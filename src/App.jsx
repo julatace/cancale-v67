@@ -35,7 +35,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.58.0';
+const EXT_ATTENDUE = '5.59.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -58,8 +58,8 @@ const EXT_ATTENDUE = '5.58.0';
 //    qu'on ne l'éteint pas dans son dos. eBay n'a jamais rien préparé : cocher
 //    à sa place mettrait 44 annonces dans une file qu'il n'a pas demandée.
 const MP_PLACES = [
-  { cle: 'lbc',  nom: 'Leboncoin', defaut: true,  cap: 'places' },
-  { cle: 'ebay', nom: 'eBay',      defaut: false, cap: 'ebay' },
+  { cle: 'lbc',  nom: 'Leboncoin', defaut: true,  cap: 'places', capPhotos: 'photoslbc' },
+  { cle: 'ebay', nom: 'eBay',      defaut: false, cap: 'ebay',   capPhotos: 'photosebay' },
 ];
 // ── LE TITRE LEBONCOIN : 50 caractères, et ils se gagnent ───────────────────
 // ⚠️⚠️ COPIE EXACTE DE `lbcTitre` DE `background.js`. Les deux calculent la file
@@ -83,7 +83,7 @@ const lbcDescription = (brut) => {
 };
 
 const LBC_TITRE_MAX = 50;
-const lbcTitre = (brand, base, size) => {
+const lbcTitre = (brand, base, size, max) => {
   let t = String(base || '').replace(/\s+/g, ' ').trim();
   t = t.replace(/^(?:chaussures?|baskets?|sneakers?)\s+(?:style|type|genre)\s+/i, '');
   const bq = String(brand || '').trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -99,7 +99,7 @@ const lbcTitre = (brand, base, size) => {
   t = t.replace(/\s+/g, ' ').trim();
   t = t.charAt(0).toUpperCase() + t.slice(1);
   const suff = taille ? ' T' + taille : '';
-  const place = LBC_TITRE_MAX - suff.length;
+  const place = (max || LBC_TITRE_MAX) - suff.length;
   if (t.length > place) {
     const coupe = t.slice(0, place);
     const esp = coupe.lastIndexOf(' ');
@@ -146,7 +146,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 //   releve  `capterReleves`       5.52.0  (5 sept.)   le relevé daté du porte-monnaie
 // `audit-coherence.cjs` vérifie que ces trois fonctions existent toujours dans
 // l'extension : une capacité annoncée mais retirée serait le même mensonge.
-const EXT_CAPACITES = { codes: '5.45.0', offres: '5.38.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4' };
+const EXT_CAPACITES = { codes: '5.45.0', offres: '5.38.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -18956,34 +18956,75 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             peut les vérifier en comptant les puces bleues.
             ⚠️ Chaque place annonce ce que l'extension INSTALLÉE sait faire,
             jamais ce que la dernière version sait faire (`EXT_CAPACITES`). */}
-        {annStats.n > 0 && MP_PLACES.map(pl => {
-          const n = pl.cle === 'lbc' ? annStats.surLbc : annStats.surEbay;
-          const etat = extSait(pl.cap);
-          return (
-          <div key={pl.cle} style={{marginBottom:10,background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 12px'}}>
-            <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-              <div style={{flex:'1 1 260px',minWidth:0}}>
-                <div style={{fontSize:13,fontWeight:700,color:C.text}}>
-                  {n} annonce{n>1?'s':''} sur {annStats.n} part{n>1?'ent':''} aussi sur {pl.nom}
+        {annStats.n > 0 && (()=>{
+          /* ⚠️ §7 : LA MÊME PHRASE SUR CHAQUE LIGNE EST **UNE** PHRASE.
+             Vu au rendu le 13 septembre : les deux places portaient mot pour mot
+             « Ton choix est enregistré. C'est l'extension, dans ton Chrome, qui
+             prépare ensuite chaque annonce sur X — ouvre l'app sur l'ordinateur
+             où elle est installée. » — 150 caractères écrits deux fois, dont
+             seul le nom de la place changeait, et il est déjà dans le titre de
+             la ligne juste au-dessus. C'est le défaut des 13 × « code pas encore
+             reçu » et des 14 × « l'extension le récupère », sur l'écran qu'il
+             ouvre pour cocher ses annonces.
+             ⚠️ MAIS ON NE JUGE PAS SUR L'ÉTAT, ON JUGE SUR LA PHRASE RENDUE :
+             deux places « en retard » ne réclament pas la même version (5.54 et
+             5.55), donc leurs phrases DISTINGUENT et doivent rester sur la
+             ligne. D'où une clé qui porte tout ce qui varie. Un contrôle posé
+             sur l'état aurait fusionné deux consignes différentes. */
+          const lignes = MP_PLACES.map(pl => {
+            const n = pl.cle === 'lbc' ? annStats.surLbc : annStats.surEbay;
+            const etat = extSait(pl.cap);
+            const ph = extSait(pl.capPhotos) === 'ok';
+            const cle = etat + '|' + ph + '|' + (etat==='retard' ? EXT_CAPACITES[pl.cap] : '')
+                      + '|' + (etat==='ok' && !ph ? EXT_CAPACITES[pl.capPhotos] : '');
+            return { pl, n, etat, ph, cle };
+          });
+          const uniforme = lignes.length > 1 && lignes.every(l => l.cle === lignes[0].cle);
+          const phrase = (l, nommer) => {
+            const pl = l.pl;
+            const ou = nommer ? <> sur {pl.nom.toLowerCase()}.fr</> : <> sur le site de chaque place</>;
+            return l.etat==='ok'
+                    ? (l.ph
+                      /* ⚠️ LA PHRASE QUI DÉCRIT CE QUE FAIT L'EXTENSION DOIT SUIVRE CE
+                         QU'ELLE FAIT. Elle disait « photos téléchargées » — vrai jusqu'à
+                         la 5.58, faux depuis : elles s'ATTACHENT au formulaire, et c'est
+                         exactement ce dont il se plaignait (« ça me fait télécharger des
+                         photos dans mon ordi »). Même défaut que la carte URSSAF : les
+                         chiffres rebranchés, la phrase restée en arrière.
+                         ⚠️ Et la phrase dépend de la VERSION INSTALLÉE, PLACE PAR PLACE :
+                         Leboncoin attache depuis la 5.58, eBay depuis la 5.59. Un seul
+                         seuil pour les deux aurait menti dans un sens ou dans l'autre. */
+                      ? <>La puce sous chaque annonce décide. L'extension prépare ensuite chacune{ou} — <b>photos attachées au formulaire</b> (rien sur ton ordinateur), texte copié, champs remplis : <b>c'est toi qui publies</b>.</>
+                      : <>La puce sous chaque annonce décide. L'extension prépare ensuite chacune{ou} — photos téléchargées dans un dossier, texte copié, formulaire pré-rempli : <b>c'est toi qui publies</b>. La <b>{EXT_CAPACITES[pl.capPhotos]}</b> les attache directement au formulaire.</>)
+                  : l.etat==='absente'
+                    ? <>Ton choix est enregistré. C'est l'extension, dans ton Chrome, qui prépare ensuite chaque annonce{nommer ? <> sur {pl.nom}</> : ''} — ouvre l'app sur l'ordinateur où elle est installée.</>
+                    : <>Ton choix est enregistré, <b>mais l'extension installée ne sait pas encore {nommer ? <>préparer {pl.nom}</> : 'les préparer'}</b> : il lui faut la <b>{EXT_CAPACITES[pl.cap]}</b>. Mets-la à jour depuis <b>Réglages</b> — tes coches ne bougent pas.</>;
+          };
+          return (<>
+            {/* La phrase commune une seule fois, au-dessus des lignes. Sur la
+                ligne il ne reste alors que ce qui DISTINGUE : le nom de la
+                place, son compte, et ses deux boutons. */}
+            {uniforme && <div style={{fontSize:11.5,color:C.muted,lineHeight:1.45,margin:'0 2px 8px'}}>{phrase(lignes[0], false)}</div>}
+            {lignes.map(l => (
+            <div key={l.pl.cle} style={{marginBottom:10,background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 12px'}}>
+              <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+                <div style={{flex:'1 1 260px',minWidth:0}}>
+                  <div style={{fontSize:13,fontWeight:700,color:C.text}}>
+                    {l.n} annonce{l.n>1?'s':''} sur {annStats.n} part{l.n>1?'ent':''} aussi sur {l.pl.nom}
+                  </div>
+                  {!uniforme && <div style={{fontSize:11.5,color:C.muted,lineHeight:1.45,marginTop:2}}>{phrase(l, true)}</div>}
                 </div>
-                <div style={{fontSize:11.5,color:C.muted,lineHeight:1.45,marginTop:2}}>{
-                  etat==='ok'
-                    ? <>La puce sous chaque annonce décide. L'extension prépare ensuite chacune sur {pl.nom.toLowerCase()}.fr — photos téléchargées, texte copié, formulaire pré-rempli : <b>c'est toi qui publies</b>.</>
-                  : etat==='absente'
-                    ? <>Ton choix est enregistré. C'est l'extension, dans ton Chrome, qui prépare ensuite chaque annonce sur {pl.nom} — ouvre l'app sur l'ordinateur où elle est installée.</>
-                    : <>Ton choix est enregistré, <b>mais l'extension installée ne sait pas encore préparer {pl.nom}</b> : il lui faut la <b>{EXT_CAPACITES[pl.cap]}</b>. Mets-la à jour depuis <b>Réglages</b> — tes coches ne bougent pas.</>
-                }</div>
-              </div>
-              <div style={{display:'flex',gap:6,flexShrink:0}}>
-                <button type="button" onClick={()=>setMpToutes(pl.cle, true)}
-                  style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'6px 11px',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit',maxWidth:180}}>Tout cocher</button>
-                <button type="button" onClick={()=>setMpToutes(pl.cle, false)}
-                  style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'6px 11px',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit',maxWidth:180}}>Tout décocher</button>
+                <div style={{display:'flex',gap:6,flexShrink:0}}>
+                  <button type="button" onClick={()=>setMpToutes(l.pl.cle, true)}
+                    style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'6px 11px',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit',maxWidth:180}}>Tout cocher</button>
+                  <button type="button" onClick={()=>setMpToutes(l.pl.cle, false)}
+                    style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'6px 11px',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit',maxWidth:180}}>Tout décocher</button>
+                </div>
               </div>
             </div>
-          </div>
-          );
-        })}
+            ))}
+          </>);
+        })()}
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(clamp(160px, 25%, 240px), 1fr))',gap:14}}>
           {annShown.map(it=>{
             const item = { id:it.id, title:it.title, photo:it.photo, price:it.price, _acc:it._acc };
@@ -21436,7 +21477,14 @@ function LeboncoinScreen() {
         <h2 style={{ fontSize: 18, fontWeight: 800, color: C.text, margin: 0 }}>🟠 Leboncoin</h2>
         <button onClick={reload} style={{ background: 'transparent', border: `1px solid ${C.border}`, borderRadius: 999, padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: C.text }}>{loading ? '…' : '↻ Actualiser'}</button>
       </div>
-      <div style={{ fontSize: 12, color: C.muted, marginBottom: 14, lineHeight: 1.5 }}>La file de publication est construite à partir de tes <b>annonces réellement en ligne sur Vinted</b> (comptes actifs uniquement, paires retirées exclues). La <b>publication</b> se fait via l'extension sur leboncoin.fr, bouton « 🚀 Tout préparer » : photos téléchargées, texte copié, formulaire pré-rempli — tu valides.</div>
+      {/* ⚠️ MÊME DÉFAUT QUE LA LIGNE DES PLACES, TROUVÉ EN BALAYANT « télécharg » :
+          cette phrase-ci disait aussi « photos téléchargées » et n'était gardée
+          par AUCUNE version. Depuis la 5.58 elles s'attachent au formulaire.
+          *Une suppression « terminée » se vérifie sur ce qui RESTE* — le premier
+          correctif n'avait touché qu'un des deux endroits. */}
+      <div style={{ fontSize: 12, color: C.muted, marginBottom: 14, lineHeight: 1.5 }}>La file de publication est construite à partir de tes <b>annonces réellement en ligne sur Vinted</b> (comptes actifs uniquement, paires retirées exclues). La <b>publication</b> se fait via l'extension sur leboncoin.fr, bouton « 🚀 Tout préparer » : {extSait('photoslbc')==='ok'
+        ? <><b>photos attachées au formulaire</b> (rien sur ton ordinateur), texte copié, champs remplis</>
+        : <>photos téléchargées dans un dossier, texte copié, formulaire pré-rempli</>} — tu valides.</div>
 
       {/* COMPTES LEBONCOIN — plusieurs comptes possibles. On liste ceux que
           l'extension a réellement vus connectés dans le navigateur, avec le

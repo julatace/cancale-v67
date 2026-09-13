@@ -1158,11 +1158,9 @@ champs qu'il **reconnaît**. Aucune publication automatique.
   peuvent pas être injectées, un navigateur interdit de remplir un champ fichier
   par programme ». **Mesuré le 13 septembre dans Chromium** : ce qui est interdit
   c'est `input.value = '/chemin/photo.jpg'` ; **`input.files =
-  dataTransfer.files` marche** — la page reçoit un vrai `File` (nom, taille,
-  type), `change` part, et le glisser-déposer synthétique marche aussi. Je l'ai
-  écrit deux fois dans ce dossier sans jamais l'avoir essayé. *Une impossibilité
-  qu'on n'a pas mesurée est une opinion.* Voir Leboncoin ci-dessus — à reporter
-  sur eBay au prochain passage.
+  dataTransfer.files` marche**. Je l'ai écrit deux fois dans ce dossier sans
+  jamais l'avoir essayé. *Une impossibilité qu'on n'a pas mesurée est une
+  opinion.* **Reporté sur eBay le 13 septembre** — voir la section suivante.
 - `EXT_CAPACITES.ebay = '5.55.0'`, et `audit-places.cjs` couvre les deux places.
   ⚠️ Son premier jet **mourait** sur le code d'avant (`buildEbayData` n'existe
   pas → `TypeError`), donc les contrôles suivants n'étaient jamais rendus : *un
@@ -1185,6 +1183,97 @@ champs qu'il **reconnaît**. Aucune publication automatique.
   barre de recherche, et le bandeau annonce « 1 champ rempli » sur une page où
   il n'a rien rempli d'utile). *Une précaution, pas une découverte.*
 
+### ⚠️⚠️ ET eBAY N'AVAIT APPRIS AUCUNE DES LEÇONS DE LEBONCOIN
+Les deux assistants sont livrés « sur le même modèle », et c'est précisément ce
+qui rend le piège invisible : **les six défauts mesurés et corrigés sur Leboncoin
+le 13 septembre étaient tous entiers dans eBay**, côte à côte, dans un fichier
+que personne ne relisait parce qu'il était déjà « fait ». *Un correctif « sur le
+modèle de » n'est pas un correctif appliqué aux deux.*
+
+**Mesuré avant de coder** (le VRAI `buildEbayAd` exécuté sur la vraie base, file
+eBay vide aujourd'hui — on mesure donc ce qui arrive **le jour où il coche**) :
+
+1. ⚠️⚠️ **14 DE SES 53 ANNONCES EN LIGNE ET NUMÉROTÉES SONT PROUVÉES VENDUES**, et
+   `buildEbayData` ne filtrait que sur `is_closed`. Exactement sa plainte du
+   13 septembre (« des paires qui sont vendues »), corrigée pour Leboncoin le
+   jour même. **Sur eBay c'est plus coûteux encore** : une vente y engage une
+   expédition qu'il ne peut pas faire. La preuve (`transaction → item_id`, §5)
+   **prime sur l'état de l'annonce**, et le panneau **dit combien** il écarte —
+   une file qui rétrécit sans explication se lit comme une perte.
+   ⚠️ Et l'absence de preuve n'est pas une preuve : sans **aucune** transaction
+   captée, rien n'est écarté (le banc le vérifie — sinon une lecture vide
+   viderait sa file, « rien lu » ne vaut pas « rien »).
+2. **18 titres sur 53 sortaient avec la marque écrite deux fois** — « Nike nike
+   shox tl », « Salomon salomon XT-6 » — et **51 sur 53** en « taille 42 » au
+   lieu de « T42 ». `buildEbayAd` recollait `[marque, titre].join(' ')` puis
+   `.slice(0, 80)` : **une seconde règle de titre**, avec le défaut que
+   `lbcTitre` corrigeait juste à côté. Le plafond est devenu un **paramètre**
+   (§11 : une notion, une règle, un propriétaire) — 50 pour Leboncoin, 80 pour
+   eBay, la même règle pour les deux.
+3. ⚠️⚠️ **LES PHOTOS ÉTAIENT TÉLÉCHARGÉES SUR SON DISQUE** (« ça me fait
+   télécharger des photos dans mon ordi »), et le fichier affirmait toujours
+   l'impossibilité mesurée fausse. Elles s'attachent. **0 téléchargement,
+   3 photos attachées** au banc.
+4. **Les listes déroulantes n'étaient même pas REGARDÉES** : `champ()` ne lit que
+   `input`/`textarea`. C'est mot pour mot « ça ne met pas la catégorie ni le
+   reste ». L'**état**, la **marque** et la **pointure** sont choisis —
+   ⚠️ **jamais la CATÉGORIE** : eBay la propose à partir du titre et se trompe
+   moins que moi, qui n'ai jamais vu son arbre. Le banc **exige** qu'elle reste
+   vide : le jour où quelqu'un « complète la symétrie » avec Leboncoin, il passe
+   au rouge.
+5. ⚠️⚠️ **« Titre copié » SANS RIEN COPIER**, et ici c'était pire qu'ailleurs :
+   `copy()` n'avait **aucun repli**. Une promesse rejetée ne passe pas par
+   `catch`. Prouvé au banc sur le code d'avant : le presse-papier reste vide,
+   deux `NotAllowed` non gérés, et le panneau annonce « Référence copiée :
+   VRM-101 » — la référence est le seul filet quand le formulaire n'a pas de
+   champ pour elle.
+6. **L'arrêt au bout de 90 s se faisait en silence**, et `panel_ebay_form` était
+   **écrasée à chaque passage** : la dernière étape vue effaçait la seule que
+   j'avais. Toutes les étapes sont gardées par signature (comme
+   `lbc_recon.etapes`), et le bandeau dit que c'est fini avec un
+   « Re-remplir » qui **relance** la surveillance.
+
+- `scripts/bancs/ebay.cjs` : **35 contrôles, 16 échecs sur le code d'avant**.
+  `audit-places.cjs` : **4 échecs** de plus (vente prouvée, compte rendu, marque
+  doublée, règle de titre unique).
+- ⚠️ **ONZIÈME ET DOUZIÈME FOIS QU'UN DE MES CONTRÔLES CRIE AU LOUP**, et les deux
+  sont des récidives nommées dans ce dossier : (1) j'interdisais le MOT
+  « télécharg », et il attrapait la phrase **honnête** que je venais d'écrire
+  (« rien n'est téléchargé sur ton ordinateur ») — ce qui est interdit est
+  l'**instruction** d'aller chercher un dossier sur son disque ; (2)
+  `audit-places.cjs` exigeait la signature exacte `(brand, base, size)` et
+  tombait au rouge quand le plafond est devenu un paramètre — la fonction était
+  **mieux partagée** qu'avant. *Un audit suit la RÈGLE, pas son orthographe.*
+- ⚠️ **Et le banc MOURAIT sur le code d'avant** (un `click` sur un bouton
+  inexistant expire à 30 s), donc deux blocs entiers n'étaient jamais rendus et
+  je ne voyais que 10 échecs sur 16. *Un banc ne meurt pas, il rapporte* — même
+  erreur que le premier jet d'`audit-places.cjs`.
+- ⚠️ **La phrase de l'app était restée en arrière** : l'écran Annonces promettait
+  « photos téléchargées » pour les deux places. Elle suit maintenant la version
+  INSTALLÉE, place par place (`capPhotos`).
+  ⚠️⚠️ **Et je n'en avais corrigé QU'UN des deux.** En balayant « télécharg » sur
+  tout le dépôt : l'**écran Leboncoin** portait la même affirmation
+  (« bouton 🚀 Tout préparer : photos téléchargées, texte copié, formulaire
+  pré-rempli »), sans **aucune** garde de version. *Une suppression « terminée »
+  se vérifie sur ce qui RESTE* — c'est la leçon du pipeline Factures, refaite le
+  jour même, à une heure d'intervalle.
+  ⇒ `audit-coherence.cjs` porte désormais la règle, dans la forme acceptée de
+  `panne.cjs` : **toute phrase qui affirme ce que l'extension fait des photos
+  doit avoir une garde de version dans son voisinage immédiat**. Interdire le
+  *mot* attraperait la phrase honnête ; c'est la GARDE qui est exigée. **Rouge
+  sur le code d'avant**, et il nomme la ligne.
+  ⚠️ **TREIZIÈME fois qu'un de mes contrôles crie au loup**, et la récidive
+  exacte du balayage des sondes : il s'est déclenché sur **mon propre
+  commentaire**, celui qui cite la phrase d'avant pour expliquer pourquoi elle
+  est partie. Retirer les lignes qui *commencent* par `//` ne suffit pas — un
+  bloc `/* … */` de dix lignes n'en a aucune. Les blocs sont neutralisés en
+  gardant les retours à la ligne, pour que les numéros signalés restent ceux du
+  fichier.
+- ⚠️ Et un **commentaire** de `lbc.js` répétait encore l'impossibilité fausse,
+  quinze lignes au-dessus du code qui attache les photos. *Une suppression
+  « terminée » se vérifie sur ce qui RESTE, commentaires compris* : un
+  commentaire faux se relit comme une règle.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
@@ -1199,6 +1288,17 @@ arrivée** — vérifiée commit par commit sur `manifest.json`, pas devinée.
 | `places` | `mpChoisi` | **5.54.0** (11 sept.) | « seules les annonces cochées partent sur Leboncoin » |
 | `ebay` | `buildEbayData` | **5.55.0** (12 sept.) | « l'extension prépare tes annonces sur eBay » |
 | `lbctitre` | `lbcTitre` | **5.55.4** (12 sept.) | « le titre exactement tel qu'il partira sur Leboncoin » |
+| `photoslbc` | `photosEnOctets` | **5.58.0** (13 sept.) | « photos attachées au formulaire Leboncoin, rien sur ton ordinateur » |
+| `photosebay` | `photosPourEbay` | **5.59.0** (13 sept.) | la même promesse, pour eBay |
+
+⚠️ **DEUX SEUILS POUR UNE MÊME NOTION, EXPRÈS.** Les photos s'attachent côté
+Leboncoin depuis la 5.58 et côté eBay depuis la 5.59 : un seul seuil aurait
+menti dans un sens (promettre à une 5.58 que ses annonces eBay partent avec leurs
+photos — le défaut le plus coûteux du projet) ou dans l'autre (réclamer une mise
+à jour qui ne change rien, ce que le dossier interdit aussi). Et comme
+`audit-coherence.cjs` exige qu'une capacité cite une **fonction** de
+`background.js`, le pont eBay passe par `photosPourEbay` — une ligne de pont ne
+se date pas, une fonction si. `MP_PLACES` porte `capPhotos` place par place.
 
 `extSait(quoi)` rend **trois états** — `absente` (téléphone, autre navigateur) ·
 `retard` · `ok` — et **jamais deux**. Une extension **muette** sur sa version est
@@ -1220,6 +1320,38 @@ d'extension attendue » à l'écran, code de sortie 0. §8 annonçait pourtant �
 vérifie que la constante suit le manifeste » : il le **racontait**. Un contrôle
 qui ne peut pas échouer est **pire qu'absent — il rassure**. Il compte
 maintenant (`ko`/`dit`) et sort en 1.
+
+⚠️⚠️ **ET LA LIGNE DES PLACES ÉCRIVAIT LA MÊME PHRASE DEUX FOIS.** Vu au rendu
+le 13 septembre, sur l'écran Annonces : Leboncoin et eBay portaient chacun
+« *Ton choix est enregistré. C'est l'extension, dans ton Chrome, qui prépare
+ensuite chaque annonce sur X — ouvre l'app sur l'ordinateur où elle est
+installée.* » — **150 caractères écrits deux fois**, dont seul le nom de la place
+changeait, et il est déjà dans le titre de la ligne juste au-dessus. C'est §7 mot
+pour mot (les 13 × « code pas encore reçu », les 14 × « l'extension le
+récupère »), sur l'écran où il coche ses annonces. La phrase commune se dit
+**une fois au-dessus des lignes** ; sur la ligne il ne reste que ce qui
+distingue.
+- ⚠️ **On juge sur la PHRASE RENDUE, pas sur l'état** : deux places « en retard »
+  ne réclament pas la même version (5.54 et 5.55), donc leurs phrases
+  **distinguent** et restent sur leur ligne. Fusionner sur l'état aurait donné
+  une seule consigne, fausse pour l'une des deux. D'où une clé qui porte tout ce
+  qui varie.
+- Le banc `capacites.cjs` **cherche la répétition**, pas une formule — un
+  contrôle posé sur le libellé serait vert le jour où quelqu'un reformule
+  (§6.5). Et il exige **les deux moitiés** : aucun doublon **et** les deux places
+  toujours nommées — un contrôle qui n'aurait que la première serait vert sur un
+  écran qui a perdu eBay.
+- ⚠️⚠️ **ET MON PREMIER JET DE CE CONTRÔLE NE POUVAIT PAS ÉCHOUER.** Il exigeait
+  deux phrases **identiques** — or les deux lignes différaient d'un mot (« sur
+  Leboncoin » / « sur eBay »). **Vert sur le défaut**, donc *pire qu'absent : il
+  rassurait* (même famille que le `DIST` absolu des quatorze bancs et
+  qu'`audit-coherence.cjs` qui sortait toujours en 0). Ce qui se répète n'est pas
+  la phrase exacte mais sa **substance** : on mesure le plus long morceau de
+  texte **commun** à deux phrases rendues, et **60 caractères identiques** valent
+  une phrase écrite deux fois, quel que soit le mot qui change au milieu.
+  **2 échecs** sur le code d'avant, 0 après — et le message cite le morceau
+  répété. *Un contrôle se vérifie sur le code d'AVANT, toujours, même quand la
+  règle paraît évidente.*
 
 ⚠️ **Le bandeau se pose UNE fois, pas sur chaque carte.** Les 43 cartes
 d'Annonces portent chacune le champ « Min. accepté » ; la phrase qui dit que
@@ -1496,8 +1628,14 @@ compteur = la fonction n'a jamais tourné. Ni `panel_colis_relais` ni
 `panel_ebay_form` n'existent en base. **Tant qu'il ne met pas à jour, aucun code
 de retrait ne sera lu, aucun relevé capté, et la sélection Leboncoin/eBay ne
 sera pas appliquée par le panneau.** Le zip à jour est dans l'app
-(`public/VRM-extension.zip`, **5.55.3**) ; `EXT_ATTENDUE` le suit et l'app
+(`public/VRM-extension.zip`, **5.59.0**) ; `EXT_ATTENDUE` le suit et l'app
 affiche le bandeau.
+
+⚠️ **CE QUE LA FILE eBAY DONNERAIT LE JOUR OÙ IL COCHE** (mesuré le 13 septembre,
+la file est vide aujourd'hui — défaut `false`) : **53 annonces en ligne et
+numérotées**, dont **14 prouvées vendues** (écartées depuis), **18 titres** avec
+la marque écrite deux fois et **51** en « taille X » (corrigés depuis). Voir
+« eBay n'avait appris aucune des leçons de Leboncoin ».
 
 ⚠️⚠️ **PIÈGE `billing` — ET C'EST ENCORE MON SCRIPT QUI AVAIT TORT.** Première
 mesure après le retour : « **0 € sur 0 porte-monnaie, 10 lignes hors sujet** »,

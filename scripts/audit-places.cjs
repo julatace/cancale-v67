@@ -44,7 +44,7 @@ const LISTINGS = [
   ] } } },
 ];
 
-function ctxAvec(numeros) {
+function ctxAvec(numeros, txns) {
   const ctx = {
     console: { log() {}, warn() {}, error() {} },
     setTimeout, clearTimeout, setInterval, clearInterval, URL, TextDecoder, TextEncoder,
@@ -65,6 +65,8 @@ function ctxAvec(numeros) {
       if (/id=eq\.main/.test(u)) return j([{ data: { vinted_annonce_numeros: numeros, vinted_accounts: [
         { vinted_user_id: '9001', login: 'compteA' }, { vinted_user_id: '9002', login: 'compteB' }] } }]);
       if (/id=like\.harvest_\*_listings/.test(u)) return j(LISTINGS);
+      // La PREUVE d'une vente : `transaction → item_id` (§5, l'identité).
+      if (/id=like\.harvest_\*_txn_\*/.test(u)) return j(txns || []);
       return j([]);
     },
   };
@@ -143,6 +145,68 @@ function ctxAvec(numeros) {
     dit(a.sku === 'VRM-101', 'eBay : chaque annonce porte sa référence VRM-{n°}', String(a.sku));
     dit(String(a.title || '').length <= 80, 'eBay : le titre tient dans les 80 caractères du site', String((a.title || '').length));
     dit(!a.category, 'eBay : aucune catégorie devinée', 'eBay la propose lui-même, une catégorie fausse ferait pire que rien');
+
+    // ── ⚠️⚠️ UNE PAIRE DÉJÀ VENDUE NE DOIT PAS ENTRER DANS LA FILE eBAY ──────
+    // C'est la plainte de Julien du 13 septembre (« des paires qui sont
+    // vendues »), corrigée pour Leboncoin le jour même et laissée entière ici.
+    // Mesuré sur ses vraies données : **14 de ses 53 annonces en ligne et
+    // numérotées portent une vente PROUVÉE**. Vinted ne ferme pas toujours
+    // l'annonce après la vente, et la capture d'un compte peut dater : l'état de
+    // l'annonce ne suffit pas, la preuve de vente PRIME.
+    {
+      const tous = {
+        '101': { numero: '101', title: 'A', mp: { ebay: true } },
+        '202': { numero: '202', title: 'B', mp: { ebay: true } },
+        '303': { numero: '303', title: 'C', mp: { ebay: true } },
+      };
+      const vendue = [{ id: 'harvest_9001_txn_7', data: { payload: { transaction: { item_id: 101 } } } }];
+      const r3 = await ctxAvec(tous, vendue).buildEbayData();
+      const n3 = (r3.queue || []).map(a2 => String(a2.numero)).sort();
+      dit(!n3.includes('101'), 'eBay : une paire PROUVÉE VENDUE n\'entre pas dans la file',
+        n3.includes('101') ? 'il se verrait proposer de remettre en vente une paire qu\'il n\'a plus' : 'file : ' + n3.join(', '));
+      dit(n3.includes('202') && n3.includes('303'), 'et les autres y restent (on n\'écarte que le prouvé)',
+        'file : ' + n3.join(', '));
+      // ⚠️ Et on DIT combien : une file qui rétrécit sans explication se lit
+      //    comme une perte (leçon de l'écran Leboncoin).
+      dit(r3.vendues === 1, 'eBay : le nombre de paires écartées est RENDU, pour être dit à l\'écran',
+        'vendues = ' + String(r3.vendues));
+      // L'absence de preuve n'est pas une preuve d'absence : sans transaction
+      // captée, la paire reste dans la file.
+      const r4 = await ctxAvec(tous, []).buildEbayData();
+      dit((r4.queue || []).length === 3, 'sans AUCUNE transaction captée, rien n\'est écarté',
+        'sinon une lecture vide viderait sa file — « rien lu » ne vaut pas « rien »');
+    }
+
+    // ── LE TITRE eBAY : LA MÊME RÈGLE QUE LEBONCOIN, AVEC 80 CARACTÈRES ──────
+    // Mesuré le 13 septembre sur ses 53 annonces en ligne : l'ancien
+    // `buildEbayAd` recollait marque + titre sans regarder si le titre portait
+    // déjà la marque → **18 titres sur 53 en « Nike nike shox tl »**, et 51 en
+    // « taille 42 » au lieu de « T42 ». Deux règles pour une notion, c'est §11.
+    {
+      const cas = [
+        ['Nike', 'nike shox tl noir et vert', '36'],
+        ['Salomon', 'salomon XT-6 blanc', '40'],
+        ['Nike', 'chaussures style Nike sacai vaporwaffle sail', '42'],
+        ['Dr. Martens', '1461 mono noir taille 46', '46'],
+      ];
+      const mauvais = [];
+      for (const [b2, t2, z2] of cas) {
+        const titre = ctx2.buildEbayAd({ title: t2, brand_title: b2, size_title: z2 }, {}, '101', 'compteA').title;
+        const mots = titre.split(/\s+/);
+        for (let i = 1; i < mots.length; i++) {
+          if (mots[i] && mots[i].toLowerCase() === mots[i - 1].toLowerCase()) mauvais.push('doublon : « ' + titre + ' »');
+        }
+        if (titre.length > 80) mauvais.push('trop long : ' + titre.length);
+        if (/\btaille\s/i.test(titre)) mauvais.push('« taille » au long : « ' + titre + ' »');
+        if (z2 && !new RegExp('T' + z2.replace('.', '[.,]') + '$').test(titre)) mauvais.push('taille absente de la fin : « ' + titre + ' »');
+      }
+      dit(mauvais.length === 0, 'eBay : la marque n\'est jamais doublée et la taille est en suffixe',
+        mauvais[0] || '4 cas réels vérifiés');
+      // Et c'est bien la MÊME fonction : un second `slice(0, 80)` recréerait le
+      // défaut corrigé pour Leboncoin.
+      dit(/lbcTitre\([^)]*EBAY_TITRE_MAX\)/.test(src), 'eBay : il réutilise la règle de titre, il n\'en a pas une seconde',
+        'une notion, une règle, un propriétaire (§11)');
+    }
   }
   // L'app doit afficher la puce eBay ET ne rien promettre que l'extension
   // installée ne sait pas faire.
@@ -173,7 +237,15 @@ function ctxAvec(numeros) {
     // Le VRAI `lbcTitre` de l'extension, déjà chargé dans le contexte vm.
     const ctxT = ctxAvec({});
     // Celui de l'app : on l'extrait du source et on l'exécute tel quel.
-    const m = /const lbcTitre = \(brand, base, size\) => \{[\s\S]*?\n\};/.exec(APP);
+    // ⚠️ DOUZIÈME FOIS QU'UN DE MES CONTRÔLES CRIE AU LOUP : ce motif exigeait la
+    //    signature EXACTE `(brand, base, size)`. Le jour où le plafond est devenu
+    //    un paramètre (`(brand, base, size, max)`, pour qu'eBay réutilise la MÊME
+    //    règle à 80 caractères au lieu d'en avoir une seconde), la fonction était
+    //    intacte — mieux partagée qu'avant — et l'audit tombait au rouge en
+    //    annonçant « `lbcTitre` introuvable dans App.jsx ».
+    //    *Un audit suit la RÈGLE, pas son orthographe* : on accepte n'importe
+    //    quelle liste de paramètres, et ce sont les SORTIES qui sont comparées.
+    const m = /const lbcTitre = \([^)]*\) => \{[\s\S]*?\n\};/.exec(APP);
     // ⚠️ UN AUDIT NE MEURT PAS ET NE SAUTE PAS SES CONTRÔLES. Premier jet : si
     //    l'app n'avait pas la fonction, tout le bloc était sauté — donc on ne
     //    savait même pas si l'EXTENSION l'avait. On juge les deux séparément,

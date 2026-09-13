@@ -131,7 +131,7 @@ if(appNeedsBord&&bgShipConst){
   //     l'atteindrait, donc la promesse ne s'afficherait JAMAIS, et on
   //     enverrait Julien chercher une mise à jour qui n'existe pas. C'est le
   //     défaut du zip, retourné.
-  const FONCTIONS = { codes:'capterRetraits', offres:'autoAccepterOffres', releve:'capterReleves', places:'mpChoisi', ebay:'buildEbayData', lbctitre:'lbcTitre' };
+  const FONCTIONS = { codes:'capterRetraits', offres:'autoAccepterOffres', releve:'capterReleves', places:'mpChoisi', ebay:'buildEbayData', lbctitre:'lbcTitre', photoslbc:'photosEnOctets', photosebay:'photosPourEbay' };
   const t = /const EXT_CAPACITES\s*=\s*\{([^}]*)\}/.exec(APP);
   dit(!!t, "l'app tient une table des capacités de l'extension",
     "sans elle, chaque promesse « tout seul » est reprise à la main — et une seule était gardée");
@@ -145,6 +145,38 @@ if(appNeedsBord&&bgShipConst){
       dit(cmpVer(c.v, man.version) <= 0,
         `capacité « ${c.nom} » : son seuil ${c.v} est atteignable`,
         `manifeste ${man.version} — un seuil plus haut ne s'affiche jamais`);
+    }
+    // ⚠️⚠️ CE QUE L'APP DIT DES PHOTOS DÉPEND DE LA VERSION INSTALLÉE.
+    // Elles étaient téléchargées sur son disque jusqu'à la 5.58 (Leboncoin) et
+    // la 5.59 (eBay) ; depuis, elles s'attachent au formulaire. Le 13 septembre
+    // la phrase a été corrigée à un endroit… et laissée à l'autre (l'écran
+    // Leboncoin), sans aucune garde de version. *Une suppression « terminée » se
+    // vérifie sur ce qui RESTE.*
+    // ⚠️ Même forme que le contrôle de `panne.cjs` : toute phrase qui AFFIRME ce
+    //    que l'extension fait des photos doit avoir une garde dans son voisinage
+    //    immédiat. Un contrôle qui interdirait le mot attraperait la phrase
+    //    honnête ; celui-ci exige la GARDE, pas une formulation.
+    {
+      // ⚠️ TREIZIÈME FOIS QU'UN DE MES CONTRÔLES CRIE AU LOUP, et c'est la
+      //    récidive exacte du balayage des sondes (§« deux fois de plus ») :
+      //    premier jet, il s'est déclenché sur MON PROPRE COMMENTAIRE — celui
+      //    qui cite la phrase d'avant pour expliquer pourquoi elle est partie.
+      //    Retirer les lignes qui COMMENCENT par `//` ne suffit pas : un bloc
+      //    `/* … */` de dix lignes n'en a aucune. *Un audit lit le CODE* — on
+      //    neutralise les blocs en gardant les retours à la ligne, pour que les
+      //    numéros signalés restent ceux du fichier.
+      const sansCommentaires = APP
+        .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '))
+        .replace(/(^|[^:])\/\/[^\n]*/g, (m, p1) => p1 + ' '.repeat(Math.max(0, m.length - p1.length)));
+      const lignes = sansCommentaires.split('\n');
+      const sansGarde = [];
+      lignes.forEach((l, i) => {
+        if (!/photos? (attachées|téléchargées)/i.test(l)) return;
+        const autour = lignes.slice(Math.max(0, i - 8), i + 3).join('\n');
+        if (!/capPhotos|photoslbc|photosebay/.test(autour)) sansGarde.push(i + 1);
+      });
+      dit(sansGarde.length === 0, 'ce que l\'app dit des PHOTOS est gardé par la version installée',
+        sansGarde.length ? 'ligne(s) ' + sansGarde.join(', ') + ' : affirme sans savoir ce que l\'extension sait faire' : '');
     }
     for (const k in FONCTIONS) dit(caps.some(c => c.nom === k),
       `la capacité « ${k} » est déclarée dans la table`,
