@@ -35,7 +35,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.56.1';
+const EXT_ATTENDUE = '5.57.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -21338,6 +21338,8 @@ function LeboncoinScreen() {
     // ⚠️ « jamais capté » n'est pas « zéro annonce » : sans cette ligne, le
     //    rapprochement par référence est impossible, donc « vendue sur Vinted →
     //    à retirer » ne peut RIEN trouver. L'écran doit le dire, pas afficher 0.
+    // « jamais capté » = aucune annonce QUI SOIT À LUI (la ligne peut exister et
+    // ne contenir que des annonces d'autres).
     const lbcJamaisLu = lbcRows !== null && !(lbcRows && lbcRows[0]);
     const lbcItems = (lbcRows && lbcRows[0] && lbcRows[0].data && lbcRows[0].data.items) || {};
     const lbcAds = Object.values(lbcItems).filter(Boolean);
@@ -21351,7 +21353,14 @@ function LeboncoinScreen() {
       return ks;
     };
     const isDead = (ad) => /(supprim|delete|expir|refus|sold|vendu)/i.test(String(ad.status || ''));
-    const liveAds = lbcAds.filter(ad => !isDead(ad));
+    // ⚠️ ET ON NE GARDE QUE CE QU'ON PEUT LUI ATTRIBUER. Mesuré le 13 septembre :
+    //    81 annonces rangées par la capture n'étaient pas les siennes (chalets,
+    //    gîtes — le flux « découverte » de la page qu'il regardait). Sans ce
+    //    filtre elles ressortaient toutes en « annonces non reliées », et le
+    //    compteur annonçait 81. Une annonce est à lui si elle porte notre
+    //    référence VRM, ou si son propriétaire est connu.
+    const aLui = (ad) => !!(ad && (ad.ref || ad.customRef || ad.lbcUser));
+    const liveAds = lbcAds.filter(ad => !isDead(ad) && aLui(ad));
     const refToAd = new Map();
     liveAds.forEach(ad => adKeys(ad).forEach(k => { if (!refToAd.has(k)) refToAd.set(k, ad); }));
     const vKeys = (id, title) => { const e = numeros[id] || {}; const ks = []; if (e.numero) ks.push(String(e.numero).trim()); const m = numFrom(title || e.title); if (m) ks.push(m); return ks; };
@@ -21361,11 +21370,15 @@ function LeboncoinScreen() {
     //    chargée). Ils doivent donc appliquer EXACTEMENT les mêmes règles, sinon
     //    l'app annonce « 12 à publier » et le panneau en montre 8 —
     //    `audit-places.cjs` vérifie que les deux filtres existent des deux côtés.
-    const queue = []; let autoMatched = 0; let retirees = 0;
+    const queue = []; let autoMatched = 0; let retirees = 0; let vendues = 0;
     for (const o of online) {
       const e = numeros[o.id]; const num = e && e.numero;
       if (!num || String(num).trim() === '') continue;
       if (!mpChoisi(e, 'lbc')) { retirees++; continue; }             // retirée de la file par Julien
+      // ⚠️⚠️ VENDUE = HORS DE LA FILE (mesuré : 14 des 57 « en ligne » ont une
+      //    vente prouvée). La preuve prime sur l'état de l'annonce : Vinted ne
+      //    la ferme pas toujours, et une capture peut dater de 85 h.
+      if (vendus.has(o.id)) { vendues++; continue; }
       if (lost[String(num).trim()]) continue;                        // paire retirée du stock
       if (posted.has(o.id) || posted.has(String(num))) continue;
       if (vKeys(o.id, o.title).some(k => refToAd.has(k))) { autoMatched++; continue; } // déjà sur LBC
@@ -21408,7 +21421,7 @@ function LeboncoinScreen() {
     // Répartition des annonces LBC par compte (plusieurs comptes possibles).
     const parCompte = {};
     for (const ad of liveAds) { const k = String(ad.lbcUser || '?'); (parCompte[k] = parCompte[k] || []).push(ad); }
-    setData({ echecLecture: echecLecture || listRowsBrut === null, lbcJamaisLu, queue, removals, unlinked, liveAds, autoMatched, retirees, lbcAccounts, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: liveAds.length, limit: pd.limit, plan: pd.plan });
+    setData({ echecLecture: echecLecture || listRowsBrut === null, lbcJamaisLu: lbcJamaisLu || liveAds.length === 0, vendues, queue, removals, unlinked, liveAds, autoMatched, retirees, lbcAccounts, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: liveAds.length, limit: pd.limit, plan: pd.plan });
     setLoading(false);
   };
   useEffect(() => { reload(); /* eslint-disable-next-line */ }, []);
@@ -21558,6 +21571,11 @@ function LeboncoinScreen() {
               Sans cette ligne, désélectionner faisait fondre la file sans que
               rien ne dise pourquoi — et « 0 à publier » se serait lu « tout est
               fait ». On dit combien, et où c'est réglé. */}
+          {data.vendues > 0 && (
+            <div style={{ fontSize: 11, color: C.muted, marginBottom: 8, lineHeight: 1.5 }}>
+              {data.vendues} paire{data.vendues > 1 ? 's' : ''} {data.vendues > 1 ? 'sont' : 'est'} <b>déjà vendue{data.vendues > 1 ? 's' : ''} sur Vinted</b> — {data.vendues > 1 ? 'elles ne sont' : "elle n'est"} pas dans cette file. (Vinted laisse parfois l'annonce ouverte après la vente ; c'est la transaction qui fait foi.)
+            </div>
+          )}
           {data.retirees > 0 && (
             <div style={{ fontSize: 11, color: C.muted, marginBottom: 8, lineHeight: 1.5 }}>
               {data.retirees} annonce{data.retirees > 1 ? 's' : ''} en ligne {data.retirees > 1 ? 'ne sont' : "n'est"} pas dans cette file : tu {data.retirees > 1 ? 'les' : "l'"}as retirée{data.retirees > 1 ? 's' : ''} de Leboncoin. Ça se règle annonce par annonce sur l'écran <b>Annonces</b> (la puce « Aussi sur »).

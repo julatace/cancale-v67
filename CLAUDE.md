@@ -1035,6 +1035,33 @@ mesurés :
     référence**, **mémoriser la paire** (sans ça le nouvel onglet ne sait pas
     laquelle remplir) et ouvrir la page de dépôt.
 
+13. ⚠️⚠️ **14 DES 57 ANNONCES « EN LIGNE » ÉTAIENT DÉJÀ VENDUES.** Plainte de
+    Julien le 13 septembre (« des paires qui sont vendues »). Mesuré : la file
+    ne filtrait que sur `is_closed`, or **Vinted ne ferme pas toujours
+    l'annonce** après la vente, et une capture peut dater (`julatace3535` à
+    **85 h**). La preuve de vente (`transaction → item_id`) **prime sur l'état
+    de l'annonce** : une paire prouvée vendue sort de la file, dans l'app comme
+    dans le panneau. Et l'écran **le dit** — une file qui rétrécit sans
+    explication se lit comme une perte.
+14. ⚠️⚠️ **LA CAPTURE A RANGÉ 81 ANNONCES QUI N'ÉTAIENT PAS À LUI.** Mesuré juste
+    après la mise à jour : des **chalets, des gîtes, un appartement à La
+    Plagne** — le flux `api/discovery/category/53` de la page qu'il regardait.
+    Mon parser `__next_f` prenait tout objet en forme d'annonce sans se demander
+    **à qui** il est. Le compteur aurait annoncé « 81 annonces sur Leboncoin »,
+    et les 81 seraient ressorties en « non reliées ».
+    ⇒ On ne garde que ce qu'on peut **attribuer** : l'annonce porte notre
+    référence `VRM-{n°}`, ou son propriétaire est le compte connecté. Le reste
+    est **ignoré**, pas caché. Et `lbcJamaisLu` vaut « rien vu » quand plus rien
+    n'est attribuable — sinon on retombait sur le zéro inventé qu'on venait de
+    retirer. *Élargir une lecture sans l'attribuer, c'est inventer des données.*
+15. **« Des photos qui n'apparaissent pas »** — et je n'ai pas pu trancher :
+    Vinted **bloque mes requêtes** (même page de blocage pour deux annonces
+    différentes), et l'URL d'une photo ne porte qu'une signature `?s=…`, **sans
+    date d'expiration lisible**. Plutôt que de deviner, **la carte le constate
+    elle-même** : si l'image ne charge pas, une note apparaît (« le lien Vinted
+    a expiré ») avec la porte — rouvrir l'annonce recapte des liens frais. C'est
+    la méthode du bandeau eBay appliquée à ce que je ne peux pas mesurer.
+
 ⚠️⚠️ **ET `lbc.js` N'AVAIT JAMAIS TOURNÉ** — 480 lignes, le panneau qui SERT à
 publier. `node --check` ne lit que la syntaxe. `scripts/bancs/leboncoin.cjs` le
 charge dans une fausse page avec un faux `chrome.runtime` : **18 contrôles, 10

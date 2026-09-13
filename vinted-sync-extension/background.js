@@ -4987,7 +4987,16 @@ async function buildLbcData() {
   for (const o of online) {
     const e = numeros[o.id]; const num = e && e.numero;
     if (!num || String(num).trim() === '') continue;          // seulement les annonces numérotées
-    if (!mpChoisi(e, 'lbc')) continue;                          // retirée de la file par Julien (écran Annonces)
+    if (!mpChoisi(e, 'lbc')) continue;                          // retirée par Julien (écran Annonces)
+    // ⚠️⚠️ VENDUE = HORS DE LA FILE, même si Vinted la dit encore en ligne.
+    // Mesuré le 13 septembre sur ses vraies données : **14 des 57** annonces
+    // « en ligne » portent une vente PROUVÉE (`transaction → item_id`). Vinted
+    // ne ferme pas toujours l'annonce, et la capture d'un compte peut dater
+    // (mesuré : `julatace3535` à 85 h). Résultat, il voyait dans la file des
+    // paires déjà vendues — exactement ce qu'il a signalé. La preuve de vente
+    // prime sur l'état de l'annonce : on ne propose pas de publier une paire
+    // qu'il n'a plus.
+    if (vendus.has(o.id)) continue;
     if (posted.has(o.id) || posted.has(String(num))) continue;  // déjà publiée (marquée à la main)
     // Déjà en ligne sur Leboncoin d'après la capture ? -> pas dans la file.
     let hit = null;
@@ -5076,11 +5085,21 @@ async function buildLbcData() {
     const lbcRows = await sbGet('app_data?id=eq.lbc_listings&select=data');
     if (lbcRows !== null) {                       // `null` = la base n'a pas répondu
       const ligne = lbcRows && lbcRows[0];
-      lbcJamaisLu = !ligne;                       // aucune ligne = jamais capté
+      // ⚠️ « jamais capté » veut dire : aucune annonce QUI SOIT À LUI. La ligne
+      //    peut exister et ne contenir que des annonces d'autres (les 81 du
+      //    13 septembre) — auquel cas on n'a toujours rien vu de son côté, et
+      //    afficher « 0 » serait le zéro inventé qu'on vient de retirer.
+      lbcJamaisLu = !ligne;
       const items = (ligne && ligne.data && ligne.data.items) || {};
-      lbcCount = Object.values(items).filter((v) => !/(supprim|delete|expir|refus|sold|vendu)/i.test(String(v && v.status || ''))).length;
+      // ⚠️ 81 annonces rangées le 13 septembre n'étaient PAS à lui (le flux
+      //    « découverte » de la page). Elles restent en base — on ne supprime
+      //    rien — mais elles ne COMPTENT pas : une annonce qu'on ne peut pas
+      //    lui attribuer n'est pas la sienne.
+      lbcCount = Object.values(items).filter((v) => v && (v.ref || v.lbcUser)
+        && !/(supprim|delete|expir|refus|sold|vendu)/i.test(String(v.status || ''))).length;
     }
   } catch (_) {}
+  if (lbcCount === 0) lbcJamaisLu = true;       // rien d'attribuable = rien vu
   const postedCount = [...posted].filter((x) => /^\d+$/.test(x)).length;
   // Quota détecté automatiquement depuis l'offre Leboncoin (si trouvé).
   let detected = null;
