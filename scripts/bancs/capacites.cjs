@@ -125,10 +125,38 @@ const BANDEAU=/prix plancher[^\n]*rien ne les applique/i;
   const cas=[
     {pont:'5.37.0', nom:'en retard (5.37, juste sous le seuil)', attendu:true},
     {pont:'5.38.0', nom:'a jour pour les offres (5.38, le seuil)', attendu:false},
-    {pont:'5.52.0', nom:'a jour (5.52)',                          attendu:false},
+    {pont:'5.52.0', nom:'a jour (5.52)',                          attendu:false, places:'mixte'},
     {pont:'',       nom:'MUETTE sur sa version (< 5.26)',         attendu:true},
-    {pont:null,     nom:'absente (telephone)',                    attendu:true},
+    {pont:null,     nom:'absente (telephone)',                    attendu:true,  places:'uniforme'},
+    {pont:'5.59.0', nom:'a jour pour tout (5.59)',                attendu:false, places:'uniforme'},
   ];
+  // ⚠️ §7 : LA MEME PHRASE REPETEE SUR CHAQUE LIGNE EST **UNE** PHRASE.
+  // Vu au rendu le 13 septembre : les deux places (Leboncoin, eBay) portaient
+  // mot pour mot la meme explication de 150 caracteres, dont seul le nom de la
+  // place changeait — et il est deja dans le titre de la ligne juste au-dessus.
+  // ⚠️ ON NE COMPTE PAS UNE FORMULE, ON CHERCHE LA REPETITION : un controle pose
+  //    sur le libelle serait vert le jour ou quelqu'un reformule (§6.5).
+  // ⚠️⚠️ ET MON PREMIER JET NE POUVAIT PAS ECHOUER — il exigeait deux phrases
+  //    IDENTIQUES, or les deux lignes differaient d'un mot (« sur Leboncoin » /
+  //    « sur eBay »). Vert sur le defaut, donc pire qu'absent : il rassurait.
+  //    Ce qui se repete, ce n'est pas la phrase exacte, c'est sa SUBSTANCE : on
+  //    mesure le plus long morceau de texte commun a deux phrases rendues.
+  //    Soixante caracteres identiques dans deux phrases, c'est une phrase
+  //    ecrite deux fois, quel que soit le mot qui change au milieu.
+  const COMMUN=60;
+  const communLong=(a,b)=>{
+    for(let i=0;i+COMMUN<=a.length;i++) if(b.indexOf(a.substr(i,COMMUN))>=0) return a.substr(i,COMMUN);
+    return null;
+  };
+  const repetees=(t)=>{
+    const phs=String(t).split(/\n/).map(x=>x.trim()).filter(x=>x.length>=45);
+    const out=[];
+    for(let i=0;i<phs.length;i++) for(let j=i+1;j<phs.length;j++){
+      const c=communLong(phs[i],phs[j]);
+      if(c) out.push(c);
+    }
+    return out;
+  };
   for(const c of cas){
     const {t,errs}=await lis(c.pont);
     const vu=BANDEAU.test(t);
@@ -136,6 +164,27 @@ const BANDEAU=/prix plancher[^\n]*rien ne les applique/i;
     dit(vu===c.attendu, 'extension '+c.nom+' : '+(c.attendu?'l\'app dit que rien ne l\'applique':'l\'app ne crie pas pour rien'),
       vu===c.attendu?'':'bandeau '+(vu?'affiche':'absent')+' alors qu\'on attend '+(c.attendu?'affiche':'absent'));
     dit(errs.length===0, 'aucune erreur d\'app ('+c.nom+')', errs.slice(0,2).join(' | '));
+    // ── §7 : une phrase commune se dit UNE fois ─────────────────────────────
+    if(c.places){
+      const dbl=repetees(t);
+      if(c.places==='uniforme'){
+        dit(dbl.length===0, 'places dans le MEME etat ('+c.nom+') : aucune phrase n\'est ecrite deux fois',
+          dbl.length?('60 caracteres communs a deux phrases : « '+dbl[0]+' »'):'');
+      }
+      // ⚠️ ET L'AUTRE MOITIE : la place ne disparait jamais. Un controle qui
+      //    n'aurait que « pas de doublon » serait vert sur un ecran qui a perdu
+      //    eBay — meme piege que le compte nomme sur les colis a retirer.
+      dit(/Leboncoin/.test(t) && /eBay/.test(t), 'et les deux places restent NOMMEES ('+c.nom+')',
+        'une place effacee serait pire que la repetition qu\'on vient de retirer');
+      if(c.places==='mixte'){
+        // Deux places « en retard » ne reclament pas la meme version (5.54 /
+        // 5.55) : la phrase DISTINGUE, elle doit rester sur la ligne. Fusionner
+        // la aurait donne une seule consigne, fausse pour l'une des deux.
+        dit(/5\.54\.0/.test(t) && /5\.55\.0/.test(t),
+          'places dans des etats DIFFERENTS ('+c.nom+') : chaque ligne garde sa consigne',
+          'les deux versions attendues doivent etre nommees, 5.54 et 5.55');
+      }
+    }
     // ⚠️ Le bandeau doit DIRE COMBIEN : un chiffre qu'on ne peut pas verifier
     //    est invendable (§2.7). On en a pose exactement un.
     if(vu){

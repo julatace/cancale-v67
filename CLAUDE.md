@@ -1251,6 +1251,24 @@ eBay vide aujourd'hui — on mesure donc ce qui arrive **le jour où il coche**)
 - ⚠️ **La phrase de l'app était restée en arrière** : l'écran Annonces promettait
   « photos téléchargées » pour les deux places. Elle suit maintenant la version
   INSTALLÉE, place par place (`capPhotos`).
+  ⚠️⚠️ **Et je n'en avais corrigé QU'UN des deux.** En balayant « télécharg » sur
+  tout le dépôt : l'**écran Leboncoin** portait la même affirmation
+  (« bouton 🚀 Tout préparer : photos téléchargées, texte copié, formulaire
+  pré-rempli »), sans **aucune** garde de version. *Une suppression « terminée »
+  se vérifie sur ce qui RESTE* — c'est la leçon du pipeline Factures, refaite le
+  jour même, à une heure d'intervalle.
+  ⇒ `audit-coherence.cjs` porte désormais la règle, dans la forme acceptée de
+  `panne.cjs` : **toute phrase qui affirme ce que l'extension fait des photos
+  doit avoir une garde de version dans son voisinage immédiat**. Interdire le
+  *mot* attraperait la phrase honnête ; c'est la GARDE qui est exigée. **Rouge
+  sur le code d'avant**, et il nomme la ligne.
+  ⚠️ **TREIZIÈME fois qu'un de mes contrôles crie au loup**, et la récidive
+  exacte du balayage des sondes : il s'est déclenché sur **mon propre
+  commentaire**, celui qui cite la phrase d'avant pour expliquer pourquoi elle
+  est partie. Retirer les lignes qui *commencent* par `//` ne suffit pas — un
+  bloc `/* … */` de dix lignes n'en a aucune. Les blocs sont neutralisés en
+  gardant les retours à la ligne, pour que les numéros signalés restent ceux du
+  fichier.
 - ⚠️ Et un **commentaire** de `lbc.js` répétait encore l'impossibilité fausse,
   quinze lignes au-dessus du code qui attache les photos. *Une suppression
   « terminée » se vérifie sur ce qui RESTE, commentaires compris* : un
@@ -1302,6 +1320,38 @@ d'extension attendue » à l'écran, code de sortie 0. §8 annonçait pourtant �
 vérifie que la constante suit le manifeste » : il le **racontait**. Un contrôle
 qui ne peut pas échouer est **pire qu'absent — il rassure**. Il compte
 maintenant (`ko`/`dit`) et sort en 1.
+
+⚠️⚠️ **ET LA LIGNE DES PLACES ÉCRIVAIT LA MÊME PHRASE DEUX FOIS.** Vu au rendu
+le 13 septembre, sur l'écran Annonces : Leboncoin et eBay portaient chacun
+« *Ton choix est enregistré. C'est l'extension, dans ton Chrome, qui prépare
+ensuite chaque annonce sur X — ouvre l'app sur l'ordinateur où elle est
+installée.* » — **150 caractères écrits deux fois**, dont seul le nom de la place
+changeait, et il est déjà dans le titre de la ligne juste au-dessus. C'est §7 mot
+pour mot (les 13 × « code pas encore reçu », les 14 × « l'extension le
+récupère »), sur l'écran où il coche ses annonces. La phrase commune se dit
+**une fois au-dessus des lignes** ; sur la ligne il ne reste que ce qui
+distingue.
+- ⚠️ **On juge sur la PHRASE RENDUE, pas sur l'état** : deux places « en retard »
+  ne réclament pas la même version (5.54 et 5.55), donc leurs phrases
+  **distinguent** et restent sur leur ligne. Fusionner sur l'état aurait donné
+  une seule consigne, fausse pour l'une des deux. D'où une clé qui porte tout ce
+  qui varie.
+- Le banc `capacites.cjs` **cherche la répétition**, pas une formule — un
+  contrôle posé sur le libellé serait vert le jour où quelqu'un reformule
+  (§6.5). Et il exige **les deux moitiés** : aucun doublon **et** les deux places
+  toujours nommées — un contrôle qui n'aurait que la première serait vert sur un
+  écran qui a perdu eBay.
+- ⚠️⚠️ **ET MON PREMIER JET DE CE CONTRÔLE NE POUVAIT PAS ÉCHOUER.** Il exigeait
+  deux phrases **identiques** — or les deux lignes différaient d'un mot (« sur
+  Leboncoin » / « sur eBay »). **Vert sur le défaut**, donc *pire qu'absent : il
+  rassurait* (même famille que le `DIST` absolu des quatorze bancs et
+  qu'`audit-coherence.cjs` qui sortait toujours en 0). Ce qui se répète n'est pas
+  la phrase exacte mais sa **substance** : on mesure le plus long morceau de
+  texte **commun** à deux phrases rendues, et **60 caractères identiques** valent
+  une phrase écrite deux fois, quel que soit le mot qui change au milieu.
+  **2 échecs** sur le code d'avant, 0 après — et le message cite le morceau
+  répété. *Un contrôle se vérifie sur le code d'AVANT, toujours, même quand la
+  règle paraît évidente.*
 
 ⚠️ **Le bandeau se pose UNE fois, pas sur chaque carte.** Les 43 cartes
 d'Annonces portent chacune le champ « Min. accepté » ; la phrase qui dit que
