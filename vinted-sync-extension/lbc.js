@@ -563,6 +563,73 @@
   // ⇒ On dit CE QUI a été rempli, on nomme ce qui manque, et on rappelle que la
   //   référence est dans la description copiée (`buildLbcAd` l'y met en haut et
   //   en bas). Le chiffre, jamais la promesse — leçon du bandeau eBay.
+  // ══════════════════════════════════════════════════════════════════════════
+  // LES PHOTOS S'ATTACHENT — MESURÉ, PAS SUPPOSÉ
+  // ══════════════════════════════════════════════════════════════════════════
+  // Ce que le dossier affirmait (« un navigateur interdit de remplir un champ
+  // fichier par programme ») est FAUX, et je l'avais écrit. Ce qui est interdit
+  // c'est `input.value = '/chemin/…'`. `input.files = dataTransfer.files`, lui,
+  // marche : la page reçoit un vrai `File` et son `change` part. Vérifié dans
+  // Chromium le 13 septembre, puis au banc sur le VRAI `lbc.js`.
+  // ⇒ Julien n'a plus rien à télécharger : le fond lit les octets (le CDN de
+  //   Vinted n'a pas d'en-tête CORS, la page seule ne peut pas), on fabrique les
+  //   fichiers ici, et on les attache.
+  // ⚠️ On n'invente aucun clic : `input.files` et un `change` sont l'API du
+  //   navigateur, pas un faux clic de souris (§3 — ce qui est refusé, c'est
+  //   piloter la souris à l'aveugle sur Vinted).
+  function champsFichier() {
+    return Array.from(document.querySelectorAll('input[type="file"]'))
+      .filter((el) => !el.disabled && !DANS_ENTETE(el));
+  }
+  function fichiersDepuis(photos, numero) {
+    const out = [];
+    for (let i = 0; i < photos.length; i++) {
+      const p = photos[i];
+      if (!p || !p.b64) continue;
+      try {
+        const bin = atob(p.b64);
+        const buf = new Uint8Array(bin.length);
+        for (let j = 0; j < bin.length; j++) buf[j] = bin.charCodeAt(j);
+        const type = p.type || 'image/jpeg';
+        const ext = /png/.test(type) ? 'png' : (/webp/.test(type) ? 'webp' : 'jpg');
+        out.push(new File([buf], `VRM-${numero}-${i + 1}.${ext}`, { type }));
+      } catch (_) {}
+    }
+    return out;
+  }
+  async function attacherPhotos(ad) {
+    const urls = (ad.photos || []).slice(0, 10);
+    if (!urls.length) return { n: 0, raison: 'aucune photo à attacher' };
+    const cible = champsFichier()[0];
+    const zone = document.querySelector('[class*="drop"],[class*="Drop"],[data-testid*="photo"],[class*="photo"]');
+    if (!cible && !zone) return { n: 0, raison: 'aucun champ photo sur cette étape' };
+    const r = await send({ action: 'photoBytes', urls, max: 10 });
+    const photos = (r && r.ok && Array.isArray(r.photos)) ? r.photos : [];
+    const fichiers = fichiersDepuis(photos, ad.numero);
+    // ⚠️ On DIT ce qui a échoué : une photo que le CDN refuse n'est pas une
+    //    photo attachée, et un compte rond ne doit pas la compter.
+    const rates = photos.filter((p) => p && p.erreur).length;
+    if (!fichiers.length) return { n: 0, rates, raison: rates ? 'les photos n\'ont pas pu être lues' : 'aucune photo lisible' };
+    try {
+      const dt = new DataTransfer();
+      fichiers.forEach((f) => dt.items.add(f));
+      if (cible) {
+        cible.files = dt.files;
+        cible.dispatchEvent(new Event('input', { bubbles: true }));
+        cible.dispatchEvent(new Event('change', { bubbles: true }));
+        if (cible.files && cible.files.length) return { n: cible.files.length, rates };
+      }
+      if (zone) {
+        const dt2 = new DataTransfer();
+        fichiers.forEach((f) => dt2.items.add(f));
+        zone.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt2 }));
+        zone.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt2 }));
+        return { n: fichiers.length, rates, voie: 'glisser-déposer' };
+      }
+      return { n: 0, rates, raison: 'le champ n\'a pas accepté les fichiers' };
+    } catch (e) { return { n: 0, rates, raison: String((e && e.message) || e).slice(0, 60) }; }
+  }
+
   function prefill(ad) {
     const ref = ad.ref || ('VRM-' + ad.numero);
     const faits = [];
@@ -583,6 +650,7 @@
   }
   // Capture la STRUCTURE du formulaire de dépôt Leboncoin (noms/libellés des champs)
   // pour que je puisse brancher le pré-remplissage exactement (réf, catégorie…).
+  let derniereEtape = '';
   function captureDepositForm() {
     try {
       if (!/depos|d[ée]p[oô]t|\/ai\/|creation|nouvelle-annonce/i.test(location.href)) return;
@@ -590,7 +658,24 @@
       document.querySelectorAll('input, select, textarea').forEach((el) => {
         fields.push({ tag: el.tagName.toLowerCase(), type: el.type || '', name: el.name || '', id: el.id || '', ph: el.placeholder || '', aria: el.getAttribute('aria-label') || '', label: ((el.labels && el.labels[0] && el.labels[0].innerText) || '').slice(0, 50), qa: el.getAttribute('data-qa-id') || el.getAttribute('data-testid') || '' });
       });
-      if (fields.length) chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcForm', url: location.href, fields: fields.slice(0, 150) });
+      // ⚠️ LE DÉPÔT SE FAIT EN ÉTAPES, et je n'en ai jamais vu qu'UNE (celle du
+      //    titre). Tant que je ne connais pas les suivantes, je ne peux pas
+      //    remplir « la catégorie ni le reste ». On enregistre donc CHAQUE étape
+      //    distincte, une seule fois chacune — noms de champs et libellés
+      //    d'options, AUCUN contenu saisi. C'est ce qui me permettra de finir.
+      const sels = [];
+      document.querySelectorAll('select').forEach((el) => {
+        sels.push({ name: el.name || '', id: el.id || '', label: ((el.labels && el.labels[0] && el.labels[0].innerText) || '').slice(0, 50),
+          options: Array.from(el.options || []).slice(0, 25).map((o) => String(o.textContent || '').trim().slice(0, 40)) });
+      });
+      const fichiers = document.querySelectorAll('input[type="file"]').length;
+      const signature = fields.map((f) => f.name || f.id).join('|') + '#' + sels.length + '#' + fichiers;
+      if (signature === derniereEtape) return;
+      derniereEtape = signature;
+      if (fields.length || sels.length || fichiers) {
+        chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcForm', url: location.href,
+          fields: fields.slice(0, 150), selects: sels.slice(0, 30), fichiers, etape: signature.slice(0, 120) });
+      }
     } catch (_) {}
   }
 
@@ -645,14 +730,17 @@
     else if (a === 'cprice') { copy(ad.price); toast('Prix copié'); }
     else if (a === 'photos') { const r = await send({ action: 'downloadPhotos', urls: ad.photos || [], numero: ad.numero }); toast((r && r.count ? r.count : 0) + ' photo(s) téléchargée(s) → dossier VRM-' + ad.numero); }
     else if (a === 'prepare') {
-      const dl = await send({ action: 'downloadPhotos', urls: ad.photos || [], numero: ad.numero });
+      // ⚠️ ON NE TÉLÉCHARGE PLUS RIEN SUR SON DISQUE. « Ça me fait télécharger
+      //    des photos dans mon ordi » — et pour rien : les photos s'attachent
+      //    directement au formulaire (mesuré le 13 septembre).
+      const nbPh = (ad.photos || []).length;
       copy('TITRE :\n' + ad.title + '\n\nDESCRIPTION :\n' + ad.description + '\n\nPRIX : ' + ad.price + ' €\nRÉFÉRENCE : ' + (ad.ref || ('VRM-' + ad.numero)) + '\nCATÉGORIE : ' + ad.category);
       // ON MEMORISE L'ANNONCE EN COURS. C'est ce qui manquait : la page de depot
       // s'ouvrait dans un NOUVEL onglet, qui n'avait aucune idee de la paire
       // choisie — donc rien n'etait rempli et il fallait tout recoller a la main.
       await send({ action: 'setPending', ad });
       window.open('https://www.leboncoin.fr/deposer-une-annonce', '_blank');
-      toast('🚀 ' + (dl && dl.count ? dl.count : 0) + ' photo(s) téléchargée(s) — le formulaire se remplit tout seul dans le nouvel onglet');
+      toast('🚀 ' + nbPh + ' photo' + (nbPh > 1 ? 's' : '') + ' prête' + (nbPh > 1 ? 's' : '') + ' — le formulaire se remplit dans le nouvel onglet, photos comprises. Rien n\'est téléchargé sur ton ordinateur.');
     }
     else if (a === 'prefill') { prefill(ad); }
     else if (a === 'posted') {
@@ -670,6 +758,7 @@
   // photos ne peuvent pas etre injectees (un navigateur interdit de remplir un
   // champ fichier par programme) : elles sont deja dans ton dossier VRM-{N°}.
   let pending = null, pendingTries = 0, pendingDone = 0, pendingTimer = null, pendingArrete = false;
+  let photosFaites = false, photosEtat = null;
   async function autoPrefill() {
     if (!/deposer|depot|d[ée]p[oô]t/i.test(location.href)) return;
     const r = await send({ action: 'getPending' });
@@ -681,6 +770,12 @@
       pendingTries++;
       const n = fillNow(pending);
       if (n > pendingDone) { pendingDone = n; banner(); }
+      // Les photos : dès qu'une étape porte un champ fichier, on attache. Une
+      // seule fois — ré-attacher écraserait ce qu'il vient d'ajouter lui-même.
+      if (!photosFaites && champsFichier().length) {
+        photosFaites = true;
+        attacherPhotos(pending).then((r) => { photosEtat = r; banner(); });
+      }
       // On s'arrete au bout de 90 s : au-dela, soit c'est rempli, soit la page
       // n'est pas celle qu'on croit — inutile de tourner en fond.
       // ⚠️ MAIS IL FAUT LE DIRE. Le dépôt Leboncoin se fait en ÉTAPES (mesuré :
@@ -694,11 +789,50 @@
   }
   function fillNow(ad) {
     let n = 0;
-    if (setIfEmpty(findField([/titre|title|subject/]), ad.title)) n++;
+    if (setIfEmpty(findField([/titre|title|subject|proposez/]), ad.title)) n++;
     if (setIfEmpty(findField([/description|texte|body|détail|detail/]), ad.description)) n++;
     if (setIfEmpty(findField([/prix|price|montant/]), String(ad.price || ''))) n++;
     if (setIfEmpty(findField([/référ|referen|\bref\b|\bsku\b|identifiant|code.?article|numéro.?article/]), ad.ref || ('VRM-' + ad.numero))) n++;
+    // ⚠️ « ça ne met pas la catégorie ni le reste » (Julien, 13 septembre). Les
+    //    listes déroulantes ne sont pas des `input` : `findField` ne les voyait
+    //    même pas. On les traite, et on ne choisit QUE si une option correspond
+    //    vraiment — sinon on laisse vide. Une catégorie fausse fait plus de mal
+    //    que pas de catégorie (leçon eBay).
+    if (choisirListe([/cat[ée]gorie|category|rubrique/], [ad.category, 'Chaussures'])) n++;
+    if (choisirListe([/[ée]tat|condition|state/], ['Très bon état', 'Bon état', 'Satisfaisant'])) n++;
+    if (choisirListe([/marque|brand/], [ad.marque])) n++;
+    if (choisirListe([/pointure|taille|size/], [ad.taille])) n++;
     return n;
+  }
+  // Une liste déroulante : on ne prend une option que si son libellé contient
+  // vraiment ce qu'on cherche. Aucune approximation, aucun « premier de la
+  // liste » — laisser vide est toujours préférable à choisir faux (§5).
+  function choisirListe(motifs, valeurs) {
+    const sels = Array.from(document.querySelectorAll('select')).filter((el) => !el.disabled && !DANS_ENTETE(el));
+    for (const m of motifs) {
+      for (const el of sels) {
+        const lab = (el.labels && el.labels[0] && el.labels[0].innerText) || '';
+        const hay = ((el.name || '') + ' ' + (el.id || '') + ' ' + (el.getAttribute('aria-label') || '') + ' ' + lab).toLowerCase();
+        if (!m.test(hay)) continue;
+        if (String(el.value || '').trim()) return false;          // déjà choisi : on ne touche pas
+        for (const v of (valeurs || [])) {
+          const cible = String(v || '').trim().toLowerCase();
+          if (!cible) continue;
+          const opt = Array.from(el.options || []).find((o) => {
+            const t = String(o.textContent || '').trim().toLowerCase();
+            return t === cible || (t.length > 2 && cible.includes(t)) || (cible.length > 2 && t.includes(cible));
+          });
+          if (opt) {
+            el.value = opt.value;
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+            return true;
+          }
+        }
+        return false;                                             // trouvé le champ, aucune option qui colle
+      }
+    }
+    return false;
   }
   // On ne remplit QUE les champs vides : sinon, a chaque passage, on effacerait
   // ce que tu viens de corriger a la main.
@@ -718,7 +852,12 @@
     el.innerHTML =
       '<div style="font-weight:700;font-size:13px;margin-bottom:3px">N°' + (pending.numero || '?') + ' — ' + esc(String(pending.title || '').slice(0, 46)) + '</div>' +
       '<div style="color:#8b9b92">' + pendingDone + ' champ' + (pendingDone > 1 ? 's' : '') + ' rempli' + (pendingDone > 1 ? 's' : '') +
-      '. Catégorie <b style="color:#eef4f0">' + esc(pending.category || '—') + '</b>. Photos dans le dossier <b style="color:#eef4f0">VRM-' + (pending.numero || '') + '</b>.</div>' +
+      '. Catégorie <b style="color:#eef4f0">' + esc(pending.category || '—') + '</b>.</div>' +
+      '<div style="color:#8b9b92;margin-top:3px">' + (photosEtat
+        ? (photosEtat.n > 0
+            ? '📷 <b style="color:#eef4f0">' + photosEtat.n + ' photo' + (photosEtat.n > 1 ? 's' : '') + ' attachée' + (photosEtat.n > 1 ? 's' : '') + '</b>' + (photosEtat.rates ? ' (' + photosEtat.rates + ' illisible' + (photosEtat.rates > 1 ? 's' : '') + ')' : '')
+            : '📷 aucune photo attachée — ' + esc(photosEtat.raison || 'raison inconnue'))
+        : '📷 j\'attache les photos dès que l\'étape photo s\'affiche.') + '</div>' +
       (pendingArrete
         ? '<div style="color:#e8b35d;margin-top:6px">Je ne remplis plus tout seul (c\'est fini après 1 min 30). Le dépôt se fait en plusieurs étapes : à chaque nouvelle étape, clique <b style="color:#eef4f0">Re-remplir</b>.</div>'
         : '') +
