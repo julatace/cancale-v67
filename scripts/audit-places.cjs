@@ -44,7 +44,7 @@ const LISTINGS = [
   ] } } },
 ];
 
-function ctxAvec(numeros, txns) {
+function ctxAvec(numeros, txns, lbcItems) {
   const ctx = {
     console: { log() {}, warn() {}, error() {} },
     setTimeout, clearTimeout, setInterval, clearInterval, URL, TextDecoder, TextEncoder,
@@ -67,6 +67,8 @@ function ctxAvec(numeros, txns) {
       if (/id=like\.harvest_\*_listings/.test(u)) return j(LISTINGS);
       // La PREUVE d'une vente : `transaction → item_id` (§5, l'identité).
       if (/id=like\.harvest_\*_txn_\*/.test(u)) return j(txns || []);
+      // Les annonces Leboncoin captées — dont celles qui NE SONT PAS à lui.
+      if (/id=eq\.lbc_listings/.test(u)) return j(lbcItems ? [{ data: { items: lbcItems } }] : []);
       return j([]);
     },
   };
@@ -213,6 +215,68 @@ function ctxAvec(numeros, txns) {
   dit(/cle: 'ebay'/.test(APP) && /defaut: false/.test(APP), 'l\'app propose eBay, décoché par défaut');
   dit(/ebay: '5\.55\.0'/.test(APP), 'et la capacité `ebay` est déclarée avec sa version d\'arrivée');
   dit(/mpChoisi\(e, 'ebay'\)/.test(src), 'l\'extension lit le même choix pour eBay');
+
+  // ── ⚠️⚠️ UNE ANNONCE QUI N'EST PAS À LUI NE COMPTE NULLE PART ──────────────
+  // Mesuré le 13 septembre sur sa VRAIE base : `lbc_listings` contient **81
+  // annonces qui ne sont pas les siennes** (chalets, gîtes — le flux
+  // « découverte » de la page qu'il regardait). Le filtre d'attribution avait été
+  // posé sur `lbcCount`… et seulement là : `readLbcItems` rendait tout, donc le
+  // panneau annonçait « 81 vues sur Leboncoin » et déroulait 81 chalets en
+  // « non reliées » — pendant que l'APP en affichait 0. Deux lecteurs, deux
+  // règles, la même ligne (§11).
+  // ⚠️ ET LE CAS QUI COÛTE : `adRefKeys` lit « n° 1234 » dans le TITRE de
+  //    n'importe quelle annonce. Un chalet nommé « … n°202 » relie la paire
+  //    N°202 et la SORT de sa file en silence (« déjà en ligne sur Leboncoin »).
+  //    C'est un rapprochement par ressemblance (§5) sur des données qui ne sont
+  //    même pas les siennes. On sert donc exprès ce chalet-là.
+  {
+    const tous = {
+      '101': { numero: '101', title: 'A', mp: { lbc: true } },
+      '202': { numero: '202', title: 'B', mp: { lbc: true } },
+      '303': { numero: '303', title: 'C', mp: { lbc: true } },
+    };
+    const items = {
+      // À LUI : elle porte notre référence pro.
+      '900': { id: '900', ref: '101', customRef: 'VRM-101', subject: 'Paire A', url: 'u', status: 'active' },
+      // PAS à lui : aucune référence, aucun propriétaire connu — et un titre
+      // qui contient « n°202 », exactement le piège.
+      '901': { id: '901', ref: null, subject: 'Chalet 8/15 personnes n°202 aux Menuires', url: 'u2', status: 'active' },
+      '902': { id: '902', ref: null, subject: 'Gîte à louer, 3 chambres', url: 'u3', status: 'active' },
+    };
+    const r5 = await ctxAvec(tous, [], items).buildLbcData();
+    const st = r5.stats || {};
+    dit(st.lbcSeen === 1, 'Leboncoin : seules les annonces ATTRIBUABLES sont comptées',
+      st.lbcSeen === 1 ? '1 sur 3 (les 2 autres ne sont pas à lui)' : `il en compte ${st.lbcSeen} — des annonces d'autres gens sur son écran`);
+    dit((r5.unlinked || []).length === 0, 'et aucune annonce d\'autrui ne sort en « non reliée »',
+      (r5.unlinked || []).length ? `${(r5.unlinked || []).length} rendues — 81 chalets sur sa vraie base` : '');
+    const nums5 = (r5.queue || []).map(a => String(a.numero)).sort();
+    dit(nums5.includes('202'), '⚠️ et un CHALET nommé « n°202 » ne retire pas sa paire N°202 de la file',
+      nums5.includes('202') ? '' : 'rapprochement par ressemblance (§5) sur une annonce qui n\'est même pas la sienne');
+    dit(st.lbcCount === 1, 'le compteur du panneau dit la même chose que la lecture',
+      `lbcCount ${st.lbcCount} / lbcSeen ${st.lbcSeen} — deux règles pour une notion, c'est §11`);
+    // L'app applique la MÊME règle (elle la portait déjà — c'est l'extension qui
+    // avait dérivé). On compare les PRÉDICATS sur les mêmes entrées.
+    const mApp = /const aLui = \(ad\) => [^;]+;/.exec(APP);
+    if (!mApp) {
+      dit(false, 'l\'app a sa règle d\'attribution', '`aLui` introuvable dans App.jsx');
+    } else {
+      const aLuiApp = new Function('"use strict"; ' + mApp[0] + ' return aLui;')();
+      const aLuiExt = ctxAvec(tous, [], items).estALui;
+      // ⚠️ UN AUDIT NE MEURT PAS, IL RAPPORTE — et c'est la TROISIÈME fois que je
+      //    l'oublie ici même. Sur le code d'avant `estALui` n'existe pas : mon
+      //    premier jet appelait `aLuiExt(ad)` et sortait en `TypeError`, donc le
+      //    bilan n'était jamais imprimé et les contrôles suivants disparaissaient.
+      if (typeof aLuiExt !== 'function') {
+        dit(false, 'l\'app et l\'extension attribuent EXACTEMENT pareil',
+          '`estALui` n\'existe pas dans background.js — la règle vit chez un seul des deux lecteurs');
+      } else {
+        const cas = Object.values(items).concat([{ id: 'x', lbcUser: 'julatace' }, { id: 'y' }]);
+        const memes = cas.every((ad) => !!aLuiApp(ad) === !!aLuiExt(ad));
+        dit(memes, 'l\'app et l\'extension attribuent EXACTEMENT pareil',
+          memes ? `${cas.length} cas` : 'l\'app en montre un nombre, le panneau un autre');
+      }
+    }
+  }
 
   // ── LE TITRE LEBONCOIN : LES DEUX CÔTÉS DOIVENT RENDRE LE MÊME ──────────────
   // ⚠️⚠️ L'app et l'extension calculent la file CHACUN DE SON CÔTÉ (le panneau
