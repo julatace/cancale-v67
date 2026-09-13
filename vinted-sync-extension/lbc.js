@@ -192,6 +192,25 @@
         a_next_f: !!(self.__next_f && self.__next_f.length),
       });
     } catch (_) {}
+    // ⚠️⚠️ CE QUI EST SUR LA PAGE N'EST PAS FORCÉMENT À LUI.
+    // Mesuré le 13 septembre, juste après la mise à jour : la capture a rangé
+    // **81 « annonces »** — des chalets, des gîtes, un appartement à La Plagne.
+    // C'était le flux `api/discovery/category/53` de la page qu'il regardait.
+    // Mon parser prenait tout objet en forme d'annonce, sans se demander À QUI
+    // elle est. Conséquences : le compteur aurait annoncé « 81 annonces sur
+    // Leboncoin », et le rapprochement aurait travaillé sur des inconnues.
+    // ⇒ On ne garde que ce qu'on peut ATTRIBUER : l'annonce porte une référence
+    //   `VRM-{n°}` (c'est nous qui l'y mettons), OU son propriétaire est le
+    //   compte connecté sur la page. Le reste est ignoré — pas caché, ignoré :
+    //   il n'a jamais été à lui.
+    //   C'est la même discipline que « mieux vaut un blanc qu'un faux » (§5).
+    const moi = account && account.id ? String(account.id) : null;
+    const aMoi = (l) => !!(l && (l.ref || (moi && String(l.lbcUser || '') === moi)));
+    const avant = listings.length;
+    listings = listings.filter(aMoi);
+    if (avant !== listings.length) {
+      try { send({ action: 'lbcDiag', source: src.source, vues: listings.length, ecartees: avant - listings.length, compte: !!account, url: location.href.slice(0, 160), a_next_data: !!document.getElementById('__NEXT_DATA__'), a_next_f: !!(self.__next_f && self.__next_f.length) }); } catch (_) {}
+    }
     if (listings.length || account) {
       send({ action: 'lbcCapture', url: location.href, listings, account });
     }
@@ -238,6 +257,8 @@
     .deposit{display:block;text-align:center;background:#ff6e14;color:#fff;text-decoration:none;font-size:13px;font-weight:900;padding:10px;margin:0 10px 6px;border-radius:10px}
   
   .grp{font-size:11px;font-weight:800;color:#10151b;margin:10px 2px 4px;letter-spacing:.2px}
+  .pko{font-size:10.5px;color:#c0392b;line-height:1.45;margin-top:5px}
+  .pko a{color:#c0392b;font-weight:700}
   .pnote{font-size:10.5px;color:#6b7684;line-height:1.45;margin-top:5px}
   .pnote a{color:#1e5fcc;font-weight:700}
 `;
@@ -425,13 +446,21 @@
     return `<div class="pnote">${manques.join(' · ')}. Tout est sur la page Vinted : ouvre-la une fois, l&#39;extension lit le reste toute seule.${lien}</div>`;
   }
   function cardHtml(ad) {
-    const ph = (ad.photos || []).slice(0, 6).map((u) => `<img src="${esc(u)}" data-full="${esc(u)}" title="Ouvrir la photo">`).join('');
+    // ⚠️ « IL Y A DES PHOTOS QUI N'APPARAISSENT PAS » (Julien, 13 septembre).
+    //    Je n'ai pas pu vérifier pourquoi depuis mes outils : Vinted bloque mes
+    //    requêtes, et l'URL d'une photo ne porte qu'une signature `?s=…`, sans
+    //    date d'expiration lisible. Plutôt que de deviner, **la carte le dit
+    //    elle-même** : si l'image ne charge pas, on l'écrit et on donne la porte
+    //    (rouvrir l'annonce sur Vinted recapte des URL fraîches).
+    //    C'est la méthode du bandeau eBay : faire constater par ce qui y a accès.
+    const ph = (ad.photos || []).slice(0, 6).map((u) => `<img src="${esc(u)}" data-full="${esc(u)}" title="Ouvrir la photo" onerror="this.remove();const c=this.closest('.card');if(c){const n=c.querySelector('.pko');if(n)n.hidden=false;}">`).join('');
     const onPage = pageRefs.has(String(ad.numero));
     return `<div class="card" data-id="${esc(ad.id)}">
       <div class="row"><span class="num">N°${esc(ad.numero)}</span><span class="cat">${esc(ad.category)}</span>${onPage ? '<span class="cat" style="background:#e6f6ec;color:#0a7f3f">déjà sur cette page ?</span>' : ''}<span class="acc">${esc(ad.account)}</span></div>
       <div class="tt">${esc(ad.title)}</div>
       <div class="pr">${esc(euro(ad.price))}</div>
       ${ph ? `<div class="ph">${ph}</div>` : ''}
+      <div class="pko" hidden>⚠️ Une photo ne s'affiche plus (le lien Vinted a expiré). Ouvre l'annonce sur Vinted${ad.vintedUrl ? ` — <a href="${esc(ad.vintedUrl)}" target="_blank" rel="noreferrer">ici</a>` : ''} : l'extension recapte des liens frais au passage.</div>
       ${photosLigne(ad)}
       <div class="desc">${esc(ad.description)}</div>
       <div class="btns">
