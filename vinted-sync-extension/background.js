@@ -4811,12 +4811,31 @@ function refFromText(text) {
   m = /r[ée]f\.?\s*[:#]?\s*(\d{1,5})/i.exec(s);
   return m ? m[1] : null;
 }
+// ⚠️⚠️ UNE ANNONCE QU'ON NE PEUT PAS LUI ATTRIBUER N'EST PAS LA SIENNE, ET CE
+// FILTRE VIT AU **READ** — pas chez l'un des lecteurs.
+// Mesuré le 13 septembre sur sa vraie base : `lbc_listings` contient **81
+// annonces qui ne sont pas à lui** (chalets, gîtes, un appartement à La Plagne —
+// le flux `api/discovery/category/53` de la page qu'il regardait, rangé à 06:38).
+// Le filtre avait bien été posé sur `lbcCount`… et seulement là. `readLbcItems`
+// rendait TOUT, donc :
+//   · le panneau affichait « **81** vues sur Leboncoin » et déroulait
+//     **81 chalets en « annonces non reliées »**, sur l'écran qui sert à publier
+//     ses baskets — pendant que l'APP, elle, en affichait 0 (elle filtre depuis
+//     le 13 au matin). Deux lecteurs, deux règles, la même ligne : §11.
+//   · et surtout `adRefKeys` lit « n° 1234 » dans le TITRE de n'importe quelle
+//     annonce : un chalet nommé « … n°412 » aurait relié la paire N°412 et
+//     l'aurait **retirée de sa file en silence** (« déjà en ligne sur
+//     Leboncoin »). Mesuré aujourd'hui : 0 cas — mais c'est un rapprochement par
+//     ressemblance (§5) sur des données qui ne sont même pas les siennes.
+// ⇒ Une seule règle, un seul propriétaire : `estALui` est la MÊME que celle de
+//   l'app (`ad.ref || ad.customRef || ad.lbcUser`). Rien n'est supprimé en base.
+function estALui(ad) { return !!(ad && (ad.ref || ad.customRef || ad.lbcUser)); }
 // Lit les annonces Leboncoin captées (ligne lbc_listings) sous forme de tableau.
 async function readLbcItems() {
   try {
     const rows = await sbGet('app_data?id=eq.lbc_listings&select=data');
     const items = (rows && rows[0] && rows[0].data && rows[0].data.items) || {};
-    return Object.values(items).filter(Boolean);
+    return Object.values(items).filter((ad) => ad && estALui(ad));
   } catch (_) { return []; }
 }
 // Clés de rapprochement d'une annonce Leboncoin : sa référence pro (CustomRef),
@@ -5167,7 +5186,10 @@ async function buildLbcData() {
       //    « découverte » de la page). Elles restent en base — on ne supprime
       //    rien — mais elles ne COMPTENT pas : une annonce qu'on ne peut pas
       //    lui attribuer n'est pas la sienne.
-      lbcCount = Object.values(items).filter((v) => v && (v.ref || v.lbcUser)
+      // ⚠️ LA MÊME règle que `readLbcItems` (`estALui`), pas une copie qui dérive :
+      //    celle-ci oubliait `customRef`, que l'app accepte — un troisième écart
+      //    sur la même notion.
+      lbcCount = Object.values(items).filter((v) => estALui(v)
         && !/(supprim|delete|expir|refus|sold|vendu)/i.test(String(v.status || ''))).length;
     }
   } catch (_) {}

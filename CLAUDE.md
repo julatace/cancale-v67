@@ -1054,7 +1054,33 @@ mesurés :
     est **ignoré**, pas caché. Et `lbcJamaisLu` vaut « rien vu » quand plus rien
     n'est attribuable — sinon on retombait sur le zéro inventé qu'on venait de
     retirer. *Élargir une lecture sans l'attribuer, c'est inventer des données.*
-15. **« Des photos qui n'apparaissent pas »** — et je n'ai pas pu trancher :
+15. ⚠️⚠️ **ET LE FILTRE D'ATTRIBUTION N'AVAIT ÉTÉ POSÉ QUE CHEZ UN DES TROIS
+    LECTEURS.** Mesuré le 13 septembre sur sa vraie base, l'extension à jour et
+    qui tourne (`panel_diag_capture.majAt` à la minute) : `lbc_listings`
+    contient bien les **81 annonces qui ne sont pas à lui**, rangées le matin
+    même à 06:38 depuis `api/discovery/category/53`. Le filtre avait été mis sur
+    `lbcCount`… et **seulement là**. `readLbcItems()` rendait tout, donc :
+    - le **panneau** affichait « **81** vues sur Leboncoin » et déroulait
+      **81 chalets** en « annonces non reliées », sur l'écran qui sert à publier
+      ses baskets — pendant que l'**app** en affichait **0** (elle, filtrait).
+      Deux lecteurs, deux règles, la même ligne : §11. Et c'est l'app↔extension
+      qui diverge, le défaut que `audit-places.cjs` existe pour attraper.
+    - ⚠️⚠️ **Et le cas qui coûte** : `adRefKeys` lit « n° 1234 » dans le TITRE de
+      **n'importe quelle** annonce. Un chalet nommé « … n°412 » relie la paire
+      N°412 et la **sort de sa file en silence** (« déjà en ligne sur
+      Leboncoin ») — il ne la publie jamais. Mesuré aujourd'hui : **0 cas réel**,
+      mais c'est un rapprochement par ressemblance (§5) sur des données qui ne
+      sont **même pas les siennes**. Le banc sert exprès ce chalet-là.
+    ⇒ `estALui` vit au **READ** (`readLbcItems`), pas chez un lecteur, et c'est
+    **la même** que celle de l'app (`ref || customRef || lbcUser` — celle de
+    l'extension oubliait `customRef`, troisième écart sur la même notion). Rien
+    n'est supprimé en base. Mesuré après : **81 → 0**, et les deux écrans
+    s'accordent. **4 échecs** sur le code d'avant.
+    ⚠️ **QUATORZIÈME fois qu'un de mes contrôles est fautif**, et la TROISIÈME
+    fois que c'est « il meurt au lieu de rapporter » : sur le code d'avant
+    `estALui` n'existe pas, mon premier jet sortait en `TypeError` et le bilan
+    n'était jamais imprimé.
+16. **« Des photos qui n'apparaissent pas »** — et je n'ai pas pu trancher :
     Vinted **bloque mes requêtes** (même page de blocage pour deux annonces
     différentes), et l'URL d'une photo ne porte qu'une signature `?s=…`, **sans
     date d'expiration lisible**. Plutôt que de deviner, **la carte le constate
@@ -1620,16 +1646,23 @@ les deux qu'il n'a pas ouverts depuis la panne, et `julatace3535` est justement
 celui qui porte ses colis à retirer. **Le geste : passer sur Vinted connecté sur
 ces deux comptes-là.**
 
-⚠️⚠️ **SON EXTENSION EST TOUJOURS ANTÉRIEURE À 5.45** — mesuré, pas deviné : sur
-les **47 compteurs** de `panel_diag_capture`, **0 `retrait_*`, 0 `releve_*`,
-0 `ebay_*`, 0 `lbc_*`**, alors que `bordereau_genere` (3) et `label_envoye` (15)
-tournent. Or `capterRetraits` écrit son compteur **même en échec** : zéro
-compteur = la fonction n'a jamais tourné. Ni `panel_colis_relais` ni
-`panel_ebay_form` n'existent en base. **Tant qu'il ne met pas à jour, aucun code
-de retrait ne sera lu, aucun relevé capté, et la sélection Leboncoin/eBay ne
-sera pas appliquée par le panneau.** Le zip à jour est dans l'app
-(`public/VRM-extension.zip`, **5.59.0**) ; `EXT_ATTENDUE` le suit et l'app
-affiche le bandeau.
+⚠️⚠️ **CE QUE SON EXTENSION FAIT VRAIMENT — REMESURÉ LE 13 SEPTEMBRE, ET LE
+DOSSIER DISAIT LE CONTRAIRE.** §8 affirmait « toujours antérieure à 5.45 », déduit
+de « 0 compteur `retrait_*` ». **C'est une déduction, pas une mesure** : un
+compteur absent ne prouve la version que si la fonction s'exécute
+inconditionnellement — or `capterRetraits` sort avant d'écrire quand aucun achat
+n'est en attente de retrait. Ce qui EST mesuré :
+- `panel_diag_capture.majAt` = **aujourd'hui 10:14** : elle tourne à la minute
+  (`bordereau_genere` 3 → **6**, `label_envoye` 15 → **25**) ;
+- `lbc_listings` a été **écrite ce matin à 06:38** avec les 81 annonces du flux
+  « découverte » — donc son extension porte le parser `__next_f`, arrivé bien
+  **après** la 5.45 ;
+- mais `lbc_recon` n'a **ni `capture` ni `etapes`** (dernière écriture le
+  28 juillet) et `panel_ebay_form` est absente : `lbcDiag` et l'enregistrement
+  des étapes n'ont jamais tourné.
+⇒ **Ne pas redéduire une version d'un compteur à zéro.** Le signal fiable est ce
+que le pont annonce, ou une écriture datée. Le zip livré est en **5.59.1**
+(`public/VRM-extension.zip`) ; `EXT_ATTENDUE` le suit.
 
 ⚠️ **CE QUE LA FILE eBAY DONNERAIT LE JOUR OÙ IL COCHE** (mesuré le 13 septembre,
 la file est vide aujourd'hui — défaut `false`) : **53 annonces en ligne et
