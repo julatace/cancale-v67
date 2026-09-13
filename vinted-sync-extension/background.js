@@ -4980,6 +4980,16 @@ async function buildLbcData() {
   const accounts = main.vinted_accounts || [];
   const uid2login = {};
   accounts.forEach((a) => { uid2login[String(a.vinted_user_id)] = labels[String(a.vinted_user_id)] || a.login || String(a.vinted_user_id); });
+  // ⚠️⚠️ UN COMPTE QU'IL A EXCLU DE L'APP N'ALIMENTE PAS LA FILE.
+  // Mesuré le 13 septembre sur sa vraie base : la file du panneau contenait
+  // **la N°118, qui vient de `liliand653`** — le compte que Julien a lui-même
+  // mis de côté. Le panneau lui proposait donc de publier sur Leboncoin
+  // l'annonce d'un compte qu'il a écarté. C'est § « un CHOIX n'est pas une
+  // panne » retourné : une fois le geste fait, l'app n'a plus rien à en tirer.
+  // ⚠️ Et l'APP, elle, filtrait déjà (`offAcc`) — comme `buildEbayData`. Seule
+  //    cette file-ci ne le faisait pas : l'app annonçait 39 et le panneau 40,
+  //    sur exactement la même donnée. Deux règles pour une notion, §11.
+  const off = new Set([...(main.vinted_accounts_hidden || []), ...(main.vinted_accounts_blocked || [])].map(String));
   // Déjà publiées sur Leboncoin (ligne DÉDIÉE → on n'écrase jamais le blob main).
   const postedData = await readPostedData();
   const posted = new Set(postedData.ids);
@@ -4988,8 +4998,19 @@ async function buildLbcData() {
   // Annonces EN LIGNE (harvest listings).
   const listRows = (await sbGet('app_data?id=like.harvest_*_listings&select=id,data')) || [];
   const online = []; const onlineIds = new Set(); const seen = new Set();
+  let exclues = 0;
   for (const r of listRows) {
     const d = r.data || {}; const p = d.payload || {}; const uid = String(d.uid);
+    // ⚠️ On COMPTE ce qu'on écarte : une file qui rétrécit sans explication se
+    //    lit comme une perte (leçon de l'écran Leboncoin).
+    if (off.has(uid)) {
+      for (const it of (p.items || [])) {
+        if (it.is_closed || it.is_hidden || it.is_draft) continue;
+        const e = numeros[String(it.id)];
+        if (e && String(e.numero || '').trim() !== '' && mpChoisi(e, 'lbc')) exclues++;
+      }
+      continue;
+    }
     for (const it of (p.items || [])) {
       const oid = String(it.id);
       if (it.is_closed || it.is_hidden || it.is_draft) continue;
@@ -5200,7 +5221,7 @@ async function buildLbcData() {
   try { const rec = await sbGet('app_data?id=eq.lbc_recon&select=data'); const q = rec && rec[0] && rec[0].data && rec[0].data.quota; if (q && q.value) detected = q.value; } catch (_) {}
   // Compteurs de diagnostic (pour comprendre si la file est vide et pourquoi).
   const numberedOnline = online.filter((o) => { const e = numeros[o.id]; return e && String(e.numero || '').trim() !== ''; }).length;
-  const stats = { postedCount, lbcCount, lbcJamaisLu, limit: lbcLimit, plan: lbcPlan, detected, onlineCount: online.length, numberedCount: numberedOnline, queueCount: queue.length,
+  const stats = { postedCount, lbcCount, lbcJamaisLu, limit: lbcLimit, plan: lbcPlan, detected, exclues, onlineCount: online.length, numberedCount: numberedOnline, queueCount: queue.length,
     autoMatched: autoMatched.size, lbcSeen: lbcItems.length, unlinkedCount: unlinked.length };
   // Liste des paires marquées « publiées » (pour pouvoir annuler une erreur).
   const postedList = [...posted].filter((x) => /^\d+$/.test(x)).map((pid) => { const e = numeros[pid] || {}; return { id: pid, numero: String(e.numero || '?'), title: e.title || '' }; }).sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0));

@@ -44,7 +44,7 @@ const LISTINGS = [
   ] } } },
 ];
 
-function ctxAvec(numeros, txns, lbcItems) {
+function ctxAvec(numeros, txns, lbcItems, exclus) {
   const ctx = {
     console: { log() {}, warn() {}, error() {} },
     setTimeout, clearTimeout, setInterval, clearInterval, URL, TextDecoder, TextEncoder,
@@ -62,7 +62,7 @@ function ctxAvec(numeros, txns, lbcItems) {
       const u = String(url);
       const j = (d) => ({ ok: true, status: 200, json: async () => d, text: async () => JSON.stringify(d), headers: { get: () => 'application/json' } });
       if ((opts.method || 'GET') === 'POST') return { ok: true, status: 201, json: async () => ({}), text: async () => '', headers: { get: () => '' } };
-      if (/id=eq\.main/.test(u)) return j([{ data: { vinted_annonce_numeros: numeros, vinted_accounts: [
+      if (/id=eq\.main/.test(u)) return j([{ data: { vinted_annonce_numeros: numeros, vinted_accounts_hidden: exclus || [], vinted_accounts: [
         { vinted_user_id: '9001', login: 'compteA' }, { vinted_user_id: '9002', login: 'compteB' }] } }]);
       if (/id=like\.harvest_\*_listings/.test(u)) return j(LISTINGS);
       // La PREUVE d'une vente : `transaction → item_id` (§5, l'identité).
@@ -276,6 +276,38 @@ function ctxAvec(numeros, txns, lbcItems) {
           memes ? `${cas.length} cas` : 'l\'app en montre un nombre, le panneau un autre');
       }
     }
+  }
+
+  // ── ⚠️⚠️ UN COMPTE QU'IL A EXCLU N'ALIMENTE AUCUNE FILE ────────────────────
+  // Mesuré le 13 septembre sur sa vraie base : la file du panneau contenait la
+  // **N°118, qui vient de `liliand653`** — le compte que Julien a lui-même mis
+  // de côté dans l'app. `buildEbayData` filtrait, l'APP filtrait (`offAcc`),
+  // seule la file Leboncoin du panneau ne le faisait pas : **l'app annonçait 39
+  // et le panneau 40**, sur exactement la même donnée (§11).
+  {
+    const tous = {
+      '101': { numero: '101', title: 'A', mp: { lbc: true, ebay: true } },
+      '202': { numero: '202', title: 'B', mp: { lbc: true, ebay: true } },
+      '303': { numero: '303', title: 'C', mp: { lbc: true, ebay: true } },
+    };
+    // 303 vit sur le compte 9002 : on l'exclut, comme `liliand653`.
+    const ctxE = ctxAvec(tous, [], null, ['9002']);
+    const rl = await ctxE.buildLbcData();
+    const nl = (rl.queue || []).map(a => String(a.numero)).sort();
+    dit(!nl.includes('303'), 'Leboncoin : un compte EXCLU de l\'app n\'alimente pas la file',
+      nl.includes('303') ? 'le panneau propose de publier l\'annonce d\'un compte qu\'il a écarté' : 'file : ' + nl.join(', '));
+    dit(nl.includes('101') && nl.includes('202'), 'et les comptes actifs y restent', 'file : ' + nl.join(', '));
+    // ⚠️ Et on le DIT : une file qui rétrécit sans explication se lit comme une
+    //    perte. Le compte est RENDU, pour que le panneau puisse l'écrire.
+    dit((rl.stats || {}).exclues === 1, 'et le nombre de paires écartées est RENDU',
+      'exclues = ' + String((rl.stats || {}).exclues));
+    // eBay le faisait déjà : on vérifie que les deux files partagent la règle.
+    const re = await ctxE.buildEbayData();
+    const ne = (re.queue || []).map(a => String(a.numero)).sort();
+    dit(!ne.includes('303'), 'eBay : même règle sur le compte exclu', 'file : ' + ne.join(', '));
+    // Et l'app aussi — c'est elle qui était juste.
+    dit(/offAcc\.has\(uid\)/.test(APP), 'l\'app applique la même exclusion sur SA file',
+      'sinon l\'app annonce un nombre et le panneau en montre un autre');
   }
 
   // ── LE TITRE LEBONCOIN : LES DEUX CÔTÉS DOIVENT RENDRE LE MÊME ──────────────
