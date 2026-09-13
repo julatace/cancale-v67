@@ -867,6 +867,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         try {
           if (msg.action === 'getQueue') { const r = await buildEbayData(); sendResponse({ ok: true, ...r }); return; }
           if (msg.action === 'downloadPhotos' && Array.isArray(msg.urls)) { const nb = await downloadPhotos(msg.urls, msg.numero); sendResponse({ ok: true, count: nb }); return; }
+          // Les OCTETS des photos, pour les ATTACHER au formulaire eBay au lieu
+          // de les déposer sur son disque. Le fond les lit parce que le CDN de
+          // Vinted ne renvoie aucun en-tête CORS — la page seule ne peut pas.
+          if (msg.action === 'photoBytes' && Array.isArray(msg.urls)) { const ph = await photosPourEbay(msg.urls, msg.max); sendResponse({ ok: true, photos: ph }); return; }
           if (msg.action === 'markPosted' && msg.id) { sendResponse({ ok: await markEbayPosted(msg.id, true) }); return; }
           if (msg.action === 'unmarkPosted' && msg.id) { sendResponse({ ok: await markEbayPosted(msg.id, false) }); return; }
           if (msg.action === 'setPending') { await chrome.storage.local.set({ vrmPendingEbay: msg.ad ? { ad: msg.ad, at: Date.now() } : null }); sendResponse({ ok: true }); return; }
@@ -880,7 +884,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           //    la méthode du projet (mesurer d'abord) appliquée à ce que je ne
           //    peux pas mesurer moi-même. Aucun contenu, juste des noms de champs.
           if (msg.action === 'ebayForm' && Array.isArray(msg.fields)) {
-            await supabaseUpsert('app_data', [{ id: 'panel_ebay_form', data: { url: msg.url, fields: msg.fields.slice(0, 150), at: new Date().toISOString() } }], 'id');
+            // ⚠️ LA MISE EN VENTE eBAY SE FAIT AUSSI EN ÉTAPES, et cette ligne
+            //    était ÉCRASÉE à chaque passage : la dernière étape vue effaçait
+            //    la seule que j'avais. C'est le défaut corrigé pour `lbc_recon`
+            //    le 13 septembre, resté entier ici. On garde TOUTES les étapes,
+            //    par signature — noms de champs et libellés d'options seulement,
+            //    jamais un contenu saisi.
+            const prev = await sbGet('app_data?id=eq.panel_ebay_form&select=data');
+            if (prev === null) { sendResponse({ ok: false, error: 'lecture' }); return; }   // « pas su » ≠ « rien »
+            const cur = (prev && prev[0] && prev[0].data) || {};
+            const etapes = Object.assign({}, cur.etapes || {});
+            etapes[String(msg.etape || msg.url || Object.keys(etapes).length)] =
+              { url: msg.url, fields: msg.fields.slice(0, 150), selects: (msg.selects || []).slice(0, 30), fichiers: msg.fichiers || 0, at: new Date().toISOString() };
+            await supabaseUpsert('app_data', [{ id: 'panel_ebay_form', data: { ...cur, url: msg.url, fields: msg.fields.slice(0, 150), etapes, at: new Date().toISOString() } }], 'id');
             sendResponse({ ok: true }); return;
           }
           sendResponse({ ok: false, error: 'action inconnue' });
@@ -4704,7 +4720,15 @@ function lbcDescription(brut) {
 }
 
 const LBC_TITRE_MAX = 50;
-function lbcTitre(brand, base, size) {
+// ⚠️ LE PLAFOND EST UN PARAMÈTRE, PAS UNE SECONDE RÈGLE. eBay accepte 80
+//    caractères, Leboncoin 50 — mais « ne pas doubler la marque », « ne pas
+//    couper en plein mot » et « la taille en suffixe » sont les MÊMES règles.
+//    `buildEbayAd` recopiait sa propre version (`[marque, titre].join(' ')` puis
+//    `.slice(0, 80)`) : mesuré le 13 septembre sur ses vraies annonces,
+//    **18 titres sur 53 sortaient avec la marque écrite deux fois** (« Nike nike
+//    shox tl », « Salomon salomon XT-6 ») — exactement le défaut corrigé pour
+//    Leboncoin, resté entier à côté. Deux règles pour une notion, c'est §11.
+function lbcTitre(brand, base, size, max) {
   let t = String(base || '').replace(/\s+/g, ' ').trim();
   // 1. Le remplissage PUR, et seulement lui.
   //    ⚠️ PAS le mot « chaussures » tout court : mesuré, il PORTE DU SENS trois
@@ -4730,7 +4754,7 @@ function lbcTitre(brand, base, size) {
   t = t.charAt(0).toUpperCase() + t.slice(1);
   const suff = taille ? ' T' + taille : '';
   // 5. ⚠️ ON NE COUPE JAMAIS EN PLEIN MOT.
-  const place = LBC_TITRE_MAX - suff.length;
+  const place = (max || LBC_TITRE_MAX) - suff.length;
   if (t.length > place) {
     const coupe = t.slice(0, place);
     const esp = coupe.lastIndexOf(' ');
@@ -4850,14 +4874,18 @@ async function markEbayPosted(id, on) {
 // au même endroit, et on ne devine AUCUNE catégorie — eBay la propose lui-même
 // à partir du titre, une catégorie fausse ferait plus de mal que pas de
 // catégorie du tout.
+const EBAY_TITRE_MAX = 80;
 function buildEbayAd(raw, det, num, account) {
   const a = buildLbcAd(raw, det, num, account);
-  let titre = [firstDefined(det.brand_dto && det.brand_dto.title, raw.brand_title, det.brand, raw.brand),
-               String(firstDefined(det.title, raw.title)).trim()].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+  // ⚠️ LA MÊME RÈGLE DE TITRE QUE LEBONCOIN, AVEC UN AUTRE PLAFOND. L'ancienne
+  //    version recollait marque + titre et coupait à 80 : mesuré sur ses vraies
+  //    annonces, **18 titres sur 53 portaient la marque deux fois** et 51
+  //    écrivaient « taille 42 » au lieu de « T42 ». Une seule règle, un seul
+  //    propriétaire (§11) — le plafond est son paramètre.
+  const marque = firstDefined(det.brand_dto && det.brand_dto.title, raw.brand_title, det.brand, raw.brand);
+  const base = String(firstDefined(det.title, raw.title)).trim();
   const size = String(firstDefined(det.size, det.size_title, raw.size_title, raw.size)).trim();
-  if (size && !/taille|t\s?\d/i.test(titre)) titre += ' Taille ' + size;
-  if (titre.length > 80) titre = titre.slice(0, 80).trim();
-  return { ...a, title: titre, sku: a.ref, category: '' };
+  return { ...a, title: lbcTitre(marque, base, size, EBAY_TITRE_MAX), sku: a.ref, category: '' };
 }
 async function buildEbayData() {
   const mainRows = await sbGet('app_data?id=eq.main&select=data');
@@ -4882,7 +4910,27 @@ async function buildEbayData() {
     if ((!cur.photos || !cur.photos.length) && pd.photos && pd.photos.length) cur.photos = pd.photos.map(u => ({ url: u }));
     details[id] = cur;
   }
-  const queue = []; const vus = new Set(); let retirees = 0;
+  // ⚠️⚠️ UNE PAIRE DÉJÀ VENDUE NE DOIT PAS ENTRER DANS LA FILE eBAY.
+  // C'est la plainte de Julien du 13 septembre (« des paires qui sont vendues »),
+  // corrigée pour Leboncoin le jour même — et laissée entière ici. Mesuré le même
+  // jour sur ses vraies données : sur ses **53 annonces en ligne et numérotées,
+  // 14 portent une vente PROUVÉE** (`transaction → item_id`, §5 : l'identité,
+  // jamais la ressemblance). Vinted ne ferme pas toujours l'annonce après la
+  // vente, et la capture d'un compte peut dater de plusieurs jours : l'état de
+  // l'annonce ne suffit donc pas. La preuve de vente PRIME.
+  // Le jour où il coche « eBay », il se verrait proposer de mettre en vente
+  // quatorze paires qu'il n'a plus — et sur eBay une vente engage une expédition.
+  const vendus = new Set();
+  {
+    const txnRows = (await sbGet('app_data?id=like.harvest_*_txn_*&select=data')) || [];
+    for (const r of txnRows) {
+      const p = (r.data && r.data.payload) || {};
+      const t = p.transaction || p;
+      const it = t && (t.item_id || (t.item && t.item.id));
+      if (it) vendus.add(String(it));
+    }
+  }
+  const queue = []; const vus = new Set(); let retirees = 0, vendues = 0;
   for (const r of listRows) {
     const d = r.data || {}; const p = d.payload || {}; const uid = String(d.uid);
     if (off.has(uid)) continue;
@@ -4893,13 +4941,16 @@ async function buildEbayData() {
       const e = numeros[oid]; const num = e && e.numero;
       if (!num || String(num).trim() === '') continue;      // il lui faut un N° (la réf)
       if (!mpChoisi(e, 'ebay')) { retirees++; continue; }   // pas cochée pour eBay
+      // ⚠️ On compte celles qu'on écarte : une file qui rétrécit sans explication
+      //    se lit comme une perte (leçon de l'écran Leboncoin).
+      if (vendus.has(oid)) { vendues++; continue; }
       if (lost[String(num).trim()]) continue;
       if (posted.has(oid) || posted.has(String(num))) continue;
       queue.push(buildEbayAd(it, details[oid] || {}, num, uid2login[uid]));
     }
   }
   queue.sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0));
-  return { queue, retirees, postedCount: posted.size, echec: pos.echec };
+  return { queue, retirees, vendues, postedCount: posted.size, echec: pos.echec };
 }
 
 async function buildLbcData() {
@@ -5325,6 +5376,15 @@ async function photosEnOctets(urls, max) {
   }
   return out;
 }
+
+// ⚠️ UNE FONCTION NOMMÉE, EXPRÈS : c'est elle que l'app DATE dans
+//    `EXT_CAPACITES.photosebay`. Les photos s'attachent côté Leboncoin depuis la
+//    5.58 et côté eBay depuis la 5.59 — deux dates, donc deux seuils, sinon l'app
+//    promet à une 5.58 que ses annonces eBay partent avec leurs photos (le défaut
+//    le plus coûteux du projet) ou réclame une mise à jour qui ne change rien
+//    (son miroir, aussi interdit). Une ligne de pont ne se date pas ; une
+//    fonction, oui.
+async function photosPourEbay(urls, max) { return await photosEnOctets(urls, max); }
 
 async function downloadPhotos(urls, numero) {
   if (!chrome.downloads) return 0;

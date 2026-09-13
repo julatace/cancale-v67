@@ -35,7 +35,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.58.0';
+const EXT_ATTENDUE = '5.59.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -58,8 +58,8 @@ const EXT_ATTENDUE = '5.58.0';
 //    qu'on ne l'éteint pas dans son dos. eBay n'a jamais rien préparé : cocher
 //    à sa place mettrait 44 annonces dans une file qu'il n'a pas demandée.
 const MP_PLACES = [
-  { cle: 'lbc',  nom: 'Leboncoin', defaut: true,  cap: 'places' },
-  { cle: 'ebay', nom: 'eBay',      defaut: false, cap: 'ebay' },
+  { cle: 'lbc',  nom: 'Leboncoin', defaut: true,  cap: 'places', capPhotos: 'photoslbc' },
+  { cle: 'ebay', nom: 'eBay',      defaut: false, cap: 'ebay',   capPhotos: 'photosebay' },
 ];
 // ── LE TITRE LEBONCOIN : 50 caractères, et ils se gagnent ───────────────────
 // ⚠️⚠️ COPIE EXACTE DE `lbcTitre` DE `background.js`. Les deux calculent la file
@@ -83,7 +83,7 @@ const lbcDescription = (brut) => {
 };
 
 const LBC_TITRE_MAX = 50;
-const lbcTitre = (brand, base, size) => {
+const lbcTitre = (brand, base, size, max) => {
   let t = String(base || '').replace(/\s+/g, ' ').trim();
   t = t.replace(/^(?:chaussures?|baskets?|sneakers?)\s+(?:style|type|genre)\s+/i, '');
   const bq = String(brand || '').trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -99,7 +99,7 @@ const lbcTitre = (brand, base, size) => {
   t = t.replace(/\s+/g, ' ').trim();
   t = t.charAt(0).toUpperCase() + t.slice(1);
   const suff = taille ? ' T' + taille : '';
-  const place = LBC_TITRE_MAX - suff.length;
+  const place = (max || LBC_TITRE_MAX) - suff.length;
   if (t.length > place) {
     const coupe = t.slice(0, place);
     const esp = coupe.lastIndexOf(' ');
@@ -146,7 +146,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 //   releve  `capterReleves`       5.52.0  (5 sept.)   le relevé daté du porte-monnaie
 // `audit-coherence.cjs` vérifie que ces trois fonctions existent toujours dans
 // l'extension : une capacité annoncée mais retirée serait le même mensonge.
-const EXT_CAPACITES = { codes: '5.45.0', offres: '5.38.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4' };
+const EXT_CAPACITES = { codes: '5.45.0', offres: '5.38.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -18968,7 +18968,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 </div>
                 <div style={{fontSize:11.5,color:C.muted,lineHeight:1.45,marginTop:2}}>{
                   etat==='ok'
-                    ? <>La puce sous chaque annonce décide. L'extension prépare ensuite chacune sur {pl.nom.toLowerCase()}.fr — photos téléchargées, texte copié, formulaire pré-rempli : <b>c'est toi qui publies</b>.</>
+                    ? (extSait(pl.capPhotos)==='ok'
+                      /* ⚠️ LA PHRASE QUI DÉCRIT CE QUE FAIT L'EXTENSION DOIT SUIVRE CE
+                         QU'ELLE FAIT. Elle disait « photos téléchargées » — vrai jusqu'à
+                         la 5.58, faux depuis : elles s'ATTACHENT au formulaire, et c'est
+                         exactement ce dont il se plaignait (« ça me fait télécharger des
+                         photos dans mon ordi »). Même défaut que la carte URSSAF : les
+                         chiffres rebranchés, la phrase restée en arrière.
+                         ⚠️ Et la phrase dépend de la VERSION INSTALLÉE, PLACE PAR PLACE :
+                         Leboncoin attache depuis la 5.58, eBay depuis la 5.59. Un seul
+                         seuil pour les deux aurait menti dans un sens ou dans l'autre. */
+                      ? <>La puce sous chaque annonce décide. L'extension prépare ensuite chacune sur {pl.nom.toLowerCase()}.fr — <b>photos attachées au formulaire</b> (rien sur ton ordinateur), texte copié, champs remplis : <b>c'est toi qui publies</b>.</>
+                      : <>La puce sous chaque annonce décide. L'extension prépare ensuite chacune sur {pl.nom.toLowerCase()}.fr — photos téléchargées dans un dossier, texte copié, formulaire pré-rempli : <b>c'est toi qui publies</b>. La <b>{EXT_CAPACITES[pl.capPhotos]}</b> les attache directement au formulaire.</>)
                   : etat==='absente'
                     ? <>Ton choix est enregistré. C'est l'extension, dans ton Chrome, qui prépare ensuite chaque annonce sur {pl.nom} — ouvre l'app sur l'ordinateur où elle est installée.</>
                     : <>Ton choix est enregistré, <b>mais l'extension installée ne sait pas encore préparer {pl.nom}</b> : il lui faut la <b>{EXT_CAPACITES[pl.cap]}</b>. Mets-la à jour depuis <b>Réglages</b> — tes coches ne bougent pas.</>

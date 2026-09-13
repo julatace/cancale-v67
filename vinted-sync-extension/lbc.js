@@ -754,9 +754,14 @@
   // Leboncoin est une application a page unique : le formulaire n'existe pas
   // encore quand la page finit de charger, et il se reconstruit a chaque etape.
   // On surveille donc l'apparition des champs et on remplit des qu'ils sont la.
-  // ⚠️ On remplit, on ne publie PAS : c'est toi qui relis et qui valides. Les
-  // photos ne peuvent pas etre injectees (un navigateur interdit de remplir un
-  // champ fichier par programme) : elles sont deja dans ton dossier VRM-{N°}.
+  // ⚠️ On remplit, on ne publie PAS : c'est toi qui relis et qui valides.
+  // ⚠️ CE COMMENTAIRE DISAIT ENCORE « les photos ne peuvent pas être injectées,
+  //    un navigateur interdit de remplir un champ fichier par programme » — la
+  //    phrase mesurée FAUSSE le 13 septembre, dans le fichier même où je venais
+  //    de l'attacher quinze lignes plus haut. `attacherPhotos` les attache, et
+  //    rien ne touche son disque. *Une suppression « terminée » se vérifie sur ce
+  //    qui RESTE*, commentaires compris : un commentaire faux se relit comme une
+  //    règle.
   let pending = null, pendingTries = 0, pendingDone = 0, pendingTimer = null, pendingArrete = false;
   let photosFaites = false, photosEtat = null;
   async function autoPrefill() {
