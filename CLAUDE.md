@@ -1080,7 +1080,25 @@ mesurés :
     fois que c'est « il meurt au lieu de rapporter » : sur le code d'avant
     `estALui` n'existe pas, mon premier jet sortait en `TypeError` et le bilan
     n'était jamais imprimé.
-16. **« Des photos qui n'apparaissent pas »** — et je n'ai pas pu trancher :
+16. ⚠️⚠️ **ET UN COMPTE QU'IL A EXCLU ALIMENTAIT ENCORE LA FILE.** Mesuré le
+    13 septembre : la file du panneau contenait la **N°118, qui vient de
+    `liliand653`** — le compte que Julien a lui-même mis de côté dans l'app. Le
+    panneau lui proposait donc de publier sur Leboncoin l'annonce d'un compte
+    qu'il a écarté. C'est § « un CHOIX n'est pas une panne » **retourné** : une
+    fois le geste fait, l'app n'a plus rien à en tirer.
+    ⚠️ Et ce n'était vrai que **là** : `buildEbayData` filtrait, l'**app**
+    filtrait (`offAcc`) — seule la file Leboncoin du panneau ne le faisait pas.
+    **L'app annonçait 39, le panneau 40**, sur exactement la même donnée (§11).
+    ⇒ Mesuré après : **40 → 39**, et le panneau **le dit** en gris et sans
+    consigne (« son compte Vinted est exclu de l'app — ton choix »), parce
+    qu'une file qui rétrécit sans explication se lit comme une perte.
+    **2 échecs** sur le code d'avant.
+    ⚠️ **Mesuré au passage, et laissé tel quel** : une paire de la file (**N°30**)
+    vient de `3170782324`, un identifiant de moisson qui **n'a plus de compte
+    dans VRM**, dernière capture il y a **33 jours**. L'app et le panneau la
+    gardent **tous les deux** — donc aucune divergence à corriger, et je
+    n'invente pas une troisième règle sans qu'il ait tranché. À lui de dire.
+17. **« Des photos qui n'apparaissent pas »** — et je n'ai pas pu trancher :
     Vinted **bloque mes requêtes** (même page de blocage pour deux annonces
     différentes), et l'URL d'une photo ne porte qu'une signature `?s=…`, **sans
     date d'expiration lisible**. Plutôt que de deviner, **la carte le constate

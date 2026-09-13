@@ -308,7 +308,7 @@
              <button data-a="refresh" title="Rafraîchir">⟳</button>
              <button data-a="close" title="Fermer">×</button></div>
            <a class="deposit" href="https://www.leboncoin.fr/deposer-une-annonce" target="_blank" rel="noreferrer">➕ Déposer une annonce sur Leboncoin</a>
-           <div class="body">${photoHtml()}${counterHtml()}${remHtml}${unlHtml}${items.length ? listeGroupee(items) : emptyHtml()}${donePostedHtml()}</div>
+           <div class="body">${photoHtml()}${counterHtml()}${exclusHtml()}${remHtml}${unlHtml}${items.length ? listeGroupee(items) : emptyHtml()}${donePostedHtml()}</div>
            <div class="hint">1) Clique <b>➕ Déposer une annonce</b>. 2) Sur la page, clique <b>✍️ Pré-remplir</b> sur la paire voulue. 3) Vérifie et publie toi-même. Rien n&#39;est publié automatiquement.</div>
          </div>`
       : `<button class="fab" data-a="open">🟠 VRM <span class="b">${badge}</span></button>`);
@@ -327,6 +327,19 @@
     return titre('Aucune photo', nues.length, '#c0392b') + nues.map(cardHtml).join('')
       + titre('Prêtes, avec toutes leurs photos', pretes.length) + pretes.map(cardHtml).join('')
       + titre('Une seule photo', une.length) + une.map(cardHtml).join('');
+  }
+  // ⚠️ UNE FILE QUI RÉTRÉCIT SANS EXPLICATION SE LIT COMME UNE PERTE.
+  // Mesuré le 13 septembre : la N°118 vient de `liliand653`, le compte que
+  // Julien a lui-même mis de côté dans l'app — le panneau la proposait quand
+  // même. Elle en sort ; on le DIT, en gris et sans consigne : c'est son choix,
+  // pas une panne (§ « un CHOIX n'est pas une panne »), et le geste pour la
+  // récupérer est de remettre le compte dans l'app.
+  function exclusHtml() {
+    const n = (stats && stats.exclues) || 0;
+    if (!n) return '';
+    return `<div class="counter" style="margin-top:8px">
+      <div class="cmsg" style="color:#8a8f98">${n} paire${n > 1 ? 's ne sont' : ' n\'est'} pas dans la liste : ${n > 1 ? 'leurs comptes Vinted sont exclus' : 'son compte Vinted est exclu'} de l&#39;app — ton choix. Ça se règle dans <b>Réglages → Comptes liés</b>.</div>
+    </div>`;
   }
   function donePostedHtml() {
     if (!postedList.length) return '';
