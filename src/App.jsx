@@ -35,7 +35,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.60.0';
+const EXT_ATTENDUE = '5.61.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -21395,18 +21395,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 // l'extension sur leboncoin.fr (assistant 1-clic). Ici on montre : combien
 // publiées / ton offre, ce qu'il reste à publier, et ce qu'il faut retirer
 // (vendu sur Vinted). Tout est lu depuis Supabase (0 appel Vinted/Leboncoin).
+const MAIN_LEBONCOIN = ['vinted_annonce_numeros', 'vinted_accounts_hidden', 'vinted_accounts_blocked', 'vinted_pairs_lost'];
 function LeboncoinScreen() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const sbGet = async (q) => { try { const r = await fetch(`${SUPABASE_URL}/rest/v1/${q}`, { headers: sbAuth() }); return r.ok ? await r.json() : null; } catch (_) { return null; } };
   const reload = async () => {
     setLoading(true);
-    const mainRows = await sbGet('app_data?id=eq.main&select=data');
+    // ⚠️ 197 Ko POUR EN LIRE 133 : cet écran lit `main` lui-même (c'est ce qui
+    //    lui donne son propre `echecLecture`), mais il n'en utilise que QUATRE
+    //    clés. Mesuré le 15 septembre : `select=data` 197 Ko / 795 ms, la
+    //    projection 133 Ko / 442 ms, **valeurs identiques**. §4.4 : on ne
+    //    rapatrie pas le blob d'une ligne lourde. L'alias porte le nom de la
+    //    clé, donc la lecture ci-dessous ne change pas.
+    const mainRows = await sbGet(`app_data?id=eq.main&select=${MAIN_LEBONCOIN.map(k => `${k}:data->${k}`).join(',')}`);
     // ⚠️ `sbGet` rend `null` quand la base n'a PAS RÉPONDU, et `[]` quand elle
     //    a répondu « rien ». Confondre les deux faisait fêter « Tout est
     //    publié 🎉 » une file qu'on n'avait jamais pu lire.
     const echecLecture = mainRows === null;
-    const main = (mainRows && mainRows[0] && mainRows[0].data) || {};
+    const main = (mainRows && mainRows[0]) || {};
     const numeros = main.vinted_annonce_numeros || {};
     const postedRows = await sbGet('app_data?id=eq.vinted_lbc_posted&select=data');
     const pd = (postedRows && postedRows[0] && postedRows[0].data) || {};
