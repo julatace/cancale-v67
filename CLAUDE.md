@@ -1710,6 +1710,30 @@ retire pas.
 **deux autres endroits**. Le retirer avec la règle du titre aurait tué
 `buildPanelData` en silence — §4.11, *une coupe se vérifie sur ce qui RESTE*.
 
+### ⚠️⚠️ ET L'ÉCRAN LEBONCOIN NE CONNAISSAIT QUE DEUX ÉTATS SUR TROIS
+Vu **au rendu, sur ses vraies données**, le 15 septembre. Sa phrase
+d'introduction s'écrivait `extSait('photoslbc')==='ok' ? A : B` — **deux** états
+pour une fonction qui en rend **trois**. Le troisième est celui de son
+**iPhone** : `absente`. L'écran lui annonçait donc « photos téléchargées dans un
+dossier » — la description d'un comportement **qui ne peut pas avoir lieu**
+(sans extension, rien n'est ni téléchargé ni attaché) — au lieu du vrai geste :
+ouvrir l'app sur l'ordinateur où elle est installée.
+C'est le trou du premier jet d'`extSaitLireCodes` (« l'extension la plus en
+retard était la seule à ne rien déclencher »), et **l'écran Annonces, lui,
+traitait déjà les trois** : le correctif n'avait été appliqué qu'à un des deux
+endroits. *Une suppression « terminée » se vérifie sur ce qui RESTE.*
+⚠️ **ON NE JUGE PAS SUR UN MOT** — interdire « télécharg » attraperait la phrase
+honnête (onzième piège de ce genre). Le banc `capacites.cjs` rend l'écran dans
+les **trois** états et exige **trois phrases différentes** : deux états qui se
+ressemblent, c'est un état oublié. **3 échecs** sur le code d'avant, dont
+« absente » et « en retard » à **100 % de recouvrement** — mot pour mot la même
+phrase de 172 caractères.
+⚠️ **DIX-NEUVIÈME FOIS QU'UN DE MES CONTRÔLES CRIE AU LOUP** : le seuil de §7
+(60 caractères communs) ne s'applique pas tel quel ici — la phrase a **trois
+morceaux** (la file · où ça se passe · les photos) et les deux premiers sont
+**légitimement** communs aux trois états. On mesure le recouvrement **relatif** :
+mesuré 13 % · 51 % · 13 % après, contre **100 %** sur le défaut.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par

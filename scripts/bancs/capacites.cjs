@@ -78,7 +78,7 @@ const BANDEAU=/prix plancher[^\n]*rien ne les applique/i;
 
 (async()=>{
   const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-angle=swiftshader','--no-sandbox']});
-  const lis=async (pont)=>{
+  const lis=async (pont, onglet)=>{
     const pg=await b.newPage({viewport:{width:1512,height:950}});
     const errs=[]; pg.on('pageerror',e=>errs.push(e.message));
     await pg.addInitScript((v)=>{
@@ -104,7 +104,7 @@ const BANDEAU=/prix plancher[^\n]*rien ne les applique/i;
         return j(rows.filter(r=>re.test(r.id)).map(r=>projette(r,S)));}
       return j([]);});
     await pg.route('**/api/**',r2=>r2.fulfill({status:200,contentType:'application/json',body:'{"pret":true,"devices":1}'}));
-    await pg.goto('http://localhost:4472/?tab=cat_annonces',{waitUntil:'domcontentloaded'});
+    await pg.goto('http://localhost:4472/?tab='+(onglet||'cat_annonces'),{waitUntil:'domcontentloaded'});
     await pg.waitForTimeout(4500);
     const t=await pg.evaluate(()=>document.body.innerText||'');
     if(process.env.DEBUG) console.log('      diag:',JSON.stringify(await pg.evaluate(()=>{
@@ -113,7 +113,7 @@ const BANDEAU=/prix plancher[^\n]*rien ne les applique/i;
       return {numeros:Object.keys(n).length, avecMin:avec.length, ex:avec[0]||null,
         planchTexte:/prix plancher/i.test(document.body.innerText||''), cartes:document.querySelectorAll('img').length};
     })));
-    const nom=pont===null?'absente':(pont===''?'muette':pont);
+    const nom=(onglet||'ann')+'-'+(pont===null?'absente':(pont===''?'muette':pont));
     await pg.screenshot({path:SC+'/z-cap-'+nom.replace(/\./g,'_')+'.png',fullPage:true});
     await pg.close();
     return {t, errs};
@@ -200,6 +200,78 @@ const BANDEAU=/prix plancher[^\n]*rien ne les applique/i;
         'bandeau '+nBandeau+' / grille '+nGrille);
     }
   }
+  // ══════════════════════════════════════════════════════════════════════════
+  // L'ECRAN LEBONCOIN DOIT CONNAITRE LES **TROIS** ETATS, PAS DEUX
+  // ══════════════════════════════════════════════════════════════════════════
+  // ⚠️⚠️ VU AU RENDU LE 15 SEPTEMBRE, SUR SES VRAIES DONNEES. Sa phrase
+  // d'introduction s'ecrivait `extSait('photoslbc')==='ok' ? A : B` — donc DEUX
+  // etats pour une fonction qui en rend TROIS. Le troisieme est celui de son
+  // iPhone : **absente**. L'ecran lui annoncait alors « photos telechargees dans
+  // un dossier » — la description d'un comportement qui ne peut PAS avoir lieu
+  // (sans extension, rien n'est ni telecharge ni attache) — au lieu du vrai
+  // geste : ouvrir l'app sur l'ordinateur ou elle est installee.
+  // C'est le trou du premier jet d'`extSaitLireCodes` (« l'extension la plus en
+  // retard etait la seule a ne rien declencher »), et l'ecran Annonces, lui,
+  // traitait deja les trois.
+  //
+  // ⚠️ ON NE JUGE PAS SUR UN MOT — interdire « telecharg » attraperait la phrase
+  //    HONNETE (c'est la 11e fois que ce piege est note dans le dossier). On juge
+  //    sur la SUBSTANCE : les trois etats doivent rendre trois phrases
+  //    DIFFERENTES. Deux etats qui se ressemblent, c'est un etat oublie.
+  {
+    console.log('\n── L\'ECRAN LEBONCOIN : TROIS ETATS, TROIS PHRASES');
+    const intro = async (pont) => {
+      const { t } = await lis(pont, 'leboncoin');
+      const l = t.split('\n').map(x => x.trim())
+        .find(x => /La file de publication est construite/i.test(x)) || '';
+      // ⚠️ DIX-NEUVIEME FOIS QU'UN DE MES CONTROLES CRIE AU LOUP : la PREMIERE
+      //    moitie de cette phrase decrit la FILE (« construite a partir de tes
+      //    annonces reellement en ligne… ») — elle est la meme dans les trois
+      //    etats, et c'est normal. Ce qui doit distinguer, c'est ce qui decrit
+      //    l'EXTENSION. On compare donc la clause d'etat, pas le paragraphe.
+      return l.replace(/^.*?paires? retir[ée]es? exclues?\)\.?\s*/i, '');
+    };
+    const absente = await intro(null);
+    const retard  = await intro('5.57.0');   // juste sous la 5.58 (arrivee des photos attachees)
+    const ajour   = await intro('5.62.0');
+    dit(!!absente && !!retard && !!ajour, 'la phrase d\'introduction est rendue dans les trois etats',
+      `absente ${absente.length} car · retard ${retard.length} · a jour ${ajour.length}`);
+    // ⚠️ ET LE SEUIL DE §7 NE S'APPLIQUE PAS TEL QUEL ICI : cette phrase a TROIS
+    //    morceaux (la file · ou ca se passe · les photos), et les deux premiers
+    //    sont legitimement communs — c'est le meme fait vrai dans les trois
+    //    etats. Ce qui doit distinguer, c'est CE QU'ELLE DIT DES PHOTOS.
+    //    On mesure donc le recouvrement RELATIF : deux phrases dont la plus
+    //    courte est contenue a plus de 80 % dans l'autre n'ajoutent rien l'une
+    //    a l'autre — c'est un etat oublie. Mesure sur le defaut : « absente »
+    //    rendait MOT POUR MOT la phrase de « en retard » (100 %).
+    const recouvrement = (a2, b2) => {
+      if (!a2 || !b2) return 0;
+      const [court, long] = a2.length <= b2.length ? [a2, b2] : [b2, a2];
+      let best = 0;
+      for (let i = 0; i < court.length; i++) {
+        for (let j = court.length; j > i + best; j--) {
+          if (long.indexOf(court.slice(i, j)) >= 0) { best = Math.max(best, j - i); break; }
+        }
+      }
+      return best / court.length;
+    };
+    const paires = [['absente', absente, 'en retard', retard],
+                    ['en retard', retard, 'a jour', ajour],
+                    ['absente', absente, 'a jour', ajour]];
+    for (const [na, a2, nb, b2] of paires) {
+      const r = recouvrement(a2, b2);
+      dit(r <= 0.8, `« ${na} » et « ${nb} » ne disent pas la meme chose`,
+        `${Math.round(r * 100)} % de la plus courte est dans l'autre`);
+    }
+    // Et l'autre sens : sans extension, on ne se tait pas non plus — il doit
+    // savoir OU se fait la publication, sinon la liste n'a pas de mode d'emploi.
+    dit(/ordinateur/i.test(absente), 'et sans extension, l\'ecran dit OU ca se passe',
+      'se taire laisserait croire que le bouton existe ici');
+    // La version qui change le comportement est NOMMEE quand elle manque.
+    dit(/5\.58\.0/.test(retard), 'et en retard, il NOMME la version qui attache les photos',
+      '« mets-la a jour » sans numero ne dit pas quoi verifier');
+  }
+
   await b.close(); srv.close();
   console.log(ko?('\n'+ko+' controle(s) non conforme(s).'):'\nL\'app ne promet que ce que l\'extension installee sait faire.');
   process.exit(ko?1:0);

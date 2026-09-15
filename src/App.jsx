@@ -21790,9 +21790,22 @@ function LeboncoinScreen() {
           par AUCUNE version. Depuis la 5.58 elles s'attachent au formulaire.
           *Une suppression « terminée » se vérifie sur ce qui RESTE* — le premier
           correctif n'avait touché qu'un des deux endroits. */}
-      <div style={{ fontSize: 12, color: C.muted, marginBottom: 14, lineHeight: 1.5 }}>La file de publication est construite à partir de tes <b>annonces réellement en ligne sur Vinted</b> (comptes actifs uniquement, paires retirées exclues). La <b>publication</b> se fait via l'extension sur leboncoin.fr, bouton « 🚀 Tout préparer » : {extSait('photoslbc')==='ok'
-        ? <><b>photos attachées au formulaire</b> (rien sur ton ordinateur), texte copié, champs remplis</>
-        : <>photos téléchargées dans un dossier, texte copié, formulaire pré-rempli</>} — tu valides.</div>
+      {/* ⚠️⚠️ ET ELLE NE CONNAISSAIT QUE DEUX ÉTATS — vu au rendu le 15 septembre
+          sur ses vraies données. `extSait` en rend TROIS, et le troisième est
+          celui de son iPhone : **absente**. L'écran lui annonçait alors
+          « photos téléchargées dans un dossier » — la description d'un
+          comportement qui ne peut PAS avoir lieu (sans extension, rien n'est
+          téléchargé ni attaché), au lieu de lui dire le vrai geste : ouvrir
+          l'app sur l'ordinateur où elle est installée. C'est exactement le trou
+          du premier jet d'`extSaitLireCodes` (« l'extension la plus en retard
+          était la seule à ne rien déclencher »), et l'écran Annonces, lui,
+          traitait déjà les trois. *« Pas su » ne vaut pas « oui ».* */}
+      <div style={{ fontSize: 12, color: C.muted, marginBottom: 14, lineHeight: 1.5 }}>La file de publication est construite à partir de tes <b>annonces réellement en ligne sur Vinted</b> (comptes actifs uniquement, paires retirées exclues). {(() => {
+        const e = extSait('photoslbc');
+        if (e === 'ok') return <>La <b>publication</b> se fait via l'extension sur leboncoin.fr, bouton « 🚀 Tout préparer » : <b>photos attachées au formulaire</b> (rien sur ton ordinateur), texte copié, champs remplis — tu valides.</>;
+        if (e === 'retard') return <>La <b>publication</b> se fait via l'extension sur leboncoin.fr, bouton « 🚀 Tout préparer » : photos téléchargées dans un dossier, texte copié, formulaire pré-rempli — tu valides. À partir de la <b>{EXT_CAPACITES.photoslbc}</b> elles s'attachent directement au formulaire : mets-la à jour depuis <b>Réglages</b>.</>;
+        return <>La <b>publication</b> se fait depuis l'ordinateur où l'extension est installée : c'est elle qui prépare chaque annonce sur leboncoin.fr. Cette liste, elle, se consulte de partout.</>;
+      })()}</div>
 
       {/* COMPTES LEBONCOIN — plusieurs comptes possibles. On liste ceux que
           l'extension a réellement vus connectés dans le navigateur, avec le
