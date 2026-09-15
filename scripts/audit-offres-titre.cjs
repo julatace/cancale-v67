@@ -181,5 +181,83 @@ console.log('\n── ET « PAS ENCORE SYNCHRONISÉE » SE JUGE SUR LA TRANSACTI
     'du code mort qui n\'attend qu\'un relecteur pour redevenir un rapprochement par ressemblance');
 }
 
+// ⚠️⚠️ `lireVentesProuvees` est ASYNC — et mon premier jet ne l'attendait pas.
+//    `r.vendus` valait `undefined` sur une Promise, donc « rien n'est vendu » :
+//    les contrôles qui attendent une ABSENCE passaient **pour la mauvaise
+//    raison**, et seuls ceux qui attendent une présence tombaient. Un contrôle
+//    vert par accident est exactement ce que ce dossier appelle « pire
+//    qu'absent ». Ce bloc est donc `await`é.
+(async () => {
+console.log('\n── ET « CITÉE DANS UNE TRANSACTION » N\'EST PAS « VENDUE »');
+{
+  // ⚠️⚠️ MESURÉ LE 15 SEPTEMBRE, EN VÉRIFIANT LA FORME (§6) : sur les **711
+  //    lignes** de `harvest_*_txn_*`, **468 portent un `status_title` VIDE** —
+  //    ce sont des CONVERSATIONS, pas des ventes. Une seule annonce en portait
+  //    treize (« salomon XT-6 blanc taille 40 », toujours en ligne) : treize
+  //    acheteurs lui ont écrit, aucun n'a acheté.
+  //    Conséquence : sur ses 65 annonces en ligne, la « preuve » en écartait
+  //    **15** des files Leboncoin et eBay — quinze paires qu'il a encore.
+  //    Avec un vrai état de commande : **zéro**. (Sur les 412 annonces FERMÉES
+  //    la preuve tenait — 188 états de vente — et c'est ce qui l'a rendue
+  //    invisible.)
+  const EXT = fs.readFileSync(path.join(racine, 'vinted-sync-extension', 'background.js'), 'utf8');
+  const fn = /async function lireVentesProuvees\(\)[\s\S]*?\n\}/.exec(EXT);
+  dit(!!fn, 'l\'extension a sa règle de preuve', fn ? '' : '`lireVentesProuvees` introuvable');
+  if (fn) {
+    // La lecture doit RAPPORTER l'état de la commande : sans lui, impossible de
+    // distinguer une conversation d'une vente.
+    dit(/status_title/.test(fn[0]), 'et elle lit l\'ÉTAT de la commande, pas seulement l\'identité',
+      'sans `status_title`, une conversation compte comme une vente');
+    // Et elle doit l'utiliser : un état vide, ou un état qui fait REVENIR la
+    // paire, ne prouve rien.
+    const R3 = (() => {
+      try {
+        const c = { console: { log() {} } }; vm.createContext(c);
+        // On sert des lignes en mémoire : la règle est jugée sur ce qu'elle REND.
+        vm.runInContext(`
+          const RANGS = __RANGS__;
+          async function sbGetTout(){ return RANGS; }
+          ${fn[0]}
+          globalThis.P = lireVentesProuvees;
+          ${/const PAS_UNE_VENTE = [^\n]*/.exec(EXT)[0]}
+        `.replace('__RANGS__', JSON.stringify([
+          { it: '111', ti: '' },                                      // conversation
+          { it: '222', ti: 'Commande finalisée' },                    // vendue
+          { it: '333', ti: 'Commande annulée - article indisponible' },// revient
+          { it: '444', ti: 'Retour initié' },                         // revient
+          { it: '555', ti: 'Un état que je ne connais pas encore' },  // vendue (par défaut)
+        ])), c, { filename: 'background.js' });
+        return c.P;
+      } catch (e) { dit(false, 'la règle de preuve se charge', String((e && e.message) || e)); return null; }
+    })();
+    if (typeof R3 === 'function') {
+      let r = null;
+      try { r = await R3(); } catch (e) { dit(false, 'la règle de preuve s\'exécute', String((e && e.message) || e)); }
+      const v = (r && r.vendus) || new Set();
+      // ⚠️ `instanceof Set` est FAUX ici : le `vm` a son propre Set. On teste ce
+      //    qui compte — l'objet sait répondre `has` — pas sa lignée.
+      dit(!!r && !!r.vendus && typeof r.vendus.has === 'function',
+        'et elle rend bien un ensemble d\'identités',
+        'sans `await`, on juge une Promise — et tout paraît « pas vendu »');
+      dit(!v.has('111'), 'une CONVERSATION (état vide) ne prouve aucune vente',
+        'c\'est ce qui écartait 15 paires qu\'il a encore');
+      dit(v.has('222'), 'une commande finalisée, oui');
+      dit(!v.has('333') && !v.has('444'), 'une commande annulée ou un retour, non — la paire revient');
+      // ⚠️ L'AUTRE SENS, et il compte : un état INCONNU doit valoir « vendue ».
+      //    Lister des codes ferait réapparaître une paire vendue dans la file le
+      //    jour où Vinted en ajoute un — le défaut que cette preuve corrigeait.
+      dit(v.has('555'), 'et un état inconnu compte comme une VENTE',
+        'lister des codes ferait reproposer une paire vendue le jour où Vinted en ajoute un');
+    } else {
+      dit(false, 'la règle de preuve est exécutable');
+    }
+  }
+  // Et l'app applique la MÊME (§11) : deux copies qui divergent donnent deux files.
+  dit(/const PAS_UNE_VENTE = /.test(APP) && /const PAS_UNE_VENTE = /.test(EXT),
+    'et l\'app et l\'extension portent la même règle',
+    'une seule des deux corrigée, et les deux écrans annoncent deux nombres');
+}
+
 console.log(ko ? `\n${ko} contrôle(s) en échec.` : '\nAucune offre, aucun bordereau n\'est rangé sur une simple ressemblance.');
 process.exit(ko ? 1 : 0);
+})();

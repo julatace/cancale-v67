@@ -35,7 +35,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.61.0';
+const EXT_ATTENDUE = '5.62.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -11056,6 +11056,10 @@ const INV_STATUS = {
 // Normalise un titre pour comparer une annonce et une commande vendue (Vinted
 // renvoie le titre exact de l'article dans les deux). Insensible casse/espaces.
 const normTitle = (t) => (t || '').toLowerCase().replace(/\s+/g, ' ').trim();
+// Un état de commande qui fait REVENIR la paire : elle n'est pas vendue.
+// ⚠️ Même expression que côté extension (`background.js`) — une notion, une
+//    règle (§11). Deux copies qui divergeraient donneraient deux files.
+const PAS_UNE_VENTE = /annul|cancel|refus|rembours|retour|suspend|[ée]chou/i;
 
 // ══════════════════════════════════════════════════════════════════════════════
 // UNE OFFRE NE SE RANGE PAS PAR RESSEMBLANCE DE TITRE (§5)
@@ -13744,27 +13748,44 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listings.items, numeros, accounts, hiddenAccts, blockedAccts]);
 
-  // ⚠️ UNE PAIRE VENDUE QUI TRAÎNE ENCORE « EN LIGNE ».
-  // Vinted laisse parfois l'annonce avec `is_closed:false` après la vente. Le
-  // panneau de l'extension la retirait déjà (vente de moins de 60 jours dont le
-  // titre est UNIQUE parmi les annonces en ligne) — pas l'app : les deux outils
-  // n'affichaient donc pas le même nombre d'annonces en ligne. Même règle des
-  // deux côtés, avec la même garde : un titre en double ne retire JAMAIS rien
-  // (§24 — sinon on effacerait une paire identique réellement encore en vente).
-  const venduesRecentes = useMemo(() => {
-    const titres = new Set();
+  // ⚠️⚠️ UNE PAIRE VENDUE QUI TRAÎNE ENCORE « EN LIGNE » — ET LE TITRE DÉSIGNAIT
+  // LA MAUVAISE. Vinted laisse parfois l'annonce avec `is_closed:false` après la
+  // vente. La règle était : *une vente de moins de 60 jours dont le titre est
+  // UNIQUE parmi les annonces en ligne*, avec pour seule garde « un titre en
+  // double ne retire rien ». Cette garde comptait les annonces EN LIGNE — pas
+  // les ventes : deux paires identiques, il en vend une, il n'en reste qu'une en
+  // ligne… donc le titre redevient « unique », et **la paire qu'il a encore
+  // disparaît de son écran Annonces**.
+  //
+  // Mesuré le 15 septembre sur ses **65 annonces en ligne** : **5 étaient
+  // retirées**, et **aucune des cinq n'est prouvée vendue**. Pour quatre d'entre
+  // elles Vinted dit lui-même quelle annonce est partie — et c'est une **AUTRE**
+  // à chaque fois : « Adidas Spezial noir taille 35,5 » a **3 ventes**, qui
+  // pointent vers 3 annonces différentes ; celle qui restait en ligne était la
+  // quatrième paire, bien réelle. C'est §2.4 mot pour mot (« même avec
+  // 50 articles identiques, tu ne dois pas pouvoir te tromper »), et une annonce
+  // cachée est une paire qu'il ne peut plus numéroter, ni cocher pour Leboncoin,
+  // ni tarifer.
+  //
+  // ⇒ On retire sur l'IDENTITÉ (`identiteAnnonce` : transaction → item_id, sinon
+  //   la photo — les deux voies certaines, le titre en est exclu depuis toujours).
+  //   Mesuré après : **5 retirées à tort → 0**, et **0 paire prouvée vendue n'est
+  //   laissée en ligne** (la règle du titre n'en attrapait aucune que l'identité
+  //   rate). Quand l'identité ne dit rien, on ne retire pas : mieux vaut un blanc
+  //   qu'un faux.
+  const annoncesVendues = useMemo(() => {
+    const ids = new Set();
     for (const o of (sales.items || [])) {
       if (classifyOrderStatus(o.status) === 'cancelled') continue;   // retour/remboursement : la paire revient
       const ts = o.date ? Date.parse(o.date) : NaN;
       if (!isNaN(ts) && (Date.now() - ts) / 86400000 > 60) continue;
-      const k = normTitle(o.title); if (k) titres.add(k);
+      const id = identiteAnnonce(o); if (id) ids.add(String(id));
     }
-    return titres;
-  }, [sales.items]);
+    return ids;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sales.items, txnItem, numeros]);
   const annBase = useMemo(() => {
     const items = (listings.items || []);
-    const nParTitre = {};
-    for (const it of items) { const k = normTitle(it.title); if (k) nParTitre[k] = (nParTitre[k] || 0) + 1; }
     return items.filter(it => {
       // ⚠️ UNE ANNONCE DOIT VENIR D'UN COMPTE QUI EXISTE ENCORE. `acctOffOf`
       // teste `_acc.vinted_user_id` : quand ce compte a été supprimé, l'annonce
@@ -13776,13 +13797,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (!uidIt || !accountUids.has(uidIt)) return false;
       if (acctOffOf(it) || soldManual.has(String(it.id))) return false;
       if (!showEmailSold && emailSoldIds.has(String(it.id))) return false;
-      const k = normTitle(it.title);
-      if (!showEmailSold && k && nParTitre[k] === 1 && venduesRecentes.has(k)) return false;  // vendue, titre sans ambiguïté
+      // Vendue d'après VINTED LUI-MÊME (identité, jamais le titre).
+      if (!showEmailSold && annoncesVendues.has(String(it.id))) return false;
       return true;
     });
   },
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  [listings.items, soldManual, emailSoldIds, showEmailSold, blockedAccts, hiddenAccts, venduesRecentes, accountUids]);
+  [listings.items, soldManual, emailSoldIds, showEmailSold, blockedAccts, hiddenAccts, annoncesVendues, accountUids]);
 
   // ⚠️ « pas au garage » SUR CHAQUE LIGNE NE DIT RIEN TANT QUE LE GARAGE EST
   // VIDE. Mesuré : 0 case posée, donc la mention s'affichait sur les 184 ventes,
@@ -21616,7 +21637,16 @@ function LeboncoinScreen() {
     //    part dans ses données (704 lignes sur 704 portent `item_id`), donc il
     //    ne perd rien — et un `item_id` absent ne prouverait aucune vente de
     //    toute façon.
-    const txnRows = await sbGet('app_data?id=like.harvest_*_txn_*&select=it:data->payload->transaction->>item_id');
+    // ⚠️⚠️⚠️ ET « CITÉE DANS UNE TRANSACTION » N'EST PAS « VENDUE ». Mesuré le
+    //    15 septembre en vérifiant la FORME (§6) : sur les **711 lignes** de
+    //    cette famille, **468 portent un `status_title` VIDE** — ce sont des
+    //    CONVERSATIONS. Une seule annonce en portait treize (« salomon XT-6
+    //    blanc taille 40 », toujours en ligne) : treize acheteurs lui ont écrit,
+    //    aucun n'a acheté. La file écartait ainsi **15 paires qu'il a encore**.
+    //    ⇒ Une vente est prouvée quand Vinted donne un ÉTAT DE COMMANDE à la
+    //      transaction, et que cet état ne la fait pas REVENIR. On ne liste pas
+    //      des codes : un code inconnu demain doit compter comme une vente.
+    const txnRows = await sbGet('app_data?id=like.harvest_*_txn_*&select=it:data->payload->transaction->>item_id,ti:data->payload->transaction->>status_title');
     // ⚠️⚠️ ET « JE N'AI PAS PU LIRE » N'EST PAS « AUCUNE VENTE ». Mesuré en
     //    direct le 15 septembre : cette lecture a échoué une fois (base sous
     //    charge), le `|| []` l'a transformée en « aucune vente prouvée », et la
@@ -21625,7 +21655,12 @@ function LeboncoinScreen() {
     //    13 septembre ressuscitée par un simple timeout.
     const preuveKO = txnRows === null;
     const vendus = new Set();
-    for (const r of (txnRows || [])) { if (r && r.it) vendus.add(String(r.it)); }
+    for (const r of (txnRows || [])) {
+      if (!r || !r.it) continue;
+      const etat = String(r.ti || '').trim();
+      if (!etat || PAS_UNE_VENTE.test(etat)) continue;   // conversation, ou la paire revient
+      vendus.add(String(r.it));
+    }
     const online = []; const onlineIds = new Set(); const seen = new Set(); const etatVinted = {};
     for (const r of listRows) {
       const uid = String(r.id).split('_')[1];
