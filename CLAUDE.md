@@ -1463,6 +1463,52 @@ est là**. Prouvé en retirant le filtre : le bandeau nomme `angeled92`, plus
 frais de 5 min et **sans PDF** — il enverrait tamponner un bordereau qui
 n'existe pas.
 
+### ⚠️⚠️ LA LIGNE `main` PÈSE 197 Ko, ET HUIT LECTEURS LA PRENAIENT EN ENTIER
+Mesuré le 15 septembre : `main` — la ligne des réglages synchronisés — fait
+**197 Ko** (127 Ko de `vinted_annonce_numeros`, 25 Ko de
+`vinted_sale_overrides`), et **huit** endroits la lisaient en `select=data` :
+- le **panneau sur Vinted** (`buildPanelData`), à **chaque visite** ;
+- les files **Leboncoin** et **eBay** du panneau, sur chaque page de ces sites ;
+- l'**écran Leboncoin** de l'app ;
+- la sauvegarde des numéros, `getPairPhotos`,
+- et **le widget de son iPhone**, qui n'en lit que **trois clés pesant 1 Ko**.
+
+C'est §4.4 mot pour mot (« jamais `select=data` sur une ligne lourde ») sur la
+ligne la plus lue du projet — et c'est de l'**égress**, sur la route même dont le
+dossier dit qu'un `select=data` avait **crevé le quota (5,7 Go)**. *La leçon
+avait été apprise pour les commandes, jamais pour `main`.*
+- **Mesuré, valeurs identiques** : widget **197 Ko / 1 070 ms → 1 Ko / 494 ms** ·
+  écran Leboncoin **197 → 133 Ko** · panneau **197 → 161 Ko**.
+- Exécuté sur la vraie base (le `vm` avant/après) : `buildPanelData` **1,5× plus
+  vite**, `buildLbcData` **1,6×**, **résultat identique** dans les trois cas
+  (file 40 → 40). Gagner du temps en perdant une paire serait le pire échange.
+- **L'alias porte le nom de la clé** (`vinted_annonce_numeros:data->vinted_annonce_numeros`) :
+  la ligne rendue se lit exactement comme avant, donc aucun appelant à renommer
+  — donc aucune chance d'en oublier un.
+- Un seul lecteur a le droit de tout prendre : **`cloudLoad`**, qui restaure
+  toutes les clés synchronisées. C'est le **propriétaire** de la ligne (§11).
+⚠️⚠️ **ET LA MOITIÉ QUI MANQUERAIT À UN CONTRÔLE POSÉ SUR LES OCTETS** : projeter
+**trop peu** ne coûte rien et ne lève rien — la clé oubliée vaut `undefined`,
+c'est-à-dire un compte exclu qui revient dans la file, ou une paire retirée du
+stock qu'on republie, **en silence**. `audit-lectures.cjs` relit donc le corps de
+chaque fonction, y cherche les clés de `main` qu'elle utilise **vraiment**, et
+exige que la liste projetée les contienne toutes. **8 échecs** sur le code
+d'avant, et rouge dès qu'on retire une clé d'une liste (prouvé).
+⚠️ **Et ce défaut existait déjà : `vinted_pairs_lost` manquait à la file
+Leboncoin du panneau.** L'app l'écartait, `buildEbayData` l'écartait — le panneau
+proposait de publier une paire qu'il a déclarée **retirée du stock**. Mesuré :
+**0 paire retirée aujourd'hui**, donc 0 cas réel, mais c'est le motif exact de
+« l'app annonçait 39, le panneau 40 » (§11). Les trois lecteurs, une seule règle.
+⚠️ **DEUXIÈME FOIS QUE MON PROPRE BANC SERT LA MAUVAISE FORME** (§6.3) :
+`audit-places.cjs` rendait la ligne **brute** pour `id=eq.main`. Dès que les
+files ont projeté, `main.vinted_annonce_numeros` se lisait sur un objet qui ne
+l'a pas → **file vide**, et l'audit criait au loup sur un code intact. Même
+piège que « 0 bordereau prêt à imprimer » sur l'écran Colis. Il projette.
+⚠️ **Et deux allers-retours de plus, pour rien** : `harvest_*_billing` était lu
+**deux fois** sur Ma journée (les soldes, puis les boosts) — **4 Ko**, mais
+**710 ms × 2**. Ici ce n'est pas l'égress qui coûte, c'est le **voyage**.
+`fetchBillingRows` partage la requête en vol (`cachedRow`).
+
 ### ⚠️⚠️ ET UNE LECTURE RATÉE POUVAIT RESSUSCITER TOUS LES COMPTES SUPPRIMÉS
 **Seizième forme de « rien lu ne vaut pas rien » — et la première dans l'APP qui
 DÉTRUIT.** `vrm_blocked_accounts` est la liste que l'extension lit pour refuser
@@ -1848,7 +1894,7 @@ n'est en attente de retrait. Ce qui EST mesuré :
   28 juillet) et `panel_ebay_form` est absente : `lbcDiag` et l'enregistrement
   des étapes n'ont jamais tourné.
 ⇒ **Ne pas redéduire une version d'un compteur à zéro.** Le signal fiable est ce
-que le pont annonce, ou une écriture datée. Le zip livré est en **5.59.1**
+que le pont annonce, ou une écriture datée. Le zip livré est en **5.61.0**
 (`public/VRM-extension.zip`) ; `EXT_ATTENDUE` le suit.
 
 ⚠️ **CE QUE LA FILE eBAY DONNERAIT LE JOUR OÙ IL COCHE** (mesuré le 13 septembre,

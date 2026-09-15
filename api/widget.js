@@ -98,13 +98,26 @@ async function harvestOrders(kind) {
 const awaitingShip = (s) => /bordereau\s+envoy[ée]\s+au\s+vendeur/i.test(s || '') || /paiement.*valid/i.test(s || '');
 // À retirer : l'achat est déposé au point relais, en attente que tu le récupères.
 const atRelay = (s) => /d[ée]pos[ée]/i.test(s || '') && /point\s+relais|bureau\s+de\s+poste/i.test(s || '');
+// ⚠️⚠️ CETTE ROUTE RAPATRIAIT 197 Ko POUR EN LIRE 1. Mesuré le 15 septembre sur
+// sa vraie base : la ligne `main` pèse **197 Ko** (127 Ko rien que pour
+// `vinted_annonce_numeros`) et cette fonction la lisait ENTIÈRE, à chaque
+// rafraîchissement du widget de son iPhone — alors qu'elle n'en utilise que
+// **trois clés**, qui pèsent **1 Ko à elles trois**.
+// C'est §4.4 mot pour mot, et sur la route qui a DÉJÀ crevé le quota d'égress
+// (5,7 Go) avec un `select=data`. *La leçon avait été apprise pour les
+// commandes, jamais pour `main`.* Mesuré après : **197 Ko / 1 070 ms →
+// 1 Ko / 494 ms**, valeurs identiques.
+// ⚠️ L'alias porte le nom de la clé : la ligne rendue se lit exactement comme
+//    avant (`m.vrm_widget_token`), donc aucun appelant à renommer.
+const MAIN_WIDGET = ['vrm_widget_token', 'vinted_pickup_done', 'vinted_bords_printed'];
 async function main() {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=data`, { headers: HEADERS });
+    const sel = MAIN_WIDGET.map((k) => `${k}:data->${k}`).join(',');
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=${sel}`, { headers: HEADERS });
     if (!r.ok) return null;
     const j = await r.json();
     if (!Array.isArray(j)) return null;
-    return (j[0] && j[0].data) || {};
+    return j[0] || {};
   } catch (_) { return null; }
 }
 // Photo des chiffres publiée par l'app elle-même (ligne widget_stats) → source

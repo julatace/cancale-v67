@@ -93,8 +93,12 @@ function ctxAvec(numeros, txns, lbcItems, exclus, quiEchoue) {
       }
       const j = (d) => ({ ok: true, status: 200, json: async () => d, text: async () => JSON.stringify(d), headers: { get: () => 'application/json' } });
       if ((opts.method || 'GET') === 'POST') return { ok: true, status: 201, json: async () => ({}), text: async () => '', headers: { get: () => '' } };
-      if (/id=eq\.main/.test(u)) return j([{ data: { vinted_annonce_numeros: numeros, vinted_accounts_hidden: exclus || [], vinted_accounts: [
-        { vinted_user_id: '9001', login: 'compteA' }, { vinted_user_id: '9002', login: 'compteB' }] } }]);
+      // ⚠️ MÊME RÈGLE POUR `main` : les files la lisent PROJETÉE (197 Ko sinon,
+      //    §4.4). Servir la ligne brute ferait lire `main.vinted_annonce_numeros`
+      //    sur un objet qui ne l'a pas → file VIDE, et l'audit crierait au loup
+      //    sur un code intact. C'est le piège de l'écran Colis, deuxième fois.
+      if (/id=eq\.main/.test(u)) return j(projette([{ data: { vinted_annonce_numeros: numeros, vinted_accounts_hidden: exclus || [], vinted_accounts: [
+        { vinted_user_id: '9001', login: 'compteA' }, { vinted_user_id: '9002', login: 'compteB' }] } }], u));
       if (/id=like\.harvest_\*_listings/.test(u)) return j(LISTINGS);
       // La PREUVE d'une vente : `transaction → item_id` (§5, l'identité).
       // ⚠️⚠️ ET ON APPLIQUE LA PROJECTION POUR DE VRAI (§6.3). Le code demande

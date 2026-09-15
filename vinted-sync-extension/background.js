@@ -845,8 +845,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           // Si un jour la ligne cloud est perdue, c'est ce fichier qui te sauve —
           // le numéro est ce qu'il y a d'écrit sur la boîte, ça ne se recalcule pas.
           if (msg.action === 'sauvegardeNumeros') {
-            const rows = await sbGet('app_data?id=eq.main&select=data');
-            const d = (rows && rows[0] && rows[0].data) || {};
+            const d = (await lireMain(MAIN_SAUVEGARDE)) || {};
             sendResponse({ ok: true, data: {
               exporteLe: new Date().toISOString(),
               vinted_annonce_numeros: d.vinted_annonce_numeros || {},
@@ -3796,7 +3795,7 @@ async function buildPanelData() {
   const PARALLELE_MAX = 6;                 // on groupe, on n'inonde pas
   {
     const aLancer = [
-      'app_data?id=eq.main&select=data',
+      qMain(MAIN_PANNEAU),
       'app_data?id=eq.vinted_listing_dates&select=data',
       'app_data?id=eq.vinted_item_details&select=data',
       'app_data?id=eq.panel_accounts_off&select=data',
@@ -3849,8 +3848,8 @@ async function buildPanelData() {
     if (r === null) lecturesRatees++;
     return r;
   };
-  const rows = await lire('app_data?id=eq.main&select=data');
-  const d = (rows && rows[0] && rows[0].data) || {};
+  const rows = await lire(qMain(MAIN_PANNEAU));
+  const d = (rows && rows[0]) || {};
   const numeros = d.vinted_annonce_numeros || {};
   const grid = d.vinted_garage_grid || {};
   // Case du garage par numéro (grille 2D : { "A1": ["12","34"], … }).
@@ -4783,6 +4782,50 @@ async function sbGet(query) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// LA LIGNE `main` PÈSE 197 Ko, ET AUCUN LECTEUR N'EN VEUT PLUS DE QUELQUES CLÉS
+// ══════════════════════════════════════════════════════════════════════════════
+// Mesuré le 15 septembre sur sa vraie base : `main` fait **197 Ko** (dont 127 Ko
+// de `vinted_annonce_numeros` et 25 Ko de `vinted_sale_overrides`), et **six**
+// endroits de ce fichier la lisaient en `select=data` — le panneau à chaque
+// visite sur Vinted, la file Leboncoin sur chaque page leboncoin.fr, la file
+// eBay de même. C'est §4.4 mot pour mot (« jamais `select=data` sur une ligne
+// lourde »), sur la ligne la plus lue du projet.
+//
+// ⚠️ ET C'EST DE L'ÉGRESS : un `select=data` avait déjà crevé le quota (5,7 Go).
+//    La leçon avait été apprise pour les commandes, jamais pour `main`.
+//
+// ⇒ Un seul lecteur (§11), qui projette EXACTEMENT les clés demandées. L'alias
+//   porte le nom de la clé, donc la ligne rendue se lit comme avant
+//   (`d.vinted_annonce_numeros`) : rien à renommer chez les appelants, donc
+//   aucune chance d'en oublier un.
+// ⚠️ La LISTE de clés d'un lecteur est une déclaration : une clé oubliée vaut
+//    `undefined`, c'est-à-dire un compte exclu qui revient ou une paire retirée
+//    du stock qu'on republie — **en silence**. `audit-lectures.cjs` compare donc
+//    chaque liste aux clés que la fonction lit vraiment.
+const qMain = (cles) => `app_data?id=eq.main&select=${cles.map((k) => `${k}:data->${k}`).join(',')}`;
+// Mesuré : 197 Ko → 161 Ko (panneau) · 133 Ko (les files) · 1 Ko (sauvegarde).
+const MAIN_PANNEAU = ['vinted_account_labels', 'vinted_accounts_blocked', 'vinted_accounts_hidden',
+  'vinted_annonce_numeros', 'vinted_annonces_email_sold', 'vinted_bords_hidden', 'vinted_bords_printed',
+  'vinted_bords_shipped', 'vinted_garage_grid', 'vinted_goal', 'vinted_invoices', 'vinted_quick_replies',
+  'vinted_sale_overrides', 'vrm_colis_collected'];
+// ⚠️ `vinted_pairs_lost` EST DANS LES DEUX FILES, ET IL MANQUAIT À LEBONCOIN.
+//    L'app et la file eBay écartent une paire qu'il a déclarée retirée du stock ;
+//    la file Leboncoin du panneau, non — elle lui proposait de publier une paire
+//    qu'il n'a plus. Mesuré aujourd'hui : **0 paire retirée**, donc 0 cas réel —
+//    mais c'est le motif exact de « l'app annonçait 39, le panneau 40 » (§11),
+//    et `audit-places.cjs` existe pour ça. Les trois lecteurs, une seule règle.
+const MAIN_FILE = ['vinted_account_labels', 'vinted_accounts', 'vinted_accounts_blocked',
+  'vinted_accounts_hidden', 'vinted_annonce_numeros', 'vinted_pairs_lost'];
+const MAIN_SAUVEGARDE = ['vinted_annonce_numeros', 'vinted_buyprice_by_num', 'vinted_garage_grid'];
+// Rend la ligne projetée (les clés absentes valent `null`), ou `null` si la base
+// n'a pas répondu — « rien lu » ne vaut pas « rien ».
+async function lireMain(cles) {
+  const rows = await sbGet(qMain(cles));
+  if (rows === null) return null;
+  return (rows && rows[0]) || {};
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // AU-DELÀ DE 1 000 LIGNES, SUPABASE COUPE — ET NE LE DIT PAS (§4.5)
 // ══════════════════════════════════════════════════════════════════════════════
 // Mesuré le 15 septembre sur sa vraie base : une requête sans `Range` rend
@@ -5112,8 +5155,7 @@ function buildEbayAd(raw, det, num, account) {
   return { ...a, title: lbcTitre(marque, base, size, EBAY_TITRE_MAX), sku: a.ref, category: '' };
 }
 async function buildEbayData() {
-  const mainRows = await sbGet('app_data?id=eq.main&select=data');
-  const main = (mainRows && mainRows[0] && mainRows[0].data) || {};
+  const main = (await lireMain(MAIN_FILE)) || {};
   const numeros = main.vinted_annonce_numeros || {};
   const labels = main.vinted_account_labels || {};
   const uid2login = {};
@@ -5173,9 +5215,9 @@ async function buildEbayData() {
 }
 
 async function buildLbcData() {
-  const mainRows = await sbGet('app_data?id=eq.main&select=data');
-  const main = (mainRows && mainRows[0] && mainRows[0].data) || {};
+  const main = (await lireMain(MAIN_FILE)) || {};
   const numeros = main.vinted_annonce_numeros || {};
+  const lost = main.vinted_pairs_lost || {};
   const labels = main.vinted_account_labels || {};
   const accounts = main.vinted_accounts || [];
   const uid2login = {};
@@ -5310,6 +5352,13 @@ async function buildLbcData() {
     // prime sur l'état de l'annonce : on ne propose pas de publier une paire
     // qu'il n'a plus.
     if (vendus.has(o.id)) continue;
+    // ⚠️ UNE PAIRE RETIRÉE DU STOCK N'EST PAS À PUBLIER NON PLUS, et cette
+    //    ligne-ci manquait : l'app et la file eBay écartaient déjà `pairs_lost`,
+    //    le panneau Leboncoin lui proposait de publier une paire qu'il n'a plus.
+    //    Mesuré le 15 septembre : **0 paire retirée aujourd'hui**, donc 0 cas
+    //    réel — mais c'est le motif exact de « l'app annonçait 39, le panneau
+    //    40 » (§11), et une paire publiée qu'on ne peut pas envoyer coûte cher.
+    if (lost[String(num).trim()]) continue;
     if (posted.has(o.id) || posted.has(String(num))) continue;  // déjà publiée (marquée à la main)
     // Déjà en ligne sur Leboncoin d'après la capture ? -> pas dans la file.
     let hit = null;
@@ -5563,8 +5612,8 @@ async function handleLbcRaw(url, body) {
 async function getPairPhotos(numero) {
   const num = String(numero || '').trim();
   if (!num) return { numero: num, title: '', photos: [] };
-  const mainRows = await sbGet('app_data?id=eq.main&select=data');
-  const numeros = (mainRows && mainRows[0] && mainRows[0].data && mainRows[0].data.vinted_annonce_numeros) || {};
+  const mainRows = await lireMain(['vinted_annonce_numeros']);
+  const numeros = (mainRows && mainRows.vinted_annonce_numeros) || {};
   const ids = Object.keys(numeros).filter((k) => String(numeros[k] && numeros[k].numero) === num);
   const photos = []; const seen = new Set(); let title = '';
   const add = (u) => { const s = typeof u === 'string' ? u : (u && (u.full_size_url || u.url)); if (s && !seen.has(s)) { seen.add(s); photos.push(s); } };

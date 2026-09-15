@@ -100,6 +100,85 @@ console.log('\n── LES FAMILLES QUI APPROCHENT DES 1 000 LIGNES SONT PAGINÉE
   }
 }
 
+console.log('\n── LA LIGNE `main` (197 Ko) N\'EST JAMAIS RAPATRIÉE EN ENTIER');
+{
+  // ⚠️⚠️ MESURÉ LE 15 SEPTEMBRE SUR SA VRAIE BASE : `main` pèse **197 Ko** —
+  // 127 Ko de `vinted_annonce_numeros`, 25 Ko de `vinted_sale_overrides` — et
+  // **huit** endroits la lisaient en `select=data` : le panneau à chaque visite
+  // sur Vinted, les files Leboncoin et eBay sur chaque page de ces sites,
+  // l'écran Leboncoin de l'app, et **le widget de son iPhone**, qui n'en lit
+  // que trois clés pesant 1 Ko à elles trois.
+  // C'est §4.4 (« jamais `select=data` sur une ligne lourde ») sur la ligne la
+  // plus lue du projet, et c'est de l'ÉGRESS — un `select=data` avait déjà
+  // crevé le quota (5,7 Go) sur cette même route widget. *La leçon avait été
+  // apprise pour les commandes, jamais pour `main`.*
+  //
+  // ⚠️ UN SEUL LECTEUR A LE DROIT DE TOUT PRENDRE : `cloudLoad`, qui restaure
+  //    toutes les clés synchronisées dans le navigateur — c'est le
+  //    PROPRIÉTAIRE de la ligne (§11). Tous les autres projettent.
+  const PROPRIETAIRE = 'cloudLoad';
+  const CIBLES = ['src/App.jsx', 'vinted-sync-extension/background.js',
+    'api/widget.js', 'api/ship-reminders.js', 'api/email-inbound.js'];
+  for (const f of CIBLES) {
+    const p2 = path.join(racine, f);
+    if (!fs.existsSync(p2)) continue;
+    const src = sansCommentaires(fs.readFileSync(p2, 'utf8'));
+    // La lecture fautive : `id=eq.main` suivi d'un `select` qui demande `data`
+    // entier. Ce qui est en cause est la REQUÊTE, pas la façon de l'écrire.
+    const brutes = [...src.matchAll(/id=eq\.main&select=(?:id,)?data(?![-,>])/g)];
+    const dansProprietaire = brutes.filter((m) => {
+      const av = src.slice(Math.max(0, m.index - 1500), m.index);
+      return av.includes(PROPRIETAIRE);
+    }).length;
+    const fautives = brutes.length - dansProprietaire;
+    dit(fautives === 0, `${f} : \`main\` n'est lue en entier que par son propriétaire`,
+      fautives ? `${fautives} lecture(s) de 197 Ko — projette les clés utilisées` : '');
+  }
+}
+
+console.log('\n── ET UNE PROJECTION DÉCLARE TOUTES LES CLÉS QUE SA FONCTION LIT');
+{
+  // ⚠️ LA MOITIÉ QUI MANQUERAIT À UN CONTRÔLE POSÉ SUR LES SEULS OCTETS :
+  //    projeter trop peu ne coûte rien et ne lève rien — la clé oubliée vaut
+  //    `undefined`, c'est-à-dire un compte exclu qui revient dans la file, ou
+  //    une paire retirée du stock qu'on republie. **En silence.** C'est
+  //    exactement ce qui existait déjà : `vinted_pairs_lost` était écarté par
+  //    l'app et par la file eBay, et PAS par la file Leboncoin du panneau —
+  //    « l'app annonçait 39, le panneau 40 » (§11).
+  // ⚠️ CE CONTRÔLE PORTE SUR LA RÈGLE, PAS SUR UNE LISTE ÉCRITE À LA MAIN : il
+  //    relit le corps de chaque fonction, y cherche les clés de `main` qu'elle
+  //    utilise vraiment, et exige que la liste projetée les contienne toutes.
+  //    Ajouter une clé sans l'ajouter à la liste passe au rouge.
+  const corpsDe = (src, i) => {
+    let p2 = src.indexOf('{', i), n = 0, j = p2;
+    for (; j < src.length; j++) { const c = src[j]; if (c === '{') n++; else if (c === '}') { n--; if (!n) break; } }
+    return src.slice(p2, j + 1);
+  };
+  const LECTEURS = [
+    { f: 'vinted-sync-extension/background.js', fn: 'buildPanelData', liste: 'MAIN_PANNEAU' },
+    { f: 'vinted-sync-extension/background.js', fn: 'buildLbcData',   liste: 'MAIN_FILE' },
+    { f: 'vinted-sync-extension/background.js', fn: 'buildEbayData',  liste: 'MAIN_FILE' },
+    { f: 'src/App.jsx',                         fn: 'LeboncoinScreen', liste: 'MAIN_LEBONCOIN' },
+    { f: 'api/widget.js',                       fn: 'handler',         liste: 'MAIN_WIDGET' },
+  ];
+  for (const L of LECTEURS) {
+    const p2 = path.join(racine, L.f);
+    if (!fs.existsSync(p2)) { dit(false, `${L.f} introuvable`); continue; }
+    const src = sansCommentaires(fs.readFileSync(p2, 'utf8'));
+    const decl = new RegExp('const ' + L.liste + ' = \\[([^\\]]*)\\]').exec(src);
+    if (!decl) { dit(false, `${L.fn} : la liste ${L.liste} est introuvable`); continue; }
+    const declarees = new Set((decl[1].match(/'([^']+)'/g) || []).map((x) => x.slice(1, -1)));
+    const i = src.search(new RegExp('(async function|function|const) ' + L.fn + '\\b'));
+    if (i < 0) { dit(false, `${L.fn} introuvable dans ${L.f}`); continue; }
+    const c = corpsDe(src, i);
+    const utilisees = [...new Set([...c.matchAll(/\b(?:main|d|m)\.((?:vinted|vrm)_[a-zA-Z0-9_]+)/g)].map((x) => x[1]))];
+    const manquantes = utilisees.filter((k) => !declarees.has(k));
+    dit(manquantes.length === 0,
+      `${L.fn} : ${L.liste} déclare les ${utilisees.length} clé(s) qu'elle lit`,
+      manquantes.length ? `absente(s) de la projection : ${manquantes.join(', ')} — elles vaudraient \`undefined\`, en silence` : '');
+  }
+}
+
 console.log('\n── ET LA PREUVE DE VENTE NE SE CALCULE QU\'À UN SEUL ENDROIT');
 {
   const bg = sansCommentaires(fs.readFileSync(path.join(racine, 'vinted-sync-extension/background.js'), 'utf8'));
