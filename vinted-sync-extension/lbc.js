@@ -308,7 +308,7 @@
              <button data-a="refresh" title="Rafraîchir">⟳</button>
              <button data-a="close" title="Fermer">×</button></div>
            <a class="deposit" href="https://www.leboncoin.fr/deposer-une-annonce" target="_blank" rel="noreferrer">➕ Déposer une annonce sur Leboncoin</a>
-           <div class="body">${photoHtml()}${counterHtml()}${exclusHtml()}${remHtml}${unlHtml}${items.length ? listeGroupee(items) : emptyHtml()}${donePostedHtml()}</div>
+           <div class="body">${photoHtml()}${counterHtml()}${preuveHtml()}${exclusHtml()}${remHtml}${unlHtml}${items.length ? listeGroupee(items) : emptyHtml()}${donePostedHtml()}</div>
            <div class="hint">1) Clique <b>➕ Déposer une annonce</b>. 2) Sur la page, clique <b>✍️ Pré-remplir</b> sur la paire voulue. 3) Vérifie et publie toi-même. Rien n&#39;est publié automatiquement.</div>
          </div>`
       : `<button class="fab" data-a="open">🟠 VRM <span class="b">${badge}</span></button>`);
@@ -334,6 +334,17 @@
   // même. Elle en sort ; on le DIT, en gris et sans consigne : c'est son choix,
   // pas une panne (§ « un CHOIX n'est pas une panne »), et le geste pour la
   // récupérer est de remettre le compte dans l'app.
+  // ⚠️⚠️ QUAND LA PREUVE DE VENTE N'A PAS PU ÊTRE LUE, LA LISTE N'EST PAS SÛRE.
+  // Mesuré le 15 septembre : cette lecture a raté une fois et la file est passée
+  // de 40 à **55** paires — quinze paires déjà vendues reproposées à la
+  // publication, sans un mot. On ne cache pas la liste (elle reste utile), on
+  // dit ce qu'on n'a pas pu vérifier, et ce que ça change.
+  function preuveHtml() {
+    if (!stats || !stats.preuveKO) return '';
+    return `<div class="counter" style="margin-top:8px">
+      <div class="cmsg" style="color:#9a5b16">Je n&#39;ai pas pu vérifier lesquelles sont <b>déjà vendues sur Vinted</b> : la lecture a échoué. La liste ci-dessous peut donc en contenir. Rien n&#39;est perdu — clique <b>↻</b> dans un moment.</div>
+    </div>`;
+  }
   function exclusHtml() {
     const n = (stats && stats.exclues) || 0;
     if (!n) return '';

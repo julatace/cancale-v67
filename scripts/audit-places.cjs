@@ -44,7 +44,34 @@ const LISTINGS = [
   ] } } },
 ];
 
-function ctxAvec(numeros, txns, lbcItems, exclus) {
+// Applique le `select=` d'une requête comme le ferait PostgREST : chaque alias
+// `nom:data->a->b->>c` devient une colonne. Sans ça un banc sert une FORME que
+// l'app ne sait pas lire (§6.3).
+function projette(rows, url) {
+  const sel = decodeURIComponent((/[?&]select=([^&]*)/.exec(url) || [])[1] || '');
+  if (!sel || sel === '*') return rows;
+  const parts = sel.split(',').map((x) => x.trim()).filter(Boolean);
+  return rows.map((row) => {
+    const out = {};
+    for (const part of parts) {
+      const m = /^(?:([^:]+):)?(.+)$/.exec(part); if (!m) continue;
+      const src = m[2];
+      const alias = m[1] || src.split('->').pop().replace(/^>/, '');
+      if (src === 'id' || src === 'updated_at') { out[alias] = row[src]; continue; }
+      if (src === 'data') { out[alias] = row.data; continue; }
+      if (/^data(->|->>)/.test(src)) {
+        let v = row.data;
+        for (const seg of src.replace(/^data(->>|->)/, '').split(/->>|->/)) v = (v == null ? null : v[seg]);
+        out[alias] = (v == null) ? null : v;
+        continue;
+      }
+      out[alias] = row[src];
+    }
+    return out;
+  });
+}
+
+function ctxAvec(numeros, txns, lbcItems, exclus, quiEchoue) {
   const ctx = {
     console: { log() {}, warn() {}, error() {} },
     setTimeout, clearTimeout, setInterval, clearInterval, URL, TextDecoder, TextEncoder,
@@ -60,13 +87,22 @@ function ctxAvec(numeros, txns, lbcItems, exclus) {
     },
     fetch: async (url, opts = {}) => {
       const u = String(url);
+      // ⚠️ On sert la VRAIE forme d'un échec : 522 + HTML, pas un JSON d'erreur.
+      if (quiEchoue && u.includes(quiEchoue) && (opts.method || 'GET') === 'GET') {
+        return { ok: false, status: 522, json: async () => { throw new Error('HTML'); }, text: async () => '<html>522</html>', headers: { get: () => 'text/html' } };
+      }
       const j = (d) => ({ ok: true, status: 200, json: async () => d, text: async () => JSON.stringify(d), headers: { get: () => 'application/json' } });
       if ((opts.method || 'GET') === 'POST') return { ok: true, status: 201, json: async () => ({}), text: async () => '', headers: { get: () => '' } };
       if (/id=eq\.main/.test(u)) return j([{ data: { vinted_annonce_numeros: numeros, vinted_accounts_hidden: exclus || [], vinted_accounts: [
         { vinted_user_id: '9001', login: 'compteA' }, { vinted_user_id: '9002', login: 'compteB' }] } }]);
       if (/id=like\.harvest_\*_listings/.test(u)) return j(LISTINGS);
       // La PREUVE d'une vente : `transaction → item_id` (§5, l'identité).
-      if (/id=like\.harvest_\*_txn_\*/.test(u)) return j(txns || []);
+      // ⚠️⚠️ ET ON APPLIQUE LA PROJECTION POUR DE VRAI (§6.3). Le code demande
+      //    `select=it:data->payload->transaction->>item_id` ; servir la ligne
+      //    BRUTE ferait lire `r.it` sur un objet qui ne l'a pas — donc « aucune
+      //    vente prouvée », et l'audit mesurerait une fiction. C'est le piège
+      //    qui avait fait afficher « 0 bordereau prêt » sur l'écran Colis.
+      if (/id=like\.harvest_\*_txn_\*/.test(u)) return j(projette(txns || [], u));
       // Les annonces Leboncoin captées — dont celles qui NE SONT PAS à lui.
       if (/id=eq\.lbc_listings/.test(u)) return j(lbcItems ? [{ data: { items: lbcItems } }] : []);
       return j([]);
@@ -308,6 +344,47 @@ function ctxAvec(numeros, txns, lbcItems, exclus) {
     // Et l'app aussi — c'est elle qui était juste.
     dit(/offAcc\.has\(uid\)/.test(APP), 'l\'app applique la même exclusion sur SA file',
       'sinon l\'app annonce un nombre et le panneau en montre un autre');
+  }
+
+  // ── ⚠️⚠️ UNE PREUVE QU'ON N'A PAS PU LIRE N'EST PAS « AUCUNE VENTE » ───────
+  // Mesuré EN DIRECT le 15 septembre, pendant les essais de performance : la
+  // lecture des transactions a échoué une fois (base sous charge), le `|| []`
+  // l'a transformée en « aucune vente prouvée », et la file Leboncoin est passée
+  // de **40 à 55 paires** — quinze paires DÉJÀ VENDUES reproposées à la
+  // publication, sans un mot. C'est la plainte du 13 septembre ressuscitée par
+  // un simple timeout, et c'est la quinzième forme de « rien lu ne vaut pas
+  // rien ». On ne cache pas la liste : on DIT ce qu'on n'a pas pu vérifier.
+  {
+    const tous = {
+      '101': { numero: '101', title: 'A', mp: { lbc: true, ebay: true } },
+      '202': { numero: '202', title: 'B', mp: { lbc: true, ebay: true } },
+      '303': { numero: '303', title: 'C', mp: { lbc: true, ebay: true } },
+    };
+    const vendue = [{ id: 'harvest_9001_txn_7', data: { payload: { transaction: { item_id: 101 } } } }];
+    // 1) marche normale : la preuve est lue, 101 sort de la file, rien à signaler.
+    const ok = ctxAvec(tous, vendue, null, [], null);
+    const rOk = await ok.buildLbcData();
+    const nOk = (rOk.queue || []).map(a2 => String(a2.numero)).sort();
+    dit(!nOk.includes('101') && (rOk.stats || {}).preuveKO === false,
+      'preuve LUE : la paire vendue sort de la file, et rien n\'est signalé',
+      'file ' + nOk.join(', ') + ' · preuveKO ' + String((rOk.stats || {}).preuveKO));
+    // 2) la MÊME base, mais la lecture de la preuve échoue.
+    const ko2 = ctxAvec(tous, vendue, null, [], 'txn_');
+    const rKo = await ko2.buildLbcData();
+    dit((rKo.stats || {}).preuveKO === true,
+      '⚠️ preuve RATÉE : la file le PORTE, elle ne se présente pas comme sûre',
+      (rKo.stats || {}).preuveKO === true ? '' : 'une lecture ratée devient « aucune vente » : 15 paires vendues reproposées (mesuré)');
+    // Et eBay, où une vente engage une expédition.
+    const rE = await ctxAvec(tous, vendue, null, [], 'txn_').buildEbayData();
+    dit(rE.preuveKO === true, 'eBay : même règle, la file porte l\'échec',
+      rE.preuveKO === true ? '' : 'publier une paire vendue sur eBay engage une expédition qu\'il ne peut pas faire');
+    // ⚠️ Et les DEUX panneaux doivent le dire — une information rendue que
+    //    l'affichage ignore ne vaut rien (défaut du panneau de sécurité).
+    const LBC = fs.readFileSync(path.join(racine, 'vinted-sync-extension', 'lbc.js'), 'utf8');
+    const EBAY = fs.readFileSync(path.join(racine, 'vinted-sync-extension', 'ebay.js'), 'utf8');
+    dit(/preuveKO/.test(LBC), 'le panneau Leboncoin LIT cet échec', 'le fond le signale, l\'affichage l\'ignore');
+    dit(/preuveKO/.test(EBAY), 'le panneau eBay aussi');
+    dit(/preuveKO/.test(APP), 'et l\'écran Leboncoin de l\'app aussi');
   }
 
   // ── LE TITRE LEBONCOIN : LES DEUX CÔTÉS DOIVENT RENDRE LE MÊME ──────────────
