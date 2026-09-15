@@ -3,6 +3,32 @@
 // quelles offres ont été acceptées, et lesquelles ne l'ont PAS été.
 const fs = require('fs'), vm = require('vm');
 const path = require('path');
+
+// Applique le `select=` comme PostgREST : sans ça un banc sert une FORME que le
+// code ne sait pas lire, et il mesure une fiction (§6.3).
+function projette(rows, url) {
+  const sel = decodeURIComponent((/[?&]select=([^&]*)/.exec(url) || [])[1] || '');
+  if (!sel || sel === '*') return rows;
+  return rows.map((row) => {
+    const out = {};
+    for (const part of sel.split(',').map((x) => x.trim()).filter(Boolean)) {
+      const m = /^(?:([^:]+):)?(.+)$/.exec(part); if (!m) continue;
+      const src = m[2];
+      const alias = m[1] || src.split('->').pop().replace(/^>/, '');
+      if (src === 'id' || src === 'updated_at') { out[alias] = row[src]; continue; }
+      if (src === 'data') { out[alias] = row.data; continue; }
+      if (/^data(->|->>)/.test(src)) {
+        let v = row.data;
+        for (const seg of src.replace(/^data(->>|->)/, '').split(/->>|->/)) v = (v == null ? null : v[seg]);
+        out[alias] = (v == null) ? null : v;
+        continue;
+      }
+      out[alias] = row[src];
+    }
+    return out;
+  });
+}
+
 const src = fs.readFileSync(path.join(__dirname, '..', 'vinted-sync-extension', 'background.js'), 'utf8');
 const dual = (v) => function (...a) { const cb = a[a.length - 1]; if (typeof cb === 'function') { cb(v); return; } return Promise.resolve(v); };
 
@@ -55,7 +81,12 @@ function faireBanc({ convs, mins = {}, minsApp = {}, actif = true, connecte = '1
       if (/\/rest\/v1\/vinted_accounts/.test(u)) return J([{ vinted_user_id: '111', login: 'moi', domain: 'www.vinted.fr', access_token: 't', anon_id: 'a', csrf_token: 'c' }]);
       if (/id=eq\.panel_min_prices/.test(u)) return J([{ data: mins }]);
       if (/id=eq\.main.*vinted_annonce_numeros/.test(u)) return J([{ nums: minsApp }]);
-      if (/id=like\.harvest_111_conv_/.test(u)) return J(convs);
+      // ⚠️⚠️ ON APPLIQUE LA PROJECTION POUR DE VRAI (§6.3). `capterOffres` demande
+      //    `select=id,cap:…,cid:…,msgs:…` : servir la ligne BRUTE ferait lire
+      //    `r.msgs` sur un objet qui ne l'a pas, donc « aucune offre » — et
+      //    l'audit mesurerait une fiction en se croyant vert. C'est le piège qui
+      //    avait fait afficher « 0 bordereau prêt » sur l'écran Colis.
+      if (/id=like\.harvest_111_conv_/.test(u)) return J(projette(convs, u));
       if (/\/rest\/v1\//.test(u)) return J([]);
       if (/vinted\.[a-z]+\/api\//.test(u)) { envois.push(m + ' ' + u.replace(/^https:\/\/[^/]+/, '')); return J({ ok: true }); }
       return J({});

@@ -134,15 +134,27 @@ async function authLogout() { await saveSession(null); return { ok: true }; }
 // TOUTES les captures (400 : colonne inconnue). On teste donc l'etat reel de la
 // base, une fois, et on garde la reponse le temps de vie du service worker.
 let CLOISONNE = null;   // null = pas encore verifie
+// ⚠️ ON MÉMORISE LA PROMESSE, PAS SEULEMENT LE RÉSULTAT (même motif que
+//    `sbGetMemo`). Cette sonde ne gardait que sa réponse : tant qu'elle était en
+//    vol, chaque appelant en relançait une. Tant que les lectures partaient une
+//    par une ça ne se voyait pas ; dès qu'elles partent ensemble, **six sondes
+//    identiques** partaient avant que la première ne réponde — mesuré le
+//    15 septembre, 6× `select=owner&limit=1` sur une construction de panneau.
+let CLOISONNE_EN_VOL = null;
 async function isCloisonne() {
   if (CLOISONNE !== null) return CLOISONNE;
-  try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?select=owner&limit=1`, {
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
-    });
-    CLOISONNE = r.ok;
-  } catch (_) { CLOISONNE = false; }
-  return CLOISONNE;
+  if (CLOISONNE_EN_VOL) return await CLOISONNE_EN_VOL;
+  CLOISONNE_EN_VOL = (async () => {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?select=owner&limit=1`, {
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+      });
+      CLOISONNE = r.ok;
+    } catch (_) { CLOISONNE = false; }
+    CLOISONNE_EN_VOL = null;
+    return CLOISONNE;
+  })();
+  return await CLOISONNE_EN_VOL;
 }
 
 // En-tetes Supabase : jeton du vendeur UNIQUEMENT si la base sait s'en servir.
@@ -2726,7 +2738,15 @@ async function planchers() {
 async function offresEnAttente(uid) {
   const out = [];
   try {
-    const rows = await sbGet(`app_data?id=like.harvest_${uid}_conv_*&select=id,data`) || [];
+    // ⚠️ MÊME PROJECTION QUE LE PANNEAU (§4.4) : sur ses 939 conversations,
+    //    `select=id,data` rend 4,3 Mo quand les champs utiles tiennent en
+    //    994 Ko — et ce chemin-ci tourne à CHAQUE visite sur Vinted.
+    const rows = (await sbGetTout(`app_data?id=like.harvest_${uid}_conv_*&select=id,cap:data->>capturedAt,cid:data->payload->conversation->>id,opp:data->payload->conversation->opposite_user->>id,descr:data->payload->conversation->>description,it:data->payload->conversation->transaction->>item_id,msgs:data->payload->conversation->messages`) || [])
+      .map((r) => ({ id: r.id, data: { capturedAt: r.cap, payload: { conversation: {
+        id: r.cid, opposite_user: r.opp != null ? { id: Number(r.opp) } : null,
+        description: r.descr, transaction: r.it != null ? { item_id: r.it } : null,
+        messages: Array.isArray(r.msgs) ? r.msgs : [],
+      } } } }));
     // ⚠️ TRI INLINÉ, PAS `parFraicheur` : ce helper vit DANS `buildPanelData`.
     //    L'appeler d'ici lève une ReferenceError avalée par le try/catch — la
     //    fonction rendait donc toujours une liste vide, en silence. Troisième
@@ -3415,16 +3435,35 @@ async function recupererLabel(acc, uid, tx) {
     // les chemins observés dans `seen_urls` (§5.26), l'un après l'autre, et on
     // GARDE UN ÉCHANTILLON de ce qui revient : c'est comme ça qu'on a fini par
     // comprendre la fiche article (§5.24 → §5.26). Sans mesure, on devinerait.
+    // ⚠️⚠️ ON SAVAIT QUEL CHEMIN MARCHE, ET ON LE JETAIT. `via` était calculé —
+    //    et jamais enregistré nulle part. Or c'est LA mesure qui manque pour
+    //    rendre cette capture plus rapide : relevé du 13 septembre,
+    //    **`label_url_trouve` 29 contre `label_url_introuvable` 61** (l'URL est
+    //    introuvable deux fois sur trois), et rien ne disait **lequel** des trois
+    //    chemins avait répondu quand ça marchait. Sans ça, réordonner ou en
+    //    retirer un serait une supposition — et la supposition est précisément ce
+    //    que ce projet s'interdit. On note donc le chemin gagnant, et le STATUT
+    //    de chacun quand aucun ne donne rien : « Vinted a refusé » et « Vinted a
+    //    répondu sans URL » ne se corrigent pas de la même façon.
     let url = null, via = '';
+    const statuts = [];
     for (const chemin of [`/api/v2/shipments/${shipId}/label_url`, `/api/v2/shipments/${shipId}`, `/api/v2/shipments/${shipId}/label_options`]) {
       const l = await vintedGet(acc, chemin);
       const brut = l && l.json ? JSON.stringify(l.json) : '';
       await echantillonRate('label' + chemin.replace(/^.*\/shipments\/\d+/, '').replace(/\W+/g, '_'), shipId, brut.slice(0, 400));
+      statuts.push(String((l && l.status) || 'sans_reponse'));
       const u = urlDeLabel(l && l.json);
       if (u) { url = u; via = chemin; break; }
     }
-    if (!url) { await noterDiag('label_url_introuvable'); return { ok: false, raison: "Vinted n'a pas donné l'URL du PDF" }; }
+    const nomChemin = (c) => (c.replace(/^.*\/shipments\/\d+/, '').replace(/\W+/g, '_') || '_racine');
+    if (!url) {
+      await noterDiag('label_url_introuvable');
+      // Bornée par construction : trois chemins, trois statuts HTTP.
+      await noterDiag('label_ko_statuts_' + statuts.join('_'));
+      return { ok: false, raison: "Vinted n'a pas donné l'URL du PDF" };
+    }
     await noterDiag('label_url_trouve');
+    await noterDiag('label_via' + nomChemin(via));
     // ⚠️ LE PDF N'EST PAS SERVI PAR VINTED. `label_url` renvoie une URL **S3**
     // (`svc-shipping-labels.s3.eu-central-1.amazonaws.com`) — vérifié dans
     // l'échantillon de diagnostic. Sans `https://*.amazonaws.com/*` dans les
@@ -3726,7 +3765,90 @@ async function buildPanelData() {
   // à l'identique dans l'extension, et il tournait pendant les quatre jours de
   // panne. On compte les lectures ratées et on le DIT.
   let lecturesRatees = 0;
-  const lire = async (q) => { const r = await sbGet(q); if (r === null) lecturesRatees++; return r; };
+  // ══════════════════════════════════════════════════════════════════════════
+  // LES LECTURES PARTENT ENSEMBLE — 99 % DU TEMPS DU PANNEAU ÉTAIT DE L'ATTENTE
+  // ══════════════════════════════════════════════════════════════════════════
+  // Mesuré le 15 septembre sur sa vraie base : **26 requêtes, 6 198 ms, dont
+  // 6 153 ms passés à attendre le réseau (99 %) — et jamais plus d'UNE requête
+  // en vol à la fois**. Même une lecture qui rend **0 Ko** coûte **536 ms** :
+  // ce qui coûte n'est pas la donnée, c'est l'aller-retour, et on en faisait
+  // vingt-six à la queue leu leu.
+  // ⚠️⚠️ CE N'EST PAS LE GARDE-FOU « UNE PAR UNE » (§3). Celui-là porte sur les
+  //    requêtes envoyées à **VINTED** — c'est lui qui évite de ressembler à un
+  //    robot, et il ne bouge pas d'un pouce. Ici on lit **notre propre base
+  //    Supabase** : Vinted n'est pas dans la boucle, aucun compte n'est touché,
+  //    aucune action n'est faite. Ne pas resérialiser ces lectures en croyant
+  //    protéger quelque chose.
+  // ⚠️ La liste ci-dessous n'est qu'une OPTIMISATION : une requête oubliée ici
+  //    part quand même, simplement à son tour. Elle ne peut donc pas rendre un
+  //    résultat faux — au pire elle le rend plus lentement.
+  // ⚠️ LA PAGINATION EST DÉCIDÉE ICI, PAS DANS LA LISTE DE PRÉCHARGEMENT : si
+  //    elle en dépendait, une requête oubliée serait silencieusement coupée à
+  //    1 000 lignes — une garantie ne doit pas reposer sur le fait de ne rien
+  //    oublier. `lire` et le préchargement appliquent la MÊME règle.
+  // ⚠️⚠️ ET ELLE EST DÉCLARÉE **AVANT** LE BLOC QUI S'EN SERT (§4.6). Posée
+  //    après, elle donnait « Cannot access 'balayeFamille' before
+  //    initialization » et `buildPanelData` mourait — panneau vide. Aucun audit
+  //    ne l'a vu : c'est la comparaison avant/après, qui EXÉCUTE la fonction,
+  //    qui l'a attrapée. Même piège que le `useMemo` de l'écran Achats.
+  const balayeFamille = (q) => /id=like\.[^&]*_(?:txn|conv)_\*/.test(q);
+  const memo = new Map();
+  const PARALLELE_MAX = 6;                 // on groupe, on n'inonde pas
+  {
+    const aLancer = [
+      'app_data?id=eq.main&select=data',
+      'app_data?id=eq.vinted_listing_dates&select=data',
+      'app_data?id=eq.vinted_item_details&select=data',
+      'app_data?id=eq.panel_accounts_off&select=data',
+      'vinted_accounts?select=vinted_user_id,login',
+      'app_data?id=like.harvest_*_listings&select=id,data',
+      'app_data?id=like.harvest_*_orders_sold&select=data',
+      'app_data?id=like.email_bord_*&select=transaction:data->>transaction',
+      'app_data?id=like.harvest_*_label_*&select=tx:data->>tx,capturedAt:data->>capturedAt',
+      'app_data?id=like.harvest_*_orders_purchased&select=data',
+      'app_data?id=like.harvest_*_complaints&select=data',
+      'app_data?id=like.harvest_*_txn_*&select=uid:data->>uid,tx:data->payload->transaction->>id,it:data->payload->transaction->>item_id,st:data->payload->transaction->shipment->>status_title,shs:data->payload->transaction->shipment->>status,st2:data->payload->transaction->>status_title,ts:data->payload->transaction->>status,cap:data->>capturedAt',
+      'app_data?id=eq.panel_colis_collected&select=data',
+      'app_data?id=like.harvest_*_inbox&select=data',
+      'app_data?id=like.harvest_*_item_*&select=id,data',
+      'app_data?id=eq.panel_repub_pending&select=data',
+      'app_data?id=eq.panel_buyprices&select=data',
+      'app_data?id=eq.panel_bords_done&select=data',
+      'app_data?id=eq.widget_stats&select=data',
+    ];
+    // Chaque « voie » enchaîne les requêtes l'une après l'autre ; PARALLELE_MAX
+    // voies tournent en même temps. La promesse de chaque requête existe AVANT
+    // qu'elle parte, pour que `lire` puisse l'attendre dans n'importe quel ordre.
+    const donner = new Map();
+    for (const q of aLancer) memo.set(q, new Promise((res) => donner.set(q, res)));
+    let i = 0;
+    const voie = async () => {
+      while (i < aLancer.length) {
+        const q = aLancer[i++];
+        // Même règle que `lire` : une famille qui balaie des centaines de lignes
+        // passe par la pagination (§4.5 — `_txn_*` 704, `_conv_*` 939).
+        try {
+          const r = balayeFamille(q) ? await sbGetTout(q) : await sbGet(q);   // ni l'un ni l'autre ne lève : ils rendent `null`
+          donner.get(q)(r);
+        } catch (_) {
+          // ⚠️⚠️ UNE VOIE QUI TOMBE NE DOIT NI FAIRE ATTENDRE, NI MENTIR.
+          //    Ces promesses sont lancées SANS être attendues : une erreur de
+          //    programmation à l'intérieur (un `const` lu avant sa déclaration,
+          //    par exemple) devient un rejet non traité qui tue le service
+          //    worker — et les requêtes suivantes ne se résolvent JAMAIS, donc
+          //    le panneau attend pour toujours. On rend `null` : c'est « je
+          //    n'ai pas pu lire », que le panneau sait déjà dire honnêtement.
+          donner.get(q)(null);
+        }
+      }
+    };
+    for (let k = 0; k < PARALLELE_MAX; k++) voie();
+  }
+  const lire = async (q) => {
+    const r = memo.has(q) ? await memo.get(q) : (balayeFamille(q) ? await sbGetTout(q) : await sbGet(q));
+    if (r === null) lecturesRatees++;
+    return r;
+  };
   const rows = await lire('app_data?id=eq.main&select=data');
   const d = (rows && rows[0] && rows[0].data) || {};
   const numeros = d.vinted_annonce_numeros || {};
@@ -4045,16 +4167,26 @@ async function buildPanelData() {
   // dans la boucle existante — aucune requête ni octet supplémentaire (§34).
   const itemParTxn = {};
   try {
-    const txnRows = (await lire('app_data?id=like.harvest_*_txn_*&select=data') || []).filter(keepAcc);
+    // ⚠️⚠️ ON PROJETTE, ON NE RAPATRIE PAS LE BLOB (§4.4). Mesuré le 15 septembre
+    //    sur sa vraie base : `select=data` sur ces **704 lignes** rend
+    //    **19,8 Mo en 5,0 s** — à chaque construction du panneau. Les six champs
+    //    dont ce bloc a besoin tiennent en **122 Ko en 0,35 s** : **162× moins
+    //    d'octets**. C'est de l'égress, pas seulement de l'attente : un
+    //    `select=data` sur le widget avait déjà crevé le quota (5,7 Go).
+    // ⚠️ ET LA CHAÎNE DE REPLIS EST RECOPIÉE À L'IDENTIQUE, parce qu'elle sert :
+    //    mesuré, **497 lignes sur 704** n'ont de statut QUE par un repli
+    //    (`shipment.status` numérique, ou `transaction.status_title`). Ne
+    //    projeter que `shipment.status_title` aurait fait disparaître le statut
+    //    de sept colis sur dix, en silence — et « colis parti » serait redevenu
+    //    « à générer ».
+    const txnRows = (await lire('app_data?id=like.harvest_*_txn_*&select=uid:data->>uid,tx:data->payload->transaction->>id,it:data->payload->transaction->>item_id,st:data->payload->transaction->shipment->>status_title,shs:data->payload->transaction->shipment->>status,st2:data->payload->transaction->>status_title,ts:data->payload->transaction->>status,cap:data->>capturedAt') || [])
+      .filter((r) => { const u = r && r.uid; return compteExiste(u) && !acctOff(u); });
     for (const r of txnRows) {
-      const p = (r.data && r.data.payload) || {};
-      const t = p.transaction || p;
-      const tx = String((t && t.id) || '');
+      const tx = String(r.tx || '');
       if (!tx) continue;
-      if (t && t.item_id != null) itemParTxn[tx] = String(t.item_id);
-      const sh = (t && t.shipment) || {};
-      const st = String(sh.status_title || sh.status || t.status_title || t.status || '');
-      const cap = Date.parse((r.data && r.data.capturedAt) || '') || 0;
+      if (r.it != null && r.it !== '') itemParTxn[tx] = String(r.it);
+      const st = String(r.st || r.shs || r.st2 || r.ts || '');
+      const cap = Date.parse(r.cap || '') || 0;
       if (!st) continue;
       if (!txnEtat[tx] || cap > txnEtat[tx].cap) txnEtat[tx] = { st, cap };
     }
@@ -4490,11 +4622,27 @@ async function buildPanelData() {
       const n = Number(String(v).replace(',', '.').replace(/[^\d.]/g, ''));
       return isFinite(n) ? n : null;
     };
-    const convRows = (await lire('app_data?id=like.harvest_*_conv_*&select=id,data') || []).filter(keepAcc).sort(parFraicheur);
+    // ⚠️⚠️ LA LECTURE LA PLUS LOURDE DU PANNEAU, ET LA PLUS PROCHE DU PLAFOND.
+    //    Mesuré le 15 septembre : `select=id,data` sur **939 conversations** rend
+    //    **4,3 Mo en 2,0 s** ; les huit champs dont ce bloc se sert tiennent en
+    //    **994 Ko en 0,6 s** — **4,3× moins d'octets**, et les messages
+    //    reviennent **identiques** (629 conversations comparées, 0 différence).
+    //    Les 3,3 Mo de trop, ce sont les objets utilisateur, l'article, les
+    //    photos — rien de ce qu'on lit ici.
+    // ⚠️ ET ON PAGINE : 939 lignes, plafond à 1 000 (§4.5). Sans `sbGetTout`, le
+    //    jour où il passe 1 000, le panneau cesse de voir des offres SANS RIEN
+    //    DIRE.
+    const convBrut = await sbGetTout('app_data?id=like.harvest_*_conv_*&select=id,uid:data->>uid,cap:data->>capturedAt,cid:data->payload->conversation->>id,opp:data->payload->conversation->opposite_user->>id,descr:data->payload->conversation->>description,titre:data->payload->conversation->>title,it:data->payload->conversation->transaction->>item_id,msgs:data->payload->conversation->messages');
+    if (convBrut === null) lecturesRatees++;
+    const convRows = (convBrut || [])
+      .filter((r) => { const u = r && r.uid; return compteExiste(u) && !acctOff(u); })
+      .sort((a, b) => (Date.parse(b.cap || '') || 0) - (Date.parse(a.cap || '') || 0));
     const vus = new Set();
     for (const r of convRows) {
-      const p = (r.data && r.data.payload) || {};
-      const c = p.conversation || p;
+      const c = { id: r.cid, opposite_user: r.opp != null ? { id: Number(r.opp) } : null,
+        description: r.descr, title: r.titre,
+        transaction: r.it != null ? { item_id: r.it } : null,
+        messages: Array.isArray(r.msgs) ? r.msgs : [] };
       const cid = String(c.id || ''); if (!cid || vus.has(cid)) continue; vus.add(cid);
       // Forme RÉELLE, relevée sur les conversations en base (pas devinée) :
       //   entity_type 'offer_request_message' = une offre DE L'ACHETEUR
@@ -4632,6 +4780,39 @@ async function sbGet(query) {
     if (!res.ok) return null;
     return await res.json();
   } catch (_) { return null; }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// AU-DELÀ DE 1 000 LIGNES, SUPABASE COUPE — ET NE LE DIT PAS (§4.5)
+// ══════════════════════════════════════════════════════════════════════════════
+// Mesuré le 15 septembre sur sa vraie base : une requête sans `Range` rend
+// **1 000 lignes** avec `Content-Range: 0-999/4999` — les 3 999 autres sont
+// perdues **en silence**. `sbGet` ne paginait pas, et la famille des
+// conversations est à **939 lignes** : à soixante et une conversations du
+// plafond. Le jour où il le franchit, le panneau cesse de voir des offres et des
+// codes de retrait **sans aucun message** — « un colis caché est un colis
+// perdu », et ici c'est le silence qui cache.
+// ⚠️ On garde la règle du fichier : `null` sur échec, jamais une liste partielle
+//    présentée comme complète. Si UNE page échoue, tout l'appel rend `null` —
+//    une moitié de liste serait pire qu'une lecture ratée, parce qu'elle a l'air
+//    d'une réponse.
+const SB_PAGE = 1000;
+async function sbGetTout(query) {
+  const out = [];
+  for (let de = 0; ; de += SB_PAGE) {
+    let page = null;
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/${query}`, {
+        headers: { ...(await sbHeaders()), Range: `${de}-${de + SB_PAGE - 1}`, 'Range-Unit': 'items' },
+      });
+      if (!res.ok) return null;
+      page = await res.json();
+    } catch (_) { return null; }
+    if (!Array.isArray(page)) return null;
+    out.push(...page);
+    if (page.length < SB_PAGE) return out;
+    if (de > 100000) return out;                  // garde-fou : jamais de boucle sans fin
+  }
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -4863,6 +5044,30 @@ function mpChoisi(e, place) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// LA PREUVE D'UNE VENTE — UNE SEULE LECTURE, ET ELLE NE RAPATRIE QUE L'IDENTITÉ
+// ══════════════════════════════════════════════════════════════════════════════
+// `harvest_*_txn_*` porte `transaction.item_id` : c'est l'identité qui relie une
+// vente à son annonce (§5), et c'est TOUT ce dont la file a besoin.
+// ⚠️⚠️ CE BLOC ÉTAIT ÉCRIT TROIS FOIS, chaque fois en `select=data`. Mesuré le
+// 15 septembre sur sa vraie base : **19,8 Mo en 5,0 s** par lecture, contre
+// **16 Ko en 0,36 s** pour la projection — **1 251× moins d'octets, 14× plus
+// vite**, et **exactement les mêmes 242 ventes prouvées** (0 manquante, 0 en
+// trop). C'est §4.4 mot pour mot, et c'est de l'égress : un `select=data` sur le
+// widget avait déjà crevé le quota (5,7 Go).
+// ⚠️ Le repli `t.item.id` n'existe nulle part dans ses données (704 lignes sur
+//    704 portent `item_id`) — mesuré avant de le retirer, pas supposé.
+// ⚠️ Et « rien lu » ne vaut pas « rien » : une lecture ratée rend `null`, et
+//    l'appelant doit pouvoir la distinguer d'une base sans aucune vente — sinon
+//    une file entière se vide sur un timeout.
+async function lireVentesProuvees() {
+  const rows = await sbGetTout('app_data?id=like.harvest_*_txn_*&select=it:data->payload->transaction->>item_id');
+  if (rows === null) return { echec: true, vendus: new Set() };
+  const vendus = new Set();
+  for (const r of rows) { if (r && r.it) vendus.add(String(r.it)); }
+  return { echec: false, vendus };
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // eBAY — MÊME MODÈLE QUE LEBONCOIN : ON PRÉPARE, C'EST LUI QUI PUBLIE
 // ══════════════════════════════════════════════════════════════════════════════
 // Julien a un compte particulier ET un compte professionnel. Le compte pro a un
@@ -4939,16 +5144,11 @@ async function buildEbayData() {
   // l'annonce ne suffit donc pas. La preuve de vente PRIME.
   // Le jour où il coche « eBay », il se verrait proposer de mettre en vente
   // quatorze paires qu'il n'a plus — et sur eBay une vente engage une expédition.
-  const vendus = new Set();
-  {
-    const txnRows = (await sbGet('app_data?id=like.harvest_*_txn_*&select=data')) || [];
-    for (const r of txnRows) {
-      const p = (r.data && r.data.payload) || {};
-      const t = p.transaction || p;
-      const it = t && (t.item_id || (t.item && t.item.id));
-      if (it) vendus.add(String(it));
-    }
-  }
+  // ⚠️ Même règle que Leboncoin : une preuve qu'on n'a PAS PU LIRE ne vaut pas
+  //    « rien n'est vendu ». Sur eBay c'est plus coûteux encore — une vente y
+  //    engage une expédition qu'il ne peut pas faire.
+  const preuve = await lireVentesProuvees();
+  const vendus = preuve.vendus;
   const queue = []; const vus = new Set(); let retirees = 0, vendues = 0;
   for (const r of listRows) {
     const d = r.data || {}; const p = d.payload || {}; const uid = String(d.uid);
@@ -4969,7 +5169,7 @@ async function buildEbayData() {
     }
   }
   queue.sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0));
-  return { queue, retirees, vendues, postedCount: posted.size, echec: pos.echec };
+  return { queue, retirees, vendues, preuveKO: preuve.echec, postedCount: posted.size, echec: pos.echec };
 }
 
 async function buildLbcData() {
@@ -5047,16 +5247,17 @@ async function buildLbcData() {
   // jamais la ressemblance). C'est donc ça qui prouve la vente.
   // ⚠️ Et l'absence de preuve n'est PAS une preuve d'absence : une paire fermée
   //    sans transaction captée se dit « à vérifier », jamais « pas vendue ».
-  const vendus = new Set();
-  {
-    const txnRows = (await sbGet('app_data?id=like.harvest_*_txn_*&select=data')) || [];
-    for (const r of txnRows) {
-      const p = (r.data && r.data.payload) || {};
-      const t = p.transaction || p;
-      const it = t && (t.item_id || (t.item && t.item.id));
-      if (it) vendus.add(String(it));
-    }
-  }
+  // ⚠️⚠️ ET « JE N'AI PAS PU LIRE » N'EST PAS « AUCUNE VENTE ».
+  // Mesuré en direct le 15 septembre, pendant les essais : cette lecture a
+  // échoué une fois (la base sous charge), `|| []` l'a transformée en « aucune
+  // vente prouvée » — et la file est passée de **40 à 55 paires**. Quinze paires
+  // DÉJÀ VENDUES se seraient reproposées à la publication, sans un mot. C'est
+  // exactement la plainte du 13 septembre (« des paires qui sont vendues »),
+  // ressuscitée par un simple timeout. Quinzième forme de « rien lu ne vaut pas
+  // rien » — et la première où c'est une LECTURE RATÉE qui rallume un défaut
+  // qu'on venait de corriger.
+  const preuveLbc = await lireVentesProuvees();
+  const vendus = preuveLbc.vendus;
   // L'état Vinted réel de chaque annonce connue : vendue (prouvé) · en pause ·
   // fermée sans preuve · jamais vue. Trois états, pas deux (même leçon que le
   // panneau de sécurité).
@@ -5221,7 +5422,7 @@ async function buildLbcData() {
   try { const rec = await sbGet('app_data?id=eq.lbc_recon&select=data'); const q = rec && rec[0] && rec[0].data && rec[0].data.quota; if (q && q.value) detected = q.value; } catch (_) {}
   // Compteurs de diagnostic (pour comprendre si la file est vide et pourquoi).
   const numberedOnline = online.filter((o) => { const e = numeros[o.id]; return e && String(e.numero || '').trim() !== ''; }).length;
-  const stats = { postedCount, lbcCount, lbcJamaisLu, limit: lbcLimit, plan: lbcPlan, detected, exclues, onlineCount: online.length, numberedCount: numberedOnline, queueCount: queue.length,
+  const stats = { postedCount, lbcCount, lbcJamaisLu, preuveKO: preuveLbc.echec, limit: lbcLimit, plan: lbcPlan, detected, exclues, onlineCount: online.length, numberedCount: numberedOnline, queueCount: queue.length,
     autoMatched: autoMatched.size, lbcSeen: lbcItems.length, unlinkedCount: unlinked.length };
   // Liste des paires marquées « publiées » (pour pouvoir annuler une erreur).
   const postedList = [...posted].filter((x) => /^\d+$/.test(x)).map((pid) => { const e = numeros[pid] || {}; return { id: pid, numero: String(e.numero || '?'), title: e.title || '' }; }).sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0));

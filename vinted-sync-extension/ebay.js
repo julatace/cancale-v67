@@ -55,7 +55,7 @@
       : 'Je n\'ai pas pu accéder à ton presse-papier (' + quoi.toLowerCase() + '). Clique dans la page puis réessaie.');
   };
 
-  let queue = [], retirees = 0, postedCount = 0, vendues = 0, echec = false, ouvert = false, charge = false;
+  let queue = [], retirees = 0, postedCount = 0, vendues = 0, preuveKO = false, echec = false, ouvert = false, charge = false;
 
   function toast(msg) {
     let el = document.getElementById('vrm-ebay-toast');
@@ -113,19 +113,24 @@
     const reste = queue.length > 40 ? `<div style="padding:9px 13px;color:#5B6470;font-size:11.5px">… et ${queue.length - 40} autres.</div>` : '';
     // ⚠️ UNE FILE QUI RÉTRÉCIT SANS EXPLICATION SE LIT COMME UNE PERTE : les
     //    paires prouvées vendues sur Vinted sont écartées, et on dit combien.
+    // ⚠️ Une preuve qu'on n'a pas pu lire ne vaut pas « rien n'est vendu » : sur
+    //    eBay, publier une paire déjà vendue engage une expédition.
+    const doute = preuveKO
+      ? `<div style="padding:9px 13px;color:#B45309;font-size:11.5px;border-top:1px solid #E3E6EA">Je n'ai pas pu vérifier lesquelles sont <b>déjà vendues sur Vinted</b> : la lecture a échoué. Cette liste peut donc en contenir — clique <b>↻</b> dans un moment.</div>`
+      : '';
     const ecartees = vendues
       ? `<br>${vendues} paire${vendues > 1 ? 's' : ''} déjà vendue${vendues > 1 ? 's' : ''} sur Vinted n'${vendues > 1 ? 'y sont' : 'y est'} pas : je ne te propose pas de remettre en vente ce que tu n'as plus. ${vendues > 1 ? 'Elles gardent leurs numéros' : 'Elle garde son numéro'}.`
       : '';
     return tete
       + `<div style="padding:10px 13px;color:#5B6470;font-size:11.5px">${queue.length} paire${queue.length > 1 ? 's' : ''} cochée${queue.length > 1 ? 's' : ''} pour eBay${postedCount ? ` · ${postedCount} déjà marquée${postedCount > 1 ? 's' : ''} en ligne` : ''}.<br>Je prépare, <b>tu publies</b> : les photos s'attachent au formulaire, rien n'est téléchargé sur ton ordinateur.${ecartees}</div>`
-      + cartes + reste;
+      + doute + cartes + reste;
   }
 
   async function charger() {
     const r = await send({ action: 'getQueue' });
     charge = true;
     if (!r || !r.ok) { echec = true; queue = []; }
-    else { echec = !!r.echec; queue = r.queue || []; retirees = r.retirees || 0; postedCount = r.postedCount || 0; vendues = r.vendues || 0; }
+    else { echec = !!r.echec; queue = r.queue || []; retirees = r.retirees || 0; postedCount = r.postedCount || 0; vendues = r.vendues || 0; preuveKO = !!r.preuveKO; }
     panneau();
   }
 

@@ -35,7 +35,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.59.2';
+const EXT_ATTENDUE = '5.60.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -21345,14 +21345,25 @@ function LeboncoinScreen() {
     //    toutes leur `item_id` : c'est l'identité qui relie une vente à son
     //    annonce. Mesuré : sur 400 annonces fermées, 151 seulement ont une vente
     //    prouvée — « plus en ligne » ne veut donc pas dire « vendue ».
-    const txnRows = await sbGet('app_data?id=like.harvest_*_txn_*&select=data');
+    // ⚠️⚠️ ET ON NE DEMANDE QUE `item_id`, PAS LE BLOB (§4.4). Mesuré le
+    //    15 septembre sur sa vraie base : `select=data` sur ces 704 lignes rend
+    //    **19,8 Mo en 5,0 s** ; la projection rend **16 Ko en 0,36 s** —
+    //    **1 251× moins d'octets, 14× plus vite**, et **exactement les mêmes
+    //    242 ventes prouvées** (0 manquante, 0 en trop : c'est la preuve qu'un
+    //    jugement métier n'a pas bougé). Le repli `t.item.id` n'existe nulle
+    //    part dans ses données (704 lignes sur 704 portent `item_id`), donc il
+    //    ne perd rien — et un `item_id` absent ne prouverait aucune vente de
+    //    toute façon.
+    const txnRows = await sbGet('app_data?id=like.harvest_*_txn_*&select=it:data->payload->transaction->>item_id');
+    // ⚠️⚠️ ET « JE N'AI PAS PU LIRE » N'EST PAS « AUCUNE VENTE ». Mesuré en
+    //    direct le 15 septembre : cette lecture a échoué une fois (base sous
+    //    charge), le `|| []` l'a transformée en « aucune vente prouvée », et la
+    //    file est passée de **40 à 55 paires** — quinze paires DÉJÀ VENDUES
+    //    reproposées à la publication, sans un mot. C'est la plainte du
+    //    13 septembre ressuscitée par un simple timeout.
+    const preuveKO = txnRows === null;
     const vendus = new Set();
-    for (const r of (txnRows || [])) {
-      const pl = (r.data && r.data.payload) || {};
-      const t = pl.transaction || pl;
-      const it = t && (t.item_id || (t.item && t.item.id));
-      if (it) vendus.add(String(it));
-    }
+    for (const r of (txnRows || [])) { if (r && r.it) vendus.add(String(r.it)); }
     const online = []; const onlineIds = new Set(); const seen = new Set(); const etatVinted = {};
     for (const r of listRows) {
       const uid = String(r.id).split('_')[1];
@@ -21462,7 +21473,7 @@ function LeboncoinScreen() {
     // Répartition des annonces LBC par compte (plusieurs comptes possibles).
     const parCompte = {};
     for (const ad of liveAds) { const k = String(ad.lbcUser || '?'); (parCompte[k] = parCompte[k] || []).push(ad); }
-    setData({ echecLecture: echecLecture || listRowsBrut === null, lbcJamaisLu: lbcJamaisLu || liveAds.length === 0, vendues, queue, removals, unlinked, liveAds, autoMatched, retirees, lbcAccounts, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: liveAds.length, limit: pd.limit, plan: pd.plan });
+    setData({ preuveKO, echecLecture: echecLecture || listRowsBrut === null, lbcJamaisLu: lbcJamaisLu || liveAds.length === 0, vendues, queue, removals, unlinked, liveAds, autoMatched, retirees, lbcAccounts, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: liveAds.length, limit: pd.limit, plan: pd.plan });
     setLoading(false);
   };
   useEffect(() => { reload(); /* eslint-disable-next-line */ }, []);
@@ -21579,6 +21590,18 @@ function LeboncoinScreen() {
             )}
           </>);
         })()}
+        {/* ⚠️⚠️ LA PREUVE DE VENTE N'A PAS PU ÊTRE LUE : la file peut contenir des
+            paires déjà vendues. Mesuré le 15 septembre — une lecture ratée a fait
+            passer la file de 40 à 55. On ne cache pas la liste, on dit ce qu'on
+            n'a pas pu vérifier. */}
+        {data.preuveKO && (
+          <Card style={{ borderColor: C.warn }}>
+            <div style={{ fontSize: 12.5, color: C.warn, lineHeight: 1.5 }}>
+              <b>Je n'ai pas pu vérifier lesquelles sont déjà vendues sur Vinted</b> — la lecture a échoué.
+              La liste ci-dessous peut donc en contenir. Rien n'est perdu : rouvre l'écran dans un moment.
+            </div>
+          </Card>
+        )}
         {/* Annonces Leboncoin non reliées à une paire VRM : informatif. On ne les
             présente JAMAIS comme « à retirer » (VRM ne connaît pas la paire). */}
         {data.unlinked && data.unlinked.length > 0 && (

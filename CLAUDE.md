@@ -1318,6 +1318,106 @@ eBay vide aujourd'hui — on mesure donc ce qui arrive **le jour où il coche**)
   « terminée » se vérifie sur ce qui RESTE, commentaires compris* : un
   commentaire faux se relit comme une règle.
 
+### ⚠️⚠️ « AMÉLIORE LA RAPIDITÉ » — 99 % DU TEMPS ÉTAIT DE L'ATTENTE
+Demande de Julien, 15 septembre : « améliore la rapidité de la capture de
+bordereau, de lecture de donnée et de transmission ». **Mesuré avant de coder**,
+sur sa vraie base, et les trois chiffres qui comptent :
+
+1. ⚠️⚠️ **`select=data` SUR 704 LIGNES DE TRANSACTION : 19,8 Mo en 5,0 s.** La
+   projection `item_id` rend **16 Ko en 0,36 s** — **1 251× moins d'octets,
+   14× plus vite**, et **exactement les mêmes 242 ventes prouvées** (0 manquante,
+   0 en trop : la preuve qu'un jugement métier n'a pas bougé). Cette lecture
+   était écrite **quatre fois** (app, `buildLbcData`, `buildEbayData`,
+   `buildPanelData`) : **77 Mo par tour de panneau**. C'est §4.4 mot pour mot —
+   et c'est de l'**égress**, celui qu'un `select=data` avait déjà crevé (5,7 Go).
+   ⚠️ Le repli `t.item.id` n'existe nulle part chez lui (**704 lignes sur 704**
+   portent `item_id`) : mesuré avant de le retirer, pas supposé.
+2. **`harvest_*_conv_*` : 939 lignes, 4,3 Mo.** Les huit champs dont le panneau
+   se sert tiennent en **994 Ko** — et les messages reviennent **identiques**
+   (629 conversations comparées, 0 différence). Les 3,3 Mo de trop, ce sont les
+   objets utilisateur, l'article et les photos : rien de ce qu'on lit.
+3. ⚠️⚠️ **ET LA VRAIE LENTEUR N'ÉTAIT PAS LÀ.** Mesuré : **26 requêtes,
+   6 198 ms, dont 6 153 ms d'attente réseau (99 %) — et jamais plus d'UNE
+   requête en vol**. Même une lecture qui rend **0 Ko** coûte **536 ms** : ce qui
+   coûte, c'est l'aller-retour, et on en faisait vingt-six à la queue leu leu.
+   Les lectures indépendantes partent maintenant **par six**.
+   ⚠️ **Ce n'est PAS le garde-fou « une par une » (§3)** : celui-là porte sur les
+   requêtes envoyées à **VINTED**, et il ne bouge pas. Ici on lit **notre propre
+   base** — Vinted n'est pas dans la boucle. Ne pas resérialiser en croyant
+   protéger quelque chose.
+   ⚠️ Effet de bord trouvé en mesurant : `isCloisonne()` mémorisait son
+   **résultat**, pas sa **promesse** — tant que les lectures partaient une par
+   une ça ne se voyait pas ; dès qu'elles partent ensemble, **six sondes
+   identiques** partaient avant que la première ne réponde.
+
+**Mesuré après, sur la même base** : `buildPanelData` **21,0 s → 3,8 s**
+(5,6× plus vite), **25,6 Mo → 2,6 Mo** ; `buildLbcData` **21× moins d'octets** ;
+`buildEbayData` **29×**. **Résultat identique partout** — c'est vérifié en
+comparant les files et les `stats` rendues, pas en relisant le code.
+
+⚠️⚠️ **ET LA MESURE A RÉVÉLÉ PIRE QUE LA LENTEUR.** Pendant les essais, la
+lecture des transactions a **échoué une fois** (base sous charge) : le `|| []`
+l'a transformée en « aucune vente prouvée », et la file Leboncoin est passée de
+**40 à 55 paires** — **quinze paires DÉJÀ VENDUES reproposées à la
+publication**, sans un mot. C'est la plainte du 13 septembre ressuscitée par un
+simple timeout, et la **quinzième forme** de « rien lu ne vaut pas rien ».
+⇒ `lireVentesProuvees()` **porte l'échec** (`{echec, vendus}`), les deux files le
+rendent (`preuveKO`), et **les trois écrans le disent** — sans cacher la liste,
+qui reste utile : « je n'ai pas pu vérifier lesquelles sont déjà vendues ».
+**6 échecs** sur le code d'avant.
+
+⚠️ **ET LE PLAFOND DES 1 000 LIGNES ÉTAIT À 61 LIGNES D'ÊTRE FRANCHI.** Mesuré :
+`Content-Range: 0-999/4999` — au-delà de mille, Supabase coupe **sans le dire**
+(§4.5), et `sbGet` ne paginait pas. `harvest_*_conv_*` est à **939**. Le jour où
+il passe, le panneau cesse de voir des offres et des codes de retrait, en
+silence. `sbGetTout` pagine, et **rend `null` si une page échoue** — une
+demi-liste a l'air d'une réponse, c'est pire qu'une lecture ratée.
+⚠️ La pagination est décidée **dans `lire`**, pas dans la liste de
+préchargement : une garantie ne doit pas reposer sur le fait de ne rien oublier.
+
+- `scripts/audit-lectures.cjs` porte les trois règles : aucun blob sur une
+  famille lourde, toute famille qui balaie est paginée, une seule règle de preuve
+  qui porte son échec. **10 échecs** sur le code d'avant.
+- ⚠️ **§4.6 PAYÉ CASH, ENCORE** : `balayeFamille` posé **après** le bloc qui s'en
+  sert → « Cannot access 'balayeFamille' before initialization », et
+  `buildPanelData` mourait. **Aucun audit ne l'a vu** — c'est la comparaison
+  avant/après, qui EXÉCUTE la fonction sur la vraie base, qui l'a attrapée.
+- ⚠️ **Et `audit-panneau.cjs` MOURAIT au lieu de rapporter** (quatrième fois) :
+  l'erreur venait d'une voie de préchargement **non attendue**, donc un rejet non
+  traité qui tue le processus — et, dans la vraie extension, le service worker,
+  en laissant les requêtes suivantes sans réponse **pour toujours**. Une voie qui
+  tombe rend `null` : « je n'ai pas pu lire », que le panneau sait déjà dire.
+- ⚠️ **DEUX de mes bancs servaient une FORME que le code ne sait plus lire**
+  (§6.3) : `audit-places` et `audit-offres-auto` rendaient la ligne BRUTE pour
+  une requête qui demande une projection — donc « aucune vente prouvée » et
+  « aucune offre », en se croyant verts. Ils appliquent maintenant le `select=`
+  pour de vrai.
+- ⚠️ **SEIZIÈME ET DIX-SEPTIÈME fois qu'un de mes contrôles crie au loup** :
+  (1) il traitait `harvest_*_conv_${convId}` — la lecture d'**UNE** conversation
+  par son identifiant — comme un balayage de famille ; (2) il exigeait le nom
+  `sbGetTout` au point d'appel, alors que `lire` pagine lui-même. *Un audit suit
+  la RÈGLE, pas son orthographe* : il suit l'expression jusqu'à sa définition.
+
+### La capture de bordereau : on savait quel chemin marche, et on le jetait
+Troisième point de sa demande du 15 septembre. Relevé du **13 septembre** :
+**`label_url_trouve` 29 contre `label_url_introuvable` 61** — l'URL du PDF est
+introuvable **deux fois sur trois**. `recupererLabel` essaie **trois chemins**
+Vinted l'un après l'autre (`/label_url`, `/shipments/{id}`, `/label_options`) et
+s'arrête au premier qui répond.
+⚠️ **Il calculait `via` — le chemin gagnant — et ne l'enregistrait nulle part.**
+C'est exactement la mesure qui manque pour aller plus vite : sans elle, retirer
+un chemin ou les réordonner serait une **supposition**, et c'est ce que ce projet
+s'interdit. Le chemin gagnant est noté (`label_via_*`), et quand aucun ne donne
+rien on note **les trois statuts HTTP** (`label_ko_statuts_*`) : « Vinted a
+refusé » et « Vinted a répondu sans URL » ne se corrigent pas de la même façon.
+Borné par construction : trois chemins, trois statuts.
+⚠️ **Et je n'ai pas pu mesurer plus loin aujourd'hui** : `panel_diag_capture` a
+été **remise à zéro** (48 compteurs et les deux échantillons le 13, plus rien le
+15 — `majAt` du jour). Le code d'écriture est pourtant correct (il refuse
+d'écrire sur une lecture ratée et garde `rates`). **Ne pas conclure sans la
+cause** : la prochaine session aura les compteurs, et c'est eux qui diront quoi
+changer.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
@@ -1454,7 +1554,7 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | outil | quoi |
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
-| `node scripts/audit-*.cjs` | **31 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `node scripts/audit-*.cjs` | **32 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
 | `scripts/bancs/*.cjs` | les **17 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
@@ -1722,7 +1822,7 @@ script-là me fait croire à une catastrophe.
 src/App.jsx                     l'app (grep avant de lire — le fichier est énorme)
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
-scripts/audit-*.cjs             les 31 audits
+scripts/audit-*.cjs             les 32 audits
 scripts/bancs/                  les 17 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
