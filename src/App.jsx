@@ -12329,6 +12329,29 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // la liste (synchronisée) : ses annonces et ses ventes sont masquées automatiquement
   // tant qu'un futur « Synchroniser » ne le voit pas revenir en ligne.
   const [blockedAccts, setBlockedAccts] = useState(() => new Set((load('vinted_accounts_blocked', []) || []).map(String)));
+  // ⚠️⚠️ CES DEUX LISTES SONT LUES AU MONTAGE, ET LE NUAGE ARRIVE APRÈS.
+  // C'est le défaut de la carte des points relais (§5.49), cette fois sur la
+  // donnée qui dit **quels comptes il a mis de côté**. Mesuré au rendu le
+  // 15 septembre, sur ses vraies données et sur un APPAREIL NEUF — l'état le
+  // plus risqué, celui où rien n'a encore été écrit localement : l'écran
+  // Annonces annonçait **64 en ligne** au premier passage et **63** au second,
+  // et le Tableau de bord l'inverse. Une notion, deux nombres (§11) — et la
+  // cause n'était ni dans l'un ni dans l'autre : le compte `liliand653`, exclu
+  // **dans le nuage**, n'était pas encore connu du navigateur.
+  // ⇒ Rattrapage par `onCloudReady`, comme les numéros et les réglages de la
+  //   carte. ⚠️ Et on ne REMPLACE que ce qui est resté VIDE : sinon une
+  //   exclusion faite pendant le chargement serait écrasée par le nuage — pour
+  //   les numéros ce serait le pire défaut de l'app.
+  // ⚠️ Posé APRÈS les deux `useState` qu'il alimente (§4.6).
+  useEffect(() => onCloudReady(() => {
+    const maj = (cle, set) => set(prev => {
+      if (prev && prev.size) return prev;                 // il a déjà choisi ici
+      const v = new Set((load(cle, []) || []).map(String));
+      return v.size ? v : prev;
+    });
+    maj('vinted_accounts_hidden', setHiddenAccts);
+    maj('vinted_accounts_blocked', setBlockedAccts);
+  }), []);
   // ⚠️ UN 401 N'EST PAS UN COMPTE BLOQUÉ — c'est une session expirée.
   // Les jetons Vinted durent ~2 h et, depuis le passage en profil discret (§5),
   // l'app ne les renouvelle plus en masse : tout compte sur lequel Julien n'est
@@ -23915,8 +23938,17 @@ export default function App() {
   // Résumé « en direct » pour l'écran d'accueil : CA finalisé du mois, ventes en
   // cours, annonces en ligne, messages non lus — agrégés sur tous les comptes,
   // en lecture moissonnée (0 requête Vinted quand la donnée est déjà captée).
+  // ⚠️⚠️ ET CE CALCUL-CI LISAIT AUSSI LES COMPTES EXCLUS DANS LE NAVIGATEUR.
+  // Même défaut, même écran : sur un appareil neuf, `skipAcc` ne savait pas
+  // encore que `liliand653` est exclu (l'information est dans le NUAGE), et le
+  // tableau de bord annonçait **64 annonces en ligne** contre **63** sur
+  // l'écran Annonces. On attend donc que le nuage soit là — ce sont des
+  // réglages SYNCHRONISÉS, pas des réglages d'appareil (§5.49).
+  const [nuagePret, setNuagePret] = useState(() => isCloudReady());
+  useEffect(() => onCloudReady(() => setNuagePret(true)), []);
   useEffect(()=>{
     if(!accountsLoaded || !vintedAccounts || vintedAccounts.length===0) return;
+    if(!nuagePret) return;              // sinon on compte des comptes qu'il a exclus
     let stop=false;
     (async()=>{
       const now=new Date(); const ym=now.getFullYear()*100+now.getMonth();
@@ -23994,10 +24026,13 @@ export default function App() {
           }
           if(st==='cancelled' && inMonth){ refunded.push({ acct:String(a.login||'').toLowerCase(), amount:amt0, title:normTitle(o.title||'') }); }
         }}
-        // « En ligne » compte EXACTEMENT ce que montre l'onglet Annonces : on
-        // retire les paires marquées vendues à la main et celles auto-retirées
-        // parce qu'un email de vente/bordereau les a confirmées vendues. Sinon
-        // le tableau de bord affichait plus d'annonces que la liste elle-même.
+        // « En ligne » compte ce que montre l'onglet Annonces : on retire les
+        // paires marquées vendues à la main et celles confirmées vendues par un
+        // email. ⚠️ Les comptes EXCLUS sont écartés plus haut (`skipAcc`), qui
+        // lit les mêmes listes — et depuis le 15 septembre ces listes passent
+        // par `onCloudReady` des deux côtés : sur un appareil neuf elles
+        // arrivaient APRÈS le premier rendu, et les deux écrans annonçaient
+        // deux nombres (64 et 63, mesuré).
         if(list.ok){ ok=true;
           for(const it of list.items){
             const id=String(it.id);
@@ -24037,7 +24072,7 @@ export default function App() {
       const uidsVivants=new Set((vintedAccounts||[]).map(a=>String(a.vinted_user_id||'')).filter(Boolean));
       try{ const esc=await fetchWalletEscrow(uidsVivants); if(esc&&esc.total>0) enAttenteReel=esc.total; }catch(_){}
       if(!stop && ok){
-        setLiveStats({caMois,caEncaisse,enCours,online,unread,stockValue,pairesStock,ventesJour,caJour,ventesMois,soldTotal,joursVente:joursVenteSet.size});
+      setLiveStats({caMois,caEncaisse,enCours,online,unread,stockValue,pairesStock,ventesJour,caJour,ventesMois,soldTotal,joursVente:joursVenteSet.size});
         // Photo des chiffres pour le WIDGET écran d'accueil : l'app publie ce
         // qu'elle affiche → le widget montre EXACTEMENT la même chose. « Synchroniser »
         // le widget = simplement ouvrir l'app (qui réécrit cette ligne).
@@ -24052,7 +24087,7 @@ export default function App() {
     })();
     return ()=>{stop=true;};
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[accountsLoaded, vintedAccounts]);
+  },[accountsLoaded, vintedAccounts, nuagePret]);
 
   const vintedNotifChecked = React.useRef(false);
   // Le propriétaire des colis à retirer (`pickupUnion`) publie ses comptes ;

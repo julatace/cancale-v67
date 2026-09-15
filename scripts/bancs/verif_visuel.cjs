@@ -12,6 +12,7 @@ const DIST=require('path').join(__dirname,'..','..','dist'), SC=__dirname;
 const FX=f=>JSON.parse(fs.readFileSync(path.join(SC,'fx',f+'.json'),'utf8'));
 const main=FX('main'), accounts=FX('accounts');
 const rows=[...FX('sold'),...FX('purch'),...FX('listings'),...FX('inbox'),...FX('track'),...FX('bord'),...FX('label'),...FX('billing')]; const txn=FX('txn');
+
 // ── LA PROJECTION `select=` DE POSTGREST, honnêtement appliquée ─────────────
 // ⚠️ SANS ÇA, CE BANC MESURE UNE FICTION. Il rendait la ligne BRUTE
 // (`{id,data}`) pour une requête qui demande une projection

@@ -67,12 +67,16 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
   const vieux=Object.keys(parUid).sort((x,y)=>(ages[x]||0)-(ages[y]||0))[0];
   console.log(`fixture : on masque « ${parUid[vieux]} » (le moins frais), comme Julien l'a fait pour liliand653`);
 
-  const lire=async(masque)=>{
+  const lire=async(masque, onglet, nuage)=>{
     const ctx=await b.newContext({viewport:{width:1512,height:950}});
     const pg=await ctx.newPage();
     const errs=[]; pg.on('pageerror',e=>errs.push(e.message));
     await pg.addInitScript((uid)=>{ try{ localStorage.setItem('vrm_acces_direct','1');
-      if(uid) localStorage.setItem('vinted_accounts_hidden', JSON.stringify([uid])); }catch(_){} }, masque);
+      if(uid) localStorage.setItem('vinted_accounts_hidden', JSON.stringify([uid])); }catch(_){} }, nuage?null:masque);
+    // `nuage` = l'exclusion n'existe QUE dans la ligne `main` (le nuage), pas
+    // dans le navigateur : c'est l'état d'un APPAREIL NEUF.
+    if(nuage && masque){ const d=main[0]&&main[0].data; if(d)
+      d.vinted_accounts_hidden=[...new Set([...(d.vinted_accounts_hidden||[]),String(masque)])]; }
     await pg.route('**/rest/v1/**',route=>{const u=route.request().url();
       const j=d=>route.fulfill({status:200,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:JSON.stringify(d)});
       if(route.request().method()!=='GET') return j([]);
@@ -86,17 +90,18 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
         return j(rows.filter(r=>re.test(r.id)).map(r=>projette(r,S)));}
       return j([]);});
     await pg.route('**/api/**',r2=>r2.fulfill({status:200,contentType:'application/json',body:'{"pret":true,"devices":1}'}));
-    await pg.goto('http://localhost:4477/?tab=vintedaccounts',{waitUntil:'domcontentloaded'});
-    await pg.waitForTimeout(4500);
-    if(masque) await pg.screenshot({path:SC+'/z-comptes.png',fullPage:true});
-    const L=(await pg.evaluate(()=>document.body.innerText||'')).split('\n').map(x=>x.trim());
+    await pg.goto('http://localhost:4477/?tab='+(onglet||'vintedaccounts'),{waitUntil:'domcontentloaded'});
+    await pg.waitForTimeout(onglet?6500:4500);
+    if(masque && !onglet) await pg.screenshot({path:SC+'/z-comptes.png',fullPage:true});
+    const brut=await pg.evaluate(()=>document.body.innerText||'');
+    const L=brut.split('\n').map(x=>x.trim());
     const k=L.findIndex(x=>x.startsWith('État des comptes'));
     const tete=k<0?'':L.slice(k,k+6).join(' · ');
     const n=(re)=>{ const m=re.exec(tete); return m?+m[1]:0; };
     const q=L.findIndex(x=>x===parUid[vieux]);
     const carte=q<0?'':L.slice(q,q+5).join(' · ');
     await ctx.close();
-    return { tete, carte, errs,
+    return { tete, carte, errs, txt:brut,
       panne:n(/(\d+) en panne/), exclu:n(/(\d+) exclus? —/), aJour:n(/(\d+) à jour/), rafr:n(/(\d+) à rafraîchir/) };
   };
 
@@ -124,6 +129,38 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
     ap.carte);
   dit(av.errs.length===0 && ap.errs.length===0, "aucune erreur d'app",
     [...av.errs,...ap.errs].slice(0,2).join(' | '));
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // UN COMPTE EXCLU DANS LE NUAGE COMPTE DES LE PREMIER ECRAN
+  // ══════════════════════════════════════════════════════════════════════════
+  // ⚠️⚠️ MESURE AU RENDU LE 15 SEPTEMBRE, SUR SES VRAIES DONNEES : l'ecran
+  // Annonces annoncait « 64 en ligne » et le Tableau de bord « 63 » — une
+  // notion, deux nombres (§11). Ni l'un ni l'autre n'avait tort : le compte
+  // exclu (`liliand653`) est declare dans le NUAGE, et les deux ecrans lisaient
+  // cette liste dans le NAVIGATEUR, au MONTAGE. Sur un appareil neuf elle est
+  // vide — donc le compte exclu comptait, jusqu'a ce qu'un second passage
+  // trouve le localStorage rempli par `cloudLoad`.
+  // C'est §5.49 mot pour mot (la carte des points relais), sur la donnee qui dit
+  // quels comptes il a mis de cote.
+  //
+  // ⚠️ LE CONTROLE NE PEUT SE DECLENCHER QUE SUR LE **PREMIER** ECRAN RENDU :
+  //    des le second, `cloudLoad` a rempli le navigateur et tout s'accorde. On
+  //    ouvre donc DEUX contextes NEUFS, un par ecran. Un banc qui enchainerait
+  //    les onglets dans la meme page serait vert sur le defaut.
+  {
+    console.log('\n── UN COMPTE EXCLU DANS LE NUAGE COMPTE DES LE PREMIER ECRAN');
+    const nAnn = (t) => { const m=/(\d+)\s+en ligne/.exec(t); return m?+m[1]:null; };
+    const nDash = (t) => { const i=t.indexOf('ANNONCES EN LIGNE'); if(i<0) return null;
+      const m=/(\d+)/.exec(t.slice(i,i+40)); return m?+m[1]:null; };
+    const a5 = await lire(vieux, 'cat_annonces', true);
+    const d5 = await lire(vieux, 'dashboard', true);
+    const na = nAnn(a5.txt), nd = nDash(d5.txt);
+    console.log(`    Annonces ${na===null?'—':na} · Tableau de bord ${nd===null?'—':nd}`);
+    dit(na!==null && nd!==null, 'les deux ecrans annoncent un nombre d\'annonces en ligne');
+    if(na!==null && nd!==null)
+      dit(na===nd, 'et le MEME, des le premier ecran ouvert',
+        `Annonces ${na} · Tableau de bord ${nd} — un compte exclu dans le nuage compte encore`);
+  }
 
   await b.close(); srv.close();
   console.log(ko?('\n'+ko+' controle(s) non conforme(s).'):"\nUn compte mis de cote ne se fait plus passer pour une panne.");

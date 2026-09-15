@@ -1734,6 +1734,42 @@ morceaux** (la file · où ça se passe · les photos) et les deux premiers sont
 **légitimement** communs aux trois états. On mesure le recouvrement **relatif** :
 mesuré 13 % · 51 % · 13 % après, contre **100 %** sur le défaut.
 
+### ⚠️⚠️ « 64 EN LIGNE » ET « 63 » — LE COMPTE EXCLU N'ÉTAIT PAS ENCORE ARRIVÉ
+Vu **au rendu, sur ses vraies données** : l'écran Annonces annonçait **64 en
+ligne**, le Tableau de bord **63**. Une notion, deux nombres (§11) — et le
+commentaire du tableau de bord affirmait pourtant, en toutes lettres, « compte
+EXACTEMENT ce que montre l'onglet Annonces ».
+⚠️ **Et ni l'un ni l'autre n'avait tort.** La cause n'était dans aucun des deux
+calculs : le compte **`liliand653`, exclu**, est déclaré **dans le nuage**, et
+les deux écrans lisent cette liste **dans le navigateur, au MONTAGE**
+(`useState(() => load('vinted_accounts_hidden'))`). Sur un **appareil neuf** elle
+est vide — donc le compte exclu compte, jusqu'à ce qu'un second passage trouve
+le `localStorage` rempli par `cloudLoad`. Mesuré : l'écran Annonces rendait
+**64 au premier passage et 63 au second**, et le tableau de bord l'inverse.
+C'est §5.49 mot pour mot (la carte des points relais), sur la donnée qui dit
+**quels comptes il a mis de côté**.
+⇒ Rattrapage par **`onCloudReady`** des deux côtés, et le calcul du tableau de
+bord **attend le nuage** (ce sont des réglages synchronisés, pas des réglages
+d'appareil). ⚠️ On ne remplace que ce qui est resté **VIDE** : sinon une
+exclusion faite pendant le chargement serait écrasée. Mesuré après, sur la vraie
+base : **63 / 63 dans les deux ordres** (avant : 64/63 et 64/63).
+⚠️⚠️ **ET J'AI D'ABORD CORRIGÉ LE SYMPTÔME.** Premier jet : faire *publier* le
+nombre par Annonces et le faire *consommer* par le tableau de bord (le motif de
+`vrm_colis_prets`). Ça marchait dans **un** ordre et pas dans l'autre — et
+surtout ça **figeait un 64 périmé**. *Un écart entre deux écrans n'est pas
+toujours un problème de propriétaire : ici les deux lisaient la même chose, au
+mauvais moment.* Retiré, et la cause corrigée.
+⚠️⚠️ **ET LE CONTRÔLE NE PEUT SE DÉCLENCHER QUE SUR LE PREMIER ÉCRAN RENDU** :
+dès le second, `cloudLoad` a rempli le navigateur et tout s'accorde. Mes deux
+premiers jets enchaînaient les onglets dans la même page — **verts sur le
+défaut**. `comptes.cjs` ouvre donc **deux contextes NEUFS**, un par écran, avec
+l'exclusion déclarée **uniquement dans le nuage**. Sur le code d'avant :
+**Annonces 48 · Tableau de bord 47** — rouge. *Un contrôle qui ne peut pas
+échouer est pire qu'absent.*
+⚠️ **Et j'ai avalé `projette()` en découpant un banc** (§4.11) : le bloc que je
+remplaçais s'étendait jusqu'à la fonction suivante, et `verif_visuel.cjs` est
+mort sur « projette is not defined ». *Une coupe se vérifie sur ce qui RESTE.*
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
