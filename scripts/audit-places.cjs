@@ -201,7 +201,12 @@ function ctxAvec(numeros, txns, lbcItems, exclus, quiEchoue) {
         '202': { numero: '202', title: 'B', mp: { ebay: true } },
         '303': { numero: '303', title: 'C', mp: { ebay: true } },
       };
-      const vendue = [{ id: 'harvest_9001_txn_7', data: { payload: { transaction: { item_id: 101 } } } }];
+      // ⚠️ TROISIÈME FOIS QUE MON BANC SERT UNE FORME QUE LE CODE NE LIT PLUS (§6.3).
+      //    Une ligne txn ne prouve une vente que si Vinted lui a donné un ÉTAT DE
+      //    COMMANDE : **468 des 711 lignes réelles** portent un `status_title`
+      //    VIDE — ce sont des conversations. Servir une ligne sans état, c'est
+      //    servir une conversation et s'étonner qu'elle ne prouve rien.
+      const vendue = [{ id: 'harvest_9001_txn_7', data: { payload: { transaction: { item_id: 101, status_title: 'Commande finalisée' } } } }];
       const r3 = await ctxAvec(tous, vendue).buildEbayData();
       const n3 = (r3.queue || []).map(a2 => String(a2.numero)).sort();
       dit(!n3.includes('101'), 'eBay : une paire PROUVÉE VENDUE n\'entre pas dans la file',
@@ -364,7 +369,12 @@ function ctxAvec(numeros, txns, lbcItems, exclus, quiEchoue) {
       '202': { numero: '202', title: 'B', mp: { lbc: true, ebay: true } },
       '303': { numero: '303', title: 'C', mp: { lbc: true, ebay: true } },
     };
-    const vendue = [{ id: 'harvest_9001_txn_7', data: { payload: { transaction: { item_id: 101 } } } }];
+    // ⚠️ TROISIÈME FOIS QUE MON BANC SERT UNE FORME QUE LE CODE NE LIT PLUS (§6.3).
+      //    Une ligne txn ne prouve une vente que si Vinted lui a donné un ÉTAT DE
+      //    COMMANDE : **468 des 711 lignes réelles** portent un `status_title`
+      //    VIDE — ce sont des conversations. Servir une ligne sans état, c'est
+      //    servir une conversation et s'étonner qu'elle ne prouve rien.
+      const vendue = [{ id: 'harvest_9001_txn_7', data: { payload: { transaction: { item_id: 101, status_title: 'Commande finalisée' } } } }];
     // 1) marche normale : la preuve est lue, 101 sort de la file, rien à signaler.
     const ok = ctxAvec(tous, vendue, null, [], null);
     const rOk = await ok.buildLbcData();

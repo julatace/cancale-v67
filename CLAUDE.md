@@ -1655,6 +1655,61 @@ affichées**, **34 qu'il ne voyait pas** — dont une à **65 €** sur `tomj683
   ne le lit **nulle part**. Projetée : **231 Ko / 1 192 ms → 111 Ko / 402 ms**,
   valeurs identiques (518 lignes × 9 champs, 0 écart).
 
+### ⚠️⚠️⚠️ « CITÉE DANS UNE TRANSACTION » N'EST PAS « VENDUE » — 15 PAIRES ÉCARTÉES
+**Le défaut le plus coûteux de la journée, et il vient de MOI** : `lireVentesProuvees`
+(écrite le 15 septembre) prenait **tout `item_id`** vu dans `harvest_*_txn_*`.
+En vérifiant la FORME (§6) : sur les **711 lignes**, **468 portent `status: 1` et
+un `status_title` VIDE** — ce sont des **conversations**, pas des ventes. Une
+seule annonce en portait **treize** (« salomon XT-6 blanc taille 40 », **toujours
+en ligne**) : treize acheteurs lui ont écrit, aucun n'a acheté.
+⇒ Conséquence sur ses **65 annonces en ligne** : la « preuve » en écartait **15**
+des files Leboncoin et eBay — **quinze paires qu'il a encore**, qu'il ne pouvait
+donc plus publier ailleurs. Avec un vrai état de commande : **zéro**.
+⚠️ **Et c'est ce qui l'a rendue invisible** : sur les **412 annonces FERMÉES** la
+preuve tenait (188 états de vente). Elle avait donc l'air juste partout où on la
+regardait — sauf là où elle coûtait.
+- Une vente est prouvée quand Vinted donne un **état de commande** à la
+  transaction (`status_title` non vide) **et** que cet état ne la fait pas
+  REVENIR (`PAS_UNE_VENTE` : annulée, retour, suspendue, paiement échoué).
+- ⚠️ **On ne liste pas de codes numériques** : un état inconnu demain doit
+  compter comme une **vente**, sinon une paire vendue réapparaît dans la file le
+  jour où Vinted en ajoute un — le défaut que cette preuve corrigeait. L'audit
+  sert exprès « un état que je ne connais pas encore ».
+- La règle est la **même des deux côtés** (`PAS_UNE_VENTE` dans l'app et dans
+  l'extension) : une seule des deux corrigée, et les deux écrans divergent (§11).
+- Mesuré après, sur la vraie base : **file Leboncoin 49 → 64**, panneau
+  **58 → 63 annonces en ligne**, valeur du stock **3 461 → 3 653 €**.
+⚠️ **ET MON AUDIT EST PASSÉ VERT POUR LA MAUVAISE RAISON.** `lireVentesProuvees`
+est **async**, et je ne l'`await`ais pas : `r.vendus` valait `undefined` sur une
+Promise, donc « rien n'est vendu » — les contrôles qui attendent une **absence**
+passaient, seuls ceux qui attendent une présence tombaient. *Un contrôle vert par
+accident est pire qu'absent.* (Et `instanceof Set` est FAUX dans un `vm` : il a
+son propre realm — on teste que l'objet sait répondre `has`, pas sa lignée.)
+⚠️ **TROISIÈME FOIS QUE MON BANC SERT UNE FORME QUE LE CODE NE LIT PLUS** (§6.3) :
+`audit-places.cjs` servait une ligne txn **sans** `status_title` — c'est-à-dire
+une conversation — et s'étonnait qu'elle ne prouve rien. Ses fixtures portent
+l'état.
+
+### ⚠️⚠️ ET LE TITRE DÉSIGNAIT LA MAUVAISE ANNONCE — 5 PAIRES CACHÉES DE L'ÉCRAN
+L'écran Annonces (et le panneau) retiraient une annonce « en ligne » quand une
+vente de moins de 60 jours portait le **même titre**, avec pour seule garde « un
+titre en double ne retire rien ». Mais cette garde comptait les annonces **EN
+LIGNE**, pas les ventes : deux paires identiques, il en vend une, il n'en reste
+qu'une en ligne… donc le titre redevient « unique », et **la paire qu'il a encore
+disparaît**.
+Mesuré sur ses **65 annonces en ligne** : **5 étaient retirées, aucune prouvée
+vendue**. Pour quatre d'entre elles **Vinted dit lui-même** quelle annonce est
+partie — et c'est une **AUTRE** à chaque fois. « Adidas Spezial noir taille 35,5 »
+a **3 ventes**, qui pointent vers 3 annonces différentes : celle qui restait en
+ligne était la **quatrième paire**, bien réelle.
+⇒ C'est §2.4 mot pour mot, et une annonce cachée est une paire qu'il ne peut plus
+numéroter, ni cocher pour Leboncoin, ni tarifer. On retire sur l'**identité**
+(`identiteAnnonce`), jamais sur le titre ; quand l'identité ne dit rien, on ne
+retire pas.
+⚠️ **`onlineTitleN` RESTE** dans l'extension : il sert de garde d'ambiguïté à
+**deux autres endroits**. Le retirer avec la règle du titre aurait tué
+`buildPanelData` en silence — §4.11, *une coupe se vérifie sur ce qui RESTE*.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
@@ -2016,7 +2071,7 @@ n'est en attente de retrait. Ce qui EST mesuré :
   28 juillet) et `panel_ebay_form` est absente : `lbcDiag` et l'enregistrement
   des étapes n'ont jamais tourné.
 ⇒ **Ne pas redéduire une version d'un compteur à zéro.** Le signal fiable est ce
-que le pont annonce, ou une écriture datée. Le zip livré est en **5.61.0**
+que le pont annonce, ou une écriture datée. Le zip livré est en **5.62.0**
 (`public/VRM-extension.zip`) ; `EXT_ATTENDUE` le suit.
 
 ⚠️ **CE QUE LA FILE eBAY DONNERAIT LE JOUR OÙ IL COCHE** (mesuré le 13 septembre,

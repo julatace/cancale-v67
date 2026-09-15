@@ -4066,27 +4066,34 @@ async function buildPanelData() {
   // différence donnait 8 annonces en ligne ici contre 7 dans l'app, sur les
   // mêmes données. Même remarque pour le comptage des titres en double juste
   // après : plus la vue est large, moins on risque de retirer à tort.
-  const soldRecentTitles = new Set();
-  for (const r of soldAll) {
-    for (const o of ((r.data && r.data.payload && r.data.payload.my_orders) || [])) {
-      // Même classement que l'app (`classifyOrderStatus`) : un retour ou une
-      // transaction suspendue n'est PAS une vente aboutie — la paire revient,
-      // son annonce doit rester en ligne.
-      if (/annul|cancel|refus|rembours|retour|suspend/i.test(o.status || '')) continue;
-      const ts = o.date ? Date.parse(o.date) : NaN;
-      if (!isNaN(ts) && (Date.now() - ts) / 86400000 > 60) continue;
-      const k = normT(o.title); if (k) soldRecentTitles.add(k);
-    }
-  }
+  // ⚠️⚠️ ET LE TITRE DÉSIGNAIT LA MAUVAISE ANNONCE. La règle était « une vente
+  // de moins de 60 j dont le titre est UNIQUE parmi les annonces en ligne », avec
+  // pour garde « un titre en double ne retire rien ». Mais cette garde comptait
+  // les annonces EN LIGNE, pas les ventes : deux paires identiques, il en vend
+  // une, il n'en reste qu'une en ligne… donc le titre redevient « unique », et
+  // **la paire qu'il a encore** est retirée.
+  // Mesuré le 15 septembre côté app, sur ses 65 annonces en ligne : **5 étaient
+  // retirées, aucune prouvée vendue**, et pour quatre d'entre elles Vinted dit
+  // lui-même quelle annonce est partie — une AUTRE à chaque fois (« Adidas
+  // Spezial noir taille 35,5 » : 3 ventes, 3 annonces différentes).
+  // ⇒ On retire sur l'IDENTITÉ (`transaction → item_id`), la même règle et le
+  //   même propriétaire que les deux files (§11) — et comme elle porte son
+  //   échec, une lecture ratée ne retire RIEN plutôt que de tout retirer.
+  // ⚠️ `onlineTitleN` RESTE : il sert de garde d'ambiguïté à DEUX autres endroits
+  //    (le rapprochement d'un bordereau et celui d'un email de vente). Le retirer
+  //    avec la règle du titre aurait tué `buildPanelData` en silence — §4.11, une
+  //    coupe se vérifie sur ce qui RESTE.
   const onlineTitleN = {};
   for (const r of lstAll) for (const it of (((r.data && r.data.payload) || {}).items || [])) {
     if (it.is_closed || it.is_hidden || it.is_draft) continue;
     const k = normT(it.title); if (k) onlineTitleN[k] = (onlineTitleN[k] || 0) + 1;
   }
+  const preuveEnLigne = await lireVentesProuvees();
   let removedSold = 0;
   for (let i = online.length - 1; i >= 0; i--) {
-    const o = online[i]; const k = normT(o.title);
-    const vendue = emailSoldIds.has(String(o.id)) || (k && onlineTitleN[k] === 1 && soldRecentTitles.has(k));
+    const o = online[i];
+    const vendue = emailSoldIds.has(String(o.id))
+      || (!preuveEnLigne.echec && preuveEnLigne.vendus.has(String(o.id)));
     if (vendue) { online.splice(i, 1); removedSold++; }
   }
   // ── PRIX DES PAIRES COMPARABLES (peer price) ────────────────────────────────
@@ -5102,11 +5109,35 @@ function mpChoisi(e, place) {
 // ⚠️ Et « rien lu » ne vaut pas « rien » : une lecture ratée rend `null`, et
 //    l'appelant doit pouvoir la distinguer d'une base sans aucune vente — sinon
 //    une file entière se vide sur un timeout.
+// ⚠️⚠️⚠️ ET « CITÉE DANS UNE TRANSACTION » N'EST PAS « VENDUE ». Mesuré le
+// 15 septembre, en vérifiant la FORME (§6) : sur les **711 lignes** de cette
+// famille, **468 portent `status: 1` et un `status_title` VIDE** — ce sont des
+// **conversations**, pas des ventes. Une seule annonce en portait **treize**
+// (« salomon XT-6 blanc taille 40 », toujours en ligne) : treize acheteurs lui
+// ont écrit, aucun n'a acheté.
+// Conséquence, sur ses **65 annonces en ligne** : la « preuve » en écartait
+// **15** des files Leboncoin et eBay — **quinze paires qu'il a encore** et qu'il
+// ne pouvait donc plus publier ailleurs. Avec un vrai statut de commande :
+// **zéro**. (Sur les 412 annonces FERMÉES la preuve tenait : 188 statuts de
+// vente — c'est ce qui l'a rendue invisible.)
+// ⇒ Une vente est prouvée quand Vinted donne un **état de commande** à la
+//   transaction (`status_title` non vide) ET que cet état ne la fait pas
+//   REVENIR (annulée, retour, suspendue, paiement échoué → la paire est là).
+//   On ne liste pas des codes numériques : un code inconnu demain doit compter
+//   comme une vente, pas disparaître — c'est le même sens que
+//   `classifyOrderStatus` côté app.
+const PAS_UNE_VENTE = /annul|cancel|refus|rembours|retour|suspend|[ée]chou/i;
 async function lireVentesProuvees() {
-  const rows = await sbGetTout('app_data?id=like.harvest_*_txn_*&select=it:data->payload->transaction->>item_id');
+  const rows = await sbGetTout('app_data?id=like.harvest_*_txn_*&select=it:data->payload->transaction->>item_id,ti:data->payload->transaction->>status_title');
   if (rows === null) return { echec: true, vendus: new Set() };
   const vendus = new Set();
-  for (const r of rows) { if (r && r.it) vendus.add(String(r.it)); }
+  for (const r of rows) {
+    if (!r || !r.it) continue;
+    const etat = String(r.ti || '').trim();
+    if (!etat) continue;                       // conversation : aucune commande
+    if (PAS_UNE_VENTE.test(etat)) continue;    // la paire revient
+    vendus.add(String(r.it));
+  }
   return { echec: false, vendus };
 }
 
