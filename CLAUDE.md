@@ -1628,6 +1628,28 @@ affichées**, **34 qu'il ne voyait pas** — dont une à **65 €** sur `tomj683
   (`OFFRE_FENETRE_J`), sortait en `ReferenceError`, et **aucun contrôle n'était
   rendu**. Les bornes sont extraites du source, pas recopiées — recopiées, elles
   mesureraient MES chiffres, pas ceux de l'app.
+- ⚠️⚠️ **ET LE MÊME DÉFAUT VIVAIT SUR LE MÊME ÉCRAN, À CÔTÉ.** « N ventes
+  repérées via bordereau, pas encore synchronisées » rapprochait aussi par
+  **titre** — alors que les **deux** côtés portent un n° de **transaction** :
+  mesuré, **165 des 166 bordereaux** le portent et les 385 ventes aussi. Le
+  titre se trompait **dans les deux sens** : il montrait à tort
+  `tx 22155558568` (deux paires dans un même colis, titre composé qui ne
+  correspond à aucune vente) — une **fausse alerte**, et une fausse alerte fait
+  cesser de lire les vraies ; et il en cacherait une vraie dès qu'une paire au
+  même libellé est vendue. `bordereauxPasSynchro` juge sur la transaction ; un
+  bordereau **sans** transaction n'est pas jugé (mieux vaut un blanc qu'un faux).
+  *Chercher l'identité AVANT d'aménager la ressemblance : ici elle était déjà là.*
+- ⚠️ **Et une ligne morte préparait le retour du titre** : `vendus.add('t:'+titre)`
+  alimentait un ensemble que **plus rien ne lisait** — le test par titre avait
+  été retiré, sa ligne d'alimentation était restée. Même famille que le tiroir
+  `Nav` : un relecteur la « rebranche » un jour en croyant réparer un oubli.
+  L'audit refuse qu'un ensemble « vendu » soit alimenté par un titre.
+- ⚠️⚠️ **SIXIÈME FOIS QU'UN DE MES AUDITS MEURT AU LIEU DE RAPPORTER**, et les
+  **deux dernières dans ce fichier même** : charger la règle dans un `vm` ne
+  suffit pas, l'**appeler** peut lever, et le rejet tue le processus **avant le
+  bilan**. Tout appel passe par `essaie()` : ce qui lève devient un contrôle
+  ROUGE. Prouvé en rebasculant les deux règles sur le titre — **3 contrôles
+  rouges et un bilan imprimé**, au lieu d'une pile d'appels.
 - ⚠️ **Et la lecture rapatriait le double de ce qu'elle lit** : `email_offer_*`
   porte `extrait`, le morceau brut de l'email — **102 Ko des 231 Ko** — et l'app
   ne le lit **nulle part**. Projetée : **231 Ko / 1 192 ms → 111 Ko / 402 ms**,
