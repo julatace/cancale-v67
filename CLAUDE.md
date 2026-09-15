@@ -1398,6 +1398,26 @@ préchargement : une garantie ne doit pas reposer sur le fait de ne rien oublier
   `sbGetTout` au point d'appel, alors que `lire` pagine lui-même. *Un audit suit
   la RÈGLE, pas son orthographe* : il suit l'expression jusqu'à sa définition.
 
+### La capture de bordereau : on savait quel chemin marche, et on le jetait
+Troisième point de sa demande du 15 septembre. Relevé du **13 septembre** :
+**`label_url_trouve` 29 contre `label_url_introuvable` 61** — l'URL du PDF est
+introuvable **deux fois sur trois**. `recupererLabel` essaie **trois chemins**
+Vinted l'un après l'autre (`/label_url`, `/shipments/{id}`, `/label_options`) et
+s'arrête au premier qui répond.
+⚠️ **Il calculait `via` — le chemin gagnant — et ne l'enregistrait nulle part.**
+C'est exactement la mesure qui manque pour aller plus vite : sans elle, retirer
+un chemin ou les réordonner serait une **supposition**, et c'est ce que ce projet
+s'interdit. Le chemin gagnant est noté (`label_via_*`), et quand aucun ne donne
+rien on note **les trois statuts HTTP** (`label_ko_statuts_*`) : « Vinted a
+refusé » et « Vinted a répondu sans URL » ne se corrigent pas de la même façon.
+Borné par construction : trois chemins, trois statuts.
+⚠️ **Et je n'ai pas pu mesurer plus loin aujourd'hui** : `panel_diag_capture` a
+été **remise à zéro** (48 compteurs et les deux échantillons le 13, plus rien le
+15 — `majAt` du jour). Le code d'écriture est pourtant correct (il refuse
+d'écrire sur une lecture ratée et garde `rates`). **Ne pas conclure sans la
+cause** : la prochaine session aura les compteurs, et c'est eux qui diront quoi
+changer.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par

@@ -3435,16 +3435,35 @@ async function recupererLabel(acc, uid, tx) {
     // les chemins observés dans `seen_urls` (§5.26), l'un après l'autre, et on
     // GARDE UN ÉCHANTILLON de ce qui revient : c'est comme ça qu'on a fini par
     // comprendre la fiche article (§5.24 → §5.26). Sans mesure, on devinerait.
+    // ⚠️⚠️ ON SAVAIT QUEL CHEMIN MARCHE, ET ON LE JETAIT. `via` était calculé —
+    //    et jamais enregistré nulle part. Or c'est LA mesure qui manque pour
+    //    rendre cette capture plus rapide : relevé du 13 septembre,
+    //    **`label_url_trouve` 29 contre `label_url_introuvable` 61** (l'URL est
+    //    introuvable deux fois sur trois), et rien ne disait **lequel** des trois
+    //    chemins avait répondu quand ça marchait. Sans ça, réordonner ou en
+    //    retirer un serait une supposition — et la supposition est précisément ce
+    //    que ce projet s'interdit. On note donc le chemin gagnant, et le STATUT
+    //    de chacun quand aucun ne donne rien : « Vinted a refusé » et « Vinted a
+    //    répondu sans URL » ne se corrigent pas de la même façon.
     let url = null, via = '';
+    const statuts = [];
     for (const chemin of [`/api/v2/shipments/${shipId}/label_url`, `/api/v2/shipments/${shipId}`, `/api/v2/shipments/${shipId}/label_options`]) {
       const l = await vintedGet(acc, chemin);
       const brut = l && l.json ? JSON.stringify(l.json) : '';
       await echantillonRate('label' + chemin.replace(/^.*\/shipments\/\d+/, '').replace(/\W+/g, '_'), shipId, brut.slice(0, 400));
+      statuts.push(String((l && l.status) || 'sans_reponse'));
       const u = urlDeLabel(l && l.json);
       if (u) { url = u; via = chemin; break; }
     }
-    if (!url) { await noterDiag('label_url_introuvable'); return { ok: false, raison: "Vinted n'a pas donné l'URL du PDF" }; }
+    const nomChemin = (c) => (c.replace(/^.*\/shipments\/\d+/, '').replace(/\W+/g, '_') || '_racine');
+    if (!url) {
+      await noterDiag('label_url_introuvable');
+      // Bornée par construction : trois chemins, trois statuts HTTP.
+      await noterDiag('label_ko_statuts_' + statuts.join('_'));
+      return { ok: false, raison: "Vinted n'a pas donné l'URL du PDF" };
+    }
     await noterDiag('label_url_trouve');
+    await noterDiag('label_via' + nomChemin(via));
     // ⚠️ LE PDF N'EST PAS SERVI PAR VINTED. `label_url` renvoie une URL **S3**
     // (`svc-shipping-labels.s3.eu-central-1.amazonaws.com`) — vérifié dans
     // l'échantillon de diagnostic. Sans `https://*.amazonaws.com/*` dans les

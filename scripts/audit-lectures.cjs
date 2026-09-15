@@ -113,5 +113,26 @@ console.log('\n── ET LA PREUVE DE VENTE NE SE CALCULE QU\'À UN SEUL ENDROIT
     'une lecture ratée deviendrait « aucune vente » : 15 paires vendues reproposées (mesuré le 15 septembre)');
 }
 
+console.log('\n── ET CE QU\'ON A MESURÉ, ON LE GARDE');
+{
+  const bg = sansCommentaires(fs.readFileSync(path.join(racine, 'vinted-sync-extension/background.js'), 'utf8'));
+  // ⚠️⚠️ `recupererLabel` essaie TROIS chemins Vinted l'un après l'autre et
+  // s'arrête au premier qui donne l'URL du PDF. Il calculait `via` — le chemin
+  // gagnant — et ne l'enregistrait NULLE PART. Or c'est la seule mesure qui
+  // permettrait d'en retirer un ou de les réordonner : relevé du 13 septembre,
+  // **`label_url_trouve` 29 contre `label_url_introuvable` 61**, l'URL est
+  // introuvable deux fois sur trois, et rien ne disait lequel répond.
+  // Sans cette trace, accélérer cette capture serait une supposition.
+  const m = /async function recupererLabel\([\s\S]*?\n\}/.exec(bg);
+  dit(!!m, 'la récupération du bordereau est toujours là');
+  if (m) {
+    dit(/via\s*=\s*chemin/.test(m[0]), 'elle sait QUEL chemin a donné l\'URL');
+    dit(/noterDiag\([^)]*via/.test(m[0]), 'et elle l\'ENREGISTRE',
+      'un chemin gagnant calculé puis jeté, c\'est la mesure qui manque pour accélérer');
+    dit(/label_ko_statuts/.test(m[0]), 'et quand aucun ne répond, elle note les statuts',
+      '« Vinted a refusé » et « Vinted a répondu sans URL » ne se corrigent pas pareil');
+  }
+}
+
 console.log(ko ? `\n${ko} contrôle(s) non conforme(s).` : '\nAucune lecture ne rapatrie plus que ce qu\'elle lit.');
 process.exit(ko ? 1 : 0);
