@@ -1583,6 +1583,56 @@ taire renverrait au défaut d'origine (« je l'ai réglé et ça n'a pas tenu »
   remplace que si elle a réussi (c'est le motif `onCloudReady`). Ne pas les
   « corriger ».
 
+### ⚠️⚠️ 135 DE SES 176 OFFRES ÉTAIENT CACHÉES PAR UNE RESSEMBLANCE DE TITRE
+Mesuré le 15 septembre sur sa vraie base : sur ses **176 offres de moins de
+14 jours**, l'accueil n'en montrait que **41**. Les 135 autres disparaissaient
+parce qu'une vente — **n'importe laquelle, n'importe quand, sur n'importe lequel
+de ses neuf comptes** — portait le **même titre**. C'est §5 mot pour mot :
+« 22 % des ventes portent un titre en double, et le titre désignait la MAUVAISE
+annonce dans 3 cas réels ».
+⚠️ **Et l'asymétrie est décisive** : montrer une offre déjà réglée coûte un clic
+sur « ✓ » ; en cacher une vivante lui fait **rater une vente** — la carte dit
+elle-même « une offre acceptée, c'est presque une vente ».
+⚠️ **CHERCHÉ D'ABORD, UNE IDENTITÉ** (§5 l'exige avant de toucher une
+ressemblance) : sur les **518 offres**, `item_id` **0/518**, `transaction`
+**0/518**, `conversation` **0/518** — et les liens de l'email sont des
+redirections `links.vinted.com` en base64 qui ne portent que l'identifiant
+d'invitation, **le même dans tous les emails**. Il n'existe donc **aucun pont
+certain**. On n'échange pas une ressemblance contre une autre : on lui ajoute
+les **contraintes réelles**, celles qui ne se devinent pas.
+| contrainte | pourquoi c'en est une | offres rendues |
+|---|---|---|
+| le **COMPTE** | une offre reçue sur `tomj683` ne peut pas être réglée par une vente sur `angeled92` | **13** |
+| la **CHRONOLOGIE** | une vente ANTÉRIEURE à l'offre ne l'explique pas — il avait donc une seconde paire | **4** |
+| un titre **NON AMBIGU** | « adidas spezial noir taille 35,5 » est porté par **5 transactions** : vendre l'une n'apprend rien sur les offres faites aux autres (§2.4) | **17** |
+⇒ Mesuré après, la VRAIE fonction exécutée sur la vraie base : **42 → 76 offres
+affichées**, **34 qu'il ne voyait pas** — dont une à **65 €** sur `tomj683`.
+- La tolérance de **6 h** n'est pas un réglage fin : elle absorbe le délai de
+  classement de l'email, et mesurée à **6, 24 et 48 h le résultat est
+  identique** (101 mises de côté). À 0 h on en garde 13 de plus.
+- **Aucune vente captée ⇒ on ne cache RIEN** : une lecture vide ne doit pas vider
+  sa liste (« rien lu » ne vaut pas « rien »).
+- ⚠️ **Une liste qui rétrécit sans explication se lit comme une perte** (leçon de
+  l'écran Leboncoin) : la carte dit maintenant combien sont mises de côté et
+  pourquoi. Le chiffre, jamais la promesse.
+- ⚠️ La chaîne vivait **en plein milieu du JSX** — impossible de savoir combien
+  elle rendait sans la recopier (même défaut que les filtres de l'écran Ventes).
+  Elle est dans `offresAtraiter` (§11, un seul propriétaire), et
+  `audit-offres-titre.cjs` l'**exécute** dans un `vm` : il juge ce qu'elle REND.
+  ⚠️ **Prouvé en RÉAFFAIBLISSANT la règle au titre seul** — les trois contrôles
+  passent au rouge. « La fonction n'existe pas sur le code d'avant » n'est PAS
+  une preuve (c'est la leçon d'`estALui`) : ce qu'il faut montrer, c'est que le
+  contrôle attrape la RÈGLE fautive.
+- ⚠️ **CINQUIÈME FOIS QU'UN DE MES AUDITS MEURT AU LIEU DE RAPPORTER**, et je
+  viens de la refaire : le premier jet chargeait la règle **sans ses bornes**
+  (`OFFRE_FENETRE_J`), sortait en `ReferenceError`, et **aucun contrôle n'était
+  rendu**. Les bornes sont extraites du source, pas recopiées — recopiées, elles
+  mesureraient MES chiffres, pas ceux de l'app.
+- ⚠️ **Et la lecture rapatriait le double de ce qu'elle lit** : `email_offer_*`
+  porte `extrait`, le morceau brut de l'email — **102 Ko des 231 Ko** — et l'app
+  ne le lit **nulle part**. Projetée : **231 Ko / 1 192 ms → 111 Ko / 402 ms**,
+  valeurs identiques (518 lignes × 9 champs, 0 écart).
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
@@ -1719,7 +1769,7 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | outil | quoi |
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
-| `node scripts/audit-*.cjs` | **32 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `node scripts/audit-*.cjs` | **33 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
 | `scripts/bancs/*.cjs` | les **18 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
@@ -1987,7 +2037,7 @@ script-là me fait croire à une catastrophe.
 src/App.jsx                     l'app (grep avant de lire — le fichier est énorme)
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
-scripts/audit-*.cjs             les 32 audits
+scripts/audit-*.cjs             les 33 audits
 scripts/bancs/                  les 18 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt

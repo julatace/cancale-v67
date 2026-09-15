@@ -1785,14 +1785,20 @@ const fetchEmailAchats = async () => {
 };
 // Offres reçues (Copilote d'offres) : lignes email_offer_* = { qui, article,
 // montant, buy, net, receivedAt }. Le serveur y met déjà le conseil chiffré.
+// ⚠️ ÉGRESS (§4.4) : la ligne porte `extrait`, le morceau brut de l'email —
+// **102 Ko des 231 Ko** de la famille, et l'app ne le lit NULLE PART. On projette
+// les neuf champs utilisés. Mesuré le 15 septembre : **231 Ko / 1 192 ms →
+// 111 Ko / 402 ms**, valeurs identiques (518 lignes × 9 champs, 0 écart).
+const OFFRE_CHAMPS = ['article', 'receivedAt', 'montant', 'qui', 'uid', 'account', 'buy', 'net', 'type'];
 const fetchEmailOffers = async () => {
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_offer_*&select=id,data`, {
+    const sel = OFFRE_CHAMPS.map((k) => `${k}:data->>${k}`).join(',');
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_offer_*&select=id,${sel}`, {
       headers: sbAuth(),
     });
     if (!res.ok) return [];
     const rows = await res.json();
-    return rows.map(r => r.data).filter(Boolean).sort((a, b) => new Date(b.receivedAt || 0) - new Date(a.receivedAt || 0));
+    return (Array.isArray(rows) ? rows : []).sort((a, b) => new Date(b.receivedAt || 0) - new Date(a.receivedAt || 0));
   } catch (_) { return []; }
 };
 // Emails de VENTE (« X a acheté ton article ») : lignes email_sale_* =
@@ -11050,6 +11056,74 @@ const INV_STATUS = {
 // Normalise un titre pour comparer une annonce et une commande vendue (Vinted
 // renvoie le titre exact de l'article dans les deux). Insensible casse/espaces.
 const normTitle = (t) => (t || '').toLowerCase().replace(/\s+/g, ' ').trim();
+
+// ══════════════════════════════════════════════════════════════════════════════
+// UNE OFFRE NE SE RANGE PAS PAR RESSEMBLANCE DE TITRE (§5)
+// ══════════════════════════════════════════════════════════════════════════════
+// ⚠️⚠️ MESURÉ LE 15 SEPTEMBRE SUR SA VRAIE BASE : sur ses **176 offres de moins
+// de 14 jours**, l'accueil n'en montrait que **41** — **135 étaient cachées par
+// un rapprochement de TITRE**, exactement ce que §5 interdit (« 22 % des ventes
+// portent un titre en double, et le titre désignait la MAUVAISE annonce dans
+// 3 cas réels »). La règle était : *si une vente quelconque porte le même titre,
+// l'offre disparaît*.
+//
+// ⚠️ ET L'ASYMÉTRIE EST DÉCISIVE. Montrer une offre déjà réglée coûte un clic
+//    sur « ✓ » ; en cacher une vivante lui fait **rater une vente** — et la carte
+//    dit elle-même « une offre acceptée, c'est presque une vente ».
+//
+// ⚠️ CHERCHÉ D'ABORD : une IDENTITÉ. Mesuré sur les **518 offres** — `item_id`
+//    0/518, `transaction` 0/518, `conversation` 0/518, et les liens de l'email
+//    sont des redirections `links.vinted.com` en base64 qui ne portent que
+//    l'identifiant d'invitation, **le même dans tous les emails**. Il n'existe
+//    donc AUCUN pont certain. On ne remplace pas la ressemblance par une autre :
+//    on lui ajoute les **contraintes réelles**, celles qui ne se devinent pas.
+//
+//   1. **Le COMPTE** — une offre reçue sur `tomj683` ne peut pas être réglée par
+//      une vente sur `angeled92`. (13 offres rendues.)
+//   2. **La CHRONOLOGIE** — une vente ANTÉRIEURE à l'offre ne l'explique pas.
+//      La tolérance de 6 h n'est pas un réglage fin : elle absorbe le délai de
+//      classement de l'email, et mesuré à 6, 24 et 48 h le résultat est
+//      **identique** (101 cachées). (4 offres rendues.)
+//   3. **Un titre AMBIGU ne désigne rien** — « adidas spezial noir taille 35,5 »
+//      est porté par **5 transactions** : vendre l'une n'apprend rien sur les
+//      offres faites aux autres. C'est « même avec 50 articles identiques, tu ne
+//      dois pas pouvoir te tromper » (§2.4). (17 offres rendues.)
+//
+// Mesuré après : **41 → 75 offres affichées**, 34 qu'il ne voyait pas.
+// ⚠️ La chaîne vivait EN PLEIN MILIEU DU JSX — impossible de savoir combien elle
+//    rendait sans la recopier (même défaut que les filtres de l'écran Ventes).
+//    Elle est ici, une seule fois, et le banc l'exécute.
+const OFFRE_FENETRE_J = 14;          // une offre Vinted expire vite
+const OFFRE_TOLERANCE_H = 6;         // délai de classement de l'email
+const offresAtraiter = (offers, ventes, dejaFaites, cle) => {
+  const vivantes = (ventes || []).filter((o) => o && classifyOrderStatus(o.status) !== 'cancelled');
+  // Index titre → ventes, pour savoir AUSSI si le titre est ambigu.
+  const parTitre = new Map();
+  for (const o of vivantes) {
+    const t = normTitle(o.title); if (!t) continue;
+    if (!parTitre.has(t)) parTitre.set(t, []);
+    parTitre.get(t).push(o);
+  }
+  const limite = Date.now() - OFFRE_FENETRE_J * 86400000;
+  const gardees = [], reglees = [];
+  for (const of of (offers || [])) {
+    if (!of) continue;
+    const recue = of.receivedAt ? new Date(of.receivedAt).getTime() : 0;
+    if (!(recue > limite)) continue;                       // trop vieille : hors sujet
+    if (dejaFaites && dejaFaites.has(cle(of))) continue;   // il l'a marquée traitée
+    const memes = parTitre.get(normTitle(of.article || '')) || [];
+    // Un titre porté par PLUSIEURS transactions ne désigne aucune paire (§5).
+    const txs = new Set(memes.map((o) => String(o.transaction_id)));
+    const reglee = txs.size === 1 && memes.some((o) => {
+      const sur = String((o._acc && o._acc.vinted_user_id) || o._uid || '');
+      if (sur && String(of.uid || '') && sur !== String(of.uid)) return false;   // pas le même compte
+      const vendue = Date.parse(o.date || 0) || 0;
+      return vendue >= recue - OFFRE_TOLERANCE_H * 3600000;                      // pas avant l'offre
+    });
+    (reglee ? reglees : gardees).push(of);
+  }
+  return { gardees, reglees };
+};
 // ── COLIS À RETIRER : UNE SEULE DÉFINITION POUR TOUTE L'APP ─────────────────
 // Le compteur de l'onglet Achats, celui de l'accueil et celui du centre de
 // notifications comptaient chacun à leur façon (l'un « available », l'autre avec
@@ -16486,24 +16560,24 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 Vinted de toute façon (l'app n'envoie pas de message, §5) — ce
                 qu'on veut savoir ici, c'est COMBIEN, et y aller. */}
             {!loading && (offers||[]).length>0 && (()=>{
-              // Une offre ACCEPTÉE sort d'elle-même dès que la vente est
-              // moissonnée. + celles marquées « traité ». + 14 jours max (une
-              // offre Vinted expire vite).
-              const soldTitles = new Set((sales.items||[]).filter(o=>classifyOrderStatus(o.status)!=='cancelled').map(o=>normTitle(o.title)).filter(Boolean));
-              const recent=(offers||[]).filter(o=>{
-                const d=o.receivedAt?new Date(o.receivedAt).getTime():0;
-                if(d < Date.now()-14*86400000) return false;
-                if(offersDone.has(offerKey(o))) return false;
-                if(soldTitles.has(normTitle(o.article||''))) return false;
-                return true;
-              });
+              // ⚠️ LA RÈGLE VIT DANS `offresAtraiter` (§11, un seul propriétaire) :
+              //    elle écarte une offre seulement quand une vente PEUT l'avoir
+              //    réglée — même compte, pas avant l'offre, et un titre qui ne
+              //    désigne qu'une paire. Mesuré : 41 → 75 offres affichées.
+              const { gardees: recent, reglees } = offresAtraiter(offers, sales.items, offersDone, offerKey);
               if(!recent.length) return null;
               return (
                 <div style={{marginTop:10,display:'flex',alignItems:'center',gap:12,padding:'13px 15px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none'}}>
                   <div style={{color:C.accent,display:'flex',flexShrink:0}}><Icon name="tag" size={20}/></div>
                   <div style={{flex:'1 1 120px',minWidth:0}}>
                     <div style={{fontSize:15,fontWeight:700,color:C.text}}>{recent.length} offre{recent.length>1?'s':''} reçue{recent.length>1?'s':''}</div>
-                    <div style={{fontSize:12,color:C.muted,marginTop:2}}>Une offre acceptée, c'est presque une vente.</div>
+                    {/* ⚠️ UNE LISTE QUI RÉTRÉCIT SANS EXPLICATION SE LIT COMME UNE
+                        PERTE (leçon de l'écran Leboncoin). On dit combien sont
+                        mises de côté et POURQUOI — le chiffre, pas la promesse. */}
+                    <div style={{fontSize:12,color:C.muted,marginTop:2}}>
+                      Une offre acceptée, c'est presque une vente.
+                      {reglees.length>0 && ` ${reglees.length} autre${reglees.length>1?'s sont mises':' est mise'} de côté : la paire s'est vendue depuis.`}
+                    </div>
                   </div>
                   <a href="https://www.vinted.fr/inbox" target="_blank" rel="noreferrer"
                      style={{flexShrink:0,textDecoration:'none',fontSize:12.5,fontWeight:700,color:C.onAccent,background:C.accent,borderRadius:8,padding:'8px 12px'}}>Répondre</a>
