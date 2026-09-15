@@ -269,6 +269,52 @@ chercher un colis, donc le perdre. Ne pas réessayer sans une identité nouvelle
   Ils ont leur bloc sur Achats. On dit « à vérifier », **jamais « perdu »** :
   Vinted rembourse souvent tout seul.
 
+### Les codes de retrait, remesurés le 15 septembre — et la photo est IMPOSSIBLE
+Demande de Julien : « les codes de retrait Mondial Relay, Chronopost et Vinted
+Go… je veux qu'il y ait les QR codes, les codes de retrait à chaque fois. Tu
+prends tout ce qu'il y a dans le mail et tu le mets dans l'application. **Si tu
+peux**, tu peux mettre la photo à côté si jamais tu as un numéro de suivi. Mais
+attention, ne fais pas d'erreur. »
+
+**Remesuré sur ses 150 emails de suivi, transporteur par transporteur** :
+
+| transporteur | emails | code | QR | n° de suivi | lieu | date limite |
+|---|---|---|---|---|---|---|
+| Mondial Relay | 93 | **18** | 0 | 91 | 13 | 0 |
+| Chronopost | 46 | 3 (dont 2 casiers à deux codes) | **3 vrais** | 42 | 2 | 3 |
+| Vinted (`shipping@`) | 6 | 0 | 0 | 5 | 0 | 0 |
+| Colissimo | 4 | 0 | 0 | 0 | 0 | 0 |
+| Shop2Shop | 1 | 0 | 0 | 0 | 0 | 0 |
+
+- **19 colis « arrivés au point de retrait »**, dont **15 avec leur code** et
+  **3 avec un vrai code-barres** : c'est déjà ce que l'app affiche. Les
+  **28 `qrUrl`** se réduisent bien à **3** (`/api/barcode/AztecCode|DataMatrix`) ;
+  les 25 autres sont des mouchards et des bannières — `URL_PAS_UN_QR` fait son
+  travail, ne pas l'assouplir.
+- **Vinted Go : AUCUN email dans sa base** (2 mentions en tout, aucune de colis).
+  Le transporteur est pourtant déjà reconnu (`detecterTransporteur` le teste
+  **avant** « vinted », `CARRIERS.vinted` = « Vinted Go ») et `codeRetrait`
+  accepte déjà sa forme `C65735`. **Il n'y a rien à écrire de plus tant qu'un
+  vrai email n'est pas arrivé** — écrire un analyseur pour un format jamais vu,
+  c'est promettre ce qu'on n'a pas mesuré.
+- ⚠️ **La ligne `email_track_chronopost_XW476115185SP` porte toujours
+  `code: "suivant"`** — un mot capté par un ancien motif trop large. Le serveur
+  est corrigé depuis, mais **cette ligne ne sera jamais réécrite** : c'est
+  `codeRetrait` qui l'écarte à l'affichage. Ne pas « nettoyer la base » pour ça.
+- ⚠️⚠️ **LA PHOTO À CÔTÉ DU CODE : MESURÉE IMPOSSIBLE, ET C'EST DÉFINITIF TANT
+  QU'AUCUNE IDENTITÉ N'APPARAÎT.** Sur les **21 emails qui portent un code,
+  ZÉRO** se relie à un bordereau, à un achat ou à une commande Vinted :
+  `artTitle` **0/150**, et sur **134 n° de suivi distincts**, **0/57** se
+  retrouve dans un `email_achat_*` et **1/134** dans les commandes moissonnées.
+  (Le pont existe **dans l'autre sens** — **23 des 134** correspondent à un
+  bordereau, donc à une **vente** : ce sont les colis qu'il ENVOIE, pas ceux
+  qu'il retire.) Mettre une photo à côté d'un code de retrait reviendrait donc à
+  rapprocher par la date ou le point relais — le rapprochement par ressemblance
+  interdit (§5) — et se tromper ici, c'est aller chercher le mauvais colis.
+  **Mieux vaut un blanc qu'un faux.** Ne pas réessayer sans une identité neuve ;
+  celle qui viendra est le code lu dans la **conversation Vinted**
+  (`panel_colis_relais`, extension ≥ 5.45), qui, elle, porte la commande.
+
 ### Les prix d'achat : aucun pont automatique, mesuré
 **Mesuré le 7 septembre**, en cherchant s'il existait un rapprochement CERTAIN
 paire ↔ achat : sur **320 paires numérotées**, seules **4** partagent le nom de
@@ -1770,6 +1816,79 @@ l'exclusion déclarée **uniquement dans le nuage**. Sur le code d'avant :
 remplaçais s'étendait jusqu'à la fonction suivante, et `verif_visuel.cjs` est
 mort sur « projette is not defined ». *Une coupe se vérifie sur ce qui RESTE.*
 
+### ⚠️⚠️ « ÇA IMPRIME DES FOIS EN RECTO VERSO » — ET LA PAGE PORTE TROIS CHOSES
+Demande de Julien, 15 septembre : « quand tu imprimes un bordereau et que tu mets
+tout imprimer, ça imprime des fois en recto verso, je veux juste que ça imprime
+plusieurs feuilles avec un seul bordereau sur chaque feuille », puis
+« **imprimante classique / imprimante thermique** — en thermique c'est simplement
+le bordereau **sans la partie fiche destinataire**, et pub pour les Mondial
+Relay, avec un **tout petit SKU en bas** ».
+
+**MESURÉ AVANT DE CODER, sur ses 148 bordereaux qui portent un PDF** :
+- **tous font UNE seule page A4**, jamais deux — « un bordereau par feuille »
+  n'était donc pas cassé par un PDF multipage ;
+- **67 en paysage** (842×595, Chronopost) et **81 en portrait** (595×842,
+  InPost) — et un lot mélange les deux ;
+- et cette page unique porte **l'étiquette ET la fiche destinataire ET la pub du
+  transporteur**, séparées par une **ligne de découpe (✂)**. C'est ce qu'il
+  décrit mot pour mot, et ça se voit au rendu, pas dans le DOM.
+
+**Ce qui est livré :**
+- **`/Duplex /Simplex`** dans tout PDF produit (`posePrefsImpression`). macOS et
+  Acrobat lisent cette préférence et décochent le recto-verso. ⚠️ **Rien n'est
+  promis pour autant** : un pilote qui force le recto-verso gagne toujours, et
+  l'app **n'a aucun moyen de le vérifier** — elle rappelle où est la case, elle
+  n'affirme pas que ça n'arrivera plus. (C'est le défaut le plus coûteux du
+  projet qui repointait : promettre ce qu'on ne peut pas tenir.)
+- **`zoneEtiquette(PL, page)`** isole l'étiquette : **144 des 148 (97 %)**,
+  **quatre** mises en page, et la zone est **identique** d'un bordereau à l'autre
+  pour une mise en page donnée. Le N° est tamponné **en petit, en bas** —
+  103×153 mm sur Mondial Relay, une étiquette thermique fait 100×150.
+- **Quand on ne SAIT pas, la page part ENTIÈRE**, et l'écran écrit **combien**
+  ont été découpées, combien sont parties entières et **pourquoi**. Une zone
+  devinée de travers, c'est un **code-barres coupé**, donc un colis qui ne part
+  pas — et ça ne se voit qu'au comptoir. *Le chiffre, jamais la promesse.*
+- Le sélecteur vit dans l'onglet Colis, avec **UNE** phrase sous les deux
+  pastilles (§7) : c'est la pastille active qui distingue, pas un texte par ligne.
+- `vrm_imprimante` est un réglage **synchronisé**, donc rattrapé par
+  `onCloudReady` et seulement s'il est resté au défaut (§5.49).
+
+⚠️⚠️ **QUATRE DÉFAUTS TROUVÉS EN REGARDANT LE RENDU, AUCUN DANS LE CODE** (§6.2) :
+1. **Sur un bordereau Colissimo, c'était la MAUVAISE MOITIÉ qui était gardée** —
+   « Comment utiliser votre étiquette » + « Preuve de dépôt », et l'étiquette
+   avec son code-barres partait à la poubelle. *Une liste de mots est une
+   ressemblance, et elle peut désigner le mauvais côté.* ⇒ Une **confirmation
+   indépendante des mots** est exigée : le plus gros aplat (un code-barres est un
+   pavé noir) doit être du côté gardé ; si les deux se contredisent, **on ne
+   découpe pas**. Le repli par cadre écarte aussi tout cadre qui **contient** les
+   mots de la notice — le plus GRAND cadre n'est pas forcément l'étiquette.
+2. **Un chemin PDF porte plusieurs sous-chemins** (`m … l … m … l … S`). Fondus
+   en une seule boîte, un trait de l'étiquette et un trait de la colonne d'à côté
+   n'en formaient qu'un, large de 346 pt : la bande vide était bouchée et
+   **33 bordereaux ressortaient pleine largeur** — donc sans rien retirer.
+3. **Un texte n'est pas un point.** En ne notant que son origine, la carte
+   d'occupation le croit large de zéro : la coupe pouvait tomber **en plein
+   milieu d'une ligne**. Largeur estimée à 0,5 em par caractère, **dans le sens
+   du texte** (les étiquettes en portent à la verticale).
+4. **Un rectangle ne s'écrit pas toujours `re`** : la plupart des générateurs
+   tracent un chemin. Ne lire que `re` rendait la page aveugle à tous ses traits.
+⚠️ **Et un nom de pays coupé net n'était PAS un défaut** : vérifié en recadrant
+large, le bordereau InPost le tronque lui-même. *Avant de « corriger », regarder
+la source.*
+
+- `scripts/audit-impression.cjs` **exécute** le vrai code extrait d'`App.jsx`
+  dans un `vm`, sur de **vrais** PDF : **18 contrôles**, dont « une mise en page
+  inconnue n'est PAS découpée ». `--prouve` réaffaiblit la règle (on découpe même
+  sans savoir) → **3 contrôles au rouge**. « La fonction n'existait pas avant »
+  n'est pas une preuve (§6.1).
+- ⚠️ **QUATRIÈME FOIS QUE MON BANC SERT UNE FORME QUE LE CODE NE LIT PAS** (§6.3),
+  et deux fois dans le même banc : (1) un PDF qu'on vient de construire porte son
+  flux **en objet**, celui qui arrive de Vinted est **compressé** — le banc
+  passait par `save()` puis `load()` après ça ; (2) pdf-lib écrit son texte en
+  **hexadécimal** (`<4669…> Tj`), une forme que `relevePage` ne lisait pas. La
+  deuxième a été corrigée **dans l'app** : une chaîne PDF s'écrit des deux façons,
+  et n'en lire qu'une laisse la page muette.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
@@ -1906,7 +2025,7 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | outil | quoi |
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
-| `node scripts/audit-*.cjs` | **33 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `node scripts/audit-*.cjs` | **34 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
 | `scripts/bancs/*.cjs` | les **18 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
@@ -2174,7 +2293,7 @@ script-là me fait croire à une catastrophe.
 src/App.jsx                     l'app (grep avant de lire — le fichier est énorme)
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
-scripts/audit-*.cjs             les 33 audits
+scripts/audit-*.cjs             les 34 audits
 scripts/bancs/                  les 18 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
