@@ -1418,6 +1418,75 @@ d'écrire sur une lecture ratée et garde `rates`). **Ne pas conclure sans la
 cause** : la prochaine session aura les compteurs, et c'est eux qui diront quoi
 changer.
 
+### ⚠️⚠️ OUVRIR COLIS RETÉLÉCHARGEAIT 1,6 Mo DE PDF — LE CALLER ÉTAIT RESTÉ
+Mesuré le 15 septembre sur sa vraie base, écran par écran : **Colis coûtait
+3 594 Ko**, dont **713 · 482 · 268 Ko** pour trois lectures
+`harvest_{uid}_label_latest&select=data`. Ses **7 lignes `label_latest` pèsent
+1 663 Ko dont 1 658 Ko de `pdfB64` (99,7 %)** — et elles étaient lues **une fois
+par compte à chaque ouverture**, uniquement pour répondre à **deux questions** :
+« y a-t-il un PDF ? » et « de quand date-t-il ? ».
+⚠️ **La version scalaire existait déjà**, avec un commentaire qui interdisait
+exactement ça (« les octets du PDF ne partent qu'à l'impression »). C'est le
+**CALLER** qui n'avait jamais été retiré : *une suppression « terminée » se
+vérifie sur ce qui RESTE* — la leçon du pipeline Factures et du tiroir `Nav`,
+refaite sur l'égress.
+- `fetchLabelFrais` lit deux scalaires avec le filtre `data->>pdfB64=not.is.null`
+  (la **présence** de la ligne vaut « il y a un PDF ») : **1 282 ms / 713 Ko →
+  224 ms / 0 Ko** par compte. Les octets ne partent qu'au clic
+  (`startBordereau`), qui garde `fetchCapturedLabel`.
+- Et les neuf comptes sont interrogés **ensemble** (`Promise.all`). ⚠️ Rien à
+  voir avec le garde-fou « une requête à la fois » : celui-là porte sur ce qu'on
+  envoie à **Vinted**, jamais sur nos propres lectures Supabase.
+- `email_track_*` était lu **3 fois** à l'ouverture de Colis (l'effet de l'écran,
+  celui du changement d'onglet, le centre de notifications) : `cachedRow` partage
+  la requête **en vol**, les deux appels qui doivent voir un changement passent
+  `{force:true}`.
+- `harvest_*_billing` était lu **deux fois** sur Ma journée (les soldes, puis les
+  boosts) : **4 Ko**, mais **710 ms d'aller-retour × 2**. Ici ce n'est pas
+  l'égress qui coûte, c'est le VOYAGE. Même motif, `fetchBillingRows`.
+- Mesuré après : **Colis 3 594 → 1 797 Ko**.
+⚠️⚠️ **ET LE BANC NE POUVAIT PAS LE VOIR, POUR DEUX RAISONS.** (1) Les fixtures
+tronquent `pdfB64` à **quatre caractères** (elles ne montent jamais dans le
+dépôt, §6) : servie ainsi, la lecture fautive coûtait 28 octets — **vert sur le
+défaut**. C'est la leçon de la projection `select=` (§6.3) appliquée au **POIDS** :
+un banc qui ne sert pas le bon **ordre de grandeur** mesure une fiction. Les PDF
+sont regonflés à leur taille mesurée (237 Ko). (2) Le banc **ignorait les
+filtres** de PostgREST : il rendait des lignes que l'app ne verrait jamais.
+⇒ `colis.cjs` compte désormais **les octets de `pdfB64` qui traversent** —
+ouvrir Colis doit en rapatrier **zéro** — et honore `data->>X=(not.)is.null`.
+**1 185 Ko rapatriés** sur le code d'avant.
+⚠️ Et la moitié qui manquerait à un contrôle posé sur les seuls octets : *ne
+rien lire du tout est le moyen le plus simple de ne rien télécharger*. Le banc
+sert donc **deux** `label_latest` fraîches, une seule avec son PDF, et exige que
+le bandeau « tamponner en 1 clic » s'affiche **en nommant le compte dont le PDF
+est là**. Prouvé en retirant le filtre : le bandeau nomme `angeled92`, plus
+frais de 5 min et **sans PDF** — il enverrait tamponner un bordereau qui
+n'existe pas.
+
+### ⚠️⚠️ ET UNE LECTURE RATÉE POUVAIT RESSUSCITER TOUS LES COMPTES SUPPRIMÉS
+**Seizième forme de « rien lu ne vaut pas rien » — et la première dans l'APP qui
+DÉTRUIT.** `vrm_blocked_accounts` est la liste que l'extension lit pour refuser
+de recapter un compte supprimé. Le dossier décrivait ce cas comme corrigé : il
+l'était **du côté qui lit**. C'est l'**app** qui écrit cette liste
+(`deleteVintedAccount`), en **lire-fusionner-réécrire**, et la lecture s'écrivait
+`r.ok ? await r.json() : []`.
+⇒ Un simple timeout — la base debout par ailleurs, donc **l'écriture passe** —
+repartait d'une liste vide et **réécrivait la ligne avec le seul compte du
+moment**. Prouvé au banc sur le code d'avant : la ligne part avec `["333"]`,
+**`shop_cancale` et l'autre compte effacés**. Tous les comptes supprimés avant
+lui redeviennent capturables, **jetons compris** — c'est mot pour mot « il
+revenait tout le temps ».
+*La moitié qui écrit n'avait jamais appris la leçon de la moitié qui lit.*
+- On ne fusionne **que si on a lu** ; sinon on n'écrit pas.
+- Et **on le dit** : la fonction rend `{ok, memo}`, et le message devient
+  « supprimé — mais la base n'a pas répondu pour le mémo. S'il réapparaît,
+  resupprime-le. » Se taire ici, c'est le défaut d'origine.
+- `audit-fusion.cjs` ne s'arrêtait qu'aux onze lire-fusionner-réécrire de
+  l'extension. Il **exécute** maintenant la vraie fonction d'`App.jsx` dans un
+  `vm`, sur le cas qui détruit (**lecture KO, écriture OK** — la panne totale
+  n'est presque jamais le cas dangereux) et dans **l'autre sens**. **3 échecs**
+  sur le code d'avant.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
