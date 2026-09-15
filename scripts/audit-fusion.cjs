@@ -114,6 +114,93 @@ const CAS = [
       w ? JSON.stringify(w.data).slice(0, 90) : 'aucune écriture');
   }
 
+  // ══════════════════════════════════════════════════════════════════════════
+  // ET L'APP AUSSI RÉÉCRIT UNE LIGNE PARTAGÉE : `vrm_blocked_accounts`
+  // ══════════════════════════════════════════════════════════════════════════
+  // Ce fichier vérifiait les ONZE lire-fusionner-réécrire de l'extension, et
+  // s'arrêtait là. Or la liste « ne recapte plus ce compte » n'est pas écrite
+  // par l'extension — elle la LIT. C'est l'APP qui la réécrit, dans
+  // `deleteVintedAccount`, et elle le faisait avec `r.ok ? await r.json() : []` :
+  // une lecture ratée repartait d'une liste vide et **remplaçait la ligne par le
+  // seul compte du moment**. Tous les comptes supprimés avant lui redevenaient
+  // capturables, jetons compris — mot pour mot le cas `shop_cancale`, « il
+  // revenait tout le temps », que le dossier décrivait comme corrigé.
+  // *La moitié qui écrit n'avait jamais appris la leçon de la moitié qui lit.*
+  //
+  // ⚠️ ON EXÉCUTE LA VRAIE FONCTION, extraite d'`App.jsx` dans un `vm` — comme
+  //    `audit-places.cjs` le fait pour les règles de file. Un contrôle posé sur
+  //    l'orthographe (`r.ok ?`) serait vert le jour où quelqu'un réécrit la
+  //    lecture autrement ; ici c'est l'ÉCRITURE PARTIE qu'on regarde.
+  console.log('\n── ET L\'APP : `vrm_blocked_accounts` (lecture KO, écriture OK)');
+  {
+    const APP = fs.readFileSync(path.join(racine, 'src', 'App.jsx'), 'utf8');
+    const m = /const deleteVintedAccount = async[\s\S]*?\n\};/.exec(APP);
+    dit(!!m, 'la suppression de compte est toujours là', m ? '' : '`deleteVintedAccount` introuvable dans App.jsx');
+    if (m) {
+      const lance = async (lectureOK) => {
+        const partis = [];
+        const ctx = {
+          console: { log() {}, warn() {}, error() {} },
+          SUPABASE_URL: 'https://x.test',
+          sbAuth: (h) => ({ ...(h || {}) }),
+          withOwner: (o) => o,
+          fetch: async (url, opts = {}) => {
+            const u = String(url), meth = (opts.method || 'GET').toUpperCase();
+            if (meth === 'POST') {
+              try { JSON.parse(opts.body || '[]').forEach((r) => partis.push(r)); } catch (_) {}
+              return { ok: true, status: 201, json: async () => [], text: async () => '' };
+            }
+            if (meth === 'DELETE') return { ok: true, status: 204, json: async () => [], text: async () => '' };
+            // ⚠️ LA VRAIE FORME DE LA PANNE : un 522 Cloudflare rend du HTML.
+            //    L'ÉCRITURE, elle, passe — c'est le cas qui détruit.
+            if (!lectureOK && /vrm_blocked_accounts/.test(u)) {
+              return { ok: false, status: 522, json: async () => { throw new Error('HTML'); }, text: async () => '<html>522</html>' };
+            }
+            if (/vrm_blocked_accounts/.test(u)) {
+              return { ok: true, status: 200, json: async () => ([{ data: { uids: ['111', '222'], logins: ['shop_cancale', 'ancien2'] } }]) };
+            }
+            return { ok: true, status: 200, json: async () => ([]) };
+          },
+        };
+        ctx.globalThis = ctx;
+        vm.createContext(ctx);
+        vm.runInContext(m[0] + '\nglobalThis.__r = deleteVintedAccount;', ctx, { filename: 'App.jsx' });
+        const res = await ctx.__r('333', 'nouveau');
+        return { partis, res };
+      };
+
+      // 1. Le cas qui détruit : la liste n'a pas pu être lue, l'écriture marche.
+      {
+        const { partis, res } = await lance(false);
+        const w = partis.find((r) => r.id === 'vrm_blocked_accounts');
+        const perdus = w ? ['111', '222'].filter((u) => !((w.data || {}).uids || []).map(String).includes(u)) : [];
+        dit(!w || perdus.length === 0,
+          'une lecture ratée n\'efface pas les comptes déjà supprimés',
+          w ? (perdus.length ? `${perdus.length} compte(s) perdu(s) : la ligne est réécrite avec ${JSON.stringify((w.data || {}).uids)}` : '')
+            : 'aucune écriture — on ne fusionne que ce qu\'on a lu');
+        // ⚠️ ET ON NE SE TAIT PAS : un compte supprimé qui revient sans
+        //    explication est le défaut d'origine. La fonction doit RAPPORTER
+        //    que le mémo n'est pas écrit, sinon l'écran dit « supprimé » tout
+        //    court. C'est « pas su ne vaut pas oui » du côté du message.
+        dit(!!res && res.ok === true && res.memo === false,
+          'et elle DIT que le mémo n\'a pas pu être écrit',
+          `elle rend ${JSON.stringify(res)}`);
+      }
+
+      // 2. L'autre sens : en marche normale, le compte s'ajoute aux anciens.
+      {
+        const { partis, res } = await lance(true);
+        const w = partis.find((r) => r.id === 'vrm_blocked_accounts');
+        const uids = w ? ((w.data || {}).uids || []).map(String) : [];
+        dit(!!w && ['111', '222', '333'].every((u) => uids.includes(u)),
+          'en marche normale, le compte s\'ajoute SANS perdre les anciens',
+          w ? JSON.stringify(uids) : 'aucune écriture — le compte reviendrait');
+        dit(!!res && res.memo === true, 'et le mémo est annoncé comme écrit',
+          `elle rend ${JSON.stringify(res)}`);
+      }
+    }
+  }
+
   console.log(ko ? `\n${ko} contrôle(s) en échec.` : '\nUne lecture ratée n\'efface plus rien.');
   process.exit(ko ? 1 : 0);
 })();

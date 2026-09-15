@@ -1132,24 +1132,42 @@ const fetchVintedAccounts = async () => {
 //  2. supprimer la ligne `vinted_accounts` (les jetons) ;
 //  3. supprimer ses lignes moissonnées `harvest_{uid}_*` — sinon ses annonces
 //     et ses ventes continuent d'alimenter l'app après la « déconnexion ».
+// ⚠️⚠️ SEIZIÈME FORME DE « RIEN LU NE VAUT PAS RIEN » — ET CELLE-CI EST DANS
+// L'APP, SUR LA LISTE QUI DÉCIDE QU'UN COMPTE RESTE SUPPRIMÉ.
+// `vrm_blocked_accounts` se met à jour en **lire-fusionner-réécrire**, et la
+// lecture s'écrivait `r.ok ? await r.json() : []` : un simple timeout — la base
+// debout par ailleurs, donc l'écriture passe — repartait d'un objet VIDE et
+// **réécrivait la ligne entière avec le seul compte du moment**. Tous les
+// comptes supprimés avant lui redevenaient capturables, jetons compris : c'est
+// mot pour mot le cas `shop_cancale`, « il revenait tout le temps » — que le
+// dossier décrit comme corrigé CÔTÉ EXTENSION. L'extension ne réécrit pas cette
+// liste ; l'APP si. La moitié qui écrit n'avait jamais appris la leçon.
+// ⚠️ Le cas qui détruit n'est pas la panne totale (l'écriture échouerait aussi) :
+//    c'est **lecture KO, écriture OK**. `audit-fusion.cjs` sert exactement ça.
+// ⇒ On ne fusionne QUE si on a lu. Sinon on n'écrit pas — et on le DIT, parce
+//    qu'un compte supprimé qui revient sans explication est le défaut d'origine.
 const deleteVintedAccount = async (vintedUserId, login) => {
   const uid = String(vintedUserId || '').trim();
-  if (!uid) return false;
+  if (!uid) return { ok: false, memo: false };
+  let memo = false;                 // le mémo « ne le recapte plus » est-il écrit ?
   try {
     // 1. mémo « supprimé définitivement » (lu par l'extension)
     try {
       const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_blocked_accounts&select=data`, { headers: sbAuth() });
-      const rows = r.ok ? await r.json() : [];
-      const cur = (rows[0] && rows[0].data) || {};
-      const uids = Array.isArray(cur.uids) ? cur.uids.map(String) : [];
-      const logins = Array.isArray(cur.logins) ? cur.logins.map(String) : [];
-      if (!uids.includes(uid)) uids.push(uid);
-      if (login && !logins.includes(String(login))) logins.push(String(login));
-      await fetch(`${SUPABASE_URL}/rest/v1/app_data`, {
-        method: 'POST',
-        headers: sbAuth({ 'Content-Type': 'application/json', Prefer: `resolution=merge-duplicates,return=minimal` }),
-        body: JSON.stringify([withOwner({ id: 'vrm_blocked_accounts', data: { ...cur, uids, logins, note: 'supprimé définitivement depuis l\'app' } })]),
-      });
+      const rows = r.ok ? await r.json() : null;   // `null` = « pas su », jamais « liste vide »
+      if (Array.isArray(rows)) {
+        const cur = (rows[0] && rows[0].data) || {};
+        const uids = Array.isArray(cur.uids) ? cur.uids.map(String) : [];
+        const logins = Array.isArray(cur.logins) ? cur.logins.map(String) : [];
+        if (!uids.includes(uid)) uids.push(uid);
+        if (login && !logins.includes(String(login))) logins.push(String(login));
+        const w = await fetch(`${SUPABASE_URL}/rest/v1/app_data`, {
+          method: 'POST',
+          headers: sbAuth({ 'Content-Type': 'application/json', Prefer: `resolution=merge-duplicates,return=minimal` }),
+          body: JSON.stringify([withOwner({ id: 'vrm_blocked_accounts', data: { ...cur, uids, logins, note: 'supprimé définitivement depuis l\'app' } })]),
+        });
+        memo = !!(w && w.ok);
+      }
     } catch (_) { /* le mémo est un plus : on continue quand même */ }
     // 2. les jetons
     const res = await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${uid}`, {
@@ -1174,8 +1192,8 @@ const deleteVintedAccount = async (vintedUserId, login) => {
         });
       }
     } catch (_) { /* le compte est de toute façon écarté par `accountUids` */ }
-    return res.ok;
-  } catch (_) { return false; }
+    return { ok: res.ok, memo };
+  } catch (_) { return { ok: false, memo }; }
 };
 
 // L'extension ne capture pas toujours le pseudo Vinted (colonne login vide) ->
@@ -1493,7 +1511,17 @@ const fetchEmailsIncompris = async () => {
     return rows.sort((a, b) => String(b.at || '').localeCompare(String(a.at || '')));
   } catch (_) { return []; }
 };
-const fetchEmailTracking = async () => {
+// ⚠️ TROIS EFFETS DEMANDAIENT LA MÊME LISTE EN MÊME TEMPS. Mesuré le
+//    15 septembre à l'ouverture de Colis : `email_track_*` était lu **3 fois**
+//    (l'effet de l'écran, celui du changement d'onglet, celui du centre de
+//    notifications) — trois allers-retours et trois fois l'égress pour la même
+//    réponse. Le motif existait déjà (`cachedRow`, §23) : il partage la requête
+//    EN COURS, pas seulement son résultat.
+// ⚠️ MAIS DEUX APPELANTS LISENT EXPRÈS POUR VOIR UN CHANGEMENT (la boucle qui
+//    réimporte les colis rafraîchit tous les 40 pour faire apparaître les codes).
+//    Un cache les aurait figés sur la vue d'avant — un cache qui ment est pire
+//    qu'un aller-retour de trop. Ils passent donc `{force:true}`.
+const fetchEmailTrackingBrut = async () => {
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_track_*&select=id,data`, {
       headers: sbAuth(),
@@ -1504,16 +1532,35 @@ const fetchEmailTracking = async () => {
       .sort((a, b) => new Date(b.receivedAt || 0) - new Date(a.receivedAt || 0));
   } catch (_) { return []; }
 };
+const fetchEmailTracking = async (opts = {}) => {
+  if (opts.force) _rowCache.delete('email_track');
+  return cachedRow('email_track', fetchEmailTrackingBrut);
+};
 // Solde BLOQUÉ (escrow) de chaque porte-monnaie Vinted, capté par l'extension
 // (lignes harvest_*_billing quand tu ouvres ton porte-monnaie). On somme sur
 // tous les comptes. total=0/accounts=0 si aucun porte-monnaie n'a été capté.
-const fetchWalletEscrow = async (uidsVivants) => {
+// ⚠️ LA MÊME LIGNE LUE DEUX FOIS DANS LA MÊME SECONDE. Mesuré le 15 septembre
+// sur Ma journée : `harvest_*_billing&select=id,data` part **deux fois**, une
+// pour les soldes et une pour les boosts — deux allers-retours de **710 ms**
+// pour **4 Ko** (les dix porte-monnaie tiennent dans quatre kilo-octets : ici
+// ce n'est pas l'égress qui coûte, c'est le VOYAGE). Le motif existait déjà
+// (`cachedRow`, qui partage la promesse EN VOL et pas seulement le résultat) ;
+// les deux lecteurs gardent chacun leur lecture de la donnée, ils se partagent
+// juste l'aller-retour. ⚠️ « Synchroniser » vide ce cache (`viderCacheLignes`).
+const fetchBillingRows = () => cachedRow('billing', async () => {
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_billing&select=id,data`, {
       headers: sbAuth(),
     });
-    if (!res.ok) return { total: 0, dispo: 0, accounts: 0, avecSolde: new Set(), parCompte: [], plusVieuxJours: null };
+    if (!res.ok) return null;              // « rien lu » ne vaut pas « rien »
     const rows = await res.json();
+    return Array.isArray(rows) ? rows : null;
+  } catch (_) { return null; }
+});
+const fetchWalletEscrow = async (uidsVivants) => {
+  try {
+    const rows = await fetchBillingRows();
+    if (rows === null) return { total: 0, dispo: 0, accounts: 0, avecSolde: new Set(), parCompte: [], plusVieuxJours: null };
     let total = 0, accounts = 0, plusVieux = 0, dispo = 0;
     const avecSolde = new Set();   // uid des porte-monnaie RÉELLEMENT lus
     const parCompte = [];          // le DÉTAIL, compte par compte (Julien veut voir le décompte)
@@ -2146,6 +2193,29 @@ const fetchCapturedLabel = async (uid) => {
     return rows[0]?.data || null;
   } catch (_) { return null; }
 };
+// ⚠️⚠️ ET C'EST EXACTEMENT CE QUI SE PASSAIT ENCORE, MESURÉ LE 15 SEPTEMBRE.
+// La version scalaire ci-dessous existait déjà, avec ce commentaire — mais
+// `fetchCapturedLabel` (le blob) était TOUJOURS appelée à l'ouverture de
+// l'écran, une fois par compte, **uniquement pour savoir s'il y a un PDF et de
+// quand il date**. Mesuré sur sa vraie base : ses 7 lignes `label_latest` pèsent
+// **1 663 Ko dont 1 658 Ko de `pdfB64` (99,7 %)** — dont une seule à **713 Ko**.
+// Ouvrir Colis retéléchargeait donc **1,6 Mo de PDF** pour répondre à deux
+// questions qui tiennent dans deux scalaires. Le correctif avait été écrit, le
+// caller pas retiré : *une suppression « terminée » se vérifie sur ce qui
+// RESTE* (la leçon du pipeline Factures, du tiroir `Nav`).
+// ⇒ `fetchLabelFrais` répond aux deux questions sans un octet de PDF :
+//   **1 282 ms / 713 Ko → 224 ms / 0 Ko** par compte. Le filtre
+//   `pdfB64=not.is.null` fait que la PRÉSENCE de la ligne vaut « il y a un PDF » ;
+//   les octets ne partent qu'au clic, dans `startBordereau`.
+const fetchLabelFrais = async (uid) => {
+  if (!uid) return null;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.harvest_${uid}_label_latest&select=capturedAt:data->>capturedAt,tx:data->>tx&data->>pdfB64=not.is.null`, { headers: sbAuth() });
+    if (!res.ok) return null;                     // « pas su » ≠ « pas de PDF »
+    const rows = await res.json();
+    return Array.isArray(rows) && rows[0] ? rows[0] : null;
+  } catch (_) { return null; }
+};
 // ⚠️ ÉGRESS (§34) : la ligne `label_latest` porte le PDF en base64. On lit
 // d'abord les SCALAIRES (quelle vente, quand) pour savoir quoi afficher, et on
 // ne va chercher les octets qu'au moment d'imprimer. Sans ça, ouvrir l'écran
@@ -2343,11 +2413,8 @@ const fetchHarvestPickupPoints = async () => {
 // fusionne, sans doublon. Lecture seule : n'écrase jamais tes saisies manuelles.
 const fetchHarvestBoosts = async () => {
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_billing&select=id,data`, {
-      headers: sbAuth(),
-    });
-    if (!res.ok) return [];
-    const rows = await res.json();
+    const rows = await fetchBillingRows();   // le même aller-retour que les soldes
+    if (rows === null) return [];
     const all = []; const seen = new Set();
     for (const r of rows) for (const b of extractBoosts(r.data && r.data.payload)) {
       const key = (b.itemId || b.title || b.label) + '@' + b.amount + '@' + (b.date || '');
@@ -10664,9 +10731,16 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
     // « masqué » sur tous les appareils alors qu'il était supprimé : c'est la
     // moitié de la confusion « mes comptes sont tous masqués » (§5.09/§5.10).
     setRemoving(acc.vinted_user_id);
-    const ok = await deleteVintedAccount(acc.vinted_user_id, acc.login);
+    const r = await deleteVintedAccount(acc.vinted_user_id, acc.login);
     setRemoving(null);
-    toast(ok ? `« ${accountName(acc)} » supprimé.` : 'Échec de la suppression — réessaie.');
+    // ⚠️ Le mémo « ne le recapte plus » et la suppression des jetons sont DEUX
+    //    choses. Quand le mémo n'a pas pu être écrit (base injoignable), le
+    //    compte est bien parti mais l'extension peut le ramener : on le dit, et
+    //    on dit le geste. Se taire, c'est le défaut d'origine (« je l'ai
+    //    supprimé mais il est toujours là »).
+    toast(!r.ok ? 'Échec de la suppression — réessaie.'
+      : r.memo ? `« ${accountName(acc)} » supprimé.`
+      : `« ${accountName(acc)} » supprimé — mais la base n'a pas répondu pour le mémo. S'il réapparaît, resupprime-le.`);
     setAccounts(prev => prev.filter(a => a.vinted_user_id !== acc.vinted_user_id));
   };
 
@@ -14373,22 +14447,32 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   useEffect(() => { (async () => {
     if (curSub!=='bordereaux' || !accounts.length) return;
     let best = null;
-    for (const a of accounts) {
-      const lbl = await fetchCapturedLabel(a.vinted_user_id);
-      if (lbl && lbl.pdfB64 && lbl.capturedAt) {
+    // ⚠️ SCALAIRES SEULEMENT : on demande « y a-t-il un PDF, et de quand ? »,
+    //    pas le PDF. Les octets ne partent qu'au clic (§34 — mesuré : 1,6 Mo
+    //    retéléchargés à chaque ouverture de cet écran).
+    // ⚠️ Et les neuf comptes sont interrogés ENSEMBLE : ces lectures ne
+    //    dépendent pas les unes des autres, et l'aller-retour coûte plus que la
+    //    donnée. (Rien à voir avec le garde-fou « une par une », qui porte sur
+    //    les requêtes envoyées à VINTED.)
+    const frais = await Promise.all(accounts.map((a) => fetchLabelFrais(a.vinted_user_id)));
+    accounts.forEach((a, i) => {
+      const lbl = frais[i];
+      if (lbl && lbl.capturedAt) {
         const mins = (Date.now()-new Date(lbl.capturedAt).getTime())/60000;
         if (mins < 60 && (!best || mins < best.mins)) best = { acc: a, name: accNameOf(a), mins: Math.max(0, Math.round(mins)) };
       }
-    }
+    });
     setFreshLabel(best);
     // Index par transaction (lecture scalaire, pas les octets du PDF).
     // Tous les bordereaux captés, indexés par transaction (une ligne par colis).
+    // Même chose ici : neuf lectures indépendantes, donc neuf en même temps.
     const idx = {};
-    for (const a of accounts) {
-      for (const meta of await fetchCapturedLabelMetas(a.vinted_user_id)) {
+    const metas = await Promise.all(accounts.map((a) => fetchCapturedLabelMetas(a.vinted_user_id)));
+    accounts.forEach((a, i) => {
+      for (const meta of (metas[i] || [])) {
         if (meta && meta.tx) idx[String(meta.tx)] = { uid: a.vinted_user_id, acc: a, row: meta.id, capturedAt: meta.capturedAt || null, item: meta.item || '' };
       }
-    }
+    });
     setLabelsCaptes(idx);
     setLabelsPrets(true);
   })(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
@@ -14462,9 +14546,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if (ratesDeSuite >= 8) break;
         // Dès que les colis sont passés, on rafraîchit : le QR et le code
         // apparaissent sans attendre la fin du reste.
-        if (i + 1 === nColis || (i + 1) % 40 === 0) { try { const t = await fetchEmailTracking(); if (!mort) setTracking(t); } catch (_) {} }
+        if (i + 1 === nColis || (i + 1) % 40 === 0) { try { const t = await fetchEmailTracking({ force: true }); if (!mort) setTracking(t); } catch (_) {} }
       }
-      if (!mort) { try { const t = await fetchEmailTracking(); if (!mort) setTracking(t); } catch (_) {} }
+      if (!mort) { try { const t = await fetchEmailTracking({ force: true }); if (!mort) setTracking(t); } catch (_) {} }
     })();
     return () => { mort = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -18811,7 +18895,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div style={{fontSize:13,fontWeight:700,color:C.danger}}>Compte « {accNameOf(a)} » bloqué par Vinted</div>
                   <div style={{fontSize:11,color:C.muted,marginTop:1}}>Ses annonces ont été retirées automatiquement (le compte ne répond plus). Tu peux le déconnecter définitivement.</div>
                 </div>
-                <button type="button" onClick={async ()=>{ if(await askConfirm({title:`Déconnecter « ${accNameOf(a)} » ?`, desc:"Ses jetons, ses annonces et ses ventes captées sont supprimés, et l'extension ne le recaptera plus (avant, il revenait tout seul au bout de 10 minutes). À faire pour un compte banni ou fermé. Réversible depuis « Comptes retirés ».", ok:'Déconnecter', cancel:'Annuler', danger:true})){ const ok=await deleteVintedAccount(a.vinted_user_id, a.login); setBlockedAccts(prev=>{ const n=new Set(prev); n.delete(String(a.vinted_user_id)); save('vinted_accounts_blocked',[...n]); return n; }); toast(ok?`« ${accNameOf(a)} » déconnecté — recharge l'app pour le voir disparaître`:'Échec de la déconnexion — réessaie'); } }} style={{flexShrink:0,border:`1px solid ${C.danger}`,background:`${C.danger}14`,color:C.danger,borderRadius:8,padding:'7px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Déconnecter</button>
+                <button type="button" onClick={async ()=>{ if(await askConfirm({title:`Déconnecter « ${accNameOf(a)} » ?`, desc:"Ses jetons, ses annonces et ses ventes captées sont supprimés, et l'extension ne le recaptera plus (avant, il revenait tout seul au bout de 10 minutes). À faire pour un compte banni ou fermé. Réversible depuis « Comptes retirés ».", ok:'Déconnecter', cancel:'Annuler', danger:true})){ const r=await deleteVintedAccount(a.vinted_user_id, a.login); setBlockedAccts(prev=>{ const n=new Set(prev); n.delete(String(a.vinted_user_id)); save('vinted_accounts_blocked',[...n]); return n; }); toast(!r.ok?'Échec de la déconnexion — réessaie':r.memo?`« ${accNameOf(a)} » déconnecté — recharge l'app pour le voir disparaître`:`« ${accNameOf(a)} » déconnecté — mais la base n'a pas répondu pour le mémo. S'il réapparaît, resupprime-le.`); } }} style={{flexShrink:0,border:`1px solid ${C.danger}`,background:`${C.danger}14`,color:C.danger,borderRadius:8,padding:'7px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Déconnecter</button>
               </div>
             ))}
           </div>

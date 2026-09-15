@@ -16,7 +16,54 @@ const fs=require('fs'), http=require('http'), path=require('path');
 const DIST=require('path').join(__dirname,'..','..','dist'), SC=__dirname;
 const FX=f=>JSON.parse(fs.readFileSync(path.join(SC,'fx',f+'.json'),'utf8'));
 const main=FX('main'), accounts=FX('accounts'), txn=FX('txn');
-const rows=[...FX('sold'),...FX('purch'),...FX('listings'),...FX('inbox'),...FX('track'),...FX('bord'),...FX('label'),...FX('billing')];
+
+// ── LA LIGNE `label_latest` PÈSE CE QU'ELLE PÈSE EN VRAI ────────────────────
+// ⚠️⚠️ UN BANC QUI SERT UNE LIGNE LÉGÈRE NE PEUT PAS VOIR UN DÉFAUT D'ÉGRESS.
+// Les fixtures tronquent `pdfB64` à quatre caractères (elles ne montent jamais
+// dans le dépôt, et un PDF pèse). Servie ainsi, la lecture `select=data` qui
+// coûtait **1,6 Mo à chaque ouverture de cet écran** — mesuré le 15 septembre
+// sur sa vraie base : 7 lignes `label_latest`, **1 663 Ko dont 1 658 Ko de
+// `pdfB64` (99,7 %)**, une seule à 713 Ko — ne coûte ici que 28 octets, et le
+// banc serait VERT sur le défaut. C'est la leçon de la projection `select=`
+// (§6.3) appliquée au POIDS : un banc qui ne sert pas le bon ordre de grandeur
+// mesure une fiction. On regonfle donc chaque PDF à sa taille mesurée.
+const PDF_KO = 237;                       // 1 663 Ko / 7 lignes, mesuré
+const MAINTENANT = Date.now();
+const labelRows = FX('label').map((r) => {
+  if (!/_label_latest$/.test(r.id)) return r;
+  const d = { ...(r.data || {}) };
+  if (d.pdfB64) d.pdfB64 = 'JVBERi0'.repeat(Math.ceil((PDF_KO * 1024) / 7));
+  return { ...r, data: d };
+});
+// Deux états qu'il FAUT servir pour que le bandeau « tamponner en 1 clic » soit
+// mesurable : un bordereau frais AVEC son PDF (le bandeau doit s'afficher et
+// nommer CE compte), et un bordereau ENCORE PLUS frais dont le PDF n'est jamais
+// arrivé (la ligne existe, `pdfB64` est vide — Vinted a répondu sans URL, cas
+// mesuré : `label_url_introuvable` 61 contre `label_url_trouve` 29). C'est ce
+// second cas qui PROUVE que le filtre `data->>pdfB64=not.is.null` est appliqué :
+// sans lui le bandeau nomme le mauvais compte, celui qui n'a rien à tamponner.
+const FRAIS = 'harvest_147827838_label_latest';   // julatace3535 — avec son PDF
+const SANS  = 'harvest_3175765377_label_latest';  // angeled92 — PDF jamais arrivé
+labelRows.forEach((r) => {
+  if (r.id === FRAIS) r.data.capturedAt = new Date(MAINTENANT - 7 * 60000).toISOString();
+  if (r.id === SANS) { r.data.capturedAt = new Date(MAINTENANT - 2 * 60000).toISOString(); r.data.pdfB64 = null; }
+});
+const nomDe = (uid) => { const a = accounts.find((x) => String(x.vinted_user_id) === String(uid)); return (a && (a.login || a.username)) || uid; };
+const NOM_FRAIS = nomDe(FRAIS.split('_')[1]), NOM_SANS = nomDe(SANS.split('_')[1]);
+
+// Ce que la page a réellement rapatrié comme octets de PDF.
+const PDF = { octets: 0, ou: [] };
+const pesePdf = (d) => {
+  let n = 0;
+  const voir = (x) => {
+    if (!x || typeof x !== 'object') return;
+    if (Array.isArray(x)) return x.forEach(voir);
+    for (const k in x) { if (k === 'pdfB64' && typeof x[k] === 'string') n += x[k].length; else voir(x[k]); }
+  };
+  voir(d); return n;
+};
+
+const rows=[...FX('sold'),...FX('purch'),...FX('listings'),...FX('inbox'),...FX('track'),...FX('bord'),...labelRows,...FX('billing')];
 const MIME={'.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json','.png':'image/png','.svg':'image/svg+xml','.webmanifest':'application/manifest+json','.zip':'application/zip'};
 const srv=http.createServer((q,r)=>{let f=q.url.split('?')[0]; if(f==='/'||!path.extname(f))f='/index.html';
   const p=path.join(DIST,f); if(!fs.existsSync(p)){r.writeHead(404);return r.end();}
@@ -67,16 +114,25 @@ const attendus=aEnvoyer.filter(o=>parTx[String(o.transaction_id)]).length;
     //    et le banc mesure une page vide en croyant mesurer un écran.
     await p.addInitScript(()=>{try{localStorage.setItem('vrm_acces_direct','1');}catch(_){}});
     await p.route('**/rest/v1/**',route=>{const u=route.request().url();
-    const j=d=>route.fulfill({status:200,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:JSON.stringify(d)});
+    const j=d=>{const n=pesePdf(d); if(n){PDF.octets+=n; PDF.ou.push(decodeURIComponent(u.split('/rest/v1/')[1]||'').slice(0,90));}
+      return route.fulfill({status:200,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:JSON.stringify(d)});};
     if(route.request().method()!=='GET') return j([]);
     if(/select=owner/.test(u)) return route.fulfill({status:400,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:'{"m":1}'});
     const sel=(/[?&]select=([^&]*)/.exec(u)||[])[1]; const S=sel?decodeURIComponent(sel):null;
+    // ⚠️ LE FILTRE COMPTE AUTANT QUE LA PROJECTION (§6.3). PostgREST ne rend que
+    //    les lignes qui passent ses filtres ; `data->>pdfB64=not.is.null` en est
+    //    un. Un banc qui les ignore sert des lignes que l'app ne verrait jamais
+    //    — c'est le même artefact que la ligne BRUTE rendue pour un `select=`.
+    const U=decodeURIComponent(u);
+    const filtres=[...U.matchAll(/[?&]data->>(\w+)=(not\.)?is\.null(?=&|$)/g)].map(x=>({champ:x[1],nul:!x[2]}));
+    const passe=r=>filtres.every(f=>{const v=(r.data||{})[f.champ];
+      const estNul=(v===null||v===undefined||v===''); return f.nul?estNul:!estNul;});
     if(/vinted_accounts/.test(u)) return j(accounts);
-    if(/id=eq\.main/.test(u)) return j(main.map(r=>projette(r,S)));
+    if(/id=eq\.main/.test(u)) return j(main.filter(passe).map(r=>projette(r,S)));
     if(/transaction->>id/.test(u)) return j(txn);
-    const eq=/id=eq\.([^&]*)/.exec(u); if(eq){const k=decodeURIComponent(eq[1]);return j(rows.filter(r=>r.id===k).map(r=>projette(r,S)));}
+    const eq=/id=eq\.([^&]*)/.exec(u); if(eq){const k=decodeURIComponent(eq[1]);return j(rows.filter(r=>r.id===k).filter(passe).map(r=>projette(r,S)));}
     const m=/id=like\.([^&]*)/.exec(u); if(m){const pat=decodeURIComponent(m[1]).replace(/[*%]/g,'.*');const re=new RegExp('^'+pat+'$');
-      return j(rows.filter(r=>re.test(r.id)).map(r=>projette(r,S)));}
+      return j(rows.filter(r=>re.test(r.id)).filter(passe).map(r=>projette(r,S)));}
     return j([]);});
     await p.route('**/api/**',r2=>r2.fulfill({status:200,contentType:'application/json',body:'{"pret":true,"devices":1}'}));
   };
@@ -95,6 +151,47 @@ const attendus=aEnvoyer.filter(o=>parTx[String(o.transaction_id)]).length;
   dit(!/l'extension les récupère/i.test(v.txt) || (mPret&&+mPret[1]>0),
     'l\'app ne demande plus d\'aller les chercher quand elle les a déjà');
   dit(errs.length===0, "aucune erreur d'app", errs.slice(0,2).join(' | '));
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // OUVRIR COLIS NE RAPATRIE PAS UN SEUL OCTET DE PDF
+  // ══════════════════════════════════════════════════════════════════════════
+  // Mesuré le 15 septembre sur sa vraie base : ouvrir cet écran lisait
+  // `harvest_{uid}_label_latest&select=data` UNE FOIS PAR COMPTE — 1 282 ms et
+  // 713 Ko pour le plus gros — alors que les deux seules questions posées sont
+  // « y a-t-il un PDF ? » et « de quand date-t-il ? ». La version scalaire
+  // existait déjà, avec un commentaire qui interdisait exactement ça ; c'est le
+  // CALLER qui n'avait pas été retiré. *Une suppression « terminée » se vérifie
+  // sur ce qui RESTE* — la leçon du pipeline Factures et du tiroir `Nav`.
+  //
+  // ⚠️ CE CONTRÔLE PORTE SUR LES OCTETS, PAS SUR LE NOM DE LA FONCTION : il
+  //    compte ce qui a traversé le réseau. Renommer, déplacer ou réécrire la
+  //    lecture ne peut pas le rendre vert (§6.5) — seul ne pas demander le PDF
+  //    le peut. Les octets ont le droit de partir AU CLIC (`startBordereau`),
+  //    que le banc ne fait pas.
+  const pdfOuverture = PDF.octets;
+  dit(pdfOuverture === 0, 'ouvrir Colis ne télécharge aucun octet de PDF',
+    pdfOuverture ? `${Math.round(pdfOuverture/1024)} Ko rapatriés par ${[...new Set(PDF.ou)].slice(0,2).join(' | ')}`
+                 : `${labelRows.filter(r=>/_label_latest$/.test(r.id)).length} lignes servies à ${PDF_KO} Ko pièce`);
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // ET LE BANDEAU « TAMPONNER EN 1 CLIC » MARCHE TOUJOURS, SUR LE BON COMPTE
+  // ══════════════════════════════════════════════════════════════════════════
+  // La moitié qui manquerait à un contrôle posé seulement sur les octets : ne
+  // rien lire du tout est le moyen le plus simple de ne rien télécharger. Le
+  // bandeau doit donc TOUJOURS s'afficher pour un bordereau frais — et nommer
+  // le compte dont le PDF existe, pas le compte plus frais qui n'en a pas.
+  // C'est la donnée qui déclenche : deux lignes `label_latest` fraîches, une
+  // seule avec son PDF.
+  {
+    const ligne = v.txt.split('\n').map(x=>x.trim()).find(l=>/Bordereau téléchargé il y a/i.test(l)) || '';
+    console.log(`    bandeau frais : ${ligne||'(aucun)'}`);
+    dit(!!ligne, 'un bordereau capté il y a 7 min ouvre le tamponnage en 1 clic',
+      `${NOM_FRAIS} a son PDF — sans ce bandeau, il refait le tamponnage à la main`);
+    dit(!!ligne && ligne.includes(NOM_FRAIS), 'et il nomme le compte dont le PDF est là',
+      `attendu ${NOM_FRAIS}`);
+    dit(!ligne.includes(NOM_SANS), "et jamais celui dont le PDF n'est pas arrivé",
+      `${NOM_SANS} est plus frais de 5 min, mais sa ligne n'a pas de PDF — le filtre l'écarte`);
+  }
 
   // ══════════════════════════════════════════════════════════════════════════
   // MA JOURNÉE NE DOIT PAS ANNONCER MOINS DE BORDEREAUX PRÊTS QUE COLIS
