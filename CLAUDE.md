@@ -1816,6 +1816,67 @@ l'exclusion déclarée **uniquement dans le nuage**. Sur le code d'avant :
 remplaçais s'étendait jusqu'à la fonction suivante, et `verif_visuel.cjs` est
 mort sur « projette is not defined ». *Une coupe se vérifie sur ce qui RESTE.*
 
+### ⚠️⚠️⚠️ « MISE EN LIGNE » — MESURÉ : LA BASE N'EST PAS CLOISONNÉE DU TOUT
+Demande de Julien, 15 septembre : « je veux que tu commences à réfléchir à une
+optique de **mise en ligne** de l'application… que les données coexistent,
+soient bien séparées entre elles, que chaque compte appartienne bien à une
+personne et que chaque donnée appartienne bien à chaque compte, et que tout ne
+se mélange pas. Car ça pourrait avoir de **gros problèmes**. »
+
+**MESURÉ SUR SA VRAIE BASE LE MÊME JOUR — et c'est le point de départ :**
+- **`app_data.owner` N'EXISTE PAS** : `400 « column app_data.owner does not
+  exist »`. La migration `supabase/migrations/001-multi-utilisateurs.sql` n'a
+  **jamais été passée** — ses **5 086 lignes** sont dans un seul tas ;
+- **`vinted_accounts` n'a pas de propriétaire non plus** (9 comptes) ;
+- la clé publique **LIT** (200) **et ÉCRIT** : un `POST` sur `app_data` avec elle
+  seule répond **201** (ligne de sonde supprimée aussitôt) ;
+- et elle **lit `vinted_accounts`**, qui porte `access_token`, `refresh_token`,
+  `csrf_token` — vérifié, elle rend les logins.
+⇒ **Aujourd'hui un second utilisateur ouvrirait SA boutique, et pourrait
+l'effacer.** Ce n'est pas un risque théorique : c'est l'état mesuré.
+
+**Ce qui est de MOI, et qui est fait :**
+- le panneau ne parlait que de la **LECTURE**. Or *lire, c'est regarder ;
+  écrire, c'est remplacer ses numéros de rangement, ses bordereaux, ses comptes
+  — et effacer*. Il décrivait donc le moindre des deux risques, sur l'écran qui
+  sert précisément à décider si ses données sont protégées. Deux sondes de plus,
+  **mesurées vraies aujourd'hui** : l'écriture et les jetons Vinted.
+- ⚠️ **UNE SONDE N'ÉCRIT PAS DANS SA BASE** (§2.3). Le droit d'écriture se teste
+  par un **`PATCH` sur un identifiant qui n'existe pas** : même contrôle de
+  permission, **aucune ligne touchée** — vérifié, 200 + `[]`, et la ligne n'est
+  pas créée. RLS actif sans règle répondrait 401/403.
+- ⚠️ **UNE CAUSE, UNE LIGNE** (§7) : lire, écrire et les jetons, c'est le MÊME
+  verrou manquant. Trois lignes d'alerte se liraient comme trois problèmes —
+  c'est une seule ligne, « Accès sans compte », qui **nomme les trois faits**.
+  Et le verdict global (« cloisonnées ») exige désormais les **quatre** sondes :
+  une base qu'on peut encore écrire n'est pas cloisonnée.
+
+**Ce qui n'appartient qu'à LUI** (il possède les comptes, §« panneau de
+sécurité ») : passer la migration SQL, poser `SUPABASE_SERVICE_KEY` et
+`VRM_OWNER_UID` sur Vercel, et passer le dépôt en privé. Le panneau écrit
+l'ordre exact. **Ne pas le faire à sa place, et ne pas le lui cacher.**
+
+⚠️⚠️ **CE QUE LE BANC A RÉVÉLÉ EN TOMBANT, ET QUI VAUT MIEUX QUE LE BADGE** :
+dès que la colonne existe, **l'app ne montre plus aucune boutique sans
+session** — elle bascule sur l'écran de connexion (`isCloisonne()`). C'est CE
+comportement qui protège un vendeur d'un autre, bien plus qu'un libellé.
+`scripts/bancs/securite.cjs` l'exige donc explicitement, et vérifie qu'**aucune
+donnée ne transparaît** sur cet écran (ni login Vinted, ni montant).
+- Le banc rend **trois états** : base grande ouverte (le sien), base cloisonnée,
+  sondes muettes. **2 échecs** sur le code d'avant (mesurés sur un vrai build
+  d'avant, §6.1).
+- ⚠️ **VINGTIÈME FOIS QU'UN DE MES CONTRÔLES CRIE AU LOUP**, récidive exacte de
+  « télécharg » : j'interdisais les MOTS (« jetons », « effacer ») dans l'état
+  muet — or la phrase honnête **nomme ce qu'elle n'a pas pu mesurer**
+  (« la lecture · l'écriture · les jetons Vinted »), et c'est exactement ce
+  qu'on veut. Ce qui est interdit, c'est l'**AFFIRMATION** qu'un accès est
+  ouvert (« permet encore de »).
+- ⚠️ **Et trois défauts étaient dans mon banc, pas dans l'app** : il servait `[]`
+  à la sonde de lecture (donc « lecture fermée » sur une base grande ouverte,
+  **vert sur le défaut**, §6.3) ; il comptait les écritures **légitimes** de
+  l'app (`widget_stats`) comme des sondes ; et sa « base cloisonnée » répondait
+  401 à **tout**, ce qui simule une panne, pas un cloisonnement.
+
 ### ⚠️⚠️ « ÇA IMPRIME DES FOIS EN RECTO VERSO » — ET LA PAGE PORTE TROIS CHOSES
 Demande de Julien, 15 septembre : « quand tu imprimes un bordereau et que tu mets
 tout imprimer, ça imprime des fois en recto verso, je veux juste que ça imprime
@@ -2026,7 +2087,7 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
 | `node scripts/audit-*.cjs` | **34 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
-| `scripts/bancs/*.cjs` | les **18 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
+| `scripts/bancs/*.cjs` | les **19 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
 **Trois règles de preuve :**
@@ -2294,7 +2355,7 @@ src/App.jsx                     l'app (grep avant de lire — le fichier est én
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
 scripts/audit-*.cjs             les 34 audits
-scripts/bancs/                  les 18 bancs (leur README dit comment les lancer)
+scripts/bancs/                  les 19 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 ```
