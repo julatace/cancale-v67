@@ -23324,7 +23324,7 @@ function SecuriteSetting() {
   //    Seul `ok:true` est une mesure.
   useEffect(() => { fetch('/api/sante').then(r=>r.json()).then(j=>setSrv(j && j.ok === true ? j : null)).catch(()=>setSrv(null)); }, []);
   useEffect(() => { (async () => {
-    const out = { colonne: null, lisibleSansCompte: null, mailAuto: null };
+    const out = { colonne: null, lisibleSansCompte: null, ecritureSansCompte: null, jetonsLisibles: null, mailAuto: null };
     // 1. La colonne `owner` existe-t-elle ? SEUL un 400 « column does not
     //    exist » répond NON. ⚠️ `out.colonne = res.ok` faisait répondre non à
     //    TOUT échec : le 10 septembre, base injoignable (522), ce panneau
@@ -23353,6 +23353,39 @@ function SecuriteSetting() {
       out.lisibleSansCompte = r.ok ? (await r.json()).length > 0
         : ((r.status === 401 || r.status === 403) ? false : null);
     } catch (_) { out.lisibleSansCompte = null; }
+    // 2 bis. ⚠️⚠️ ET LIRE N'EST PAS LE PIRE — MESURÉ LE 15 SEPTEMBRE.
+    //    La clé publique peut aussi ÉCRIRE : un `POST` sur `app_data` avec elle
+    //    seule répond **201**. Lire, c'est regarder ; écrire, c'est remplacer
+    //    ses numéros de rangement, ses bordereaux, ses comptes — et effacer.
+    //    Le panneau ne disait que la lecture : il décrivait donc le moindre des
+    //    deux risques sur l'écran qui sert à décider si ses données sont
+    //    protégées.
+    //    ⚠️ ON NE SONDE PAS EN ÉCRIVANT (§2.3 : aucune ligne de test dans la
+    //    base de production). Un `PATCH` sur un identifiant qui n'existe pas
+    //    passe par le MÊME contrôle de permission et ne touche **aucune ligne**
+    //    — vérifié : 200 et `[]`, et la ligne n'est pas créée. RLS actif sans
+    //    règle répondrait 401/403.
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.__sonde_droits_ecriture__`, {
+        method: 'PATCH',
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+        body: JSON.stringify({ updated_at: new Date().toISOString() }),
+      });
+      out.ecritureSansCompte = r.ok ? true : ((r.status === 401 || r.status === 403) ? false : null);
+    } catch (_) { out.ecritureSansCompte = null; }
+    // 2 ter. ⚠️⚠️ LE PIRE DE TOUS, ET AUCUNE SONDE NE LE REGARDAIT : la table
+    //    `vinted_accounts` porte les JETONS de ses neuf comptes
+    //    (`access_token`, `refresh_token`, `csrf_token`), et la clé publique la
+    //    lit — mesuré, elle répond 200. Qui les a n'a pas besoin de son mot de
+    //    passe : il EST lui sur Vinted. Les trois autres sondes parlaient de
+    //    `app_data` uniquement.
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=id&limit=1`, {
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+      });
+      out.jetonsLisibles = r.ok ? (await r.json()).length > 0
+        : ((r.status === 401 || r.status === 403) ? false : null);
+    } catch (_) { out.jetonsLisibles = null; }
     // 3. Création de compte : faut-il un email de confirmation ? (le serveur de
     //    test Supabase n'en envoie que quelques-uns par heure)
     try {
@@ -23380,9 +23413,14 @@ function SecuriteSetting() {
     </div>
   );
   const s = st || {};
-  const proteges = s.colonne === true && s.lisibleSansCompte === false;
+  // ⚠️ LE VERDICT PORTE SUR LES QUATRE, pas sur la lecture seule : une base
+  // qu'on peut encore ÉCRIRE, ou dont les jetons Vinted se lisent, n'est pas
+  // cloisonnée — même si `app_data` finissait par se fermer en lecture.
+  const proteges = s.colonne === true && s.lisibleSansCompte === false
+    && s.ecritureSansCompte === false && s.jetonsLisibles === false;
   // « Je ne sais pas » n'est ni « cloisonnées » ni « partagées ».
-  const sondeInconnue = s.colonne == null || s.lisibleSansCompte == null;
+  const sondeInconnue = s.colonne == null || s.lisibleSansCompte == null
+    || s.ecritureSansCompte == null || s.jetonsLisibles == null;
   return (
     <div style={{border:`1px solid ${proteges || sondeInconnue ? C.border : C.warn + '66'}`,background:C.card,borderRadius:10,padding:'12px 14px'}}>
       <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:2}}>
@@ -23403,11 +23441,38 @@ function SecuriteSetting() {
             style={{marginTop:7,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'6px 10px',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
             {copie==='sql' ? '✓ Copié — colle-le dans Supabase → SQL Editor' : <span style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="doc" size={12}/>Copier la migration SQL</span>}
           </button>)}/>
-      <Ligne t="Lecture sans compte" ok={s.lisibleSansCompte == null ? null : s.lisibleSansCompte === false}
-        etat={s.lisibleSansCompte == null ? 'pas encore vérifié' : s.lisibleSansCompte ? 'tout est lisible' : 'fermée'}
-        d={s.lisibleSansCompte == null ? PAS_SU : s.lisibleSansCompte
-          ? "La clé publique, visible dans le code, suffit encore à tout lire. C'est le verrou qui compte vraiment (RLS) — la colonne seule ne protège rien."
-          : "La clé publique ne ramène plus rien : seule une session identifiée lit tes données."}/>
+      {/* ⚠️ UNE CAUSE, UNE LIGNE (§7). Lire, écrire et les jetons Vinted, c'est
+          le MÊME verrou manquant (RLS) : trois lignes d'alerte pour un seul
+          geste se liraient comme trois problèmes. Mais les trois faits sont
+          DIFFÉRENTS — écrire, c'est remplacer et effacer ; les jetons, c'est
+          être lui sur Vinted — donc la ligne les dit tous les trois, mesurés.
+          ⚠️ Et chacun garde ses trois états : une sonde qui n'a pas répondu ne
+          doit ni accuser ni rassurer. */}
+      {(() => {
+        const su = [s.lisibleSansCompte, s.ecritureSansCompte, s.jetonsLisibles];
+        const inconnu = su.some((v) => v == null);
+        const ouverts = [
+          s.lisibleSansCompte === true ? 'tout lire' : null,
+          s.ecritureSansCompte === true ? 'tout écrire et effacer' : null,
+          s.jetonsLisibles === true ? 'lire les jetons de tes comptes Vinted' : null,
+        ].filter(Boolean);
+        // Ce qui n'a pas pu être mesuré est nommé, jamais compté comme fermé.
+        const pasSus = [
+          s.lisibleSansCompte == null ? 'la lecture' : null,
+          s.ecritureSansCompte == null ? 'l’écriture' : null,
+          s.jetonsLisibles == null ? 'les jetons Vinted' : null,
+        ].filter(Boolean);
+        return (
+          <Ligne t="Accès sans compte"
+            ok={inconnu ? null : ouverts.length === 0}
+            etat={inconnu ? 'pas encore vérifié' : ouverts.length === 0 ? 'fermé' : ouverts.length === 3 ? 'tout est ouvert' : 'partiellement ouvert'}
+            d={inconnu
+              ? `${PAS_SU} (${pasSus.join(' · ')})`
+              : ouverts.length === 0
+                ? "La clé publique ne ramène plus rien et n'écrit plus rien : seule une session identifiée touche tes données."
+                : <>La clé publique — celle qui est <b>visible dans le code de la page</b> — permet encore de <b>{ouverts.join(', ')}</b>. C'est le verrou qui compte vraiment (RLS) : la colonne seule ne protège rien.{s.jetonsLisibles === true ? <> Un jeton Vinted vaut le compte lui-même : pas besoin de ton mot de passe.</> : null}</>}/>
+        );
+      })()}
       <Ligne t="Création de compte" ok={s.mailAuto == null ? null : s.mailAuto === true}
         etat={s.mailAuto == null ? 'pas encore vérifié' : s.mailAuto ? 'immédiate' : 'email de confirmation exigé'}
         d={s.mailAuto == null ? PAS_SU : s.mailAuto ? "Un nouveau compte est utilisable tout de suite."
