@@ -1533,6 +1533,56 @@ revenait tout le temps ».
   n'est presque jamais le cas dangereux) et dans **l'autre sens**. **3 échecs**
   sur le code d'avant.
 
+### ⚠️⚠️ ET QUATRE PANNEAUX DE RÉGLAGES EFFAÇAIENT CE QU'ILS N'AVAIENT PAS LU
+**Dix-septième forme de « rien lu ne vaut pas rien », et la première qui frappe
+quatre écrans d'un coup.** Chacun lit sa ligne puis la **réécrit ENTIÈRE** au
+premier réglage touché, et tous traitaient une lecture ratée comme « vide » :
+
+| ligne | ce qu'il perd si la base hoquette pendant qu'il ouvre Réglages |
+|---|---|
+| `vrm_email_owners` | **toutes ses adresses de réception**. C'est l'adresse d'arrivée qui décide à quel vendeur appartient un email (§5) : les bordereaux, ventes et suivis suivants partent en quarantaine. Et l'écran affirmait **« Aucune adresse déclarée »** — une affirmation sur l'attribution de ses emails, faite sur une mesure qui n'a pas eu lieu. |
+| `push_prefs` | mesuré : **5 préférences, toutes à `true`**. Un basculement après une lecture ratée réécrit la ligne avec **une seule clé** (prouvé au banc : `{"suivi":true}`) ; les quatre autres retombent sur leur défaut, dont certains à `false` — **il cesse d'être prévenu**, sans rien voir. |
+| `vrm_pro_facture` | **l'entité du reçu comptable** (raison sociale, adresse, SIRET). Le formulaire s'affichait VIDE, et la première frappe l'écrivait : le reçu redit « Ma boutique », ce que le dossier décrit comme un défaut de plusieurs mois. |
+| `vrm_email_config` | l'écran affichait **la date du jour** alors que le vrai réglage est le **10 juillet** (mesuré). Il lit « les emails ne sont pris en compte qu'à partir du 15 septembre » et croit avoir perdu deux mois. Un mensonge d'affichage sur un écran de RÉGLAGES — et s'il « corrige » le champ, il l'écrit pour de bon. |
+
+Deux d'entre eux n'avaient **aucun `res.ok`** : sur un 522 Cloudflare `res.json()`
+lève, et le `catch` posait les valeurs par défaut en annonçant que tout allait
+bien. Les deux autres écrivaient `r.ok ? await r.json() : []`.
+⇒ **Trois états, jamais deux** — comme la sonde du panneau de sécurité et
+`extSait` : `undefined` = en cours · `null` = **pas su** · un objet = lu.
+`lireReglage(id)` porte la règle pour les quatre (§11), on n'écrit rien tant
+qu'on n'a pas lu, et l'écran le **DIT** avec le geste (`REGLAGE_PAS_LU`) — se
+taire renverrait au défaut d'origine (« je l'ai réglé et ça n'a pas tenu »).
+- ⚠️ **`null` pour « en cours » ET pour « échec » faisait dire « Chargement… »
+  pour toujours** à un panneau qui avait échoué. Deux états ne suffisent pas.
+- ⚠️ **Le cas qui détruit n'est pas la panne totale** (l'écriture échouerait
+  aussi) : c'est **lecture KO, écriture OK**. `scripts/bancs/reglages.cjs` sert
+  exactement ça — seules ces quatre lignes échouent, la base debout par ailleurs
+  — puis **CLIQUE** et exige que **zéro** écriture parte. **11 échecs** sur le
+  code d'avant, dont `push_prefs ← {"suivi":true}`.
+- ⚠️⚠️ **ET MON PREMIER RENDU DISAIT LA MÊME CHOSE QUATRE FOIS.** Vu en capture :
+  les quatre panneaux portaient chacun le même paragraphe de **190 caractères** —
+  quatre alertes pour **une** cause, sur un écran qu'il faut déjà faire défiler.
+  C'est §7 mot pour mot : le défaut de Ma journée (« la panne dite trois fois »)
+  et des six « saisis tes prix d'achat », refait le jour même.
+  ⇒ Même forme que `BaseInjoignable` : **le bloc UNE fois en haut de Réglages**,
+  qui **nomme** les panneaux touchés (sur un écran qui défile, « un réglage » ne
+  dit pas lequel regarder) ; sur le panneau il ne reste qu'une **pastille grise**
+  — c'est elle qui distingue, pas le libellé. Le banc **compte** : bloc ×1,
+  pastille ≤ 1 par panneau.
+- ⚠️ **Et il vérifie l'autre sens** : *ne rien écrire du tout est le moyen le
+  plus simple de ne rien écraser*. En marche normale le banc clique pour de vrai
+  et exige que l'écriture parte **avec les cinq clés**.
+- ⚠️ **DIX-HUITIÈME fois qu'un de mes contrôles crie au loup**, et c'est la
+  récidive des `href` de `panne.cjs` : la date d'import est un
+  `<input type="date">` et la raison sociale un `<input>` — **leur valeur n'est
+  pas dans `innerText`**. Le banc les déclarait absentes sur une app intacte. On
+  lit ce qui est RENDU, pas ce qui est écrit en toutes lettres.
+- **Vérifié, et laissés tels quels** : `vrm_local` et `vrm_room` ne sont PAS
+  concernés — leur état vient du `localStorage` et la lecture du nuage ne le
+  remplace que si elle a réussi (c'est le motif `onCloudReady`). Ne pas les
+  « corriger ».
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
@@ -1670,7 +1720,7 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
 | `node scripts/audit-*.cjs` | **32 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
-| `scripts/bancs/*.cjs` | les **17 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
+| `scripts/bancs/*.cjs` | les **18 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
 **Trois règles de preuve :**
@@ -1938,7 +1988,7 @@ src/App.jsx                     l'app (grep avant de lire — le fichier est én
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
 scripts/audit-*.cjs             les 32 audits
-scripts/bancs/                  les 17 bancs (leur README dit comment les lancer)
+scripts/bancs/                  les 18 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 ```

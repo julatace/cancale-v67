@@ -1309,6 +1309,74 @@ const cachedRow = (cle, chercher) => {
 };
 const viderCacheLignes = () => _rowCache.clear();   // bouton « Synchroniser »
 
+// ══════════════════════════════════════════════════════════════════════════════
+// UNE LIGNE DE RÉGLAGES SE LIT EN TROIS ÉTATS — JAMAIS DEUX
+// ══════════════════════════════════════════════════════════════════════════════
+// ⚠️⚠️ DIX-SEPTIÈME FORME DE « RIEN LU NE VAUT PAS RIEN », ET LA PREMIÈRE QUI
+// FRAPPE **QUATRE** PANNEAUX DE RÉGLAGES D'UN COUP. Chacun lisait sa ligne puis
+// la RÉÉCRIT ENTIÈRE au premier réglage touché — et tous traitaient une lecture
+// ratée comme « vide » :
+//   · `vrm_email_owners`  `r.ok ? … : []`  → **toutes ses adresses de réception**
+//     disparaissent. C'est l'adresse de RÉCEPTION qui décide à quel vendeur
+//     appartient un email (§5) : les emails Vinted suivants ne sont plus
+//     attribués et partent en quarantaine.
+//   · `push_prefs`        `r.ok ? … : []`  → mesuré : **5 préférences**, toutes
+//     à `true`. Un basculement après une lecture ratée en réécrit **une** ; les
+//     quatre autres retombent sur leur défaut, dont certains à `false` — il
+//     cesse d'être prévenu, sans rien voir.
+//   · `vrm_pro_facture`   aucun `res.ok`   → **l'entité de facturation** (raison
+//     sociale, adresse, SIRET) revient aux valeurs vides, et le reçu d'achat
+//     qui part chez son comptable redit « Ma boutique » (§5).
+//   · `vrm_email_config`  aucun `res.ok`   → l'écran affiche **la date du jour**
+//     alors que le vrai réglage est le **10 juillet** (mesuré). Il lit « les
+//     emails ne sont pris en compte qu'à partir du 15 septembre » et croit avoir
+//     perdu deux mois d'emails. Un mensonge d'affichage, sur un écran de
+//     réglages.
+//
+// ⚠️ Le cas qui détruit n'est PAS la panne totale (l'écriture échouerait aussi) :
+//    c'est **lecture KO, écriture OK** — un hoquet pendant qu'il ouvre Réglages.
+//    Même famille que `push_subs`, `vrm_blocked_accounts` et les onze fusions de
+//    l'extension.
+// ⇒ Trois états, comme la sonde du panneau de sécurité et `extSait` :
+//      `null` = **pas su** (la base n'a pas répondu) — on n'écrit RIEN par-dessus
+//      `{}`   = elle a répondu, la ligne n'existe pas encore
+//      `{…}`  = elle a répondu
+//    et l'écran le DIT, avec le geste — se taire renverrait au défaut d'origine.
+const lireReglage = async (id) => {
+  const rendre = (v) => { noterReglage(id, v === null); return v; };
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}&select=data`, { headers: sbAuth() });
+    if (!res.ok) return rendre(null);
+    const rows = await res.json();
+    if (!Array.isArray(rows)) return rendre(null);   // un 522 Cloudflare rend du HTML
+    return rendre((rows[0] && rows[0].data) || {});
+  } catch (_) { return rendre(null); }
+};
+// ⚠️⚠️ ET LA PHRASE NE S'ÉCRIT QU'UNE FOIS (§7). Vu au rendu le 15 septembre,
+// dans l'état « lecture ratée » : les QUATRE panneaux affichaient chacun le même
+// paragraphe de 190 caractères — **quatre alertes pour une seule cause**, sur un
+// écran qu'il faut déjà faire défiler. C'est mot pour mot le défaut de Ma journée
+// (« la panne dite trois fois ») et des six « saisis tes prix d'achat ».
+// ⇒ Même forme que `BaseInjoignable` : **le bloc une fois en haut de Réglages**,
+//   qui NOMME les panneaux touchés, et sur le panneau lui-même il ne reste que
+//   ce qui distingue — une pastille grise. Se taire sur le panneau serait pire
+//   (il lirait un formulaire vide sans savoir pourquoi).
+const REGLAGE_PAS_LU = 'réglage pas lu';
+const _reglagesRates = new Map();          // id -> nom lisible
+const _reglagesEcoute = new Set();
+const NOM_REGLAGE = {
+  push_prefs: 'les notifications',
+  vrm_email_config: "la date d'import des emails",
+  vrm_pro_facture: 'la facturation Pro',
+  vrm_email_owners: 'tes adresses de réception',
+};
+const _direReglages = () => { _reglagesEcoute.forEach((f) => { try { f(); } catch (_) {} }); };
+const noterReglage = (id, rate) => {
+  const avant = _reglagesRates.has(id);
+  if (rate) _reglagesRates.set(id, NOM_REGLAGE[id] || id); else _reglagesRates.delete(id);
+  if (avant !== _reglagesRates.has(id)) _direReglages();
+};
+
 const fetchHarvest = async (uid, type, opts = {}) => {
   if (!uid) return null;
   if (opts.force) _rowCache.delete(`h:${uid}:${type}`);
@@ -21848,7 +21916,10 @@ const PUSH_CATS = [
   { id:'facture',  def:false, titre:'🧾 Facture',           desc:'Facture préparée ou envoyée.' },
 ];
 function PushPrefsSetting({ comptes }) {
-  const [prefs, setPrefs] = useState(null);
+  // ⚠️ TROIS ÉTATS : `undefined` = en cours de lecture · `null` = la base n'a
+  //    pas répondu · un objet = lu. Confondre les deux premiers ferait dire
+  //    « Chargement… » pour toujours à un panneau qui a ÉCHOUÉ.
+  const [prefs, setPrefs] = useState(undefined);
   const [busy, setBusy] = useState(false);
   // Comptes dont aucune vente ne peut déclencher de notification (voir
   // `fetchComptesSansEmailVente`). `null` tant qu'on ne sait pas : on
@@ -21861,16 +21932,19 @@ function PushPrefsSetting({ comptes }) {
   useEffect(() => { let mort = false;
     (async () => {
       try {
-        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.push_prefs&select=data`, { headers: sbAuth() });
-        const rows = r.ok ? await r.json() : [];
-        if (!mort) setPrefs((rows && rows[0] && rows[0].data) || {});
-      } catch (_) { if (!mort) setPrefs({}); }
+        const d = await lireReglage('push_prefs');
+        // `null` = pas su : on NE bascule rien tant qu'on n'a pas lu (sinon un
+        // seul clic réécrit la ligne avec une seule préférence).
+        if (!mort) setPrefs(d);
+      } catch (_) { if (!mort) setPrefs(null); }
     })();
     return () => { mort = true; };
   }, []);
   const actif = (c) => { const v = prefs && prefs[c.id]; return typeof v === 'boolean' ? v : c.def; };
+  const pasLu = prefs === null;              // la base n'a pas répondu
+  const enCours = prefs === undefined;
   const bascule = async (c) => {
-    if (busy) return; setBusy(true);
+    if (busy || pasLu) return; setBusy(true);
     const next = { ...(prefs || {}), [c.id]: !actif(c) };
     setPrefs(next);
     try {
@@ -21889,7 +21963,9 @@ function PushPrefsSetting({ comptes }) {
         <div style={{flex:1,minWidth:0}}>
           <div style={{fontSize:13,fontWeight:600,color:C.text}}>🔔 Ce que tu reçois sur ton téléphone</div>
           <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.4}}>
-            {prefs ? `${n} type${n>1?'s':''} de notification sur ${PUSH_CATS.length}. Par défaut, on ne sonne que pour l'argent et ce qu'il y a à faire.` : 'Chargement…'}
+            {enCours ? 'Chargement…'
+              : pasLu ? <span style={{display:'inline-block',fontSize:11,fontWeight:600,color:C.muted,background:C.bg,border:`1px solid ${C.border}`,borderRadius:999,padding:'2px 9px'}}>{REGLAGE_PAS_LU}</span>
+              : `${n} type${n>1?'s':''} de notification sur ${PUSH_CATS.length}. Par défaut, on ne sonne que pour l'argent et ce qu'il y a à faire.`}
             {muets && muets.length > 0 && (
               <div style={{color:C.warn,fontWeight:600,marginTop:3}}>
                 ⚠ {muets.length} compte{muets.length>1?'s':''} ne te préviendra{muets.length>1?'ient':''} d'aucune vente — déplie pour savoir lesquels.
@@ -21922,7 +21998,7 @@ function PushPrefsSetting({ comptes }) {
                 <div style={{fontSize:11,color:C.muted,marginTop:1,lineHeight:1.35}}>{c.desc}</div>
               </div>
               <button type="button" onClick={()=>bascule(c)} disabled={!prefs||busy} aria-label={`${c.titre} : ${on?'activé':'désactivé'}`}
-                style={{flexShrink:0,padding:'5px 13px',borderRadius:8,fontSize:11.5,fontWeight:600,cursor:prefs?'pointer':'default',fontFamily:'inherit',
+                style={{flexShrink:0,padding:'5px 13px',borderRadius:8,fontSize:11.5,fontWeight:600,cursor:prefs?'pointer':'default',fontFamily:'inherit',opacity:pasLu?0.45:1,
                   background:on?C.accent:'transparent',color:on?'#fff':C.muted,border:`1.5px solid ${on?C.accent:C.border}`}}>
                 {on?'ON':'OFF'}
               </button>
@@ -22009,6 +22085,7 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
     <div style={{padding:'16px 14px 40px',maxWidth:600,margin:'0 auto'}}>
       <AcctSheet/>
       <h2 style={{fontSize:26,fontWeight:700,color:C.text,margin:'4px 0 18px',letterSpacing:'-0.03em'}}>Paramètres</h2>
+      <ReglagesPasLus/>
 
       {/* ── TON COMPTE VRM ──────────────────────────────────────────────────
           Toujours présent en multi-vendeurs, y compris quand on est entré par la
@@ -22272,21 +22349,28 @@ function ZoomSetting() {
 // (les factures restent en brouillon, envoi manuel possible dans Factures).
 function ProFactureSetting() {
   const DEFAULTS = { actif:false, autoSend:false, nom:'', adresse:'', codePostal:'', ville:'', siret:'', tva:'', prefixe:'FA', tauxTva:'0', mentions:'', logo:'' };
-  const [cfg, setCfg] = useState(null); // null = chargement
+  const [cfg, setCfg] = useState(undefined); // undefined = en cours · null = pas su · objet = lu
   const [status, setStatus] = useState('');
   const HEADERS = sbAuth();
   const saveTimer = React.useRef(null);
 
   useEffect(() => { (async () => {
     try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_pro_facture&select=data`, { headers: HEADERS });
-      const rows = await res.json();
-      setCfg({ ...DEFAULTS, ...((rows[0] && rows[0].data) || {}) });
-    } catch (_) { setCfg({ ...DEFAULTS }); }
+      // ⚠️⚠️ CE PANNEAU RÉÉCRIT LA LIGNE ENTIÈRE AU PREMIER CARACTÈRE TAPÉ.
+      //    Avant, une lecture ratée (aucun `res.ok` : sur un 522 Cloudflare
+      //    `res.json()` lève, et le `catch` posait les valeurs par DÉFAUT) lui
+      //    montrait un formulaire VIDE — et la première frappe écrasait sa
+      //    raison sociale, son adresse et son SIRET. C'est l'entité que porte
+      //    le reçu d'achat envoyé à son comptable (§5) : sans elle, il redit
+      //    « Ma boutique ». « Rien lu » ne vaut pas « rien ».
+      const d = await lireReglage('vrm_pro_facture');
+      setCfg(d === null ? null : { ...DEFAULTS, ...d });
+    } catch (_) { setCfg(null); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   })(); }, []);
 
   const persist = (next) => {
+    if (cfg === null) return;                  // pas lu : on n'écrit rien
     setCfg(next); setStatus('enregistrement…');
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
@@ -22302,7 +22386,16 @@ function ProFactureSetting() {
   };
   const upd = (field, val) => persist({ ...cfg, [field]: val });
 
-  if (cfg === null) return <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px',fontSize:12,color:C.muted}}>Chargement…</div>;
+  // Trois états : `undefined` = en cours · `null` = la base n'a pas répondu ·
+  // un objet = lu. Un panneau qui a ÉCHOUÉ ne doit pas dire « Chargement… »
+  // pour toujours, et surtout pas montrer des champs vides à remplir.
+  if (cfg === undefined) return <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px',fontSize:12,color:C.muted}}>Chargement…</div>;
+  if (cfg === null) return (
+    <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px'}}>
+      <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>🧾 Facturation Pro</div>
+      <span style={{display:'inline-block',fontSize:11,fontWeight:600,color:C.muted,background:C.bg,border:`1px solid ${C.border}`,borderRadius:999,padding:'2px 9px'}}>{REGLAGE_PAS_LU}</span>
+    </div>
+  );
 
   const input = (field, placeholder, flex) => (
     <input value={cfg[field]||''} onChange={e=>upd(field, e.target.value)} placeholder={placeholder}
@@ -22386,23 +22479,58 @@ function ProFactureSetting() {
 // Date de départ de l'import des emails Vinted. Rangée dans Supabase
 // (ligne vrm_email_config) : le script Gmail la lit à chaque passage, donc
 // changer la date ici prend effet à la synchro suivante, sans toucher au script.
+// ⚠️ LE BLOC SE POSE UNE FOIS, EN HAUT (§7). Quatre panneaux qui disent la même
+// chose sont quatre alertes pour une cause — et une alerte qu'on lit quatre fois
+// est une alerte qu'on cesse de lire. Il NOMME les panneaux touchés : sans ça il
+// ne saurait pas lesquels regarder sur un écran qui fait défiler.
+function ReglagesPasLus() {
+  const [, forcer] = useState(0);
+  useEffect(() => {
+    const f = () => forcer((n) => n + 1);
+    _reglagesEcoute.add(f);
+    return () => { _reglagesEcoute.delete(f); };
+  }, []);
+  const noms = [..._reglagesRates.values()];
+  if (!noms.length) return null;
+  const liste = noms.length === 1 ? noms[0]
+    : noms.slice(0, -1).join(', ') + ' et ' + noms[noms.length - 1];
+  return (
+    <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'11px 13px',marginBottom:14}}>
+      <div style={{fontSize:13,fontWeight:600,color:C.text}}>
+        {noms.length > 1 ? `${noms.length} réglages n'ont pas pu être lus` : "Un réglage n'a pas pu être lu"}
+      </div>
+      <div style={{fontSize:12,color:C.muted,marginTop:3,lineHeight:1.45}}>
+        La base n'a pas répondu pour {liste}. <b>Rien n'est perdu</b>, et rien ne sera
+        écrit par-dessus : tant que je n'ai pas lu, je ne touche à rien. Rouvre cet
+        écran dans un moment.
+      </div>
+    </div>
+  );
+}
 function EmailStartSetting() {
   const [date, setDate] = useState('');
-  const [status, setStatus] = useState('load'); // load | ok | saving | err
+  const [status, setStatus] = useState('load'); // load | ok | saving | err | pasLu
   const HEADERS = sbAuth();
 
   useEffect(() => { (async () => {
     try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_email_config&select=data`, { headers: HEADERS });
-      const rows = await res.json();
-      setDate((rows[0] && rows[0].data && rows[0].data.startDate) || new Date().toISOString().slice(0,10));
+      // ⚠️⚠️ UNE LECTURE RATÉE AFFICHAIT LA DATE DU JOUR. Mesuré le
+      //    15 septembre : le vrai réglage est le **10 juillet**. Sur un 522
+      //    Cloudflare `res.json()` levait, et le `catch` posait « aujourd'hui »
+      //    en annonçant `ok` — l'écran lui disait donc « les emails ne sont pris
+      //    en compte qu'à partir du 15 septembre », et il pouvait croire avoir
+      //    perdu deux mois. Un mensonge d'affichage sur un écran de RÉGLAGES —
+      //    et s'il « corrigeait » le champ, il l'écrivait pour de bon.
+      const d = await lireReglage('vrm_email_config');
+      if (d === null) { setStatus('pasLu'); return; }   // « pas su » ≠ une date
+      setDate(d.startDate || '');
       setStatus('ok');
-    } catch (_) { setDate(new Date().toISOString().slice(0,10)); setStatus('ok'); }
+    } catch (_) { setStatus('pasLu'); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   })(); }, []);
 
   const saveDate = async (v) => {
-    if (!v) return;
+    if (!v || status === 'pasLu') return;   // on n'écrit pas par-dessus ce qu'on n'a pas lu
     setDate(v); setStatus('saving');
     try {
       await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
@@ -22422,12 +22550,13 @@ function EmailStartSetting() {
       </div>
       <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
         <span style={{fontSize:12,fontWeight:500,color:C.text}}>À partir du</span>
-        <input type="date" value={date} onChange={e=>saveDate(e.target.value)} disabled={status==='load'}
-          style={{border:`1px solid ${C.border}`,borderRadius:8,padding:'6px 10px',fontSize:13,fontFamily:'inherit',background:C.bg,color:C.text,outline:'none'}}/>
+        <input type="date" value={date} onChange={e=>saveDate(e.target.value)} disabled={status==='load'||status==='pasLu'}
+          style={{border:`1px solid ${C.border}`,borderRadius:8,padding:'6px 10px',fontSize:13,fontFamily:'inherit',background:C.bg,color:C.text,outline:'none',opacity:status==='pasLu'?0.45:1}}/>
         <span style={{fontSize:11,color:status==='err'?C.danger:C.muted}}>
-          {status==='load'?'chargement…':status==='saving'?'enregistrement…':status==='err'?'⚠ échec — réessaie':'✓ enregistré'}
+          {status==='load'?'chargement…':status==='saving'?'enregistrement…':status==='err'?'⚠ échec — réessaie':status==='pasLu'?'':'✓ enregistré'}
         </span>
       </div>
+      {status==='pasLu' && <div style={{marginTop:9}}><span style={{display:'inline-block',fontSize:11,fontWeight:600,color:C.muted,background:C.bg,border:`1px solid ${C.border}`,borderRadius:999,padding:'2px 9px'}}>{REGLAGE_PAS_LU}</span></div>}
     </div>
   );
 }
@@ -22791,17 +22920,25 @@ function SecuriteSetting() {
 // Le registre vit dans une ligne dédiée (`vrm_email_owners`) que l'app écrit et
 // que le serveur se contente de lire.
 function EmailsSetting() {
-  const [reg, setReg] = useState(null);          // { adresse: {owner,label} }
+  // ⚠️ `undefined` = en cours · `null` = la base n'a pas répondu · objet = lu.
+  //    Sans ce troisième état, une lecture ratée affichait « Aucune adresse
+  //    déclarée » — une AFFIRMATION sur l'attribution de ses emails, faite sur
+  //    une mesure qui n'a pas eu lieu.
+  const [reg, setReg] = useState(undefined);     // { adresse: {owner,label} }
   const [quarantaine, setQuarantaine] = useState(null);
   const [busy, setBusy] = useState('');
   const uid = (AUTH.user && AUTH.user.id) || '';
   const charger = React.useCallback(async () => {
     try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_email_owners&select=data`, { headers: sbAuth() });
-      const j = r.ok ? await r.json() : [];
-      const d = (j[0] && j[0].data) || {};
-      setReg((d && d.adresses) || {});
-    } catch (_) { setReg({}); }
+      // ⚠️⚠️ C'EST L'ADRESSE DE RÉCEPTION QUI DÉCIDE à quel vendeur appartient
+      //    un email (§5), et cette liste se réécrit ENTIÈRE à chaque ajout.
+      //    Avec `r.ok ? … : []`, un hoquet de la base pendant qu'il ouvre cet
+      //    écran, puis un seul ajout, effaçait TOUTES ses autres adresses : les
+      //    emails Vinted suivants (bordereaux, ventes, suivis) ne lui étaient
+      //    plus attribués et partaient en quarantaine. « Rien lu » ≠ « rien ».
+      const d = await lireReglage('vrm_email_owners');
+      setReg(d === null ? null : (d.adresses || {}));
+    } catch (_) { setReg(null); }
     try {
       // ⚠️ Scalaires seulement : une ligne de quarantaine contient l'email
       // ENTIER (pièces jointes comprises) — un `select=data` ici referait le
@@ -22813,6 +22950,7 @@ function EmailsSetting() {
   useEffect(() => { charger(); }, [charger]);
 
   const ecrire = async (adresses) => {
+    if (reg === null) return;                 // pas lu : on n'écrase pas la liste
     setReg(adresses);
     try {
       await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
@@ -22888,7 +23026,9 @@ function EmailsSetting() {
       <div style={{fontSize:12,color:C.muted,marginBottom:10,lineHeight:1.45}}>
         Les emails Vinted (bordereaux, ventes, colis) que tu fais suivre ici t'appartiennent. <b>C'est l'adresse d'arrivée qui décide</b> — jamais l'expéditeur ni le contenu, qui se falsifient. Une adresse inconnue n'est jamais attribuée au hasard : l'email est mis de côté, et tu le réclames d'un tap.
       </div>
-      {reg === null ? <div style={{fontSize:12,color:C.muted}}>Chargement…</div> : liste.length === 0 ? (
+      {reg === undefined ? <div style={{fontSize:12,color:C.muted}}>Chargement…</div>
+      : reg === null ? <span style={{display:'inline-block',fontSize:11,fontWeight:600,color:C.muted,background:C.bg,border:`1px solid ${C.border}`,borderRadius:999,padding:'2px 9px'}}>{REGLAGE_PAS_LU}</span>
+      : liste.length === 0 ? (
         <div style={{fontSize:12,color:C.warn,background:`${C.warn}12`,border:`1px solid ${C.warn}44`,borderRadius:8,padding:'9px 11px',lineHeight:1.45}}>
           Aucune adresse déclarée. Tant qu'il n'y en a pas, les emails reçus sont attribués au propriétaire de cette installation — ce qui va très bien tant que tu es seul dessus.
         </div>
@@ -22899,8 +23039,8 @@ function EmailsSetting() {
             style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:8,padding:'5px 9px',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Retirer</button>
         </div>
       ))}
-      <button type="button" onClick={ajouter}
-        style={{marginTop:10,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'8px 12px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+      <button type="button" onClick={ajouter} disabled={reg === null || reg === undefined}
+        style={{marginTop:10,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'8px 12px',fontSize:12.5,fontWeight:600,cursor:reg?'pointer':'default',fontFamily:'inherit',opacity:reg?1:0.45}}>
         + Ajouter une adresse
       </button>
       {enAttente.length > 0 && (
