@@ -11093,6 +11093,20 @@ const normTitle = (t) => (t || '').toLowerCase().replace(/\s+/g, ' ').trim();
 // ⚠️ La chaîne vivait EN PLEIN MILIEU DU JSX — impossible de savoir combien elle
 //    rendait sans la recopier (même défaut que les filtres de l'écran Ventes).
 //    Elle est ici, une seule fois, et le banc l'exécute.
+// ⚠️⚠️ ET LE MÊME DÉFAUT VIVAIT SUR L'ACCUEIL, À CÔTÉ : « N ventes repérées via
+// bordereau, pas encore synchronisées » rapprochait par TITRE, alors que les
+// DEUX côtés portent un n° de TRANSACTION — une identité (§5).
+// Mesuré le 15 septembre : **165 des 166 bordereaux** portent leur `transaction`,
+// et les 385 ventes portent `transaction_id`. Le titre se trompait des deux
+// côtés : il montrait à tort `tx 22155558568` (deux paires dans un même colis,
+// titre composé qui ne correspond à aucune vente) — une **fausse alerte**, et
+// une fausse alerte fait cesser de lire les vraies ; et il en cacherait un vrai
+// dès qu'une paire au même libellé est vendue.
+// ⚠️ Un bordereau SANS transaction n'est pas jugé : mieux vaut un blanc qu'un faux.
+const bordereauxPasSynchro = (emailBords, ventes) => {
+  const txVendues = new Set((ventes || []).map((o) => String(o && o.transaction_id)).filter((x) => x && x !== 'undefined'));
+  return (emailBords || []).filter((b) => b && b.transaction && !txVendues.has(String(b.transaction)));
+};
 const OFFRE_FENETRE_J = 14;          // une offre Vinted expire vite
 const OFFRE_TOLERANCE_H = 6;         // délai de classement de l'email
 const offresAtraiter = (offers, ventes, dejaFaites, cle) => {
@@ -13681,7 +13695,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     for (const o of (sales.items || [])) {
       const e = saleOv[String(o.transaction_id)];
       const n = String((e && e.numero) || '').trim().toLowerCase(); if (n) vendus.add(n);
-      const t = normTitle(o.title || ''); if (t) vendus.add('t:' + t);
+      // ⚠️ `vendus.add('t:' + titre)` VIVAIT ICI, et RIEN ne le lisait — le test
+      //    par titre avait été retiré (voir le commentaire plus bas), la ligne
+      //    qui l'alimentait était restée. Même famille que le tiroir `Nav` : du
+      //    code mort qu'un relecteur « rebranche » un jour en croyant réparer un
+      //    oubli, et le rapprochement par ressemblance revient (§5).
     }
     const out = [];
     for (const k in numeros) {
@@ -17010,10 +17028,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         })()}
         {/* Ventes déduites des bordereaux, pas encore dans la synchro Vinted */}
         {(()=>{
-          const pending=(emailBords||[]).filter(b=>{
-            const n=normTitle(b.modele||b.article||'');
-            return n && !(sales.items||[]).some(o=>normTitle(o.title)===n);
-          });
+          // ⚠️⚠️ CE RAPPROCHEMENT SE FAISAIT PAR TITRE, alors que les DEUX côtés
+          //    portent un n° de TRANSACTION — une identité (§5). Mesuré le
+          //    15 septembre : **165 des 166 bordereaux** portent leur
+          //    `transaction`, et les 385 ventes portent `transaction_id`.
+          //    Le titre se trompait dans les deux sens :
+          //      · il MONTRAIT à tort un bordereau déjà synchronisé — mesuré :
+          //        `tx 22155558568`, deux paires dans un même colis, dont le
+          //        titre composé (« salomon XT-6 gris…, salomon XT-6 bleu… ») ne
+          //        correspond à aucun titre de vente. Une fausse alerte sur
+          //        l'accueil, et une fausse alerte fait cesser de lire les vraies ;
+          //      · et il en CACHERAIT un vrai dès qu'une paire au même libellé
+          //        est vendue (22 % des ventes ont un titre en double).
+          // ⚠️ Un bordereau SANS transaction (1 sur 166) n'est pas jugé : mieux
+          //    vaut un blanc qu'un faux, et sans identité il n'y a rien à dire.
+          const pending=bordereauxPasSynchro(emailBords, sales.items);
           if(!pending.length||sales.items===null) return null;
           return (
             <Notice tone="warn" icon="box"
