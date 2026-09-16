@@ -740,7 +740,7 @@ const SYNC_KEYS = [
   'vinted_invoice_settings','vinted_custom_logo','vinted_dark','vinted_stock_vinted',
   'vinted_accounts','vinted_account_labels','vinted_account_emails',
   'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros','vinted_annonces_vendues','vinted_bords_shipped',
-  'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats','vinted_bords_printed','vrm_imprimante','vrm_points_relais','vrm_ville','vrm_colis_collected','vrm_colis_collected_at',
+  'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats','vinted_bords_printed','vrm_imprimante','vrm_prenom','vrm_points_relais','vrm_ville','vrm_colis_collected','vrm_colis_collected_at',
   'vinted_txn_link','vinted_sales_hidden','vinted_accounts_hidden','vinted_autonum','vinted_urssaf_freq','vinted_urssaf_taux',
   'vinted_sale_overrides','vinted_bord_links','vinted_pickup_done','vinted_bords_hidden','vinted_ship_done','vinted_pairs_lost','vinted_retours_recus','vinted_retours_dismissed',
   'vinted_offvinted_buys','vinted_buyprice_by_num','vinted_quick_replies','vinted_ca_keep_removed',
@@ -1086,6 +1086,33 @@ const save = (k,v) => {
 // « tout va bien », et ne poste pas ses colis.
 // C'est §4.1 RETOURNÉ : rendre `[]` au lieu de lever, oui — mais l'app doit
 // SAVOIR que c'est un échec pour ne pas le présenter comme un fait.
+// ── LA LECTURE SANS COMPTE — UNE SEULE RÈGLE, DEUX LECTEURS ─────────────────
+// Est-ce que la clé PUBLIQUE (celle qui est dans le code de la page, visible
+// par tout le monde) ramène encore des lignes ? C'est ça, et rien d'autre, qui
+// décide si les vendeurs sont séparés : la colonne `owner` peut exister sans
+// que RLS soit actif — la migration le dit elle-même en toutes lettres (« garde
+// RLS désactivé, n'applique que l'étape 1 »).
+//
+// ⚠️⚠️ TROIS ÉTATS. `true` = tout le monde lit tout · `false` = fermée (401/403,
+// ou 200 sans aucune ligne : RLS actif sans règle pour l'anonyme) · `null` =
+// **pas su** (réseau, base injoignable). « Pas su » ne vaut pas « fermée » :
+// c'est le feu vert menteur du 11 septembre.
+//
+// §11 : le panneau de sécurité ET la porte d'entrée lisent CETTE fonction. Deux
+// verdicts sur la même notion, c'est le défaut que ce dossier passe son temps à
+// rattraper — et ici le mauvais des deux était celui qu'une nouvelle personne
+// voit en premier.
+const sondeLectureSansCompte = async () => {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?select=id&limit=1`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+    });
+    if (!r.ok) return (r.status === 401 || r.status === 403) ? false : null;
+    const j = await r.json();
+    return Array.isArray(j) ? j.length > 0 : null;   // du HTML (522) n'est pas une mesure
+  } catch (_) { return null; }
+};
+
 const fetchVintedAccounts = async () => {
   try {
     const [res, blk] = await Promise.all([
@@ -5401,6 +5428,15 @@ const BrandMark = ({ id }) => id === 'google' ? (
 const CODE_ACCES_HASH = 'abe463733a572f979547b38c378eadd7f35c273d81acee0b7f35cca551e7e426';
 
 function AuthScreen() {
+  // Trois états : `undefined` = on sonde · `true` = la clé publique lit encore
+  // · `false` = fermée · `null` = pas su. Une seule requête, en lecture seule
+  // (§2.3 : une sonde n'écrit jamais dans sa base).
+  const [ouverte, setOuverte] = React.useState(undefined);
+  React.useEffect(() => {
+    let stop = false;
+    (async () => { const v = await sondeLectureSansCompte(); if (!stop) setOuverte(v); })();
+    return () => { stop = true; };
+  }, []);
   const [codeAcces, setCodeAcces] = React.useState('');
   const [codeErr, setCodeErr] = React.useState('');
   const [mode, setMode] = React.useState(() => (AUTH_REDIRECT && AUTH_REDIRECT.recovery) ? 'newpw' : 'in'); // in · up · reset · newpw
@@ -5636,13 +5672,26 @@ function AuthScreen() {
             </form>
           </details>
         )}
-        {/* On dit la VÉRITÉ sur l'état de la base. Afficher « chacun ses
-            données » alors que la migration n'est pas passée serait un mensonge
-            — et exactement le genre de mensonge qui fait fuiter des données. */}
-        <div style={{fontSize:11,color:C.muted,textAlign:'center',marginTop:16,lineHeight:1.5}}>
-          {CLOISONNE
+        {/* ⚠️⚠️ CETTE PHRASE AFFIRMAIT UNE PROTECTION QUE `CLOISONNE` NE MESURE
+            PAS. `CLOISONNE` dit seulement que la colonne `owner` EXISTE — et la
+            migration autorise explicitement de s'arrêter là (« garde RLS
+            désactivé, n'applique que l'étape 1 »). Dans cet état la porte
+            promettait « chaque vendeur ne voit que ses propres données ·
+            l'isolation est appliquée par la base » pendant que le panneau de
+            Réglages disait, sur la MÊME base, « la clé publique permet encore
+            de tout écrire et effacer ». Deux verdicts sur une notion (§11), et
+            le faux était celui qu'une nouvelle personne lit en premier, juste
+            avant de confier ses jetons Vinted.
+            ⇒ On MESURE (`sondeLectureSansCompte`, la règle du panneau), et on
+            ne dit rien tant qu'on ne sait pas : « pas su » ne vaut pas « oui ». */}
+        <div style={{fontSize:11,color:C.muted,textAlign:'center',marginTop:16,lineHeight:1.5,minHeight:32}}>
+          {!CLOISONNE
+            ? <><b style={{color:C.warn}}>Séparation des comptes pas encore activée.</b><br/>Connecte-toi pour retrouver tes données — mais n'invite personne tant que la migration n'est pas passée.</>
+            : ouverte === true
+            ? <><b style={{color:C.warn}}>Séparation des comptes pas encore verrouillée.</b><br/>La clé publique de cette page lit encore les données. Connecte-toi pour retrouver les tiennes — mais n'invite personne tant que le verrou (RLS) n'est pas posé.</>
+            : ouverte === false
             ? <>Chaque vendeur ne voit que ses propres données.<br/>L'isolation est appliquée par la base, pas par l'application.</>
-            : <><b style={{color:C.warn}}>Séparation des comptes pas encore activée.</b><br/>Connecte-toi pour retrouver tes données — mais n'invite personne tant que la migration n'est pas passée.</>}
+            : null /* en cours, ou pas su : on n'affirme rien */}
         </div>
       </div>
     </div>
@@ -13459,6 +13508,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // rattrapage l'app imprimerait en A4 alors qu'il a choisi thermique).
   // ⚠️ On ne remplace que ce qui est resté au DÉFAUT — sinon un changement fait
   // pendant le chargement serait écrasé.
+  // ⚠️ « Bonjour Julien » ÉTAIT ÉCRIT EN DUR. Mesuré au rendu le 16 septembre,
+  // sur une installation neuve : une vendeuse qui ouvre VRM pour la première
+  // fois est accueillie par le prénom de QUELQU'UN D'AUTRE. C'est la première
+  // ligne du premier écran. Le prénom est un réglage synchronisé ; tant qu'il
+  // est vide on dit « Bonjour » tout court — mieux vaut un blanc qu'un faux
+  // (§5). On ne le devine PAS depuis l'email : « vinted35260 » n'est pas un
+  // prénom, et un prénom inventé est un faux.
+  const [prenom, setPrenom] = useState(() => String(load('vrm_prenom', '') || '').trim());
+  useEffect(() => onCloudReady(() => {
+    // §5.49 : un réglage synchronisé lu au MONTAGE lit du vide au premier
+    // écran ouvert. On ne remplace que ce qui est resté vide.
+    setPrenom((p) => p || String(load('vrm_prenom', '') || '').trim());
+  }), []);
   const [imprimante, setImprimante] = useState(() => imprMode(load('vrm_imprimante', 'normale')));
   const imprTouchee = React.useRef(false);
   useEffect(() => onCloudReady(() => {
@@ -16714,6 +16776,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const inRoute = (sales.items||[]).filter(o=>!isHidden(o) && classifyOrderStatus(o.status)==='pending');
         let inRouteSum=0; for(const o of inRoute){ const v=o.price?.amount!=null?Number(o.price.amount):0; if(v>0) inRouteSum+=v; }
         const loading = accounts.length>0 && sales.items===null && buys.items===null && listings.items===null && convs.items===null;
+        // ⚠️⚠️ TROIS ÉTATS, JAMAIS DEUX. « aucun compte » se dit seulement quand
+        //    on a VRAIMENT regardé : `accountsReady` (la lecture est revenue) et
+        //    `!baseKO` (elle a réussi). Sans ça, une base qui hoquette accueille
+        //    quelqu'un qui a neuf comptes par « installe l'extension » — le
+        //    mensonge du 10 septembre, retourné.
+        const premierJour = !!accountsReady && !baseKO && accounts.length===0;
         const jobs=[];
         // ⚠️ LA PREMIÈRE CHOSE QU'IL VOIT DOIT DIRE CE QU'IL PEUT FAIRE TOUT
         // DE SUITE. Mesuré le 7 septembre : 15 colis à expédier, dont **10 dont
@@ -16781,7 +16849,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div style={{fontSize:12,color:C.muted,fontWeight:500,textTransform:'capitalize'}}>{dateStr}</div>
               {/* Le soleil en emoji devant le bonjour : c'est joli une fois, et ça fait
                       « thème par défaut » les mille fois suivantes. Le nom suffit. */}
-              <div style={{fontSize:24,fontWeight:700,color:C.text,marginTop:2,letterSpacing:-0.5}}>{hello} Julien</div>
+              <div style={{fontSize:24,fontWeight:700,color:C.text,marginTop:2,letterSpacing:-0.5}}>{hello}{prenom ? ' ' + prenom : ''}</div>
               {!loading && (
                 <div style={{fontSize:13,color:C.muted,marginTop:3}}>
                   {/* ⚠️ Trois fois la même phrase sur un écran, c'est UNE phrase
@@ -16790,6 +16858,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       rien — surtout pas « rien d'urgent ». */}
                   {jobs.length>0 ? <>Tu as <b style={{color:C.text}}>{jobs.length} action{jobs.length>1?'s':''}</b> {jobs.length>1?'qui te font':'qui te fait'} avancer aujourd'hui.</>
                     : baseKO ? null
+                    /* ⚠️ « ta boutique tourne » à quelqu'un dont AUCUN compte
+                       n'est branché : sa boutique ne tourne pas, elle n'existe
+                       pas encore. La carte des premiers pas dit la suite — ici
+                       on se tait plutôt que d'affirmer (§7 : une cause, une
+                       phrase). */
+                    : premierJour ? null
                     : <>Rien d'urgent — ta boutique tourne. 👌</>}
                 </div>
               )}
@@ -16879,6 +16953,38 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 « Rien à faire » ne se dit QUE si on a pu regarder. */}
             {!loading && jobs.length===0 && (baseKO
               ? <LignePanne>Je n'ai pas pu lire tes données — cette liste est vide parce que la lecture a échoué, pas parce qu'il n'y a rien à expédier ni à retirer.</LignePanne>
+              /* ⚠️⚠️ LA FÊTE SUR UNE BOUTIQUE QUI N'EXISTE PAS ENCORE. Mesuré au
+                 rendu le 16 septembre, sur une installation neuve : « 🎉 Tout
+                 est à jour ! Rien à expédier, rien à retirer » — à quelqu'un
+                 qui n'a JAMAIS branché quoi que ce soit. Rien n'est à jour :
+                 rien n'a encore été lu. C'est « Tout est publié 🎉 » sur une
+                 file jamais lue (écran Leboncoin), sur le tout premier écran
+                 que voit une nouvelle personne. Ici la liste vide a une CAUSE
+                 connue, et elle se dit — avec le geste, en ordre. */
+              : premierJour
+              ? <div style={{padding:'22px 20px',border:`1px solid ${C.border}`,borderRadius:10,background:C.card}}>
+                  <div style={{fontSize:17,fontWeight:700,color:C.text}}>Bienvenue — il reste une chose à brancher</div>
+                  <div style={{fontSize:13,color:C.muted,marginTop:5,lineHeight:1.55}}>
+                    Ta journée est vide parce qu'aucun compte Vinted n'est encore relié, pas parce qu'il n'y a rien à faire. VRM ne va rien chercher tout seul&nbsp;: c'est l'extension, dans ton navigateur Chrome, qui range ce que Vinted t'envoie déjà.
+                  </div>
+                  <ol style={{margin:'14px 0 0 0',padding:'0 0 0 20px',fontSize:13,color:C.text,lineHeight:1.75}}>
+                    <li>Télécharge l'extension, puis dézippe-la (un seul dossier, «&nbsp;VRM-extension&nbsp;»).</li>
+                    <li>Dans Chrome, ouvre <code style={{fontSize:12,background:C.bg,padding:'1px 5px',borderRadius:5}}>chrome://extensions</code>, active «&nbsp;Mode développeur&nbsp;» en haut à droite, puis «&nbsp;Charger l'extension non empaquetée&nbsp;» et choisis ce dossier.</li>
+                    <li>Clique son icône et connecte-toi <b style={{color:C.text}}>avec le même email que sur VRM</b> — c'est ce qui range tes données chez toi et nulle part ailleurs.</li>
+                    <li>Ouvre <b style={{color:C.text}}>vinted.fr</b> une fois, connecté sur ton compte. Tes annonces, ventes, achats et messages arrivent ici tout seuls.</li>
+                  </ol>
+                  <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:14}}>
+                    <a href="/VRM-extension.zip" download style={{textDecoration:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'11px 16px',fontSize:13.5,fontWeight:600}}>Télécharger l'extension</a>
+                    <button type="button" onClick={()=>onNav&&onNav('vintedaccounts')} style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'11px 16px',fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Voir mes comptes liés</button>
+                  </div>
+                  {/* ⚠️ On ne promet PAS de délai ni de résultat : l'app ne sait
+                      pas si l'extension est installée sur CET appareil, ni si
+                      la personne passera sur Vinted. Le geste, jamais la
+                      promesse. */}
+                  <div style={{fontSize:11.5,color:C.muted,marginTop:12,lineHeight:1.5}}>
+                    Sur téléphone, il n'y a pas d'extension Chrome&nbsp;: fais ces étapes une fois sur un ordinateur, puis rouvre VRM sur ton téléphone — les données y seront.
+                  </div>
+                </div>
               : <div style={{textAlign:'center',padding:'34px 18px',border:`1px dashed ${C.border}`,borderRadius:10,background:C.card}}>
                   <div style={{fontSize:44,lineHeight:1}}>🎉</div>
                   <div style={{fontSize:17,fontWeight:700,color:C.text,marginTop:10}}>Tout est à jour !</div>
@@ -17046,7 +17152,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {/* ⚠️ `accounts.length===0` veut dire « aucun compte » OU « je n'ai
                 rien pu lire » : pendant la panne cette consigne envoyait lier
                 un dixième compte à quelqu'un qui en a neuf. */}
-            {accounts.length===0 && !baseKO && (
+            {/* ⚠️ §7 : la carte des premiers pas dit déjà tout ça, en mieux.
+                Cette ligne ne sert plus qu'au cas où la journée a QUAND MÊME
+                des actions sans aucun compte lié (des colis repérés par email,
+                par exemple) — là seulement elle apprend quelque chose. */}
+            {accounts.length===0 && !baseKO && !(jobs.length===0 && !loading && premierJour) && (
               <div style={{marginTop:16,fontSize:13,color:C.muted,textAlign:'center',lineHeight:1.5,padding:'0 10px'}}>Lie un compte Vinted (⚙️ → Comptes liés) pour que ta journée se remplisse automatiquement.</div>
             )}
           </div>
@@ -22649,6 +22759,8 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
           </div>
         )}
 
+        <PrenomSetting/>
+
         {/* MOYENS DE CONNEXION — on affiche l'état RÉEL de chacun, pas une liste
             décorative. Un bouton Google qui mène à une page d'erreur ne rend
             service à personne : tant que le fournisseur n'est pas branché dans
@@ -22845,6 +22957,34 @@ const applyZoom = (z) => {
     localStorage.setItem(ZOOM_KEY, z);
   } catch (_) {}
 };
+
+// ── TON PRÉNOM ───────────────────────────────────────────────────────────────
+// « Bonjour Julien » était écrit en dur dans l'app. Sur une installation neuve
+// c'est le prénom de quelqu'un d'autre, sur la première ligne du premier écran.
+// Réglage SYNCHRONISÉ (il suit la personne d'un appareil à l'autre) ; vide par
+// défaut, et alors l'accueil dit « Bonjour » tout court. On ne le déduit PAS de
+// l'email : un prénom inventé est un faux, et un blanc vaut mieux (§5).
+function PrenomSetting() {
+  const [v, setV] = React.useState(() => String(load('vrm_prenom', '') || ''));
+  const touche = React.useRef(false);
+  React.useEffect(() => onCloudReady(() => {
+    // §5.49 : le nuage arrive après le montage. On ne remplace que le vide,
+    // sinon une saisie faite pendant le chargement serait écrasée.
+    if (touche.current) return;
+    setV((p) => p || String(load('vrm_prenom', '') || ''));
+  }), []);
+  const ecrire = (t) => { touche.current = true; const n = t.slice(0, 24); setV(n); save('vrm_prenom', n.trim()); };
+  return (
+    <div style={{padding:'13px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
+      <div style={{fontSize:13,fontWeight:600,color:C.text}}>Ton prénom</div>
+      <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.5}}>
+        Il sert uniquement à te dire bonjour sur l'écran d'accueil. Laisse vide et l'app dira simplement «&nbsp;Bonjour&nbsp;».
+      </div>
+      <input value={v} onChange={(e)=>ecrire(e.target.value)} placeholder="Prénom" autoComplete="given-name"
+        style={{marginTop:10,width:'100%',boxSizing:'border-box',padding:'10px 12px',borderRadius:8,border:`1px solid ${C.border}`,background:C.bg,color:C.text,fontSize:14,fontFamily:'inherit'}}/>
+    </div>
+  );
+}
 
 function ZoomSetting() {
   const [z, setZ] = React.useState(readZoom);
@@ -23339,20 +23479,10 @@ function SecuriteSetting() {
     // 2. ⚠️ LE PIÈGE : la colonne peut exister sans que RLS soit actif. On teste
     //    donc ce qui compte vraiment — une lecture avec la clé PUBLIQUE seule
     //    ramène-t-elle encore des lignes ? Si oui, tout le monde lit tout.
-    try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?select=id&limit=1`, {
-        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
-      });
-      // ⚠️⚠️ LE PIRE DES TROIS, ET C'ÉTAIT UN FEU VERT. `: false` faisait dire
-      //      « Lecture sans compte · fermée — seule une session identifiée lit
-      //      tes données » dès que la base ne répondait pas. Sur un panneau de
-      //      SÉCURITÉ, affirmer que le verrou est posé sans l'avoir mesuré est
-      //      le mensonge le plus cher possible : aujourd'hui RLS est DÉSACTIVÉ
-      //      et la clé publique lit tout. Un 401/403 est en revanche une vraie
-      //      mesure — la clé publique est refusée, donc elle ne ramène rien.
-      out.lisibleSansCompte = r.ok ? (await r.json()).length > 0
-        : ((r.status === 401 || r.status === 403) ? false : null);
-    } catch (_) { out.lisibleSansCompte = null; }
+    // §11 : la règle vit dans `sondeLectureSansCompte`, la porte d'entrée lit
+    // la MÊME. Elle rend trois états, dont `null` = pas su — c'était le feu
+    // vert menteur du 11 septembre (`: false` sur tout échec).
+    out.lisibleSansCompte = await sondeLectureSansCompte();
     // 2 bis. ⚠️⚠️ ET LIRE N'EST PAS LE PIRE — MESURÉ LE 15 SEPTEMBRE.
     //    La clé publique peut aussi ÉCRIRE : un `POST` sur `app_data` avec elle
     //    seule répond **201**. Lire, c'est regarder ; écrire, c'est remplacer
@@ -25162,7 +25292,7 @@ export default function App() {
             annoncer « 🎉 Tout est à jour ! » pendant la panne, c'est-à-dire
             précisément l'écran qu'il ouvre le matin. Corriger « partout » se
             vérifie au rendu, écran par écran, pas en lisant le code. */}
-        {tab==='journee'&&<Comptabilite key="journee" accounts={vintedAccounts} only="journee" onNav={setTab} baseKO={baseKO} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}
+        {tab==='journee'&&<Comptabilite key="journee" accounts={vintedAccounts} only="journee" onNav={setTab} baseKO={baseKO} accountsReady={accountsLoaded} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}
         {/* ⚠️ « Bienvenue 👋 · connecte ton compte Vinted pour commencer » à
             quelqu'un qui a neuf comptes : c'est ce qu'il voyait quand la base
             ne répondait pas. `baseKO` distingue « aucun compte » de « je n'ai

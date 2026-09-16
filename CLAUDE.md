@@ -2004,6 +2004,97 @@ là où l'information manquait (§7).
   absolu des quatorze bancs). On découpe la **phrase** qui parle de la dernière
   capture et on juge dedans : **2 → 5 échecs** sur le code d'avant.
 
+### ⚠️⚠️ « BONJOUR JULIEN » — LE PREMIER ÉCRAN D'UNE NOUVELLE PERSONNE MENTAIT TROIS FOIS
+Demande de Julien, 16 septembre : « continue à améliorer l'app pour qu'elle
+accueille bientôt de nouvelles personnes. »
+
+**Mesuré AU RENDU, pas dans le code** (§6.2), sur une installation neuve : base
+**cloisonnée**, session valide, **zéro ligne**. Ce que voit la première vendeuse
+qui ouvre VRM, en haut du tout premier écran :
+> **Bonjour Julien**
+> Rien d'urgent — ta boutique tourne. 👌
+> 🎉 **Tout est à jour !** Rien à expédier, rien à retirer, aucun message en attente.
+> *Profite — ou va sourcer de nouvelles paires.* 👟
+
+Trois affirmations fausses d'affilée — **son prénom**, l'état de **sa boutique**,
+l'état de **ses données** — et la seule ligne vraie (« Lie un compte Vinted »)
+était en gris, 13 px, tout en bas. C'est « Tout est publié 🎉 » sur une file
+jamais lue (écran Leboncoin), posé sur l'écran d'accueil de quelqu'un qui
+découvre l'app.
+
+- **Le prénom est un réglage synchronisé** (`vrm_prenom`, champ dans Réglages →
+  Ton compte), **vide par défaut** : l'accueil dit alors « Bonjour » tout court.
+  ⚠️ **On ne le déduit PAS de l'email** — « vinted35260 » n'est pas un prénom, et
+  un prénom inventé est un faux : *mieux vaut un blanc qu'un faux* (§5). Lu au
+  montage, donc rattrapé par `onCloudReady`, et seulement s'il est resté VIDE
+  (§5.49). ⚠️ **Julien devra taper le sien une fois** — jusque-là son accueil dit
+  « Bonjour ».
+- **Une boutique jamais branchée ne se fête pas.** La liste vide a ici une
+  **cause connue**, et une cause connue se dit : la carte des premiers pas
+  nomme les quatre gestes dans l'ordre (dézipper · charger dans
+  `chrome://extensions` · **se connecter à l'extension avec le même email que
+  sur VRM** · ouvrir vinted.fr une fois), avec le **lien de téléchargement du
+  zip**. Le geste, jamais la promesse : l'app ne sait pas si l'extension est
+  installée sur cet appareil ni si la personne passera sur Vinted, elle ne
+  promet donc aucun délai.
+- ⚠️ **TROIS ÉTATS, JAMAIS DEUX** : `premierJour` exige `accountsReady` (la
+  lecture est revenue) **et** `!baseKO` (elle a réussi). Sans ça une base qui
+  hoquette accueille quelqu'un qui a **neuf comptes** par « installe
+  l'extension » — le mensonge du 10 septembre, retourné. `journee` ne recevait
+  d'ailleurs **pas** `accountsReady` (elle est montée à part, `tab==='journee'`,
+  hors de la table `map` — exactement comme lors du premier correctif de
+  `baseKO`).
+- ⚠️ §7 : une fois la carte posée, la ligne grise « Lie un compte Vinted
+  (⚙️ → Comptes liés) » disait la même chose en plus petit. Elle ne reste que
+  pour le cas où la journée a **quand même** des actions sans aucun compte lié
+  (des colis repérés par email) — là seulement elle apprend quelque chose.
+- `scripts/bancs/premierjour.cjs` : **25 contrôles, 15 rouges** sur un vrai
+  build d'avant (§6.1). ⚠️ **Il n'a besoin d'AUCUNE fixture** — une installation
+  neuve, c'est une base vide : rien de réel ne transite, il vit donc entièrement
+  dans le dépôt.
+  - Le contrôle du prénom ne cherche **pas le mot « Julien »** (ce serait posé
+    sur l'orthographe, et vert le jour où quelqu'un met un autre prénom en dur) :
+    il rend **deux fois, avec deux valeurs du réglage**, et exige que le bonjour
+    **suive la donnée**.
+  - Et il vérifie **les deux autres sens**, sans quoi *ne rien fêter du tout*
+    passerait tous les contrôles : un compte lié et rien à faire ⇒ la fête
+    revient ; base injoignable ⇒ ni fête, ni « installe l'extension ».
+  - Le lien du zip est vérifié **par son `href`** (un geste qui se clique ne se
+    voit pas dans `innerText`) **et** par l'existence du fichier pointé — un
+    bouton qui mène à un 404 est le défaut du pipeline Factures.
+- ⚠️ **VINGT-ET-UNIÈME fois qu'un de mes contrôles crie au loup**, et c'est mon
+  balayage d'exploration : `/NaN/i` attrapait « mainte**nan**t ». `NaN` se
+  cherche **sensible à la casse**.
+
+### ⚠️⚠️ LA PORTE D'ENTRÉE PROMETTAIT UNE PROTECTION QU'ELLE N'AVAIT PAS MESURÉE
+Même passe, même écran d'accueil — mais **avant** la connexion. La dernière
+phrase que lit quelqu'un juste avant de confier ses jetons Vinted disait :
+> « Chaque vendeur ne voit que ses propres données.
+> **L'isolation est appliquée par la base, pas par l'application.** »
+
+Elle s'affichait dès que **`CLOISONNE`** était vrai — et `CLOISONNE` mesure une
+seule chose : **la colonne `owner` EXISTE**. Or la migration autorise
+explicitement de s'arrêter là (« *garde RLS désactivé, n'applique que l'étape
+1* »). Dans cet état la porte promettait l'isolation pendant que le panneau de
+Réglages disait, **sur la même base**, « la clé publique permet encore de tout
+écrire et effacer ». **Deux verdicts sur une notion (§11)** — et le faux était
+celui qu'une nouvelle personne lit en premier.
+⇒ La porte **mesure** : `sondeLectureSansCompte()` (une lecture, zéro écriture,
+§2.3) rend **trois états** — encore lisible · fermée · **pas su**. On n'affirme
+rien tant qu'on ne sait pas, et on n'accuse pas non plus.
+⇒ **La règle est extraite et PARTAGÉE** : le panneau de sécurité la consomme au
+lieu de la réécrire. Une seule des deux corrigée, et les deux écrans divergent
+de nouveau.
+- ⚠️ **VINGT-DEUXIÈME fois qu'un de mes contrôles crie au loup**, et c'est la
+  récidive exacte de `sbGetTout` : `audit-chiffres.cjs` exigeait le mot `null`
+  **dans l'expression** de la sonde. Devenue un appel de fonction partagée, la
+  règle était **mieux tenue qu'avant** et l'audit tombait au rouge. Il suit
+  maintenant l'expression **jusqu'à sa définition** — et il reste rouge quand on
+  réaffaiblit la fonction (prouvé).
+- Le banc couvre les **trois** états, y compris « sonde muette : aucune promesse
+  **et** aucune accusation ». Sur le build d'avant, c'est la sonde muette qui
+  échouait aussi : elle promettait l'isolation sans avoir rien pu mesurer.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
@@ -2141,7 +2232,7 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
 | `node scripts/audit-*.cjs` | **34 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
-| `scripts/bancs/*.cjs` | les **19 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
+| `scripts/bancs/*.cjs` | les **20 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
 **Trois règles de preuve :**
