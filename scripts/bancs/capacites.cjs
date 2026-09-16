@@ -78,7 +78,10 @@ const BANDEAU=/prix plancher[^\n]*rien ne les applique/i;
 
 (async()=>{
   const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-angle=swiftshader','--no-sandbox']});
-  const lis=async (pont, onglet)=>{
+  // `diagVer` : ce que la ligne de diagnostic dit de la version qui a capté en
+  // DERNIER — `undefined` la ligne n'existe pas · 'KO' la lecture échoue ·
+  // sinon la version. C'est un CONSTAT, jamais une capacité (voir ci-dessous).
+  const lis=async (pont, onglet, diagVer)=>{
     const pg=await b.newPage({viewport:{width:1512,height:950}});
     const errs=[]; pg.on('pageerror',e=>errs.push(e.message));
     await pg.addInitScript((v)=>{
@@ -99,6 +102,11 @@ const BANDEAU=/prix plancher[^\n]*rien ne les applique/i;
       if(/vinted_accounts/.test(u)) return j(accounts);
       if(/id=eq\.main/.test(u)) return j(main.map(r=>projette(r,S)));
       if(/transaction->>id/.test(u)) return j(txn);
+      if(/id=eq\.panel_diag_capture/.test(u)){
+        if(diagVer==='KO') return route.fulfill({status:522,contentType:'text/html',headers:{'access-control-allow-origin':'*'},body:'<html>522</html>'});
+        if(diagVer===undefined) return j([]);
+        return j([{ver:diagVer, verAt:new Date(Date.now()-3*3600e3).toISOString()}]);
+      }
       const eq=/id=eq\.([^&]*)/.exec(u); if(eq){const k=decodeURIComponent(eq[1]);return j(rows.filter(r=>r.id===k).map(r=>projette(r,S)));}
       const m=/id=like\.([^&]*)/.exec(u); if(m){const pat=decodeURIComponent(m[1]).replace(/[*%]/g,'.*');const re=new RegExp('^'+pat+'$');
         return j(rows.filter(r=>re.test(r.id)).map(r=>projette(r,S)));}
@@ -113,7 +121,7 @@ const BANDEAU=/prix plancher[^\n]*rien ne les applique/i;
       return {numeros:Object.keys(n).length, avecMin:avec.length, ex:avec[0]||null,
         planchTexte:/prix plancher/i.test(document.body.innerText||''), cartes:document.querySelectorAll('img').length};
     })));
-    const nom=(onglet||'ann')+'-'+(pont===null?'absente':(pont===''?'muette':pont));
+    const nom=(onglet||'ann')+'-'+(pont===null?'absente':(pont===''?'muette':pont))+(diagVer===undefined?'':'-diag'+String(diagVer).replace(/\./g,'_'));
     await pg.screenshot({path:SC+'/z-cap-'+nom.replace(/\./g,'_')+'.png',fullPage:true});
     await pg.close();
     return {t, errs};
@@ -270,6 +278,54 @@ const BANDEAU=/prix plancher[^\n]*rien ne les applique/i;
     // La version qui change le comportement est NOMMEE quand elle manque.
     dit(/5\.58\.0/.test(retard), 'et en retard, il NOMME la version qui attache les photos',
       '« mets-la a jour » sans numero ne dit pas quoi verifier');
+  }
+
+  // ── DEPUIS SON iPHONE, QUELLE VERSION A VRAIMENT CAPTE ? ─────────────────
+  // Le pont n'existe que dans le Chrome ou l'extension est installee : sur son
+  // telephone, l'app ne pouvait PAS repondre « est-elle a jour ? » — la
+  // question qu'il pose justement la. L'extension inscrit desormais sa version
+  // dans sa ligne de diagnostic a chaque capture.
+  // ⚠️ C'EST UN CONSTAT, PAS UNE CAPACITE : cette version est celle de
+  // l'extension qui a capte EN DERNIER, quelque part. Le banc exige donc les
+  // deux moitiés — qu'elle soit DITE quand on la connait, et qu'elle ne
+  // devienne JAMAIS une promesse sur ce navigateur-ci.
+  {
+    const EXT = (/const EXT_ATTENDUE = '([^']+)'/.exec(fs.readFileSync(path.join(__dirname,'..','..','src','App.jsx'),'utf8'))||[])[1]||'';
+    // ⚠️⚠️ ON LIT LA PHRASE, PAS LA PAGE. Mon premier jet cherchait le numero de
+    //    version dans TOUT l'ecran : or « Telecharger l'extension 5.62.0 » y est
+    //    deja, et « · a jour » aussi. Les deux controles passaient donc au VERT
+    //    sur le code d'avant — verts par accident, c'est-a-dire pires qu'absents
+    //    (meme famille que le DIST absolu des quatorze bancs). On decoupe la
+    //    phrase qui parle de la DERNIERE CAPTURE et on juge dedans.
+    const phrase = (t) => { const m = /derni[eè]re capture[\s\S]{0,260}/i.exec(t); return m ? m[0] : ''; };
+
+    const aJour = await lis(null, 'settings', EXT);
+    const pA = phrase(aJour.t);
+    dit(!!pA, 'sans extension ici, l\'app dit d\'ou vient la DERNIERE capture');
+    dit(pA.includes(EXT), 'et cette phrase-la NOMME la version qui a capte', 'attendu ' + EXT + ' dans « ' + pA.slice(0, 90) + ' »');
+    dit(/[àa] jour/i.test(pA), 'a jour : elle le dit dans la meme phrase, et ne reclame rien', pA.slice(0, 90));
+    dit(aJour.errs.length===0, 'aucune erreur d\'app (version a jour)', aJour.errs.slice(0,2).join(' | '));
+
+    const vieille = await lis(null, 'settings', '5.41.0');
+    const pV = phrase(vieille.t);
+    dit(pV.includes('5.41.0'), 'une vieille version captee est nommee dans cette phrase', pV.slice(0, 90));
+    dit(/remplacer|remplace/i.test(pV), 'et le geste y est le REMPLACEMENT du dossier, pas un rechargement', pV.slice(0, 90));
+
+    // ⚠️ RIEN LU NE VAUT PAS RIEN, et « aucune ligne » ne vaut pas « ancienne ».
+    //    Dans les deux cas on n'invente aucune version.
+    const absente = await lis(null, 'settings', undefined);
+    dit(!/derni[eè]re capture/i.test(absente.t), 'ligne de diagnostic absente : aucune version inventee');
+    const ko2 = await lis(null, 'settings', 'KO');
+    dit(!/derni[eè]re capture/i.test(ko2.t), 'lecture ratee : aucune version inventee non plus');
+
+    // ⚠️ ET SURTOUT : connaitre la version ne doit RIEN promettre ici. Sans
+    //    extension dans ce navigateur, l'ecran ne peut pas annoncer qu'elle
+    //    travaille sur cette page.
+    dit(/pas d[ée]tect[ée]e ici/i.test(aJour.t),
+      'et l\'ecran dit toujours qu\'aucune extension ne tourne DANS CE navigateur',
+      'une version connue ne vaut pas une extension presente');
+    dit(!/branch[ée]e sur cette page/i.test(aJour.t),
+      'il ne promet pas qu\'elle est branchee sur cette page');
   }
 
   await b.close(); srv.close();

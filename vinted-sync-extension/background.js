@@ -444,8 +444,23 @@ async function viderTampon(buf) {
   // partent à chaque capture (des centaines de fois par jour) alors qu'un
   // échantillon n'est posé que sur un échec, la preuve était détruite dans la
   // minute (constaté le 24 août).
+  // ⚠️⚠️ LA VERSION QUI A VRAIMENT TOURNÉ — ET C'EST UNE MESURE, PAS UNE DÉDUCTION.
+  // Le dossier le répète : « ne pas redéduire une version d'un compteur à zéro ».
+  // Trois sessions de suite ont pourtant dû la DEVINER (« aucun `retrait_*` donc
+  // antérieure à 5.45 »), et une de ces déductions était fausse. Le pont
+  // (`bridge.js`) l'annonce, mais uniquement quand l'app est ouverte dans LE
+  // Chrome où l'extension est installée : depuis son iPhone, ou depuis une
+  // session comme celle-ci, personne ne peut la lire.
+  // ⚠️ C'EST UN DIAGNOSTIC, PAS UNE CAPACITÉ. Cette version est celle de
+  // l'extension qui a capté EN DERNIER, quelque part — jamais celle du
+  // navigateur qui lit l'app. `extSait()` continue donc de n'écouter QUE le
+  // pont : décider ce qu'on promet sur cette valeur-ci serait promettre à un
+  // iPhone ce qu'un Chrome sait faire, c'est-à-dire le défaut le plus coûteux
+  // du projet. `audit-coherence.cjs` l'interdit.
+  const ver = (() => { try { return String(chrome.runtime.getManifest().version || ''); } catch (_) { return ''; } })();
   await supabaseUpsert('app_data', [{ id: 'panel_diag_capture', data: {
     ...tout, n, rates: { ...(tout.rates || {}), ...(buf.rates || {}) }, majAt: new Date().toISOString(),
+    ...(ver ? { ver, verAt: new Date().toISOString() } : {}),
   } }], 'id');
   buf.n = {}; buf.rates = {};
   try { await chrome.storage.local.set({ [DIAG_BUF]: buf }); } catch (_) {}
