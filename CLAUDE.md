@@ -2048,8 +2048,7 @@ découvre l'app.
   (⚙️ → Comptes liés) » disait la même chose en plus petit. Elle ne reste que
   pour le cas où la journée a **quand même** des actions sans aucun compte lié
   (des colis repérés par email) — là seulement elle apprend quelque chose.
-- `scripts/bancs/premierjour.cjs` : **36 contrôles, 15 rouges** sur un vrai
-  build d'avant (§6.1). ⚠️ **Il n'a besoin d'AUCUNE fixture** — une installation
+- `scripts/bancs/premierjour.cjs` : **42 contrôles**, et 10 rouges de plus sur le build d'avant (§6.1). ⚠️ **Il n'a besoin d'AUCUNE fixture** — une installation
   neuve, c'est une base vide : rien de réel ne transite, il vit donc entièrement
   dans le dépôt.
   - Le contrôle du prénom ne cherche **pas le mot « Julien »** (ce serait posé
@@ -2097,6 +2096,64 @@ celui qui bloque ; les étapes faites portent une coche.
 - Le banc rejoue le **vrai dialogue du pont** (`postMessage` `ready` /
   `authEtat`) : c'est la seule façon de rendre les cinq états sans Chrome.
   **36 contrôles** au total, **6 rouges** de plus sur le build d'il y a une heure.
+
+### ⚠️⚠️ « CE N'EST PAS NATUREL » — L'ACCUEIL ÉTAIT UNE NOTICE DE MONTAGE
+Julien, 16 septembre, en regardant le premier écran : « bien mais pas encore
+parfait, **ce n'est pas naturel** ». Il avait raison, et c'est §2.7 mot pour
+mot : quatre étapes numérotées d'un coup, « dézippe », « Mode développeur »,
+« extension non empaquetée » — du vocabulaire d'informaticien sur la toute
+première page, à quelqu'un qui n'en est pas un.
+⇒ **UNE seule étape à la fois**, en gros et en français ; les autres restent
+visibles **en sourdine** (on veut savoir ce qui reste, pas tout lire). Une barre
+de progression à trois segments, et l'écran **avance tout seul** — le pont
+prévient dès que l'extension répond, et **on le dit** : c'est ça qui fait qu'on
+se sent accompagné plutôt que mis au travail. Quatre étapes sont devenues
+**trois** : télécharger et installer, c'est UN geste vu de l'utilisateur.
+- **Le prénom se demande à l'inscription**, pas dans Réglages : c'est la
+  question la plus naturelle du monde à ce moment-là, et personne ne va la
+  chercher dans un écran de réglages. **Facultatif** — un champ obligatoire de
+  plus pour un bonjour serait un péage. Même réglage `vrm_prenom` que le champ
+  de Réglages (§11).
+- ⚠️⚠️ **IL Y AVAIT DEUX ONBOARDINGS, ET ILS NE DISAIENT PAS LA MÊME CHOSE.**
+  Le tableau de bord récitait « 3 étapes » — **sans lien de téléchargement**,
+  en nommant « Shop Cancale35 – Vinted Sync » (**la boutique de quelqu'un
+  d'autre**, pour un nouveau venu), et **sans l'étape qui sépare les vendeurs**
+  (se connecter à l'extension avec le même email). Ma journée en disait quatre,
+  mesurées. Deux écrans, deux consignes, sur les deux premières pages. §11.
+  ⇒ `PremiersPas` porte la règle, les deux écrans la **rendent**. Le banc exige
+  que **les trois gestes soient nommés sur les DEUX** — chacun identifié par ce
+  qu'il DÉSIGNE (une adresse, une notion, un domaine), jamais par sa phrase.
+- ⚠️⚠️ **ET LE TABLEAU DE BORD FÊTAIT « ✅ Tout est à jour » JUSTE SOUS LA CARTE
+  QUI VENAIT D'EXPLIQUER QUE RIEN N'ÉTAIT BRANCHÉ** — un écran qui se contredit
+  à deux centimètres d'écart. C'est le **troisième** « tout est à jour » du même
+  écran (§ « ce banc ne rendait que les 4 écrans »), et le premier vu sur une
+  installation neuve. La carte du dessus dit déjà quoi faire : ici on se tait
+  (§7, une cause une phrase).
+  ⇒ « c'est son premier jour » est UNE notion : elle est décidée **dans la
+  coque** (`premierJour`) et consommée par les trois écrans.
+- ⚠️ **Leboncoin fêtait « Tout est publié 🎉 (toutes tes paires numérotées en
+  ligne sont sur Leboncoin) » sur une base à ZÉRO annonce.** Troisième cause
+  d'une file vide, après « lecture ratée » et « tout décoché » : *il n'y a
+  encore rien*. Une cause connue se dit. Quatrième cause au passage : des
+  annonces en ligne mais **aucune numérotée**.
+- ⚠️ **« Réception des emails · 3 transporteurs silencieux »**, en ambre, avec
+  trois « aucun email reçu » en ROUGE — à quelqu'un qui vient de créer son
+  compte. Rien ne se tait : **rien n'a commencé**. Trois états, jamais deux —
+  et une fausse alerte est ce qui fait cesser de lire les vraies.
+  ⚠️ **§4.6 PAYÉ CASH, ENCORE** : posé après `detail` (un élément JSX construit
+  IMMÉDIATEMENT), `aucunEmailDeSuivi` a tué l'écran Achats sur « Cannot access
+  before initialization ». **C'est le RENDU qui l'a vu**, pas le build.
+- ⚠️ **VINGT-TROISIÈME fois qu'un de mes contrôles crie au loup**, et quatre
+  d'un coup : ils cherchaient les PHRASES d'avant (« pas connectée à ton
+  compte », « AUTRE compte », « n'a pas répondu »). Les états étaient tous
+  corrects — seul le texte avait changé, et il devait changer, c'était la
+  demande. ⇒ **La carte PORTE l'état décidé** (`data-etape`) et le banc juge
+  **l'état et ses conséquences** (quel bouton, quelles adresses nommées) ; le
+  texte reste libre. C'est la seule forme qui survive à une réécriture.
+- ⚠️ **Et le banc MOURAIT sur un port déjà pris** (EADDRINUSE) au lieu de
+  rapporter — septième fois. Il dit maintenant « le port est pris, relance-le
+  seul ».
+- **10 rouges** sur le build d'il y a une heure, 0 après.
 
 ### ⚠️⚠️ LA PORTE D'ENTRÉE PROMETTAIT UNE PROTECTION QU'ELLE N'AVAIT PAS MESURÉE
 Même passe, même écran d'accueil — mais **avant** la connexion. La dernière

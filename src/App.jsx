@@ -4737,6 +4737,18 @@ function ReceptionEmails({ tracking, comptes, colisParTransporteur }) {
     if (!parCompte || !comptes || !comptes.length) return [];
     return comptes.filter(a => { const l = String(a.login || '').trim(); return l && !parCompte[l]; });
   }, [parCompte, comptes]);
+  // ⚠️⚠️ « ON LES ATTEND » N'EST PAS VRAI LE PREMIER JOUR. Vu au rendu le
+  //    16 septembre sur une installation neuve : « Réception des emails ·
+  //    3 transporteurs silencieux », en ambre, avec trois « aucun email reçu »
+  //    en rouge — à quelqu'un qui vient de créer son compte et n'a encore rien
+  //    acheté. Rien ne se tait : rien n'a commencé. Une fausse alerte est ce
+  //    qui fait cesser de lire les vraies (leçon du panneau de sécurité et du
+  //    compte exclu). Trois états, jamais deux : jamais rien reçu · certains
+  //    muets · tout arrive.
+  // ⚠️ §4.6 : `detail` est un élément JSX construit IMMÉDIATEMENT, et il lit
+  //    cette valeur — posée plus bas, l'écran Achats mourait sur « Cannot
+  //    access before initialization ». C'est le RENDU qui l'a vu, pas le build.
+  const aucunEmailDeSuivi = lignes.every(([, v]) => !v.ts);
   const ligne = { display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 };
   // Le DÉTAIL (transporteurs + comptes, un par ligne) : c'est la preuve, pas
   // l'alerte. Il vit derrière un dépliant dans les deux cas, pour que l'écran
@@ -4753,8 +4765,8 @@ function ReceptionEmails({ tracking, comptes, colisParTransporteur }) {
                 {carrierName(k)}
                 {nColis>0 && <b style={{color:C.accent}}> · {nColis} colis à retirer</b>}
               </div>
-              <div style={{color:v.ts?(Date.now()-v.ts<3*86400000?(C.ok||C.accent):C.warn):C.danger,fontWeight:600,flexShrink:0,textAlign:'right'}}>
-                {v.ts ? `${v.n} email${v.n>1?'s':''} · ${age(v.ts)}` : 'aucun email reçu'}
+              <div style={{color:v.ts?(Date.now()-v.ts<3*86400000?(C.ok||C.accent):C.warn):(aucunEmailDeSuivi?C.muted:C.danger),fontWeight:600,flexShrink:0,textAlign:'right'}}>
+                {v.ts ? `${v.n} email${v.n>1?'s':''} · ${age(v.ts)}` : aucunEmailDeSuivi ? 'rien encore' : 'aucun email reçu'}
               </div>
             </div>
           );
@@ -4801,8 +4813,7 @@ function ReceptionEmails({ tracking, comptes, colisParTransporteur }) {
       )}
     </>
   );
-  // Combien de transporteurs se taisent alors qu'on les attend.
-  const muetsTr = lignes.filter(([, v]) => !v.ts).length;
+  const muetsTr = aucunEmailDeSuivi ? 0 : lignes.filter(([, v]) => !v.ts).length;
   const probleme = muets.length > 0 || nInc > 0;
   // ── QUAND QUELQUE CHOSE CLOCHE : on le NOMME, avec le geste à faire.
   //    Un compte muet est le cas grave : ses codes de retrait n'arrivent jamais.
@@ -4824,8 +4835,12 @@ function ReceptionEmails({ tracking, comptes, colisParTransporteur }) {
   return (
     <details style={{marginBottom:10}}>
       <summary style={{listStyle:'none',cursor:'pointer',display:'flex',alignItems:'center',gap:7,fontSize:11.5,color:C.muted,padding:'2px 0'}}>
-        <span aria-hidden="true" style={{color:muetsTr?C.warn:(C.ok||C.accent),display:'flex'}}><Icon name={muetsTr?'alert':'check'} size={14}/></span>
-        Réception des emails{muetsTr>0 ? ` · ${muetsTr} transporteur${muetsTr>1?'s':''} silencieux` : ' · tout arrive'}
+        {/* ⚠️ Ni triangle ambre (rien ne cloche), ni coche verte (rien n'est
+            confirmé non plus) : gris, comme une sonde qui n'a pas encore de
+            quoi répondre. */}
+        <span aria-hidden="true" style={{color:muetsTr?C.warn:aucunEmailDeSuivi?C.muted:(C.ok||C.accent),display:'flex'}}><Icon name={muetsTr?'alert':aucunEmailDeSuivi?'clock':'check'} size={14}/></span>
+        Réception des emails{muetsTr>0 ? ` · ${muetsTr} transporteur${muetsTr>1?'s':''} silencieux`
+          : aucunEmailDeSuivi ? ' · aucun email de suivi reçu pour l’instant' : ' · tout arrive'}
       </summary>
       <div style={{marginTop:8,border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'10px 12px'}}>{detail}</div>
     </details>
@@ -5441,6 +5456,10 @@ function AuthScreen() {
   const [codeErr, setCodeErr] = React.useState('');
   const [mode, setMode] = React.useState(() => (AUTH_REDIRECT && AUTH_REDIRECT.recovery) ? 'newpw' : 'in'); // in · up · reset · newpw
   const [email, setEmail] = React.useState('');
+  // Le prénom demandé à l'inscription : il sert au bonjour de l'accueil, rien
+  // d'autre. Rangé dans le même réglage synchronisé que le champ de Réglages
+  // (§11) — un seul propriétaire, `vrm_prenom`.
+  const [prenom, setPrenom] = React.useState('');
   const [pw, setPw] = React.useState('');
   const [busy, setBusy] = React.useState(false);
   const [err, setErr] = React.useState(() => (AUTH_REDIRECT && AUTH_REDIRECT.error) || '');
@@ -5474,6 +5493,10 @@ function AuthScreen() {
         // ce formulaire dirait à n'importe qui quels emails sont inscrits.
         setInfo("Si un compte existe avec cet email, tu vas recevoir un lien pour choisir un nouveau mot de passe.");
       } else if (mode === 'up') {
+        // On l'écrit AVANT de partir : `save` range dans le navigateur et le
+        // nuage suivra à la première synchro. Écrit seulement s'il l'a donné —
+        // on n'invente pas un prénom vide (§5 : mieux vaut un blanc qu'un faux).
+        try { if (prenom.trim()) save('vrm_prenom', prenom.trim()); } catch (_) {}
         const r = await authSignUp(email, pw);
         if (!r.ok) setErr(r.error);
         else if (r.needsConfirm) setInfo("Compte créé ! Ouvre l'email de confirmation qu'on vient de t'envoyer, puis reviens te connecter.");
@@ -5547,6 +5570,16 @@ function AuthScreen() {
             </div>
           )}
 
+          {/* ⚠️ LE PRÉNOM SE DEMANDE ICI, ET NULLE PART AILLEURS. L'accueil dit
+              « Bonjour » tout court tant qu'on ne le connaît pas — c'est honnête
+              mais froid, et aller le chercher dans Réglages, personne ne le
+              fait. À la création du compte, c'est la question la plus naturelle
+              du monde. Facultatif : un champ obligatoire de plus pour un
+              bonjour serait un péage. */}
+          {mode==='up' && (
+            <input type="text" autoComplete="given-name" placeholder="Ton prénom (facultatif)"
+              value={prenom} onChange={e=>setPrenom(e.target.value.slice(0,24))} style={{...field, marginBottom:9}}/>
+          )}
           {mode!=='newpw' && (
             <input type="email" inputMode="email" autoComplete="email" autoCapitalize="none" placeholder="Email"
               value={email} onChange={e=>setEmail(e.target.value)} style={{...field, marginBottom:9}}/>
@@ -5825,52 +5858,203 @@ function LignePanne({ children }) {
   );
 }
 
-function Onboarding({ setTab }) {
-  // L'étape 1 se VÉRIFIE : l'extension se signale à l'app (bridge.js). Cocher
-  // « fait » soi-même n'apprend rien ; savoir qu'elle répond, si.
-  const [ext, setExt] = useState(() => ({ on: vmrExtPresent(), v: vmrExtVersion() }));
-  useEffect(() => onVmrExt(() => setExt({ on: vmrExtPresent(), v: vmrExtVersion() })), []);
-  const steps = [
-    { n:1, t:'Installe l\'extension Chrome', ok: ext.on,
-      d: ext.on ? `Elle répond sur cette page${ext.v ? ` (version ${ext.v})` : ''} — étape faite.`
-                : '« Shop Cancale35 – Vinted Sync » (mode développeur). Elle synchronise tes données Vinted en toute discrétion, sans jamais toucher à ton mot de passe. Sur téléphone, il n\'y a pas d\'extension : installe-la sur l\'ordinateur.' },
-    { n:2, t:'Connecte-toi sur vinted.fr', d:'Ouvre ta boutique une fois, connecté. L\'extension capte automatiquement ton compte et tes annonces — aucune manip supplémentaire.' },
-    { n:3, t:'Reviens ici', d:'Tes annonces, ventes, achats et messages apparaissent tout seuls. Mets un numéro sur chaque paire pour la retrouver au garage et sur le bordereau.' },
+// ══════════════════════════════════════════════════════════════════════════════
+//  LES PREMIERS PAS — UNE SEULE RÈGLE, DEUX ÉCRANS (§11)
+// ══════════════════════════════════════════════════════════════════════════════
+// ⚠️⚠️ IL Y AVAIT DEUX ONBOARDINGS, ET ILS NE DISAIENT PAS LA MÊME CHOSE.
+// Mesuré au rendu le 16 septembre sur une installation neuve : le tableau de
+// bord récitait « 3 étapes » (installe « Shop Cancale35 – Vinted Sync », va sur
+// vinted.fr, reviens ici) — SANS lien de téléchargement, avec le nom de la
+// boutique de quelqu'un d'autre, et surtout SANS l'étape qui sépare les
+// vendeurs : se connecter à l'extension avec le même email. Ma journée, elle,
+// en disait quatre, mesurées. Deux écrans, deux consignes, sur les deux
+// premières pages que voit une nouvelle personne. C'est §11 mot pour mot.
+// ⇒ La règle vit ICI. Les deux écrans la RENDENT, ils ne la réécrivent pas.
+//
+// ⚠️ TROIS ÉTATS PARTOUT : le pont dit si l'extension tourne dans CE
+// navigateur, `vmrAuthEtat` sous quel compte elle écrit — et « pas su » ne vaut
+// ni oui ni non.
+function useEtapePont() {
+  const [pont, setPont] = React.useState(() => ({ on: vmrExtPresent(), v: vmrExtVersion() }));
+  React.useEffect(() => onVmrExt(() => setPont({ on: vmrExtPresent(), v: vmrExtVersion() })), []);
+  // `undefined` = on demande · `null` = l'extension n'a pas répondu · objet = mesuré.
+  const [extAuth, setExtAuth] = React.useState(undefined);
+  React.useEffect(() => {
+    let stop = false;
+    (async () => {
+      if (!pont.on) { if (!stop) setExtAuth(null); return; }
+      const e = await vmrAuthEtat();
+      if (!stop) setExtAuth(e);
+    })();
+    return () => { stop = true; };
+  }, [pont.on]);
+  // Le compte sous lequel l'extension écrit est-il CELUI-CI ? C'est une
+  // identité (la même adresse), pas une ressemblance. Si elle écrit sous une
+  // autre, ses captures partent chez l'autre vendeur et cette boutique reste
+  // vide pour toujours — sans que rien ne le dise.
+  const monMail = String((AUTH.user && AUTH.user.email) || '').trim().toLowerCase();
+  const sonMail = String((extAuth && extAuth.email) || '').trim().toLowerCase();
+  const etape = !pont.on ? 'absente'
+    : extAuth === undefined ? 'demande'
+    : !extAuth ? 'muette'
+    : !extAuth.connecte ? 'pasconnectee'
+    : (monMail && sonMail && monMail !== sonMail) ? 'autrecompte'
+    : 'connectee';
+  return { pont, extAuth, etape };
+}
+
+// `titreNeuf` : ce que dit le titre quand rien n'est encore branché. Les deux
+// écrans n'ouvrent pas la même conversation (« Bienvenue » sur le tableau de
+// bord, « ta journée est vide » sur l'accueil) — mais les ÉTAPES, elles, sont
+// les mêmes, et c'est tout ce qui compte.
+function PremiersPas({ onNav, titreNeuf, introNeuf }) {
+  const { extAuth, etape } = useEtapePont();
+  // ⚠️⚠️ « CE N'EST PAS NATUREL » — Julien, 16 septembre, en regardant le
+  //    premier écran. Il avait raison : c'était une notice de montage. Quatre
+  //    étapes numérotées d'un coup, « Mode développeur », « extension non
+  //    empaquetée », « dézippe » — du vocabulaire d'informaticien (§2.7) sur la
+  //    toute première page, à quelqu'un qui n'en est pas un.
+  //    ⇒ UNE SEULE étape à la fois, en gros et en français ; les autres restent
+  //      visibles mais en sourdine, pour savoir où on en est. L'écran AVANCE
+  //      TOUT SEUL (le pont prévient), et il le dit — c'est ça qui fait qu'on
+  //      se sent accompagné plutôt que mis au travail.
+  const fait = { ext: etape !== 'absente' && etape !== 'demande', lien: etape === 'connectee' };
+  // L'étape COURANTE, mesurée. Jamais « coche ce que tu as fait » : savoir
+  // qu'elle répond vaut mieux qu'une case à cocher.
+  const n = !fait.ext ? 1 : !fait.lien ? 2 : 3;
+  const ETAPES = [
+    { t: 'Installer l’extension dans Chrome', c: 'extension' },
+    { t: 'La connecter avec le même email que VRM', c: 'lien' },
+    { t: 'Passer une fois sur vinted.fr', c: 'vinted' },
   ];
+
+  // ── CE QUI SE PASSE MAINTENANT, en une phrase qu'on lit sans effort ───────
+  const titre = etape === 'autrecompte' ? 'Ton extension range dans une autre boutique'
+    : etape === 'pasconnectee' ? 'Plus qu’une chose : lui dire que c’est toi'
+    : etape === 'connectee' ? 'Tout est prêt — il ne manque qu’un tour sur Vinted'
+    : (titreNeuf || 'Bienvenue — on branche ta boutique en trois minutes');
+
+  const corps = etape === 'autrecompte' ? (
+    <>
+      <p style={{margin:'0 0 10px'}}>
+        Dans Chrome, l’extension est connectée sous <b style={{color:C.text}}>{extAuth.email}</b>. Toi, tu es sur <b style={{color:C.text}}>{(AUTH.user&&AUTH.user.email)||'ce compte'}</b>.
+      </p>
+      <p style={{margin:0}}>
+        Du coup, tout ce qu’elle lit sur Vinted part dans l’autre boutique, et celle-ci reste vide.
+        Clique son icône en haut de Chrome, déconnecte-la, et reconnecte-la avec <b style={{color:C.text}}>{(AUTH.user&&AUTH.user.email)||'ton email'}</b>.
+      </p>
+    </>
+  ) : etape === 'pasconnectee' ? (
+    <>
+      <p style={{margin:'0 0 10px'}}>Je vois bien ton extension dans ce navigateur 👍 — mais elle ne sait pas encore à qui elle a affaire, alors elle n’a nulle part où ranger ce qu’elle lit.</p>
+      <p style={{margin:0}}>Clique son icône en haut de Chrome, puis entre <b style={{color:C.text}}>le même email et le même mot de passe</b> qu’ici. C’est ce qui envoie tes données chez toi, et nulle part ailleurs.</p>
+    </>
+  ) : etape === 'connectee' ? (
+    <>
+      <p style={{margin:'0 0 10px'}}>Ton extension tourne et elle écrit bien sous ton compte. Elle ne va rien chercher d’elle-même : elle range ce que Vinted affiche quand <b style={{color:C.text}}>toi</b> tu y passes.</p>
+      <p style={{margin:0}}>Ouvre <b style={{color:C.text}}>vinted.fr</b>, connecté à ton compte, et fais un tour sur ton dressing. Tes annonces, ventes, achats et messages arrivent ici tout seuls.</p>
+    </>
+  ) : etape === 'muette' ? (
+    <p style={{margin:0}}>Ton extension est bien là, mais elle ne m’a pas répondu quand je lui ai demandé sous quel compte elle écrit. Recharge la page, je lui redemande.</p>
+  ) : (
+    <>
+      {introNeuf ? <p style={{margin:'0 0 10px'}}>{introNeuf}</p> : (
+        <p style={{margin:'0 0 10px'}}>VRM ne va rien chercher tout seul sur Vinted. C’est une petite extension, installée dans ton navigateur, qui lit tes pages Vinted quand tu y passes et range tout ici. Elle ne touche jamais à ton mot de passe Vinted.</p>
+      )}
+      <p style={{margin:'0 0 4px'}}>Commence par la télécharger. Ensuite&nbsp;:</p>
+      <ul style={{margin:'6px 0 0',padding:'0 0 0 18px',lineHeight:1.7}}>
+        <li>ouvre le fichier pour le décompresser&nbsp;— tu obtiens un dossier <b style={{color:C.text}}>VRM-extension</b>&nbsp;;</li>
+        <li>dans Chrome, va sur <code style={{fontSize:12,background:C.bg,padding:'1px 5px',borderRadius:5}}>chrome://extensions</code>&nbsp;;</li>
+        <li>allume l’interrupteur <b style={{color:C.text}}>Mode développeur</b>, en haut à droite. C’est normal&nbsp;: cette extension est la tienne, elle n’est pas sur le magasin de Chrome&nbsp;;</li>
+        <li>clique <b style={{color:C.text}}>Charger l’extension non empaquetée</b> et choisis le dossier.</li>
+      </ul>
+    </>
+  );
+
+  // ⚠️ Le bouton propose le geste qui DÉBLOQUE, jamais le suivant : envoyer sur
+  //    Vinted quelqu'un dont l'extension n'est pas connectée, c'est le faire
+  //    capter dans le vide — et dans le cas « autre compte », dans la boutique
+  //    d'un autre. Quand le geste se passe dans Chrome (cliquer l'icône de
+  //    l'extension), une page web ne peut pas l'ouvrir : on ne met alors AUCUN
+  //    bouton principal.
+  const bouton = !fait.ext
+    ? <a href="/VRM-extension.zip" download style={{textDecoration:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'12px 18px',fontSize:14,fontWeight:600}}>Télécharger l’extension</a>
+    : etape === 'connectee'
+      ? <a href="https://www.vinted.fr" target="_blank" rel="noreferrer" style={{textDecoration:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'12px 18px',fontSize:14,fontWeight:600}}>Ouvrir vinted.fr</a>
+      : null;
+
+  return (
+    /* ⚠️ L'ÉTAT DÉCIDÉ EST PORTÉ PAR LA CARTE (`data-etape`). Un contrôle posé
+       sur la PHRASE est vert le jour où quelqu'un reformule — c'est arrivé
+       vingt-trois fois dans ce projet. Le banc juge l'état rendu et ses
+       conséquences (quel bouton, quelles adresses nommées) ; le texte reste
+       libre. */
+    <div data-etape={etape} style={{padding:'22px 20px',border:`1px solid ${etape==='autrecompte'?C.warn+'66':C.border}`,borderRadius:12,background:C.card}}>
+      {/* Où on en est — trois pastilles, lisibles d'un coup d'œil. */}
+      <div style={{display:'flex',gap:6,marginBottom:14}}>
+        {ETAPES.map((e,k)=>(
+          <span key={e.c} style={{flex:1,height:4,borderRadius:999,background:(k+1)<n?(INV_STATUS.online.color):(k+1)===n?C.accent:C.border}}/>
+        ))}
+      </div>
+      <div style={{fontSize:18,fontWeight:700,color:C.text,letterSpacing:-0.3}}>{titre}</div>
+      <div style={{fontSize:13.5,color:C.muted,marginTop:7,lineHeight:1.6}}>{corps}</div>
+
+      {(bouton || onNav) && (
+        <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:16,alignItems:'center'}}>
+          {bouton}
+          <button type="button" onClick={()=>onNav&&onNav('vintedaccounts')} style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'12px 18px',fontSize:14,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Voir mes comptes liés</button>
+        </div>
+      )}
+
+      {/* Les autres étapes restent VISIBLES, en sourdine : savoir ce qui reste
+          rassure, le détail de chacune arrive à son tour. */}
+      <ol style={{margin:'12px 0 0',padding:'0 0 0 18px',fontSize:12,color:C.muted,lineHeight:1.9}}>
+        {ETAPES.map((e,k)=>(
+          <li key={e.c} style={{color:(k+1)===n?C.text:C.muted,fontWeight:(k+1)===n?600:400}}>
+            {(k+1)<n && <span style={{color:INV_STATUS.online.color,fontWeight:700,marginRight:5}}>✓</span>}{e.t}
+          </li>
+        ))}
+      </ol>
+      {/* L'écran avance TOUT SEUL : le pont prévient dès que l'extension
+          répond. Le dire, c'est la différence entre « on t'accompagne » et
+          « débrouille-toi ». On ne promet aucun délai pour autant. */}
+      <div style={{fontSize:11.5,color:C.muted,marginTop:14,paddingTop:12,borderTop:`1px solid ${C.border}`,lineHeight:1.55}}>
+        {etape==='absente'
+          ? <>Je regarde en direct&nbsp;: dès que l’extension est là, cet écran passe à la suite tout seul. Sur téléphone il n’y a pas d’extension Chrome — fais-le une fois sur un ordinateur, tes données seront ensuite partout.</>
+          : etape==='muette' ? <>Rien n’est perdu&nbsp;: c’est la question qui n’a pas abouti, pas tes données.</>
+          : <>Cet écran suit tout seul&nbsp;: dès que c’est fait, il passe à la suite.</>}
+      </div>
+
+    </div>
+  );
+}
+
+function Onboarding({ setTab }) {
+  // ⚠️ LES ÉTAPES NE VIVENT PLUS ICI (§11). Cet écran ouvre la conversation
+  //    (« Bienvenue »), `PremiersPas` dit quoi faire — et c'est la MÊME chose
+  //    que sur Ma journée, forcément, puisque c'est le même composant.
   return (
     <div style={{padding:'20px 16px 8px'}}>
-      <div style={{borderRadius:12,border:`1px solid ${C.border}`,background:C.card,padding:'22px 20px',boxShadow:'0 1px 3px rgba(0,0,0,.04)'}}>
-        <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:10}}>
-          <VrmLogo size={44}/>
+      <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:12}}>
+        <VrmLogo size={44}/>
+        <div>
           <div style={{fontSize:22,fontWeight:700,color:C.text,letterSpacing:'-0.02em'}}>Bienvenue 👋</div>
+          <div style={{fontSize:13.5,color:C.muted,lineHeight:1.45,marginTop:2}}>
+            Ton poste de pilotage&nbsp;: ce que tu vends, où c'est rangé, ce que ça te rapporte.
+          </div>
         </div>
-        <div style={{fontSize:15,color:C.muted,lineHeight:1.5,marginBottom:20}}>
-          Ton poste de pilotage : ce que tu vends, où c'est rangé, ce que ça te rapporte. Connecte ton compte Vinted pour commencer — c'est parti en 3 étapes :
-        </div>
-        <div style={{display:'flex',flexDirection:'column',gap:14}}>
-          {steps.map(s=>(
-            <div key={s.n} style={{display:'flex',gap:14,alignItems:'flex-start'}}>
-              <div style={{flexShrink:0,width:32,height:32,borderRadius:8,background:s.ok?INV_STATUS.online.color:C.accent,color:C.onAccent,display:'flex',alignItems:'center',justifyContent:'center',fontSize:15,fontWeight:700}}>{s.ok?'✓':s.n}</div>
-              <div style={{minWidth:0}}>
-                <div style={{fontSize:15,fontWeight:600,color:C.text}}>{s.t}</div>
-                <div style={{fontSize:13,color:C.muted,lineHeight:1.45,marginTop:2}}>{s.d}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-        <button onClick={()=>setTab('vintedaccounts')}
-          style={{marginTop:22,width:'100%',background:C.accent,color:C.onAccent,border:'none',borderRadius:10,padding:'13px 16px',cursor:'pointer',fontSize:15,fontWeight:600}}>
-          Voir mes comptes connectés
-        </button>
-        <div style={{fontSize:12,color:C.muted,textAlign:'center',marginTop:14,lineHeight:1.4,paddingTop:14,borderTop:`1px solid ${C.border}`}}>
-          Déjà des données ailleurs ? Va dans ⚙️ Paramètres → Restaurer pour les récupérer.
-        </div>
+      </div>
+      <PremiersPas onNav={setTab}
+        titreNeuf="Pour commencer, relie ton compte Vinted"
+        introNeuf={<>VRM ne va rien chercher tout seul&nbsp;: c'est l'extension, dans ton navigateur Chrome, qui range ce que Vinted t'envoie déjà. Elle ne touche jamais à ton mot de passe Vinted.</>}/>
+      <div style={{fontSize:12,color:C.muted,textAlign:'center',marginTop:14,lineHeight:1.4}}>
+        Déjà des données ailleurs&nbsp;? Va dans ⚙️ Réglages → Restaurer pour les récupérer.
       </div>
     </div>
   );
 }
 
-function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,baseKO}) {
+function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,baseKO,premierJour}) {
   // Mois sélectionné au clic sur un graphique (affiche le détail des ventes)
   const [selMonthEnc,setSelMonthEnc]=useState(null);   // graphique encaissé
   const [selMonthVente,setSelMonthVente]=useState(null); // graphique date de vente
@@ -6227,6 +6411,14 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
              banc qui l'a vue, pas la relecture du code. Une liste d'actions
              vide parce qu'on n'a rien pu lire n'est pas « rien qui presse ». */
           <LignePanne>Je n'ai pas pu lire tes données — cette liste est vide parce que la lecture a échoué, pas parce qu'il n'y a rien.</LignePanne>
+        ) : premierJour ? (
+          /* ⚠️⚠️ TROISIÈME « tout est à jour » DU MÊME ÉCRAN, vu au rendu le
+             16 septembre : le bandeau vert s'affichait JUSTE SOUS la carte qui
+             venait d'expliquer que rien n'était encore branché. Un écran qui se
+             contredit à deux centimètres d'écart. Rien n'est à jour : rien n'a
+             encore commencé — et la carte du dessus dit déjà quoi faire, donc
+             ici on se tait (§7 : une cause, une phrase). */
+          null
         ) : (
           <div style={{display:'flex',alignItems:'center',gap:10,border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px'}}>
             <span style={{fontSize:20}}>✅</span>
@@ -12153,7 +12345,7 @@ const _CACHE_TTL = 180000; // 3 min
 // reload au lieu de re-solliciter Supabase. Purge auto par TTL (3 min).
 const _acctCache = (()=>{ try{ const raw=sessionStorage.getItem('vrm_acct_cache'); if(raw){ const o=JSON.parse(raw); const now=Date.now(); Object.keys(o).forEach(k=>{ if(!o[k]||now-o[k].ts>=_CACHE_TTL) delete o[k]; }); return o; } }catch(_){} return {}; })();
 const _persistAcctCache = ()=>{ try{ sessionStorage.setItem('vrm_acct_cache', JSON.stringify(_acctCache)); }catch(_){} };
-function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO }) {
+function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp }) {
   const [numeros, setNumeros] = useState(() => load('vinted_annonce_numeros', {}));
   // Dates de mise en ligne réelles, lues sur la page de l'annonce par l'extension
   // (ligne Supabase vinted_listing_dates = { idAnnonce: {ts, text} }). Seule
@@ -13521,38 +13713,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // écran ouvert. On ne remplace que ce qui est resté vide.
     setPrenom((p) => p || String(load('vrm_prenom', '') || '').trim());
   }), []);
-  // ── CE QUI MANQUE VRAIMENT POUR QUE ÇA SE REMPLISSE ────────────────────────
-  // La carte des premiers pas récitait quatre gestes, toujours les mêmes. Or
-  // l'app SAIT lesquels sont déjà faits : le pont dit si l'extension tourne
-  // dans CE navigateur, et `vmrAuthEtat` sous quel compte elle écrit. Réciter
-  // une étape déjà faite, c'est laisser chercher ailleurs celle qui bloque —
-  // « l'écran se range sur ce qu'il PEUT faire ».
-  const [pont, setPont] = useState(() => ({ on: vmrExtPresent(), v: vmrExtVersion() }));
-  useEffect(() => onVmrExt(() => setPont({ on: vmrExtPresent(), v: vmrExtVersion() })), []);
-  // ⚠️ TROIS ÉTATS : `undefined` = on demande · `null` = l'extension n'a pas
-  //    répondu (« pas su », on n'accuse pas) · un objet = mesuré.
-  const [extAuth, setExtAuth] = useState(undefined);
-  useEffect(() => {
-    let stop = false;
-    (async () => {
-      if (!pont.on) { if (!stop) setExtAuth(null); return; }
-      const e = await vmrAuthEtat();
-      if (!stop) setExtAuth(e);
-    })();
-    return () => { stop = true; };
-  }, [pont.on]);
-  // Le compte sous lequel l'extension écrit est-il CELUI-CI ? C'est une
-  // identité (la même adresse), pas une ressemblance. Si elle écrit sous une
-  // autre, ses captures partent chez l'autre vendeur et cette boutique reste
-  // vide pour toujours — sans que rien ne le dise.
-  const monMail = String((AUTH.user && AUTH.user.email) || '').trim().toLowerCase();
-  const sonMail = String((extAuth && extAuth.email) || '').trim().toLowerCase();
-  const etapePont = !pont.on ? 'absente'
-    : extAuth === undefined ? 'demande'
-    : !extAuth ? 'muette'
-    : !extAuth.connecte ? 'pasconnectee'
-    : (monMail && sonMail && monMail !== sonMail) ? 'autrecompte'
-    : 'connectee';
   const [imprimante, setImprimante] = useState(() => imprMode(load('vrm_imprimante', 'normale')));
   const imprTouchee = React.useRef(false);
   useEffect(() => onCloudReady(() => {
@@ -16813,7 +16973,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         //    `!baseKO` (elle a réussi). Sans ça, une base qui hoquette accueille
         //    quelqu'un qui a neuf comptes par « installe l'extension » — le
         //    mensonge du 10 septembre, retourné.
-        const premierJour = !!accountsReady && !baseKO && accounts.length===0;
+        // §11 : décidé par la coque, consommé ici. Le repli garde l'ancienne
+        // dérivation pour les rendus qui ne passent pas la prop.
+        const premierJour = premierJourProp !== undefined ? !!premierJourProp : (!!accountsReady && !baseKO && accounts.length===0);
         const jobs=[];
         // ⚠️ LA PREMIÈRE CHOSE QU'IL VOIT DOIT DIRE CE QU'IL PEUT FAIRE TOUT
         // DE SUITE. Mesuré le 7 septembre : 15 colis à expédier, dont **10 dont
@@ -16994,69 +17156,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                  que voit une nouvelle personne. Ici la liste vide a une CAUSE
                  connue, et elle se dit — avec le geste, en ordre. */
               : premierJour
-              ? (()=>{
-                  // ⚠️ L'ÉTAPE QUI BLOQUE EN PREMIER, ET ELLE EST MESURÉE. Une
-                  //    liste de quatre gestes dont trois sont déjà faits fait
-                  //    chercher au mauvais endroit : le titre nomme CE qui
-                  //    manque, et les étapes faites portent une coche.
-                  const faitInstall = etapePont !== 'absente';
-                  const faitConnexion = etapePont === 'connectee';
-                  const titre = etapePont === 'pasconnectee' ? "L'extension est là, mais elle n'est pas connectée à ton compte"
-                    : etapePont === 'autrecompte' ? "L'extension écrit sous un AUTRE compte"
-                    : etapePont === 'connectee' ? "Tout est branché — il reste à passer sur Vinted"
-                    : "Bienvenue — il reste une chose à brancher";
-                  const intro = etapePont === 'pasconnectee'
-                      ? <>Elle tourne bien dans ce navigateur, mais tant qu'elle ne sait pas qui tu es, ce qu'elle capte n'a nulle part où aller. C'est pour ça que ta journée reste vide.</>
-                    : etapePont === 'autrecompte'
-                      ? <>Elle est connectée sous <b style={{color:C.text}}>{extAuth.email}</b>, et toi tu es sur <b style={{color:C.text}}>{(AUTH.user&&AUTH.user.email)||'ce compte'}</b>. Ce qu'elle capte part donc dans l'autre boutique — celle-ci restera vide tant que les deux ne seront pas la même.</>
-                    : etapePont === 'connectee'
-                      ? <>L'extension tourne et elle écrit bien sous ton compte. Il ne manque que le dernier geste&nbsp;: elle ne range que ce que Vinted envoie à ton navigateur, donc elle a besoin que tu y passes une fois.</>
-                      : <>Ta journée est vide parce qu'aucun compte Vinted n'est encore relié, pas parce qu'il n'y a rien à faire. VRM ne va rien chercher tout seul&nbsp;: c'est l'extension, dans ton navigateur Chrome, qui range ce que Vinted t'envoie déjà.</>;
-                  const Etape = ({ fait, children }) => (
-                    <li style={{color: fait ? C.muted : C.text}}>
-                      {fait && <span style={{color:INV_STATUS.online.color,fontWeight:700,marginRight:5}}>✓</span>}{children}
-                    </li>
-                  );
-                  return (
-                <div style={{padding:'22px 20px',border:`1px solid ${etapePont==='autrecompte'?C.warn+'66':C.border}`,borderRadius:10,background:C.card}}>
-                  <div style={{fontSize:17,fontWeight:700,color:C.text}}>{titre}</div>
-                  <div style={{fontSize:13,color:C.muted,marginTop:5,lineHeight:1.55}}>{intro}</div>
-                  <ol style={{margin:'14px 0 0 0',padding:'0 0 0 20px',fontSize:13,lineHeight:1.75}}>
-                    <Etape fait={faitInstall}>Télécharge l'extension, puis dézippe-la (un seul dossier, «&nbsp;VRM-extension&nbsp;»).</Etape>
-                    <Etape fait={faitInstall}>Dans Chrome, ouvre <code style={{fontSize:12,background:C.bg,padding:'1px 5px',borderRadius:5}}>chrome://extensions</code>, active «&nbsp;Mode développeur&nbsp;» en haut à droite, puis «&nbsp;Charger l'extension non empaquetée&nbsp;» et choisis ce dossier.</Etape>
-                    <Etape fait={faitConnexion}>Clique son icône et connecte-toi <b style={{color:C.text}}>avec le même email que sur VRM</b> — c'est ce qui range tes données chez toi et nulle part ailleurs.</Etape>
-                    <Etape fait={false}>Ouvre <b style={{color:C.text}}>vinted.fr</b> une fois, connecté sur ton compte. Tes annonces, ventes, achats et messages arrivent ici tout seuls.</Etape>
-                  </ol>
-                  <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:14}}>
-                    {/* §7 : le bouton de téléchargement n'a plus rien à faire là
-                        quand l'extension tourne déjà sous nos yeux. */}
-                    {/* ⚠️⚠️ VU AU RENDU : le bouton principal disait « Ouvrir
-                        vinted.fr » alors que l'étape qui bloque était la
-                        connexion de l'extension — et dans le cas « autre
-                        compte », y aller aurait capté dans la boutique de
-                        QUELQU'UN D'AUTRE. Le geste proposé doit être celui qui
-                        débloque, jamais le suivant. Quand le geste se passe
-                        dans Chrome (cliquer l'icône de l'extension), une page
-                        web ne peut pas l'ouvrir : on ne met alors AUCUN bouton
-                        principal plutôt qu'un qui envoie ailleurs. */}
-                    {!faitInstall && <a href="/VRM-extension.zip" download style={{textDecoration:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'11px 16px',fontSize:13.5,fontWeight:600}}>Télécharger l'extension</a>}
-                    {faitConnexion && <a href="https://www.vinted.fr" target="_blank" rel="noreferrer" style={{textDecoration:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'11px 16px',fontSize:13.5,fontWeight:600}}>Ouvrir vinted.fr</a>}
-                    <button type="button" onClick={()=>onNav&&onNav('vintedaccounts')} style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'11px 16px',fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Voir mes comptes liés</button>
-                  </div>
-                  {/* ⚠️ On ne promet PAS de délai ni de résultat : l'app ne sait
-                      pas si la personne passera sur Vinted. Le geste, jamais la
-                      promesse. Et « pas su » ne s'écrit pas comme un défaut :
-                      quand l'extension n'a pas répondu, on ne l'accuse de rien. */}
-                  <div style={{fontSize:11.5,color:C.muted,marginTop:12,lineHeight:1.5}}>
-                    {etapePont==='absente'
-                      ? <>Sur téléphone, il n'y a pas d'extension Chrome&nbsp;: fais ces étapes une fois sur un ordinateur, puis rouvre VRM sur ton téléphone — les données y seront.</>
-                      : etapePont==='muette'
-                      ? <>L'extension est bien là, mais elle n'a pas répondu quand je lui ai demandé sous quel compte elle écrit. Recharge la page pour réessayer.</>
-                      : <>Une fois ces étapes faites, les données arrivent toutes seules — tu n'as plus rien à lancer.</>}
-                  </div>
-                </div>
-                  );
-                })()
+              /* §11 : les étapes vivent dans `PremiersPas`, rendu ici ET sur le
+                 tableau de bord. Deux copies, c'était deux consignes — mesuré
+                 au rendu le 16 septembre. */
+              ? <PremiersPas onNav={onNav}
+                  titreNeuf="Bienvenue — il reste une chose à brancher"
+                  introNeuf={<>Ta journée est vide parce qu'aucun compte Vinted n'est encore relié, pas parce qu'il n'y a rien à faire. VRM ne va rien chercher tout seul&nbsp;: c'est l'extension, dans ton navigateur Chrome, qui range ce que Vinted t'envoie déjà.</>}/>
               : <div style={{textAlign:'center',padding:'34px 18px',border:`1px dashed ${C.border}`,borderRadius:10,background:C.card}}>
                   <div style={{fontSize:44,lineHeight:1}}>🎉</div>
                   <div style={{fontSize:17,fontWeight:700,color:C.text,marginTop:10}}>Tout est à jour !</div>
@@ -22280,9 +22385,14 @@ function LeboncoinScreen() {
     //    l'app annonce « 12 à publier » et le panneau en montre 8 —
     //    `audit-places.cjs` vérifie que les deux filtres existent des deux côtés.
     const queue = []; let autoMatched = 0; let retirees = 0; let vendues = 0;
+    // ⚠️ Combien d'annonces en ligne portent un numéro : sans ça, une file vide
+    //    ne sait pas DIRE pourquoi elle est vide (voir le bloc « Tout est
+    //    publié 🎉 » plus bas — il le disait à quelqu'un qui n'a aucune annonce).
+    let nNumerotees = 0;
     for (const o of online) {
       const e = numeros[o.id]; const num = e && e.numero;
       if (!num || String(num).trim() === '') continue;
+      nNumerotees++;
       if (!mpChoisi(e, 'lbc')) { retirees++; continue; }             // retirée de la file par Julien
       // ⚠️⚠️ VENDUE = HORS DE LA FILE (mesuré : 14 des 57 « en ligne » ont une
       //    vente prouvée). La preuve prime sur l'état de l'annonce : Vinted ne
@@ -22330,7 +22440,7 @@ function LeboncoinScreen() {
     // Répartition des annonces LBC par compte (plusieurs comptes possibles).
     const parCompte = {};
     for (const ad of liveAds) { const k = String(ad.lbcUser || '?'); (parCompte[k] = parCompte[k] || []).push(ad); }
-    setData({ preuveKO, echecLecture: echecLecture || listRowsBrut === null, lbcJamaisLu: lbcJamaisLu || liveAds.length === 0, vendues, queue, removals, unlinked, liveAds, autoMatched, retirees, lbcAccounts, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: liveAds.length, limit: pd.limit, plan: pd.plan });
+    setData({ preuveKO, echecLecture: echecLecture || listRowsBrut === null, lbcJamaisLu: lbcJamaisLu || liveAds.length === 0, vendues, nEnLigne: online.length, nNumerotees, queue, removals, unlinked, liveAds, autoMatched, retirees, lbcAccounts, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: liveAds.length, limit: pd.limit, plan: pd.plan });
     setLoading(false);
   };
   useEffect(() => { reload(); /* eslint-disable-next-line */ }, []);
@@ -22527,6 +22637,17 @@ function LeboncoinScreen() {
               ratée. Le 🎉 ne sort que si on a pu REGARDER. */}
           {data.queue.length === 0 ? (data.echecLecture
             ? <LignePanne>Je n'ai pas pu lire tes annonces Vinted — cette file est vide parce que la lecture a échoué, pas parce qu'il ne reste rien à publier.</LignePanne>
+            /* ⚠️⚠️ TROISIÈME CAUSE, VUE AU RENDU LE 16 SEPTEMBRE SUR UNE
+               INSTALLATION NEUVE : « Tout est publié 🎉 (toutes tes paires
+               numérotées en ligne sont sur Leboncoin) » s'affichait à quelqu'un
+               qui n'a AUCUNE annonce. Rien n'est publié, et la parenthèse
+               affirme une chose qui ne veut rien dire sur zéro paire. Une file
+               vide a ici encore une cause connue — et une cause connue se dit.
+               Troisième forme, après « lecture ratée » et « tout décoché ». */
+            : data.nEnLigne === 0
+              ? <div style={{ fontSize: 12, color: C.muted }}>Tu n'as pas encore d'annonce en ligne sur Vinted — c'est de là que vient cette file. Dès qu'il y en aura, elles apparaîtront ici.</div>
+            : data.nNumerotees === 0
+              ? <div style={{ fontSize: 12, color: C.muted }}>Tes {data.nEnLigne} annonce{data.nEnLigne > 1 ? 's' : ''} en ligne n'{data.nEnLigne > 1 ? 'ont' : 'a'} pas encore de numéro de rangement — c'est lui qui sert de référence sur Leboncoin. Ça se pose sur l'écran <b>Annonces</b>.</div>
             : data.retirees > 0 && data.autoMatched === 0
               // ⚠️ « Tout est publié 🎉 » serait faux : rien n'est publié, tout
               //    a été retiré de la file. Deux causes, deux phrases.
@@ -24365,6 +24486,13 @@ export default function App() {
   //    Sans le troisième, « je n'ai pas pu lire » s'affiche comme « il n'y a
   //    rien » — et c'est le seul cas où l'app peut le tromper gravement.
   const [baseKO,setBaseKO]=useState(false);
+  // ⚠️ §11 : « c'est son premier jour » est UNE notion. Trois écrans s'en
+  //    servent (Ma journée, le tableau de bord, l'onboarding) — elle se décide
+  //    ICI, une fois. Et elle exige les TROIS états : la lecture est revenue
+  //    (`accountsLoaded`) ET elle a réussi (`!baseKO`). Sans ça, une base qui
+  //    hoquette accueille quelqu'un qui a neuf comptes par « installe
+  //    l'extension ».
+  const premierJour = accountsLoaded && !baseKO && vintedAccounts.length === 0;
   const [liveStats,setLiveStats]=useState(null); // résumé Vinted en direct pour l'accueil
   useEffect(()=>{
     let stop=false;
@@ -25364,13 +25492,13 @@ export default function App() {
             annoncer « 🎉 Tout est à jour ! » pendant la panne, c'est-à-dire
             précisément l'écran qu'il ouvre le matin. Corriger « partout » se
             vérifie au rendu, écran par écran, pas en lisant le code. */}
-        {tab==='journee'&&<Comptabilite key="journee" accounts={vintedAccounts} only="journee" onNav={setTab} baseKO={baseKO} accountsReady={accountsLoaded} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}
+        {tab==='journee'&&<Comptabilite key="journee" accounts={vintedAccounts} only="journee" onNav={setTab} baseKO={baseKO} accountsReady={accountsLoaded} premierJour={premierJour} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}
         {/* ⚠️ « Bienvenue 👋 · connecte ton compte Vinted pour commencer » à
             quelqu'un qui a neuf comptes : c'est ce qu'il voyait quand la base
             ne répondait pas. `baseKO` distingue « aucun compte » de « je n'ai
             pas pu lire », et l'écran le DIT au lieu de repartir de zéro. */}
-        {tab==='dashboard'&&accountsLoaded&&vintedAccounts.length===0&&!baseKO&&<Onboarding setTab={setTab}/>}
-        {tab==='dashboard'&&<Dashboard catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices} liveStats={liveStats} onGo={setTab} actions={notifItems} baseKO={baseKO}/>}
+        {tab==='dashboard'&&premierJour&&<Onboarding setTab={setTab}/>}
+        {tab==='dashboard'&&<Dashboard premierJour={premierJour} catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices} liveStats={liveStats} onGo={setTab} actions={notifItems} baseKO={baseKO}/>}
         {tab==='inventory'&&<Inventory inventory={inventory} setInventory={setInventory} accounts={vintedAccounts} garageGrid={garageGrid} labels={accountLabels} onLocate={(numero)=>{ setGarageLocate(String(numero)); setTab('garage'); }}/>}
         {tab==='catalog'  &&<Catalog   catalog={catalog} setCatalog={setCatalog} onDeleteId={(id)=>{
           const norm=v=>String(v||'').trim();
