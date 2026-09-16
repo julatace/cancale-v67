@@ -72,8 +72,14 @@ const ecouter = () => new Promise((res, rej) => {
 //   comptes : [] (neuf) ou [COMPTE_BANC]
 //   baseKO  : la base ne répond pas (522 + HTML, la VRAIE forme de la panne)
 //   prenom  : ce que le réglage synchronisé contient
-async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lecturePublique = false, sansSession = false, pont = null, tab = 'journee' } = {}) {
-  const ctx = await nav.newContext({ viewport: { width: 1512, height: 950 } });
+async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lecturePublique = false, sansSession = false, pont = null, tab = 'journee', telephone = false } = {}) {
+  // ⚠️ Un téléphone n'est pas « un écran étroit » : ce qui compte est l'ENTRÉE.
+  //    `isMobile + hasTouch` fait déclarer à Chromium `pointer: coarse` et
+  //    `hover: none` — exactement ce que l'app mesure (vérifié : coarse true /
+  //    nohover true en mobile, false/false en bureau).
+  const ctx = await nav.newContext(telephone
+    ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }
+    : { viewport: { width: 1512, height: 950 } });
   const pg = await ctx.newPage();
   await pg.addInitScript(([s, pr, sans]) => {
     try {
@@ -293,6 +299,37 @@ async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lectureP
   dit(!/Tout est à jour/i.test(bord.txt),
     'le tableau de bord ne fête rien sous la carte des premiers pas',
     bord.txt.replace(/\n/g, ' · ').slice(0, 200));
+  // ⚠️ Un taux de marge sans aucune vente, c'est 0 ÷ 0 : un chiffre fabriqué
+  //    présenté comme un fait, sur le premier écran d'une nouvelle personne.
+  // ⚠️ VINGT-QUATRIÈME cri au loup, attrapé avant de partir : mon premier jet
+  //    interdisait « 0% » sur TOUTE la page — et il attrapait « Remplissage
+  //    garage 0% », qui est une vraie mesure (rien n'est rangé). On juge la
+  //    carte concernée, pas la page.
+  const carteMarge = (/Taux marge[\s\S]{0,40}/i.exec(bord.txt) || ['?'])[0];
+  dit(!/\d\s*%/.test(carteMarge),
+    'aucun taux de marge inventé tant qu’il n’y a pas de vente',
+    carteMarge.replace(/\n/g, ' · '));
+
+  // ── 4 quater. SUR UN APPAREIL SANS SOURIS, ON NE DEMANDE PAS L'IMPOSSIBLE ─
+  // Mesuré au rendu sur iPhone : la carte déroulait « va sur
+  // chrome://extensions », « Mode développeur », « Charger l'extension non
+  // empaquetée » — et proposait de TÉLÉCHARGER un zip sur un téléphone, où il
+  // ne sert à rien. La seule ligne vraie était en tout petit, tout en bas.
+  console.log('\n── Sur un appareil qui ne peut pas installer d’extension');
+  const tel = await rendre(nav, { comptes: [], telephone: true });
+  dit(!/chrome:\/\/extensions/i.test(tel.txt),
+    'aucune marche à suivre Chrome sur un appareil qui ne peut pas la suivre',
+    tel.txt.replace(/\n/g, ' · ').slice(0, 200));
+  dit(!tel.liens.some((h) => /VRM-extension\.zip/.test(h || '')),
+    'et aucun zip à télécharger là où il ne servirait à rien');
+  dit(/ordinateur/i.test(tel.txt), 'mais on dit OÙ ça se passe');
+  // ⚠️ L'AUTRE SENS : tout retirer partout passerait le contrôle ci-dessus.
+  //    Sur un ordinateur, la marche à suivre et le zip DOIVENT rester.
+  const bureau = await rendre(nav, { comptes: [] });
+  dit(/chrome:\/\/extensions/i.test(bureau.txt),
+    'sur ordinateur, la marche à suivre est bien là');
+  dit(bureau.liens.some((h) => /VRM-extension\.zip/.test(h || '')),
+    'et le zip aussi');
 
   // ── 5. LA PORTE D'ENTRÉE N'AFFIRME QUE CE QU'ELLE A MESURÉ ────────────────
   // Elle promettait « l'isolation est appliquée par la base » dès que la

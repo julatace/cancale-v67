@@ -5874,6 +5874,33 @@ function LignePanne({ children }) {
 // ⚠️ TROIS ÉTATS PARTOUT : le pont dit si l'extension tourne dans CE
 // navigateur, `vmrAuthEtat` sous quel compte elle écrit — et « pas su » ne vaut
 // ni oui ni non.
+// EST-CE QU'ON PEUT INSTALLER UNE EXTENSION CHROME ICI ?
+// ⚠️ On ne devine PAS « c'est un téléphone » : on MESURE l'entrée. Un appareil
+// sans souris du tout (pointeur grossier ET aucun survol) ne peut pas ouvrir
+// `chrome://extensions` — c'est vrai des téléphones comme des tablettes, et ça
+// reste vrai le jour où la marque change. Un portable tactile, lui, a une
+// souris : il déclare `pointer: fine`, et rien ne change pour lui.
+// Mesuré au rendu le 16 septembre : sur iPhone, la carte déroulait quand même
+// « va sur chrome://extensions », « Mode développeur », « Charger l'extension
+// non empaquetée » — et proposait de TÉLÉCHARGER un zip sur un téléphone, où il
+// ne sert à rien. La seule ligne vraie (« fais-le sur un ordinateur ») était en
+// tout petit, tout en bas.
+function useSansSouris() {
+  const lire = () => {
+    try {
+      return window.matchMedia('(pointer: coarse)').matches
+          && window.matchMedia('(hover: none)').matches;
+    } catch (_) { return false; }   // pas su ⇒ on garde le comportement d'avant
+  };
+  const [v, setV] = React.useState(lire);
+  React.useEffect(() => {
+    let mq; const maj = () => setV(lire());
+    try { mq = window.matchMedia('(pointer: coarse)'); mq.addEventListener('change', maj); } catch (_) {}
+    return () => { try { mq && mq.removeEventListener('change', maj); } catch (_) {} };
+  }, []);
+  return v;
+}
+
 function useEtapePont() {
   const [pont, setPont] = React.useState(() => ({ on: vmrExtPresent(), v: vmrExtVersion() }));
   React.useEffect(() => onVmrExt(() => setPont({ on: vmrExtPresent(), v: vmrExtVersion() })), []);
@@ -5909,6 +5936,7 @@ function useEtapePont() {
 // les mêmes, et c'est tout ce qui compte.
 function PremiersPas({ onNav, titreNeuf, introNeuf }) {
   const { extAuth, etape } = useEtapePont();
+  const sansSouris = useSansSouris();
   // ⚠️⚠️ « CE N'EST PAS NATUREL » — Julien, 16 septembre, en regardant le
   //    premier écran. Il avait raison : c'était une notice de montage. Quatre
   //    étapes numérotées d'un coup, « Mode développeur », « extension non
@@ -5956,6 +5984,19 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
     </>
   ) : etape === 'muette' ? (
     <p style={{margin:0}}>Ton extension est bien là, mais elle ne m’a pas répondu quand je lui ai demandé sous quel compte elle écrit. Recharge la page, je lui redemande.</p>
+  ) : sansSouris ? (
+    /* ⚠️ Dérouler la marche à suivre Chrome sur un appareil qui ne peut pas la
+       suivre, c'est donner du travail impossible — et proposer d'y télécharger
+       un zip, c'est pire. On dit OÙ ça se passe, et rien d'autre. */
+    <>
+      {introNeuf ? <p style={{margin:'0 0 10px'}}>{introNeuf}</p> : (
+        <p style={{margin:'0 0 10px'}}>VRM ne va rien chercher tout seul sur Vinted. C’est une petite extension, installée dans ton navigateur, qui lit tes pages Vinted quand tu y passes et range tout ici.</p>
+      )}
+      <p style={{margin:0}}>
+        Cette première étape se passe <b style={{color:C.text}}>sur un ordinateur</b>&nbsp;: c’est là que vit l’extension, et ton appareil n’en accepte pas.
+        Ouvre <b style={{color:C.text}}>vrm.center</b> dans le Chrome de ton ordinateur — tu y retrouveras exactement cet écran, avec la marche à suivre. Une fois que c’est fait, tout revient ici tout seul.
+      </p>
+    </>
   ) : (
     <>
       {introNeuf ? <p style={{margin:'0 0 10px'}}>{introNeuf}</p> : (
@@ -5977,7 +6018,9 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
   //    d'un autre. Quand le geste se passe dans Chrome (cliquer l'icône de
   //    l'extension), une page web ne peut pas l'ouvrir : on ne met alors AUCUN
   //    bouton principal.
-  const bouton = !fait.ext
+  const bouton = (!fait.ext && sansSouris)
+    ? null   // un zip sur un téléphone est du poids mort, pas un geste
+    : !fait.ext
     ? <a href="/VRM-extension.zip" download style={{textDecoration:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'12px 18px',fontSize:14,fontWeight:600}}>Télécharger l’extension</a>
     : etape === 'connectee'
       ? <a href="https://www.vinted.fr" target="_blank" rel="noreferrer" style={{textDecoration:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'12px 18px',fontSize:14,fontWeight:600}}>Ouvrir vinted.fr</a>
@@ -6020,7 +6063,9 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
           « débrouille-toi ». On ne promet aucun délai pour autant. */}
       <div style={{fontSize:11.5,color:C.muted,marginTop:14,paddingTop:12,borderTop:`1px solid ${C.border}`,lineHeight:1.55}}>
         {etape==='absente'
-          ? <>Je regarde en direct&nbsp;: dès que l’extension est là, cet écran passe à la suite tout seul. Sur téléphone il n’y a pas d’extension Chrome — fais-le une fois sur un ordinateur, tes données seront ensuite partout.</>
+          ? (sansSouris
+            ? <>Rien ne presse et rien ne se perd&nbsp;: ton compte est créé, il t’attend. Cet écran suivra tout seul dès que l’extension aura tourné une fois.</>
+            : <>Je regarde en direct&nbsp;: dès que l’extension est là, cet écran passe à la suite tout seul.</>)
           : etape==='muette' ? <>Rien n’est perdu&nbsp;: c’est la question qui n’a pas abouti, pas tes données.</>
           : <>Cet écran suit tout seul&nbsp;: dès que c’est fait, il passe à la suite.</>}
       </div>
@@ -6084,7 +6129,12 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
   const enAttente=useMemo(()=>sales.filter(v=>!v.receiveDate||v.receiveDate.trim()===''),[sales]);
   const caAttente=useMemo(()=>enAttente.reduce((s,v)=>s+ +v.sellPrice,0),[enAttente]);
   const avgX=useMemo(()=>encaissees.length?(encaissees.reduce((s,v)=>s+ +v.multi,0)/encaissees.length).toFixed(2):'—',[encaissees]);
-  const avgMargin=ca>0?((profit/ca)*100).toFixed(1):'0';
+  // ⚠️ SANS CA, UN TAUX DE MARGE N'EXISTE PAS — c'est 0 ÷ 0. Vu au rendu le
+  //    16 septembre sur une installation neuve : « Taux marge 0% », un chiffre
+  //    fabriqué présenté comme un fait, sur le premier tableau de bord d'une
+  //    nouvelle personne. §7 : un zéro qui veut dire « on ne sait pas » s'écrit
+  //    `—`, avec la raison à côté.
+  const avgMargin=ca>0?((profit/ca)*100).toFixed(1):null;
   const avgSale=encaissees.length?(ca/encaissees.length):0;
   const avgProfit=encaissees.length?(profit/encaissees.length):0;
 
@@ -6512,7 +6562,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         {/* ⚠️ « prix d'achat manquants » disait la MÊME chose que ses deux
             voisines, avec d'autres mots : trois formulations pour une seule
             cause font croire à trois problèmes. */}
-        <StatCard icon="🎯" label="Taux marge" value={liveStats&&liveStats.caEncaisse!=null?'—':`${avgMargin}%`} color={C.muted} sub={liveStats&&liveStats.caEncaisse!=null?undefined:'bénéf / CA'}/>
+        <StatCard icon="🎯" label="Taux marge" value={(liveStats&&liveStats.caEncaisse!=null)||avgMargin===null?'—':`${avgMargin}%`} color={C.muted} sub={liveStats&&liveStats.caEncaisse!=null?undefined:(avgMargin===null?'dès ta première vente':'bénéf / CA')}/>
       </div>
       {manquePrix && <LignePrixAchat quoi={quoiDepuisDebut}/>}
 
