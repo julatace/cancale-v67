@@ -61,7 +61,7 @@ const serveur = () => http.createServer((q, r) => {
 //   comptes : [] (neuf) ou [COMPTE_BANC]
 //   baseKO  : la base ne répond pas (522 + HTML, la VRAIE forme de la panne)
 //   prenom  : ce que le réglage synchronisé contient
-async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lecturePublique = false, sansSession = false } = {}) {
+async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lecturePublique = false, sansSession = false, pont = null } = {}) {
   const ctx = await nav.newContext({ viewport: { width: 1512, height: 950 } });
   const pg = await ctx.newPage();
   await pg.addInitScript(([s, pr, sans]) => {
@@ -70,6 +70,29 @@ async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lectureP
       if (pr) localStorage.setItem('vrm_prenom', JSON.stringify(pr));
     } catch (_) {}
   }, [SESSION, prenom, sansSession]);
+
+  // ── UN FAUX PONT D'EXTENSION ──────────────────────────────────────────────
+  // L'app ne peut pas lire le stockage de l'extension : elle le lui DEMANDE
+  // par `window.postMessage`. On rejoue exactement ce dialogue, c'est la seule
+  // façon de rendre les quatre états sans Chrome.
+  //   pont = null              → aucune extension ici (téléphone, autre navigateur)
+  //   pont = 'muette'          → elle est là mais ne répond pas (« pas su »)
+  //   pont = {connecte, email} → elle répond
+  if (pont) {
+    await pg.addInitScript((p) => {
+      window.addEventListener('message', (ev) => {
+        if (ev.source !== window || !ev.data || typeof ev.data !== 'object') return;
+        const d = ev.data;
+        if (d.__vmr === 'ping') { window.postMessage({ __vmr: 'ready', version: '5.63.0' }, '*'); return; }
+        if (d.__vmr === 'authEtat' && d.reqId && p !== 'muette') {
+          window.postMessage({ __vmr: 'authEtat:result', reqId: d.reqId,
+            etat: { ok: true, connecte: !!p.connecte, email: p.email || '', cloisonne: true } }, '*');
+        }
+      });
+      window.postMessage({ __vmr: 'ready', version: '5.63.0' }, '*');
+      setTimeout(() => window.postMessage({ __vmr: 'ready', version: '5.63.0' }, '*'), 400);
+    }, pont);
+  }
 
   await pg.route('**/auth/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json',
     body: JSON.stringify({ access_token: 'jeton-de-banc', refresh_token: 'r', expires_in: 3600, user: SESSION.user }) }));
@@ -170,6 +193,49 @@ async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lectureP
   dit(!/ta boutique tourne/i.test(panne.txt), 'pas de « ta boutique tourne » pendant la panne');
   dit(/pas pu lire|ne répond pas|rien n['’]est perdu/i.test(panne.txt),
     'la panne, elle, est dite', panne.txt.slice(0, 160).replace(/\n/g, ' · '));
+
+  // ── 4 bis. LA CARTE SUIT CE QUI EST VRAI, ELLE NE RÉCITE PAS ──────────────
+  // Une liste de quatre gestes dont trois sont déjà faits fait chercher au
+  // mauvais endroit. L'app SAIT : le pont dit si l'extension tourne ici, et
+  // `authEtat` sous quel compte elle écrit.
+  console.log('\n── La carte nomme l’étape qui bloque, mesurée');
+  const pasConnectee = await rendre(nav, { comptes: [], pont: { connecte: false } });
+  dit(/pas connectée à ton compte/i.test(pasConnectee.txt),
+    'extension installée mais pas connectée : c’est CE blocage qui est nommé',
+    pasConnectee.txt.split('\n').slice(0, 3).join(' · '));
+  dit(!/Télécharger l['’]extension/i.test(pasConnectee.txt),
+    'et on ne lui propose plus de télécharger ce qui tourne déjà (§7)');
+  // ⚠️⚠️ VU AU RENDU : le bouton principal proposait « Ouvrir vinted.fr »
+  //    alors que l'étape qui bloque est la connexion. Le geste proposé doit
+  //    être celui qui DÉBLOQUE — sinon on envoie capter dans le vide.
+  dit(!/Ouvrir vinted\.fr/i.test(pasConnectee.txt),
+    'et on ne l’envoie pas sur Vinted alors que rien ne pourra être rangé');
+
+  // ⚠️⚠️ LE CAS QUI SÉPARE LES VENDEURS. Connectée sous une AUTRE adresse, elle
+  //    range ses captures dans la boutique de quelqu'un d'autre — et cette
+  //    boutique-ci reste vide pour toujours, sans un mot.
+  const autreCompte = await rendre(nav, { comptes: [], pont: { connecte: true, email: 'quelqu-un-dautre@exemple.fr' } });
+  dit(/AUTRE compte/i.test(autreCompte.txt), 'connectée sous une autre adresse : c’est dit',
+    autreCompte.txt.split('\n').slice(0, 3).join(' · '));
+  dit(/quelqu-un-dautre@exemple\.fr/.test(autreCompte.txt) && /sophie@exemple\.fr/.test(autreCompte.txt),
+    'et les DEUX adresses sont nommées — sinon on ne sait pas laquelle changer');
+
+  const branchee = await rendre(nav, { comptes: [], pont: { connecte: true, email: 'sophie@exemple.fr' } });
+  dit(/reste à passer sur Vinted/i.test(branchee.txt),
+    'tout branché : il ne reste que le dernier geste', branchee.txt.split('\n').slice(0, 3).join(' · '));
+  dit(!/AUTRE compte/i.test(branchee.txt), 'et la même adresse ne déclenche AUCUNE alerte');
+  dit(/Ouvrir vinted\.fr/i.test(branchee.txt), 'là, et là seulement, le bouton mène à Vinted');
+  // ⚠️ Le pire des deux : y aller capterait dans la boutique de quelqu'un d'autre.
+  dit(!/Ouvrir vinted\.fr/i.test(autreCompte.txt),
+    'connectée ailleurs : surtout pas de bouton vers Vinted');
+
+  // « Pas su » ne vaut ni oui ni non : une extension qui ne répond pas ne
+  // s'accuse pas d'être mal connectée.
+  const muette = await rendre(nav, { comptes: [], pont: 'muette' });
+  dit(!/AUTRE compte/i.test(muette.txt) && !/pas connectée à ton compte/i.test(muette.txt),
+    'extension muette : aucune accusation');
+  dit(/n['’]a pas répondu/i.test(muette.txt), 'mais on dit qu’on n’a pas pu demander',
+    muette.txt.split('\n').slice(-2).join(' · '));
 
   // ── 5. LA PORTE D'ENTRÉE N'AFFIRME QUE CE QU'ELLE A MESURÉ ────────────────
   // Elle promettait « l'isolation est appliquée par la base » dès que la

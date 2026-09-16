@@ -2048,7 +2048,7 @@ découvre l'app.
   (⚙️ → Comptes liés) » disait la même chose en plus petit. Elle ne reste que
   pour le cas où la journée a **quand même** des actions sans aucun compte lié
   (des colis repérés par email) — là seulement elle apprend quelque chose.
-- `scripts/bancs/premierjour.cjs` : **25 contrôles, 15 rouges** sur un vrai
+- `scripts/bancs/premierjour.cjs` : **36 contrôles, 15 rouges** sur un vrai
   build d'avant (§6.1). ⚠️ **Il n'a besoin d'AUCUNE fixture** — une installation
   neuve, c'est une base vide : rien de réel ne transite, il vit donc entièrement
   dans le dépôt.
@@ -2065,6 +2065,38 @@ découvre l'app.
 - ⚠️ **VINGT-ET-UNIÈME fois qu'un de mes contrôles crie au loup**, et c'est mon
   balayage d'exploration : `/NaN/i` attrapait « mainte**nan**t ». `NaN` se
   cherche **sensible à la casse**.
+
+### ⚠️⚠️ ET LA CARTE DE BIENVENUE RÉCITAIT QUATRE GESTES SANS REGARDER LESQUELS ÉTAIENT FAITS
+Suite immédiate : une liste de quatre étapes dont trois sont déjà faites fait
+chercher au **mauvais endroit**. Or l'app SAIT — le pont dit si l'extension
+tourne dans **ce** navigateur (`vmrExtPresent`), et `vmrAuthEtat()` sous **quel
+compte** elle écrit. L'information existait depuis toujours ; elle n'était lue
+que dans le panneau « Sécurité des données », tout au fond de Réglages, sur la
+ligne « Extension identifiée · pas connectée » — là où quelqu'un dont l'app
+reste vide n'ira jamais.
+`etapePont` rend **cinq** états — `absente` · `demande` · `muette` ·
+`pasconnectee` · `autrecompte` · `connectee` — et le TITRE de la carte nomme
+celui qui bloque ; les étapes faites portent une coche.
+- ⚠️⚠️ **LE CAS QUI SÉPARE LES VENDEURS, ET IL ÉTAIT MUET** : l'extension peut
+  être connectée sous **une autre adresse** que celle de l'app. Ses captures
+  partent alors dans **la boutique de quelqu'un d'autre**, et celle-ci reste
+  vide **pour toujours** — sans un mot. C'est exactement ce que Julien craint
+  (« que tout ne se mélange pas »), vu du côté de la personne qui y perd. La
+  carte **nomme les deux adresses** : sans les deux, on ne sait pas laquelle
+  changer. C'est une **identité** (la même adresse), pas une ressemblance.
+- ⚠️⚠️ **VU AU RENDU, ET C'ÉTAIT LE PIRE DÉTAIL** (§6.2) : le bouton principal
+  disait « **Ouvrir vinted.fr** » dans les trois cas — y compris quand l'étape
+  qui bloque était la **connexion** de l'extension. Dans le cas « autre
+  compte », y aller aurait capté dans la boutique de l'autre. *Une alerte qui
+  ne dit pas quoi faire ne sert à rien ; une alerte qui dit le MAUVAIS geste
+  est pire.* Le bouton suit l'étape qui débloque — et quand le geste se passe
+  dans Chrome (cliquer l'icône de l'extension), une page web ne peut pas
+  l'ouvrir : **aucun** bouton principal plutôt qu'un qui envoie ailleurs.
+- ⚠️ **« Pas su » ne vaut ni oui ni non** : une extension présente qui ne répond
+  pas ne s'accuse de rien — on dit qu'on n'a **pas pu demander**.
+- Le banc rejoue le **vrai dialogue du pont** (`postMessage` `ready` /
+  `authEtat`) : c'est la seule façon de rendre les cinq états sans Chrome.
+  **36 contrôles** au total, **6 rouges** de plus sur le build d'il y a une heure.
 
 ### ⚠️⚠️ LA PORTE D'ENTRÉE PROMETTAIT UNE PROTECTION QU'ELLE N'AVAIT PAS MESURÉE
 Même passe, même écran d'accueil — mais **avant** la connexion. La dernière
@@ -2210,6 +2242,29 @@ Elle écrit dans ses **lignes dédiées** (`panel_bords_done`, `panel_buyprices`
 `panel_accounts_off`, `panel_colis_relais`, …) en lecture-fusion-écriture.
 L'app les lit en source supplémentaire, jamais l'inverse.
 
+### ⚠️⚠️ ET LE REPLI « UN SEUL VENDEUR » N'EST VRAI QUE TANT QU'IL EST SEUL
+`resoudreProprietaire` (api/_lib/proprietaire-email.js) décide dans quelle
+boutique atterrit un bordereau. Son étape 3 dit : « installation à un seul
+vendeur, tout lui appartient » (`VRM_OWNER_UID`). C'était juste — **tant que
+Julien est seul**. Le jour où l'app accueille quelqu'un d'autre, un email arrivé
+sur une adresse que le NOUVEAU vendeur n'a pas encore déclarée partirait chez le
+propriétaire de l'installation : **son bordereau, son code de retrait, sa vente,
+dans la boutique d'un autre** — et ça ne se voit pas, celui qui l'attendait ne
+saura jamais qu'il a existé. C'est le fichier lui-même qui l'écrit : « perdre un
+email est réparable ; le donner au mauvais vendeur ne l'est pas. »
+⇒ Le repli s'éteint **dès que le registre déclare un propriétaire AUTRE que
+celui de l'installation** — il y a alors démonstrablement plus d'un vendeur.
+⚠️ **Et il ne s'éteint PAS avant** : registre vide, ou ne portant que ses
+propres adresses, rien ne change. C'est l'**incident du 16 au 22 août** (593
+emails en quarantaine, zéro traité, ses codes de retrait perdus) qu'on ne refait
+pas — *une nouveauté ne doit pas éteindre ce qui marchait*.
+⚠️ **Le fichier annonçait « fonction PURE, donc testable exhaustivement »… et
+RIEN ne l'exécutait.** C'est §4.10 mot pour mot, sur la règle qui répartit les
+emails entre vendeurs. `scripts/audit-proprietaire-email.cjs` : **16 contrôles,
+2 rouges** sur le code d'avant. Il vérifie aussi ce qui ne doit **jamais**
+décider — un email dont l'expéditeur, le sujet ET le corps nomment un autre
+vendeur reste chez le bon.
+
 ### Les emails
 - **C'est l'adresse de RÉCEPTION qui décide** à quel vendeur appartient un email —
   jamais l'expéditeur, le sujet ou le corps (sinon n'importe qui déposerait des
@@ -2231,7 +2286,7 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | outil | quoi |
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
-| `node scripts/audit-*.cjs` | **34 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `node scripts/audit-*.cjs` | **35 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
 | `scripts/bancs/*.cjs` | les **20 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
@@ -2499,7 +2554,7 @@ script-là me fait croire à une catastrophe.
 src/App.jsx                     l'app (grep avant de lire — le fichier est énorme)
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
-scripts/audit-*.cjs             les 34 audits
+scripts/audit-*.cjs             les 35 audits
 scripts/bancs/                  les 19 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
