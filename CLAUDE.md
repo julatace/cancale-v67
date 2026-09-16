@@ -2155,6 +2155,37 @@ se sent accompagné plutôt que mis au travail. Quatre étapes sont devenues
   seul ».
 - **10 rouges** sur le build d'il y a une heure, 0 après.
 
+### ⚠️⚠️ ET SUR SON IPHONE, L'ACCUEIL DEMANDAIT L'IMPOSSIBLE
+Mesuré au rendu à **390 px avec `isMobile + hasTouch`**, juste après la passe
+« naturel » : la carte des premiers pas déroulait quand même « va sur
+`chrome://extensions` », « allume Mode développeur », « Charger l'extension non
+empaquetée » — **et proposait de TÉLÉCHARGER un zip sur un téléphone**, où il
+ne sert à rien. La seule ligne vraie (« fais-le une fois sur un ordinateur »)
+était en tout petit, tout en bas, sous la barre de navigation.
+C'est l'écran que Julien ouvre le plus souvent, et c'est du travail impossible.
+⇒ **On ne devine PAS « c'est un téléphone » : on mesure l'ENTRÉE.**
+`useSansSouris()` = `(pointer: coarse)` **ET** `(hover: none)` — aucune souris du
+tout. C'est vrai des téléphones comme des tablettes, et ça reste vrai le jour
+où la marque change ; un portable tactile, lui, déclare `pointer: fine` et **rien
+ne change pour lui**. Vérifié dans le Chromium du banc : `coarse/nohover` valent
+`true/true` en mobile et `false/false` en bureau.
+⇒ Dans ce cas, **aucune marche à suivre Chrome, aucun bouton de téléchargement**,
+et on dit **où** ça se passe (« ouvre vrm.center dans le Chrome de ton
+ordinateur — tu y retrouveras exactement cet écran »). Un `matchMedia` qui lève
+rend `false` : « pas su » garde le comportement d'avant.
+- ⚠️ **Le banc vérifie L'AUTRE SENS** : *tout retirer partout* passerait le
+  contrôle. Sur ordinateur, la marche à suivre **et** le zip doivent rester.
+- ⚠️ **Et « Taux marge 0% » sur le premier tableau de bord** : sans aucune
+  vente, c'est **0 ÷ 0** — un chiffre fabriqué présenté comme un fait. §7 : un
+  zéro qui veut dire « on ne sait pas » s'écrit `—`, avec la raison (« dès ta
+  première vente »).
+  ⚠️ **VINGT-QUATRIÈME cri au loup, attrapé avant de partir** : mon premier jet
+  interdisait « 0% » sur **toute la page** — il attrapait « Remplissage garage
+  0% », qui est une **vraie** mesure (rien n'est rangé). On juge la carte
+  concernée, pas la page.
+- **3 rouges** de plus sur le build d'il y a une heure ; `premierjour.cjs` est à
+  **48 contrôles**.
+
 ### ⚠️⚠️ LA PORTE D'ENTRÉE PROMETTAIT UNE PROTECTION QU'ELLE N'AVAIT PAS MESURÉE
 Même passe, même écran d'accueil — mais **avant** la connexion. La dernière
 phrase que lit quelqu'un juste avant de confier ses jetons Vinted disait :
