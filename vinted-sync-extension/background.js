@@ -2326,10 +2326,10 @@ async function nouveautes(uid) {
   // unes des autres : les enchaîner faisait attendre le récap le temps de
   // QUATRE allers-retours au lieu d'un. Les ventes sont servies par le mémo de
   // visite (la génération vient de les lire) — donc aucune requête de plus.
-  const [rVentes, rConvs, nOffres, aGen] = await Promise.all([
+  const [rVentes, rConvs, lOffres, aGen] = await Promise.all([
     sbGetMemo(`app_data?id=eq.harvest_${uid}_orders_sold&select=data`).catch(() => null),
     sbGetMemo(`app_data?id=eq.harvest_${uid}_inbox&select=data`).catch(() => null),
-    offresEnAttente(uid).then(l => l.length).catch(() => 0),
+    offresEnAttente(uid).catch(() => []),
     ventesSansBordereau(uid).catch(() => []),
   ]);
 
@@ -2364,13 +2364,29 @@ async function nouveautes(uid) {
   }
 
   // 3. LES OFFRES en attente (argent, et 24 h pour répondre).
-  out.offres = nOffres;
+  // ⚠️⚠️ C'ÉTAIT UN COMPTE ABSOLU, ET ÇA REMPLISSAIT SON ÉCRAN. Julien,
+  //    16 septembre : « dès que j'appuie sur un bouton dans Vinted, j'ai
+  //    "offre à trancher" qui apparaît ». Cause mesurée : les ventes et les
+  //    messages étaient comparés au mémo, les offres NON — `out.offres` valait
+  //    le nombre d'offres EN ATTENTE, pas le nombre de NOUVELLES. Tant qu'il
+  //    lui restait une offre non tranchée, `rien` était faux pour toujours, et
+  //    la fenêtre plein écran revenait à chaque passage (Vinted est une SPA :
+  //    chaque bouton relance un cycle de capture).
+  //    ⇒ Une offre a une identité — `offer_request_id`. On compte celles qu'on
+  //      n'a pas encore montrées, exactement comme les ventes. Une VRAIE
+  //      nouvelle offre mérite encore d'interrompre : elle porte de l'argent et
+  //      24 h pour répondre. Une offre déjà vue, non.
+  const vuOff = new Set((memo && memo.offres) || []);
+  const oidsCourants = lOffres.map((o) => String(o.oid || '')).filter(Boolean);
+  out.offres = oidsCourants.filter((o) => !vuOff.has(o)).length;
 
   // 4. LES BORDEREAUX À GÉNÉRER — le seul point qui appelle une ACTION.
   out.aGenerer = aGen;
 
   out._marque = {
     at: Date.now(),
+    // Les offres montrées, par leur identité — même principe que les ventes.
+    offres: oidsCourants.slice(0, RECAP_MAX_CONVS),
     ventes: ventes.map(o => o && o.transaction_id != null ? String(o.transaction_id) : '').filter(Boolean),
     convs: Object.keys(convsMaj).slice(0, RECAP_MAX_CONVS)
       .reduce((a, k) => { a[k] = convsMaj[k]; return a; }, {}),
@@ -2409,7 +2425,10 @@ async function proposerBordereaux(uid, genes) {
     // s'il venait de se produire (ce serait « 320 ventes ! » à la première
     // visite). On pose seulement le repère, et on ne parle que des bordereaux
     // à générer, qui eux sont vrais aujourd'hui.
-    if (n.premiere) { n.ventes = []; n.messages = 0; }
+    // ⚠️ Les offres aussi : à la première visite elles sont TOUTES « nouvelles »,
+    //    et « 17 offres à trancher » d'un coup, c'est le « 320 ventes ! » qu'on
+    //    vient d'éviter juste à côté.
+    if (n.premiere) { n.ventes = []; n.messages = 0; n.offres = 0; }
     if (!n.ventes.length && !n.messages && !n.offres && !n.aGenerer.length && !n.envoyes) {
       await marquerRecapVu(uid, n._marque); return;
     }
@@ -3440,10 +3459,23 @@ const urlDeLabel = (o, prof = 0) => {
   return null;
 };
 
-async function recupererLabel(acc, uid, tx) {
+// ⚠️ `connu` : ce qu'un essai précédent a DÉJÀ appris sur cette vente
+// (l'identifiant d'expédition, et la transaction elle-même). Ils ne changent
+// pas d'un essai à l'autre — les redemander était trois allers-retours Vinted
+// pour rien, sur le chemin dont Julien dit qu'il est lent.
+async function recupererLabel(acc, uid, tx, connu) {
   try {
-    const t = await vintedGet(acc, `/api/v2/transactions/${tx}`);
+    const t = (connu && connu.t) || await vintedGet(acc, `/api/v2/transactions/${tx}`);
     const shipId = t && t.json && (t.json.transaction?.shipment?.id ?? t.json.shipment?.id);
+    // ⚠️⚠️ ON NE GARDE LA TRANSACTION QUE SI ELLE A RÉPONDU CE QU'ON LUI
+    //    DEMANDAIT. « Vinted n'expose pas encore l'expédition » est justement le
+    //    cas où il FAUT la redemander : le service d'expédition est en train de
+    //    la créer. Mon premier jet mettait la réponse en cache dans tous les
+    //    cas — les trois essais suivants relisaient donc la même réponse vide et
+    //    échouaient à l'identique. C'est `audit-bordereau-rattrapage.cjs` qui
+    //    l'a vu, sur un contrôle écrit avant : « on réessaie le temps que le PDF
+    //    arrive ».
+    if (connu && shipId) connu.t = t;
     if (!shipId) { await echantillonRate('label_txn', tx, JSON.stringify(t && t.json).slice(0, 400)); return { ok: false, raison: "Vinted n'expose pas encore l'expédition de cette vente" }; }
     // ⚠️ On ne connaît la forme d'AUCUNE de ces réponses (§5.29). On essaie donc
     // les chemins observés dans `seen_urls` (§5.26), l'un après l'autre, et on
@@ -3464,7 +3496,16 @@ async function recupererLabel(acc, uid, tx) {
     for (const chemin of [`/api/v2/shipments/${shipId}/label_url`, `/api/v2/shipments/${shipId}`, `/api/v2/shipments/${shipId}/label_options`]) {
       const l = await vintedGet(acc, chemin);
       const brut = l && l.json ? JSON.stringify(l.json) : '';
-      await echantillonRate('label' + chemin.replace(/^.*\/shipments\/\d+/, '').replace(/\W+/g, '_'), shipId, brut.slice(0, 400));
+      // ⚠️ L'ÉCHANTILLON EST UN DIAGNOSTIC, PAS UNE MESURE PAR ESSAI. Il passe
+      //    par `majTampon`, donc une lecture + une écriture de
+      //    `chrome.storage.local` — trois par essai, quatre essais : douze
+      //    aller-retours de stockage pour garder QUATRE FOIS le même
+      //    échantillon. Un par type et par visite suffit à comprendre la forme.
+      const cle = 'label' + chemin.replace(/^.*\/shipments\/\d+/, '').replace(/\W+/g, '_');
+      if (!connu || !connu.vus || !connu.vus.has(cle)) {
+        await echantillonRate(cle, shipId, brut.slice(0, 400));
+        if (connu && connu.vus) connu.vus.add(cle);
+      }
       statuts.push(String((l && l.status) || 'sans_reponse'));
       const u = urlDeLabel(l && l.json);
       if (u) { url = u; via = chemin; break; }
@@ -3534,8 +3575,13 @@ async function recupererLabel(acc, uid, tx) {
 const LABEL_ATTENTES_MS = [1500, 4000, 9000];
 async function recupererLabelInsiste(acc, uid, tx) {
   let dernier = { ok: false, raison: 'non tenté' };
+  // Ce que les essais successifs se transmettent : la transaction (donc
+  // l'identifiant d'expédition) et les échantillons déjà pris. Mesuré : une
+  // vente dont le PDF n'est pas prêt coûtait 4 × (1 + 3) = 16 requêtes Vinted ;
+  // elle en coûte 13, et 3 écritures de stockage au lieu de 12.
+  const connu = { t: null, vus: new Set() };
   for (let i = 0; i <= LABEL_ATTENTES_MS.length; i++) {
-    dernier = await recupererLabel(acc, uid, tx);
+    dernier = await recupererLabel(acc, uid, tx, connu);
     if (dernier.ok) { if (i) await noterDiag('label_ok_apres_' + i + '_essai'); return dernier; }
     // On n'insiste que sur les échecs TRANSITOIRES (le PDF n'est pas encore là).
     // Un refus dur (permissions, PDF vide, 4xx) ne s'arrangera pas en attendant.

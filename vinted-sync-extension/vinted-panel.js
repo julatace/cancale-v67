@@ -3481,7 +3481,11 @@
     if (ventes.length) lignes.push(['💶', ventes.length === 1 ? '1 vente' : ventes.length + ' ventes',
       recap.eur ? eur(recap.eur) : '']);
     if (nMsg) lignes.push(['💬', nMsg === 1 ? '1 nouveau message' : nMsg + ' nouveaux messages', '']);
-    if (nOff) lignes.push(['🏷️', nOff === 1 ? '1 offre à trancher' : nOff + ' offres à trancher', '']);
+    // ⚠️ Ce récap dit « depuis ton dernier passage » : le nombre est celui des
+    //    offres NOUVELLES (le fond les compare à ce qui a déjà été montré). Le
+    //    libellé doit dire la même chose que la donnée — sinon on lit « 3 offres
+    //    à trancher » et on en trouve 12 dans le panneau.
+    if (nOff) lignes.push(['🏷️', nOff === 1 ? '1 nouvelle offre à trancher' : nOff + ' nouvelles offres à trancher', '']);
     // Ce qui vient de partir tout seul dans l'app (Julien, 27 août : « une fois
     // que la vente a été faite, je veux que le bordereau soit automatiquement
     // envoyé dans l'app »). On le DIT : un geste silencieux n'inspire pas
