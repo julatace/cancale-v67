@@ -1950,6 +1950,60 @@ la source.*
   deuxième a été corrigée **dans l'app** : une chaîne PDF s'écrit des deux façons,
   et n'en lire qu'une laisse la page muette.
 
+### ⚠️⚠️ « EST-CE QUE MON EXTENSION EST À JOUR ? » — L'APP NE POUVAIT PAS RÉPONDRE
+Trois sessions de suite ont dû **DEVINER** la version installée (« aucun
+compteur `retrait_*`, donc antérieure à 5.45 ») — et §8 dit noir sur blanc que
+**l'une de ces déductions était fausse**. Le dossier en avait tiré la règle
+(« ne pas redéduire une version d'un compteur à zéro. Le signal fiable est ce
+que le pont annonce, ou une écriture datée »), **sans jamais créer cette
+écriture datée**. C'est le même motif que le tiroir `Nav` : la règle était là,
+le mécanisme n'existait pas.
+
+**Remesuré le 16 septembre, et c'est ce qui a déclenché la passe** :
+`label_url_trouve` **7** contre `label_url_introuvable` **4** — mais **aucun
+`label_via_*`**, alors que le code l'écrit à la ligne **suivante**, sur le même
+chemin, sans condition. Ce n'est PAS le piège du compteur à zéro : la fonction a
+demonstrablement tourné 7 fois sans écrire son voisin. Donc son extension est
+plus ancienne que la version qui a posé `label_via_*`. Et le seul moyen de le
+savoir était ce raisonnement-là.
+
+⇒ L'extension inscrit désormais **sa propre version** dans sa ligne de
+diagnostic à chaque capture (`panel_diag_capture.ver` + `verAt`), dans
+`viderTampon` — qui refuse déjà d'écrire sur une lecture ratée et conserve
+`rates`.
+
+⚠️⚠️ **C'EST UN CONSTAT, JAMAIS UNE CAPACITÉ — et c'est toute la difficulté.**
+Cette version est celle de l'extension qui a capté **EN DERNIER, quelque part**,
+pas celle du navigateur qui lit l'app. S'en servir pour décider ce qu'on
+**promet** reviendrait à annoncer à son **iPhone** ce qu'un Chrome sait faire :
+le défaut le plus coûteux du projet, pour la sixième fois. `extSait()` continue
+donc de n'écouter **que le pont**, et `audit-coherence.cjs` l'interdit
+explicitement (il relit le corps d'`extSait` et refuse qu'il touche à cette
+valeur).
+
+**Ce que ça change pour lui** : depuis son téléphone — l'appareil où il pose la
+question — la ligne « Extension Chrome · pas détectée ici » ajoute le fait
+mesuré : « **La dernière capture est partie d'une 5.41.0 (il y a 3 h).** C'est
+donc l'ancienne qui tourne encore sur ton ordinateur — c'est là qu'il faut la
+remplacer par la 5.63.0. » À jour, elle dit « rien à faire ici » et ne réclame
+rien. Sur l'ordinateur, le pont répond déjà : la phrase ne s'affiche donc **que**
+là où l'information manquait (§7).
+- **Trois états**, comme partout : `undefined` en cours · `null` **pas su** ·
+  un objet lu. Ligne absente **ou** lecture ratée ⇒ **aucune version inventée**.
+- **Aucune entrée d'`EXT_CAPACITES`** : l'app ne promet rien de neuf. Extension
+  en **5.63.0**, zip régénéré, `EXT_ATTENDUE` suivie.
+- `capacites.cjs` rend l'écran Réglages **sans extension** dans quatre états
+  (version à jour · vieille · ligne absente · lecture ratée) et exige les deux
+  moitiés : la version est **dite** quand on la connaît, et elle ne devient
+  **jamais** une promesse (« pas détectée ici » reste, « branchée sur cette
+  page » n'apparaît pas).
+- ⚠️⚠️ **ET DEUX DE MES CONTRÔLES ÉTAIENT VERTS PAR ACCIDENT SUR LE CODE
+  D'AVANT.** Ils cherchaient le numéro de version dans **TOUTE la page** — or
+  « Télécharger l'extension 5.62.0 » y est déjà, et « · à jour » aussi. *Un
+  contrôle vert par accident est pire qu'absent* (même famille que le `DIST`
+  absolu des quatorze bancs). On découpe la **phrase** qui parle de la dernière
+  capture et on juge dedans : **2 → 5 échecs** sur le code d'avant.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
@@ -2311,7 +2365,7 @@ n'est en attente de retrait. Ce qui EST mesuré :
   28 juillet) et `panel_ebay_form` est absente : `lbcDiag` et l'enregistrement
   des étapes n'ont jamais tourné.
 ⇒ **Ne pas redéduire une version d'un compteur à zéro.** Le signal fiable est ce
-que le pont annonce, ou une écriture datée. Le zip livré est en **5.62.0**
+que le pont annonce, ou une écriture datée. Le zip livré est en **5.63.0**
 (`public/VRM-extension.zip`) ; `EXT_ATTENDUE` le suit.
 
 ⚠️ **CE QUE LA FILE eBAY DONNERAIT LE JOUR OÙ IL COCHE** (mesuré le 13 septembre,

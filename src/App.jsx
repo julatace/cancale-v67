@@ -35,7 +35,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.62.0';
+const EXT_ATTENDUE = '5.63.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -23666,7 +23666,29 @@ function ConnexionsSetting() {
   const [ext, setExt] = useState(() => ({ on: vmrExtPresent(), v: vmrExtVersion() }));
   const [mail, setMail] = useState(null);   // { ts, n } | 'vide' | null = en cours
   const [capt, setCapt] = useState(null);   // { ts, n }
+  // ⚠️⚠️ QUELLE VERSION A VRAIMENT CAPTÉ ? Depuis son iPhone, le pont n'existe
+  // pas — l'app ne pouvait donc PAS répondre « ton extension est-elle à jour ? »
+  // sur l'appareil où il pose justement la question. L'extension inscrit
+  // désormais sa version dans sa ligne de diagnostic à chaque capture, et c'est
+  // une MESURE, pas une déduction (trois sessions ont dû la deviner, une de ces
+  // déductions était fausse).
+  // ⚠️ C'EST UN CONSTAT, JAMAIS UNE CAPACITÉ : cette version est celle de
+  // l'extension qui a capté EN DERNIER, quelque part. `extSait()` n'y touche
+  // pas — promettre sur cette valeur, ce serait annoncer à un iPhone ce qu'un
+  // Chrome sait faire. Trois états, comme partout : `undefined` = en cours,
+  // `null` = pas su, un objet = lu.
+  const [derniereExt, setDerniereExt] = useState(undefined);
   useEffect(() => onVmrExt(() => setExt({ on: vmrExtPresent(), v: vmrExtVersion() })), []);
+  useEffect(() => { (async () => {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_diag_capture&select=ver:data->>ver,verAt:data->>verAt`, { headers: sbAuth() });
+      if (!r.ok) { setDerniereExt(null); return; }
+      const rows = await r.json();
+      if (!Array.isArray(rows)) { setDerniereExt(null); return; }
+      const d = rows[0] || {};
+      setDerniereExt(d.ver ? { v: String(d.ver), at: d.verAt || '' } : 'aucune');
+    } catch (_) { setDerniereExt(null); }
+  })(); }, []);
   useEffect(() => { (async () => {
     const lire = async (motif) => {
       try {
@@ -23710,7 +23732,7 @@ function ConnexionsSetting() {
           ne « bugue » pas, elle ne capte simplement pas, en silence. */}
       <Ligne t="Extension Chrome" coul={!ext.on ? C.warn : extEnRetard(ext.v) ? C.warn : INV_STATUS.online.color}
         etat={!ext.on ? 'pas détectée ici' : !ext.v ? 'détectée' : extEnRetard(ext.v) ? `version ${ext.v} — en retard` : `version ${ext.v} · à jour`}
-        d={!ext.on ? "Sur téléphone c'est normal (il n'y a pas d'extension). Sur l'ordinateur : ouvre l'app dans le Chrome où elle est installée, et recharge-la dans chrome://extensions."
+        d={!ext.on ? <>Sur téléphone c'est normal (il n'y a pas d'extension). Sur l'ordinateur : ouvre l'app dans le Chrome où elle est installée, et recharge-la dans chrome://extensions.{derniereExt && derniereExt !== 'aucune' ? <><br/><b style={{color: extEnRetard(derniereExt.v) ? C.warn : INV_STATUS.online.color}}>La dernière capture est partie d'une {derniereExt.v}{derniereExt.at ? ` (${depuis(Date.parse(derniereExt.at) || 0)})` : ''}.</b> {extEnRetard(derniereExt.v) ? `C'est donc l'ancienne qui tourne encore sur ton ordinateur — c'est là qu'il faut la remplacer par la ${EXT_ATTENDUE}.` : `Ton ordinateur est donc bien à jour — rien à faire ici.`}</> : null}</>
            : extEnRetard(ext.v) ? `La ${EXT_ATTENDUE} est prête à télécharger (bouton ci-dessous). Dézippe, remplace l'ancien dossier « VRM-extension », puis ⟳ dans chrome://extensions. Tant que c'est l'ancienne qui tourne, elle capte moins de choses que l'app en attend — sans jamais afficher d'erreur.`
            : "Elle est branchée sur cette page : répondre à un message part de ton navigateur, jamais d'un serveur."}/>
       {/* ⚠️ LE ZIP DOIT ÊTRE À UN CLIC. Pendant des semaines l'app a dit

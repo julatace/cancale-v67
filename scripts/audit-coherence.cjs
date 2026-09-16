@@ -182,6 +182,36 @@ if(appNeedsBord&&bgShipConst){
       `la capacité « ${k} » est déclarée dans la table`,
       'une capacité livrée mais non déclarée retombe sur EXT_ATTENDUE');
   }
+
+  // ⚠️⚠️ LA VERSION ÉCRITE EN BASE EST UN CONSTAT, JAMAIS UNE CAPACITÉ.
+  // `panel_diag_capture.ver` dit quelle extension a capté EN DERNIER, quelque
+  // part — pas laquelle tourne dans le navigateur qui lit l'app. S'en servir
+  // pour décider ce qu'on PROMET reviendrait à annoncer à un iPhone (où il n'y
+  // a aucune extension) ce qu'un Chrome sait faire : le défaut le plus coûteux
+  // du projet, cinq fois répété. Seul le pont (`vmrExtVersion`) a le droit de
+  // décider, et c'est ce que fait `extSait`.
+  {
+    const bloc = (/const extSait = [\s\S]*?\n\};/.exec(APP) || [])[0]
+      || (/const extSait = [^\n]*\n/.exec(APP) || [])[0] || '';
+    dit(!!bloc, '`extSait` est trouvable dans App.jsx');
+    if (bloc) dit(!/derniereExt|panel_diag_capture|\bver\b/.test(bloc),
+      '`extSait` ne décide que sur le PONT, jamais sur la version écrite en base',
+      'une version lue en base dirait à un iPhone ce qu\'un Chrome sait faire');
+    // Et l'autre moitié : la phrase qui l'affiche ne doit pas se transformer en
+    // promesse. Elle CONSTATE (« la dernière capture est partie d'une … »).
+    const i = APP.indexOf('function ConnexionsSetting');
+    const j = i < 0 ? -1 : APP.indexOf('\nfunction ', i + 10);
+    const S2 = i < 0 ? '' : APP.slice(i, j < 0 ? APP.length : j);
+    if (S2 && /derniereExt/.test(S2)) {
+      dit(/dernière capture/i.test(S2),
+        'la version lue en base est présentée comme un CONSTAT',
+        'elle doit dire d\'où vient la capture, pas ce que l\'extension d\'ici sait faire');
+      // Trois états : en cours · pas su · lu. Une lecture ratée ne doit pas
+      // se lire comme « aucune extension n'a capté ».
+      dit(/setDerniereExt\(null\)/.test(S2) && /'aucune'/.test(S2),
+        'et sa lecture distingue « pas su » de « aucune »');
+    }
+  }
 }
 console.log('\nStatuts réels :'); S.forEach(s=>console.log('  -',s));
 console.log(ko ? `\n${ko} contrôle(s) non conforme(s).` : "\nL'app et l'extension disent la même chose.");
