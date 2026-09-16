@@ -2186,6 +2186,30 @@ rend `false` : « pas su » garde le comportement d'avant.
 - **3 rouges** de plus sur le build d'il y a une heure ; `premierjour.cjs` est à
   **48 contrôles**.
 
+### ⚠️⚠️ ET LA FENÊTRE DE L'EXTENSION NE DISAIT PAS QUEL MOT DE PASSE ELLE VOULAIT
+C'est **l'étape qui sépare les vendeurs** : si quelqu'un se trompe de compte,
+ses captures partent dans la boutique d'un autre. Or on arrive dans cette
+fenêtre **juste après avoir été sur Vinted**, on lit « Email / Mot de passe »…
+et on tape son mot de passe **Vinted**. Ça échoue — et on vient de le saisir
+dans une fenêtre qui n'en a aucun besoin.
+L'app le disait bien dans sa carte des premiers pas (« avec le même email que
+sur VRM ») ; **la surface où le geste SE FAIT, elle, se taisait** — §11, sur la
+seule étape où une erreur mélange deux boutiques.
+⇒ La fenêtre nomme le compte (« ton compte **VRM**, le même que sur
+vrm.center »), dit **ce que ce n'est pas** (« pas ton mot de passe Vinted,
+l'extension n'en a jamais besoin »), met ça **dans les placeholders** — c'est
+eux qu'on lit en tapant, pas le paragraphe — et offre un lien pour créer le
+compte si on n'en a pas.
+- ⚠️ **`popup.js` n'avait JAMAIS tourné** — §4.10, comme `lbc.js` et `ebay.js`
+  avant lui. `scripts/bancs/popup.cjs` la charge dans une vraie page avec un
+  faux `chrome.runtime` : **11 contrôles, 3 rouges** sur le code d'avant.
+- Il vérifie les **trois états** de la fenêtre : pas connecté · connecté (elle
+  **nomme** le compte — c'est ce qui permet de voir qu'on s'est trompé) ·
+  **session expirée**, qui n'est pas « pas de compte » et n'appelle pas la même
+  consigne.
+- Extension en **5.64.0**, zip régénéré, `EXT_ATTENDUE` suivie. Aucune entrée
+  d'`EXT_CAPACITES` : l'app ne promet rien de neuf.
+
 ### ⚠️⚠️ LA PORTE D'ENTRÉE PROMETTAIT UNE PROTECTION QU'ELLE N'AVAIT PAS MESURÉE
 Même passe, même écran d'accueil — mais **avant** la connexion. La dernière
 phrase que lit quelqu'un juste avant de confier ses jetons Vinted disait :
@@ -2375,7 +2399,7 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
 | `node scripts/audit-*.cjs` | **35 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
-| `scripts/bancs/*.cjs` | les **20 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
+| `scripts/bancs/*.cjs` | les **21 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
 **Trois règles de preuve :**
@@ -2643,7 +2667,7 @@ src/App.jsx                     l'app (grep avant de lire — le fichier est én
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
 scripts/audit-*.cjs             les 35 audits
-scripts/bancs/                  les 19 bancs (leur README dit comment les lancer)
+scripts/bancs/                  les 21 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 ```
