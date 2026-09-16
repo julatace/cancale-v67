@@ -76,6 +76,13 @@ function rendreAuth(e) {
   const note = e && e.cloisonne
     ? "Tes captures sont enregistrées sous ton compte."
     : "La séparation des comptes n'est pas encore activée en base : se connecter prépare le terrain, mais ne cloisonne pas encore les données.";
+  // ⚠️⚠️ QUEL MOT DE PASSE ? C'est LA question de cette fenêtre, et elle ne
+  //    répondait nulle part. On arrive ici juste après avoir été sur Vinted,
+  //    on voit « Email / Mot de passe »… et on tape son mot de passe VINTED.
+  //    Ça échoue, et pire : on vient de le saisir dans une fenêtre qui n'en a
+  //    pas besoin. L'app le dit dans sa carte des premiers pas ; la surface où
+  //    le geste SE FAIT, elle, se taisait (§11).
+  const quelCompte = "C'est ton compte <b>VRM</b> — le même email et le même mot de passe que sur vrm.center. Ce n'est pas ton mot de passe Vinted, l'extension n'en a jamais besoin.";
   if (e && e.connecte) {
     box.innerHTML = `<div class="who"><span class="dot"></span><span class="nom">${esc(e.email || 'connecté')}</span></div>
       <div class="muted" style="margin-top:0">${note}</div>
@@ -87,11 +94,13 @@ function rendreAuth(e) {
   }
   const expiree = e && e.expiree;
   box.innerHTML = `<div class="who"><span class="dot ${expiree ? 'warn' : 'off'}"></span><span class="nom">${expiree ? 'Session expirée' : 'Non connecté'}</span></div>
-    <div class="muted" style="margin-top:0">${expiree ? 'Ta session a expiré — retape ton mot de passe.' : note}</div>
-    <input id="mail" type="email" placeholder="Email" autocomplete="username">
-    <input id="pw" type="password" placeholder="Mot de passe" autocomplete="current-password">
+    <div class="muted" style="margin-top:0">${expiree ? 'Ta session a expiré — retape le mot de passe de ton compte VRM.' : quelCompte}</div>
+    <input id="mail" type="email" placeholder="Email de ton compte VRM" autocomplete="username">
+    <input id="pw" type="password" placeholder="Mot de passe VRM" autocomplete="current-password">
     <button id="inBtn">Se connecter</button>
-    <div class="err" id="authErr" hidden></div>`;
+    <div class="err" id="authErr" hidden></div>
+    <div class="muted">Pas encore de compte ? <a href="https://vrm.center" target="_blank" rel="noreferrer" style="color:#4aa87d">Ouvre vrm.center</a> et crée-le en une minute.</div>
+    ${expiree ? '' : `<div class="muted" style="margin-top:6px">${note}</div>`}`;
   const err = document.getElementById('authErr');
   const go = () => {
     const email = document.getElementById('mail').value, password = document.getElementById('pw').value;
