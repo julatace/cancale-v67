@@ -2155,6 +2155,41 @@ se sent accompagné plutôt que mis au travail. Quatre étapes sont devenues
   seul ».
 - **10 rouges** sur le build d'il y a une heure, 0 après.
 
+### ⚠️⚠️ LES ÉTAPES DU DÉPÔT LEBONCOIN NE POUVAIENT PAS ÊTRE ENREGISTRÉES
+Le dossier dit depuis deux passes : « *l'extension enregistre désormais chaque
+étape distincte (`lbc_recon.etapes`)… un seul dépôt fait à la main suffit à me
+donner la carte complète* ». **Mesuré le 16 septembre, et c'était une promesse
+qu'aucun code ne pouvait tenir.**
+`captureDepositForm()` ne tourne que dans `load()` — au démarrage, au retour sur
+l'onglet, et **quand `location.href` CHANGE**. Or le dépôt Leboncoin est un
+**assistant** : il remplace l'étape **sur place**, sans toucher à l'adresse. Les
+étapes 2, 3, 4… étaient donc **invisibles** — exactement ce pour quoi ce code
+existe. Les deux moitiés étaient là (`lbc.js` envoie `etape`, le fond range par
+signature) ; c'est le **déclencheur** qui regardait la mauvaise chose.
+⇒ On observe le **FORMULAIRE**, pas l'URL (`MutationObserver`, une capture par
+seconde au plus, **12 étapes** au maximum, et uniquement sur une page de dépôt).
+La signature dédoublonne déjà : réobserver ne coûte rien, **manquer une étape**
+coûte la carte entière.
+- ⚠️ **C'est une chance UNIQUE** : `lbc_recon.etapes` est absente de sa base. Le
+  jour où il fait un dépôt à la main avec une extension à jour, soit
+  l'enregistreur marche et j'ai enfin où vivent la catégorie, l'état et le champ
+  photo — soit il ne marche pas, et on ne le saura qu'après. §4.10 : **ce code
+  n'avait jamais tourné**.
+- Le banc simule l'étape suivante **sans changer d'adresse** et exige : deux
+  étapes enregistrées, **deux signatures distinctes** (la suivante n'écrase pas
+  la précédente), et que l'étape rapporte **les listes déroulantes ET le champ
+  photo**. **2 rouges** sur le code d'avant — dont « 0 liste, 0 champ fichier ».
+- ⚠️ **Et la promesse de confidentialité n'avait jamais été vérifiée** : le code
+  dit « noms de champs et libellés d'options uniquement, **aucun contenu
+  saisi** ». Le banc tape une valeur dans un champ et exige qu'elle **ne parte
+  pas** avec la structure.
+- **Mesuré au passage, et ce n'était PAS un défaut** : le libellé de la page de
+  dépôt a changé (« Que proposez-vous aujourd'hui ? » → « **Quel est le titre de
+  l'annonce ?** », relevé du 13 septembre dans `lbc_recon.form`). `findField`
+  cherche aussi `subject` et `titre` : le titre se remplit toujours. *Avant de
+  « corriger », vérifier que c'est cassé.*
+- Extension en **5.66.0**, zip régénéré, `EXT_ATTENDUE` suivie.
+
 ### ⚠️⚠️ « DÈS QUE J'APPUIE SUR UN BOUTON DANS VINTED, J'AI "OFFRE À TRANCHER" »
 Plainte de Julien, 16 septembre. **Cause mesurée, et elle est nette** : dans
 `nouveautes()`, les **ventes** et les **messages** sont comparés au mémo du

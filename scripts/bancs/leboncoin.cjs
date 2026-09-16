@@ -450,6 +450,70 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
     await p6.close();
   }
 
+  // ══════════════════════════════════════════════════════════════════════════
+  //  LES ÉTAPES DU DÉPÔT — le seul code qui puisse me donner la carte
+  // ══════════════════════════════════════════════════════════════════════════
+  // ⚠️⚠️ CE CODE N'A JAMAIS TOURNÉ, ET C'EST UNE CHANCE UNIQUE. `lbc_recon.etapes`
+  //    est absente de sa base : le jour où il fait UN dépôt à la main avec une
+  //    extension à jour, soit l'enregistreur marche et j'ai la carte complète du
+  //    formulaire (où vivent la catégorie, l'état, le champ photo), soit il ne
+  //    marche pas et on ne le saura qu'après. §4.10.
+  // ⚠️⚠️ ET IL NE POUVAIT PAS MARCHER : `captureDepositForm()` ne tournait que
+  //    dans `load()` — au démarrage, au retour sur l'onglet, et quand l'ADRESSE
+  //    change. Or un assistant remplace l'étape SUR PLACE. Les étapes 2, 3, 4…
+  //    étaient donc invisibles : exactement ce pour quoi ce code existe.
+  {
+    const p7 = await b.newPage({ viewport: { width: 1280, height: 900 } });
+    const e7 = []; p7.on('pageerror', (e) => e7.push(e.message));
+    await p7.addInitScript((d) => {
+      window.__formes = [];                      // tout ce qui part vers le fond
+      window.chrome = { runtime: { id: 'banc', lastError: null, sendMessage: (m, cb) => {
+        if (m && m.action === 'lbcForm') window.__formes.push(m);
+        const rep = (o) => { try { cb && cb(o); } catch (_) {} };
+        if (m && m.action === 'getQueue') return rep({ ok: true, queue: d.queue, removals: [], unlinked: [], postedList: [], stats: {} });
+        return rep({ ok: true });
+      }, onMessage: { addListener() {} } } };
+    }, { queue: QUEUE });
+    await p7.goto('http://localhost:4491/depot', { waitUntil: 'domcontentloaded' });
+    await p7.addScriptTag({ content: SRC });
+    await p7.waitForTimeout(1400);
+    const apres1 = await p7.evaluate(() => window.__formes.length);
+    dit(apres1 >= 1, 'la première étape du dépôt est enregistrée', apres1 + ' étape(s)');
+
+    // L'ÉTAPE SUIVANTE, comme le fait Leboncoin : on remplace le contenu du
+    // formulaire SANS toucher à l'adresse.
+    await p7.evaluate(() => {
+      document.querySelector('main').innerHTML =
+        '<label for="p2">Prix</label><input id="p2" name="price" type="text">'
+        + '<label for="c2">Catégorie</label><select id="c2" name="category"><option value=""></option><option value="2">Chaussures</option></select>'
+        + '<label for="f2">Photos</label><input id="f2" name="images" type="file" multiple>';
+    });
+    await p7.waitForTimeout(1800);
+    const etapes = await p7.evaluate(() => window.__formes.map((m) => ({
+      etape: m.etape, champs: (m.fields || []).map((f) => f.name), selects: (m.selects || []).length, fichiers: m.fichiers,
+      // Ce qui ne doit JAMAIS partir : une valeur saisie.
+      valeurs: JSON.stringify(m).match(/"value"/g) || [],
+    })));
+    dit(etapes.length >= 2, 'une étape qui arrive SANS changer d’adresse est enregistrée aussi',
+      etapes.length + ' étape(s) : ' + etapes.map((e) => e.champs.join('+')).join(' | '));
+    dit(new Set(etapes.map((e) => e.etape)).size === etapes.length,
+      'et chaque étape a sa propre signature — la suivante n’écrase pas la précédente',
+      etapes.map((e) => String(e.etape).slice(0, 30)).join(' | '));
+    const derniere = etapes[etapes.length - 1] || {};
+    dit(derniere.selects >= 1 && derniere.fichiers >= 1,
+      'l’étape rapporte les listes déroulantes ET le champ photo — c’est là que vivent la catégorie et les images',
+      `${derniere.selects} liste(s), ${derniere.fichiers} champ(s) fichier`);
+    // ⚠️ La promesse écrite dans le code : « noms de champs et libellés
+    //    d'options uniquement : AUCUN contenu saisi ». Elle n'avait jamais été
+    //    vérifiée — et c'est une promesse de confidentialité.
+    await p7.evaluate(() => { const i = document.querySelector('input[name="price"]'); if (i) { i.value = 'SECRET-42'; i.dispatchEvent(new Event('input', { bubbles: true })); } });
+    await p7.waitForTimeout(1600);
+    const fuite = await p7.evaluate(() => JSON.stringify(window.__formes).includes('SECRET-42'));
+    dit(!fuite, 'et aucune valeur saisie ne part avec la structure');
+    dit(!e7.length, 'aucune erreur pendant l’enregistrement des étapes', e7[0] || '');
+    await p7.close();
+  }
+
   await b.close(); srv.close();
   console.log(ko ? `\n${ko} contrôle(s) non conforme(s).` : '\nLe panneau Leboncoin dit ce qu\'il sait, et seulement ce qu\'il sait.');
   process.exit(ko ? 1 : 0);

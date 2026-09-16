@@ -943,4 +943,39 @@
   document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
   let lastUrl = location.href;
   setInterval(() => { if (location.href !== lastUrl) { lastUrl = location.href; setTimeout(load, 1200); } }, 2000);
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  LES ÉTAPES DU DÉPÔT SE SUIVENT SANS CHANGER D'ADRESSE
+  // ══════════════════════════════════════════════════════════════════════════
+  // ⚠️⚠️ `captureDepositForm()` ne tournait QUE dans `load()` — c'est-à-dire au
+  //    démarrage, au retour sur l'onglet, et quand `location.href` CHANGE. Or le
+  //    dépôt Leboncoin est un assistant : il remplace l'étape **sur place**,
+  //    sans toucher à l'adresse. Les étapes 2, 3, 4… n'étaient donc jamais
+  //    enregistrées — exactement la seule chose pour laquelle ce code existe.
+  //    Et ça colle à la mesure : `lbc_recon.form` porte UNE étape (le titre),
+  //    écrite le 13 septembre, et rien d'autre depuis le 2 août.
+  // ⇒ On regarde le FORMULAIRE, pas l'URL. La signature dédoublonne déjà, donc
+  //   réobserver ne coûte rien ; ce qui coûterait, c'est une étape manquée.
+  // ⚠️ BORNÉ : uniquement sur les pages de dépôt, au plus une capture par
+  //    seconde, et on s'arrête après 12 étapes distinctes — un assistant n'en a
+  //    pas trente, et une page qui mute sans fin ne doit pas nous faire tourner
+  //    en boucle.
+  (function surveillerLesEtapes() {
+    try {
+      if (!/depos|d[ée]p[oô]t|\/ai\/|creation|nouvelle-annonce/i.test(location.href)) return;
+      let enAttente = null, vues = 0;
+      const MAX_ETAPES = 12;
+      const obs = new MutationObserver(() => {
+        if (vues >= MAX_ETAPES) { try { obs.disconnect(); } catch (_) {} return; }
+        if (enAttente) return;
+        enAttente = setTimeout(() => {
+          enAttente = null;
+          const avant = derniereEtape;
+          captureDepositForm();
+          if (derniereEtape !== avant) vues++;   // une étape VRAIMENT nouvelle
+        }, 1000);
+      });
+      obs.observe(document.documentElement, { childList: true, subtree: true });
+    } catch (_) { /* pas d'observateur : on garde le comportement d'avant */ }
+  })();
 })();
