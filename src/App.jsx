@@ -13521,6 +13521,38 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // écran ouvert. On ne remplace que ce qui est resté vide.
     setPrenom((p) => p || String(load('vrm_prenom', '') || '').trim());
   }), []);
+  // ── CE QUI MANQUE VRAIMENT POUR QUE ÇA SE REMPLISSE ────────────────────────
+  // La carte des premiers pas récitait quatre gestes, toujours les mêmes. Or
+  // l'app SAIT lesquels sont déjà faits : le pont dit si l'extension tourne
+  // dans CE navigateur, et `vmrAuthEtat` sous quel compte elle écrit. Réciter
+  // une étape déjà faite, c'est laisser chercher ailleurs celle qui bloque —
+  // « l'écran se range sur ce qu'il PEUT faire ».
+  const [pont, setPont] = useState(() => ({ on: vmrExtPresent(), v: vmrExtVersion() }));
+  useEffect(() => onVmrExt(() => setPont({ on: vmrExtPresent(), v: vmrExtVersion() })), []);
+  // ⚠️ TROIS ÉTATS : `undefined` = on demande · `null` = l'extension n'a pas
+  //    répondu (« pas su », on n'accuse pas) · un objet = mesuré.
+  const [extAuth, setExtAuth] = useState(undefined);
+  useEffect(() => {
+    let stop = false;
+    (async () => {
+      if (!pont.on) { if (!stop) setExtAuth(null); return; }
+      const e = await vmrAuthEtat();
+      if (!stop) setExtAuth(e);
+    })();
+    return () => { stop = true; };
+  }, [pont.on]);
+  // Le compte sous lequel l'extension écrit est-il CELUI-CI ? C'est une
+  // identité (la même adresse), pas une ressemblance. Si elle écrit sous une
+  // autre, ses captures partent chez l'autre vendeur et cette boutique reste
+  // vide pour toujours — sans que rien ne le dise.
+  const monMail = String((AUTH.user && AUTH.user.email) || '').trim().toLowerCase();
+  const sonMail = String((extAuth && extAuth.email) || '').trim().toLowerCase();
+  const etapePont = !pont.on ? 'absente'
+    : extAuth === undefined ? 'demande'
+    : !extAuth ? 'muette'
+    : !extAuth.connecte ? 'pasconnectee'
+    : (monMail && sonMail && monMail !== sonMail) ? 'autrecompte'
+    : 'connectee';
   const [imprimante, setImprimante] = useState(() => imprMode(load('vrm_imprimante', 'normale')));
   const imprTouchee = React.useRef(false);
   useEffect(() => onCloudReady(() => {
@@ -16962,29 +16994,69 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                  que voit une nouvelle personne. Ici la liste vide a une CAUSE
                  connue, et elle se dit — avec le geste, en ordre. */
               : premierJour
-              ? <div style={{padding:'22px 20px',border:`1px solid ${C.border}`,borderRadius:10,background:C.card}}>
-                  <div style={{fontSize:17,fontWeight:700,color:C.text}}>Bienvenue — il reste une chose à brancher</div>
-                  <div style={{fontSize:13,color:C.muted,marginTop:5,lineHeight:1.55}}>
-                    Ta journée est vide parce qu'aucun compte Vinted n'est encore relié, pas parce qu'il n'y a rien à faire. VRM ne va rien chercher tout seul&nbsp;: c'est l'extension, dans ton navigateur Chrome, qui range ce que Vinted t'envoie déjà.
-                  </div>
-                  <ol style={{margin:'14px 0 0 0',padding:'0 0 0 20px',fontSize:13,color:C.text,lineHeight:1.75}}>
-                    <li>Télécharge l'extension, puis dézippe-la (un seul dossier, «&nbsp;VRM-extension&nbsp;»).</li>
-                    <li>Dans Chrome, ouvre <code style={{fontSize:12,background:C.bg,padding:'1px 5px',borderRadius:5}}>chrome://extensions</code>, active «&nbsp;Mode développeur&nbsp;» en haut à droite, puis «&nbsp;Charger l'extension non empaquetée&nbsp;» et choisis ce dossier.</li>
-                    <li>Clique son icône et connecte-toi <b style={{color:C.text}}>avec le même email que sur VRM</b> — c'est ce qui range tes données chez toi et nulle part ailleurs.</li>
-                    <li>Ouvre <b style={{color:C.text}}>vinted.fr</b> une fois, connecté sur ton compte. Tes annonces, ventes, achats et messages arrivent ici tout seuls.</li>
+              ? (()=>{
+                  // ⚠️ L'ÉTAPE QUI BLOQUE EN PREMIER, ET ELLE EST MESURÉE. Une
+                  //    liste de quatre gestes dont trois sont déjà faits fait
+                  //    chercher au mauvais endroit : le titre nomme CE qui
+                  //    manque, et les étapes faites portent une coche.
+                  const faitInstall = etapePont !== 'absente';
+                  const faitConnexion = etapePont === 'connectee';
+                  const titre = etapePont === 'pasconnectee' ? "L'extension est là, mais elle n'est pas connectée à ton compte"
+                    : etapePont === 'autrecompte' ? "L'extension écrit sous un AUTRE compte"
+                    : etapePont === 'connectee' ? "Tout est branché — il reste à passer sur Vinted"
+                    : "Bienvenue — il reste une chose à brancher";
+                  const intro = etapePont === 'pasconnectee'
+                      ? <>Elle tourne bien dans ce navigateur, mais tant qu'elle ne sait pas qui tu es, ce qu'elle capte n'a nulle part où aller. C'est pour ça que ta journée reste vide.</>
+                    : etapePont === 'autrecompte'
+                      ? <>Elle est connectée sous <b style={{color:C.text}}>{extAuth.email}</b>, et toi tu es sur <b style={{color:C.text}}>{(AUTH.user&&AUTH.user.email)||'ce compte'}</b>. Ce qu'elle capte part donc dans l'autre boutique — celle-ci restera vide tant que les deux ne seront pas la même.</>
+                    : etapePont === 'connectee'
+                      ? <>L'extension tourne et elle écrit bien sous ton compte. Il ne manque que le dernier geste&nbsp;: elle ne range que ce que Vinted envoie à ton navigateur, donc elle a besoin que tu y passes une fois.</>
+                      : <>Ta journée est vide parce qu'aucun compte Vinted n'est encore relié, pas parce qu'il n'y a rien à faire. VRM ne va rien chercher tout seul&nbsp;: c'est l'extension, dans ton navigateur Chrome, qui range ce que Vinted t'envoie déjà.</>;
+                  const Etape = ({ fait, children }) => (
+                    <li style={{color: fait ? C.muted : C.text}}>
+                      {fait && <span style={{color:INV_STATUS.online.color,fontWeight:700,marginRight:5}}>✓</span>}{children}
+                    </li>
+                  );
+                  return (
+                <div style={{padding:'22px 20px',border:`1px solid ${etapePont==='autrecompte'?C.warn+'66':C.border}`,borderRadius:10,background:C.card}}>
+                  <div style={{fontSize:17,fontWeight:700,color:C.text}}>{titre}</div>
+                  <div style={{fontSize:13,color:C.muted,marginTop:5,lineHeight:1.55}}>{intro}</div>
+                  <ol style={{margin:'14px 0 0 0',padding:'0 0 0 20px',fontSize:13,lineHeight:1.75}}>
+                    <Etape fait={faitInstall}>Télécharge l'extension, puis dézippe-la (un seul dossier, «&nbsp;VRM-extension&nbsp;»).</Etape>
+                    <Etape fait={faitInstall}>Dans Chrome, ouvre <code style={{fontSize:12,background:C.bg,padding:'1px 5px',borderRadius:5}}>chrome://extensions</code>, active «&nbsp;Mode développeur&nbsp;» en haut à droite, puis «&nbsp;Charger l'extension non empaquetée&nbsp;» et choisis ce dossier.</Etape>
+                    <Etape fait={faitConnexion}>Clique son icône et connecte-toi <b style={{color:C.text}}>avec le même email que sur VRM</b> — c'est ce qui range tes données chez toi et nulle part ailleurs.</Etape>
+                    <Etape fait={false}>Ouvre <b style={{color:C.text}}>vinted.fr</b> une fois, connecté sur ton compte. Tes annonces, ventes, achats et messages arrivent ici tout seuls.</Etape>
                   </ol>
                   <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:14}}>
-                    <a href="/VRM-extension.zip" download style={{textDecoration:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'11px 16px',fontSize:13.5,fontWeight:600}}>Télécharger l'extension</a>
+                    {/* §7 : le bouton de téléchargement n'a plus rien à faire là
+                        quand l'extension tourne déjà sous nos yeux. */}
+                    {/* ⚠️⚠️ VU AU RENDU : le bouton principal disait « Ouvrir
+                        vinted.fr » alors que l'étape qui bloque était la
+                        connexion de l'extension — et dans le cas « autre
+                        compte », y aller aurait capté dans la boutique de
+                        QUELQU'UN D'AUTRE. Le geste proposé doit être celui qui
+                        débloque, jamais le suivant. Quand le geste se passe
+                        dans Chrome (cliquer l'icône de l'extension), une page
+                        web ne peut pas l'ouvrir : on ne met alors AUCUN bouton
+                        principal plutôt qu'un qui envoie ailleurs. */}
+                    {!faitInstall && <a href="/VRM-extension.zip" download style={{textDecoration:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'11px 16px',fontSize:13.5,fontWeight:600}}>Télécharger l'extension</a>}
+                    {faitConnexion && <a href="https://www.vinted.fr" target="_blank" rel="noreferrer" style={{textDecoration:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'11px 16px',fontSize:13.5,fontWeight:600}}>Ouvrir vinted.fr</a>}
                     <button type="button" onClick={()=>onNav&&onNav('vintedaccounts')} style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'11px 16px',fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Voir mes comptes liés</button>
                   </div>
                   {/* ⚠️ On ne promet PAS de délai ni de résultat : l'app ne sait
-                      pas si l'extension est installée sur CET appareil, ni si
-                      la personne passera sur Vinted. Le geste, jamais la
-                      promesse. */}
+                      pas si la personne passera sur Vinted. Le geste, jamais la
+                      promesse. Et « pas su » ne s'écrit pas comme un défaut :
+                      quand l'extension n'a pas répondu, on ne l'accuse de rien. */}
                   <div style={{fontSize:11.5,color:C.muted,marginTop:12,lineHeight:1.5}}>
-                    Sur téléphone, il n'y a pas d'extension Chrome&nbsp;: fais ces étapes une fois sur un ordinateur, puis rouvre VRM sur ton téléphone — les données y seront.
+                    {etapePont==='absente'
+                      ? <>Sur téléphone, il n'y a pas d'extension Chrome&nbsp;: fais ces étapes une fois sur un ordinateur, puis rouvre VRM sur ton téléphone — les données y seront.</>
+                      : etapePont==='muette'
+                      ? <>L'extension est bien là, mais elle n'a pas répondu quand je lui ai demandé sous quel compte elle écrit. Recharge la page pour réessayer.</>
+                      : <>Une fois ces étapes faites, les données arrivent toutes seules — tu n'as plus rien à lancer.</>}
                   </div>
                 </div>
+                  );
+                })()
               : <div style={{textAlign:'center',padding:'34px 18px',border:`1px dashed ${C.border}`,borderRadius:10,background:C.card}}>
                   <div style={{fontSize:44,lineHeight:1}}>🎉</div>
                   <div style={{fontSize:17,fontWeight:700,color:C.text,marginTop:10}}>Tout est à jour !</div>

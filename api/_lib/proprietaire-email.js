@@ -105,9 +105,30 @@ export function resoudreProprietaire(adresses, registre, defaut) {
   if (bases.length === 1) return { owner: bases[0], via: 'adresse-base', adresse: liste.find(a => reg[sansEtiquette(a)]) };
   if (bases.length > 1) return { owner: '', via: 'quarantaine', raison: 'plusieurs vendeurs destinataires' };
 
-  // 3. Installation à un seul vendeur : tout lui appartient, c'est explicite et
+  // 3. Installation à UN SEUL vendeur : tout lui appartient, c'est explicite et
   //    réglé par lui (VRM_OWNER_UID). Ce n'est PAS une devinette.
-  if (defaut) return { owner: String(defaut), via: 'installation' };
+  //
+  // ⚠️⚠️ MAIS « un seul vendeur » N'EST VRAI QUE TANT QU'IL EST SEUL. Le jour
+  //    où l'app accueille quelqu'un d'autre, ce repli devient exactement la
+  //    devinette que tout ce fichier interdit : un email arrivé sur une adresse
+  //    que le NOUVEAU vendeur n'a pas encore déclarée partirait chez le
+  //    propriétaire de l'installation — son bordereau, son code de retrait, sa
+  //    vente, dans la boutique d'un autre. Et ça ne se voit pas : celui qui
+  //    l'attendait ne saura jamais qu'il a existé.
+  //    ⇒ Dès que le registre déclare un propriétaire AUTRE que celui de
+  //      l'installation, il y a démonstrablement plus d'un vendeur : le repli
+  //      s'éteint et on passe en quarantaine (réparable d'un clic).
+  //    ⚠️ Et il ne s'éteint PAS avant : tant que Julien est seul — registre
+  //      vide, ou ne portant que ses propres adresses — rien ne change. C'est
+  //      l'incident du 16 au 22 août (593 emails en quarantaine, zéro traité,
+  //      ses codes de retrait perdus) qu'on ne refait pas.
+  const dft = String(defaut || '').trim();
+  const autresVendeurs = Object.keys(reg).some((a) => reg[a] && reg[a] !== dft);
+  if (dft && !autresVendeurs) return { owner: dft, via: 'installation' };
+  if (dft && autresVendeurs) {
+    return { owner: '', via: 'quarantaine',
+      raison: 'adresse de réception inconnue, et l’app compte plusieurs vendeurs' };
+  }
 
   // 4. On ne sait pas → quarantaine. Jamais d'attribution au hasard.
   return { owner: '', via: 'quarantaine', raison: liste.length ? 'adresse de réception inconnue' : 'aucune adresse de réception lisible' };
