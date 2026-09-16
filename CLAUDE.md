@@ -2155,6 +2155,59 @@ se sent accompagné plutôt que mis au travail. Quatre étapes sont devenues
   seul ».
 - **10 rouges** sur le build d'il y a une heure, 0 après.
 
+### ⚠️⚠️ « DÈS QUE J'APPUIE SUR UN BOUTON DANS VINTED, J'AI "OFFRE À TRANCHER" »
+Plainte de Julien, 16 septembre. **Cause mesurée, et elle est nette** : dans
+`nouveautes()`, les **ventes** et les **messages** sont comparés au mémo du
+dernier récap ; les **OFFRES ne l'étaient pas**. `out.offres` valait le nombre
+d'offres **EN ATTENTE**, pas le nombre de **nouvelles** — donc tant qu'il lui
+restait une offre non tranchée, `rien` était faux **pour toujours**, et la
+fenêtre **plein écran** (`position:fixed;inset:0`, fond assombri) revenait à
+chaque cycle de capture. Vinted est une SPA : chaque bouton en relance un.
+⇒ Une offre a une identité — **`offer_request_id`**. On compte celles qu'on n'a
+pas encore montrées, exactement comme les ventes. Une VRAIE nouvelle offre
+mérite encore d'interrompre (de l'argent, 24 h pour répondre) ; une offre déjà
+vue, non.
+- ⚠️ **Le libellé suit la donnée** : « 1 **nouvelle** offre à trancher ». Sinon
+  on lit « 3 offres » dans la fenêtre et on en trouve 12 dans le panneau.
+- ⚠️ **Première visite** : elles sont toutes « nouvelles ». On les remet à zéro
+  comme les ventes et les messages — « 17 offres à trancher » d'un coup, c'est
+  le « 320 ventes ! » qu'on évite juste à côté.
+
+### « LA LECTURE DES BORDEREAUX PLUS VITE » — CE QUI SE MESURE SANS SUPPOSER
+Même demande, même jour. **Relevé sur sa base le 16 septembre** :
+`label_url_trouve` **25** contre `label_url_introuvable` **28** — l'URL manque
+**une fois sur deux** — et **AUCUN compteur `label_via_*`** ni
+`label_ko_statuts_*`, alors que le code les écrit sur le même chemin, sans
+condition. ⇒ **Son extension est antérieure à celle qui les écrit** (confirmé
+par `panel_diag_capture.ver` absent, la version que l'extension inscrit
+elle-même depuis la 5.63). *On ne sait donc toujours pas quel chemin gagne, et
+réordonner serait une supposition — ce que ce projet s'interdit.*
+**Ce qui se mesure sans ça** : une vente dont le PDF n'est pas prêt faisait
+`4 × (1 transaction + 3 chemins)` = **16 requêtes Vinted**, et reprenait **4 fois
+le même échantillon de diagnostic** (12 aller-retours de `chrome.storage.local`).
+⇒ La boucle d'insistance transmet ce qu'elle a appris : **13 requêtes** et
+**3 écritures** de stockage. Les trois chemins restent essayés à chaque
+tentative — c'est le PDF qu'on attend, pas eux.
+⚠️⚠️ **ET MON PREMIER JET CASSAIT LE CAS QUI COMPTE** : je mettais la
+transaction en cache **dans tous les cas** — or « Vinted n'expose pas encore
+l'expédition » est justement celui où il FAUT la redemander (le service
+d'expédition est en train de la créer). Les trois essais suivants relisaient la
+même réponse vide. **C'est `audit-bordereau-rattrapage.cjs` qui l'a vu**, sur un
+contrôle écrit bien avant : « on réessaie le temps que le PDF arrive ». On ne
+garde la transaction **que si elle a répondu ce qu'on lui demandait**.
+⚠️ **Le garde-fou « une requête à la fois » (§3) ne bouge pas** : ces trois
+chemins vont chez **Vinted**. Les paralléliser serait exactement le signal
+qu'on refuse depuis le début.
+- `scripts/audit-recap-bordereau.cjs` exécute le VRAI `background.js` dans un
+  `vm` : **10 contrôles, 5 rouges** sur le code d'avant — dont « deuxième
+  passage, MÊMES offres : offres=**2** », la fenêtre qui revenait.
+- ⚠️ **ET MON BANC SERVAIT UNE FORME QUE LE CODE NE LIT PAS** (§6.3, dans mon
+  propre banc) : `rep(body, status)` appelé sans statut rendait
+  `ok: undefined < 400` = **faux**, donc `sbGetTout` rendait `null` et je
+  mesurais « aucune offre » sur un code intact.
+- Extension en **5.65.0**, zip régénéré, `EXT_ATTENDUE` suivie. Aucune entrée
+  d'`EXT_CAPACITES` : ce sont des corrections, pas des promesses neuves.
+
 ### ⚠️⚠️ ET SUR SON IPHONE, L'ACCUEIL DEMANDAIT L'IMPOSSIBLE
 Mesuré au rendu à **390 px avec `isMobile + hasTouch`**, juste après la passe
 « naturel » : la carte des premiers pas déroulait quand même « va sur
@@ -2398,7 +2451,7 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | outil | quoi |
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
-| `node scripts/audit-*.cjs` | **35 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `node scripts/audit-*.cjs` | **36 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
 | `scripts/bancs/*.cjs` | les **21 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
@@ -2666,7 +2719,7 @@ script-là me fait croire à une catastrophe.
 src/App.jsx                     l'app (grep avant de lire — le fichier est énorme)
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
-scripts/audit-*.cjs             les 35 audits
+scripts/audit-*.cjs             les 36 audits
 scripts/bancs/                  les 21 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
