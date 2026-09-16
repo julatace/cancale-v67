@@ -282,8 +282,26 @@ nBenef === 2 ? ok('Rapports mensuel ET annuel : bénéfice sur le coût connu')
   //    termine sur la fonction suivante, `-1` compris : `slice(i, -1)` aurait
   //    ratissé tout le fichier.)
   const S = i < 0 ? '' : app.slice(i, j < 0 ? app.length : j).replace(/^\s*\/\/.*$/gm, '');
+  // ⚠️ VINGT-DEUXIÈME FOIS QU'UN DE MES CONTRÔLES CRIE AU LOUP, et c'est la
+  //    récidive nommée dans le dossier : il exigeait le mot `null` DANS
+  //    l'expression. Le 16 septembre la sonde de lecture est devenue une
+  //    fonction partagée (`sondeLectureSansCompte`, lue AUSSI par la porte
+  //    d'entrée, §11) : `out.lisibleSansCompte = await sondeLectureSansCompte();`
+  //    ne contient plus le mot, alors que la règle est mieux tenue qu'avant —
+  //    un seul endroit la porte. *Un audit suit la RÈGLE, pas son orthographe* :
+  //    il suit l'expression jusqu'à sa DÉFINITION.
+  const suitLaDefinition = (expr) => {
+    const m = /\b(sonde[A-Za-z0-9_]*)\s*\(/.exec(expr);
+    if (!m) return false;
+    const k = app.indexOf(`const ${m[1]} = `);
+    if (k < 0) return false;
+    const fin = app.indexOf('\n};', k);
+    const corps = app.slice(k, fin < 0 ? k + 2000 : fin).replace(/^\s*\/\/.*$/gm, '');
+    return /return\s+null|\?\s*null|:\s*null/.test(corps);
+  };
   const aveugles = [...S.matchAll(/out\.(\w+)\s*=\s*([\s\S]*?);/g)].filter(([tout, , expr]) => {
     if (/\bnull\b/.test(expr)) return false;                  // sait rendre « je ne sais pas »
+    if (suitLaDefinition(expr)) return false;                 // la fonction appelée le sait
     // Une affectation à l'intérieur d'un `if (r.ok)` est déjà une mesure : on
     // n'y entre que quand la base a VRAIMENT répondu.
     return !/if\s*\(\s*r\.ok\s*\)\s*\{[^{}]*$/.test(S.slice(0, S.indexOf(tout)));
