@@ -974,6 +974,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             sendResponse({ ok: true }); return;
           }
           if (msg.action === 'lbcRaw' && msg.body) { await handleLbcRaw(msg.url, msg.body); sendResponse({ ok: true }); return; }
+          // Le catalogue Leboncoin (codes de catégorie/marque/taille/état) : sa
+          // propre ligne, une place par endpoint, rien ne peut l'évincer.
+          if (msg.action === 'lbcCatalogue' && msg.body) { await storeLbcCatalogue(msg.url, String(msg.body).slice(0, LBC_CATALOGUE_MAX), !!msg.coupe || String(msg.body).length > LBC_CATALOGUE_MAX); sendResponse({ ok: true }); return; }
           if (msg.action === 'lbcPaths' && Array.isArray(msg.paths)) { await storeLbcRecon({ paths: msg.paths, url: msg.url }); sendResponse({ ok: true }); return; }
           // ANNONCE EN COURS DE DEPOT : memorisee au clic sur « Tout preparer »,
           // relue par la page de depot qui s'ouvre dans un AUTRE onglet. Sans ce
@@ -5560,7 +5563,10 @@ async function buildLbcData() {
   const postedCount = [...posted].filter((x) => /^\d+$/.test(x)).length;
   // Quota détecté automatiquement depuis l'offre Leboncoin (si trouvé).
   let detected = null;
-  try { const rec = await sbGet('app_data?id=eq.lbc_recon&select=data'); const q = rec && rec[0] && rec[0].data && rec[0].data.quota; if (q && q.value) detected = q.value; } catch (_) {}
+  // ⚠️ §4.4 : `lbc_recon` pèse **67 Ko** (échantillons de réponses) et on n'en
+  //    veut qu'UNE valeur — mesuré : 67 Ko / 725 ms en entier, **16 octets /
+  //    165 ms** projetée, à chaque ouverture du panneau sur leboncoin.fr.
+  try { const rec = await sbGet('app_data?id=eq.lbc_recon&select=quota:data->quota'); const q = rec && rec[0] && rec[0].quota; if (q && q.value) detected = q.value; } catch (_) {}
   // Compteurs de diagnostic (pour comprendre si la file est vide et pourquoi).
   const numberedOnline = online.filter((o) => { const e = numeros[o.id]; return e && String(e.numero || '').trim() !== ''; }).length;
   const stats = { postedCount, lbcCount, lbcJamaisLu, preuveKO: preuveLbc.echec, limit: lbcLimit, plan: lbcPlan, detected, exclues, onlineCount: online.length, numberedCount: numberedOnline, queueCount: queue.length,
@@ -5575,7 +5581,13 @@ async function buildLbcData() {
 async function storeLbcListings(url, listings) {
   try {
     const prevRows = await sbGet('app_data?id=eq.lbc_listings&select=data');
-    const prev = (prevRows && prevRows[0] && prevRows[0].data && prevRows[0].data.items) || {};
+    // ⚠️ « RIEN LU » NE VAUT PAS « RIEN ». `sbGet` rend `null` quand la base n'a
+    //    pas répondu : repartir de `{}` réécrirait la ligne avec la seule annonce
+    //    du moment, et effacerait tout l'historique de ses annonces Leboncoin.
+    //    Le cas qui détruit n'est pas la panne totale (l'écriture échoue aussi),
+    //    c'est LECTURE KO / ÉCRITURE OK — un simple timeout.
+    if (prevRows === null) return;
+    const prev = (prevRows[0] && prevRows[0].data && prevRows[0].data.items) || {};
     const merged = Object.assign({}, prev);
     for (const l of listings) { if (l && l.id) merged[String(l.id)] = Object.assign({}, merged[String(l.id)], l, { seenAt: new Date().toISOString() }); }
     await supabaseUpsert('app_data', [{ id: 'lbc_listings', data: { items: merged, updatedAt: new Date().toISOString(), lastUrl: url } }], 'id');
@@ -5587,7 +5599,8 @@ async function storeLbcListings(url, listings) {
 async function storeLbcAccount(acc) {
   try {
     const prevRows = await sbGet('app_data?id=eq.lbc_accounts&select=data');
-    const prev = (prevRows && prevRows[0] && prevRows[0].data && prevRows[0].data.accounts) || {};
+    if (prevRows === null) return;                 // pas su ≠ aucun compte (voir storeLbcListings)
+    const prev = (prevRows[0] && prevRows[0].data && prevRows[0].data.accounts) || {};
     const merged = Object.assign({}, prev);
     merged[String(acc.id)] = Object.assign({}, merged[String(acc.id)], acc, { seenAt: new Date().toISOString() });
     await supabaseUpsert('app_data', [{ id: 'lbc_accounts', data: { accounts: merged, updatedAt: new Date().toISOString() } }], 'id');
@@ -5598,7 +5611,13 @@ async function storeLbcAccount(acc) {
 async function storeLbcRecon(patch) {
   try {
     const prevRows = await sbGet('app_data?id=eq.lbc_recon&select=data');
-    const prev = (prevRows && prevRows[0] && prevRows[0].data) || {};
+    // ⚠️⚠️ C'EST LA LIGNE QUI PORTE LA CARTE DU FORMULAIRE DE DÉPÔT (`form`,
+    //    `etapes`) — celle qu'on attend depuis des semaines, et qu'un seul dépôt
+    //    fait à la main remplira. Une lecture ratée réécrivait la ligne avec le
+    //    seul échantillon du moment : la carte partait, et il faudrait refaire
+    //    le dépôt. Prouvé : `form:PERDU · etapes:PERDUES`.
+    if (prevRows === null) return;
+    const prev = (prevRows[0] && prevRows[0].data) || {};
     const next = Object.assign({ paths: [], samples: [] }, prev);
     if (patch.paths) { const set = new Set([...(next.paths || []), ...patch.paths]); next.paths = [...set].slice(0, 300); }
     if (patch.sample) { next.samples = [patch.sample, ...(next.samples || [])].slice(0, 6); }
@@ -5607,6 +5626,51 @@ async function storeLbcRecon(patch) {
     if (patch.url) next.lastUrl = patch.url;
     next.updatedAt = new Date().toISOString();
     await supabaseUpsert('app_data', [{ id: 'lbc_recon', data: next }], 'id');
+  } catch (_) {}
+}
+// ══════════════════════════════════════════════════════════════════════════════
+// LE CATALOGUE LEBONCOIN — SES CODES EXACTS DE CATÉGORIE, MARQUE, TAILLE, ÉTAT
+// ══════════════════════════════════════════════════════════════════════════════
+// Julien demande « le titre, la description, les catégories au bon endroit, le
+// prix — tout paramétré pour l'annonce ». Mettre une catégorie au bon endroit
+// suppose de connaître le CODE que Leboncoin attend, pas son libellé : son
+// formulaire ne prend pas « Chaussures », il prend une valeur (`{value,label}`).
+//
+// ⚠️ MESURÉ LE 17 SEPTEMBRE, et c'est ce qui bloquait. Ces codes passent par
+//    DEUX endpoints, tous deux VUS dans son navigateur (`lbc_recon.paths`) :
+//      · `api/frontend/v1/data/v7/fdata`  — le dictionnaire des attributs
+//        (mesuré : `features.accessories_brand.values.simpleData[{value,label}]`) ;
+//      · `api/frontend/v1/data/v5/fforms` — les formulaires par catégorie.
+//    Or `fdata` n'arrivait ici que **coupé à 9 000 caractères**, et `fforms`
+//    n'a JAMAIS eu d'échantillon : les six places de `lbc_recon.samples` étaient
+//    prises en ordre d'arrivée, et la moitié par des enchères PUBLICITAIRES
+//    (`nexx360`, `adnxs`, `pubmatic` — mesuré, 3 sur 6) qui ne sont même pas
+//    Leboncoin. Le bruit évinçait la seule chose qui sert.
+//
+// ⇒ Le catalogue a sa PROPRE ligne (`lbc_catalogue`), une place par endpoint :
+//   rien ne peut plus l'évincer, et il ne pèse pas sur `lbc_recon` que le
+//   panneau relit (§4.4). On le garde ENTIER dans la limite ci-dessous, et
+//   **on dit s'il a été coupé** — la moitié d'un catalogue a l'air d'un
+//   catalogue, et l'analyser en croyant l'avoir en entier serait promettre ce
+//   qu'on n'a pas mesuré.
+// ⚠️ ON N'ANALYSE RIEN ICI. Je n'ai vu que 9 000 caractères de `fdata` et zéro
+//    de `fforms` : écrire l'analyseur aujourd'hui serait deviner. On collecte,
+//    la prochaine passe branche — même méthode que `panel_ebay_form`.
+const LBC_CATALOGUE_MAX = 400000;      // borné : on ne renvoie pas une page entière
+async function storeLbcCatalogue(url, body, coupe) {
+  try {
+    const cle = String(url || '').replace(/^https?:\/\//, '').split('?')[0].replace(/[^a-zA-Z0-9]+/g, '_').slice(0, 80);
+    if (!cle) return;
+    const prevRows = await sbGet('app_data?id=eq.lbc_catalogue&select=data');
+    if (prevRows === null) return;                 // pas su ≠ vide (voir storeLbcListings)
+    const prev = (prevRows[0] && prevRows[0].data) || {};
+    const next = Object.assign({}, prev);
+    const dejala = next[cle];
+    // Rien de neuf → on n'écrit pas : inutile de renvoyer 400 Ko à chaque visite.
+    if (dejala && dejala.taille === body.length && dejala.coupe === !!coupe) return;
+    next[cle] = { url, at: new Date().toISOString(), taille: body.length, coupe: !!coupe, corps: body };
+    next.updatedAt = new Date().toISOString();
+    await supabaseUpsert('app_data', [{ id: 'lbc_catalogue', data: next }], 'id');
   } catch (_) {}
 }
 // Extraction GÉNÉRIQUE des annonces depuis une réponse JSON Leboncoin : on cherche

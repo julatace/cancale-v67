@@ -91,6 +91,30 @@ const CAS = [
     geste: (c) => c.saveListingDate('222', 2, 'il y a 2 jours'), garde: (d) => d['111'] && d['222'] },
   { id: 'vinted_item_details',   avant: { '111': { description: 'd1', photos: [] } }, quoi: 'les descriptions captées',
     geste: (c) => c.saveItemDetail('222', { description: 'd2', photos: [] }), garde: (d) => d['111'] && d['222'] },
+
+  // ⚠️⚠️ TROIS DE PLUS, TROUVÉES LE 17 SEPTEMBRE — LE CHEMIN LEBONCOIN N'AVAIT
+  //    JAMAIS APPRIS LA LEÇON. Ce fichier listait les lire-fusionner-réécrire
+  //    « de l'extension » et s'arrêtait à ceux du panneau Vinted : `storeLbcRecon`,
+  //    `storeLbcListings` et `storeLbcAccount` écrivaient toutes les trois
+  //    `(rows && rows[0] && rows[0].data) || {}`. Prouvé sur le code d'avant :
+  //    `lbc_recon` repartait avec `form:PERDU · etapes:PERDUES`.
+  //    ⇒ Et `lbc_recon` est **la ligne qui porte la carte du formulaire de
+  //      dépôt** : celle qu'un seul dépôt fait à la main doit remplir, et sans
+  //      laquelle « les catégories au bon endroit » reste une supposition. Un
+  //      timeout pendant ce dépôt-là, et il faut le refaire.
+  //    *Un banc qui énumère à la main ne couvre que ce qu'on a pensé à écrire.*
+  { id: 'lbc_recon',    avant: { form: { url: '/deposer-une-annonce', fields: [{ name: 'subject' }] }, etapes: { sig1: { fields: [] } }, paths: ['a', 'b'], quota: { value: 50 }, samples: [] },
+    quoi: 'la carte du formulaire de dépôt (form + etapes)',
+    geste: (c) => c.storeLbcRecon({ paths: ['c'], url: 'https://www.leboncoin.fr/x' }),
+    garde: (d) => d.form && d.etapes && d.etapes.sig1 && d.quota && (d.paths || []).length === 3 },
+  { id: 'lbc_listings', avant: { items: { '1': { subject: 'a' }, '2': { subject: 'b' } } },
+    quoi: 'l\'historique de ses annonces Leboncoin',
+    geste: (c) => c.storeLbcListings('u', [{ id: '3', subject: 'c' }]),
+    garde: (d) => d.items && d.items['1'] && d.items['2'] && d.items['3'] },
+  { id: 'lbc_accounts', avant: { accounts: { a1: { login: 'x' }, a2: { login: 'y' } } },
+    quoi: 'ses comptes Leboncoin déjà vus',
+    geste: (c) => c.storeLbcAccount({ id: 'a3', login: 'z' }),
+    garde: (d) => d.accounts && d.accounts.a1 && d.accounts.a2 && d.accounts.a3 },
 ];
 
 (async () => {
