@@ -482,10 +482,20 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
 
     // L'ÉTAPE SUIVANTE, comme le fait Leboncoin : on remplace le contenu du
     // formulaire SANS toucher à l'adresse.
+    // ⚠️⚠️ ET CETTE ÉTAPE-CI N'A **AUCUN `<select>` NATIF** — c'est le point que
+    //    Julien a soulevé (« c'est différent pour chaque annonce ») poussé au
+    //    bout : Leboncoin est une application React, ses listes sont des
+    //    COMPOSANTS (`role="combobox"` + `role="listbox"`). Servir un vrai
+    //    `<select>` rendait le banc VERT sur le défaut — on rapportait « 0
+    //    liste », donc ni catégorie, ni état, ni pointure : exactement ce qu'on
+    //    vient chercher. §6.3, sur la forme de la PAGE cette fois.
     await p7.evaluate(() => {
       document.querySelector('main').innerHTML =
-        '<label for="p2">Prix</label><input id="p2" name="price" type="text">'
-        + '<label for="c2">Catégorie</label><select id="c2" name="category"><option value=""></option><option value="2">Chaussures</option></select>'
+        '<nav aria-label="Fil d\u2019ariane">Accueil › Mode › Chaussures</nav>'
+        + '<label for="p2">Prix</label><input id="p2" name="price" type="text">'
+        + '<span id="lblcat">Catégorie</span>'
+        + '<div role="combobox" aria-labelledby="lblcat" aria-haspopup="listbox" aria-controls="listecat" data-qa-id="category_picker">Chaussures</div>'
+        + '<div id="listecat" role="listbox"><div role="option">Vêtements</div><div role="option">Chaussures</div><div role="option">Sacs</div></div>'
         + '<label for="f2">Photos</label><input id="f2" name="images" type="file" multiple>';
     });
     await p7.waitForTimeout(1800);
@@ -503,6 +513,22 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
     dit(derniere.selects >= 1 && derniere.fichiers >= 1,
       'l’étape rapporte les listes déroulantes ET le champ photo — c’est là que vivent la catégorie et les images',
       `${derniere.selects} liste(s), ${derniere.fichiers} champ(s) fichier`);
+    // ⚠️ « C'EST DIFFÉRENT POUR CHAQUE ANNONCE » : sans la CATÉGORIE, un champ
+    //    « Pointure » ne dit pas sur quel chemin il vit — et on le remplirait
+    //    sur le formulaire d'un livre. Et sans le rang ni le dépôt, deux
+    //    annonces se mélangent.
+    const brut = await p7.evaluate(() => window.__formes[window.__formes.length - 1] || {});
+    dit(/chaussure/i.test(String(brut.categorie || '')),
+      'et elle DIT dans quelle catégorie elle a été vue', `catégorie : « ${String(brut.categorie || '').slice(0, 60) || '(vide)'} »`);
+    dit(!!brut.depot && Number(brut.ordre) >= 2,
+      'chaque étape porte son dépôt et son RANG — deux annonces ne se mélangent pas',
+      `dépôt ${brut.depot || '—'} · étape n°${brut.ordre || '—'}`);
+    const choisi = (brut.selects || []).map((x) => x.choisi).filter(Boolean).join(', ');
+    dit(/chaussure/i.test(choisi), 'et la valeur CHOISIE dans la liste est rapportée', `choisi : « ${choisi || '(rien)'} »`);
+    const formes = (brut.selects || []).map((x) => x.forme);
+    dit(formes.includes('composant'), 'y compris quand la liste n’est PAS un `<select>` natif', `formes vues : ${formes.join(', ') || 'aucune'}`);
+    const opts = (brut.selects || []).flatMap((x) => x.options || []);
+    dit(opts.some((o) => /vêtements|sacs/i.test(o)), 'avec les options proposées', `${opts.length} option(s)`);
     // ⚠️ La promesse écrite dans le code : « noms de champs et libellés
     //    d'options uniquement : AUCUN contenu saisi ». Elle n'avait jamais été
     //    vérifiée — et c'est une promesse de confidentialité.
