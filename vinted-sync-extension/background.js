@@ -971,6 +971,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
               etapes[cle] = { url: msg.url, fields: msg.fields, selects: msg.selects || [],
                 fichiers: msg.fichiers || 0, categorie: String(msg.categorie || ''),
                 depot: String(msg.depot || ''), ordre: Number(msg.ordre) || 0,
+                ver: String(msg.ver || ''),
                 at: new Date().toISOString() };
               // Borné : on garde les plus récentes, jamais une ligne qui enfle.
               const cles = Object.keys(etapes);

@@ -467,7 +467,9 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
     const e7 = []; p7.on('pageerror', (e) => e7.push(e.message));
     await p7.addInitScript((d) => {
       window.__formes = [];                      // tout ce qui part vers le fond
-      window.chrome = { runtime: { id: 'banc', lastError: null, sendMessage: (m, cb) => {
+      // §6.3 dans mon propre banc : sans `getManifest`, l'extension ne peut pas
+      // estampiller sa version et le contrôle sortait rouge sur un code intact.
+      window.chrome = { runtime: { id: 'banc', lastError: null, getManifest: () => ({ version: '9.9.9' }), sendMessage: (m, cb) => {
         if (m && m.action === 'lbcForm') window.__formes.push(m);
         const rep = (o) => { try { cb && cb(o); } catch (_) {} };
         if (m && m.action === 'getQueue') return rep({ ok: true, queue: d.queue, removals: [], unlinked: [], postedList: [], stats: {} });
@@ -542,6 +544,54 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
     //    formulaire. `querySelectorAll` ne le traverse pas — on chercherait dans
     //    une page vide sans le savoir. Même « 0 liste » que les composants, mais
     //    SILENCIEUX.
+    // ══════════════════════════════════════════════════════════════════════
+    // ⚠️⚠️ LE BRUIT QU'IL A VRAIMENT RENCONTRÉ — SANS LUI, LE BANC EST VERT
+    // ══════════════════════════════════════════════════════════════════════
+    // Mesuré sur son VRAI dépôt du 17 septembre : sur trois étapes
+    // enregistrées, deux ne portaient que `high-contrast-toggle`,
+    // `search-header-mobile-input`, `search-header-extendable-input` et une
+    // volée de champs cachés `id, ev, dl, rl, if, ts, iw, sw, sh, v, r`. Les
+    // quatre « listes » étaient la barre de recherche (« Valider votre
+    // recherche »). Le vrai formulaire n'a jamais été enregistré : le bruit
+    // changeait la signature et consommait les places.
+    // Le banc sert donc cet en-tête-là, avec le vrai formulaire dessous.
+    await p7.evaluate(() => {
+      document.body.insertAdjacentHTML('afterbegin',
+        '<header role="banner"><input id="high-contrast-toggle" type="checkbox">'
+        + '<form action="/recherche" role="search"><input name="search-header-mobile-input"><input name="search-header-extendable-input">'
+        + '<div role="combobox" aria-label="rech">Valider votre recherche</div></form></header>'
+        + '<input type="hidden" name="id"><input type="hidden" name="ev"><input type="hidden" name="dl"><input type="hidden" name="ts">');
+      document.querySelector('main').innerHTML =
+        '<label for="pr">Prix</label><input id="pr" name="price" type="text">'
+        + '<span id="lbe">État</span><div role="combobox" aria-labelledby="lbe" aria-controls="le">Très bon état</div>'
+        + '<div id="le" role="listbox"><div role="option">Neuf</div><div role="option">Très bon état</div></div>'
+        + '<input name="photos" type="file">';
+    });
+    await p7.waitForTimeout(1800);
+    const propre = await p7.evaluate(() => window.__formes[window.__formes.length - 1] || {});
+    const noms = (propre.fields || []).map((f) => f.name || f.id);
+    dit(!noms.some((n) => /high-contrast|search-header/.test(String(n))),
+      'l’en-tête du site n’est PAS pris pour une étape du dépôt',
+      `champs retenus : ${noms.join(', ') || 'aucun'}`);
+    dit(!noms.some((n) => ['id', 'ev', 'dl', 'ts'].includes(String(n))),
+      'ni les champs cachés de pistage');
+    dit(noms.includes('price') && noms.includes('photos'),
+      'et le VRAI formulaire est bien là', `champs : ${noms.join(', ')}`);
+    const lbl = (propre.selects || []).map((x) => x.choisi).join(' ');
+    dit(!/valider votre recherche/i.test(lbl) && /très bon état/i.test(lbl),
+      'la barre de recherche n’est pas comptée comme une liste du dépôt', `listes : « ${lbl} »`);
+    dit(!!propre.ver, 'et l’étape porte la VERSION de l’extension qui l’a écrite', `ver ${propre.ver || '—'}`);
+
+    // La page de FIN n'est pas une étape : elle a fourni deux des trois étapes
+    // enregistrées chez lui, et rien d'utilisable.
+    const avantFin = await p7.evaluate(() => window.__formes.length);
+    await p7.evaluate(() => { history.pushState({}, '', '/deposer-une-annonce/confirmation'); document.querySelector('main').innerHTML = '<input name="autre">'; });
+    await p7.waitForTimeout(1800);
+    const apresFin = await p7.evaluate(() => window.__formes.length);
+    dit(apresFin === avantFin, 'la page de confirmation n’est pas enregistrée comme une étape',
+      `${avantFin} → ${apresFin}`);
+    await p7.evaluate(() => history.pushState({}, '', '/depot'));
+
     await p7.evaluate(() => {
       document.querySelector('main').innerHTML = '<div id="hote"></div>';
       const h = document.getElementById('hote').attachShadow({ mode: 'open' });

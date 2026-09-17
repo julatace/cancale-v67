@@ -710,6 +710,13 @@
   //    description, prix) ne part jamais. Seuls partent des noms de champs et
   //    des libellés d'options — y compris celui qu'il a choisi dans une liste.
   const DEPOT_ID = Math.random().toString(36).slice(2, 8);
+  // ⚠️ LA VERSION QUI A ÉCRIT L'ÉTAPE. Sans elle je dois DEVINER si une étape
+  //    manquante vient d'un défaut ou d'une extension plus ancienne — et le
+  //    dossier dit noir sur blanc de ne plus redéduire une version. Mesuré le
+  //    17 septembre : trois étapes enregistrées, aucune n'était le formulaire du
+  //    milieu, et je n'avais aucun moyen de savoir laquelle des versions
+  //    tournait. On l'écrit.
+  const EXT_VER = (() => { try { return (chrome.runtime.getManifest() || {}).version || ''; } catch (_) { return ''; } })();
   let ordreEtape = 0;
 
   // ⚠️⚠️ ET `querySelectorAll` NE TRAVERSE PAS LE SHADOW DOM. Une application
@@ -754,7 +761,7 @@
   function listesDeroulantes() {
     const out = [];
     try {
-      tousLesNoeuds('select').forEach((el) => {
+      tousLesNoeuds('select').filter(estDuDepot).forEach((el) => {
         const opts = Array.from(el.options || []);
         out.push({ forme: 'select', name: el.name || '', id: el.id || '', label: libelleDe(el),
           choisi: (el.selectedIndex >= 0 && opts[el.selectedIndex] ? String(opts[el.selectedIndex].textContent || '').trim().slice(0, 40) : ''),
@@ -765,6 +772,9 @@
       // Les composants : ce qu'une page React expose vraiment.
       tousLesNoeuds('[role="combobox"], [role="listbox"], [aria-haspopup="listbox"], [aria-haspopup="menu"]').forEach((el) => {
         if (el.tagName && el.tagName.toLowerCase() === 'select') return;      // déjà pris
+        // ⚠️ Mesuré : les quatre « listes » de son dépôt étaient la BARRE DE
+        //    RECHERCHE de l'en-tête (« Valider votre recherche »).
+        if (!estDuDepot(el)) return;
         let options = [];
         try {
           const id = el.getAttribute('aria-controls') || el.getAttribute('aria-owns');
@@ -820,11 +830,40 @@
     } catch (_) {}
   }
 
+  // ══════════════════════════════════════════════════════════════════════════
+  // ⚠️⚠️ CE QUI N'EST PAS LE FORMULAIRE DE DÉPÔT
+  // ══════════════════════════════════════════════════════════════════════════
+  // MESURÉ sur son vrai dépôt du 17 septembre, et c'est ce qui gâchait tout :
+  // sur trois étapes enregistrées, **deux ne portaient que du bruit** —
+  // `high-contrast-toggle`, `search-header-mobile-input`,
+  // `search-header-extendable-input` (l'en-tête du site) et une volée de champs
+  // cachés `id, ev, dl, rl, if, ts, iw, sw, sh, v, r` (du pistage). Les quatre
+  // « listes » vues étaient la barre de recherche (« Valider votre recherche »).
+  // Pendant ce temps le VRAI formulaire — catégorie, photos, prix — n'a jamais
+  // été enregistré : le bruit changeait la signature et consommait les places.
+  // C'est la garde `DANS_ENTETE` d'`ebay.js`, qu'il fallait ici aussi.
+  const BRUIT = /high-contrast|search-header|cookie|consent|newsletter|recherche|autocomplete|^(id|ev|dl|rl|if|ts|iw|sw|sh|v|r|u|t|c)$/i;
+  function estDuDepot(el) {
+    try {
+      if (el.type === 'hidden') return false;                     // pistage
+      if (el.closest && el.closest('header, footer, nav, [role="banner"], [role="contentinfo"], [role="search"], form[action*="recherche"]')) return false;
+      const cle = String(el.name || el.id || el.getAttribute('data-qa-id') || '');
+      if (cle && BRUIT.test(cle)) return false;
+      // Un champ qu'on ne voit pas n'est pas une étape à remplir.
+      const r = el.getBoundingClientRect ? el.getBoundingClientRect() : null;
+      if (r && r.width === 0 && r.height === 0 && el.type !== 'file') return false;
+      return true;
+    } catch (_) { return true; }                                   // « pas su » ne retire rien
+  }
+
   function captureDepositForm() {
     try {
       if (!/depos|d[ée]p[oô]t|\/ai\/|creation|nouvelle-annonce/i.test(location.href)) return;
+      // La page de FIN n'est pas une étape du formulaire — mesuré : elle a
+      // fourni deux des trois étapes enregistrées, et rien d'utilisable.
+      if (/confirmation|merci|succes|succ[eè]s/i.test(location.href)) return;
       const fields = [];
-      tousLesNoeuds('input, select, textarea').forEach((el) => {
+      tousLesNoeuds('input, select, textarea').filter(estDuDepot).forEach((el) => {
         // ⚠️ AUCUNE valeur saisie : ni `el.value`, ni le texte d'un textarea.
         fields.push({ tag: el.tagName.toLowerCase(), type: el.type || '', name: el.name || '', id: el.id || '', ph: el.placeholder || '', aria: el.getAttribute('aria-label') || '', label: libelleDe(el), qa: el.getAttribute('data-qa-id') || el.getAttribute('data-testid') || '' });
       });
@@ -840,7 +879,7 @@
         ordreEtape++;
         chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcForm', url: location.href,
           fields: fields.slice(0, 150), selects: sels.slice(0, 30), fichiers,
-          categorie, depot: DEPOT_ID, ordre: ordreEtape,
+          categorie, depot: DEPOT_ID, ordre: ordreEtape, ver: EXT_VER,
           etape: signature.slice(0, 160) });
         // ⚠️⚠️ « LÀ C'EST SÛR ? » — Julien, 17 septembre. NON, et c'est la bonne
         //    réponse : je n'ai jamais pu voir la vraie page (leboncoin.fr me
@@ -1121,7 +1160,7 @@
     try {
       if (!/depos|d[ée]p[oô]t|\/ai\/|creation|nouvelle-annonce/i.test(location.href)) return;
       let enAttente = null, vues = 0;
-      const MAX_ETAPES = 12;
+      const MAX_ETAPES = 24;   // le bruit en consommait la moitié (mesuré)
       const obs = new MutationObserver(() => {
         if (vues >= MAX_ETAPES) { try { obs.disconnect(); } catch (_) {} return; }
         if (enAttente) return;
