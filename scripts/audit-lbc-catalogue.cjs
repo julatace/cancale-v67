@@ -157,6 +157,24 @@ const ANNONCES = JSON.stringify({ ads: [{ list_id: 991, subject: 'Salomon XT-6 V
     const clefs = envois.flatMap((e) => e.cles || []).join(' ');
     dit(/subject:string/.test(clefs) && /price:number/.test(clefs) && /attributes\[\]\.key/.test(clefs),
       'on sait donc quels champs remplir, et de quel type');
+    // ⚠️⚠️ TOUTE ÉCRITURE EST NOTÉE, PAS SEULEMENT LE DÉPÔT. Quand Julien décrit
+    //    un bouton que je n'ai jamais vu (« le premier bouton est article
+    //    toujours dispo ? »), la seule façon de savoir ce qu'il envoie est de
+    //    l'avoir noté. C'est ce que fait `inject.js` sur Vinted depuis toujours,
+    //    et c'est comme ça qu'on a trouvé son `PUT …/shipment/order`.
+    await pg2.evaluate(`(async () => {
+      await fetch('https://api.leboncoin.fr/api/pintad/v1/public/expired', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ list_id: 3012, still_available: true }) }).then(r => r.text());
+      await fetch('https://api.leboncoin.fr/api/dashboard/v1/search').then(r => r.text());
+    })()`).catch(() => {});
+    await pg2.waitForTimeout(400);
+    const tous = await pg2.evaluate('window.__vus');
+    const ecrits = tous.filter((v) => v.kind === 'lbcenvoi');
+    dit(ecrits.some((e) => /expired/.test(e.url || '')),
+      'un bouton HORS dépôt est noté lui aussi (c\'est ce qui manquait côté Leboncoin)',
+      ecrits.map((e) => String(e.url).replace(/^.*leboncoin\.fr/, '')).join(' · ') || 'aucun');
+    dit(!ecrits.some((e) => /dashboard\/v1\/search/.test(e.url || '')),
+      'et une simple LECTURE n\'est pas notée comme une action');
+
     // ⚠️⚠️ ET LA PROMESSE QUI COMPTE : son annonce ne part PAS.
     const toutCeQuiSort = JSON.stringify(vus2);
     const fuites = ['SECRET-TITRE', 'SECRET-DESCRIPTION', 'SECRET-MARQUE'].filter((x) => toutCeQuiSort.includes(x));

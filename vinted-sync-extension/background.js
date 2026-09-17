@@ -1004,10 +1004,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             if (prev !== null) {
               const cur = (prev && prev[0] && prev[0].data) || {};
               const envois = Object.assign({}, cur.envois || {});
-              const cle = String(msg.url || '').replace(/^https?:\/\//, '').split('?')[0].slice(0, 90);
-              envois[cle] = { at: new Date().toISOString(), ver: EXT_VERSION, cles: msg.cles.slice(0, 400) };
+              const cle = (String(msg.methode || '') + ' ' + String(msg.url || '').replace(/^https?:\/\//, '').split('?')[0]).trim().slice(0, 110);
+              envois[cle] = { at: new Date().toISOString(), ver: EXT_VERSION, methode: String(msg.methode || ''), cles: msg.cles.slice(0, 400) };
               const noms = Object.keys(envois);
-              if (noms.length > 30) { const g = noms.sort((x, y) => Date.parse((envois[y] || {}).at || 0) - Date.parse((envois[x] || {}).at || 0)).slice(0, 30); for (const n of noms) if (!g.includes(n)) delete envois[n]; }
+              if (noms.length > 60) { const g = noms.sort((x, y) => Date.parse((envois[y] || {}).at || 0) - Date.parse((envois[x] || {}).at || 0)).slice(0, 60); for (const n of noms) if (!g.includes(n)) delete envois[n]; }
               await storeLbcRecon({ envois });
             }
             sendResponse({ ok: true }); return;
