@@ -2327,6 +2327,118 @@ de nouveau.
   **et** aucune accusation ». Sur le build d'avant, c'est la sonde muette qui
   échouait aussi : elle promettait l'isolation sans avoir rien pu mesurer.
 
+### ⚠️⚠️ « TOUT PARAMÉTRÉ POUR L'ANNONCE » — LES CODES ARRIVAIENT COUPÉS À 9 000
+Demande de Julien, 17 septembre : « qu'elle puisse publier, donc mettre le titre,
+la description, les catégories au bon endroit, le prix, en gros tout paramétré
+pour l'annonce ».
+
+**Mesuré d'abord, et c'est ce qui bloquait.** Mettre une catégorie au bon endroit
+suppose de connaître le **CODE** que Leboncoin attend (`{value,label}`), pas son
+libellé. Ces codes passent par **deux** endpoints, tous deux **VUS** dans son
+navigateur (`lbc_recon.paths`) : `api/frontend/v1/data/v7/fdata` (le dictionnaire
+des attributs — mesuré :
+`features.accessories_brand.values.simpleData[{value,label}]`) et
+`api/frontend/v1/data/v5/fforms` (les formulaires par catégorie).
+Or `lbc_recon.samples` n'a que **six places, prises en ordre d'arrivée** :
+
+| réponse gardée | taille |
+|---|---|
+| `api.leboncoin.fr/…/v7/fdata` | **9 000** ← coupé |
+| `/_next/data/…/nouveautes.json` · `/_next/data/…/my-searches.json` | 9 000 |
+| `fast.nexx360.io/booster` · `ib.adnxs.com/openrtb2/prebidjs` · `hbopenbid.pubmatic.com/translator` | 9 000 · 9 000 · 7 119 |
+
+**Trois sur six ne sont pas Leboncoin** : des enchères publicitaires. Elles
+passent `AD_HINT` parce qu'une créative porte une adresse en `/ads` (mesuré :
+c'est le seul mot qui matche, et il est **au-delà du 9 000ᵉ caractère**), et
+elles évincent les seules réponses qui servent. `fforms` n'a **jamais** eu
+d'échantillon.
+⇒ On n'échantillonne plus que **leboncoin.fr** ; le catalogue a sa **propre
+ligne** (`lbc_catalogue`), **une place par endpoint**, gardé **entier**, et il
+**DIT s'il a été coupé** — la moitié d'un catalogue a l'air d'un catalogue.
+⚠️ **ON N'ANALYSE RIEN POUR L'INSTANT** : 9 000 caractères de `fdata`, zéro de
+`fforms`. Écrire l'analyseur aujourd'hui serait deviner. On collecte, la
+prochaine passe branche — même méthode que `panel_ebay_form`.
+⚠️ **Et `lbc_recon.etapes` est TOUJOURS absente** (dernière visite Leboncoin :
+13 septembre, extension d'alors trop ancienne). **Le clic « Publier » ne
+s'écrit pas avant d'avoir la carte des étapes** — ça n'a pas bougé.
+
+- ⚠️⚠️ **TROIS LIRE-FUSIONNER-RÉÉCRIRE DE PLUS EFFAÇAIENT LEUR LIGNE.**
+  `audit-fusion.cjs` listait les onze du panneau Vinted et s'arrêtait là :
+  `storeLbcRecon`, `storeLbcListings` et `storeLbcAccount` écrivaient toutes les
+  trois `(rows && rows[0] && rows[0].data) || {}`. Prouvé : `lbc_recon` repartait
+  avec **`form:PERDU · etapes:PERDUES`** — c'est-à-dire **la carte du formulaire
+  de dépôt**, celle qu'un seul dépôt fait à la main doit remplir. Un timeout
+  pendant ce dépôt-là, et il faut le refaire. **3 rouges** sur le code d'avant.
+  *Un banc qui énumère à la main ne couvre que ce qu'on a pensé à écrire.*
+- §4.4 : `lbc_recon` pèse **67 Ko** et le panneau n'en veut qu'**une** valeur —
+  **67 Ko / 725 ms** en entier, **16 octets / 165 ms** projetée, à chaque
+  ouverture sur leboncoin.fr.
+- `scripts/audit-lbc-catalogue.cjs` exécute le vrai `lbc-inject.js` dans un vrai
+  navigateur **et** le vrai `background.js` dans un `vm` : **12 contrôles,
+  9 rouges** sur le code d'avant.
+  ⚠️ **MON PREMIER JET ÉTAIT VERT SUR LE DÉFAUT** : je servais un corps
+  d'enchère **inventé**, qui ne contenait aucun des mots du filtre — il n'était
+  donc pas relayé, et le contrôle passait. La forme servie vient maintenant de
+  la **vraie ligne** (§6.3, sur le CONTENU cette fois, pas sur la projection).
+  ⚠️ Et §6.6 payé cash dans le même banc : **Playwright prend la DERNIÈRE route
+  enregistrée en premier** — le fourre-tout `**` avalait la route précise
+  `/api/**` et servait du HTML, que `handle` écarte à raison ; le contrôle
+  « l'autre sens » sortait rouge sur un code intact.
+
+### ⚠️⚠️ « UNE RELANCE AUX FAVORIS » — 1 240 PERSONNES, ZÉRO ADRESSE ; ET 57 QUI EN ONT UNE
+Deuxième moitié de sa demande du 17 septembre : « envoyer aux personnes sur
+Vinted qui ont mis l'article en favori une petite relance pour qu'ils achètent ».
+
+**Remesuré** (§3 dit non, mais ce non repose sur une MESURE, et une mesure se
+refait — c'est ce qui a fait tomber le refus des offres automatiques) : sur ses
+**481 annonces captées**, **105 portent au moins un favori, 1 240 favoris en
+tout**, et les seuls champs qui nomment quelqu'un sont `user`/`user_id` (LUI, le
+vendeur), `is_favourite` (est-ce que LUI a mis en favori) et `favourite_count` —
+**un nombre**. ⇒ **Le refus tient toujours** : mille deux cent quarante
+personnes, aucune adresse. L'onglet Favoris reste le bon canal (la remise
+**native** de Vinted, qui les touche tous en un clic).
+
+⚠️⚠️ **MAIS UN AUTRE GROUPE EST NOMMÉ, ET PERSONNE NE L'AVAIT CHERCHÉ.** Sur ses
+**988 conversations captées** : **669 portent un `opposite_user`** (id **et**
+login) et **661 un `transaction.item_id`** — la personne **et** la paire dont
+elle a parlé, par **IDENTITÉ** (§5), jamais par ressemblance de titre. En ne
+gardant que les paires **encore en ligne** dont l'échange n'a **jamais abouti**,
+et en laissant de côté celles qui portent une offre en attente (elles ont déjà
+leur place dans l'onglet Offres, §7) : **57 personnes sur 26 paires** — dont
+**13 sur la seule « salomon XT-6 blanc taille 40 » à 99 €**. Vinted autorise la
+réponse sur toutes (`allow_reply` : 0 refus).
+⇒ Onglet **Relances** dans le panneau, groupé **par paire**, chaque personne
+nommée avec **sa** conversation et le message prêt (remise calculée par
+`montantRemise` — **la même règle** que l'onglet Favoris, §11).
+- ⚠️ **RIEN NE PART TOUT SEUL, et ce n'est pas une prudence de façade** :
+  soixante messages envoyés par un programme, c'est le signal de robot qui a
+  fait bloquer `vanessa5723` (§3). Le clic **ouvre** la conversation et copie le
+  texte ; c'est lui qui écrit et qui envoie. Même forme que l'assistant
+  Leboncoin.
+- **Une seule lecture pour deux usages** : les relances se calculent sur les
+  **mêmes** `convRows` que les offres, avec deux champs de plus dans la
+  projection (`opplogin`, `is_completed`).
+- `scripts/audit-relances.cjs` : **11 contrôles, 9 rouges** sur le build
+  d'avant. Il exige qu'**aucun** message ne parte, que chaque personne soit
+  **NOMMÉE** (⚠️ l'autre sens : *tout retirer* passerait les contrôles
+  d'envoi), et que les **trois** causes d'une liste vide donnent **trois**
+  phrases différentes.
+  ⚠️ **« Copié » ne s'écrit que si la copie a eu lieu** — prouvé en
+  **réaffaiblissant** `copier` à la forme naïve `try { writeText } catch`, qui
+  repasse au **rouge** : une promesse rejetée ne passe pas par `catch`. C'est la
+  seule preuve qui vaille (« la fonction n'existait pas avant » n'en est pas
+  une).
+- ⚠️ **HUITIÈME FOIS QU'UN DE MES AUDITS MEURT AU LIEU DE RAPPORTER** : sur le
+  code d'avant le bouton n'existe pas, et `.click()` sur `null` tuait le
+  processus **avant le bilan**. Tout bloc passe par `essaie()`.
+- ⚠️⚠️ **ET MON REMPLACEMENT DE PROJECTION AVAIT VISÉ LE MAUVAIS SITE D'APPEL** :
+  une **autre** fonction portait la même sous-chaîne, et c'est elle qui a été
+  modifiée. `opplogin` valait `''`, les relances sortaient à **0** — alors que
+  la paire, elle, était trouvée **60 fois**. Aucun audit ne l'a vu ; c'est
+  l'**exécution sur la vraie base** qui l'a attrapée. *Un remplacement par
+  sous-chaîne se vérifie sur le site qu'on visait, pas sur le premier qui
+  matche* — cousin de §4.11.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
@@ -2486,7 +2598,7 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | outil | quoi |
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
-| `node scripts/audit-*.cjs` | **36 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `node scripts/audit-*.cjs` | **38 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
 | `scripts/bancs/*.cjs` | les **21 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
@@ -2754,7 +2866,7 @@ script-là me fait croire à une catastrophe.
 src/App.jsx                     l'app (grep avant de lire — le fichier est énorme)
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
-scripts/audit-*.cjs             les 36 audits
+scripts/audit-*.cjs             les 38 audits
 scripts/bancs/                  les 21 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
