@@ -13,6 +13,26 @@
   // (Leboncoin a plusieurs endpoints) mais on évite le bruit (pub, tracking).
   const AD_HINT = /(list_id|\"ads\"|\"subject\"|annonce|myads|\/ads|classified|listing|dashboard|selection|owner)/i;
   const NOISE = /(datadome|captcha|track|metric|event|telemetr|analytic|consent|pixel|gtm|batch\.bmcdn|xiti|adservice)/i;
+
+  // ⚠️⚠️ ON N'ÉCHANTILLONNE QUE LEBONCOIN. Mesuré le 17 septembre sur sa base :
+  //    **3 des 6 échantillons gardés n'étaient pas Leboncoin** — `fast.nexx360.io`,
+  //    `ib.adnxs.com`, `hbopenbid.pubmatic.com`, des enchères publicitaires. Elles
+  //    passent `AD_HINT` justement parce qu'une enchère parle d'« ads », et elles
+  //    évinçaient les réponses de Leboncoin, les seules qui servent. Une réponse
+  //    d'un tiers n'a rien à faire dans sa base : on ne la relaie pas.
+  const DE_LEBONCOIN = (url) => {
+    try {
+      const u = new URL(url, location.origin);
+      return /(^|\.)leboncoin\.fr$/i.test(u.hostname);
+    } catch (_) { return false; }        // adresse illisible ⇒ on ne relaie pas
+  };
+
+  // LE CATALOGUE : les codes exacts que le formulaire de dépôt attend (catégorie,
+  // marque, taille, état). Deux endpoints, tous deux VUS dans son navigateur.
+  // Ils partent dans leur propre ligne, ENTIERS — pas dans le flot d'échantillons
+  // où ils étaient coupés à 9 000 caractères et évincés par le reste.
+  const CATALOGUE = /\/data\/v\d+\/(fdata|fforms)\b/i;
+  const CAT_MAX = 400000;
   const seenPaths = new Set(); let seenDirty = false;
   const noteSeen = (url) => {
     try {
@@ -29,6 +49,13 @@
       if (NOISE.test(url)) return;
       if (!text || text.length > 1500000) return;
       if (ctype && !/json/i.test(ctype)) return;
+      if (!DE_LEBONCOIN(url)) return;                       // ni pub, ni tiers
+      if (CATALOGUE.test(url)) {
+        // On le garde entier dans la limite, et on DIT s'il a été coupé : la
+        // moitié d'un catalogue a l'air d'un catalogue.
+        post({ kind: 'lbccatalogue', url, body: text.slice(0, CAT_MAX), coupe: text.length > CAT_MAX });
+        return;
+      }
       if (!AD_HINT.test(text) && !AD_HINT.test(url)) return;
       post({ kind: 'lbcraw', url, body: text });
     } catch (_) {}
