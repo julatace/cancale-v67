@@ -208,6 +208,48 @@ const ANNONCES = JSON.stringify({ ads: [{ list_id: 991, subject: 'Salomon XT-6 V
       slot ? `coupe=${slot.coupe}` : 'aucune écriture');
   });
 
+  // ══════════════════════════════════════════════════════════════════════════
+  // ⚠️⚠️⚠️ CE QUI PART DE LA PAGE N'EST PAS CE QUI ARRIVE EN BASE
+  // ══════════════════════════════════════════════════════════════════════════
+  // Mesuré le 17 septembre, juste après le dépôt que Julien a fait à la main :
+  // `lbc_recon.form` écrit à 12:18:55 avec 3 champs — donc l'enregistreur a
+  // tourné et le handler a construit `etapes` — et **`etapes` absente de la
+  // base**. `storeLbcRecon` rangeait clé par clé (`form`, `quota`, `paths`,
+  // `sample`) et **jetait `etapes` et `capture` en silence**.
+  // ⚠️ ET AUCUN BANC NE POUVAIT LE VOIR : `bancs/leboncoin.cjs` vérifie ce que
+  //    `lbc.js` ENVOIE (`window.__formes`), il s'arrête à la frontière. Le
+  //    rangement, personne ne le mesurait. *Un contrôle qui s'arrête au message
+  //    prouve le message, jamais la donnée.*
+  // ⇒ Ici on va jusqu'à l'ÉCRITURE : ce qu'un appelant envoie doit se retrouver
+  //   dans la ligne. Et la règle porte sur TOUTES les clés, pas sur celles
+  //   qu'on a pensé à nommer.
+  console.log('\n── CE QU\'UN APPELANT ENVOIE SE RETROUVE EN BASE');
+  await essaie('le rangement de lbc_recon', async () => {
+    ligne = { lbc_recon: { paths: ['a'], form: { url: 'u', fields: [] } } };
+    lectureKO = false;
+    const c = faireCtx();
+    const envoye = {
+      etapes: { 'Chaussures :: sig1': { url: 'u', fields: [{ name: 'subject' }], selects: [{ forme: 'composant', choisi: 'Chaussures' }], fichiers: 1, categorie: 'Chaussures', depot: 'abc', ordre: 2 } },
+      capture: { source: 'next_f', vues: 12 },
+      form: { url: 'u2', fields: [{ name: 'price' }], at: 'maintenant' },
+      quota: { value: 50 },
+    };
+    await c.storeLbcRecon(envoye);
+    const w = ecrits.find((r) => r.id === 'lbc_recon');
+    dit(!!w, 'la ligne est bien écrite', w ? '' : 'aucune écriture');
+    const d = (w && w.data) || {};
+    const perdues = Object.keys(envoye).filter((k) => d[k] === undefined);
+    dit(perdues.length === 0,
+      'AUCUNE clé envoyée n\'est jetée en silence',
+      perdues.length ? `perdue(s) : ${perdues.join(', ')}` : `rangées : ${Object.keys(envoye).join(', ')}`);
+    const et = d.etapes && d.etapes['Chaussures :: sig1'];
+    dit(!!et && et.categorie === 'Chaussures' && et.ordre === 2 && (et.selects || []).length === 1,
+      'et l\'étape garde sa catégorie, son rang et ses listes',
+      et ? `catégorie ${et.categorie} · étape n°${et.ordre} · ${(et.selects || []).length} liste(s)` : 'étape absente');
+    // ⚠️ L'autre sens : ce qui existait déjà ne doit pas disparaître.
+    dit(Array.isArray(d.paths) && d.paths.includes('a'), 'sans perdre ce que la ligne portait déjà');
+  });
+
   // 5. §4.4 : `lbc_recon` pèse 67 Ko et le panneau n'en veut QUE le quota.
   await essaie('la lecture du quota', async () => {
     const m = /async function buildLbcData[\s\S]*?\n}/.exec(BG);

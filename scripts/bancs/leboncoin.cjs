@@ -529,6 +529,35 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
     dit(formes.includes('composant'), 'y compris quand la liste n’est PAS un `<select>` natif', `formes vues : ${formes.join(', ') || 'aucune'}`);
     const opts = (brut.selects || []).flatMap((x) => x.options || []);
     dit(opts.some((o) => /vêtements|sacs/i.test(o)), 'avec les options proposées', `${opts.length} option(s)`);
+
+    // ⚠️⚠️ « LÀ C'EST SÛR ? » — il ne doit pas avoir à me croire. Le TÉMOIN écrit
+    //    sur la page ce qui vient d'être enregistré : s'il lit « 0 liste », il
+    //    arrête tout de suite au lieu de faire le dépôt entier pour rien.
+    const temoin = await p7.evaluate(() => { const t = document.getElementById('vrm-temoin-etape'); return t ? t.innerText : ''; });
+    dit(/étape\s*2/i.test(temoin), 'un témoin dit à l’écran QUELLE étape vient d’être enregistrée', `« ${temoin.replace(/\n/g, ' · ').slice(0, 90) }»`);
+    dit(/2\s*listes?/i.test(temoin) && /champ photo/i.test(temoin), 'et il écrit les CHIFFRES — pas « c’est bon »');
+    dit(/chaussure/i.test(temoin), 'et la catégorie qu’il a reconnue');
+
+    // ⚠️⚠️ ET LE SHADOW DOM : une application moderne peut y enfermer son
+    //    formulaire. `querySelectorAll` ne le traverse pas — on chercherait dans
+    //    une page vide sans le savoir. Même « 0 liste » que les composants, mais
+    //    SILENCIEUX.
+    await p7.evaluate(() => {
+      document.querySelector('main').innerHTML = '<div id="hote"></div>';
+      const h = document.getElementById('hote').attachShadow({ mode: 'open' });
+      h.innerHTML = '<span id="lbp">Pointure</span>'
+        + '<div role="combobox" aria-labelledby="lbp" aria-controls="lp">42</div>'
+        + '<div id="lp" role="listbox"><div role="option">41</div><div role="option">42</div></div>'
+        + '<input name="shoe_size" type="text"><input name="photos" type="file">';
+    });
+    await p7.waitForTimeout(1800);
+    const dansOmbre = await p7.evaluate(() => window.__formes[window.__formes.length - 1] || {});
+    dit((dansOmbre.fields || []).some((f) => f.name === 'shoe_size'),
+      'un formulaire enfermé dans le SHADOW DOM est vu quand même',
+      `${(dansOmbre.fields || []).length} champ(s) : ${(dansOmbre.fields || []).map((f) => f.name).join(', ') || 'aucun'}`);
+    dit((dansOmbre.selects || []).length >= 1 && (dansOmbre.fichiers || 0) >= 1,
+      'et ses listes et son champ photo aussi',
+      `${(dansOmbre.selects || []).length} liste(s), ${dansOmbre.fichiers} champ(s) fichier`);
     // ⚠️ La promesse écrite dans le code : « noms de champs et libellés
     //    d'options uniquement : AUCUN contenu saisi ». Elle n'avait jamais été
     //    vérifiée — et c'est une promesse de confidentialité.
