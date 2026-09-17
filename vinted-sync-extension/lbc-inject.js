@@ -32,7 +32,7 @@
   // Ils partent dans leur propre ligne, ENTIERS — pas dans le flot d'échantillons
   // où ils étaient coupés à 9 000 caractères et évincés par le reste.
   const CATALOGUE = /\/data\/v\d+\/(fdata|fforms)\b/i;
-  const CAT_MAX = 400000;
+  const CAT_MAX = 3000000;   // mesuré : à 400 000 le catalogue arrivait COUPÉ
   const seenPaths = new Set(); let seenDirty = false;
   const noteSeen = (url) => {
     try {

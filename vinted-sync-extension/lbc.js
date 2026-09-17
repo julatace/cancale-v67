@@ -8,6 +8,13 @@
 // qui cliques sur « Publier ». Un humain publie → pas de risque pour ton compte.
 (function () {
   if (window.__vrmLbcLoaded) return; window.__vrmLbcLoaded = true;
+  // ⚠️⚠️ ET SI LE FORMULAIRE DE DÉPÔT VIT DANS UN CADRE (iframe) ? Le script ne
+  //    tournait que dans la page du haut (`all_frames: false`) : l'enregistreur
+  //    n'aurait alors **jamais rien vu**, et le dépôt fait à la main aurait été
+  //    fait pour rien. Il tourne désormais dans TOUS les cadres de leboncoin.fr
+  //    — mais le PANNEAU, lui, ne se dessine que dans la page du haut : sinon on
+  //    en aurait un par cadre. Dans un cadre, on n'enregistre, on n'affiche rien.
+  const DANS_UN_CADRE = (() => { try { return window.top !== window; } catch (_) { return true; } })();
   const send = (m) => new Promise((res) => { try { chrome.runtime.sendMessage(Object.assign({ from: 'cancale-lbc' }, m), (r) => res(r || { ok: false })); } catch (_) { res({ ok: false }); } });
 
   // L'observateur réseau MAIN world (lbc-inject.js) est injecté via le manifest
@@ -705,6 +712,27 @@
   const DEPOT_ID = Math.random().toString(36).slice(2, 8);
   let ordreEtape = 0;
 
+  // ⚠️⚠️ ET `querySelectorAll` NE TRAVERSE PAS LE SHADOW DOM. Une application
+  //    moderne peut y enfermer tout son formulaire : on chercherait alors dans
+  //    une page vide sans le savoir — le même « 0 liste » que les composants,
+  //    mais silencieux. On descend dans les racines fantômes, borné (300
+  //    racines) pour ne jamais bloquer la page.
+  function tousLesNoeuds(sel) {
+    const out = [];
+    const racines = [document];
+    let vues = 0;
+    while (racines.length && vues < 300) {
+      const r = racines.shift(); vues++;
+      let n = [];
+      try { n = Array.from(r.querySelectorAll(sel)); } catch (_) { n = []; }
+      for (const el of n) out.push(el);
+      let tous = [];
+      try { tous = Array.from(r.querySelectorAll('*')); } catch (_) { tous = []; }
+      for (const el of tous) if (el.shadowRoot) racines.push(el.shadowRoot);
+    }
+    return out;
+  }
+
   // Le texte visible d'un élément, borné (un composant de liste affiche sa
   // valeur choisie en clair).
   function texteVisible(el, max) {
@@ -726,7 +754,7 @@
   function listesDeroulantes() {
     const out = [];
     try {
-      document.querySelectorAll('select').forEach((el) => {
+      tousLesNoeuds('select').forEach((el) => {
         const opts = Array.from(el.options || []);
         out.push({ forme: 'select', name: el.name || '', id: el.id || '', label: libelleDe(el),
           choisi: (el.selectedIndex >= 0 && opts[el.selectedIndex] ? String(opts[el.selectedIndex].textContent || '').trim().slice(0, 40) : ''),
@@ -735,7 +763,7 @@
     } catch (_) {}
     try {
       // Les composants : ce qu'une page React expose vraiment.
-      document.querySelectorAll('[role="combobox"], [role="listbox"], [aria-haspopup="listbox"], [aria-haspopup="menu"]').forEach((el) => {
+      tousLesNoeuds('[role="combobox"], [role="listbox"], [aria-haspopup="listbox"], [aria-haspopup="menu"]').forEach((el) => {
         if (el.tagName && el.tagName.toLowerCase() === 'select') return;      // déjà pris
         let options = [];
         try {
@@ -762,16 +790,46 @@
     return (l && l.choisi) || '';
   }
 
+  // Le témoin : discret, en bas à gauche, il disparaît tout seul. Il ne
+  // s'affiche QUE sur une page de dépôt et QUE dans la page du haut.
+  function temoinEtape(n, nChamps, nListes, nFichiers, categorie) {
+    try {
+      if (DANS_UN_CADRE || !document.body) return;
+      let t = document.getElementById('vrm-temoin-etape');
+      if (!t) {
+        t = document.createElement('div');
+        t.id = 'vrm-temoin-etape';
+        t.style.cssText = 'position:fixed;left:14px;bottom:14px;z-index:2147483646;max-width:330px;'
+          + 'background:#10151B;color:#fff;border-radius:10px;padding:9px 12px;'
+          + 'font:500 12.5px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;'
+          + 'box-shadow:0 1px 2px rgba(0,0,0,.28),0 10px 26px rgba(0,0,0,.22)';
+        document.body.appendChild(t);
+      }
+      // Ce qui MANQUE se dit en premier : c'est ça qui doit le faire s'arrêter.
+      const manque = [];
+      if (!nListes) manque.push('aucune liste déroulante vue');
+      if (!categorie) manque.push('catégorie inconnue');
+      t.innerHTML = '<div style="font-weight:800;margin-bottom:2px">VRM · étape ' + n + ' enregistrée</div>'
+        + '<div style="opacity:.82">' + nChamps + ' champ' + (nChamps > 1 ? 's' : '') + ' · '
+        + nListes + ' liste' + (nListes > 1 ? 's' : '') + ' · '
+        + nFichiers + ' champ photo' + (nFichiers > 1 ? 's' : '') + '</div>'
+        + (categorie ? '<div style="opacity:.82">catégorie : ' + String(categorie).replace(/[<>&]/g, '').slice(0, 60) + '</div>' : '')
+        + (manque.length ? '<div style="margin-top:4px;color:#FFC38A">⚠️ ' + manque.join(' · ') + ' — dis-le-moi, je corrige avant que tu continues.</div>' : '');
+      clearTimeout(temoinEtape._t);
+      temoinEtape._t = setTimeout(() => { try { t.remove(); } catch (_) {} }, manque.length ? 14000 : 7000);
+    } catch (_) {}
+  }
+
   function captureDepositForm() {
     try {
       if (!/depos|d[ée]p[oô]t|\/ai\/|creation|nouvelle-annonce/i.test(location.href)) return;
       const fields = [];
-      document.querySelectorAll('input, select, textarea').forEach((el) => {
+      tousLesNoeuds('input, select, textarea').forEach((el) => {
         // ⚠️ AUCUNE valeur saisie : ni `el.value`, ni le texte d'un textarea.
         fields.push({ tag: el.tagName.toLowerCase(), type: el.type || '', name: el.name || '', id: el.id || '', ph: el.placeholder || '', aria: el.getAttribute('aria-label') || '', label: libelleDe(el), qa: el.getAttribute('data-qa-id') || el.getAttribute('data-testid') || '' });
       });
       const sels = listesDeroulantes();
-      const fichiers = document.querySelectorAll('input[type="file"]').length;
+      const fichiers = tousLesNoeuds('input[type="file"]').length;
       const categorie = categorieCourante(sels);
       // La signature dédoublonne les étapes identiques — mais deux CATÉGORIES
       // donnent deux formulaires différents, donc la catégorie en fait partie.
@@ -784,6 +842,14 @@
           fields: fields.slice(0, 150), selects: sels.slice(0, 30), fichiers,
           categorie, depot: DEPOT_ID, ordre: ordreEtape,
           etape: signature.slice(0, 160) });
+        // ⚠️⚠️ « LÀ C'EST SÛR ? » — Julien, 17 septembre. NON, et c'est la bonne
+        //    réponse : je n'ai jamais pu voir la vraie page (leboncoin.fr me
+        //    répond 403), donc mon banc sert une page que J'AI écrite. Ce que je
+        //    PEUX faire, c'est qu'il n'ait pas à me croire : le témoin écrit, à
+        //    chaque étape, CE QUI A ÉTÉ ENREGISTRÉ. S'il lit « 0 liste » il
+        //    arrête tout de suite, au lieu de faire le dépôt entier pour rien.
+        //    *Le chiffre, jamais la promesse.*
+        temoinEtape(ordreEtape, fields.length, sels.length, fichiers, categorie);
       }
     } catch (_) {}
   }
@@ -1022,13 +1088,18 @@
     if (r && r.ok && r.stats) stats = r.stats;
     render();
   }
-  render();
-  load();
-  // Rafraîchit quand on revient sur l'onglet (nouvelle annonce entre-temps) et
-  // re-scanne la page après navigation interne (Leboncoin est une SPA).
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
-  let lastUrl = location.href;
-  setInterval(() => { if (location.href !== lastUrl) { lastUrl = location.href; setTimeout(load, 1200); } }, 2000);
+  if (!DANS_UN_CADRE) {
+    render();
+    load();
+    // Rafraîchit quand on revient sur l'onglet (nouvelle annonce entre-temps) et
+    // re-scanne la page après navigation interne (Leboncoin est une SPA).
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
+    let lastUrl = location.href;
+    setInterval(() => { if (location.href !== lastUrl) { lastUrl = location.href; setTimeout(load, 1200); } }, 2000);
+  } else {
+    // Dans un cadre : la seule chose qui compte est d'enregistrer l'étape.
+    captureDepositForm();
+  }
 
   // ══════════════════════════════════════════════════════════════════════════
   //  LES ÉTAPES DU DÉPÔT SE SUIVENT SANS CHANGER D'ADRESSE

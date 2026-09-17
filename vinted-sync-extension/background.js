@@ -5694,9 +5694,27 @@ async function storeLbcRecon(patch) {
     const next = Object.assign({ paths: [], samples: [] }, prev);
     if (patch.paths) { const set = new Set([...(next.paths || []), ...patch.paths]); next.paths = [...set].slice(0, 300); }
     if (patch.sample) { next.samples = [patch.sample, ...(next.samples || [])].slice(0, 6); }
-    if (patch.quota) next.quota = patch.quota;                 // quota d'annonces détecté (offre)
-    if (patch.form) next.form = patch.form;                     // structure du formulaire de dépôt (pour pré-remplir juste)
     if (patch.url) next.lastUrl = patch.url;
+    // ⚠️⚠️⚠️ CETTE FONCTION JETAIT `etapes` ET `capture` — EN SILENCE.
+    //    Mesuré le 17 septembre, juste après que Julien a fait son dépôt à la
+    //    main : `lbc_recon.form` écrit à 12:18:55 avec 3 champs (donc
+    //    `captureDepositForm` a bel et bien tourné, et le handler a bel et bien
+    //    construit `etapes`)… et `etapes` **toujours absente de la base**.
+    //    Cause : il y avait `if (patch.form)` et `if (patch.quota)`, et RIEN
+    //    pour `patch.etapes` ni `patch.capture`. Les deux moitiés existaient,
+    //    le raccord manquait — le motif du tiroir `Nav` (§4.11), sur la donnée
+    //    que j'attends depuis trois passes. **Il a fait ce dépôt pour rien, et
+    //    c'est de mon fait.**
+    //    ⚠️ Et ça réécrit l'histoire de `lbcDiag` : le dossier disait « il n'a
+    //      jamais tourné » ; en réalité c'est son rangement qui le jetait.
+    // ⇒ ON NE RANGE PLUS CLÉ PAR CLÉ. Tout ce qu'un appelant envoie est gardé ;
+    //   seules `paths` et `sample` ont besoin d'une fusion particulière (au-dessus).
+    //   Une clé oubliée ne peut plus disparaître sans un mot.
+    for (const k of Object.keys(patch)) {
+      if (k === 'paths' || k === 'sample' || k === 'url') continue;   // déjà traitées
+      if (patch[k] === undefined) continue;
+      next[k] = patch[k];
+    }
     next.updatedAt = new Date().toISOString();
     await supabaseUpsert('app_data', [{ id: 'lbc_recon', data: next }], 'id');
   } catch (_) {}
@@ -5729,7 +5747,11 @@ async function storeLbcRecon(patch) {
 // ⚠️ ON N'ANALYSE RIEN ICI. Je n'ai vu que 9 000 caractères de `fdata` et zéro
 //    de `fforms` : écrire l'analyseur aujourd'hui serait deviner. On collecte,
 //    la prochaine passe branche — même méthode que `panel_ebay_form`.
-const LBC_CATALOGUE_MAX = 400000;      // borné : on ne renvoie pas une page entière
+// ⚠️ MESURÉ LE 17 SEPTEMBRE, sur sa vraie base : `fdata` est arrivé **coupé à
+//    400 000** — le catalogue est donc plus gros que ça. On monte le plafond ;
+//    la ligne n'est réécrite que si le corps CHANGE, donc ça ne coûte qu'une
+//    fois. Et le drapeau `coupe` reste : on saura si ça ne suffit toujours pas.
+const LBC_CATALOGUE_MAX = 3000000;
 async function storeLbcCatalogue(url, body, coupe) {
   try {
     const cle = String(url || '').replace(/^https?:\/\//, '').split('?')[0].replace(/[^a-zA-Z0-9]+/g, '_').slice(0, 80);
