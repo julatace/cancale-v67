@@ -53,7 +53,21 @@
   //    annonce — titre, description, prix. **On n'envoie donc QUE les chemins de
   //    clés, jamais les valeurs** : la promesse de confidentialité ne bouge pas,
   //    et c'est la structure qui sert, pas le contenu.
-  const ENVOI = /(adsubmit|\/submit|dynamic-deposit|\/upload\/image|classifieds)/i;
+  // ⚠️⚠️ ON NOTE **TOUTE** ÉCRITURE LEBONCOIN, PAS SEULEMENT LE DÉPÔT.
+  //    Mesuré le 17 septembre : ses 232 chemins Leboncoin portent bien plus que
+  //    le dépôt — `api/ad-classifier/v2/classify` (c'est LUI qui devine la
+  //    catégorie depuis le titre : voilà « ce qui est fait tout seul »),
+  //    `api/ad-prediction/v1/public/description-price` (la description ET le
+  //    prix proposés), `api/ad-geoloc/v2/autocomplete`, `api/options/v7/pricing/
+  //    classifieds`, `api/pintad/v1/public/expired`…
+  //    Et quand Julien décrit un bouton que je n'ai jamais vu, la seule façon de
+  //    savoir ce qu'il envoie est de l'AVOIR NOTÉ. C'est déjà ce que fait
+  //    `inject.js` sur Vinted (`writereq`), et c'est comme ça que j'ai trouvé
+  //    son `PUT …/shipment/order` : cette moitié-là manquait côté Leboncoin.
+  //    ⇒ Toute requête qui MODIFIE quelque chose (POST/PUT/PATCH/DELETE) est
+  //      notée — **chemins de clés et types uniquement, jamais les valeurs**.
+  const ENVOI = /leboncoin\.fr\/(api|messaging|finder|_next)/i;
+  const MODIFIE = /^(POST|PUT|PATCH|DELETE)$/i;
   function cheminsDeCles(v, prefixe, out, prof) {
     if (!out) out = []; if (out.length > 400 || (prof || 0) > 6) return out;
     if (Array.isArray(v)) { if (v.length) cheminsDeCles(v[0], (prefixe || '') + '[]', out, (prof || 0) + 1); return out; }
@@ -65,14 +79,17 @@
     if (prefixe) out.push(prefixe + ':' + (v === null ? 'null' : typeof v));
     return out;
   }
-  const noteEnvoi = (url, corps) => {
+  const noteEnvoi = (url, corps, methode) => {
     try {
-      if (!DE_LEBONCOIN(url) || !ENVOI.test(url) || !corps) return;
+      if (!DE_LEBONCOIN(url) || !ENVOI.test(url)) return;
+      if (methode && !MODIFIE.test(methode)) return;
+      // Un corps vide compte aussi : le bouton peut n'envoyer qu'une adresse.
+      if (!corps) { post({ kind: 'lbcenvoi', url, methode: String(methode || ''), cles: ['(sans corps)'] }); return; }
       let cles = [];
       if (typeof corps === 'string') { try { cles = cheminsDeCles(JSON.parse(corps)); } catch (_) { return; } }
       else if (corps instanceof FormData) { cles = [...corps.keys()].slice(0, 80).map((k) => k + ':formdata'); }
       else return;
-      if (cles.length) post({ kind: 'lbcenvoi', url, cles: cles.slice(0, 400) });
+      if (cles.length) post({ kind: 'lbcenvoi', url, methode: String(methode || ''), cles: cles.slice(0, 400) });
     } catch (_) {}
   };
   const seenPaths = new Set(); let seenDirty = false;
@@ -107,7 +124,7 @@
   if (origFetch) {
     window.fetch = function (input, init) {
       const url = (typeof input === 'string') ? input : (input && input.url) || '';
-      try { if (init && init.body) noteEnvoi(url, init.body); } catch (_) {}
+      try { const m = (init && init.method) || (typeof input === 'object' && input && input.method) || 'GET'; if (MODIFIE.test(m)) noteEnvoi(url, init && init.body, m); } catch (_) {}
       const p = origFetch.apply(this, arguments);
       try {
         p.then((res) => {
@@ -125,9 +142,9 @@
   const OX = window.XMLHttpRequest;
   if (OX) {
     const origOpen = OX.prototype.open, origSend = OX.prototype.send;
-    OX.prototype.open = function (method, url) { this.__lbcUrl = url; return origOpen.apply(this, arguments); };
+    OX.prototype.open = function (method, url) { this.__lbcUrl = url; this.__lbcMeth = method; return origOpen.apply(this, arguments); };
     OX.prototype.send = function (corps) {
-      try { if (corps) noteEnvoi(this.__lbcUrl || '', corps); } catch (_) {}
+      try { if (MODIFIE.test(this.__lbcMeth || '')) noteEnvoi(this.__lbcUrl || '', corps, this.__lbcMeth); } catch (_) {}
       try {
         this.addEventListener('load', function () {
           try {
