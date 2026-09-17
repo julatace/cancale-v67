@@ -31,8 +31,50 @@
   // marque, taille, état). Deux endpoints, tous deux VUS dans son navigateur.
   // Ils partent dans leur propre ligne, ENTIERS — pas dans le flot d'échantillons
   // où ils étaient coupés à 9 000 caractères et évincés par le reste.
-  const CATALOGUE = /\/data\/v\d+\/(fdata|fforms)\b/i;
+  // ⚠️⚠️ MESURÉ LE 17 SEPTEMBRE — ET C'EST LA VRAIE CARTE. Julien : « il y a des
+  //    choses que je remplis, d'autres où c'est fait tout seul ». Ses
+  //    `lbc_recon.paths` disent pourquoi, et où regarder :
+  //      api/adsubmit/dynamic-deposit/config   ← LE FORMULAIRE EST **DYNAMIQUE**
+  //      api/ad-prediction/v2/public/adparams  ← ce que Leboncoin PRÉ-REMPLIT
+  //      api/consumergoods/proxy/v2/pages/ad-submit
+  //      _next/data/…/deposer-une-annonce/options.json
+  //      api/pintad/v1/public/upload/image     ← l'envoi des photos
+  //      api/adsubmit/v2/classifieds           ← la soumission
+  //    Le formulaire n'est pas écrit en dur : il est CONSTRUIT à partir d'une
+  //    config renvoyée par l'API, et cette config change avec la catégorie.
+  //    C'est exactement « c'est différent pour chaque annonce », et ça se lit
+  //    **dans la réponse**, pas en scrutant des `<div role="combobox">`.
+  //    ⇒ On garde ces réponses-là ENTIÈRES. C'est infiniment plus sûr que le DOM.
+  const CATALOGUE = /(\/data\/v\d+\/(fdata|fforms)\b|adsubmit|ad-prediction|ad-submit|dynamic-deposit|adparams|deposer-une-annonce.*\.json|\/upload\/image)/i;
   const CAT_MAX = 3000000;   // mesuré : à 400 000 le catalogue arrivait COUPÉ
+
+  // ⚠️ ET LA FORME DE CE QUI PART. La requête de soumission dit, mieux que tout
+  //    le reste, quels champs Leboncoin attend vraiment. Mais elle contient SON
+  //    annonce — titre, description, prix. **On n'envoie donc QUE les chemins de
+  //    clés, jamais les valeurs** : la promesse de confidentialité ne bouge pas,
+  //    et c'est la structure qui sert, pas le contenu.
+  const ENVOI = /(adsubmit|\/submit|dynamic-deposit|\/upload\/image|classifieds)/i;
+  function cheminsDeCles(v, prefixe, out, prof) {
+    if (!out) out = []; if (out.length > 400 || (prof || 0) > 6) return out;
+    if (Array.isArray(v)) { if (v.length) cheminsDeCles(v[0], (prefixe || '') + '[]', out, (prof || 0) + 1); return out; }
+    if (v && typeof v === 'object') {
+      for (const k of Object.keys(v).slice(0, 80)) cheminsDeCles(v[k], (prefixe ? prefixe + '.' : '') + k, out, (prof || 0) + 1);
+      return out;
+    }
+    // La FEUILLE : on note son chemin et son TYPE, jamais sa valeur.
+    if (prefixe) out.push(prefixe + ':' + (v === null ? 'null' : typeof v));
+    return out;
+  }
+  const noteEnvoi = (url, corps) => {
+    try {
+      if (!DE_LEBONCOIN(url) || !ENVOI.test(url) || !corps) return;
+      let cles = [];
+      if (typeof corps === 'string') { try { cles = cheminsDeCles(JSON.parse(corps)); } catch (_) { return; } }
+      else if (corps instanceof FormData) { cles = [...corps.keys()].slice(0, 80).map((k) => k + ':formdata'); }
+      else return;
+      if (cles.length) post({ kind: 'lbcenvoi', url, cles: cles.slice(0, 400) });
+    } catch (_) {}
+  };
   const seenPaths = new Set(); let seenDirty = false;
   const noteSeen = (url) => {
     try {
@@ -65,6 +107,7 @@
   if (origFetch) {
     window.fetch = function (input, init) {
       const url = (typeof input === 'string') ? input : (input && input.url) || '';
+      try { if (init && init.body) noteEnvoi(url, init.body); } catch (_) {}
       const p = origFetch.apply(this, arguments);
       try {
         p.then((res) => {
@@ -83,7 +126,8 @@
   if (OX) {
     const origOpen = OX.prototype.open, origSend = OX.prototype.send;
     OX.prototype.open = function (method, url) { this.__lbcUrl = url; return origOpen.apply(this, arguments); };
-    OX.prototype.send = function () {
+    OX.prototype.send = function (corps) {
+      try { if (corps) noteEnvoi(this.__lbcUrl || '', corps); } catch (_) {}
       try {
         this.addEventListener('load', function () {
           try {
