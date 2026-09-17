@@ -27,14 +27,14 @@
   // l'onglet republié, ce n'est pas obligé »). `renderRepublier` reste dans le
   // fichier mais PLUS RIEN NE L'OUVRE — même parti pris que « Renuméroter à la
   // suite » côté app (§5.45) : on retire l'entrée, on ne charcute pas le code.
-  const PANEL_TABS = ['journee', 'recherche', 'paire', 'chaussures', 'ventes', 'coffre', 'reponse', 'expedier', 'achats', 'litiges', 'messages', 'favoris'];
+  const PANEL_TABS = ['journee', 'recherche', 'paire', 'chaussures', 'ventes', 'coffre', 'reponse', 'expedier', 'achats', 'litiges', 'messages', 'favoris', 'relances'];
   // ── LA BARRE D'ONGLETS : 5 au quotidien, le reste derrière « Plus » ────────
   // Douze pastilles sur trois rangées, c'est un mur : on ne lit plus, on
   // cherche. Même remède que la barre du bas de l'app (§5.53) — les écrans du
   // quotidien restent visibles, les autres passent derrière un bouton, et ce
   // bouton s'allume quand l'onglet affiché vient de derrière (sinon on ne sait
   // plus où on est).
-  const TABS_PLUS = ['ventes', 'recherche', 'coffre', 'litiges', 'favoris'];
+  const TABS_PLUS = ['ventes', 'recherche', 'coffre', 'litiges', 'favoris', 'relances'];
   let plusOuvert = false;
   // Le COFFRE, chargé à la demande (une requête, seulement quand tu ouvres l'onglet).
   let coffre = null, coffreBusy = false, coffreQuery = '', coffreOuvert = null;
@@ -1353,6 +1353,7 @@
     if (t === 'achats') return st.toPickup || 0;
     if (t === 'litiges') return st.litiges || 0;
     if (t === 'messages') return st.unread || 0;
+    if (t === 'relances') return ((DATA && DATA.relances) || []).length;
     return 0;
   }
   const LIB_ONGLET = {
@@ -1360,6 +1361,7 @@
     ventes: ['trending-up', 'Ventes'], recherche: ['search', 'Chercher'], coffre: ['archive', 'Coffre'],
     expedier: ['printer', 'Bordereaux'], achats: ['shopping-bag', 'Achats'],
     litiges: ['alert-triangle', 'Litiges'], messages: ['message-circle', 'Messages'], favoris: ['heart', 'Favoris'],
+    relances: ['zap', 'Relances'],
   };
   function pastille(t, actif) {
     const [ic, lbl] = LIB_ONGLET[t] || ['home', t];
@@ -1406,6 +1408,7 @@
         : tab === 'litiges' ? renderLitiges()
         : tab === 'messages' ? renderMessages()
         : tab === 'favoris' ? renderFavoris()
+        : tab === 'relances' ? renderRelances()
         : renderJournee()
       }</div>
       ${(DATA && DATA.activity && DATA.activity.length) ? `
@@ -1712,6 +1715,7 @@
     if (tab === 'achats') wireAchats();
     if (tab === 'messages') wireMessages();
     if (tab === 'favoris') wireFavoris();
+    if (tab === 'relances') wireRelances();
   }
 
   // ── ONGLET MESSAGES : répondre, piloté par TA sélection (une-par-une) ────────
@@ -1940,6 +1944,121 @@
           if (cible != null) { const p = b.textContent; b.textContent = `Ouvert · ${cible} € copié`; setTimeout(() => { try { b.textContent = p; } catch (_) {} }, 1600); }
         }
         else if (act === 'next') { if (favRun) { favRun.idx++; render(); } }
+      };
+    });
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // ONGLET RELANCES — LA MOITIÉ DE SA DEMANDE QUI A UN DESTINATAIRE
+  // ══════════════════════════════════════════════════════════════════════════
+  // Julien, 17 septembre : « envoyer aux personnes sur Vinted qui ont mis
+  // l'article en favori une petite relance pour qu'ils achètent ».
+  //
+  // ⚠️ REMESURÉ sur ses 481 annonces : 105 portent au moins un favori,
+  //    **1 240 favoris** — et aucun champ ne nomme qui que ce soit
+  //    (`favourite_count` est un NOMBRE, `user` est le vendeur). Mille deux cent
+  //    quarante personnes, zéro adresse : c'est l'onglet Favoris, et il passe
+  //    par la remise NATIVE de Vinted, qui les touche tous en une fois.
+  //
+  // ⚠️⚠️ ICI, c'est l'autre groupe, et il est NOMMÉ : les gens qui lui ont
+  //    ÉCRIT au sujet d'une paire, qui ne l'ont jamais achetée, et dont la paire
+  //    est encore en ligne. Identité : la conversation → `transaction.item_id`
+  //    (§5), jamais un rapprochement de titre. Mesuré sur sa vraie base :
+  //    **58 personnes sur 27 paires**, dont 13 sur la seule « salomon XT-6 blanc
+  //    taille 40 » à 99 €.
+  //
+  // ⚠️ RIEN NE PART TOUT SEUL. Soixante messages envoyés par un programme, c'est
+  //    le signal de robot qui a fait bloquer `vanessa5723` (§3). On PRÉPARE : la
+  //    personne, la paire, le texte ; le clic ouvre SA conversation. C'est lui
+  //    qui écrit et qui envoie — même forme que l'assistant Leboncoin.
+  function texteRelance(g) {
+    const cible = montantRemise(g);
+    const prix = Number(g.price);
+    const t = String(g.title || 'la paire').trim();
+    return cible != null && isFinite(prix)
+      ? `Bonjour ! Vous m'aviez écrit pour « ${t} ». Elle est toujours dispo — je peux vous la faire à ${cible} € au lieu de ${Math.round(prix)} € si ça vous intéresse. Bonne journée !`
+      : `Bonjour ! Vous m'aviez écrit pour « ${t} ». Elle est toujours disponible si ça vous intéresse. Bonne journée !`;
+  }
+  function renderRelances() {
+    const list = ((DATA && DATA.relances) || []);
+    if (!list.length) {
+      // ⚠️ UNE LISTE VIDE A UNE CAUSE, ET UNE CAUSE CONNUE SE DIT (§7) : trois
+      //    raisons possibles, trois phrases — jamais un « rien à faire » qui
+      //    laisse croire que c'est cassé.
+      const rien = !((DATA && DATA.online) || []).length;
+      return `<div class="vrm-m">${DATA && DATA.baseKO
+        ? 'Je n\'ai pas pu tout lire — cette liste peut être incomplète. Rouvre le panneau dans un moment.'
+        : rien ? 'Aucune annonce captée pour l\'instant : passe une fois sur ta boutique Vinted.'
+        : 'Personne à relancer : toutes les conversations portent sur des paires déjà vendues ou plus en ligne. C\'est bon signe.'}</div>`;
+    }
+    // Groupé PAR PAIRE : c'est la paire qui porte le prix et la remise, et une
+    // personne ne se relance que sur une paire précise.
+    const par = new Map();
+    for (const r of list) {
+      const k = String(r.id);
+      if (!par.has(k)) par.set(k, { id: r.id, numero: r.numero, title: r.title, photo: r.photo, price: r.price, minPrice: r.minPrice, buyPrice: r.buyPrice, gens: [] });
+      if (!par.get(k).gens.some((g) => g.login === r.login)) par.get(k).gens.push(r);
+    }
+    const groupes = [...par.values()].sort((a, b) => b.gens.length - a.gens.length);
+    const total = groupes.reduce((s2, g) => s2 + g.gens.length, 0);
+    const cartes = groupes.map((g) => {
+      const cible = montantRemise(g);
+      const gens = g.gens.map((p) => `
+        <div style="display:flex;gap:6px;align-items:center;padding:4px 0;border-top:1px solid rgba(0,0,0,.05)">
+          <div style="flex:1;min-width:0"><b style="font-size:12px">${esc(p.login)}</b><span class="vrm-m" style="font-size:11px"> · ${p.nMsg || 0} message${(p.nMsg || 0) > 1 ? 's' : ''}</span></div>
+          <button class="vrm-rel-go" data-act="open" data-conv="${esc(p.conv)}" data-pair="${esc(g.id)}" style="border:none;background:#D2401E;color:#fff;border-radius:8px;padding:5px 10px;font:inherit;font-weight:700;font-size:11.5px;cursor:pointer">Lui écrire ↗</button>
+        </div>`).join('');
+      return `<div class="vrm-card" style="margin-bottom:8px;padding:9px">
+        <div style="display:flex;gap:9px;align-items:center">
+          ${g.photo ? `<img src="${esc(g.photo)}" alt="" style="width:38px;height:38px;border-radius:8px;object-fit:cover;flex-shrink:0;background:#eee">` : '<div style="width:38px;height:38px;border-radius:8px;background:#eee;flex-shrink:0"></div>'}
+          <div style="flex:1;min-width:0">
+            <div class="vrm-t">${g.numero ? `N°${esc(g.numero)} · ` : ''}${esc(g.title)}</div>
+            <div class="vrm-m">${fmt(g.price)} · <b>${g.gens.length}</b> personne${g.gens.length > 1 ? 's' : ''} l'ont demandée sans l'acheter</div>
+            ${remiseLigne(g)}
+          </div>
+        </div>
+        <div class="vrm-m" style="margin-top:6px;font-size:11.5px;background:rgba(0,0,0,.03);border-radius:8px;padding:6px 8px">${esc(texteRelance(g))}</div>
+        <button class="vrm-rel-go" data-act="copy" data-pair="${esc(g.id)}" style="margin-top:6px;border:1px solid #dde;background:#fff;color:#334;border-radius:8px;padding:5px 10px;font:inherit;font-weight:700;font-size:11.5px;cursor:pointer">📋 Copier ce message${cible != null ? ` (${cible} €)` : ''}</button>
+        ${gens}
+      </div>`;
+    }).join('');
+    return `
+      <div class="vrm-stats" style="margin-bottom:8px">
+        <div class="vrm-st"><b>${total}</b><span class="vrm-m">personne${total > 1 ? 's' : ''} à relancer</span></div>
+        <div class="vrm-st"><b>${groupes.length}</b><span class="vrm-m">paire${groupes.length > 1 ? 's' : ''} concernée${groupes.length > 1 ? 's' : ''}</span></div>
+      </div>
+      <div class="vrm-m" style="margin-bottom:8px">Ces personnes t'ont <b>écrit</b> au sujet d'une paire, ne l'ont <b>jamais achetée</b>, et la paire est <b>toujours en ligne</b>. Le message est prêt : « Lui écrire » <b>ouvre sa conversation</b> et copie le texte — tu relis et tu envoies toi-même.</div>
+      <div class="vrm-m" style="margin-bottom:8px;padding:7px 9px;border-radius:8px;background:#fff6ec;color:#9a5b16;border:1px solid #ffd7a8">ℹ️ <b>Ce ne sont pas les favoris.</b> Vinted donne le <b>nombre</b> de favoris, jamais les noms — personne n'y est joignable un par un. Pour eux, c'est l'onglet <b>Favoris</b> et la remise de Vinted, qui part à tous en une fois. Ici, chaque personne a un nom parce qu'elle t'a écrit.</div>
+      ${cartes}`;
+  }
+  function wireRelances() {
+    const groupes = new Map();
+    for (const r of ((DATA && DATA.relances) || [])) if (!groupes.has(String(r.id))) groupes.set(String(r.id), r);
+    // ⚠️ « TEXTE COPIÉ » SANS RIEN COPIER : `writeText` échoue en rendant une
+    //    promesse REJETÉE, qui ne passe pas par `catch` (leçon de `lbc.js` et
+    //    d'`ebay.js`). On attend la promesse, et le bouton ne dit « copié » que
+    //    si ça a vraiment copié.
+    const copier = async (txt, b, ok) => {
+      const avant = b.textContent;
+      let fait = false;
+      try { await navigator.clipboard.writeText(txt); fait = true; } catch (_) { fait = false; }
+      if (!fait) { try { const ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta); ta.select(); fait = document.execCommand('copy'); ta.remove(); } catch (_) { fait = false; } }
+      b.textContent = fait ? ok : '⚠️ Copie refusée — sélectionne le texte';
+      setTimeout(() => { try { b.textContent = avant; } catch (_) {} }, 2200);
+    };
+    panel.querySelectorAll('.vrm-rel-go').forEach((b) => {
+      b.onclick = async () => {
+        const g = groupes.get(String(b.dataset.pair));
+        if (!g) return;
+        const txt = texteRelance(g);
+        if (b.dataset.act === 'copy') return copier(txt, b, '✓ Copié');
+        // Ouvrir : la conversation de CETTE personne, et le texte dans le
+        // presse-papier au même moment — sur l'écran de Vinted il ne reste qu'à
+        // coller. L'ouverture ne dépend PAS de la copie (un presse-papier refusé
+        // ne doit pas empêcher d'aller répondre).
+        const conv = b.dataset.conv;
+        if (conv) window.open(`https://www.vinted.fr/inbox/${encodeURIComponent(conv)}`, '_blank', 'noopener');
+        await copier(txt, b, '✓ Ouvert · texte copié');
       };
     });
   }

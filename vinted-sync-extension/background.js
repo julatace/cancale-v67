@@ -4684,6 +4684,36 @@ async function buildPanelData() {
     }
   } catch (_) {}
   const offers = [];
+  // ══════════════════════════════════════════════════════════════════════════
+  // LES RELANCES — ET ELLES ONT UN DESTINATAIRE, CONTRAIREMENT AUX FAVORIS
+  // ══════════════════════════════════════════════════════════════════════════
+  // Demande de Julien, 17 septembre : « envoyer aux personnes sur Vinted qui ont
+  // mis l'article en favori une petite relance pour qu'ils achètent ».
+  //
+  // ⚠️ REMESURÉ AVANT DE CODER, sur ses **481 annonces captées** : **105 portent
+  //    au moins un favori, 1 240 favoris en tout** — et les seuls champs qui
+  //    nomment quelqu'un sont `user` / `user_id` (LUI, le vendeur),
+  //    `is_favourite` (est-ce que LUI a mis en favori) et `favourite_count`
+  //    (**un nombre**). Mille deux cent quarante personnes, **zéro adresse** :
+  //    une relance aux favoris n'a pas de destinataire, et c'est pour ça que
+  //    l'onglet Favoris passe par la remise NATIVE de Vinted, qui les touche
+  //    tous en un clic.
+  //
+  // ⚠️⚠️ MAIS IL EXISTE UN AUTRE GROUPE, ET LUI EST NOMMÉ. Mesuré sur ses
+  //    **988 conversations captées** : **669 portent un `opposite_user`**
+  //    (id + login) et **661 un `transaction.item_id`** — c'est-à-dire la
+  //    personne ET la paire dont elle a parlé, par **identité** (§5), jamais
+  //    par ressemblance de titre. En ne gardant que les paires **encore en
+  //    ligne** dont l'échange n'a **jamais abouti** : **27 paires, 60
+  //    personnes** — dont 14 sur la seule « salomon XT-6 blanc taille 40 » à
+  //    99 €. Vinted autorise la réponse sur **les 60**.
+  //
+  // ⚠️ RIEN N'EST ENVOYÉ TOUT SEUL, et ce n'est pas une prudence de façade :
+  //    soixante messages partis d'un programme, c'est exactement le signal de
+  //    robot qui a fait bloquer `vanessa5723` (§3). Le panneau PRÉPARE — il
+  //    nomme la personne, la paire, et ouvre SA conversation ; c'est Julien qui
+  //    écrit et qui envoie. Même forme que l'assistant Leboncoin.
+  const relances = [];
   try {
     const nombre = (v) => {
       if (v == null) return null;
@@ -4702,7 +4732,7 @@ async function buildPanelData() {
     // ⚠️ ET ON PAGINE : 939 lignes, plafond à 1 000 (§4.5). Sans `sbGetTout`, le
     //    jour où il passe 1 000, le panneau cesse de voir des offres SANS RIEN
     //    DIRE.
-    const convBrut = await sbGetTout('app_data?id=like.harvest_*_conv_*&select=id,uid:data->>uid,cap:data->>capturedAt,cid:data->payload->conversation->>id,opp:data->payload->conversation->opposite_user->>id,descr:data->payload->conversation->>description,titre:data->payload->conversation->>title,it:data->payload->conversation->transaction->>item_id,msgs:data->payload->conversation->messages');
+    const convBrut = await sbGetTout('app_data?id=like.harvest_*_conv_*&select=id,uid:data->>uid,cap:data->>capturedAt,cid:data->payload->conversation->>id,opp:data->payload->conversation->opposite_user->>id,opplogin:data->payload->conversation->opposite_user->>login,fini:data->payload->conversation->transaction->>is_completed,descr:data->payload->conversation->>description,titre:data->payload->conversation->>title,it:data->payload->conversation->transaction->>item_id,msgs:data->payload->conversation->messages');
     if (convBrut === null) lecturesRatees++;
     const convRows = (convBrut || [])
       .filter((r) => { const u = r && r.uid; return compteExiste(u) && !acctOff(u); })
@@ -4736,6 +4766,32 @@ async function buildPanelData() {
         const px = nombre(e.price != null ? e.price : (e.offer_price != null ? e.offer_price : e.amount));
         if (px == null) continue;
         last = { px, tx: e.transaction_id != null ? String(e.transaction_id) : '', oid: e.offer_request_id != null ? String(e.offer_request_id) : '' };
+      }
+      // ── LA RELANCE, sur la MÊME lecture (§11 : une notion, une source) ──────
+      // Elle se décide AVANT `if (!last) continue` : une conversation sans offre
+      // en attente est justement celle qu'on relance. Et une conversation QUI
+      // porte une offre en attente n'est pas une relance — elle a déjà sa place
+      // dans l'onglet Offres (§7 : une cause, un endroit).
+      {
+        const iid = String((c.transaction && c.transaction.item_id) || '');
+        const qui = String(r.opplogin || '').trim();
+        // ⚠️ TROIS IDENTITÉS EXIGÉES, aucune ressemblance : la paire (item_id),
+        //    la personne (son login), et la conversation où lui écrire.
+        const paire = iid ? online.find((o) => String(o.id) === iid) : null;
+        // `online` est déjà purgé des paires prouvées vendues et des comptes
+        // exclus : une paire qui n'y est plus n'est pas à relancer.
+        const achete = String(r.fini || '') === 'true';
+        if (paire && qui && cid && !achete && !last) {
+          relances.push({
+            conv: cid, url: `https://www.vinted.fr/inbox/${cid}`,
+            login: qui, uid: String(r.uid || ''),
+            id: paire.id, numero: paire.numero || null, title: paire.title || '',
+            photo: paire.photo || null, price: paire.price != null ? paire.price : null,
+            minPrice: paire.minPrice != null ? paire.minPrice : null,
+            buyPrice: paire.buyPrice != null ? paire.buyPrice : null,
+            at: r.cap || null, nMsg: Array.isArray(c.messages) ? c.messages.length : 0,
+          });
+        }
       }
       if (!last) continue;
       const titre = String(c.description || c.title || '');
@@ -4841,7 +4897,7 @@ async function buildPanelData() {
   // PAS le déduire de ses chiffres — des compteurs à 0 sont exactement ce qu'il
   // voit quand tout va bien et qu'il n'y a rien à faire. C'est donc la seule
   // information qui distingue « rien à faire » de « je n'ai rien pu lire ».
-  return { baseKO: lecturesRatees > 0, lecturesRatees, online, relance, sleeping, noNum, toShip, offers, renumSuggest, momentVente, sante, compteActif, connecte, recentSales, sales, recentBuys, disputes, pickups, bordsToPrint, convs, activity, quickReplies, appStats, goal, freshestAt, stats, accounts, removedSold, byId: Object.fromEntries(online.map(o => [o.id, o])) };
+  return { baseKO: lecturesRatees > 0, lecturesRatees, online, relance, sleeping, noNum, toShip, offers, relances, renumSuggest, momentVente, sante, compteActif, connecte, recentSales, sales, recentBuys, disputes, pickups, bordsToPrint, convs, activity, quickReplies, appStats, goal, freshestAt, stats, accounts, removedSold, byId: Object.fromEntries(online.map(o => [o.id, o])) };
 }
 
 async function sbGet(query) {
