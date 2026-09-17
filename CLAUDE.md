@@ -2439,6 +2439,61 @@ nommée avec **sa** conversation et le message prêt (remise calculée par
   sous-chaîne se vérifie sur le site qu'on visait, pas sur le premier qui
   matche* — cousin de §4.11.
 
+### ⚠️⚠️⚠️ LE DÉPÔT A ÉTÉ FAIT, ET `storeLbcRecon` JETAIT L'ÉTAPE EN SILENCE
+Julien a fait son dépôt Leboncoin à la main le 17 septembre. **Mesuré tout de
+suite** : `lbc_recon.form` écrit à **12:18:55 avec 3 champs** — donc
+`captureDepositForm` a bel et bien tourné et le handler a bel et bien construit
+`etapes` — et **`etapes` toujours absente de la base**.
+Cause : `storeLbcRecon` rangeait **clé par clé** (`paths`, `sample`, `quota`,
+`form`, `url`) et n'avait **aucune ligne** pour `patch.etapes` ni
+`patch.capture`. Les deux moitiés existaient, le raccord manquait — le motif du
+tiroir `Nav` (§4.11), sur la donnée attendue depuis trois passes. **Il a fait ce
+dépôt pour rien, et c'était de mon fait.**
+⚠️ Et ça **réécrit l'histoire de `lbcDiag`** : §8 disait « il n'a jamais tourné » ;
+en réalité c'est son **rangement** qui le jetait. *Avant de conclure qu'un code
+n'a jamais tourné, vérifier que ce qu'il produit est bien RANGÉ.*
+⇒ On ne range plus clé par clé : tout ce qu'un appelant envoie est gardé.
+⚠️⚠️ **ET AUCUN BANC NE POUVAIT LE VOIR** : `bancs/leboncoin.cjs` vérifie ce que
+`lbc.js` **ENVOIE** (`window.__formes`) — il s'arrête à la frontière. Le
+rangement, personne ne le mesurait. *Un contrôle qui s'arrête au message prouve
+le message, jamais la donnée.* `audit-lbc-catalogue.cjs` va jusqu'à
+l'**ÉCRITURE** et porte la règle sur **toutes** les clés : sur le code d'avant
+il nomme les deux perdues, « etapes, capture ».
+
+### ⚠️⚠️ ET LE SECOND DÉPÔT A ENREGISTRÉ TROIS ÉTAPES DE BRUIT
+Rangement réparé, il refait le dépôt. **Mesuré** : 3 étapes, même dépôt, ordre et
+horodatage corrects — et **aucune n'est le formulaire du milieu** :
+- étape 1 : `/deposer-une-annonce`, **1 champ** (`subject`), 0 liste ;
+- étapes 2 et 3 : `/deposer-une-annonce/**confirmation**` — la page de FIN — avec
+  `high-contrast-toggle`, `search-header-mobile-input`,
+  `search-header-extendable-input` et une volée de champs **cachés**
+  (`id, ev, dl, rl, if, ts, iw, sw, sh, v, r`, du pistage). Les **quatre
+  « listes »** étaient la **barre de recherche** de l'en-tête (« Valider votre
+  recherche »).
+**1 min 44 s** séparent l'étape 1 de l'étape 2 : l'observateur a tourné pendant
+tout le dépôt, et le bruit a consommé les places pendant que la catégorie, les
+photos et le prix passaient.
+⇒ `estDuDepot` écarte l'en-tête, le pied, la zone de recherche, les `type=hidden`
+et ce qui n'a aucune surface — c'est la garde `DANS_ENTETE` d'`ebay.js`, qu'il
+fallait ici aussi. La page de **confirmation** n'est plus une étape. Plafond
+porté à 24.
+⚠️ **Et chaque étape porte désormais la VERSION de l'extension qui l'a écrite** :
+sans elle je dois DEVINER si une étape manquante vient d'un défaut ou d'une
+version trop ancienne — ce que le dossier interdit explicitement (§8). Trois
+étapes, et aucun moyen de savoir laquelle des versions tournait.
+- Le banc sert **le bruit réel mesuré** (cet en-tête-là, ces champs cachés-là) :
+  sans lui il restait **vert sur le défaut**. **5 rouges** sur le code d'avant,
+  qui reproduisent mot pour mot ce qu'il y avait dans sa base.
+- ⚠️ §6.3 dans mon propre banc, encore : son faux `chrome.runtime` n'avait pas
+  `getManifest`, donc le contrôle de version sortait rouge sur un code intact.
+
+### ⚠️ ET LE CATALOGUE EST PLUS GROS QUE MON PLAFOND
+Bonne nouvelle de la même mesure : **`lbc_catalogue` EXISTE**, écrite par la
+nouvelle extension. Mais `fdata` est arrivé **coupé à 400 000** — le drapeau
+`coupe` a fait son travail. Plafond porté à **3 000 000** ; la ligne n'est
+réécrite que si le corps change, donc ça ne coûte qu'une fois. `fforms` n'est
+toujours pas arrivé.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
