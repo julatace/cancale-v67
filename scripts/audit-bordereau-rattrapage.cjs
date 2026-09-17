@@ -14,7 +14,8 @@ const src = fs.readFileSync(path.join(__dirname, '..', 'vinted-sync-extension', 
 const dual = (v) => function (...a) { const cb = a[a.length - 1]; if (typeof cb === 'function') { cb(v); return; } return Promise.resolve(v); };
 const jours = (n) => new Date(Date.now() - n * 86400000).toISOString();
 
-function banc({ ventes = [], labels = [], mails = [] }) {
+function banc({ ventes = [], labels = [], mails = [], commandeRepond = null }) {
+  const commandes = [];                      // les PUT « commander le bordereau »
   const demandes = [];                       // les transactions réellement lues chez Vinted
   const store = {};
   const ctx = {
@@ -37,6 +38,11 @@ function banc({ ventes = [], labels = [], mails = [] }) {
       const u = String(url);
       const J = (o, st = 200) => ({ ok: st < 400, status: st, json: async () => o, text: async () => JSON.stringify(o), arrayBuffer: async () => new ArrayBuffer(0), headers: { get: () => 'application/json' } });
       // Appels VINTED : c'est ce qu'on mesure.
+      // ⚠️ LE PUT « commander le bordereau » se distingue du GET qui va chercher
+      //    le PDF : sans ça on ne peut pas mesurer si un 409 enchaîne bien sur
+      //    la récupération.
+      const cmd = /vinted\.fr\/api\/v2\/transactions\/(\d+)\/shipment\/order/.exec(u);
+      if (cmd) { commandes.push(cmd[1]); return J(commandeRepond === 409 ? { message: 'Shipment already ordered' } : {}, commandeRepond || 200); }
       const tx = /vinted\.fr\/api\/v2\/transactions\/(\d+)/.exec(u);
       if (tx) { demandes.push(tx[1]); return J({ transaction: {} }); }   // pas d'expédition exposée → échec propre
       if (/vinted\.fr\//.test(u)) return J({});
@@ -53,7 +59,17 @@ function banc({ ventes = [], labels = [], mails = [] }) {
   vm.createContext(ctx); vm.runInContext(src, ctx, { filename: 'background.js' });
   ctx.getStoredAccounts = async () => [{ vinted_user_id: '111', domain: 'www.vinted.fr', access_token: 'x' }];
   ctx.compteConnecte = async () => '111';
-  return { ctx, demandes };
+  // ⚠️ SEULEMENT quand on mesure la COMMANDE du bordereau. Surcharger ces deux-là
+  //    pour tout le monde change l'état des contrôles voisins : sans adresse,
+  //    `genererBordereau` sort avant le PUT — et c'est ce que mesurent les
+  //    contrôles écrits avant celui-ci. (Mon premier jet l'a fait, et « une vente
+  //    à générer n'est pas récupérée deux fois » est passé au rouge sur un code
+  //    intact : *un harnais qui change l'état mesure autre chose.*)
+  if (commandeRepond != null) {
+    ctx.adresseVendeur = async () => 42;        // sinon on n'atteint jamais le PUT
+    ctx.garde = async () => null;               // le garde-fou n'est pas l'objet ici
+  }
+  return { ctx, demandes, commandes };
 }
 const V = (tx, statut, j, titre) => ({ transaction_id: tx, title: titre || ('Paire ' + tx), status: statut, date: jours(j), price: { amount: '40' } });
 const EXPEDIE = "Commande expédiée et en cours d'acheminement !";
@@ -146,6 +162,41 @@ const AGENERER = 'Le paiement a été validé';
     const n = b.demandes.filter(x => x === '21000042').length;
     dit(n > 1, "vente qui attend l'envoi → on réessaie le temps que le PDF arrive", `${n} requête(s)`);
   }
+  // ══════════════════════════════════════════════════════════════════════════
+  // ⚠️⚠️ UN 409 VEUT DIRE « IL Y EN A DÉJÀ UN », PAS « ÇA A RATÉ »
+  // ══════════════════════════════════════════════════════════════════════════
+  // Mesuré le 17 septembre sur sa base : `bordereau_genere` **1** contre
+  // `bordereau_refuse_409` **1** — et dans les requêtes captées de SA page, à
+  // 11:58:40, `PUT /api/v2/transactions/22355375065/shipment/order` : c'est LUI
+  // qui l'a commandé à la main, et cette vente est bien passée en « Bordereau
+  // envoyé au vendeur ». Quand l'extension repasse derrière, Vinted répond 409.
+  // On traitait ça comme un échec sec : on n'allait JAMAIS chercher le PDF, et
+  // la vente était bloquée 6 h. Le bordereau existait, et il n'arrivait jamais
+  // dans l'app — mot pour mot ce qu'il décrit.
+  {
+    const b = banc({ ventes: [V('21000009', AGENERER, 1)], commandeRepond: 409 });
+    await b.ctx.genererBordereauxEnAttente('111');
+    dit(b.commandes.includes('21000009'), 'on commande bien le bordereau', b.commandes.join(',') || 'aucune');
+    dit(b.demandes.includes('21000009'),
+      'Vinted répond « déjà commandé » (409) → on va QUAND MÊME chercher le PDF',
+      b.demandes.length ? b.demandes.join(',') : 'aucune récupération — le bordereau existe et n\'arrivera jamais');
+    // ⚠️ Et on ne bloque pas la vente six heures sur un « c'est déjà fait ».
+    const memo = await b.ctx.chrome.storage.local.get('vrmBordFaits');
+    const m = (memo.vrmBordFaits || {})['21000009'];
+    dit(!!m && m.ok === true, 'et le mémo ne met pas la vente en quarantaine 6 h',
+      m ? `ok=${m.ok}` : 'aucun mémo');
+  }
+
+  // ⚠️ L'AUTRE SENS : un vrai refus reste un refus. Sans ça, « tout traiter
+  //    comme déjà fait » passerait le contrôle ci-dessus.
+  {
+    const b = banc({ ventes: [V('21000010', AGENERER, 1)], commandeRepond: 403 });
+    await b.ctx.genererBordereauxEnAttente('111');
+    dit(!b.demandes.includes('21000010'),
+      'un vrai refus (403) ne se fait PAS passer pour un bordereau existant',
+      b.demandes.join(',') || 'aucune récupération');
+  }
+
   console.log(ko ? `\n${ko} contrôle(s) en échec` : '\nLe rattrapage des bordereaux ne laisse plus filer une vente.');
   process.exit(ko ? 1 : 0);
 })();
