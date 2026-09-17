@@ -3334,13 +3334,30 @@ async function genererBordereau(uid, tx) {
   if (!r.ok) { try { echantillonRate('bordereau', String(tx), JSON.stringify(r.json || {})); } catch (_) {} }
   // Le message brut de Vinted ne dit rien à Julien. On traduit ce qu'on sait.
   const brut = (r.json && (r.json.message || r.json.error)) || '';
+  // ⚠️⚠️ UN 409 VEUT DIRE « IL Y EN A DÉJÀ UN », PAS « ÇA A RATÉ ».
+  //    Mesuré le 17 septembre sur sa base, et les deux bouts se rejoignent :
+  //      · `bordereau_genere` **1** contre `bordereau_refuse_409` **1** ;
+  //      · et dans les requêtes captées de SA page, à 11:58:40 :
+  //        `PUT /api/v2/transactions/22355375065/shipment/order` — c'est LUI
+  //        qui l'a commandé à la main, et cette vente est bien passée en
+  //        « Bordereau envoyé au vendeur ».
+  //    Quand l'extension repasse derrière, Vinted répond **409 : déjà commandé**.
+  //    Or on traitait ça comme un échec sec : on n'allait **jamais** chercher le
+  //    PDF, et `vrmBordFaits` bloquait la vente **6 h**. Le bordereau existait,
+  //    et il n'arrivait jamais dans l'app — mot pour mot ce qu'il décrit.
+  //    ⇒ `deja: true` : l'appelant enchaîne sur la récupération du PDF, exactement
+  //      comme après un succès. Le commentaire plus haut disait déjà que le
+  //      statut est périmé après une génération manuelle ; le correctif portait
+  //      sur le STATUT, jamais sur la réponse 409 elle-même.
+  const deja = r.status === 409;
   const clair = r.ok ? ''
+    : deja ? 'le bordereau existait déjà chez Vinted — je vais chercher le PDF'
     : r.status === 401 ? 'session expirée pour ce compte — recharge une page Vinted et réessaie'
     : r.status === 403 ? 'Vinted a refusé pour ce compte'
     : r.status === 404 ? "cette vente n'attend plus de bordereau chez Vinted"
     : r.status === 422 ? (brut || "Vinted refuse ces informations d'envoi — génère-en un à la main une fois")
     : (brut || `Vinted a répondu ${r.status}`);
-  return { ok: !!r.ok, status: r.status, error: clair };
+  return { ok: !!r.ok, deja, status: r.status, error: clair };
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -3687,13 +3704,17 @@ async function genererBordereauxEnAttente(uid, opts = {}) {
       if (dejaMail.has(tx)) continue;
       if (memo[tx] && Date.now() - Number(memo[tx].t || 0) < BORD_RETRY_MS) continue;
       const r = await genererBordereau(uid, tx);
-      memo[tx] = { t: Date.now(), ok: !!r.ok };
-      if (r.ok) {
-        faits++;
+      // ⚠️ « Déjà commandé » (409) compte comme un SUCCÈS pour la suite : le
+      //    bordereau existe, c'est le PDF qu'on veut. Et on ne bloque pas la
+      //    vente 6 h sur un « c'est déjà fait ».
+      memo[tx] = { t: Date.now(), ok: !!r.ok || !!r.deja };
+      if (r.ok || r.deja) {
+        if (r.ok) faits++;
         delete dernierBlocage[String(uid)];
         const eu = (await recupererLabelInsiste(acc, uid, tx)).ok;
-        logActivity(eu ? `📄 Bordereau généré et rangé dans l'app — ${String(o.title || '').slice(0, 40)}`
-                       : `📄 Bordereau généré — ${String(o.title || '').slice(0, 40)} (le PDF arrivera par email)`);
+        const quoi = r.deja ? 'Bordereau déjà commandé' : 'Bordereau généré';
+        logActivity(eu ? `📄 ${quoi} et rangé dans l'app — ${String(o.title || '').slice(0, 40)}`
+                       : `📄 ${quoi} — ${String(o.title || '').slice(0, 40)} (le PDF arrivera par email)`);
       } else {
         logActivity(`⚠️ Bordereau non généré : ${r.error || 'refus Vinted'}`);
         // Compte connecté ailleurs / plafond atteint : inutile d'insister sur
