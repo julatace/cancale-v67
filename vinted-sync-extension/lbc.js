@@ -676,33 +676,118 @@
   // Capture la STRUCTURE du formulaire de dépôt Leboncoin (noms/libellés des champs)
   // pour que je puisse brancher le pré-remplissage exactement (réf, catégorie…).
   let derniereEtape = '';
+  // ══════════════════════════════════════════════════════════════════════════
+  // ⚠️⚠️ « C'EST DIFFÉRENT POUR CHAQUE ANNONCE » — Julien, 17 septembre, et il a
+  //       raison : le dépôt Leboncoin n'a pas les mêmes étapes selon la
+  //       CATÉGORIE. Des chaussures n'ont pas les champs d'un livre.
+  // ══════════════════════════════════════════════════════════════════════════
+  // Trois choses manquaient pour que l'enregistrement serve à quelque chose, et
+  // les trois font qu'un dépôt fait à la main aurait été fait pour rien :
+  //
+  //  1. ⚠️⚠️ **SEULS LES `<select>` NATIFS ÉTAIENT REGARDÉS.** Leboncoin est une
+  //     application React : ses listes sont presque sûrement des composants
+  //     (`role="combobox"` + `role="listbox"`), pas des `<select>`. Dans ce cas
+  //     on rapportait **zéro liste** — donc ni catégorie, ni état, ni pointure,
+  //     c'est-à-dire exactement ce qu'on vient chercher. Je ne peux pas le
+  //     vérifier moi-même (leboncoin.fr me répond 403) : on couvre **les deux
+  //     formes**, et l'étape DIT laquelle elle a trouvée.
+  //  2. **Rien ne disait DANS QUELLE CATÉGORIE l'étape avait été vue.** Recevoir
+  //     un champ « Pointure » sans savoir sur quel chemin, c'est risquer de le
+  //     remplir sur le formulaire d'un livre. La catégorie choisie est donc
+  //     notée — c'est un libellé d'option, pas un contenu saisi.
+  //  3. **Aucun ordre, et deux dépôts se mélangeaient.** Chaque visite porte un
+  //     identifiant et chaque étape son rang : on saura quelle étape suit
+  //     laquelle, et laquelle appartient à quelle annonce.
+  //
+  // ⚠️ LA PROMESSE DE CONFIDENTIALITÉ NE BOUGE PAS : ce qu'il TAPE (titre,
+  //    description, prix) ne part jamais. Seuls partent des noms de champs et
+  //    des libellés d'options — y compris celui qu'il a choisi dans une liste.
+  const DEPOT_ID = Math.random().toString(36).slice(2, 8);
+  let ordreEtape = 0;
+
+  // Le texte visible d'un élément, borné (un composant de liste affiche sa
+  // valeur choisie en clair).
+  function texteVisible(el, max) {
+    try { return String((el.innerText || el.textContent || '')).replace(/\s+/g, ' ').trim().slice(0, max || 40); } catch (_) { return ''; }
+  }
+  function libelleDe(el) {
+    try {
+      if (el.labels && el.labels[0]) return texteVisible(el.labels[0], 50);
+      const al = el.getAttribute && el.getAttribute('aria-label'); if (al) return String(al).slice(0, 50);
+      const lb = el.getAttribute && el.getAttribute('aria-labelledby');
+      if (lb) { const n = document.getElementById(lb); if (n) return texteVisible(n, 50); }
+      const p = el.closest && el.closest('label'); if (p) return texteVisible(p, 50);
+    } catch (_) {}
+    return '';
+  }
+  // TOUTES les listes déroulantes de la page : les `<select>` natifs ET les
+  // composants. `forme` dit laquelle des deux, pour que la prochaine passe vise
+  // juste au lieu de supposer.
+  function listesDeroulantes() {
+    const out = [];
+    try {
+      document.querySelectorAll('select').forEach((el) => {
+        const opts = Array.from(el.options || []);
+        out.push({ forme: 'select', name: el.name || '', id: el.id || '', label: libelleDe(el),
+          choisi: (el.selectedIndex >= 0 && opts[el.selectedIndex] ? String(opts[el.selectedIndex].textContent || '').trim().slice(0, 40) : ''),
+          options: opts.slice(0, 25).map((o) => String(o.textContent || '').trim().slice(0, 40)) });
+      });
+    } catch (_) {}
+    try {
+      // Les composants : ce qu'une page React expose vraiment.
+      document.querySelectorAll('[role="combobox"], [role="listbox"], [aria-haspopup="listbox"], [aria-haspopup="menu"]').forEach((el) => {
+        if (el.tagName && el.tagName.toLowerCase() === 'select') return;      // déjà pris
+        let options = [];
+        try {
+          const id = el.getAttribute('aria-controls') || el.getAttribute('aria-owns');
+          const boite = (id && document.getElementById(id)) || el.parentElement;
+          if (boite) options = Array.from(boite.querySelectorAll('[role="option"], [role="menuitem"]')).slice(0, 25).map((o) => texteVisible(o, 40));
+        } catch (_) {}
+        out.push({ forme: 'composant', name: el.getAttribute('name') || '', id: el.id || '',
+          qa: el.getAttribute('data-qa-id') || el.getAttribute('data-testid') || '',
+          label: libelleDe(el), choisi: texteVisible(el, 40), options });
+      });
+    } catch (_) {}
+    return out;
+  }
+  // La catégorie sur laquelle on se trouve : le fil d'Ariane s'il existe, sinon
+  // la valeur choisie d'une liste dont le libellé parle de catégorie. Vide si on
+  // ne SAIT pas — on n'invente pas un chemin (§5, mieux vaut un blanc qu'un faux).
+  function categorieCourante(listes) {
+    try {
+      const fil = document.querySelector('nav[aria-label*="il d’ariane" i], nav[aria-label*="il d\'ariane" i], nav[aria-label*="readcrumb" i], [class*="readcrumb"]');
+      if (fil) { const t = texteVisible(fil, 120); if (t) return t; }
+    } catch (_) {}
+    const l = (listes || []).find((x) => /cat[ée]gorie|rubrique|type de bien/i.test(String(x.label || '') + ' ' + String(x.name || '')));
+    return (l && l.choisi) || '';
+  }
+
   function captureDepositForm() {
     try {
       if (!/depos|d[ée]p[oô]t|\/ai\/|creation|nouvelle-annonce/i.test(location.href)) return;
       const fields = [];
       document.querySelectorAll('input, select, textarea').forEach((el) => {
-        fields.push({ tag: el.tagName.toLowerCase(), type: el.type || '', name: el.name || '', id: el.id || '', ph: el.placeholder || '', aria: el.getAttribute('aria-label') || '', label: ((el.labels && el.labels[0] && el.labels[0].innerText) || '').slice(0, 50), qa: el.getAttribute('data-qa-id') || el.getAttribute('data-testid') || '' });
+        // ⚠️ AUCUNE valeur saisie : ni `el.value`, ni le texte d'un textarea.
+        fields.push({ tag: el.tagName.toLowerCase(), type: el.type || '', name: el.name || '', id: el.id || '', ph: el.placeholder || '', aria: el.getAttribute('aria-label') || '', label: libelleDe(el), qa: el.getAttribute('data-qa-id') || el.getAttribute('data-testid') || '' });
       });
-      // ⚠️ LE DÉPÔT SE FAIT EN ÉTAPES, et je n'en ai jamais vu qu'UNE (celle du
-      //    titre). Tant que je ne connais pas les suivantes, je ne peux pas
-      //    remplir « la catégorie ni le reste ». On enregistre donc CHAQUE étape
-      //    distincte, une seule fois chacune — noms de champs et libellés
-      //    d'options, AUCUN contenu saisi. C'est ce qui me permettra de finir.
-      const sels = [];
-      document.querySelectorAll('select').forEach((el) => {
-        sels.push({ name: el.name || '', id: el.id || '', label: ((el.labels && el.labels[0] && el.labels[0].innerText) || '').slice(0, 50),
-          options: Array.from(el.options || []).slice(0, 25).map((o) => String(o.textContent || '').trim().slice(0, 40)) });
-      });
+      const sels = listesDeroulantes();
       const fichiers = document.querySelectorAll('input[type="file"]').length;
-      const signature = fields.map((f) => f.name || f.id).join('|') + '#' + sels.length + '#' + fichiers;
+      const categorie = categorieCourante(sels);
+      // La signature dédoublonne les étapes identiques — mais deux CATÉGORIES
+      // donnent deux formulaires différents, donc la catégorie en fait partie.
+      const signature = fields.map((f) => f.name || f.id).join('|') + '#' + sels.length + '#' + fichiers + (categorie ? '#' + categorie.slice(0, 40) : '');
       if (signature === derniereEtape) return;
       derniereEtape = signature;
       if (fields.length || sels.length || fichiers) {
+        ordreEtape++;
         chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcForm', url: location.href,
-          fields: fields.slice(0, 150), selects: sels.slice(0, 30), fichiers, etape: signature.slice(0, 120) });
+          fields: fields.slice(0, 150), selects: sels.slice(0, 30), fichiers,
+          categorie, depot: DEPOT_ID, ordre: ordreEtape,
+          etape: signature.slice(0, 160) });
       }
     } catch (_) {}
   }
+
 
   root.addEventListener('click', async (e) => {
     const a = e.target.getAttribute && e.target.getAttribute('data-a');

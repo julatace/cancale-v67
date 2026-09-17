@@ -959,8 +959,25 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             if (prev !== null) {
               const cur = (prev && prev[0] && prev[0].data) || {};
               const etapes = Object.assign({}, cur.etapes || {});
-              etapes[String(msg.etape || msg.url || Object.keys(etapes).length)] =
-                { url: msg.url, fields: msg.fields, selects: msg.selects || [], fichiers: msg.fichiers || 0, at: new Date().toISOString() };
+              // ⚠️⚠️ « C'EST DIFFÉRENT POUR CHAQUE ANNONCE » (Julien, 17 sept.) :
+              //    les étapes du dépôt dépendent de la CATÉGORIE. Une clé qui ne
+              //    porte que la structure ferait passer le formulaire d'un livre
+              //    pour celui d'une paire de chaussures. La catégorie entre donc
+              //    dans la clé, et l'étape garde son DÉPÔT et son RANG — sans
+              //    quoi on ne sait ni quelle étape suit laquelle, ni laquelle
+              //    appartient à quelle annonce.
+              const cle = [String(msg.categorie || 'sans-categorie').slice(0, 40),
+                String(msg.etape || msg.url || Object.keys(etapes).length)].join(' :: ');
+              etapes[cle] = { url: msg.url, fields: msg.fields, selects: msg.selects || [],
+                fichiers: msg.fichiers || 0, categorie: String(msg.categorie || ''),
+                depot: String(msg.depot || ''), ordre: Number(msg.ordre) || 0,
+                at: new Date().toISOString() };
+              // Borné : on garde les plus récentes, jamais une ligne qui enfle.
+              const cles = Object.keys(etapes);
+              if (cles.length > 40) {
+                const gardees = cles.sort((x, y) => Date.parse((etapes[y] || {}).at || 0) - Date.parse((etapes[x] || {}).at || 0)).slice(0, 40);
+                for (const k of cles) if (!gardees.includes(k)) delete etapes[k];
+              }
               await storeLbcRecon({ form: { url: msg.url, fields: msg.fields, at: new Date().toISOString() }, etapes });
             }
             sendResponse({ ok: true }); return;
