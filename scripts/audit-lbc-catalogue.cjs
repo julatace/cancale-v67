@@ -118,6 +118,53 @@ const ANNONCES = JSON.stringify({ ads: [{ list_id: 991, subject: 'Salomon XT-6 V
   const brutes = vus.filter((v) => v.kind === 'lbcraw');
   dit(brutes.length >= 1, 'et une VRAIE réponse d\'annonces Leboncoin passe toujours',
     `${brutes.length} relayée(s)`);
+  console.log('\n── LE FORMULAIRE DE DÉPÔT EST **DYNAMIQUE** — on lit la CONFIG, pas le DOM');
+  await essaie('la config du dépôt', async () => {
+    // ⚠️⚠️ MESURÉ LE 17 SEPTEMBRE dans ses `lbc_recon.paths`, et ça change tout :
+    //    `api/adsubmit/dynamic-deposit/config`, `api/ad-prediction/v2/public/adparams`,
+    //    `api/consumergoods/proxy/v2/pages/ad-submit`, `…/options.json`,
+    //    `api/pintad/v1/public/upload/image`, `api/adsubmit/v2/classifieds`.
+    //    Le formulaire n'est pas écrit en dur : il est CONSTRUIT à partir d'une
+    //    config renvoyée par l'API, et elle change avec la catégorie — c'est
+    //    mot pour mot « c'est différent pour chaque annonce ».
+    const CONFIG = JSON.stringify({ steps: [{ id: 'category', fields: [{ name: 'category_id', type: 'select', required: true }] },
+      { id: 'attributes', fields: [{ name: 'brand', type: 'select', values: [{ value: 'nike', label: 'Nike' }] }, { name: 'shoe_size', type: 'select' }, { name: 'item_condition', type: 'select' }] },
+      { id: 'photos', fields: [{ name: 'images', type: 'file', max: 10 }] },
+      { id: 'price', fields: [{ name: 'price', type: 'number', prefilled: true }] }] });
+    const pg2 = await b.newPage();
+    await pg2.route('https://www.leboncoin.fr/**', (r) => r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: '<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>lbc</title></head><body></body></html>' }));
+    await pg2.route('https://api.leboncoin.fr/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: CONFIG }));
+    await pg2.goto('https://www.leboncoin.fr/deposer-une-annonce');
+    await pg2.evaluate(`window.__vus = []; window.addEventListener('message', (e) => { const d = e.data; if (d && d.__tag === 'CANCALE_LBC') window.__vus.push({ kind: d.kind, url: d.url, len: (d.body || '').length, cles: d.cles || null }); });`);
+    await pg2.evaluate(INJ);
+    // La page charge sa config, puis SOUMET l'annonce (avec du contenu réel).
+    await pg2.evaluate(`(async () => {
+      await fetch('https://api.leboncoin.fr/api/adsubmit/dynamic-deposit/config').then(r => r.text());
+      await fetch('https://api.leboncoin.fr/api/ad-prediction/v2/public/adparams').then(r => r.text());
+      await fetch('https://api.leboncoin.fr/api/adsubmit/v2/classifieds', { method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ subject: 'Salomon XT-6 blanc T40 SECRET-TITRE', body: 'SECRET-DESCRIPTION', price: 9900,
+          attributes: [{ key: 'brand', value: 'SECRET-MARQUE' }], images: ['u1'] }) }).then(r => r.text());
+    })()`).catch(() => {});
+    await pg2.waitForTimeout(700);
+    const vus2 = await pg2.evaluate('window.__vus');
+    const confs = vus2.filter((v) => v.kind === 'lbccatalogue');
+    dit(confs.length >= 2, 'la CONFIG du dépôt dynamique est gardée (c\'est elle qui décrit le formulaire)',
+      `gardées : ${confs.map((c) => (c.url.match(/(dynamic-deposit|adparams|classifieds|ad-submit|options)/) || ['?'])[0]).join(', ') || 'aucune'}`);
+    const envois = vus2.filter((v) => v.kind === 'lbcenvoi');
+    dit(envois.length >= 1, 'et la FORME de ce qui part (les champs que Leboncoin attend vraiment)',
+      envois.length ? `${(envois[0].cles || []).length} clé(s) : ${(envois[0].cles || []).slice(0, 6).join(', ')}` : 'rien');
+    const clefs = envois.flatMap((e) => e.cles || []).join(' ');
+    dit(/subject:string/.test(clefs) && /price:number/.test(clefs) && /attributes\[\]\.key/.test(clefs),
+      'on sait donc quels champs remplir, et de quel type');
+    // ⚠️⚠️ ET LA PROMESSE QUI COMPTE : son annonce ne part PAS.
+    const toutCeQuiSort = JSON.stringify(vus2);
+    const fuites = ['SECRET-TITRE', 'SECRET-DESCRIPTION', 'SECRET-MARQUE'].filter((x) => toutCeQuiSort.includes(x));
+    dit(fuites.length === 0, 'AUCUNE valeur de son annonce ne part avec la structure',
+      fuites.length ? `fuite(s) : ${fuites.join(', ')}` : 'ni le titre, ni la description, ni la marque saisie');
+    await pg2.close();
+  });
+
   await b.close();
 
   console.log('\n── CE QUI ARRIVE EN BASE (le vrai `background.js`, dans un `vm`)');

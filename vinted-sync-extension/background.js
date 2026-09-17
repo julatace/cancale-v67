@@ -995,6 +995,23 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           // Le catalogue Leboncoin (codes de catégorie/marque/taille/état) : sa
           // propre ligne, une place par endpoint, rien ne peut l'évincer.
           if (msg.action === 'lbcCatalogue' && msg.body) { await storeLbcCatalogue(msg.url, String(msg.body).slice(0, LBC_CATALOGUE_MAX), !!msg.coupe || String(msg.body).length > LBC_CATALOGUE_MAX); sendResponse({ ok: true }); return; }
+          // ⚠️ LA FORME DE CE QUI PART VERS LEBONCOIN — chemins de clés et types,
+          //    JAMAIS les valeurs (son titre, sa description, son prix ne
+          //    quittent pas sa page). C'est ce qui dit quels champs le dépôt
+          //    attend vraiment, catégorie par catégorie.
+          if (msg.action === 'lbcEnvoi' && Array.isArray(msg.cles)) {
+            const prev = await sbGet('app_data?id=eq.lbc_recon&select=data');
+            if (prev !== null) {
+              const cur = (prev && prev[0] && prev[0].data) || {};
+              const envois = Object.assign({}, cur.envois || {});
+              const cle = String(msg.url || '').replace(/^https?:\/\//, '').split('?')[0].slice(0, 90);
+              envois[cle] = { at: new Date().toISOString(), ver: EXT_VERSION, cles: msg.cles.slice(0, 400) };
+              const noms = Object.keys(envois);
+              if (noms.length > 30) { const g = noms.sort((x, y) => Date.parse((envois[y] || {}).at || 0) - Date.parse((envois[x] || {}).at || 0)).slice(0, 30); for (const n of noms) if (!g.includes(n)) delete envois[n]; }
+              await storeLbcRecon({ envois });
+            }
+            sendResponse({ ok: true }); return;
+          }
           if (msg.action === 'lbcPaths' && Array.isArray(msg.paths)) { await storeLbcRecon({ paths: msg.paths, url: msg.url }); sendResponse({ ok: true }); return; }
           // ANNONCE EN COURS DE DEPOT : memorisee au clic sur « Tout preparer »,
           // relue par la page de depot qui s'ouvre dans un AUTRE onglet. Sans ce
@@ -5752,6 +5769,7 @@ async function storeLbcRecon(patch) {
 //    400 000** — le catalogue est donc plus gros que ça. On monte le plafond ;
 //    la ligne n'est réécrite que si le corps CHANGE, donc ça ne coûte qu'une
 //    fois. Et le drapeau `coupe` reste : on saura si ça ne suffit toujours pas.
+const EXT_VERSION = (() => { try { return (chrome.runtime.getManifest() || {}).version || ''; } catch (_) { return ''; } })();
 const LBC_CATALOGUE_MAX = 3000000;
 async function storeLbcCatalogue(url, body, coupe) {
   try {
