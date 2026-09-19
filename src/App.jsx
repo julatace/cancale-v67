@@ -35,7 +35,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.80.0';
+const EXT_ATTENDUE = '5.81.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -22329,6 +22329,15 @@ function LeboncoinScreen() {
     // détecté bloqué ne doit pas alimenter la file Leboncoin (ses annonces sont
     // périmées). Et une paire déclarée retirée du stock n'a plus rien à publier.
     const offAcc = new Set([...(main.vinted_accounts_hidden || []), ...(main.vinted_accounts_blocked || [])].map(String));
+    // ⚠️⚠️ ET LES SUPPRIMÉS DÉFINITIVEMENT (`vrm_blocked_accounts`) : une TROISIÈME
+    //    liste, que ni `vinted_accounts_hidden` ni `vinted_accounts_blocked` ne
+    //    recouvrent. Sans ça les paires d'un compte fermé par Vinted (mesuré :
+    //    `shop_cancale`, 96 paires numérotées) étaient proposées à la
+    //    republication, ici comme dans le panneau. `null`/échec ⇒ on n'exclut
+    //    RIEN (ne pas cacher un compte vivant sur un hoquet — sens inverse du cas
+    //    d'écriture). C'est la MÊME règle que `buildLbcData`/`buildEbayData` (§11).
+    const blkRows = await sbGet('app_data?id=eq.vrm_blocked_accounts&select=data');
+    ((blkRows && blkRows[0] && blkRows[0].data && blkRows[0].data.uids) || []).forEach((u) => offAcc.add(String(u)));
     const lost = main.vinted_pairs_lost || {};
     const listRowsBrut = await sbGet('app_data?id=like.harvest_*_listings&select=id,data');
     const listRows = listRowsBrut || [];

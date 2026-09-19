@@ -5584,6 +5584,9 @@ async function buildEbayData() {
   const uid2login = {};
   (main.vinted_accounts || []).forEach((a) => { uid2login[String(a.vinted_user_id)] = labels[String(a.vinted_user_id)] || a.login || String(a.vinted_user_id); });
   const off = new Set([...(main.vinted_accounts_hidden || []), ...(main.vinted_accounts_blocked || [])].map(String));
+  // ⚠️ Même règle que Leboncoin : un compte supprimé définitivement
+  //    (`vrm_blocked_accounts`) n'alimente aucune file. `null` ⇒ on n'exclut rien.
+  { const noirs = await blockedAccounts(); if (noirs) noirs.forEach((u) => off.add(String(u))); }
   const lost = main.vinted_pairs_lost || {};
   const pos = await readEbayPosted();
   const posted = new Set(pos.ids);
@@ -5655,6 +5658,18 @@ async function buildLbcData() {
   //    cette file-ci ne le faisait pas : l'app annonçait 39 et le panneau 40,
   //    sur exactement la même donnée. Deux règles pour une notion, §11.
   const off = new Set([...(main.vinted_accounts_hidden || []), ...(main.vinted_accounts_blocked || [])].map(String));
+  // ⚠️⚠️ ET LES SUPPRIMÉS DÉFINITIVEMENT AUSSI (`vrm_blocked_accounts`).
+  // Mesuré le 19 septembre : `shop_cancale` (199082413), supprimé définitivement,
+  // n'est ni dans `vinted_accounts_hidden` ni dans `vinted_accounts_blocked` —
+  // ce sont TROIS listes différentes. Ses 96 paires numérotées en ligne
+  // entraient donc dans la file Leboncoin, alors que l'app les écarte déjà
+  // (elles n'ont plus de ligne `vinted_accounts`, donc plus de jetons). C'est
+  // la divergence app↔panneau du §11, sur la liste des comptes que Vinted a
+  // bloqués ou qu'il a fermés lui-même : on ne propose pas de republier ailleurs
+  // les paires d'un compte mort. ⚠️ `null` (jamais lu) ⇒ on n'exclut RIEN :
+  // cacher les paires d'un compte VIVANT sur un hoquet serait pire (sens inverse
+  // du cas d'écriture — ici sur-exclure coûte, sous-exclure revient à l'existant).
+  { const noirs = await blockedAccounts(); if (noirs) noirs.forEach((u) => off.add(String(u))); }
   // Déjà publiées sur Leboncoin (ligne DÉDIÉE → on n'écrase jamais le blob main).
   const postedData = await readPostedData();
   const posted = new Set(postedData.ids);

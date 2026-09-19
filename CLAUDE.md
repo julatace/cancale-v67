@@ -2704,6 +2704,35 @@ l'intuition.
 (« pousse à chaque modification ») qui protège aussi de ça, et c'est la seule
 fois où l'avoir oublié a coûté du travail.
 
+### ⚠️⚠️ UN COMPTE SUPPRIMÉ DÉFINITIVEMENT ALIMENTAIT ENCORE LES FILES DE PUBLICATION
+Mesuré le 19 septembre, en isolant `shop_cancale` (que Vinted a bloqué, uid
+**199082413**). Il y a **TROIS** listes de comptes écartés, pas deux, et elles
+ne se recouvrent pas :
+- `vinted_accounts_hidden` — masqué à la main dans l'app ;
+- `vinted_accounts_blocked` — « refusé par Vinted » (LOCAL à l'appareil, §5.31) ;
+- `vrm_blocked_accounts` — **supprimé DÉFINITIVEMENT** (celle que l'extension lit
+  pour refuser de recapter, celle où vit `shop_cancale`).
+
+Les files de cross-posting — `buildLbcData`, `buildEbayData` **et l'écran
+Leboncoin de l'app** — ne construisaient leur `off` que des **deux premières**.
+Un compte supprimé définitivement n'y était donc **pas**, et ses paires
+numérotées en ligne (mesuré : **96** pour `shop_cancale`) étaient proposées à la
+republication sur Leboncoin/eBay — alors que les écrans d'annonces de l'app
+l'écartent déjà (plus de ligne `vinted_accounts`, donc absent d'`accountUids`).
+C'est la divergence §11 (« l'app annonçait 39, le panneau 40 »), sur la liste
+des comptes morts : on ne propose pas de republier ailleurs les paires d'un
+compte que Vinted a fermé.
+⇒ Les trois lecteurs unionnent désormais `vrm_blocked_accounts` dans `off` —
+côté extension via `blockedAccounts()` (dernière valeur connue, `null` sur
+échec), côté app via une lecture dédiée. ⚠️ **`null`/échec ⇒ on n'exclut RIEN** :
+sur-exclure cacherait les paires d'un compte VIVANT sur un simple hoquet — c'est
+le **sens inverse** du cas d'écriture (sous-exclure revient au comportement
+existant, sur-exclure fait perdre). `audit-places.cjs` sert un compte dans
+`vrm_blocked_accounts` **seul** (ni hidden ni blocked) et exige les deux sens —
+**3 rouges** sur le code d'avant (Leboncoin, eBay, app).
+- **Aucune entrée d'`EXT_CAPACITES`** : c'est une correction, l'app ne promet
+  rien de neuf. Extension en **5.81.0**, zip régénéré, `EXT_ATTENDUE` suivie.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
