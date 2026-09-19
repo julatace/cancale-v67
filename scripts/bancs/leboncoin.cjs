@@ -570,7 +570,7 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
       document.querySelector('main').innerHTML =
         '<label for="pr">Prix</label><input id="pr" name="price" type="text">'
         + '<span id="lbe">État</span><div role="combobox" aria-labelledby="lbe" aria-controls="le">Très bon état</div>'
-        + '<div id="le" role="listbox"><div role="option">Neuf</div><div role="option">Très bon état</div></div>'
+        + '<div id="le" role="listbox"><div role="option" data-value="5">Neuf</div><div role="option" data-value="3">Très bon état</div></div>'
         + '<input name="photos" type="file">';
     });
     await p7.waitForTimeout(1800);
@@ -587,6 +587,13 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
     dit(!/valider votre recherche/i.test(lbl) && /très bon état/i.test(lbl),
       'la barre de recherche n’est pas comptée comme une liste du dépôt', `listes : « ${lbl} »`);
     dit(!!propre.ver, 'et l’étape porte la VERSION de l’extension qui l’a écrite', `ver ${propre.ver || '—'}`);
+    // ⚠️ Le CODE de chaque option (jamais capté avant) : Leboncoin soumet un
+    //    code, pas le libellé. Sans lui la passe qui remplira Pointure/État ne
+    //    peut que deviner. On relève le code réel de SA page.
+    const codes = (propre.selects || []).flatMap((x) => x.optcodes || []);
+    dit(codes.some((o) => o.t === 'Très bon état' && o.v === '3'),
+      'et le CODE de chaque option est relevé (pas seulement son libellé)',
+      `optcodes : ${codes.map((o) => o.t + '=' + (o.v || '∅')).join(', ') || 'aucun'}`);
 
     // La page de FIN n'est pas une étape : elle a fourni deux des trois étapes
     // enregistrées chez lui, et rien d'utilisable.
