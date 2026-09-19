@@ -2953,15 +2953,39 @@ compte, ni un `slice` : l'extension envoie déjà **toutes** les photos qu'elle 
   jour où une annonce Vinted aura **plus de 10** photos. *Ne pas lui promettre
   qu'il verra plus de photos : la limite d'aujourd'hui est ce que porte SON
   annonce, pas le code.*
-- ⚠️ **Ce qui reste ouvert, et à lui de trancher** : si une de ses annonces
-  Vinted a **vraiment** plus de 6 photos et que Leboncoin n'en montre que 5-6,
-  alors c'est la **capture** de la page Vinted qui en manque (à remesurer sur SA
-  page — je ne peux pas atteindre Vinted d'ici). Aujourd'hui rien ne le prouve :
-  ses annonces captées ont ≤ 6. **Le geste utile : me dire combien de photos
-  porte l'annonce Vinted qu'il regarde.**
 - **Aucune entrée d'`EXT_CAPACITES`** : le pont `photoBytes` respecte déjà `max`
-  (`photosEnOctets(urls, max)`), rien de neuf n'est promis à l'app. Extension en
-  **5.86.0**, zip régénéré, `EXT_ATTENDUE` suivie.
+  (`photosEnOctets(urls, max)`), rien de neuf n'est promis à l'app.
+
+### ⚠️⚠️ ET C'ÉTAIT BIEN LA CAPTURE — LE CARROUSEL VINTED CHARGE SES IMAGES AU FUR ET À MESURE
+Julien, 19 sept. : « c'est peut-être parce que la capture Vinted ne prend que
+5 photos ». **Il avait raison.** `readListingDetailFromPage` (dans
+`vinted-panel.js`) lisait les photos **du DOM**, et seulement `img[src*="vinted.net"]`.
+Or le carrousel Vinted est **lazy** : les slides pas encore affichées n'ont pas
+de `src` (leur URL vit dans `srcset`/`data-src`), donc elles étaient **perdues**.
+D'où le plafond mesuré à 6 (les seules chargées d'emblée), qui n'a **rien** à
+voir avec le type de compte.
+⇒ `ajoute(u)` collecte désormais `src`, `srcset`, `data-srcset`, `data-src` des
+`<img>` **et** les `<source srcset>`, toujours filtré au même domaine + grand
+format (`f800|f1200|tc`). Et il **dédoublonne par IDENTITÉ de photo**
+(`cle` = URL sans la query ni le segment de format) : une même photo vue en f800
+**et** f1200 ne compte qu'une fois — sinon Leboncoin recevrait un doublon (défaut
+que l'ancien code avait **aussi** : il ajoutait la photo principale deux fois).
+- ⚠️ **§4.10 : cette fonction n'avait jamais tourné hors de Chrome.**
+  `scripts/bancs/photos.cjs` extrait la VRAIE fonction (AVANT = `HEAD`, APRÈS =
+  arbre) et les exécute sur **le même** carrousel synthétique où seules 5 images
+  ont un `src` et le reste vit en lazy : **AVANT perd les 3 slides lazy et
+  double la principale ; APRÈS capte les 9, sans doublon.** C'est un vrai
+  avant/après (§6.1), pas « la fonction n'existait pas ».
+- ⚠️⚠️ **CE QUE JE NE PEUX PAS PROUVER D'ICI, ET QUI RESTE À MESURER** : que le
+  DOM réel de Vinted expose bien ses slides lazy dans `srcset`/`data-src`. Le
+  banc prouve que **si** elles y sont, on les prend ; il ne prouve pas qu'elles
+  y sont (je n'atteins pas Vinted, 403). *Le seul verdict : qu'il rouvre, avec
+  la 5.87, une annonce qui a plus de 6 photos sur Vinted — puis on relit
+  `vinted_item_details` et on compte.* Si ça reste à 6, les photos vivent dans
+  la DONNÉE de la page (JSON embarqué), pas le DOM, et c'est la prochaine passe :
+  faire mesurer par ce qui y a accès, comme le formulaire eBay.
+- **Aucune entrée d'`EXT_CAPACITES`** : c'est une correction de capture, pas une
+  promesse neuve. Extension en **5.87.0**, zip régénéré, `EXT_ATTENDUE` suivie.
 
 ### ✅ LE DÉPÔT DU 17 SEPT. A ÉTÉ CAPTÉ — `optcodes` RÉELS, ET LEBONCOIN AUTO-REMPLIT 4/6 ATTRIBUTS
 Mesuré sur sa vraie base après son dépôt manuel (extension à jour) : la capture
