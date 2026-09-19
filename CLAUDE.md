@@ -2919,27 +2919,46 @@ titre du README.
 - Extension en **5.85.0**, zip régénéré, `EXT_ATTENDUE` suivie. Aucune entrée
   d'`EXT_CAPACITES` : rien de neuf n'est promis.
 
-### ⚠️ « IL N'Y A QUE 5 PHOTOS » — LE PLAFOND EST CELUI DU COMPTE, PAS DU CODE
+### ⚠️⚠️ « IL N'Y A QUE 5 PHOTOS » — ET MA « MESURE » DE COMPTE PRO ÉTAIT UN FRAGMENT D'URL
 Julien, 19 sept. : « sur les comptes **particuliers** tu peux en mettre jusqu'à
 **15** ; c'est sur les comptes **pro** où tu peux en mettre que **5** si tu
 n'achètes pas le pack. Je veux toutes les photos de l'annonce Vinted sur
-Leboncoin si c'est du compte particulier. »
-**Mesuré d'abord — et ce n'était PAS un défaut chez lui aujourd'hui** : son
-compte Leboncoin est **PRO** (`online_store_id`), donc Leboncoin plafonne à 5 de
-son côté ; et ses annonces Vinted portent **au plus 6 photos** (mesuré sur son
-dépôt du 17 sept. : 6 envoyées, 5 gardées, aucune erreur, l'annonce est partie).
-Le « 5 » qu'il voyait est donc la limite de Leboncoin, pas un `slice` de
-l'extension.
-⇒ `attacherPhotos` **envoie jusqu'à 15** (`slice(0,15)`, `photoBytes … max:15`)
-et **laisse Leboncoin plafonner selon le compte**. C'est mesuré : sur-fournir est
-sans risque (Leboncoin garde les premières et ignore le surplus, sans erreur),
-et ça évite une **détection fragile du type de compte** (particulier vs pro) sur
-une page de dépôt qu'on ne voit pas d'ici — *on ne devine pas ce qu'on peut
-laisser la plateforme trancher.*
-- ⚠️ **Aucun changement visible pour lui aujourd'hui** : compte pro + ≤ 6 photos
-  ⇒ toujours 5 affichées. C'est une correction **latente** — le jour où il
-  publie depuis un compte **particulier** avec une paire à 8-15 photos, elles
-  partent toutes. Ne pas lui promettre un effet immédiat : lui dire la vérité.
+Leboncoin si c'est du compte particulier. » Puis, quand je lui ai répondu « ton
+compte est pro » : **« non là c'est compte particulier »**. Il a raison, il
+possède le compte.
+⚠️⚠️ **MON PREMIER JET AFFIRMAIT « son compte Leboncoin est PRO
+(`online_store_id`) » — c'était FAUX, et c'est le piège §6 mot pour mot.** En
+remesurant : `lbc_accounts` est **vide** (`[]`) — le type de compte n'a **jamais
+été capté** — et `online_store_id` n'était qu'un **bout de chemin d'URL** dans
+`lbc_recon.paths` (`.../online_store_id"`), pas un champ de compte. J'ai lu le
+mauvais champ et j'en ai tiré une affirmation, exactement ce que ce dossier
+interdit. *Avant d'affirmer un fait sur ses données, vérifier le NOM et la FORME
+du champ ; un fragment de chaîne n'est pas une mesure.*
+**Ce qui EST mesuré, sur sa vraie base** : ses annonces Vinted captées portent
+**au plus 6 photos** (`vinted_item_details`, 118 objets : `1→14 · 3→1 · 4→5 ·
+5→38 · 6→60`, **aucune au-dessus de 6**). Et **ce n'est pas une troncature de
+notre côté** : la capture garde jusqu'à **20** photos (`background.js:2610`,
+`slice(0,20)`), le `slice(0,6)` de `lbc.js:489` ne concerne que les **vignettes
+d'aperçu** du panneau. Donc ses paires ont réellement ≤ 6 photos — cohérent avec
+« 5 en moyenne » mesuré le 12 sept.
+⇒ **Le « 5 » qu'il voit = le nombre réel de photos de CETTE annonce-là** (38 de
+ses annonces en ont exactement 5, 60 en ont 6). Ce n'est ni un plafond de
+compte, ni un `slice` : l'extension envoie déjà **toutes** les photos qu'elle a.
+- `attacherPhotos` **envoie jusqu'à 15** (`slice(0,15)`, `photoBytes … max:15`,
+  contre 10 avant). C'est **correct pour un compte particulier** (15 autorisés),
+  et sans risque : sur-fournir ne fait que laisser Leboncoin ignorer le surplus.
+- ⚠️ **Mais AUCUN effet visible aujourd'hui, quel que soit le type de compte** :
+  l'ancien plafond était **10**, ses annonces portent **≤ 6** photos → toutes
+  passaient déjà. Le « 15 » est une correction **latente**, qui ne portera que le
+  jour où une annonce Vinted aura **plus de 10** photos. *Ne pas lui promettre
+  qu'il verra plus de photos : la limite d'aujourd'hui est ce que porte SON
+  annonce, pas le code.*
+- ⚠️ **Ce qui reste ouvert, et à lui de trancher** : si une de ses annonces
+  Vinted a **vraiment** plus de 6 photos et que Leboncoin n'en montre que 5-6,
+  alors c'est la **capture** de la page Vinted qui en manque (à remesurer sur SA
+  page — je ne peux pas atteindre Vinted d'ici). Aujourd'hui rien ne le prouve :
+  ses annonces captées ont ≤ 6. **Le geste utile : me dire combien de photos
+  porte l'annonce Vinted qu'il regarde.**
 - **Aucune entrée d'`EXT_CAPACITES`** : le pont `photoBytes` respecte déjà `max`
   (`photosEnOctets(urls, max)`), rien de neuf n'est promis à l'app. Extension en
   **5.86.0**, zip régénéré, `EXT_ATTENDUE` suivie.
