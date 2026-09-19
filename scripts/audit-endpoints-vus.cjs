@@ -100,6 +100,71 @@ const essaie = async (quoi, fn) => { try { return await fn(); } catch (e) { ko++
       JSON.stringify(cles.filter((k) => /data_export/.test(k))));
   });
 
+  // ════════════════════════════════════════════════════════════════════════
+  //  ⚠️⚠️ ET LE COMPTE VISÉ EST DANS LA LISTE NOIRE — C'EST LUI QUI L'A VU.
+  //  Julien, 19 septembre : « je crois que ça ne va pas marcher car le compte
+  //  shop cancale devait être ignoré par l'extension ». Il a raison de le
+  //  demander : `shop_cancale` (uid 199082413) est dans `vrm_blocked_accounts`,
+  //  la liste des comptes supprimés DÉFINITIVEMENT, et `captureDomain` refuse
+  //  d'en enregistrer les jetons — c'est ce qui l'empêchait de « revenir tout
+  //  le temps ».
+  //  ⇒ Mesuré ici : cette liste ne porte QUE sur les jetons. Le mouchard, lui,
+  //    ne lit que le cookie de session (`activeAccountId`) et n'a aucune raison
+  //    de se taire — un chemin d'API n'est pas un jeton, et une ligne
+  //    `harvest_{uid}_seen_urls` ne fait PAS réapparaître le compte dans l'app
+  //    (elle lit la table `vinted_accounts`, jamais `app_data`).
+  //  ⚠️ Ce contrôle est là pour que personne ne « complète » la liste noire un
+  //    jour en l'étendant au diagnostic : ce serait rendre muet exactement le
+  //    compte qu'on cherche à documenter.
+  console.log('\n── Le compte est dans la liste noire : le mouchard doit quand même relever');
+  await essaie('un compte supprimé définitivement', async () => {
+    const vm = require('vm');
+    const BG = fs.readFileSync(path.join(__dirname, '..', 'vinted-sync-extension', 'background.js'), 'utf8');
+    const UID = '199082413';                       // shop_cancale, tel qu'il est en base
+    const ecrits = [];
+    const dual = (v) => function (...a) { const cb = a[a.length - 1]; if (typeof cb === 'function') { cb(v); return; } return Promise.resolve(v); };
+    const c = {
+      console: { log() {}, warn() {}, error() {} },
+      setTimeout: (f, ms) => setTimeout(f, Math.min(ms || 0, 1)), clearTimeout, setInterval: () => 0, clearInterval,
+      URL, TextDecoder, TextEncoder,
+      btoa: (x) => Buffer.from(x, 'binary').toString('base64'), atob: (x) => Buffer.from(x, 'base64').toString('binary'),
+      chrome: { runtime: { onInstalled: { addListener() {} }, onStartup: { addListener() {} }, onMessage: { addListener() {} }, getManifest: () => ({ version: 'banc' }), lastError: null, id: 'x' },
+        alarms: { create() {}, onAlarm: { addListener() {} } }, cookies: { get: dual(null), getAll: dual([]), onChanged: { addListener() {} } },
+        downloads: { onCreated: { addListener() {} } }, action: { setBadgeText() {}, setBadgeBackgroundColor() {}, setTitle() {} },
+        tabs: { onUpdated: { addListener() {} }, query: dual([]), sendMessage: dual(undefined) },
+        storage: { local: { get: dual({}), set: dual(undefined), remove: dual(undefined) } } },
+      fetch: async (url, opts = {}) => {
+        const u = String(url);
+        const rep = (b, st = 200) => ({ ok: st < 400, status: st, json: async () => JSON.parse(b), text: async () => b, headers: { get: () => 'application/json' } });
+        if ((opts.method || 'GET') === 'POST' && /\/rest\/v1\//.test(u)) { try { ecrits.push(JSON.parse(opts.body || '[]')); } catch (_) {} return rep('[]', 201); }
+        // La VRAIE liste noire de sa base, avec ce compte dedans.
+        if (/id=eq\.vrm_blocked_accounts/.test(u)) return rep(JSON.stringify([{ data: { note: 'shop_cancale supprimé définitivement', uids: [UID], logins: ['shop_cancale'] } }]));
+        if (/id=eq\.vrm_unblocked_accounts/.test(u)) return rep('[]');
+        if (/_seen_urls/.test(u)) return rep(JSON.stringify([{ data: { uid: UID, paths: ['/api/v2/inbox'], reponses: {} } }]));
+        return rep('[]');
+      },
+    };
+    c.self = c; c.globalThis = c; c.window = undefined;
+    vm.createContext(c); vm.runInContext(BG, c, { filename: 'background.js' });
+    // Il est bien dans la liste noire — on le VÉRIFIE, on ne le suppose pas.
+    const noirs = await c.blockedAccounts();
+    dit(!!(noirs && noirs.has(UID)), 'le compte est bien dans la liste des supprimés définitivement',
+      noirs ? JSON.stringify([...noirs]) : 'liste non lue');
+    // Et malgré ça, le mouchard écrit.
+    c.activeAccountId = async () => UID;
+    await c.storeSeenUrls('www.vinted.fr', ['/parametres/donnees-personnelles'], { 'POST /api/v2/data_export': { st: 403, n: 1 } });
+    const ligne = (ecrits.flat() || []).find((e) => e && e.id === `harvest_${UID}_seen_urls`);
+    dit(!!ligne, 'le relevé est quand même écrit pour ce compte — la liste noire ne porte que sur les JETONS',
+      ligne ? '' : 'RIEN écrit : le diagnostic serait muet sur le compte qu’on cherche à documenter');
+    dit(!!(ligne && ligne.data && ligne.data.reponses && ligne.data.reponses['POST /api/v2/data_export']),
+      'et il porte le statut de la requête d’export', JSON.stringify(ligne && ligne.data && ligne.data.reponses));
+    // ⚠️ L'AUTRE MOITIÉ : les JETONS, eux, ne doivent toujours PAS être écrits.
+    //    Sans ce contrôle, « faire marcher le diagnostic » pourrait ressusciter
+    //    le compte — c'est exactement ce qu'il ne veut pas.
+    const jetons = (ecrits.flat() || []).some((e) => e && (e.vinted_user_id || e.access_token));
+    dit(!jetons, 'et AUCUN jeton n’est enregistré : le compte ne réapparaît pas dans l’app');
+  });
+
   await ctx.close(); await nav.close();
   console.log(`\n${ko ? '❌ ' + ko + ' contrôle(s) au rouge.' : `✅ ${ok} contrôles : son clic me dira l’endpoint ET si le serveur refuse.`}`);
   process.exit(ko ? 1 : 0);

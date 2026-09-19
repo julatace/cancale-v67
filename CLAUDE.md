@@ -2613,7 +2613,7 @@ ou de compte — pas les autres (§7 vaut aussi pour un diagnostic).
   fusionne, et **ne réécrit pas sur une lecture ratée** — `audit-fusion.cjs`
   porte le cas (la quinzième ligne de cette famille).
 - `scripts/audit-endpoints-vus.cjs` **charge le vrai `inject.js` dans une vraie
-  page** (§4.10) et regarde ce qu'il ENVOIE : **9 contrôles, 5 rouges** sur le
+  page** (§4.10) et regarde ce qu'il ENVOIE : **13 contrôles**, dont **5 rouges** sur le
   code d'avant — dont « et avec son CODE DE RÉPONSE : `[]` ».
 - **Aucune entrée d'`EXT_CAPACITES`** : l'app ne promet rien de neuf, c'est une
   mesure. Extension en **5.78.0**, zip régénéré, `EXT_ATTENDUE` suivie.
@@ -2631,6 +2631,31 @@ ou de compte — pas les autres (§7 vaut aussi pour un diagnostic).
   ⚠️ **L'adresse du DPO n'est pas affirmée** : je n'ai pas pu la lire depuis une
   source primaire, le document renvoie donc à la page de la CNIL qui la porte
   (`cnil.fr/fr/cnil-direct/question/1991`). *Mieux vaut un blanc qu'un faux.*
+
+⚠️⚠️ **ET C'EST LUI QUI A VU LE TROU : « le compte shop cancale devait être
+ignoré par l'extension ».** Il avait raison de demander — `shop_cancale`
+(uid **199082413**) est dans `vrm_blocked_accounts`, la liste des comptes
+supprimés DÉFINITIVEMENT, et c'est elle qui l'empêchait de « revenir tout le
+temps ». **Mesuré, en exécutant le vrai `background.js`** : cette liste ne porte
+que sur `captureDomain`, c'est-à-dire sur les **JETONS**. Ni `storeSeenUrls` ni
+`storeHarvest` ne la consultent — ils ne lisent que le cookie de session
+(`activeAccountId`). Donc le relevé partira, et **le compte ne réapparaît pas
+dans l'app** : elle lit ses comptes dans la table `vinted_accounts`, jamais dans
+`app_data`. Vérifié aussi : `content.js` tourne sur **toutes** les pages Vinted
+quel que soit le compte connecté.
+- `audit-endpoints-vus.cjs` porte les deux moitiés : le relevé **EST** écrit pour
+  un compte de la liste noire, **et aucun jeton ne l'est**. Sans la seconde,
+  « faire marcher le diagnostic » pourrait ressusciter le compte — exactement ce
+  qu'il ne veut pas. Et sans la première, quelqu'un « compléterait » la liste
+  noire un jour en l'étendant au diagnostic, rendant muet le seul compte qu'on
+  cherche à documenter.
+- ⚠️ **EFFET DE BORD À LUI ANNONCER, PAS À DÉCIDER POUR LUI** : comme
+  `storeHarvest` n'est pas filtré non plus, passer sur `shop_cancale` va aussi
+  **remoissonner ses annonces, ventes et messages** dans `harvest_199082413_*`.
+  C'est une LECTURE sur ses propres données (§3 l'autorise), et ça peut lui
+  servir pour récupérer le compte — mais des annonces d'un compte écarté peuvent
+  ressortir dans certaines listes, comme le fait déjà l'orphelin `3170782324`.
+  *Je n'invente pas une règle de plus sans qu'il ait tranché.*
 
 ⚠️⚠️ **ET J'AI DÉTRUIT MON PROPRE TRAVAIL EN VOULANT REBASER.** La recette de
 rebase de ce dossier (`git checkout -B branche origin/main && git checkout <sha>
