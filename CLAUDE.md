@@ -2759,6 +2759,51 @@ surveillance, `fillNowForce` le « Re-remplir »), chacun avec le même défaut 
   on branche à la prochaine passe, pas avant d'avoir relié un `_r_XX_` à son
   libellé.
 
+### ⚠️⚠️ REMESURÉ LE 19 SEPTEMBRE (plus tard) : LE PONT `_r_XX_` → LIBELLÉ EXISTE, ET `choisirListe` EST MORT SUR LE VRAI FORMULAIRE
+Le point ci-dessus (« les `_r_XX_` n'ont pas de libellé ») **est périmé** — mesuré
+sur sa vraie base ce soir. L'étape attributs de `lbc_recon.etapes` (captée le
+17 septembre par une **5.75.0**, donc déjà présente quand j'écrivais le contraire)
+porte pour ses **six** champs le libellé **ET** la liste d'options :
+| champ (`_r_XX_`) | libellé | options captées |
+|---|---|---|
+| `_r_15_` | **Univers*** | Femme · Homme · Enfant |
+| `_r_1e_` | **Type de chaussures** | Baskets & Sneakers · Mocassins · Bottines… (13) |
+| `_r_21_` | **Pointure*** | 16 · 16,5 · … (25) |
+| `_r_4c_` | **Marque** | A Bathing Ape · … · Adidas… (**11 — liste filtrée**, pas exhaustive) |
+| `_r_4i_` | **Couleur** | Blanc · Bleu / Ciel · Gris / Anthracite… (21) |
+| `_r_5d_` | **État** | Neuf avec étiquette · Très bon état · Bon état · État satisfaisant (5) |
+- ⚠️⚠️ **ET `choisirListe` NE REMPLIT RIEN SUR CETTE ÉTAPE.** Les six champs sont
+  **`tag:"input"` / `forme:"composant"`** — des listes React, **zéro `<select>`
+  natif**. Or `choisirListe` fait `document.querySelectorAll('select')` : il
+  trouve **0 élément** et remplit donc **0 attribut**. C'est mot pour mot
+  « ça ne met pas la catégorie ni le reste » (13 sept.). Le bloc ci-dessus qui
+  affirme « la catégorie et l'état sont choisis / les listes ne sont pas des
+  `input` » **décrit une réalité qui n'existe pas sur son formulaire** — le
+  bandeau, lui, reste honnête (il compte `n`, et `n` n'inclut jamais ces
+  champs). *Une suppression « terminée » se vérifie sur ce qui RESTE* :
+  `choisirListe` **reste** (une autre étape/variante peut porter un vrai
+  `<select>`, §4.11), mais il ne faut pas croire qu'il fait ce travail.
+- ⚠️⚠️ **CE QU'ON NE PEUT PAS FAIRE AUJOURD'HUI, ET POURQUOI** : la valeur
+  **soumise** par Leboncoin est un **CODE** (`{value,label}`, `fforms`/`fdata`),
+  pas le libellé. Poser le texte « Nike » dans un composant React ne pose **pas**
+  le code — au mieux rien ne s'enregistre, au pire l'annonce part avec un
+  attribut cassé. Écrire un remplisseur de combobox **avant** d'avoir relié
+  chaque option à son code serait le défaut le plus coûteux du projet. `fforms`
+  (**61 798 car.**) et `fdata` (**808 878 car.**) sont **entiers** dans
+  `lbc_catalogue` (`coupe:false`) : la matière du mapping est là, **rien n'est
+  encore analysé**. **Ne pas écrire le clic « Publier ».**
+- **Ce qui sera mappable avec CERTITUDE** quand on branchera : **Pointure**
+  (← `ad.taille`) et **État** (← condition, libellés exacts ci-dessus). **Marque**
+  est une liste **filtrée** (11 options = résultats de recherche, pas le
+  catalogue) → passe par le code, pas par le libellé. **Univers / Type / Couleur**
+  ne se **devinent pas** depuis ses données (*mieux vaut un blanc qu'un faux*) —
+  laissés vides, il les choisit.
+- **Son extension installée est en `5.80.0`** (`panel_diag_capture.ver`, verAt
+  19 sept.) — **derrière la 5.82.0 livrée**. Le correctif du prix en centimes
+  (5.82) et l'exclusion des comptes supprimés (5.81) **ne tournent pas encore
+  chez lui** ; l'app le dit déjà (diagnostic de version). *Le premier geste
+  reste : remplacer le dossier de l'extension par le zip livré.*
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
