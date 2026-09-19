@@ -160,6 +160,16 @@
       // « 403 à chaque essai » ne se lisent pas pareil.
       if (!av || av.st !== Number(status)) seenDirty = true;
       seenRep[cle] = { st: Number(status), n: ((av && av.n) || 0) + 1, at: new Date().toISOString() };
+      // ⚠️⚠️ UNE PAGE QUI REBONDIT N'ATTEINT JAMAIS LE VIDAGE À 5 s.
+      // Mesuré le 19 septembre : il a cliqué sur « télécharger mes infos » avec
+      // son compte bloqué, la page l'a renvoyé aussitôt sur « compte bloqué »,
+      // et le relevé de CETTE page n'est jamais parti — seuls les chemins de la
+      // page d'avant (son dressing) ont été rangés. `pagehide` ne suffit pas :
+      // un `sendMessage` depuis une page qui se décharge part rarement.
+      // ⇒ Ce qui est INTÉRESSANT s'envoie sur-le-champ : un appel qui ÉCHOUE
+      //   (≥ 400), ou un appel sur un chemin de compte/export. C'est justement
+      //   le cas où la page ne nous laisse pas le temps.
+      try { if (Number(status) >= 400 || PAGE_A_NOTER.test(p)) setTimeout(flushSeen, 0); } catch (_) {}
     } catch (_) {}
   };
   const flushSeen = () => {

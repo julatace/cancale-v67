@@ -2632,6 +2632,41 @@ ou de compte — pas les autres (§7 vaut aussi pour un diagnostic).
   source primaire, le document renvoie donc à la page de la CNIL qui la porte
   (`cnil.fr/fr/cnil-direct/question/1991`). *Mieux vaut un blanc qu'un faux.*
 
+⚠️⚠️⚠️ **IL A CLIQUÉ, ET LE RELEVÉ EST ARRIVÉ VIDE — DEUX DÉFAUTS, TOUS DEUX DE MOI.**
+Mesuré dans la minute : `harvest_199082413_seen_urls` écrite par la **5.79.0**,
+donc la liste noire ne bloquait bien rien (c'était juste). Mais **0 réponse**, et
+les 5 chemins relevés étaient ceux de son **dressing**, pas de la page de
+réglages.
+
+1. ⚠️⚠️ **`content.js` RELAYAIT UNE LISTE DE CHAMPS FIXE.** `inject.js` envoyait
+   bien `reponses` ; le relais recopiait `kind, type, id, url, method, body,
+   csrf, b64, paths` — **et rien d'autre**. La donnée mourait **entre deux
+   fichiers qui avaient tous les deux raison**. C'est `storeLbcRecon` (qui
+   rangeait clé par clé et perdait `etapes`) **une couche plus tôt**.
+   ⇒ Le relais recopie désormais **tout** ce que la page envoie, sauf son
+   étiquette ; `from` et `domain` restent posés par NOUS (la page ne les dicte
+   pas). *Un raccord qui énumère ne transporte que ce qu'on a pensé à écrire.*
+   ⚠️ **ET MON BANC NE POUVAIT PAS LE VOIR** : il lisait le `postMessage` **dans
+   la page**. Il prouvait donc que `inject.js` ENVOIE, jamais que ça ARRIVE.
+   *Un contrôle qui s'arrête au message prouve le message, jamais la donnée* —
+   le dossier l'écrivait déjà pour `storeLbcRecon`, et j'y suis retombé. Le banc
+   charge maintenant le **VRAI `content.js`** et juge ce qui en sort.
+2. ⚠️⚠️ **LE VIDAGE À 5 s NE LAISSE AUCUNE CHANCE À UNE PAGE QUI REBONDIT.** Il
+   clique, Vinted le renvoie **aussitôt** sur « compte bloqué » : la page est
+   déchargée bien avant les 5 s, et `pagehide` ne sauve rien (un `sendMessage`
+   depuis une page qui se décharge part rarement). C'est **exactement** le cas
+   qu'on cherche à mesurer, et c'était le seul qu'on ne pouvait pas voir.
+   ⇒ Ce qui est intéressant part **sur-le-champ** : tout appel qui **échoue**
+   (≥ 400) ou tout appel sur un chemin de compte/export déclenche le vidage
+   immédiatement.
+- `audit-endpoints-vus.cjs` est à **18 contrôles**, et les deux nouveaux défauts
+  sortent **7 rouges** sur la 5.79.0 — dont « les codes de réponse survivent au
+  relais : `[]` » et « rien relayé après 800 ms ».
+- ⚠️ **Le même motif dort dans `lbc.js`** : son relais énumère aussi, kind par
+  kind. Complet aujourd'hui, mais c'est la même fragilité — à recopier en entier
+  le jour où on y touche.
+- Extension en **5.80.0**, zip régénéré, `EXT_ATTENDUE` suivie.
+
 ⚠️⚠️ **ET C'EST LUI QUI A VU LE TROU : « le compte shop cancale devait être
 ignoré par l'extension ».** Il avait raison de demander — `shop_cancale`
 (uid **199082413**) est dans `vrm_blocked_accounts`, la liste des comptes

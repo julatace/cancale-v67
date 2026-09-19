@@ -29,6 +29,7 @@
 const { chromium } = require(require('path').join(__dirname, '..', 'node_modules', 'playwright'));
 const fs = require('fs'), path = require('path');
 const SRC = fs.readFileSync(path.join(__dirname, '..', 'vinted-sync-extension', 'inject.js'), 'utf8');
+const RELAIS = fs.readFileSync(path.join(__dirname, '..', 'vinted-sync-extension', 'content.js'), 'utf8');
 
 let ko = 0, ok = 0;
 const dit = (bon, quoi, det) => {
@@ -58,7 +59,22 @@ const essaie = async (quoi, fn) => { try { return await fn(); } catch (e) { ko++
       if (d && d.kind === 'seen_urls') window.__vus.push(d);
     });
   });
+  // ⚠️⚠️ ON TRAVERSE `content.js`. Mon premier jet lisait le `postMessage` DANS
+  //    la page : il prouvait donc que `inject.js` ENVOIE `reponses`, et pas du
+  //    tout qu'elles ARRIVENT. Or `content.js` recopiait une liste de champs
+  //    FIXE et jetait `reponses` en silence — la donnée mourait entre les deux.
+  //    *Un contrôle qui s'arrête au message prouve le message, jamais la
+  //    donnée* : le dossier le disait déjà pour `storeLbcRecon`, et j'y suis
+  //    retombé. Le banc charge maintenant le VRAI relais.
+  await pg.evaluate(() => {
+    window.__recu = [];
+    window.chrome = { runtime: {
+      getURL: (f) => 'about:blank#' + f,          // le banc injecte inject.js lui-même
+      sendMessage: (m) => { window.__recu.push(m); },
+    } };
+  });
   await pg.addScriptTag({ content: SRC });
+  await pg.addScriptTag({ content: RELAIS });
 
   await essaie('le clic sur le bouton', async () => {
     // Ce que fait le bouton : une requête d'export, plus un appel banal à côté.
@@ -68,10 +84,31 @@ const essaie = async (quoi, fn) => { try { return await fn(); } catch (e) { ko++
       // et en XHR, parce que Vinted utilise les deux
       await new Promise((res) => { const x = new XMLHttpRequest(); x.open('POST', '/api/v2/data_export/2214455667'); x.onloadend = res; x.onerror = res; x.send('rien'); });
     });
+    // ⚠️⚠️ LE DÉLAI EST LE DÉFAUT QUI A FAIT ÉCHOUER SON PREMIER ESSAI.
+    //    Il a cliqué, la page l'a renvoyé aussitôt sur « compte bloqué », et le
+    //    relevé de CETTE page n'est jamais parti : le vidage n'avait lieu qu'à
+    //    5 s. On exige donc qu'un appel qui ÉCHOUE parte SANS ATTENDRE — c'est
+    //    exactement le cas où la page ne nous laisse pas le temps.
+    await pg.waitForTimeout(800);
+    const tot = (await pg.evaluate(() => window.__recu || [])).filter((m) => m && m.kind === 'seen_urls');
+    dit(tot.length > 0, 'un appel qui ÉCHOUE part TOUT DE SUITE, sans attendre les 5 s',
+      tot.length ? '' : 'rien relayé après 800 ms — une page qui rebondit ne laisserait rien');
+    dit(!!(tot.length && tot.some((m) => m.reponses && Object.keys(m.reponses).some((k) => /data_export/.test(k)))),
+      'et cet envoi immédiat porte déjà la requête d’export',
+      JSON.stringify(tot.map((m) => Object.keys(m.reponses || {}))));
     await pg.waitForTimeout(6000);
     const vus = await pg.evaluate(() => window.__vus || []);
     dit(vus.length > 0, 'le mouchard envoie son relevé', `${vus.length} envoi(s)`);
-    const dernier = vus[vus.length - 1] || {};
+    // Ce que le RELAIS a réellement transmis au service worker.
+    const recu = (await pg.evaluate(() => window.__recu || [])).filter((m) => m && m.kind === 'seen_urls');
+    dit(recu.length > 0, 'et le relevé TRAVERSE content.js jusqu’au background', `${recu.length} message(s) relayé(s)`);
+    const arrive = recu[recu.length - 1] || {};
+    dit(arrive.reponses && Object.keys(arrive.reponses).length > 0,
+      'les CODES DE RÉPONSE survivent au relais (ils étaient jetés là)',
+      JSON.stringify(Object.keys(arrive.reponses || {})));
+    dit(arrive.from === 'cancale-content' && !!arrive.domain,
+      'et le relais pose lui-même l’expéditeur et le domaine (la page ne les dicte pas)');
+    const dernier = arrive.paths ? arrive : (vus[vus.length - 1] || {});
     const chemins = dernier.paths || [];
     const rep = dernier.reponses || {};
 
