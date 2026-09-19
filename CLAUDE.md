@@ -2494,6 +2494,84 @@ nouvelle extension. Mais `fdata` est arrivé **coupé à 400 000** — le drapea
 réécrite que si le corps change, donc ça ne coûte qu'une fois. `fforms` n'est
 toujours pas arrivé.
 
+### ⚠️⚠️⚠️ « QU'ELLE RÉPONDE À MA PLACE AUX MESSAGES » — ET 2 SUR 5 N'ÉTAIENT PAS DES ACHETEURS
+Demande de Julien, 18 septembre : « je veux également que tu puisses répondre à
+ma place au message Vinted ». Mis devant le risque, il a tranché : **« Tout, elle
+répond à tout »**. C'est SA décision, elle n'est pas à re-négocier.
+
+**MESURÉ AVANT DE BRANCHER QUOI QUE CE SOIT**, sur ses **32 conversations non
+lues** du 19 septembre :
+
+| ce qu'elles sont | combien |
+|---|---|
+| aucune conversation captée (rien à lire) | **17** |
+| captée, mais aucun message de l'acheteur dedans | **9** |
+| `allow_reply: false` — Vinted refuse la réponse | **1** |
+| ⚠️ un échange où c'est **LUI l'acheteur** | **1** |
+| une vraie question posée sur une de SES annonces | **3** |
+
+⚠️⚠️ **LE DÉFAUT QUE LA MESURE A ÉVITÉ.** « Conversation non lue = un acheteur qui
+demande » est une **RESSEMBLANCE** (§5), et elle se trompait **2 fois sur 5** des
+conversations lisibles : « *Trainers are in post, thanks for buying* » et
+« *juste pour vous dire que j'envoie demain, le colis est prêt* » sont des
+**vendeurs qui LUI expédient**. Or `api/ai` répond en VENDEUR (sa consigne dit
+mot pour mot « on te donne le message d'un ACHETEUR ») : elle aurait envoyé, **en
+son nom**, une réponse à côté de la plaque à quelqu'un qui lui poste un colis.
+⇒ L'identité est l'**ARTICLE** : `transaction.item_id` ∈ ses annonces captées
+(`sesAnnonces`). Mesuré : les 3 vraies questions passent, les 2 conversations où
+il achète sont écartées, **0 erreur**.
+⚠️ **Deux autres pistes essayées et ÉCARTÉES, mesurées** : `transaction.user_side`
+est **`null` sur les 1 030 conversations** captées ; et l'identifiant de
+participant déduit de `harvest_*_txn_*` ne marche pas — ces lignes portent AUSSI
+ses **achats**, donc `seller_id` y varie (162 fois l'un, une fois chacun des
+autres) : le prendre « le plus fréquent » serait un rapprochement par
+**fréquence**. Ancré sur l'article il n'apportait d'ailleurs **rien** (0
+conversation de plus). *Chercher l'identité, pas aménager la ressemblance.*
+
+**Les garde-fous, qui sont ANTI-BLOCAGE et pas des scrupules** (§3 : `vanessa5723`
+a été bloqué, neuf comptes sont son gagne-pain) : éteint par défaut
+(`vinted_repond_auto`), uniquement le compte de l'onglet (`garde`), **3 réponses
+par visite**, plafond horaire, une requête à la fois, et **jamais deux fois le
+même message** — l'identité est l'`id` du message de l'acheteur, jamais son texte
+ni sa date. Rien sous **55 de confiance** de l'IA, rien sur une réponse vide,
+rien si l'IA est injoignable : *mieux vaut un blanc qu'un faux*, et un silence
+d'une heure coûte moins qu'une phrase inventée sur un prix.
+
+⚠️⚠️ **ET « ELLE RÉPOND À TOUT » NE DOIT PAS S'AFFICHER COMME UN FAIT.** 3 sur 32,
+c'est le chiffre d'aujourd'hui : un total partiel présenté comme complet est pire
+qu'un total absent (§5). L'extension **publie son bilan**
+(`panel_msg_repondus.bilan` — une clé réservée, jamais confondue avec un envoi) et
+le panneau de Réglages écrit **les deux nombres** et **les causes** (« 1 où c'est
+toi qui achètes », « 17 dont l'extension n'a pas encore lu l'échange »…). Une
+cause à **zéro** n'est pas écrite — ce serait du bruit permanent.
+- **Il peut relire ce qui est parti en son nom** : le texte exact, la personne
+  nommée, la paire. Un message envoyé à sa place qu'il ne peut pas relire serait
+  le pire de tout — « un colis caché est un colis perdu » appliqué à ce qu'on dit
+  à ses acheteurs.
+- ⚠️ **« Pas su » ne vaut pas « allumé », et ne vaut pas « il est le vendeur »** :
+  réglage non lu, annonces non lues, mémo des réponses non lu ⇒ **rien ne part**.
+  Trois lectures, trois refus — le banc sert chacune en 522 séparément (lecture
+  KO, écriture OK : le cas dangereux, jamais la panne totale).
+- `convDernierMessageId(uid, cid)` lit la ligne **du compte** (`id=eq.`, vérifié :
+  une conversation est toujours captée sous le compte de sa boîte) et rend
+  `itemId` + `allowReply` — et rend son objet **même sans message lisible**, pour
+  que le bilan distingue « pas captée » de « captée mais vide » : deux causes,
+  deux phrases.
+- `scripts/audit-repondre.cjs` **EXÉCUTE** le vrai `background.js` dans un `vm` et
+  compte ce qui part chez Vinted : **30 contrôles**. Prouvé en **réaffaiblissant**
+  la règle (identité du vendeur retirée, refus de Vinted ignoré) → **5 rouges**,
+  dont « aucune réponse à quelqu'un qui LUI vend — envois=1 ». *« La fonction
+  n'existait pas avant » n'est pas une preuve.*
+- `scripts/bancs/repondre.cjs` rend le panneau dans **quatre** états et exige que
+  le texte **suive la donnée** (deux jeux de chiffres, deux rendus différents —
+  un texte figé passerait sinon). **7 rouges** sur un rendu réaffaibli à « Elle
+  répond à tout ».
+- `EXT_CAPACITES.repond = '5.77.0'`, extension en **5.77.0**, zip régénéré,
+  `EXT_ATTENDUE` suivie. ⚠️ **Mesuré le 19 septembre : `panel_diag_capture.ver`
+  est ABSENT** alors que `majAt` est de l'heure — son extension est donc encore
+  antérieure à la 5.63. Tant qu'il ne l'a pas remplacée, **rien ne partira**, et
+  l'app le dit (`extSait('repond') === 'retard'`).
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
@@ -2510,6 +2588,7 @@ arrivée** — vérifiée commit par commit sur `manifest.json`, pas devinée.
 | `lbctitre` | `lbcTitre` | **5.55.4** (12 sept.) | « le titre exactement tel qu'il partira sur Leboncoin » |
 | `photoslbc` | `photosEnOctets` | **5.58.0** (13 sept.) | « photos attachées au formulaire Leboncoin, rien sur ton ordinateur » |
 | `photosebay` | `photosPourEbay` | **5.59.0** (13 sept.) | la même promesse, pour eBay |
+| `repond` | `repondreAuxMessages` | **5.77.0** (19 sept.) | « elle répond aux questions posées sur tes annonces » |
 
 ⚠️ **DEUX SEUILS POUR UNE MÊME NOTION, EXPRÈS.** Les photos s'attachent côté
 Leboncoin depuis la 5.58 et côté eBay depuis la 5.59 : un seul seuil aurait
@@ -2653,8 +2732,8 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | outil | quoi |
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
-| `node scripts/audit-*.cjs` | **38 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
-| `scripts/bancs/*.cjs` | les **21 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
+| `node scripts/audit-*.cjs` | **39 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `scripts/bancs/*.cjs` | les **23 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
 **Trois règles de preuve :**
@@ -2921,8 +3000,8 @@ script-là me fait croire à une catastrophe.
 src/App.jsx                     l'app (grep avant de lire — le fichier est énorme)
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
-scripts/audit-*.cjs             les 38 audits
-scripts/bancs/                  les 21 bancs (leur README dit comment les lancer)
+scripts/audit-*.cjs             les 39 audits
+scripts/bancs/                  les 23 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 ```

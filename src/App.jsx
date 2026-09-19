@@ -35,7 +35,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.76.0';
+const EXT_ATTENDUE = '5.77.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -146,7 +146,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 //   releve  `capterReleves`       5.52.0  (5 sept.)   le relevé daté du porte-monnaie
 // `audit-coherence.cjs` vérifie que ces trois fonctions existent toujours dans
 // l'extension : une capacité annoncée mais retirée serait le même mensonge.
-const EXT_CAPACITES = { codes: '5.45.0', offres: '5.38.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0' };
+const EXT_CAPACITES = { codes: '5.45.0', offres: '5.38.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', repond: '5.77.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -740,7 +740,7 @@ const SYNC_KEYS = [
   'vinted_invoice_settings','vinted_custom_logo','vinted_dark','vinted_stock_vinted',
   'vinted_accounts','vinted_account_labels','vinted_account_emails',
   'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros','vinted_annonces_vendues','vinted_bords_shipped',
-  'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats','vinted_bords_printed','vrm_imprimante','vrm_prenom','vrm_points_relais','vrm_ville','vrm_colis_collected','vrm_colis_collected_at',
+  'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats','vinted_bords_printed','vrm_imprimante','vrm_prenom', 'vinted_repond_auto','vrm_points_relais','vrm_ville','vrm_colis_collected','vrm_colis_collected_at',
   'vinted_txn_link','vinted_sales_hidden','vinted_accounts_hidden','vinted_autonum','vinted_urssaf_freq','vinted_urssaf_taux',
   'vinted_sale_overrides','vinted_bord_links','vinted_pickup_done','vinted_bords_hidden','vinted_ship_done','vinted_pairs_lost','vinted_retours_recus','vinted_retours_dismissed',
   'vinted_offvinted_buys','vinted_buyprice_by_num','vinted_quick_replies','vinted_ca_keep_removed',
@@ -23088,6 +23088,8 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
 
         <PrenomSetting/>
 
+        <RepondreSetting/>
+
         {/* MOYENS DE CONNEXION — on affiche l'état RÉEL de chacun, pas une liste
             décorative. Un bouton Google qui mène à une page d'erreur ne rend
             service à personne : tant que le fournisseur n'est pas branché dans
@@ -23309,6 +23311,114 @@ function PrenomSetting() {
       </div>
       <input value={v} onChange={(e)=>ecrire(e.target.value)} placeholder="Prénom" autoComplete="given-name"
         style={{marginTop:10,width:'100%',boxSizing:'border-box',padding:'10px 12px',borderRadius:8,border:`1px solid ${C.border}`,background:C.bg,color:C.text,fontSize:14,fontFamily:'inherit'}}/>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// RÉPONDRE AUX MESSAGES À SA PLACE — SA DÉCISION DU 19 SEPTEMBRE
+// ══════════════════════════════════════════════════════════════════════════════
+// Je lui ai posé la question avec le risque écrit noir sur blanc, et il a
+// répondu « tout, elle répond à tout ». C'est tranché ; l'interrupteur ne le
+// redemande pas, il dit seulement ce qui se passe et montre ce qui est parti.
+// ⚠️ ÉTEINT PAR DÉFAUT, comme le moteur d'offres (§3) : allumer est un geste,
+//    et un geste se fait une fois, en connaissance.
+// ⚠️⚠️ ET LE DÉFAUT LE PLUS COÛTEUX DU PROJET NE SE REFAIT PAS : c'est
+//    l'EXTENSION qui répond, avec SA version. Sans `extSait('repond')`, l'app
+//    promettrait « elle répond à tes messages » à une extension qui ne sait pas
+//    le faire — pour la septième fois. Trois états, jamais deux.
+function RepondreSetting() {
+  const [on, setOn] = React.useState(() => !!load('vinted_repond_auto', false));
+  const [envois, setEnvois] = React.useState(undefined);   // undefined = en cours · null = pas su
+  const [bilan, setBilan] = React.useState(undefined);
+  const touche = React.useRef(false);
+  React.useEffect(() => onCloudReady(() => {
+    if (touche.current) return;                            // §5.49 : ne remplacer que le vide
+    setOn((p) => p || !!load('vinted_repond_auto', false));
+  }), []);
+  React.useEffect(() => {
+    let vivant = true;
+    (async () => {
+      try {
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_msg_repondus&select=data`, { headers: sbAuth() });
+        if (!vivant) return;
+        // « Rien lu » ne vaut pas « rien envoyé » : trois états.
+        if (!r.ok) { setEnvois(null); setBilan(null); return; }
+        const j = await r.json();
+        const d = (j && j[0] && j[0].data) || {};
+        // `bilan` est une clé réservée : ce n'est pas un envoi, on ne le liste pas.
+        setBilan(d.bilan || null);
+        setEnvois(Object.keys(d).filter((k) => k !== 'bilan').map((k) => d[k]).filter(Boolean)
+          .sort((a, b) => String(b.at || '').localeCompare(String(a.at || ''))));
+      } catch (_) { if (vivant) { setEnvois(null); setBilan(null); } }
+    })();
+    return () => { vivant = false; };
+  }, [on]);
+  const cap = extSait('repond');
+  const basculer = () => { touche.current = true; const n = !on; setOn(n); save('vinted_repond_auto', n); };
+  // ⚠️⚠️ « ELLE RÉPOND À TOUT » SERAIT FAUX, ET MESURÉ FAUX. Sur ses 32
+  //    conversations non lues du 19 septembre, **3** portaient une question
+  //    d'acheteur sur une de SES annonces : les autres n'ont pas de conversation
+  //    captée, pas de message dedans, sont refusées à la réponse par Vinted, ou
+  //    sont des échanges où c'est LUI qui achète. Un total partiel présenté
+  //    comme complet est pire qu'un total absent (§5) : on écrit les deux
+  //    nombres et la RAISON, jamais le seul « à tout ».
+  const ecartees = bilan ? [
+    bilan.pasVendeur ? `${bilan.pasVendeur} où c’est toi qui achètes (là, c’est au vendeur de parler)` : '',
+    bilan.pasCaptee ? `${bilan.pasCaptee} dont l’extension n’a pas encore lu l’échange` : '',
+    bilan.sansMessage ? `${bilan.sansMessage} sans message de l’acheteur à cette heure` : '',
+    bilan.replyRefuse ? `${bilan.replyRefuse} où Vinted n’autorise pas de réponse` : '',
+    bilan.pasSure ? `${bilan.pasSure} où elle n’était pas sûre — elle n’a rien envoyé` : '',
+  ].filter(Boolean) : [];
+  return (
+    <div style={{padding:'13px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
+      <div style={{display:'flex',alignItems:'center',gap:10}}>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontSize:13,fontWeight:600,color:C.text}}>Répondre à mes messages Vinted</div>
+          <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.5}}>
+            À chaque passage sur Vinted, l’extension lit les messages non lus du compte connecté et répond <b>aux questions posées sur tes annonces</b>&nbsp;: <b>3 par visite au maximum</b>, jamais deux fois au même message, et <b>rien du tout si elle n’est pas sûre</b> — un silence coûte moins qu’une réponse fausse sur un prix.
+          </div>
+        </div>
+        <button type="button" onClick={basculer} aria-pressed={on}
+          style={{flexShrink:0,width:46,height:27,borderRadius:999,border:`1px solid ${on?C.accent:C.border}`,background:on?C.accent:C.bg,position:'relative',cursor:'pointer',padding:0}}>
+          <span style={{position:'absolute',top:2,left:on?21:2,width:21,height:21,borderRadius:999,background:on?(C.onAccent||'#fff'):C.muted,transition:'left .15s'}}/>
+        </button>
+      </div>
+      {/* Trois états de capacité, jamais deux — et le GESTE, jamais la promesse. */}
+      {on && cap === 'absente' && (
+        <div style={{marginTop:9,fontSize:11.5,color:C.muted,lineHeight:1.5}}>
+          C’est l’extension, dans ton Chrome, qui répond — pas cette page. Ouvre l’app sur l’ordinateur où elle est installée pour voir ce qui est parti.
+        </div>
+      )}
+      {on && cap === 'retard' && (
+        <div style={{marginTop:9,fontSize:11.5,color:C.warn,lineHeight:1.5}}>
+          L’extension installée ici ne sait pas encore répondre. Remplace-la par la {EXT_ATTENDUE} d’abord&nbsp;: tant qu’elle est plus ancienne, rien ne partira.
+        </div>
+      )}
+      {on && (
+        <div style={{marginTop:10,borderTop:`1px solid ${C.border}`,paddingTop:9}} data-bilan={bilan ? 'lu' : bilan === null ? 'pasSu' : 'attente'}>
+          <div style={{fontSize:12,fontWeight:600,color:C.text,marginBottom:4}}>Ce qui est parti en ton nom</div>
+          {bilan ? (
+            <div style={{fontSize:11.5,color:C.muted,lineHeight:1.5,marginBottom:6}}>
+              Au dernier passage&nbsp;: <b style={{color:C.text}}>{bilan.envoyes || 0}</b> réponse{(bilan.envoyes || 0) > 1 ? 's' : ''} envoyée{(bilan.envoyes || 0) > 1 ? 's' : ''} sur <b style={{color:C.text}}>{bilan.nonLues || 0}</b> conversation{(bilan.nonLues || 0) > 1 ? 's' : ''} non lue{(bilan.nonLues || 0) > 1 ? 's' : ''}.
+              {ecartees.length ? <> Les autres ne sont pas pour elle&nbsp;: {ecartees.join(' · ')}.</> : null}
+            </div>
+          ) : null}
+          {envois === undefined ? <div style={{fontSize:11.5,color:C.muted}}>Chargement…</div>
+            : envois === null ? <div style={{fontSize:11.5,color:C.muted}}>Je n’ai pas pu lire la liste. Rien n’est perdu — rouvre cet écran dans un moment.</div>
+            : !envois.length ? <div style={{fontSize:11.5,color:C.muted}}>Aucune réponse envoyée pour l’instant.</div>
+            : <div style={{display:'grid',gap:6}}>
+                {envois.slice(0, 8).map((e, i) => (
+                  <div key={i} style={{fontSize:11.5,lineHeight:1.5}}>
+                    <span style={{color:C.text,fontWeight:600}}>{e.login || 'un acheteur'}</span>
+                    {e.titre ? <span style={{color:C.muted}}> · {e.titre}</span> : null}
+                    <div style={{color:C.muted}}>« {e.texte} »</div>
+                  </div>
+                ))}
+                {envois.length > 8 ? <div style={{fontSize:11,color:C.muted}}>et {envois.length - 8} autre{envois.length - 8 > 1 ? 's' : ''}.</div> : null}
+              </div>}
+        </div>
+      )}
     </div>
   );
 }
