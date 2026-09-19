@@ -2879,6 +2879,46 @@ et il y avait un défaut des DEUX côtés :
   promet rien de neuf) ; extension en **5.84.0**, zip régénéré, `EXT_ATTENDUE`
   suivie.
 
+### ⚠️ « UN PETIT ONGLET EN BAS À DROITE » + RETRAIT DE « SHOP CANCALE »
+Demande de Julien, 19 sept. : « un petit onglet tant que l'extension a pas tout
+capté en bas à droite pour voir ce que j'ai à faire », et « supprime tout ce qui
+concerne shop cancale dans l'extension et l'app ».
+
+**L'onglet (`ResteAFaire`, monté sur la COQUE)** : petit bloc fixe en bas à
+droite, qui LIT `extSait('_maj')` (le propriétaire de la version, §11 — compare
+l'extension de CE navigateur à `EXT_ATTENDUE`) et ne dit QUE le mesurable :
+- extension en retard → « à mettre à jour → {EXT_ATTENDUE} » + bouton Réglages ;
+- extension absente ici → « pas détectée dans ce navigateur » + bouton Réglages ;
+- **à jour → l'onglet DISPARAÎT** (pas de badge permanent qui a fini son travail) ;
+- **téléphone** (`useSansSouris`) → muet (l'install est sur l'ordinateur, leçon
+  iPhone : on ne harcèle pas un geste impossible) ; **base injoignable** →
+  `BaseInjoignable` dit déjà la panne ; **premier jour** → `PremiersPas` dit déjà
+  tout. On ne double aucune de ces voix (§7).
+- ⚠️ **« Tout capté » n'est pas devinable côté app** (la capture vit dans la base
+  de l'extension) : tant qu'elle n'est pas à jour elle ne capte pas tout — c'est
+  CE geste-là, mesurable, que l'onglet porte. Le reste se branchera quand un
+  signal de capture existera, **jamais avant** (on ne devine pas).
+- `capacites.cjs` : onglet **présent** quand l'extension est en retard (nomme
+  `EXT_ATTENDUE`), **absent** quand elle est à jour. 4 contrôles.
+
+**Retrait de « shop cancale »** — mesuré d'abord (`grep`), 39 occurrences dont la
+quasi-totalité en **commentaires** (le « pourquoi » d'une règle : `vanessa5723`
+bloqué, « il revenait tout le temps ») et en fixtures de test. Le
+**fonctionnel/visible** genericisé : tooltip du manifeste (`default_title` →
+« VRM - Vinted Sync », le `name` l'était déjà), texte de l'app qui nommait
+l'extension, nom du fichier de sauvegarde (`shop-cancale-backup-` → `vrm-backup-`),
+titre du README.
+- ⚠️ **PAS touché, et c'est VOULU** : `vrm_blocked_accounts` en base garde
+  shop_cancale **hors capture** — la retirer le ferait « revenir tout le temps »
+  (l'inverse de ce qu'il veut). Les commentaires d'historique restent (ils
+  encodent le POURQUOI de règles de sécurité ; les retirer inviterait la
+  régression). Le lien Vercel `shopcancale35-7638s-projects` est son **vrai**
+  projet de déploiement (le toucher casserait le lien Réglages→env) ; le
+  `.gs` Firebase est un script mort non livré. Les deux sont signalés, pas
+  modifiés en douce.
+- Extension en **5.85.0**, zip régénéré, `EXT_ATTENDUE` suivie. Aucune entrée
+  d'`EXT_CAPACITES` : rien de neuf n'est promis.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par

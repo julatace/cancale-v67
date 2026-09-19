@@ -35,7 +35,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.84.0';
+const EXT_ATTENDUE = '5.85.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -5930,6 +5930,47 @@ function useEtapePont() {
   return { pont, extAuth, etape };
 }
 
+// ⚠️ « un petit onglet en bas à droite tant que l'extension n'a pas tout capté,
+//    pour voir ce que j'ai à faire » (Julien, 19 sept.). Il ne dit QUE ce qui
+//    est MESURABLE et ACTIONNABLE ici :
+//     • il LIT `extSait('_maj')` — le propriétaire de la version (§11), qui
+//       compare l'extension de CE navigateur à `EXT_ATTENDUE` ; aucun recalcul ;
+//     • extension à jour ⇒ plus rien à faire ⇒ l'onglet DISPARAÎT (§7, on ne
+//       laisse pas un badge permanent qui a fini son travail) ;
+//     • sur le TÉLÉPHONE (`useSansSouris`) l'install se fait sur l'ordinateur :
+//       on ne harcèle pas un geste impossible ici (leçon iPhone), l'onglet se tait ;
+//     • base injoignable ⇒ `BaseInjoignable` dit déjà la panne, on ne double pas ;
+//     • premier jour ⇒ `PremiersPas` dit déjà tout, on ne double pas.
+//    « Tout capté » n'est pas devinable côté app (la capture vit dans la base de
+//    l'extension) : tant qu'elle n'est pas à jour, elle ne capte pas tout — c'est
+//    CE geste-là, mesurable, que l'onglet porte. Le reste se branchera quand un
+//    signal de capture existera, jamais avant (on ne devine pas).
+function ResteAFaire({ onNav, baseKO, premierJour }) {
+  const [, force] = React.useReducer((n) => n + 1, 0);
+  React.useEffect(() => onVmrExt(force), []);
+  const sansSouris = useSansSouris();
+  if (baseKO || premierJour || sansSouris) return null;
+  const maj = extSait('_maj');                 // 'absente' | 'retard' | 'ok' vs EXT_ATTENDUE
+  if (maj === 'ok') return null;               // à jour ⇒ rien à faire, l'onglet s'efface
+  const v = vmrExtVersion();
+  const titre = maj === 'absente' ? 'Extension pas détectée ici' : 'Extension à mettre à jour';
+  const quoi = maj === 'absente'
+    ? <>Installe l'extension VRM dans <b>ce</b> navigateur — c'est elle qui capte tes annonces, tes ventes et les codes Leboncoin.</>
+    : <>La version installée{v ? <> (<b>{v}</b>)</> : null} ne capte pas encore tout. Passe à la <b>{EXT_ATTENDUE}</b> pour débloquer le reste (codes Leboncoin, prix, description).</>;
+  return (
+    <div data-onglet="reste-a-faire" style={{position:'fixed',right:16,bottom:16,zIndex:2147483646,maxWidth:300,
+      background:C.card,color:C.text,border:`1px solid ${C.border}`,borderRadius:12,
+      padding:'12px 14px',fontSize:12.5,lineHeight:1.45,
+      boxShadow:'0 1px 2px rgba(0,0,0,.10),0 12px 30px rgba(0,0,0,.16)'}}>
+      <div style={{fontWeight:800,marginBottom:3}}>⏳ {titre}</div>
+      <div style={{color:C.muted}}>{quoi}</div>
+      <button onClick={() => onNav && onNav('settings')} style={{marginTop:9,width:'100%',
+        background:C.accent,color:'#fff',border:'none',borderRadius:9,padding:'8px 10px',
+        fontSize:12.5,fontWeight:600,cursor:'pointer'}}>Ouvrir Réglages pour la télécharger →</button>
+    </div>
+  );
+}
+
 // `titreNeuf` : ce que dit le titre quand rien n'est encore branché. Les deux
 // écrans n'ouvrent pas la même conversation (« Bienvenue » sur le tableau de
 // bord, « ta journée est vide » sur l'accueil) — mais les ÉTAPES, elles, sont
@@ -10913,7 +10954,7 @@ function BackupModal({catalog,sales,garageGrid,blockedCells,onClose,onImport}) {
     const url=URL.createObjectURL(blob);
     const a=document.createElement('a');
     a.href=url;
-    a.download=`shop-cancale-backup-${new Date().toISOString().slice(0,10)}.json`;
+    a.download=`vrm-backup-${new Date().toISOString().slice(0,10)}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -11497,7 +11538,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
         ? <LignePanne>Je n'ai pas pu lire la liste de tes comptes — elle est vide parce que la lecture a échoué, pas parce qu'aucun compte n'est lié. Rien n'est perdu.</LignePanne>
         : (
         <div style={{padding:16,borderRadius:10,background:C.card,border:`1px solid ${C.border}`,fontSize:13,color:C.muted,lineHeight:1.5}}>
-          Aucun compte détecté pour l'instant. Installe l'extension « Shop Cancale35 – Vinted Sync »,
+          Aucun compte détecté pour l'instant. Installe l'extension « VRM – Vinted Sync »,
           connecte-toi sur vinted.fr, puis clique sur « Actualiser ».
         </div>
       ))}
@@ -25676,6 +25717,7 @@ export default function App() {
             LIGNE de panne (`LignePanne`) là où leur propre liste vide
             mentirait — le bloc, lui, ne s'affiche qu'une fois. */}
         {baseKO && <BaseInjoignable/>}
+        <ResteAFaire onNav={setTab} baseKO={baseKO} premierJour={premierJour}/>
         {tab==='settings'&&<SettingsScreen setTab={setTab} comptes={vintedAccounts}
           customLogo={customLogo} onPickLogo={()=>logoInputRef.current&&logoInputRef.current.click()} onResetLogo={resetLogo}
           notifEnabled={notifEnabled}

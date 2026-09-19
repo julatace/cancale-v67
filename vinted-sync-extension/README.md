@@ -1,4 +1,4 @@
-# Shop Cancale35 — Extension Vinted Sync (v2)
+# VRM — Extension Vinted Sync (v2)
 
 Cette extension tourne **dans ton navigateur** (jamais sur un serveur). Elle fait deux choses :
 
