@@ -18,24 +18,29 @@
   } catch (_) {}
 
   // Relaie les messages d'inject.js (csrf + donnees moissonnees) au background.
+  // ⚠️⚠️ IL RELAYAIT UNE LISTE DE CHAMPS FIXE, ET JETAIT LE RESTE EN SILENCE.
+  // Mesuré le 19 septembre : `inject.js` envoyait bien `reponses` (les codes de
+  // réponse HTTP, la mesure qui devait dire si la requête d'export part et se
+  // fait refuser) — et ce relais ne recopiait que `paths`. La donnée mourait
+  // ici, entre deux fichiers qui avaient tous les deux raison.
+  // C'est le défaut de `storeLbcRecon` (qui rangeait clé par clé et perdait
+  // `etapes`), exactement, une couche plus tôt. *Un raccord qui énumère ne
+  // transporte que ce qu'on a pensé à écrire.*
+  // ⇒ On recopie TOUT ce que la page envoie, sauf son étiquette. `from` et
+  //   `domain` restent posés par NOUS : la page ne doit pas pouvoir les dicter.
   window.addEventListener('message', (event) => {
     if (event.source !== window) return;
     const d = event.data;
     if (!d || d.__tag !== TAG) return;
     try {
-      chrome.runtime.sendMessage({
-        from: 'cancale-content',
-        kind: d.kind,
-        type: d.type,
-        id: d.id,
-        url: d.url,
-        method: d.method,
-        body: d.body,
-        csrf: d.csrf,
-        b64: d.b64,
-        paths: d.paths, // diagnostic : chemins d'API vus (voir storeSeenUrls)
-        domain: location.host,
-      });
+      const m = {};
+      for (const k of Object.keys(d)) {
+        if (k === '__tag' || k === 'from' || k === 'domain') continue;
+        m[k] = d[k];
+      }
+      m.from = 'cancale-content';
+      m.domain = location.host;
+      chrome.runtime.sendMessage(m);
     } catch (_) { /* le service worker peut etre endormi, on ignore */ }
   }, false);
 })();
