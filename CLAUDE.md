@@ -3035,6 +3035,46 @@ je câble le « où / quel compte » et le « vendue ici → retire là » (les 
 `status` active/inactive existe déjà), prouvé sur des données réelles. *Ne pas
 écrire ce lien à l'aveugle.*
 
+### ⚠️⚠️ « CAPTE À QUI APPARTIENT CHAQUE ANNONCE + LE NOM DU COMPTE » — LA MOITIÉ QUE JE PEUX FAIRE
+Demande de Julien, 19 sept. : « prépare une extension intelligente qui capte la
+plateforme, à quel compte ça appartient et le nom du compte, pour lier toutes les
+paires — un écosystème pour un vrai revendeur. »
+**Mesuré : l'infra existait (`storeLbcAccount`, message `lbcCapture.account`) mais
+`lbc_accounts` était VIDE** — le motif du tiroir `Nav` : le mécanisme est là, la
+DÉTECTION manquait. `lbc.js` cherchait le compte dans les données EMBARQUÉES de la
+page (`__NEXT_DATA__`/`__next_f`) — il n'y est pas. L'identité du compte connecté
+vit dans une **réponse API** que `lbc-inject` relaie déjà, mais que `handleLbcRaw`
+ne minait pas.
+⇒ `detectLbcAccount(data, url)` (background) lit l'identité du compte connecté dans
+n'importe quelle réponse Leboncoin : un objet qui porte un **id + un nom** ET un
+**marqueur de « c'est moi »** (email, téléphone, siren, store_id, is_pro). Il rend
+`{id, name, type: pro|particulier, platform:'leboncoin'}`.
+- ⚠️ **PRUDENCE (§5) : un acheteur a aussi un id + un pseudo.** Sans marqueur
+  personnel (ou hors d'une clé `user/account/store/me/pro`), on ne prend RIEN —
+  taguer une annonce du **mauvais compte** serait pire que ne rien taguer. Le banc
+  sert exprès une réponse de **messagerie** (acheteurs) et exige `null`.
+- `handleLbcRaw` tague les annonces de son **tableau de bord** (chemin pro `Ads`)
+  du compte connecté (`account`, `accountName`, `accountType`, `platform`), et les
+  annonces d'une réponse générique de **leur PROPRE owner** (jamais du compte de
+  session — un chalet du flux découverte n'est pas à lui). Le compte est mémorisé
+  dans `lbc_accounts`.
+- `lbc-inject` laisse désormais passer les réponses `/account`, `/user`, `/me`,
+  `/pro`, `dashboard`… (`ACCOUNT_HINT`), pas seulement celles qui parlent
+  d'annonces — c'est là que vit l'identité.
+- `scripts/audit-lbc-comptes.cjs` EXÉCUTE le vrai `background.js` (HEAD vs arbre) :
+  particulier reconnu, pro reconnu, **acheteur non pris**, annonces taguées +
+  écrites dans `lbc_accounts`. **§6.1 : sur le code d'avant, 0 annonce taguée.**
+- **Aucune entrée d'`EXT_CAPACITES`** : c'est de la COLLECTE (l'app ne promet rien
+  de neuf tant que le lien n'est pas rendu). Extension en **5.88.0**, zip
+  régénéré, `EXT_ATTENDUE` suivie.
+- ⚠️ **CE QUI RESTE, et pourquoi je ne le câble pas encore** : je n'ai pas VU la
+  vraie forme de sa réponse « mes annonces » (403). `detectLbcAccount` est
+  défensif (plusieurs noms de champs), mais tant que sa vraie réponse n'a pas
+  confirmé où vit l'id + le nom, l'app **n'affiche pas** « publiée sur tel
+  compte ». La prochaine passe, sur `lbc_accounts` réellement rempli, câble
+  l'affichage par paire + le « vendue ici → retire là ». *On collecte, on
+  vérifie, PUIS on promet.*
+
 ### ✅ LE DÉPÔT DU 17 SEPT. A ÉTÉ CAPTÉ — `optcodes` RÉELS, ET LEBONCOIN AUTO-REMPLIT 4/6 ATTRIBUTS
 Mesuré sur sa vraie base après son dépôt manuel (extension à jour) : la capture
 des étapes remonte enfin, pour chaque champ composant, son **code DOM réel**

@@ -12,6 +12,12 @@
   // Une réponse « intéressante » = du JSON qui parle d'annonces. On reste large
   // (Leboncoin a plusieurs endpoints) mais on évite le bruit (pub, tracking).
   const AD_HINT = /(list_id|\"ads\"|\"subject\"|annonce|myads|\/ads|classified|listing|dashboard|selection|owner)/i;
+  // ⚠️ L'IDENTITÉ DU COMPTE CONNECTÉ vit souvent dans une réponse `/account`,
+  //    `/user`, `/me`, `/pro`… que `AD_HINT` ne matche pas. On la laisse passer
+  //    aussi : le background y lit à QUI (id + nom + pro/particulier) appartient
+  //    la session, pour relier ensuite chaque annonce à son compte. Julien aura
+  //    plusieurs comptes Leboncoin — sans ce lien, tout se mélange.
+  const ACCOUNT_HINT = /(\/account|\/users?\b|\/me\b|profile|\/pro\/|dashboard|store_id|\"siren\"|pseudo)/i;
   const NOISE = /(datadome|captcha|track|metric|event|telemetr|analytic|consent|pixel|gtm|batch\.bmcdn|xiti|adservice)/i;
 
   // ⚠️⚠️ ON N'ÉCHANTILLONNE QUE LEBONCOIN. Mesuré le 17 septembre sur sa base :
@@ -115,7 +121,7 @@
         post({ kind: 'lbccatalogue', url, body: text.slice(0, CAT_MAX), coupe: text.length > CAT_MAX });
         return;
       }
-      if (!AD_HINT.test(text) && !AD_HINT.test(url)) return;
+      if (!AD_HINT.test(text) && !AD_HINT.test(url) && !ACCOUNT_HINT.test(url) && !ACCOUNT_HINT.test(text)) return;
       post({ kind: 'lbcraw', url, body: text });
     } catch (_) {}
   };

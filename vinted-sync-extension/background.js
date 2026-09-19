@@ -6091,10 +6091,42 @@ async function publierPrepLbc() {
 // Extraction GÉNÉRIQUE des annonces depuis une réponse JSON Leboncoin : on cherche
 // récursivement les objets qui ressemblent à une annonce (un id + un titre + un
 // prix). Marche quel que soit l'endpoint. On garde aussi un échantillon (recon).
+// ⚠️ À QUI APPARTIENT LA SESSION ? — la brique de l'écosystème multi-comptes.
+// On cherche dans une réponse Leboncoin l'identité du compte CONNECTÉ : un objet
+// qui porte un id + un nom ET un marqueur de « c'est MOI » (email, téléphone,
+// siren, store_id, is_pro). On reste PRUDENT (§5, mieux vaut un blanc qu'un faux) :
+// un acheteur a aussi un id + un pseudo, mais pas ton email/siren — sans marqueur
+// personnel (ou sous une clé « user/account/store/me/pro »), on ne prend pas.
+// Taguer une annonce du MAUVAIS compte serait pire que ne rien taguer.
+function detectLbcAccount(data, url) {
+  let best = null;
+  const marqueurMoi = (o) => !!(o.email || o.phone || o.phone_number || o.phoneNumber
+    || o.siren || o.siret || o.is_pro != null || o.store_id || o.storeId || o.company_name);
+  const walk = (node, depth, key) => {
+    if (best || !node || depth > 8 || typeof node !== 'object') return;
+    if (Array.isArray(node)) { for (const v of node) walk(v, depth + 1, key); return; }
+    const id = node.user_id || node.userId || node.store_id || node.storeId || node.account_id || node.accountId || node.id;
+    const name = node.store_name || node.storeName || node.company_name || node.companyName
+      || node.pseudo || node.pseudonym || node.name || node.display_name || node.displayName;
+    const cleMoi = /^(user|account|store|owner|me|profile|pro|seller|self|current)/i.test(String(key || ''));
+    if (id && name && (marqueurMoi(node) || (cleMoi && (node.pseudo || node.pseudonym || node.email)))) {
+      const pro = !!(node.siren || node.siret || node.store_id || node.storeId || node.company_name || node.is_pro);
+      best = { id: String(id), name: String(name), type: pro ? 'pro' : 'particulier', platform: 'leboncoin', source: String(url || '').slice(0, 120) };
+      return;
+    }
+    for (const k in node) if (Object.prototype.hasOwnProperty.call(node, k)) walk(node[k], depth + 1, k);
+  };
+  try { walk(data, 0, ''); } catch (_) {}
+  return best;
+}
+
 async function handleLbcRaw(url, body) {
   let data = null;
   try { data = JSON.parse(body); } catch (_) { return; }
   const found = []; const seen = new Set();
+  // Le compte connecté (id + nom + pro/particulier), s'il transparaît ici.
+  const acct = detectLbcAccount(data, url);
+  if (acct) await storeLbcAccount(acct);
 
   // ── CAS PRO LEBONCOIN (endpoint réel de « mes annonces ») ──────────────────
   // GET /api/stats/proxy/v2/account/classifieds/analysis/list
@@ -6133,6 +6165,14 @@ async function handleLbcRaw(url, body) {
         issue: an.Issue || null,
         ctr: an.CTR != null ? an.CTR : null,
         appreciation: an.Appreciation || null,
+        // ⚠️ CE TABLEAU DE BORD est le SIEN : ses annonces appartiennent au
+        //    compte connecté. On les tague pour relier chaque paire à SON compte
+        //    Leboncoin (il en aura plusieurs) — sans compte détecté, on laisse
+        //    vide (mieux vaut un blanc qu'un faux, §5).
+        account: acct ? acct.id : null,
+        accountName: acct ? acct.name : null,
+        accountType: acct ? acct.type : null,
+        platform: 'leboncoin',
       });
     }
     if (found.length) { await storeLbcListings(url, found); return; }
@@ -6164,6 +6204,13 @@ async function handleLbcRaw(url, body) {
           images: (node.images && (node.images.urls || node.images.thumb_urls || node.images.urls_thumb)) || node.image_urls || [],
           category: node.category_name || node.category_id || '',
           status: node.status || node.ad_status || '',
+          // ⚠️ Le propriétaire de CETTE annonce (une réponse générique mêle ses
+          //    annonces et le flux « découverte » d'autrui) : on prend l'owner
+          //    porté par l'annonce ELLE-MÊME, jamais le compte de session (qui,
+          //    ici, ne prouverait pas que le chalet d'à côté est à lui, §5).
+          account: String((node.owner && (node.owner.user_id || node.owner.store_id)) || node.user_id || node.store_id || '') || null,
+          accountName: String((node.owner && (node.owner.name || node.owner.pseudo)) || node.owner_name || '') || null,
+          platform: 'leboncoin',
         });
       }
     }
