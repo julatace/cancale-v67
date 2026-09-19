@@ -663,12 +663,28 @@
     } catch (e) { return { n: 0, rates, raison: String((e && e.message) || e).slice(0, 60) }; }
   }
 
+  // ⚠️⚠️ LE CHAMP PRIX S'APPELLE `price_cents` — IL ATTEND DES CENTIMES.
+  // Mesuré le 19 septembre sur la carte du dépôt (`lbc_recon.etapes`, étape à
+  // 5 champs : `subject, body, price_cents, location`). L'ancien code posait
+  // `ad.price` (54) directement → Leboncoin affichait **0,54 €** sur l'annonce.
+  // Le NOM du champ porte l'unité : s'il contient « cent », on pose l'entier en
+  // centimes ; sinon (un champ euros ailleurs) on pose les euros. On ne devine
+  // pas l'unité, on la LIT.
+  function poserPrix(euros, siVide) {
+    const el = findField([/prix|price|montant/]);
+    if (!el) return false;
+    if (siVide && String(el.value || '').trim()) return false;   // ne pas écraser une correction manuelle
+    const n = Number(euros);
+    if (!isFinite(n) || n <= 0) return false;
+    const nom = ((el.name || '') + ' ' + (el.id || '') + ' ' + (el.getAttribute('aria-label') || '')).toLowerCase();
+    return setField(el, /cent/.test(nom) ? String(Math.round(n * 100)) : String(n));
+  }
   function prefill(ad) {
     const ref = ad.ref || ('VRM-' + ad.numero);
     const faits = [];
     if (setField(findField([/titre|title|subject|proposez/]), ad.title)) faits.push('le titre');
     if (setField(findField([/description|texte|body|détail|detail/]), ad.description)) faits.push('la description');
-    if (setField(findField([/prix|price|montant/]), ad.price)) faits.push('le prix');
+    if (poserPrix(ad.price)) faits.push('le prix');
     // Champ RÉFÉRENCE des comptes PRO : on y met VRM-{N°} → pas besoin de le mettre
     // dans le titre, et tu peux rechercher la paire par ce numéro dans ton profil.
     const refMise = setField(findField([/référ|referen|\bref\b|\bsku\b|identifiant|code.?article|numéro.?article/]), ref);
@@ -1012,7 +1028,7 @@
     let n = 0;
     if (setIfEmpty(findField([/titre|title|subject|proposez/]), ad.title)) n++;
     if (setIfEmpty(findField([/description|texte|body|détail|detail/]), ad.description)) n++;
-    if (setIfEmpty(findField([/prix|price|montant/]), String(ad.price || ''))) n++;
+    if (poserPrix(ad.price, true)) n++;   // §11 : le prix a UNE règle (centimes), une seule
     if (setIfEmpty(findField([/référ|referen|\bref\b|\bsku\b|identifiant|code.?article|numéro.?article/]), ad.ref || ('VRM-' + ad.numero))) n++;
     // ⚠️ « ça ne met pas la catégorie ni le reste » (Julien, 13 septembre). Les
     //    listes déroulantes ne sont pas des `input` : `findField` ne les voyait
@@ -1109,7 +1125,7 @@
     let n = 0;
     if (setField(findField([/titre|title|subject/]), ad.title)) n++;
     if (setField(findField([/description|texte|body|détail|detail/]), ad.description)) n++;
-    if (setField(findField([/prix|price|montant/]), String(ad.price || ''))) n++;
+    if (poserPrix(ad.price)) n++;   // §11 : la même règle de prix que partout
     if (setField(findField([/référ|referen|\bref\b|\bsku\b|identifiant|code.?article|numéro.?article/]), ad.ref || ('VRM-' + ad.numero))) n++;
     return n;
   }

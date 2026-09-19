@@ -34,7 +34,7 @@ const PAGE = (depot) => `<!doctype html><html lang="fr"><head><meta charset="utf
   <main>${depot === 'etape2'
     ? '<label for="s2">Titre de l’annonce</label><input id="s2" name="subject" type="text">'
       + '<label for="d2">Description</label><textarea id="d2" name="body"></textarea>'
-      + '<label for="p2">Prix</label><input id="p2" name="price" type="text">'
+      + '<label for="p2">Prix</label><input id="p2" name="price_cents" type="text">'  // ⚠️ la VRAIE forme mesurée : le champ est en CENTIMES (lbc_recon.etapes, 19 sept.)
       + '<label for="c2">Catégorie</label><select id="c2" name="category"><option value=""></option><option value="1">Vêtements</option><option value="2">Chaussures</option><option value="3">Sacs à main</option></select>'
       + '<label for="e2">État</label><select id="e2" name="condition"><option value=""></option><option value="1">Neuf</option><option value="2">Très bon état</option><option value="3">Satisfaisant</option></select>'
       + '<label for="f2">Photos</label><input id="f2" name="images" type="file" multiple accept="image/*">'
@@ -428,7 +428,7 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
       catTexte: (() => { const s2 = document.querySelector('select[name="category"]'); return s2 && s2.selectedIndex >= 0 ? s2.options[s2.selectedIndex].textContent : ''; })(),
       etatSel: (() => { const s2 = document.querySelector('select[name="condition"]'); return s2 && s2.selectedIndex >= 0 ? s2.options[s2.selectedIndex].textContent : ''; })(),
       titre: (document.querySelector('input[name="subject"]') || {}).value || '',
-      prix: (document.querySelector('input[name="price"]') || {}).value || '',
+      prix: (document.querySelector('input[name="price_cents"]') || {}).value || '',
       desc: (document.querySelector('textarea[name="body"]') || {}).value || '',
       dl: window.__dl,
       bandeau: (document.getElementById('vrm-lbc-banner') || {}).innerText || '',
@@ -444,6 +444,12 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
     dit(/état/i.test(etat.etatSel || ''), 'et l\'état aussi', 'choisi : « ' + etat.etatSel + ' »');
     dit(etat.titre === QUEUE[0].title && !!etat.prix && !!etat.desc, 'titre, prix et description sont remplis',
       'titre « ' + etat.titre.slice(0, 24) + ' » · prix ' + etat.prix);
+    // ⚠️⚠️ LE CHAMP `price_cents` ATTEND DES CENTIMES. Mesuré le 19 septembre :
+    //    l'ancien code posait 99 → Leboncoin affichait 0,99 €. Le prix (99,00 €)
+    //    doit devenir 9900, en ENTIER. C'est le nom du champ qui porte l'unité.
+    const attenduCents = String(Math.round(Number(QUEUE[0].price) * 100));
+    dit(etat.prix === attenduCents, 'le prix est posé en CENTIMES (99,00 € → 9900), pas en euros dans un champ _cents',
+      'champ price_cents = « ' + etat.prix +' » (attendu ' + attenduCents + ')');
     // Le bandeau écrit le CHIFFRE, jamais « c'est prêt ».
     dit(/3 photos attachées/.test(etat.bandeau), 'le bandeau écrit combien de photos ont été attachées',
       (etat.bandeau || '').replace(/\n/g, ' ').slice(0, 90));
