@@ -2733,6 +2733,32 @@ existant, sur-exclure fait perdre). `audit-places.cjs` sert un compte dans
 - **Aucune entrée d'`EXT_CAPACITES`** : c'est une correction, l'app ne promet
   rien de neuf. Extension en **5.81.0**, zip régénéré, `EXT_ATTENDUE` suivie.
 
+### ⚠️⚠️ LE PRIX PARTAIT À 0,54 € — LE CHAMP LEBONCOIN EST EN CENTIMES
+Julien a fait ses dépôts le 17 septembre, et la **carte du formulaire est enfin
+arrivée** (`lbc_recon.etapes`). Mesuré le 19 septembre — l'étape cœur porte
+`subject` (titre), **`body`** (description), **`price_cents`** (prix), `location`.
+Le nom le dit : ce champ attend des **CENTIMES**. Or `lbc.js` y posait `ad.price`
+tel quel (« 54 ») → Leboncoin affichait **0,54 €** sur son annonce. Le titre et
+la description, eux, tombaient juste (`subject`/`body` matchent les motifs).
+⇒ `poserPrix(euros, siVide)` LIT l'unité **dans le nom du champ** : si le nom
+contient « cent », il pose l'entier en centimes (`Math.round(n*100)`), sinon les
+euros. On ne devine pas — on lit ce que le champ déclare.
+⚠️ **Le prix se remplissait à TROIS endroits** (`prefill`, `fillNow` la
+surveillance, `fillNowForce` le « Re-remplir »), chacun avec le même défaut :
+§11, une notion une règle. Les trois passent désormais par `poserPrix`.
+- `scripts/bancs/leboncoin.cjs` sert maintenant la **vraie forme** du champ
+  (`name="price_cents"`, §6.3) et exige `99,00 € → 9900`. **Rouge** sur le code
+  d'avant (« price_cents = 99.00 »), vert après.
+- **Aucune entrée d'`EXT_CAPACITES`** : c'est une correction. Extension en
+  **5.82.0**, zip régénéré, `EXT_ATTENDUE` suivie.
+- ⚠️ **Ce qui manque encore** : les champs `:form-field-_r_XX_` de l'étape
+  catégorie/attributs n'ont **pas de libellé** dans la carte captée (l'extension
+  d'alors ne relevait pas les `listes` de ces étapes). `fforms` (52 Ko) et
+  `fdata` (682 Ko) sont arrivés **entiers** dans `lbc_catalogue` : c'est de là
+  que sortira le mapping catégorie→code. **Rien n'est analysé pour l'instant** —
+  on branche à la prochaine passe, pas avant d'avoir relié un `_r_XX_` à son
+  libellé.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
