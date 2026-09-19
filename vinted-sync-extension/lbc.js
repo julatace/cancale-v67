@@ -793,14 +793,32 @@
         //    RECHERCHE de l'en-tête (« Valider votre recherche »).
         if (!estDuDepot(el)) return;
         let options = [];
+        // ⚠️ Le CODE de chaque option, jamais vu jusqu'ici. Leboncoin soumet un
+        //    code (`{value,label}` de fforms/fdata), pas le libellé : sans lui,
+        //    la passe qui remplit Pointure/État ne peut que DEVINER (le défaut le
+        //    plus coûteux du projet). On relève donc les attributs qui portent
+        //    peut-être ce code — value/data-value/data-qa-id/id — pour que la
+        //    prochaine passe vise le vrai code de SA page, pas un mapping supposé.
+        //    LECTURE SEULE : uniquement des libellés d'options et des attributs
+        //    de structure, jamais un contenu saisi (même promesse que les étapes).
+        let optcodes = [];
         try {
           const id = el.getAttribute('aria-controls') || el.getAttribute('aria-owns');
           const boite = (id && document.getElementById(id)) || el.parentElement;
-          if (boite) options = Array.from(boite.querySelectorAll('[role="option"], [role="menuitem"]')).slice(0, 25).map((o) => texteVisible(o, 40));
+          if (boite) {
+            const els = Array.from(boite.querySelectorAll('[role="option"], [role="menuitem"]')).slice(0, 25);
+            options = els.map((o) => texteVisible(o, 40));
+            optcodes = els.map((o) => ({
+              t: texteVisible(o, 40),
+              v: (o.getAttribute('data-value') || o.getAttribute('value') || o.getAttribute('data-qa-id')
+                || o.getAttribute('data-testid') || o.id || '').slice(0, 60),
+            }));
+          }
         } catch (_) {}
         out.push({ forme: 'composant', name: el.getAttribute('name') || '', id: el.id || '',
           qa: el.getAttribute('data-qa-id') || el.getAttribute('data-testid') || '',
-          label: libelleDe(el), choisi: texteVisible(el, 40), options });
+          role: el.getAttribute('role') || '', controls: !!(el.getAttribute('aria-controls') || el.getAttribute('aria-owns')),
+          label: libelleDe(el), choisi: texteVisible(el, 40), options, optcodes });
       });
     } catch (_) {}
     return out;

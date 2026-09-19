@@ -2804,6 +2804,51 @@ porte pour ses **six** champs le libellé **ET** la liste d'options :
   chez lui** ; l'app le dit déjà (diagnostic de version). *Le premier geste
   reste : remplacer le dossier de l'extension par le zip livré.*
 
+### ⚠️⚠️ « FAIS-LE TOUT SEUL » — LE MAPPING EST FAIT, LE CODE DE CHAQUE OPTION MANQUAIT
+Julien, 19 sept. (plus tard) : « tu peux faire ça tout seul ». J'ai donc analysé
+`fforms`/`fdata` (entiers dans `lbc_catalogue`) pour relier chaque attribut du
+dépôt à son **code** — le mapping que le dossier diffère depuis des passes.
+**Mesuré, et deux choses ont tranché :**
+- ⚠️ **`fforms` capté = `searchAd` UNIQUEMENT** — le formulaire de **RECHERCHE**,
+  pas de dépôt. Le dossier supposait « les formulaires par catégorie » : faux
+  sur la mesure. La liaison champ→feature ne vient donc pas de `fforms`.
+- ✅ **Mais `fdata.features` la donne, par IDENTITÉ D'ENSEMBLE** (§5, jamais par
+  ressemblance de libellé — plusieurs features s'appellent « État »/« Marque »).
+  Chacun des six champs captés matche **un seul** feature dont l'ensemble
+  d'options est identique (ou sur-ensemble pour les listes filtrées) :
+  | champ dépôt | feature `fdata` | jointure |
+  |---|---|---|
+  | Univers* | `shoe_type` (1=Femme·2=Homme·3=Enfant) | ensemble identique |
+  | Type de chaussures | `shoe_category_a` | ensemble identique |
+  | Pointure* | `shoe_size` | sur-ensemble (liste captée partielle) |
+  | Marque | `shoe_brand_a` | sur-ensemble (liste **filtrée** à la frappe) |
+  | Couleur | `clothing_color_a` | ensemble identique |
+  | État | `clothing_condition_a` (5=Neuf ét.·4·3=TBÉ·2·1) | ensemble identique |
+- ⚠️⚠️ **CE QUI RESTAIT NON MESURABLE, ET POURQUOI JE N'AI PAS ÉCRIT LE REMPLISSAGE** :
+  Leboncoin **soumet un code**, pas le libellé ; et les six listes sont des
+  **composants React**, dont je n'ai **jamais vu** le DOM de sélection (comment
+  la liste s'ouvre, où vit le code). Écrire un remplisseur de combobox sur cette
+  base serait deviner — et un banc qui sert un faux composant mesure une fiction
+  (§6.3). Un mauvais attribut sur une annonce **publiée** est le coût le plus
+  élevé (leçon eBay). **Ne pas écrire le remplissage ni le clic « Publier » tant
+  que le code réel n'est pas mesuré sur SA page.**
+- ⇒ **Ce qui EST livré (mesuré, lecture seule, sans risque)** : la capture des
+  étapes relève désormais, pour chaque option de composant, son **code réel**
+  (`optcodes` : `{t: libellé, v: value/data-value/data-qa-id/id}`) + `role` et
+  `controls` du contrôle. Le jour où sa **5.83** passe sur une page de dépôt,
+  j'ai enfin le code de SA page — la jointure `fdata` n'est qu'un filet, pas une
+  supposition. `bancs/leboncoin.cjs` sert une option `data-value="3"` et exige
+  que `optcodes` la relève (`Très bon état=3`), et vérifie toujours qu'**aucune
+  valeur saisie ne fuit**. Extension en **5.83.0**, zip régénéré, `EXT_ATTENDUE`
+  suivie. **Aucune entrée d'`EXT_CAPACITES`** : c'est une mesure, l'app ne promet
+  rien de neuf.
+- **La passe suivante remplira Pointure + État** (code-certains **et**
+  valeur-connue : `ad.taille`, condition), en visant le code relevé, prouvé au
+  banc sur la vraie forme. **Univers/Type/Couleur restent vides** — leur valeur
+  ne se devine pas depuis ses données (*mieux vaut un blanc qu'un faux*), même si
+  leur code est connu. **Marque** : liste filtrée → passe par le code, jamais le
+  libellé.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
