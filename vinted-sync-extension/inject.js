@@ -124,21 +124,48 @@
   // découvrir des semaines plus tard que la moisson est muette. Envoyé au plus
   // une fois par minute, liste dédupliquée.
   const seenPaths = new Set();
+  const seenRep = {};                    // "METHOD /chemin" → { st, n }
   let seenDirty = false;
-  const noteSeen = (url) => {
+  // ⚠️⚠️ POURQUOI LE CODE DE RÉPONSE, ET POURQUOI LES PAGES NON-API.
+  // Demande de Julien, 19 septembre : son compte PRO est bloqué, et le bouton
+  // « télécharger mes données » des réglages Vinted le renvoie sur « ton compte
+  // est bloqué ». Impossible de savoir, de l'extérieur, si la requête d'export
+  // PART et se fait refuser par le serveur (403 → aucun contournement côté
+  // navigateur ne servira) ou si elle n'est jamais envoyée parce que c'est
+  // seulement la page qui redirige (→ la donnée est peut-être atteignable). Les
+  // deux cas n'appellent pas du tout le même geste, et les distinguer demande
+  // **le statut**, que ce mouchard ne notait pas. Il ne notait pas non plus les
+  // adresses hors `/api/` : une page de réglages ne laissait donc aucune trace.
+  // ⚠️ La promesse de confidentialité ne change pas : chemin + méthode + statut,
+  //    JAMAIS le contenu, jamais les paramètres — les identifiants numériques
+  //    sont même remplacés par `{id}` (voir `chemin()`).
+  const PAGE_A_NOTER = /(export|download|telecharg|takeout|gdpr|rgpd|privacy|donnees|data|settings|parametres|reglages|account|compte|blocked|bloque|suspend|restrict)/i;
+  const chemin = (url) => {
+    let p = url;
+    try { p = new URL(url, location.origin).pathname; } catch (_) { p = String(url).split('?')[0]; }
+    return p.replace(/\/\d{3,}/g, '/{id}');       // jamais un identifiant réel
+  };
+  const noteSeen = (url, method, status) => {
     try {
-      if (!/\/api\//.test(url)) return;
-      let p = url;
-      try { p = new URL(url, location.origin).pathname; } catch (_) { p = String(url).split('?')[0]; }
-      // Les identifiants numériques deviennent {id} → la liste reste courte.
-      p = p.replace(/\/\d{3,}/g, '/{id}');
+      const estApi = /\/api\//.test(url || '');
+      const p = chemin(url || '');
+      // Hors API, on ne note que ce qui peut concerner un export ou le compte :
+      // tout noter ferait une liste de bruit, et §7 vaut aussi pour un diagnostic.
+      if (!estApi && !PAGE_A_NOTER.test(p)) return;
       if (!seenPaths.has(p)) { seenPaths.add(p); seenDirty = true; }
+      if (status == null) return;
+      const cle = `${String(method || 'GET').toUpperCase()} ${p}`;
+      const av = seenRep[cle];
+      // On garde le dernier statut vu et combien de fois : « 403 une fois » et
+      // « 403 à chaque essai » ne se lisent pas pareil.
+      if (!av || av.st !== Number(status)) seenDirty = true;
+      seenRep[cle] = { st: Number(status), n: ((av && av.n) || 0) + 1, at: new Date().toISOString() };
     } catch (_) {}
   };
   const flushSeen = () => {
-    if (!seenDirty || !seenPaths.size) return;
+    if (!seenDirty || (!seenPaths.size && !Object.keys(seenRep).length)) return;
     seenDirty = false;
-    post({ kind: 'seen_urls', paths: Array.from(seenPaths).slice(0, 300) });
+    post({ kind: 'seen_urls', paths: Array.from(seenPaths).slice(0, 300), reponses: seenRep });
   };
   // Envoi RAPIDE puis régulier : une page Vinted est souvent quittée avant 60 s,
   // et le diagnostic ne partait alors jamais. On envoie à 5 s, puis toutes les
@@ -149,6 +176,9 @@
     window.addEventListener('pagehide', flushSeen);
     document.addEventListener('visibilitychange', () => { if (document.hidden) flushSeen(); });
   } catch (_) {}
+  // La page elle-même est notée : c'est elle qui redirige quand un compte est
+  // bloqué, et sans ça on ne sait même pas qu'il y est passé.
+  try { noteSeen(location.href, 'PAGE', null); } catch (_) {}
 
   const sendHarvest = (url, text) => {
     noteSeen(url);
@@ -223,6 +253,7 @@
         noteSeen(url); // diagnostic : TOUT appel API, pas seulement ceux qui matchent
         p.then((res) => {
           try {
+            noteSeen(url, method, res.status);          // le STATUT, pas seulement le chemin
             const ct = (res.headers && res.headers.get) ? (res.headers.get('content-type') || '') : '';
             if (/application\/pdf/i.test(ct)) {
               maybeCaptureLabel(ct, url, () => res.clone().arrayBuffer());
@@ -262,6 +293,7 @@
         noteSeen(url); // diagnostic : TOUT appel API (XHR aussi)
         this.addEventListener('load', function () {
           try {
+            noteSeen(url, this.__cancaleMethod, this.status);   // le STATUT aussi
             const ct = this.getResponseHeader ? (this.getResponseHeader('content-type') || '') : '';
             // Bordereau PDF via XHR (si Vinted le charge en binaire).
             if (/application\/pdf/i.test(ct) && this.response && this.response.byteLength) {

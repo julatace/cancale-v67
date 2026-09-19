@@ -111,6 +111,21 @@ const CAS = [
     quoi: 'l\'historique de ses annonces Leboncoin',
     geste: (c) => c.storeLbcListings('u', [{ id: '3', subject: 'c' }]),
     garde: (d) => d.items && d.items['1'] && d.items['2'] && d.items['3'] },
+  // ⚠️⚠️ UNE DE PLUS, LE 19 SEPTEMBRE — et celle-là n'était même pas une fusion :
+  //    `storeSeenUrls` ÉCRASAIT la ligne à chaque visite. Un diagnostic dont le
+  //    but est d'attraper un endpoint vu UNE fois (le bouton « télécharger mes
+  //    données », inaccessible depuis son compte pro bloqué) perdait donc tout
+  //    à la visite suivante. Mesuré : 41 chemins distincts en tout sur
+  //    11 comptes, alors que chaque passage en voit une dizaine.
+  { id: 'harvest_9_seen_urls',
+    avant: { uid: '9', paths: ['/api/v2/users/{id}/items', '/api/v2/inbox'],
+             reponses: { 'GET /api/v2/inbox': { st: 200, n: 3 } } },
+    quoi: 'les endpoints déjà observés et leurs codes de réponse',
+    geste: (c) => { c.activeAccountId = async () => '9';
+      return c.storeSeenUrls('fr', ['/compte/export'], { 'POST /api/v2/data_export': { st: 403, n: 1 } }); },
+    garde: (d) => (d.paths || []).includes('/api/v2/inbox') && (d.paths || []).includes('/compte/export')
+      && d.reponses && d.reponses['GET /api/v2/inbox'] && d.reponses['POST /api/v2/data_export'] },
+
   { id: 'lbc_accounts', avant: { accounts: { a1: { login: 'x' }, a2: { login: 'y' } } },
     quoi: 'ses comptes Leboncoin déjà vus',
     geste: (c) => c.storeLbcAccount({ id: 'a3', login: 'z' }),

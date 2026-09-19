@@ -1049,7 +1049,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   } else if (msg.kind === 'writereq' && msg.url) {
     storeWriteReq(domain, msg.method, msg.url, msg.body);
   } else if (msg.kind === 'seen_urls' && Array.isArray(msg.paths)) {
-    storeSeenUrls(domain, msg.paths);
+    storeSeenUrls(domain, msg.paths, msg.reponses);
   }
 });
 
@@ -1090,10 +1090,31 @@ async function noterStatutsOffres(parsed) {
 // Diagnostic : liste des CHEMINS d'API que le site appelle réellement (aucun
 // contenu, aucun paramètre). Sert à repérer tout de suite quand Vinted déplace
 // un endpoint — c'est ce qui avait rendu la moisson muette pendant 18 jours.
-async function storeSeenUrls(domain, paths) {
+async function storeSeenUrls(domain, paths, reponses) {
   const uid = await activeAccountId(domain);
   if (!uid) return;
-  const data = { uid, paths: paths.slice(0, 300), capturedAt: new Date().toISOString() };
+  // ⚠️⚠️ ÇA ÉCRASAIT LA LISTE À CHAQUE VISITE. Une page ne fait qu'une poignée
+  //    d'appels : la visite suivante remplaçait donc tout ce qu'on avait appris
+  //    ailleurs. Mesuré le 19 septembre — 41 chemins distincts en tout sur
+  //    11 comptes, alors que chaque compte en voit une dizaine à chaque passage.
+  //    Pour un diagnostic dont le but est justement d'attraper UN endpoint vu
+  //    UNE fois (le bouton d'export des données, inaccessible depuis son compte
+  //    pro bloqué), écraser était fatal.
+  // ⚠️ Et « rien lu » ne vaut pas « rien » : lecture ratée ⇒ on n'écrit pas,
+  //    sinon on efface ce qu'on avait (la leçon des lire-fusionner-réécrire).
+  const rows = await sbGet(`app_data?id=eq.harvest_${uid}_seen_urls&select=data`);
+  if (rows === null) return;
+  const cur = (rows[0] && rows[0].data) || {};
+  const tous = new Set([...(Array.isArray(cur.paths) ? cur.paths : []), ...paths]);
+  const rep = Object.assign({}, cur.reponses || {}, reponses || {});
+  // Bornes par construction : un diagnostic ne doit jamais grossir sans fin.
+  const repBorne = {};
+  for (const k of Object.keys(rep).slice(0, 400)) repBorne[k] = rep[k];
+  const data = { uid, paths: Array.from(tous).slice(0, 600), reponses: repBorne,
+    capturedAt: new Date().toISOString(), ver: EXT_VERSION };
+  // Rien de neuf → on ne repousse pas la même ligne.
+  if (JSON.stringify(data.paths) === JSON.stringify(cur.paths || [])
+      && JSON.stringify(repBorne) === JSON.stringify(cur.reponses || {})) return;
   await supabaseUpsert('app_data', [{ id: `harvest_${uid}_seen_urls`, data }], 'id');
 }
 
