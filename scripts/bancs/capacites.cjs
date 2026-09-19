@@ -328,6 +328,23 @@ const BANDEAU=/prix plancher[^\n]*rien ne les applique/i;
       'il ne promet pas qu\'elle est branchee sur cette page');
   }
 
+  // ── L'ONGLET « CE QU'IL TE RESTE A FAIRE » (bas a droite) ──────────────────
+  // Il ne s'affiche QUE tant que l'extension de CE navigateur n'est pas a jour
+  // (donc ne capte pas encore tout), et DISPARAIT des qu'elle l'est.
+  {
+    const EXT = (/const EXT_ATTENDUE = '([^']+)'/.exec(fs.readFileSync(path.join(__dirname,'..','..','src','App.jsx'),'utf8'))||[])[1]||'';
+    const vieille = await lis('5.10.0', 'cat_annonces');   // extension tres en retard
+    dit(/Ouvrir R[ée]glages pour la t[ée]l[ée]charger/i.test(vieille.t),
+      'l\'onglet « reste a faire » s\'affiche quand l\'extension est en retard',
+      'attendu le bouton, ecran : ' + vieille.t.replace(/\n/g,' ').slice(0,80));
+    dit(new RegExp(EXT.replace(/\./g,'\\.')).test(vieille.t),
+      'et il NOMME la version a installer', 'attendu ' + EXT);
+    const ajour = await lis(EXT, 'cat_annonces');          // extension a jour
+    dit(!/Ouvrir R[ée]glages pour la t[ée]l[ée]charger/i.test(ajour.t),
+      'et il DISPARAIT quand l\'extension est a jour (pas de badge permanent)');
+    dit(vieille.errs.length===0 && ajour.errs.length===0, 'aucune erreur d\'app avec l\'onglet', (vieille.errs[0]||ajour.errs[0]||''));
+  }
+
   await b.close(); srv.close();
   console.log(ko?('\n'+ko+' controle(s) non conforme(s).'):'\nL\'app ne promet que ce que l\'extension installee sait faire.');
   process.exit(ko?1:0);
