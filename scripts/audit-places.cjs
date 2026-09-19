@@ -71,7 +71,7 @@ function projette(rows, url) {
   });
 }
 
-function ctxAvec(numeros, txns, lbcItems, exclus, quiEchoue) {
+function ctxAvec(numeros, txns, lbcItems, exclus, quiEchoue, bloquesDef) {
   const ctx = {
     console: { log() {}, warn() {}, error() {} },
     setTimeout, clearTimeout, setInterval, clearInterval, URL, TextDecoder, TextEncoder,
@@ -109,6 +109,8 @@ function ctxAvec(numeros, txns, lbcItems, exclus, quiEchoue) {
       if (/id=like\.harvest_\*_txn_\*/.test(u)) return j(projette(txns || [], u));
       // Les annonces Leboncoin captées — dont celles qui NE SONT PAS à lui.
       if (/id=eq\.lbc_listings/.test(u)) return j(lbcItems ? [{ data: { items: lbcItems } }] : []);
+      // Les comptes supprimés DÉFINITIVEMENT (liste distincte de hidden/blocked).
+      if (/id=eq\.vrm_blocked_accounts/.test(u)) return j(bloquesDef ? [{ data: { uids: bloquesDef.map(String), logins: [] } }] : []);
       return j([]);
     },
   };
@@ -353,6 +355,44 @@ function ctxAvec(numeros, txns, lbcItems, exclus, quiEchoue) {
     // Et l'app aussi — c'est elle qui était juste.
     dit(/offAcc\.has\(uid\)/.test(APP), 'l\'app applique la même exclusion sur SA file',
       'sinon l\'app annonce un nombre et le panneau en montre un autre');
+  }
+
+  // ── ⚠️⚠️ UN COMPTE SUPPRIMÉ DÉFINITIVEMENT N'ALIMENTE AUCUNE FILE ──────────
+  // Mesuré le 19 septembre : `shop_cancale` (199082413) est dans
+  // `vrm_blocked_accounts` — une TROISIÈME liste, que ni `vinted_accounts_hidden`
+  // ni `vinted_accounts_blocked` ne recouvrent. Ses 96 paires numérotées en
+  // ligne entraient dans la file Leboncoin (panneau ET app), alors que l'app
+  // les écarte déjà de ses écrans (plus de jetons). On propose de republier
+  // ailleurs les paires d'un compte que Vinted a fermé. §11 : même notion,
+  // même règle — les deux files doivent l'appliquer.
+  {
+    const tous = {
+      '101': { numero: '101', title: 'A', mp: { lbc: true, ebay: true } },
+      '202': { numero: '202', title: 'B', mp: { lbc: true, ebay: true } },
+      '303': { numero: '303', title: 'C', mp: { lbc: true, ebay: true } },
+    };
+    // 9002 (paire 303) n'est PAS masqué — il est supprimé DÉFINITIVEMENT.
+    const ctxB = ctxAvec(tous, [], null, [], null, ['9002']);
+    const rl = await ctxB.buildLbcData();
+    const nl = (rl.queue || []).map(a => String(a.numero)).sort();
+    dit(!nl.includes('303'), 'Leboncoin : un compte SUPPRIMÉ DÉFINITIVEMENT n\'alimente pas la file',
+      nl.includes('303') ? 'le panneau propose de publier une paire d\'un compte fermé par Vinted' : 'file : ' + nl.join(', '));
+    dit(nl.includes('101') && nl.includes('202'), 'et les comptes actifs y restent malgré tout',
+      'file : ' + nl.join(', '));
+    const re = await ctxB.buildEbayData();
+    const ne = (re.queue || []).map(a => String(a.numero)).sort();
+    dit(!ne.includes('303'), 'eBay : même règle sur le compte supprimé définitivement', 'file : ' + ne.join(', '));
+    // ⚠️ L'AUTRE SENS : liste NON LUE ⇒ on n'exclut rien (ne pas cacher un
+    //    compte vivant sur un hoquet). Sur une lecture ratée de la liste, 303 reste.
+    const ctxKO = ctxAvec(tous, [], null, [], 'vrm_blocked_accounts', ['9002']);
+    const rko = await ctxKO.buildLbcData();
+    dit((rko.queue || []).map(a => String(a.numero)).includes('303'),
+      'liste des supprimés NON LUE ⇒ on n\'exclut rien (pas de sur-exclusion sur un hoquet)',
+      'file : ' + (rko.queue || []).map(a => String(a.numero)).join(', '));
+    // Et l'app applique la même exclusion sur SA file.
+    dit(/vrm_blocked_accounts&select=data/.test(APP) && /blkRows\[0\]\.data\.uids|data && blkRows\[0\]\.data\.uids/.test(APP.replace(/\s+/g,' ')),
+      'l\'app exclut aussi les supprimés définitivement de SA file Leboncoin',
+      'sinon l\'app et le panneau divergent sur un compte fermé');
   }
 
   // ── ⚠️⚠️ UNE PREUVE QU'ON N'A PAS PU LIRE N'EST PAS « AUCUNE VENTE » ───────

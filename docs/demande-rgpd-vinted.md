@@ -9,7 +9,13 @@
 > mets les deux en destinataires.
 >
 > À compléter : [MON NOM], [MON EMAIL DE COMPTE], [MON PSEUDO VINTED],
-> [DATE DU BLOCAGE], [DATE]. À joindre : copie de ta pièce d'identité.
+> [DATE DU BLOCAGE], [DATE DE L'ESSAI], [DATE]. À joindre : copie de ta pièce
+> d'identité.
+>
+> ⚠️ La phrase sur `/settings/privacy/request_data_export` est **mesurée**, pas
+> supposée : le chemin a été relevé dans ton navigateur au moment où tu as
+> cliqué, et aucune requête d'export n'est partie. C'est un fait vérifiable, et
+> c'est ce qui coupe court au « utilisez le bouton dans vos paramètres ».
 
 **Objet : Compte bloqué — demande d'accès à mes données personnelles (art. 15 RGPD) et à la motivation de la décision (art. 15.1.h et 22.3 RGPD)**
 
@@ -18,9 +24,15 @@ Madame, Monsieur,
 Je suis titulaire du compte Vinted « [MON PSEUDO VINTED] », associé à l'adresse
 [MON EMAIL DE COMPTE]. Ce compte a été bloqué le [DATE DU BLOCAGE].
 
-Depuis ce blocage, je n'ai plus accès à mon compte et l'interface ne me permet
-donc plus d'utiliser la fonction de téléchargement de mes données. Je vous
-adresse par conséquent cette demande par écrit.
+Depuis ce blocage, l'interface ne me permet plus d'utiliser votre fonction de
+téléchargement de mes données. J'ai constaté précisément ceci le [DATE DE L'ESSAI] :
+en me rendant sur la page **`/settings/privacy/request_data_export`** de mon
+compte, votre interface m'a immédiatement redirigé vers une page « compte
+bloqué », **sans qu'aucune demande d'export ne soit soumise**.
+
+Votre propre outil d'exercice du droit d'accès m'est donc inaccessible, alors
+que ce droit ne dépend pas de l'état de mon compte. Je vous adresse par
+conséquent cette demande par écrit.
 
 **1. Droit d'accès à mes données (article 15 du RGPD)**
 
