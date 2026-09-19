@@ -631,12 +631,18 @@
     return out;
   }
   async function attacherPhotos(ad) {
-    const urls = (ad.photos || []).slice(0, 10);
+    // ⚠️ Compte PARTICULIER : jusqu'à 15 photos. Compte PRO : 5 max sans le pack
+    //    (Julien, 19 sept.). On ENVOIE jusqu'à 15 et on laisse LEBONCOIN plafonner
+    //    lui-même selon le compte — MESURÉ : un dépôt pro a reçu 6 photos et
+    //    Leboncoin en a gardé 5, sans erreur, l'annonce est partie. Sur-fournir
+    //    est donc sans risque, et ça évite une détection fragile du type de compte
+    //    (particulier vs pro) sur une page de dépôt qu'on ne voit pas d'ici.
+    const urls = (ad.photos || []).slice(0, 15);
     if (!urls.length) return { n: 0, raison: 'aucune photo à attacher' };
     const cible = champsFichier()[0];
     const zone = document.querySelector('[class*="drop"],[class*="Drop"],[data-testid*="photo"],[class*="photo"]');
     if (!cible && !zone) return { n: 0, raison: 'aucun champ photo sur cette étape' };
-    const r = await send({ action: 'photoBytes', urls, max: 10 });
+    const r = await send({ action: 'photoBytes', urls, max: 15 });
     const photos = (r && r.ok && Array.isArray(r.photos)) ? r.photos : [];
     const fichiers = fichiersDepuis(photos, ad.numero);
     // ⚠️ On DIT ce qui a échoué : une photo que le CDN refuse n'est pas une

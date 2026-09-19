@@ -2919,6 +2919,47 @@ titre du README.
 - Extension en **5.85.0**, zip régénéré, `EXT_ATTENDUE` suivie. Aucune entrée
   d'`EXT_CAPACITES` : rien de neuf n'est promis.
 
+### ⚠️ « IL N'Y A QUE 5 PHOTOS » — LE PLAFOND EST CELUI DU COMPTE, PAS DU CODE
+Julien, 19 sept. : « sur les comptes **particuliers** tu peux en mettre jusqu'à
+**15** ; c'est sur les comptes **pro** où tu peux en mettre que **5** si tu
+n'achètes pas le pack. Je veux toutes les photos de l'annonce Vinted sur
+Leboncoin si c'est du compte particulier. »
+**Mesuré d'abord — et ce n'était PAS un défaut chez lui aujourd'hui** : son
+compte Leboncoin est **PRO** (`online_store_id`), donc Leboncoin plafonne à 5 de
+son côté ; et ses annonces Vinted portent **au plus 6 photos** (mesuré sur son
+dépôt du 17 sept. : 6 envoyées, 5 gardées, aucune erreur, l'annonce est partie).
+Le « 5 » qu'il voyait est donc la limite de Leboncoin, pas un `slice` de
+l'extension.
+⇒ `attacherPhotos` **envoie jusqu'à 15** (`slice(0,15)`, `photoBytes … max:15`)
+et **laisse Leboncoin plafonner selon le compte**. C'est mesuré : sur-fournir est
+sans risque (Leboncoin garde les premières et ignore le surplus, sans erreur),
+et ça évite une **détection fragile du type de compte** (particulier vs pro) sur
+une page de dépôt qu'on ne voit pas d'ici — *on ne devine pas ce qu'on peut
+laisser la plateforme trancher.*
+- ⚠️ **Aucun changement visible pour lui aujourd'hui** : compte pro + ≤ 6 photos
+  ⇒ toujours 5 affichées. C'est une correction **latente** — le jour où il
+  publie depuis un compte **particulier** avec une paire à 8-15 photos, elles
+  partent toutes. Ne pas lui promettre un effet immédiat : lui dire la vérité.
+- **Aucune entrée d'`EXT_CAPACITES`** : le pont `photoBytes` respecte déjà `max`
+  (`photosEnOctets(urls, max)`), rien de neuf n'est promis à l'app. Extension en
+  **5.86.0**, zip régénéré, `EXT_ATTENDUE` suivie.
+
+### ✅ LE DÉPÔT DU 17 SEPT. A ÉTÉ CAPTÉ — `optcodes` RÉELS, ET LEBONCOIN AUTO-REMPLIT 4/6 ATTRIBUTS
+Mesuré sur sa vraie base après son dépôt manuel (extension à jour) : la capture
+des étapes remonte enfin, pour chaque champ composant, son **code DOM réel**
+(`optcodes: {t:libellé, v:value/data-value/data-qa-id/id}`) — plus une
+supposition, la valeur qui part vraiment. Et **Leboncoin remplit lui-même** 4 des
+6 attributs (Univers, Type, Pointure, Marque `rempli:true`), laissant **Couleur
+et État** vides.
+⇒ Ça débloque une passe FUTURE de remplissage d'attributs (Pointure ← `ad.taille`,
+État ← condition) **visant le code relevé**, prouvée au banc sur la vraie forme —
+**pas maintenant** : tant qu'un banc ne prouve pas le remplissage sur les codes
+réels captés, écrire le remplisseur de combobox serait deviner (§6.3), et un
+mauvais attribut sur une annonce **publiée** est le coût le plus élevé (leçon
+eBay). **Univers/Type/Couleur restent vides** — leur valeur ne se devine pas
+depuis ses données (*mieux vaut un blanc qu'un faux*). **Ne pas écrire le clic
+« Publier ».**
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
