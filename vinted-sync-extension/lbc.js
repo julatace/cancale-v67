@@ -229,47 +229,60 @@
   const root = host.attachShadow({ mode: 'open' });
   document.documentElement.appendChild(host);
 
+  // ⚠️ DESIGN — Julien : « j'aime pas trop les couleurs ni les boutons, ça fait
+  //    un peu simple ». On aligne le panneau sur la SIGNATURE de VRM (§7) :
+  //    encre ardoise #10151B, UNE seule couleur d'accent (bleu #1E5FCC, rare),
+  //    fond gris froid #F6F7F9, cartes blanches, rayons 8/10/12/14, ombres à
+  //    deux couches (contact serré + diffusion large et pâle). Plus d'orange
+  //    Leboncoin partout. Boutons : UNE seule forme (hauteur, rayon, graisse) —
+  //    la dispersion est ce qui se lit « pas fini », pas la couleur.
   const css = `
     *{box-sizing:border-box;font-family:-apple-system,Segoe UI,Roboto,sans-serif}
-    .fab{background:#ff6e14;color:#fff;border:none;border-radius:999px;padding:12px 16px;font-size:14px;font-weight:800;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.28);display:flex;align-items:center;gap:8px}
-    .fab .b{background:#fff;color:#ff6e14;border-radius:999px;min-width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;padding:0 6px}
-    .panel{width:380px;max-width:92vw;max-height:80vh;background:#fff;border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,.3);overflow:hidden;display:flex;flex-direction:column}
-    .hd{background:#ff6e14;color:#fff;padding:12px 14px;display:flex;align-items:center;gap:8px}
-    .hd .t{font-size:14px;font-weight:900;flex:1}
-    .hd button{background:rgba(255,255,255,.25);color:#fff;border:none;width:28px;height:28px;border-radius:999px;font-size:16px;cursor:pointer}
-    .body{overflow:auto;padding:10px;background:#f6f7f9}
-    .empty{padding:26px 16px;text-align:center;color:#666;font-size:13px;line-height:1.5}
-    .card{background:#fff;border:1px solid #e6e8eb;border-radius:12px;padding:10px;margin-bottom:10px}
-    .row{display:flex;gap:8px;align-items:center}
-    .num{background:#111;color:#fff;border-radius:999px;font-size:11px;font-weight:900;padding:2px 8px}
-    .cat{background:#eef2f7;color:#2b5aa0;border-radius:999px;font-size:10.5px;font-weight:800;padding:2px 8px}
-    .acc{color:#888;font-size:10.5px;font-weight:700;margin-left:auto}
-    .tt{font-size:13.5px;font-weight:800;color:#111;margin-top:7px}
-    .pr{font-size:15px;font-weight:900;color:#ff6e14;margin-top:2px}
-    .ph{display:flex;gap:5px;margin-top:7px;overflow-x:auto}
-    .ph img{width:52px;height:52px;object-fit:cover;border-radius:7px;flex-shrink:0;cursor:pointer;border:1px solid #e6e8eb}
-    .desc{font-size:11.5px;color:#444;white-space:pre-wrap;background:#f6f7f9;border-radius:8px;padding:8px;margin-top:7px;max-height:110px;overflow:auto}
-    .btns{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
-    .btn{border:1px solid #d7dbe0;background:#fff;color:#222;border-radius:8px;padding:6px 10px;font-size:11.5px;font-weight:800;cursor:pointer}
-    .btn.p{background:#ff6e14;color:#fff;border-color:#ff6e14}
-    .btn.g{background:#0a7f3f;color:#fff;border-color:#0a7f3f}
-    .hint{font-size:10.5px;color:#8a8f98;padding:4px 2px 8px;line-height:1.4}
-    .toast{position:fixed;left:50%;bottom:80px;transform:translateX(-50%);background:#111;color:#fff;padding:9px 14px;border-radius:10px;font-size:12.5px;font-weight:700;opacity:0;transition:opacity .2s;z-index:2147483647}
-    .remsec{border:1px solid #f0b6b0;background:#fdeceb;border-radius:12px;padding:8px;margin-bottom:10px}
-    .remhd{font-size:12px;font-weight:900;color:#c0392b;margin-bottom:6px}
-    .rem{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #f2cfcb;border-radius:9px;padding:7px 9px;margin-bottom:6px;font-size:12px}
-    .counter{background:#fff;border:1px solid #e6e8eb;border-radius:12px;padding:9px 11px;margin-bottom:10px}
-    .crow{display:flex;align-items:center;gap:6px;font-size:12.5px;color:#111}
-    .cbar{height:7px;border-radius:999px;background:#eef0f2;overflow:hidden;margin-top:7px}
-    .cbarfill{height:100%;border-radius:999px;transition:width .3s}
-    .cmsg{font-size:11px;font-weight:700;margin-top:5px}
-    .deposit{display:block;text-align:center;background:#ff6e14;color:#fff;text-decoration:none;font-size:13px;font-weight:900;padding:10px;margin:0 10px 6px;border-radius:10px}
-  
-  .grp{font-size:11px;font-weight:800;color:#10151b;margin:10px 2px 4px;letter-spacing:.2px}
-  .pko{font-size:10.5px;color:#c0392b;line-height:1.45;margin-top:5px}
-  .pko a{color:#c0392b;font-weight:700}
-  .pnote{font-size:10.5px;color:#6b7684;line-height:1.45;margin-top:5px}
-  .pnote a{color:#1e5fcc;font-weight:700}
+    .fab{background:#10151b;color:#fff;border:none;border-radius:999px;padding:11px 17px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 1px 2px rgba(16,21,27,.16),0 8px 24px rgba(16,21,27,.22);display:flex;align-items:center;gap:8px;letter-spacing:.2px}
+    .fab .b{background:#1e5fcc;color:#fff;border-radius:999px;min-width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;padding:0 6px}
+    .panel{width:384px;max-width:92vw;max-height:82vh;background:#fff;border-radius:16px;box-shadow:0 1px 3px rgba(16,21,27,.14),0 16px 44px rgba(16,21,27,.22);overflow:hidden;display:flex;flex-direction:column}
+    .hd{background:#10151b;color:#fff;padding:13px 15px;display:flex;align-items:center;gap:8px}
+    .hd .t{font-size:14px;font-weight:800;flex:1;letter-spacing:.2px}
+    .hd button{background:rgba(255,255,255,.16);color:#fff;border:none;width:28px;height:28px;border-radius:999px;font-size:16px;cursor:pointer}
+    .body{overflow:auto;padding:11px;background:#f6f7f9}
+    .empty{padding:26px 16px;text-align:center;color:#6b7684;font-size:13px;line-height:1.5}
+    .card{background:#fff;border:1px solid #e6e8eb;border-radius:12px;padding:11px;margin-bottom:10px;box-shadow:0 1px 2px rgba(16,21,27,.05)}
+    /* ⚠️ « flouter pour dire que je l'ai déjà publié » (Julien) : une paire
+       déjà en ligne sur Leboncoin est estompée, pour ne pas la republier. */
+    .card.deja{opacity:.5;filter:grayscale(.55)}
+    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .num{background:#10151b;color:#fff;border-radius:999px;font-size:11px;font-weight:800;padding:2px 9px}
+    .cat{background:#eef1f6;color:#3a4351;border-radius:999px;font-size:10.5px;font-weight:700;padding:2px 9px}
+    .done{background:#e9f0fb;color:#1e5fcc;border-radius:999px;font-size:10.5px;font-weight:800;padding:2px 9px}
+    .acc{color:#8a919c;font-size:10.5px;font-weight:700;margin-left:auto}
+    .tt{font-size:13.5px;font-weight:700;color:#10151b;margin-top:8px;line-height:1.35}
+    .pr{font-size:15px;font-weight:800;color:#10151b;margin-top:2px}
+    .ph{display:flex;gap:5px;margin-top:8px;overflow-x:auto}
+    .ph img{width:52px;height:52px;object-fit:cover;border-radius:8px;flex-shrink:0;cursor:pointer;border:1px solid #e6e8eb}
+    .desc{font-size:11.5px;color:#3a4351;white-space:pre-wrap;background:#f6f7f9;border-radius:8px;padding:8px;margin-top:8px;max-height:110px;overflow:auto}
+    .btns{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
+    .btn{border:1px solid #dce0e6;background:#fff;color:#10151b;border-radius:8px;padding:7px 11px;font-size:12px;font-weight:700;cursor:pointer;min-height:32px;transition:background .12s,border-color .12s}
+    .btn:hover{border-color:#c3c9d2}
+    .btn.p{background:#1e5fcc;color:#fff;border-color:#1e5fcc}
+    .btn.p:hover{background:#1a54b6;border-color:#1a54b6}
+    .btn.g{background:#fff;color:#1e5fcc;border-color:#1e5fcc}
+    .btn[disabled]{opacity:.5;cursor:not-allowed}
+    .hint{font-size:10.5px;color:#8a919c;padding:4px 2px 8px;line-height:1.45}
+    .toast{position:fixed;left:50%;bottom:80px;transform:translateX(-50%);background:#10151b;color:#fff;padding:10px 15px;border-radius:10px;font-size:12.5px;font-weight:600;opacity:0;transition:opacity .2s;z-index:2147483647;box-shadow:0 8px 24px rgba(16,21,27,.28)}
+    .remsec{border:1px solid #e6e8eb;background:#fff;border-radius:12px;padding:9px;margin-bottom:10px;box-shadow:0 1px 2px rgba(16,21,27,.05)}
+    .remhd{font-size:12px;font-weight:800;color:#10151b;margin-bottom:6px}
+    .rem{display:flex;align-items:center;gap:8px;background:#f6f7f9;border:1px solid #e6e8eb;border-radius:9px;padding:7px 9px;margin-bottom:6px;font-size:12px}
+    .counter{background:#fff;border:1px solid #e6e8eb;border-radius:12px;padding:10px 12px;margin-bottom:10px;box-shadow:0 1px 2px rgba(16,21,27,.05)}
+    .crow{display:flex;align-items:center;gap:6px;font-size:12.5px;color:#10151b;font-weight:600}
+    .cbar{height:7px;border-radius:999px;background:#eef0f2;overflow:hidden;margin-top:8px}
+    .cbarfill{height:100%;border-radius:999px;transition:width .3s;background:#1e5fcc}
+    .cmsg{font-size:11px;font-weight:600;margin-top:5px;line-height:1.45}
+    .deposit{display:block;text-align:center;background:#1e5fcc;color:#fff;text-decoration:none;font-size:13px;font-weight:800;padding:11px;margin:0 11px 8px;border-radius:10px;box-shadow:0 1px 2px rgba(16,21,27,.1)}
+    .grp{font-size:11px;font-weight:800;color:#10151b;margin:10px 2px 5px;letter-spacing:.2px;text-transform:uppercase}
+    .pko{font-size:10.5px;color:#c0392b;line-height:1.45;margin-top:5px}
+    .pko a{color:#c0392b;font-weight:700}
+    .pnote{font-size:10.5px;color:#6b7684;line-height:1.45;margin-top:5px}
+    .pnote a{color:#1e5fcc;font-weight:700}
 `;
 
   let open = false;
@@ -487,9 +500,14 @@
     //    (rouvrir l'annonce sur Vinted recapte des URL fraîches).
     //    C'est la méthode du bandeau eBay : faire constater par ce qui y a accès.
     const ph = (ad.photos || []).slice(0, 6).map((u) => `<img src="${esc(u)}" data-full="${esc(u)}" title="Ouvrir la photo" onerror="this.remove();const c=this.closest('.card');if(c){const n=c.querySelector('.pko');if(n)n.hidden=false;}">`).join('');
+    // ⚠️ « on les a déjà republiés… ça peut les flouter pour dire que je l'ai
+    //    déjà publié » (Julien). On repère NOTRE référence VRM-{n°} sur la page
+    //    Leboncoin (identité, jamais une ressemblance de titre, §5) : si elle y
+    //    est, la paire est DÉJÀ en ligne → carte estompée + « Tout préparer »
+    //    désactivé, pour ne pas la republier deux fois.
     const onPage = pageRefs.has(String(ad.numero));
-    return `<div class="card" data-id="${esc(ad.id)}">
-      <div class="row"><span class="num">N°${esc(ad.numero)}</span><span class="cat">${esc(ad.category)}</span>${onPage ? '<span class="cat" style="background:#e6f6ec;color:#0a7f3f">déjà sur cette page ?</span>' : ''}<span class="acc">${esc(ad.account)}</span></div>
+    return `<div class="card${onPage ? ' deja' : ''}" data-id="${esc(ad.id)}">
+      <div class="row"><span class="num">N°${esc(ad.numero)}</span><span class="cat">${esc(ad.category)}</span>${onPage ? '<span class="done">✓ déjà en ligne</span>' : ''}<span class="acc">${esc(ad.account)}</span></div>
       <div class="tt">${esc(ad.title)}</div>
       <div class="pr">${esc(euro(ad.price))}</div>
       ${ph ? `<div class="ph">${ph}</div>` : ''}
@@ -497,7 +515,7 @@
       ${photosLigne(ad)}
       <div class="desc">${esc(ad.description)}</div>
       <div class="btns">
-        <button class="btn p" data-a="prepare" style="flex:1 1 100%" title="Télécharge les photos, copie tout le texte de l'annonce et ouvre la page de dépôt Leboncoin.">🚀 Tout préparer (photos + texte + page)</button>
+        <button class="btn p" data-a="prepare" style="flex:1 1 100%"${onPage ? ' disabled' : ''} title="${onPage ? "Cette paire porte déjà ta référence VRM sur Leboncoin — inutile de la republier." : "Télécharge les photos, copie tout le texte de l'annonce et ouvre la page de dépôt Leboncoin."}">${onPage ? '✓ déjà publiée sur Leboncoin' : '🚀 Tout préparer (photos + texte + page)'}</button>
         <button class="btn" data-a="prefill">✍️ Pré-remplir</button>
         <button class="btn" data-a="ctitle">Titre</button>
         <button class="btn" data-a="cdesc">Description</button>

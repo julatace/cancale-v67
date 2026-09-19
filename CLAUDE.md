@@ -3075,6 +3075,37 @@ n'importe quelle réponse Leboncoin : un objet qui porte un **id + un nom** ET u
   l'affichage par paire + le « vendue ici → retire là ». *On collecte, on
   vérifie, PUIS on promet.*
 
+### ⚠️ « FLOUTER LES DÉJÀ PUBLIÉES » + « LE DESIGN FAIT SIMPLE » + « JUSTE UN BOUTON QUI PUBLIE »
+Demande de Julien, 19 sept. Trois points, traités selon ce qui est HONNÊTE :
+1. **Flouter les annonces déjà republiées** (« les Nike Sacai, on les a déjà mises
+   sur Leboncoin »). `cardHtml` estompe (`.card.deja` : opacity .5 + grayscale) et
+   **désactive « Tout préparer »** toute paire dont NOTRE `VRM-{n°}` est repéré sur
+   la page Leboncoin (`pageRefs`, une IDENTITÉ, jamais un titre — §5), avec un
+   badge « ✓ déjà en ligne ». ⚠️ Le signal PERSISTANT (ref trouvée dans ses
+   annonces captées) ne s'allumera qu'une fois ses ads captées (5.88 + sa visite) ;
+   d'ici là c'est le scan de page qui l'alimente.
+2. **Design aligné sur la signature de VRM (§7)** : fini l'orange Leboncoin
+   partout — encre ardoise `#10151B`, **UNE** couleur d'accent (bleu `#1E5FCC`,
+   rare), fond gris froid `#F6F7F9`, ombres à deux couches, et **une seule forme
+   de bouton** (hauteur/rayon/graisse). CSS only, aucune logique touchée ; le banc
+   `leboncoin.cjs` reste vert.
+3. ⚠️⚠️ **« juste appuyer sur un bouton et que ça publie » — PAS écrit, et c'est
+   la règle du projet.** Le clic « Publier » et le remplissage des listes
+   d'attributs (Univers/Type/Pointure/Marque/Couleur/État) sont des **composants
+   React** dont je n'ai **jamais vu** le DOM de sélection (Leboncoin me renvoie
+   403), et la valeur soumise est un **CODE**, pas le libellé. Un mauvais attribut
+   sur une annonce **publiée** est le coût le plus élevé du projet (leçon eBay).
+   *Écrire le clic « Publier » à l'aveugle serait le défaut le plus coûteux.* Ce
+   que fait déjà « Tout préparer » (mesuré, sûr) : attache les photos, remplit
+   titre + description + prix (en centimes) + référence, ouvre la page. **Ce qui
+   débloque le bouton unique** : qu'il fasse UN dépôt à la main avec la 5.88+ (la
+   capture `optcodes` + `lbc_recon.etapes` relève alors le DOM réel des listes) —
+   ensuite on câble le remplissage des attributs code-certains (Pointure, État) et
+   l'enchaînement des étapes, prouvé au banc sur la vraie forme. On ne promet pas
+   avant d'avoir mesuré.
+- Extension en **5.89.0**, zip régénéré, `EXT_ATTENDUE` suivie. Aucune entrée
+  d'`EXT_CAPACITES` : estompage + design, rien de neuf n'est promis.
+
 ### ✅ LE DÉPÔT DU 17 SEPT. A ÉTÉ CAPTÉ — `optcodes` RÉELS, ET LEBONCOIN AUTO-REMPLIT 4/6 ATTRIBUTS
 Mesuré sur sa vraie base après son dépôt manuel (extension à jour) : la capture
 des étapes remonte enfin, pour chaque champ composant, son **code DOM réel**
