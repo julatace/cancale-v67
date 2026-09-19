@@ -2947,12 +2947,12 @@ compte, ni un `slice` : l'extension envoie déjà **toutes** les photos qu'elle 
 - `attacherPhotos` **envoie jusqu'à 15** (`slice(0,15)`, `photoBytes … max:15`,
   contre 10 avant). C'est **correct pour un compte particulier** (15 autorisés),
   et sans risque : sur-fournir ne fait que laisser Leboncoin ignorer le surplus.
-- ⚠️ **Mais AUCUN effet visible aujourd'hui, quel que soit le type de compte** :
-  l'ancien plafond était **10**, ses annonces portent **≤ 6** photos → toutes
-  passaient déjà. Le « 15 » est une correction **latente**, qui ne portera que le
-  jour où une annonce Vinted aura **plus de 10** photos. *Ne pas lui promettre
-  qu'il verra plus de photos : la limite d'aujourd'hui est ce que porte SON
-  annonce, pas le code.*
+- ⚠️⚠️ **CE QUE JE CROYAIS ÊTRE LA VÉRITÉ ÉTAIT ENCORE FAUX** : j'avais écrit
+  « ses annonces portent ≤ 6 photos ». C'était le compte **CAPTÉ**, pas le réel.
+  Vinted DIT le vrai nombre dans `nPhotos` : **mesuré, ses annonces ont 7 à 16
+  photos** (médiane ~12 ; distribution sur 784 : le gros entre 11 et 14). On n'en
+  captait que **≤ 6** — il en manquait donc **la moitié**. Le « 15 » n'est PAS
+  latent : c'est la **capture** qui plafonnait (voir la section suivante).
 - **Aucune entrée d'`EXT_CAPACITES`** : le pont `photoBytes` respecte déjà `max`
   (`photosEnOctets(urls, max)`), rien de neuf n'est promis à l'app.
 
@@ -2986,6 +2986,54 @@ que l'ancien code avait **aussi** : il ajoutait la photo principale deux fois).
   faire mesurer par ce qui y a accès, comme le formulaire eBay.
 - **Aucune entrée d'`EXT_CAPACITES`** : c'est une correction de capture, pas une
   promesse neuve. Extension en **5.87.0**, zip régénéré, `EXT_ATTENDUE` suivie.
+
+### ⚠️ « DIS-MOI QUAND TOUTE L'ANNONCE EST CAPTÉE → PRÊTE POUR LEBONCOIN »
+Demande de Julien, 19 sept. : « j'aimerais que ça me dise quand ça capture toute
+l'annonce sur Vinted, pour qu'après ça puisse me dire s'il est en capacité de la
+mettre sur Leboncoin. »
+**Le signal existe grâce à `nPhotos`** (le compte RÉEL de Vinted, mesuré 7-16 par
+annonce) : on le compare aux photos **captées** de la page
+(`vinted_item_details[id].photos.length`, exposé à l'app par `fetchDescLens` qui
+rend désormais `{len, ph}` au lieu d'une simple longueur).
+- Par paire (carte Annonces) : **✓ prête pour Leboncoin** (numérotée + toutes ses
+  photos captées + une description) · **📷 X/Y photos — rouvre-la sur Vinted** ·
+  **à capter — ouvre-la sur Vinted** · **description à capter**. Le CHIFFRE,
+  jamais la promesse ; un total inconnu (`photoCount` absent) ne se juge pas (§5).
+- Dans le bandeau : « **N à recapturer pour Leboncoin** » (ambre) / « ✓ N prêtes »,
+  compté dans `annStats` — **même base que la grille** (§11), jamais un second
+  calcul.
+- ⚠️ **Ça éclaire le vrai état AUJOURD'HUI** : tant que la 5.87 (capture des
+  photos lazy) n'est pas installée et les annonces rouvertes, presque tout est
+  « à recapturer » (≤ 6 captées sur ~12 réelles). C'est honnête et actionnable :
+  ça lui dit exactement quoi rouvrir.
+
+### ⚠️⚠️ « OÙ EST LA PAIRE : VINTED / LEBONCOIN / QUEL COMPTE » — MESURÉ IMPOSSIBLE AUJOURD'HUI
+Demande de Julien, 19 sept. : « dans VRM, dis-moi précisément si la paire est
+postée sur Leboncoin, sur quel compte (j'aurai sûrement plusieurs comptes
+Leboncoin) ; et vendue sur Vinted → dis-moi de la retirer de Leboncoin, et
+inversement. »
+**Mesuré sur sa vraie base, et c'est le point de départ honnête** :
+- `lbc_listings.items` = **140 annonces qui ne sont PAS les siennes** (le flux
+  « découverte » : chalets, locations), **0 avec une réf VRM**, **0 avec un champ
+  compte**. `lbc_accounts` est **vide**.
+- Le parseur (`handleLbcRaw`) extrait `id, ref, url, status, subject, price,
+  images` — mais **aucun owner/compte**, et ses PROPRES annonces (particulier) ne
+  sont pas encore captées avec leur `VRM-{n°}`.
+⇒ Donc « sur quel compte » et « vendue ici → retire là » **ne peuvent pas être
+rendus honnêtement aujourd'hui** : il n'y a ni compte capté, ni lien
+paire↔annonce Leboncoin. Les afficher serait promettre ce qu'on ne peut pas
+tenir (le défaut le plus coûteux du projet). *Le lien qui survit à plusieurs
+comptes Leboncoin est la référence `VRM-{n°}` (déjà mise dans la description au
+dépôt) + le compte connecté, à capter.*
+⚠️ **CE QU'IL FAUT POUR DÉBLOQUER, et je ne peux pas le faire seul** : Leboncoin
+me renvoie **403** — je ne vois pas la page « mes annonces » du compte
+particulier ni où vit l'id de compte. Il faut : (1) qu'il **poste une vraie
+annonce** et rouvre « mes annonces » sur Leboncoin avec l'extension à jour, pour
+que ses ads soient captées avec leur `VRM-{n°}` **et** taguées du compte
+connecté ; (2) que je voie la **forme** de cette réponse (recon). Alors seulement
+je câble le « où / quel compte » et le « vendue ici → retire là » (les deux sens,
+`status` active/inactive existe déjà), prouvé sur des données réelles. *Ne pas
+écrire ce lien à l'aveugle.*
 
 ### ✅ LE DÉPÔT DU 17 SEPT. A ÉTÉ CAPTÉ — `optcodes` RÉELS, ET LEBONCOIN AUTO-REMPLIT 4/6 ATTRIBUTS
 Mesuré sur sa vraie base après son dépôt manuel (extension à jour) : la capture

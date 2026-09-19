@@ -1591,7 +1591,12 @@ const fetchDescLens = async () => {
       const PUB = /une communaut[ée].{0,60}marques|pour chaque achat effectu|thousands of brands|politique de rembours/i;
       for (const k in d) {
         const t = String((d[k] && d[k].description) || '').trim();
-        if (t && !PUB.test(t)) out[String(k)] = t.length;
+        const len = (t && !PUB.test(t)) ? t.length : 0;
+        // Photos EFFECTIVEMENT captées de la page (≤ nPhotos tant que le
+        // carrousel Vinted n'a pas tout livré) : sert au signal « toute
+        // l'annonce captée → prête pour Leboncoin ».
+        const ph = Array.isArray(d[k] && d[k].photos) ? d[k].photos.length : 0;
+        if (len || ph) out[String(k)] = { len, ph };
       }
     }
   } catch (_) { /* réseau : on se passe du complément */ }
@@ -14783,6 +14788,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // comptes, même déconnectés) → « 42 en ligne » avec 30 cartes visibles.
     const arr = annBase;
     let val=0, favs=0, views=0, hasFav=false, hasView=false, sansNum=0, sleeping=0, sleepingVal=0, datesKnown=0, planchers=0, surLbc=0, surEbay=0;
+    // « Toute l'annonce captée » = on a lu de la page AUTANT de photos que Vinted
+    // en annonce (`photoCount`/nPhotos) ET une description. C'est la mesure que
+    // Julien demande : savoir si une paire est PRÊTE à partir sur Leboncoin.
+    // Un total inconnu ne se juge pas (mieux vaut un blanc qu'un faux, §5).
+    let pretLbc=0, aRecapturer=0;
     for (const it of arr) {
       const p = it.price!=null ? Number(it.price) : 0;
       if (it.price!=null) val += p;
@@ -14799,8 +14809,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (numeros[it.id]?.numero && mpChoisi(numeros[it.id], 'lbc')) surLbc++;
       if (numeros[it.id]?.numero && mpChoisi(numeros[it.id], 'ebay')) surEbay++;
       const age = listedAgeDays(it); if (age!=null) datesKnown++; if (age!=null && age>=SLEEP_DAYS) { sleeping++; sleepingVal+=p; }
+      // Prête pour Leboncoin : numérotée, toutes ses photos captées, une description.
+      if (numeros[it.id]?.numero) {
+        const total = Number(it.photoCount)||0, capt = Number(it.captPhotos)||0, descOk = (Number(it.descLen)||0) > 0;
+        if (total > 0) { if (capt >= total && descOk) pretLbc++; else aRecapturer++; }
+      }
     }
-    return { n:arr.length, val, favs, views, hasFav, hasView, sansNum, sleeping, sleepingVal, datesKnown, planchers, surLbc, surEbay };
+    return { n:arr.length, val, favs, views, hasFav, hasView, sansNum, sleeping, sleepingVal, datesKnown, planchers, surLbc, surEbay, pretLbc, aRecapturer };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [annBase, numeros, listingDates]);
   // ── RENUMÉROTER À LA SUITE ────────────────────────────────────────────────
@@ -15258,7 +15273,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // l'extension ne la pose (elle ne coûte qu'une lecture, mise en cache).
     try {
       const lens = await fetchDescLens();
-      for (const it of out) { if (it.descLen == null) { const l = lens[String(it.id)]; if (l != null) it.descLen = l; } }
+      for (const it of out) {
+        const info = lens[String(it.id)];
+        if (!info) continue;
+        if (it.descLen == null && info.len) it.descLen = info.len;
+        // Combien de photos on a VRAIMENT captées de la page (pour « X/Y captées »).
+        if (info.ph) it.captPhotos = info.ph;
+      }
     } catch (_) { /* sans ce complément, le critère reste simplement inconnu */ }
     if (!error) putCache('listings', out);
     // Annonces que VINTED a marquées vendues (identité, jamais un titre).
@@ -19654,6 +19675,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {annStats.hasFav && <span title="Favoris cumulés sur tes annonces en ligne" style={{flexShrink:0,display:'inline-flex',alignItems:'center',gap:5,fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:'4px 11px'}}><Icon name="heart" size={13}/> {annStats.favs}</span>}
             {annStats.hasView && <span title="Vues cumulées sur tes annonces en ligne" style={{flexShrink:0,display:'inline-flex',alignItems:'center',gap:5,fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:'4px 11px'}}><Icon name="eye" size={13}/> {annStats.views}</span>}
             {annStats.sansNum>0 && <span style={{fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'4px 11px'}}>{annStats.sansNum} sans N°</span>}
+            {/* ⚠️ « Toute l'annonce captée ? » — même base que la grille (§11).
+                On compare les photos captées au compte RÉEL de Vinted : tant
+                qu'il en manque, la paire n'a pas toutes ses photos pour partir
+                sur Leboncoin. Rouvrir l'annonce sur Vinted les capte. */}
+            {annStats.aRecapturer>0 && <span title={`${annStats.pretLbc} paire(s) ont TOUTES leurs photos + une description captées — prêtes pour Leboncoin. ${annStats.aRecapturer} n'ont pas encore toutes leurs photos : rouvre-les sur Vinted (extension à jour) pour que l'extension les capte en entier.`} style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'4px 11px'}}>{annStats.aRecapturer} à recapturer pour Leboncoin</span>}
+            {annStats.pretLbc>0 && annStats.aRecapturer===0 && <span title="Toutes tes paires numérotées ont leurs photos et leur description captées : elles peuvent partir sur Leboncoin." style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:'4px 11px'}}>✓ {annStats.pretLbc} prêtes pour Leboncoin</span>}
             {/* ⚠️ « qui dorment » était en ROUGE, à côté d'un « sans N° » ambre et
                 d'un bouton bleu plein : trois couleurs dans une rangée de stats.
                 Le rouge est réservé à ce qui est irréversible — deux paires sous
@@ -20114,6 +20141,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     );
                   })}
                   {!num && <span style={{fontSize:10.5,color:C.warn}}>il lui faut un N°</span>}
+                  {/* ⚠️ « Toute l'annonce captée ? » — demande de Julien : savoir
+                      quand une paire est PRÊTE à partir sur Leboncoin. On compare
+                      les photos captées de la page au compte RÉEL de Vinted
+                      (`photoCount`/nPhotos). Le chiffre, jamais la promesse : un
+                      total inconnu ne se juge pas (§5). */}
+                  {num && (() => {
+                    const total = Number(item.photoCount)||0, capt = Number(item.captPhotos)||0, descOk = (Number(item.descLen)||0) > 0;
+                    let txt=null, warn=false, tip='';
+                    if (capt===0) { txt='à capter — ouvre-la sur Vinted'; warn=true; tip="Ouvre-la une fois sur Vinted : l'extension lira ses photos et sa description."; }
+                    else if (total>0 && capt<total) { txt=`📷 ${capt}/${total} photos — rouvre-la sur Vinted`; warn=true; tip="Le carrousel Vinted n'a pas encore livré toutes ses photos : rouvre-la pour les capter toutes."; }
+                    else if (!descOk) { txt='description à capter — rouvre-la sur Vinted'; warn=true; tip='Rouvre-la sur Vinted pour capter sa description.'; }
+                    else if (total>0) { txt='✓ prête pour Leboncoin'; warn=false; tip='Toutes ses photos et sa description sont captées : elle peut partir sur Leboncoin.'; }
+                    return txt ? <span title={tip} style={{fontSize:10.5,fontWeight:600,color:warn?C.warn:C.muted}}>{txt}</span> : null;
+                  })()}
                 </div>
                 {/* ⚠️ LE PRIX MINIMUM ACCEPTÉ — demande de Julien : « pour chaque
                     annonce que je poste je mets un prix minimum que l'app accepte
