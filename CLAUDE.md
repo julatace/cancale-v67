@@ -2987,6 +2987,40 @@ que l'ancien code avait **aussi** : il ajoutait la photo principale deux fois).
 - **Aucune entrée d'`EXT_CAPACITES`** : c'est une correction de capture, pas une
   promesse neuve. Extension en **5.87.0**, zip régénéré, `EXT_ATTENDUE` suivie.
 
+### ⚠️⚠️ « ÇA NE FAIT PAS LA CATÉGORIE TOUT SEUL » — LES MENUS REACT SONT ENFIN REMPLIS (POINTURE + ÉTAT)
+Julien, 19 sept., après son dépôt test. **Mesuré : son dépôt (5.89) n'a capté que
+l'étape « titre »** — mais un dépôt antérieur avait capté l'étape ATTRIBUTS
+entière (`lbc_recon.etapes`), et j'ai enfin sa **vraie forme** : chaque attribut
+(Univers, Type, Pointure, Marque, Couleur, État) est un **`[role="combobox"]`**
+(`:form-field-_r_XX_`) + une liste **`[role="option"]`** (les `-item-N`) — des
+COMPOSANTS React, **zéro `<select>` natif**. C'est pour ça que `choisirListe`
+(qui fait `querySelectorAll('select')`) ne remplissait **rien**.
+⇒ `choisirComposant(motif, valeurExacte)` (lbc.js) **OUVRE le menu et CLIQUE
+l'option** — le geste d'un humain, pas une valeur posée en douce. On trouve le
+menu par son **libellé** (les ids `_r_XX_` changent à chaque rendu React), et on
+ne clique QUE l'option au texte **EXACTEMENT** égal.
+- Rempli automatiquement : **Pointure** (← `ad.taille`, « 40.5 »→« 40,5 ») et
+  **État** (← `ad.etat` Vinted, exposé par `buildLbcAd`). ⚠️ **Correspondance
+  EXACTE** : « Satisfaisant » (Vinted) ≠ « État satisfaisant » (Leboncoin) → laissé
+  VIDE, exprès (mieux vaut un blanc qu'un faux, §5). Un attribut faux sur une
+  annonce publiée est le coût le plus élevé (leçon eBay).
+- **JAMAIS Univers/Type/Couleur/Marque** : ils ne se devinent pas depuis ses
+  données. **JAMAIS le clic « Publier »** : il reste à lui.
+- ⚠️ **Ce que je ne peux TOUJOURS pas prouver d'ici (403)** : que le combobox
+  RÉEL de Leboncoin réponde au clic synthétique comme mon fixture. Le banc sert la
+  vraie FORME mesurée (combobox + option), pas une fiction ; mais l'interaction se
+  confirme à son prochain dépôt. Si un menu ne se remplit pas, c'est un no-op
+  (VIDE), jamais un faux — il voit et complète.
+- `scripts/bancs/leboncoin.cjs` sert un dépôt `etape3` avec la vraie forme
+  (combobox React) : **Pointure 40 et État « Très bon état » choisis par clic ;
+  une pointure absente et « Satisfaisant » laissés VIDES.** Extension en
+  **5.90.0**, zip régénéré, `EXT_ATTENDUE` suivie. Aucune entrée d'`EXT_CAPACITES`
+  (le panneau fait le geste et écrit le chiffre ; l'app ne promet rien de neuf).
+- ⚠️ **La CATÉGORIE (l'arbre Mode > Chaussures), elle, n'est pas encore captée**
+  (son dépôt 5.89 s'est arrêté au titre) : c'est l'étape en amont qui ouvre les
+  attributs. À câbler quand un dépôt l'aura relevée — d'ici là, il choisit la
+  catégorie, l'extension remplit le reste qu'elle peut.
+
 ### ⚠️ « DIS-MOI QUAND TOUTE L'ANNONCE EST CAPTÉE → PRÊTE POUR LEBONCOIN »
 Demande de Julien, 19 sept. : « j'aimerais que ça me dise quand ça capture toute
 l'annonce sur Vinted, pour qu'après ça puisse me dire s'il est en capacité de la

@@ -1075,6 +1075,67 @@
       if (pendingTries > 90) { clearInterval(pendingTimer); pendingArrete = true; banner(); }
     }, 1000);
   }
+  // ── LES MENUS D'ATTRIBUTS DE LEBONCOIN sont des COMPOSANTS React (mesuré sur
+  //    le vrai dépôt de Julien, `lbc_recon.etapes`) : un `[role="combobox"]`
+  //    (`:form-field-_r_XX_`) + une liste `[role="option"]`. `choisirListe` ne
+  //    voyait que les `<select>` natifs → il ne remplissait RIEN (« ça ne met pas
+  //    la catégorie ni le reste »). `choisirComposant` OUVRE le menu et CLIQUE
+  //    l'option — exactement le geste d'un humain, pas une valeur posée en douce.
+  //    ⚠️ Les identifiants `_r_XX_` CHANGENT à chaque rendu React : on trouve le
+  //    menu par son LIBELLÉ, jamais par un id figé.
+  function labelCombobox(el) {
+    let lbl = el.getAttribute('aria-label') || '';
+    const lb = el.getAttribute('aria-labelledby');
+    if (lb) { try { for (const id of lb.split(/\s+/)) { const e = document.getElementById(id); if (e) lbl += ' ' + (e.innerText || ''); } } catch (_) {} }
+    const id = el.getAttribute('id');
+    if (id) { try { const l = document.querySelector('label[for="' + ((window.CSS && CSS.escape) ? CSS.escape(id) : id) + '"]'); if (l) lbl += ' ' + (l.innerText || ''); } catch (_) {} }
+    const f = el.closest('div,fieldset,section'); if (f) { const l = f.querySelector('label'); if (l) lbl += ' ' + (l.innerText || ''); }
+    return lbl.toLowerCase();
+  }
+  async function choisirComposant(motif, valeurExacte) {
+    // ⚠️ CORRESPONDANCE EXACTE, une seule valeur — jamais « le premier qui
+    //    ressemble » ni un « premier de la liste ». Aucune option exacte ⇒ on
+    //    laisse VIDE (mieux vaut un blanc qu'un faux, §5) : un attribut faux sur
+    //    une annonce publiée est le coût le plus élevé du projet.
+    const cible = String(valeurExacte || '').trim();
+    if (!cible) return false;
+    const boxes = Array.from(document.querySelectorAll('[role="combobox"]')).filter((el) => !DANS_ENTETE(el));
+    for (const box of boxes) {
+      if (!motif.test(labelCombobox(box))) continue;
+      const val = String(box.value || box.getAttribute('data-choisi') || '').trim();
+      if (val) return false;                          // déjà choisi : on ne touche pas
+      try { box.focus(); box.click(); } catch (_) {}
+      await new Promise((r) => setTimeout(r, 160));    // le menu React s'ouvre
+      const opt = Array.from(document.querySelectorAll('[role="option"]'))
+        .find((o) => String(o.textContent || '').trim().toLowerCase() === cible.toLowerCase());
+      if (opt) { try { opt.click(); } catch (_) {} return true; }
+      try { box.blur(); } catch (_) {}                 // referme le menu, rien choisi
+      return false;
+    }
+    return false;
+  }
+  // On ne remplit ces menus qu'UNE fois par paire (l'observateur du formulaire
+  // rappelle fillNow à chaque mutation — sans ça on ré-ouvrirait le menu en
+  // boucle). Réinitialisé par « Re-remplir » (fillNowForce).
+  let _composFaits = new Set(); let _composEnCours = false;
+  async function remplirComposants(ad) {
+    if (_composEnCours) return 0; _composEnCours = true;
+    let k = 0;
+    try {
+      const cle = (q) => String(ad.id) + ':' + q;
+      // POINTURE : sa taille Vinted (« 40.5 » → « 40,5 » côté Leboncoin).
+      const taille = String(ad.taille || '').trim().replace('.', ',');
+      if (taille && !_composFaits.has(cle('p')) && await choisirComposant(/pointure|taille|size/, taille)) { _composFaits.add(cle('p')); k++; }
+      // ÉTAT : son état Vinted, par correspondance EXACTE. « Satisfaisant »
+      // (Vinted) ≠ « État satisfaisant » (Leboncoin) : pas de correspondance
+      // exacte ⇒ laissé vide, exprès.
+      const etat = String(ad.etat || '').trim();
+      if (etat && !_composFaits.has(cle('e')) && await choisirComposant(/[ée]tat|condition/, etat)) { _composFaits.add(cle('e')); k++; }
+    } catch (_) {}
+    _composEnCours = false;
+    if (k) toast('👟 ' + k + ' menu' + (k > 1 ? 's' : '') + ' rempli' + (k > 1 ? 's' : '') + ' (pointure / état)');
+    return k;
+  }
   function fillNow(ad) {
     let n = 0;
     if (setIfEmpty(findField([/titre|title|subject|proposez/]), ad.title)) n++;
@@ -1083,13 +1144,17 @@
     if (setIfEmpty(findField([/référ|referen|\bref\b|\bsku\b|identifiant|code.?article|numéro.?article/]), ad.ref || ('VRM-' + ad.numero))) n++;
     // ⚠️ « ça ne met pas la catégorie ni le reste » (Julien, 13 septembre). Les
     //    listes déroulantes ne sont pas des `input` : `findField` ne les voyait
-    //    même pas. On les traite, et on ne choisit QUE si une option correspond
-    //    vraiment — sinon on laisse vide. Une catégorie fausse fait plus de mal
-    //    que pas de catégorie (leçon eBay).
+    //    même pas. `choisirListe` couvre le cas d'un `<select>` natif (repli),
+    //    `remplirComposants` (async, ci-dessous) couvre les COMPOSANTS React —
+    //    la vraie forme mesurée sur son dépôt. On ne choisit QUE si une option
+    //    correspond VRAIMENT — sinon on laisse vide (une catégorie fausse fait
+    //    plus de mal que pas de catégorie, leçon eBay).
     if (choisirListe([/cat[ée]gorie|category|rubrique/], [ad.category, 'Chaussures'])) n++;
-    if (choisirListe([/[ée]tat|condition|state/], ['Très bon état', 'Bon état', 'Satisfaisant'])) n++;
+    if (choisirListe([/[ée]tat|condition|state/], [ad.etat])) n++;
     if (choisirListe([/marque|brand/], [ad.marque])) n++;
     if (choisirListe([/pointure|taille|size/], [ad.taille])) n++;
+    // Les menus React (pointure, état) — sans bloquer le comptage synchrone.
+    remplirComposants(ad);
     return n;
   }
   // Une liste déroulante : on ne prend une option que si son libellé contient
@@ -1197,6 +1262,9 @@
     { const d = poserDescription(ad); if (d.fait || d.ref) n++; }   // même face à « Re-remplir » : on n'écrase pas l'auto-description de Leboncoin
     if (poserPrix(ad.price)) n++;   // §11 : la même règle de prix que partout
     if (setField(findField([/référ|referen|\bref\b|\bsku\b|identifiant|code.?article|numéro.?article/]), ad.ref || ('VRM-' + ad.numero))) n++;
+    // « Re-remplir » relance aussi les menus React (on oublie qu'on les a déjà
+    // faits, au cas où on serait revenu sur l'étape des attributs).
+    _composFaits = new Set(); remplirComposants(ad);
     return n;
   }
 
