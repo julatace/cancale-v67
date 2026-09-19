@@ -12,7 +12,7 @@
 // background ne minait pas). `detectLbcAccount` la lit maintenant, et
 // `handleLbcRaw` tague chaque annonce de SON tableau de bord avec ce compte.
 //
-// Ce que ce contrôle EXÉCUTE (le vrai `background.js`, HEAD vs arbre, §6.1) :
+// Ce que ce contrôle EXÉCUTE (le vrai `background.js` dans un `vm`) :
 //   1. un compte PARTICULIER (id + pseudo + email) est reconnu, type particulier ;
 //   2. un compte PRO (store_id + raison sociale + siren) est reconnu, type pro ;
 //   3. ⚠️ un ACHETEUR (id + pseudo, mais AUCUN email/siren) n'est PAS pris pour
@@ -20,12 +20,12 @@
 //      mauvais compte serait pire que ne rien taguer ;
 //   4. les annonces du tableau de bord sont TAGUÉES du compte connecté, et
 //      écrites dans `lbc_accounts` ;
-//   5. §6.1 : sur le code d'AVANT, AUCUNE annonce n'était taguée (0 compte).
-const fs = require('fs'), vm = require('vm'), path = require('path'), cp = require('child_process');
+//   5. le taguage est PILOTÉ par la détection : sans compte détectable, aucune
+//      annonce n'est taguée (réaffaiblir la détection fait tomber ce contrôle).
+const fs = require('fs'), vm = require('vm'), path = require('path');
 const racine = path.join(__dirname, '..');
 const FICH = 'vinted-sync-extension/background.js';
 const BG_NEUF = fs.readFileSync(path.join(racine, FICH), 'utf8');
-let BG_VIEUX = ''; try { BG_VIEUX = cp.execSync('git show HEAD:' + FICH, { cwd: racine, encoding: 'utf8' }); } catch (_) {}
 
 let ko = 0;
 const dit = (ok, nom, det) => { if (!ok) ko++; console.log(`${ok ? '✅' : '❌'} ${nom}${det ? ' — ' + det : ''}`); };
@@ -103,15 +103,20 @@ const MESSAGES = JSON.stringify({ conversations: [{ interlocutor: { user_id: 999
     dit(!!accs && !!(accs.data.accounts && accs.data.accounts['55']), 'le compte est mémorisé dans lbc_accounts', accs ? JSON.stringify(accs.data.accounts['55']) : 'rien');
   });
 
-  console.log('\n── §6.1 : SUR LE CODE D’AVANT, AUCUNE ANNONCE N’ÉTAIT TAGUÉE');
-  await essaie('code d’avant : 0 annonce avec un compte', async () => {
-    if (!BG_VIEUX) { dit(false, 'HEAD illisible'); return; }
-    const cv = faireCtx(BG_VIEUX);
-    await cv.handleLbcRaw('https://api.leboncoin.fr/api/dashboard/v1/search', DASH_PART);
-    const list = cv.__ecrits.find((r) => r.id === 'lbc_listings');
+  console.log('\n── LE TAGUAGE EST PILOTÉ PAR LA DÉTECTION, JAMAIS AVEUGLE (§5)');
+  // ⚠️ Règle permanente (pas un diff HEAD, qui devient faux une fois le commit
+  //    fusionné) : sans compte DÉTECTABLE dans la réponse, une annonce ne reçoit
+  //    AUCUN compte — on ne tague jamais « au hasard ». Réaffaiblir detectLbcAccount
+  //    pour qu'il rende toujours un compte ferait tomber ce contrôle au rouge.
+  await essaie('sans compte détectable, l’annonce n’est PAS taguée (pas de faux compte)', async () => {
+    const cc = faireCtx(BG_NEUF);
+    // Un tableau de bord SANS objet compte (aucun email/siren/store_id nulle part).
+    const SANS = JSON.stringify({ Ads: [{ Id: 7, Status: 'active', Info: { Title: 'Nike VRM-777', Price: 60, URL: 'https://www.leboncoin.fr/ad/7', CustomRef: '777' } }] });
+    await cc.handleLbcRaw('https://api.leboncoin.fr/api/dashboard/v1/search', SANS);
+    const list = cc.__ecrits.find((r) => r.id === 'lbc_listings');
     const items = list ? Object.values(list.data.items || {}) : [];
     const taguees = items.filter((it) => it.account).length;
-    dit(taguees === 0, 'aucune annonce ne portait de compte avant', 'taguées=' + taguees + ' sur ' + items.length);
+    dit(items.length === 1 && taguees === 0, 'l’annonce existe mais SANS compte (pas de compte détecté ⇒ pas de tag)', 'taguées=' + taguees + ' sur ' + items.length);
   });
 
   console.log(ko === 0 ? '\nChaque annonce sait à quel compte Leboncoin elle appartient.' : '\n' + ko + ' contrôle(s) au rouge.');
