@@ -648,43 +648,82 @@
     }
     return out;
   }
+  const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
+  function zonePhotos() {
+    return document.querySelector('[class*="drop"],[class*="Drop"],[data-testid*="photo"],[class*="photo"],[class*="upload"],[class*="Upload"],[aria-label*="photo" i]');
+  }
+  // Combien de VIGNETTES d'aperçu de photos sont visibles (blob:/data:). C'est
+  // ainsi qu'on SAIT combien de photos Leboncoin a réellement acceptées, sans
+  // voir sa page : on avance jusqu'à ce que ce nombre atteigne le nôtre.
+  function apercusPhotos() {
+    try { return document.querySelectorAll('img[src^="blob:"], img[src^="data:"]').length; } catch (_) { return 0; }
+  }
+  function poserFichiers(input, fichiers) {
+    try {
+      const dt = new DataTransfer(); fichiers.forEach((f) => dt.items.add(f));
+      input.files = dt.files;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+      return true;
+    } catch (_) { return false; }
+  }
+  function dropSur(zone, fichiers) {
+    try {
+      const dt = new DataTransfer(); fichiers.forEach((f) => dt.items.add(f));
+      ['dragenter', 'dragover', 'drop'].forEach((t) => zone.dispatchEvent(new DragEvent(t, { bubbles: true, cancelable: true, dataTransfer: dt })));
+      return true;
+    } catch (_) { return false; }
+  }
   async function attacherPhotos(ad) {
-    // ⚠️ Compte PARTICULIER : jusqu'à 15 photos. Compte PRO : 5 max sans le pack
-    //    (Julien, 19 sept.). On ENVOIE jusqu'à 15 et on laisse LEBONCOIN plafonner
-    //    lui-même selon le compte — MESURÉ : un dépôt pro a reçu 6 photos et
-    //    Leboncoin en a gardé 5, sans erreur, l'annonce est partie. Sur-fournir
-    //    est donc sans risque, et ça évite une détection fragile du type de compte
-    //    (particulier vs pro) sur une page de dépôt qu'on ne voit pas d'ici.
+    // ⚠️ Compte PARTICULIER : jusqu'à 15 photos. Compte PRO : 5 max sans le pack.
+    //    On ENVOIE jusqu'à 15 et Leboncoin plafonne lui-même selon le compte.
     const urls = (ad.photos || []).slice(0, 15);
     if (!urls.length) return { n: 0, raison: 'aucune photo à attacher' };
-    const cible = champsFichier()[0];
-    const zone = document.querySelector('[class*="drop"],[class*="Drop"],[data-testid*="photo"],[class*="photo"]');
-    if (!cible && !zone) return { n: 0, raison: 'aucun champ photo sur cette étape' };
+    if (!champsFichier()[0] && !zonePhotos()) return { n: 0, raison: 'aucun champ photo sur cette étape' };
     const r = await send({ action: 'photoBytes', urls, max: 15 });
     const photos = (r && r.ok && Array.isArray(r.photos)) ? r.photos : [];
     const fichiers = fichiersDepuis(photos, ad.numero);
-    // ⚠️ On DIT ce qui a échoué : une photo que le CDN refuse n'est pas une
-    //    photo attachée, et un compte rond ne doit pas la compter.
-    const rates = photos.filter((p) => p && p.erreur).length;
+    const rates = photos.filter((p) => p && p.erreur).length;   // le CDN a refusé
     if (!fichiers.length) return { n: 0, rates, raison: rates ? 'les photos n\'ont pas pu être lues' : 'aucune photo lisible' };
-    try {
-      const dt = new DataTransfer();
-      fichiers.forEach((f) => dt.items.add(f));
-      if (cible) {
-        cible.files = dt.files;
-        cible.dispatchEvent(new Event('input', { bubbles: true }));
-        cible.dispatchEvent(new Event('change', { bubbles: true }));
-        if (cible.files && cible.files.length) return { n: cible.files.length, rates };
+
+    const base = apercusPhotos();
+    const cible = champsFichier()[0];
+    // ── VOIE A : champ MULTIPLE → tout d'un coup (l'API standard, et le bon
+    //    geste pour ce type de champ).
+    if (cible && cible.multiple) {
+      poserFichiers(cible, fichiers);
+      await attendre(900);
+      const faites = apercusPhotos() - base;
+      if (faites >= fichiers.length || faites <= 0) {
+        // tout pris, OU on ne sait pas compter les aperçus : on ne force pas un
+        // séquentiel qui, sur un champ multiple, REMPLACERAIT tout par une seule.
+        return { n: faites > 0 ? Math.min(faites, fichiers.length) : fichiers.length, rates, total: fichiers.length, voie: 'multiple' };
       }
-      if (zone) {
-        const dt2 = new DataTransfer();
-        fichiers.forEach((f) => dt2.items.add(f));
-        zone.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt2 }));
-        zone.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt2 }));
-        return { n: fichiers.length, rates, voie: 'glisser-déposer' };
-      }
-      return { n: 0, rates, raison: 'le champ n\'a pas accepté les fichiers' };
-    } catch (e) { return { n: 0, rates, raison: String((e && e.message) || e).slice(0, 60) }; }
+      // multiple mais Leboncoin n'a pris qu'une partie : on complète en séquentiel.
+    }
+    // ── VOIE B (débrouillarde) : UNE PAR UNE. C'est le cas où « une seule photo
+    //    se téléversait » : l'uploader lit une photo, l'ajoute, puis REMONTE le
+    //    champ. On re-cherche le champ à chaque fois, on attend que la vignette
+    //    apparaisse, et on avance jusqu'à atteindre notre nombre de photos. Si
+    //    Leboncoin change sa mécanique, on tente aussi le glisser-déposer.
+    let placees = 0, sansProgres = 0;
+    for (let garde = 0; garde < fichiers.length * 3 + 5; garde++) {
+      const faites = apercusPhotos() - base;
+      const cibleN = Math.max(faites, placees);        // la prochaine photo à poser
+      if (faites >= fichiers.length || cibleN >= fichiers.length) break;
+      let input = null;
+      for (let e = 0; e < 5 && !input; e++) { input = champsFichier()[0]; if (!input) await attendre(250); }
+      let ok = false;
+      if (input) ok = poserFichiers(input, [fichiers[cibleN]]);
+      if (!ok) { const z = zonePhotos(); if (z) ok = dropSur(z, [fichiers[cibleN]]); }
+      if (ok) placees++;
+      await attendre(650);
+      const apres = apercusPhotos() - base;
+      if (apres <= faites) { sansProgres++; if (sansProgres >= 3) break; } else sansProgres = 0;
+    }
+    const vues = apercusPhotos() - base;
+    const n = Math.min(fichiers.length, Math.max(vues, placees));
+    return { n, rates, total: fichiers.length };
   }
 
   // ⚠️⚠️ LE CHAMP PRIX S'APPELLE `price_cents` — IL ATTEND DES CENTIMES.
@@ -933,10 +972,15 @@
         //    pour ne pas les écraser (§ « adapte face à l'auto-remplissage »).
         //    Un booléen et un nombre, jamais le texte.
         const val = (() => { try { return String(el.value || ''); } catch (_) { return ''; } })();
-        fields.push({ tag: el.tagName.toLowerCase(), type: el.type || '', name: el.name || '', id: el.id || '', ph: el.placeholder || '', aria: el.getAttribute('aria-label') || '', label: libelleDe(el), qa: el.getAttribute('data-qa-id') || el.getAttribute('data-testid') || '', rempli: !!val.trim(), len: val.length });
+        // ⚠️ `multiple`/`accept` sur un champ fichier : c'est CE qui décide si on
+        //    pose toutes les photos d'un coup ou une par une. On le relève pour
+        //    ne plus deviner (« une seule photo se téléverse », Julien 19 sept.).
+        fields.push({ tag: el.tagName.toLowerCase(), type: el.type || '', name: el.name || '', id: el.id || '', ph: el.placeholder || '', aria: el.getAttribute('aria-label') || '', label: libelleDe(el), qa: el.getAttribute('data-qa-id') || el.getAttribute('data-testid') || '', rempli: !!val.trim(), len: val.length, multiple: el.type === 'file' ? !!el.multiple : undefined, accept: el.type === 'file' ? (el.accept || '') : undefined });
       });
       const sels = listesDeroulantes();
-      const fichiers = tousLesNoeuds('input[type="file"]').length;
+      const fileInputs = tousLesNoeuds('input[type="file"]');
+      const fichiers = fileInputs.length;
+      const fichiersMultiple = fileInputs.some((el) => el.multiple);
       const categorie = categorieCourante(sels);
       // La signature dédoublonne les étapes identiques — mais deux CATÉGORIES
       // donnent deux formulaires différents, donc la catégorie en fait partie.
@@ -946,7 +990,7 @@
       if (fields.length || sels.length || fichiers) {
         ordreEtape++;
         chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcForm', url: location.href,
-          fields: fields.slice(0, 150), selects: sels.slice(0, 30), fichiers,
+          fields: fields.slice(0, 150), selects: sels.slice(0, 30), fichiers, fichiersMultiple,
           categorie, depot: DEPOT_ID, ordre: ordreEtape, ver: EXT_VER,
           etape: signature.slice(0, 160) });
         // ⚠️⚠️ « LÀ C'EST SÛR ? » — Julien, 17 septembre. NON, et c'est la bonne

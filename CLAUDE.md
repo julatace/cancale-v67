@@ -2987,6 +2987,33 @@ que l'ancien code avait **aussi** : il ajoutait la photo principale deux fois).
 - **Aucune entrée d'`EXT_CAPACITES`** : c'est une correction de capture, pas une
   promesse neuve. Extension en **5.87.0**, zip régénéré, `EXT_ATTENDUE` suivie.
 
+### ⚠️⚠️ « UNE SEULE PHOTO SE TÉLÉVERSE » — L'UPLOADER LEBONCOIN LES PREND UNE PAR UNE
+Julien, 19 sept. (dépôt simulé) : « il n'y a qu'une seule photo qui se téléverse,
+il faut qu'elles y soient toutes, tout seul ». **Cause** : `attacherPhotos` posait
+**toutes** les photos d'un coup (`input.files = dt.files` avec N fichiers). Or
+l'uploader de Leboncoin lit **une** photo par `change`, ajoute sa vignette, puis
+**remonte le champ** — un envoi groupé n'y dépose donc qu'**une** vignette.
+⇒ Nouvelle stratégie, **débrouillarde** (résiste à un changement de Leboncoin) :
+- champ **`multiple`** → on pose tout d'un coup (l'API standard) ;
+- sinon → **une par une**, en **re-cherchant le champ** à chaque fois et en
+  **comptant les vignettes d'aperçu** (`img[src^="blob:"]`) pour savoir combien
+  Leboncoin a réellement acceptées — on avance jusqu'à atteindre notre nombre,
+  avec repli **glisser-déposer** si le champ disparaît. S'arrête sur absence de
+  progrès (pas de boucle infinie).
+- La capture note désormais `multiple`/`accept` du champ fichier + `fichiersMultiple`
+  de l'étape : on ne devine plus, on mesure.
+- `bancs/leboncoin.cjs` sert l'uploader qui **ne prend qu'une photo** (non
+  `multiple`, lit `files[0]`, se vide) : **§6.1 — un envoi groupé n'y dépose
+  qu'1 vignette (le défaut) ; l'extension en dépose 3** (une par une). Le champ
+  `multiple` (etape2) garde l'envoi groupé.
+- Extension en **5.91.0**, zip régénéré, `EXT_ATTENDUE` suivie. Aucune entrée
+  d'`EXT_CAPACITES` (correction de fiabilité).
+- ⚠️ **« Juste un bouton et ça se poste » — toujours PAS le clic « Publier ».**
+  L'arbre catégorie (Mode > Chaussures) et le clic final restent à lui tant que
+  je n'ai pas capté l'étape catégorie sur un dépôt complet (le sien s'est arrêté
+  avant). Photos + titre + description + prix + pointure + état sont automatiques ;
+  publier reste un geste humain (aucune publication à l'aveugle, §5/§3).
+
 ### ⚠️⚠️ « ÇA NE FAIT PAS LA CATÉGORIE TOUT SEUL » — LES MENUS REACT SONT ENFIN REMPLIS (POINTURE + ÉTAT)
 Julien, 19 sept., après son dépôt test. **Mesuré : son dépôt (5.89) n'a capté que
 l'étape « titre »** — mais un dépôt antérieur avait capté l'étape ATTRIBUTS
