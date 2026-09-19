@@ -31,7 +31,18 @@ const SRC = fs.readFileSync(path.join(__dirname, '..', '..', 'vinted-sync-extens
 const PAGE = (depot) => `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Leboncoin</title></head>
 <body>
   <header role="banner"><form action="/recherche"><input name="text" type="text" placeholder="Rechercher sur leboncoin"></form></header>
-  <main>${depot === 'etape2'
+  <main>${depot === 'etape3'
+    // ⚠️ LA VRAIE FORME MESURÉE sur son dépôt (`lbc_recon.etapes`) : les
+    //    attributs sont des COMPOSANTS React — un [role=combobox] + une liste
+    //    [role=option], PAS des <select> natifs. C'est pour ça que `choisirListe`
+    //    ne remplissait rien. On sert ici exactement cette forme.
+    ? '<label for="s3">Titre</label><input id="s3" name="subject" type="text">'
+      + '<div><label for="cbp">Pointure*</label><input id="cbp" role="combobox" aria-label="Pointure*" readonly>'
+      + '<ul id="cbp-menu" role="listbox" hidden><li role="option">39</li><li role="option">40</li><li role="option">40,5</li><li role="option">41</li></ul></div>'
+      + '<div><label for="cbe">État*</label><input id="cbe" role="combobox" aria-label="État*" readonly>'
+      + '<ul id="cbe-menu" role="listbox" hidden><li role="option">Neuf avec étiquette</li><li role="option">Très bon état</li><li role="option">Bon état</li><li role="option">État satisfaisant</li></ul></div>'
+      + '<scr'+'ipt>document.querySelectorAll("[role=combobox]").forEach(function(cb){var menu=document.getElementById(cb.id+"-menu");cb.addEventListener("click",function(){menu.hidden=false;});menu.querySelectorAll("[role=option]").forEach(function(o){o.addEventListener("click",function(){cb.value=o.textContent;cb.setAttribute("data-choisi",o.textContent);menu.hidden=true;});});});</scr'+'ipt>'
+    : depot === 'etape2'
     ? '<label for="s2">Titre de l’annonce</label><input id="s2" name="subject" type="text">'
       + '<label for="d2">Description</label><textarea id="d2" name="body"></textarea>'
       + '<label for="p2">Prix</label><input id="p2" name="price_cents" type="text">'  // ⚠️ la VRAIE forme mesurée : le champ est en CENTIMES (lbc_recon.etapes, 19 sept.)
@@ -46,7 +57,7 @@ const PAGE = (depot) => `<!doctype html><html lang="fr"><head><meta charset="utf
 
 // La file servie au panneau : les trois cas de photo, et les trois preuves.
 const QUEUE = [
-  { id: '1001', numero: '401', account: 'julatace3535', title: 'Salomon XT-6 blanc T40', description: 'Réf. VRM-401\n\nTrès bon état.', price: '99.00', category: 'Chaussures', photos: ['https://ex/a1.jpg', 'https://ex/a2.jpg', 'https://ex/a3.jpg'], ref: 'VRM-401', vintedUrl: 'https://www.vinted.fr/items/1001' },
+  { id: '1001', numero: '401', account: 'julatace3535', title: 'Salomon XT-6 blanc T40', description: 'Réf. VRM-401\n\nTrès bon état.', price: '99.00', category: 'Chaussures', taille: '40', etat: 'Très bon état', photos: ['https://ex/a1.jpg', 'https://ex/a2.jpg', 'https://ex/a3.jpg'], ref: 'VRM-401', vintedUrl: 'https://www.vinted.fr/items/1001' },
   { id: '1002', numero: '402', account: 'julatace3535', title: 'Nike air max 1 clear jade T44', description: 'Réf. VRM-402\n\nBon état.', price: '44.00', category: 'Chaussures', photos: ['https://ex/b1.jpg'], ref: 'VRM-402', vintedUrl: 'https://www.vinted.fr/items/1002' },
   { id: '1003', numero: '403', account: 'llloollllaa', title: 'Autry medalist blanc T36', description: 'Réf. VRM-403', price: '24.00', category: 'Chaussures', photos: [], ref: 'VRM-403', vintedUrl: 'https://www.vinted.fr/items/1003' },
 ];
@@ -60,7 +71,7 @@ let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
 
 (async () => {
-  const srv = http.createServer((q, r) => { r.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); r.end(PAGE(/etape2/.test(q.url) ? 'etape2' : /depot/.test(q.url))); });
+  const srv = http.createServer((q, r) => { r.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); r.end(PAGE(/etape3/.test(q.url) ? 'etape3' : /etape2/.test(q.url) ? 'etape2' : /depot/.test(q.url))); });
   await new Promise((res) => srv.listen(4491, res));
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox'] });
   const pg = await b.newPage({ viewport: { width: 1280, height: 900 } });
@@ -454,6 +465,49 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
     dit(/3 photos attachées/.test(etat.bandeau), 'le bandeau écrit combien de photos ont été attachées',
       (etat.bandeau || '').replace(/\n/g, ' ').slice(0, 90));
     await p6.close();
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  LES MENUS D'ATTRIBUTS REACT (Julien, 19 sept. : « ça ne fait pas la
+  //  catégorie tout seul ») — POINTURE + ÉTAT, PAR CLIC SUR L'OPTION
+  // ══════════════════════════════════════════════════════════════════════════
+  // La vraie forme mesurée : [role=combobox] + [role=option], pas un <select>.
+  // On remplit UNIQUEMENT les attributs CERTAINS depuis ses données (pointure =
+  // sa taille, état = son état Vinted), par correspondance EXACTE. Une valeur
+  // qui ne colle à AUCUNE option est laissée VIDE (mieux vaut un blanc qu'un
+  // faux, §5) — c'est le cas de « Satisfaisant » (Vinted) vs « État satisfaisant ».
+  const lireCombos = (page) => page.evaluate(() => ({
+    pointure: (document.getElementById('cbp') || {}).getAttribute ? (document.getElementById('cbp').getAttribute('data-choisi') || '') : '',
+    etat: (document.getElementById('cbe') || {}).getAttribute ? (document.getElementById('cbe').getAttribute('data-choisi') || '') : '',
+  }));
+  const monteCombos = async (ad) => {
+    const pg = await b.newPage({ viewport: { width: 1280, height: 900 } });
+    const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
+    await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => r.abort());
+    await pg.addInitScript((d) => {
+      window.chrome = { runtime: { id: 'banc', lastError: null, sendMessage: (m, cb) => {
+        const rep = (o) => { try { cb && cb(o); } catch (_) {} };
+        if (m && m.action === 'getPending') return rep({ ok: true, ad: d.ad });
+        if (m && m.action === 'getQueue') return rep({ ok: true, queue: [d.ad], removals: [], unlinked: [], postedList: [], stats: { onlineCount: 1, numberedCount: 1 } });
+        return rep({ ok: true }); }, onMessage: { addListener() {} } } };
+    }, { ad });
+    await pg.goto('http://localhost:4491/depot/etape3', { waitUntil: 'domcontentloaded' });
+    await pg.addScriptTag({ content: SRC });
+    await pg.waitForTimeout(3200);   // surveillance à la seconde + ouverture des menus
+    const r = await lireCombos(pg); r.errs = errs;
+    await pg.close();
+    return r;
+  };
+  {
+    // Positif : sa taille (40) et son état (Très bon état) collent → choisis.
+    const ok = await monteCombos(QUEUE[0]);
+    dit(!ok.errs.length, 'aucune erreur pendant le remplissage des menus', ok.errs[0] || '');
+    dit(ok.pointure === '40', 'la POINTURE est choisie dans le combobox React (clic sur l’option)', 'pointure = « ' + ok.pointure + ' »');
+    dit(ok.etat === 'Très bon état', 'l’ÉTAT est choisi par correspondance EXACTE', 'état = « ' + ok.etat + ' »');
+    // Négatif : une valeur qui ne colle à AUCUNE option reste VIDE (§5).
+    const ko = await monteCombos({ ...QUEUE[0], taille: '99', etat: 'Satisfaisant' });
+    dit(ko.pointure === '', 'une pointure absente de la liste n’est PAS choisie (pas de « à peu près »)', 'pointure = « ' + ko.pointure + ' »');
+    dit(ko.etat === '', '« Satisfaisant » (≠ « État satisfaisant ») laisse l’état VIDE — mieux vaut un blanc qu’un faux', 'état = « ' + ko.etat + ' »');
   }
 
   // ══════════════════════════════════════════════════════════════════════════

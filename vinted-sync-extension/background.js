@@ -5422,7 +5422,7 @@ function buildLbcAd(raw, det, num, account) {
   parts.push('Réf. ' + ref);
   const description = parts.join('\n');
   // marque/taille : le formulaire Leboncoin a des listes déroulantes pour ça.
-  return { id: String(raw.id), numero: String(num), ref, account: account || '', title, description, price, category: lbcCategory(det, raw), marque: brand || '', taille: size || '', photos, aDescription: !!desc0, vintedUrl: firstDefined(raw.url, det.url) };
+  return { id: String(raw.id), numero: String(num), ref, account: account || '', title, description, price, category: lbcCategory(det, raw), marque: brand || '', taille: size || '', etat: cond || '', photos, aDescription: !!desc0, vintedUrl: firstDefined(raw.url, det.url) };
 }
 // Extrait NOTRE numéro depuis n'importe quel texte d'annonce Leboncoin (titre +
 // description). Marche pour un compte PRO (numérotation auto ignorée) comme pour
