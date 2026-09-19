@@ -2572,6 +2572,78 @@ cause à **zéro** n'est pas écrite — ce serait du bruit permanent.
   antérieure à la 5.63. Tant qu'il ne l'a pas remplacée, **rien ne partira**, et
   l'app le dit (`extSait('repond') === 'retard'`).
 
+### ⚠️⚠️ « LE BOUTON TÉLÉCHARGER MES DONNÉES ME RENVOIE SUR "COMPTE BLOQUÉ" »
+Demande de Julien, 19 septembre : son **compte pro Vinted est bloqué**, il a
+besoin de l'export de ses données pour le récupérer, et le bouton des réglages
+le renvoie sur la page « ton compte est bloqué ». Il a une **session** — c'est
+l'interface qui refuse, pas la connexion.
+
+⚠️ **CE QU'IL NE FAUT PAS FAIRE, ET LA RAISON EST UNE MESURE.** Sur les
+**41 chemins d'API** que son extension a observés en tout (`harvest_*_seen_urls`,
+11 lignes), **aucun** ne concerne un export. Cet endpoint n'a **jamais été vu**.
+Écrire un appel vers une adresse devinée est exactement ce que ce dossier
+interdit partout — et ici ça partirait depuis la session d'un compte **déjà
+bloqué**, c'est-à-dire au pire endroit possible : du trafic inhabituel sur ce
+compte-là est ce qui transforme un blocage contestable en blocage définitif.
+⇒ **C'est son navigateur qui mesure et qui rapporte** — la méthode du formulaire
+eBay et des étapes Leboncoin : *faire mesurer par ce qui y a accès.*
+
+⚠️⚠️ **ET LA MESURE QUI MANQUAIT EST LE STATUT.** Deux situations
+**indistinguables** de l'extérieur, et qui n'appellent pas du tout le même geste :
+- la requête d'export **part** et le serveur la refuse (**403**) ⇒ aucun
+  contournement côté navigateur ne servira jamais, la voie écrite est la seule ;
+- la requête **ne part pas** parce que c'est seulement la page qui redirige ⇒ la
+  donnée est peut-être atteignable.
+
+Le mouchard notait le **chemin** et **pas le statut** ; et il ignorait tout ce
+qui n'est pas `/api/`, donc une page de réglages ne laissait **aucune trace**.
+⇒ `noteSeen(url, method, status)` relève `MÉTHODE chemin → statut` (dernier
+statut vu + combien de fois : « 403 une fois » et « 403 à chaque essai » ne se
+lisent pas pareil), et note aussi les **pages** qui parlent d'export, de données
+ou de compte — pas les autres (§7 vaut aussi pour un diagnostic).
+- **La promesse de confidentialité ne bouge pas** : chemin + méthode + statut,
+  **jamais** le corps, **jamais** les paramètres d'URL, et les identifiants
+  numériques deviennent `{id}`. Le banc tape un corps et une adresse email dans
+  la requête et exige qu'ils **ne partent pas**.
+- ⚠️⚠️ **ET `storeSeenUrls` ÉCRASAIT LA LIGNE À CHAQUE VISITE.** Une page ne fait
+  qu'une poignée d'appels : le passage suivant remplaçait donc tout ce qui avait
+  été appris ailleurs. C'est ce qui explique les **41 chemins seulement** sur
+  11 comptes alors que chaque visite en voit une dizaine. Pour un diagnostic dont
+  le but est d'attraper **UN endpoint vu UNE fois**, écraser était fatal. Il
+  fusionne, et **ne réécrit pas sur une lecture ratée** — `audit-fusion.cjs`
+  porte le cas (la quinzième ligne de cette famille).
+- `scripts/audit-endpoints-vus.cjs` **charge le vrai `inject.js` dans une vraie
+  page** (§4.10) et regarde ce qu'il ENVOIE : **9 contrôles, 5 rouges** sur le
+  code d'avant — dont « et avec son CODE DE RÉPONSE : `[]` ».
+- **Aucune entrée d'`EXT_CAPACITES`** : l'app ne promet rien de neuf, c'est une
+  mesure. Extension en **5.78.0**, zip régénéré, `EXT_ATTENDUE` suivie.
+- ⚠️ **Ce qu'on détient DÉJÀ du compte bloqué**, mesuré : l'identifiant de
+  moisson `3170782324` porte le login **`vanessa5723`** et sa capture s'arrête
+  net le **11 août** — 2 annonces (dont une à 49 € encore en ligne), 1 vente,
+  4 achats, 10 conversations, un porte-monnaie. **132 Ko que Vinted ne lui montre
+  plus**, exportés et envoyés. Ne PAS mettre cet export dans le dépôt : vrais
+  acheteurs, vrais messages, dépôt public.
+- La voie écrite est prête et ne dépend pas de l'interface :
+  `docs/demande-rgpd-vinted.md` (art. 15 · art. 15.1.h · **art. 22.3, droit à
+  une intervention humaine** quand un automate a décidé · sommes retenues).
+  ⚠️ **Ne pas demander l'effacement** : la CNIL dit que ce n'est pas un droit
+  absolu après un blocage, et ça **contredit** une demande de récupération.
+  ⚠️ **L'adresse du DPO n'est pas affirmée** : je n'ai pas pu la lire depuis une
+  source primaire, le document renvoie donc à la page de la CNIL qui la porte
+  (`cnil.fr/fr/cnil-direct/question/1991`). *Mieux vaut un blanc qu'un faux.*
+
+⚠️⚠️ **ET J'AI DÉTRUIT MON PROPRE TRAVAIL EN VOULANT REBASER.** La recette de
+rebase de ce dossier (`git checkout -B branche origin/main && git checkout <sha>
+-- .`) est écrite pour du travail **COMMITÉ**. Lancée sur un arbre qui portait
+cinq fichiers **non commités**, elle les a remplacés par la version du commit :
+`inject.js`, `background.js`, `manifest.json`, `EXT_ATTENDUE`, `CLAUDE.md` et
+`audit-fusion.cjs` sont repartis en arrière d'un coup, sans un mot. Seul le
+fichier **non suivi** (`audit-endpoints-vus.cjs`) a survécu — l'inverse de
+l'intuition.
+⇒ **On commite AVANT toute manipulation de branche**, jamais après. C'est §2.1
+(« pousse à chaque modification ») qui protège aussi de ça, et c'est la seule
+fois où l'avoir oublié a coûté du travail.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
@@ -2732,7 +2804,7 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | outil | quoi |
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
-| `node scripts/audit-*.cjs` | **39 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `node scripts/audit-*.cjs` | **40 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
 | `scripts/bancs/*.cjs` | les **23 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
@@ -3000,7 +3072,7 @@ script-là me fait croire à une catastrophe.
 src/App.jsx                     l'app (grep avant de lire — le fichier est énorme)
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
-scripts/audit-*.cjs             les 39 audits
+scripts/audit-*.cjs             les 40 audits
 scripts/bancs/                  les 23 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
