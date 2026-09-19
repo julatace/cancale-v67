@@ -5756,6 +5756,7 @@ async function storeLbcRecon(patch) {
     }
     next.updatedAt = new Date().toISOString();
     await supabaseUpsert('app_data', [{ id: 'lbc_recon', data: next }], 'id');
+    if (patch.etapes || patch.envois) await publierPrepLbc();   // idem
   } catch (_) {}
 }
 // ══════════════════════════════════════════════════════════════════════════════
@@ -5806,8 +5807,56 @@ async function storeLbcCatalogue(url, body, coupe) {
     next[cle] = { url, at: new Date().toISOString(), taille: body.length, coupe: !!coupe, corps: body };
     next.updatedAt = new Date().toISOString();
     await supabaseUpsert('app_data', [{ id: 'lbc_catalogue', data: next }], 'id');
+    await publierPrepLbc();      // l'app doit VOIR ce qui a été capté (§11)
   } catch (_) {}
 }
+// ══════════════════════════════════════════════════════════════════════════════
+// CE QUI EST PRÊT POUR PUBLIER SUR LEBONCOIN — PUBLIÉ, PAS DEVINÉ
+// ══════════════════════════════════════════════════════════════════════════════
+// L'extension collecte depuis quatre versions (le catalogue des codes, la config
+// du formulaire dynamique, la forme de ce qui part, les étapes) — et **l'app
+// n'en voyait rien**. Julien ne pouvait donc pas savoir si ça avançait, ni quel
+// geste faisait avancer. C'est le motif du tiroir `Nav` (§4.11) : du code qui
+// tourne et que personne ne lit.
+// ⚠️ §4.4 : `lbc_catalogue` pèse des centaines de Ko et `lbc_recon` 67 Ko —
+//    l'app ne doit RIEN en rapatrier. C'est donc l'extension qui PUBLIE un
+//    résumé de 1 Ko dans sa propre ligne, et l'app qui CONSOMME (§11, le motif
+//    de `vrm_colis_prets`). Un seul propriétaire, aucune divergence possible.
+// ⚠️ Et on n'y met que des FAITS : des tailles, des noms d'endpoint, des dates.
+//    Aucune promesse — c'est l'app qui dira le geste.
+async function publierPrepLbc() {
+  try {
+    const cat = await sbGet('app_data?id=eq.lbc_catalogue&select=data');
+    const rec = await sbGet('app_data?id=eq.lbc_recon&select=data');
+    // « Pas su » ne vaut pas « rien » : sans lecture, on ne publie pas — sinon
+    // un simple timeout annoncerait « rien n'est capté » et le ferait
+    // recommencer un dépôt pour rien.
+    if (cat === null || rec === null) return;
+    const cd = (cat[0] && cat[0].data) || {};
+    const rd = (rec[0] && rec[0].data) || {};
+    const morceaux = {};
+    for (const k of Object.keys(cd)) {
+      if (k === 'updatedAt') continue;
+      const v = cd[k] || {};
+      const nom = /fdata/.test(k) ? 'codes' : /fforms/.test(k) ? 'formulaires'
+        : /dynamic-deposit|config/.test(k) ? 'config' : /adparams|prediction/.test(k) ? 'prerempli'
+        : /classifieds|adsubmit/.test(k) ? 'soumission' : /upload.image/.test(k) ? 'photos' : k.slice(-24);
+      morceaux[nom] = { taille: v.taille || 0, coupe: !!v.coupe, at: v.at || null };
+    }
+    const envois = Object.keys(rd.envois || {}).slice(0, 40);
+    const etapes = Object.values(rd.etapes || {});
+    await supabaseUpsert('app_data', [{ id: 'vrm_lbc_prep', data: {
+      morceaux, envois,
+      // Une étape « utile » porte au moins une liste ou un champ photo : sans ça
+      // c'est l'en-tête du site, et on l'a déjà payé une fois.
+      etapes: etapes.length,
+      etapesUtiles: etapes.filter((e) => ((e.selects || []).length || (e.fichiers || 0))).length,
+      categories: [...new Set(etapes.map((e) => String(e.categorie || '')).filter(Boolean))].slice(0, 10),
+      ver: EXT_VERSION, majAt: new Date().toISOString(),
+    } }], 'id');
+  } catch (_) {}
+}
+
 // Extraction GÉNÉRIQUE des annonces depuis une réponse JSON Leboncoin : on cherche
 // récursivement les objets qui ressemblent à une annonce (un id + un titre + un
 // prix). Marche quel que soit l'endpoint. On garde aussi un échantillon (recon).

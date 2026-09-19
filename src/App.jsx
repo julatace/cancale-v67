@@ -35,7 +35,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.75.0';
+const EXT_ATTENDUE = '5.76.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -22390,6 +22390,18 @@ function LeboncoinScreen() {
         online.push({ id: oid, title: it.title, brand: it.brand_title || '', size: it.size_title || '', price: (it.price && it.price.amount) || it.price || null, photo: (it.photo && it.photo.url) || '' });
       }
     }
+    // ── OÙ EN EST LA PRÉPARATION DE LA PUBLICATION AUTOMATIQUE ────────────────
+    // L'extension collecte depuis quatre versions (le catalogue des codes, la
+    // config du formulaire dynamique, la forme de ce qui part) et l'app n'en
+    // montrait RIEN : impossible pour lui de savoir si ça avance, ni quel geste
+    // fait avancer. C'est le motif du tiroir `Nav` (§4.11).
+    // ⚠️ §4.4 : on ne lit PAS `lbc_catalogue` (des centaines de Ko) ni
+    //    `lbc_recon` (67 Ko). C'est l'extension qui PUBLIE un résumé de 1 Ko,
+    //    l'app le CONSOMME — le motif de `vrm_colis_prets` (§11).
+    const prepRows = await sbGet('app_data?id=eq.vrm_lbc_prep&select=data');
+    // Trois états, jamais deux : `null` = pas su, `[]` = jamais publié, sinon lu.
+    const prep = prepRows === null ? null : ((prepRows[0] && prepRows[0].data) || {});
+
     // Comptes Leboncoin réellement vus dans le navigateur (captés par l'extension).
     const accRows = await sbGet('app_data?id=eq.lbc_accounts&select=data');
     const lbcAccounts = Object.values(((accRows && accRows[0] && accRows[0].data && accRows[0].data.accounts) || {})).filter(Boolean)
@@ -22490,7 +22502,7 @@ function LeboncoinScreen() {
     // Répartition des annonces LBC par compte (plusieurs comptes possibles).
     const parCompte = {};
     for (const ad of liveAds) { const k = String(ad.lbcUser || '?'); (parCompte[k] = parCompte[k] || []).push(ad); }
-    setData({ preuveKO, echecLecture: echecLecture || listRowsBrut === null, lbcJamaisLu: lbcJamaisLu || liveAds.length === 0, vendues, nEnLigne: online.length, nNumerotees, queue, removals, unlinked, liveAds, autoMatched, retirees, lbcAccounts, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: liveAds.length, limit: pd.limit, plan: pd.plan });
+    setData({ preuveKO, echecLecture: echecLecture || listRowsBrut === null, lbcJamaisLu: lbcJamaisLu || liveAds.length === 0, vendues, nEnLigne: online.length, nNumerotees, queue, removals, unlinked, liveAds, autoMatched, retirees, lbcAccounts, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: liveAds.length, limit: pd.limit, plan: pd.plan, prep });
     setLoading(false);
   };
   useEffect(() => { reload(); /* eslint-disable-next-line */ }, []);
@@ -22505,6 +22517,78 @@ function LeboncoinScreen() {
         <h2 style={{ fontSize: 18, fontWeight: 800, color: C.text, margin: 0 }}>🟠 Leboncoin</h2>
         <button onClick={reload} style={{ background: 'transparent', border: `1px solid ${C.border}`, borderRadius: 999, padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: C.text }}>{loading ? '…' : '↻ Actualiser'}</button>
       </div>
+      {/* ══════════════════════════════════════════════════════════════════════
+          PUBLIER TOUT SEUL : OÙ ÇA EN EST, ET CE QUI FAIT AVANCER
+          ══════════════════════════════════════════════════════════════════════
+          L'extension collecte depuis quatre versions — le catalogue des codes de
+          Leboncoin, la config de son formulaire (qui est DYNAMIQUE : mesuré,
+          `api/adsubmit/dynamic-deposit/config`), la forme de ce qui part — et
+          l'app n'en montrait RIEN. Julien ne pouvait donc pas savoir si ça
+          avançait, ni quel geste faisait avancer : il a refait trois dépôts à la
+          main sans jamais voir de retour. C'est le motif du tiroir `Nav` (§4.11),
+          sur la chose qu'il attend.
+          ⚠️ On écrit des FAITS — des tailles, des dates, des noms d'endpoint — et
+             le GESTE. Jamais « bientôt », jamais un pourcentage inventé. */}
+      {(() => {
+        const p = data && data.prep;
+        if (p === undefined) return null;
+        // Trois états, jamais deux : pas su · jamais publié · lu.
+        const morceaux = (p && p.morceaux) || {};
+        const PIECES = [
+          ['codes', 'Les codes de Leboncoin', 'marques, tailles, états — leurs valeurs exactes'],
+          ['config', 'La composition du formulaire', 'quels champs, dans quel ordre, par catégorie'],
+          ['prerempli', 'Ce que Leboncoin remplit tout seul', 'la catégorie, la description et le prix qu’il propose'],
+          ['soumission', 'La forme de la publication', 'les champs attendus quand on valide'],
+        ];
+        const aPiece = (k) => { const m = morceaux[k]; return m && m.taille > 0 ? (m.coupe ? 'coupe' : 'ok') : 'non'; };
+        const faits = PIECES.filter(([k]) => aPiece(k) === 'ok').length;
+        const coupes = PIECES.filter(([k]) => aPiece(k) === 'coupe').length;
+        const pastille = (e) => e === 'ok' ? { t: '✓', c: INV_STATUS.online.color } : e === 'coupe' ? { t: '⚠', c: C.warn } : { t: '·', c: C.muted };
+        // Le geste : un seul, celui qui débloque le plus. Jamais une liste.
+        const geste = p === null ? null
+          : !p.majAt ? { q: 'Mets l’extension à jour, puis passe une fois sur leboncoin.fr.', d: 'Rien n’a encore été relevé : c’est la visite qui déclenche tout.' }
+          : aPiece('codes') !== 'ok' ? { q: 'Passe une fois sur leboncoin.fr.', d: 'Leboncoin envoie ses codes au chargement — l’extension les attrape au passage.' }
+          : aPiece('config') !== 'ok' || aPiece('soumission') !== 'ok'
+            ? { q: 'Dépose une annonce à la main, jusqu’au bout.', d: 'C’est le seul moment où Leboncoin envoie la composition du formulaire et la forme de la publication.' }
+            : null;
+        return (
+          <Card style={{ borderColor: C.border }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: C.text, marginBottom: 2 }}>Publier sans rien retaper — préparation</div>
+            <div style={{ fontSize: 11.5, color: C.muted, marginBottom: 10, lineHeight: 1.5 }}>
+              {p === null
+                ? 'Je n’ai pas pu lire où ça en est. Rien n’est perdu — rouvre cet écran dans un moment.'
+                : <>Le formulaire de Leboncoin n’est pas le même d’une annonce à l’autre : il est <b>construit</b> à partir d’une configuration qu’il envoie. Il me faut ces quatre pièces pour remplir juste — <b>{faits} sur {PIECES.length}</b> {faits > 1 ? 'reçues' : 'reçue'}{coupes ? `, ${coupes} incomplète${coupes > 1 ? 's' : ''}` : ''}.</>}
+            </div>
+            {p !== null && (
+              <div style={{ display: 'grid', gap: 5, marginBottom: geste ? 10 : 0 }}>
+                {PIECES.map(([k, titre, quoi]) => {
+                  const e = aPiece(k); const pa = pastille(e); const m = morceaux[k] || {};
+                  return (
+                    <div key={k} style={{ display: 'flex', gap: 8, alignItems: 'baseline', fontSize: 12 }}>
+                      <span style={{ color: pa.c, fontWeight: 800, width: 12, flexShrink: 0 }}>{pa.t}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ color: e === 'non' ? C.muted : C.text, fontWeight: e === 'non' ? 500 : 700 }}>{titre}</span>
+                        <span style={{ color: C.muted }}> — {quoi}</span>
+                        {e === 'coupe' && <span style={{ color: C.warn }}> · reçue incomplète, elle se recomplètera à ta prochaine visite</span>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {geste && (
+              <div style={{ fontSize: 12, color: C.text, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: '8px 10px' }}>
+                <b>{geste.q}</b> <span style={{ color: C.muted }}>{geste.d}</span>
+              </div>
+            )}
+            {p !== null && !geste && (
+              <div style={{ fontSize: 12, color: C.text }}>
+                J’ai tout ce qu’il me faut pour préparer le remplissage. <span style={{ color: C.muted }}>C’est toi qui cliqueras « Publier » — rien ne part tout seul.</span>
+              </div>
+            )}
+          </Card>
+        );
+      })()}
       {/* ⚠️ MÊME DÉFAUT QUE LA LIGNE DES PLACES, TROUVÉ EN BALAYANT « télécharg » :
           cette phrase-ci disait aussi « photos téléchargées » et n'était gardée
           par AUCUNE version. Depuis la 5.58 elles s'attachent au formulaire.
