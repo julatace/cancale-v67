@@ -31,7 +31,15 @@ const SRC = fs.readFileSync(path.join(__dirname, '..', '..', 'vinted-sync-extens
 const PAGE = (depot) => `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Leboncoin</title></head>
 <body>
   <header role="banner"><form action="/recherche"><input name="text" type="text" placeholder="Rechercher sur leboncoin"></form></header>
-  <main>${depot === 'etape3'
+  <main>${depot === 'photos1'
+    // ⚠️ L'UPLOADER QUI NE GARDE QU'UNE PHOTO (« une seule se téléverse »,
+    //    Julien 19 sept.) : un champ NON `multiple` qui, à chaque `change`, lit
+    //    UNE photo, ajoute sa vignette (blob:) et se VIDE pour la suivante — le
+    //    remontage React. Un envoi groupé n'y dépose qu'UNE vignette ; il faut
+    //    poser les photos une par une.
+    ? '<div class="dropzone" aria-label="Ajouter des photos"><input id="uf" type="file" accept="image/*"></div><div id="previews"></div>'
+      + '<scr'+'ipt>var uf=document.getElementById("uf");uf.addEventListener("change",function(){var f=uf.files[0];if(!f)return;var img=document.createElement("img");img.src="blob:"+f.name;document.getElementById("previews").appendChild(img);uf.value="";});</scr'+'ipt>'
+    : depot === 'etape3'
     // ⚠️ LA VRAIE FORME MESURÉE sur son dépôt (`lbc_recon.etapes`) : les
     //    attributs sont des COMPOSANTS React — un [role=combobox] + une liste
     //    [role=option], PAS des <select> natifs. C'est pour ça que `choisirListe`
@@ -71,7 +79,7 @@ let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
 
 (async () => {
-  const srv = http.createServer((q, r) => { r.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); r.end(PAGE(/etape3/.test(q.url) ? 'etape3' : /etape2/.test(q.url) ? 'etape2' : /depot/.test(q.url))); });
+  const srv = http.createServer((q, r) => { r.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); r.end(PAGE(/photos1/.test(q.url) ? 'photos1' : /etape3/.test(q.url) ? 'etape3' : /etape2/.test(q.url) ? 'etape2' : /depot/.test(q.url))); });
   await new Promise((res) => srv.listen(4491, res));
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox'] });
   const pg = await b.newPage({ viewport: { width: 1280, height: 900 } });
@@ -508,6 +516,52 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
     const ko = await monteCombos({ ...QUEUE[0], taille: '99', etat: 'Satisfaisant' });
     dit(ko.pointure === '', 'une pointure absente de la liste n’est PAS choisie (pas de « à peu près »)', 'pointure = « ' + ko.pointure + ' »');
     dit(ko.etat === '', '« Satisfaisant » (≠ « État satisfaisant ») laisse l’état VIDE — mieux vaut un blanc qu’un faux', 'état = « ' + ko.etat + ' »');
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  TOUTES LES PHOTOS SE TÉLÉVERSENT (Julien, 19 sept. : « une seule se
+  //  téléverse, ça ne va pas ») — sur un uploader qui n'en prend qu'UNE à la fois
+  // ══════════════════════════════════════════════════════════════════════════
+  {
+    const initChrome = (d) => {
+      const JPEG = 'ffd8ffe000104a46494600010100000100010000ffd9';
+      const b64 = (() => { const bin = JPEG.match(/../g).map((h) => String.fromCharCode(parseInt(h, 16))).join(''); return btoa(bin); })();
+      window.chrome = { runtime: { id: 'banc', lastError: null, sendMessage: (m, cb) => {
+        const rep = (o) => { try { cb && cb(o); } catch (_) {} };
+        if (m && m.action === 'getPending') return rep({ ok: true, ad: d.ad });
+        if (m && m.action === 'photoBytes') return rep({ ok: true, photos: (m.urls || []).map((u) => ({ url: u, b64, type: 'image/jpeg', taille: 22 })) });
+        if (m && m.action === 'getQueue') return rep({ ok: true, queue: [d.ad], removals: [], unlinked: [], postedList: [], stats: { onlineCount: 1, numberedCount: 1 } });
+        return rep({ ok: true }); }, onMessage: { addListener() {} } } };
+    };
+    const adPhotos = { ...QUEUE[0], photos: ['https://ex/a1.jpg', 'https://ex/a2.jpg', 'https://ex/a3.jpg'] };
+
+    // 1) §6.1 — LE DÉFAUT : un envoi GROUPÉ ne dépose qu'UNE vignette sur cet
+    //    uploader (c'est ce que Julien voit). On le prouve à la main.
+    const pbulk = await b.newPage({ viewport: { width: 1200, height: 900 } });
+    await pbulk.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => r.abort());
+    await pbulk.goto('http://localhost:4491/depot/photos1', { waitUntil: 'domcontentloaded' });
+    const nBulk = await pbulk.evaluate(() => {
+      const uf = document.getElementById('uf');
+      const dt = new DataTransfer();
+      ['a', 'b', 'c'].forEach((x) => dt.items.add(new File([new Uint8Array([255, 216, 255])], 'VRM-401-' + x + '.jpg', { type: 'image/jpeg' })));
+      uf.files = dt.files; uf.dispatchEvent(new Event('change', { bubbles: true }));
+      return document.querySelectorAll('#previews img').length;
+    });
+    dit(nBulk === 1, '§6.1 — un envoi GROUPÉ ne dépose qu’UNE vignette sur cet uploader (le défaut)', nBulk + ' vignette(s)');
+    await pbulk.close();
+
+    // 2) LE CORRECTIF : l'extension pose les photos UNE PAR UNE → les 3 arrivent.
+    const pseq = await b.newPage({ viewport: { width: 1200, height: 900 } });
+    const eseq = []; pseq.on('pageerror', (e) => eseq.push(e.message));
+    await pseq.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => r.abort());
+    await pseq.addInitScript(initChrome, { ad: adPhotos });
+    await pseq.goto('http://localhost:4491/depot/photos1', { waitUntil: 'domcontentloaded' });
+    await pseq.addScriptTag({ content: SRC });
+    await pseq.waitForTimeout(5000);   // pose séquentielle + attentes entre photos
+    const nSeq = await pseq.evaluate(() => document.querySelectorAll('#previews img').length);
+    dit(!eseq.length, 'aucune erreur pendant le téléversement des photos', eseq[0] || '');
+    dit(nSeq === 3, 'les 3 photos sont téléversées (une par une, sur un uploader qui n’en prend qu’une)', nSeq + ' vignette(s) sur 3');
+    await pseq.close();
   }
 
   // ══════════════════════════════════════════════════════════════════════════
