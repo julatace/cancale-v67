@@ -291,16 +291,40 @@
         if (t.length > 15 && !PUB_VINTED.test(t)) { out.description = t.slice(0, 3000); break; }
       }
       // Photos : les images Vinted en grand format présentes sur la page.
-      const seen = new Set();
-      const og = document.querySelector('meta[property="og:image"]');
-      if (og && og.getAttribute('content')) { const u = og.getAttribute('content'); seen.add(u); out.photos.push(u); }
-      for (const img of document.querySelectorAll('img[src*="vinted.net"]')) {
-        const u = img.getAttribute('src') || '';
+      // ⚠️ MESURÉ le 19 sept. : 0 annonce > 6 photos captées, alors que ses
+      //    annonces en ont plus. CAUSE : le carrousel Vinted charge ses images
+      //    au fur et à mesure — les slides pas encore affichées n'ont pas de
+      //    `src`, seulement un `srcset`/`data-src`. Lire seulement `img[src]`
+      //    n'en voyait donc que ~5-6. On lit AUSSI `srcset`, `data-src`,
+      //    `data-srcset` et les <source>. Filtré au MÊME domaine + grand format :
+      //    ça ne peut ajouter qu'une VRAIE photo Vinted, jamais autre chose.
+      const seen = new Set(); // par IDENTITÉ de photo, pas par URL
+      // ⚠️ Deux URL de la MÊME photo ne diffèrent que par le format (/f800/,
+      //    /f1200/, /tc/) et la query `?s=…`. On les ramène à une clé stable
+      //    pour ne pas envoyer DEUX FOIS la même image à des tailles
+      //    différentes (Leboncoin recevrait un doublon).
+      const cle = (u) => String(u).replace(/\?.*$/, '').replace(/\/(f\d+|tc)\//, '/');
+      const ajoute = (u) => {
+        if (!u || !/vinted\.net/.test(u)) return;
         // On ne garde que les grands formats (les vignettes 70x100 ne servent à rien).
-        if (!/\/(f800|f1200|tc)\//.test(u)) continue;
-        if (seen.has(u)) continue;
-        seen.add(u); out.photos.push(u);
-        if (out.photos.length >= 20) break;
+        if (!/\/(f800|f1200|tc)\//.test(u)) return;
+        const k = cle(u);
+        if (seen.has(k)) return;
+        seen.add(k);
+        if (out.photos.length < 20) out.photos.push(u);
+      };
+      // un `srcset` est « url1 1x, url2 2x » : on prend chaque URL.
+      const urlsDe = (v) => String(v || '').split(',').map((p) => p.trim().split(/\s+/)[0]).filter(Boolean);
+      const og = document.querySelector('meta[property="og:image"]');
+      if (og) ajoute(og.getAttribute('content')); // la photo principale d'abord
+      for (const img of document.querySelectorAll('img')) {
+        ajoute(img.getAttribute('src'));
+        for (const u of urlsDe(img.getAttribute('srcset'))) ajoute(u);
+        for (const u of urlsDe(img.getAttribute('data-srcset'))) ajoute(u);
+        ajoute(img.getAttribute('data-src'));
+      }
+      for (const s of document.querySelectorAll('source')) {
+        for (const u of urlsDe(s.getAttribute('srcset'))) ajoute(u);
       }
     } catch (_) { /* page inattendue */ }
     return (out.description || out.photos.length) ? out : null;
