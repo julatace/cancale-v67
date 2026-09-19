@@ -457,6 +457,46 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
   }
 
   // ══════════════════════════════════════════════════════════════════════════
+  //  LEBONCOIN ÉCRIT PARFOIS LA DESCRIPTION LUI-MÊME (Julien, 19 sept.)
+  // ══════════════════════════════════════════════════════════════════════════
+  // On ne l'écrase JAMAIS — mais la référence VRM-{n°} doit y être (§5). Le banc
+  // pré-remplit la description AVANT que l'extension tourne (comme le ferait
+  // l'auto-remplissage de Leboncoin), sans la référence, et exige les deux :
+  // le texte de Leboncoin est GARDÉ, et la référence a été AJOUTÉE.
+  {
+    const pd = await b.newPage({ viewport: { width: 1280, height: 900 } });
+    const ed = []; pd.on('pageerror', (e) => ed.push(e.message));
+    await pd.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => {
+      const t = r.request().resourceType();
+      return (t === 'image' || t === 'font' || t === 'media') ? r.abort() : r.continue();
+    });
+    await pd.addInitScript((d) => {
+      window.chrome = { runtime: { id: 'banc', lastError: null, sendMessage: (m, cb) => {
+        const rep = (o) => { try { cb && cb(o); } catch (_) {} };
+        if (m && m.action === 'getPending') return rep({ ok: true, ad: d.ad });
+        if (m && m.action === 'photoBytes') return rep({ ok: true, photos: [] });
+        if (m && m.action === 'getQueue') return rep({ ok: true, queue: [d.ad], removals: [], unlinked: [], postedList: [], stats: { onlineCount: 1, numberedCount: 1 } });
+        return rep({ ok: true }); }, onMessage: { addListener() {} } } };
+    }, { ad: QUEUE[0] });
+    await pd.goto('http://localhost:4491/depot/etape2', { waitUntil: 'domcontentloaded' });
+    const AUTO = 'Superbe paire, taille 40, portée deux fois. Envoi rapide et soigné.';
+    await pd.evaluate((txt) => {
+      const el = document.querySelector('textarea[name="body"]');
+      const set = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
+      set.call(el, txt); el.dispatchEvent(new Event('input', { bubbles: true }));
+    }, AUTO);
+    await pd.addScriptTag({ content: SRC });
+    await pd.waitForTimeout(2600);
+    const desc = await pd.evaluate(() => (document.querySelector('textarea[name="body"]') || {}).value || '');
+    dit(desc.includes(AUTO), 'la description écrite par Leboncoin n\'est PAS écrasée',
+      '« ' + desc.replace(/\n/g, ' ').slice(0, 70) + ' »');
+    dit(/VRM-401/.test(desc), 'et la référence VRM-401 y est quand même AJOUTÉE (le lien vers la paire, §5)',
+      /VRM-401/.test(desc) ? '' : 'la réf a disparu : « vendue → retire-la » ne reconnaîtra plus l\'annonce');
+    dit(!ed.length, 'aucune erreur sur ce cas', ed[0] || '');
+    await pd.close();
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
   //  LES ÉTAPES DU DÉPÔT — le seul code qui puisse me donner la carte
   // ══════════════════════════════════════════════════════════════════════════
   // ⚠️⚠️ CE CODE N'A JAMAIS TOURNÉ, ET C'EST UNE CHANCE UNIQUE. `lbc_recon.etapes`

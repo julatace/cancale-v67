@@ -2849,6 +2849,36 @@ dépôt à son **code** — le mapping que le dossier diffère depuis des passes
   leur code est connu. **Marque** : liste filtrée → passe par le code, jamais le
   libellé.
 
+### ⚠️⚠️ LEBONCOIN ÉCRIT PARFOIS LA DESCRIPTION LUI-MÊME — ET LA RÉFÉRENCE DISPARAISSAIT
+Julien, 19 sept. : « parfois la description et certaines choses sont faites
+automatiquement par le bon coin, adapte l'extension ». **Mesuré dans le code**,
+et il y avait un défaut des DEUX côtés :
+- `fillNow` (surveillance auto) remplissait la description en `setIfEmpty` — donc
+  quand Leboncoin l'avait **déjà écrite**, l'extension la respectait (bien) **mais
+  la référence `VRM-{n°}` n'y entrait JAMAIS**. Or c'est elle qui relie l'annonce
+  à la paire sans rapprochement par titre (§5) : sans elle, « vendue sur Vinted →
+  retire-la de Leboncoin » ne reconnaît plus l'annonce, et il la republie ou vend
+  deux fois. **La réf disparaissait en silence.**
+- `prefill` (« ✍️ Pré-remplir ») et `fillNowForce` (« Re-remplir ») faisaient
+  l'inverse : `setField` **écrasait** la description que Leboncoin venait
+  d'écrire.
+⇒ `poserDescription(ad)` porte la règle pour les trois chemins (§11) : champ vide
+  → description complète ; champ **déjà rempli** (Leboncoin ou lui) → on **garde**
+  son texte et on **ajoute la référence à la fin, une seule fois** (jamais un
+  doublon, garde par regex sur `VRM-{n°}`). On n'écrase plus jamais une
+  description. Le bandeau le dit (« ta référence ajoutée à la description que
+  Leboncoin a déjà écrite »).
+- ⚠️ **On ne devine pas « certaines choses »** : la capture des étapes note
+  désormais, par champ, `rempli` (booléen) et `len` (longueur) — **jamais le
+  contenu** — pour MESURER ce que Leboncoin auto-remplit vraiment et adapter le
+  reste à la prochaine passe, sur mesure et pas sur une supposition.
+- `bancs/leboncoin.cjs` pré-remplit la description **avant** que l'extension
+  tourne (comme le ferait Leboncoin), sans référence, et exige les deux : le
+  texte de Leboncoin **gardé** ET `VRM-401` **ajoutée**. Prouvé rouge sur le code
+  d'avant (« la réf a disparu »). **Aucune entrée d'`EXT_CAPACITES`** (l'app ne
+  promet rien de neuf) ; extension en **5.84.0**, zip régénéré, `EXT_ATTENDUE`
+  suivie.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par

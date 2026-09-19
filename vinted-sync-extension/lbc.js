@@ -683,7 +683,11 @@
     const ref = ad.ref || ('VRM-' + ad.numero);
     const faits = [];
     if (setField(findField([/titre|title|subject|proposez/]), ad.title)) faits.push('le titre');
-    if (setField(findField([/description|texte|body|détail|detail/]), ad.description)) faits.push('la description');
+    // ⚠️ Leboncoin écrit parfois la description lui-même : on ne l'écrase pas,
+    //    on garde la sienne et on y GARANTIT la référence (§5).
+    const desc = poserDescription(ad);
+    if (desc.fait) faits.push('la description');
+    else if (desc.garde && desc.ref) faits.push('ta référence ajoutée à la description que Leboncoin a déjà écrite');
     if (poserPrix(ad.price)) faits.push('le prix');
     // Champ RÉFÉRENCE des comptes PRO : on y met VRM-{N°} → pas besoin de le mettre
     // dans le titre, et tu peux rechercher la paire par ce numéro dans ton profil.
@@ -900,7 +904,12 @@
       const fields = [];
       tousLesNoeuds('input, select, textarea').filter(estDuDepot).forEach((el) => {
         // ⚠️ AUCUNE valeur saisie : ni `el.value`, ni le texte d'un textarea.
-        fields.push({ tag: el.tagName.toLowerCase(), type: el.type || '', name: el.name || '', id: el.id || '', ph: el.placeholder || '', aria: el.getAttribute('aria-label') || '', label: libelleDe(el), qa: el.getAttribute('data-qa-id') || el.getAttribute('data-testid') || '' });
+        //    Mais on note SI le champ est déjà rempli et sa LONGUEUR — Leboncoin
+        //    écrit parfois la description lui-même, et je dois savoir lesquels
+        //    pour ne pas les écraser (§ « adapte face à l'auto-remplissage »).
+        //    Un booléen et un nombre, jamais le texte.
+        const val = (() => { try { return String(el.value || ''); } catch (_) { return ''; } })();
+        fields.push({ tag: el.tagName.toLowerCase(), type: el.type || '', name: el.name || '', id: el.id || '', ph: el.placeholder || '', aria: el.getAttribute('aria-label') || '', label: libelleDe(el), qa: el.getAttribute('data-qa-id') || el.getAttribute('data-testid') || '', rempli: !!val.trim(), len: val.length });
       });
       const sels = listesDeroulantes();
       const fichiers = tousLesNoeuds('input[type="file"]').length;
@@ -1045,7 +1054,7 @@
   function fillNow(ad) {
     let n = 0;
     if (setIfEmpty(findField([/titre|title|subject|proposez/]), ad.title)) n++;
-    if (setIfEmpty(findField([/description|texte|body|détail|detail/]), ad.description)) n++;
+    { const d = poserDescription(ad); if (d.fait || d.ref) n++; }   // jamais d'écrasement ; la réf est garantie
     if (poserPrix(ad.price, true)) n++;   // §11 : le prix a UNE règle (centimes), une seule
     if (setIfEmpty(findField([/référ|referen|\bref\b|\bsku\b|identifiant|code.?article|numéro.?article/]), ad.ref || ('VRM-' + ad.numero))) n++;
     // ⚠️ « ça ne met pas la catégorie ni le reste » (Julien, 13 septembre). Les
@@ -1096,6 +1105,25 @@
     if (String(el.value || '').trim()) return false;
     return setField(el, val);
   }
+  // La description : Leboncoin l'écrit PARFOIS lui-même (Julien, 19 sept.). On ne
+  // l'écrase JAMAIS — mais la référence VRM-{n°} doit y être : c'est elle qui
+  // relie l'annonce à la paire, sans rapprochement par titre (§5). Sinon
+  // « vendue sur Vinted → retire-la » ne reconnaît plus l'annonce.
+  //  • champ VIDE → on met la description complète (elle porte déjà la réf) ;
+  //  • champ DÉJÀ REMPLI (Leboncoin ou lui) → on GARDE son texte et on ajoute la
+  //    réf à la fin, UNE seule fois (jamais un doublon).
+  // Rend { fait, garde, ref } pour que le bandeau dise ce qui s'est passé.
+  function poserDescription(ad) {
+    const el = findField([/description|texte|body|détail|detail/]);
+    if (!el) return { trouve: false, fait: false, garde: false, ref: false };
+    const ref = ad.ref || ('VRM-' + ad.numero);
+    const actuel = String(el.value || '');
+    if (!actuel.trim()) { const ok = setField(el, ad.description); return { trouve: true, fait: ok, garde: false, ref: /VRM-\d/i.test(ad.description) }; }
+    const dejaRef = new RegExp(ref.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(actuel);
+    if (dejaRef) return { trouve: true, fait: false, garde: true, ref: true };
+    const ok = setField(el, actuel.replace(/\s+$/, '') + '\n\nRéférence : ' + ref);
+    return { trouve: true, fait: false, garde: true, ref: ok };
+  }
   function banner() {
     let el = document.getElementById('vrm-lbc-banner');
     if (!el) {
@@ -1142,7 +1170,7 @@
   function fillNowForce(ad) {
     let n = 0;
     if (setField(findField([/titre|title|subject/]), ad.title)) n++;
-    if (setField(findField([/description|texte|body|détail|detail/]), ad.description)) n++;
+    { const d = poserDescription(ad); if (d.fait || d.ref) n++; }   // même face à « Re-remplir » : on n'écrase pas l'auto-description de Leboncoin
     if (poserPrix(ad.price)) n++;   // §11 : la même règle de prix que partout
     if (setField(findField([/référ|referen|\bref\b|\bsku\b|identifiant|code.?article|numéro.?article/]), ad.ref || ('VRM-' + ad.numero))) n++;
     return n;
