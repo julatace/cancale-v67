@@ -35,7 +35,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.95.0';
+const EXT_ATTENDUE = '5.96.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -93,12 +93,16 @@ const lbcTitre = (brand, base, size, max) => {
   t = t.replace(/\btailles?\s*:?\s*(\d{1,2}(?:[.,]\d)?)\b/i, (m, n) => { vue = n; return ''; })
        .replace(/\bT\s*(\d{2}(?:[.,]\d)?)\b/i, (m, n) => { vue = n; return ''; })
        .replace(/\s+/g, ' ').trim();
-  const taille = String(size || vue || '').replace(/^t/i, '').trim();
+  const taille = String(size || vue || '').replace(/^t(?=\d)/i, '').trim();
   const b = String(brand || '').trim();
   if (b && !new RegExp('\\b' + bq + '\\b', 'i').test(t)) t = b + ' ' + t;
   t = t.replace(/\s+/g, ' ').trim();
   t = t.charAt(0).toUpperCase() + t.slice(1);
-  const suff = taille ? ' T' + taille : '';
+  // ⚠️ Le « T » n'est une POINTURE que pour un nombre (chaussures) : une taille
+  //    lettre (M, L, XL) n'est pas « TM ». Un reseller qui ne fait pas de
+  //    chaussures ne doit pas voir son titre corrompu (Julien, 20 sept.).
+  const estPointure = /^\d{1,2}(?:[.,]\d)?$/.test(taille);
+  const suff = taille ? (estPointure ? ' T' + taille : ' ' + taille) : '';
   const place = (max || LBC_TITRE_MAX) - suff.length;
   if (t.length > place) {
     const coupe = t.slice(0, place);

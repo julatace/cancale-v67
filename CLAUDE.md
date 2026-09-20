@@ -3424,6 +3424,47 @@ carte réelle de l'étape options + publication.**
   engage de l'argent AVANT de l'automatiser. Le clic « Continuer » entre étapes
   non-payantes est déjà automatique ; il ne reste que la dernière page.
 
+### ⚠️ « QU'UN RESELLER QUI FASSE AUTRE CHOSE QUE DES CHAUSSURES PUISSE L'UTILISER »
+Julien, 20 sept. La boutique est en sneakers, et plusieurs endroits étaient
+**codés « chaussures »**. Ce qui CORROMPT un article non-chaussure (donc traité
+en premier) et ce qui est resté sûr :
+- ⚠️⚠️ **LE TITRE FORÇAIT UN SUFFIXE « T{taille} » — même sur une taille LETTRE.**
+  `lbcTitre` faisait `' T' + taille` : une taille « M » sortait en « **TM** », « L »
+  en « TL ». Mesuré au banc sur le code d'avant : « Nike sweat tech fleece gris
+  **TM** ». ⇒ Le « T » n'est une **pointure** que pour un **nombre** : `estPointure`
+  (`/^\d{1,2}([.,]\d)?$/`) → numérique = « T42 » · lettre = « M » telle quelle. Et
+  l'extraction ne retire le « T » de tête que **devant un chiffre** (`^t(?=\d)` :
+  « T40 »→« 40 », mais « TU »/« M » intacts). **La MÊME fonction vit dans l'app
+  ET l'extension** (§11) — les deux corrigées à l'identique, `audit-places` exige
+  qu'elles rendent le même titre (11 cas, dont 3 non-chaussures).
+- ⚠️ **PLUS DE DÉFAUT « Chaussures » CODÉ EN DUR.** `lbcCategory` renvoyait
+  `'Chaussures'` pour tout ce qu'aucun mot-clé ne reconnaissait — un reseller de
+  vêtements aurait vu « Chaussures » proposée partout. Désormais : familles par
+  mot-clé élargies (sacs, vêtements, accessoires, livres, **chaussures**), puis
+  **pointure numérique 34–50** (ce qui garde l'auto-catégorie de SES sneakers,
+  dont le titre ne dit pas « chaussure »), **sinon `''`** — Leboncoin propose la
+  catégorie (il la devine du titre), l'utilisateur choisit. Une catégorie fausse
+  fait plus de mal que pas de catégorie (§5, leçon eBay). Les **vêtements sont
+  testés AVANT** la pointure (« jean taille 40 » = vêtement, pas du 40).
+- ⚠️ **Le panneau ne coche plus « Chaussures » par défaut** : `choisirCategorie`
+  et `choisirListe` avaient un repli `'Chaussures'` — retiré. Catégorie inconnue
+  ⇒ on ne coche RIEN (l'utilisateur choisit), et le message dit « Choisis la
+  catégorie » au lieu de « Vérifie la catégorie « » ».
+- **Déjà GÉNÉRIQUE, vérifié** : `remplirComposants` choisit la taille par
+  `/pointure|taille|size/` **exact-match** — donc une taille lettre « M » clique
+  l'option « M » d'un menu Taille de vêtement, ou ne clique rien (jamais un
+  faux). L'ÉTAT, la description structurée (Marque/Taille/État/Couleur), la
+  référence `VRM-{n°}`, l'upload photo, eBay (qui réutilise `lbcTitre`) : tous
+  indépendants de la catégorie.
+- `audit-places.cjs` : **§6.1 prouvé** sur le build d'avant (« sweat … **TM** »,
+  « polo … **TL** ») ; après, « … M » / « … L », et app == extension sur les cas
+  non-chaussures. Extension **5.96.0**, zip régénéré, `EXT_ATTENDUE` suivie.
+  Aucune entrée d'`EXT_CAPACITES` (généralisation, pas promesse neuve).
+- ⚠️ **Ce qui reste chaussure-spécifique et MESURÉ tel quel** : `extraireTaille`
+  du barème des prix d'achat (§« prix d'achat ») compare des pointures — c'est de
+  la SUGGESTION interne, pas une publication, et ça ne casse rien pour un autre
+  article (au pire 0 suggestion). Non touché, pas de risque.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
