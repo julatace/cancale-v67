@@ -98,19 +98,43 @@
       if (cles.length) post({ kind: 'lbcenvoi', url, methode: String(methode || ''), cles: cles.slice(0, 400) });
     } catch (_) {}
   };
+  // ⚠️⚠️ LE MOUCHARD DE CHEMINS — À PARITÉ AVEC CELUI DE VINTED (`inject.js`).
+  //    Julien veut « capter le bordereau du Bon Coin comme sur Vinted » : le jour
+  //    d'une vente, Leboncoin émet une étiquette (un PDF, ou une réponse qui y
+  //    mène). Pour la RECONNAÎTRE parmi des dizaines d'appels, un chemin nu ne
+  //    suffit pas — un GET qui répond un `pdf` ne se lit pas comme un JSON de
+  //    vente, et un 403 ne se corrige pas comme un 200. On note donc, par chemin,
+  //    **la méthode + le statut + le TYPE de réponse** — JAMAIS le corps, JAMAIS
+  //    la query (la promesse de confidentialité ne bouge pas). C'est la même
+  //    mesure qui a fait trouver le `PUT …/shipment/order` de Vinted.
+  //    On garde Leboncoin, plus **tout PDF** (un bordereau peut être servi par le
+  //    transporteur) et **tout échec ≥400** ; jamais le bruit publicitaire en
+  //    200/json, qui évincerait les seuls chemins qui servent (leçon du catalogue).
   const seenPaths = new Set(); let seenDirty = false;
-  const noteSeen = (url) => {
+  const typeCourt = (ctype) => {
+    const c = String(ctype || '').toLowerCase();
+    return /pdf/.test(c) ? 'pdf' : /json/.test(c) ? 'json' : /html/.test(c) ? 'html'
+      : /image/.test(c) ? 'img' : /(octet|binary|zip)/.test(c) ? 'bin' : '';
+  };
+  const noteSeen = (url, methode, statut, ctype) => {
     try {
-      let p = url; try { p = new URL(url, location.origin).host + new URL(url, location.origin).pathname; } catch (_) { p = String(url).split('?')[0]; }
-      p = p.replace(/\/\d{3,}/g, '/{id}');
-      if (!seenPaths.has(p)) { seenPaths.add(p); seenDirty = true; }
+      if (NOISE.test(url)) return;
+      const t = typeCourt(ctype);
+      const s = Number(statut) || 0;
+      if (!DE_LEBONCOIN(url) && t !== 'pdf' && !(s >= 400)) return;
+      let host = '', chemin = '';
+      try { const u = new URL(url, location.origin); host = u.host; chemin = u.pathname; }
+      catch (_) { chemin = String(url).split('?')[0]; }
+      chemin = chemin.replace(/\/\d{3,}/g, '/{id}').replace(/\/[0-9a-f]{16,}/gi, '/{id}');
+      const rec = ((methode ? String(methode).toUpperCase() + ' ' : '') + host + chemin
+        + (s ? ' → ' + s : '') + (t ? ' [' + t + ']' : '')).slice(0, 160);
+      if (!seenPaths.has(rec)) { seenPaths.add(rec); seenDirty = true; }
     } catch (_) {}
   };
   setInterval(() => { if (seenDirty) { seenDirty = false; post({ kind: 'lbcpaths', paths: [...seenPaths].slice(0, 200) }); } }, 4000);
 
   const handle = (url, text, ctype) => {
     try {
-      noteSeen(url);
       if (NOISE.test(url)) return;
       if (!text || text.length > 1500000) return;
       if (ctype && !/json/i.test(ctype)) return;
@@ -130,13 +154,15 @@
   if (origFetch) {
     window.fetch = function (input, init) {
       const url = (typeof input === 'string') ? input : (input && input.url) || '';
-      try { const m = (init && init.method) || (typeof input === 'object' && input && input.method) || 'GET'; if (MODIFIE.test(m)) noteEnvoi(url, init && init.body, m); } catch (_) {}
+      const meth = (init && init.method) || (typeof input === 'object' && input && input.method) || 'GET';
+      try { if (MODIFIE.test(meth)) noteEnvoi(url, init && init.body, meth); } catch (_) {}
       const p = origFetch.apply(this, arguments);
       try {
         p.then((res) => {
           try {
             const ct = res.headers && res.headers.get && res.headers.get('content-type');
             if (/vinted|supabase/i.test(url)) return; // ne touche pas aux autres domaines
+            noteSeen(url, meth, res.status, ct);
             res.clone().text().then((t) => handle(url, t, ct)).catch(() => {});
           } catch (_) {}
         }).catch(() => {});
@@ -157,6 +183,7 @@
             const url = this.__lbcUrl || '';
             if (/vinted|supabase/i.test(url)) return;
             const ct = this.getResponseHeader && this.getResponseHeader('content-type');
+            noteSeen(url, this.__lbcMeth, this.status, ct);
             const t = (this.responseType === '' || this.responseType === 'text') ? this.responseText : null;
             if (t) handle(url, t, ct);
           } catch (_) {}
