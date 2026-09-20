@@ -1315,14 +1315,30 @@
     // 2) le bouton de publication GRATUITE, jamais un bouton payant.
     const PRIX = /€|\beuros?\b|\d[.,]\d{2}|booster|remont|payer|premium|\bpack\b|\boption/i;
     const PUBLIER = /publier|d[ée]poser\s+(?:mon|l)|d[ée]poser l['’]annonce|mettre en ligne|valider\s+(?:mon|l['’])\s*annonce/i;
-    const btns = Array.from(document.querySelectorAll('button,[role="button"],input[type="submit"]')).filter((el) => !DANS_ENTETE(el));
-    const publier = btns.find((b) => {
-      if (b.disabled || b.getAttribute('aria-disabled') === 'true') return false;
-      const t = (((b.innerText || b.value || '') + ' ' + (b.getAttribute('aria-label') || '')) || '').trim();
-      if (!t) return false;
-      if (PRIX.test(t)) return false;                 // paie / boost → jamais
-      return PUBLIER.test(t);
+    const NEG = /annuler|retour|pr[ée]c[ée]dent|revenir|\bback\b|supprim|brouillon|plus tard|aper[çc]u|pr[ée]visualis/i;
+    const CONTINUER = /continuer|suivant/i;
+    const libBtn = (b) => (((b.innerText || b.value || '') + ' ' + (b.getAttribute('aria-label') || '')) || '').trim();
+    const actif = (b) => !b.disabled && b.getAttribute('aria-disabled') !== 'true' && !!libBtn(b);
+    // ⚠️ On exclut NOTRE PROPRE interface (bandeau/témoin VRM) : sinon la
+    //   recherche du bouton « le plus bas » cliquerait un bouton de notre bandeau,
+    //   pas celui de Leboncoin (le bandeau est en position fixe, tout en bas).
+    const NOTRE_UI = (el) => !!el.closest('#vrm-lbc-banner,#vrm-temoin-etape,#vrm-fab,#vrm-panel');
+    const btns = Array.from(document.querySelectorAll('button,[role="button"],input[type="submit"]')).filter((el) => !DANS_ENTETE(el) && !NOTRE_UI(el));
+    let publier = btns.find((b) => {
+      if (!actif(b)) return false;
+      if (PRIX.test(libBtn(b))) return false;         // paie / boost → jamais
+      return PUBLIER.test(libBtn(b));
     });
+    // Julien 20 sept. : « le clic Publier est tout en bas de la page ; même si tu
+    // ne l'as pas, essaie de le deviner ». On tente donc le bouton le PLUS BAS de
+    // l'étape — mais la garde ARGENT ne bouge pas : jamais un bouton à prix ou à
+    // boost (PRIX), jamais « annuler/retour/aperçu » (NEG), jamais « Continuer »
+    // (géré par l'enchaînement des étapes). Au pire rien n'est dépensé, jamais un faux.
+    if (!publier) {
+      const surs = btns.filter((b) => { const t = libBtn(b); return actif(b) && !PRIX.test(t) && !NEG.test(t) && !CONTINUER.test(t); });
+      surs.sort((a, b) => a.getBoundingClientRect().bottom - b.getBoundingClientRect().bottom);
+      publier = surs[surs.length - 1] || null;
+    }
     if (!publier) return { ok: false, raison: 'bouton « Publier » introuvable sur cette étape' };
     try { publier.click(); } catch (_) {}
     return { ok: true, bouton: ((publier.innerText || publier.value || '') + '').trim().slice(0, 40) };
