@@ -53,7 +53,11 @@
   const writeLS = (k, v) => { try { localStorage.setItem(k, v); } catch (_) {} };
   const readJSON = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (_) { return d; } };
   const writeJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} };
-  let open = readLS('vrm_panel_open', '0') === '1';
+  // Julien 20 sept. : « arrête de l'ouvrir à chaque fois que je lance Vinted,
+  // laisse le bouton à droite ». Le panneau démarre donc TOUJOURS fermé (juste
+  // le bouton rond « VRM » à droite) ; on ne restaure plus l'état ouvert d'une
+  // page à l'autre — c'est SON clic sur le bouton qui l'ouvre.
+  let open = false;
   let big = readLS('vrm_panel_big', '0') === '1'; // panneau agrandi (quasi plein écran)
   let tab = (() => { const t = readLS('vrm_panel_tab', 'journee'); return PANEL_TABS.includes(t) ? t : 'journee'; })(); // journee | paire | relance | dorment | sansnum | republier | reponse | expedier | achats | messages | favoris
   // ── File de republication ASSISTÉE ─────────────────────────────────────────

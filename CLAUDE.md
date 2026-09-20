@@ -3514,6 +3514,37 @@ un **↻ Reprendre** qui n'apparaît QUE si le remplissage cale (filet).
   à la main — jamais une dépense, jamais un faux. Le prochain vrai dépôt le
   confirmera.
 
+### ⚠️ « LE BOUTON PUBLIER EST TOUT EN BAS, DEVINE-LE » + LE PANNEAU S'OUVRAIT TOUT SEUL
+Julien, 20 sept. (après son dépôt) : « le clic publier sans booster, c'est pas
+difficile, il est tout en bas de la page ; même si tu ne l'as pas, essaie de le
+deviner » — et « arrête d'ouvrir le panneau à chaque fois que je lance Vinted,
+laisse le bouton à droite ». Deux gestes qu'il a explicitement autorisés.
+- **Deviner le bouton du bas** : `publierSansBooster` cherche d'abord un libellé
+  « Publier/Déposer… » ; s'il n'en trouve pas, il prend le bouton **le plus bas**
+  de l'étape. **La garde ARGENT ne bouge pas** : jamais un bouton à prix/boost
+  (`PRIX`), jamais « annuler/retour/aperçu » (`NEG`), jamais « Continuer »
+  (l'enchaînement des étapes s'en charge). Au pire rien n'est cliqué, jamais une
+  dépense, jamais un faux.
+  ⚠️⚠️ **ET LE BANC A ATTRAPÉ UN VRAI DÉFAUT** : le « plus bas » cliquait le
+  bouton de **NOTRE PROPRE bandeau** (`#vrm-lbc-banner`, en position fixe tout en
+  bas), pas celui de Leboncoin. `NOTRE_UI` exclut désormais notre bandeau/témoin/
+  panneau du balayage. Le banc sert une étape finale SANS libellé « Publier »
+  (bouton gratuit « Terminer » tout en bas, un bouton à 9,90 € et un « Annuler »
+  au-dessus) : **Terminer cliqué, le payant JAMAIS, Annuler jamais**. Sans
+  l'exclusion, `fin=0` (il cliquait le bandeau) — rouge.
+- **Le panneau démarre FERMÉ** (`vinted-panel.js`, `let open = false`) : on ne
+  restaure plus l'état ouvert d'une page à l'autre. Le bouton rond « VRM » à
+  droite reste, c'est SON clic qui l'ouvre. Extension **5.98.0**, zip régénéré,
+  `EXT_ATTENDUE` suivie. Aucune entrée d'`EXT_CAPACITES` (le geste est dans le
+  panneau, pas une promesse de l'app).
+- ⚠️ **Ce qui reste à mesurer chez lui** (dit à Julien, pas deviné) : (1) le
+  **prix** qu'il a vu faux — le code pose le prix Vinted en centimes dans
+  `price_cents` ; sans le couple (prix Vinted → prix affiché) je ne peux pas
+  distinguer un bug de centimes d'un mauvais champ ; (2) les **photos ≤ 6** —
+  c'est la capture qui plafonne tant qu'il n'a pas rouvert ses annonces Vinted
+  avec l'extension à jour (la capture passive `capterPhotosAnnonces` les complète
+  ensuite toute seule).
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par

@@ -31,7 +31,21 @@ const SRC = fs.readFileSync(path.join(__dirname, '..', '..', 'vinted-sync-extens
 const PAGE = (depot) => `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Leboncoin</title></head>
 <body>
   <header role="banner"><form action="/recherche"><input name="text" type="text" placeholder="Rechercher sur leboncoin"></form></header>
-  <main>${depot === 'boost'
+  <main>${depot === 'basdepage'
+    // ⚠️ Étape publication SANS libellé « Publier » reconnaissable : le bouton
+    //    gratuit s'appelle « Terminer » (tout en bas), au-dessus un bouton à PRIX,
+    //    un « Annuler » et un « Continuer ». Prouve que la garde argent tient même
+    //    quand on DEVINE le bouton du bas (Julien : « il est tout en bas »).
+    ? '<div class="dropzone"><input id="uf" type="file" multiple accept="image/*"></div><div id="previews"></div>'
+      + '<fieldset><label><input type="checkbox" name="gallery" checked> Galerie</label></fieldset>'
+      // ÉTAPE FINALE (pas de « Continuer » — c'est la dernière) : un bouton à PRIX,
+      // un « Annuler », et le bouton gratuit « Terminer » tout en bas.
+      + '<div><button id="paidx" type="button">Remonter mon annonce · 9,90 €</button></div>'
+      + '<div><button id="annx" type="button">Annuler</button></div>'
+      + '<div><button id="finx" type="button">Terminer</button></div>'
+      + '<scr'+'ipt>var uf=document.getElementById("uf");var k=0;uf.addEventListener("change",function(){var f=uf.files[0];if(!f)return;k++;var img=document.createElement("img");img.src="https://cdn.leboncoin.example/"+k+".jpg";document.getElementById("previews").appendChild(img);uf.value="";});'
+      + 'window.__fin=0;window.__paidx=0;window.__annx=0;document.getElementById("finx").onclick=function(){window.__fin++;};document.getElementById("paidx").onclick=function(){window.__paidx++;};document.getElementById("annx").onclick=function(){window.__annx++;};</scr'+'ipt>'
+    : depot === 'boost'
     // ⚠️⚠️ L'ÉTAPE OPTIONS (mesurée `lbc_recon.etapes`) : QUE des cases de boost
     //    PAYANTES (gallery/daily_bump/urgent), un bouton de dépôt GRATUIT et un
     //    bouton PAYANT. + un champ photo (multiple, upload-à-chaque-change) pour
@@ -112,7 +126,7 @@ let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
 
 (async () => {
-  const srv = http.createServer((q, r) => { r.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); r.end(PAGE(/boost/.test(q.url) ? 'boost' : /photosreel/.test(q.url) ? 'photosreel' : /photos1/.test(q.url) ? 'photos1' : /etape3/.test(q.url) ? 'etape3' : /etape2/.test(q.url) ? 'etape2' : /depot/.test(q.url))); });
+  const srv = http.createServer((q, r) => { r.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); r.end(PAGE(/basdepage/.test(q.url) ? 'basdepage' : /boost/.test(q.url) ? 'boost' : /photosreel/.test(q.url) ? 'photosreel' : /photos1/.test(q.url) ? 'photos1' : /etape3/.test(q.url) ? 'etape3' : /etape2/.test(q.url) ? 'etape2' : /depot/.test(q.url))); });
   await new Promise((res) => srv.listen(4491, res));
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox'] });
   const pg = await b.newPage({ viewport: { width: 1280, height: 900 } });
@@ -636,9 +650,27 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
       dit(/sans booster/i.test(r.bandeau), 'le bandeau dit « publiée sans booster »', (r.bandeau || '').replace(/\n/g, ' ').slice(-70));
     }
     {
-      const faible = SRC.replace('if (PRIX.test(t)) return false;', 'if (false) return false;');
+      const faible = SRC.replace('if (PRIX.test(libBtn(b))) return false;', 'if (false) return false;').replace('&& !PRIX.test(t) &&', '&&');
       if (faible === SRC) dit(false, 'la garde « prix » attendue est introuvable — l\'audit ne prouve rien');
       else { const { r } = await lancerBoost(faible); dit(r.paid >= 1, '§6.1 — sans la garde « prix », le bouton PAYANT EST cliqué (donc la garde protège de la dépense)', '__paid=' + r.paid + ' __pub=' + r.pub); }
+    }
+    // 5) ⚠️ DEVINER LE BOUTON DU BAS (Julien, 20 sept. : « il est tout en bas ; même
+    //    si tu ne l'as pas, essaie de le deviner »). Sur une étape SANS libellé
+    //    « Publier », on clique le bouton le PLUS BAS qui n'est ni à prix, ni
+    //    « annuler/retour », ni « continuer » — la garde argent tient en devinant.
+    {
+      const pg = await b.newPage({ viewport: { width: 1200, height: 900 } });
+      const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
+      await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => r.abort());
+      await pg.addInitScript(initChrome, { ad: adPub });
+      await pg.goto('http://localhost:4491/depot/basdepage', { waitUntil: 'domcontentloaded' });
+      await pg.addScriptTag({ content: SRC });
+      await pg.waitForTimeout(9000);
+      const r = await pg.evaluate(() => ({ fin: window.__fin, paidx: window.__paidx, annx: window.__annx, prev: document.querySelectorAll('#previews img').length, gallery: !!document.querySelector('input[name=gallery]:checked'), banner: (document.getElementById('vrm-lbc-banner') || {}).innerText || '' }));
+      await pg.close();
+      dit(r.fin === 1, 'sans libellé « Publier », le bouton le PLUS BAS (« Terminer ») est cliqué', '__fin=' + r.fin + ' prev=' + r.prev + ' gallery_encore_cochee=' + r.gallery + ' | ' + (r.banner || '').replace(/\n/g, ' ').slice(0, 70));
+      dit(r.paidx === 0, 'le bouton à PRIX (9,90 €) reste JAMAIS cliqué, même en devinant', '__paidx=' + r.paidx);
+      dit(r.annx === 0, '« Annuler » n\'est pas pris pour « Publier » (garde NEG)', 'ann=' + r.annx);
     }
   }
 
