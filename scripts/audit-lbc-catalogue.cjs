@@ -89,14 +89,21 @@ const ANNONCES = JSON.stringify({ ads: [{ list_id: 991, subject: 'Salomon XT-6 V
     r.fulfill({ status: 200, contentType: 'application/json', body: /fforms/.test(u) ? FFORMS : CATALOGUE });
   });
   await pg.route('https://ib.adnxs.com/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: PUB }));
+  // ⚠️ Enregistrées EN DERNIER (§6.6 : Playwright prend la dernière route d'abord)
+  //    pour gagner sur `/api/**`. Le bordereau d'une vente Leboncoin = un PDF ;
+  //    un refus = un 403. C'est exactement ce que le mouchard doit distinguer.
+  await pg.route('**/api/vrmtest/label/**', (r) => r.fulfill({ status: 200, contentType: 'application/pdf', body: '%PDF-1.4 faux bordereau' }));
+  await pg.route('**/api/vrmtest/refuse', (r) => r.fulfill({ status: 403, contentType: 'application/json', body: '{"error":"nope"}' }));
   await pg.goto('https://www.leboncoin.fr/deposer-une-annonce');
-  await pg.evaluate(`window.__vus = []; window.addEventListener('message', (e) => { const d = e.data; if (d && d.__tag === 'CANCALE_LBC') window.__vus.push({ kind: d.kind, url: d.url, len: (d.body || '').length, coupe: !!d.coupe }); });`);
+  await pg.evaluate(`window.__vus = []; window.addEventListener('message', (e) => { const d = e.data; if (d && d.__tag === 'CANCALE_LBC') window.__vus.push({ kind: d.kind, url: d.url, len: (d.body || '').length, coupe: !!d.coupe, paths: d.paths || null }); });`);
   await pg.evaluate(INJ);
   await pg.evaluate(`(async () => {
     await fetch('https://api.leboncoin.fr/api/frontend/v1/data/v7/fdata').then(r => r.text());
     await fetch('https://api.leboncoin.fr/api/frontend/v1/data/v5/fforms').then(r => r.text());
     await fetch('https://ib.adnxs.com/openrtb2/prebidjs').then(r => r.text());
     await fetch('/api/discovery/category/53').then(r => r.text()).catch(() => {});
+    await fetch('https://api.leboncoin.fr/api/vrmtest/label/9182734655').then(r => r.text()).catch(() => {});
+    await fetch('https://api.leboncoin.fr/api/vrmtest/refuse').then(r => r.text()).catch(() => {});
   })()`).catch(() => {});
   await pg.waitForTimeout(600);
   const vus = await pg.evaluate('window.__vus');
@@ -118,6 +125,31 @@ const ANNONCES = JSON.stringify({ ads: [{ list_id: 991, subject: 'Salomon XT-6 V
   const brutes = vus.filter((v) => v.kind === 'lbcraw');
   dit(brutes.length >= 1, 'et une VRAIE réponse d\'annonces Leboncoin passe toujours',
     `${brutes.length} relayée(s)`);
+
+  // ── LE MOUCHARD DE CHEMINS RECONNAÎT LE BORDEREAU (comme sur Vinted)
+  //    Sur le code d'AVANT, un chemin vu était nu (`host/path`) : impossible de
+  //    savoir lequel est le PDF de l'étiquette. Il porte maintenant méthode +
+  //    statut + type. Le flush est sur un intervalle de 4 s → on l'attend.
+  console.log('\n── LE MOUCHARD RECONNAÎT LE BORDEREAU : méthode + statut + type');
+  await pg.waitForTimeout(4300);
+  const vusP = await pg.evaluate('window.__vus');
+  const chemins = vusP.filter((v) => v.kind === 'lbcpaths').flatMap((v) => v.paths || []);
+  dit(chemins.some((p) => /label\/\{id\}/.test(p) && /\[pdf\]/.test(p) && /→\s*200/.test(p)),
+    'un bordereau (GET → 200 [pdf]) est reconnaissable dans les chemins vus',
+    'chemins pdf : ' + (chemins.filter((p) => /\[pdf\]/.test(p)).join(' · ') || 'AUCUN (code d\'avant : chemin nu, sans type ni statut)'));
+  dit(chemins.some((p) => /refuse/.test(p) && /→\s*403/.test(p)),
+    'un refus (→ 403) se distingue d\'un succès',
+    'chemins en échec : ' + (chemins.filter((p) => /→\s*4\d\d/.test(p)).join(' · ') || 'AUCUN'));
+  dit(chemins.some((p) => /^GET\s/.test(p)) ,
+    'la méthode est portée (un GET de lecture ≠ un POST qui modifie)',
+    (chemins[0] || '(aucun chemin)'));
+  dit(!chemins.some((p) => /adnxs/.test(p)),
+    'le bruit publicitaire en 200/json n\'évince PAS les chemins qui servent',
+    chemins.filter((p) => /adnxs/.test(p)).join(' · ') || 'aucun tiers dans les chemins');
+  dit(!JSON.stringify(chemins).includes('9182734655'),
+    'aucun identifiant brut ne fuite : il devient {id}',
+    chemins.find((p) => /9182734655/.test(p)) || 'normalisé');
+
   console.log('\n── LE FORMULAIRE DE DÉPÔT EST **DYNAMIQUE** — on lit la CONFIG, pas le DOM');
   await essaie('la config du dépôt', async () => {
     // ⚠️⚠️ MESURÉ LE 17 SEPTEMBRE dans ses `lbc_recon.paths`, et ça change tout :

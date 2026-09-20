@@ -3276,6 +3276,40 @@ reste. Aucune raison de bumper la version ni de régénérer le zip pour cette
 passe : rien n'a changé dans `vinted-sync-extension/`, c'est un constat, pas une
 promesse neuve.
 
+### ⚠️ « CAPTER LE BORDEREAU DU BON COIN COMME SUR VINTED » — LE MOUCHARD DE CHEMINS PASSE À PARITÉ
+Julien, 20 sept. (précision) : « oui je parle de capture **comme sur Vinted** ;
+continue à améliorer. » Sur Vinted, VRM ne *génère* pas le bordereau : Vinted
+l'émet après la vente, l'extension en capte le PDF. Le pendant Leboncoin est
+identique — mais **je n'ai encore vu aucune vente ni aucun bordereau LBC**
+(403), donc écrire l'analyseur maintenant serait deviner (§4.10/§6.3). *Faire
+mesurer par ce qui y a accès* : ce qui débloque, c'est que sa prochaine vente LBC
+soit **reconnaissable** dans ce que l'extension remonte.
+**Mesuré, et c'était le trou** : le mouchard de chemins de `lbc-inject.js`
+(`lbcpaths` → `lbc_recon.paths`) notait le chemin **nu** (`host/path`) — alors
+que celui de Vinted (`inject.js`) note **méthode + statut**. Un bordereau est un
+**PDF** ; un chemin nu ne se distingue pas d'un JSON de vente, et « 403 » ne se
+lit pas comme « 200 ».
+⇒ `noteSeen(url, méthode, statut, ctype)` note désormais **`MÉTHODE host/chemin
+→ statut [type]`** — `[pdf]`/`[json]`/`[html]`/… — **jamais le corps, jamais la
+query**, ids → `{id}` (la promesse de confidentialité ne bouge pas). Porté au
+niveau transport (fetch **et** XHR), là où méthode et statut vivent. On garde
+**Leboncoin**, plus **tout PDF** (un bordereau peut venir du transporteur) et
+**tout échec ≥ 400** ; jamais le bruit publicitaire en 200/json, qui évincerait
+les chemins qui servent (leçon du catalogue). Le jour d'une vente, un
+`GET …/label… → 200 [pdf]` saute aux yeux, et la passe suivante câble la capture
+du PDF, prouvée sur la vraie forme.
+- **Aucune entrée d'`EXT_CAPACITES`** : c'est de la MESURE (lecture seule), l'app
+  ne promet rien de neuf. Extension en **5.93.0**, zip régénéré, `EXT_ATTENDUE`
+  suivie.
+- `audit-lbc-catalogue.cjs` sert un `GET → 200 [pdf]` et un `→ 403` et exige
+  qu'ils soient distinguables dans les chemins, que la méthode soit portée, que
+  le bruit `adnxs` n'y entre pas, et qu'aucun id brut ne fuite. **4 rouges** sur
+  le code d'avant (chemin nu, sans type ni statut).
+- ⚠️ **Il ne peut toujours pas charger l'extension** : ça n'aide qu'une fois
+  installée + une vraie vente LBC faite. L'app le dit déjà (diagnostic de
+  version). Rien d'autre n'est promis ; « vendue ici → retire là » et la capture
+  du bordereau restent gated sur cette mesure.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
