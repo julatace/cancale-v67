@@ -3310,6 +3310,53 @@ du PDF, prouvée sur la vraie forme.
   version). Rien d'autre n'est promis ; « vendue ici → retire là » et la capture
   du bordereau restent gated sur cette mesure.
 
+### ⚠️⚠️ « IL N'Y A QUE LA PHOTO DE COUVERTURE » — LE VRAI UPLOADER LEBONCOIN, ENFIN MESURÉ
+Julien, 20 sept. (le dépôt va jusqu'au bout, sauf ça) : « il y a juste la photo
+de couverture ». **Mesuré sur sa vraie base** (installé : **5.91**,
+`panel_diag_capture.ver`) : le champ photo de l'étape dépôt (`lbc_recon.etapes`)
+est **`multiple:true`** (`accept image/*,.heic,…`). Or seule 1 photo arrivait.
+- L'ancien `attacherPhotos` avait deux voies : champ `multiple` → **envoi groupé**
+  (`input.files = tous`) ; sinon → une par une. Le vrai uploader Leboncoin est
+  `multiple` **mais** lit **UNE** photo par `change`, l'envoie au serveur, affiche
+  la vignette **renvoyée (URL http)** et **vide** le champ. L'envoi groupé n'y
+  dépose donc que la **couverture**.
+- Pire, la voie groupée **se croyait finie** : elle comptait les vignettes
+  `blob:`/`data:` (`apercusPhotos`) — or Leboncoin les rend en **http**, donc le
+  compteur valait **0**, et le code retournait « tout attaché » (n = total). Le
+  faux-vert classique (§ « vert sur le défaut »), et le bandeau annonçait « 3
+  photos attachées » alors qu'il y en avait 1.
+⇒ **Le signal fiable n'est PAS l'attribut `multiple`** — c'est de savoir si le
+champ **GARDE** le fichier qu'on vient d'y poser. On pose la **1re** photo, puis :
+  · le champ la garde (`input.files` rempli) → **champ contrôlé** → on pose tout
+    d'un coup (un séquentiel le remplacerait par une seule) ;
+  · le champ s'est vidé → **uploader « à chaque change »** → on continue **une par
+    une**, sans jamais reposer la même (pas de doublon), en re-cherchant le champ
+    à chaque fois. On pilote sur ce qu'on **POSE**, jamais sur un compteur de
+    vignettes aveugle.
+- **On ne PRÉTEND jamais plus que ce qu'on sait** : « confirmées » quand on peut
+  compter (vignettes blob/data, ou fichiers gardés par un champ contrôlé) ; sinon
+  le bandeau dit « **N photos envoyées — vérifie qu'elles y sont toutes** », pas un
+  « X/Y attachées » invérifiable.
+- ⚠️ **La CAPTURE reste ≤ 6 photos** tant qu'il n'a pas rouvert ses annonces
+  Vinted avec la 5.87+ (mesuré : `vinted_item_details` = {1:14,3:1,4:5,5:38,6:60},
+  jamais > 6). Même uploader parfait, il n'attachera que ce qui est capté : le
+  bandeau le dit et renvoie rouvrir l'annonce Vinted.
+- ⚠️ **Deuxième cause possible, non écartée** : le CDN Vinted peut refuser des
+  liens périmés (`rates`) → moins d'octets, moins de photos. `attacherPhotos`
+  renvoie `rates`, et la **sonde** `photoDiag` (lecture seule, aucun contenu :
+  compte des vignettes blob/data/http/canvas/bg + `multiple` + envoyées/rates)
+  est rangée dans `lbc_recon.photodiag` — le prochain dépôt tranchera (a) uploader
+  vs (b) octets manquants, sans deviner.
+- `bancs/leboncoin.cjs` sert le **vrai** uploader (`photosreel` : `multiple` +
+  upload-à-chaque-change + vignettes **http**) : **§6.1 — sur le code d'avant
+  1 vignette sur 3 et le bandeau ment « 3 attachées » ; après, 3 sur 3 et le
+  bandeau dit « envoyées — vérifie ».** Le champ CONTRÔLÉ (`etape2`) garde l'envoi
+  groupé (3 fichiers retenus). Extension en **5.94.0**, zip régénéré,
+  `EXT_ATTENDUE` suivie. Aucune entrée d'`EXT_CAPACITES` (correction de fiabilité).
+- ⚠️ **« La prochaine fois, dépose sans booster »** — c'est déjà le cas : le clic
+  « Publier »/boost reste à lui (`BTN_PUBLIER` écarte publier/déposer/payer), et
+  l'app ne le fait jamais toute seule.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
