@@ -992,6 +992,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             sendResponse({ ok: true }); return;
           }
           if (msg.action === 'lbcRaw' && msg.body) { await handleLbcRaw(msg.url, msg.body); sendResponse({ ok: true }); return; }
+          // LA VENTE LEBONCOIN : détail transaction / commande / livraison. On
+          // range un échantillon capé par famille d'endpoint, pour voir la FORME
+          // (où vivent l'état, l'acheteur, le bordereau) — sans rien analyser
+          // encore. C'est une lecture de SES ventes (§3), rangée dans lbc_recon.
+          // On garde une place par famille (pas par id) : la 100e vente n'écrase
+          // pas la carte, elle la rafraîchit. Jamais dans une fixture (§6).
+          if (msg.action === 'lbcVente' && msg.body) { await storeLbcVente(msg.url, String(msg.body).slice(0, 200000), !!msg.coupe); sendResponse({ ok: true }); return; }
           // Le catalogue Leboncoin (codes de catégorie/marque/taille/état) : sa
           // propre ligne, une place par endpoint, rien ne peut l'évincer.
           if (msg.action === 'lbcCatalogue' && msg.body) { await storeLbcCatalogue(msg.url, String(msg.body).slice(0, LBC_CATALOGUE_MAX), !!msg.coupe || String(msg.body).length > LBC_CATALOGUE_MAX); sendResponse({ ok: true }); return; }
@@ -6068,6 +6075,17 @@ async function storeLbcAccount(acc) {
     if (prevRows === null) return;                 // pas su ≠ aucun compte (voir storeLbcListings)
     const prev = (prevRows[0] && prevRows[0].data && prevRows[0].data.accounts) || {};
     const merged = Object.assign({}, prev);
+    // ⚠️ AUTO-NETTOYAGE (§5) : un correctif de la détection ne suffit pas — les
+    //    comptes captés à tort AVANT restent en base. On retire ceux dont la
+    //    `source` est une fiche d'AUTRUI (user-card / discovery / same / search /
+    //    dashboard). On ne retire QUE sur une source positivement « autrui » :
+    //    une source absente ou inconnue est laissée (mieux vaut garder un compte
+    //    douteux que supprimer le sien sur un doute). Le compte à lui, venu de
+    //    `linked_accounts`, ne matche pas et reste.
+    for (const id of Object.keys(merged)) {
+      const s = merged[id] && merged[id].source;
+      if (s && LBC_URL_AUTRUI.test(String(s))) delete merged[id];
+    }
     merged[String(acc.id)] = Object.assign({}, merged[String(acc.id)], acc, { seenAt: new Date().toISOString() });
     await supabaseUpsert('app_data', [{ id: 'lbc_accounts', data: { accounts: merged, updatedAt: new Date().toISOString() } }], 'id');
   } catch (_) {}
@@ -6111,6 +6129,30 @@ async function storeLbcRecon(patch) {
     next.updatedAt = new Date().toISOString();
     await supabaseUpsert('app_data', [{ id: 'lbc_recon', data: next }], 'id');
     if (patch.etapes || patch.envois) await publierPrepLbc();   // idem
+  } catch (_) {}
+}
+// LA VENTE LEBONCOIN — la surface qu'on attendait pour « vendue → à retirer » et
+// « capter le bordereau comme sur Vinted ». On range un échantillon capé par
+// FAMILLE d'endpoint (ids gommés), une place chacune : la vente d'après rafraîchit
+// la carte au lieu de l'écraser, et rien ne peut l'évincer. On NE parse RIEN ici
+// (on ne devine pas la forme d'une vente jamais vue) — on collecte, la prochaine
+// passe branchera l'extraction + la capture du PDF sur la vraie forme (§6.3).
+async function storeLbcVente(url, body, coupe) {
+  try {
+    let fam = '';
+    try { const u = new URL(url); fam = (u.host + u.pathname).replace(/\/\d{3,}/g, '/{id}').replace(/\/[0-9a-f]{16,}/gi, '/{id}'); }
+    catch (_) { fam = String(url).split('?')[0].slice(0, 120); }
+    fam = fam.slice(0, 120);
+    if (!fam) return;
+    const prevRows = await sbGet('app_data?id=eq.lbc_recon&select=data');
+    if (prevRows === null) return;                 // pas su ≠ vide (§ storeLbcListings)
+    const cur = (prevRows[0] && prevRows[0].data) || {};
+    const ventes = Object.assign({}, cur.ventes || {});
+    ventes[fam] = { url: String(url).split('?')[0].slice(0, 160), body, coupe: !!coupe, ver: EXT_VERSION, at: new Date().toISOString() };
+    // Borné : au plus 12 familles, les plus récentes.
+    const noms = Object.keys(ventes);
+    if (noms.length > 12) { const g = noms.sort((x, y) => Date.parse((ventes[y] || {}).at || 0) - Date.parse((ventes[x] || {}).at || 0)).slice(0, 12); for (const n of noms) if (!g.includes(n)) delete ventes[n]; }
+    await storeLbcRecon({ ventes });
   } catch (_) {}
 }
 // ══════════════════════════════════════════════════════════════════════════════
@@ -6221,8 +6263,27 @@ async function publierPrepLbc() {
 // un acheteur a aussi un id + un pseudo, mais pas ton email/siren — sans marqueur
 // personnel (ou sous une clé « user/account/store/me/pro »), on ne prend pas.
 // Taguer une annonce du MAUVAIS compte serait pire que ne rien taguer.
+// ⚠️⚠️ §5 — L'IDENTITÉ DU COMPTE CONNECTÉ NE SE LIT QUE SUR UN ENDPOINT « MOI ».
+//   Mesuré le 20 sept. sur sa base : 8 des 9 comptes captés N'ÉTAIENT PAS les
+//   siens (Ethan, Chloé, David, Miguel…), venus de `api/user-card/v2/{id}/infos`,
+//   `api/discovery/category/N`, `api/same/v4/search/{id}`, `api/dashboard/v1/
+//   search` — des fiches D'AUTRES vendeurs. Elles passaient parce que TOUTE fiche
+//   pro publique porte `is_pro`/`store_id` : ce marqueur « c'est moi » n'en est
+//   pas un. Le SEUL compte à lui (`SHOPCANCALE`) est venu de
+//   `/users/me/linked_accounts`. Taguer une paire du MAUVAIS compte est la faute
+//   irréversible (§5) : on n'accepte l'identité QUE d'un endpoint qui décrit
+//   l'utilisateur CONNECTÉ, jamais la carte/le feed d'un id précis. Manquer un
+//   futur endpoint « moi » ⇒ on ne tague pas (blanc, safe) ; accepter une fiche
+//   d'autrui ⇒ on tague faux (perte). L'asymétrie tranche. Même règle des deux
+//   côtés (détection ET auto-nettoyage de storeLbcAccount), §11.
+const LBC_URL_MOI = /\/(users?|accounts?)\/me(\b|\/|$)|linked_accounts|\/me(\b|\/|$)|mon-compte|\/user\/settings/i;
+const LBC_URL_AUTRUI = /user-card|\/discovery\/|\/same\/|\/search(\b|\/|\?)|\/dashboard\//i;
 function detectLbcAccount(data, url) {
   let best = null;
+  const u = String(url || '');
+  // Un compte ne se reconnaît que sur un endpoint « moi » — jamais une fiche
+  // d'autrui (voir le bloc ci-dessus). Sinon on ne prend rien.
+  if (!LBC_URL_MOI.test(u) || LBC_URL_AUTRUI.test(u)) return null;
   const marqueurMoi = (o) => !!(o.email || o.phone || o.phone_number || o.phoneNumber
     || o.siren || o.siret || o.is_pro != null || o.store_id || o.storeId || o.company_name);
   const walk = (node, depth, key) => {
