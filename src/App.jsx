@@ -12461,6 +12461,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       setListingDates((rows && rows[0] && rows[0].data) || {});
     } catch (_) { /* pas de date connue : l'âge restera « inconnu » */ }
   })(); }, []);
+  // Sur quelle plateforme est chaque paire — demande de Julien (20 sept.).
+  // Signal HONNÊTE et déjà en base : `vinted_lbc_posted.ids` = les id d'annonce
+  // Vinted qu'il a marquées « publiée sur Leboncoin » (bouton « ✓ Je l'ai déjà
+  // publiée » du panneau, ou après une publication réussie). L'id stocké est
+  // `item.id`, exactement la clé de la carte Annonces → correspondance directe,
+  // sans rapprochement par titre (§5). ⚠️ Lecture ratée / vide ⇒ Set vide ⇒
+  // aucune pastille verte : on n'affirme JAMAIS « publiée » à tort (sous-affirmer
+  // ne trompe pas ; une fausse pastille verte, si). Le « sur quel COMPTE LBC »
+  // reste gaté sur la capture de ses propres annonces LBC (lbc_accounts vide).
+  const [lbcPosted, setLbcPosted] = useState(() => new Set());
+  useEffect(() => { (async () => {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_lbc_posted&select=data`, { headers: sbAuth() });
+      if (!r.ok) return;
+      const rows = await r.json();
+      const ids = (rows && rows[0] && rows[0].data && rows[0].data.ids) || [];
+      if (Array.isArray(ids)) setLbcPosted(new Set(ids.map(String)));
+    } catch (_) { /* pas su ⇒ Set vide ⇒ aucune pastille, jamais un faux « publiée » */ }
+  })(); }, []);
   const [usedNumeros, setUsedNumeros] = useState(() => load('vinted_used_numeros', []));
   // Prix d'achat mémorisé PAR NUMÉRO (et non par id d'annonce, qui change à la
   // vente/republication). Source de vérité durable : quand tu saisis le prix
@@ -20159,6 +20178,26 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     else if (total>0) { txt='✓ prête pour Leboncoin'; warn=false; tip='Toutes ses photos et sa description sont captées : elle peut partir sur Leboncoin.'; }
                     return txt ? <span title={tip} style={{fontSize:10.5,fontWeight:600,color:warn?C.warn:C.muted}}>{txt}</span> : null;
                   })()}
+                  {/* ⚠️ OÙ EST CETTE PAIRE — demande de Julien (20 sept.). On
+                      n'affiche que du PROUVÉ : « publiée sur Leboncoin » vient de
+                      SA marque (`vinted_lbc_posted`, indexée par id d'annonce =
+                      `item.id`). Pas de pastille ⇒ on ne prétend rien ; jamais un
+                      faux « publiée ». Le « sur quel COMPTE » reste gaté sur la
+                      capture de ses annonces LBC. */}
+                  {lbcPosted.has(String(item.id)) && (
+                    <span title="Tu l'as marquée publiée sur Leboncoin (bouton « ✓ Je l'ai déjà publiée » du panneau). Elle est donc sur Vinted ET sur Leboncoin."
+                      style={{fontSize:10.5,fontWeight:700,color:C.card,background:C.text,borderRadius:8,padding:'2px 8px'}}>
+                      ✓ sur Leboncoin
+                    </span>
+                  )}
+                  {/* La paire qui DORT : en ligne depuis longtemps sans partir.
+                      Le CHIFFRE (jours en ligne), pas une promesse — l'âge vient
+                      de la date de mise en ligne captée (`listedAgeDays`), sinon
+                      rien (on n'invente pas d'ancienneté, §5.34). */}
+                  {(() => { const age = listedAgeDays(item); return age != null && age >= SLEEP_DAYS
+                    ? <span title="En ligne depuis longtemps sans se vendre : pense à baisser le prix, la remettre aux favoris, ou relancer les personnes intéressées."
+                        style={{fontSize:10.5,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}44`,borderRadius:8,padding:'2px 8px'}}>😴 en ligne depuis {age} j</span>
+                    : null; })()}
                 </div>
                 {/* ⚠️ LE PRIX MINIMUM ACCEPTÉ — demande de Julien : « pour chaque
                     annonce que je poste je mets un prix minimum que l'app accepte
