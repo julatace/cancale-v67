@@ -756,6 +756,8 @@
     // dans le titre, et tu peux rechercher la paire par ce numéro dans ton profil.
     const refMise = setField(findField([/référ|referen|\bref\b|\bsku\b|identifiant|code.?article|numéro.?article/]), ref);
     if (refMise) faits.push('la référence ' + ref);
+    if (choisirCategorie(ad)) faits.push('la catégorie ' + ad.category);
+    remplirComposants(ad);   // pointure + état (menus React)
     if (!faits.length) {
       copy(ad.title + '\n\n' + ad.description);
       toast('Aucun champ reconnu sur cette page — titre + description copiés (la réf ' + ref + ' est dedans). Le dépôt Leboncoin se fait en plusieurs étapes : reviens cliquer ici à l\'étape du titre.');
@@ -1180,6 +1182,59 @@
     if (k) toast('👟 ' + k + ' menu' + (k > 1 ? 's' : '') + ' rempli' + (k > 1 ? 's' : '') + ' (pointure / état)');
     return k;
   }
+  // ── LA CATÉGORIE — mesuré au RENDU (capture d'écran de Julien, 20 sept.) :
+  //    c'est des BOUTONS RADIO (« Mode > Chaussures », « Loisirs > Sport »,
+  //    « Mode > Vêtements »), pas une liste. On clique celui qui correspond à sa
+  //    catégorie (`ad.category`, « Chaussures » pour ses paires). Repli : la
+  //    liste « Ou choisissez une autre catégorie » (un composant), au cas où
+  //    aucune suggestion ne colle.
+  function choisirCategorie(ad) {
+    const cat = String(ad.category || 'Chaussures').trim().toLowerCase();
+    if (!cat) return false;
+    const radios = Array.from(document.querySelectorAll('input[type="radio"],[role="radio"]')).filter((el) => !el.disabled && !DANS_ENTETE(el));
+    for (const rb of radios) {
+      let lab = (libelleDe(rb) || '').toLowerCase();
+      if (!lab) { const c = rb.closest('label,li,div,button'); if (c) { try { lab = (c.innerText || '').toLowerCase(); } catch (_) {} } }
+      if (lab.includes(cat)) {
+        if (rb.checked || rb.getAttribute('aria-checked') === 'true') return false;
+        try { rb.click(); } catch (_) {}
+        return true;
+      }
+    }
+    return false;
+  }
+  // ⚠️⚠️ JAMAIS « Publier » — on n'AVANCE que d'une étape (§3/§5 : aucune
+  //    publication à l'aveugle). On n'accepte QUE « Continuer »/« Suivant », et
+  //    on écarte tout bouton qui publie, dépose, valide, paye ou finalise.
+  const BTN_PUBLIER = /publier|d[ée]poser|mettre en ligne|payer|valider|confirmer|finaliser|en ligne/i;
+  const BTN_AVANCER = /continuer|suivant|[ée]tape suivante/i;
+  function cliquerContinuer() {
+    const btns = Array.from(document.querySelectorAll('button,[role="button"],input[type="submit"],a[role="button"]')).filter((el) => !DANS_ENTETE(el));
+    for (const b of btns) {
+      const t = (((b.innerText || b.value || '') + ' ' + (b.getAttribute('aria-label') || '')) || '').trim();
+      if (!t) continue;
+      if (BTN_PUBLIER.test(t)) continue;              // ⚠️ on ne publie jamais tout seul
+      if (BTN_AVANCER.test(t)) {
+        if (b.disabled || b.getAttribute('aria-disabled') === 'true') return false;
+        try { b.click(); } catch (_) {}
+        return true;
+      }
+    }
+    return false;
+  }
+  // Enchaîne les étapes tout seul : après avoir rempli ce qu'on peut, on clique
+  // « Continuer ». Une fois par étape (signature), quelques essais puis on cède —
+  // si ça n'avance pas, c'est qu'un champ OBLIGATOIRE qu'on ne devine pas manque
+  // (ex. Univers/Type) : on le DIT plutôt que de tourner en rond.
+  let _avanceFaite = new Set(); const _avanceEssais = {}; let _avanceEnCours = false;
+  async function avancer() {
+    if (_avanceEnCours) return; const sig = derniereEtape; if (!sig || _avanceFaite.has(sig)) return;
+    const n = (_avanceEssais[sig] = (_avanceEssais[sig] || 0) + 1);
+    if (n > 4) { if (n === 5) toast('⚠️ Un champ obligatoire reste à choisir (ex. Univers) — fais-le, je continue'); return; }
+    _avanceEnCours = true;
+    try { await attendre(1100); if (cliquerContinuer()) { _avanceFaite.add(sig); toast('→ étape suivante'); } } catch (_) {}
+    _avanceEnCours = false;
+  }
   function fillNow(ad) {
     let n = 0;
     if (setIfEmpty(findField([/titre|title|subject|proposez/]), ad.title)) n++;
@@ -1197,8 +1252,12 @@
     if (choisirListe([/[ée]tat|condition|state/], [ad.etat])) n++;
     if (choisirListe([/marque|brand/], [ad.marque])) n++;
     if (choisirListe([/pointure|taille|size/], [ad.taille])) n++;
+    // La CATÉGORIE — des boutons RADIO (« Mode > Chaussures »…), mesuré au rendu.
+    if (choisirCategorie(ad)) n++;
     // Les menus React (pointure, état) — sans bloquer le comptage synchrone.
     remplirComposants(ad);
+    // Puis on enchaîne l'étape : clic « Continuer » (JAMAIS « Publier »).
+    avancer();
     return n;
   }
   // Une liste déroulante : on ne prend une option que si son libellé contient
@@ -1306,9 +1365,11 @@
     { const d = poserDescription(ad); if (d.fait || d.ref) n++; }   // même face à « Re-remplir » : on n'écrase pas l'auto-description de Leboncoin
     if (poserPrix(ad.price)) n++;   // §11 : la même règle de prix que partout
     if (setField(findField([/référ|referen|\bref\b|\bsku\b|identifiant|code.?article|numéro.?article/]), ad.ref || ('VRM-' + ad.numero))) n++;
-    // « Re-remplir » relance aussi les menus React (on oublie qu'on les a déjà
-    // faits, au cas où on serait revenu sur l'étape des attributs).
+    if (choisirCategorie(ad)) n++;
+    // « Re-remplir » relance aussi les menus React et l'enchaînement d'étape
+    // (on oublie qu'on les a déjà faits, au cas où on serait revenu en arrière).
     _composFaits = new Set(); remplirComposants(ad);
+    _avanceFaite = new Set(); avancer();
     return n;
   }
 
