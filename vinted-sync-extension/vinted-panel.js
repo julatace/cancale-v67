@@ -27,14 +27,14 @@
   // l'onglet republié, ce n'est pas obligé »). `renderRepublier` reste dans le
   // fichier mais PLUS RIEN NE L'OUVRE — même parti pris que « Renuméroter à la
   // suite » côté app (§5.45) : on retire l'entrée, on ne charcute pas le code.
-  const PANEL_TABS = ['journee', 'recherche', 'paire', 'chaussures', 'ventes', 'coffre', 'reponse', 'expedier', 'achats', 'litiges', 'messages', 'favoris', 'relances'];
+  const PANEL_TABS = ['journee', 'recherche', 'paire', 'chaussures', 'ventes', 'coffre', 'reponse', 'expedier', 'achats', 'litiges', 'messages', 'favoris', 'relances', 'captation'];
   // ── LA BARRE D'ONGLETS : 5 au quotidien, le reste derrière « Plus » ────────
   // Douze pastilles sur trois rangées, c'est un mur : on ne lit plus, on
   // cherche. Même remède que la barre du bas de l'app (§5.53) — les écrans du
   // quotidien restent visibles, les autres passent derrière un bouton, et ce
   // bouton s'allume quand l'onglet affiché vient de derrière (sinon on ne sait
   // plus où on est).
-  const TABS_PLUS = ['ventes', 'recherche', 'coffre', 'litiges', 'favoris', 'relances'];
+  const TABS_PLUS = ['captation', 'ventes', 'recherche', 'coffre', 'litiges', 'favoris', 'relances'];
   let plusOuvert = false;
   // Le COFFRE, chargé à la demande (une requête, seulement quand tu ouvres l'onglet).
   let coffre = null, coffreBusy = false, coffreQuery = '', coffreOuvert = null;
@@ -178,6 +178,24 @@
     "hash": '<line x1="4" y1="9" x2="20" y2="9"></line><line x1="4" y1="15" x2="20" y2="15"></line><line x1="10" y1="3" x2="8" y2="21"></line><line x1="16" y1="3" x2="14" y2="21"></line>',
   };
   const svgi = (name, sz) => { const p = ICONS[name]; if (!p) return ''; const s = sz || 16; return `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;flex-shrink:0">${p}</svg>`; };
+
+  // Depuis quand ce compte n'a-t-il rien envoyé ? Un compte muet depuis deux
+  // semaines, c'est une session expirée — il faut repasser dessus. UN SEUL
+  // propriétaire de la formule (§11) : le bloc « Mes comptes » de Ma journée ET
+  // l'onglet Captation la lisent, pour qu'un même état n'ait pas deux couleurs.
+  // `t` est un horodatage (ms) ou 0 si jamais capté.
+  const CAPTE_VIEUX_J = 7; // au-delà, « repasse dessus »
+  function fraicheurCapte(t) {
+    if (!t) return 'jamais capté';
+    const j = (Date.now() - t) / 86400000;
+    if (j < 1) return "capté aujourd'hui";
+    if (j < 2) return 'capté hier';
+    if (j < CAPTE_VIEUX_J) return `capté il y a ${Math.round(j)} j`;
+    return `⚠️ rien depuis ${Math.round(j)} j — repasse dessus`;
+  }
+  // Un compte ACTIF (non masqué) qui n'a rien envoyé depuis trop longtemps, ou
+  // jamais : c'est lui qu'il faut rouvrir sur Vinted. Sert au badge de l'onglet.
+  const compteARafraichir = (a) => !a.off && (!a.capte || (Date.now() - a.capte) / 86400000 >= CAPTE_VIEUX_J);
   // Conseil marché compact réutilisable (même règle partout : écart >15% vs médiane
   // des paires comparables o.peer). Renvoie '' si pas d'écart net ou pas de peer.
   const marketNote = (o) => {
@@ -612,18 +630,7 @@
     // cette mention, un compte disparaît sans raison visible et on croit à un
     // bug de capture. « ↺ Réafficher » marche désormais dans les trois cas.
     const pourquoi = { app: "masqué depuis l'app", supprime: "supprimé dans l'app", panneau: 'masqué ici' };
-    // Depuis quand ce compte n'a-t-il rien envoyé ? Un compte muet depuis
-    // deux semaines, c'est une session expirée — il faut repasser dessus.
-    // Même échelle que l'écran Santé et que l'app : un même état ne doit pas
-    // porter deux couleurs selon l'écran.
-    const fraicheurTxt = (t) => {
-      if (!t) return 'jamais capté';
-      const j = (Date.now() - t) / 86400000;
-      if (j < 1) return 'capté aujourd\'hui';
-      if (j < 2) return 'capté hier';
-      if (j < 7) return `capté il y a ${Math.round(j)} j`;
-      return `⚠️ rien depuis ${Math.round(j)} j — repasse dessus`;
-    };
+    const fraicheurTxt = fraicheurCapte;
     const rows = accs.map(a => `
       <div style="display:flex;gap:8px;align-items:center;padding:7px 2px;border-top:1px solid #f0f2f5">
         <div style="flex:1 1 120px;min-width:0">
@@ -644,6 +651,72 @@
       <div class="vrm-m" style="margin:5px 0 2px">Masque un compte que tu n'utilises plus : ses paires, ventes et messages disparaissent partout dans VRM.</div>
       ${rows}
     </details>`;
+  }
+
+  // ── ONGLET « CAPTATION » : l'état de la moisson, en un coup d'œil ───────────
+  // Julien : « fais un onglet avec l'évolution de la captation des données ».
+  // Tout vient de `buildPanelData` (aucune lecture de plus, §4.4) + la version
+  // de CE navigateur (le panneau EST l'extension installée — `getManifest` est
+  // donc la vérité, pas une déduction). Trois blocs :
+  //   1. la version installée + la dernière capture (le pouls) ;
+  //   2. « ce qui est capté » — des CHIFFRES vérifiables, jamais une promesse ;
+  //   3. « par compte » — la fraîcheur, réutilisée telle quelle de Ma journée
+  //      (§11 : une seule source), avec « Tout recapter » déjà câblé.
+  // ⚠️ Trois états : si la base n'a rien répondu (`baseKO`), on n'écrit AUCUN
+  //    zéro (« rien lu » ne vaut pas « rien ») — le bandeau de panne, posé sur
+  //    la coque, dit déjà quoi faire.
+  function renderCaptation() {
+    if (DATA && DATA.baseKO) {
+      return `<div class="vrm-m">Je n'ai rien pu lire pour l'instant — vois le bandeau au-dessus. Rien n'est perdu, c'est la lecture qui a échoué.</div>`;
+    }
+    let ver = ''; try { ver = (chrome.runtime.getManifest && chrome.runtime.getManifest().version) || ''; } catch (_) {}
+    const fresh = (DATA && DATA.freshestAt) ? timeago(DATA.freshestAt) : '';
+    const online = (DATA && DATA.online) || [];
+    const accs = (DATA && DATA.accounts) || [];
+    const aRafraichir = accs.filter(compteARafraichir).length;
+    // Photos : Vinted DIT le vrai nombre (`nPhotosVinted`) ; on ne juge que ce
+    // qu'on connaît (§5) — une annonce dont le total est inconnu n'est ni
+    // « complète » ni « à compléter ».
+    let phComplet = 0, phManque = 0, phInconnu = 0;
+    for (const o of online) {
+      const reel = Number(o.nPhotosVinted) || 0, capt = Number(o.nPhotos) || 0;
+      if (!reel) phInconnu++;
+      else if (capt >= reel) phComplet++;
+      else phManque++;
+    }
+    const pickups = (DATA && DATA.pickups) || [];
+    const pkCode = pickups.filter(p => p && p.code).length;
+    // Une ligne de chiffre : label · valeur · note optionnelle. `alerte` met la
+    // pastille ambre — et SEULEMENT quand il y a vraiment quelque chose à
+    // rattraper (§7), jamais un total neutre.
+    const ligne = (label, val, note, alerte) => `
+      <div style="display:flex;align-items:center;gap:8px;padding:7px 2px;border-top:1px solid #f0f2f5">
+        <span style="width:7px;height:7px;border-radius:50%;flex-shrink:0;background:${alerte ? '#c98a1a' : 'rgba(0,0,0,.18)'}"></span>
+        <span style="flex:1 1 auto;font-size:12.5px">${esc(label)}</span>
+        <span style="flex-shrink:0;font-weight:800;font-size:13px;font-variant-numeric:tabular-nums">${esc(String(val))}</span>
+      </div>${note ? `<div class="vrm-m" style="font-size:10.5px;margin:-2px 0 2px 15px">${note}</div>` : ''}`;
+    const photoLine = phManque > 0
+      ? ligne('Photos complètes', `${phComplet} / ${phComplet + phManque}`,
+          `${phManque} annonce${phManque > 1 ? 's' : ''} à compléter — elles se remplissent toutes seules à ta prochaine visite sur Vinted.`, true)
+      : (phComplet > 0
+          ? ligne('Photos complètes', `${phComplet} / ${phComplet}`, phInconnu ? `${phInconnu} annonce${phInconnu > 1 ? 's' : ''} dont Vinted ne dit pas le nombre de photos — non jugée${phInconnu > 1 ? 's' : ''}.` : '', false)
+          : '');
+    const totaux = `
+      <div class="vrm-card" style="padding:10px 12px">
+        <div style="font-weight:800;font-size:12.5px;margin-bottom:2px;display:flex;align-items:center;gap:6px">${svgi('grid', 14)} Ce qui est capté</div>
+        ${ligne('Annonces en ligne', online.length)}
+        ${ligne('Ventes captées', ((DATA && DATA.sales) || []).length)}
+        ${ligne('Conversations', ((DATA && DATA.convs) || []).length)}
+        ${ligne('Bordereaux prêts à imprimer', ((DATA && DATA.bordsToPrint) || []).length, '', ((DATA && DATA.bordsToPrint) || []).length > 0)}
+        ${ligne('Colis à retirer', pickups.length + (pkCode ? ` · ${pkCode} avec code` : ''), '', pickups.length > 0)}
+        ${photoLine}
+      </div>`;
+    const pouls = `
+      <div class="vrm-m" style="margin-bottom:8px">
+        ${ver ? `Extension <b>${esc(ver)}</b>` : 'Extension'}${fresh ? ` · dernière capture ${esc(fresh)}` : ' · aucune capture datée pour l\'instant'}.
+        ${aRafraichir ? `<br><b style="color:#9a5b16">${aRafraichir} compte${aRafraichir > 1 ? 's' : ''} à rafraîchir</b> — ouvre Vinted connecté dessus, l'extension capte alors ses annonces, ventes, messages et bordereaux toute seule.` : '<br>Tous tes comptes reliés sont à jour.'}
+      </div>`;
+    return `${pouls}${totaux}<div style="margin-top:10px"></div>${comptesBlock()}`;
   }
 
   // ── ONGLET « MES PAIRES » : la liste de toutes tes chaussures en ligne, en
@@ -1382,6 +1455,9 @@
     if (t === 'litiges') return st.litiges || 0;
     if (t === 'messages') return st.unread || 0;
     if (t === 'relances') return ((DATA && DATA.relances) || []).length;
+    // Badge Captation = les comptes à rafraîchir (jamais capté / trop vieux),
+    // c'est-à-dire ce sur quoi il doit repasser. Un compte à jour n'y compte pas.
+    if (t === 'captation') return ((DATA && DATA.accounts) || []).filter(compteARafraichir).length;
     return 0;
   }
   const LIB_ONGLET = {
@@ -1389,7 +1465,7 @@
     ventes: ['trending-up', 'Ventes'], recherche: ['search', 'Chercher'], coffre: ['archive', 'Coffre'],
     expedier: ['printer', 'Bordereaux'], achats: ['shopping-bag', 'Achats'],
     litiges: ['alert-triangle', 'Litiges'], messages: ['message-circle', 'Messages'], favoris: ['heart', 'Favoris'],
-    relances: ['zap', 'Relances'],
+    relances: ['zap', 'Relances'], captation: ['refresh-cw', 'Captation'],
   };
   function pastille(t, actif) {
     const [ic, lbl] = LIB_ONGLET[t] || ['home', t];
@@ -1437,6 +1513,7 @@
         : tab === 'messages' ? renderMessages()
         : tab === 'favoris' ? renderFavoris()
         : tab === 'relances' ? renderRelances()
+        : tab === 'captation' ? renderCaptation()
         : renderJournee()
       }</div>
       ${(DATA && DATA.activity && DATA.activity.length) ? `
