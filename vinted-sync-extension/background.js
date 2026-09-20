@@ -998,7 +998,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           // encore. C'est une lecture de SES ventes (§3), rangée dans lbc_recon.
           // On garde une place par famille (pas par id) : la 100e vente n'écrase
           // pas la carte, elle la rafraîchit. Jamais dans une fixture (§6).
-          if (msg.action === 'lbcVente' && msg.body) { await storeLbcVente(msg.url, String(msg.body).slice(0, 200000), !!msg.coupe); sendResponse({ ok: true }); return; }
+          if (msg.action === 'lbcVente' && msg.body) { const corps = String(msg.body).slice(0, 200000); await storeLbcVente(msg.url, corps, !!msg.coupe); try { await rangerLbcVentes(extraireVentesLbc(msg.url, corps)); } catch (_) {} sendResponse({ ok: true }); return; }
           // Le catalogue Leboncoin (codes de catégorie/marque/taille/état) : sa
           // propre ligne, une place par endpoint, rien ne peut l'évincer.
           if (msg.action === 'lbcCatalogue' && msg.body) { await storeLbcCatalogue(msg.url, String(msg.body).slice(0, LBC_CATALOGUE_MAX), !!msg.coupe || String(msg.body).length > LBC_CATALOGUE_MAX); sendResponse({ ok: true }); return; }
@@ -6154,6 +6154,105 @@ async function storeLbcVente(url, body, coupe) {
     if (noms.length > 12) { const g = noms.sort((x, y) => Date.parse((ventes[y] || {}).at || 0) - Date.parse((ventes[x] || {}).at || 0)).slice(0, 12); for (const n of noms) if (!g.includes(n)) delete ventes[n]; }
     await storeLbcRecon({ ventes });
   } catch (_) {}
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// LES VENTES LEBONCOIN — comme sur Vinted : l'état + le BORDEREAU, par vente
+// ══════════════════════════════════════════════════════════════════════════════
+// Julien : « je veux comme pour Vinted les ventes, les bordereaux, les annonces ».
+// MESURÉ le 20 septembre sur sa vraie base, après son tour (capture 5.101 non
+// tronquée) : le détail d'une transaction Leboncoin porte, POUR UNE VENTE :
+//   • `is_seller: true` — l'identité « c'est bien MOI le vendeur » (§5, jamais
+//     déduite d'un titre) ;
+//   • `item.id` + `item.title` + `item.prices.final` — l'annonce concernée ;
+//   • `step.status` / `step.label` (« Colis à envoyer », …) — l'état de la vente ;
+//   • `mondial_relay.label_information.{reference,voucher_url,qrcode_url,tracking_url}`
+//     — LE BORDEREAU (le `voucher_url` est le PDF), exactement le pendant du
+//     `label_latest` de Vinted.
+// La liste `v3/pages/transactions` donne le résumé (purchase_id, item, step).
+//
+// ⇒ On range chaque vente dans une ligne DÉDIÉE `lbc_ventes`, clé = id de
+//   transaction, en lire-fusionner-réécrire ENRICHISSANT (le résumé pose l'état,
+//   le détail ajoute le bordereau) — jamais un vide n'écrase une valeur connue,
+//   et `null` sur lecture ratée = on n'écrit pas (§ storeLbcListings, la famille
+//   « rien lu ≠ rien »). Aucune donnée perso : ni acheteur, ni adresse.
+// ⚠️ On COLLECTE seulement — l'app ne promet encore rien : le lien avec sa PAIRE
+//   VRM passe par la réf lue sur l'annonce Leboncoin (`lbc_listings`), pas encore
+//   captée. « On collecte, on vérifie, PUIS on promet. »
+function labelInfoDe(d) {
+  // Le bloc `label_information` vit sous le transporteur (mesuré : `mondial_relay`).
+  // On le trouve par sa FORME, pas par un nom deviné : le premier objet de premier
+  // niveau qui en porte un.
+  if (!d || typeof d !== 'object') return null;
+  if (d.label_information && typeof d.label_information === 'object') return d.label_information;
+  for (const k of Object.keys(d)) {
+    const v = d[k];
+    if (v && typeof v === 'object' && v.label_information && typeof v.label_information === 'object') return v.label_information;
+  }
+  return null;
+}
+function extraireVentesLbc(url, body) {
+  let j; try { j = typeof body === 'string' ? JSON.parse(body) : body; } catch (_) { return []; }
+  // Résumé : la liste des transactions (v3).
+  if (Array.isArray(j)) {
+    return j.map((t) => t && {
+      txId: String((t.id && t.id.purchase_id) || t.purchase_id || ''),
+      title: (t.item && t.item.title) || '',
+      price: (t.item && t.item.price != null) ? t.item.price : (t.price != null ? t.price : null),
+      stepStatus: typeof t.step === 'string' ? t.step : ((t.step && t.step.status) || ''),
+    }).filter((x) => x && x.txId);
+  }
+  // Détail : une transaction (v2 API, ou page Next enveloppée).
+  const d = (j && j.pageProps && (j.pageProps.transaction || j.pageProps.data)) || j;
+  if (d && typeof d === 'object' && (d.item || d.step || d.parcel_id || d.is_seller != null)) {
+    const mid = String(url).match(/transactions?\/(\d+)/);
+    const li = labelInfoDe(d);
+    const pr = (d.item && d.item.prices) || {};
+    const v = {
+      txId: (mid && mid[1]) || String((d.id && d.id.purchase_id) || d.purchase_id || (d.item && d.item.id) || ''),
+      itemId: String((d.item && d.item.id) || ''),
+      title: (d.item && d.item.title) || '',
+      price: (pr.final != null ? pr.final : (pr.total != null ? pr.total : null)),
+      isSeller: d.is_seller === true ? true : (d.is_seller === false ? false : undefined),
+      stepStatus: (d.step && d.step.status) || (typeof d.step === 'string' ? d.step : ''),
+      stepLabel: (d.step && d.step.label) || '',
+      deliveryMethod: d.delivery_method || '',
+      deliveryLabel: d.delivery_method_label || '',
+      label: li ? {
+        reference: li.reference || '', voucherUrl: li.voucher_url || '',
+        qrUrl: li.qrcode_url || '', trackingUrl: li.tracking_url || '',
+      } : null,
+    };
+    return v.txId ? [v] : [];
+  }
+  return [];
+}
+async function rangerLbcVentes(list) {
+  if (!list || !list.length) return;
+  const prev = await sbGet('app_data?id=eq.lbc_ventes&select=data');
+  if (prev === null) return;                          // pas su ≠ vide — on n'écrase rien
+  const cur = (prev[0] && prev[0].data) || {};
+  const ventes = Object.assign({}, cur.ventes || {});
+  for (const v of list) {
+    const k = v.txId; if (!k) continue;
+    const old = ventes[k] || {};
+    const m = Object.assign({}, old);
+    for (const [kk, vv] of Object.entries(v)) {
+      if (kk === 'label') continue;                   // fusionné à part
+      if (vv === '' || vv == null) continue;          // un vide n'écrase pas une valeur connue
+      m[kk] = vv;
+    }
+    if (v.label) {                                     // enrichit le bordereau champ par champ
+      const lm = Object.assign({}, old.label || {});
+      for (const [lk, lv] of Object.entries(v.label)) if (lv) lm[lk] = lv;
+      m.label = lm;
+    }
+    m.at = new Date().toISOString();
+    ventes[k] = m;
+  }
+  const noms = Object.keys(ventes);
+  if (noms.length > 500) { const g = noms.sort((x, y) => Date.parse((ventes[y] || {}).at || 0) - Date.parse((ventes[x] || {}).at || 0)).slice(0, 500); for (const n of noms) if (!g.includes(n)) delete ventes[n]; }
+  await supabaseUpsert('app_data', [{ id: 'lbc_ventes', data: { ventes, updatedAt: new Date().toISOString() } }], 'id');
 }
 // ══════════════════════════════════════════════════════════════════════════════
 // LE CATALOGUE LEBONCOIN — SES CODES EXACTS DE CATÉGORIE, MARQUE, TAILLE, ÉTAT
