@@ -3357,6 +3357,73 @@ champ **GARDE** le fichier qu'on vient d'y poser. On pose la **1re** photo, puis
   « Publier »/boost reste à lui (`BTN_PUBLIER` écarte publier/déposer/payer), et
   l'app ne le fait jamais toute seule.
 
+### ⚠️ « CAPTE TOUTES LES PHOTOS EN PASSIF » — L'EXTENSION LIT LE DÉTAIL, SANS OUVRIR L'ANNONCE
+Julien, 20 sept. : « je veux que ça capture toutes les photos en passif, dès que
+j'ouvre Vinted, je veux pas aller sur l'annonce ». **Mesuré sur sa base** : la
+liste du dressing (`harvest_{uid}_listings`, ce qui charge quand il ouvre Vinted)
+ne porte, par annonce, que **la couverture** (`photo` = UN objet) + le **vrai
+compte** (`nPhotos`, ex. 9). Le jeu complet ne vit **que** dans le détail de
+l'annonce. Lire les photos « du DOM » (5.87) exige donc d'ouvrir chaque annonce —
+exactement ce qu'il ne veut plus.
+⇒ `capterPhotosAnnonces(uid)` (background) tourne à **chaque visite Vinted**,
+après la moisson : il prend SES annonces **en ligne** (`harvest_{uid}_listings`)
+dont `nPhotos > photos déjà captées`, et va lire `/api/v2/items/{id}` pour en
+extraire **toutes** les photos (`saveItemDetail`). C'est une **lecture sur ses
+propres annonces** (§3 l'autorise), la forme exacte de `capterRetraits` /
+`capterReleves`, avec les **mêmes garde-fous** : compte connecté (`garde`),
+**3 par visite**, une par une, pas de nouvel essai avant 24 h. En quelques
+visites, tout se remplit **tout seul** — la pastille « X/Y photos » de l'écran
+Annonces passe au vert sans qu'il ouvre rien.
+- ⚠️ **L'endpoint de détail n'a jamais été observé d'ici (403).** `urlsPhotosDeItem`
+  lit `item.photos[].full_size_url|url` **et**, si cette forme ne donne rien,
+  balaie la réponse pour toute URL d'image `vinted.net` — puis note un diag
+  (`photos_annonce_ecrit` / `_refuse_{status}` / `_vide`) + un échantillon des
+  **clés** (jamais le corps). Si l'extraction rate, la prochaine visite me dira
+  la vraie forme (*faire mesurer par ce qui y a accès*), sans deviner.
+- **On n'écrit jamais moins qu'on a** (`saveItemDetail` ne remplace pas par du
+  vide) ; une lecture ratée de `vinted_item_details` (`null`) ⇒ on ne rejoue pas.
+- `scripts/audit-photos-passif.cjs` **exécute** le vrai `background.js` dans un
+  `vm` : complète les annonces à qui il manque des photos (jeu **complet**, pas
+  la couverture), **ignore** fermées / 1 photo / déjà complètes, **borne à 3**,
+  s'arrête si `garde` refuse. **§6.1 prouvé en RÉAFFAIBLISSANT** (retirer le
+  filtre « en ligne » ⇒ une annonce fermée est lue → le contrôle mord). **11
+  contrôles.** ⚠️ §6.3 dans mon propre banc : le mock devait honorer la
+  **projection** `items:data->payload->items` (sinon `rows[0].items` = undefined,
+  0 photo sur un code intact) **et** la lecture-après-écriture.
+- **Aucune entrée d'`EXT_CAPACITES`** : c'est de la CAPTURE (l'app ne promet rien
+  de neuf, la pastille lit ce qui est là). Extension en **5.95.0**, zip régénéré,
+  `EXT_ATTENDUE` suivie.
+
+### ⚠️⚠️ « APPUIE SUR PUBLIER SANS BOOSTER » — AUTORISÉ, MAIS GATED SUR UNE MESURE (LE BOOST = DE L'ARGENT)
+Julien, 20 sept. : « si tout est parfait dans l'app et la publication, je veux que
+ce soit TOI qui appuies sur publier **sans booster**, ça me dérange pas du tout ».
+C'est un **renversement de la règle** « publier reste manuel » — et c'est **SA
+décision d'owner**, elle n'est pas à re-négocier. Mais elle a une condition qu'il
+pose lui-même (« **si tout est parfait** ») et un risque unique dans tout le
+projet : **le boost coûte de l'argent**.
+**Mesuré** (`lbc_recon.etapes`) : le dépôt passe par une étape
+`deposer-une-annonce/options` portant `gallery | gallery30 | daily_bump |
+daily_bump30 | sub_toplist | urgent` — **les options PAYANTES**. « Publier sans
+booster » = traverser cette étape en **ne cochant AUCUNE** option payante, puis
+cliquer le publier **gratuit**. Or **je n'ai jamais vu** cette étape jusqu'au
+bout (ses dépôts se sont arrêtés avant), ni le bouton final, ni s'il y a une
+confirmation/paiement derrière.
+⇒ **Écrire le clic « Publier » à l'aveugle à travers une page d'options payantes,
+c'est risquer de cocher un boost — dépenser son argent. C'est le SEUL défaut pire
+qu'un clic manuel.** Donc, fidèle à tout le dossier (*ne pas promettre / cliquer
+ce qu'on n'a pas mesuré*) : **pas de clic automatique tant que je n'ai pas la
+carte réelle de l'étape options + publication.**
+- L'enregistreur d'étapes (`captureDepositForm`) capte DÉJÀ chaque étape, options
+  comprise — **un seul dépôt mené jusqu'à « Publier » (à la main, gratuit)** me
+  donne : les vrais libellés/état par défaut des toggles de boost, et le bouton
+  de publication gratuite. **Ensuite** je câble le clic, **gaté** : ne cliquer le
+  publier que si **zéro** option payante n'est active, **jamais** un bouton de
+  boost/paiement (la garde `BTN_PUBLIER`/boost), et seulement quand les champs
+  requis sont remplis. Prouvé au banc sur la vraie forme (comme le reste).
+- ⚠️ **Ce n'est pas un refus** — c'est l'ordre correct : mesurer l'étape qui
+  engage de l'argent AVANT de l'automatiser. Le clic « Continuer » entre étapes
+  non-payantes est déjà automatique ; il ne reste que la dernière page.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par

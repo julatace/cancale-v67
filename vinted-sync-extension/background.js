@@ -1535,6 +1535,8 @@ const estPorteMonnaie = (p) => !!(p && typeof p === 'object' && MONTANTS_PM.some
 // fait à chaque visite. Le relevé a donc sa PROPRE ligne, une par mois.
 const RELEVE_MAX_PAR_VISITE = 2;
 const RELEVE_RETRY_MS = 24 * 60 * 60 * 1000;
+const PHOTOS_MAX_PAR_VISITE = 3;
+const PHOTOS_RETRY_MS = 24 * 60 * 60 * 1000;
 
 // Un mouvement, réduit à ce qui l'identifie et le date. On ne garde pas le
 // libellé complet ni les champs de présentation : ces lignes repartent à chaque
@@ -1688,6 +1690,101 @@ async function capterReleves(uid) {
       await storeReleve(uid, rep.json, 'www.vinted.fr');
     }
     await chrome.storage.local.set({ vrmReleveFaits: memo });
+    return n;
+  } catch (_) { return 0; }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CAPTER TOUTES LES PHOTOS D'UNE ANNONCE — EN PASSIF (Julien, 20 sept. : « je
+// veux pas aller sur l'annonce »)
+// ══════════════════════════════════════════════════════════════════════════════
+// MESURÉ sur sa base le 20 sept. : la LISTE du dressing (`harvest_{uid}_listings`,
+// ce qui charge quand il ouvre Vinted) ne porte, par annonce, que **la
+// couverture** (`photo` = UN objet) + le VRAI compte (`nPhotos`, ex. 9). Le jeu
+// complet ne vit QUE dans le détail de l'annonce. Pour l'avoir « sans ouvrir
+// l'annonce », c'est donc l'extension qui va lire ce détail — une LECTURE sur SES
+// propres annonces, exactement la forme de `capterRetraits`/`capterReleves`
+// (§3 l'autorise), avec les MÊMES garde-fous : compte connecté (`garde`), N par
+// visite, une requête à la fois, pas de nouvel essai avant 24 h.
+// ⚠️ L'ENDPOINT DE DÉTAIL N'A JAMAIS ÉTÉ OBSERVÉ D'ICI (403 vers Vinted). On lit
+// `/api/v2/items/{id}` DÉFENSIVEMENT : on prend `item.photos[].full_size_url|url`,
+// et si cette forme ne donne rien on balaie la réponse pour toute URL d'image
+// vinted.net. Un diag (`photos_annonce_*`) + un échantillon des CLÉS (jamais le
+// corps) disent la vraie forme au cas où — la prochaine visite corrigera le tri
+// sans deviner. On n'écrit JAMAIS moins de photos qu'on en a déjà (saveItemDetail
+// ne remplace pas par du vide).
+function urlsPhotosDeItem(json) {
+  const out = [];
+  const pousse = (u) => { if (typeof u === 'string' && /vinted\.net\//i.test(u) && !out.includes(u)) out.push(u); };
+  try {
+    const it = (json && (json.item || json)) || {};
+    const ph = Array.isArray(it.photos) ? it.photos : [];
+    for (const p of ph) { if (p) pousse(p.full_size_url || p.url || (p.thumbnails && p.thumbnails.length && p.thumbnails[p.thumbnails.length - 1].url)); }
+    if (out.length) return out;
+    // Forme inattendue : on balaie pour toute grande image vinted.net (jamais du
+    // texte, jamais un mouchard — seulement des URL d'image du CDN).
+    const vu = new Set();
+    const scan = (o, prof) => {
+      if (!o || prof > 6 || out.length >= 20) return;
+      if (typeof o === 'string') { if (/vinted\.net\/.+\/(f800|f1200|1600|large|full)/i.test(o) || /vinted\.net\//i.test(o) && /\.(jpe?g|webp|png)/i.test(o)) pousse(o); return; }
+      if (Array.isArray(o)) { for (const x of o) scan(x, prof + 1); return; }
+      if (typeof o === 'object') { if (vu.has(o)) return; vu.add(o); for (const k of Object.keys(o)) scan(o[k], prof + 1); }
+    };
+    scan(json, 0);
+  } catch (_) {}
+  return out.slice(0, 20);
+}
+async function capterPhotosAnnonces(uid) {
+  try {
+    if (!uid) return 0;
+    const accts = await getStoredAccounts();
+    const acc = accts.find(a => String(a.vinted_user_id) === String(uid));
+    if (!acc) return 0;
+    // La liste du dressing : id + nPhotos + état. C'est SA donnée (ligne du compte).
+    let items = [];
+    try {
+      const rows = await sbGet(`app_data?id=eq.harvest_${uid}_listings&select=items:data->payload->items`);
+      items = (rows && rows[0] && Array.isArray(rows[0].items)) ? rows[0].items : [];
+    } catch (_) {}
+    if (!items.length) return 0;
+    // Ce qu'on a DÉJÀ capté (photos par id) — une lecture, la carte complète.
+    let dej = {};
+    try {
+      const dr = await sbGet('app_data?id=eq.vinted_item_details&select=data');
+      if (dr === null) return 0;                          // pas su ≠ « rien capté » : on ne rejoue pas à l'aveugle
+      dej = (dr[0] && dr[0].data) || {};
+    } catch (_) {}
+    const manquants = items.filter((it) => {
+      if (!it || !it.id) return false;
+      if (it.is_closed || it.is_hidden || it.is_draft) return false;   // en ligne seulement
+      const veut = Number(it.nPhotos || 0);
+      const a = ((dej[String(it.id)] || {}).photos || []).length;
+      return veut > 1 && a < veut;                        // il en manque
+    }).sort((a, b) => Number(b.nPhotos || 0) - Number(a.nPhotos || 0));
+    if (!manquants.length) return 0;
+    const memo = (await chrome.storage.local.get('vrmPhotosFaites')).vrmPhotosFaites || {};
+    let n = 0;
+    for (const it of manquants) {
+      if (n >= PHOTOS_MAX_PAR_VISITE) break;
+      const k = `${uid}_${it.id}`;
+      if (memo[k] && Date.now() - Number(memo[k]) < PHOTOS_RETRY_MS) continue;
+      const refus = await garde(uid, acc);
+      if (refus) { logActivity(`⚠️ Photos non captées : ${refus.error}`); break; }
+      memo[k] = Date.now();
+      n++;
+      const rep = await vintedGet(acc, `/api/v2/items/${encodeURIComponent(it.id)}`);
+      if (!rep.ok || !rep.json) { noterDiag(`photos_annonce_refuse_${rep.status}`); continue; }
+      const urls = urlsPhotosDeItem(rep.json);
+      if (!urls.length) {
+        noterDiag('photos_annonce_vide');
+        echantillonRate('photos_annonce', String(it.id), JSON.stringify(Object.keys((rep.json && (rep.json.item || rep.json)) || {})).slice(0, 300));
+        continue;
+      }
+      const it2 = (rep.json && (rep.json.item || rep.json)) || {};
+      await saveItemDetail(it.id, { description: it2.description || '', photos: urls });
+      noterDiag('photos_annonce_ecrit');
+    }
+    await chrome.storage.local.set({ vrmPhotosFaites: memo });
     return n;
   } catch (_) { return 0; }
 }
@@ -2332,6 +2429,11 @@ async function visiteVinted() {
     // `/payouts` (aucune requête ajoutée) ; ici on ne va chercher que les mois
     // PASSÉS encore absents, deux par visite au plus.
     await capterReleves(uid);
+    // ⚠️ APRÈS la moisson : la liste du dressing (id + nPhotos) vient d'être
+    // captée. On complète EN PASSIF les photos manquantes de ses annonces en
+    // ligne — 3 par visite, une par une, compte connecté (§3). Sans ouvrir
+    // l'annonce : c'est l'extension qui lit le détail (Julien, 20 sept.).
+    await capterPhotosAnnonces(uid);
   } catch (_) { /* une visite ratée n'a pas à casser la navigation */ }
 }
 
