@@ -104,6 +104,7 @@ const ANNONCES = JSON.stringify({ ads: [{ list_id: 991, subject: 'Salomon XT-6 V
     await fetch('/api/discovery/category/53').then(r => r.text()).catch(() => {});
     await fetch('https://api.leboncoin.fr/api/vrmtest/label/9182734655').then(r => r.text()).catch(() => {});
     await fetch('https://api.leboncoin.fr/api/vrmtest/refuse').then(r => r.text()).catch(() => {});
+    await fetch('https://api.leboncoin.fr/api/consumergoods/proxy/v2/pages/transactions/778899').then(r => r.text()).catch(() => {});
   })()`).catch(() => {});
   await pg.waitForTimeout(600);
   const vus = await pg.evaluate('window.__vus');
@@ -125,6 +126,18 @@ const ANNONCES = JSON.stringify({ ads: [{ list_id: 991, subject: 'Salomon XT-6 V
   const brutes = vus.filter((v) => v.kind === 'lbcraw');
   dit(brutes.length >= 1, 'et une VRAIE réponse d\'annonces Leboncoin passe toujours',
     `${brutes.length} relayée(s)`);
+
+  // ── LA VENTE LEBONCOIN EST RELAYÉE POUR ÊTRE CAPTÉE (comme sur Vinted)
+  //    Sur le code d'avant, une transaction ne matchait ni AD_HINT ni
+  //    ACCOUNT_HINT : son corps ne partait PAS, et sa vente était perdue pour
+  //    l'analyse (comme le dépôt qu'on avait jeté). Elle part maintenant dans
+  //    son propre kind `lbcvente` — jamais confondue avec une annonce.
+  const ventes = vus.filter((v) => v.kind === 'lbcvente');
+  dit(ventes.length >= 1 && /transactions\/778899/.test((ventes[0] || {}).url || ''),
+    'une transaction (vente/livraison) est relayée comme `lbcvente`',
+    ventes.length ? String(ventes[0].url).replace(/^.*leboncoin\.fr/, '') : 'AUCUNE (code d\'avant : ni AD_HINT ni ACCOUNT_HINT ⇒ perdue)');
+  dit(!ventes.some((v) => v.kind === 'lbcraw') && !brutes.some((v) => /transactions/.test(v.url || '')),
+    'et jamais mélangée au flot d\'annonces (`lbcraw`)');
 
   // ── LE MOUCHARD DE CHEMINS RECONNAÎT LE BORDEREAU (comme sur Vinted)
   //    Sur le code d'AVANT, un chemin vu était nu (`host/path`) : impossible de
@@ -303,6 +316,23 @@ const ANNONCES = JSON.stringify({ ads: [{ list_id: 991, subject: 'Salomon XT-6 V
     const slot = w && w.data[Object.keys(w.data).filter((k) => k !== 'updatedAt')[0]];
     dit(!!slot && slot.coupe === true, 'un catalogue coupé le DIT (on ne l\'analysera pas en le croyant entier)',
       slot ? `coupe=${slot.coupe}` : 'aucune écriture');
+  });
+
+  // 5. LA VENTE : rangée par FAMILLE d'endpoint (ids gommés), sans rien parser.
+  await essaie('la vente est rangée dans lbc_recon.ventes, par famille (id gommé)', async () => {
+    ligne = { lbc_recon: { paths: ['x'] } }; lectureKO = false;
+    const c = faireCtx();
+    const CORPS = JSON.stringify({ id: 778899, state: 'to_ship', buyer: { name: 'ACHETEUR' }, delivery: { label_url: 'https://.../l.pdf' } });
+    await c.storeLbcVente('https://api.leboncoin.fr/api/consumergoods/proxy/v2/pages/transactions/778899', CORPS, false);
+    const w = ecrits.find((r) => r.id === 'lbc_recon');
+    const ventes = (w && w.data && w.data.ventes) || {};
+    const cles = Object.keys(ventes);
+    dit(cles.length === 1 && /transactions\/\{id\}/.test(cles[0]),
+      'une place par famille, l\'id est gommé (la 100e vente rafraîchit, n\'ajoute pas)',
+      'clés : ' + JSON.stringify(cles));
+    const v = ventes[cles[0]] || {};
+    dit(v.body === CORPS && v.coupe === false, 'le corps de la vente est gardé pour voir la forme (état, acheteur, bordereau)');
+    dit(Array.isArray(w.data.paths) && w.data.paths.includes('x'), 'sans perdre ce que lbc_recon portait déjà');
   });
 
   // ══════════════════════════════════════════════════════════════════════════

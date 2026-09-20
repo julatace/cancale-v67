@@ -54,6 +54,22 @@
   const CATALOGUE = /(\/data\/v\d+\/(fdata|fforms)\b|adsubmit|ad-prediction|ad-submit|dynamic-deposit|adparams|deposer-une-annonce.*\.json|\/upload\/image)/i;
   const CAT_MAX = 3000000;   // mesuré : à 400 000 le catalogue arrivait COUPÉ
 
+  // ⚠️⚠️ LA VENTE LEBONCOIN — « capter le bordereau comme sur Vinted ». Mesuré le
+  //    20 sept. : ses chemins portent enfin la surface d'une vente —
+  //      api/consumergoods/proxy/v{n}/pages/transactions/{id}   ← le détail vente
+  //      _next/data/…/compte/part/transaction/{id}.json · mes-transactions.json
+  //      api/pro-order-proxy/v2/users/own_orders                ← les commandes
+  //      api/delivery-configurator-api/v1/configs               ← la livraison
+  //      api/consumergoods/purchase/v1/purchases/{id}/action/…  ← les actions
+  //    Mais leur CORPS ne partait pas (AD_HINT/ACCOUNT_HINT ne matchent pas une
+  //    transaction). On les relaie donc — c'est une LECTURE de SES propres ventes
+  //    (§3), rangée dans une ligne dédiée. Sans ça, sa prochaine vente est perdue
+  //    pour l'analyse, exactement comme le dépôt qu'on avait jeté (le défaut le
+  //    plus coûteux du projet). Le jour où j'ai la forme, je câble « vendue → à
+  //    retirer » + la capture du bordereau (PDF) — pas avant (on ne devine pas).
+  const VENTE_HINT = /(consumergoods\/proxy\/v\d+\/pages\/transactions|compte\/part\/(transaction|mes-transactions)|pro-order-proxy|own_orders|delivery-configurator|purchases\/[^/]+\/(action|delivery|label)|\/orders?\b)/i;
+  const VENTE_MAX = 150000;
+
   // ⚠️ ET LA FORME DE CE QUI PART. La requête de soumission dit, mieux que tout
   //    le reste, quels champs Leboncoin attend vraiment. Mais elle contient SON
   //    annonce — titre, description, prix. **On n'envoie donc QUE les chemins de
@@ -145,6 +161,8 @@
         post({ kind: 'lbccatalogue', url, body: text.slice(0, CAT_MAX), coupe: text.length > CAT_MAX });
         return;
       }
+      // LA VENTE : sa propre transaction/commande/livraison. Ligne dédiée, capée.
+      if (VENTE_HINT.test(url)) { post({ kind: 'lbcvente', url, body: text.slice(0, VENTE_MAX), coupe: text.length > VENTE_MAX }); return; }
       if (!AD_HINT.test(text) && !AD_HINT.test(url) && !ACCOUNT_HINT.test(url) && !ACCOUNT_HINT.test(text)) return;
       post({ kind: 'lbcraw', url, body: text });
     } catch (_) {}
