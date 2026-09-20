@@ -3213,6 +3213,69 @@ eBay). **Univers/Type/Couleur restent vides** — leur valeur ne se devine pas
 depuis ses données (*mieux vaut un blanc qu'un faux*). **Ne pas écrire le clic
 « Publier ».**
 
+### ⚠️⚠️ « QU'IL N'Y AIT PLUS D'ERREUR / QUAND JE VENDS ÇA SE SUPPRIME / BORDEREAUX LEBONCOIN » — CE QUI EST DÉJÀ FAIT, ET CE QUI ATTEND SA DONNÉE
+Demande de Julien, 20 sept. : « une fois qu'une paire est rentrée dans
+l'écosystème, plus d'erreur possible ; **quand je fais une vente que ça supprime
+tout seul** ; et vois pour la **génération de bordereaux sur le bon coin** —
+capter les bordereaux déjà dans l'app, et en générer comme sur Vinted. Je te
+laisse te débrouiller **en attendant que je puisse mettre l'extension.** »
+
+**Mesuré d'abord (§6), et le point de départ honnête** : sa base porte, côté
+Leboncoin, seulement `lbc_accounts` · `lbc_catalogue` · `lbc_listings` ·
+`lbc_recon` — **aucune vente, aucun bordereau, aucune commande** Leboncoin. Et
+`lbc_listings` = **182 annonces qui ne sont PAS les siennes** (le flux
+« découverte »), **1 seule** portant une réf `VRM-{n°}`. Leboncoin me renvoie
+**403** : je ne vois ni sa page « mes annonces », ni sa messagerie, ni un
+bordereau LBC.
+
+**1. « Quand je vends → ça se supprime tout seul » : DÉJÀ FAIT, côté app, et
+mesuré live.** `annBase` (App.jsx, la base de l'écran Annonces, des pastilles
+« prête pour Leboncoin », de la numérotation) **exclut les paires prouvées
+vendues** par `annoncesVendues` — `identiteAnnonce(o)` (jamais le titre, §5),
+vente de **≤ 60 j**, `classifyOrderStatus !== 'cancelled'` (un retour/remboursement
+la fait revenir). La paire disparaît de l'app **dès que la vente est captée**. Et
+la **file Leboncoin** (comme eBay) écarte déjà les paires prouvées vendues
+(`lireVentesProuvees`, qui **porte son échec** : « rien lu » ne vide pas la file).
+⇒ Tout ce qui est faisable **sans donnée Leboncoin** pour « vendu → retiré » est
+en place. Ne pas ré-écrire une seconde règle.
+
+**2. « Retirer l'annonce Leboncoin *elle-même* quand la paire se vend » : BLOQUÉ
+sur le lien paire ↔ annonce LBC, pas sur le code.** Ce lien est la réf
+`VRM-{n°}` lue **sur l'annonce Leboncoin** + le compte connecté — et cette donnée
+n'existe pas encore (`lbc_listings` ne contient pas ses annonces à lui avec leur
+réf). L'afficher aujourd'hui serait promettre ce qu'on ne peut pas tenir (le
+défaut le plus coûteux du projet). *Ne pas l'écrire à l'aveugle.*
+
+**3. « Générer / capter des bordereaux Leboncoin comme sur Vinted » : BLOQUÉ sur
+la MÊME absence, et VRM ne *génère* rien — il *capte*.** Sur Vinted, VRM ne crée
+pas le bordereau : Vinted l'émet après la vente, l'extension en capte le **PDF**
+(`label_latest.pdfB64`), l'app affiche « prêt à imprimer ». Le pendant Leboncoin
+serait identique — capter le PDF du bordereau que **Leboncoin** émet dans la
+messagerie/le colis après une vente. Il faut donc d'abord **voir la forme** d'une
+vente LBC et de son bordereau. Écrire un analyseur de bordereau LBC sans avoir vu
+un seul email/réponse serait deviner (§4.10, §6.3).
+
+**⇒ CE QUI DÉBLOQUE TOUT est UNE seule chose, et l'infra de collecte existe
+DÉJÀ** (rien à coder ici — vérifié en relisant `lbc-inject.js`) : dès qu'il
+**charge l'extension à jour** et **fait/regarde une vente sur Leboncoin**,
+`lbc-inject` remonte automatiquement — `lbc_recon.paths` (tous les chemins vus,
+ids → `{id}`), `lbcenvoi` (toute écriture POST/PUT/PATCH/DELETE, **chemins de
+clés et types uniquement, jamais les valeurs**), et les réponses `annonces` /
+`compte` (`lbcraw`). C'est exactement comme ça que le `PUT …/shipment/order` de
+Vinted a été trouvé. **La prochaine passe, sur données réelles**, câble alors :
+le lien paire ↔ annonce LBC (réf + compte), le « vendue ici → retire là » (les
+deux sens — `status` active/inactive existe déjà dans `handleLbcRaw`), et la
+capture du bordereau LBC. **On collecte, on vérifie, PUIS on promet** — pas
+avant, et surtout pas depuis une donnée qui n'est même pas la sienne.
+
+⚠️ **Il « ne peut pas encore charger l'extension »** : donc aucune version neuve
+ne l'aide tant qu'il ne l'a pas installée, et l'app le dit déjà (diagnostic de
+version, `EXT_ATTENDUE`). Le premier geste reste **remplacer le dossier de
+l'extension par le zip livré** — c'est lui qui débloque la mesure, donc tout le
+reste. Aucune raison de bumper la version ni de régénérer le zip pour cette
+passe : rien n'a changé dans `vinted-sync-extension/`, c'est un constat, pas une
+promesse neuve.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
