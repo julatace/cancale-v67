@@ -3545,6 +3545,33 @@ laisse le bouton à droite ». Deux gestes qu'il a explicitement autorisés.
   avec l'extension à jour (la capture passive `capterPhotosAnnonces` les complète
   ensuite toute seule).
 
+### ⚠️ « SUR QUELLE PLATEFORME EST CHAQUE PAIRE » + PAIRES QUI DORMENT (écran Annonces)
+Julien, 20 sept. : « dans les annonces, dis sur quelle plateforme est chaque
+paire » + « paires qui dorment ». **Le « paires qui dorment » existait déjà**
+(`annStats.sleeping`, `SLEEP_DAYS=30`, tri « Qui dorment 😴 », bandeau,
+assistant de baisse de prix) — on l'a **rendu visible par carte**, pas refait.
+- **Sur quelle plateforme — ce qui est PROUVÉ seulement.** Pastille **« ✓ sur
+  Leboncoin »** quand `vinted_lbc_posted.ids` contient `item.id` (l'id d'annonce
+  Vinted, exactement ce que `markPosted` écrit → correspondance directe, §5,
+  jamais par titre). Chargé comme `listingDates` ; **lecture ratée/vide ⇒ Set
+  vide ⇒ aucune pastille** : on n'affirme JAMAIS « publiée » à tort (sous-affirmer
+  ne trompe pas, une fausse pastille verte si). Rendu en pastille ardoise pleine
+  (`C.text`/`C.card`) — **pas de nouvelle couleur** (§7 : une seule teinte
+  d'accent ; pas de vert en dur).
+- **Pastille « 😴 en ligne depuis X j »** sur les paires qui dorment (âge de
+  `listedAgeDays`, la date de mise en ligne captée ; `null` ⇒ rien, on n'invente
+  pas d'ancienneté, §5.34). Le chiffre, jamais la promesse.
+- ⚠️⚠️ **« SUR QUEL COMPTE Leboncoin » RESTE MESURÉ IMPOSSIBLE** (§ « où est la
+  paire »). `lbc_accounts` vide, `lbc_listings` = des annonces qui ne sont pas
+  les siennes : tant que ses PROPRES annonces LBC ne sont pas captées (5.98 + une
+  vraie visite « mes annonces » sur Leboncoin, forme à voir), l'app **n'affiche
+  pas** le compte ni un « publiée » déduit d'une capture. La seule source
+  honnête aujourd'hui est SA marque `vinted_lbc_posted`. *On collecte, on
+  vérifie, PUIS on promet.* **Rien touché dans l'extension** cette passe (pas de
+  bump, pas de zip) : ce serait du code spéculatif sur une donnée absente.
+- `npm run build`, `verif_visuel` (annonces rendues aux deux tailles, aucun
+  crash/blanc/débordement), `audit-chiffres/variables/boutons/icones` : verts.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
