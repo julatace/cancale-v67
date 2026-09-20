@@ -49,7 +49,16 @@ const PAGE = (depot) => `<!doctype html><html lang="fr"><head><meta charset="utf
       + '<ul id="cbp-menu" role="listbox" hidden><li role="option">39</li><li role="option">40</li><li role="option">40,5</li><li role="option">41</li></ul></div>'
       + '<div><label for="cbe">État*</label><input id="cbe" role="combobox" aria-label="État*" readonly>'
       + '<ul id="cbe-menu" role="listbox" hidden><li role="option">Neuf avec étiquette</li><li role="option">Très bon état</li><li role="option">Bon état</li><li role="option">État satisfaisant</li></ul></div>'
-      + '<scr'+'ipt>document.querySelectorAll("[role=combobox]").forEach(function(cb){var menu=document.getElementById(cb.id+"-menu");cb.addEventListener("click",function(){menu.hidden=false;});menu.querySelectorAll("[role=option]").forEach(function(o){o.addEventListener("click",function(){cb.value=o.textContent;cb.setAttribute("data-choisi",o.textContent);menu.hidden=true;});});});</scr'+'ipt>'
+      // ⚠️ LA CATÉGORIE = des boutons RADIO (mesuré au rendu, 20 sept.), + un
+      //    bouton « Continuer » et un « Publier ». L'extension doit cocher le
+      //    bon radio (Chaussures), cliquer Continuer, et JAMAIS Publier (§3/§5).
+      + '<fieldset><label><input type="radio" name="cat"> Mode &gt; Chaussures</label>'
+      + '<label><input type="radio" name="cat"> Loisirs &gt; Sport &amp; Plein air</label>'
+      + '<label><input type="radio" name="cat"> Mode &gt; Vêtements</label></fieldset>'
+      + '<button type="button" id="continuer">Continuer</button>'
+      + '<button type="button" id="publier">Publier mon annonce</button>'
+      + '<scr'+'ipt>document.querySelectorAll("[role=combobox]").forEach(function(cb){var menu=document.getElementById(cb.id+"-menu");cb.addEventListener("click",function(){menu.hidden=false;});menu.querySelectorAll("[role=option]").forEach(function(o){o.addEventListener("click",function(){cb.value=o.textContent;cb.setAttribute("data-choisi",o.textContent);menu.hidden=true;});});});'
+      + 'window.__cont=0;window.__pub=0;document.getElementById("continuer").addEventListener("click",function(){window.__cont++;});document.getElementById("publier").addEventListener("click",function(){window.__pub++;});</scr'+'ipt>'
     : depot === 'etape2'
     ? '<label for="s2">Titre de l’annonce</label><input id="s2" name="subject" type="text">'
       + '<label for="d2">Description</label><textarea id="d2" name="body"></textarea>'
@@ -484,10 +493,17 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
   // sa taille, état = son état Vinted), par correspondance EXACTE. Une valeur
   // qui ne colle à AUCUNE option est laissée VIDE (mieux vaut un blanc qu'un
   // faux, §5) — c'est le cas de « Satisfaisant » (Vinted) vs « État satisfaisant ».
-  const lireCombos = (page) => page.evaluate(() => ({
-    pointure: (document.getElementById('cbp') || {}).getAttribute ? (document.getElementById('cbp').getAttribute('data-choisi') || '') : '',
-    etat: (document.getElementById('cbe') || {}).getAttribute ? (document.getElementById('cbe').getAttribute('data-choisi') || '') : '',
-  }));
+  const lireCombos = (page) => page.evaluate(() => {
+    const coche = [...document.querySelectorAll('input[type=radio][name=cat]')].find((r) => r.checked);
+    const lab = coche ? (coche.closest('label') ? coche.closest('label').innerText.trim() : '') : '';
+    return {
+      pointure: (document.getElementById('cbp') || {}).getAttribute ? (document.getElementById('cbp').getAttribute('data-choisi') || '') : '',
+      etat: (document.getElementById('cbe') || {}).getAttribute ? (document.getElementById('cbe').getAttribute('data-choisi') || '') : '',
+      categorie: lab,
+      continuer: window.__cont || 0,
+      publier: window.__pub || 0,
+    };
+  });
   const monteCombos = async (ad) => {
     const pg = await b.newPage({ viewport: { width: 1280, height: 900 } });
     const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
@@ -512,6 +528,9 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
     dit(!ok.errs.length, 'aucune erreur pendant le remplissage des menus', ok.errs[0] || '');
     dit(ok.pointure === '40', 'la POINTURE est choisie dans le combobox React (clic sur l’option)', 'pointure = « ' + ok.pointure + ' »');
     dit(ok.etat === 'Très bon état', 'l’ÉTAT est choisi par correspondance EXACTE', 'état = « ' + ok.etat + ' »');
+    dit(/chaussures/i.test(ok.categorie), 'la CATÉGORIE (bouton radio « Mode > Chaussures ») est cochée', 'coché : « ' + ok.categorie + ' »');
+    dit(ok.continuer >= 1, 'le bouton « Continuer » est cliqué pour enchaîner l’étape', ok.continuer + ' clic(s)');
+    dit(ok.publier === 0, '⚠️ « Publier » n’est JAMAIS cliqué tout seul (§3/§5)', ok.publier + ' clic(s) sur Publier');
     // Négatif : une valeur qui ne colle à AUCUNE option reste VIDE (§5).
     const ko = await monteCombos({ ...QUEUE[0], taille: '99', etat: 'Satisfaisant' });
     dit(ko.pointure === '', 'une pointure absente de la liste n’est PAS choisie (pas de « à peu près »)', 'pointure = « ' + ko.pointure + ' »');

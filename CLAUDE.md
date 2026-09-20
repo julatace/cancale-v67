@@ -3048,6 +3048,36 @@ ne clique QUE l'option au texte **EXACTEMENT** égal.
   attributs. À câbler quand un dépôt l'aura relevée — d'ici là, il choisit la
   catégorie, l'extension remplit le reste qu'elle peut.
 
+### ⚠️⚠️ « ÇA NE CLIQUE PAS SUR LA CATÉGORIE » — VU AU RENDU : DES RADIOS + UN « CONTINUER »
+Julien, 20 sept., capture d'écran de l'étape 1 du dépôt à l'appui : « ça ne clique
+pas sur la bonne catégorie, et ça ne clique même pas ; je veux que ça fasse ça,
+tout le reste, et que ça appuie sur Continuer ». **Mesuré au rendu (§6.2)** : la
+catégorie n'est PAS une liste — c'est **trois boutons radio** (« Mode >
+Chaussures », « Loisirs > Sport & Plein air », « Mode > Vêtements »), plus un
+champ « Ou choisissez une autre catégorie », et un bouton **Continuer** dessous.
+`choisirComposant` (combobox) et `choisirListe` (`<select>`) ne voyaient donc
+**rien** ici.
+⇒ **`choisirCategorie(ad)`** clique le RADIO dont le libellé contient sa
+catégorie (`ad.category` = « Chaussures ») — une correspondance, jamais « le
+premier ». **`cliquerContinuer()`** enchaîne l'étape : il clique un bouton
+**« Continuer »/« Suivant »** et **JAMAIS** un bouton qui **publie/dépose/valide/
+paye/finalise** (`BTN_PUBLIER` l'écarte, §3/§5). **`avancer()`** l'appelle une
+fois par étape (signature), avec quelques essais puis abandon — si ça n'avance
+pas, c'est qu'un champ **obligatoire non devinable** manque (ex. **Univers***),
+et on le **DIT** (« un champ obligatoire reste à choisir ») au lieu de tourner en
+rond. Câblé dans `fillNow` (passif), `prefill` et `fillNowForce`.
+- ⚠️ **« Publier » reste À LUI**, toujours (aucune publication à l'aveugle). Ce
+  qui part tout seul : titre, description, prix, référence, photos, pointure,
+  état, **catégorie**, et l'enchaînement **Continuer**. Ce qui reste manuel :
+  les attributs qu'on ne devine pas (Univers/Type/Couleur/Marque) et le clic
+  final Publier.
+- `bancs/leboncoin.cjs` sert l'étape catégorie (radios + Continuer + Publier) :
+  **le radio « Mode > Chaussures » est coché, « Continuer » cliqué une fois,
+  « Publier » JAMAIS** (0 clic). Extension en **5.92.0**, zip régénéré,
+  `EXT_ATTENDUE` suivie. Aucune entrée d'`EXT_CAPACITES` (l'app ne promet rien
+  de neuf : c'est le panneau qui agit, et le manifeste continue de dire « c'est
+  toi qui cliques sur Publier »).
+
 ### ⚠️ « DIS-MOI QUAND TOUTE L'ANNONCE EST CAPTÉE → PRÊTE POUR LEBONCOIN »
 Demande de Julien, 19 sept. : « j'aimerais que ça me dise quand ça capture toute
 l'annonce sur Vinted, pour qu'après ça puisse me dire s'il est en capacité de la
