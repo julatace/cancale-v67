@@ -69,6 +69,16 @@ const PUB = JSON.stringify({
 });
 // Une VRAIE réponse d'annonces Leboncoin : elle doit continuer de passer.
 const ANNONCES = JSON.stringify({ ads: [{ list_id: 991, subject: 'Salomon XT-6 VRM-401', price: [99], body: 'Réf. VRM-401' }] });
+// Le détail d'une VENTE Leboncoin, dans la forme MESURÉE le 20 sept. : sa vraie
+// donnée (purchaseId, livraison, bordereau) est NOYÉE sous ~150 Ko de
+// traductions `pageProps.messages` (offset 39 → fin). On sert ce bruit exprès,
+// gros, pour que la coupe se voie : sans allègement, la vraie donnée est perdue.
+const BRUIT_I18N = {}; for (let i = 0; i < 6000; i++) BRUIT_I18N['cle_' + i] = 'un libellé de traduction de longueur moyenne numéro ' + i;
+const VENTE_BODY = JSON.stringify({ pageProps: {
+  purchaseId: '778899',
+  messages: BRUIT_I18N, confidence: { flags: BRUIT_I18N }, experimentContext: BRUIT_I18N,
+  transaction: { step: 'to_ship', item: { title: 'REEL-ARTICLE', price: 9900 }, delivery: { label_url: 'https://x/l.pdf', mode: 'mondial_relay' } },
+} });
 
 (async () => {
   console.log('── CE QUI PART DE LA PAGE (le vrai `lbc-inject.js`, dans un vrai navigateur)');
@@ -86,7 +96,8 @@ const ANNONCES = JSON.stringify({ ads: [{ list_id: 991, subject: 'Salomon XT-6 V
   await pg.route('https://www.leboncoin.fr/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: ANNONCES }));
   await pg.route('https://api.leboncoin.fr/**', (r) => {
     const u = r.request().url();
-    r.fulfill({ status: 200, contentType: 'application/json', body: /fforms/.test(u) ? FFORMS : CATALOGUE });
+    const body = /fforms/.test(u) ? FFORMS : /transactions/.test(u) ? VENTE_BODY : CATALOGUE;
+    r.fulfill({ status: 200, contentType: 'application/json', body });
   });
   await pg.route('https://ib.adnxs.com/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: PUB }));
   // ⚠️ Enregistrées EN DERNIER (§6.6 : Playwright prend la dernière route d'abord)
@@ -95,7 +106,7 @@ const ANNONCES = JSON.stringify({ ads: [{ list_id: 991, subject: 'Salomon XT-6 V
   await pg.route('**/api/vrmtest/label/**', (r) => r.fulfill({ status: 200, contentType: 'application/pdf', body: '%PDF-1.4 faux bordereau' }));
   await pg.route('**/api/vrmtest/refuse', (r) => r.fulfill({ status: 403, contentType: 'application/json', body: '{"error":"nope"}' }));
   await pg.goto('https://www.leboncoin.fr/deposer-une-annonce');
-  await pg.evaluate(`window.__vus = []; window.addEventListener('message', (e) => { const d = e.data; if (d && d.__tag === 'CANCALE_LBC') window.__vus.push({ kind: d.kind, url: d.url, len: (d.body || '').length, coupe: !!d.coupe, paths: d.paths || null }); });`);
+  await pg.evaluate(`window.__vus = []; window.addEventListener('message', (e) => { const d = e.data; if (d && d.__tag === 'CANCALE_LBC') window.__vus.push({ kind: d.kind, url: d.url, len: (d.body || '').length, coupe: !!d.coupe, paths: d.paths || null, body: d.kind === 'lbcvente' ? (d.body || '') : undefined }); });`);
   await pg.evaluate(INJ);
   await pg.evaluate(`(async () => {
     await fetch('https://api.leboncoin.fr/api/frontend/v1/data/v7/fdata').then(r => r.text());
@@ -138,6 +149,17 @@ const ANNONCES = JSON.stringify({ ads: [{ list_id: 991, subject: 'Salomon XT-6 V
     ventes.length ? String(ventes[0].url).replace(/^.*leboncoin\.fr/, '') : 'AUCUNE (code d\'avant : ni AD_HINT ni ACCOUNT_HINT ⇒ perdue)');
   dit(!ventes.some((v) => v.kind === 'lbcraw') && !brutes.some((v) => /transactions/.test(v.url || '')),
     'et jamais mélangée au flot d\'annonces (`lbcraw`)');
+  // ⚠️⚠️ L'i18n (150 Ko de traductions) est retiré AVANT le plafond, sinon la
+  //    vraie donnée (livraison, bordereau, état) est coupée. On sert un corps
+  //    gonflé de bruit : sur le code d'avant il part ENTIER (> plafond, la vraie
+  //    donnée perdue) ; après, le bruit saute et la donnée de vente reste.
+  const vb = (ventes[0] || {}).body || '';
+  dit(vb.includes('REEL-ARTICLE') && vb.includes('to_ship') && vb.includes('label_url'),
+    'la vraie donnée de vente est GARDÉE (article, état, bordereau)',
+    'longueur relayée : ' + vb.length);
+  dit(!vb.includes('cle_0') && !vb.includes('traduction') && vb.length < 5000,
+    'les ~150 Ko de traductions i18n sont retirés (la donnée rentre sous le plafond)',
+    vb.includes('cle_0') ? 'i18n TOUJOURS présent (code d\'avant : ' + vb.length + ' c, vraie donnée coupée)' : 'allégé à ' + vb.length + ' c');
 
   // ── LE MOUCHARD DE CHEMINS RECONNAÎT LE BORDEREAU (comme sur Vinted)
   //    Sur le code d'AVANT, un chemin vu était nu (`host/path`) : impossible de

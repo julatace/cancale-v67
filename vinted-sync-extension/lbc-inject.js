@@ -69,6 +69,20 @@
   //    retirer » + la capture du bordereau (PDF) — pas avant (on ne devine pas).
   const VENTE_HINT = /(consumergoods\/proxy\/v\d+\/pages\/transactions|compte\/part\/(transaction|mes-transactions)|pro-order-proxy|own_orders|delivery-configurator|purchases\/[^/]+\/(action|delivery|label)|\/orders?\b)/i;
   const VENTE_MAX = 150000;
+  // ⚠️⚠️ MESURÉ le 20 sept. : le détail d'une transaction Leboncoin (_next/data)
+  //    porte sa vraie donnée (livraison, bordereau, état) APRÈS ~150 000
+  //    caractères de TRADUCTIONS (`pageProps.messages`) — le plafond coupait
+  //    juste avant. On fait sauter ce bruit pur (i18n + flags A/B) AVANT de
+  //    caper : ni donnée de vente, ni donnée perso là-dedans, que des libellés
+  //    d'interface. Ce qui reste (purchaseId, article, prix, livraison…) rentre.
+  const allegeVente = (txt) => {
+    try {
+      const j = JSON.parse(txt);
+      const pp = (j && j.pageProps) || j;
+      if (pp && typeof pp === 'object') { delete pp.messages; delete pp.confidence; delete pp.experimentContext; delete pp._sentryTraceData; delete pp.i18n; }
+      return JSON.stringify(j);
+    } catch (_) { return txt; }   // corps tronqué/illisible ⇒ on garde le brut
+  };
 
   // ⚠️ ET LA FORME DE CE QUI PART. La requête de soumission dit, mieux que tout
   //    le reste, quels champs Leboncoin attend vraiment. Mais elle contient SON
@@ -162,7 +176,7 @@
         return;
       }
       // LA VENTE : sa propre transaction/commande/livraison. Ligne dédiée, capée.
-      if (VENTE_HINT.test(url)) { post({ kind: 'lbcvente', url, body: text.slice(0, VENTE_MAX), coupe: text.length > VENTE_MAX }); return; }
+      if (VENTE_HINT.test(url)) { const c = allegeVente(text); post({ kind: 'lbcvente', url, body: c.slice(0, VENTE_MAX), coupe: c.length > VENTE_MAX }); return; }
       if (!AD_HINT.test(text) && !AD_HINT.test(url) && !ACCOUNT_HINT.test(url) && !ACCOUNT_HINT.test(text)) return;
       post({ kind: 'lbcraw', url, body: text });
     } catch (_) {}
