@@ -515,13 +515,8 @@
       ${photosLigne(ad)}
       <div class="desc">${esc(ad.description)}</div>
       <div class="btns">
-        <button class="btn p" data-a="prepare" style="flex:1 1 100%"${onPage ? ' disabled' : ''} title="${onPage ? "Cette paire porte déjà ta référence VRM sur Leboncoin — inutile de la republier." : "Télécharge les photos, copie tout le texte de l'annonce et ouvre la page de dépôt Leboncoin."}">${onPage ? '✓ déjà publiée sur Leboncoin' : '🚀 Tout préparer (photos + texte + page)'}</button>
-        <button class="btn" data-a="prefill">✍️ Pré-remplir</button>
-        <button class="btn" data-a="ctitle">Titre</button>
-        <button class="btn" data-a="cdesc">Description</button>
-        <button class="btn" data-a="cprice">Prix</button>
-        <button class="btn" data-a="photos">⬇️ Photos</button>
-        <button class="btn" data-a="posted" style="border-color:#0a7f3f;color:#0a7f3f" title="À cliquer SEULEMENT après avoir publié toi-même sur Leboncoin. Ça ne publie rien, ça la retire juste de la liste.">✓ Je l'ai déjà publiée</button>
+        <button class="btn p" data-a="prepare" style="flex:1 1 100%"${onPage ? ' disabled' : ''} title="${onPage ? "Cette paire porte déjà ta référence VRM sur Leboncoin — inutile de la republier." : "Ouvre Leboncoin et fait TOUT tout seul : photos, titre, description, prix, catégorie, puis publie SANS booster."}">${onPage ? '✓ déjà en ligne sur Leboncoin' : '🚀 Publier sur Leboncoin'}</button>
+        <button class="btn" data-a="posted" style="flex:1 1 100%;border-color:#0a7f3f;color:#0a7f3f" title="À cliquer SEULEMENT si tu l'as publiée toi-même. Ça ne publie rien, ça la retire juste de la liste.">✓ Je l'ai déjà publiée</button>
       </div>
     </div>`;
   }
@@ -1100,16 +1095,13 @@
       // ⚠️ ON NE TÉLÉCHARGE PLUS RIEN SUR SON DISQUE. « Ça me fait télécharger
       //    des photos dans mon ordi » — et pour rien : les photos s'attachent
       //    directement au formulaire (mesuré le 13 septembre).
-      const nbPh = (ad.photos || []).length;
-      copy('TITRE :\n' + ad.title + '\n\nDESCRIPTION :\n' + ad.description + '\n\nPRIX : ' + ad.price + ' €\nRÉFÉRENCE : ' + (ad.ref || ('VRM-' + ad.numero)) + '\nCATÉGORIE : ' + ad.category);
-      // ON MEMORISE L'ANNONCE EN COURS. C'est ce qui manquait : la page de depot
-      // s'ouvrait dans un NOUVEL onglet, qui n'avait aucune idee de la paire
-      // choisie — donc rien n'etait rempli et il fallait tout recoller a la main.
-      await send({ action: 'setPending', ad });
+      // ON MEMORISE L'ANNONCE EN COURS (+ le feu vert pour publier sans booster :
+      // c'est LUI qui lance, donc l'onglet de dépôt a le droit de publier). La
+      // page de dépôt s'ouvre dans un nouvel onglet et fait tout tout seul.
+      await send({ action: 'setPending', ad: Object.assign({}, ad, { publier: true }) });
       window.open('https://www.leboncoin.fr/deposer-une-annonce', '_blank');
-      toast('🚀 ' + nbPh + ' photo' + (nbPh > 1 ? 's' : '') + ' prête' + (nbPh > 1 ? 's' : '') + ' — le formulaire se remplit dans le nouvel onglet, photos comprises. Rien n\'est téléchargé sur ton ordinateur.');
+      toast('🚀 J\'ouvre Leboncoin et je remplis tout (photos, titre, description, prix, catégorie) puis je publie SANS booster. Laisse l\'onglet faire — tu peux relire avant que ça parte.');
     }
-    else if (a === 'prefill') { prefill(ad); }
     else if (a === 'posted') {
       if (!confirm('⚠️ Ceci NE publie PAS l\'annonce.\n\nÀ cliquer seulement si tu as DÉJÀ publié la N°' + ad.numero + ' toi-même sur Leboncoin.\nÇa la retire juste de la liste « à publier ». Continuer ?')) return;
       await send({ action: 'markPosted', id: ad.id });
@@ -1131,6 +1123,7 @@
   //    règle.
   let pending = null, pendingTries = 0, pendingDone = 0, pendingTimer = null, pendingArrete = false;
   let photosFaites = false, photosEtat = null;
+  let publieFait = false, publieEtat = null;
   async function autoPrefill() {
     if (!/deposer|depot|d[ée]p[oô]t/i.test(location.href)) return;
     const r = await send({ action: 'getPending' });
@@ -1147,6 +1140,22 @@
       if (!photosFaites && champsFichier().length) {
         photosFaites = true;
         attacherPhotos(pending).then((r) => { photosEtat = r; banner(); });
+      }
+      // ⚠️ PUBLIER SANS BOOSTER — seulement pour une paire qu'IL a lancée par le
+      //   bouton (`pending.publier !== false`), seulement à l'étape des boosts
+      //   (mesurée), et seulement si des photos ont été ENVOYÉES (sinon Leboncoin
+      //   refuse de toute façon — on ne clique pas pour rien). Une fois.
+      if (!publieFait && pending.publier !== false && estEtapePublication()
+          && photosEtat && (photosEtat.envoyees || photosEtat.n || 0) > 0) {
+        publieFait = true;
+        publierSansBooster().then((r) => {
+          publieEtat = r; banner();
+          if (r && r.ok) {
+            clearInterval(pendingTimer);
+            send({ action: 'markPosted', id: pending.id });   // sort de la file
+            send({ action: 'setPending', ad: null });          // ne pas republier
+          }
+        });
       }
       // On s'arrete au bout de 90 s : au-dela, soit c'est rempli, soit la page
       // n'est pas celle qu'on croit — inutile de tourner en fond.
@@ -1277,6 +1286,50 @@
     try { await attendre(1100); if (cliquerContinuer()) { _avanceFaite.add(sig); toast('→ étape suivante'); } } catch (_) {}
     _avanceEnCours = false;
   }
+  // ══════════════════════════════════════════════════════════════════════════
+  // PUBLIER — SANS BOOSTER (Julien, 20 sept. : « c'est toi qui appuies sur
+  // publier sans booster, ça me dérange pas »). C'est SA décision d'owner.
+  // ⚠️⚠️ LE BOOST = DE L'ARGENT. La seule erreur pire qu'un clic manuel serait de
+  //   cocher un boost. Mesuré (`lbc_recon.etapes`) : l'étape options ne porte que
+  //   des CASES À COCHER de boost (gallery, daily_bump, sub_toplist, urgent…),
+  //   toutes inspectables. La garantie « sans booster » est donc SÛRE :
+  //   1) on DÉCOCHE toute option payante ; s'il en reste une cochée → on NE
+  //      publie pas (on le dit) ;
+  //   2) on clique un bouton de publication GRATUITE — jamais un bouton qui porte
+  //      un PRIX (€ / 9,90) ni « booster/remonter/payer/premium/pack/option ».
+  //   Au pire (bouton introuvable, forme inconnue) : rien n'est cliqué, il publie
+  //   à la main — jamais un faux, jamais une dépense.
+  function optionsBoost() {
+    return Array.from(document.querySelectorAll('input[type="checkbox"],[role="checkbox"],[role="switch"]')).filter((cb) => {
+      if (DANS_ENTETE(cb)) return false;
+      const n = ((cb.name || '') + ' ' + (cb.id || '') + ' ' + (cb.getAttribute('aria-label') || '') + ' ' + (libelleDe(cb) || '')).toLowerCase();
+      return /(gallery|galerie|bump|remont|toplist|top.?liste|urgent|boost|mise en avant|premium|\bpack\b|photos?\s*suppl)/.test(n);
+    });
+  }
+  const estCoche = (cb) => cb.checked || cb.getAttribute('aria-checked') === 'true';
+  async function publierSansBooster() {
+    // 1) décocher toute option payante.
+    for (const cb of optionsBoost()) if (estCoche(cb)) { try { cb.click(); } catch (_) {} }
+    await attendre(450);
+    if (optionsBoost().some(estCoche)) return { ok: false, raison: 'une option payante n\'a pas pu être décochée — publie toi-même, sans booster' };
+    // 2) le bouton de publication GRATUITE, jamais un bouton payant.
+    const PRIX = /€|\beuros?\b|\d[.,]\d{2}|booster|remont|payer|premium|\bpack\b|\boption/i;
+    const PUBLIER = /publier|d[ée]poser\s+(?:mon|l)|d[ée]poser l['’]annonce|mettre en ligne|valider\s+(?:mon|l['’])\s*annonce/i;
+    const btns = Array.from(document.querySelectorAll('button,[role="button"],input[type="submit"]')).filter((el) => !DANS_ENTETE(el));
+    const publier = btns.find((b) => {
+      if (b.disabled || b.getAttribute('aria-disabled') === 'true') return false;
+      const t = (((b.innerText || b.value || '') + ' ' + (b.getAttribute('aria-label') || '')) || '').trim();
+      if (!t) return false;
+      if (PRIX.test(t)) return false;                 // paie / boost → jamais
+      return PUBLIER.test(t);
+    });
+    if (!publier) return { ok: false, raison: 'bouton « Publier » introuvable sur cette étape' };
+    try { publier.click(); } catch (_) {}
+    return { ok: true, bouton: ((publier.innerText || publier.value || '') + '').trim().slice(0, 40) };
+  }
+  // On est à l'étape de publication quand l'étape des boosts (cases mesurées) est
+  // là : c'est la dernière, tout le reste a été rempli pour y arriver.
+  const estEtapePublication = () => optionsBoost().length > 0;
   function fillNow(ad) {
     let n = 0;
     if (setIfEmpty(findField([/titre|title|subject|proposez/]), ad.title)) n++;
@@ -1382,30 +1435,40 @@
               + (photosEtat.total <= 6 ? '<br><span style="color:#e8b35d">Seules ' + photosEtat.total + ' photos sont captées de Vinted : rouvre l\'annonce sur Vinted (extension à jour) pour les avoir toutes.</span>' : '')
             : '📷 aucune photo attachée — ' + esc(photosEtat.raison || 'raison inconnue'))
         : '📷 j\'attache les photos dès que l\'étape photo s\'affiche.') + '</div>' +
-      (pendingArrete
-        ? '<div style="color:#e8b35d;margin-top:6px">Je ne remplis plus tout seul (c\'est fini après 1 min 30). Le dépôt se fait en plusieurs étapes : à chaque nouvelle étape, clique <b style="color:#eef4f0">Re-remplir</b>.</div>'
+      // Statut de PUBLICATION : ce qui compte, dit clairement.
+      (publieEtat
+        ? '<div style="margin-top:6px">' + (publieEtat.ok
+            ? '✅ <b style="color:#5fd08a">Publiée sans booster.</b>'
+            : '<span style="color:#e8b35d">Je n\'ai pas publié — ' + esc(publieEtat.raison || 'à faire toi-même') + '.</span>') + '</div>'
+        : '') +
+      (pendingArrete && !(publieEtat && publieEtat.ok)
+        ? '<div style="color:#e8b35d;margin-top:6px">Le dépôt se fait en étapes ; si une nouvelle étape s\'affiche, clique <b style="color:#eef4f0">↻ Reprendre</b>.</div>'
         : '') +
       '<div style="display:flex;gap:6px;margin-top:9px">' +
-      '<button id="vrm-refill" style="flex:1;border:1px solid #3a4a43;background:transparent;color:#eef4f0;border-radius:9px;padding:7px;font-size:11.5px;font-weight:600;cursor:pointer">Re-remplir</button>' +
-      '<button id="vrm-cdesc" style="flex:1;border:1px solid #3a4a43;background:transparent;color:#eef4f0;border-radius:9px;padding:7px;font-size:11.5px;font-weight:600;cursor:pointer">Copier la description</button>' +
-      '<button id="vrm-close" title="Fermer" style="border:1px solid #3a4a43;background:transparent;color:#8b9b92;border-radius:9px;padding:7px 9px;font-size:11.5px;cursor:pointer">✕</button>' +
+      (pendingArrete && !(publieEtat && publieEtat.ok)
+        ? '<button id="vrm-refill" style="flex:1;border:1px solid #3a4a43;background:transparent;color:#eef4f0;border-radius:9px;padding:7px;font-size:11.5px;font-weight:600;cursor:pointer">↻ Reprendre</button>'
+        : '') +
+      '<button id="vrm-close" title="Fermer" style="border:1px solid #3a4a43;background:transparent;color:#8b9b92;border-radius:9px;padding:7px 11px;font-size:11.5px;cursor:pointer">✕</button>' +
       '</div>' +
-      '<div style="color:#6f7f77;font-size:10px;margin-top:7px">VRM ne publie jamais à ta place : relis et clique toi-même sur Publier.</div>';
-    el.querySelector('#vrm-refill').onclick = () => {
+      '<div style="color:#6f7f77;font-size:10px;margin-top:7px">VRM remplit tout et publie <b>sans booster</b> (aucune option payante). Tu peux relire avant que ça parte.</div>';
+    const refill = el.querySelector('#vrm-refill');
+    if (refill) refill.onclick = () => {
       pendingDone = fillNowForce(pending);
-      // Et on RELANCE la surveillance : sans ça, « Re-remplir » ne servait
-      // qu'une fois, et l'étape suivante repartait dans le silence.
-      pendingArrete = false; pendingTries = 0;
+      pendingArrete = false; pendingTries = 0; publieFait = false;
       clearInterval(pendingTimer);
       pendingTimer = setInterval(() => {
         pendingTries++;
         const n2 = fillNow(pending);
         if (n2 > pendingDone) { pendingDone = n2; banner(); }
+        if (!photosFaites && champsFichier().length) { photosFaites = true; attacherPhotos(pending).then((r) => { photosEtat = r; banner(); }); }
+        if (!publieFait && pending.publier !== false && estEtapePublication() && photosEtat && (photosEtat.envoyees || photosEtat.n || 0) > 0) {
+          publieFait = true;
+          publierSansBooster().then((r) => { publieEtat = r; banner(); if (r && r.ok) { clearInterval(pendingTimer); send({ action: 'markPosted', id: pending.id }); send({ action: 'setPending', ad: null }); } });
+        }
         if (pendingTries > 90) { clearInterval(pendingTimer); pendingArrete = true; banner(); }
       }, 1000);
       banner();
     };
-    el.querySelector('#vrm-cdesc').onclick = () => { copy(pending.description || ''); toast('Description copiée'); };
     el.querySelector('#vrm-close').onclick = () => { clearInterval(pendingTimer); el.remove(); send({ action: 'setPending', ad: null }); };
   }
   function fillNowForce(ad) {

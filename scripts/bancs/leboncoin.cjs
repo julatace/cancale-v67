@@ -31,7 +31,22 @@ const SRC = fs.readFileSync(path.join(__dirname, '..', '..', 'vinted-sync-extens
 const PAGE = (depot) => `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Leboncoin</title></head>
 <body>
   <header role="banner"><form action="/recherche"><input name="text" type="text" placeholder="Rechercher sur leboncoin"></form></header>
-  <main>${depot === 'photosreel'
+  <main>${depot === 'boost'
+    // ⚠️⚠️ L'ÉTAPE OPTIONS (mesurée `lbc_recon.etapes`) : QUE des cases de boost
+    //    PAYANTES (gallery/daily_bump/urgent), un bouton de dépôt GRATUIT et un
+    //    bouton PAYANT. + un champ photo (multiple, upload-à-chaque-change) pour
+    //    que des photos soient « envoyées » (la publication est gatée dessus).
+    ? '<div class="dropzone" aria-label="Ajouter des photos"><input id="uf" type="file" multiple accept="image/*"></div><div id="previews"></div>'
+      + '<fieldset><label><input type="checkbox" name="gallery" checked> Galerie</label>'
+      + '<label><input type="checkbox" name="daily_bump"> Remontée quotidienne</label>'
+      + '<label><input type="checkbox" name="urgent"> Annonce urgente</label></fieldset>'
+      // Le PAYANT est placé AVANT le gratuit exprès : sans la garde « prix », un
+      // finder naïf prendrait le premier « déposer » — celui qui coûte.
+      + '<button id="paid" type="button">Déposer mon annonce en Galerie · 9,90 €</button>'
+      + '<button id="pub" type="button">Déposer mon annonce</button>'
+      + '<scr'+'ipt>var uf=document.getElementById("uf");var k=0;uf.addEventListener("change",function(){var f=uf.files[0];if(!f)return;k++;var img=document.createElement("img");img.src="https://cdn.leboncoin.example/"+k+".jpg";document.getElementById("previews").appendChild(img);uf.value="";});'
+      + 'window.__pub=0;window.__paid=0;document.getElementById("pub").onclick=function(){window.__pub++;};document.getElementById("paid").onclick=function(){window.__paid++;};</scr'+'ipt>'
+    : depot === 'photosreel'
     // ⚠️⚠️ LE VRAI UPLOADER LEBONCOIN (mesuré le 20 sept. sur `lbc_recon.etapes`) :
     //    champ `multiple:true`, MAIS il lit UNE photo par `change`, l'envoie au
     //    serveur, affiche la vignette RENVOYÉE (une URL http, PAS un blob:) et
@@ -97,7 +112,7 @@ let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
 
 (async () => {
-  const srv = http.createServer((q, r) => { r.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); r.end(PAGE(/photosreel/.test(q.url) ? 'photosreel' : /photos1/.test(q.url) ? 'photos1' : /etape3/.test(q.url) ? 'etape3' : /etape2/.test(q.url) ? 'etape2' : /depot/.test(q.url))); });
+  const srv = http.createServer((q, r) => { r.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); r.end(PAGE(/boost/.test(q.url) ? 'boost' : /photosreel/.test(q.url) ? 'photosreel' : /photos1/.test(q.url) ? 'photos1' : /etape3/.test(q.url) ? 'etape3' : /etape2/.test(q.url) ? 'etape2' : /depot/.test(q.url))); });
   await new Promise((res) => srv.listen(4491, res));
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox'] });
   const pg = await b.newPage({ viewport: { width: 1280, height: 900 } });
@@ -211,57 +226,37 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
     await p2.addInitScript((d) => {
       window.chrome = { runtime: { id: 'banc', lastError: null, sendMessage: (m, cb) => { const rep = (o) => { try { cb && cb(o); } catch (_) {} };
         if (m && m.action === 'getQueue') return rep({ ok: true, queue: d.queue, removals: [], unlinked: [], postedList: [], stats: { onlineCount: 3, numberedCount: 3 } });
+        if (m && m.action === 'getPending') return rep({ ok: true, ad: d.queue[0] });   // ⚠️ auto : plus de bouton « Pré-remplir »
         return rep({ ok: true }); }, onMessage: { addListener() {} } } };
     }, { queue: QUEUE });
     await p2.goto('http://localhost:4491/depot', { waitUntil: 'domcontentloaded' });
     await p2.addScriptTag({ content: SRC });
-    await p2.waitForTimeout(900);
-    const f2 = await p2.$('[data-a="open"]'); if (f2) { await f2.click(); await p2.waitForTimeout(500); }
-    // Cliquer « Pré-remplir » sur la première annonce.
-    // ⚠️ MON PREMIER JET ATTENDAIT « Salomon », la première annonce de la FILE.
-    //    Or la liste est maintenant groupée : la première carte est celle SANS
-    //    photo. Le code avait raison, c'est l'attente du banc qui était périmée
-    //    — et c'est au passage une preuve de plus que le groupement s'applique.
-    //    On lit donc quelle carte on clique, au lieu de le supposer.
-    const clic = await p2.evaluate(() => {
-      const rs = [...document.querySelectorAll('*')].map(e => e.shadowRoot).filter(Boolean);
-      for (const r of rs) {
-        const b2 = r.querySelector('[data-a="prefill"]');
-        if (b2) { const c = b2.closest('.card'); b2.click(); return c ? c.getAttribute('data-id') : 'sans-id'; }
-      }
-      return null;
-    });
-    dit(!!clic, 'le bouton « Pré-remplir » existe et se clique', clic ? 'carte ' + clic : '');
-    const attendu = (QUEUE.find((q) => q.id === clic) || {}).title || '';
-    await p2.waitForTimeout(500);
+    // ⚠️ L'extension fait tout TOUTE SEULE (Julien, 20 sept.) : plus de « Pré-remplir »
+    //    à cliquer. Sur une page de dépôt, `autoPrefill` lit la paire en attente
+    //    (`getPending`) et remplit — on laisse tourner.
+    await p2.waitForTimeout(3000);
+    const attendu = QUEUE[0].title || '';
     const etat = await p2.evaluate(() => ({
       sujet: (document.querySelector('input[name="subject"]') || {}).value || '',
       recherche: (document.querySelector('header input[name="text"]') || {}).value || '',
-      toast: [...document.querySelectorAll('*')].map(e => e.shadowRoot).filter(Boolean)
-        .map(r => r.textContent || '').join(' '),
     }));
-    dit(!e2.length, 'aucune erreur de page pendant le pré-remplissage', e2[0] || '');
-    dit(!!attendu && etat.sujet === attendu, 'le champ de la page de dépôt reçoit le titre Leboncoin DE CETTE CARTE',
-      'attendu « ' + attendu +' », reçu « ' + etat.sujet.slice(0, 40) + ' »');
+    dit(!e2.length, 'aucune erreur de page pendant le remplissage automatique', e2[0] || '');
+    dit(!!attendu && etat.sujet === attendu, 'la page de dépôt reçoit le titre de la paire en attente, TOUTE SEULE',
+      'attendu « ' + attendu + ' », reçu « ' + etat.sujet.slice(0, 40) + ' »');
     // ⚠️ LE PIÈGE : la barre de recherche de l'en-tête, présente sur TOUTES les
     //    pages. La garde `DANS_ENTETE` doit l'écarter.
     dit(etat.recherche === '', 'la barre de recherche de l\'en-tête n\'est JAMAIS remplie',
-      etat.recherche ? 'elle a reçu « ' + etat.recherche.slice(0, 30) + ' » : le panneau annoncerait « rempli » sur une page où il n\'a rien fait d\'utile' : '');
-    // Le message doit dire CE QUI a été rempli, et ne pas prétendre la référence.
-    const dit_ref = /dont la réf/i.test(etat.toast);
-    dit(!dit_ref, 'le message ne prétend PAS que la référence a été mise',
-      dit_ref ? 'la page de dépôt n\'a aucun champ de référence — l\'annonce partirait sans, et ne serait plus reconnaissable' : '');
-    dit(/n.a PAS pu être mise|est dans la description/i.test(etat.toast),
-      'il dit où se trouve la référence quand elle n\'a pas pu être mise',
-      'sans la réf, « vendue sur Vinted → à retirer » ne reconnaît plus l\'annonce');
+      etat.recherche ? 'elle a reçu « ' + etat.recherche.slice(0, 30) + ' »' : '');
     await p2.close();
   }
 
-  // ── UN CHAMP DE FILTRE N'EST PAS UN CHAMP DE DÉPÔT ────────────────────────
-  // Le panneau est sur TOUTES les pages de Leboncoin. Une page de résultats
-  // porte « Prix min » / « Prix max », qui collent au motif `/prix|price/`.
-  // Sans garde, cliquer « Pré-remplir » depuis une recherche écrit son prix dans
-  // un filtre et annonce « 1 champ rempli » — rien d'utile n'a été fait.
+  // ── LE PANNEAU N'AUTO-REMPLIT QUE LES PAGES DE DÉPÔT ──────────────────────
+  // ⚠️ Avant, « Pré-remplir » pouvait remplir n'importe quelle page (une
+  //    recherche avec « Prix min/max »). Maintenant l'extension fait tout TOUTE
+  //    SEULE, et `autoPrefill` ne s'arme QUE sur une URL de dépôt : une page de
+  //    résultats n'est jamais touchée (le prix de sa paire n'atterrit pas dans
+  //    un filtre), même avec une paire en attente. C'est la garde d'URL, jugée
+  //    sur le RÉSULTAT.
   {
     const p3 = await b.newPage({ viewport: { width: 1280, height: 900 } });
     await p3.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => {
@@ -271,26 +266,20 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
     await p3.addInitScript((d) => {
       window.chrome = { runtime: { id: 'banc', lastError: null, sendMessage: (m, cb) => { const rep = (o) => { try { cb && cb(o); } catch (_) {} };
         if (m && m.action === 'getQueue') return rep({ ok: true, queue: d.queue, removals: [], unlinked: [], postedList: [], stats: { onlineCount: 3, numberedCount: 3 } });
+        if (m && m.action === 'getPending') return rep({ ok: true, ad: d.queue[0] });
         return rep({ ok: true }); }, onMessage: { addListener() {} } } };
     }, { queue: QUEUE });
     await p3.goto('http://localhost:4491/recherche', { waitUntil: 'domcontentloaded' });
     await p3.addScriptTag({ content: SRC });
-    await p3.waitForTimeout(900);
-    const f3 = await p3.$('[data-a="open"]'); if (f3) { await f3.click(); await p3.waitForTimeout(500); }
-    await p3.evaluate(() => {
-      const rs = [...document.querySelectorAll('*')].map(e => e.shadowRoot).filter(Boolean);
-      for (const r of rs) { const b2 = r.querySelector('[data-a="prefill"]'); if (b2) { b2.click(); return; } }
-    });
-    await p3.waitForTimeout(400);
+    await p3.waitForTimeout(2500);
     const filtres = await p3.evaluate(() => ({
       min: (document.querySelector('input[name="price_min"]') || {}).value || '',
       max: (document.querySelector('input[name="price_max"]') || {}).value || '',
-      toast: [...document.querySelectorAll('*')].map(e => e.shadowRoot).filter(Boolean).map(r => r.textContent || '').join(' '),
+      recherche: (document.querySelector('header input[name="text"]') || {}).value || '',
     }));
-    dit(filtres.min === '' && filtres.max === '', 'un filtre « Prix min / max » n\'est jamais pris pour le champ prix',
-      'min=« ' + filtres.min + ' » max=« ' + filtres.max + ' » : le prix de sa paire écrit dans un filtre de recherche');
-    dit(/Aucun champ reconnu/i.test(filtres.toast), 'et sur une page sans formulaire, il le DIT et copie le texte',
-      'annoncer « rempli » sur une page où rien n\'a été fait est le défaut du bandeau eBay');
+    dit(filtres.min === '' && filtres.max === '' && filtres.recherche === '',
+      'une page de RECHERCHE n\'est jamais auto-remplie (ni filtre prix, ni barre de recherche)',
+      'min=« ' + filtres.min + ' » max=« ' + filtres.max + ' » rech=« ' + filtres.recherche + ' »');
     await p3.close();
   }
 
@@ -419,13 +408,14 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
     dit(!!vus.pending && vus.pending.ad && vus.pending.ad.numero === '401',
       'il MÉMORISE la paire choisie pour le nouvel onglet',
       vus.pending ? '' : 'sans ça, la page de dépôt s\'ouvre sans savoir quoi remplir');
+    // ⚠️ ET LE FEU VERT POUR PUBLIER : c'est LUI qui lance, donc l'onglet de dépôt
+    //    a le droit de publier (sans booster). Une page de dépôt ouverte à la main
+    //    sans ce drapeau n'est jamais publiée toute seule.
+    dit(!!vus.pending && vus.pending.ad && vus.pending.ad.publier === true,
+      'il autorise la publication (sans booster) pour CETTE paire lancée par le bouton',
+      vus.pending && vus.pending.ad ? 'publier=' + vus.pending.ad.publier : '');
     dit(/leboncoin\.fr\/deposer-une-annonce/.test(String(vus.ouvert || '')), 'et il ouvre la page de dépôt',
       'ouvert : ' + String(vus.ouvert || 'rien'));
-    // Le texte copié doit porter la RÉFÉRENCE : c'est le seul filet quand le
-    // formulaire n'a pas de champ pour elle (mesuré : il n'en a pas).
-    dit(/VRM-401/.test(String(vus.copie || '')), 'le presse-papier refusé retombe sur l\'ancienne méthode, et le texte porte VRM-401',
-      'c\'est elle qui relie l\'annonce à la paire — sans elle, plus de retrait automatique');
-    dit(/TITRE|DESCRIPTION|PRIX/.test(String(vus.copie || '')), 'et il est complet (titre, description, prix)');
     await p5.close();
   }
 
@@ -616,6 +606,40 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
       'le bandeau dit « envoyées — vérifie » quand il ne peut pas compter les vignettes',
       (reel.bandeau || '').replace(/\n/g, ' ').slice(0, 110));
     await preel.close();
+
+    // 4) ⚠️⚠️ PUBLIER SANS BOOSTER (Julien, 20 sept. : « c'est toi qui appuies
+    //    sur publier sans booster »). L'étape options ne porte que des cases de
+    //    boost PAYANTES : on les décoche TOUTES, on clique le dépôt GRATUIT,
+    //    JAMAIS le payant. §6.1 par réaffaiblissement (retirer la garde « prix »).
+    const adPub = { ...QUEUE[0], publier: true, photos: ['https://ex/a1.jpg', 'https://ex/a2.jpg', 'https://ex/a3.jpg'] };
+    const lancerBoost = async (srcJs) => {
+      const pg = await b.newPage({ viewport: { width: 1200, height: 900 } });
+      const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
+      await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => r.abort());
+      await pg.addInitScript(initChrome, { ad: adPub });
+      await pg.goto('http://localhost:4491/depot/boost', { waitUntil: 'domcontentloaded' });
+      await pg.addScriptTag({ content: srcJs });
+      await pg.waitForTimeout(9000);
+      const r = await pg.evaluate(() => ({
+        pub: window.__pub, paid: window.__paid,
+        coches: [...document.querySelectorAll('fieldset input[type=checkbox]')].filter((c) => c.checked).map((c) => c.name),
+        bandeau: (document.getElementById('vrm-lbc-banner') || {}).innerText || '',
+      }));
+      await pg.close(); return { r, errs };
+    };
+    {
+      const { r, errs } = await lancerBoost(SRC);
+      dit(!errs.length, 'aucune erreur pendant la publication sans booster', errs[0] || '');
+      dit(r.coches.length === 0, 'TOUTES les options de boost sont décochées (jamais de dépense)', 'restées cochées : ' + (r.coches.join(',') || 'aucune'));
+      dit(r.pub === 1, 'le bouton de dépôt GRATUIT est cliqué une fois', '__pub=' + r.pub);
+      dit(r.paid === 0, 'le bouton PAYANT (9,90 €) n\'est JAMAIS cliqué', '__paid=' + r.paid);
+      dit(/sans booster/i.test(r.bandeau), 'le bandeau dit « publiée sans booster »', (r.bandeau || '').replace(/\n/g, ' ').slice(-70));
+    }
+    {
+      const faible = SRC.replace('if (PRIX.test(t)) return false;', 'if (false) return false;');
+      if (faible === SRC) dit(false, 'la garde « prix » attendue est introuvable — l\'audit ne prouve rien');
+      else { const { r } = await lancerBoost(faible); dit(r.paid >= 1, '§6.1 — sans la garde « prix », le bouton PAYANT EST cliqué (donc la garde protège de la dépense)', '__paid=' + r.paid + ' __pub=' + r.pub); }
+    }
   }
 
   // ══════════════════════════════════════════════════════════════════════════

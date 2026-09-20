@@ -3465,6 +3465,55 @@ en premier) et ce qui est resté sûr :
   la SUGGESTION interne, pas une publication, et ça ne casse rien pour un autre
   article (au pire 0 suggestion). Non touché, pas de risque.
 
+### ⚠️⚠️ « L'EXTENSION FAIT TOUT » — PUBLIER SANS BOOSTER, ET UN SEUL BOUTON
+Julien, 20 sept. : « est-ce que l'extension publie jusqu'à publier sans
+booster ? enlève Tout préparer / Pré-remplir / machin, je veux juste que ce soit
+téléversé sur le Bon Coin. Maintenant l'extension fait tout. » Deux volets.
+
+**1. Auto-publication SANS booster — livrée, mesurée sûre.** Le dossier différait
+ça sur le risque ARGENT (cocher un boost). **Mesuré** (`lbc_recon.etapes`) :
+l'étape options ne porte que **6 CASES À COCHER de boost** (gallery, gallery30,
+daily_bump, daily_bump30, sub_toplist, urgent) — inspectables — et la page
+`/confirmation` prouve que la voie GRATUITE existe et se termine là.
+⇒ `publierSansBooster()` (lbc.js) : **décoche toute option payante** ; s'il en
+reste une cochée → **on NE publie pas** (on le dit) ; puis clique un bouton de
+publication qui matche `publier|déposer mon/l'annonce|mettre en ligne|valider`
+**et jamais** un bouton portant un PRIX (`€`, `9,90`, booster, remont, payer,
+premium, pack, option). Bouton introuvable ⇒ rien de cliqué, il publie à la main.
+- **Gaté sur SA main** : ne se déclenche que pour une paire lancée par le bouton
+  (`pending.publier === true`, posé au clic), à l'**étape des boosts** (mesurée),
+  et seulement si des **photos ont été envoyées** (sinon Leboncoin refuse). Une
+  fois ; après succès, la paire sort de la file (`markPosted`) et `pending` est
+  effacé — jamais deux publications.
+- ⚠️ **Le clic « Publier » n'est plus interdit — c'est SA décision d'owner**,
+  répétée. La garde `BTN_PUBLIER` de `cliquerContinuer` (enchaînement d'étapes)
+  reste : on n'AVANCE que par « Continuer », et la publication est un geste
+  séparé, borné à `publierSansBooster`.
+- `bancs/leboncoin.cjs` : fixture `boost` (cases de boost + un bouton GRATUIT +
+  un bouton PAYANT à 9,90 € placé AVANT). **Boosts tous décochés, bouton gratuit
+  cliqué 1×, bouton payant JAMAIS.** §6.1 : en retirant la garde « prix », le
+  bouton PAYANT est cliqué (`__paid=1`) — la garde protège de la dépense.
+
+**2. Un seul bouton, plus de « machin ».** La carte n'a plus que **🚀 Publier sur
+Leboncoin** (ouvre le dépôt + remplit tout + publie sans booster) et **✓ Je l'ai
+déjà publiée**. Retirés : Pré-remplir, Titre, Description, Prix, ⬇️ Photos — le
+remplissage est **automatique** sur la page de dépôt (`autoPrefill`). Le bandeau
+du dépôt n'a plus « Re-remplir »/« Copier la description » ; il montre l'état et
+un **↻ Reprendre** qui n'apparaît QUE si le remplissage cale (filet).
+- ⚠️ Bancs mis à jour : le pré-remplissage se teste par la voie AUTO (`getPending`
+  → la page se remplit seule), plus par un bouton disparu ; et une page de
+  **recherche** n'est jamais auto-remplie (garde d'URL de `autoPrefill` — le prix
+  n'atterrit pas dans un filtre). Le bouton « Publier » pose `publier:true`.
+- Extension **5.97.0**, zip régénéré, `EXT_ATTENDUE` suivie. Aucune entrée
+  d'`EXT_CAPACITES` : la publication est un geste du panneau (lbc.js), pas une
+  promesse de l'app gatée sur une version.
+- ⚠️ **CE QUE JE N'AI TOUJOURS PAS VU (403), et le filet posé pour ça** : le
+  bouton de publication réel et l'après-clic (confirmation ? paiement ?). Le
+  risque argent est neutralisé (boosts décochés + aucun bouton à prix cliqué), et
+  au pire rien n'est cliqué. Si le libellé réel diffère de mes motifs, il publie
+  à la main — jamais une dépense, jamais un faux. Le prochain vrai dépôt le
+  confirmera.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
