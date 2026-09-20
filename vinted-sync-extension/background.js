@@ -5401,16 +5401,28 @@ function viderMemoVisite(uid) {
 // Correspondance de catégorie Vinted → Leboncoin. La boutique = sneakers → la
 // catégorie Leboncoin est « Chaussures » (Mode). On garde une logique simple et
 // extensible (vêtements/accessoires si un jour d'autres articles).
+// ⚠️⚠️ PLUS DE DÉFAUT « Chaussures » CODÉ EN DUR (Julien, 20 sept. : « qu'un
+//    reseller qui fasse autre chose que des chaussures puisse l'utiliser »).
+//    La catégorie est un CHOIX, pas une ressemblance (§5) : on ne la renvoie que
+//    si un mot la DÉSIGNE, ou si la taille est une POINTURE (nombre en fourchette
+//    chaussure) — sinon on rend '' et Leboncoin la propose (il la devine du
+//    titre), l'utilisateur tranche. Une catégorie FAUSSE fait plus de mal que
+//    pas de catégorie (« 3 manuels première ST2S » partait en Chaussures).
+//    ⚠️ Les vêtements sont testés AVANT la pointure : « jean taille 40 » est un
+//    vêtement, pas une paire du 40.
 function lbcCategory(det, raw) {
   const t = ((det.title || raw.title || '') + ' ' + (det.description || '')).toLowerCase();
-  if (/(sac|sacoche|bandouli|cabas)/.test(t)) return 'Sacs à main';
-  if (/(veste|manteau|pull|t-?shirt|chemise|jean|pantalon|robe|short|sweat|hoodie)/.test(t)) return 'Vêtements';
-  if (/(casquette|bonnet|ceinture|montre|lunettes|écharpe|gants)/.test(t)) return 'Accessoires & Bagagerie';
-  // ⚠️ VU DANS SA FILE : « 3 manuels première ST2S » partait en « Chaussures ».
-  //    Une catégorie FAUSSE fait plus de mal que pas de catégorie (leçon eBay) :
-  //    l'annonce ne sort dans aucune recherche utile.
-  if (/(manuel|livre|bouquin|roman|bd|scolaire|cahier)/.test(t)) return 'Livres';
-  return 'Chaussures';
+  if (/(sac|sacoche|bandouli|cabas|pochette|portefeuille|porte-monnaie)/.test(t)) return 'Sacs à main';
+  if (/(veste|manteau|pull|t-?shirt|tee-?shirt|chemise|jean|pantalon|robe|jupe|short|sweat|hoodie|doudoune|gilet|d[ée]bardeur|combinaison|legging|surv[êe]tement|maillot)/.test(t)) return 'Vêtements';
+  if (/(casquette|bonnet|ceinture|montre|lunettes|[ée]charpe|gants|bijou|collier|bracelet|bague|foulard|cravate|portefeuille)/.test(t)) return 'Accessoires & Bagagerie';
+  if (/(manuel|livre|bouquin|roman|\bbd\b|scolaire|cahier)/.test(t)) return 'Livres';
+  if (/(chaussure|basket|sneaker|running|derby|mocassin|botte|bottine|escarpin|sandale|tong|ballerine|mule|richelieu|espadrille)/.test(t)) return 'Chaussures';
+  // Pointure : une taille NUMÉRIQUE en fourchette chaussure (34–50), et aucun mot
+  //   de vêtement au-dessus. C'est ce qui garde l'auto-catégorie de ses sneakers
+  //   (dont le titre ne dit pas « chaussure »), sans forcer les autres articles.
+  const p = parseFloat(String(det.size || raw.size || det.size_title || raw.size_title || '').replace(',', '.'));
+  if (isFinite(p) && p >= 34 && p <= 50) return 'Chaussures';
+  return '';   // inconnu : on ne force pas — Leboncoin propose, l'utilisateur choisit
 }
 // ══════════════════════════════════════════════════════════════════════════════
 // LE TITRE LEBONCOIN — 50 caractères, et ils se gagnent
@@ -5475,14 +5487,18 @@ function lbcTitre(brand, base, size, max) {
   t = t.replace(/\btailles?\s*:?\s*(\d{1,2}(?:[.,]\d)?)\b/i, (m, n) => { vue = n; return ''; })
        .replace(/\bT\s*(\d{2}(?:[.,]\d)?)\b/i, (m, n) => { vue = n; return ''; })
        .replace(/\s+/g, ' ').trim();
-  const taille = String(size || vue || '').replace(/^t/i, '').trim();
+  const taille = String(size || vue || '').replace(/^t(?=\d)/i, '').trim();
   // 3. La marque une seule fois.
   const b = String(brand || '').trim();
   if (b && !new RegExp('\\b' + bq + '\\b', 'i').test(t)) t = b + ' ' + t;
   t = t.replace(/\s+/g, ' ').trim();
   // 4. Une majuscule : un titre tout en minuscules se lit « bricolé ».
   t = t.charAt(0).toUpperCase() + t.slice(1);
-  const suff = taille ? ' T' + taille : '';
+  // ⚠️ Le « T » n'est une POINTURE que pour un nombre (chaussures) : une taille
+  //    lettre (M, L, XL) n'est pas « TM ». Un reseller qui ne fait pas de
+  //    chaussures ne doit pas voir son titre corrompu (Julien, 20 sept.).
+  const estPointure = /^\d{1,2}(?:[.,]\d)?$/.test(taille);
+  const suff = taille ? (estPointure ? ' T' + taille : ' ' + taille) : '';
   // 5. ⚠️ ON NE COUPE JAMAIS EN PLEIN MOT.
   const place = (max || LBC_TITRE_MAX) - suff.length;
   if (t.length > place) {

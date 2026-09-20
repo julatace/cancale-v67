@@ -460,6 +460,12 @@ function ctxAvec(numeros, txns, lbcItems, exclus, quiEchoue, bloquesDef) {
       ['Nike', 'nike zoomX vaporfly next 4 bright crimson mint foam taille 44', '44'],
       ['', 'basket sans marque', ''],
       ['Autry', 'Autry medalist blanc taille 36', '36'],
+      // ⚠️ NON-CHAUSSURES (Julien, 20 sept. : « qu'un reseller qui fasse autre
+      //    chose que des chaussures puisse l'utiliser »). Une taille LETTRE ne
+      //    doit pas devenir « TM » : c'est corrompre le titre.
+      ['Nike', 'sweat tech fleece gris', 'M'],
+      ['Lacoste', 'polo piqué blanc', 'L'],
+      ['Louis Vuitton', 'sac speedy 30 monogram', ''],
     ];
     // Le VRAI `lbcTitre` de l'extension, déjà chargé dans le contexte vm.
     const ctxT = ctxAvec({});
@@ -507,12 +513,32 @@ function ctxAvec(numeros, txns, lbcItems, exclus, quiEchoue, bloquesDef) {
         return /[a-zà-ÿ]$/i.test(r2) && !/\bT\d/.test(r2.slice(-6));
       });
       dit(coupe.length === 0, 'aucun titre ne se termine au milieu d\'un mot', coupe[0] || '');
+      // ⚠️ NON-CHAUSSURES : une taille LETTRE ne devient jamais « TM »/« TL »
+      //    (le « T » n'est une pointure que pour un nombre). Et la taille lettre
+      //    reste présente. §6.1 : sur le code d'avant (`' T' + taille`), « M »
+      //    donnait « … TM » → ce contrôle rougit.
+      const mSweat = lbcApp('Nike', 'sweat tech fleece gris', 'M');
+      const lPolo = lbcApp('Lacoste', 'polo piqué blanc', 'L');
+      dit(!/\bT[A-Za-zÀ-ÿ]\b/.test(mSweat) && !/\bT[A-Za-zÀ-ÿ]\b/.test(lPolo) && /\bM$/.test(mSweat) && /\bL$/.test(lPolo),
+        'une taille LETTRE (M, L) n\'est pas corrompue en « TM »/« TL »',
+        `« ${mSweat} » · « ${lPolo} »`);
+      // Et l'app == extension sur ces cas non-chaussures (une seule règle, §11).
+      const divNS = [['Nike', 'sweat tech fleece gris', 'M'], ['Louis Vuitton', 'sac speedy 30 monogram', '']]
+        .filter(([b, t, z]) => ctxT.lbcTitre && lbcApp(b, t, z) !== ctxT.lbcTitre(b, t, z));
+      dit(divNS.length === 0, 'app == extension aussi sur les articles non-chaussures');
       // La marque n'est jamais doublée (« Nike nike shox » était son titre réel).
       const double = cas.map(([b, t, z]) => [b, lbcApp(b, t, z)])
         .filter(([b, r2]) => b && (r2.toLowerCase().split(b.toLowerCase()).length - 1) > 1);
       dit(double.length === 0, 'la marque n\'apparaît jamais deux fois', double.length ? double[0][1] : '');
       // La taille survit TOUJOURS : c'est sur elle qu'un acheteur filtre.
-      const sansTaille = cas.filter(([b, t, z]) => z && !new RegExp('T' + z.replace('.', '[.,]') + '$').test(lbcApp(b, t, z)));
+      // ⚠️ Numérique (pointure) → suffixe « T{n} » ; lettre (M/L…) → « {z} » sans
+      //    le T (une taille lettre n'est pas une pointure — Julien, 20 sept.).
+      const sansTaille = cas.filter(([b, t, z]) => {
+        if (!z) return false;
+        const est = /^\d{1,2}([.,]\d)?$/.test(z);
+        const attendu = est ? 'T' + z.replace('.', '[.,]') + '$' : z + '$';
+        return !new RegExp(attendu).test(lbcApp(b, t, z));
+      });
       dit(sansTaille.length === 0, 'la taille est toujours à la fin, même sur un titre long',
         sansTaille.length ? '« ' + lbcApp(...sansTaille[0]) + ' »' : '');
     }

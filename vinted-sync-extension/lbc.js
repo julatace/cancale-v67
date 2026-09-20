@@ -799,7 +799,10 @@
       return;
     }
     const manque = refMise ? '' : ' La référence ' + ref + ' n\'a PAS pu être mise dans un champ : elle est dans la description (en haut et en bas) — garde-la, c\'est elle qui relie l\'annonce à ta paire.';
-    toast(faits.length + ' champ' + (faits.length > 1 ? 's' : '') + ' rempli' + (faits.length > 1 ? 's' : '') + ' : ' + faits.join(', ') + '.' + manque + ' Vérifie la catégorie « ' + ad.category + ' » et les photos, puis publie.');
+    // La catégorie n'est nommée que si on la connaît ; sinon on dit de la choisir
+    // (un reseller hors chaussures n'a pas de catégorie devinée).
+    const catPhrase = ad.category ? ' Vérifie la catégorie « ' + ad.category + ' »' : ' Choisis la catégorie';
+    toast(faits.length + ' champ' + (faits.length > 1 ? 's' : '') + ' rempli' + (faits.length > 1 ? 's' : '') + ' : ' + faits.join(', ') + '.' + manque + catPhrase + ' et les photos, puis publie.');
   }
   // Capture la STRUCTURE du formulaire de dépôt Leboncoin (noms/libellés des champs)
   // pour que je puisse brancher le pré-remplissage exactement (réf, catégorie…).
@@ -1224,7 +1227,11 @@
   //    liste « Ou choisissez une autre catégorie » (un composant), au cas où
   //    aucune suggestion ne colle.
   function choisirCategorie(ad) {
-    const cat = String(ad.category || 'Chaussures').trim().toLowerCase();
+    // ⚠️ Plus de défaut « Chaussures » : catégorie inconnue ⇒ on ne coche RIEN,
+    //    Leboncoin la propose (il la devine du titre) et l'utilisateur choisit.
+    //    Un reseller qui ne fait pas de chaussures ne doit pas voir « Chaussures »
+    //    cochée à sa place (Julien, 20 sept.).
+    const cat = String(ad.category || '').trim().toLowerCase();
     if (!cat) return false;
     const radios = Array.from(document.querySelectorAll('input[type="radio"],[role="radio"]')).filter((el) => !el.disabled && !DANS_ENTETE(el));
     for (const rb of radios) {
@@ -1283,7 +1290,7 @@
     //    la vraie forme mesurée sur son dépôt. On ne choisit QUE si une option
     //    correspond VRAIMENT — sinon on laisse vide (une catégorie fausse fait
     //    plus de mal que pas de catégorie, leçon eBay).
-    if (choisirListe([/cat[ée]gorie|category|rubrique/], [ad.category, 'Chaussures'])) n++;
+    if (ad.category && choisirListe([/cat[ée]gorie|category|rubrique/], [ad.category])) n++;
     if (choisirListe([/[ée]tat|condition|state/], [ad.etat])) n++;
     if (choisirListe([/marque|brand/], [ad.marque])) n++;
     if (choisirListe([/pointure|taille|size/], [ad.taille])) n++;
