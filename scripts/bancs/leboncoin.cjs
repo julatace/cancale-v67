@@ -31,7 +31,16 @@ const SRC = fs.readFileSync(path.join(__dirname, '..', '..', 'vinted-sync-extens
 const PAGE = (depot) => `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Leboncoin</title></head>
 <body>
   <header role="banner"><form action="/recherche"><input name="text" type="text" placeholder="Rechercher sur leboncoin"></form></header>
-  <main>${depot === 'photos1'
+  <main>${depot === 'photosreel'
+    // ⚠️⚠️ LE VRAI UPLOADER LEBONCOIN (mesuré le 20 sept. sur `lbc_recon.etapes`) :
+    //    champ `multiple:true`, MAIS il lit UNE photo par `change`, l'envoie au
+    //    serveur, affiche la vignette RENVOYÉE (une URL http, PAS un blob:) et
+    //    VIDE le champ. C'est le cas qui piégeait l'ancien code : il partait en
+    //    « envoi groupé » (car multiple) → une seule photo, puis se croyait fini
+    //    car il comptait les blob: (=0). Ici les vignettes sont http → aveugle.
+    ? '<div class="dropzone" aria-label="Ajouter des photos"><input id="uf" type="file" multiple accept="image/*,.webp"></div><div id="previews"></div>'
+      + '<scr'+'ipt>var uf=document.getElementById("uf");var k=0;uf.addEventListener("change",function(){var f=uf.files[0];if(!f)return;k++;var img=document.createElement("img");img.src="https://cdn.leboncoin.example/"+k+".jpg";document.getElementById("previews").appendChild(img);uf.value="";});</scr'+'ipt>'
+    : depot === 'photos1'
     // ⚠️ L'UPLOADER QUI NE GARDE QU'UNE PHOTO (« une seule se téléverse »,
     //    Julien 19 sept.) : un champ NON `multiple` qui, à chaque `change`, lit
     //    UNE photo, ajoute sa vignette (blob:) et se VIDE pour la suivante — le
@@ -88,7 +97,7 @@ let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
 
 (async () => {
-  const srv = http.createServer((q, r) => { r.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); r.end(PAGE(/photos1/.test(q.url) ? 'photos1' : /etape3/.test(q.url) ? 'etape3' : /etape2/.test(q.url) ? 'etape2' : /depot/.test(q.url))); });
+  const srv = http.createServer((q, r) => { r.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); r.end(PAGE(/photosreel/.test(q.url) ? 'photosreel' : /photos1/.test(q.url) ? 'photos1' : /etape3/.test(q.url) ? 'etape3' : /etape2/.test(q.url) ? 'etape2' : /depot/.test(q.url))); });
   await new Promise((res) => srv.listen(4491, res));
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox'] });
   const pg = await b.newPage({ viewport: { width: 1280, height: 900 } });
@@ -448,7 +457,7 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
     }, { ad: QUEUE[0] });
     await p6.goto('http://localhost:4491/depot/etape2', { waitUntil: 'domcontentloaded' });
     await p6.addScriptTag({ content: SRC });
-    await p6.waitForTimeout(2600);           // la surveillance tourne à la seconde
+    await p6.waitForTimeout(4200);           // surveillance à la seconde + pose 1re photo (700ms) puis groupée (900ms)
     const etat = await p6.evaluate(() => ({
       photos: (document.querySelector('input[name="images"]') || {}).files ? document.querySelector('input[name="images"]').files.length : -1,
       noms: document.querySelector('input[name="images"]') ? [...document.querySelector('input[name="images"]').files].map(f => f.name + ':' + f.type) : [],
@@ -581,6 +590,32 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
     dit(!eseq.length, 'aucune erreur pendant le téléversement des photos', eseq[0] || '');
     dit(nSeq === 3, 'les 3 photos sont téléversées (une par une, sur un uploader qui n’en prend qu’une)', nSeq + ' vignette(s) sur 3');
     await pseq.close();
+
+    // 3) ⚠️⚠️ LE VRAI CAS LEBONCOIN (mesuré 20 sept.) : champ `multiple` MAIS
+    //    upload-à-chaque-change + vignettes http (pas blob). C'est ce qui donnait
+    //    « il n'y a qu'une seule photo » : l'ancien code partait en envoi groupé
+    //    (car multiple) et se croyait fini (compteur blob aveugle = 0).
+    //    §6.1 : sur le code d'AVANT, une seule vignette arrive ; APRÈS, les trois.
+    const preel = await b.newPage({ viewport: { width: 1200, height: 900 } });
+    const ereel = []; preel.on('pageerror', (e) => ereel.push(e.message));
+    await preel.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => r.abort());
+    await preel.addInitScript(initChrome, { ad: adPhotos });
+    await preel.goto('http://localhost:4491/depot/photosreel', { waitUntil: 'domcontentloaded' });
+    await preel.addScriptTag({ content: SRC });
+    await preel.waitForTimeout(6000);
+    const reel = await preel.evaluate(() => ({
+      vignettes: document.querySelectorAll('#previews img[src^="http"]').length,
+      bandeau: (document.getElementById('vrm-lbc-banner') || {}).innerText || '',
+    }));
+    dit(!ereel.length, 'aucune erreur sur le vrai uploader Leboncoin', ereel[0] || '');
+    dit(reel.vignettes === 3, 'les 3 photos arrivent sur le VRAI uploader (multiple + upload-à-chaque-change, vignettes http)',
+      reel.vignettes + ' vignette(s) sur 3');
+    // Le bandeau ne MENT pas : vignettes non comptables ⇒ « envoyées » + vérifie,
+    // jamais un « X/Y attachées » qu'on ne peut pas prouver.
+    dit(/envoy[ée]e?s? au formulaire/i.test(reel.bandeau) && /v[ée]rifie/i.test(reel.bandeau),
+      'le bandeau dit « envoyées — vérifie » quand il ne peut pas compter les vignettes',
+      (reel.bandeau || '').replace(/\n/g, ' ').slice(0, 110));
+    await preel.close();
   }
 
   // ══════════════════════════════════════════════════════════════════════════

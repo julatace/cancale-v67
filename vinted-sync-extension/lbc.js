@@ -655,8 +655,29 @@
   // Combien de VIGNETTES d'aperçu de photos sont visibles (blob:/data:). C'est
   // ainsi qu'on SAIT combien de photos Leboncoin a réellement acceptées, sans
   // voir sa page : on avance jusqu'à ce que ce nombre atteigne le nôtre.
+  // ⚠️⚠️ MESURÉ LE 20 SEPTEMBRE : ce compteur est AVEUGLE sur le vrai dépôt.
+  //    Leboncoin téléverse chaque photo (`api/pintad/v1/public/upload/image`) et
+  //    affiche la vignette RENVOYÉE par le serveur (une URL https), PAS un
+  //    `blob:`/`data:`. Il rendait donc **0** quoi qu'il arrive — d'où la fausse
+  //    réussite « tout attaché » alors qu'il n'y avait que la couverture. On ne
+  //    PILOTE donc plus le remplissage dessus (on pilote sur ce qu'on POSE) ; il
+  //    ne sert qu'à confirmer, quand il le peut. Un `null` veut dire « pas su ».
   function apercusPhotos() {
     try { return document.querySelectorAll('img[src^="blob:"], img[src^="data:"]').length; } catch (_) { return 0; }
+  }
+  // ── SONDE (lecture seule, aucun contenu) : à quoi ressemblent les vignettes
+  //    acceptées, pour MESURER — sans voir sa page — combien Leboncoin a pris et
+  //    sous quelle forme. Le prochain dépôt me dira la vérité, et je pourrai
+  //    alors compter juste. *Faire mesurer par ce qui y a accès.*
+  function sondePhotos() {
+    const c = (s) => { try { return document.querySelectorAll(s).length; } catch (_) { return 0; } };
+    let bg = 0;
+    try { for (const el of document.querySelectorAll('[style*="background-image"]')) if (/url\(/i.test(el.getAttribute('style') || '')) bg++; } catch (_) {}
+    return {
+      blob: c('img[src^="blob:"]'), data: c('img[src^="data:"]'),
+      http: c('img[src^="http"]'), canvas: c('canvas'), bg,
+      fichierMultiple: (() => { const f = champsFichier()[0]; return f ? !!f.multiple : null; })(),
+    };
   }
   function poserFichiers(input, fichiers) {
     try {
@@ -687,43 +708,57 @@
     if (!fichiers.length) return { n: 0, rates, raison: rates ? 'les photos n\'ont pas pu être lues' : 'aucune photo lisible' };
 
     const base = apercusPhotos();
-    const cible = champsFichier()[0];
-    // ── VOIE A : champ MULTIPLE → tout d'un coup (l'API standard, et le bon
-    //    geste pour ce type de champ).
-    if (cible && cible.multiple) {
-      poserFichiers(cible, fichiers);
-      await attendre(900);
-      const faites = apercusPhotos() - base;
-      if (faites >= fichiers.length || faites <= 0) {
-        // tout pris, OU on ne sait pas compter les aperçus : on ne force pas un
-        // séquentiel qui, sur un champ multiple, REMPLACERAIT tout par une seule.
-        return { n: faites > 0 ? Math.min(faites, fichiers.length) : fichiers.length, rates, total: fichiers.length, voie: 'multiple' };
-      }
-      // multiple mais Leboncoin n'a pris qu'une partie : on complète en séquentiel.
+    const champGarde = () => { const f = champsFichier()[0]; return f && f.files ? f.files.length : 0; };
+    // ⚠️⚠️ DEUX UPLOADERS, DEUX GESTES OPPOSÉS — et le SEUL signal fiable pour les
+    //    distinguer n'est PAS l'attribut `multiple`, mais si le champ GARDE le
+    //    fichier qu'on vient d'y poser :
+    //    · champ CONTRÔLÉ (source de vérité) → il garde `input.files` → on pose
+    //      tout d'un coup (un séquentiel le REMPLACERAIT par une seule).
+    //    · uploader « à chaque change » (le vrai dépôt Leboncoin, mesuré le
+    //      20 sept. : `multiple:true` pourtant) → il lit UNE photo, l'envoie au
+    //      serveur, et VIDE le champ. Un envoi groupé n'y dépose que la couverture
+    //      (« il n'y a qu'une seule photo qui se téléverse »). Il faut les poser
+    //      UNE PAR UNE, chacune dans son propre `change`.
+    //    On POSE la première, puis on REGARDE : le champ l'a-t-il gardée ?
+    let placees = 0, voie = 'seq', manques = 0;
+    { const first = champsFichier()[0]; let ok = first ? poserFichiers(first, [fichiers[0]]) : false;
+      if (!ok) { const z = zonePhotos(); if (z) ok = dropSur(z, [fichiers[0]]); }
+      if (ok) placees = 1; }
+    await attendre(700);
+    if (placees === 1 && champGarde() >= 1 && fichiers.length > 1) {
+      // CONTRÔLÉ : il a gardé la 1re → on remplace par TOUTES d'un coup.
+      const f = champsFichier()[0];
+      if (f) { poserFichiers(f, fichiers); voie = 'multiple'; placees = fichiers.length; await attendre(900); }
     }
-    // ── VOIE B (débrouillarde) : UNE PAR UNE. C'est le cas où « une seule photo
-    //    se téléversait » : l'uploader lit une photo, l'ajoute, puis REMONTE le
-    //    champ. On re-cherche le champ à chaque fois, on attend que la vignette
-    //    apparaisse, et on avance jusqu'à atteindre notre nombre de photos. Si
-    //    Leboncoin change sa mécanique, on tente aussi le glisser-déposer.
-    let placees = 0, sansProgres = 0;
-    for (let garde = 0; garde < fichiers.length * 3 + 5; garde++) {
-      const faites = apercusPhotos() - base;
-      const cibleN = Math.max(faites, placees);        // la prochaine photo à poser
-      if (faites >= fichiers.length || cibleN >= fichiers.length) break;
-      let input = null;
-      for (let e = 0; e < 5 && !input; e++) { input = champsFichier()[0]; if (!input) await attendre(250); }
-      let ok = false;
-      if (input) ok = poserFichiers(input, [fichiers[cibleN]]);
-      if (!ok) { const z = zonePhotos(); if (z) ok = dropSur(z, [fichiers[cibleN]]); }
-      if (ok) placees++;
-      await attendre(650);
-      const apres = apercusPhotos() - base;
-      if (apres <= faites) { sansProgres++; if (sansProgres >= 3) break; } else sansProgres = 0;
+    if (voie === 'seq') {
+      // « À chaque change » : il a vidé le champ (ou ne le garde pas). On continue
+      //  photo par photo, sans jamais reposer la même (pas de doublon), en
+      //  re-cherchant le champ à chaque fois (l'uploader le remonte). On pilote
+      //  sur ce qu'on POSE — le compteur de vignettes est aveugle ici.
+      const cap = fichiers.length * 4 + 8;
+      for (let garde = 0; garde < cap && placees < fichiers.length && manques < 4; garde++) {
+        const vues0 = apercusPhotos() - base;
+        if (vues0 >= fichiers.length) break;           // vignettes comptables ET complètes
+        let input = null;
+        for (let e = 0; e < 6 && !input; e++) { input = champsFichier()[0]; if (!input) await attendre(300); }
+        let ok = false;
+        if (input) ok = poserFichiers(input, [fichiers[placees]]);
+        if (!ok) { const z = zonePhotos(); if (z) ok = dropSur(z, [fichiers[placees]]); }
+        if (ok) { placees++; manques = 0; } else { manques++; }
+        await attendre(700);
+      }
     }
     const vues = apercusPhotos() - base;
-    const n = Math.min(fichiers.length, Math.max(vues, placees));
-    return { n, rates, total: fichiers.length };
+    // On ne PRÉTEND jamais plus que ce qu'on a envoyé. « confirmées » = ce qu'on a
+    // pu COMPTER (vignettes blob/data, ou fichiers gardés par un champ contrôlé) ;
+    // sinon `null` = « pas su » (les vignettes de Leboncoin sont hors de portée).
+    const confirmees = vues > 0 ? Math.min(vues, fichiers.length)
+      : (voie === 'multiple' && champGarde() >= 1 ? Math.min(champGarde(), fichiers.length) : null);
+    const n = confirmees != null ? Math.max(confirmees, placees) : placees;
+    // ── SONDE renvoyée au fond (lecture seule, aucun contenu) pour MESURER la
+    //    vraie mécanique de l'uploader — le prochain dépôt me dira la vérité.
+    try { send({ action: 'photoDiag', diag: Object.assign({ envoyees: placees, lisibles: fichiers.length, rates, voie, at: new Date().toISOString() }, sondePhotos()) }); } catch (_) {}
+    return { n: Math.min(n, fichiers.length), envoyees: placees, confirmees, rates, total: fichiers.length, voie };
   }
 
   // ⚠️⚠️ LE CHAMP PRIX S'APPELLE `price_cents` — IL ATTEND DES CENTIMES.
@@ -1330,7 +1365,14 @@
       '. Catégorie <b style="color:#eef4f0">' + esc(pending.category || '—') + '</b>.</div>' +
       '<div style="color:#8b9b92;margin-top:3px">' + (photosEtat
         ? (photosEtat.n > 0
-            ? '📷 <b style="color:#eef4f0">' + photosEtat.n + ' photo' + (photosEtat.n > 1 ? 's' : '') + ' attachée' + (photosEtat.n > 1 ? 's' : '') + '</b>' + (photosEtat.rates ? ' (' + photosEtat.rates + ' illisible' + (photosEtat.rates > 1 ? 's' : '') + ')' : '')
+            // On dit ce qu'on SAIT : « confirmées » quand on a pu compter les
+            // vignettes, sinon « envoyées » + vérifie (les vignettes de Leboncoin
+            // ne sont pas comptables de l'extérieur — mesuré le 20 sept.).
+            ? (photosEtat.confirmees != null
+                ? '📷 <b style="color:#eef4f0">' + photosEtat.confirmees + '/' + photosEtat.total + ' photo' + (photosEtat.total > 1 ? 's' : '') + ' attachée' + (photosEtat.confirmees > 1 ? 's' : '') + '</b>'
+                : '📷 <b style="color:#eef4f0">' + photosEtat.envoyees + ' photo' + (photosEtat.envoyees > 1 ? 's' : '') + ' envoyée' + (photosEtat.envoyees > 1 ? 's' : '') + '</b> au formulaire — <b style="color:#e8b35d">vérifie qu\'elles y sont toutes</b> avant de publier')
+              + (photosEtat.rates ? ' (' + photosEtat.rates + ' illisible' + (photosEtat.rates > 1 ? 's' : '') + ')' : '')
+              + (photosEtat.total <= 6 ? '<br><span style="color:#e8b35d">Seules ' + photosEtat.total + ' photos sont captées de Vinted : rouvre l\'annonce sur Vinted (extension à jour) pour les avoir toutes.</span>' : '')
             : '📷 aucune photo attachée — ' + esc(photosEtat.raison || 'raison inconnue'))
         : '📷 j\'attache les photos dès que l\'étape photo s\'affiche.') + '</div>' +
       (pendingArrete

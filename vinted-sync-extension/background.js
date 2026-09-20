@@ -1013,6 +1013,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             sendResponse({ ok: true }); return;
           }
           if (msg.action === 'lbcPaths' && Array.isArray(msg.paths)) { await storeLbcRecon({ paths: msg.paths, url: msg.url }); sendResponse({ ok: true }); return; }
+          // SONDE PHOTOS (lecture seule, aucun contenu) : à quoi ressemblent les
+          // vignettes acceptées + combien l'extension a posé. Sert à MESURER la
+          // vraie mécanique de l'uploader Leboncoin (blob ? http ? multiple ?),
+          // qu'on ne voit pas d'ici (403). Rangé pour la prochaine passe.
+          if (msg.action === 'photoDiag' && msg.diag) { await storeLbcRecon({ photodiag: Object.assign({ ver: EXT_VERSION }, msg.diag) }); sendResponse({ ok: true }); return; }
           // ANNONCE EN COURS DE DEPOT : memorisee au clic sur « Tout preparer »,
           // relue par la page de depot qui s'ouvre dans un AUTRE onglet. Sans ce
           // relais, le nouvel onglet ne savait pas quelle paire etait choisie.
