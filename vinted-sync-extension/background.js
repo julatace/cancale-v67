@@ -6304,10 +6304,28 @@ function detectLbcAccount(data, url) {
   return best;
 }
 
+// Les ids des comptes Leboncoin qui sont À LUI (source = endpoint « moi »).
+// Sert à ne ranger, dans le parcours générique, QUE ses annonces — jamais le
+// flux « découverte » d'autrui. Une source absente est gardée (on ne perd pas
+// un compte au doute) ; une source « autrui » (user-card/discovery/…) est
+// exclue. Lecture ratée ⇒ Set vide ⇒ on ne garde que ce qui porte une réf VRM
+// (mieux vaut un blanc qu'un faux : ne pas ranger 183 annonces d'autrui).
+async function comptesMiens() {
+  const s = new Set();
+  try {
+    const rows = await sbGet('app_data?id=eq.lbc_accounts&select=data');
+    const accs = (rows && rows[0] && rows[0].data && rows[0].data.accounts) || {};
+    for (const id in accs) { const src = accs[id] && accs[id].source; if (!src || (LBC_URL_MOI.test(String(src)) && !LBC_URL_AUTRUI.test(String(src)))) s.add(String(id)); }
+  } catch (_) {}
+  return s;
+}
+
 async function handleLbcRaw(url, body) {
   let data = null;
   try { data = JSON.parse(body); } catch (_) { return; }
   const found = []; const seen = new Set();
+  // Qui suis-je ? (pour ne garder que MES annonces dans le parcours générique)
+  const miens = await comptesMiens();
   // Le compte connecté (id + nom + pro/particulier), s'il transparaît ici.
   const acct = detectLbcAccount(data, url);
   if (acct) await storeLbcAccount(acct);
@@ -6380,10 +6398,20 @@ async function handleLbcRaw(url, body) {
       if (!seen.has(sid)) {
         seen.add(sid);
         const bodyTxt = String(node.body || node.description || '');
-        found.push({
+        const refVRM = (bodyTxt.match(/VRM[-\s]?(\d{1,5})/i) || [])[1] || (String(title).match(/VRM[-\s]?(\d{1,5})/i) || [])[1] || null;
+        // ⚠️⚠️ ON NE RANGE QUE SES ANNONCES (§5). Une réponse générique
+        //    (`dashboard/v1/search`, `discovery/…`) MÊLE ses annonces au flux
+        //    « découverte » d'autrui — mesuré le 20 sept. : 183 annonces rangées,
+        //    la quasi-totalité d'AUTRES vendeurs (ted, Gabriel, Coccinelle…).
+        //    Une annonce est à lui si elle porte notre réf VRM, OU si son owner
+        //    est un de SES comptes (source « moi »). Sinon on l'IGNORE — jamais
+        //    « caché », juste pas rangé (élargir une lecture sans l'attribuer,
+        //    c'est inventer des données). `miens` vide ⇒ seule la réf VRM garde.
+        const ownerId = String((node.owner && (node.owner.user_id || node.owner.store_id)) || node.user_id || node.store_id || '');
+        if (refVRM || (ownerId && miens.has(ownerId))) found.push({
           id: sid, subject: String(title), price,
           body: bodyTxt.slice(0, 400),
-          ref: (bodyTxt.match(/VRM[-\s]?(\d{1,5})/i) || [])[1] || (String(title).match(/VRM[-\s]?(\d{1,5})/i) || [])[1] || null,
+          ref: refVRM,
           url: node.url || '',
           images: (node.images && (node.images.urls || node.images.thumb_urls || node.images.urls_thumb)) || node.image_urls || [],
           category: node.category_name || node.category_id || '',

@@ -127,6 +127,32 @@ const MESSAGES = { conversations: [{ interlocutor: { user_id: 999, pseudo: 'ache
     dit(!acc['6002'] && !acc['6003'], 'Miguel & Chloé (fiches d’autrui) retirés');
   });
 
+  console.log('\n── ON NE RANGE QUE SES ANNONCES — LE FLUX « DÉCOUVERTE » D’AUTRUI EST IGNORÉ');
+  // Mesuré le 20 sept. : lbc_listings = 183 annonces, la quasi-totalité d'AUTRES
+  // vendeurs (ted, Gabriel, Coccinelle…), rangées depuis dashboard/v1/search.
+  // Une réponse générique mêle ses annonces au flux découverte : on ne garde que
+  // ce qui porte notre réf VRM OU dont l'owner est un de SES comptes.
+  await essaie('une réponse générique ne range QUE ses annonces (owner à lui / réf VRM)', async () => {
+    const seed = { lbc_accounts: { accounts: {
+      '55': { id: '55', name: 'SHOPCANCALE', type: 'particulier', source: 'https://api.leboncoin.fr/api/authenticator/v1/users/me/linked_accounts' },
+    } } };
+    const cc = faireCtx(BG_NEUF, seed);
+    const REP = JSON.stringify({ ads: [
+      { list_id: 111, subject: 'Nike air jordan à lui', price: [90], owner: { user_id: 55, name: 'SHOPCANCALE' } },          // à lui (owner)
+      { list_id: 222, subject: 'Chalet à La Plagne', price: [120000], owner: { user_id: 6002, name: 'Miguel' } },            // AUTRUI
+      { list_id: 333, subject: 'Nike Sacai VRM-777', price: [110], owner: { user_id: 9009, name: 'inconnu' } },              // à lui (réf VRM)
+      { list_id: 444, subject: 'Gîte bord de mer', price: [80000], owner: { user_id: 7003, name: 'ted' } },                  // AUTRUI
+    ] });
+    await cc.handleLbcRaw('https://api.leboncoin.fr/api/dashboard/v1/search', REP);
+    const w = cc.__ecrits.filter((r) => r.id === 'lbc_listings').pop();
+    const items = w ? Object.values(w.data.items || {}) : [];
+    const ids = items.map((it) => it.id).sort();
+    dit(ids.length === 2 && ids.includes('111') && ids.includes('333'),
+      'seules SES 2 annonces sont rangées (owner à lui + réf VRM)', 'rangées : ' + JSON.stringify(ids));
+    dit(!ids.includes('222') && !ids.includes('444'),
+      'le chalet et le gîte d’autrui sont IGNORÉS (jamais rangés)');
+  });
+
   console.log(ko === 0 ? '\nChaque compte capté est bien le SIEN — jamais une fiche d’autrui.' : '\n' + ko + ' contrôle(s) au rouge.');
   process.exit(ko === 0 ? 0 : 1);
 })();
