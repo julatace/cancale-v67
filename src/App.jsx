@@ -5216,6 +5216,14 @@ function SideBar({ tab, setTab }) {
 // écrans du quotidien, un point c'est tout, et LE menu donne accès à tout.
 // ⚠️ Sur ordinateur il n'existe pas : la barre latérale montre déjà les neuf
 //    écrans d'un coup, un bouton de plus ne ferait que dupliquer.
+// ⚠️⚠️ IL NE RÉPÈTE PAS LA BARRE DU BAS. Julien, 21 sept. : « tu mets deux fois
+//    Ma journée, Annonces et Ventes ». C'était vrai — le menu déroulait les
+//    CINQ onglets du quotidien (`BOTTOM_TABS`) alors qu'ils sont déjà, à un
+//    tap, dans la barre du bas juste en dessous. Un menu « Plus » ne porte que
+//    ce que la barre ne porte PAS (le motif iOS standard) : les écrans
+//    ponctuels (`PLUS_TABS`) et Réglages. Zéro doublon, et tout reste joignable
+//    (les cinq du quotidien par la barre, le reste par ici). §7 : on ne dit pas
+//    deux fois la même chose sur le même écran.
 function MenuEcrans({ tab, setTab }) {
   const [open, setOpen] = React.useState(false);
   React.useEffect(() => { setOpen(false); }, [tab]);
@@ -5226,8 +5234,7 @@ function MenuEcrans({ tab, setTab }) {
     return () => window.removeEventListener('keydown', esc);
   }, [open]);
   const groupes = [
-    { titre: 'Au quotidien', items: BOTTOM_TABS },
-    { titre: 'Le reste',     items: PLUS_TABS },
+    { titre: 'Le reste', items: PLUS_TABS },
   ];
   return (
     <>
@@ -17000,24 +17007,51 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [batchBusy, setBatchBusy] = useState(false);
   const batchBordereaux = async () => {
     if (batchBusy) return;
-    const pending = (emailBords || []).filter(b => b.hasPdf && !isBordDone(b));
-    if (!pending.length) { toast('Aucun bordereau à imprimer (tous sont déjà marqués imprimés).'); return; }
+    // ⚠️⚠️ « TOUT IMPRIMER » IMPRIME EXACTEMENT CE QUE LE BOUTON COMPTE (§11).
+    // Julien, 21 sept. : « le bouton tout imprimer imprime des bordereaux qui
+    // n'existent pas ou plus, et ne prend pas en compte ceux qui sont déjà là ».
+    // Cause mesurée, un pur écart §11 — DEUX règles pour « quoi imprimer » :
+    //  · le compteur du bouton (`avecPdf`) part de `expeditions()` : une entrée
+    //    par VENTE encore à expédier (`!isShipDone`), qui a un PDF — email
+    //    (`b.hasPdf`) OU capté par l'extension (`labelsCaptes[txn]`) ;
+    //  · l'ancien `batchBordereaux` partait de `emailBords.filter(hasPdf &&
+    //    !isBordDone)` — donc (a) il IGNORAIT les bordereaux captés par
+    //    l'extension (« ceux qui sont déjà là »), et (b) il jugeait sur
+    //    `isBordDone` (marqué imprimé) au lieu de `isShipDone` (colis parti) :
+    //    un colis déjà expédié mais non coché « imprimé » repartait à
+    //    l'impression — « un bordereau qui n'existe plus ».
+    // ⇒ On construit la liste depuis `expeditions()`, filtrée À L'IDENTIQUE du
+    //    compteur `avecPdf`. Une seule règle, un seul propriétaire.
+    const ex = expeditions();
+    const aImprimer = ex.filter(e => ((e.b && e.b.hasPdf) || (e.txn && labelsCaptes[e.txn])) && !(e.o && isShipDone(e.o)));
+    if (!aImprimer.length) { toast('Aucun bordereau prêt à imprimer pour l\'instant.'); return; }
     setBatchBusy(true);
     try {
       // Les PDF sont téléchargés MAINTENANT, et seulement ceux à imprimer :
       // les embarquer dans la liste coûtait 6 Mo à chaque ouverture de l'écran.
       const items = [];
-      for (const b of pending) {
-        const pdf = await fetchBordPdf(b._row);
-        const buf = pdf && pdf.pdfB64 ? b64ToBytes(pdf.pdfB64) : null;
-        if (!buf) continue;
+      for (const e of aImprimer) {
+        const o = e.o, b = e.b;
+        // ⚠️ LE PDF CAPTÉ PAR L'EXTENSION PASSE EN PREMIER (même règle que la
+        //    carte, § per-card) : c'est l'étiquette prise chez Vinted, rattachée
+        //    par n° de transaction ; l'email n'est qu'un secours.
+        let buf = null;
+        const capte = e.txn ? labelsCaptes[e.txn] : null;
+        if (capte) { const l = await fetchLabelPdf(capte.row); buf = l && l.pdfB64 ? b64ToBytes(l.pdfB64) : null; }
+        if (!buf && b && b.hasPdf) { const p = await fetchBordPdf(b._row); buf = p && p.pdfB64 ? b64ToBytes(p.pdfB64) : null; }
+        if (!buf) continue;   // PDF illisible : on saute, on n'imprime pas du vide
+        // Numéro et titre : même dérivation que la carte (identité Vinted, jamais
+        // le titre — §5). Numéro depuis le bordereau si on l'a, sinon la vente.
+        const numero = (b ? numForBord(b) : '') || (o ? (effEntry(o)?.numero || '') : '');
+        const title = o ? o.title : (b ? (b.modele || b.article || '') : '');
         // Compte pro (une facture existe pour cette vente) → on joint la facture
         // juste après son bordereau dans le PDF groupé (§41).
         let invBytes = null;
-        const inv = invForBord(b);
+        const inv = b ? invForBord(b) : null;
         if (inv) { const ent = entForBordInvoice(inv); if (ent) { try { invBytes = await buildFacturXBytes(inv, ent); } catch(_) {} } }
-        items.push({ numero: numForBord(b), title: b.modele || b.article || '', pdfBuf: buf, invBytes });
+        items.push({ numero, title, pdfBuf: buf, invBytes });
       }
+      if (!items.length) { toast('Les PDF n\'ont pas pu être lus. Réessaie dans un instant.'); setBatchBusy(false); return; }
       const r = await mergeAndDownloadBordereaux(items, (w, h) => posForFormat(w, h, false), { autoprint: true, imprimante });
       setBordResult({ ...r, batch: true });
     } catch(err){ toast('Erreur : ' + String(err)); }

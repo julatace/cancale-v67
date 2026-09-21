@@ -11,7 +11,18 @@ const fs=require('fs'), http=require('http'), path=require('path');
 const DIST=require('path').join(__dirname,'..','..','dist'), SC=__dirname;
 const FX=f=>JSON.parse(fs.readFileSync(path.join(SC,'fx',f+'.json'),'utf8'));
 const main=FX('main'), accounts=FX('accounts');
-const rows=[...FX('sold'),...FX('purch'),...FX('listings'),...FX('inbox'),...FX('track'),...FX('bord'),...FX('label'),...FX('billing')]; const txn=FX('txn');
+const rows=[...FX('sold'),...FX('purch'),...FX('listings'),...FX('inbox'),...FX('track'),...FX('bord'),...FX('label'),...FX('billing'),...LBCV()]; const txn=FX('txn');
+// ⚠️ VENTES LEBONCOIN — donnée SYNTHÉTIQUE (aucun acheteur, aucune adresse : elle
+// peut donc vivre DANS le banc, dépôt public). Sans elle, l'écran Ventes rend le
+// bloc « Ventes Leboncoin » VIDE, et un piège §4.6 (TDZ) ou un mensonge §5 (un
+// ACHAT montré comme vente) y passerait inaperçu. On sert une vente PROUVÉE
+// (isSeller true, avec bordereau), un ACHAT prouvé (Rolex, isSeller false) et une
+// transaction de côté inconnu — la vraie forme mesurée le 20 sept.
+function LBCV(){ return [{ id:'lbc_ventes', data:{ ventes:{
+  '362201423':{ txId:'362201423', itemId:'3271360255', title:'New Balance 990 gris taille 44', price:7500, isSeller:true, stepStatus:'action', stepLabel:'Colis à envoyer', deliveryLabel:'Mondial Relay', label:{ reference:'71977917', voucherUrl:'https://cdn.leboncoin/label/71977917.pdf' } },
+  '900001':{ txId:'900001', title:'Montre Rolex Submariner', price:450000, isSeller:false, stepStatus:'done', stepLabel:'Terminée' },
+  '163516245':{ txId:'163516245', title:'transaction en cours', price:1500, stepStatus:'ongoing' },
+} } }]; }
 
 // ── LA PROJECTION `select=` DE POSTGREST, honnêtement appliquée ─────────────
 // ⚠️ SANS ÇA, CE BANC MESURE UNE FICTION. Il rendait la ligne BRUTE
@@ -88,13 +99,14 @@ const TABS=['journee','dashboard','cat_annonces','cat_ventes','cat_achats','cat_
       const m=/id=like\.([^&]*)/.exec(u); if(m){const pat=decodeURIComponent(m[1]).replace(/[*%]/g,'.*');const re=new RegExp('^'+pat+'$');return j(rows.filter(r=>re.test(r.id)).map(r=>projette(r,S)));}
       return j([]);});
     await pg.route('**/api/**',r2=>r2.fulfill({status:200,contentType:'application/json',body:'{"pret":true,"devices":1}'}));
-    const vides=[], deb=[], susp=[], sousIle=[], morts=[];
+    const vides=[], deb=[], susp=[], sousIle=[], morts=[]; let venteTxt='';
     for(const t of TABS){
       await pg.goto('http://localhost:4322/?tab='+t,{waitUntil:'domcontentloaded'});
       await pg.waitForTimeout(2200);
       const r=await pg.evaluate(()=>({n:(document.body.innerText||'').length,
         sw:document.documentElement.scrollWidth, cw:document.documentElement.clientWidth,
         txt:(document.body.innerText||'')}));
+      if(t==='cat_ventes') venteTxt=r.txt;
       if(r.n<120) vides.push(t+':'+r.n);
       // ⚠️ LE GARDE-FOU D'ÉCRAN PASSAIT TOUS LES CONTRÔLES : « Cet écran n'a pas
       // pu s'afficher » est un vrai texte, sans débordement et sans `pageerror`
@@ -127,6 +139,15 @@ const TABS=['journee','dashboard','cat_annonces','cat_ventes','cat_achats','cat_
     dit(susp.length===0,"aucun artefact d'affichage",susp.join(', '));
     dit(sousIle.length===0,"rien ne passe sous l'île d'actions",sousIle.join(' // ')   /* ⚠️ PAS DE PLAFOND : `slice(0,3)` a masqué une 3e trouvaille derrière deux autres — un contrôle qui tronque ses résultats fait croire que le reste va bien. */);
     dit(errs.length===0,"aucune erreur d'app",errs.slice(0,2).join(' | '));
+    // ⚠️ §5 SUR L'ÉCRAN VENTES : le bloc « Ventes Leboncoin » n'affiche comme
+    // vente que ce que Leboncoin CONFIRME (isSeller true). Un ACHAT prouvé
+    // (Rolex) ne doit JAMAIS y figurer, le compte ne porte que les ventes
+    // prouvées (1), et le côté pas encore su est DIT. Un rendu figé « toutes les
+    // transactions » afficherait la Rolex — c'est le défaut qu'on garde rouge.
+    dit(/Ventes Leboncoin/.test(venteTxt) && /New Balance 990/.test(venteTxt),'la vente Leboncoin PROUVÉE est affichée',venteTxt?'':'écran ventes non lu');
+    dit(!/Rolex/i.test(venteTxt),'un ACHAT prouvé (Rolex) n\'est JAMAIS montré comme une vente (§5)');
+    dit(/Ventes Leboncoin \(1\)/.test(venteTxt),'le compte ne porte QUE les ventes prouvées (1)');
+    dit(/pas encore confirmé/.test(venteTxt),'le côté pas encore su est DIT, pas compté comme vente');
     await pg.close();
   }
   await b.close(); srv.close();
