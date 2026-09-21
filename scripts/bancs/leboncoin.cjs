@@ -121,10 +121,14 @@ const REMOVALS = [
   { id: '2002', numero: '502', ref: 'VRM-502', title: 'Adidas Spezial noir', etat: 'fermee', url: 'https://www.leboncoin.fr/ad/502' },
   { id: '2003', numero: '503', ref: 'VRM-503', title: 'Dr. Martens 1461 mono', etat: 'pause', url: 'https://www.leboncoin.fr/ad/503' },
 ];
-// Ses ventes Leboncoin captées (forme réelle mesurée le 20 sept.) : une vente à
-// lui avec son bordereau Mondial Relay, et une transaction annulée.
+// Ses transactions Leboncoin captées (forme réelle mesurée le 20 sept.). Elles
+// MÊLENT ventes et achats — comme sa vraie base : une vente PROUVÉE à lui
+// (`isSeller: true`) avec son bordereau ; un ACHAT prouvé (`isSeller: false`,
+// une Rolex — il ne la vend pas, il l'a achetée) ; une transaction dont le côté
+// n'est pas encore su (issue de la liste v3, `isSeller` absent).
 const VENTES = [
   { txId: '362201423', itemId: '3271360255', title: 'New Balance 990 gris taille 44', price: 7500, isSeller: true, stepStatus: 'action', stepLabel: 'Colis à envoyer', deliveryLabel: 'Mondial Relay', label: { reference: '71977917', voucherUrl: 'https://cdn.leboncoin/label/71977917.pdf', qrUrl: '', trackingUrl: 'https://mondialrelay/suivi/71977917' } },
+  { txId: '900001', itemId: '900001', title: 'Montre Rolex Submariner', price: 450000, isSeller: false, stepStatus: 'done', stepLabel: 'Terminée', label: null },
   { txId: '163516245', title: 'autre paire', price: 1500, stepStatus: 'cancelled', stepLabel: 'Annulée', label: null },
 ];
 
@@ -178,13 +182,20 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
 
   // ── SES VENTES LEBONCOIN : l'état + le bordereau (comme sur Vinted) ────────
   dit(/Tes ventes Leboncoin/.test(txt), 'le panneau MONTRE ses ventes Leboncoin');
-  dit(/New Balance 990 gris taille 44/.test(txt), 'la vente porte son titre');
+  dit(/New Balance 990 gris taille 44/.test(txt), 'la vente PROUVÉE porte son titre');
   dit(/Colis à envoyer/.test(txt) && /75[.,]00 €/.test(txt), 'et son état + son prix (centimes → €)');
   const hrefsV = await pg.evaluate(() => {
     const rs = [...document.querySelectorAll('*')].map(e => e.shadowRoot).filter(Boolean);
     return rs.flatMap(r => [...r.querySelectorAll('a[href]')].map(a => a.getAttribute('href')));
   });
   dit(hrefsV.some((h) => /71977917\.pdf/.test(h || '')), 'le BORDEREAU s\'ouvre (voucher PDF), comme sur Vinted');
+  // ⚠️⚠️ §5 : un ACHAT n'est JAMAIS affiché comme une vente. La Rolex est un
+  //   `isSeller: false` — la montrer sous « Tes ventes » désignerait le mauvais
+  //   rôle. Et le compte du titre ne porte QUE les ventes prouvées (1), pas le
+  //   total des transactions (3). Sur le code d'avant : Rolex présente, « (3) ».
+  dit(!/Rolex/i.test(txt), 'un ACHAT prouvé (Rolex) n\'est JAMAIS montré comme une vente (§5)');
+  dit(/Tes ventes Leboncoin \(1\)/.test(txt), 'le compte ne porte QUE les ventes prouvées (1), pas les 3 transactions');
+  dit(/pas encore confirmé/.test(txt), 'le côté pas encore su est DIT, jamais compté comme vente (une liste qui rétrécit sans un mot se lit comme une perte)');
 
   // ── LE GROUPEMENT : ce qu'il peut faire, pas le numéro ────────────────────
   const iNue = txt.indexOf('Autry medalist');        // 0 photo
