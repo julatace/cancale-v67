@@ -33,6 +33,7 @@
   let queue = [];
   let removals = []; // paires vendues sur Vinted → à retirer de Leboncoin
   let unlinked = []; // annonces LBC que VRM n'a pas su relier à une paire connue
+  let ventes = []; // ses ventes Leboncoin captées (état + bordereau), lecture seule
   let stats = { postedCount: 0, lbcCount: 0, limit: null, plan: null, detected: null }; // compteur d'annonces LBC + offre
   let loadError = false; // vrai si getQueue a échoué (≠ file vide)
   let postedList = []; // paires marquées « publiées » (pour annuler une erreur)
@@ -331,7 +332,7 @@
              <button data-a="refresh" title="Rafraîchir">⟳</button>
              <button data-a="close" title="Fermer">×</button></div>
            <a class="deposit" href="https://www.leboncoin.fr/deposer-une-annonce" target="_blank" rel="noreferrer">➕ Déposer une annonce sur Leboncoin</a>
-           <div class="body">${photoHtml()}${counterHtml()}${preuveHtml()}${exclusHtml()}${remHtml}${unlHtml}${items.length ? listeGroupee(items) : emptyHtml()}${donePostedHtml()}</div>
+           <div class="body">${photoHtml()}${counterHtml()}${preuveHtml()}${exclusHtml()}${ventesHtml()}${remHtml}${unlHtml}${items.length ? listeGroupee(items) : emptyHtml()}${donePostedHtml()}</div>
            <div class="hint">1) Clique <b>➕ Déposer une annonce</b>. 2) Sur la page, clique <b>✍️ Pré-remplir</b> sur la paire voulue. 3) Vérifie et publie toi-même. Rien n&#39;est publié automatiquement.</div>
          </div>`
       : `<button class="fab" data-a="open">🟠 VRM <span class="b">${badge}</span></button>`);
@@ -362,6 +363,31 @@
   // de 40 à **55** paires — quinze paires déjà vendues reproposées à la
   // publication, sans un mot. On ne cache pas la liste (elle reste utile), on
   // dit ce qu'on n'a pas pu vérifier, et ce que ça change.
+  // ⚠️ TES VENTES LEBONCOIN — l'état + le BORDEREAU, comme sur Vinted.
+  // Tout vient de `lbc_ventes` (capté par l'extension, §« capter les ventes »).
+  // On n'AFFICHE que ce qui est MESURÉ : titre, prix, état ; et le bordereau
+  // seulement quand la vente le porte (`label.voucherUrl`) ET que c'est bien
+  // une vente à lui (`isSeller === true`, jamais déduit). Liste vide ⇒ aucune
+  // section (rien de capté encore ≠ « aucune vente », on n'invente pas).
+  function ventesHtml() {
+    if (!ventes.length) return '';
+    const euro = (c) => (c == null ? '' : (Number(c) / 100).toFixed(2).replace('.', ',') + ' €');
+    const etat = (o) => o.stepLabel || ({ ongoing: 'En cours', cancelled: 'Annulée', done: 'Terminée', refunded: 'Remboursée', action: 'À expédier' }[o.stepStatus] || o.stepStatus || '');
+    const annulee = (o) => /annul|cancel|refund|rembours/i.test((o.stepStatus || '') + ' ' + (o.stepLabel || ''));
+    const lignes = ventes.slice(0, 40).map((o) => {
+      const bord = (o.isSeller === true && o.label && o.label.voucherUrl)
+        ? `<a href="${esc(o.label.voucherUrl)}" target="_blank" rel="noreferrer" style="display:inline-block;margin-top:6px;background:#10151B;color:#fff;border-radius:8px;padding:6px 11px;font-weight:700;font-size:12px;text-decoration:none">🧾 Ouvrir le bordereau${o.label.reference ? ' · ' + esc(o.label.reference) : ''}</a>`
+        : (o.label && o.label.trackingUrl ? `<a href="${esc(o.label.trackingUrl)}" target="_blank" rel="noreferrer" class="vrm-link" style="display:inline-block;margin-top:4px;font-size:12px">Suivre le colis ↗</a>` : '');
+      return `<div class="rem" style="${annulee(o) ? 'opacity:.55' : ''}">
+        <div class="remt">${esc(o.title || '(sans titre)')}</div>
+        <div class="remm">${esc(etat(o))}${o.price != null ? ' · ' + esc(euro(o.price)) : ''}${o.deliveryLabel ? ' · ' + esc(o.deliveryLabel) : ''}</div>
+        ${bord}
+      </div>`;
+    }).join('');
+    return `<div class="remsec"><div class="remhd">🧾 Tes ventes Leboncoin (${ventes.length})</div>
+      <div class="remm" style="padding:2px 2px 6px">Capté depuis Leboncoin. Le bordereau s'ouvre quand la vente le porte — comme sur Vinted.</div>
+      ${lignes}</div>`;
+  }
   function preuveHtml() {
     if (!stats || !stats.preuveKO) return '';
     return `<div class="counter" style="margin-top:8px">
@@ -1513,6 +1539,7 @@
     removals = (r && r.ok && Array.isArray(r.removals)) ? r.removals : [];
     unlinked = (r && r.ok && Array.isArray(r.unlinked)) ? r.unlinked : [];
     postedList = (r && r.ok && Array.isArray(r.postedList)) ? r.postedList : [];
+    ventes = (r && r.ok && Array.isArray(r.ventes)) ? r.ventes : [];
     if (r && r.ok && r.stats) stats = r.stats;
     render();
   }

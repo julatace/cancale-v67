@@ -933,7 +933,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg && msg.from === 'cancale-lbc') {
       (async () => {
         try {
-          if (msg.action === 'getQueue') { const r = await buildLbcData(); sendResponse({ ok: true, queue: r.queue, removals: r.removals, stats: r.stats, postedList: r.postedList }); return; }
+          if (msg.action === 'getQueue') { const r = await buildLbcData(); const ventes = await lireLbcVentes(); sendResponse({ ok: true, queue: r.queue, removals: r.removals, stats: r.stats, postedList: r.postedList, ventes }); return; }
           if (msg.action === 'setLimit') { await setLbcLimit(msg.limit, msg.plan); sendResponse({ ok: true }); return; }
           if (msg.action === 'getPhotos') { const r = await getPairPhotos(msg.numero); sendResponse({ ok: true, numero: r.numero, title: r.title, photos: r.photos }); return; }
           if (msg.action === 'downloadPhotos' && Array.isArray(msg.urls)) { const nb = await downloadPhotos(msg.urls, msg.numero); sendResponse({ ok: true, count: nb }); return; }
@@ -6253,6 +6253,23 @@ async function rangerLbcVentes(list) {
   const noms = Object.keys(ventes);
   if (noms.length > 500) { const g = noms.sort((x, y) => Date.parse((ventes[y] || {}).at || 0) - Date.parse((ventes[x] || {}).at || 0)).slice(0, 500); for (const n of noms) if (!g.includes(n)) delete ventes[n]; }
   await supabaseUpsert('app_data', [{ id: 'lbc_ventes', data: { ventes, updatedAt: new Date().toISOString() } }], 'id');
+}
+// Le panneau AFFICHE ses ventes Leboncoin : on rend la liste, triée sur ce qu'il
+// PEUT faire — d'abord celles qui portent un bordereau à imprimer, puis les
+// autres en cours, puis les terminées/annulées. Lecture seule ; `[]` si rien ou
+// lecture ratée (l'affichage ne détruit rien, il n'apparaît juste pas).
+async function lireLbcVentes() {
+  const rows = await sbGet('app_data?id=eq.lbc_ventes&select=data');
+  if (!rows || !rows[0] || !rows[0].data) return [];
+  const v = rows[0].data.ventes || {};
+  const rang = (o) => {
+    const s = (o.stepStatus || '') + ' ' + (o.stepLabel || '');
+    if (/annul|cancel|refund|rembours/i.test(s)) return 3;
+    if (o.label && o.label.voucherUrl) return 0;      // un bordereau à imprimer
+    if (/action|envoy|à envoyer|ship/i.test(s)) return 1;
+    return 2;
+  };
+  return Object.values(v).sort((a, b) => rang(a) - rang(b) || (Date.parse(b.at || 0) - Date.parse(a.at || 0)));
 }
 // ══════════════════════════════════════════════════════════════════════════════
 // LE CATALOGUE LEBONCOIN — SES CODES EXACTS DE CATÉGORIE, MARQUE, TAILLE, ÉTAT
