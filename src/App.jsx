@@ -4194,6 +4194,26 @@ function Badge({children,color}) {
 // n'écoute. Un drapeau attend.
 const DEMANDE_SAISIE_PRIX = { on: false };
 
+// Petit LOGO de plateforme — demande de Julien (21 sept.) : « un logo par
+// application pour dire sur quoi est postée la paire ». C'est une identité de
+// MARQUE, pas une couleur de donnée : la seule raison d'un ton hors palette ici
+// (§7 tolère le logo, comme le bouton orange « Déposer sur Leboncoin »). Rendu
+// minuscule (16 px), une pastille par plateforme. On n'affiche un logo que
+// quand c'est PROUVÉ (§5) : Vinted parce que la paire EST une annonce Vinted ;
+// Leboncoin seulement si `vinted_lbc_posted` la porte.
+function PlateformeLogo({ p, title }) {
+  const M = {
+    vinted: { bg: '#09B1BA', t: 'Vinted' },
+    lbc:    { bg: '#EC5A13', t: 'leboncoin' },
+  };
+  const m = M[p]; if (!m) return null;
+  return (
+    <span title={title || m.t} aria-label={m.t} style={{
+      display:'inline-flex', alignItems:'center', height:16, padding:'0 6px',
+      background:m.bg, color:'#fff', borderRadius:5, fontSize:10, fontWeight:800,
+      lineHeight:1, flexShrink:0, whiteSpace:'nowrap' }}>{m.t}</span>
+  );
+}
 function StatBox({label,value,color=C.text,sub=null,subColor=null,onClick=null,title=null}) {
   // ⚠️ LE CHIFFRE N'EST PLUS DANS UNE BOÎTE. Trois cartes grises côte à côte,
   // c'est le gabarit « KPI » de n'importe quel tableau de bord. Ici : un FILET
@@ -12480,6 +12500,28 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (Array.isArray(ids)) setLbcPosted(new Set(ids.map(String)));
     } catch (_) { /* pas su ⇒ Set vide ⇒ aucune pastille, jamais un faux « publiée » */ }
   })(); }, []);
+  // Ses VENTES Leboncoin — demande de Julien (21 sept.) : « je veux une partie
+  // vente Leboncoin et vente Vinted sur l'app ». Captées par l'extension dans
+  // `lbc_ventes` (chaque transaction, clé = id). ⚠️⚠️ §5 : une VENTE, c'est
+  // `isSeller === true` — jamais déduit. La liste Leboncoin MÊLE ses ventes ET
+  // ses achats (mesuré : une Rolex, une bague… sont ses ACHATS), et seul le
+  // détail d'une transaction porte le côté. On sépare donc en trois : ventes
+  // prouvées / côté pas encore su / achats (écartés). Le côté se résout tout
+  // seul quand il ouvre la transaction sur Leboncoin (le détail est capté au
+  // passage). Lecture ratée/vide ⇒ tout à zéro : jamais un faux « vendu ».
+  const [lbcVentes, setLbcVentes] = useState({ ventes: [], inconnues: 0 });
+  useEffect(() => { (async () => {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=data`, { headers: sbAuth() });
+      if (!r.ok) return;
+      const rows = await r.json();
+      const obj = (rows && rows[0] && rows[0].data && rows[0].data.ventes) || {};
+      const arr = Object.values(obj);
+      const ventes = arr.filter(o => o && o.isSeller === true);
+      const inconnues = arr.filter(o => o && o.isSeller == null).length;
+      setLbcVentes({ ventes, inconnues });
+    } catch (_) { /* pas su ⇒ rien : jamais un faux « vendu » */ }
+  })(); }, []);
   const [usedNumeros, setUsedNumeros] = useState(() => load('vinted_used_numeros', []));
   // Prix d'achat mémorisé PAR NUMÉRO (et non par id d'annonce, qui change à la
   // vente/republication). Source de vérité durable : quand tu saisis le prix
@@ -17498,6 +17540,42 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           </div>
         )}
         <NoAcc/>
+        {/* ⚠️ VENTES LEBONCOIN — demande de Julien (21 sept.) : « je veux une
+            partie vente Leboncoin ET vente Vinted sur l'app ». La liste ci-dessous
+            est Vinted ; ce bloc-ci montre ses ventes LEBONCOIN, captées par
+            l'extension (`lbc_ventes`). §5 : on n'affiche comme vente que ce que
+            Leboncoin CONFIRME (`isSeller === true`) ; le côté pas encore su est
+            DIT, jamais compté comme vente ; un achat prouvé est écarté (la liste
+            Leboncoin mêle ventes et achats). Le bordereau s'ouvre, comme sur
+            Vinted. Rien capté ⇒ le bloc ne s'affiche pas (on n'invente rien). */}
+        {(lbcVentes.ventes.length > 0 || lbcVentes.inconnues > 0) && (
+          <div style={{marginBottom:14,border:`1px solid ${C.border}`,borderRadius:12,background:C.card,padding:'12px 14px'}}>
+            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:lbcVentes.ventes.length?6:0}}>
+              <PlateformeLogo p="lbc"/>
+              <div style={{fontWeight:800,fontSize:14,color:C.text}}>Ventes Leboncoin{lbcVentes.ventes.length?` (${lbcVentes.ventes.length})`:''}</div>
+            </div>
+            {lbcVentes.ventes.map(o=>{
+              const euro = o.price==null ? '' : (Number(o.price)/100).toFixed(2).replace('.',',')+' €';
+              const annulee = /annul|cancel|refund|rembours/i.test((o.stepStatus||'')+' '+(o.stepLabel||''));
+              return (
+                <div key={o.txId} style={{display:'flex',flexWrap:'wrap',alignItems:'center',gap:8,padding:'7px 0',borderTop:`1px solid ${C.border}`,opacity:annulee?0.55:1}}>
+                  <div style={{flex:'1 1 200px',minWidth:0}}>
+                    <div style={{fontWeight:600,fontSize:13,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{o.title||'(sans titre)'}</div>
+                    <div style={{fontSize:11.5,color:C.muted}}>{o.stepLabel||o.stepStatus||''}{euro?` · ${euro}`:''}{o.deliveryLabel?` · ${o.deliveryLabel}`:''}</div>
+                  </div>
+                  {o.label && o.label.voucherUrl
+                    ? <a href={o.label.voucherUrl} target="_blank" rel="noreferrer" style={{flexShrink:0,background:C.text,color:C.card,borderRadius:8,padding:'6px 11px',fontWeight:700,fontSize:12,textDecoration:'none'}}>🧾 Bordereau{o.label.reference?` · ${o.label.reference}`:''}</a>
+                    : (o.label && o.label.trackingUrl ? <a href={o.label.trackingUrl} target="_blank" rel="noreferrer" style={{flexShrink:0,color:C.accent,fontWeight:700,fontSize:12,textDecoration:'none'}}>Suivre ↗</a> : null)}
+                </div>
+              );
+            })}
+            {lbcVentes.inconnues>0 && (
+              <div style={{fontSize:11.5,color:C.muted,marginTop:lbcVentes.ventes.length?8:6,paddingTop:lbcVentes.ventes.length?8:0,borderTop:lbcVentes.ventes.length?`1px solid ${C.border}`:'none'}}>
+                {lbcVentes.inconnues} autre{lbcVentes.inconnues>1?'s':''} transaction{lbcVentes.inconnues>1?'s':''} Leboncoin — vente ou achat <b>pas encore confirmé</b>. Ouvre-la sur Leboncoin : le côté se lit tout seul au passage.
+              </div>
+            )}
+          </div>
+        )}
         {/* Rappel d'expédition : alerte les ventes à expédier, les plus urgentes
             d'abord (échéance estimée à +5 j). Protège la note vendeur. */}
          {/* ⚠️ AU-DESSUS DE LA LISTE, ON NE GARDE QUE CE QU'ON VIENT FAIRE.
@@ -20184,12 +20262,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       `item.id`). Pas de pastille ⇒ on ne prétend rien ; jamais un
                       faux « publiée ». Le « sur quel COMPTE » reste gaté sur la
                       capture de ses annonces LBC. */}
-                  {lbcPosted.has(String(item.id)) && (
-                    <span title="Tu l'as marquée publiée sur Leboncoin (bouton « ✓ Je l'ai déjà publiée » du panneau). Elle est donc sur Vinted ET sur Leboncoin."
-                      style={{fontSize:10.5,fontWeight:700,color:C.card,background:C.text,borderRadius:8,padding:'2px 8px'}}>
-                      ✓ sur Leboncoin
-                    </span>
-                  )}
+                  {/* ⚠️ SUR QUELLE PLATEFORME — demande de Julien (21 sept.) :
+                      « un logo par application pour dire sur quoi est postée la
+                      paire ». Vinted TOUJOURS (la paire EST une annonce Vinted) ;
+                      Leboncoin seulement si SA marque `vinted_lbc_posted` la porte
+                      (§5, jamais déduit d'un titre). Lecture ratée/vide ⇒ pas de
+                      logo LBC : jamais un faux « publiée ». */}
+                  <span style={{display:'inline-flex',alignItems:'center',gap:4}}>
+                    <PlateformeLogo p="vinted" title="En ligne sur Vinted"/>
+                    {lbcPosted.has(String(item.id)) && <PlateformeLogo p="lbc" title="Tu l'as marquée publiée sur Leboncoin (bouton « ✓ Je l'ai déjà publiée » du panneau). Elle est donc sur Vinted ET sur Leboncoin."/>}
+                  </span>
                   {/* La paire qui DORT : en ligne depuis longtemps sans partir.
                       Le CHIFFRE (jours en ligne), pas une promesse — l'âge vient
                       de la date de mise en ligne captée (`listedAgeDays`), sinon
