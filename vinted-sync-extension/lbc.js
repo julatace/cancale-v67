@@ -374,8 +374,22 @@
     const euro = (c) => (c == null ? '' : (Number(c) / 100).toFixed(2).replace('.', ',') + ' €');
     const etat = (o) => o.stepLabel || ({ ongoing: 'En cours', cancelled: 'Annulée', done: 'Terminée', refunded: 'Remboursée', action: 'À expédier' }[o.stepStatus] || o.stepStatus || '');
     const annulee = (o) => /annul|cancel|refund|rembours/i.test((o.stepStatus || '') + ' ' + (o.stepLabel || ''));
-    const lignes = ventes.slice(0, 40).map((o) => {
-      const bord = (o.isSeller === true && o.label && o.label.voucherUrl)
+    // ⚠️⚠️ §5 : une VENTE, c'est `isSeller === true` — jamais déduit. La liste v3
+    // (`mes-transactions`) ne porte PAS ce champ : toutes ses lignes sont
+    // `isSeller: undefined`, et elle MÊLE ses ventes ET ses achats (mesuré : une
+    // montre Rolex, une bague… sont ses ACHATS). Compter tout ça « Tes ventes »
+    // désignerait le mauvais rôle — le §5 mot pour mot. Seul le DÉTAIL d'une
+    // transaction porte `is_seller`, et il se capte tout seul quand il ouvre la
+    // transaction sur Leboncoin (aucune requête lancée à l'aveugle).
+    // ⇒ On n'affiche comme vente QUE `isSeller === true`. Un achat prouvé
+    //   (`isSeller === false`) est écarté (ce n'est pas son sujet ici). Le côté
+    //   pas encore su (`isSeller == null`) n'est PAS une vente non plus, mais on
+    //   le DIT (une liste qui rétrécit sans un mot se lit comme une perte, §5).
+    const vraies = ventes.filter((o) => o.isSeller === true);
+    const inconnues = ventes.filter((o) => o.isSeller == null).length;
+    if (!vraies.length && !inconnues) return '';   // que des achats prouvés : rien à montrer ici
+    const lignes = vraies.slice(0, 40).map((o) => {
+      const bord = (o.label && o.label.voucherUrl)
         ? `<a href="${esc(o.label.voucherUrl)}" target="_blank" rel="noreferrer" style="display:inline-block;margin-top:6px;background:#10151B;color:#fff;border-radius:8px;padding:6px 11px;font-weight:700;font-size:12px;text-decoration:none">🧾 Ouvrir le bordereau${o.label.reference ? ' · ' + esc(o.label.reference) : ''}</a>`
         : (o.label && o.label.trackingUrl ? `<a href="${esc(o.label.trackingUrl)}" target="_blank" rel="noreferrer" class="vrm-link" style="display:inline-block;margin-top:4px;font-size:12px">Suivre le colis ↗</a>` : '');
       return `<div class="rem" style="${annulee(o) ? 'opacity:.55' : ''}">
@@ -384,9 +398,16 @@
         ${bord}
       </div>`;
     }).join('');
-    return `<div class="remsec"><div class="remhd">🧾 Tes ventes Leboncoin (${ventes.length})</div>
+    const note = inconnues
+      ? `<div class="remm" style="padding:4px 2px 6px;color:#8a8f98">${inconnues} autre${inconnues > 1 ? 's' : ''} transaction${inconnues > 1 ? 's' : ''} vue${inconnues > 1 ? 's' : ''} sur Leboncoin — vente ou achat <b>pas encore confirmé</b>. Ouvre-la sur Leboncoin : le côté se lit tout seul au passage.</div>`
+      : '';
+    if (!vraies.length) {
+      // Aucune vente confirmée, mais des transactions vues : on ne fête rien, on explique.
+      return `<div class="remsec"><div class="remhd">🧾 Tes ventes Leboncoin</div>${note}</div>`;
+    }
+    return `<div class="remsec"><div class="remhd">🧾 Tes ventes Leboncoin (${vraies.length})</div>
       <div class="remm" style="padding:2px 2px 6px">Capté depuis Leboncoin. Le bordereau s'ouvre quand la vente le porte — comme sur Vinted.</div>
-      ${lignes}</div>`;
+      ${lignes}${note}</div>`;
   }
   function preuveHtml() {
     if (!stats || !stats.preuveKO) return '';
