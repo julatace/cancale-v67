@@ -121,6 +121,12 @@ const REMOVALS = [
   { id: '2002', numero: '502', ref: 'VRM-502', title: 'Adidas Spezial noir', etat: 'fermee', url: 'https://www.leboncoin.fr/ad/502' },
   { id: '2003', numero: '503', ref: 'VRM-503', title: 'Dr. Martens 1461 mono', etat: 'pause', url: 'https://www.leboncoin.fr/ad/503' },
 ];
+// Ses ventes Leboncoin captées (forme réelle mesurée le 20 sept.) : une vente à
+// lui avec son bordereau Mondial Relay, et une transaction annulée.
+const VENTES = [
+  { txId: '362201423', itemId: '3271360255', title: 'New Balance 990 gris taille 44', price: 7500, isSeller: true, stepStatus: 'action', stepLabel: 'Colis à envoyer', deliveryLabel: 'Mondial Relay', label: { reference: '71977917', voucherUrl: 'https://cdn.leboncoin/label/71977917.pdf', qrUrl: '', trackingUrl: 'https://mondialrelay/suivi/71977917' } },
+  { txId: '163516245', title: 'autre paire', price: 1500, stepStatus: 'cancelled', stepLabel: 'Annulée', label: null },
+];
 
 let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
@@ -144,13 +150,13 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
         sendMessage: (msg, cb) => {
           const rep = (o) => { try { cb && cb(o); } catch (_) {} };
           if (!msg || msg.action === undefined) return rep({ ok: true });
-          if (msg.action === 'getQueue') return rep({ ok: true, queue: d.queue, removals: d.removals, unlinked: [], postedList: [], stats: { onlineCount: 3, numberedCount: 3, postedCount: 0, lbcCount: 0 } });
+          if (msg.action === 'getQueue') return rep({ ok: true, queue: d.queue, removals: d.removals, unlinked: [], postedList: [], ventes: d.ventes, stats: { onlineCount: 3, numberedCount: 3, postedCount: 0, lbcCount: 0 } });
           return rep({ ok: true });
         },
         onMessage: { addListener() {} },
       },
     };
-  }, { queue: QUEUE, removals: REMOVALS });
+  }, { queue: QUEUE, removals: REMOVALS, ventes: VENTES });
 
   await pg.goto('http://localhost:4491/', { waitUntil: 'domcontentloaded' });
   await pg.addScriptTag({ content: SRC });
@@ -169,6 +175,16 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
   dit(!errs.length, 'aucune erreur de page', errs[0] || '');
   dit(/Salomon XT-6 blanc T40/.test(txt), 'la liste montre le titre LEBONCOIN, pas le titre Vinted brut');
   dit(/99[.,]00 €|99 €/.test(txt), 'et le prix');
+
+  // ── SES VENTES LEBONCOIN : l'état + le bordereau (comme sur Vinted) ────────
+  dit(/Tes ventes Leboncoin/.test(txt), 'le panneau MONTRE ses ventes Leboncoin');
+  dit(/New Balance 990 gris taille 44/.test(txt), 'la vente porte son titre');
+  dit(/Colis à envoyer/.test(txt) && /75[.,]00 €/.test(txt), 'et son état + son prix (centimes → €)');
+  const hrefsV = await pg.evaluate(() => {
+    const rs = [...document.querySelectorAll('*')].map(e => e.shadowRoot).filter(Boolean);
+    return rs.flatMap(r => [...r.querySelectorAll('a[href]')].map(a => a.getAttribute('href')));
+  });
+  dit(hrefsV.some((h) => /71977917\.pdf/.test(h || '')), 'le BORDEREAU s\'ouvre (voucher PDF), comme sur Vinted');
 
   // ── LE GROUPEMENT : ce qu'il peut faire, pas le numéro ────────────────────
   const iNue = txt.indexOf('Autry medalist');        // 0 photo
