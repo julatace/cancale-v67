@@ -952,6 +952,57 @@ export function detecterTransporteur(mail) {
   return carrier;
 }
 
+// ── LE TEXTE DE LA NOTIFICATION D'UN COLIS À RETIRER ───────────────────────
+// Julien, 21 sept. : « la notification, c'est juste marqué "colis en transit"
+// ou "information colis", mais pas "tu as reçu un colis à tel endroit".
+// Normalement tu reçois l'endroit, le lieu et la date de retrait ».
+// Il a raison : pour un colis ARRIVÉ, la notif ne portait que le transporteur,
+// le n° de suivi et un « Code de retrait » — jamais le LIEU ni la DATE LIMITE,
+// pourtant tous deux déjà extraits de l'email (`track.lieu`, `track.limite`) et
+// rangés dans la ligne. On ne prend RIEN de la géolocalisation (« ne prends
+// plus en compte la localisation ») : uniquement ce que l'email dit.
+// ⚠️ §11 : le corps de la notif a une seule définition, ici, testée au banc —
+//    et non plus une chaîne inline dans le handler.
+const nomTransporteur = (carrier) => carrier === 'mondialrelay' ? 'Mondial Relay'
+  : carrier === 'chronopost' ? 'Chronopost'
+  : carrier === 'vinted' ? 'Vinted Go'
+  : carrier === 'colissimo' ? 'Colissimo'
+  : carrier === 'shop2shop' ? 'Shop2Shop'
+  : 'Colis';
+// Le nom court du point relais : la 1re partie du lieu (l'enseigne), pas
+// l'adresse entière — une notif se lit en une ligne. On ne garde que ce qui
+// vient de l'email.
+const lieuBref = (lieu) => {
+  const s = String(lieu || '').replace(/®|™|©/g, '').replace(/\s+/g, ' ').trim();
+  if (!s) return '';
+  const nom = s.split(',')[0].trim();
+  return nom.length >= 3 ? nom.slice(0, 45) : '';
+};
+// Un vrai code de retrait porte des chiffres ; « suivant » (capté par un ancien
+// motif trop large, §5.72) n'en est pas un — on ne l'affiche jamais.
+const codeNotif = (code) => { const c = String(code || '').trim(); return (/\d/.test(c) && !/^suivant$/i.test(c)) ? c : ''; };
+// « 2026-08-23 » → « 23/08 ». Une date illisible ne devient jamais un faux.
+const dateBref = (d) => { const m = String(d || '').match(/(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}/${m[2]}` : ''; };
+
+export function bodyNotifColis(track, carrier) {
+  const t = track || {};
+  const nom = nomTransporteur(carrier);
+  if (t.status === 'available') {
+    // « Tu as reçu un colis à tel endroit » : le LIEU d'abord (c'est ce qu'il
+    // veut savoir — où aller), le code ensuite, la date limite si on l'a.
+    const lieu = lieuBref(t.lieu);
+    const parts = [];
+    parts.push(lieu ? `${nom} — à retirer chez ${lieu}` : `${nom}${t.suivi ? ' — n°' + t.suivi : ''} — arrivé au point de retrait`);
+    const code = codeNotif(t.code);
+    if (code) parts.push(`Code : ${code}${codeNotif(t.code2) ? ' + ' + codeNotif(t.code2) : ''}`);
+    const lim = dateBref(t.limite);
+    if (lim) parts.push(`à retirer avant le ${lim}`);
+    return parts.join('. ') + '.';
+  }
+  // Livré / en transit / info : le message court d'avant, sans changement.
+  return `${nom}${t.suivi ? ' — n°' + t.suivi : ''} : ${t.label || ''}.`;
+}
+
 export default async function handler(req, res) {
   return contexteVendeur.run({ owner: '' }, () => traiterEmail(req, res));
 }
@@ -1075,7 +1126,7 @@ export async function traiterEmail(req, res) {
       const titles = { delivered: 'Colis livré', available: 'Colis arrivé au point de retrait', transit: 'Colis en transit', info: 'Suivi colis' };
       try { await pushOnce({
         title: `${icons[track.status]} ${titles[track.status]}`,
-        body: `${carrier === 'mondialrelay' ? 'Mondial Relay' : carrier === 'chronopost' ? 'Chronopost' : 'Vinted'}${track.suivi ? ' — n°' + track.suivi : ''} : ${track.label}.${track.status === 'available' && track.code ? ` Code de retrait : ${track.code}` : ''}`,
+        body: bodyNotifColis(track, carrier),
         tag: `track-${track.suivi || rowId}`, url: '/?tab=cat_achats',
       }, track.status === 'available' ? 'colis' : 'suivi'); } catch (_) {}
       await logEmail({ type: 'suivi', subject, from: mail.from, carrier, suivi: track.suivi, statut: track.label });
