@@ -19218,6 +19218,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {thumb(orderPhoto(o)||(rel&&rel.photo)||photoByTitle[normTitle(o.title||'')])}
                       <div style={{flex:'1 1 150px',minWidth:0}}>
                         <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{o.title||'Colis'}</div>
+                        {/* ⚠️ « Il manque des infos utiles » (Julien). Le prix et
+                            la date SONT portés par la commande Vinted (§5 retrait :
+                            transaction_id, date, titre, prix, statut) — la MÊME
+                            source et le MÊME format que le bloc « repartis chez
+                            leurs vendeurs » plus bas (§11 : montantCommande + o.date).
+                            Chacun ne s'affiche que s'il est connu — jamais un 0
+                            inventé (§5/§7). */}
+                        {(()=>{ const m=montantCommande(o); const dt=o.date?new Date(o.date):null;
+                          const jour = dt && !isNaN(dt.getTime()) ? dt.toLocaleDateString('fr-FR') : '';
+                          const bits=[]; if(m>0) bits.push(m.toFixed(2).replace('.',',')+' €'); if(jour) bits.push('commandé le '+jour);
+                          return bits.length ? <div style={{fontSize:11,color:C.muted,marginTop:1}}>{bits.join(' · ')}</div> : null;
+                        })()}
                         {/* L'adresse est déjà en tête du bloc : ici on ne met que
                             ce qui est propre à CE colis. */}
                         {/* ⚠️ Seulement quand le groupe est MIXTE : là, la ligne

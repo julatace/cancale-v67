@@ -164,6 +164,39 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
     }
   }
 
+  // ── 5 ter. CHAQUE COLIS À RETIRER PORTE SON PRIX ET SA DATE ───────────────
+  // « Il manque des infos utiles » (Julien, 23 sept.) : la commande Vinted
+  // PORTE le prix et la date (§5 retrait : transaction_id, date, titre, prix,
+  // statut), et les cartes « à retirer » n'en montraient AUCUN. Même source et
+  // même format que le bloc « repartis chez leurs vendeurs » (§11 :
+  // montantCommande + o.date). La BASE déclenche : s'il y a des cartes à
+  // retirer, chacune porte son prix et sa date — jamais un 0 inventé (la ligne
+  // s'omet quand le prix manque). On lit le bloc RENDU, jamais une formule
+  // (§6.5). Le « € » et « commandé le » n'existent nulle part ailleurs dans ce
+  // bloc, donc les compter, c'est compter les cartes enrichies.
+  // ⚠️ On borne la section « à retirer » par deux marqueurs FIABLES — l'en-tête
+  // « colis à retirer » et le pied « Coche ✓ quand tu l… » — et non par
+  // « Point relais » : le groupe s'affiche « à retirer en point relais » (p
+  // minuscule) quand la conversation ne donne pas de nom, donc un indexOf
+  // sensible à la casse rendait le bloc VIDE et le contrôle ne pouvait jamais
+  // échouer (le piège du DIST absolu, en petit). Le bloc « repartis » est APRÈS
+  // ce pied, donc son « commandé il y a » ne compte pas ici.
+  {
+    const dep2 = v.txt.indexOf('colis à retirer');
+    const suite2 = dep2 < 0 ? -1 : v.txt.indexOf('Coche ✓ quand tu l', dep2);
+    const bloc2 = dep2 < 0 ? '' : v.txt.slice(dep2, suite2 > 0 ? suite2 : dep2 + 1600);
+    const nCartes = (bloc2.match(/Ouvrir la conversation/g) || []).length;
+    // « <prix> € · commandé le <date> » : la forme EXACTE de la ligne ajoutée,
+    // portée par montantCommande + o.date (§11). Unique à ce bloc.
+    const nPrixDate = (bloc2.match(/€ · command[ée] le /g) || []).length;
+    console.log(`    bloc « à retirer » : ${nCartes} carte(s) · ${nPrixDate} prix+date`);
+    if (nCartes > 0) {
+      dit(nPrixDate === nCartes,
+        'chaque colis à retirer porte son prix ET sa date de commande',
+        nPrixDate + ' prix+date pour ' + nCartes + ' carte(s)');
+    }
+  }
+
   // ── 6. LES TROIS ÉCRANS DISENT LE MÊME NOMBRE ─────────────────────────────
   // Mesuré le 7 septembre : le tableau de bord annonçait « 1 colis à retirer »
   // pendant que Ma journée en comptait 5. Cause : le centre de notifications
