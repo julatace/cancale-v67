@@ -4670,6 +4670,10 @@ const BOTTOM_TABS=[
 // Les écrans qu'on ouvre ponctuellement — jamais perdus, juste rangés.
 const PLUS_TABS=[
   {id:'collectif',    icon:'target',  emoji:'🌐',label:'Collectif',     desc:'Toutes tes plateformes réunies'},
+  {id:'plat_vinted',    icon:'tag', emoji:'🟢',label:'Vinted',     desc:'Annonces, ventes et achats Vinted'},
+  {id:'plat_leboncoin', icon:'tag', emoji:'🟠',label:'Leboncoin',  desc:'Ce que VRM sait de Leboncoin'},
+  {id:'plat_ebay',      icon:'tag', emoji:'🔵',label:'eBay',       desc:'Ce que VRM sait d\'eBay'},
+  {id:'plat_vestiaire', icon:'tag', emoji:'👗',label:'Vestiaire',  desc:'Pas encore reliée à VRM'},
   {id:'dashboard',    icon:'chart',   emoji:'📊',label:'Statistiques',  desc:'Chiffre d\'affaires, bénéfices, cotisations'},
   {id:'cat_msg',      icon:'chat',    emoji:'💬',label:'Messages',      desc:'Ce qui est arrivé de nouveau'},
   {id:'garage',       icon:'home',    emoji:'🏠',label:'Garage',        desc:'Où est rangée chaque paire'},
@@ -6203,6 +6207,78 @@ function caParPlateforme(liveStats, lbcVentes) {
     { nom:'eBay', ca:null, note:'pas encore de vente captée' },
     { nom:'Vestiaire Collective', ca:null, note:'pas encore de vente captée' },
   ];
+}
+
+// ── UN ONGLET PAR PLATEFORME (Vinted · Leboncoin · eBay · Vestiaire) ────────
+// Julien : « je veux un onglet par app comme pour vente/achat ». Chaque onglet
+// montre TOUT de la plateforme — mais seulement ce qui est MESURÉ (§5, jamais un
+// 0 inventé). Vinted a de vraies données : c'est un hub vers Annonces/Ventes/
+// Achats (les écrans détaillés RESTENT la source, §11 — on ne recopie aucune
+// liste ici). Leboncoin/eBay/Vestiaire n'ont aucune vente captée aujourd'hui →
+// un tiret + la cause connue + le geste. Le compte connecté « où est la paire »
+// reste mesuré impossible (lbc_accounts vide) : on ne l'affiche pas.
+function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, onGo, baseKO }) {
+  const p = caParPlateforme(liveStats, lbcVentes).find(x => x.nom === plat) || { nom:plat, ca:null };
+  const estVinted = plat === 'Vinted';
+  const ventesVinted = liveStats && liveStats.soldTotal != null ? liveStats.soldTotal : null;
+  const online = liveStats && liveStats.online != null ? liveStats.online : null;
+  const enAttente = liveStats && liveStats.enCours != null ? liveStats.enCours : null;
+  const court = plat === 'Vestiaire Collective' ? 'Vestiaire' : plat;
+  const carte = {textAlign:'left',border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'13px 15px',cursor:'pointer',fontFamily:'inherit'};
+  const eti = {fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500};
+  const gros = {fontSize:24,fontWeight:700,color:C.text};
+  return (
+    <div style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
+      <ScreenHead icon="tag" title={court} desc={estVinted ? 'Tes annonces, ventes et achats sur Vinted' : `Ce que VRM sait de ${court}`}/>
+      {baseKO ? (
+        <LignePanne>Je n'ai pas pu lire tes données — les totaux seraient faux, on ne les affiche pas. Rien n'est perdu : c'est la lecture qui a échoué.</LignePanne>
+      ) : estVinted ? (<>
+        <Card style={{padding:18}}>
+          <div style={{...eti,marginBottom:4}}>Vinted · chiffre d'affaires</div>
+          <div className="vrm-display" style={{fontSize:30,fontWeight:700,color:C.text}}>{p.ca==null?'—':fmt(p.ca)}</div>
+          <div style={{fontSize:11.5,color:C.muted,marginTop:2}}>{p.ca==null?'aucune vente finalisée captée pour l’instant':'ventes finalisées, tous comptes'}</div>
+        </Card>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(150px,1fr))',gap:10}}>
+          <button type="button" onClick={()=>onGo&&onGo('cat_annonces')} style={carte}>
+            <div style={eti}>Annonces en ligne</div>
+            <div className="vrm-display" style={gros}>{online==null?'—':online}</div>
+            <div style={{fontSize:11,color:C.muted,marginTop:2}}>Voir toutes les annonces ›</div>
+          </button>
+          <button type="button" onClick={()=>onGo&&onGo('cat_ventes')} style={carte}>
+            <div style={eti}>Ventes finalisées</div>
+            <div className="vrm-display" style={gros}>{ventesVinted==null?'—':ventesVinted}</div>
+            <div style={{fontSize:11,color:C.muted,marginTop:2}}>{enAttente==null?'Voir les ventes ›':`+ ${enAttente} en cours · voir les ventes ›`}</div>
+          </button>
+          <button type="button" onClick={()=>onGo&&onGo('cat_achats')} style={carte}>
+            <div style={eti}>Achats</div>
+            <div className="vrm-display" style={{...gros,fontSize:18,color:C.muted}}>Voir ›</div>
+            <div style={{fontSize:11,color:C.muted,marginTop:2}}>Tes commandes et colis reçus</div>
+          </button>
+        </div>
+        <div style={{fontSize:11,color:C.muted,lineHeight:1.5}}>
+          Les chiffres viennent du Tableau de bord et des écrans Ventes/Annonces — c'est la même source, ils ne peuvent pas se contredire.
+        </div>
+      </>) : (<>
+        <Card style={{padding:18}}>
+          <div style={{...eti,marginBottom:4}}>{court} · chiffre d'affaires</div>
+          <div className="vrm-display" style={{fontSize:30,fontWeight:700,color:C.muted}}>—</div>
+          <div style={{fontSize:11.5,color:C.muted,marginTop:2}}>pas encore de vente captée</div>
+        </Card>
+        <Card style={{padding:16}}>
+          <div style={{fontSize:13.5,color:C.text,lineHeight:1.55}}>
+            {plat==='Vestiaire Collective'
+              ? <>Vestiaire Collective n'est <b>pas encore reliée</b> à VRM : rien n'y est capté aujourd'hui. Le jour où une vente y remontera, elle apparaîtra ici et dans le total — jamais un chiffre inventé avant.</>
+              : <>Aucune vente n'a encore été captée sur {court}. Tu publies tes paires depuis l'écran <b>Annonces</b> ; dès qu'une vente y sera reconnue, son chiffre s'ajoutera ici et au total. Rien n'est inventé tant qu'il n'y a pas de donnée.</>}
+          </div>
+          {plat!=='Vestiaire Collective' && (
+            <button type="button" onClick={()=>onGo&&onGo('cat_annonces')} style={{marginTop:12,border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'10px 14px',cursor:'pointer',fontFamily:'inherit',fontSize:13,fontWeight:600,color:C.text}}>
+              Ouvrir l'écran Annonces →
+            </button>
+          )}
+        </Card>
+      </>)}
+    </div>
+  );
 }
 
 // ── ONGLET COLLECTIF : LA VUE GLOBALE, TOUTES PLATEFORMES RÉUNIES ───────────
@@ -24799,7 +24875,7 @@ export default function App() {
     // banc, qui navigue par `?tab=`, croyait rendre Leboncoin alors qu'il
     // mesurait l'accueil (un faux vert dans ma propre couverture d'hier).
     // `journee` manquait aussi : invisible parce que c'est l'état de départ.
-    const TABS_OK=['journee','collectif','dashboard','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','invoices','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin'];
+    const TABS_OK=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','dashboard','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','invoices','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin'];
     const goto=(search)=>{ try{ const p=new URLSearchParams(search); const t=p.get('tab'); if(p.get('print')==='bord') _pendingBordPrint=true; if(t&&TABS_OK.includes(t)){ setTab(t); window.history.replaceState({},'',window.location.pathname); } }catch(_){}};
     goto(window.location.search);
     const onMsg=(e)=>{ if(e.data&&e.data.type==='open-url'&&e.data.url){ try{ goto(new URL(e.data.url,window.location.origin).search); }catch(_){}} };
@@ -26072,6 +26148,10 @@ export default function App() {
         {tab==='dashboard'&&premierJour&&<Onboarding setTab={setTab}/>}
         {tab==='dashboard'&&<Dashboard premierJour={premierJour} catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices} liveStats={liveStats} lbcVentes={lbcVentes} onGo={setTab} actions={notifItems} baseKO={baseKO}/>}
         {tab==='collectif'&&<Collectif liveStats={liveStats} lbcVentes={lbcVentes} onGo={setTab} baseKO={baseKO} actions={notifItems} premierJour={premierJour}/>}
+        {tab==='plat_vinted'&&<Plateforme plat="Vinted" liveStats={liveStats} lbcVentes={lbcVentes} onGo={setTab} baseKO={baseKO}/>}
+        {tab==='plat_leboncoin'&&<Plateforme plat="Leboncoin" liveStats={liveStats} lbcVentes={lbcVentes} onGo={setTab} baseKO={baseKO}/>}
+        {tab==='plat_ebay'&&<Plateforme plat="eBay" liveStats={liveStats} lbcVentes={lbcVentes} onGo={setTab} baseKO={baseKO}/>}
+        {tab==='plat_vestiaire'&&<Plateforme plat="Vestiaire Collective" liveStats={liveStats} lbcVentes={lbcVentes} onGo={setTab} baseKO={baseKO}/>}
         {tab==='inventory'&&<Inventory inventory={inventory} setInventory={setInventory} accounts={vintedAccounts} garageGrid={garageGrid} labels={accountLabels} onLocate={(numero)=>{ setGarageLocate(String(numero)); setTab('garage'); }}/>}
         {tab==='catalog'  &&<Catalog   catalog={catalog} setCatalog={setCatalog} onDeleteId={(id)=>{
           const norm=v=>String(v||'').trim();

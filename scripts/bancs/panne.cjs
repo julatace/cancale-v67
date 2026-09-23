@@ -135,7 +135,7 @@ const AVEU=/Je n'arrive pas à joindre tes données|Je n'ai pas pu lire tes donn
   //      liste complète (celle d'`audit-bancs.cjs`), il a trouvé HUIT écrans
   //      muets et cinq affirmations de plus. Même leçon que l'île d'actions :
   //      trois écrans y échappaient parce qu'aucun banc ne les rendait.
-  const ECRANS=['journee','collectif','dashboard','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','garage','invoices','settings','vintedaccounts','catalog','sales','leboncoin','stockvinted'];
+  const ECRANS=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','dashboard','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','garage','invoices','settings','vintedaccounts','catalog','sales','leboncoin','stockvinted'];
 
   console.log('── BASE INJOIGNABLE (522, réponse HTML — la vraie forme)');
   for(const t of ECRANS){
