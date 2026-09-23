@@ -4669,6 +4669,7 @@ const BOTTOM_TABS=[
 ];
 // Les écrans qu'on ouvre ponctuellement — jamais perdus, juste rangés.
 const PLUS_TABS=[
+  {id:'collectif',    icon:'target',  emoji:'🌐',label:'Collectif',     desc:'Toutes tes plateformes réunies'},
   {id:'dashboard',    icon:'chart',   emoji:'📊',label:'Statistiques',  desc:'Chiffre d\'affaires, bénéfices, cotisations'},
   {id:'cat_msg',      icon:'chat',    emoji:'💬',label:'Messages',      desc:'Ce qui est arrivé de nouveau'},
   {id:'garage',       icon:'home',    emoji:'🏠',label:'Garage',        desc:'Où est rangée chaque paire'},
@@ -6186,6 +6187,113 @@ function Onboarding({ setTab }) {
   );
 }
 
+// ── CA FINALISÉ PAR PLATEFORME (propriétaire unique, §11) ──────────────────
+// Consommé par le Tableau de bord ET l'onglet Collectif : une seule règle, un
+// seul endroit — les deux écrans ne peuvent donc pas se contredire. Vinted vient
+// de `liveStats.caEncaisse` (ventes finalisées), Leboncoin des ventes prouvées
+// non annulées (prix en centimes). Une plateforme sans vente captée rend `ca:null`
+// (« pas encore de vente captée »), jamais 0 € (§5/§7).
+function caParPlateforme(liveStats, lbcVentes) {
+  const caVinted = liveStats && liveStats.caEncaisse != null ? liveStats.caEncaisse : null;
+  const lbcOk = ((lbcVentes && lbcVentes.ventes) || []).filter(o => !/annul|cancel|refund|rembours/i.test((o.stepStatus||'')+' '+(o.stepLabel||'')));
+  const caLbc = lbcOk.length ? lbcOk.reduce((s,o)=> s + (o.price!=null ? Number(o.price)/100 : 0), 0) : null;
+  return [
+    { nom:'Vinted', ca:caVinted, note:'ventes finalisées, tous comptes' },
+    { nom:'Leboncoin', ca:caLbc, note:caLbc==null?'pas encore de vente captée':'ventes confirmées vendeur' },
+    { nom:'eBay', ca:null, note:'pas encore de vente captée' },
+    { nom:'Vestiaire Collective', ca:null, note:'pas encore de vente captée' },
+  ];
+}
+
+// ── ONGLET COLLECTIF : LA VUE GLOBALE, TOUTES PLATEFORMES RÉUNIES ───────────
+// Julien, 21 sept. : « l'onglet collectif — une vue globale toutes plateformes ».
+// Il ne RECALCULE rien (§11) : il CONSOMME `liveStats` (Vinted) et `lbcVentes`
+// (Leboncoin prouvé) via `caParPlateforme`, le même helper que le Tableau de
+// bord. Aujourd'hui seul Vinted remonte des ventes ; les autres plateformes
+// disent « pas encore de vente captée » (jamais un 0 € inventé, §5/§7) et
+// s'ajouteront d'elles-mêmes le jour où une vente y est captée.
+function Collectif({ liveStats, lbcVentes = {ventes:[],inconnues:0}, onGo, baseKO }) {
+  const plateformes = caParPlateforme(liveStats, lbcVentes);
+  const connues = plateformes.filter(p => p.ca != null);
+  const caGlobal = connues.reduce((s,p)=> s + p.ca, 0);
+  const maxCA = Math.max(...connues.map(p=>p.ca), 1);
+  const ventesVinted = liveStats && liveStats.soldTotal != null ? liveStats.soldTotal : null;
+  const online = liveStats && liveStats.online != null ? liveStats.online : null;
+  const enAttente = liveStats && liveStats.enCours != null ? liveStats.enCours : null;
+  return (
+    <div style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
+      <ScreenHead icon="chart" title="Collectif" desc="Toutes tes plateformes réunies"/>
+      {baseKO ? (
+        <LignePanne>Je n'ai pas pu lire tes données — les totaux seraient faux, on ne les affiche pas. Rien n'est perdu : c'est la lecture qui a échoué.</LignePanne>
+      ) : (<>
+        {/* CHIFFRE D'AFFAIRES GLOBAL — la somme des plateformes captées.
+            Même source que le CA finalisé du Tableau de bord : ils sont égaux
+            quand seul Vinted a des ventes (§11). */}
+        <Card style={{padding:18}}>
+          <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:4}}>Chiffre d'affaires · toutes plateformes</div>
+          <div className="vrm-display" style={{fontSize:30,fontWeight:700,color:C.text}}>{connues.length?fmt(caGlobal):'—'}</div>
+          <div style={{fontSize:11.5,color:C.muted,marginTop:2}}>
+            {connues.length
+              ? `ventes finalisées${connues.length<plateformes.length?` · ${connues.length} plateforme${connues.length>1?'s':''} sur ${plateformes.length} avec des ventes captées`:''}`
+              : 'aucune vente captée pour l’instant'}
+          </div>
+        </Card>
+
+        {/* RÉPARTITION PAR PLATEFORME — barres horizontales, UNE seule teinte
+            d'accent (§7). Une plateforme sans donnée montre un tiret + sa
+            raison, jamais une barre à zéro. */}
+        <Card style={{padding:16}}>
+          <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:12}}>Répartition du CA par plateforme</div>
+          <div style={{display:'flex',flexDirection:'column',gap:12}}>
+            {plateformes.map(p=>(
+              <div key={p.nom}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:10,marginBottom:4}}>
+                  <span style={{fontSize:13.5,fontWeight:600,color:C.text}}>{p.nom}</span>
+                  <span className="vrm-display" style={{fontSize:14,fontWeight:700,color:p.ca==null?C.muted:C.text}}>{p.ca==null?'—':fmt(p.ca)}</span>
+                </div>
+                {p.ca==null
+                  ? <div style={{fontSize:11,color:C.muted}}>{p.note}</div>
+                  : <div style={{height:8,background:C.surface,borderRadius:8,overflow:'hidden',border:`1px solid ${C.border}`}} role="img" aria-label={`${p.nom} : ${fmt(p.ca)}`}>
+                      <div style={{height:'100%',width:`${Math.max(2,Math.round(p.ca/maxCA*100))}%`,background:C.accent,borderRadius:8,transition:'width .4s'}}/>
+                    </div>}
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        {/* CUMULS — ventes finalisées, annonces en ligne, argent en cours.
+            Cliquables vers l'écran détaillé. §11 : mêmes chiffres que le Tableau
+            de bord (mêmes `liveStats`). */}
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(150px,1fr))',gap:10}}>
+          <button type="button" onClick={()=>onGo&&onGo('cat_ventes')} style={{textAlign:'left',border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'13px 15px',cursor:'pointer',fontFamily:'inherit'}}>
+            <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500}}>Ventes finalisées</div>
+            <div className="vrm-display" style={{fontSize:24,fontWeight:700,color:C.text}}>{ventesVinted==null?'—':ventesVinted}</div>
+            <div style={{fontSize:11,color:C.muted,marginTop:2}}>Vinted · les autres s'ajoutent dès qu'une vente y est captée</div>
+          </button>
+          <button type="button" onClick={()=>onGo&&onGo('cat_annonces')} style={{textAlign:'left',border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'13px 15px',cursor:'pointer',fontFamily:'inherit'}}>
+            <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500}}>Annonces en ligne</div>
+            <div className="vrm-display" style={{fontSize:24,fontWeight:700,color:C.text}}>{online==null?'—':online}</div>
+            <div style={{fontSize:11,color:C.muted,marginTop:2}}>Vinted (capté)</div>
+          </button>
+          <button type="button" onClick={()=>onGo&&onGo('cat_ventes')} style={{textAlign:'left',border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'13px 15px',cursor:'pointer',fontFamily:'inherit'}}>
+            <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500}}>Ventes en cours</div>
+            <div className="vrm-display" style={{fontSize:24,fontWeight:700,color:C.text}}>{enAttente==null?'—':enAttente}</div>
+            <div style={{fontSize:11,color:C.muted,marginTop:2}}>en attente de finalisation</div>
+          </button>
+        </div>
+
+        {/* Le détail mois par mois vit sur Statistiques — une seule source. */}
+        <button type="button" onClick={()=>onGo&&onGo('dashboard')} style={{alignSelf:'flex-start',border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'10px 14px',cursor:'pointer',fontFamily:'inherit',fontSize:13,fontWeight:600,color:C.text}}>
+          Voir l'évolution mois par mois → Statistiques
+        </button>
+        <div style={{fontSize:11,color:C.muted,lineHeight:1.5}}>
+          Leboncoin et eBay apparaîtront ici <b>dès qu'une vente y sera captée</b> ; pour l'instant seul Vinted remonte des ventes. Rien n'est inventé : une plateforme sans donnée affiche un tiret.
+        </div>
+      </>)}
+    </div>
+  );
+}
+
 function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,baseKO,premierJour,lbcVentes={ventes:[],inconnues:0}}) {
   // Mois sélectionné au clic sur un graphique (affiche le détail des ventes)
   const [selMonthEnc,setSelMonthEnc]=useState(null);   // graphique encaissé
@@ -6690,19 +6798,13 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
           les seules comptées ; eBay et Vestiaire Collective n'ont encore
           aucune vente captée. */}
       {(()=>{
-        const caVinted = liveStats && liveStats.caEncaisse != null ? liveStats.caEncaisse : null;
+        // §11 : LE MÊME helper que l'onglet Collectif — un seul propriétaire du
+        // « CA par plateforme », les deux écrans ne peuvent pas diverger.
+        const plateformes = caParPlateforme(liveStats, lbcVentes);
+        const caVinted = plateformes[0].ca, caLbc = plateformes[1].ca;
         const parCompte = (liveStats && liveStats.caParCompte) || null;
-        // Leboncoin : somme des ventes PROUVÉES non annulées (prix en centimes).
-        const lbcOk = (lbcVentes.ventes || []).filter(o => !/annul|cancel|refund|rembours/i.test((o.stepStatus||'')+' '+(o.stepLabel||'')));
-        const caLbc = lbcOk.length ? lbcOk.reduce((s,o)=> s + (o.price!=null ? Number(o.price)/100 : 0), 0) : null;
         // Rien à décomposer tant que le CA Vinted n'est pas encore lu.
         if (caVinted == null && caLbc == null) return null;
-        const plateformes = [
-          { nom:'Vinted', ca:caVinted, note:'ventes finalisées, tous comptes' },
-          { nom:'Leboncoin', ca:caLbc, note:caLbc==null?'pas encore de vente captée':'ventes confirmées vendeur' },
-          { nom:'eBay', ca:null, note:'pas encore de vente captée' },
-          { nom:'Vestiaire Collective', ca:null, note:'pas encore de vente captée' },
-        ];
         const comptes = parCompte ? Object.entries(parCompte).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]) : [];
         const Ligne = ({label, val, note, fort}) => (
           <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:12,padding:'8px 0',borderTop:`1px solid ${C.border}`}}>
@@ -24608,7 +24710,7 @@ export default function App() {
     // banc, qui navigue par `?tab=`, croyait rendre Leboncoin alors qu'il
     // mesurait l'accueil (un faux vert dans ma propre couverture d'hier).
     // `journee` manquait aussi : invisible parce que c'est l'état de départ.
-    const TABS_OK=['journee','dashboard','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','invoices','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin'];
+    const TABS_OK=['journee','collectif','dashboard','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','invoices','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin'];
     const goto=(search)=>{ try{ const p=new URLSearchParams(search); const t=p.get('tab'); if(p.get('print')==='bord') _pendingBordPrint=true; if(t&&TABS_OK.includes(t)){ setTab(t); window.history.replaceState({},'',window.location.pathname); } }catch(_){}};
     goto(window.location.search);
     const onMsg=(e)=>{ if(e.data&&e.data.type==='open-url'&&e.data.url){ try{ goto(new URL(e.data.url,window.location.origin).search); }catch(_){}} };
@@ -25880,6 +25982,7 @@ export default function App() {
             pas pu lire », et l'écran le DIT au lieu de repartir de zéro. */}
         {tab==='dashboard'&&premierJour&&<Onboarding setTab={setTab}/>}
         {tab==='dashboard'&&<Dashboard premierJour={premierJour} catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices} liveStats={liveStats} lbcVentes={lbcVentes} onGo={setTab} actions={notifItems} baseKO={baseKO}/>}
+        {tab==='collectif'&&<Collectif liveStats={liveStats} lbcVentes={lbcVentes} onGo={setTab} baseKO={baseKO}/>}
         {tab==='inventory'&&<Inventory inventory={inventory} setInventory={setInventory} accounts={vintedAccounts} garageGrid={garageGrid} labels={accountLabels} onLocate={(numero)=>{ setGarageLocate(String(numero)); setTab('garage'); }}/>}
         {tab==='catalog'  &&<Catalog   catalog={catalog} setCatalog={setCatalog} onDeleteId={(id)=>{
           const norm=v=>String(v||'').trim();
