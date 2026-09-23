@@ -106,7 +106,7 @@ const VENTE_BODY = JSON.stringify({ pageProps: {
   await pg.route('**/api/vrmtest/label/**', (r) => r.fulfill({ status: 200, contentType: 'application/pdf', body: '%PDF-1.4 faux bordereau' }));
   await pg.route('**/api/vrmtest/refuse', (r) => r.fulfill({ status: 403, contentType: 'application/json', body: '{"error":"nope"}' }));
   await pg.goto('https://www.leboncoin.fr/deposer-une-annonce');
-  await pg.evaluate(`window.__vus = []; window.addEventListener('message', (e) => { const d = e.data; if (d && d.__tag === 'CANCALE_LBC') window.__vus.push({ kind: d.kind, url: d.url, len: (d.body || '').length, coupe: !!d.coupe, paths: d.paths || null, body: d.kind === 'lbcvente' ? (d.body || '') : undefined }); });`);
+  await pg.evaluate(`window.__vus = []; window.addEventListener('message', (e) => { const d = e.data; if (d && d.__tag === 'CANCALE_LBC') window.__vus.push({ kind: d.kind, url: d.url, len: (d.body || '').length, coupe: !!d.coupe, paths: d.paths || null, endpoint: d.endpoint || null, cles: d.cles || null, body: d.kind === 'lbcvente' ? (d.body || '') : undefined }); });`);
   await pg.evaluate(INJ);
   await pg.evaluate(`(async () => {
     await fetch('https://api.leboncoin.fr/api/frontend/v1/data/v7/fdata').then(r => r.text());
@@ -181,6 +181,15 @@ const VENTE_BODY = JSON.stringify({ pageProps: {
   dit(!chemins.some((p) => /adnxs/.test(p)),
     'le bruit publicitaire en 200/json n\'évince PAS les chemins qui servent',
     chemins.filter((p) => /adnxs/.test(p)).join(' · ') || 'aucun tiers dans les chemins');
+  // ── LA CARTE COMPLÈTE : structure de CHAQUE réponse, sans valeur ─────────
+  const schemas = vus.filter((v) => v.kind === 'lbcschema');
+  dit(schemas.length >= 1, 'chaque réponse Leboncoin laisse sa STRUCTURE (carte complète, Julien « capte tout »)',
+    schemas.length ? `${schemas.length} endpoint(s) : ${schemas.map((s) => s.endpoint).join(', ').slice(0, 90)}` : 'aucun schéma');
+  const schAnn = schemas.find((s) => (s.cles || []).some((c) => /subject/.test(c)));
+  dit(!!schAnn && (schAnn.cles || []).some((c) => /subject:/.test(c)),
+    'le schéma porte les CHEMINS + le TYPE (ex. subject:string)', schAnn ? (schAnn.cles || []).slice(0, 6).join(' · ') : 'pas de schéma annonces');
+  dit(!!schAnn && !JSON.stringify(schAnn.cles || []).includes('Salomon') && !JSON.stringify(schAnn.cles || []).includes('VRM-401'),
+    'et JAMAIS la valeur — ni le titre, ni la référence de l\'annonce', schAnn ? 'ok' : 'pas de schéma annonces');
   dit(!JSON.stringify(chemins).includes('9182734655'),
     'aucun identifiant brut ne fuite : il devient {id}',
     chemins.find((p) => /9182734655/.test(p)) || 'normalisé');
@@ -307,6 +316,23 @@ const VENTE_BODY = JSON.stringify({ pageProps: {
     const places = w ? Object.keys(w.data).filter((k) => k !== 'updatedAt') : [];
     dit(places.length === 2, 'le second endpoint s\'AJOUTE, il n\'écrase pas le premier',
       `${places.length} place(s) : ${places.join(', ')}`);
+  });
+
+  // 1bis. La carte complète : chaque schéma d'endpoint est RANGÉ, et fusionné.
+  await essaie('les schémas de réponse arrivent en base', async () => {
+    ligne = {}; lectureKO = false;
+    let c = faireCtx();
+    await c.storeLbcRecon({ schemaOne: { endpoint: 'api.leboncoin.fr/api/messaging/conv', cles: ['items[].id:string', 'items[].last_message:string'] } });
+    let w = ecrits.find((r) => r.id === 'lbc_recon');
+    dit(!!w && w.data.schemas && w.data.schemas['api.leboncoin.fr/api/messaging/conv'],
+      'un schéma d\'endpoint est rangé dans `lbc_recon.schemas`', w && w.data.schemas ? Object.keys(w.data.schemas).join(', ') : 'aucun');
+    // un second endpoint s'AJOUTE (jamais un remplacement)
+    ligne = { lbc_recon: (w ? w.data : {}) };
+    c = faireCtx();
+    await c.storeLbcRecon({ schemaOne: { endpoint: 'api.leboncoin.fr/api/ads/mine', cles: ['ads[].list_id:number'] } });
+    w = ecrits.find((r) => r.id === 'lbc_recon');
+    const eps = w && w.data.schemas ? Object.keys(w.data.schemas) : [];
+    dit(eps.length === 2, 'un second endpoint s\'AJOUTE à la carte, il n\'écrase pas le premier', `${eps.length} : ${eps.join(', ')}`);
   });
 
   // 2. Une lecture ratée n'écrit pas.

@@ -28,6 +28,7 @@
     else if (d.kind === 'lbcenvoi' && d.cles) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcEnvoi', url: d.url, methode: d.methode || '', cles: d.cles }); } catch (_) {} }
     else if (d.kind === 'lbcvente' && d.body) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcVente', url: d.url, body: d.body, coupe: !!d.coupe }); } catch (_) {} }
     else if (d.kind === 'lbcpaths' && d.paths) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcPaths', paths: d.paths, url: location.href }); } catch (_) {} }
+    else if (d.kind === 'lbcschema' && d.cles) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcSchema', endpoint: d.endpoint, cles: d.cles }); } catch (_) {} }
   }, false);
 
   let queue = [];

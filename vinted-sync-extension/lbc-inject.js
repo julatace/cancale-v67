@@ -163,12 +163,38 @@
   };
   setInterval(() => { if (seenDirty) { seenDirty = false; post({ kind: 'lbcpaths', paths: [...seenPaths].slice(0, 200) }); } }, 4000);
 
+  // ── LA CARTE COMPLÈTE DE LEBONCOIN (Julien, 23 sept. : « capte tout ») ─────
+  //    Pour CHAQUE réponse JSON Leboncoin, on relève sa STRUCTURE — chemins de
+  //    clés + TYPE de feuille, JAMAIS une valeur (même règle que `lbcenvoi`).
+  //    Une seule fois par endpoint et par page (dédup), borné. Le jour où on
+  //    cherche un champ (vente, bordereau, compte, messagerie, livraison…), on
+  //    sait exactement où il vit — sans deviner, sans que Julien ait à me le
+  //    montrer. Les identifiants dans les chemins deviennent `{id}` : aucune
+  //    donnée qui désigne quelqu'un ne part.
+  const schemaVus = new Set();
+  const noteSchema = (url, text) => {
+    try {
+      let ep = '';
+      try { const u = new URL(url, location.origin); ep = u.host + u.pathname; } catch (_) { ep = String(url).split('?')[0]; }
+      ep = ep.replace(/\/\d{3,}/g, '/{id}').replace(/\/[0-9a-f]{16,}/gi, '/{id}');
+      if (schemaVus.has(ep)) return;
+      let obj = null; try { obj = JSON.parse(text); } catch (_) { return; }
+      if (!obj || typeof obj !== 'object') return;
+      schemaVus.add(ep);
+      const cles = cheminsDeCles(obj)
+        .map((c) => c.replace(/\.\d{3,}(?=[.:[])/g, '.{id}').replace(/\.[0-9a-f]{16,}(?=[.:[])/gi, '.{id}'))
+        .slice(0, 200);
+      if (cles.length) post({ kind: 'lbcschema', endpoint: ep, cles });
+    } catch (_) {}
+  };
+
   const handle = (url, text, ctype) => {
     try {
       if (NOISE.test(url)) return;
       if (!text || text.length > 1500000) return;
       if (ctype && !/json/i.test(ctype)) return;
       if (!DE_LEBONCOIN(url)) return;                       // ni pub, ni tiers
+      noteSchema(url, text);                                // la structure, jamais les valeurs
       if (CATALOGUE.test(url)) {
         // On le garde entier dans la limite, et on DIT s'il a été coupé : la
         // moitié d'un catalogue a l'air d'un catalogue.
