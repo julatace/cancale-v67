@@ -6190,6 +6190,8 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
   // Mois sélectionné au clic sur un graphique (affiche le détail des ventes)
   const [selMonthEnc,setSelMonthEnc]=useState(null);   // graphique encaissé
   const [selMonthVente,setSelMonthVente]=useState(null); // graphique date de vente
+  const [caMode,setCaMode]=useState('ca');             // graphique d'évolution : « ca » (€) ou « ventes » (nb)
+  const [selMois,setSelMois]=useState(null);           // mois sélectionné dans le graphique d'évolution moisson
 
   // Paires réellement présentes dans le garage (mémorisé)
   const garageVals=useMemo(()=>
@@ -6446,6 +6448,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
       }
     });
     const depuisArchive = Object.keys(map).sort().reverse().map(k=>({
+      ym:k,
       label:`${moisNoms[map[k].mois-1]||map[k].mois} ${map[k].annee}`,
       ca:map[k].ca, profit:map[k].profit, count:map[k].count,
       urssaf:map[k].ca*TAUX_URSSAF, net:map[k].ca-map[k].ca*TAUX_URSSAF
@@ -6456,11 +6459,32 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
     // plutôt qu'un zéro qui passerait pour un vrai chiffre.
     return urssafMois.map(m=>{
       const [y,mo]=m.ym.split('-');
-      return { label:`${moisNoms[Number(mo)-1]||mo} ${y}`, ca:m.ca, profit:null, count:m.n,
+      return { ym:m.ym, label:`${moisNoms[Number(mo)-1]||mo} ${y}`, ca:m.ca, profit:null, count:m.n,
                nMasq:m.nMasq, caMasq:m.caMasq,
                urssaf:m.ca*TAUX_URSSAF, net:m.ca-m.ca*TAUX_URSSAF };
     });
   },[encaissees,urssafMois,TAUX_URSSAF]);
+
+  // ── ÉVOLUTION MENSUELLE, DÉRIVÉE DU RÉCAP COMPTABLE (§11) ─────────────────
+  // On CONSOMME `moisRecap` — le même tableau que le Récap comptable mensuel
+  // (source : la ligne publiée `vinted_urssaf_mois`, sinon l'archive) : le
+  // graphique et le tableau ne peuvent donc PAS diverger, et la courbe apparaît
+  // partout où le tableau a des lignes. Les deux anciens graphiques lisaient le
+  // vieux catalogue local par `receiveDate`/`saleDate` (vide depuis la moisson) :
+  // Julien ne voyait plus aucune courbe alors qu'il a ~190 ventes en août.
+  // `moisRecap` est du plus récent au plus ancien → on remet dans l'ordre du
+  // temps et on garde 12 mois ; le dernier est le mois EN COURS (encore en
+  // train de se finaliser — on le DIT, jamais un total partiel présenté comme
+  // complet, §5).
+  const moisMoisson=useMemo(()=>{
+    if(!moisRecap||!moisRecap.length) return null;
+    const mc=['jan','fév','mar','avr','mai','juin','juil','aoû','sep','oct','nov','déc'];
+    const now=new Date(); const curKey=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+    return [...moisRecap].reverse().slice(-12).map(m=>{
+      const mo=parseInt(String(m.ym||'').split('-')[1],10); const mi=mo-1;
+      return {key:m.ym||m.label,label:mc[mi]||String(mo||''),nomComplet:m.label,ca:Number(m.ca)||0,ventes:Number(m.count)||0,enCours:m.ym===curKey};
+    });
+  },[moisRecap]);
 
   // Téléchargement du récap comptable MENSUEL en CSV
   const exportCompta=()=>{
@@ -6878,8 +6902,59 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         </div>
       </div>
 
-      {/* Graphique du CA encaissé par mois (cliquable) */}
-      {caHistory.length>0&&(()=>{
+      {/* ── ÉVOLUTION MENSUELLE, SUR LES VRAIES DONNÉES (moisson) ──────────
+          §11 : même source que le CA total. Une seule teinte d'accent (§7),
+          barres fines à sommet arrondi, la valeur écrite sur chaque barre. Le
+          mois EN COURS est hachuré et dit « en cours » : un total partiel ne se
+          présente jamais comme complet (§5). Bascule CA €/Ventes plutôt qu'un
+          double axe (jamais deux échelles sur un même graphique — dataviz). */}
+      {moisMoisson && moisMoisson.length>0 && (()=>{
+        const val=(h)=> caMode==='ca' ? h.ca : h.ventes;
+        const maxV=Math.max(...moisMoisson.map(val),1);
+        const sel=moisMoisson.find(h=>h.key===selMois);
+        return (
+          <Card>
+            <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',marginBottom:6}}>
+              <span style={{fontSize:13,fontWeight:600,color:C.text,flex:1,minWidth:120}}>Évolution — ventes finalisées</span>
+              <div style={{display:'flex',gap:4,background:C.surface,borderRadius:8,padding:2,border:`1px solid ${C.border}`}}>
+                {[['ca','CA €'],['ventes','Ventes']].map(([v,l])=>(
+                  <button key={v} onClick={()=>setCaMode(v)} style={{border:'none',borderRadius:8,padding:'3px 10px',fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'inherit',background:caMode===v?C.accent:'transparent',color:caMode===v?'#fff':C.muted}}>{l}</button>
+                ))}
+              </div>
+            </div>
+            <div style={{fontSize:11,color:C.muted,marginBottom:14}}>
+              {moisMoisson.length} mois · même source que le récap comptable ci-dessous — touche une barre pour le détail.
+            </div>
+            <div style={{display:'flex',alignItems:'flex-end',gap:6,height:160,paddingTop:12}} role="img" aria-label={`Évolution ${caMode==='ca'?'du chiffre d’affaires':'du nombre de ventes'} par mois, ventes finalisées`}>
+              {moisMoisson.map((h,i)=>{
+                const pct=Math.round(val(h)/maxV*100);
+                const actif=h.key===selMois;
+                const col=actif?C.text:C.accent;
+                return (
+                  <div key={i} onClick={()=>setSelMois(actif?null:h.key)}
+                       title={`${h.nomComplet} · ${fmt(h.ca)} · ${h.ventes} vente${h.ventes>1?'s':''}${h.enCours?' (en cours)':''}`}
+                       style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:6,height:'100%',justifyContent:'flex-end',cursor:'pointer',minWidth:0}}>
+                    <div style={{fontSize:9,color:C.muted,fontWeight:600,whiteSpace:'nowrap'}}>{caMode==='ca'?Math.round(h.ca):h.ventes}</div>
+                    <div style={{width:'100%',maxWidth:32,height:`${pct}%`,minHeight:3,borderRadius:'8px 8px 0 0',transition:'height .4s',
+                         background:h.enCours?`repeating-linear-gradient(135deg, ${col}, ${col} 3px, ${col}66 3px, ${col}66 6px)`:col,
+                         outline:actif?`2px solid ${C.accent}`:'none',outlineOffset:1}}/>
+                    <div style={{fontSize:10,color:actif?C.accent:C.muted,fontWeight:actif?700:500,whiteSpace:'nowrap'}}>{h.label}</div>
+                  </div>
+                );
+              })}
+            </div>
+            {sel&&(
+              <div style={{marginTop:12,paddingTop:12,borderTop:`1px solid ${C.border}`,fontSize:13,color:C.text}}>
+                <b>{sel.nomComplet}</b>{sel.enCours&&<span style={{color:C.muted,fontWeight:500}}> · en cours (se finalise ~2 semaines après la vente)</span>} — <b>{fmt(sel.ca)}</b> · {sel.ventes} vente{sel.ventes>1?'s':''}
+              </div>
+            )}
+          </Card>
+        );
+      })()}
+
+      {/* Graphique du CA encaissé par mois (repli : ancien catalogue local, si
+          la moisson n'a encore rien publié) */}
+      {!moisMoisson && caHistory.length>0&&(()=>{
         const maxCA=Math.max(...caHistory.map(h=>h.ca),1);
         const sel=caHistory.find(h=>h.key===selMonthEnc);
         return (
@@ -25046,6 +25121,7 @@ export default function App() {
       // construction, exactement le CA global (§11). Impossible qu'ils divergent,
       // et il peut vérifier le total en additionnant les lignes (§2.7).
       const caParCompte={};
+
       // Comptes BLOQUÉS (détectés) ou MASQUÉS (à la main) : on les EXCLUT
       // totalement des stats — leurs annonces sont périmées et leurs ventes ne
       // comptent pas. Sinon le dashboard gonfle « annonces en ligne » / CA avec
