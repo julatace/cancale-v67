@@ -6176,7 +6176,7 @@ function Onboarding({ setTab }) {
   );
 }
 
-function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,baseKO,premierJour}) {
+function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,baseKO,premierJour,lbcVentes={ventes:[],inconnues:0}}) {
   // Mois sélectionné au clic sur un graphique (affiche le détail des ventes)
   const [selMonthEnc,setSelMonthEnc]=useState(null);   // graphique encaissé
   const [selMonthVente,setSelMonthVente]=useState(null); // graphique date de vente
@@ -6642,6 +6642,59 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         <StatCard icon="🎯" label="Taux marge" value={(liveStats&&liveStats.caEncaisse!=null)||avgMargin===null?'—':`${avgMargin}%`} color={C.muted} sub={liveStats&&liveStats.caEncaisse!=null?undefined:(avgMargin===null?'dès ta première vente':'bénéf / CA')}/>
       </div>
       {manquePrix && <LignePrixAchat quoi={quoiDepuisDebut}/>}
+
+      {/* ── CA PAR PLATEFORME ET PAR COMPTE ─────────────────────────────────
+          Julien, 21 sept. : « un chiffre d'affaires global et un CA par
+          application ; et tu peux décomposer aussi en compte ». Deux
+          décompositions du CA finalisé, sur la MÊME source que le total
+          (§11) — la somme des lignes est exactement le global, donc chaque
+          chiffre est vérifiable (§2.7).
+          ⚠️ On n'invente aucune vente : une plateforme sans vente captée
+          affiche « — · pas encore de vente captée », jamais « 0 € »
+          (§7, un zéro qui veut dire « on ne sait pas » s'écrit avec sa
+          raison). Les ventes Leboncoin PROUVÉES (isSeller===true, §5) sont
+          les seules comptées ; eBay et Vestiaire Collective n'ont encore
+          aucune vente captée. */}
+      {(()=>{
+        const caVinted = liveStats && liveStats.caEncaisse != null ? liveStats.caEncaisse : null;
+        const parCompte = (liveStats && liveStats.caParCompte) || null;
+        // Leboncoin : somme des ventes PROUVÉES non annulées (prix en centimes).
+        const lbcOk = (lbcVentes.ventes || []).filter(o => !/annul|cancel|refund|rembours/i.test((o.stepStatus||'')+' '+(o.stepLabel||'')));
+        const caLbc = lbcOk.length ? lbcOk.reduce((s,o)=> s + (o.price!=null ? Number(o.price)/100 : 0), 0) : null;
+        // Rien à décomposer tant que le CA Vinted n'est pas encore lu.
+        if (caVinted == null && caLbc == null) return null;
+        const plateformes = [
+          { nom:'Vinted', ca:caVinted, note:'ventes finalisées, tous comptes' },
+          { nom:'Leboncoin', ca:caLbc, note:caLbc==null?'pas encore de vente captée':'ventes confirmées vendeur' },
+          { nom:'eBay', ca:null, note:'pas encore de vente captée' },
+          { nom:'Vestiaire Collective', ca:null, note:'pas encore de vente captée' },
+        ];
+        const comptes = parCompte ? Object.entries(parCompte).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]) : [];
+        const Ligne = ({label, val, note, fort}) => (
+          <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:12,padding:'8px 0',borderTop:`1px solid ${C.border}`}}>
+            <div style={{minWidth:0}}>
+              <div style={{fontSize:13.5,fontWeight:fort?700:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{label}</div>
+              {note && <div style={{fontSize:11,color:C.muted,marginTop:1}}>{note}</div>}
+            </div>
+            <div className="vrm-display" style={{fontSize:15,fontWeight:700,color:val==null?C.muted:C.text,flexShrink:0}}>{val==null?'—':fmt(val)}</div>
+          </div>
+        );
+        return (
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(300px,100%), 1fr))',gap:12,marginTop:12}}>
+            <Card style={{padding:16,background:C.card,border:`1px solid ${C.border}`}}>
+              <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:4}}>CA finalisé par plateforme</div>
+              {plateformes.map(p => <Ligne key={p.nom} label={p.nom} val={p.ca} note={p.note}/>)}
+            </Card>
+            <Card style={{padding:16,background:C.card,border:`1px solid ${C.border}`}}>
+              <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:4}}>CA Vinted par compte</div>
+              {comptes.length
+                ? comptes.map(([lg,v]) => <Ligne key={lg} label={lg} val={v}/>)
+                : <div style={{fontSize:12,color:C.muted,padding:'8px 0',borderTop:`1px solid ${C.border}`}}>Le détail par compte apparaît dès que tes ventes sont chargées.</div>}
+              {comptes.length>0 && caVinted!=null && <Ligne label="Total Vinted" val={caVinted} fort/>}
+            </Card>
+          </div>
+        );
+      })()}
 
       {/* ── LE MOIS EN COURS, EN UNE SEULE CARTE ────────────────────────────
           ⚠️ Il y en avait DEUX à la suite, toutes deux titrées du même mois
@@ -24988,6 +25041,23 @@ export default function App() {
   //    l'extension ».
   const premierJour = accountsLoaded && !baseKO && vintedAccounts.length === 0;
   const [liveStats,setLiveStats]=useState(null); // résumé Vinted en direct pour l'accueil
+  // ── VENTES LEBONCOIN PROUVÉES, pour le CA par plateforme du tableau de bord ──
+  // §5 : une VENTE Leboncoin n'est comptée que si `isSeller===true` (le détail de
+  // transaction le dit) — jamais déduite d'une transaction vue en liste. Lecture
+  // seule, `null`/échec ⇒ rien (« rien lu » ne vaut pas « rien »). Même règle que
+  // la section « Ventes Leboncoin » de l'écran Ventes (§11) ; ici c'est le seul
+  // lecteur côté COQUE, pour alimenter le tableau de bord.
+  const [lbcVentes,setLbcVentes]=useState({ ventes:[], inconnues:0 });
+  useEffect(()=>{ (async()=>{
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=data`, { headers: sbAuth() });
+      if (!r.ok) return;
+      const rows = await r.json();
+      const obj = (rows && rows[0] && rows[0].data && rows[0].data.ventes) || {};
+      const arr = Object.values(obj);
+      setLbcVentes({ ventes: arr.filter(o => o && o.isSeller === true), inconnues: arr.filter(o => o && o.isSeller == null).length });
+    } catch (_) { /* pas su ⇒ rien : jamais un faux « vendu » */ }
+  })(); }, []);
   useEffect(()=>{
     let stop=false;
     (async()=>{
@@ -25237,6 +25307,13 @@ export default function App() {
       // sinon la moyenne serait fausse (un numérateur et un dénominateur qui ne
       // parlent pas des mêmes ventes, §5.45).
       const joursVenteSet=new Set();
+      // ── CA FINALISÉ PAR COMPTE (§6 : « décomposer aussi en compte ») ────────
+      // Julien : « un chiffre d'affaires global et un CA par application, et tu
+      // peux décomposer en compte ». On accumule le CA finalisé compte par
+      // compte DANS CETTE MÊME BOUCLE : la somme des comptes est donc, par
+      // construction, exactement le CA global (§11). Impossible qu'ils divergent,
+      // et il peut vérifier le total en additionnant les lignes (§2.7).
+      const caParCompte={};
       // Comptes BLOQUÉS (détectés) ou MASQUÉS (à la main) : on les EXCLUT
       // totalement des stats — leurs annonces sont périmées et leurs ventes ne
       // comptent pas. Sinon le dashboard gonfle « annonces en ligne » / CA avec
@@ -25280,7 +25357,8 @@ export default function App() {
           const d=o.date?new Date(o.date):null; const okD=d&&!isNaN(d);
           const inMonth=okD&&d.getFullYear()*100+d.getMonth()===ym;
           if(st==='pending'){ enCours++; enAttente+=amt0; }
-          if(st==='completed'){ caEncaisse+=amt0; soldTotal++; if(okD) joursVenteSet.add(d.toISOString().slice(0,10)); }
+          if(st==='completed'){ caEncaisse+=amt0; soldTotal++; if(okD) joursVenteSet.add(d.toISOString().slice(0,10));
+            const lg=String(a.login||a.vinted_user_id||'').trim(); if(lg) caParCompte[lg]=(caParCompte[lg]||0)+amt0; }
           // CA + ventes DU MOIS = ventes FAITES ce mois (par DATE de vente), hors
           // annulées — qu'elles soient déjà finalisées ou encore en cours. Une
           // vente ne devient « finalisée » que ~2 semaines après (validation
@@ -25338,7 +25416,7 @@ export default function App() {
       const uidsVivants=new Set((vintedAccounts||[]).map(a=>String(a.vinted_user_id||'')).filter(Boolean));
       try{ const esc=await fetchWalletEscrow(uidsVivants); if(esc&&esc.total>0) enAttenteReel=esc.total; }catch(_){}
       if(!stop && ok){
-      setLiveStats({caMois,caEncaisse,enCours,online,unread,stockValue,pairesStock,ventesJour,caJour,ventesMois,soldTotal,joursVente:joursVenteSet.size});
+      setLiveStats({caMois,caEncaisse,enCours,online,unread,stockValue,pairesStock,ventesJour,caJour,ventesMois,soldTotal,joursVente:joursVenteSet.size,caParCompte});
         // Photo des chiffres pour le WIDGET écran d'accueil : l'app publie ce
         // qu'elle affiche → le widget montre EXACTEMENT la même chose. « Synchroniser »
         // le widget = simplement ouvrir l'app (qui réécrit cette ligne).
@@ -25993,7 +26071,7 @@ export default function App() {
             ne répondait pas. `baseKO` distingue « aucun compte » de « je n'ai
             pas pu lire », et l'écran le DIT au lieu de repartir de zéro. */}
         {tab==='dashboard'&&premierJour&&<Onboarding setTab={setTab}/>}
-        {tab==='dashboard'&&<Dashboard premierJour={premierJour} catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices} liveStats={liveStats} onGo={setTab} actions={notifItems} baseKO={baseKO}/>}
+        {tab==='dashboard'&&<Dashboard premierJour={premierJour} catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices} liveStats={liveStats} lbcVentes={lbcVentes} onGo={setTab} actions={notifItems} baseKO={baseKO}/>}
         {tab==='inventory'&&<Inventory inventory={inventory} setInventory={setInventory} accounts={vintedAccounts} garageGrid={garageGrid} labels={accountLabels} onLocate={(numero)=>{ setGarageLocate(String(numero)); setTab('garage'); }}/>}
         {tab==='catalog'  &&<Catalog   catalog={catalog} setCatalog={setCatalog} onDeleteId={(id)=>{
           const norm=v=>String(v||'').trim();

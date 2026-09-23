@@ -99,7 +99,7 @@ const TABS=['journee','dashboard','cat_annonces','cat_ventes','cat_achats','cat_
       const m=/id=like\.([^&]*)/.exec(u); if(m){const pat=decodeURIComponent(m[1]).replace(/[*%]/g,'.*');const re=new RegExp('^'+pat+'$');return j(rows.filter(r=>re.test(r.id)).map(r=>projette(r,S)));}
       return j([]);});
     await pg.route('**/api/**',r2=>r2.fulfill({status:200,contentType:'application/json',body:'{"pret":true,"devices":1}'}));
-    const vides=[], deb=[], susp=[], sousIle=[], morts=[]; let venteTxt='';
+    const vides=[], deb=[], susp=[], sousIle=[], morts=[]; let venteTxt='', dashTxt='';
     for(const t of TABS){
       await pg.goto('http://localhost:4322/?tab='+t,{waitUntil:'domcontentloaded'});
       await pg.waitForTimeout(2200);
@@ -107,6 +107,7 @@ const TABS=['journee','dashboard','cat_annonces','cat_ventes','cat_achats','cat_
         sw:document.documentElement.scrollWidth, cw:document.documentElement.clientWidth,
         txt:(document.body.innerText||'')}));
       if(t==='cat_ventes') venteTxt=r.txt;
+      if(t==='dashboard') dashTxt=r.txt;
       if(r.n<120) vides.push(t+':'+r.n);
       // ⚠️ LE GARDE-FOU D'ÉCRAN PASSAIT TOUS LES CONTRÔLES : « Cet écran n'a pas
       // pu s'afficher » est un vrai texte, sans débordement et sans `pageerror`
@@ -148,6 +149,14 @@ const TABS=['journee','dashboard','cat_annonces','cat_ventes','cat_achats','cat_
     dit(!/Rolex/i.test(venteTxt),'un ACHAT prouvé (Rolex) n\'est JAMAIS montré comme une vente (§5)');
     dit(/Ventes Leboncoin \(1\)/.test(venteTxt),'le compte ne porte QUE les ventes prouvées (1)');
     dit(/pas encore confirmé/.test(venteTxt),'le côté pas encore su est DIT, pas compté comme vente');
+    // ── §6 CA PAR PLATEFORME + PAR COMPTE (tableau de bord) ─────────────────
+    // Julien : « un CA global, un CA par application, et décomposer par compte ».
+    // La décomposition vit sur la MÊME source que le total (§11) — donc chaque
+    // chiffre est vérifiable. §7/§5 : une plateforme SANS vente captée dit
+    // « pas encore de vente captée », JAMAIS « 0 € » (un zéro inventé).
+    dit(/CA finalisé par plateforme/i.test(dashTxt),'le CA se décompose par plateforme',dashTxt?'':'tableau de bord non lu');
+    dit(/CA Vinted par compte/i.test(dashTxt),'le CA Vinted se décompose par compte');
+    dit(/pas encore de vente captée/.test(dashTxt),'une plateforme sans vente dit « pas encore de vente captée », pas « 0 € »');
     await pg.close();
   }
   await b.close(); srv.close();
