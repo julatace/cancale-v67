@@ -1021,6 +1021,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             sendResponse({ ok: true }); return;
           }
           if (msg.action === 'lbcPaths' && Array.isArray(msg.paths)) { await storeLbcRecon({ paths: msg.paths, url: msg.url }); sendResponse({ ok: true }); return; }
+          // La carte complète de Leboncoin : structure (chemins de clés) d'une
+          // réponse, par endpoint. Jamais de valeur (§ « capte tout »).
+          if (msg.action === 'lbcSchema' && msg.endpoint && Array.isArray(msg.cles)) { await storeLbcRecon({ schemaOne: { endpoint: msg.endpoint, cles: msg.cles } }); sendResponse({ ok: true }); return; }
           // SONDE PHOTOS (lecture seule, aucun contenu) : à quoi ressemblent les
           // vignettes acceptées + combien l'extension a posé. Sert à MESURER la
           // vraie mécanique de l'uploader Leboncoin (blob ? http ? multiple ?),
@@ -6106,6 +6109,15 @@ async function storeLbcRecon(patch) {
     const next = Object.assign({ paths: [], samples: [] }, prev);
     if (patch.paths) { const set = new Set([...(next.paths || []), ...patch.paths]); next.paths = [...set].slice(0, 300); }
     if (patch.sample) { next.samples = [patch.sample, ...(next.samples || [])].slice(0, 6); }
+    // La carte complète : un schéma par endpoint, fusionné (jamais remplacé),
+    // borné aux 80 endpoints les plus récents. Structure seule, pas de valeur.
+    if (patch.schemaOne && patch.schemaOne.endpoint) {
+      const sc = Object.assign({}, next.schemas || {});
+      sc[String(patch.schemaOne.endpoint).slice(0, 120)] = { cles: (patch.schemaOne.cles || []).slice(0, 200), at: new Date().toISOString() };
+      const ks = Object.keys(sc);
+      if (ks.length > 80) { const keep = ks.sort((a, b) => Date.parse(sc[b].at || 0) - Date.parse(sc[a].at || 0)).slice(0, 80); for (const k of ks) if (!keep.includes(k)) delete sc[k]; }
+      next.schemas = sc;
+    }
     if (patch.url) next.lastUrl = patch.url;
     // ⚠️⚠️⚠️ CETTE FONCTION JETAIT `etapes` ET `capture` — EN SILENCE.
     //    Mesuré le 17 septembre, juste après que Julien a fait son dépôt à la
@@ -6123,7 +6135,7 @@ async function storeLbcRecon(patch) {
     //   seules `paths` et `sample` ont besoin d'une fusion particulière (au-dessus).
     //   Une clé oubliée ne peut plus disparaître sans un mot.
     for (const k of Object.keys(patch)) {
-      if (k === 'paths' || k === 'sample' || k === 'url') continue;   // déjà traitées
+      if (k === 'paths' || k === 'sample' || k === 'url' || k === 'schemaOne') continue;   // déjà traitées
       if (patch[k] === undefined) continue;
       next[k] = patch[k];
     }
