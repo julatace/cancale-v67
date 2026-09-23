@@ -4201,10 +4201,20 @@ const DEMANDE_SAISIE_PRIX = { on: false };
 // minuscule (16 px), une pastille par plateforme. On n'affiche un logo que
 // quand c'est PROUVÉ (§5) : Vinted parce que la paire EST une annonce Vinted ;
 // Leboncoin seulement si `vinted_lbc_posted` la porte.
+// ⚠️ UNE seule valeur pour la couleur de MARQUE Leboncoin (§11 appliqué à une
+// couleur). Elle vivait en DEUX teintes — ce logo (#EC5A13) et un #ff6e14
+// ad-hoc recopié à trois endroits (bouton « Déposer », pastille « à publier »,
+// marqueur de la recherche globale) : deux « oranges Leboncoin » sur le même
+// produit, la trace d'un travail pas fini. Un seul propriétaire de la teinte,
+// et tout le monde le LIT. Ce n'est PAS une couleur d'accent (§7) : c'est un
+// logo de marque, la seule raison d'un ton hors palette, et Julien l'a demandé
+// (21 sept.). Le teal #007782 ailleurs est « Vinted GO » le transporteur, une
+// autre notion — on n'y touche pas.
+const LBC_ORANGE = '#EC5A13';
 function PlateformeLogo({ p, title }) {
   const M = {
     vinted: { bg: '#09B1BA', t: 'Vinted' },
-    lbc:    { bg: '#EC5A13', t: 'leboncoin' },
+    lbc:    { bg: LBC_ORANGE, t: 'leboncoin' },
   };
   const m = M[p]; if (!m) return null;
   return (
@@ -22927,7 +22937,7 @@ function LeboncoinScreen() {
             const jours = vu ? Math.floor((Date.now() - vu.getTime()) / 86400000) : null;
             return (
               <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderTop: `1px solid ${C.border}` }}>
-                <span style={{ width: 30, height: 30, borderRadius: 999, flexShrink: 0, background: '#ff6e1418', color: '#ff6e14', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700 }}>
+                <span style={{ width: 30, height: 30, borderRadius: 999, flexShrink: 0, background: LBC_ORANGE + '18', color: LBC_ORANGE, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700 }}>
                   {String(a.name || '?').slice(0, 1).toUpperCase()}
                 </span>
                 <span style={{ flex: 1, minWidth: 0 }}>
@@ -23158,7 +23168,7 @@ function LeboncoinScreen() {
             })()}
           </>)}
         </Card>
-        <a href="https://www.leboncoin.fr/deposer-une-annonce" target="_blank" rel="noreferrer" style={{ display: 'block', textAlign: 'center', background: '#ff6e14', color: '#fff', textDecoration: 'none', fontWeight: 900, fontSize: 14, padding: '12px', borderRadius: 12 }}>➕ Ouvrir « Déposer une annonce » sur Leboncoin</a>
+        <a href="https://www.leboncoin.fr/deposer-une-annonce" target="_blank" rel="noreferrer" style={{ display: 'block', textAlign: 'center', background: LBC_ORANGE, color: '#fff', textDecoration: 'none', fontWeight: 900, fontSize: 14, padding: '12px', borderRadius: 12 }}>➕ Ouvrir « Déposer une annonce » sur Leboncoin</a>
       </>)}
     </div>
   );
@@ -25887,7 +25897,7 @@ export default function App() {
                   <div style={{fontSize:13,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.title||'(sans titre)'}</div>
                   <div style={{fontSize:12,color:C.muted,fontWeight:500,marginTop:2,display:'flex',gap:8,flexWrap:'wrap'}}>
                     <span style={{color:p.online?INV_STATUS.online.color:C.muted}}>{p.online?'🟢 En ligne':'⚪ Retirée'}</span>
-                    {p.onLbc && <span style={{color:'#ff6e14'}}>🟠 Leboncoin</span>}
+                    {p.onLbc && <span style={{color:LBC_ORANGE}}>🟠 Leboncoin</span>}
                     {p.box!=null && <span style={{color:C.accent}}>🏠 Au garage</span>}
                     {p.buyPrice && <span>achat {p.buyPrice}€</span>}
                     {p.price && <span>· {p.price}€</span>}
