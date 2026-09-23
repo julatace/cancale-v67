@@ -12792,7 +12792,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return null;
   };
   const [tracking, setTracking] = useState(null); // suivi colis (emails Mondial Relay / Chronopost)
-  const [showRelais, setShowRelais] = useState(false); // carte des relais dépliée (repliée par défaut si rien à retirer)
   const [achEmails, setAchEmails] = useState(null); // reçus d'achat archivés (emails)
   const [receiptView, setReceiptView] = useState(null); // reçu affiché dans une modale in-app
   const [lotView, setLotView] = useState(null); // détail d'un lot : { loading, order, items }
@@ -18598,7 +18597,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {nom} paire{nom>1?'s':''} connue{nom>1?'s':''}{nom<pickupUnion.total?` · ${pickupUnion.total-nom} colis dont l'article n'est pas encore identifié`:''}
                     </div>; })()}
                 </div>
-                <button type="button" onClick={()=>setShowRelais(v=>!v)} style={{border:`1px solid ${C.accent}`,background:showRelais?C.accent:'transparent',color:showRelais?'#fff':C.accent,borderRadius:8,padding:'5px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>🗺️ {showRelais?'Masquer la carte':'Carte'}</button>
               </div>
               {/* ⚠️ UN ENDROIT DÉDIÉ PAR TRANSPORTEUR (demande de Julien). Chaque
                   transporteur a sa façon de remettre le colis (§28) : Chronopost
@@ -18635,17 +18633,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div style={{display:'flex',alignItems:'center',gap:9,padding:'10px 12px',background:C.card2||C.card,borderBottom:`1px solid ${C.border}`}}>
                     {g.carrier&&<CarrierBadge carrier={g.carrier} size={24}/>}
                     <div style={{flex:'1 1 140px',minWidth:0}}>
+                      {/* ⚠️ « NE PRENDS PLUS EN COMPTE LA LOCALISATION, JUSTE LES
+                          CODES » (Julien, 20 sept.). Plus d'adresse, d'horaires,
+                          d'itinéraire ni de carte : le point relais exact est dans
+                          l'e-mail du transporteur / son appli. Ce qui sert à retirer,
+                          c'est le CODE / le QR juste en dessous. Le nom vient de
+                          l'e-mail, jamais deviné (§5). */}
                       <div style={{fontSize:14,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{nom}</div>
-                      {g.adresse && <div style={{fontSize:11.5,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{g.adresse}</div>}
-                      {/* Ouverture du jour, quand Vinted l'a donnée pour CE point. */}
-                      {g.horaires && <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{g.horaires}</div>}
-                      {/* ⚠️ L'e-mail n'a pas nommé le point : on ne l'invente pas et
-                          on n'envoie nulle part. Le lieu exact est dans l'e-mail
-                          du transporteur / son appli ; ce qui ouvre le colis, c'est
-                          le code / le QR juste en dessous. */}
-                      {g.lieuInconnu && <div style={{fontSize:11.5,color:C.muted,whiteSpace:'normal'}}>Le point n'est pas précisé dans l'e-mail — présente le code / QR ci-dessous (le lieu exact est dans l'e-mail {carrierName(g.carrier)} ou son appli).</div>}
                     </div>
-                    {!g.lieuInconnu && <a href={g.geoPt&&g.geoPt.lat&&g.geoPt.lon?`https://www.google.com/maps/dir/?api=1&destination=${g.geoPt.lat},${g.geoPt.lon}`:`https://maps.apple.com/?q=${encodeURIComponent(g.adresse||nom)}`} target="_blank" rel="noreferrer" title="Itinéraire" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.blue||C.accent}`,background:`${(C.blue||C.accent)}12`,color:C.blue||C.accent,borderRadius:8,padding:'6px 10px',fontSize:12,fontWeight:600}}>🧭 Y aller</a>}
                   </div>
                   {(()=>{ const M=methodeDuPoint(g.colis);
                     const urg=(()=>{ let m=null; for(const t of g.colis){ const j=joursAvant(t.limite); if(j!=null&&(m==null||j<m)) m=j; } return m; })();
@@ -18837,14 +18832,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div style={{display:'flex',alignItems:'center',gap:9,padding:'10px 12px',background:C.card2||C.card,borderBottom:`1px solid ${C.border}`}}>
                     <CarrierBadge carrier="vinted" size={24}/>
                     <div style={{flex:'1 1 140px',minWidth:0}}>
-                      <div style={{fontSize:14,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{pt.nom || 'Point relais à confirmer'}</div>
-                      {pt.adresse
-                        ? <div style={{fontSize:11.5,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{pt.adresse}</div>
-                        : <div style={{fontSize:11.5,color:C.muted}}>Vinted dit « déposé » — l'adresse arrive avec le message de retrait</div>}
+                      {/* Nom du relais quand la conversation Vinted le donne (une
+                          identité, §5) ; sinon un libellé neutre. Plus d'adresse
+                          ni d'itinéraire : juste le code de retrait, en dessous. */}
+                      <div style={{fontSize:14,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{pt.nom || 'À retirer en point relais'}</div>
                     </div>
-                    {pt.adresse && (
-                      <a href={`https://maps.apple.com/?q=${encodeURIComponent(pt.adresse)}`} target="_blank" rel="noreferrer" title="Itinéraire" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.blue||C.accent}`,background:`${(C.blue||C.accent)}12`,color:C.blue||C.accent,borderRadius:8,padding:'6px 10px',fontSize:12,fontWeight:600}}>🧭 Y aller</a>
-                    )}
                   </div>
                   <div style={{display:'flex',alignItems:'baseline',gap:6,flexWrap:'wrap',padding:'7px 12px',borderBottom:`1px solid ${C.border}`}}>
                     {/* ⚠️ LE MÊME NOMBRE NE S'ÉCRIT PAS DEUX FOIS SUR UN ÉCRAN.
@@ -19094,283 +19086,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
           </div>
         )}
-        {/* Carte des points relais : où retirer tes colis + codes/QR de retrait.
-            Repliée par défaut quand il n'y a AUCUN colis à retirer (elle prenait
-            tout l'écran avant les achats). */}
-        {(()=>{ const hasPickup=(tracking||[]).some(isPickupActive)||vintedToPickup.length>0; return !hasPickup ? (
-          <button type="button" onClick={()=>setShowRelais(v=>!v)} style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:8,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,padding:'10px',cursor:'pointer',fontSize:13,fontWeight:600,fontFamily:'inherit',marginBottom:12}}><Icon name="pin" size={16}/>Points relais {ville?`de ${ville}`:''} <span style={{color:C.muted}}>{showRelais?'▲ masquer':'▼ voir la carte'}</span></button>
-        ) : null; })()}
-        {/* Carte des relais : masquée par défaut (la liste ci-dessus suffit pour
-            retirer). On l'affiche seulement si tu tapes « 🗺️ Carte ». */}
-        {showRelais && (()=>{
-          const avail=(tracking||[]).filter(isPickupActive);
-          const norm=s=>String(s||'').toLowerCase();
-          // Groupes : points enregistrés + points de TA VILLE, colis rattachés par nom.
-          const groups={};
-          savedPoints.forEach(sp=>{ groups[sp.nom]={colis:[],lat:sp.lat,lon:sp.lon,saved:true,carrier:sp.carrier}; });
-          // Tous les points relais de la ville (affichés d'office), sauf ceux
-          // que tu as masqués (ils reviennent si un colis y arrive).
-          if(villeCache.city && norm(villeCache.city)===norm(ville)){
-            villeCache.pts.forEach(pt=>{
-              // Filtre « casiers & transporteurs seulement » : on ne garde que
-              // les points dont le transporteur est identifié (ou les casiers).
-              if(carriersOnly && !pt.carrier && !pt.locker) return;
-              if(hiddenPts.has(norm2(pt.nom))) return;
-              // Deux points de MÊME nom (ex. plusieurs « Casier Mondial Relay ») →
-              // on les distingue par la rue pour ne pas les fusionner.
-              let gk = pt.nom;
-              if(groups[gk] && pt.rue) gk = `${pt.nom} — ${pt.rue}`;
-              if(!groups[gk]) groups[gk]={colis:[],lat:pt.lat,lon:pt.lon,ville:true,type:pt.type,carrier:pt.carrier,rue:pt.rue,nom:pt.nom};
-            });
-          }
-          // Points relais OFFICIELS de Vinted (captés par l'extension) : la source
-          // complète et exacte. Affichés d'office, sans doublon avec un point déjà
-          // présent (même nom OU très proche, <60 m).
-          (vintedPoints||[]).forEach(pt=>{
-            if(carriersOnly && !pt.carrier && !pt.locker) return;
-            if(hiddenPts.has(norm2(pt.nom))) return;
-            const dup=Object.values(groups).some(g=>g.lat&&distMeters(g.lat,g.lon,pt.lat,pt.lon)<60);
-            if(!groups[pt.nom] && !dup) groups[pt.nom]={colis:[],lat:pt.lat,lon:pt.lon,vinted:true,carrier:pt.carrier};
-          });
-          avail.forEach(t=>{
-            const c=cleanLieu(t.lieu);
-            const key=c.nom||`Point ${carrierName(t.carrier)}`;
-            // Rattache le colis au point du même nom (enregistré OU de la ville).
-            const match=Object.keys(groups).find(k=>norm(k)===norm(key)||norm(k).includes(norm(key))||norm(key).includes(norm(k)));
-            const gk=match||key;
-            if(!groups[gk]) groups[gk]={colis:[],saved:false};
-            groups[gk].colis.push(t);
-            if(!groups[gk].carrier) groups[gk].carrier=t.carrier;
-          });
-          Object.entries(groups).forEach(([k,g])=>{ if(!g.lat&&geo[k]&&geo[k].lat){g.lat=geo[k].lat;g.lon=geo[k].lon;} });
-          // Carte ÉPURÉE : on n'affiche que TES points utiles — ceux avec un colis à
-          // retirer + tes points enregistrés. Les dizaines de relais de la ville
-          // n'apparaissent QUE si tu n'as aucun colis (pour t'aider à en trouver un).
-          const anyColis=avail.length>0;
-          // Carte ÉPURÉE : dès que tu as des colis à retirer, on n'affiche QUE les
-          // points où il y en a (fini les dizaines de casiers/relais de la ville qui
-          // n'ont rien pour toi). La carte des points de la ville ne revient que si
-          // tu n'as aucun colis (pour t'aider à en trouver un).
-          const pins=Object.entries(groups).filter(([,g])=>g.lat && (g.colis.length>0 || !anyColis)).map(([k,g])=>({key:k,lat:g.lat,lon:g.lon,count:g.colis.length,carrier:g.carrier,label:(g.rue && /casier|point relais|^point /i.test(g.nom||k))?g.rue:(g.nom||k)}));
-          // Liste : d'abord les points avec colis, puis le reste (points de la ville).
-          const entriesSorted=Object.entries(groups).sort((a,b)=>(b[1].colis.length-a[1].colis.length)||a[0].localeCompare(b[0]));
-          const withColis=entriesSorted.filter(([,g])=>g.colis.length>0);
-          // Points enregistrés SANS colis : masqués quand tu as des colis à retirer
-          // (ils encombraient la vue), listés seulement quand tu n'as rien à retirer.
-          // ⚠️ LA LISTE NE MONTRAIT QUE SES POINTS ENREGISTRÉS, sous le titre
-          // « Points relais à Cancale (4) » : les points de la VILLE, ceux
-          // qu'il vient justement de demander en tapant son nom, n'y étaient
-          // pas — ils n'existaient que comme épingles sur la carte. Le compte
-          // du titre ne comptait donc pas ce qu'il annonçait.
-          const autres=anyColis?[]:entriesSorted.filter(([,g])=>g.colis.length===0 && (g.saved || g.ville || g.vinted));
-          // ⚠️ CE QUE LE FILTRE CACHE DOIT SE VOIR. « Casiers & transporteurs »
-          // est actif par défaut : sur les 5 points que l'API renvoie pour
-          // Cancale, il en laissait passer UN. L'écran avait l'air vide sans
-          // jamais dire pourquoi — et un filtre muet, ça se lit « ça ne marche
-          // pas ».
-          const villeAJour = villeCache.city && norm(villeCache.city)===norm(ville);
-          const masquesFiltre = !carriersOnly ? 0 :
-            ((villeAJour ? (villeCache.pts||[]) : []).concat(vintedPoints||[])
-              .filter(pt=>pt && !pt.carrier && !pt.locker && !hiddenPts.has(norm2(pt.nom))).length);
-          // Le centre de la ville, pour repérer un point manifestement hors sujet.
-          const centreVille = (villeAJour && villeCache.center) ? villeCache.center
-            : (villeAJour && (villeCache.pts||[]).length
-                ? { lat:(villeCache.pts||[]).reduce((t,p)=>t+(+p.lat||0),0)/villeCache.pts.length,
-                    lon:(villeCache.pts||[]).reduce((t,p)=>t+(+p.lon||0),0)/villeCache.pts.length }
-                : null);
-          // Au-delà de 30 km, ce n'est plus « un point relais de ta ville ».
-          const kmDeLaVille = (g) => {
-            if (!centreVille || !g || !g.lat) return null;
-            const km = distMeters(centreVille.lat, centreVille.lon, g.lat, g.lon) / 1000;
-            return km > 30 ? Math.round(km) : null;
-          };
-          const singlePoint=withColis.length===1;
-          const selGroup=openPoint?groups[openPoint]:null;
-          return (
-            <div style={{marginBottom:14,display:'flex',flexDirection:'column',gap:10}}>
-              {/* Champ VILLE : tous les points relais de la ville s'affichent d'office */}
-              <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}>
-                <input value={villeInput} onChange={e=>setVilleInput(e.target.value)}
-                  onKeyDown={e=>{ if(e.key==='Enter'&&(villeInput||'').trim()) fetchVillePoints(villeInput.trim()); }}
-                  placeholder="Ta ville → tous les points relais"
-                  style={{flex:'1 1 150px',minWidth:0,border:`1px solid ${C.border}`,borderRadius:8,padding:'9px 12px',fontSize:13,fontFamily:'inherit',background:C.card,color:C.text,outline:'none'}}/>
-                <button onClick={()=>{ const v=(villeInput||'').trim(); if(v) fetchVillePoints(v); }} disabled={villeLoading} style={{border:'none',borderRadius:8,background:C.accent,color:'#fff',fontSize:13,fontWeight:600,padding:'9px 16px',cursor:'pointer',fontFamily:'inherit',opacity:villeLoading?0.6:1}}>{villeLoading?'…':'Voir'}</button>
-                <button onClick={()=>{
-                  if(!navigator.geolocation){ toast('Position non disponible sur cet appareil.'); return; }
-                  setVilleLoading(true);
-                  navigator.geolocation.getCurrentPosition(async pos=>{
-                    try{
-                      const r=await fetch(`/api/relais?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`);
-                      const j=await r.json();
-                      const pts=(j&&Array.isArray(j.points))?j.points:[];
-                      if(j&&j.city){ const cache={city:j.city,pts,center:j.center||null}; setVilleCache(cache); save('vrm_ville_points',cache); setVille(j.city); save('vrm_ville',j.city); setVilleInput(j.city); }
-                      else toast('Ville non trouvée depuis ta position.');
-                    }catch(_){ toast('Recherche indisponible, réessaie.'); }
-                    setVilleLoading(false);
-                  }, ()=>{ setVilleLoading(false); toast('Autorise la localisation pour utiliser ta position.'); }, {timeout:8000});
-                }} disabled={villeLoading} title="Utiliser ma position" style={{border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,fontSize:13,fontWeight:600,padding:'9px 12px',cursor:'pointer',fontFamily:'inherit'}}>📍</button>
-              </div>
-              {/* Accès direct aux CODES/QR de retrait — un tap = QR plein écran à scanner. */}
-              {avail.length>0 && (
-                <div style={{display:'flex',gap:8,overflowX:'auto',paddingBottom:2,WebkitOverflowScrolling:'touch'}}>
-                  {avail.map((t,i)=>(
-                    <button key={i} type="button" onClick={()=>openQrView(t)} title="Afficher le QR/code en grand" style={{flexShrink:0,display:'flex',flexDirection:'column',alignItems:'center',gap:3,border:`1px solid ${C.accent}55`,background:`${C.accent}0e`,borderRadius:8,padding:'7px 9px',cursor:'pointer',fontFamily:'inherit',minWidth:70}}>
-                      <div style={{width:44,height:44,borderRadius:5,background:'#fff',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>{qrImage(t)?<img src={qrImage(t)} alt="" style={{width:'100%',height:'100%',objectFit:'contain'}}/>:<span style={{fontSize:20}}>🎫</span>}</div>
-                      <span style={{fontSize:9,color:C.text,fontWeight:600,whiteSpace:'nowrap'}}>{codeRetrait(t.code)||(t.suivi?'n°'+String(t.suivi).slice(-5):'Retrait')}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-              {/* LA carte : toutes les épingles de la ville, badges = colis en attente */}
-              {pins.length>0&&(
-                <div style={{border:`1px solid ${C.border}`,borderRadius:10,overflow:'hidden',boxShadow:'0 2px 10px rgba(0,0,0,0.07)'}}>
-                  <OsmMap points={pins} selected={openPoint} onSelect={k=>setOpenPoint(openPoint===k?null:k)}/>
-                  <div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 12px',borderTop:`1px solid ${C.border}`,background:C.card}}>
-                    <span style={{flex:1,fontSize:11,color:avail.length>0?C.accent:C.muted,fontWeight:500}}>
-                      {avail.length>0?`🎫 ${avail.length} code${avail.length>1?'s':''} de retrait`:`${pins.length} point${pins.length>1?'s':''} relais${ville?' à '+ville:''}`}
-                    </span>
-                    {hiddenPts.size>0&&<button onClick={unhideAll} title="Réafficher les points masqués" style={{border:'none',background:'transparent',color:C.muted,fontSize:11,fontWeight:500,cursor:'pointer',fontFamily:'inherit'}}>↺ {hiddenPts.size} masqué{hiddenPts.size>1?'s':''}</button>}
-                    <button onClick={openRelayPicker} style={{border:`1px solid ${C.accent}`,borderRadius:8,background:`${C.accent}12`,color:C.accent,fontSize:11,fontWeight:600,padding:'5px 11px',cursor:'pointer',fontFamily:'inherit'}}>➕ Ajouter</button>
-                  </div>
-                </div>
-              )}
-              {pins.length===0&&(
-                <div style={{border:`1.5px dashed ${C.accent}66`,borderRadius:10,background:`${C.accent}08`,padding:'14px 16px',fontSize:13,color:C.text,fontWeight:500,lineHeight:1.5}}>
-                  🗺 Les points relais que <b>Vinted</b> utilise apparaissent ici tout seuls : sur Vinted (extension active), fais un achat et ouvre <b>une fois</b> la carte de choix du point relais → l'app importe la liste officielle complète. Tu peux aussi taper ta ville ci-dessus. Les points où tu as un colis afficheront le nombre.
-                </div>
-              )}
-              {/* Point sélectionné sans colis en attente */}
-              {selGroup&&selGroup.colis.length===0&&(
-                <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 13px',border:`1px solid ${C.border}`,borderRadius:10,background:C.card}}>
-                  <span style={{color:C.muted,display:'flex'}}><Icon name="pin" size={19}/></span>
-                  <span style={{flex:1,fontSize:12,color:C.text,fontWeight:500}}>{openPoint} <span style={{color:C.muted,fontWeight:600}}>— aucun colis ici{selGroup.type?' · '+selGroup.type:''}</span></span>
-                  <button onClick={()=>{ if(selGroup.saved) removeSavedPoint(openPoint); else hidePoint(openPoint); }} style={{border:`1px solid ${C.danger}66`,borderRadius:8,background:'transparent',color:C.danger,fontSize:11,fontWeight:600,padding:'4px 10px',cursor:'pointer',fontFamily:'inherit'}}>✕ Retirer</button>
-                </div>
-              )}
-              {withColis.map(([lieu,g])=>{
-                const colis=g.colis;
-                // Un point qui a des colis est TOUJOURS déplié : tu vois direct le
-                // code + le QR de chaque colis, sans avoir à cliquer.
-                const isOpen=colis.length>0||singlePoint||openPoint===lieu;
-                return (
-                <div key={lieu} style={{border:`1.5px solid ${openPoint===lieu?C.accent:C.border}`,background:C.card,borderRadius:10,overflow:'hidden',boxShadow:'0 2px 10px rgba(0,0,0,0.06)'}}>
-                  {/* En-tête du point : nom + badge + renommer */}
-                  <button onClick={()=>setOpenPoint(isOpen&&!singlePoint?null:lieu)} style={{width:'100%',display:'flex',alignItems:'center',gap:10,padding:'11px 13px',background:'transparent',border:'none',cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
-                    <span style={{position:'relative',flexShrink:0,fontSize:26}}>
-                      📍
-                      <span style={{position:'absolute',top:-6,right:-10,minWidth:20,height:20,borderRadius:8,background:C.danger,color:'#fff',fontSize:12,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',padding:'0 5px',boxShadow:'0 1px 4px rgba(0,0,0,0.25)'}}>{colis.length}</span>
-                    </span>
-                    <span style={{flex:1,minWidth:0}}>
-                      <span style={{display:'flex',alignItems:'center',gap:6}}>
-                        {g.carrier&&<CarrierBadge carrier={g.carrier} size={20}/>}
-                        <span style={{fontSize:13,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{g.nom||lieu}</span>
-                      </span>
-                      {g.rue&&<span style={{display:'block',fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{g.rue}</span>}
-                      <span style={{display:'block',fontSize:11,color:C.accent,fontWeight:500,marginTop:1}}>{colis.length} code{colis.length>1?'s':''} de retrait{singlePoint?'':(isOpen?' · replier':' · voir')}</span>
-                    </span>
-                    {g.lat && <a href={`https://maps.apple.com/?daddr=${g.lat},${g.lon}`} target="_blank" rel="noreferrer" onClick={(ev)=>ev.stopPropagation()} title="Itinéraire vers ce point relais" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.blue||C.accent}`,background:`${(C.blue||C.accent)}12`,color:C.blue||C.accent,borderRadius:8,padding:'5px 9px',fontSize:11,fontWeight:600}}>🧭 Y aller</a>}
-                    {!g.saved&&<span onClick={async(ev)=>{
-                      ev.stopPropagation();
-                      const nom=await askText({ desc: 'Nom du point relais (ex : Maison de la Presse, Cancale) :', value: colis[0].lieu||'' });
-                      if(nom===null) return;
-                      for(const t of colis){
-                        const rowId=`email_track_${t.carrier}_${t.suivi||''}`;
-                        try{
-                          await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(rowId)}`,{
-                            method:'PATCH',
-                            headers:sbAuth({ 'Content-Type':'application/json',Prefer:'return=minimal' }),
-                            body:JSON.stringify({data:{...t,lieu:nom.trim()}}),
-                          });
-                        }catch(_){}
-                      }
-                      fetchEmailTracking().then(setTracking);
-                    }} title="Renommer ce point relais (permet de le localiser sur la carte)" style={{flexShrink:0,fontSize:15,color:C.muted,padding:'4px 6px'}}>✎</span>}
-                    <span onClick={async (ev)=>{ ev.stopPropagation(); if(await askConfirm(`Retirer « ${lieu} » de la carte ?`)){ if(g.saved) removeSavedPoint(lieu); else hidePoint(lieu); } }} title="Retirer ce point" style={{flexShrink:0,fontSize:15,color:C.muted,padding:'4px 6px'}}>✕</span>
-                  </button>
-                  {/* Les colis qui attendent à ce point (défilables si nombreux) */}
-                  {isOpen&&<div style={{borderTop:`1px solid ${C.accent}33`,maxHeight:300,overflowY:'auto'}}>
-                    {colis.map((t,i)=>{
-                      const buy=buyForTrack(t);
-                      return (
-                        <div key={i} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 13px',borderTop:i>0?`1px solid ${C.accent}22`:'none'}}>
-                          <div style={{width:40,height:40,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                            {buy&&orderPhoto(buy)?<img src={orderPhoto(buy)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:17}}>📦</span>}
-                          </div>
-                          <div style={{flex:1,minWidth:0}}>
-                            <div style={{fontSize:12,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{(buy&&buy.title)||t.artTitle||`Colis${t.suivi?' n°'+t.suivi:''}`}</div>
-                            <div style={{fontSize:11,color:C.muted}}>{carrierName(t.carrier)}{t.consigne?' · consigne':''}{t.suivi?` · ${t.suivi}`:''}{t.account?` · ${t.account}`:''}</div>
-                            {/* DATE LIMITE DE RETRAIT — passé cette date le colis
-                                repart chez l'expéditeur, et rien ne le disait.
-                                Captée dans l'email, jamais déduite : pas de date
-                                dans l'email ⟹ rien d'affiché (§ email-inbound). */}
-                            {t.limite && (()=>{
-                              const j = joursAvant(t.limite);
-                              const urgent = j<=2;
-                              return <div style={{fontSize:11,fontWeight:urgent?700:500,color:urgent?C.danger:C.warn,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-                                {j<0?'délai dépassé':j===0?"dernier jour pour le retirer":j===1?'⏰ à retirer demain':`🗓 à retirer avant le ${new Date(t.limite).toLocaleDateString('fr-FR')} (${j} j)`}
-                              </div>;
-                            })()}
-                          </div>
-                          {codeRetrait(t.code)&&(
-                            <button type="button" onClick={()=>openQrView(t)} title="Afficher en grand pour scanner" style={{flexShrink:0,textAlign:'center',background:C.card,border:`1.5px dashed ${C.accent}`,borderRadius:8,padding:'3px 10px',cursor:'pointer',fontFamily:'inherit'}}>
-                              <div style={{fontSize:8,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500}}>Code</div>
-                              <div style={{fontSize:15,fontWeight:700,color:C.text,fontFamily:'monospace',letterSpacing:1.5}}>{codeRetrait(t.code)}</div>
-                            </button>
-                          )}
-                          {/* QR de retrait : UNIQUEMENT le vrai QR de Vinted (qrB64/qrUrl)
-                              s'il a été capté. Mondial Relay n'en envoie pas → on ne montre
-                              pas de faux QR, le code ci-dessus suffit au comptoir. */}
-                          {qrImage(t)&&(
-                            <button type="button" onClick={()=>openQrView(t)} title="QR de retrait — afficher en grand pour scanner" aria-label="Afficher le QR de retrait en grand"
-                              style={{flexShrink:0,border:`1px solid ${C.border}`,background:'#fff',borderRadius:8,padding:0,cursor:'pointer',width:46,height:46,display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
-                              {qrImage(t)?<img src={qrImage(t)} alt="QR" style={{width:'100%',height:'100%',objectFit:'contain'}}/>:<span style={{fontSize:22}}>🔳</span>}
-                            </button>
-                          )}
-                          <button onClick={()=>markCollected(t)} title="J'ai retiré ce colis" style={{flexShrink:0,border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}14`,color:INV_STATUS.online.color,borderRadius:8,padding:'6px 9px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>✓ Retiré</button>
-                        </div>
-                      );
-                    })}
-                  </div>}
-                </div>
-                );
-              })}
-              {/* Autres points relais de la ville (sans colis en attente) */}
-              {autres.length>0&&(
-                <div style={{border:`1px solid ${C.border}`,borderRadius:10,background:C.card,overflow:'hidden'}}>
-                  <div style={{display:'flex',alignItems:'center',gap:8,padding:'9px 12px',borderBottom:`1px solid ${C.border}`}}>
-                    <span style={{flex:1,fontSize:11,fontWeight:600,color:C.muted}}>Points relais{ville?` à ${ville}`:''} ({autres.length})</span>
-                    {masquesFiltre>0 && <span style={{fontSize:11,color:C.warn,fontWeight:600,flexShrink:0}}>{masquesFiltre} masqué{masquesFiltre>1?'s':''} par le filtre</span>}
-                    <button onClick={()=>{ const v=!carriersOnly; setCarriersOnly(v); save('vrm_relais_carriers_only',v); }} style={{border:`1px solid ${carriersOnly?C.accent:C.border}`,borderRadius:8,background:carriersOnly?`${C.accent}12`:'transparent',color:carriersOnly?C.accent:C.muted,fontSize:11,fontWeight:600,padding:'3px 10px',cursor:'pointer',fontFamily:'inherit'}}>{carriersOnly?'Casiers & transporteurs':'Tous les commerces'}</button>
-                  </div>
-                  {/* Assez haut pour montrer six points d'un coup : à 240 px la
-                      sixième ligne était coupée en deux, ce qui se lit « cassé »
-                      plutôt que « ça défile ». */}
-                  <div style={{maxHeight:320,overflowY:'auto'}}>
-                    {autres.map(([lieu,g])=>(
-                      <div key={lieu} style={{display:'flex',alignItems:'center',gap:9,padding:'8px 12px',borderTop:`1px solid ${C.border}55`}}>
-                        {g.carrier?<CarrierBadge carrier={g.carrier} size={22}/>:<span style={{flexShrink:0,color:C.muted,display:'flex'}}><Icon name="pin" size={18}/></span>}
-                        <span style={{flex:1,minWidth:0}}>
-                          <span style={{display:'block',fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{g.nom||lieu}</span>
-                          <span style={{display:'block',fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{[g.rue,g.type].filter(Boolean).join(' · ')||' '}</span>
-                          {/* ⚠️ MESURÉ DANS SA BASE : « Juste Ici » — un bout de
-                              texte pris dans un email, géocodé à Marseille — était
-                              listé comme un point relais de Cancale, à 800 km. On
-                              ne le supprime pas tout seul (c'est sa liste), on dit
-                              ce qui cloche, et la croix est juste à côté. */}
-                          {(()=>{ const km = kmDeLaVille(g); return km == null ? null : (
-                            <span style={{display:'block',fontSize:11,color:C.warn,fontWeight:600}}>à {km} km de {ville} — sûrement une erreur de nom</span>
-                          ); })()}
-                        </span>
-                        {g.lat&&<a href={`https://maps.apple.com/?daddr=${g.lat},${g.lon}`} target="_blank" rel="noreferrer" title="Itinéraire" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.border}`,borderRadius:8,color:C.blue||C.accent,padding:'5px 7px',display:'flex'}}><Icon name="nav" size={15}/></a>}
-                        <button onClick={()=>{ if(g.saved) removeSavedPoint(lieu); else hidePoint(lieu); }} title="Retirer ce point de la carte" style={{border:'none',background:'transparent',color:C.muted,fontSize:15,cursor:'pointer',flexShrink:0,padding:'2px 6px'}}><Icon name="close" size={15}/></button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })()}
         {/* ── LES COLIS QUI SONT REPARTIS CHEZ LE VENDEUR ────────────────────
             ⚠️ MESURÉ SUR LA VRAIE BASE (6 septembre) : trois achats portent
             « Commande non réclamée - Retournée à l'expéditeur.rice », pour
