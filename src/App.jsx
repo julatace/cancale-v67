@@ -18545,13 +18545,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             ? <img src={src} alt="" loading="lazy" onError={()=>noterImgMorte(src)}
                 style={{width:38,height:38,borderRadius:8,objectFit:'cover',flexShrink:0,border:`1px solid ${C.border}`}}/>
             : <span style={{flexShrink:0,color:C.muted,display:'flex'}}><Icon name="bag" size={22}/></span>;
-          // Point relais HABITUEL par transporteur : certains emails ne contiennent
-          // pas l'adresse du relais (juste un lien « juste ici »). On déduit alors
-          // le relais le plus fréquent de CE transporteur (ex. Mondial Relay →
-          // Maison de la Presse) à partir de TOUS les emails de suivi connus.
-          const relayFreq = {}; // carrier -> { "nom|adresse": count }
-          (tracking||[]).forEach(t=>{ const cl=cleanLieu(t.lieu); if(cl.nom){ const k=cl.nom+'|'+(cl.adresse||''); (relayFreq[t.carrier]=relayFreq[t.carrier]||{})[k]=((relayFreq[t.carrier]||{})[k]||0)+1; } });
-          const usualRelay = (carrier)=>{ const m=relayFreq[carrier]; if(!m) return null; let best=null,bn=0; for(const k in m){ if(m[k]>bn){bn=m[k];best=k;} } if(!best) return null; const [nom,adresse]=best.split('|'); return {nom,adresse}; };
+          // ⚠️ ON NE DEVINE PLUS LE LIEU (Julien, 23 sept. : « ne prends plus en
+          // compte la localisation, seulement les informations du mail »).
+          // Avant, un email sans adresse de relais héritait du relais le plus
+          // FRÉQUENT du transporteur (ex. Mondial Relay → « Maison de la Presse »).
+          // C'était un rapprochement par ressemblance (§5) : ça l'envoyait à un
+          // point qui n'était PAS celui du colis — Maison de la Presse a arrêté
+          // Vinted, une consigne Pick-up n'a rien à voir avec son relais habituel.
+          // Quand l'email ne nomme pas le lieu, on l'ÉCRIT (« lieu non indiqué »)
+          // et on s'appuie sur le CODE / le QR, qui, eux, sont dans le mail —
+          // jamais sur un lieu inventé. Mieux vaut un blanc qu'un faux.
           // ⚠️ COMPLÉTER L'ADRESSE DEPUIS LA LISTE OFFICIELLE DE VINTED.
           // L'email donne souvent le NOM du relais sans son adresse ni ses
           // horaires (mesuré : 13 lieux renseignés sur 94 suivis). Or la liste
@@ -18564,7 +18567,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const pointsConnus = {};
           ((dropOffs&&dropOffs.carriers)||[]).forEach(c=>c.points.forEach(p=>{ const k=normNom(p.nom); if(k&&!pointsConnus[k]) pointsConnus[k]=p; }));
           const groups = {};
-          avail.forEach(t=>{ let cl=cleanLieu(t.lieu); if(!cl.nom){ const u=usualRelay(t.carrier); if(u) cl={...u,guessed:true}; } const nom=cl.nom||`Point ${carrierName(t.carrier)||'relais'}`; const pc=pointsConnus[normNom(nom)]||null; (groups[nom]=groups[nom]||{colis:[],carrier:t.carrier,adresse:cl.adresse||(pc&&pc.adresse)||'',horaires:(pc&&pc.ouverture)||'',geoPt:pc||null,guessed:cl.guessed}).colis.push(t); if(!groups[nom].carrier) groups[nom].carrier=t.carrier; });
+          avail.forEach(t=>{ const cl=cleanLieu(t.lieu); const lieuInconnu=!cl.nom; const nom = cl.nom || (t.consigne ? `Consigne Pick-up ${carrierName(t.carrier)}` : `${carrierName(t.carrier)} — lieu non indiqué dans l'e-mail`); const pc = lieuInconnu ? null : (pointsConnus[normNom(nom)]||null); (groups[nom]=groups[nom]||{colis:[],carrier:t.carrier,adresse:cl.adresse||(pc&&pc.adresse)||'',horaires:(pc&&pc.ouverture)||'',geoPt:pc||null,lieuInconnu}).colis.push(t); if(!groups[nom].carrier) groups[nom].carrier=t.carrier; });
           return (
             <div style={{border:`1px solid ${C.accent}`,background:`${C.accent}0e`,borderRadius:10,padding:'12px 14px',marginBottom:10}}>
               <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:11}}>
@@ -18636,8 +18639,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {g.adresse && <div style={{fontSize:11.5,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{g.adresse}</div>}
                       {/* Ouverture du jour, quand Vinted l'a donnée pour CE point. */}
                       {g.horaires && <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{g.horaires}</div>}
+                      {/* ⚠️ L'e-mail n'a pas nommé le point : on ne l'invente pas et
+                          on n'envoie nulle part. Le lieu exact est dans l'e-mail
+                          du transporteur / son appli ; ce qui ouvre le colis, c'est
+                          le code / le QR juste en dessous. */}
+                      {g.lieuInconnu && <div style={{fontSize:11.5,color:C.muted,whiteSpace:'normal'}}>Le point n'est pas précisé dans l'e-mail — présente le code / QR ci-dessous (le lieu exact est dans l'e-mail {carrierName(g.carrier)} ou son appli).</div>}
                     </div>
-                    <a href={g.geoPt&&g.geoPt.lat&&g.geoPt.lon?`https://www.google.com/maps/dir/?api=1&destination=${g.geoPt.lat},${g.geoPt.lon}`:`https://maps.apple.com/?q=${encodeURIComponent(g.adresse||nom)}`} target="_blank" rel="noreferrer" title="Itinéraire" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.blue||C.accent}`,background:`${(C.blue||C.accent)}12`,color:C.blue||C.accent,borderRadius:8,padding:'6px 10px',fontSize:12,fontWeight:600}}>🧭 Y aller</a>
+                    {!g.lieuInconnu && <a href={g.geoPt&&g.geoPt.lat&&g.geoPt.lon?`https://www.google.com/maps/dir/?api=1&destination=${g.geoPt.lat},${g.geoPt.lon}`:`https://maps.apple.com/?q=${encodeURIComponent(g.adresse||nom)}`} target="_blank" rel="noreferrer" title="Itinéraire" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.blue||C.accent}`,background:`${(C.blue||C.accent)}12`,color:C.blue||C.accent,borderRadius:8,padding:'6px 10px',fontSize:12,fontWeight:600}}>🧭 Y aller</a>}
                   </div>
                   {(()=>{ const M=methodeDuPoint(g.colis);
                     const urg=(()=>{ let m=null; for(const t of g.colis){ const j=joursAvant(t.limite); if(j!=null&&(m==null||j<m)) m=j; } return m; })();
@@ -18693,7 +18701,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                               chaque ligne, c'était trois fois la même phrase sur
                               un écran de téléphone. Ne reste que ce qui est propre
                               à CE colis. */}
-                          {g.guessed && <div style={{fontSize:11,color:C.muted,marginTop:1}}>relais habituel (l'email ne le disait pas)</div>}
                           {!code && !qrImage(t) && <div style={{fontSize:11,color:C.muted,marginTop:1}}>Code pas encore reçu</div>}
                           {/* Le n° de suivi sur SA ligne, en chiffres lisibles :
                               au comptoir c'est ce qu'on demande quand le scan

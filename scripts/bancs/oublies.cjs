@@ -26,7 +26,16 @@ const coches=new Set(((main[0].data.vrm_colis_collected)||[]).map(String));
 const env=new Set(rows.filter(r=>/^email_bord_/.test(r.id)).map(r=>String((r.data||{}).suivi||'').trim().toUpperCase()).filter(Boolean));
 const j=(d)=>Math.round((Date.now()-new Date(d).getTime())/86400000);
 const vieux=track.map(r=>r.data).filter(d=>d.status==='available' && !coches.has(String(d.suivi)) && !env.has(String(d.suivi||'').trim().toUpperCase()) && j(d.receivedAt)>14);
-const avecQR=vieux.filter(d=>d.qrB64||d.qrUrl).length, avecCode=vieux.filter(d=>d.code&&String(d.code).trim()).length;
+// ⚠️ UN QR EN BASE ≠ UN VRAI QR. `qrUrl` porte AUSSI des bannières et des
+// mouchards Pickup (`/tracking/1/open/…`, `avn-prod/…_PARCEL`, `banner-mail`) :
+// l'app les écarte à l'affichage (`URL_PAS_UN_QR`) — c'est VOULU (§5.28). Un
+// contrôle qui compte `qrB64||qrUrl` mesure donc une fiction et sort rouge sur
+// un app CORRECTE (3 vrais QR affichés, 1 mouchard écarté). On compte ici le QR
+// comme l'app décide de le MONTRER : b64, ou un code-barres certain, ou une url
+// qui n'est pas un mouchard connu.
+const QR_PAS=/\/tracking\/|\/open\/|\/o\/|pixel|spacer|1x1|banner|banni[eè]re|logo|header|footer|enquete|enqu[eê]te|satisfaction|unsubscribe|desabonn|d[eé]sabonn|facebook|instagram|twitter|linkedin|youtube|email-messaging\.com|avn-prod|azureedge|drop[_-]?off|dropoff|_parcel|illustration|visuel|\.svg(\?|$)/i;
+const qrReel=(d)=>!!(d.qrB64 || (d.qrUrl && !QR_PAS.test(d.qrUrl)));
+const avecQR=vieux.filter(qrReel).length, avecCode=vieux.filter(d=>d.code&&String(d.code).trim()).length;
 let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' — '+d:''));};
 (async()=>{
   console.log('base servie : '+vieux.length+' colis trop vieux · '+avecCode+' avec code · '+avecQR+' avec QR');
