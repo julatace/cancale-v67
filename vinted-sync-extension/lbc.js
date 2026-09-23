@@ -1061,19 +1061,44 @@
         fields.push({ tag: el.tagName.toLowerCase(), type: el.type || '', name: el.name || '', id: el.id || '', ph: el.placeholder || '', aria: el.getAttribute('aria-label') || '', label: libelleDe(el), qa: el.getAttribute('data-qa-id') || el.getAttribute('data-testid') || '', rempli: !!val.trim(), len: val.length, multiple: el.type === 'file' ? !!el.multiple : undefined, accept: el.type === 'file' ? (el.accept || '') : undefined });
       });
       const sels = listesDeroulantes();
+      // ── LA LIVRAISON (« Envoi ») ────────────────────────────────────────
+      // Julien, 23 sept. : « active la livraison quand tu republies, mes
+      // annonces partent SANS livraison ». Mesuré : le dépôt SOUMET bien
+      // `extended_attributes.shipping.shipping_types[]` — donc le contrôle
+      // existe — mais il n'est PAS un <input>/<select> : c'est un composant
+      // React (toggle/checkbox), que `captureDepositForm` manquait. On le
+      // RELÈVE ici (libellé, rôle, état coché) — LECTURE SEULE, jamais une
+      // valeur saisie — pour câbler « livraison ON » à coup sûr la prochaine
+      // passe. On ne l'active PAS à l'aveugle : un poids de colis faux fait
+      // payer le mauvais prix d'envoi (§ « le boost coûte de l'argent »).
+      const MOTS_LIV = /livrais|envoi|coliss|mondial|remise\s*en\s*main|point\s*relais|\bpoids\b|\bweight\b|shipping|exp[eé]di|chronopost|shop2shop|\bcolis\b|\brelais\b/i;
+      const livraison = [];
+      try {
+        tousLesNoeuds('[role="switch"],[role="checkbox"],[role="radio"],input[type="checkbox"],input[type="radio"],button,[data-qa-id]').forEach((el) => {
+          if (!estDuDepot(el)) return;
+          const g = (a) => { try { return (el.getAttribute && el.getAttribute(a)) || ''; } catch (_) { return ''; } };
+          const lib = [libelleDe(el), g('aria-label'), el.name || el.id || g('data-qa-id'), String(el.textContent || '').slice(0, 60)].join(' ');
+          if (!MOTS_LIV.test(lib)) return;
+          const ac = g('aria-checked');
+          livraison.push({ tag: (el.tagName || '').toLowerCase(), type: el.type || '', role: g('role'),
+            name: el.name || '', id: el.id || '', qa: g('data-qa-id') || g('data-testid'),
+            label: (libelleDe(el) || String(el.textContent || '').trim()).slice(0, 60),
+            checked: ac || (el.checked != null ? String(!!el.checked) : '') });
+        });
+      } catch (_) {}
       const fileInputs = tousLesNoeuds('input[type="file"]');
       const fichiers = fileInputs.length;
       const fichiersMultiple = fileInputs.some((el) => el.multiple);
       const categorie = categorieCourante(sels);
       // La signature dédoublonne les étapes identiques — mais deux CATÉGORIES
       // donnent deux formulaires différents, donc la catégorie en fait partie.
-      const signature = fields.map((f) => f.name || f.id).join('|') + '#' + sels.length + '#' + fichiers + (categorie ? '#' + categorie.slice(0, 40) : '');
+      const signature = fields.map((f) => f.name || f.id).join('|') + '#' + sels.length + '#' + fichiers + (categorie ? '#' + categorie.slice(0, 40) : '') + (livraison.length ? '#L' + livraison.length : '');
       if (signature === derniereEtape) return;
       derniereEtape = signature;
       if (fields.length || sels.length || fichiers) {
         ordreEtape++;
         chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcForm', url: location.href,
-          fields: fields.slice(0, 150), selects: sels.slice(0, 30), fichiers, fichiersMultiple,
+          fields: fields.slice(0, 150), selects: sels.slice(0, 30), livraison: livraison.slice(0, 30), fichiers, fichiersMultiple,
           categorie, depot: DEPOT_ID, ordre: ordreEtape, ver: EXT_VER,
           etape: signature.slice(0, 160) });
         // ⚠️⚠️ « LÀ C'EST SÛR ? » — Julien, 17 septembre. NON, et c'est la bonne
