@@ -836,6 +836,7 @@
     if (refMise) faits.push('la référence ' + ref);
     if (choisirCategorie(ad)) faits.push('la catégorie ' + ad.category);
     remplirComposants(ad);   // pointure + état (menus React)
+    if (activerLivraison() === 'active') faits.push('la livraison');
     if (!faits.length) {
       copy(ad.title + '\n\n' + ad.description);
       toast('Aucun champ reconnu sur cette page — titre + description copiés (la réf ' + ref + ' est dedans). Le dépôt Leboncoin se fait en plusieurs étapes : reviens cliquer ici à l\'étape du titre.');
@@ -1302,6 +1303,33 @@
     if (k) toast('👟 ' + k + ' menu' + (k > 1 ? 's' : '') + ' rempli' + (k > 1 ? 's' : '') + ' (pointure / état)');
     return k;
   }
+  // ── LA LIVRAISON — Julien, 23 sept. : « active la livraison quand tu
+  //    republies » puis « pour mon cas c'était activé par défaut ». On GARANTIT
+  //    donc que l'interrupteur maître d'envoi reste ACTIVÉ, sans jamais toucher
+  //    au POIDS ni aux méthodes (Leboncoin garde ses valeurs par défaut, celles
+  //    qu'il utilise déjà — un poids faux coûterait de l'argent, §3/§5).
+  //    Sûr par construction : on n'agit QUE sur un contrôle au libellé
+  //    clairement « livraison/envoi », et SEULEMENT s'il est ÉTEINT ; sinon
+  //    on ne touche à rien (déjà activé, illisible, ou absent → no-op).
+  const MOTS_LIV_MAITRE = /proposer\s+la\s+livraison|je\s+propose\s+la\s+livraison|activer\s+la\s+livraison|mode\s+d.envoi|^\s*livraison\s*$|^\s*envoi\s*$/i;
+  function activerLivraison() {
+    try {
+      const cands = tousLesNoeuds('[role="switch"],[role="checkbox"],input[type="checkbox"]').filter(estDuDepot);
+      for (const el of cands) {
+        const g = (a) => { try { return (el.getAttribute && el.getAttribute(a)) || ''; } catch (_) { return ''; } };
+        const lib = [libelleDe(el), g('aria-label'), String(el.textContent || '').slice(0, 60)].join(' ');
+        if (!MOTS_LIV_MAITRE.test(lib)) continue;
+        const ac = g('aria-checked');
+        const connu = ac === 'true' || ac === 'false' || typeof el.checked === 'boolean';
+        if (!connu) return 'illisible';                          // état inconnu → on ne touche pas
+        const on = ac === 'true' || (ac === '' && el.checked === true);
+        if (on) return 'deja';                                   // déjà activée (son défaut) → rien
+        try { el.click(); } catch (_) {}                         // éteinte → on l'active (clic humain)
+        return 'active';
+      }
+      return 'absent';
+    } catch (_) { return 'absent'; }
+  }
   // ── LA CATÉGORIE — mesuré au RENDU (capture d'écran de Julien, 20 sept.) :
   //    c'est des BOUTONS RADIO (« Mode > Chaussures », « Loisirs > Sport »,
   //    « Mode > Vêtements »), pas une liste. On clique celui qui correspond à sa
@@ -1440,6 +1468,7 @@
     if (choisirCategorie(ad)) n++;
     // Les menus React (pointure, état) — sans bloquer le comptage synchrone.
     remplirComposants(ad);
+    if (activerLivraison() === 'active') n++;   // garantir l'envoi activé (son défaut)
     // Puis on enchaîne l'étape : clic « Continuer » (JAMAIS « Publier »).
     avancer();
     return n;
@@ -1570,6 +1599,7 @@
     // « Re-remplir » relance aussi les menus React et l'enchaînement d'étape
     // (on oublie qu'on les a déjà faits, au cas où on serait revenu en arrière).
     _composFaits = new Set(); remplirComposants(ad);
+    if (activerLivraison() === 'active') n++;
     _avanceFaite = new Set(); avancer();
     return n;
   }

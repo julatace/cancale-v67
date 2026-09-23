@@ -95,6 +95,12 @@ const PAGE = (depot) => `<!doctype html><html lang="fr"><head><meta charset="utf
       + '<label><input type="radio" name="cat"> Mode &gt; Vêtements</label></fieldset>'
       + '<button type="button" id="continuer">Continuer</button>'
       + '<button type="button" id="publier">Publier mon annonce</button>'
+      // ⚠️ LA LIVRAISON : interrupteur maître ÉTEINT (l'extension doit le
+      //    rallumer, « activé par défaut » chez lui) + un leurre « offres par
+      //    email » qui NE doit PAS être coché (on n'agit que sur l'envoi).
+      + '<div id="livsw" role="switch" aria-checked="false" aria-label="Proposer la livraison">Proposer la livraison</div>'
+      + '<label><input type="checkbox" id="news"> Recevoir des offres par email</label>'
+      + '<scr'+'ipt>document.getElementById("livsw").addEventListener("click",function(){this.setAttribute("aria-checked",this.getAttribute("aria-checked")==="true"?"false":"true");});</scr'+'ipt>'
       + '<scr'+'ipt>document.querySelectorAll("[role=combobox]").forEach(function(cb){var menu=document.getElementById(cb.id+"-menu");cb.addEventListener("click",function(){menu.hidden=false;});menu.querySelectorAll("[role=option]").forEach(function(o){o.addEventListener("click",function(){cb.value=o.textContent;cb.setAttribute("data-choisi",o.textContent);menu.hidden=true;});});});'
       + 'window.__cont=0;window.__pub=0;document.getElementById("continuer").addEventListener("click",function(){window.__cont++;});document.getElementById("publier").addEventListener("click",function(){window.__pub++;});</scr'+'ipt>'
     : depot === 'etape2'
@@ -542,6 +548,8 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
       categorie: lab,
       continuer: window.__cont || 0,
       publier: window.__pub || 0,
+      livraison: (document.getElementById('livsw') || {}).getAttribute ? document.getElementById('livsw').getAttribute('aria-checked') : '',
+      news: !!(document.getElementById('news') || {}).checked,
     };
   });
   const monteCombos = async (ad) => {
@@ -571,6 +579,9 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
     dit(/chaussures/i.test(ok.categorie), 'la CATÉGORIE (bouton radio « Mode > Chaussures ») est cochée', 'coché : « ' + ok.categorie + ' »');
     dit(ok.continuer >= 1, 'le bouton « Continuer » est cliqué pour enchaîner l’étape', ok.continuer + ' clic(s)');
     dit(ok.publier === 0, '⚠️ « Publier » n’est JAMAIS cliqué tout seul (§3/§5)', ok.publier + ' clic(s) sur Publier');
+    // ── LA LIVRAISON est activée (Julien, 23 sept.) ─────────────────────────
+    dit(ok.livraison === 'true', 'l’interrupteur d’ENVOI éteint est rallumé (livraison activée)', 'aria-checked = « ' + ok.livraison + ' »');
+    dit(ok.news === false, 'et RIEN d’autre n’est coché — le leurre « offres par email » reste éteint', 'offres par email cochées : ' + ok.news);
     // Négatif : une valeur qui ne colle à AUCUNE option reste VIDE (§5).
     const ko = await monteCombos({ ...QUEUE[0], taille: '99', etat: 'Satisfaisant' });
     dit(ko.pointure === '', 'une pointure absente de la liste n’est PAS choisie (pas de « à peu près »)', 'pointure = « ' + ko.pointure + ' »');
