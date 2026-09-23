@@ -789,7 +789,15 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
         + '<span id="lblcat">Catégorie</span>'
         + '<div role="combobox" aria-labelledby="lblcat" aria-haspopup="listbox" aria-controls="listecat" data-qa-id="category_picker">Chaussures</div>'
         + '<div id="listecat" role="listbox"><div role="option">Vêtements</div><div role="option">Chaussures</div><div role="option">Sacs</div></div>'
-        + '<label for="f2">Photos</label><input id="f2" name="images" type="file" multiple>';
+        + '<label for="f2">Photos</label><input id="f2" name="images" type="file" multiple>'
+        // ── LA LIVRAISON : composants React (pas des <input>), c'est pour ça
+        //    que la capture les manquait. On sert la vraie forme mesurée :
+        //    un interrupteur « Proposer la livraison » (éteint) + un choix
+        //    Colissimo, avec une VALEUR de poids saisie qui ne doit PAS fuiter.
+        + '<span id="lbllvr">Mode d’envoi</span>'
+        + '<div role="switch" aria-checked="false" aria-label="Proposer la livraison" data-qa-id="shipping_toggle">Proposer la livraison</div>'
+        + '<div role="checkbox" aria-checked="false" aria-label="Colissimo" data-qa-id="shipping_colissimo">Colissimo</div>'
+        + '<input name="estimated_parcel_weight" type="text" value="1500" aria-label="Poids du colis (g)">';
     });
     await p7.waitForTimeout(1800);
     const etapes = await p7.evaluate(() => window.__formes.map((m) => ({
@@ -813,6 +821,20 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
     const brut = await p7.evaluate(() => window.__formes[window.__formes.length - 1] || {});
     dit(/chaussure/i.test(String(brut.categorie || '')),
       'et elle DIT dans quelle catégorie elle a été vue', `catégorie : « ${String(brut.categorie || '').slice(0, 60) || '(vide)'} »`);
+    // ── LA LIVRAISON (Julien 23 sept. : « active la livraison ») ────────────
+    // Les contrôles d'envoi sont des composants React que la capture manquait.
+    // On EXIGE qu'ils soient relevés (libellé + état coché), pour câbler
+    // « livraison ON » à coup sûr la prochaine passe — sans deviner le poids.
+    const liv = Array.isArray(brut.livraison) ? brut.livraison : [];
+    const libLiv = liv.map((x) => String(x.label || '')).join(' | ').toLowerCase();
+    dit(/livraison|colissimo|envoi/.test(libLiv),
+      'l’étape RELÈVE les contrôles de livraison — je saurai les activer', `livraison: ${liv.length} contrôle(s) — ${liv.map((x) => x.label).join(', ').slice(0, 80) || '(aucun)'}`);
+    dit(liv.some((x) => /faux|false|non/i.test(String(x.checked)) || x.checked === '' || x.checked === 'false'),
+      'et leur ÉTAT (ici : éteint) est relevé — c’est ce qui prouve qu’il faut l’activer', `états : ${liv.map((x) => x.label + '=' + x.checked).join(', ').slice(0, 90)}`);
+    // ⚠️ Le POIDS saisi (1500 g) ne doit JAMAIS partir — un poids faux coûte de
+    //    l'argent, et de toute façon on ne stocke aucune valeur (§ promesse).
+    dit(!/1500/.test(JSON.stringify(brut)),
+      'la VALEUR de poids saisie ne fuite pas — on relève la structure, jamais le contenu');
     dit(!!brut.depot && Number(brut.ordre) >= 2,
       'chaque étape porte son dépôt et son RANG — deux annonces ne se mélangent pas',
       `dépôt ${brut.depot || '—'} · étape n°${brut.ordre || '—'}`);

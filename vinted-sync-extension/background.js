@@ -969,7 +969,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
               const cle = [String(msg.categorie || 'sans-categorie').slice(0, 40),
                 String(msg.etape || msg.url || Object.keys(etapes).length)].join(' :: ');
               etapes[cle] = { url: msg.url, fields: msg.fields, selects: msg.selects || [],
-                fichiers: msg.fichiers || 0, categorie: String(msg.categorie || ''),
+                livraison: msg.livraison || [], fichiers: msg.fichiers || 0,
+                fichiersMultiple: !!msg.fichiersMultiple, categorie: String(msg.categorie || ''),
                 depot: String(msg.depot || ''), ordre: Number(msg.ordre) || 0,
                 ver: String(msg.ver || ''),
                 at: new Date().toISOString() };
