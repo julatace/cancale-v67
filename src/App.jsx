@@ -6212,7 +6212,7 @@ function caParPlateforme(liveStats, lbcVentes) {
 // bord. Aujourd'hui seul Vinted remonte des ventes ; les autres plateformes
 // disent « pas encore de vente captée » (jamais un 0 € inventé, §5/§7) et
 // s'ajouteront d'elles-mêmes le jour où une vente y est captée.
-function Collectif({ liveStats, lbcVentes = {ventes:[],inconnues:0}, onGo, baseKO }) {
+function Collectif({ liveStats, lbcVentes = {ventes:[],inconnues:0}, onGo, baseKO, actions, premierJour }) {
   const plateformes = caParPlateforme(liveStats, lbcVentes);
   const connues = plateformes.filter(p => p.ca != null);
   const caGlobal = connues.reduce((s,p)=> s + p.ca, 0);
@@ -6220,12 +6220,51 @@ function Collectif({ liveStats, lbcVentes = {ventes:[],inconnues:0}, onGo, baseK
   const ventesVinted = liveStats && liveStats.soldTotal != null ? liveStats.soldTotal : null;
   const online = liveStats && liveStats.online != null ? liveStats.online : null;
   const enAttente = liveStats && liveStats.enCours != null ? liveStats.enCours : null;
+  // Sélecteur de plateforme : « Toutes » = la vue globale ; chaque plateforme a
+  // sa propre vue, qui ne montre QUE ce qui est mesuré (§5, jamais un 0 inventé).
+  // Julien : « il y a pas l'onglet vinted ebay leboncoin et vestiaire. »
+  const [plat, setPlat] = React.useState('toutes');
+  const platSel = plateformes.find(p => p.nom === plat) || null;
   return (
     <div style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
       <ScreenHead icon="chart" title="Collectif" desc="Toutes tes plateformes réunies"/>
-      {baseKO ? (
+      {premierJour ? <Onboarding setTab={onGo}/> : baseKO ? (
         <LignePanne>Je n'ai pas pu lire tes données — les totaux seraient faux, on ne les affiche pas. Rien n'est perdu : c'est la lecture qui a échoué.</LignePanne>
       ) : (<>
+        {/* À FAIRE AUJOURD'HUI. Le Collectif est la PAGE D'OUVERTURE : elle ne
+            doit JAMAIS cacher un colis à expédier ou à retirer (le mensonge le
+            plus coûteux du projet — §« quand la base ne répond pas »). Même
+            source que Ma journée et le Tableau de bord : `notifItems` (§11),
+            jamais un second calcul. Rien à faire ⇒ on ne dit rien (§7). */}
+        {Array.isArray(actions) && actions.length>0 && (
+          <div>
+            <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:8}}>À faire</div>
+            <div style={{display:'flex',flexDirection:'column',gap:8}}>
+              {actions.map((a,i)=>(
+                <button key={i} onClick={()=>onGo&&onGo(a.tab)} style={{textAlign:'left',display:'flex',alignItems:'center',gap:12,border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px',cursor:'pointer',fontFamily:'inherit'}}>
+                  <span aria-hidden="true" style={{flexShrink:0,width:34,height:34,borderRadius:8,background:C.card2||C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',color:C.muted}}>
+                    {a.ic ? <Icon name={a.ic} size={17}/> : <span style={{fontSize:17}}>{a.icon}</span>}
+                  </span>
+                  <span style={{flex:1,fontSize:15,fontWeight:600,color:C.text}}>{a.text}</span>
+                  <span style={{fontSize:20,color:C.muted}}>›</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {/* SÉLECTEUR DE PLATEFORME — Toutes · Vinted · Leboncoin · eBay ·
+            Vestiaire. Une rangée qui défile au doigt (§7, `.vrm-rangee`). La
+            pastille active distingue ; le libellé ne porte que le nom. */}
+        <div className="vrm-rangee" style={{display:'flex',gap:8}}>
+          {[{k:'toutes',l:'Toutes'},...plateformes.map(p=>({k:p.nom,l:p.nom==='Vestiaire Collective'?'Vestiaire':p.nom}))].map(o=>{
+            const actif = plat===o.k;
+            return (
+              <button key={o.k} type="button" onClick={()=>setPlat(o.k)} style={{flexShrink:0,padding:'8px 14px',borderRadius:8,border:`1px solid ${actif?C.text:C.border}`,background:actif?C.text:C.card,color:actif?C.card:C.text,fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{o.l}</button>
+            );
+          })}
+        </div>
+
+        {plat==='toutes' ? (<>
         {/* CHIFFRE D'AFFAIRES GLOBAL — la somme des plateformes captées.
             Même source que le CA finalisé du Tableau de bord : ils sont égaux
             quand seul Vinted a des ventes (§11). */}
@@ -6289,6 +6328,56 @@ function Collectif({ liveStats, lbcVentes = {ventes:[],inconnues:0}, onGo, baseK
         <div style={{fontSize:11,color:C.muted,lineHeight:1.5}}>
           Leboncoin et eBay apparaîtront ici <b>dès qu'une vente y sera captée</b> ; pour l'instant seul Vinted remonte des ventes. Rien n'est inventé : une plateforme sans donnée affiche un tiret.
         </div>
+        </>) : platSel && platSel.nom==='Vinted' ? (<>
+          {/* VUE VINTED — la seule plateforme qui remonte des ventes. Tous les
+              chiffres viennent de `liveStats` (§11), jamais recalculés. */}
+          <Card style={{padding:18}}>
+            <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:4}}>Vinted · chiffre d'affaires</div>
+            <div className="vrm-display" style={{fontSize:30,fontWeight:700,color:C.text}}>{platSel.ca==null?'—':fmt(platSel.ca)}</div>
+            <div style={{fontSize:11.5,color:C.muted,marginTop:2}}>{platSel.ca==null?'aucune vente finalisée captée':'ventes finalisées, tous comptes'}</div>
+          </Card>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(150px,1fr))',gap:10}}>
+            <button type="button" onClick={()=>onGo&&onGo('cat_ventes')} style={{textAlign:'left',border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'13px 15px',cursor:'pointer',fontFamily:'inherit'}}>
+              <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500}}>Ventes finalisées</div>
+              <div className="vrm-display" style={{fontSize:24,fontWeight:700,color:C.text}}>{ventesVinted==null?'—':ventesVinted}</div>
+            </button>
+            <button type="button" onClick={()=>onGo&&onGo('cat_ventes')} style={{textAlign:'left',border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'13px 15px',cursor:'pointer',fontFamily:'inherit'}}>
+              <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500}}>Ventes en cours</div>
+              <div className="vrm-display" style={{fontSize:24,fontWeight:700,color:C.text}}>{enAttente==null?'—':enAttente}</div>
+              <div style={{fontSize:11,color:C.muted,marginTop:2}}>en attente de finalisation</div>
+            </button>
+            <button type="button" onClick={()=>onGo&&onGo('cat_annonces')} style={{textAlign:'left',border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'13px 15px',cursor:'pointer',fontFamily:'inherit'}}>
+              <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500}}>Annonces en ligne</div>
+              <div className="vrm-display" style={{fontSize:24,fontWeight:700,color:C.text}}>{online==null?'—':online}</div>
+            </button>
+          </div>
+          <button type="button" onClick={()=>onGo&&onGo('dashboard')} style={{alignSelf:'flex-start',border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'10px 14px',cursor:'pointer',fontFamily:'inherit',fontSize:13,fontWeight:600,color:C.text}}>
+            Voir le détail → Statistiques
+          </button>
+        </>) : platSel ? (<>
+          {/* VUE D'UNE PLATEFORME SANS DONNÉE CAPTÉE — on ne fête rien et on
+              n'invente pas de 0 € (§5/§7). Un tiret + la cause connue + le geste
+              (publier depuis Annonces pour Leboncoin/eBay ; Vestiaire n'est pas
+              encore reliée à VRM). C'est « il n'y a encore rien », une cause qui
+              se dit — pas « tout est à jour 🎉 ». */}
+          <Card style={{padding:18}}>
+            <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:4}}>{platSel.nom} · chiffre d'affaires</div>
+            <div className="vrm-display" style={{fontSize:30,fontWeight:700,color:C.muted}}>—</div>
+            <div style={{fontSize:11.5,color:C.muted,marginTop:2}}>pas encore de vente captée</div>
+          </Card>
+          <Card style={{padding:16}}>
+            <div style={{fontSize:13.5,color:C.text,lineHeight:1.55}}>
+              {platSel.nom==='Vestiaire Collective'
+                ? <>Vestiaire Collective n'est <b>pas encore reliée</b> à VRM. Rien n'y est capté aujourd'hui — dès qu'une vente y remontera, elle apparaîtra ici, comptée dans le total, sans que tu aies rien à faire.</>
+                : <>Aucune vente n'a encore été captée sur {platSel.nom}. Tu publies tes paires depuis l'écran <b>Annonces</b> ; dès qu'une vente y sera reconnue, son chiffre s'ajoutera ici et au total — jamais avant, rien n'est inventé.</>}
+            </div>
+            {platSel.nom!=='Vestiaire Collective' && (
+              <button type="button" onClick={()=>onGo&&onGo('cat_annonces')} style={{marginTop:12,border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'10px 14px',cursor:'pointer',fontFamily:'inherit',fontSize:13,fontWeight:600,color:C.text}}>
+                Ouvrir l'écran Annonces →
+              </button>
+            )}
+          </Card>
+        </>) : null}
       </>)}
     </div>
   );
@@ -24669,7 +24758,7 @@ export default function App() {
       save('vrm_widget_token', btoa(String.fromCharCode(...a)).replace(/[+/=]/g,'').slice(0,28));
     } catch(_) {}
   }),[]);
-  const [tab,setTab]=useState('journee');
+  const [tab,setTab]=useState('collectif');
   // Historique de navigation → bouton « retour » (plus besoin de recharger l'app).
   const navHistRef = React.useRef([]);
   const prevTabRef = React.useRef('journee');
@@ -25982,7 +26071,7 @@ export default function App() {
             pas pu lire », et l'écran le DIT au lieu de repartir de zéro. */}
         {tab==='dashboard'&&premierJour&&<Onboarding setTab={setTab}/>}
         {tab==='dashboard'&&<Dashboard premierJour={premierJour} catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices} liveStats={liveStats} lbcVentes={lbcVentes} onGo={setTab} actions={notifItems} baseKO={baseKO}/>}
-        {tab==='collectif'&&<Collectif liveStats={liveStats} lbcVentes={lbcVentes} onGo={setTab} baseKO={baseKO}/>}
+        {tab==='collectif'&&<Collectif liveStats={liveStats} lbcVentes={lbcVentes} onGo={setTab} baseKO={baseKO} actions={notifItems} premierJour={premierJour}/>}
         {tab==='inventory'&&<Inventory inventory={inventory} setInventory={setInventory} accounts={vintedAccounts} garageGrid={garageGrid} labels={accountLabels} onLocate={(numero)=>{ setGarageLocate(String(numero)); setTab('garage'); }}/>}
         {tab==='catalog'  &&<Catalog   catalog={catalog} setCatalog={setCatalog} onDeleteId={(id)=>{
           const norm=v=>String(v||'').trim();
