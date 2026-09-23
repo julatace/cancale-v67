@@ -63,7 +63,7 @@ srv.listen(4322);
 // `ScreenHead` : il atterrissait PILE SOUS l'ile d'actions, donc invisible.
 // Le controle existait, l'ecran n'y passait jamais. `catalog` et `sales`
 // (l'ancienne appli) etaient dans le meme angle mort.
-const TABS=['journee','dashboard','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','garage','invoices','settings','vintedaccounts','catalog','sales','leboncoin','stockvinted'];
+const TABS=['journee','collectif','dashboard','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','garage','invoices','settings','vintedaccounts','catalog','sales','leboncoin','stockvinted'];
 (async()=>{
   let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'✅ ':'❌ ')+m+(d?' — '+d:''));};
   const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-angle=swiftshader','--no-sandbox']});
