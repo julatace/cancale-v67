@@ -14,8 +14,8 @@ try {
   M=new Function(`const normTitle=(t)=>(t||'').toLowerCase().replace(/\\s+/g,' ').trim();
 ${sl(2669,2676)}
 ${sl(3752,3924)}
-${sl(6239,6263)}
-return {grouperPrixMarche, extractModel, extractSize, montantCommande};`)();
+${sl(6239,6281)}
+return {grouperPrixMarche, valoriserStock, extractModel, extractSize, montantCommande};`)();
 } catch(e){ console.log('KO  extraction du code impossible —', e.message); process.exit(1); }
 const FX=f=>JSON.parse(fs.readFileSync(path.join(__dirname,'fx',f+'.json'),'utf8'));
 // Ventes finalisées + annonces en ligne, comme le fait le chargeur de l'écran.
@@ -59,5 +59,17 @@ dit(indepPetits>0, 'le filtre « >=2 ventes » écarte de vrais groupes (il n\'e
   dit(!petit1 || !set.has(petit1[0]), 'un modèle+taille à 1 vente n\'apparaît jamais',
     petit1?petit1[0]:'(aucun cas à 1 vente)'); }
 
-console.log(ko?('\n'+ko+' controle(s) non conforme(s).'):'\nLe prix affiché est la médiane réelle de tes ventes, jamais un cas isolé.');
+// ── VALORISATION DU STOCK (feature B) ────────────────────────────────────────
+const valo = essaie('valoriserStock s\'exécute', ()=>M.valoriserStock(real, online)) || {};
+// Recompute INDÉPENDANT : somme des médianes sur les annonces reconnues.
+const medBy={}; real.forEach(g=>medBy[g.modele+'|'+g.taille]=g.med);
+let recI=0, marI=0; for(const it of online){ const mo=M.extractModel(it&&it.title);
+  const ta=M.extractSize(it&&it.title)||(it&&it.size!=null?M.extractSize('taille '+it.size):null);
+  const m=(mo&&ta)?medBy[mo+'|'+ta]:null; if(m==null)continue; recI++; marI+=m; }
+console.log('valorisation : '+valo.reconnu+' annonces reconnues / '+valo.total+' en ligne · marché '+Math.round(valo.marche||0)+' €');
+dit(valo.reconnu===recI, 'la valorisation compte exactement les annonces au prix connu', 'écran '+valo.reconnu+' · indépendant '+recI);
+dit(Math.abs((valo.marche||0)-marI)<0.5, 'la valeur = somme des médianes réelles', 'écran '+Math.round(valo.marche||0)+' · indépendant '+Math.round(marI));
+dit(valo.reconnu<=valo.total, 'jamais plus d\'annonces reconnues que d\'annonces en ligne (couverture honnête)', valo.reconnu+'/'+valo.total);
+
+console.log(ko?('\n'+ko+' controle(s) non conforme(s).'):'\nLe prix affiché est la médiane réelle de tes ventes, et le stock est valorisé à ce prix — jamais un cas isolé, jamais un prix inventé.');
 process.exit(ko?1:0);

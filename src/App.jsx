@@ -6261,17 +6261,50 @@ function grouperPrixMarche(sold, online) {
       med: medianeNb(x.pr), min: x.pr[0], max: x.pr[x.pr.length - 1], stock: x.stock }))
     .sort((a, b) => b.n - a.n || b.med - a.med);
 }
+// ── VALEUR DE TON STOCK EN LIGNE, AU PRIX OÙ ÇA PART VRAIMENT ─────────────────
+// Chaque annonce en ligne dont on connaît le prix de marché (son modèle+taille a
+// au moins 2 ventes) est valorisée à ce médian — pas à son prix affiché, qui peut
+// être de travers. On DIT la couverture (combien d'annonces reconnues sur le
+// total) : un total partiel ne se présente jamais comme complet (§5). On compare
+// aussi au total AFFICHÉ, pour voir si globalement il vise au-dessus/en dessous.
+function valoriserStock(groups, online) {
+  const medMap = {}; for (const g of (groups || [])) medMap[g.modele + '|' + g.taille] = g.med;
+  let reconnu = 0, marche = 0, affiche = 0;
+  for (const it of (online || [])) {
+    const mo = extractModel(it && it.title);
+    const ta = extractSize(it && it.title) || (it && it.size != null ? extractSize('taille ' + it.size) : null);
+    const m = (mo && ta) ? medMap[mo + '|' + ta] : null;
+    if (m == null) continue;
+    reconnu++; marche += m; affiche += (montantCommande(it) || 0);
+  }
+  return { total: (online || []).length, reconnu, marche, affiche };
+}
 function PrixMarche({ data, baseKO }) {
   const eur2 = (n) => n.toFixed(n % 1 ? 2 : 0).replace('.', ',');
+  const groups = data && data.groups;
+  const valo = data && data.valo;
+  const eti = { fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 500 };
   return (
     <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
       <ScreenHead icon="chart" title="Le prix qui marche"
         desc="Ce que tes ventes disent du prix — par modèle et taille, pour tarifer et racheter juste." />
       {baseKO ? (
         <LignePanne>Je n'ai pas pu lire tes ventes — un prix médian faux serait pire que pas de prix. Rien n'est perdu : c'est la lecture qui a échoué.</LignePanne>
-      ) : data == null ? (
+      ) : groups == null ? (
         <div style={{ fontSize: 13, color: C.muted }}>Lecture de tes ventes…</div>
-      ) : data.length === 0 ? (
+      ) : (<>
+        {valo && valo.reconnu > 0 && (
+          <Card style={{ padding: 18 }}>
+            <div style={{ ...eti, marginBottom: 4 }}>Valeur de ton stock en ligne · au prix du marché</div>
+            <div className="vrm-display" style={{ fontSize: 30, fontWeight: 700, color: C.text }}>≈ {eur2(valo.marche)} €</div>
+            <div style={{ fontSize: 11.5, color: C.muted, marginTop: 4, lineHeight: 1.5 }}>
+              Sur <b>{valo.reconnu}</b> annonce{valo.reconnu > 1 ? 's' : ''} en ligne dont on connaît le prix du marché{valo.total > valo.reconnu ? <> (sur {valo.total} — les autres n'ont pas encore 2 ventes du même modèle+taille)</> : null}.
+              {valo.affiche > 0 && (() => { const ec = Math.round((valo.affiche / valo.marche - 1) * 100);
+                return <> Tu les affiches à ≈ <b>{eur2(valo.affiche)} €</b>{Math.abs(ec) >= 5 ? <> — soit <b style={{ color: C.text }}>{ec > 0 ? '+' : ''}{ec}%</b> {ec > 0 ? 'au-dessus' : 'en dessous'} du marché</> : ' — en ligne avec le marché'}.</>; })()}
+            </div>
+          </Card>
+        )}
+        {groups.length === 0 ? (
         <Card style={{ padding: 16 }}>
           <div style={{ fontSize: 13.5, color: C.text, lineHeight: 1.55 }}>
             Pas encore assez de ventes pour dégager un prix fiable — il faut <b>au moins deux ventes</b> d'un même modèle dans une même taille. Ça se remplira tout seul au fil de tes ventes.
@@ -6282,7 +6315,7 @@ function PrixMarche({ data, baseKO }) {
           Calculé sur tes <b>ventes finalisées</b>, regroupées par <b>modèle + taille</b> (au moins 2 ventes). Un modèle hors des grands connus n'apparaît pas — mieux vaut un blanc qu'un faux. Trié par ce qui se vend le plus.
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {data.map((gr, i) => (
+          {groups.map((gr, i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, border: `1px solid ${C.border}`, background: C.card, borderRadius: 10, padding: '11px 14px', boxShadow: C.shadow || 'none' }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13.5, fontWeight: 600, color: C.text, textTransform: 'capitalize' }}>
@@ -6299,6 +6332,7 @@ function PrixMarche({ data, baseKO }) {
             </div>
           ))}
         </div>
+      </>)}
       </>)}
     </div>
   );
@@ -25247,7 +25281,8 @@ export default function App() {
     const lst=await sb('app_data?id=like.harvest_*_listings&select=data')||[];
     const online=[]; for(const r of lst){ const p=(r.data&&r.data.payload)||{};
       for(const it of (p.items||[])){ if(!it.is_closed&&!it.is_hidden&&!it.is_draft) online.push(it); } }
-    setPqmData(grouperPrixMarche(sold, online));
+    const g = grouperPrixMarche(sold, online);
+    setPqmData({ groups: g, valo: valoriserStock(g, online) });
   })(); /* eslint-disable-next-line */ },[tab]);
   // ── VENTES LEBONCOIN PROUVÉES, pour le CA par plateforme du tableau de bord ──
   // §5 : une VENTE Leboncoin n'est comptée que si `isSeller===true` (le détail de
