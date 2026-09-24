@@ -3840,7 +3840,16 @@ function extractColor(text){
 //   commune +4 / aucune couleur commune −8, sur des ENSEMBLES (une paire
 //   bicolore neutralisait tout le test) · payé moins cher que revendu +1 ·
 //   titre strictement identique +6.
-const SEUIL_SUGGERE = 12;   // en dessous, on ne se prononce pas
+const SEUIL_SUGGERE = 12;   // en dessous, l'app ne se prononce pas TOUTE SEULE
+// ⚠️ MAIS ELLE MONTRE QUAND MÊME LES PISTES, à confirmer À LA MAIN. Mesuré sur
+// sa vraie base : le seuil sûr (>=12) couvre 111 paires sur 320 ; au-dessus de
+// ce plancher (>=6 : marque + un autre vrai signal), 236 paires ont au moins une
+// piste. Les 125 de plus passaient d'un BLANC (saisie aveugle) à un choix
+// rapide. On ne relie JAMAIS tout seul sous 12 (§5, un faux prix d'achat ne se
+// voit jamais) — la piste porte titre + prix + photo, et c'est LUI qui tape
+// dessus. En dessous de 6, c'est du bruit (marque seule = des centaines de
+// paires) : on se tait.
+const SEUIL_CANDIDAT = 6;
 const refAchat = (item) => ({
   marque:   (extractBrand(item?.title) || '').toLowerCase(),
   taille:   String(extractSize(item?.title) || '').toLowerCase(),
@@ -16846,13 +16855,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const out = {};
     for (const r of fillBuyRows) {
       const ref = refAchat({ title: r.e.title, price: r.e.price });
-      let best = null, bestS = 0;
+      // ⚠️ TOUTES les pistes au-dessus du plancher, pas seulement la plus sûre.
+      // Avant : on ne gardait que le meilleur >= 12, sinon rien — donc un blanc
+      // sur 209 paires. Maintenant on garde jusqu'à 3 candidats >= SEUIL_CANDIDAT,
+      // classés par score : le 1er « sûr » (>=12) reste en accent (« C'est ça »),
+      // les suivants « à vérifier » — TOUJOURS avec titre/prix/photo, et c'est
+      // LUI qui confirme (§5 : jamais l'app qui relie toute seule sous 12).
+      // Plus de dédup gloutonne entre paires : rien ne se relie automatiquement,
+      // donc un même achat peut être une piste pour deux paires — dès qu'il est
+      // relié à l'une, `linkedBuyIds` l'écarte de l'autre.
+      const scored = [];
       for (const c of prets) {
         if (pris.has(c.id)) continue;
         const sc = scoreAchatPrep(ref, c.p);
-        if (sc > bestS) { bestS = sc; best = c.o; }
+        if (sc >= SEUIL_CANDIDAT) scored.push({ o: c.o, sc });
       }
-      if (best && bestS >= SEUIL_SUGGERE) { out[r.key] = best; pris.add(String(best.transaction_id)); }
+      if (scored.length) {
+        scored.sort((a, b) => b.sc - a.sc);
+        out[r.key] = scored.slice(0, 3).map(x => ({ o: x.o, sur: x.sc >= SEUIL_SUGGERE }));
+      }
     }
     return out;
   }, [fillBuyOpen, fillBuyAchats.items, fillBuyRows, linkedBuyIds]);
@@ -21727,7 +21748,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div style={{fontSize:11.5,color:C.muted,marginTop:2}}>
                     {fillBuyRows.length} paire{fillBuyRows.length>1?'s':''} sans coût · tape le prix, <b>Entrée</b> passe à la suivante
                     {fillBuyAchats.loading && <> · <span style={{color:C.accent}}>recherche de tes achats…</span></>}
-                    {!fillBuyAchats.loading && Object.keys(fillBuySugg).length>0 && <> · <b style={{color:C.accent}}>{Object.keys(fillBuySugg).length} achat{Object.keys(fillBuySugg).length>1?'s':''} retrouvé{Object.keys(fillBuySugg).length>1?'s':''}</b>, tape dessus pour relier</>}
+                    {!fillBuyAchats.loading && Object.keys(fillBuySugg).length>0 && <> · <b style={{color:C.accent}}>{Object.keys(fillBuySugg).length} paire{Object.keys(fillBuySugg).length>1?'s':''} avec une piste</b> — tape « C'est ça » ou vérifie</>}
                   </div>
                 </div>
                 <button type="button" onClick={()=>setFillBuyOpen(false)} aria-label="Fermer" style={{flexShrink:0,border:'none',background:'transparent',color:C.muted,cursor:'pointer',padding:4}}><Icon name="close" size={18}/></button>
@@ -21774,23 +21795,28 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <span style={{fontSize:11,color:C.muted}}>€</span>
                   </div>
                  </div>
-                 {(()=>{ const p=fillBuySugg[r.key]; if(!p) return null;
-                   const pr=p.price?.amount!=null?Number(p.price.amount):null;
-                   const d=p.date?new Date(p.date):null;
+                 {(()=>{ const cs=fillBuySugg[r.key]; if(!cs||!cs.length) return null;
                    return (
-                     <button type="button" onClick={()=>linkBuyForKey(r.key,p)}
-                       style={{marginTop:6,width:'100%',display:'flex',alignItems:'center',gap:8,border:`1px solid ${C.accent}55`,background:`${C.accent}10`,borderRadius:8,padding:'6px 8px',cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
-                       {orderPhoto(p)
-                         ? <img src={orderPhoto(p)} alt="" loading="lazy" decoding="async" style={{width:26,height:26,borderRadius:5,objectFit:'cover',flexShrink:0}}/>
-                         : <span style={{width:26,height:26,borderRadius:5,background:C.border,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13}}>👟</span>}
-                       <span style={{flex:1,minWidth:0}}>
-                         <span style={{display:'block',fontSize:11.5,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.title||'(sans titre)'}</span>
-                         <span style={{display:'block',fontSize:10.5,color:C.muted}}>
-                           {pr!=null?`payé ${pr.toFixed(2).replace('.',',')} €`:'prix inconnu'}{d&&!isNaN(d)?` · ${d.toLocaleDateString('fr-FR')}`:''}{p._acc?` · ${accNameOf(p._acc)}`:''}
-                         </span>
-                       </span>
-                       <span style={{flexShrink:0,fontSize:11,fontWeight:700,color:C.accent,border:`1px solid ${C.accent}`,borderRadius:8,padding:'3px 9px'}}>C'est ça</span>
-                     </button>
+                     <div style={{marginTop:6,display:'flex',flexDirection:'column',gap:4}}>
+                       {cs.map((cand,ci)=>{ const p=cand.o, sur=cand.sur;
+                         const pr=p.price?.amount!=null?Number(p.price.amount):null;
+                         const d=p.date?new Date(p.date):null;
+                         return (
+                           <button key={ci} type="button" onClick={()=>linkBuyForKey(r.key,p)}
+                             style={{width:'100%',display:'flex',alignItems:'center',gap:8,border:`1px solid ${sur?C.accent+'55':C.border}`,background:sur?`${C.accent}10`:C.card,borderRadius:8,padding:'6px 8px',cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
+                             {orderPhoto(p)
+                               ? <img src={orderPhoto(p)} alt="" loading="lazy" decoding="async" style={{width:26,height:26,borderRadius:5,objectFit:'cover',flexShrink:0}}/>
+                               : <span style={{width:26,height:26,borderRadius:5,background:C.border,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13}}>👟</span>}
+                             <span style={{flex:1,minWidth:0}}>
+                               <span style={{display:'block',fontSize:11.5,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.title||'(sans titre)'}</span>
+                               <span style={{display:'block',fontSize:10.5,color:C.muted}}>
+                                 {pr!=null?`payé ${pr.toFixed(2).replace('.',',')} €`:'prix inconnu'}{d&&!isNaN(d)?` · ${d.toLocaleDateString('fr-FR')}`:''}{p._acc?` · ${accNameOf(p._acc)}`:''}
+                               </span>
+                             </span>
+                             <span style={{flexShrink:0,fontSize:11,fontWeight:700,color:sur?C.accent:C.muted,border:`1px solid ${sur?C.accent:C.border}`,borderRadius:8,padding:'3px 9px'}}>{sur?"C'est ça":'à vérifier'}</span>
+                           </button>
+                         ); })}
+                     </div>
                    ); })()}
                 </div>
               ))}
