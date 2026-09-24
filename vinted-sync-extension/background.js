@@ -3577,8 +3577,15 @@ const BORD_RATTRAPAGE_J = 21;
 //    ce sont des protections ANTI-BLOCAGE (§3), pas des scrupules. `vanessa5723`
 //    a été bloqué, et neuf comptes sont son gagne-pain :
 //      · uniquement le compte connecté dans l'onglet (`garde`) ;
-//      · plafond de 20 actions/heure par compte, déjà tenu par `garde` ;
-//      · **3 réponses par visite** — une réponse est une action Vinted ;
+//      · plafond de 20 actions/heure par compte, déjà tenu par `garde` —
+//        **c'est LUI la vraie protection anti-blocage**, pas le plafond par
+//        visite (§ « répond à tout mais étalé ») ;
+//      · **8 réponses par visite** — Julien, 24 septembre : « améliore la
+//        fiabilité, tu peux mettre plus de 3 répétitions… répond à tout mais
+//        étalé ». Le plafond par visite n'évite qu'une RAFALE sur une seule
+//        page ; répondre à tout se fait sur plusieurs visites, borné par le
+//        plafond horaire de 20 qui, lui, ne bouge pas. Monté de 3 à 8 : plus de
+//        3 (sa demande), mais jamais une salve de vingt d'un coup.
 //      · une requête à la fois, jamais deux en vol.
 // ⚠️ ET DEUX RÈGLES DE FOND, celles du dossier :
 //    1. **JAMAIS DEUX FOIS LE MÊME MESSAGE.** L'identité est l'`id` du message
@@ -3592,7 +3599,7 @@ const BORD_RATTRAPAGE_J = 21;
 //    `panel_msg_repondus` et le journal l'annonce : un message envoyé à sa place
 //    qu'il ne peut pas relire serait le pire de tout — c'est « un colis caché
 //    est un colis perdu » appliqué à ce qu'on dit à ses acheteurs.
-const MSG_MAX_PAR_VISITE = 3;
+const MSG_MAX_PAR_VISITE = 8;
 const MSG_MIN_CONFIANCE = 55;    // en dessous, l'IA hésite : on ne parle pas à sa place
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -3675,8 +3682,6 @@ async function repondreAuxMessages(uid) {
       const cle = cid + ':' + det.id;
       if (deja[cle] || neufs[cle]) { bilan.dejaRepondu++; continue; }    // déjà répondu à CE message
       if (envoyes >= MSG_MAX_PAR_VISITE) continue;                       // le reste attend la prochaine visite
-      const stop = await garde(uid, acc);          // compte de l'onglet + plafond horaire
-      if (stop) break;
       const sugg = await aiReply(det.body, det.article || c.description || '', det.price);
       const texte = (sugg && sugg.ok && Array.isArray(sugg.suggestions) && sugg.suggestions[0]
         && String(sugg.suggestions[0].text || '').trim()) || '';
@@ -3686,6 +3691,18 @@ async function repondreAuxMessages(uid) {
         noterDiag(!texte ? 'repond_sans_reponse' : 'repond_peu_sur');
         continue;
       }
+      // ⚠️ LE PLAFOND HORAIRE SE CONSOMME AU MOMENT DE L'ENVOI, JAMAIS AVANT.
+      //    `garde` → `compterAction` POUSSE un créneau du budget 20/h à chaque
+      //    appel. L'appeler avant l'IA brûlait un créneau pour une conversation
+      //    « pas sûre » qui n'envoyait rien : invisible à 3 par visite, mais dès
+      //    qu'on monte le plafond (sa demande « plus de 3 »), le budget de
+      //    l'heure s'épuisait sur des NON-réponses et les vraies réponses
+      //    suivantes se faisaient refuser à tort. On ne compte une action que
+      //    quand une réponse VA réellement partir. (Le contrôle « autre compte »
+      //    de `garde` reste ici : au pire on a payé un appel à NOTRE serveur IA,
+      //    jamais une requête à Vinted.)
+      const stop = await garde(uid, acc);          // compte de l'onglet + plafond horaire
+      if (stop) break;
       const r = await vintedSend(acc, 'POST', `/api/v2/conversations/${cid}/replies`, { reply: texte });
       noterDiag(r.ok ? 'repond_envoye' : `repond_refuse_${r.status}`);
       if (!r.ok) {
