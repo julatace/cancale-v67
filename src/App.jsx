@@ -4685,6 +4685,7 @@ const PLUS_TABS=[
   {id:'plat_vestiaire', icon:'tag', emoji:'👗',label:'Vestiaire',  desc:'Pas encore reliée à VRM'},
   {id:'dashboard',    icon:'chart',   emoji:'📊',label:'Statistiques',  desc:'Chiffre d\'affaires, bénéfices, cotisations'},
   {id:'prixmarche',   icon:'chart',   emoji:'💡',label:'Prix qui marche',desc:'À quel prix tes modèles se vendent, par taille'},
+  {id:'leboncoin',    icon:'shop',    emoji:'🟠',label:'À publier',      desc:'Tes annonces à publier sur Leboncoin, et à retirer'},
   /* ⚠️ « Messages » RETIRÉ du menu (demande de Julien, 24 sept. : « pas en
      onglet, mets les messages reçus dans les notifications »). Les non-lus
      restent dans le centre de notifications (job « Répondre à N messages »), qui
@@ -23816,8 +23817,10 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
         </>);
       })()}
 
-      <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Leboncoin</div>
-      <Row icon="shop" title="Leboncoin" desc="Publiées, à publier, à retirer, ton offre." onClick={()=>setTab('leboncoin')}/>
+      {/* ⚠️ « Leboncoin » RETIRÉ des Réglages (demande de Julien, 24 sept. :
+          « les annonces à publier sur le bon coin, pas la peine de mettre ça dans
+          les paramètres — fais un onglet à part »). L'atelier a désormais sa
+          propre entrée « À publier » dans le menu (PLUS_TABS → leboncoin). */}
 
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Sauvegarde</div>
       <Row icon="save" title="Sauvegarde complète (1 clic)" desc="Télécharge TOUT : catalogue, ventes, achats, numéros, comptes, garage, réglages. Ton filet de sécurité." onClick={onExport}/>
