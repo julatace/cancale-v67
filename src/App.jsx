@@ -4684,6 +4684,7 @@ const PLUS_TABS=[
   {id:'plat_ebay',      icon:'tag', emoji:'🔵',label:'eBay',       desc:'Ce que VRM sait d\'eBay'},
   {id:'plat_vestiaire', icon:'tag', emoji:'👗',label:'Vestiaire',  desc:'Pas encore reliée à VRM'},
   {id:'dashboard',    icon:'chart',   emoji:'📊',label:'Statistiques',  desc:'Chiffre d\'affaires, bénéfices, cotisations'},
+  {id:'prixmarche',   icon:'chart',   emoji:'💡',label:'Prix qui marche',desc:'À quel prix tes modèles se vendent, par taille'},
   {id:'cat_msg',      icon:'chat',    emoji:'💬',label:'Messages',      desc:'Ce qui est arrivé de nouveau'},
   {id:'garage',       icon:'home',    emoji:'🏠',label:'Garage',        desc:'Où est rangée chaque paire'},
   {id:'invoices',     icon:'receipt', emoji:'🧾',label:'Factures',      desc:'Documents pour tes comptes pro'},
@@ -6226,6 +6227,82 @@ function caParPlateforme(liveStats, lbcVentes) {
 // liste ici). Leboncoin/eBay/Vestiaire n'ont aucune vente captée aujourd'hui →
 // un tiret + la cause connue + le geste. Le compte connecté « où est la paire »
 // reste mesuré impossible (lbc_accounts vide) : on ne l'affiche pas.
+// ── « LE PRIX QUI MARCHE » ───────────────────────────────────────────────────
+// Demande de Julien (24 sept.) : un écran qui dit « à combien se vend CE modèle
+// dans CETTE taille », depuis SON histoire — pour tarifer et racheter juste.
+// ⚠️ REGROUPEMENT PAR MODÈLE + TAILLE, jamais par paire. C'est une STATISTIQUE
+// de catégorie, pas une identité (§5) : elle n'assigne aucune paire, donc aucun
+// risque de mauvaise chaussure — au pire un prix conseillé qu'on ignore. Le
+// modèle vient de KNOWN_MODELS : hors de cette liste, PAS de conseil (mieux vaut
+// un blanc qu'un faux). Et pas de groupe sous 2 ventes : une seule ne « marche »
+// pas, c'est un cas isolé. Mesuré : marque+taille seul mélange Air Max / Zoom /
+// Dunk (prix incomparables) — c'est pour ça qu'on exige le MODÈLE.
+const medianeNb = (arr) => { const a = arr.filter(x => x > 0).sort((x, y) => x - y);
+  if (!a.length) return 0; const m = Math.floor(a.length / 2);
+  return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2; };
+function grouperPrixMarche(sold, online) {
+  const g = {};
+  for (const o of (sold || [])) {
+    const mo = extractModel(o && o.title), ta = extractSize(o && o.title);
+    if (!mo || !ta) continue;
+    const k = mo + '|' + ta;
+    (g[k] = g[k] || { modele: mo, taille: ta, prix: [], stock: 0 }).prix.push(montantCommande(o));
+  }
+  for (const it of (online || [])) {
+    const mo = extractModel(it && it.title);
+    const ta = extractSize(it && it.title) || (it && it.size != null ? extractSize('taille ' + it.size) : null);
+    if (!mo || !ta) continue;
+    const k = mo + '|' + ta; if (g[k]) g[k].stock++;
+  }
+  return Object.values(g)
+    .map(x => { const pr = x.prix.filter(p => p > 0).sort((a, b) => a - b); return { ...x, pr }; })
+    .filter(x => x.pr.length >= 2)
+    .map(x => ({ modele: x.modele, taille: x.taille, n: x.pr.length,
+      med: medianeNb(x.pr), min: x.pr[0], max: x.pr[x.pr.length - 1], stock: x.stock }))
+    .sort((a, b) => b.n - a.n || b.med - a.med);
+}
+function PrixMarche({ data, baseKO }) {
+  const eur2 = (n) => n.toFixed(n % 1 ? 2 : 0).replace('.', ',');
+  return (
+    <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <ScreenHead icon="chart" title="Le prix qui marche"
+        desc="Ce que tes ventes disent du prix — par modèle et taille, pour tarifer et racheter juste." />
+      {baseKO ? (
+        <LignePanne>Je n'ai pas pu lire tes ventes — un prix médian faux serait pire que pas de prix. Rien n'est perdu : c'est la lecture qui a échoué.</LignePanne>
+      ) : data == null ? (
+        <div style={{ fontSize: 13, color: C.muted }}>Lecture de tes ventes…</div>
+      ) : data.length === 0 ? (
+        <Card style={{ padding: 16 }}>
+          <div style={{ fontSize: 13.5, color: C.text, lineHeight: 1.55 }}>
+            Pas encore assez de ventes pour dégager un prix fiable — il faut <b>au moins deux ventes</b> d'un même modèle dans une même taille. Ça se remplira tout seul au fil de tes ventes.
+          </div>
+        </Card>
+      ) : (<>
+        <div style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.5 }}>
+          Calculé sur tes <b>ventes finalisées</b>, regroupées par <b>modèle + taille</b> (au moins 2 ventes). Un modèle hors des grands connus n'apparaît pas — mieux vaut un blanc qu'un faux. Trié par ce qui se vend le plus.
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {data.map((gr, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, border: `1px solid ${C.border}`, background: C.card, borderRadius: 10, padding: '11px 14px', boxShadow: C.shadow || 'none' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13.5, fontWeight: 600, color: C.text, textTransform: 'capitalize' }}>
+                  {gr.modele} <span style={{ color: C.accent, fontWeight: 700, textTransform: 'none' }}>T{gr.taille}</span>
+                </div>
+                <div style={{ fontSize: 11.5, color: C.muted, marginTop: 2 }}>
+                  {gr.n} vente{gr.n > 1 ? 's' : ''} · de {eur2(gr.min)} à {eur2(gr.max)} €{gr.stock > 0 ? ` · ${gr.stock} en stock` : ''}
+                </div>
+              </div>
+              <div style={{ flexShrink: 0, textAlign: 'right' }}>
+                <div style={{ fontSize: 10, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 500 }}>Prix médian</div>
+                <div className="vrm-display" style={{ fontSize: 22, fontWeight: 700, color: C.text }}>{eur2(gr.med)} €</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </>)}
+    </div>
+  );
+}
 function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, onGo, baseKO }) {
   const p = caParPlateforme(liveStats, lbcVentes).find(x => x.nom === plat) || { nom:plat, ca:null };
   const estVinted = plat === 'Vinted';
@@ -24913,7 +24990,7 @@ export default function App() {
     // banc, qui navigue par `?tab=`, croyait rendre Leboncoin alors qu'il
     // mesurait l'accueil (un faux vert dans ma propre couverture d'hier).
     // `journee` manquait aussi : invisible parce que c'est l'état de départ.
-    const TABS_OK=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','dashboard','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','invoices','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin'];
+    const TABS_OK=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','invoices','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin'];
     const goto=(search)=>{ try{ const p=new URLSearchParams(search); const t=p.get('tab'); if(p.get('print')==='bord') _pendingBordPrint=true; if(t&&TABS_OK.includes(t)){ setTab(t); window.history.replaceState({},'',window.location.pathname); } }catch(_){}};
     goto(window.location.search);
     const onMsg=(e)=>{ if(e.data&&e.data.type==='open-url'&&e.data.url){ try{ goto(new URL(e.data.url,window.location.origin).search); }catch(_){}} };
@@ -25153,6 +25230,25 @@ export default function App() {
   //    l'extension ».
   const premierJour = accountsLoaded && !baseKO && vintedAccounts.length === 0;
   const [liveStats,setLiveStats]=useState(null); // résumé Vinted en direct pour l'accueil
+  // ── « Le prix qui marche » : chargé À LA DEMANDE (onglet ouvert), une fois ──
+  // Lit les ventes FINALISÉES et les annonces en ligne, regroupe par
+  // modèle+taille (grouperPrixMarche). `null` = pas encore lu · [] = lu, rien
+  // d'assez dense · échec ⇒ baseKO parle déjà. select=data sur orders_sold /
+  // listings : lignes légères (pas de PDF), §4.4 respecté.
+  const [pqmData,setPqmData]=useState(null);
+  useEffect(()=>{ if(tab!=='prixmarche' || pqmData!==null) return; (async()=>{
+    const sb=async(q)=>{ try{ const r=await fetch(`${SUPABASE_URL}/rest/v1/${q}`,{headers:sbAuth()}); return r.ok?await r.json():null; }catch(_){ return null; } };
+    const so=await sb('app_data?id=like.harvest_*_orders_sold&select=data');
+    if(so===null) return; // pas su ⇒ on laisse `null`, baseKO affiche la panne
+    const sold=[]; const seen=new Set();
+    for(const r of so){ const p=(r.data&&r.data.payload)||{}; for(const o of (p.my_orders||[])){
+      const t=String(o.transaction_id||o.id||''); if(t&&seen.has(t)) continue; if(t) seen.add(t);
+      if(/finalis/i.test(o.status||'')) sold.push(o); } }
+    const lst=await sb('app_data?id=like.harvest_*_listings&select=data')||[];
+    const online=[]; for(const r of lst){ const p=(r.data&&r.data.payload)||{};
+      for(const it of (p.items||[])){ if(!it.is_closed&&!it.is_hidden&&!it.is_draft) online.push(it); } }
+    setPqmData(grouperPrixMarche(sold, online));
+  })(); /* eslint-disable-next-line */ },[tab]);
   // ── VENTES LEBONCOIN PROUVÉES, pour le CA par plateforme du tableau de bord ──
   // §5 : une VENTE Leboncoin n'est comptée que si `isSeller===true` (le détail de
   // transaction le dit) — jamais déduite d'une transaction vue en liste. Lecture
@@ -26190,6 +26286,7 @@ export default function App() {
         {tab==='plat_leboncoin'&&<Plateforme plat="Leboncoin" liveStats={liveStats} lbcVentes={lbcVentes} onGo={setTab} baseKO={baseKO}/>}
         {tab==='plat_ebay'&&<Plateforme plat="eBay" liveStats={liveStats} lbcVentes={lbcVentes} onGo={setTab} baseKO={baseKO}/>}
         {tab==='plat_vestiaire'&&<Plateforme plat="Vestiaire Collective" liveStats={liveStats} lbcVentes={lbcVentes} onGo={setTab} baseKO={baseKO}/>}
+        {tab==='prixmarche'&&<PrixMarche data={pqmData} baseKO={baseKO}/>}
         {tab==='inventory'&&<Inventory inventory={inventory} setInventory={setInventory} accounts={vintedAccounts} garageGrid={garageGrid} labels={accountLabels} onLocate={(numero)=>{ setGarageLocate(String(numero)); setTab('garage'); }}/>}
         {tab==='catalog'  &&<Catalog   catalog={catalog} setCatalog={setCatalog} onDeleteId={(id)=>{
           const norm=v=>String(v||'').trim();
