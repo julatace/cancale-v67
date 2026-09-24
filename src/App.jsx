@@ -6360,6 +6360,13 @@ function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, onGo
   const ventesVinted = liveStats && liveStats.soldTotal != null ? liveStats.soldTotal : null;
   const online = liveStats && liveStats.online != null ? liveStats.online : null;
   const enAttente = liveStats && liveStats.enCours != null ? liveStats.enCours : null;
+  // Argent Vinted : « disponible » et « en attente » sont DEUX montants qui ne
+  // se confondent jamais (§5.14). Consommés de liveStats (même source que Ma
+  // journée et Statistiques, §11) — jamais recalculés ici.
+  const wDispo   = liveStats && liveStats.walletDispo   != null ? liveStats.walletDispo   : null;
+  const wAttente = liveStats && liveStats.walletAttente != null ? liveStats.walletAttente : null;
+  const wComptes = (liveStats && liveStats.walletComptes) || 0;
+  const wAge     = liveStats && liveStats.walletAgeJours != null ? liveStats.walletAgeJours : null;
   const court = plat === 'Vestiaire Collective' ? 'Vestiaire' : plat;
   const carte = {textAlign:'left',border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'13px 15px',cursor:'pointer',fontFamily:'inherit'};
   const eti = {fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500};
@@ -6375,6 +6382,24 @@ function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, onGo
           <div className="vrm-display" style={{fontSize:30,fontWeight:700,color:C.text}}>{p.ca==null?'—':fmt(p.ca)}</div>
           <div style={{fontSize:11.5,color:C.muted,marginTop:2}}>{p.ca==null?'aucune vente finalisée captée pour l’instant':'ventes finalisées, tous comptes'}</div>
         </Card>
+        {wComptes>0 && (
+          <Card style={{padding:16}}>
+            <div style={{...eti,marginBottom:8}}>Argent Vinted</div>
+            <div style={{display:'flex',gap:20,flexWrap:'wrap'}}>
+              <div>
+                <div className="vrm-display" style={{fontSize:22,fontWeight:700,color:C.text}}>{wDispo==null?'—':fmt(wDispo)}</div>
+                <div style={{fontSize:11,color:C.muted,marginTop:2}}>disponible à virer</div>
+              </div>
+              <div>
+                <div className="vrm-display" style={{fontSize:22,fontWeight:700,color:C.muted}}>{wAttente==null?'—':fmt(wAttente)}</div>
+                <div style={{fontSize:11,color:C.muted,marginTop:2}}>en attente (retenu par Vinted)</div>
+              </div>
+            </div>
+            <div style={{fontSize:11,color:C.muted,marginTop:8,lineHeight:1.5}}>
+              Lu sur {wComptes} porte-monnaie{wComptes>1?'s':''}. Ce sont les chiffres de Vinted, pas une estimation.{wAge!=null && wAge>7 ? ` Le plus ancien date de ${wAge} j — repasse sur ces comptes pour rafraîchir.` : ''}
+            </div>
+          </Card>
+        )}
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(150px,1fr))',gap:10}}>
           <button type="button" onClick={()=>onGo&&onGo('cat_annonces')} style={carte}>
             <div style={eti}>Annonces en ligne</div>
@@ -25773,9 +25798,18 @@ export default function App() {
       // Mêmes comptes que l'app : un compte supprimé ne doit pas gonfler le
       // chiffre du widget (mesuré : 57,23 € de shop_cancale comptés en trop).
       const uidsVivants=new Set((vintedAccounts||[]).map(a=>String(a.vinted_user_id||'')).filter(Boolean));
-      try{ const esc=await fetchWalletEscrow(uidsVivants); if(esc&&esc.total>0) enAttenteReel=esc.total; }catch(_){}
+      // ⚠️ On garde le porte-monnaie ENTIER (pas seulement l'attente) pour le
+      //    passer au hub Vinted : « disponible » et « en attente » sont deux
+      //    montants Vinted qui ne se confondent JAMAIS (§5.14). Même source que
+      //    Ma journée et Statistiques (§11), jamais un recalcul.
+      let walletEsc=null;
+      try{ walletEsc=await fetchWalletEscrow(uidsVivants); if(walletEsc&&walletEsc.total>0) enAttenteReel=walletEsc.total; }catch(_){}
       if(!stop && ok){
-      setLiveStats({caMois,caEncaisse,enCours,online,unread,stockValue,pairesStock,ventesJour,caJour,ventesMois,soldTotal,joursVente:joursVenteSet.size,caParCompte});
+      setLiveStats({caMois,caEncaisse,enCours,online,unread,stockValue,pairesStock,ventesJour,caJour,ventesMois,soldTotal,joursVente:joursVenteSet.size,caParCompte,
+        walletDispo:(walletEsc&&walletEsc.accounts>0)?walletEsc.dispo:null,
+        walletAttente:(walletEsc&&walletEsc.accounts>0)?walletEsc.total:null,
+        walletComptes:(walletEsc&&walletEsc.accounts)||0,
+        walletAgeJours:(walletEsc&&walletEsc.plusVieuxJours!=null)?walletEsc.plusVieuxJours:null});
         // Photo des chiffres pour le WIDGET écran d'accueil : l'app publie ce
         // qu'elle affiche → le widget montre EXACTEMENT la même chose. « Synchroniser »
         // le widget = simplement ouvrir l'app (qui réécrit cette ligne).
