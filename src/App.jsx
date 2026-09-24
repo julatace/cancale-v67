@@ -13154,7 +13154,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (brouillons de republication : état retiré avec l'atelier. La clé
   //  `vinted_annonce_drafts` reste synchronisée — on ne supprime pas des
   //  données du nuage au passage d'un écran.)
-  const [repubAi, setRepubAi] = useState({ busy:false, why:'', reason:'' }); // état de la rédaction IA
+  const [repubAi, setRepubAi] = useState({ busy:false, key:'', res:null, why:'', reason:'' }); // état de la rédaction IA
   const [repubBucket, setRepubBucket] = useState('all'); // filtre file de travail : all|low|mid|top
   const [photoEdit, setPhotoEdit] = useState(null); // { refPhoto, refTitle } → éditeur de photo (recadrer/zoomer)
   const [auditOpen, setAuditOpen] = useState(false); // modale « Audit d'inventaire »
@@ -16848,6 +16848,29 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listQ, listSize, listBuy, sales.items, annBase, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts]);
   const copyText = (txt, key) => { try { navigator.clipboard.writeText(txt); setCopied(key); setTimeout(()=>setCopied(''),1500); } catch(_){} };
+  // ── Atelier « Rédiger avec l'IA » (feature A) ──────────────────────────────
+  // Le MOTEUR existe déjà côté serveur (api/ai.js : titre + description
+  // réécrits, consigne stricte « ne rien inventer », clé jamais dans le code).
+  // Il ne manquait que le bouton — l'atelier avait été retiré, laissant `repubAi`
+  // et le réglage de clé orphelins (motif du tiroir Nav, §4.11). On rebranche.
+  // ⚠️ COPIE SEULEMENT — rien n'est publié tout seul (§3) : il relit, ajuste et
+  // colle sur Vinted. La clé perso reste sur l'appareil (`vrm_ai_key`), envoyée
+  // en HTTPS ; côté serveur elle n'est même pas nécessaire si AI_API_KEY est sur
+  // Vercel. Pas de clé ⇒ on le DIT (aucune rédaction inventée).
+  const [iaOpen, setIaOpen] = useState(false);
+  const redigerIA = async (e) => {
+    if (!e) return;
+    setRepubAi({ busy:true, key:String(e.numero||e.id||''), res:null, why:'', reason:'' });
+    try {
+      const r = await fetch('/api/ai', { method:'POST', headers:{'content-type':'application/json'},
+        body: JSON.stringify({ title:e.title||'', brand:extractBrand(e.title)||'',
+          size:e.size||extractSize(e.title)||'', price:e.price, desc:e.desc||'',
+          key: (load('vrm_ai_key','')||'').trim() || undefined }) });
+      const j = await r.json().catch(()=>({}));
+      if (j && j.ok) setRepubAi({ busy:false, key:String(e.numero||e.id||''), res:{ title:j.title||'', desc:j.desc||'' }, why:j.why||'', reason:'' });
+      else setRepubAi({ busy:false, key:String(e.numero||e.id||''), res:null, why:'', reason:(j&&j.reason)||'network' });
+    } catch(_) { setRepubAi({ busy:false, key:String(e.numero||e.id||''), res:null, why:'', reason:'network' }); }
+  };
 
   // ── Rapport comptable (#3) ─────────────────────────────────────────
   // ── SAISIE EN SÉRIE DES PRIX D'ACHAT ───────────────────────────────────────
@@ -20333,6 +20356,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {k:'inv', icon:'📋', lab:'Inventaire physique', desc:'Les paires qui doivent être chez toi, par numéro', on:()=>{ setAnnToolsOpen(false); setInventOpen(true); }},
                     {k:'aud', icon:'🔎', lab:'Audit du stock', desc:'Retrouver les paires mal rangées', on:()=>{ setAnnToolsOpen(false); setAuditOpen(true); }},
                     {k:'fillbuy', icon:'💶', lab:"Compléter les prix d'achat", desc:`${fillBuyRows.length} paire${fillBuyRows.length>1?'s':''} sans coût — le bénéfice est faux sans eux`, on:()=>{ setAnnToolsOpen(false); setFillBuyOpen(true); }},
+                    {k:'ia', icon:'✨', lab:"Rédiger une annonce (IA)", desc:'Réécrit titre + description pour vendre plus vite — tu copies, tu publies', on:()=>{ setAnnToolsOpen(false); setRepubAi({ busy:false, key:'', res:null, why:'', reason:'' }); setIaOpen(true); }},
                     /* ⚠️ « Renuméroter à la suite » A ÉTÉ RETIRÉ DU MENU (23 août 2026).
                        C'est le seul outil qui RÉATTRIBUE des numéros en masse — donc
                        exactement ce que Julien interdit maintenant qu'il les écrit sur
@@ -21931,6 +21955,68 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                    ); })()}
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+      {iaOpen && (
+        <div onClick={()=>setIaOpen(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}} data-noswipe="1">
+          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'90vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+            <div style={{display:'flex',gap:10,alignItems:'center',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:15,fontWeight:700,color:C.text}}>✨ Rédiger une annonce (IA)</div>
+                <div style={{fontSize:11,color:C.muted,marginTop:1}}>Choisis une paire — l'IA propose un titre et une description. <b>Tu copies, tu publies</b> ; rien n'est envoyé tout seul, et l'IA n'invente aucune caractéristique.</div>
+              </div>
+              <button type="button" onClick={()=>setIaOpen(false)} aria-label="Fermer" style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
+            </div>
+            <div style={{overflowY:'auto',padding:'10px 12px 16px'}}>
+              {(()=>{ const items=Object.entries(numeros)
+                  .filter(([id,e])=>e&&e.numero&&String(e.title||'').trim())
+                  .sort((a,b)=>Number(b[1].numero||0)-Number(a[1].numero||0));
+                if(!items.length) return <div style={{textAlign:'center',padding:'26px 12px',color:C.muted,fontSize:13}}>Aucune paire numérotée à rédiger.</div>;
+                return items.map(([id,e])=>{ const k=String(e.numero||id); const actif=repubAi.key===k;
+                  return (
+                  <div key={id} style={{background:C.card,border:`1px solid ${actif?C.accent+'55':C.border}`,borderRadius:10,padding:'8px 10px',marginBottom:6}}>
+                    <div style={{display:'flex',gap:10,alignItems:'center'}}>
+                      <div style={{width:40,height:40,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                        {e.photo?<img src={e.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:16}}>👟</span>}
+                      </div>
+                      <div style={{flex:'1 1 130px',minWidth:0}}>
+                        <div style={{fontSize:12.5,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                          <span style={{color:C.accent,fontWeight:700}}>N°{e.numero}</span> {e.title}
+                        </div>
+                        {e.price!=null&&e.price!==''&&<div style={{fontSize:11,color:C.muted,marginTop:1}}>{eur(e.price).toFixed(2).replace('.',',')} €</div>}
+                      </div>
+                      <button type="button" onClick={()=>redigerIA({...e,id})} disabled={repubAi.busy&&actif}
+                        style={{flexShrink:0,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,borderRadius:8,padding:'8px 12px',fontSize:12.5,fontWeight:700,cursor:repubAi.busy&&actif?'default':'pointer',fontFamily:'inherit',opacity:repubAi.busy&&actif?0.6:1}}>
+                        {repubAi.busy&&actif?'…':'✨ Rédiger'}
+                      </button>
+                    </div>
+                    {actif&&!repubAi.busy&&repubAi.reason&&(
+                      <div style={{marginTop:8,fontSize:11.5,color:C.muted,lineHeight:1.45}}>
+                        {repubAi.reason==='no-key'
+                          ? <>Pas de clé IA : ajoute-la dans <b>Réglages → Rédaction d'annonces par l'IA</b> (ou pose <b>AI_API_KEY</b> sur Vercel). Rien n'est inventé sans elle.</>
+                          : <>L'IA n'a pas répondu ({repubAi.reason}). Réessaie dans un instant.</>}
+                      </div>
+                    )}
+                    {actif&&!repubAi.busy&&repubAi.res&&(
+                      <div style={{marginTop:8,display:'flex',flexDirection:'column',gap:8}}>
+                        <div style={{border:`1px solid ${C.border}`,borderRadius:8,padding:'8px 10px',background:C.card2||C.card}}>
+                          <div style={{fontSize:10,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:2}}>Titre proposé</div>
+                          <div style={{fontSize:13,color:C.text,fontWeight:600}}>{repubAi.res.title}</div>
+                          <button type="button" onClick={()=>copyText(repubAi.res.title,'iat'+k)} style={{marginTop:6,border:`1px solid ${C.border}`,background:'transparent',color:copied==='iat'+k?C.accent:C.text,borderRadius:8,padding:'5px 10px',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{copied==='iat'+k?'✓ Copié':'Copier le titre'}</button>
+                        </div>
+                        <div style={{border:`1px solid ${C.border}`,borderRadius:8,padding:'8px 10px',background:C.card2||C.card}}>
+                          <div style={{fontSize:10,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:2}}>Description proposée</div>
+                          <div style={{fontSize:12.5,color:C.text,whiteSpace:'pre-wrap',lineHeight:1.45}}>{repubAi.res.desc}</div>
+                          <button type="button" onClick={()=>copyText(repubAi.res.desc,'iad'+k)} style={{marginTop:6,border:`1px solid ${C.border}`,background:'transparent',color:copied==='iad'+k?C.accent:C.text,borderRadius:8,padding:'5px 10px',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{copied==='iad'+k?'✓ Copié':'Copier la description'}</button>
+                        </div>
+                        {repubAi.why&&<div style={{fontSize:11,color:C.muted,fontStyle:'italic'}}>{repubAi.why}</div>}
+                      </div>
+                    )}
+                  </div>
+                  ); });
+              })()}
             </div>
           </div>
         </div>
