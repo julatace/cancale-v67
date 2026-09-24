@@ -35,7 +35,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.108.0';
+const EXT_ATTENDUE = '5.109.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -24005,7 +24005,7 @@ function RepondreSetting() {
         <div style={{flex:1,minWidth:0}}>
           <div style={{fontSize:13,fontWeight:600,color:C.text}}>Répondre à mes messages Vinted</div>
           <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.5}}>
-            À chaque passage sur Vinted, l’extension lit les messages non lus du compte connecté et répond <b>aux questions posées sur tes annonces</b>&nbsp;: <b>3 par visite au maximum</b>, jamais deux fois au même message, et <b>rien du tout si elle n’est pas sûre</b> — un silence coûte moins qu’une réponse fausse sur un prix.
+            À chaque passage sur Vinted, l’extension lit les messages non lus du compte connecté et répond <b>aux questions posées sur tes annonces</b>&nbsp;: <b>plusieurs par visite</b> (le reste à la visite suivante, sans jamais dépasser une limite sûre par heure), jamais deux fois au même message, et <b>rien du tout si elle n’est pas sûre</b> — un silence coûte moins qu’une réponse fausse sur un prix.
           </div>
         </div>
         <button type="button" onClick={basculer} aria-pressed={on}

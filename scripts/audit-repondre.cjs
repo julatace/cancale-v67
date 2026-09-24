@@ -51,7 +51,7 @@ const convRow = ({ cid, msgId, body, itemId, allowReply = true, login = 'un_ache
 
 function faireCtx({ lignes = {}, ia = null, gardeStop = null } = {}) {
   const store = {};
-  const journal = { replies: [], ecrits: [], ia: 0 };
+  const journal = { replies: [], ecrits: [], ia: 0, gardeCalls: 0 };
   const ctx = {
     console: { log() {}, warn() {}, error() {} },
     setTimeout: (fn, ms) => setTimeout(fn, Math.min(ms || 0, 1)),
@@ -103,7 +103,11 @@ function faireCtx({ lignes = {}, ia = null, gardeStop = null } = {}) {
   vm.runInContext(src, ctx, { filename: 'background.js' });
   // Les portes du monde extérieur, remplacées pour COMPTER.
   ctx.getStoredAccounts = async () => [{ vinted_user_id: UID, login: 'julatace3535', domain: 'fr' }];
-  ctx.garde = async () => gardeStop;
+  // ⚠️ On COMPTE les appels à `garde` : `garde`→`compterAction` consomme un
+  //    créneau du budget 20/h à chaque appel. Un appel de `garde` sans envoi =
+  //    un créneau de l'heure brûlé pour rien. Le correctif ne l'appelle plus
+  //    qu'au moment d'un envoi réel.
+  ctx.garde = async () => { journal.gardeCalls++; return gardeStop; };
   ctx.logActivity = async () => {};
   ctx.aiReply = async (message, article, price) => { journal.ia++; return ia ? ia(message, article, price) : { ok: true, intent: 'question', confidence: 90, suggestions: [{ tone: 'court', text: 'Oui, toujours dispo !' }] }; };
   ctx.vintedSend = async (acc, method, endpoint, body) => {
@@ -208,18 +212,52 @@ const nonLue = (cid, desc) => ({ id: Number(cid), unread: true, description: des
   });
 
   // ══ 5. LE PLAFOND PAR VISITE ══════════════════════════════════════════════
-  console.log('\n── Trois par visite au maximum (une réponse est une action Vinted, §3)');
+  console.log('\n── Le plafond par visite : plus de 3, mais borné (répond à tout, étalé §3)');
   await essaie('le plafond', async () => {
+    const max = Number((/const MSG_MAX_PAR_VISITE = (\d+)/.exec(src) || [])[1]);
+    dit(max > 0, 'le plafond est lu dans le code, pas recopié dans le banc', `MSG_MAX_PAR_VISITE=${max}`);
+    dit(max > 3, 'le plafond a bien été relevé au-dessus de 3 (sa demande « plus de 3 »)', `MSG_MAX_PAR_VISITE=${max}`);
+    // On sert PLUS de conversations que le plafond, sinon le contrôle ne peut
+    // pas mordre : il faut qu'il en reste à écarter (§6.1).
+    const total = max + 4;
     const convs = [], rows = {};
-    for (let i = 1; i <= 6; i++) {
+    for (let i = 1; i <= total; i++) {
       convs.push(nonLue(1000 + i));
       rows[`harvest_${UID}_conv_${1000 + i}`] = convRow({ cid: 1000 + i, msgId: 500 + i, body: 'Bonjour, toujours dispo ?', itemId: MON_ITEM });
     }
     const ctx = faireCtx({ lignes: base(Object.assign(inbox(convs), rows)) });
     const n = await ctx.repondreAuxMessages(UID);
-    const max = Number((/const MSG_MAX_PAR_VISITE = (\d+)/.exec(src) || [])[1]);
-    dit(max > 0, 'le plafond est lu dans le code, pas recopié dans le banc', `MSG_MAX_PAR_VISITE=${max}`);
-    dit(n === max && ctx.__journal.replies.length === max, `exactement ${max} réponses sur 6 possibles`, `envois=${ctx.__journal.replies.length}`);
+    dit(n === max && ctx.__journal.replies.length === max, `exactement ${max} réponses sur ${total} possibles (le reste attend la prochaine visite)`, `envois=${ctx.__journal.replies.length}`);
+  });
+
+  // ══ 5bis. LE BUDGET HORAIRE NE SE BRÛLE QUE POUR UN ENVOI RÉEL ════════════
+  // La vraie protection anti-blocage est le plafond de 20 actions/heure
+  // (`garde`→`compterAction`, qui pousse un créneau à chaque appel). Avant, on
+  // appelait `garde` AVANT de savoir si l'IA répond : une conversation « pas
+  // sûre » brûlait un créneau du budget sans rien envoyer. Invisible à 3/visite,
+  // fatal en montant le plafond. On compte donc les appels à `garde` : il ne
+  // doit y en avoir qu'AUTANT que d'envois réels.
+  console.log('\n── Une conversation « pas sûre » ne brûle pas un créneau du budget horaire');
+  await essaie('le budget horaire', async () => {
+    const convs = [nonLue(2001), nonLue(2002), nonLue(2003)];
+    const rows = {
+      [`harvest_${UID}_conv_2001`]: convRow({ cid: 2001, msgId: 91, body: 'floue, je ne sais pas', itemId: MON_ITEM }),
+      [`harvest_${UID}_conv_2002`]: convRow({ cid: 2002, msgId: 92, body: 'SURE dispo demain', itemId: MON_ITEM }),
+      [`harvest_${UID}_conv_2003`]: convRow({ cid: 2003, msgId: 93, body: 'floue aussi', itemId: MON_ITEM }),
+    };
+    // L'IA n'est sûre que pour la conversation dont le message porte « SURE ».
+    const ia = (message) => /SURE/.test(message)
+      ? { ok: true, intent: 'question', confidence: 90, suggestions: [{ text: 'Oui, dispo !' }] }
+      : { ok: true, intent: 'negociation', confidence: 30, suggestions: [{ text: 'Je ne sais pas trop.' }] };
+    const ctx = faireCtx({ lignes: base(Object.assign(inbox(convs), rows)), ia });
+    const n = await ctx.repondreAuxMessages(UID);
+    const j = ctx.__journal;
+    dit(n === 1 && j.replies.length === 1, 'une seule réponse part (une seule était sûre)', `envois=${j.replies.length}`);
+    // ⚠️ §6.1 : sur le code d'avant `garde` était appelé AVANT l'IA, donc 3 fois
+    //    (une par conversation examinée) — le budget de l'heure aurait perdu 2
+    //    créneaux pour des conversations non répondues. Ici : 1 appel = 1 envoi.
+    dit(j.gardeCalls === 1, 'le plafond horaire (`garde`) n\'est consommé que pour l\'envoi réel, pas pour les 2 « pas sûres »', `appels garde=${j.gardeCalls}`);
+    dit(j.ia === 3, 'les trois conversations sont bien examinées par l\'IA', `appels IA=${j.ia}`);
   });
 
   // ══ 6. MIEUX VAUT UN BLANC QU'UN FAUX ═════════════════════════════════════
