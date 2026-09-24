@@ -6421,18 +6421,38 @@ function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, onGo
           Les chiffres viennent du Tableau de bord et des écrans Ventes/Annonces — c'est la même source, ils ne peuvent pas se contredire.
         </div>
       </>) : (<>
+        {/* Chaque site a son espace avec SES infos (Julien : « chaque info par
+            site »). Le CA vient de `caParPlateforme` (§11) : pour Leboncoin il
+            porte les ventes PROUVÉES par référence VRM (jamais un titre, §5) —
+            on l'affiche vraiment, au lieu d'un « — » systématique. */}
         <Card style={{padding:18}}>
           <div style={{...eti,marginBottom:4}}>{court} · chiffre d'affaires</div>
-          <div className="vrm-display" style={{fontSize:30,fontWeight:700,color:C.muted}}>—</div>
-          <div style={{fontSize:11.5,color:C.muted,marginTop:2}}>pas encore de vente captée</div>
+          <div className="vrm-display" style={{fontSize:30,fontWeight:700,color:p.ca!=null?C.text:C.muted}}>{p.ca!=null?fmt(p.ca):'—'}</div>
+          <div style={{fontSize:11.5,color:C.muted,marginTop:2}}>{p.ca!=null?'ventes prouvées captées':'pas encore de vente captée'}</div>
         </Card>
+        {plat==='Leboncoin' && (
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(150px,1fr))',gap:10}}>
+            <button type="button" onClick={()=>onGo&&onGo('leboncoin')} style={carte}>
+              <div style={eti}>À publier</div>
+              <div className="vrm-display" style={{...gros,fontSize:18,color:C.text}}>Ouvrir ›</div>
+              <div style={{fontSize:11,color:C.muted,marginTop:2}}>Tes annonces à mettre sur Leboncoin, et à retirer</div>
+            </button>
+            <button type="button" onClick={()=>onGo&&onGo('cat_annonces')} style={carte}>
+              <div style={eti}>Ventes prouvées</div>
+              <div className="vrm-display" style={gros}>{(lbcVentes&&Array.isArray(lbcVentes.ventes))?lbcVentes.ventes.length:0}</div>
+              <div style={{fontSize:11,color:C.muted,marginTop:2}}>reliées à une paire par la référence VRM</div>
+            </button>
+          </div>
+        )}
         <Card style={{padding:16}}>
           <div style={{fontSize:13.5,color:C.text,lineHeight:1.55}}>
             {plat==='Vestiaire Collective'
               ? <>Vestiaire Collective n'est <b>pas encore reliée</b> à VRM : rien n'y est capté aujourd'hui. Le jour où une vente y remontera, elle apparaîtra ici et dans le total — jamais un chiffre inventé avant.</>
-              : <>Aucune vente n'a encore été captée sur {court}. Tu publies tes paires depuis l'écran <b>Annonces</b> ; dès qu'une vente y sera reconnue, son chiffre s'ajoutera ici et au total. Rien n'est inventé tant qu'il n'y a pas de donnée.</>}
+              : plat==='Leboncoin'
+              ? <>Ce que VRM sait de Leboncoin passe par l'extension (elle tourne sur leboncoin.fr). Prépare tes annonces depuis <b>À publier</b> ; une vente n'est comptée que si la <b>référence VRM</b> de l'annonce la relie à une paire — jamais par ressemblance de titre. Rien n'est inventé tant qu'il n'y a pas de donnée.</>
+              : <>Aucune vente n'a encore été captée sur {court}. Tu prépares tes paires depuis l'écran <b>Annonces</b> (coche « aussi sur {court} ») ; dès qu'une vente y sera reconnue, son chiffre s'ajoutera ici et au total. Rien n'est inventé tant qu'il n'y a pas de donnée.</>}
           </div>
-          {plat!=='Vestiaire Collective' && (
+          {plat!=='Vestiaire Collective' && plat!=='Leboncoin' && (
             <button type="button" onClick={()=>onGo&&onGo('cat_annonces')} style={{marginTop:12,border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'10px 14px',cursor:'pointer',fontFamily:'inherit',fontSize:13,fontWeight:600,color:C.text}}>
               Ouvrir l'écran Annonces →
             </button>
