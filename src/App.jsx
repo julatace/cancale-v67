@@ -4685,7 +4685,11 @@ const PLUS_TABS=[
   {id:'plat_vestiaire', icon:'tag', emoji:'👗',label:'Vestiaire',  desc:'Pas encore reliée à VRM'},
   {id:'dashboard',    icon:'chart',   emoji:'📊',label:'Statistiques',  desc:'Chiffre d\'affaires, bénéfices, cotisations'},
   {id:'prixmarche',   icon:'chart',   emoji:'💡',label:'Prix qui marche',desc:'À quel prix tes modèles se vendent, par taille'},
-  {id:'cat_msg',      icon:'chat',    emoji:'💬',label:'Messages',      desc:'Ce qui est arrivé de nouveau'},
+  /* ⚠️ « Messages » RETIRÉ du menu (demande de Julien, 24 sept. : « pas en
+     onglet, mets les messages reçus dans les notifications »). Les non-lus
+     restent dans le centre de notifications (job « Répondre à N messages »), qui
+     ouvre l'écran Messages au clic — l'écran reste monté et joignable par là,
+     simplement plus dans le menu. */
   {id:'garage',       icon:'home',    emoji:'🏠',label:'Garage',        desc:'Où est rangée chaque paire'},
   {id:'invoices',     icon:'receipt', emoji:'🧾',label:'Factures',      desc:'Documents pour tes comptes pro'},
 ];
