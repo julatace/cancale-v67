@@ -16855,6 +16855,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // en HTTPS ; côté serveur elle n'est même pas nécessaire si AI_API_KEY est sur
   // Vercel. Pas de clé ⇒ on le DIT (aucune rédaction inventée).
   const [iaOpen, setIaOpen] = useState(false);
+  // ⚠️ « TROUVE UNE SOLUTION » (Julien, 24 sept.) pour l'IA jugée « pas top » :
+  // le défaut, c'était un bouton qui échoue sans clé. On ne le montre donc QUE
+  // quand l'IA marche — clé locale posée, OU clé serveur (AI_API_KEY sur Vercel,
+  // illimitée pour tous les appareils). Sans clé, l'entrée n'apparaît pas :
+  // jamais de bouton mort. La sonde /api/ai (GET) ne renvoie aucune donnée
+  // sensible, juste { ready }.
+  const [aiPret, setAiPret] = useState(() => { try { return !!(load('vrm_ai_key','')||'').trim(); } catch(_) { return false; } });
+  useEffect(() => { if (aiPret) return; let stop=false;
+    fetch('/api/ai').then(r=>r.json()).then(j=>{ if(!stop && j && j.ready) setAiPret(true); }).catch(()=>{});
+    return ()=>{ stop=true; }; }, [aiPret]);
   const redigerIA = async (e) => {
     if (!e) return;
     setRepubAi({ busy:true, key:String(e.numero||e.id||''), res:null, why:'', reason:'' });
@@ -20353,7 +20363,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {k:'inv', icon:'📋', lab:'Inventaire physique', desc:'Les paires qui doivent être chez toi, par numéro', on:()=>{ setAnnToolsOpen(false); setInventOpen(true); }},
                     {k:'aud', icon:'🔎', lab:'Audit du stock', desc:'Retrouver les paires mal rangées', on:()=>{ setAnnToolsOpen(false); setAuditOpen(true); }},
                     {k:'fillbuy', icon:'💶', lab:"Compléter les prix d'achat", desc:`${fillBuyRows.length} paire${fillBuyRows.length>1?'s':''} sans coût — le bénéfice est faux sans eux`, on:()=>{ setAnnToolsOpen(false); setFillBuyOpen(true); }},
-                    {k:'ia', icon:'✨', lab:"Rédiger une annonce (IA)", desc:'Réécrit titre + description pour vendre plus vite — tu copies, tu publies', on:()=>{ setAnnToolsOpen(false); setRepubAi({ busy:false, key:'', res:null, why:'', reason:'' }); setIaOpen(true); }},
+                    ...(aiPret ? [{k:'ia', icon:'✨', lab:"Rédiger une annonce (IA)", desc:'Réécrit titre + description pour vendre plus vite — tu copies, tu publies', on:()=>{ setAnnToolsOpen(false); setRepubAi({ busy:false, key:'', res:null, why:'', reason:'' }); setIaOpen(true); }}] : []),
                     /* ⚠️ « Renuméroter à la suite » A ÉTÉ RETIRÉ DU MENU (23 août 2026).
                        C'est le seul outil qui RÉATTRIBUE des numéros en masse — donc
                        exactement ce que Julien interdit maintenant qu'il les écrit sur
@@ -23818,10 +23828,13 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
         );
       })()}
 
-      <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Ancienne application</div>
-      <Row icon="box" title="Ancien catalogue" desc="Les paires de l'ancienne appli (toujours comptées dans les stats)." onClick={()=>setTab('catalog')}/>
-      <Row icon="cash" title="Anciennes ventes" desc="Les ventes historiques de l'ancienne appli." onClick={()=>setTab('sales')}/>
-      <Row icon="tag" title="Stock Vinted (ancien)" desc="L'ancienne liste de numéros en ligne." onClick={()=>setTab('stockvinted')}/>
+      {/* ⚠️ « Ancienne application » RETIRÉE (demande de Julien, 24 sept. :
+          « enlève ancien stock, ancienne compta, ancien catalogue »). On retire
+          seulement les LIENS d'accès — les DONNÉES (vinted_catalog / vinted_sales)
+          restent en base et TOUJOURS comptées dans les stats (§ rien n'est
+          supprimé du nuage au passage d'un écran). Les écrans catalog/sales/
+          stockvinted restent montés mais deviennent injoignables, comme
+          comptabilite/inventory (§4.11) : aucun n'est requis au banc. */}
 
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Assistant IA</div>
       <AiKeySetting/>
