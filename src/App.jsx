@@ -7009,16 +7009,13 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
           <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:8}}>Vinted en direct · ce mois</div>
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))',gap:10}}>
             {[
-              /* ⚠️ CES QUATRE CHIFFRES ÉTAIENT DE QUATRE COULEURS (bleu, ambre,
-                 bleu, rouge), et les six du dessous de six autres : dix teintes
-                 sur un seul écran, donc plus rien qui ressorte (§5.90). Aucun
-                 d'eux n'appelle une action — ce sont des repères. Seuls les
-                 messages non lus se colorent, parce que là il y a vraiment
-                 quelque chose à faire. */
+              /* ⚠️ CES CHIFFRES SONT DES REPÈRES, aucun n'appelle une action : ils
+                 restent à l'encre (§5.90). « Messages non lus » a été RETIRÉ d'ici
+                 (demande de Julien, 24 sept.) — les non-lus vivent dans le centre
+                 de notifications, pas en doublon sur cet écran. */
               {k:'caMois', icon:'💸', label:'CA du mois', val:`${liveStats.caMois.toFixed(0)} €`, go:'cat_ventes', color:C.text},
               {k:'enCours', icon:'⏳', label:'Ventes en cours', val:liveStats.enCours, go:'cat_ventes', color:C.text},
               {k:'online', icon:'🟢', label:'Annonces en ligne', val:liveStats.online, go:'cat_annonces', color:C.text},
-              {k:'unread', icon:'💬', label:'Messages non lus', val:liveStats.unread, go:'cat_msg', color:liveStats.unread>0?C.accent:C.text},
             ].map(s=>(
               <button key={s.k} onClick={()=>onGo&&onGo(s.go)} title={`Voir ${s.label.toLowerCase()}`}
                 style={{textAlign:'left',border:'none',background:'transparent',borderRadius:0,padding:0,cursor:'pointer',fontFamily:'inherit',display:'block',width:'100%'}}>
