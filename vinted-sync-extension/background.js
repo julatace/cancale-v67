@@ -5734,9 +5734,11 @@ async function buildEbayData() {
   const labels = main.vinted_account_labels || {};
   const uid2login = {};
   (main.vinted_accounts || []).forEach((a) => { uid2login[String(a.vinted_user_id)] = labels[String(a.vinted_user_id)] || a.login || String(a.vinted_user_id); });
-  const off = new Set([...(main.vinted_accounts_hidden || []), ...(main.vinted_accounts_blocked || [])].map(String));
-  // ⚠️ Même règle que Leboncoin : un compte supprimé définitivement
-  //    (`vrm_blocked_accounts`) n'alimente aucune file. `null` ⇒ on n'exclut rien.
+  // ⚠️ Un compte MASQUÉ à la main n'alimente pas la file. Un compte BANNI par
+  //    Vinted (`vinted_accounts_blocked`), LUI, RESTE dans la file (Julien,
+  //    25 sept.) : ses paires existent encore, il veut les publier ailleurs.
+  //    Seuls les SUPPRIMÉS définitivement (`vrm_blocked_accounts`) restent exclus.
+  const off = new Set((main.vinted_accounts_hidden || []).map(String));
   { const noirs = await blockedAccounts(); if (noirs) noirs.forEach((u) => off.add(String(u))); }
   const lost = main.vinted_pairs_lost || {};
   const pos = await readEbayPosted();
@@ -5808,18 +5810,17 @@ async function buildLbcData() {
   // ⚠️ Et l'APP, elle, filtrait déjà (`offAcc`) — comme `buildEbayData`. Seule
   //    cette file-ci ne le faisait pas : l'app annonçait 39 et le panneau 40,
   //    sur exactement la même donnée. Deux règles pour une notion, §11.
-  const off = new Set([...(main.vinted_accounts_hidden || []), ...(main.vinted_accounts_blocked || [])].map(String));
-  // ⚠️⚠️ ET LES SUPPRIMÉS DÉFINITIVEMENT AUSSI (`vrm_blocked_accounts`).
-  // Mesuré le 19 septembre : `shop_cancale` (199082413), supprimé définitivement,
-  // n'est ni dans `vinted_accounts_hidden` ni dans `vinted_accounts_blocked` —
-  // ce sont TROIS listes différentes. Ses 96 paires numérotées en ligne
-  // entraient donc dans la file Leboncoin, alors que l'app les écarte déjà
-  // (elles n'ont plus de ligne `vinted_accounts`, donc plus de jetons). C'est
-  // la divergence app↔panneau du §11, sur la liste des comptes que Vinted a
-  // bloqués ou qu'il a fermés lui-même : on ne propose pas de republier ailleurs
-  // les paires d'un compte mort. ⚠️ `null` (jamais lu) ⇒ on n'exclut RIEN :
-  // cacher les paires d'un compte VIVANT sur un hoquet serait pire (sens inverse
-  // du cas d'écriture — ici sur-exclure coûte, sous-exclure revient à l'existant).
+  // ⚠️ Un compte MASQUÉ à la main n'alimente pas la file (choix explicite).
+  // ⚠️⚠️ UN COMPTE BANNI PAR VINTED (`vinted_accounts_blocked`) RESTE dans la
+  //    file (Julien, 25 sept.) : ses paires existent encore, il veut pouvoir les
+  //    publier sur Leboncoin/eBay/Vestiaire. Elles sortent de « en ligne »
+  //    Vinted mais restent PUBLIABLES ailleurs — renversement assumé de l'ancienne
+  //    règle « un compte mort n'alimente aucune file ».
+  const off = new Set((main.vinted_accounts_hidden || []).map(String));
+  // ⚠️⚠️ SEULS LES SUPPRIMÉS DÉFINITIVEMENT (`vrm_blocked_accounts`) RESTENT
+  // exclus : c'est un choix explicite de suppression (shop_cancale, 199082413),
+  // pas un bannissement subi. `null` (jamais lu) ⇒ on n'exclut RIEN (ne pas
+  // cacher les paires d'un compte vivant sur un hoquet).
   { const noirs = await blockedAccounts(); if (noirs) noirs.forEach((u) => off.add(String(u))); }
   // Déjà publiées sur Leboncoin (ligne DÉDIÉE → on n'écrase jamais le blob main).
   const postedData = await readPostedData();
