@@ -6405,6 +6405,8 @@ function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, onGo
   const wAttente = liveStats && liveStats.walletAttente != null ? liveStats.walletAttente : null;
   const wComptes = (liveStats && liveStats.walletComptes) || 0;
   const wAge     = liveStats && liveStats.walletAgeJours != null ? liveStats.walletAgeJours : null;
+  // Âge de la capture la plus ancienne : explique un colis déjà parti qui traîne.
+  const dAge     = liveStats && liveStats.dataAgeJours != null ? liveStats.dataAgeJours : null;
   const court = plat === 'Vestiaire Collective' ? 'Vestiaire' : plat;
   const carte = {textAlign:'left',border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'13px 15px',cursor:'pointer',fontFamily:'inherit'};
   const eti = {fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500};
@@ -6415,6 +6417,19 @@ function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, onGo
       {baseKO ? (
         <LignePanne>Je n'ai pas pu lire tes données — les totaux seraient faux, on ne les affiche pas. Rien n'est perdu : c'est la lecture qui a échoué.</LignePanne>
       ) : estVinted ? (<>
+        {/* ⚠️ FRAÎCHEUR DES DONNÉES : quand la capture est ancienne, les chiffres
+            ci-dessous sont figés (un colis déjà expédié peut encore apparaître).
+            On le DIT au lieu de laisser croire à un défaut. Le chiffre, jamais un
+            faux : sous 2 j on rassure, au-delà on explique et on donne le geste. */}
+        {dAge!=null && (
+          dAge<=1 ? (
+            <div style={{fontSize:11.5,color:C.muted}}>✓ Données Vinted à jour (capturées {dAge<1?"aujourd'hui":'hier'}).</div>
+          ) : (
+            <div style={{fontSize:12,color:C.warn,background:`${C.warn}12`,border:`1px solid ${C.warn}55`,borderRadius:10,padding:'9px 12px',lineHeight:1.5}}>
+              Ces chiffres datent d'il y a <b>{dAge} j</b> : une vente récente peut manquer, et un colis déjà expédié peut encore apparaître. Ils se rafraîchissent dès que tu repasses sur Vinted avec l'extension à jour.
+            </div>
+          )
+        )}
         <Card style={{padding:18}}>
           <div style={{...eti,marginBottom:4}}>Vinted · chiffre d'affaires</div>
           <div className="vrm-display" style={{fontSize:30,fontWeight:700,color:C.text}}>{p.ca==null?'—':fmt(p.ca)}</div>
@@ -25896,8 +25911,23 @@ export default function App() {
       //    Ma journée et Statistiques (§11), jamais un recalcul.
       let walletEsc=null;
       try{ walletEsc=await fetchWalletEscrow(uidsVivants); if(walletEsc&&walletEsc.total>0) enAttenteReel=walletEsc.total; }catch(_){}
+      // ⚠️ DEPUIS QUAND TES DONNÉES VINTED DATENT (Julien, 25 sept. : « j'ai des
+      //    paires déjà expédiées qui restent »). C'est presque toujours une
+      //    donnée GELÉE par une extension en retard, pas un défaut de l'app. On
+      //    le DIT : l'âge de la capture la plus ANCIENNE parmi les comptes
+      //    vivants (celui qui explique un colis figé). Lecture scalaire projetée
+      //    (§4.4, jamais `select=data`), `capturedAt` — jamais `updated_at` qui
+      //    ment (§4.3). Échec/absence ⇒ null ⇒ on n'affiche rien (pas un faux).
+      let dataAgeJours=null;
+      try{
+        const rf=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_orders_sold&select=id,cap:data->>capturedAt`,{headers:sbAuth()});
+        if(rf.ok){ const rows=await rf.json(); let vieux=null;
+          for(const row of (Array.isArray(rows)?rows:[])){ const m=/^harvest_([^_]+)_/.exec(row&&row.id||''); if(!m||!uidsVivants.has(m[1])) continue; const t=Date.parse(row.cap||''); if(!isNaN(t)&&(vieux==null||t<vieux)) vieux=t; }
+          if(vieux!=null) dataAgeJours=Math.max(0,Math.round((Date.now()-vieux)/86400000));
+        }
+      }catch(_){/* pas su ⇒ null ⇒ rien d'affiché */}
       if(!stop && ok){
-      setLiveStats({caMois,caEncaisse,enCours,online,unread,stockValue,pairesStock,ventesJour,caJour,ventesMois,soldTotal,joursVente:joursVenteSet.size,caParCompte,
+      setLiveStats({caMois,caEncaisse,enCours,online,unread,stockValue,pairesStock,ventesJour,caJour,ventesMois,soldTotal,joursVente:joursVenteSet.size,caParCompte,dataAgeJours,
         walletDispo:(walletEsc&&walletEsc.accounts>0)?walletEsc.dispo:null,
         walletAttente:(walletEsc&&walletEsc.accounts>0)?walletEsc.total:null,
         walletComptes:(walletEsc&&walletEsc.accounts)||0,
