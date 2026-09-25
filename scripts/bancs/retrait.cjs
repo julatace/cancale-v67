@@ -151,7 +151,12 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
     for (const a of accounts) { const l = String(a.login || ''); if (!l) continue;
       const n = bloc.split(l).length - 1; if (n > 0) vus[l] = n; }
     const noms = Object.keys(vus);
-    const nColis = (bloc.match(/Ouvrir la conversation/g) || []).length;
+    // ⚠️ ON COMPTE LES FICHES PAR CE QU'ELLES OFFRENT (une porte vers le code),
+    // pas par une formule exacte : le libellé est passé de « Ouvrir la
+    // conversation » à « Voir mon code de retrait » pour qu'un novice sache ce
+    // qu'il obtient (§6.5). Un ancre figé aurait rendu ce contrôle INERTE.
+    const CTA = /Ouvrir la conversation|Voir (?:mon code|le QR) de retrait/g;
+    const nColis = (bloc.match(CTA) || []).length;
     console.log(`    bloc « point relais » : ${nColis} colis · comptes nommés ${noms.length ? noms.map(l => `${l}\u00d7${vus[l]}`).join(', ') : '(aucun)'}`);
     if (nColis > 1) {
       dit(noms.length >= 1, "l'écran Achats nomme le compte sur lequel se connecter",
@@ -185,7 +190,8 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
     const dep2 = v.txt.indexOf('colis à retirer');
     const suite2 = dep2 < 0 ? -1 : v.txt.indexOf('Coche ✓ quand tu l', dep2);
     const bloc2 = dep2 < 0 ? '' : v.txt.slice(dep2, suite2 > 0 ? suite2 : dep2 + 1600);
-    const nCartes = (bloc2.match(/Ouvrir la conversation/g) || []).length;
+    // Même ancre stable qu'au 5bis : une porte vers le code par fiche.
+    const nCartes = (bloc2.match(/Ouvrir la conversation|Voir (?:mon code|le QR) de retrait/g) || []).length;
     // « <prix> € · commandé le <date> » : la forme EXACTE de la ligne ajoutée,
     // portée par montantCommande + o.date (§11). Unique à ce bloc.
     const nPrixDate = (bloc2.match(/€ · command[ée] le /g) || []).length;
