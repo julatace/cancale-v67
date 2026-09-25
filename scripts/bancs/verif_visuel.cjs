@@ -99,7 +99,7 @@ const TABS=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','pl
       const m=/id=like\.([^&]*)/.exec(u); if(m){const pat=decodeURIComponent(m[1]).replace(/[*%]/g,'.*');const re=new RegExp('^'+pat+'$');return j(rows.filter(r=>re.test(r.id)).map(r=>projette(r,S)));}
       return j([]);});
     await pg.route('**/api/**',r2=>r2.fulfill({status:200,contentType:'application/json',body:'{"pret":true,"devices":1}'}));
-    const vides=[], deb=[], susp=[], sousIle=[], morts=[]; let venteTxt='', dashTxt='';
+    const vides=[], deb=[], susp=[], sousIle=[], morts=[]; let venteTxt='', dashTxt='', lbcTxt='';
     for(const t of TABS){
       await pg.goto('http://localhost:4322/?tab='+t,{waitUntil:'domcontentloaded'});
       await pg.waitForTimeout(2200);
@@ -107,6 +107,7 @@ const TABS=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','pl
         sw:document.documentElement.scrollWidth, cw:document.documentElement.clientWidth,
         txt:(document.body.innerText||'')}));
       if(t==='cat_ventes') venteTxt=r.txt;
+      if(t==='plat_leboncoin') lbcTxt=r.txt;   // le bloc « Ventes Leboncoin » vit ICI maintenant
       if(t==='dashboard') dashTxt=r.txt;
       if(r.n<120) vides.push(t+':'+r.n);
       // ⚠️ LE GARDE-FOU D'ÉCRAN PASSAIT TOUS LES CONTRÔLES : « Cet écran n'a pas
@@ -140,15 +141,17 @@ const TABS=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','pl
     dit(susp.length===0,"aucun artefact d'affichage",susp.join(', '));
     dit(sousIle.length===0,"rien ne passe sous l'île d'actions",sousIle.join(' // ')   /* ⚠️ PAS DE PLAFOND : `slice(0,3)` a masqué une 3e trouvaille derrière deux autres — un contrôle qui tronque ses résultats fait croire que le reste va bien. */);
     dit(errs.length===0,"aucune erreur d'app",errs.slice(0,2).join(' | '));
-    // ⚠️ §5 SUR L'ÉCRAN VENTES : le bloc « Ventes Leboncoin » n'affiche comme
-    // vente que ce que Leboncoin CONFIRME (isSeller true). Un ACHAT prouvé
-    // (Rolex) ne doit JAMAIS y figurer, le compte ne porte que les ventes
-    // prouvées (1), et le côté pas encore su est DIT. Un rendu figé « toutes les
-    // transactions » afficherait la Rolex — c'est le défaut qu'on garde rouge.
-    dit(/Ventes Leboncoin/.test(venteTxt) && /New Balance 990/.test(venteTxt),'la vente Leboncoin PROUVÉE est affichée',venteTxt?'':'écran ventes non lu');
-    dit(!/Rolex/i.test(venteTxt),'un ACHAT prouvé (Rolex) n\'est JAMAIS montré comme une vente (§5)');
-    dit(/Ventes Leboncoin \(1\)/.test(venteTxt),'le compte ne porte QUE les ventes prouvées (1)');
-    dit(/pas encore confirmé/.test(venteTxt),'le côté pas encore su est DIT, pas compté comme vente');
+    // ⚠️ §5 : le bloc « Ventes Leboncoin » vit dans l'ESPACE LEBONCOIN (plus dans
+    // les ventes Vinted, Julien 25 sept.). Il n'affiche comme vente que ce que
+    // Leboncoin CONFIRME (isSeller true) : un ACHAT prouvé (Rolex) ne doit JAMAIS
+    // y figurer, le compte ne porte que les ventes prouvées (1), et le côté pas
+    // encore su est DIT. ⚠️ Et l'AUTRE sens : il ne doit PLUS être dans les
+    // ventes Vinted (sinon on n'a fait que le dupliquer).
+    dit(/Ventes Leboncoin/.test(lbcTxt) && /New Balance 990/.test(lbcTxt),'la vente Leboncoin PROUVÉE est affichée dans l\'espace Leboncoin',lbcTxt?'':'espace Leboncoin non lu');
+    dit(!/Ventes Leboncoin/.test(venteTxt),'les ventes Leboncoin ne sont PLUS dans les ventes Vinted (§11)');
+    dit(!/Rolex/i.test(lbcTxt),'un ACHAT prouvé (Rolex) n\'est JAMAIS montré comme une vente (§5)');
+    dit(/Ventes Leboncoin \(1\)/.test(lbcTxt),'le compte ne porte QUE les ventes prouvées (1)');
+    dit(/pas encore confirmé/.test(lbcTxt),'le côté pas encore su est DIT, pas compté comme vente');
     // ── §6 CA PAR PLATEFORME + PAR COMPTE (tableau de bord) ─────────────────
     // Julien : « un CA global, un CA par application, et décomposer par compte ».
     // La décomposition vit sur la MÊME source que le total (§11) — donc chaque
