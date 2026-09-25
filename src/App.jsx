@@ -35,7 +35,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.109.0';
+const EXT_ATTENDUE = '5.110.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -20082,7 +20082,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             peuvent juste plus s'y vendre. */}
         {annBannies.n>0 && (
           <div style={{margin:'0 0 12px',fontSize:12,color:C.warn,background:`${C.warn}12`,border:`1px solid ${C.warn}55`,borderRadius:10,padding:'9px 12px',lineHeight:1.5}}>
-            <b>{annBannies.n} annonce{annBannies.n>1?'s':''}</b> de {annBannies.comptes.length>1?'comptes refusés':'ton compte '+annBannies.comptes[0]} par Vinted {annBannies.n>1?'ont été retirées':'a été retirée'} de « en ligne » : le compte est bloqué, {annBannies.n>1?'elles ne peuvent':'elle ne peut'} plus s'y vendre. Les paires, elles, ne sont pas perdues.
+            <b>{annBannies.n} annonce{annBannies.n>1?'s':''}</b> de {annBannies.comptes.length>1?'comptes refusés':'ton compte '+annBannies.comptes[0]} par Vinted {annBannies.n>1?'ont été retirées':'a été retirée'} de « en ligne » : le compte est bloqué, {annBannies.n>1?'elles ne peuvent':'elle ne peut'} plus s'y vendre. Mais les paires restent là — tu peux {annBannies.n>1?'les':'la'} publier sur <b>Leboncoin</b> ou <b>eBay</b> (onglet de la plateforme → À publier).
           </div>
         )}
         {/* ── SIGNALEMENTS, REPLIÉS ────────────────────────────────────────
@@ -23149,10 +23149,17 @@ function LeboncoinScreen() {
     const postedRows = await sbGet('app_data?id=eq.vinted_lbc_posted&select=data');
     const pd = (postedRows && postedRows[0] && postedRows[0].data) || {};
     const posted = new Set((pd.ids || []).map(String));
-    // MÊMES RÈGLES DE COMPTE QUE LE RESTE DE L'APP : un compte Vinted masqué ou
-    // détecté bloqué ne doit pas alimenter la file Leboncoin (ses annonces sont
-    // périmées). Et une paire déclarée retirée du stock n'a plus rien à publier.
-    const offAcc = new Set([...(main.vinted_accounts_hidden || []), ...(main.vinted_accounts_blocked || [])].map(String));
+    // MÊMES RÈGLES DE COMPTE QUE LE RESTE DE L'APP : un compte MASQUÉ à la main
+    // ne doit pas alimenter la file (choix explicite de Julien).
+    // ⚠️⚠️ UN COMPTE BANNI PAR VINTED (`vinted_accounts_blocked`), LUI, RESTE
+    //    DANS LA FILE (Julien, 25 sept.) : « dès qu'un compte est banni, je veux
+    //    pouvoir publier ses annonces sur Leboncoin/eBay/Vestiaire ». Les paires
+    //    existent encore physiquement — le compte Vinted est mort, pas le stock.
+    //    Elles sortent de « en ligne » Vinted (annBase/liveStats les écartent),
+    //    mais restent PUBLIABLES ailleurs. C'est un renversement ASSUMÉ de
+    //    l'ancienne règle « un compte fermé n'alimente aucune file » — qui, elle,
+    //    ne vaut plus que pour les comptes SUPPRIMÉS (`vrm_blocked_accounts`).
+    const offAcc = new Set((main.vinted_accounts_hidden || []).map(String));
     // ⚠️⚠️ ET LES SUPPRIMÉS DÉFINITIVEMENT (`vrm_blocked_accounts`) : une TROISIÈME
     //    liste, que ni `vinted_accounts_hidden` ni `vinted_accounts_blocked` ne
     //    recouvrent. Sans ça les paires d'un compte fermé par Vinted (mesuré :
