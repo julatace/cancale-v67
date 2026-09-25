@@ -15569,6 +15569,26 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   //    un tap, avec le nom de la paire et les deux numéros sous les yeux).
   // ⚠️ NE PAS LA REMETTRE EN AUTOMATIQUE sans son accord explicite.
 
+  // ⚠️ CE QUE LE FILTRE « COMPTE BANNI » A MIS DE CÔTÉ. Une liste qui rétrécit
+  //    sans explication se lit comme une perte : on compte les annonces retirées
+  //    de « en ligne » PARCE QUE leur compte est refusé par Vinted (403), pour
+  //    le DIRE. Même critère que `annBase` (compte existant, banni, pas déjà
+  //    masqué à la main / vendu) — ce sont exactement celles qu'on n'affiche plus.
+  const annBannies = useMemo(() => {
+    const parCompte = {};
+    for (const it of (listings.items || [])) {
+      const uid = String((it && it._acc && it._acc.vinted_user_id) || '');
+      if (!uid || !accountUids.has(uid) || !blockedAccts.has(uid)) continue;
+      if (acctOffOf(it) || soldManual.has(String(it.id))) continue;
+      if (!showEmailSold && (emailSoldIds.has(String(it.id)) || annoncesVendues.has(String(it.id)))) continue;
+      const lg = (it._acc && it._acc.login) || uid;
+      parCompte[lg] = (parCompte[lg] || 0) + 1;
+    }
+    const comptes = Object.keys(parCompte);
+    return { n: comptes.reduce((s, k) => s + parCompte[k], 0), comptes };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listings.items, blockedAccts, accountUids, soldManual, emailSoldIds, showEmailSold, annoncesVendues]);
+
   const annStats = useMemo(() => {
     // Même base que la grille (annBase) : le bandeau compte exactement ce qui
     // est affiché en dessous. Avant, il partait de listings.items (TOUS les
@@ -20056,6 +20076,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {curSub==='annonces' && (<>
         <ScreenHead icon="tag" title="Annonces en ligne" desc="Tes annonces actuellement en vente. Donne un numéro et un prix d'achat à chaque paire : c'est ce qui rend ton bénéfice et ton garage justes."/>
         <NoAcc/>
+        {/* ⚠️ On DIT ce que le filtre « compte banni » a mis de côté (§ : une
+            liste qui rétrécit sans explication se lit comme une perte). Les
+            paires ne sont pas perdues — le compte Vinted est bloqué, elles ne
+            peuvent juste plus s'y vendre. */}
+        {annBannies.n>0 && (
+          <div style={{margin:'0 0 12px',fontSize:12,color:C.warn,background:`${C.warn}12`,border:`1px solid ${C.warn}55`,borderRadius:10,padding:'9px 12px',lineHeight:1.5}}>
+            <b>{annBannies.n} annonce{annBannies.n>1?'s':''}</b> de {annBannies.comptes.length>1?'comptes refusés':'ton compte '+annBannies.comptes[0]} par Vinted {annBannies.n>1?'ont été retirées':'a été retirée'} de « en ligne » : le compte est bloqué, {annBannies.n>1?'elles ne peuvent':'elle ne peut'} plus s'y vendre. Les paires, elles, ne sont pas perdues.
+          </div>
+        )}
         {/* ── SIGNALEMENTS, REPLIÉS ────────────────────────────────────────
             Trois bandeaux d'alerte s'empilaient ici en permanence (compte muet,
             annonces disparues, compte bloqué) : il fallait défiler longtemps
