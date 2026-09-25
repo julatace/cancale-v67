@@ -4669,30 +4669,39 @@ const Icon = ({ name, size = 24, style }) => {
 // garde donc les CINQ écrans du travail quotidien, et le reste passe derrière
 // « Plus » — c'est le motif standard des applications mobiles, et il fait
 // tenir la barre sur n'importe quel écran sans jamais rien couper.
-// ⚠️ L'ONGLET « VENTES » GLOBAL A ÉTÉ RETIRÉ DE LA BARRE (Julien, 24 sept. :
-// « enlève l'onglet ventes, fais la même chose pour Vinted, pour Leboncoin
-// etc. — que tout soit séparé »). Les ventes ne sont pas une notion
-// TRANSVERSALE : ce sont les ventes VINTED (aujourd'hui la seule plateforme
-// qui remonte des ventes). Elles vivent donc dans le hub **Vinted**, à côté de
-// son CA, ses annonces et ses achats — et chaque autre site a son propre hub
-// (Leboncoin, eBay…) dans « Plus ». L'écran Ventes détaillé (`cat_ventes`)
-// n'est PAS supprimé : il reste monté et joignable depuis le hub Vinted, Ma
-// journée et le Tableau de bord (§4.11 — une coupe se vérifie sur ce qui
-// RESTE : cat_ventes garde toutes ses cibles de navigation).
+// ⚠️ SÉPARATION TOTALE PAR SITE (Julien, 24-25 sept. : « enlève l'onglet ventes,
+// fais la même chose pour chaque site… chaque info par site… fais la séparation
+// totale »). La barre du bas n'est plus organisée par FONCTION (annonces /
+// ventes / achats, qui étaient toutes des données Vinted) mais par SITE :
+//   Ma journée · Vinted · Leboncoin · Colis.
+// Annonces, Ventes et Achats sont devenus des SECTIONS du hub Vinted — leurs
+// écrans détaillés ne sont PAS supprimés, ils restent montés et joignables
+// depuis les cartes du hub (et depuis Ma journée / le Tableau de bord). §4.11 :
+// une coupe se vérifie sur ce qui RESTE — `cat_annonces`, `cat_ventes`,
+// `cat_achats` gardent toutes leurs cibles de navigation, ils passent
+// simplement d'un accès en 1 tap à un accès depuis le hub Vinted.
 const BOTTOM_TABS=[
-  {id:'journee',      icon:'sun',     emoji:'☀️',label:'Ma journée'},
-  {id:'cat_annonces', icon:'tag',     emoji:'🟢',label:'Annonces'},
-  {id:'plat_vinted',  icon:'shop',    emoji:'🟢',label:'Vinted'},
-  {id:'cat_achats',   icon:'bag',     emoji:'🛍️',label:'Achats'},
-  {id:'cat_bord',     icon:'doc',     emoji:'📄',label:'Colis'},
+  {id:'journee',        icon:'sun',  emoji:'☀️',label:'Ma journée'},
+  {id:'plat_vinted',    icon:'shop', emoji:'🟢',label:'Vinted'},
+  {id:'plat_leboncoin', icon:'tag',  emoji:'🟠',label:'Leboncoin'},
+  {id:'cat_bord',       icon:'doc',  emoji:'📄',label:'Colis'},
+];
+// Les écrans DÉTAILLÉS de Vinted. Ils ne sont plus des onglets de la barre
+// (séparation par site) : on y arrive par les cartes du hub Vinted. Mais ils
+// restent listés dans la navigation, sous « Vinted », pour rester DÉCOUVRABLES
+// (§4.11 : une coupe se vérifie sur ce qui RESTE — sans ça ils sortiraient du
+// menu et du rail alors qu'ils existent toujours).
+const VINTED_TABS=[
+  {id:'cat_annonces', icon:'tag',  emoji:'🟢',label:'Annonces'},
+  {id:'cat_ventes',   icon:'cash', emoji:'💸',label:'Ventes'},
+  {id:'cat_achats',   icon:'bag',  emoji:'🛍️',label:'Achats'},
 ];
 // Les écrans qu'on ouvre ponctuellement — jamais perdus, juste rangés.
 const PLUS_TABS=[
   {id:'collectif',    icon:'target',  emoji:'🌐',label:'Collectif',     desc:'Toutes tes plateformes réunies'},
-  /* ⚠️ `plat_vinted` est passé dans la BARRE DU BAS (onglet « Vinted »), à la
-     place de l'ancien « Ventes » global — retiré d'ici pour ne pas le montrer
-     deux fois. Les autres hubs de plateforme restent dans « Plus ». */
-  {id:'plat_leboncoin', icon:'tag', emoji:'🟠',label:'Leboncoin',  desc:'Ce que VRM sait de Leboncoin'},
+  /* ⚠️ `plat_vinted` ET `plat_leboncoin` sont dans la BARRE DU BAS (séparation
+     par site) — retirés d'ici pour ne pas les montrer deux fois. Les autres
+     hubs de plateforme (eBay, Vestiaire) restent dans « Plus ». */
   {id:'plat_ebay',      icon:'tag', emoji:'🔵',label:'eBay',       desc:'Ce que VRM sait d\'eBay'},
   {id:'plat_vestiaire', icon:'tag', emoji:'👗',label:'Vestiaire',  desc:'Pas encore reliée à VRM'},
   {id:'dashboard',    icon:'chart',   emoji:'📊',label:'Statistiques',  desc:'Chiffre d\'affaires, bénéfices, cotisations'},
@@ -5198,6 +5207,7 @@ const NAV_LARGEUR = 236;
 function SideBar({ tab, setTab }) {
   const groupes = [
     { titre: 'Au quotidien', items: BOTTOM_TABS },
+    { titre: 'Dans Vinted',  items: VINTED_TABS },
     { titre: 'Le reste',     items: PLUS_TABS },
   ];
   return (
@@ -5276,6 +5286,7 @@ function MenuEcrans({ tab, setTab }) {
     return () => window.removeEventListener('keydown', esc);
   }, [open]);
   const groupes = [
+    { titre: 'Dans Vinted', items: VINTED_TABS },
     { titre: 'Le reste', items: PLUS_TABS },
   ];
   return (
