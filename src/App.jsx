@@ -25184,7 +25184,12 @@ export default function App() {
       save('vrm_widget_token', btoa(String.fromCharCode(...a)).replace(/[+/=]/g,'').slice(0,28));
     } catch(_) {}
   }),[]);
-  const [tab,setTab]=useState('collectif');
+  // ⚠️ L'app démarre sur MA JOURNÉE, pas sur Collectif (Julien, 25 sept. :
+  //    « ça me met directement sur collectif alors que j'ai Ma journée, je ne
+  //    vois pas l'utilité d'avoir les deux »). Ma journée est le poste de
+  //    pilotage quotidien (les actions du jour) ; Collectif reste une vue
+  //    d'ensemble optionnelle dans le menu, plus l'écran forcé à l'ouverture.
+  const [tab,setTab]=useState('journee');
   // Historique de navigation → bouton « retour » (plus besoin de recharger l'app).
   const navHistRef = React.useRef([]);
   const prevTabRef = React.useRef('journee');
