@@ -6374,6 +6374,19 @@ function PrixMarche({ data, baseKO }) {
     </div>
   );
 }
+// ⚠️ UN SEUL MESSAGE DE FRAÎCHEUR, PARTAGÉ (§11). Quand la capture est ancienne,
+// les chiffres sont figés (un colis déjà expédié peut encore apparaître) : on le
+// DIT plutôt que de laisser croire à un défaut. Le geste, jamais la promesse
+// (§7). `jours == null` (âge inconnu / lecture ratée) ⇒ rien : jamais un faux.
+function FraicheurDonnees({ jours }) {
+  if (jours == null) return null;
+  if (jours <= 1) return <div style={{fontSize:11.5,color:C.muted}}>✓ Données Vinted à jour (capturées {jours<1?"aujourd'hui":'hier'}).</div>;
+  return (
+    <div style={{fontSize:12,color:C.warn,background:`${C.warn}12`,border:`1px solid ${C.warn}55`,borderRadius:10,padding:'9px 12px',lineHeight:1.5}}>
+      Ces infos datent d'il y a <b>{jours} j</b> : une vente récente peut manquer, et un colis déjà expédié peut encore apparaître. Elles se rafraîchissent dès que tu repasses sur Vinted avec l'extension à jour.
+    </div>
+  );
+}
 // Sous-navigation d'un hub de plateforme : des pastilles qui changent la SECTION
 // affichée DANS l'onglet (Aperçu · Annonces · Ventes · Achats), sans quitter la
 // plateforme. Une seule teinte d'accent (§7), la pastille active distingue.
@@ -6417,19 +6430,7 @@ function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, onGo
       {baseKO ? (
         <LignePanne>Je n'ai pas pu lire tes données — les totaux seraient faux, on ne les affiche pas. Rien n'est perdu : c'est la lecture qui a échoué.</LignePanne>
       ) : estVinted ? (<>
-        {/* ⚠️ FRAÎCHEUR DES DONNÉES : quand la capture est ancienne, les chiffres
-            ci-dessous sont figés (un colis déjà expédié peut encore apparaître).
-            On le DIT au lieu de laisser croire à un défaut. Le chiffre, jamais un
-            faux : sous 2 j on rassure, au-delà on explique et on donne le geste. */}
-        {dAge!=null && (
-          dAge<=1 ? (
-            <div style={{fontSize:11.5,color:C.muted}}>✓ Données Vinted à jour (capturées {dAge<1?"aujourd'hui":'hier'}).</div>
-          ) : (
-            <div style={{fontSize:12,color:C.warn,background:`${C.warn}12`,border:`1px solid ${C.warn}55`,borderRadius:10,padding:'9px 12px',lineHeight:1.5}}>
-              Ces chiffres datent d'il y a <b>{dAge} j</b> : une vente récente peut manquer, et un colis déjà expédié peut encore apparaître. Ils se rafraîchissent dès que tu repasses sur Vinted avec l'extension à jour.
-            </div>
-          )
-        )}
+        <FraicheurDonnees jours={dAge}/>
         <Card style={{padding:18}}>
           <div style={{...eti,marginBottom:4}}>Vinted · chiffre d'affaires</div>
           <div className="vrm-display" style={{fontSize:30,fontWeight:700,color:C.text}}>{p.ca==null?'—':fmt(p.ca)}</div>
@@ -17967,6 +17968,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               )}
             </div>
 
+            {/* Fraîcheur : quand la capture est ancienne, les actions ci-dessous
+                (colis, ventes) peuvent être en retard. On le dit une fois, sous
+                le bonjour — pas pendant une panne (le bloc de la coque parle) ni
+                le premier jour (rien n'est encore capté). §11, message partagé. */}
+            {!baseKO && !premierJour && <div style={{marginBottom:14}}><FraicheurDonnees jours={liveStats && liveStats.dataAgeJours}/></div>}
+
             {/* ⚠️ Avant tout le reste : si le serveur ne peut envoyer aucune
                 notification, il faut le voir ICI. Compter sur les notifications
                 pour ne pas ouvrir l'app, et n'apprendre la panne qu'en ouvrant
@@ -20924,6 +20931,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {/* ── Bordereaux (ventes non annulées avec un numéro, à imprimer) ── */}
       {curSub==='bordereaux' && (<>
         <ScreenHead icon="doc" title="Colis à envoyer" desc="Ce que Vinted attend de toi, capté par l'extension. Le bordereau manquant est généré tout seul quand tu passes sur Vinted, puis déposé ici. Un colis parti disparaît sans rien cocher."/>
+        {/* ⚠️ Un colis déjà expédié qui traîne ici vient presque toujours d'une
+            capture ancienne (statut figé), pas d'un défaut. On le dit (§11, même
+            message partout). */}
+        <div style={{padding:'0 16px'}}><FraicheurDonnees jours={liveStats && liveStats.dataAgeJours}/></div>
         <NoAcc/>
         {/* RÉCAP EN HAUT : combien de COLIS restent à envoyer. On compte ce que
             Vinted attend de toi (moisson de l'extension), pas les emails reçus :
@@ -26580,7 +26591,7 @@ export default function App() {
             annoncer « 🎉 Tout est à jour ! » pendant la panne, c'est-à-dire
             précisément l'écran qu'il ouvre le matin. Corriger « partout » se
             vérifie au rendu, écran par écran, pas en lisant le code. */}
-        {tab==='journee'&&<Comptabilite key="journee" accounts={vintedAccounts} only="journee" onNav={setTab} baseKO={baseKO} accountsReady={accountsLoaded} premierJour={premierJour} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}
+        {tab==='journee'&&<Comptabilite key="journee" accounts={vintedAccounts} only="journee" liveStats={liveStats} onNav={setTab} baseKO={baseKO} accountsReady={accountsLoaded} premierJour={premierJour} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}
         {/* ⚠️ « Bienvenue 👋 · connecte ton compte Vinted pour commencer » à
             quelqu'un qui a neuf comptes : c'est ce qu'il voyait quand la base
             ne répondait pas. `baseKO` distingue « aucun compte » de « je n'ai
