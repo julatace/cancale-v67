@@ -93,9 +93,13 @@ dit(/compte <b[^>]*>\{accName\(o\._acc\)\}/.test(APP),
   'chaque colis à retirer dit sur quel compte se connecter',
   'il en a neuf, et l\'extension ne lit que le compte connecté dans l\'onglet');
 // ⚠️ SUIVRE LA RÈGLE, PAS SON ORTHOGRAPHE (leçon payée sur `audit-identite`).
-// La règle : le lien dit ce qu'il RAPPORTE, pas seulement où il mène.
-dit(/Ouvrir la conversation → le code [^'"]+/.test(APP),
-  'et ce que ça rapporte d\'ouvrir la conversation',
+// La règle : la porte vers le code dit ce qu'elle RAPPORTE (le code / le QR),
+// pas seulement « ouvrir ». Le libellé est passé de « Ouvrir la conversation →
+// le code arrive » à « Voir mon code de retrait » (refonte du 25 sept.) — plus
+// direct pour un novice, et il nomme toujours le gain. Un ancre figé sur
+// l'ancienne phrase serait rouge sur un écran MIEUX fait qu'avant.
+dit(/Voir (?:mon code|le QR) de retrait/.test(APP),
+  'la porte vers le code dit ce qu\'elle rapporte (le code / le QR)',
   'ouvrir un lien sans savoir pourquoi, c\'est du travail en plus');
 
 // ── 3 bis. L'APP NE DOIT PAS RÉCLAMER UN TRAVAIL QUE L'EXTENSION FAIT ──────

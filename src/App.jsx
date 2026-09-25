@@ -13548,33 +13548,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const hidePoint = (nom) => { setHiddenPts(prev => { const n = new Set(prev); n.add(norm2(nom)); save('vrm_points_hidden', [...n]); return n; }); setOpenPoint(null); };
   const unhideAll = () => { setHiddenPts(new Set()); save('vrm_points_hidden', []); };
   const norm2 = (s) => String(s || '').toLowerCase().trim();
-  // TA VILLE : une fois renseignée, tous les points relais de la ville
-  // s'affichent d'office sur la carte ; le nombre de colis apparaît sur ceux
-  // où tu en as. Synchronisé. La liste des points est mise en cache.
-  const [ville, setVille] = useState(() => load('vrm_ville', ''));
-  const [villeCache, setVilleCache] = useState(() => load('vrm_ville_points', { city: '', pts: [] }));
-  const [villeLoading, setVilleLoading] = useState(false);
-  const [villeInput, setVilleInput] = useState(() => load('vrm_ville', ''));
+  // ⚠️ RECHERCHE DE RELAIS « PAR VILLE » RETIRÉE (§4.11, code mort qui tournait).
+  // Son AFFICHAGE (liste des points de la ville + filtre + drapeau 30 km) avait
+  // été remplacé par « Où déposer tes colis » (points captés par l'extension,
+  // `dropOffs`) et par la recherche manuelle (`relayPicker`). Mais l'ancien
+  // `fetchVillePoints('/api/relais?city=')` tournait ENCORE à chaque visite
+  // Achats — et son résultat (`villeCache`) n'était rendu NULLE PART : un appel
+  // réseau jeté à chaque ouverture, et un commentaire qui promettait une carte
+  // qui n'existe plus. État (`ville`, `villeCache`, `villeInput`, `villeLoading`),
+  // fonction et réveils `onCloudReady` associés supprimés. `relayPicker` et
+  // `savedPoints` (la recherche/ajout manuel) restent, eux sont bien rendus.
   const [carriersOnly, setCarriersOnly] = useState(() => load('vrm_relais_carriers_only', true)); // casiers/transporteurs seulement
-  const fetchVillePoints = async (city) => {
-    setVilleLoading(true);
-    try {
-      // Recherche faite CÔTÉ SERVEUR (api/relais) → fiable, pas de blocage réseau.
-      const r = await fetch(`/api/relais?city=${encodeURIComponent(city)}`);
-      const j = await r.json();
-      if (j && j.error === 'ville_introuvable') { setVilleLoading(false); toast('Ville introuvable — vérifie l\'orthographe.'); return; }
-      const pts = (j && Array.isArray(j.points)) ? j.points : [];
-      if (!pts.length && j && j.error) { setVilleLoading(false); toast('Service de carte momentanément indisponible, réessaie dans un instant.'); return; }
-      // ⚠️ On garde le CENTRE de la ville : sans lui, impossible de dire qu'un
-      // point enregistré est à 800 km (cas mesuré : « Juste Ici », capté depuis
-      // le texte d'un email, géocodé à Marseille et listé « à Cancale »).
-      const cache = { city, pts, center: (j && j.center) || null };
-      setVilleCache(cache); save('vrm_ville_points', cache);
-      setVille(city); save('vrm_ville', city);
-      setVilleInput(city);
-    } catch (_) { toast('Recherche indisponible, réessaie.'); }
-    setVilleLoading(false);
-  };
   // Géocode une adresse précise via l'API Adresse du gouvernement français
   // (data.gouv, gratuite, fiable) ; repli Nominatim. Renvoie {lat,lon} ou null.
   const geocode = async (q) => {
@@ -16244,8 +16228,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // CET appareil gagne toujours.
   useEffect(() => onCloudReady(() => {
     const vide = (o) => !o || (Array.isArray(o) ? o.length === 0 : Object.keys(o).length === 0);
-    setVille(v => v || load('vrm_ville', ''));
-    setVilleInput(v => v || load('vrm_ville', ''));
     setSavedPoints(p => vide(p) ? load('vrm_points_relais', []) : p);
     setBuyByNum(n => vide(n) ? load('vinted_buyprice_by_num', {}) : n);
     setPickupDone(n => vide(n) ? load('vinted_pickup_done', {}) : n);
@@ -16254,11 +16236,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     setCollectedAt(n => vide(n) ? load('vrm_colis_collected_at', {}) : n);
     setCollected(c => (c && c.size) ? c : loadCollected());
   }), []);
-  // Ta ville est connue mais la liste de ses points n'est pas encore chargée
-  // (ou date d'une autre ville) → on la récupère AUTOMATIQUEMENT.
-  useEffect(() => {
-    if (curSub==='achats' && ville && norm2(villeCache.city)!==norm2(ville) && !villeLoading) fetchVillePoints(ville);
-  /* eslint-disable-next-line */ }, [sub, ville]);
   // Un colis est à retirer → on charge les achats (harvest, gratuit) pour
   // retrouver la photo de l'article correspondant.
   useEffect(() => { if ((tracking||[]).some(t=>t.status==='available') && accounts.length && buys.items===null) loadOrders('purchased', setBuys); /* eslint-disable-next-line */ }, [tracking, accounts.length]);
