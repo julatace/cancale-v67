@@ -19301,6 +19301,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     return <div style={{fontSize:11.5,color:C.muted,fontWeight:600,marginTop:1}}>
                       {nom} paire{nom>1?'s':''} connue{nom>1?'s':''}{nom<pickupUnion.total?` · ${pickupUnion.total-nom} colis dont l'article n'est pas encore identifié`:''}
                     </div>; })()}
+                  {/* ⚠️ POUR QUELQU'UN QUI NE CONNAÎT PAS VINTED (Julien, 25 sept. :
+                      « une personne qui ne connaît pas du tout Vinted pourrait
+                      savoir ce qu'elle doit faire »). Le geste, en 3 temps, écrit
+                      une seule fois en haut — pas répété sur chaque fiche (§7).
+                      Chaque fiche répond ensuite à OÙ · QUEL CODE · QUEL JOUR. */}
+                  <div style={{display:'flex',flexWrap:'wrap',gap:6,marginTop:10}}>
+                    {[['1','Va au point relais indiqué'],['2','Donne le code ou montre le QR'],['3','Coche ✓ « récupéré »']].map(([n,txt])=>(
+                      <span key={n} style={{display:'inline-flex',alignItems:'center',gap:6,background:C.card,border:`1px solid ${C.border}`,borderRadius:999,padding:'4px 10px 4px 4px',fontSize:11.5,color:C.text,fontWeight:600}}>
+                        <span style={{flexShrink:0,width:18,height:18,borderRadius:999,background:C.accent,color:'#fff',fontSize:11,fontWeight:700,display:'inline-flex',alignItems:'center',justifyContent:'center'}}>{n}</span>
+                        {txt}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               </div>
               {/* ⚠️ UN ENDROIT DÉDIÉ PAR TRANSPORTEUR (demande de Julien). Chaque
@@ -19335,7 +19348,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       Le nom du lieu en premier (c'est là qu'on va), l'adresse
                       dessous, et LE GESTE à faire une fois sur place — chaque
                       transporteur remet le colis à sa façon (§28). */}
-                  <div style={{display:'flex',alignItems:'center',gap:9,padding:'10px 12px',background:C.card2||C.card,borderBottom:`1px solid ${C.border}`}}>
+                  <div style={{display:'flex',alignItems:'center',gap:9,padding:'11px 12px',background:C.card2||C.card,borderBottom:`1px solid ${C.border}`}}>
                     {g.carrier&&<CarrierBadge carrier={g.carrier} size={24}/>}
                     <div style={{flex:'1 1 140px',minWidth:0}}>
                       {/* ⚠️ « NE PRENDS PLUS EN COMPTE LA LOCALISATION, JUSTE LES
@@ -19343,8 +19356,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           d'itinéraire ni de carte : le point relais exact est dans
                           l'e-mail du transporteur / son appli. Ce qui sert à retirer,
                           c'est le CODE / le QR juste en dessous. Le nom vient de
-                          l'e-mail, jamais deviné (§5). */}
-                      <div style={{fontSize:14,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{nom}</div>
+                          l'e-mail, jamais deviné (§5).
+                          ⚠️ « OÙ EST-CE QUE JE DOIS ALLER » (Julien, 25 sept.) : on
+                          préfixe « Va à : » quand le lieu est connu, pour qu'un
+                          novice lise l'ADRESSE comme une destination, pas comme un
+                          titre. Lieu inconnu → on ne ment pas, on renvoie à la
+                          source (e-mail du transporteur). */}
+                      <div style={{fontSize:10,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:.6}}>{g.lieuInconnu?'Point relais':'Va à'}</div>
+                      <div style={{fontSize:15,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',lineHeight:1.25}}>{nom}</div>
+                      {g.lieuInconnu && <div style={{fontSize:11,color:C.muted,marginTop:1}}>L'adresse exacte est dans l'e-mail du transporteur.</div>}
                     </div>
                   </div>
                   {(()=>{ const M=methodeDuPoint(g.colis);
@@ -19534,13 +19554,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   const memeCompte = comptesGr.length === 1 ? comptesGr[0] : null;
                   return (
                 <div key={'xg'+k} style={{marginBottom:14,border:`1px solid ${C.border}`,borderRadius:10,background:C.card,overflow:'hidden'}}>
-                  <div style={{display:'flex',alignItems:'center',gap:9,padding:'10px 12px',background:C.card2||C.card,borderBottom:`1px solid ${C.border}`}}>
+                  <div style={{display:'flex',alignItems:'center',gap:9,padding:'11px 12px',background:C.card2||C.card,borderBottom:`1px solid ${C.border}`}}>
                     <CarrierBadge carrier="vinted" size={24}/>
                     <div style={{flex:'1 1 140px',minWidth:0}}>
                       {/* Nom du relais quand la conversation Vinted le donne (une
                           identité, §5) ; sinon un libellé neutre. Plus d'adresse
-                          ni d'itinéraire : juste le code de retrait, en dessous. */}
-                      <div style={{fontSize:14,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{pt.nom || 'À retirer en point relais'}</div>
+                          ni d'itinéraire : juste le code de retrait, en dessous.
+                          ⚠️ « OÙ EST-CE QUE JE DOIS ALLER » (25 sept.) : lieu connu →
+                          « Va à : … » ; lieu inconnu → on le DIT en clair (le lieu
+                          ET le code sont dans la conversation Vinted), jamais un
+                          libellé vague qu'un novice ne comprend pas. */}
+                      <div style={{fontSize:10,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:.6}}>{pt.nom?'Va à':'Point relais'}</div>
+                      <div style={{fontSize:15,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',lineHeight:1.25}}>{pt.nom || 'À voir dans ta conversation Vinted'}</div>
+                      {!pt.nom && <div style={{fontSize:11,color:C.muted,marginTop:1}}>Le lieu exact et le code sont écrits dans la conversation du colis.</div>}
                     </div>
                   </div>
                   <div style={{display:'flex',alignItems:'baseline',gap:6,flexWrap:'wrap',padding:'7px 12px',borderBottom:`1px solid ${C.border}`}}>
@@ -19624,16 +19650,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         {(()=>{
                           const href = (rel && (rel.qr || rel.url)) || lienConv(o);
                           if (!href) return null;
-                          // ⚠️ MÊME RÈGLE POUR LE LIBELLÉ. « → le code arrive
-                          //    tout de suite » explique la même chose que
-                          //    l'en-tête du groupe : répété sur les cinq lignes,
-                          //    c'est cinq fois une phrase. Il ne reste que
-                          //    lorsqu'il DISTINGUE — groupe mixte, ce colis-ci
-                          //    n'a pas son code alors que ses voisins l'ont.
-                          const quoi = (rel && rel.qr) ? 'Voir le QR de retrait ↗'
-                            : (cd || !melange) ? 'Ouvrir la conversation ↗'
-                            : 'Ouvrir la conversation → le code arrive tout de suite ↗';
-                          return (
+                          // ⚠️ POUR UN NOVICE, LE GESTE DOIT DIRE CE QU'IL RAPPORTE
+                          //    (Julien, 25 sept. : « quel code de retrait par
+                          //    colis »). « Ouvrir la conversation » ne dit pas qu'on
+                          //    y trouve LE CODE. Quand le code n'est pas encore
+                          //    affiché ici, le bouton dit « Voir mon code de retrait »
+                          //    et ressemble à un bouton (bordé, accent) : c'est LA
+                          //    chose à toucher. Quand le code est déjà en gros à
+                          //    côté (`cd`), le lien reste discret (rien de neuf à
+                          //    aller chercher).
+                          const qr = !!(rel && rel.qr);
+                          const primaire = !cd;   // pas de code visible → c'est l'action principale
+                          const quoi = qr ? '🔑 Voir le QR de retrait ↗'
+                            : cd ? 'Ouvrir la conversation ↗'
+                            : '🔑 Voir mon code de retrait ↗';
+                          return primaire ? (
+                            <a href={href} target="_blank" rel="noreferrer" style={{display:'inline-flex',alignItems:'center',marginTop:5,border:`1.5px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,borderRadius:8,padding:'7px 12px',fontSize:12.5,fontWeight:700,textDecoration:'none'}}>
+                              {quoi}
+                            </a>
+                          ) : (
                             <a href={href} target="_blank" rel="noreferrer" style={{fontSize:11.5,color:C.accent,fontWeight:700,textDecoration:'none',display:'inline-block',marginTop:3}}>
                               {quoi}
                             </a>
