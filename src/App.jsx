@@ -6425,6 +6425,41 @@ function VintedResume({ liveStats, baseKO }) {
     </div>
   );
 }
+// Les VENTES Leboncoin (prouvées `isSeller`), avec leur bordereau. Vivent dans
+// l'espace LEBONCOIN (plus dans les ventes Vinted — Julien, 25 sept. : « il y a
+// encore des ventes leboncoin dans les ventes vinted, elle doit être dans les
+// ventes leboncoin avec le bordereau »). Rien capté ⇒ rien affiché (§5).
+function VentesLeboncoin({ lbcVentes = {ventes:[],inconnues:0} }) {
+  if (!(lbcVentes.ventes.length > 0 || lbcVentes.inconnues > 0)) return null;
+  return (
+    <div style={{marginBottom:14,border:`1px solid ${C.border}`,borderRadius:12,background:C.card,padding:'12px 14px'}}>
+      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:lbcVentes.ventes.length?6:0}}>
+        <PlateformeLogo p="lbc"/>
+        <div style={{fontWeight:800,fontSize:14,color:C.text}}>Ventes Leboncoin{lbcVentes.ventes.length?` (${lbcVentes.ventes.length})`:''}</div>
+      </div>
+      {lbcVentes.ventes.map(o=>{
+        const euro = o.price==null ? '' : (Number(o.price)/100).toFixed(2).replace('.',',')+' €';
+        const annulee = /annul|cancel|refund|rembours/i.test((o.stepStatus||'')+' '+(o.stepLabel||''));
+        return (
+          <div key={o.txId} style={{display:'flex',flexWrap:'wrap',alignItems:'center',gap:8,padding:'7px 0',borderTop:`1px solid ${C.border}`,opacity:annulee?0.55:1}}>
+            <div style={{flex:'1 1 200px',minWidth:0}}>
+              <div style={{fontWeight:600,fontSize:13,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{o.title||'(sans titre)'}</div>
+              <div style={{fontSize:11.5,color:C.muted}}>{o.stepLabel||o.stepStatus||''}{euro?` · ${euro}`:''}{o.deliveryLabel?` · ${o.deliveryLabel}`:''}</div>
+            </div>
+            {o.label && o.label.voucherUrl
+              ? <a href={o.label.voucherUrl} target="_blank" rel="noreferrer" style={{flexShrink:0,background:C.text,color:C.card,borderRadius:8,padding:'6px 11px',fontWeight:700,fontSize:12,textDecoration:'none'}}>🧾 Bordereau{o.label.reference?` · ${o.label.reference}`:''}</a>
+              : (o.label && o.label.trackingUrl ? <a href={o.label.trackingUrl} target="_blank" rel="noreferrer" style={{flexShrink:0,color:C.accent,fontWeight:700,fontSize:12,textDecoration:'none'}}>Suivre ↗</a> : null)}
+          </div>
+        );
+      })}
+      {lbcVentes.inconnues>0 && (
+        <div style={{fontSize:11.5,color:C.muted,marginTop:lbcVentes.ventes.length?8:6,paddingTop:lbcVentes.ventes.length?8:0,borderTop:lbcVentes.ventes.length?`1px solid ${C.border}`:'none'}}>
+          {lbcVentes.inconnues} autre{lbcVentes.inconnues>1?'s':''} transaction{lbcVentes.inconnues>1?'s':''} Leboncoin — vente ou achat <b>pas encore confirmé</b>. Ouvre-la sur Leboncoin : le côté se lit tout seul au passage.
+        </div>
+      )}
+    </div>
+  );
+}
 function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, onGo, onSub, baseKO }) {
   const p = caParPlateforme(liveStats, lbcVentes).find(x => x.nom === plat) || { nom:plat, ca:null };
   // Les cartes du hub ouvrent une SECTION dans l'onglet (onSub) si l'appelant le
@@ -6521,6 +6556,9 @@ function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, onGo
             </button>
           </div>
         )}
+        {/* Les ventes Leboncoin (avec leur bordereau) vivent ICI, dans l'espace
+            Leboncoin — plus dans les ventes Vinted (§11, une notion un endroit). */}
+        {plat==='Leboncoin' && <VentesLeboncoin lbcVentes={lbcVentes}/>}
         <Card style={{padding:16}}>
           <div style={{fontSize:13.5,color:C.text,lineHeight:1.55}}>
             {plat==='Vestiaire Collective'
@@ -15203,6 +15241,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // un compte existe s'il a des jetons, pas parce qu'il reste des données.
       const uidIt = String((it && it._acc && it._acc.vinted_user_id) || '');
       if (!uidIt || !accountUids.has(uidIt)) return false;
+      // ⚠️ COMPTE BANNI PAR VINTED (403) → ses annonces ne sont plus « en ligne »
+      //    (Julien : « dès qu'un compte est ban, enlève l'annonce en ligne »).
+      //    Le constructeur `liveStats` les écartait DÉJÀ (`skipAcc` = blocked ||
+      //    hidden) : l'écran Annonces le faisait pas → deux nombres pour la même
+      //    notion (§11). On aligne. Ça ne touche PAS la compta/ventes (un compte
+      //    banni a quand même vendu) : `acctOffOf` reste inchangé.
+      //    `isBanni` ne marque que sur un vrai 403 (jamais un 401 « session
+      //    expirée »), et l'auto-réparation rallume un compte re-capté — donc
+      //    aucun compte sain n'est écarté à tort.
+      if (blockedAccts.has(uidIt)) return false;
       if (acctOffOf(it) || soldManual.has(String(it.id))) return false;
       if (!showEmailSold && emailSoldIds.has(String(it.id))) return false;
       // Vendue d'après VINTED LUI-MÊME (identité, jamais le titre).
@@ -18306,42 +18354,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           </div>
         )}
         <NoAcc/>
-        {/* ⚠️ VENTES LEBONCOIN — demande de Julien (21 sept.) : « je veux une
-            partie vente Leboncoin ET vente Vinted sur l'app ». La liste ci-dessous
-            est Vinted ; ce bloc-ci montre ses ventes LEBONCOIN, captées par
-            l'extension (`lbc_ventes`). §5 : on n'affiche comme vente que ce que
-            Leboncoin CONFIRME (`isSeller === true`) ; le côté pas encore su est
-            DIT, jamais compté comme vente ; un achat prouvé est écarté (la liste
-            Leboncoin mêle ventes et achats). Le bordereau s'ouvre, comme sur
-            Vinted. Rien capté ⇒ le bloc ne s'affiche pas (on n'invente rien). */}
-        {(lbcVentes.ventes.length > 0 || lbcVentes.inconnues > 0) && (
-          <div style={{marginBottom:14,border:`1px solid ${C.border}`,borderRadius:12,background:C.card,padding:'12px 14px'}}>
-            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:lbcVentes.ventes.length?6:0}}>
-              <PlateformeLogo p="lbc"/>
-              <div style={{fontWeight:800,fontSize:14,color:C.text}}>Ventes Leboncoin{lbcVentes.ventes.length?` (${lbcVentes.ventes.length})`:''}</div>
-            </div>
-            {lbcVentes.ventes.map(o=>{
-              const euro = o.price==null ? '' : (Number(o.price)/100).toFixed(2).replace('.',',')+' €';
-              const annulee = /annul|cancel|refund|rembours/i.test((o.stepStatus||'')+' '+(o.stepLabel||''));
-              return (
-                <div key={o.txId} style={{display:'flex',flexWrap:'wrap',alignItems:'center',gap:8,padding:'7px 0',borderTop:`1px solid ${C.border}`,opacity:annulee?0.55:1}}>
-                  <div style={{flex:'1 1 200px',minWidth:0}}>
-                    <div style={{fontWeight:600,fontSize:13,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{o.title||'(sans titre)'}</div>
-                    <div style={{fontSize:11.5,color:C.muted}}>{o.stepLabel||o.stepStatus||''}{euro?` · ${euro}`:''}{o.deliveryLabel?` · ${o.deliveryLabel}`:''}</div>
-                  </div>
-                  {o.label && o.label.voucherUrl
-                    ? <a href={o.label.voucherUrl} target="_blank" rel="noreferrer" style={{flexShrink:0,background:C.text,color:C.card,borderRadius:8,padding:'6px 11px',fontWeight:700,fontSize:12,textDecoration:'none'}}>🧾 Bordereau{o.label.reference?` · ${o.label.reference}`:''}</a>
-                    : (o.label && o.label.trackingUrl ? <a href={o.label.trackingUrl} target="_blank" rel="noreferrer" style={{flexShrink:0,color:C.accent,fontWeight:700,fontSize:12,textDecoration:'none'}}>Suivre ↗</a> : null)}
-                </div>
-              );
-            })}
-            {lbcVentes.inconnues>0 && (
-              <div style={{fontSize:11.5,color:C.muted,marginTop:lbcVentes.ventes.length?8:6,paddingTop:lbcVentes.ventes.length?8:0,borderTop:lbcVentes.ventes.length?`1px solid ${C.border}`:'none'}}>
-                {lbcVentes.inconnues} autre{lbcVentes.inconnues>1?'s':''} transaction{lbcVentes.inconnues>1?'s':''} Leboncoin — vente ou achat <b>pas encore confirmé</b>. Ouvre-la sur Leboncoin : le côté se lit tout seul au passage.
-              </div>
-            )}
-          </div>
-        )}
+        {/* ⚠️ LES VENTES LEBONCOIN NE SONT PLUS ICI : elles vivent dans l'espace
+            LEBONCOIN (onglet Leboncoin → aperçu), pas dans les ventes VINTED
+            (Julien, 25 sept.). Cet écran est Vinted uniquement. */}
         {/* Rappel d'expédition : alerte les ventes à expédier, les plus urgentes
             d'abord (échéance estimée à +5 j). Protège la note vendeur. */}
          {/* ⚠️ AU-DESSUS DE LA LISTE, ON NE GARDE QUE CE QU'ON VIENT FAIRE.
