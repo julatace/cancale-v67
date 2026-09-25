@@ -11,10 +11,14 @@ const SRC=fs.readFileSync(path.join(__dirname,'..','..','src','App.jsx'),'utf8')
 const sl=(a,b)=>SRC.slice(a,b).join('\n');
 let M;
 try {
+  // ⚠️ EXTRACTION PAR NUMÉROS DE LIGNE (§4.11 : fragile — se re-cale quand
+  //    App.jsx bouge). Tranches recalées le 25 sept. :
+  //    montantCommande (2670-2676) · extractSize+extractModel (3767-3924) ·
+  //    medianeNb+grouperPrixMarche+valoriserStock (6277-6318).
   M=new Function(`const normTitle=(t)=>(t||'').toLowerCase().replace(/\\s+/g,' ').trim();
 ${sl(2669,2676)}
-${sl(3752,3924)}
-${sl(6239,6281)}
+${sl(3766,3924)}
+${sl(6276,6318)}
 return {grouperPrixMarche, valoriserStock, extractModel, extractSize, montantCommande};`)();
 } catch(e){ console.log('KO  extraction du code impossible —', e.message); process.exit(1); }
 const FX=f=>JSON.parse(fs.readFileSync(path.join(__dirname,'fx',f+'.json'),'utf8'));
