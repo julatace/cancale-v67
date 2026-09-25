@@ -14192,7 +14192,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const parCompte = new Map();
     for (const o of sansCodeList) { const a = o && o._acc; if (a && !parCompte.has(String(a.vinted_user_id))) parCompte.set(String(a.vinted_user_id), a); }
     const comptesSansCode = [...parCompte.values()];
-    return { emailList, extra, attente, attenteMail, oublies, horsDelai, sansCode, comptesSansCode,
+    // ⚠️ OÙ ALLER LES CHERCHER (Julien : « dis à quel relais »). L'écran Achats
+    //    les groupe déjà par point relais ; la notification résumé, elle, ne le
+    //    disait pas. On expose les relais DISTINCTS des colis retirables — quand
+    //    ils sont tous au même endroit, la notification peut le nommer. Le nom
+    //    vient de `cleanLieu(t.lieu)` (§11, la même source que les groupes de
+    //    l'écran Achats), jamais deviné : un email sans lieu n'ajoute rien.
+    const lieux = [...new Set(emailList.map(t => (cleanLieu(t.lieu).nom || '').trim()).filter(Boolean))];
+    return { emailList, extra, attente, attenteMail, oublies, horsDelai, sansCode, comptesSansCode, lieux,
              prets: emailList.length + (extra.length - sansCode),
              total: emailList.length + extra.length };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -17873,9 +17880,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // la ligne en tête parce qu'un colis non retiré repart chez l'expéditeur.
         if(pickupCount){
           const hd=pickupUnion.horsDelai.length, pr=pickupUnion.prets, sc=pickupUnion.sansCode;
-          const sub = hd>0 ? `${hd} hors délai — va vite ${hd>1?'les':'le'} chercher`
-            : pr>0 && sc>0 ? `${pr} avec ton code · ${sc} en attente de leur code`
-            : pr>0 ? 'Tu as le code — plus qu\'à aller les chercher'
+          const lx=pickupUnion.lieux||[];
+          // « chez X » quand tous les colis retirables sont au MÊME relais ;
+          // sinon le nombre de relais (jamais un seul nom qui en cacherait
+          // d'autres — §5, mieux vaut un blanc qu'un faux).
+          const ou = lx.length===1 ? ` chez ${lx[0]}` : lx.length>1 ? ` dans ${lx.length} points relais` : '';
+          const sub = hd>0 ? `${hd} hors délai — va vite ${hd>1?'les':'le'} chercher${lx.length===1?` chez ${lx[0]}`:''}`
+            : pr>0 && sc>0 ? `${pr} avec ton code${ou} · ${sc} en attente de leur code`
+            : pr>0 ? `Tu as le code — plus qu'à aller ${pr>1?'les':'le'} chercher${ou}`
             : (()=>{ const cs = (pickupUnion.comptesSansCode||[]).map(a=>accName(a)).filter(Boolean);
                      const qui = cs.length===1 ? `sur ${cs[0]}` : cs.length>1 ? `sur ${cs.slice(0,3).join(', ')}${cs.length>3?'…':''}` : 'avec le bon compte';
                      const e = extSaitLireCodes();
