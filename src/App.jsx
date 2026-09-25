@@ -6402,6 +6402,29 @@ function PlatSubNav({ sub, setSub, sections }) {
     </div>
   );
 }
+// Résumé Vinted COMPACT, toujours visible en haut de l'onglet (Julien, 25 sept. :
+// « il n'y a pas direct les ventes et les achats »). Plus d'écran « Aperçu » à
+// traverser : les chiffres qui comptent (CA, argent) restent sous les yeux, et
+// la liste (ventes par défaut) est juste en dessous. Consomme liveStats (§11).
+function VintedResume({ liveStats, baseKO }) {
+  if (baseKO) return <div style={{padding:'12px 16px 0'}}><LignePanne>Je n'ai pas pu lire tes données — les totaux seraient faux, on ne les affiche pas. Rien n'est perdu : c'est la lecture qui a échoué.</LignePanne></div>;
+  const ca = liveStats && liveStats.caEncaisse != null ? liveStats.caEncaisse : null;
+  const dispo = liveStats && liveStats.walletDispo != null ? liveStats.walletDispo : null;
+  const att = liveStats && liveStats.walletAttente != null ? liveStats.walletAttente : null;
+  const dAge = liveStats && liveStats.dataAgeJours != null ? liveStats.dataAgeJours : null;
+  const box = { flex:'1 1 90px', minWidth:0 };
+  const eti = { fontSize:10.5, color:C.muted, textTransform:'uppercase', letterSpacing:0.7, fontWeight:600 };
+  return (
+    <div style={{padding:'12px 16px 0',display:'flex',flexDirection:'column',gap:10}}>
+      <div style={{display:'flex',gap:14,flexWrap:'wrap',border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 15px',boxShadow:C.shadow||'none'}}>
+        <div style={box}><div style={eti}>CA finalisé</div><div className="vrm-display" style={{fontSize:20,fontWeight:700,color:C.text}}>{ca==null?'—':fmt(ca)}</div></div>
+        <div style={box}><div style={eti}>Disponible</div><div className="vrm-display" style={{fontSize:20,fontWeight:700,color:C.text}}>{dispo==null?'—':fmt(dispo)}</div></div>
+        <div style={box}><div style={eti}>En attente</div><div className="vrm-display" style={{fontSize:20,fontWeight:700,color:C.muted}}>{att==null?'—':fmt(att)}</div></div>
+      </div>
+      <FraicheurDonnees jours={dAge}/>
+    </div>
+  );
+}
 function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, onGo, onSub, baseKO }) {
   const p = caParPlateforme(liveStats, lbcVentes).find(x => x.nom === plat) || { nom:plat, ca:null };
   // Les cartes du hub ouvrent une SECTION dans l'onglet (onSub) si l'appelant le
@@ -25240,8 +25263,11 @@ export default function App() {
   //    qui rend les écrans détaillés À L'INTÉRIEUR de l'onglet (mêmes composants,
   //    aucune duplication §11) au lieu d'envoyer vers un autre onglet.
   const [platSub,setPlatSub]=useState('apercu');
-  // En changeant d'onglet, la sous-navigation de plateforme revient à l'aperçu.
-  React.useEffect(()=>{ setPlatSub('apercu'); },[tab]);
+  // En changeant d'onglet, la sous-navigation revient à sa section par défaut :
+  // Vinted ouvre DIRECTEMENT sur les ventes (le résumé CA/argent reste en haut,
+  // pas d'écran « Aperçu » à traverser — demande de Julien) ; les autres
+  // plateformes ouvrent sur leur aperçu.
+  React.useEffect(()=>{ setPlatSub(tab==='plat_vinted'?'ventes':'apercu'); },[tab]);
   // Historique de navigation → bouton « retour » (plus besoin de recharger l'app).
   const navHistRef = React.useRef([]);
   const prevTabRef = React.useRef('journee');
@@ -26606,9 +26632,12 @@ export default function App() {
             ailleurs. Les écrans détaillés restent aussi joignables seuls (menu
             « Dans Vinted »), donc rien n'est perdu (§4.11). */}
         {tab==='plat_vinted'&&(<>
-          <PlatSubNav sub={platSub} setSub={setPlatSub} sections={[['apercu','Aperçu'],['annonces','Annonces'],['ventes','Ventes'],['achats','Achats']]}/>
-          {platSub==='apercu'&&<Plateforme plat="Vinted" liveStats={liveStats} lbcVentes={lbcVentes} onGo={setTab} onSub={setPlatSub} baseKO={baseKO}/>}
-          {platSub!=='apercu'&&<Comptabilite key={'pv_'+platSub} accounts={vintedAccounts} only={platSub} liveStats={liveStats} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}/>}
+          {/* Résumé CA/argent TOUJOURS visible en haut, puis la liste (ventes par
+              défaut) directement — plus d'écran « Aperçu » intermédiaire. Les
+              sections restent les mêmes écrans (§11), juste à un tap. */}
+          <VintedResume liveStats={liveStats} baseKO={baseKO}/>
+          <PlatSubNav sub={platSub} setSub={setPlatSub} sections={[['ventes','Ventes'],['achats','Achats'],['annonces','Annonces']]}/>
+          <Comptabilite key={'pv_'+platSub} accounts={vintedAccounts} only={platSub==='apercu'?'ventes':platSub} liveStats={liveStats} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}/>
         </>)}
         {tab==='plat_leboncoin'&&(<>
           <PlatSubNav sub={platSub} setSub={setPlatSub} sections={[['apercu','Aperçu'],['apublier','À publier']]}/>
