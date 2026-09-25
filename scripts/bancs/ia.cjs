@@ -78,7 +78,18 @@ const aiPosts=[]; let aiMode='ok'; const vintedWrites=[];
   await pg.screenshot({path:SC+'/z-ia.png',fullPage:true});
   dit(v.copierTitre && v.copierDesc, 'de quoi COPIER le titre ET la description', 'titre:'+v.copierTitre+' desc:'+v.copierDesc);
   // COPIE SEULEMENT : la modale n'a AUCUN bouton qui publie (par construction §3).
-  const publieBtn=await pg.evaluate(()=>[...document.querySelectorAll('button')].some(b=>/publier|mettre en ligne|d[ée]poser|envoyer sur vinted/i.test(b.innerText||'')));
+  // ⚠️ ON NE REGARDE QUE DANS LA MODALE IA, pas toute la page : le libellé de
+  //    navigation « À publier » (onglet Leboncoin) matche /publier/ et faisait
+  //    crier le banc au loup (§6). Ce qui est interdit, c'est un bouton qui
+  //    PUBLIE DANS L'ATELIER, pas un onglet du menu.
+  const publieBtn=await pg.evaluate(()=>{
+    // La modale IA est un overlay [data-noswipe] qui contient son titre. On
+    // scanne UNIQUEMENT dedans (le libellé de navigation « À publier » matche
+    // sinon /publier/ et fait crier le banc au loup, §6).
+    const modal=[...document.querySelectorAll('[data-noswipe]')].find(o=>/R[ée]diger une annonce \(IA\)/.test(o.textContent||''));
+    if(!modal) return false;
+    return [...modal.querySelectorAll('button')].some(b=>/publier|mettre en ligne|d[ée]poser|envoyer sur vinted/i.test(b.innerText||''));
+  });
   dit(!publieBtn, 'COPIE SEULEMENT : aucun bouton ne publie depuis l\'atelier (§3)');
   dit(errs.length===0, 'aucune erreur d\'app', errs.slice(0,2).join(' | '));
   // ── SANS CLÉ : on le DIT, aucune rédaction inventée ──
