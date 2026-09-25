@@ -6374,8 +6374,26 @@ function PrixMarche({ data, baseKO }) {
     </div>
   );
 }
-function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, onGo, baseKO }) {
+// Sous-navigation d'un hub de plateforme : des pastilles qui changent la SECTION
+// affichée DANS l'onglet (Aperçu · Annonces · Ventes · Achats), sans quitter la
+// plateforme. Une seule teinte d'accent (§7), la pastille active distingue.
+function PlatSubNav({ sub, setSub, sections }) {
+  return (
+    <div className="vrm-rangee" style={{display:'flex',gap:8,padding:'12px 16px 0',overflowX:'auto'}}>
+      {sections.map(([id,label])=>{ const on = sub===id; return (
+        <button key={id} type="button" onClick={()=>setSub(id)} aria-current={on?'page':undefined}
+          style={{flexShrink:0,border:`1px solid ${on?C.accent:C.border}`,background:on?C.accent:C.card,
+            color:on?(C.onAccent||'#fff'):C.text,borderRadius:999,padding:'7px 14px',cursor:'pointer',
+            fontFamily:'inherit',fontSize:13,fontWeight:on?700:600,whiteSpace:'nowrap'}}>{label}</button>
+      );})}
+    </div>
+  );
+}
+function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, onGo, onSub, baseKO }) {
   const p = caParPlateforme(liveStats, lbcVentes).find(x => x.nom === plat) || { nom:plat, ca:null };
+  // Les cartes du hub ouvrent une SECTION dans l'onglet (onSub) si l'appelant le
+  // permet ; sinon (compat) elles naviguent vers l'écran séparé (onGo).
+  const aller = (section, tabId) => (onSub ? onSub(section) : (onGo && onGo(tabId)));
   const estVinted = plat === 'Vinted';
   const ventesVinted = liveStats && liveStats.soldTotal != null ? liveStats.soldTotal : null;
   const online = liveStats && liveStats.online != null ? liveStats.online : null;
@@ -6421,17 +6439,17 @@ function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, onGo
           </Card>
         )}
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(150px,1fr))',gap:10}}>
-          <button type="button" onClick={()=>onGo&&onGo('cat_annonces')} style={carte}>
+          <button type="button" onClick={()=>aller('annonces','cat_annonces')} style={carte}>
             <div style={eti}>Annonces en ligne</div>
             <div className="vrm-display" style={gros}>{online==null?'—':online}</div>
             <div style={{fontSize:11,color:C.muted,marginTop:2}}>Voir toutes les annonces ›</div>
           </button>
-          <button type="button" onClick={()=>onGo&&onGo('cat_ventes')} style={carte}>
+          <button type="button" onClick={()=>aller('ventes','cat_ventes')} style={carte}>
             <div style={eti}>Ventes finalisées</div>
             <div className="vrm-display" style={gros}>{ventesVinted==null?'—':ventesVinted}</div>
             <div style={{fontSize:11,color:C.muted,marginTop:2}}>{enAttente==null?'Voir les ventes ›':`+ ${enAttente} en cours · voir les ventes ›`}</div>
           </button>
-          <button type="button" onClick={()=>onGo&&onGo('cat_achats')} style={carte}>
+          <button type="button" onClick={()=>aller('achats','cat_achats')} style={carte}>
             <div style={eti}>Achats</div>
             <div className="vrm-display" style={{...gros,fontSize:18,color:C.muted}}>Voir ›</div>
             <div style={{fontSize:11,color:C.muted,marginTop:2}}>Tes commandes et colis reçus</div>
@@ -6452,7 +6470,7 @@ function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, onGo
         </Card>
         {plat==='Leboncoin' && (
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(150px,1fr))',gap:10}}>
-            <button type="button" onClick={()=>onGo&&onGo('leboncoin')} style={carte}>
+            <button type="button" onClick={()=>aller('apublier','leboncoin')} style={carte}>
               <div style={eti}>À publier</div>
               <div className="vrm-display" style={{...gros,fontSize:18,color:C.text}}>Ouvrir ›</div>
               <div style={{fontSize:11,color:C.muted,marginTop:2}}>Tes annonces à mettre sur Leboncoin, et à retirer</div>
@@ -25190,6 +25208,14 @@ export default function App() {
   //    pilotage quotidien (les actions du jour) ; Collectif reste une vue
   //    d'ensemble optionnelle dans le menu, plus l'écran forcé à l'ouverture.
   const [tab,setTab]=useState('journee');
+  // ⚠️ UN SEUL ONGLET PAR PLATEFORME QUI CONTIENT TOUT (Julien, 25 sept. : « tu
+  //    peux directement tout mettre dans l'onglet Vinted… sans avoir besoin
+  //    d'avoir vente, achat »). Le hub Vinted/Leboncoin porte une sous-navigation
+  //    qui rend les écrans détaillés À L'INTÉRIEUR de l'onglet (mêmes composants,
+  //    aucune duplication §11) au lieu d'envoyer vers un autre onglet.
+  const [platSub,setPlatSub]=useState('apercu');
+  // En changeant d'onglet, la sous-navigation de plateforme revient à l'aperçu.
+  React.useEffect(()=>{ setPlatSub('apercu'); },[tab]);
   // Historique de navigation → bouton « retour » (plus besoin de recharger l'app).
   const navHistRef = React.useRef([]);
   const prevTabRef = React.useRef('journee');
@@ -26532,8 +26558,22 @@ export default function App() {
         {tab==='dashboard'&&premierJour&&<Onboarding setTab={setTab}/>}
         {tab==='dashboard'&&<Dashboard premierJour={premierJour} catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices} liveStats={liveStats} lbcVentes={lbcVentes} onGo={setTab} actions={notifItems} baseKO={baseKO}/>}
         {tab==='collectif'&&<Collectif liveStats={liveStats} lbcVentes={lbcVentes} onGo={setTab} baseKO={baseKO} actions={notifItems} premierJour={premierJour}/>}
-        {tab==='plat_vinted'&&<Plateforme plat="Vinted" liveStats={liveStats} lbcVentes={lbcVentes} onGo={setTab} baseKO={baseKO}/>}
-        {tab==='plat_leboncoin'&&<Plateforme plat="Leboncoin" liveStats={liveStats} lbcVentes={lbcVentes} onGo={setTab} baseKO={baseKO}/>}
+        {/* ⚠️ UN SEUL ONGLET VINTED QUI CONTIENT TOUT : Aperçu (CA, argent,
+            compteurs) + Annonces / Ventes / Achats rendus À L'INTÉRIEUR, via les
+            MÊMES composants que les écrans séparés (aucune duplication §11). Les
+            cartes de l'aperçu changent la section (onSub) au lieu d'envoyer
+            ailleurs. Les écrans détaillés restent aussi joignables seuls (menu
+            « Dans Vinted »), donc rien n'est perdu (§4.11). */}
+        {tab==='plat_vinted'&&(<>
+          <PlatSubNav sub={platSub} setSub={setPlatSub} sections={[['apercu','Aperçu'],['annonces','Annonces'],['ventes','Ventes'],['achats','Achats']]}/>
+          {platSub==='apercu'&&<Plateforme plat="Vinted" liveStats={liveStats} lbcVentes={lbcVentes} onGo={setTab} onSub={setPlatSub} baseKO={baseKO}/>}
+          {platSub!=='apercu'&&<Comptabilite key={'pv_'+platSub} accounts={vintedAccounts} only={platSub} liveStats={liveStats} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}/>}
+        </>)}
+        {tab==='plat_leboncoin'&&(<>
+          <PlatSubNav sub={platSub} setSub={setPlatSub} sections={[['apercu','Aperçu'],['apublier','À publier']]}/>
+          {platSub==='apercu'&&<Plateforme plat="Leboncoin" liveStats={liveStats} lbcVentes={lbcVentes} onGo={setTab} onSub={setPlatSub} baseKO={baseKO}/>}
+          {platSub==='apublier'&&<LeboncoinScreen/>}
+        </>)}
         {tab==='plat_ebay'&&<Plateforme plat="eBay" liveStats={liveStats} lbcVentes={lbcVentes} onGo={setTab} baseKO={baseKO}/>}
         {tab==='plat_vestiaire'&&<Plateforme plat="Vestiaire Collective" liveStats={liveStats} lbcVentes={lbcVentes} onGo={setTab} baseKO={baseKO}/>}
         {tab==='prixmarche'&&<PrixMarche data={pqmData} baseKO={baseKO}/>}
