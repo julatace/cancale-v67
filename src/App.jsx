@@ -18092,15 +18092,24 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <div style={{fontSize:12,color:C.muted,marginTop:2}}>
                       Une offre acceptée, c'est presque une vente.
                       {reglees.length>0 && ` ${reglees.length} autre${reglees.length>1?'s sont mises':' est mise'} de côté : la paire s'est vendue depuis.`}
+                      {/* ⚠️ POURQUOI ELLES « S'ACCUMULENT » : une offre tranchée sur
+                          Vinted n'a AUCUN signal d'identité qui revienne jusqu'ici
+                          (§5 : email_offer_* sans item_id/transaction/conversation) —
+                          on ne peut donc pas savoir tout seul qu'il a répondu, et
+                          les relier par titre serait le rapprochement interdit. Le
+                          geste sûr est le SIEN : « J'ai répondu » les classe. */}
+                      {' '}Déjà répondu&nbsp;? Classe-les d'un tap — sinon elles restent 14 jours.
                     </div>
                   </div>
                   <a href="https://www.vinted.fr/inbox" target="_blank" rel="noreferrer"
                      style={{flexShrink:0,textDecoration:'none',fontSize:12.5,fontWeight:700,color:C.onAccent,background:C.accent,borderRadius:8,padding:'8px 12px'}}>Répondre</a>
                   {/* Sans ce bouton le compteur ne redescendrait qu'au bout de
                       14 jours : les offres traitées sur Vinted n'ont aucun signal
-                      qui revienne jusqu'ici. */}
-                  <button type="button" onClick={()=>recent.forEach(markOfferDone)} title="Tout marquer comme traité"
-                     style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:8,padding:'8px 10px',cursor:'pointer',fontSize:12,fontWeight:600,fontFamily:'inherit'}}>✓</button>
+                      qui revienne jusqu'ici. Le libellé est VISIBLE (une infobulle
+                      ne se voit pas sur téléphone — c'est pour ça qu'il croyait
+                      les offres « infinies »). */}
+                  <button type="button" onClick={()=>recent.forEach(markOfferDone)} title="Marquer toutes ces offres comme traitées"
+                     style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:8,padding:'8px 11px',cursor:'pointer',fontSize:12,fontWeight:600,fontFamily:'inherit',whiteSpace:'nowrap'}}>✓ J'ai répondu</button>
                 </div>
               );
             })()}
