@@ -4696,6 +4696,15 @@ const VINTED_TABS=[
   {id:'cat_ventes',   icon:'cash', emoji:'💸',label:'Ventes'},
   {id:'cat_achats',   icon:'bag',  emoji:'🛍️',label:'Achats'},
 ];
+// Quand on est DANS une section d'un site (Annonces, Ventes… sont des sections
+// de Vinted ; « À publier » est une section de Leboncoin), l'onglet du SITE
+// reste allumé dans la barre — sinon aucun onglet n'est actif et on ne sait
+// plus dans quel espace on se trouve. Une notion, une source (§11).
+const BAR_GROUPE={
+  cat_annonces:'plat_vinted', cat_ventes:'plat_vinted', cat_achats:'plat_vinted',
+  cat_msg:'plat_vinted', cat_expedition:'cat_bord',
+  leboncoin:'plat_leboncoin',
+};
 // Les écrans qu'on ouvre ponctuellement — jamais perdus, juste rangés.
 const PLUS_TABS=[
   {id:'collectif',    icon:'target',  emoji:'🌐',label:'Collectif',     desc:'Toutes tes plateformes réunies'},
@@ -5367,7 +5376,7 @@ function BottomBar({tab,setTab}) {
       background:C.chrome,borderTop:`1px solid ${C.chromeLine}`,boxShadow:'none',
       paddingBottom:'env(safe-area-inset-bottom)',
       transform:kbOpen?'translateY(120%)':'translateY(0)',transition:'transform .22s cubic-bezier(.32,.72,0,1)'}}>
-      {BOTTOM_TABS.map(t=>{ const on=tab===t.id; return (
+      {(()=>{ const actif=BAR_GROUPE[tab]||tab; return BOTTOM_TABS.map(t=>{ const on=actif===t.id; return (
         <button key={t.id} type="button" onClick={()=>setTab(t.id)} aria-label={t.label} aria-current={on?'page':undefined} style={{
           flex:'1 1 0',minWidth:0,display:'flex',flexDirection:'column',alignItems:'center',gap:4,padding:'8px 2px 7px',
           background:'transparent',border:'none',cursor:'pointer',fontFamily:'inherit',
@@ -5380,7 +5389,7 @@ function BottomBar({tab,setTab}) {
           <span style={{fontSize:9,fontWeight:on?600:500,whiteSpace:'nowrap',letterSpacing:0.1,
             overflow:'hidden',textOverflow:'ellipsis',maxWidth:'100%'}}>{t.label}</span>
         </button>
-      );})}
+      );}); })()}
     </nav>
     </>
   );
