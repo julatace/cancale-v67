@@ -1,7 +1,7 @@
 // Service worker : (1) rend l'app installable + consultable hors-ligne (PWA) ;
 // (2) sert les PDFs bordereaux via une vraie URL HTTPS pour AirPrint.
 
-const CACHE = 'vrm-shell-v3';
+const CACHE = 'vrm-shell-v4';
 const pdfStore = {};
 
 self.addEventListener('install', () => self.skipWaiting());
@@ -132,7 +132,28 @@ self.addEventListener('fetch', event => {
         return fresh;
       } catch (_) {
         const cache = await caches.open(CACHE);
-        return (await cache.match('/')) || (await cache.match(req)) || Response.error();
+        const cached = (await cache.match('/')) || (await cache.match(req));
+        if (cached) return cached;
+        // ⚠️⚠️ JAMAIS `Response.error()` SUR UNE NAVIGATION. Mesuré chez Julien :
+        // sur Edge, ça affichait « impossible d'ouvrir cette page » de façon
+        // COLLANTE — le service worker brickait l'onglet, et l'app ne s'ouvrait
+        // plus JAMAIS sur ce navigateur (elle marchait sur Chrome). Un secours
+        // qui rend l'app inaccessible est pire que pas de secours. On renvoie
+        // une petite page qui explique et propose de réessayer — jamais un
+        // cul-de-sac. Elle réessaie une fois toute seule, sans boucler.
+        return new Response(
+          '<!doctype html><html lang="fr"><head><meta charset="utf-8">' +
+          '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+          '<title>VRM</title></head>' +
+          '<body style="margin:0;font-family:system-ui,-apple-system,sans-serif;background:#f6f7f9;color:#14181d;display:flex;min-height:100vh;align-items:center;justify-content:center">' +
+          '<div style="max-width:360px;padding:24px;text-align:center">' +
+          '<div style="font-size:17px;font-weight:700;margin-bottom:8px">Connexion en cours…</div>' +
+          '<div style="font-size:13px;color:#5b6675;line-height:1.5;margin-bottom:16px">La page n\'a pas pu se charger. Tes données sont intactes.</div>' +
+          '<button onclick="location.reload()" style="border:none;background:#14181d;color:#fff;border-radius:10px;padding:11px 18px;font-size:14px;font-weight:600;cursor:pointer">Réessayer</button>' +
+          '<script>setTimeout(function(){location.reload()},4000)</script>' +
+          '</div></body></html>',
+          { headers: { 'Content-Type': 'text/html; charset=utf-8' } }
+        );
       }
     })());
     return;
