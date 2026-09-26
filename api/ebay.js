@@ -134,6 +134,50 @@ async function handleRevise(b) {
   return { status: 200, body: { ok: true, ack: r.ack } };
 }
 
+// ── MESURE pour la PUBLICATION (lecture seule) : ce qu'eBay EXIGE pour créer
+//    une annonce — la catégorie, ses attributs obligatoires, et les règles/
+//    emplacements du compte. On mesure AVANT d'écrire le publieur (§6).
+async function handlePubInfo(b) {
+  const at = await accessToken();
+  if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
+  const token = at.token;
+  const MKT = 'EBAY_FR';
+  const H = { 'Accept-Language': 'fr-FR', 'Content-Language': 'fr-FR' };
+  const title = String(b.title || 'Nike Air Max baskets').slice(0, 80);
+  // 1) Arbre de catégories FR + suggestion de catégorie pour un titre.
+  const tree = await ebayJson(`${EBAY_API}/commerce/taxonomy/v1/get_default_category_tree_id?marketplace_id=${MKT}`, token, H);
+  const treeId = (tree.data && tree.data.categoryTreeId) || '';
+  let sugg = { status: 0 }, aspects = { status: 0 }, categoryId = String(b.categoryId || '');
+  if (treeId) {
+    sugg = await ebayJson(`${EBAY_API}/commerce/taxonomy/v1/category_tree/${treeId}/get_category_suggestions?q=${encodeURIComponent(title)}`, token, H);
+    const s0 = sugg.data && sugg.data.categorySuggestions && sugg.data.categorySuggestions[0];
+    if (!categoryId && s0 && s0.category) categoryId = s0.category.categoryId || '';
+    if (categoryId) aspects = await ebayJson(`${EBAY_API}/commerce/taxonomy/v1/category_tree/${treeId}/get_item_aspects_for_category?category_id=${categoryId}`, token, H);
+  }
+  // 2) Règles du compte (paiement / retour / expédition) + emplacements.
+  const [pay, ret, ful, loc] = await Promise.all([
+    ebayJson(`${EBAY_API}/sell/account/v1/payment_policy?marketplace_id=${MKT}`, token, H),
+    ebayJson(`${EBAY_API}/sell/account/v1/return_policy?marketplace_id=${MKT}`, token, H),
+    ebayJson(`${EBAY_API}/sell/account/v1/fulfillment_policy?marketplace_id=${MKT}`, token, H),
+    ebayJson(`${EBAY_API}/sell/inventory/v1/location`, token, H),
+  ]);
+  const pol = (r, key) => ({ status: r.status, count: ((r.data && r.data[key]) || []).length, ids: ((r.data && r.data[key]) || []).slice(0, 3).map(p => ({ id: p[Object.keys(p).find(k => /PolicyId$/.test(k))] || p.paymentPolicyId || p.returnPolicyId || p.fulfillmentPolicyId, name: p.name })) });
+  const asp = (aspects.data && aspects.data.aspects) || [];
+  return { status: 200, body: {
+    ok: true,
+    treeId,
+    categorie: { suggeree: (sugg.data && sugg.data.categorySuggestions && sugg.data.categorySuggestions[0] && sugg.data.categorySuggestions[0].category) || null, status: sugg.status, categoryId },
+    attributsObligatoires: asp.filter(a => a.aspectConstraint && a.aspectConstraint.aspectRequired).map(a => a.localizedAspectName),
+    attributsCount: asp.length,
+    reglePaiement: pol(pay, 'paymentPolicies'),
+    regleRetour: pol(ret, 'returnPolicies'),
+    regleExpedition: pol(ful, 'fulfillmentPolicies'),
+    emplacements: { status: loc.status, count: ((loc.data && loc.data.locations) || []).length },
+    // Bruts en cas d'erreur, pour diagnostiquer sans deviner.
+    diag: { tree: tree.ok ? undefined : tree.raw, sugg: sugg.ok ? undefined : sugg.raw, aspects: aspects.ok ? undefined : aspects.raw, pay: pay.ok ? undefined : pay.raw, loc: loc.ok ? undefined : loc.raw },
+  } };
+}
+
 async function handleSync() {
   const at = await accessToken();
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error, detail: at.detail || '' } };
@@ -249,6 +293,11 @@ async function handleApp(req, res) {
     }
     if (action === 'revise') {
       const r = await handleRevise(b);
+      res.status(r.status).json(r.body);
+      return;
+    }
+    if (action === 'pubinfo') {
+      const r = await handlePubInfo(b);
       res.status(r.status).json(r.body);
       return;
     }
