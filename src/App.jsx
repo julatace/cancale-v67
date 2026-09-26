@@ -7005,6 +7005,11 @@ function Collectif({ liveStats, lbcVentes = {ventes:[],inconnues:0}, ebayCa = nu
   const ventesVinted = liveStats && liveStats.soldTotal != null ? liveStats.soldTotal : null;
   const online = liveStats && liveStats.online != null ? liveStats.online : null;
   const enAttente = liveStats && liveStats.enCours != null ? liveStats.enCours : null;
+  // Argent à VIRER (Vinted) — publié par liveStats (§11, jamais recalculé).
+  // « disponible » et « en attente » ne se confondent jamais (§5.14).
+  const wDispo = liveStats && liveStats.walletDispo != null ? liveStats.walletDispo : null;
+  const wAttente = liveStats && liveStats.walletAttente != null ? liveStats.walletAttente : null;
+  const wAge = liveStats && liveStats.walletAgeJours != null ? liveStats.walletAgeJours : null;
   // Sélecteur de plateforme : « Toutes » = la vue globale ; chaque plateforme a
   // sa propre vue, qui ne montre QUE ce qui est mesuré (§5, jamais un 0 inventé).
   // Julien : « il y a pas l'onglet vinted ebay leboncoin et vestiaire. »
@@ -7105,6 +7110,31 @@ function Collectif({ liveStats, lbcVentes = {ventes:[],inconnues:0}, ebayCa = nu
             <div style={{fontSize:11,color:C.muted,marginTop:2}}>en attente de finalisation</div>
           </button>
         </div>
+
+        {/* ARGENT À VIRER — le chiffre qui compte pour un revendeur : ce qu'il
+            peut sortir. Publié par liveStats (§11, jamais recalculé). « dispo »
+            et « en attente » ne se confondent JAMAIS (§5.14) : deux lignes, deux
+            mots. Absent ⇒ on n'affiche pas la carte (pas de 0 inventé, §5/§7).
+            eBay a le sien sur son propre onglet (droit « paiements » à
+            reconnecter) ; Vinted est le seul lisible sans geste. */}
+        {(wDispo != null || wAttente != null) && (
+          <Card style={{padding:16}}>
+            <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:8}}>Argent à virer · Vinted</div>
+            <div style={{display:'flex',gap:24,flexWrap:'wrap'}}>
+              <div>
+                <div className="vrm-display" style={{fontSize:24,fontWeight:700,color:C.text}}>{wDispo==null?'—':fmt(wDispo)}</div>
+                <div style={{fontSize:11,color:C.muted,marginTop:1}}>disponible à virer</div>
+              </div>
+              {wAttente!=null && wAttente>0 && (
+                <div>
+                  <div className="vrm-display" style={{fontSize:24,fontWeight:700,color:C.muted}}>{fmt(wAttente)}</div>
+                  <div style={{fontSize:11,color:C.muted,marginTop:1}}>en attente (retenu par Vinted)</div>
+                </div>
+              )}
+            </div>
+            {wAge!=null && wAge>7 && <div style={{fontSize:11,color:C.muted,marginTop:8}}>Solde lu il y a {Math.round(wAge)} j — repasse sur Vinted pour le rafraîchir.</div>}
+          </Card>
+        )}
 
         {/* Le détail mois par mois vit sur Statistiques — une seule source. */}
         <button type="button" onClick={()=>onGo&&onGo('dashboard')} style={{alignSelf:'flex-start',border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'10px 14px',cursor:'pointer',fontFamily:'inherit',fontSize:13,fontWeight:600,color:C.text}}>
