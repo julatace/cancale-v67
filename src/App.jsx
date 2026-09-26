@@ -6619,12 +6619,52 @@ function EbayConnexion() {
           {data == null ? (
             <div style={{ fontSize: 12.5, color: C.muted }}>{syncing ? 'Première lecture de ton compte eBay…' : 'Chargement…'}</div>
           ) : (<>
-            {/* Ventes eBay */}
-            <div style={{ fontSize: 12.5, color: C.muted, marginBottom: 8 }}>
-              {data.orders.length > 0
-                ? <><b style={{ color: C.text }}>{data.orders.length}</b> vente{data.orders.length > 1 ? 's' : ''} eBay captée{data.orders.length > 1 ? 's' : ''}.</>
-                : 'Aucune vente eBay pour l\'instant.'}
-            </div>
+            {/* Argent eBay : montants, en attente de paiement, payées, à expédier.
+                Calculé depuis les commandes captées (Fulfillment API) — jamais un
+                chiffre inventé. Ces montants viennent d'eBay, comme la ligne argent
+                de Vinted. */}
+            {(() => {
+              const ords = data.orders || [];
+              const eur = (n) => (Math.round(n * 100) / 100).toFixed(2).replace('.', ',') + ' €';
+              const val = (o) => Number((o && o.pricingSummary && o.pricingSummary.total && o.pricingSummary.total.value) || 0) || 0;
+              const paye = (o) => String((o && o.orderPaymentStatus) || '').toUpperCase() === 'PAID';
+              const livre = (o) => String((o && o.orderFulfillmentStatus) || '').toUpperCase() === 'FULFILLED';
+              const total = ords.reduce((s, o) => s + val(o), 0);
+              const enAttente = ords.filter(o => !paye(o)).reduce((s, o) => s + val(o), 0);
+              const payees = ords.filter(o => paye(o)).reduce((s, o) => s + val(o), 0);
+              const aExpedier = ords.filter(o => paye(o) && !livre(o)).length;
+              if (ords.length === 0) return <div style={{ fontSize: 12.5, color: C.muted, marginBottom: 10 }}>Aucune vente eBay pour l'instant — dès ta première vente, le montant, le paiement et les colis à expédier s'afficheront ici.</div>;
+              const bloc = (v, lib, col) => <div><div className="vrm-display" style={{ fontSize: 20, fontWeight: 700, color: col || C.text }}>{v}</div><div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>{lib}</div></div>;
+              return (
+                <div style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 10, padding: '12px 14px', marginBottom: 10 }}>
+                  <div style={{ ...eti, marginBottom: 8 }}>Argent eBay · {ords.length} vente{ords.length > 1 ? 's' : ''}</div>
+                  <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+                    {bloc(eur(total), 'total des ventes')}
+                    {bloc(eur(payees), 'payées')}
+                    {enAttente > 0 && bloc(eur(enAttente), 'en attente de paiement', C.warn)}
+                    {aExpedier > 0 && bloc(String(aExpedier), 'à expédier', C.accent)}
+                  </div>
+                  {/* Liste des ventes : acheteur, montant, état de paiement/expédition. */}
+                  <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {ords.slice(0, 8).map((o, i) => {
+                      const li = (o.lineItems && o.lineItems[0]) || {};
+                      const titre = li.title || 'Vente eBay';
+                      const acheteur = (o.buyer && o.buyer.username) || '';
+                      const etat = !paye(o) ? { t: 'en attente de paiement', c: C.warn } : !livre(o) ? { t: 'à expédier', c: C.accent } : { t: 'expédiée', c: C.muted };
+                      return (
+                        <div key={o.orderId || i} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', borderTop: `1px solid ${C.border}`, paddingTop: 6 }}>
+                          <div style={{ flex: '1 1 150px', minWidth: 0 }}>
+                            <div style={{ fontSize: 12.5, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{titre}</div>
+                            <div style={{ fontSize: 11, color: C.muted }}>{acheteur ? acheteur + ' · ' : ''}<span style={{ color: etat.c, fontWeight: 600 }}>{etat.t}</span></div>
+                          </div>
+                          <div style={{ flexShrink: 0, fontSize: 13, fontWeight: 700, color: C.text }}>{eur(val(o))}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
             {/* Annonces eBay en ligne */}
             <div style={{ ...eti, marginBottom: 6 }}>Tes annonces eBay en ligne ({data.listings.length})</div>
             {data.listings.length === 0 ? (
