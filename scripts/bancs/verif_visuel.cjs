@@ -33,6 +33,9 @@ function LBCV(){ return [{ id:'lbc_ventes', data:{ ventes:{
 // payées » et compter eBay dans le CA global.
 function EBAYO(){ return [{ id:'ebay_orders', data:{ capturedAt:Date.now(), orders:[
   { orderId:'o-777', orderPaymentStatus:'PAID', orderFulfillmentStatus:'FULFILLED', pricingSummary:{ total:{ value:68, currency:'EUR' } }, lineItems:[{ title:'Nike Air Max 1 eBay' }], buyer:{ username:'acheteur_ebay' } },
+  // Une vente PAYÉE mais PAS encore expédiée : elle doit remonter dans « À faire »
+  // aujourd'hui, comme un colis Vinted (« tout centralisé », §11).
+  { orderId:'o-778', orderPaymentStatus:'PAID', orderFulfillmentStatus:'NOT_STARTED', pricingSummary:{ total:{ value:45, currency:'EUR' } }, lineItems:[{ title:'Adidas Samba eBay' }], buyer:{ username:'acheteur2' } },
 ] } }]; }
 
 // ── LA PROJECTION `select=` DE POSTGREST, honnêtement appliquée ─────────────
@@ -110,7 +113,7 @@ const TABS=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','pl
       const m=/id=like\.([^&]*)/.exec(u); if(m){const pat=decodeURIComponent(m[1]).replace(/[*%]/g,'.*');const re=new RegExp('^'+pat+'$');return j(rows.filter(r=>re.test(r.id)).map(r=>projette(r,S)));}
       return j([]);});
     await pg.route('**/api/**',r2=>r2.fulfill({status:200,contentType:'application/json',body:'{"pret":true,"devices":1}'}));
-    const vides=[], deb=[], susp=[], sousIle=[], morts=[]; let venteTxt='', dashTxt='', lbcTxt='';
+    const vides=[], deb=[], susp=[], sousIle=[], morts=[]; let venteTxt='', dashTxt='', lbcTxt='', collTxt='';
     for(const t of TABS){
       await pg.goto('http://localhost:4322/?tab='+t,{waitUntil:'domcontentloaded'});
       await pg.waitForTimeout(2200);
@@ -120,6 +123,7 @@ const TABS=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','pl
       if(t==='cat_ventes') venteTxt=r.txt;
       if(t==='plat_leboncoin') lbcTxt=r.txt;   // le bloc « Ventes Leboncoin » vit ICI maintenant
       if(t==='dashboard') dashTxt=r.txt;
+      if(t==='collectif') collTxt=r.txt;
       if(r.n<120) vides.push(t+':'+r.n);
       // ⚠️ LE GARDE-FOU D'ÉCRAN PASSAIT TOUS LES CONTRÔLES : « Cet écran n'a pas
       // pu s'afficher » est un vrai texte, sans débordement et sans `pageerror`
@@ -176,6 +180,11 @@ const TABS=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','pl
     // code d'avant `caParPlateforme` ignorait les commandes eBay → eBay restait
     // « pas encore de vente captée » → ce contrôle échoue (§6.1).
     dit(/ventes payées/.test(dashTxt),'le CA eBay des commandes PAYÉES entre dans le total (§11)',dashTxt?'':'tableau de bord non lu');
+    // ── eBay dans « À faire aujourd'hui » : une vente eBay payée non expédiée
+    // est un colis à envoyer, exactement comme une vente Vinted (« tout
+    // centralisé », §11). Sur le code d'avant, notifItems ignorait eBay →
+    // cette ligne n'existe pas (§6.1).
+    dit(/eBay à expédier/.test(collTxt),'une vente eBay payée non expédiée remonte dans « À faire »',collTxt?'':'Collectif non lu');
     await pg.close();
   }
   await b.close(); srv.close();
