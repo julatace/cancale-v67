@@ -76,6 +76,64 @@ async function tradingActiveList(token) {
   } catch (e) { return { status: 0, ok: false, error: String((e && e.message) || '').slice(0, 120) }; }
 }
 
+// Appel Trading générique (XML) : renvoie le XML brut + l'Ack + le 1er message
+// d'erreur eBay le cas échéant.
+async function tradingCall(token, callName, inner) {
+  const body = '<?xml version="1.0" encoding="utf-8"?>'
+    + `<${callName}Request xmlns="urn:ebay:apis:eBLBaseComponents">${inner}</${callName}Request>`;
+  try {
+    const r = await fetch(`${EBAY_API}/ws/api.dll`, {
+      method: 'POST',
+      headers: { 'X-EBAY-API-CALL-NAME': callName, 'X-EBAY-API-SITEID': '71', 'X-EBAY-API-COMPATIBILITY-LEVEL': '1149', 'X-EBAY-API-IAF-TOKEN': token, 'Content-Type': 'text/xml' },
+      body,
+    });
+    const xml = await r.text();
+    const ack = (/<Ack>([\s\S]*?)<\/Ack>/.exec(xml) || [])[1] || '';
+    const err = (/<Errors>[\s\S]*?<(?:LongMessage|ShortMessage)>([\s\S]*?)<\/(?:LongMessage|ShortMessage)>/.exec(xml) || [])[1] || '';
+    return { status: r.status, ok: r.ok && /Success|Warning/i.test(ack), ack, err, xml };
+  } catch (e) { return { status: 0, ok: false, error: String((e && e.message) || '').slice(0, 140) }; }
+}
+
+// Détail COMPLET d'une annonce (description, catégorie, état, photos,
+// caractéristiques). Pour capter « tout ».
+async function tradingGetItem(token, itemId) {
+  const res = await tradingCall(token, 'GetItem', `<ItemID>${itemId}</ItemID><DetailLevel>ReturnAll</DetailLevel><IncludeItemSpecifics>true</IncludeItemSpecifics>`);
+  if (!res.ok) return null;
+  const xml = res.xml;
+  const g = (t) => { const x = new RegExp('<' + t + '[^>]*>([\\s\\S]*?)</' + t + '>').exec(xml); return x ? x[1].trim() : ''; };
+  const photos = []; const pre = /<PictureURL[^>]*>([\s\S]*?)<\/PictureURL>/g; let pm;
+  while ((pm = pre.exec(xml)) && photos.length < 24) photos.push(pm[1].trim());
+  const specs = {}; const sre = /<NameValueList>([\s\S]*?)<\/NameValueList>/g; let sm;
+  while ((sm = sre.exec(xml))) { const n = (/<Name>([\s\S]*?)<\/Name>/.exec(sm[1]) || [])[1]; const v = (/<Value>([\s\S]*?)<\/Value>/.exec(sm[1]) || [])[1]; if (n) specs[n.trim()] = (v || '').trim(); }
+  return {
+    description: g('Description').replace(/<!\[CDATA\[|\]\]>/g, '').slice(0, 4000),
+    categoryId: (/<PrimaryCategory>[\s\S]*?<CategoryID>([\s\S]*?)<\/CategoryID>/.exec(xml) || [])[1] || '',
+    categoryName: (/<PrimaryCategory>[\s\S]*?<CategoryName>([\s\S]*?)<\/CategoryName>/.exec(xml) || [])[1] || '',
+    condition: g('ConditionDisplayName'),
+    photos,
+    specifics: specs,
+  };
+}
+
+// MODIFIER prix / stock d'une annonce existante (léger et sûr, prévu pour ça).
+async function tradingReviseInventoryStatus(token, itemId, price, qty) {
+  let inv = `<ItemID>${itemId}</ItemID>`;
+  if (price != null && price !== '') inv += `<StartPrice>${Number(String(price).replace(',', '.')).toFixed(2)}</StartPrice>`;
+  if (qty != null && qty !== '') inv += `<Quantity>${parseInt(qty, 10)}</Quantity>`;
+  return tradingCall(token, 'ReviseInventoryStatus', `<InventoryStatus>${inv}</InventoryStatus>`);
+}
+
+async function handleRevise(b) {
+  const itemId = String(b.itemId || '').trim();
+  if (!/^\d+$/.test(itemId)) return { status: 400, body: { ok: false, error: 'itemId invalide' } };
+  if ((b.price == null || b.price === '') && (b.quantity == null || b.quantity === '')) return { status: 400, body: { ok: false, error: 'rien à modifier' } };
+  const at = await accessToken();
+  if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
+  const r = await tradingReviseInventoryStatus(at.token, itemId, b.price, b.quantity);
+  if (!r.ok) return { status: r.status >= 500 ? 502 : (r.status || 502), body: { ok: false, error: r.err || 'eBay a refusé la modification', ack: r.ack } };
+  return { status: 200, body: { ok: true, ack: r.ack } };
+}
+
 async function handleSync() {
   const at = await accessToken();
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error, detail: at.detail || '' } };
@@ -88,9 +146,18 @@ async function handleSync() {
     ebayJson(`${EBAY_API}/sell/inventory/v1/inventory_item?limit=100`, token, { 'Accept-Language': 'fr-FR', 'Content-Language': 'fr-FR' }),
     tradingActiveList(token),
   ]);
+  // ── DÉTAIL COMPLET par annonce (photos, description, catégorie, état,
+  //    caractéristiques) : « capter tout ». On borne à 20 GetItem par sync
+  //    (limites d'API) — largement assez pour son stock, et extensible.
+  const lst = listings.items || [];
+  for (const it of lst.slice(0, 20)) {
+    if (!it.itemId) continue;
+    const d = await tradingGetItem(token, it.itemId);
+    if (d) { it.detail = d; if (!it.photo && d.photos && d.photos[0]) it.photo = d.photos[0]; }
+  }
   // Range ce qu'on a (fusion par id). On garde le brut pour mesurer la forme.
   const at2 = Date.now();
-  await storeData('ebay_listings', { items: (listings.items || []), ack: listings.ack, status: listings.status, capturedAt: at2 });
+  await storeData('ebay_listings', { items: lst, ack: listings.ack, status: listings.status, capturedAt: at2 });
   await storeData('ebay_orders', { orders: (orders.data && orders.data.orders) || [], status: orders.status, capturedAt: at2 });
   await storeData('ebay_inventory', { items: (inv.data && inv.data.inventoryItems) || [], status: inv.status, capturedAt: at2 });
   // Résumé de MESURE : comptes + statuts + petits échantillons (pour voir la forme).
@@ -175,6 +242,11 @@ async function handleApp(req, res) {
     }
     if (action === 'sync') {
       const r = await handleSync();
+      res.status(r.status).json(r.body);
+      return;
+    }
+    if (action === 'revise') {
+      const r = await handleRevise(b);
       res.status(r.status).json(r.body);
       return;
     }
