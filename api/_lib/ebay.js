@@ -22,7 +22,15 @@ const appId  = () => process.env.EBAY_APP_ID || '';
 const certId = () => process.env.EBAY_CERT_ID || '';
 // Le « RuName » (URL de redirection) configuré dans le portail eBay Developer.
 const ruName = () => process.env.EBAY_RUNAME || process.env.EBAY_REDIRECT || '';
-const sbKey  = () => process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY || '';
+// ⚠️ REPLI SUR LA CLÉ PUBLIQUE « anon », comme api/push.js et api/email-inbound.js.
+// Sans lui, la route eBay n'avait AUCUNE clé pour ranger/lire le jeton quand
+// SUPABASE_SERVICE_KEY n'est pas posée sur Vercel → l'échange OAuth échouait à la
+// dernière ligne (« store-failed »), et status répondait « store-unreachable ».
+// Tant que la base n'est pas cloisonnée, la clé anon lit/écrit app_data (mesuré).
+// Le jeton n'est donc pas plus exposé que les jetons Vinted déjà en base — la
+// migration RLS (SECURITE.md) protège tout d'un coup, ce jeton compris.
+const ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ';
+const sbKey  = () => process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY || ANON;
 
 const keysReady  = () => !!(appId() && certId());
 const canConsent = () => !!(appId() && ruName());
