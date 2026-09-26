@@ -27,29 +27,29 @@ const loc = (res) => res.headers.Location || '';
 
 (async () => {
   process.env.EBAY_APP_ID = APP; process.env.EBAY_CERT_ID = CERT; process.env.EBAY_RUNAME = RU; process.env.EBAY_SERVICE_KEY; process.env.SUPABASE_SERVICE_KEY = 'svc';
-  const mod = await import('file://' + path.join(RACINE, 'api', 'ebay-callback.js'));
+  const mod = await import('file://' + path.join(RACINE, 'api', 'ebay.js'));
   const handler = mod.default;
 
-  { const res = faireRes(); await handler({ query: { error: 'access_denied' } }, res);
+  { const res = faireRes(); await handler({ query: { mode: 'callback', error: 'access_denied' } }, res);
     dit(res.code === 302 && /ebay=refus/.test(loc(res)), 'refus de consentement → retour ?ebay=refus', loc(res)); }
-  { const res = faireRes(); await handler({ query: {} }, res);
+  { const res = faireRes(); await handler({ query: { mode: 'callback', mode: 'callback' } }, res);
     dit(res.code === 302 && /ebay=erreur/.test(loc(res)), 'aucun code → retour ?ebay=erreur', loc(res)); }
 
   ebayMode = 'ok'; supaWriteOk = true;
-  { const res = faireRes(); await handler({ query: { code: 'C123', state: 'x' } }, res);
+  { const res = faireRes(); await handler({ query: { mode: 'callback', code: 'C123', state: 'x' } }, res);
     dit(res.code === 302 && /ebay=connecte/.test(loc(res)), 'code valide + rangement OK → ?ebay=connecte', loc(res));
     dit(!loc(res).includes(REFRESH) && !loc(res).includes(ACCESS), 'AUCUN jeton dans l\'URL de retour', loc(res)); }
 
   supaWriteOk = false;
-  { const res = faireRes(); await handler({ query: { code: 'C123' } }, res);
+  { const res = faireRes(); await handler({ query: { mode: 'callback', code: 'C123' } }, res);
     dit(res.code === 302 && /ebay=erreur/.test(loc(res)) && !/connecte/.test(loc(res)), 'rangement échoué → ?ebay=erreur, JAMAIS connecte', loc(res)); }
   supaWriteOk = true; ebayMode = 'bad';
-  { const res = faireRes(); await handler({ query: { code: 'BADCODE' } }, res);
+  { const res = faireRes(); await handler({ query: { mode: 'callback', code: 'BADCODE' } }, res);
     dit(res.code === 302 && /ebay=erreur/.test(loc(res)), 'code refusé par eBay → ?ebay=erreur', loc(res)); }
 
   // sans clés → erreur honnête (pas de crash)
   ebayMode = 'ok'; delete process.env.EBAY_APP_ID;
-  { const res = faireRes(); await handler({ query: { code: 'C123' } }, res);
+  { const res = faireRes(); await handler({ query: { mode: 'callback', code: 'C123' } }, res);
     dit(res.code === 302 && /ebay=erreur/.test(loc(res)), 'clés absentes → ?ebay=erreur', loc(res)); }
 
   console.log(ko ? ('\n' + ko + ' controle(s) non conforme(s).') : '\nLe retour eBay range le jeton, renvoie un statut, et ne laisse jamais fuir de jeton.');

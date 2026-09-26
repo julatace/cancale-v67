@@ -1,5 +1,12 @@
 # Détourage des photos avec Photoroom — ce que TU dois faire (une fois)
 
+> ⏸️ **EN PAUSE (temporaire).** Le plan Vercel gratuit (Hobby) limite à **12
+> fonctions serverless**, et on a dû faire de la place pour les routes eBay. La
+> route `api/detourage.js` a donc été retirée pour l'instant (elle était dormante :
+> aucune clé configurée, non branchée à l'app). On la remet dès qu'il y a de la
+> place (passage en Vercel Pro, ou consolidation d'autres routes). Rien n'est perdu.
+
+
 Le détourage (retirer le fond, ne garder que la chaussure) se fait via l'API
 **Photoroom**. Le code est prêt côté VRM (`api/detourage.js`). Il ne manque que
 **ta clé Photoroom**, à créer et à coller dans Vercel. C'est toi qui la crées,
