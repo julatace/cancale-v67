@@ -6460,6 +6460,58 @@ function VentesLeboncoin({ lbcVentes = {ventes:[],inconnues:0} }) {
     </div>
   );
 }
+// ── UNE ANNONCE eBay captée, modifiable depuis VRM (prix / stock) ───────────
+// La modification passe par l'action serveur `revise` (Trading
+// ReviseInventoryStatus) : elle change la VRAIE annonce eBay. C'est un geste
+// explicite (bouton ✏️ → Enregistrer), jamais automatique.
+function EbayLigne({ it, onSaved }) {
+  const [edit, setEdit] = React.useState(false);
+  const [price, setPrice] = React.useState(String(it.price || '').replace('.', ','));
+  const [qty, setQty] = React.useState(String(it.qty || ''));
+  const [saving, setSaving] = React.useState(false);
+  const [msg, setMsg] = React.useState('');
+  const enregistrer = async () => {
+    setSaving(true); setMsg('');
+    try {
+      const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'revise', itemId: it.itemId, price: String(price).replace(',', '.'), quantity: qty }) });
+      const j = await r.json();
+      if (j && j.ok) { setMsg('✓ Modifié sur eBay'); setEdit(false); if (onSaved) onSaved(); }
+      else { setMsg(j && j.error ? j.error : 'eBay a refusé la modification.'); }
+    } catch (_) { setMsg('Modification impossible (réseau).'); }
+    setSaving(false);
+  };
+  const inp = { width: 80, boxSizing: 'border-box', border: `1px solid ${C.border}`, background: C.bg || C.card, color: C.text, borderRadius: 8, padding: '7px 9px', fontSize: 13, fontFamily: 'inherit' };
+  return (
+    <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, padding: '9px 11px', background: C.card }}>
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+        {it.photo
+          ? <img src={it.photo} alt="" loading="lazy" style={{ width: 42, height: 42, borderRadius: 8, objectFit: 'cover', flexShrink: 0, border: `1px solid ${C.border}` }} />
+          : <span style={{ flexShrink: 0, color: C.muted, display: 'flex' }}><Icon name="tag" size={20} /></span>}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{it.title || ('Annonce ' + it.itemId)}</div>
+          <div style={{ fontSize: 11.5, color: C.muted, marginTop: 1 }}>
+            {it.price ? Number(String(it.price).replace(',', '.')).toFixed(2).replace('.', ',') + ' €' : '—'}
+            {it.qty ? ` · ${it.qty} en stock` : ''}
+            {it.detail && it.detail.categoryName ? ` · ${it.detail.categoryName}` : ''}
+            {it.vues && Number(it.vues) > 0 ? ` · ${it.vues} suivi${Number(it.vues) > 1 ? 's' : ''}` : ''}
+          </div>
+        </div>
+        {!edit && <button type="button" onClick={() => { setEdit(true); setMsg(''); }} title="Modifier le prix / le stock" style={{ flexShrink: 0, border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 8, padding: '6px 10px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>✏️ Modifier</button>}
+        {it.url && !edit && <a href={it.url} target="_blank" rel="noreferrer" style={{ flexShrink: 0, fontSize: 11.5, color: C.accent, fontWeight: 700, textDecoration: 'none' }}>Voir ↗</a>}
+      </div>
+      {edit && (
+        <div style={{ marginTop: 9, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <label style={{ fontSize: 11.5, color: C.muted }}>Prix €<br /><input value={price} onChange={e => setPrice(e.target.value)} inputMode="decimal" style={inp} /></label>
+          <label style={{ fontSize: 11.5, color: C.muted }}>Stock<br /><input value={qty} onChange={e => setQty(e.target.value)} inputMode="numeric" style={{ ...inp, width: 64 }} /></label>
+          <button type="button" onClick={enregistrer} disabled={saving} style={{ border: 'none', background: C.accent, color: '#fff', borderRadius: 8, padding: '9px 13px', fontSize: 13, fontWeight: 600, cursor: saving ? 'default' : 'pointer', fontFamily: 'inherit', opacity: saving ? 0.6 : 1, alignSelf: 'flex-end' }}>{saving ? 'Envoi…' : 'Enregistrer'}</button>
+          <button type="button" onClick={() => { setEdit(false); setMsg(''); }} style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.muted, borderRadius: 8, padding: '9px 11px', fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit', alignSelf: 'flex-end' }}>Annuler</button>
+        </div>
+      )}
+      {msg && <div style={{ fontSize: 11.5, color: /✓/.test(msg) ? INV_STATUS.online.color : C.danger, marginTop: 6 }}>{msg}</div>}
+    </div>
+  );
+}
+
 // ── CONNEXION eBay (API officielle) ─────────────────────────────────────────
 // Reflète HONNÊTEMENT l'état de `api/ebay` (jamais un « connecté » inventé) :
 //   • à configurer (clés absentes dans Vercel) ;
@@ -6578,23 +6630,8 @@ function EbayConnexion() {
             {data.listings.length === 0 ? (
               <div style={{ fontSize: 12.5, color: C.muted }}>Aucune annonce captée. Clique « Rafraîchir depuis eBay » si tu viens d'en publier.</div>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(260px,100%), 1fr))', gap: 8 }}>
-                {data.listings.map((it) => (
-                  <div key={it.itemId} style={{ display: 'flex', gap: 10, alignItems: 'center', border: `1px solid ${C.border}`, borderRadius: 10, padding: '9px 11px', background: C.card }}>
-                    {it.photo
-                      ? <img src={it.photo} alt="" loading="lazy" style={{ width: 42, height: 42, borderRadius: 8, objectFit: 'cover', flexShrink: 0, border: `1px solid ${C.border}` }} />
-                      : <span style={{ flexShrink: 0, color: C.muted, display: 'flex' }}><Icon name="tag" size={20} /></span>}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{it.title || ('Annonce ' + it.itemId)}</div>
-                      <div style={{ fontSize: 11.5, color: C.muted, marginTop: 1 }}>
-                        {it.price ? Number(String(it.price).replace(',', '.')).toFixed(2).replace('.', ',') + ' €' : '—'}
-                        {it.qty ? ` · ${it.qty} en stock` : ''}
-                        {it.vues && Number(it.vues) > 0 ? ` · ${it.vues} suivi${Number(it.vues) > 1 ? 's' : ''}` : ''}
-                      </div>
-                    </div>
-                    {it.url && <a href={it.url} target="_blank" rel="noreferrer" style={{ flexShrink: 0, fontSize: 11.5, color: C.accent, fontWeight: 700, textDecoration: 'none' }}>Voir ↗</a>}
-                  </div>
-                ))}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(300px,100%), 1fr))', gap: 8 }}>
+                {data.listings.map((it) => <EbayLigne key={it.itemId} it={it} onSaved={synchroniser} />)}
               </div>
             )}
             {data.capturedAt && <div style={{ fontSize: 10.5, color: C.muted, marginTop: 8 }}>Capté {(() => { const j = Math.round((Date.now() - data.capturedAt) / 3600000); return j < 1 ? 'à l\'instant' : j < 24 ? `il y a ${j} h` : `il y a ${Math.round(j / 24)} j`; })()} · eBay met à jour le nombre de vues avec un peu de retard.</div>}
