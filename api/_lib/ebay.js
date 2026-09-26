@@ -6,11 +6,17 @@
 
 const EBAY_AUTH_URL  = 'https://auth.ebay.com/oauth2/authorize';
 const EBAY_TOKEN_URL = 'https://api.ebay.com/identity/v1/oauth2/token';
+// ⚠️ Scopes demandés à la CONSENTEMENT (authorize). `sell.finances` (lecture)
+// ouvre le solde à virer (getSellerFundsSummary). Il n'entre en vigueur qu'au
+// PROCHAIN consentement : un jeton déjà accordé SANS ce droit ne l'a pas — c'est
+// pourquoi le rafraîchissement (accessToken) ne redemande AUCUN scope (voir
+// plus bas), sinon eBay refuserait un droit non accordé et casserait TOUT accès.
 const SCOPES = [
   'https://api.ebay.com/oauth/api_scope',
   'https://api.ebay.com/oauth/api_scope/sell.inventory',
   'https://api.ebay.com/oauth/api_scope/sell.account',
   'https://api.ebay.com/oauth/api_scope/sell.fulfillment',
+  'https://api.ebay.com/oauth/api_scope/sell.finances',
 ].join(' ');
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
@@ -118,10 +124,15 @@ async function readRefresh() {
 async function accessToken() {
   const refresh = await readRefresh();
   if (!refresh) return { ok: false, status: 401, reason: 'not-connected', error: 'Aucun compte eBay relié.' };
+  // ⚠️ AUCUN `scope=` ici. eBay renvoie alors TOUS les droits déjà accordés à ce
+  // refresh_token. Redemander `SCOPES` casserait tout le jour où on y ajoute un
+  // droit (comme `sell.finances`) que le jeton actuel n'a pas encore : eBay
+  // répond `invalid_scope` et plus RIEN ne se lit. Le nouveau droit s'obtient
+  // en se reconnectant (nouveau consentement), pas en le réclamant au refresh.
   const r = await fetch(EBAY_TOKEN_URL, {
     method: 'POST',
     headers: { Authorization: basicAuth(), 'content-type': 'application/x-www-form-urlencoded' },
-    body: `grant_type=refresh_token&refresh_token=${encodeURIComponent(refresh)}&scope=${encodeURIComponent(SCOPES)}`,
+    body: `grant_type=refresh_token&refresh_token=${encodeURIComponent(refresh)}`,
   });
   const j = await r.json().catch(() => ({}));
   if (!r.ok || !j.access_token) return { ok: false, status: r.status >= 500 ? 502 : (r.status || 502),

@@ -221,6 +221,27 @@ async function handleVerify(b) {
   return { status: 200, body: { ok: true, fees: r.fees } };
 }
 
+// ── SOLDE eBay À VIRER (getSellerFundsSummary, lecture seule) ────────────────
+// Les MÊMES mots que Vinted (§5.14) : « disponible » et « en attente/retenu »
+// ne se confondent jamais. Chaque montant est celui qu'eBay renvoie
+// (availableFunds / processingFunds / fundsOnHold), jamais un calcul de notre
+// part. Absent ⇒ `null` (l'app écrit « — »), jamais 0. Nécessite le droit
+// `sell.finances` : un jeton accordé avant que ce droit existe répond 403 →
+// on dit « reconnecte-toi », on n'invente rien.
+async function handleFinances() {
+  const at = await accessToken();
+  if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
+  const r = await ebayJson(`${EBAY_API}/sell/finances/v1/seller_funds_summary`, at.token, { 'Accept-Language': 'fr-FR' });
+  if (r.status === 403) return { status: 200, body: { ok: false, reason: 'scope', error: 'Reconnecte-toi à eBay pour voir ton solde à virer (l\'accès « paiements » n\'a pas encore été autorisé).' } };
+  if (r.status === 0) return { status: 503, body: { ok: false, error: 'eBay injoignable' } };
+  if (!r.ok || !r.data) return { status: r.status >= 400 ? r.status : 502, body: { ok: false, error: 'eBay n\'a pas renvoyé le solde.' } };
+  const amt = (o) => (o && o.value != null && isFinite(Number(o.value))) ? Number(o.value) : null;
+  const d = r.data;
+  const out = { ok: true, dispo: amt(d.availableFunds), enAttente: amt(d.processingFunds), retenu: amt(d.fundsOnHold), total: amt(d.totalFunds), devise: (d.totalFunds && d.totalFunds.currency) || (d.availableFunds && d.availableFunds.currency) || 'EUR', capturedAt: Date.now() };
+  await storeData('ebay_finances', out);
+  return { status: 200, body: out };
+}
+
 // ── MESURE pour la PUBLICATION (lecture seule) : ce qu'eBay EXIGE pour créer
 //    une annonce — la catégorie, ses attributs obligatoires, et les règles/
 //    emplacements du compte. On mesure AVANT d'écrire le publieur (§6).
@@ -390,6 +411,11 @@ async function handleApp(req, res) {
     }
     if (action === 'pubverify') {
       const r = await handleVerify(b);
+      res.status(r.status).json(r.body);
+      return;
+    }
+    if (action === 'finances') {
+      const r = await handleFinances();
       res.status(r.status).json(r.body);
       return;
     }

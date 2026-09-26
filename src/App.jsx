@@ -6699,7 +6699,15 @@ function EbayConnexion() {
   //    reste de l'app, et rafraîchies via l'action serveur `sync`. ──
   const [data, setData] = React.useState(null);   // {listings, orders, capturedAt} | null
   const [syncing, setSyncing] = React.useState(false);
+  const [solde, setSolde] = React.useState(null);  // {ok,dispo,enAttente,retenu}|{reason:'scope'}|null
   const autoFait = React.useRef(false);
+  // Solde à virer (getSellerFundsSummary). Lecture seule, une fois à l'ouverture.
+  const lireSolde = React.useCallback(async () => {
+    try {
+      const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'finances' }) });
+      setSolde(await r.json());
+    } catch (_) { setSolde(null); }
+  }, []);
   const lireData = React.useCallback(async () => {
     try {
       const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=in.(ebay_listings,ebay_orders)&select=id,data`, { headers: sbAuth() });
@@ -6722,13 +6730,14 @@ function EbayConnexion() {
     let stop = false;
     (async () => {
       const cap = await lireData();
+      lireSolde();
       if (stop || autoFait.current) return;
       // Première capture (jamais synchronisé) OU données vieilles de +6 h → on
       // rafraîchit une seule fois automatiquement (comme la moisson Vinted).
       if (cap == null || (Date.now() - cap) > 6 * 3600 * 1000) { autoFait.current = true; synchroniser(); }
     })();
     return () => { stop = true; };
-  }, [connected, lireData, synchroniser]);
+  }, [connected, lireData, synchroniser, lireSolde]);
   const eti = { fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 500 };
   const boite = (bg, bord) => ({ border: `1px solid ${bord || C.border}`, background: bg || C.card, borderRadius: 10, padding: '14px 16px' });
   return (
@@ -6759,6 +6768,34 @@ function EbayConnexion() {
           {data == null ? (
             <div style={{ fontSize: 12.5, color: C.muted }}>{syncing ? 'Première lecture de ton compte eBay…' : 'Chargement…'}</div>
           ) : (<>
+            {/* ── Solde eBay à virer (getSellerFundsSummary). « disponible » et
+                « en attente » ne se confondent JAMAIS (§5.14) — deux montants,
+                deux mots. Absent ⇒ « — », jamais 0. Sans le droit « paiements »
+                (jeton accordé avant qu'on le demande) : on invite à se
+                reconnecter, on n'invente aucun chiffre. */}
+            {(() => {
+              const eur = (n) => (Math.round(n * 100) / 100).toFixed(2).replace('.', ',') + ' €';
+              if (solde && solde.reason === 'scope') return (
+                <div style={{ border: `1px solid ${C.warn}`, background: `${C.warn}10`, borderRadius: 10, padding: '10px 12px', marginBottom: 10, fontSize: 12.5, color: C.text, lineHeight: 1.5 }}>
+                  💶 Ton <b>solde à virer</b> n'est pas encore visible : l'accès « paiements » d'eBay n'avait pas été autorisé quand tu t'es connecté.
+                  <div style={{ marginTop: 8 }}><button type="button" onClick={connecter} disabled={busy} style={{ border: `1px solid ${C.accent}`, background: `${C.accent}12`, color: C.accent, borderRadius: 8, padding: '8px 12px', fontSize: 13, fontWeight: 700, cursor: busy ? 'default' : 'pointer', fontFamily: 'inherit', opacity: busy ? 0.6 : 1 }}>{busy ? 'Ouverture d\'eBay…' : 'Reconnecter eBay pour l\'activer'}</button></div>
+                </div>
+              );
+              if (solde && solde.ok && (solde.dispo != null || solde.retenu != null || solde.enAttente != null)) {
+                const item = (v, lib, col) => <div><div className="vrm-display" style={{ fontSize: 19, fontWeight: 700, color: col || C.text }}>{v == null ? '—' : eur(v)}</div><div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>{lib}</div></div>;
+                const enRoute = (solde.enAttente != null || solde.retenu != null) ? (Number(solde.enAttente || 0) + Number(solde.retenu || 0)) : null;
+                return (
+                  <div style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 10, padding: '12px 14px', marginBottom: 10 }}>
+                    <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 500, marginBottom: 8 }}>Solde eBay</div>
+                    <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+                      {item(solde.dispo, 'disponible à virer', C.text)}
+                      {enRoute != null && enRoute > 0 && item(enRoute, 'en attente / retenu par eBay', C.muted)}
+                    </div>
+                  </div>
+                );
+              }
+              return null;
+            })()}
             {/* Argent eBay : montants, en attente de paiement, payées, à expédier.
                 Calculé depuis les commandes captées (Fulfillment API) — jamais un
                 chiffre inventé. Ces montants viennent d'eBay, comme la ligne argent

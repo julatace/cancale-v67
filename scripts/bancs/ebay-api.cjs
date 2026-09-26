@@ -16,7 +16,7 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
 const APP = 'davidfou-VRM-PRD-xxxx', CERT = 'PRD-secret-cert-value-zzzz', RU = 'David_Fournier-david-VRM-abcde';
 const REFRESH = 'v^1.1#i^1#REFRESHTOKENSECRET', ACCESS = 'v^1.1#i^1#ACCESSTOKEN';
 
-let ebayBody = null, ebayAuth = null, supaWrites = [], supaHasRow = false, supaReadOk = true, ebayMode = 'ok';
+let ebayBody = null, ebayAuth = null, supaWrites = [], supaHasRow = false, supaReadOk = true, ebayMode = 'ok', finMode = 'ok';
 function poserFetch() {
   global.fetch = async (url, opts = {}) => {
     const u = String(url); const h = opts.headers || {};
@@ -26,7 +26,12 @@ function poserFetch() {
       if (ebayMode === 'down') return new Response('boom', { status: 500 });
       if (ebayBody.includes('client_credentials')) return new Response(JSON.stringify({ access_token: ACCESS, expires_in: 7200 }), { status: 200 });
       if (ebayBody.includes('authorization_code')) return new Response(JSON.stringify({ access_token: ACCESS, refresh_token: REFRESH, expires_in: 7200, refresh_token_expires_in: 47304000 }), { status: 200 });
+      if (ebayBody.includes('refresh_token')) return new Response(JSON.stringify({ access_token: ACCESS, expires_in: 7200 }), { status: 200 });
       return new Response('{}', { status: 200 });
+    }
+    if (u.includes('/sell/finances/v1/seller_funds_summary')) {
+      if (finMode === 'scope') return new Response(JSON.stringify({ errors: [{ errorId: 1100, message: 'Access denied: insufficient permissions' }] }), { status: 403 });
+      return new Response(JSON.stringify({ totalFunds: { value: '250.94', currency: 'EUR' }, availableFunds: { value: '227.54', currency: 'EUR' }, processingFunds: { value: '12.40', currency: 'EUR' }, fundsOnHold: { value: '11.00', currency: 'EUR' } }), { status: 200 });
     }
     if (u.includes('/rest/v1/app_data')) {
       if (opts.method === 'POST') { supaWrites.push(String(opts.body || '')); return new Response('', { status: supaWriteOk ? 201 : 500 }); }
@@ -115,7 +120,25 @@ const noSecret = (o) => { const s = JSON.stringify(o || {}); return !s.includes(
   { const res = faireRes(); await handler({ method: 'POST', body: { action: 'status' } }, res);
     dit(res.code === 503 && res.corps && res.corps.reason === 'store-unreachable', 'base injoignable → 503, jamais « pas connecté » inventé (§ pas su ≠ non)'); }
 
+  // ── 9. SOLDE À VIRER (getSellerFundsSummary) ────────────────────────────────
+  // Le compte est relié (refresh rangé) ; eBay renvoie le solde. On lit les
+  // montants qu'eBay LABELLISE, jamais un calcul de notre part (§5.14).
+  supaHasRow = true; supaReadOk = true; ebayMode = 'ok'; finMode = 'ok'; supaWrites = []; ebayBody = null;
+  { const res = faireRes(); await handler({ method: 'POST', body: { action: 'finances' } }, res);
+    dit(res.code === 200 && res.corps && res.corps.ok === true && res.corps.dispo === 227.54, 'finances : « disponible à virer » = ce qu\'eBay renvoie (227,54 €)', 'dispo=' + (res.corps && res.corps.dispo));
+    dit(res.corps && res.corps.enAttente === 12.40 && res.corps.retenu === 11.00, 'et « en attente » / « retenu » restent DISTINCTS (§5.14 escrow≠dispo)', `att=${res.corps && res.corps.enAttente} ret=${res.corps && res.corps.retenu}`);
+    dit(!/scope=/.test(ebayBody || ''), 'le RAFRAÎCHISSEMENT ne redemande AUCUN scope (n\'ajoute pas un droit non accordé → ne casse pas les accès)', ebayBody ? 'body sans scope' : '(aucun appel)');
+    dit(supaWrites.some(w => w.includes('ebay_finances')), 'le solde est rangé (ebay_finances) pour le tableau de bord');
+    dit(noSecret(res.corps), 'finances ne renvoie AUCUN jeton'); }
+
+  // ── 10. DROIT « paiements » PAS ENCORE ACCORDÉ (jeton d'avant) → 403 ─────────
+  // On n'invente aucun chiffre : on dit « reconnecte-toi ». « Pas su » ≠ « 0 € ».
+  finMode = 'scope';
+  { const res = faireRes(); await handler({ method: 'POST', body: { action: 'finances' } }, res);
+    dit(res.code === 200 && res.corps && res.corps.ok === false && res.corps.reason === 'scope', 'accès paiements manquant (403) → reason:scope, jamais un solde inventé', `HTTP ${res.code} reason=${res.corps && res.corps.reason}`);
+    dit(res.corps && res.corps.dispo == null, 'et AUCUN montant n\'est renvoyé (pas de 0 € trompeur)'); }
+
   console.log(ko ? ('\n' + ko + ' controle(s) non conforme(s).')
-    : '\nLa route eBay s\'authentifie avec les clés cachées, range le jeton côté serveur, et ne ment jamais sur un échec.');
+    : '\nLa route eBay s\'authentifie avec les clés cachées, range le jeton côté serveur, lit le solde sans jamais l\'inventer, et ne ment jamais sur un échec.');
   process.exit(ko ? 1 : 0);
 })();
