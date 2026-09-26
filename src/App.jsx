@@ -21058,6 +21058,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </button>
                 )}
               </div>
+              {/* ⚠️ COMMENT ENVOYER, POUR UN NOVICE (cohérent avec le guide de
+                  l'écran « colis à retirer »). Le geste en 3 temps, écrit UNE
+                  fois en tête (§7), pas répété sur chaque carte. Seulement quand
+                  il y a vraiment quelque chose à envoyer — sinon c'est du bruit. */}
+              {aPoster.length>0 && (
+                <div style={{flexBasis:'100%',marginTop:12,paddingTop:11,borderTop:`1px solid ${C.border}`,display:'flex',flexWrap:'wrap',gap:6}}>
+                  {[['1','Imprime le bordereau'],['2','Colle-le sur le colis'],['3','Dépose-le, puis coche « Colis fait »']].map(([n,txt])=>(
+                    <span key={n} style={{display:'inline-flex',alignItems:'center',gap:6,background:C.bg||C.card2||'transparent',border:`1px solid ${C.border}`,borderRadius:999,padding:'4px 10px 4px 4px',fontSize:11.5,color:C.text,fontWeight:600}}>
+                      <span style={{flexShrink:0,width:18,height:18,borderRadius:999,background:C.accent,color:'#fff',fontSize:11,fontWeight:700,display:'inline-flex',alignItems:'center',justifyContent:'center'}}>{n}</span>
+                      {txt}
+                    </span>
+                  ))}
+                </div>
+              )}
               {/* ── QUELLE IMPRIMANTE ? ────────────────────────────────────────
                   Demande du 15 septembre. MESURÉ sur ses 148 bordereaux : la
                   page A4 porte l'étiquette ET la fiche destinataire ET la pub du
