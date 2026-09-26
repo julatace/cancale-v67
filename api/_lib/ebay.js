@@ -100,4 +100,46 @@ async function hasRefresh() {
   } catch (_) { return null; }
 }
 
-export { SCOPES, appId, certId, ruName, keysReady, canConsent, authUrl, appToken, exchangeCode, hasRefresh };
+// Lit le refresh_token rangé (la valeur, pas juste sa présence).
+async function readRefresh() {
+  if (!sbKey()) return null;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${TOKENS_ID}&select=data->>refresh_token`, {
+      headers: { apikey: sbKey(), Authorization: `Bearer ${sbKey()}` },
+    });
+    if (!r.ok) return null;
+    const rows = await r.json();
+    return (Array.isArray(rows) && rows[0] && rows[0].refresh_token) || null;
+  } catch (_) { return null; }
+}
+
+// Échange le refresh_token contre un access_token frais (valable ~2 h).
+// C'est ce jeton qui autorise la LECTURE des données eBay du vendeur.
+async function accessToken() {
+  const refresh = await readRefresh();
+  if (!refresh) return { ok: false, status: 401, reason: 'not-connected', error: 'Aucun compte eBay relié.' };
+  const r = await fetch(EBAY_TOKEN_URL, {
+    method: 'POST',
+    headers: { Authorization: basicAuth(), 'content-type': 'application/x-www-form-urlencoded' },
+    body: `grant_type=refresh_token&refresh_token=${encodeURIComponent(refresh)}&scope=${encodeURIComponent(SCOPES)}`,
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || !j.access_token) return { ok: false, status: r.status >= 500 ? 502 : (r.status || 502),
+    reason: 'refresh-failed', error: 'Impossible de rafraîchir le jeton eBay', detail: (j && (j.error_description || j.error)) || '' };
+  return { ok: true, token: j.access_token, expires_in: j.expires_in || null };
+}
+
+// Range n'importe quelle donnée captée (fusion par id), comme storeRefresh.
+async function storeData(id, data) {
+  if (!sbKey()) return false;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=id`, {
+      method: 'POST',
+      headers: { apikey: sbKey(), Authorization: `Bearer ${sbKey()}`, 'content-type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify([{ id, data }]),
+    });
+    return r.ok;
+  } catch (_) { return false; }
+}
+
+export { SCOPES, appId, certId, ruName, keysReady, canConsent, authUrl, appToken, exchangeCode, hasRefresh, readRefresh, accessToken, storeData };
