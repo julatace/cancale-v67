@@ -98,7 +98,7 @@ async function tradingCall(token, callName, inner) {
 // caractéristiques). Pour capter « tout ».
 async function tradingGetItem(token, itemId) {
   const res = await tradingCall(token, 'GetItem', `<ItemID>${itemId}</ItemID><DetailLevel>ReturnAll</DetailLevel><IncludeItemSpecifics>true</IncludeItemSpecifics>`);
-  if (!res.ok) return null;
+  if (!res.ok) return { _err: res.err || res.ack || res.error || ('status ' + res.status) };
   const xml = res.xml;
   const g = (t) => { const x = new RegExp('<' + t + '[^>]*>([\\s\\S]*?)</' + t + '>').exec(xml); return x ? x[1].trim() : ''; };
   const photos = []; const pre = /<PictureURL[^>]*>([\s\S]*?)<\/PictureURL>/g; let pm;
@@ -150,10 +150,12 @@ async function handleSync() {
   //    caractéristiques) : « capter tout ». On borne à 20 GetItem par sync
   //    (limites d'API) — largement assez pour son stock, et extensible.
   const lst = listings.items || [];
+  const detailDiag = [];
   for (const it of lst.slice(0, 20)) {
     if (!it.itemId) continue;
     const d = await tradingGetItem(token, it.itemId);
-    if (d) { it.detail = d; if (!it.photo && d.photos && d.photos[0]) it.photo = d.photos[0]; }
+    if (d && !d._err) { it.detail = d; if (!it.photo && d.photos && d.photos[0]) it.photo = d.photos[0]; }
+    else if (d && d._err && detailDiag.length < 3) detailDiag.push({ itemId: it.itemId, err: d._err });
   }
   // Range ce qu'on a (fusion par id). On garde le brut pour mesurer la forme.
   const at2 = Date.now();
@@ -163,7 +165,7 @@ async function handleSync() {
   // Résumé de MESURE : comptes + statuts + petits échantillons (pour voir la forme).
   return { status: 200, body: {
     ok: true,
-    listings: { status: listings.status, ack: listings.ack, count: (listings.items || []).length, sample: (listings.items || []).slice(0, 3), raw: listings.raw, error: listings.error },
+    listings: { status: listings.status, ack: listings.ack, count: (listings.items || []).length, sample: (listings.items || []).slice(0, 3), detailDiag, raw: listings.raw, error: listings.error },
     orders: { status: orders.status, count: ((orders.data && orders.data.orders) || []).length, total: (orders.data && orders.data.total), sample: (((orders.data && orders.data.orders) || []).slice(0, 1)), raw: orders.ok ? undefined : orders.raw },
     inventory: { status: inv.status, count: ((inv.data && inv.data.inventoryItems) || []).length, total: (inv.data && inv.data.total), raw: inv.ok ? undefined : inv.raw },
   } };
