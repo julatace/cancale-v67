@@ -185,6 +185,10 @@ const TABS=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','pl
     // centralisé », §11). Sur le code d'avant, notifItems ignorait eBay →
     // cette ligne n'existe pas (§6.1).
     dit(/eBay à expédier/.test(collTxt),'une vente eBay payée non expédiée remonte dans « À faire »',collTxt?'':'Collectif non lu');
+    // ── Argent à virer sur le Collectif : le chiffre qui compte pour un
+    // revendeur (ce qu'il peut sortir), publié par liveStats (§11). Sur le
+    // code d'avant, la carte n'existait pas (§6.1).
+    dit(/Argent à virer/i.test(collTxt) && /disponible à virer/i.test(collTxt),'le solde Vinted « disponible à virer » est sur le Collectif',collTxt?'':'Collectif non lu');
     await pg.close();
   }
   await b.close(); srv.close();
