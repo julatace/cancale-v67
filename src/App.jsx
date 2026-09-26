@@ -6460,6 +6460,102 @@ function VentesLeboncoin({ lbcVentes = {ventes:[],inconnues:0} }) {
     </div>
   );
 }
+// ── PUBLIER une annonce sur eBay depuis VRM ─────────────────────────────────
+// Piloté par la MESURE : on demande à eBay (action pubinfo) la catégorie et les
+// attributs OBLIGATOIRES à partir du titre, et on ne montre QUE les champs
+// qu'eBay exige. L'humain confirme tout avant l'envoi (aucune publication à
+// l'aveugle). Un refus eBay s'affiche tel quel ; aucune annonce n'est créée.
+const EBAY_CONDITIONS = [['3000', 'Occasion'], ['1000', 'Neuf avec boîte'], ['1500', 'Neuf sans boîte'], ['1750', 'Neuf avec défauts']];
+function EbayPublier({ onPublie }) {
+  const [ouvert, setOuvert] = React.useState(false);
+  const [titre, setTitre] = React.useState('');
+  const [prix, setPrix] = React.useState('');
+  const [qty, setQty] = React.useState('1');
+  const [cond, setCond] = React.useState('3000');
+  const [desc, setDesc] = React.useState('');
+  const [photos, setPhotos] = React.useState('');
+  const [port, setPort] = React.useState('');
+  const [cat, setCat] = React.useState(null);          // {categoryId, categoryName, required:[]}
+  const [asp, setAsp] = React.useState({});
+  const [analyse, setAnalyse] = React.useState(false);
+  const [busy, setBusy] = React.useState(false);
+  const [res, setRes] = React.useState(null);          // {ok,url}|{err}
+  const analyser = async () => {
+    if (!titre.trim()) { setRes({ err: 'Mets d\'abord un titre.' }); return; }
+    setAnalyse(true); setRes(null);
+    try {
+      const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'pubinfo', title: titre }) });
+      const j = await r.json();
+      if (j && j.ok && j.categorie && j.categorie.suggeree) {
+        setCat({ categoryId: j.categorie.suggeree.categoryId, categoryName: j.categorie.suggeree.categoryName, required: j.attributsObligatoires || [] });
+      } else setRes({ err: (j && j.error) || 'eBay n\'a pas suggéré de catégorie pour ce titre.' });
+    } catch (_) { setRes({ err: 'Analyse impossible (réseau).' }); }
+    setAnalyse(false);
+  };
+  const publier = async () => {
+    const manquants = (cat.required || []).filter(n => !String(asp[n] || '').trim());
+    if (manquants.length) { setRes({ err: 'À compléter : ' + manquants.join(', ') }); return; }
+    const urls = photos.split(/\s+/).map(s => s.trim()).filter(s => /^https?:\/\//.test(s));
+    if (!urls.length) { setRes({ err: 'Ajoute au moins une photo (URL http).' }); return; }
+    if (!prix.trim()) { setRes({ err: 'Mets un prix.' }); return; }
+    setBusy(true); setRes(null);
+    try {
+      const item = { title: titre, categoryId: cat.categoryId, price: String(prix).replace(',', '.'), quantity: qty, conditionId: cond, description: desc || titre, photos: urls, aspects: asp, shippingCost: String(port || 0).replace(',', '.') };
+      const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'publish', item }) });
+      const j = await r.json();
+      if (j && j.ok) { setRes({ ok: true, url: j.url, itemId: j.itemId }); if (onPublie) onPublie(); }
+      else setRes({ err: (j && j.error) || 'eBay a refusé la publication.' });
+    } catch (_) { setRes({ err: 'Publication impossible (réseau).' }); }
+    setBusy(false);
+  };
+  const lab = { fontSize: 11.5, color: C.muted, display: 'block', marginBottom: 3 };
+  const inp = { width: '100%', boxSizing: 'border-box', border: `1px solid ${C.border}`, background: C.bg || C.card, color: C.text, borderRadius: 8, padding: '9px 10px', fontSize: 13, fontFamily: 'inherit' };
+  if (!ouvert) return (
+    <button type="button" onClick={() => setOuvert(true)} style={{ marginTop: 10, border: `1px solid ${C.accent}`, background: `${C.accent}12`, color: C.accent, borderRadius: 10, padding: '10px 14px', fontSize: 13.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>➕ Publier une annonce sur eBay</button>
+  );
+  return (
+    <div style={{ marginTop: 10, border: `1px solid ${C.accent}`, borderRadius: 10, padding: '13px 14px', background: C.card }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+        <div style={{ flex: 1, fontSize: 14, fontWeight: 700, color: C.text }}>Publier une annonce sur eBay</div>
+        <button type="button" onClick={() => setOuvert(false)} style={{ border: 'none', background: 'transparent', color: C.muted, fontSize: 18, cursor: 'pointer', lineHeight: 1 }}>×</button>
+      </div>
+      {res && res.ok ? (
+        <div style={{ fontSize: 13, color: C.text, lineHeight: 1.6 }}>
+          ✅ <b>Annonce publiée sur eBay !</b> (n° {res.itemId})<br />
+          <a href={res.url} target="_blank" rel="noreferrer" style={{ color: C.accent, fontWeight: 700, textDecoration: 'none' }}>Voir l'annonce ↗</a>
+          <div style={{ marginTop: 10 }}><button type="button" onClick={() => { setOuvert(false); setRes(null); setTitre(''); setPrix(''); setCat(null); setAsp({}); setPhotos(''); setDesc(''); }} style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 8, padding: '8px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Terminé</button></div>
+        </div>
+      ) : (<>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+          <div><label style={lab}>Titre (80 car. max)</label><input value={titre} maxLength={80} onChange={e => { setTitre(e.target.value); setCat(null); }} placeholder="Nike Air Max 1 Aquatone Bleu Taille 44" style={inp} /></div>
+          {!cat ? (
+            <button type="button" onClick={analyser} disabled={analyse} style={{ alignSelf: 'flex-start', border: 'none', background: C.accent, color: '#fff', borderRadius: 8, padding: '10px 14px', fontSize: 13, fontWeight: 600, cursor: analyse ? 'default' : 'pointer', fontFamily: 'inherit', opacity: analyse ? 0.6 : 1 }}>{analyse ? 'eBay analyse…' : '1) Trouver la catégorie eBay'}</button>
+          ) : (<>
+            <div style={{ fontSize: 12, color: C.muted }}>Catégorie eBay : <b style={{ color: C.text }}>{cat.categoryName}</b> <span style={{ opacity: .6 }}>({cat.categoryId})</span></div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 9 }}>
+              <div><label style={lab}>Prix €</label><input value={prix} onChange={e => setPrix(e.target.value)} inputMode="decimal" style={inp} /></div>
+              <div><label style={lab}>Quantité</label><input value={qty} onChange={e => setQty(e.target.value)} inputMode="numeric" style={inp} /></div>
+              <div><label style={lab}>Frais de port €</label><input value={port} onChange={e => setPort(e.target.value)} inputMode="decimal" placeholder="0 = gratuit" style={inp} /></div>
+              <div><label style={lab}>État</label><select value={cond} onChange={e => setCond(e.target.value)} style={inp}>{EBAY_CONDITIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></div>
+            </div>
+            {/* Attributs OBLIGATOIRES, dictés par eBay (jamais devinés). */}
+            {(cat.required || []).length > 0 && <div style={{ fontSize: 11.5, color: C.muted, marginTop: 2 }}>Attributs demandés par eBay pour cette catégorie :</div>}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 9 }}>
+              {(cat.required || []).map(n => (
+                <div key={n}><label style={lab}>{n} *</label><input value={asp[n] || ''} onChange={e => setAsp(a => ({ ...a, [n]: e.target.value }))} style={inp} /></div>
+              ))}
+            </div>
+            <div><label style={lab}>Photos (une URL par ligne, http)</label><textarea value={photos} onChange={e => setPhotos(e.target.value)} rows={2} placeholder="https://…jpg" style={{ ...inp, resize: 'vertical' }} /></div>
+            <div><label style={lab}>Description</label><textarea value={desc} onChange={e => setDesc(e.target.value)} rows={2} style={{ ...inp, resize: 'vertical' }} /></div>
+            <button type="button" onClick={publier} disabled={busy} style={{ border: 'none', background: C.accent, color: '#fff', borderRadius: 10, padding: '12px 16px', fontSize: 14, fontWeight: 700, cursor: busy ? 'default' : 'pointer', fontFamily: 'inherit', opacity: busy ? 0.6 : 1 }}>{busy ? 'Publication…' : '2) Publier sur eBay'}</button>
+          </>)}
+        </div>
+      </>)}
+      {res && res.err && <div style={{ fontSize: 12, color: C.danger, marginTop: 9, lineHeight: 1.5 }}>{res.err}</div>}
+    </div>
+  );
+}
+
 // ── UNE ANNONCE eBay captée, modifiable depuis VRM (prix / stock) ───────────
 // La modification passe par l'action serveur `revise` (Trading
 // ReviseInventoryStatus) : elle change la VRAIE annonce eBay. C'est un geste
@@ -6675,9 +6771,7 @@ function EbayConnexion() {
               </div>
             )}
             {data.capturedAt && <div style={{ fontSize: 10.5, color: C.muted, marginTop: 8 }}>Capté {(() => { const j = Math.round((Date.now() - data.capturedAt) / 3600000); return j < 1 ? 'à l\'instant' : j < 24 ? `il y a ${j} h` : `il y a ${Math.round(j / 24)} j`; })()} · eBay met à jour le nombre de vues avec un peu de retard.</div>}
-            <div style={{ fontSize: 11, color: C.muted, marginTop: 8, lineHeight: 1.5 }}>
-              La <b>publication</b> d'annonces depuis VRM arrivera ensuite : elle attend d'avoir mesuré les vraies catégories eBay (on ne publie pas à l'aveugle — un mauvais attribut coûte cher).
-            </div>
+            <EbayPublier onPublie={synchroniser} />
           </>)}
         </>
       ) : (
