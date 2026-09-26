@@ -11,7 +11,7 @@ const fs=require('fs'), http=require('http'), path=require('path');
 const DIST=require('path').join(__dirname,'..','..','dist'), SC=__dirname;
 const FX=f=>JSON.parse(fs.readFileSync(path.join(SC,'fx',f+'.json'),'utf8'));
 const main=FX('main'), accounts=FX('accounts');
-const rows=[...FX('sold'),...FX('purch'),...FX('listings'),...FX('inbox'),...FX('track'),...FX('bord'),...FX('label'),...FX('billing'),...LBCV()]; const txn=FX('txn');
+const rows=[...FX('sold'),...FX('purch'),...FX('listings'),...FX('inbox'),...FX('track'),...FX('bord'),...FX('label'),...FX('billing'),...LBCV(),...EBAYO()]; const txn=FX('txn');
 // ⚠️ VENTES LEBONCOIN — donnée SYNTHÉTIQUE (aucun acheteur, aucune adresse : elle
 // peut donc vivre DANS le banc, dépôt public). Sans elle, l'écran Ventes rend le
 // bloc « Ventes Leboncoin » VIDE, et un piège §4.6 (TDZ) ou un mensonge §5 (un
@@ -23,6 +23,17 @@ function LBCV(){ return [{ id:'lbc_ventes', data:{ ventes:{
   '900001':{ txId:'900001', title:'Montre Rolex Submariner', price:450000, isSeller:false, stepStatus:'done', stepLabel:'Terminée' },
   '163516245':{ txId:'163516245', title:'transaction en cours', price:1500, stepStatus:'ongoing' },
 } } }]; }
+
+// ── VENTES eBay — donnée SYNTHÉTIQUE (aucun acheteur réel, aucune adresse : elle
+// vit DANS le banc, dépôt public). Une commande PAYÉE (orderPaymentStatus PAID)
+// avec son montant (pricingSummary.total.value). Sans elle, eBay resterait
+// « pas encore de vente captée » sur TOUTES les données, et le câblage du CA
+// eBay dans le Collectif (§ caEbayPayees) ne serait prouvé par AUCUN banc —
+// vert sur le défaut (§6.1). Avec elle, le tableau de bord doit dire « ventes
+// payées » et compter eBay dans le CA global.
+function EBAYO(){ return [{ id:'ebay_orders', data:{ capturedAt:Date.now(), orders:[
+  { orderId:'o-777', orderPaymentStatus:'PAID', orderFulfillmentStatus:'FULFILLED', pricingSummary:{ total:{ value:68, currency:'EUR' } }, lineItems:[{ title:'Nike Air Max 1 eBay' }], buyer:{ username:'acheteur_ebay' } },
+] } }]; }
 
 // ── LA PROJECTION `select=` DE POSTGREST, honnêtement appliquée ─────────────
 // ⚠️ SANS ÇA, CE BANC MESURE UNE FICTION. Il rendait la ligne BRUTE
@@ -160,6 +171,11 @@ const TABS=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','pl
     dit(/CA finalisé par plateforme/i.test(dashTxt),'le CA se décompose par plateforme',dashTxt?'':'tableau de bord non lu');
     dit(/CA Vinted par compte/i.test(dashTxt),'le CA Vinted se décompose par compte');
     dit(/pas encore de vente captée/.test(dashTxt),'une plateforme sans vente dit « pas encore de vente captée », pas « 0 € »');
+    // ── eBay câblé dans le CA (§ caEbayPayees) : une commande PAYÉE captée doit
+    // apparaître dans la décomposition, avec sa note « ventes payées ». Sur le
+    // code d'avant `caParPlateforme` ignorait les commandes eBay → eBay restait
+    // « pas encore de vente captée » → ce contrôle échoue (§6.1).
+    dit(/ventes payées/.test(dashTxt),'le CA eBay des commandes PAYÉES entre dans le total (§11)',dashTxt?'':'tableau de bord non lu');
     await pg.close();
   }
   await b.close(); srv.close();
