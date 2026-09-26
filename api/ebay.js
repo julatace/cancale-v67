@@ -17,7 +17,78 @@
 // navigateur ; échecs honnêtes (503 sans clés, un refus eBay remonte).
 
 import crypto from 'crypto';
-import { keysReady, canConsent, ruName, authUrl, appToken, exchangeCode, hasRefresh } from './_lib/ebay.js';
+import { keysReady, canConsent, ruName, authUrl, appToken, exchangeCode, hasRefresh, accessToken, storeData } from './_lib/ebay.js';
+
+// ── LECTURE des données eBay du vendeur (centraliser dans VRM) ───────────────
+// Julien : « capte absolument tout d'eBay ». C'est une LECTURE (comme la moisson
+// Vinted) : on ne publie rien. On mesure ce qu'eBay expose VRAIMENT pour son
+// compte, on range, et on renvoie un résumé (comptes + échantillon) — pas de
+// schéma inventé (§6).
+const EBAY_API = 'https://api.ebay.com';
+async function ebayJson(url, token, extra) {
+  try {
+    const r = await fetch(url, { headers: Object.assign({ Authorization: `Bearer ${token}`, Accept: 'application/json' }, extra || {}) });
+    const txt = await r.text();
+    let j = null; try { j = JSON.parse(txt); } catch (_) {}
+    return { status: r.status, ok: r.ok, data: j, raw: txt.slice(0, 400) };
+  } catch (e) { return { status: 0, ok: false, error: String((e && e.message) || '').slice(0, 120) }; }
+}
+// Trading API (XML) : le seul moyen fiable de récupérer les annonces créées sur
+// le SITE eBay (l'Inventory API ne voit que celles créées par API).
+async function tradingActiveList(token) {
+  const body = '<?xml version="1.0" encoding="utf-8"?>'
+    + '<GetMyeBaySellingRequest xmlns="urn:ebay:apis:eBLBaseComponents">'
+    + '<ActiveList><Include>true</Include><Pagination><EntriesPerPage>200</EntriesPerPage><PageNumber>1</PageNumber></Pagination></ActiveList>'
+    + '</GetMyeBaySellingRequest>';
+  try {
+    const r = await fetch(`${EBAY_API}/ws/api.dll`, {
+      method: 'POST',
+      headers: {
+        'X-EBAY-API-CALL-NAME': 'GetMyeBaySelling',
+        'X-EBAY-API-SITEID': '71',                 // 71 = eBay France
+        'X-EBAY-API-COMPATIBILITY-LEVEL': '1149',
+        'X-EBAY-API-IAF-TOKEN': token,             // jeton OAuth
+        'Content-Type': 'text/xml',
+      },
+      body,
+    });
+    const xml = await r.text();
+    // Parsing minimal (pas de lib) : on compte et on extrait titre/id/prix.
+    const items = [];
+    const re = /<Item>([\s\S]*?)<\/Item>/g; let m;
+    while ((m = re.exec(xml)) && items.length < 300) {
+      const blk = m[1];
+      const g = (t) => { const x = new RegExp('<' + t + '[^>]*>([\\s\\S]*?)</' + t + '>').exec(blk); return x ? x[1] : ''; };
+      items.push({ itemId: g('ItemID'), title: g('Title'), price: g('CurrentPrice'), qty: g('QuantityAvailable') || g('Quantity'), url: g('ViewItemURL') });
+    }
+    const ack = (/<Ack>([\s\S]*?)<\/Ack>/.exec(xml) || [])[1] || '';
+    return { status: r.status, ok: r.ok && /Success|Warning/i.test(ack), ack, items, raw: xml.slice(0, 500) };
+  } catch (e) { return { status: 0, ok: false, error: String((e && e.message) || '').slice(0, 120) }; }
+}
+
+async function handleSync() {
+  const at = await accessToken();
+  if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error, detail: at.detail || '' } };
+  const token = at.token;
+  // On appelle chaque source séparément : un échec n'empêche pas les autres.
+  const [orders, inv, listings] = await Promise.all([
+    ebayJson(`${EBAY_API}/sell/fulfillment/v1/order?limit=50`, token),
+    ebayJson(`${EBAY_API}/sell/inventory/v1/inventory_item?limit=100`, token),
+    tradingActiveList(token),
+  ]);
+  // Range ce qu'on a (fusion par id). On garde le brut pour mesurer la forme.
+  const at2 = Date.now();
+  await storeData('ebay_listings', { items: (listings.items || []), ack: listings.ack, status: listings.status, capturedAt: at2 });
+  await storeData('ebay_orders', { orders: (orders.data && orders.data.orders) || [], status: orders.status, capturedAt: at2 });
+  await storeData('ebay_inventory', { items: (inv.data && inv.data.inventoryItems) || [], status: inv.status, capturedAt: at2 });
+  // Résumé de MESURE : comptes + statuts + petits échantillons (pour voir la forme).
+  return { status: 200, body: {
+    ok: true,
+    listings: { status: listings.status, ack: listings.ack, count: (listings.items || []).length, sample: (listings.items || []).slice(0, 3), raw: listings.raw, error: listings.error },
+    orders: { status: orders.status, count: ((orders.data && orders.data.orders) || []).length, total: (orders.data && orders.data.total), sample: (((orders.data && orders.data.orders) || []).slice(0, 1)), raw: orders.ok ? undefined : orders.raw },
+    inventory: { status: inv.status, count: ((inv.data && inv.data.inventoryItems) || []).length, total: (inv.data && inv.data.total), raw: inv.ok ? undefined : inv.raw },
+  } };
+}
 
 // ── CONFORMITÉ : notification de suppression de compte ──────────────────────
 const verifToken = () => process.env.EBAY_VERIF_TOKEN || '';
@@ -88,6 +159,11 @@ async function handleApp(req, res) {
       const has = await hasRefresh();
       if (has === null) { res.status(503).json({ ok: false, reason: 'store-unreachable', error: 'Impossible de lire l\'état (base injoignable).' }); return; }
       res.status(200).json({ ok: true, connected: !!has });
+      return;
+    }
+    if (action === 'sync') {
+      const r = await handleSync();
+      res.status(r.status).json(r.body);
       return;
     }
     res.status(400).json({ ok: false, error: 'action inconnue' });
