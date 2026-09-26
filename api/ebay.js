@@ -89,7 +89,7 @@ async function tradingCall(token, callName, inner) {
     });
     const xml = await r.text();
     const ack = (/<Ack>([\s\S]*?)<\/Ack>/.exec(xml) || [])[1] || '';
-    const err = (/<Errors>[\s\S]*?<(?:LongMessage|ShortMessage)>([\s\S]*?)<\/(?:LongMessage|ShortMessage)>/.exec(xml) || [])[1] || '';
+    const err = ((/<LongMessage>([\s\S]*?)<\/LongMessage>/.exec(xml)) || (/<ShortMessage>([\s\S]*?)<\/ShortMessage>/.exec(xml)) || [])[1] || '';
     return { status: r.status, ok: r.ok && /Success|Warning/i.test(ack), ack, err, xml };
   } catch (e) { return { status: 0, ok: false, error: String((e && e.message) || '').slice(0, 140) }; }
 }
@@ -130,8 +130,57 @@ async function handleRevise(b) {
   const at = await accessToken();
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
   const r = await tradingReviseInventoryStatus(at.token, itemId, b.price, b.quantity);
-  if (!r.ok) return { status: r.status >= 500 ? 502 : (r.status || 502), body: { ok: false, error: r.err || 'eBay a refusé la modification', ack: r.ack } };
+  // Trading renvoie HTTP 200 même sur refus (erreur dans le corps) → vrai code 422.
+  if (!r.ok) return { status: r.status >= 400 ? r.status : 422, body: { ok: false, error: r.err || 'eBay a refusé la modification', ack: r.ack } };
   return { status: 200, body: { ok: true, ack: r.ack } };
+}
+
+// ── PUBLIER une nouvelle annonce (Trading AddFixedPriceItem) ────────────────
+// MESURÉ : le compte n'est pas éligible aux Business Policies → on met
+// l'expédition / le retour EN LIGNE dans l'appel (pas d'IDs de règles). Catégorie
+// + attributs obligatoires viennent de `pubinfo`. Rien n'est deviné : l'app
+// fournit un payload explicite (l'humain confirme avant d'envoyer).
+function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+async function tradingAddFixedPriceItem(token, it) {
+  const pics = (it.photos || []).slice(0, 24).map(u => `<PictureURL>${esc(u)}</PictureURL>`).join('');
+  const specs = Object.entries(it.aspects || {}).filter(([, v]) => v != null && String(v).trim())
+    .map(([n, v]) => `<NameValueList><Name>${esc(n)}</Name><Value>${esc(v)}</Value></NameValueList>`).join('');
+  const inner =
+    '<Item>' +
+    `<Title>${esc(String(it.title || '').slice(0, 80))}</Title>` +
+    `<Description><![CDATA[${String(it.description || it.title || '')}]]></Description>` +
+    `<PrimaryCategory><CategoryID>${esc(it.categoryId)}</CategoryID></PrimaryCategory>` +
+    `<StartPrice>${Number(String(it.price).replace(',', '.')).toFixed(2)}</StartPrice>` +
+    `<Quantity>${parseInt(it.quantity || 1, 10)}</Quantity>` +
+    '<ListingType>FixedPriceItem</ListingType><ListingDuration>GTC</ListingDuration>' +
+    '<Currency>EUR</Currency><Country>FR</Country>' +
+    `<Location>${esc(it.location || 'France')}</Location>` +
+    `<ConditionID>${esc(it.conditionId || '3000')}</ConditionID>` +
+    (pics ? `<PictureDetails>${pics}</PictureDetails>` : '') +
+    (specs ? `<ItemSpecifics>${specs}</ItemSpecifics>` : '') +
+    `<DispatchTimeMax>${parseInt(it.dispatchDays || 3, 10)}</DispatchTimeMax>` +
+    '<ShippingDetails><ShippingType>Flat</ShippingType>' +
+    '<ShippingServiceOptions><ShippingServicePriority>1</ShippingServicePriority>' +
+    `<ShippingService>${esc(it.shippingService || 'FR_ColissimoLabelPointRetrait')}</ShippingService>` +
+    `<ShippingServiceCost>${Number(String(it.shippingCost != null ? it.shippingCost : 0).replace(',', '.')).toFixed(2)}</ShippingServiceCost>` +
+    '</ShippingServiceOptions></ShippingDetails>' +
+    '<ReturnPolicy><ReturnsAcceptedOption>ReturnsAccepted</ReturnsAcceptedOption>' +
+    '<ReturnsWithinOption>Days_14</ReturnsWithinOption><ShippingCostPaidByOption>Buyer</ShippingCostPaidByOption></ReturnPolicy>' +
+    '</Item>';
+  const res = await tradingCall(token, 'AddFixedPriceItem', inner);
+  const itemId = (/<ItemID>([\s\S]*?)<\/ItemID>/.exec(res.xml || '') || [])[1] || '';
+  return Object.assign(res, { itemId });
+}
+async function handlePublish(b) {
+  const it = b.item || {};
+  if (!it.title || !it.categoryId || it.price == null || it.price === '') return { status: 400, body: { ok: false, error: 'titre, catégorie et prix requis' } };
+  const at = await accessToken();
+  if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
+  const r = await tradingAddFixedPriceItem(at.token, it);
+  // ⚠️ L'API Trading renvoie HTTP 200 même sur un refus (l'erreur est dans le
+  // corps, Ack=Failure). On répond donc un vrai code d'échec (422) dans ce cas.
+  if (!r.ok || !r.itemId) return { status: r.status >= 400 ? r.status : 422, body: { ok: false, error: r.err || 'eBay a refusé la publication', ack: r.ack } };
+  return { status: 200, body: { ok: true, itemId: r.itemId, url: `https://www.ebay.fr/itm/${r.itemId}` } };
 }
 
 // ── MESURE pour la PUBLICATION (lecture seule) : ce qu'eBay EXIGE pour créer
@@ -298,6 +347,11 @@ async function handleApp(req, res) {
     }
     if (action === 'pubinfo') {
       const r = await handlePubInfo(b);
+      res.status(r.status).json(r.body);
+      return;
+    }
+    if (action === 'publish') {
+      const r = await handlePublish(b);
       res.status(r.status).json(r.body);
       return;
     }
