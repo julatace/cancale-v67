@@ -6238,20 +6238,36 @@ function Onboarding({ setTab }) {
   );
 }
 
+// ── CA eBay = commandes PAYÉES (propriétaire unique de la règle, §11) ───────
+// La MÊME règle que la carte « payées » de l'écran eBay : une commande compte
+// quand eBay dit `orderPaymentStatus PAID`, et son montant est
+// `pricingSummary.total.value`. Rend `null` quand AUCUNE commande payée n'est
+// captée — jamais un 0 inventé (§5/§7) : le Collectif lit « pas encore de vente ».
+// L'écran eBay, lui, retombe sur 0 (il y a des commandes, aucune payée : c'est un
+// chiffre mesuré, affiché à côté du total et de l'attente).
+function caEbayPayees(orders) {
+  const arr = Array.isArray(orders) ? orders : [];
+  const paid = arr.filter(o => String((o && o.orderPaymentStatus) || '').toUpperCase() === 'PAID');
+  if (!paid.length) return null;
+  return paid.reduce((s, o) => s + (Number((o && o.pricingSummary && o.pricingSummary.total && o.pricingSummary.total.value) || 0) || 0), 0);
+}
+
 // ── CA FINALISÉ PAR PLATEFORME (propriétaire unique, §11) ──────────────────
 // Consommé par le Tableau de bord ET l'onglet Collectif : une seule règle, un
 // seul endroit — les deux écrans ne peuvent donc pas se contredire. Vinted vient
 // de `liveStats.caEncaisse` (ventes finalisées), Leboncoin des ventes prouvées
-// non annulées (prix en centimes). Une plateforme sans vente captée rend `ca:null`
-// (« pas encore de vente captée »), jamais 0 € (§5/§7).
-function caParPlateforme(liveStats, lbcVentes) {
+// non annulées (prix en centimes), eBay des commandes payées (`caEbayPayees`).
+// Une plateforme sans vente captée rend `ca:null` (« pas encore de vente
+// captée »), jamais 0 € (§5/§7).
+function caParPlateforme(liveStats, lbcVentes, ebayCa) {
   const caVinted = liveStats && liveStats.caEncaisse != null ? liveStats.caEncaisse : null;
   const lbcOk = ((lbcVentes && lbcVentes.ventes) || []).filter(o => !/annul|cancel|refund|rembours/i.test((o.stepStatus||'')+' '+(o.stepLabel||'')));
   const caLbc = lbcOk.length ? lbcOk.reduce((s,o)=> s + (o.price!=null ? Number(o.price)/100 : 0), 0) : null;
+  const caEbay = ebayCa != null ? ebayCa : null;
   return [
     { nom:'Vinted', ca:caVinted, note:'ventes finalisées, tous comptes' },
     { nom:'Leboncoin', ca:caLbc, note:caLbc==null?'pas encore de vente captée':'ventes confirmées vendeur' },
-    { nom:'eBay', ca:null, note:'pas encore de vente captée' },
+    { nom:'eBay', ca:caEbay, note:caEbay==null?'pas encore de vente captée':'ventes payées' },
     { nom:'Vestiaire Collective', ca:null, note:'pas encore de vente captée' },
   ];
 }
@@ -6727,7 +6743,7 @@ function EbayConnexion() {
               const livre = (o) => String((o && o.orderFulfillmentStatus) || '').toUpperCase() === 'FULFILLED';
               const total = ords.reduce((s, o) => s + val(o), 0);
               const enAttente = ords.filter(o => !paye(o)).reduce((s, o) => s + val(o), 0);
-              const payees = ords.filter(o => paye(o)).reduce((s, o) => s + val(o), 0);
+              const payees = caEbayPayees(ords) || 0;   // même règle que le Collectif (§11)
               const aExpedier = ords.filter(o => paye(o) && !livre(o)).length;
               if (ords.length === 0) return <div style={{ fontSize: 12.5, color: C.muted, marginBottom: 10 }}>Aucune vente eBay pour l'instant — dès ta première vente, le montant, le paiement et les colis à expédier s'afficheront ici.</div>;
               const bloc = (v, lib, col) => <div><div className="vrm-display" style={{ fontSize: 20, fontWeight: 700, color: col || C.text }}>{v}</div><div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>{lib}</div></div>;
@@ -6790,8 +6806,8 @@ function EbayConnexion() {
   );
 }
 
-function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, onGo, onSub, baseKO }) {
-  const p = caParPlateforme(liveStats, lbcVentes).find(x => x.nom === plat) || { nom:plat, ca:null };
+function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, ebayCa = null, onGo, onSub, baseKO }) {
+  const p = caParPlateforme(liveStats, lbcVentes, ebayCa).find(x => x.nom === plat) || { nom:plat, ca:null };
   // Les cartes du hub ouvrent une SECTION dans l'onglet (onSub) si l'appelant le
   // permet ; sinon (compat) elles naviguent vers l'écran séparé (onGo).
   const aller = (section, tabId) => (onSub ? onSub(section) : (onGo && onGo(tabId)));
@@ -6916,8 +6932,8 @@ function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, onGo
 // bord. Aujourd'hui seul Vinted remonte des ventes ; les autres plateformes
 // disent « pas encore de vente captée » (jamais un 0 € inventé, §5/§7) et
 // s'ajouteront d'elles-mêmes le jour où une vente y est captée.
-function Collectif({ liveStats, lbcVentes = {ventes:[],inconnues:0}, onGo, baseKO, actions, premierJour }) {
-  const plateformes = caParPlateforme(liveStats, lbcVentes);
+function Collectif({ liveStats, lbcVentes = {ventes:[],inconnues:0}, ebayCa = null, onGo, baseKO, actions, premierJour }) {
+  const plateformes = caParPlateforme(liveStats, lbcVentes, ebayCa);
   const connues = plateformes.filter(p => p.ca != null);
   const caGlobal = connues.reduce((s,p)=> s + p.ca, 0);
   const maxCA = Math.max(...connues.map(p=>p.ca), 1);
@@ -7087,7 +7103,7 @@ function Collectif({ liveStats, lbcVentes = {ventes:[],inconnues:0}, onGo, baseK
   );
 }
 
-function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,baseKO,premierJour,lbcVentes={ventes:[],inconnues:0}}) {
+function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,baseKO,premierJour,lbcVentes={ventes:[],inconnues:0},ebayCa=null}) {
   // Mois sélectionné au clic sur un graphique (affiche le détail des ventes)
   const [selMonthEnc,setSelMonthEnc]=useState(null);   // graphique encaissé
   const [selMonthVente,setSelMonthVente]=useState(null); // graphique date de vente
@@ -7590,7 +7606,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
       {(()=>{
         // §11 : LE MÊME helper que l'onglet Collectif — un seul propriétaire du
         // « CA par plateforme », les deux écrans ne peuvent pas diverger.
-        const plateformes = caParPlateforme(liveStats, lbcVentes);
+        const plateformes = caParPlateforme(liveStats, lbcVentes, ebayCa);
         const caVinted = plateformes[0].ca, caLbc = plateformes[1].ca;
         const parCompte = (liveStats && liveStats.caParCompte) || null;
         // Rien à décomposer tant que le CA Vinted n'est pas encore lu.
@@ -25993,6 +26009,21 @@ export default function App() {
       setLbcVentes({ ventes: arr.filter(o => o && o.isSeller === true), inconnues: arr.filter(o => o && o.isSeller == null).length });
     } catch (_) { /* pas su ⇒ rien : jamais un faux « vendu » */ }
   })(); }, []);
+  // CA eBay pour le Tableau de bord / le Collectif : la somme des commandes
+  // PAYÉES captées (`caEbayPayees`, la MÊME règle que la carte « payées » de
+  // l'écran eBay, §11). `null` tant qu'aucune vente payée n'est captée — le
+  // Collectif lit « pas encore de vente », jamais 0 € (§5). Une lecture ratée
+  // reste `null` : « pas su » ne vaut pas « zéro vente ».
+  const [ebayCa,setEbayCa]=useState(null);
+  useEffect(()=>{ (async()=>{
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.ebay_orders&select=data`, { headers: sbAuth() });
+      if (!r.ok) return;
+      const rows = await r.json();
+      const orders = (rows && rows[0] && rows[0].data && rows[0].data.orders) || [];
+      setEbayCa(caEbayPayees(orders));
+    } catch (_) { /* pas su ⇒ null : jamais un faux CA eBay */ }
+  })(); }, []);
   useEffect(()=>{
     let stop=false;
     (async()=>{
@@ -27031,8 +27062,8 @@ export default function App() {
             ne répondait pas. `baseKO` distingue « aucun compte » de « je n'ai
             pas pu lire », et l'écran le DIT au lieu de repartir de zéro. */}
         {tab==='dashboard'&&premierJour&&<Onboarding setTab={setTab}/>}
-        {tab==='dashboard'&&<Dashboard premierJour={premierJour} catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices} liveStats={liveStats} lbcVentes={lbcVentes} onGo={setTab} actions={notifItems} baseKO={baseKO}/>}
-        {tab==='collectif'&&<Collectif liveStats={liveStats} lbcVentes={lbcVentes} onGo={setTab} baseKO={baseKO} actions={notifItems} premierJour={premierJour}/>}
+        {tab==='dashboard'&&<Dashboard premierJour={premierJour} catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices} liveStats={liveStats} lbcVentes={lbcVentes} ebayCa={ebayCa} onGo={setTab} actions={notifItems} baseKO={baseKO}/>}
+        {tab==='collectif'&&<Collectif liveStats={liveStats} lbcVentes={lbcVentes} ebayCa={ebayCa} onGo={setTab} baseKO={baseKO} actions={notifItems} premierJour={premierJour}/>}
         {/* ⚠️ UN SEUL ONGLET VINTED QUI CONTIENT TOUT : Aperçu (CA, argent,
             compteurs) + Annonces / Ventes / Achats rendus À L'INTÉRIEUR, via les
             MÊMES composants que les écrans séparés (aucune duplication §11). Les
@@ -27052,7 +27083,7 @@ export default function App() {
           {platSub==='apercu'&&<Plateforme plat="Leboncoin" liveStats={liveStats} lbcVentes={lbcVentes} onGo={setTab} onSub={setPlatSub} baseKO={baseKO}/>}
           {platSub==='apublier'&&<LeboncoinScreen/>}
         </>)}
-        {tab==='plat_ebay'&&<Plateforme plat="eBay" liveStats={liveStats} lbcVentes={lbcVentes} onGo={setTab} baseKO={baseKO}/>}
+        {tab==='plat_ebay'&&<Plateforme plat="eBay" liveStats={liveStats} lbcVentes={lbcVentes} ebayCa={ebayCa} onGo={setTab} baseKO={baseKO}/>}
         {tab==='plat_vestiaire'&&<Plateforme plat="Vestiaire Collective" liveStats={liveStats} lbcVentes={lbcVentes} onGo={setTab} baseKO={baseKO}/>}
         {tab==='prixmarche'&&<PrixMarche data={pqmData} baseKO={baseKO}/>}
         {tab==='inventory'&&<Inventory inventory={inventory} setInventory={setInventory} accounts={vintedAccounts} garageGrid={garageGrid} labels={accountLabels} onLocate={(numero)=>{ setGarageLocate(String(numero)); setTab('garage'); }}/>}
