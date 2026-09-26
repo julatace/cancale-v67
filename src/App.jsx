@@ -6460,6 +6460,85 @@ function VentesLeboncoin({ lbcVentes = {ventes:[],inconnues:0} }) {
     </div>
   );
 }
+// ── CONNEXION eBay (API officielle) ─────────────────────────────────────────
+// Reflète HONNÊTEMENT l'état de `api/ebay` (jamais un « connecté » inventé) :
+//   • à configurer (clés absentes dans Vercel) ;
+//   • clés posées mais RuName manquant ;
+//   • prêt à connecter → bouton qui envoie sur la page de consentement d'eBay
+//     (c'est LUI qui autorise ; aucun mot de passe ne passe par VRM) ;
+//   • relié ✓ (la publication viendra après mesure des catégories eBay).
+// Au retour d'eBay (?ebay=…), on affiche le résultat et on nettoie l'URL.
+function EbayConnexion() {
+  const [st, setSt] = React.useState(null);          // {ready, canConsent} | null = en cours
+  const [connected, setConnected] = React.useState(undefined); // true/false/null(pas su)/undefined(en cours)
+  const [busy, setBusy] = React.useState(false);
+  const [retour, setRetour] = React.useState('');
+  React.useEffect(() => {
+    try {
+      const p = new URLSearchParams(window.location.search);
+      const e = p.get('ebay');
+      if (e) {
+        setRetour(e === 'connecte' ? '✓ Ton compte eBay est bien relié.'
+          : e === 'refus' ? 'Connexion annulée sur eBay — tu peux réessayer.'
+          : 'La connexion a échoué' + (p.get('raison') ? ` (${p.get('raison')})` : '') + '.');
+        p.delete('ebay'); p.delete('raison');
+        window.history.replaceState({}, '', window.location.pathname + (p.toString() ? '?' + p.toString() : ''));
+      }
+    } catch (_) {}
+  }, []);
+  React.useEffect(() => {
+    let stop = false;
+    fetch('/api/ebay').then(r => r.json()).then(j => { if (!stop) setSt({ ready: !!(j && j.ready), canConsent: !!(j && j.canConsent) }); }).catch(() => { if (!stop) setSt({ ready: false, canConsent: false }); });
+    fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'status' }) })
+      .then(r => r.json()).then(j => { if (!stop) setConnected(j && j.ok ? !!j.connected : null); }).catch(() => { if (!stop) setConnected(null); });
+    return () => { stop = true; };
+  }, []);
+  const connecter = async () => {
+    setBusy(true);
+    try {
+      const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'authurl', state: 'vrm' }) });
+      const j = await r.json();
+      if (j && j.ok && j.url) { window.location.href = j.url; return; }
+    } catch (_) {}
+    setBusy(false);
+    setRetour("Impossible de démarrer la connexion — vérifie la configuration eBay (docs/ebay-api.md).");
+  };
+  const eti = { fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 500 };
+  const boite = (bg, bord) => ({ border: `1px solid ${bord || C.border}`, background: bg || C.card, borderRadius: 10, padding: '14px 16px' });
+  return (
+    <div style={boite()}>
+      <div style={{ ...eti, marginBottom: 6 }}>Publier sur eBay · connexion</div>
+      {retour && <div style={{ fontSize: 12.5, color: C.text, background: C.bg || 'transparent', border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 10px', marginBottom: 10 }}>{retour}</div>}
+      {st === null ? (
+        <div style={{ fontSize: 13, color: C.muted }}>Vérification…</div>
+      ) : !st.ready ? (
+        <div style={{ fontSize: 13, color: C.text, lineHeight: 1.55 }}>
+          eBay n'est <b>pas encore configuré</b>. Ajoute tes clés eBay dans Vercel (App ID, Dev ID, Cert ID), puis le RuName — la marche à suivre est dans <b>docs/ebay-api.md</b>. Tant que ce n'est pas fait, rien ne part sur eBay.
+        </div>
+      ) : !st.canConsent ? (
+        <div style={{ fontSize: 13, color: C.text, lineHeight: 1.55 }}>
+          Tes clés eBay sont posées ✓. Il manque le <b>RuName</b> (l'URL de redirection, variable <code>EBAY_RUNAME</code>) à créer dans le portail eBay Developer et à coller dans Vercel — voir <b>docs/ebay-api.md</b>.
+        </div>
+      ) : connected === true ? (
+        <div style={{ fontSize: 13, color: C.text, lineHeight: 1.55 }}>
+          ✓ <b>Ton compte eBay est relié.</b> La publication des annonces arrivera ensuite : elle attend d'avoir mesuré les vraies catégories et attributs d'eBay (on ne publie pas à l'aveugle — un mauvais attribut sur une annonce coûte cher).
+        </div>
+      ) : (
+        <>
+          <div style={{ fontSize: 13, color: C.text, lineHeight: 1.55, marginBottom: 10 }}>
+            Tout est prêt côté clés. Autorise ton compte vendeur sur la page d'eBay — <b>aucun mot de passe ne passe par VRM</b>, tu te connectes chez eBay.
+          </div>
+          <button type="button" onClick={connecter} disabled={busy}
+            style={{ border: 'none', borderRadius: 10, background: C.accent, color: '#fff', padding: '11px 16px', cursor: busy ? 'default' : 'pointer', fontSize: 14, fontWeight: 600, fontFamily: 'inherit', opacity: busy ? 0.6 : 1 }}>
+            {busy ? 'Ouverture d\'eBay…' : 'Connecter mon compte eBay'}
+          </button>
+          {connected === null && <div style={{ fontSize: 11, color: C.muted, marginTop: 8 }}>(État du compte non lisible pour l'instant — la base n'a pas répondu.)</div>}
+        </>
+      )}
+    </div>
+  );
+}
+
 function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, onGo, onSub, baseKO }) {
   const p = caParPlateforme(liveStats, lbcVentes).find(x => x.nom === plat) || { nom:plat, ca:null };
   // Les cartes du hub ouvrent une SECTION dans l'onglet (onSub) si l'appelant le
@@ -6542,6 +6621,7 @@ function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, onGo
           <div className="vrm-display" style={{fontSize:30,fontWeight:700,color:p.ca!=null?C.text:C.muted}}>{p.ca!=null?fmt(p.ca):'—'}</div>
           <div style={{fontSize:11.5,color:C.muted,marginTop:2}}>{p.ca!=null?'ventes prouvées captées':'pas encore de vente captée'}</div>
         </Card>
+        {plat==='eBay' && <EbayConnexion/>}
         {plat==='Leboncoin' && (
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(150px,1fr))',gap:10}}>
             <button type="button" onClick={()=>aller('apublier','leboncoin')} style={carte}>
