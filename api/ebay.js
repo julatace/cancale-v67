@@ -58,8 +58,18 @@ async function tradingActiveList(token) {
     const re = /<Item>([\s\S]*?)<\/Item>/g; let m;
     while ((m = re.exec(xml)) && items.length < 300) {
       const blk = m[1];
-      const g = (t) => { const x = new RegExp('<' + t + '[^>]*>([\\s\\S]*?)</' + t + '>').exec(blk); return x ? x[1] : ''; };
-      items.push({ itemId: g('ItemID'), title: g('Title'), price: g('CurrentPrice'), qty: g('QuantityAvailable') || g('Quantity'), url: g('ViewItemURL') });
+      const g = (t) => { const x = new RegExp('<' + t + '[^>]*>([\\s\\S]*?)</' + t + '>').exec(blk); return x ? x[1].trim() : ''; };
+      items.push({
+        itemId: g('ItemID'),
+        title: g('Title'),
+        price: g('CurrentPrice') || g('BuyItNowPrice') || g('StartPrice'),
+        qty: g('QuantityAvailable') || g('Quantity'),
+        vendus: g('QuantitySold'),
+        vues: g('WatchCount'),
+        photo: g('GalleryURL') || g('PictureURL'),
+        depuis: g('StartTime'),
+        url: g('ViewItemURL'),
+      });
     }
     const ack = (/<Ack>([\s\S]*?)<\/Ack>/.exec(xml) || [])[1] || '';
     return { status: r.status, ok: r.ok && /Success|Warning/i.test(ack), ack, items, raw: xml.slice(0, 500) };
@@ -73,7 +83,9 @@ async function handleSync() {
   // On appelle chaque source séparément : un échec n'empêche pas les autres.
   const [orders, inv, listings] = await Promise.all([
     ebayJson(`${EBAY_API}/sell/fulfillment/v1/order?limit=50`, token),
-    ebayJson(`${EBAY_API}/sell/inventory/v1/inventory_item?limit=100`, token),
+    // L'Inventory API exige un Accept-Language (sinon 400 « Invalid value for
+    // header Accept-Language »). Ne concerne que les annonces créées par API.
+    ebayJson(`${EBAY_API}/sell/inventory/v1/inventory_item?limit=100`, token, { 'Accept-Language': 'fr-FR', 'Content-Language': 'fr-FR' }),
     tradingActiveList(token),
   ]);
   // Range ce qu'on a (fusion par id). On garde le brut pour mesurer la forme.
