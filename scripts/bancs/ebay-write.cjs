@@ -19,6 +19,7 @@ global.fetch = async (url, opts = {}) => {
   if (u.includes('/ws/api.dll')) {
     lastCall = h['X-EBAY-API-CALL-NAME'] || ''; lastBody = String(opts.body || '');
     if (tradingMode === 'fail') return new Response('<?xml version="1.0"?><r xmlns="urn:ebay:apis:eBLBaseComponents"><Ack>Failure</Ack><Errors><ShortMessage>Missing required aspect</ShortMessage><LongMessage>L\'attribut Pointure EU est obligatoire.</LongMessage></Errors></r>', { status: 200 });
+    if (/VerifyAddFixedPriceItem/.test(lastCall)) return new Response('<?xml version="1.0"?><r xmlns="urn:ebay:apis:eBLBaseComponents"><Ack>Success</Ack><Fees><Fee><Name>ListingFee</Name><Fee currencyID="EUR">0.35</Fee></Fee><Fee><Name>InsertionFee</Name><Fee currencyID="EUR">0.00</Fee></Fee></Fees></r>', { status: 200 });
     if (/AddFixedPriceItem/.test(lastCall)) return new Response('<?xml version="1.0"?><r xmlns="urn:ebay:apis:eBLBaseComponents"><Ack>Success</Ack><ItemID>110555000111</ItemID></r>', { status: 200 });
     return new Response('<?xml version="1.0"?><r xmlns="urn:ebay:apis:eBLBaseComponents"><Ack>Success</Ack></r>', { status: 200 });
   }
@@ -60,6 +61,20 @@ const item = { title: 'Nike Air Max 1 Aquatone Bleu T44', categoryId: '15709', p
   { const res = faireRes(); await handler({ method: 'POST', query: {}, body: { action: 'revise', itemId: '1', price: '9' } }, res);
     dit(res.code >= 400 && res.corps && res.corps.ok === false, 'un refus de modification REMONTE'); }
 
-  console.log(ko ? ('\n' + ko + ' controle(s) non conforme(s).') : '\nPublier et modifier passent par l\'API Trading, envoient les bons champs, et un refus eBay ne devient jamais un faux succès.');
+  // 6. Vérifier À BLANC (VerifyAddFixedPriceItem) : rien n'est créé, les frais remontent
+  tradingMode = 'ok';
+  { const res = faireRes(); await handler({ method: 'POST', query: {}, body: { action: 'pubverify', item } }, res);
+    dit(res.code === 200 && res.corps && res.corps.ok === true, 'pubverify → 200 ok:true (annonce acceptée)', `HTTP ${res.code}`);
+    dit(/VerifyAddFixedPriceItem/.test(lastCall), 'l\'appel est bien VerifyAddFixedPriceItem (rien n\'est publié)');
+    dit(res.corps && res.corps.fees === 0.35, 'les frais eBay estimés remontent (0,35 €)', 'fees=' + (res.corps && res.corps.fees));
+    dit(res.corps && res.corps.itemId == null, 'aucun itemId : la vérif ne crée AUCUNE annonce'); }
+
+  // 7. Vérif : eBay refuserait → remonte l'info SANS échec serveur (200 ok:false), rien créé
+  tradingMode = 'fail';
+  { const res = faireRes(); await handler({ method: 'POST', query: {}, body: { action: 'pubverify', item } }, res);
+    dit(res.code === 200 && res.corps && res.corps.ok === false && /Pointure EU|obligatoire/i.test(res.corps.error || ''), 'un refus à la VÉRIF remonte l\'exact message eBay, sans rien publier', `HTTP ${res.code} : ${res.corps && res.corps.error}`);
+    dit(/VerifyAddFixedPriceItem/.test(lastCall), 'toujours une VÉRIF, jamais une publication'); }
+
+  console.log(ko ? ('\n' + ko + ' controle(s) non conforme(s).') : '\nPublier, VÉRIFIER À BLANC et modifier passent par l\'API Trading, envoient les bons champs, et un refus eBay ne devient jamais un faux succès ni une annonce fantôme.');
   process.exit(ko ? 1 : 0);
 })();

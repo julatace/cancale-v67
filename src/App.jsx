@@ -6496,6 +6496,8 @@ function EbayPublier({ onPublie }) {
   const [analyse, setAnalyse] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const [res, setRes] = React.useState(null);          // {ok,url}|{err}
+  const [check, setCheck] = React.useState(null);      // {ok,fees}|{err} — vérif à blanc eBay
+  const [verif, setVerif] = React.useState(false);
   const analyser = async () => {
     if (!titre.trim()) { setRes({ err: 'Mets d\'abord un titre.' }); return; }
     setAnalyse(true); setRes(null);
@@ -6508,16 +6510,35 @@ function EbayPublier({ onPublie }) {
     } catch (_) { setRes({ err: 'Analyse impossible (réseau).' }); }
     setAnalyse(false);
   };
-  const publier = async () => {
+  // Construit le payload OU dit ce qui manque — une seule règle pour vérifier
+  // ET publier (§11) : impossible de vérifier autre chose que ce qu'on publie.
+  const buildItem = () => {
     const manquants = (cat.required || []).filter(n => !String(asp[n] || '').trim());
-    if (manquants.length) { setRes({ err: 'À compléter : ' + manquants.join(', ') }); return; }
+    if (manquants.length) return { err: 'À compléter : ' + manquants.join(', ') };
     const urls = photos.split(/\s+/).map(s => s.trim()).filter(s => /^https?:\/\//.test(s));
-    if (!urls.length) { setRes({ err: 'Ajoute au moins une photo (URL http).' }); return; }
-    if (!prix.trim()) { setRes({ err: 'Mets un prix.' }); return; }
-    setBusy(true); setRes(null);
+    if (!urls.length) return { err: 'Ajoute au moins une photo (URL http).' };
+    if (!prix.trim()) return { err: 'Mets un prix.' };
+    return { item: { title: titre, categoryId: cat.categoryId, price: String(prix).replace(',', '.'), quantity: qty, conditionId: cond, description: desc || titre, photos: urls, aspects: asp, shippingCost: String(port || 0).replace(',', '.') } };
+  };
+  // VÉRIFIER À BLANC (VerifyAddFixedPriceItem) : eBay valide exactement ce qu'on
+  // publierait et renvoie les frais, SANS rien créer. Le filet pour la première
+  // publication — les refus (attribut, photo) remontent avant d'engager.
+  const verifier = async () => {
+    const b = buildItem(); if (b.err) { setRes({ err: b.err }); setCheck(null); return; }
+    setVerif(true); setRes(null); setCheck(null);
     try {
-      const item = { title: titre, categoryId: cat.categoryId, price: String(prix).replace(',', '.'), quantity: qty, conditionId: cond, description: desc || titre, photos: urls, aspects: asp, shippingCost: String(port || 0).replace(',', '.') };
-      const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'publish', item }) });
+      const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'pubverify', item: b.item }) });
+      const j = await r.json();
+      if (j && j.ok) setCheck({ ok: true, fees: j.fees });
+      else setCheck({ err: (j && j.error) || 'eBay refuserait cette annonce.' });
+    } catch (_) { setCheck({ err: 'Vérification impossible (réseau).' }); }
+    setVerif(false);
+  };
+  const publier = async () => {
+    const b = buildItem(); if (b.err) { setRes({ err: b.err }); return; }
+    setBusy(true); setRes(null); setCheck(null);
+    try {
+      const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'publish', item: b.item }) });
       const j = await r.json();
       if (j && j.ok) { setRes({ ok: true, url: j.url, itemId: j.itemId }); if (onPublie) onPublie(); }
       else setRes({ err: (j && j.error) || 'eBay a refusé la publication.' });
@@ -6539,31 +6560,38 @@ function EbayPublier({ onPublie }) {
         <div style={{ fontSize: 13, color: C.text, lineHeight: 1.6 }}>
           ✅ <b>Annonce publiée sur eBay !</b> (n° {res.itemId})<br />
           <a href={res.url} target="_blank" rel="noreferrer" style={{ color: C.accent, fontWeight: 700, textDecoration: 'none' }}>Voir l'annonce ↗</a>
-          <div style={{ marginTop: 10 }}><button type="button" onClick={() => { setOuvert(false); setRes(null); setTitre(''); setPrix(''); setCat(null); setAsp({}); setPhotos(''); setDesc(''); }} style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 8, padding: '8px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Terminé</button></div>
+          <div style={{ marginTop: 10 }}><button type="button" onClick={() => { setOuvert(false); setRes(null); setCheck(null); setTitre(''); setPrix(''); setCat(null); setAsp({}); setPhotos(''); setDesc(''); }} style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 8, padding: '8px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Terminé</button></div>
         </div>
       ) : (<>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
-          <div><label style={lab}>Titre (80 car. max)</label><input value={titre} maxLength={80} onChange={e => { setTitre(e.target.value); setCat(null); }} placeholder="Nike Air Max 1 Aquatone Bleu Taille 44" style={inp} /></div>
+          <div><label style={lab}>Titre (80 car. max)</label><input value={titre} maxLength={80} onChange={e => { setTitre(e.target.value); setCat(null); setCheck(null); }} placeholder="Nike Air Max 1 Aquatone Bleu Taille 44" style={inp} /></div>
           {!cat ? (
             <button type="button" onClick={analyser} disabled={analyse} style={{ alignSelf: 'flex-start', border: 'none', background: C.accent, color: '#fff', borderRadius: 8, padding: '10px 14px', fontSize: 13, fontWeight: 600, cursor: analyse ? 'default' : 'pointer', fontFamily: 'inherit', opacity: analyse ? 0.6 : 1 }}>{analyse ? 'eBay analyse…' : '1) Trouver la catégorie eBay'}</button>
           ) : (<>
             <div style={{ fontSize: 12, color: C.muted }}>Catégorie eBay : <b style={{ color: C.text }}>{cat.categoryName}</b> <span style={{ opacity: .6 }}>({cat.categoryId})</span></div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 9 }}>
-              <div><label style={lab}>Prix €</label><input value={prix} onChange={e => setPrix(e.target.value)} inputMode="decimal" style={inp} /></div>
+              <div><label style={lab}>Prix €</label><input value={prix} onChange={e => { setPrix(e.target.value); setCheck(null); }} inputMode="decimal" style={inp} /></div>
               <div><label style={lab}>Quantité</label><input value={qty} onChange={e => setQty(e.target.value)} inputMode="numeric" style={inp} /></div>
               <div><label style={lab}>Frais de port €</label><input value={port} onChange={e => setPort(e.target.value)} inputMode="decimal" placeholder="0 = gratuit" style={inp} /></div>
-              <div><label style={lab}>État</label><select value={cond} onChange={e => setCond(e.target.value)} style={inp}>{EBAY_CONDITIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></div>
+              <div><label style={lab}>État</label><select value={cond} onChange={e => { setCond(e.target.value); setCheck(null); }} style={inp}>{EBAY_CONDITIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></div>
             </div>
             {/* Attributs OBLIGATOIRES, dictés par eBay (jamais devinés). */}
             {(cat.required || []).length > 0 && <div style={{ fontSize: 11.5, color: C.muted, marginTop: 2 }}>Attributs demandés par eBay pour cette catégorie :</div>}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 9 }}>
               {(cat.required || []).map(n => (
-                <div key={n}><label style={lab}>{n} *</label><input value={asp[n] || ''} onChange={e => setAsp(a => ({ ...a, [n]: e.target.value }))} style={inp} /></div>
+                <div key={n}><label style={lab}>{n} *</label><input value={asp[n] || ''} onChange={e => { setAsp(a => ({ ...a, [n]: e.target.value })); setCheck(null); }} style={inp} /></div>
               ))}
             </div>
-            <div><label style={lab}>Photos (une URL par ligne, http)</label><textarea value={photos} onChange={e => setPhotos(e.target.value)} rows={2} placeholder="https://…jpg" style={{ ...inp, resize: 'vertical' }} /></div>
+            <div><label style={lab}>Photos (une URL par ligne, http)</label><textarea value={photos} onChange={e => { setPhotos(e.target.value); setCheck(null); }} rows={2} placeholder="https://…jpg" style={{ ...inp, resize: 'vertical' }} /></div>
             <div><label style={lab}>Description</label><textarea value={desc} onChange={e => setDesc(e.target.value)} rows={2} style={{ ...inp, resize: 'vertical' }} /></div>
-            <button type="button" onClick={publier} disabled={busy} style={{ border: 'none', background: C.accent, color: '#fff', borderRadius: 10, padding: '12px 16px', fontSize: 14, fontWeight: 700, cursor: busy ? 'default' : 'pointer', fontFamily: 'inherit', opacity: busy ? 0.6 : 1 }}>{busy ? 'Publication…' : '2) Publier sur eBay'}</button>
+            {/* Vérifier à blanc AVANT de publier : eBay contrôle tout (attributs,
+                photos, expédition) et donne les frais, sans rien créer. */}
+            {check && check.ok && <div style={{ fontSize: 12.5, color: C.text, background: `${C.accent}10`, border: `1px solid ${C.accent}`, borderRadius: 8, padding: '8px 10px', lineHeight: 1.5 }}>✅ <b>eBay accepterait cette annonce.</b>{check.fees != null ? ` Frais eBay estimés : ${(Math.round(check.fees * 100) / 100).toFixed(2).replace('.', ',')} €.` : ''} Tu peux publier.</div>}
+            {check && check.err && <div style={{ fontSize: 12.5, color: C.warn, background: `${C.warn}12`, border: `1px solid ${C.warn}`, borderRadius: 8, padding: '8px 10px', lineHeight: 1.5 }}>⚠️ eBay signale : {check.err}<br /><span style={{ color: C.muted }}>Rien n'a été publié — corrige et revérifie.</span></div>}
+            <div className="vrm-rangee" style={{ display: 'flex', gap: 8 }}>
+              <button type="button" onClick={verifier} disabled={verif || busy} style={{ border: `1px solid ${C.accent}`, background: 'transparent', color: C.accent, borderRadius: 10, padding: '11px 14px', fontSize: 13.5, fontWeight: 700, cursor: (verif || busy) ? 'default' : 'pointer', fontFamily: 'inherit', opacity: (verif || busy) ? 0.6 : 1 }}>{verif ? 'eBay vérifie…' : '2) Vérifier sans publier'}</button>
+              <button type="button" onClick={publier} disabled={busy || verif} style={{ border: 'none', background: C.accent, color: '#fff', borderRadius: 10, padding: '11px 16px', fontSize: 13.5, fontWeight: 700, cursor: (busy || verif) ? 'default' : 'pointer', fontFamily: 'inherit', opacity: (busy || verif) ? 0.6 : 1 }}>{busy ? 'Publication…' : '3) Publier sur eBay'}</button>
+            </div>
           </>)}
         </div>
       </>)}

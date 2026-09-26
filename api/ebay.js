@@ -141,12 +141,15 @@ async function handleRevise(b) {
 // + attributs obligatoires viennent de `pubinfo`. Rien n'est deviné : l'app
 // fournit un payload explicite (l'humain confirme avant d'envoyer).
 function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
-async function tradingAddFixedPriceItem(token, it) {
+// ── Le corps <Item> d'une annonce, construit UNE fois (§11) : partagé par la
+//    publication réelle (AddFixedPriceItem) ET la vérification à blanc
+//    (VerifyAddFixedPriceItem). Deux appels, un seul payload — impossible de
+//    vérifier autre chose que ce qu'on publie.
+function itemXml(it) {
   const pics = (it.photos || []).slice(0, 24).map(u => `<PictureURL>${esc(u)}</PictureURL>`).join('');
   const specs = Object.entries(it.aspects || {}).filter(([, v]) => v != null && String(v).trim())
     .map(([n, v]) => `<NameValueList><Name>${esc(n)}</Name><Value>${esc(v)}</Value></NameValueList>`).join('');
-  const inner =
-    '<Item>' +
+  return '<Item>' +
     `<Title>${esc(String(it.title || '').slice(0, 80))}</Title>` +
     `<Description><![CDATA[${String(it.description || it.title || '')}]]></Description>` +
     `<PrimaryCategory><CategoryID>${esc(it.categoryId)}</CategoryID></PrimaryCategory>` +
@@ -167,9 +170,29 @@ async function tradingAddFixedPriceItem(token, it) {
     '<ReturnPolicy><ReturnsAcceptedOption>ReturnsAccepted</ReturnsAcceptedOption>' +
     '<ReturnsWithinOption>Days_14</ReturnsWithinOption><ShippingCostPaidByOption>Buyer</ShippingCostPaidByOption></ReturnPolicy>' +
     '</Item>';
-  const res = await tradingCall(token, 'AddFixedPriceItem', inner);
+}
+async function tradingAddFixedPriceItem(token, it) {
+  const res = await tradingCall(token, 'AddFixedPriceItem', itemXml(it));
   const itemId = (/<ItemID>([\s\S]*?)<\/ItemID>/.exec(res.xml || '') || [])[1] || '';
   return Object.assign(res, { itemId });
+}
+// Somme des frais eBay renvoyés (le <Fees> de la réponse) : chaque <Fee> porte
+// un <Fee> montant. On additionne — le vendeur voit ce que ça lui coûtera.
+function totalFrais(xml) {
+  let t = 0, found = false; const re = /<Fee>[\s\S]*?<Fee currencyID="[^"]*">([\s\S]*?)<\/Fee>[\s\S]*?<\/Fee>/g; let m;
+  // La structure est <Fees><Fee><Name>…</Name><Fee currencyID="EUR">0.0</Fee></Fee>…</Fees>.
+  const bloc = (/<Fees>([\s\S]*?)<\/Fees>/.exec(xml || '') || [])[1] || '';
+  const fre = /<Fee currencyID="[^"]*">([\s\S]*?)<\/Fee>/g;
+  while ((m = fre.exec(bloc))) { const v = Number(m[1]); if (isFinite(v)) { t += v; found = true; } }
+  return found ? Math.round(t * 100) / 100 : null;
+}
+// VÉRIFIER À BLANC : eBay valide EXACTEMENT ce qu'on publierait (attributs,
+// photos, expédition) et renvoie les frais — SANS créer d'annonce. C'est le
+// filet de sécurité pour la première publication : les erreurs (attribut
+// manquant, photo refusée) remontent AVANT d'engager quoi que ce soit.
+async function tradingVerifyAddFixedPriceItem(token, it) {
+  const res = await tradingCall(token, 'VerifyAddFixedPriceItem', itemXml(it));
+  return Object.assign(res, { fees: totalFrais(res.xml) });
 }
 async function handlePublish(b) {
   const it = b.item || {};
@@ -181,6 +204,21 @@ async function handlePublish(b) {
   // corps, Ack=Failure). On répond donc un vrai code d'échec (422) dans ce cas.
   if (!r.ok || !r.itemId) return { status: r.status >= 400 ? r.status : 422, body: { ok: false, error: r.err || 'eBay a refusé la publication', ack: r.ack } };
   return { status: 200, body: { ok: true, itemId: r.itemId, url: `https://www.ebay.fr/itm/${r.itemId}` } };
+}
+
+// VÉRIFIER sans publier : mêmes champs requis que publish, mais RIEN n'est créé.
+// L'appel eBay ayant réussi, on répond toujours 200 : `ok:true` = « prête »
+// (avec les frais estimés), `ok:false` = « eBay refuserait : <raison> » — une
+// information à corriger, pas une panne. Réseau/jeton KO → vrai code d'échec.
+async function handleVerify(b) {
+  const it = b.item || {};
+  if (!it.title || !it.categoryId || it.price == null || it.price === '') return { status: 400, body: { ok: false, error: 'titre, catégorie et prix requis' } };
+  const at = await accessToken();
+  if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
+  const r = await tradingVerifyAddFixedPriceItem(at.token, it);
+  if (r.status === 0) return { status: 503, body: { ok: false, error: r.error || 'eBay injoignable' } };
+  if (!r.ok) return { status: 200, body: { ok: false, error: r.err || 'eBay refuserait cette annonce', ack: r.ack } };
+  return { status: 200, body: { ok: true, fees: r.fees } };
 }
 
 // ── MESURE pour la PUBLICATION (lecture seule) : ce qu'eBay EXIGE pour créer
@@ -347,6 +385,11 @@ async function handleApp(req, res) {
     }
     if (action === 'pubinfo') {
       const r = await handlePubInfo(b);
+      res.status(r.status).json(r.body);
+      return;
+    }
+    if (action === 'pubverify') {
+      const r = await handleVerify(b);
       res.status(r.status).json(r.body);
       return;
     }
