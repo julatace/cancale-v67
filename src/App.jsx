@@ -6503,6 +6503,40 @@ function EbayConnexion() {
     setBusy(false);
     setRetour("Impossible de démarrer la connexion — vérifie la configuration eBay (docs/ebay-api.md).");
   };
+  // ── Données eBay captées (annonces + ventes), lues dans la base comme le
+  //    reste de l'app, et rafraîchies via l'action serveur `sync`. ──
+  const [data, setData] = React.useState(null);   // {listings, orders, capturedAt} | null
+  const [syncing, setSyncing] = React.useState(false);
+  const autoFait = React.useRef(false);
+  const lireData = React.useCallback(async () => {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=in.(ebay_listings,ebay_orders)&select=id,data`, { headers: sbAuth() });
+      if (!r.ok) return;
+      const rows = await r.json();
+      const L = ((rows.find(x => x.id === 'ebay_listings') || {}).data) || {};
+      const O = ((rows.find(x => x.id === 'ebay_orders') || {}).data) || {};
+      setData({ listings: L.items || [], orders: O.orders || [], capturedAt: L.capturedAt || O.capturedAt || null });
+      return L.capturedAt || O.capturedAt || null;
+    } catch (_) { return null; }
+  }, []);
+  const synchroniser = React.useCallback(async () => {
+    setSyncing(true);
+    try { await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'sync' }) }); } catch (_) {}
+    await lireData();
+    setSyncing(false);
+  }, [lireData]);
+  React.useEffect(() => {
+    if (connected !== true) return;
+    let stop = false;
+    (async () => {
+      const cap = await lireData();
+      if (stop || autoFait.current) return;
+      // Première capture (jamais synchronisé) OU données vieilles de +6 h → on
+      // rafraîchit une seule fois automatiquement (comme la moisson Vinted).
+      if (cap == null || (Date.now() - cap) > 6 * 3600 * 1000) { autoFait.current = true; synchroniser(); }
+    })();
+    return () => { stop = true; };
+  }, [connected, lireData, synchroniser]);
   const eti = { fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 500 };
   const boite = (bg, bord) => ({ border: `1px solid ${bord || C.border}`, background: bg || C.card, borderRadius: 10, padding: '14px 16px' });
   return (
@@ -6520,9 +6554,55 @@ function EbayConnexion() {
           Tes clés eBay sont posées ✓. Il manque le <b>RuName</b> (l'URL de redirection, variable <code>EBAY_RUNAME</code>) à créer dans le portail eBay Developer et à coller dans Vercel — voir <b>docs/ebay-api.md</b>.
         </div>
       ) : connected === true ? (
-        <div style={{ fontSize: 13, color: C.text, lineHeight: 1.55 }}>
-          ✓ <b>Ton compte eBay est relié.</b> La publication des annonces arrivera ensuite : elle attend d'avoir mesuré les vraies catégories et attributs d'eBay (on ne publie pas à l'aveugle — un mauvais attribut sur une annonce coûte cher).
-        </div>
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
+            <div style={{ flex: '1 1 180px', minWidth: 0, fontSize: 13, color: C.text, lineHeight: 1.5 }}>
+              ✓ <b>Ton compte eBay est relié.</b> VRM lit tes annonces et tes ventes eBay ici — plus besoin d'ouvrir l'appli eBay.
+            </div>
+            <button type="button" onClick={synchroniser} disabled={syncing}
+              style={{ flexShrink: 0, border: `1px solid ${C.border}`, background: C.card, color: C.text, borderRadius: 10, padding: '9px 13px', cursor: syncing ? 'default' : 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', opacity: syncing ? 0.6 : 1 }}>
+              {syncing ? 'Lecture eBay…' : '↻ Rafraîchir depuis eBay'}
+            </button>
+          </div>
+          {data == null ? (
+            <div style={{ fontSize: 12.5, color: C.muted }}>{syncing ? 'Première lecture de ton compte eBay…' : 'Chargement…'}</div>
+          ) : (<>
+            {/* Ventes eBay */}
+            <div style={{ fontSize: 12.5, color: C.muted, marginBottom: 8 }}>
+              {data.orders.length > 0
+                ? <><b style={{ color: C.text }}>{data.orders.length}</b> vente{data.orders.length > 1 ? 's' : ''} eBay captée{data.orders.length > 1 ? 's' : ''}.</>
+                : 'Aucune vente eBay pour l\'instant.'}
+            </div>
+            {/* Annonces eBay en ligne */}
+            <div style={{ ...eti, marginBottom: 6 }}>Tes annonces eBay en ligne ({data.listings.length})</div>
+            {data.listings.length === 0 ? (
+              <div style={{ fontSize: 12.5, color: C.muted }}>Aucune annonce captée. Clique « Rafraîchir depuis eBay » si tu viens d'en publier.</div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(260px,100%), 1fr))', gap: 8 }}>
+                {data.listings.map((it) => (
+                  <div key={it.itemId} style={{ display: 'flex', gap: 10, alignItems: 'center', border: `1px solid ${C.border}`, borderRadius: 10, padding: '9px 11px', background: C.card }}>
+                    {it.photo
+                      ? <img src={it.photo} alt="" loading="lazy" style={{ width: 42, height: 42, borderRadius: 8, objectFit: 'cover', flexShrink: 0, border: `1px solid ${C.border}` }} />
+                      : <span style={{ flexShrink: 0, color: C.muted, display: 'flex' }}><Icon name="tag" size={20} /></span>}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{it.title || ('Annonce ' + it.itemId)}</div>
+                      <div style={{ fontSize: 11.5, color: C.muted, marginTop: 1 }}>
+                        {it.price ? Number(String(it.price).replace(',', '.')).toFixed(2).replace('.', ',') + ' €' : '—'}
+                        {it.qty ? ` · ${it.qty} en stock` : ''}
+                        {it.vues && Number(it.vues) > 0 ? ` · ${it.vues} suivi${Number(it.vues) > 1 ? 's' : ''}` : ''}
+                      </div>
+                    </div>
+                    {it.url && <a href={it.url} target="_blank" rel="noreferrer" style={{ flexShrink: 0, fontSize: 11.5, color: C.accent, fontWeight: 700, textDecoration: 'none' }}>Voir ↗</a>}
+                  </div>
+                ))}
+              </div>
+            )}
+            {data.capturedAt && <div style={{ fontSize: 10.5, color: C.muted, marginTop: 8 }}>Capté {(() => { const j = Math.round((Date.now() - data.capturedAt) / 3600000); return j < 1 ? 'à l\'instant' : j < 24 ? `il y a ${j} h` : `il y a ${Math.round(j / 24)} j`; })()} · eBay met à jour le nombre de vues avec un peu de retard.</div>}
+            <div style={{ fontSize: 11, color: C.muted, marginTop: 8, lineHeight: 1.5 }}>
+              La <b>publication</b> d'annonces depuis VRM arrivera ensuite : elle attend d'avoir mesuré les vraies catégories eBay (on ne publie pas à l'aveugle — un mauvais attribut coûte cher).
+            </div>
+          </>)}
+        </>
       ) : (
         <>
           <div style={{ fontSize: 13, color: C.text, lineHeight: 1.55, marginBottom: 10 }}>
