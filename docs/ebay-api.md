@@ -46,6 +46,27 @@ Le refresh_token de ton compte vendeur est rangé **côté serveur** (Supabase),
 jamais dans le navigateur. Il faut donc que `SUPABASE_SERVICE_KEY` soit posée
 dans Vercel (elle sert déjà aux emails). Si elle y est déjà, rien à faire.
 
+## 3 bis. Conformité eBay (« Non Compliant » → « Compliant »)
+
+eBay bloque la Production tant que l'app est **Non Compliant**. Il faut fournir un
+**endpoint de notification de suppression de compte** (déjà construit :
+`api/ebay-deletion.js`). Étapes :
+
+1. Dans Vercel, ajoute 2 variables (type Secret, Production) :
+   - `EBAY_VERIF_TOKEN` = le token fourni par Claude (32–80 caractères)
+   - `EBAY_DELETION_URL` = `https://vrm.center/api/ebay-deletion`
+   puis **Redeploy**.
+2. Dans le portail eBay (page *Alerts & Notifications* / *Marketplace account
+   deletion*), renseigne :
+   - **Notification endpoint URL** : `https://vrm.center/api/ebay-deletion`
+   - **Verification token** : le même que `EBAY_VERIF_TOKEN`
+   - clique **Save** → eBay appelle l'endpoint, vérifie le hash, et passe l'app
+     en **Compliant**.
+3. Accepte aussi tout **accord/agreement** qu'eBay demande sur la page de
+   conformité (API License Agreement, etc.).
+
+Une fois « Compliant », le formulaire du **RuName** (étape 2) se débloque.
+
 ## 4. Ton compte eBay doit être validé
 
 Ton compte vendeur était **en vérification**. Tant qu'eBay ne l'a pas validé, la
