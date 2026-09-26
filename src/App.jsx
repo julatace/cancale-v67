@@ -26594,6 +26594,16 @@ export default function App() {
         const r=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_lbc_posted&select=data`,{headers:sbAuth()});
         if(r.ok){ const rows=await r.json(); const posted=(rows&&rows[0]&&rows[0].data&&rows[0].data.ids)||[]; lbcRemoveCount=posted.filter(x=>/^\d+$/.test(String(x))&&!lbcOnlineIds.has(String(x))).length; }
       }catch(_){}
+      // eBay : ventes PAYÉES pas encore expédiées — le MÊME to-do qu'un colis
+      // Vinted (« tout centralisé dans VRM », §11). Lu sur les commandes captées
+      // (scope fulfillment, déjà accordé — aucune reconnexion). Une lecture
+      // ratée/vide ⇒ 0, jamais un colis inventé (§5).
+      let ebayShipCount=0;
+      try{
+        const r=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.ebay_orders&select=data`,{headers:sbAuth()});
+        if(r.ok){ const rows=await r.json(); const ords=(rows&&rows[0]&&rows[0].data&&rows[0].data.orders)||[];
+          ebayShipCount=ords.filter(o=>String((o&&o.orderPaymentStatus)||'').toUpperCase()==='PAID' && String((o&&o.orderFulfillmentStatus)||'').toUpperCase()!=='FULFILLED').length; }
+      }catch(_){}
       if(cancelled) return;
       // ── Centre de notifications : ce qui demande une action, ici et maintenant.
       const items=[];
@@ -26632,6 +26642,7 @@ export default function App() {
         }
       }
       if(toShipCount>0)  items.push({icon:'⏰', ic:'truck', text:`${toShipCount} vente${toShipCount>1?'s':''} à expédier`, n:toShipCount, tab:'cat_bord'});
+      if(ebayShipCount>0) items.push({icon:'📮', ic:'truck', text:`${ebayShipCount} vente${ebayShipCount>1?'s':''} eBay à expédier`, n:ebayShipCount, tab:'plat_ebay'});
       if(lbcRemoveCount>0) items.push({icon:'🟠', ic:'tag', text:`${lbcRemoveCount} à retirer de Leboncoin (vendue${lbcRemoveCount>1?'s':''} sur Vinted)`, n:lbcRemoveCount, tab:'leboncoin'});
       if(unreadTotal>0){
         // ⚠️ SEPT COMPTES ÉNUMÉRÉS, ÇA FAISAIT DEUX LIGNES qui noyaient l'action
