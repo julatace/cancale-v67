@@ -96,6 +96,14 @@ let ko = 0; const dit = (c,m,d)=>{ if(!c)ko++; console.log((c?'✅ ':'❌ ')+m+(
   dit(champ.val === '44', 'la pointure de la paire est sélectionnée dans la liste eBay (44)', 'val=' + champ.val);
   const plusBtn = await pg.$('text=/Plus de caractéristiques/');
   dit(!!plusBtn, 'les caractéristiques FACULTATIVES sont sous un dépliant (comme eBay)');
+  // Plus intelligent : la MARQUE se remplit toute seule depuis le titre, en
+  // visant une valeur AUTORISÉE par eBay (Nike), jamais devinée.
+  const marque = await pg.evaluate(()=>{ const labs=[...document.querySelectorAll('label')]; const l=labs.find(x=>/marque/i.test(x.textContent)); if(!l)return ''; const s=l.parentElement&&l.parentElement.querySelector('select'); return s?s.value:''; });
+  dit(marque === 'Nike', 'la marque se pré-remplit depuis le titre (valeur eBay « Nike »)', 'marque=' + marque);
+  // Département (Homme/Femme/Enfant) n'apparaît pas dans le titre → laissé VIDE.
+  const dep = await pg.evaluate(()=>{ const labs=[...document.querySelectorAll('label')]; const l=labs.find(x=>/département/i.test(x.textContent)); if(!l)return 'x'; const s=l.parentElement&&l.parentElement.querySelector('select'); return s?s.value:'x'; });
+  dit(dep === '', 'ce qui ne se prouve pas reste VIDE (Département, mieux vaut un blanc qu\'un faux)', 'dep=' + dep);
+  dit(/requis/i.test(await T()), 'un compteur dit combien de champs obligatoires restent');
 
   // Mode de livraison : un vrai sélecteur (comme sur eBay)
   const shipOpts = await pg.evaluate(()=>{ const sels=[...document.querySelectorAll('select')]; for(const s of sels){ const t=[...s.options].map(o=>o.textContent).join('|'); if(/Mondial Relay|Colissimo/i.test(t)) return t; } return ''; });

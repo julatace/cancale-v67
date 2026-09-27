@@ -6494,6 +6494,35 @@ const EBAY_SHIPPING = [
   ['FR_Chronopost', 'Chronopost'],
   ['FR_LaPosteLettreSuivie', 'Lettre suivie'],
 ];
+// Remplit les caractéristiques eBay à partir de la paire — SANS JAMAIS DEVINER
+// (§5). On ne pose qu'une valeur AUTORISÉE par eBay (a.valeurs) : la pointure
+// exacte, la marque exacte, ou une valeur qui apparaît SANS AMBIGUÏTÉ (une
+// seule) comme mot du titre. Zéro ou plusieurs correspondances ⇒ on laisse
+// vide (« mieux vaut un blanc qu'un faux »). Un attribut en texte libre n'est
+// jamais rempli automatiquement (on ne connaît pas ses valeurs valides).
+function autoRemplirAttributs(attributs, { titre, marque, taille }) {
+  const out = {};
+  const hay = ' ' + String(titre || '').toLowerCase() + ' ';
+  const echap = (s) => String(s).toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  for (const a of attributs || []) {
+    if (!a || !Array.isArray(a.valeurs) || !a.valeurs.length) continue;   // texte libre : jamais deviné
+    const nl = String(a.nom || '').toLowerCase();
+    if (/pointure|taille|size/.test(nl) && taille) {
+      const t = String(taille).replace(',', '.');
+      const m = a.valeurs.find(v => String(v).replace(',', '.') === t);
+      if (m) { out[a.nom] = m; continue; }
+    }
+    if (/marque|brand/.test(nl) && marque) {
+      const m = a.valeurs.find(v => String(v).toLowerCase() === String(marque).toLowerCase());
+      if (m) { out[a.nom] = m; continue; }
+    }
+    // Générique : une valeur eBay (≥ 3 lettres) présente comme MOT du titre, et
+    // une seule — sinon on ne tranche pas.
+    const hits = a.valeurs.filter(v => { const w = echap(v); return String(v).length >= 3 && new RegExp('(^|[^a-z0-9])' + w + '([^a-z0-9]|$)').test(hay); });
+    if (hits.length === 1) out[a.nom] = hits[0];
+  }
+  return out;
+}
 function EbayPublier({ onPublie, paires = [] }) {
   const [ouvert, setOuvert] = React.useState(false);
   const [titre, setTitre] = React.useState('');
@@ -6574,17 +6603,14 @@ function EbayPublier({ onPublie, paires = [] }) {
           : (j.attributsObligatoires || []).map(n => ({ nom: n, requis: true, mode: 'FREE_TEXT', valeurs: [] }));
         const required = attributs.filter(a => a.requis).map(a => a.nom);
         setCat({ categoryId: j.categorie.suggeree.categoryId, categoryName: j.categorie.suggeree.categoryName, required, attributs });
-        // La pointure de la paire choisie remplit l'attribut taille d'eBay
-        // (mesure connue, pas une devinette) — en visant une valeur autorisée
-        // par eBay quand la liste existe ; les autres restent à choisir.
-        if (pairSel && pairSel.taille) {
-          const ch = attributs.find(a => /pointure|taille|size/i.test(a.nom));
-          if (ch) {
-            const brut = String(pairSel.taille).replace(',', '.');
-            const val = (ch.valeurs && ch.valeurs.length) ? (ch.valeurs.find(v => String(v).replace(',', '.') === brut) || '') : brut;
-            if (val) setAsp(a => (a[ch.nom] ? a : { ...a, [ch.nom]: val }));
-          }
-        }
+        // On pré-remplit ce qu'on peut PROUVER, jamais deviner (§5) : chaque
+        // valeur posée est une valeur AUTORISÉE par eBay qui correspond
+        // exactement à la paire (pointure, marque) ou apparaît SANS AMBIGUÏTÉ
+        // dans le titre. Un doute ⇒ champ vide. Les valeurs saisies à la main
+        // ne sont jamais écrasées.
+        const src = pairSel ? pairSel.title : titre;
+        const auto = autoRemplirAttributs(attributs, { titre: src, marque: extractBrand(src) || '', taille: (pairSel && pairSel.taille) || extractSize(src) || '' });
+        if (Object.keys(auto).length) setAsp(a => ({ ...auto, ...a }));
       } else setRes({ err: (j && j.error) || 'eBay n\'a pas suggéré de catégorie pour ce titre.' });
     } catch (_) { setRes({ err: 'Analyse impossible (réseau).' }); }
     setAnalyse(false);
@@ -6761,8 +6787,8 @@ function EbayPublier({ onPublie, paires = [] }) {
                 valeurs viennent d'eBay (get_item_aspects_for_category) — listes
                 déroulantes quand eBay en fournit, comme sur son site. Les
                 obligatoires (✳) d'abord ; les facultatives sous un dépliant. */}
-            <Bloc n="3" titre="Caractéristiques">
-              <div style={{ fontSize: 11.5, color: C.muted, marginBottom: 10, lineHeight: 1.45 }}>Ces champs viennent d'eBay pour « {cat.categoryName} » — les mêmes que sur son site. ✳ = obligatoire.</div>
+            <Bloc n="3" titre="Caractéristiques" right={(() => { const reste = (cat.required || []).filter(n => !String(asp[n] || '').trim()).length; return <span style={{ fontSize: 11, fontWeight: 700, color: reste ? C.warn : C.accent }}>{reste ? `${reste} requis` : '✓ complet'}</span>; })()}>
+              <div style={{ fontSize: 11.5, color: C.muted, marginBottom: 10, lineHeight: 1.45 }}>Ces champs viennent d'eBay pour « {cat.categoryName} » — les mêmes que sur son site. ✳ = obligatoire. VRM a pré-rempli ce qu'il pouvait prouver ; complète le reste.</div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(148px,1fr))', gap: 10 }}>
                 <div><label style={lab}>État</label><select value={cond} onChange={e => { setCond(e.target.value); setCheck(null); }} style={inp}>{EBAY_CONDITIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></div>
                 {(cat.attributs || []).filter(a => a.requis).map(a => (
