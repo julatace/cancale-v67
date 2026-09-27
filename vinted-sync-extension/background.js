@@ -1546,8 +1546,14 @@ const estPorteMonnaie = (p) => !!(p && typeof p === 'object' && MONTANTS_PM.some
 // fait à chaque visite. Le relevé a donc sa PROPRE ligne, une par mois.
 const RELEVE_MAX_PAR_VISITE = 2;
 const RELEVE_RETRY_MS = 24 * 60 * 60 * 1000;
-const PHOTOS_MAX_PAR_VISITE = 3;
-const PHOTOS_RETRY_MS = 24 * 60 * 60 * 1000;
+// ⚠️ DÉBIT DES PHOTOS (Julien : « augmente le débit… les 12 photos doivent
+// transiter »). Chaque annonce est captée en UN appel API qui rend TOUTES ses
+// photos (jusqu'à 20) — la seule limite est le nombre d'annonces rattrapées par
+// visite. Monté 3 → 8 pour remplir le catalogue plus vite. Le vrai garde-fou
+// anti-blocage reste le plafond de 20 actions/h par compte (`garde`), une requête
+// à la fois : monter ce nombre front-charge le rattrapage sans jamais le dépasser.
+const PHOTOS_MAX_PAR_VISITE = 8;
+const PHOTOS_RETRY_MS = 6 * 60 * 60 * 1000;
 
 // Un mouvement, réduit à ce qui l'identifie et le date. On ne garde pas le
 // libellé complet ni les champs de présentation : ces lignes repartent à chaque

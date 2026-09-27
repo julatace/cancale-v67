@@ -137,13 +137,16 @@ const photosRangees = (j) => { let out = {}; for (const e of j.ecrits) { const l
     dit(n >= 1, 'elle rapporte ce qu\'elle a fait', 'n=' + n);
   });
 
-  // ══ 2. BORNÉ : 3 PAR VISITE (le garde-fou §3, sur NOS lectures Vinted) ══════
-  await essaie('bornée à 3 lectures Vinted par visite', async () => {
-    const many = Array.from({ length: 8 }, (_, i) => ({ id: 900 + i, nPhotos: 5, is_closed: false, is_hidden: false }));
+  // ══ 2. BORNÉ PAR VISITE (le garde-fou §3, sur NOS lectures Vinted) ══════════
+  // Le plafond suit la constante du code (PHOTOS_MAX_PAR_VISITE) — un audit
+  // suit la RÈGLE, pas un nombre recopié (§6.5).
+  const CAP = Number((/PHOTOS_MAX_PAR_VISITE\s*=\s*(\d+)/.exec(SRC) || [])[1] || 0);
+  await essaie(`bornée à ${CAP} lectures Vinted par visite`, async () => {
+    const many = Array.from({ length: CAP + 4 }, (_, i) => ({ id: 900 + i, nPhotos: 5, is_closed: false, is_hidden: false }));
     const ctx = faireCtx({ items: many });
     await ctx.capterPhotosAnnonces(UID);
     const vus = idsVus(ctx.__journal);
-    dit(vus.length <= 3, 'au plus 3 annonces lues, même quand 8 en ont besoin', vus.length + ' lues');
+    dit(CAP > 0 && vus.length === CAP, `au plus ${CAP} annonces lues quand ${CAP + 4} en ont besoin (le plafond mord)`, vus.length + ' lues');
   });
 
   // ══ 3. COMPTE CONNECTÉ : garde refuse ⇒ RIEN ne part chez Vinted ═══════════
