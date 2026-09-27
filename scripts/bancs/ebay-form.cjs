@@ -12,18 +12,28 @@ const srv = http.createServer((q,r)=>{ let f=q.url.split('?')[0]; if(f==='/'||!p
 srv.listen(4331);
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEklEQVR4nGNk+M+ADzCOKgAAV7wDA8mm/lgAAAAASUVORK5CYII=','base64');
 // La paire à vendre : sa fiche numéro (localStorage) + ses photos captées (base).
-const NUMS = { '111': { numero:'401', title:'Nike Air Max 1 Aquatone Bleu Taille 44', photo:'https://img.example/cover.jpg', numberedAt: Date.now() } };
+// Deux paires numérotées : la 401 est EN LIGNE, la 402 est VENDUE (annonce
+// fermée). Le sélecteur ne doit proposer QUE la 401 (plainte de Julien).
+const NUMS = {
+  '111': { numero:'401', title:'Nike Air Max 1 Aquatone Bleu Taille 44', photo:'https://img.example/cover.jpg', numberedAt: Date.now() },
+  '222': { numero:'402', title:'Adidas Samba OG Blanc Taille 43', photo:'https://img.example/covb.jpg', numberedAt: Date.now() },
+};
 const DETAILS = { '111': { description:'Basket Nike', photos:['https://img.example/1.jpg','https://img.example/2.jpg','https://img.example/3.jpg'] } };
+const ACCOUNTS = [{ vinted_user_id:'u1', login:'moi' }];
+// Annonces captées : 111 active (is_closed=false), 222 fermée (vendue).
+const LISTINGS = { data:{ payload:{ items:[ { id:'111', is_closed:false }, { id:'222', is_closed:true } ] } } };
 let ko = 0; const dit = (c,m,d)=>{ if(!c)ko++; console.log((c?'✅ ':'❌ ')+m+(d?' — '+d:'')); };
 (async()=>{
   const b = await chromium.launch({ executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args:['--use-angle=swiftshader','--no-sandbox'] });
   const pg = await b.newPage({ viewport:{ width:390, height:1500 } });
   const errs=[]; pg.on('pageerror',e=>errs.push(e.message));
-  await pg.addInitScript(([nums]) => { try{ localStorage.setItem('vrm_acces_direct','1'); localStorage.setItem('vinted_annonce_numeros', JSON.stringify(nums)); localStorage.setItem('vinted_nums_physiques', JSON.stringify(['401'])); }catch(_){}}, [NUMS]);
+  await pg.addInitScript(([nums]) => { try{ localStorage.setItem('vrm_acces_direct','1'); localStorage.setItem('vinted_annonce_numeros', JSON.stringify(nums)); localStorage.setItem('vinted_nums_physiques', JSON.stringify(['401','402'])); }catch(_){}}, [NUMS]);
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r)=>{ const t=r.request().resourceType(); if(t==='image') return r.fulfill({status:200,contentType:'image/png',body:PNG}); if(t==='media'||t==='font') return r.abort(); return r.continue(); });
   await pg.route('**/rest/v1/**', route=>{ const u=route.request().url(); const j=d=>route.fulfill({status:200,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:JSON.stringify(d)});
     if(/select=owner/.test(u)) return route.fulfill({status:400,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:'{"m":1}'});
+    if(/\/vinted_accounts/.test(u)) return j(ACCOUNTS);
     if(/id=eq\.vinted_item_details/.test(u)) return j([{ data: DETAILS }]);
+    if(/id=eq\.harvest_u1_listings/.test(u)) return j([LISTINGS]);
     return j([]); });
   await pg.route('**/api/**', r2=>r2.fulfill({status:200,contentType:'application/json',body:'{"ok":true}'}));
   // IA de rédaction (api/ai) : disponible, et renvoie un titre optimisé.
@@ -65,9 +75,23 @@ let ko = 0; const dit = (c,m,d)=>{ if(!c)ko++; console.log((c?'✅ ':'❌ ')+m+(
   const linkInput = await pg.$('input[placeholder*="Colle le lien"]');
   dit(!linkInput, 'aucun champ « colle un lien de photo » (photos automatiques)');
 
+  // ⚠️ LE CLAVIER NE DOIT PLUS SE FERMER À CHAQUE LETTRE. Cause : un composant
+  // défini dans le rendu → remonté à chaque frappe → focus perdu. On tape une
+  // lettre et on vérifie que le champ garde le focus (sur iPhone = clavier ouvert).
+  await pg.focus('input[placeholder^="Nike Air Max"]');
+  await pg.keyboard.type('Z');
+  const focusGarde = await pg.evaluate(()=>{ const el=document.activeElement; return !!(el && el.tagName==='INPUT' && /Nike Air Max/.test(el.getAttribute('placeholder')||'')); });
+  dit(focusGarde, 'taper dans le titre GARDE le focus (le clavier ne se ferme plus)');
+  // ⚠️ Pas de zoom iOS : les champs sont à ≥ 16px.
+  const petits = await pg.evaluate(()=>{ const els=[...document.querySelectorAll('main input, main select, main textarea')]; return els.filter(e=>{ const fs=parseFloat(getComputedStyle(e).fontSize); return fs && fs < 16; }).length; });
+  dit(petits === 0, 'les champs font ≥ 16px (pas de zoom iOS au focus)', 'sous 16px=' + petits);
+
   // Choisir la paire N°401 → titre + photos auto
   const pairBtn = await pg.$('text=N°401');
-  dit(!!pairBtn, 'la paire numérotée apparaît dans le sélecteur (N°401)');
+  dit(!!pairBtn, 'la paire EN LIGNE apparaît dans le sélecteur (N°401)');
+  // ⚠️ La paire VENDUE (402, annonce fermée) ne doit PAS être proposée.
+  const venduBtn = await pg.$('text=N°402');
+  dit(!venduBtn, 'une paire déjà VENDUE (annonce fermée) n\'est PAS proposée');
   if (pairBtn) await pairBtn.click();
   await pg.waitForTimeout(400);
   const titleVal = await pg.$eval('input[placeholder^="Nike Air Max"]', el=>el.value).catch(()=>'');

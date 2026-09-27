@@ -6494,6 +6494,22 @@ const EBAY_SHIPPING = [
   ['FR_Chronopost', 'Chronopost'],
   ['FR_LaPosteLettreSuivie', 'Lettre suivie'],
 ];
+// ⚠️ DÉFINI AU NIVEAU MODULE, PAS DANS EbayPublier. Un composant défini dans le
+// rendu prend une NOUVELLE identité à chaque frappe → React démonte/remonte tout
+// son sous-arbre → le champ perd le focus → sur iPhone le clavier se referme et
+// la page saute à chaque lettre. Mesuré chez Julien. Ici l'identité est stable.
+function BlocEbay({ n, titre: t, right, children }) {
+  return (
+    <div style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: 14, boxShadow: C.shadow }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+        <span style={{ flexShrink: 0, width: 22, height: 22, borderRadius: 11, background: `${C.accent}18`, color: C.accent, fontSize: 12, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{n}</span>
+        <span style={{ flex: 1, fontSize: 13.5, fontWeight: 700, color: C.text }}>{t}</span>
+        {right}
+      </div>
+      {children}
+    </div>
+  );
+}
 // Remplit les caractéristiques eBay à partir de la paire — SANS JAMAIS DEVINER
 // (§5). On ne pose qu'une valeur AUTORISÉE par eBay (a.valeurs) : la pointure
 // exacte, la marque exacte, ou une valeur qui apparaît SANS AMBIGUÏTÉ (une
@@ -6655,19 +6671,11 @@ function EbayPublier({ onPublie, paires = [] }) {
     setBusy(false);
   };
   const lab = { fontSize: 11, color: C.muted, display: 'block', marginBottom: 5, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600 };
-  const inp = { width: '100%', boxSizing: 'border-box', border: `1px solid ${C.border}`, background: C.bg || C.card, color: C.text, borderRadius: 10, padding: '11px 12px', fontSize: 14, fontFamily: 'inherit', outline: 'none' };
+  // ⚠️ fontSize 16 MINIMUM : en dessous, iOS Safari ZOOME automatiquement dès
+  // qu'on touche un champ (plainte de Julien « ça zoome »). 16px = pas de zoom.
+  const inp = { width: '100%', boxSizing: 'border-box', border: `1px solid ${C.border}`, background: C.bg || C.card, color: C.text, borderRadius: 10, padding: '11px 12px', fontSize: 16, fontFamily: 'inherit', outline: 'none' };
   // Un « bloc » = une section de l'annonce, comme les étapes du formulaire eBay :
   // eyebrow numéroté + carte. §7 : une seule teinte d'accent, rayons 10/12.
-  const Bloc = ({ n, titre: t, right, children }) => (
-    <div style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: 14, boxShadow: C.shadow }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-        <span style={{ flexShrink: 0, width: 22, height: 22, borderRadius: 11, background: `${C.accent}18`, color: C.accent, fontSize: 12, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{n}</span>
-        <span style={{ flex: 1, fontSize: 13.5, fontWeight: 700, color: C.text }}>{t}</span>
-        {right}
-      </div>
-      {children}
-    </div>
-  );
   const urls = photos.split(/\s+/).map(s => s.trim()).filter(s => /^https?:\/\//.test(s));
   const setUrls = (arr) => { setPhotos(arr.join('\n')); setCheck(null); };
   const reset = () => { setOuvert(false); setRes(null); setCheck(null); setTitre(''); setPrix(''); setCat(null); setAsp({}); setPhotos(''); setDesc(''); setPairId(null); };
@@ -6721,7 +6729,7 @@ function EbayPublier({ onPublie, paires = [] }) {
 
           {/* 1 — LA PAIRE : on CHOISIT une paire (comme sur eBay on choisit son
               objet), ses photos partent toutes seules — plus aucun lien à coller. */}
-          <Bloc n="1" titre="La paire à vendre" right={pairSel ? <button type="button" onClick={() => setPickerOpen(true)} style={{ border: 'none', background: 'transparent', color: C.accent, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Changer</button> : null}>
+          <BlocEbay n="1" titre="La paire à vendre" right={pairSel ? <button type="button" onClick={() => setPickerOpen(true)} style={{ border: 'none', background: 'transparent', color: C.accent, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Changer</button> : null}>
             {(!pairSel || pickerOpen) ? (
               paires.length === 0 ? (
                 <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.5 }}>Aucune paire numérotée n'est encore chargée sur cet appareil. Ouvre l'écran <b>Annonces</b> une fois (sur l'ordinateur où l'extension tourne) : tes paires — avec leurs photos — apparaîtront ici.</div>
@@ -6762,10 +6770,10 @@ function EbayPublier({ onPublie, paires = [] }) {
               )}
               <div style={{ fontSize: 11, color: C.muted, marginTop: 8, lineHeight: 1.45 }}>Ces photos viennent de ton annonce Vinted. La 1ʳᵉ sert de couverture ; tu peux en retirer.</div>
             </>)}
-          </Bloc>
+          </BlocEbay>
 
           {/* 2 — TITRE & CATÉGORIE */}
-          <Bloc n="2" titre="Titre & catégorie" right={<span style={{ fontSize: 11, color: titre.length > 75 ? C.warn : C.muted }}>{titre.length}/80</span>}>
+          <BlocEbay n="2" titre="Titre & catégorie" right={<span style={{ fontSize: 11, color: titre.length > 75 ? C.warn : C.muted }}>{titre.length}/80</span>}>
             <input value={titre} maxLength={80} onChange={e => { setTitre(e.target.value); setCat(null); setCheck(null); }} placeholder="Nike Air Max 1 Aquatone Bleu Taille 44" style={inp} />
             {/* Rédaction IA : optimise le titre à partir des VRAIES infos de la
                 paire (jamais d'invention, api/ai). Affiché seulement si l'IA est
@@ -6797,14 +6805,14 @@ function EbayPublier({ onPublie, paires = [] }) {
                 )}
               </>)}
             </div>
-          </Bloc>
+          </BlocEbay>
 
           {cat && (<>
             {/* 3 — CARACTÉRISTIQUES : la MÊME interface qu'eBay. Chaque champ et ses
                 valeurs viennent d'eBay (get_item_aspects_for_category) — listes
                 déroulantes quand eBay en fournit, comme sur son site. Les
                 obligatoires (✳) d'abord ; les facultatives sous un dépliant. */}
-            <Bloc n="3" titre="Caractéristiques" right={(() => { const reste = (cat.required || []).filter(n => !String(asp[n] || '').trim()).length; return <span style={{ fontSize: 11, fontWeight: 700, color: reste ? C.warn : C.accent }}>{reste ? `${reste} requis` : '✓ complet'}</span>; })()}>
+            <BlocEbay n="3" titre="Caractéristiques" right={(() => { const reste = (cat.required || []).filter(n => !String(asp[n] || '').trim()).length; return <span style={{ fontSize: 11, fontWeight: 700, color: reste ? C.warn : C.accent }}>{reste ? `${reste} requis` : '✓ complet'}</span>; })()}>
               <div style={{ fontSize: 11.5, color: C.muted, marginBottom: 10, lineHeight: 1.45 }}>Ces champs viennent d'eBay pour « {cat.categoryName} » — les mêmes que sur son site. ✳ = obligatoire. VRM a pré-rempli ce qu'il pouvait prouver ; complète le reste.</div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(148px,1fr))', gap: 10 }}>
                 <div><label style={lab}>État</label><select value={cond} onChange={e => { setCond(e.target.value); setCheck(null); }} style={inp}>{EBAY_CONDITIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></div>
@@ -6824,24 +6832,24 @@ function EbayPublier({ onPublie, paires = [] }) {
                   )}
                 </>);
               })()}
-            </Bloc>
+            </BlocEbay>
 
             {/* 4 — PRIX & LIVRAISON : on CHOISIT le mode de livraison (comme sur
                 eBay), pas juste un montant. Le jeton part à eBay ; « Vérifier »
                 confirme qu'il est accepté avant toute publication. */}
-            <Bloc n="4" titre="Prix & livraison">
+            <BlocEbay n="4" titre="Prix & livraison">
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(148px,1fr))', gap: 10 }}>
                 <div><label style={lab}>Prix (€)</label><input value={prix} onChange={e => { setPrix(e.target.value); setCheck(null); }} inputMode="decimal" placeholder="ex. 74" style={inp} /></div>
                 <div><label style={lab}>Quantité</label><input value={qty} onChange={e => setQty(e.target.value)} inputMode="numeric" style={inp} /></div>
                 <div style={{ gridColumn: '1 / -1' }}><label style={lab}>Mode de livraison</label><select value={ship} onChange={e => { setShip(e.target.value); setCheck(null); }} style={inp}>{EBAY_SHIPPING.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></div>
                 <div><label style={lab}>Frais de port (€)</label><input value={port} onChange={e => { setPort(e.target.value); setCheck(null); }} inputMode="decimal" placeholder="0 = gratuit" style={inp} /></div>
               </div>
-            </Bloc>
+            </BlocEbay>
 
             {/* 5 — DESCRIPTION */}
-            <Bloc n="5" titre="Description">
+            <BlocEbay n="5" titre="Description">
               <textarea value={desc} onChange={e => setDesc(e.target.value)} rows={4} placeholder="État, particularités, authenticité… (le titre est repris si tu laisses vide)" style={{ ...inp, resize: 'vertical', lineHeight: 1.5 }} />
-            </Bloc>
+            </BlocEbay>
 
             {/* Vérif à blanc : eBay contrôle tout et donne les frais, sans rien créer. */}
             {check && check.ok && <div style={{ fontSize: 12.5, color: C.text, background: `${C.accent}10`, border: `1px solid ${C.accent}`, borderRadius: 10, padding: '10px 12px', lineHeight: 1.5 }}>✓ <b>eBay accepterait cette annonce.</b>{check.fees != null ? ` Frais eBay estimés : ${eur(check.fees)}.` : ''} Tu peux publier.</div>}
@@ -6919,7 +6927,7 @@ function EbayLigne({ it, onSaved }) {
 //     (c'est LUI qui autorise ; aucun mot de passe ne passe par VRM) ;
 //   • relié ✓ (la publication viendra après mesure des catégories eBay).
 // Au retour d'eBay (?ebay=…), on affiche le résultat et on nettoie l'URL.
-function EbayConnexion() {
+function EbayConnexion({ comptes = [] }) {
   const [st, setSt] = React.useState(null);          // {ready, canConsent} | null = en cours
   const [connected, setConnected] = React.useState(undefined); // true/false/null(pas su)/undefined(en cours)
   const [busy, setBusy] = React.useState(false);
@@ -6965,11 +6973,25 @@ function EbayConnexion() {
   // numéro (id → n°, titre, photo de couverture) jointe aux photos captées de la
   // page (`vinted_item_details[id].photos`). On publie EN CHOISISSANT une paire,
   // ses photos viennent toutes seules — plus aucun lien à coller.
-  React.useEffect(() => { (async () => {
+  React.useEffect(() => { let stop = false; (async () => {
     try {
       const fiches = load('vinted_annonce_numeros', {}) || {};
       const phys = load('vinted_nums_physiques', null);
       const presents = Array.isArray(phys) && phys.length ? new Set(phys.map(String)) : null;
+      // ⚠️ NE PROPOSER QUE LES PAIRES EN LIGNE (plainte de Julien : « il y a des
+      // paires déjà vendues »). On lit les annonces de chaque compte et on garde
+      // les id dont l'annonce Vinted est ACTIVE (is_closed=false). Aucune annonce
+      // lisible (réseau, pas de compte) ⇒ `online` reste `null` : on ne filtre
+      // pas plutôt que de tout cacher (« rien lu » ≠ « rien »).
+      let online = null;
+      if (Array.isArray(comptes) && comptes.length) {
+        const s = new Set(); let okAny = false;
+        for (const a of comptes) {
+          const L = await fetchHarvest(a.vinted_user_id, 'listings');
+          if (L && Array.isArray(L.items)) { okAny = true; for (const it of L.items) if (isOnlineListing(it)) s.add(String(it.id)); }
+        }
+        if (okAny) online = s;
+      }
       let details = {};
       try {
         const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_item_details&select=data`, { headers: sbAuth() });
@@ -6980,7 +7002,8 @@ function EbayConnexion() {
       for (const id in fiches) {
         const f = fiches[id] || {}; const n = f.numero != null ? String(f.numero).trim() : '';
         if (!n || vus.has(n)) continue;
-        if (presents && !presents.has(n)) continue;           // en stock seulement, si on le sait
+        if (online && !online.has(String(id))) continue;      // en ligne seulement (vendue/retirée écartée)
+        if (!online && presents && !presents.has(n)) continue; // à défaut : au moins « en stock » si on le sait
         vus.add(n);
         const cover = f.photo || null;
         const dphotos = Array.isArray(details[id] && details[id].photos) ? details[id].photos.map(norm).filter(Boolean) : [];
@@ -6988,9 +7011,9 @@ function EbayConnexion() {
         out.push({ id: String(id), num: n, title: f.title || '', taille: extractSize(f.title || '') || '', cover, photos });
       }
       out.sort((a, b) => (parseInt(b.num, 10) || 0) - (parseInt(a.num, 10) || 0));
-      setPaires(out);
-    } catch (_) { setPaires([]); }
-  })(); }, []);
+      if (!stop) setPaires(out);
+    } catch (_) { if (!stop) setPaires([]); }
+  })(); return () => { stop = true; }; }, [comptes]);
   // Solde à virer (getSellerFundsSummary). Lecture seule, une fois à l'ouverture.
   const lireSolde = React.useCallback(async () => {
     try {
@@ -7161,7 +7184,7 @@ function EbayConnexion() {
   );
 }
 
-function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, ebayCa = null, onGo, onSub, baseKO }) {
+function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, ebayCa = null, comptes = [], onGo, onSub, baseKO }) {
   const p = caParPlateforme(liveStats, lbcVentes, ebayCa).find(x => x.nom === plat) || { nom:plat, ca:null };
   // Les cartes du hub ouvrent une SECTION dans l'onglet (onSub) si l'appelant le
   // permet ; sinon (compat) elles naviguent vers l'écran séparé (onGo).
@@ -7243,7 +7266,7 @@ function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, ebay
           <div className="vrm-display" style={{fontSize:30,fontWeight:700,color:p.ca!=null?C.text:C.muted}}>{p.ca!=null?fmt(p.ca):'—'}</div>
           <div style={{fontSize:11.5,color:C.muted,marginTop:2}}>{p.ca!=null?'ventes prouvées captées':'pas encore de vente captée'}</div>
         </Card>
-        {plat==='eBay' && <EbayConnexion/>}
+        {plat==='eBay' && <EbayConnexion comptes={comptes}/>}
         {plat==='Leboncoin' && (
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(150px,1fr))',gap:10}}>
             <button type="button" onClick={()=>aller('apublier','leboncoin')} style={carte}>
@@ -27490,7 +27513,7 @@ export default function App() {
           {platSub==='apercu'&&<Plateforme plat="Leboncoin" liveStats={liveStats} lbcVentes={lbcVentes} onGo={setTab} onSub={setPlatSub} baseKO={baseKO}/>}
           {platSub==='apublier'&&<LeboncoinScreen/>}
         </>)}
-        {tab==='plat_ebay'&&<Plateforme plat="eBay" liveStats={liveStats} lbcVentes={lbcVentes} ebayCa={ebayCa} onGo={setTab} baseKO={baseKO}/>}
+        {tab==='plat_ebay'&&<Plateforme plat="eBay" liveStats={liveStats} lbcVentes={lbcVentes} ebayCa={ebayCa} comptes={vintedAccounts} onGo={setTab} baseKO={baseKO}/>}
         {tab==='plat_vestiaire'&&<Plateforme plat="Vestiaire Collective" liveStats={liveStats} lbcVentes={lbcVentes} onGo={setTab} baseKO={baseKO}/>}
         {tab==='prixmarche'&&<PrixMarche data={pqmData} baseKO={baseKO}/>}
         {tab==='inventory'&&<Inventory inventory={inventory} setInventory={setInventory} accounts={vintedAccounts} garageGrid={garageGrid} labels={accountLabels} onLocate={(numero)=>{ setGarageLocate(String(numero)); setTab('garage'); }}/>}
