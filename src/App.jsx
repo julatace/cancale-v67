@@ -6494,6 +6494,25 @@ const EBAY_SHIPPING = [
   ['FR_Chronopost', 'Chronopost'],
   ['FR_LaPosteLettreSuivie', 'Lettre suivie'],
 ];
+// Titre eBay : comme lbcTitre mais la pointure s'écrit « taille 36 » en toutes
+// lettres (demande de Julien : pas « T36 »). ≤ 80 caractères, coupé sur un mot.
+function ebayTitre(base, taille, max) {
+  const M = max || 80;
+  const t = String(taille || '').replace(/^t(?=\d)/i, '').trim();
+  const estNum = /^\d{1,2}(?:[.,]\d)?$/.test(t);
+  // Taille lettre (M, L…) : lbcTitre suffit (il n'écrit pas « TM »). Pointure
+  // numérique : Julien veut « taille 44 » en toutes lettres, pas « T44 ». Or
+  // lbcTitre rajoute toujours « T44 » même quand on ne lui passe pas de taille
+  // (il la relit dans le titre) : on retire ce « T44 » final et on réécrit.
+  if (!estNum) return lbcTitre('', base, taille, M);
+  const suff = ' taille ' + t;
+  let core = lbcTitre('', base, '', M).replace(/\s+T\d{1,2}(?:[.,]\d)?$/i, '').trim();
+  if ((core + suff).length > M) {
+    const c = core.slice(0, M - suff.length); const e = c.lastIndexOf(' ');
+    core = (e > 12 ? c.slice(0, e) : c).replace(/[\s,;:/-]+$/, '');
+  }
+  return (core + suff).trim();
+}
 // ⚠️ DÉFINI AU NIVEAU MODULE, PAS DANS EbayPublier. Un composant défini dans le
 // rendu prend une NOUVELLE identité à chaque frappe → React démonte/remonte tout
 // son sous-arbre → le champ perd le focus → sur iPhone le clavier se referme et
@@ -6566,14 +6585,29 @@ function EbayPublier({ onPublie, paires = [] }) {
   const pairSel = paires.find(p => p.id === pairId) || null;
   // Un champ de caractéristique rendu comme eBay : liste déroulante quand eBay
   // fournit ses valeurs, texte libre sinon. On ne propose QUE les valeurs d'eBay.
-  const champAttr = (a) => a.valeurs && a.valeurs.length ? (
-    <select value={asp[a.nom] || ''} onChange={e => { setAsp(x => ({ ...x, [a.nom]: e.target.value })); setCheck(null); }} style={inp}>
-      <option value="">— choisir —</option>
-      {a.valeurs.map(v => <option key={v} value={v}>{v}</option>)}
-    </select>
-  ) : (
-    <input value={asp[a.nom] || ''} onChange={e => { setAsp(x => ({ ...x, [a.nom]: e.target.value })); setCheck(null); }} placeholder={/pointure|taille|size/i.test(a.nom) ? 'ex. 44' : /marque|brand/i.test(a.nom) ? 'ex. Nike' : /couleur|color/i.test(a.nom) ? 'ex. Bleu' : ''} style={inp} />
-  );
+  const champAttr = (a) => {
+    const n = (a.valeurs || []).length;
+    // Liste COURTE (≤ 12) → menu déroulant. Liste LONGUE (marques : des
+    // centaines) → champ avec SUGGESTIONS (datalist) : on tape « aut » et « Autry »
+    // apparaît, comme les sites de marques. Les suggestions restent les valeurs
+    // d'eBay ; « Vérifier » refuse ce qui n'en est pas.
+    if (n === 0) return (
+      <input value={asp[a.nom] || ''} onChange={e => { setAsp(x => ({ ...x, [a.nom]: e.target.value })); setCheck(null); }} placeholder={/pointure|taille|size/i.test(a.nom) ? 'ex. 44' : /marque|brand/i.test(a.nom) ? 'ex. Nike' : /couleur|color/i.test(a.nom) ? 'ex. Bleu' : ''} style={inp} />
+    );
+    if (n > 12) {
+      const dlId = 'dl-' + a.nom.replace(/[^a-z0-9]/gi, '');
+      return (<>
+        <input list={dlId} value={asp[a.nom] || ''} onChange={e => { setAsp(x => ({ ...x, [a.nom]: e.target.value })); setCheck(null); }} placeholder="tape pour chercher…" style={inp} />
+        <datalist id={dlId}>{a.valeurs.map(v => <option key={v} value={v} />)}</datalist>
+      </>);
+    }
+    return (
+      <select value={asp[a.nom] || ''} onChange={e => { setAsp(x => ({ ...x, [a.nom]: e.target.value })); setCheck(null); }} style={inp}>
+        <option value="">— choisir —</option>
+        {a.valeurs.map(v => <option key={v} value={v}>{v}</option>)}
+      </select>
+    );
+  };
   // L'IA de rédaction (api/ai) est-elle disponible ? On ne montre le bouton que
   // si oui — jamais un bouton mort (§ « une clé perso reste sur l'appareil »).
   React.useEffect(() => { let stop = false;
@@ -6601,8 +6635,9 @@ function EbayPublier({ onPublie, paires = [] }) {
   // modifiable ; la pointure sera reportée sur l'attribut eBay après l'analyse.
   const choisirPaire = (p) => {
     setPairId(p.id); setPickerOpen(false); setPairQ('');
-    setTitre(lbcTitre('', p.title || '', p.taille || '', 80));
+    setTitre(ebayTitre(p.title || '', p.taille || ''));   // « taille 36 », pas « T36 »
     setPhotos((p.photos || []).join('\n'));
+    setDesc(p.desc || '');                                 // sa description Vinted, reprise automatiquement
     setCat(null); setCheck(null);
   };
   // Applique une réponse pubinfo → catégorie + caractéristiques eBay + pré-
@@ -6768,7 +6803,14 @@ function EbayPublier({ onPublie, paires = [] }) {
               ) : (
                 <div style={{ fontSize: 12, color: C.warn, lineHeight: 1.45 }}>Cette paire n'a pas encore de photo captée. Rouvre son annonce sur Vinted (avec l'extension à jour) puis reviens.</div>
               )}
-              <div style={{ fontSize: 11, color: C.muted, marginTop: 8, lineHeight: 1.45 }}>Ces photos viennent de ton annonce Vinted. La 1ʳᵉ sert de couverture ; tu peux en retirer.</div>
+              {/* ⚠️ HONNÊTE sur le nombre : si Vinted a plus de photos que ce
+                  qu'on a capté (carrousel lazy tant que l'extension à jour n'est
+                  pas passée), on le DIT et on envoie rouvrir l'annonce. */}
+              {pairSel.nPhotos != null && urls.length < pairSel.nPhotos ? (
+                <div style={{ fontSize: 12, color: C.warn, marginTop: 8, lineHeight: 1.45, background: `${C.warn}12`, border: `1px solid ${C.warn}`, borderRadius: 8, padding: '8px 10px' }}>Seulement {urls.length} photo{urls.length > 1 ? 's' : ''} captée{urls.length > 1 ? 's' : ''} sur {pairSel.nPhotos}. Rouvre l'annonce sur Vinted (extension à jour) pour les avoir toutes — elles s'ajouteront ici automatiquement.</div>
+              ) : (
+                <div style={{ fontSize: 11, color: C.muted, marginTop: 8, lineHeight: 1.45 }}>Ces photos viennent de ton annonce Vinted. La 1ʳᵉ sert de couverture ; tu peux en retirer.</div>
+              )}
             </>)}
           </BlocEbay>
 
@@ -6842,8 +6884,18 @@ function EbayPublier({ onPublie, paires = [] }) {
                 <div><label style={lab}>Prix (€)</label><input value={prix} onChange={e => { setPrix(e.target.value); setCheck(null); }} inputMode="decimal" placeholder="ex. 74" style={inp} /></div>
                 <div><label style={lab}>Quantité</label><input value={qty} onChange={e => setQty(e.target.value)} inputMode="numeric" style={inp} /></div>
                 <div style={{ gridColumn: '1 / -1' }}><label style={lab}>Mode de livraison</label><select value={ship} onChange={e => { setShip(e.target.value); setCheck(null); }} style={inp}>{EBAY_SHIPPING.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></div>
-                <div><label style={lab}>Frais de port (€)</label><input value={port} onChange={e => { setPort(e.target.value); setCheck(null); }} inputMode="decimal" placeholder="0 = gratuit" style={inp} /></div>
+                <div><label style={lab}>Frais de port — payés par l'acheteur (€)</label><input value={port} onChange={e => { setPort(e.target.value); setCheck(null); }} inputMode="decimal" placeholder="ex. 5,50" style={inp} /></div>
               </div>
+              {/* ⚠️ Julien : « je ne veux JAMAIS payer les frais de port ». Sur
+                  eBay, le montant saisi ici est facturé À L'ACHETEUR. Le seul cas
+                  où c'est TOI qui paies, c'est 0 (livraison offerte) — on le dit. */}
+              {(() => { const p = Number(String(port || '').replace(',', '.'));
+                return (!port || !p) ? (
+                  <div style={{ fontSize: 12, color: C.warn, marginTop: 8, lineHeight: 1.45, background: `${C.warn}12`, border: `1px solid ${C.warn}`, borderRadius: 8, padding: '8px 10px' }}>⚠️ À 0, la livraison est <b>offerte</b> — c'est <b>toi</b> qui paies. Mets le tarif du transporteur pour que l'<b>acheteur</b> paie.</div>
+                ) : (
+                  <div style={{ fontSize: 11.5, color: C.muted, marginTop: 8, lineHeight: 1.45 }}>✓ L'acheteur paie {p.toFixed(2).replace('.', ',')} € de livraison. Tu ne paies rien.</div>
+                );
+              })()}
             </BlocEbay>
 
             {/* 5 — DESCRIPTION */}
@@ -6983,15 +7035,17 @@ function EbayConnexion({ comptes = [] }) {
       // les id dont l'annonce Vinted est ACTIVE (is_closed=false). Aucune annonce
       // lisible (réseau, pas de compte) ⇒ `online` reste `null` : on ne filtre
       // pas plutôt que de tout cacher (« rien lu » ≠ « rien »).
-      let online = null;
+      let online = null; const nPhotosMap = {};
       if (Array.isArray(comptes) && comptes.length) {
         const s = new Set(); let okAny = false;
         for (const a of comptes) {
           const L = await fetchHarvest(a.vinted_user_id, 'listings');
-          if (L && Array.isArray(L.items)) { okAny = true; for (const it of L.items) if (isOnlineListing(it)) s.add(String(it.id)); }
+          if (L && Array.isArray(L.items)) { okAny = true; for (const it of L.items) { if (isOnlineListing(it)) s.add(String(it.id)); if (Number.isFinite(it.nPhotos)) nPhotosMap[String(it.id)] = it.nPhotos; } }
         }
         if (okAny) online = s;
       }
+      // Le texte marketing de Vinted n'est pas une description (§5.08).
+      const PUB = /une communaut[ée].{0,60}marques|pour chaque achat effectu|thousands of brands|politique de rembours/i;
       let details = {};
       try {
         const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_item_details&select=data`, { headers: sbAuth() });
@@ -7008,7 +7062,9 @@ function EbayConnexion({ comptes = [] }) {
         const cover = f.photo || null;
         const dphotos = Array.isArray(details[id] && details[id].photos) ? details[id].photos.map(norm).filter(Boolean) : [];
         const photos = dphotos.length ? dphotos : (cover ? [cover] : []);
-        out.push({ id: String(id), num: n, title: f.title || '', taille: extractSize(f.title || '') || '', cover, photos });
+        const dsc = String((details[id] && details[id].description) || '').trim();
+        const desc = (dsc && !PUB.test(dsc)) ? dsc : '';   // sa vraie description Vinted, jamais le texte pub
+        out.push({ id: String(id), num: n, title: f.title || '', taille: extractSize(f.title || '') || '', cover, photos, desc, nPhotos: nPhotosMap[String(id)] });
       }
       out.sort((a, b) => (parseInt(b.num, 10) || 0) - (parseInt(a.num, 10) || 0));
       if (!stop) setPaires(out);
