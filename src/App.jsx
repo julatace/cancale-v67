@@ -6498,6 +6498,7 @@ function EbayPublier({ onPublie }) {
   const [res, setRes] = React.useState(null);          // {ok,url}|{err}
   const [check, setCheck] = React.useState(null);      // {ok,fees}|{err} — vérif à blanc eBay
   const [verif, setVerif] = React.useState(false);
+  const [photoInput, setPhotoInput] = React.useState('');  // champ « ajouter une photo »
   const analyser = async () => {
     if (!titre.trim()) { setRes({ err: 'Mets d\'abord un titre.' }); return; }
     setAnalyse(true); setRes(null);
@@ -6545,57 +6546,147 @@ function EbayPublier({ onPublie }) {
     } catch (_) { setRes({ err: 'Publication impossible (réseau).' }); }
     setBusy(false);
   };
-  const lab = { fontSize: 11.5, color: C.muted, display: 'block', marginBottom: 3 };
-  const inp = { width: '100%', boxSizing: 'border-box', border: `1px solid ${C.border}`, background: C.bg || C.card, color: C.text, borderRadius: 8, padding: '9px 10px', fontSize: 13, fontFamily: 'inherit' };
+  const lab = { fontSize: 11, color: C.muted, display: 'block', marginBottom: 5, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600 };
+  const inp = { width: '100%', boxSizing: 'border-box', border: `1px solid ${C.border}`, background: C.bg || C.card, color: C.text, borderRadius: 10, padding: '11px 12px', fontSize: 14, fontFamily: 'inherit', outline: 'none' };
+  // Un « bloc » = une section de l'annonce, comme les étapes du formulaire eBay :
+  // eyebrow numéroté + carte. §7 : une seule teinte d'accent, rayons 10/12.
+  const Bloc = ({ n, titre: t, right, children }) => (
+    <div style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: 14, boxShadow: C.shadow }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+        <span style={{ flexShrink: 0, width: 22, height: 22, borderRadius: 11, background: `${C.accent}18`, color: C.accent, fontSize: 12, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{n}</span>
+        <span style={{ flex: 1, fontSize: 13.5, fontWeight: 700, color: C.text }}>{t}</span>
+        {right}
+      </div>
+      {children}
+    </div>
+  );
+  const urls = photos.split(/\s+/).map(s => s.trim()).filter(s => /^https?:\/\//.test(s));
+  const setUrls = (arr) => { setPhotos(arr.join('\n')); setCheck(null); };
+  const ajouterPhotos = () => {
+    const nouv = photoInput.split(/\s+/).map(s => s.trim()).filter(s => /^https?:\/\//.test(s));
+    if (nouv.length) setUrls([...urls, ...nouv.filter(u => !urls.includes(u))]);
+    setPhotoInput('');
+  };
+  const eur = (n) => (Math.round(n * 100) / 100).toFixed(2).replace('.', ',') + ' €';
+  const condLabel = (EBAY_CONDITIONS.find(([v]) => v === cond) || [, 'Occasion'])[1];
   if (!ouvert) return (
-    <button type="button" onClick={() => setOuvert(true)} style={{ marginTop: 10, border: `1px solid ${C.accent}`, background: `${C.accent}12`, color: C.accent, borderRadius: 10, padding: '10px 14px', fontSize: 13.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>➕ Publier une annonce sur eBay</button>
+    <button type="button" onClick={() => setOuvert(true)} style={{ marginTop: 10, width: '100%', border: `1px solid ${C.accent}`, background: `${C.accent}12`, color: C.accent, borderRadius: 12, padding: '13px 14px', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+      <Icon name="tag" size={17}/> Vendre une paire sur eBay
+    </button>
   );
   return (
-    <div style={{ marginTop: 10, border: `1px solid ${C.accent}`, borderRadius: 10, padding: '13px 14px', background: C.card }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-        <div style={{ flex: 1, fontSize: 14, fontWeight: 700, color: C.text }}>Publier une annonce sur eBay</div>
-        <button type="button" onClick={() => setOuvert(false)} style={{ border: 'none', background: 'transparent', color: C.muted, fontSize: 18, cursor: 'pointer', lineHeight: 1 }}>×</button>
+    <div style={{ marginTop: 10, border: `1px solid ${C.border}`, borderRadius: 14, background: C.bg || C.card, overflow: 'hidden', boxShadow: C.shadow }}>
+      {/* En-tête façon feuille de vente eBay */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px', background: C.card, borderBottom: `1px solid ${C.border}` }}>
+        <span style={{ flexShrink: 0, width: 32, height: 32, borderRadius: 9, background: `${C.accent}15`, color: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="tag" size={17}/></span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 15, fontWeight: 800, color: C.text }}>Vendre sur eBay</div>
+          <div style={{ fontSize: 11.5, color: C.muted }}>Ton annonce, comme sur eBay — vérifiée avant publication</div>
+        </div>
+        <button type="button" onClick={() => setOuvert(false)} aria-label="Fermer" style={{ flexShrink: 0, border: 'none', background: 'transparent', color: C.muted, fontSize: 22, cursor: 'pointer', lineHeight: 1 }}>×</button>
       </div>
+
       {res && res.ok ? (
-        <div style={{ fontSize: 13, color: C.text, lineHeight: 1.6 }}>
-          ✅ <b>Annonce publiée sur eBay !</b> (n° {res.itemId})<br />
-          <a href={res.url} target="_blank" rel="noreferrer" style={{ color: C.accent, fontWeight: 700, textDecoration: 'none' }}>Voir l'annonce ↗</a>
-          <div style={{ marginTop: 10 }}><button type="button" onClick={() => { setOuvert(false); setRes(null); setCheck(null); setTitre(''); setPrix(''); setCat(null); setAsp({}); setPhotos(''); setDesc(''); }} style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 8, padding: '8px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Terminé</button></div>
+        <div style={{ padding: 20, textAlign: 'center' }}>
+          <div style={{ width: 52, height: 52, margin: '0 auto 12px', borderRadius: 26, background: `${C.accent}15`, color: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26 }}>✓</div>
+          <div style={{ fontSize: 16, fontWeight: 800, color: C.text, marginBottom: 4 }}>Annonce publiée sur eBay</div>
+          <div style={{ fontSize: 12.5, color: C.muted, marginBottom: 14 }}>N° {res.itemId}</div>
+          <a href={res.url} target="_blank" rel="noreferrer" style={{ display: 'inline-block', border: 'none', background: C.accent, color: '#fff', borderRadius: 10, padding: '11px 18px', fontSize: 14, fontWeight: 700, textDecoration: 'none' }}>Voir l'annonce sur eBay ↗</a>
+          <div style={{ marginTop: 12 }}><button type="button" onClick={() => { setOuvert(false); setRes(null); setCheck(null); setTitre(''); setPrix(''); setCat(null); setAsp({}); setPhotos(''); setDesc(''); }} style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 10, padding: '9px 16px', fontSize: 13.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Terminé</button></div>
         </div>
       ) : (<>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
-          <div><label style={lab}>Titre (80 car. max)</label><input value={titre} maxLength={80} onChange={e => { setTitre(e.target.value); setCat(null); setCheck(null); }} placeholder="Nike Air Max 1 Aquatone Bleu Taille 44" style={inp} /></div>
-          {!cat ? (
-            <button type="button" onClick={analyser} disabled={analyse} style={{ alignSelf: 'flex-start', border: 'none', background: C.accent, color: '#fff', borderRadius: 8, padding: '10px 14px', fontSize: 13, fontWeight: 600, cursor: analyse ? 'default' : 'pointer', fontFamily: 'inherit', opacity: analyse ? 0.6 : 1 }}>{analyse ? 'eBay analyse…' : '1) Trouver la catégorie eBay'}</button>
-          ) : (<>
-            <div style={{ fontSize: 12, color: C.muted }}>Catégorie eBay : <b style={{ color: C.text }}>{cat.categoryName}</b> <span style={{ opacity: .6 }}>({cat.categoryId})</span></div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 9 }}>
-              <div><label style={lab}>Prix €</label><input value={prix} onChange={e => { setPrix(e.target.value); setCheck(null); }} inputMode="decimal" style={inp} /></div>
-              <div><label style={lab}>Quantité</label><input value={qty} onChange={e => setQty(e.target.value)} inputMode="numeric" style={inp} /></div>
-              <div><label style={lab}>Frais de port €</label><input value={port} onChange={e => setPort(e.target.value)} inputMode="decimal" placeholder="0 = gratuit" style={inp} /></div>
-              <div><label style={lab}>État</label><select value={cond} onChange={e => { setCond(e.target.value); setCheck(null); }} style={inp}>{EBAY_CONDITIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></div>
+        <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+          {/* APERÇU — comme la vignette d'annonce eBay : photo, titre, prix. Ne
+              s'affiche que s'il y a de quoi montrer (pas de cadre vide). */}
+          {(urls.length > 0 || titre.trim()) && (
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center', border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: 10, boxShadow: C.shadow }}>
+              <div style={{ flexShrink: 0, width: 66, height: 66, borderRadius: 10, overflow: 'hidden', background: C.bg, border: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {urls[0] ? <img src={urls[0]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.currentTarget.style.display = 'none'; }} /> : <Icon name="tag" size={20} />}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13.5, fontWeight: 600, color: titre.trim() ? C.text : C.muted, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{titre.trim() || 'Titre de ton annonce…'}</div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 3 }}>
+                  <span className="vrm-display" style={{ fontSize: 17, fontWeight: 800, color: C.text }}>{prix.trim() ? eur(Number(String(prix).replace(',', '.')) || 0) : '—'}</span>
+                  <span style={{ fontSize: 11, color: C.muted }}>{condLabel}{urls.length ? ` · ${urls.length} photo${urls.length > 1 ? 's' : ''}` : ''}</span>
+                </div>
+              </div>
             </div>
-            {/* Attributs OBLIGATOIRES, dictés par eBay (jamais devinés). */}
-            {(cat.required || []).length > 0 && <div style={{ fontSize: 11.5, color: C.muted, marginTop: 2 }}>Attributs demandés par eBay pour cette catégorie :</div>}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 9 }}>
-              {(cat.required || []).map(n => (
-                <div key={n}><label style={lab}>{n} *</label><input value={asp[n] || ''} onChange={e => { setAsp(a => ({ ...a, [n]: e.target.value })); setCheck(null); }} style={inp} /></div>
-              ))}
+          )}
+
+          {/* 1 — PHOTOS : des vignettes, comme la grille de photos d'eBay. */}
+          <Bloc n="1" titre="Photos" right={urls.length ? <span style={{ fontSize: 11, color: C.muted }}>{urls.length}/24</span> : null}>
+            {urls.length > 0 && (
+              <div className="vrm-rangee" style={{ display: 'flex', gap: 8, marginBottom: 10, overflowX: 'auto', paddingBottom: 2 }}>
+                {urls.map((u, i) => (
+                  <div key={u + i} style={{ position: 'relative', width: 74, height: 74, borderRadius: 10, overflow: 'hidden', border: `1px solid ${C.border}`, flexShrink: 0, background: C.bg }}>
+                    <img src={u} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.currentTarget.style.opacity = 0.15; }} />
+                    <button type="button" onClick={() => setUrls(urls.filter((_, j) => j !== i))} aria-label="Retirer" style={{ position: 'absolute', top: 3, right: 3, width: 20, height: 20, borderRadius: 10, border: 'none', background: 'rgba(0,0,0,.62)', color: '#fff', fontSize: 13, cursor: 'pointer', lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+                    {i === 0 && <span style={{ position: 'absolute', bottom: 0, left: 0, right: 0, fontSize: 9, textAlign: 'center', background: 'rgba(0,0,0,.6)', color: '#fff', padding: '2px 0', fontWeight: 600 }}>couverture</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input value={photoInput} onChange={e => setPhotoInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); ajouterPhotos(); } }} placeholder="Colle le lien d'une photo (https://…)" style={{ ...inp, flex: 1 }} />
+              <button type="button" onClick={ajouterPhotos} disabled={!photoInput.trim()} style={{ flexShrink: 0, border: `1px solid ${C.accent}`, background: `${C.accent}12`, color: C.accent, borderRadius: 10, padding: '0 14px', fontSize: 13.5, fontWeight: 700, cursor: photoInput.trim() ? 'pointer' : 'default', fontFamily: 'inherit', opacity: photoInput.trim() ? 1 : 0.5 }}>Ajouter</button>
             </div>
-            <div><label style={lab}>Photos (une URL par ligne, http)</label><textarea value={photos} onChange={e => { setPhotos(e.target.value); setCheck(null); }} rows={2} placeholder="https://…jpg" style={{ ...inp, resize: 'vertical' }} /></div>
-            <div><label style={lab}>Description</label><textarea value={desc} onChange={e => setDesc(e.target.value)} rows={2} style={{ ...inp, resize: 'vertical' }} /></div>
-            {/* Vérifier à blanc AVANT de publier : eBay contrôle tout (attributs,
-                photos, expédition) et donne les frais, sans rien créer. */}
-            {check && check.ok && <div style={{ fontSize: 12.5, color: C.text, background: `${C.accent}10`, border: `1px solid ${C.accent}`, borderRadius: 8, padding: '8px 10px', lineHeight: 1.5 }}>✅ <b>eBay accepterait cette annonce.</b>{check.fees != null ? ` Frais eBay estimés : ${(Math.round(check.fees * 100) / 100).toFixed(2).replace('.', ',')} €.` : ''} Tu peux publier.</div>}
-            {check && check.err && <div style={{ fontSize: 12.5, color: C.warn, background: `${C.warn}12`, border: `1px solid ${C.warn}`, borderRadius: 8, padding: '8px 10px', lineHeight: 1.5 }}>⚠️ eBay signale : {check.err}<br /><span style={{ color: C.muted }}>Rien n'a été publié — corrige et revérifie.</span></div>}
-            <div className="vrm-rangee" style={{ display: 'flex', gap: 8 }}>
-              <button type="button" onClick={verifier} disabled={verif || busy} style={{ border: `1px solid ${C.accent}`, background: 'transparent', color: C.accent, borderRadius: 10, padding: '11px 14px', fontSize: 13.5, fontWeight: 700, cursor: (verif || busy) ? 'default' : 'pointer', fontFamily: 'inherit', opacity: (verif || busy) ? 0.6 : 1 }}>{verif ? 'eBay vérifie…' : '2) Vérifier sans publier'}</button>
-              <button type="button" onClick={publier} disabled={busy || verif} style={{ border: 'none', background: C.accent, color: '#fff', borderRadius: 10, padding: '11px 16px', fontSize: 13.5, fontWeight: 700, cursor: (busy || verif) ? 'default' : 'pointer', fontFamily: 'inherit', opacity: (busy || verif) ? 0.6 : 1 }}>{busy ? 'Publication…' : '3) Publier sur eBay'}</button>
+            <div style={{ fontSize: 11, color: C.muted, marginTop: 6, lineHeight: 1.45 }}>La 1ʳᵉ photo sert de couverture. Tu peux coller plusieurs liens d'un coup (séparés par un espace).</div>
+          </Bloc>
+
+          {/* 2 — TITRE & CATÉGORIE */}
+          <Bloc n="2" titre="Titre & catégorie" right={<span style={{ fontSize: 11, color: titre.length > 75 ? C.warn : C.muted }}>{titre.length}/80</span>}>
+            <input value={titre} maxLength={80} onChange={e => { setTitre(e.target.value); setCat(null); setCheck(null); }} placeholder="Nike Air Max 1 Aquatone Bleu Taille 44" style={inp} />
+            <div style={{ marginTop: 10 }}>
+              {!cat ? (
+                <button type="button" onClick={analyser} disabled={analyse || !titre.trim()} style={{ width: '100%', border: `1px solid ${C.accent}`, background: `${C.accent}12`, color: C.accent, borderRadius: 10, padding: '11px 14px', fontSize: 13.5, fontWeight: 700, cursor: (analyse || !titre.trim()) ? 'default' : 'pointer', fontFamily: 'inherit', opacity: (analyse || !titre.trim()) ? 0.5 : 1 }}>{analyse ? 'eBay cherche la catégorie…' : 'Trouver la catégorie eBay'}</button>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: `${C.accent}0d`, border: `1px solid ${C.border}`, borderRadius: 10, padding: '9px 12px' }}>
+                  <Icon name="check" size={15} />
+                  <span style={{ fontSize: 12.5, color: C.text }}>Catégorie eBay : <b>{cat.categoryName}</b> <span style={{ color: C.muted }}>({cat.categoryId})</span></span>
+                </div>
+              )}
+            </div>
+          </Bloc>
+
+          {cat && (<>
+            {/* 3 — CARACTÉRISTIQUES (dictées par eBay, jamais devinées) */}
+            <Bloc n="3" titre="Caractéristiques">
+              {(cat.required || []).length > 0 && <div style={{ fontSize: 11.5, color: C.muted, marginBottom: 10, lineHeight: 1.45 }}>eBay demande ces informations pour « {cat.categoryName} ». Les champs avec ✳ sont obligatoires.</div>}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(148px,1fr))', gap: 10 }}>
+                <div><label style={lab}>État</label><select value={cond} onChange={e => { setCond(e.target.value); setCheck(null); }} style={inp}>{EBAY_CONDITIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></div>
+                {(cat.required || []).map(n => (
+                  <div key={n}><label style={lab}>{n} <span style={{ color: C.accent }}>✳</span></label><input value={asp[n] || ''} onChange={e => { setAsp(a => ({ ...a, [n]: e.target.value })); setCheck(null); }} placeholder={/pointure|taille|size/i.test(n) ? 'ex. 44' : /marque|brand/i.test(n) ? 'ex. Nike' : /couleur|color/i.test(n) ? 'ex. Bleu' : ''} style={inp} /></div>
+                ))}
+              </div>
+            </Bloc>
+
+            {/* 4 — PRIX & LIVRAISON */}
+            <Bloc n="4" titre="Prix & livraison">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(148px,1fr))', gap: 10 }}>
+                <div><label style={lab}>Prix (€)</label><input value={prix} onChange={e => { setPrix(e.target.value); setCheck(null); }} inputMode="decimal" placeholder="ex. 74" style={inp} /></div>
+                <div><label style={lab}>Quantité</label><input value={qty} onChange={e => setQty(e.target.value)} inputMode="numeric" style={inp} /></div>
+                <div><label style={lab}>Frais de port (€)</label><input value={port} onChange={e => setPort(e.target.value)} inputMode="decimal" placeholder="0 = gratuit" style={inp} /></div>
+              </div>
+            </Bloc>
+
+            {/* 5 — DESCRIPTION */}
+            <Bloc n="5" titre="Description">
+              <textarea value={desc} onChange={e => setDesc(e.target.value)} rows={4} placeholder="État, particularités, authenticité… (le titre est repris si tu laisses vide)" style={{ ...inp, resize: 'vertical', lineHeight: 1.5 }} />
+            </Bloc>
+
+            {/* Vérif à blanc : eBay contrôle tout et donne les frais, sans rien créer. */}
+            {check && check.ok && <div style={{ fontSize: 12.5, color: C.text, background: `${C.accent}10`, border: `1px solid ${C.accent}`, borderRadius: 10, padding: '10px 12px', lineHeight: 1.5 }}>✓ <b>eBay accepterait cette annonce.</b>{check.fees != null ? ` Frais eBay estimés : ${eur(check.fees)}.` : ''} Tu peux publier.</div>}
+            {check && check.err && <div style={{ fontSize: 12.5, color: C.warn, background: `${C.warn}12`, border: `1px solid ${C.warn}`, borderRadius: 10, padding: '10px 12px', lineHeight: 1.5 }}>⚠️ eBay signale : {check.err}<br /><span style={{ color: C.muted }}>Rien n'a été publié — corrige et revérifie.</span></div>}
+
+            <div className="vrm-rangee" style={{ display: 'flex', gap: 10 }}>
+              <button type="button" onClick={verifier} disabled={verif || busy} style={{ flex: 1, border: `1px solid ${C.accent}`, background: 'transparent', color: C.accent, borderRadius: 12, padding: '13px 14px', fontSize: 14, fontWeight: 700, cursor: (verif || busy) ? 'default' : 'pointer', fontFamily: 'inherit', opacity: (verif || busy) ? 0.6 : 1 }}>{verif ? 'eBay vérifie…' : 'Vérifier sans publier'}</button>
+              <button type="button" onClick={publier} disabled={busy || verif} style={{ flex: 1, border: 'none', background: C.accent, color: '#fff', borderRadius: 12, padding: '13px 16px', fontSize: 14, fontWeight: 700, cursor: (busy || verif) ? 'default' : 'pointer', fontFamily: 'inherit', opacity: (busy || verif) ? 0.6 : 1 }}>{busy ? 'Publication…' : 'Publier sur eBay'}</button>
             </div>
           </>)}
         </div>
       </>)}
-      {res && res.err && <div style={{ fontSize: 12, color: C.danger, marginTop: 9, lineHeight: 1.5 }}>{res.err}</div>}
+      {res && res.err && <div style={{ fontSize: 12.5, color: C.danger, margin: '0 14px 14px', lineHeight: 1.5 }}>{res.err}</div>}
     </div>
   );
 }
