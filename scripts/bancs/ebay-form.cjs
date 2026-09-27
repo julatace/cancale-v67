@@ -1,10 +1,9 @@
 // BANC de rendu du formulaire « Vendre sur eBay » (EbayPublier), EXÉCUTÉ dans un
-// vrai navigateur avec un eBay CONNECTÉ simulé (§4.10 : ni `npm run build` ni
-// `node --check` ne rendent ce composant). Il vérifie que le formulaire présente
-// bien l'annonce comme la feuille de vente eBay : vignettes photo + couverture,
-// aperçu vivant (titre/prix), sections numérotées, catégorie + attributs dictés
-// par eBay, et les deux gestes (vérifier / publier). Aucune logique d'envoi
-// n'est touchée (couverte par ebay-write.cjs / ebay-api.cjs) — ici c'est le RENDU.
+// vrai navigateur avec un eBay CONNECTÉ simulé (§4.10). On publie EN CHOISISSANT
+// une paire (ses photos captées partent toutes seules — plus AUCUN lien à coller,
+// demande de Julien), on choisit le MODE DE LIVRAISON, et eBay vérifie avant de
+// publier. La logique d'envoi est couverte par ebay-write.cjs / ebay-api.cjs ;
+// ici c'est le RENDU + le flux « comme dans l'app ».
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -12,15 +11,19 @@ const MIME = { '.html':'text/html','.js':'text/javascript','.css':'text/css','.j
 const srv = http.createServer((q,r)=>{ let f=q.url.split('?')[0]; if(f==='/'||!path.extname(f))f='/index.html'; const p=path.join(DIST,f); if(!fs.existsSync(p)){r.writeHead(404);return r.end();} r.writeHead(200,{'content-type':MIME[path.extname(p)]||'application/octet-stream'}); r.end(fs.readFileSync(p)); });
 srv.listen(4331);
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEklEQVR4nGNk+M+ADzCOKgAAV7wDA8mm/lgAAAAASUVORK5CYII=','base64');
+// La paire à vendre : sa fiche numéro (localStorage) + ses photos captées (base).
+const NUMS = { '111': { numero:'401', title:'Nike Air Max 1 Aquatone Bleu Taille 44', photo:'https://img.example/cover.jpg', numberedAt: Date.now() } };
+const DETAILS = { '111': { description:'Basket Nike', photos:['https://img.example/1.jpg','https://img.example/2.jpg','https://img.example/3.jpg'] } };
 let ko = 0; const dit = (c,m,d)=>{ if(!c)ko++; console.log((c?'✅ ':'❌ ')+m+(d?' — '+d:'')); };
 (async()=>{
   const b = await chromium.launch({ executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args:['--use-angle=swiftshader','--no-sandbox'] });
-  const pg = await b.newPage({ viewport:{ width:390, height:1400 } });
+  const pg = await b.newPage({ viewport:{ width:390, height:1500 } });
   const errs=[]; pg.on('pageerror',e=>errs.push(e.message));
-  await pg.addInitScript(()=>{ try{ localStorage.setItem('vrm_acces_direct','1'); }catch(_){}} );
+  await pg.addInitScript(([nums]) => { try{ localStorage.setItem('vrm_acces_direct','1'); localStorage.setItem('vinted_annonce_numeros', JSON.stringify(nums)); localStorage.setItem('vinted_nums_physiques', JSON.stringify(['401'])); }catch(_){}}, [NUMS]);
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r)=>{ const t=r.request().resourceType(); if(t==='image') return r.fulfill({status:200,contentType:'image/png',body:PNG}); if(t==='media'||t==='font') return r.abort(); return r.continue(); });
   await pg.route('**/rest/v1/**', route=>{ const u=route.request().url(); const j=d=>route.fulfill({status:200,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:JSON.stringify(d)});
     if(/select=owner/.test(u)) return route.fulfill({status:400,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:'{"m":1}'});
+    if(/id=eq\.vinted_item_details/.test(u)) return j([{ data: DETAILS }]);
     return j([]); });
   await pg.route('**/api/**', r2=>r2.fulfill({status:200,contentType:'application/json',body:'{"ok":true}'}));
   // ⚠️ enregistré APRÈS le catch-all → Playwright le prend en PREMIER (§6.6).
@@ -39,39 +42,45 @@ let ko = 0; const dit = (c,m,d)=>{ if(!c)ko++; console.log((c?'✅ ':'❌ ')+m+(
   dit(!!openBtn, 'le bouton d\'ouverture dit « Vendre une paire sur eBay »');
   if (openBtn) await openBtn.click();
   await pg.waitForTimeout(400);
-  const titleInput = await pg.$('input[placeholder^="Nike Air Max"]');
-  dit(!!titleInput, 'le formulaire s\'ouvre (champ Titre présent)');
-  if (!titleInput) { console.log('\n'+ko+' KO'); await b.close(); srv.close(); process.exit(1); }
+  let txt = await T();
+  dit(/La paire à vendre/i.test(txt), 'le formulaire s\'ouvre sur « La paire à vendre » (on choisit, on ne colle pas)');
 
-  await pg.fill('input[placeholder^="Nike Air Max"]', 'Nike Air Max 1 Aquatone Bleu Taille 44');
-  await pg.fill('input[placeholder^="Colle le lien"]', 'https://img.example/1.jpg https://img.example/2.jpg https://img.example/3.jpg');
-  await (await pg.$('text=Ajouter')).click();
-  await pg.waitForTimeout(300);
+  // ⚠️ Plus AUCUN champ « colle le lien » : c'était la demande de Julien.
+  const linkInput = await pg.$('input[placeholder*="Colle le lien"]');
+  dit(!linkInput, 'aucun champ « colle un lien de photo » (photos automatiques)');
 
-  // Vignettes + couverture (comme la grille photo d'eBay)
-  // 3 vignettes + 1 aperçu (la couverture est reprise dans la carte d'aperçu).
-  const nImgs = await pg.evaluate(()=>document.querySelectorAll('img[src^="https://img.example"]').length);
-  dit(nImgs >= 3, 'les 3 photos deviennent des vignettes (+ l\'aperçu)', 'images=' + nImgs);
+  // Choisir la paire N°401 → titre + photos auto
+  const pairBtn = await pg.$('text=N°401');
+  dit(!!pairBtn, 'la paire numérotée apparaît dans le sélecteur (N°401)');
+  if (pairBtn) await pairBtn.click();
+  await pg.waitForTimeout(400);
+  const titleVal = await pg.$eval('input[placeholder^="Nike Air Max"]', el=>el.value).catch(()=>'');
+  dit(/nike/i.test(titleVal), 'choisir la paire remplit le titre tout seul', 'titre=' + titleVal.slice(0,30));
+  const nImgs = await pg.evaluate(()=>document.querySelectorAll('img[src^="https://img.example/"]').length);
+  dit(nImgs >= 3, 'les photos de la paire arrivent toutes seules (≥3 vignettes)', 'images=' + nImgs);
   dit(/couverture/.test(await T()), 'la 1ʳᵉ photo est marquée « couverture »');
 
-  // Trouver la catégorie → chip + sections attributs/prix/description
+  // Analyser la catégorie → sections + pointure pré-remplie depuis la paire
   await (await pg.$('text=Trouver la catégorie eBay')).click();
   await pg.waitForTimeout(900);
-  let txt = await T();
-  dit(/Cat[ée]gorie eBay/.test(txt) && /Baskets/.test(txt), 'la catégorie eBay suggérée s\'affiche (Baskets)');
-  dit(/Caract[ée]ristiques/.test(txt), 'section « Caractéristiques » présente');
+  txt = await T();
+  dit(/Baskets/.test(txt), 'la catégorie eBay suggérée s\'affiche (Baskets)');
   dit(/Prix & livraison/.test(txt), 'section « Prix & livraison » présente');
-  dit(/Pointure EU/i.test(txt) && /Marque/i.test(txt), 'les attributs dictés par eBay sont rendus');
+  const pointure = await pg.evaluate(()=>{ const labs=[...document.querySelectorAll('label')]; const l=labs.find(x=>/pointure/i.test(x.textContent)); if(!l)return ''; const box=l.parentElement; const inp=box&&box.querySelector('input'); return inp?inp.value:''; });
+  dit(pointure === '44', 'la pointure de la paire remplit l\'attribut eBay (44)', 'pointure=' + pointure);
 
-  // Aperçu vivant : titre + prix
+  // Mode de livraison : un vrai sélecteur (comme sur eBay)
+  const shipOpts = await pg.evaluate(()=>{ const sels=[...document.querySelectorAll('select')]; for(const s of sels){ const t=[...s.options].map(o=>o.textContent).join('|'); if(/Mondial Relay|Colissimo/i.test(t)) return t; } return ''; });
+  dit(/Colissimo/i.test(shipOpts) && /Mondial Relay/i.test(shipOpts), 'on CHOISIT le mode de livraison (Colissimo, Mondial Relay…)', shipOpts.slice(0,60));
+
   await pg.fill('input[placeholder="ex. 74"]', '74');
   await pg.waitForTimeout(250);
   txt = await T();
-  dit(/74,00 €/.test(txt), 'l\'aperçu de l\'annonce montre le prix formaté (74,00 €)');
+  dit(/74,00 €/.test(txt), 'l\'aperçu montre le prix formaté (74,00 €)');
   dit(/Vérifier sans publier/.test(txt) && /Publier sur eBay/.test(txt), 'les deux gestes sont là (vérifier à blanc + publier)');
   dit(errs.length === 0, 'aucune erreur d\'app', errs.slice(0,1).join(''));
 
-  console.log(ko ? ('\n'+ko+' contrôle(s) non conforme(s).') : '\nLe formulaire eBay se présente comme une vraie feuille de vente : vignettes, aperçu, sections, catégorie + attributs, vérifier puis publier.');
+  console.log(ko ? ('\n'+ko+' contrôle(s) non conforme(s).') : '\nOn publie en CHOISISSANT une paire (photos auto, aucun lien) et en CHOISISSANT la livraison — comme sur eBay, dans l\'app.');
   await b.close(); srv.close();
   process.exit(ko ? 1 : 0);
 })();

@@ -6482,7 +6482,19 @@ function VentesLeboncoin({ lbcVentes = {ventes:[],inconnues:0} }) {
 // qu'eBay exige. L'humain confirme tout avant l'envoi (aucune publication à
 // l'aveugle). Un refus eBay s'affiche tel quel ; aucune annonce n'est créée.
 const EBAY_CONDITIONS = [['3000', 'Occasion'], ['1000', 'Neuf avec boîte'], ['1500', 'Neuf sans boîte'], ['1750', 'Neuf avec défauts']];
-function EbayPublier({ onPublie }) {
+// Modes de livraison eBay France (site 71). Le code (value) est le jeton
+// ShippingService qu'eBay attend ; le libellé est en clair. ⚠️ On ne PROMET pas
+// qu'un jeton est accepté : « Vérifier sans publier » (VerifyAddFixedPriceItem)
+// le contrôle chez eBay AVANT toute publication — un jeton refusé remonte, rien
+// n'est publié. C'est la même prudence que partout : mesurer, ne pas deviner.
+const EBAY_SHIPPING = [
+  ['FR_ColissimoLabelPointRetrait', 'Colissimo — point de retrait'],
+  ['FR_Colissimo', 'Colissimo — à domicile'],
+  ['FR_MondialRelay', 'Mondial Relay'],
+  ['FR_Chronopost', 'Chronopost'],
+  ['FR_LaPosteLettreSuivie', 'Lettre suivie'],
+];
+function EbayPublier({ onPublie, paires = [] }) {
   const [ouvert, setOuvert] = React.useState(false);
   const [titre, setTitre] = React.useState('');
   const [prix, setPrix] = React.useState('');
@@ -6498,7 +6510,20 @@ function EbayPublier({ onPublie }) {
   const [res, setRes] = React.useState(null);          // {ok,url}|{err}
   const [check, setCheck] = React.useState(null);      // {ok,fees}|{err} — vérif à blanc eBay
   const [verif, setVerif] = React.useState(false);
-  const [photoInput, setPhotoInput] = React.useState('');  // champ « ajouter une photo »
+  const [pairId, setPairId] = React.useState(null);    // paire choisie (ses photos partent avec)
+  const [pickerOpen, setPickerOpen] = React.useState(false);
+  const [pairQ, setPairQ] = React.useState('');        // recherche dans le sélecteur de paires
+  const [ship, setShip] = React.useState('FR_ColissimoLabelPointRetrait');  // mode de livraison
+  const pairSel = paires.find(p => p.id === pairId) || null;
+  // Choisir une paire remplit le titre (règle §11 partagée), sa pointure et
+  // TOUTES ses photos captées — plus aucun lien à coller. Le titre reste
+  // modifiable ; la pointure sera reportée sur l'attribut eBay après l'analyse.
+  const choisirPaire = (p) => {
+    setPairId(p.id); setPickerOpen(false); setPairQ('');
+    setTitre(lbcTitre('', p.title || '', p.taille || '', 80));
+    setPhotos((p.photos || []).join('\n'));
+    setCat(null); setCheck(null);
+  };
   const analyser = async () => {
     if (!titre.trim()) { setRes({ err: 'Mets d\'abord un titre.' }); return; }
     setAnalyse(true); setRes(null);
@@ -6506,7 +6531,14 @@ function EbayPublier({ onPublie }) {
       const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'pubinfo', title: titre }) });
       const j = await r.json();
       if (j && j.ok && j.categorie && j.categorie.suggeree) {
-        setCat({ categoryId: j.categorie.suggeree.categoryId, categoryName: j.categorie.suggeree.categoryName, required: j.attributsObligatoires || [] });
+        const required = j.attributsObligatoires || [];
+        setCat({ categoryId: j.categorie.suggeree.categoryId, categoryName: j.categorie.suggeree.categoryName, required });
+        // La pointure de la paire choisie remplit l'attribut taille d'eBay
+        // (mesure connue, pas une devinette) ; les autres restent à saisir.
+        if (pairSel && pairSel.taille) {
+          const champTaille = required.find(n => /pointure|taille|size/i.test(n));
+          if (champTaille) setAsp(a => (a[champTaille] ? a : { ...a, [champTaille]: String(pairSel.taille).replace(',', '.') }));
+        }
       } else setRes({ err: (j && j.error) || 'eBay n\'a pas suggéré de catégorie pour ce titre.' });
     } catch (_) { setRes({ err: 'Analyse impossible (réseau).' }); }
     setAnalyse(false);
@@ -6517,9 +6549,9 @@ function EbayPublier({ onPublie }) {
     const manquants = (cat.required || []).filter(n => !String(asp[n] || '').trim());
     if (manquants.length) return { err: 'À compléter : ' + manquants.join(', ') };
     const urls = photos.split(/\s+/).map(s => s.trim()).filter(s => /^https?:\/\//.test(s));
-    if (!urls.length) return { err: 'Ajoute au moins une photo (URL http).' };
+    if (!urls.length) return { err: 'Choisis une paire — ses photos partent avec l\'annonce.' };
     if (!prix.trim()) return { err: 'Mets un prix.' };
-    return { item: { title: titre, categoryId: cat.categoryId, price: String(prix).replace(',', '.'), quantity: qty, conditionId: cond, description: desc || titre, photos: urls, aspects: asp, shippingCost: String(port || 0).replace(',', '.') } };
+    return { item: { title: titre, categoryId: cat.categoryId, price: String(prix).replace(',', '.'), quantity: qty, conditionId: cond, description: desc || titre, photos: urls, aspects: asp, shippingService: ship, shippingCost: String(port || 0).replace(',', '.') } };
   };
   // VÉRIFIER À BLANC (VerifyAddFixedPriceItem) : eBay valide exactement ce qu'on
   // publierait et renvoie les frais, SANS rien créer. Le filet pour la première
@@ -6562,11 +6594,8 @@ function EbayPublier({ onPublie }) {
   );
   const urls = photos.split(/\s+/).map(s => s.trim()).filter(s => /^https?:\/\//.test(s));
   const setUrls = (arr) => { setPhotos(arr.join('\n')); setCheck(null); };
-  const ajouterPhotos = () => {
-    const nouv = photoInput.split(/\s+/).map(s => s.trim()).filter(s => /^https?:\/\//.test(s));
-    if (nouv.length) setUrls([...urls, ...nouv.filter(u => !urls.includes(u))]);
-    setPhotoInput('');
-  };
+  const reset = () => { setOuvert(false); setRes(null); setCheck(null); setTitre(''); setPrix(''); setCat(null); setAsp({}); setPhotos(''); setDesc(''); setPairId(null); };
+  const listePaires = paires.filter(p => { const q = pairQ.trim().toLowerCase(); return !q || p.num.includes(q) || (p.title || '').toLowerCase().includes(q) || String(p.taille).toLowerCase().includes(q); });
   const eur = (n) => (Math.round(n * 100) / 100).toFixed(2).replace('.', ',') + ' €';
   const condLabel = (EBAY_CONDITIONS.find(([v]) => v === cond) || [, 'Occasion'])[1];
   if (!ouvert) return (
@@ -6592,7 +6621,7 @@ function EbayPublier({ onPublie }) {
           <div style={{ fontSize: 16, fontWeight: 800, color: C.text, marginBottom: 4 }}>Annonce publiée sur eBay</div>
           <div style={{ fontSize: 12.5, color: C.muted, marginBottom: 14 }}>N° {res.itemId}</div>
           <a href={res.url} target="_blank" rel="noreferrer" style={{ display: 'inline-block', border: 'none', background: C.accent, color: '#fff', borderRadius: 10, padding: '11px 18px', fontSize: 14, fontWeight: 700, textDecoration: 'none' }}>Voir l'annonce sur eBay ↗</a>
-          <div style={{ marginTop: 12 }}><button type="button" onClick={() => { setOuvert(false); setRes(null); setCheck(null); setTitre(''); setPrix(''); setCat(null); setAsp({}); setPhotos(''); setDesc(''); }} style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 10, padding: '9px 16px', fontSize: 13.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Terminé</button></div>
+          <div style={{ marginTop: 12 }}><button type="button" onClick={reset} style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 10, padding: '9px 16px', fontSize: 13.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Terminé</button></div>
         </div>
       ) : (<>
         <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -6614,24 +6643,49 @@ function EbayPublier({ onPublie }) {
             </div>
           )}
 
-          {/* 1 — PHOTOS : des vignettes, comme la grille de photos d'eBay. */}
-          <Bloc n="1" titre="Photos" right={urls.length ? <span style={{ fontSize: 11, color: C.muted }}>{urls.length}/24</span> : null}>
-            {urls.length > 0 && (
-              <div className="vrm-rangee" style={{ display: 'flex', gap: 8, marginBottom: 10, overflowX: 'auto', paddingBottom: 2 }}>
-                {urls.map((u, i) => (
-                  <div key={u + i} style={{ position: 'relative', width: 74, height: 74, borderRadius: 10, overflow: 'hidden', border: `1px solid ${C.border}`, flexShrink: 0, background: C.bg }}>
-                    <img src={u} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.currentTarget.style.opacity = 0.15; }} />
-                    <button type="button" onClick={() => setUrls(urls.filter((_, j) => j !== i))} aria-label="Retirer" style={{ position: 'absolute', top: 3, right: 3, width: 20, height: 20, borderRadius: 10, border: 'none', background: 'rgba(0,0,0,.62)', color: '#fff', fontSize: 13, cursor: 'pointer', lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
-                    {i === 0 && <span style={{ position: 'absolute', bottom: 0, left: 0, right: 0, fontSize: 9, textAlign: 'center', background: 'rgba(0,0,0,.6)', color: '#fff', padding: '2px 0', fontWeight: 600 }}>couverture</span>}
-                  </div>
-                ))}
+          {/* 1 — LA PAIRE : on CHOISIT une paire (comme sur eBay on choisit son
+              objet), ses photos partent toutes seules — plus aucun lien à coller. */}
+          <Bloc n="1" titre="La paire à vendre" right={pairSel ? <button type="button" onClick={() => setPickerOpen(true)} style={{ border: 'none', background: 'transparent', color: C.accent, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Changer</button> : null}>
+            {(!pairSel || pickerOpen) ? (
+              paires.length === 0 ? (
+                <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.5 }}>Aucune paire numérotée n'est encore chargée sur cet appareil. Ouvre l'écran <b>Annonces</b> une fois (sur l'ordinateur où l'extension tourne) : tes paires — avec leurs photos — apparaîtront ici.</div>
+              ) : (<>
+                <input value={pairQ} onChange={e => setPairQ(e.target.value)} placeholder="Chercher : n°, marque, pointure…" style={{ ...inp, marginBottom: 10 }} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 7, maxHeight: 260, overflowY: 'auto' }}>
+                  {listePaires.length === 0 && <div style={{ fontSize: 12.5, color: C.muted, padding: '6px 2px' }}>Aucune paire ne correspond.</div>}
+                  {listePaires.slice(0, 120).map(p => (
+                    <button key={p.id} type="button" onClick={() => choisirPaire(p)} style={{ display: 'flex', alignItems: 'center', gap: 11, textAlign: 'left', border: `1px solid ${C.border}`, borderRadius: 10, background: C.card, padding: '8px 10px', cursor: 'pointer', fontFamily: 'inherit' }}>
+                      {p.cover ? <img src={p.cover} alt="" loading="lazy" style={{ width: 46, height: 46, borderRadius: 8, objectFit: 'cover', flexShrink: 0, background: C.bg }} onError={e => { e.currentTarget.style.opacity = 0.15; }} /> : <span style={{ width: 46, height: 46, borderRadius: 8, background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>👟</span>}
+                      <span style={{ flex: 1, minWidth: 0 }}>
+                        <span className="vrm-display" style={{ display: 'block', fontSize: 14, fontWeight: 700, color: C.accent }}>N°{p.num}</span>
+                        <span style={{ display: 'block', fontSize: 12.5, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.title || '—'}</span>
+                        <span style={{ fontSize: 11, color: C.muted }}>{p.taille ? `Pointure ${p.taille} · ` : ''}{p.photos.length} photo{p.photos.length > 1 ? 's' : ''}</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </>)
+            ) : (<>
+              {/* Paire choisie : ses photos, en vignettes (retirables). */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <span className="vrm-display" style={{ fontSize: 13.5, fontWeight: 800, color: C.accent }}>N°{pairSel.num}</span>
+                <span style={{ fontSize: 12.5, color: C.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pairSel.title}</span>
               </div>
-            )}
-            <div style={{ display: 'flex', gap: 8 }}>
-              <input value={photoInput} onChange={e => setPhotoInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); ajouterPhotos(); } }} placeholder="Colle le lien d'une photo (https://…)" style={{ ...inp, flex: 1 }} />
-              <button type="button" onClick={ajouterPhotos} disabled={!photoInput.trim()} style={{ flexShrink: 0, border: `1px solid ${C.accent}`, background: `${C.accent}12`, color: C.accent, borderRadius: 10, padding: '0 14px', fontSize: 13.5, fontWeight: 700, cursor: photoInput.trim() ? 'pointer' : 'default', fontFamily: 'inherit', opacity: photoInput.trim() ? 1 : 0.5 }}>Ajouter</button>
-            </div>
-            <div style={{ fontSize: 11, color: C.muted, marginTop: 6, lineHeight: 1.45 }}>La 1ʳᵉ photo sert de couverture. Tu peux coller plusieurs liens d'un coup (séparés par un espace).</div>
+              {urls.length > 0 ? (
+                <div className="vrm-rangee" style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 2 }}>
+                  {urls.map((u, i) => (
+                    <div key={u + i} style={{ position: 'relative', width: 74, height: 74, borderRadius: 10, overflow: 'hidden', border: `1px solid ${C.border}`, flexShrink: 0, background: C.bg }}>
+                      <img src={u} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.currentTarget.style.opacity = 0.15; }} />
+                      <button type="button" onClick={() => setUrls(urls.filter((_, j) => j !== i))} aria-label="Retirer" style={{ position: 'absolute', top: 3, right: 3, width: 20, height: 20, borderRadius: 10, border: 'none', background: 'rgba(0,0,0,.62)', color: '#fff', fontSize: 13, cursor: 'pointer', lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+                      {i === 0 && <span style={{ position: 'absolute', bottom: 0, left: 0, right: 0, fontSize: 9, textAlign: 'center', background: 'rgba(0,0,0,.6)', color: '#fff', padding: '2px 0', fontWeight: 600 }}>couverture</span>}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ fontSize: 12, color: C.warn, lineHeight: 1.45 }}>Cette paire n'a pas encore de photo captée. Rouvre son annonce sur Vinted (avec l'extension à jour) puis reviens.</div>
+              )}
+              <div style={{ fontSize: 11, color: C.muted, marginTop: 8, lineHeight: 1.45 }}>Ces photos viennent de ton annonce Vinted. La 1ʳᵉ sert de couverture ; tu peux en retirer.</div>
+            </>)}
           </Bloc>
 
           {/* 2 — TITRE & CATÉGORIE */}
@@ -6661,12 +6715,15 @@ function EbayPublier({ onPublie }) {
               </div>
             </Bloc>
 
-            {/* 4 — PRIX & LIVRAISON */}
+            {/* 4 — PRIX & LIVRAISON : on CHOISIT le mode de livraison (comme sur
+                eBay), pas juste un montant. Le jeton part à eBay ; « Vérifier »
+                confirme qu'il est accepté avant toute publication. */}
             <Bloc n="4" titre="Prix & livraison">
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(148px,1fr))', gap: 10 }}>
                 <div><label style={lab}>Prix (€)</label><input value={prix} onChange={e => { setPrix(e.target.value); setCheck(null); }} inputMode="decimal" placeholder="ex. 74" style={inp} /></div>
                 <div><label style={lab}>Quantité</label><input value={qty} onChange={e => setQty(e.target.value)} inputMode="numeric" style={inp} /></div>
-                <div><label style={lab}>Frais de port (€)</label><input value={port} onChange={e => setPort(e.target.value)} inputMode="decimal" placeholder="0 = gratuit" style={inp} /></div>
+                <div style={{ gridColumn: '1 / -1' }}><label style={lab}>Mode de livraison</label><select value={ship} onChange={e => { setShip(e.target.value); setCheck(null); }} style={inp}>{EBAY_SHIPPING.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></div>
+                <div><label style={lab}>Frais de port (€)</label><input value={port} onChange={e => { setPort(e.target.value); setCheck(null); }} inputMode="decimal" placeholder="0 = gratuit" style={inp} /></div>
               </div>
             </Bloc>
 
@@ -6791,7 +6848,38 @@ function EbayConnexion() {
   const [data, setData] = React.useState(null);   // {listings, orders, capturedAt} | null
   const [syncing, setSyncing] = React.useState(false);
   const [solde, setSolde] = React.useState(null);  // {ok,dispo,enAttente,retenu}|{reason:'scope'}|null
+  const [paires, setPaires] = React.useState([]);  // paires numérotées, pour publier SANS coller de lien
   const autoFait = React.useRef(false);
+  // Les paires à vendre — mêmes données que l'écran Annonces (§11) : la fiche du
+  // numéro (id → n°, titre, photo de couverture) jointe aux photos captées de la
+  // page (`vinted_item_details[id].photos`). On publie EN CHOISISSANT une paire,
+  // ses photos viennent toutes seules — plus aucun lien à coller.
+  React.useEffect(() => { (async () => {
+    try {
+      const fiches = load('vinted_annonce_numeros', {}) || {};
+      const phys = load('vinted_nums_physiques', null);
+      const presents = Array.isArray(phys) && phys.length ? new Set(phys.map(String)) : null;
+      let details = {};
+      try {
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_item_details&select=data`, { headers: sbAuth() });
+        if (r.ok) { const rows = await r.json(); details = (rows && rows[0] && rows[0].data) || {}; }
+      } catch (_) { /* réseau : on se contente de la couverture */ }
+      const norm = (p) => typeof p === 'string' ? p : (p && (p.url || p.full_size_url)) || '';
+      const vus = new Set(), out = [];
+      for (const id in fiches) {
+        const f = fiches[id] || {}; const n = f.numero != null ? String(f.numero).trim() : '';
+        if (!n || vus.has(n)) continue;
+        if (presents && !presents.has(n)) continue;           // en stock seulement, si on le sait
+        vus.add(n);
+        const cover = f.photo || null;
+        const dphotos = Array.isArray(details[id] && details[id].photos) ? details[id].photos.map(norm).filter(Boolean) : [];
+        const photos = dphotos.length ? dphotos : (cover ? [cover] : []);
+        out.push({ id: String(id), num: n, title: f.title || '', taille: extractSize(f.title || '') || '', cover, photos });
+      }
+      out.sort((a, b) => (parseInt(b.num, 10) || 0) - (parseInt(a.num, 10) || 0));
+      setPaires(out);
+    } catch (_) { setPaires([]); }
+  })(); }, []);
   // Solde à virer (getSellerFundsSummary). Lecture seule, une fois à l'ouverture.
   const lireSolde = React.useCallback(async () => {
     try {
@@ -6943,7 +7031,7 @@ function EbayConnexion() {
               </div>
             )}
             {data.capturedAt && <div style={{ fontSize: 10.5, color: C.muted, marginTop: 8 }}>Capté {(() => { const j = Math.round((Date.now() - data.capturedAt) / 3600000); return j < 1 ? 'à l\'instant' : j < 24 ? `il y a ${j} h` : `il y a ${Math.round(j / 24)} j`; })()} · eBay met à jour le nombre de vues avec un peu de retard.</div>}
-            <EbayPublier onPublie={synchroniser} />
+            <EbayPublier onPublie={synchroniser} paires={paires} />
           </>)}
         </>
       ) : (
