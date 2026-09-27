@@ -26,6 +26,10 @@ let ko = 0; const dit = (c,m,d)=>{ if(!c)ko++; console.log((c?'✅ ':'❌ ')+m+(
     if(/id=eq\.vinted_item_details/.test(u)) return j([{ data: DETAILS }]);
     return j([]); });
   await pg.route('**/api/**', r2=>r2.fulfill({status:200,contentType:'application/json',body:'{"ok":true}'}));
+  // IA de rédaction (api/ai) : disponible, et renvoie un titre optimisé.
+  await pg.route('**/api/ai**', route=>{ const req=route.request(); const j=d=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(d)});
+    if(req.method()!=='POST') return j({ ok:true, ready:true });
+    return j({ ok:true, title:'Nike Air Max 1 Aquatone bleu T44 — très bon état', desc:'Sneakers Nike Air Max 1, coloris Aquatone.', why:'Titre optimisé pour la recherche eBay.' }); });
   // ⚠️ enregistré APRÈS le catch-all → Playwright le prend en PREMIER (§6.6).
   await pg.route('**/api/ebay**', route=>{ const req=route.request(); const j=d=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(d)});
     if(req.method()!=='POST') return j({ ready:true, canConsent:true });
@@ -59,6 +63,13 @@ let ko = 0; const dit = (c,m,d)=>{ if(!c)ko++; console.log((c?'✅ ':'❌ ')+m+(
   const nImgs = await pg.evaluate(()=>document.querySelectorAll('img[src^="https://img.example/"]').length);
   dit(nImgs >= 3, 'les photos de la paire arrivent toutes seules (≥3 vignettes)', 'images=' + nImgs);
   dit(/couverture/.test(await T()), 'la 1ʳᵉ photo est marquée « couverture »');
+
+  // IA : optimiser le titre (à partir des vraies infos de la paire)
+  const aiBtn = await pg.$('text=Optimiser le titre avec l\'IA');
+  dit(!!aiBtn, 'le bouton « Optimiser le titre avec l\'IA » est proposé (IA branchée)');
+  if (aiBtn) { await aiBtn.click(); await pg.waitForTimeout(500);
+    const t2 = await pg.$eval('input[placeholder^="Nike Air Max"]', el=>el.value).catch(()=>'');
+    dit(/très bon état/i.test(t2), 'l\'IA remplit le titre optimisé', 'titre=' + t2.slice(0,40)); }
 
   // Analyser la catégorie → sections + pointure pré-remplie depuis la paire
   await (await pg.$('text=Trouver la catégorie eBay')).click();
