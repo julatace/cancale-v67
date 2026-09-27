@@ -4684,7 +4684,7 @@ const BOTTOM_TABS=[
   {id:'journee',        icon:'sun',  emoji:'☀️',label:'Ma journée'},
   {id:'plat_vinted',    icon:'shop', emoji:'🟢',label:'Vinted'},
   {id:'plat_leboncoin', icon:'tag',  emoji:'🟠',label:'Leboncoin'},
-  {id:'cat_bord',       icon:'doc',  emoji:'📄',label:'Colis'},
+  {id:'cat_bord',       icon:'box',  emoji:'📄',label:'Colis'},   // colis = carton, pas « document »
 ];
 // Les écrans DÉTAILLÉS de Vinted. Ils ne sont plus des onglets de la barre
 // (séparation par site) : on y arrive par les cartes du hub Vinted. Mais ils
@@ -4692,7 +4692,7 @@ const BOTTOM_TABS=[
 // (§4.11 : une coupe se vérifie sur ce qui RESTE — sans ça ils sortiraient du
 // menu et du rail alors qu'ils existent toujours).
 const VINTED_TABS=[
-  {id:'cat_annonces', icon:'tag',  emoji:'🟢',label:'Annonces'},
+  {id:'cat_annonces', icon:'image', emoji:'🟢',label:'Annonces'},   // icône distincte de Leboncoin (tag)
   {id:'cat_ventes',   icon:'cash', emoji:'💸',label:'Ventes'},
   {id:'cat_achats',   icon:'bag',  emoji:'🛍️',label:'Achats'},
 ];
@@ -4711,11 +4711,11 @@ const PLUS_TABS=[
   /* ⚠️ `plat_vinted` ET `plat_leboncoin` sont dans la BARRE DU BAS (séparation
      par site) — retirés d'ici pour ne pas les montrer deux fois. Les autres
      hubs de plateforme (eBay, Vestiaire) restent dans « Plus ». */
-  {id:'plat_ebay',      icon:'tag', emoji:'🔵',label:'eBay',       desc:'Ce que VRM sait d\'eBay'},
-  {id:'plat_vestiaire', icon:'tag', emoji:'👗',label:'Vestiaire',  desc:'Pas encore reliée à VRM'},
+  {id:'plat_ebay',      icon:'grid', emoji:'🔵',label:'eBay',       desc:'Ce que VRM sait d\'eBay'},
+  {id:'plat_vestiaire', icon:'heart', emoji:'👗',label:'Vestiaire',  desc:'Pas encore reliée à VRM'},
   {id:'dashboard',    icon:'chart',   emoji:'📊',label:'Statistiques',  desc:'Chiffre d\'affaires, bénéfices, cotisations'},
-  {id:'prixmarche',   icon:'chart',   emoji:'💡',label:'Prix qui marche',desc:'À quel prix tes modèles se vendent, par taille'},
-  {id:'leboncoin',    icon:'shop',    emoji:'🟠',label:'À publier',      desc:'Tes annonces à publier sur Leboncoin, et à retirer'},
+  {id:'prixmarche',   icon:'spark',   emoji:'💡',label:'Prix qui marche',desc:'À quel prix tes modèles se vendent, par taille'},
+  {id:'leboncoin',    icon:'pin',     emoji:'🟠',label:'À publier',      desc:'Tes annonces à publier sur Leboncoin, et à retirer'},
   /* ⚠️ « Messages » RETIRÉ du menu (demande de Julien, 24 sept. : « pas en
      onglet, mets les messages reçus dans les notifications »). Les non-lus
      restent dans le centre de notifications (job « Répondre à N messages »), qui
@@ -5214,8 +5214,11 @@ const NAV_LARGEUR = 236;
 // « Plus ». Sur un grand écran, cacher la moitié de la navigation derrière un
 // bouton n'a aucune raison d'être — c'est une contrainte de téléphone.
 function SideBar({ tab, setTab }) {
+  // ⚠️ HIÉRARCHIE VISUELLE (Julien : « trop chargé »). Le groupe du quotidien est
+  // PRIMAIRE (icônes + texte un peu plus grands) ; les deux autres sont secondaires
+  // (plus discrets), pour qu'une liste de 15 n'ait pas l'air d'un mur d'égaux.
   const groupes = [
-    { titre: 'Au quotidien', items: BOTTOM_TABS },
+    { titre: 'Au quotidien', items: BOTTOM_TABS, primaire: true },
     { titre: 'Dans Vinted',  items: VINTED_TABS },
     { titre: 'Le reste',     items: PLUS_TABS },
   ];
@@ -5224,32 +5227,33 @@ function SideBar({ tab, setTab }) {
       position:'fixed',left:0,top:0,bottom:0,width:NAV_LARGEUR,zIndex:60,
       display:'flex',flexDirection:'column',gap:2,
       background:C.chrome,borderRight:`1px solid ${C.chromeLine}`,
-      padding:'14px 12px 14px',overflowY:'auto'}}>
+      padding:'16px 12px 14px',overflowY:'auto'}}>
       {/* ⚠️ LA MARQUE EST ÉCRITE UNE SEULE FOIS. Le carré porte déjà les trois
           lettres : le poser à côté du mot revenait à écrire « VRM VRM » en haut
           de chaque écran (§5.68 l'avait corrigé dans l'en-tête, pas ici). */}
-      <div style={{display:'flex',alignItems:'center',padding:'6px 8px 18px'}}>
+      <div style={{display:'flex',alignItems:'center',padding:'6px 8px 20px'}}>
         <VrmWord height={19} color={C.onChrome} accent={C.accent}/>
       </div>
-      {groupes.map(g => (
-        <div key={g.titre} style={{marginBottom:6}}>
-          <div className="vrm-label" style={{color:C.chromeMuted,padding:'8px 8px 6px'}}>{g.titre}</div>
+      {groupes.map((g,gi) => (
+        <div key={g.titre} style={{marginBottom:gi<groupes.length-1?14:6}}>
+          <div className="vrm-label" style={{color:C.chromeMuted,padding:'2px 10px 7px',fontSize:10,letterSpacing:1.1,opacity:.8}}>{g.titre}</div>
           {g.items.map(t => {
             const on = tab === t.id;
+            const gros = !!g.primaire;
             return (
               <button key={t.id} type="button" onClick={()=>setTab(t.id)} aria-current={on?'page':undefined}
-                style={{display:'flex',alignItems:'center',gap:11,width:'100%',textAlign:'left',
-                  padding:'9px 10px',marginBottom:2,borderRadius:8,border:'none',cursor:'pointer',fontFamily:'inherit',
+                style={{display:'flex',alignItems:'center',gap:12,width:'100%',textAlign:'left',
+                  padding:gros?'10px 10px':'8px 10px',marginBottom:2,borderRadius:9,border:'none',cursor:'pointer',fontFamily:'inherit',
                   position:'relative',
                   // ⚠️ L'onglet actif est un LISERÉ, plus un pavé plein d'accent.
                   // La couleur d'accent doit rester rare : posée en aplat sur la
                   // navigation, elle était la tache la plus forte de l'écran à
                   // longueur de journée, donc elle ne signalait plus rien.
-                  background:on?'rgba(255,255,255,.09)':'transparent',
-                  color:on?'#fff':C.onChrome,
-                  fontSize:13.5,fontWeight:on?600:500,transition:'background .15s ease,color .15s ease'}}>
-                {on && <span aria-hidden="true" style={{position:'absolute',left:0,top:6,bottom:6,width:3,borderRadius:5,background:C.accent}}/>}
-                <Icon name={t.icon} size={19} style={{opacity:on?1:.68,flexShrink:0,color:on?C.accent:undefined}}/>
+                  background:on?'rgba(255,255,255,.10)':'transparent',
+                  color:on?'#fff':(gros?C.onChrome:C.chromeMuted),
+                  fontSize:gros?14:13,fontWeight:on?600:(gros?500:450),transition:'background .15s ease,color .15s ease'}}>
+                {on && <span aria-hidden="true" style={{position:'absolute',left:0,top:7,bottom:7,width:3,borderRadius:5,background:C.accent}}/>}
+                <Icon name={t.icon} size={gros?20:18} style={{opacity:on?1:(gros?.8:.6),flexShrink:0,color:on?C.accent:undefined}}/>
                 <span style={{minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{t.label}</span>
               </button>
             );
