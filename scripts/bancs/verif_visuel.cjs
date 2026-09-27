@@ -180,6 +180,13 @@ const TABS=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','pl
     // code d'avant `caParPlateforme` ignorait les commandes eBay → eBay restait
     // « pas encore de vente captée » → ce contrôle échoue (§6.1).
     dit(/ventes payées/.test(dashTxt),'le CA eBay des commandes PAYÉES entre dans le total (§11)',dashTxt?'':'tableau de bord non lu');
+    // ── §11 : le CA finalisé du Tableau de bord ne doit pas se contredire avec le
+    // Collectif. Le headline « CA finalisé » est VINTED (scope explicite dans le
+    // sous-titre), et la carte « par plateforme » porte un « Total toutes
+    // plateformes » = le global du Collectif. Sur le code d'avant : ni le scope,
+    // ni le total (§6.1).
+    dit(/Total toutes plateformes/i.test(dashTxt),'la carte « par plateforme » porte le Total (= global du Collectif, §11)',dashTxt?'':'tableau de bord non lu');
+    dit(/CA finalisé[\s\S]{0,80}Vinted, tous comptes/i.test(dashTxt),'le headline « CA finalisé » dit son scope Vinted (pas un total partiel présenté comme complet, §5)');
     // ── eBay dans « À faire aujourd'hui » : une vente eBay payée non expédiée
     // est un colis à envoyer, exactement comme une vente Vinted (« tout
     // centralisé », §11). Sur le code d'avant, notifItems ignorait eBay →

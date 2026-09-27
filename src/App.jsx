@@ -7675,7 +7675,13 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             VENTE, jamais au jour où Vinted a versé l'argent (elle ne connaît pas
             cette date). Le rapport comptable a été corrigé, ce titre-là était
             resté — et c'est le chiffre qu'on regarde pour déclarer. */}
-        <StatCard icon="💸" label="CA finalisé" value={fmt(liveStats&&liveStats.caEncaisse!=null?liveStats.caEncaisse:ca)} color={C.text} sub="ventes finalisées · daté au jour de la vente"/>
+        {/* ⚠️ SCOPE EXPLICITE : ce chiffre est le CA finalisé VINTED (caEncaisse) —
+            le même que la ligne « Vinted » de la carte « par plateforme » juste
+            dessous. Sans « Vinted » dans le sous-titre, il se lit comme un total
+            global alors que le « Total toutes plateformes » (Collectif) est plus
+            grand dès qu'une autre plateforme a des ventes : un total partiel qui
+            se présente comme complet (§5). On ne touche PAS la valeur (URSSAF). */}
+        <StatCard icon="💸" label="CA finalisé" value={fmt(liveStats&&liveStats.caEncaisse!=null?liveStats.caEncaisse:ca)} color={C.text} sub="Vinted, tous comptes · daté au jour de la vente"/>
         {/* Bénéfice/marge : n/d tant qu'aucun prix d'achat n'est saisi (sinon on
             afficherait le CA comme « bénéfice », ce qui est faux — cf. écran Ventes). */}
         <StatCard icon="📈" label="Bénéfice net" value={liveStats&&liveStats.caEncaisse!=null?'—':fmt(profit)} color={C.muted} sub={liveStats&&liveStats.caEncaisse!=null?undefined:'argent reçu uniquement'}/>
@@ -7721,6 +7727,11 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             <Card style={{padding:16,background:C.card,border:`1px solid ${C.border}`}}>
               <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:4}}>CA finalisé par plateforme</div>
               {plateformes.map(p => <Ligne key={p.nom} label={p.nom} val={p.ca} note={p.note}/>)}
+              {/* Total = somme des plateformes captées = le CA global de l'onglet
+                  Collectif (§11 : les deux écrans ne peuvent pas se contredire).
+                  Affiché seulement quand ≥ 2 plateformes ont des ventes, sinon il
+                  répète la seule ligne remplie. */}
+              {(()=>{ const nz=plateformes.filter(p=>p.ca!=null); return nz.length>=2 ? <Ligne label="Total toutes plateformes" val={nz.reduce((s,p)=>s+p.ca,0)} fort/> : null; })()}
             </Card>
             <Card style={{padding:16,background:C.card,border:`1px solid ${C.border}`}}>
               <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:4}}>CA Vinted par compte</div>
