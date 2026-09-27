@@ -5306,7 +5306,7 @@ function SideBar({ tab, setTab }) {
 //    ponctuels (`PLUS_TABS`) et Réglages. Zéro doublon, et tout reste joignable
 //    (les cinq du quotidien par la barre, le reste par ici). §7 : on ne dit pas
 //    deux fois la même chose sur le même écran.
-function MenuEcrans({ tab, setTab }) {
+function MenuEcrans({ tab, setTab, dark = false }) {
   const [open, setOpen] = React.useState(false);
   React.useEffect(() => { setOpen(false); }, [tab]);
   React.useEffect(() => {
@@ -5323,8 +5323,8 @@ function MenuEcrans({ tab, setTab }) {
     <>
       <button type="button" onClick={()=>setOpen(o=>!o)} aria-label="Tous les écrans" aria-expanded={open}
         style={{flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',width:38,height:38,
-          borderRadius:8,border:`1px solid ${open?C.accent:C.border}`,background:open?`${C.accent}14`:C.bg,
-          color:open?C.accent:C.text,cursor:'pointer',fontFamily:'inherit'}}>
+          borderRadius:8,border:`1px solid ${open?C.accent:(dark?'#3A3A3C':C.border)}`,background:open?`${C.accent}14`:(dark?'#1C1C1E':C.bg),
+          color:open?C.accent:(dark?'#fff':C.text),cursor:'pointer',fontFamily:'inherit'}}>
         <Icon name={open?'close':'menu'} size={19}/>
       </button>
       {open && (
@@ -27280,17 +27280,21 @@ export default function App() {
            FOND et perd sa bordure : les icônes flottent au-dessus de la page,
            il n'y a plus de barre à regarder. Sur téléphone, rien ne change —
            le bandeau y porte le menu, le logo et la synchro. */
-        background: C.glass||C.surface,
+        // ⚠️ Sur l'onglet eBay (téléphone), la barre du haut passe au NOIR eBay
+        // pour que l'écran soit d'un seul tenant (Julien : « améliore tout » —
+        // plus de barre claire au-dessus d'un contenu noir). Fond + bordure
+        // seulement : les puces/icônes restent lisibles sur noir.
+        background: (!ordi && tab==='plat_ebay') ? '#000000' : (C.glass||C.surface),
         backdropFilter:'saturate(180%) blur(20px)',WebkitBackdropFilter:'saturate(180%) blur(20px)',
-        borderBottom: ordi ? undefined : `1px solid ${C.border}`}}>
+        borderBottom: ordi ? undefined : `1px solid ${(tab==='plat_ebay') ? '#1C1C1E' : C.border}`}}>
         {/* ⚠️ `display:none` sur ordinateur, pas `visibility:hidden` : un bloc
             invisible occupe quand même sa largeur, et l'île ferait 400 px. */}
         <div style={{display: ordi ? 'none' : 'flex',alignItems:'center',gap:10,minWidth:0,flex:'0 1 auto'}}>
           {/* Tous les écrans, en haut à gauche. Sur ordinateur la barre latérale
               les montre déjà tous : ce bouton n'y existe pas. */}
-          {!ordi && <MenuEcrans tab={tab} setTab={setTab}/>}
+          {!ordi && <MenuEcrans tab={tab} setTab={setTab} dark={tab==='plat_ebay'}/>}
           {canBack && <button type="button" onClick={goBack} title="Retour" aria-label="Retour"
-            style={{flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',width:38,height:38,borderRadius:8,border:`1px solid ${C.border}`,background:C.bg,color:C.text,cursor:'pointer',fontSize:20,fontWeight:600,fontFamily:'inherit',lineHeight:1}}>‹</button>}
+            style={{flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',width:38,height:38,borderRadius:8,border:`1px solid ${(!ordi&&tab==='plat_ebay')?'#3A3A3C':C.border}`,background:(!ordi&&tab==='plat_ebay')?'#1C1C1E':C.bg,color:(!ordi&&tab==='plat_ebay')?'#fff':C.text,cursor:'pointer',fontSize:20,fontWeight:600,fontFamily:'inherit',lineHeight:1}}>‹</button>}
           {/* Logo Cancale Shoes Store - cliquable pour le changer */}
           <input ref={logoInputRef} type="file" accept="image/*" onChange={handleLogoChange} style={{display:'none'}}/>
           <div
@@ -27372,19 +27376,21 @@ export default function App() {
               style={{background:notifEnabled?C.accent:'transparent',border:`1px solid ${notifEnabled?C.accent:C.border}`,borderRadius:8,padding:'6px 11px',color:notifEnabled?C.onAccent:C.text,cursor:'pointer',fontSize:15,fontWeight:500,fontFamily:'inherit'}}>
               {notifEnabled?'🔔':'🔕'}
             </button>}
+            {(() => { const eD = !ordi && tab==='plat_ebay'; const ink = eD ? '#fff' : C.text; const bd = eD ? '#3A3A3C' : C.border; return (<>
             <button type="button" onClick={()=>{setGsOpen(true);}} title="Rechercher" aria-label="Rechercher une paire"
-              style={{background:gsOpen?C.accent:'transparent',border:`1px solid ${gsOpen?C.accent:C.border}`,borderRadius:8,padding:'6px 11px',color:gsOpen?C.onAccent:C.text,cursor:'pointer',fontSize:15,fontWeight:500,fontFamily:'inherit'}}>
+              style={{background:gsOpen?C.accent:'transparent',border:`1px solid ${gsOpen?C.accent:bd}`,borderRadius:8,padding:'6px 11px',color:gsOpen?C.onAccent:ink,cursor:'pointer',fontSize:15,fontWeight:500,fontFamily:'inherit'}}>
               <Icon name="search" size={17}/>
             </button>
             <button type="button" onClick={()=>setNotifOpen(o=>!o)} title="Notifications" aria-label="Notifications"
-              style={{position:'relative',background:notifOpen?C.accent:'transparent',border:`1px solid ${notifOpen?C.accent:C.border}`,borderRadius:8,padding:'6px 11px',color:notifOpen?C.onAccent:C.text,cursor:'pointer',fontSize:15,fontWeight:500,fontFamily:'inherit'}}>
+              style={{position:'relative',background:notifOpen?C.accent:'transparent',border:`1px solid ${notifOpen?C.accent:bd}`,borderRadius:8,padding:'6px 11px',color:notifOpen?C.onAccent:ink,cursor:'pointer',fontSize:15,fontWeight:500,fontFamily:'inherit'}}>
               <Icon name="bell2" size={17}/>
-              {notifItems.length>0 && <span style={{position:'absolute',top:-5,right:-5,minWidth:17,height:17,borderRadius:8,background:C.danger,color:'#fff',fontSize:11,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',padding:'0 4px',border:`1.5px solid ${C.surface}`}}>{notifItems.reduce((s,i)=>s+(i.n||1),0)}</span>}
+              {notifItems.length>0 && <span style={{position:'absolute',top:-5,right:-5,minWidth:17,height:17,borderRadius:8,background:C.danger,color:'#fff',fontSize:11,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',padding:'0 4px',border:`1.5px solid ${eD?'#000':C.surface}`}}>{notifItems.reduce((s,i)=>s+(i.n||1),0)}</span>}
             </button>
             <button type="button" onClick={()=>setTab('settings')} title="Paramètres" aria-label="Ouvrir les paramètres"
-              style={{background:tab==='settings'?C.accent:'transparent',border:`1px solid ${tab==='settings'?C.accent:C.border}`,borderRadius:8,padding:'6px 11px',color:tab==='settings'?C.onAccent:C.text,cursor:'pointer',fontSize:15,fontWeight:500,fontFamily:'inherit'}}>
+              style={{background:tab==='settings'?C.accent:'transparent',border:`1px solid ${tab==='settings'?C.accent:bd}`,borderRadius:8,padding:'6px 11px',color:tab==='settings'?C.onAccent:ink,cursor:'pointer',fontSize:15,fontWeight:500,fontFamily:'inherit'}}>
               <Icon name="gear" size={17}/>
             </button>
+            </>); })()}
           </div>
         </div>
       </header>
