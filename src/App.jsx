@@ -187,10 +187,18 @@ const THEMES = {
   // essayés et rejetés (§5.58, §5.60, §5.70).
   // Les clés existantes sont conservées : tout le fichier lit toujours C.xxx.
   light: {
-    bg:"#F6F7F9", surface:"#FFFFFF", card:"#FFFFFF", card2:"#F1F3F6", border:"#E3E7EC",
-    accent:"#1E5FCC", accentSoft:"#3D7BE0", onAccent:"#FFFFFF",
+    // ⚠️ PASSE « HAUT DE GAMME » (Julien, 27 sept. : « améliore les couleurs et
+    // la qualité, ça fait pas haut de gamme »). On ne change PAS d'identité
+    // (§7 : un seul accent, bleu, rare) : on l'AFFINE. Le bleu web un peu criard
+    // (#1E5FCC) devient un bleu profond et posé (#1D4FD6) — c'est la teinte des
+    // apps « premium », plus dense, moins fluo. L'encre est plus franche
+    // (#0B0F15), les filets plus légers (cartes moins « encadrées »), le fond
+    // très légèrement plus froid : ce sont les vrais signaux de finition, pas la
+    // multiplication des couleurs. Une seule teinte d'accent, toujours.
+    bg:"#F6F7F9", surface:"#FFFFFF", card:"#FFFFFF", card2:"#F1F3F7", border:"#E7EAF0",
+    accent:"#1D4FD6", accentSoft:"#4C7BEA", onAccent:"#FFFFFF",
     danger:"#C0392B", warn:"#A15C00", gold:"#7A6636",
-    blue:"#1E5FCC", purple:"#5B4B9E", text:"#10151B", muted:"#5C6672",
+    blue:"#1D4FD6", purple:"#5B4B9E", text:"#0B0F15", muted:"#5A6472",
     // Cartes BLANCHES sur fond gris : c'est l'écart entre les deux qui donne le
     // relief, et une ombre très douce qui les décolle. Les filets « imprimés »
     // du papier n'ont plus de sens ici.
@@ -198,10 +206,12 @@ const THEMES = {
     // gris sous la carte ; deux couches — un contact serré, puis une diffusion
     // large et très pâle — donnent l'impression que la carte est POSÉE. C'est
     // le détail qui sépare « encadré » de « soigné », et il ne coûte rien.
-    shadow:"0 1px 1px rgba(16,21,27,.04), 0 2px 6px rgba(16,21,27,.05)",
-    shadowMd:"0 1px 2px rgba(16,21,27,.05), 0 6px 16px rgba(16,21,27,.07)",
-    shadowLg:"0 2px 4px rgba(16,21,27,.05), 0 16px 40px rgba(16,21,27,.12)",
-    ring:"rgba(30,95,204,.14)",
+    // Ombres à deux couches, un cran plus douces et plus larges : une carte qui
+    // « flotte » sur un halo pâle lit plus soigné qu'une carte posée net.
+    shadow:"0 1px 2px rgba(11,15,21,.04), 0 3px 8px rgba(11,15,21,.05)",
+    shadowMd:"0 1px 2px rgba(11,15,21,.05), 0 8px 22px rgba(11,15,21,.07)",
+    shadowLg:"0 2px 6px rgba(11,15,21,.06), 0 22px 50px rgba(11,15,21,.13)",
+    ring:"rgba(29,79,214,.16)",
     glass:"rgba(255,255,255,.88)",
     // LE CHROME RESTE À L'ENCRE, MÊME EN CLAIR : la navigation est un bloc
     // sombre contre la page claire — c'est la signature, et ça règle au passage
@@ -209,7 +219,7 @@ const THEMES = {
     // (`C` est une variable de module mutable, cf. §4). Encre ARDOISE désormais,
     // plus brune : deux températures sur le même écran, ça se voit.
     chrome:"#131820", onChrome:"#E7ECF2", chromeMuted:"#8592A3", chromeLine:"#242C37",
-    s1:"#1E5FCC", s2:"#0F8A6A",
+    s1:"#1D4FD6", s2:"#0F8A6A",
   },
   dark: {
     // Le sombre est la MÊME identité, la nuit : ardoise froide, même bleu
@@ -4680,11 +4690,17 @@ const Icon = ({ name, size = 24, style }) => {
 // une coupe se vérifie sur ce qui RESTE — `cat_annonces`, `cat_ventes`,
 // `cat_achats` gardent toutes leurs cibles de navigation, ils passent
 // simplement d'un accès en 1 tap à un accès depuis le hub Vinted.
+// ⚠️ BARRE DU BAS = LES APPLICATIONS (demande de Julien, 27 sept. : « vinted
+// leboncoin vestiaire et ebay… les applications, le reste est dans l'onglet en
+// haut déroulant »). Ma journée (l'accueil) reste en tête, puis les quatre
+// plateformes. Colis, Annonces, Ventes… partent dans le menu ☰ — Colis reste à
+// un tap depuis Ma journée (carte « Expédier N colis »), il n'est pas perdu.
 const BOTTOM_TABS=[
-  {id:'journee',        icon:'sun',  emoji:'☀️',label:'Ma journée'},
-  {id:'plat_vinted',    icon:'shop', emoji:'🟢',label:'Vinted'},
-  {id:'plat_leboncoin', icon:'tag',  emoji:'🟠',label:'Leboncoin'},
-  {id:'cat_bord',       icon:'box',  emoji:'📄',label:'Colis'},   // colis = carton, pas « document »
+  {id:'journee',        icon:'sun',   emoji:'☀️',label:'Ma journée'},
+  {id:'plat_vinted',    icon:'shop',  emoji:'🟢',label:'Vinted'},
+  {id:'plat_leboncoin', icon:'tag',   emoji:'🟠',label:'Leboncoin'},
+  {id:'plat_vestiaire', icon:'heart', emoji:'👗',label:'Vestiaire'},
+  {id:'plat_ebay',      icon:'grid',  emoji:'🔵',label:'eBay'},
 ];
 // Les écrans DÉTAILLÉS de Vinted. Ils ne sont plus des onglets de la barre
 // (séparation par site) : on y arrive par les cartes du hub Vinted. Mais ils
@@ -4707,12 +4723,13 @@ const BAR_GROUPE={
 };
 // Les écrans qu'on ouvre ponctuellement — jamais perdus, juste rangés.
 const PLUS_TABS=[
+  /* ⚠️ Colis descend ici (barre du bas = les plateformes, demande du 27 sept.).
+     Il reste en tête du menu — c'est le geste quotidien le plus fréquent après
+     l'accueil — et à un tap depuis la carte « Expédier N colis » de Ma journée. */
+  {id:'cat_bord',       icon:'box',  emoji:'📄',label:'Colis',       desc:'Bordereaux à imprimer, colis à retirer'},
   {id:'collectif',    icon:'target',  emoji:'🌐',label:'Collectif',     desc:'Toutes tes plateformes réunies'},
-  /* ⚠️ `plat_vinted` ET `plat_leboncoin` sont dans la BARRE DU BAS (séparation
-     par site) — retirés d'ici pour ne pas les montrer deux fois. Les autres
-     hubs de plateforme (eBay, Vestiaire) restent dans « Plus ». */
-  {id:'plat_ebay',      icon:'grid', emoji:'🔵',label:'eBay',       desc:'Ce que VRM sait d\'eBay'},
-  {id:'plat_vestiaire', icon:'heart', emoji:'👗',label:'Vestiaire',  desc:'Pas encore reliée à VRM'},
+  /* ⚠️ `plat_vinted`, `plat_leboncoin`, `plat_vestiaire` ET `plat_ebay` sont
+     tous dans la BARRE DU BAS — retirés d'ici pour ne pas les montrer deux fois. */
   {id:'dashboard',    icon:'chart',   emoji:'📊',label:'Statistiques',  desc:'Chiffre d\'affaires, bénéfices, cotisations'},
   {id:'prixmarche',   icon:'spark',   emoji:'💡',label:'Prix qui marche',desc:'À quel prix tes modèles se vendent, par taille'},
   {id:'leboncoin',    icon:'pin',     emoji:'🟠',label:'À publier',      desc:'Tes annonces à publier sur Leboncoin, et à retirer'},
@@ -13231,7 +13248,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
 // sur une app vermillon. Elles suivent maintenant la famille papier/encre.
 const INV_STATUS = {
   online:       { label: 'En ligne',      color: '#0F8A6A', icon: '🟢' },
-  pending_sale: { label: 'Vente en cours', color: '#1E5FCC', icon: '⏳' },
+  pending_sale: { label: 'Vente en cours', color: '#1D4FD6', icon: '⏳' },
   sold:         { label: 'Vendu',         color: '#5C6672', icon: '💸' },
   stock:        { label: 'Stock',         color: '#A15C00', icon: '📦' },
 };
