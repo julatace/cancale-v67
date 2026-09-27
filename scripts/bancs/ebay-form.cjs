@@ -35,7 +35,17 @@ let ko = 0; const dit = (c,m,d)=>{ if(!c)ko++; console.log((c?'✅ ':'❌ ')+m+(
     if(req.method()!=='POST') return j({ ready:true, canConsent:true });
     let body={}; try{ body=JSON.parse(req.postData()||'{}'); }catch(_){}
     if(body.action==='status') return j({ ok:true, connected:true });
-    if(body.action==='pubinfo') return j({ ok:true, categorie:{ suggeree:{ categoryId:'15709', categoryName:'Baskets' } }, attributsObligatoires:['Marque','Pointure EU','Couleur','Département','Style','Type'] });
+    if(body.action==='pubinfo') return j({ ok:true, categorie:{ suggeree:{ categoryId:'15709', categoryName:'Baskets' } },
+      // eBay renvoie chaque caractéristique AVEC ses valeurs (la « même interface »).
+      attributs:[
+        { nom:'Marque', requis:true, mode:'SELECTION_ONLY', valeurs:['Nike','Adidas','New Balance','Salomon'] },
+        { nom:'Pointure EU', requis:true, mode:'SELECTION_ONLY', valeurs:['42','43','44','45'] },
+        { nom:'Couleur', requis:true, mode:'FREE_TEXT', valeurs:[] },
+        { nom:'Département', requis:true, mode:'SELECTION_ONLY', valeurs:['Homme','Femme','Enfant'] },
+        { nom:'Style', requis:false, mode:'SELECTION_ONLY', valeurs:['Basket','Running','Ville'] },
+        { nom:'Matière extérieure', requis:false, mode:'SELECTION_ONLY', valeurs:['Cuir','Textile','Synthétique'] },
+      ],
+      attributsObligatoires:['Marque','Pointure EU','Couleur','Département'] });
     if(body.action==='finances') return j({ ok:false, reason:'scope', error:'x' });
     return j({ ok:true }); });
   await pg.goto('http://localhost:4331/?tab=plat_ebay',{waitUntil:'domcontentloaded'});
@@ -77,8 +87,15 @@ let ko = 0; const dit = (c,m,d)=>{ if(!c)ko++; console.log((c?'✅ ':'❌ ')+m+(
   txt = await T();
   dit(/Baskets/.test(txt), 'la catégorie eBay suggérée s\'affiche (Baskets)');
   dit(/Prix & livraison/.test(txt), 'section « Prix & livraison » présente');
-  const pointure = await pg.evaluate(()=>{ const labs=[...document.querySelectorAll('label')]; const l=labs.find(x=>/pointure/i.test(x.textContent)); if(!l)return ''; const box=l.parentElement; const inp=box&&box.querySelector('input'); return inp?inp.value:''; });
-  dit(pointure === '44', 'la pointure de la paire remplit l\'attribut eBay (44)', 'pointure=' + pointure);
+  // Même interface qu'eBay : les caractéristiques à valeurs sont des LISTES
+  // déroulantes portant les valeurs d'eBay, et la pointure de la paire s'y
+  // sélectionne (valeur autorisée par eBay).
+  const champ = await pg.evaluate(()=>{ const labs=[...document.querySelectorAll('label')]; const l=labs.find(x=>/pointure/i.test(x.textContent)); if(!l)return {}; const box=l.parentElement; const sel=box&&box.querySelector('select'); return { tag: sel?'select':(box&&box.querySelector('input')?'input':''), val: sel?sel.value:'', opts: sel?[...sel.options].map(o=>o.value).join(','):'' }; });
+  dit(champ.tag === 'select', 'la caractéristique eBay est une LISTE (comme sur eBay), pas un champ libre', 'tag=' + champ.tag);
+  dit(/(^|,)44(,|$)/.test(champ.opts), 'la liste porte les valeurs d\'eBay (…,44,…)', champ.opts);
+  dit(champ.val === '44', 'la pointure de la paire est sélectionnée dans la liste eBay (44)', 'val=' + champ.val);
+  const plusBtn = await pg.$('text=/Plus de caractéristiques/');
+  dit(!!plusBtn, 'les caractéristiques FACULTATIVES sont sous un dépliant (comme eBay)');
 
   // Mode de livraison : un vrai sélecteur (comme sur eBay)
   const shipOpts = await pg.evaluate(()=>{ const sels=[...document.querySelectorAll('select')]; for(const s of sels){ const t=[...s.options].map(o=>o.textContent).join('|'); if(/Mondial Relay|Colissimo/i.test(t)) return t; } return ''; });
