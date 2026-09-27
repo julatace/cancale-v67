@@ -144,22 +144,16 @@ let ko = 0; const dit = (c,m,d)=>{ if(!c)ko++; console.log((c?'✅ ':'❌ ')+m+(
   dit(dep === '', 'ce qui ne se prouve pas reste VIDE (Département, mieux vaut un blanc qu\'un faux)', 'dep=' + dep);
   dit(/requis/i.test(await T()), 'un compteur dit combien de champs obligatoires restent');
 
-  // Mode de livraison : des CARTES de transporteurs (comme sur eBay), pas un
-  // menu — et CHACUNE affiche son PRIX (le manque que Julien a signalé).
-  const cartesShip = await pg.evaluate(()=>{ const b=[...document.querySelectorAll('button')].filter(x=>/Mondial Relay|Colissimo|Chronopost/i.test(x.textContent));
-    return b.map(x=>({ t:x.textContent.replace(/\s+/g,' ').trim(), euro:/\d+[.,]\d{2}\s*€/.test(x.textContent) })); });
-  dit(cartesShip.some(c=>/Mondial Relay/i.test(c.t)) && cartesShip.some(c=>/Colissimo/i.test(c.t)), 'on CHOISIT le transporteur en cartes (Mondial Relay, Colissimo…)', cartesShip.map(c=>c.t.slice(0,18)).join(' / ').slice(0,70));
-  // ⚠️ LE DÉFAUT SIGNALÉ : chaque carte doit porter un PRIX (« le prix s'affiche »).
-  dit(cartesShip.length>0 && cartesShip.every(c=>c.euro), 'chaque transporteur affiche SON prix (comme sur eBay)', cartesShip.map(c=>c.euro?'€':'—').join(''));
-  // Choisir Mondial Relay remplit le champ « frais de port » avec son tarif.
-  const mr = await pg.evaluate(()=>{ const b=[...document.querySelectorAll('button')].find(x=>/Mondial Relay/i.test(x.textContent)); if(b)b.click(); return true; });
-  await pg.waitForTimeout(200);
-  const portVal = await pg.evaluate(()=>{ const l=[...document.querySelectorAll('label')].find(x=>/Frais de port/i.test(x.textContent)); const i=l&&l.parentElement&&l.parentElement.querySelector('input'); return i?i.value:''; });
-  dit(/\d/.test(portVal), 'choisir un transporteur remplit son prix dans « frais de port »', 'port=' + portVal);
-  // Frais de port : à 0 (vide), on prévient que c'est LUI qui paie (il n'en veut jamais).
-  await pg.evaluate(()=>{ const l=[...document.querySelectorAll('label')].find(x=>/Frais de port/i.test(x.textContent)); const i=l&&l.parentElement&&l.parentElement.querySelector('input'); if(i){ const set=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set; set.call(i,''); i.dispatchEvent(new Event('input',{bubbles:true})); } });
-  await pg.waitForTimeout(200);
-  dit(/c'est.{0,6}toi.{0,6}qui paies|livraison.{0,20}offerte/i.test(await T()), 'à 0 €, on prévient que c\'est TOI qui paies la livraison (Julien n\'en veut jamais)');
+  // ⚠️ LIVRAISON GÉRÉE PAR eBay (Julien : « c'est pas moi qui choisis le prix,
+  // c'est eBay qui me propose »). MESURÉ à blanc : son compte refuse un tarif
+  // fixe de l'API. Donc PAS de sélecteur de transporteur ni de champ de prix —
+  // un bloc dit qu'eBay gère, et on ne réclame jamais un prix à Julien.
+  const shipTxt = (await T());
+  dit(/livraison.{0,30}g[ée]r[ée]e? par eBay|eBay.{0,20}(g[èe]re|propose).{0,20}(livraison|tarif|prix)/i.test(shipTxt), 'un bloc dit que la LIVRAISON est gérée par eBay (il propose le prix)', shipTxt.replace(/\s+/g,' ').slice(0,80));
+  dit(/tu ne paies jamais le port|tu ne fixes rien/i.test(shipTxt), 'et que Julien ne paie jamais le port / ne fixe rien');
+  // Aucune saisie de prix de port ne doit être demandée (eBay s'en charge).
+  const aChampPort = await pg.evaluate(()=>[...document.querySelectorAll('label')].some(x=>/Frais de port/i.test(x.textContent)));
+  dit(!aChampPort, 'aucun champ « frais de port » à remplir — eBay gère le tarif');
   // Photo : Vinted a 9 photos, 3 captées → on le DIT (rouvrir l'annonce).
   dit(/sur 9/i.test(await T()), 'si Vinted a plus de photos que capté, on le dit (3 sur 9 → rouvrir)');
   // La description Vinted est reprise AUTOMATIQUEMENT (le champ apparaît avec la catégorie).
@@ -173,7 +167,7 @@ let ko = 0; const dit = (c,m,d)=>{ if(!c)ko++; console.log((c?'✅ ':'❌ ')+m+(
   dit(/Vérifier sans publier/.test(txt) && /Publier sur eBay/.test(txt), 'les deux gestes sont là (vérifier à blanc + publier)');
   dit(errs.length === 0, 'aucune erreur d\'app', errs.slice(0,1).join(''));
 
-  console.log(ko ? ('\n'+ko+' contrôle(s) non conforme(s).') : '\nOn publie en CHOISISSANT une paire (photos auto, aucun lien) et en CHOISISSANT la livraison — comme sur eBay, dans l\'app.');
+  console.log(ko ? ('\n'+ko+' contrôle(s) non conforme(s).') : '\nOn publie en CHOISISSANT une paire (photos auto, aucun lien) ; eBay gère la livraison (il propose le prix), comme dans l\'appli eBay.');
   await b.close(); srv.close();
   process.exit(ko ? 1 : 0);
 })();

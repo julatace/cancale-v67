@@ -6503,45 +6503,14 @@ function VentesLeboncoin({ lbcVentes = {ventes:[],inconnues:0} }) {
 // qu'eBay exige. L'humain confirme tout avant l'envoi (aucune publication à
 // l'aveugle). Un refus eBay s'affiche tel quel ; aucune annonce n'est créée.
 const EBAY_CONDITIONS = [['3000', 'Occasion'], ['1000', 'Neuf avec boîte'], ['1500', 'Neuf sans boîte'], ['1750', 'Neuf avec défauts']];
-// Modes de livraison eBay France (site 71). Le code (value) est le jeton
-// ShippingService qu'eBay attend ; le libellé est en clair. ⚠️ On ne PROMET pas
-// qu'un jeton est accepté : « Vérifier sans publier » (VerifyAddFixedPriceItem)
-// le contrôle chez eBay AVANT toute publication — un jeton refusé remonte, rien
-// n'est publié. C'est la même prudence que partout : mesurer, ne pas deviner.
-//
-// ⚠️ LE PRIX PAR TRANSPORTEUR (Julien, 27 sept. : « sur eBay on choisit Mondial
-// Relay et le prix s'affiche, dans VRM non »). MESURÉ : l'API eBay ne nous
-// donne PAS ses tarifs de bordereau (son compte n'a aucune règle d'expédition
-// nommée — `regleExpedition` répond 400/0 ; ces prix viennent du flux « Simple
-// Delivery » d'eBay, invisible de l'API). On ne peut donc pas les LIRE. On ne
-// les INVENTE pas non plus (§5) : le 4ᵉ champ est un tarif INDICATIF, volontai-
-// rement du côté HAUT (l'acheteur paie ce qu'on met — trop bas, c'est JULIEN
-// qui paierait le complément, ce qu'il refuse). Il est ÉDITABLE, et VRM RETIENT
-// le tarif que Julien fixe par transporteur (`vrm_ebay_ports`, par appareil) :
-// dès la 2ᵉ annonce, « le prix s'affiche » — son propre prix, pas une supposition.
-const EBAY_SHIPPING = [
-  ['FR_MondialRelay',              'Mondial Relay',            'Point relais · 2-4 j · suivi inclus', '4.29'],
-  ['FR_ColissimoLabelPointRetrait','Colissimo — point retrait','1-2 j · suivi inclus',                '4.99'],
-  ['FR_Colissimo',                 'Colissimo — à domicile',   '1-2 j · suivi inclus',                '6.99'],
-  ['FR_Chronopost',               'Chronopost',               'Rapide · 1-2 j · suivi inclus',       '9.90'],
-  ['FR_LaPosteLettreSuivie',      'Lettre suivie',            'Petit envoi · suivi simple',          '2.99'],
-];
-// VRM retient le tarif que Julien fixe pour CHAQUE transporteur, sur l'appareil
-// (ce n'est pas une donnée partagée : un prix de livraison est un choix local,
-// pas un chiffre de compta). Le défaut du tableau sert de première valeur ;
-// dès qu'il l'ajuste, c'est SA valeur qui revient — jamais une supposition.
-const EBAY_PORTS_KEY = 'vrm_ebay_ports';
-function loadEbayPorts() { try { return JSON.parse(localStorage.getItem(EBAY_PORTS_KEY) || '{}') || {}; } catch (_) { return {}; } }
-function saveEbayPort(code, val) {
-  try { const m = loadEbayPorts(); const v = String(val == null ? '' : val).trim();
-    if (!v) delete m[code]; else m[code] = v; localStorage.setItem(EBAY_PORTS_KEY, JSON.stringify(m)); } catch (_) {}
-}
-// Le prix à afficher pour un transporteur : celui que Julien a retenu, sinon le
-// tarif indicatif du tableau. Jamais vide (sauf transporteur inconnu).
-function portPour(code) {
-  const m = loadEbayPorts(); if (m[code] != null && m[code] !== '') return m[code];
-  const e = EBAY_SHIPPING.find(x => x[0] === code); return e && e[3] != null ? e[3] : '';
-}
+// ⚠️ LA LIVRAISON EST GÉRÉE PAR eBay (Julien, 27 sept. : « c'est pas moi qui
+// choisis le prix, c'est eBay qui me propose »). MESURÉ à blanc
+// (VerifyAddFixedPriceItem) : son compte est en livraison gérée par eBay, qui
+// REFUSE un tarif fixe envoyé par l'API (« Item.ShippingDetails non valides »).
+// VRM ne choisit donc AUCUN transporteur ni prix ici — l'item part avec
+// `ebayGere:true` et eBay applique sa livraison gérée (il propose le prix à
+// l'acheteur, l'encaisse, fournit le bordereau). Plus de table de transporteurs
+// côté app : ce serait promettre un choix qu'eBay ne nous laisse pas faire.
 // Titre eBay : comme lbcTitre mais la pointure s'écrit « taille 36 » en toutes
 // lettres (demande de Julien : pas « T36 »). ≤ 80 caractères, coupé sur un mot.
 function ebayTitre(base, taille, max) {
@@ -6614,7 +6583,6 @@ function EbayPublier({ onPublie, paires = [] }) {
   const [cond, setCond] = React.useState('3000');
   const [desc, setDesc] = React.useState('');
   const [photos, setPhotos] = React.useState('');
-  const [port, setPort] = React.useState(() => portPour('FR_MondialRelay'));  // prix retenu pour le transporteur, sinon tarif indicatif
   const [cat, setCat] = React.useState(null);          // {categoryId, categoryName, required:[]}
   const [asp, setAsp] = React.useState({});
   const [analyse, setAnalyse] = React.useState(false);
@@ -6625,10 +6593,6 @@ function EbayPublier({ onPublie, paires = [] }) {
   const [pairId, setPairId] = React.useState(null);    // paire choisie (ses photos partent avec)
   const [pickerOpen, setPickerOpen] = React.useState(false);
   const [pairQ, setPairQ] = React.useState('');        // recherche dans le sélecteur de paires
-  const [ship, setShip] = React.useState('FR_MondialRelay');  // transporteur choisi (comme sur eBay, Mondial Relay en tête)
-  // Choisir un transporteur remplit son prix (celui retenu, sinon indicatif) —
-  // c'est ce qui manquait : « on choisit Mondial Relay et le prix s'affiche ».
-  const choisirTransporteur = (code) => { setShip(code); setPort(portPour(code)); setCheck(null); };
   const [aiPret, setAiPret] = React.useState(false);   // l'IA de rédaction est-elle branchée ?
   const [aiBusy, setAiBusy] = React.useState(false);
   const [aiWhy, setAiWhy] = React.useState('');
@@ -6736,7 +6700,9 @@ function EbayPublier({ onPublie, paires = [] }) {
     const urls = photos.split(/\s+/).map(s => s.trim()).filter(s => /^https?:\/\//.test(s));
     if (!urls.length) return { err: 'Choisis une paire — ses photos partent avec l\'annonce.' };
     if (!prix.trim()) return { err: 'Mets un prix.' };
-    return { item: { title: titre, categoryId: cat.categoryId, price: String(prix).replace(',', '.'), quantity: qty, conditionId: cond, description: desc || titre, photos: urls, aspects: asp, shippingService: ship, shippingCost: String(port || 0).replace(',', '.') } };
+    // ebayGere: eBay gère la livraison (mesuré : son compte refuse un tarif fixe
+    // envoyé par l'API). VRM n'impose aucun port ; eBay applique sa livraison gérée.
+    return { item: { title: titre, categoryId: cat.categoryId, price: String(prix).replace(',', '.'), quantity: qty, conditionId: cond, description: desc || titre, photos: urls, aspects: asp, ebayGere: true } };
   };
   // VÉRIFIER À BLANC (VerifyAddFixedPriceItem) : eBay valide exactement ce qu'on
   // publierait et renvoie les frais, SANS rien créer. Le filet pour la première
@@ -6942,47 +6908,18 @@ function EbayPublier({ onPublie, paires = [] }) {
                 <div><label style={lab}>Prix (€)</label><input value={prix} onChange={e => { setPrix(e.target.value); setCheck(null); }} inputMode="decimal" placeholder="ex. 74" style={inp} /></div>
                 <div><label style={lab}>Quantité</label><input value={qty} onChange={e => setQty(e.target.value)} inputMode="numeric" style={inp} /></div>
               </div>
-              {/* ── LIVRAISON EN CARTES, COMME SUR eBay : on choisit un transporteur
-                  et SON PRIX s'affiche (Julien, 27 sept.). Le prix est celui que VRM
-                  a retenu pour ce transporteur, sinon le tarif indicatif — toujours
-                  éditable, toujours à la charge de l'ACHETEUR. */}
-              <label style={{ ...lab, marginTop: 12, display: 'block' }}>Mode de livraison — l'acheteur paie</label>
-              <div style={{ display: 'grid', gap: 8, marginTop: 6 }}>
-                {EBAY_SHIPPING.map(([v, l, sub]) => { const on = ship === v; const px = on ? port : portPour(v);
-                  const pv = Number(String(px || '').replace(',', '.'));
-                  return (
-                    <button key={v} type="button" onClick={() => choisirTransporteur(v)} aria-pressed={on}
-                      style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
-                        border: `1.5px solid ${on ? C.accent : C.border}`, background: on ? `${C.accent}0D` : C.card, borderRadius: 12, padding: '11px 13px',
-                        boxShadow: on ? C.shadow : 'none', transition: 'border-color .15s ease, background .15s ease' }}>
-                      <span aria-hidden="true" style={{ flexShrink: 0, width: 18, height: 18, borderRadius: 999, border: `2px solid ${on ? C.accent : C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        {on && <span style={{ width: 8, height: 8, borderRadius: 999, background: C.accent }} />}
-                      </span>
-                      <span style={{ minWidth: 0, flex: 1 }}>
-                        <span style={{ display: 'block', fontSize: 14, fontWeight: on ? 700 : 600, color: C.text }}>{l}</span>
-                        <span style={{ display: 'block', fontSize: 11.5, color: C.muted, marginTop: 1 }}>{sub}</span>
-                      </span>
-                      <span style={{ flexShrink: 0, fontSize: 15, fontWeight: 700, color: on ? C.accent : C.text }}>{pv ? pv.toFixed(2).replace('.', ',') + ' €' : '—'}</span>
-                    </button>
-                  );
-                })}
-              </div>
-              {/* Le prix du transporteur choisi : éditable, et VRM le RETIENT. */}
-              <div style={{ marginTop: 10, display: 'flex', alignItems: 'flex-end', gap: 10, flexWrap: 'wrap' }}>
-                <div style={{ flex: '1 1 160px', minWidth: 0 }}>
-                  <label style={lab}>Frais de port — payés par l'acheteur (€)</label>
-                  <input value={port} onChange={e => { setPort(e.target.value); saveEbayPort(ship, e.target.value); setCheck(null); }} inputMode="decimal" placeholder="ex. 4,29" style={inp} />
+              {/* ── LIVRAISON GÉRÉE PAR eBay (Julien, 27 sept. : « c'est pas moi qui
+                  choisis le prix, c'est eBay qui me propose »). MESURÉ à blanc : son
+                  compte est en livraison gérée par eBay — eBay REFUSE un tarif fixe
+                  envoyé par l'API (« Item.ShippingDetails non valides »). VRM ne fixe
+                  donc AUCUN prix : eBay propose le tarif à l'acheteur, l'encaisse et
+                  fournit le bordereau. On le DIT, on n'invente rien. */}
+              <div style={{ marginTop: 12, display: 'flex', gap: 11, alignItems: 'flex-start', background: `${C.accent}0D`, border: `1px solid ${C.accent}`, borderRadius: 12, padding: '12px 13px' }}>
+                <Icon name="box" size={20} style={{ color: C.accent, flexShrink: 0, marginTop: 1 }} />
+                <div style={{ minWidth: 0, fontSize: 12.5, color: C.text, lineHeight: 1.5 }}>
+                  <b>La livraison est gérée par eBay.</b> C'est <b>eBay</b> qui propose le tarif à l'acheteur (Mondial Relay, Colissimo…), l'encaisse et te fournit le bordereau — comme dans l'appli eBay. <span style={{ color: C.muted }}>Tu ne fixes rien ici, et tu ne paies jamais le port. Le prix exact s'affiche du côté de l'acheteur au moment de l'achat.</span>
                 </div>
               </div>
-              {/* ⚠️ Julien : « je ne veux JAMAIS payer les frais de port ». Le montant
-                  est facturé À L'ACHETEUR. Le seul cas où c'est TOI qui paies, c'est 0. */}
-              {(() => { const p = Number(String(port || '').replace(',', '.'));
-                return (!port || !p) ? (
-                  <div style={{ fontSize: 12, color: C.warn, marginTop: 8, lineHeight: 1.45, background: `${C.warn}12`, border: `1px solid ${C.warn}`, borderRadius: 8, padding: '8px 10px' }}>⚠️ À 0, la livraison est <b>offerte</b> — c'est <b>toi</b> qui paies. Mets le tarif du transporteur pour que l'<b>acheteur</b> paie.</div>
-                ) : (
-                  <div style={{ fontSize: 11.5, color: C.muted, marginTop: 8, lineHeight: 1.45 }}>✓ L'acheteur paie <b>{p.toFixed(2).replace('.', ',')} €</b> de livraison. Tu ne paies rien. <span style={{ color: C.muted }}>VRM retient ce tarif pour {(EBAY_SHIPPING.find(x => x[0] === ship) || [])[1]} — au 1<sup>er</sup> envoi, recopie le prix qu'eBay t'affiche ; ensuite il revient tout seul.</span></div>
-                );
-              })()}
             </BlocEbay>
 
             {/* 5 — DESCRIPTION */}
