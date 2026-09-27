@@ -6908,16 +6908,17 @@ function EbayPublier({ onPublie, paires = [] }) {
                 <div><label style={lab}>Prix (€)</label><input value={prix} onChange={e => { setPrix(e.target.value); setCheck(null); }} inputMode="decimal" placeholder="ex. 74" style={inp} /></div>
                 <div><label style={lab}>Quantité</label><input value={qty} onChange={e => setQty(e.target.value)} inputMode="numeric" style={inp} /></div>
               </div>
-              {/* ── LIVRAISON GÉRÉE PAR eBay (Julien, 27 sept. : « c'est pas moi qui
-                  choisis le prix, c'est eBay qui me propose »). MESURÉ à blanc : son
-                  compte est en livraison gérée par eBay — eBay REFUSE un tarif fixe
-                  envoyé par l'API (« Item.ShippingDetails non valides »). VRM ne fixe
-                  donc AUCUN prix : eBay propose le tarif à l'acheteur, l'encaisse et
-                  fournit le bordereau. On le DIT, on n'invente rien. */}
+              {/* ── LIVRAISON GÉRÉE PAR eBay (Julien, 27 sept. : « c'est MOI qui
+                  choisis le transporteur, mais c'est eBay qui fixe le montant »).
+                  MESURÉ 3 fois à blanc : eBay REFUSE tout <ShippingDetails> envoyé
+                  par l'API — transporteur + coût ET transporteur seul (« Item.
+                  ShippingDetails non valides ») ; seul un item SANS livraison passe.
+                  Donc le choix du transporteur se fait DANS eBay (pas dans VRM), et
+                  eBay fixe le prix. VRM publie sans toucher à la livraison. */}
               <div style={{ marginTop: 12, display: 'flex', gap: 11, alignItems: 'flex-start', background: `${C.accent}0D`, border: `1px solid ${C.accent}`, borderRadius: 12, padding: '12px 13px' }}>
                 <Icon name="box" size={20} style={{ color: C.accent, flexShrink: 0, marginTop: 1 }} />
                 <div style={{ minWidth: 0, fontSize: 12.5, color: C.text, lineHeight: 1.5 }}>
-                  <b>La livraison est gérée par eBay.</b> C'est <b>eBay</b> qui propose le tarif à l'acheteur (Mondial Relay, Colissimo…), l'encaisse et te fournit le bordereau — comme dans l'appli eBay. <span style={{ color: C.muted }}>Tu ne fixes rien ici, et tu ne paies jamais le port. Le prix exact s'affiche du côté de l'acheteur au moment de l'achat.</span>
+                  <b>La livraison est gérée par eBay.</b> Le <b>transporteur</b> (Mondial Relay, Chronopost, Colissimo…) se choisit <b>dans eBay</b>, et c'est <b>eBay</b> qui fixe le montant, l'encaisse et te fournit le bordereau. <span style={{ color: C.muted }}>VRM publie l'annonce sans toucher à la livraison — tu ne paies jamais le port. (eBay refuse qu'une appli fixe le transporteur ou le prix à sa place : vérifié.)</span>
                 </div>
               </div>
             </BlocEbay>

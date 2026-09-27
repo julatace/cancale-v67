@@ -168,22 +168,21 @@ function itemXml(it) {
     // valides », mesuré à blanc). Quand `ebayGere` est vrai, on N'IMPOSE aucun
     // tarif — eBay applique sa livraison gérée. Sinon (compte à tarif fixe), on
     // envoie le mode + le coût choisis, à la charge de l'acheteur.
-    // ⚠️ Julien : « c'est MOI qui choisis le transporteur, mais c'est eBay qui
-    // fixe le montant ». On teste donc trois formes (mesure à blanc) :
-    //  • ebayGere sans transporteur → aucun <ShippingDetails> (eBay gère tout) ;
-    //  • transporteur SANS coût → on nomme le transporteur, eBay tarife (ce
-    //    qu'il demande) ;
-    //  • transporteur AVEC coût → tarif fixe (compte non géré).
-    ((() => {
-      const car = it.carrier || (it.ebayGere ? '' : (it.shippingService || 'FR_ColissimoLabelPointRetrait'));
-      const hasCost = it.shippingCost != null && String(it.shippingCost) !== '';
-      if (!car) return '';
-      const cost = hasCost ? `<ShippingServiceCost>${Number(String(it.shippingCost).replace(',', '.')).toFixed(2)}</ShippingServiceCost>` : '';
-      return '<ShippingDetails>' + (hasCost ? '<ShippingType>Flat</ShippingType>' : '') +
+    // ⚠️ LIVRAISON GÉRÉE PAR eBay. MESURÉ 3 fois à blanc sur son compte (27 sept.) :
+    // eBay REFUSE tout <ShippingDetails> que VRM envoie — transporteur + coût ET
+    // transporteur seul sortent « Item.ShippingDetails non valides ». Seul un item
+    // SANS aucun bloc livraison est accepté (ok:true) : eBay gère alors transporteur
+    // ET prix (Julien : « c'est eBay qui propose »). VRM ne peut donc PAS laisser
+    // choisir le transporteur via l'API — c'est le geste de l'appli eBay, pas du
+    // nôtre. `ebayGere` (vrai par défaut) ⇒ on n'émet rien. Le mode tarif-fixe
+    // reste possible pour un compte NON géré (rétro-compat).
+    (it.ebayGere
+      ? ''
+      : '<ShippingDetails><ShippingType>Flat</ShippingType>' +
         '<ShippingServiceOptions><ShippingServicePriority>1</ShippingServicePriority>' +
-        `<ShippingService>${esc(car)}</ShippingService>` + cost +
-        '</ShippingServiceOptions></ShippingDetails>';
-    })()) +
+        `<ShippingService>${esc(it.shippingService || 'FR_ColissimoLabelPointRetrait')}</ShippingService>` +
+        `<ShippingServiceCost>${Number(String(it.shippingCost != null ? it.shippingCost : 0).replace(',', '.')).toFixed(2)}</ShippingServiceCost>` +
+        '</ShippingServiceOptions></ShippingDetails>') +
     '<ReturnPolicy><ReturnsAcceptedOption>ReturnsAccepted</ReturnsAcceptedOption>' +
     '<ReturnsWithinOption>Days_14</ReturnsWithinOption><ShippingCostPaidByOption>Buyer</ShippingCostPaidByOption></ReturnPolicy>' +
     '</Item>';
