@@ -6517,7 +6517,18 @@ function EbayPublier({ onPublie, paires = [] }) {
   const [aiPret, setAiPret] = React.useState(false);   // l'IA de rédaction est-elle branchée ?
   const [aiBusy, setAiBusy] = React.useState(false);
   const [aiWhy, setAiWhy] = React.useState('');
+  const [plusAttr, setPlusAttr] = React.useState(false);  // afficher les caractéristiques facultatives
   const pairSel = paires.find(p => p.id === pairId) || null;
+  // Un champ de caractéristique rendu comme eBay : liste déroulante quand eBay
+  // fournit ses valeurs, texte libre sinon. On ne propose QUE les valeurs d'eBay.
+  const champAttr = (a) => a.valeurs && a.valeurs.length ? (
+    <select value={asp[a.nom] || ''} onChange={e => { setAsp(x => ({ ...x, [a.nom]: e.target.value })); setCheck(null); }} style={inp}>
+      <option value="">— choisir —</option>
+      {a.valeurs.map(v => <option key={v} value={v}>{v}</option>)}
+    </select>
+  ) : (
+    <input value={asp[a.nom] || ''} onChange={e => { setAsp(x => ({ ...x, [a.nom]: e.target.value })); setCheck(null); }} placeholder={/pointure|taille|size/i.test(a.nom) ? 'ex. 44' : /marque|brand/i.test(a.nom) ? 'ex. Nike' : /couleur|color/i.test(a.nom) ? 'ex. Bleu' : ''} style={inp} />
+  );
   // L'IA de rédaction (api/ai) est-elle disponible ? On ne montre le bouton que
   // si oui — jamais un bouton mort (§ « une clé perso reste sur l'appareil »).
   React.useEffect(() => { let stop = false;
@@ -6556,13 +6567,23 @@ function EbayPublier({ onPublie, paires = [] }) {
       const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'pubinfo', title: titre }) });
       const j = await r.json();
       if (j && j.ok && j.categorie && j.categorie.suggeree) {
-        const required = j.attributsObligatoires || [];
-        setCat({ categoryId: j.categorie.suggeree.categoryId, categoryName: j.categorie.suggeree.categoryName, required });
+        // eBay renvoie chaque caractéristique avec ses valeurs (la « même
+        // interface »). Repli si un ancien serveur ne renvoie que les noms.
+        const attributs = Array.isArray(j.attributs) && j.attributs.length
+          ? j.attributs
+          : (j.attributsObligatoires || []).map(n => ({ nom: n, requis: true, mode: 'FREE_TEXT', valeurs: [] }));
+        const required = attributs.filter(a => a.requis).map(a => a.nom);
+        setCat({ categoryId: j.categorie.suggeree.categoryId, categoryName: j.categorie.suggeree.categoryName, required, attributs });
         // La pointure de la paire choisie remplit l'attribut taille d'eBay
-        // (mesure connue, pas une devinette) ; les autres restent à saisir.
+        // (mesure connue, pas une devinette) — en visant une valeur autorisée
+        // par eBay quand la liste existe ; les autres restent à choisir.
         if (pairSel && pairSel.taille) {
-          const champTaille = required.find(n => /pointure|taille|size/i.test(n));
-          if (champTaille) setAsp(a => (a[champTaille] ? a : { ...a, [champTaille]: String(pairSel.taille).replace(',', '.') }));
+          const ch = attributs.find(a => /pointure|taille|size/i.test(a.nom));
+          if (ch) {
+            const brut = String(pairSel.taille).replace(',', '.');
+            const val = (ch.valeurs && ch.valeurs.length) ? (ch.valeurs.find(v => String(v).replace(',', '.') === brut) || '') : brut;
+            if (val) setAsp(a => (a[ch.nom] ? a : { ...a, [ch.nom]: val }));
+          }
         }
       } else setRes({ err: (j && j.error) || 'eBay n\'a pas suggéré de catégorie pour ce titre.' });
     } catch (_) { setRes({ err: 'Analyse impossible (réseau).' }); }
@@ -6736,15 +6757,30 @@ function EbayPublier({ onPublie, paires = [] }) {
           </Bloc>
 
           {cat && (<>
-            {/* 3 — CARACTÉRISTIQUES (dictées par eBay, jamais devinées) */}
+            {/* 3 — CARACTÉRISTIQUES : la MÊME interface qu'eBay. Chaque champ et ses
+                valeurs viennent d'eBay (get_item_aspects_for_category) — listes
+                déroulantes quand eBay en fournit, comme sur son site. Les
+                obligatoires (✳) d'abord ; les facultatives sous un dépliant. */}
             <Bloc n="3" titre="Caractéristiques">
-              {(cat.required || []).length > 0 && <div style={{ fontSize: 11.5, color: C.muted, marginBottom: 10, lineHeight: 1.45 }}>eBay demande ces informations pour « {cat.categoryName} ». Les champs avec ✳ sont obligatoires.</div>}
+              <div style={{ fontSize: 11.5, color: C.muted, marginBottom: 10, lineHeight: 1.45 }}>Ces champs viennent d'eBay pour « {cat.categoryName} » — les mêmes que sur son site. ✳ = obligatoire.</div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(148px,1fr))', gap: 10 }}>
                 <div><label style={lab}>État</label><select value={cond} onChange={e => { setCond(e.target.value); setCheck(null); }} style={inp}>{EBAY_CONDITIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></div>
-                {(cat.required || []).map(n => (
-                  <div key={n}><label style={lab}>{n} <span style={{ color: C.accent }}>✳</span></label><input value={asp[n] || ''} onChange={e => { setAsp(a => ({ ...a, [n]: e.target.value })); setCheck(null); }} placeholder={/pointure|taille|size/i.test(n) ? 'ex. 44' : /marque|brand/i.test(n) ? 'ex. Nike' : /couleur|color/i.test(n) ? 'ex. Bleu' : ''} style={inp} /></div>
+                {(cat.attributs || []).filter(a => a.requis).map(a => (
+                  <div key={a.nom}><label style={lab}>{a.nom} <span style={{ color: C.accent }}>✳</span></label>{champAttr(a)}</div>
                 ))}
               </div>
+              {(() => {
+                const opt = (cat.attributs || []).filter(a => !a.requis);
+                if (!opt.length) return null;
+                return (<>
+                  <button type="button" onClick={() => setPlusAttr(v => !v)} style={{ marginTop: 12, border: 'none', background: 'transparent', color: C.accent, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>{plusAttr ? '− Moins de caractéristiques' : `+ Plus de caractéristiques (${opt.length})`}</button>
+                  {plusAttr && (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(148px,1fr))', gap: 10, marginTop: 10 }}>
+                      {opt.map(a => (<div key={a.nom}><label style={lab}>{a.nom}</label>{champAttr(a)}</div>))}
+                    </div>
+                  )}
+                </>);
+              })()}
             </Bloc>
 
             {/* 4 — PRIX & LIVRAISON : on CHOISIT le mode de livraison (comme sur

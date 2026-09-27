@@ -271,10 +271,22 @@ async function handlePubInfo(b) {
   ]);
   const pol = (r, key) => ({ status: r.status, count: ((r.data && r.data[key]) || []).length, ids: ((r.data && r.data[key]) || []).slice(0, 3).map(p => ({ id: p[Object.keys(p).find(k => /PolicyId$/.test(k))] || p.paymentPolicyId || p.returnPolicyId || p.fulfillmentPolicyId, name: p.name })) });
   const asp = (aspects.data && aspects.data.aspects) || [];
+  // ── LA MÊME INTERFACE QU'eBAY : on retranscrit, pour chaque caractéristique,
+  //    ce qu'eBay dit lui-même — est-elle obligatoire, est-ce une liste à choix
+  //    (SELECTION_ONLY) ou du texte libre, et SES valeurs autorisées. C'est ce
+  //    qui rend le formulaire eBay « intelligent » ; VRM le rend à l'identique.
+  //    Rien n'est inventé : ce sont les listes d'eBay (§5). ──
+  const attributs = asp.map(a => ({
+    nom: a.localizedAspectName,
+    requis: !!(a.aspectConstraint && a.aspectConstraint.aspectRequired),
+    mode: (a.aspectConstraint && a.aspectConstraint.aspectMode) || 'FREE_TEXT',   // SELECTION_ONLY | FREE_TEXT
+    valeurs: ((a.aspectValues) || []).map(v => v.localizedValue).filter(Boolean).slice(0, 80),
+  }));
   return { status: 200, body: {
     ok: true,
     treeId,
     categorie: { suggeree: (sugg.data && sugg.data.categorySuggestions && sugg.data.categorySuggestions[0] && sugg.data.categorySuggestions[0].category) || null, status: sugg.status, categoryId },
+    attributs,
     attributsObligatoires: asp.filter(a => a.aspectConstraint && a.aspectConstraint.aspectRequired).map(a => a.localizedAspectName),
     attributsCount: asp.length,
     reglePaiement: pol(pay, 'paymentPolicies'),
