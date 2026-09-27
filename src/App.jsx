@@ -7024,6 +7024,7 @@ function EbayLigne({ it, onSaved }) {
 //   • relié ✓ (la publication viendra après mesure des catégories eBay).
 // Au retour d'eBay (?ebay=…), on affiche le résultat et on nettoie l'URL.
 function EbayConnexion({ comptes = [] }) {
+  const C = EBAY_SKIN;   // tout l'espace eBay est au look de l'appli eBay (Julien : « je veux exactement le même visuel que dans eBay »)
   const [st, setSt] = React.useState(null);          // {ready, canConsent} | null = en cours
   const [connected, setConnected] = React.useState(undefined); // true/false/null(pas su)/undefined(en cours)
   const [busy, setBusy] = React.useState(false);
@@ -7306,6 +7307,34 @@ function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, ebay
   const carte = {textAlign:'left',border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'13px 15px',cursor:'pointer',fontFamily:'inherit'};
   const eti = {fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500};
   const gros = {fontSize:24,fontWeight:700,color:C.text};
+  // ⚠️ TOUT L'ÉCRAN eBay AU LOOK eBay (Julien, 27 sept. : « je veux exactement le
+  // même visuel que dans eBay », « tout, rien ne va »). L'onglet eBay entier —
+  // fond noir, en-tête eBay, cartes eBay — pas seulement le sous-formulaire.
+  // Exception ASSUMÉE à §7, bornée à l'espace eBay, à la demande de l'owner.
+  if (plat === 'eBay') {
+    const E = EBAY_SKIN;
+    return (
+      <div style={{ background: E.bg, minHeight: '100vh', padding: 16, paddingBottom: 48, display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingTop: 4 }}>
+          <span style={{ flexShrink: 0, width: 40, height: 40, borderRadius: 10, background: E.accent, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="tag" size={20}/></span>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 26, fontWeight: 800, color: E.text, letterSpacing: -0.5, lineHeight: 1.1 }}>eBay</div>
+            <div style={{ fontSize: 12.5, color: E.muted }}>Vends tes paires sur eBay</div>
+          </div>
+        </div>
+        {baseKO ? (
+          <div style={{ background: E.card, borderRadius: 14, padding: 16, color: E.text, fontSize: 13, lineHeight: 1.5 }}>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué. Réessaie dans un instant.</div>
+        ) : (<>
+          <div style={{ background: E.card, borderRadius: 14, padding: 18 }}>
+            <div style={{ fontSize: 12.5, color: E.muted, marginBottom: 4 }}>Chiffre d'affaires eBay</div>
+            <div className="vrm-display" style={{ fontSize: 30, fontWeight: 800, color: p.ca != null ? E.text : E.muted }}>{p.ca != null ? fmt(p.ca) : '—'}</div>
+            <div style={{ fontSize: 11.5, color: E.muted, marginTop: 2 }}>{p.ca != null ? 'ventes eBay payées' : 'pas encore de vente captée'}</div>
+          </div>
+          <EbayConnexion comptes={comptes}/>
+        </>)}
+      </div>
+    );
+  }
   return (
     <div style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
       <ScreenHead icon="tag" title={court} desc={estVinted ? 'Tes annonces, ventes et achats sur Vinted' : `Ce que VRM sait de ${court}`}/>
