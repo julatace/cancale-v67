@@ -6542,19 +6542,22 @@ function ebayTitre(base, taille, max) {
 // mutable (§4) ; on la SHADOW localement (`const C = EBAY_SKIN`) dans BlocEbay et
 // EbayPublier — tous les `C.xxx` de ces deux fonctions passent au thème eBay sans
 // toucher au reste de l'app. Les clés couvrent exactement celles utilisées ici.
+// Valeurs relevées sur ses captures eBay (iOS, mode sombre) : fond NOIR pur,
+// cartes gris iOS (#1C1C1E) bien détachées, champs un cran plus clairs (#2C2C2E),
+// texte blanc, gris iOS (#8E8E93), bleu eBay des boutons (#3665F3). Cartes PLATES
+// (pas d'ombre, pas de bordure) — c'est le contraste gris/noir qui détache.
 const EBAY_SKIN = {
-  bg: '#0B0B0C', card: '#1A1A1C', card2: '#242427', border: '#2E2F33',
-  text: '#FFFFFF', muted: '#A6ABB3', accent: '#3665F3', accentSoft: '#5C86FF',
-  onAccent: '#FFFFFF', warn: '#E7A94A', danger: '#FF6B5E',
-  shadow: '0 1px 2px rgba(0,0,0,.5), 0 8px 22px rgba(0,0,0,.5)',
+  bg: '#000000', card: '#1C1C1E', card2: '#2C2C2E', border: '#3A3A3C',
+  text: '#FFFFFF', muted: '#8E8E93', accent: '#3665F3', accentSoft: '#5B86FF',
+  onAccent: '#FFFFFF', warn: '#FFB340', danger: '#FF453A', shadow: 'none',
 };
+// eBay ne NUMÉROTE pas ses sections : un GROS titre blanc, une carte grise plate.
 function BlocEbay({ n, titre: t, right, children }) {
   const C = EBAY_SKIN;
   return (
-    <div style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: 14, boxShadow: C.shadow }}>
+    <div style={{ borderRadius: 14, background: C.card, padding: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-        <span style={{ flexShrink: 0, width: 22, height: 22, borderRadius: 11, background: `${C.accent}18`, color: C.accent, fontSize: 12, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{n}</span>
-        <span style={{ flex: 1, fontSize: 13.5, fontWeight: 700, color: C.text }}>{t}</span>
+        <span style={{ flex: 1, fontSize: 17, fontWeight: 700, color: C.text, letterSpacing: -0.2 }}>{t}</span>
         {right}
       </div>
       {children}
@@ -6745,10 +6748,10 @@ function EbayPublier({ onPublie, paires = [] }) {
     } catch (_) { setRes({ err: 'Publication impossible (réseau).' }); }
     setBusy(false);
   };
-  const lab = { fontSize: 11, color: C.muted, display: 'block', marginBottom: 5, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600 };
+  const lab = { fontSize: 12.5, color: C.muted, display: 'block', marginBottom: 6, fontWeight: 500 };
   // ⚠️ fontSize 16 MINIMUM : en dessous, iOS Safari ZOOME automatiquement dès
   // qu'on touche un champ (plainte de Julien « ça zoome »). 16px = pas de zoom.
-  const inp = { width: '100%', boxSizing: 'border-box', border: `1px solid ${C.border}`, background: C.bg || C.card, color: C.text, borderRadius: 10, padding: '11px 12px', fontSize: 16, fontFamily: 'inherit', outline: 'none' };
+  const inp = { width: '100%', boxSizing: 'border-box', border: '1px solid transparent', background: C.card2, color: C.text, borderRadius: 12, padding: '13px 14px', fontSize: 16, fontFamily: 'inherit', outline: 'none' };
   // Un « bloc » = une section de l'annonce, comme les étapes du formulaire eBay :
   // eyebrow numéroté + carte. §7 : une seule teinte d'accent, rayons 10/12.
   const urls = photos.split(/\s+/).map(s => s.trim()).filter(s => /^https?:\/\//.test(s));
@@ -6758,7 +6761,7 @@ function EbayPublier({ onPublie, paires = [] }) {
   const eur = (n) => (Math.round(n * 100) / 100).toFixed(2).replace('.', ',') + ' €';
   const condLabel = (EBAY_CONDITIONS.find(([v]) => v === cond) || [, 'Occasion'])[1];
   if (!ouvert) return (
-    <button type="button" onClick={() => setOuvert(true)} style={{ marginTop: 10, width: '100%', border: `1px solid ${C.accent}`, background: `${C.accent}12`, color: C.accent, borderRadius: 12, padding: '13px 14px', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+    <button type="button" onClick={() => setOuvert(true)} style={{ marginTop: 10, width: '100%', border: 'none', background: C.accent, color: '#fff', borderRadius: 999, padding: '14px 16px', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
       <Icon name="tag" size={17}/> Vendre une paire sur eBay
     </button>
   );
@@ -6949,7 +6952,7 @@ function EbayPublier({ onPublie, paires = [] }) {
             {check && check.err && <div style={{ fontSize: 12.5, color: C.warn, background: `${C.warn}12`, border: `1px solid ${C.warn}`, borderRadius: 10, padding: '10px 12px', lineHeight: 1.5 }}>⚠️ eBay signale : {check.err}<br /><span style={{ color: C.muted }}>Rien n'a été publié — corrige et revérifie.</span></div>}
 
             <div className="vrm-rangee" style={{ display: 'flex', gap: 10 }}>
-              <button type="button" onClick={verifier} disabled={verif || busy} style={{ flex: 1, border: `1px solid ${C.accent}`, background: 'transparent', color: C.accent, borderRadius: 999, padding: '14px 16px', fontSize: 14, fontWeight: 700, cursor: (verif || busy) ? 'default' : 'pointer', fontFamily: 'inherit', opacity: (verif || busy) ? 0.6 : 1 }}>{verif ? 'eBay vérifie…' : 'Vérifier sans publier'}</button>
+              <button type="button" onClick={verifier} disabled={verif || busy} style={{ flex: 1, border: 'none', background: C.card2, color: C.text, borderRadius: 999, padding: '14px 16px', fontSize: 14, fontWeight: 700, cursor: (verif || busy) ? 'default' : 'pointer', fontFamily: 'inherit', opacity: (verif || busy) ? 0.6 : 1 }}>{verif ? 'eBay vérifie…' : 'Vérifier sans publier'}</button>
               <button type="button" onClick={publier} disabled={busy || verif} style={{ flex: 1, border: 'none', background: C.accent, color: '#fff', borderRadius: 999, padding: '14px 16px', fontSize: 14, fontWeight: 700, cursor: (busy || verif) ? 'default' : 'pointer', fontFamily: 'inherit', opacity: (busy || verif) ? 0.6 : 1 }}>{busy ? 'Publication…' : 'Publier sur eBay'}</button>
             </div>
           </>)}
