@@ -21,7 +21,7 @@ const NUMS = {
 const DETAILS = { '111': { description:'Basket Nike', photos:['https://img.example/1.jpg','https://img.example/2.jpg','https://img.example/3.jpg'] } };
 const ACCOUNTS = [{ vinted_user_id:'u1', login:'moi' }];
 // Annonces captées : 111 active (is_closed=false), 222 fermée (vendue).
-const LISTINGS = { data:{ payload:{ items:[ { id:'111', is_closed:false }, { id:'222', is_closed:true } ] } } };
+const LISTINGS = { data:{ payload:{ items:[ { id:'111', is_closed:false, nPhotos:9 }, { id:'222', is_closed:true } ] } } };
 let ko = 0; const dit = (c,m,d)=>{ if(!c)ko++; console.log((c?'✅ ':'❌ ')+m+(d?' — '+d:'')); };
 (async()=>{
   const b = await chromium.launch({ executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args:['--use-angle=swiftshader','--no-sandbox'] });
@@ -50,7 +50,7 @@ let ko = 0; const dit = (c,m,d)=>{ if(!c)ko++; console.log((c?'✅ ':'❌ ')+m+(
       categories:[{categoryId:'15709',categoryName:'Baskets'},{categoryId:'93427',categoryName:'Chaussures de sport'},{categoryId:'3034',categoryName:'Chaussures ville'}],
       // eBay renvoie chaque caractéristique AVEC ses valeurs (la « même interface »).
       attributs:[
-        { nom:'Marque', requis:true, mode:'SELECTION_ONLY', valeurs:['Nike','Adidas','New Balance','Salomon'] },
+        { nom:'Marque', requis:true, mode:'SELECTION_ONLY', valeurs:['Nike','Adidas','New Balance','Salomon','Autry','Puma','Asics','Reebok','Vans','Converse','Jordan','Yeezy','Veja','Hoka','On','Mizuno'] },
         { nom:'Pointure EU', requis:true, mode:'SELECTION_ONLY', valeurs:['42','43','44','45'] },
         { nom:'Couleur', requis:true, mode:'FREE_TEXT', valeurs:[] },
         { nom:'Département', requis:true, mode:'SELECTION_ONLY', valeurs:['Homme','Femme','Enfant'] },
@@ -95,7 +95,8 @@ let ko = 0; const dit = (c,m,d)=>{ if(!c)ko++; console.log((c?'✅ ':'❌ ')+m+(
   if (pairBtn) await pairBtn.click();
   await pg.waitForTimeout(400);
   const titleVal = await pg.$eval('input[placeholder^="Nike Air Max"]', el=>el.value).catch(()=>'');
-  dit(/nike/i.test(titleVal), 'choisir la paire remplit le titre tout seul', 'titre=' + titleVal.slice(0,30));
+  dit(/nike/i.test(titleVal), 'choisir la paire remplit le titre tout seul', 'titre=' + titleVal.slice(0,40));
+  dit(/taille 44/i.test(titleVal) && !/\bT44\b/.test(titleVal), 'le titre écrit « taille 44 », pas « T44 » (demande de Julien)', 'titre=' + titleVal);
   const nImgs = await pg.evaluate(()=>document.querySelectorAll('img[src^="https://img.example/"]').length);
   dit(nImgs >= 3, 'les photos de la paire arrivent toutes seules (≥3 vignettes)', 'images=' + nImgs);
   dit(/couverture/.test(await T()), 'la 1ʳᵉ photo est marquée « couverture »');
@@ -129,8 +130,10 @@ let ko = 0; const dit = (c,m,d)=>{ if(!c)ko++; console.log((c?'✅ ':'❌ ')+m+(
   dit(!!plusBtn, 'les caractéristiques FACULTATIVES sont sous un dépliant (comme eBay)');
   // Plus intelligent : la MARQUE se remplit toute seule depuis le titre, en
   // visant une valeur AUTORISÉE par eBay (Nike), jamais devinée.
-  const marque = await pg.evaluate(()=>{ const labs=[...document.querySelectorAll('label')]; const l=labs.find(x=>/marque/i.test(x.textContent)); if(!l)return ''; const s=l.parentElement&&l.parentElement.querySelector('select'); return s?s.value:''; });
-  dit(marque === 'Nike', 'la marque se pré-remplit depuis le titre (valeur eBay « Nike »)', 'marque=' + marque);
+  // Marque = liste LONGUE → champ à SUGGESTIONS (datalist), et pré-rempli « Nike ».
+  const mq = await pg.evaluate(()=>{ const labs=[...document.querySelectorAll('label')]; const l=labs.find(x=>/marque/i.test(x.textContent)); if(!l)return {}; const box=l.parentElement; const inp=box&&box.querySelector('input[list]'); const dl=inp&&document.getElementById(inp.getAttribute('list')); return { val: inp?inp.value:'', hasList: !!inp, nOpts: dl?dl.options.length:0 }; });
+  dit(mq.hasList && mq.nOpts > 12, 'la marque est un champ à SUGGESTIONS (liste longue, comme les sites de marques)', 'options=' + mq.nOpts);
+  dit(mq.val === 'Nike', 'la marque se pré-remplit depuis le titre (valeur eBay « Nike »)', 'marque=' + mq.val);
   // Département (Homme/Femme/Enfant) n'apparaît pas dans le titre → laissé VIDE.
   const dep = await pg.evaluate(()=>{ const labs=[...document.querySelectorAll('label')]; const l=labs.find(x=>/département/i.test(x.textContent)); if(!l)return 'x'; const s=l.parentElement&&l.parentElement.querySelector('select'); return s?s.value:'x'; });
   dit(dep === '', 'ce qui ne se prouve pas reste VIDE (Département, mieux vaut un blanc qu\'un faux)', 'dep=' + dep);
@@ -139,6 +142,13 @@ let ko = 0; const dit = (c,m,d)=>{ if(!c)ko++; console.log((c?'✅ ':'❌ ')+m+(
   // Mode de livraison : un vrai sélecteur (comme sur eBay)
   const shipOpts = await pg.evaluate(()=>{ const sels=[...document.querySelectorAll('select')]; for(const s of sels){ const t=[...s.options].map(o=>o.textContent).join('|'); if(/Mondial Relay|Colissimo/i.test(t)) return t; } return ''; });
   dit(/Colissimo/i.test(shipOpts) && /Mondial Relay/i.test(shipOpts), 'on CHOISIT le mode de livraison (Colissimo, Mondial Relay…)', shipOpts.slice(0,60));
+  // Frais de port : à 0 (vide), on prévient que c'est LUI qui paie (il n'en veut jamais).
+  dit(/c'est.{0,6}toi.{0,6}qui paies|livraison.{0,20}offerte/i.test(await T()), 'à 0 €, on prévient que c\'est TOI qui paies la livraison (Julien n\'en veut jamais)');
+  // Photo : Vinted a 9 photos, 3 captées → on le DIT (rouvrir l'annonce).
+  dit(/sur 9/i.test(await T()), 'si Vinted a plus de photos que capté, on le dit (3 sur 9 → rouvrir)');
+  // La description Vinted est reprise AUTOMATIQUEMENT (le champ apparaît avec la catégorie).
+  const descVal = await pg.evaluate(()=>{ const t=document.querySelector('main textarea'); return t?t.value:''; });
+  dit(/Basket Nike/i.test(descVal), 'la description de l\'annonce Vinted est reprise automatiquement', 'desc=' + descVal.slice(0,30));
 
   await pg.fill('input[placeholder="ex. 74"]', '74');
   await pg.waitForTimeout(250);
