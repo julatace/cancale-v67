@@ -6508,13 +6508,40 @@ const EBAY_CONDITIONS = [['3000', 'Occasion'], ['1000', 'Neuf avec boîte'], ['1
 // qu'un jeton est accepté : « Vérifier sans publier » (VerifyAddFixedPriceItem)
 // le contrôle chez eBay AVANT toute publication — un jeton refusé remonte, rien
 // n'est publié. C'est la même prudence que partout : mesurer, ne pas deviner.
+//
+// ⚠️ LE PRIX PAR TRANSPORTEUR (Julien, 27 sept. : « sur eBay on choisit Mondial
+// Relay et le prix s'affiche, dans VRM non »). MESURÉ : l'API eBay ne nous
+// donne PAS ses tarifs de bordereau (son compte n'a aucune règle d'expédition
+// nommée — `regleExpedition` répond 400/0 ; ces prix viennent du flux « Simple
+// Delivery » d'eBay, invisible de l'API). On ne peut donc pas les LIRE. On ne
+// les INVENTE pas non plus (§5) : le 4ᵉ champ est un tarif INDICATIF, volontai-
+// rement du côté HAUT (l'acheteur paie ce qu'on met — trop bas, c'est JULIEN
+// qui paierait le complément, ce qu'il refuse). Il est ÉDITABLE, et VRM RETIENT
+// le tarif que Julien fixe par transporteur (`vrm_ebay_ports`, par appareil) :
+// dès la 2ᵉ annonce, « le prix s'affiche » — son propre prix, pas une supposition.
 const EBAY_SHIPPING = [
-  ['FR_ColissimoLabelPointRetrait', 'Colissimo — point de retrait'],
-  ['FR_Colissimo', 'Colissimo — à domicile'],
-  ['FR_MondialRelay', 'Mondial Relay'],
-  ['FR_Chronopost', 'Chronopost'],
-  ['FR_LaPosteLettreSuivie', 'Lettre suivie'],
+  ['FR_MondialRelay',              'Mondial Relay',            'Point relais · 2-4 j · suivi inclus', '4.29'],
+  ['FR_ColissimoLabelPointRetrait','Colissimo — point retrait','1-2 j · suivi inclus',                '4.99'],
+  ['FR_Colissimo',                 'Colissimo — à domicile',   '1-2 j · suivi inclus',                '6.99'],
+  ['FR_Chronopost',               'Chronopost',               'Rapide · 1-2 j · suivi inclus',       '9.90'],
+  ['FR_LaPosteLettreSuivie',      'Lettre suivie',            'Petit envoi · suivi simple',          '2.99'],
 ];
+// VRM retient le tarif que Julien fixe pour CHAQUE transporteur, sur l'appareil
+// (ce n'est pas une donnée partagée : un prix de livraison est un choix local,
+// pas un chiffre de compta). Le défaut du tableau sert de première valeur ;
+// dès qu'il l'ajuste, c'est SA valeur qui revient — jamais une supposition.
+const EBAY_PORTS_KEY = 'vrm_ebay_ports';
+function loadEbayPorts() { try { return JSON.parse(localStorage.getItem(EBAY_PORTS_KEY) || '{}') || {}; } catch (_) { return {}; } }
+function saveEbayPort(code, val) {
+  try { const m = loadEbayPorts(); const v = String(val == null ? '' : val).trim();
+    if (!v) delete m[code]; else m[code] = v; localStorage.setItem(EBAY_PORTS_KEY, JSON.stringify(m)); } catch (_) {}
+}
+// Le prix à afficher pour un transporteur : celui que Julien a retenu, sinon le
+// tarif indicatif du tableau. Jamais vide (sauf transporteur inconnu).
+function portPour(code) {
+  const m = loadEbayPorts(); if (m[code] != null && m[code] !== '') return m[code];
+  const e = EBAY_SHIPPING.find(x => x[0] === code); return e && e[3] != null ? e[3] : '';
+}
 // Titre eBay : comme lbcTitre mais la pointure s'écrit « taille 36 » en toutes
 // lettres (demande de Julien : pas « T36 »). ≤ 80 caractères, coupé sur un mot.
 function ebayTitre(base, taille, max) {
@@ -6587,7 +6614,7 @@ function EbayPublier({ onPublie, paires = [] }) {
   const [cond, setCond] = React.useState('3000');
   const [desc, setDesc] = React.useState('');
   const [photos, setPhotos] = React.useState('');
-  const [port, setPort] = React.useState('');
+  const [port, setPort] = React.useState(() => portPour('FR_MondialRelay'));  // prix retenu pour le transporteur, sinon tarif indicatif
   const [cat, setCat] = React.useState(null);          // {categoryId, categoryName, required:[]}
   const [asp, setAsp] = React.useState({});
   const [analyse, setAnalyse] = React.useState(false);
@@ -6598,7 +6625,10 @@ function EbayPublier({ onPublie, paires = [] }) {
   const [pairId, setPairId] = React.useState(null);    // paire choisie (ses photos partent avec)
   const [pickerOpen, setPickerOpen] = React.useState(false);
   const [pairQ, setPairQ] = React.useState('');        // recherche dans le sélecteur de paires
-  const [ship, setShip] = React.useState('FR_ColissimoLabelPointRetrait');  // mode de livraison
+  const [ship, setShip] = React.useState('FR_MondialRelay');  // transporteur choisi (comme sur eBay, Mondial Relay en tête)
+  // Choisir un transporteur remplit son prix (celui retenu, sinon indicatif) —
+  // c'est ce qui manquait : « on choisit Mondial Relay et le prix s'affiche ».
+  const choisirTransporteur = (code) => { setShip(code); setPort(portPour(code)); setCheck(null); };
   const [aiPret, setAiPret] = React.useState(false);   // l'IA de rédaction est-elle branchée ?
   const [aiBusy, setAiBusy] = React.useState(false);
   const [aiWhy, setAiWhy] = React.useState('');
@@ -6911,17 +6941,46 @@ function EbayPublier({ onPublie, paires = [] }) {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(148px,1fr))', gap: 10 }}>
                 <div><label style={lab}>Prix (€)</label><input value={prix} onChange={e => { setPrix(e.target.value); setCheck(null); }} inputMode="decimal" placeholder="ex. 74" style={inp} /></div>
                 <div><label style={lab}>Quantité</label><input value={qty} onChange={e => setQty(e.target.value)} inputMode="numeric" style={inp} /></div>
-                <div style={{ gridColumn: '1 / -1' }}><label style={lab}>Mode de livraison</label><select value={ship} onChange={e => { setShip(e.target.value); setCheck(null); }} style={inp}>{EBAY_SHIPPING.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></div>
-                <div><label style={lab}>Frais de port — payés par l'acheteur (€)</label><input value={port} onChange={e => { setPort(e.target.value); setCheck(null); }} inputMode="decimal" placeholder="ex. 5,50" style={inp} /></div>
               </div>
-              {/* ⚠️ Julien : « je ne veux JAMAIS payer les frais de port ». Sur
-                  eBay, le montant saisi ici est facturé À L'ACHETEUR. Le seul cas
-                  où c'est TOI qui paies, c'est 0 (livraison offerte) — on le dit. */}
+              {/* ── LIVRAISON EN CARTES, COMME SUR eBay : on choisit un transporteur
+                  et SON PRIX s'affiche (Julien, 27 sept.). Le prix est celui que VRM
+                  a retenu pour ce transporteur, sinon le tarif indicatif — toujours
+                  éditable, toujours à la charge de l'ACHETEUR. */}
+              <label style={{ ...lab, marginTop: 12, display: 'block' }}>Mode de livraison — l'acheteur paie</label>
+              <div style={{ display: 'grid', gap: 8, marginTop: 6 }}>
+                {EBAY_SHIPPING.map(([v, l, sub]) => { const on = ship === v; const px = on ? port : portPour(v);
+                  const pv = Number(String(px || '').replace(',', '.'));
+                  return (
+                    <button key={v} type="button" onClick={() => choisirTransporteur(v)} aria-pressed={on}
+                      style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
+                        border: `1.5px solid ${on ? C.accent : C.border}`, background: on ? `${C.accent}0D` : C.card, borderRadius: 12, padding: '11px 13px',
+                        boxShadow: on ? C.shadow : 'none', transition: 'border-color .15s ease, background .15s ease' }}>
+                      <span aria-hidden="true" style={{ flexShrink: 0, width: 18, height: 18, borderRadius: 999, border: `2px solid ${on ? C.accent : C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {on && <span style={{ width: 8, height: 8, borderRadius: 999, background: C.accent }} />}
+                      </span>
+                      <span style={{ minWidth: 0, flex: 1 }}>
+                        <span style={{ display: 'block', fontSize: 14, fontWeight: on ? 700 : 600, color: C.text }}>{l}</span>
+                        <span style={{ display: 'block', fontSize: 11.5, color: C.muted, marginTop: 1 }}>{sub}</span>
+                      </span>
+                      <span style={{ flexShrink: 0, fontSize: 15, fontWeight: 700, color: on ? C.accent : C.text }}>{pv ? pv.toFixed(2).replace('.', ',') + ' €' : '—'}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {/* Le prix du transporteur choisi : éditable, et VRM le RETIENT. */}
+              <div style={{ marginTop: 10, display: 'flex', alignItems: 'flex-end', gap: 10, flexWrap: 'wrap' }}>
+                <div style={{ flex: '1 1 160px', minWidth: 0 }}>
+                  <label style={lab}>Frais de port — payés par l'acheteur (€)</label>
+                  <input value={port} onChange={e => { setPort(e.target.value); saveEbayPort(ship, e.target.value); setCheck(null); }} inputMode="decimal" placeholder="ex. 4,29" style={inp} />
+                </div>
+              </div>
+              {/* ⚠️ Julien : « je ne veux JAMAIS payer les frais de port ». Le montant
+                  est facturé À L'ACHETEUR. Le seul cas où c'est TOI qui paies, c'est 0. */}
               {(() => { const p = Number(String(port || '').replace(',', '.'));
                 return (!port || !p) ? (
                   <div style={{ fontSize: 12, color: C.warn, marginTop: 8, lineHeight: 1.45, background: `${C.warn}12`, border: `1px solid ${C.warn}`, borderRadius: 8, padding: '8px 10px' }}>⚠️ À 0, la livraison est <b>offerte</b> — c'est <b>toi</b> qui paies. Mets le tarif du transporteur pour que l'<b>acheteur</b> paie.</div>
                 ) : (
-                  <div style={{ fontSize: 11.5, color: C.muted, marginTop: 8, lineHeight: 1.45 }}>✓ L'acheteur paie {p.toFixed(2).replace('.', ',')} € de livraison. Tu ne paies rien.</div>
+                  <div style={{ fontSize: 11.5, color: C.muted, marginTop: 8, lineHeight: 1.45 }}>✓ L'acheteur paie <b>{p.toFixed(2).replace('.', ',')} €</b> de livraison. Tu ne paies rien. <span style={{ color: C.muted }}>VRM retient ce tarif pour {(EBAY_SHIPPING.find(x => x[0] === ship) || [])[1]} — au 1<sup>er</sup> envoi, recopie le prix qu'eBay t'affiche ; ensuite il revient tout seul.</span></div>
                 );
               })()}
             </BlocEbay>
