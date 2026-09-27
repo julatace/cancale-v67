@@ -6589,29 +6589,33 @@ function EbayPublier({ onPublie, paires = [] }) {
     setPhotos((p.photos || []).join('\n'));
     setCat(null); setCheck(null);
   };
-  const analyser = async () => {
+  // Applique une réponse pubinfo → catégorie + caractéristiques eBay + pré-
+  // remplissage prouvé. `nomForce` sert quand on CHOISIT une autre catégorie
+  // (eBay renvoie toujours la 1ʳᵉ suggestion en `suggeree`, on garde le nom cliqué).
+  const appliquerPubinfo = (j, nomForce, fresh) => {
+    if (!(j && j.ok && (j.categorie && (j.categorie.categoryId || j.categorie.suggeree)))) { setRes({ err: (j && j.error) || 'eBay n\'a pas suggéré de catégorie pour ce titre.' }); return; }
+    const attributs = Array.isArray(j.attributs) && j.attributs.length
+      ? j.attributs
+      : (j.attributsObligatoires || []).map(n => ({ nom: n, requis: true, mode: 'FREE_TEXT', valeurs: [] }));
+    const required = attributs.filter(a => a.requis).map(a => a.nom);
+    const catId = (j.categorie && j.categorie.categoryId) || (j.categorie && j.categorie.suggeree && j.categorie.suggeree.categoryId) || '';
+    const catNom = nomForce || (j.categorie && j.categorie.suggeree && j.categorie.suggeree.categoryName) || catId;
+    setCat({ categoryId: catId, categoryName: catNom, required, attributs, cats: Array.isArray(j.categories) ? j.categories : [] });
+    // Pré-remplissage PROUVÉ (§5) ; on n'écrase pas une saisie manuelle.
+    const src = pairSel ? pairSel.title : titre;
+    const auto = autoRemplirAttributs(attributs, { titre: src, marque: extractBrand(src) || '', taille: (pairSel && pairSel.taille) || extractSize(src) || '' });
+    // Changement de catégorie ⇒ on repart des valeurs prouvées (les anciennes
+    // caractéristiques n'ont pas de sens dans la nouvelle catégorie).
+    if (fresh) setAsp(auto); else if (Object.keys(auto).length) setAsp(a => ({ ...auto, ...a }));
+  };
+  const analyser = async (categoryId, nomForce) => {
     if (!titre.trim()) { setRes({ err: 'Mets d\'abord un titre.' }); return; }
-    setAnalyse(true); setRes(null);
+    setAnalyse(true); setRes(null); setCheck(null);
     try {
-      const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'pubinfo', title: titre }) });
-      const j = await r.json();
-      if (j && j.ok && j.categorie && j.categorie.suggeree) {
-        // eBay renvoie chaque caractéristique avec ses valeurs (la « même
-        // interface »). Repli si un ancien serveur ne renvoie que les noms.
-        const attributs = Array.isArray(j.attributs) && j.attributs.length
-          ? j.attributs
-          : (j.attributsObligatoires || []).map(n => ({ nom: n, requis: true, mode: 'FREE_TEXT', valeurs: [] }));
-        const required = attributs.filter(a => a.requis).map(a => a.nom);
-        setCat({ categoryId: j.categorie.suggeree.categoryId, categoryName: j.categorie.suggeree.categoryName, required, attributs });
-        // On pré-remplit ce qu'on peut PROUVER, jamais deviner (§5) : chaque
-        // valeur posée est une valeur AUTORISÉE par eBay qui correspond
-        // exactement à la paire (pointure, marque) ou apparaît SANS AMBIGUÏTÉ
-        // dans le titre. Un doute ⇒ champ vide. Les valeurs saisies à la main
-        // ne sont jamais écrasées.
-        const src = pairSel ? pairSel.title : titre;
-        const auto = autoRemplirAttributs(attributs, { titre: src, marque: extractBrand(src) || '', taille: (pairSel && pairSel.taille) || extractSize(src) || '' });
-        if (Object.keys(auto).length) setAsp(a => ({ ...auto, ...a }));
-      } else setRes({ err: (j && j.error) || 'eBay n\'a pas suggéré de catégorie pour ce titre.' });
+      const body = { action: 'pubinfo', title: titre };
+      if (categoryId) body.categoryId = categoryId;   // choisir une autre catégorie → ses caractéristiques
+      const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+      appliquerPubinfo(await r.json(), nomForce, !!categoryId);
     } catch (_) { setRes({ err: 'Analyse impossible (réseau).' }); }
     setAnalyse(false);
   };
@@ -6772,13 +6776,26 @@ function EbayPublier({ onPublie, paires = [] }) {
             {aiWhy && <div style={{ fontSize: 11.5, color: C.muted, marginTop: 6, lineHeight: 1.45 }}>✨ {aiWhy}</div>}
             <div style={{ marginTop: 10 }}>
               {!cat ? (
-                <button type="button" onClick={analyser} disabled={analyse || !titre.trim()} style={{ width: '100%', border: `1px solid ${C.accent}`, background: `${C.accent}12`, color: C.accent, borderRadius: 10, padding: '11px 14px', fontSize: 13.5, fontWeight: 700, cursor: (analyse || !titre.trim()) ? 'default' : 'pointer', fontFamily: 'inherit', opacity: (analyse || !titre.trim()) ? 0.5 : 1 }}>{analyse ? 'eBay cherche la catégorie…' : 'Trouver la catégorie eBay'}</button>
-              ) : (
+                <button type="button" onClick={() => analyser()} disabled={analyse || !titre.trim()} style={{ width: '100%', border: `1px solid ${C.accent}`, background: `${C.accent}12`, color: C.accent, borderRadius: 10, padding: '11px 14px', fontSize: 13.5, fontWeight: 700, cursor: (analyse || !titre.trim()) ? 'default' : 'pointer', fontFamily: 'inherit', opacity: (analyse || !titre.trim()) ? 0.5 : 1 }}>{analyse ? 'eBay cherche la catégorie…' : 'Trouver la catégorie eBay'}</button>
+              ) : (<>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: `${C.accent}0d`, border: `1px solid ${C.border}`, borderRadius: 10, padding: '9px 12px' }}>
                   <Icon name="check" size={15} />
                   <span style={{ fontSize: 12.5, color: C.text }}>Catégorie eBay : <b>{cat.categoryName}</b> <span style={{ color: C.muted }}>({cat.categoryId})</span></span>
                 </div>
-              )}
+                {/* Les autres catégories proposées par eBay — si la 1ʳᵉ n'est pas
+                    la bonne, on en choisit une autre (ses caractéristiques se
+                    rechargent). Comme sur eBay ; rien n'est deviné. */}
+                {Array.isArray(cat.cats) && cat.cats.filter(c => c.categoryId !== cat.categoryId).length > 0 && (
+                  <div style={{ marginTop: 8 }}>
+                    <div style={{ fontSize: 11, color: C.muted, marginBottom: 6 }}>Pas la bonne ? Autres catégories proposées par eBay :</div>
+                    <div className="vrm-rangee" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {cat.cats.filter(c => c.categoryId !== cat.categoryId).map(c => (
+                        <button key={c.categoryId} type="button" onClick={() => analyser(c.categoryId, c.categoryName)} disabled={analyse} style={{ border: `1px solid ${C.border}`, background: C.card, color: C.text, borderRadius: 8, padding: '6px 10px', fontSize: 12, fontWeight: 600, cursor: analyse ? 'default' : 'pointer', fontFamily: 'inherit' }}>{c.categoryName}</button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>)}
             </div>
           </Bloc>
 

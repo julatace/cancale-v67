@@ -282,10 +282,17 @@ async function handlePubInfo(b) {
     mode: (a.aspectConstraint && a.aspectConstraint.aspectMode) || 'FREE_TEXT',   // SELECTION_ONLY | FREE_TEXT
     valeurs: ((a.aspectValues) || []).map(v => v.localizedValue).filter(Boolean).slice(0, 80),
   }));
+  // Les catégories qu'eBay PROPOSE pour ce titre (jusqu'à 5) — on laisse choisir
+  // si la première n'est pas la bonne, comme sur eBay. Rien n'est deviné.
+  const categories = ((sugg.data && sugg.data.categorySuggestions) || [])
+    .map(s => s && s.category).filter(c => c && c.categoryId)
+    .map(c => ({ categoryId: c.categoryId, categoryName: c.categoryName }))
+    .slice(0, 5);
   return { status: 200, body: {
     ok: true,
     treeId,
     categorie: { suggeree: (sugg.data && sugg.data.categorySuggestions && sugg.data.categorySuggestions[0] && sugg.data.categorySuggestions[0].category) || null, status: sugg.status, categoryId },
+    categories,
     attributs,
     attributsObligatoires: asp.filter(a => a.aspectConstraint && a.aspectConstraint.aspectRequired).map(a => a.localizedAspectName),
     attributsCount: asp.length,

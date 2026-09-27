@@ -35,7 +35,9 @@ let ko = 0; const dit = (c,m,d)=>{ if(!c)ko++; console.log((c?'✅ ':'❌ ')+m+(
     if(req.method()!=='POST') return j({ ready:true, canConsent:true });
     let body={}; try{ body=JSON.parse(req.postData()||'{}'); }catch(_){}
     if(body.action==='status') return j({ ok:true, connected:true });
-    if(body.action==='pubinfo') return j({ ok:true, categorie:{ suggeree:{ categoryId:'15709', categoryName:'Baskets' } },
+    if(body.action==='pubinfo'){ const cid = body.categoryId || '15709';
+      return j({ ok:true, categorie:{ categoryId:cid, suggeree:{ categoryId:'15709', categoryName:'Baskets' } },
+      categories:[{categoryId:'15709',categoryName:'Baskets'},{categoryId:'93427',categoryName:'Chaussures de sport'},{categoryId:'3034',categoryName:'Chaussures ville'}],
       // eBay renvoie chaque caractéristique AVEC ses valeurs (la « même interface »).
       attributs:[
         { nom:'Marque', requis:true, mode:'SELECTION_ONLY', valeurs:['Nike','Adidas','New Balance','Salomon'] },
@@ -45,7 +47,7 @@ let ko = 0; const dit = (c,m,d)=>{ if(!c)ko++; console.log((c?'✅ ':'❌ ')+m+(
         { nom:'Style', requis:false, mode:'SELECTION_ONLY', valeurs:['Basket','Running','Ville'] },
         { nom:'Matière extérieure', requis:false, mode:'SELECTION_ONLY', valeurs:['Cuir','Textile','Synthétique'] },
       ],
-      attributsObligatoires:['Marque','Pointure EU','Couleur','Département'] });
+      attributsObligatoires:['Marque','Pointure EU','Couleur','Département'] }); }
     if(body.action==='finances') return j({ ok:false, reason:'scope', error:'x' });
     return j({ ok:true }); });
   await pg.goto('http://localhost:4331/?tab=plat_ebay',{waitUntil:'domcontentloaded'});
@@ -86,6 +88,11 @@ let ko = 0; const dit = (c,m,d)=>{ if(!c)ko++; console.log((c?'✅ ':'❌ ')+m+(
   await pg.waitForTimeout(900);
   txt = await T();
   dit(/Baskets/.test(txt), 'la catégorie eBay suggérée s\'affiche (Baskets)');
+  // eBay propose d'autres catégories : on peut en choisir une autre (comme eBay).
+  const autreCat = await pg.$('text=Chaussures de sport');
+  dit(!!autreCat, 'les autres catégories proposées par eBay sont offertes au choix');
+  if (autreCat) { await autreCat.click(); await pg.waitForTimeout(700);
+    dit(/Catégorie eBay\s*:?\s*Chaussures de sport/i.test((await T()).replace(/\s+/g,' ')), 'changer de catégorie met à jour la catégorie retenue'); }
   dit(/Prix & livraison/.test(txt), 'section « Prix & livraison » présente');
   // Même interface qu'eBay : les caractéristiques à valeurs sont des LISTES
   // déroulantes portant les valeurs d'eBay, et la pointure de la paire s'y
