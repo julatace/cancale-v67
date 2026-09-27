@@ -48,6 +48,8 @@ let ko = 0; const dit = (c,m,d)=>{ if(!c)ko++; console.log((c?'✅ ':'❌ ')+m+(
     if(body.action==='pubinfo'){ const cid = body.categoryId || '15709';
       return j({ ok:true, categorie:{ categoryId:cid, suggeree:{ categoryId:'15709', categoryName:'Baskets' } },
       categories:[{categoryId:'15709',categoryName:'Baskets'},{categoryId:'93427',categoryName:'Chaussures de sport'},{categoryId:'3034',categoryName:'Chaussures ville'}],
+      // les états qu'eBay autorise pour CETTE catégorie (Sell Metadata)
+      conditions:[{id:'1000',label:'Neuf'},{id:'1500',label:'Neuf sans emballage'},{id:'3000',label:"D'occasion"}],
       // eBay renvoie chaque caractéristique AVEC ses valeurs (la « même interface »).
       attributs:[
         { nom:'Marque', requis:true, mode:'SELECTION_ONLY', valeurs:['Nike','Adidas','New Balance','Salomon','Autry','Puma','Asics','Reebok','Vans','Converse','Jordan','Yeezy','Veja','Hoka','On','Mizuno'] },
@@ -119,6 +121,9 @@ let ko = 0; const dit = (c,m,d)=>{ if(!c)ko++; console.log((c?'✅ ':'❌ ')+m+(
   if (autreCat) { await autreCat.click(); await pg.waitForTimeout(700);
     dit(/Catégorie eBay\s*:?\s*Chaussures de sport/i.test((await T()).replace(/\s+/g,' ')), 'changer de catégorie met à jour la catégorie retenue'); }
   dit(/Prix & livraison/.test(txt), 'section « Prix & livraison » présente');
+  // L'ÉTAT vient de la liste d'eBay pour la catégorie (Sell Metadata), pas d'une liste en dur.
+  const etats = await pg.evaluate(()=>{ const labs=[...document.querySelectorAll('label')]; const l=labs.find(x=>/^état/i.test(x.textContent.trim())); if(!l)return ''; const s=l.parentElement&&l.parentElement.querySelector('select'); return s?[...s.options].map(o=>o.textContent).join('|'):''; });
+  dit(/occasion/i.test(etats) && /Neuf sans emballage/i.test(etats), 'la liste d\'états vient d\'eBay pour la catégorie', etats.slice(0,60));
   // Même interface qu'eBay : les caractéristiques à valeurs sont des LISTES
   // déroulantes portant les valeurs d'eBay, et la pointure de la paire s'y
   // sélectionne (valeur autorisée par eBay).

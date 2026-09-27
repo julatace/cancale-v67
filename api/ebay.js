@@ -262,6 +262,16 @@ async function handlePubInfo(b) {
     if (!categoryId && s0 && s0.category) categoryId = s0.category.categoryId || '';
     if (categoryId) aspects = await ebayJson(`${EBAY_API}/commerce/taxonomy/v1/category_tree/${treeId}/get_item_aspects_for_category?category_id=${categoryId}`, token, H);
   }
+  // Les ÉTATS qu'eBay autorise pour CETTE catégorie (Sell Metadata) — comme sur
+  // son site. Échec/scope manquant ⇒ on n'en renvoie pas, l'app garde sa liste
+  // standard (Occasion / Neuf…). Jamais bloquant.
+  let conditions = [];
+  if (categoryId) {
+    const cp = await ebayJson(`${EBAY_API}/sell/metadata/v1/marketplace/${MKT}/get_item_condition_policies?filter=categoryIds:%7B${categoryId}%7D`, token, H);
+    const p0 = cp.data && Array.isArray(cp.data.itemConditionPolicies) && cp.data.itemConditionPolicies[0];
+    conditions = (p0 && Array.isArray(p0.itemConditions) ? p0.itemConditions : [])
+      .map(c => ({ id: String(c.conditionId), label: c.conditionDescription || '' })).filter(c => c.id && c.label);
+  }
   // 2) Règles du compte (paiement / retour / expédition) + emplacements.
   const [pay, ret, ful, loc] = await Promise.all([
     ebayJson(`${EBAY_API}/sell/account/v1/payment_policy?marketplace_id=${MKT}`, token, H),
@@ -293,6 +303,7 @@ async function handlePubInfo(b) {
     treeId,
     categorie: { suggeree: (sugg.data && sugg.data.categorySuggestions && sugg.data.categorySuggestions[0] && sugg.data.categorySuggestions[0].category) || null, status: sugg.status, categoryId },
     categories,
+    conditions,
     attributs,
     attributsObligatoires: asp.filter(a => a.aspectConstraint && a.aspectConstraint.aspectRequired).map(a => a.localizedAspectName),
     attributsCount: asp.length,
