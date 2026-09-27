@@ -162,11 +162,19 @@ function itemXml(it) {
     (pics ? `<PictureDetails>${pics}</PictureDetails>` : '') +
     (specs ? `<ItemSpecifics>${specs}</ItemSpecifics>` : '') +
     `<DispatchTimeMax>${parseInt(it.dispatchDays || 3, 10)}</DispatchTimeMax>` +
-    '<ShippingDetails><ShippingType>Flat</ShippingType>' +
-    '<ShippingServiceOptions><ShippingServicePriority>1</ShippingServicePriority>' +
-    `<ShippingService>${esc(it.shippingService || 'FR_ColissimoLabelPointRetrait')}</ShippingService>` +
-    `<ShippingServiceCost>${Number(String(it.shippingCost != null ? it.shippingCost : 0).replace(',', '.')).toFixed(2)}</ShippingServiceCost>` +
-    '</ShippingServiceOptions></ShippingDetails>' +
+    // ⚠️ LIVRAISON GÉRÉE PAR eBay (« Simple Delivery », mesuré le 27 sept.). Son
+    // compte laisse eBay PROPOSER et encaisser le port : eBay REFUSE alors un
+    // <ShippingDetails> à prix fixe (« Item.ShippingDetails manquantes ou non
+    // valides », mesuré à blanc). Quand `ebayGere` est vrai, on N'IMPOSE aucun
+    // tarif — eBay applique sa livraison gérée. Sinon (compte à tarif fixe), on
+    // envoie le mode + le coût choisis, à la charge de l'acheteur.
+    (it.ebayGere
+      ? ''
+      : '<ShippingDetails><ShippingType>Flat</ShippingType>' +
+        '<ShippingServiceOptions><ShippingServicePriority>1</ShippingServicePriority>' +
+        `<ShippingService>${esc(it.shippingService || 'FR_ColissimoLabelPointRetrait')}</ShippingService>` +
+        `<ShippingServiceCost>${Number(String(it.shippingCost != null ? it.shippingCost : 0).replace(',', '.')).toFixed(2)}</ShippingServiceCost>` +
+        '</ShippingServiceOptions></ShippingDetails>') +
     '<ReturnPolicy><ReturnsAcceptedOption>ReturnsAccepted</ReturnsAcceptedOption>' +
     '<ReturnsWithinOption>Days_14</ReturnsWithinOption><ShippingCostPaidByOption>Buyer</ShippingCostPaidByOption></ReturnPolicy>' +
     '</Item>';
