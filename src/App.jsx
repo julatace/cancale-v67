@@ -6651,7 +6651,14 @@ function EbayPublier({ onPublie, paires = [] }) {
     const required = attributs.filter(a => a.requis).map(a => a.nom);
     const catId = (j.categorie && j.categorie.categoryId) || (j.categorie && j.categorie.suggeree && j.categorie.suggeree.categoryId) || '';
     const catNom = nomForce || (j.categorie && j.categorie.suggeree && j.categorie.suggeree.categoryName) || catId;
-    setCat({ categoryId: catId, categoryName: catNom, required, attributs, cats: Array.isArray(j.categories) ? j.categories : [] });
+    const conditions = Array.isArray(j.conditions) && j.conditions.length ? j.conditions : null;
+    setCat({ categoryId: catId, categoryName: catNom, required, attributs, cats: Array.isArray(j.categories) ? j.categories : [], conditions });
+    // Si eBay donne SA liste d'états pour cette catégorie et que l'état courant
+    // n'y est pas, on prend « Occasion » (3000) si présent, sinon le premier.
+    if (conditions && !conditions.some(c => c.id === cond)) {
+      const occ = conditions.find(c => c.id === '3000');
+      setCond((occ || conditions[0]).id);
+    }
     // Pré-remplissage PROUVÉ (§5) ; on n'écrase pas une saisie manuelle.
     const src = pairSel ? pairSel.title : titre;
     const auto = autoRemplirAttributs(attributs, { titre: src, marque: extractBrand(src) || '', taille: (pairSel && pairSel.taille) || extractSize(src) || '' });
@@ -6857,7 +6864,7 @@ function EbayPublier({ onPublie, paires = [] }) {
             <BlocEbay n="3" titre="Caractéristiques" right={(() => { const reste = (cat.required || []).filter(n => !String(asp[n] || '').trim()).length; return <span style={{ fontSize: 11, fontWeight: 700, color: reste ? C.warn : C.accent }}>{reste ? `${reste} requis` : '✓ complet'}</span>; })()}>
               <div style={{ fontSize: 11.5, color: C.muted, marginBottom: 10, lineHeight: 1.45 }}>Ces champs viennent d'eBay pour « {cat.categoryName} » — les mêmes que sur son site. ✳ = obligatoire. VRM a pré-rempli ce qu'il pouvait prouver ; complète le reste.</div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(148px,1fr))', gap: 10 }}>
-                <div><label style={lab}>État</label><select value={cond} onChange={e => { setCond(e.target.value); setCheck(null); }} style={inp}>{EBAY_CONDITIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></div>
+                <div><label style={lab}>État</label><select value={cond} onChange={e => { setCond(e.target.value); setCheck(null); }} style={inp}>{(cat.conditions && cat.conditions.length ? cat.conditions.map(c => [c.id, c.label]) : EBAY_CONDITIONS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></div>
                 {(cat.attributs || []).filter(a => a.requis).map(a => (
                   <div key={a.nom}><label style={lab}>{a.nom} <span style={{ color: C.accent }}>✳</span></label>{champAttr(a)}</div>
                 ))}
