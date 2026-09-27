@@ -168,13 +168,22 @@ function itemXml(it) {
     // valides », mesuré à blanc). Quand `ebayGere` est vrai, on N'IMPOSE aucun
     // tarif — eBay applique sa livraison gérée. Sinon (compte à tarif fixe), on
     // envoie le mode + le coût choisis, à la charge de l'acheteur.
-    (it.ebayGere
-      ? ''
-      : '<ShippingDetails><ShippingType>Flat</ShippingType>' +
+    // ⚠️ Julien : « c'est MOI qui choisis le transporteur, mais c'est eBay qui
+    // fixe le montant ». On teste donc trois formes (mesure à blanc) :
+    //  • ebayGere sans transporteur → aucun <ShippingDetails> (eBay gère tout) ;
+    //  • transporteur SANS coût → on nomme le transporteur, eBay tarife (ce
+    //    qu'il demande) ;
+    //  • transporteur AVEC coût → tarif fixe (compte non géré).
+    ((() => {
+      const car = it.carrier || (it.ebayGere ? '' : (it.shippingService || 'FR_ColissimoLabelPointRetrait'));
+      const hasCost = it.shippingCost != null && String(it.shippingCost) !== '';
+      if (!car) return '';
+      const cost = hasCost ? `<ShippingServiceCost>${Number(String(it.shippingCost).replace(',', '.')).toFixed(2)}</ShippingServiceCost>` : '';
+      return '<ShippingDetails>' + (hasCost ? '<ShippingType>Flat</ShippingType>' : '') +
         '<ShippingServiceOptions><ShippingServicePriority>1</ShippingServicePriority>' +
-        `<ShippingService>${esc(it.shippingService || 'FR_ColissimoLabelPointRetrait')}</ShippingService>` +
-        `<ShippingServiceCost>${Number(String(it.shippingCost != null ? it.shippingCost : 0).replace(',', '.')).toFixed(2)}</ShippingServiceCost>` +
-        '</ShippingServiceOptions></ShippingDetails>') +
+        `<ShippingService>${esc(car)}</ShippingService>` + cost +
+        '</ShippingServiceOptions></ShippingDetails>';
+    })()) +
     '<ReturnPolicy><ReturnsAcceptedOption>ReturnsAccepted</ReturnsAcceptedOption>' +
     '<ReturnsWithinOption>Days_14</ReturnsWithinOption><ShippingCostPaidByOption>Buyer</ShippingCostPaidByOption></ReturnPolicy>' +
     '</Item>';
