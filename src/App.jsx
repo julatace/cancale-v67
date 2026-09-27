@@ -6534,7 +6534,22 @@ function ebayTitre(base, taille, max) {
 // rendu prend une NOUVELLE identité à chaque frappe → React démonte/remonte tout
 // son sous-arbre → le champ perd le focus → sur iPhone le clavier se referme et
 // la page saute à chaque lettre. Mesuré chez Julien. Ici l'identité est stable.
+// ⚠️ PEAU eBay (Julien, 27 sept. : « je veux exactement le même visuel que dans
+// eBay »). L'écran « Publier sur eBay » adopte le look de l'appli eBay : fond
+// sombre, texte blanc, bleu eBay, champs et boutons arrondis. C'est une exception
+// ASSUMÉE à §7 (une seule identité VRM) : SEUL l'écran de publication eBay porte
+// cette peau, à la demande de l'owner. Technique : `C` est une variable de module
+// mutable (§4) ; on la SHADOW localement (`const C = EBAY_SKIN`) dans BlocEbay et
+// EbayPublier — tous les `C.xxx` de ces deux fonctions passent au thème eBay sans
+// toucher au reste de l'app. Les clés couvrent exactement celles utilisées ici.
+const EBAY_SKIN = {
+  bg: '#0B0B0C', card: '#1A1A1C', card2: '#242427', border: '#2E2F33',
+  text: '#FFFFFF', muted: '#A6ABB3', accent: '#3665F3', accentSoft: '#5C86FF',
+  onAccent: '#FFFFFF', warn: '#E7A94A', danger: '#FF6B5E',
+  shadow: '0 1px 2px rgba(0,0,0,.5), 0 8px 22px rgba(0,0,0,.5)',
+};
 function BlocEbay({ n, titre: t, right, children }) {
+  const C = EBAY_SKIN;
   return (
     <div style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: 14, boxShadow: C.shadow }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
@@ -6576,6 +6591,7 @@ function autoRemplirAttributs(attributs, { titre, marque, taille }) {
   return out;
 }
 function EbayPublier({ onPublie, paires = [] }) {
+  const C = EBAY_SKIN;   // peau eBay : tout ce formulaire est au look de l'appli eBay (§ ci-dessus)
   const [ouvert, setOuvert] = React.useState(false);
   const [titre, setTitre] = React.useState('');
   const [prix, setPrix] = React.useState('');
@@ -6763,7 +6779,7 @@ function EbayPublier({ onPublie, paires = [] }) {
           <div style={{ width: 52, height: 52, margin: '0 auto 12px', borderRadius: 26, background: `${C.accent}15`, color: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26 }}>✓</div>
           <div style={{ fontSize: 16, fontWeight: 800, color: C.text, marginBottom: 4 }}>Annonce publiée sur eBay</div>
           <div style={{ fontSize: 12.5, color: C.muted, marginBottom: 14 }}>N° {res.itemId}</div>
-          <a href={res.url} target="_blank" rel="noreferrer" style={{ display: 'inline-block', border: 'none', background: C.accent, color: '#fff', borderRadius: 10, padding: '11px 18px', fontSize: 14, fontWeight: 700, textDecoration: 'none' }}>Voir l'annonce sur eBay ↗</a>
+          <a href={res.url} target="_blank" rel="noreferrer" style={{ display: 'inline-block', border: 'none', background: C.accent, color: '#fff', borderRadius: 999, padding: '12px 20px', fontSize: 14, fontWeight: 700, textDecoration: 'none' }}>Voir l'annonce sur eBay ↗</a>
           <div style={{ marginTop: 12 }}><button type="button" onClick={reset} style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 10, padding: '9px 16px', fontSize: 13.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Terminé</button></div>
         </div>
       ) : (<>
@@ -6933,8 +6949,8 @@ function EbayPublier({ onPublie, paires = [] }) {
             {check && check.err && <div style={{ fontSize: 12.5, color: C.warn, background: `${C.warn}12`, border: `1px solid ${C.warn}`, borderRadius: 10, padding: '10px 12px', lineHeight: 1.5 }}>⚠️ eBay signale : {check.err}<br /><span style={{ color: C.muted }}>Rien n'a été publié — corrige et revérifie.</span></div>}
 
             <div className="vrm-rangee" style={{ display: 'flex', gap: 10 }}>
-              <button type="button" onClick={verifier} disabled={verif || busy} style={{ flex: 1, border: `1px solid ${C.accent}`, background: 'transparent', color: C.accent, borderRadius: 12, padding: '13px 14px', fontSize: 14, fontWeight: 700, cursor: (verif || busy) ? 'default' : 'pointer', fontFamily: 'inherit', opacity: (verif || busy) ? 0.6 : 1 }}>{verif ? 'eBay vérifie…' : 'Vérifier sans publier'}</button>
-              <button type="button" onClick={publier} disabled={busy || verif} style={{ flex: 1, border: 'none', background: C.accent, color: '#fff', borderRadius: 12, padding: '13px 16px', fontSize: 14, fontWeight: 700, cursor: (busy || verif) ? 'default' : 'pointer', fontFamily: 'inherit', opacity: (busy || verif) ? 0.6 : 1 }}>{busy ? 'Publication…' : 'Publier sur eBay'}</button>
+              <button type="button" onClick={verifier} disabled={verif || busy} style={{ flex: 1, border: `1px solid ${C.accent}`, background: 'transparent', color: C.accent, borderRadius: 999, padding: '14px 16px', fontSize: 14, fontWeight: 700, cursor: (verif || busy) ? 'default' : 'pointer', fontFamily: 'inherit', opacity: (verif || busy) ? 0.6 : 1 }}>{verif ? 'eBay vérifie…' : 'Vérifier sans publier'}</button>
+              <button type="button" onClick={publier} disabled={busy || verif} style={{ flex: 1, border: 'none', background: C.accent, color: '#fff', borderRadius: 999, padding: '14px 16px', fontSize: 14, fontWeight: 700, cursor: (busy || verif) ? 'default' : 'pointer', fontFamily: 'inherit', opacity: (busy || verif) ? 0.6 : 1 }}>{busy ? 'Publication…' : 'Publier sur eBay'}</button>
             </div>
           </>)}
         </div>
