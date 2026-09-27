@@ -144,10 +144,21 @@ let ko = 0; const dit = (c,m,d)=>{ if(!c)ko++; console.log((c?'✅ ':'❌ ')+m+(
   dit(dep === '', 'ce qui ne se prouve pas reste VIDE (Département, mieux vaut un blanc qu\'un faux)', 'dep=' + dep);
   dit(/requis/i.test(await T()), 'un compteur dit combien de champs obligatoires restent');
 
-  // Mode de livraison : un vrai sélecteur (comme sur eBay)
-  const shipOpts = await pg.evaluate(()=>{ const sels=[...document.querySelectorAll('select')]; for(const s of sels){ const t=[...s.options].map(o=>o.textContent).join('|'); if(/Mondial Relay|Colissimo/i.test(t)) return t; } return ''; });
-  dit(/Colissimo/i.test(shipOpts) && /Mondial Relay/i.test(shipOpts), 'on CHOISIT le mode de livraison (Colissimo, Mondial Relay…)', shipOpts.slice(0,60));
+  // Mode de livraison : des CARTES de transporteurs (comme sur eBay), pas un
+  // menu — et CHACUNE affiche son PRIX (le manque que Julien a signalé).
+  const cartesShip = await pg.evaluate(()=>{ const b=[...document.querySelectorAll('button')].filter(x=>/Mondial Relay|Colissimo|Chronopost/i.test(x.textContent));
+    return b.map(x=>({ t:x.textContent.replace(/\s+/g,' ').trim(), euro:/\d+[.,]\d{2}\s*€/.test(x.textContent) })); });
+  dit(cartesShip.some(c=>/Mondial Relay/i.test(c.t)) && cartesShip.some(c=>/Colissimo/i.test(c.t)), 'on CHOISIT le transporteur en cartes (Mondial Relay, Colissimo…)', cartesShip.map(c=>c.t.slice(0,18)).join(' / ').slice(0,70));
+  // ⚠️ LE DÉFAUT SIGNALÉ : chaque carte doit porter un PRIX (« le prix s'affiche »).
+  dit(cartesShip.length>0 && cartesShip.every(c=>c.euro), 'chaque transporteur affiche SON prix (comme sur eBay)', cartesShip.map(c=>c.euro?'€':'—').join(''));
+  // Choisir Mondial Relay remplit le champ « frais de port » avec son tarif.
+  const mr = await pg.evaluate(()=>{ const b=[...document.querySelectorAll('button')].find(x=>/Mondial Relay/i.test(x.textContent)); if(b)b.click(); return true; });
+  await pg.waitForTimeout(200);
+  const portVal = await pg.evaluate(()=>{ const l=[...document.querySelectorAll('label')].find(x=>/Frais de port/i.test(x.textContent)); const i=l&&l.parentElement&&l.parentElement.querySelector('input'); return i?i.value:''; });
+  dit(/\d/.test(portVal), 'choisir un transporteur remplit son prix dans « frais de port »', 'port=' + portVal);
   // Frais de port : à 0 (vide), on prévient que c'est LUI qui paie (il n'en veut jamais).
+  await pg.evaluate(()=>{ const l=[...document.querySelectorAll('label')].find(x=>/Frais de port/i.test(x.textContent)); const i=l&&l.parentElement&&l.parentElement.querySelector('input'); if(i){ const set=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set; set.call(i,''); i.dispatchEvent(new Event('input',{bubbles:true})); } });
+  await pg.waitForTimeout(200);
   dit(/c'est.{0,6}toi.{0,6}qui paies|livraison.{0,20}offerte/i.test(await T()), 'à 0 €, on prévient que c\'est TOI qui paies la livraison (Julien n\'en veut jamais)');
   // Photo : Vinted a 9 photos, 3 captées → on le DIT (rouvrir l'annonce).
   dit(/sur 9/i.test(await T()), 'si Vinted a plus de photos que capté, on le dit (3 sur 9 → rouvrir)');
