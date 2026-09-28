@@ -20036,23 +20036,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             return (
               // Carte de vente : même vocabulaire visuel que les achats et le
               // reste de l'app (rayon 16, ombre, photo 56, titre plus lisible).
-              <div key={o.transaction_id} style={{borderRadius:10,border:`1px solid ${hidden?C.danger+'55':C.border}`,background:C.card,boxShadow:C.shadow||'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'11px 12px'}}>
-               <div style={{display:'flex',gap:12,alignItems:'center',flexWrap:'wrap'}}>
-                <div style={{width:56,height:56,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+              <div key={o.transaction_id} style={{borderRadius:12,border:`1px solid ${hidden?C.danger+'55':C.border}`,background:C.card,boxShadow:C.shadow||'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'13px 14px',display:'flex',flexDirection:'column',gap:10}}>
+               {/* ── Haut : photo · titre + méta · prix ─────────────────────── */}
+               <div style={{display:'flex',gap:12,alignItems:'flex-start'}}>
+                <div style={{width:60,height:60,borderRadius:12,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
                   {orderPhoto(o)?<img src={orderPhoto(o)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}>👟</span>}
                 </div>
-                <div style={{flex:'1 1 140px',minWidth:0}}>
-                  <div style={{fontSize:13,fontWeight:600,color:C.text,letterSpacing:-0.2,
+                <div style={{flex:'1 1 auto',minWidth:0}}>
+                  <div style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.2,
                     display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden',lineHeight:1.3}} title={o.title}>{num?`N°${num} · `:''}{o.title}</div>
-                  <div style={{fontSize:11,color:C.muted,marginTop:2,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                  <div style={{fontSize:12.5,color:C.muted,marginTop:3,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
                     <AcctTag acc={o._acc} name={accNameOf(o._acc)}/>
-                    {/* Ligne reconstituée depuis l'email (filet quand la moisson
-                        Vinted manque). On le DIT : sinon on cherche d'où sort une
-                        ligne sans statut ni n° de transaction Vinted. */}
                     {o._fromEmail && <span title="Reconstituée depuis l'email — pas encore confirmée par Vinted" style={{flexShrink:0,fontSize:10,fontWeight:600,color:C.muted,border:`1px solid ${C.border}`,borderRadius:8,padding:'1px 6px'}}>email</span>}
                     <span style={{flexShrink:0}}>{o.date?new Date(o.date).toLocaleDateString('fr-FR'):''}</span>
-                    {(()=>{ const vs=venteStage(o); return <span title={vs.aide||undefined} style={{color:vs.color,fontWeight:700,background:`${vs.color}18`,borderRadius:8,padding:'1px 8px',flexShrink:0}}>{vs.label}</span>; })()}
-                    {num && needsBordereau(o.status) && (()=>{ const cell=garageCellOf(garageGrid,num); return cell ? <span onClick={()=>onLocate&&onLocate(num)} title="Voir la paire au garage" style={{color:C.blue||C.accent,fontWeight:600,cursor:'pointer'}}>· 🏠 {garageCellLabel(cell)}</span> : (garageUtilise ? <span style={{color:C.muted,fontWeight:500}} title="Cette paire n'est pas rangée au garage">· 🏠 pas au garage</span> : null); })()}
+                    {num && needsBordereau(o.status) && (()=>{ const cell=garageCellOf(garageGrid,num); return cell ? <span onClick={()=>onLocate&&onLocate(num)} title="Voir la paire au garage" style={{color:C.blue||C.accent,fontWeight:600,cursor:'pointer'}}>🏠 {garageCellLabel(cell)}</span> : (garageUtilise ? <span style={{color:C.muted,fontWeight:500}} title="Cette paire n'est pas rangée au garage">🏠 pas au garage</span> : null); })()}
                     {st==='cancelled' && num && (()=>{
                       const out = saleOutcome(o);
                       if (isPairLost(num)) return <span style={{color:C.danger,fontWeight:600,background:`${C.danger}18`,border:`1px solid ${C.danger}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title="Paire déclarée perdue : son numéro est libéré et sa case au garage vidée.">❌ N°{num} perdue</span>;
@@ -20064,11 +20061,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </div>
                 </div>
                 <div style={{textAlign:'right',flexShrink:0}}>
-                  <div style={{fontSize:15,fontWeight:700,color:C.text}}>{sell!=null?`${sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:''}</div>
-                  {benef!=null && <div style={{fontSize:11,fontWeight:600,color:benef>=0?INV_STATUS.online.color:C.danger}}>{benef>=0?'+':''}{benef.toFixed(2).replace('.',',')}€</div>}
+                  <div className="vrm-display" style={{fontSize:17,fontWeight:700,color:C.text}}>{sell!=null?`${sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:''}</div>
+                  {benef!=null && <div style={{fontSize:12,fontWeight:600,color:benef>=0?INV_STATUS.online.color:C.danger}}>{benef>=0?'+':''}{benef.toFixed(2).replace('.',',')}€</div>}
                   {benef!=null && fees>0 && <div style={{fontSize:9,color:C.muted}}>dont boost −{fees.toFixed(2).replace('.',',')}€</div>}
                   {benef==null && buy==null && <div style={{fontSize:11,color:C.muted}}>achat ?</div>}
                 </div>
+               </div>
+               {/* ── Bas : une seule pastille de statut · les actions groupées ─── */}
+               <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+                {(()=>{ const vs=venteStage(o); return <span title={vs.aide||undefined} style={{fontSize:12,color:vs.color,fontWeight:700,background:`${vs.color}18`,borderRadius:999,padding:'3px 10px',display:'inline-flex',alignItems:'center',gap:5,flexShrink:0}}><span style={{width:7,height:7,borderRadius:999,background:vs.color,display:'inline-block'}}/>{vs.label}</span>; })()}
+                <div style={{display:'flex',alignItems:'center',gap:6,flexShrink:0,marginLeft:'auto'}}>
                 {num && needsBordereau(o.status) && !hidden && inGarage(num) && (
                   <button type="button" onClick={()=>onLocate&&onLocate(num)} title={`Voir la paire N°${num} au garage`} aria-label="Voir au garage" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.blue||C.accent,cursor:'pointer',fontSize:15,padding:'6px 8px'}}>📍</button>
                 )}
@@ -20091,28 +20093,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 ) : (
                   <button type="button" onClick={()=>toggleHidden(o.transaction_id)} title="Masquer de la compta" aria-label="Masquer" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.muted,cursor:'pointer',fontSize:13,padding:'6px 8px'}}><Icon name="eyeOff" size={16}/></button>
                 )}
+                </div>
                </div>
-               {/* Barre de progression de la vente : À expédier · Expédiée · Livrée · Encaissée */}
-               {/* Comme pour les achats : la barre ne sert que tant que la vente
-                   AVANCE. Sur une vente encaissée (étape finale), elle est toute
-                   verte, n'apprend rien et double la hauteur de la ligne. */}
-               {!hidden && (()=>{ const vs=venteStage(o); if(vs.step<=0 || vs.step>=4) return null; return (
-                 /* ⚠️ LES QUATRE LIBELLÉS SONT RETIRÉS. La pastille de statut,
-                    trois lignes plus haut, dit DÉJÀ où en est la vente (« À
-                    expédier »). Les répéter sous la barre, c'est la même
-                    information deux fois — et une ligne de texte de plus par
-                    vente sur un écran qui en porte des dizaines. Les quatre
-                    segments suffisent à montrer l'avancement. */
-                 <div style={{display:'flex',alignItems:'center',gap:5,marginTop:9}}
-                      title={[1,2,3,4].map(i=>['À expédier','Expédiée','Livrée','Finalisée'][i-1]).join(' → ')}>
-                   {[1,2,3,4].map(idx=>(
-                     <div key={idx} style={{flex:1,height:4,borderRadius:8,background:vs.step>=idx?vs.color:C.border}}/>
-                   ))}
-                 </div>
-               ); })()}
+               {/* La barre de progression a été retirée : la pastille de statut
+                   ci-dessus dit déjà où en est la vente (style maquette iOS,
+                   28 sept.). Un segment de plus, c'est la même info deux fois. */}
                {/* Saisie manuelle par vente : N° et prix d'achat, même pour une paire jamais numérotée. */}
                {!hidden && (
-                 <div style={{display:'flex',gap:6,marginTop:8,alignItems:'center'}}>
+                 <div style={{display:'flex',gap:6,alignItems:'center'}}>
                    {/* ⚠️ BORDS CALMES (Julien, 28 sept. : « les bords qui brillent »).
                        Avant, un champ rempli passait sa bordure au vert (#0F8A6A) —
                        en sombre ça lit « néon ». iOS = bordure fine neutre TOUJOURS ;
@@ -20132,7 +20120,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                    numéro et l'achat qui correspond » — le N° est dans le titre de la
                    ligne, l'achat relié (photo + reçu) juste ici. Il vient de la paire
                    identifiée par Vinted (§5.34), jamais d'un rapprochement par titre. */}
-               {!hidden && <div style={{marginTop:8}}><AchatRelie entry={e} numero={num}/></div>}
+               {!hidden && <div><AchatRelie entry={e} numero={num}/></div>}
               </div>
             );
           })}
