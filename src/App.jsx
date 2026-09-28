@@ -5391,19 +5391,18 @@ function BottomBar({tab,setTab}) {
     // d'être coupé net par un bandeau opaque. L'onglet actif porte une pastille
     // colorée — repère visuel net, plus lisible qu'un simple changement de teinte.
     <>
-    <nav style={{position:'fixed',left:0,right:0,bottom:0,zIndex:60,display:'flex',overflowX:'hidden',
+    <nav style={{flexShrink:0,zIndex:60,display:kbOpen?'none':'flex',overflowX:'hidden',
       /* LA NAVIGATION EST À L'ENCRE — sur téléphone c'est elle qui porte la
          signature, comme la barre latérale sur ordinateur. */
       background:C.chrome,borderTop:`1px solid ${C.chromeLine}`,boxShadow:'none',
       paddingBottom:'env(safe-area-inset-bottom)',
-      // ⚠️ iOS : une barre `position:fixed` LAGGE pendant l'inertie du défilement
-      // (elle apparaît figée en plein milieu, vu en capture le 28 sept.). On la
-      // force sur sa propre couche GPU (translateZ + willChange + backface) pour
-      // qu'iOS la repeigne avec le viewport. Atténuation ; le correctif complet
-      // serait de faire défiler le CONTENU dans un conteneur et sortir la barre
-      // du scroll (refonte de coque) — à faire si ça persiste.
-      transform:kbOpen?'translateY(120%)':'translateY(0)',transition:'transform .22s cubic-bezier(.32,.72,0,1)',
-      willChange:'transform',backfaceVisibility:'hidden',WebkitBackfaceVisibility:'hidden'}}>
+      // ⚠️ COQUE APP-SHELL (28 sept.) : la barre n'est PLUS `position:fixed`.
+      // Elle est un frère de `<main>` dans une colonne flex bornée à l'écran, et
+      // c'est `<main>` qui défile. Une barre qui ne participe pas au défilement
+      // ne peut pas « flotter au milieu de l'écran » pendant l'inertie iOS, ni
+      // être décalée par le `zoom` de densité. On la masque au clavier avec
+      // `display:none` (elle est dans le flux, un translate laisserait un vide).
+      }}>
       {(()=>{ const actif=BAR_GROUPE[tab]||tab; return BOTTOM_TABS.map(t=>{ const on=actif===t.id; return (
         <button key={t.id} type="button" onClick={()=>setTab(t.id)} aria-label={t.label} aria-current={on?'page':undefined} style={{
           flex:'1 1 0',minWidth:0,display:'flex',flexDirection:'column',alignItems:'center',gap:4,padding:'8px 2px 7px',
@@ -27351,7 +27350,7 @@ export default function App() {
   if (MULTI_USER && !bypass && (!authState.session || RECOVERY_PENDING)) return <AuthScreen/>;
 
   return (
-    <div style={{minHeight:'100vh',width:'100%',overflowX:'clip',background:C.bg,color:C.text,fontFamily:'inherit',paddingBottom:24,transition:'background .3s,color .3s',boxSizing:'border-box'}}
+    <div style={{height:'100%',width:'100%',display:'flex',flexDirection:'column',overflowX:'clip',background:C.bg,color:C.text,fontFamily:'inherit',transition:'background .3s,color .3s',boxSizing:'border-box'}}
       onTouchStart={e=>{
       // Pas de navigation par balayage quand le geste commence dans une
       // surface flottante (modale, ajustement du tampon, carte...) :
@@ -27696,13 +27695,24 @@ export default function App() {
           ligne redevienne trop longue (les listes sont en deux colonnes). Sur téléphone,
           `ordi` est faux et RIEN ne change. */}
       <main style={{
+        // ⚠️ COQUE APP-SHELL : c'est `<main>` qui défile, pas le document. La
+        // barre du bas est un frère HORS de ce conteneur → elle ne bouge plus
+        // jamais pendant le scroll (bug iOS « barre au milieu de l'écran »).
+        // `minHeight:0` est indispensable : sans lui, un enfant de flex refuse
+        // de rétrécir et le conteneur ne défile pas (il s'étire).
+        flex:'1 1 auto', minHeight:0, overflowY:'auto', overflowX:'hidden',
+        WebkitOverflowScrolling:'touch', overscrollBehaviorY:'contain',
+        width: ordi ? undefined : '100%',
         maxWidth: ordi ? 1180 : 1200,
         margin: ordi ? '0' : '0 auto',
         marginLeft: ordi ? NAV_LARGEUR + 36 : undefined,
         paddingRight: ordi ? 28 : undefined,
         // Le bandeau flotte : il faut juste de quoi ne pas coller au bord.
         paddingTop: ordi ? 14 : undefined,
-        paddingBottom: ordi ? 40 : 'calc(84px + env(safe-area-inset-bottom))'}}>
+        // La barre étant maintenant DANS le flux (sous `<main>`), plus besoin de
+        // réserver sa hauteur : juste une marge pour ne pas coller la dernière
+        // carte à la barre.
+        paddingBottom: ordi ? 40 : 'calc(20px + env(safe-area-inset-bottom))'}}>
         <EcranGardeFou resetKey={tab}>
         {/* ⚠️⚠️ UN SEUL ENDROIT POUR « JE N'ARRIVE PAS À LIRE TES DONNÉES ».
             Mon premier correctif posait la garde ÉCRAN PAR ÉCRAN : j'en avais
