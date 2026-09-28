@@ -21014,73 +21014,47 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             largeur dans le JavaScript, donc rien a maintenir en double.
             Les lignes portent deja `flexWrap` et une largeur plancher
             (§26), elles supportent la colonne plus etroite. */}
-        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(430px, 100%), 1fr))',gap:8,alignItems:'start'}}>
-          {/* « À retirer » ne déroule PAS de liste ici : les colis qui t'attendent
-              sont déjà en haut, groupés par endroit avec leur code. Répéter la
-              même chose en dessous, c'était le doublon qui rendait l'écran
-              illisible (336 lignes pour 4 colis). Voir `achatsAffiches`. */}
-          {achatsAffiches.slice(0, achatsMax).map(({o,tk,st})=>{
+        {/* Liste blanche groupée (style démo iOS) : une seule surface, des lignes
+            séparées par un filet fin, beaucoup d'air — plus de cartes encadrées
+            séparées. La couleur ne sert qu'au point de statut ; les actions sont
+            de petites icônes discrètes à droite. */}
+        <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,overflow:'hidden',boxShadow:C.shadow||'none'}}>
+          {achatsAffiches.slice(0, achatsMax).map(({o,tk,st},i)=>{
             const cancelled = st.step===0;
             const suivi = tk && tk.suivi ? String(tk.suivi) : '';
+            const rc = receiptFor(o);
+            const numA = buyNumByTxn[String(o.transaction_id)];
             return (
-            // Carte d'achat : rayon + ombre alignés sur le reste de l'app, photo
-            // plus grande (on achète des articles, l'image compte) et hiérarchie
-            // typographique plus nette. Une bordure colorée uniquement quand il y
-            // a une action à faire (colis au relais).
-            <div key={o.transaction_id} style={{borderRadius:12,border:`1px solid ${st.step===3?C.warn:C.border}`,background:C.card,boxShadow:C.shadow||'none',opacity:cancelled?0.55:1,padding:'13px 14px',display:'flex',flexDirection:'column',gap:10}}>
-              <div style={{display:'flex',gap:12,alignItems:'flex-start'}}>
-                <div style={{width:60,height:60,borderRadius:12,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                  {orderPhoto(o)?<img src={orderPhoto(o)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
-                </div>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:15,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',letterSpacing:-0.2}} title={o.title}>{o.title}</div>
-                  <div style={{fontSize:12.5,color:C.muted,marginTop:3,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
-                    <AcctTag acc={o._acc} name={accNameOf(o._acc)}/>
-                    {o._fromEmail && <span title="Reconstituée depuis l'email — pas encore confirmée par Vinted" style={{flexShrink:0,fontSize:10,fontWeight:600,color:C.muted,border:`1px solid ${C.border}`,borderRadius:8,padding:'1px 6px'}}>email</span>}
-                    <span>{o.date?new Date(o.date).toLocaleDateString('fr-FR'):''}</span>
-                    {/* DEPUIS COMBIEN DE TEMPS. C'est LA question d'un outil de
-                        réception : « est-ce que je dois m'inquiéter ? ». La date
-                        d'achat seule ne répond pas — il faut compter dans sa
-                        tête. Au-delà de trois semaines, le chiffre passe en
-                        rouge : c'est le moment de relancer le vendeur. */}
-                    {!cancelled && st.step>=1 && st.step<4 && (()=>{
-                      const t=tsCommande(o); if(!t) return null;
-                      const j=Math.floor((Date.now()-t)/86400000); if(j<2) return null;
-                      const tard=j>ACHAT_RETARD_J;
-                      return <span style={{fontWeight:tard?700:600,color:tard?C.danger:C.muted}}>· depuis {j} j{tard?' — relance le vendeur':''}</span>;
-                    })()}
-                    {tk && tk.lieu && st.step===3 && <span style={{color:C.text}}>· {tk.lieu}</span>}
-                  </div>
-                </div>
-                <div style={{textAlign:'right',flexShrink:0,display:'flex',flexDirection:'column',alignItems:'flex-end',gap:3}}>
-                  {/* ⚠️ LE PRIX S'ÉCRIVAIT À L'ANGLAISE : « 21.0 € », « 6.73 € »
-                      — le montant brut de Vinted, recopié tel quel. Vu en
-                      capture le 7 septembre. Deux décimales et une virgule,
-                      comme partout ailleurs dans l'app. */}
-                  <div style={{fontSize:17,fontWeight:700,color:C.text,letterSpacing:-0.4}}>{montantCommande(o).toFixed(2).replace('.',',')} {cur(o.price?.currency_code)}</div>
-                  {buyNumByTxn[String(o.transaction_id)]!=null && <span title="Numéro de la paire (lien avec l'annonce / la vente)" style={{fontSize:11,fontWeight:700,color:C.accent,background:`${C.accent}18`,borderRadius:5,padding:'1px 7px'}}>N°{buyNumByTxn[String(o.transaction_id)]}</span>}
+            <div key={o.transaction_id} style={{padding:'12px 14px',borderTop:i>0?`1px solid ${C.border}`:'none',opacity:cancelled?0.55:1,display:'flex',alignItems:'center',gap:12}}>
+              <div style={{width:46,height:46,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                {orderPhoto(o)?<img src={orderPhoto(o)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={18} style={{color:C.muted,opacity:.55}}/>}
+              </div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:15,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',letterSpacing:-0.2}} title={o.title}>{o.title}</div>
+                <div style={{fontSize:12.5,color:C.muted,marginTop:3,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                  <span style={{display:'inline-flex',alignItems:'center',gap:5,flexShrink:0}}><span style={{width:7,height:7,borderRadius:999,background:st.color,display:'inline-block'}}/>{st.label}</span>
+                  <AcctTag acc={o._acc} name={accNameOf(o._acc)}/>
+                  <span>{o.date?new Date(o.date).toLocaleDateString('fr-FR'):''}</span>
+                  {/* DEPUIS COMBIEN DE TEMPS : « dois-je m'inquiéter ? ». Au-delà de
+                      trois semaines, en rouge — le moment de relancer le vendeur. */}
+                  {!cancelled && st.step>=1 && st.step<4 && (()=>{ const t=tsCommande(o); if(!t) return null; const j=Math.floor((Date.now()-t)/86400000); if(j<2) return null; const tard=j>ACHAT_RETARD_J; return <span style={{fontWeight:tard?700:600,color:tard?C.danger:C.muted}}>· depuis {j} j{tard?' — relance le vendeur':''}</span>; })()}
+                  {tk && tk.lieu && st.step===3 && <span style={{color:C.text}}>· {tk.lieu}</span>}
+                  {numA!=null && <span title="Numéro de la paire (lien avec l'annonce / la vente)" style={{fontSize:11,fontWeight:700,color:C.accent,background:`${C.accent}18`,borderRadius:5,padding:'0 6px'}}>N°{numA}</span>}
+                  {o._fromEmail && <span title="Reconstituée depuis l'email — pas encore confirmée par Vinted" style={{fontSize:10,fontWeight:600,color:C.muted,border:`1px solid ${C.border}`,borderRadius:8,padding:'0 6px'}}>email</span>}
                 </div>
               </div>
-              {/* La barre de progression est retirée (style maquette iOS) : la
-                  pastille de statut ci-dessous dit déjà l'étape. */}
-              {/* ── Bas : une pastille de statut · les actions ─────────────────── */}
-              <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
-                <span style={{fontSize:12,color:st.color,fontWeight:700,background:`${st.color}18`,borderRadius:999,padding:'3px 10px',display:'inline-flex',alignItems:'center',gap:5,flexShrink:0}}><span style={{width:7,height:7,borderRadius:999,background:st.color,display:'inline-block'}}/>{st.label}</span>
+              {/* Prix à deux décimales et une virgule (jamais « 21.0 € » brut). */}
+              <div style={{fontSize:16,fontWeight:700,color:C.text,letterSpacing:-0.3,flexShrink:0}}>{montantCommande(o).toFixed(2).replace('.',',')} {cur(o.price?.currency_code)}</div>
+              {/* Actions en petites icônes discrètes (suivre · code · justificatif). */}
+              <div style={{display:'flex',alignItems:'center',gap:4,flexShrink:0}}>
                 {suivi && (st.step===2||st.step===3) && (
-                  <a href={trackUrl(tk.carrier||'', suivi)} target="_blank" rel="noreferrer" title={`Suivre le colis (${carrierName(tk.carrier)} n°${suivi})`} style={{textDecoration:'none',border:`1px solid ${C.blue||C.accent}`,background:`${(C.blue||C.accent)}12`,color:C.blue||C.accent,borderRadius:8,padding:'6px 11px',fontSize:12,fontWeight:600}}><Icon name="truck" size={13} style={{verticalAlign:'-2px',marginRight:5}}/>Suivre {tk.carrier?`· ${carrierName(tk.carrier)}`:''}</a>
+                  <a href={trackUrl(tk.carrier||'', suivi)} target="_blank" rel="noreferrer" title={`Suivre le colis (${carrierName(tk.carrier)} n°${suivi})`} aria-label="Suivre le colis" style={{display:'flex',alignItems:'center',justifyContent:'center',width:30,height:30,borderRadius:8,border:`1px solid ${C.border}`,color:C.blue||C.accent,textDecoration:'none'}}><Icon name="truck" size={15}/></a>
                 )}
                 {st.step===3 && tk && (qrImage(tk)||codeRetrait(tk.code)) && (
-                  <button type="button" onClick={()=>openQrView(tk)} style={{border:`1px solid ${C.warn}`,background:`${C.warn}14`,color:C.warn,borderRadius:8,padding:'6px 11px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Code de retrait</button>
+                  <button type="button" onClick={()=>openQrView(tk)} title="Code de retrait" aria-label="Code de retrait" style={{display:'flex',alignItems:'center',justifyContent:'center',width:30,height:30,borderRadius:8,border:`1px solid ${C.warn}`,background:'transparent',color:C.warn,cursor:'pointer',fontFamily:'inherit'}}><Icon name="key" size={15}/></button>
                 )}
-                <div style={{marginLeft:'auto'}}>
-                  {(()=>{ const rc=receiptFor(o); return rc ? (
-                    <button type="button" onClick={()=>{ if(rc.pdfB64) openReceipt(rc); else setReceiptView(rc); }}
-                      title="Reçu Vinted authentique (email archivé)" style={{border:`1px solid ${C.accent}`,borderRadius:8,background:`${C.accent}12`,color:C.accent,cursor:'pointer',fontSize:11,fontWeight:600,padding:'5px 10px'}}><Icon name="doc" size={13} style={{verticalAlign:'-2px',marginRight:5}}/>Justificatif</button>
-                  ) : (
-                    <button type="button" onClick={()=>generateAchatJustificatif(o,{ account:accNameOf(o._acc), regime:load('vinted_regime','micro'), numero:buyNumByTxn[String(o.transaction_id)]||'' })}
-                      title="Télécharger le justificatif d'achat (PDF)" style={{border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:'pointer',fontSize:11,fontWeight:500,padding:'5px 10px'}}><Icon name="doc" size={13} style={{verticalAlign:'-2px',marginRight:5}}/>Justificatif</button>
-                  ); })()}
-                </div>
+                <button type="button" onClick={()=>{ if(rc){ if(rc.pdfB64) openReceipt(rc); else setReceiptView(rc); } else generateAchatJustificatif(o,{ account:accNameOf(o._acc), regime:load('vinted_regime','micro'), numero:numA||'' }); }}
+                  title={rc?'Reçu Vinted authentique (email archivé)':"Télécharger le justificatif d'achat (PDF)"} aria-label="Justificatif" style={{display:'flex',alignItems:'center',justifyContent:'center',width:30,height:30,borderRadius:8,border:`1px solid ${rc?C.accent:C.border}`,background:rc?`${C.accent}12`:'transparent',color:rc?C.accent:C.muted,cursor:'pointer',fontFamily:'inherit'}}><Icon name="doc" size={15}/></button>
               </div>
             </div>
           );})}
