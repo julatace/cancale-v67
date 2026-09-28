@@ -26429,6 +26429,22 @@ export default function App() {
       if (m) m.setAttribute('content', t.bg);
     } catch (_) { /* un navigateur sans <head> accessible ne doit rien casser */ }
   }, [dark]);
+  // ⚠️ BASCULE UNIQUE VERS LE CLAIR (28 sept. — « je veux tout en blanc comme la
+  //    démo »). Le mode sombre reste un CHOIX possible (toggle dans Réglages),
+  //    mais la direction visuelle par défaut passe au clair. Le thème étant
+  //    synchronisé dans le nuage, on ne peut pas juste changer le défaut : la
+  //    valeur cloud (sombre) réécraserait au rechargement. On force donc le
+  //    clair UNE fois, APRÈS que le nuage a répondu (sinon il gagnerait), et on
+  //    l'écrit côté cloud (`save` pousse) pour que tous les appareils suivent.
+  //    Le drapeau est LOCAL à l'appareil (hors SYNC_KEYS) : une fois basculé, on
+  //    ne reforce plus — si tu remets le sombre, ça tient.
+  useEffect(() => onCloudReady(() => {
+    try {
+      if (localStorage.getItem('vrm_bascule_clair_v1') === '1') return;
+      localStorage.setItem('vrm_bascule_clair_v1', '1');
+      if (load('vinted_dark', false)) { setDark(false); save('vinted_dark', false); }
+    } catch (_) {}
+  }), []);
   const [catalog,setCatalog]=useState(()=>{
     const s=load('vinted_catalog',null);
     if(!s||s.length===0){return INIT_CAT;}
