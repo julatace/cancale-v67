@@ -12629,7 +12629,7 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
         </div>}
       </div>
       {allValsSet.size===0&&!addMode&&<div style={{fontSize:12,color:C.text,background:`${C.accent}0e`,border:`1px solid ${C.accent}44`,borderRadius:10,padding:'10px 13px',marginBottom:10,lineHeight:1.45}}>
-        🗄️ <b>Ton garage est vide.</b> Clique une case pour y poser un numéro de boîte, ou va sur une annonce et utilise « 🏠 Ranger » pour la placer d'un tap.
+        🗄️ <b>Ton garage est vide.</b> Clique une case pour y poser un numéro de boîte, ou va sur une annonce et utilise « Ranger » pour la placer d'un tap.
       </div>}
       {(blockMode||colorMode||addMode)&&<div style={{fontSize:11,color:C.muted}}>
         {addMode&&'Toutes les cases sont visibles. Tu peux ajouter des paires dans les cases vides.'}
@@ -14070,7 +14070,7 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
                   <button type="button" onClick={()=>garage && onLocate && onLocate(p.numero)}
                     title={garage?'Voir dans le garage':'Ce numéro n\'apparaît dans aucune case du garage'}
                     style={{border:'none',background:'transparent',cursor:garage?'pointer':'default',padding:0,fontSize:11,fontWeight:500,color:garage?C.blue||C.accent:C.muted}}>
-                    {garage ? '🏠 Au garage' : '🏠 Absent du garage'}
+                    {garage ? 'Au garage' : 'Absent du garage'}
                   </button>
                   {p.price != null && <span style={{fontSize:11,color:C.muted}}>{p.price} €</span>}
                   {p.vintedItemId && <span style={{fontSize:11,color:C.muted}}>🔗 annonce liée</span>}
@@ -15997,7 +15997,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const qui = presents.map(p => p.type === 'annonce' ? `📦 en ligne « ${p.titre} »`
         : p.type === 'vente' ? `📮 à expédier « ${p.titre} »`
         : p.type === 'annulee' ? `↩️ vente annulée, la paire est restée « ${p.titre} »`
-        : `🏠 ${p.titre}`).join('\n');
+        : `${p.titre}`).join('\n');
       const prendre = await askConfirm({
         title: `Le N°${n} est déjà pris`,
         desc: `Une paire le porte encore :\n${qui}\n\nDeux paires avec le même numéro, c'est la mauvaise chaussure au moment d'expédier.`,
@@ -20049,7 +20049,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <AcctTag acc={o._acc} name={accNameOf(o._acc)}/>
                     {o._fromEmail && <span title="Reconstituée depuis l'email — pas encore confirmée par Vinted" style={{flexShrink:0,fontSize:10,fontWeight:600,color:C.muted,border:`1px solid ${C.border}`,borderRadius:8,padding:'1px 6px'}}>email</span>}
                     <span style={{flexShrink:0}}>{o.date?new Date(o.date).toLocaleDateString('fr-FR'):''}</span>
-                    {num && needsBordereau(o.status) && (()=>{ const cell=garageCellOf(garageGrid,num); return cell ? <span onClick={()=>onLocate&&onLocate(num)} title="Voir la paire au garage" style={{color:C.blue||C.accent,fontWeight:600,cursor:'pointer'}}>🏠 {garageCellLabel(cell)}</span> : (garageUtilise ? <span style={{color:C.muted,fontWeight:500}} title="Cette paire n'est pas rangée au garage">🏠 pas au garage</span> : null); })()}
+                    {num && needsBordereau(o.status) && (()=>{ const cell=garageCellOf(garageGrid,num); return cell ? <span onClick={()=>onLocate&&onLocate(num)} title="Voir la paire au garage" style={{color:C.blue||C.accent,fontWeight:600,cursor:'pointer'}}>{garageCellLabel(cell)}</span> : (garageUtilise ? <span style={{color:C.muted,fontWeight:500}} title="Cette paire n'est pas rangée au garage">pas au garage</span> : null); })()}
                     {st==='cancelled' && num && (()=>{
                       const out = saleOutcome(o);
                       if (isPairLost(num)) return <span style={{color:C.danger,fontWeight:600,background:`${C.danger}18`,border:`1px solid ${C.danger}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title="Paire déclarée perdue : son numéro est libéré et sa case au garage vidée.">❌ N°{num} perdue</span>;
@@ -20072,7 +20072,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {(()=>{ const vs=venteStage(o); return <span title={vs.aide||undefined} style={{fontSize:12,color:vs.color,fontWeight:700,background:`${vs.color}18`,borderRadius:999,padding:'3px 10px',display:'inline-flex',alignItems:'center',gap:5,flexShrink:0}}><span style={{width:7,height:7,borderRadius:999,background:vs.color,display:'inline-block'}}/>{vs.label}</span>; })()}
                 <div style={{display:'flex',alignItems:'center',gap:6,flexShrink:0,marginLeft:'auto'}}>
                 {num && needsBordereau(o.status) && !hidden && inGarage(num) && (
-                  <button type="button" onClick={()=>onLocate&&onLocate(num)} title={`Voir la paire N°${num} au garage`} aria-label="Voir au garage" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.blue||C.accent,cursor:'pointer',fontSize:15,padding:'6px 8px'}}>📍</button>
+                  <button type="button" onClick={()=>onLocate&&onLocate(num)} title={`Voir la paire N°${num} au garage`} aria-label="Voir au garage" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.blue||C.accent,cursor:'pointer',fontSize:15,padding:'6px 8px'}}><Icon name="pin" size={15}/></button>
                 )}
                 {needsBordereau(o.status) && !hidden && (
                   <button type="button" onClick={()=>startBordereau(num||'',o.title,o._acc)} title={num?`Bordereau N°${num}`:'Bordereau (titre)'} aria-label="Bordereau annoté" style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:8,padding:'8px 10px',cursor:'pointer',fontSize:15}}><Icon name="doc" size={16}/></button>
@@ -20084,7 +20084,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <button type="button" onClick={()=>unmarkPairLost(num)} title={`Annuler : la paire N°${num} est finalement revenue.`} aria-label="Annuler paire perdue" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.muted,cursor:'pointer',fontSize:11,fontWeight:500,padding:'6px 9px',fontFamily:'inherit'}}>↩︎ revenue</button>
                 )}
                 {isLotTitle(o.title) && (
-                  <button type="button" onClick={async()=>{ setLotView({loading:true,order:o,items:[]}); const items=await fetchLotItems(o._acc,o.transaction_id); setLotView({loading:false,order:o,items}); }} title="Voir les paires du lot" aria-label="Voir les paires du lot" style={{flexShrink:0,border:'none',background:C.purple||C.blue||C.accent,color:'#fff',borderRadius:8,padding:'8px 10px',cursor:'pointer',fontSize:15}}>📦</button>
+                  <button type="button" onClick={async()=>{ setLotView({loading:true,order:o,items:[]}); const items=await fetchLotItems(o._acc,o.transaction_id); setLotView({loading:false,order:o,items}); }} title="Voir les paires du lot" aria-label="Voir les paires du lot" style={{flexShrink:0,border:'none',background:C.purple||C.blue||C.accent,color:'#fff',borderRadius:8,padding:'8px 10px',cursor:'pointer',fontSize:15}}><Icon name="box" size={16}/></button>
                 )}
                 {hidden ? (
                   <button type="button" onClick={()=>toggleHidden(o.transaction_id)} title="Réafficher dans la compta" aria-label="Réafficher" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.blue||C.accent,cursor:'pointer',fontSize:13,padding:'6px 8px'}}>↩︎</button>
@@ -20668,9 +20668,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           //    aller chercher).
                           const qr = !!(rel && rel.qr);
                           const primaire = !cd;   // pas de code visible → c'est l'action principale
-                          const quoi = qr ? '🔑 Voir le QR de retrait ↗'
+                          const quoi = qr ? 'Voir le QR de retrait ↗'
                             : cd ? 'Ouvrir la conversation ↗'
-                            : '🔑 Voir mon code de retrait ↗';
+                            : 'Voir mon code de retrait ↗';
                           return primaire ? (
                             <a href={href} target="_blank" rel="noreferrer" style={{display:'inline-flex',alignItems:'center',marginTop:5,border:`1.5px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,borderRadius:8,padding:'7px 12px',fontSize:12.5,fontWeight:700,textDecoration:'none'}}>
                               {quoi}
@@ -21067,7 +21067,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
                 <span style={{fontSize:12,color:st.color,fontWeight:700,background:`${st.color}18`,borderRadius:999,padding:'3px 10px',display:'inline-flex',alignItems:'center',gap:5,flexShrink:0}}><span style={{width:7,height:7,borderRadius:999,background:st.color,display:'inline-block'}}/>{st.label}</span>
                 {suivi && (st.step===2||st.step===3) && (
-                  <a href={trackUrl(tk.carrier||'', suivi)} target="_blank" rel="noreferrer" title={`Suivre le colis (${carrierName(tk.carrier)} n°${suivi})`} style={{textDecoration:'none',border:`1px solid ${C.blue||C.accent}`,background:`${(C.blue||C.accent)}12`,color:C.blue||C.accent,borderRadius:8,padding:'6px 11px',fontSize:12,fontWeight:600}}>🔍 Suivre {tk.carrier?`· ${carrierName(tk.carrier)}`:''}</a>
+                  <a href={trackUrl(tk.carrier||'', suivi)} target="_blank" rel="noreferrer" title={`Suivre le colis (${carrierName(tk.carrier)} n°${suivi})`} style={{textDecoration:'none',border:`1px solid ${C.blue||C.accent}`,background:`${(C.blue||C.accent)}12`,color:C.blue||C.accent,borderRadius:8,padding:'6px 11px',fontSize:12,fontWeight:600}}><Icon name="truck" size={13} style={{verticalAlign:'-2px',marginRight:5}}/>Suivre {tk.carrier?`· ${carrierName(tk.carrier)}`:''}</a>
                 )}
                 {st.step===3 && tk && (qrImage(tk)||codeRetrait(tk.code)) && (
                   <button type="button" onClick={()=>openQrView(tk)} style={{border:`1px solid ${C.warn}`,background:`${C.warn}14`,color:C.warn,borderRadius:8,padding:'6px 11px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Code de retrait</button>
@@ -21075,10 +21075,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{marginLeft:'auto'}}>
                   {(()=>{ const rc=receiptFor(o); return rc ? (
                     <button type="button" onClick={()=>{ if(rc.pdfB64) openReceipt(rc); else setReceiptView(rc); }}
-                      title="Reçu Vinted authentique (email archivé)" style={{border:`1px solid ${C.accent}`,borderRadius:8,background:`${C.accent}12`,color:C.accent,cursor:'pointer',fontSize:11,fontWeight:600,padding:'5px 10px'}}>📄 Justificatif</button>
+                      title="Reçu Vinted authentique (email archivé)" style={{border:`1px solid ${C.accent}`,borderRadius:8,background:`${C.accent}12`,color:C.accent,cursor:'pointer',fontSize:11,fontWeight:600,padding:'5px 10px'}}><Icon name="doc" size={13} style={{verticalAlign:'-2px',marginRight:5}}/>Justificatif</button>
                   ) : (
                     <button type="button" onClick={()=>generateAchatJustificatif(o,{ account:accNameOf(o._acc), regime:load('vinted_regime','micro'), numero:buyNumByTxn[String(o.transaction_id)]||'' })}
-                      title="Télécharger le justificatif d'achat (PDF)" style={{border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:'pointer',fontSize:11,fontWeight:500,padding:'5px 10px'}}>📄 Justificatif</button>
+                      title="Télécharger le justificatif d'achat (PDF)" style={{border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:'pointer',fontSize:11,fontWeight:500,padding:'5px 10px'}}><Icon name="doc" size={13} style={{verticalAlign:'-2px',marginRight:5}}/>Justificatif</button>
                   ); })()}
                 </div>
               </div>
@@ -21329,7 +21329,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     </div>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:12,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.item.title}</div>
-                      <div style={{fontSize:11,color:C.muted,fontWeight:500,marginTop:1}}>N°{r.current.numero} (neuf) → <b style={{color:C.blue||C.accent}}>N°{r.orphan.e.numero}</b>{garageCellOf(garageGrid,r.orphan.e.numero)?` · 🏠 ${garageCellLabel(garageCellOf(garageGrid,r.orphan.e.numero))}`:''}</div>
+                      <div style={{fontSize:11,color:C.muted,fontWeight:500,marginTop:1}}>N°{r.current.numero} (neuf) → <b style={{color:C.blue||C.accent}}>N°{r.orphan.e.numero}</b>{garageCellOf(garageGrid,r.orphan.e.numero)?` · ${garageCellLabel(garageCellOf(garageGrid,r.orphan.e.numero))}`:''}</div>
                       {r.vendue && <div style={{fontSize:10,color:C.warn,fontWeight:600,marginTop:2}}>⚠️ cette paire a été VENDUE sous le N°{r.orphan.e.numero} — ne le remets que si elle t'est revenue et qu'elle est dans sa boîte</div>}
                     </div>
                     <button type="button" onClick={()=>applyReprise(r)} style={{flexShrink:0,border:'none',background:C.blue||C.accent,color:'#fff',borderRadius:8,padding:'7px 10px',cursor:'pointer',fontSize:12,fontWeight:600,fontFamily:'inherit'}}>Remettre N°{r.orphan.e.numero}</button>
@@ -22393,7 +22393,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           {o && o.price && <span style={{flexShrink:0,fontWeight:600,color:C.text}}>{(parseFloat(o.price.amount ?? o.price)||0).toFixed(2).replace('.',',')} €</span>}
                           {urgTxt && <span style={{flexShrink:0,color:urgCol,fontWeight:600}}>{urgTxt}</span>}
                           {cell
-                            ? <button type="button" onClick={()=>onLocate&&onLocate(num)} style={{flexShrink:0,border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',padding:0,fontSize:11,fontFamily:'inherit'}}>🏠 {garageCellLabel(cell)}</button>
+                            ? <button type="button" onClick={()=>onLocate&&onLocate(num)} style={{flexShrink:0,border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',padding:0,fontSize:11,fontFamily:'inherit'}}>{garageCellLabel(cell)}</button>
                             /* ⚠️ Même règle que sur les Ventes (§11) : « pas rangée »
                                sur CHAQUE carte ne dit rien tant que le garage est
                                vide (mesuré : 0 case posée). Dès qu'une paire y est,
@@ -22510,7 +22510,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         style={{...sec,border:`1px solid ${posted?INV_STATUS.online.color:C.border}`,background:posted?`${INV_STATUS.online.color}18`:'transparent',color:posted?INV_STATUS.online.color:C.muted}}>
                         {posted?'↺ Pas encore':'✓ Colis fait'}
                       </button>
-                      {b && b.suivi && <a href={trackUrl(b.transporteur||'', b.suivi)} target="_blank" rel="noreferrer" title={`Suivre le colis n°${b.suivi}`} style={{...sec,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,textDecoration:'none'}}>🔍 Suivre</a>}
+                      {b && b.suivi && <a href={trackUrl(b.transporteur||'', b.suivi)} target="_blank" rel="noreferrer" title={`Suivre le colis n°${b.suivi}`} style={{...sec,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,textDecoration:'none'}}><Icon name="truck" size={13} style={{verticalAlign:'-2px',marginRight:5}}/>Suivre</a>}
                       {capte && <span style={{fontSize:11,color:INV_STATUS.online.color,fontWeight:600}}>📎 Bordereau récupéré chez Vinted par l'extension{b && b.hasPdf ? ' · ✓ confirmé par l\'email' : ''}</span>}
                       {/* ⚠️ « Bordereau pas encore reçu » disait, sur la MÊME carte
                           et à trois lignes d'écart, exactement ce que le bandeau
@@ -22958,7 +22958,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{display:'flex',alignItems:'center',gap:10,padding:'12px 14px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <button type="button" onClick={()=>setReceiptView(null)} aria-label="Retour" style={{display:'flex',alignItems:'center',justifyContent:'center',width:36,height:36,borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.text,cursor:'pointer',fontSize:20,fontWeight:600,fontFamily:'inherit',lineHeight:1,flexShrink:0}}>‹</button>
               <div style={{flex:1,fontSize:15,fontWeight:700,color:C.text}}>Reçu d'achat</div>
-              <button type="button" onClick={()=>openReceipt(receiptView)} title="Imprimer / PDF" style={{border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:8,padding:'7px 11px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>🖨 PDF</button>
+              <button type="button" onClick={()=>openReceipt(receiptView)} title="Imprimer / PDF" style={{border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:8,padding:'7px 11px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}><Icon name="printer" size={14} style={{verticalAlign:'-2px',marginRight:5}}/>PDF</button>
             </div>
             <div style={{flex:1,overflow:'auto',padding:16}}>
               <div style={{background:C.card,borderRadius:10,overflow:'hidden',border:`1px solid ${C.border}`}}>
@@ -27578,7 +27578,7 @@ export default function App() {
                   <div style={{fontSize:12,color:C.muted,fontWeight:500,marginTop:2,display:'flex',gap:8,flexWrap:'wrap'}}>
                     <span style={{color:p.online?INV_STATUS.online.color:C.muted}}>{p.online?'🟢 En ligne':'⚪ Retirée'}</span>
                     {p.onLbc && <span style={{color:LBC_ORANGE}}>🟠 Leboncoin</span>}
-                    {p.box!=null && <span style={{color:C.accent}}>🏠 Au garage</span>}
+                    {p.box!=null && <span style={{color:C.accent}}>Au garage</span>}
                     {p.buyPrice && <span>achat {p.buyPrice}€</span>}
                     {p.price && <span>· {p.price}€</span>}
                   </div>
