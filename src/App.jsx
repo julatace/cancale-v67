@@ -21027,21 +21027,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             // plus grande (on achète des articles, l'image compte) et hiérarchie
             // typographique plus nette. Une bordure colorée uniquement quand il y
             // a une action à faire (colis au relais).
-            <div key={o.transaction_id} style={{borderRadius:10,border:`1px solid ${st.step===3?C.warn:C.border}`,background:C.card,boxShadow:C.shadow||'none',opacity:cancelled?0.55:1,padding:'11px 12px'}}>
-              <div style={{display:'flex',gap:12,alignItems:'center'}}>
-                <div style={{width:56,height:56,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+            <div key={o.transaction_id} style={{borderRadius:12,border:`1px solid ${st.step===3?C.warn:C.border}`,background:C.card,boxShadow:C.shadow||'none',opacity:cancelled?0.55:1,padding:'13px 14px',display:'flex',flexDirection:'column',gap:10}}>
+              <div style={{display:'flex',gap:12,alignItems:'flex-start'}}>
+                <div style={{width:60,height:60,borderRadius:12,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
                   {orderPhoto(o)?<img src={orderPhoto(o)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}>👟</span>}
                 </div>
                 <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',letterSpacing:-0.2}} title={o.title}>{o.title}</div>
-                  <div style={{fontSize:11,color:C.muted,marginTop:4,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                  <div style={{fontSize:15,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',letterSpacing:-0.2}} title={o.title}>{o.title}</div>
+                  <div style={{fontSize:12.5,color:C.muted,marginTop:3,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
                     <AcctTag acc={o._acc} name={accNameOf(o._acc)}/>
-                    {/* Ligne reconstituée depuis l'email (filet quand la moisson
-                        Vinted manque). On le DIT : sinon on cherche d'où sort une
-                        ligne sans statut ni n° de transaction Vinted. */}
                     {o._fromEmail && <span title="Reconstituée depuis l'email — pas encore confirmée par Vinted" style={{flexShrink:0,fontSize:10,fontWeight:600,color:C.muted,border:`1px solid ${C.border}`,borderRadius:8,padding:'1px 6px'}}>email</span>}
                     <span>{o.date?new Date(o.date).toLocaleDateString('fr-FR'):''}</span>
-                    <span style={{fontWeight:700,color:st.color,background:`${st.color}18`,borderRadius:8,padding:'1px 8px'}}>{st.label}</span>
                     {/* DEPUIS COMBIEN DE TEMPS. C'est LA question d'un outil de
                         réception : « est-ce que je dois m'inquiéter ? ». La date
                         d'achat seule ne répond pas — il faut compter dans sa
@@ -21065,25 +21061,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {buyNumByTxn[String(o.transaction_id)]!=null && <span title="Numéro de la paire (lien avec l'annonce / la vente)" style={{fontSize:11,fontWeight:700,color:C.accent,background:`${C.accent}18`,borderRadius:5,padding:'1px 7px'}}>N°{buyNumByTxn[String(o.transaction_id)]}</span>}
                 </div>
               </div>
-              {/* Barre de suivi : affichée UNIQUEMENT tant que le colis est en
-                  route. Sur un achat déjà reçu, elle n'apprenait rien (tout en
-                  vert) et doublait la hauteur de chaque ligne — la pastille
-                  « ✅ Reçu » suffit. La liste est deux fois plus courte. */}
-              {!cancelled && st.step<4 && (
-                <div style={{display:'flex',alignItems:'center',gap:5,marginTop:9}}>
-                  {/* ⚠️ LES QUATRE LIBELLÉS SONT RETIRÉS (même défaut que les
-                      lignes de vente, §5.69) : la pastille juste au-dessus dit
-                      DÉJÀ l'étape en cours (« En transit », « Au relais »…).
-                      Écrire « Payé · Expédié · Au relais · Reçu » sur chaque
-                      ligne, c'est une légende recopiée 26 fois — mesuré, 104 des
-                      286 lignes de l'écran. Les segments colorés suffisent. */}
-                  {[1,2,3,4].map((idx)=>(
-                    <div key={idx} style={{flex:1,height:4,borderRadius:8,background:st.step>=idx?st.color:C.border}}/>
-                  ))}
-                </div>
-              )}
-              {/* Actions : Suivre le colis + reçu/justif */}
-              <div style={{display:'flex',gap:6,alignItems:'center',marginTop:9,flexWrap:'wrap'}}>
+              {/* La barre de progression est retirée (style maquette iOS) : la
+                  pastille de statut ci-dessous dit déjà l'étape. */}
+              {/* ── Bas : une pastille de statut · les actions ─────────────────── */}
+              <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+                <span style={{fontSize:12,color:st.color,fontWeight:700,background:`${st.color}18`,borderRadius:999,padding:'3px 10px',display:'inline-flex',alignItems:'center',gap:5,flexShrink:0}}><span style={{width:7,height:7,borderRadius:999,background:st.color,display:'inline-block'}}/>{st.label}</span>
                 {suivi && (st.step===2||st.step===3) && (
                   <a href={trackUrl(tk.carrier||'', suivi)} target="_blank" rel="noreferrer" title={`Suivre le colis (${carrierName(tk.carrier)} n°${suivi})`} style={{textDecoration:'none',border:`1px solid ${C.blue||C.accent}`,background:`${(C.blue||C.accent)}12`,color:C.blue||C.accent,borderRadius:8,padding:'6px 11px',fontSize:12,fontWeight:600}}>🔍 Suivre {tk.carrier?`· ${carrierName(tk.carrier)}`:''}</a>
                 )}
