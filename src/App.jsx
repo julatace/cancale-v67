@@ -7648,6 +7648,10 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
   const [selMois,setSelMois]=useState(null);           // mois sélectionné dans le graphique d'évolution moisson
   const [caDu,setCaDu]=useState('');                   // CA sur mesure : borne de début (YYYY-MM-DD)
   const [caAu,setCaAu]=useState('');                   // CA sur mesure : borne de fin
+  const [topMode,setTopMode]=useState('marques');      // « ce qui rapporte » : marques | tailles
+  const [objectif,setObjectif]=useState(()=>+(load('vrm_ca_objectif',0))||0); // objectif de CA du mois
+  const [objEdit,setObjEdit]=useState(false);
+  const [objTmp,setObjTmp]=useState('');
 
   // Paires réellement présentes dans le garage (mémorisé)
   const garageVals=useMemo(()=>
@@ -7893,6 +7897,34 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
     });
     return {ca,count};
   },[sales,caDu,caAu]);
+
+  // ── GRAPHIQUES « épuré / haut de gamme » (Julien, 28 sept.) : une seule teinte
+  //    d'accent, variée par OPACITÉ fixée par plateforme (jamais par rang, §7 +
+  //    dataviz), et l'identité portée par les libellés — pas par la couleur seule.
+  // Anneau par plateforme — CONSOMME caParPlateforme (§11), ne recalcule rien.
+  const platParts=useMemo(()=>{
+    const arr=caParPlateforme(liveStats,lbcVentes,ebayCa).filter(p=>p.ca!=null && p.ca>0)
+      .map(p=>({nom:p.nom, court:p.nom==='Vestiaire Collective'?'Vestiaire':p.nom, ca:p.ca}));
+    const total=arr.reduce((s,p)=>s+p.ca,0);
+    return {arr,total};
+  },[liveStats,lbcVentes,ebayCa]);
+  // Top marques / pointures par CA : la paire vient du catalogue (titre + taille).
+  const catInfo=useMemo(()=>{ const m={}; catalog.forEach(p=>{ m[p.id]={title:p.title||'',taille:(p.taille!=null?String(p.taille):'')}; }); return m; },[catalog]);
+  const topStats=useMemo(()=>{
+    const parM={}, parT={};
+    sales.forEach(v=>{
+      const info=catInfo[v.productId]||{}; const px=+v.sellPrice||0; if(!(px>0)) return;
+      const b=extractBrand(info.title||''); if(b) parM[b]=(parM[b]||0)+px;
+      const t=(info.taille||'').trim()||extractSize(info.title||''); if(t) parT[t]=(parT[t]||0)+px;
+    });
+    const top=(o)=>Object.entries(o).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([k,v])=>({k,v}));
+    return {marques:top(parM), tailles:top(parT)};
+  },[sales,catInfo]);
+  // CA du mois courant (par date de VENTE, §5) pour la jauge d'objectif.
+  const caMoisCourant=useMemo(()=>{
+    const now=new Date(); const ym=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+    return sales.reduce((s,v)=>{ const p=(v.saleDate||'').trim().split('/'); return (p.length===3 && `${p[2]}-${p[1]}`===ym) ? s+(+v.sellPrice||0) : s; },0);
+  },[sales]);
 
   // Paires ajoutées par jour (basé sur addedAt JJ/MM/AAAA).
   // On ignore la date d'init "01/01/2024" qui regroupe tout l'historique importé,
@@ -8487,6 +8519,91 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
           </div>
         ) : (
           <div style={{fontSize:12,color:C.muted,marginTop:12,lineHeight:1.5}}>Renseigne une date de début et/ou de fin pour voir le CA de la période.</div>
+        )}
+      </Card>
+
+      {/* 🍩 ANNEAU PAR PLATEFORME — une seule teinte (accent), variée par opacité
+          FIXE par plateforme (§7) ; identité portée par la légende, pas la couleur. */}
+      {platParts.total>0 && (()=>{
+        const op={'Vinted':1,'Leboncoin':0.6,'eBay':0.4,'Vestiaire Collective':0.24};
+        const cx=66,cy=66,r=52,CIRC=2*Math.PI*r; let acc=0;
+        return (
+          <Card>
+            <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:2}}>Répartition du CA par plateforme</div>
+            <div style={{fontSize:11.5,color:C.muted,marginBottom:12}}>La part de chaque plateforme dans ton chiffre d'affaires.</div>
+            <div style={{display:'flex',gap:18,alignItems:'center',flexWrap:'wrap'}}>
+              <svg width="132" height="132" viewBox="0 0 132 132" style={{flexShrink:0}} role="img" aria-label="Répartition du CA par plateforme">
+                <circle cx={cx} cy={cy} r={r} fill="none" stroke={C.card2||C.border} strokeWidth="14"/>
+                {platParts.arr.map((p)=>{ const len=p.ca/platParts.total*CIRC; const el=(
+                  <circle key={p.nom} cx={cx} cy={cy} r={r} fill="none" stroke={C.accent} strokeOpacity={op[p.nom]!=null?op[p.nom]:0.3} strokeWidth="14"
+                    strokeDasharray={`${len} ${CIRC-len}`} strokeDashoffset={-acc} transform={`rotate(-90 ${cx} ${cy})`} strokeLinecap="butt"/>);
+                  acc+=len; return el; })}
+                <text x="66" y="62" textAnchor="middle" className="vrm-display" style={{fontSize:'16px',fontWeight:800,fill:C.text}}>{Math.round(platParts.total)} €</text>
+                <text x="66" y="79" textAnchor="middle" style={{fontSize:'9px',fill:C.muted}}>CA total</text>
+              </svg>
+              <div style={{flex:'1 1 150px',minWidth:0,display:'flex',flexDirection:'column',gap:8}}>
+                {platParts.arr.map((p)=>(
+                  <div key={p.nom} style={{display:'flex',alignItems:'center',gap:8,fontSize:12.5}}>
+                    <span style={{width:11,height:11,borderRadius:999,background:C.accent,opacity:op[p.nom]!=null?op[p.nom]:0.3,flexShrink:0}}/>
+                    <span style={{flex:1,color:C.text,minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.court}</span>
+                    <span style={{color:C.text,fontWeight:700}}>{fmt(p.ca)}</span>
+                    <span style={{color:C.muted,width:40,textAlign:'right'}}>{Math.round(p.ca/platParts.total*100)}%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </Card>
+        );
+      })()}
+
+      {/* 🏆 CE QUI RAPPORTE — top marques / pointures par CA, barres à l'accent. */}
+      {(topStats.marques.length>0 || topStats.tailles.length>0) && (
+        <Card>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:12}}>
+            <div style={{fontSize:13,fontWeight:600,color:C.text}}>Ce qui rapporte le plus</div>
+            <div style={{display:'flex',gap:3,background:C.card2||C.bg,borderRadius:9,padding:3}}>
+              {[['marques','Marques'],['tailles','Pointures']].map(([k,l])=>(
+                <button key={k} type="button" onClick={()=>setTopMode(k)} style={{border:'none',borderRadius:999,padding:'5px 11px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',background:topMode===k?C.accent:'transparent',color:topMode===k?(C.onAccent||'#fff'):C.muted}}>{l}</button>
+              ))}
+            </div>
+          </div>
+          {(()=>{ const rows=topMode==='marques'?topStats.marques:topStats.tailles;
+            if(!rows.length) return <div style={{fontSize:12,color:C.muted,lineHeight:1.5}}>Pas encore assez de ventes reliées à une paire pour {topMode==='marques'?'classer les marques':'classer les pointures'}.</div>;
+            const max=Math.max(...rows.map(r=>r.v),1);
+            return (<div style={{display:'flex',flexDirection:'column',gap:9}}>{rows.map(r=>(
+              <div key={r.k} style={{display:'flex',alignItems:'center',gap:10}}>
+                <span style={{width:70,fontSize:12.5,color:C.text,flexShrink:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{topMode==='tailles'?`T${r.k}`:r.k}</span>
+                <div style={{flex:1,height:10,background:C.card2||C.bg,borderRadius:5,overflow:'hidden'}}><div style={{width:`${Math.max(4,r.v/max*100)}%`,height:'100%',background:C.accent,borderRadius:5}}/></div>
+                <span style={{width:62,textAlign:'right',fontSize:12.5,fontWeight:700,color:C.text,flexShrink:0}} className="vrm-display">{fmt(r.v)}</span>
+              </div>
+            ))}</div>);
+          })()}
+          <div style={{fontSize:11,color:C.muted,marginTop:10,lineHeight:1.45}}>Sur tes ventes reliées à une paire (marque et pointure lues sur la fiche). Utile pour racheter les bons modèles.</div>
+        </Card>
+      )}
+
+      {/* 🎯 OBJECTIF DU MOIS — jauge vers un objectif de CA que tu fixes. */}
+      <Card>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:objectif>0&&!objEdit?8:2}}>
+          <div style={{fontSize:13,fontWeight:600,color:C.text}}>Objectif du mois</div>
+          <button type="button" onClick={()=>{ setObjTmp(objectif>0?String(objectif):''); setObjEdit(e=>!e); }} style={{border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:8,padding:'6px 11px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{objEdit?'Annuler':(objectif>0?'Modifier':'Fixer')}</button>
+        </div>
+        {objEdit ? (
+          <div style={{display:'flex',gap:8,alignItems:'center',marginTop:8}}>
+            <input type="number" inputMode="decimal" value={objTmp} onChange={e=>setObjTmp(e.target.value)} placeholder="ex. 2000" style={{flex:1,minWidth:0,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,padding:'11px 12px',fontSize:16,fontFamily:'inherit',outline:'none'}}/>
+            <button type="button" onClick={()=>{ const n=Math.max(0,+objTmp||0); setObjectif(n); save('vrm_ca_objectif',n); setObjEdit(false); }} style={{border:'none',background:C.accent,color:'#fff',borderRadius:10,padding:'11px 16px',fontSize:13.5,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>OK</button>
+          </div>
+        ) : objectif>0 ? (()=>{ const pct=Math.min(100,Math.round(caMoisCourant/objectif*100)); const done=caMoisCourant>=objectif; return (
+          <>
+            <div style={{display:'flex',alignItems:'baseline',gap:8}}>
+              <span className="vrm-display" style={{fontSize:28,fontWeight:800,color:C.text}}>{fmt(caMoisCourant)}</span>
+              <span style={{fontSize:13,color:C.muted}}>/ {fmt(objectif)}</span>
+            </div>
+            <div style={{height:12,background:C.card2||C.bg,borderRadius:999,overflow:'hidden',marginTop:8}}><div style={{width:`${Math.max(2,pct)}%`,height:'100%',background:C.accent,borderRadius:999,transition:'width .3s ease'}}/></div>
+            <div style={{fontSize:12,color:C.muted,marginTop:6}}>{done?'🎉 Objectif atteint !':`${pct}% de ton objectif`} · CA de ce mois (par date de vente)</div>
+          </>
+        ); })() : (
+          <div style={{fontSize:12,color:C.muted,marginTop:6,lineHeight:1.5}}>Fixe un objectif de CA pour ce mois et suis ta progression au fil de tes ventes.</div>
         )}
       </Card>
 
