@@ -19083,51 +19083,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </div>
             )}
 
-            {/* 🏷️ OFFRES REÇUES — JUSTE LE NOMBRE (demande de Julien : « pour
-                les offres reçues, tu peux juste mettre le nombre »). Avant :
-                six cartes avec photo, titre, date et deux boutons chacune, soit
-                un pavé de 300 px sur l'écran d'accueil. Une offre se répond sur
-                Vinted de toute façon (l'app n'envoie pas de message, §5) — ce
-                qu'on veut savoir ici, c'est COMBIEN, et y aller. */}
-            {!loading && (offers||[]).length>0 && (()=>{
-              // ⚠️ LA RÈGLE VIT DANS `offresAtraiter` (§11, un seul propriétaire) :
-              //    elle écarte une offre seulement quand une vente PEUT l'avoir
-              //    réglée — même compte, pas avant l'offre, et un titre qui ne
-              //    désigne qu'une paire. Mesuré : 41 → 75 offres affichées.
-              const { gardees: recent, reglees } = offresAtraiter(offers, sales.items, offersDone, offerKey);
-              if(!recent.length) return null;
-              return (
-                <div style={{marginTop:10,display:'flex',alignItems:'center',gap:12,padding:'13px 15px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none'}}>
-                  <div style={{color:C.accent,display:'flex',flexShrink:0}}><Icon name="tag" size={20}/></div>
-                  <div style={{flex:'1 1 120px',minWidth:0}}>
-                    <div style={{fontSize:15,fontWeight:700,color:C.text}}>{recent.length} offre{recent.length>1?'s':''} reçue{recent.length>1?'s':''}</div>
-                    {/* ⚠️ UNE LISTE QUI RÉTRÉCIT SANS EXPLICATION SE LIT COMME UNE
-                        PERTE (leçon de l'écran Leboncoin). On dit combien sont
-                        mises de côté et POURQUOI — le chiffre, pas la promesse. */}
-                    <div style={{fontSize:12,color:C.muted,marginTop:2}}>
-                      Une offre acceptée, c'est presque une vente.
-                      {reglees.length>0 && ` ${reglees.length} autre${reglees.length>1?'s sont mises':' est mise'} de côté : la paire s'est vendue depuis.`}
-                      {/* ⚠️ POURQUOI ELLES « S'ACCUMULENT » : une offre tranchée sur
-                          Vinted n'a AUCUN signal d'identité qui revienne jusqu'ici
-                          (§5 : email_offer_* sans item_id/transaction/conversation) —
-                          on ne peut donc pas savoir tout seul qu'il a répondu, et
-                          les relier par titre serait le rapprochement interdit. Le
-                          geste sûr est le SIEN : « J'ai répondu » les classe. */}
-                      {' '}Déjà répondu&nbsp;? Classe-les d'un tap — sinon elles restent 14 jours.
-                    </div>
-                  </div>
-                  <a href="https://www.vinted.fr/inbox" target="_blank" rel="noreferrer"
-                     style={{flexShrink:0,textDecoration:'none',fontSize:12.5,fontWeight:700,color:C.onAccent,background:C.accent,borderRadius:8,padding:'8px 12px'}}>Répondre</a>
-                  {/* Sans ce bouton le compteur ne redescendrait qu'au bout de
-                      14 jours : les offres traitées sur Vinted n'ont aucun signal
-                      qui revienne jusqu'ici. Le libellé est VISIBLE (une infobulle
-                      ne se voit pas sur téléphone — c'est pour ça qu'il croyait
-                      les offres « infinies »). */}
-                  <button type="button" onClick={()=>recent.forEach(markOfferDone)} title="Marquer toutes ces offres comme traitées"
-                     style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:8,padding:'8px 11px',cursor:'pointer',fontSize:12,fontWeight:600,fontFamily:'inherit',whiteSpace:'nowrap'}}>✓ J'ai répondu</button>
-                </div>
-              );
-            })()}
+            {/* 🏷️ OFFRES REÇUES — RETIRÉ DE L'ACCUEIL (demande de Julien,
+                28 sept. : « enlève le nombre d'offres reçues, laisse simplement
+                les notifications »). Les offres restent dans le centre de
+                notifications (la cloche) ; on ne double plus l'info sur l'écran
+                d'accueil. Les offres sont maintenant une entrée du centre de
+                notifications (la cloche), via la MÊME règle `offresAtraiter`
+                (§11) — on répond sur Vinted. */}
 
             {/* Argent EN ATTENTE = ce que Vinted te doit. UNE seule notion,
                 cohérente partout : le VRAI solde bloqué du porte-monnaie quand on
@@ -27137,6 +27099,23 @@ export default function App() {
         const hint=tete.length?` · sur ${tete.join(', ')}${reste>0?` et ${tri.length-3} autres comptes`:''}`:'';
         items.push({icon:'💬', ic:'chat', text:`${unreadTotal} message${unreadTotal>1?'s':''} non lu${unreadTotal>1?'s':''}${hint}`, n:unreadTotal, tab:'cat_msg'});
       }
+      // 🏷️ OFFRES REÇUES → notification (Julien, 28 sept. : « enlève le nombre
+      // d'offres de l'accueil, laisse simplement les notifications »). On lit les
+      // offres et le mémo « déjà répondu » ICI (le centre de notifs est dans la
+      // coque, pas dans l'écran d'accueil) et on applique la MÊME règle
+      // `offresAtraiter` (§11). `ventes:[]` : la coque n'a pas la liste des ventes
+      // en forme `items` — sans elle on ne peut pas écarter une offre déjà réglée,
+      // donc on n'en écarte aucune (montrer une offre réglée coûte un clic ;
+      // en cacher une vivante fait rater une vente, §5). On répond sur Vinted.
+      try{
+        const offresBrutes = await fetchEmailOffers();
+        if(Array.isArray(offresBrutes) && offresBrutes.length){
+          const dejaRepondu = new Set(load('vinted_offers_done', []) || []);
+          const cle = (o) => `${o.receivedAt||''}|${normTitle(o.article||'')}`;
+          const { gardees:offresRecent } = offresAtraiter(offresBrutes, [], dejaRepondu, cle);
+          if(!cancelled && offresRecent.length) items.push({icon:'🏷️', ic:'tag', text:`${offresRecent.length} offre${offresRecent.length>1?'s':''} reçue${offresRecent.length>1?'s':''} — réponds sur Vinted`, n:offresRecent.length, href:'https://www.vinted.fr/inbox'});
+        }
+      }catch(_){}
       // Actions GRATUITES pour vendre plus (jamais de « booster » payant ici) :
       const numDbl=Object.entries(numPorteurs).filter(([,v])=>v.length>1);
       if(numDbl.length>0) items.push({icon:'🚨', ic:'alert', text:`${numDbl.length} numéro${numDbl.length>1?'s':''} porté${numDbl.length>1?'s':''} par deux annonces (N°${numDbl.map(([n])=>n).slice(0,3).join(', N°')}) — la mauvaise paire peut partir`, n:numDbl.length, tab:'cat_annonces'});
@@ -27488,7 +27467,7 @@ export default function App() {
             {notifItems.length===0 ? (
               <div style={{padding:'22px 16px',fontSize:13,color:C.muted,textAlign:'center',lineHeight:1.5}}>Rien qui presse pour l'instant ✨<br/><span style={{fontSize:11}}>Colis à retirer, ventes à expédier et messages non lus s'afficheront ici.</span></div>
             ) : notifItems.map((it,i)=>(
-              <button key={i} onClick={()=>{ setTab(it.tab); setNotifOpen(false); }}
+              <button key={i} onClick={()=>{ if(it.href){ try{window.open(it.href,'_blank','noopener');}catch(_){} } else if(it.tab){ setTab(it.tab); } setNotifOpen(false); }}
                 style={{width:'100%',display:'flex',alignItems:'center',gap:11,padding:'12px 14px',background:'transparent',border:'none',borderTop:i>0?`1px solid ${C.border}`:'none',cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
                 <span style={{fontSize:20}}>{it.icon}</span>
                 <span style={{flex:1,fontSize:13,fontWeight:600,color:C.text}}>{it.text}</span>
