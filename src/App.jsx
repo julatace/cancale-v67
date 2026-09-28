@@ -20114,15 +20114,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                {/* Saisie manuelle par vente : N° et prix d'achat, même pour une paire jamais numérotée. */}
                {!hidden && (
                  <div style={{display:'flex',gap:6,marginTop:8,alignItems:'center'}}>
-                   <div style={{display:'flex',alignItems:'center',gap:3,border:`1px solid ${ov.numero!=null?INV_STATUS.online.color:C.border}`,borderRadius:8,padding:'3px 6px',background:C.bg,width:78,flexShrink:0}}>
+                   {/* ⚠️ BORDS CALMES (Julien, 28 sept. : « les bords qui brillent »).
+                       Avant, un champ rempli passait sa bordure au vert (#0F8A6A) —
+                       en sombre ça lit « néon ». iOS = bordure fine neutre TOUJOURS ;
+                       la petite ✎ discrète en bout de ligne dit déjà « saisi ». */}
+                   <div style={{display:'flex',alignItems:'center',gap:3,border:`1px solid ${C.border}`,borderRadius:8,padding:'3px 6px',background:C.bg,width:78,flexShrink:0}}>
                      <span style={{fontSize:11,color:C.muted,fontWeight:500}}>N°</span>
                      <ChampSaisie value={ov.numero ?? ''} onCommit={v=>setSaleOverride(o.transaction_id,{numero:v})} placeholder={baseNum||'—'} inputMode="numeric" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
                    </div>
-                   <div style={{flex:1,display:'flex',alignItems:'center',gap:3,border:`1px solid ${ov.buyPrice!=null?INV_STATUS.online.color:C.border}`,borderRadius:8,padding:'3px 8px',background:C.bg}}>
+                   <div style={{flex:1,display:'flex',alignItems:'center',gap:3,border:`1px solid ${C.border}`,borderRadius:8,padding:'3px 8px',background:C.bg}}>
                      <ChampSaisie value={ov.buyPrice ?? ''} onCommit={v=>setSaleOverride(o.transaction_id,{buyPrice:v})} placeholder={baseBuy?`achat ${baseBuy}€ (auto)`:"ajouter le prix d'achat €"} inputMode="decimal" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
                      <span style={{fontSize:11,color:C.muted}}>€</span>
                    </div>
-                   {(ov.numero!=null||ov.buyPrice!=null) && <span style={{fontSize:9,color:INV_STATUS.online.color,fontWeight:600,flexShrink:0}} title="Valeurs saisies à la main pour cette vente (priment sur l'auto)">✎</span>}
+                   {(ov.numero!=null||ov.buyPrice!=null) && <span style={{fontSize:10,color:C.muted,flexShrink:0}} title="Valeurs saisies à la main pour cette vente (priment sur l'auto)">✎</span>}
                  </div>
                )}
                {/* « je veux que ça fasse également ça dans les ventes, donc avec le
