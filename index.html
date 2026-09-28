@@ -76,6 +76,13 @@
     html[data-theme="light"] { color-scheme: light; }
     @media (prefers-color-scheme: dark){ body{background:#11151B;background-image:none;} }
     *{-webkit-tap-highlight-color:transparent;}
+    /* ⚠️ COQUE APP-SHELL : la hauteur est bornée à l'écran et c'est le CONTENU
+       (`<main>`) qui défile, jamais le document. La barre du bas vit HORS du
+       défilement — elle ne peut donc plus « flotter au milieu de l'écran »
+       pendant l'inertie du scroll iOS (bug vu en capture, signalé 3 fois), ni
+       être décalée par le `zoom` de densité posé sur <html>. Le correctif que
+       le dossier désignait comme « le vrai » depuis le début. */
+    html,body,#root{height:100%;}
     @keyframes cancaleSkeleton{0%{background-position:100% 50%}100%{background-position:0 50%}}
 
     /* ── FINITIONS « PREMIUM », valables sur TOUS les écrans ─────────────────
