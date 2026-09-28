@@ -20020,8 +20020,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             largeur dans le JavaScript, donc rien a maintenir en double.
             Les lignes portent deja `flexWrap` et une largeur plancher
             (§26), elles supportent la colonne plus etroite. */}
-        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(430px, 100%), 1fr))',gap:8,alignItems:'start'}}>
-          {ventesAffichees.slice(0, ventesMax).map(o=>{
+        {/* Liste blanche groupée façon démo (comme Achats) : une seule surface,
+            filets fins entre les lignes, lignes aérées — plus de cartes
+            encadrées séparées. */}
+        <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,overflow:'hidden',boxShadow:C.shadow||'none'}}>
+          {ventesAffichees.slice(0, ventesMax).map((o,i)=>{
             const st = classifyOrderStatus(o.status);
             const hidden = isHidden(o);
             const e = effEntry(o); const num = e?.numero;
@@ -20034,9 +20037,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const baseNum = baseE?.numero || '';
             const baseBuy = baseE && baseE.buyPrice!=null && String(baseE.buyPrice).trim()!=='' ? String(baseE.buyPrice) : '';
             return (
-              // Carte de vente : même vocabulaire visuel que les achats et le
-              // reste de l'app (rayon 16, ombre, photo 56, titre plus lisible).
-              <div key={o.transaction_id} style={{borderRadius:12,border:`1px solid ${hidden?C.danger+'55':C.border}`,background:C.card,boxShadow:C.shadow||'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'13px 14px',display:'flex',flexDirection:'column',gap:10}}>
+              // Ligne de vente dans la liste groupée (filet fin entre les lignes,
+              // pas de carte encadrée séparée — style démo, comme Achats).
+              <div key={o.transaction_id} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10}}>
                {/* ── Haut : photo · titre + méta · prix ─────────────────────── */}
                <div style={{display:'flex',gap:12,alignItems:'flex-start'}}>
                 <div style={{width:60,height:60,borderRadius:12,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
@@ -20069,7 +20072,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                </div>
                {/* ── Bas : une seule pastille de statut · les actions groupées ─── */}
                <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-                {(()=>{ const vs=venteStage(o); return <span title={vs.aide||undefined} style={{fontSize:12,color:vs.color,fontWeight:700,background:`${vs.color}18`,borderRadius:999,padding:'3px 10px',display:'inline-flex',alignItems:'center',gap:5,flexShrink:0}}><span style={{width:7,height:7,borderRadius:999,background:vs.color,display:'inline-block'}}/>{vs.label}</span>; })()}
+                {(()=>{ const vs=venteStage(o); return <span title={vs.aide||undefined} style={{fontSize:12.5,color:C.muted,fontWeight:600,display:'inline-flex',alignItems:'center',gap:6,flexShrink:0}}><span style={{width:7,height:7,borderRadius:999,background:vs.color,display:'inline-block'}}/>{vs.label}</span>; })()}
                 <div style={{display:'flex',alignItems:'center',gap:6,flexShrink:0,marginLeft:'auto'}}>
                 {num && needsBordereau(o.status) && !hidden && inGarage(num) && (
                   <button type="button" onClick={()=>onLocate&&onLocate(num)} title={`Voir la paire N°${num} au garage`} aria-label="Voir au garage" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.blue||C.accent,cursor:'pointer',fontSize:15,padding:'6px 8px'}}><Icon name="pin" size={15}/></button>
