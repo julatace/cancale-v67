@@ -7646,6 +7646,8 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
   const [selMonthVente,setSelMonthVente]=useState(null); // graphique date de vente
   const [caMode,setCaMode]=useState('ca');             // graphique d'évolution : « ca » (€) ou « ventes » (nb)
   const [selMois,setSelMois]=useState(null);           // mois sélectionné dans le graphique d'évolution moisson
+  const [caDu,setCaDu]=useState('');                   // CA sur mesure : borne de début (YYYY-MM-DD)
+  const [caAu,setCaAu]=useState('');                   // CA sur mesure : borne de fin
 
   // Paires réellement présentes dans le garage (mémorisé)
   const garageVals=useMemo(()=>
@@ -7869,6 +7871,28 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
     });
     return Object.keys(map).sort().slice(-12).map(k=>({key:k,label:map[k].label,nomComplet:map[k].nomComplet,ca:map[k].ca,ventes:map[k].ventes}));
   },[sales]);
+
+  // CA SUR MESURE — « d'une date à une autre » (Julien, 28 sept.). MÊME source
+  // que le graphique par date de vente ci-dessus (§11) : les ventes finalisées,
+  // à leur date de VENTE (§5 — jamais la date d'encaissement). Bornes incluses ;
+  // une borne vide = ouverte de ce côté. On n'affiche que ce qu'on sait (le
+  // nombre de ventes de la période à côté du total, jamais un total « complet »).
+  const caRange=useMemo(()=>{
+    if(!caDu && !caAu) return null;
+    const toNum=(iso)=> iso ? parseInt(iso.replace(/-/g,''),10) : null;   // YYYY-MM-DD → YYYYMMDD
+    const from=toNum(caDu), to=toNum(caAu);
+    let ca=0, count=0;
+    sales.forEach(v=>{
+      const p=(v.saleDate||'').trim().split('/');
+      if(p.length!==3) return;
+      const n=parseInt(p[2]+p[1].padStart(2,'0')+p[0].padStart(2,'0'),10);  // AAAAMMJJ
+      if(!Number.isFinite(n)) return;
+      if(from!=null && n<from) return;
+      if(to!=null && n>to) return;
+      ca+=+v.sellPrice||0; count++;
+    });
+    return {ca,count};
+  },[sales,caDu,caAu]);
 
   // Paires ajoutées par jour (basé sur addedAt JJ/MM/AAAA).
   // On ignore la date d'init "01/01/2024" qui regroupe tout l'historique importé,
@@ -8435,6 +8459,36 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
           </Card>
         );
       })()}
+
+      {/* CA SUR MESURE : d'une date à une autre (Julien, 28 sept.). */}
+      <Card>
+        <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:2}}>📅 Chiffre d'affaires entre deux dates</div>
+        <div style={{fontSize:11.5,color:C.muted,marginBottom:10}}>Choisis une période — le total porte sur tes ventes finalisées, à leur date de vente.</div>
+        <div style={{display:'flex',gap:10,flexWrap:'wrap',alignItems:'flex-end'}}>
+          <div>
+            <label style={{fontSize:11,color:C.muted,display:'block',marginBottom:4,fontWeight:600}}>Du</label>
+            <input type="date" value={caDu} onChange={e=>setCaDu(e.target.value)} style={{border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,padding:'10px 12px',fontSize:16,fontFamily:'inherit',outline:'none',colorScheme:'inherit'}}/>
+          </div>
+          <div>
+            <label style={{fontSize:11,color:C.muted,display:'block',marginBottom:4,fontWeight:600}}>Au</label>
+            <input type="date" value={caAu} onChange={e=>setCaAu(e.target.value)} style={{border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,padding:'10px 12px',fontSize:16,fontFamily:'inherit',outline:'none',colorScheme:'inherit'}}/>
+          </div>
+          {(caDu||caAu) && <button type="button" onClick={()=>{setCaDu('');setCaAu('');}} style={{border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:10,padding:'10px 12px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Effacer</button>}
+        </div>
+        {caRange ? (
+          <div style={{marginTop:14}}>
+            <div className="vrm-display" style={{fontSize:30,fontWeight:800,color:C.text}}>{fmt(caRange.ca)}</div>
+            <div style={{fontSize:12,color:C.muted,marginTop:2}}>
+              {caRange.count} vente{caRange.count>1?'s':''} finalisée{caRange.count>1?'s':''}
+              {caDu&&caAu?` du ${caDu.split('-').reverse().join('/')} au ${caAu.split('-').reverse().join('/')}`
+                : caDu?` depuis le ${caDu.split('-').reverse().join('/')}`
+                : ` jusqu'au ${caAu.split('-').reverse().join('/')}`}
+            </div>
+          </div>
+        ) : (
+          <div style={{fontSize:12,color:C.muted,marginTop:12,lineHeight:1.5}}>Renseigne une date de début et/ou de fin pour voir le CA de la période.</div>
+        )}
+      </Card>
 
       {/* Graphique du CA par date de vente (cliquable) */}
       {caHistoryVente.length>0&&(()=>{
