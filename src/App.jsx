@@ -5396,7 +5396,14 @@ function BottomBar({tab,setTab}) {
          signature, comme la barre latérale sur ordinateur. */
       background:C.chrome,borderTop:`1px solid ${C.chromeLine}`,boxShadow:'none',
       paddingBottom:'env(safe-area-inset-bottom)',
-      transform:kbOpen?'translateY(120%)':'translateY(0)',transition:'transform .22s cubic-bezier(.32,.72,0,1)'}}>
+      // ⚠️ iOS : une barre `position:fixed` LAGGE pendant l'inertie du défilement
+      // (elle apparaît figée en plein milieu, vu en capture le 28 sept.). On la
+      // force sur sa propre couche GPU (translateZ + willChange + backface) pour
+      // qu'iOS la repeigne avec le viewport. Atténuation ; le correctif complet
+      // serait de faire défiler le CONTENU dans un conteneur et sortir la barre
+      // du scroll (refonte de coque) — à faire si ça persiste.
+      transform:kbOpen?'translateY(120%)':'translateY(0)',transition:'transform .22s cubic-bezier(.32,.72,0,1)',
+      willChange:'transform',backfaceVisibility:'hidden',WebkitBackfaceVisibility:'hidden'}}>
       {(()=>{ const actif=BAR_GROUPE[tab]||tab; return BOTTOM_TABS.map(t=>{ const on=actif===t.id; return (
         <button key={t.id} type="button" onClick={()=>setTab(t.id)} aria-label={t.label} aria-current={on?'page':undefined} style={{
           flex:'1 1 0',minWidth:0,display:'flex',flexDirection:'column',alignItems:'center',gap:4,padding:'8px 2px 7px',
@@ -16089,7 +16096,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (vFilter === 'finalisees') return st === 'completed';
       if (vFilter === 'annulees') return st === 'cancelled';
       if (vFilter === 'sanscout') return isSaleNoBuy(o);
-      return true; })
+      // « Toutes » = toutes SAUF les annulées (demande de Julien, 28 sept. : une
+      // vente annulée sur Vinted ne doit plus apparaître dans les ventes, elle
+      // vit dans l'onglet « Annulées »). Les annulées ne comptent nulle part
+      // dans le CA (§5), c'est cohérent.
+      return st !== 'cancelled'; })
     .filter(o => matchOrd(o))
     .sort(parDateDesc),
     // eslint-disable-next-line react-hooks/exhaustive-deps
