@@ -1785,7 +1785,7 @@ async function capterPhotosAnnonces(uid) {
     }).sort((a, b) => Number(b.nPhotos || 0) - Number(a.nPhotos || 0));
     if (!manquants.length) return 0;
     const memo = (await chrome.storage.local.get('vrmPhotosFaites')).vrmPhotosFaites || {};
-    let n = 0;
+    let n = 0, dirty = false;
     for (const it of manquants) {
       if (n >= PHOTOS_MAX_PAR_VISITE) break;
       const k = `${uid}_${it.id}`;
@@ -1803,9 +1803,22 @@ async function capterPhotosAnnonces(uid) {
         continue;
       }
       const it2 = (rep.json && (rep.json.item || rep.json)) || {};
-      await saveItemDetail(it.id, { description: it2.description || '', photos: urls });
+      // ⚠️ ÉCRITURE GROUPÉE (§4.4, égress — « c'est pas trop coûteux pour
+      //    Supabase ? », 29 sept.). AVANT : `saveItemDetail` relisait ET
+      //    réécrivait la ligne ENTIÈRE `vinted_item_details` à CHAQUE annonce —
+      //    20 annonces = 20 réécritures d'une ligne qui grossit (coût en n²).
+      //    Ici on met à jour la carte DÉJÀ en mémoire (`dej`, lue une seule
+      //    fois plus haut) et on n'écrit qu'UNE fois, après la boucle. Même
+      //    règle de fusion que `saveItemDetail` : ne jamais écraser par du vide.
+      const kk = String(it.id);
+      const prev = dej[kk] || {};
+      const desc = String(it2.description || '').trim();
+      const photos = urls.filter(Boolean).slice(0, 20);
+      dej[kk] = { description: desc || prev.description || '', photos: photos.length ? photos : (prev.photos || []), readAt: new Date().toISOString() };
+      dirty = true;
       noterDiag('photos_annonce_ecrit');
     }
+    if (dirty) await supabaseUpsert('app_data', [{ id: 'vinted_item_details', data: dej }], 'id');
     await chrome.storage.local.set({ vrmPhotosFaites: memo });
     return n;
   } catch (_) { return 0; }
