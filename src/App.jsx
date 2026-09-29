@@ -20072,7 +20072,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                </div>
                {/* ── Bas : une seule pastille de statut · les actions groupées ─── */}
                <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-                {(()=>{ const vs=venteStage(o); return <span title={vs.aide||undefined} style={{fontSize:12.5,color:C.muted,fontWeight:600,display:'inline-flex',alignItems:'center',gap:6,flexShrink:0}}><span style={{width:7,height:7,borderRadius:999,background:vs.color,display:'inline-block'}}/>{vs.label}</span>; })()}
+                {(()=>{ const vs=venteStage(o); return <span title={vs.aide||undefined} style={{fontSize:11.5,color:C.text,fontWeight:600,background:C.card2,borderRadius:5,padding:'3px 9px',display:'inline-flex',alignItems:'center',gap:6,flexShrink:0}}><span style={{width:7,height:7,borderRadius:999,background:vs.color,display:'inline-block'}}/>{vs.label}</span>; })()}
                 <div style={{display:'flex',alignItems:'center',gap:6,flexShrink:0,marginLeft:'auto'}}>
                 {num && needsBordereau(o.status) && !hidden && inGarage(num) && (
                   <button type="button" onClick={()=>onLocate&&onLocate(num)} title={`Voir la paire N°${num} au garage`} aria-label="Voir au garage" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.blue||C.accent,cursor:'pointer',fontSize:15,padding:'6px 8px'}}><Icon name="pin" size={15}/></button>
@@ -21035,7 +21035,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:15,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',letterSpacing:-0.2}} title={o.title}>{o.title}</div>
                 <div style={{fontSize:12.5,color:C.muted,marginTop:3,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
-                  <span style={{display:'inline-flex',alignItems:'center',gap:5,flexShrink:0}}><span style={{width:7,height:7,borderRadius:999,background:st.color,display:'inline-block'}}/>{st.label}</span>
+                  <span style={{display:'inline-flex',alignItems:'center',gap:5,flexShrink:0,fontSize:11.5,fontWeight:600,color:C.text,background:C.card2,borderRadius:5,padding:'3px 9px'}}><span style={{width:7,height:7,borderRadius:999,background:st.color,display:'inline-block'}}/>{st.label}</span>
                   <AcctTag acc={o._acc} name={accNameOf(o._acc)}/>
                   <span>{o.date?new Date(o.date).toLocaleDateString('fr-FR'):''}</span>
                   {/* DEPUIS COMBIEN DE TEMPS : « dois-je m'inquiéter ? ». Au-delà de
