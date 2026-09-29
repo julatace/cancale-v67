@@ -1552,7 +1552,7 @@ const RELEVE_RETRY_MS = 24 * 60 * 60 * 1000;
 // visite. Monté 3 → 8 pour remplir le catalogue plus vite. Le vrai garde-fou
 // anti-blocage reste le plafond de 20 actions/h par compte (`garde`), une requête
 // à la fois : monter ce nombre front-charge le rattrapage sans jamais le dépasser.
-const PHOTOS_MAX_PAR_VISITE = 20;
+const PHOTOS_MAX_PAR_VISITE = 60;
 const PHOTOS_RETRY_MS = 6 * 60 * 60 * 1000;
 // Quand il ne manque plus aucune photo, on met une pause avant de relire la
 // base : sans elle, un onglet Vinted laissé ouvert relirait `vinted_item_details`
@@ -1747,14 +1747,14 @@ function urlsPhotosDeItem(json) {
     // texte, jamais un mouchard — seulement des URL d'image du CDN).
     const vu = new Set();
     const scan = (o, prof) => {
-      if (!o || prof > 6 || out.length >= 20) return;
+      if (!o || prof > 6 || out.length >= 25) return;
       if (typeof o === 'string') { if (/vinted\.net\/.+\/(f800|f1200|1600|large|full)/i.test(o) || /vinted\.net\//i.test(o) && /\.(jpe?g|webp|png)/i.test(o)) pousse(o); return; }
       if (Array.isArray(o)) { for (const x of o) scan(x, prof + 1); return; }
       if (typeof o === 'object') { if (vu.has(o)) return; vu.add(o); for (const k of Object.keys(o)) scan(o[k], prof + 1); }
     };
     scan(json, 0);
   } catch (_) {}
-  return out.slice(0, 20);
+  return out.slice(0, 25);
 }
 async function capterPhotosAnnonces(uid) {
   try {
@@ -1813,7 +1813,12 @@ async function capterPhotosAnnonces(uid) {
       const kk = String(it.id);
       const prev = dej[kk] || {};
       const desc = String(it2.description || '').trim();
-      const photos = urls.filter(Boolean).slice(0, 20);
+      const photos = urls.filter(Boolean).slice(0, 24);
+      // MESURE (§6, « on ne prend que 5 photos », 29 sept.) : si on en récupère
+      // MOINS que Vinted n'en annonce (`nPhotos`), on note combien + les CLÉS de
+      // la réponse (jamais le corps) — pour trancher si l'API de détail limite,
+      // ou si les photos vivent dans un champ qu'on ne lit pas encore.
+      if (Number(it.nPhotos || 0) > photos.length) echantillonRate('photos_incomplet', String(it.id), 'got=' + photos.length + ' want=' + Number(it.nPhotos || 0) + ' cles=' + Object.keys(it2).slice(0, 30).join(','));
       dej[kk] = { description: desc || prev.description || '', photos: photos.length ? photos : (prev.photos || []), readAt: new Date().toISOString() };
       dirty = true;
       noterDiag('photos_annonce_ecrit');
