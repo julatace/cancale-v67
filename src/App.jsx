@@ -10378,6 +10378,103 @@ const GARAGE_AMBIANCES = [
 // pièce avec sol/murs/lumière, meubles en volumes 3D, caméra qu'on tourne au
 // doigt (OrbitControls), tap sur un meuble → on l'ouvre, surlignage rouge du N°
 // cherché. Si WebGL/three échoue, on retombe sur la vue 2.5D (prop fallback).
+// ── Compteur qui monte (le CA du héros) ────────────────────────────────────
+// Une montée fluide de 0 jusqu'à la vraie valeur — décoration, elle ATTERRIT
+// toujours sur le chiffre exact (§5). `prefers-reduced-motion` ⇒ pas d'anim.
+function CountUpEuro({ value }) {
+  const cible = Number(value) || 0;
+  const [v, setV] = React.useState(() => {
+    try { return matchMedia('(prefers-reduced-motion: reduce)').matches ? cible : 0; } catch (_) { return cible; }
+  });
+  React.useEffect(() => {
+    let reduce = false; try { reduce = matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) {}
+    if (reduce) { setV(cible); return; }
+    let raf = 0, t0 = 0; const D = 1100; const ease = x => 1 - Math.pow(1 - x, 3);
+    const step = (ts) => { if (!t0) t0 = ts; const p = Math.min(1, (ts - t0) / D); setV(cible * ease(p)); if (p < 1) raf = requestAnimationFrame(step); };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [cible]);
+  return <>{Math.round(v).toLocaleString('fr-FR')} €</>;
+}
+
+// ── SCÈNE 3D DU HÉROS : pile de cases glossy qui flottent (le garage) ────────
+// Décor du héros de l'accueil, validé par Julien (« fais de la 3D, des bangers »).
+// Même moteur que le garage (import dynamique de three, WebGL avec repli propre).
+// C'est de la DÉCORATION, pas de la donnée : des cases abstraites, aucun chiffre
+// dessus (un N° faux serait un mensonge, §5). Robuste : si three ou WebGL manque,
+// le canvas reste vide et le héros garde son dégradé. rAF en pause quand l'onglet
+// est masqué (batterie), et `prefers-reduced-motion` ⇒ une seule image fixe.
+function HeroScene3D() {
+  const mountRef = React.useRef(null);
+  React.useEffect(() => {
+    let cancelled = false; let cleanup = () => {};
+    (async () => {
+      let THREE; try { THREE = await import('three'); } catch (_) { return; }
+      const el = mountRef.current; if (cancelled || !el) return;
+      let renderer; try { renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); } catch (_) { return; }
+      let reduce = false; try { reduce = matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) {}
+      const W = el.clientWidth || 300, H = el.clientHeight || 220;
+      renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+      renderer.setSize(W, H, false);
+      const dom = renderer.domElement;
+      dom.style.width = '100%'; dom.style.height = '100%'; dom.style.display = 'block'; dom.style.pointerEvents = 'none';
+      el.appendChild(dom);
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(38, W / H, 0.1, 100);
+      camera.position.set(0.2, 1.3, 7.4); camera.lookAt(0, 0.1, 0);
+      const group = new THREE.Group(); scene.add(group);
+      const N = 5, boxes = [];
+      const c1 = new THREE.Color('#5B8CFF'), c2 = new THREE.Color('#8E7BFF');
+      for (let i = 0; i < N; i++) {
+        const g = new THREE.BoxGeometry(1.9, 0.6, 1.25);
+        const body = new THREE.MeshStandardMaterial({ color: 0x22304f, metalness: 0.4, roughness: 0.28 });
+        const lidCol = c1.clone().lerp(c2, N > 1 ? i / (N - 1) : 0);
+        const lid = new THREE.MeshStandardMaterial({ color: lidCol, metalness: 0.55, roughness: 0.2, emissive: lidCol.clone().multiplyScalar(0.28) });
+        const mats = [body, body, lid, body, body, body]; // +x,-x,+y(couvercle),-y,+z,-z
+        const m = new THREE.Mesh(g, mats);
+        m.position.y = (i - (N - 1) / 2) * 0.82;
+        m.userData = { baseY: m.position.y, phase: i * 0.9, rot: (i % 2 ? 1 : -1) * 0.12 };
+        m.rotation.y = m.userData.rot;
+        group.add(m); boxes.push(m);
+      }
+      group.rotation.set(0.05, -0.5, 0);
+      scene.add(new THREE.AmbientLight(0x3a4874, 1.1));
+      const key = new THREE.DirectionalLight(0xffffff, 1.35); key.position.set(4, 6, 5); scene.add(key);
+      const front = new THREE.DirectionalLight(0xcfe0ff, 0.55); front.position.set(0, 1, 8); scene.add(front); // éclaire les faces vers la caméra
+      const rim = new THREE.PointLight(0x6f8dff, 2.4, 30); rim.position.set(-4, 1, 3); scene.add(rim);
+      const rim2 = new THREE.PointLight(0x8e7bff, 1.7, 30); rim2.position.set(3, -2, 4); scene.add(rim2);
+      const pointer = { x: 0, y: 0 };
+      const parent = el.parentElement || el;
+      const onMove = (e) => { try { const r = parent.getBoundingClientRect(); pointer.x = (e.clientX - r.left) / r.width - 0.5; pointer.y = (e.clientY - r.top) / r.height - 0.5; } catch (_) {} };
+      parent.addEventListener('pointermove', onMove);
+      const onResize = () => { const w = el.clientWidth || W, h = el.clientHeight || H; camera.aspect = w / h; camera.updateProjectionMatrix(); renderer.setSize(w, h, false); };
+      let ro; try { ro = new ResizeObserver(onResize); ro.observe(el); } catch (_) {}
+      const frame = () => {
+        const t = performance.now() * 0.001;
+        group.rotation.y += 0.0032;
+        group.rotation.x += ((pointer.y * 0.3) - group.rotation.x + 0.05) * 0.05;
+        for (const b of boxes) { b.position.y = b.userData.baseY + Math.sin(t * 0.9 + b.userData.phase) * 0.06; b.rotation.y = Math.sin(t * 0.4 + b.userData.phase) * 0.06 + b.userData.rot; }
+        renderer.render(scene, camera);
+      };
+      let raf = 0, running = true;
+      const tick = () => { if (!running) return; frame(); raf = requestAnimationFrame(tick); };
+      const onVis = () => { if (document.hidden) { running = false; cancelAnimationFrame(raf); } else if (!running) { running = true; tick(); } };
+      document.addEventListener('visibilitychange', onVis);
+      if (reduce) { group.rotation.y = -0.4; frame(); } else tick();
+      cleanup = () => {
+        running = false; cancelAnimationFrame(raf);
+        parent.removeEventListener('pointermove', onMove); document.removeEventListener('visibilitychange', onVis);
+        try { ro && ro.disconnect(); } catch (_) {}
+        try { boxes.forEach(b => { b.geometry.dispose(); (Array.isArray(b.material) ? b.material : [b.material]).forEach(mm => mm && mm.dispose()); }); } catch (_) {}
+        try { renderer.dispose(); } catch (_) {} try { el.removeChild(dom); } catch (_) {}
+      };
+    })();
+    return () => { cancelled = true; cleanup(); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return <div ref={mountRef} aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }} />;
+}
+
 function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, onPileTap, onMove, colorOf, emojiOf, h3dOf, storedCount, depot, sortie, fallback }) {
   const mountRef = React.useRef(null);
   const st = React.useRef({});
@@ -19134,20 +19231,28 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {!baseKO && !premierJour && liveStats && liveStats.caMois!=null && (
               <button type="button" onClick={()=>onNav&&onNav('cat_ventes')}
                 style={{width:'100%',textAlign:'left',border:'none',cursor:'pointer',fontFamily:'inherit',
-                  borderRadius:12,padding:'18px 18px 16px',marginBottom:16,position:'relative',overflow:'hidden',color:'#fff',
-                  background:`linear-gradient(150deg, ${C.chrome} 0%, ${C.accent} 78%, ${C.accentSoft} 100%)`,
+                  borderRadius:12,marginBottom:16,position:'relative',overflow:'hidden',color:'#fff',minHeight:210,display:'block',
+                  background:`linear-gradient(150deg, ${C.chrome} 0%, ${C.accent} 82%, ${C.accentSoft} 100%)`,
                   boxShadow:C.shadowLg||'none'}}>
-                <div aria-hidden="true" style={{position:'absolute',right:-46,top:-56,width:190,height:190,borderRadius:999,background:'radial-gradient(circle, rgba(255,255,255,.17), rgba(255,255,255,0) 70%)',pointerEvents:'none'}}/>
-                <div aria-hidden="true" style={{position:'absolute',left:-30,bottom:-70,width:170,height:170,borderRadius:999,background:'radial-gradient(circle, rgba(255,255,255,.08), rgba(255,255,255,0) 70%)',pointerEvents:'none'}}/>
-                <div style={{position:'relative',zIndex:1}}>
-                  <div style={{fontSize:11,fontWeight:600,letterSpacing:0.6,textTransform:'uppercase',opacity:.72}}>Chiffre d'affaires · {new Date().toLocaleDateString('fr-FR',{month:'long'})}</div>
-                  <div className="vrm-display" style={{fontSize:36,fontWeight:800,letterSpacing:-1,marginTop:3,lineHeight:1.05}}>{fmtE0(liveStats.caMois)}</div>
-                  <div style={{fontSize:12.5,opacity:.82,marginTop:4,display:'flex',alignItems:'center',gap:6}}>
+                {/* Scène 3D (à droite), lueur d'accent, puis un voile sombre de
+                    gauche à droite pour que le gros chiffre reste lisible par
+                    dessus la 3D — quel que soit le thème (le héros est sa propre
+                    surface sombre, clair comme sombre). */}
+                <HeroScene3D/>
+                <div aria-hidden="true" style={{position:'absolute',right:'-6%',top:'50%',transform:'translateY(-50%)',width:'55%',height:'120%',background:'radial-gradient(closest-side, rgba(91,140,255,.42), rgba(91,140,255,0) 72%)',pointerEvents:'none',zIndex:1}}/>
+                <div aria-hidden="true" style={{position:'absolute',inset:0,pointerEvents:'none',zIndex:2,background:'linear-gradient(100deg, rgba(9,12,20,.80) 0%, rgba(9,12,20,.42) 44%, rgba(9,12,20,0) 74%)'}}/>
+                <div style={{position:'relative',zIndex:3,padding:'22px 20px 20px'}}>
+                  <div style={{fontSize:11,fontWeight:600,letterSpacing:0.7,textTransform:'uppercase',opacity:.78,display:'flex',alignItems:'center',gap:9}}>
+                    <span aria-hidden="true" style={{width:22,height:2,borderRadius:999,background:'currentColor',opacity:.8,display:'inline-block'}}/>
+                    Chiffre d'affaires · {new Date().toLocaleDateString('fr-FR',{month:'long'})}
+                  </div>
+                  <div className="vrm-display" style={{fontSize:'clamp(40px, 12vw, 60px)',fontWeight:800,letterSpacing:-1.5,marginTop:8,lineHeight:.95,fontVariantNumeric:'tabular-nums'}}><CountUpEuro value={liveStats.caMois}/></div>
+                  <div style={{fontSize:13,opacity:.85,marginTop:8,display:'flex',alignItems:'center',gap:7,flexWrap:'wrap'}}>
                     {liveStats.ventesMois!=null
-                      ? <>{liveStats.ventesMois} vente{liveStats.ventesMois>1?'s':''} ce mois-ci</>
+                      ? <><b style={{fontWeight:700}}>{liveStats.ventesMois}</b> vente{liveStats.ventesMois>1?'s':''} ce mois-ci</>
                       : <>ventes finalisées du mois</>}
-                    <span style={{opacity:.6}}>·</span>
-                    <span style={{opacity:.85,fontWeight:600}}>voir mes ventes ›</span>
+                    <span style={{opacity:.55}}>·</span>
+                    <span style={{opacity:.9,fontWeight:600}}>voir mes ventes ›</span>
                   </div>
                 </div>
               </button>
