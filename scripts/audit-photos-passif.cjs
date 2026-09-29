@@ -103,13 +103,18 @@ function faireCtx({ items = LISTINGS, dejaPhotos = {}, gardeStop = null, srcOver
   ctx.logActivity = async () => {};
   ctx.noterDiag = async () => {};
   ctx.echantillonRate = async () => {};
-  // La porte vers Vinted : on COMPTE et on sert le détail (ou un refus).
-  ctx.vintedGet = async (acc, endpoint) => {
+  // La porte vers Vinted : on COMPTE et on sert la PAGE de l'annonce (rendu
+  // serveur, __NEXT_DATA__ avec TOUTES les photos) — c'est la vraie forme depuis
+  // le 29 sept. (l'API /api/v2/items/{id} est morte, 404). Ou un refus.
+  ctx.vintedGet = async () => ({ ok: false, status: 404, json: null }); // l'API item est morte : on ne s'en sert plus
+  ctx.vintedGetHtml = async (acc, endpoint) => {
     journal.gets.push(endpoint);
     const id = (endpoint.match(/items\/(\d+)/) || [])[1];
-    if (detailKO) return { ok: false, status: 502, json: null };
+    if (detailKO) return { ok: false, status: 502, text: '' };
     const nb = { '111': 9, '222': 3, '333': 12, '555': 5 }[id] || 0;
-    return { ok: true, status: 200, json: detail(id, nb) };
+    const item = { id: Number(id), description: 'desc ' + id, photos: Array.from({ length: nb }, (_, i) => ({ full_size_url: img(id, i), url: img(id, i) })) };
+    const html = '<!doctype html><html><body><script id="__NEXT_DATA__" type="application/json">' + JSON.stringify({ props: { pageProps: { item } } }) + '</script></body></html>';
+    return { ok: true, status: 200, text: html };
   };
   ctx.__journal = journal; ctx.__store = store;
   return ctx;

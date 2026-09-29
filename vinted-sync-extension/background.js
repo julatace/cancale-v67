@@ -1552,7 +1552,7 @@ const RELEVE_RETRY_MS = 24 * 60 * 60 * 1000;
 // visite. Monté 3 → 8 pour remplir le catalogue plus vite. Le vrai garde-fou
 // anti-blocage reste le plafond de 20 actions/h par compte (`garde`), une requête
 // à la fois : monter ce nombre front-charge le rattrapage sans jamais le dépasser.
-const PHOTOS_MAX_PAR_VISITE = 60;
+const PHOTOS_MAX_PAR_VISITE = 20;
 const PHOTOS_RETRY_MS = 6 * 60 * 60 * 1000;
 // Quand il ne manque plus aucune photo, on met une pause avant de relire la
 // base : sans elle, un onglet Vinted laissé ouvert relirait `vinted_item_details`
@@ -1756,6 +1756,66 @@ function urlsPhotosDeItem(json) {
   } catch (_) {}
   return out.slice(0, 25);
 }
+
+// ⚠️⚠️ VINTED N'A PLUS D'API DE DÉTAIL (mesuré le 29 sept. sur la vraie base :
+// `/api/v2/items/{id}` renvoie 404, et en ouvrant une annonce la page n'appelle
+// AUCUNE API item — les photos sont EMBARQUÉES dans le HTML rendu serveur).
+// On récupère donc la PAGE publique de l'annonce (elle montre TOUTES les photos,
+// même déconnecté) et on l'analyse. `credentials:'omit'` : on ne touche pas à la
+// session, c'est une page publique.
+async function vintedGetHtml(acc, endpoint) {
+  try {
+    const res = await fetch(`https://${acc.domain || 'www.vinted.fr'}${endpoint}`, {
+      method: 'GET',
+      credentials: 'omit',
+      headers: { 'Accept': 'text/html,application/xhtml+xml', 'Accept-Language': 'fr-FR,fr;q=0.9' },
+    });
+    const text = await res.text();
+    return { status: res.status, ok: res.ok, text };
+  } catch (_) { return { status: 0, ok: false, text: '' }; }
+}
+// Extrait { photos, description } de la PAGE d'une annonce. Priorité au bloc
+// `__NEXT_DATA__` (rendu serveur) où vit l'objet de l'annonce avec TOUTES ses
+// photos — on ne prend QUE l'objet dont l'id == celui de l'annonce (§5,
+// l'identité prime, jamais un autre article). Repli : balayage des grandes
+// images vinted.net du HTML.
+function extraireDetailPage(html, id) {
+  const out = { photos: [], description: '' };
+  if (!html) return out;
+  try {
+    const m = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+    let data = null;
+    if (m) { try { data = JSON.parse(m[1]); } catch (_) {} }
+    if (data) {
+      const cible = String(id);
+      let found = null;
+      const vu = new Set();
+      const walk = (o, prof) => {
+        if (!o || found || prof > 9 || typeof o !== 'object') return;
+        if (vu.has(o)) return; vu.add(o);
+        if (String(o.id) === cible && Array.isArray(o.photos) && o.photos.length) { found = o; return; }
+        for (const k of Object.keys(o)) walk(o[k], prof + 1);
+      };
+      walk(data, 0);
+      if (found) {
+        for (const p of found.photos) { const u = p && (p.full_size_url || p.url || (p.thumbnails && p.thumbnails.length && p.thumbnails[p.thumbnails.length - 1].url)); if (typeof u === 'string' && /vinted\.net\//i.test(u) && !out.photos.includes(u)) out.photos.push(u); }
+        if (typeof found.description === 'string') out.description = found.description;
+      }
+    }
+    if (!out.photos.length) {
+      const re = /https:\/\/images\d*\.vinted\.net\/[^"'\\\s)]+/gi;
+      const vus = new Set(); let mm;
+      while ((mm = re.exec(html)) && out.photos.length < 25) {
+        const u = mm[0];
+        if (!/\/(f800|f1200|1600|large|full)\//i.test(u)) continue;   // grandes images = photos d'article, pas les avatars
+        const cle = u.split('?')[0];
+        if (vus.has(cle)) continue; vus.add(cle);
+        out.photos.push(u);
+      }
+    }
+  } catch (_) {}
+  return out;
+}
 async function capterPhotosAnnonces(uid) {
   try {
     if (!uid) return 0;
@@ -1794,15 +1854,16 @@ async function capterPhotosAnnonces(uid) {
       if (refus) { logActivity(`⚠️ Photos non captées : ${refus.error}`); break; }
       memo[k] = Date.now();
       n++;
-      const rep = await vintedGet(acc, `/api/v2/items/${encodeURIComponent(it.id)}`);
-      if (!rep.ok || !rep.json) { noterDiag(`photos_annonce_refuse_${rep.status}`); continue; }
-      const urls = urlsPhotosDeItem(rep.json);
+      const rep = await vintedGetHtml(acc, `/items/${encodeURIComponent(it.id)}`);
+      if (!rep.ok || !rep.text) { noterDiag(`photos_page_refuse_${rep.status}`); continue; }
+      const det = extraireDetailPage(rep.text, it.id);
+      const urls = det.photos;
       if (!urls.length) {
-        noterDiag('photos_annonce_vide');
-        echantillonRate('photos_annonce', String(it.id), JSON.stringify(Object.keys((rep.json && (rep.json.item || rep.json)) || {})).slice(0, 300));
+        noterDiag('photos_page_vide');
+        echantillonRate('photos_page', String(it.id), 'nextdata=' + (/__NEXT_DATA__/.test(rep.text) ? 'oui' : 'non') + ' len=' + rep.text.length);
         continue;
       }
-      const it2 = (rep.json && (rep.json.item || rep.json)) || {};
+      const it2 = { description: det.description || '' };
       // ⚠️ ÉCRITURE GROUPÉE (§4.4, égress — « c'est pas trop coûteux pour
       //    Supabase ? », 29 sept.). AVANT : `saveItemDetail` relisait ET
       //    réécrivait la ligne ENTIÈRE `vinted_item_details` à CHAQUE annonce —
@@ -1821,7 +1882,7 @@ async function capterPhotosAnnonces(uid) {
       if (Number(it.nPhotos || 0) > photos.length) echantillonRate('photos_incomplet', String(it.id), 'got=' + photos.length + ' want=' + Number(it.nPhotos || 0) + ' cles=' + Object.keys(it2).slice(0, 30).join(','));
       dej[kk] = { description: desc || prev.description || '', photos: photos.length ? photos : (prev.photos || []), readAt: new Date().toISOString() };
       dirty = true;
-      noterDiag('photos_annonce_ecrit');
+      noterDiag('photos_page_ecrit');
     }
     if (dirty) await supabaseUpsert('app_data', [{ id: 'vinted_item_details', data: dej }], 'id');
     await chrome.storage.local.set({ vrmPhotosFaites: memo });
