@@ -19116,6 +19116,43 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 (colis, ventes) peuvent être en retard. On le dit une fois, sous
                 le bonjour — pas pendant une panne (le bloc de la coque parle) ni
                 le premier jour (rien n'est encore capté). §11, message partagé. */}
+            {/* ═══ HERO — LE CA DU MOIS, EN GRAND ══════════════════════════════
+                L'élément « premium » de l'accueil (Julien : « fais quelque chose
+                de bangers, ça fait trop bâclé »). Un dégradé profond, un seul
+                gros chiffre, sur toute la largeur.
+                ⚠️ §5 : QUE DES CHIFFRES SÛRS. Pas de bénéfice ici — 0 prix
+                d'achat saisi, donc un « bénéfice » vaudrait mécaniquement le CA :
+                un faux (plainte « les données ne sont plus fiables »). Le CA du
+                mois est LU côté Vinted (`caMois`), et il n'est écrit NULLE PART
+                AILLEURS sur cet écran — pas de doublon (§7). L'argent « à virer /
+                en attente » a déjà sa carte plus bas : on ne le répète pas ici.
+                ⚠️ Rendu seulement quand `caMois` est LU (« pas su ne vaut pas
+                oui ») : sinon la carte du dessous et le bloc de panne parlent
+                déjà. Le halo est une DÉCORATION, pas une courbe de données —
+                une fausse tendance mentirait (§5). Le dégradé vient des jetons
+                de thème (`chrome`→`accent`), donc il suit la palette. */}
+            {!baseKO && !premierJour && liveStats && liveStats.caMois!=null && (
+              <button type="button" onClick={()=>onNav&&onNav('cat_ventes')}
+                style={{width:'100%',textAlign:'left',border:'none',cursor:'pointer',fontFamily:'inherit',
+                  borderRadius:12,padding:'18px 18px 16px',marginBottom:16,position:'relative',overflow:'hidden',color:'#fff',
+                  background:`linear-gradient(150deg, ${C.chrome} 0%, ${C.accent} 78%, ${C.accentSoft} 100%)`,
+                  boxShadow:C.shadowLg||'none'}}>
+                <div aria-hidden="true" style={{position:'absolute',right:-46,top:-56,width:190,height:190,borderRadius:999,background:'radial-gradient(circle, rgba(255,255,255,.17), rgba(255,255,255,0) 70%)',pointerEvents:'none'}}/>
+                <div aria-hidden="true" style={{position:'absolute',left:-30,bottom:-70,width:170,height:170,borderRadius:999,background:'radial-gradient(circle, rgba(255,255,255,.08), rgba(255,255,255,0) 70%)',pointerEvents:'none'}}/>
+                <div style={{position:'relative',zIndex:1}}>
+                  <div style={{fontSize:11,fontWeight:600,letterSpacing:0.6,textTransform:'uppercase',opacity:.72}}>Chiffre d'affaires · {new Date().toLocaleDateString('fr-FR',{month:'long'})}</div>
+                  <div className="vrm-display" style={{fontSize:36,fontWeight:800,letterSpacing:-1,marginTop:3,lineHeight:1.05}}>{fmtE0(liveStats.caMois)}</div>
+                  <div style={{fontSize:12.5,opacity:.82,marginTop:4,display:'flex',alignItems:'center',gap:6}}>
+                    {liveStats.ventesMois!=null
+                      ? <>{liveStats.ventesMois} vente{liveStats.ventesMois>1?'s':''} ce mois-ci</>
+                      : <>ventes finalisées du mois</>}
+                    <span style={{opacity:.6}}>·</span>
+                    <span style={{opacity:.85,fontWeight:600}}>voir mes ventes ›</span>
+                  </div>
+                </div>
+              </button>
+            )}
+
             {!baseKO && !premierJour && <div style={{marginBottom:14}}><FraicheurDonnees jours={liveStats && liveStats.dataAgeJours}/></div>}
 
             {/* ⚠️ Avant tout le reste : si le serveur ne peut envoyer aucune
@@ -19323,32 +19360,50 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 regarder, ses dernières ventes. Ce n'est pas un conseil ni un
                 diagnostic (ceux-là restent bannis de l'accueil, §5.66) — c'est
                 du contenu, et il mène à l'écran Ventes. */}
+            {/* ⚠️ « les photos sont toutes petites dans les dernières ventes, on
+                comprend rien, c'est nul » (Julien). Elles passent d'une vignette
+                de 36 px à de GROSSES photos carrées en grille : `minmax(150px)`
+                donne deux colonnes sur téléphone, plus sur ordinateur — la même
+                règle CSS, aucun test de largeur en JavaScript (§7). Chaque carte
+                porte son N° et son statut ; PAS de bénéfice (0 prix d'achat, ce
+                serait un faux, §5) — le prix de vente, qui est un fait. */}
             {!loading && dernieresVentes.length>0 && (
-              <div style={{marginTop:14,border:`1px solid ${C.border}`,background:C.card,borderRadius:10,boxShadow:C.shadow||'none',overflow:'hidden'}}>
-                <div style={{display:'flex',alignItems:'baseline',gap:8,padding:'12px 15px 9px'}}>
+              <div style={{marginTop:14}}>
+                <div style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:10,paddingLeft:2}}>
                   <div className="vrm-label" style={{color:C.muted,flex:1}}>Dernières ventes</div>
                   <button type="button" onClick={()=>onNav&&onNav('cat_ventes')}
-                    style={{border:'none',background:'transparent',color:C.accent,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',padding:0}}>tout voir ›</button>
+                    style={{border:'none',background:'transparent',color:C.accent,fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit',padding:0}}>tout voir ›</button>
                 </div>
-                {dernieresVentes.map((o,i)=>{
-                  const ph = orderPhoto(o);
-                  const d = new Date(o._t);
-                  return (
-                    <button key={o.transaction_id||i} type="button" onClick={()=>onNav&&onNav('cat_ventes')}
-                      style={{display:'flex',alignItems:'center',gap:11,width:'100%',textAlign:'left',padding:'9px 15px',border:'none',borderTop:`1px solid ${C.border}`,background:'transparent',cursor:'pointer',fontFamily:'inherit'}}>
-                      <div style={{width:36,height:36,borderRadius:8,background:C.bg,border:`1px solid ${C.border}`,flexShrink:0,overflow:'hidden'}}>
-                        {/* Le CDN Vinted expire : sans ce repli, la vignette
-                            devient l'icône « image cassée » du navigateur (§5.76). */}
-                        {ph && !imgMortes.has(ph) && <img src={ph} alt="" loading="lazy" onError={()=>noterImgMorte(ph)} style={{width:'100%',height:'100%',objectFit:'cover'}}/>}
-                      </div>
-                      <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontSize:13,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{o.title||'—'}</div>
-                        <div style={{fontSize:11,color:C.muted,marginTop:1}}>{d.toLocaleDateString('fr-FR',{day:'2-digit',month:'short'})}{o._acc?` · ${accName(o._acc)}`:''}</div>
-                      </div>
-                      <div style={{fontSize:14,fontWeight:700,color:C.text,flexShrink:0}}>{montantCommande(o).toFixed(2).replace('.',',')} €</div>
-                    </button>
-                  );
-                })}
+                <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(150px, 1fr))',gap:12}}>
+                  {dernieresVentes.map((o,i)=>{
+                    const ph = orderPhoto(o);
+                    const e = effEntry(o); const num = e?.numero;
+                    const vs = venteStage(o);
+                    return (
+                      <button key={o.transaction_id||i} type="button" onClick={()=>onNav&&onNav('cat_ventes')}
+                        style={{textAlign:'left',border:`1px solid ${C.border}`,background:C.card,borderRadius:12,overflow:'hidden',boxShadow:C.shadow||'none',cursor:'pointer',fontFamily:'inherit',padding:0,display:'block'}}>
+                        <div style={{position:'relative',aspectRatio:'1 / 1',background:C.bg,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                          {/* Le CDN Vinted expire : sans ce repli, la vignette
+                              devient l'icône « image cassée » du navigateur (§5.76). */}
+                          {ph && !imgMortes.has(ph)
+                            ? <img src={ph} alt="" loading="lazy" onError={()=>noterImgMorte(ph)} style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                            : <Icon name="image" size={30} style={{color:C.muted,opacity:.5}}/>}
+                          {num && <span style={{position:'absolute',top:9,right:9,fontSize:10.5,fontWeight:700,color:'#fff',background:'rgba(11,15,21,.62)',borderRadius:8,padding:'2px 8px'}}>N°{num}</span>}
+                        </div>
+                        <div style={{padding:'10px 11px 11px'}}>
+                          <div style={{fontSize:13.5,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{o.title||'—'}</div>
+                          <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:8,marginTop:4}}>
+                            <span className="vrm-display" style={{fontSize:15,fontWeight:700,color:C.text}}>{montantCommande(o).toFixed(0)} €</span>
+                          </div>
+                          <div style={{fontSize:11.5,color:C.muted,marginTop:6,display:'flex',alignItems:'center',gap:6,minWidth:0}}>
+                            <span style={{width:7,height:7,borderRadius:999,background:vs.color,flexShrink:0}}/>
+                            <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{vs.label}</span>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             )}
 
