@@ -1552,8 +1552,13 @@ const RELEVE_RETRY_MS = 24 * 60 * 60 * 1000;
 // visite. Monté 3 → 8 pour remplir le catalogue plus vite. Le vrai garde-fou
 // anti-blocage reste le plafond de 20 actions/h par compte (`garde`), une requête
 // à la fois : monter ce nombre front-charge le rattrapage sans jamais le dépasser.
-const PHOTOS_MAX_PAR_VISITE = 8;
+const PHOTOS_MAX_PAR_VISITE = 20;
 const PHOTOS_RETRY_MS = 6 * 60 * 60 * 1000;
+// Quand il ne manque plus aucune photo, on met une pause avant de relire la
+// base : sans elle, un onglet Vinted laissé ouvert relirait `vinted_item_details`
+// (lourde) toutes les minutes pour rien (§4.4, égress). 5 min = la même cadence
+// que la moisson de visite, donc une nouvelle annonce est prise vite.
+const PHOTOS_TICK_COOLDOWN_MS = 5 * 60 * 1000;
 
 // Un mouvement, réduit à ce qui l'identifie et le date. On ne garde pas le
 // libellé complet ni les champs de présentation : ces lignes repartent à chaque
@@ -1804,6 +1809,29 @@ async function capterPhotosAnnonces(uid) {
     await chrome.storage.local.set({ vrmPhotosFaites: memo });
     return n;
   } catch (_) { return 0; }
+}
+
+// ⚠️ CAPTURE PLUS RAPIDE, SANS ATTENDRE UNE NAVIGATION (Julien, 29 sept. :
+// « elle doit être bcp plus rapide et pas attendre que je l'ouvre »).
+// L'extension a BESOIN d'une session Vinted (elle lit avec TES jetons) : elle
+// ne peut donc rien capter sans qu'un onglet Vinted soit ouvert. Mais tant
+// qu'UN onglet Vinted est ouvert — même sans que tu cliques — cette alarme
+// (1 min) complète les photos manquantes du compte connecté, 20 par tour, une
+// par une (§3, garde interne). Dès qu'il ne manque plus rien, on marque une
+// pause (`PHOTOS_TICK_COOLDOWN_MS`) pour ne pas relire la base en boucle
+// (§4.4). Aucun onglet Vinted ⇒ rien ne part, aucun coût.
+async function tickPhotos() {
+  try {
+    const tabs = await chrome.tabs.query({ url: ['https://*.vinted.fr/*', 'https://*.vinted.com/*', 'https://*.vinted.it/*', 'https://*.vinted.de/*'] });
+    if (!tabs || !tabs.length) return;                 // pas d'onglet Vinted : on ne touche à rien
+    const uid = await activeUidForDomain('www.vinted.fr');
+    if (!uid) return;                                  // pas connecté : rien à capter
+    const cd = (await chrome.storage.local.get('vrmPhotosCooldown')).vrmPhotosCooldown || {};
+    if (Date.now() - Number(cd[uid] || 0) < PHOTOS_TICK_COOLDOWN_MS) return; // fini récemment : on ne relit pas la base
+    const n = await capterPhotosAnnonces(uid);
+    // Plus rien à faire (ou garde qui refuse) → on met en pause ce compte.
+    if (!n) { cd[uid] = Date.now(); await chrome.storage.local.set({ vrmPhotosCooldown: cd }); }
+  } catch (_) { /* une capture ratée n'a pas à réveiller d'erreur */ }
 }
 
 const AWAITING_SHIP = (s) => /bordereau\s+envoy[ée]\s+au\s+vendeur/i.test(s || '') || /paiement.*valid/i.test(s || '');
@@ -2332,10 +2360,14 @@ try {
   // c'est-à-dire, sous RLS, plus aucune capture enregistrée, en silence.
   // 40 min : bien avant l'heure, et rien ne part si aucune session n'existe.
   chrome.alarms.create('vrm-session', { periodInMinutes: 40 });
+  // Photos des annonces : tant qu'un onglet Vinted est ouvert, on complète tout
+  // seul, sans attendre une navigation (Julien, 29 sept.). Voir `tickPhotos`.
+  chrome.alarms.create('vrm-photos', { periodInMinutes: 1 });
   chrome.alarms.onAlarm.addListener((a) => {
     if (a.name === 'cancale-sync') captureAllAccounts();
     else if (a.name === 'cancale-active') runActive();
     else if (a.name === 'vrm-session') { loadSession().then(s => { if (s) authToken(); }); }
+    else if (a.name === 'vrm-photos') tickPhotos();
     // Le tampon de diagnostic survit au worker (chrome.storage.local) ; encore
     // faut-il qu'il PARTE un jour. Sans ce réveil, un tampon posé juste avant
     // une longue période calme attendrait la prochaine capture pour être écrit.
