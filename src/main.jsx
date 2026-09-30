@@ -1,6 +1,16 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
+// Polices HÉBERGÉES SUR LE SITE (30 sept.) : charger Google Fonts envoyait
+// l'adresse IP de chaque visiteur à Google (recommandation CNIL, jugement
+// LG München 3 O 17493/20). Mêmes familles, même rendu, plus aucun tiers.
+import '@fontsource/inter/400.css';
+import '@fontsource/inter/500.css';
+import '@fontsource/inter/600.css';
+import '@fontsource/inter/700.css';
+import '@fontsource/space-grotesk/500.css';
+import '@fontsource/space-grotesk/600.css';
+import '@fontsource/space-grotesk/700.css';
 
 // ⚠️ DERNIER FILET : même si l'application entière tombe (erreur AVANT que le
 // garde-fou d'écran soit monté), on ne laisse jamais une page blanche. Une page

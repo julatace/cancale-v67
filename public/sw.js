@@ -122,6 +122,11 @@ self.addEventListener('fetch', event => {
   // On ne gère que le GET même origine ; le reste (POST, cross-origin) au réseau.
   if (req.method !== 'GET' || url.origin !== self.location.origin) return;
 
+  // ⚠️ Les pages légales (/legal/*.html) sont de vraies pages statiques : la
+  // navigation ci-dessous range la réponse sous « / » — ouvrir les CGU aurait
+  // remplacé l'app en cache par les CGU. Elles vont au réseau, sans cache.
+  if (url.pathname.startsWith('/legal/')) return;
+
   // 2) Navigation : réseau d'abord, secours cache.
   if (req.mode === 'navigate') {
     event.respondWith((async () => {

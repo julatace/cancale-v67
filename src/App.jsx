@@ -5690,6 +5690,23 @@ const BrandMark = ({ id }) => id === 'google' ? (
 // `echo -n "<nouveau code>" | shasum -a 256` et remplacer la ligne ci-dessous.
 const CODE_ACCES_HASH = 'abe463733a572f979547b38c378eadd7f35c273d81acee0b7f35cca551e7e426';
 
+// Les documents légaux (public/legal/*.html) : liens discrets, sur l'écran de
+// connexion (accessibles SANS compte, comme la loi l'exige) et dans Réglages.
+const DOCS_LEGAUX = [
+  ['/legal/mentions-legales.html', 'Mentions légales'],
+  ['/legal/cgu.html', 'CGU'],
+  ['/legal/cgv.html', 'CGV'],
+  ['/legal/confidentialite.html', 'Confidentialité'],
+  ['/legal/cookies.html', 'Cookies'],
+];
+function LiensLegaux() {
+  return (
+    <nav aria-label="Documents légaux" style={{display:'flex',flexWrap:'wrap',justifyContent:'center',gap:'4px 14px',marginTop:16,fontSize:11.5}}>
+      {DOCS_LEGAUX.map(([h,t]) => <a key={h} href={h} target="_blank" rel="noopener" style={{color:C.muted,textDecoration:'none'}}>{t}</a>)}
+    </nav>
+  );
+}
+
 function AuthScreen() {
   // Trois états : `undefined` = on sonde · `true` = la clé publique lit encore
   // · `false` = fermée · `null` = pas su. Une seule requête, en lecture seule
@@ -5880,6 +5897,15 @@ function AuthScreen() {
             borderRadius:10,padding:'13px',fontSize:15,fontWeight:600,cursor:busy?'default':'pointer',opacity:busy?0.6:1,fontFamily:'inherit'}}>
             {busy ? '…' : mode==='up' ? 'Créer mon compte' : mode==='reset' ? 'Envoyer le lien' : mode==='newpw' ? 'Enregistrer' : 'Se connecter'}
           </button>
+          {/* Acceptation des conditions AVANT la création du compte (art. 1127-1
+              C. civ., RGPD art. 13 : l'information est donnée au moment de la
+              collecte). */}
+          {mode==='up' && (
+            <div style={{fontSize:11.5,color:C.muted,lineHeight:1.5,marginTop:10,textAlign:'center'}}>
+              En créant ton compte, tu acceptes les <a href="/legal/cgu.html" target="_blank" rel="noopener" style={{color:C.accent}}>conditions d’utilisation</a> et
+              tu as pris connaissance de la <a href="/legal/confidentialite.html" target="_blank" rel="noopener" style={{color:C.accent}}>politique de confidentialité</a>.
+            </div>
+          )}
 
           <div style={{display:mode==='newpw'?'none':'flex',justifyContent:'space-between',alignItems:'center',gap:10,marginTop:14,flexWrap:'wrap'}}>
             {/* ⚠️ INSCRIPTIONS FERMÉES tant que la base ne sépare pas les
@@ -5908,6 +5934,7 @@ function AuthScreen() {
             )}
           </div>
         </form>
+        <LiensLegaux/>
         {/* ⚠️⚠️ CETTE PORTE ÉTAIT GRANDE OUVERTE SUR INTERNET.
             Elle existait pour une bonne raison (§12) : personne ne doit se
             retrouver enfermé hors de son propre outil parce qu'un email de
@@ -25420,6 +25447,14 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
       <EmailStartSetting/>
 
       {/* « Facturation Pro » déménagée dans l'onglet Factures (30 sept.). */}
+
+      <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Tes données et les conditions</div>
+      <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px',fontSize:12.5,color:C.muted,lineHeight:1.55}}>
+        Tu peux <b style={{color:C.text}}>exporter toutes tes données</b> avec « Sauvegarde complète » ci-dessus. Pour <b style={{color:C.text}}>supprimer ton compte</b> ou exercer tes droits (accès, rectification, effacement), écris à l’adresse indiquée dans la <a href="/legal/confidentialite.html" target="_blank" rel="noopener" style={{color:C.accent}}>politique de confidentialité</a>.
+        <div style={{display:'flex',flexWrap:'wrap',gap:'4px 14px',marginTop:9}}>
+          {DOCS_LEGAUX.map(([h,t]) => <a key={h} href={h} target="_blank" rel="noopener" style={{color:C.accent,fontWeight:500,textDecoration:'none'}}>{t}</a>)}
+        </div>
+      </div>
 
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Affichage</div>
       <Row icon={dark?'☀️':'🌙'} title={dark?'Passer en mode clair':'Passer en mode sombre'} onClick={toggleDark}/>
