@@ -4624,8 +4624,8 @@ let _logoSeq = 0;
 // Une image, pas un dessin : c'est SA marque, telle qu'il l'a fait faire.
 // Les coins sont arrondis ici pour ne jamais montrer le fond noir de l'image
 // sur le thème clair.
-function VrmLogo({ size = 40, style }) {
-  return <img src="/logo-vrm-192.png" alt="VRM" width={size} height={size}
+function VrmLogo({ size = 40, style, anim = true }) {
+  return <img src="/logo-vrm-192.png" alt="VRM" width={size} height={size} className={anim ? 'vrm-logo-anim' : undefined}
     style={{ width: size, height: size, borderRadius: Math.round(size * 0.24), objectFit: 'cover', display: 'block', ...(style || {}) }}/>;
 }
 // Le sigle à plat, pour poser à côté du médaillon dans l'en-tête.
@@ -27885,10 +27885,13 @@ export default function App() {
             onContextMenu={(e)=>{e.preventDefault();resetLogo();}}
             title="Cliquer pour changer le logo (clic droit / appui long = remettre par défaut)"
             style={{position:'relative',width:40,height:40,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,borderRadius:10,cursor:'pointer'}}>
-            {/* Logo VRM par défaut ; remplacé par ton image si tu en as chargé une. */}
+            {/* Logo VRM par défaut ; remplacé par ton image si tu en as chargé une.
+                `key={tab}` remonte le logo à chaque changement d'écran → la petite
+                rotation 3D se rejoue « quand VRM charge une page » (demande de
+                Julien). `prefers-reduced-motion` la neutralise. */}
             {customLogo
-              ? <img src={logoSrc} alt="Logo" style={{width:40,height:40,objectFit:'cover',borderRadius:10}}/>
-              : <VrmLogo size={40}/>}
+              ? <img key={tab} src={logoSrc} alt="Logo" className="vrm-logo-anim" style={{width:40,height:40,objectFit:'cover',borderRadius:10}}/>
+              : <VrmLogo key={tab} size={40}/>}
             {/* Repère « modifiable » : une pastille discrète en coin, et non plus
                 un bandeau noir en travers du logo — il masquait le bas du V. */}
             {/* ⚠️ La pastille « modifiable » ne colle plus en permanence sur la
