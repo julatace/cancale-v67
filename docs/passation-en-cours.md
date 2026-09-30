@@ -261,6 +261,10 @@ auth : shopcancale35@gmail.com = `74eea6e7-f060-46b6-b9c7-d500cedf4738`
   JWT) : `api/_lib/cle.js` → `sbCle(k)` n'envoie `Authorization: Bearer` que
   pour une clé JWT (`eyJ…`). Appliqué à toutes les routes (19 sites). Vérifié
   en exécutant `api/widget.js` avec les deux formats ; `bancs/serveur.cjs` vert.
+- ✅ `SUPABASE_SERVICE_KEY` posée sur Vercel le 30/09 (type sensitive,
+  production), clé `sb_secret_` donnée par Julien dans la conversation ⇒
+  lui conseiller de la RÉGÉNÉRER une fois la fermeture validée (Supabase →
+  API Keys → nouvelle clé secrète → la poser sur Vercel → supprimer l'ancienne).
 - ⬜ ÉTAPE 2 = `supabase/migrations/002-fermeture.sql` (prêt). Conditions :
   👤 `SUPABASE_SERVICE_KEY` sur Vercel (Supabase → Settings → API Keys →
   service_role → Vercel → Settings → Environment Variables, Production) ;
