@@ -95,7 +95,7 @@ const MENSONGES = [
 
   // `reglagesKO` : SEULES les quatre lignes de réglages échouent. Tout le reste
   // répond — y compris les ÉCRITURES, qui sont comptées.
-  const rendre = async (reglagesKO, gestes) => {
+  const rendre = async (reglagesKO, gestes, tab = 'settings') => {
     const ctx = await b.newContext({ viewport: { width: 1512, height: 950 } });
     const pg = await ctx.newPage();
     const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
@@ -127,14 +127,14 @@ const MENSONGES = [
       return j([]);
     });
     await pg.route('**/api/**', (r2) => r2.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true,"devices":1}' }));
-    await pg.goto('http://localhost:4482/?tab=settings', { waitUntil: 'domcontentloaded' });
+    await pg.goto('http://localhost:4482/?tab=' + tab, { waitUntil: 'domcontentloaded' });
     await pg.waitForTimeout(5000);
     // Déplie le panneau des notifications (c'est un <details>).
     try { await pg.evaluate(() => { document.querySelectorAll('details').forEach((d) => { d.open = true; }); }); } catch (_) {}
     await pg.waitForTimeout(600);
     if (gestes) await gestes(pg);
     await pg.waitForTimeout(1200);
-    await pg.screenshot({ path: SC + '/z-reglages-' + (reglagesKO ? 'ko' : 'ok') + '.png', fullPage: true });
+    await pg.screenshot({ path: SC + '/z-reglages-' + tab + '-' + (reglagesKO ? 'ko' : 'ok') + '.png', fullPage: true });
     // ⚠️ UNE VALEUR DANS UN CHAMP NE SE VOIT PAS DANS `innerText`. La date
     //    d'import est un `<input type="date">`, la raison sociale un `<input>` :
     //    un contrôle posé sur le seul texte de la page les déclare absentes et
@@ -182,7 +182,9 @@ const MENSONGES = [
       'c\'est exactement ce qu\'il craint : « je l\'ai réglé et ça n\'a pas tenu »');
     // Il NOMME les panneaux : sur un écran qui défile, « un réglage » ne dit pas
     // lequel regarder.
-    for (const nom of ['les notifications', 'tes adresses de réception', 'la facturation Pro', "la date d'import des emails"]) {
+    // (« la facturation Pro » vit dans l'onglet Factures depuis le 30 sept. :
+    //  elle n'est plus montée sur Réglages, donc plus nommée ici — voir plus bas.)
+    for (const nom of ['les notifications', 'tes adresses de réception', "la date d'import des emails"]) {
       dit(r.txt.includes(nom), `et il nomme « ${nom} »`);
     }
     // Et le panneau lui-même porte la marque — se taire dessus laisserait croire
@@ -205,7 +207,6 @@ const MENSONGES = [
     const r = await rendre(false, basculer);
     dit(/10\/07\/2026|2026-07-10/.test(r.txt), 'la date d\'import lue est bien la sienne',
       'sinon l\'écran affiche autre chose que ce qui est enregistré');
-    dit(/MA RAISON SOCIALE/.test(r.txt), 'l\'entité de facturation est affichée');
     dit(/a@exemple\.test/.test(r.txt) && /b@exemple\.test/.test(r.txt),
       'ses deux adresses de réception sont là');
     dit(!/n'ai pas pu lire ce réglage/i.test(r.txt), 'et aucune fausse alerte quand la base répond');
@@ -221,6 +222,37 @@ const MENSONGES = [
         `suivi = ${JSON.stringify(d3.suivi)}`);
     }
     dit(r.errs.length === 0, 'aucune erreur d\'app', r.errs.slice(0, 2).join(' | '));
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // FACTURATION PRO — déménagée dans l'onglet Factures (30 sept.). Même règle :
+  // lecture ratée ⇒ rien n'est réécrit, et le panneau le dit ; en marche
+  // normale, l'entité s'affiche.
+  const ouvrirPro = async (pg) => {
+    const bt = pg.locator('button', { hasText: 'Facturation Pro' });
+    if (await bt.count()) { try { await bt.first().click({ timeout: 2500 }); } catch (_) {} }
+    await pg.waitForTimeout(1500);
+    const champ = pg.locator('input[placeholder]').first();
+    try { await champ.fill('X', { timeout: 1500 }); } catch (_) {}
+  };
+  console.log('\n── FACTURATION PRO (onglet Factures), lecture ratée');
+  {
+    const r = await rendre(true, ouvrirPro, 'invoices');
+    const w = r.ecrits.filter((x) => x && x.id === 'vrm_pro_facture');
+    dit(w.length === 0, 'la facturation Pro n\'est pas réécrite depuis une lecture ratée',
+      w.map((x) => JSON.stringify(x.data).slice(0, 70)).join(' | '));
+    dit(/réglage pas lu/.test(r.txt), 'et le panneau porte sa pastille');
+    dit(r.errs.length === 0, 'aucune erreur d\'app', r.errs.slice(0, 2).join(' | '));
+  }
+  console.log('\n── FACTURATION PRO (onglet Factures), marche normale');
+  {
+    const r = await rendre(false, ouvrirPro, 'invoices');
+    dit(/MA RAISON SOCIALE/.test(r.txt), 'l\'entité de facturation est affichée dans l\'onglet Factures');
+    dit(r.errs.length === 0, 'aucune erreur d\'app', r.errs.slice(0, 2).join(' | '));
+  }
+  {
+    const r = await rendre(false, null);
+    dit(!/MA RAISON SOCIALE/.test(r.txt), 'et elle n\'est plus dans Réglages');
   }
 
   await b.close(); srv.close();
