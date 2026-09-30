@@ -22,12 +22,12 @@
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
   <link rel="icon" type="image/png" href="/icon-192.png" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <!-- Connexion anticipée à Supabase : le tout premier chargement de données
        (comptes, moisson) démarre son handshake TLS pendant que le JS se parse. -->
   <link rel="preconnect" href="https://lgonxzrzjcqthjtbdpzo.supabase.co" crossorigin />
-  <!-- Police chargée SANS bloquer l'affichage : la page s'affiche tout de suite
+  <!-- ⚠️ 30 sept. : les polices ne viennent PLUS de Google (IP des visiteurs
+       transmise à un tiers) — elles sont servies par le site (src/main.jsx).
+       Police chargée SANS bloquer l'affichage : la page s'affiche tout de suite
        avec la police système, puis bascule sur Inter une fois prête (display=swap).
        Le média « print » rend le lien non-bloquant, l'onload le réactive. -->
   <!-- ⚠️ DEUX POLICES, ET C'EST VOULU. Julien : « on dirait fait par une IA ».
@@ -38,9 +38,6 @@
        Bricolage Grotesque a du caractère (terminaisons coupées, chiffres
        larges) sans être fantaisiste — et elle est superbe en gros chiffre,
        ce que cette app affiche partout. -->
-  <link rel="stylesheet" media="print" onload="this.media='all'"
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" />
-  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" /></noscript>
   <title>VRM</title>
   <!-- ⚠️ AVANT LE PREMIER RENDU, sinon l'app s'affiche en clair puis bascule.
        On lit le MÊME réglage que React (`vinted_dark`) et on estampille la
