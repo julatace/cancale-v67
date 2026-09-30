@@ -112,7 +112,12 @@ function faireCtx({ items = LISTINGS, dejaPhotos = {}, gardeStop = null, srcOver
     const id = (endpoint.match(/items\/(\d+)/) || [])[1];
     if (detailKO) return { ok: false, status: 502, text: '' };
     const nb = { '111': 9, '222': 3, '333': 12, '555': 5 }[id] || 0;
-    const item = { id: Number(id), description: 'desc ' + id, photos: Array.from({ length: nb }, (_, i) => ({ full_size_url: img(id, i), url: img(id, i) })) };
+    // La page porte aussi les CODES de la fiche (forme Vinted : ids numériques,
+    // brand_dto, price objet) — c'est ce que la republication réutilisera.
+    const item = { id: Number(id), description: 'desc ' + id, catalog_id: 1242, brand_dto: { id: 53, title: 'Nike' }, size_id: 789, status_id: 2,
+      color1_id: 12, package_size_id: 1, price: { amount: '55.0', currency_code: 'EUR' },
+      user: { login: 'NE-PAS-GARDER', email: 'ne-pas@garder.fr' },
+      photos: Array.from({ length: nb }, (_, i) => ({ id: 30000 + i, full_size_url: img(id, i), url: img(id, i) })) };
     const html = '<!doctype html><html><body><script id="__NEXT_DATA__" type="application/json">' + JSON.stringify({ props: { pageProps: { item } } }) + '</script></body></html>';
     return { ok: true, status: 200, text: html };
   };
@@ -128,18 +133,32 @@ const photosRangees = (j) => { let out = {}; for (const e of j.ecrits) { const l
   await essaie('capterPhotosAnnonces complète les annonces en ligne', async () => {
     const ctx = faireCtx({ dejaPhotos: {
       '111': { photos: [0, 1, 2, 3, 4, 5].map((i) => img(111, i)), description: 'x' },   // 6/9 → manque
-      '555': { photos: [0, 1, 2, 3, 4].map((i) => img(555, i)) },                          // 5/5 → complet
+      '444': { photos: [img(444, 0)], codes: { catalog_id: 1242 } },                                    // 1 photo, fiche déjà là
+      '555': { photos: [0, 1, 2, 3, 4].map((i) => img(555, i)), codes: { catalog_id: 1242 } },          // 5/5 + fiche → complet
     } });
     const n = await ctx.capterPhotosAnnonces(UID);
     const vus = idsVus(ctx.__journal);
     dit(vus.includes('111') && vus.includes('222'), 'elle va lire le détail des annonces à qui il MANQUE des photos', 'lues : ' + vus.join(',') || 'aucune');
     dit(!vus.includes('333'), 'une annonce FERMÉE n\'est pas touchée', vus.includes('333') ? 'elle a été lue' : 'ignorée');
-    dit(!vus.includes('444'), 'une annonce à 1 photo n\'est pas relue pour rien');
-    dit(!vus.includes('555'), 'une annonce déjà complète (5/5) n\'est pas relue');
+    dit(!vus.includes('444'), 'une annonce à 1 photo dont la fiche est déjà captée n\'est pas relue pour rien');
+    dit(!vus.includes('555'), 'une annonce déjà complète (5/5, fiche captée) n\'est pas relue');
     const rang = photosRangees(ctx.__journal);
     dit((rang['111'] || {}).photos && rang['111'].photos.length === 9, 'les 9 photos de la 111 sont rangées (le jeu COMPLET, pas la couverture)', 'rangées : ' + ((rang['111'] || {}).photos || []).length);
     dit((rang['222'] || {}).photos && rang['222'].photos.length === 3, 'et les 3 de la 222', 'rangées : ' + ((rang['222'] || {}).photos || []).length);
     dit(n >= 1, 'elle rapporte ce qu\'elle a fait', 'n=' + n);
+    // 1er oct. : la FICHE de republication est rangée avec les photos.
+    const f = (rang['222'] || {}).codes || {};
+    dit(f.catalog_id === 1242 && f.brand_id === 53 && f.size_id === 789 && f.status_id === 2 && f.package_size_id === 1 && f.price === '55.0',
+      'la fiche (catégorie, marque, taille, état, colis, prix) est rangée pour la republication', JSON.stringify(f));
+    dit(Array.isArray((rang['222'] || {}).photoIds) && rang['222'].photoIds.length === 3, 'avec les identifiants des photos', JSON.stringify((rang['222'] || {}).photoIds));
+    dit(!JSON.stringify(rang).includes('NE-PAS-GARDER') && !JSON.stringify(rang).includes('ne-pas@garder.fr'), 'et rien d\'autre de la page (ni pseudo, ni e-mail)');
+  });
+
+  // ══ 1 bis. PHOTOS COMPLÈTES MAIS SANS FICHE ⇒ relue UNE fois ═══════════════
+  await essaie('une annonce sans fiche de republication est relue une fois', async () => {
+    const ctx = faireCtx({ items: [{ id: 555, nPhotos: 5, is_closed: false, is_hidden: false }], dejaPhotos: { '555': { photos: [1, 2, 3, 4, 5].map((i) => img(555, i)) } } });
+    await ctx.capterPhotosAnnonces(UID);
+    dit(idsVus(ctx.__journal).includes('555'), 'photos complètes mais fiche absente : elle est lue pour récupérer la fiche');
   });
 
   // ══ 2. BORNÉ PAR VISITE (le garde-fou §3, sur NOS lectures Vinted) ══════════
@@ -174,9 +193,9 @@ const photosRangees = (j) => { let out = {}; for (const e of j.ecrits) { const l
 
   // ══ 5. L'AUTRE SENS : aucune donnée à compléter ⇒ zéro requête ═════════════
   await essaie('rien à compléter ⇒ aucune requête (pas de bruit dans l\'empreinte du compte)', async () => {
-    const ctx = faireCtx({ items: [{ id: 555, nPhotos: 5, is_closed: false, is_hidden: false }], dejaPhotos: { '555': { photos: [1, 2, 3, 4, 5].map((i) => img(555, i)) } } });
+    const ctx = faireCtx({ items: [{ id: 555, nPhotos: 5, is_closed: false, is_hidden: false }], dejaPhotos: { '555': { photos: [1, 2, 3, 4, 5].map((i) => img(555, i)), codes: { catalog_id: 1242 } } } });
     await ctx.capterPhotosAnnonces(UID);
-    dit(idsVus(ctx.__journal).length === 0, 'aucune lecture quand tout est déjà capté');
+    dit(idsVus(ctx.__journal).length === 0, 'aucune lecture quand photos ET fiche sont déjà captées');
   });
 
   console.log(`\n${ko ? '❌ ' + ko + ' rouge(s)' : '✅ tout vert'} · ${ok} contrôle(s)`);

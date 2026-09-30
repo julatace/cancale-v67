@@ -1793,7 +1793,7 @@ async function vintedGetHtml(acc, endpoint) {
 // l'identité prime, jamais un autre article). Repli : balayage des grandes
 // images vinted.net du HTML.
 function extraireDetailPage(html, id) {
-  const out = { photos: [], description: '' };
+  const out = { photos: [], description: '', codes: null, cles: null, photoIds: [] };
   if (!html) return out;
   try {
     const m = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
@@ -1813,6 +1813,24 @@ function extraireDetailPage(html, id) {
       if (found) {
         for (const p of found.photos) { const u = p && (p.full_size_url || p.url || (p.thumbnails && p.thumbnails.length && p.thumbnails[p.thumbnails.length - 1].url)); if (typeof u === 'string' && /vinted\.net\//i.test(u) && !out.photos.includes(u)) out.photos.push(u); }
         if (typeof found.description === 'string') out.description = found.description;
+        // ── LA FICHE POUR REPUBLIER (1er oct.) ─────────────────────────────
+        // Recréer une annonce exige des CODES Vinted (catégorie, marque,
+        // taille, état, couleurs, format du colis) — `GET /api/v2/items/{id}`
+        // répond 404 (mesuré ×120), et la liste du dressing ne les porte pas.
+        // La page de l'annonce, elle, les a dans ses données internes : on ne
+        // garde QUE ces codes (aucune donnée personnelle), et la liste des
+        // CLÉS de l'objet pour vérifier la forme au premier passage (§6).
+        const pick = (o, ks) => { const r = {}; for (const k of ks) if (o[k] !== undefined && o[k] !== null && typeof o[k] !== 'object') r[k] = o[k]; return r; };
+        const c = pick(found, ['catalog_id', 'brand_id', 'brand', 'size_id', 'size_title', 'status_id', 'status', 'color1_id', 'color2_id',
+          'package_size_id', 'is_unisex', 'isbn', 'measurement_length', 'measurement_width', 'title', 'currency', 'item_closing_action']);
+        if (found.brand_dto && typeof found.brand_dto === 'object') { if (found.brand_dto.id != null && c.brand_id == null) c.brand_id = found.brand_dto.id; if (found.brand_dto.title && !c.brand) c.brand = found.brand_dto.title; }
+        if (found.price && typeof found.price === 'object') { if (found.price.amount != null) c.price = String(found.price.amount); if (found.price.currency_code) c.currency = found.price.currency_code; }
+        else if (found.price != null) c.price = String(found.price);
+        if (Array.isArray(found.color_ids)) c.color_ids = found.color_ids.filter(x => typeof x === 'number');
+        if (Array.isArray(found.item_attributes)) c.item_attributes = found.item_attributes.map(a => a && ({ code: String(a.code || ''), ids: Array.isArray(a.ids) ? a.ids.filter(x => typeof x === 'number') : [] })).filter(a => a && a.code);
+        out.codes = Object.keys(c).length ? c : null;
+        out.cles = Object.keys(found).slice(0, 80);
+        for (const p of found.photos) if (p && typeof p.id === 'number') out.photoIds.push(p.id);
       }
     }
     if (!out.photos.length) {
@@ -1853,8 +1871,11 @@ async function capterPhotosAnnonces(uid) {
       if (!it || !it.id) return false;
       if (it.is_closed || it.is_hidden || it.is_draft) return false;   // en ligne seulement
       const veut = Number(it.nPhotos || 0);
-      const a = ((dej[String(it.id)] || {}).photos || []).length;
-      return veut > 1 && a < veut;                        // il en manque
+      const d0 = dej[String(it.id)] || {};
+      const a = (d0.photos || []).length;
+      // Il manque des photos, OU la fiche de codes (pour republier). La même
+      // lecture de page donne les deux : aucune requête de plus par annonce.
+      return (veut > 1 && a < veut) || !d0.codes;
     }).sort((a, b) => Number(b.nPhotos || 0) - Number(a.nPhotos || 0));
     if (!manquants.length) return 0;
     const memo = (await chrome.storage.local.get('vrmPhotosFaites')).vrmPhotosFaites || {};
@@ -1893,9 +1914,13 @@ async function capterPhotosAnnonces(uid) {
       // la réponse (jamais le corps) — pour trancher si l'API de détail limite,
       // ou si les photos vivent dans un champ qu'on ne lit pas encore.
       if (Number(it.nPhotos || 0) > photos.length) echantillonRate('photos_incomplet', String(it.id), 'got=' + photos.length + ' want=' + Number(it.nPhotos || 0) + ' cles=' + Object.keys(it2).slice(0, 30).join(','));
-      dej[kk] = { description: desc || prev.description || '', photos: photos.length ? photos : (prev.photos || []), readAt: new Date().toISOString() };
+      dej[kk] = { description: desc || prev.description || '', photos: photos.length ? photos : (prev.photos || []), readAt: new Date().toISOString(),
+        codes: det.codes || prev.codes || null, photoIds: (det.photoIds && det.photoIds.length) ? det.photoIds : (prev.photoIds || []) };
       dirty = true;
       noterDiag('photos_page_ecrit');
+      // Mesure de la fiche : codes trouvés, ou non — et alors les CLÉS (jamais les valeurs).
+      if (det.codes && det.codes.catalog_id != null) noterDiag('fiche_codes_ok');
+      else { noterDiag('fiche_codes_absents'); echantillonRate('fiche_codes', String(it.id), 'cles=' + (det.cles || []).join(',').slice(0, 600)); }
     }
     if (dirty) await supabaseUpsert('app_data', [{ id: 'vinted_item_details', data: dej }], 'id');
     await chrome.storage.local.set({ vrmPhotosFaites: memo });
