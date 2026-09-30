@@ -221,7 +221,21 @@
       let b = body;
       if (b && typeof b !== 'string') {
         if (typeof URLSearchParams !== 'undefined' && b instanceof URLSearchParams) b = b.toString();
-        else if (typeof FormData !== 'undefined' && b instanceof FormData) b = '[FormData]';
+        else if (typeof FormData !== 'undefined' && b instanceof FormData) {
+          // 1er oct. : la FORME de l'envoi (noms des champs, type et taille des
+          // fichiers), jamais le contenu d'un fichier. C'est ce qui manque pour
+          // renvoyer une photo lors d'une republication (POST /api/v2/photos).
+          // Les valeurs texte courtes sont gardées (type, uuid temporaire) ;
+          // les longues sont réduites à leur longueur.
+          try {
+            const parts = [];
+            b.forEach((v, k) => {
+              if (typeof File !== 'undefined' && v instanceof File) parts.push(k + '=Fichier(' + (v.type || '?') + ',' + v.size + 'o)');
+              else { const t = String(v); parts.push(k + '=' + (t.length <= 40 ? t : '[' + t.length + ' car.]')); }
+            });
+            b = '[FormData] ' + parts.slice(0, 20).join(' & ');
+          } catch (_) { b = '[FormData]'; }
+        }
         else { try { b = JSON.stringify(b); } catch (_) { b = String(b); } }
       }
       if (b && b.length > 100000) b = b.slice(0, 100000);
