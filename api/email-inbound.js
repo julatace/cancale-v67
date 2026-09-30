@@ -619,7 +619,12 @@ function parseCarrierEmail(mail, carrier) {
   // sur les lignes SUIVANTES.
   {
     const lines = txt.split('\n').map(l => l.trim());
-    const idx = lines.findIndex(l => /^point\s+(?:relais|de\s+retrait)\b[\s:–-]*$/i.test(l));
+    // ⚠️ 30 septembre : les emails « colis disponible » d'un LOCKER Mondial Relay
+    //    (casier 24/7, `consigne` vrai) n'avaient JAMAIS de lieu — mesuré : 5 sur 5
+    //    des Mondial Relay sans lieu étaient des lockers. Même forme que le point
+    //    relais (en-tête sur sa ligne, puis nom et adresse dessous) : on accepte
+    //    donc aussi « Locker », « Locker 24/7 », « Consigne », « Casier ».
+    const idx = lines.findIndex(l => /^(?:point\s+(?:relais|de\s+retrait)|(?:votre\s+)?locker(?:\s*24\s*\/?\s*7)?|(?:votre\s+)?consigne(?:\s+automatique)?|(?:votre\s+)?casier)\b[\s:–-]*$/i.test(l));
     if (idx >= 0) {
       const parts = [];
       for (let i = idx + 1; i < lines.length && parts.length < 3; i++) {
@@ -692,7 +697,23 @@ function parseCarrierEmail(mail, carrier) {
   // scanne), au comptoir on présente un code et une pièce d'identité.
   const consigne = /consigne\s+pickup|casier|locker/i.test(all);
 
-  return { suivi, status, label, code, code2, artTitle, lieu, limite, consigne, ...(sortant ? { sens: 'sortant' } : {}) };
+  // ── MESURE : lieu introuvable sur un colis À RETIRER ─────────────────────
+  // Julien (30 sept.) : « le lieu est en bas du mail ou dans ses infos ». Le
+  // texte brut n'est conservé nulle part : impossible de voir la forme qui nous
+  // échappe. On garde donc, SEULEMENT dans ce cas, les lignes qui portent un
+  // code postal et les deux lignes au-dessus (le nom, la rue) — 600 caractères
+  // au plus. C'est ce qui permettra d'écrire la règle sur la vraie forme au
+  // lieu de la deviner. Jamais affiché comme un lieu : c'est un indice.
+  let extraitLieu = null;
+  if (!lieu && status === 'available') {
+    const L = txt.split('\n').map(l => l.trim()).filter(Boolean);
+    const garde = new Set();
+    L.forEach((l, i) => { if (/\b\d{5}\b\s+[A-Za-zÀ-ÿ]/.test(l)) { garde.add(i - 2); garde.add(i - 1); garde.add(i); } });
+    const bouts = [...garde].filter(i => i >= 0).sort((a, b) => a - b).map(i => L[i]);
+    if (bouts.length) extraitLieu = bouts.join(' | ').slice(0, 600);
+  }
+
+  return { suivi, status, label, code, code2, artTitle, lieu, limite, consigne, extraitLieu, ...(sortant ? { sens: 'sortant' } : {}) };
 }
 
 // Dimensions d'une image PNG/GIF depuis son en-tête (sans la décoder en entier).
@@ -1119,6 +1140,7 @@ export async function traiterEmail(req, res) {
         statusLabel: track.label, subject, receivedAt: now,
         code: track.code || null, code2: track.code2 || null, artTitle: track.artTitle || null, lieu: track.lieu || null,
         limite: track.limite || null, consigne: !!track.consigne,
+        ...(track.extraitLieu && !track.lieu ? { extraitLieu: track.extraitLieu } : {}),
         qrB64: qr.qrB64, qrType: qr.qrType, qrUrl: qr.qrUrl || null,
         account: acc.login || '',
       } }]);
