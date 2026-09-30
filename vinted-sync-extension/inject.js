@@ -42,6 +42,14 @@
     // matche QUE le détail (…/transactions/{id}), pas les sous-chemins (…/shipment/order).
     { re: /\/api\/v\d+\/transactions\/(\d+)(?:\?|$)/, type: 'transaction' },
     { re: /\/api\/v\d+\/users\/current/,        type: 'profile'  },
+    // NOTIFICATIONS VINTED (la cloche) — 30 septembre. Mesuré par l'observation
+    // de Vintex : c'est là que Vinted dit QUI a mis un article en favori
+    // (« X a marqué ton article Y comme favori »), avec le pseudo. §3 disait
+    // « Vinted ne dit jamais qui met en favori » : faux pour ce flux-là.
+    // L'extension n'avait JAMAIS vu cette adresse (0 dans seen_urls). On garde
+    // la réponse telle quelle quand la page la charge (ouvrir la cloche), pour
+    // MESURER sa forme avant d'écrire la moindre règle dessus.
+    { re: /\/api\/v\d+\/(?:user_)?notifications(?:\?|$)/i, type: 'notifications' },
     // LITIGES / RÉCLAMATIONS. Quand un acheteur ouvre un litige, la paire te
     // revient (ou pas) et il faut la republier — mais Vinted ne le dit que dans
     // cet écran. On capte la LISTE et le DÉTAIL, passivement, quand tu ouvres la
