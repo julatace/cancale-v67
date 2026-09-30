@@ -12,8 +12,33 @@ Lien donné par Julien : https://claude.ai/artifact/SUm7REcQLakN9dpvdafDJ5 — c
 une **maquette d'accueil « VRM Cash · Menthe »** (CA du mois, « à virer 282 € »,
 « en attente chez Vinted 1 944 € », puces Expédier / Retirer / Messages), PAS
 l'ancienne conversation. Référence de style pour la future page d'accueil.
-⚠️ Les **captures d'écran des messages Leboncoin** annoncées ne sont pas arrivées :
-les redemander.
+Logo VRM (nouveau, 30/09) : `docs/assets/logo-vrm-2026-09-30.png` — carré noir
+arrondi, liseré bleu lumineux, mot-symbole « VRM » blanc/argent. À décliner
+(icône app, extension, accueil).
+
+**Alertes Supabase reçues par Julien (29/09)** — Advisor, 2 CRITICAL :
+« RLS Disabled in Public : table public.vinted_accounts » et « Sensitive Columns
+Exposed : vinted_accounts … access_token ». Projet `cancale` plan **PRO**, compute
+**NANO**, 12 819 requêtes/24 h, **65,3 % de succès**, Postgres 230 erreurs,
+API gateway 4 122 warnings. ⇒ N1 est URGENT (dépôt public + jetons lisibles) :
+recommandé à Julien de le remonter en priorité.
+
+**Captures Leboncoin (vente du 29/09, reçues le 30/09)** — faits mesurés, SANS
+données de l'acheteur (dépôt public) :
+- page transaction : `leboncoin.fr/compte/part/transaction/{id}` (ex. 364210558) ;
+  « Détails du prix » (prix barré 50 € → 45 €, frais offerts, total 45 €),
+  « Numéro de transaction », « Annuler la transaction », acheteur (pseudo).
+- messages automatiques Leboncoin dans la conversation : n° de **tracking**
+  (ici 72397087, = « MR 72397087 ») puis « Votre QR code de dépôt est
+  disponible ! Vous avez **3 jours** pour déposer… Point Relais® ou Locker » +
+  bouton « Afficher le QR code ». Le QR est aussi dans l'email et le détail de
+  transaction.
+- deux modes : « Sans impression » (QR code) / « Avec impression » (bon d'envoi
+  PDF servi par **api.leboncoin.fr**).
+- le PDF : mise en page **InPost / Mondial Relay** portrait, étiquette à gauche +
+  « Fiche destinataire » à droite ; porte « N° Expédition » (= tracking) et
+  **« Référence Commande » = n° de transaction LBC** ⇒ IDENTITÉ bordereau ↔ vente
+  (§5), pas besoin de ressemblance.
 
 ---
 
