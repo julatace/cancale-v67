@@ -26,9 +26,15 @@
     .err { font-size: 11px; color: #e87b7f; margin-top: 8px; line-height: 1.45; }
     .who { display: flex; align-items: center; gap: 9px; font-size: 12px; padding: 7px 0; }
     .who .nom { font-weight: 600; }
+    /* 30 sept. : l'icône OUVRE VRM. La fenêtre ne sert plus qu'à se connecter :
+       tant qu'on ne sait pas, on ne montre rien ; pas connecté, seulement la
+       connexion. Le tableau de fraîcheur vit dans l'app. */
+    body.decide > *:not(.head) { display: none; }
+    body.compact { width: 280px; }
+    body.compact > *:not(.head):not(#auth) { display: none; }
   </style>
 </head>
-<body>
+<body class="decide">
   <div class="head">
     <svg class="logo" viewBox="0 0 64 64">
       <defs>

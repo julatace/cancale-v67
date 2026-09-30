@@ -35,7 +35,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.117.0';
+const EXT_ATTENDUE = '5.118.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -17963,6 +17963,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // changement d'onglet (§34).
   const [dropOffs, setDropOffs] = useState(null);
   const [dropOpen, setDropOpen] = useState(false);
+  const [voirPostes, setVoirPostes] = useState(false); // Colis : afficher les colis marqués « postés »
   useEffect(() => {
     // Aussi sur Achats : c'est là qu'on complète l'adresse et les horaires d'un
     // point de retrait dont l'email ne donne que le nom.
@@ -22444,25 +22445,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             ))}
           </div>
         )}
-        {/* SIGNALEMENT (pas un colis) : un bordereau reçu qu'on ne rattache à
-            aucune vente. Il ne peut pas y avoir de bordereau sans vente — donc
-            si ça arrive, c'est la MOISSON qui manque, pas un carton à préparer.
-            On le dit ici au lieu de fabriquer une fausse ligne de travail. */}
-        {(()=>{
-          const sv = bordSansVente();
-          if (!sv.length) return null;
-          const comptes = [...new Set(sv.map(b=>b.account).filter(Boolean))];
-          return (
-            /* ⚠️ L'EXPLICATION PASSE DERRIÈRE « Pourquoi ? » (gabarit `Notice`,
-               §5.54). Elle faisait cinq lignes de texte en permanence, au-dessus
-               des colis — pour un cas qui ne demande aucun geste immédiat. Le
-               titre dit quoi faire ; le reste attend qu'on le demande. */
-            <Notice tone="warn" icon="alert"
-              title={`${sv.length} bordereau${sv.length>1?'x':''} sans vente correspondante — repasse sur Vinted${comptes.length?` (${comptes.join(', ')})`:''}`}
-              detail={`Un bordereau existe toujours pour une vente : si celle-ci n'apparaît pas, c'est que la capture est en retard${comptes.length?` sur ${comptes.join(', ')}`:''}. Ce n'est pas un colis à préparer, donc il n'est pas dans la liste.`}
-            />
-          );
-        })()}
+        {/* « N bordereaux sans vente correspondante » RETIRÉ le 30 septembre
+            (Julien : « tu ne les affiches pas, tu attends d'avoir capté dans
+            Vinted, les mails doivent juste servir de sécurité »). Ils n'ont
+            jamais été des lignes de travail ; ils n'apparaissent plus du tout —
+            dès que la vente est captée, le bordereau se rattache tout seul. */}
         {/* ── LA LISTE : UN COLIS = UNE VENTE QUI ATTEND MON ENVOI ───────────
             Une seule liste, construite sur la moisson de l'extension. Le
             bordereau (PDF reçu par email) n'est qu'un COMPLÉMENT de la ligne :
@@ -22473,12 +22460,24 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {sales.loading && <Skeleton variant="row" count={4}/>}
         {sales.error && <LoadError onRetry={()=>loadOrders('sold',setSales,true)}/>}
         {!sales.loading && !sales.error && (()=>{
-          const ex = expeditions().filter(e => !e.o || matchOrd(e.o));
-          if (!ex.length) return (
+          // ⚠️ 30 septembre (Julien : « les bordereaux doivent s'enlever quand
+          // les ventes sont expédiées ») : un colis coché « colis fait » QUITTE
+          // la liste. Pas en silence (« un colis caché est un colis perdu ») :
+          // une ligne dit combien, et un clic les remontre.
+          const exTout = expeditions().filter(e => !e.o || matchOrd(e.o));
+          const estPosteT = (x) => !!(x.o ? isShipDone(x.o) : isBordShippedManual(x.b));
+          const nbMasquesPostes = exTout.filter(estPosteT).length;
+          const lignePostes = nbMasquesPostes > 0 ? (
+            <button type="button" onClick={()=>setVoirPostes(v=>!v)}
+              style={{alignSelf:'flex-start',border:'none',background:'transparent',padding:'2px 2px',color:C.muted,fontSize:12,cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
+              {voirPostes ? 'Cacher' : 'Afficher'} les {nbMasquesPostes} colis marqué{nbMasquesPostes>1?'s':''} « posté{nbMasquesPostes>1?'s':''} » — ils disparaissent seuls quand Vinted confirme l'envoi
+            </button>) : null;
+          const ex = voirPostes ? exTout : exTout.filter(x => !estPosteT(x));
+          if (!ex.length) return (<>{lignePostes}
             <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'22px 16px',lineHeight:1.6}}>
               Aucun colis à envoyer.<br/>
               <span style={{fontSize:12}}>Dès que Vinted te demande un envoi, la paire apparaît ici — l'extension le capte sans que tu fasses rien.</span>
-            </div>
+            </div></>
           );
           const sec = { flexShrink:0, borderRadius:8, padding:'7px 11px', cursor:'pointer', fontSize:12, fontWeight:600, fontFamily:'inherit' };
           // ⚠️ QUATORZE CARTES QUI PORTENT LA MÊME PHRASE, C'EST UNE PHRASE.
@@ -22527,6 +22526,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const attenteCommune = attentes.size === 1 ? [...attentes][0] : null;
           return (
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
+              {lignePostes}
               {/* ⚠️ La phrase d'attente vit désormais dans l'intertitre du groupe
                   « En attente de leur bordereau » — au-dessus des colis qu'elle
                   concerne, et d'eux seuls. En tête de liste, elle parlait au nom
