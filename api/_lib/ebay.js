@@ -1,3 +1,4 @@
+import { sbCle } from './cle.js';
 // api/_lib/ebay.js — la logique OAuth eBay, en UN seul endroit (§11).
 // Utilisée par api/ebay.js (l'app pilote) ET api/ebay-callback.js (le retour de
 // consentement d'eBay). Deux routes, une seule règle : les clés vivent dans les
@@ -69,7 +70,7 @@ async function storeRefresh(refresh, expiresInDays) {
     const body = [{ id: TOKENS_ID, data: { refresh_token: refresh, saved_at: Date.now(), refresh_expires_days: expiresInDays || null } }];
     const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=id`, {
       method: 'POST',
-      headers: { apikey: sbKey(), Authorization: `Bearer ${sbKey()}`, 'content-type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+      headers: { ...sbCle(sbKey()), 'content-type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify(body),
     });
     return r.ok;
@@ -98,7 +99,7 @@ async function hasRefresh() {
   if (!sbKey()) return null;
   try {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${TOKENS_ID}&select=data->>refresh_token`, {
-      headers: { apikey: sbKey(), Authorization: `Bearer ${sbKey()}` },
+      headers: { ...sbCle(sbKey()) },
     });
     if (!r.ok) return null;
     const rows = await r.json();
@@ -111,7 +112,7 @@ async function readRefresh() {
   if (!sbKey()) return null;
   try {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${TOKENS_ID}&select=data->>refresh_token`, {
-      headers: { apikey: sbKey(), Authorization: `Bearer ${sbKey()}` },
+      headers: { ...sbCle(sbKey()) },
     });
     if (!r.ok) return null;
     const rows = await r.json();
@@ -146,7 +147,7 @@ async function storeData(id, data) {
   try {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=id`, {
       method: 'POST',
-      headers: { apikey: sbKey(), Authorization: `Bearer ${sbKey()}`, 'content-type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+      headers: { ...sbCle(sbKey()), 'content-type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify([{ id, data }]),
     });
     return r.ok;

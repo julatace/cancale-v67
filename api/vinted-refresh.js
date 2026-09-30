@@ -1,3 +1,4 @@
+import { sbCle } from './_lib/cle.js';
 // api/vinted-refresh.js
 // Rafraichit de facon CENTRALISEE les tokens Vinted de tous les comptes lies,
 // puis les persiste dans Supabase. But : que Julien puisse consulter ses comptes
@@ -79,7 +80,7 @@ async function refreshOne(acc) {
 async function persist(acc, tokens) {
   await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${acc.vinted_user_id}`, {
     method: 'PATCH',
-    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+    headers: { ...sbCle(SUPABASE_KEY), 'Content-Type': 'application/json', Prefer: 'return=minimal' },
     body: JSON.stringify({ access_token: tokens.access_token, refresh_token: tokens.refresh_token, updated_at: new Date().toISOString() }),
   });
 }
@@ -87,7 +88,7 @@ async function persist(acc, tokens) {
 export default async function handler(req, res) {
   try {
     const listRes = await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=*`, {
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+      headers: { ...sbCle(SUPABASE_KEY) },
     });
     if (!listRes.ok) { res.status(502).json({ error: 'Lecture Supabase impossible' }); return; }
     const accounts = await listRes.json();

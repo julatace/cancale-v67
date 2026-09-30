@@ -244,6 +244,10 @@ auth : shopcancale35@gmail.com = `74eea6e7-f060-46b6-b9c7-d500cedf4738`
   (user-agent Google-Apps-Script) avec une clé invalide : lit
   vrm_email_config / vrm_pro_facture / email_invoice_*. Rejeté, inoffensif ;
   👤 le couper (script.google.com → Déclencheurs).
+- ✅ Serveur compatible avec les NOUVELLES clés Supabase (`sb_secret_…`, pas des
+  JWT) : `api/_lib/cle.js` → `sbCle(k)` n'envoie `Authorization: Bearer` que
+  pour une clé JWT (`eyJ…`). Appliqué à toutes les routes (19 sites). Vérifié
+  en exécutant `api/widget.js` avec les deux formats ; `bancs/serveur.cjs` vert.
 - ⬜ ÉTAPE 2 = `supabase/migrations/002-fermeture.sql` (prêt). Conditions :
   👤 `SUPABASE_SERVICE_KEY` sur Vercel (Supabase → Settings → API Keys →
   service_role → Vercel → Settings → Environment Variables, Production) ;

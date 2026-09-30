@@ -14,6 +14,7 @@
 import webpush from 'web-push';
 
 import { withOwnerAll, conflictTarget, duVendeur } from './owner.js';
+import { sbCle } from './cle.js';
 
 // La base sait-elle séparer les vendeurs ? (sondé une fois par instance)
 let _cl = null;
@@ -56,7 +57,7 @@ export const pushConfigure = () => {
 const PUSH_PRET = pushConfigure();
 
 const HEADERS = {
-  apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`,
+  ...sbCle(SUPABASE_KEY),
   'Content-Type': 'application/json',
 };
 
