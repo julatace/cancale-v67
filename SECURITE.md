@@ -11,8 +11,8 @@ de louer l'outil — donc sans rien arrondir.
 | | état |
 |---|---|
 | dépôt GitHub `julatace/cancale-v67` | **public** |
-| colonne `owner` sur `app_data` | **absente** (`select=owner` → 400) |
-| RLS (Row Level Security) | **désactivé** |
+| colonne `owner` sur `app_data` et `vinted_accounts` | **présente depuis le 30/09/2026** (étape 1), toutes les lignes attribuées au compte VRM du propriétaire |
+| RLS (Row Level Security) | `app_data` : activé mais règles « tout le monde » ; `vinted_accounts` : **désactivé** — fermeture = `supabase/migrations/002-fermeture.sql` (étape 2, conditions dedans) |
 | clé « anon » Supabase | dans le bundle **et** dans le dépôt |
 
 Une clé anon dans une application web, **c'est normal** : un site ne peut rien
