@@ -233,7 +233,7 @@ données de l'acheteur (dépôt public) :
   lui demander sur quel écran et où est le curseur.
 
 ## L. Stock (ex-Garage)
-- ⬜ L1. Renommer « Garage » en **« Stock »**.
+- ✅ L1. Renommer « Garage » en **« Stock »** (libellés visibles seulement ; l'id d'onglet `garage` et les clés `vrm_garage*` restent, sinon ses rangements seraient perdus).
 - ⬜ L2. Beaucoup plus simple : ranger vêtements, chaussures, montres, tout objet ;
   étages, étagères, par terre, boîtes numérotées ; un « jeu vidéo » pour
   retrouver ses articles plus vite que dans la vraie vie.
@@ -241,6 +241,19 @@ données de l'acheteur (dépôt public) :
 ## M. Statistiques
 - ⬜ M1. Plus de graphiques / représentations 3D (ex. la marque / le logo le plus
   vendu en 3D).
+
+## O. Demandes du 30/09 (après le rapport Vintex)
+- ⛔ Pauses aléatoires « pour paraître humain » : refusées (§3 — évasion de
+  détection bot, cause du blocage de `vanessa5723`). Julien a insisté ; refus
+  maintenu et expliqué.
+- ⬜ O1. « Republier en 1 clic » (Julien : « je ne veux pas faire ça
+  manuellement, tu peux pas supprimer l'annonce ») : UN clic + confirmation par
+  annonce → l'extension recrée depuis le coffre (`vinted_item_details` + photos)
+  puis supprime l'ancienne. Pas de file, pas de pauses aléatoires, `garde`,
+  plafond horaire. ⚠️ Bloqué : (1) endpoint de SUPPRESSION jamais observé
+  (création vue : `wreq_api_v2_item_upload_items`) → faire supprimer UNE
+  annonce à la main avec 5.117 ; (2) Julien ne peut pas installer l'extension
+  pour l'instant.
 
 ## N. Ensuite, dans cet ordre (après A→M « parfaitement »)
 - 🟨 N1 (PRIORITÉ, Julien : « on fait Supabase ») — voir « État Supabase » ci-dessous. Isolation des données + début du multi-utilisateurs : une extension et
