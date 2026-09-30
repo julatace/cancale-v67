@@ -86,7 +86,11 @@ données de l'acheteur (dépôt public) :
   Store (👤 compte développeur 5 $) + dépôt privé.
 
 ## B. Messages / offres aux favoris (comme Vintex)
-- ⬜ B1. Julien installe l'extension Vintex ; capter son mécanisme d'envoi de
+- 🟨 B1 : une extension ne peut PAS observer une autre (isolation Chrome).
+  Méthode donnée à Julien : DevTools du service worker de Vintex + DevTools de
+  la page Vinted, onglet Network, « Keep log », une action Vintex, export HAR
+  (Chrome l'exporte sans cookies ni en-têtes d'auth). Attendre ses fichiers.
+  Julien installe l'extension Vintex ; capter son mécanisme d'envoi de
   messages / offres aux favoris et le reproduire. ⚠️ §3 : « Vinted ne dit jamais
   QUI a mis en favori » — mesuré. Si Vintex le fait, c'est qu'un endpoint existe :
   MESURER d'abord (mouchard `seen_urls` quand Vintex agit), ne pas deviner.
@@ -265,6 +269,14 @@ auth : shopcancale35@gmail.com = `74eea6e7-f060-46b6-b9c7-d500cedf4738`
   production), clé `sb_secret_` donnée par Julien dans la conversation ⇒
   lui conseiller de la RÉGÉNÉRER une fois la fermeture validée (Supabase →
   API Keys → nouvelle clé secrète → la poser sur Vercel → supprimer l'ancienne).
+- ⚠️ Journal 30/09 : l'extension écrivait `authenticated` jusqu'à 11:27 puis
+  `anon` dès 11:28 = installation du nouveau dossier 5.115 (mémoire neuve, la
+  session transmise par l'app était perdue). Julien : « ça ne me demande pas de
+  me connecter » (le formulaire n'était que dans la fenêtre de l'icône).
+  ⇒ 5.116 : la bulle VRM de Vinted affiche le formulaire de connexion VRM quand
+  l'extension n'est pas connectée (bouton VRM cerclé d'orange) ; background
+  accepte authEtat/authLogin depuis `cancale-vpanel`. Testé en exécutant le vrai
+  vinted-panel.js (bandeau, envoi, disparition après connexion).
 - ⬜ ÉTAPE 2 = `supabase/migrations/002-fermeture.sql` (prêt). Conditions :
   👤 `SUPABASE_SERVICE_KEY` sur Vercel (Supabase → Settings → API Keys →
   service_role → Vercel → Settings → Environment Variables, Production) ;
