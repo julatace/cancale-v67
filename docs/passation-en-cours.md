@@ -212,9 +212,9 @@ données de l'acheteur (dépôt public) :
   reconnaître les différents bordereaux (transporteurs ET variantes d'un même
   transporteur), et demander l'emplacement pour thermique ET normal.
 - ✅ I4. Retirer « où aller déposer les colis ».
-- ⬜ I5. Bordereaux captés sans vente correspondante : ne pas les afficher ;
+- ✅ I5 (le bloc « N bordereaux sans vente correspondante » est retiré ; ils n'étaient déjà plus des lignes de travail). Bordereaux captés sans vente correspondante : ne pas les afficher ;
   attendre la capture Vinted, les emails ne servent que de sécurité.
-- ⬜ I6. Les bordereaux disparaissent quand la vente est expédiée.
+- ✅ I6 (un colis coché « colis fait » quitte la liste ; ligne « Afficher les N colis marqués postés » pour les revoir ; « Tout imprimer » les excluait déjà ; rendu vérifié). Les bordereaux disparaissent quand la vente est expédiée.
 
 ## J. Réglages divers
 - ⬜ J1. « Mes adresses de réception » : demander à la création du compte ou à la
