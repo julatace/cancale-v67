@@ -39,6 +39,26 @@ données de l'acheteur (dépôt public) :
   « Fiche destinataire » à droite ; porte « N° Expédition » (= tracking) et
   **« Référence Commande » = n° de transaction LBC** ⇒ IDENTITÉ bordereau ↔ vente
   (§5), pas besoin de ressemblance.
+- **Cycle de vie d'une vente LBC** (captures 29/09, 16:20 → 19:52) :
+  1. offre acceptée → message auto « L'acheteur a 48 heures pour payer » ;
+  2. « {pseudo} a acheté votre article ! … a choisi la livraison Mondial Relay …
+     Pour recevoir vos 45,00 €, **confirmez la disponibilité de sa commande dans
+     les 48 heures**. Passé ce délai, la vente sera annulée. » + bouton
+     « La commande est-elle disponible ? » → fenêtre « Vous avez fait une vente de
+     45 € » avec **« Confirmer la disponibilité »** / « Annuler la vente » ;
+     ⇒ à afficher dans l'app comme ACTION URGENTE (compte à rebours 48 h) ;
+  3. page transaction : statut **« Colis à envoyer »** + date, bloc « Livraison
+     Mondial Relay », « Votre QR code est en cours de génération. On vous notifie
+     dès qu'il est prêt ! », « Numéro de suivi : 72397087 » ;
+  4. QR prêt → « Vous avez 3 jours pour déposer le colis » (compte à rebours).
+- URLs : annonce `leboncoin.fr/vi/{adId}` (ex. 3272594138, lien présent sur la
+  page transaction ⇒ IDENTITÉ vente ↔ annonce LBC) ; conversation
+  `leboncoin.fr/messages/id/{uuid}` ; transaction `…/compte/part/transaction/{id}`.
+- La page transaction porte photo, titre, « Marron • 40,5 », prix, acheteur.
+- Le panneau VRM de l'extension s'affiche sur leboncoin.fr (pastille « VRM 69 »).
+- ⚠️ Reste à MESURER côté extension (le mouchard `lbc_recon.paths` 5.93 note
+  méthode + statut + type) : les endpoints api.leboncoin.fr de la transaction,
+  du QR et du PDF — ne pas les deviner.
 
 ---
 
