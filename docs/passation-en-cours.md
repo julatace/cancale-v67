@@ -114,9 +114,22 @@ données de l'acheteur (dépôt public) :
   1er de chaque mois pour la faire.
 - ✅ D3. Retirer « 25 offres reçues » (on les verra via la captation des messages).
 - ✅ D4. Retirer « 20 messages non lus ».
-- ⬜ D5. « Vente à expédier » : seulement si VRAIMENT sûr qu'elle n'est pas
+- 🟨 D5 — MESURÉ 30/09 : 4 ventes « à expédier » dans la moisson ; 3 déjà cochées
+  « colis fait » par Julien (`vinted_ship_done`), donc hors compte. Reste
+  **angeled92, tx 22501209977, vente du 22/09, acheteur cladej** : Vinted dit
+  encore « Bordereau envoyé au vendeur » (status 230) au détail du 28/09 ET à la
+  liste du 30/09. ⇒ demandé à Julien si ce colis est parti. Compte
+  `julienf765` capté il y a 10 j (20/09) : ses deux ventes y étaient figées.
+  « Vente à expédier » : seulement si VRAIMENT sûr qu'elle n'est pas
   expédiée (il a déjà reçu l'argent pour celle signalée). Revoir la règle.
-- ⬜ D6. « Colis à retirer » : le lieu du point relais est souvent en bas du mail
+- ✅ D6 (partiel) — MESURÉ : 9 colis « disponible » sans lieu, dont les 5 Mondial
+  Relay récents = des LOCKERS (`consigne:true`) ; le parseur ne connaissait que
+  l'en-tête « Point Relais ». Élargi à Locker / Locker 24/7 / Consigne / Casier
+  (même forme : en-tête puis nom + adresse). Le texte brut n'étant conservé
+  nulle part, quand le lieu reste introuvable on stocke `extraitLieu` (lignes à
+  code postal + 2 au-dessus, 600 car.) pour écrire la règle sur la VRAIE forme.
+  Les anciennes lignes ne seront pas réécrites (pas de texte brut).
+  « Colis à retirer » : le lieu du point relais est souvent en bas du mail
   ou dans ses infos, l'app dit à tort qu'elle ne l'a pas. Mieux extraire.
 - ⬜ D7. Notifications push : « très bien ». Mais à une vente, le « en transit »
   en petit dessous doit être pertinent et fiable.
