@@ -76,6 +76,7 @@ export const PUSH_DEFAUT = {
   colis:    true,   // colis à retirer (porte le code de retrait)
   offre:    true,   // une offre attend une réponse
   expedier: true,   // colis à poster (rappel quotidien)
+  urssaf:   true,   // rappel de déclaration, le 1er du mois
   suivi:    false,  // « en transit », « livré » : rien à faire
   achat:    false,  // tu viens de l'acheter, tu le sais
   message:  false,  // le badge de l'app suffit

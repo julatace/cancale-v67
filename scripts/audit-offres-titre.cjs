@@ -126,10 +126,21 @@ console.log('\n── ET CE QU\'ON MET DE CÔTÉ EST DIT, PAS AVALÉ');
     .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '))
     .replace(/(^|[^:])\/\/[^\n]*/g, (m, p1) => p1 + ' '.repeat(Math.max(0, m.length - p1.length)));
   const src = sansCommentaires(APP);
-  dit(/reglees\.length\s*>\s*0\s*&&/.test(src), 'l\'accueil affiche le nombre mis de côté',
-    'sinon la carte passe de 75 à 41 sans un mot');
-  dit(/offresAtraiter\(/.test(src), 'et la règle a UN SEUL propriétaire (§11)',
-    'recopiée dans le JSX, elle redevient impossible à mesurer');
+  // ⚠️ 30 septembre : Julien a retiré les offres de l'accueil (28 sept.) PUIS de
+  // la cloche (30 sept.) — elles reviendront dans un onglet dédié (captation +
+  // réponse, comme Vintex). Tant qu'AUCUN écran n'appelle la règle, il n'y a
+  // pas de liste qui rétrécit en silence : rien à exiger. Dès qu'un appel
+  // revient, les deux exigences s'appliquent de nouveau — ce contrôle ne peut
+  // donc pas être vert sur un écran qui réaffiche des offres sans le dire.
+  const appelle = /offresAtraiter\(/.test(src);
+  if (!appelle) {
+    dit(!/offresRecent|offres?\s+reçues?\s*—/.test(src), 'aucun écran n\'affiche d\'offres (retirées par décision de Julien, 28 et 30 sept.)',
+      'un compte d\'offres est rendu sans passer par offresAtraiter');
+  } else {
+    dit(/reglees\.length\s*>\s*0\s*&&/.test(src), 'l\'accueil affiche le nombre mis de côté',
+      'sinon la carte passe de 75 à 41 sans un mot');
+    dit(true, 'et la règle a UN SEUL propriétaire (§11)');
+  }
 }
 
 console.log('\n── ET « PAS ENCORE SYNCHRONISÉE » SE JUGE SUR LA TRANSACTION, PAS LE TITRE');
