@@ -197,8 +197,8 @@ const THEMES = {
     // multiplication des couleurs. Une seule teinte d'accent, toujours.
     // Version claire de l'identité « Menthe » : accent menthe profonde (bon
     // contraste du texte blanc sur bouton), le bleu reste une seconde teinte.
-    bg:"#F5F8F6", surface:"#FFFFFF", card:"#FFFFFF", card2:"#EEF3F0", border:"#E2EAE6",
-    accent:"#0B9C74", accentSoft:"#12B76A", onAccent:"#FFFFFF",
+    bg:"#F4F6FA", surface:"#FFFFFF", card:"#FFFFFF", card2:"#EEF1F6", border:"#E3E7EE",
+    accent:"#2458E6", accentSoft:"#4C7BFF", onAccent:"#FFFFFF",
     danger:"#C0392B", warn:"#A15C00", gold:"#7A6636",
     blue:"#1D4FD6", purple:"#5B4B9E", text:"#0B0F15", muted:"#5A6472",
     // Cartes BLANCHES sur fond gris : c'est l'écart entre les deux qui donne le
@@ -213,15 +213,15 @@ const THEMES = {
     shadow:"0 1px 2px rgba(11,15,21,.04), 0 3px 8px rgba(11,15,21,.05)",
     shadowMd:"0 1px 2px rgba(11,15,21,.05), 0 8px 22px rgba(11,15,21,.07)",
     shadowLg:"0 2px 6px rgba(11,15,21,.06), 0 22px 50px rgba(11,15,21,.13)",
-    ring:"rgba(11,156,116,.16)",
+    ring:"rgba(36,88,230,.16)",
     glass:"rgba(255,255,255,.88)",
     // LE CHROME RESTE À L'ENCRE, MÊME EN CLAIR : la navigation est un bloc
     // sombre contre la page claire — c'est la signature, et ça règle au passage
     // l'incohérence du thème sur les composants qui ne se redessinent pas
     // (`C` est une variable de module mutable, cf. §4). Encre ARDOISE désormais,
     // plus brune : deux températures sur le même écran, ça se voit.
-    chrome:"#0E1A22", onChrome:"#E7F0EC", chromeMuted:"#8592A3", chromeLine:"#233038",
-    s1:"#0B9C74", s2:"#1D4FD6",
+    chrome:"#0A0D12", onChrome:"#F2F5FA", chromeMuted:"#7D8798", chromeLine:"#1C222C",
+    s1:"#2458E6", s2:"#7C9CFF",
   },
   dark: {
     // Le sombre est la MÊME identité, la nuit : ardoise froide, même bleu
@@ -235,17 +235,22 @@ const THEMES = {
     // Le sombre est désormais l'identité principale. La hiérarchie tient :
     // rail (chrome) le plus sombre < page (bg) < cartes (card). L'accent est la
     // MENTHE, rare ; le bleu reste une seconde teinte pour les dégradés.
-    bg:"#0A1622", surface:"#0F2030", card:"#0F2030", card2:"#15293C", border:"#1E3348",
-    accent:"#3DE0A0", accentSoft:"#6FE9BC", onAccent:"#04120C",
-    danger:"#FF7A6E", warn:"#FFAE3B", gold:"#C9AE78",
-    blue:"#4F9CFF", purple:"#A99AF0", text:"#EAF2F8", muted:"#8CA3B6",
-    shadow:"0 1px 1px rgba(0,0,0,.35), 0 2px 8px rgba(0,0,0,.4)",
-    shadowMd:"0 1px 2px rgba(0,0,0,.45), 0 8px 20px rgba(0,0,0,.45)",
-    shadowLg:"0 2px 6px rgba(0,0,0,.45), 0 22px 50px rgba(0,0,0,.6)",
-    ring:"rgba(61,224,160,.20)",
-    glass:"rgba(15,32,48,.90)",
-    chrome:"#06111C", onChrome:"#EAF2F8", chromeMuted:"#6E8496", chromeLine:"#14283A",
-    s1:"#3DE0A0", s2:"#4F9CFF",
+    // ── IDENTITÉ « VRM NOIR » (30 septembre) — tirée du LOGO de Julien ───────
+    // Son nouveau logo : un carré NOIR, « VRM » blanc argenté, un liseré BLEU
+    // électrique. L'app était menthe : deux identités qui se contredisaient.
+    // On garde la règle §7 (UN accent, rare) et la hiérarchie du sombre :
+    // rail (chrome) < page (bg) < cartes (card), marches bien écartées.
+    bg:"#07090D", surface:"#10141B", card:"#10141B", card2:"#171C25", border:"#232A36",
+    accent:"#3D7BFF", accentSoft:"#78A3FF", onAccent:"#FFFFFF",
+    danger:"#FF6B6B", warn:"#FFB23E", gold:"#C9AE78",
+    blue:"#5B93FF", purple:"#A99AF0", text:"#F2F5FA", muted:"#8A94A6",
+    shadow:"0 1px 1px rgba(0,0,0,.4), 0 2px 8px rgba(0,0,0,.45)",
+    shadowMd:"0 1px 2px rgba(0,0,0,.5), 0 8px 20px rgba(0,0,0,.5)",
+    shadowLg:"0 2px 6px rgba(0,0,0,.5), 0 22px 50px rgba(0,0,0,.65)",
+    ring:"rgba(61,123,255,.24)",
+    glass:"rgba(16,20,27,.90)",
+    chrome:"#030406", onChrome:"#F2F5FA", chromeMuted:"#6D7788", chromeLine:"#161B24",
+    s1:"#3D7BFF", s2:"#8AB4FF",
   },
 };
 let C = THEMES.light;
@@ -4548,29 +4553,13 @@ const L_M = 'M0 20 V0 H5.2 L7.6 8.4 L10 0 H15.2 V20 H10.9 V8.2 L8.9 14.6 H6.3 L4
 
 let _logoSeq = 0;
 // Le sigle en médaillon : l'icône de l'app (écran d'accueil, onglet, en-tête).
+// Le logo de Julien (30 septembre) : carré noir, « VRM » argent, liseré bleu.
+// Une image, pas un dessin : c'est SA marque, telle qu'il l'a fait faire.
+// Les coins sont arrondis ici pour ne jamais montrer le fond noir de l'image
+// sur le thème clair.
 function VrmLogo({ size = 40, style }) {
-  // Identifiants de dégradé uniques : deux <svg> qui partagent le même id se
-  // volent leur dégradé, et le second s'affiche vide.
-  const uid = React.useMemo(() => `vrm${++_logoSeq}`, []);
-  return (
-    <svg width={size} height={size} viewBox="0 0 64 64" style={style} role="img" aria-label="VRM">
-      <defs>
-        <linearGradient id={`${uid}o`} x1="0" y1="0" x2=".3" y2="1">
-          <stop offset="0" stopColor="#F7E3B6"/><stop offset=".5" stopColor="#E0B972"/><stop offset="1" stopColor="#BE8F45"/>
-        </linearGradient>
-        <linearGradient id={`${uid}n`} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#2A2A2F"/><stop offset="1" stopColor="#08080A"/>
-        </linearGradient>
-      </defs>
-      <rect width="64" height="64" rx="14" fill={`url(#${uid}n)`}/>
-      <rect x="1.25" y="1.25" width="61.5" height="61.5" rx="12.9" fill="none" stroke="#E0B972" strokeOpacity=".34" strokeWidth="1.6"/>
-      <g transform="translate(6 22)">
-        <path d={L_V} fill="#fff"/>
-        <g transform="translate(18.2 0)"><path d={L_R} fill={`url(#${uid}o)`} fillRule="evenodd"/></g>
-        <g transform="translate(37 0)"><path d={L_M} fill="#fff"/></g>
-      </g>
-    </svg>
-  );
+  return <img src="/logo-vrm-192.png" alt="VRM" width={size} height={size}
+    style={{ width: size, height: size, borderRadius: Math.round(size * 0.24), objectFit: 'cover', display: 'block', ...(style || {}) }}/>;
 }
 // Le sigle à plat, pour poser à côté du médaillon dans l'en-tête.
 function VrmWord({ height = 22, color, accent, style }) {
@@ -5312,7 +5301,7 @@ function SideBar({ tab, setTab }) {
           lettres : le poser à côté du mot revenait à écrire « VRM VRM » en haut
           de chaque écran (§5.68 l'avait corrigé dans l'en-tête, pas ici). */}
       <div style={{display:'flex',alignItems:'center',padding:'6px 8px 20px'}}>
-        <VrmWord height={19} color={C.onChrome} accent={C.accent}/>
+        <VrmLogo size={38}/>
       </div>
       {groupes.map((g,gi) => (
         <div key={g.titre} style={{marginBottom:gi<groupes.length-1?14:6}}>
@@ -19357,16 +19346,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {!baseKO && !premierJour && liveStats && liveStats.caMois!=null && (
               <button type="button" onClick={()=>onNav&&onNav('cat_ventes')}
                 style={{width:'100%',textAlign:'left',border:'none',cursor:'pointer',fontFamily:'inherit',
-                  borderRadius:12,marginBottom:16,position:'relative',overflow:'hidden',color:'#fff',minHeight:210,display:'block',
-                  background:`linear-gradient(150deg, ${C.chrome} 0%, ${C.accent} 82%, ${C.accentSoft} 100%)`,
+                  borderRadius:12,marginBottom:16,position:'relative',overflow:'hidden',color:'#fff',minHeight:0,display:'block',
+                  background:'linear-gradient(160deg, #0E131C 0%, #05070A 100%)',
                   boxShadow:C.shadowLg||'none'}}>
                 {/* Scène 3D (à droite), lueur d'accent, puis un voile sombre de
                     gauche à droite pour que le gros chiffre reste lisible par
                     dessus la 3D — quel que soit le thème (le héros est sa propre
                     surface sombre, clair comme sombre). */}
-                <HeroScene3D/>
-                <div aria-hidden="true" style={{position:'absolute',right:'-6%',top:'50%',transform:'translateY(-50%)',width:'55%',height:'120%',background:'radial-gradient(closest-side, rgba(91,140,255,.42), rgba(91,140,255,0) 72%)',pointerEvents:'none',zIndex:1}}/>
-                <div aria-hidden="true" style={{position:'absolute',inset:0,pointerEvents:'none',zIndex:2,background:'linear-gradient(100deg, rgba(9,12,20,.80) 0%, rgba(9,12,20,.42) 44%, rgba(9,12,20,0) 74%)'}}/>
+                {/* 30 sept. : la pièce 3D qui tournait est RETIRÉE (Julien : « je
+                    veux que ce soit le logo que je t'ai envoyé, en petit, en
+                    haut » — il est dans l'en-tête). Sur téléphone elle
+                    chevauchait le titre. Le fond reprend le LOGO : noir, avec
+                    le liseré bleu qui s'allume dans le coin. */}
+                <div aria-hidden="true" style={{position:'absolute',inset:0,pointerEvents:'none',zIndex:1,borderRadius:12,
+                  background:'radial-gradient(90% 120% at 100% 0%, rgba(61,123,255,.38), rgba(61,123,255,0) 55%)'}}/>
+                <div aria-hidden="true" style={{position:'absolute',inset:0,pointerEvents:'none',zIndex:2,borderRadius:12,
+                  boxShadow:'inset 0 0 0 1px rgba(120,163,255,.28)'}}/>
                 <div style={{position:'relative',zIndex:3,padding:'22px 20px 20px'}}>
                   <div style={{fontSize:11,fontWeight:600,letterSpacing:0.7,textTransform:'uppercase',opacity:.78,display:'flex',alignItems:'center',gap:9}}>
                     <span aria-hidden="true" style={{width:22,height:2,borderRadius:999,background:'currentColor',opacity:.8,display:'inline-block'}}/>
@@ -22293,7 +22288,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {/* ⚠️ Un colis déjà expédié qui traîne ici vient presque toujours d'une
             capture ancienne (statut figé), pas d'un défaut. On le dit (§11, même
             message partout). */}
-        <div style={{padding:'0 16px'}}><FraicheurDonnees jours={liveStats && liveStats.dataAgeJours} compte={liveStats && liveStats.dataAgeCompte}/></div>
+        <div style={{padding:'0 2px',marginBottom:10}}><FraicheurDonnees jours={liveStats && liveStats.dataAgeJours} compte={liveStats && liveStats.dataAgeCompte}/></div>
         <NoAcc/>
         {/* RÉCAP EN HAUT : combien de COLIS restent à envoyer. On compte ce que
             Vinted attend de toi (moisson de l'extension), pas les emails reçus :

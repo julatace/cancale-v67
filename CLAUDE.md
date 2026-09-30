@@ -3780,9 +3780,14 @@ Règle unique, posée après six passes ratées :
 > **UNE SEULE couleur d'accent, et elle est RARE.** Tout le reste est neutre. Un
 > chiffre ne porte une couleur que s'il y a **vraiment quelque chose à rattraper**.
 
-Famille actuelle : fond gris froid `#F6F7F9`, cartes blanches, encre ardoise
-`#10151B`, accent bleu `#1E5FCC`, navigation (rail / barre du bas) en ardoise —
-c'est elle, la signature. Mode sombre choisi, pas inversé automatiquement.
+Famille actuelle (30 septembre, **« VRM Noir » tirée du logo de Julien** —
+`public/logo-vrm.png` : carré noir, « VRM » argent, liseré bleu) : sombre
+`#07090D` / cartes `#10141B` / rail `#030406`, **un seul accent bleu
+électrique `#3D7BFF`** (clair : fond `#F4F6FA`, accent `#2458E6`). Le logo
+(image) est en petit en haut (en-tête téléphone, rail ordinateur) ; la pièce
+3D de l'accueil est RETIRÉE (demande de Julien, elle chevauchait le titre sur
+téléphone). La menthe est abandonnée. Mode sombre choisi, pas inversé
+automatiquement.
 Rayons **5 / 8 / 10 / 12** (plus de 2-3-4 px éparpillés), ombres à **deux
 couches** (contact serré + diffusion large et pâle).
 
