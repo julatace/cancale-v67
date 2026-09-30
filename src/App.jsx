@@ -758,7 +758,7 @@ const SYNC_KEYS = [
   'vinted_catalog','vinted_sales','vinted_garage_grid','vinted_blocked',
   'vinted_extracols','vinted_colors','vinted_invoices',
   'vinted_invoice_settings','vinted_custom_logo','vinted_dark','vinted_stock_vinted',
-  'vinted_accounts','vinted_account_labels','vinted_account_emails',
+  'vinted_accounts','vinted_account_labels','vinted_account_emails','vinted_account_phones',
   'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros','vinted_annonces_vendues','vinted_bords_shipped',
   'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats','vinted_bords_printed','vrm_imprimante','vrm_prenom', 'vinted_repond_auto','vrm_points_relais','vrm_ville','vrm_colis_collected','vrm_colis_collected_at',
   'vinted_txn_link','vinted_sales_hidden','vinted_accounts_hidden','vinted_autonum','vinted_urssaf_freq','vinted_urssaf_taux',
@@ -13253,6 +13253,18 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
   // iCloud ou classique). Sert au serveur pour attribuer chaque email de vente/
   // bordereau au bon compte. Synchronisé (vinted_account_emails).
   const [acctEmails, setAcctEmails] = useState(() => load('vinted_account_emails', {}));
+  // Téléphone de chaque compte (Julien, 30 sept. : « pour ceux qui font du
+  // multi-compte, savoir si les numéros ont servi »). Saisi à la main — Vinted
+  // ne l'expose pas dans ce qu'on capte, on ne le devine pas. Synchronisé.
+  const [acctPhones, setAcctPhones] = useState(() => load('vinted_account_phones', {}));
+  const setAcctPhone = (uid, val) => {
+    const u = { ...acctPhones, [String(uid)]: val };
+    if (!String(val).trim()) delete u[String(uid)];
+    setAcctPhones(u); save('vinted_account_phones', u);
+  };
+  // Même numéro sur deux comptes : la comparaison se fait chiffres seuls
+  // (« 06 12… » et « +33 6 12… » sont le même numéro).
+  const telNorm = (t) => { const d = String(t || '').replace(/\D/g, ''); return d.startsWith('33') && d.length === 11 ? '0' + d.slice(2) : d; };
   const [reput, setReput] = useState({}); // { uid: { rating, count, pos, neg } } — note vendeur captée
   const setAcctEmail = (uid, val) => {
     const u = { ...acctEmails, [String(uid)]: val.trim() };
@@ -13595,6 +13607,19 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
                       onFocus={e=>e.target.style.borderColor=C.accent}
                       onBlur={e=>e.target.style.borderColor=C.border}
                     />
+                    <input
+                      type="tel" inputMode="tel"
+                      value={acctPhones[String(acc.vinted_user_id)] || ''}
+                      onChange={e=>setAcctPhone(acc.vinted_user_id, e.target.value)}
+                      placeholder="Téléphone du compte"
+                      title="Le numéro utilisé pour ce compte Vinted. Si tu le mets aussi sur un autre compte, l'app te le signale."
+                      style={{display:'block',marginTop:6,width:'100%',maxWidth:280,boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 9px',fontSize:12,fontFamily:'inherit',background:C.surface,color:C.text,outline:'none'}}
+                      onFocus={e=>e.target.style.borderColor=C.accent}
+                      onBlur={e=>e.target.style.borderColor=C.border}
+                    />
+                    {(()=>{ const n=telNorm(acctPhones[String(acc.vinted_user_id)]); if(n.length<9) return null;
+                      const autres=(accounts||[]).filter(o=>String(o.vinted_user_id)!==String(acc.vinted_user_id) && telNorm(acctPhones[String(o.vinted_user_id)])===n).map(o=>labels[String(o.vinted_user_id)]||o.login||`#${o.vinted_user_id}`);
+                      return autres.length ? <div style={{fontSize:11,color:C.warn,marginTop:3}}>Ce numéro sert aussi sur {autres.join(', ')}.</div> : null; })()}
                   </div>
                 </div>
                 <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>

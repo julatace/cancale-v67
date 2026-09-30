@@ -201,7 +201,7 @@ données de l'acheteur (dépôt public) :
   (argent reçu, à déclarer).
 - ⬜ H3. Fiche d'une annonce : trop d'infos, mal organisée ⇒ beaucoup plus
   intuitive et simple.
-- ⬜ H4. Comptes liés : champ numéro de téléphone par compte (multi-compte : savoir
+- ✅ H4 (`vinted_account_phones`, synchronisé ; alerte si le même numéro — comparé chiffres seuls, +33 ≡ 0 — sert sur un autre compte ; rendu vérifié). Comptes liés : champ numéro de téléphone par compte (multi-compte : savoir
   quels numéros ont servi).
 
 ## I. Colis
