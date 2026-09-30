@@ -86,7 +86,32 @@ données de l'acheteur (dépôt public) :
   Store (👤 compte développeur 5 $) + dépôt privé.
 
 ## B. Messages / offres aux favoris (comme Vintex)
-- 🟨 B1 : une extension ne peut PAS observer une autre (isolation Chrome).
+- 🟨 B1 — RAPPORT D'OBSERVATION DE VINTEX (Claude in Chrome, 30/09, compte
+  angeled92 ; aucune action envoyée, pas de capture réseau) :
+  · panneau `vintex-proxy-panel` injecté dans vinted.fr (shadow DOM fermé) =
+    RELAIS : les actions pilotées depuis vintex.app s'exécutent dans l'onglet
+    Vinted avec la session de l'utilisateur ; pont v2.7.0.
+  · tableau de bord « Vintex Neo » : Notifications (filtre « Favoris ») liste
+    « [pseudo] a marqué ton article [titre] comme favori » → action « Répondre
+    aux notifications » ; automatisation « Messages aux favoris » (règles texte
+    / offre, jours, créneaux, délai 15 min, 1 j avant de réécrire, anti-doublon
+    via conversations, quotas 10/60/illimité par jour selon forfait) ;
+    « Boost favoris » = échange de favoris entre membres (gonflage, a priori
+    contraire aux CGU Vinted — NE PAS reproduire) ; republication = supprime
+    puis recrée (déjà refusé §3).
+  · ⇒ **§3 « Vinted ne dit jamais QUI met en favori » est FAUX pour le flux des
+    NOTIFICATIONS Vinted** (confirmé par Julien : « ça vient de l'app Vinted
+    directement »). Nos emails « favori » le disent aussi : 33 reçus depuis le
+    22/09, 9 avec pseudo lu — le serveur extrait `qui` + `article` puis JETTE
+    (seul `email_journal` borné) → à ranger (`email_favori_*`) plus tard.
+  · 5.117 : `inject.js` capte passivement `/api/v*/notifications` (et
+    `user_notifications`) → `harvest_{uid}_notifications`. 0 vu à ce jour ;
+    Julien doit ouvrir la cloche sur Vinted une fois. PUIS mesurer la forme
+    (pseudo/id, item_id, date, pagination) avant toute règle.
+  · Garde-fous si on construit l'envoi : compte de l'onglet (`garde`), un par
+    un, plafond/heure et /jour, jamais 2 fois la même personne, déclenché par
+    lui (§3 : `vanessa5723`). Pas de délais « faussement humains ».
+  Méthode initiale : une extension ne peut PAS observer une autre (isolation Chrome).
   Méthode donnée à Julien : DevTools du service worker de Vintex + DevTools de
   la page Vinted, onglet Network, « Keep log », une action Vintex, export HAR
   (Chrome l'exporte sans cookies ni en-têtes d'auth). Attendre ses fichiers.
