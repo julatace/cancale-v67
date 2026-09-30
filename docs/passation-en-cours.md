@@ -181,7 +181,7 @@ données de l'acheteur (dépôt public) :
   distincts pour attribuer chacun à son annonce.
 
 ## G. Compta / fiscal
-- ⬜ G1. Tout ce qu'on masque dans la compta ⇒ dans Réglages, onglets « Ventes
+- ✅ G1 (Réglages → Comptabilité → « Masqué de la compta », onglets Ventes masquées / Achats masqués avec titre·date·compte·montant et « Réafficher » ; NOUVEAU : masquer un achat (icône œil barré sur la carte Achats, `vinted_purchases_hidden`, synchronisé), retiré à la source dans `loadOrders('purchased')` donc de tous les totaux ; liste gardée en mémoire car `save()` est différé de 500 ms et `load()` ne voit pas l'écriture en attente — deux masquages rapprochés s'écrasaient). Tout ce qu'on masque dans la compta ⇒ dans Réglages, onglets « Ventes
   masquées » et « Achats masqués ».
 - ⬜ G2. Rapport comptable à améliorer impérativement : il liste les factures
   d'achat par paire mais seulement le montant global des ventes ⇒ détail des
