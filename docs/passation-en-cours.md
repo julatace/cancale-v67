@@ -246,14 +246,17 @@ données de l'acheteur (dépôt public) :
 - ⛔ Pauses aléatoires « pour paraître humain » : refusées (§3 — évasion de
   détection bot, cause du blocage de `vanessa5723`). Julien a insisté ; refus
   maintenu et expliqué.
-- ⬜ O1. « Republier en 1 clic » (Julien : « je ne veux pas faire ça
-  manuellement, tu peux pas supprimer l'annonce ») : UN clic + confirmation par
-  annonce → l'extension recrée depuis le coffre (`vinted_item_details` + photos)
-  puis supprime l'ancienne. Pas de file, pas de pauses aléatoires, `garde`,
-  plafond horaire. ⚠️ Bloqué : (1) endpoint de SUPPRESSION jamais observé
-  (création vue : `wreq_api_v2_item_upload_items`) → faire supprimer UNE
-  annonce à la main avec 5.117 ; (2) Julien ne peut pas installer l'extension
-  pour l'instant.
+- ⬜ O1. « Republier en 1 clic » — Julien : « je ne veux pas le faire
+  manuellement / je ne veux pas avoir à le faire tout seul ». Conception
+  retenue : UN clic + confirmation par annonce ; l'extension (1) CRÉE la
+  nouvelle depuis le coffre (`vinted_item_details` + photos ; création déjà
+  observée : `wreq_api_v2_item_upload_items`) et vérifie qu'elle est en ligne,
+  (2) PUIS supprime l'ancienne par l'endpoint usuel de Vinted, ciblé par son
+  item_id (identité, §5), (3) VÉRIFIE la disparition (relire l'item) et le dit ;
+  échec ⇒ deux annonces en ligne, rien de perdu, l'app le signale. AUCUN geste
+  de mesure demandé à Julien : le 1er clic EST la mesure (statuts notés).
+  Pas de file, pas de pauses aléatoires, `garde`, plafond horaire.
+  Bloqué tant que l'extension n'est pas installée chez lui.
 
 ## N. Ensuite, dans cet ordre (après A→M « parfaitement »)
 - 🟨 N1 (PRIORITÉ, Julien : « on fait Supabase ») — voir « État Supabase » ci-dessous. Isolation des données + début du multi-utilisateurs : une extension et
