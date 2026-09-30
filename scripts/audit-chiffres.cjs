@@ -29,7 +29,8 @@ const nok = (m, d) => { ko++; console.log('❌ ' + m + (d ? ' — ' + d : '')); 
   : nok('Ventes : `benefConnu` sommé sur les ventes au coût connu');
 
 // 2) …et c'est bien CE chiffre qui est affiché
-/StatBox label="Bénéfice net" value=\{fmtE0\(totals\.benefConnu\)\}/.test(app)
+// (un audit suit la RÈGLE, pas son orthographe : d'autres attributs peuvent précéder `label`)
+/StatBox\b[^>]*?label="Bénéfice net" value=\{fmtE0\(totals\.benefConnu\)\}/.test(app)
   ? ok('Ventes : la carte affiche `benefConnu`, pas `ca - cout`')
   : nok('Ventes : la carte affiche `totals.benefConnu`');
 
