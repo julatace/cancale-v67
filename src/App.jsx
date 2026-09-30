@@ -16755,6 +16755,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return arr;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [annBase, annSearch, annSort, numeros]);
+  // Un seul compte à l'écran ⇒ le nommer sur chaque carte ne distingue rien (§7).
+  const annUnCompte = useMemo(() => new Set(annShown.map(x => String(x._acc && x._acc.vinted_user_id || ''))).size <= 1, [annShown]);
   // Comptes bloqués actuellement présents (pour le bandeau d'alerte).
   const blockedList = useMemo(() => accounts.filter(a => blockedAccts.has(String(a.vinted_user_id))), [accounts, blockedAccts]);
 
@@ -22070,25 +22072,29 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {/* La phrase commune une seule fois, au-dessus des lignes. Sur la
                 ligne il ne reste alors que ce qui DISTINGUE : le nom de la
                 place, son compte, et ses deux boutons. */}
-            {uniforme && <div style={{fontSize:11.5,color:C.muted,lineHeight:1.45,margin:'0 2px 8px'}}>{phrase(lignes[0], false)}</div>}
-            {lignes.map(l => (
-            <div key={l.pl.cle} style={{marginBottom:10,background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 12px'}}>
-              <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-                <div style={{flex:'1 1 260px',minWidth:0}}>
-                  <div style={{fontSize:13,fontWeight:700,color:C.text}}>
-                    {l.n} annonce{l.n>1?'s':''} sur {annStats.n} part{l.n>1?'ent':''} aussi sur {l.pl.nom}
+            {/* 1er oct. — « trop chargé » : les places tiennent dans UNE carte,
+                une ligne chacune (nom · combien · Toutes / Aucune). La phrase
+                commune dessous, en petit. */}
+            <div style={{marginBottom:12,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'4px 12px 10px',boxShadow:C.shadow||'none'}}>
+              {lignes.map((l, i) => (
+                <div key={l.pl.cle} style={{padding:'8px 0',borderTop:i?`1px solid ${C.border}`:'none'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:10}}>
+                    <div style={{flex:1,minWidth:0,fontSize:13,color:C.text}}>
+                      <b style={{fontWeight:700}}>{l.pl.nom}</b>
+                      <span style={{color:C.muted,marginLeft:8,fontVariantNumeric:'tabular-nums'}}>{l.n}/{annStats.n} annonce{annStats.n>1?'s':''}</span>
+                    </div>
+                    <div role="group" aria-label={`Sélection pour ${l.pl.nom}`} style={{display:'flex',border:`1px solid ${C.border}`,borderRadius:8,overflow:'hidden',flexShrink:0}}>
+                      <button type="button" onClick={()=>setMpToutes(l.pl.cle, true)} aria-pressed={l.n===annStats.n}
+                        style={{border:'none',background:l.n===annStats.n?(C.card2||C.bg):'transparent',color:C.text,padding:'5px 10px',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit',minHeight:0}}>Toutes</button>
+                      <button type="button" onClick={()=>setMpToutes(l.pl.cle, false)} aria-pressed={l.n===0}
+                        style={{border:'none',borderLeft:`1px solid ${C.border}`,background:l.n===0?(C.card2||C.bg):'transparent',color:C.text,padding:'5px 10px',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit',minHeight:0}}>Aucune</button>
+                    </div>
                   </div>
-                  {!uniforme && <div style={{fontSize:11.5,color:C.muted,lineHeight:1.45,marginTop:2}}>{phrase(l, true)}</div>}
+                  {!uniforme && <div style={{fontSize:11.5,color:C.muted,lineHeight:1.45,marginTop:4}}>{phrase(l, true)}</div>}
                 </div>
-                <div style={{display:'flex',gap:6,flexShrink:0}}>
-                  <button type="button" onClick={()=>setMpToutes(l.pl.cle, true)}
-                    style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'6px 11px',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit',maxWidth:180}}>Tout cocher</button>
-                  <button type="button" onClick={()=>setMpToutes(l.pl.cle, false)}
-                    style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'6px 11px',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit',maxWidth:180}}>Tout décocher</button>
-                </div>
-              </div>
+              ))}
+              {uniforme && <div style={{fontSize:11.5,color:C.muted,lineHeight:1.45,paddingTop:8,borderTop:`1px solid ${C.border}`}}>{phrase(lignes[0], false)}</div>}
             </div>
-            ))}
           </>);
         })()}
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(clamp(160px, 25%, 240px), 1fr))',gap:14}}>
@@ -22141,22 +22147,24 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     </div>
                   )}
                   <div style={{marginTop:5,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
-                    <AcctTag acc={it._acc} name={accNameOf(it._acc)}/>
-                    {num && <button type="button" onClick={()=>atGarage?(onLocate&&onLocate(num)):(onStore&&onStore(num))} style={{border:'none',background:'transparent',padding:0,cursor:'pointer',fontSize:11,fontWeight:500,color:atGarage?(C.blue||C.accent):C.warn,display:'inline-flex',alignItems:'center',gap:3,minHeight:0}}><Icon name="home" size={12}/>{atGarage?'Au stock':'Ranger'}</button>}
-                    <button type="button" onClick={async ()=>{ if(await askConfirm('Marquer cette paire VENDUE et la retirer des annonces ?')) markSold(it.id); }} title="Marquer vendue : la retire des annonces tout de suite (sans attendre la synchro Vinted)" style={{marginLeft:'auto',border:`1px solid ${C.warn}`,background:`${C.warn}12`,color:C.warn,borderRadius:8,padding:'3px 9px',cursor:'pointer',fontSize:11,fontWeight:600,fontFamily:'inherit'}}>✓ Vendue</button>
+                    {!annUnCompte && <AcctTag acc={it._acc} name={accNameOf(it._acc)}/>}
+                    {num && <button type="button" onClick={()=>atGarage?(onLocate&&onLocate(num)):(onStore&&onStore(num))} style={{border:'none',background:'transparent',padding:0,cursor:'pointer',fontSize:11,fontWeight:500,color:atGarage?(C.blue||C.accent):C.muted,display:'inline-flex',alignItems:'center',gap:3,minHeight:0}}><Icon name="home" size={12}/>{atGarage?'Au stock':'Ranger'}</button>}
+                    {/* « Relier à un achat » remonté ici (1er oct.) : sur téléphone, trois
+                        éléments côte à côte tronquaient le champ du prix d'achat. */}
+                    <button type="button" onClick={()=>openPicker(item)} title="Relier à un achat" aria-label="Relier cette annonce à un achat Vinted" style={{marginLeft:'auto',flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:e.buyFromId?INV_STATUS.online.color:C.text,cursor:'pointer',padding:'3px 7px',display:'flex',alignItems:'center',minHeight:0}}><Icon name="link" size={13}/></button>
+                    <button type="button" onClick={async ()=>{ if(await askConfirm('Marquer cette paire VENDUE et la retirer des annonces ?')) markSold(it.id); }} title="Marquer vendue : la retire des annonces tout de suite (sans attendre la synchro Vinted)" style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'3px 9px',cursor:'pointer',fontSize:11,fontWeight:600,fontFamily:'inherit'}}>✓ Vendue</button>
                     {/* Pas d'alerte « titre en double » : chaque annonce a sa propre identité (id) et son propre N°. */}
                   </div>
                 </div>
                 <div style={{marginTop:'auto',display:'flex',gap:6,padding:'0 10px 10px'}}>
-                  <div style={{flex:1,display:'flex',alignItems:'center',gap:4,border:`1px solid ${C.border}`,borderRadius:8,padding:'2px 6px',background:C.bg}}>
+                  <div style={{flex:'0 0 64px',minWidth:0,display:'flex',alignItems:'center',gap:3,border:`1px solid ${C.border}`,borderRadius:8,padding:'2px 6px',background:C.bg}}>
                     <span style={{fontSize:11,color:C.muted,fontWeight:500}}>N°</span>
                     <ChampSaisie value={num} onCommit={(v,avant)=>poserNumero(item,v,avant)} inputMode="numeric" placeholder={String(nextNumero)} style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
                   </div>
-                  <div style={{flex:1,display:'flex',alignItems:'center',gap:2,border:`1px solid ${e.buyFromId?INV_STATUS.online.color:C.border}`,borderRadius:8,padding:'2px 6px',background:C.bg}}>
+                  <div style={{flex:'1 1 0',minWidth:0,display:'flex',alignItems:'center',gap:2,border:`1px solid ${e.buyFromId?INV_STATUS.online.color:C.border}`,borderRadius:8,padding:'2px 6px',background:C.bg}}>
                     <ChampSaisie value={buy} onCommit={v=>updatePair(item,{buyPrice:v,buyFromId:null,buyFrom:null})} placeholder="achat" inputMode="decimal" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
                     <span style={{fontSize:11,color:C.muted}}>€</span>
                   </div>
-                  <button type="button" onClick={()=>openPicker(item)} title="Relier à un achat" aria-label="Relier cette annonce à un achat Vinted" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:e.buyFromId?INV_STATUS.online.color:C.text,cursor:'pointer',padding:'3px 8px',display:'flex',alignItems:'center'}}><Icon name="link" size={14}/></button>
                 </div>
                 {/* L'achat relié, avec SA photo et SON reçu — demande de Julien :
                     « quand l'annonce est en ligne, pouvoir relier un achat avec la
