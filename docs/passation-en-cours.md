@@ -258,6 +258,16 @@ données de l'acheteur (dépôt public) :
   Pas de file, pas de pauses aléatoires, `garde`, plafond horaire.
   Bloqué tant que l'extension n'est pas installée chez lui.
 
+## P. Visuel (30/09) — « améliore le visuel, surtout téléphone ; le logo en petit en haut »
+- ✅ P1. Identité « VRM Noir » tirée de son logo (thèmes sombre et clair, index.html :
+  barre d'état, fond, focus). Logo = `public/logo-vrm.png` / `-192.png`
+  (découpé de sa capture) via `VrmLogo` (en-tête, rail, connexion, Réglages).
+  Pièce 3D retirée du héros (chevauchait « SEPTEMBRE » à 390 px). Espacement
+  « Données à jour » sur Colis corrigé. Rendu vérifié à 390 et 1512 px.
+- ⬜ P2. Suite mobile : en-tête chargé (menu + retour + logo + 4 icônes),
+  emojis-icônes restants (🔢 Poser le N°, 📎 J'ai le PDF) → icônes au trait,
+  photos des ventes (E4). Attendre son retour sur P1.
+
 ## N. Ensuite, dans cet ordre (après A→M « parfaitement »)
 - 🟨 N1 (PRIORITÉ, Julien : « on fait Supabase ») — voir « État Supabase » ci-dessous. Isolation des données + début du multi-utilisateurs : une extension et
   une adresse email appartiennent à UN compte, lui seul reçoit les infos, aucune
