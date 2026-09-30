@@ -4819,7 +4819,9 @@ const PLUS_TABS=[
      simplement plus dans le menu. */
   {id:'garage',       icon:'home',    emoji:'🏠',label:'Stock',        desc:'Où est rangée chaque paire'},
   {id:'invoices',     icon:'receipt', emoji:'🧾',label:'Factures',      desc:'Documents pour tes comptes pro'},
-  {id:'masques',      icon:'eyeOff',  emoji:'🙈',label:'Masqués',       desc:'Ventes et achats retirés de la compta'},
+  /* ⚠️ « Masqués » RETIRÉ du menu le 1er oct. (demande de Julien : « dans les
+     paramètres, ça prend de la place pour rien »). L'écran reste monté et
+     joignable par Réglages → Comptabilité → « Ventes et achats masqués ». */
 ];
 // Barre de chargement fine en haut de l'écran (façon navigateur). Elle avance
 // vite au début puis ralentit — on ne peut pas connaître l'avancement réel de
@@ -25451,7 +25453,11 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
       {/* « Rédaction d'annonces par l'IA » retirée de Réglages le 30 septembre (Julien). */}
 
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Comptabilité</div>
-      {/* « Masqué de la compta » a son ONGLET depuis le 30 sept. (menu → Masqués). */}
+      {/* Julien, 1er oct. : « les ventes masquées, je veux que ce soit dans les
+          paramètres, pas sous Factures — ça prend de la place pour rien ». Retiré
+          de PLUS_TABS (le menu) ; l'écran reste monté et joignable par ce Row. */}
+      <Row icon="eyeOff" title="Ventes et achats masqués" desc="Ce que tu as retiré de la compta (réversible)." onClick={()=>setTab('masques')}/>
+      <div style={{height:10}}/>
       <RegimeSetting/>
       <div style={{height:10}}/>
       <Row icon="doc" title="Emplacements de bordereau" desc="Réinitialise où le N° est tamponné (l'app te redemandera à chaque format)." onClick={async ()=>{ if(await askConfirm('Oublier les emplacements de tampon mémorisés ? L\'app te redemandera où placer le N° au prochain bordereau de chaque format.')){ save('vinted_bordereau_formats',{}); toast('✓ Emplacements réinitialisés.'); } }}/>
@@ -26790,19 +26796,9 @@ export default function App() {
   // pas d'écran « Aperçu » à traverser — demande de Julien) ; les autres
   // plateformes ouvrent sur leur aperçu.
   React.useEffect(()=>{ setPlatSub(tab==='plat_vinted'?'ventes':'apercu'); },[tab]);
-  // Historique de navigation → bouton « retour » (plus besoin de recharger l'app).
-  const navHistRef = React.useRef([]);
-  const prevTabRef = React.useRef('journee');
-  const backingRef = React.useRef(false);
-  const [canBack,setCanBack]=useState(false);
-  React.useEffect(()=>{
-    if(prevTabRef.current!==tab){
-      if(!backingRef.current){ navHistRef.current.push(prevTabRef.current); if(navHistRef.current.length>30) navHistRef.current.shift(); }
-      backingRef.current=false;
-      prevTabRef.current=tab;
-      setCanBack(navHistRef.current.length>0);
-    }
-  },[tab]);
+  // ⚠️ Flèche « retour » RETIRÉE le 1er octobre (demande de Julien : « elle sert
+  // à rien »). La navigation se fait par le menu des écrans / la barre latérale,
+  // toujours joignables ; un bouton retour de plus n'apprenait rien.
   // Libère un numéro au garage : vide la case qui le contient (paire perdue
   // après un litige). Ne touche à rien d'autre — le numéro reste dans
   // l'historique (vinted_used_numeros) et n'est jamais redonné à une autre paire.
@@ -26819,7 +26815,6 @@ export default function App() {
       return touched?next:prev;
     });
   };
-  const goBack=()=>{ if(!navHistRef.current.length) return; const dest=navHistRef.current.pop(); backingRef.current=true; setTab(dest); setCanBack(navHistRef.current.length>0); };
   // Ouverture ciblée : une notification cliquée porte ?tab=... (à froid) ou un
   // message du service worker (app déjà ouverte) → on saute au bon onglet.
   useEffect(()=>{
@@ -27883,8 +27878,6 @@ export default function App() {
           {/* Tous les écrans, en haut à gauche. Sur ordinateur la barre latérale
               les montre déjà tous : ce bouton n'y existe pas. */}
           {!ordi && <MenuEcrans tab={tab} setTab={setTab} dark={tab==='plat_ebay'}/>}
-          {canBack && <button type="button" onClick={goBack} title="Retour" aria-label="Retour"
-            style={{flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',width:38,height:38,borderRadius:8,border:`1px solid ${(!ordi&&tab==='plat_ebay')?'#3A3A3C':C.border}`,background:(!ordi&&tab==='plat_ebay')?'#1C1C1E':C.bg,color:(!ordi&&tab==='plat_ebay')?'#fff':C.text,cursor:'pointer',fontSize:20,fontWeight:600,fontFamily:'inherit',lineHeight:1}}>‹</button>}
           {/* Logo Cancale Shoes Store - cliquable pour le changer */}
           <input ref={logoInputRef} type="file" accept="image/*" onChange={handleLogoChange} style={{display:'none'}}/>
           <div
