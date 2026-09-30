@@ -141,14 +141,17 @@ const nonLue = (cid, desc) => ({ id: Number(cid), unread: true, description: des
     dit(n === 1 && j.replies.length === 1, 'UNE réponse part', `rendu=${n} envois=${j.replies.length}`);
     dit(j.replies[0] && /\/conversations\/500024320731\/replies$/.test(j.replies[0].endpoint),
       'elle part dans la bonne conversation', j.replies[0] && j.replies[0].endpoint);
-    dit(j.replies[0] && j.replies[0].body && typeof j.replies[0].body.reply === 'string' && j.replies[0].body.reply.length > 0
+    // ⚠️ LA FORME RÉELLE, relevée sur les 9 réponses que Vinted envoie lui-même
+    //    (`wreq_…_replies`, 30 sept.) : `reply` est un OBJET qui porte `body`.
+    const rep0 = j.replies[0] && j.replies[0].body && j.replies[0].body.reply;
+    dit(rep0 && typeof rep0 === 'object' && typeof rep0.body === 'string' && rep0.body.length > 0
       && Object.keys(j.replies[0].body).length === 1,
-      'le corps est le seul champ que Vinted attend (`reply`)', JSON.stringify(j.replies[0] && j.replies[0].body));
+      'le corps a la forme que Vinted envoie lui-même (`reply.body`)', JSON.stringify(j.replies[0] && j.replies[0].body));
     // ⚠️ IL DOIT POUVOIR RELIRE CE QUI EST PARTI EN SON NOM.
     const ecrit = (j.ecrits[0] || [])[0] || {};
     const garde = ecrit.data || {};
     const envoi = Object.keys(garde).filter((k) => k !== 'bilan').map((k) => garde[k])[0];
-    dit(ecrit.id === 'panel_msg_repondus' && envoi && envoi.texte && envoi.texte === j.replies[0].body.reply,
+    dit(ecrit.id === 'panel_msg_repondus' && envoi && envoi.texte && envoi.texte === (rep0 && rep0.body),
       'le texte exact est gardé pour qu’il le relise', JSON.stringify(envoi && envoi.texte));
     dit(envoi && String(envoi.login || '') !== '', 'et la personne est nommée', JSON.stringify(envoi && envoi.login));
   });

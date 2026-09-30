@@ -35,7 +35,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.118.0';
+const EXT_ATTENDUE = '5.119.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -1419,7 +1419,7 @@ const _reglagesEcoute = new Set();
 const NOM_REGLAGE = {
   push_prefs: 'les notifications',
   vrm_email_config: "la date d'import des emails",
-  vrm_pro_facture: 'la facturation Pro',
+  vrm_pro_facture: 'la facturation Pro (onglet Factures)',
   vrm_email_owners: 'tes adresses de réception',
 };
 const _direReglages = () => { _reglagesEcoute.forEach((f) => { try { f(); } catch (_) {} }); };
@@ -4752,6 +4752,7 @@ const PLUS_TABS=[
      simplement plus dans le menu. */
   {id:'garage',       icon:'home',    emoji:'🏠',label:'Stock',        desc:'Où est rangée chaque paire'},
   {id:'invoices',     icon:'receipt', emoji:'🧾',label:'Factures',      desc:'Documents pour tes comptes pro'},
+  {id:'masques',      icon:'eyeOff',  emoji:'🙈',label:'Masqués',       desc:'Ventes et achats retirés de la compta'},
 ];
 // Barre de chargement fine en haut de l'écran (façon navigateur). Elle avance
 // vite au début puis ralentit — on ne peut pas connaître l'avancement réel de
@@ -5127,7 +5128,10 @@ function ScreenHead({ icon, title, desc, right }) {
               Le texte reste passé par les appelants (rien à défaire si on veut
               le remettre, par exemple pour un nouvel utilisateur). */}
         </div>
-        {right && <div style={{flexShrink:0}}>{right}</div>}
+        {/* ⚠️ `maxWidth:100%` : sans lui, une rangée de boutons ne pouvait pas
+            revenir à la ligne sur téléphone (Factures débordait de 300 px sur
+            le côté — mesuré le 30 sept.). */}
+        {right && <div style={{flexShrink:0,maxWidth:'100%'}}>{right}</div>}
       </div>
     </div>
   );
@@ -9443,6 +9447,10 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
   const [showAll,setShowAll]=useState(false);
   const [showForm,setShowForm]=useState(false);
   const [showSettings,setShowSettings]=useState(false);
+  // « Facturation Pro » vit ICI depuis le 30 sept. (Julien : « ça doit être dans
+  // l'onglet Facture », plus dans Réglages). Même composant, même ligne
+  // `vrm_pro_facture` — seul l'endroit change (§11 : un seul propriétaire).
+  const [showPro,setShowPro]=useState(false);
   const [fetching,setFetching]=useState(false);
   const [proInvs,setProInvs]=useState(null); // factures Pro (pipeline email)
   const PER_PAGE=50;
@@ -9607,9 +9615,11 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
             <Icon name="sync" size={13}/>{fetching?'Chargement…':'Relire les reçus'}
           </Btn>
           <Btn small outline color={C.muted} onClick={exportExcel} style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="save" size={13}/>Exporter Excel</Btn>
+          <Btn small outline color={C.muted} onClick={()=>setShowPro(v=>!v)} aria-expanded={showPro} style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="receipt" size={13}/>Facturation Pro</Btn>
           <Btn small outline color={C.muted} onClick={()=>setShowSettings(true)} style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="gear" size={13}/>Réglages</Btn>
         </div>}/>
       </div>
+      {showPro && <ProFactureSetting/>}
 
       {/* Barre de recherche : par n° de paire ou date de vente (cherche dans toutes les zones) */}
       <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}>
@@ -17603,7 +17613,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // iPhone** — quatre-vingt-six écrans de défilement — pour 8 844 nœuds et
   // 329 photos. La chaîne de filtres vivait, là aussi, en plein milieu du JSX.
   const masquerAchat = async (o) => {
-    const ok = await askConfirm({ title: 'Masquer cet achat ?', desc: `« ${o.title || 'cet achat'} » sort de la liste des achats et de tous les totaux de la compta. Rien n'est supprimé : tu le retrouves dans Réglages → Achats masqués, et il revient d'un clic.`, ok: 'Masquer' });
+    const ok = await askConfirm({ title: 'Masquer cet achat ?', desc: `« ${o.title || 'cet achat'} » sort de la liste des achats et de tous les totaux de la compta. Rien n'est supprimé : tu le retrouves dans l’onglet Masqués (menu), et il revient d'un clic.`, ok: 'Masquer' });
     if (!ok) return;
     const n = achatsMasques(); n.add(String(o.transaction_id)); ecrireAchatsMasques([...n]);
     setBuys(prev => prev && prev.items ? { ...prev, items: prev.items.filter(x => String(x.transaction_id) !== String(o.transaction_id)) } : prev);
@@ -21341,7 +21351,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 )}
                 <button type="button" onClick={()=>{ if(rc){ if(rc.pdfB64) openReceipt(rc); else setReceiptView(rc); } else generateAchatJustificatif(o,{ account:accNameOf(o._acc), regime:load('vinted_regime','micro'), numero:numA||'' }); }}
                   title={rc?'Reçu Vinted authentique (email archivé)':"Télécharger le justificatif d'achat (PDF)"} aria-label="Justificatif" style={{display:'flex',alignItems:'center',justifyContent:'center',width:30,height:30,borderRadius:8,border:`1px solid ${rc?C.accent:C.border}`,background:rc?`${C.accent}12`:'transparent',color:rc?C.accent:C.muted,cursor:'pointer',fontFamily:'inherit'}}><Icon name="doc" size={15}/></button>
-                <button type="button" onClick={()=>masquerAchat(o)} title="Masquer cet achat (il sort de la liste et de la compta — tu le retrouves dans Réglages → Achats masqués)" aria-label="Masquer cet achat"
+                <button type="button" onClick={()=>masquerAchat(o)} title="Masquer cet achat (il sort de la liste et de la compta — tu le retrouves dans l’onglet Masqués (menu))" aria-label="Masquer cet achat"
                   style={{display:'flex',alignItems:'center',justifyContent:'center',width:30,height:30,borderRadius:8,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,cursor:'pointer',fontFamily:'inherit'}}><Icon name="eyeOff" size={15}/></button>
               </div>
             </div>
@@ -25302,8 +25312,7 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
       {/* « Rédaction d'annonces par l'IA » retirée de Réglages le 30 septembre (Julien). */}
 
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Comptabilité</div>
-      <ElementsMasques comptes={comptes}/>
-      <div style={{height:10}}/>
+      {/* « Masqué de la compta » a son ONGLET depuis le 30 sept. (menu → Masqués). */}
       <RegimeSetting/>
       <div style={{height:10}}/>
       <Row icon="doc" title="Emplacements de bordereau" desc="Réinitialise où le N° est tamponné (l'app te redemandera à chaque format)." onClick={async ()=>{ if(await askConfirm('Oublier les emplacements de tampon mémorisés ? L\'app te redemandera où placer le N° au prochain bordereau de chaque format.')){ save('vinted_bordereau_formats',{}); toast('✓ Emplacements réinitialisés.'); } }}/>
@@ -25330,8 +25339,7 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Emails Vinted</div>
       <EmailStartSetting/>
 
-      <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Facturation Pro</div>
-      <ProFactureSetting/>
+      {/* « Facturation Pro » déménagée dans l'onglet Factures (30 sept.). */}
 
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Affichage</div>
       <Row icon={dark?'☀️':'🌙'} title={dark?'Passer en mode clair':'Passer en mode sombre'} onClick={toggleDark}/>
@@ -26462,16 +26470,23 @@ function AiKeySetting() {
   );
 }
 
-// ── RÉGLAGES → VENTES MASQUÉES · ACHATS MASQUÉS (30 septembre) ───────────────
-// Tout ce qui est écarté de la compta, au même endroit, avec ce que c'était
-// (titre, date, montant, compte) et un bouton pour le réafficher. Lit les
-// mêmes moissons que les écrans Ventes / Achats (`fetchHarvestOrders`).
+// ── ONGLET « MASQUÉS » — VENTES MASQUÉES · ACHATS MASQUÉS ────────────────────
+// 30 sept. : d'abord rangé dans Réglages, puis Julien : « fais un onglet dédié,
+// pas en vrac dans les paramètres », et « si je réaffiche, je veux que les
+// photos apparaissent ». Tout ce qui est écarté de la compta, au même endroit,
+// avec ce que c'était (PHOTO, titre, date, montant, compte) et un bouton pour
+// le réafficher. Lit les mêmes moissons que les écrans Ventes / Achats
+// (`fetchHarvestOrders`) ; l'identité est le n° de transaction (§5).
 // « Pas su » ≠ « rien » : tant que la lecture n'est pas revenue, on le dit.
-function ElementsMasques({ comptes }) {
+function EcranMasques({ comptes, ordi }) {
   const [onglet, setOnglet] = useState('ventes');
   const [vMasq, setVMasq] = useState(() => (load('vinted_sales_hidden', []) || []).map(String));
   const [aMasq, setAMasq] = useState(() => [...achatsMasques()]);
   const [det, setDet] = useState(undefined); // undefined = en cours · null = pas su · {tx: commande}
+  useEffect(() => onCloudReady(() => {
+    setVMasq((cur) => cur.length ? cur : (load('vinted_sales_hidden', []) || []).map(String));
+    setAMasq((cur) => cur.length ? cur : [...achatsMasques()]);
+  }), []);
   useEffect(() => { let stop = false; (async () => {
     try {
       const m = {}; let lu = false;
@@ -26493,30 +26508,38 @@ function ElementsMasques({ comptes }) {
   const liste = onglet === 'ventes' ? vMasq : aMasq;
   const eur = (o) => { const v = o && (o.price && o.price.amount != null ? Number(o.price.amount) : null); return v != null && isFinite(v) ? v.toFixed(2).replace('.', ',') + ' €' : ''; };
   return (
-    <div style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 10, padding: '12px 14px' }}>
-      <div style={{ fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 8 }}>Masqué de la compta</div>
-      <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+    <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <ScreenHead icon="eyeOff" title="Masqués" desc="Les ventes et achats que tu as retirés de la compta — réaffiche-les d'un clic."/>
+      <div className="vrm-rangee" style={{ display: 'flex', gap: 6 }}>
         {[['ventes', `Ventes masquées (${vMasq.length})`], ['achats', `Achats masqués (${aMasq.length})`]].map(([k, lib]) => (
           <button key={k} type="button" onClick={() => setOnglet(k)} aria-pressed={onglet === k}
-            style={{ border: `1px solid ${onglet === k ? C.text : C.border}`, borderRadius: 999, padding: '5px 11px', background: onglet === k ? C.text : 'transparent', color: onglet === k ? C.bg : C.muted, cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'inherit' }}>{lib}</button>
+            style={{ border: `1px solid ${onglet === k ? C.text : C.border}`, borderRadius: 999, padding: '6px 13px', background: onglet === k ? C.text : 'transparent', color: onglet === k ? C.bg : C.muted, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', flexShrink: 0 }}>{lib}</button>
         ))}
       </div>
       {!liste.length ? (
-        <div style={{ fontSize: 12, color: C.muted }}>{onglet === 'ventes' ? "Aucune vente masquée. Le ✕ d'une vente, sur l'écran Ventes, la range ici." : "Aucun achat masqué. L'icône « œil barré » d'un achat, sur l'écran Achats, le range ici."}</div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          {det === null && <div style={{ fontSize: 11.5, color: C.muted, marginBottom: 6 }}>Je n'ai pas pu relire le détail de ces {onglet} — la liste reste juste, seuls titres et montants manquent.</div>}
-          {liste.map((tx, i) => { const o = det && det[tx];
-            return (
-              <div key={tx} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderTop: i ? `1px solid ${C.border}` : 'none' }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{o ? o.title : (det === undefined ? 'Lecture…' : `Transaction ${tx}`)}</div>
-                  {o && <div style={{ fontSize: 11.5, color: C.muted }}>{[o.date ? new Date(o.date).toLocaleDateString('fr-FR') : '', o._login, eur(o)].filter(Boolean).join(' · ')}</div>}
-                </div>
-                <button type="button" onClick={() => reafficher(tx)} style={{ flexShrink: 0, border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, padding: '5px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Réafficher</button>
-              </div>
-            ); })}
+        <div style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, padding: '18px 16px', fontSize: 13, color: C.muted, lineHeight: 1.5 }}>
+          {onglet === 'ventes' ? "Aucune vente masquée. Le ✕ d'une vente, sur l'écran Ventes, la range ici." : "Aucun achat masqué. L'icône « œil barré » d'un achat, sur l'écran Achats, le range ici."}
         </div>
+      ) : (
+        <>
+          {det === null && <div style={{ fontSize: 12, color: C.muted }}>Je n'ai pas pu relire le détail de ces {onglet} — la liste reste juste, seuls photos, titres et montants manquent.</div>}
+          <div style={{ display: 'grid', gridTemplateColumns: ordi ? 'repeat(2, minmax(0, 1fr))' : 'minmax(0, 1fr)', gap: 10 }}>
+            {liste.map((tx) => { const o = det && det[tx]; const ph = o ? orderPhoto(o) : null;
+              return (
+                <div key={tx} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 10, border: `1px solid ${C.border}`, background: C.card, borderRadius: 12 }}>
+                  <div style={{ width: 64, height: 64, flexShrink: 0, borderRadius: 8, overflow: 'hidden', background: C.card2 || C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted }}>
+                    {ph ? <img src={ph} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { e.currentTarget.style.display = 'none'; }}/>
+                      : <Icon name={det === undefined ? 'sync' : 'box'} size={20}/>}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{o ? o.title : (det === undefined ? 'Lecture…' : `Transaction ${tx}`)}</div>
+                    {o && <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{[o.date ? new Date(o.date).toLocaleDateString('fr-FR') : '', o._login, eur(o)].filter(Boolean).join(' · ')}</div>}
+                  </div>
+                  <button type="button" onClick={() => reafficher(tx)} style={{ flexShrink: 0, border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, padding: '7px 11px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Réafficher</button>
+                </div>
+              ); })}
+          </div>
+        </>
       )}
     </div>
   );
@@ -26660,7 +26683,7 @@ export default function App() {
     // banc, qui navigue par `?tab=`, croyait rendre Leboncoin alors qu'il
     // mesurait l'accueil (un faux vert dans ma propre couverture d'hier).
     // `journee` manquait aussi : invisible parce que c'est l'état de départ.
-    const TABS_OK=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','invoices','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin'];
+    const TABS_OK=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','invoices','masques','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin'];
     const goto=(search)=>{ try{ const p=new URLSearchParams(search); const t=p.get('tab'); if(p.get('print')==='bord') _pendingBordPrint=true; if(t&&TABS_OK.includes(t)){ setTab(t); window.history.replaceState({},'',window.location.pathname); } }catch(_){}};
     goto(window.location.search);
     const onMsg=(e)=>{ if(e.data&&e.data.type==='open-url'&&e.data.url){ try{ goto(new URL(e.data.url,window.location.origin).search); }catch(_){}} };
@@ -28084,6 +28107,7 @@ export default function App() {
           try{const ar=load('vinted_sv_auto_removed',[]).filter(x=>norm(x)!==n);localStorage.setItem('vinted_sv_auto_removed',JSON.stringify(ar));}catch{}
         }}/>}
         {tab==='sales'    &&<Sales     catalog={catalog} setCatalog={setCatalog} sales={sales} setSales={setSales} invoices={invoices} invoiceSettings={invoiceSettings} entreprises={entreprises} activeEnt={activeEnt}/>}
+        {tab==='masques' &&<EcranMasques comptes={vintedAccounts} ordi={ordi}/>}
         {tab==='invoices' &&<Invoices  invoices={invoices} setInvoices={setInvoices} catalog={catalog} sales={sales} invoiceSettings={invoiceSettings} setInvoiceSettings={setInvoiceSettings} entreprises={entreprises} setEntreprises={setEntreprises} activeEnt={activeEnt} setActiveEnt={setActiveEnt}/>}
         {tab==='stockvinted'&&<StockVinted stockVinted={stockVinted} setStockVinted={setStockVinted} garageGrid={garageGrid} invoices={invoices}/>}
         {tab==='garage'   &&<Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} locate={garageLocate} onLocateConsumed={()=>setGarageLocate(null)} placeNum={garagePlace} onPlaced={()=>setGaragePlace(null)}/>}

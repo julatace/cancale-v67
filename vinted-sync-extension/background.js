@@ -1137,15 +1137,28 @@ async function storeSeenUrls(domain, paths, reponses) {
 // Range une requete d'ECRITURE observee (baisser prix, message...) dans une
 // ligne dediee, une par type d'action (regroupee par chemin). Pure observation :
 // sert a l'app pour reproduire ensuite l'action exacte en 1 clic, sans deviner.
+// ⚠️⚠️ CE QUI NE DOIT JAMAIS ÊTRE RANGÉ EN CLAIR (mesuré le 30 sept.) : la base
+//    contenait, recopiés tels quels, un IBAN (`bank_accounts`), un scan de
+//    passeport en base64 (`payments/identity`), des jetons de carte bancaire,
+//    des codes de double authentification (`user_2fa`) et des changements
+//    d'email — dans une table encore lisible avec la clé publique. Aucune de
+//    ces requêtes ne sert à reproduire une action de vente. On garde leur
+//    CHEMIN et leur méthode (diagnostic), jamais leur contenu. Et une requête
+//    vers un autre site (publicité, mesure d'audience) n'est pas rangée du tout.
+const WREQ_SENSIBLE = /bank_account|credit_card|payments|payment|payout|user_2fa|save_email|email_change|personal_data|purchases\/|checkout|identity|password|dsa\/|help_center|complaint|refund|user_addresses/i;
 async function storeWriteReq(domain, method, url, body) {
   const uid = await activeAccountId(domain);
   if (!uid) return;
   let path = url;
-  try { path = new URL(url, `https://${domain}`).pathname; } catch (_) {}
+  let hote = '';
+  try { const U = new URL(url, `https://${domain}`); path = U.pathname; hote = U.hostname; } catch (_) {}
+  // Une URL relative part forcément vers Vinted ; une absolue, on vérifie l'hôte.
+  if (/^https?:/i.test(String(url)) && !/(^|\.)vinted\.[a-z.]+$/i.test(hote)) return;
+  if (WREQ_SENSIBLE.test(path)) body = '[retiré : donnée personnelle ou bancaire]';
   // Cle courte par type d'action : on remplace les ids numeriques pour regrouper
   // (ex: /api/v2/items/123 et /api/v2/items/456 -> meme cle).
   const key = (path.replace(/\/\d+/g, '/_id').replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '').slice(0, 60)) || 'root';
-  const data = { uid, method, url, path, body: body || '', capturedAt: new Date().toISOString() };
+  const data = { uid, method, url: WREQ_SENSIBLE.test(path) ? path : url, path, body: body || '', capturedAt: new Date().toISOString() };
   await supabaseUpsert('app_data', [{ id: `harvest_${uid}_wreq_${key}`, data }], 'id');
 }
 
@@ -3684,9 +3697,12 @@ const BORD_RATTRAPAGE_J = 21;
 //     donnée moissonnée (pas dans la page) ;
 //   · `aiReply(...)` — `/api/ai` mode `reply`, qui rend une intention, une
 //     confiance et 3 à 5 suggestions ;
-//   · `POST /api/v2/conversations/{id}/replies` avec un seul champ `reply` —
-//     **mesuré dans SES propres requêtes** (10 occurrences captées, la dernière
-//     le 18 septembre à 20:07). L'endpoint n'est pas deviné.
+//   · `POST /api/v2/conversations/{id}/replies` — **mesuré dans SES propres
+//     requêtes**. ⚠️ Remesuré le 30 sept. sur les 9 captures (`wreq_…_replies`) :
+//     `reply` est un OBJET — `{reply:{body, photo_temp_uuids:null,
+//     is_personal_data_sharing_check_skipped:false}}` — pas une chaîne. La
+//     5.77→5.118 envoyait `{reply: texte}` : l'endpoint était juste, la FORME
+//     du corps non (§6 : vérifier le nom ET la forme du champ).
 // Il ne manquait que le maillon qui envoie. C'est exactement l'histoire du
 // bordereau : le pipeline était là, le dernier chaînon absent.
 //
@@ -3820,7 +3836,8 @@ async function repondreAuxMessages(uid) {
       //    jamais une requête à Vinted.)
       const stop = await garde(uid, acc);          // compte de l'onglet + plafond horaire
       if (stop) break;
-      const r = await vintedSend(acc, 'POST', `/api/v2/conversations/${cid}/replies`, { reply: texte });
+      const r = await vintedSend(acc, 'POST', `/api/v2/conversations/${cid}/replies`,
+        { reply: { body: texte, photo_temp_uuids: null, is_personal_data_sharing_check_skipped: false } });
       noterDiag(r.ok ? 'repond_envoye' : `repond_refuse_${r.status}`);
       if (!r.ok) {
         bilan.refusees++;
