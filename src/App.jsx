@@ -195,8 +195,10 @@ const THEMES = {
     // (#0B0F15), les filets plus légers (cartes moins « encadrées »), le fond
     // très légèrement plus froid : ce sont les vrais signaux de finition, pas la
     // multiplication des couleurs. Une seule teinte d'accent, toujours.
-    bg:"#F6F7F9", surface:"#FFFFFF", card:"#FFFFFF", card2:"#F1F3F7", border:"#E7EAF0",
-    accent:"#1D4FD6", accentSoft:"#4C7BEA", onAccent:"#FFFFFF",
+    // Version claire de l'identité « Menthe » : accent menthe profonde (bon
+    // contraste du texte blanc sur bouton), le bleu reste une seconde teinte.
+    bg:"#F5F8F6", surface:"#FFFFFF", card:"#FFFFFF", card2:"#EEF3F0", border:"#E2EAE6",
+    accent:"#0B9C74", accentSoft:"#12B76A", onAccent:"#FFFFFF",
     danger:"#C0392B", warn:"#A15C00", gold:"#7A6636",
     blue:"#1D4FD6", purple:"#5B4B9E", text:"#0B0F15", muted:"#5A6472",
     // Cartes BLANCHES sur fond gris : c'est l'écart entre les deux qui donne le
@@ -211,15 +213,15 @@ const THEMES = {
     shadow:"0 1px 2px rgba(11,15,21,.04), 0 3px 8px rgba(11,15,21,.05)",
     shadowMd:"0 1px 2px rgba(11,15,21,.05), 0 8px 22px rgba(11,15,21,.07)",
     shadowLg:"0 2px 6px rgba(11,15,21,.06), 0 22px 50px rgba(11,15,21,.13)",
-    ring:"rgba(29,79,214,.16)",
+    ring:"rgba(11,156,116,.16)",
     glass:"rgba(255,255,255,.88)",
     // LE CHROME RESTE À L'ENCRE, MÊME EN CLAIR : la navigation est un bloc
     // sombre contre la page claire — c'est la signature, et ça règle au passage
     // l'incohérence du thème sur les composants qui ne se redessinent pas
     // (`C` est une variable de module mutable, cf. §4). Encre ARDOISE désormais,
     // plus brune : deux températures sur le même écran, ça se voit.
-    chrome:"#131820", onChrome:"#E7ECF2", chromeMuted:"#8592A3", chromeLine:"#242C37",
-    s1:"#1D4FD6", s2:"#0F8A6A",
+    chrome:"#0E1A22", onChrome:"#E7F0EC", chromeMuted:"#8592A3", chromeLine:"#233038",
+    s1:"#0B9C74", s2:"#1D4FD6",
   },
   dark: {
     // Le sombre est la MÊME identité, la nuit : ardoise froide, même bleu
@@ -229,17 +231,21 @@ const THEMES = {
     // avec la page et la signature du produit disparaissait la nuit. Chaque
     // niveau est écarté : rail le plus sombre, page au-dessus, cartes encore
     // au-dessus. C'est la hiérarchie qui porte le sombre, pas la teinte.
-    bg:"#11151B", surface:"#1A1F27", card:"#1A1F27", card2:"#232932", border:"#303845",
-    accent:"#5B9BFF", accentSoft:"#7FB4FF", onAccent:"#08111F",
-    danger:"#FF7A6E", warn:"#E0A945", gold:"#C9AE78",
-    blue:"#5B9BFF", purple:"#A99AF0", text:"#E8ECF1", muted:"#98A3B2",
-    shadow:"0 1px 1px rgba(0,0,0,.35), 0 2px 8px rgba(0,0,0,.35)",
-    shadowMd:"0 1px 2px rgba(0,0,0,.4), 0 6px 18px rgba(0,0,0,.4)",
-    shadowLg:"0 2px 6px rgba(0,0,0,.4), 0 18px 44px rgba(0,0,0,.5)",
-    ring:"rgba(91,155,255,.18)",
-    glass:"rgba(23,27,34,.90)",
-    chrome:"#070A0E", onChrome:"#E8ECF1", chromeMuted:"#8592A3", chromeLine:"#1A212A",
-    s1:"#5B9BFF", s2:"#37D39A",
+    // ── IDENTITÉ « MENTHE » (validée par Julien) : bleu nuit + menthe ─────────
+    // Le sombre est désormais l'identité principale. La hiérarchie tient :
+    // rail (chrome) le plus sombre < page (bg) < cartes (card). L'accent est la
+    // MENTHE, rare ; le bleu reste une seconde teinte pour les dégradés.
+    bg:"#0A1622", surface:"#0F2030", card:"#0F2030", card2:"#15293C", border:"#1E3348",
+    accent:"#3DE0A0", accentSoft:"#6FE9BC", onAccent:"#04120C",
+    danger:"#FF7A6E", warn:"#FFAE3B", gold:"#C9AE78",
+    blue:"#4F9CFF", purple:"#A99AF0", text:"#EAF2F8", muted:"#8CA3B6",
+    shadow:"0 1px 1px rgba(0,0,0,.35), 0 2px 8px rgba(0,0,0,.4)",
+    shadowMd:"0 1px 2px rgba(0,0,0,.45), 0 8px 20px rgba(0,0,0,.45)",
+    shadowLg:"0 2px 6px rgba(0,0,0,.45), 0 22px 50px rgba(0,0,0,.6)",
+    ring:"rgba(61,224,160,.20)",
+    glass:"rgba(15,32,48,.90)",
+    chrome:"#06111C", onChrome:"#EAF2F8", chromeMuted:"#6E8496", chromeLine:"#14283A",
+    s1:"#3DE0A0", s2:"#4F9CFF",
   },
 };
 let C = THEMES.light;
@@ -5145,6 +5151,46 @@ const toast = (msg, type) => {
   _emitToasts();
   setTimeout(() => dismissToast(id), t === 'err' ? 6000 : 3800);
 };
+
+// ── DÉFILEMENT PARTOUT (K1, 30 septembre) ────────────────────────────────────
+// Plainte de Julien : « je ne peux pas descendre sur mon ordi, je suis obligé
+// d'utiliser la barre glissante, mon pavé tactile ne marche pas ». MESURÉ : dans
+// la coque, c'est `<main>` qui défile, pas le document. Une molette / un pavé
+// tactile envoie l'événement à ce qui est SOUS le curseur — dans la marge entre
+// le rail et la colonne, dans la bande de droite ou sur le rail, aucun ancêtre
+// ne défile : 0 px, alors que la barre glissante de `<main>` marche.
+// ⇒ Un événement que personne ne peut absorber est renvoyé à `<main>`.
+// ⚠️ On ne vole RIEN : un conteneur défilable sous le curseur (fiche, liste,
+// modale) garde la main ; au-dessus d'une MODALE plein écran on ne fait
+// défiler rien derrière ; Ctrl+molette (zoom) passe tel quel.
+function DefilementPartout() {
+  React.useEffect(() => {
+    const peutDefiler = (el, dy, dx) => {
+      const s = getComputedStyle(el);
+      if (Math.abs(dy) >= Math.abs(dx)) return /(auto|scroll)/.test(s.overflowY) && el.scrollHeight > el.clientHeight + 1;
+      return /(auto|scroll)/.test(s.overflowX) && el.scrollWidth > el.clientWidth + 1;
+    };
+    const onWheel = (e) => {
+      if (e.defaultPrevented || e.ctrlKey) return;
+      const main = document.querySelector('main[data-defile]');
+      if (!main) return;
+      for (let el = e.target; el && el !== document.body && el !== document.documentElement; el = el.parentElement) {
+        if (el === main) return;                       // le navigateur s'en charge
+        if (peutDefiler(el, e.deltaY, e.deltaX)) return; // un autre conteneur défile
+        if (getComputedStyle(el).position === 'fixed') {
+          const r = el.getBoundingClientRect();
+          if (r.width >= window.innerWidth - 2 && r.height >= window.innerHeight - 2) return; // modale
+        }
+      }
+      if (Math.abs(e.deltaY) < Math.abs(e.deltaX)) return;
+      const f = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? main.clientHeight : 1;
+      main.scrollBy({ top: e.deltaY * f });
+    };
+    window.addEventListener('wheel', onWheel, { passive: true });
+    return () => window.removeEventListener('wheel', onWheel);
+  }, []);
+  return null;
+}
 
 function Toaster() {
   const [list, setList] = React.useState([]);
@@ -10420,29 +10466,50 @@ function HeroScene3D() {
       dom.style.width = '100%'; dom.style.height = '100%'; dom.style.display = 'block'; dom.style.pointerEvents = 'none';
       el.appendChild(dom);
       const scene = new THREE.Scene();
-      const camera = new THREE.PerspectiveCamera(38, W / H, 0.1, 100);
-      camera.position.set(0.2, 1.3, 7.4); camera.lookAt(0, 0.1, 0);
+      const camera = new THREE.PerspectiveCamera(40, W / H, 0.1, 100);
+      camera.position.set(0, 0, 6.4);
+      try { renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15; } catch (_) {}
+      // Environnement studio menthe/bleu → vrais reflets sur le métal.
+      try {
+        const pm = new THREE.PMREMGenerator(renderer);
+        const cn = document.createElement('canvas'); cn.width = 512; cn.height = 256; const gx = cn.getContext('2d');
+        const gr = gx.createLinearGradient(0, 0, 0, 256); gr.addColorStop(0, '#0f4a54'); gr.addColorStop(.5, '#0a1622'); gr.addColorStop(1, '#0e3a2c'); gx.fillStyle = gr; gx.fillRect(0, 0, 512, 256);
+        gx.fillStyle = 'rgba(61,224,160,.95)'; gx.beginPath(); gx.arc(150, 70, 64, 0, 7); gx.fill();
+        gx.fillStyle = 'rgba(79,156,255,.85)'; gx.beginPath(); gx.arc(380, 110, 74, 0, 7); gx.fill();
+        gx.fillStyle = 'rgba(255,255,255,.9)'; gx.beginPath(); gx.arc(300, 40, 26, 0, 7); gx.fill();
+        const et = new THREE.CanvasTexture(cn); et.mapping = THREE.EquirectangularReflectionMapping; scene.environment = pm.fromEquirectangular(et).texture; et.dispose(); pm.dispose();
+      } catch (_) {}
       const group = new THREE.Group(); scene.add(group);
-      const N = 5, boxes = [];
-      const c1 = new THREE.Color('#5B8CFF'), c2 = new THREE.Color('#8E7BFF');
-      for (let i = 0; i < N; i++) {
-        const g = new THREE.BoxGeometry(1.9, 0.6, 1.25);
-        const body = new THREE.MeshStandardMaterial({ color: 0x22304f, metalness: 0.4, roughness: 0.28 });
-        const lidCol = c1.clone().lerp(c2, N > 1 ? i / (N - 1) : 0);
-        const lid = new THREE.MeshStandardMaterial({ color: lidCol, metalness: 0.55, roughness: 0.2, emissive: lidCol.clone().multiplyScalar(0.28) });
-        const mats = [body, body, lid, body, body, body]; // +x,-x,+y(couvercle),-y,+z,-z
-        const m = new THREE.Mesh(g, mats);
-        m.position.y = (i - (N - 1) / 2) * 0.82;
-        m.userData = { baseY: m.position.y, phase: i * 0.9, rot: (i % 2 ? 1 : -1) * 0.12 };
-        m.rotation.y = m.userData.rot;
-        group.add(m); boxes.push(m);
-      }
-      group.rotation.set(0.05, -0.5, 0);
-      scene.add(new THREE.AmbientLight(0x3a4874, 1.1));
-      const key = new THREE.DirectionalLight(0xffffff, 1.35); key.position.set(4, 6, 5); scene.add(key);
-      const front = new THREE.DirectionalLight(0xcfe0ff, 0.55); front.position.set(0, 1, 8); scene.add(front); // éclaire les faces vers la caméra
-      const rim = new THREE.PointLight(0x6f8dff, 2.4, 30); rim.position.set(-4, 1, 3); scene.add(rim);
-      const rim2 = new THREE.PointLight(0x8e7bff, 1.7, 30); rim2.position.set(3, -2, 4); scene.add(rim2);
+      // Face du médaillon : « VRM » à l'endroit (dessinée sur un canvas).
+      const fc = document.createElement('canvas'); fc.width = fc.height = 512;
+      { const x = fc.getContext('2d');
+        const g = x.createRadialGradient(256, 205, 30, 256, 256, 300); g.addColorStop(0, '#dff7ee'); g.addColorStop(1, '#37b98a'); x.fillStyle = g; x.beginPath(); x.arc(256, 256, 252, 0, 7); x.fill();
+        x.strokeStyle = 'rgba(255,255,255,.55)'; x.lineWidth = 9; x.beginPath(); x.arc(256, 256, 226, 0, 7); x.stroke();
+        x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillStyle = '#08281d'; x.font = '800 176px system-ui, Arial, sans-serif'; x.fillText('VRM', 256, 246);
+        x.fillStyle = 'rgba(8,40,29,.6)'; x.font = '700 30px system-ui, Arial, sans-serif'; x.fillText('· SNEAKER RESELL ·', 256, 356); }
+      const ft = new THREE.CanvasTexture(fc); try { ft.colorSpace = THREE.SRGBColorSpace; } catch (_) {}
+      const rimMat = new THREE.MeshStandardMaterial({ color: 0x2fb98a, metalness: 1, roughness: 0.22, envMapIntensity: 1.3 });
+      const faceMat = new THREE.MeshStandardMaterial({ map: ft, metalness: 0.55, roughness: 0.32, envMapIntensity: 1.05 });
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 0.3, 90), rimMat); body.rotation.x = Math.PI / 2; group.add(body);
+      const f1 = new THREE.Mesh(new THREE.CircleGeometry(1.46, 72), faceMat); f1.position.z = 0.151; group.add(f1);
+      const f2 = new THREE.Mesh(new THREE.CircleGeometry(1.46, 72), faceMat); f2.position.z = -0.151; f2.rotation.y = Math.PI; group.add(f2);
+      const edge = new THREE.Mesh(new THREE.TorusGeometry(1.5, 0.11, 20, 90), rimMat); group.add(edge);
+      // Emblème en HAUT À DROITE, plus petit : le gros chiffre vit en bas à
+      // gauche, l'emblème ne le recouvre pas (surtout sur téléphone étroit).
+      group.scale.setScalar((W < 520) ? 0.56 : 0.9);
+      const BX = (W < 520) ? 1.25 : 1.95;
+      const BY = (W < 520) ? 0.95 : 0.35;
+      // Ombre de contact + particules (vie).
+      let ptsMesh = null;
+      try { const s2 = document.createElement('canvas'); s2.width = s2.height = 128; const sg = s2.getContext('2d'); const rg = sg.createRadialGradient(64, 64, 4, 64, 64, 62); rg.addColorStop(0, 'rgba(0,0,0,.5)'); rg.addColorStop(1, 'rgba(0,0,0,0)'); sg.fillStyle = rg; sg.fillRect(0, 0, 128, 128);
+        const sh = new THREE.Mesh(new THREE.PlaneGeometry(5, 2.2), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(s2), transparent: true, depthWrite: false })); sh.rotation.x = -Math.PI / 2; sh.position.set(BX, BY - 1.7, 0); sh.scale.setScalar(0.85); scene.add(sh); } catch (_) {}
+      try { const NP = 56, po = new Float32Array(NP * 3); for (let i = 0; i < NP; i++) { po[i * 3] = (Math.random() - .5) * 11; po[i * 3 + 1] = (Math.random() - .5) * 7; po[i * 3 + 2] = (Math.random() - .5) * 6 - 1; }
+        const pgeo = new THREE.BufferGeometry(); pgeo.setAttribute('position', new THREE.BufferAttribute(po, 3)); ptsMesh = new THREE.Points(pgeo, new THREE.PointsMaterial({ color: 0x8fe8d0, size: 0.045, transparent: true, opacity: 0.7, depthWrite: false })); scene.add(ptsMesh); } catch (_) {}
+      let tX = 0, tY = 0;
+      scene.add(new THREE.AmbientLight(0x2a4a5a, 0.6));
+      const key = new THREE.PointLight(0x3DE0A0, 2.4, 30); key.position.set(-4, 3, 6); scene.add(key);
+      const rim = new THREE.PointLight(0x4F9CFF, 2.2, 30); rim.position.set(4, -1, 5); scene.add(rim);
+      const keyD = new THREE.DirectionalLight(0xffffff, 1.25); keyD.position.set(0, 4, 7); scene.add(keyD);
       const pointer = { x: 0, y: 0 };
       const parent = el.parentElement || el;
       const onMove = (e) => { try { const r = parent.getBoundingClientRect(); pointer.x = (e.clientX - r.left) / r.width - 0.5; pointer.y = (e.clientY - r.top) / r.height - 0.5; } catch (_) {} };
@@ -10451,21 +10518,24 @@ function HeroScene3D() {
       let ro; try { ro = new ResizeObserver(onResize); ro.observe(el); } catch (_) {}
       const frame = () => {
         const t = performance.now() * 0.001;
-        group.rotation.y += 0.0032;
-        group.rotation.x += ((pointer.y * 0.3) - group.rotation.x + 0.05) * 0.05;
-        for (const b of boxes) { b.position.y = b.userData.baseY + Math.sin(t * 0.9 + b.userData.phase) * 0.06; b.rotation.y = Math.sin(t * 0.4 + b.userData.phase) * 0.06 + b.userData.rot; }
+        tX += ((pointer.y * 0.28) - tX) * 0.06; tY += ((pointer.x * 0.6) - tY) * 0.06;
+        group.rotation.y = Math.sin(t * 0.6) * 0.22 + tY;   // léger balancement, le logo reste DROIT et lisible
+        group.rotation.x = Math.sin(t * 0.9) * 0.05 + tX;
+        group.position.set(BX, BY + Math.sin(t * 0.85) * 0.1, 0);
+        if (ptsMesh) ptsMesh.rotation.y = t * 0.05;
         renderer.render(scene, camera);
       };
       let raf = 0, running = true;
       const tick = () => { if (!running) return; frame(); raf = requestAnimationFrame(tick); };
       const onVis = () => { if (document.hidden) { running = false; cancelAnimationFrame(raf); } else if (!running) { running = true; tick(); } };
       document.addEventListener('visibilitychange', onVis);
-      if (reduce) { group.rotation.y = -0.4; frame(); } else tick();
+      if (reduce) { group.rotation.set(0.02, 0.15, 0); frame(); } else tick();
       cleanup = () => {
         running = false; cancelAnimationFrame(raf);
         parent.removeEventListener('pointermove', onMove); document.removeEventListener('visibilitychange', onVis);
         try { ro && ro.disconnect(); } catch (_) {}
-        try { boxes.forEach(b => { b.geometry.dispose(); (Array.isArray(b.material) ? b.material : [b.material]).forEach(mm => mm && mm.dispose()); }); } catch (_) {}
+        try { scene.traverse(o => { if (o.geometry) o.geometry.dispose(); const m = o.material; if (m) { (Array.isArray(m) ? m : [m]).forEach(mm => { if (mm && mm.map) mm.map.dispose(); mm && mm.dispose && mm.dispose(); }); } }); } catch (_) {}
+        try { ft.dispose(); } catch (_) {}
         try { renderer.dispose(); } catch (_) {} try { el.removeChild(dom); } catch (_) {}
       };
     })();
@@ -26582,6 +26652,18 @@ export default function App() {
       if (load('vinted_dark', false)) { setDark(false); save('vinted_dark', false); }
     } catch (_) {}
   }), []);
+  // ⚠️ NOUVELLE IDENTITÉ « MENTHE » (Julien, 29 sept. : « rien ne doit être comme
+  //    avant »). L'identité principale est désormais le SOMBRE bleu nuit + menthe.
+  //    On bascule vers le sombre UNE fois, après le nuage (même mécanique que la
+  //    bascule claire ci-dessus), et on pousse au cloud. Drapeau LOCAL : si tu
+  //    repasses en clair ensuite, ça tient — on ne reforce plus.
+  useEffect(() => onCloudReady(() => {
+    try {
+      if (localStorage.getItem('vrm_bascule_menthe_v1') === '1') return;
+      localStorage.setItem('vrm_bascule_menthe_v1', '1');
+      if (!load('vinted_dark', false)) { setDark(true); save('vinted_dark', true); }
+    } catch (_) {}
+  }), []);
   const [catalog,setCatalog]=useState(()=>{
     const s=load('vinted_catalog',null);
     if(!s||s.length===0){return INIT_CAT;}
@@ -27534,6 +27616,7 @@ export default function App() {
           chargement, sur n'importe quel écran. */}
       <TopProgress/>
       <Toaster/>
+      <DefilementPartout/>
       {/* Fenêtre de confirmation maison (askConfirm). Sans ce montage, l'app
           retomberait silencieusement sur la boîte grise du navigateur. */}
       <ConfirmHost/>
@@ -27817,7 +27900,7 @@ export default function App() {
           voyait comme un décalage. 1180 occupe l'espace disponible sans que la
           ligne redevienne trop longue (les listes sont en deux colonnes). Sur téléphone,
           `ordi` est faux et RIEN ne change. */}
-      <main style={{
+      <main data-defile="1" style={{
         // ⚠️ COQUE APP-SHELL : c'est `<main>` qui défile, pas le document. La
         // barre du bas est un frère HORS de ce conteneur → elle ne bouge plus
         // jamais pendant le scroll (bug iOS « barre au milieu de l'écran »).
