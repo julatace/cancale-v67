@@ -35,7 +35,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.120.0';
+const EXT_ATTENDUE = '5.121.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -6652,7 +6652,22 @@ function VentesLeboncoin({ lbcVentes = {ventes:[],inconnues:0} }) {
       })}
       {lbcVentes.inconnues>0 && (
         <div style={{fontSize:11.5,color:C.muted,marginTop:lbcVentes.ventes.length?8:6,paddingTop:lbcVentes.ventes.length?8:0,borderTop:lbcVentes.ventes.length?`1px solid ${C.border}`:'none'}}>
-          {lbcVentes.inconnues} autre{lbcVentes.inconnues>1?'s':''} transaction{lbcVentes.inconnues>1?'s':''} Leboncoin — vente ou achat <b>pas encore confirmé</b>. Ouvre-la sur Leboncoin : le côté se lit tout seul au passage.
+          {lbcVentes.inconnues} autre{lbcVentes.inconnues>1?'s':''} transaction{lbcVentes.inconnues>1?'s':''} Leboncoin — vente ou achat <b>pas encore confirmé</b>. Ouvre-la sur Leboncoin : l'extension lit le côté au passage, et elle passe ici si c'est une vente.
+          {(lbcVentes.inconnuesListe||[]).length>0 && (
+            <div style={{marginTop:6}}>
+              {(lbcVentes.inconnuesListe||[]).slice(0,8).map(o=>{
+                const euro = o.price==null ? '' : (Number(o.price)/100).toFixed(2).replace('.',',')+' €';
+                return (
+                  <a key={o.txId} href={`https://www.leboncoin.fr/compte/part/transaction/${encodeURIComponent(o.txId)}`} target="_blank" rel="noreferrer"
+                    style={{display:'flex',alignItems:'center',gap:8,padding:'6px 0',borderTop:`1px solid ${C.border}`,textDecoration:'none',color:C.text}}>
+                    <span style={{flex:1,minWidth:0,fontSize:12.5,fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{o.title||'(sans titre)'}</span>
+                    {euro && <span style={{fontSize:12,color:C.muted,flexShrink:0}}>{euro}</span>}
+                    <span style={{fontSize:12,color:C.accent,fontWeight:600,flexShrink:0}}>Ouvrir ↗</span>
+                  </a>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -14639,8 +14654,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const obj = (rows && rows[0] && rows[0].data && rows[0].data.ventes) || {};
       const arr = Object.values(obj);
       const ventes = arr.filter(o => o && o.isSeller === true);
-      const inconnues = arr.filter(o => o && o.isSeller == null).length;
-      setLbcVentes({ ventes, inconnues });
+      const inc = arr.filter(o => o && o.isSeller == null);
+      // Les transactions au côté pas encore su, NOMMÉES (sauf annulées) : un
+      // clic sur leur page Leboncoin suffit à les lire (1er oct. — la vente
+      // des Air Max 1 olive restait cachée derrière « 1 autre transaction »).
+      const inconnuesListe = inc.filter(o => !/cancel|annul|refund|rembours/i.test(String(o.stepStatus||''))).sort((a,b)=>String(b.at||'').localeCompare(String(a.at||'')));
+      setLbcVentes({ ventes, inconnues: inc.length, inconnuesListe });
     } catch (_) { /* pas su ⇒ rien : jamais un faux « vendu » */ }
   })(); }, []);
   const [usedNumeros, setUsedNumeros] = useState(() => load('vinted_used_numeros', []));
@@ -27113,7 +27132,9 @@ export default function App() {
       const rows = await r.json();
       const obj = (rows && rows[0] && rows[0].data && rows[0].data.ventes) || {};
       const arr = Object.values(obj);
-      setLbcVentes({ ventes: arr.filter(o => o && o.isSeller === true), inconnues: arr.filter(o => o && o.isSeller == null).length });
+      const inc = arr.filter(o => o && o.isSeller == null);
+      setLbcVentes({ ventes: arr.filter(o => o && o.isSeller === true), inconnues: inc.length,
+        inconnuesListe: inc.filter(o => !/cancel|annul|refund|rembours/i.test(String(o.stepStatus||''))).sort((a,b)=>String(b.at||'').localeCompare(String(a.at||''))) });
     } catch (_) { /* pas su ⇒ rien : jamais un faux « vendu » */ }
   })(); }, []);
   // CA eBay pour le Tableau de bord / le Collectif : la somme des commandes
