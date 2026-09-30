@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "VRM Capteur (diagnostic)",
+  "version": "1.0.0",
+  "description": "Enregistre, à la demande, les requêtes envoyées à Vinted depuis les pages vinted.fr (chemin, méthode, statut, clés du corps) — jamais les cookies ni les jetons.",
+  "permissions": ["webRequest", "storage"],
+  "host_permissions": ["https://*.vinted.fr/*", "https://*.vinted.com/*"],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_popup": "popup.html", "default_title": "VRM Capteur" }
+}
