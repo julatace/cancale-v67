@@ -15,6 +15,7 @@
 import { sendPushToAll, pushCategorieActive } from './_lib/push.js';
 
 import { withOwnerAll, conflictTarget } from './_lib/owner.js';
+import { sbCle } from './_lib/cle.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 // ⚠️ CLÉ DE SERVICE QUAND ELLE EXISTE. Ces routes tournent sur le serveur, sans
@@ -25,7 +26,7 @@ const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.s
 // dépôt) si elle est définie, et on retombe sur la clé publique tant qu'elle ne
 // l'est pas : le comportement d'aujourd'hui reste identique.
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ';
-const HEADERS = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` };
+const HEADERS = { ...sbCle(SUPABASE_KEY) };
 
 // Date du jour (et de demain) dans le fuseau de Paris, en 'YYYY-MM-DD'.
 function parisDate(offsetDays = 0) {

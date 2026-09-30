@@ -16,6 +16,7 @@
 // à Vinted, juste à connecter un compte proprement depuis l'app.
 
 import { withOwnerAll, conflictTarget } from './_lib/owner.js';
+import { sbCle } from './_lib/cle.js';
 
 const SUPABASE_URL = 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 // ⚠️ CLÉ DE SERVICE QUAND ELLE EXISTE. Ces routes tournent sur le serveur, sans
@@ -103,8 +104,7 @@ async function upsertAccount(row) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?on_conflict=${conflictTarget('vinted_user_id')}`, {
     method: 'POST',
     headers: {
-      apikey: SUPABASE_KEY,
-      Authorization: `Bearer ${SUPABASE_KEY}`,
+      ...sbCle(SUPABASE_KEY),
       'Content-Type': 'application/json',
       Prefer: 'resolution=merge-duplicates,return=minimal',
     },

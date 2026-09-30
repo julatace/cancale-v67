@@ -23,6 +23,7 @@ import { stampBordereau } from './_lib/stamp.js';
 import { withOwnerAll, conflictTarget, contexteVendeur, proprietaireCourant, duVendeur as duVendeurLib } from './_lib/owner.js';
 import { adressesDeLivraison, resoudreProprietaire } from './_lib/proprietaire-email.js';
 import { normaliserEntrant, formeRecue, demasquerRelais } from './_lib/lire-email.js';
+import { sbCle } from './_lib/cle.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 // ⚠️ CLÉ DE SERVICE QUAND ELLE EXISTE. Ces routes tournent sur le serveur, sans
@@ -136,7 +137,7 @@ async function supabaseUpsert(rows) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${conflictTarget('id')}`, {
     method: 'POST',
     headers: {
-      apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`,
+      ...sbCle(SUPABASE_KEY),
       'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal',
     },
     body: JSON.stringify(rows),
@@ -149,7 +150,7 @@ async function supabaseUpsert(rows) {
 // dans le texte brut du mail. (Optionnel : la donnée reste utile sans compte.)
 async function detectAccount(raw) {
   try {
-    const headers = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` };
+    const headers = { ...sbCle(SUPABASE_KEY) };
     const low = (raw || '').toLowerCase();
     const res = await fetch(await duVendeur(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=vinted_user_id,login`), { headers });
     const accts = res.ok ? await res.json() : [];
@@ -289,7 +290,7 @@ function parseBordereauEmail({ subject, text, html, attachments }) {
 async function supabaseGetRow(id) {
   try {
     const res = await fetch(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(id)}&select=data`), {
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+      headers: { ...sbCle(SUPABASE_KEY) },
     });
     if (!res.ok) return null;
     const rows = await res.json();
@@ -472,7 +473,7 @@ async function findNumeroByTitle(title, size) {
     const t = norm(title);
     if (!t) return '';
     const res = await fetch(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=data->vinted_annonce_numeros`), {
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+      headers: { ...sbCle(SUPABASE_KEY) },
     });
     if (!res.ok) return '';
     const rows = await res.json();
@@ -504,7 +505,7 @@ async function findBuyPriceByTitle(title) {
     const norm = s => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
     const t = norm(title); if (!t) return null;
     const res = await fetch(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=data->vinted_annonce_numeros`), {
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+      headers: { ...sbCle(SUPABASE_KEY) },
     });
     if (!res.ok) return null;
     const rows = await res.json();
@@ -836,7 +837,7 @@ async function baseCloisonnee() {
   if (_cloisonnee !== null) return _cloisonnee;
   try {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?select=owner&limit=1`, {
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+      headers: { ...sbCle(SUPABASE_KEY) },
     });
     _cloisonnee = r.ok;
   } catch (_) { _cloisonnee = false; }
@@ -849,7 +850,7 @@ const duVendeur = (url) => duVendeurLib(url, baseCloisonnee);
 async function lireRegistreEmails() {
   try {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_email_owners&select=data`, {
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+      headers: { ...sbCle(SUPABASE_KEY) },
     });
     if (!r.ok) return {};
     const j = await r.json();
@@ -877,7 +878,7 @@ async function mettreEnQuarantaine(mail, adresses, raison) {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${conflictTarget('id')}`, {
       method: 'POST',
       headers: {
-        apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`,
+        ...sbCle(SUPABASE_KEY),
         'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal',
       },
       body: JSON.stringify(withOwnerAll([ligne])),
@@ -1154,7 +1155,7 @@ export async function traiterEmail(req, res) {
       if (pdf) {
         try {
           const rf = await fetch(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=data->vinted_bordereau_formats`), {
-            headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+            headers: { ...sbCle(SUPABASE_KEY) },
           });
           const rfRows = rf.ok ? await rf.json() : [];
           const formats = (rfRows[0] && rfRows[0].vinted_bordereau_formats) || {};

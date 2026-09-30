@@ -12,11 +12,12 @@
 // emails d'un autre vendeur, ce qui serait pire que le problème d'origine.
 import { traiterEmail } from './email-inbound.js';
 import { contexteVendeur } from './_lib/owner.js';
+import { sbCle } from './_lib/cle.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const ANON = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ';
 const SERVICE = process.env.SUPABASE_SERVICE_KEY || ANON;
-const HEADERS = { apikey: SERVICE, Authorization: `Bearer ${SERVICE}` };
+const HEADERS = { ...sbCle(SERVICE) };
 
 // Le jeton présenté appartient-il vraiment à quelqu'un ? Supabase répond.
 async function vendeurDuJeton(jeton) {
