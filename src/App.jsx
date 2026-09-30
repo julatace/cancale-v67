@@ -4271,7 +4271,7 @@ function PlateformeLogo({ p, title }) {
       lineHeight:1, flexShrink:0, whiteSpace:'nowrap' }}>{m.t}</span>
   );
 }
-function StatBox({label,value,color=C.text,sub=null,subColor=null,onClick=null,title=null}) {
+function StatBox({label,value,color=C.text,sub=null,subColor=null,onClick=null,title=null,compact=false}) {
   // ⚠️ LE CHIFFRE N'EST PLUS DANS UNE BOÎTE. Trois cartes grises côte à côte,
   // c'est le gabarit « KPI » de n'importe quel tableau de bord. Ici : un FILET
   // d'accent en haut, l'étiquette en capitales dessous, puis le nombre en très
@@ -4298,9 +4298,11 @@ function StatBox({label,value,color=C.text,sub=null,subColor=null,onClick=null,t
     style:{border:'none',background:'transparent',padding:0,margin:0,font:'inherit',textAlign:'left',cursor:'pointer',width:'100%',
            display:'block',minHeight:0} } : {};
   return (
-    <Balise {...extra} style={{flex:1,minWidth:118,paddingTop:11,borderTop:`3px solid ${color===C.text?C.border:color}`,...(extra.style||{})}}>
-      <div className="vrm-label" style={{color:C.muted,minHeight:'2.44em'}}>{label}</div>
-      <div className="vrm-display" style={{fontSize:fs,fontWeight:700,color,lineHeight:1.05,marginTop:2,whiteSpace:'nowrap'}}>{value}</div>
+    <Balise {...extra} style={compact
+        ? {flex:1,minWidth:0,...(extra.style||{}),padding:'2px 14px',boxShadow:`-1px 0 0 ${C.border}`}
+        : {flex:1,minWidth:118,paddingTop:11,borderTop:`3px solid ${color===C.text?C.border:color}`,...(extra.style||{})}}>
+      <div className={compact?undefined:'vrm-label'} style={compact?{fontSize:11.5,color:C.muted,fontWeight:500}:{color:C.muted,minHeight:'2.44em'}}>{label}</div>
+      <div className="vrm-display" style={{fontSize:compact?'clamp(17px,5vw,22px)':fs,fontWeight:700,color,lineHeight:1.05,marginTop:compact?4:2,whiteSpace:'nowrap'}}>{value}</div>
       {sub && <div style={{fontSize:11.5,color:subColor||C.muted,fontWeight:subColor?600:400,marginTop:4,lineHeight:1.35}}>{sub}</div>}
     </Balise>
   );
@@ -4331,6 +4333,69 @@ function MiniBarres({ jours, hauteur = 84, surSombre = false }) {
         {jours.map((j) => (
           <div key={j.cle} style={{flex:1,minWidth:0,textAlign:'center',fontSize:9,letterSpacing:.2,color:surSombre?'rgba(255,255,255,.55)':C.muted,fontWeight:600,overflow:'hidden'}}>{j.jour}</div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+// ── COURBE DES VENTES (30 sept.) ──────────────────────────────────────────────
+// Julien : « je veux des graphiques de qualité, là c'est enfantin » (les grosses
+// barres blanches). Une courbe LISSÉE (cubique monotone : elle ne dépasse jamais
+// les vraies valeurs, donc elle ne ment pas sur un jour sans vente), un trait fin
+// à l'accent, un dégradé qui s'efface vers le bas, un point sur le dernier jour,
+// et seulement deux repères de date. Chaque point garde son infobulle (jour,
+// ventes, montant). Aucune bibliothèque : du SVG pur, qui suit la palette.
+function CourbeVentes({ jours, hauteur = 70, surSombre = false, libDebut = null, libFin = null }) {
+  const W = 320, H = hauteur, pad = 4;
+  const uid = React.useId ? React.useId().replace(/:/g, '') : 'cv';
+  const max = Math.max(1, ...jours.map(j => j.eur));
+  const n = jours.length;
+  const pts = jours.map((j, i) => [pad + (i * (W - 2 * pad)) / Math.max(1, n - 1), H - pad - (j.eur / max) * (H - 2 * pad - 6)]);
+  // Cubique monotone (Fritsch–Carlson) : pas de bosse sous zéro, pas de dépassement.
+  const d = (() => {
+    if (pts.length < 2) return '';
+    const dx = [], dy = [], m = [];
+    for (let i = 0; i < pts.length - 1; i++) { dx.push(pts[i + 1][0] - pts[i][0]); dy.push((pts[i + 1][1] - pts[i][1]) / dx[i]); }
+    m.push(dy[0]);
+    for (let i = 1; i < pts.length - 1; i++) m.push(dy[i - 1] * dy[i] <= 0 ? 0 : (dy[i - 1] + dy[i]) / 2);
+    m.push(dy[dy.length - 1]);
+    for (let i = 0; i < dy.length; i++) {
+      if (dy[i] === 0) { m[i] = 0; m[i + 1] = 0; continue; }
+      const a = m[i] / dy[i], b = m[i + 1] / dy[i], h = a * a + b * b;
+      if (h > 9) { const t = 3 / Math.sqrt(h); m[i] = t * a * dy[i]; m[i + 1] = t * b * dy[i]; }
+    }
+    let p = `M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
+    for (let i = 0; i < dy.length; i++) {
+      const [x0, y0] = pts[i], [x1, y1] = pts[i + 1], h = dx[i] / 3;
+      p += ` C${(x0 + h).toFixed(1)},${(y0 + m[i] * h).toFixed(1)} ${(x1 - h).toFixed(1)},${(y1 - m[i + 1] * h).toFixed(1)} ${x1.toFixed(1)},${y1.toFixed(1)}`;
+    }
+    return p;
+  })();
+  const trait = surSombre ? '#8FB2FF' : C.accent;
+  const grille = surSombre ? 'rgba(255,255,255,.08)' : C.border;
+  const texte = surSombre ? 'rgba(255,255,255,.5)' : C.muted;
+  const last = pts[pts.length - 1];
+  const court = (j) => j.long.split(' ').slice(1).join(' ');
+  return (
+    <div>
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none" role="img"
+        aria-label={`Ventes des ${n} derniers jours : ${jours.reduce((a, j) => a + j.eur, 0).toFixed(0)} €`} style={{display:'block',overflow:'visible'}}>
+        <defs>
+          <linearGradient id={`cvg${uid}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={trait} stopOpacity={surSombre ? 0.42 : 0.28}/>
+            <stop offset="100%" stopColor={trait} stopOpacity="0"/>
+          </linearGradient>
+        </defs>
+        {[0.5, 1].map(f => <line key={f} x1="0" x2={W} y1={(H - pad) * f} y2={(H - pad) * f} stroke={grille} strokeWidth="1" vectorEffect="non-scaling-stroke" strokeDasharray={f < 1 ? '2 4' : undefined}/>)}
+        {d && <path d={`${d} L${last[0].toFixed(1)},${H - pad} L${pts[0][0].toFixed(1)},${H - pad} Z`} fill={`url(#cvg${uid})`}/>}
+        {d && <path d={d} fill="none" stroke={trait} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke"/>}
+        {pts.map((p, i) => <rect key={i} x={p[0] - (W / n) / 2} y="0" width={W / n} height={H} fill="transparent"><title>{`${jours[i].long} · ${jours[i].n} vente${jours[i].n > 1 ? 's' : ''} · ${jours[i].eur.toFixed(0)} €`}</title></rect>)}
+      </svg>
+      <div style={{position:'relative',height:0}}>
+        <span aria-hidden="true" style={{position:'absolute',right:`${(pad / W) * 100}%`,top:-(H - last[1]) - 4,width:8,height:8,marginRight:-4,borderRadius:999,background:trait,boxShadow:`0 0 0 4px ${surSombre ? 'rgba(143,178,255,.22)' : C.accent + '33'}`}}/>
+      </div>
+      <div style={{display:'flex',justifyContent:'space-between',marginTop:7,fontSize:10.5,color:texte,fontWeight:500}}>
+        <span>{libDebut || court(jours[0])}</span><span>{libFin || "aujourd'hui"}</span>
       </div>
     </div>
   );
@@ -8091,7 +8156,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
   // `icon` et `gradient` restent acceptés — les 10 appels ne changent pas — mais
   // ne sont plus dessinés.
   const StatCard=({label,value,color=C.text,sub,subColor=null,onClick=null,title=null})=>
-    <StatBox label={label} value={value} color={color} sub={sub} subColor={subColor} onClick={onClick} title={title}/>;
+    <StatBox compact label={label} value={value} color={color} sub={sub} subColor={subColor} onClick={onClick} title={title}/>;
   // Une seule phrase pour une seule cause, et elle ouvre la saisie en série sur
   // l'écran Annonces (le propriétaire de la modale, §11).
   const versSaisiePrix = () => { DEMANDE_SAISIE_PRIX.on = true; if (onGo) onGo('cat_annonces'); };
@@ -8194,7 +8259,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
       {liveStats && (
         <div>
           <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:8}}>Vinted en direct · ce mois</div>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))',gap:10}}>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(96px, 1fr))',gap:0,border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 0',overflow:'hidden',boxShadow:C.shadow||'none'}}>
             {[
               /* ⚠️ CES CHIFFRES SONT DES REPÈRES, aucun n'appelle une action : ils
                  restent à l'encre (§5.90). « Messages non lus » a été RETIRÉ d'ici
@@ -8206,7 +8271,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             ].map(s=>(
               <button key={s.k} onClick={()=>onGo&&onGo(s.go)} title={`Voir ${s.label.toLowerCase()}`}
                 style={{textAlign:'left',border:'none',background:'transparent',borderRadius:0,padding:0,cursor:'pointer',fontFamily:'inherit',display:'block',width:'100%'}}>
-                <StatBox label={s.label} value={s.val} color={s.color}/>
+                <StatBox compact label={s.label} value={s.val} color={s.color}/>
               </button>
             ))}
           </div>
@@ -8218,7 +8283,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
           Σ prix d'achat des annonces en ligne · CA = ventes finalisées, tous comptes.
           Repli sur les valeurs locales (catalogue/garage) tant que le direct charge. */}
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginTop:18,marginBottom:8}}>Depuis le début</div>
-      <div style={{display:'flex',flexWrap:'wrap',gap:10}}>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))',rowGap:14,border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 0',overflow:'hidden',boxShadow:C.shadow||'none'}}>
         {/* ⚠️ LE LIBELLÉ ÉTAIT FAUX. « Paires en stock : 0 » s'affichait en gros
             alors qu'il y a 50 annonces en ligne — parce que ce compteur mesure
             les numéros POSÉS AU GARAGE (le garage est vide), ce que seule la
@@ -8260,6 +8325,32 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
       </div>
       {manquePrix && <LignePrixAchat quoi={quoiDepuisDebut}/>}
 
+      {/* ── COURBE DU CHIFFRE D'AFFAIRES, 12 MOIS (30 sept.) ─────────────────
+          « Des graphiques de qualité » : la même courbe que l'accueil, sur
+          douze mois. Source = `caParMois`, calculé dans la même boucle que « CA
+          du mois » (§11) — le dernier point est donc exactement ce chiffre-là. */}
+      {liveStats && liveStats.caParMois && (()=>{
+        const now = new Date(); const mois = [];
+        for (let i = 11; i >= 0; i--) {
+          const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          const k = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+          mois.push({ cle:k, eur: liveStats.caParMois[k] || 0, n: (liveStats.ventesParMois||{})[k] || 0,
+            long: d.toLocaleDateString('fr-FR',{month:'long',year:'numeric'}) });
+        }
+        const tot = mois.reduce((a,m)=>a+m.eur,0);
+        if (!tot) return null;
+        const meilleur = mois.reduce((a,m)=>m.eur>a.eur?m:a, mois[0]);
+        const court = (m) => new Date(m.cle+'-01T12:00:00').toLocaleDateString('fr-FR',{month:'short',year:'2-digit'});
+        return (
+          <Card style={{padding:'16px 16px 14px',background:C.card,border:`1px solid ${C.border}`,marginTop:12}}>
+            <div style={{fontSize:12,color:C.muted,fontWeight:500}}>Chiffre d'affaires · 12 derniers mois</div>
+            <div className="vrm-display" style={{fontSize:26,fontWeight:800,color:C.text,letterSpacing:-0.6,marginTop:3}}>{fmt(tot)}</div>
+            <div style={{fontSize:12,color:C.muted,marginTop:3}}>Meilleur mois : <b style={{color:C.text,fontWeight:600}}>{meilleur.long} · {fmt(meilleur.eur)}</b></div>
+            <div style={{marginTop:14}}><CourbeVentes jours={mois} hauteur={110} libDebut={court(mois[0])} libFin="ce mois-ci"/></div>
+          </Card>
+        );
+      })()}
+
       {/* ── CA PAR PLATEFORME ET PAR COMPTE ─────────────────────────────────
           Julien, 21 sept. : « un chiffre d'affaires global et un CA par
           application ; et tu peux décomposer aussi en compte ». Deux
@@ -8281,20 +8372,29 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         // Rien à décomposer tant que le CA Vinted n'est pas encore lu.
         if (caVinted == null && caLbc == null) return null;
         const comptes = parCompte ? Object.entries(parCompte).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]) : [];
-        const Ligne = ({label, val, note, fort}) => (
-          <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:12,padding:'8px 0',borderTop:`1px solid ${C.border}`}}>
-            <div style={{minWidth:0}}>
-              <div style={{fontSize:13.5,fontWeight:fort?700:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{label}</div>
-              {note && <div style={{fontSize:11,color:C.muted,marginTop:1}}>{note}</div>}
+        const Ligne = ({label, val, note, fort, part}) => (
+          <div style={{padding:'9px 0',borderTop:`1px solid ${C.border}`}}>
+            <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:12}}>
+              <div style={{minWidth:0}}>
+                <div style={{fontSize:13.5,fontWeight:fort?700:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{label}</div>
+                {note && <div style={{fontSize:11,color:C.muted,marginTop:1}}>{note}</div>}
+              </div>
+              <div style={{display:'flex',alignItems:'baseline',gap:8,flexShrink:0}}>
+                {part!=null && <span style={{fontSize:11.5,color:C.muted,fontVariantNumeric:'tabular-nums'}}>{Math.round(part*100)} %</span>}
+                <span className="vrm-display" style={{fontSize:15,fontWeight:700,color:val==null?C.muted:C.text}}>{val==null?'—':fmt(val)}</span>
+              </div>
             </div>
-            <div className="vrm-display" style={{fontSize:15,fontWeight:700,color:val==null?C.muted:C.text,flexShrink:0}}>{val==null?'—':fmt(val)}</div>
+            {/* Part du total : une barre fine, une seule teinte (§7). */}
+            {part!=null && <div style={{height:4,borderRadius:999,background:C.card2||C.border,marginTop:7,overflow:'hidden'}}><div style={{width:`${Math.max(2,part*100)}%`,height:'100%',borderRadius:999,background:C.accent}}/></div>}
           </div>
         );
+        const totPlat = plateformes.reduce((s2,p)=>s2+(p.ca||0),0);
+        const totCpt = comptes.reduce((s2,[,v])=>s2+v,0);
         return (
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(300px,100%), 1fr))',gap:12,marginTop:12}}>
             <Card style={{padding:16,background:C.card,border:`1px solid ${C.border}`}}>
               <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:4}}>CA finalisé par plateforme</div>
-              {plateformes.map(p => <Ligne key={p.nom} label={p.nom} val={p.ca} note={p.note}/>)}
+              {plateformes.map(p => <Ligne key={p.nom} label={p.nom} val={p.ca} note={p.note} part={p.ca!=null && totPlat>0 && plateformes.filter(x=>x.ca!=null).length>1 ? p.ca/totPlat : null}/>)}
               {/* Total = somme des plateformes captées = le CA global de l'onglet
                   Collectif (§11 : les deux écrans ne peuvent pas se contredire).
                   Affiché seulement quand ≥ 2 plateformes ont des ventes, sinon il
@@ -8304,7 +8404,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             <Card style={{padding:16,background:C.card,border:`1px solid ${C.border}`}}>
               <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:4}}>CA Vinted par compte</div>
               {comptes.length
-                ? comptes.map(([lg,v]) => <Ligne key={lg} label={lg} val={v}/>)
+                ? comptes.map(([lg,v]) => <Ligne key={lg} label={lg} val={v} part={comptes.length>1 && totCpt>0 ? v/totCpt : null}/>)
                 : <div style={{fontSize:12,color:C.muted,padding:'8px 0',borderTop:`1px solid ${C.border}`}}>Le détail par compte apparaît dès que tes ventes sont chargées.</div>}
               {comptes.length>0 && caVinted!=null && <Ligne label="Total Vinted" val={caVinted} fort/>}
             </Card>
@@ -16326,6 +16426,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Une recherche ou un changement de filtre repart du haut : sinon on garderait
   // « 240 affichées » sur une liste qui n'en compte plus que trois.
   useEffect(() => { setVentesMax(60); }, [vFilter, ordSearchDiff, periode, showHidden]);
+  // Un seul compte dans la liste ⇒ le nommer sur chaque carte ne distingue rien
+  // (§7 : « compte julatace3535 » ×5). Il ne reste que s'il y en a plusieurs.
+  const ventesUnCompte = useMemo(() => new Set(ventesAffichees.map(x => String(x._acc || ''))).size <= 1, [ventesAffichees]);
 
   // Annonces filtrées (recherche titre/marque/N°) + triées. Sert à retrouver vite
   // une paire quand il y en a beaucoup, comme dans les outils pros de revente.
@@ -19174,7 +19277,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // centimes n'apportent rien sur un total de plusieurs milliers ; on affiche
   // « 15 038 € » (espace fine des milliers), lisible et jamais tronqué.
   const fmtE0 = (n)=> (n==null?'—':Math.round(Number(n)).toLocaleString('fr-FR')+' €');
-  const cur = (c)=> c==='EUR'?'€':(c||'');
+  const cur = (c)=> (c==='EUR'||!c)?'€':c;
   // Prix Vinted formaté proprement : l'API renvoie « 88.0 » / « 95.0 » (chaîne),
   // qui s'affichait tel quel (« 88.0 € »). On formate en français sans zéro
   // inutile : « 88 € », « 158,99 € ».
@@ -19396,7 +19499,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       seconde carte « Ta semaine » qui redisait les mêmes ventes
                       en trois autres nombres (§7 : un nombre ne s'écrit qu'une
                       fois). */}
-                  {jours14.some(j=>j.eur>0) && <div style={{marginTop:18}}><MiniBarres jours={jours14} hauteur={52} surSombre/></div>}
+                  {jours14.some(j=>j.eur>0) && <div style={{marginTop:18}}><CourbeVentes jours={jours14} hauteur={64} surSombre/></div>}
                 </div>
               </button>
             )}
@@ -19666,13 +19769,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
              une ligne sur les ventes masquées. Tout ce qui n'est ni un filtre
              ni un chiffre ni une vente est descendu dans « Analyse ». */}
         {(totals.nb>0 || totals.nbAttente>0) && (
-          <div style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:8}}>
-            <StatBox label="CA finalisé" value={fmtE0(totals.ca)} sub={`${totals.nb} vente${totals.nb>1?'s':''}`}/>
+          /* 30 sept. — une seule carte, trois colonnes séparées d'un filet :
+             quatre gros blocs empilés prenaient un écran entier sur téléphone. */
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(92px, 1fr))',gap:0,marginBottom:12,border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 0',overflow:'hidden',boxShadow:C.shadow||'none'}}>
+            <StatBox compact label="CA finalisé" value={fmtE0(totals.ca)} sub={`${totals.nb} vente${totals.nb>1?'s':''}`}/>
             {/* ⚠️ L'ARGENT EN ATTENTE RESTE UN CHIFFRE VISIBLE. Sa grande carte
                 (avec le détail par compte et l'avertissement d'incomplétude) est
                 descendue dans « Analyse » — mais le montant lui-même est ce que
                 Julien vient regarder : il prend sa place dans la rangée. */}
-            {totals.nbAttente>0 && <StatBox label="En attente" value={fmtE0(totals.enAttente)} sub={`${totals.nbAttente} en cours`}/>}
+            {totals.nbAttente>0 && <StatBox compact label="En attente" value={fmtE0(totals.enAttente)} sub={`${totals.nbAttente} en cours`}/>}
             {/* ⚠️ PAS DE « 💰 En attente » ICI : la carte dépliable juste au-dessus
                 affiche déjà ce montant, avec le détail par compte et l'avertissement
                 d'incomplétude. On lisait donc « ≈ 807 € · 25 ventes en cours » puis,
@@ -19683,10 +19788,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 repliée (§5.67) — or le prix d'achat est LA donnée manquante
                 (0 sur 320) et c'est ce chiffre-ci qui le dit. Un tap dessus
                 ouvre la liste. */}
-            <StatBox label="Coût d'achat" value={fmtE0(totals.cout)} sub={`${totals.nbCout}/${totals.nb} renseigné${totals.nbCout>1?'s':''}${totals.nbCout<totals.nb?' · compléter':''}`}
+            {/* 30 sept. — « trop chargé » : sans AUCUN prix d'achat, « Coût
+                d'achat 0 € » et « Bénéfice — » disaient la même absence en deux
+                cases. Il n'en reste qu'une (Bénéfice), qui ouvre la saisie. */}
+            {totals.nbCout>0 && <StatBox compact label="Coût d'achat" value={fmtE0(totals.cout)} sub={`${totals.nbCout}/${totals.nb} renseigné${totals.nbCout>1?'s':''}${totals.nbCout<totals.nb?' · compléter':''}`}
               onClick={totals.nbCout<totals.nb ? ()=>setFillBuyOpen(true) : null}
-              title="Compléter les prix d'achat, paire par paire"/>
-            {totals.frais>0 && <StatBox label="Boosts" value={fmtE0(totals.frais)} sub="mises en avant"/>}
+              title="Compléter les prix d'achat, paire par paire"/>}
+            {totals.frais>0 && <StatBox compact label="Boosts" value={fmtE0(totals.frais)} sub="mises en avant"/>}
             {/* ⚠️ HONNÊTETÉ DES CHIFFRES : sans AUCUN prix d'achat saisi, le
                 « bénéfice » vaut mécaniquement le CA (coût = 0) — c'est FAUX, et
                 l'afficher en gros trompe (plainte de Julien : « les données ne
@@ -19694,8 +19802,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 faux bénéfice, on dit qu'il manque les prix d'achat. Prix connus
                 en partie → on affiche le bénéfice mais on précise « sur X/Y ». */}
             {totals.nbCout===0
-              ? <StatBox label="Bénéfice net" value="—" color={C.muted} sub="saisis tes prix d'achat"/>
-              : <StatBox label="Bénéfice net" value={fmtE0(totals.benefConnu)} color={totals.benefConnu>=0?C.text:C.danger}
+              ? <StatBox compact label="Bénéfice net" value="—" color={C.muted} sub={`0/${totals.nb} prix d'achat · les saisir ›`}
+                  onClick={()=>setFillBuyOpen(true)} title="Saisir les prix d'achat, paire par paire"/>
+              : <StatBox compact label="Bénéfice net" value={fmtE0(totals.benefConnu)} color={totals.benefConnu>=0?C.text:C.danger}
                   subColor={totals.nbCout<totals.nb?C.warn:undefined}
                   sub={totals.nbCout<totals.nb
                     ? `sur ${totals.nbCout} vente${totals.nbCout>1?'s':''} sur ${totals.nb} — les autres n'ont pas de prix d'achat`
@@ -20308,16 +20417,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div key={o.transaction_id} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10}}>
                {/* ── Haut : photo · titre + méta · prix ─────────────────────── */}
                <div style={{display:'flex',gap:12,alignItems:'flex-start'}}>
-                <div style={{width:60,height:60,borderRadius:12,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                <div style={{width:72,height:72,borderRadius:10,background:C.card2||C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
                   {orderPhoto(o)?<img src={orderPhoto(o)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
                 </div>
                 <div style={{flex:'1 1 auto',minWidth:0}}>
                   <div style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.2,
                     display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden',lineHeight:1.3}} title={o.title}>{num?`N°${num} · `:''}{o.title}</div>
-                  <div style={{fontSize:12.5,color:C.muted,marginTop:3,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
-                    <AcctTag acc={o._acc} name={accNameOf(o._acc)}/>
+                  <div style={{fontSize:12.5,color:C.muted,marginTop:4,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+                    {(()=>{ const vs=venteStage(o); return <span title={vs.aide||undefined} style={{color:C.text,fontWeight:600,display:'inline-flex',alignItems:'center',gap:5,flexShrink:0}}><span style={{width:7,height:7,borderRadius:999,background:vs.color,display:'inline-block'}}/>{vs.label}</span>; })()}
+                    {!ventesUnCompte && <AcctTag acc={o._acc} name={accNameOf(o._acc)}/>}
                     {o._fromEmail && <span title="Reconstituée depuis l'email — pas encore confirmée par Vinted" style={{flexShrink:0,fontSize:10,fontWeight:600,color:C.muted,border:`1px solid ${C.border}`,borderRadius:8,padding:'1px 6px'}}>email</span>}
-                    <span style={{flexShrink:0}}>{o.date?new Date(o.date).toLocaleDateString('fr-FR'):''}</span>
+                    <span style={{flexShrink:0}}>{o.date?new Date(o.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):''}</span>
                     {num && needsBordereau(o.status) && (()=>{ const cell=garageCellOf(garageGrid,num); return cell ? <span onClick={()=>onLocate&&onLocate(num)} title="Voir la paire au stock" style={{color:C.blue||C.accent,fontWeight:600,cursor:'pointer'}}>{garageCellLabel(cell)}</span> : (garageUtilise ? <span style={{color:C.muted,fontWeight:500}} title="Cette paire n'est pas rangée au garage">pas au garage</span> : null); })()}
                     {st==='cancelled' && num && (()=>{
                       const out = saleOutcome(o);
@@ -20326,19 +20436,34 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       if (out === 'suspendue') return <span style={{color:C.muted,fontWeight:600,background:`${C.muted}18`,border:`1px solid ${C.muted}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title="Transaction suspendue par Vinted : rien n'est tranché, on ne touche pas au numéro.">⏸ en attente → N°{num} conservé</span>;
                       return <span style={{color:C.warn,fontWeight:600,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title="Vente annulée : si la paire t'est renvoyée, republie-la avec CE numéro (l'app le réutilise automatiquement).">🔁 renvoi → garde le N°{num}</span>;
                     })()}
-                    {!num && st!=='cancelled' && <span style={{color:C.warn,fontWeight:600}} title="Paire pas encore identifiée automatiquement (photo non reconnue). Ajoute son N° et son prix d'achat dans les champs ci-dessous.">⚠️ à identifier</span>}
+                    {/* « ⚠️ à identifier » RETIRÉ (30 sept.) : écrit en orange sur
+                        chaque vente sans N°, c'était la même alerte ×N (§7). Le
+                        champ « N° ? » juste dessous porte la même information. */}
                   </div>
                 </div>
                 <div style={{textAlign:'right',flexShrink:0}}>
-                  <div className="vrm-display" style={{fontSize:17,fontWeight:700,color:C.text}}>{sell!=null?`${sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:''}</div>
+                  <div className="vrm-display" style={{fontSize:17,fontWeight:700,color:C.text}}>{sell!=null?`${Number.isInteger(sell)?sell:sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:''}</div>
                   {benef!=null && <div style={{fontSize:12,fontWeight:600,color:benef>=0?INV_STATUS.online.color:C.danger}}>{benef>=0?'+':''}{benef.toFixed(2).replace('.',',')}€</div>}
                   {benef!=null && fees>0 && <div style={{fontSize:9,color:C.muted}}>dont boost −{fees.toFixed(2).replace('.',',')}€</div>}
-                  {benef==null && buy==null && <div style={{fontSize:11,color:C.muted}}>achat ?</div>}
                 </div>
                </div>
                {/* ── Bas : une seule pastille de statut · les actions groupées ─── */}
                <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-                {(()=>{ const vs=venteStage(o); return <span title={vs.aide||undefined} style={{fontSize:11.5,color:C.text,fontWeight:600,background:C.card2,borderRadius:5,padding:'3px 9px',display:'inline-flex',alignItems:'center',gap:6,flexShrink:0}}><span style={{width:7,height:7,borderRadius:999,background:vs.color,display:'inline-block'}}/>{vs.label}</span>; })()}
+                {/* Saisie N° + prix d'achat SUR LA MÊME LIGNE que les actions
+                    (30 sept. : une ligne de moins par vente). */}
+                {!hidden && (
+                  <div style={{display:'flex',gap:6,alignItems:'center',flex:'1 1 200px',minWidth:0}}>
+                    <div title={num?undefined:"Paire pas encore identifiée automatiquement : pose son N° ici"} style={{display:'flex',alignItems:'center',gap:3,border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 7px',background:C.bg,width:74,flexShrink:0}}>
+                      <span style={{fontSize:11,color:C.muted,fontWeight:500}}>N°</span>
+                      <ChampSaisie value={ov.numero ?? ''} onCommit={v=>setSaleOverride(o.transaction_id,{numero:v})} placeholder={baseNum||'?'} inputMode="numeric" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
+                    </div>
+                    <div style={{flex:1,minWidth:0,display:'flex',alignItems:'center',gap:3,border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 8px',background:C.bg}}>
+                      <ChampSaisie value={ov.buyPrice ?? ''} onCommit={v=>setSaleOverride(o.transaction_id,{buyPrice:v})} placeholder={baseBuy?`achat ${baseBuy}€ (auto)`:"prix d'achat"} inputMode="decimal" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
+                      <span style={{fontSize:11,color:C.muted}}>€</span>
+                    </div>
+                    {(ov.numero!=null||ov.buyPrice!=null) && <span style={{fontSize:10,color:C.muted,flexShrink:0}} title="Valeurs saisies à la main pour cette vente (priment sur l'auto)">✎</span>}
+                  </div>
+                )}
                 <div style={{display:'flex',alignItems:'center',gap:6,flexShrink:0,marginLeft:'auto'}}>
                 {num && needsBordereau(o.status) && !hidden && inGarage(num) && (
                   <button type="button" onClick={()=>onLocate&&onLocate(num)} title={`Voir la paire N°${num} au stock`} aria-label="Voir au stock" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.blue||C.accent,cursor:'pointer',fontSize:15,padding:'6px 8px'}}><Icon name="pin" size={15}/></button>
@@ -20367,24 +20492,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                {/* La barre de progression a été retirée : la pastille de statut
                    ci-dessus dit déjà où en est la vente (style maquette iOS,
                    28 sept.). Un segment de plus, c'est la même info deux fois. */}
-               {/* Saisie manuelle par vente : N° et prix d'achat, même pour une paire jamais numérotée. */}
-               {!hidden && (
-                 <div style={{display:'flex',gap:6,alignItems:'center'}}>
-                   {/* ⚠️ BORDS CALMES (Julien, 28 sept. : « les bords qui brillent »).
-                       Avant, un champ rempli passait sa bordure au vert (#0F8A6A) —
-                       en sombre ça lit « néon ». iOS = bordure fine neutre TOUJOURS ;
-                       la petite ✎ discrète en bout de ligne dit déjà « saisi ». */}
-                   <div style={{display:'flex',alignItems:'center',gap:3,border:`1px solid ${C.border}`,borderRadius:8,padding:'3px 6px',background:C.bg,width:78,flexShrink:0}}>
-                     <span style={{fontSize:11,color:C.muted,fontWeight:500}}>N°</span>
-                     <ChampSaisie value={ov.numero ?? ''} onCommit={v=>setSaleOverride(o.transaction_id,{numero:v})} placeholder={baseNum||'—'} inputMode="numeric" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
-                   </div>
-                   <div style={{flex:1,display:'flex',alignItems:'center',gap:3,border:`1px solid ${C.border}`,borderRadius:8,padding:'3px 8px',background:C.bg}}>
-                     <ChampSaisie value={ov.buyPrice ?? ''} onCommit={v=>setSaleOverride(o.transaction_id,{buyPrice:v})} placeholder={baseBuy?`achat ${baseBuy}€ (auto)`:"ajouter le prix d'achat €"} inputMode="decimal" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
-                     <span style={{fontSize:11,color:C.muted}}>€</span>
-                   </div>
-                   {(ov.numero!=null||ov.buyPrice!=null) && <span style={{fontSize:10,color:C.muted,flexShrink:0}} title="Valeurs saisies à la main pour cette vente (priment sur l'auto)">✎</span>}
-                 </div>
-               )}
                {/* « je veux que ça fasse également ça dans les ventes, donc avec le
                    numéro et l'achat qui correspond » — le N° est dans le titre de la
                    ligne, l'achat relié (photo + reçu) juste ici. Il vient de la paire
@@ -27232,6 +27339,10 @@ export default function App() {
       // construction, exactement le CA global (§11). Impossible qu'ils divergent,
       // et il peut vérifier le total en additionnant les lignes (§2.7).
       const caParCompte={};
+      // 30 sept. : le CA mois par mois (12 derniers mois), même règle que « CA du
+      // mois » (ventes faites ce mois-là, hors annulées) — pour la courbe des
+      // Statistiques. Calculé ICI pour ne pas créer une seconde règle.
+      const caParMois={}, ventesParMois={};
 
       // Comptes BLOQUÉS (détectés) ou MASQUÉS (à la main) : on les EXCLUT
       // totalement des stats — leurs annonces sont périmées et leurs ventes ne
@@ -27283,6 +27394,7 @@ export default function App() {
           // vente ne devient « finalisée » que ~2 semaines après (validation
           // acheteur) : compter uniquement les finalisées donnait ~0 € pour le
           // mois en cours. SOURCE = moisson Vinted (extension), plus d'emails.
+          if(st!=='cancelled' && okD){ const km=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; caParMois[km]=(caParMois[km]||0)+amt0; ventesParMois[km]=(ventesParMois[km]||0)+1; }
           if(st!=='cancelled' && inMonth){
             caMois+=amt0; ventesMois++;
             if(d.getDate()===now.getDate()){ caJour+=amt0; ventesJour++; }
@@ -27365,7 +27477,7 @@ export default function App() {
         }
       }catch(_){/* pas su ⇒ null ⇒ rien d'affiché */}
       if(!stop && ok){
-      setLiveStats({caMois,caEncaisse,enCours,online,unread,stockValue,pairesStock,ventesJour,caJour,ventesMois,soldTotal,joursVente:joursVenteSet.size,caParCompte,dataAgeJours,dataAgeCompte,
+      setLiveStats({caMois,caEncaisse,enCours,online,unread,stockValue,pairesStock,ventesJour,caJour,ventesMois,soldTotal,joursVente:joursVenteSet.size,caParCompte,caParMois,ventesParMois,dataAgeJours,dataAgeCompte,
         walletDispo:(walletEsc&&walletEsc.accounts>0)?walletEsc.dispo:null,
         walletAttente:(walletEsc&&walletEsc.accounts>0)?walletEsc.total:null,
         walletComptes:(walletEsc&&walletEsc.accounts)||0,
