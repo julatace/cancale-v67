@@ -25212,9 +25212,13 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
       if (!r.ok) { setAcct(a=>({...a,busy:false,err:r.error})); return; }
       close(); toast("✓ Demande envoyée — ouvre le lien reçu pour valider la nouvelle adresse");
     };
-    return (
-      <div onClick={close} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1400,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
-        <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:460,borderRadius:'20px 20px 0 0',padding:'16px 18px calc(18px + env(safe-area-inset-bottom))'}}>
+    // ⚠️ 30 sept. (Julien) : « le bouton Se déconnecter est trop bas, la barre
+    // Leboncoin/Vestiaire passe dessus ». Rendue DANS l'écran, la fenêtre était
+    // piégée sous la barre du bas (même défaut que l'overlay plus bas) : elle
+    // part dans document.body, au-dessus de tout.
+    return createPortal(
+      <div onClick={close} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:10000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+        <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:460,borderRadius:'20px 20px 0 0',padding:'16px 18px calc(22px + env(safe-area-inset-bottom))'}}>
           <div style={{width:36,height:4,borderRadius:8,background:C.border,margin:'0 auto 14px'}}/>
           <div style={{fontSize:17,fontWeight:700,color:M==='out'?C.danger:C.text,letterSpacing:'-0.02em'}}>{titre}</div>
           <div style={{fontSize:12.5,color:C.muted,marginTop:4,lineHeight:1.5}}>
@@ -25240,7 +25244,8 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
             </button>
           </div>
         </div>
-      </div>
+      </div>,
+      document.body
     );
   };
 
