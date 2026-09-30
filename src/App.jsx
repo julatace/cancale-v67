@@ -4744,7 +4744,7 @@ const PLUS_TABS=[
      restent dans le centre de notifications (job « Répondre à N messages »), qui
      ouvre l'écran Messages au clic — l'écran reste monté et joignable par là,
      simplement plus dans le menu. */
-  {id:'garage',       icon:'home',    emoji:'🏠',label:'Garage',        desc:'Où est rangée chaque paire'},
+  {id:'garage',       icon:'home',    emoji:'🏠',label:'Stock',        desc:'Où est rangée chaque paire'},
   {id:'invoices',     icon:'receipt', emoji:'🧾',label:'Factures',      desc:'Documents pour tes comptes pro'},
 ];
 // Barre de chargement fine en haut de l'écran (façon navigateur). Elle avance
@@ -5700,7 +5700,7 @@ function AuthScreen() {
                 sans la colonne `owner` (§12), un compte créé ici tombe dans les
                 MÊMES données que le vendeur existant. Le dire avant, pas après. */}
             {mode==='up' ? (CLOISONNE
-              ? 'Tes données (annonces, garage, compta) ne seront visibles que par toi.'
+              ? 'Tes données (annonces, stock, compta) ne seront visibles que par toi.'
               : 'Attention : la séparation des données n\'est pas encore activée en base. Un compte créé maintenant ouvre la MÊME boutique — à réserver à toi-même.')
              : mode==='reset' ? 'On t\'envoie un lien pour en choisir un nouveau.'
              : mode==='newpw' ? 'Choisis-en un nouveau, tu resteras connecté.'
@@ -8209,7 +8209,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             les numéros POSÉS AU GARAGE (le garage est vide), ce que seule la
             légende disait. Un chiffre qu'on doit corriger avec sa légende est un
             chiffre faux : le titre dit maintenant ce qu'il compte. */}
-        <StatCard icon="📦" label="Paires au garage" value={liveStats&&liveStats.pairesStock!=null?liveStats.pairesStock:stockCount} color={C.text} sub="cases réellement remplies"/>
+        <StatCard icon="📦" label="Paires en stock" value={liveStats&&liveStats.pairesStock!=null?liveStats.pairesStock:stockCount} color={C.text} sub="cases réellement remplies"/>
         {/* ⚠️ « 0,00 € » N'EST PAS UN ZÉRO, C'EST UNE ABSENCE. Cette carte somme
             les PRIX D'ACHAT des annonces en ligne — or aucun n'est saisi, donc
             elle affichait un gros 0,00 € à côté d'un « 1581 € de valeur » sur
@@ -8385,7 +8385,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
       {/* Barre de progression du garage */}
       <Card style={{padding:18}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
-          <span style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:600,display:'inline-flex',alignItems:'center',gap:5}}><Icon name="home" size={12}/>Remplissage garage</span>
+          <span style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:600,display:'inline-flex',alignItems:'center',gap:5}}><Icon name="home" size={12}/>Remplissage du stock</span>
           <span style={{fontSize:13,fontWeight:600,color:C.accent}}>{fillRate}%</span>
         </div>
         <div style={{height:10,background:C.surface,borderRadius:8,overflow:'hidden',border:`1px solid ${C.border}`}}>
@@ -12147,7 +12147,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
       if (reste.length) slots[cellKey] = reste; else delete slots[cellKey];
       updateItem(itemId, { slots: compactSlots(slots, Math.max(1, it.rows || 3), Math.max(1, it.cols || 4)) });
       setSortie(null);
-      toast(`N°${numero} sorti du garage.`);
+      toast(`N°${numero} sorti du stock.`);
     };
     setSortie({ itemId, cellKey, at: Date.now(), fini: ecrire });
   };
@@ -12182,7 +12182,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
       <style>{`@keyframes vrmpulse2{0%,100%{box-shadow:0 0 0 0 rgba(229,72,77,0.7);}50%{box-shadow:0 0 0 8px rgba(229,72,77,0);}}`}</style>
       {/* ⚠️ LA PIÈCE D'ABORD, LES RÉGLAGES ENSUITE.
           La vue 3D était sous quinze rangées de boutons : il fallait défiler
-          tout l'écran de configuration avant de voir son garage. On regarde la
+          tout l'écran de configuration avant de voir son stock. On regarde la
           pièce, on la modifie ensuite — pas l'inverse. */}
       <Room3D key={`${activeRoom.id}-${room.w}-${room.h}-${room.wallH || 3.4}-${room.wallColor || 'def'}`} items={items} room={room} hi={hi} sel={sel} canMove={moveMode} onSelect={selectItem} onCellTap={fillCell} onPileTap={pileTap} onMove={moveItem} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount} depot={depot} sortie={sortie}
         fallback={<RoomPerspective items={items} room={room} hi={hi} sel={sel} onOpen={(id) => setSel(id)} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount} />} />
@@ -12345,7 +12345,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
                           {p.ambigu ? '⚠️ N° porté par plusieurs paires' : (p.title || '—')}
                         </span>
                       </span>
-                      <button onClick={() => sortirDeCase(selItem.id, p.cell, p.numero)} title="Sortir cette paire du garage"
+                      <button onClick={() => sortirDeCase(selItem.id, p.cell, p.numero)} title="Sortir cette paire du stock"
                         style={{ flexShrink: 0, border: `1px solid ${C.border}`, borderRadius: 9, background: 'transparent', color: C.muted, fontSize: 11.5, fontWeight: 600, padding: '6px 9px', cursor: 'pointer', fontFamily: 'inherit' }}>Sortir</button>
                     </div>
                   ))}
@@ -12679,7 +12679,7 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
   let colN=0;
   return (
     <div style={{padding:16,display:'flex',flexDirection:'column',gap:14}}>
-      <ScreenHead icon="home" title="Garage" desc="Où sont rangées tes paires. Cherche un numéro, il te dit le meuble et la case."/>
+      <ScreenHead icon="home" title="Stock" desc="Où sont rangées tes paires. Cherche un numéro, il te dit le meuble et la case."/>
 
       {/* Bascule : grille classique ↔ photo de ton vrai local */}
       <div style={{display:'flex',gap:6,background:C.surface,borderRadius:8,padding:3,border:`1px solid ${C.border}`,alignSelf:'flex-start'}}>
@@ -12740,8 +12740,8 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
           )}
           {storedUnknown.length>0&&(
             <Card style={{padding:12,background:`${C.blue||C.accent}11`,borderColor:`${C.blue||C.accent}44`}}>
-              <div style={{fontSize:11,color:C.blue||C.accent,fontWeight:500,marginBottom:6,textTransform:'uppercase',letterSpacing:1}}>❓ Au garage mais numéro inconnu ({storedUnknown.length})</div>
-              <div style={{fontSize:11,color:C.muted,marginBottom:6}}>Numéros présents au garage sans paire numérotée correspondante (ancien numéro, faute de frappe, ou vendue).</div>
+              <div style={{fontSize:11,color:C.blue||C.accent,fontWeight:500,marginBottom:6,textTransform:'uppercase',letterSpacing:1}}>❓ Au stock mais numéro inconnu ({storedUnknown.length})</div>
+              <div style={{fontSize:11,color:C.muted,marginBottom:6}}>Numéros présents au stock sans paire numérotée correspondante (ancien numéro, faute de frappe, ou vendue).</div>
               <div style={{display:'flex',flexWrap:'wrap',gap:8,fontSize:11}}>
                 {storedUnknown.map(n=>(<span key={n} onClick={()=>{setSearchInput(n);setGarageSearch(n);}} style={{background:C.bg,padding:'4px 10px',borderRadius:5,cursor:'pointer',color:C.text,border:`1px solid ${(C.blue||C.accent)}66`,fontWeight:500}}>#{n}</span>))}
               </div>
@@ -12765,7 +12765,7 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
       {searchTrim&&<div style={{fontSize:12,color:C.muted}}>
         {allValsSet.has(searchTrim)
           ?<span style={{color:C.warn}}>✓ Numéro #{garageSearch} trouvé — case en surbrillance</span>
-          :<span style={{color:C.danger}}>✗ Numéro #{garageSearch} non trouvé dans le garage</span>}
+          :<span style={{color:C.danger}}>✗ Numéro #{garageSearch} non trouvé dans le stock</span>}
       </div>}
       
       {/* Réglages avancés repliés par défaut : le vendeur n'a besoin que de
@@ -12799,7 +12799,7 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
         </div>}
       </div>
       {allValsSet.size===0&&!addMode&&<div style={{fontSize:12,color:C.text,background:`${C.accent}0e`,border:`1px solid ${C.accent}44`,borderRadius:10,padding:'10px 13px',marginBottom:10,lineHeight:1.45}}>
-        🗄️ <b>Ton garage est vide.</b> Clique une case pour y poser un numéro de boîte, ou va sur une annonce et utilise « Ranger » pour la placer d'un tap.
+        🗄️ <b>Ton stock est vide.</b> Clique une case pour y poser un numéro de boîte, ou va sur une annonce et utilise « Ranger » pour la placer d'un tap.
       </div>}
       {(blockMode||colorMode||addMode)&&<div style={{fontSize:11,color:C.muted}}>
         {addMode&&'Toutes les cases sont visibles. Tu peux ajouter des paires dans les cases vides.'}
@@ -13145,19 +13145,19 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
       {/* ⚠️ Rien a comparer tant que le garage est vide : on le DIT, une fois. */}
       {garageVide && stockVinted.length>0 && (
         <div style={{marginBottom:16,padding:'10px 12px',border:`1px solid ${C.border}`,borderRadius:10,background:C.card,fontSize:12.5,color:C.muted,lineHeight:1.5}}>
-          Aucun numéro n'est encore posé dans le <b style={{color:C.text}}>Garage</b> : la comparaison
+          Aucun numéro n'est encore posé dans le <b style={{color:C.text}}>Stock</b> : la comparaison
           avec cette liste ne dirait donc rien d'utile (elle signalerait les {stockVinted.length} numéros
-          d'un coup). Range tes paires dans le Garage, et les écarts apparaîtront ici.
+          d'un coup). Range tes paires dans le Stock, et les écarts apparaîtront ici.
         </div>
       )}
       {!garageVide && (enLignePasGarage.length>0||garagePasEnLigne.length>0)&&(
         <div style={{marginBottom:16}}>
-          <h3 style={{fontSize:15,fontWeight:600,margin:'0 0 8px',color:C.warn,display:'flex',alignItems:'center',gap:6}}><Icon name="alert" size={15}/>Incohérences avec le garage</h3>
+          <h3 style={{fontSize:15,fontWeight:600,margin:'0 0 8px',color:C.warn,display:'flex',alignItems:'center',gap:6}}><Icon name="alert" size={15}/>Incohérences avec le stock</h3>
 
           {enLignePasGarage.length>0&&(
             <div style={{marginBottom:10,padding:10,background:'rgba(156,106,31,0.10)',borderRadius:8}}>
-              <div style={{fontSize:13,fontWeight:500,marginBottom:4}}>En ligne mais absent du garage ({enLignePasGarage.length})</div>
-              <div style={{fontSize:12,color:C.muted,marginBottom:6}}>Ces annonces sont dans ton stock Vinted mais leur numéro n'est pas dans le garage.</div>
+              <div style={{fontSize:13,fontWeight:500,marginBottom:4}}>En ligne mais absent du stock ({enLignePasGarage.length})</div>
+              <div style={{fontSize:12,color:C.muted,marginBottom:6}}>Ces annonces sont dans ton stock Vinted mais leur numéro n'est pas dans le stock.</div>
               <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
                 {enLignePasGarage.slice(0,ecartsMax).map(n=>(
                   <span key={n} style={{background:C.warn,color:'#fff',borderRadius:5,padding:'3px 8px',fontSize:12,fontWeight:500}}>{n}</span>
@@ -13174,8 +13174,8 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
 
           {garagePasEnLigne.length>0&&(
             <div style={{padding:10,background:'rgba(0,119,130,0.08)',borderRadius:8}}>
-              <div style={{fontSize:13,fontWeight:500,marginBottom:4}}>Au garage mais pas en ligne ({garagePasEnLigne.length})</div>
-              <div style={{fontSize:12,color:C.muted,marginBottom:6}}>Ces paires sont dans le garage mais pas dans ton stock Vinted (peut-être à mettre en ligne).</div>
+              <div style={{fontSize:13,fontWeight:500,marginBottom:4}}>Au stock mais pas en ligne ({garagePasEnLigne.length})</div>
+              <div style={{fontSize:12,color:C.muted,marginBottom:6}}>Ces paires sont dans le stock mais pas dans ton stock Vinted (peut-être à mettre en ligne).</div>
               <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
                 {garagePasEnLigne.map(n=>(
                   <span key={n} style={{background:C.accent,color:C.onAccent,borderRadius:5,padding:'3px 8px',fontSize:12,fontWeight:500}}>{n}</span>
@@ -14238,9 +14238,9 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
                 <div style={{display:'flex',gap:6,alignItems:'center',marginTop:5,flexWrap:'wrap'}}>
                   <Badge color={stt.color}>{stt.icon} {stt.label}</Badge>
                   <button type="button" onClick={()=>garage && onLocate && onLocate(p.numero)}
-                    title={garage?'Voir dans le garage':'Ce numéro n\'apparaît dans aucune case du garage'}
+                    title={garage?'Voir dans le stock':'Ce numéro n\'apparaît dans aucune case du stock'}
                     style={{border:'none',background:'transparent',cursor:garage?'pointer':'default',padding:0,fontSize:11,fontWeight:500,color:garage?C.blue||C.accent:C.muted}}>
-                    {garage ? 'Au garage' : 'Absent du garage'}
+                    {garage ? 'Au stock' : 'Absent du stock'}
                   </button>
                   {p.price != null && <span style={{fontSize:11,color:C.muted}}>{p.price} €</span>}
                   {p.vintedItemId && <span style={{fontSize:11,color:C.muted}}>🔗 annonce liée</span>}
@@ -14606,7 +14606,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (num) steps.push({ icon:'🔢', label:`Numérotée N°${num}`, detail: e && e.numberedAt ? `le ${new Date(e.numberedAt).toLocaleDateString('fr-FR')}` : '', done:true });
     // 3) Garage
     const spot = garageSpotOf(num); const atG = inGarage(num) || !!spot;
-    steps.push({ icon:'🏠', label: atG?'Rangée au garage':'Pas encore rangée', detail: spot?`${spot.room} · ${spot.kind}`:(atG?'':'à ranger'), done:atG });
+    steps.push({ icon:'🏠', label: atG?'Rangée au stock':'Pas encore rangée', detail: spot?`${spot.room} · ${spot.kind}`:(atG?'':'à ranger'), done:atG });
     // 4) En ligne
     if (it) { const age = listedAgeDays(it); steps.push({ icon:'🟢', label:'En ligne', detail:[prix(it.price,it.currency)||null, age!=null?`depuis ${age} j`:null, it.views!=null?`👁 ${it.views}`:null, it.favourites!=null?`❤️ ${it.favourites}`:null].filter(Boolean).join(' · '), done:true }); }
     // 5) Vente
@@ -19216,7 +19216,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const sub = late>0 && pretsImpr>0 ? `${late} en retard · ${exact?'':'au moins '}${pretsImpr} prêt${pretsImpr>1?'s':''} à imprimer`
             : late>0 ? `${late} en retard — à poster en priorité`
             : pretsImpr>0 ? `${combien}${exact?' — le reste attend le sien':''}`
-            : 'Bordereau + paire au garage, coche par colis';
+            : 'Bordereau + paire au stock, coche par colis';
           jobs.push({icon:'truck',color:late>0?C.danger:C.warn,urgent:late>0,title:`Expédier ${toShip.length} colis`,sub,tab:'cat_bord',prio:late>0?0:1});
         }
         const pickupCount=pickupUnion.total; // UNION email + statut Vinted — EXACTEMENT le compte de l'onglet Achats
@@ -19467,7 +19467,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {/* ⚠️ UNE URGENCE ÉCRITE EN GRIS N'EST PAS UNE URGENCE.
                           « 3 en retard — à poster en priorité » et « 3 hors
                           délai — va vite les chercher » se lisaient de la même
-                          couleur que « Bordereau + paire au garage ». La
+                          couleur que « Bordereau + paire au stock ». La
                           consigne porte la couleur seulement quand il y a
                           vraiment quelque chose à rattraper (§5.65 : c'est le
                           chiffre qui se colore, pas le fond). */}
@@ -20287,7 +20287,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <AcctTag acc={o._acc} name={accNameOf(o._acc)}/>
                     {o._fromEmail && <span title="Reconstituée depuis l'email — pas encore confirmée par Vinted" style={{flexShrink:0,fontSize:10,fontWeight:600,color:C.muted,border:`1px solid ${C.border}`,borderRadius:8,padding:'1px 6px'}}>email</span>}
                     <span style={{flexShrink:0}}>{o.date?new Date(o.date).toLocaleDateString('fr-FR'):''}</span>
-                    {num && needsBordereau(o.status) && (()=>{ const cell=garageCellOf(garageGrid,num); return cell ? <span onClick={()=>onLocate&&onLocate(num)} title="Voir la paire au garage" style={{color:C.blue||C.accent,fontWeight:600,cursor:'pointer'}}>{garageCellLabel(cell)}</span> : (garageUtilise ? <span style={{color:C.muted,fontWeight:500}} title="Cette paire n'est pas rangée au garage">pas au garage</span> : null); })()}
+                    {num && needsBordereau(o.status) && (()=>{ const cell=garageCellOf(garageGrid,num); return cell ? <span onClick={()=>onLocate&&onLocate(num)} title="Voir la paire au stock" style={{color:C.blue||C.accent,fontWeight:600,cursor:'pointer'}}>{garageCellLabel(cell)}</span> : (garageUtilise ? <span style={{color:C.muted,fontWeight:500}} title="Cette paire n'est pas rangée au garage">pas au garage</span> : null); })()}
                     {st==='cancelled' && num && (()=>{
                       const out = saleOutcome(o);
                       if (isPairLost(num)) return <span style={{color:C.danger,fontWeight:600,background:`${C.danger}18`,border:`1px solid ${C.danger}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title="Paire déclarée perdue : son numéro est libéré et sa case au garage vidée.">❌ N°{num} perdue</span>;
@@ -20310,7 +20310,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {(()=>{ const vs=venteStage(o); return <span title={vs.aide||undefined} style={{fontSize:11.5,color:C.text,fontWeight:600,background:C.card2,borderRadius:5,padding:'3px 9px',display:'inline-flex',alignItems:'center',gap:6,flexShrink:0}}><span style={{width:7,height:7,borderRadius:999,background:vs.color,display:'inline-block'}}/>{vs.label}</span>; })()}
                 <div style={{display:'flex',alignItems:'center',gap:6,flexShrink:0,marginLeft:'auto'}}>
                 {num && needsBordereau(o.status) && !hidden && inGarage(num) && (
-                  <button type="button" onClick={()=>onLocate&&onLocate(num)} title={`Voir la paire N°${num} au garage`} aria-label="Voir au garage" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.blue||C.accent,cursor:'pointer',fontSize:15,padding:'6px 8px'}}><Icon name="pin" size={15}/></button>
+                  <button type="button" onClick={()=>onLocate&&onLocate(num)} title={`Voir la paire N°${num} au stock`} aria-label="Voir au stock" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.blue||C.accent,cursor:'pointer',fontSize:15,padding:'6px 8px'}}><Icon name="pin" size={15}/></button>
                 )}
                 {needsBordereau(o.status) && !hidden && (
                   <button type="button" onClick={()=>startBordereau(num||'',o.title,o._acc)} title={num?`Bordereau N°${num}`:'Bordereau (titre)'} aria-label="Bordereau annoté" style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:8,padding:'8px 10px',cursor:'pointer',fontSize:15}}><Icon name="doc" size={16}/></button>
@@ -21679,7 +21679,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     </div>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:12,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>N°{d.numero} · {d.e.title||'—'}</div>
-                      <div style={{fontSize:10.5,color:C.muted,marginTop:1}}>{inGarage(d.numero) ? 'rangée au garage' : 'pas au garage'}</div>
+                      <div style={{fontSize:10.5,color:C.muted,marginTop:1}}>{inGarage(d.numero) ? 'rangée au stock' : 'pas au stock'}</div>
                     </div>
                     <button type="button" title="La paire n'est plus à vendre : on libère son numéro pour une autre paire."
                       onClick={()=>{ setPairsLost(prev=>{ const u={...prev,[d.numero]:{ at:new Date().toISOString(), title:d.e.title||'' }}; save('vinted_pairs_lost',u); return u; }); toast(`N°${d.numero} retirée du stock`); }}
@@ -21975,7 +21975,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   )}
                   <div style={{marginTop:5,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
                     <AcctTag acc={it._acc} name={accNameOf(it._acc)}/>
-                    {num && <button type="button" onClick={()=>atGarage?(onLocate&&onLocate(num)):(onStore&&onStore(num))} style={{border:'none',background:'transparent',padding:0,cursor:'pointer',fontSize:11,fontWeight:500,color:atGarage?(C.blue||C.accent):C.warn,display:'inline-flex',alignItems:'center',gap:3,minHeight:0}}><Icon name="home" size={12}/>{atGarage?'Au garage':'Ranger'}</button>}
+                    {num && <button type="button" onClick={()=>atGarage?(onLocate&&onLocate(num)):(onStore&&onStore(num))} style={{border:'none',background:'transparent',padding:0,cursor:'pointer',fontSize:11,fontWeight:500,color:atGarage?(C.blue||C.accent):C.warn,display:'inline-flex',alignItems:'center',gap:3,minHeight:0}}><Icon name="home" size={12}/>{atGarage?'Au stock':'Ranger'}</button>}
                     <button type="button" onClick={async ()=>{ if(await askConfirm('Marquer cette paire VENDUE et la retirer des annonces ?')) markSold(it.id); }} title="Marquer vendue : la retire des annonces tout de suite (sans attendre la synchro Vinted)" style={{marginLeft:'auto',border:`1px solid ${C.warn}`,background:`${C.warn}12`,color:C.warn,borderRadius:8,padding:'3px 9px',cursor:'pointer',fontSize:11,fontWeight:600,fontFamily:'inherit'}}>✓ Vendue</button>
                     {/* Pas d'alerte « titre en double » : chaque annonce a sa propre identité (id) et son propre N°. */}
                   </div>
