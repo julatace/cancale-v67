@@ -232,6 +232,18 @@ auth : shopcancale35@gmail.com = `74eea6e7-f060-46b6-b9c7-d500cedf4738`
   (jeton de l'utilisateur, `owner` écrit) ; un écrivain ANONYME laisse `owner`
   vide = témoin mesurable.
 - ✅ `VRM_OWNER_UID` posé sur Vercel (production + preview).
+- ✅ Journal TEMPORAIRE des écritures (`sauvegarde.journal_ecritures`, trigger
+  `vrm_noter_ecriture` sur les 2 tables) : rôle (anon / authenticated /
+  service_role), id de ligne, op, user-agent — jamais le contenu. Prouvé par un
+  test auto-annulé (`raise exception`) ; le 1er jet n'écrivait RIEN (erreur
+  avalée par `exception when others`) — corrigé via `to_jsonb(new)`.
+  Mesure : `select role, left(agent,40), count(*), max(at) from
+  sauvegarde.journal_ecritures group by 1,2 order by 4 desc;`
+  ⇒ étape 2 quand plus AUCUNE ligne `anon`. Puis supprimer trigger + table.
+- ℹ️ 15 requêtes 401 toutes les 5 min = un vieux **Google Apps Script**
+  (user-agent Google-Apps-Script) avec une clé invalide : lit
+  vrm_email_config / vrm_pro_facture / email_invoice_*. Rejeté, inoffensif ;
+  👤 le couper (script.google.com → Déclencheurs).
 - ⬜ ÉTAPE 2 = `supabase/migrations/002-fermeture.sql` (prêt). Conditions :
   👤 `SUPABASE_SERVICE_KEY` sur Vercel (Supabase → Settings → API Keys →
   service_role → Vercel → Settings → Environment Variables, Production) ;
