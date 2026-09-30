@@ -110,17 +110,17 @@ données de l'acheteur (dépôt public) :
 
 ## D. Accueil / notifications (cloche en haut, à côté du verrou et des réglages)
 - ⬜ D1. Centre de notifications plus clair.
-- ⬜ D2. Retirer la carte « déclaration URSSAF » ; à la place, notification le
+- ✅ D2 (cloche : rappel les 1–3 du mois ; push serveur le 1er via le cron `ship-reminders`, catégorie `urssaf`, anti-doublon `urssaf_reminder_dedup`, route EXÉCUTÉE au banc). La carte « Prochaine déclaration » du tableau de bord est RESTÉE (le « dedans » visait la cloche) — à confirmer. Retirer la carte « déclaration URSSAF » ; à la place, notification le
   1er de chaque mois pour la faire.
-- ⬜ D3. Retirer « 25 offres reçues » (on les verra via la captation des messages).
-- ⬜ D4. Retirer « 20 messages non lus ».
+- ✅ D3. Retirer « 25 offres reçues » (on les verra via la captation des messages).
+- ✅ D4. Retirer « 20 messages non lus ».
 - ⬜ D5. « Vente à expédier » : seulement si VRAIMENT sûr qu'elle n'est pas
   expédiée (il a déjà reçu l'argent pour celle signalée). Revoir la règle.
 - ⬜ D6. « Colis à retirer » : le lieu du point relais est souvent en bas du mail
   ou dans ses infos, l'app dit à tort qu'elle ne l'a pas. Mieux extraire.
 - ⬜ D7. Notifications push : « très bien ». Mais à une vente, le « en transit »
   en petit dessous doit être pertinent et fiable.
-- ⬜ D8. Renommer « push » en **« Notifications téléphone »**.
+- ✅ D8. Renommer « push » en **« Notifications téléphone »**.
 
 ## E. Ventes
 - ⬜ E1. Bordereau à côté de chaque vente (à côté du prix si possible), en plus
@@ -130,8 +130,8 @@ données de l'acheteur (dépôt public) :
 - ⬜ E3. Pouvoir relier une vente à un achat Vinted + sa facture d'achat.
 - ⬜ E4. Photo de l'annonce + toutes les infos à côté pour chaque vente ET achat
   (comme Vinted).
-- ⬜ E5. Export CSV : ajouter à côté « format Excel / Numbers ».
-- ⬜ E6. Litiges : les retirer des Outils (déjà dans « annulée », ce n'est pas un
+- ✅ E5 (le CSV avait déjà BOM + « ; » : seul le libellé manquait). Export CSV : ajouter à côté « format Excel / Numbers ».
+- ✅ E6. Litiges : les retirer des Outils (déjà dans « annulée », ce n'est pas un
   problème pour lui).
 
 ## F. Achats
@@ -163,13 +163,13 @@ données de l'acheteur (dépôt public) :
   quels numéros ont servi).
 
 ## I. Colis
-- ⬜ I1. « Les infos datent de 58 jours » : faux, trouver et corriger.
-- ⬜ I2. Retirer « 1 imprime, colle, dépose et clique sur fait ».
+- ✅ I1 (cause : l'âge = compte le plus ANCIEN parmi TOUS les comptes, exclus/bloqués compris ; ils sont écartés et le bandeau nomme le compte en retard. Non mesuré sur sa base — réseau bloqué). « Les infos datent de 58 jours » : faux, trouver et corriger.
+- ✅ I2. Retirer « 1 imprime, colle, dépose et clique sur fait ».
 - ⬜ I3. Imprimante classique/thermique prend trop de place ⇒ demander le format
   de découpe UNE fois à chaque nouveau type de bordereau capté ; l'app doit
   reconnaître les différents bordereaux (transporteurs ET variantes d'un même
   transporteur), et demander l'emplacement pour thermique ET normal.
-- ⬜ I4. Retirer « où aller déposer les colis ».
+- ✅ I4. Retirer « où aller déposer les colis ».
 - ⬜ I5. Bordereaux captés sans vente correspondante : ne pas les afficher ;
   attendre la capture Vinted, les emails ne servent que de sécurité.
 - ⬜ I6. Les bordereaux disparaissent quand la vente est expédiée.
@@ -177,7 +177,7 @@ données de l'acheteur (dépôt public) :
 ## J. Réglages divers
 - ⬜ J1. « Mes adresses de réception » : demander à la création du compte ou à la
   connexion d'un nouveau compte Vinted ; ou deviner via l'email du compte Vinted.
-- ⬜ J2. Retirer la rédaction d'annonces par l'IA.
+- ✅ J2 (menu Annonces, bouton eBay, réglage de clé locale ; `api/ai` reste — il sert aux réponses automatiques). Retirer la rédaction d'annonces par l'IA.
 - ⬜ J3. Widget : pas convaincu pour l'instant (à revoir / garder discret).
 
 ## K. Bugs
@@ -225,4 +225,5 @@ données de l'acheteur (dépôt public) :
   affiche le nombre mis de côté ») — probablement la refonte d'accueil #305/#306.
 - La branche portait un commit non déployé de la session précédente :
   « Nouvelle identité Menthe » (fba8202) — conservé, part avec la 1re PR.
-- K1 livré.
+- K1 livré (#307).
+- Lot 2 : D2 D3 D4 D8 I1 I2 I4 E5 E6 J2. `audit-offres-titre` rendu conditionnel (plus aucune offre affichée, décision de Julien) — il redevient exigeant dès qu'un écran rappelle `offresAtraiter`.

@@ -6467,12 +6467,14 @@ function PrixMarche({ data, baseKO }) {
 // les chiffres sont figés (un colis déjà expédié peut encore apparaître) : on le
 // DIT plutôt que de laisser croire à un défaut. Le geste, jamais la promesse
 // (§7). `jours == null` (âge inconnu / lecture ratée) ⇒ rien : jamais un faux.
-function FraicheurDonnees({ jours }) {
+function FraicheurDonnees({ jours, compte }) {
   if (jours == null) return null;
   if (jours <= 1) return <div style={{fontSize:11.5,color:C.muted}}>✓ Données Vinted à jour (capturées {jours<1?"aujourd'hui":'hier'}).</div>;
   return (
     <div style={{fontSize:12,color:C.warn,background:`${C.warn}12`,border:`1px solid ${C.warn}55`,borderRadius:10,padding:'9px 12px',lineHeight:1.5}}>
-      Ces infos datent d'il y a <b>{jours} j</b> : une vente récente peut manquer, et un colis déjà expédié peut encore apparaître. Elles se rafraîchissent dès que tu repasses sur Vinted avec l'extension à jour.
+      {compte
+        ? <>Les données du compte <b>{compte}</b> datent d'il y a <b>{jours} j</b> : une de ses ventes récentes peut manquer, et un colis déjà expédié peut encore apparaître. Repasse sur Vinted connecté sur <b>{compte}</b> pour les rafraîchir.</>
+        : <>Ces infos datent d'il y a <b>{jours} j</b> : une vente récente peut manquer, et un colis déjà expédié peut encore apparaître. Elles se rafraîchissent dès que tu repasses sur Vinted avec l'extension à jour.</>}
     </div>
   );
 }
@@ -6510,7 +6512,7 @@ function VintedResume({ liveStats, baseKO }) {
         <div style={box}><div style={eti}>Disponible</div><div className="vrm-display" style={{fontSize:20,fontWeight:700,color:C.text}}>{dispo==null?'—':fmt(dispo)}</div></div>
         <div style={box}><div style={eti}>En attente</div><div className="vrm-display" style={{fontSize:20,fontWeight:700,color:C.muted}}>{att==null?'—':fmt(att)}</div></div>
       </div>
-      <FraicheurDonnees jours={dAge}/>
+      <FraicheurDonnees jours={dAge} compte={liveStats && liveStats.dataAgeCompte}/>
     </div>
   );
 }
@@ -6915,7 +6917,8 @@ function EbayPublier({ onPublie, paires = [] }) {
             {/* Rédaction IA : optimise le titre à partir des VRAIES infos de la
                 paire (jamais d'invention, api/ai). Affiché seulement si l'IA est
                 branchée — sinon le titre reste celui de la paire, déjà rempli. */}
-            {aiPret && (
+            {/* Bouton IA retiré le 30 septembre (rédaction IA abandonnée). */}
+            {false && aiPret && (
               <button type="button" onClick={titreIA} disabled={aiBusy} style={{ marginTop: 8, width: '100%', border: `1px solid ${C.accent}`, background: `${C.accent}0d`, color: C.accent, borderRadius: 10, padding: '10px 14px', fontSize: 13, fontWeight: 700, cursor: aiBusy ? 'default' : 'pointer', fontFamily: 'inherit', opacity: aiBusy ? 0.6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>{aiBusy ? 'L\'IA rédige…' : '✨ Optimiser le titre avec l\'IA'}</button>
             )}
             {aiWhy && <div style={{ fontSize: 11.5, color: C.muted, marginTop: 6, lineHeight: 1.45 }}>✨ {aiWhy}</div>}
@@ -7393,7 +7396,7 @@ function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, ebay
       {baseKO ? (
         <LignePanne>Je n'ai pas pu lire tes données — les totaux seraient faux, on ne les affiche pas. Rien n'est perdu : c'est la lecture qui a échoué.</LignePanne>
       ) : estVinted ? (<>
-        <FraicheurDonnees jours={dAge}/>
+        <FraicheurDonnees jours={dAge} compte={liveStats && liveStats.dataAgeCompte}/>
         <Card style={{padding:18}}>
           <div style={{...eti,marginBottom:4}}>Vinted · chiffre d'affaires</div>
           <div className="vrm-display" style={{fontSize:30,fontWeight:700,color:C.text}}>{p.ca==null?'—':fmt(p.ca)}</div>
@@ -8718,7 +8721,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         <Card>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
             <span style={{fontSize:13,fontWeight:600,color:C.text}}>📊 Récap comptable mensuel</span>
-            <Btn small onClick={exportCompta}>📥 Exporter (CSV)</Btn>
+            <Btn small onClick={exportCompta}>📥 Exporter (CSV · Excel · Numbers)</Btn>
           </div>
           <div style={{overflowX:'auto'}}>
             <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
@@ -19328,7 +19331,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </button>
             )}
 
-            {!baseKO && !premierJour && <div style={{marginBottom:14}}><FraicheurDonnees jours={liveStats && liveStats.dataAgeJours}/></div>}
+            {!baseKO && !premierJour && <div style={{marginBottom:14}}><FraicheurDonnees jours={liveStats && liveStats.dataAgeJours} compte={liveStats && liveStats.dataAgeCompte}/></div>}
 
             {/* ⚠️ Avant tout le reste : si le serveur ne peut envoyer aucune
                 notification, il faut le voir ICI. Compter sur les notifications
@@ -20179,8 +20182,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {[
                         {k:'rep', icon:'📊', lab:'Rapport comptable', desc:'CA, bénéfice, cotisations du mois', on:()=>{ setToolsOpen(false); openReport(); }},
                         {k:'ann', icon:'📚', lab:'Registre annuel', desc:'Ventes + achats ligne par ligne', on:()=>{ setToolsOpen(false); openAnnual(); }},
-                        ...(alert?[{k:'lit', icon:'⚖️', lab:`Litiges${disputes.totalLost>0?` · −${Math.round(disputes.totalLost)} €`:''}`, desc:'Annulations et remboursements', danger:true, on:()=>{ setToolsOpen(false); setShowDisputes(true); }}]:[]),
-                        ...((sales.items&&sales.items.length>0)?[{k:'csv', icon:'⬇️', lab:'Exporter en CSV', desc:'Toutes tes ventes', on:()=>{ setToolsOpen(false); exportCsv(); }}]:[]),
+                        /* « Litiges » retiré des Outils le 30 septembre (Julien : « ce n'est
+                           pas un problème, je reçois les articles après ; ils sont déjà
+                           dans Annulées »). La modale reste, plus rien n'y mène d'ici. */
+                        ...((sales.items&&sales.items.length>0)?[{k:'csv', icon:'⬇️', lab:'Exporter (CSV · Excel · Numbers)', desc:'Toutes tes ventes, lisible dans Excel et Numbers', on:()=>{ setToolsOpen(false); exportCsv(); }}]:[]),
                       ].map(t=>(
                         <button key={t.k} onClick={t.on} style={{display:'flex',alignItems:'center',gap:10,textAlign:'left',border:'none',background:'transparent',borderRadius:8,padding:'9px 10px',cursor:'pointer',fontFamily:'inherit'}}>
                           <span style={{fontSize:17,flexShrink:0}}>{t.icon}</span>
@@ -21804,7 +21809,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {k:'inv', icon:'📋', lab:'Inventaire physique', desc:'Les paires qui doivent être chez toi, par numéro', on:()=>{ setAnnToolsOpen(false); setInventOpen(true); }},
                     {k:'aud', icon:'🔎', lab:'Audit du stock', desc:'Retrouver les paires mal rangées', on:()=>{ setAnnToolsOpen(false); setAuditOpen(true); }},
                     {k:'fillbuy', icon:'💶', lab:"Compléter les prix d'achat", desc:`${fillBuyRows.length} paire${fillBuyRows.length>1?'s':''} sans coût — le bénéfice est faux sans eux`, on:()=>{ setAnnToolsOpen(false); setFillBuyOpen(true); }},
-                    ...(aiPret ? [{k:'ia', icon:'✨', lab:"Rédiger une annonce (IA)", desc:'Réécrit titre + description pour vendre plus vite — tu copies, tu publies', on:()=>{ setAnnToolsOpen(false); setRepubAi({ busy:false, key:'', res:null, why:'', reason:'' }); setIaOpen(true); }}] : []),
+                    /* « Rédiger une annonce (IA) » retiré le 30 septembre (Julien : « ça ne
+                       va pas servir »). */
                     /* ⚠️ « Renuméroter à la suite » A ÉTÉ RETIRÉ DU MENU (23 août 2026).
                        C'est le seul outil qui RÉATTRIBUE des numéros en masse — donc
                        exactement ce que Julien interdit maintenant qu'il les écrit sur
@@ -22232,7 +22238,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {/* ⚠️ Un colis déjà expédié qui traîne ici vient presque toujours d'une
             capture ancienne (statut figé), pas d'un défaut. On le dit (§11, même
             message partout). */}
-        <div style={{padding:'0 16px'}}><FraicheurDonnees jours={liveStats && liveStats.dataAgeJours}/></div>
+        <div style={{padding:'0 16px'}}><FraicheurDonnees jours={liveStats && liveStats.dataAgeJours} compte={liveStats && liveStats.dataAgeCompte}/></div>
         <NoAcc/>
         {/* RÉCAP EN HAUT : combien de COLIS restent à envoyer. On compte ce que
             Vinted attend de toi (moisson de l'extension), pas les emails reçus :
@@ -22277,20 +22283,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </button>
                 )}
               </div>
-              {/* ⚠️ COMMENT ENVOYER, POUR UN NOVICE (cohérent avec le guide de
-                  l'écran « colis à retirer »). Le geste en 3 temps, écrit UNE
-                  fois en tête (§7), pas répété sur chaque carte. Seulement quand
-                  il y a vraiment quelque chose à envoyer — sinon c'est du bruit. */}
-              {aPoster.length>0 && (
-                <div style={{flexBasis:'100%',marginTop:12,paddingTop:11,borderTop:`1px solid ${C.border}`,display:'flex',flexWrap:'wrap',gap:6}}>
-                  {[['1','Imprime le bordereau'],['2','Colle-le sur le colis'],['3','Dépose-le, puis coche « Colis fait »']].map(([n,txt])=>(
-                    <span key={n} style={{display:'inline-flex',alignItems:'center',gap:6,background:C.bg||C.card2||'transparent',border:`1px solid ${C.border}`,borderRadius:999,padding:'4px 10px 4px 4px',fontSize:11.5,color:C.text,fontWeight:600}}>
-                      <span style={{flexShrink:0,width:18,height:18,borderRadius:999,background:C.accent,color:'#fff',fontSize:11,fontWeight:700,display:'inline-flex',alignItems:'center',justifyContent:'center'}}>{n}</span>
-                      {txt}
-                    </span>
-                  ))}
-                </div>
-              )}
+              {/* Retiré le 30 septembre (Julien) : « 1 imprime, colle, dépose et
+                  clique sur fait, ça sert à rien, tu peux enlever ». */}
               {/* ── QUELLE IMPRIMANTE ? ────────────────────────────────────────
                   Demande du 15 septembre. MESURÉ sur ses 148 bordereaux : la
                   page A4 porte l'étiquette ET la fiche destinataire ET la pub du
@@ -22323,59 +22317,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
           );
         })()}
-        {/* ── OÙ DÉPOSER TES COLIS ────────────────────────────────────────────
-            Les points relais autour de chez toi, avec adresse, distance et
-            horaires. Donnée captée par l'extension quand Vinted la charge :
-            ZÉRO appel Vinted depuis l'app.
-            ⚠️ C'est le DÉPÔT (où tu portes le carton), pas le retrait d'un
-            achat — deux choses différentes, cf. fetchDropOffPoints. */}
-        {(()=>{
-          if (!dropOffs || !dropOffs.carriers.length) return null;
-          const jours = dropOffs.capturedAt ? Math.round((Date.now()-dropOffs.capturedAt)/86400000) : null;
-          const total = dropOffs.carriers.reduce((n,c)=>n+c.points.length,0);
-          return (
-            <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px',marginBottom:12}}>
-              <button type="button" onClick={()=>setDropOpen(o=>!o)} aria-expanded={dropOpen}
-                style={{width:'100%',border:'none',background:'transparent',padding:0,cursor:'pointer',fontFamily:'inherit',textAlign:'left',display:'flex',alignItems:'center',gap:10}}>
-                <span style={{fontSize:18,flexShrink:0}}>📍</span>
-                <span style={{flex:'1 1 150px',minWidth:0}}>
-                  <span style={{display:'block',fontSize:15,fontWeight:700,color:C.text}}>Où déposer tes colis</span>
-                  <span style={{display:'block',fontSize:11,color:C.muted,marginTop:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-                    {total} point{total>1?'s':''} près de chez toi · {dropOffs.carriers.map(c=>c.carrier).join(' · ')}
-                  </span>
-                </span>
-                <span style={{flexShrink:0,fontSize:12,color:C.muted}}>{dropOpen?'▲':'▼'}</span>
-              </button>
-              {dropOpen && (
-                <div style={{marginTop:10}}>
-                  {dropOffs.carriers.map(c=>(
-                    <div key={c.carrier} style={{marginBottom:10}}>
-                      <div style={{fontSize:11,fontWeight:600,color:C.muted,marginBottom:6}}>{c.carrier}</div>
-                      {c.points.slice(0,6).map(p=>(
-                        <div key={p.code} style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',padding:'8px 0',borderTop:`1px solid ${C.border}`}}>
-                          <div style={{flex:'1 1 150px',minWidth:0}}>
-                            <div style={{fontSize:13,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.nom}</div>
-                            {p.adresse && <div style={{fontSize:11,color:C.muted,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.adresse}</div>}
-                            {p.ouverture && <div style={{fontSize:11,color:C.muted,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.ouverture}</div>}
-                          </div>
-                          {p.km!=null && <span style={{flexShrink:0,fontSize:12,fontWeight:600,color:C.text}}>{p.km} {p.unite}</span>}
-                          {p.lat && p.lon && (
-                            <a href={`https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lon}`} target="_blank" rel="noreferrer"
-                               style={{flexShrink:0,fontSize:12,color:C.accent,textDecoration:'none'}}>Itinéraire ↗</a>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  ))}
-                  {/* On DIT l'âge : un point relais ferme, la liste n'est pas éternelle. */}
-                  <div style={{fontSize:11,color:C.muted}}>
-                    Liste captée par l'extension{jours!=null?(jours<1?" aujourd'hui":` il y a ${jours} j`):''} — elle se rafraîchit quand tu prépares un envoi sur Vinted.
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })()}
+        {/* « Où déposer tes colis » retiré le 30 septembre (Julien : « c'est pas
+            obligé, c'est pas ouf »). Il affichait aussi « liste captée il y a
+            58 j » — l'âge d'une liste de points relais, lu comme l'âge des
+            données de Colis. */}
         {/* Bordereau capté par l'extension (téléchargé sur Vinted) → tamponnage 1 clic. */}
         {freshLabel && (()=>{
           // Bordereau frais capté → on cherche la vente À EXPÉDIER de CE compte.
@@ -24960,6 +24905,7 @@ const PUSH_CATS = [
   { id:'colis',    def:true,  titre:'📍 Colis à retirer',   desc:'Arrivé au relais, avec le code de retrait.' },
   { id:'expedier', def:true,  titre:'📮 Colis à poster',    desc:"Rappel du matin, avec l'échéance." },
   { id:'offre',    def:true,  titre:'🏷️ Offre reçue',       desc:'Un acheteur propose un prix.' },
+  { id:'urssaf',   def:true,  titre:'🧾 Déclaration URSSAF', desc:'Le 1er de chaque mois, pour penser à la faire.' },
   { id:'suivi',    def:false, titre:'🚚 Suivi du colis',    desc:'« En transit », « livré ». Rien à faire.' },
   { id:'achat',    def:false, titre:'🛍 Achat confirmé',    desc:"Tu viens de l'acheter, tu le sais déjà." },
   { id:'message',  def:false, titre:'💬 Message',           desc:"Le badge de l'app suffit." },
@@ -25304,8 +25250,7 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
           stockvinted restent montés mais deviennent injoignables, comme
           comptabilite/inventory (§4.11) : aucun n'est requis au banc. */}
 
-      <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Assistant IA</div>
-      <AiKeySetting/>
+      {/* « Rédaction d'annonces par l'IA » retirée de Réglages le 30 septembre (Julien). */}
 
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Comptabilité</div>
       <RegimeSetting/>
@@ -25322,7 +25267,7 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
       <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}>
         <div style={{minWidth:0}}>
           <div style={{fontSize:13,fontWeight:600,color:C.text}}>🛎 Alertes dans l'app</div>
-          <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.4}}>Bandeau + notification quand l'app est ouverte (ventes comptabilisées, factures reçues). Les notifications push ci-dessus couvrent le reste, app fermée.</div>
+          <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.4}}>Bandeau + notification quand l'app est ouverte (ventes comptabilisées, factures reçues). Les notifications téléphone ci-dessus couvrent le reste, app fermée.</div>
         </div>
         <button onClick={onToggleNotif} style={{
           flexShrink:0,padding:'6px 16px',borderRadius:8,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',
@@ -25879,7 +25824,7 @@ function PushSetting() {
 
   return (
     <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px'}}>
-      <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:4}}>🔔 Notifications push</div>
+      <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:4}}>🔔 Notifications téléphone</div>
       <div style={{fontSize:12,color:C.muted,marginBottom:10,lineHeight:1.4}}>
         Vente, bordereau, argent reçu : notifié en temps réel, même app fermée.
         {state==='unsupported' && ' — Non disponible ici : installe d\'abord l\'app sur ton écran d\'accueil (Partager → Sur l\'écran d\'accueil) puis ouvre-la depuis l\'icône.'}
@@ -27294,16 +27239,26 @@ export default function App() {
       //    vivants (celui qui explique un colis figé). Lecture scalaire projetée
       //    (§4.4, jamais `select=data`), `capturedAt` — jamais `updated_at` qui
       //    ment (§4.3). Échec/absence ⇒ null ⇒ on n'affiche rien (pas un faux).
-      let dataAgeJours=null;
+      // ⚠️⚠️ « LES INFOS DATENT DE 58 JOURS » ÉTAIT FAUX (Julien, 30 sept.) :
+      //    l'âge retenu était celui du compte le plus ancien parmi TOUS les
+      //    comptes liés — y compris un compte qu'il a EXCLU de l'app ou que
+      //    Vinted a bloqué, qu'il ne rouvrira jamais. Un seul compte mis de
+      //    côté faisait dire « 58 j » à tout l'écran Colis. C'est « un CHOIX
+      //    n'est pas une panne » (§5) sur la fraîcheur. On ne compte que les
+      //    comptes ACTIFS, et on NOMME celui qui est en retard : sans son nom,
+      //    impossible de savoir sur quel compte repasser (il en a neuf).
+      let dataAgeJours=null, dataAgeCompte='';
       try{
+        const ecartes=new Set([...(load('vinted_accounts_hidden',[])||[]),...(load('vinted_accounts_blocked',[])||[])].map(String));
+        const loginDe=(uid)=>{ const a=(vintedAccounts||[]).find(x=>String(x.vinted_user_id)===uid); return a?String(a.login||''):''; };
         const rf=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_orders_sold&select=id,cap:data->>capturedAt`,{headers:sbAuth()});
-        if(rf.ok){ const rows=await rf.json(); let vieux=null;
-          for(const row of (Array.isArray(rows)?rows:[])){ const m=/^harvest_([^_]+)_/.exec(row&&row.id||''); if(!m||!uidsVivants.has(m[1])) continue; const t=Date.parse(row.cap||''); if(!isNaN(t)&&(vieux==null||t<vieux)) vieux=t; }
-          if(vieux!=null) dataAgeJours=Math.max(0,Math.round((Date.now()-vieux)/86400000));
+        if(rf.ok){ const rows=await rf.json(); let vieux=null, qui='';
+          for(const row of (Array.isArray(rows)?rows:[])){ const m=/^harvest_([^_]+)_/.exec(row&&row.id||''); if(!m||!uidsVivants.has(m[1])||ecartes.has(m[1])) continue; const t=Date.parse(row.cap||''); if(!isNaN(t)&&(vieux==null||t<vieux)){ vieux=t; qui=m[1]; } }
+          if(vieux!=null){ dataAgeJours=Math.max(0,Math.round((Date.now()-vieux)/86400000)); dataAgeCompte=loginDe(qui); }
         }
       }catch(_){/* pas su ⇒ null ⇒ rien d'affiché */}
       if(!stop && ok){
-      setLiveStats({caMois,caEncaisse,enCours,online,unread,stockValue,pairesStock,ventesJour,caJour,ventesMois,soldTotal,joursVente:joursVenteSet.size,caParCompte,dataAgeJours,
+      setLiveStats({caMois,caEncaisse,enCours,online,unread,stockValue,pairesStock,ventesJour,caJour,ventesMois,soldTotal,joursVente:joursVenteSet.size,caParCompte,dataAgeJours,dataAgeCompte,
         walletDispo:(walletEsc&&walletEsc.accounts>0)?walletEsc.dispo:null,
         walletAttente:(walletEsc&&walletEsc.accounts>0)?walletEsc.total:null,
         walletComptes:(walletEsc&&walletEsc.accounts)||0,
@@ -27479,46 +27434,23 @@ export default function App() {
       if(toShipCount>0)  items.push({icon:'⏰', ic:'truck', text:`${toShipCount} vente${toShipCount>1?'s':''} à expédier`, n:toShipCount, tab:'cat_bord'});
       if(ebayShipCount>0) items.push({icon:'📮', ic:'truck', text:`${ebayShipCount} vente${ebayShipCount>1?'s':''} eBay à expédier`, n:ebayShipCount, tab:'plat_ebay'});
       if(lbcRemoveCount>0) items.push({icon:'🟠', ic:'tag', text:`${lbcRemoveCount} à retirer de Leboncoin (vendue${lbcRemoveCount>1?'s':''} sur Vinted)`, n:lbcRemoveCount, tab:'leboncoin'});
-      if(unreadTotal>0){
-        // ⚠️ SEPT COMPTES ÉNUMÉRÉS, ÇA FAISAIT DEUX LIGNES qui noyaient l'action
-        // (« lis tes messages »). On garde les trois qui en ont le plus, le
-        // reste devient un total — le détail est sur l'écran Messages.
-        const tri=Object.entries(unreadByAcct).sort((x,y)=>y[1]-x[1]);
-        const tete=tri.slice(0,3).map(([n,c])=>`${n} (${c})`);
-        const reste=tri.slice(3).reduce((t,[,c])=>t+c,0);
-        const hint=tete.length?` · sur ${tete.join(', ')}${reste>0?` et ${tri.length-3} autres comptes`:''}`:'';
-        items.push({icon:'💬', ic:'chat', text:`${unreadTotal} message${unreadTotal>1?'s':''} non lu${unreadTotal>1?'s':''}${hint}`, n:unreadTotal, tab:'cat_msg'});
-      }
-      // 🏷️ OFFRES REÇUES → notification (Julien, 28 sept. : « enlève le nombre
-      // d'offres de l'accueil, laisse simplement les notifications »). On lit les
-      // offres et le mémo « déjà répondu » ICI (le centre de notifs est dans la
-      // coque, pas dans l'écran d'accueil) et on applique la MÊME règle
-      // `offresAtraiter` (§11). `ventes:[]` : la coque n'a pas la liste des ventes
-      // en forme `items` — sans elle on ne peut pas écarter une offre déjà réglée,
-      // donc on n'en écarte aucune (montrer une offre réglée coûte un clic ;
-      // en cacher une vivante fait rater une vente, §5). On répond sur Vinted.
-      try{
-        const offresBrutes = await fetchEmailOffers();
-        if(Array.isArray(offresBrutes) && offresBrutes.length){
-          const dejaRepondu = new Set(load('vinted_offers_done', []) || []);
-          const cle = (o) => `${o.receivedAt||''}|${normTitle(o.article||'')}`;
-          const { gardees:offresRecent } = offresAtraiter(offresBrutes, [], dejaRepondu, cle);
-          if(!cancelled && offresRecent.length) items.push({icon:'🏷️', ic:'tag', text:`${offresRecent.length} offre${offresRecent.length>1?'s':''} reçue${offresRecent.length>1?'s':''} — réponds sur Vinted`, n:offresRecent.length, href:'https://www.vinted.fr/inbox'});
-        }
-      }catch(_){}
+      // ⚠️ Retirés le 30 septembre, à la demande de Julien : « N messages non
+      // lus » et « N offres reçues » ne sont pas intéressants ici — les offres
+      // et les messages auront leur propre onglet (captation + envoi, comme
+      // Vintex). Ne pas les remettre dans la cloche.
       // Actions GRATUITES pour vendre plus (jamais de « booster » payant ici) :
       const numDbl=Object.entries(numPorteurs).filter(([,v])=>v.length>1);
       if(numDbl.length>0) items.push({icon:'🚨', ic:'alert', text:`${numDbl.length} numéro${numDbl.length>1?'s':''} porté${numDbl.length>1?'s':''} par deux annonces (N°${numDbl.map(([n])=>n).slice(0,3).join(', N°')}) — la mauvaise paire peut partir`, n:numDbl.length, tab:'cat_annonces'});
       if(noNumCount>0)   items.push({icon:'🔢', ic:'tag', text:`${noNumCount} annonce${noNumCount>1?'s':''} sans numéro`, n:noNumCount, tab:'cat_annonces'});
       if(sleepCount>0)   items.push({icon:'😴', ic:'sleep', text:`${sleepCount} annonce${sleepCount>1?'s':''} qui ${sleepCount>1?'dorment':'dort'} → baisser le prix`, n:sleepCount, tab:'cat_annonces'});
-      // Rappel URSSAF si l'échéance de déclaration approche (≤ 14 j) ou est passée.
-      try{
-        const due=nextUrssafDeadline(load('vinted_urssaf_freq','trimestriel'));
-        if(due && due.daysLeft<=14){
-          const when=due.daysLeft<0?`en retard (${due.dueDate.toLocaleDateString('fr-FR')})`:due.daysLeft===0?"aujourd'hui":`avant le ${due.dueDate.toLocaleDateString('fr-FR')}`;
-          items.push({icon:'🧾', ic:'receipt', text:`Déclaration URSSAF ${when}`, n:1, tab:'dashboard'});
-        }
-      }catch(_){}
+      // Rappel URSSAF : UNE notification, le 1er de chaque mois (et les deux
+      // jours suivants, pour qui n'ouvre pas l'app le 1er). Julien, 30 sept. :
+      // « enlève la déclaration URSSAF, envoie simplement une notification le
+      // premier de chaque mois pour la faire, pas besoin de la laisser ».
+      {
+        const j=new Date().getDate();
+        if(j<=3) items.push({icon:'🧾', ic:'receipt', text:`Nouveau mois : pense à ta déclaration URSSAF`, n:1, tab:'dashboard'});
+      }
       setNotifItems(items);
       save('vinted_notif_seen_convs',nextSeen);
       const prevS=parseInt(localStorage.getItem('vinted_notif_last_vsales')||'-1',10);

@@ -73,12 +73,41 @@ export default async function handler(req, res) {
     // La seule question qui compte : **cette vente attend-elle encore MON
     // envoi ?** C'est exactement ce que l'extension écrit à la capture
     // (`data.resume.txns`, §5.14) — même règle que l'app, lu en scalaire.
+    const today = parisDate(0);
     const m = (await getRow('main')) || {};
     const printed = m.vinted_bords_printed || {};
     const shippedManual = m.vinted_bords_shipped || {};
     const hidden = m.vinted_bords_hidden || {};
     const panelDone = (await getRow('panel_bords_done')) || {};
     const key = (b) => String(b.transaction || b.suivi || b.numero || '');
+
+    // RAPPEL URSSAF — le 1er de chaque mois (Julien, 30 sept. : « envoie
+    // simplement une notification le premier de chaque mois pour la faire »).
+    // Posé AVANT le calcul des colis : ce dernier se tait quand le résumé
+    // manque, le rappel mensuel ne doit pas se taire avec lui. Une seule fois
+    // par mois (ligne `urssaf_reminder_dedup`), et une écriture ratée du mémo
+    // n'empêche pas le reste du rappel.
+    let urssaf = null;
+    try {
+      const mois = today.slice(0, 7);
+      if (today.endsWith('-01')) {
+        const deja = (await getRow('urssaf_reminder_dedup')) || {};
+        if (deja.mois !== mois && await pushCategorieActive('urssaf')) {
+          await sendPushToAll({
+            title: '🧾 Déclaration URSSAF',
+            body: 'Nouveau mois : pense à déclarer ton chiffre d\'affaires sur autoentrepreneur.urssaf.fr.',
+            tag: 'urssaf-' + mois,
+            url: '/?tab=dashboard',
+          });
+          await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${conflictTarget('id')}`, {
+            method: 'POST',
+            headers: { ...HEADERS, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+            body: JSON.stringify(withOwnerAll([{ id: 'urssaf_reminder_dedup', data: { mois } }])),
+          });
+          urssaf = 'envoyé';
+        }
+      }
+    } catch (_) { urssaf = 'échec'; }
 
     // Transactions encore en attente d'expédition, d'après la moisson.
     let attente = null;
@@ -96,9 +125,9 @@ export default async function handler(req, res) {
     // ⚠️ Aucune ligne ne porte encore de résumé (extension pas rechargée) : on
     // se TAIT. Une notification fausse est pire que pas de notification — c'est
     // très exactement le « 51 bordereaux » qu'on corrige ici.
-    if (!attente) { res.status(200).json({ ok: true, skipped: 'resume absent — aucune notification envoyee' }); return; }
+    if (!attente) { res.status(200).json({ ok: true, urssaf, skipped: 'resume absent — aucune notification envoyee' }); return; }
 
-    const today = parisDate(0), tomorrow = parisDate(1);
+    const tomorrow = parisDate(1);
     let overdue = 0, dueToday = 0, dueTomorrow = 0;
     for (const b of rows) {
       if (!b) continue;
