@@ -63,7 +63,7 @@ données de l'acheteur (dépôt public) :
 ---
 
 ## A. Extension ↔ app (comme Vintex / l'extension « vines »)
-- ⬜ A1. Clic sur l'icône de l'extension ⇒ ouvre directement l'app VRM : sur
+- ✅ A1 (5.118 : connecté → l'icône ouvre/réutilise l'onglet vrm.center sur `plat_vinted` ou `plat_leboncoin` selon le site actif, puis se ferme ; pas connecté → petite fenêtre de connexion seule, qui ouvre VRM après connexion ; `bancs/popup.cjs` 14 verts. Le panneau sur Vinted existe encore — à retirer/réduire quand l'app aura tout). Clic sur l'icône de l'extension ⇒ ouvre directement l'app VRM : sur
   vinted.fr → onglet Vinted de VRM ; sur leboncoin.fr → onglet Leboncoin. Plus de
   panneau à utiliser sur Vinted : « c'est que sur l'app maintenant que l'on
   retrouve les données qui nous intéressent ». L'extension capte et envoie.

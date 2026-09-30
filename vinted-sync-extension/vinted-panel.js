@@ -14,7 +14,7 @@
   if (window.__vrmPanelLoaded) return;
   window.__vrmPanelLoaded = true;
 
-  const APP_URL = 'https://cancale-v67-ten.vercel.app';
+  const APP_URL = 'https://vrm.center';
   let DATA = null;
   // ── Mémoire de navigation du panneau (localStorage, partagé entre onglets
   //    Vinted) : on garde OUVERT/FERMÉ et l'onglet actif d'une page à l'autre.

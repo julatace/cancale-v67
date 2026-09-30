@@ -49,7 +49,15 @@ async function rendre(nav, etat) {
         },
       },
       storage: { local: { get: (k, cb) => setTimeout(() => cb && cb({}), 0) } },
+      // 30 sept. : connecté, l'icône OUVRE VRM (onglet réutilisé ou créé).
+      tabs: {
+        query: (q, cb) => setTimeout(() => cb(q && q.active ? [{ id: 1, url: e.__url || 'https://www.vinted.fr/items/1' }] : []), 0),
+        create: (o, cb) => { window.__ouvert = o.url; cb && cb(); },
+        update: (id, o, cb) => { window.__ouvert = o.url; cb && cb(); },
+      },
+      windows: { update: () => {} },
     };
+    window.close = () => { window.__ferme = true; };
   }, etat);
   await pg.addScriptTag({ content: js });
   await pg.waitForTimeout(400);
@@ -58,8 +66,10 @@ async function rendre(nav, etat) {
   const champs = await pg.evaluate(() => Array.from(document.querySelectorAll('input'))
     .map((i) => ({ id: i.id, ph: i.placeholder, type: i.type })));
   const liens = await pg.evaluate(() => Array.from(document.querySelectorAll('a[href]')).map((a) => a.href));
+  const ouvert = await pg.evaluate(() => window.__ouvert || null);
+  const ferme = await pg.evaluate(() => !!window.__ferme);
   await ctx.close();
-  return { txt, champs, liens, erreurs, pg };
+  return { txt, champs, liens, erreurs, pg, ouvert, ferme };
 }
 
 (async () => {
@@ -91,8 +101,13 @@ async function rendre(nav, etat) {
   console.log('\n── Connecté : la fenêtre ne redemande pas de mot de passe');
   const co = await rendre(nav, { ok: true, connecte: true, email: 'sophie@exemple.fr', cloisonne: true });
   dit(!co.erreurs.length, 'toujours aucune erreur', co.erreurs[0]);
-  dit(/sophie@exemple\.fr/.test(co.txt), 'elle nomme le compte connecté — c’est ce qui permet de voir qu’on s’est trompé');
+  // 30 sept. (Julien) : « quand on ouvre l'extension, je veux que ça ouvre VRM ».
+  dit(/^https:\/\/vrm\.center\/\?tab=plat_vinted$/.test(co.ouvert || ''), 'connecté, depuis Vinted : l’icône ouvre VRM sur l’onglet Vinted', co.ouvert);
+  dit(co.ferme, 'et la petite fenêtre se referme');
   dit(!co.champs.some((c) => c.id === 'pw'), 'et aucun champ mot de passe');
+  const lbc = await rendre(nav, { ok: true, connecte: true, cloisonne: true, __url: 'https://www.leboncoin.fr/compte/part/transaction/1' });
+  dit(/tab=plat_leboncoin$/.test(lbc.ouvert || ''), 'depuis Leboncoin : l’onglet Leboncoin de VRM', lbc.ouvert);
+  dit(!neuf.ouvert, 'pas connecté : rien ne s’ouvre, on montre la connexion', neuf.ouvert);
 
   // ── 3. SESSION EXPIRÉE — un troisième état, pas « non connecté » ─────────
   // ⚠️ « pas su » ne vaut pas « non » : une session expirée n'est pas une

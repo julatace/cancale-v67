@@ -108,7 +108,7 @@ function rendreAuth(e) {
     btn.textContent = 'Connexion…'; btn.disabled = true; err.hidden = true;
     chrome.runtime.sendMessage({ from: 'cancale-popup', action: 'authLogin', email, password }, (r) => {
       btn.textContent = 'Se connecter'; btn.disabled = false;
-      if (r && r.ok) chargerAuth();
+      if (r && r.ok) ouvrirVRM();
       else { err.textContent = (r && r.error) || 'Connexion refusée.'; err.hidden = false; }
     });
   };
@@ -117,8 +117,34 @@ function rendreAuth(e) {
   document.getElementById('pw').addEventListener('keydown', (ev) => { if (ev.key === 'Enter') go(); });
 }
 
+// ── L'ICÔNE OUVRE VRM (Julien, 30 septembre) ──────────────────────────────
+// « Quand on ouvre l'extension, je veux que ça ouvre VRM, pas l'extension —
+// sauf un tout petit onglet de connexion. » Connecté : on ouvre (ou on
+// réutilise) l'onglet vrm.center, sur l'onglet Vinted ou Leboncoin selon le
+// site où l'on est, et la fenêtre se ferme. Pas connecté : seulement la
+// connexion ; dès qu'elle réussit, on ouvre VRM.
+const APP = 'https://vrm.center';
+function ouvrirVRM() {
+  const aller = (url) => {
+    const cible = APP + '/?tab=' + (/leboncoin\.fr/i.test(url || '') ? 'plat_leboncoin' : 'plat_vinted');
+    try {
+      chrome.tabs.query({ url: APP + '/*' }, (ouverts) => {
+        const t = (ouverts || [])[0];
+        if (t) chrome.tabs.update(t.id, { url: cible, active: true }, () => { try { chrome.windows.update(t.windowId, { focused: true }); } catch (_) {} window.close(); });
+        else chrome.tabs.create({ url: cible }, () => window.close());
+      });
+    } catch (_) { try { chrome.tabs.create({ url: cible }); } catch (_) {} window.close(); }
+  };
+  try { chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => aller(tabs && tabs[0] && tabs[0].url)); }
+  catch (_) { aller(''); }
+}
 function chargerAuth() {
-  chrome.runtime.sendMessage({ from: 'cancale-popup', action: 'authEtat' }, (r) => rendreAuth(r || {}));
+  chrome.runtime.sendMessage({ from: 'cancale-popup', action: 'authEtat' }, (r) => {
+    const e = r || {};
+    if (e.connecte) { ouvrirVRM(); return; }
+    document.body.classList.remove('decide'); document.body.classList.add('compact');
+    rendreAuth(e);
+  });
 }
 chargerAuth();
 
