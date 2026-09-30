@@ -188,6 +188,56 @@
     } catch (_) {}
   };
 
+  // ── LE DÉTAIL DES TRANSACTIONS, LU ACTIVEMENT (1er oct.) ─────────────────
+  // Mesuré : la LISTE (`v3/pages/transactions`) ne dit pas si tu es vendeur ou
+  // acheteur ; seul le DÉTAIL (`v2/pages/transactions/{id}`, relevé dans tes
+  // requêtes) porte `is_seller` et le statut à jour. La vente des Air Max 1
+  // olive n'avait été vue qu'en liste (21 sept.) : côté inconnu, statut figé à
+  // « ongoing » → elle ne sortait nulle part.
+  // ⇒ Quand la liste s'affiche, on lit le détail des transactions non
+  //   annulées : LECTURE de tes propres données (§3), 5 au plus par page, une par
+  //   une, avec les MÊMES en-têtes que Leboncoin vient d'envoyer. Une transaction
+  //   terminée n'est plus relue ; une en cours, pas avant 6 h. La réponse passe
+  //   par le même chemin que si tu avais ouvert la transaction.
+  let entetesLbc = null;                                   // copiés d'une vraie requête du site
+  const DETAIL_MAX = 5, DETAIL_REVOIR_MS = 6 * 3600e3;
+  const FINI = /^(done|cancelled|canceled|closed|refunded)$/i;
+  const memoDetail = () => { try { return JSON.parse(localStorage.getItem('vrm_lbc_detail_vus') || '{}') || {}; } catch (_) { return {}; } };
+  const ecrireMemo = (m) => { try { localStorage.setItem('vrm_lbc_detail_vus', JSON.stringify(m)); } catch (_) {} };
+  let detailEnCours = false;
+  const lireDetails = async (listeTexte) => {
+    if (detailEnCours) return;
+    let arr; try { arr = JSON.parse(listeTexte); } catch (_) { return; }
+    if (!Array.isArray(arr)) return;
+    const memo = memoDetail(); const now = Date.now();
+    const aLire = arr.map((t) => t && {
+      id: String((t.id && t.id.purchase_id) || t.purchase_id || ''),
+      st: typeof t.step === 'string' ? t.step : ((t.step && t.step.status) || ''),
+    }).filter((t) => t && t.id && !/cancel/i.test(t.st)).filter((t) => {
+      const m = memo[t.id];
+      if (!m) return true;
+      if (FINI.test(m.st || '')) return false;             // déjà lue une fois terminée
+      return now - (m.t || 0) > DETAIL_REVOIR_MS;
+    }).slice(0, DETAIL_MAX);
+    if (!aLire.length) return;
+    detailEnCours = true;
+    try {
+      for (const t of aLire) {
+        const url = 'https://api.leboncoin.fr/api/consumergoods/proxy/v2/pages/transactions/' + encodeURIComponent(t.id);
+        let st = t.st;
+        try {
+          // window.fetch (notre crochet) : la réponse repasse par `handle`, donc
+          // elle est rangée exactement comme une transaction ouverte à la main.
+          const res = await window.fetch(url, { method: 'GET', credentials: 'include', headers: entetesLbc || { Accept: 'application/json' } });
+          if (res.status === 401 || res.status === 403) break;   // refusé : on s'arrête
+          if (res.ok) { try { const j = await res.clone().json(); st = (j && j.step && j.step.status) || (j && j.pageProps && j.pageProps.transaction && j.pageProps.transaction.step && j.pageProps.transaction.step.status) || st; } catch (_) {} }
+        } catch (_) {}
+        memo[t.id] = { t: Date.now(), st };
+      }
+      ecrireMemo(memo);
+    } finally { detailEnCours = false; }
+  };
+
   const handle = (url, text, ctype) => {
     try {
       if (NOISE.test(url)) return;
@@ -202,7 +252,11 @@
         return;
       }
       // LA VENTE : sa propre transaction/commande/livraison. Ligne dédiée, capée.
-      if (VENTE_HINT.test(url)) { const c = allegeVente(text); post({ kind: 'lbcvente', url, body: c.slice(0, VENTE_MAX), coupe: c.length > VENTE_MAX }); return; }
+      if (VENTE_HINT.test(url)) {
+        const c = allegeVente(text); post({ kind: 'lbcvente', url, body: c.slice(0, VENTE_MAX), coupe: c.length > VENTE_MAX });
+        if (/consumergoods\/proxy\/v\d+\/pages\/transactions(?:\?|$)/i.test(url)) setTimeout(() => { lireDetails(text); }, 800);
+        return;
+      }
       if (!AD_HINT.test(text) && !AD_HINT.test(url) && !ACCOUNT_HINT.test(url) && !ACCOUNT_HINT.test(text)) return;
       post({ kind: 'lbcraw', url, body: text });
     } catch (_) {}
@@ -214,6 +268,14 @@
       const url = (typeof input === 'string') ? input : (input && input.url) || '';
       const meth = (init && init.method) || (typeof input === 'object' && input && input.method) || 'GET';
       try { if (MODIFIE.test(meth)) noteEnvoi(url, init && init.body, meth); } catch (_) {}
+      // En-têtes d'une requête du SITE vers ses transactions : on les réutilise
+      // tels quels pour lire le détail (restent dans la page, jamais envoyés ailleurs).
+      try {
+        if (/api\.leboncoin\.fr\/api\/consumergoods\//i.test(url) && init && init.headers && !/vrm/i.test(String(init.headers['x-vrm'] || ''))) {
+          const h = init.headers instanceof Headers ? Object.fromEntries(init.headers.entries()) : Object.assign({}, init.headers);
+          if (Object.keys(h).length) entetesLbc = h;
+        }
+      } catch (_) {}
       const p = origFetch.apply(this, arguments);
       try {
         p.then((res) => {

@@ -43,7 +43,46 @@ async function saveSession(sess) {
     if (sess) await chrome.storage.local.set({ [SESSION_STORE]: sess });
     else await chrome.storage.local.remove(SESSION_STORE);
   } catch (_) {}
+  majIcone(!!sess);
 }
+
+// ── L'ICÔNE OUVRE VRM, SANS FENÊTRE (1er octobre) ───────────────────────────
+// Julien : « quand on appuie sur l'extension, ça envoie directement à
+// l'application VRM, et ça ne lance pas l'extension ». Jusqu'à la 5.120, un
+// clic ouvrait la petite fenêtre, qui redirigeait puis se fermait : on la
+// voyait clignoter. Connecté : AUCUNE fenêtre (popup vide) — le clic arrive
+// ici (`chrome.action.onClicked`) et ouvre VRM directement. Pas connecté : la
+// petite fenêtre de connexion, et elle seule.
+const APP_URL_VRM = 'https://vrm.center';
+function majIcone(connecte) {
+  try { chrome.action.setPopup({ popup: connecte ? '' : 'popup.html' }); } catch (_) {}
+}
+function ouvrirVRMDepuis(urlActive) {
+  const cible = APP_URL_VRM + '/?tab=' + (/leboncoin\.fr/i.test(urlActive || '') ? 'plat_leboncoin' : 'plat_vinted');
+  try {
+    chrome.tabs.query({ url: APP_URL_VRM + '/*' }, (ouverts) => {
+      const t = (ouverts || [])[0];
+      // Déjà sur VRM : on ne recharge pas la page (on garde l'écran où l'on est).
+      if (t && /vrm\.center/i.test(urlActive || '')) { chrome.tabs.update(t.id, { active: true }); return; }
+      if (t) { chrome.tabs.update(t.id, { url: cible, active: true }); try { chrome.windows.update(t.windowId, { focused: true }); } catch (_) {} }
+      else chrome.tabs.create({ url: cible });
+    });
+  } catch (_) { try { chrome.tabs.create({ url: cible }); } catch (_) {} }
+}
+try {
+  chrome.action.onClicked.addListener(async (tab) => {
+    // Le clic n'arrive ici que si le popup est vide, donc si une session
+    // existe. Si elle a expiré entre-temps, on remet la fenêtre de connexion.
+    const e = await authEtat().catch(() => ({ connecte: true }));
+    if (!e.connecte) {
+      majIcone(false);
+      try { await chrome.action.openPopup(); return; } catch (_) {}
+    }
+    ouvrirVRMDepuis(tab && tab.url);
+  });
+} catch (_) {}
+// Au réveil du service worker : l'icône suit la session enregistrée.
+loadSession().then((s) => majIcone(!!s)).catch(() => {});
 // Le jeton d'acces dure ~1 h ; on le renouvelle tout seul, sinon l'extension
 // cesserait d'ecrire des que tu fermes l'app.
 async function refreshSession() {
