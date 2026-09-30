@@ -181,8 +181,14 @@ données de l'acheteur (dépôt public) :
 - ⬜ J3. Widget : pas convaincu pour l'instant (à revoir / garder discret).
 
 ## K. Bugs
-- ⬜ K1. Sur ordinateur, impossible de défiler VRM au pavé tactile (obligé
+- ✅ K1 (à confirmer sur son Mac). Sur ordinateur, impossible de défiler VRM au pavé tactile (obligé
   d'utiliser la barre de défilement). Anormal : corriger.
+  → MESURÉ : c'est `<main>` qui défile ; hors de la colonne (marge, bande de
+  droite, rail) la molette faisait 0 px. `DefilementPartout` renvoie à `<main>`
+  tout événement qu'aucun conteneur ne peut absorber (jamais derrière une
+  modale plein écran, jamais Ctrl+molette). Banc : 0 → 400 px aux 4 positions.
+  Au-dessus du contenu, ça défilait déjà dans Chromium : s'il bloque ENCORE,
+  lui demander sur quel écran et où est le curseur.
 
 ## L. Stock (ex-Garage)
 - ⬜ L1. Renommer « Garage » en **« Stock »**.
@@ -212,3 +218,11 @@ données de l'acheteur (dépôt public) :
 
 ## Journal de cette session
 - 30/09 : prompt reçu, découpé ici.
+- ⚠️ Le réseau de la session BLOQUE `lgonxzrzjcqthjtbdpzo.supabase.co` (403
+  proxy) : aucune mesure sur la vraie base possible tant que Julien n'a pas
+  ajouté le domaine (environnement → Edit → Network access).
+- ⚠️ `audit-offres-titre.cjs` était DÉJÀ rouge avant cette session (« l'accueil
+  affiche le nombre mis de côté ») — probablement la refonte d'accueil #305/#306.
+- La branche portait un commit non déployé de la session précédente :
+  « Nouvelle identité Menthe » (fba8202) — conservé, part avec la 1re PR.
+- K1 livré.

@@ -5152,6 +5152,46 @@ const toast = (msg, type) => {
   setTimeout(() => dismissToast(id), t === 'err' ? 6000 : 3800);
 };
 
+// ── DÉFILEMENT PARTOUT (K1, 30 septembre) ────────────────────────────────────
+// Plainte de Julien : « je ne peux pas descendre sur mon ordi, je suis obligé
+// d'utiliser la barre glissante, mon pavé tactile ne marche pas ». MESURÉ : dans
+// la coque, c'est `<main>` qui défile, pas le document. Une molette / un pavé
+// tactile envoie l'événement à ce qui est SOUS le curseur — dans la marge entre
+// le rail et la colonne, dans la bande de droite ou sur le rail, aucun ancêtre
+// ne défile : 0 px, alors que la barre glissante de `<main>` marche.
+// ⇒ Un événement que personne ne peut absorber est renvoyé à `<main>`.
+// ⚠️ On ne vole RIEN : un conteneur défilable sous le curseur (fiche, liste,
+// modale) garde la main ; au-dessus d'une MODALE plein écran on ne fait
+// défiler rien derrière ; Ctrl+molette (zoom) passe tel quel.
+function DefilementPartout() {
+  React.useEffect(() => {
+    const peutDefiler = (el, dy, dx) => {
+      const s = getComputedStyle(el);
+      if (Math.abs(dy) >= Math.abs(dx)) return /(auto|scroll)/.test(s.overflowY) && el.scrollHeight > el.clientHeight + 1;
+      return /(auto|scroll)/.test(s.overflowX) && el.scrollWidth > el.clientWidth + 1;
+    };
+    const onWheel = (e) => {
+      if (e.defaultPrevented || e.ctrlKey) return;
+      const main = document.querySelector('main[data-defile]');
+      if (!main) return;
+      for (let el = e.target; el && el !== document.body && el !== document.documentElement; el = el.parentElement) {
+        if (el === main) return;                       // le navigateur s'en charge
+        if (peutDefiler(el, e.deltaY, e.deltaX)) return; // un autre conteneur défile
+        if (getComputedStyle(el).position === 'fixed') {
+          const r = el.getBoundingClientRect();
+          if (r.width >= window.innerWidth - 2 && r.height >= window.innerHeight - 2) return; // modale
+        }
+      }
+      if (Math.abs(e.deltaY) < Math.abs(e.deltaX)) return;
+      const f = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? main.clientHeight : 1;
+      main.scrollBy({ top: e.deltaY * f });
+    };
+    window.addEventListener('wheel', onWheel, { passive: true });
+    return () => window.removeEventListener('wheel', onWheel);
+  }, []);
+  return null;
+}
+
 function Toaster() {
   const [list, setList] = React.useState([]);
   React.useEffect(() => onToasts(setList), []);
@@ -27576,6 +27616,7 @@ export default function App() {
           chargement, sur n'importe quel écran. */}
       <TopProgress/>
       <Toaster/>
+      <DefilementPartout/>
       {/* Fenêtre de confirmation maison (askConfirm). Sans ce montage, l'app
           retomberait silencieusement sur la boîte grise du navigateur. */}
       <ConfirmHost/>
@@ -27859,7 +27900,7 @@ export default function App() {
           voyait comme un décalage. 1180 occupe l'espace disponible sans que la
           ligne redevienne trop longue (les listes sont en deux colonnes). Sur téléphone,
           `ordi` est faux et RIEN ne change. */}
-      <main style={{
+      <main data-defile="1" style={{
         // ⚠️ COQUE APP-SHELL : c'est `<main>` qui défile, pas le document. La
         // barre du bas est un frère HORS de ce conteneur → elle ne bouge plus
         // jamais pendant le scroll (bug iOS « barre au milieu de l'écran »).
