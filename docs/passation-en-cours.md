@@ -201,7 +201,7 @@ données de l'acheteur (dépôt public) :
   vendu en 3D).
 
 ## N. Ensuite, dans cet ordre (après A→M « parfaitement »)
-- ⬜ N1. Isolation des données + début du multi-utilisateurs : une extension et
+- 🟨 N1 (PRIORITÉ, Julien : « on fait Supabase ») — voir « État Supabase » ci-dessous. Isolation des données + début du multi-utilisateurs : une extension et
   une adresse email appartiennent à UN compte, lui seul reçoit les infos, aucune
   fuite. Regarder les alertes de vulnérabilité envoyées par Supabase.
 - ⬜ N2. Coût pour 200 utilisateurs (Supabase, Vercel…) : l'abonnement actuel
@@ -215,6 +215,30 @@ données de l'acheteur (dépôt public) :
 - ⬜ N8. Maquettes de motion design pour le site.
 
 ---
+
+## État Supabase (30/09) — MCP Supabase branché dans la session
+Mesuré : `app_data` avait RLS ACTIVÉ mais 3 règles « tout_select/insert/update »
+ouvertes à `public` (= grande ouverte, sans DELETE) ; `vinted_accounts` RLS
+DÉSACTIVÉ (jetons Vinted lisibles/écrits par la clé publique). 1 seul compte
+auth : shopcancale35@gmail.com = `74eea6e7-f060-46b6-b9c7-d500cedf4738`
+(dernière connexion le 30/09 — l'app tourne connectée). Extension installée :
+5.114. Vercel : ni `SUPABASE_SERVICE_KEY`, ni `CRON_SECRET`, ni `AI_API_KEY`.
+- ✅ Sauvegarde intégrale : schéma privé `sauvegarde` (app_data 5 916 lignes,
+  vinted_accounts 9), droits retirés à anon/authenticated.
+- ✅ ÉTAPE 1 (migration `vrm_cloisonnement_etape1_proprietaire`) : colonne
+  `owner` (défaut `auth.uid()`), tout attribué au compte ci-dessus, index
+  uniques (owner,id) et (owner,vinted_user_id) EN PLUS des clés actuelles.
+  Accès encore OUVERTS. ⇒ l'app et l'extension passent en mode cloisonné
+  (jeton de l'utilisateur, `owner` écrit) ; un écrivain ANONYME laisse `owner`
+  vide = témoin mesurable.
+- ✅ `VRM_OWNER_UID` posé sur Vercel (production + preview).
+- ⬜ ÉTAPE 2 = `supabase/migrations/002-fermeture.sql` (prêt). Conditions :
+  👤 `SUPABASE_SERVICE_KEY` sur Vercel (Supabase → Settings → API Keys →
+  service_role → Vercel → Settings → Environment Variables, Production) ;
+  👤 extension connectée à son compte VRM (icône → email + mot de passe VRM) ;
+  mesure : aucune ligne `owner is null` récente.
+- 👤 Advisor WARN : activer « Leaked password protection » (Auth → Providers →
+  Email / Password security).
 
 ## Journal de cette session
 - 30/09 : prompt reçu, découpé ici.
