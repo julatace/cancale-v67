@@ -4310,8 +4310,10 @@ function StatBox({label,value,color=C.text,sub=null,subColor=null,onClick=null,t
 // ⚠️ Une seule série, donc UNE seule couleur et aucune légende — le titre au-dessus
 // nomme ce qu'on regarde. Un jour sans vente garde une trace grise : un trou dans
 // la rangée se lirait comme une donnée manquante, pas comme un zéro.
-function MiniBarres({ jours, hauteur = 84 }) {
+function MiniBarres({ jours, hauteur = 84, surSombre = false }) {
   const max = Math.max(1, ...jours.map(j => j.eur));
+  const plein = surSombre ? 'rgba(255,255,255,.92)' : C.accent;
+  const vide = surSombre ? 'rgba(255,255,255,.16)' : C.border;
   return (
     <div>
       <div style={{display:'flex',alignItems:'flex-end',gap:5,height:hauteur}}>
@@ -4320,14 +4322,14 @@ function MiniBarres({ jours, hauteur = 84 }) {
           return (
             <div key={j.cle} title={`${j.long} · ${j.n} vente${j.n > 1 ? 's' : ''} · ${j.eur.toFixed(0)} €`}
               style={{flex:1,minWidth:0,display:'flex',flexDirection:'column',justifyContent:'flex-end',height:'100%'}}>
-              <div style={{height:h,background:j.eur > 0 ? C.accent : C.border,borderRadius:'4px 4px 0 0'}}/>
+              <div style={{height:h,background:j.eur > 0 ? plein : vide,borderRadius:'4px 4px 0 0'}}/>
             </div>
           );
         })}
       </div>
-      <div style={{display:'flex',gap:5,marginTop:6,borderTop:`1px solid ${C.border}`,paddingTop:5}}>
+      <div style={{display:'flex',gap:5,marginTop:6,borderTop:`1px solid ${surSombre?'rgba(255,255,255,.14)':C.border}`,paddingTop:5}}>
         {jours.map((j) => (
-          <div key={j.cle} style={{flex:1,minWidth:0,textAlign:'center',fontSize:9,letterSpacing:.2,color:C.muted,fontWeight:600,overflow:'hidden'}}>{j.jour}</div>
+          <div key={j.cle} style={{flex:1,minWidth:0,textAlign:'center',fontSize:9,letterSpacing:.2,color:surSombre?'rgba(255,255,255,.55)':C.muted,fontWeight:600,overflow:'hidden'}}>{j.jour}</div>
         ))}
       </div>
     </div>
@@ -6477,8 +6479,11 @@ function PrixMarche({ data, baseKO }) {
 // les chiffres sont figés (un colis déjà expédié peut encore apparaître) : on le
 // DIT plutôt que de laisser croire à un défaut. Le geste, jamais la promesse
 // (§7). `jours == null` (âge inconnu / lecture ratée) ⇒ rien : jamais un faux.
-function FraicheurDonnees({ jours, compte }) {
+function FraicheurDonnees({ jours, compte, siAJour = true }) {
   if (jours == null) return null;
+  // L'accueil ne dit rien quand tout va bien (« trop de texte », 30 sept.) :
+  // seule l'alerte d'une capture ancienne y a sa place.
+  if (jours <= 1 && !siAJour) return null;
   if (jours <= 1) return <div style={{fontSize:11.5,color:C.muted}}>✓ Données Vinted à jour (capturées {jours<1?"aujourd'hui":'hier'}).</div>;
   return (
     <div style={{fontSize:12,color:C.warn,background:`${C.warn}12`,border:`1px solid ${C.warn}55`,borderRadius:10,padding:'9px 12px',lineHeight:1.5}}>
@@ -19269,7 +19274,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             : late>0 ? `${late} en retard — à poster en priorité`
             : pretsImpr>0 ? `${combien}${exact?' — le reste attend le sien':''}`
             : 'Bordereau + paire au stock, coche par colis';
-          jobs.push({icon:'truck',color:late>0?C.danger:C.warn,urgent:late>0,title:`Expédier ${toShip.length} colis`,sub,tab:'cat_bord',prio:late>0?0:1});
+          jobs.push({icon:'truck',color:late>0?C.danger:C.warn,urgent:late>0,title:`Expédier ${toShip.length} colis`,sub,tab:'cat_bord',prio:late>0?0:1,
+            photos:toShip.map(x=>orderPhoto(x.o)).filter(ph=>ph && !imgMortes.has(ph)).slice(0,3)});
         }
         const pickupCount=pickupUnion.total; // UNION email + statut Vinted — EXACTEMENT le compte de l'onglet Achats
         // ⚠️ LE SOUS-TITRE DOIT DIRE CE QU'IL PEUT FAIRE, PAS SEULEMENT COMBIEN.
@@ -19321,7 +19327,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       (§7). Le bloc de la coque annonce la panne, la ligne
                       dit de quoi la liste est vide : sous le bonjour, plus
                       rien — surtout pas « rien d'urgent ». */}
-                  {jobs.length>0 ? <>Tu as <b style={{color:C.text}}>{jobs.length} action{jobs.length>1?'s':''}</b> {jobs.length>1?'qui te font':'qui te fait'} avancer aujourd'hui.</>
+                  {jobs.length>0 ? <><b style={{color:C.text}}>{jobs.length} chose{jobs.length>1?'s':''}</b> à faire aujourd'hui.</>
                     : baseKO ? null
                     /* ⚠️ « ta boutique tourne » à quelqu'un dont AUCUN compte
                        n'est branché : sa boutique ne tourne pas, elle n'existe
@@ -19385,11 +19391,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <span style={{opacity:.55}}>·</span>
                     <span style={{opacity:.9,fontWeight:600}}>voir mes ventes ›</span>
                   </div>
+                  {/* 30 sept. — « trop de texte, trop chargé » : les 14 derniers
+                      jours vivent ICI, dans le bloc du chiffre, au lieu d'une
+                      seconde carte « Ta semaine » qui redisait les mêmes ventes
+                      en trois autres nombres (§7 : un nombre ne s'écrit qu'une
+                      fois). */}
+                  {jours14.some(j=>j.eur>0) && <div style={{marginTop:18}}><MiniBarres jours={jours14} hauteur={52} surSombre/></div>}
                 </div>
               </button>
             )}
 
-            {!baseKO && !premierJour && <div style={{marginBottom:14}}><FraicheurDonnees jours={liveStats && liveStats.dataAgeJours} compte={liveStats && liveStats.dataAgeCompte}/></div>}
+            {!baseKO && !premierJour && liveStats && liveStats.dataAgeJours>1 && <div style={{marginBottom:14}}><FraicheurDonnees siAJour={false} jours={liveStats.dataAgeJours} compte={liveStats.dataAgeCompte}/></div>}
 
             {/* ⚠️ Avant tout le reste : si le serveur ne peut envoyer aucune
                 notification, il faut le voir ICI. Compter sur les notifications
@@ -19413,58 +19425,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </button>
             )}
 
-            {/* 🗓️ Bilan de la semaine (7 derniers jours) — depuis les emails de
-                vente (fiable), + ce qu'il reste à expédier. */}
-            {(()=>{
-              // Même règle que la tuile du jour : la moisson, pas les emails.
-              const weekAgo = Date.now() - 7*86400000;
-              const sem = bilanVentes(weekAgo);
-              const wca = sem.eur;
-              if(!sem.n && !toShip.length) return null;
-              return (
-                /* ⚠️ SURFACE NEUTRE. Juste au-dessus, « Vendu aujourd'hui » est
-                   déjà un bloc teinté à l'accent : deux encadrés de la même
-                   couleur qui se suivent, plus rien ne ressort et l'écran a
-                   l'air « décoré » (§5.54). Ici la couleur ne sert qu'aux
-                   chiffres. */
-                /* Sur grand écran, les trois chiffres tenaient sur une ligne de
-                   1100 px et laissaient la moitié de la carte vide. Le graphe
-                   occupe cette moitié : même bloc, aucune information de plus à
-                   lire, et la page cesse de s'arrêter au tiers de l'écran. */
-                <div style={{marginBottom:14,border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'14px 16px',boxShadow:C.shadow||'none',
-                  display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(250px,100%), 1fr))',gap:22,alignItems:'start'}}>
-                  <div>
-                  <div className="vrm-label" style={{color:C.muted,marginBottom:9}}>Ta semaine</div>
-                  <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
-                    <div style={{flex:'1 1 90px'}}>
-                      <div style={{fontSize:22,fontWeight:700,color:C.text,lineHeight:1}}>{sem.n}</div>
-                      <div style={{fontSize:11,color:C.muted,fontWeight:500,marginTop:2}}>vente{sem.n>1?'s':''} · 7 j</div>
-                    </div>
-                    <div style={{flex:'1 1 90px'}}>
-                      <div style={{fontSize:22,fontWeight:700,color:C.text,lineHeight:1}}>{wca.toFixed(0)} €</div>
-                      <div style={{fontSize:11,color:C.muted,fontWeight:500,marginTop:2}}>vendu sur 7 j</div>
-                    </div>
-                    <div style={{flex:'1 1 90px'}}>
-                      {/* ⚠️ Les trois chiffres de la semaine sont à l'ENCRE.
-                          Trois couleurs côte à côte (bleu, noir, ambre), c'est
-                          le même défaut que la rangée de Ventes : plus rien ne
-                          ressort (§5.90). Ce sont des repères, pas des alertes —
-                          l'urgence est dite juste en dessous, sur la carte. */}
-                      <div style={{fontSize:22,fontWeight:700,color:C.text,lineHeight:1}}>{toShip.length}</div>
-                      <div style={{fontSize:11,color:C.muted,fontWeight:500,marginTop:2}}>à expédier</div>
-                    </div>
-                  </div>
-                  </div>
-                  <div>
-                    <div className="vrm-label" style={{color:C.muted,marginBottom:9,display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:8}}>
-                      <span>14 derniers jours</span>
-                      <span style={{color:C.text,fontWeight:700}}>{jours14.reduce((a,j)=>a+j.eur,0).toFixed(0)} €</span>
-                    </div>
-                    <MiniBarres jours={jours14}/>
-                  </div>
-                </div>
-              );
-            })()}
+            {/* « Ta semaine » RETIRÉE le 30 sept. : ses 3 nombres redisaient le
+                héros (ventes, CA) et la carte « Expédier » (à expédier) ; son
+                graphique est monté dans le héros. */}
 
             {loading && <Skeleton variant="card" count={4}/>}
 
@@ -19519,7 +19482,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         Maintenant : une pastille neutre et l'icône au trait, du
                         même dessin que la barre du bas. La couleur ne sert plus
                         qu'à l'icône et au chevron — le fond reste calme. */}
-                    <div style={{width:42,height:42,borderRadius:8,background:C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,color:j.color}}><Icon name={j.icon} size={20}/></div>
+                    {/* 30 sept. — « pas assez de photos » : une action qui porte
+                        des paires les MONTRE (jusqu'à 3 vignettes en éventail) ;
+                        les autres gardent leur icône. */}
+                    {j.photos && j.photos.length
+                      ? <div style={{display:'flex',flexShrink:0,paddingRight:2}}>
+                          {j.photos.map((ph,k)=>(
+                            <img key={ph} src={ph} alt="" loading="lazy" onError={()=>noterImgMorte(ph)}
+                              style={{width:46,height:46,borderRadius:9,objectFit:'cover',border:`2px solid ${C.card}`,marginLeft:k?-18:0,background:C.bg,boxShadow:'0 1px 3px rgba(0,0,0,.25)'}}/>
+                          ))}
+                        </div>
+                      : <div style={{width:42,height:42,borderRadius:8,background:C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,color:j.color}}><Icon name={j.icon} size={20}/></div>}
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:15,fontWeight:700,color:C.text}}>{j.title}</div>
                       {/* ⚠️ UNE URGENCE ÉCRITE EN GRIS N'EST PAS UNE URGENCE.
@@ -19562,8 +19535,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div style={{marginTop:14,display:'flex',alignItems:'center',gap:12,padding:'13px 15px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none'}}>
                 <div style={{color:C.muted,display:'flex',flexShrink:0}}><Icon name="wallet" size={22}/></div>
                 <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:11,color:C.muted,fontWeight:500,textTransform:'uppercase',letterSpacing:0.4}}>Argent en attente{escrow?'':' (estimation)'}</div>
-                  <div style={{fontSize:20,fontWeight:700,color:C.text}}>{escrow?'':'≈ '}{val.toFixed(0)} € <span style={{fontSize:12,color:C.muted,fontWeight:500}}>· {inRoute.length} vente{inRoute.length>1?'s':''} en cours</span></div>
+                  <div style={{fontSize:20,fontWeight:700,color:C.text}}>{escrow?'':'≈ '}{val.toFixed(0)} € <span style={{fontSize:13,color:C.muted,fontWeight:500}}>en attente</span></div>
+                  <div style={{fontSize:12,color:C.muted,marginTop:1}}>{inRoute.length} vente{inRoute.length>1?'s':''} en cours{escrow?'':' · estimation'}</div>
                   {/* ⚠️ L'ARGENT DÉJÀ VIRABLE N'APPARAISSAIT QUE DANS UNE PHRASE
                       d'explication de l'écran Statistiques. Mesuré le
                       7 septembre sur ses neuf porte-monnaie : **281,94 €
@@ -19610,7 +19583,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <button type="button" onClick={()=>onNav&&onNav('cat_ventes')}
                     style={{border:'none',background:'transparent',color:C.accent,fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit',padding:0}}>tout voir ›</button>
                 </div>
-                <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(150px, 1fr))',gap:12}}>
+                <div className="vrm-carrousel">
                   {dernieresVentes.map((o,i)=>{
                     const ph = orderPhoto(o);
                     const e = effEntry(o); const num = e?.numero;

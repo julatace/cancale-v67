@@ -232,3 +232,129 @@ a coûté `vanessa5723`.
 - une **offre du vendeur à un favori** de bout en bout (création de conversation → transaction → offre) ;
 - la liste complète des codes `condition` ;
 - la réponse de `POST /api/v2/conversations` (où se trouve l'id créé).
+
+---
+
+## 7. Comment fonctionne VRM (le chemin d'une donnée)
+
+```
+vinted.fr (ton onglet Chrome)
+  └─ inject.js      écoute les réponses que Vinted envoie à la page (lecture seule)
+  └─ content.js     relaie ces réponses à l'extension
+       └─ background.js (service worker)
+            · range chaque réponse dans Supabase (table app_data, lignes harvest_{uid}_…)
+            · lit aussi Vinted directement, avec les jetons du compte connecté
+              (annonces, ventes, achats, conversations, bordereaux)
+            · agit quand c'est autorisé : bordereau, réponses auto, offres auto
+              au-dessus du plancher — toujours via `garde` (compte de l'onglet,
+              20 actions/heure, une requête à la fois)
+emails Vinted / transporteurs
+  └─ Cloudflare Email Worker → api/email-inbound.js (Vercel) → app_data (email_*)
+vrm.center (l'app, src/App.jsx)
+  └─ lit app_data + vinted_accounts et affiche ; écrit ses réglages dans la ligne `main`
+api/push · api/ship-reminders (cron)  →  notifications téléphone
+api/widget                            →  widget iPhone
+```
+
+Trois choses à retenir si tu branches ton automatisation dessus :
+1. **Les jetons de tous tes comptes sont déjà dans `vinted_accounts`**, tenus à jour par l'extension.
+2. **Les données sont déjà captées** : pas besoin de relire Vinted pour savoir ce qui est en ligne, vendu ou en conversation — lis `app_data`.
+3. **L'extension n'écrit jamais la ligne `main`** (c'est l'app qui en est propriétaire) ; elle écrit ses propres lignes `panel_*`. Fais pareil : une ligne à toi (par ex. `auto_*`), en lire-fusionner-réécrire, et **n'écris rien si la lecture a échoué** (sinon tu effaces la ligne).
+
+---
+
+## 8. Tout ce que fait Vintex (observé le 30 septembre, compte angeled92)
+
+Observation faite avec Claude in Chrome, en lecture seule. **Aucune capture
+réseau n'a abouti** : les chemins d'API de Vintex restent inconnus. Ce qui suit
+vient de l'écran et de leur documentation.
+
+### 8.1 L'architecture
+- Une extension Chrome (« pont » v2.7.0) injecte dans vinted.fr un panneau
+  `div#vintex-proxy-panel` (contenu dans un shadow DOM fermé, illisible pour la page).
+- **L'onglet Vinted sert de relais** : tout se pilote depuis le site
+  `vintex.app/dashboard` (« Vintex Neo »), et les actions s'exécutent dans ton
+  onglet Vinted, avec ta session. C'est le même principe que VRM (tout part du
+  navigateur), mais piloté depuis leur serveur.
+- Le panneau affiche : compte Vintex connecté, compte Vinted lié, relais
+  « Chrome – macOS connecté », nombre d'automatisations actives et « dernier
+  cycle : il y a 3 min » (il tourne en boucle), bouton « Ouvrir en fenêtre ».
+- Un compte sans onglet Vinted ouvert affiche « Ouvrez un onglet de la
+  plateforme pour utiliser ce compte » → **Vintex ne peut agir que sur un compte
+  dont l'onglet est ouvert**, comme VRM.
+- Il garde les données en cache 10 minutes.
+
+### 8.2 Le menu du tableau de bord
+Accueil · Journal · Sauvegardes cloud · Articles · Commandes · Comptabilité ·
+Messagerie · **Notifications** · Abonnements · **Automatisations** · Nouveautés ·
+Paramètres.
+
+### 8.3 Notifications → « qui a mis en favori »
+- Table filtrable : texte libre, type **Favoris**, période (7 jours par défaut),
+  statut Traitée / Non traitée. Colonnes : Notification, Compte, Statut.
+- Chaque ligne : « **[pseudo] a marqué ton article [titre] comme favori** ».
+- Action groupée unique : **« Répondre aux notifications »** (sur les lignes cochées).
+- Leur documentation prévient « certains favoris manquent » si la période est
+  trop longue → ils lisent **le flux paginé des notifications Vinted**, pas une
+  liste de favoris par annonce. (Confirmé par toi : ça vient de l'app Vinted.)
+- ➡️ Pour VRM : l'extension ≥ 5.117 capte ce même flux (`harvest_{uid}_notifications`)
+  dès que tu ouvres la cloche sur vinted.fr. Il reste à voir sa forme.
+
+### 8.4 Automatisation « Messages aux favoris »
+- Écrit automatiquement aux personnes qui mettent un article en favori.
+- **Règles** : un texte, et/ou une **offre de prix** jointe ; condition « seulement
+  si la personne a mis au moins 2 articles en favori » ; jours de la semaine ;
+  créneau horaire. Si plusieurs règles collent, une est tirée au hasard.
+- **Ciblage** : période de recherche (aujourd'hui → 7 jours) ; délai avant de
+  traiter un favori : 15 min ; délai avant de réécrire à la même personne : 1 jour ;
+  plafond par article : illimité ; note minimale de l'acheteur : aucune.
+- **Anti-doublon** : relit la liste des conversations pour ne pas écrire deux fois.
+- **Quotas** : 10 messages/jour (gratuit), 60 (Starter), illimité (Advanced, Pro).
+- En manuel : même moteur, sur les lignes cochées, avec quelques secondes entre
+  chaque message.
+
+➡️ La chaîne équivalente avec ce qui est mesuré chez toi :
+notification (pseudo + id personne + id annonce) → `POST /api/v2/conversations`
+`{initiator:"seller_enters_notification", item_id, opposite_user_id}` →
+`POST /api/v2/conversations/{id}/replies` (texte) et/ou
+`POST /api/v2/transactions/{tx}/offers` (offre).
+
+### 8.5 Autres automatisations
+- **Conversations auto** (désactivée sur ton compte, non détaillée).
+- **Boost favoris** : échange de favoris entre membres — ton compte met des
+  favoris sur les annonces d'autres membres, et en reçoit en retour sur les
+  tiennes (2 à 32 par article selon le forfait) ; coupe tes notifications de
+  favoris pendant qu'il tourne. C'est du gonflage artificiel, a priori contraire
+  aux règles de Vinted : à ne pas reproduire.
+
+### 8.6 Articles et republication
+- Actions : Republier · Publier les brouillons · Modifier · Masquer · Afficher ·
+  Dupliquer · Sauvegarder dans le cloud · Supprimer.
+- **Republication Vintex** : crée un brouillon, **supprime l'annonce d'origine**
+  (favoris, vues, ancienneté perdus), puis publie le brouillon après le délai
+  réglé ; pauses irrégulières entre chaque écriture ; déroulé dans le Journal.
+- Dialogue « Republication » : avertissement « chaque annonce sera supprimée puis
+  recréée » ; retouche des photos (incliner, recadrer 1:1 · 4:5 · 3:4 · 16:9,
+  zoom, retourner) ; texte ajouté avant/après le titre ; prix augmenté / diminué
+  / fixé, en % ou en €, avec arrondi ; sauvegarde cloud ; publier
+  automatiquement ou laisser en brouillon ; délai avant publication.
+- ➡️ Différence avec l'ordre conseillé au §3 : Vintex supprime **avant** de
+  publier ; créer d'abord puis supprimer ne perd jamais l'annonce.
+  Et retoucher les photos ne protège de rien : Vinted relie les comptes par
+  appareil, navigateur, adresse et moyen de paiement, pas par les images.
+
+### 8.7 Forfaits Vintex (page publique)
+| forfait | prix HT/mois | republications | messages aux favoris | favoris boostés/article |
+|---|---|---|---|---|
+| Gratuit | 0 € | 50 | 10/jour | 2 |
+| Starter | 5,99 € | 1 000 | 60/jour | 8 |
+| Advanced | 11,99 € | 3 000 | illimités | 16 |
+| Professional | 19,99 € | illimitées | illimités | 32 |
+
+### 8.8 Ce qu'on ne sait pas de Vintex
+- Les chemins d'API exacts qu'il appelle (la capture réseau n'a rien relevé).
+- Le contenu de son code.
+- Si tu veux les relever : DevTools de la page vinted.fr → onglet Network →
+  cocher « Preserve log » → lancer UNE action depuis vintex.app → clic droit →
+  « Save all as HAR ». (Mets « Messages aux favoris » en pause avant, sinon ses
+  envois se mélangent à ta capture.)
