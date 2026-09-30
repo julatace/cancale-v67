@@ -761,7 +761,7 @@ const SYNC_KEYS = [
   'vinted_accounts','vinted_account_labels','vinted_account_emails','vinted_account_phones',
   'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros','vinted_annonces_vendues','vinted_bords_shipped',
   'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats','vinted_bords_printed','vrm_imprimante','vrm_prenom', 'vinted_repond_auto','vrm_points_relais','vrm_ville','vrm_colis_collected','vrm_colis_collected_at',
-  'vinted_txn_link','vinted_sales_hidden','vinted_accounts_hidden','vinted_autonum','vinted_urssaf_freq','vinted_urssaf_taux',
+  'vinted_txn_link','vinted_sales_hidden','vinted_purchases_hidden','vinted_accounts_hidden','vinted_autonum','vinted_urssaf_freq','vinted_urssaf_taux',
   'vinted_sale_overrides','vinted_bord_links','vinted_pickup_done','vinted_bords_hidden','vinted_ship_done','vinted_pairs_lost','vinted_retours_recus','vinted_retours_dismissed',
   'vinted_offvinted_buys','vinted_buyprice_by_num','vinted_quick_replies','vinted_ca_keep_removed',
   // Offres marquées « traité » à la main (tu as répondu) → disparaissent de
@@ -2267,6 +2267,23 @@ const b64ToBytes = (b64) => {
 // lignes sont nommées harvest_{uid}_orders_{type} où {type} est le param d'URL
 // capté par l'extension (sold/sell pour les ventes, bought/buy/purchased pour
 // les achats). On classe par le nom de la clé pour être robuste au libellé exact.
+// ── ACHATS MASQUÉS (30 septembre) ─────────────────────────────────────────
+// Julien : « tout ce qu'on masque dans la compta, je veux le retrouver dans
+// Réglages, un onglet ventes masquées et un onglet achats masqués ». Les ventes
+// se masquaient déjà (✕, `vinted_sales_hidden`) ; les achats, JAMAIS. Un achat
+// masqué sort de la liste ET de tous les totaux — il est retiré à la source,
+// dans `loadOrders('purchased')`, une seule fois pour tous les écrans (§11).
+// Rien n'est supprimé : la liste se synchronise et tout revient d'un clic.
+const ACHATS_MASQUES = 'vinted_purchases_hidden';
+// ⚠️ `save()` n'écrit qu'au bout de 500 ms et `load()` ne voit pas l'écriture en
+// attente : deux achats masqués coup sur coup, et le second repartait de la
+// liste d'AVANT — le premier redevenait visible. On garde donc la dernière
+// version en mémoire ; le nuage (onCloudReady) la remplace quand il arrive.
+let _achatsMasques = null;
+const achatsMasques = () => new Set(_achatsMasques || (load(ACHATS_MASQUES, []) || []).map(String));
+const ecrireAchatsMasques = (liste) => { _achatsMasques = [...new Set(liste.map(String))]; save(ACHATS_MASQUES, _achatsMasques); };
+onCloudReady(() => { _achatsMasques = null; });
+
 const fetchHarvestOrders = async (uid, side, opts = {}) => {
   if (!uid) return null;
   // Même mutualisation que fetchHarvest : la requête ramène les DEUX côtés
@@ -17097,12 +17114,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       ? new Set((sales.items || []).map(o => String(o.transaction_id)))
       : null;
     const porteMonNumero = (t) => /\bn\s?\d{3,4}\b/i.test(String(t || ''));
+    const masquesA = type === 'purchased' ? achatsMasques() : new Set();
     const seen = new Set(); const out = []; let anyOk=false, anyErr=false; const failed=[];
     for (const { acc, res } of results) {
       if (res.ok) { anyOk=true; for (const o of res.items) {
         const id = String(o.transaction_id);
         if (seen.has(id)) continue;
         if (type === 'purchased' && (soldTxns.has(id) || porteMonNumero(o.title))) continue; // transfert entre tes comptes, pas un achat
+        if (type === 'purchased' && masquesA.has(id)) continue; // masqué à la main → Réglages « Achats masqués »
         seen.add(id); out.push({ ...o, _acc: acc });
       } }
       else { anyErr=true; failed.push(accNameOf(acc)); }
@@ -17594,6 +17613,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // ⚠️ MESURÉ AU BANC LE 7 SEPTEMBRE, onglet « Tous » : **72 880 px de page sur
   // iPhone** — quatre-vingt-six écrans de défilement — pour 8 844 nœuds et
   // 329 photos. La chaîne de filtres vivait, là aussi, en plein milieu du JSX.
+  const masquerAchat = async (o) => {
+    const ok = await askConfirm({ title: 'Masquer cet achat ?', desc: `« ${o.title || 'cet achat'} » sort de la liste des achats et de tous les totaux de la compta. Rien n'est supprimé : tu le retrouves dans Réglages → Achats masqués, et il revient d'un clic.`, ok: 'Masquer' });
+    if (!ok) return;
+    const n = achatsMasques(); n.add(String(o.transaction_id)); ecrireAchatsMasques([...n]);
+    setBuys(prev => prev && prev.items ? { ...prev, items: prev.items.filter(x => String(x.transaction_id) !== String(o.transaction_id)) } : prev);
+    if (_acctCache['purchased']) { _acctCache['purchased'].items = (_acctCache['purchased'].items || []).filter(x => String(x.transaction_id) !== String(o.transaction_id)); _persistAcctCache(); }
+    toast('Achat masqué — Réglages → Achats masqués pour le réafficher.');
+  };
   const achatsAffiches = useMemo(() => buysBase
     .filter(o => { const p = phaseReception(o);
       if (aFilter === 'attente') return false;
@@ -21318,6 +21345,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 )}
                 <button type="button" onClick={()=>{ if(rc){ if(rc.pdfB64) openReceipt(rc); else setReceiptView(rc); } else generateAchatJustificatif(o,{ account:accNameOf(o._acc), regime:load('vinted_regime','micro'), numero:numA||'' }); }}
                   title={rc?'Reçu Vinted authentique (email archivé)':"Télécharger le justificatif d'achat (PDF)"} aria-label="Justificatif" style={{display:'flex',alignItems:'center',justifyContent:'center',width:30,height:30,borderRadius:8,border:`1px solid ${rc?C.accent:C.border}`,background:rc?`${C.accent}12`:'transparent',color:rc?C.accent:C.muted,cursor:'pointer',fontFamily:'inherit'}}><Icon name="doc" size={15}/></button>
+                <button type="button" onClick={()=>masquerAchat(o)} title="Masquer cet achat (il sort de la liste et de la compta — tu le retrouves dans Réglages → Achats masqués)" aria-label="Masquer cet achat"
+                  style={{display:'flex',alignItems:'center',justifyContent:'center',width:30,height:30,borderRadius:8,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,cursor:'pointer',fontFamily:'inherit'}}><Icon name="eyeOff" size={15}/></button>
               </div>
             </div>
           );})}
@@ -25278,6 +25307,8 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
       {/* « Rédaction d'annonces par l'IA » retirée de Réglages le 30 septembre (Julien). */}
 
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Comptabilité</div>
+      <ElementsMasques comptes={comptes}/>
+      <div style={{height:10}}/>
       <RegimeSetting/>
       <div style={{height:10}}/>
       <Row icon="doc" title="Emplacements de bordereau" desc="Réinitialise où le N° est tamponné (l'app te redemandera à chaque format)." onClick={async ()=>{ if(await askConfirm('Oublier les emplacements de tampon mémorisés ? L\'app te redemandera où placer le N° au prochain bordereau de chaque format.')){ save('vinted_bordereau_formats',{}); toast('✓ Emplacements réinitialisés.'); } }}/>
@@ -26430,6 +26461,66 @@ function AiKeySetting() {
         <div style={{display:'flex',gap:8,alignItems:'center'}}>
           <input type={show?'text':'password'} value={key} onChange={e=>commit(e.target.value)} placeholder="sk-ant-…" style={{flex:1,minWidth:0,border:`1px solid ${C.border}`,borderRadius:8,padding:'8px 10px',fontSize:13,background:C.bg,color:C.text,outline:'none',fontFamily:'inherit'}}/>
           <button type="button" onClick={()=>setShow(s=>!s)} style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.muted,fontSize:12,fontWeight:600,padding:'8px 10px',cursor:'pointer',fontFamily:'inherit'}}>{show?'Cacher':'Voir'}</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── RÉGLAGES → VENTES MASQUÉES · ACHATS MASQUÉS (30 septembre) ───────────────
+// Tout ce qui est écarté de la compta, au même endroit, avec ce que c'était
+// (titre, date, montant, compte) et un bouton pour le réafficher. Lit les
+// mêmes moissons que les écrans Ventes / Achats (`fetchHarvestOrders`).
+// « Pas su » ≠ « rien » : tant que la lecture n'est pas revenue, on le dit.
+function ElementsMasques({ comptes }) {
+  const [onglet, setOnglet] = useState('ventes');
+  const [vMasq, setVMasq] = useState(() => (load('vinted_sales_hidden', []) || []).map(String));
+  const [aMasq, setAMasq] = useState(() => [...achatsMasques()]);
+  const [det, setDet] = useState(undefined); // undefined = en cours · null = pas su · {tx: commande}
+  useEffect(() => { let stop = false; (async () => {
+    try {
+      const m = {}; let lu = false;
+      await Promise.all((comptes || []).map(async (a) => {
+        for (const cote of ['sold', 'purchased']) {
+          const p = await fetchHarvestOrders(a.vinted_user_id, cote);
+          if (p) lu = true;
+          for (const o of ((p && p.my_orders) || [])) m[String(o.transaction_id)] = { ...o, _login: a.login || '', _cote: cote };
+        }
+      }));
+      if (!stop) setDet(lu || !(comptes || []).length ? m : null);
+    } catch (_) { if (!stop) setDet(null); }
+  })(); return () => { stop = true; }; }, [comptes]);
+  const reafficher = (tx) => {
+    if (onglet === 'ventes') { const n = vMasq.filter(x => x !== tx); setVMasq(n); save('vinted_sales_hidden', n); }
+    else { const n = aMasq.filter(x => x !== tx); setAMasq(n); ecrireAchatsMasques(n); if (_acctCache['purchased']) { delete _acctCache['purchased']; _persistAcctCache(); } }
+    toast('Réaffiché — il compte de nouveau dans la compta.');
+  };
+  const liste = onglet === 'ventes' ? vMasq : aMasq;
+  const eur = (o) => { const v = o && (o.price && o.price.amount != null ? Number(o.price.amount) : null); return v != null && isFinite(v) ? v.toFixed(2).replace('.', ',') + ' €' : ''; };
+  return (
+    <div style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 10, padding: '12px 14px' }}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 8 }}>Masqué de la compta</div>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+        {[['ventes', `Ventes masquées (${vMasq.length})`], ['achats', `Achats masqués (${aMasq.length})`]].map(([k, lib]) => (
+          <button key={k} type="button" onClick={() => setOnglet(k)} aria-pressed={onglet === k}
+            style={{ border: `1px solid ${onglet === k ? C.text : C.border}`, borderRadius: 999, padding: '5px 11px', background: onglet === k ? C.text : 'transparent', color: onglet === k ? C.bg : C.muted, cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'inherit' }}>{lib}</button>
+        ))}
+      </div>
+      {!liste.length ? (
+        <div style={{ fontSize: 12, color: C.muted }}>{onglet === 'ventes' ? "Aucune vente masquée. Le ✕ d'une vente, sur l'écran Ventes, la range ici." : "Aucun achat masqué. L'icône « œil barré » d'un achat, sur l'écran Achats, le range ici."}</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          {det === null && <div style={{ fontSize: 11.5, color: C.muted, marginBottom: 6 }}>Je n'ai pas pu relire le détail de ces {onglet} — la liste reste juste, seuls titres et montants manquent.</div>}
+          {liste.map((tx, i) => { const o = det && det[tx];
+            return (
+              <div key={tx} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderTop: i ? `1px solid ${C.border}` : 'none' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{o ? o.title : (det === undefined ? 'Lecture…' : `Transaction ${tx}`)}</div>
+                  {o && <div style={{ fontSize: 11.5, color: C.muted }}>{[o.date ? new Date(o.date).toLocaleDateString('fr-FR') : '', o._login, eur(o)].filter(Boolean).join(' · ')}</div>}
+                </div>
+                <button type="button" onClick={() => reafficher(tx)} style={{ flexShrink: 0, border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, padding: '5px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Réafficher</button>
+              </div>
+            ); })}
         </div>
       )}
     </div>
