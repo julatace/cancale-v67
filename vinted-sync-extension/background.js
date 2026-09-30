@@ -671,10 +671,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       return true;
     }
     // COMPTE VRM (identification du vendeur, depuis la fenêtre de l'extension).
-    if (msg && msg.from === 'cancale-popup' && msg.action === 'authEtat') {
+    if (msg && (msg.from === 'cancale-popup' || msg.from === 'cancale-vpanel') && msg.action === 'authEtat') {
       authEtat().then(sendResponse); return true;
     }
-    if (msg && msg.from === 'cancale-popup' && msg.action === 'authLogin') {
+    if (msg && (msg.from === 'cancale-popup' || msg.from === 'cancale-vpanel') && msg.action === 'authLogin') {
       authLogin(msg.email, msg.password).then(sendResponse); return true;
     }
     if (msg && msg.from === 'cancale-popup' && msg.action === 'authLogout') {

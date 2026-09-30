@@ -1498,7 +1498,7 @@
         <div class="vrm-sub">Tes infos, sur Vinted.${fresh}</div>
         <div class="vrm-tabs">${barreOnglets()}</div>
       </div>
-      <div id="vrm-body">${bandeauPanne()}${bandeauAlerte()}${depotBandeau()}${modeleBandeau()}${
+      <div id="vrm-body">${bandeauConnexion()}${bandeauPanne()}${bandeauAlerte()}${depotBandeau()}${modeleBandeau()}${
         !DATA ? '<div class="vrm-m">Chargement…</div>'
         : tab === 'journee' ? renderJournee()
         : tab === 'paire' ? renderPaire()
@@ -1525,6 +1525,7 @@
         <a class="vrm-link" href="${APP_URL}" target="_blank" rel="noreferrer">Ouvrir l'app VRM ↗</a>
       </div>`;
     panel.classList.toggle('vrm-big', big); // garde la taille en phase avec l'état
+    brancherConnexion();
     panel.querySelector('.vrm-close').onclick = () => toggle(false);
     const rb = panel.querySelector('.vrm-refresh'); if (rb) rb.onclick = () => { if (!dataBusy) load(); };
     const mb = panel.querySelector('.vrm-max'); if (mb) mb.onclick = () => { big = !big; writeLS('vrm_panel_big', big ? '1' : '0'); render(); };
@@ -2663,6 +2664,54 @@
   // ⚠️ Ne rien promettre ici sur le retour : le panneau ne peut pas savoir quand
   //    la base répondra, et une alerte qui dit d'ATTENDRE quand il faut agir est
   //    pire que pas d'alerte.
+  // ── CONNEXION AU COMPTE VRM, LÀ OÙ IL REGARDE (30 septembre) ─────────────
+  // Julien : « ça ne me demande pas de me connecter ». Le formulaire vivait
+  // seulement dans la fenêtre de l'icône (barre de Chrome) ; la bulle VRM de la
+  // page, celle qu'il ouvre tous les jours, n'en disait rien. Or depuis le
+  // cloisonnement de la base, une extension NON connectée écrit en anonyme — et
+  // à la fermeture, ses captures seraient refusées. Un dossier d'extension neuf
+  // repart d'une mémoire vide : c'est exactement ce qui s'est passé à la 5.115.
+  // ⇒ la bulle le DIT et offre le formulaire ; l'identifiant est ensuite gardé
+  // (jeton de rafraîchissement, jamais le mot de passe). `AUTH === null` =
+  // « pas encore su » : on n'affiche rien plutôt qu'une fausse alerte.
+  let AUTH = null;
+  const chargerAuthPanel = () => {
+    try {
+      chrome.runtime.sendMessage({ from: 'cancale-vpanel', action: 'authEtat' }, (r) => {
+        if (chrome.runtime.lastError) return;
+        AUTH = r || null; majFabAuth(); if (panel.style.display !== 'none') render();
+      });
+    } catch (_) {}
+  };
+  const majFabAuth = () => {
+    const pas = !!(AUTH && AUTH.ok && !AUTH.connecte);
+    fab.style.boxShadow = pas ? '0 0 0 3px #f59e0b' : '';
+    fab.title = pas ? 'VRM — extension NON connectée à ton compte VRM : ouvre-moi pour te connecter' : 'VRM — mes infos sur cette paire';
+  };
+  const bandeauConnexion = () => (AUTH && AUTH.ok && !AUTH.connecte) ? `<div class="vrm-card" id="vrm-auth" style="margin-bottom:8px;padding:10px;background:#fff6ec;border-color:#ffd7a8">
+      <div style="font-weight:800;font-size:12.5px;color:#9a5b16;display:flex;align-items:center;gap:6px">${svgi('alert-triangle', 14)} ${AUTH.expiree ? 'Ta session VRM a expiré' : 'Extension pas connectée à ton compte VRM'}</div>
+      <div class="vrm-m" style="font-size:11.5px;margin-top:3px">Sans ça, tes captures ne seront plus enregistrées sous ton compte. Mets l'email et le mot de passe de ton compte <b>VRM</b> (ceux de vrm.center, <b>pas</b> ceux de Vinted) — c'est à faire une seule fois.</div>
+      <input id="vrm-auth-mail" type="email" autocomplete="username" placeholder="Email de ton compte VRM" style="display:block;width:100%;box-sizing:border-box;margin-top:7px;padding:8px 10px;border:1px solid #e5d3bd;border-radius:9px;font:inherit;font-size:13px">
+      <input id="vrm-auth-pw" type="password" autocomplete="current-password" placeholder="Mot de passe VRM" style="display:block;width:100%;box-sizing:border-box;margin-top:6px;padding:8px 10px;border:1px solid #e5d3bd;border-radius:9px;font:inherit;font-size:13px">
+      <button id="vrm-auth-go" style="margin-top:7px;border:none;background:#0f172a;color:#fff;border-radius:9px;padding:8px 12px;font:inherit;font-weight:800;font-size:12.5px;cursor:pointer">Se connecter</button>
+      <div id="vrm-auth-err" class="vrm-m" style="font-size:11.5px;margin-top:5px;color:#b42318" hidden></div>
+    </div>` : '';
+  const brancherConnexion = () => {
+    const go = panel.querySelector('#vrm-auth-go'); if (!go) return;
+    const envoyer = () => {
+      const email = (panel.querySelector('#vrm-auth-mail') || {}).value || '';
+      const password = (panel.querySelector('#vrm-auth-pw') || {}).value || '';
+      const err = panel.querySelector('#vrm-auth-err');
+      go.disabled = true; go.textContent = 'Connexion…'; if (err) err.hidden = true;
+      chrome.runtime.sendMessage({ from: 'cancale-vpanel', action: 'authLogin', email, password }, (r) => {
+        go.disabled = false; go.textContent = 'Se connecter';
+        if (r && r.ok) { chargerAuthPanel(); load(); }
+        else if (err) { err.textContent = (r && r.error) || 'Connexion refusée.'; err.hidden = false; }
+      });
+    };
+    go.onclick = envoyer;
+    const pw = panel.querySelector('#vrm-auth-pw'); if (pw) pw.onkeydown = (ev) => { if (ev.key === 'Enter') envoyer(); };
+  };
   const bandeauPanne = () => (DATA && DATA.baseKO) ? `<div class="vrm-card" style="margin-bottom:8px;padding:9px;background:#fff6ec;border-color:#ffd7a8">
       <div style="font-weight:800;font-size:12.5px;color:#9a5b16;display:flex;align-items:center;gap:6px">${svgi('alert-triangle', 14)} Je n'ai pas pu lire tes données</div>
       <div class="vrm-m" style="font-size:11.5px;margin-top:3px"><b>Les chiffres ci-dessous sont incomplets</b> — ne te fie pas à eux pour décider ce que tu as à faire aujourd'hui. <b>Rien n'est perdu</b> : c'est la lecture qui échoue, pas tes données. Ouvre VRM sur <b>vrm.center</b>, il t'y dira quoi faire.</div>
@@ -3768,5 +3817,6 @@
   } catch (_) {}
 
   load();   // pastille dès l'arrivée sur Vinted
+  chargerAuthPanel();
   onPage(); // lit la date si on arrive directement sur une annonce
 })();
