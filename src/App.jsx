@@ -3777,6 +3777,40 @@ const generateAchatJustificatif = async (o, opts = {}) => {
   setTimeout(()=>URL.revokeObjectURL(url), 4000);
 };
 
+// Petit helper partagé : télécharge des octets PDF.
+const _telechargerPdf = (bytes, nom) => {
+  const blob = new Blob([bytes], { type: 'application/pdf' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = nom;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+};
+
+// ── ÉTIQUETTE SKU ───────────────────────────────────────────────────────────
+// Julien (Actions rapides) : une petite étiquette à coller, avec le N° en gros.
+// Format sticker 100×60 mm (283×170 pt). Le N° domine ; titre + transaction
+// dessous pour la retrouver. Rien d'inventé : si pas de N°, on ne génère pas.
+const generateEtiquetteSku = async (num, o = {}) => {
+  const n = String(num || '').trim();
+  if (!n) return;
+  const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib');
+  const pdf = await PDFDocument.create();
+  const W = 283, H = 170;
+  const page = pdf.addPage([W, H]);
+  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const reg = await pdf.embedFont(StandardFonts.Helvetica);
+  const N = rgb(0.08, 0.08, 0.08), G = rgb(0.4, 0.4, 0.4);
+  page.drawText('N°', { x: 18, y: H - 46, size: 16, font: reg, color: G });
+  const big = String(n);
+  const sz = big.length > 5 ? 56 : 72;
+  page.drawText(big, { x: 18, y: 54, size: sz, font: bold, color: N });
+  const titre = (o.title || '').slice(0, 42);
+  if (titre) page.drawText(titre, { x: 18, y: 32, size: 10, font: reg, color: G });
+  if (o.transaction_id) page.drawText('tx ' + String(o.transaction_id), { x: 18, y: 16, size: 8, font: reg, color: G });
+  page.drawRectangle({ x: 4, y: 4, width: W - 8, height: H - 8, borderColor: rgb(0.8, 0.8, 0.8), borderWidth: 1 });
+  _telechargerPdf(await pdf.save(), `etiquette-${n}.pdf`);
+};
+
 // ⚠️ `syncFromSheets` / `syncToSheets` SUPPRIMÉES (30 août).
 // Restes de l'ancienne architecture Google Sheets (§2) : plus AUCUN appelant, et
 // toutes deux lisaient une constante `API_URL` **qui n'existe nulle part** — donc
@@ -6661,40 +6695,61 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
   const aEnvoyer = avecLabel.filter(o => estEnvoyer(o) && !annulee(o));
   const postes = avecLabel.filter(o => !estEnvoyer(o) && !annulee(o));
   const euro = (p) => p == null ? '' : (Number(p) / 100).toFixed(2).replace('.', ',') + ' €';
+  // ── LE N° (SKU) D'UN COLIS LEBONCOIN ──────────────────────────────────────
+  // Le colis Leboncoin porte l'`itemId` VINTED (l'annonce a été cross-postée) :
+  // on retrouve donc son numéro de rangement par IDENTITÉ (itemId → numéro),
+  // jamais par titre (§5). Absent ⇒ pas de N°, on n'invente rien.
+  const numD = (typeof load === 'function' ? (load('vinted_annonce_numeros', {}) || {}) : {});
+  const numDe = (o) => { const e = o && o.itemId && numD[o.itemId]; return (e && e.numero != null && String(e.numero).trim()) ? String(e.numero).trim() : ''; };
+  // Pastille N°, comme sur Vinted.
+  const badgeNum = (n) => n ? <span style={{ flexShrink: 0, fontSize: 12, fontWeight: 800, color: C.text, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: '2px 9px' }}>N°{n}</span> : null;
   return (
     <div style={{ padding: 16 }}>
       <ScreenHead icon="box" title="Colis Leboncoin" desc="Les bordereaux à poster, puis les colis déjà envoyés" />
       {avecLabel.length === 0 ? (
         <Card><div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Aucun bordereau Leboncoin capté pour l'instant. Dès qu'une vente Leboncoin a son bordereau, il apparaît ici — avec son QR code.</div></Card>
       ) : (<>
+        {/* ⚠️ TAMPONNAGE DU N° : sur Vinted, le N° est imprimé DANS le PDF du
+            bordereau (on a les octets). Sur Leboncoin le bordereau est un lien
+            distant (api.leboncoin) que la page ne peut pas modifier (CORS) : on
+            fournit donc une ÉTIQUETTE N° à imprimer et coller sur le colis —
+            même numéro, par identité. Honnête : on ne promet pas d'écrire dans
+            le PDF de Leboncoin. */}
         <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, margin: '2px 0 8px 2px' }}>À envoyer ({aEnvoyer.length})</div>
         {aEnvoyer.length === 0 ? <Card style={{ marginBottom: 14 }}><div style={{ fontSize: 12.5, color: C.muted }}>Rien à poster — tout est parti. 👌</div></Card>
-          : aEnvoyer.map(o => (
+          : aEnvoyer.map(o => { const n = numDe(o); return (
             <Card key={o.txId} style={{ marginBottom: 10 }}>
               <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
                 <PhotoVente src={o.image} size={56} />
                 <div style={{ flex: '1 1 auto', minWidth: 0 }}>
-                  <div style={{ fontWeight: 700, fontSize: 14, color: C.text, lineHeight: 1.25 }}>{o.title || '(sans titre)'}</div>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                    <div style={{ flex: '1 1 auto', minWidth: 0, fontWeight: 700, fontSize: 14, color: C.text, lineHeight: 1.25 }}>{o.title || '(sans titre)'}</div>
+                    {badgeNum(n)}
+                  </div>
                   <div style={{ fontSize: 11.5, color: C.muted, marginTop: 2 }}>{o.deliveryLabel || o.deliveryMethod || 'Transporteur'}{euro(o.price) ? ` · ${euro(o.price)}` : ''}</div>
-                  {o.label.voucherUrl && <a href={o.label.voucherUrl} target="_blank" rel="noreferrer" style={{ display: 'inline-block', marginTop: 8, background: C.text, color: C.card, borderRadius: 8, padding: '7px 12px', fontWeight: 700, fontSize: 12.5, textDecoration: 'none' }}>🧾 Bordereau{o.label.reference ? ` · ${o.label.reference}` : ''}</a>}
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+                    {o.label.voucherUrl && <a href={o.label.voucherUrl} target="_blank" rel="noreferrer" style={{ display: 'inline-block', background: C.text, color: C.card, borderRadius: 8, padding: '7px 12px', fontWeight: 700, fontSize: 12.5, textDecoration: 'none' }}>🧾 Bordereau{o.label.reference ? ` · ${o.label.reference}` : ''}</a>}
+                    {n && <button type="button" onClick={() => generateEtiquetteSku(n, { title: o.title, transaction_id: o.txId })} style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 8, padding: '7px 12px', fontWeight: 700, fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit' }}>🏷️ Étiquette N°{n}</button>}
+                  </div>
                 </div>
                 <QrColis url={o.label.qrUrl} />
               </div>
             </Card>
-          ))}
+          ); })}
         {postes.length > 0 && (<>
           <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, margin: '16px 0 8px 2px' }}>Déjà postés ({postes.length})</div>
           <Card>
-            {postes.map((o, i) => (
+            {postes.map((o, i) => { const n = numDe(o); return (
               <div key={o.txId} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '9px 0', borderTop: i ? `1px solid ${C.border}` : 'none' }}>
                 <PhotoVente src={o.image} size={40} />
                 <div style={{ flex: '1 1 auto', minWidth: 0 }}>
                   <div style={{ fontWeight: 600, fontSize: 13, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.title || '(sans titre)'}</div>
                   <div style={{ fontSize: 11, color: C.muted }}>{o.stepLabel || 'Posté'}{o.label.reference ? ` · ${o.label.reference}` : ''}</div>
                 </div>
+                {badgeNum(n)}
                 {o.label.trackingUrl && <a href={o.label.trackingUrl} target="_blank" rel="noreferrer" style={{ flexShrink: 0, color: C.accent, fontWeight: 700, fontSize: 12, textDecoration: 'none' }}>Suivre ↗</a>}
               </div>
-            ))}
+            ); })}
           </Card>
         </>)}
       </>)}
