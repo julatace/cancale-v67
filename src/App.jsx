@@ -6590,13 +6590,14 @@ function FraicheurDonnees({ jours, compte, siAJour = true }) {
 // Sous-navigation d'un hub de plateforme : des pastilles qui changent la SECTION
 // affichée DANS l'onglet (Aperçu · Annonces · Ventes · Achats), sans quitter la
 // plateforme. Une seule teinte d'accent (§7), la pastille active distingue.
-function PlatSubNav({ sub, setSub, sections }) {
+function PlatSubNav({ sub, setSub, sections, dark }) {
+  const T = dark ? EBAY_SKIN : C;   // eBay garde son skin noir (Julien : « le même visuel qu'eBay »)
   return (
-    <div className="vrm-rangee" style={{display:'flex',gap:8,padding:'12px 16px 0',overflowX:'auto'}}>
+    <div className="vrm-rangee" style={{display:'flex',gap:8,padding:'12px 16px 0',overflowX:'auto',background:dark?EBAY_SKIN.bg:'transparent'}}>
       {sections.map(([id,label])=>{ const on = sub===id; return (
         <button key={id} type="button" onClick={()=>setSub(id)} aria-current={on?'page':undefined}
-          style={{flexShrink:0,border:`1px solid ${on?C.accent:C.border}`,background:on?C.accent:C.card,
-            color:on?(C.onAccent||'#fff'):C.text,borderRadius:999,padding:'7px 14px',cursor:'pointer',
+          style={{flexShrink:0,border:`1px solid ${on?T.accent:T.border}`,background:on?T.accent:T.card,
+            color:on?(T.onAccent||'#fff'):T.text,borderRadius:999,padding:'7px 14px',cursor:'pointer',
             fontFamily:'inherit',fontSize:13,fontWeight:on?700:600,whiteSpace:'nowrap'}}>{label}</button>
       );})}
     </div>
@@ -7481,6 +7482,68 @@ function EbayConnexion({ comptes = [] }) {
   );
 }
 
+// ── eBay · VENTES (commandes captées par l'API officielle) ──────────────────
+// Même esprit que les Ventes Leboncoin : on rend ce qui est MESURÉ (ebay_orders),
+// jamais un chiffre inventé. Skin eBay (noir). La place de la photo est réservée.
+function EbayVentes({ baseKO }) {
+  const E = EBAY_SKIN;
+  const [orders, setOrders] = React.useState(undefined); // undefined=en cours · null=pas su · []=lu
+  React.useEffect(() => { let stop = false; (async () => {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.ebay_orders&select=data`, { headers: sbAuth() });
+      if (!r.ok) { if (!stop) setOrders(null); return; }
+      const rows = await r.json();
+      if (!Array.isArray(rows)) { if (!stop) setOrders(null); return; }
+      const O = (rows[0] && rows[0].data) || {};
+      if (!stop) setOrders(Array.isArray(O.orders) ? O.orders : []);
+    } catch (_) { if (!stop) setOrders(null); }
+  })(); return () => { stop = true; }; }, []);
+  const wrap = (kids) => <div style={{ background: E.bg, minHeight: '100vh', padding: 16, paddingBottom: 48 }}>{kids}</div>;
+  const head = <div style={{ fontSize: 22, fontWeight: 800, color: E.text, marginBottom: 2 }}>Ventes eBay</div>;
+  if (baseKO) return wrap(<>{head}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué. Réessaie dans un instant.</div></>);
+  if (orders === undefined) return wrap(<>{head}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Chargement…</div></>);
+  if (orders === null) return wrap(<>{head}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Je n'ai pas pu lire tes ventes eBay. Réessaie dans un instant.</div></>);
+  if (!orders.length) return wrap(<>{head}<div style={{ color: E.muted, fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>Pas encore de vente eBay captée. Connecte ton compte eBay dans l'onglet Aperçu et synchronise — tes ventes apparaîtront ici.</div></>);
+  const euro = (v, c) => v == null ? '' : Number(v).toFixed(2).replace('.', ',') + ' ' + (c === 'USD' ? '$' : '€');
+  const payees = orders.filter(o => String((o && o.orderPaymentStatus) || '').toUpperCase() === 'PAID').length;
+  return wrap(<>
+    {head}
+    <div style={{ color: E.muted, fontSize: 12, marginBottom: 12 }}>{orders.length} commande{orders.length > 1 ? 's' : ''}{payees ? ` · ${payees} payée${payees > 1 ? 's' : ''}` : ''}</div>
+    <div style={{ background: E.card, border: `1px solid ${E.border}`, borderRadius: 14, overflow: 'hidden' }}>
+      {orders.map((o, i) => {
+        const li = (o.lineItems && o.lineItems[0]) || {};
+        const img = (li.image && (li.image.imageUrl || li.image.url)) || li.imageUrl || '';
+        const paye = String(o.orderPaymentStatus || '').toUpperCase() === 'PAID';
+        const expedie = /FULFILLED|SHIPPED/i.test(String(o.orderFulfillmentStatus || ''));
+        const statut = !paye ? 'Paiement en attente' : expedie ? 'Expédiée' : 'À expédier';
+        const col = !paye ? E.muted : expedie ? E.muted : E.warn;
+        return (
+          <div key={o.orderId || i} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '11px 14px', borderTop: i ? `1px solid ${E.border}` : 'none' }}>
+            <PhotoVente src={img} size={52} />
+            <div style={{ flex: '1 1 auto', minWidth: 0 }}>
+              <div style={{ fontWeight: 600, fontSize: 13.5, color: E.text, lineHeight: 1.25, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{li.title || '(sans titre)'}</div>
+              <div style={{ fontSize: 11.5, color: col, marginTop: 2, fontWeight: 600 }}>{statut}{o.buyer && o.buyer.username ? ` · ${o.buyer.username}` : ''}</div>
+            </div>
+            <div className="vrm-display" style={{ flexShrink: 0, fontSize: 16, fontWeight: 800, color: E.text, alignSelf: 'flex-start' }}>{euro(o.pricingSummary && o.pricingSummary.total && o.pricingSummary.total.value, o.pricingSummary && o.pricingSummary.total && o.pricingSummary.total.currency)}</div>
+          </div>
+        );
+      })}
+    </div>
+  </>);
+}
+// ── eBay · ACHATS — pas captés aujourd'hui (l'API de VENTE ne porte pas les
+//    achats). On le DIT au lieu d'un onglet vide qui laisserait croire à un bug.
+function EbayAchats() {
+  const E = EBAY_SKIN;
+  return (
+    <div style={{ background: E.bg, minHeight: '100vh', padding: 16, paddingBottom: 48 }}>
+      <div style={{ fontSize: 22, fontWeight: 800, color: E.text, marginBottom: 2 }}>Achats eBay</div>
+      <div style={{ color: E.muted, fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>
+        Tes achats eBay ne sont pas encore récupérés : la connexion eBay porte tes <b style={{ color: E.text }}>ventes</b> et tes <b style={{ color: E.text }}>annonces</b>, pas le côté acheteur. Dès que ce sera possible, ils s'afficheront ici — comme pour Vinted.
+      </div>
+    </div>
+  );
+}
 function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, ebayCa = null, comptes = [], onGo, onSub, baseKO }) {
   const p = caParPlateforme(liveStats, lbcVentes, ebayCa).find(x => x.nom === plat) || { nom:plat, ca:null };
   // Les cartes du hub ouvrent une SECTION dans l'onglet (onSub) si l'appelant le
@@ -28268,7 +28331,16 @@ export default function App() {
           {platSub==='ventes'&&<div style={{padding:16}}><ScreenHead icon="tag" title="Ventes Leboncoin" desc="Tes ventes Leboncoin, reliées par identité (jamais par titre)"/>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:<VentesLeboncoin lbcVentes={lbcVentes}/>}</div>}
           {platSub==='apublier'&&<LeboncoinScreen/>}
         </>)}
-        {tab==='plat_ebay'&&<Plateforme plat="eBay" liveStats={liveStats} lbcVentes={lbcVentes} ebayCa={ebayCa} comptes={vintedAccounts} onGo={setTab} baseKO={baseKO}/>}
+        {tab==='plat_ebay'&&(<>
+          {/* Julien : « eBay, je veux tout pareil que Vinted — les onglets achats,
+              ventes ». Même structure, dans le skin eBay (noir). Aperçu garde la
+              connexion + la publication ; Ventes liste les commandes captées ;
+              Achats dit honnêtement qu'ils ne sont pas encore récupérés. */}
+          <div style={{background:'#000000'}}><PlatSubNav sub={platSub} setSub={setPlatSub} sections={[['apercu','Aperçu'],['ventes','Ventes'],['achats','Achats']]} dark/></div>
+          {platSub==='apercu'&&<Plateforme plat="eBay" liveStats={liveStats} lbcVentes={lbcVentes} ebayCa={ebayCa} comptes={vintedAccounts} onGo={setTab} baseKO={baseKO}/>}
+          {platSub==='ventes'&&<EbayVentes baseKO={baseKO}/>}
+          {platSub==='achats'&&<EbayAchats/>}
+        </>)}
         {tab==='plat_vestiaire'&&<Plateforme plat="Vestiaire Collective" liveStats={liveStats} lbcVentes={lbcVentes} onGo={setTab} baseKO={baseKO}/>}
         {tab==='prixmarche'&&<PrixMarche data={pqmData} baseKO={baseKO}/>}
         {tab==='inventory'&&<Inventory inventory={inventory} setInventory={setInventory} accounts={vintedAccounts} garageGrid={garageGrid} labels={accountLabels} onLocate={(numero)=>{ setGarageLocate(String(numero)); setTab('garage'); }}/>}
