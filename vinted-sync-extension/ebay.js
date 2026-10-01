@@ -296,6 +296,58 @@
     }
     return false;
   }
+  // ⚠️⚠️ eBAY UTILISE DES LISTES REACT, PAS DES `<select>` NATIFS — exactement
+  //    comme Leboncoin (mesuré le 19 sept.). `choisirListe` (ci-dessus) ne voit
+  //    que les `<select>` : sur le vrai formulaire eBay il ne remplit RIEN, le
+  //    défaut « ça ne met pas la catégorie ni le reste ». Même correctif que
+  //    Leboncoin : on OUVRE le combobox et on CLIQUE l'option au texte EXACT —
+  //    le geste d'un humain, jamais une valeur posée en douce, jamais « le
+  //    premier qui ressemble » (§5 : un attribut faux sur une annonce publiée
+  //    est le coût le plus élevé du projet).
+  function labelCombobox(el) {
+    let lbl = el.getAttribute('aria-label') || '';
+    const lb = el.getAttribute('aria-labelledby');
+    if (lb) { try { for (const id of lb.split(/\s+/)) { const e = document.getElementById(id); if (e) lbl += ' ' + (e.innerText || ''); } } catch (_) {} }
+    const id = el.getAttribute('id');
+    if (id) { try { const l = document.querySelector('label[for="' + ((window.CSS && CSS.escape) ? CSS.escape(id) : id) + '"]'); if (l) lbl += ' ' + (l.innerText || ''); } catch (_) {} }
+    const f = el.closest('div,fieldset,section'); if (f) { const l = f.querySelector('label'); if (l) lbl += ' ' + (l.innerText || ''); }
+    return lbl.toLowerCase();
+  }
+  async function choisirComposant(motif, valeurExacte) {
+    const cible = String(valeurExacte || '').trim();
+    if (!cible) return false;
+    const boxes = Array.from(document.querySelectorAll('[role="combobox"]')).filter((el) => !DANS_ENTETE(el));
+    for (const box of boxes) {
+      if (!motif.test(labelCombobox(box))) continue;
+      const val = String(box.value || box.getAttribute('data-choisi') || '').trim();
+      if (val) return false;                            // déjà choisi : on ne touche pas
+      try { box.focus(); box.click(); } catch (_) {}
+      await new Promise((r) => setTimeout(r, 160));      // le menu React s'ouvre
+      const opt = Array.from(document.querySelectorAll('[role="option"]'))
+        .find((o) => String(o.textContent || '').trim().toLowerCase() === cible.toLowerCase());
+      if (opt) { try { opt.click(); } catch (_) {} return true; }
+      try { box.blur(); } catch (_) {}                   // referme le menu, rien choisi
+      return false;
+    }
+    return false;
+  }
+  // Une seule fois par paire (le minuteur rappelle `remplir` chaque seconde —
+  // sans ça on rouvrirait le menu en boucle). Remis à zéro par « Re-remplir ».
+  let _composFaits = new Set(); let _composEnCours = false; let composFaits = 0;
+  async function remplirComposants(ad) {
+    if (_composEnCours) return 0; _composEnCours = true;
+    let k = 0;
+    try {
+      const cle = (q) => String(ad.id || ad.sku || '') + ':' + q;
+      const etat = String(ad.etat || '').trim();
+      if (etat && !_composFaits.has(cle('e')) && await choisirComposant(/[ée]tat|condition/, etat)) { _composFaits.add(cle('e')); k++; }
+      const marque = String(ad.marque || '').trim();
+      if (marque && !_composFaits.has(cle('m')) && await choisirComposant(/marque|brand/, marque)) { _composFaits.add(cle('m')); k++; }
+      const taille = String(ad.taille || '').trim();
+      if (taille && !_composFaits.has(cle('p')) && await choisirComposant(/pointure|taille|\bsize\b/, taille)) { _composFaits.add(cle('p')); k++; }
+    } catch (_) {}
+    _composEnCours = false; composFaits += k; return k;
+  }
   function remplir(ad) {
     let n = 0;
     if (setField(champ([/titre|title|subject/]), ad.title)) n++;
@@ -306,10 +358,12 @@
     //    Leboncoin) : les listes déroulantes ne sont pas des `input`, `champ()`
     //    ne les voyait même pas. L'état, la marque et la pointure en sont, et
     //    eBay les demande. La CATÉGORIE, non — voir `choisirListe`.
+    //    Les `<select>` natifs d'abord ; les comboboxes React suivent
+    //    (`remplirComposants`, async, appelé par le minuteur).
     if (choisirListe([/[ée]tat|condition/], ['Très bon état', 'Bon état', 'Occasion', 'Used'])) n++;
     if (choisirListe([/marque|brand/], [ad.marque])) n++;
     if (choisirListe([/pointure|taille|\bsize\b/], [ad.taille])) n++;
-    return n;
+    return n + composFaits;
   }
   function bandeau(n, ad) {
     let el = document.getElementById('vrm-ebay-b');
@@ -355,6 +409,9 @@
     clearInterval(minuteur);
     minuteur = setInterval(() => {
       essais++;
+      // Les comboboxes React (état/marque/pointure) se remplissent en async ;
+      // leur compte s'ajoute à `composFaits`, que `remplir` additionne.
+      remplirComposants(ad).then((k) => { if (k) { const nn = remplir(ad); if (nn > faits) { faits = nn; bandeau(faits, ad); } } });
       const n = remplir(ad);
       if (n > faits) { faits = n; bandeau(faits, ad); }
       // Les photos : dès qu'une étape porte un champ fichier, on attache. UNE
@@ -368,6 +425,7 @@
   }
   function relancer(ad) {
     arrete = false; essais = 0;
+    _composFaits = new Set(); composFaits = 0;   // « Re-remplir » rouvre les menus
     faits = remplir(ad);
     if (!photosFaites && champsFichier().length) {
       photosFaites = true;
