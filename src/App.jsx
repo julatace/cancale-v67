@@ -24843,7 +24843,7 @@ function LeboncoinScreen() {
           : (it.is_closed ? (vendus.has(oid) ? 'vendue' : 'fermee') : 'enligne'));
         if (it.is_closed || it.is_hidden || it.is_draft) continue;
         onlineIds.add(oid); if (seen.has(oid)) continue; seen.add(oid);
-        online.push({ id: oid, title: it.title, brand: it.brand_title || '', size: it.size_title || '', price: (it.price && it.price.amount) || it.price || null, photo: (it.photo && it.photo.url) || '' });
+        online.push({ id: oid, title: it.title, brand: it.brand_title || '', size: it.size_title || '', price: (it.price && it.price.amount) || it.price || null, photo: (it.photo && it.photo.url) || '', nPhotos: Number.isFinite(it.nPhotos) ? it.nPhotos : (it.photos_count != null ? Number(it.photos_count) : undefined) });
       }
     }
     // ── OÙ EN EST LA PRÉPARATION DE LA PUBLICATION AUTOMATIQUE ────────────────
@@ -24923,12 +24923,19 @@ function LeboncoinScreen() {
       // deux côtés), le prix, et le nombre de photos réellement disponibles.
       // Avant, cette liste montrait le titre VINTED brut — donc pas ce qui part.
       const d = pageDet[o.id] || {};
-      const photos = Array.isArray(d.photos) ? d.photos.length : (o.photo ? 1 : 0);
+      const normPh = (p) => typeof p === 'string' ? p : (p && (p.url || p.full_size_url)) || '';
+      // TOUTES les photos captées (Julien : « je veux à chaque fois toutes les
+      // photos »), pas seulement la couverture. Le nombre RÉEL que Vinted annonce
+      // (nPhotos) peut être plus grand que ce qui est capté : on le garde pour
+      // dire « 6/12 captées » sans mentir.
+      const photosAll = (Array.isArray(d.photos) ? d.photos.map(normPh).filter(Boolean) : (o.photo ? [o.photo] : []));
+      const photos = photosAll.length;
+      const nReelles = Number.isFinite(o.nPhotos) ? o.nPhotos : (Number.isFinite(d.nPhotos) ? d.nPhotos : null);
       queue.push({
         id: o.id, numero: String(num), vinted: o.title || (e && e.title) || '',
         title: lbcTitre(d.brand || o.brand, d.title || o.title, d.size || o.size),
         prix: o.price != null ? Number(o.price) : null,
-        photos, vignette: o.photo || (Array.isArray(d.photos) ? d.photos[0] : ''),
+        photos, photosAll, nReelles, vignette: photosAll[0] || '',
         desc: !!lbcDescription(d.description),
         url: 'https://www.vinted.fr/items/' + o.id,
       });
@@ -25273,18 +25280,34 @@ function LeboncoinScreen() {
               // Un seul groupe ⇒ pas de titre de groupe : il répéterait le
               //    compte de l'en-tête (§7, le même nombre deux fois).
               const groupes = [pretes, maigres, nues].filter(g => g.length).length;
-              const Ligne = (q) => (
-                <div key={q.id} style={{ display: 'flex', gap: 9, alignItems: 'center', padding: '6px 0', borderTop: `1px solid ${C.border}` }}>
-                  {q.vignette ? <img src={q.vignette} alt="" loading="lazy" style={{ width: 34, height: 34, borderRadius: 7, objectFit: 'cover', flexShrink: 0, background: C.bg }} /> : <span style={{ width: 34, height: 34, borderRadius: 7, flexShrink: 0, background: C.bg }} />}
-                  <span style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{ display: 'block', fontSize: 12.5, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{q.title || '—'}</span>
-                    <span style={{ display: 'block', fontSize: 10.5, color: C.muted, marginTop: 1 }}>
-                      N°{q.numero} · {q.prix != null ? q.prix.toFixed(2).replace('.', ',') + ' €' : '—'} · {q.photos} photo{q.photos > 1 ? 's' : ''}{q.desc ? '' : ' · pas de description'}
-                      {' · '}<a href={q.url} target="_blank" rel="noreferrer" style={{ color: C.accent, fontWeight: 700 }}>l'annonce Vinted</a>
+              const Ligne = (q) => {
+                const toutes = Array.isArray(q.photosAll) ? q.photosAll : [];
+                // Combien MANQUENT à la capture (le vrai nombre d'après Vinted).
+                const manque = (q.nReelles != null && q.nReelles > q.photos) ? (q.nReelles - q.photos) : 0;
+                return (
+                <div key={q.id} style={{ padding: '9px 0', borderTop: `1px solid ${C.border}` }}>
+                  <div style={{ display: 'flex', gap: 9, alignItems: 'baseline' }}>
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ display: 'block', fontSize: 12.5, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{q.title || '—'}</span>
+                      <span style={{ display: 'block', fontSize: 10.5, color: C.muted, marginTop: 1 }}>
+                        N°{q.numero} · {q.prix != null ? q.prix.toFixed(2).replace('.', ',') + ' €' : '—'} · {q.photos} photo{q.photos > 1 ? 's' : ''}{manque ? ` captée${q.photos > 1 ? 's' : ''} sur ${q.nReelles}` : ''}{q.desc ? '' : ' · pas de description'}
+                        {' · '}<a href={q.url} target="_blank" rel="noreferrer" style={{ color: C.accent, fontWeight: 700 }}>l'annonce Vinted</a>
+                      </span>
                     </span>
-                  </span>
+                  </div>
+                  {/* TOUTES les photos captées, en bande qui défile (Julien l'a
+                      demandé). Rien capté ⇒ un cadre neutre, jamais un trou. */}
+                  <div className="vrm-rangee" style={{ display: 'flex', gap: 6, marginTop: 7, overflowX: 'auto', paddingBottom: 2 }}>
+                    {toutes.length === 0
+                      ? <span style={{ width: 54, height: 54, borderRadius: 8, flexShrink: 0, background: C.bg, border: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="image" size={20} style={{ color: C.muted, opacity: .5 }} /></span>
+                      : toutes.map((src, i) => <img key={i} src={src} alt="" loading="lazy" decoding="async" style={{ width: 54, height: 54, borderRadius: 8, objectFit: 'cover', flexShrink: 0, background: C.bg, border: `1px solid ${C.border}` }} />)}
+                    {manque > 0 && (
+                      <span style={{ width: 54, height: 54, borderRadius: 8, flexShrink: 0, background: C.bg, border: `1px dashed ${C.border}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: C.muted, textAlign: 'center', lineHeight: 1.2 }}>+{manque}<span style={{ fontSize: 8, fontWeight: 500 }}>rouvrir</span></span>
+                    )}
+                  </div>
                 </div>
-              );
+                );
+              };
               return (<>
                 {nues.length > 0 && (<>
                   {groupes > 1 && <div style={{ fontSize: 11.5, fontWeight: 800, color: C.warn, marginTop: 4 }}>Aucune photo — {nues.length}</div>}
