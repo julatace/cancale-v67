@@ -35,7 +35,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.124.0';
+const EXT_ATTENDUE = '5.125.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -6829,12 +6829,29 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
   );
 }
 // Une transaction Leboncoin est FINALISÉE (argent reçu côté vente, colis reçu
-// côté achat) quand Leboncoin a clôturé/livré la transaction ; sinon elle est EN
-// COURS, exactement comme Vinted sépare « CA finalisé » et « en attente ».
-// Mesuré sur ses stepStatus : 'done'/'terminé'/'livré' = finalisée ;
-// 'action'/'ongoing'/transit = en cours.
-const lbcAnnulee = (o) => /annul|cancel|refund|rembours/i.test((o.stepStatus || '') + ' ' + (o.stepLabel || ''));
-const lbcFinalisee = (o) => /\bdone\b|termin|finalis|cl[oô]tur|re[çc]u|livr|deliver|clos/i.test((o.stepStatus || '') + ' ' + (o.stepLabel || ''));
+// côté achat) ou EN COURS — exactement comme Vinted sépare « CA finalisé » et
+// « en attente ». ⚠️ ON NE DEVINE PAS SUR LE LIBELLÉ : on lit CE QUE L'EXTENSION
+// CAPTE. MESURÉ sur sa vraie base (détail v2 de la Salomon) : le vrai signal est
+// `parcel.timeline_config.color_status === 'finished'` + `parcel.last_event_status
+// === 'delivered'`. Le `step.label` « Paiement effectué » est le DERNIER palier
+// vendeur (paiement reversé, current_step_index 3/4) = finalisé — pas « en
+// cours » comme mon ancien regex le croyait. La LISTE v3 donne `step` en chaîne
+// simple : 'done' = finalisé, 'cancelled' = annulé.
+// Ordre : 1) le colis (signal autoritaire) · 2) la liste v3 · 3) le libellé du
+// détail (repli pour les lignes captées AVANT que le colis soit extrait).
+const lbcAnnulee = (o) => o.stepStatus === 'cancelled' || /annul|cancel|refund|rembours/i.test((o.parcelStatus || '') + ' ' + (o.stepStatus || '') + ' ' + (o.stepLabel || ''));
+const lbcFinalisee = (o) => {
+  if (o.parcelColor) return o.parcelColor === 'finished';           // ce que dit le colis
+  if (o.parcelStatus) return /deliver|livr/i.test(o.parcelStatus);
+  if (o.stepStatus === 'done') return true;                         // liste v3
+  if (o.stepStatus === 'cancelled') return false;
+  // repli (lignes déjà captées, sans colis) : UNIQUEMENT les libellés TERMINAUX
+  // mesurés — « Paiement effectué » (vendeur payé), « Terminé » (acheteur a reçu),
+  // « livré/livrée », « colis reçu », « finalisé/clôturé/clos ». ⚠️ `livr[ée]`
+  // et pas `livr` : « en cours de livraison » = EN TRANSIT, pas livré. Et pas de
+  // « reçu » seul (ambigu : « paiement reçu » peut être un palier amont).
+  return /paiement effectu|termin[ée]|finalis|cl[oô]tur|livr[ée]|colis re[çc]u|\bclos/i.test((o.stepLabel || '') + ' ' + (o.stepStatus || ''));
+};
 const lbcEuro = (p) => p == null ? '' : (Number(p) / 100).toFixed(2).replace('.', ',') + ' €';
 // Carte d'une transaction Leboncoin — comme Vinted : photo · titre · statut +
 // transporteur · prix. Partagée par Ventes ET Achats (§11 : une seule forme).

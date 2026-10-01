@@ -6466,6 +6466,12 @@ function extraireVentesLbc(url, body) {
     const mid = String(url).match(/transactions?\/(\d+)/);
     const li = labelInfoDe(d);
     const pr = (d.item && d.item.prices) || {};
+    // ⚠️ LE VRAI SIGNAL « FINALISÉ » (Julien : « regarde ce que l'extension dit »).
+    // MESURÉ sur le détail v2 : `step.label` « Paiement effectué » est ambigu, mais
+    // `parcel` tranche — `last_event_status: delivered`, `timeline_config.color_status:
+    // finished` (current_step_index 3/4). On capte ces deux-là pour que l'app
+    // classe sur la mesure, pas sur un mot. LECTURE seule, aucune donnée perso.
+    const pcl = (d.parcel && d.parcel.timeline_config) || {};
     const v = {
       txId: (mid && mid[1]) || String((d.id && d.id.purchase_id) || d.purchase_id || (d.item && d.item.id) || ''),
       itemId: String((d.item && d.item.id) || ''),
@@ -6479,6 +6485,8 @@ function extraireVentesLbc(url, body) {
       isSeller: d.is_seller === true ? true : (d.is_seller === false ? false : undefined),
       stepStatus: (d.step && d.step.status) || (typeof d.step === 'string' ? d.step : ''),
       stepLabel: (d.step && d.step.label) || '',
+      parcelStatus: (d.parcel && d.parcel.last_event_status) || '',
+      parcelColor: pcl.color_status || '',
       deliveryMethod: d.delivery_method || '',
       deliveryLabel: d.delivery_method_label || '',
       label: li ? {
