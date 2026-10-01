@@ -6828,12 +6828,29 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
     </div>
   );
 }
-// Une vente Leboncoin est FINALISÉE (argent reçu) quand Leboncoin a clôturé la
-// transaction ; sinon elle est EN COURS (argent en attente), exactement comme
-// Vinted sépare « CA finalisé » et « en attente ». Mesuré sur ses stepStatus :
-// 'done'/'terminé' = finalisée ; 'action'/'ongoing'/transit = en cours.
+// Une transaction Leboncoin est FINALISÉE (argent reçu côté vente, colis reçu
+// côté achat) quand Leboncoin a clôturé/livré la transaction ; sinon elle est EN
+// COURS, exactement comme Vinted sépare « CA finalisé » et « en attente ».
+// Mesuré sur ses stepStatus : 'done'/'terminé'/'livré' = finalisée ;
+// 'action'/'ongoing'/transit = en cours.
 const lbcAnnulee = (o) => /annul|cancel|refund|rembours/i.test((o.stepStatus || '') + ' ' + (o.stepLabel || ''));
-const lbcFinalisee = (o) => /\bdone\b|termin|finalis|cl[oô]tur|re[çc]u|clos/i.test((o.stepStatus || '') + ' ' + (o.stepLabel || ''));
+const lbcFinalisee = (o) => /\bdone\b|termin|finalis|cl[oô]tur|re[çc]u|livr|deliver|clos/i.test((o.stepStatus || '') + ' ' + (o.stepLabel || ''));
+const lbcEuro = (p) => p == null ? '' : (Number(p) / 100).toFixed(2).replace('.', ',') + ' €';
+// Carte d'une transaction Leboncoin — comme Vinted : photo · titre · statut +
+// transporteur · prix. Partagée par Ventes ET Achats (§11 : une seule forme).
+function CarteLbc({ o }) {
+  const euro = lbcEuro(o.price);
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '10px 0', borderTop: `1px solid ${C.border}`, opacity: lbcAnnulee(o) ? 0.55 : 1 }}>
+      <PhotoVente src={o.image} />
+      <div style={{ flex: '1 1 auto', minWidth: 0 }}>
+        <div style={{ fontWeight: 600, fontSize: 13.5, color: C.text, lineHeight: 1.25, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{o.title || '(sans titre)'}</div>
+        <div style={{ fontSize: 11.5, color: C.muted, marginTop: 2 }}>{o.stepLabel || o.stepStatus || ''}{o.deliveryLabel ? ` · ${o.deliveryLabel}` : ''}</div>
+      </div>
+      {euro && <div className="vrm-display" style={{ flexShrink: 0, fontSize: 16, fontWeight: 800, color: C.text, alignSelf: 'flex-start' }}>{euro}</div>}
+    </div>
+  );
+}
 function VentesLeboncoin({ lbcVentes = {ventes:[],inconnues:0} }) {
   if (!(lbcVentes.ventes.length > 0 || lbcVentes.inconnues > 0)) return null;
   const ventes = lbcVentes.ventes || [];
@@ -6842,20 +6859,7 @@ function VentesLeboncoin({ lbcVentes = {ventes:[],inconnues:0} }) {
   const enCours = actives.filter(o => !lbcFinalisee(o));
   const somme = (arr) => arr.reduce((s, o) => s + (o.price != null ? Number(o.price) / 100 : 0), 0);
   const fmt2 = (n) => n.toFixed(2).replace('.', ',') + ' €';
-  // Carte d'une vente — comme Vinted : photo · titre · statut + transporteur · prix.
-  const Carte = (o) => {
-    const euro = o.price == null ? '' : fmt2(Number(o.price) / 100);
-    return (
-      <div key={o.txId} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '10px 0', borderTop: `1px solid ${C.border}`, opacity: lbcAnnulee(o) ? 0.55 : 1 }}>
-        <PhotoVente src={o.image} />
-        <div style={{ flex: '1 1 auto', minWidth: 0 }}>
-          <div style={{ fontWeight: 600, fontSize: 13.5, color: C.text, lineHeight: 1.25, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{o.title || '(sans titre)'}</div>
-          <div style={{ fontSize: 11.5, color: C.muted, marginTop: 2 }}>{o.stepLabel || o.stepStatus || ''}{o.deliveryLabel ? ` · ${o.deliveryLabel}` : ''}</div>
-        </div>
-        {euro && <div className="vrm-display" style={{ flexShrink: 0, fontSize: 16, fontWeight: 800, color: C.text, alignSelf: 'flex-start' }}>{euro}</div>}
-      </div>
-    );
-  };
+  const Carte = (o) => <CarteLbc key={o.txId} o={o} />;
   return (
     <div style={{marginBottom:14,border:`1px solid ${C.border}`,borderRadius:12,background:C.card,padding:'12px 14px'}}>
       <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
@@ -6905,6 +6909,56 @@ function VentesLeboncoin({ lbcVentes = {ventes:[],inconnues:0} }) {
           )}
         </div>
       )}
+    </div>
+  );
+}
+// Ses ACHATS Leboncoin — demande de Julien (29 sept.) : « ajoute les photos et
+// les informations pour les achats ET les ventes ». Même donnée que les ventes
+// (`lbc_ventes`, chaque transaction), côté ACHETEUR : `isSeller === false`
+// (jamais déduit, §5). Même carte, même séparation « reçu / en cours » que les
+// ventes — côté achat « finalisé » = colis reçu. Photo + titre + statut + prix.
+function AchatsLeboncoin({ lbcVentes = { achats: [] } }) {
+  const achats = (lbcVentes.achats || []);
+  if (achats.length === 0) return null;
+  const actives = achats.filter(o => !lbcAnnulee(o));
+  const recus = actives.filter(lbcFinalisee);
+  const enRoute = actives.filter(o => !lbcFinalisee(o));
+  const annules = achats.filter(lbcAnnulee);
+  const somme = (arr) => arr.reduce((s, o) => s + (o.price != null ? Number(o.price) / 100 : 0), 0);
+  const fmt2 = (n) => n.toFixed(2).replace('.', ',') + ' €';
+  const Carte = (o) => <CarteLbc key={o.txId} o={o} />;
+  return (
+    <div style={{ marginBottom: 14, border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '12px 14px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+        <PlateformeLogo p="lbc" />
+        <div style={{ fontWeight: 800, fontSize: 14, color: C.text }}>Achats Leboncoin{achats.length ? ` (${achats.length})` : ''}</div>
+      </div>
+      {/* Côté achat : « Reçus » = colis arrivé · « En route » = en cours de
+          livraison. Deux chiffres, deux mots, jamais mélangés (comme les ventes). */}
+      {actives.length > 0 && (
+        <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', padding: '2px 0 10px' }}>
+          <div>
+            <div className="vrm-display" style={{ fontSize: 20, fontWeight: 800, color: C.text }}>{fmt2(somme(recus))}</div>
+            <div style={{ fontSize: 10.5, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.6, fontWeight: 600 }}>Reçus · {recus.length}</div>
+          </div>
+          <div>
+            <div className="vrm-display" style={{ fontSize: 20, fontWeight: 800, color: C.muted }}>{fmt2(somme(enRoute))}</div>
+            <div style={{ fontSize: 10.5, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.6, fontWeight: 600 }}>En route · {enRoute.length}</div>
+          </div>
+        </div>
+      )}
+      {enRoute.length > 0 && (<>
+        <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, margin: '6px 0 0' }}>En cours de livraison ({enRoute.length})</div>
+        {enRoute.map(Carte)}
+      </>)}
+      {recus.length > 0 && (<>
+        <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, margin: '12px 0 0' }}>Reçus ({recus.length})</div>
+        {recus.map(Carte)}
+      </>)}
+      {annules.length > 0 && (<>
+        <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, margin: '12px 0 0' }}>Annulés / remboursés ({annules.length})</div>
+        {annules.map(Carte)}
+      </>)}
     </div>
   );
 }
@@ -27584,7 +27638,9 @@ export default function App() {
       const obj = (rows && rows[0] && rows[0].data && rows[0].data.ventes) || {};
       const arr = Object.values(obj);
       const inc = arr.filter(o => o && o.isSeller == null);
-      setLbcVentes({ ventes: arr.filter(o => o && o.isSeller === true), inconnues: inc.length,
+      // ACHATS = `isSeller === false` (jamais déduit, §5) — mêmes champs que les
+      // ventes (photo, titre, prix, statut). Avant, ils étaient simplement jetés.
+      setLbcVentes({ ventes: arr.filter(o => o && o.isSeller === true), achats: arr.filter(o => o && o.isSeller === false), inconnues: inc.length,
         inconnuesListe: inc.filter(o => !/cancel|annul|refund|rembours/i.test(String(o.stepStatus||''))).sort((a,b)=>String(b.at||'').localeCompare(String(a.at||''))) });
     } catch (_) { /* pas su ⇒ rien : jamais un faux « vendu » */ }
   })(); }, []);
@@ -28698,13 +28754,15 @@ export default function App() {
         </>)}
         {tab==='plat_leboncoin'&&(<>
           {/* Julien : « Leboncoin, la même mise en page que Vinted ». Vinted a
-              Ventes / Achats / Annonces ; côté Leboncoin on a les VENTES (prouvées
-              par identité, cf. VentesLeboncoin) et les annonces « À publier ».
-              Les achats Leboncoin ne sont pas captés → pas d'onglet qui mentirait
-              (mieux vaut un blanc qu'un faux, §5). */}
-          <PlatSubNav sub={platSub} setSub={setPlatSub} sections={[['apercu','Aperçu'],['ventes','Ventes'],['colis','Colis'],['apublier','À publier']]}/>
+              Ventes / Achats / Annonces ; côté Leboncoin on a maintenant les
+              VENTES et les ACHATS (les deux prouvés par `isSeller`, cf.
+              VentesLeboncoin/AchatsLeboncoin), les Colis, et « À publier ».
+              L'onglet Achats n'apparaît que si des achats sont captés — sinon il
+              ne mentirait pas, il resterait vide (mieux vaut un blanc, §5). */}
+          <PlatSubNav sub={platSub} setSub={setPlatSub} sections={[['apercu','Aperçu'],['ventes','Ventes'],...(((lbcVentes.achats||[]).length>0)?[['achats','Achats']]:[]),['colis','Colis'],['apublier','À publier']]}/>
           {platSub==='apercu'&&<Plateforme plat="Leboncoin" liveStats={liveStats} lbcVentes={lbcVentes} onGo={setTab} onSub={setPlatSub} baseKO={baseKO}/>}
           {platSub==='ventes'&&<div style={{padding:16}}><ScreenHead icon="tag" title="Ventes Leboncoin" desc="Tes ventes Leboncoin, reliées par identité (jamais par titre)"/>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:<VentesLeboncoin lbcVentes={lbcVentes}/>}</div>}
+          {platSub==='achats'&&<div style={{padding:16}}><ScreenHead icon="bag" title="Achats Leboncoin" desc="Tes achats Leboncoin, avec photos et suivi"/>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:<AchatsLeboncoin lbcVentes={lbcVentes}/>}</div>}
           {platSub==='colis'&&(baseKO?<div style={{padding:16}}><ScreenHead icon="box" title="Colis Leboncoin"/><LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne></div>:<LeboncoinColis lbcVentes={lbcVentes}/>)}
           {platSub==='apublier'&&<LeboncoinScreen/>}
         </>)}
