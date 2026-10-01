@@ -25,6 +25,9 @@
 //     Mesurer d'abord, deviner jamais.
 (function () {
   if (window.__vrmEbayLoaded) return; window.__vrmEbayLoaded = true;
+  // §8 : chaque relevé porte la VERSION de l'extension qui l'a écrit, sinon une
+  // étape manquante me fait deviner « défaut ou version trop ancienne ».
+  const EXT_VER = (() => { try { return chrome.runtime.getManifest().version; } catch (_) { return ''; } })();
   const send = (m) => new Promise((res) => { try { chrome.runtime.sendMessage(Object.assign({ from: 'cancale-ebay' }, m), (r) => res(r || { ok: false })); } catch (_) { res({ ok: false }); } });
   // ⚠️⚠️ « TITRE COPIÉ » SANS RIEN COPIER. `navigator.clipboard.writeText` échoue
   //    en rendant une promesse REJETÉE (document pas au premier plan, permission
@@ -390,27 +393,84 @@
   //    plusieurs écrans, et n'en garder qu'un revient à ne rien savoir des
   //    autres — c'est exactement le défaut corrigé pour `lbc_recon.etapes`.
   let derniereEtape = '';
+  // ⚠️⚠️ CE RELEVÉ N'AVAIT APPRIS AUCUNE DES LEÇONS DE LEBONCOIN (1er oct.) :
+  //   1. il captait la BARRE DE RECHERCHE (`_nkw`) et les champs cachés comme s'ils
+  //      étaient des champs du formulaire — alors que `champ()` les écarte déjà par
+  //      `DANS_ENTETE`/`PAS_UN_CHAMP_DE_DEPOT`/hidden. Un relevé pollué me fait
+  //      viser un faux champ au prochain passage. On applique les MÊMES gardes.
+  //   2. il ne lisait que les `<select>` natifs — or le formulaire de mise en vente
+  //      d'eBay (comme Leboncoin) utilise des listes REACT (`role="combobox"` +
+  //      `role="option"`), que `document.querySelectorAll('select')` ne voit pas.
+  //      C'est « ça ne met pas la catégorie » : la liste existe, on ne la mesurait
+  //      pas. On relève son libellé, ses options ET le CODE réel de chaque option
+  //      (`value`/`data-value`/`data-qa-id`/id) — jamais une valeur saisie.
+  //   3. il ne portait PAS la version de l'extension qui l'a écrit. §8 : sans elle,
+  //      une étape manquante me fait DEVINER « défaut ou version trop ancienne ».
+  function champDepot(el) {
+    try {
+      if (el.type === 'hidden' || el.disabled) return false;
+      if (DANS_ENTETE(el)) return false;
+      const lab = (el.labels && el.labels[0] && el.labels[0].innerText) || '';
+      const hay = ((el.name || '') + ' ' + (el.id || '') + ' ' + (el.getAttribute('aria-label') || '') + ' ' + (el.placeholder || '') + ' ' + lab).toLowerCase();
+      return !PAS_UN_CHAMP_DE_DEPOT.test(hay);
+    } catch (_) { return false; }
+  }
   function rapporterEtape() {
     try {
       const fields = [];
       document.querySelectorAll('input, select, textarea').forEach((el) => {
+        if (!champDepot(el)) return;
+        // ⚠️ AUCUNE valeur saisie : on note SI le champ est rempli et sa LONGUEUR
+        //    (un booléen, un nombre), jamais le texte — et `multiple`/`accept` d'un
+        //    champ photo, qui décide si on pose les photos d'un coup ou une par une.
+        const val = (() => { try { return String(el.value || ''); } catch (_) { return ''; } })();
         fields.push({ tag: el.tagName.toLowerCase(), type: el.type || '', name: el.name || '', id: el.id || '',
           ph: el.placeholder || '', aria: el.getAttribute('aria-label') || '',
           label: ((el.labels && el.labels[0] && el.labels[0].innerText) || '').slice(0, 60),
-          qa: el.getAttribute('data-testid') || el.getAttribute('data-test-id') || '' });
+          qa: el.getAttribute('data-testid') || el.getAttribute('data-test-id') || '',
+          rempli: !!val.trim(), len: val.length,
+          multiple: el.type === 'file' ? !!el.multiple : undefined,
+          accept: el.type === 'file' ? (el.accept || '') : undefined });
       });
       const selects = [];
       document.querySelectorAll('select').forEach((el) => {
-        selects.push({ name: el.name || '', id: el.id || '',
+        if (!champDepot(el)) return;
+        selects.push({ name: el.name || '', id: el.id || '', forme: 'select',
           label: ((el.labels && el.labels[0] && el.labels[0].innerText) || '').slice(0, 50),
-          options: Array.from(el.options || []).slice(0, 25).map((o) => String(o.textContent || '').trim().slice(0, 40)) });
+          options: Array.from(el.options || []).slice(0, 25).map((o) => String(o.textContent || '').trim().slice(0, 40)),
+          optcodes: Array.from(el.options || []).slice(0, 25).filter((o) => o.value).map((o) => ({ t: String(o.textContent || '').trim().slice(0, 40), v: String(o.value).slice(0, 40) })) });
       });
-      const fichiers = document.querySelectorAll('input[type="file"]').length;
+      // Les listes REACT (combobox/listbox) — invisibles à `querySelectorAll('select')`.
+      // ⚠️ Une `listbox` rattachée à un `combobox` par `aria-controls` est le
+      //    conteneur d'options de ce combobox, pas une seconde liste : on l'écarte
+      //    pour ne pas compter la même liste deux fois.
+      const boxesControlees = new Set();
+      document.querySelectorAll('[role="combobox"][aria-controls]').forEach((c) => { const id = c.getAttribute('aria-controls'); if (id) boxesControlees.add(id); });
+      document.querySelectorAll('[role="combobox"],[role="listbox"]').forEach((el) => {
+        if (!champDepot(el)) return;
+        if ((el.getAttribute('role') || '') === 'listbox' && el.id && boxesControlees.has(el.id)) return;
+        const g = (a) => { try { return el.getAttribute(a) || ''; } catch (_) { return ''; } };
+        const lib = (((el.labels && el.labels[0] && el.labels[0].innerText) || '') || g('aria-label') || String(el.textContent || '')).slice(0, 50);
+        // Les options d'un combobox ouvert OU rattaché par aria-controls.
+        let opts = [];
+        try {
+          const ctrl = g('aria-controls'); const box = ctrl && document.getElementById(ctrl);
+          const scope = box || el.parentElement || document;
+          opts = Array.from(scope.querySelectorAll('[role="option"]')).slice(0, 30);
+        } catch (_) {}
+        selects.push({ name: el.name || '', id: el.id || '', forme: 'composant', role: g('role'), controls: g('aria-controls'),
+          label: lib,
+          options: opts.map((o) => String(o.textContent || '').trim().slice(0, 40)),
+          optcodes: opts.map((o) => ({ t: String(o.textContent || '').trim().slice(0, 40), v: String(o.getAttribute('data-value') || o.getAttribute('value') || o.getAttribute('data-qa-id') || o.id || '').slice(0, 40) })).filter((o) => o.v) });
+      });
+      const fileInputs = Array.from(document.querySelectorAll('input[type="file"]')).filter((el) => !el.disabled && !DANS_ENTETE(el));
+      const fichiers = fileInputs.length;
+      const fichiersMultiple = fileInputs.some((el) => el.multiple);
       const signature = fields.map((f) => f.name || f.id).join('|') + '#' + selects.length + '#' + fichiers;
       if (!fields.length && !selects.length && !fichiers) return;
       if (signature === derniereEtape) return;
       derniereEtape = signature;
-      send({ action: 'ebayForm', url: location.href, fields, selects, fichiers, etape: signature.slice(0, 120) });
+      send({ action: 'ebayForm', url: location.href, fields, selects, fichiers, fichiersMultiple, ver: EXT_VER, etape: signature.slice(0, 120) });
     } catch (_) {}
   }
 

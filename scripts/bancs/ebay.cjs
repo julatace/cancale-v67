@@ -54,6 +54,15 @@ const PAGE = (avecForm) => `<!doctype html><html lang="fr"><head><meta charset="
     <select id="f-m" name="brand"><option value=""></option><option value="m1">Adidas</option><option value="m2">Nike</option></select>
     <label for="f-z">Pointure</label>
     <select id="f-z" name="size"><option value=""></option><option value="z1">41</option><option value="z2">42</option></select>
+    <!-- ⚠️ Une liste REACT (combobox) — eBay n'utilise pas que des <select> natifs.
+         Le relevé doit la voir ET relever le CODE de chaque option. -->
+    <label id="lbl-u">Univers</label>
+    <div role="combobox" aria-label="Univers" aria-controls="box-u"></div>
+    <ul id="box-u" role="listbox">
+      <li role="option" data-value="u1">Homme</li>
+      <li role="option" data-value="u2">Femme</li>
+      <li role="option" data-value="u3">Enfant</li>
+    </ul>
     <!-- ⚠️ Un filtre de recherche, HORS en-tête : le prix de sa paire n'a rien à y faire. -->
     <label for="f-min">Prix min</label><input id="f-min" name="price_min" type="text">
     <label for="f-ph">Photos</label><input id="f-ph" name="images" type="file" multiple>
@@ -89,10 +98,10 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
       // Un vrai JPEG minuscule, en base64 : de quoi fabriquer de vrais `File`.
       const JPEG = 'ffd8ffe000104a46494600010100000100010000ffd9';
       const b64 = (() => { const bin = JPEG.match(/../g).map(h => String.fromCharCode(parseInt(h, 16))).join(''); return btoa(bin); })();
-      window.chrome = { runtime: { sendMessage(m, cb) {
+      window.chrome = { runtime: { getManifest: () => ({ version: '9.9.9' }), sendMessage(m, cb) {
         window.__vrmEnvois.push(m.action);
         if (m.action === 'downloadPhotos') window.__dl++;
-        if (m.action === 'ebayForm') window.__etapes.push({ etape: m.etape, selects: (m.selects || []).length, fichiers: m.fichiers });
+        if (m.action === 'ebayForm') window.__etapes.push({ etape: m.etape, selects: (m.selects || []).length, selectsArr: m.selects || [], fields: m.fields || [], ver: m.ver || '', fichiers: m.fichiers });
         const rep = m.action === 'getQueue' ? { ok: true, queue: [ad], retirees: 3, postedCount: 0, vendues: 2, echec: false }
           : m.action === 'getPending' ? { ok: true, ad }
           : m.action === 'photoBytes' ? { ok: true, photos: (m.urls || []).map((u) => ({ url: u, b64, type: 'image/jpeg', taille: 22 })) }
@@ -207,7 +216,22 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
     const etapes = await pg.evaluate(() => window.__etapes || []);
     dit(etapes.length >= 1 && etapes[0].selects >= 4 && etapes[0].fichiers >= 1,
       'il me rapporte l\'étape avec ses listes déroulantes et son champ photo',
-      JSON.stringify(etapes[0] || null));
+      JSON.stringify({ selects: etapes[0] && etapes[0].selects, fichiers: etapes[0] && etapes[0].fichiers }));
+    // ── LES LEÇONS DE LEBONCOIN, PORTÉES À eBay (1er oct.) ───────────────────
+    const e0 = etapes[0] || { fields: [], selectsArr: [], ver: '' };
+    const noms = (e0.fields || []).map((f) => f.name || f.id);
+    dit(!noms.includes('_nkw') && !noms.some((n) => /price_min/.test(n)),
+      'la barre de recherche et les filtres ne sont PAS pris pour des champs du dépôt',
+      'champs : ' + noms.join(','));
+    dit(e0.ver === '9.9.9',
+      'l\'étape porte la VERSION de l\'extension qui l\'a écrite (§8)', 'ver : ' + e0.ver);
+    const combo = (e0.selectsArr || []).find((s) => s.forme === 'composant' && /univers/i.test(s.label || ''));
+    dit(!!combo && (combo.options || []).includes('Homme'),
+      'une liste REACT (combobox) est vue, pas seulement les <select> natifs',
+      combo ? (combo.options || []).join(',') : 'aucun combobox relevé');
+    dit(!!combo && (combo.optcodes || []).some((o) => o.t === 'Homme' && o.v === 'u1'),
+      'et le CODE réel de chaque option est relevé (Homme=u1), pas seulement le libellé',
+      combo ? JSON.stringify(combo.optcodes) : '—');
 
     // ── « Re-remplir » RELANCE : sans ça il ne servait qu'une fois ───────────
     // On vide un champ et on fait apparaître une nouvelle liste, comme une étape
