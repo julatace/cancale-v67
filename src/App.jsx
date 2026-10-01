@@ -6828,37 +6828,62 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
     </div>
   );
 }
+// Une vente Leboncoin est FINALISÉE (argent reçu) quand Leboncoin a clôturé la
+// transaction ; sinon elle est EN COURS (argent en attente), exactement comme
+// Vinted sépare « CA finalisé » et « en attente ». Mesuré sur ses stepStatus :
+// 'done'/'terminé' = finalisée ; 'action'/'ongoing'/transit = en cours.
+const lbcAnnulee = (o) => /annul|cancel|refund|rembours/i.test((o.stepStatus || '') + ' ' + (o.stepLabel || ''));
+const lbcFinalisee = (o) => /\bdone\b|termin|finalis|cl[oô]tur|re[çc]u|clos/i.test((o.stepStatus || '') + ' ' + (o.stepLabel || ''));
 function VentesLeboncoin({ lbcVentes = {ventes:[],inconnues:0} }) {
   if (!(lbcVentes.ventes.length > 0 || lbcVentes.inconnues > 0)) return null;
+  const ventes = lbcVentes.ventes || [];
+  const actives = ventes.filter(o => !lbcAnnulee(o));
+  const finals = actives.filter(lbcFinalisee);
+  const enCours = actives.filter(o => !lbcFinalisee(o));
+  const somme = (arr) => arr.reduce((s, o) => s + (o.price != null ? Number(o.price) / 100 : 0), 0);
+  const fmt2 = (n) => n.toFixed(2).replace('.', ',') + ' €';
+  // Carte d'une vente — comme Vinted : photo · titre · statut + transporteur · prix.
+  const Carte = (o) => {
+    const euro = o.price == null ? '' : fmt2(Number(o.price) / 100);
+    return (
+      <div key={o.txId} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '10px 0', borderTop: `1px solid ${C.border}`, opacity: lbcAnnulee(o) ? 0.55 : 1 }}>
+        <PhotoVente src={o.image} />
+        <div style={{ flex: '1 1 auto', minWidth: 0 }}>
+          <div style={{ fontWeight: 600, fontSize: 13.5, color: C.text, lineHeight: 1.25, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{o.title || '(sans titre)'}</div>
+          <div style={{ fontSize: 11.5, color: C.muted, marginTop: 2 }}>{o.stepLabel || o.stepStatus || ''}{o.deliveryLabel ? ` · ${o.deliveryLabel}` : ''}</div>
+        </div>
+        {euro && <div className="vrm-display" style={{ flexShrink: 0, fontSize: 16, fontWeight: 800, color: C.text, alignSelf: 'flex-start' }}>{euro}</div>}
+      </div>
+    );
+  };
   return (
     <div style={{marginBottom:14,border:`1px solid ${C.border}`,borderRadius:12,background:C.card,padding:'12px 14px'}}>
-      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:lbcVentes.ventes.length?6:0}}>
+      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
         <PlateformeLogo p="lbc"/>
-        <div style={{fontWeight:800,fontSize:14,color:C.text}}>Ventes Leboncoin{lbcVentes.ventes.length?` (${lbcVentes.ventes.length})`:''}</div>
+        <div style={{fontWeight:800,fontSize:14,color:C.text}}>Ventes Leboncoin{ventes.length?` (${ventes.length})`:''}</div>
       </div>
-      {lbcVentes.ventes.map(o=>{
-        const euro = o.price==null ? '' : (Number(o.price)/100).toFixed(2).replace('.',',')+' €';
-        const annulee = /annul|cancel|refund|rembours/i.test((o.stepStatus||'')+' '+(o.stepLabel||''));
-        return (
-          <div key={o.txId} style={{display:'flex',alignItems:'center',gap:11,padding:'10px 0',borderTop:`1px solid ${C.border}`,opacity:annulee?0.55:1}}>
-            {/* ⚠️ LA PLACE DE LA PHOTO EST RÉSERVÉE (demande de Julien) : la
-                vignette s'affiche dès que l'extension capte l'image de la vente
-                Leboncoin ; sinon un cadre neutre tient la place — jamais un trou,
-                jamais une fausse image. */}
-            <PhotoVente src={o.image} />
-            <div style={{flex:'1 1 auto',minWidth:0}}>
-              <div style={{fontWeight:600,fontSize:13.5,color:C.text,lineHeight:1.25,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{o.title||'(sans titre)'}</div>
-              {/* ⚠️ COMME SUR VINTED : la carte de vente dit l'ESSENTIEL (statut +
-                  transporteur + prix). Le bordereau et le QR ne sont PAS collés
-                  ici — ils vivent dans l'onglet Colis (Julien : « je veux
-                  exactement comme sur Vinted », le bordereau était répété sur
-                  chaque vente). On ne le montre plus dans Ventes. */}
-              <div style={{fontSize:11.5,color:C.muted,marginTop:2}}>{o.stepLabel||o.stepStatus||''}{o.deliveryLabel?` · ${o.deliveryLabel}`:''}</div>
-            </div>
-            {euro && <div className="vrm-display" style={{flexShrink:0,fontSize:16,fontWeight:800,color:C.text,alignSelf:'flex-start'}}>{euro}</div>}
+      {/* ⚠️ ARGENT REÇU ≠ ARGENT EN ATTENTE (Julien : « exactement comme Vinted »).
+          Deux chiffres, deux mots — jamais mélangés (comme walletDispo/escrow). */}
+      {actives.length > 0 && (
+        <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', padding: '2px 0 10px' }}>
+          <div>
+            <div className="vrm-display" style={{ fontSize: 20, fontWeight: 800, color: C.text }}>{fmt2(somme(finals))}</div>
+            <div style={{ fontSize: 10.5, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.6, fontWeight: 600 }}>Argent reçu · {finals.length} finalisée{finals.length > 1 ? 's' : ''}</div>
           </div>
-        );
-      })}
+          <div>
+            <div className="vrm-display" style={{ fontSize: 20, fontWeight: 800, color: C.muted }}>{fmt2(somme(enCours))}</div>
+            <div style={{ fontSize: 10.5, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.6, fontWeight: 600 }}>En attente · {enCours.length} en cours</div>
+          </div>
+        </div>
+      )}
+      {enCours.length > 0 && (<>
+        <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, margin: '6px 0 0' }}>En cours ({enCours.length})</div>
+        {enCours.map(Carte)}
+      </>)}
+      {finals.length > 0 && (<>
+        <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, margin: '12px 0 0' }}>Finalisées ({finals.length})</div>
+        {finals.map(Carte)}
+      </>)}
       {lbcVentes.inconnues>0 && (
         <div style={{fontSize:11.5,color:C.muted,marginTop:lbcVentes.ventes.length?8:6,paddingTop:lbcVentes.ventes.length?8:0,borderTop:lbcVentes.ventes.length?`1px solid ${C.border}`:'none'}}>
           {lbcVentes.inconnues} autre{lbcVentes.inconnues>1?'s':''} transaction{lbcVentes.inconnues>1?'s':''} Leboncoin — vente ou achat <b>pas encore confirmé</b>. Ouvre-la sur Leboncoin : l'extension lit le côté au passage, et elle passe ici si c'est une vente.
