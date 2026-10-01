@@ -35,7 +35,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.122.0';
+const EXT_ATTENDUE = '5.123.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -6629,6 +6629,16 @@ function VintedResume({ liveStats, baseKO }) {
 // l'espace LEBONCOIN (plus dans les ventes Vinted — Julien, 25 sept. : « il y a
 // encore des ventes leboncoin dans les ventes vinted, elle doit être dans les
 // ventes leboncoin avec le bordereau »). Rien capté ⇒ rien affiché (§5).
+// Vignette d'une vente : l'image si l'extension l'a captée, sinon un cadre neutre
+// qui RÉSERVE la place (jamais un trou, jamais une fausse image). Si le lien a
+// expiré, on retombe sur le cadre — la carte le constate elle-même.
+function PhotoVente({ src, size = 56 }) {
+  const [ko, setKo] = React.useState(false);
+  const ok = src && /^https?:\/\//.test(String(src)) && !ko;
+  const box = { width: size, height: size, flexShrink: 0, borderRadius: 10, overflow: 'hidden', background: C.bg, border: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' };
+  if (ok) return <img src={src} alt="" loading="lazy" onError={() => setKo(true)} style={{ ...box, objectFit: 'cover' }} />;
+  return <div style={box} aria-hidden="true"><Icon name="tag" size={Math.round(size * 0.42)} color={C.muted} /></div>;
+}
 function VentesLeboncoin({ lbcVentes = {ventes:[],inconnues:0} }) {
   if (!(lbcVentes.ventes.length > 0 || lbcVentes.inconnues > 0)) return null;
   return (
@@ -6641,14 +6651,20 @@ function VentesLeboncoin({ lbcVentes = {ventes:[],inconnues:0} }) {
         const euro = o.price==null ? '' : (Number(o.price)/100).toFixed(2).replace('.',',')+' €';
         const annulee = /annul|cancel|refund|rembours/i.test((o.stepStatus||'')+' '+(o.stepLabel||''));
         return (
-          <div key={o.txId} style={{display:'flex',flexWrap:'wrap',alignItems:'center',gap:8,padding:'7px 0',borderTop:`1px solid ${C.border}`,opacity:annulee?0.55:1}}>
-            <div style={{flex:'1 1 200px',minWidth:0}}>
-              <div style={{fontWeight:600,fontSize:13,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{o.title||'(sans titre)'}</div>
-              <div style={{fontSize:11.5,color:C.muted}}>{o.stepLabel||o.stepStatus||''}{euro?` · ${euro}`:''}{o.deliveryLabel?` · ${o.deliveryLabel}`:''}</div>
+          <div key={o.txId} style={{display:'flex',alignItems:'center',gap:11,padding:'10px 0',borderTop:`1px solid ${C.border}`,opacity:annulee?0.55:1}}>
+            {/* ⚠️ LA PLACE DE LA PHOTO EST RÉSERVÉE (demande de Julien) : la
+                vignette s'affiche dès que l'extension capte l'image de la vente
+                Leboncoin ; sinon un cadre neutre tient la place — jamais un trou,
+                jamais une fausse image. */}
+            <PhotoVente src={o.image} />
+            <div style={{flex:'1 1 auto',minWidth:0}}>
+              <div style={{fontWeight:600,fontSize:13.5,color:C.text,lineHeight:1.25,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{o.title||'(sans titre)'}</div>
+              <div style={{fontSize:11.5,color:C.muted,marginTop:2}}>{o.stepLabel||o.stepStatus||''}{o.deliveryLabel?` · ${o.deliveryLabel}`:''}</div>
+              {(o.label && o.label.voucherUrl)
+                ? <a href={o.label.voucherUrl} target="_blank" rel="noreferrer" style={{display:'inline-block',marginTop:6,background:C.text,color:C.card,borderRadius:8,padding:'6px 11px',fontWeight:700,fontSize:12,textDecoration:'none'}}>🧾 Bordereau{o.label.reference?` · ${o.label.reference}`:''}</a>
+                : (o.label && o.label.trackingUrl ? <a href={o.label.trackingUrl} target="_blank" rel="noreferrer" style={{display:'inline-block',marginTop:6,color:C.accent,fontWeight:700,fontSize:12,textDecoration:'none'}}>Suivre ↗</a> : null)}
             </div>
-            {o.label && o.label.voucherUrl
-              ? <a href={o.label.voucherUrl} target="_blank" rel="noreferrer" style={{flexShrink:0,background:C.text,color:C.card,borderRadius:8,padding:'6px 11px',fontWeight:700,fontSize:12,textDecoration:'none'}}>🧾 Bordereau{o.label.reference?` · ${o.label.reference}`:''}</a>
-              : (o.label && o.label.trackingUrl ? <a href={o.label.trackingUrl} target="_blank" rel="noreferrer" style={{flexShrink:0,color:C.accent,fontWeight:700,fontSize:12,textDecoration:'none'}}>Suivre ↗</a> : null)}
+            {euro && <div className="vrm-display" style={{flexShrink:0,fontSize:16,fontWeight:800,color:C.text,alignSelf:'flex-start'}}>{euro}</div>}
           </div>
         );
       })}
@@ -6661,7 +6677,8 @@ function VentesLeboncoin({ lbcVentes = {ventes:[],inconnues:0} }) {
                 const euro = o.price==null ? '' : (Number(o.price)/100).toFixed(2).replace('.',',')+' €';
                 return (
                   <a key={o.txId} href={`https://www.leboncoin.fr/compte/part/transaction/${encodeURIComponent(o.txId)}`} target="_blank" rel="noreferrer"
-                    style={{display:'flex',alignItems:'center',gap:8,padding:'6px 0',borderTop:`1px solid ${C.border}`,textDecoration:'none',color:C.text}}>
+                    style={{display:'flex',alignItems:'center',gap:9,padding:'7px 0',borderTop:`1px solid ${C.border}`,textDecoration:'none',color:C.text}}>
+                    <PhotoVente src={o.image} size={40} />
                     <span style={{flex:1,minWidth:0,fontSize:12.5,fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{o.title||'(sans titre)'}</span>
                     {euro && <span style={{fontSize:12,color:C.muted,flexShrink:0}}>{euro}</span>}
                     <span style={{fontSize:12,color:C.accent,fontWeight:600,flexShrink:0}}>Ouvrir ↗</span>
