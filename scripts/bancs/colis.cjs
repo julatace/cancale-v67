@@ -101,10 +101,10 @@ const aEnvoyer=ventes.filter(o=>/Bordereau envoyé au vendeur|Le paiement a ét�
 const attendus=aEnvoyer.filter(o=>parTx[String(o.transaction_id)]).length;
 (async()=>{
   console.log('base servie : '+aEnvoyer.length+' ventes a expedier · '+attendus+' ont deja leur PDF en base');
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-angle=swiftshader','--no-sandbox']});
+  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
   // Un SECOND navigateur pour la comparaison accueil ↔ Colis : il lui faut un
   // `localStorage` VIERGE (l'appareil neuf), et celui du premier a déjà servi.
-  const b2=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-angle=swiftshader','--no-sandbox']});
+  const b2=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
   const pg=await b.newPage({viewport:{width:1512,height:950}});
   const errs=[]; pg.on('pageerror',e=>errs.push(e.message));
   await pg.addInitScript(()=>{try{localStorage.setItem('vrm_acces_direct','1');}catch(_){}});

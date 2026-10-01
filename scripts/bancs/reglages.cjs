@@ -91,7 +91,7 @@ const MENSONGES = [
 ];
 
 (async () => {
-  const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox'] });
+  const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
 
   // `reglagesKO` : SEULES les quatre lignes de réglages échouent. Tout le reste
   // répond — y compris les ÉCRITURES, qui sont comptées.

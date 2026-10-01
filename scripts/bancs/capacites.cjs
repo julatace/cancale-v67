@@ -77,7 +77,7 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
 const BANDEAU=/prix plancher[^\n]*rien ne les applique/i;
 
 (async()=>{
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-angle=swiftshader','--no-sandbox']});
+  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
   // `diagVer` : ce que la ligne de diagnostic dit de la version qui a capté en
   // DERNIER — `undefined` la ligne n'existe pas · 'KO' la lecture échoue ·
   // sinon la version. C'est un CONSTAT, jamais une capacité (voir ci-dessous).

@@ -86,7 +86,7 @@ const MENSONGES=[
 const AVEU=/Je n'arrive pas à joindre tes données|Je n'ai pas pu lire tes données/i;
 
 (async()=>{
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-angle=swiftshader','--no-sandbox']});
+  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
   const rendre=async(panne,t,depuisJours)=>{
     const ctx=await b.newContext({viewport:{width:1512,height:950}});
     const pg=await ctx.newPage();

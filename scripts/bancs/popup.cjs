@@ -74,7 +74,7 @@ async function rendre(nav, etat) {
 
 (async () => {
   const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
-    args: ['--use-angle=swiftshader', '--no-sandbox'] });
+    args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
 
   // ── 1. PAS CONNECTÉ — l'état d'un nouveau venu ───────────────────────────
   console.log('\n── Fenêtre de l’extension, personne n’est connecté');
