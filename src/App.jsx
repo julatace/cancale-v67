@@ -6640,6 +6640,67 @@ function PhotoVente({ src, size = 56 }) {
   if (ok) return <img src={src} alt="" loading="lazy" onError={() => setKo(true)} style={{ ...box, objectFit: 'cover' }} />;
   return <div style={box} aria-hidden="true"><Icon name="tag" size={Math.round(size * 0.42)} color={C.muted} /></div>;
 }
+// Le QR d'un colis Leboncoin : l'image si elle charge, sinon un lien (api.leboncoin
+// peut exiger la session). On ne PROMET pas l'image — on la montre si elle vient,
+// sinon la porte vers elle. Même principe que PhotoVente.
+function QrColis({ url, size = 88 }) {
+  const [ko, setKo] = React.useState(false);
+  if (!url || !/^https?:\/\//.test(String(url))) return null;
+  if (ko) return <a href={url} target="_blank" rel="noreferrer" style={{ flexShrink: 0, width: size, height: size, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', border: `1px solid ${C.border}`, borderRadius: 10, background: C.bg, color: C.accent, fontSize: 11, fontWeight: 700, textDecoration: 'none', padding: 6 }}>Voir le QR ↗</a>;
+  return <a href={url} target="_blank" rel="noreferrer" style={{ flexShrink: 0, lineHeight: 0 }}><img src={url} alt="QR du colis" width={size} height={size} onError={() => setKo(true)} style={{ width: size, height: size, borderRadius: 10, background: '#fff', border: `1px solid ${C.border}`, objectFit: 'contain' }} /></a>;
+}
+// ── LEBONCOIN · COLIS — à envoyer (bordereau + QR), puis déjà postés ─────────
+// Julien : « onglet colis Leboncoin, avec le QR code, et le bordereau qui
+// disparaît quand tu expédies ». Le colis « à envoyer » montre bordereau + QR ;
+// une fois posté il descend dans « Déjà postés » (le bordereau n'est plus en
+// avant). On rend ce qui est MESURÉ (label capté), jamais un colis inventé.
+function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
+  const avecLabel = (lbcVentes.ventes || []).filter(o => o.label && (o.label.voucherUrl || o.label.qrUrl || o.label.reference));
+  const estEnvoyer = (o) => /action|envoyer|exp[ée]di|pr[ée]par/i.test((o.stepStatus || '') + ' ' + (o.stepLabel || ''));
+  const annulee = (o) => /annul|cancel|refund|rembours/i.test((o.stepStatus || '') + ' ' + (o.stepLabel || ''));
+  const aEnvoyer = avecLabel.filter(o => estEnvoyer(o) && !annulee(o));
+  const postes = avecLabel.filter(o => !estEnvoyer(o) && !annulee(o));
+  const euro = (p) => p == null ? '' : (Number(p) / 100).toFixed(2).replace('.', ',') + ' €';
+  return (
+    <div style={{ padding: 16 }}>
+      <ScreenHead icon="box" title="Colis Leboncoin" desc="Les bordereaux à poster, puis les colis déjà envoyés" />
+      {avecLabel.length === 0 ? (
+        <Card><div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Aucun bordereau Leboncoin capté pour l'instant. Dès qu'une vente Leboncoin a son bordereau, il apparaît ici — avec son QR code.</div></Card>
+      ) : (<>
+        <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, margin: '2px 0 8px 2px' }}>À envoyer ({aEnvoyer.length})</div>
+        {aEnvoyer.length === 0 ? <Card style={{ marginBottom: 14 }}><div style={{ fontSize: 12.5, color: C.muted }}>Rien à poster — tout est parti. 👌</div></Card>
+          : aEnvoyer.map(o => (
+            <Card key={o.txId} style={{ marginBottom: 10 }}>
+              <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                <PhotoVente src={o.image} size={56} />
+                <div style={{ flex: '1 1 auto', minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: C.text, lineHeight: 1.25 }}>{o.title || '(sans titre)'}</div>
+                  <div style={{ fontSize: 11.5, color: C.muted, marginTop: 2 }}>{o.deliveryLabel || o.deliveryMethod || 'Transporteur'}{euro(o.price) ? ` · ${euro(o.price)}` : ''}</div>
+                  {o.label.voucherUrl && <a href={o.label.voucherUrl} target="_blank" rel="noreferrer" style={{ display: 'inline-block', marginTop: 8, background: C.text, color: C.card, borderRadius: 8, padding: '7px 12px', fontWeight: 700, fontSize: 12.5, textDecoration: 'none' }}>🧾 Bordereau{o.label.reference ? ` · ${o.label.reference}` : ''}</a>}
+                </div>
+                <QrColis url={o.label.qrUrl} />
+              </div>
+            </Card>
+          ))}
+        {postes.length > 0 && (<>
+          <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, margin: '16px 0 8px 2px' }}>Déjà postés ({postes.length})</div>
+          <Card>
+            {postes.map((o, i) => (
+              <div key={o.txId} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '9px 0', borderTop: i ? `1px solid ${C.border}` : 'none' }}>
+                <PhotoVente src={o.image} size={40} />
+                <div style={{ flex: '1 1 auto', minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, fontSize: 13, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.title || '(sans titre)'}</div>
+                  <div style={{ fontSize: 11, color: C.muted }}>{o.stepLabel || 'Posté'}{o.label.reference ? ` · ${o.label.reference}` : ''}</div>
+                </div>
+                {o.label.trackingUrl && <a href={o.label.trackingUrl} target="_blank" rel="noreferrer" style={{ flexShrink: 0, color: C.accent, fontWeight: 700, fontSize: 12, textDecoration: 'none' }}>Suivre ↗</a>}
+              </div>
+            ))}
+          </Card>
+        </>)}
+      </>)}
+    </div>
+  );
+}
 function VentesLeboncoin({ lbcVentes = {ventes:[],inconnues:0} }) {
   if (!(lbcVentes.ventes.length > 0 || lbcVentes.inconnues > 0)) return null;
   return (
@@ -28326,9 +28387,10 @@ export default function App() {
               par identité, cf. VentesLeboncoin) et les annonces « À publier ».
               Les achats Leboncoin ne sont pas captés → pas d'onglet qui mentirait
               (mieux vaut un blanc qu'un faux, §5). */}
-          <PlatSubNav sub={platSub} setSub={setPlatSub} sections={[['apercu','Aperçu'],['ventes','Ventes'],['apublier','À publier']]}/>
+          <PlatSubNav sub={platSub} setSub={setPlatSub} sections={[['apercu','Aperçu'],['ventes','Ventes'],['colis','Colis'],['apublier','À publier']]}/>
           {platSub==='apercu'&&<Plateforme plat="Leboncoin" liveStats={liveStats} lbcVentes={lbcVentes} onGo={setTab} onSub={setPlatSub} baseKO={baseKO}/>}
           {platSub==='ventes'&&<div style={{padding:16}}><ScreenHead icon="tag" title="Ventes Leboncoin" desc="Tes ventes Leboncoin, reliées par identité (jamais par titre)"/>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:<VentesLeboncoin lbcVentes={lbcVentes}/>}</div>}
+          {platSub==='colis'&&(baseKO?<div style={{padding:16}}><ScreenHead icon="box" title="Colis Leboncoin"/><LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne></div>:<LeboncoinColis lbcVentes={lbcVentes}/>)}
           {platSub==='apublier'&&<LeboncoinScreen/>}
         </>)}
         {tab==='plat_ebay'&&(<>
