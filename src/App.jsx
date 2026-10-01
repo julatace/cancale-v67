@@ -35,7 +35,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.126.0';
+const EXT_ATTENDUE = '5.127.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -768,7 +768,7 @@ const SYNC_KEYS = [
   'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats','vinted_bords_printed','vrm_imprimante','vrm_prenom', 'vinted_repond_auto','vrm_points_relais','vrm_ville','vrm_colis_collected','vrm_colis_collected_at',
   'vinted_txn_link','vinted_sales_hidden','vinted_purchases_hidden','vinted_accounts_hidden','vinted_autonum','vinted_urssaf_freq','vinted_urssaf_taux',
   'vinted_sale_overrides','vinted_bord_links','vinted_pickup_done','vinted_bords_hidden','vinted_ship_done','vinted_pairs_lost','vinted_retours_recus','vinted_retours_dismissed',
-  'vinted_offvinted_buys','vinted_buyprice_by_num','vinted_quick_replies','vinted_ca_keep_removed','vinted_achat_notes',
+  'vinted_offvinted_buys','vinted_buyprice_by_num','vinted_quick_replies','vinted_ca_keep_removed','vinted_achat_notes','vrm_lbc_colis_done',
   // Offres marquées « traité » à la main (tu as répondu) → disparaissent de
   // « Ma journée ». Clé = receivedAt|article. Synchronisé entre appareils.
   'vinted_offers_done',
@@ -6730,6 +6730,11 @@ function QrColis({ url, size = 88 }) {
 // une fois posté il descend dans « Déjà postés » (le bordereau n'est plus en
 // avant). On rend ce qui est MESURÉ (label capté), jamais un colis inventé.
 function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
+  // « Colis fait » comme sur Vinted (`vinted_ship_done`) : un colis coché quitte
+  // la liste « à poster » et descend dans « Déjà postés », sans être perdu.
+  const [lbcDone, setLbcDone] = React.useState(() => (typeof load === 'function' ? (load('vrm_lbc_colis_done', {}) || {}) : {}));
+  const estFait = (o) => !!(o && lbcDone[o.txId]);
+  const toggleFait = (o) => { if (!o || o.txId == null) return; setLbcDone(prev => { const u = { ...prev }; if (u[o.txId]) delete u[o.txId]; else u[o.txId] = Date.now(); if (typeof save === 'function') save('vrm_lbc_colis_done', u); return u; }); };
   const ventes = lbcVentes.ventes || [];
   const aLabel = (o) => !!(o.label && (o.label.voucherUrl || o.label.qrUrl || o.label.reference));
   // Un COLIS vendeur : vente prouvée (isSeller) OU un bordereau existe (un
@@ -6738,20 +6743,56 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
   const annulee = (o) => /annul|cancel|refund|rembours/i.test((o.stepStatus || '') + ' ' + (o.stepLabel || ''));
   const estPoste = (o) => /done|livr|transit|remis|collect|termin|finalis|exp[ée]di[ée]/i.test((o.stepStatus || '') + ' ' + (o.stepLabel || ''));
   const colis = ventes.filter(o => estVendeur(o) && !annulee(o));
-  const aExpedier = colis.filter(o => !estPoste(o));            // vendu, pas encore parti
+  const aExpedier = colis.filter(o => !estPoste(o) && !estFait(o));     // vendu, pas encore parti
   const prets = aExpedier.filter(o => o.label && o.label.voucherUrl);   // bordereau prêt
   const aGenerer = aExpedier.filter(o => !(o.label && o.label.voucherUrl)); // bordereau à générer
-  const postes = colis.filter(o => estPoste(o));
+  const postes = colis.filter(o => estPoste(o) || estFait(o));
   const lbcUrl = (o) => `https://www.leboncoin.fr/compte/part/transaction/${encodeURIComponent(o.txId)}`;
   const euro = (p) => p == null ? '' : (Number(p) / 100).toFixed(2).replace('.', ',') + ' €';
   // ── LE N° (SKU) D'UN COLIS LEBONCOIN ──────────────────────────────────────
-  // Le colis Leboncoin porte l'`itemId` VINTED (l'annonce a été cross-postée) :
-  // on retrouve donc son numéro de rangement par IDENTITÉ (itemId → numéro),
-  // jamais par titre (§5). Absent ⇒ pas de N°, on n'invente rien.
+  // ⚠️ Le colis porte l'`itemId` LEBONCOIN (pas l'id Vinted) : il ne se retrouve
+  // dans `vinted_annonce_numeros` (clé = id Vinted) que si les deux coïncident.
+  // Quand ça ne résout pas, PAS de N° inventé — mieux vaut un blanc qu'un faux (§5).
   const numD = (typeof load === 'function' ? (load('vinted_annonce_numeros', {}) || {}) : {});
   const numDe = (o) => { const e = o && o.itemId && numD[o.itemId]; return (e && e.numero != null && String(e.numero).trim()) ? String(e.numero).trim() : ''; };
-  // Pastille N°, comme sur Vinted.
-  const badgeNum = (n) => n ? <span style={{ flexShrink: 0, fontSize: 12, fontWeight: 800, color: C.text, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: '2px 9px' }}>N°{n}</span> : null;
+  // Pastille N° accent — IDENTIQUE à l'écran Colis Vinted (fond accent, blanc).
+  const badgeNum = (n) => n ? <span style={{ flexShrink: 0, fontSize: 15, fontWeight: 700, color: C.onAccent || '#fff', background: C.accent, borderRadius: 8, padding: '3px 9px', letterSpacing: -0.2 }}>N°{n}</span> : null;
+  // Carte d'un colis — même squelette que l'écran Colis Vinted : photo 58 ·
+  // N° + titre · transporteur + prix · UNE action principale (🖨 Imprimer) + Colis fait.
+  const carte = (o, { principal }) => {
+    const n = numDe(o);
+    const posted = estFait(o);
+    return (
+      <div key={o.txId} data-bord-card style={{ padding: '11px 12px', border: `1px solid ${o.label && o.label.voucherUrl ? INV_STATUS.online.color + '44' : C.border}`, background: C.card, borderRadius: 10, marginBottom: 8, opacity: posted ? 0.55 : 1 }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+          <PhotoVente src={o.image} size={58} />
+          <div style={{ flex: '1 1 150px', minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              {badgeNum(n)}
+              <span style={{ fontSize: 13.5, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{o.title || '(sans titre)'}</span>
+            </div>
+            <div style={{ fontSize: 11, color: C.muted, marginTop: 4, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              <span style={{ flexShrink: 0 }}>{o.deliveryLabel || o.deliveryMethod || 'Transporteur'}</span>
+              {euro(o.price) && <span style={{ flexShrink: 0, fontWeight: 600, color: C.text }}>{euro(o.price)}</span>}
+              {o.label && o.label.reference && <span style={{ flexShrink: 0 }}>bordereau {o.label.reference}</span>}
+              {posted && <span style={{ flexShrink: 0, color: INV_STATUS.online.color, fontWeight: 600 }}>✓ posté</span>}
+            </div>
+          </div>
+          {o.label && o.label.qrUrl && <QrColis url={o.label.qrUrl} size={64} />}
+        </div>
+        {/* ACTION PRINCIPALE — comme Vinted : un gros bouton accent. « Imprimer »
+            ouvre le PDF du bordereau Leboncoin ; « Générer » ouvre la vente sur
+            Leboncoin pour qu'il y soit créé (l'extension le capte ensuite). */}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12, flexWrap: 'wrap' }}>
+          {principal === 'imprimer'
+            ? <a href={o.label.voucherUrl} target="_blank" rel="noreferrer" style={{ flex: '1 1 160px', maxWidth: 340, textAlign: 'center', border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '12px', fontSize: 15, fontWeight: 600, textDecoration: 'none' }}>🖨 Imprimer le bordereau</a>
+            : <a href={lbcUrl(o)} target="_blank" rel="noreferrer" style={{ flex: '1 1 160px', maxWidth: 340, textAlign: 'center', border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '12px', fontSize: 15, fontWeight: 600, textDecoration: 'none' }}>↗ Générer le bordereau</a>}
+          {principal === 'imprimer' && n && <button type="button" onClick={() => generateEtiquetteSku(n, { title: o.title, transaction_id: o.txId })} title={`Étiquette N°${n} à coller`} style={{ flexShrink: 0, border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 10, padding: '12px 13px', fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>🏷️ Étiquette N°{n}</button>}
+          <button type="button" onClick={() => toggleFait(o)} title={posted ? 'Remettre dans les colis à poster' : 'Marquer comme posté'} style={{ flexShrink: 0, border: `1px solid ${posted ? INV_STATUS.online.color : C.border}`, background: posted ? `${INV_STATUS.online.color}18` : 'transparent', color: posted ? INV_STATUS.online.color : C.muted, borderRadius: 10, padding: '12px 13px', fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>{posted ? '↺ Pas encore' : '✓ Colis fait'}</button>
+        </div>
+      </div>
+    );
+  };
   return (
     <div style={{ padding: 16 }}>
       <ScreenHead icon="box" title="Colis Leboncoin" desc="Génère tes bordereaux, poste tes colis — comme sur Vinted" />
@@ -6770,44 +6811,12 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
             {aGenerer.length > 1 && <button type="button" onClick={() => { if (aGenerer.length > 4 && !window.confirm(`Ouvrir ${aGenerer.length} ventes Leboncoin pour générer leurs bordereaux ?`)) return; aGenerer.forEach(o => { try { window.open(lbcUrl(o), '_blank', 'noopener'); } catch (_) {} }); }}
               style={{ flexShrink: 0, border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 8, padding: '7px 12px', fontWeight: 700, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>Générer tous ↗</button>}
           </div>
-          {aGenerer.map(o => { const n = numDe(o); return (
-            <Card key={o.txId} style={{ marginBottom: 10 }}>
-              <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                <PhotoVente src={o.image} size={48} />
-                <div style={{ flex: '1 1 auto', minWidth: 0 }}>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                    <div style={{ flex: '1 1 auto', minWidth: 0, fontWeight: 700, fontSize: 13.5, color: C.text, lineHeight: 1.25 }}>{o.title || '(sans titre)'}</div>
-                    {badgeNum(n)}
-                  </div>
-                  <div style={{ fontSize: 11.5, color: C.muted, marginTop: 2 }}>{o.deliveryLabel || o.deliveryMethod || 'Vendue'}{euro(o.price) ? ` · ${euro(o.price)}` : ''} · bordereau pas encore généré</div>
-                </div>
-                <a href={lbcUrl(o)} target="_blank" rel="noreferrer" style={{ flexShrink: 0, background: C.text, color: C.card, borderRadius: 8, padding: '8px 12px', fontWeight: 700, fontSize: 12.5, textDecoration: 'none' }}>Générer ↗</a>
-              </div>
-            </Card>
-          ); })}
+          {aGenerer.map(o => carte(o, { principal: 'generer' }))}
         </>)}
         {/* ── PRÊTS À POSTER : bordereau dispo → imprimer + étiquette N° + QR ──── */}
         <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, margin: (aGenerer.length ? '16px' : '2px') + ' 0 8px 2px' }}>Prêts à poster ({prets.length})</div>
         {prets.length === 0 ? <Card style={{ marginBottom: 14 }}><div style={{ fontSize: 12.5, color: C.muted }}>{aGenerer.length ? 'Génère les bordereaux ci-dessus, ils arriveront ici.' : 'Rien à poster — tout est parti. 👌'}</div></Card>
-          : prets.map(o => { const n = numDe(o); return (
-            <Card key={o.txId} style={{ marginBottom: 10 }}>
-              <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                <PhotoVente src={o.image} size={56} />
-                <div style={{ flex: '1 1 auto', minWidth: 0 }}>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                    <div style={{ flex: '1 1 auto', minWidth: 0, fontWeight: 700, fontSize: 14, color: C.text, lineHeight: 1.25 }}>{o.title || '(sans titre)'}</div>
-                    {badgeNum(n)}
-                  </div>
-                  <div style={{ fontSize: 11.5, color: C.muted, marginTop: 2 }}>{o.deliveryLabel || o.deliveryMethod || 'Transporteur'}{euro(o.price) ? ` · ${euro(o.price)}` : ''}</div>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
-                    {o.label.voucherUrl && <a href={o.label.voucherUrl} target="_blank" rel="noreferrer" style={{ display: 'inline-block', background: C.text, color: C.card, borderRadius: 8, padding: '7px 12px', fontWeight: 700, fontSize: 12.5, textDecoration: 'none' }}>🧾 Bordereau{o.label.reference ? ` · ${o.label.reference}` : ''}</a>}
-                    {n && <button type="button" onClick={() => generateEtiquetteSku(n, { title: o.title, transaction_id: o.txId })} style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 8, padding: '7px 12px', fontWeight: 700, fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit' }}>🏷️ Étiquette N°{n}</button>}
-                  </div>
-                </div>
-                <QrColis url={o.label.qrUrl} />
-              </div>
-            </Card>
-          ); })}
+          : prets.map(o => carte(o, { principal: 'imprimer' }))}
         {postes.length > 0 && (<>
           <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, margin: '16px 0 8px 2px' }}>Déjà postés ({postes.length})</div>
           <Card>
@@ -6816,9 +6825,10 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
                 <PhotoVente src={o.image} size={40} />
                 <div style={{ flex: '1 1 auto', minWidth: 0 }}>
                   <div style={{ fontWeight: 600, fontSize: 13, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.title || '(sans titre)'}</div>
-                  <div style={{ fontSize: 11, color: C.muted }}>{o.stepLabel || 'Posté'}{lbl.reference ? ` · ${lbl.reference}` : ''}</div>
+                  <div style={{ fontSize: 11, color: C.muted }}>{estFait(o) ? 'Posté' : (o.stepLabel || 'Posté')}{lbl.reference ? ` · ${lbl.reference}` : ''}</div>
                 </div>
                 {badgeNum(n)}
+                {estFait(o) && <button type="button" onClick={() => toggleFait(o)} title="Remettre dans les colis à poster" style={{ flexShrink: 0, border: 'none', background: 'transparent', color: C.muted, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>↺ Pas encore</button>}
                 {lbl.trackingUrl && <a href={lbl.trackingUrl} target="_blank" rel="noreferrer" style={{ flexShrink: 0, color: C.accent, fontWeight: 700, fontSize: 12, textDecoration: 'none' }}>Suivre ↗</a>}
               </div>
             ); })}

@@ -6427,16 +6427,21 @@ function labelInfoDe(d) {
 function imageDeVente(d) {
   try {
     const it = (d && d.item) || {};
-    const estImg = (s) => typeof s === 'string' && /^https?:\/\//.test(s) && /\.(jpe?g|png|webp|avif)(\?|$)/i.test(s);
+    // ⚠️ MESURÉ : le détail v2 d'une vente Leboncoin porte la photo dans
+    //    `item.thumb_url` (CDN `img.leboncoin.fr`, URL en `.jpg?rule=ad-thumb`),
+    //    la liste v3 dans `item.thumbnail_url`. On accepte donc l'extension d'image
+    //    ET le CDN Leboncoin/Vinted (une URL d'image sans extension propre existe).
+    const estImg = (s) => typeof s === 'string' && /^https?:\/\//.test(s) && (/\.(jpe?g|png|webp|avif)(\?|$)/i.test(s) || /img\.leboncoin\.fr|images?\.vinted|vinted\.net/i.test(s));
     const prem = (x) => {
       if (!x) return '';
       if (estImg(x)) return x;
       if (Array.isArray(x)) { for (const e of x) { const u = prem(e); if (u) return u; } return ''; }
-      if (typeof x === 'object') { for (const k of ['url', 'href', 'src', 'large_url', 'thumb_url', 'small_url', 'image_url']) if (estImg(x[k])) return x[k]; }
+      if (typeof x === 'object') { for (const k of ['url', 'href', 'src', 'large_url', 'thumb_url', 'thumbnail_url', 'small_url', 'image_url']) if (estImg(x[k])) return x[k]; }
       return '';
     };
-    // formes usuelles d'abord
-    for (const champ of [it.images, it.image, it.pictures, it.picture, it.photos, it.photo, it.thumb, it.thumbnail]) {
+    // formes usuelles d'abord — y compris les CHAÎNES directes `thumb_url` /
+    // `thumbnail_url` portées par l'article Leboncoin (ni objet, ni tableau).
+    for (const champ of [it.thumb_url, it.thumbnail_url, it.image_url, it.large_url, it.images, it.image, it.pictures, it.picture, it.photos, it.photo, it.thumb, it.thumbnail]) {
       const u = prem(champ); if (u) return u;
     }
     // sinon, balayage borné de l'article (profondeur 3) pour toute URL d'image
