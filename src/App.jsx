@@ -768,7 +768,7 @@ const SYNC_KEYS = [
   'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats','vinted_bords_printed','vrm_imprimante','vrm_prenom', 'vinted_repond_auto','vrm_points_relais','vrm_ville','vrm_colis_collected','vrm_colis_collected_at',
   'vinted_txn_link','vinted_sales_hidden','vinted_purchases_hidden','vinted_accounts_hidden','vinted_autonum','vinted_urssaf_freq','vinted_urssaf_taux',
   'vinted_sale_overrides','vinted_bord_links','vinted_pickup_done','vinted_bords_hidden','vinted_ship_done','vinted_pairs_lost','vinted_retours_recus','vinted_retours_dismissed',
-  'vinted_offvinted_buys','vinted_buyprice_by_num','vinted_quick_replies','vinted_ca_keep_removed',
+  'vinted_offvinted_buys','vinted_buyprice_by_num','vinted_quick_replies','vinted_ca_keep_removed','vinted_achat_notes',
   // Offres marquées « traité » à la main (tu as répondu) → disparaissent de
   // « Ma journée ». Clé = receivedAt|article. Synchronisé entre appareils.
   'vinted_offers_done',
@@ -3790,6 +3790,47 @@ const _telechargerPdf = (bytes, nom) => {
 // Julien (Actions rapides) : une petite étiquette à coller, avec le N° en gros.
 // Format sticker 100×60 mm (283×170 pt). Le N° domine ; titre + transaction
 // dessous pour la retrouver. Rien d'inventé : si pas de N°, on ne génère pas.
+// ── ATTESTATION DE REMBOURSEMENT ────────────────────────────────────────────
+// Julien (Actions rapides) : un document à part pour un achat remboursé/annulé.
+// SÉPARÉ du reçu d'achat (protégé par audit-justificatif.cjs) : on ne touche pas
+// au document du comptable. Même garde : ce n'est PAS une facture Vinted.
+const generateRemboursementAttestation = async (o, opts = {}) => {
+  const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib');
+  const pdf = await PDFDocument.create();
+  const page = pdf.addPage([420, 520]);
+  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const reg = await pdf.embedFont(StandardFonts.Helvetica);
+  const { height } = page.getSize();
+  const G = rgb(0.45, 0.45, 0.45), N = rgb(0.1, 0.1, 0.1);
+  let y = height - 44;
+  const ents = load('vinted_entreprises', []);
+  const actif = load('vinted_entreprise_active', '');
+  const ent = (Array.isArray(ents) && ents.length) ? (ents.find(e => e && String(e.id) === String(actif)) || ents[0]) : load('vinted_invoice_settings', null);
+  const qui = [ent && ent.companyName, ent && ent.companyType].filter(Boolean).join(' ');
+  page.drawText('Attestation de remboursement', { x: 32, y, size: 18, font: bold, color: N }); y -= 16;
+  page.drawText(qui || opts.account || 'Achat de marchandise', { x: 32, y, size: 10, font: reg, color: G }); y -= 24;
+  page.drawRectangle({ x: 32, y, width: 356, height: 2, color: rgb(0.9, 0.9, 0.9) }); y -= 24;
+  const line = (label, val, big) => {
+    page.drawText(label, { x: 32, y, size: 9, font: reg, color: G });
+    page.drawText(String(val == null ? '—' : val), { x: 32, y: y - 15, size: big ? 15 : 12, font: big ? bold : reg, color: N });
+    y -= 38;
+  };
+  line('Article', (o.title || '—').slice(0, 54));
+  line('Date d\'achat', o.date ? new Date(o.date).toLocaleDateString('fr-FR') : '—');
+  line('N° de transaction Vinted', o.transaction_id || '—');
+  line('Vendeur', o.seller || o.user_login || (o.opposite_user && o.opposite_user.login) || '—');
+  line('Montant remboursé', o.price && o.price.amount != null ? `${Number(o.price.amount).toFixed(2).replace('.', ',')} ${o.price.currency_code === 'EUR' ? '€' : (o.price.currency_code || '')}` : '—', true);
+  line('Compte acheteur', opts.account || '—');
+  y -= 4;
+  const notes = [
+    'Attestation d\'un achat annule ou retourne, rembourse par Vinted.',
+    'Recapitulatif etabli par VRM d\'apres les donnees de la commande Vinted. Ce n\'est pas une facture emise par Vinted.',
+    'Etabli le ' + new Date().toLocaleDateString('fr-FR') + '.',
+  ];
+  notes.forEach(n => { page.drawText(n.slice(0, 74), { x: 32, y, size: 8, font: reg, color: G }); y -= 13; });
+  _telechargerPdf(await pdf.save(), `attestation-remboursement-${o.transaction_id || 'achat'}.pdf`);
+};
+
 const generateEtiquetteSku = async (num, o = {}) => {
   const n = String(num || '').trim();
   if (!n) return;
@@ -18115,6 +18156,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [buysBase, aFilter, ordSearchDiff, periode, tracking, colisRelais, numeros]);
   const [achatsMax, setAchatsMax] = useState(60);
+  // ── ACHATS · ACTIONS RAPIDES (note interne + menu « … ») ──────────────────
+  // Note interne par achat (synchronisée, clé = transaction_id) + menu groupant
+  // les actions (attestation d'achat / remboursement, étiquette SKU, masquer).
+  const [achatMenu, setAchatMenu] = useState(null);           // transaction_id du menu ouvert
+  const [achatNotes, setAchatNotes] = useState(() => load('vinted_achat_notes', {}) || {});
+  const [noteEdit, setNoteEdit] = useState(null);             // { tid, title, val }
+  const saveAchatNote = (tid, val) => {
+    setAchatNotes(prev => {
+      const n = { ...prev }; const t = String(val || '').trim();
+      if (t) n[tid] = t; else delete n[tid];
+      save('vinted_achat_notes', n); return n;
+    });
+  };
   useEffect(() => { setAchatsMax(60); }, [aFilter, ordSearchDiff, periode]);
 
 
@@ -21790,19 +21844,38 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </div>
               {/* Prix à deux décimales et une virgule (jamais « 21.0 € » brut). */}
               <div style={{fontSize:16,fontWeight:700,color:C.text,letterSpacing:-0.3,flexShrink:0}}>{montantCommande(o).toFixed(2).replace('.',',')} {cur(o.price?.currency_code)}</div>
-              {/* Actions en petites icônes discrètes (suivre · code · justificatif). */}
-              <div style={{display:'flex',alignItems:'center',gap:4,flexShrink:0}}>
+              {/* Actions rapides : suivre · code en accès direct ; le reste dans un
+                  menu « … » (attestations, étiquette SKU, note interne, masquer). */}
+              {(() => {
+                const tid = String(o.transaction_id || '');
+                const note = achatNotes[tid] || '';
+                const rembourse = /annul|rembours|refus|retour|cancel|refund/i.test(String(o.status || '') + ' ' + String((o.status_title||'')));
+                const item = { display:'flex',alignItems:'center',gap:10,width:'100%',textAlign:'left',border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,padding:'9px 12px',cursor:'pointer',fontFamily:'inherit' };
+                const close = () => setAchatMenu(null);
+                return (
+              <div style={{display:'flex',alignItems:'center',gap:4,flexShrink:0,position:'relative'}}>
+                {note && <button type="button" onClick={()=>setNoteEdit({tid,title:o.title,val:note})} title={`Note : ${note}`} aria-label="Note interne" style={{display:'flex',alignItems:'center',justifyContent:'center',width:30,height:30,borderRadius:8,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,cursor:'pointer',fontFamily:'inherit'}}><Icon name="doc" size={14}/></button>}
                 {suivi && (st.step===2||st.step===3) && (
                   <a href={trackUrl(tk.carrier||'', suivi)} target="_blank" rel="noreferrer" title={`Suivre le colis (${carrierName(tk.carrier)} n°${suivi})`} aria-label="Suivre le colis" style={{display:'flex',alignItems:'center',justifyContent:'center',width:30,height:30,borderRadius:8,border:`1px solid ${C.border}`,color:C.blue||C.accent,textDecoration:'none'}}><Icon name="truck" size={15}/></a>
                 )}
                 {st.step===3 && tk && (qrImage(tk)||codeRetrait(tk.code)) && (
                   <button type="button" onClick={()=>openQrView(tk)} title="Code de retrait" aria-label="Code de retrait" style={{display:'flex',alignItems:'center',justifyContent:'center',width:30,height:30,borderRadius:8,border:`1px solid ${C.warn}`,background:'transparent',color:C.warn,cursor:'pointer',fontFamily:'inherit'}}><Icon name="key" size={15}/></button>
                 )}
-                <button type="button" onClick={()=>{ if(rc){ if(rc.pdfB64) openReceipt(rc); else setReceiptView(rc); } else generateAchatJustificatif(o,{ account:accNameOf(o._acc), regime:load('vinted_regime','micro'), numero:numA||'' }); }}
-                  title={rc?'Reçu Vinted authentique (email archivé)':"Télécharger le justificatif d'achat (PDF)"} aria-label="Justificatif" style={{display:'flex',alignItems:'center',justifyContent:'center',width:30,height:30,borderRadius:8,border:`1px solid ${rc?C.accent:C.border}`,background:rc?`${C.accent}12`:'transparent',color:rc?C.accent:C.muted,cursor:'pointer',fontFamily:'inherit'}}><Icon name="doc" size={15}/></button>
-                <button type="button" onClick={()=>masquerAchat(o)} title="Masquer cet achat (il sort de la liste et de la compta — tu le retrouves dans l’onglet Masqués (menu))" aria-label="Masquer cet achat"
-                  style={{display:'flex',alignItems:'center',justifyContent:'center',width:30,height:30,borderRadius:8,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,cursor:'pointer',fontFamily:'inherit'}}><Icon name="eyeOff" size={15}/></button>
+                <button type="button" onClick={()=>setAchatMenu(m=>m===tid?null:tid)} title="Actions rapides" aria-label="Actions rapides" aria-haspopup="menu" style={{display:'flex',alignItems:'center',justifyContent:'center',width:30,height:30,borderRadius:8,border:`1px solid ${achatMenu===tid?C.accent:C.border}`,background:achatMenu===tid?`${C.accent}12`:'transparent',color:achatMenu===tid?C.accent:C.muted,cursor:'pointer',fontFamily:'inherit',fontWeight:800,fontSize:17,lineHeight:1}}>⋯</button>
+                {achatMenu===tid && (<>
+                  <div onClick={close} style={{position:'fixed',inset:0,zIndex:40}}/>
+                  <div role="menu" style={{position:'absolute',top:34,right:0,zIndex:41,minWidth:226,background:C.card,border:`1px solid ${C.border}`,borderRadius:10,boxShadow:C.shadow||'0 8px 24px rgba(0,0,0,.18)',overflow:'hidden',padding:'4px 0'}}>
+                    <button type="button" role="menuitem" style={item} onClick={()=>{ close(); setNoteEdit({tid,title:o.title,val:note}); }}><Icon name="doc" size={15} style={{color:C.muted}}/>{note?'Modifier la note interne':'Ajouter une note interne'}</button>
+                    <button type="button" role="menuitem" style={item} onClick={()=>{ close(); if(rc){ if(rc.pdfB64) openReceipt(rc); else setReceiptView(rc); } else generateAchatJustificatif(o,{ account:accNameOf(o._acc), regime:load('vinted_regime','micro'), numero:numA||'' }); }}><Icon name="receipt" size={15} style={{color:C.muted}}/>{rc?'Reçu d\'achat (Vinted)':'Attestation d\'achat'}</button>
+                    {rembourse && <button type="button" role="menuitem" style={item} onClick={()=>{ close(); generateRemboursementAttestation(o,{ account:accNameOf(o._acc) }); }}><Icon name="receipt" size={15} style={{color:C.muted}}/>Attestation de remboursement</button>}
+                    {numA && <button type="button" role="menuitem" style={item} onClick={()=>{ close(); generateEtiquetteSku(numA,{ title:o.title, transaction_id:o.transaction_id }); }}><Icon name="tag" size={15} style={{color:C.muted}}/>Étiquette N°{numA}</button>}
+                    <div style={{height:1,background:C.border,margin:'4px 0'}}/>
+                    <button type="button" role="menuitem" style={{...item,color:C.muted}} onClick={()=>{ close(); masquerAchat(o); }}><Icon name="eyeOff" size={15} style={{color:C.muted}}/>Masquer cet achat</button>
+                  </div>
+                </>)}
               </div>
+                );
+              })()}
             </div>
           );})}
         </div>
@@ -24704,6 +24777,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {/* ── Éditeur de photo (recadrer / zoomer) — retouche manuelle, Julien
              téléverse lui-même sur Vinted. Aucune modif auto (refus tenu). ── */}
       {photoEdit && <PhotoEditor refPhoto={photoEdit.refPhoto} refTitle={photoEdit.refTitle} onClose={()=>setPhotoEdit(null)} toast={toast} />}
+
+      {/* ── Note interne d'un achat (Actions rapides) — privée, synchronisée ── */}
+      {noteEdit && (
+        <div onClick={()=>setNoteEdit(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1360,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,width:'100%',maxWidth:420,padding:'18px 18px 16px',boxShadow:C.shadow||'0 12px 40px rgba(0,0,0,.3)'}}>
+            <div style={{fontSize:15,fontWeight:700,color:C.text,marginBottom:2}}>Note interne</div>
+            <div style={{fontSize:11.5,color:C.muted,marginBottom:10,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{noteEdit.title||'Achat'} — privée, pour toi seul</div>
+            <textarea autoFocus value={noteEdit.val} onChange={e=>setNoteEdit(n=>({...n,val:e.target.value}))} placeholder="ex : à retoucher · reçu demandé · pour un client…" rows={4}
+              style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 12px',fontSize:14,background:C.bg,color:C.text,outline:'none',fontFamily:'inherit',resize:'vertical'}}/>
+            <div style={{display:'flex',gap:8,justifyContent:'flex-end',marginTop:12}}>
+              <button type="button" onClick={()=>setNoteEdit(null)} style={{border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:10,padding:'9px 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Annuler</button>
+              <button type="button" onClick={()=>{ saveAchatNote(noteEdit.tid, noteEdit.val); setNoteEdit(null); }} style={{border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'9px 16px',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>Enregistrer</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Passeport de la paire : toute la vie d'une paire sur une frise ── */}
       {passportFor && (()=>{
