@@ -7592,6 +7592,62 @@ function EbayVentes({ baseKO }) {
     </div>
   </>);
 }
+// ── eBay · ANNONCES (captées par l'API officielle) ──────────────────────────
+// Julien : « l'extension ne capte rien, pourtant j'ai des annonces » — en fait
+// elles ÉTAIENT captées (ebay_listings), mais aucun onglet ne les montrait (le
+// Aperçu ne les affichait que connexion OUVERTE). Cet onglet lit les annonces
+// captées DIRECTEMENT : « rien lu ≠ rien », on montre ce qu'on a même si la
+// connexion OAuth est momentanément tombée.
+function EbayAnnonces({ baseKO }) {
+  const E = EBAY_SKIN;
+  const [items, setItems] = React.useState(undefined); // undefined=en cours · null=pas su · []=lu
+  React.useEffect(() => { let stop = false; (async () => {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.ebay_listings&select=data`, { headers: sbAuth() });
+      if (!r.ok) { if (!stop) setItems(null); return; }
+      const rows = await r.json();
+      if (!Array.isArray(rows)) { if (!stop) setItems(null); return; }
+      const L = (rows[0] && rows[0].data) || {};
+      if (!stop) setItems(Array.isArray(L.items) ? L.items : []);
+    } catch (_) { if (!stop) setItems(null); }
+  })(); return () => { stop = true; }; }, []);
+  const wrap = (kids) => <div style={{ background: E.bg, minHeight: '100vh', padding: 16, paddingBottom: 48 }}>{kids}</div>;
+  const head = (n) => <div style={{ fontSize: 22, fontWeight: 800, color: E.text, marginBottom: 2 }}>Annonces eBay{n != null ? ` (${n})` : ''}</div>;
+  if (baseKO) return wrap(<>{head()}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué. Réessaie dans un instant.</div></>);
+  if (items === undefined) return wrap(<>{head()}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Chargement…</div></>);
+  if (items === null) return wrap(<>{head()}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Je n'ai pas pu lire tes annonces eBay. Réessaie dans un instant.</div></>);
+  if (!items.length) return wrap(<>{head(0)}<div style={{ color: E.muted, fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>Pas encore d'annonce eBay captée. Connecte ton compte eBay dans l'onglet Aperçu et synchronise — tes annonces apparaîtront ici.</div></>);
+  const euro = (p) => { const n = Number(p); return isFinite(n) ? n.toFixed(2).replace('.', ',') + ' €' : ''; };
+  const jours = (iso) => { const t = Date.parse(iso || ''); return isNaN(t) ? null : Math.max(0, Math.round((Date.now() - t) / 86400000)); };
+  return wrap(<>
+    {head(items.length)}
+    <div style={{ color: E.muted, fontSize: 12, marginBottom: 12 }}>Tes annonces en ligne sur eBay</div>
+    <div style={{ background: E.card, border: `1px solid ${E.border}`, borderRadius: 14, overflow: 'hidden' }}>
+      {items.map((it, i) => {
+        const j = jours(it.depuis);
+        const url = it.url || (it.itemId ? `https://www.ebay.fr/itm/${it.itemId}` : null);
+        const nb = (it.detail && Array.isArray(it.detail.photos)) ? it.detail.photos.length : null;
+        const inner = (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '11px 14px', borderTop: i ? `1px solid ${E.border}` : 'none' }}>
+            <PhotoVente src={it.photo} size={56} />
+            <div style={{ flex: '1 1 auto', minWidth: 0 }}>
+              <div style={{ fontWeight: 600, fontSize: 13.5, color: E.text, lineHeight: 1.25, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{it.title || '(sans titre)'}</div>
+              <div style={{ fontSize: 11.5, color: E.muted, marginTop: 2 }}>
+                {it.vues != null && it.vues !== '' ? `${it.vues} vue${Number(it.vues) > 1 ? 's' : ''}` : ''}
+                {nb ? `${it.vues ? ' · ' : ''}${nb} photo${nb > 1 ? 's' : ''}` : ''}
+                {j != null ? `${(it.vues || nb) ? ' · ' : ''}en ligne depuis ${j} j` : ''}
+              </div>
+            </div>
+            <div className="vrm-display" style={{ flexShrink: 0, fontSize: 16, fontWeight: 800, color: E.text, alignSelf: 'flex-start' }}>{euro(it.price)}</div>
+          </div>
+        );
+        return url
+          ? <a key={it.itemId || i} href={url} target="_blank" rel="noreferrer" style={{ display: 'block', textDecoration: 'none' }}>{inner}</a>
+          : <div key={it.itemId || i}>{inner}</div>;
+      })}
+    </div>
+  </>);
+}
 // ── eBay · ACHATS — pas captés aujourd'hui (l'API de VENTE ne porte pas les
 //    achats). On le DIT au lieu d'un onglet vide qui laisserait croire à un bug.
 function EbayAchats() {
@@ -28398,8 +28454,9 @@ export default function App() {
               ventes ». Même structure, dans le skin eBay (noir). Aperçu garde la
               connexion + la publication ; Ventes liste les commandes captées ;
               Achats dit honnêtement qu'ils ne sont pas encore récupérés. */}
-          <div style={{background:'#000000'}}><PlatSubNav sub={platSub} setSub={setPlatSub} sections={[['apercu','Aperçu'],['ventes','Ventes'],['achats','Achats']]} dark/></div>
+          <div style={{background:'#000000'}}><PlatSubNav sub={platSub} setSub={setPlatSub} sections={[['apercu','Aperçu'],['annonces','Annonces'],['ventes','Ventes'],['achats','Achats']]} dark/></div>
           {platSub==='apercu'&&<Plateforme plat="eBay" liveStats={liveStats} lbcVentes={lbcVentes} ebayCa={ebayCa} comptes={vintedAccounts} onGo={setTab} baseKO={baseKO}/>}
+          {platSub==='annonces'&&<EbayAnnonces baseKO={baseKO}/>}
           {platSub==='ventes'&&<EbayVentes baseKO={baseKO}/>}
           {platSub==='achats'&&<EbayAchats/>}
         </>)}
