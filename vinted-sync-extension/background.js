@@ -6420,6 +6420,35 @@ function labelInfoDe(d) {
   }
   return null;
 }
+// La première URL d'image trouvée dans l'article d'une transaction Leboncoin.
+// On ne connaît pas le champ exact (page jamais vue d'ici, 403) : on essaie les
+// formes usuelles, puis on balaie l'objet `item` à la recherche d'une URL
+// d'image. Rien trouvé ⇒ chaîne vide (la carte garde sa place, sans fausse image).
+function imageDeVente(d) {
+  try {
+    const it = (d && d.item) || {};
+    const estImg = (s) => typeof s === 'string' && /^https?:\/\//.test(s) && /\.(jpe?g|png|webp|avif)(\?|$)/i.test(s);
+    const prem = (x) => {
+      if (!x) return '';
+      if (estImg(x)) return x;
+      if (Array.isArray(x)) { for (const e of x) { const u = prem(e); if (u) return u; } return ''; }
+      if (typeof x === 'object') { for (const k of ['url', 'href', 'src', 'large_url', 'thumb_url', 'small_url', 'image_url']) if (estImg(x[k])) return x[k]; }
+      return '';
+    };
+    // formes usuelles d'abord
+    for (const champ of [it.images, it.image, it.pictures, it.picture, it.photos, it.photo, it.thumb, it.thumbnail]) {
+      const u = prem(champ); if (u) return u;
+    }
+    // sinon, balayage borné de l'article (profondeur 3) pour toute URL d'image
+    const vu = new Set(); const pile = [[it, 0]];
+    while (pile.length) {
+      const [o, prof] = pile.pop();
+      if (!o || typeof o !== 'object' || prof > 3 || vu.has(o)) continue; vu.add(o);
+      for (const k in o) { const val = o[k]; if (estImg(val)) return val; if (val && typeof val === 'object') pile.push([val, prof + 1]); }
+    }
+  } catch (_) {}
+  return '';
+}
 function extraireVentesLbc(url, body) {
   let j; try { j = typeof body === 'string' ? JSON.parse(body) : body; } catch (_) { return []; }
   // Résumé : la liste des transactions (v3).
@@ -6440,6 +6469,11 @@ function extraireVentesLbc(url, body) {
     const v = {
       txId: (mid && mid[1]) || String((d.id && d.id.purchase_id) || d.purchase_id || (d.item && d.item.id) || ''),
       itemId: String((d.item && d.item.id) || ''),
+      // ⚠️ L'IMAGE DE LA VENTE — on ne DEVINE pas un champ : on cherche la
+      // première URL d'image réelle dans l'article (plusieurs formes possibles,
+      // jamais vues d'ici en 403). Absente ⇒ la carte garde sa place vide, elle
+      // n'invente pas d'image (§5). LECTURE seule.
+      image: imageDeVente(d),
       title: (d.item && d.item.title) || '',
       price: (pr.final != null ? pr.final : (pr.total != null ? pr.total : null)),
       isSeller: d.is_seller === true ? true : (d.is_seller === false ? false : undefined),
