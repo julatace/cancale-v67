@@ -241,8 +241,10 @@
   //    la dispersion est ce qui se lit « pas fini », pas la couleur.
   const css = `
     *{box-sizing:border-box;font-family:-apple-system,Segoe UI,Roboto,sans-serif}
-    .fab{background:#10151b;color:#fff;border:none;border-radius:999px;padding:11px 17px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 1px 2px rgba(16,21,27,.16),0 8px 24px rgba(16,21,27,.22);display:flex;align-items:center;gap:8px;letter-spacing:.2px}
+    .fab{background:#10151b;color:#fff;border:none;border-radius:999px;padding:9px 15px 9px 9px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 1px 2px rgba(16,21,27,.16),0 8px 24px rgba(16,21,27,.22);display:flex;align-items:center;gap:9px;letter-spacing:.2px}
+    .fab img{width:30px;height:30px;border-radius:7px;object-fit:cover;display:block}
     .fab .b{background:#1e5fcc;color:#fff;border-radius:999px;min-width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;padding:0 6px}
+    .hd img{width:24px;height:24px;border-radius:6px;object-fit:cover;display:block}
     .panel{width:384px;max-width:92vw;max-height:82vh;background:#fff;border-radius:16px;box-shadow:0 1px 3px rgba(16,21,27,.14),0 16px 44px rgba(16,21,27,.22);overflow:hidden;display:flex;flex-direction:column}
     .hd{background:#10151b;color:#fff;padding:13px 15px;display:flex;align-items:center;gap:8px}
     .hd .t{font-size:14px;font-weight:800;flex:1;letter-spacing:.2px}
@@ -288,6 +290,10 @@
     .pnote a{color:#1e5fcc;font-weight:700}
 `;
 
+  // Le vrai logo VRM (demande de Julien : « mets le logo du site en bas, "VRM 52"
+  // c'est dégueulasse »). Exposé en web_accessible_resource ; si getURL échoue
+  // pour une raison quelconque, on retombe sur le texte — jamais d'image cassée.
+  let LOGO = ''; try { LOGO = chrome.runtime.getURL('logo-vrm.png'); } catch (_) { LOGO = ''; }
   let open = false;
   function render() {
     const items = queue;
@@ -329,14 +335,14 @@
         : '');
     root.innerHTML = `<style>${css}</style>` + (open
       ? `<div class="panel">
-           <div class="hd"><span class="t">🟠 ${items.length} à publier${removals.length ? ' · ' + removals.length + ' à retirer' : ''}</span>
+           <div class="hd">${LOGO ? `<img src="${LOGO}" alt="VRM">` : ''}<span class="t">${items.length} à publier${removals.length ? ' · ' + removals.length + ' à retirer' : ''}</span>
              <button data-a="refresh" title="Rafraîchir">⟳</button>
              <button data-a="close" title="Fermer">×</button></div>
            <a class="deposit" href="https://www.leboncoin.fr/deposer-une-annonce" target="_blank" rel="noreferrer">➕ Déposer une annonce sur Leboncoin</a>
            <div class="body">${photoHtml()}${counterHtml()}${preuveHtml()}${exclusHtml()}${ventesHtml()}${remHtml}${unlHtml}${items.length ? listeGroupee(items) : emptyHtml()}${donePostedHtml()}</div>
            <div class="hint">1) Clique <b>➕ Déposer une annonce</b>. 2) Sur la page, clique <b>✍️ Pré-remplir</b> sur la paire voulue. 3) Vérifie et publie toi-même. Rien n&#39;est publié automatiquement.</div>
          </div>`
-      : `<button class="fab" data-a="open">🟠 VRM <span class="b">${badge}</span></button>`);
+      : `<button class="fab" data-a="open" title="Ouvrir VRM">${LOGO ? `<img src="${LOGO}" alt="VRM">` : '<b>VRM</b>'}${(items.length || removals.length) ? `<span class="b">${badge}</span>` : ''}</button>`);
   }
   // La liste se groupe sur CE QU'IL PEUT FAIRE, pas sur le numéro — c'est la loi
   // de l'écran Colis : trier par numéro mettait devant des annonces qui
@@ -1117,8 +1123,12 @@
 
 
   root.addEventListener('click', async (e) => {
-    const a = e.target.getAttribute && e.target.getAttribute('data-a');
+    // ⚠️ Un clic sur le LOGO (ou le badge) à l'intérieur du bouton a pour cible
+    //    l'<img>/<span>, pas le bouton : lire `data-a` sur la cible exacte
+    //    laissait le panneau fermé. On remonte au plus proche porteur de `data-a`.
     if (e.target.tagName === 'IMG' && e.target.dataset.full) { window.open(e.target.dataset.full, '_blank'); return; }
+    const porteur = e.target.closest && e.target.closest('[data-a]');
+    const a = porteur && porteur.getAttribute('data-a');
     if (!a) return;
     if (a === 'open') { open = true; render(); return; }
     if (a === 'close') { open = false; render(); return; }
