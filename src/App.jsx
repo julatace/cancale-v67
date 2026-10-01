@@ -7592,6 +7592,61 @@ function EbayVentes({ baseKO }) {
     </div>
   </>);
 }
+// Une annonce eBay : résumé + détail DÉPLIABLE qui montre TOUTES les
+// caractéristiques captées (specifics, catégorie, état, nb de photos, description).
+// Julien veut voir que « tout est capté » ; c'est aussi la matière du
+// remplissage complet à la republication. Lecture seule.
+function EbayAnnonceCard({ it, first }) {
+  const E = EBAY_SKIN;
+  const [open, setOpen] = React.useState(false);
+  const euro = (p) => { const n = Number(p); return isFinite(n) ? n.toFixed(2).replace('.', ',') + ' €' : ''; };
+  const j = (() => { const t = Date.parse(it.depuis || ''); return isNaN(t) ? null : Math.max(0, Math.round((Date.now() - t) / 86400000)); })();
+  const url = it.url || (it.itemId ? `https://www.ebay.fr/itm/${it.itemId}` : null);
+  const d = it.detail || {};
+  const specs = (d.specifics && typeof d.specifics === 'object') ? Object.entries(d.specifics).filter(([, v]) => v != null && String(v).trim()) : [];
+  const nb = Array.isArray(d.photos) ? d.photos.length : null;
+  const desc = String(d.description || '').replace(/&lt;br&gt;|<br\s*\/?>/gi, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
+  const chip = { fontSize: 11, color: E.text, background: E.card2, border: `1px solid ${E.border}`, borderRadius: 999, padding: '3px 9px', whiteSpace: 'nowrap' };
+  return (
+    <div style={{ borderTop: first ? 'none' : `1px solid ${E.border}` }}>
+      <div onClick={() => setOpen(o => !o)} role="button" tabIndex={0}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(o => !o); } }}
+        style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '11px 14px', cursor: 'pointer' }}>
+        <PhotoVente src={it.photo} size={56} />
+        <div style={{ flex: '1 1 auto', minWidth: 0 }}>
+          <div style={{ fontWeight: 600, fontSize: 13.5, color: E.text, lineHeight: 1.25, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{it.title || '(sans titre)'}</div>
+          <div style={{ fontSize: 11.5, color: E.muted, marginTop: 2 }}>
+            {it.vues != null && it.vues !== '' ? `${it.vues} vue${Number(it.vues) > 1 ? 's' : ''}` : ''}
+            {nb ? `${it.vues ? ' · ' : ''}${nb} photo${nb > 1 ? 's' : ''}` : ''}
+            {j != null ? `${(it.vues || nb) ? ' · ' : ''}en ligne depuis ${j} j` : ''}
+          </div>
+        </div>
+        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+          <div className="vrm-display" style={{ fontSize: 16, fontWeight: 800, color: E.text }}>{euro(it.price)}</div>
+          <div style={{ fontSize: 10.5, color: E.accentSoft, marginTop: 2, fontWeight: 600 }}>{open ? 'masquer ▲' : 'détails ▼'}</div>
+        </div>
+      </div>
+      {open && (
+        <div style={{ padding: '0 14px 13px 14px' }}>
+          {(d.categoryName || d.condition) && (
+            <div style={{ fontSize: 11.5, color: E.muted, marginBottom: 8, lineHeight: 1.45 }}>
+              {d.condition ? <>État : <b style={{ color: E.text }}>{d.condition}</b></> : null}
+              {d.categoryName ? <>{d.condition ? ' · ' : ''}Catégorie : <b style={{ color: E.text }}>{String(d.categoryName).split(':').pop()}</b></> : null}
+            </div>
+          )}
+          {specs.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: desc ? 10 : 0 }}>
+              {specs.map(([k, v]) => <span key={k} style={chip}><span style={{ color: E.muted }}>{k} : </span>{String(v)}</span>)}
+            </div>
+          )}
+          {desc && <div style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, marginBottom: 10 }}>{desc.slice(0, 280)}{desc.length > 280 ? '…' : ''}</div>}
+          {url && <a href={url} target="_blank" rel="noreferrer" style={{ display: 'inline-block', color: E.accentSoft, fontWeight: 700, fontSize: 12.5, textDecoration: 'none' }}>Voir sur eBay ↗</a>}
+          {specs.length === 0 && !d.categoryName && !desc && <div style={{ fontSize: 12, color: E.muted }}>Caractéristiques pas encore captées pour cette annonce — rouvre-la sur eBay.</div>}
+        </div>
+      )}
+    </div>
+  );
+}
 // ── eBay · ANNONCES (captées par l'API officielle) ──────────────────────────
 // Julien : « l'extension ne capte rien, pourtant j'ai des annonces » — en fait
 // elles ÉTAIENT captées (ebay_listings), mais aucun onglet ne les montrait (le
@@ -7623,28 +7678,7 @@ function EbayAnnonces({ baseKO }) {
     {head(items.length)}
     <div style={{ color: E.muted, fontSize: 12, marginBottom: 12 }}>Tes annonces en ligne sur eBay</div>
     <div style={{ background: E.card, border: `1px solid ${E.border}`, borderRadius: 14, overflow: 'hidden' }}>
-      {items.map((it, i) => {
-        const j = jours(it.depuis);
-        const url = it.url || (it.itemId ? `https://www.ebay.fr/itm/${it.itemId}` : null);
-        const nb = (it.detail && Array.isArray(it.detail.photos)) ? it.detail.photos.length : null;
-        const inner = (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '11px 14px', borderTop: i ? `1px solid ${E.border}` : 'none' }}>
-            <PhotoVente src={it.photo} size={56} />
-            <div style={{ flex: '1 1 auto', minWidth: 0 }}>
-              <div style={{ fontWeight: 600, fontSize: 13.5, color: E.text, lineHeight: 1.25, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{it.title || '(sans titre)'}</div>
-              <div style={{ fontSize: 11.5, color: E.muted, marginTop: 2 }}>
-                {it.vues != null && it.vues !== '' ? `${it.vues} vue${Number(it.vues) > 1 ? 's' : ''}` : ''}
-                {nb ? `${it.vues ? ' · ' : ''}${nb} photo${nb > 1 ? 's' : ''}` : ''}
-                {j != null ? `${(it.vues || nb) ? ' · ' : ''}en ligne depuis ${j} j` : ''}
-              </div>
-            </div>
-            <div className="vrm-display" style={{ flexShrink: 0, fontSize: 16, fontWeight: 800, color: E.text, alignSelf: 'flex-start' }}>{euro(it.price)}</div>
-          </div>
-        );
-        return url
-          ? <a key={it.itemId || i} href={url} target="_blank" rel="noreferrer" style={{ display: 'block', textDecoration: 'none' }}>{inner}</a>
-          : <div key={it.itemId || i}>{inner}</div>;
-      })}
+      {items.map((it, i) => <EbayAnnonceCard key={it.itemId || i} it={it} first={i === 0} />)}
     </div>
   </>);
 }
