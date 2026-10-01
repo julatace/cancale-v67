@@ -3833,7 +3833,10 @@ const generateRemboursementAttestation = async (o, opts = {}) => {
 
 const generateEtiquetteSku = async (num, o = {}) => {
   const n = String(num || '').trim();
-  if (!n) return;
+  const titre = (o.title || '').slice(0, 60);
+  // ⚠️ Julien (1er oct.) : « même s'il n'y a pas encore le numéro, place quand
+  //    même le TITRE en attendant ». Sans N° ET sans titre, rien à coller.
+  if (!n && !titre) return;
   const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib');
   const pdf = await PDFDocument.create();
   const W = 283, H = 170;
@@ -3841,15 +3844,21 @@ const generateEtiquetteSku = async (num, o = {}) => {
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
   const reg = await pdf.embedFont(StandardFonts.Helvetica);
   const N = rgb(0.08, 0.08, 0.08), G = rgb(0.4, 0.4, 0.4);
-  page.drawText('N°', { x: 18, y: H - 46, size: 16, font: reg, color: G });
-  const big = String(n);
-  const sz = big.length > 5 ? 56 : 72;
-  page.drawText(big, { x: 18, y: 54, size: sz, font: bold, color: N });
-  const titre = (o.title || '').slice(0, 42);
-  if (titre) page.drawText(titre, { x: 18, y: 32, size: 10, font: reg, color: G });
+  if (n) {
+    page.drawText('N°', { x: 18, y: H - 46, size: 16, font: reg, color: G });
+    const big = String(n);
+    page.drawText(big, { x: 18, y: 54, size: big.length > 5 ? 56 : 72, font: bold, color: N });
+    if (titre) page.drawText(titre.slice(0, 42), { x: 18, y: 32, size: 10, font: reg, color: G });
+  } else {
+    // Pas encore de numéro : le TITRE devient le repère principal.
+    page.drawText('En attente de numéro', { x: 18, y: H - 40, size: 11, font: reg, color: G });
+    const t = titre.length > 26 ? titre.slice(0, 26) : titre;
+    page.drawText(t, { x: 18, y: 76, size: t.length > 18 ? 20 : 26, font: bold, color: N });
+    if (titre.length > 26) page.drawText(titre.slice(26, 54), { x: 18, y: 52, size: 14, font: bold, color: N });
+  }
   if (o.transaction_id) page.drawText('tx ' + String(o.transaction_id), { x: 18, y: 16, size: 8, font: reg, color: G });
   page.drawRectangle({ x: 4, y: 4, width: W - 8, height: H - 8, borderColor: rgb(0.8, 0.8, 0.8), borderWidth: 1 });
-  _telechargerPdf(await pdf.save(), `etiquette-${n}.pdf`);
+  _telechargerPdf(await pdf.save(), `etiquette-${n || 'titre'}.pdf`);
 };
 
 // ⚠️ `syncFromSheets` / `syncToSheets` SUPPRIMÉES (30 août).
@@ -6515,12 +6524,17 @@ function caEbayPayees(orders) {
 // captée »), jamais 0 € (§5/§7).
 function caParPlateforme(liveStats, lbcVentes, ebayCa) {
   const caVinted = liveStats && liveStats.caEncaisse != null ? liveStats.caEncaisse : null;
-  const lbcOk = ((lbcVentes && lbcVentes.ventes) || []).filter(o => !/annul|cancel|refund|rembours/i.test((o.stepStatus||'')+' '+(o.stepLabel||'')));
+  // ⚠️ CA = VENTES FINALISÉES SEULEMENT (Julien, 1er oct.) : « le CA d'un mois est
+  //    la somme des ventes FINALISÉES, pas celles en cours — une vente en cours
+  //    peut partir en litige ». Côté Leboncoin on comptait toute vente non
+  //    annulée (donc les « en attente d'envoi » aussi) : on restreint aux
+  //    finalisées (argent reçu), par le MÊME prédicat que l'écran Ventes (§11).
+  const lbcOk = ((lbcVentes && lbcVentes.ventes) || []).filter(o => !lbcAnnulee(o) && lbcFinalisee(o));
   const caLbc = lbcOk.length ? lbcOk.reduce((s,o)=> s + (o.price!=null ? Number(o.price)/100 : 0), 0) : null;
   const caEbay = ebayCa != null ? ebayCa : null;
   return [
     { nom:'Vinted', ca:caVinted, note:'ventes finalisées, tous comptes' },
-    { nom:'Leboncoin', ca:caLbc, note:caLbc==null?'pas encore de vente captée':'ventes confirmées vendeur' },
+    { nom:'Leboncoin', ca:caLbc, note:caLbc==null?'pas encore de vente finalisée':'ventes finalisées (argent reçu)' },
     { nom:'eBay', ca:caEbay, note:caEbay==null?'pas encore de vente captée':'ventes payées' },
     { nom:'Vestiaire Collective', ca:null, note:'pas encore de vente captée' },
   ];
@@ -6787,7 +6801,7 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
           {principal === 'imprimer'
             ? <a href={o.label.voucherUrl} target="_blank" rel="noreferrer" style={{ flex: '1 1 160px', maxWidth: 340, textAlign: 'center', border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '12px', fontSize: 15, fontWeight: 600, textDecoration: 'none' }}>🖨 Imprimer le bordereau</a>
             : <a href={lbcUrl(o)} target="_blank" rel="noreferrer" style={{ flex: '1 1 160px', maxWidth: 340, textAlign: 'center', border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '12px', fontSize: 15, fontWeight: 600, textDecoration: 'none' }}>↗ Générer le bordereau</a>}
-          {principal === 'imprimer' && n && <button type="button" onClick={() => generateEtiquetteSku(n, { title: o.title, transaction_id: o.txId })} title={`Étiquette N°${n} à coller`} style={{ flexShrink: 0, border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 10, padding: '12px 13px', fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>🏷️ Étiquette N°{n}</button>}
+          {principal === 'imprimer' && <button type="button" onClick={() => generateEtiquetteSku(n, { title: o.title, transaction_id: o.txId })} title={n ? `Étiquette N°${n} à coller` : 'Étiquette avec le titre (en attendant le numéro)'} style={{ flexShrink: 0, border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 10, padding: '12px 13px', fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>🏷️ Étiquette {n ? `N°${n}` : '(titre)'}</button>}
           <button type="button" onClick={() => toggleFait(o)} title={posted ? 'Remettre dans les colis à poster' : 'Marquer comme posté'} style={{ flexShrink: 0, border: `1px solid ${posted ? INV_STATUS.online.color : C.border}`, background: posted ? `${INV_STATUS.online.color}18` : 'transparent', color: posted ? INV_STATUS.online.color : C.muted, borderRadius: 10, padding: '12px 13px', fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>{posted ? '↺ Pas encore' : '✓ Colis fait'}</button>
         </div>
       </div>
