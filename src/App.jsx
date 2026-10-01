@@ -28241,8 +28241,14 @@ export default function App() {
           <Comptabilite key={'pv_'+platSub} accounts={vintedAccounts} only={platSub==='apercu'?'ventes':platSub} liveStats={liveStats} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}/>
         </>)}
         {tab==='plat_leboncoin'&&(<>
-          <PlatSubNav sub={platSub} setSub={setPlatSub} sections={[['apercu','Aperçu'],['apublier','À publier']]}/>
+          {/* Julien : « Leboncoin, la même mise en page que Vinted ». Vinted a
+              Ventes / Achats / Annonces ; côté Leboncoin on a les VENTES (prouvées
+              par identité, cf. VentesLeboncoin) et les annonces « À publier ».
+              Les achats Leboncoin ne sont pas captés → pas d'onglet qui mentirait
+              (mieux vaut un blanc qu'un faux, §5). */}
+          <PlatSubNav sub={platSub} setSub={setPlatSub} sections={[['apercu','Aperçu'],['ventes','Ventes'],['apublier','À publier']]}/>
           {platSub==='apercu'&&<Plateforme plat="Leboncoin" liveStats={liveStats} lbcVentes={lbcVentes} onGo={setTab} onSub={setPlatSub} baseKO={baseKO}/>}
+          {platSub==='ventes'&&<div style={{padding:16}}><ScreenHead icon="tag" title="Ventes Leboncoin" desc="Tes ventes Leboncoin, reliées par identité (jamais par titre)"/>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:<VentesLeboncoin lbcVentes={lbcVentes}/>}</div>}
           {platSub==='apublier'&&<LeboncoinScreen/>}
         </>)}
         {tab==='plat_ebay'&&<Plateforme plat="eBay" liveStats={liveStats} lbcVentes={lbcVentes} ebayCa={ebayCa} comptes={vintedAccounts} onGo={setTab} baseKO={baseKO}/>}
