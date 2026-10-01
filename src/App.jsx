@@ -6721,10 +6721,12 @@ function VentesLeboncoin({ lbcVentes = {ventes:[],inconnues:0} }) {
             <PhotoVente src={o.image} />
             <div style={{flex:'1 1 auto',minWidth:0}}>
               <div style={{fontWeight:600,fontSize:13.5,color:C.text,lineHeight:1.25,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{o.title||'(sans titre)'}</div>
+              {/* ⚠️ COMME SUR VINTED : la carte de vente dit l'ESSENTIEL (statut +
+                  transporteur + prix). Le bordereau et le QR ne sont PAS collés
+                  ici — ils vivent dans l'onglet Colis (Julien : « je veux
+                  exactement comme sur Vinted », le bordereau était répété sur
+                  chaque vente). On ne le montre plus dans Ventes. */}
               <div style={{fontSize:11.5,color:C.muted,marginTop:2}}>{o.stepLabel||o.stepStatus||''}{o.deliveryLabel?` · ${o.deliveryLabel}`:''}</div>
-              {(o.label && o.label.voucherUrl)
-                ? <a href={o.label.voucherUrl} target="_blank" rel="noreferrer" style={{display:'inline-block',marginTop:6,background:C.text,color:C.card,borderRadius:8,padding:'6px 11px',fontWeight:700,fontSize:12,textDecoration:'none'}}>🧾 Bordereau{o.label.reference?` · ${o.label.reference}`:''}</a>
-                : (o.label && o.label.trackingUrl ? <a href={o.label.trackingUrl} target="_blank" rel="noreferrer" style={{display:'inline-block',marginTop:6,color:C.accent,fontWeight:700,fontSize:12,textDecoration:'none'}}>Suivre ↗</a> : null)}
             </div>
             {euro && <div className="vrm-display" style={{flexShrink:0,fontSize:16,fontWeight:800,color:C.text,alignSelf:'flex-start'}}>{euro}</div>}
           </div>
