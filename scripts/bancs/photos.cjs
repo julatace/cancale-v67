@@ -74,7 +74,7 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
   await new Promise((res) => srv.listen(4493, res));
   let b;
   try {
-    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox'] });
+    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   } catch (e) { console.log('KO  Chromium indisponible :', e.message); srv.close(); process.exit(1); }
   const pg = await b.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));

@@ -26,7 +26,7 @@ srv.listen(4393);
 let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' — '+d:''));};
 const W=+(process.env.W||1512), H=+(process.env.H||950);
 (async()=>{
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-angle=swiftshader','--no-sandbox']});
+  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
   const pg=await b.newPage({viewport:{width:W,height:H}});
   const errs=[]; pg.on('pageerror',e=>errs.push(e.message));
   let appelsRelais=0;

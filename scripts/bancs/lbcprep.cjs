@@ -92,7 +92,7 @@ async function rendre(nav, etat) {
 (async () => {
   let srvOk = null;
   try { srvOk = await ecouter(); } catch (e) { console.log('❌ ' + e.message); process.exit(1); }
-  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox'] });
+  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   const vus = {};
   for (const etat of ['pasSu', 'rienRelevé', 'partiel', 'coupé', 'complet']) {
     const r = await rendre(nav, etat);

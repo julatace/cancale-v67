@@ -159,7 +159,7 @@ async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lectureP
 (async () => {
   const srv = await ecouter();
   const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
-    args: ['--use-angle=swiftshader', '--no-sandbox'] });
+    args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
 
   // ── 1. LE PRÉNOM ──────────────────────────────────────────────────────────
   // La règle : le bonjour DÉPEND du réglage. On ne cherche pas le mot
