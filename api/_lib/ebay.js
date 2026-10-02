@@ -1,4 +1,6 @@
 import { sbCle } from './cle.js';
+// Base cloisonnée : sans propriétaire ni cible (owner,id), l'écriture est refusée.
+import { withOwnerAll, conflictTarget } from './owner.js';
 // api/_lib/ebay.js — la logique OAuth eBay, en UN seul endroit (§11).
 // Utilisée par api/ebay.js (l'app pilote) ET api/ebay-callback.js (le retour de
 // consentement d'eBay). Deux routes, une seule règle : les clés vivent dans les
@@ -68,10 +70,10 @@ async function storeRefresh(refresh, expiresInDays) {
   if (!sbKey()) return false;
   try {
     const body = [{ id: TOKENS_ID, data: { refresh_token: refresh, saved_at: Date.now(), refresh_expires_days: expiresInDays || null } }];
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=id`, {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${conflictTarget('id')}`, {
       method: 'POST',
       headers: { ...sbCle(sbKey()), 'content-type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify(body),
+      body: JSON.stringify(withOwnerAll(body)),
     });
     return r.ok;
   } catch (_) { return false; }
@@ -145,10 +147,10 @@ async function accessToken() {
 async function storeData(id, data) {
   if (!sbKey()) return false;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=id`, {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${conflictTarget('id')}`, {
       method: 'POST',
       headers: { ...sbCle(sbKey()), 'content-type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify([{ id, data }]),
+      body: JSON.stringify(withOwnerAll([{ id, data }])),
     });
     return r.ok;
   } catch (_) { return false; }
