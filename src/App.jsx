@@ -6908,6 +6908,11 @@ function VentesLeboncoin({ lbcVentes = {ventes:[],inconnues:0} }) {
   const actives = ventes.filter(o => !lbcAnnulee(o));
   const finals = actives.filter(lbcFinalisee);
   const enCours = actives.filter(o => !lbcFinalisee(o));
+  // Symétrie avec les Achats Leboncoin : une vente ANNULÉE/REMBOURSÉE a sa propre
+  // section (comme Vinted suit ses remboursées), sinon l'en-tête compte (N) mais
+  // la liste en montre moins — le même mensonge §7 qu'on vient de retirer des
+  // transactions à confirmer. Rien n'est caché.
+  const annulees = ventes.filter(lbcAnnulee);
   const somme = (arr) => arr.reduce((s, o) => s + (o.price != null ? Number(o.price) / 100 : 0), 0);
   const fmt2 = (n) => n.toFixed(2).replace('.', ',') + ' €';
   const Carte = (o) => <CarteLbc key={o.txId} o={o} />;
@@ -6938,6 +6943,10 @@ function VentesLeboncoin({ lbcVentes = {ventes:[],inconnues:0} }) {
       {finals.length > 0 && (<>
         <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, margin: '12px 0 0' }}>Finalisées ({finals.length})</div>
         {finals.map(Carte)}
+      </>)}
+      {annulees.length > 0 && (<>
+        <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, margin: '12px 0 0' }}>Annulées / remboursées ({annulees.length})</div>
+        {annulees.map(Carte)}
       </>)}
       {lbcVentes.inconnues>0 && (
         <div style={{marginTop:lbcVentes.ventes.length?8:6,paddingTop:lbcVentes.ventes.length?8:0,borderTop:lbcVentes.ventes.length?`1px solid ${C.border}`:'none'}}>
