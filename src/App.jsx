@@ -6866,7 +6866,11 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
 const lbcAnnulee = (o) => o.stepStatus === 'cancelled' || /annul|cancel|refund|rembours/i.test((o.parcelStatus || '') + ' ' + (o.stepStatus || '') + ' ' + (o.stepLabel || ''));
 const lbcFinalisee = (o) => {
   if (o.parcelColor) return o.parcelColor === 'finished';           // ce que dit le colis
-  if (o.parcelStatus) return /deliver|livr/i.test(o.parcelStatus);
+  // ⚠️ `delivered`/`livr[ée]` STRICT, pas `deliver`/`livr` : « out_for_delivery »
+  //    et « en cours de livraison » sont EN TRANSIT, pas livrés — les compter
+  //    gonflerait le CA d'une vente non finalisée (risque de litige). Même soin
+  //    que le repli libellé plus bas.
+  if (o.parcelStatus) return /delivered|livr[ée]/i.test(o.parcelStatus);
   if (o.stepStatus === 'done') return true;                         // liste v3
   if (o.stepStatus === 'cancelled') return false;
   // repli (lignes déjà captées, sans colis) : UNIQUEMENT les libellés TERMINAUX
