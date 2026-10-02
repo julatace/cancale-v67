@@ -47,7 +47,7 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' â€
     const jj=d=>route.fulfill({status:200,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:JSON.stringify(d)});
     if(route.request().method()!=='GET') return jj([]);
     if(/select=owner/.test(u)) return route.fulfill({status:400,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:'{"m":1}'});
-    if(/vinted_accounts/.test(u)) return jj(accounts);
+    if(/\/rest\/v1\/vinted_accounts/.test(u)) return jj(accounts);
     if(/id=eq\.main/.test(u)) return jj(main);
     if(/transaction->>id/.test(u)) return jj(txn);
     const eq=/id=eq\.([^&]*)/.exec(u); if(eq){const k=decodeURIComponent(eq[1]);return jj(rows.filter(r=>r.id===k));}

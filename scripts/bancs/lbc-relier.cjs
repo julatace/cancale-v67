@@ -1,31 +1,18 @@
-// Banc : les COMPTES ne s'empilent plus sur l'écran Annonces (H1, 30 sept.).
+// Banc : RELIER une annonce Leboncoin « non reliée » à une paire (C4, 30 sept.).
 //
-// « L'onglet Annonces, c'est le bordel : la liste des comptes va dans Réglages. »
-// Sur trois comptes INVENTÉS (il vit dans le dépôt), il exige :
-//   · plus aucune puce de compte cliquable sur Annonces (elles MASQUAIENT le
-//     compte au tap — Julien le faisait en croyant filtrer) ;
-//   · UNE ligne qui dit combien de comptes alimentent la liste, et une porte
-//     « Gérer les comptes » qui mène à Réglages → Comptes liés ;
-//   · là-bas, masquer un compte DEMANDE confirmation (la règle suit le geste),
-//     et « Annuler » ne masque rien.
-
-//
-// Le rapport listait les achats ligne par ligne, mais les ventes seulement en
-// TOTAL : le comptable ne pouvait rien rapprocher. Ce banc ouvre le rapport sur
-// des ventes INVENTÉES (aucune donnée réelle : il vit dans le dépôt, qui est
-// public) et exige :
-//   1. un registre des ventes, une ligne par vente FINALISÉE du mois — ni la
-//      vente en cours, ni l'annulée ;
-//   2. que la somme des lignes rendues soit le CA affiché (§11 : une seule
-//      source, la même boucle) — jugé sur les NOMBRES rendus, jamais un libellé ;
-//   3. un prix d'achat inconnu écrit « — », jamais « 0,00 € » (§7) ;
-//   4. que le PDF se génère, même avec un emoji dans un titre (les polices
-//      standard de pdf-lib ne savent pas l'écrire : tout l'export échouait), et
-//      qu'il contienne bien les deux registres.
+// « Annonce Leboncoin non reliée : afficher la photo + pouvoir la relier à un N°
+// dans l'app. » Sur des données INVENTÉES (il vit dans le dépôt), il exige :
+//   · l'annonce non reliée montre sa PHOTO ;
+//   · un N° que VRM ne connaît pas est REFUSÉ (le lien ne mènerait à rien) ;
+//   · un N° connu la RELIE : elle sort de « non reliées », le lien est écrit
+//     dans `vrm_lbc_liens` (une identité posée par lui, jamais devinée) ;
+//   · l'EXTENSION applique la même règle : le VRAI `adRefKeys` de background.js,
+//     exécuté dans un vm, rend ce N° pour cette annonce (§11 — sinon l'app
+//     relie et le panneau ne relie pas).
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
-const PORT = 4334;
+const PORT = 4335;
 
 const auj = new Date();
 const jour = (d) => new Date(auj.getFullYear(), auj.getMonth(), d, 12).toISOString();
@@ -42,9 +29,13 @@ const ACHATS = [
   { transaction_id: 7001, title: 'Lot Nike Air Max', price: { amount: '35', currency_code: 'EUR' }, status: 'Commande finalisée', date: jour(1), seller: 'vendeur_test' },
 ];
 const ACCOUNTS = [{ id: 1, vinted_user_id: '111', login: 'compte_test', domain: 'www.vinted.fr', updated_at: auj.toISOString() }];
-const ACCS = ['111','222','333'].map((u, i) => ({ id: i + 1, vinted_user_id: u, login: 'compte_test_' + u, domain: 'www.vinted.fr', updated_at: auj.toISOString() }));
-const annonce = (id, t) => ({ id, title: t, price: { amount: '50', currency_code: 'EUR' }, is_closed: false, is_draft: false, photo: null });
-const rows = ACCS.map((a, i) => ({ id: `harvest_${a.vinted_user_id}_listings`, data: { capturedAt: auj.toISOString(), payload: { items: [annonce(8000 + i * 10, 'Paire test A' + i), annonce(8001 + i * 10, 'Paire test B' + i)] } } }));
+const ACCS = [{ id: 1, vinted_user_id: '111', login: 'compte_test', domain: 'www.vinted.fr', updated_at: auj.toISOString() }];
+const MAIN = { vinted_annonce_numeros: { '5001': { numero: '12', title: 'Paire test numérotée' } } };
+const AD = { id: 'lbc777', subject: 'Basket test à relier', price: 40, lbcUser: 'u_test', status: 'active', images: ['https://img.test/photo-lbc777.jpg'], url: 'https://www.leboncoin.fr/ad/test/777' };
+const rows = [
+  { id: 'main', data: MAIN },
+  { id: 'lbc_listings', data: { items: { lbc777: AD } } },
+];
 let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
 const types = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/json', '.woff2': 'font/woff2' };
@@ -73,6 +64,16 @@ const projette = (row, sel) => {
 };
 
 (async () => {
+  console.log('── extension (background.js, vm)');
+  try {
+    const vm = require('vm');
+    const bg = fs.readFileSync(path.join(__dirname, '..', '..', 'vinted-sync-extension', 'background.js'), 'utf8');
+    const i = bg.indexOf('function adRefKeys('); const fin = bg.indexOf('\n}\n', i) + 3;
+    const ctx = {}; vm.createContext(ctx); vm.runInContext(bg.slice(i, fin) + '\nthis.adRefKeys = adRefKeys;', ctx);
+    const k1 = ctx.adRefKeys(AD, { lbc777: '12' });
+    dit(Array.isArray(k1) && k1[0] === '12', 'le panneau relie la même annonce au même N° (adRefKeys)', JSON.stringify(k1));
+    dit(JSON.stringify(ctx.adRefKeys(AD, {})) === '[]', 'sans lien posé, il ne devine rien', JSON.stringify(ctx.adRefKeys(AD, {})));
+  } catch (e) { dit(false, 'adRefKeys s’exécute', String(e.message).slice(0, 120)); }
   let b;
   try {
     b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
@@ -89,6 +90,7 @@ const projette = (row, sel) => {
         if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
         if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCS);
         const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
+        if (/id=eq\.main/.test(u)) return j([projette({ id: 'main', data: MAIN }, sel)]);
         const forme = (r) => (sel && sel !== 'data,updated_at,cap:data->>capturedAt' && !/^id,data/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: auj.toISOString(), cap: r.data.capturedAt });
         const eq = /id=eq\.([^&]*)/.exec(u);
         if (eq) { if (/pdfB64/.test(sel || '')) pdfDemandes.push(eq[1]); return j(rows.filter((r) => r.id === eq[1]).map(forme)); }
@@ -97,40 +99,32 @@ const projette = (row, sel) => {
         return j([]);
       });
       await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
-      await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
+      await pg.goto(`http://localhost:${PORT}/?tab=leboncoin`, { waitUntil: 'domcontentloaded' });
       await pg.waitForTimeout(3500);
-      const v = await pg.evaluate(() => {
-        const ligne = document.querySelector('[data-comptes-annonces]');
-        const puces = [...document.querySelectorAll('main button')].filter((x) => /compte_test_\d+\s*·\s*\d/.test(x.innerText || ''));
-        return { ligne: ligne ? ligne.innerText : null, puces: puces.length, sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth };
-      });
-      await pg.screenshot({ path: path.join(require('os').tmpdir(), 'comptes-annonces-' + vp.width + '.png') });
-      dit(v.puces === 0, 'plus aucune puce de compte cliquable sur Annonces', `${v.puces} puce(s)`);
-      dit(!!v.ligne && /3 comptes/.test(v.ligne), 'une ligne dit combien de comptes alimentent la liste', JSON.stringify(v.ligne));
-      dit(v.sw <= v.cw + 1, 'aucun débordement horizontal', `${v.sw} > ${v.cw}`);
-      try { await pg.click('[data-comptes-annonces] button', { timeout: 4000 }); } catch (e) { dit(false, 'la porte se clique', String(e.message).slice(0, 80)); }
-      await pg.waitForTimeout(2500);
-      const surComptes = await pg.evaluate(() => /compte_test_111/.test(document.body.innerText) && /Comptes/i.test(document.body.innerText) && location.search.includes('vintedaccounts') || !!document.querySelector('[data-tab="vintedaccounts"]') || /Comptes (Vinted )?liés/i.test(document.body.innerText));
-      dit(surComptes, '« Gérer les comptes » mène à Comptes liés');
-      // Masquer y demande confirmation, et « Annuler » ne masque rien.
-      const avant = await pg.evaluate(() => localStorage.getItem('vinted_accounts_hidden'));
-      let confirmVue = false;
+      const bloc = '[data-lbc-relier="lbc777"]';
+      const vu = await pg.evaluate((s) => { const el = document.querySelector(s); return el ? { img: !!el.querySelector('img[src*="photo-lbc777"]'), t: el.innerText } : null; }, bloc);
+      await pg.screenshot({ path: path.join(require('os').tmpdir(), 'lbc-relier-' + vp.width + '.png') });
+      dit(!!vu, 'l’annonce non reliée est listée');
+      dit(!!(vu && vu.img), 'elle montre sa PHOTO');
       try {
-        await pg.locator('button[title*="Clique pour le masquer"]').first().click({ timeout: 4000 });
-        await pg.waitForTimeout(600);
-        confirmVue = await pg.evaluate(() => /Masquer « /.test(document.body.innerText));
-        await pg.getByText('Annuler', { exact: true }).last().click({ timeout: 3000 });
-        await pg.waitForTimeout(600);
-      } catch (e) { dit(false, 'l’interrupteur « masquer » se clique', String(e.message).slice(0, 80)); }
-      const apres = await pg.evaluate(() => localStorage.getItem('vinted_accounts_hidden'));
-      dit(confirmVue, 'masquer un compte demande confirmation');
-      dit(!/111|222|333/.test(String(apres || '')) && String(apres || '') === String(avant || ''), '« Annuler » ne masque rien', `${avant} → ${apres}`);
+        await pg.fill(bloc + ' input', '999'); await pg.click(bloc + ' button');
+        await pg.waitForTimeout(500);
+        const t = await pg.evaluate((s) => (document.querySelector(s) || {}).innerText || '', bloc);
+        dit(/Aucune paire ne porte le N°999/.test(t), 'un N° inconnu de VRM est refusé', t.split('\n').slice(-2).join(' | '));
+        dit(!await pg.evaluate(() => localStorage.getItem('vrm_lbc_liens')), 'et rien n’est écrit');
+        await pg.fill(bloc + ' input', '12'); await pg.click(bloc + ' button');
+        await pg.waitForTimeout(2500);
+      } catch (e) { dit(false, 'le champ N° et « Relier » se manipulent', String(e.message).slice(0, 90)); }
+      const liens = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_lbc_liens') || 'null'); } catch (_) { return null; } });
+      dit(liens && liens.lbc777 === '12', 'un N° connu est relié : vrm_lbc_liens = { lbc777: "12" }', JSON.stringify(liens));
+      dit(!await pg.$(bloc), 'l’annonce sort de « non reliées »');
+      const r = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
+      dit(r.sw <= r.cw + 1, 'aucun débordement horizontal', `${r.sw} > ${r.cw}`);
       dit(errs.length === 0, 'aucune erreur d’app', errs.join(' | ').slice(0, 160));
-      /* capture prise sur Annonces, plus haut */
       await ctx.close();
     }
   } catch (e) { dit(false, 'le banc a tourné jusqu’au bout', String(e && e.message).slice(0, 160)); }
   finally { if (b) await b.close(); srv.close(); }
-  console.log(ko ? `\n❌ comptes / annonces : ${ko} rouge(s)` : '\n✅ comptes / annonces : tout est vert');
+  console.log(ko ? `\n❌ relier une annonce Leboncoin : ${ko} rouge(s)` : '\n✅ relier une annonce Leboncoin : tout est vert');
   process.exit(ko ? 1 : 0);
 })();

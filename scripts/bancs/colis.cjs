@@ -127,7 +127,7 @@ const attendus=aEnvoyer.filter(o=>parTx[String(o.transaction_id)]).length;
     const filtres=[...U.matchAll(/[?&]data->>(\w+)=(not\.)?is\.null(?=&|$)/g)].map(x=>({champ:x[1],nul:!x[2]}));
     const passe=r=>filtres.every(f=>{const v=(r.data||{})[f.champ];
       const estNul=(v===null||v===undefined||v===''); return f.nul?estNul:!estNul;});
-    if(/vinted_accounts/.test(u)) return j(accounts);
+    if(/\/rest\/v1\/vinted_accounts/.test(u)) return j(accounts);
     if(/id=eq\.main/.test(u)) return j(main.filter(passe).map(r=>projette(r,S)));
     if(/transaction->>id/.test(u)) return j(txn);
     const eq=/id=eq\.([^&]*)/.exec(u); if(eq){const k=decodeURIComponent(eq[1]);return j(rows.filter(r=>r.id===k).filter(passe).map(r=>projette(r,S)));}

@@ -134,7 +134,7 @@ données de l'acheteur (dépôt public) :
   l'argent est reçu. Corriger le suivi de statut des ventes LBC.
 - ⬜ C3. Onglet « à publier » : pas intuitif ; pourquoi « annonce Leboncoin offre
   gratuit » ? Refaire.
-- ⬜ C4. « Annonce Leboncoin non reliée » : afficher la photo + pouvoir la relier
+- ✅ C4 (02/10 : photo + champ N° + « Relier » → `vrm_lbc_liens` {adId LBC: N°}, clé SYNCHRONISÉE ; N° inconnu de VRM refusé ; la MÊME règle dans l'extension `adRefKeys(ad, liens)` — 5.128.0 ; banc `lbc-relier.cjs`, 9 rouges avant). Le reste de la page (« ne convient pas du tout ») reste à refaire. « Annonce Leboncoin non reliée » : afficher la photo + pouvoir la relier
   à un N° dans l'app. Le reste de la page « ne convient pas du tout » : refaire.
 
 ## D. Accueil / notifications (cloche en haut, à côté du verrou et des réglages)
@@ -165,7 +165,7 @@ données de l'acheteur (dépôt public) :
 - ✅ D8. Renommer « push » en **« Notifications téléphone »**.
 
 ## E. Ventes
-- ⬜ E1. Bordereau à côté de chaque vente (à côté du prix si possible), en plus
+- ✅ E1 (02/10 : bouton « Bordereau » sous le prix, relié par la TRANSACTION, jamais le titre ; banc `ventes-bordereau.cjs`, 8 rouges avant). Bordereau à côté de chaque vente (à côté du prix si possible), en plus
   de l'existant.
 - ⬜ E2. Comptes pro : à côté, la facture générée par l'app pour la vente + bouton
   « envoyer la facture au client ».
@@ -183,7 +183,7 @@ données de l'acheteur (dépôt public) :
 ## G. Compta / fiscal
 - ✅ G1 (Réglages → Comptabilité → « Masqué de la compta », onglets Ventes masquées / Achats masqués avec titre·date·compte·montant et « Réafficher » ; NOUVEAU : masquer un achat (icône œil barré sur la carte Achats, `vinted_purchases_hidden`, synchronisé), retiré à la source dans `loadOrders('purchased')` donc de tous les totaux ; liste gardée en mémoire car `save()` est différé de 500 ms et `load()` ne voit pas l'écriture en attente — deux masquages rapprochés s'écrasaient). Tout ce qu'on masque dans la compta ⇒ dans Réglages, onglets « Ventes
   masquées » et « Achats masqués ».
-- ⬜ G2. Rapport comptable à améliorer impérativement : il liste les factures
+- ✅ G2 (02/10 : registre des ventes dans la fenêtre ET le PDF, + registre des achats au PDF ; bénéfice sans prix d'achat = « — » ; banc `rapport.cjs`, 9 rouges avant). Rapport comptable à améliorer impérativement : il liste les factures
   d'achat par paire mais seulement le montant global des ventes ⇒ détail des
   ventes (et rapprochement).
 - ⬜ G3. Régime fiscal « société » : soit parfait (TVA, boosts, frais…), soit on ne
@@ -193,7 +193,7 @@ données de l'acheteur (dépôt public) :
   l'onglet Factures.
 
 ## H. Annonces / comptes
-- ⬜ H1. Onglet Annonces Vinted « le bordel » : la liste des comptes connectés
+- ✅ H1 (02/10 : la rangée de puces de comptes devient UNE ligne « Annonces de N comptes · Gérer les comptes → » ; la confirmation du masquage suit dans Comptes liés ; banc `comptes-annonces.cjs`, 12 rouges avant). Onglet Annonces Vinted « le bordel » : la liste des comptes connectés
   va dans Réglages avec infos (email, etc.).
 - ⬜ H2. Compte bloqué définitivement par Vinted : ses ANNONCES sortent des
   annonces en ligne, l'app propose de les republier sur un autre compte (s'il y
@@ -374,3 +374,7 @@ auth : shopcancale35@gmail.com = `74eea6e7-f060-46b6-b9c7-d500cedf4738`
 - 01/10 (suite) : **8 PR ce tour.** #344 ventes LBC finalisé/en-cours · #345 onglet Achats LBC · #346 logo panneau + clic · #347 doc · #348 **statut LBC sur le VRAI signal du colis** (`parcel.color_status:finished`/`last_event_status:delivered` capté par l'extension ; « Paiement effectué » = palier terminal vendeur → finalisé ; repli `livr[ée]` jamais `livr` pour ne pas prendre « en cours de livraison » pour « livré ») · #349 **bancs `--no-proxy-server`** · #350 **eBay remplit les comboboxes React** (port de `choisirComposant` de lbc.js, sûr par construction : exact-match only).
 - ⚠️⚠️ **BANCS DE RENDU HS DANS CE CONTENEUR (session du 01/10).** `--no-proxy-server` (#349) a débloqué les bancs AUTONOMES (`leboncoin.cjs` vert de bout en bout). Mais les bancs qui chargent l'**app complète** (`verif_visuel`, `comptes`, `lbcprep`) **et** `ebay.cjs` **CALENT** (goto/àpropos ne rend jamais), même avec un gros timeout, même un banc à 2 écrans. Diagnostic poussé : chromium LANCE (test minimal OK) ; `goto` vers une page `data:`/simple OK ; `goto` vers l'app réelle ou le chargement d'`ebay.cjs` ne se termine pas. Cause non élucidée (pas le proxy seul, pas un zombie, pas la mémoire). ⇒ **Règle de survie mesurée** : une commande Bash **TUÉE** (timeout) voit sa sortie ET ses fichiers **ROLLBACK** ; seule une commande qui **se termine proprement** laisse une trace. Donc un banc qui cale = zéro sortie. Et **ne jamais piper la sortie d'un banc** (`| grep`/`| tail`) : les process chromium gardent le pipe ouvert → la commande ne finit jamais → tuée → rien. Lancer direct, sans pipe, `timeout N node banc.cjs 2>&1; echo rc=$?`.
 - ⇒ **Ce qui reste (C3, C4, D1, D7, E1-E4, F1, G2-G4, H1-H3, L2, M1) est de l'app-UI** : non vérifiable au rendu dans ce conteneur. NE PAS pousser à l'aveugle (écran blanc sur l'app du matin = défaut le plus coûteux). À reprendre dans une session où les bancs de rendu tournent (ils marchaient les sessions précédentes). Les audits pur-node (variables/icones/chiffres/coherence/boutons/places/lectures/panne/serveur…) et les bancs autonomes (leboncoin) RESTENT fiables.
+- 02/10 : **les bancs de rendu REMARCHENT dans ce conteneur** (`premierjour.cjs` 48 verts) — mais `fx/` ne peut plus être rempli : le réseau bloque supabase.co, et copier les vraies données via le MCP a été REFUSÉ par les permissions (données clients). ⇒ Méthode : bancs sur données INVENTÉES, qui vivent dans le dépôt (`rapport`, `ventes-bordereau`, `comptes-annonces`, `lbc-relier`).
+- 02/10 : ⚠️ **`main > *{animation: … both}` piégeait TOUTES les fenêtres d'un écran sous la barre du bas** (contexte d'empilement permanent) : sur téléphone, CSV/PDF du rapport étaient inaccessibles. Passé à `backwards` (index.html). Vu à la CAPTURE.
+- 02/10 : ⚠️ **piège de banc (§6.3) dans 14 bancs** : `if(/vinted_accounts/.test(u))` attrapait aussi la lecture de `main` projetée (`…vinted_accounts_hidden:data->…`) et lui servait la liste des comptes. Corrigé en `/\/rest\/v1\/vinted_accounts/`. Les anciens bancs ne tournent pas ici (pas de `fx/`) : non relancés.
+

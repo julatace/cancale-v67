@@ -125,7 +125,7 @@ async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lectureP
         body: lecturePublique ? JSON.stringify([{ id: 'main' }]) : '[]' });
     }
     if (baseKO) return r.fulfill({ status: 522, contentType: 'text/html', body: '<html>error 522</html>' });
-    if (/vinted_accounts/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(comptes) });
+    if (/\/rest\/v1\/vinted_accounts/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(comptes) });
     return r.fulfill({ status: 200, contentType: 'application/json', headers: { 'content-range': '0-0/0' }, body: '[]' });
   });
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
