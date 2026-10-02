@@ -6897,6 +6897,12 @@ function CarteLbc({ o }) {
   );
 }
 function VentesLeboncoin({ lbcVentes = {ventes:[],inconnues:0} }) {
+  // « À confirmer » replié par défaut : l'écran Ventes reste propre, comme Vinted
+  // (Julien, 2 oct. : « pourquoi il y a Nike Pro là, je veux que tout soit comme
+  // Vinted »). Ces transactions sont au côté PAS ENCORE SU — ni vente ni achat
+  // prouvé — donc elles n'encombrent plus la liste ; un tap les déplie (jamais
+  // cachées, §5). Le côté se résout quand il les ouvre sur Leboncoin.
+  const [voirInc, setVoirInc] = React.useState(false);
   if (!(lbcVentes.ventes.length > 0 || lbcVentes.inconnues > 0)) return null;
   const ventes = lbcVentes.ventes || [];
   const actives = ventes.filter(o => !lbcAnnulee(o));
@@ -6934,11 +6940,16 @@ function VentesLeboncoin({ lbcVentes = {ventes:[],inconnues:0} }) {
         {finals.map(Carte)}
       </>)}
       {lbcVentes.inconnues>0 && (
-        <div style={{fontSize:11.5,color:C.muted,marginTop:lbcVentes.ventes.length?8:6,paddingTop:lbcVentes.ventes.length?8:0,borderTop:lbcVentes.ventes.length?`1px solid ${C.border}`:'none'}}>
-          {lbcVentes.inconnues} autre{lbcVentes.inconnues>1?'s':''} transaction{lbcVentes.inconnues>1?'s':''} Leboncoin — vente ou achat <b>pas encore confirmé</b>. Ouvre-la sur Leboncoin : l'extension lit le côté au passage, et elle passe ici si c'est une vente.
-          {(lbcVentes.inconnuesListe||[]).length>0 && (
-            <div style={{marginTop:6}}>
-              {(lbcVentes.inconnuesListe||[]).slice(0,8).map(o=>{
+        <div style={{marginTop:lbcVentes.ventes.length?8:6,paddingTop:lbcVentes.ventes.length?8:0,borderTop:lbcVentes.ventes.length?`1px solid ${C.border}`:'none'}}>
+          <button type="button" onClick={()=>setVoirInc(v=>!v)}
+            style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,background:'transparent',border:'none',padding:'4px 0',cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
+            <span style={{fontSize:12,color:C.muted}}><b style={{color:C.text}}>À confirmer ({lbcVentes.inconnues})</b> · vente ou achat pas encore connu</span>
+            <span style={{flexShrink:0,fontSize:11,color:C.muted}}>{voirInc?'▲':'▼'}</span>
+          </button>
+          {voirInc && (lbcVentes.inconnuesListe||[]).length>0 && (
+            <div style={{marginTop:4}}>
+              <div style={{fontSize:11.5,color:C.muted,lineHeight:1.45,marginBottom:4}}>Ouvre-la sur Leboncoin : l'extension lit le côté au passage, et elle se range alors en vente ou en achat.</div>
+              {(lbcVentes.inconnuesListe||[]).slice(0,12).map(o=>{
                 const euro = o.price==null ? '' : (Number(o.price)/100).toFixed(2).replace('.',',')+' €';
                 return (
                   <a key={o.txId} href={`https://www.leboncoin.fr/compte/part/transaction/${encodeURIComponent(o.txId)}`} target="_blank" rel="noreferrer"
@@ -15140,11 +15151,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const obj = (rows && rows[0] && rows[0].data && rows[0].data.ventes) || {};
       const arr = Object.values(obj);
       const ventes = arr.filter(o => o && o.isSeller === true);
-      const inc = arr.filter(o => o && o.isSeller == null);
-      // Les transactions au côté pas encore su, NOMMÉES (sauf annulées) : un
-      // clic sur leur page Leboncoin suffit à les lire (1er oct. — la vente
-      // des Air Max 1 olive restait cachée derrière « 1 autre transaction »).
-      const inconnuesListe = inc.filter(o => !/cancel|annul|refund|rembours/i.test(String(o.stepStatus||''))).sort((a,b)=>String(b.at||'').localeCompare(String(a.at||'')));
+      // ⚠️ Côté pas encore su, ET non annulées : une transaction ANNULÉE est
+      // morte (aucune action, aucun côté à confirmer), on ne la compte ni ne
+      // l'affiche — sinon « 8 autres » alors que 3 seulement sont vivantes (§7,
+      // le nombre doit être celui qu'on voit). `lbcAnnulee` = la règle unique (§11).
+      const inc = arr.filter(o => o && o.isSeller == null && !lbcAnnulee(o));
+      const inconnuesListe = inc.slice().sort((a,b)=>String(b.at||'').localeCompare(String(a.at||'')));
       setLbcVentes({ ventes, inconnues: inc.length, inconnuesListe });
     } catch (_) { /* pas su ⇒ rien : jamais un faux « vendu » */ }
   })(); }, []);
@@ -27682,11 +27694,13 @@ export default function App() {
       const rows = await r.json();
       const obj = (rows && rows[0] && rows[0].data && rows[0].data.ventes) || {};
       const arr = Object.values(obj);
-      const inc = arr.filter(o => o && o.isSeller == null);
+      // Côté pas encore su, ET non annulées (une transaction annulée est morte :
+      // ni comptée ni affichée, sinon « 8 autres » pour 3 vivantes, §7/§11).
+      const inc = arr.filter(o => o && o.isSeller == null && !lbcAnnulee(o));
       // ACHATS = `isSeller === false` (jamais déduit, §5) — mêmes champs que les
       // ventes (photo, titre, prix, statut). Avant, ils étaient simplement jetés.
       setLbcVentes({ ventes: arr.filter(o => o && o.isSeller === true), achats: arr.filter(o => o && o.isSeller === false), inconnues: inc.length,
-        inconnuesListe: inc.filter(o => !/cancel|annul|refund|rembours/i.test(String(o.stepStatus||''))).sort((a,b)=>String(b.at||'').localeCompare(String(a.at||''))) });
+        inconnuesListe: inc.slice().sort((a,b)=>String(b.at||'').localeCompare(String(a.at||''))) });
     } catch (_) { /* pas su ⇒ rien : jamais un faux « vendu » */ }
   })(); }, []);
   // CA eBay pour le Tableau de bord / le Collectif : la somme des commandes

@@ -173,7 +173,7 @@ const TABS=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','pl
     dit(!/Ventes Leboncoin/.test(venteTxt),'les ventes Leboncoin ne sont PLUS dans les ventes Vinted (§11)');
     dit(!/Rolex/i.test(lbcTxt),'un ACHAT prouvé (Rolex) n\'est JAMAIS montré comme une vente (§5)');
     dit(/Ventes Leboncoin \(1\)/.test(lbcTxt),'le compte ne porte QUE les ventes prouvées (1)');
-    dit(/pas encore confirmé/.test(lbcTxt),'le côté pas encore su est DIT, pas compté comme vente');
+    dit(/À confirmer \(\d/.test(lbcTxt),'le côté pas encore su est DIT (replié « À confirmer (N) »), pas compté comme vente');
     // ── §6 CA PAR PLATEFORME + PAR COMPTE (tableau de bord) ─────────────────
     // Julien : « un CA global, un CA par application, et décomposer par compte ».
     // La décomposition vit sur la MÊME source que le total (§11) — donc chaque
