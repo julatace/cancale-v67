@@ -269,7 +269,7 @@ données de l'acheteur (dépôt public) :
   photos des ventes (E4). Attendre son retour sur P1.
 
 ## N. Ensuite, dans cet ordre (après A→M « parfaitement »)
-- 🟨 N1 (PRIORITÉ, Julien : « on fait Supabase ») — voir « État Supabase » ci-dessous. Isolation des données + début du multi-utilisateurs : une extension et
+- ✅ N1 — base FERMÉE le 02/10. (PRIORITÉ, Julien : « on fait Supabase ») — voir « État Supabase » ci-dessous. Isolation des données + début du multi-utilisateurs : une extension et
   une adresse email appartiennent à UN compte, lui seul reçoit les infos, aucune
   fuite. Regarder les alertes de vulnérabilité envoyées par Supabase.
 - ⬜ N2. Coût pour 200 utilisateurs (Supabase, Vercel…) : l'abonnement actuel
@@ -328,7 +328,8 @@ auth : shopcancale35@gmail.com = `74eea6e7-f060-46b6-b9c7-d500cedf4738`
   l'extension n'est pas connectée (bouton VRM cerclé d'orange) ; background
   accepte authEtat/authLogin depuis `cancale-vpanel`. Testé en exécutant le vrai
   vinted-panel.js (bandeau, envoi, disparition après connexion).
-- ⬜ ÉTAPE 2 = `supabase/migrations/002-fermeture.sql` (prêt). Conditions :
+- ✅ **ÉTAPE 2 APPLIQUÉE LE 2 OCTOBRE** (accord de Julien). Avant : plus aucune écriture `anon` depuis le 01/10 12:01 UTC ; 4 lignes `owner` vide réattribuées ; sauvegarde `sauvegarde.app_data_20261002` (5 939) + `sauvegarde.vinted_accounts_20261002` (9) ; prérequis serveur déployé d'abord (#363). ⚠️ Le MCP Supabase bloque (timeout) tout `DROP POLICY` : les règles `tout_*` ont été RESSERRÉES (`ALTER POLICY … TO authenticated USING/WITH CHECK (owner = auth.uid())`), effet identique. Mesuré après (rôles simulés, tout annulé) : anon 0/0 et insert refusé (42501) ; Julien 9 comptes / 5 939 lignes, upsert (owner,id) OK ; autre utilisateur 0 et refusé. Advisor : ERROR RLS disparue. ⚠️ La sonde d'écriture du panneau sécurité (PATCH id inexistant) répond 200+[] AUSSI avec RLS → remplacée par un POST de deux lignes identiques (409 ouvert / 401-403 fermé, 0 ligne). 👤 Reste : régénérer la clé `sb_secret_`, « Leaked password protection », dépôt privé. Plus tard : retirer le journal temporaire (`vrm_noter_ecriture` + `sauvegarde.journal_ecritures`).
+- (historique) ÉTAPE 2 = `supabase/migrations/002-fermeture.sql`. Conditions :
   👤 `SUPABASE_SERVICE_KEY` sur Vercel (Supabase → Settings → API Keys →
   service_role → Vercel → Settings → Environment Variables, Production) ;
   👤 extension connectée à son compte VRM (icône → email + mot de passe VRM) ;
