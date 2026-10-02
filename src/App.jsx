@@ -6697,7 +6697,12 @@ function PlatSubNav({ sub, setSub, sections, dark }) {
 // traverser : les chiffres qui comptent (CA, argent) restent sous les yeux, et
 // la liste (ventes par défaut) est juste en dessous. Consomme liveStats (§11).
 function VintedResume({ liveStats, baseKO }) {
-  if (baseKO) return <div style={{padding:'12px 16px 0'}}><LignePanne>Je n'ai pas pu lire tes données — les totaux seraient faux, on ne les affiche pas. Rien n'est perdu : c'est la lecture qui a échoué.</LignePanne></div>;
+  // ⚠️ §7 : pendant une panne, le résumé NE répète PAS la ligne « Je n'ai pas pu
+  //    lire » — le bloc de la coque la dit déjà, et la liste en dessous
+  //    (Comptabilite) porte la sienne. Deux lignes ici = « la panne dite trois
+  //    fois » sur plat_vinted (mesuré au banc panne.cjs). On s'efface : pas de
+  //    totaux à montrer de toute façon.
+  if (baseKO) return null;
   const ca = liveStats && liveStats.caEncaisse != null ? liveStats.caEncaisse : null;
   const dispo = liveStats && liveStats.walletDispo != null ? liveStats.walletDispo : null;
   const att = liveStats && liveStats.walletAttente != null ? liveStats.walletAttente : null;
