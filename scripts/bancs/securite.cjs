@@ -69,6 +69,19 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
         }
         return j([]);
       }
+      // La sonde d'écriture (depuis le 2 octobre) : DEUX fois la même ligne en
+      // un envoi. Ouverte → 409 (doublon, Postgres annule tout : rien n'est
+      // écrit) ; fermée → 401 ; muette → 522. Une sonde qui n'enverrait qu'UNE
+      // ligne écrirait vraiment : elle est comptée dans `ecrits` ci-dessous.
+      if (m === 'POST') {
+        let rows = []; try { rows = JSON.parse(req.postData() || '[]') || []; } catch (_) {}
+        const sondes = (Array.isArray(rows) ? rows : [rows]).filter((r) => /^__sonde/.test(String(r && r.id || '')));
+        if (sondes.length === 2 && sondes[0].id === sondes[1].id) {
+          if (etat === 'muette') return mort();
+          if (etat === 'cloisonnee') return ferme();
+          return route.fulfill({ status: 409, contentType: 'application/json', headers: cors, body: '{"code":"23505","message":"duplicate key value violates unique constraint"}' });
+        }
+      }
       if (m === 'POST') { try { (JSON.parse(req.postData() || '[]') || []).forEach((r) => { if (/^__sonde/.test(String(r && r.id || ''))) ecrits.push(r); }); } catch (_) {} return j([], 201); }
       if (m === 'DELETE') { if (/__sonde/.test(u)) ecrits.push({ delete: u }); return j([]); }
       if (m !== 'GET') return j([]);

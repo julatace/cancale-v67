@@ -26756,17 +26756,24 @@ function SecuriteSetting() {
     //    deux risques sur l'écran qui sert à décider si ses données sont
     //    protégées.
     //    ⚠️ ON NE SONDE PAS EN ÉCRIVANT (§2.3 : aucune ligne de test dans la
-    //    base de production). Un `PATCH` sur un identifiant qui n'existe pas
-    //    passe par le MÊME contrôle de permission et ne touche **aucune ligne**
-    //    — vérifié : 200 et `[]`, et la ligne n'est pas créée. RLS actif sans
-    //    règle répondrait 401/403.
+    //    base de production).
+    //    ⚠️⚠️ L'ANCIENNE SONDE (un `PATCH` sur un identifiant inexistant) NE
+    //    POUVAIT PAS DIRE « FERMÉ » : mesuré le 2 octobre, base fermée, RLS
+    //    filtre EN SILENCE et répond 200 + `[]` — exactement comme une base
+    //    ouverte. Le panneau aurait annoncé « tout écrire et effacer » sur une
+    //    base verrouillée.
+    //    ⇒ On envoie DEUX FOIS la même ligne en un seul envoi. Base ouverte : la
+    //    première passe, la seconde heurte la clé → 409 et Postgres annule TOUT
+    //    l'envoi (rien n'est écrit). Base fermée : la règle refuse dès la
+    //    première → 401/403. Vérifié dans la base : 23505 / 42501, 0 ligne.
     try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.__sonde_droits_ecriture__`, {
-        method: 'PATCH',
-        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=representation' },
-        body: JSON.stringify({ updated_at: new Date().toISOString() }),
+      const sonde = { id: '__sonde_droits_ecriture__', data: {} };
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data`, {
+        method: 'POST',
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify([sonde, sonde]),
       });
-      out.ecritureSansCompte = r.ok ? true : ((r.status === 401 || r.status === 403) ? false : null);
+      out.ecritureSansCompte = r.status === 409 ? true : ((r.status === 401 || r.status === 403) ? false : null);
     } catch (_) { out.ecritureSansCompte = null; }
     // 2 ter. ⚠️⚠️ LE PIRE DE TOUS, ET AUCUNE SONDE NE LE REGARDAIT : la table
     //    `vinted_accounts` porte les JETONS de ses neuf comptes
