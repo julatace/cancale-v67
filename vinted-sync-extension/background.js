@@ -747,16 +747,29 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }
 
     // PONT APP -> EXTENSION : l'app VRM demande d'EXECUTER une action Vinted
-    // (repondre, faire une offre...) depuis TON navigateur/IP. On n'accepte que
-    // des endpoints /api/ Vinted, et on agit avec le token du compte vise.
+    // depuis TON navigateur/IP.
+    // ⚠️⚠️ MESURÉ LE 2 OCTOBRE : CE CANAL PASSAIT À CÔTÉ DE TOUS LES GARDE-FOUS
+    //    DU §3. Il ne vérifiait que « /api/ » : ni l'origine (tous les autres
+    //    messages du pont la vérifient), ni le compte connecté (`garde`), ni le
+    //    plafond de 20/h, ni la méthode — un `DELETE /api/v2/items/{id}` (la
+    //    suppression d'annonce que §3 refuse) serait parti. Son seul usage réel
+    //    est la réponse à un message (`sendReply`, App.jsx).
+    //    ⇒ Origine de l'app · LISTE BLANCHE (méthode + chemin) · garde STRICTE
+    //    (le compte doit être celui connecté dans Chrome — « pas su » ne vaut
+    //    pas « oui ») · plafond. Tout le reste est refusé, avec la raison.
     if (msg && msg.from === 'vmr-bridge' && msg.action === 'exec') {
       (async () => {
         try {
-          if (!/^\/api\//.test(msg.endpoint || '')) { sendResponse({ ok: false, error: 'endpoint invalide' }); return; }
+          const src = (sender && sender.origin) || (sender && sender.url) || '';
+          if (!ORIGINE_APP.test(src)) { sendResponse({ ok: false, code: 'origine', error: 'origine non autorisee' }); return; }
+          const methode = String(msg.method || 'POST').toUpperCase();
+          if (!execPermis(methode, msg.endpoint)) { sendResponse({ ok: false, code: 'non-autorise', error: 'action non autorisée depuis l\'app' }); return; }
           const accts = await getStoredAccounts();
           const acc = accts.find((a) => String(a.vinted_user_id) === String(msg.uid));
           if (!acc) { sendResponse({ ok: false, error: 'compte introuvable' }); return; }
-          const r = await vintedSend(acc, msg.method || 'POST', msg.endpoint, msg.body);
+          const stop = await gardeStricte(msg.uid, acc);
+          if (stop) { sendResponse(stop); return; }
+          const r = await vintedSend(acc, methode, msg.endpoint, msg.body);
           sendResponse({ ok: r.ok, status: r.status, data: r.json });
         } catch (e) { sendResponse({ ok: false, error: String(e) }); }
       })();
@@ -3033,6 +3046,39 @@ async function compterAction(uid) {
     await chrome.storage.local.set({ [cle]: cur });
     return { ok: true, n: list.length };
   } catch (_) { return { ok: true, n: 0 }; }
+}
+
+// ── ACTIONS COMMANDÉES PAR L'APP : LA GARDE STRICTE ─────────────────────────
+// `garde` laisse passer quand aucun cookie n'est lisible (une détection ratée
+// ne doit pas casser une visite sur Vinted, où l'onglet prouve le compte). Une
+// commande venue de l'APP n'a pas cette preuve : on ne sait pas quel compte est
+// connecté, donc on n'agit pas. « Pas su » ne vaut pas « oui ».
+const ORIGINE_APP = /^https:\/\/(cancale-v67(-ten)?\.vercel\.app|(www\.)?vrm\.center)/;
+// Ce que l'app peut faire passer par `exec`, et RIEN d'autre (§3 : jamais de
+// suppression, jamais de requête arbitraire).
+const EXEC_PERMIS = [
+  { methode: 'POST', chemin: /^\/api\/v2\/conversations\/\d+\/replies$/ },   // répondre à un message
+];
+function execPermis(methode, endpoint) {
+  const e = String(endpoint || '');
+  return EXEC_PERMIS.some((p) => p.methode === methode && p.chemin.test(e));
+}
+async function gardeStricte(uid, acc) {
+  const actif = await compteConnecte(acc && acc.domain);
+  if (!actif) {
+    return { ok: false, code: 'vinted-absent',
+             error: "aucun compte Vinted n'est connecté dans ce Chrome — connecte-toi sur vinted.fr avec ce compte d'abord" };
+  }
+  if (String(actif) !== String(uid)) {
+    return { ok: false, code: 'vinted-autre', actif: String(actif),
+             error: "ton navigateur est connecté à un autre compte Vinted — bascule sur celui-ci sur vinted.fr d'abord" };
+  }
+  const c = await compterAction(String(uid));
+  if (!c.ok) {
+    return { ok: false, code: 'plafond',
+             error: `${ACTIONS_MAX_HEURE} actions sur ce compte dans l'heure — on s'arrête là pour ne pas attirer l'attention. Réessaie plus tard.` };
+  }
+  return null;
 }
 
 // Renvoie null si l'action peut partir, sinon l'objet d'erreur à renvoyer tel quel.
