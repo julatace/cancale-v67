@@ -16,10 +16,17 @@ const rows=[...FX('sold'),...FX('purch'),...FX('listings'),...FX('inbox'),...FX(
 // peut donc vivre DANS le banc, dépôt public). Sans elle, l'écran Ventes rend le
 // bloc « Ventes Leboncoin » VIDE, et un piège §4.6 (TDZ) ou un mensonge §5 (un
 // ACHAT montré comme vente) y passerait inaperçu. On sert une vente PROUVÉE
-// (isSeller true, avec bordereau), un ACHAT prouvé (Rolex, isSeller false) et une
-// transaction de côté inconnu — la vraie forme mesurée le 20 sept.
+// (isSeller true), un ACHAT prouvé (Rolex, isSeller false) et une transaction de
+// côté inconnu — la vraie forme mesurée le 20 sept.
+// ⚠️ La vente PROUVÉE est FINALISÉE (stepStatus 'done' + parcelColor 'finished') :
+// depuis que le CA ne compte QUE les ventes finalisées (§ caParPlateforme, 1er oct.),
+// une vente « Colis à envoyer » ne nourrit plus le CA. Sans une vente finalisée ici,
+// la carte « CA finalisé par plateforme » n'a RIEN à décomposer en conteneur nu
+// (fx/ Vinted absent) et les contrôles de décomposition passaient au vert faute de
+// pouvoir échouer. Finalisée, `caLbc` est non nul et la carte s'exerce depuis la
+// fixture EMBARQUÉE, sans dépendre d'un fx/ gitignoré (§6.1).
 function LBCV(){ return [{ id:'lbc_ventes', data:{ ventes:{
-  '362201423':{ txId:'362201423', itemId:'3271360255', title:'New Balance 990 gris taille 44', price:7500, isSeller:true, stepStatus:'action', stepLabel:'Colis à envoyer', deliveryLabel:'Mondial Relay', label:{ reference:'71977917', voucherUrl:'https://cdn.leboncoin/label/71977917.pdf' } },
+  '362201423':{ txId:'362201423', itemId:'3271360255', title:'New Balance 990 gris taille 44', price:7500, isSeller:true, stepStatus:'done', stepLabel:'Terminée', parcelColor:'finished', deliveryLabel:'Mondial Relay', label:{ reference:'71977917', voucherUrl:'https://cdn.leboncoin/label/71977917.pdf' } },
   '900001':{ txId:'900001', title:'Montre Rolex Submariner', price:450000, isSeller:false, stepStatus:'done', stepLabel:'Terminée' },
   '163516245':{ txId:'163516245', title:'transaction en cours', price:1500, stepStatus:'ongoing' },
 } } }]; }
