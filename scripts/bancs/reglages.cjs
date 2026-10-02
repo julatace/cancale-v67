@@ -228,10 +228,19 @@ const MENSONGES = [
   // FACTURATION PRO — déménagée dans l'onglet Factures (30 sept.). Même règle :
   // lecture ratée ⇒ rien n'est réécrit, et le panneau le dit ; en marche
   // normale, l'entité s'affiche.
-  const ouvrirPro = async (pg) => {
+  // Ouvre le panneau SANS rien saisir : pour LIRE ce qui s'affiche (l'entité).
+  const ouvrirProPanneau = async (pg) => {
     const bt = pg.locator('button', { hasText: 'Facturation Pro' });
     if (await bt.count()) { try { await bt.first().click({ timeout: 2500 }); } catch (_) {} }
     await pg.waitForTimeout(1500);
+  };
+  // ⚠️ Ouvre PUIS saisit — réservé au test d'écriture (lecture ratée ⇒ rien
+  //    n'est réécrit). Ne PAS l'utiliser pour le test d'affichage : le premier
+  //    champ à placeholder est « Nom commercial », donc remplir ÉCRASE
+  //    « MA RAISON SOCIALE » avant qu'on le vérifie — le banc criait alors au
+  //    loup sur un affichage qui, lui, est juste (vérifié au rendu).
+  const ouvrirPro = async (pg) => {
+    await ouvrirProPanneau(pg);
     const champ = pg.locator('input[placeholder]').first();
     try { await champ.fill('X', { timeout: 1500 }); } catch (_) {}
   };
@@ -246,7 +255,7 @@ const MENSONGES = [
   }
   console.log('\n── FACTURATION PRO (onglet Factures), marche normale');
   {
-    const r = await rendre(false, ouvrirPro, 'invoices');
+    const r = await rendre(false, ouvrirProPanneau, 'invoices');   // on OUVRE sans saisir, pour LIRE l'entité
     dit(/MA RAISON SOCIALE/.test(r.txt), 'l\'entité de facturation est affichée dans l\'onglet Factures');
     dit(r.errs.length === 0, 'aucune erreur d\'app', r.errs.slice(0, 2).join(' | '));
   }
