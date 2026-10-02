@@ -258,7 +258,14 @@
        zoom, et la barre de progression de la story se remplit. */
     @keyframes wrapPop{from{opacity:0;transform:scale(.92) translateY(12px)}to{opacity:1;transform:none}}
     @keyframes wrapBar{from{transform:scaleX(0)}to{transform:scaleX(1)}}
-    main > *{animation:cancaleEnter .24s ease both;}
+    /* ⚠️⚠️ `backwards`, JAMAIS `both` (ni `forwards`). Mesuré le 2 octobre : une
+       animation d'opacité qui GARDE son état final laisse un contexte
+       d'empilement sur l'écran pour toujours. Toutes ses fenêtres (rapport
+       comptable, bilan annuel, saisie des prix d'achat… z-index 1000) restaient
+       piégées dessous, et sur téléphone la barre du bas (z 60) passait PAR-DESSUS
+       leurs boutons : « CSV » et « PDF » étaient introuvables. `backwards` fait
+       le même fondu à l'entrée et ne laisse rien une fois fini. */
+    main > *{animation:cancaleEnter .24s ease backwards;}
 
     /* 7bis) DÉBORDEMENTS — ⚠️ NE PAS mettre `min-width:0` en règle GLOBALE.
        Essayé, mesuré, ANNULÉ : ça enlève bien le plancher qui fait déborder un
