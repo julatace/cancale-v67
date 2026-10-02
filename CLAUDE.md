@@ -3572,6 +3572,52 @@ assistant de baisse de prix) — on l'a **rendu visible par carte**, pas refait.
 - `npm run build`, `verif_visuel` (annonces rendues aux deux tailles, aucun
   crash/blanc/débordement), `audit-chiffres/variables/boutons/icones` : verts.
 
+### ⚠️⚠️ « C'EST L'APPLICATION QUI CONTRÔLE L'EXTENSION » (2 octobre, 5.129)
+Julien : « on ne gère plus dans l'extension mais dans l'application ; il faut
+que l'extension soit allumée, sinon floute les boutons ; le bordereau est capté
+par l'extension, les mails ne sont qu'une sécurité ; presque instantané dès que
+je fais une vente. »
+- ⚠️⚠️ **LE CANAL `exec` CONTOURNAIT TOUS LES GARDE-FOUS DU §3** (mesuré) : ni
+  origine, ni compte connecté, ni plafond, ni méthode — un `DELETE
+  /api/v2/items/{id}` serait parti. Désormais : origine de l'app, **liste
+  blanche** (`POST …/conversations/{id}/replies` seulement), **`gardeStricte`**
+  (le compte doit être CELUI du cookie Vinted — `garde` laisse passer un cookie
+  illisible, une commande de l'app non), plafond 20/h. `audit-exec.cjs` : 6
+  rouges sur le code d'avant.
+- **Le pont est vivant** : `bridge.js` se tait quand il est orphelin
+  (`chrome.runtime.id` absent — il annonçait « ready » pour toujours), l'app
+  l'interroge toutes les 20 s (`etat`, **zéro requête Vinted**), trois états
+  (`__vmrEtat` : `undefined` on vérifie · `null` muette · objet), et
+  l'extension POUSSE (`evt` : étape de commande, bordereau rangé, ventes
+  rafraîchies). Après une mise à jour, `reinjecterPont()` recharge bridge.js
+  dans les onglets de l'app déjà ouverts.
+- **`executerCommande`** (`cmd:'bordereau'`) : garde stricte → idempotence (PDF
+  déjà rangé → « fait », 0 requête ; transaction qui a déjà son expédition →
+  **pas de PUT**, la course du 28 sept. sortait en 400) → génération → PDF →
+  `notifierApp`. L'état vit dans `chrome.storage.local.vrmCmds` (§4.9).
+  **`avecVinted`** : une seule file pour TOUTES les actions Vinted (visite,
+  commande, panneau, réponses, offres) — rien ne les sérialisait.
+  `audit-commande.cjs` : 19 contrôles ; réaffaibli (garde laxiste + file
+  retirée) → 5 rouges.
+- **`BoutonBordereau`** (Ventes ET Colis, un seul composant) : imprime si le PDF
+  est là (extension d'abord, email en secours), sinon commande ; GRISÉ et jamais
+  caché, la raison commune dite UNE fois (`RaisonBordereauxGrises`), la raison
+  propre à la vente (« Chrome est connecté sur X — bascule sur Y ») sur sa
+  ligne. Plus de bouton de bordereau sur une vente expédiée ou finalisée.
+  `bancs/pont.cjs` rejoue le vrai dialogue du pont dans 5 situations.
+- ⚠️ Le bouton E1 de la veille ne connaissait que les EMAILS : **30 ventes en 30
+  jours** avaient un PDF capté par l'extension et aucun email. `labelsCaptes`
+  est désormais chargé sur Ventes aussi.
+- ⚠️ `startBordereau` prenait `label_latest` (le dernier PDF du COMPTE) sans
+  comparer sa transaction : avec deux ventes sur un compte, le N° d'une paire
+  sur le bordereau de l'autre. Corrigé (tx exigée quand on la connaît).
+- **Fraîcheur** : l'extension pousse « ventes rangées » → l'app relit CE compte ;
+  sans extension (téléphone), sonde toutes les 60 s de `capturedAt` (< 1 Ko) ;
+  à l'ouverture de Ventes/Colis/Ma journée, `cmd:'ventes'` fait relire ses
+  ventes au compte du cookie (lecture, bornée à 90 s). ⚠️ Les ventes des
+  comptes NON connectés dans Chrome n'arrivent qu'avec l'email ou quand il s'y
+  connecte : mesuré, un seul jeton Vinted est vivant à la fois.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
@@ -3589,6 +3635,7 @@ arrivée** — vérifiée commit par commit sur `manifest.json`, pas devinée.
 | `photoslbc` | `photosEnOctets` | **5.58.0** (13 sept.) | « photos attachées au formulaire Leboncoin, rien sur ton ordinateur » |
 | `photosebay` | `photosPourEbay` | **5.59.0** (13 sept.) | la même promesse, pour eBay |
 | `repond` | `repondreAuxMessages` | **5.77.0** (19 sept.) | « elle répond aux questions posées sur tes annonces » |
+| `commande` | `executerCommande` | **5.129.0** (2 oct.) | « Générer le bordereau » depuis l'app : l'app COMMANDE l'extension |
 
 ⚠️ **DEUX SEUILS POUR UNE MÊME NOTION, EXPRÈS.** Les photos s'attachent côté
 Leboncoin depuis la 5.58 et côté eBay depuis la 5.59 : un seul seuil aurait

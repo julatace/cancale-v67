@@ -4,9 +4,13 @@
 // un bouton « Bordereau » sous son prix. Le lien se fait par le n° de
 // TRANSACTION, une identité (§5) — jamais par titre. Le banc sert, sur des
 // ventes INVENTÉES (il vit dans le dépôt) :
-//   · un bordereau relié à la vente 9001 par sa transaction ⇒ bouton sur 9001 ;
-//   · un bordereau SANS transaction mais au MÊME TITRE que 9002 ⇒ aucun bouton
-//     sur 9002 (une ressemblance de titre ne relie rien) ;
+//   · un bordereau relié à la vente 9001 (à expédier) par sa transaction ⇒
+//     bouton d'impression sur 9001 ;
+//   · un bordereau SANS transaction mais au MÊME TITRE que 9002 ⇒ PAS
+//     d'impression sur 9002 (une ressemblance de titre ne relie rien) — 9002
+//     reste « à générer » ;
+//   · une vente FINALISÉE n'a plus aucun bouton de bordereau (2 octobre :
+//     « il ne devrait même pas y en avoir », le colis est parti) ;
 //   · un clic ⇒ le PDF est réellement demandé, puis produit sans erreur.
 //
 // (Reprise de la base du banc rapport.cjs.)
@@ -33,8 +37,8 @@ const jour = (d) => new Date(auj.getFullYear(), auj.getMonth(), d, 12).toISOStri
 const J = Math.min(auj.getDate(), 28);
 const vente = (id, titre, prix, statut, d) => ({ transaction_id: id, title: titre, price: { amount: String(prix), currency_code: 'EUR' }, status: statut, date: jour(d) });
 const VENTES = [
-  vente(9001, 'Nike Air Max 1 olive taille 42', 80, 'Commande finalisée', Math.max(1, J - 3)),
-  vente(9002, 'Salomon XT-6 blanc 👟 taille 40', 99.5, 'Commande finalisée', Math.max(1, J - 2)),
+  vente(9001, 'Nike Air Max 1 olive taille 42', 80, 'Le paiement a été validé', Math.max(1, J - 3)),
+  vente(9002, 'Salomon XT-6 blanc 👟 taille 40', 99.5, 'Le paiement a été validé', Math.max(1, J - 2)),
   vente(9003, 'Adidas Spezial noir taille 38', 45, 'Commande finalisée', Math.max(1, J - 1)),
   vente(9004, 'Asics Gel-Kayano taille 41', 60, 'Paiement validé', J),        // en cours : hors CA
   vente(9005, 'New Balance 990 taille 44', 70, 'Commande annulée', J),       // annulée : hors tout
@@ -107,12 +111,12 @@ const projette = (row, sel) => {
       await pg.waitForTimeout(3500);
       // L'onglet « Toutes » : les ventes finalisées comme celles en cours.
       try { await pg.getByText('Toutes', { exact: true }).first().click({ timeout: 3000 }); await pg.waitForTimeout(800); } catch (_) {}
-      const boutons = await pg.evaluate(() => [...document.querySelectorAll('[data-bord-vente]')].map((x) => x.getAttribute('data-bord-vente')));
-      dit(boutons.includes('9001'), 'la vente 9001 a son bouton « Bordereau » (relié par sa transaction)', JSON.stringify(boutons));
-      dit(!boutons.includes('9002'), 'la vente 9002 n’en a PAS : un bordereau au même titre, sans transaction, ne relie rien (§5)');
-      dit(boutons.length === 1, 'un seul bouton en tout', String(boutons.length));
+      const bb = await pg.evaluate(() => [...document.querySelectorAll('[data-bouton-bord]')].map((x) => x.getAttribute('data-bouton-bord') + ':' + x.getAttribute('data-tx')));
+      dit(bb.includes('pdf:9001'), 'la vente 9001 a son bouton « Bordereau » (relié par sa transaction)', JSON.stringify(bb));
+      dit(!bb.includes('pdf:9002'), 'la vente 9002 n’a PAS d’impression : un bordereau au même titre, sans transaction, ne relie rien (§5)', JSON.stringify(bb));
+      dit(!bb.some((x) => /:9003$/.test(x)), 'une vente FINALISÉE n’a plus aucun bouton de bordereau', JSON.stringify(bb));
       const avant = pdfDemandes.length;
-      try { await pg.click('[data-bord-vente="9001"]', { timeout: 5000 }); } catch (e) { dit(false, 'le bouton se clique', String(e.message).slice(0, 90)); }
+      try { await pg.click('[data-bouton-bord="pdf"][data-tx="9001"]', { timeout: 5000 }); } catch (e) { dit(false, 'le bouton se clique', String(e.message).slice(0, 90)); }
       await pg.waitForTimeout(2500);
       dit(pdfDemandes.slice(avant).includes('email_bord_test1'), 'un clic demande le PDF de CE bordereau, et de lui seul', JSON.stringify(pdfDemandes.slice(avant)));
       const txt = await pg.evaluate(() => document.body.innerText);

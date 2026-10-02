@@ -35,7 +35,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.128.0';
+const EXT_ATTENDUE = '5.129.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -150,7 +150,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 //   releve  `capterReleves`       5.52.0  (5 sept.)   le relevé daté du porte-monnaie
 // `audit-coherence.cjs` vérifie que ces trois fonctions existent toujours dans
 // l'extension : une capacité annoncée mais retirée serait le même mensonge.
-const EXT_CAPACITES = { codes: '5.45.0', offres: '5.38.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', repond: '5.77.0' };
+const EXT_CAPACITES = { codes: '5.45.0', offres: '5.38.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', repond: '5.77.0', commande: '5.129.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -3068,6 +3068,73 @@ function vmrExec({ uid, method, endpoint, body }, timeoutMs = 15000) {
     try { window.postMessage({ __vmr: 'exec', reqId, uid, method, endpoint, body }, '*'); }
     catch (e) { cleanup(); resolve({ ok: false, error: String(e) }); }
   });
+}
+
+// ── LE PONT VIVANT ET LES COMMANDES (extension 5.129) ───────────────────────
+// « C'est l'application qui contrôle l'extension ; il faut qu'elle soit allumée
+// pour que ça marche, sinon floute les boutons » (Julien, 2 octobre).
+// ⚠️ « PRÉSENTE » NE VEUT PAS DIRE « ALLUMÉE ». `__vmrExtReady` passe à vrai au
+//    premier « ready » et n'en redescend jamais — mesuré : une extension
+//    rechargée ou désactivée laissait l'app persuadée qu'elle tournait. On
+//    l'interroge donc toutes les 20 s (onglet visible) : TROIS états, jamais
+//    deux — `undefined` on vérifie · `null` elle ne répond pas · objet mesuré.
+//    L'état ne coûte AUCUNE requête Vinted (cookie + stockage de l'extension).
+let __vmrEtat = undefined, __vmrRates = 0;
+const __vmrJobs = {};                       // jobId → dernière étape connue
+const __vmrNotifier = () => __vmrExtSubs.forEach(fn => { try { fn(); } catch (_) {} });
+function vmrDemande(type, payload, timeoutMs) {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined' || !__vmrExtReady) { resolve(null); return; }
+    const reqId = 'q' + Date.now() + '_' + Math.random().toString(36).slice(2);
+    let done = false;
+    const fin = (v) => { if (done) return; done = true; window.removeEventListener('message', onMsg); resolve(v); };
+    const onMsg = (e) => { if (e.source === window && e.data && e.data.__vmr === type + ':result' && e.data.reqId === reqId) fin(e.data.resp || null); };
+    window.addEventListener('message', onMsg);
+    setTimeout(() => fin(null), timeoutMs);
+    try { window.postMessage(Object.assign({ __vmr: type, reqId }, payload || {}), '*'); } catch (_) { fin(null); }
+  });
+}
+const vmrEtat = (timeoutMs = 2500) => vmrDemande('etat', {}, timeoutMs);
+const vmrCmd = (p, timeoutMs = 9000) => vmrDemande('cmd', p, timeoutMs);
+async function battementExt() {
+  if (typeof document !== 'undefined' && document.hidden) return;
+  if (!__vmrExtReady) return;
+  const r = await vmrEtat();
+  if (r && r.ok) { __vmrEtat = r; __vmrRates = 0; if (r.cmds && typeof r.cmds === 'object') Object.assign(__vmrJobs, r.cmds); }
+  else { __vmrRates++; if (__vmrRates >= 2 || __vmrEtat === undefined) __vmrEtat = null; }
+  __vmrNotifier();
+}
+if (typeof window !== 'undefined') {
+  try {
+    window.addEventListener('message', (e) => {
+      if (e.source !== window || !e.data) return;
+      if (e.data.__vmr === 'ready' && __vmrEtat === undefined) { setTimeout(battementExt, 30); return; }
+      if (e.data.__vmr !== 'evt' || !e.data.evt) return;
+      const ev = e.data.evt;
+      if (ev.type === 'cmd' && ev.jobId) { __vmrJobs[ev.jobId] = ev; __vmrNotifier(); }
+      // Les écrans qui ont des données à relire (un bordereau rangé, des
+      // ventes rafraîchies) l'écoutent : `vrm:ext`.
+      try { window.dispatchEvent(new CustomEvent('vrm:ext', { detail: ev })); } catch (_) {}
+    });
+    setInterval(() => { battementExt(); }, 20000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) battementExt(); });
+  } catch (_) {}
+}
+// Ce qui empêche l'app de faire agir l'extension, au niveau de l'EXTENSION (pas
+// du compte) : la même raison pour toutes les ventes, donc dite UNE fois au
+// lieu d'être répétée sur chaque ligne (§7). `null` = rien ne bloque ici.
+function raisonExtGlobale(sansSouris) {
+  if (sansSouris) return { code: 'telephone', texte: "Depuis ton ordinateur : c'est là que tourne l'extension qui génère les bordereaux." };
+  if (!vmrExtPresent()) return { code: 'absente', texte: "Extension VRM pas détectée dans ce navigateur — c'est elle qui génère les bordereaux." };
+  if (__vmrEtat === null) return { code: 'muette', texte: "L'extension ne répond pas — recharge cette page (après une mise à jour), ou réactive-la dans chrome://extensions." };
+  if (extSait('commande') === 'retard') return { code: 'retard', texte: `Mets l'extension à jour (${EXT_ATTENDUE}) : celle installée ne sait pas encore recevoir les commandes de l'app.` };
+  if (__vmrEtat === undefined) return { code: 'verif', texte: "Vérification de l'extension…" };
+  const v = __vmrEtat.vrm;
+  if (v && v.connecte === false) return { code: 'vrm', texte: "Connecte l'extension à ton compte VRM (clique sur son icône)." };
+  const monMail = String((AUTH.user && AUTH.user.email) || '').trim().toLowerCase();
+  const sonMail = String((v && v.email) || '').trim().toLowerCase();
+  if (monMail && sonMail && monMail !== sonMail) return { code: 'autre-vrm', texte: `L'extension est connectée au compte VRM ${sonMail}, pas au tien (${monMail}).` };
+  return null;
 }
 
 // Recupere les annonces actuellement EN LIGNE d'un compte (sa "penderie").
@@ -6292,6 +6359,109 @@ function useEtapePont() {
     : (monMail && sonMail && monMail !== sonMail) ? 'autrecompte'
     : 'connectee';
   return { pont, extAuth, etape };
+}
+
+// ── LE BOUTON BORDEREAU D'UNE VENTE (Ventes ET Colis — un seul composant, §11) ─
+// « À côté de la vente, le bouton générer le bordereau ; c'est l'application qui
+// contrôle l'extension ; sans extension allumée, floute les boutons » (2 oct.).
+//   · PDF déjà là (capté par l'extension, ou reçu par email en secours) →
+//     « Bordereau » : il s'imprime, tamponné.
+//   · sinon, vente à expédier → « Générer le bordereau » : l'app COMMANDE
+//     l'extension, qui agit sur Vinted (compte connecté dans Chrome, plafond,
+//     une requête à la fois — §3) et prévient l'app à chaque étape.
+//   · ce qui l'empêche est TOUJOURS dit : grisé, jamais caché. La raison
+//     commune à toutes les ventes (extension absente, muette, en retard…) est
+//     dite UNE fois par l'écran (`raisonExtGlobale`) ; le bouton ne dit que ce
+//     qui le distingue (le compte Vinted à connecter).
+function useExtVivante() {
+  const [, force] = React.useReducer((n) => n + 1, 0);
+  React.useEffect(() => onVmrExt(force), []);
+  return { present: vmrExtPresent(), etat: __vmrEtat, jobs: __vmrJobs };
+}
+const CMD_ACTIVE = ['file', 'generation', 'pdf'];
+// La raison COMMUNE pour laquelle les bordereaux ne peuvent pas être générés
+// depuis l'app (extension absente, muette, en retard, mal connectée). Rien à
+// générer, ou rien qui bloque → rien du tout (pas de bandeau permanent).
+function RaisonBordereauxGrises({ ventes }) {
+  useExtVivante();
+  const sansSouris = useSansSouris();
+  const n = (ventes || []).length;
+  if (!n) return null;
+  const r = raisonExtGlobale(sansSouris);
+  if (!r || r.code === 'verif') return null;
+  return (
+    <div data-raison-bord={r.code} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12.5, color: C.text, background: C.card,
+      border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.warn}`, borderRadius: 10, padding: '9px 12px', marginBottom: 10, lineHeight: 1.45 }}>
+      <Icon name="doc" size={15} style={{ color: C.warn, flexShrink: 0, marginTop: 2 }}/>
+      <span><b>{n} bordereau{n > 1 ? 'x' : ''} à générer</b> — {r.texte}</span>
+    </div>
+  );
+}
+function BoutonBordereau({ uid, tx, login, aGenerer, pdf, onImprimer, onFait, grand }) {
+  const { etat, jobs } = useExtVivante();
+  const sansSouris = useSansSouris();
+  const [refus, setRefus] = React.useState(null);
+  const [envoi, setEnvoi] = React.useState(false);
+  const jobId = `bord:${uid}:${tx}`;
+  const job = jobs[jobId] || null;
+  // Le PDF est rangé : l'écran doit relire ses bordereaux (une seule fois).
+  const signale = React.useRef(false);
+  React.useEffect(() => {
+    if (job && job.etape === 'fait' && !pdf && !signale.current) { signale.current = true; onFait && onFait(uid, tx); }
+  }, [job && job.etape, pdf]);
+  const base = { display: 'inline-flex', alignItems: 'center', gap: 6, borderRadius: 10, fontFamily: 'inherit', fontWeight: 700,
+    fontSize: grand ? 14 : 12.5, padding: grand ? '11px 14px' : '7px 11px', cursor: 'pointer', whiteSpace: 'nowrap' };
+  if (pdf) {
+    return <button type="button" data-bouton-bord="pdf" data-tx={tx} onClick={onImprimer} title="Bordereau tamponné (titre + N°), puis impression"
+      style={{ ...base, border: 'none', background: C.accent, color: C.onAccent || '#fff' }}><Icon name="doc" size={grand ? 16 : 14}/>{grand ? '🖨 Imprimer le bordereau' : 'Bordereau'}</button>;
+  }
+  if (!aGenerer || !uid || !tx) return null;
+  const glob = raisonExtGlobale(sansSouris);
+  let raison = glob ? glob.texte : null, distingue = null;
+  if (!raison && etat) {
+    if (!etat.vinted) { raison = `Connecte-toi sur vinted.fr avec ${login || 'ce compte'} dans ce Chrome.`; distingue = raison; }
+    else if (String(etat.vinted.uid) !== String(uid)) { raison = `Chrome est connecté sur ${etat.vinted.login || 'un autre compte'} — bascule sur ${login || 'ce compte'} sur vinted.fr.`; distingue = raison; }
+  }
+  const enCours = job && CMD_ACTIVE.includes(job.etape) && (Date.now() - Number(job.at || 0) < 180000);
+  const ko = job && (job.etape === 'echec' || job.etape === 'genere_sans_pdf');
+  const lancer = async () => {
+    if (raison || enCours || envoi) return;
+    setRefus(null); setEnvoi(true);
+    const r = await vmrCmd({ cmd: 'bordereau', uid: String(uid), tx: String(tx) });
+    setEnvoi(false);
+    if (!r) { setRefus("L'extension n'a pas répondu — recharge cette page et réessaie."); return; }
+    if (!r.accepte) {
+      setRefus(r.code === 'vinted-autre' ? `Chrome est connecté sur ${r.actifLogin || 'un autre compte'} — bascule sur ${login || 'ce compte'} sur vinted.fr.`
+        : r.code === 'vinted-absent' ? `Connecte-toi sur vinted.fr avec ${login || 'ce compte'} dans ce Chrome.`
+        : (r.raison || 'Refusé par l\'extension.'));
+      return;
+    }
+    __vmrJobs[r.jobId] = { etape: r.etape, at: Date.now() };
+    __vmrNotifier();
+  };
+  const libelle = envoi ? 'Envoi…'
+    : enCours ? (job.etape === 'pdf' ? 'Récupération du PDF…' : job.etape === 'generation' ? 'Génération chez Vinted…' : 'En file…')
+    : ko ? 'Réessayer'
+    // Sur téléphone le bouton est forcément grisé (l'extension tourne sur
+    // l'ordinateur) : le libellé long écrasait le titre de la paire (vu à la
+    // capture, 390 px). La raison est dite au-dessus de la liste.
+    : (sansSouris && !grand) ? 'Bordereau' : 'Générer le bordereau';
+  const grise = !!raison;
+  return (
+    <span data-bouton-bord={grise ? 'grise' : enCours ? 'encours' : ko ? 'echec' : 'pret'} data-tx={tx} style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3, maxWidth: '100%' }}>
+      <button type="button" onClick={lancer} aria-disabled={grise || enCours ? 'true' : undefined}
+        title={raison || (enCours ? "L'extension travaille sur Vinted" : "L'extension génère le bordereau sur Vinted et l'envoie ici")}
+        style={{ ...base, border: `1px solid ${grise ? C.border : C.accent}`, background: grise ? 'transparent' : `${C.accent}14`,
+          color: grise ? C.muted : C.accent, opacity: grise ? 0.55 : 1, cursor: grise || enCours ? 'not-allowed' : 'pointer', filter: grise ? 'grayscale(1)' : 'none' }}>
+        <Icon name="doc" size={grand ? 16 : 14}/>{libelle}
+      </button>
+      {(distingue || refus || (ko && job.raison)) && (
+        <span style={{ fontSize: 11, color: refus || ko ? C.warn : C.muted, lineHeight: 1.35, whiteSpace: 'normal' }}>
+          {refus || (ko ? (job.etape === 'genere_sans_pdf' ? `Généré chez Vinted, mais le PDF n'est pas encore prêt (${job.raison}).` : job.raison) : distingue)}
+        </span>
+      )}
+    </span>
+  );
 }
 
 // ⚠️ « un petit onglet en bas à droite tant que l'extension n'a pas tout capté,
@@ -15280,6 +15450,30 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   //    Ce drapeau dit si la lecture a eu lieu ; sans lui on ne peut pas
   //    distinguer « zéro capté » de « jamais demandé ».
   const [labelsPrets, setLabelsPrets] = useState(false);
+  // Relire les bordereaux captés — tous les comptes, ou UN seul quand
+  // l'extension vient d'en ranger un (on ne relit pas les neuf pour une ligne).
+  // Scalaires seulement (§4.4) : les octets du PDF ne partent qu'à l'impression.
+  const rechargerLabels = React.useCallback(async (seulUid) => {
+    const cibles = seulUid ? accounts.filter((a) => String(a.vinted_user_id) === String(seulUid)) : accounts;
+    if (!cibles.length) return;
+    const metas = await Promise.all(cibles.map((a) => fetchCapturedLabelMetas(a.vinted_user_id)));
+    setLabelsCaptes((prev) => {
+      const idx = seulUid ? { ...prev } : {};
+      cibles.forEach((a, i) => {
+        for (const meta of (metas[i] || [])) {
+          if (meta && meta.tx) idx[String(meta.tx)] = { uid: a.vinted_user_id, acc: a, row: meta.id, capturedAt: meta.capturedAt || null, item: meta.item || '' };
+        }
+      });
+      return idx;
+    });
+    setLabelsPrets(true);
+  }, [accounts]);
+  // L'extension prévient : un bordereau vient d'être rangé → on relit CE compte.
+  useEffect(() => {
+    const ecoute = (e) => { const ev = e && e.detail; if (ev && ev.type === 'maj' && ev.quoi === 'label' && ev.uid) rechargerLabels(ev.uid); };
+    window.addEventListener('vrm:ext', ecoute);
+    return () => window.removeEventListener('vrm:ext', ecoute);
+  }, [rechargerLabels]);
   // Identifiants des annonces que Vinted lui-même a fermées en « vendue ».
   // Vinted ne supprime pas une annonce vendue (Julien) : il la range dans cette
   // catégorie. C'est donc une preuve PAR IDENTIFIANT qu'une paire est partie.
@@ -18074,7 +18268,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Détecte un bordereau PDF capté par l'extension (téléchargé sur Vinted) et
   // encore frais (< 60 min) → on affiche un bandeau « tamponner en 1 clic ».
   useEffect(() => { (async () => {
-    if (curSub!=='bordereaux' || !accounts.length) return;
+    // ⚠️ AUSSI SUR VENTES (2 octobre) : le bouton « Bordereau » sous chaque
+    //    vente ne connaissait que les emails — mesuré, 30 ventes en 30 jours
+    //    avaient un PDF capté par l'extension et AUCUN email : le bouton les
+    //    ignorait. La capture de l'extension est la source ; l'email, le filet.
+    if ((curSub!=='bordereaux' && curSub!=='ventes') || !accounts.length) return;
+    if (curSub==='ventes') { await rechargerLabels(); return; }
     let best = null;
     // ⚠️ SCALAIRES SEULEMENT : on demande « y a-t-il un PDF, et de quand ? »,
     //    pas le PDF. Les octets ne partent qu'au clic (§34 — mesuré : 1,6 Mo
@@ -18095,15 +18294,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // Index par transaction (lecture scalaire, pas les octets du PDF).
     // Tous les bordereaux captés, indexés par transaction (une ligne par colis).
     // Même chose ici : neuf lectures indépendantes, donc neuf en même temps.
-    const idx = {};
-    const metas = await Promise.all(accounts.map((a) => fetchCapturedLabelMetas(a.vinted_user_id)));
-    accounts.forEach((a, i) => {
-      for (const meta of (metas[i] || [])) {
-        if (meta && meta.tx) idx[String(meta.tx)] = { uid: a.vinted_user_id, acc: a, row: meta.id, capturedAt: meta.capturedAt || null, item: meta.item || '' };
-      }
-    });
-    setLabelsCaptes(idx);
-    setLabelsPrets(true);
+    await rechargerLabels();
   })(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
   // ── COLIS PUBLIE « PRÊTS À IMPRIMER », LES AUTRES CONSOMMENT (§11) ────────
   // Même motif que `vrm_colis_retirer` et `vinted_urssaf_mois` : l'écran qui a
@@ -18232,6 +18423,57 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     };
     document.addEventListener('visibilitychange', onVis);
     return () => document.removeEventListener('visibilitychange', onVis);
+  /* eslint-disable-next-line */ }, [curSub, accounts.length]);
+  // ── LES VENTES ARRIVENT TOUTES SEULES (2 octobre) ─────────────────────────
+  // « Ça doit être presque instantanément mis à jour dès que je fais une
+  // vente. » Mesuré : l'app ne relisait la moisson qu'au montage et au retour
+  // sur l'onglet — une vente captée pendant que l'app était VISIBLE n'apparaissait
+  // jamais. Deux voies, du plus rapide au filet :
+  //   1. l'extension PRÉVIENT (`vrm:ext` · maj ventes) dès qu'elle a rangé des
+  //      ventes → on relit CE compte seulement ;
+  //   2. sans extension (téléphone), toutes les 60 s, onglet visible : on lit
+  //      l'horodatage des ventes captées (un scalaire par compte, < 1 Ko, §4.4)
+  //      et on ne relit que le compte qui a bougé.
+  // ⚠️ Aucune requête Vinted ici : on relit NOTRE base (la moisson).
+  useEffect(() => {
+    if (!accounts.length) return;
+    const ecrans = ['ventes', 'journee', 'bordereaux'];
+    let derniere = 0;
+    const relire = (uid) => {
+      if (!ecrans.includes(curSub)) return;
+      if (Date.now() - derniere < 4000) return;      // deux signaux rapprochés = une relecture
+      derniere = Date.now();
+      if (uid) _rowCache.delete(`o:${uid}`); else viderCacheLignes();
+      try { delete _acctCache.sold; _persistAcctCache(); } catch (_) {}
+      loadOrders('sold', setSales);
+    };
+    const ecoute = (e) => { const ev = e && e.detail; if (ev && ev.type === 'maj' && ev.quoi === 'ventes') relire(ev.uid); };
+    window.addEventListener('vrm:ext', ecoute);
+    const vus = {};
+    const sonde = async () => {
+      if (document.hidden || !ecrans.includes(curSub)) return;
+      try {
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_%25_orders_sold&select=id,cap:data->>capturedAt`, { headers: sbAuth() });
+        if (!r.ok) return;
+        const rows = await r.json(); if (!Array.isArray(rows)) return;
+        let bouge = null;
+        for (const x of rows) {
+          const m = /^harvest_(\d+)_orders_sold$/.exec(String(x && x.id || '')); if (!m) continue;
+          if (vus[m[1]] !== undefined && vus[m[1]] !== x.cap) bouge = m[1];
+          vus[m[1]] = x.cap;
+        }
+        if (bouge) relire(bouge);
+      } catch (_) {}
+    };
+    // Et on demande à l'extension (si elle tourne ici) de relire les ventes du
+    // compte connecté : à l'ouverture de l'écran et au retour sur l'onglet.
+    const demander = () => { if (vmrExtPresent() && ecrans.includes(curSub)) vmrCmd({ cmd: 'ventes' }, 3000); };
+    const onVis = () => { if (!document.hidden) demander(); };
+    document.addEventListener('visibilitychange', onVis);
+    demander();
+    sonde();
+    const t = setInterval(sonde, 60000);
+    return () => { window.removeEventListener('vrm:ext', ecoute); document.removeEventListener('visibilitychange', onVis); clearInterval(t); };
   /* eslint-disable-next-line */ }, [curSub, accounts.length]);
   // ── COLIS ↔ ACHAT : rapprochement UNIQUE ou RIEN ──────────────────────────
   // Un email de suivi ne porte que le titre de l'article : il n'y a pas d'autre
@@ -19663,6 +19905,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
   // Imprime le bordereau (tamponné) ET, pour un compte pro, la facture — dans UN
   // seul PDF (bordereau puis facture), et lance directement l'impression.
+  // Imprimer le bordereau d'UNE vente : le PDF capté par l'extension d'abord
+  // (rattaché par la transaction), l'email en secours ; un compte pro joint sa
+  // facture. Même chemin que la carte de l'écran Colis (§11).
+  const imprimerBordereauVente = async (o) => {
+    const tx = o && o.transaction_id != null ? String(o.transaction_id) : '';
+    const capte = tx ? labelsCaptes[tx] : null;
+    const b = tx ? bordParTx[tx] : null;
+    const num = (effEntry(o) && effEntry(o).numero) || (b ? numForBord(b) : '') || '';
+    const titre = (o && o.title) || (b ? (b.modele || b.article || '') : '');
+    if (b && b.hasPdf && invForBord(b)) { await printBordAndInvoice(b); return; }
+    let bytes = null;
+    if (capte) { const l = await fetchLabelPdf(capte.row); bytes = l && l.pdfB64 ? b64ToBytes(l.pdfB64) : null; }
+    if (!bytes && b && b.hasPdf) { const p = await fetchBordPdf(b._row); bytes = p && p.pdfB64 ? b64ToBytes(p.pdfB64) : null; }
+    if (!bytes) { toast('PDF illisible — réessaie dans un instant.'); return; }
+    processBordereau(num, titre, bytes);
+  };
   const printBordAndInvoice = async (b) => {
     try {
       const pdf = await fetchBordPdf(b._row);
@@ -19867,9 +20125,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
   const cancelBordPlacement = () => { if(bordPlace){ URL.revokeObjectURL(bordPlace.blobUrl); setBordPlace(null); } };
 
-  const startBordereau = async (numero, title, acc) => {
+  const startBordereau = async (numero, title, acc, tx) => {
     bordCtx.current = { numero, title };
-    const lbl = acc ? await fetchCapturedLabel(acc.vinted_user_id) : null;
+    // ⚠️⚠️ LE DERNIER BORDEREAU CAPTÉ N'EST PAS FORCÉMENT CELUI DE CETTE VENTE.
+    //    `label_latest` est la dernière capture du COMPTE : avec deux ventes à
+    //    expédier sur le même compte (cas réel, `julienf765`, 2 octobre), on
+    //    proposait de tamponner le N° d'une paire sur le bordereau de l'AUTRE —
+    //    la mauvaise chaussure part (§5). Quand on connaît la vente, on exige
+    //    que le bordereau porte SA transaction ; sinon on ne propose rien.
+    let lbl = null;
+    if (tx && labelsCaptes[String(tx)]) {
+      const l = await fetchLabelPdf(labelsCaptes[String(tx)].row);
+      if (l && l.pdfB64) lbl = { pdfB64: l.pdfB64, capturedAt: labelsCaptes[String(tx)].capturedAt, tx: String(tx) };
+    }
+    if (!lbl && acc) {
+      const dernier = await fetchCapturedLabel(acc.vinted_user_id);
+      if (dernier && (!tx || String(dernier.tx || '') === String(tx))) lbl = dernier;
+    }
     if (lbl && lbl.pdfB64) {
       const age = lbl.capturedAt ? (Date.now()-new Date(lbl.capturedAt).getTime())/60000 : 999;
       const mins = Math.max(0, Math.round(age));
@@ -21019,6 +21291,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {/* Liste blanche groupée façon démo (comme Achats) : une seule surface,
             filets fins entre les lignes, lignes aérées — plus de cartes
             encadrées séparées. */}
+        {/* ⚠️ UNE RAISON COMMUNE SE DIT UNE FOIS (§7). Si l'extension est
+            absente, muette ou en retard, TOUS les boutons « Générer le
+            bordereau » sont grisés pour la même raison : on la dit ici, au-dessus
+            de la liste, au lieu de la répéter sous chaque vente. */}
+        <RaisonBordereauxGrises ventes={ventesAffichees.filter(o=>o && o.transaction_id!=null && !isHidden(o) && classifyOrderStatus(o.status)!=='cancelled' && needsBordereau(o.status) && !isShipDone(o) && !labelsCaptes[String(o.transaction_id)] && !bordParTx[String(o.transaction_id)])}/>
         <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,overflow:'hidden',boxShadow:C.shadow||'none'}}>
           {ventesAffichees.slice(0, ventesMax).map((o,i)=>{
             const st = classifyOrderStatus(o.status);
@@ -21066,15 +21343,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div className="vrm-display" style={{fontSize:17,fontWeight:700,color:C.text}}>{sell!=null?`${Number.isInteger(sell)?sell:sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:''}</div>
                   {benef!=null && <div style={{fontSize:12,fontWeight:600,color:benef>=0?INV_STATUS.online.color:C.danger}}>{benef>=0?'+':''}{benef.toFixed(2).replace('.',',')}€</div>}
                   {benef!=null && fees>0 && <div style={{fontSize:9,color:C.muted}}>dont boost −{fees.toFixed(2).replace('.',',')}€</div>}
-                  {/* Le bordereau, sous le prix (E1) — seulement s'il est relié
-                      par la transaction. Même impression que l'écran Colis
-                      (tamponné du N°, facture pro jointe). */}
-                  {!hidden && bordParTx[String(o.transaction_id)] && (
-                    <button type="button" data-bord-vente={String(o.transaction_id)} onClick={()=>printBordAndInvoice(bordParTx[String(o.transaction_id)])}
-                      title={`Imprimer le bordereau de cette vente${num?` (tamponné N°${num})`:''}`}
-                      style={{marginTop:6,display:'inline-flex',alignItems:'center',gap:4,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:'pointer',fontSize:11.5,fontWeight:600,padding:'4px 8px',fontFamily:'inherit'}}>
-                      <Icon name="doc" size={13}/>Bordereau
-                    </button>
+                  {/* LE BORDEREAU, SOUS LE PRIX (E1, puis 2 octobre). Un seul
+                      bouton : il imprime si le PDF est là (capté par l'extension,
+                      ou reçu par email en secours), sinon il COMMANDE l'extension.
+                      ⚠️ Seulement tant que le colis doit partir : une fois expédiée
+                      ou finalisée, une vente n'a plus de bordereau à afficher
+                      (« il ne devrait même pas y en avoir », Julien). */}
+                  {!hidden && st!=='cancelled' && needsBordereau(o.status) && !isShipDone(o) && o.transaction_id!=null && (
+                    <div style={{marginTop:6,display:'flex',justifyContent:'flex-end'}}>
+                      <BoutonBordereau uid={o._acc && o._acc.vinted_user_id} tx={String(o.transaction_id)} login={accNameOf(o._acc)}
+                        aGenerer pdf={!!(labelsCaptes[String(o.transaction_id)] || bordParTx[String(o.transaction_id)])}
+                        onImprimer={()=>imprimerBordereauVente(o)} onFait={(u)=>rechargerLabels(u)}/>
+                    </div>
                   )}
                 </div>
                </div>
@@ -21098,9 +21378,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{display:'flex',alignItems:'center',gap:6,flexShrink:0,marginLeft:'auto'}}>
                 {num && needsBordereau(o.status) && !hidden && inGarage(num) && (
                   <button type="button" onClick={()=>onLocate&&onLocate(num)} title={`Voir la paire N°${num} au stock`} aria-label="Voir au stock" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.blue||C.accent,cursor:'pointer',fontSize:15,padding:'6px 8px'}}><Icon name="pin" size={15}/></button>
-                )}
-                {needsBordereau(o.status) && !hidden && !bordParTx[String(o.transaction_id)] && (
-                  <button type="button" onClick={()=>startBordereau(num||'',o.title,o._acc)} title={num?`Bordereau N°${num}`:'Bordereau (titre)'} aria-label="Bordereau annoté" style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:8,padding:'8px 10px',cursor:'pointer',fontSize:15}}><Icon name="doc" size={16}/></button>
                 )}
                 {st==='cancelled' && num && saleOutcome(o)==='rembourse' && !isPairLost(num) && (
                   <button type="button" onClick={()=>markPairLost(num,o)} title={`Tu as remboursé l'acheteur. Si la paire ne revient PAS, déclare-la perdue : le N°${num} sera libéré et sa case au garage vidée.`} aria-label="Déclarer la paire perdue" style={{flexShrink:0,border:`1px solid ${C.danger}`,borderRadius:8,background:'transparent',color:C.danger,cursor:'pointer',fontSize:11,fontWeight:600,padding:'6px 9px',fontFamily:'inherit'}}>Paire perdue ?</button>
@@ -23073,7 +23350,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   ? <div style={{fontSize:11,color:C.text,marginTop:1}}>Prêt à tamponner pour <b>{num?`N°${num} · `:''}{one.title}</b> — un tap et c'est fait.</div>
                   : <div style={{fontSize:11,color:C.text,marginTop:1}}>Clique le bouton <b>📄</b> sur la vente concernée → il se <b>tamponne tout seul</b> avec le N° (pas besoin de rechoisir le fichier).</div>}
               </div>
-              {one && <button type="button" onClick={()=>startBordereau(num, one.title, freshLabel.acc)} style={{flexShrink:0,border:'none',background:INV_STATUS.online.color,color:'#fff',borderRadius:8,padding:'9px 13px',cursor:'pointer',fontSize:13,fontWeight:600,fontFamily:'inherit'}}>📄 Tamponner{num?` N°${num}`:''}</button>}
+              {one && <button type="button" onClick={()=>startBordereau(num, one.title, freshLabel.acc, one.transaction_id)} style={{flexShrink:0,border:'none',background:INV_STATUS.online.color,color:'#fff',borderRadius:8,padding:'9px 13px',cursor:'pointer',fontSize:13,fontWeight:600,fontFamily:'inherit'}}>📄 Tamponner{num?` N°${num}`:''}</button>}
             </div>
           );
         })()}
@@ -23189,7 +23466,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const groupeDe = (x) => estPoste(x) ? 'fait' : (aSonPdf(x) ? 'pret' : 'attente');
           const TITRE_GROUPE = {
             pret:    ['Prêts à imprimer', 'Le bordereau est là : imprime, colle, dépose.'],
-            attente: ['En attente de leur bordereau', "Vinted l'a généré de son côté ; l'extension le dépose ici à ta prochaine visite sur Vinted (l'email sert de filet). Tu peux aussi déposer un PDF que tu as téléchargé."],
+            attente: ['En attente de leur bordereau', "« Générer le bordereau » le demande à l'extension, qui le fait sur Vinted et le dépose ici (l'email reste un filet). Tu peux aussi déposer un PDF déjà téléchargé."],
             fait:    ['Déjà postés', "Ils quittent la liste quand Vinted confirme l'envoi. « ↺ Pas encore » les remet dans les colis à envoyer."],
           };
           const nbParGroupe = {};
@@ -23198,25 +23475,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // compteur du haut (« 14 colis à envoyer » puis « En retard · 14 »),
           // et le même nombre ne s'écrit pas deux fois sur un écran.
           const plusieursGroupes = Object.keys(nbParGroupe).length > 1;
-          const attentes = new Set(ex
-            .filter(e => !estPoste(e))
-            .filter(e => !((e.b && e.b.hasPdf) || (e.txn && labelsCaptes[e.txn])))
-            .map(e => aGenererBordereau(e.o && e.o.status) ? 'gen' : 'recup'));
-          const attenteCommune = attentes.size === 1 ? [...attentes][0] : null;
           return (
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
               {lignePostes}
-              {/* ⚠️ La phrase d'attente vit désormais dans l'intertitre du groupe
-                  « En attente de leur bordereau » — au-dessus des colis qu'elle
-                  concerne, et d'eux seuls. En tête de liste, elle parlait au nom
-                  des quinze alors qu'elle n'en concernait que cinq. */}
-              {false && attenteCommune && (
-                <div style={{fontSize:12,color:C.muted,lineHeight:1.45,padding:'0 2px 2px'}}>
-                  {attenteCommune==='gen'
-                    ? <><b style={{color:C.text}}>L'extension génère les bordereaux manquants</b> à ta prochaine visite sur Vinted, puis les dépose ici.</>
-                    : <><b style={{color:C.text}}>Les bordereaux sont déjà générés chez Vinted</b> — l'extension les récupère à ta prochaine visite (l'email sert de filet). Tu peux aussi déposer un PDF que tu as téléchargé.</>}
-                </div>
-              )}
+              {/* La raison commune des boutons grisés, une fois (§7). */}
+              <RaisonBordereauxGrises ventes={ex.filter(e => !estPoste(e) && !aSonPdf(e) && e.o && e.o.transaction_id!=null).map(e => e.o)}/>
               {/* ⚠️ DEUX COLONNES SUR ORDINATEUR, comme Ventes et Achats (§5.63).
                   Une carte de colis tient dans 500 px et s'étalait sur 1120 :
                   trois colis visibles au lieu de six, sur l'écran où il travaille
@@ -23357,12 +23620,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             « En attente de leur bordereau » le dit une fois, au
                             bon endroit. La carte ne garde que ce qui la
                             distingue : Vinted doit-il encore le générer ? */}
-                        {aGenererBordereau(o && o.status) && (
-                          <div style={{flex:'1 1 120px',minWidth:0,fontSize:11.5,color:C.muted,lineHeight:1.4,alignSelf:'center'}}>
-                            Vinted ne l'a pas encore généré.
-                          </div>
+                        {/* L'app COMMANDE l'extension (2 octobre) : le bouton dit ce
+                            qui l'empêche s'il est grisé, l'étape s'il travaille. */}
+                        {o && o.transaction_id!=null && (
+                          <BoutonBordereau grand uid={acc && acc.vinted_user_id} tx={String(o.transaction_id)} login={accNameOf(acc)}
+                            aGenerer pdf={false} onFait={(u)=>rechargerLabels(u)}/>
                         )}
-                        <button type="button" onClick={()=>startBordereau(num, titre, acc)} title="J'ai déjà téléchargé le PDF : le tamponner avec le numéro"
+                        <button type="button" onClick={()=>startBordereau(num, titre, acc, o && o.transaction_id)} title="J'ai déjà téléchargé le PDF : le tamponner avec le numéro"
                           style={{...sec,flex:'0 1 auto',border:`1px solid ${C.border}`,background:'transparent',color:C.text,padding:'12px 13px',fontSize:13}}>📎 J'ai le PDF</button>
                       </>)}
                       {!num && b && <button type="button" onClick={()=>{ setLinkPickFor(b); setLinkSearch(''); }} title="Relier ce bordereau à une paire numérotée" style={{...sec,border:`1px solid ${C.warn}`,background:`${C.warn}14`,color:C.warn,padding:'12px 13px',fontSize:13}}>🔗 Relier</button>}
