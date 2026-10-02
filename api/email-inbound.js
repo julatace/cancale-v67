@@ -520,14 +520,22 @@ async function findBuyPriceByTitle(title) {
 }
 
 // ── Emails transporteurs (Mondial Relay / Chronopost) : n° de suivi + étape ──
-function parseCarrierEmail(mail, carrier) {
+export function parseCarrierEmail(mail, carrier) {
   const txt = texteUtile(mail);
   const all = (mail.subject || '') + '\n' + txt;
 
   // N° de suivi / d'expédition
   let suivi = null;
-  const m1 = all.match(/n[°o]\s*(?:d['e]?\s*)?(?:exp[ée]dition|colis|suivi|envoi)\s*[:\-]?\s*([A-Z0-9]{6,20})/i);
+  // ⚠️ « Numéro de suivi : … » AUSSI (pas seulement « N° suivi »). Mesuré sur un
+  //    vrai email Vinted Go (2 oct.) : « Numéro de suivi : VGS0000906049457 » —
+  //    l'ancien motif n'acceptait que « n° »/« no », donc le suivi Vinted Go
+  //    n'était PAS capté → `status` retombait en « info » (garde ligne ~578) et
+  //    le colis DISPARAISSAIT. C'est « les messages Vinted Go, tu ne les reçois
+  //    pas du tout ».
+  const m1 = all.match(/(?:n[°o]|num[ée]ro)\s*(?:d['e]?\s*)?(?:exp[ée]dition|colis|suivi|envoi)\s*[:：\-]?\s*([A-Z0-9]{6,20})/i);
   if (m1) suivi = m1[1];
+  // Vinted Go : suivi de forme « VGS » + chiffres.
+  if (!suivi) { const m = all.match(/\b(VGS\d{8,})\b/i); if (m) suivi = m[1].toUpperCase(); }
   if (!suivi && carrier === 'chronopost') {
     const m = all.match(/\b([A-Z]{2}\d{9}[A-Z]{2})\b/); // format international XX123456789XX
     if (m) suivi = m[1];
@@ -590,6 +598,15 @@ function parseCarrierEmail(mail, carrier) {
     // garde-fou : ne pas confondre avec un code postal
     if (m && !/postal/i.test(all.slice(Math.max(0, m.index - 14), m.index + 4))) code = m[1];
   }
+  // ⚠️ VINTED GO : code ALPHANUMÉRIQUE « C49341 » (mesuré sur un vrai email,
+  //    2 oct. : « saisis le code suivant : C49341 »). On n'acceptait que des
+  //    CHIFFRES — pour ne pas capter le mot « suivant » (bug Chronopost). On
+  //    autorise donc 1-2 LETTRES SUIVIES de chiffres (« suivant », tout lettres,
+  //    ne peut pas matcher) et seulement près d'un déclencheur « code ».
+  if (!code) {
+    const m = all.match(/(?:code\s+(?:de\s+)?(?:retrait|r[ée]ception|livraison|suivant)|saisis?\s+le\s+code(?:\s+suivant)?)[\s*_:：\-–—]*([A-Z]\d{3,10})\b/i);
+    if (m) code = m[1].toUpperCase();
+  }
   // ── Consigne Pickup / casier automatique (Chronopost Pickup) : le retrait se
   //    fait avec DEUX codes — un « Identifiant » ET un « Code d'ouverture » — (et
   //    parfois un QR « Pickup Pass »). Format RÉEL vu sur les emails de Julien
@@ -624,7 +641,10 @@ function parseCarrierEmail(mail, carrier) {
     //    des Mondial Relay sans lieu étaient des lockers. Même forme que le point
     //    relais (en-tête sur sa ligne, puis nom et adresse dessous) : on accepte
     //    donc aussi « Locker », « Locker 24/7 », « Consigne », « Casier ».
-    const idx = lines.findIndex(l => /^(?:point\s+(?:relais|de\s+retrait)|(?:votre\s+)?locker(?:\s*24\s*\/?\s*7)?|(?:votre\s+)?consigne(?:\s+automatique)?|(?:votre\s+)?casier)\b[\s:–-]*$/i.test(l));
+    // ⚠️ « Adresse » seule sur sa ligne AUSSI (Vinted Go, 2 oct. : « Adresse » puis
+    //    « Consigne Vinted Go / Speed Queen - Vannes / 24 Rue Hoche »). `^adresse$`
+    //    strict : « Adresse de livraison » (email d'envoi) ne matche pas.
+    const idx = lines.findIndex(l => /^(?:point\s+(?:relais|de\s+retrait)|(?:votre\s+)?locker(?:\s*24\s*\/?\s*7)?|(?:votre\s+)?consigne(?:\s+automatique)?|(?:votre\s+)?casier|adresse)\b[\s:–-]*$/i.test(l));
     if (idx >= 0) {
       const parts = [];
       for (let i = idx + 1; i < lines.length && parts.length < 3; i++) {
@@ -683,8 +703,11 @@ function parseCarrierEmail(mail, carrier) {
   {
     const MOIS = { janvier:1, février:2, fevrier:2, mars:3, avril:4, mai:5, juin:6, juillet:7,
                    août:8, aout:8, septembre:9, octobre:10, novembre:11, décembre:12, decembre:12 };
-    const mTxt = all.match(/jusqu['’]au\s+(?:lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)?\s*(\d{1,2})\s+([a-zà-ÿ]+)\s+(\d{4})/i);
-    const mNum = all.match(/jusqu['’]au\s+(\d{1,2})[\/.](\d{1,2})[\/.](\d{4})/i);
+    // ⚠️ « À retirer avant le 29/09/2026 » AUSSI (Vinted Go, mesuré 2 oct.) — pas
+    //    seulement « jusqu'au … ». Sans ça la date limite Vinted Go était perdue.
+    const AV = "(?:jusqu['’]au|(?:[àa]\\s+retirer\\s+)?avant\\s+le|[àa]\\s+r[ée]cup[ée]rer\\s+avant\\s+le)";
+    const mTxt = all.match(new RegExp(`${AV}\\s+(?:lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)?\\s*(\\d{1,2})\\s+([a-zà-ÿ]+)\\s+(\\d{4})`, 'i'));
+    const mNum = all.match(new RegExp(`${AV}\\s+(\\d{1,2})[\\/.](\\d{1,2})[\\/.](\\d{4})`, 'i'));
     if (mTxt) {
       const mo = MOIS[mTxt[2].toLowerCase()];
       if (mo) limite = `${mTxt[3]}-${String(mo).padStart(2,'0')}-${String(+mTxt[1]).padStart(2,'0')}`;
