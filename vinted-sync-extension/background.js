@@ -635,6 +635,9 @@ async function storeHarvest(domain, type, id, body) {
   // Dernière sortie muette possible : l'écriture elle-même. On la mesure aussi,
   // sinon « rien en base » resterait indiscernable de « jamais reçu ».
   noterDiag(`${ecrit === false ? 'ecriture_ratee' : 'ecrit'}_${type || 'inconnu'}`);
+  // Des ventes viennent d'être rangées : l'app ouverte les relit TOUT DE SUITE
+  // (« presque instantanément dès que je fais une vente », 2 octobre).
+  if (ecrit !== false && type === 'orders_sold') notifierApp({ type: 'maj', quoi: 'ventes', uid: String(uid) });
 
   // Apprentissage passif des codes de statut d'offre (voir noterStatutsOffres).
   if (type === 'conversation') { try { await noterStatutsOffres(parsed); } catch (_) {} }
@@ -747,16 +750,42 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }
 
     // PONT APP -> EXTENSION : l'app VRM demande d'EXECUTER une action Vinted
-    // (repondre, faire une offre...) depuis TON navigateur/IP. On n'accepte que
-    // des endpoints /api/ Vinted, et on agit avec le token du compte vise.
+    // depuis TON navigateur/IP.
+    // ⚠️⚠️ MESURÉ LE 2 OCTOBRE : CE CANAL PASSAIT À CÔTÉ DE TOUS LES GARDE-FOUS
+    //    DU §3. Il ne vérifiait que « /api/ » : ni l'origine (tous les autres
+    //    messages du pont la vérifient), ni le compte connecté (`garde`), ni le
+    //    plafond de 20/h, ni la méthode — un `DELETE /api/v2/items/{id}` (la
+    //    suppression d'annonce que §3 refuse) serait parti. Son seul usage réel
+    //    est la réponse à un message (`sendReply`, App.jsx).
+    //    ⇒ Origine de l'app · LISTE BLANCHE (méthode + chemin) · garde STRICTE
+    //    (le compte doit être celui connecté dans Chrome — « pas su » ne vaut
+    //    pas « oui ») · plafond. Tout le reste est refusé, avec la raison.
+    // ── L'APP INTERROGE ET COMMANDE (5.129) ────────────────────────────────
+    if (msg && msg.from === 'vmr-bridge' && (msg.action === 'etat' || msg.action === 'cmd' || msg.action === 'cmd:statut')) {
+      const src = (sender && sender.origin) || (sender && sender.url) || '';
+      if (!ORIGINE_APP.test(src)) { sendResponse({ ok: false, code: 'origine', error: 'origine non autorisee' }); return true; }
+      (async () => {
+        try {
+          if (msg.action === 'etat') { sendResponse(await etatPourApp()); return; }
+          if (msg.action === 'cmd:statut') { const c = (await lireCmds())[String(msg.jobId || '')] || null; sendResponse({ ok: true, cmd: c }); return; }
+          sendResponse(await executerCommande(msg));
+        } catch (e) { sendResponse({ ok: false, accepte: false, code: 'erreur', raison: String(e && e.message || e) }); }
+      })();
+      return true;
+    }
     if (msg && msg.from === 'vmr-bridge' && msg.action === 'exec') {
       (async () => {
         try {
-          if (!/^\/api\//.test(msg.endpoint || '')) { sendResponse({ ok: false, error: 'endpoint invalide' }); return; }
+          const src = (sender && sender.origin) || (sender && sender.url) || '';
+          if (!ORIGINE_APP.test(src)) { sendResponse({ ok: false, code: 'origine', error: 'origine non autorisee' }); return; }
+          const methode = String(msg.method || 'POST').toUpperCase();
+          if (!execPermis(methode, msg.endpoint)) { sendResponse({ ok: false, code: 'non-autorise', error: 'action non autorisée depuis l\'app' }); return; }
           const accts = await getStoredAccounts();
           const acc = accts.find((a) => String(a.vinted_user_id) === String(msg.uid));
           if (!acc) { sendResponse({ ok: false, error: 'compte introuvable' }); return; }
-          const r = await vintedSend(acc, msg.method || 'POST', msg.endpoint, msg.body);
+          const stop = await gardeStricte(msg.uid, acc);
+          if (stop) { sendResponse(stop); return; }
+          const r = await vintedSend(acc, methode, msg.endpoint, msg.body);
           sendResponse({ ok: r.ok, status: r.status, data: r.json });
         } catch (e) { sendResponse({ ok: false, error: String(e) }); }
       })();
@@ -849,13 +878,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             // Un clic = un bordereau : on génère, puis on va CHERCHER le PDF et
             // on l'envoie dans l'app. Le compte rendu remonte au panneau pour
             // qu'on voie exactement où ça s'est arrêté.
-            const r = await genererBordereau(msg.uid, msg.tx);
-            if (!r.ok) { sendResponse({ ...r, envoye: false }); return; }
+            const r = await avecVinted(() => genererBordereau(msg.uid, msg.tx));
+            if (!r.ok && !r.deja) { sendResponse({ ...r, envoye: false }); return; }
             const accs = await getStoredAccounts();
             const acc2 = accs.find(a => String(a.vinted_user_id) === String(msg.uid));
             // ⚠️ On INSISTE : Vinted fabrique le PDF après avoir accepté la
             // génération, il n'est donc pas prêt à la milliseconde suivante.
-            const r2 = acc2 ? await recupererLabelInsiste(acc2, msg.uid, msg.tx) : { ok: false, raison: 'compte introuvable' };
+            const r2 = acc2 ? await avecVinted(() => recupererLabelInsiste(acc2, msg.uid, msg.tx)) : { ok: false, raison: 'compte introuvable' };
             sendResponse({ ok: true, envoye: r2.ok, error: r2.ok ? '' : r2.raison });
             return;
           }
@@ -865,7 +894,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             const acc2 = accs.find(a => String(a.vinted_user_id) === String(msg.uid));
             if (!acc2) { sendResponse({ ok: false, error: 'compte introuvable' }); return; }
             const stop = await garde(msg.uid, acc2); if (stop) { sendResponse(stop); return; }
-            const r2 = await recupererLabelInsiste(acc2, msg.uid, msg.tx);
+            const r2 = await avecVinted(() => recupererLabelInsiste(acc2, msg.uid, msg.tx));
             sendResponse({ ok: r2.ok, envoye: r2.ok, error: r2.ok ? '' : (r2.raison || 'échec') });
             return;
           }
@@ -2166,7 +2195,8 @@ async function storeHarvestRow(uid, type, payload, domain) {
   // donc la date de creation de la ligne et faisait passer une moisson de deux
   // heures pour une moisson de 25 jours. `capturedAt` reste la reference cote
   // app, mais autant que la colonne cesse de mentir aux autres lecteurs.
-  await supabaseUpsert('app_data', [{ id: `harvest_${uid}_${type}`, data, updated_at: maintenant }], 'id');
+  const ecritRow = await supabaseUpsert('app_data', [{ id: `harvest_${uid}_${type}`, data, updated_at: maintenant }], 'id');
+  if (ecritRow !== false && type === 'orders_sold') notifierApp({ type: 'maj', quoi: 'ventes', uid: String(uid) });
   if (type === 'listings') {
     try { const tous = (brut && brut.items) || []; await archiverLot(uid, tous.filter(it => it && !it.is_closed && !it.is_hidden && !it.is_draft), tous); } catch (_) {}
   }
@@ -2501,7 +2531,18 @@ async function runActive() {
 }
 function fullSync() { captureAllAccounts().then(() => runActive()); }
 
-chrome.runtime.onInstalled.addListener(() => { fullSync(); });
+// ⚠️ APRÈS UNE MISE À JOUR, Chrome n'injecte PAS le nouveau bridge.js dans les
+//    onglets de l'app déjà ouverts : l'app parlerait à l'ancien (orphelin,
+//    muet) jusqu'à ce qu'il recharge la page. On le réinjecte nous-mêmes.
+async function reinjecterPont() {
+  try {
+    const tabs = await chrome.tabs.query({ url: APP_URLS });
+    for (const t of tabs || []) {
+      try { await chrome.scripting.executeScript({ target: { tabId: t.id }, files: ['bridge.js'] }); } catch (_) {}
+    }
+  } catch (_) {}
+}
+chrome.runtime.onInstalled.addListener(() => { fullSync(); reinjecterPont(); });
 chrome.runtime.onStartup.addListener(() => { fullSync(); });
 
 try {
@@ -2604,13 +2645,13 @@ async function visiteVinted() {
     // — la vente est faite, le colis doit partir. Tous les garde-fous restent :
     // compte connecté uniquement, 20 actions/h, plafond par visite, pas de
     // nouvel essai avant 6 h.
-    const genes = await genererBordereauxEnAttente(uid);
+    const genes = await avecVinted(() => genererBordereauxEnAttente(uid));
     // Le récap arrive APRÈS la génération : il ANNONCE ce qui est parti dans
     // l'app. Il ne demande plus rien (§5.88).
     await proposerBordereaux(uid, genes);
     // ⚠️ ET LES MESSAGES, sur sa décision du 19 septembre (« tout, elle répond à
     //    tout »). Éteint par défaut : c'est lui qui allume depuis l'app.
-    try { await repondreAuxMessages(uid); } catch (_) {}
+    try { await avecVinted(() => repondreAuxMessages(uid)); } catch (_) {}
 
     // ═══ 2. LE RESTE, ENSUITE ════════════════════════════════════════════
     // Le garde de 5 min ne protège plus que la moisson COMPLÈTE — c'est elle
@@ -2625,7 +2666,7 @@ async function visiteVinted() {
     // ⚠️ APRÈS la moisson : les offres viennent des conversations captées, donc
     //    travailler avant la capture reviendrait à décider sur des données
     //    périmées. Éteint par défaut, un plancher par annonce est obligatoire.
-    await autoAccepterOffres(uid);
+    await avecVinted(() => autoAccepterOffres(uid));
     // ⚠️ APRÈS la moisson elle aussi : la liste des colis « déposés en point
     // relais » vient des achats qu'on vient de capter. Sans ça, on lirait la
     // photo d'hier et on redemanderait des conversations pour rien.
@@ -3033,6 +3074,176 @@ async function compterAction(uid) {
     await chrome.storage.local.set({ [cle]: cur });
     return { ok: true, n: list.length };
   } catch (_) { return { ok: true, n: 0 }; }
+}
+
+// ── ACTIONS COMMANDÉES PAR L'APP : LA GARDE STRICTE ─────────────────────────
+// `garde` laisse passer quand aucun cookie n'est lisible (une détection ratée
+// ne doit pas casser une visite sur Vinted, où l'onglet prouve le compte). Une
+// commande venue de l'APP n'a pas cette preuve : on ne sait pas quel compte est
+// connecté, donc on n'agit pas. « Pas su » ne vaut pas « oui ».
+const ORIGINE_APP = /^https:\/\/(cancale-v67(-ten)?\.vercel\.app|(www\.)?vrm\.center)/;
+// Ce que l'app peut faire passer par `exec`, et RIEN d'autre (§3 : jamais de
+// suppression, jamais de requête arbitraire).
+const EXEC_PERMIS = [
+  { methode: 'POST', chemin: /^\/api\/v2\/conversations\/\d+\/replies$/ },   // répondre à un message
+];
+function execPermis(methode, endpoint) {
+  const e = String(endpoint || '');
+  return EXEC_PERMIS.some((p) => p.methode === methode && p.chemin.test(e));
+}
+async function gardeStricte(uid, acc) {
+  const actif = await compteConnecte(acc && acc.domain);
+  if (!actif) {
+    return { ok: false, code: 'vinted-absent',
+             error: "aucun compte Vinted n'est connecté dans ce Chrome — connecte-toi sur vinted.fr avec ce compte d'abord" };
+  }
+  if (String(actif) !== String(uid)) {
+    return { ok: false, code: 'vinted-autre', actif: String(actif),
+             error: "ton navigateur est connecté à un autre compte Vinted — bascule sur celui-ci sur vinted.fr d'abord" };
+  }
+  const c = await compterAction(String(uid));
+  if (!c.ok) {
+    return { ok: false, code: 'plafond',
+             error: `${ACTIONS_MAX_HEURE} actions sur ce compte dans l'heure — on s'arrête là pour ne pas attirer l'attention. Réessaie plus tard.` };
+  }
+  return null;
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// UNE REQUÊTE VINTED À LA FOIS, QUELLE QUE SOIT LA SOURCE (§3)
+// ══════════════════════════════════════════════════════════════════════════
+// La visite (génération des bordereaux, réponses, offres), une commande de
+// l'app et un clic : sans file commune, deux d'entre elles pouvaient mettre des
+// requêtes en vol en même temps — mesuré, rien ne les sérialisait. Une simple
+// chaîne de promesses en mémoire : si le service worker meurt, rien n'est en
+// vol de toute façon (§4.9 ne s'applique qu'aux DONNÉES à garder).
+let _fileVinted = Promise.resolve();
+function avecVinted(fn) {
+  const suite = _fileVinted.then(() => fn(), () => fn());
+  _fileVinted = suite.then(() => {}, () => {});
+  return suite;
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// LES COMMANDES DE L'APP (5.129) — « c'est l'application qui contrôle
+// l'extension » (Julien, 2 octobre)
+// ══════════════════════════════════════════════════════════════════════════
+// L'app demande ; l'extension vérifie (garde STRICTE, plafond), exécute dans la
+// file, et prévient l'app à chaque étape. L'état de chaque demande vit dans
+// `chrome.storage.local` (§4.9 : un service worker meurt au bout de 30 s).
+const APP_URLS = ['https://vrm.center/*', 'https://www.vrm.center/*', 'https://cancale-v67.vercel.app/*', 'https://cancale-v67-ten.vercel.app/*'];
+const CMD_EN_COURS = ['file', 'generation', 'pdf'];
+async function lireCmds() {
+  try { return (await chrome.storage.local.get('vrmCmds')).vrmCmds || {}; } catch (_) { return {}; }
+}
+async function majCmd(jobId, patch) {
+  const cmds = await lireCmds();
+  const t = Date.now();
+  // On ne garde qu'un jour d'historique : c'est un état, pas un journal.
+  for (const k of Object.keys(cmds)) if (t - Number((cmds[k] && cmds[k].at) || 0) > 86400000) delete cmds[k];
+  cmds[jobId] = Object.assign({}, cmds[jobId] || {}, patch, { at: t });
+  try { await chrome.storage.local.set({ vrmCmds: cmds }); } catch (_) {}
+  notifierApp(Object.assign({ type: 'cmd', jobId }, cmds[jobId]));
+  return cmds[jobId];
+}
+// Prévenir les onglets de l'app (bridge.js relaie à la page). Sans onglet
+// ouvert : rien, et l'app relira l'état au retour (`cmd:statut`).
+async function notifierApp(evt) {
+  try {
+    const tabs = await chrome.tabs.query({ url: APP_URLS });
+    for (const t of tabs || []) {
+      try { chrome.tabs.sendMessage(t.id, { __vmrEvt: true, evt }, () => { void chrome.runtime.lastError; }); } catch (_) {}
+    }
+  } catch (_) {}
+}
+// Le login lisible du compte connecté (l'app l'écrit à côté du bouton grisé :
+// « Chrome est connecté sur X »). Mémorisé 5 min, aucune requête Vinted.
+async function loginDe(uid) {
+  if (!uid) return '';
+  try {
+    const memo = (await chrome.storage.local.get('vrmLogins')).vrmLogins || {};
+    if (memo.at && Date.now() - memo.at < 300000 && memo.map) return memo.map[uid] || '';
+    const accts = await getStoredAccounts();
+    const map = {}; for (const a of accts || []) map[String(a.vinted_user_id)] = a.login || '';
+    if ((accts || []).length) await chrome.storage.local.set({ vrmLogins: { at: Date.now(), map } });
+    return map[uid] || '';
+  } catch (_) { return ''; }
+}
+// L'état que l'app interroge toutes les 20 s : ZÉRO requête Vinted (cookie,
+// stockage local, session VRM).
+async function etatPourApp() {
+  let version = ''; try { version = chrome.runtime.getManifest().version; } catch (_) {}
+  const uid = await compteConnecte('www.vinted.fr');
+  const vrm = await authEtat().catch(() => null);
+  const cmds = await lireCmds();
+  return { ok: true, version, vrm, vinted: uid ? { uid: String(uid), login: await loginDe(String(uid)) } : null, cmds };
+}
+// Le bordereau de CETTE vente est-il déjà rangé (avec son PDF) ? Une lecture
+// scalaire (§4.4) — `null` = la base n'a pas répondu (« pas su » ≠ « non »).
+async function labelDejaRange(uid, tx) {
+  const rows = await sbGet(`app_data?id=eq.harvest_${uid}_label_${tx}&data->>pdfB64=not.is.null&select=id,cap:data->>capturedAt`);
+  if (rows === null) return null;
+  return Array.isArray(rows) && rows.length ? rows[0] : false;
+}
+async function executerCommande(msg) {
+  // « Relis mes ventes » : l'app vient d'ouvrir Ventes / Colis / Ma journée.
+  // UNE lecture (my_orders) du compte connecté dans Chrome — jamais d'un autre —
+  // bornée par le même délai que la visite (90 s) : ouvrir l'app dix fois ne
+  // fait pas dix requêtes. C'est une LECTURE de ses propres ventes (§3).
+  if (msg && msg.cmd === 'ventes') {
+    const uid = await compteConnecte('www.vinted.fr');
+    if (!uid) return { accepte: false, code: 'vinted-absent', raison: "aucun compte Vinted connecté dans ce Chrome" };
+    const dv = (await chrome.storage.local.get('vrmDerniereVente')).vrmDerniereVente || {};
+    if (Date.now() - Number(dv[uid] || 0) < VENTES_DELAI_MS) return { accepte: true, etape: 'recent' };
+    dv[uid] = Date.now();
+    await chrome.storage.local.set({ vrmDerniereVente: dv });
+    avecVinted(() => rafraichirVentes(uid)).catch(() => {});
+    return { accepte: true, etape: 'ventes' };
+  }
+  if (!msg || msg.cmd !== 'bordereau') return { accepte: false, code: 'inconnue', raison: 'commande inconnue' };
+  const uid = String(msg.uid || ''), tx = String(msg.tx || '');
+  if (!/^\d+$/.test(uid) || !/^\d+$/.test(tx)) return { accepte: false, code: 'invalide', raison: 'vente incomplète' };
+  const jobId = `bord:${uid}:${tx}`;
+  const cur = (await lireCmds())[jobId];
+  // Déjà en cours (deux clics, deux onglets) : on renvoie la même demande.
+  if (cur && CMD_EN_COURS.includes(cur.etape) && Date.now() - Number(cur.at || 0) < 120000) return { accepte: true, jobId, etape: cur.etape, deja: true };
+  const accts = await getStoredAccounts();
+  const acc = (accts || []).find((a) => String(a.vinted_user_id) === uid);
+  if (!acc) return { accepte: false, code: 'compte', raison: 'compte introuvable dans VRM' };
+  // Idempotence : le PDF est déjà rangé → rien à demander à Vinted.
+  if (await labelDejaRange(uid, tx)) { await majCmd(jobId, { etape: 'fait', uid, tx, deja: true }); return { accepte: true, jobId, etape: 'fait', deja: true }; }
+  const stop = await gardeStricte(uid, acc);
+  if (stop) return { accepte: false, code: stop.code, raison: stop.error, actif: stop.actif || null, actifLogin: stop.actif ? await loginDe(stop.actif) : '' };
+  await majCmd(jobId, { etape: 'file', uid, tx, code: null, raison: null });
+  // L'exécution part dans la file ; l'app reçoit l'accusé TOUT DE SUITE.
+  avecVinted(async () => {
+    try {
+      await noterDiag('commande_bordereau');
+      // 1. Le bordereau existe peut-être déjà chez Vinted (commandé à la main,
+      //    ou par la visite) : on regarde AVANT de commander — sinon Vinted
+      //    répond 400 « impossible de générer » (course mesurée le 28 sept.).
+      const connu = { t: null, vus: new Set() };
+      let r = await recupererLabel(acc, uid, tx, connu);
+      if (!r.ok) {
+        if (!connu.t) {
+          await majCmd(jobId, { etape: 'generation' });
+          const g = await genererBordereau(uid, tx, { gardeFaite: true });
+          if (!g.ok && !g.deja) { await majCmd(jobId, { etape: 'echec', code: 'vinted-' + (g.status || '?'), raison: g.error || 'Vinted a refusé' }); return; }
+        }
+        await majCmd(jobId, { etape: 'pdf' });
+        r = await recupererLabelInsiste(acc, uid, tx);
+      }
+      if (r.ok) {
+        await majCmd(jobId, { etape: 'fait' });
+        notifierApp({ type: 'maj', quoi: 'label', uid, tx });
+      } else {
+        await majCmd(jobId, { etape: 'genere_sans_pdf', raison: r.raison || "le PDF n'est pas encore prêt chez Vinted" });
+      }
+    } catch (e) {
+      await majCmd(jobId, { etape: 'echec', code: 'erreur', raison: String(e && e.message || e).slice(0, 120) });
+    }
+  });
+  return { accepte: true, jobId, etape: 'file' };
 }
 
 // Renvoie null si l'action peut partir, sinon l'objet d'erreur à renvoyer tel quel.
@@ -3647,12 +3858,14 @@ async function adresseVendeur(uid, acc) {
   } catch (_) { return null; }
 }
 
-async function genererBordereau(uid, tx) {
+async function genererBordereau(uid, tx, opts = {}) {
   if (!uid || !tx) return { ok: false, error: 'vente incomplète' };
   const accts = await getStoredAccounts();
   const acc = accts.find(a => String(a.vinted_user_id) === String(uid));
   if (!acc) return { ok: false, error: 'compte introuvable' };
-  const stop = await garde(uid, acc); if (stop) return stop;   // anti-blocage
+  // `gardeFaite` : une commande de l'app est déjà passée par `gardeStricte`
+  // (et a déjà consommé son créneau du plafond) — la refaire en brûlerait deux.
+  if (!opts.gardeFaite) { const stop = await garde(uid, acc); if (stop) return stop; }   // anti-blocage
   // ⚠️ Le garde-fou passe AVANT la lecture d'adresse : celle-ci est une requête
   // Vinted comme une autre, elle n'a pas à partir depuis la session d'un autre
   // compte ni à dépasser le plafond horaire (§48).
@@ -4156,10 +4369,14 @@ async function recupererLabel(acc, uid, tx, connu) {
     const items = Array.isArray(trx.order && trx.order.items)
       ? trx.order.items.map(x => x && x.id != null ? String(x.id) : '').filter(Boolean) : [];
     const data = { uid, url, tx: String(tx), item, items, capturedAt: new Date().toISOString(), pdfB64: btoa(bin) };
-    await supabaseUpsert('app_data', [
+    const range = await supabaseUpsert('app_data', [
       { id: `harvest_${uid}_label_${tx}`, data },
       { id: `harvest_${uid}_label_latest`, data },   // gardée : d'anciens écrans la lisent
     ], 'id');
+    // ⚠️ « Envoyé dans l'application » ne se dit que si la base l'a RANGÉ : une
+    //    écriture ratée ne doit pas devenir un « fait » côté app (§ « on
+    //    n'acquitte pas ce qu'on n'a pas rangé »).
+    if (range === false) { await noterDiag('label_ecriture_ratee'); return { ok: false, raison: "PDF récupéré mais la base ne l'a pas enregistré — réessaie" }; }
     await noterUrlLabel(url, true);
     await noterDiag('label_envoye');
     logActivity('📎 Bordereau envoyé dans l\'application');

@@ -15,7 +15,13 @@
   // plutôt que « détectée » — après un rechargement dans Chrome, c'est la seule
   // façon de vérifier de visu que c'est bien la nouvelle qui tourne.
   const version = (() => { try { return chrome.runtime.getManifest().version; } catch (_) { return ''; } })();
-  const announce = () => { try { window.postMessage({ __vmr: 'ready', version }, '*'); } catch (_) {} };
+  // ⚠️ UN PONT ORPHELIN NE DOIT PAS ANNONCER UNE EXTENSION VIVANTE. Quand
+  //    l'extension est rechargée, mise à jour ou désactivée, ce script reste
+  //    dans la page mais n'a plus de service worker derrière lui :
+  //    `chrome.runtime.id` vaut alors `undefined`. Mesuré : il continuait de
+  //    répondre « ready » et l'app croyait l'extension là pour toujours.
+  const vivant = () => { try { return !!(chrome && chrome.runtime && chrome.runtime.id); } catch (_) { return false; } };
+  const announce = () => { if (!vivant()) return; try { window.postMessage({ __vmr: 'ready', version }, '*'); } catch (_) {} };
   announce();
   // L'app peut se charger APRÈS nous : sans ces rappels, son écouteur n'existe
   // pas encore quand on annonce, et elle croit l'extension absente pour toujours.
@@ -29,6 +35,21 @@
     if (!d || typeof d !== 'object') return;
 
     if (d.__vmr === 'ping') { announce(); return; }
+
+    // L'ÉTAT, LES COMMANDES ET LEUR SUIVI (5.129). Simple relais, comme le
+    // reste : c'est le service worker qui vérifie l'origine, le compte et le
+    // plafond, et qui parle à Vinted.
+    if ((d.__vmr === 'etat' || d.__vmr === 'cmd' || d.__vmr === 'cmd:statut') && d.reqId) {
+      const repondre = (resp) => { try { window.postMessage({ __vmr: d.__vmr + ':result', reqId: d.reqId, resp: resp || null }, '*'); } catch (_) {} };
+      if (!vivant()) { repondre(null); return; }
+      try {
+        chrome.runtime.sendMessage({ from: 'vmr-bridge', action: d.__vmr, cmd: d.cmd, uid: d.uid, tx: d.tx, jobId: d.jobId }, (resp) => {
+          const err = chrome.runtime.lastError;
+          repondre(err ? null : resp);
+        });
+      } catch (_) { repondre(null); }
+      return;
+    }
 
     // L'app demande QUI est connecté côté extension. Elle ne peut pas lire le
     // stockage de l'extension (c'est justement le but) : elle le demande.
@@ -88,4 +109,13 @@
       }
     }
   }, false);
+
+  // L'EXTENSION PRÉVIENT L'APP (5.129) : une étape de commande, un bordereau
+  // rangé, des ventes rafraîchies. Sans ça, l'app ne verrait rien avant de
+  // relire la base d'elle-même.
+  try {
+    chrome.runtime.onMessage.addListener((m) => {
+      if (m && m.__vmrEvt && m.evt) { try { window.postMessage({ __vmr: 'evt', evt: m.evt }, '*'); } catch (_) {} }
+    });
+  } catch (_) {}
 })();

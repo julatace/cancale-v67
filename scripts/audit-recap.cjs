@@ -130,7 +130,9 @@ const V = (tx, titre, prix, statut) => ({ transaction_id: tx, title: titre, pric
     const src2 = require('fs').readFileSync(require('path').join(__dirname, '..', 'vinted-sync-extension', 'background.js'), 'utf8');
     const i = src2.indexOf('async function visiteVinted');
     const bloc = src2.slice(i, i + 2600);
-    dit(/const genes = await genererBordereauxEnAttente\(uid\);/.test(bloc) && !/lectureSeule: true/.test(bloc),
+    // ⚠️ La RÈGLE (la visite génère), pas son orthographe : depuis la 5.129 l'appel
+    //    passe par la file commune `avecVinted` (une requête Vinted à la fois).
+    dit(/const genes = await (?:avecVinted\(\(\) => )?genererBordereauxEnAttente\(uid\)\)?;/.test(bloc) && !/lectureSeule: true/.test(bloc),
       'la visite génère le bordereau toute seule (plus de lecture seule)');
     dit(/rafraichirVentes\(uid\)/.test(bloc) && /VENTES_DELAI_MS/.test(bloc),
       'les ventes se rafraîchissent seules, sans attendre la moisson complète');

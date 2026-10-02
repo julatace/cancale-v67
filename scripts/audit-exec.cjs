@@ -1,0 +1,110 @@
+// ════════════════════════════════════════════════════════════════════════════
+//  LE CANAL `exec` (l'app fait agir l'extension) RESPECTE LES GARDE-FOUS DU §3
+//
+//  Mesuré le 2 octobre : le message `exec` du pont ne vérifiait que « /api/ ».
+//  Ni l'origine (tous les autres messages du pont la vérifient), ni le compte
+//  connecté dans Chrome (`garde`), ni le plafond de 20 actions/h, ni la méthode :
+//  un `DELETE /api/v2/items/{id}` — la suppression d'annonce que §3 refuse —
+//  serait parti depuis n'importe quel script de la page.
+//
+//  ⚠️ §4.10 : on EXÉCUTE le vrai `background.js` dans un `vm`, on récupère le
+//  vrai écouteur `chrome.runtime.onMessage` et on COMPTE ce qui part chez Vinted.
+//  ⚠️ Et l'AUTRE SENS : *tout refuser* passerait tous les contrôles « rien ne
+//  part ». Une vraie réponse, sur le bon compte, doit partir.
+// ════════════════════════════════════════════════════════════════════════════
+const fs = require('fs'), vm = require('vm'), path = require('path');
+const racine = path.join(__dirname, '..');
+const src = fs.readFileSync(path.join(racine, 'vinted-sync-extension', 'background.js'), 'utf8');
+const dual = (v) => function (...a) { const cb = a[a.length - 1]; if (typeof cb === 'function') { cb(v); return; } return Promise.resolve(v); };
+
+let ko = 0, ok = 0;
+const dit = (bon, quoi, det) => {
+  if (bon) { ok++; console.log(`✅ ${quoi}`); }
+  else { ko++; console.log(`❌ ${quoi}${det ? ' — ' + det : ''}`); }
+};
+const essaie = async (quoi, fn) => { try { return await fn(); } catch (e) { ko++; console.log(`❌ ${quoi} — a levé : ${e && e.message}`); return null; } };
+
+const UID = '3175765377';
+const APP = 'https://vrm.center';
+
+function faireCtx({ connecte = UID } = {}) {
+  const store = {}; const envois = []; let ecouteur = null;
+  const ctx = {
+    console: { log() {}, warn() {}, error() {} },
+    setTimeout: (fn, ms) => setTimeout(fn, Math.min(ms || 0, 1)), clearTimeout, setInterval: () => 0, clearInterval,
+    URL, TextDecoder, TextEncoder,
+    btoa: (s) => Buffer.from(s, 'binary').toString('base64'), atob: (s) => Buffer.from(s, 'base64').toString('binary'),
+    chrome: {
+      runtime: { onInstalled: { addListener() {} }, onStartup: { addListener() {} }, onMessage: { addListener(fn) { ecouteur = fn; } }, getManifest: () => ({ version: '9.9.9' }), lastError: null, id: 'x' },
+      alarms: { create() {}, onAlarm: { addListener() {} } },
+      cookies: { get: dual(null), getAll: dual([]), onChanged: { addListener() {} } },
+      downloads: { onCreated: { addListener() {} } },
+      action: { setBadgeText() {}, setBadgeBackgroundColor() {}, setTitle() {}, onClicked: { addListener() {} }, setPopup() {} },
+      tabs: { onUpdated: { addListener() {} }, onActivated: { addListener() {} }, query: dual([]), sendMessage: dual(undefined), create: dual({}) },
+      storage: { local: {
+        get(k, cb) { const cles = Array.isArray(k) ? k : (typeof k === 'string' ? [k] : Object.keys(k || {})); const out = {}; for (const c of cles) if (store[c] !== undefined) out[c] = store[c]; if (typeof cb === 'function') { cb(out); return; } return Promise.resolve(out); },
+        set(o, cb) { Object.assign(store, o); if (typeof cb === 'function') { cb(); return; } return Promise.resolve(); },
+        remove: dual(undefined),
+      }, onChanged: { addListener() {} } },
+      webNavigation: { onCompleted: { addListener() {} } },
+      scripting: { executeScript: dual([]) },
+    },
+    fetch: async () => ({ ok: true, status: 200, json: async () => [], text: async () => '[]', headers: { get: () => 'application/json' } }),
+  };
+  ctx.self = ctx; ctx.globalThis = ctx; ctx.window = undefined;
+  vm.createContext(ctx);
+  vm.runInContext(src, ctx, { filename: 'background.js' });
+  ctx.getStoredAccounts = async () => [{ vinted_user_id: UID, login: 'angeled92', domain: 'www.vinted.fr' }, { vinted_user_id: '999', login: 'autre', domain: 'www.vinted.fr' }];
+  ctx.activeAccountId = async () => connecte;            // le compte du cookie Vinted
+  ctx.vintedSend = async (acc, method, endpoint) => { envois.push(method + ' ' + endpoint); return { ok: true, status: 200, json: {} }; };
+  const envoyer = (msg, origine = APP) => new Promise((res) => {
+    if (!ecouteur) { res({ __pasDEcouteur: true }); return; }
+    const r = ecouteur(Object.assign({ from: 'vmr-bridge', action: 'exec' }, msg), { origin: origine, url: origine + '/' }, res);
+    if (r !== true) setTimeout(() => res(undefined), 5);
+  });
+  return { ctx, envois, envoyer };
+}
+
+const REPONSE = { uid: UID, method: 'POST', endpoint: '/api/v2/conversations/123/replies', body: { reply: { body: 'Oui !' } } };
+
+(async () => {
+  await essaie('autre sens : une vraie réponse sur le bon compte part', async () => {
+    const { envois, envoyer } = faireCtx();
+    const r = await envoyer(REPONSE);
+    dit(r && r.ok === true && envois.length === 1, 'autre sens : une réponse à un message, sur le compte connecté, PART', JSON.stringify(r) + ' · ' + envois.join(','));
+  });
+  await essaie('suppression d\'annonce refusée', async () => {
+    const { envois, envoyer } = faireCtx();
+    const r = await envoyer({ uid: UID, method: 'DELETE', endpoint: '/api/v2/items/9944967551' });
+    dit(envois.length === 0 && r && r.ok === false, '`DELETE /api/v2/items/{id}` (supprimer une annonce, §3) ne part pas', envois.join(','));
+  });
+  await essaie('requête arbitraire refusée', async () => {
+    const { envois, envoyer } = faireCtx();
+    await envoyer({ uid: UID, method: 'PUT', endpoint: '/api/v2/transactions/1/shipment/order', body: {} });
+    await envoyer({ uid: UID, method: 'POST', endpoint: '/api/v2/items/1/push_up' });
+    dit(envois.length === 0, 'une requête hors liste blanche ne part pas (PUT bordereau, push_up)', envois.join(','));
+  });
+  await essaie('origine', async () => {
+    const { envois, envoyer } = faireCtx();
+    const r = await envoyer(REPONSE, 'https://site-malveillant.example');
+    dit(envois.length === 0 && r && r.ok === false, 'une page qui n\'est pas l\'app ne fait rien partir', envois.join(','));
+  });
+  await essaie('autre compte', async () => {
+    const { envois, envoyer } = faireCtx({ connecte: '999' });
+    const r = await envoyer(REPONSE);
+    dit(envois.length === 0 && r && r.code === 'vinted-autre', 'Chrome connecté sur UN AUTRE compte : rien ne part, et la raison est « vinted-autre »', JSON.stringify(r));
+  });
+  await essaie('aucun compte', async () => {
+    const { envois, envoyer } = faireCtx({ connecte: null });
+    const r = await envoyer(REPONSE);
+    dit(envois.length === 0 && r && r.code === 'vinted-absent', 'aucun compte lisible dans Chrome : rien ne part (« pas su » ne vaut pas « oui »)', JSON.stringify(r));
+  });
+  await essaie('plafond', async () => {
+    const { envois, envoyer } = faireCtx();
+    let dernier = null;
+    for (let i = 0; i < 21; i++) dernier = await envoyer(REPONSE);
+    dit(envois.length === 20 && dernier && dernier.code === 'plafond', 'la 21ᵉ action dans l\'heure est refusée (plafond de 20/h)', `${envois.length} envoi(s), dernière réponse ${JSON.stringify(dernier)}`);
+  });
+  console.log(`\n${ok} ✅ · ${ko} ❌`);
+  process.exit(ko ? 1 : 0);
+})();
