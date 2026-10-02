@@ -7,21 +7,38 @@
 // estALui) : on recompute les groupes INDÉPENDAMMENT et on exige l'égalité, et
 // on montre que le filtre « >=2 ventes » écarte de vrais groupes (il porte).
 const fs=require('fs'), path=require('path');
-const SRC=fs.readFileSync(path.join(__dirname,'..','..','src','App.jsx'),'utf8').split('\n');
-const sl=(a,b)=>SRC.slice(a,b).join('\n');
+const FULL=fs.readFileSync(path.join(__dirname,'..','..','src','App.jsx'),'utf8');
+// ⚠️ EXTRACTION PAR NOM, PAS PAR NUMÉRO DE LIGNE (§4.11 : les tranches par ligne
+//    dérivent dès qu'App.jsx grandit — ce banc était rouge, ses tranches pointant
+//    300 lignes trop haut). `grab(name)` isole UNE déclaration (const/function) en
+//    comptant les parenthèses/accolades/crochets : il suit la RÈGLE, pas sa place.
+const grab=(name)=>{
+  const re=new RegExp('(?:^|\\n)((?:const|function)\\s+'+name+'\\b)');
+  const m=re.exec(FULL); if(!m) throw new Error('introuvable : '+name);
+  const isConst=m[1].startsWith('const');
+  let i=m.index+(FULL[m.index]==='\n'?1:0), depth=0, started=false, j=i;
+  for(; j<FULL.length; j++){
+    const c=FULL[j];
+    if(c==='{'||c==='['||c==='('){ depth++; started=true; }
+    else if(c==='}'||c===']'||c===')'){ depth--; }
+    else if(isConst && c===';' && depth===0 && started){ j++; break; }
+    if(!isConst && started && depth===0 && c==='}'){ j++; break; }
+  }
+  return FULL.slice(i,j);
+};
 let M;
 try {
-  // ⚠️ EXTRACTION PAR NUMÉROS DE LIGNE (§4.11 : fragile — se re-cale quand
-  //    App.jsx bouge). Tranches recalées le 25 sept. :
-  //    montantCommande (2670-2676) · extractSize+extractModel (3767-3924) ·
-  //    medianeNb+grouperPrixMarche+valoriserStock (6277-6318).
   M=new Function(`const normTitle=(t)=>(t||'').toLowerCase().replace(/\\s+/g,' ').trim();
-${sl(2669,2676)}
-${sl(3766,3924)}
-${sl(6276,6318)}
+${grab('montantCommande')}
+${grab('KNOWN_MODELS')}
+${grab('extractModel')}
+${grab('extractSize')}
+${grab('medianeNb')}
+${grab('grouperPrixMarche')}
+${grab('valoriserStock')}
 return {grouperPrixMarche, valoriserStock, extractModel, extractSize, montantCommande};`)();
 } catch(e){ console.log('KO  extraction du code impossible —', e.message); process.exit(1); }
-const FX=f=>JSON.parse(fs.readFileSync(path.join(__dirname,'fx',f+'.json'),'utf8'));
+const FX=f=>{try{return JSON.parse(fs.readFileSync(path.join(__dirname,'fx',f+'.json'),'utf8'));}catch(_){return [];}};
 // Ventes finalisées + annonces en ligne, comme le fait le chargeur de l'écran.
 const sold=[]; { const seen=new Set();
   for(const r of FX('sold')){ const p=(r.data&&r.data.payload)||{};
@@ -29,6 +46,23 @@ const sold=[]; { const seen=new Set();
       if(/finalis/i.test(o.status||'')) sold.push(o); } } }
 const online=[]; for(const r of FX('listings')){ const p=(r.data&&r.data.payload)||{};
   for(const it of (p.items||[])){ if(!it.is_closed&&!it.is_hidden&&!it.is_draft) online.push(it); } }
+// ⚠️ DONNÉE SYNTHÉTIQUE DE SECOURS (aucun acheteur, aucune adresse → peut vivre
+//    DANS le banc, dépôt public). Quand fx/ est vide (conteneur nu, fx gitignoré),
+//    le banc ne prouvait RIEN : « 0 groupe » passe les contrôles d'absence et
+//    échoue ceux de présence. Avec ce jeu, grouperPrixMarche s'exerce partout :
+//    Air Max 1 T42 vendue 3× (médiane 70), Dunk T44 vendue 1× (écartée : prouve
+//    le filtre ≥2), et une annonce Air Max 1 T42 en ligne (valorisation).
+if(!sold.length){
+  sold.push(
+    {title:'Nike Air Max 1 blanc taille 42', status:'finalise', price:{amount:'60'}, transaction_id:'s1'},
+    {title:'Nike Air Max 1 rouge taille 42', status:'finalise', price:{amount:'80'}, transaction_id:'s2'},
+    {title:'Nike Air Max 1 noir taille 42',  status:'finalise', price:{amount:'70'}, transaction_id:'s3'},
+    {title:'Nike Dunk low taille 44',        status:'finalise', price:{amount:'50'}, transaction_id:'s4'},
+  );
+}
+if(!online.length){
+  online.push({title:'Nike Air Max 1 vert taille 42', is_closed:false, is_hidden:false, is_draft:false, id:'o1'});
+}
 let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' — '+d:''));};
 const essaie=(m,fn)=>{ try{ return fn(); }catch(e){ ko++; console.log('KO  '+m+' — a levé : '+e.message); } };
 
