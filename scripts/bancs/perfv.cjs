@@ -63,8 +63,13 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
   const m=await pg.evaluate(()=>({noeuds:document.querySelectorAll('*').length,
      haut:document.documentElement.scrollHeight,
      cartes:document.querySelectorAll("input[placeholder*='prix']").length,
-     images:document.querySelectorAll('img').length,
-     pasLazy:[...document.querySelectorAll('img')].filter(i=>i.getAttribute('loading')!=='lazy').length}));
+     // ⚠️ On ne compte QUE les photos de CONTENU (vignettes de ventes). Le LOGO
+     //    (`/logo-vrm*.png`, en-tête/rail) est de la CHROME au-dessus de la ligne
+     //    de flottaison : il doit charger TOUT DE SUITE, pas en lazy (sinon il
+     //    clignote). L'ancien compte prenait le logo → rouge dès son ajout (30
+     //    sept.), alors que l'app a raison. On l'exclut par son src.
+     images:[...document.querySelectorAll('img')].filter(i=>!/logo-vrm/i.test(i.getAttribute('src')||i.src||'')).length,
+     pasLazy:[...document.querySelectorAll('img')].filter(i=>!/logo-vrm/i.test(i.getAttribute('src')||i.src||'') && i.getAttribute('loading')!=='lazy').length}));
   // ce que coûte un filtre : on clique « Sans prix d'achat »
   const t1=Date.now();
   await pg.evaluate(()=>{const b=[...document.querySelectorAll('button')].find(x=>/Sans prix/.test(x.textContent)); if(b)b.click();});
