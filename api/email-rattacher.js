@@ -11,7 +11,7 @@
 // Supabase avant toute chose — sinon n'importe qui pourrait s'attribuer les
 // emails d'un autre vendeur, ce qui serait pire que le problème d'origine.
 import { traiterEmail } from './email-inbound.js';
-import { contexteVendeur } from './_lib/owner.js';
+import { contexteVendeur, withOwnerAll, conflictTarget } from './_lib/owner.js';
 import { sbCle } from './_lib/cle.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
@@ -85,10 +85,10 @@ export default async function handler(req, res) {
       await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE', headers: HEADERS });
     } catch (_) {}
     try {
-      await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=id`, {
+      await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${conflictTarget('id')}`, {
         method: 'POST',
         headers: { ...HEADERS, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
-        body: JSON.stringify([{ id, data: { supprime: true, rejoueLe: new Date().toISOString(), type: resultat.type || 'traité' } }]),
+        body: JSON.stringify(withOwnerAll([{ id, data: { supprime: true, rejoueLe: new Date().toISOString(), type: resultat.type || 'traité' } }])),
       });
     } catch (_) {}
   }
