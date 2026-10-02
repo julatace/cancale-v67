@@ -35,7 +35,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.127.0';
+const EXT_ATTENDUE = '5.128.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -769,6 +769,9 @@ const SYNC_KEYS = [
   'vinted_txn_link','vinted_sales_hidden','vinted_purchases_hidden','vinted_accounts_hidden','vinted_autonum','vinted_urssaf_freq','vinted_urssaf_taux',
   'vinted_sale_overrides','vinted_bord_links','vinted_pickup_done','vinted_bords_hidden','vinted_ship_done','vinted_pairs_lost','vinted_retours_recus','vinted_retours_dismissed',
   'vinted_offvinted_buys','vinted_buyprice_by_num','vinted_quick_replies','vinted_ca_keep_removed','vinted_achat_notes','vrm_lbc_colis_done',
+  // Annonce Leboncoin → N° de paire, posé À LA MAIN (« Relier », écran
+  // Leboncoin, C4). Une identité qu'il pose lui-même : l'extension la LIT.
+  'vrm_lbc_liens',
   // Offres marquées « traité » à la main (tu as répondu) → disparaissent de
   // « Ma journée ». Clé = receivedAt|article. Synchronisé entre appareils.
   'vinted_offers_done',
@@ -25082,7 +25085,55 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 // l'extension sur leboncoin.fr (assistant 1-clic). Ici on montre : combien
 // publiées / ton offre, ce qu'il reste à publier, et ce qu'il faut retirer
 // (vendu sur Vinted). Tout est lu depuis Supabase (0 appel Vinted/Leboncoin).
-const MAIN_LEBONCOIN = ['vinted_annonce_numeros', 'vinted_accounts_hidden', 'vinted_accounts_blocked', 'vinted_pairs_lost'];
+// ── RELIER UNE ANNONCE LEBONCOIN À UNE PAIRE, À LA MAIN (C4, 30 sept.) ─────
+// « Annonce Leboncoin non reliée : afficher la photo + pouvoir la relier à un N°
+// dans l'app. » Le lien est une IDENTITÉ posée par lui (son clic), jamais une
+// ressemblance : on n'en propose aucun, il tape le N° qu'il reconnaît sur la
+// photo. Un N° que VRM ne connaît pas est refusé (sinon le lien ne mènerait à
+// aucune paire, et l'annonce resterait « non reliée » sans le dire).
+function LbcRelier({ ad, numsConnus, onRelie }) {
+  const [num, setNum] = useState('');
+  const [msg, setMsg] = useState('');
+  const photo = (Array.isArray(ad.images) && ad.images[0]) || ad.image || '';
+  const id = ad.id != null ? String(ad.id) : '';
+  const relier = () => {
+    const n = String(num || '').trim().replace(/^n[°o]?\s*/i, '');
+    if (!id) { setMsg("Cette annonce n'a pas d'identifiant Leboncoin : impossible de la relier."); return; }
+    if (!/^\d{1,5}$/.test(n)) { setMsg('Tape le numéro de la paire (des chiffres).'); return; }
+    if (!numsConnus.includes(n)) { setMsg(`Aucune paire ne porte le N°${n} dans VRM.`); return; }
+    const liens = { ...(load('vrm_lbc_liens', {}) || {}), [id]: n };
+    // ⚠️ `save` écrit 500 ms plus tard : l'écran se rechargeait AVANT et ne
+    //    voyait pas le lien (vu au banc). On pose la copie locale tout de
+    //    suite ; `save` garde la synchro vers le nuage.
+    try { localStorage.setItem('vrm_lbc_liens', JSON.stringify(liens)); } catch (_) {}
+    save('vrm_lbc_liens', liens);
+    setMsg('');
+    toast(`Annonce reliée à la paire N°${n}.`);
+    onRelie && onRelie();
+  };
+  return (
+    <div data-lbc-relier={id} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 0', borderTop: `1px solid ${C.border}` }}>
+      <div style={{ width: 52, height: 52, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: C.card2 || C.border, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {photo ? <img src={photo} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : <Icon name="image" size={18} style={{ color: C.muted, opacity: .55 }}/>}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 12.5, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ad.subject || ad.title || '—'}</div>
+        <div style={{ fontSize: 11, color: C.muted }}>
+          {ad.price != null ? `${ad.price} €` : ''}{ad.customRef ? ` · réf ${ad.customRef}` : ''}
+          {ad.url ? <> · <a href={ad.url} target="_blank" rel="noreferrer" style={{ color: C.accent, fontWeight: 600 }}>voir</a></> : null}
+        </div>
+        {msg && <div style={{ fontSize: 11, color: C.warn, marginTop: 2 }}>{msg}</div>}
+      </div>
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+        <input value={num} onChange={(e) => setNum(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') relier(); }}
+          inputMode="numeric" placeholder="N°" aria-label="N° de la paire"
+          style={{ width: 54, border: `1px solid ${C.border}`, borderRadius: 8, padding: '6px 7px', background: C.bg, color: C.text, fontSize: 13, outline: 'none', fontFamily: 'inherit' }}/>
+        <button type="button" onClick={relier} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, padding: '6px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Relier</button>
+      </div>
+    </div>
+  );
+}
+const MAIN_LEBONCOIN = ['vinted_annonce_numeros', 'vinted_accounts_hidden', 'vinted_accounts_blocked', 'vinted_pairs_lost', 'vrm_lbc_liens'];
 function LeboncoinScreen() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -25216,10 +25267,18 @@ function LeboncoinScreen() {
     const lbcItems = (lbcRows && lbcRows[0] && lbcRows[0].data && lbcRows[0].data.items) || {};
     const lbcAds = Object.values(lbcItems).filter(Boolean);
     const numFrom = (s) => { const m = /\bn\s*°?\s*(\d{1,5})\b/i.exec(String(s || '')); return m ? m[1] : null; };
+    // ⚠️ LE LIEN POSÉ À LA MAIN D'ABORD (C4) : « Relier » écrit annonce LBC →
+    //    N° dans `vrm_lbc_liens`. C'est une identité qu'il pose lui-même — la
+    //    même règle vit dans l'extension (`adRefKeys`), sinon l'app relie et le
+    //    panneau ne relie pas (§11). La copie locale prime sur le nuage : elle
+    //    est plus récente que la dernière synchro (l'envoi est différé).
+    const liens = { ...(main.vrm_lbc_liens || {}), ...(load('vrm_lbc_liens', {}) || {}) };
     const adKeys = (ad) => {
       const ks = [];
+      const lien = ad && ad.id != null ? liens[String(ad.id)] : null;
+      if (lien != null && String(lien).trim()) ks.push(String(lien).trim());
       const c = ad.customRef != null ? String(ad.customRef) : '';
-      const mc = /(\d{1,5})/.exec(c); if (mc) ks.push(mc[1]);
+      const mc = /(\d{1,5})/.exec(c); if (mc && !ks.includes(mc[1])) ks.push(mc[1]);
       if (ad.ref && !ks.includes(String(ad.ref))) ks.push(String(ad.ref));
       const mt = numFrom(ad.subject); if (mt && !ks.includes(mt)) ks.push(mt);
       return ks;
@@ -25305,7 +25364,7 @@ function LeboncoinScreen() {
     // Répartition des annonces LBC par compte (plusieurs comptes possibles).
     const parCompte = {};
     for (const ad of liveAds) { const k = String(ad.lbcUser || '?'); (parCompte[k] = parCompte[k] || []).push(ad); }
-    setData({ preuveKO, echecLecture: echecLecture || listRowsBrut === null, lbcJamaisLu: lbcJamaisLu || liveAds.length === 0, vendues, nEnLigne: online.length, nNumerotees, queue, removals, unlinked, liveAds, autoMatched, retirees, lbcAccounts, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: liveAds.length, limit: pd.limit, plan: pd.plan, prep });
+    setData({ preuveKO, echecLecture: echecLecture || listRowsBrut === null, lbcJamaisLu: lbcJamaisLu || liveAds.length === 0, vendues, nEnLigne: online.length, nNumerotees, queue, removals, unlinked, numsConnus: [...keysKnown], liveAds, autoMatched, retirees, lbcAccounts, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: liveAds.length, limit: pd.limit, plan: pd.plan, prep });
     setLoading(false);
   };
   useEffect(() => { reload(); /* eslint-disable-next-line */ }, []);
@@ -25524,15 +25583,9 @@ function LeboncoinScreen() {
         {data.unlinked && data.unlinked.length > 0 && (
           <Card>
             <div style={{ fontSize: 13, fontWeight: 900, color: C.text, marginBottom: 4 }}>❔ {data.unlinked.length} annonce{data.unlinked.length > 1 ? 's' : ''} Leboncoin non reliée{data.unlinked.length > 1 ? 's' : ''}</div>
-            <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>VRM ne retrouve pas la paire correspondante (référence inconnue). Mets le numéro de la paire en <b>référence</b> sur l'annonce Leboncoin pour qu'elle se relie toute seule.</div>
-            {data.unlinked.slice(0, 20).map((u, i) => (
-              <div key={i} style={{ fontSize: 12.5, color: C.text, padding: '3px 0' }}>
-                {u.customRef ? <b>réf {u.customRef}</b> : <b>sans réf</b>} · {u.subject || '—'}
-                {u.price != null ? ` · ${u.price} €` : ''}
-                {u.issue ? <span style={{ color: C.warn, fontWeight: 700 }}> · ⚠️ {u.issue === 'LowVisibility' ? 'peu visible' : u.issue}</span> : null}
-                {u.url ? <> · <a href={u.url} target="_blank" rel="noreferrer" style={{ color: C.blue || C.accent, fontWeight: 700 }}>voir</a></> : null}
-              </div>
-            ))}
+            <div style={{ fontSize: 11.5, color: C.muted, marginBottom: 10, lineHeight: 1.45 }}>VRM ne sait pas quelle paire c'est. Si tu la reconnais, tape son <b>N°</b> et « Relier » : elle sera suivie comme les autres (« vendue sur Vinted → à retirer »).</div>
+            {data.unlinked.slice(0, 40).map((u) => <LbcRelier key={String(u.id || u.url || u.subject)} ad={u} numsConnus={data.numsConnus || []} onRelie={reload}/>)}
+            {data.unlinked.length > 40 && <div style={{ fontSize: 11.5, color: C.muted, marginTop: 6 }}>… et {data.unlinked.length - 40} autre{data.unlinked.length - 40 > 1 ? 's' : ''}.</div>}
           </Card>
         )}
         {/* Diagnostic fourni par Leboncoin lui-même sur tes annonces en ligne. */}

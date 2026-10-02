@@ -93,7 +93,7 @@ const projette = (row, sel) => {
         const u = decodeURIComponent(route.request().url());
         const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
         if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
-        if (/vinted_accounts/.test(u)) return j(ACCOUNTS);
+        if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCOUNTS);
         const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
         const forme = (r) => (sel && sel !== 'data,updated_at,cap:data->>capturedAt' && !/^id,data/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: auj.toISOString(), cap: r.data.capturedAt });
         const eq = /id=eq\.([^&]*)/.exec(u);

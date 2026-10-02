@@ -98,7 +98,7 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
       if (etat === 'cloisonnee') {
         if (/app_data\?select=id&limit=1/.test(u) || /vinted_accounts\?select=id&limit=1/.test(u)) return ferme();
       }
-      if (/vinted_accounts/.test(u)) return j(accounts);
+      if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(accounts);
       if (/id=eq\.main/.test(u)) return j(main);
       // ⚠️ LA SONDE DE LECTURE COMPTE LES LIGNES RENDUES : un banc qui répond
       //    `[]` fait dire « lecture fermée » sur une base grande ouverte —

@@ -66,7 +66,7 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' â€
     if(route.request().method()!=='GET') return j([]);
     if(/select=owner/.test(u)) return route.fulfill({status:400,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:'{"m":1}'});
     const sel=(/[?&]select=([^&]*)/.exec(u)||[])[1]; const S=sel?decodeURIComponent(sel):null;
-    if(/vinted_accounts/.test(u)) return j(accounts);
+    if(/\/rest\/v1\/vinted_accounts/.test(u)) return j(accounts);
     if(/id=eq\.main/.test(u)) return j(main.map(r=>projette(r,S)));
     if(/transaction->>id/.test(u)) return j(txn);
     const eq=/id=eq\.([^&]*)/.exec(u); if(eq){const k=decodeURIComponent(eq[1]);return j(rows.filter(r=>r.id===k).map(r=>projette(r,S)));}

@@ -5547,7 +5547,7 @@ const MAIN_PANNEAU = ['vinted_account_labels', 'vinted_accounts_blocked', 'vinte
 //    mais c'est le motif exact de « l'app annonçait 39, le panneau 40 » (§11),
 //    et `audit-places.cjs` existe pour ça. Les trois lecteurs, une seule règle.
 const MAIN_FILE = ['vinted_account_labels', 'vinted_accounts', 'vinted_accounts_blocked',
-  'vinted_accounts_hidden', 'vinted_annonce_numeros', 'vinted_pairs_lost'];
+  'vinted_accounts_hidden', 'vinted_annonce_numeros', 'vinted_pairs_lost', 'vrm_lbc_liens'];
 const MAIN_SAUVEGARDE = ['vinted_annonce_numeros', 'vinted_buyprice_by_num', 'vinted_garage_grid'];
 // Rend la ligne projetée (les clés absentes valent `null`), ou `null` si la base
 // n'a pas répondu — « rien lu » ne vaut pas « rien ».
@@ -5812,9 +5812,13 @@ async function readLbcItems() {
 }
 // Clés de rapprochement d'une annonce Leboncoin : sa référence pro (CustomRef),
 // le VRM-xxx éventuel, et tout numéro « nXXXX » présent dans son titre.
-function adRefKeys(ad) {
+// ⚠️ `liens` = `vrm_lbc_liens` (annonce LBC → N°), posé À LA MAIN dans l'app
+// (« Relier », C4). Une identité qu'il pose lui-même ; l'app applique la même
+// règle (`adKeys`), sinon l'app relie et le panneau ne relie pas (§11).
+function adRefKeys(ad, liens) {
   const keys = [];
   const push = (v) => { const t = String(v == null ? '' : v).trim(); if (t && !keys.includes(t)) keys.push(t); };
+  if (liens && ad && ad.id != null && liens[String(ad.id)] != null) push(liens[String(ad.id)]);
   if (ad.customRef) { const m = /(\d{1,5})/.exec(String(ad.customRef)); if (m) push(m[1]); }
   if (ad.ref) push(ad.ref);
   const t = String(ad.subject || '');
@@ -5995,6 +5999,7 @@ async function buildLbcData() {
   const main = (await lireMain(MAIN_FILE)) || {};
   const numeros = main.vinted_annonce_numeros || {};
   const lost = main.vinted_pairs_lost || {};
+  const liens = main.vrm_lbc_liens || {};
   const labels = main.vinted_account_labels || {};
   const accounts = main.vinted_accounts || [];
   const uid2login = {};
@@ -6112,7 +6117,7 @@ async function buildLbcData() {
   for (const ad of lbcItems) {
     const dead = /(supprim|delete|expir|refus|sold|vendu)/i.test(String(ad.status || ''));
     if (dead) continue;
-    for (const k of adRefKeys(ad)) if (!lbcByRef.has(k)) lbcByRef.set(k, ad);
+    for (const k of adRefKeys(ad, liens)) if (!lbcByRef.has(k)) lbcByRef.set(k, ad);
   }
   // Clés de rapprochement d'une annonce Vinted : son numéro VRM + le « nXXXX »
   // présent dans son titre (les deux numérotations coexistent chez toi).
@@ -6197,7 +6202,7 @@ async function buildLbcData() {
     }
     for (const ad of lbcItems) {
       if (/(supprim|delete|expir|refus|sold|vendu)/i.test(String(ad.status || ''))) continue;
-      const keys = adRefKeys(ad);
+      const keys = adRefKeys(ad, liens);
       if (!keys.length) { unlinked.push(lbcRow(ad, keys)); continue; }
       if (keys.some((k) => keysOnline.has(k))) continue;   // encore en ligne sur Vinted
       // Paire inconnue de VRM : on ne crie PAS « à retirer » (on risquerait de

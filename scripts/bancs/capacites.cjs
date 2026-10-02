@@ -99,7 +99,7 @@ const BANDEAU=/prix plancher[^\n]*rien ne les applique/i;
       if(route.request().method()!=='GET') return j([]);
       if(/select=owner/.test(u)) return route.fulfill({status:400,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:'{"m":1}'});
       const sel=(/[?&]select=([^&]*)/.exec(u)||[])[1]; const S=sel?decodeURIComponent(sel):null;
-      if(/vinted_accounts/.test(u)) return j(accounts);
+      if(/\/rest\/v1\/vinted_accounts/.test(u)) return j(accounts);
       if(/id=eq\.main/.test(u)) return j(main.map(r=>projette(r,S)));
       if(/transaction->>id/.test(u)) return j(txn);
       if(/id=eq\.panel_diag_capture/.test(u)){

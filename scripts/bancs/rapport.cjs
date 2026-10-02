@@ -68,7 +68,7 @@ srv.listen(PORT);
         const u = decodeURIComponent(route.request().url());
         const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
         if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
-        if (/vinted_accounts/.test(u)) return j(ACCOUNTS);
+        if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCOUNTS);
         // L'app lit les ventes par MOTIF (`id=like.harvest_111_orders_%`) : un
         // banc qui ne sert que `id=eq.` mesure un écran vide (§6.3).
         const forme = (r) => ({ ...r, updated_at: auj.toISOString(), cap: r.data.capturedAt });

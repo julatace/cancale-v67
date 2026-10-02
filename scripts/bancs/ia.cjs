@@ -30,7 +30,7 @@ const aiPosts=[]; let aiMode='ok'; const vintedWrites=[];
     const meth=route.request().method();
     if(meth!=='GET'){ if(/app_data/.test(u)) vintedWrites.push(u); return j([]); }
     if(/select=owner/.test(u)) return route.fulfill({status:400,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:'{"m":1}'});
-    if(/vinted_accounts/.test(u)) return j(accounts);
+    if(/\/rest\/v1\/vinted_accounts/.test(u)) return j(accounts);
     if(/id=eq\.main/.test(u)) return j(main);
     const eq=/id=eq\.([^&]*)/.exec(u); if(eq){const k=decodeURIComponent(eq[1]);return j(rows.filter(r=>r.id===k));}
     const m=/id=like\.([^&]*)/.exec(u); if(m){const pat=decodeURIComponent(m[1]).replace(/[*%]/g,'.*');const re=new RegExp('^'+pat+'$');return j(rows.filter(r=>re.test(r.id)));}

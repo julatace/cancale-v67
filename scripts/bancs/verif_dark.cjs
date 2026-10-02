@@ -82,7 +82,7 @@ const TABS=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','pl
     await pg.route('**/rest/v1/**',route=>{const u=route.request().url();
       const j=d=>route.fulfill({status:200,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:JSON.stringify(d)});
       if(/select=owner/.test(u)) return route.fulfill({status:400,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:'{"m":1}'});
-      if(/vinted_accounts/.test(u)) return j(accounts);
+      if(/\/rest\/v1\/vinted_accounts/.test(u)) return j(accounts);
       const sel=(/[?&]select=([^&]*)/.exec(u)||[])[1]; const S=sel?decodeURIComponent(sel):null;
       if(/id=eq\.main/.test(u)) return j(main.map(r=>projette(r,S)));
       if(/transaction->>id/.test(u)) return j(txn);
