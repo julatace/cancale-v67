@@ -91,6 +91,18 @@ const AVEU=/Je n'arrive pas à joindre tes données|Je n'ai pas pu lire tes donn
     const ctx=await b.newContext({viewport:{width:1512,height:950}});
     const pg=await ctx.newPage();
     const errs=[]; pg.on('pageerror',e=>errs.push(e.message));
+    // ⚠️ §6.1 : un banc ne MEURT pas, il rapporte. Si un contexte tombe (page
+    //    fermée, renderer à court de mémoire après 40 chargements), on le signale
+    //    comme une erreur d'écran au lieu de tuer tout le banc — sinon un hoquet
+    //    de teardown masque tous les contrôles suivants.
+    try {
+      return await rendreInterne(panne, t, depuisJours, ctx, pg, errs);
+    } catch (e) {
+      try { await ctx.close(); } catch (_) {}
+      return { txt:'', errs:['contexte fermé: '+String(e&&e.message||e).slice(0,80)], marque:null, liens:[] };
+    }
+  };
+  const rendreInterne=async(panne,t,depuisJours,ctx,pg,errs)=>{
     await pg.addInitScript(()=>{try{localStorage.setItem('vrm_acces_direct','1');}catch(_){}});
     // Une panne qui DURE : l'app doit cesser de dire d'attendre.
     if(depuisJours) await pg.addInitScript(j=>{try{localStorage.setItem('vrm_base_ko_depuis',new Date(Date.now()-j*86400000).toISOString());}catch(_){}}, depuisJours);
