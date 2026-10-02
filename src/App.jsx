@@ -14031,8 +14031,24 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
   };
   // Comptes exclus de la comptabilité (leurs ventes ne comptent pas).
   const [hiddenAccts, setHiddenAccts] = useState(() => new Set((load('vinted_accounts_hidden', []) || []).map(String)));
-  const toggleAcctCompta = (uid) => {
-    setHiddenAccts(prev => { const n = new Set(prev); const k = String(uid); if (n.has(k)) n.delete(k); else n.add(k); save('vinted_accounts_hidden', [...n]); return n; });
+  // ⚠️ MASQUER SE DEMANDE, RÉAFFICHER NON. La confirmation vivait sur les puces
+  // de l'écran Annonces (Julien masquait des comptes en croyant FILTRER —
+  // vérifié en base) ; ces puces sont parties ici le 2 octobre (H1), la
+  // confirmation les suit. Le geste retire le compte de partout, sur tous les
+  // appareils.
+  const toggleAcctCompta = async (uid) => {
+    const k = String(uid);
+    if (!hiddenAccts.has(k)) {
+      const a = (accounts || []).find(x => String(x.vinted_user_id) === k);
+      const nom = a ? (labels[a.vinted_user_id] || a.login || `#${k}`) : `#${k}`;
+      const ok = await askConfirm({
+        title: `Masquer « ${nom} » ?`,
+        desc: "Ses annonces disparaissent de l'écran Annonces et ses ventes ne comptent plus dans la comptabilité, sur tous tes appareils. À réserver à un compte fermé ou abandonné — un nouveau tap le réaffiche.",
+        ok: 'Masquer', cancel: 'Annuler', danger: true,
+      });
+      if (!ok) return;
+    }
+    setHiddenAccts(prev => { const n = new Set(prev); if (n.has(k)) n.delete(k); else n.add(k); save('vinted_accounts_hidden', [...n]); return n; });
   };
 
   const startEditLabel = (acc) => { setEditingLabel(acc.vinted_user_id); setLabelDraft(labels[acc.vinted_user_id] || acc.login || ''); };
@@ -15637,28 +15653,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (d && typeof d === 'object') setPanelAcctOff(d);
     } catch (_) {}
   })(); }, []);
-  // Masquer/afficher un compte partout (annonces + compta) depuis l'onglet Annonces.
-  // ⚠️ MASQUER UN COMPTE SE DEMANDE, LE RÉAFFICHER NON.
-  // Ces puces ressemblent à des filtres, mais un simple tap RETIRE le compte de
-  // partout (annonces + comptabilité) et la liste part dans le cloud, donc sur
-  // tous les appareils. Vérifié en base : `vinted_accounts_hidden` a changé tout
-  // seul entre deux relevés (un compte masqué, un autre réaffiché) — Julien
-  // tapotait les puces en croyant filtrer. Un geste aussi lourd doit être
-  // confirmé ; le retour en arrière, lui, reste immédiat.
-  const toggleHideAcc = async (uid) => {
-    const k = String(uid);
-    if (!hiddenAccts.has(k)) {
-      const a = (accounts || []).find(x => String(x.vinted_user_id) === k);
-      const nom = a ? accNameOf(a) : `#${k}`;
-      const ok = await askConfirm({
-        title: `Masquer « ${nom} » ?`,
-        desc: "Ses annonces disparaissent de l'écran Annonces et ses ventes ne comptent plus dans la comptabilité, sur tous tes appareils. À réserver à un compte fermé ou abandonné — retape la puce pour le réafficher.",
-        ok: 'Masquer', cancel: 'Annuler', danger: true,
-      });
-      if (!ok) return;
-    }
-    setHiddenAccts(prev => { const n = new Set(prev); if (n.has(k)) n.delete(k); else n.add(k); save('vinted_accounts_hidden', [...n]); return n; });
-  };
+  // (Le masquage d'un compte se fait dans Réglages → Comptes liés, avec sa
+  // confirmation — les puces de l'écran Annonces sont parties le 2 octobre, H1.)
   // Comptes détectés BLOQUÉS par Vinted (un appel réel « Synchroniser » a renvoyé
   // 401/403 même après refresh du token → le compte est fermé/suspendu). On garde
   // la liste (synchronisée) : ses annonces et ses ventes sont masquées automatiquement
@@ -22180,101 +22176,39 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             disparues, comptes refusés) rejoignent le panneau « Conseils &
             signalements », qui existait déjà et compte déjà ce genre de
             choses. Un seul endroit où regarder. */}
-        {/* Visibilité par compte : une puce par compte qui a des annonces, avec
-            son nb en ligne. Tape pour MASQUER (compte bloqué/fermé → ses annonces
-            disparaissent partout) ou réafficher. Réglé le souci « 2 comptes
-            bloqués dont les annonces restaient affichées ». */}
+        {/* ── LES COMPTES : UNE LIGNE, PLUS UNE RANGÉE DE PUCES (H1, 30 sept.) ──
+            « L'onglet Annonces, c'est le bordel : la liste des comptes connectés
+            va dans Réglages, avec les infos. » La rangée « Comptes : » (une puce
+            par compte, qui MASQUAIT le compte au tap) faisait doublon avec
+            Réglages → Comptes liés, qui porte déjà l'email, le téléphone, l'état
+            de capture et le même interrupteur « masquer ». Il reste ici UNE
+            ligne qui dit combien de comptes alimentent la liste, ce qui demande
+            un geste (connexion refusée, données d'une semaine), et la porte.
+            Les nombres viennent de `annBase` comme « N en ligne » (§11). */}
         {listings.items && listings.items.length>0 && (()=>{
-          // ⚠️ LA SOMME DES PUCES DOIT ÉGALER « N en ligne » JUSTE EN DESSOUS.
-          // Elles comptaient TOUTES les annonces captées, `annStats` compte
-          // `annBase` (qui écarte les paires déjà vendues dont Vinted a laissé
-          // l'annonce ouverte) : on lisait « 7+6+5+5+4+3+3+2+1 = 36 » au-dessus
-          // d'un « 35 en ligne » — deux chiffres pour la même notion, sur le
-          // même écran (§11). Un compte MASQUÉ, lui, n'est pas dans `annBase`
-          // du tout : sa puce garde le compte brut, qui dit ce qu'on
-          // récupérerait en le réaffichant (et elle est barrée, donc lisible
-          // comme telle).
           const brut = {}, visibles = {};
           for (const it of listings.items) { const uid = String(it._acc?.vinted_user_id || ''); if (!uid) continue; brut[uid] = (brut[uid]||0)+1; }
           for (const it of annBase) { const uid = String(it._acc?.vinted_user_id || ''); if (!uid) continue; visibles[uid] = (visibles[uid]||0)+1; }
-          const counts = {};
-          Object.keys(brut).forEach(uid => {
-            const off = hiddenAccts.has(uid) || blockedAccts.has(uid);
-            counts[uid] = off ? brut[uid] : (visibles[uid] || 0);
-          });
-          const uids = Object.keys(counts);
-          if (uids.length < 2 && !uids.some(u=>hiddenAccts.has(u))) return null; // 1 seul compte visible : inutile
+          const uids = Object.keys(brut);
+          if (uids.length < 2 && !uids.some(u=>hiddenAccts.has(u))) return null; // un seul compte : rien à dire
+          const nOff = uids.filter(u => acctOff(u)).length;
+          const refuses = uids.filter(u => blockedAccts.has(u) && !acctOff(u));
+          const vieux = uids.filter(u => { const ms = harvestAgeMs(u, 'listings'); return ms != null && ms >= 7*86400000 && !hiddenAccts.has(u) && !blockedAccts.has(u); });
+          const nVieux = vieux.reduce((t,u)=>t+(visibles[u]||0), 0);
           const accByUid = {}; accounts.forEach(a=>{ accByUid[String(a.vinted_user_id)] = a; });
-          const anyHidden = uids.some(u=>hiddenAccts.has(u));
+          const nom = (u) => { const a = accByUid[u]; return a ? accNameOf(a) : `#${u}`; };
           return (
-            <div className="vrm-rangee" style={{marginBottom:12,display:'flex',gap:7,alignItems:'center',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',paddingBottom:2}}>
-              <span style={{fontSize:11,fontWeight:600,color:C.muted,flexShrink:0}}>Comptes :</span>
-              {uids.sort((a,b)=>counts[b]-counts[a]).map(uid=>{
-                const a = accByUid[uid]; const name = a ? accNameOf(a) : `#${uid}`;
-                // ⚠️ La puce doit dire EXACTEMENT ce que fait le filtre, sinon
-                // elle s'affiche grisée pour un compte qui compte quand même
-                // (ou l'inverse). Une seule règle : `acctOff` (§11).
-                const off = acctOff(uid);
-                // Refus d'authentification détecté automatiquement : c'est un
-                // problème de CONNEXION, plus un masquage — ses ventes comptent.
-                const refuse = blockedAccts.has(uid) && !off;
-                // ÂGE DES DONNÉES DE CE COMPTE. L'extension ne rafraîchit en
-                // direct que le compte connecté dans le navigateur : les autres
-                // peuvent dater de plusieurs semaines. Sans cette pastille, le
-                // compteur « 96 annonces » d'un compte figé depuis 26 jours
-                // passait pour du direct.
-                const ms = harvestAgeMs(uid, 'listings');
-                const j = ms != null ? Math.floor(ms/86400000) : null;
-                // ⚠️ LE SEUIL ÉTAIT DE 2 JOURS, DONC PRESQUE TOUJOURS FRANCHI :
-                // l'extension ne rafraîchit en direct que le compte connecté, les
-                // autres datent forcément de quelques jours. Sept puces sur huit
-                // s'affichaient donc en ambre pour un état parfaitement normal —
-                // un signal qu'on voit tous les jours n'est plus un signal (§5.49).
-                // Une semaine, c'est le moment où il faut vraiment y repasser.
-                const vieux = j != null && j >= 7;
-                // ⚠️ ET LA PUCE EST NEUTRE. Chaque compte portait sa couleur
-                // (bordure + fond + TEXTE), donc six couleurs sur une ligne pour
-                // une information secondaire : c'est ce qui faisait « sapin de
-                // Noël » sur l'écran Annonces (§5.90 — une seule couleur d'accent,
-                // et elle est rare). La couleur ne revient que si le compte
-                // demande quelque chose : connexion refusée, ou données figées
-                // depuis une semaine.
-                const alerte = refuse || vieux;
-                const col = off ? C.border : alerte ? C.warn : C.border;
-                const encre = off ? C.muted : alerte ? C.warn : C.text;
-                return (
-                  <button key={uid} type="button" onClick={()=>toggleHideAcc(uid)}
-                    title={off ? 'Masqué — tape pour réafficher ses annonces'
-                          : refuse ? 'Vinted a refusé la connexion à ce compte. ⚠️ Ses ventes comptent quand même dans ton chiffre d\'affaires — l\'argent a bien été gagné. Reconnecte-toi dessus sur vinted.fr pour rafraîchir ses données.'
-                          : vieux ? `Données de ce compte captées il y a ${j} j. Connecte-toi dessus sur vinted.fr et ouvre ton dressing pour les rafraîchir.`
-                          : 'Tape pour masquer ce compte (annonces + compta), utile pour un compte bloqué/fermé'}
-                    style={{flexShrink:0,whiteSpace:'nowrap',display:'inline-flex',alignItems:'center',gap:6,border:`1px solid ${col}`,background:off?'transparent':(alerte?`${col}12`:C.card),color:encre,borderRadius:8,padding:'4px 10px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',textDecoration:off?'line-through':'none'}}>
-                    {off && <Icon name="eyeOff" size={13} style={{marginRight:4}}/>}{name} · {counts[uid]}
-                    {/* « connexion refusée » se dit, mais ne retire RIEN des totaux. */}
-                    {refuse && <span style={{fontSize:10.5,fontWeight:500,opacity:.85}}>· connexion refusée</span>}
-                    {!off && !refuse && vieux && <span style={{fontSize:10.5,fontWeight:500,opacity:.85}}>· {j} j</span>}
-                  </button>
-                );
-              })}
-              {/* Une seule phrase, sous les puces, quand au moins un compte traîne. */}
-              {(()=>{
-                const vieux = uids.filter(u => { const ms = harvestAgeMs(u, 'listings'); return ms != null && ms >= 2*86400000 && !hiddenAccts.has(u) && !blockedAccts.has(u); });
-                if (!vieux.length) return null;
-                const n = vieux.reduce((t,u)=>t+(counts[u]||0), 0);
-                return (
-                  <details style={{flex:'1 1 100%',marginTop:2}}>
-                    <summary style={{listStyle:'none',cursor:'pointer',fontSize:11,color:C.muted}}>
-                      <b style={{color:C.warn}}>{n} annonce{n>1?'s':''}</b> {vieux.length>1?'viennent de comptes':'vient d\u2019un compte'} dont les données datent
-                    </summary>
-                    <span style={{display:'block',fontSize:11,color:C.muted,lineHeight:1.5,marginTop:4}}>
-                      L'extension ne rafraîchit en direct que le compte <b style={{color:C.text}}>connecté dans ton navigateur</b> — connecte-toi sur {vieux.length>1?'ces comptes':'ce compte'} et ouvre ton dressing pour les remettre à jour.
-                    </span>
-                  </details>
-                );
-              })()}
-              {/* ⚠️ Phrase d'explication permanente retirée : elle apprend une
-                  règle qu'on comprend au premier tap, puis reste là tous les
-                  jours au-dessus du stock. */}
+            <div data-comptes-annonces style={{marginBottom:12,display:'flex',flexWrap:'wrap',alignItems:'center',gap:'4px 10px',fontSize:12,color:C.muted,lineHeight:1.45}}>
+              <span>
+                Annonces de <b style={{color:C.text}}>{uids.length - nOff} compte{uids.length - nOff>1?'s':''}</b>
+                {nOff>0 && <> · {nOff} masqué{nOff>1?'s':''}</>}
+                {refuses.length>0 && <> · <b style={{color:C.warn}}>connexion refusée : {refuses.map(nom).join(', ')}</b></>}
+                {nVieux>0 && <> · <b style={{color:C.warn}}>{nVieux} annonce{nVieux>1?'s':''}</b> de {vieux.length>1?`${vieux.length} comptes`:nom(vieux[0])} pas rafraîchie{nVieux>1?'s':''} depuis une semaine — connecte-toi dessus sur vinted.fr et ouvre ton dressing</>}
+              </span>
+              <button type="button" onClick={()=>onNav && onNav('vintedaccounts')}
+                style={{border:'none',background:'transparent',padding:0,color:C.accent,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+                Gérer les comptes →
+              </button>
             </div>
           );
         })()}
