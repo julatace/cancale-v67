@@ -19353,6 +19353,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (buy!=null && !isNaN(buy)) { cout+=buy; nbCout+=1; margeKnown+=(sell-buy); fraisConnu+=fee; }
       saleLines.push({ date:o.date, num:e?.numero||'', title:o.title, sell, buy:(buy!=null&&!isNaN(buy))?buy:null, fee });
     }
+    // Registre des ventes : dans l'ordre du mois, comme le relevé d'un comptable.
+    saleLines.sort((a,b)=> new Date(a.date)-new Date(b.date));
     // Registre d'achats du mois (hors annulés).
     const buyLines=[];
     let achatsTotal=0;
@@ -19428,12 +19430,43 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     kv('Coût d\'achat', R.cout.toFixed(2)+' EUR ('+R.nbCout+'/'+R.nb+' renseignés)');
     if (R.frais>0) kv('Boosts / mises en avant', R.frais.toFixed(2)+' EUR');
     if (R.regime==='marge') { kv('Marge TTC', R.marge.toFixed(2)+' EUR', true); kv('TVA sur la marge ('+R.tvaRate+'%)', R.tvaMarge.toFixed(2)+' EUR'); kv('Marge HT', R.margeHT.toFixed(2)+' EUR'); }
-    else { kv('Bénéfice net', R.benefNet.toFixed(2)+' EUR'+(R.nbCout<R.nb?` (sur ${R.nbCout}/${R.nb} ventes au coût connu)`:''), true); kv('Estimation cotisations ('+String(R.taux).replace('.',',')+'%)', R.urssaf.toFixed(2)+' EUR'); }
+    else { kv('Bénéfice net', (R.nbCout===0&&R.nb>0) ? 'inconnu — aucun prix d\'achat saisi' : R.benefNet.toFixed(2)+' EUR'+(R.nbCout<R.nb?` (sur ${R.nbCout}/${R.nb} ventes au coût connu)`:''), true); kv('Estimation cotisations ('+String(R.taux).replace('.',',')+'%)', R.urssaf.toFixed(2)+' EUR'); }
     if (R.nMasq>0) kv('dont ventes masquees dans l\'app (comptees)', R.nMasq+' — '+R.caMasq.toFixed(2)+' EUR');
     if (R.nAttente>0) kv('Ventes de ce mois pas encore finalisees (hors CA)', R.nAttente+' — '+R.caAttente.toFixed(2)+' EUR');
     kv('Nombre de ventes', String(R.nb));
     kv('Achats du mois (registre)', R.buyLines.length+' — '+R.achatsTotal.toFixed(2)+' EUR');
-    y-=6; page.drawText('Document indicatif genere par l\'app. Ne remplace pas un conseil comptable.',{x:40,y,size:8,font:reg,color:rgb(0.55,0.55,0.55)});
+    // ── Les REGISTRES, ligne par ligne (G2) : le comptable rapproche les ventes
+    // et les achats, il ne peut rien faire d'un total seul. Pagination : une
+    // nouvelle page dès que la ligne ne tient plus. Les polices standard de
+    // pdf-lib ne savent écrire que le WinAnsi : un emoji ou un caractère exotique
+    // dans un titre ferait échouer TOUT l'export — on le retire du texte.
+    let pg = page;
+    const propre = (t) => String(t==null?'':t).replace(/[^\x20-\x7E\u00A0-\u00FF\u20AC]/g,'').trim();
+    const coupe = (t,n) => { const x=propre(t); return x.length>n ? x.slice(0,n-3)+'...' : x; };
+    const W=(t,x,s,f,c)=>pg.drawText(propre(t),{x,y,size:s,font:f||reg,color:c||rgb(0.1,0.1,0.1)});
+    const place = (h) => { if (y-h < 50) { pg = pdf.addPage([595,842]); y = 800; } };
+    const entete = (titre, cols) => {
+      place(40); y-=10; W(titre,40,12,bold,rgb(0,0.47,0.51)); y-=16;
+      cols.forEach(([x,h])=>W(h,x,8,bold,rgb(0.35,0.35,0.35))); y-=4;
+      pg.drawLine({start:{x:40,y},end:{x:555,y},thickness:0.5,color:rgb(0.8,0.8,0.8)}); y-=12;
+    };
+    const colsV=[[40,'Date'],[92,'N°'],[125,'Article'],[365,'Vente'],[420,'Achat'],[470,'Boost'],[510,'Benefice']];
+    entete('Registre des ventes ('+R.saleLines.length+')', colsV);
+    R.saleLines.forEach(v=>{
+      place(14);
+      W(v.date?new Date(v.date).toLocaleDateString('fr-FR'):'',40,8); W(v.num||'',92,8); W(coupe(v.title,48),125,8);
+      W(v.sell.toFixed(2),365,8); W(v.buy!=null?v.buy.toFixed(2):'-',420,8); W(v.fee?v.fee.toFixed(2):'',470,8);
+      W(v.buy!=null?(v.sell-v.buy-v.fee).toFixed(2):'-',510,8); y-=12;
+    });
+    place(16); W('TOTAL',125,8,bold); W(R.ca.toFixed(2),365,8,bold); W(R.cout.toFixed(2),420,8,bold); W(R.frais?R.frais.toFixed(2):'',470,8,bold); y-=18;
+    const colsA=[[40,'Date'],[92,'Vendeur'],[200,'Article'],[500,'Montant']];
+    entete('Registre des achats ('+R.buyLines.length+')', colsA);
+    R.buyLines.forEach(b=>{
+      place(14);
+      W(b.date?new Date(b.date).toLocaleDateString('fr-FR'):'',40,8); W(coupe(b.seller,20),92,8); W(coupe(b.title,58),200,8); W(b.montant.toFixed(2),500,8); y-=12;
+    });
+    place(16); W('TOTAL',200,8,bold); W(R.achatsTotal.toFixed(2),500,8,bold); y-=20;
+    place(14); pg.drawText('Document indicatif genere par l\'app. Ne remplace pas un conseil comptable.',{x:40,y,size:8,font:reg,color:rgb(0.55,0.55,0.55)});
     const bytes=await pdf.save(); const blob=new Blob([bytes],{type:'application/pdf'}); const url=URL.createObjectURL(blob);
     const a=document.createElement('a'); a.href=url; a.download=`rapport-${reportMonth}.pdf`; document.body.appendChild(a); a.click(); a.remove();
     setTimeout(()=>URL.revokeObjectURL(url),4000);
@@ -24234,9 +24267,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       derrière est passé à l'encre. Ces deux chiffres n'appellent
                       aucune action : ce sont des faits. Le rouge reste pour un
                       bénéfice NÉGATIF, qui lui en appelle une. */}
-                  <StatBox label="Bénéfice net" value={fmtE(report.benefNet)} color={report.benefNet>=0?C.text:C.danger}
+                  <StatBox label="Bénéfice net" value={report.nbCout===0?'—':fmtE(report.benefNet)} color={report.nbCout===0||report.benefNet>=0?C.text:C.danger}
                     subColor={report.nbCout<report.nb?C.warn:undefined}
-                    sub={report.nbCout<report.nb?`sur ${report.nbCout} vente${report.nbCout>1?'s':''} sur ${report.nb} — prix d'achat manquants`:(report.frais>0?`boosts ${fmtE(report.frais)}`:undefined)}/>
+                    sub={report.nbCout===0&&report.nb>0?`aucun prix d'achat saisi pour ${report.nb>1?'ces':'cette'} ${report.nb} vente${report.nb>1?'s':''}`:report.nbCout<report.nb?`sur ${report.nbCout} vente${report.nbCout>1?'s':''} sur ${report.nb} — prix d'achat manquants`:(report.frais>0?`boosts ${fmtE(report.frais)}`:undefined)}/>
                   <StatBox label="Cotisations est." value={fmtE(report.urssaf)} sub={`${String(report.taux).replace('.',',')} % du CA · réglable`}/>
                 </>)}
               </div>
@@ -24246,7 +24279,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {report.nAttente>0 && (
                 <div style={{background:C.card,border:`1px solid ${C.border}`,borderLeft:`3px solid ${C.warn}`,borderRadius:8,padding:'9px 12px',marginBottom:12}}>
                   <div style={{fontSize:12.5,color:C.text,lineHeight:1.45}}>
-                    <b>{report.nAttente} vente{report.nAttente>1?'s':''} de ce mois {report.nAttente>1?'ne sont':"n'est"} pas encore finalisée{report.nAttente>1?'s':''}</b> — <b style={{color:C.warn}}>{fmtE(report.caAttente)}</b> qui ne {report.nAttente>1?'sont':'est'} pas dans le CA ci-dessus.
+                    <b>{report.nAttente} vente{report.nAttente>1?'s':''} de ce mois {report.nAttente>1?'ne sont':"n'est"} pas encore finalisée{report.nAttente>1?'s':''}</b> — <b style={{color:C.warn}}>{fmtE(report.caAttente)}</b> qui {report.nAttente>1?'ne sont':"n'est"} pas dans le CA ci-dessus.
                     <div style={{fontSize:11.5,color:C.muted,marginTop:2}}>Vinted finalise ~2 semaines après la vente : ce mois va encore monter.</div>
                   </div>
                 </div>
@@ -24293,6 +24326,26 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   })()}
                 </div>
               )}
+              {/* ── REGISTRE DES VENTES (G2) ─────────────────────────────
+                  La modale ne montrait que le TOTAL des ventes à côté du détail
+                  des achats : le comptable ne pouvait rien rapprocher. Les lignes
+                  viennent de `report.saleLines`, la MÊME boucle que le CA
+                  ci-dessus (§11) — la somme des lignes est le CA, par
+                  construction. Le prix d'achat n'est écrit que s'il est connu ;
+                  sinon un tiret, jamais un 0 (§7). */}
+              <div style={{fontSize:12,fontWeight:600,color:C.text,margin:'6px 0 8px'}}>Registre des ventes — {fmtE(report.ca)} ({report.saleLines.length})</div>
+              {report.saleLines.length===0 && <div style={{fontSize:12,color:C.muted,padding:'6px 0 12px'}}>Aucune vente finalisée ce mois-ci.</div>}
+              <div data-registre="ventes" style={{display:'flex',flexDirection:'column',gap:6,marginBottom:14}}>
+                {report.saleLines.map((v,i)=>(
+                  <div key={i} style={{display:'flex',gap:8,alignItems:'center',padding:'7px 10px',border:`1px solid ${C.border}`,borderRadius:8,background:C.card}}>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:12,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{v.num?<span style={{fontWeight:700}}>N°{v.num} · </span>:null}{v.title||'—'}</div>
+                      <div style={{fontSize:11,color:C.muted}}>{v.date?new Date(v.date).toLocaleDateString('fr-FR'):''}{' · achat '}{v.buy!=null?fmtE(v.buy):'—'}{v.fee?` · boost ${fmtE(v.fee)}`:''}{v.buy!=null?` · bénéfice ${fmtE(v.sell-v.buy-v.fee)}`:''}</div>
+                    </div>
+                    <div style={{fontSize:13,fontWeight:600,color:C.text,flexShrink:0}}>{fmtE(v.sell)}</div>
+                  </div>
+                ))}
+              </div>
               {/* Registre d'achats */}
               <div style={{fontSize:12,fontWeight:600,color:C.text,margin:'6px 0 8px'}}>Registre d'achats — {fmtE(report.achatsTotal)} ({report.buyLines.length})</div>
               {report.buyLines.length===0 && <div style={{fontSize:12,color:C.muted,padding:'6px 0 12px'}}>Aucun achat ce mois-ci{buys.items===null?' (registre en cours de chargement)':''}.</div>}
