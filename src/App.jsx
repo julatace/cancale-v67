@@ -15229,6 +15229,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     for (const b of (emailBords || [])) if (b && b.suivi) set.add(String(b.suivi).trim().toUpperCase());
     return set;
   }, [emailBords]);
+  // ── LE BORDEREAU DE CHAQUE VENTE (E1, 30 sept.) ─────────────────────────
+  // « Le bordereau à côté de chaque vente, à côté du prix si possible. » Relié
+  // par le n° de TRANSACTION, une identité (§5) : 165 bordereaux sur 166 la
+  // portent. Jamais par titre — un bordereau sans transaction n'est relié à
+  // rien (mieux vaut un blanc qu'un faux : imprimer le bordereau d'une AUTRE
+  // vente, c'est envoyer la mauvaise paire). Deux bordereaux pour une même
+  // transaction (rare : une réémission) → le plus récent, déjà en tête de liste.
+  const bordParTx = useMemo(() => {
+    const m = {};
+    for (const b of (emailBords || [])) {
+      if (!b || !b.hasPdf || !b.transaction) continue;
+      const k = String(b.transaction);
+      if (!m[k]) m[k] = b;
+    }
+    return m;
+  }, [emailBords]);
   // Bordereau PDF capté par l'extension quand tu le télécharges sur Vinted → on
   // signale qu'il est dispo pour le tamponner en 1 clic (cf. startBordereau).
   const [freshLabel, setFreshLabel] = useState(null); // { name, mins } ou null
@@ -21051,6 +21067,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div className="vrm-display" style={{fontSize:17,fontWeight:700,color:C.text}}>{sell!=null?`${Number.isInteger(sell)?sell:sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:''}</div>
                   {benef!=null && <div style={{fontSize:12,fontWeight:600,color:benef>=0?INV_STATUS.online.color:C.danger}}>{benef>=0?'+':''}{benef.toFixed(2).replace('.',',')}€</div>}
                   {benef!=null && fees>0 && <div style={{fontSize:9,color:C.muted}}>dont boost −{fees.toFixed(2).replace('.',',')}€</div>}
+                  {/* Le bordereau, sous le prix (E1) — seulement s'il est relié
+                      par la transaction. Même impression que l'écran Colis
+                      (tamponné du N°, facture pro jointe). */}
+                  {!hidden && bordParTx[String(o.transaction_id)] && (
+                    <button type="button" data-bord-vente={String(o.transaction_id)} onClick={()=>printBordAndInvoice(bordParTx[String(o.transaction_id)])}
+                      title={`Imprimer le bordereau de cette vente${num?` (tamponné N°${num})`:''}`}
+                      style={{marginTop:6,display:'inline-flex',alignItems:'center',gap:4,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:'pointer',fontSize:11.5,fontWeight:600,padding:'4px 8px',fontFamily:'inherit'}}>
+                      <Icon name="doc" size={13}/>Bordereau
+                    </button>
+                  )}
                 </div>
                </div>
                {/* ── Bas : une seule pastille de statut · les actions groupées ─── */}
@@ -21074,7 +21100,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {num && needsBordereau(o.status) && !hidden && inGarage(num) && (
                   <button type="button" onClick={()=>onLocate&&onLocate(num)} title={`Voir la paire N°${num} au stock`} aria-label="Voir au stock" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.blue||C.accent,cursor:'pointer',fontSize:15,padding:'6px 8px'}}><Icon name="pin" size={15}/></button>
                 )}
-                {needsBordereau(o.status) && !hidden && (
+                {needsBordereau(o.status) && !hidden && !bordParTx[String(o.transaction_id)] && (
                   <button type="button" onClick={()=>startBordereau(num||'',o.title,o._acc)} title={num?`Bordereau N°${num}`:'Bordereau (titre)'} aria-label="Bordereau annoté" style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:8,padding:'8px 10px',cursor:'pointer',fontSize:15}}><Icon name="doc" size={16}/></button>
                 )}
                 {st==='cancelled' && num && saleOutcome(o)==='rembourse' && !isPairLost(num) && (
