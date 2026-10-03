@@ -2844,11 +2844,19 @@ const caUrssafParMois = (ventes, masquee, versements) => caDeclarableParMois(ven
 //    de sa création. Une autre devise est écartée et COMPTÉE à part, jamais
 //    convertie au hasard.
 const ymDeTs = (t) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
-const ventesDeclarables = ({ vinted, lbc, ebay, masquee, versements } = {}) => {
+// ⚠️ LES COMPTES SÉLECTIONNÉS (Julien, 3 octobre : « tu prends tous les comptes
+//    qu'on a sélectionnés »). `exclu(o)` = la vente vient d'un compte qu'il a
+//    exclu de l'app : elle n'entre dans AUCUN total — ni un mois, ni « à dater ».
+//    C'est différent de `masquee(o)` (une vente rangée d'un ✕ sur sa carte) :
+//    celle-là reste du chiffre d'affaires et se compte à part. Les comptes
+//    supprimés, eux, n'ont déjà plus de ventes dans la liste.
+const ventesDeclarables = ({ vinted, lbc, ebay, masquee, exclu, versements } = {}) => {
   const lignes = [], aDater = [], ecartees = [], vus = new Set();
+  let exclues = 0;
   const garde = (l) => { if (vus.has(l.id)) return false; vus.add(l.id); return true; };
   for (const o of (vinted || [])) {
     if (!o || !venteFinalisee(o)) continue;
+    if (exclu && exclu(o)) { exclues += 1; continue; }
     const tx = o.transaction_id != null ? o.transaction_id : o.id;
     const id = 'vinted:' + (tx != null ? tx : ('?' + lignes.length));
     const eur = montantCommande(o), masq = !!(masquee && masquee(o));
@@ -2882,7 +2890,7 @@ const ventesDeclarables = ({ vinted, lbc, ebay, masquee, versements } = {}) => {
     const l = { id, plateforme: 'eBay', ts: t, ym: ymDeTs(t), eur, titre, masquee: false };
     if (garde(l)) lignes.push(l);
   }
-  return { lignes, aDater, ecartees };
+  return { lignes, aDater, ecartees, exclues };
 };
 // Par mois : le total ET sa répartition par plateforme — les « dont » somment au
 // total, ils viennent des mêmes lignes (§5 : la phrase vient de la même source).
@@ -17445,7 +17453,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // toutes les ventes Vinted seraient « à dater » (« rien lu » ≠ « rien »).
     if (versements === null) return;
     try {
-      const { lignes, aDater, ecartees } = ventesDeclarables({ vinted: sales.items, lbc: lbcLu ? lbcVentes.ventes : [], ebay: ebayCmd || [], masquee: isHidden, versements });
+      const { lignes, aDater, ecartees } = ventesDeclarables({ vinted: sales.items, lbc: lbcLu ? lbcVentes.ventes : [], ebay: ebayCmd || [], masquee: (o) => hiddenSales.has(String(o.transaction_id)), exclu: acctOffOf, versements });
       const r2 = (x) => Math.round(x * 100) / 100;
       const liste = Object.values(caDeclarableParMois(lignes))
         .map(m => ({ ym: m.ym, n: m.n, ca: r2(m.ca), nMasq: m.nMasq, caMasq: r2(m.caMasq),
@@ -17461,7 +17469,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const memeChose = avant && JSON.stringify({ mois: avant.mois, aDater: avant.aDater, ecartees: avant.ecartees, sources: avant.sources }) === JSON.stringify(charge);
       if (!memeChose) save('vinted_urssaf_mois', { ...charge, at: Date.now() });
     } catch (_) {}
-  }, [sales.items, hiddenSales, hiddenAccts, lbcLu, lbcVentes, ebayCmd, versements]);
+  }, [sales.items, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements]);
 
   // Filet prix d'achat : si l'entrée a un N° mais pas de prix d'achat, on va le
   // chercher dans le miroir PAR NUMÉRO (buyByNum) — c'est ce qui fait remonter
@@ -20090,6 +20098,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     let nMasq=0, caMasq=0, nAttente=0, caAttente=0;
     const saleLines=[];
     for (const o of (sales.items||[])) {
+      // Un compte qu'il a EXCLU de l'app ne compte pas (« les comptes qu'on a
+      // sélectionnés », 3 octobre) — même règle que `ventesDeclarables`.
+      if (acctOffOf(o)) continue;
       // ⚠️ ON N'ÉCARTE PLUS LES VENTES MASQUÉES. Le ✕ d'une carte range un
       // écran ; il n'annule pas une vente encaissée. Mesuré le 2 septembre :
       // l'exclusion retirait 101 ventes finalisées / 2 174,80 €, et faisait
@@ -20108,7 +20119,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const vers = versements ? versements[String(o.transaction_id)] : null;
       if (!vers) continue;
       if (ymOf(vers)!==reportMonth) continue;
-      if (isHidden(o)) { nMasq+=1; caMasq+=montantCommande(o); }
+      if (hiddenSales.has(String(o.transaction_id))) { nMasq+=1; caMasq+=montantCommande(o); }
       const sell = o.price?.amount!=null?Number(o.price.amount):0;
       const e = effEntry(o); const fee=feesOf(e);
       const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null;
@@ -20131,7 +20142,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       saleLines.push({ date: new Date(l.ts).toISOString(), num: '', title: l.titre, sell: l.eur, buy: null, fee: 0, plateforme: l.plateforme });
     }
     // « À dater », toutes plateformes : Vinted sans date de versement compris.
-    const tousADater = ventesDeclarables({ vinted: sales.items, lbc: lbcLu ? lbcVentes.ventes : [], ebay: ebayCmd || [], versements: versements || {} }).aDater;
+    const tousADater = ventesDeclarables({ vinted: sales.items, lbc: lbcLu ? lbcVentes.ventes : [], ebay: ebayCmd || [], exclu: acctOffOf, versements: versements || {} }).aDater;
     const aDater = { n: tousADater.length, ca: tousADater.reduce((t, l) => t + l.eur, 0) };
     const sourcesKO = [versements === null ? 'Vinted (dates de versement)' : null, lbcLu === null ? 'Leboncoin' : null, ebayCmd === null ? 'eBay' : null].filter(Boolean);
     // Registre des ventes : dans l'ordre du mois, comme le relevé d'un comptable.
@@ -20159,7 +20170,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const urssaf = ca * (taux/100);
     return { regime, tvaRate, monthLabel, ca, cout, frais, nb, nbCout, benefNet, marge, tvaMarge, margeHT, taux, urssaf, nMasq, caMasq, nAttente, caAttente, saleLines, buyLines, achatsTotal, parPlateforme, aDater, sourcesKO };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, buysBase, reportMonth, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, lbcLu, lbcVentes, ebayCmd, versements]);
+  }, [sales.items, buysBase, reportMonth, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements]);
 
   // ⚠️ Il a choisi un mois : on ne le déplace plus sous ses doigts.
   const moisChoisiMain = useRef(false);
@@ -20273,18 +20284,33 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // ⚠️ MÊME RÈGLE QUE LE RAPPORT MENSUEL : une vente masquée à l'écran
       // reste du chiffre d'affaires. On la compte, et on dit combien elle pèse.
       // Même règle que le mensuel : l'année et le mois du VERSEMENT.
+      // Un compte EXCLU de l'app, lui, ne compte pas (« les comptes qu'on a
+      // sélectionnés », 3 octobre).
+      if (acctOffOf(o)) continue;
       if (!venteFinalisee(o)) continue;
       const vers = versements ? versements[String(o.transaction_id)] : null;
       if (!vers) continue;
       const d=new Date(vers); if(isNaN(d) || d.getFullYear()!==reportYear) continue;
-      if (isHidden(o)) { nMasq+=1; caMasq+=montantCommande(o); }
+      if (hiddenSales.has(String(o.transaction_id))) { nMasq+=1; caMasq+=montantCommande(o); }
       const sell = o.price?.amount!=null?Number(o.price.amount):0;
       const e = effEntry(o); const fee=feesOf(e);
       const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null;
       const mo=months[d.getMonth()];
       ca+=sell; nb+=1; frais+=fee; mo.ca+=sell; mo.nb+=1; mo.frais+=fee;
       if (buy!=null && !isNaN(buy)) { cout+=buy; nbCout+=1; margeKnown+=(sell-buy); fraisConnu+=fee; mo.cout+=buy; mo.nbCout+=1; }
-      saleLines.push({ date:vers, dateVente:o.date, num:(e&&e.numero)||'', title:o.title||'', account:accName(o._acc), sell, buy:(buy!=null&&!isNaN(buy))?buy:null, fee, marge:(buy!=null&&!isNaN(buy))?(sell-buy-fee):null });
+      saleLines.push({ date:vers, dateVente:o.date, num:(e&&e.numero)||'', title:o.title||'', account:accName(o._acc), plateforme:'Vinted', sell, buy:(buy!=null&&!isNaN(buy))?buy:null, fee, marge:(buy!=null&&!isNaN(buy))?(sell-buy-fee):null });
+    }
+    // ⚠️ TOUTES PLATEFORMES, comme le rapport mensuel et le tableau de bord
+    //    (§11 : une notion, une règle). Le bilan annuel ne comptait que Vinted :
+    //    le total de l'année n'était pas la somme des mois déclarés.
+    const parPlateforme = { Vinted: { n: nb, ca } };
+    for (const l of ventesDeclarables({ lbc: lbcLu ? lbcVentes.ventes : [], ebay: ebayCmd || [] }).lignes) {
+      const d = new Date(l.ts); if (isNaN(d) || d.getFullYear()!==reportYear) continue;
+      const mo = months[d.getMonth()];
+      ca += l.eur; nb += 1; mo.ca += l.eur; mo.nb += 1;
+      const pp = parPlateforme[l.plateforme] || (parPlateforme[l.plateforme] = { n: 0, ca: 0 });
+      pp.n += 1; pp.ca += l.eur;
+      saleLines.push({ date: d.toISOString(), num:'', title:l.titre, account:'', plateforme:l.plateforme, sell:l.eur, buy:null, fee:0, marge:null });
     }
     saleLines.sort((a,b)=> new Date(a.date)-new Date(b.date));
     let achatsTotal=0, achatsNb=0;
@@ -20308,9 +20334,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const margeHT = marge - tvaMarge;
     const taux = tauxUrssaf();
     const urssaf = ca*(taux/100);
-    return { regime, tvaRate, year:reportYear, months, ca, cout, frais, nb, nbCout, benefNet, marge, tvaMarge, margeHT, taux, urssaf, nMasq, caMasq, achatsTotal, achatsNb, buyLines, saleLines };
+    return { regime, tvaRate, year:reportYear, months, ca, cout, frais, nb, nbCout, benefNet, marge, tvaMarge, margeHT, taux, urssaf, nMasq, caMasq, achatsTotal, achatsNb, buyLines, saleLines, parPlateforme };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, buysBase, reportYear, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, versements]);
+  }, [sales.items, buysBase, reportYear, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements]);
   const [capturedReceipts, setCapturedReceipts] = useState([]); // reçus officiels Vinted captés (compta pro)
   const openAnnual = async () => {
     setShowAnnual(true);
@@ -20334,9 +20360,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     L.push(['TOTAL', R.ca.toFixed(2), R.cout.toFixed(2), R.frais.toFixed(2), R.benefNet.toFixed(2), String(R.nb)]);
     L.push([]);
     // Registre des ventes ligne par ligne (ce que l'expert-comptable attend).
-    L.push(['VENTES (registre)']); L.push(['Date','N°','Article','Compte','Prix vente','Prix achat','Boost','Marge']);
-    R.saleLines.forEach(s=>L.push([s.date?new Date(s.date).toLocaleDateString('fr-FR'):'', s.num, s.title, s.account, s.sell.toFixed(2), s.buy==null?'':s.buy.toFixed(2), s.fee?s.fee.toFixed(2):'', s.marge==null?'':s.marge.toFixed(2)]));
-    L.push(['','','','TOTAL', R.ca.toFixed(2), R.cout.toFixed(2), R.frais.toFixed(2), R.benefNet.toFixed(2)]);
+    L.push(['VENTES (registre)']); L.push(['Date','Plateforme','N°','Article','Compte','Prix vente','Prix achat','Boost','Marge']);
+    R.saleLines.forEach(s=>L.push([s.date?new Date(s.date).toLocaleDateString('fr-FR'):'', s.plateforme||'Vinted', s.num, s.title, s.account, s.sell.toFixed(2), s.buy==null?'':s.buy.toFixed(2), s.fee?s.fee.toFixed(2):'', s.marge==null?'':s.marge.toFixed(2)]));
+    L.push(['','','','','TOTAL', R.ca.toFixed(2), R.cout.toFixed(2), R.frais.toFixed(2), R.benefNet.toFixed(2)]);
     L.push([]);
     L.push(['ACHATS (registre)']); L.push(['Date','Vendeur','Article','Montant']);
     R.buyLines.forEach(b=>L.push([b.date?new Date(b.date).toLocaleDateString('fr-FR'):'',b.seller,b.title,b.montant.toFixed(2)]));
@@ -20367,6 +20393,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     kv('Achats (registre)', R.achatsTotal.toFixed(2)+' EUR ('+R.achatsNb+')');
     if (R.regime==='marge') { kv('Marge TTC', R.marge.toFixed(2)+' EUR'); kv('TVA sur la marge ('+R.tvaRate+'%)', R.tvaMarge.toFixed(2)+' EUR'); kv('Marge HT', R.margeHT.toFixed(2)+' EUR'); }
     else { kv('Bénéfice net', R.benefNet.toFixed(2)+' EUR'+(R.nbCout<R.nb?` (sur ${R.nbCout}/${R.nb} ventes au coût connu)`:'')); kv('Estimation cotisations ('+String(R.taux).replace('.',',')+'%)', R.urssaf.toFixed(2)+' EUR'); }
+    for (const [k,v] of Object.entries(R.parPlateforme||{})) if (k!=='Vinted' && v.n>0) kv('dont '+k, v.ca.toFixed(2)+' EUR ('+v.n+')');
     if (R.nMasq>0) kv('dont ventes masquees dans l\'app (comptees)', R.nMasq+' — '+R.caMasq.toFixed(2)+' EUR');
     y-=6; T('Document indicatif genere par l\'app. Ne remplace pas un conseil comptable.',40,y,8,reg,rgb(0.55,0.55,0.55));
     const bytes=await pdf.save(); const blob=new Blob([bytes],{type:'application/pdf'}); const url=URL.createObjectURL(blob);
@@ -24362,7 +24389,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </div>
               {buys.loading && <div style={{fontSize:12,color:C.muted,marginBottom:10}}>Chargement du registre d'achats…</div>}
               <div style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:14}}>
-                <StatBox label="CA des ventes finalisées" value={fmtE(annual.ca)} sub={`${annual.nb} vente${annual.nb>1?'s':''}`}/>
+                <StatBox label="CA des ventes finalisées" value={fmtE(annual.ca)} sub={`${annual.nb} vente${annual.nb>1?'s':''}`+Object.entries(annual.parPlateforme||{}).filter(([k,v])=>k!=='Vinted'&&v.n>0).map(([k,v])=>` · dont ${k} ${fmtE(v.ca)}`).join('')}/>
                 {annual.regime==='marge' ? (<>
                   <StatBox label="Marge TTC" value={fmtE(annual.marge)} color={annual.marge>=0?INV_STATUS.online.color:C.danger}/>
                   <StatBox label={`TVA marge ${annual.tvaRate}%`} value={fmtE(annual.tvaMarge)} color={C.warn}/>
@@ -24377,7 +24404,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {annual.nb>annual.nbCout && <div style={{fontSize:12,color:C.warn,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'8px 12px',marginBottom:12}}>⚠️ {annual.nb-annual.nbCout} vente(s) sans prix d'achat — le bénéfice est incomplet.</div>}
               {annual.nMasq>0 && <div style={{fontSize:12,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderLeft:`3px solid ${C.accent}`,borderRadius:8,padding:'8px 12px',marginBottom:12}}>
                 <b>{annual.nMasq} vente{annual.nMasq>1?'s':''} masquée{annual.nMasq>1?'s':''} dans l'app</b> ({fmtE(annual.caMasq)}) {annual.nMasq>1?'sont comptées':'est comptée'} dans ce CA.
-                <div style={{fontSize:11,color:C.muted,marginTop:3}}>Masquer une carte range un écran ; ça n'annule pas une vente encaissée.</div>
+                <div style={{fontSize:11,color:C.muted,marginTop:3}}>Masquer une carte range un écran ; ça n'annule pas une vente finalisée.</div>
               </div>}
               {/* Tableau mensuel */}
               <div style={{fontSize:12,fontWeight:600,color:C.text,margin:'6px 0 8px'}}>Détail par mois</div>
@@ -24975,7 +25002,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               )}
               {report.nMasq>0 && <div style={{fontSize:12,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderLeft:`3px solid ${C.accent}`,borderRadius:8,padding:'8px 12px',marginBottom:12}}>
                 <b>{report.nMasq} vente{report.nMasq>1?'s':''} masquée{report.nMasq>1?'s':''} dans l'app</b> ({fmtE(report.caMasq)}) {report.nMasq>1?'sont comptées':'est comptée'} dans ce CA.
-                <div style={{fontSize:11,color:C.muted,marginTop:3}}>Masquer une carte range un écran ; ça n'annule pas une vente encaissée.</div>
+                <div style={{fontSize:11,color:C.muted,marginTop:3}}>Masquer une carte range un écran ; ça n'annule pas une vente finalisée.</div>
               </div>}
               {/* ── LE RELEVÉ DU PORTE-MONNAIE ────────────────────────────
                   Une VÉRIFICATION à côté du CA, jamais à sa place : le CA

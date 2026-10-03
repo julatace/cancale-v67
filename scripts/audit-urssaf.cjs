@@ -175,6 +175,59 @@ if (!bloc || !/caUrssafParMois/.test(bloc)) {
     : nok('l\'écran Ventes publie toutes plateformes', 'publication encore Vinted seule');
 }
 
+// ── 1 quater. LES COMPTES SÉLECTIONNÉS (Julien, 3 octobre) ──────────────────
+//    « tu prends tous les comptes qu'on a sélectionnés ». Une vente d'un compte
+//    EXCLU de l'app n'entre dans AUCUN total — ni un mois, ni « à dater ». Une
+//    vente MASQUÉE d'un ✕ sur sa carte, elle, reste du chiffre d'affaires.
+{
+  const lbcSrc = (() => { const a = SRC.indexOf('const lbcAnnulee = '); const b = SRC.indexOf('\nconst lbcEuro', a); return a > 0 && b > a ? SRC.slice(a, b) : ''; })();
+  const c = {
+    console, Date, Number, String, isFinite, parseFloat, Object, Math, Array, load: (k, d) => d,
+    classifyOrderStatus: (s) => /annul|cancel|refus|rembours/i.test(String(s || '')) ? 'cancelled' : (/finalis/i.test(String(s || '')) ? 'completed' : 'pending'),
+    tsCommande: (o) => Date.parse((o && o.date) || '') || 0,
+    montantCommande: (o) => { const p = o && o.price; const v = (p && typeof p === 'object') ? p.amount : p; const n = Number(String(v == null ? '' : v).replace(',', '.')); return isNaN(n) ? 0 : n; },
+  };
+  try {
+    vm.createContext(c);
+    vm.runInContext(lbcSrc + '\n' + bloc + "\n;Object.assign(this, { ventesDeclarables, caDeclarableParMois });", c);
+    const V = [
+      { transaction_id: 21, date: '2026-09-02T12:00:00+02:00', price: { amount: '50.0' }, status: 'Commande finalisée', _acc: { vinted_user_id: 'garde' } },
+      { transaction_id: 22, date: '2026-09-03T12:00:00+02:00', price: { amount: '70.0' }, status: 'Commande finalisée', _acc: { vinted_user_id: 'exclu' } },
+      { transaction_id: 23, date: '2026-09-04T12:00:00+02:00', price: { amount: '30.0' }, status: 'Commande finalisée', _acc: { vinted_user_id: 'exclu' } },
+      { transaction_id: 24, date: '2026-09-05T12:00:00+02:00', price: { amount: '20.0' }, status: 'Commande finalisée', _acc: { vinted_user_id: 'garde' } },
+    ];
+    const VERS = { 21: '2026-09-10T08:00:00+02:00', 22: '2026-09-11T08:00:00+02:00', 24: '2026-09-12T08:00:00+02:00' };
+    const exclu = (o) => o._acc && o._acc.vinted_user_id === 'exclu';
+    const masquee = (o) => String(o.transaction_id) === '24';
+    const r = c.ventesDeclarables({ vinted: V, versements: VERS, exclu, masquee });
+    const sept = c.caDeclarableParMois(r.lignes)['2026-09'] || {};
+    sept.ca === 70 && sept.n === 2
+      ? ok('une vente d\'un compte EXCLU de l\'app n\'entre pas dans le CA déclaré (70 €, pas 140 €)')
+      : nok('un compte exclu ne compte pas', `ca=${sept.ca} n=${sept.n} au lieu de 70 / 2`);
+    !r.aDater.some((x) => x.id === 'vinted:23')
+      ? ok('…ni dans « à dater » (une vente sans date d\'un compte exclu ne gonfle rien)')
+      : nok('un compte exclu ne va pas dans « à dater »', JSON.stringify(r.aDater.map((x) => x.id)));
+    sept.nMasq === 1 && sept.caMasq === 20
+      ? ok('l\'autre sens : une vente masquée d\'un ✕ reste comptée, à part (20 €)')
+      : nok('une vente masquée reste comptée', `nMasq=${sept.nMasq} caMasq=${sept.caMasq}`);
+  } catch (e) { nok('la règle des comptes sélectionnés s\'exécute', e.message); }
+  // Les trois lecteurs de la règle l'appliquent : la publication, le mensuel, l'annuel.
+  const pub = SRC.slice(SRC.indexOf('if (!sales.items) return;                       // rien de sûr à publier'), SRC.indexOf('const withBuyByNum'));
+  /exclu: acctOffOf/.test(pub)
+    ? ok('l\'écran Ventes publie le CA sans les comptes exclus')
+    : nok('la publication écarte les comptes exclus', 'exclu absent');
+  const mens = SRC.slice(SRC.indexOf('const report = useMemo'), SRC.indexOf('const openReport'));
+  const ann = SRC.slice(SRC.indexOf('const annual = useMemo'), SRC.indexOf('const openAnnual'));
+  for (const [nom, t] of [['mensuel', mens], ['annuel', ann]]) {
+    /if \(acctOffOf\(o\)\) continue;/.test(t) && !/if \(isHidden\(o\)\) \{ nMasq/.test(t)
+      ? ok(`le rapport ${nom} ne compte que les comptes sélectionnés`)
+      : nok(`le rapport ${nom} écarte les comptes exclus`, 'les ventes d\'un compte exclu y sont encore comptées');
+  }
+  /ventesDeclarables\(\{ lbc:[^}]*ebay:[^}]*\}\)\.lignes/.test(ann)
+    ? ok('le bilan annuel compte Leboncoin et eBay, comme les mois (la même règle)')
+    : nok('le bilan annuel compte toutes les plateformes', 'Vinted seul');
+}
+
 // ── 1 ter. DATÉ AU JOUR DU VERSEMENT (Julien, 3 octobre) ───────────────────
 //    « il faut dater la vente pour le CA du mois à la date de réception
 //    d'argent ». On juge ce que la règle REND, jamais sa formulation.
@@ -374,7 +427,7 @@ enDur.length
   // positifs, et un audit qui crie au loup n'est plus lu (§5.49).
   const fautes = [];
   sansCom.split('\n').forEach((l, i) => {
-    if (/encaissé/i.test(l) && !/ça n'annule pas une vente encaissée/.test(l)) {
+    if (/encaissé/i.test(l)) {
       fautes.push((i + 1) + ' : ' + l.trim().slice(0, 90));
     }
   });
