@@ -4055,6 +4055,20 @@ pour l'inbox).
   promet rien de neuf. Extension en **5.141.0**, zip régénéré, `EXT_ATTENDUE`
   suivie.
 
+**Suite (5.142) — même blindage sur les captures OBJET (transaction, conversation).**
+Les listes ne sont pas les seules à casser en silence : une **transaction** porte
+la preuve de vente et la date de versement (`transaction.status`), une
+**conversation** porte la messagerie et les offres (`messages`). Un renommage de
+ces champs par Vinted viderait la preuve de vente ou la messagerie sans erreur.
+`verifFormeObjet` les garde par **présence de clé** (false-alarm-proof : un
+renommage fait disparaître `messages`/`status`, une valeur vide — `messages:[]`,
+`status:0` — garde la clé), et **uniquement** si l'objet métier est substantiel
+(≥ 3 clés) — un objet maigre/raté n'est pas jugé (mieux vaut un blanc qu'un faux).
+Le renommage AMBIGU du conteneur (`transaction` absent) n'est pas jugé, seul le
+champ interne l'est. `nomFamille` mappe `transaction`→ventes, `conversation`→
+messages pour l'alerte « Format d'un site ». **6 rouges de plus sur le code
+d'avant.** Extension **5.142.0**, zip régénéré, `EXT_ATTENDUE` suivie.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par

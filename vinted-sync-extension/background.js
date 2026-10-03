@@ -693,6 +693,40 @@ function verifChampsListe(type, liste, id) {
   } catch (_) { /* une sentinelle ne casse jamais la capture */ }
 }
 
+// Dérive sur une capture OBJET (pas une liste) : une TRANSACTION, une
+// CONVERSATION. Un renommage du champ qu'on lit casse EN SILENCE la preuve de
+// vente, les dates de versement (« vendue → retirée ») ou la messagerie (5.135).
+// ⚠️ Même prudence que la liste : on ne juge QUE si l'objet métier est clairement
+// une vraie réponse (≥ 3 clés) mais que le champ LU a disparu. Test de PRÉSENCE
+// de clé : un renommage fait disparaître `messages`/`status`, une valeur vide
+// (`messages: []`, `status: 0`) garde la clé → aucune fausse alerte. Un objet
+// maigre/raté n'est pas jugé (mieux vaut un blanc qu'un faux). On ne devine aucun
+// parser : on note le NOM du champ perdu + les clés de l'objet, jamais une valeur.
+const FORME_OBJET = {
+  // la messagerie et le moteur d'offres lisent (p.conversation||p).messages
+  conversation: { objet: (p) => (p.conversation || p), champ: 'messages', ok: (o) => Array.isArray(o.messages) },
+  // la preuve de vente, les versements et « vendue → retirée » lisent p.transaction.status
+  transaction:  { objet: (p) => p.transaction, champ: 'status', ok: (o) => ('status' in o) },
+};
+function verifFormeObjet(type, parsed, id) {
+  try {
+    const r = FORME_OBJET[type];
+    if (!r || !parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return;
+    const o = r.objet(parsed);
+    if (!o || typeof o !== 'object' || Object.keys(o).length < 3) return; // objet maigre : pas un jugement de forme
+    if (r.ok(o)) return;                                                   // champ présent : rien à signaler
+    noterDiag(`forme_inconnue_champ_${type}`);
+    majTampon((buf) => {
+      buf.rates[`forme_champ_${type}`] = {
+        id: String(id == null ? '' : id).slice(0, 40),
+        champ: r.champ,
+        cles: Object.keys(o).slice(0, 20).map(k => String(k).slice(0, 40)),
+        at: new Date().toISOString(),
+      };
+    });
+  } catch (_) { /* une sentinelle ne casse jamais la capture */ }
+}
+
 async function storeHarvest(domain, type, id, body) {
   noterDiag(`recu_${type || 'inconnu'}`);
   const uid = await activeAccountId(domain);
@@ -712,6 +746,7 @@ async function storeHarvest(domain, type, id, body) {
   // Le corps a parsé : la clé de liste attendue est-elle toujours là ? (sentinelle
   // de dérive de forme, sur le BRUT, avant tout allègement qui pourrait la masquer).
   verifFormeListe(type, parsed, id);
+  verifFormeObjet(type, parsed, id);   // transaction/conversation : un champ lu renommé
 
   // Cle de ligne app_data selon le type de donnee.
   let rowId;
@@ -2212,6 +2247,7 @@ async function storeHarvestRow(uid, type, payload, domain) {
   const brut = payload;
   // Sentinelle de dérive de forme, sur le BRUT (voie active : même protection).
   verifFormeListe(type, brut, '');
+  verifFormeObjet(type, brut, '');
   payload = alleger(type, payload);
   // ⚠️ MÊME GARDE QUE LA VOIE PASSIVE, ICI AUSSI. Le test `estPorteMonnaie`
   // n'existait que chez l'APPELANT (la moisson active) : n'importe quel autre
