@@ -8203,6 +8203,58 @@ function EbayLigne({ it, onSaved }) {
 //     (c'est LUI qui autorise ; aucun mot de passe ne passe par VRM) ;
 //   • relié ✓ (la publication viendra après mesure des catégories eBay).
 // Au retour d'eBay (?ebay=…), on affiche le résultat et on nettoie l'URL.
+// ── LES PAIRES À VENDRE, PRÊTES POUR UNE PLACE (§11, un seul propriétaire) ────
+// La fiche du numéro (id → n°, titre, couverture) jointe aux photos captées de
+// la page (`vinted_item_details[id].photos`). Publier = CHOISIR une paire, ses
+// photos viennent toutes seules — plus aucun lien à coller. Partagé par l'onglet
+// « Compte eBay » ET l'onglet « Annonces eBay » : une seule règle, pas deux
+// listes qui divergeraient.
+function useEbayPaires(comptes) {
+  const [paires, setPaires] = React.useState([]);
+  React.useEffect(() => { let stop = false; (async () => {
+    try {
+      const fiches = load('vinted_annonce_numeros', {}) || {};
+      const presents = numsPresents();
+      // ⚠️ NE PROPOSER QUE LES PAIRES EN LIGNE (plainte de Julien : « il y a des
+      // paires déjà vendues »). Aucune annonce lisible ⇒ `online` reste `null` :
+      // on ne filtre pas plutôt que de tout cacher (« rien lu » ≠ « rien »).
+      let online = null; const nPhotosMap = {};
+      if (Array.isArray(comptes) && comptes.length) {
+        const s = new Set(); let okAny = false;
+        for (const a of comptes) {
+          const L = await fetchHarvest(a.vinted_user_id, 'listings');
+          if (L && Array.isArray(L.items)) { okAny = true; for (const it of L.items) { if (isOnlineListing(it)) s.add(String(it.id)); if (Number.isFinite(it.nPhotos)) nPhotosMap[String(it.id)] = it.nPhotos; } }
+        }
+        if (okAny) online = s;
+      }
+      const PUB = /une communaut[ée].{0,60}marques|pour chaque achat effectu|thousands of brands|politique de rembours/i;
+      let details = {};
+      try {
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_item_details&select=data`, { headers: sbAuth() });
+        if (r.ok) { const rows = await r.json(); details = (rows && rows[0] && rows[0].data) || {}; }
+      } catch (_) { /* réseau : on se contente de la couverture */ }
+      const norm = (p) => typeof p === 'string' ? p : (p && (p.url || p.full_size_url)) || '';
+      const vus = new Set(), out = [];
+      for (const id in fiches) {
+        const f = fiches[id] || {}; const n = f.numero != null ? String(f.numero).trim() : '';
+        if (!n || vus.has(n)) continue;
+        if (online && !online.has(String(id))) continue;      // en ligne seulement (vendue/retirée écartée)
+        if (!online && presents && !presents.has(cleNum(n))) continue; // à défaut : au moins « en stock » si on le sait
+        vus.add(n);
+        const cover = f.photo || null;
+        const dphotos = Array.isArray(details[id] && details[id].photos) ? details[id].photos.map(norm).filter(Boolean) : [];
+        const photos = dphotos.length ? dphotos : (cover ? [cover] : []);
+        const dsc = String((details[id] && details[id].description) || '').trim();
+        const desc = (dsc && !PUB.test(dsc)) ? dsc : '';   // sa vraie description Vinted, jamais le texte pub
+        out.push({ id: String(id), num: n, title: f.title || '', taille: extractSize(f.title || '') || '', cover, photos, desc, nPhotos: nPhotosMap[String(id)] });
+      }
+      out.sort((a, b) => (parseInt(b.num, 10) || 0) - (parseInt(a.num, 10) || 0));
+      if (!stop) setPaires(out);
+    } catch (_) { if (!stop) setPaires([]); }
+  })(); return () => { stop = true; }; }, [comptes]);
+  return paires;
+}
+
 function EbayConnexion({ comptes = [] }) {
   const C = EBAY_SKIN;   // tout l'espace eBay est au look de l'appli eBay (Julien : « je veux exactement le même visuel que dans eBay »)
   const [st, setSt] = React.useState(null);          // {ready, canConsent} | null = en cours
@@ -8244,56 +8296,8 @@ function EbayConnexion({ comptes = [] }) {
   const [data, setData] = React.useState(null);   // {listings, orders, capturedAt} | null
   const [syncing, setSyncing] = React.useState(false);
   const [solde, setSolde] = React.useState(null);  // {ok,dispo,enAttente,retenu}|{reason:'scope'}|null
-  const [paires, setPaires] = React.useState([]);  // paires numérotées, pour publier SANS coller de lien
+  const paires = useEbayPaires(comptes);            // paires à vendre, source partagée (§11)
   const autoFait = React.useRef(false);
-  // Les paires à vendre — mêmes données que l'écran Annonces (§11) : la fiche du
-  // numéro (id → n°, titre, photo de couverture) jointe aux photos captées de la
-  // page (`vinted_item_details[id].photos`). On publie EN CHOISISSANT une paire,
-  // ses photos viennent toutes seules — plus aucun lien à coller.
-  React.useEffect(() => { let stop = false; (async () => {
-    try {
-      const fiches = load('vinted_annonce_numeros', {}) || {};
-      const presents = numsPresents();
-      // ⚠️ NE PROPOSER QUE LES PAIRES EN LIGNE (plainte de Julien : « il y a des
-      // paires déjà vendues »). On lit les annonces de chaque compte et on garde
-      // les id dont l'annonce Vinted est ACTIVE (is_closed=false). Aucune annonce
-      // lisible (réseau, pas de compte) ⇒ `online` reste `null` : on ne filtre
-      // pas plutôt que de tout cacher (« rien lu » ≠ « rien »).
-      let online = null; const nPhotosMap = {};
-      if (Array.isArray(comptes) && comptes.length) {
-        const s = new Set(); let okAny = false;
-        for (const a of comptes) {
-          const L = await fetchHarvest(a.vinted_user_id, 'listings');
-          if (L && Array.isArray(L.items)) { okAny = true; for (const it of L.items) { if (isOnlineListing(it)) s.add(String(it.id)); if (Number.isFinite(it.nPhotos)) nPhotosMap[String(it.id)] = it.nPhotos; } }
-        }
-        if (okAny) online = s;
-      }
-      // Le texte marketing de Vinted n'est pas une description (§5.08).
-      const PUB = /une communaut[ée].{0,60}marques|pour chaque achat effectu|thousands of brands|politique de rembours/i;
-      let details = {};
-      try {
-        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_item_details&select=data`, { headers: sbAuth() });
-        if (r.ok) { const rows = await r.json(); details = (rows && rows[0] && rows[0].data) || {}; }
-      } catch (_) { /* réseau : on se contente de la couverture */ }
-      const norm = (p) => typeof p === 'string' ? p : (p && (p.url || p.full_size_url)) || '';
-      const vus = new Set(), out = [];
-      for (const id in fiches) {
-        const f = fiches[id] || {}; const n = f.numero != null ? String(f.numero).trim() : '';
-        if (!n || vus.has(n)) continue;
-        if (online && !online.has(String(id))) continue;      // en ligne seulement (vendue/retirée écartée)
-        if (!online && presents && !presents.has(cleNum(n))) continue; // à défaut : au moins « en stock » si on le sait
-        vus.add(n);
-        const cover = f.photo || null;
-        const dphotos = Array.isArray(details[id] && details[id].photos) ? details[id].photos.map(norm).filter(Boolean) : [];
-        const photos = dphotos.length ? dphotos : (cover ? [cover] : []);
-        const dsc = String((details[id] && details[id].description) || '').trim();
-        const desc = (dsc && !PUB.test(dsc)) ? dsc : '';   // sa vraie description Vinted, jamais le texte pub
-        out.push({ id: String(id), num: n, title: f.title || '', taille: extractSize(f.title || '') || '', cover, photos, desc, nPhotos: nPhotosMap[String(id)] });
-      }
-      out.sort((a, b) => (parseInt(b.num, 10) || 0) - (parseInt(a.num, 10) || 0));
-      if (!stop) setPaires(out);
-    } catch (_) { if (!stop) setPaires([]); }
-  })(); return () => { stop = true; }; }, [comptes]);
   // Solde à virer (getSellerFundsSummary). Lecture seule, une fois à l'ouverture.
   const lireSolde = React.useCallback(async () => {
     try {
@@ -8517,9 +8521,29 @@ function EbayVentes({ baseKO }) {
 // caractéristiques captées (specifics, catégorie, état, nb de photos, description).
 // Julien veut voir que « tout est capté » ; c'est aussi la matière du
 // remplissage complet à la republication. Lecture seule.
-function EbayAnnonceCard({ it, first }) {
+function EbayAnnonceCard({ it, first, onSaved }) {
   const E = EBAY_SKIN;
   const [open, setOpen] = React.useState(false);
+  // ── MODIFIER L'ANNONCE (prix / stock) DEPUIS VRM, comme l'onglet Compte ────
+  // Julien : « pouvoir modifier les annonces dans l'application ». Passe par
+  // l'action serveur `revise` (Trading ReviseInventoryStatus) : ça change la
+  // VRAIE annonce eBay. Geste explicite (✏️ → Enregistrer), jamais automatique.
+  const [edit, setEdit] = React.useState(false);
+  const [price, setPrice] = React.useState(String(it.price || '').replace('.', ','));
+  const [qty, setQty] = React.useState(String(it.qty || ''));
+  const [saving, setSaving] = React.useState(false);
+  const [msg, setMsg] = React.useState('');
+  const enregistrer = async () => {
+    setSaving(true); setMsg('');
+    try {
+      const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'revise', itemId: it.itemId, price: String(price).replace(',', '.'), quantity: qty }) });
+      const j = await r.json();
+      if (j && j.ok) { setMsg('✓ Modifié sur eBay'); setEdit(false); if (onSaved) onSaved(); }
+      else setMsg(j && j.error ? j.error : 'eBay a refusé la modification.');
+    } catch (_) { setMsg('Modification impossible (réseau).'); }
+    setSaving(false);
+  };
+  const inpE = { width: 92, boxSizing: 'border-box', border: `1px solid ${E.border}`, background: E.bg || E.card, color: E.text, borderRadius: 8, padding: '9px 10px', fontSize: 16, fontFamily: 'inherit' };
   const euro = (p) => { const n = Number(p); return isFinite(n) ? n.toFixed(2).replace('.', ',') + ' €' : ''; };
   const j = (() => { const t = Date.parse(it.depuis || ''); return isNaN(t) ? null : Math.max(0, Math.round((Date.now() - t) / 86400000)); })();
   const url = it.url || (it.itemId ? `https://www.ebay.fr/itm/${it.itemId}` : null);
@@ -8561,8 +8585,22 @@ function EbayAnnonceCard({ it, first }) {
             </div>
           )}
           {desc && <div style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, marginBottom: 10 }}>{desc.slice(0, 280)}{desc.length > 280 ? '…' : ''}</div>}
-          {url && <a href={url} target="_blank" rel="noreferrer" style={{ display: 'inline-block', color: E.accentSoft, fontWeight: 700, fontSize: 12.5, textDecoration: 'none' }}>Voir sur eBay ↗</a>}
-          {specs.length === 0 && !d.categoryName && !desc && <div style={{ fontSize: 12, color: E.muted }}>Caractéristiques pas encore captées pour cette annonce — rouvre-la sur eBay.</div>}
+          {/* ── Modifier prix / stock ── */}
+          {!edit ? (
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+              <button type="button" onClick={() => { setEdit(true); setMsg(''); }} style={{ border: `1px solid ${E.border}`, background: 'transparent', color: E.text, borderRadius: 8, padding: '8px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>✏️ Modifier le prix / le stock</button>
+              {url && <a href={url} target="_blank" rel="noreferrer" style={{ color: E.accentSoft, fontWeight: 700, fontSize: 12.5, textDecoration: 'none' }}>Voir sur eBay ↗</a>}
+            </div>
+          ) : (
+            <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+              <label style={{ fontSize: 11.5, color: E.muted }}>Prix €<br /><input value={price} onChange={e => setPrice(e.target.value)} inputMode="decimal" style={inpE} /></label>
+              <label style={{ fontSize: 11.5, color: E.muted }}>Stock<br /><input value={qty} onChange={e => setQty(e.target.value)} inputMode="numeric" style={{ ...inpE, width: 72 }} /></label>
+              <button type="button" onClick={enregistrer} disabled={saving} style={{ border: 'none', background: E.accent, color: '#fff', borderRadius: 8, padding: '10px 14px', fontSize: 13, fontWeight: 700, cursor: saving ? 'default' : 'pointer', fontFamily: 'inherit', opacity: saving ? 0.6 : 1 }}>{saving ? 'Envoi…' : 'Enregistrer'}</button>
+              <button type="button" onClick={() => { setEdit(false); setMsg(''); }} style={{ border: `1px solid ${E.border}`, background: 'transparent', color: E.muted, borderRadius: 8, padding: '10px 12px', fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit' }}>Annuler</button>
+            </div>
+          )}
+          {msg && <div style={{ fontSize: 11.5, color: /✓/.test(msg) ? INV_STATUS.online.color : E.danger || '#c0392b', marginTop: 7 }}>{msg}</div>}
+          {specs.length === 0 && !d.categoryName && !desc && <div style={{ fontSize: 12, color: E.muted, marginTop: 8 }}>Caractéristiques pas encore captées pour cette annonce — rouvre-la sur eBay.</div>}
         </div>
       )}
     </div>
@@ -8574,32 +8612,55 @@ function EbayAnnonceCard({ it, first }) {
 // Aperçu ne les affichait que connexion OUVERTE). Cet onglet lit les annonces
 // captées DIRECTEMENT : « rien lu ≠ rien », on montre ce qu'on a même si la
 // connexion OAuth est momentanément tombée.
-function EbayAnnonces({ baseKO }) {
+function EbayAnnonces({ baseKO, comptes = [] }) {
   const E = EBAY_SKIN;
   const [items, setItems] = React.useState(undefined); // undefined=en cours · null=pas su · []=lu
-  React.useEffect(() => { let stop = false; (async () => {
+  const [connected, setConnected] = React.useState(undefined); // true/false/null(pas su)/undefined(en cours)
+  const paires = useEbayPaires(comptes);               // source partagée avec l'onglet Compte (§11)
+  // Chargement rechargeable (pour rafraîchir après une publication / modif).
+  const charger = React.useCallback(async () => {
     try {
       const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.ebay_listings&select=data`, { headers: sbAuth() });
-      if (!r.ok) { if (!stop) setItems(null); return; }
+      if (!r.ok) { setItems(null); return; }
       const rows = await r.json();
-      if (!Array.isArray(rows)) { if (!stop) setItems(null); return; }
+      if (!Array.isArray(rows)) { setItems(null); return; }
       const L = (rows[0] && rows[0].data) || {};
-      if (!stop) setItems(Array.isArray(L.items) ? L.items : []);
-    } catch (_) { if (!stop) setItems(null); }
-  })(); return () => { stop = true; }; }, []);
+      setItems(Array.isArray(L.items) ? L.items : []);
+    } catch (_) { setItems(null); }
+  }, []);
+  React.useEffect(() => { charger(); }, [charger]);
+  // Sonde de connexion eBay : le publieur ne sert à rien si le compte n'est pas
+  // relié — on l'affiche alors seulement quand c'est le cas, sinon on renvoie
+  // vers l'onglet « Compte eBay » (jamais un formulaire mort).
+  React.useEffect(() => { let stop = false;
+    fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'status' }) })
+      .then(r => r.json()).then(j => { if (!stop) setConnected(j && j.ok ? !!j.connected : null); }).catch(() => { if (!stop) setConnected(null); });
+    return () => { stop = true; }; }, []);
+  // Après une publication / modif : on resynchronise depuis eBay puis on relit.
+  const resync = React.useCallback(async () => {
+    try { await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'sync' }) }); } catch (_) {}
+    await charger();
+  }, [charger]);
   const wrap = (kids) => <div style={{ background: E.bg, minHeight: '100vh', padding: 16, paddingBottom: 48 }}>{kids}</div>;
   const head = (n) => <div style={{ fontSize: 22, fontWeight: 800, color: E.text, marginBottom: 2 }}>Annonces eBay{n != null ? ` (${n})` : ''}</div>;
+  // Le publieur, EN HAUT de l'onglet Annonces (Julien : « poster plus naturel »).
+  // Affiché seulement si le compte est relié ; sinon une ligne qui renvoie au
+  // compte, jamais un bouton mort.
+  const publier = connected === true
+    ? <EbayPublier paires={paires} onPublie={resync} />
+    : connected === false
+      ? <div style={{ fontSize: 12.5, color: E.muted, lineHeight: 1.5, border: `1px solid ${E.border}`, background: E.card, borderRadius: 12, padding: '12px 14px', marginBottom: 14 }}>Pour mettre une paire en vente ici, relie d'abord ton compte eBay dans l'onglet <b style={{ color: E.text }}>« Compte eBay »</b>.</div>
+      : null; // en cours / pas su : on ne dit rien plutôt qu'une fausse invite
   if (baseKO) return wrap(<>{head()}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué. Réessaie dans un instant.</div></>);
-  if (items === undefined) return wrap(<>{head()}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Chargement…</div></>);
-  if (items === null) return wrap(<>{head()}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Je n'ai pas pu lire tes annonces eBay. Réessaie dans un instant.</div></>);
-  if (!items.length) return wrap(<>{head(0)}<div style={{ color: E.muted, fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>Pas encore d'annonce eBay captée. Connecte ton compte eBay dans l'onglet « Compte eBay » et synchronise — tes annonces apparaîtront ici.</div></>);
-  const euro = (p) => { const n = Number(p); return isFinite(n) ? n.toFixed(2).replace('.', ',') + ' €' : ''; };
-  const jours = (iso) => { const t = Date.parse(iso || ''); return isNaN(t) ? null : Math.max(0, Math.round((Date.now() - t) / 86400000)); };
+  if (items === undefined) return wrap(<>{head()}{publier}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Chargement…</div></>);
+  if (items === null) return wrap(<>{head()}{publier}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Je n'ai pas pu lire tes annonces eBay. Réessaie dans un instant.</div></>);
+  if (!items.length) return wrap(<>{head(0)}{publier}<div style={{ color: E.muted, fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>Pas encore d'annonce eBay en ligne. {connected === true ? 'Mets une paire en vente ci-dessus — elle apparaîtra ici.' : 'Connecte ton compte eBay (onglet « Compte eBay ») et synchronise.'}</div></>);
   return wrap(<>
     {head(items.length)}
-    <div style={{ color: E.muted, fontSize: 12, marginBottom: 12 }}>Tes annonces en ligne sur eBay</div>
+    <div style={{ color: E.muted, fontSize: 12, marginBottom: 12 }}>Tes annonces en ligne sur eBay — touche une annonce pour la modifier</div>
+    {publier}
     <div style={{ background: E.card, border: `1px solid ${E.border}`, borderRadius: 14, overflow: 'hidden' }}>
-      {items.map((it, i) => <EbayAnnonceCard key={it.itemId || i} it={it} first={i === 0} />)}
+      {items.map((it, i) => <EbayAnnonceCard key={it.itemId || i} it={it} first={i === 0} onSaved={resync} />)}
     </div>
   </>);
 }
@@ -29959,7 +30020,7 @@ function AppCoeur() {
           <div style={{background:'#000000'}}><PlatSubNav sub={platSub} setSub={setPlatSub} sections={[['ventes','Ventes'],['achats','Achats'],['annonces','Annonces'],['compte','Compte eBay']]} dark/></div>
           {platSub==='ventes'&&<EbayVentes baseKO={baseKO}/>}
           {platSub==='achats'&&<EbayAchats/>}
-          {platSub==='annonces'&&<EbayAnnonces baseKO={baseKO}/>}
+          {platSub==='annonces'&&<EbayAnnonces baseKO={baseKO} comptes={vintedAccounts}/>}
           {platSub==='compte'&&<div style={{ background: EBAY_SKIN.bg, minHeight: '100vh', padding: 16, paddingBottom: 48 }}>{baseKO?<div style={{ color: EBAY_SKIN.muted, fontSize: 13 }}>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</div>:<EbayConnexion comptes={vintedAccounts}/>}</div>}
         </>)}
         {tab==='plat_vestiaire'&&<Plateforme plat="Vestiaire Collective" liveStats={liveStats} lbcVentes={lbcVentes} onGo={setTab} baseKO={baseKO}/>}
