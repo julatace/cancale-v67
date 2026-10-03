@@ -417,18 +417,49 @@
       //     (`capterAnnonce`) reste disponible si Vinted rétablit un jour
       //     l'endpoint — il le dira tout seul en écrivant une ligne.
       //     NE PAS remettre cette boucle sans avoir vu `ecrit_item > 0`.
-      // 3) ventes + achats. ⚠️ « purchased » et PAS « bought » : ?type=bought
-      // renvoie chez certains comptes les ventes (verifie en base), ce qui
-      // faisait afficher des ventes dans les achats.
+      // 3) ventes + achats — TOUTES les pages (comme le dressing en 2).
+      // ⚠️ Avant : seulement `page=1&per_page=100` → un vendeur de 300 ventes ne
+      // rendait QUE ses 100 dernières, le reste n'arrivait JAMAIS dans l'app.
+      // On concatène toutes les pages en UN SEUL envoi : `storeHarvest` garde la
+      // capture la plus RICHE (`listePlusRiche` compare le nombre d'items), donc
+      // une liste partielle n'écrase jamais une complète — mais il faut lui
+      // donner la liste complète d'un coup, des pages envoyées séparément
+      // s'écraseraient l'une l'autre (pas d'union côté fond). Mêmes garde-fous
+      // que le dressing : une requête à la fois, délai humain entre chacune,
+      // plafond de pages, et tout ça au plus une fois / 30 min (ACTIVE_TTL).
+      // ⚠️ « purchased » et PAS « bought » : ?type=bought renvoie chez certains
+      // comptes les ventes (vérifié en base) → des ventes dans les achats.
       for (const t of ['sold', 'purchased']) {
-        await new Promise(r => setTimeout(r, jitter(600, 1500)));
-        const o = await apiGet(`/api/v2/my_orders?type=${t}&page=1&per_page=100`);
-        if (o) sendHarvest(`/api/v2/my_orders?type=${t}`, o);
+        let tout = null;
+        for (let page = 1; page <= 20; page++) {
+          await new Promise(r => setTimeout(r, jitter(600, 1500)));
+          const o = await apiGet(`/api/v2/my_orders?type=${t}&page=${page}&per_page=100`);
+          if (!o) break;
+          let j = null; try { j = JSON.parse(o); } catch (_) { break; }
+          const lot = Array.isArray(j.my_orders) ? j.my_orders : null;
+          if (!lot) break;
+          if (!tout) tout = j; else tout.my_orders = tout.my_orders.concat(lot);
+          const tp = j.pagination && j.pagination.total_pages;
+          if (lot.length < 100 || !lot.length || (tp && page >= tp)) break;
+        }
+        if (tout) sendHarvest(`/api/v2/my_orders?type=${t}`, JSON.stringify(tout));
       }
-      // 4) boîte de réception (au cas où la page ne l'a pas déjà chargée).
-      await new Promise(r => setTimeout(r, jitter(600, 1500)));
-      const inb = await apiGet('/api/v2/inbox?page=1&per_page=50');
-      if (inb) sendHarvest('/api/v2/inbox', inb);
+      // 4) boîte de réception — TOUTES les pages aussi (avant : 50 max).
+      {
+        let tout = null;
+        for (let page = 1; page <= 15; page++) {
+          await new Promise(r => setTimeout(r, jitter(600, 1500)));
+          const inb = await apiGet(`/api/v2/inbox?page=${page}&per_page=50`);
+          if (!inb) break;
+          let j = null; try { j = JSON.parse(inb); } catch (_) { break; }
+          const lot = Array.isArray(j.conversations) ? j.conversations : null;
+          if (!lot) break;
+          if (!tout) tout = j; else tout.conversations = tout.conversations.concat(lot);
+          const tp = j.pagination && j.pagination.total_pages;
+          if (lot.length < 50 || !lot.length || (tp && page >= tp)) break;
+        }
+        if (tout) sendHarvest('/api/v2/inbox', JSON.stringify(tout));
+      }
     } catch (_) {}
   };
   // Lancement différé (laisse la page s'installer et le csrf se capter), puis à
