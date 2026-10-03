@@ -539,6 +539,22 @@ async function echantillonRate(type, id, body) {
   });
 }
 
+// Les chemins de clés d'une réponse qui évoquent un boost (push_up, bump,
+// spotlight, promotion…) — noms seulement, profondeur bornée.
+function clesDeBoost(obj) {
+  const out = [];
+  const marche = (o, chemin, prof) => {
+    if (!o || typeof o !== 'object' || prof > 4 || out.length >= 40) return;
+    const cles = Array.isArray(o) ? (o.length ? ['0'] : []) : Object.keys(o);
+    for (const k of cles) {
+      const c = chemin ? chemin + '.' + k : k;
+      if (/push_?up|bump|spotlight|promot|boost|vas_|visibil/i.test(k)) out.push(c);
+      marche(o[k], c, prof + 1);
+    }
+  };
+  try { marche(obj, '', 0); } catch (_) {}
+  return out;
+}
 async function noterDiag(cle) {
   return majTampon((buf) => { buf.n[cle] = (buf.n[cle] || 0) + 1; });
 }
@@ -647,7 +663,18 @@ async function storeHarvest(domain, type, id, body) {
   // peut porter les mouvements sans porter de solde, et il n'y a qu'une ligne
   // `billing` par compte — c'est elle qui écrasait le relevé (§5.91).
   if (type === 'billing') { try { await storeReleve(uid, parsed, domain); } catch (_) {} }
-  if (type === 'billing' && !estPorteMonnaie(parsed)) { noterDiag('ignore_billing_hors_sujet'); return; }
+  if (type === 'billing' && !estPorteMonnaie(parsed)) {
+    noterDiag('ignore_billing_hors_sujet');
+    // ⚠️ LES BOOSTS (3 octobre) : « les boosts, c'est à toi de les capter ».
+    //    Mesuré : AUCUNE trace de boost en base — 71 réponses « billing »
+    //    jetées sans échantillon. Avant de jeter, on relève la FORME d'une
+    //    réponse qui parle de boost (les NOMS de clés seulement, jamais une
+    //    valeur) : c'est ce qui dira si un montant se relie à une annonce par
+    //    son identifiant. On mesure d'abord, on n'invente pas de rattachement.
+    const cles = clesDeBoost(parsed);
+    if (cles.length) { noterDiag('boost_vu'); echantillonRate('boost_forme', id, JSON.stringify(cles).slice(0, 600)); }
+    return;
+  }
   const data = { type, uid, domain, capturedAt: new Date().toISOString(), payload: parsed };
   if (CLE_LISTE[type]) data.nItems = ((parsed && parsed[CLE_LISTE[type]]) || []).length;
   data.resume = resumeCommandes(type, parsed) || undefined;   // même règle que la voie active
@@ -1423,7 +1450,10 @@ async function vintedSend(acc, method, endpoint, body) {
 // Il arrivait bien dans la réponse Vinted mais l'allègement le JETAIT.
 const CHAMPS_ARTICLE = ['id','title','price','url','brand','size','brand_title','size_title','status',
   'view_count','favourite_count','favourites_count','created_at_ts',
-  'is_closed','is_hidden','is_draft','item_closing_action','is_reserved'];
+  'is_closed','is_hidden','is_draft','item_closing_action','is_reserved',
+  // Boost en cours sur l'annonce (3 octobre) : Vinted l'envoie déjà dans le
+  // dressing (prouvé sur 3 articles non allégés), l'allègement le jetait.
+  'promoted','can_push_up'];
 
 function photoUtile(it) {
   const p = it.photo || (Array.isArray(it.photos) ? it.photos[0] : null) || null;

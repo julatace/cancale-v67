@@ -131,10 +131,15 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
     ? ok('auto-retrait d\'une annonce (email) : refuse titre+taille en double')
     : nok('auto-retrait d\'une annonce (email) : refuse titre+taille en double');
 
-  // BORDEREAU ↔ annonce par titre : doit refuser un titre ambigu.
-  /if \(!n \|\| titleAmbiguous\(title\)\) return null;/.test(SRC)
-    ? ok('bordereau ↔ annonce : refuse un titre porté par plusieurs paires')
-    : nok('bordereau ↔ annonce : refuse un titre porté par plusieurs paires');
+  // BORDEREAU ↔ annonce : PAR IDENTITÉ (N°, ou transaction → annonce), jamais
+  // par titre (3 octobre : le repli par titre est retiré, §5).
+  {
+    const i = SRC.indexOf('const bordForItem = ');
+    const corps = i < 0 ? '' : SRC.slice(i, SRC.indexOf('\n  };', i));
+    (corps && /txnItem\[/.test(corps) && !/normTitle|title/i.test(corps.replace(/\/\/[^\n]*/g, '')))
+      ? ok('bordereau ↔ annonce : par identité (N° ou transaction), jamais par titre')
+      : nok('bordereau ↔ annonce : par identité seulement', corps ? 'un titre sert encore à décider' : 'bordForItem introuvable');
+  }
 
   // AUDIT DU STOCK : ne doit plus masquer une paire parce qu'une VENTE porte le
   // même titre (sinon une paire perdue passe inaperçue).
