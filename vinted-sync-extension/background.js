@@ -3283,6 +3283,10 @@ async function autoAccepterOffres(uid) {
       if (r && r.ok) {
         faites += 1;
         logActivity(`✅ Offre de ${o.prix.toFixed(2)} € acceptée automatiquement (ton minimum : ${min} €) — ${o.titre.slice(0, 40)}`);
+        // ⚠️ Julien (16 sept., redemandé) : « elle accepte ET répond —
+        //    "bonjour, je viens d'accepter votre offre" — et répond à sa
+        //    question ». UN message part (salut fixe + réponse IA si question).
+        await saluerAcheteurApresOffre({ uid, acc, conv: o.conv, titre: o.titre });
       } else {
         logActivity(`⚠️ Offre de ${o.prix.toFixed(2)} € : Vinted a refusé (${(r && r.error) || '?'})`);
         if (r && r.code) break;                          // garde-fou atteint : on arrête le lot
@@ -3290,6 +3294,56 @@ async function autoAccepterOffres(uid) {
     }
     return faites;
   } catch (_) { return 0; }
+}
+
+// ── SALUT + RÉPONSE APRÈS UNE OFFRE ACCEPTÉE ────────────────────────────────
+// Julien (16 sept., redemandé le 3 oct.) : quand on accepte, il faut dire bonjour
+// ET répondre à la question de l'acheteur. UN SEUL message part (salut fixe +
+// réponse IA si question) : moins de requêtes Vinted, jamais deux « bonjour ».
+// Garde-fous §3 : compte de l'onglet, plafond horaire au moment de l'envoi,
+// jamais deux fois le même message. L'IA est GATÉE (seuil de confiance, rien sur
+// réponse vide) : mieux vaut un blanc qu'un faux — on envoie alors le salut seul.
+const OFFRE_SALUT = 'Bonjour, je viens d’accepter votre offre, merci beaucoup ! 😊';
+async function saluerAcheteurApresOffre({ uid, acc, conv, titre }) {
+  try {
+    if (!conv) return;
+    const det = await convDernierMessageId(uid, String(conv));
+    if (!det) return;                                   // conversation pas captée : rien à envoyer
+    if (det.allowReply === false) return;               // Vinted refuse la réponse ici
+    // Lire-fusionner-réécrire, garde du dossier : « pas su » ne vaut pas « jamais
+    // salué » — on n'envoie pas à l'aveugle, et on ne réécrira pas sur du vide.
+    const lu = await sbGet('app_data?id=eq.panel_msg_repondus&select=data');
+    if (lu === null) return;
+    const deja = (lu[0] && lu[0].data) || {};
+    const cle = String(conv) + ':offre';
+    if (deja[cle]) return;                              // déjà salué sur cette offre : jamais deux fois
+    // La question de l'acheteur. Si le moteur de messages (qui tourne AVANT dans
+    // la visite) y a déjà répondu — clé `conv:idMessage` présente —, on ne
+    // ré-répond pas : on envoie le salut seul (pas de double réponse).
+    let texte = OFFRE_SALUT, intention = '', confiance = 0;
+    const dejaRepondu = det.id && deja[String(conv) + ':' + det.id];
+    if (det.body && !dejaRepondu) {
+      const sugg = await aiReply(det.body, det.article || titre || '', det.price);
+      const rep = (sugg && sugg.ok && Array.isArray(sugg.suggestions) && sugg.suggestions[0]
+        && String(sugg.suggestions[0].text || '').trim()) || '';
+      if (rep && Number(sugg.confidence || 0) >= MSG_MIN_CONFIANCE) {
+        texte = OFFRE_SALUT + '\n\n' + rep;
+        intention = String(sugg.intent || ''); confiance = Number(sugg.confidence || 0);
+      }
+      // IA qui hésite ou se tait ⇒ salut seul (mieux vaut un blanc qu'un faux).
+    }
+    const stop = await garde(uid, acc);                 // compte de l'onglet + plafond horaire
+    if (stop) return;
+    const r = await vintedSend(acc, 'POST', `/api/v2/conversations/${conv}/replies`,
+      { reply: { body: texte, photo_temp_uuids: null, is_personal_data_sharing_check_skipped: false } });
+    noterDiag(r.ok ? 'offre_salut_envoye' : `offre_salut_refuse_${r.status}`);
+    if (!r.ok) return;
+    // Il doit pouvoir relire ce que j'ai dit en son nom.
+    const neuf = Object.assign({}, deja, { [cle]: { conv: String(conv), at: new Date().toISOString(),
+      texte: texte.slice(0, 400), intention, confiance, apresOffre: true, titre: String(titre || '').slice(0, 80) } });
+    await supabaseUpsert('app_data', [{ id: 'panel_msg_repondus', data: neuf }], 'id');
+    logActivity(`💬 Message envoyé à l'acheteur — « ${texte.slice(0, 50)}${texte.length > 50 ? '…' : ''} »`);
+  } catch (_) { /* un salut raté n'annule JAMAIS l'acceptation */ }
 }
 
 async function repondreOffre({ uid, tx, oid, quoi, prix }) {
