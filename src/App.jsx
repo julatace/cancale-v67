@@ -1294,6 +1294,61 @@ const deleteVintedAccount = async (vintedUserId, login) => {
   } catch (_) { return { ok: false, memo }; }
 };
 
+// ── EFFACEMENT CIBLÉ DES DONNÉES D'UN COMPTE (récupérable) ───────────────────
+// Julien, 3 octobre : « sur supprimer ce compte, on doit pouvoir sélectionner
+// si on veut tout enlever, la compta, les ventes, les achats, les annonces ».
+// Et sa précision qui fixe TOUTE la sémantique : « si je veux récupérer mes
+// données, je reconnecte simplement l'extension sur le compte Vinted ».
+// ⇒ Donc ce geste n'écrit JAMAIS `vrm_blocked_accounts` (sinon l'extension
+//    refuserait de recapter — l'inverse de ce qu'il veut). Il VIDE les lignes
+//    choisies (`{supprime:true}`, le DELETE ne marche pas sur `app_data`, §
+//    deleteVintedAccount) ; une re-capture les réécrit (listePlusRiche repart
+//    d'un `nItems` absent → écrit). Le blocage définitif reste un geste SÉPARÉ
+//    (deleteVintedAccount), pour un compte fermé par Vinted (shop_cancale).
+// ⚠️ GARDE DESTRUCTIVE : le `_` de PostgREST `like` est un joker 1-caractère, donc
+//    `harvest_35_*` matcherait `harvest_352_*`. On relit la liste et on filtre
+//    sur le préfixe EXACT en JS avant d'effacer quoi que ce soit.
+// `scopes` : { annonces, ventes, achats, messages, compte } (booléens).
+const familiesDeCompte = (uid, id, scopes) => {
+  const hp = `harvest_${uid}_`, cp = `coffre_${uid}_`;
+  if (id.startsWith(cp)) return scopes.annonces;          // le coffre = annonces archivées
+  if (!id.startsWith(hp)) return false;                   // garde EXACTE (pas de 35→352)
+  const r = id.slice(hp.length);
+  if (/^(listings$|item_)/.test(r)) return scopes.annonces;
+  if (/^(orders_sold$|txn_|label|releve_|billing$)/.test(r)) return scopes.ventes;
+  if (/^(orders_purchased$)/.test(r)) return scopes.achats;
+  if (/^(conv_)/.test(r)) return scopes.messages;
+  // Le reste (seen_urls, diag, offer_statuts…) ne part qu'avec « tout le compte ».
+  return !!scopes.compte;
+};
+const supprimerDonneesCompte = async (uid0, login, scopes) => {
+  const uid = String(uid0 || '').trim();
+  if (!uid) return { ok: false, n: 0 };
+  let n = 0;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?or=(id.like.harvest_${uid}_*,id.like.coffre_${uid}_*)&select=id`, { headers: sbAuth() });
+    if (!r.ok) return { ok: false, n: 0 };               // « pas su » : on n'efface rien à l'aveugle
+    const rows = await r.json();
+    if (!Array.isArray(rows)) return { ok: false, n: 0 };
+    const cibles = rows.filter(x => familiesDeCompte(uid, String(x.id), scopes));
+    if (cibles.length) {
+      const w = await fetch(`${SUPABASE_URL}/rest/v1/app_data`, {
+        method: 'POST',
+        headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }),
+        body: JSON.stringify(cibles.map(x => withOwner({ id: x.id, data: { supprime: true, uid, purgedAt: new Date().toISOString() } }))),
+      });
+      if (!w.ok) return { ok: false, n: 0 };
+      n = cibles.length;
+    }
+    // « Le compte et ses jetons » : la ligne vinted_accounts (DELETE marche là,
+    // autre table). Récupérable en reconnectant l'extension sur ce compte.
+    if (scopes.compte) {
+      try { await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${uid}`, { method: 'DELETE', headers: sbAuth({ Prefer: 'return=minimal' }) }); } catch (_) {}
+    }
+    return { ok: true, n };
+  } catch (_) { return { ok: false, n: 0 }; }
+};
+
 // L'extension ne capture pas toujours le pseudo Vinted (colonne login vide) ->
 // on va le chercher via /api/v2/users/current et on le met en cache dans
 // Supabase pour ne pas refaire l'appel a chaque fois. Renvoie le login ou null.
@@ -14790,6 +14845,43 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
     setAccounts(prev => prev.filter(a => a.vinted_user_id !== acc.vinted_user_id));
   };
 
+  // ── SUPPRESSION CIBLÉE (modale, récupérable) ────────────────────────────────
+  // Julien : « on doit pouvoir sélectionner si on veut tout enlever — la compta,
+  // les ventes, les achats, les annonces » + « pour récupérer, je reconnecte
+  // l'extension ». La modale efface les lignes CHOISIES (récupérables à la
+  // prochaine capture) ; elle n'écrit JAMAIS la liste noire. La compta se
+  // calcule sur les ventes : la modale le dit, pas de fausse case qui
+  // dupliquerait « ventes ». Le blocage définitif reste une option à part.
+  const [delCible, setDelCible] = useState(null);     // le compte visé, ou null
+  const [delScopes, setDelScopes] = useState({ annonces: true, ventes: true, achats: true, messages: true, compte: true });
+  const [delBusy, setDelBusy] = useState(false);
+  const ouvrirSuppression = (acc) => { setDelScopes({ annonces: true, ventes: true, achats: true, messages: true, compte: true }); setDelCible(acc); };
+  const rienCoche = !delScopes.annonces && !delScopes.ventes && !delScopes.achats && !delScopes.messages && !delScopes.compte;
+  const confirmerSuppression = async () => {
+    const acc = delCible; if (!acc || rienCoche) return;
+    setDelBusy(true);
+    const r = await supprimerDonneesCompte(acc.vinted_user_id, acc.login, delScopes);
+    setDelBusy(false);
+    if (!r.ok) { toast('Échec de la suppression — réessaie.'); return; }
+    toast(delScopes.compte
+      ? `« ${accountName(acc)} » retiré. Pour le récupérer : reconnecte l'extension sur ce compte Vinted.`
+      : `Données effacées pour « ${accountName(acc)} ». Elles reviendront à ta prochaine visite sur Vinted avec ce compte.`);
+    // Si on a retiré le compte lui-même, il quitte la liste ; sinon il reste
+    // (ses lignes effacées se re-captent).
+    if (delScopes.compte) setAccounts(prev => prev.filter(a => a.vinted_user_id !== acc.vinted_user_id));
+    setDelCible(null);
+  };
+  // Blocage DÉFINITIF (option à part, dans la modale) : compte fermé par Vinted
+  // — l'extension ne doit plus JAMAIS le recapter. On DÉLÈGUE à
+  // `disconnectAccount`, le chemin éprouvé (sa propre confirmation, l'écriture
+  // `vrm_blocked_accounts`, le `vinted_ca_keep_removed`, le toast) : pas de
+  // logique dupliquée, et `disconnectAccount` reste vivant (pas de code mort).
+  const bloquerDefinitif = async () => {
+    const acc = delCible; if (!acc) return;
+    setDelCible(null);
+    await disconnectAccount(acc);
+  };
+
   const refreshAccounts = async () => {
     setLoading(true);
     const list = await fetchVintedAccounts();
@@ -15003,9 +15095,9 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
                   <button onClick={()=>testAccount(acc)} style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 12px',cursor:'pointer',fontSize:11,fontWeight:500,color:C.text}}>
                     {tr?.loading ? 'Test…' : 'Tester la connexion'}
                   </button>
-                  <button onClick={()=>disconnectAccount(acc)} disabled={removing===acc.vinted_user_id} title="Supprimer ce compte : jetons + annonces + ventes captées effacés, et l'extension ne le recaptera plus"
-                    style={{background:'transparent',border:`1px solid ${C.danger}`,borderRadius:8,padding:'5px 12px',cursor:'pointer',fontSize:11,fontWeight:500,color:C.danger,opacity:removing===acc.vinted_user_id?0.5:1}}>
-                    {removing===acc.vinted_user_id ? '…' : <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="trash" size={12}/>Supprimer ce compte</span>}
+                  <button onClick={()=>ouvrirSuppression(acc)} title="Supprimer les données de ce compte — tu choisis quoi effacer (annonces, ventes, achats, messages, le compte). Récupérable en reconnectant l'extension."
+                    style={{background:'transparent',border:`1px solid ${C.danger}`,borderRadius:8,padding:'5px 12px',cursor:'pointer',fontSize:11,fontWeight:500,color:C.danger}}>
+                    <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="trash" size={12}/>Supprimer ce compte</span>
                   </button>
                 </div>
               </div>
@@ -15013,6 +15105,55 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
           })}
         </div>
       )}
+
+      {/* ── MODALE : SUPPRIMER LES DONNÉES D'UN COMPTE (ciblé, récupérable) ──── */}
+      {delCible && (()=>{ const acc = delCible;
+        const Case = ({ k, titre, sous }) => (
+          <label style={{display:'flex',gap:10,alignItems:'flex-start',padding:'10px 12px',border:`1px solid ${delScopes[k]?C.accent:C.border}`,background:delScopes[k]?`${C.accent}0d`:'transparent',borderRadius:10,cursor:'pointer',marginBottom:8}}>
+            <input type="checkbox" checked={!!delScopes[k]} onChange={e=>setDelScopes(s=>({...s,[k]:e.target.checked}))} style={{marginTop:2,width:17,height:17,accentColor:C.accent,flexShrink:0}}/>
+            <span style={{minWidth:0}}>
+              <span style={{display:'block',fontSize:13.5,fontWeight:600,color:C.text}}>{titre}</span>
+              <span style={{display:'block',fontSize:11.5,color:C.muted,lineHeight:1.45,marginTop:1}}>{sous}</span>
+            </span>
+          </label>
+        );
+        const tout = delScopes.annonces && delScopes.ventes && delScopes.achats && delScopes.messages && delScopes.compte;
+        return (
+        <div onClick={()=>!delBusy&&setDelCible(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.55)',zIndex:1300,display:'flex',alignItems:'flex-end',justifyContent:'center',padding:'0'}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'92vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+            <div style={{padding:'14px 16px',borderBottom:`1px solid ${C.border}`,display:'flex',alignItems:'center',gap:10}}>
+              <span style={{flexShrink:0,width:34,height:34,borderRadius:8,background:`${C.danger}14`,color:C.danger,display:'flex',alignItems:'center',justifyContent:'center'}}><Icon name="trash" size={17}/></span>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:15,fontWeight:700,color:C.text}}>Supprimer les données de « {accountName(acc)} »</div>
+                <div style={{fontSize:11.5,color:C.muted}}>Choisis ce que tu effaces. Rien ne part tant que tu n'as pas confirmé.</div>
+              </div>
+              <button type="button" onClick={()=>!delBusy&&setDelCible(null)} aria-label="Fermer" style={{flexShrink:0,border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
+            </div>
+            <div style={{flex:1,overflow:'auto',padding:'14px 16px'}}>
+              {/* Tout sélectionner / désélectionner */}
+              <label style={{display:'flex',gap:10,alignItems:'center',padding:'8px 12px',borderRadius:10,cursor:'pointer',marginBottom:10,background:C.card,border:`1px solid ${C.border}`}}>
+                <input type="checkbox" checked={tout} onChange={e=>{ const v=e.target.checked; setDelScopes({annonces:v,ventes:v,achats:v,messages:v,compte:v}); }} style={{width:17,height:17,accentColor:C.accent}}/>
+                <span style={{fontSize:13,fontWeight:700,color:C.text}}>Tout supprimer</span>
+              </label>
+              <Case k="annonces" titre="Annonces" sous="Le dressing capté, les photos et descriptions, le coffre."/>
+              <Case k="ventes" titre="Ventes" sous="Les ventes, transactions, bordereaux, relevés et porte-monnaie. La compta (CA, URSSAF) se recalcule dessus : la retirer la met à jour."/>
+              <Case k="achats" titre="Achats" sous="Les commandes achetées sur ce compte."/>
+              <Case k="messages" titre="Messages" sous="Les conversations captées de ce compte."/>
+              <Case k="compte" titre="Le compte et ses jetons" sous="Retire le compte de la liste. Tu le récupères en reconnectant l'extension dessus sur Vinted."/>
+              <div style={{fontSize:12,color:C.muted,lineHeight:1.5,background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 12px',marginTop:4}}>
+                ↩︎ <b style={{color:C.text}}>Rien n'est perdu pour de bon</b> : ce que tu effaces ici revient tout seul à ta prochaine visite sur Vinted avec ce compte (l'extension recapte). Pour qu'un compte ne revienne <b>jamais</b> (fermé par Vinted), utilise le blocage ci-dessous.
+              </div>
+            </div>
+            <div style={{borderTop:`1px solid ${C.border}`,padding:'12px 16px',display:'flex',flexDirection:'column',gap:8}}>
+              <div style={{display:'flex',gap:8}}>
+                <button type="button" onClick={()=>!delBusy&&setDelCible(null)} style={{flex:1,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'12px',fontSize:14,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Annuler</button>
+                <button type="button" onClick={confirmerSuppression} disabled={delBusy||rienCoche} style={{flex:2,border:'none',background:rienCoche?C.border:C.danger,color:'#fff',borderRadius:10,padding:'12px',fontSize:14,fontWeight:700,cursor:(delBusy||rienCoche)?'default':'pointer',fontFamily:'inherit',opacity:delBusy?0.6:1}}>{delBusy?'…':rienCoche?'Coche au moins une case':'Supprimer'}</button>
+              </div>
+              <button type="button" onClick={bloquerDefinitif} disabled={delBusy} style={{border:'none',background:'transparent',color:C.muted,borderRadius:10,padding:'4px',fontSize:12,fontWeight:500,cursor:delBusy?'default':'pointer',fontFamily:'inherit',textDecoration:'underline'}}>Compte fermé par Vinted ? Le bloquer définitivement</button>
+            </div>
+          </div>
+        </div>
+      ); })()}
     </div>
   );
 }
