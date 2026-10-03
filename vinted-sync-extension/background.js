@@ -5145,14 +5145,31 @@ function imageDeVente(d) {
   } catch (_) {}
   return '';
 }
+// La date de VENTE d'une transaction Leboncoin (5.131) : `created_at` de la
+// liste v3, et seulement si elle se lit comme une date — sinon rien (« à dater »).
+function dateVenteLbc(t) {
+  const c = t && t.created_at;
+  return (typeof c === 'string' && !isNaN(Date.parse(c))) ? c : '';
+}
 function extraireVentesLbc(url, body) {
   let j; try { j = typeof body === 'string' ? JSON.parse(body) : body; } catch (_) { return []; }
   // Résumé : la liste des transactions (v3).
   if (Array.isArray(j)) {
+    // ⚠️⚠️ LA DATE DE LA VENTE (3 octobre) : le CA déclaré à l'URSSAF est daté
+    //    au jour de la VENTE (§5), et AUCUNE vente Leboncoin n'en portait — `at`
+    //    est l'heure de capture. Seule la liste v3 la porte (`created_at`, relevé
+    //    dans `lbc_recon.schemas`) : on la garde, et une fois posée elle ne
+    //    bouge plus (`rangerLbcVentes`). Une chaîne qui ne se lit pas comme une
+    //    date n'est pas gardée — mieux vaut « à dater » qu'une date fausse.
+    // ⚠️ LE PRIX DE LA LISTE N'EST PAS LE PRIX DE LA VENTE : mesuré 2928 dans la
+    //    liste (total acheteur, frais et port) contre 2500 dans le détail
+    //    (`prices.final`). Il est gardé à part (`prixListe`) et n'écrase plus
+    //    jamais `price`, qui ne vient que du détail.
     return j.map((t) => t && {
       txId: String((t.id && t.id.purchase_id) || t.purchase_id || ''),
       title: (t.item && t.item.title) || '',
-      price: (t.item && t.item.price != null) ? t.item.price : (t.price != null ? t.price : null),
+      prixListe: (t.item && t.item.price != null) ? t.item.price : (t.price != null ? t.price : null),
+      dateVente: dateVenteLbc(t),
       stepStatus: typeof t.step === 'string' ? t.step : ((t.step && t.step.status) || ''),
     }).filter((x) => x && x.txId);
   }
@@ -5207,6 +5224,7 @@ async function rangerLbcVentes(list) {
     for (const [kk, vv] of Object.entries(v)) {
       if (kk === 'label') continue;                   // fusionné à part
       if (vv === '' || vv == null) continue;          // un vide n'écrase pas une valeur connue
+      if (kk === 'dateVente' && old.dateVente) continue;   // la date de VENTE ne bouge plus une fois posée
       m[kk] = vv;
     }
     if (v.label) {                                     // enrichit le bordereau champ par champ

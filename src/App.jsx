@@ -35,7 +35,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.130.0';
+const EXT_ATTENDUE = '5.131.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -150,7 +150,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 //   releve  `capterReleves`       5.52.0  (5 sept.)   le relevé daté du porte-monnaie
 // `audit-coherence.cjs` vérifie que ces trois fonctions existent toujours dans
 // l'extension : une capacité annoncée mais retirée serait le même mensonge.
-const EXT_CAPACITES = { codes: '5.45.0', offres: '5.38.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', repond: '5.77.0', commande: '5.129.0', offresapp: '5.130.0', publication: '5.130.0' };
+const EXT_CAPACITES = { codes: '5.45.0', offres: '5.38.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', repond: '5.77.0', commande: '5.129.0', offresapp: '5.130.0', publication: '5.130.0', lbcdate: '5.131.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -2756,15 +2756,75 @@ const moisDeVente = (o) => {
 const venteFinalisee = (o) => classifyOrderStatus(o && o.status) === 'completed';
 // Répartition par mois du CA déclarable. `masquee(o)` sert UNIQUEMENT à compter
 // à part ce que l'app cache à l'écran : le total, lui, ne l'écarte jamais.
-const caUrssafParMois = (ventes, masquee) => {
+// (Vinted seul — l'enveloppe d'avant, gardée pour ses lecteurs ; la règle est
+// `ventesDeclarables` juste en dessous, §11.)
+const caUrssafParMois = (ventes, masquee) => caDeclarableParMois(ventesDeclarables({ vinted: ventes, masquee }).lignes);
+// ══════════════════════════════════════════════════════════════════════════════
+// LE CA DÉCLARÉ, TOUTES PLATEFORMES — UNE SEULE RÈGLE (3 octobre)
+// ══════════════════════════════════════════════════════════════════════════════
+// Julien : « toutes mes ventes finalisées, peu importe l'application de vente,
+// sont mon chiffre d'affaires du mois que je déclare à l'URSSAF ». Jusqu'ici le
+// CA mensuel ne comptait que Vinted ; Leboncoin et eBay n'apparaissaient que dans
+// un total « depuis le début », sans mois.
+// ⚠️ L'IDENTITÉ est `plateforme:id` (vinted:transaction, lbc:purchase_id,
+//    ebay:orderId) — jamais un titre, jamais une paire (§5). Une même vente vue
+//    deux fois n'est comptée qu'une fois.
+// ⚠️ DATÉ AU JOUR DE LA VENTE (§5). Une vente Leboncoin dont on n'a pas la date
+//    de vente (l'extension ne la capte que depuis la 5.131) n'est placée dans
+//    AUCUN mois : elle va dans « à dater », avec son montant. L'heure de capture
+//    serait une date FAUSSE, et un chiffre faux sur une déclaration ne se voit pas.
+// ⚠️ Leboncoin : seule une vente PROUVÉE (`isSeller === true`), finalisée, au
+//    prix FINAL du détail (en centimes). eBay : commande PAYÉE, en euros, datée
+//    de sa création. Une autre devise est écartée et COMPTÉE à part, jamais
+//    convertie au hasard.
+const ymDeTs = (t) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
+const ventesDeclarables = ({ vinted, lbc, ebay, masquee } = {}) => {
+  const lignes = [], aDater = [], ecartees = [], vus = new Set();
+  const garde = (l) => { if (vus.has(l.id)) return false; vus.add(l.id); return true; };
+  for (const o of (vinted || [])) {
+    if (!o || !venteFinalisee(o)) continue;
+    const t = tsCommande(o); if (!t) continue;
+    const tx = o.transaction_id != null ? o.transaction_id : o.id;
+    const l = { id: 'vinted:' + (tx != null ? tx : ('?' + lignes.length)), plateforme: 'Vinted', ts: t, ym: ymDeTs(t), eur: montantCommande(o),
+      titre: o.title || '', masquee: !!(masquee && masquee(o)), o };
+    if (garde(l)) lignes.push(l);
+  }
+  for (const v of (lbc || [])) {
+    if (!v || v.isSeller !== true || !v.txId) continue;
+    if (lbcAnnulee(v) || !lbcFinalisee(v)) continue;
+    const eur = v.price != null ? Number(v.price) / 100 : NaN;
+    const id = 'lbc:' + v.txId;
+    if (!isFinite(eur)) { if (!vus.has(id)) { vus.add(id); ecartees.push({ id, plateforme: 'Leboncoin', raison: 'prix inconnu', titre: v.title || '' }); } continue; }
+    const t = Date.parse(v.dateVente || '');
+    if (!t) { if (!vus.has(id)) { vus.add(id); aDater.push({ id, plateforme: 'Leboncoin', eur, titre: v.title || '' }); } continue; }
+    const l = { id, plateforme: 'Leboncoin', ts: t, ym: ymDeTs(t), eur, titre: v.title || '', masquee: false };
+    if (garde(l)) lignes.push(l);
+  }
+  for (const e of (ebay || [])) {
+    if (!e || String(e.orderPaymentStatus || '').toUpperCase() !== 'PAID' || !e.orderId) continue;
+    const tot = (e.pricingSummary && e.pricingSummary.total) || {};
+    const id = 'ebay:' + e.orderId;
+    if (tot.currency && tot.currency !== 'EUR') { if (!vus.has(id)) { vus.add(id); ecartees.push({ id, plateforme: 'eBay', raison: 'devise ' + tot.currency, titre: '' }); } continue; }
+    const eur = Number(tot.value);
+    const t = Date.parse(e.creationDate || '');
+    if (!isFinite(eur)) continue;
+    if (!t) { if (!vus.has(id)) { vus.add(id); aDater.push({ id, plateforme: 'eBay', eur, titre: '' }); } continue; }
+    const titre = (Array.isArray(e.lineItems) && e.lineItems[0] && e.lineItems[0].title) || '';
+    const l = { id, plateforme: 'eBay', ts: t, ym: ymDeTs(t), eur, titre, masquee: false };
+    if (garde(l)) lignes.push(l);
+  }
+  return { lignes, aDater, ecartees };
+};
+// Par mois : le total ET sa répartition par plateforme — les « dont » somment au
+// total, ils viennent des mêmes lignes (§5 : la phrase vient de la même source).
+const caDeclarableParMois = (lignes) => {
   const map = {};
-  for (const o of (ventes || [])) {
-    if (!venteFinalisee(o)) continue;
-    const ym = moisDeVente(o); if (!ym) continue;
-    const eur = montantCommande(o);
-    const m = map[ym] || (map[ym] = { ym, n: 0, ca: 0, nMasq: 0, caMasq: 0 });
-    m.n += 1; m.ca += eur;
-    if (masquee && masquee(o)) { m.nMasq += 1; m.caMasq += eur; }
+  for (const l of (lignes || [])) {
+    const m = map[l.ym] || (map[l.ym] = { ym: l.ym, n: 0, ca: 0, nMasq: 0, caMasq: 0, par: {} });
+    m.n += 1; m.ca += l.eur;
+    const p = m.par[l.plateforme] || (m.par[l.plateforme] = { n: 0, ca: 0 });
+    p.n += 1; p.ca += l.eur;
+    if (l.masquee) { m.nMasq += 1; m.caMasq += l.eur; }
   }
   return map;
 };
@@ -8735,9 +8795,19 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
     const v = load('vinted_urssaf_mois', null);
     return (v && Array.isArray(v.mois)) ? v.mois : null;
   }, [liveStats]);
+  // Ce que la ligne publiée sait d'AUTRE (toutes plateformes, 3 octobre) : les
+  // ventes sans date (hors de tout mois) et les sources lues ou pas (§5 : la
+  // couverture À CÔTÉ du chiffre, jamais à la place).
+  const urssafInfo = useMemo(() => {
+    const v = load('vinted_urssaf_mois', null);
+    return v ? { aDater: v.aDater || null, sources: v.sources || null } : null;
+  }, [liveStats]);
   const TAUX_URSSAF = tauxUrssaf()/100;
+  // ⚠️ SANS LIGNE PUBLIÉE, ON NE RETOMBE PLUS SUR L'ARCHIVE (vide depuis
+  //    juillet 2026 → « 0,00 € à payer » sur un appareil neuf). `null` = on ne
+  //    sait pas encore : la carte écrit un tiret et dit où ça se calcule.
   const moisCourantCA = useMemo(() => {
-    if (!urssafMois) return moisCourant.ca;
+    if (!urssafMois) return null;
     const now=new Date(); const ym=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
     const e = urssafMois.find(m=>m.ym===ym);
     return e ? e.ca : 0;
@@ -8754,8 +8824,8 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
     const e = urssafMois.find(m=>m.ym===ym);
     return e ? (e.n || 0) : 0;
   }, [urssafMois]);
-  const urssafEstime=moisCourantCA*TAUX_URSSAF;
-  const netApresUrssaf=moisCourantCA-urssafEstime;
+  const urssafEstime=moisCourantCA==null?null:moisCourantCA*TAUX_URSSAF;
+  const netApresUrssaf=moisCourantCA==null?null:moisCourantCA-urssafEstime;
   // Échéance de déclaration URSSAF (fréquence réglable) + CA encaissé de la
   // période concernée → somme estimée à déclarer/payer à cette date.
   const [urssafFreq,setUrssafFreq]=useState(()=>load('vinted_urssaf_freq','trimestriel'));
@@ -9229,7 +9299,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         <div style={{display:'flex',flexWrap:'wrap',gap:22}}>
           <div>
             <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>Ventes finalisées</div>
-            <div className="vrm-display" style={{fontSize:27,fontWeight:700,color:C.text}}>{moisCourantN!=null?moisCourantN:(liveStats&&liveStats.ventesMois!=null?liveStats.ventesMois:moisCourant.count)}</div>
+            <div className="vrm-display" style={{fontSize:27,fontWeight:700,color:moisCourantN!=null?C.text:C.muted}}>{moisCourantN!=null?moisCourantN:'—'}</div>
             {/* LA COUVERTURE À CÔTÉ, jamais à la place : une vente de ce mois
                 n'est pas encore finalisée, elle n'entre donc pas dans ce qu'il
                 doit déclarer — mais elle existe, et il l'a vue sur Ventes. */}
@@ -9246,11 +9316,11 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
           </div>
           <div>
             <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>À payer ({String(tauxUrssaf()).replace('.',',')} %)</div>
-            <div className="vrm-display" style={{fontSize:27,fontWeight:700,color:C.text}}>{fmt(urssafEstime)}</div>
+            <div className="vrm-display" style={{fontSize:27,fontWeight:700,color:urssafEstime==null?C.muted:C.text}}>{urssafEstime==null?'—':fmt(urssafEstime)}</div>
           </div>
           <div>
             <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>Net après paiement</div>
-            <div className="vrm-display" style={{fontSize:27,fontWeight:700,color:C.text}}>{fmt(netApresUrssaf)}</div>
+            <div className="vrm-display" style={{fontSize:27,fontWeight:700,color:netApresUrssaf==null?C.muted:C.text}}>{netApresUrssaf==null?'—':fmt(netApresUrssaf)}</div>
           </div>
         </div>
         <div style={{fontSize:11,color:C.muted,marginTop:10,lineHeight:1.5}}>
@@ -9262,8 +9332,29 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
               « 19,32 € à payer » et, dessous, « calculé sur 0,00 € ». Sur
               l'écran où il décide ce qu'il verse à l'URSSAF, c'est le pire
               endroit possible pour un chiffre invérifiable (§2.7). */}
-          Calculé sur le CA des ventes <b>finalisées</b> de {moisCourant.nom} (<b>{fmt(moisCourantCA)}</b>), ventes masquées comprises. C'est la somme à verser à la fin du mois (versement libératoire).
+          {moisCourantCA==null
+            ? <>Ce chiffre se calcule sur l'écran <b>Ventes</b> : ouvre-le une fois sur cet appareil et il s'affichera ici.</>
+            : <>Calculé sur le CA des ventes <b>finalisées</b> de {moisCourant.nom}, <b>toutes plateformes</b> (<b>{fmt(moisCourantCA)}</b>), ventes masquées comprises. C'est la somme à verser à la fin du mois (versement libératoire).</>}
         </div>
+        {/* TOUTES PLATEFORMES (3 octobre) — les « dont » viennent de la MÊME
+            ligne publiée que le total : ils somment au total, ils ne peuvent
+            pas le contredire (§5). Et ce qui MANQUE est dit à côté : une source
+            pas lue, des ventes sans date, Vestiaire pas relié. */}
+        {moisCourantCA!=null && (() => {
+          const now=new Date(); const ym=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+          const e = (urssafMois||[]).find(m=>m.ym===ym) || {};
+          const par = Object.entries(e.par||{}).filter(([,v])=>v && v.n>0);
+          const src = (urssafInfo && urssafInfo.sources) || {};
+          const pasSu = Object.entries(src).filter(([,v])=>v==='pasSu').map(([k])=>k);
+          const ad = urssafInfo && urssafInfo.aDater;
+          const morceaux = [];
+          if (par.length > 1 || (par.length === 1 && par[0][0] !== 'Vinted')) morceaux.push(<span key="d">dont {par.map(([k,v])=>`${k} ${fmt(v.ca)}`).join(' · ')}</span>);
+          if (pasSu.length) morceaux.push(<span key="p" style={{color:C.warn}}>{pasSu.join(' et ')} : pas pu lire — {pasSu.length>1?'leurs':'ses'} ventes ne sont pas dans ce chiffre, rouvre l'écran dans un moment</span>);
+          if (ad && ad.n > 0) morceaux.push(<span key="a" style={{color:C.warn}}>{ad.n} vente{ad.n>1?'s':''} Leboncoin sans date ({fmt(ad.ca)}) : dans aucun mois tant que leur date n'est pas captée — {extSait('lbcdate')==='ok' ? <>ouvre « Mes transactions » sur leboncoin.fr, l'extension la relève au passage</> : extSait('lbcdate')==='retard' ? <>mets d'abord l'extension à jour ({EXT_CAPACITES.lbcdate}), puis ouvre « Mes transactions » sur leboncoin.fr</> : <>depuis l'ordinateur où l'extension est installée, ouvre « Mes transactions » sur leboncoin.fr</>}</span>);
+          if (src.Vestiaire === 'nonRelie') morceaux.push(<span key="v">Vestiaire Collective : pas encore relié</span>);
+          if (!morceaux.length) return null;
+          return <div data-urssaf-couverture style={{fontSize:11,color:C.muted,marginTop:6,lineHeight:1.6,display:'flex',flexDirection:'column',gap:2}}>{morceaux}</div>;
+        })()}
         {/* ⚠️ HONNÊTETÉ (§5.57) : l'URSSAF veut le CA ENCAISSÉ sur la période.
             L'app date chaque vente au jour où elle a été VENDUE — la date à
             laquelle Vinted libère l'argent n'est pas connue pour toutes les
@@ -9271,7 +9362,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             silence. L'écart est de quelques jours à quelques semaines : on le
             DIT au lieu de laisser croire à un chiffre officiel. */}
         <div style={{fontSize:11,color:C.muted,marginTop:6,lineHeight:1.5}}>
-          ⚠️ Ces ventes sont datées au jour de la <b>vente</b>, pas au jour où Vinted t'a versé l'argent (l'app ne connaît pas cette date pour toutes). Sur une fin de mois, un ou deux jours d'écart sont possibles — vérifie ton taux et ton chiffre sur autoentrepreneur.urssaf.fr, je ne suis pas comptable.
+          ⚠️ Ces ventes sont datées au jour de la <b>vente</b>, pas au jour où la plateforme t'a versé l'argent (l'app ne connaît pas cette date pour toutes). Sur une fin de mois, un ou deux jours d'écart sont possibles — vérifie ton taux et ton chiffre sur autoentrepreneur.urssaf.fr, je ne suis pas comptable.
         </div>
         {/* Prochaine échéance de DÉCLARATION (rappel) */}
         <div style={{marginTop:14,paddingTop:14,borderTop:`1px solid ${C.border}`}}>
@@ -15423,10 +15514,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // seul quand il ouvre la transaction sur Leboncoin (le détail est capté au
   // passage). Lecture ratée/vide ⇒ tout à zéro : jamais un faux « vendu ».
   const [lbcVentes, setLbcVentes] = useState({ ventes: [], inconnues: 0 });
+  // Trois états pour le CA déclaré : `undefined` en cours · `null` pas su · lu.
+  const [lbcLu, setLbcLu] = useState(undefined);
+  const [ebayCmd, setEbayCmd] = useState(undefined);
+  useEffect(() => { (async () => {
+    try {
+      // §4.4 : seulement le tableau des commandes, jamais le blob de la ligne.
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.ebay_orders&select=orders:data->orders`, { headers: sbAuth() });
+      if (!r.ok) { setEbayCmd(null); return; }
+      const rows = await r.json();
+      setEbayCmd(Array.isArray(rows) ? ((rows[0] && Array.isArray(rows[0].orders)) ? rows[0].orders : []) : null);
+    } catch (_) { setEbayCmd(null); }
+  })(); }, []);
   useEffect(() => { (async () => {
     try {
       const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=data`, { headers: sbAuth() });
-      if (!r.ok) return;
+      if (!r.ok) { setLbcLu(null); return; }
       const rows = await r.json();
       const obj = (rows && rows[0] && rows[0].data && rows[0].data.ventes) || {};
       const arr = Object.values(obj);
@@ -15438,7 +15541,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const inc = arr.filter(o => o && o.isSeller == null && !lbcAnnulee(o));
       const inconnuesListe = inc.slice().sort((a,b)=>String(b.at||'').localeCompare(String(a.at||'')));
       setLbcVentes({ ventes, inconnues: inc.length, inconnuesListe });
-    } catch (_) { /* pas su ⇒ rien : jamais un faux « vendu » */ }
+      setLbcLu(true);
+    } catch (_) { setLbcLu(null); /* pas su ⇒ rien : jamais un faux « vendu » */ }
   })(); }, []);
   const [usedNumeros, setUsedNumeros] = useState(() => load('vinted_used_numeros', []));
   // Prix d'achat mémorisé PAR NUMÉRO (et non par id d'annonce, qui change à la
@@ -17006,18 +17110,28 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // C'est cet écran-là que Julien appelle « mon rapport tous les mois ».
   // L'écran Ventes est le PROPRIÉTAIRE des ventes (§11) : il publie le récap,
   // le tableau de bord le consomme — même motif que `vinted_nums_physiques`.
+  // ⚠️ TOUTES PLATEFORMES (3 octobre) : Vinted + Leboncoin + eBay, par la même
+  //    règle (`ventesDeclarables`). On n'attend pas Leboncoin/eBay pour publier
+  //    Vinted, mais on PUBLIE ce qu'on sait d'eux : `sources` dit lesquelles ont
+  //    été lues (« pas su » ≠ « aucune vente »), `aDater` ce qui n'a pas de date.
   useEffect(() => {
     if (!sales.items) return;                       // rien de sûr à publier
+    if (lbcLu === undefined || ebayCmd === undefined) return;   // on attend de savoir
     try {
-      const parMois = caUrssafParMois(sales.items, isHidden);
-      const liste = Object.values(parMois)
-        .map(m => ({ ym: m.ym, n: m.n, ca: Math.round(m.ca*100)/100, nMasq: m.nMasq, caMasq: Math.round(m.caMasq*100)/100 }))
+      const { lignes, aDater, ecartees } = ventesDeclarables({ vinted: sales.items, lbc: lbcLu ? lbcVentes.ventes : [], ebay: ebayCmd || [], masquee: isHidden });
+      const r2 = (x) => Math.round(x * 100) / 100;
+      const liste = Object.values(caDeclarableParMois(lignes))
+        .map(m => ({ ym: m.ym, n: m.n, ca: r2(m.ca), nMasq: m.nMasq, caMasq: r2(m.caMasq),
+          par: Object.fromEntries(Object.entries(m.par).map(([k, v]) => [k, { n: v.n, ca: r2(v.ca) }])) }))
         .sort((a,b)=> a.ym < b.ym ? 1 : -1);
+      const ad = { n: aDater.length, ca: r2(aDater.reduce((t, l) => t + l.eur, 0)) };
+      const sources = { Vinted: 'lu', Leboncoin: lbcLu ? 'lu' : 'pasSu', eBay: ebayCmd ? 'lu' : 'pasSu', Vestiaire: 'nonRelie' };
       const avant = load('vinted_urssaf_mois', null);
-      const memeChose = avant && JSON.stringify(avant.mois) === JSON.stringify(liste);
-      if (!memeChose) save('vinted_urssaf_mois', { mois: liste, at: Date.now() });
+      const charge = { mois: liste, aDater: ad, ecartees: ecartees.length, sources };
+      const memeChose = avant && JSON.stringify({ mois: avant.mois, aDater: avant.aDater, ecartees: avant.ecartees, sources: avant.sources }) === JSON.stringify(charge);
+      if (!memeChose) save('vinted_urssaf_mois', { ...charge, at: Date.now() });
     } catch (_) {}
-  }, [sales.items, hiddenSales, hiddenAccts]);
+  }, [sales.items, hiddenSales, hiddenAccts, lbcLu, lbcVentes, ebayCmd]);
 
   // Filet prix d'achat : si l'entrée a un N° mais pas de prix d'achat, on va le
   // chercher dans le miroir PAR NUMÉRO (buyByNum) — c'est ce qui fait remonter
@@ -19685,8 +19799,24 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null;
       ca+=sell; nb+=1; frais+=fee;
       if (buy!=null && !isNaN(buy)) { cout+=buy; nbCout+=1; margeKnown+=(sell-buy); fraisConnu+=fee; }
-      saleLines.push({ date:o.date, num:e?.numero||'', title:o.title, sell, buy:(buy!=null&&!isNaN(buy))?buy:null, fee });
+      saleLines.push({ date:o.date, num:e?.numero||'', title:o.title, sell, buy:(buy!=null&&!isNaN(buy))?buy:null, fee, plateforme:'Vinted' });
     }
+    // ⚠️ TOUTES PLATEFORMES (3 octobre) : les ventes Leboncoin et eBay
+    //    finalisées du mois entrent dans le CA déclaré, par la MÊME règle que le
+    //    tableau de bord (`ventesDeclarables`, §11). Leur prix d'achat n'est pas
+    //    relié (aucune identité paire ↔ vente Leboncoin/eBay aujourd'hui) : il
+    //    reste un tiret, et la couverture du bénéfice le dit déjà (nbCout/nb).
+    const autres = ventesDeclarables({ lbc: lbcLu ? lbcVentes.ventes : [], ebay: ebayCmd || [] });
+    const parPlateforme = { Vinted: { n: nb, ca } };
+    for (const l of autres.lignes) {
+      if (l.ym !== reportMonth) continue;
+      ca += l.eur; nb += 1;
+      const pp = parPlateforme[l.plateforme] || (parPlateforme[l.plateforme] = { n: 0, ca: 0 });
+      pp.n += 1; pp.ca += l.eur;
+      saleLines.push({ date: new Date(l.ts).toISOString(), num: '', title: l.titre, sell: l.eur, buy: null, fee: 0, plateforme: l.plateforme });
+    }
+    const aDater = { n: autres.aDater.length, ca: autres.aDater.reduce((t, l) => t + l.eur, 0) };
+    const sourcesKO = [lbcLu === null ? 'Leboncoin' : null, ebayCmd === null ? 'eBay' : null].filter(Boolean);
     // Registre des ventes : dans l'ordre du mois, comme le relevé d'un comptable.
     saleLines.sort((a,b)=> new Date(a.date)-new Date(b.date));
     // Registre d'achats du mois (hors annulés).
@@ -19710,9 +19840,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const margeHT = marge - tvaMarge;
     const taux = tauxUrssaf();
     const urssaf = ca * (taux/100);
-    return { regime, tvaRate, monthLabel, ca, cout, frais, nb, nbCout, benefNet, marge, tvaMarge, margeHT, taux, urssaf, nMasq, caMasq, nAttente, caAttente, saleLines, buyLines, achatsTotal };
+    return { regime, tvaRate, monthLabel, ca, cout, frais, nb, nbCout, benefNet, marge, tvaMarge, margeHT, taux, urssaf, nMasq, caMasq, nAttente, caAttente, saleLines, buyLines, achatsTotal, parPlateforme, aDater, sourcesKO };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, buysBase, reportMonth, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts]);
+  }, [sales.items, buysBase, reportMonth, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, lbcLu, lbcVentes, ebayCmd]);
 
   // ⚠️ Il a choisi un mois : on ne le déplace plus sous ses doigts.
   const moisChoisiMain = useRef(false);
@@ -19733,7 +19863,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     L.push([`Régime`, R.regime==='marge'?'Société (marge)':'Micro-entrepreneur']);
     L.push([]);
     L.push(['VENTES']); L.push(['Date','N°','Titre','Vente','Achat','Boost','Bénéfice net']);
-    R.saleLines.forEach(s=>L.push([s.date?new Date(s.date).toLocaleDateString('fr-FR'):'',s.num,s.title,s.sell.toFixed(2),s.buy!=null?s.buy.toFixed(2):'',s.fee?s.fee.toFixed(2):'',s.buy!=null?(s.sell-s.buy-s.fee).toFixed(2):'']));
+    R.saleLines.forEach(s=>L.push([s.date?new Date(s.date).toLocaleDateString('fr-FR'):'',s.num,(s.plateforme&&s.plateforme!=='Vinted'?'['+s.plateforme+'] ':'')+s.title,s.sell.toFixed(2),s.buy!=null?s.buy.toFixed(2):'',s.fee?s.fee.toFixed(2):'',s.buy!=null?(s.sell-s.buy-s.fee).toFixed(2):'']));
     L.push(['','','TOTAL',R.ca.toFixed(2),R.cout.toFixed(2),R.frais.toFixed(2),R.benefNet.toFixed(2)]);
     L.push([]);
     L.push(['ACHATS (registre)']); L.push(['Date','Vendeur','Article','Montant']);
@@ -19788,7 +19918,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     entete('Registre des ventes ('+R.saleLines.length+')', colsV);
     R.saleLines.forEach(v=>{
       place(14);
-      W(v.date?new Date(v.date).toLocaleDateString('fr-FR'):'',40,8); W(v.num||'',92,8); W(coupe(v.title,48),125,8);
+      W(v.date?new Date(v.date).toLocaleDateString('fr-FR'):'',40,8); W(v.num||'',92,8); W(coupe((v.plateforme&&v.plateforme!=='Vinted'?'['+v.plateforme+'] ':'')+(v.title||''),48),125,8);
       W(v.sell.toFixed(2),365,8); W(v.buy!=null?v.buy.toFixed(2):'-',420,8); W(v.fee?v.fee.toFixed(2):'',470,8);
       W(v.buy!=null?(v.sell-v.buy-v.fee).toFixed(2):'-',510,8); y-=12;
     });
@@ -24638,13 +24768,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   construction. Le prix d'achat n'est écrit que s'il est connu ;
                   sinon un tiret, jamais un 0 (§7). */}
               <div style={{fontSize:12,fontWeight:600,color:C.text,margin:'6px 0 8px'}}>Registre des ventes — {fmtE(report.ca)} ({report.saleLines.length})</div>
+              {/* La répartition et ce qui MANQUE, à côté du total (§5). */}
+              {(() => {
+                const pp = Object.entries(report.parPlateforme||{}).filter(([,v])=>v.n>0);
+                const bits = [];
+                if (pp.length > 1) bits.push('dont ' + pp.map(([k,v])=>`${k} ${fmtE(v.ca)}`).join(' · '));
+                if ((report.sourcesKO||[]).length) bits.push(`${report.sourcesKO.join(' et ')} : pas pu lire — rouvre le rapport dans un moment`);
+                if (report.aDater && report.aDater.n) bits.push(`${report.aDater.n} vente${report.aDater.n>1?'s':''} sans date (${fmtE(report.aDater.ca)}) : dans aucun mois tant que leur date n'est pas captée`);
+                bits.push('Vestiaire Collective : pas encore relié');
+                return <div data-registre-couverture style={{fontSize:11,color:C.muted,margin:'-4px 0 8px',lineHeight:1.5}}>{bits.join(' · ')}</div>;
+              })()}
               {report.saleLines.length===0 && <div style={{fontSize:12,color:C.muted,padding:'6px 0 12px'}}>Aucune vente finalisée ce mois-ci.</div>}
               <div data-registre="ventes" style={{display:'flex',flexDirection:'column',gap:6,marginBottom:14}}>
                 {report.saleLines.map((v,i)=>(
                   <div key={i} style={{display:'flex',gap:8,alignItems:'center',padding:'7px 10px',border:`1px solid ${C.border}`,borderRadius:8,background:C.card}}>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:12,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{v.num?<span style={{fontWeight:700}}>N°{v.num} · </span>:null}{v.title||'—'}</div>
-                      <div style={{fontSize:11,color:C.muted}}>{v.date?new Date(v.date).toLocaleDateString('fr-FR'):''}{' · achat '}{v.buy!=null?fmtE(v.buy):'—'}{v.fee?` · boost ${fmtE(v.fee)}`:''}{v.buy!=null?` · bénéfice ${fmtE(v.sell-v.buy-v.fee)}`:''}</div>
+                      <div style={{fontSize:11,color:C.muted}}>{v.plateforme||'Vinted'}{' · '}{v.date?new Date(v.date).toLocaleDateString('fr-FR'):''}{' · achat '}{v.buy!=null?fmtE(v.buy):'—'}{v.fee?` · boost ${fmtE(v.fee)}`:''}{v.buy!=null?` · bénéfice ${fmtE(v.sell-v.buy-v.fee)}`:''}</div>
                     </div>
                     <div style={{fontSize:13,fontWeight:600,color:C.text,flexShrink:0}}>{fmtE(v.sell)}</div>
                   </div>

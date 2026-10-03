@@ -3668,6 +3668,40 @@ appuies dessus, le site VRM s'ouvre ».
   `audit-panneau`, `audit-recap`, `audit-relances`, `banc-captation`,
   `banc-favoris`.
 
+### ⚠️⚠️ « TOUTES MES VENTES FINALISÉES, PEU IMPORTE LA PLATEFORME » (3 octobre, 5.131)
+Le CA mensuel déclaré, son registre et ses exports ne comptaient que **Vinted** ;
+Leboncoin et eBay n'apparaissaient que dans un total « depuis le début », sans mois.
+- **Une seule règle** : `ventesDeclarables({vinted, lbc, ebay, masquee})` →
+  `{lignes, aDater, ecartees}`, puis `caDeclarableParMois` (total + `par`
+  plateforme, les « dont » somment au total). `caUrssafParMois` n'est plus
+  qu'une enveloppe (§11). Identité `plateforme:id`, jamais un titre ; une vente
+  vue deux fois compte une fois.
+- **Leboncoin** : vente PROUVÉE (`isSeller === true`), finalisée, prix **final
+  du détail** en centimes. ⚠️ **AUCUNE vente Leboncoin ne portait sa date de
+  vente** (`at` = heure de capture). L'extension 5.131 relève `created_at` de la
+  liste v3 (`dateVenteLbc`), ne le réécrit jamais, et ne laisse plus le prix de
+  la liste (total acheteur, mesuré 2928 contre 2500) écraser le prix final
+  (`prixListe` à part). **Sans date ⇒ dans aucun mois** : « à dater », avec son
+  montant, dit à côté du total. L'heure de capture serait une date fausse.
+- **eBay** : commande `PAID`, en EUR, datée de `creationDate` ; une autre devise
+  est écartée et comptée à part, jamais convertie au hasard.
+- L'écran Ventes publie `vinted_urssaf_mois` avec `par`, `aDater` et `sources`
+  (« pas su » ≠ « aucune vente ») ; le tableau de bord ne retombe **plus jamais**
+  sur l'archive vide (sans publication : « — » et où ça se calcule). Le rapport
+  mensuel (écran, CSV, PDF) porte les lignes Leboncoin/eBay avec leur
+  plateforme, et dit la répartition, les sources illisibles, les ventes à dater
+  et « Vestiaire : pas encore relié ».
+- Audits : `audit-urssaf.cjs` exécute la règle sur les trois plateformes (2
+  rouges sur l'avant), `audit-lbc-ventes.cjs` la date et le prix (3 rouges),
+  banc `rapport.cjs` (8 rouges sur un build d'avant).
+- ⚠️ **NON TRAITÉ, À TRANCHER PAR JULIEN** (mesuré par la cartographie du
+  3 octobre) : (1) **887 ventes / 37 827 € en 2026** sur des comptes retirés de
+  l'app (`shop_cancale`, l'orphelin vanessa5723) sont hors du bilan annuel —
+  les inclure ? (2) le compte `…377` est déclaré chez **deux** propriétaires
+  VRM (8 ventes / 497 € en septembre) — est-ce le sien ? (3) le montant eBay
+  (total ou sous-total + port) ; (4) « Chiffre d'affaires » sur Ma journée et le
+  widget compte les ventes EN COURS. Ne pas trancher à sa place.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
@@ -3688,6 +3722,7 @@ arrivée** — vérifiée commit par commit sur `manifest.json`, pas devinée.
 | `commande` | `executerCommande` | **5.129.0** (2 oct.) | « Générer le bordereau » depuis l'app : l'app COMMANDE l'extension |
 | `offresapp` | `offresAutoActif` | **5.130.0** (3 oct.) | l'interrupteur des offres auto se règle dans l'app |
 | `publication` | `publierDepuisApp` | **5.130.0** (3 oct.) | « Publier sur Leboncoin » / « Préparer sur eBay » depuis l'app |
+| `lbcdate` | `dateVenteLbc` | **5.131.0** (3 oct.) | « ouvre Mes transactions, l'extension relève la date de vente » |
 
 ⚠️ **DEUX SEUILS POUR UNE MÊME NOTION, EXPRÈS.** Les photos s'attachent côté
 Leboncoin depuis la 5.58 et côté eBay depuis la 5.59 : un seul seuil aurait
