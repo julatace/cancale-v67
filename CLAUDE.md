@@ -4069,6 +4069,15 @@ champ interne l'est. `nomFamille` mappe `transaction`→ventes, `conversation`�
 messages pour l'alerte « Format d'un site ». **6 rouges de plus sur le code
 d'avant.** Extension **5.142.0**, zip régénéré, `EXT_ATTENDUE` suivie.
 
+**Suite (5.143) — le détail d'annonce (`item`).** Même sentinelle objet, sur le
+champ qui porte **toutes les photos** : le coffre ET la capture photo passive
+(Leboncoin/eBay) lisent `(p.item||p).photos`. Un renommage de `photos` par Vinted
+ferait tomber à zéro toute la publication photo en silence — le point le plus
+retravaillé du projet (5.87, 5.91, 5.94, 5.95). Gardé par présence de clé
+(`photos:[]` ne déclenche pas, seul un renommage le fait), objet substantiel.
+`nomFamille` mappe `item`→annonces. **2 rouges de plus sur le code d'avant.**
+Extension **5.143.0**, zip régénéré, `EXT_ATTENDUE` suivie.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par

@@ -707,6 +707,8 @@ const FORME_OBJET = {
   conversation: { objet: (p) => (p.conversation || p), champ: 'messages', ok: (o) => Array.isArray(o.messages) },
   // la preuve de vente, les versements et « vendue → retirée » lisent p.transaction.status
   transaction:  { objet: (p) => p.transaction, champ: 'status', ok: (o) => ('status' in o) },
+  // le coffre ET la capture photo passive (Leboncoin/eBay) lisent (p.item||p).photos
+  item:         { objet: (p) => (p.item || p), champ: 'photos', ok: (o) => Array.isArray(o.photos) },
 };
 function verifFormeObjet(type, parsed, id) {
   try {
