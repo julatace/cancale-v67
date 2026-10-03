@@ -71,16 +71,6 @@ const dit = (ok, nom, det) => { if (!ok) ko++; console.log(`${ok ? '✅' : '❌'
 
 // Chaque ligne dédiée : ce qu'elle contient DÉJÀ, et le geste qui la met à jour.
 const CAS = [
-  { id: 'panel_min_prices',      avant: { '111': 45, '222': 30 }, quoi: 'ses prix planchers',
-    geste: (c) => c.setMinPrice('333', 60), garde: (d) => d['111'] === 45 && d['222'] === 30 && d['333'] === 60 },
-  { id: 'panel_buyprices',       avant: { items: { '111': { price: 12 } } }, quoi: 'ses prix d\'achat saisis à la main',
-    geste: (c) => c.setBuyPrice('222', '20', 't', 'Paire'), garde: (d) => d.items && d.items['111'] && d.items['222'] },
-  { id: 'panel_accounts_off',    avant: { '9001': true }, quoi: 'les comptes qu\'il a éteints',
-    geste: (c) => c.setAccountOff('9002', true), garde: (d) => d['9001'] === true && d['9002'] === true },
-  { id: 'panel_bords_done',      avant: { 'AAA': 1 }, quoi: 'les bordereaux marqués faits',
-    geste: (c) => c.markBordDone('BBB', true), garde: (d) => d['AAA'] === 1 && d['BBB'] },
-  { id: 'panel_colis_collected', avant: { 'XX1': 1 }, quoi: 'les colis marqués récupérés',
-    geste: (c) => c.markPickupDone('XX2', true), garde: (d) => d['XX1'] === 1 && d['XX2'] },
   { id: 'panel_colis_relais',    avant: { '700': { tx: '700', code: 'C1', lieu: 'L1', at: new Date().toISOString() } },
     quoi: 'les codes de retrait déjà lus',
     geste: (c) => c.noterRetrait({ tx: '800', code: 'C2', lieu: 'L2', at: new Date().toISOString() }),

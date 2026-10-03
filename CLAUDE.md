@@ -3618,6 +3618,56 @@ je fais une vente. »
   comptes NON connectés dans Chrome n'arrivent qu'avec l'email ou quand il s'y
   connecte : mesuré, un seul jeton Vinted est vivant à la fois.
 
+### ⚠️⚠️ « UN TOUT PETIT ÉCRAN EN BAS À DROITE, LE LOGO DE L'APP » (3 octobre, 5.130)
+Julien : « sur Vinted, Leboncoin, eBay, peu importe où, le nouveau logo en bas à
+droite ; enlève l'ancien orange ; il ne doit pas y avoir d'informations autres
+que les moyens de connexion, le compte utilisé, le compte connecté et si les
+informations circulent bien ; tout doit être centralisé dans VRM ; dès que tu
+appuies dessus, le site VRM s'ouvre ».
+- **`vrm-badge.js`** sur Vinted, Leboncoin, eBay **et Vestiaire** : le logo de
+  l'app (`logo-vrm-96.png`), shadow root FERMÉE. Survol : compte VRM utilisé,
+  compte du site (cookie Vinted / dernier compte « moi » Leboncoin), et la
+  circulation **mesurée aux écritures** (`vrmFlux`, `noterFlux`) — jamais
+  supposée. Clic : connecté → VRM s'ouvre sur l'onglet de la plateforme ; sinon
+  la connexion. Ambre **seulement** s'il y a un geste à faire ; « pas su » reste
+  gris (aucun faux vert). Vestiaire : « VRM ne capte pas encore ce site ».
+- ⚠️⚠️ **LE MOT DE PASSE VRM SE TAPAIT DANS LE DOM DE VINTED** (bulle du
+  panneau, sans shadow root : les scripts du site pouvaient le lire). La
+  connexion vit désormais dans un **iframe de l'extension**
+  (`popup.html?mode=carte`) : ni le champ ni le clavier ne sont visibles du site.
+- ⚠️ **L'email du compte VRM se perdait au premier renouvellement** de session :
+  gardé, sinon lu dans la revendication `email` du JWT (une identité).
+- ⚠️ **Une session VRM d'un autre compte adoptée dans ce Chrome** (mesuré le
+  2 oct. : 18 lignes, dont 3 bordereaux, parties chez `julien.fournier3535@…`)
+  est notée (`vrmBascule`) et la carte nomme **les deux** adresses pendant 7 j.
+- **Panneaux retirés** : `vinted-panel.js` → `vinted-capture.js` (date,
+  description, photos lues sur la page — la seule chose que rien d'autre ne
+  faisait) ; `lbc.js` et `ebay.js` gardent relais, capture, enregistreur
+  d'étapes, remplissage, publication sans booster (LBC) et leur bandeau de
+  dépôt. ~1 600 lignes sans appelant retirées du fond (`buildPanelData`, récap
+  plein écran, réglages du panneau).
+- **Ce qui est passé dans l'app** : l'interrupteur « accepter les offres
+  au-dessus du plancher » (Réglages, `vinted_offres_auto` ; jamais touché →
+  l'interrupteur local d'avant est gardé ET affiché ; lecture ratée → rien ne
+  s'allume) ; le bouton **« Publier sur Leboncoin »** / « Préparer sur eBay »
+  par paire (`publierDepuisApp` : l'app n'envoie qu'un IDENTIFIANT, la paire
+  est relue dans la file de l'extension — vendue, décochée ou preuve illisible
+  → refusée) ; « Déjà publiée » et la limite de l'offre (`lbcMarque`,
+  `lbcQuota`). Grisés et jamais cachés quand l'extension ne peut pas, la raison
+  dite UNE fois (`RaisonPublication`).
+- Bordereau généré sans PDF : l'extension pose le **rendez-vous** et l'app
+  propose « Ouvrir la vente sur Vinted » — le PDF téléchargé est relié à CETTE
+  vente.
+- ⚠️ **PERDU AVEC LE PANNEAU, À REFAIRE DANS L'APP S'IL LE DEMANDE** : les
+  relances (57 personnes nommées), les offres tranchées au clic, le coffre,
+  l'empreinte, le gabarit de description. Ne pas les rebrancher dans une page
+  de site : c'est l'app qui pilote.
+- Bancs : `badge.cjs` (32), `popup.cjs` (carte, 23), `publier.cjs` (rendu,
+  3 états) ; audits `audit-extension-ui.cjs` (11 rouges sur l'avant),
+  `audit-publier-app.cjs` (8 rouges sur l'avant). Retirés avec le panneau :
+  `audit-panneau`, `audit-recap`, `audit-relances`, `banc-captation`,
+  `banc-favoris`.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
@@ -3636,6 +3686,8 @@ arrivée** — vérifiée commit par commit sur `manifest.json`, pas devinée.
 | `photosebay` | `photosPourEbay` | **5.59.0** (13 sept.) | la même promesse, pour eBay |
 | `repond` | `repondreAuxMessages` | **5.77.0** (19 sept.) | « elle répond aux questions posées sur tes annonces » |
 | `commande` | `executerCommande` | **5.129.0** (2 oct.) | « Générer le bordereau » depuis l'app : l'app COMMANDE l'extension |
+| `offresapp` | `offresAutoActif` | **5.130.0** (3 oct.) | l'interrupteur des offres auto se règle dans l'app |
+| `publication` | `publierDepuisApp` | **5.130.0** (3 oct.) | « Publier sur Leboncoin » / « Préparer sur eBay » depuis l'app |
 
 ⚠️ **DEUX SEUILS POUR UNE MÊME NOTION, EXPRÈS.** Les photos s'attachent côté
 Leboncoin depuis la 5.58 et côté eBay depuis la 5.59 : un seul seuil aurait

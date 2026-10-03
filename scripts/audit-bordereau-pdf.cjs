@@ -136,10 +136,17 @@ const essai = async (nom, reponses, attenduOk, attenduEssais) => {
         : nok('un seul colis possible → toujours relié', ecrites.join(',') || 'aucune ligne');
     }
   }
-  // Le panneau doit proposer le chemin manuel quand la récupération échoue.
-  const PAN = fs.readFileSync(path.join(__dirname,'..','vinted-sync-extension','vinted-panel.js'),'utf8');
-  /bordManuel = \{ uid, tx \}/.test(PAN) && /action: 'attendreBord'/.test(PAN)
-    ? ok("un échec de récupération propose d'ouvrir la vente sur Vinted")
+  // Un échec de récupération a une porte de sortie (5.130 : le panneau est
+  // retiré, c'est l'APP qui la propose) : l'extension pose le rendez-vous quand
+  // la commande finit sans PDF, et le bouton de l'app ouvre la vente.
+  const APP = fs.readFileSync(path.join(__dirname,'..','src','App.jsx'),'utf8');
+  const cmd = SRC.slice(SRC.indexOf('async function executerCommande'));
+  const corps = cmd.slice(0, cmd.indexOf('\n}\n'));
+  /attendreBordereau\(uid, tx\)[\s\S]{0,200}genere_sans_pdf/.test(corps)
+    ? ok("la commande sans PDF pose le rendez-vous (le PDF téléchargé à la main sera relié à CETTE vente)")
+    : nok("la commande sans PDF pose le rendez-vous", 'attendreBordereau absent de executerCommande');
+  /genere_sans_pdf[\s\S]{0,400}member\/transactions\//.test(APP)
+    ? ok("un échec de récupération propose d'ouvrir la vente sur Vinted (dans l'app)")
     : nok("un échec de récupération propose d'ouvrir la vente sur Vinted", 'le message d\'erreur reste un cul-de-sac');
 
   console.log(ko?`\n${ko} cas non conforme(s).`:'\nLa récupération du PDF insiste juste ce qu\'il faut, et un échec a une porte de sortie.');

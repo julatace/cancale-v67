@@ -432,13 +432,14 @@ function ctxAvec(numeros, txns, lbcItems, exclus, quiEchoue, bloquesDef) {
     const rE = await ctxAvec(tous, vendue, null, [], 'txn_').buildEbayData();
     dit(rE.preuveKO === true, 'eBay : même règle, la file porte l\'échec',
       rE.preuveKO === true ? '' : 'publier une paire vendue sur eBay engage une expédition qu\'il ne peut pas faire');
-    // ⚠️ Et les DEUX panneaux doivent le dire — une information rendue que
-    //    l'affichage ignore ne vaut rien (défaut du panneau de sécurité).
-    const LBC = fs.readFileSync(path.join(racine, 'vinted-sync-extension', 'lbc.js'), 'utf8');
-    const EBAY = fs.readFileSync(path.join(racine, 'vinted-sync-extension', 'ebay.js'), 'utf8');
-    dit(/preuveKO/.test(LBC), 'le panneau Leboncoin LIT cet échec', 'le fond le signale, l\'affichage l\'ignore');
-    dit(/preuveKO/.test(EBAY), 'le panneau eBay aussi');
-    dit(/preuveKO/.test(APP), 'et l\'écran Leboncoin de l\'app aussi');
+    // ⚠️ Et ceux qui s'en servent doivent le LIRE — une information rendue
+    //    qu'on ignore ne vaut rien (défaut du panneau de sécurité). Depuis la
+    //    5.130 les panneaux sont retirés : c'est la COMMANDE de publication qui
+    //    refuse (audit-publier-app.cjs l'exécute), et l'écran de l'app qui le dit.
+    const BG = fs.readFileSync(path.join(racine, 'vinted-sync-extension', 'background.js'), 'utf8');
+    const pub = (BG.split('async function publierDepuisApp')[1] || '').split('\n}\n')[0];
+    dit(/preuveKO/.test(pub) && /code: 'preuve'/.test(pub), 'la commande « Publier » LIT cet échec et refuse', 'le fond le signale, la publication l\'ignorerait');
+    dit(/preuveKO/.test(APP), 'et l\'écran Leboncoin de l\'app le dit');
   }
 
   // ── LE TITRE LEBONCOIN : LES DEUX CÔTÉS DOIVENT RENDRE LE MÊME ──────────────
@@ -596,7 +597,9 @@ function ctxAvec(numeros, txns, lbcItems, exclus, quiEchoue, bloquesDef) {
     //    réclamées). Le contrôle était donc VERT sur le code fautif, exactement
     //    ce qu'un contrôle ne doit jamais être. On le borne à l'écran Leboncoin.
     const iL = APP.indexOf('function LeboncoinScreen');
-    const ecran = iL < 0 ? '' : APP.slice(iL, APP.indexOf('\n}', APP.indexOf('➕ Ouvrir « Déposer une annonce »')));
+    // Bornée à la FONCTION entière (le lien orange du bas, qui servait d'ancre,
+    // est retiré en 5.130 — un audit suit la règle, pas un libellé voisin).
+    const ecran = iL < 0 ? '' : APP.slice(iL, APP.indexOf('\n}\n', iL));
     dit(ecran.length > 2000, 'l\'écran Leboncoin a été retrouvé pour être jugé', ecran.length + ' caractères');
     dit(/à vérifier/.test(ecran), 'l\'écran Leboncoin dit « à vérifier » quand la vente n\'est pas prouvée',
       'sinon il fait supprimer une annonce Leboncoin sur une supposition');

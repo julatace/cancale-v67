@@ -25,8 +25,10 @@ const dit = (bon, quoi, detail) => {
 
 // Rend la vraie popup dans une page, avec un faux `chrome` qui répond ce qu'on
 // lui dit. `etat` est ce que `authEtat` renvoie côté service worker.
-async function rendre(nav, etat) {
-  const ctx = await nav.newContext({ viewport: { width: 360, height: 900 } });
+async function rendre(nav, etat, { carte = false } = {}) {
+  // La carte (2 octobre) : la même page, dans un iframe de 300 × 380 posé par
+  // vrm-badge.js sur le site — `?mode=carte`.
+  const ctx = await nav.newContext({ viewport: carte ? { width: 300, height: 380 } : { width: 360, height: 900 } });
   const pg = await ctx.newPage();
   const html = fs.readFileSync(path.join(EXT, 'popup.html'), 'utf8')
     .replace('<script src="popup.js"></script>', '');
@@ -34,7 +36,10 @@ async function rendre(nav, etat) {
 
   const erreurs = [];
   pg.on('pageerror', (e) => erreurs.push(String(e).slice(0, 140)));
-  await pg.setContent(html);
+  await pg.route('**/*', (r) => /logo-vrm-96\.png/.test(r.request().url())
+    ? r.fulfill({ status: 200, contentType: 'image/png', body: fs.readFileSync(path.join(EXT, 'logo-vrm-96.png')) })
+    : r.fulfill({ status: 200, contentType: 'text/html', body: html }));
+  await pg.goto('https://ext.test/popup.html' + (carte ? '?mode=carte' : ''));
   // Le faux `chrome` : même forme que le vrai (callbacks), rien de plus.
   await pg.evaluate((e) => {
     window.__envoyes = [];
@@ -68,8 +73,15 @@ async function rendre(nav, etat) {
   const liens = await pg.evaluate(() => Array.from(document.querySelectorAll('a[href]')).map((a) => a.href));
   const ouvert = await pg.evaluate(() => window.__ouvert || null);
   const ferme = await pg.evaluate(() => !!window.__ferme);
+  const envoyes = await pg.evaluate(() => window.__envoyes.map((m) => m.action));
+  const boutons = await pg.evaluate(() => Array.from(document.querySelectorAll('button')).map((b) => b.id));
+  // Tout doit tenir dans la carte, sans défilement horizontal ni coupe.
+  const deborde = await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth || document.documentElement.scrollHeight > window.innerHeight + 1);
+  // Rien de l'ancienne palette (or, menthe) : la famille « VRM Noir » (§7).
+  const anciens = await pg.evaluate(() => /#4aa87d|#E0B972|#F7E3B6/i.test(document.documentElement.outerHTML));
+  if (carte && process.env.BANC_CAPTURES) await pg.screenshot({ path: path.join(process.env.BANC_CAPTURES, `popup-carte-${etat.connecte ? 'co' : 'deco'}.png`) });
   await ctx.close();
-  return { txt, champs, liens, erreurs, pg, ouvert, ferme };
+  return { txt, champs, liens, erreurs, pg, ouvert, ferme, envoyes, boutons, deborde, anciens };
 }
 
 (async () => {
@@ -116,6 +128,20 @@ async function rendre(nav, etat) {
   const exp = await rendre(nav, { ok: true, connecte: false, expiree: true, email: 'sophie@exemple.fr', cloisonne: true });
   dit(/expir/i.test(exp.txt), 'elle dit que la session a expiré', exp.txt.replace(/\n/g, ' · ').slice(0, 140));
   dit(exp.champs.some((c) => c.id === 'pw'), 'et elle redemande le mot de passe');
+
+  // ── 4. LA CARTE (iframe sur le site, 2 octobre) ──────────────────────────
+  console.log('\n── La même connexion, dans la petite carte en bas à droite');
+  const cd = await rendre(nav, { ok: true, connecte: false, cloisonne: true }, { carte: true });
+  dit(!cd.erreurs.length, 'elle s’exécute sans erreur', cd.erreurs[0]);
+  dit(cd.champs.some((c) => c.id === 'pw') && /pas ton mot de passe Vinted/i.test(cd.txt), 'pas connecté : la connexion VRM, avec la même mise en garde', cd.txt.slice(0, 160));
+  dit(!cd.deborde, 'tout tient dans la carte (300 × 380), sans défilement');
+  dit(!cd.anciens && !neuf.anciens, 'plus rien de l’ancien logo doré ni de la menthe');
+  const cc = await rendre(nav, { ok: true, connecte: true, email: 'sophie@exemple.fr', cloisonne: true }, { carte: true });
+  dit(!cc.ouvert && !cc.ferme, 'connectée, la carte ne s’ouvre pas toute seule sur VRM (elle est dans le site)', cc.ouvert);
+  dit(/sophie@exemple\.fr/.test(cc.txt), 'elle nomme le compte VRM', cc.txt.slice(0, 120));
+  dit(cc.boutons.includes('vrmBtn') && cc.boutons.includes('outBtn'), 'et propose « Ouvrir VRM » et « Se déconnecter »', JSON.stringify(cc.boutons));
+  dit(!cc.champs.some((c) => c.id === 'pw'), 'sans champ mot de passe');
+  dit(!neuf.envoyes.includes('freshness') && !neuf.envoyes.includes('syncNow'), 'la fenêtre ne lit plus de données (tout est dans l’app)', JSON.stringify(neuf.envoyes));
 
   await nav.close();
   console.log(`\n${ko ? '❌' : '✅'} popup : ${ok} vert${ok > 1 ? 's' : ''}, ${ko} rouge${ko > 1 ? 's' : ''}`);
