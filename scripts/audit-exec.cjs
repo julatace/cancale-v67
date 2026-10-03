@@ -57,6 +57,7 @@ function faireCtx({ connecte = UID } = {}) {
   ctx.getStoredAccounts = async () => [{ vinted_user_id: UID, login: 'angeled92', domain: 'www.vinted.fr' }, { vinted_user_id: '999', login: 'autre', domain: 'www.vinted.fr' }];
   ctx.activeAccountId = async () => connecte;            // le compte du cookie Vinted
   ctx.vintedSend = async (acc, method, endpoint) => { envois.push(method + ' ' + endpoint); return { ok: true, status: 200, json: {} }; };
+  ctx.vintedGet = async (acc, endpoint) => { envois.push('GET ' + endpoint); return { ok: true, status: 200, json: { conversation: { id: 1 } } }; };
   const envoyer = (msg, origine = APP) => new Promise((res) => {
     if (!ecouteur) { res({ __pasDEcouteur: true }); return; }
     const r = ecouteur(Object.assign({ from: 'vmr-bridge', action: 'exec' }, msg), { origin: origine, url: origine + '/' }, res);
@@ -104,6 +105,33 @@ const REPONSE = { uid: UID, method: 'POST', endpoint: '/api/v2/conversations/123
     let dernier = null;
     for (let i = 0; i < 21; i++) dernier = await envoyer(REPONSE);
     dit(envois.length === 20 && dernier && dernier.code === 'plafond', 'la 21ᵉ action dans l\'heure est refusée (plafond de 20/h)', `${envois.length} envoi(s), dernière réponse ${JSON.stringify(dernier)}`);
+  });
+  // ── 5.135 : la messagerie intégrée (3 octobre) ────────────────────────────
+  await essaie('les gestes d\'offre depuis l\'app', async () => {
+    const { envois, envoyer } = faireCtx();
+    const a = await envoyer({ uid: UID, method: 'PUT', endpoint: '/api/v2/transactions/123/offer_requests/456/accept' });
+    const b = await envoyer({ uid: UID, method: 'PUT', endpoint: '/api/v2/transactions/123/offer_requests/456/reject' });
+    const c = await envoyer({ uid: UID, method: 'POST', endpoint: '/api/v2/transactions/123/offers', body: { offer: { price: '45', currency: 'EUR' } } });
+    dit(a && a.ok && b && b.ok && c && c.ok && envois.length === 3, 'accepter, refuser, faire une offre : sur SON clic, ça part', envois.join(','));
+  });
+  await essaie('lire une conversation', async () => {
+    const { envois, envoyer } = faireCtx();
+    let r = null;
+    for (let i = 0; i < 25; i++) r = await envoyer({ uid: UID, method: 'GET', endpoint: '/api/v2/conversations/987' });
+    dit(r && r.ok && r.data && r.data.conversation && envois.length === 25, 'LIRE un fil part, et ne consomme pas le plafond des actions (25 lectures)', `${envois.length} lecture(s)`);
+    const g = await envoyer({ uid: UID, method: 'GET', endpoint: '/api/v2/users/1/items' });
+    dit(g && g.ok === false && envois.length === 25, 'mais une autre lecture (hors liste) ne part pas', envois.slice(25).join(','));
+  });
+  await essaie('lecture sur un autre compte', async () => {
+    const { envois, envoyer } = faireCtx({ connecte: '999' });
+    const r = await envoyer({ uid: UID, method: 'GET', endpoint: '/api/v2/conversations/987' });
+    dit(envois.length === 0 && r && r.code === 'vinted-autre', 'lire le fil d\'un compte qui n\'est pas celui de Chrome : rien ne part', JSON.stringify(r));
+  });
+  await essaie('offre sur un autre chemin', async () => {
+    const { envois, envoyer } = faireCtx();
+    await envoyer({ uid: UID, method: 'DELETE', endpoint: '/api/v2/transactions/123/offers' });
+    await envoyer({ uid: UID, method: 'PUT', endpoint: '/api/v2/transactions/123/offer_requests/456/delete' });
+    dit(envois.length === 0, 'une variante hors liste (DELETE, autre verbe) ne part pas', envois.join(','));
   });
   console.log(`\n${ok} ✅ · ${ko} ❌`);
   process.exit(ko ? 1 : 0);

@@ -851,21 +851,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       return true;
     }
     if (msg && msg.from === 'vmr-bridge' && msg.action === 'exec') {
-      (async () => {
-        try {
-          const src = (sender && sender.origin) || (sender && sender.url) || '';
-          if (!ORIGINE_APP.test(src)) { sendResponse({ ok: false, code: 'origine', error: 'origine non autorisee' }); return; }
-          const methode = String(msg.method || 'POST').toUpperCase();
-          if (!execPermis(methode, msg.endpoint)) { sendResponse({ ok: false, code: 'non-autorise', error: 'action non autorisée depuis l\'app' }); return; }
-          const accts = await getStoredAccounts();
-          const acc = accts.find((a) => String(a.vinted_user_id) === String(msg.uid));
-          if (!acc) { sendResponse({ ok: false, error: 'compte introuvable' }); return; }
-          const stop = await gardeStricte(msg.uid, acc);
-          if (stop) { sendResponse(stop); return; }
-          const r = await vintedSend(acc, methode, msg.endpoint, msg.body);
-          sendResponse({ ok: r.ok, status: r.status, data: r.json });
-        } catch (e) { sendResponse({ ok: false, error: String(e) }); }
-      })();
+      executerPourApp(msg, sender).then(sendResponse, (e) => sendResponse({ ok: false, error: String(e) }));
       return true; // reponse asynchrone
     }
     // PONT APP -> EXTENSION : la photo d'une paire, pour l'imprimer sur un reçu.
@@ -2774,14 +2760,22 @@ async function compterAction(uid) {
 const ORIGINE_APP = /^https:\/\/(cancale-v67(-ten)?\.vercel\.app|(www\.)?vrm\.center)/;
 // Ce que l'app peut faire passer par `exec`, et RIEN d'autre (§3 : jamais de
 // suppression, jamais de requête arbitraire).
+// 5.135 (3 octobre, « la messagerie intégrée, répondre et faire l'offre ») :
+// LIRE une conversation, et les trois gestes d'offre — toujours sur SON clic
+// dans l'app, un par un, au nom du compte connecté (garde stricte). Rien qui
+// supprime, rien d'arbitraire. Une LECTURE ne compte pas dans le plafond
+// horaire (elle n'engage rien) ; un geste, si.
 const EXEC_PERMIS = [
   { methode: 'POST', chemin: /^\/api\/v2\/conversations\/\d+\/replies$/ },   // répondre à un message
+  { methode: 'GET',  chemin: /^\/api\/v2\/conversations\/\d+$/, lecture: true }, // lire le fil
+  { methode: 'PUT',  chemin: /^\/api\/v2\/transactions\/\d+\/offer_requests\/\d+\/(accept|reject)$/ }, // trancher une offre
+  { methode: 'POST', chemin: /^\/api\/v2\/transactions\/\d+\/offers$/ },     // faire une offre
 ];
 function execPermis(methode, endpoint) {
   const e = String(endpoint || '');
-  return EXEC_PERMIS.some((p) => p.methode === methode && p.chemin.test(e));
+  return EXEC_PERMIS.find((p) => p.methode === methode && p.chemin.test(e)) || null;
 }
-async function gardeStricte(uid, acc) {
+async function gardeStricte(uid, acc, opts = {}) {
   const actif = await compteConnecte(acc && acc.domain);
   if (!actif) {
     return { ok: false, code: 'vinted-absent',
@@ -2791,6 +2785,7 @@ async function gardeStricte(uid, acc) {
     return { ok: false, code: 'vinted-autre', actif: String(actif),
              error: "ton navigateur est connecté à un autre compte Vinted — bascule sur celui-ci sur vinted.fr d'abord" };
   }
+  if (opts.lecture) return null;            // lire n'engage rien : pas de plafond
   const c = await compterAction(String(uid));
   if (!c.ok) {
     return { ok: false, code: 'plafond',
@@ -2807,6 +2802,24 @@ async function gardeStricte(uid, acc) {
 // requêtes en vol en même temps — mesuré, rien ne les sérialisait. Une simple
 // chaîne de promesses en mémoire : si le service worker meurt, rien n'est en
 // vol de toute façon (§4.9 ne s'applique qu'aux DONNÉES à garder).
+// Une demande de l'app (`exec`) : origine de l'app, liste blanche, compte
+// connecté (garde stricte), puis la requête DANS la file Vinted (une à la fois).
+async function executerPourApp(msg, sender) {
+  const src = (sender && sender.origin) || (sender && sender.url) || '';
+  if (!ORIGINE_APP.test(src)) return { ok: false, code: 'origine', error: 'origine non autorisee' };
+  const methode = String(msg.method || 'POST').toUpperCase();
+  const permis = execPermis(methode, msg.endpoint);
+  if (!permis) return { ok: false, code: 'non-autorise', error: 'action non autorisée depuis l\'app' };
+  const accts = await getStoredAccounts();
+  const acc = accts.find((a) => String(a.vinted_user_id) === String(msg.uid));
+  if (!acc) return { ok: false, error: 'compte introuvable' };
+  const stop = await gardeStricte(msg.uid, acc, { lecture: !!permis.lecture });
+  if (stop) return stop;
+  const r = await avecVinted(() => (methode === 'GET' ? vintedGet(acc, msg.endpoint) : vintedSend(acc, methode, msg.endpoint, msg.body)));
+  if (!permis.lecture) logActivity(r.ok ? `✉️ ${methode} ${String(msg.endpoint).replace(/\d{4,}/g, '…')} — fait depuis l'app` : `⚠️ ${methode} depuis l'app : Vinted a refusé (${r.status})`);
+  return { ok: !!r.ok, status: r.status, data: r.json,
+           error: r.ok ? '' : ((r.json && (r.json.message || r.json.error)) || `erreur ${r.status}`) };
+}
 let _fileVinted = Promise.resolve();
 function avecVinted(fn) {
   const suite = _fileVinted.then(() => fn(), () => fn());
