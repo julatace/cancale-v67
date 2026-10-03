@@ -569,6 +569,22 @@ async function noterDiag(cle) {
 // personne ne touche à rien. Le compteur est lu EN SCALAIRE (`data->>nItems`),
 // jamais le payload — la leçon d'égress de §34 vaut ici aussi.
 const CLE_LISTE = { listings: 'items', orders_sold: 'my_orders', orders_purchased: 'my_orders', inbox: 'conversations' };
+// ⚠️ CHAMPS STRUCTURELS — la dérive de forme QUI NE RENOMME PAS LA CLÉ DE LISTE.
+// La clé de liste peut rester `items`/`my_orders` et un CHAMP INTÉRIEUR être
+// renommé : c'est le vrai bug déjà vécu (§ `brand_title` vs `brand` — l'allègement
+// gardait un champ qui n'existe plus, et TOUT le stock affichait « marque
+// manquante » sans la moindre erreur). On vérifie donc que les champs qu'on LIT
+// sont encore là.
+// ⚠️ UNIQUEMENT des champs STRUCTURELS (présents quelle que soit la catégorie) :
+// Julien veut que l'app serve aussi un reseller de livres ou de sacs — `brand` et
+// `size` peuvent légitimement manquer à tout un stock, donc les exiger crierait au
+// loup. `id`/`title`/`price`/`transaction_id` ne dépendent pas de ce qu'on vend.
+const CHAMPS_CRITIQUES = {
+  listings:         ['id', 'title', 'price'],
+  orders_sold:      ['transaction_id', 'title'],
+  orders_purchased: ['transaction_id', 'title'],
+  inbox:            ['id'],
+};
 async function listePlusRiche(rowId, parsed, cle) {
   const n = ((parsed && parsed[cle]) || []).length;
   const total = Number(parsed && parsed.pagination && parsed.pagination.total_entries);
@@ -619,7 +635,12 @@ function verifFormeListe(type, parsed, id) {
   try {
     const cle = CLE_LISTE[type];
     if (!cle || !parsed || typeof parsed !== 'object') return;
-    if (!Array.isArray(parsed) && Array.isArray(parsed[cle])) return; // forme attendue : rien à signaler
+    if (!Array.isArray(parsed) && Array.isArray(parsed[cle])) {
+      // La clé de liste est là : la forme de tête est bonne. Reste à vérifier que
+      // les CHAMPS qu'on lit à l'intérieur n'ont pas été renommés sous nos pieds.
+      verifChampsListe(type, parsed[cle], id);
+      return;
+    }
     let cand = null, cles = [];
     if (Array.isArray(parsed)) {
       // Vinted a renvoyé un tableau NU au lieu de `{ <cle>: [...] }`.
@@ -639,6 +660,36 @@ function verifFormeListe(type, parsed, id) {
         at: new Date().toISOString(),
       };
     });
+  } catch (_) { /* une sentinelle ne casse jamais la capture */ }
+}
+
+// Dérive AU NIVEAU DU CHAMP (la clé de liste est bonne, un champ intérieur a
+// changé de nom). Règle anti-fausse-alerte : on ne signale un champ que s'il est
+// absent de TOUS les items d'une liste NON VIDE (0/N). Un champ manquant sur un
+// item isolé (un brouillon sans prix, un vendeur sans marque) laisse les autres
+// items le porter → pas d'alerte. Seul un RENOMMAGE fait disparaître le champ de
+// tout le monde d'un coup — et c'est ça, et seulement ça, qu'on veut attraper.
+// On ne devine aucun nouveau parser : on rend la dérive bruyante et mesurable
+// (le NOM du champ perdu + les noms de clés d'un item), la passe suivante aliase.
+function verifChampsListe(type, liste, id) {
+  try {
+    const champs = CHAMPS_CRITIQUES[type];
+    if (!champs || !Array.isArray(liste) || liste.length === 0) return; // vide = légitime
+    for (const c of champs) {
+      const vu = liste.some(it => it && typeof it === 'object' && it[c] !== undefined && it[c] !== null);
+      if (vu) continue;                              // au moins un item le porte : pas une dérive
+      noterDiag(`forme_inconnue_champ_${type}`);
+      majTampon((buf) => {
+        buf.rates[`forme_champ_${type}`] = {
+          id: String(id == null ? '' : id).slice(0, 40),
+          champ: c,                                  // le champ disparu (un nom, pas une valeur)
+          n: liste.length,
+          cles: Object.keys(liste[0] || {}).slice(0, 20).map(k => String(k).slice(0, 40)),
+          at: new Date().toISOString(),
+        };
+      });
+      return;                                        // un champ perdu suffit à alerter
+    }
   } catch (_) { /* une sentinelle ne casse jamais la capture */ }
 }
 
