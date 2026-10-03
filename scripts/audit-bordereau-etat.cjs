@@ -81,20 +81,25 @@ for (const s of MUET) if (etat(s) !== null) { e++; console.log('   ↳ devrait �
 e ? nok(e + ' valeur(s) illisible(s) prise(s) pour un verdict', 'un code numérique n\'est pas un libellé')
   : ok('un code numérique ou un libellé inconnu ne tranche RIEN (jamais « parti »)');
 
-// ── le câblage : le détail ne doit trancher que s'il dit quelque chose ───────
-/const e = etatExpedition\(d\.st\);\s*\n\s*if \(e\) return e === 'attend';/.test(BG)
-  ? ok('encoreAExpedier n\'écoute le détail que lorsqu\'il est lisible')
-  : nok('encoreAExpedier retombe sur la commande quand le détail est muet',
-        'sinon un statut inconnu fait disparaître la vente');
-
-// ── le libellé et le filtre lisent la MÊME source (§11) ─────────────────────
-/aGenerer: aGenererBordereau\(stFrais\)/.test(BG) && /emis: !aGenererBordereau\(stFrais\)/.test(BG)
-  ? ok('la ligne est ÉTIQUETÉE avec le statut qui la FILTRE (une seule source)')
-  : nok('aGenerer/emis lisent encore la commande périmée',
-        'la ligne survivait grâce au détail frais mais se décrivait avec l\'ancien statut');
-/const statutFrais = \(tx, statutCommande, capCommande\) =>/.test(BG)
-  ? ok('statutFrais existe : le statut qui gouverne est nommé une fois')
-  : nok('pas de statutFrais');
+// ── le câblage de la liste « à expédier » de l'extension ─────────────────────
+// Cette liste vivait dans le panneau (`buildPanelData`), retiré en 5.130 : c'est
+// l'APP qui la tient désormais. Les trois contrôles ne valent donc que si
+// l'extension en refabrique une — s'il revient, ils reviennent avec lui.
+if (/const encoreAExpedier = /.test(BG)) {
+  /const e = etatExpedition\(d\.st\);\s*\n\s*if \(e\) return e === 'attend';/.test(BG)
+    ? ok('encoreAExpedier n\'écoute le détail que lorsqu\'il est lisible')
+    : nok('encoreAExpedier retombe sur la commande quand le détail est muet',
+          'sinon un statut inconnu fait disparaître la vente');
+  /aGenerer: aGenererBordereau\(stFrais\)/.test(BG) && /emis: !aGenererBordereau\(stFrais\)/.test(BG)
+    ? ok('la ligne est ÉTIQUETÉE avec le statut qui la FILTRE (une seule source)')
+    : nok('aGenerer/emis lisent encore la commande périmée',
+          'la ligne survivait grâce au détail frais mais se décrivait avec l\'ancien statut');
+  /const statutFrais = \(tx, statutCommande, capCommande\) =>/.test(BG)
+    ? ok('statutFrais existe : le statut qui gouverne est nommé une fois')
+    : nok('pas de statutFrais');
+} else {
+  console.log("ℹ️  l'extension ne fabrique plus de liste « à expédier » (panneau retiré) — c'est l'app qui la tient");
+}
 
 // ── la génération ne doit pas travailler sur un statut périmé ───────────────
 /const ventes = ventesBrutes\.map\(o => \(o \? \{ \.\.\.o, status: statutDe\(o\) \} : o\)\)/.test(BG)
@@ -107,7 +112,10 @@ e ? nok(e + ' valeur(s) illisible(s) prise(s) pour un verdict', 'un code numéri
 
 // ── non-régression : sur le vocabulaire des COMMANDES, les deux règles
 //    doivent dire la même chose (sinon on aurait déplacé le problème).
-const aw = new Function('s', 'return ' + (BG.match(/const awaitingShip = \((s)\) => ([^\n]*?);\n/) || [])[2] + ';');
+// `awaitingShip` vivait dans le panneau (retiré en 5.130) : sans lui, on vérifie
+// que `etatExpedition` seule dit juste sur ces statuts réels.
+const _aw = (BG.match(/const awaitingShip = \((s)\) => ([^\n]*?);\n/) || [])[2];
+const aw = _aw ? new Function('s', 'return ' + _aw + ';') : null;
 const CMD = [
   ["Commande finalisée - l'acheteur a validé la commande", false],
   ['Remboursement effectué', false],
@@ -120,7 +128,7 @@ const CMD = [
 ];
 e = 0;
 for (const [s, att] of CMD) {
-  if (aw(s) !== att) { e++; console.log('   ↳ awaitingShip(' + JSON.stringify(s) + ') = ' + aw(s)); }
+  if (aw && aw(s) !== att) { e++; console.log('   ↳ awaitingShip(' + JSON.stringify(s) + ') = ' + aw(s)); }
   if ((etat(s) === 'attend') !== att) { e++; console.log('   ↳ etatExpedition(' + JSON.stringify(s) + ') = ' + etat(s)); }
 }
 e ? nok(e + ' désaccord(s) sur le vocabulaire des commandes')

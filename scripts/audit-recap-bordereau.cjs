@@ -99,39 +99,10 @@ const conv = (cid, oid, prix) => ({
 });
 
 (async () => {
-  // ══ 1. LES OFFRES SE COMPTENT COMME LES VENTES : celles qu'on n'a pas vues ══
-  console.log('\n── « Offre à trancher » ne doit plus revenir à chaque clic');
-  const lignes = {
-    'harvest_9_conv_1': { data: null }, // remplacé plus bas
-  };
-  // On sert les conversations par la projection que le code demande.
-  const servir = (convs) => {
-    const l = {};
-    for (const c of convs) l[c.id] = c;
-    l['harvest_9_orders_sold'] = { data: { payload: { my_orders: [] } } };
-    l['harvest_9_inbox'] = { data: { payload: { conversations: [] } } };
-    return l;
-  };
-
-  {
-    const ctx = faireCtx({ lignes: servir([conv(1, 'OFF-A', 30), conv(2, 'OFF-B', 45)]) });
-    const n1 = await ctx.nouveautes('9');
-    dit(n1.offres === 2, 'première lecture : les deux offres sont neuves', `offres=${n1.offres}`);
-    dit(Array.isArray(n1._marque && n1._marque.offres) && n1._marque.offres.length === 2,
-      'et leur identité est notée pour la suite', JSON.stringify(n1._marque && n1._marque.offres));
-
-    // On note « vu », exactement comme le fait le vrai chemin.
-    await ctx.marquerRecapVu('9', n1._marque);
-    const n2 = await ctx.nouveautes('9');
-    dit(n2.offres === 0, 'deuxième passage, MÊMES offres : plus rien à annoncer',
-      `offres=${n2.offres} — c'est ça, la fenêtre qui revenait à chaque bouton`);
-
-    // Une VRAIE nouvelle offre doit, elle, ressortir : c'est de l'argent et 24 h.
-    const ctx2 = faireCtx({ lignes: servir([conv(1, 'OFF-A', 30), conv(2, 'OFF-B', 45), conv(3, 'OFF-C', 60)]) });
-    ctx2.__store.vrmRecapVu = ctx.__store.vrmRecapVu;
-    const n3 = await ctx2.nouveautes('9');
-    dit(n3.offres === 1, 'une offre VRAIMENT nouvelle ressort', `offres=${n3.offres}`);
-  }
+  // ══ 1. (retiré en 5.130) « offre à trancher » ═══════════════════════════
+  // La fenêtre plein écran de Vinted n'existe plus : le panneau est retiré, et
+  // c'est l'APP qui annonce ce qui est nouveau. Plus rien ne peut « revenir à
+  // chaque clic » sur Vinted — voir audit-extension-ui.cjs, qui l'exige.
 
   // ══ 2. LA CAPTURE DE BORDEREAU NE REDEMANDE PAS CE QU'ELLE SAIT DÉJÀ ══════
   console.log('\n── Lecture du bordereau : moins d’allers-retours pour le même travail');

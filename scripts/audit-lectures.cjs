@@ -155,7 +155,6 @@ console.log('\n── ET UNE PROJECTION DÉCLARE TOUTES LES CLÉS QUE SA FONCTIO
     return src.slice(p2, j + 1);
   };
   const LECTEURS = [
-    { f: 'vinted-sync-extension/background.js', fn: 'buildPanelData', liste: 'MAIN_PANNEAU' },
     { f: 'vinted-sync-extension/background.js', fn: 'buildLbcData',   liste: 'MAIN_FILE' },
     { f: 'vinted-sync-extension/background.js', fn: 'buildEbayData',  liste: 'MAIN_FILE' },
     { f: 'src/App.jsx',                         fn: 'LeboncoinScreen', liste: 'MAIN_LEBONCOIN' },

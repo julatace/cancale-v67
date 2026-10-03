@@ -19,7 +19,6 @@ const fs=require('fs'), vm=require('vm'), path=require('path');
 const RACINE=path.join(__dirname,'..');
 const APP=fs.readFileSync(path.join(RACINE,'src/App.jsx'),'utf8');
 const BG=fs.readFileSync(path.join(RACINE,'vinted-sync-extension/background.js'),'utf8');
-const PANEL=fs.readFileSync(path.join(RACINE,'vinted-sync-extension/vinted-panel.js'),'utf8');
 
 // ⚠️⚠️ CE FICHIER IMPRIMAIT DES ❌ ET SORTAIT TOUJOURS EN 0 (trouvé le
 // 8 septembre). Le balayage des audits (`for f in scripts/audit-*.cjs`) le
@@ -84,7 +83,10 @@ const bgGen  = bloc(BG,'aGenererBordereau');
 const appNorm = extraire(APP, /const normTitle = (\(t\) => [^\n]*?);\n/);
 const bgNorm = extraire(BG, /const normT = (\(t\) => [^\n]*?);\n/);
 
-const dispo={appClassify,extClassify,appShip,appRelay,bgShipConst,bgRelayConst,bgShipLocal,appNeedsBord,appNorm,bgNorm,appGen,bgGen};
+// `bgNorm` vivait dans le panneau (buildPanelData, retiré en 5.130) : sans lui
+// l'extension ne rapproche plus aucun titre, il n'y a donc plus deux règles à
+// comparer. S'il revient, la comparaison revient avec lui.
+const dispo={appClassify,extClassify,appShip,appRelay,bgShipConst,bgRelayConst,bgShipLocal,appNeedsBord,appNorm,appGen,bgGen};
 const manquants=Object.entries(dispo).filter(([k,v])=>!v).map(([k])=>k);
 if(manquants.length) console.log('⚠️ non extraits :', manquants.join(', '));
 
@@ -103,7 +105,8 @@ cmp('à expédier (les DEUX copies internes de l\'extension)', bgShipConst, bgSh
 cmp('au point relais (app vs extension)', appRelay, bgRelayConst);
 cmp('bordereau À GÉNÉRER (app vs extension)', appGen, bgGen);
 const titres=['Nike  Air   MAX 1','  adidas Spezial ','ÉTÉ  Blanc'];
-dit(titres.every(t=>appNorm&&bgNorm&&appNorm(t)===bgNorm(t)), 'normalisation de titre (app vs extension)');
+if (bgNorm) dit(titres.every(t=>appNorm&&appNorm(t)===bgNorm(t)), 'normalisation de titre (app vs extension)');
+else console.log("ℹ️  normalisation de titre : l'extension n'en a plus (panneau retiré) — rien à comparer");
 // besoin d'un bordereau : l'extension n'a pas la même notion — on regarde l'écart
 if(appNeedsBord&&bgShipConst){
   const d=S.filter(s=>appNeedsBord(s)!==bgShipConst(s));
@@ -131,7 +134,7 @@ if(appNeedsBord&&bgShipConst){
   //     l'atteindrait, donc la promesse ne s'afficherait JAMAIS, et on
   //     enverrait Julien chercher une mise à jour qui n'existe pas. C'est le
   //     défaut du zip, retourné.
-  const FONCTIONS = { codes:'capterRetraits', offres:'autoAccepterOffres', releve:'capterReleves', places:'mpChoisi', ebay:'buildEbayData', lbctitre:'lbcTitre', photoslbc:'photosEnOctets', photosebay:'photosPourEbay', repond:'repondreAuxMessages', commande:'executerCommande' };
+  const FONCTIONS = { codes:'capterRetraits', offres:'autoAccepterOffres', releve:'capterReleves', places:'mpChoisi', ebay:'buildEbayData', lbctitre:'lbcTitre', photoslbc:'photosEnOctets', photosebay:'photosPourEbay', repond:'repondreAuxMessages', commande:'executerCommande', offresapp:'offresAutoActif' };
   const t = /const EXT_CAPACITES\s*=\s*\{([^}]*)\}/.exec(APP);
   dit(!!t, "l'app tient une table des capacités de l'extension",
     "sans elle, chaque promesse « tout seul » est reprise à la main — et une seule était gardée");

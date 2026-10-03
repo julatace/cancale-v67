@@ -35,7 +35,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.129.0';
+const EXT_ATTENDUE = '5.130.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -150,7 +150,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 //   releve  `capterReleves`       5.52.0  (5 sept.)   le relevé daté du porte-monnaie
 // `audit-coherence.cjs` vérifie que ces trois fonctions existent toujours dans
 // l'extension : une capacité annoncée mais retirée serait le même mensonge.
-const EXT_CAPACITES = { codes: '5.45.0', offres: '5.38.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', repond: '5.77.0', commande: '5.129.0' };
+const EXT_CAPACITES = { codes: '5.45.0', offres: '5.38.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', repond: '5.77.0', commande: '5.129.0', offresapp: '5.130.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -768,7 +768,7 @@ const SYNC_KEYS = [
   'vinted_invoice_settings','vinted_custom_logo','vinted_dark','vinted_stock_vinted',
   'vinted_accounts','vinted_account_labels','vinted_account_emails','vinted_account_phones',
   'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros','vinted_annonces_vendues','vinted_bords_shipped',
-  'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats','vinted_bords_printed','vrm_imprimante','vrm_prenom', 'vinted_repond_auto','vrm_points_relais','vrm_ville','vrm_colis_collected','vrm_colis_collected_at',
+  'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats','vinted_bords_printed','vrm_imprimante','vrm_prenom', 'vinted_repond_auto','vinted_offres_auto','vrm_points_relais','vrm_ville','vrm_colis_collected','vrm_colis_collected_at',
   'vinted_txn_link','vinted_sales_hidden','vinted_purchases_hidden','vinted_accounts_hidden','vinted_autonum','vinted_urssaf_freq','vinted_urssaf_taux',
   'vinted_sale_overrides','vinted_bord_links','vinted_pickup_done','vinted_bords_hidden','vinted_ship_done','vinted_pairs_lost','vinted_retours_recus','vinted_retours_dismissed',
   'vinted_offvinted_buys','vinted_buyprice_by_num','vinted_quick_replies','vinted_ca_keep_removed','vinted_achat_notes','vrm_lbc_colis_done',
@@ -6462,6 +6462,14 @@ function BoutonBordereau({ uid, tx, login, aGenerer, pdf, onImprimer, onFait, gr
         <span style={{ fontSize: 11, color: refus || ko ? C.warn : C.muted, lineHeight: 1.35, whiteSpace: 'normal' }}>
           {refus || (ko ? (job.etape === 'genere_sans_pdf' ? `Généré chez Vinted, mais le PDF n'est pas encore prêt (${job.raison}).` : job.raison) : distingue)}
         </span>
+      )}
+      {/* Le repli à la main : l'extension a posé un rendez-vous de 15 min, le PDF
+          téléchargé depuis la vente sera relié à ELLE (une identité, §5). */}
+      {ko && job.etape === 'genere_sans_pdf' && (
+        <a href={`https://www.vinted.fr/member/transactions/${encodeURIComponent(tx)}`} target="_blank" rel="noreferrer"
+          style={{ fontSize: 11.5, color: C.accent, fontWeight: 600, textDecoration: 'none' }}>
+          Ouvrir la vente sur Vinted et télécharger le PDF ↗
+        </a>
       )}
     </span>
   );
@@ -22531,7 +22539,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </div>
               <div style={{fontSize:11.5,color:C.text,lineHeight:1.45}}>{extSait('offres')==='absente'
                 ? <>C'est l'extension, dans ton Chrome, qui accepte une offre au-dessus de ton minimum. Ouvre l'app sur l'ordinateur où elle est installée — tes montants sont enregistrés, ils ne bougent pas.</>
-                : <>L'extension installée ne sait pas encore accepter une offre toute seule (il faut la <b>5.38</b> au minimum). Mets-la à jour depuis <b>Réglages</b>, puis active l'acceptation automatique dans son panneau. Tes montants sont enregistrés, ils ne bougent pas.</>}</div>
+                : <>L'extension installée ne sait pas encore accepter une offre toute seule (il faut la <b>5.38</b> au minimum). Mets-la à jour depuis <b>Réglages</b>, puis active l'acceptation automatique, dans Réglages aussi. Tes montants sont enregistrés, ils ne bougent pas.</>}</div>
             </div>
           )}
           {numeroReprises.length > 0 && (
@@ -26235,6 +26243,8 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
 
         <RepondreSetting/>
 
+        <OffresAutoSetting/>
+
         {/* MOYENS DE CONNEXION — on affiche l'état RÉEL de chacun, pas une liste
             décorative. Un bouton Google qui mène à une page d'erreur ne rend
             service à personne : tant que le fournisseur n'est pas branché dans
@@ -26578,6 +26588,72 @@ function RepondreSetting() {
                 ))}
                 {envois.length > 8 ? <div style={{fontSize:11,color:C.muted}}>et {envois.length - 8} autre{envois.length - 8 > 1 ? 's' : ''}.</div> : null}
               </div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ACCEPTER LES OFFRES AU-DESSUS DE MON PLANCHER — L'INTERRUPTEUR VIT DANS L'APP
+// ══════════════════════════════════════════════════════════════════════════════
+// Julien, 2 octobre : « tout doit être centralisé dans VRM ». L'interrupteur
+// vivait dans le panneau de l'extension sur Vinted, qui est retiré : sans lui,
+// un moteur allumé n'aurait plus eu AUCUN moyen d'être éteint.
+// ⚠️ ÉTEINT PAR DÉFAUT (§3). Le moteur est bordé : plancher obligatoire annonce
+//    par annonce, compte connecté dans l'onglet, 3 par visite, jamais deux fois.
+// ⚠️ Trois états de capacité (`offresapp`, 5.130) : une extension plus ancienne
+//    lit encore l'interrupteur de SON panneau, pas celui-ci.
+// ⚠️ Jamais touché ici ⇒ l'extension garde l'interrupteur local d'avant : on
+//    l'AFFICHE (`offresAutoLocal`), sinon l'app dirait « éteint » pendant que
+//    l'extension accepte.
+function OffresAutoSetting() {
+  const lire = () => { const v = load('vinted_offres_auto', null); return v === true || v === false ? v : null; };
+  const [v, setV] = React.useState(lire);
+  const touche = React.useRef(false);
+  const ext = useExtVivante();
+  React.useEffect(() => onCloudReady(() => { if (!touche.current) setV((p) => p === null ? lire() : p); }), []);
+  const local = !!(ext.etat && ext.etat.offresAutoLocal);
+  const on = v === null ? local : v;
+  const cap = extSait('offresapp');
+  const planchers = React.useMemo(() => {
+    const m = load('vinted_annonce_numeros', {}) || {};
+    let n = 0; for (const k in m) { const x = Number(m[k] && m[k].minPrice); if (isFinite(x) && x > 0) n++; }
+    return n;
+  }, [v]);
+  const basculer = () => { touche.current = true; const n = !on; setV(n); save('vinted_offres_auto', n); };
+  return (
+    <div style={{padding:'13px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}} data-offres-auto={on ? 'on' : 'off'}>
+      <div style={{display:'flex',alignItems:'center',gap:10}}>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontSize:13,fontWeight:600,color:C.text}}>Accepter les offres au-dessus de mon prix plancher</div>
+          <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.5}}>
+            À chaque passage sur Vinted, l’extension accepte à ta place une offre <b>égale ou supérieure</b> au prix plancher que tu as posé sur l’annonce (écran Annonces, champ «&nbsp;Min. accepté&nbsp;»). Sans plancher, elle ne touche à rien. Trois au plus par visite, jamais deux fois la même, et seulement sur le compte connecté.
+          </div>
+        </div>
+        <button type="button" onClick={basculer} aria-pressed={on}
+          style={{flexShrink:0,width:46,height:27,borderRadius:999,border:`1px solid ${on?C.accent:C.border}`,background:on?C.accent:C.bg,position:'relative',cursor:'pointer',padding:0}}>
+          <span style={{position:'absolute',top:2,left:on?21:2,width:21,height:21,borderRadius:999,background:on?(C.onAccent||'#fff'):C.muted,transition:'left .15s'}}/>
+        </button>
+      </div>
+      {v === null && local && (
+        <div style={{marginTop:9,fontSize:11.5,color:C.muted,lineHeight:1.5}}>
+          Allumé depuis l’ancien panneau de l’extension. C’est maintenant ici qu’il se règle.
+        </div>
+      )}
+      {on && planchers === 0 && (
+        <div style={{marginTop:9,fontSize:11.5,color:C.muted,lineHeight:1.5}}>
+          Aucune annonce n’a encore de prix plancher&nbsp;: rien ne sera accepté tant que tu n’en poses pas.
+        </div>
+      )}
+      {cap === 'retard' && (
+        <div style={{marginTop:9,fontSize:11.5,color:C.warn,lineHeight:1.5}}>
+          L’extension installée ici lit encore l’interrupteur de son ancien panneau, pas celui-ci. Remplace-la par la {EXT_ATTENDUE}&nbsp;: tant qu’elle est plus ancienne, ce réglage n’a pas d’effet.
+        </div>
+      )}
+      {on && cap === 'absente' && (
+        <div style={{marginTop:9,fontSize:11.5,color:C.muted,lineHeight:1.5}}>
+          C’est l’extension, dans le Chrome de ton ordinateur, qui accepte — pas cette page. Le réglage la suit d’un appareil à l’autre.
         </div>
       )}
     </div>

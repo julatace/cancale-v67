@@ -9,7 +9,7 @@
 // les slides pas encore affichées n'ont pas de `src`, seulement `srcset` /
 // `data-src`. C'est §4.10 : cette fonction n'avait jamais tourné hors de Chrome.
 //
-// Ce banc extrait la VRAIE fonction (AVANT = HEAD, APRÈS = arbre de travail) et
+// Ce banc extrait la VRAIE fonction (AVANT = avant le correctif, APRÈS = arbre) et
 // les exécute sur LE MÊME DOM — un carrousel où seules 5 images ont un `src` et
 // le reste vit dans `srcset`/`data-src`/<source>. Il exige :
 //   · APRÈS collecte TOUTES les photos (> 6), pas seulement les visibles ;
@@ -20,8 +20,13 @@
 const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const fs = require('fs'), http = require('http'), path = require('path'), cp = require('child_process');
 const REPO = path.join(__dirname, '..', '..');
-const FICH = 'vinted-sync-extension/vinted-panel.js';
-
+const FICH = 'vinted-sync-extension/vinted-capture.js';
+// AVANT = la version d'AVANT le correctif des photos paresseuses (257d8a7^),
+// figée. Comparer à HEAD ne prouvait plus rien dès que le correctif était
+// commité : AVANT et APRÈS devenaient identiques, et le banc sortait rouge sur
+// un code juste (§6.1 : la preuve se fait contre le code d'avant, pas contre
+// « le dernier commit »). La fonction vivait alors dans l'ancien panneau.
+const REF_AVANT = '257d8a7^:vinted-sync-extension/vinted-panel.js';
 // Extrait `const PUB_VINTED = …;` + la fonction nommée readListingDetailFromPage
 // d'un texte source, en comptant les accolades (un regex ne suffit pas).
 function extrait(src) {
@@ -37,7 +42,14 @@ function extrait(src) {
 }
 
 const NEUF = fs.readFileSync(path.join(REPO, FICH), 'utf8');
-const VIEUX = cp.execSync('git show HEAD:' + FICH, { cwd: REPO, encoding: 'utf8' });
+// Un clone superficiel n'a pas forcément ce commit : on reconstruit alors la
+// règle d'avant en RÉAFFAIBLISSANT la vraie (img[src] seulement, doublons par
+// URL) — la preuve porte sur la règle, pas sur l'histoire du dépôt.
+const affaiblir = (src) => src
+  .replace(/const k = cle\(u\);\s*if \(seen\.has\(k\)\) return;\s*seen\.add\(k\);/, 'if (seen.has(u)) return; seen.add(u);')
+  .split('\n').filter((l) => !/getAttribute\('(srcset|data-srcset|data-src)'\)/.test(l)).join('\n')
+  .replace(/for \(const s of document\.querySelectorAll\('source'\)\) \{\s*\}/, '');
+const VIEUX = (() => { try { return cp.execSync('git show ' + REF_AVANT, { cwd: REPO, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }); } catch (_) { return affaiblir(NEUF); } })();
 const fnNeuf = extrait(NEUF), fnVieux = extrait(VIEUX);
 
 // Le DOM d'une page d'annonce dont le carrousel n'a chargé QUE 5 slides en `src`.
@@ -86,7 +98,7 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
   const avant = await run(fnVieux);
   const apres = await run(fnNeuf);
 
-  console.log('AVANT (HEAD) :', avant.length, 'photos · APRÈS (arbre) :', apres.length, 'photos');
+  console.log('AVANT (257d8a7^) :', avant.length, 'photos · APRÈS (arbre) :', apres.length, 'photos');
 
   // §6.1 : le défaut existait bien sur le code d'AVANT — il RATAIT les slides
   // pas encore affichées (data-src, srcset, <source>), qui n'ont pas de `src`.
