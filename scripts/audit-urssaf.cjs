@@ -78,7 +78,9 @@ if (!bloc || !/caUrssafParMois/.test(bloc)) {
     { transaction_id: 3, date: '2026-06-12T10:00:00Z', status: 'Remboursement effectué', price: { amount: '999.00' } },
   ];
   const masquee = (o) => String(o.transaction_id) === '2';
-  const m = ctx.caUrssafParMois(ventes, masquee)['2026-06'] || {};
+  // Datées au jour du VERSEMENT (3 octobre) : chaque vente finalisée porte sa date.
+  const VERS = { 1: '2026-06-15T10:00:00Z', 2: '2026-06-16T10:00:00Z', 3: '2026-06-17T10:00:00Z' };
+  const m = ctx.caUrssafParMois(ventes, masquee, VERS)['2026-06'] || {};
   (m.ca === 141 && m.n === 2)
     ? ok('une vente masquée dans l\'app reste dans le CA déclaré (141 €, pas 41 €)')
     : nok('une vente masquée reste dans le CA déclaré', `ca=${m.ca} n=${m.n} au lieu de 141 / 2`);
@@ -86,7 +88,7 @@ if (!bloc || !/caUrssafParMois/.test(bloc)) {
     ? ok('le poids des ventes masquées est compté à part (auditable)')
     : nok('le poids des ventes masquées est compté à part', `caMasq=${m.caMasq}`);
   // Un remboursement n'est jamais du chiffre d'affaires.
-  Object.values(ctx.caUrssafParMois(ventes, null)).every(x => x.ca <= 141)
+  Object.values(ctx.caUrssafParMois(ventes, null, VERS)).every(x => x.ca <= 141)
     ? ok('les remboursements et annulations ne comptent jamais')
     : nok('les remboursements et annulations ne comptent jamais');
 
@@ -142,7 +144,8 @@ if (!bloc || !/caUrssafParMois/.test(bloc)) {
       { orderId: 'X2', orderPaymentStatus: 'FULLY_REFUNDED', creationDate: '2026-09-21T10:00:00.000Z', pricingSummary: { total: { value: '30.00', currency: 'EUR' } } },
       { orderId: 'X3', orderPaymentStatus: 'PAID', creationDate: '2026-09-22T10:00:00.000Z', pricingSummary: { total: { value: '50.00', currency: 'USD' } } },
     ];
-    r = ctxP.ventesDeclarables({ vinted: VINTED, lbc: LBC, ebay: EBAY });
+    const VERS = { 1: '2026-09-18T09:00:00+02:00' };
+    r = ctxP.ventesDeclarables({ vinted: VINTED, lbc: LBC, ebay: EBAY, versements: VERS });
     const sept = (ctxP.caDeclarableParMois(r.lignes))['2026-09'] || {};
     const par = sept.par || {};
     Math.abs((sept.ca || 0) - 215) < 0.001
@@ -160,8 +163,8 @@ if (!bloc || !/caUrssafParMois/.test(bloc)) {
     r.ecartees.some((e) => e.id === 'ebay:X3') && !r.lignes.some((l) => l.id === 'ebay:X2')
       ? ok('eBay : remboursée exclue, autre devise écartée et COMPTÉE à part (jamais convertie au hasard)')
       : nok('eBay : remboursée exclue, autre devise écartée', JSON.stringify(r.ecartees));
-    const seul = ctxP.caDeclarableParMois(ctxP.ventesDeclarables({ vinted: VINTED }).lignes)['2026-09'] || {};
-    const avant = ctxP.caUrssafParMois(VINTED)['2026-09'] || {};
+    const seul = ctxP.caDeclarableParMois(ctxP.ventesDeclarables({ vinted: VINTED, versements: VERS }).lignes)['2026-09'] || {};
+    const avant = ctxP.caUrssafParMois(VINTED, null, VERS)['2026-09'] || {};
     seul.ca === avant.ca && seul.n === avant.n
       ? ok('l\'autre sens : sans Leboncoin ni eBay, le CA est exactement celui d\'avant')
       : nok('sans Leboncoin ni eBay, rien ne change', `${seul.ca} contre ${avant.ca}`);
@@ -170,6 +173,63 @@ if (!bloc || !/caUrssafParMois/.test(bloc)) {
   /ventesDeclarables\(\{ vinted: sales\.items, lbc: [^}]*ebay: [^}]*\}\)/.test(SRC) && /sources = \{ Vinted: 'lu', Leboncoin: lbcLu \? 'lu' : 'pasSu'/.test(SRC)
     ? ok('l\'écran Ventes publie toutes plateformes, avec ce qui n\'a pas pu être lu')
     : nok('l\'écran Ventes publie toutes plateformes', 'publication encore Vinted seule');
+}
+
+// ── 1 ter. DATÉ AU JOUR DU VERSEMENT (Julien, 3 octobre) ───────────────────
+//    « il faut dater la vente pour le CA du mois à la date de réception
+//    d'argent ». On juge ce que la règle REND, jamais sa formulation.
+{
+  const lbcSrc = (() => { const a = SRC.indexOf('const lbcAnnulee = '); const b = SRC.indexOf('\nconst lbcEuro', a); return a > 0 && b > a ? SRC.slice(a, b) : ''; })();
+  const c = {
+    console, Date, Number, String, isFinite, parseFloat, Object, Math, Array, load: (k, d) => d,
+    classifyOrderStatus: (s) => /annul|cancel|refus|rembours/i.test(String(s || '')) ? 'cancelled' : (/finalis/i.test(String(s || '')) ? 'completed' : 'pending'),
+    tsCommande: (o) => Date.parse((o && o.date) || '') || 0,
+    montantCommande: (o) => { const p = o && o.price; const v = (p && typeof p === 'object') ? p.amount : p; const n = Number(String(v == null ? '' : v).replace(',', '.')); return isNaN(n) ? 0 : n; },
+  };
+  try {
+    vm.createContext(c);
+    vm.runInContext(lbcSrc + '\n' + bloc + "\n;Object.assign(this, { ventesDeclarables, caDeclarableParMois });", c);
+    const V = [
+      { transaction_id: 11, date: '2026-08-28T12:00:00+02:00', price: { amount: '90.0' }, status: 'Commande finalisée' },
+      { transaction_id: 12, date: '2026-09-02T12:00:00+02:00', price: { amount: '40.0' }, status: 'Commande finalisée' },
+      { transaction_id: 13, date: '2026-09-03T12:00:00+02:00', price: { amount: '25.0' }, status: 'Commande finalisée' },
+    ];
+    const VERS = { 11: '2026-09-05T08:00:00+02:00', 13: 'pas une date' };
+    const r = c.ventesDeclarables({ vinted: V, versements: VERS });
+    const mois = c.caDeclarableParMois(r.lignes);
+    ((mois['2026-09'] || {}).ca === 90 && !mois['2026-08'])
+      ? ok('une vente du 28 août versée le 5 septembre compte en SEPTEMBRE (mois du versement), pas en août')
+      : nok('le mois est celui du versement', JSON.stringify(mois));
+    const ad = r.aDater.filter((x) => x.plateforme === 'Vinted').map((x) => x.id).sort().join(',');
+    ad === 'vinted:12,vinted:13' && r.aDater.every((x) => x.eur > 0)
+      ? ok('une vente finalisée SANS date de versement (ou illisible) n\'entre dans aucun mois : « à dater », avec son montant')
+      : nok('sans date de versement, la vente est « à dater »', ad);
+    const sans = c.ventesDeclarables({ vinted: V });
+    sans.lignes.length === 0 && sans.aDater.length === 3
+      ? ok('aucune date de versement connue ⇒ aucun mois inventé (jamais la date de vente à la place)')
+      : nok('aucune date de versement ⇒ aucun mois', `${sans.lignes.length} ligne(s)`);
+  } catch (e) { nok('la règle du versement s\'exécute', e.message); }
+  // La publication attend les dates, et n'invente rien si elles sont illisibles.
+  /if \(versements === null\) return;/.test(SRC)
+    ? ok('dates de versement illisibles ⇒ l\'écran Ventes ne publie RIEN (jamais un mois vidé)')
+    : nok('dates illisibles ⇒ pas de publication', 'garde absente');
+  // La source : uniquement le statut 450 (« commande finalisée ») et sa date.
+  /status_updated_at/.test(SRC) && /String\(r\.s\) === '450'/.test(SRC)
+    ? ok('la date de versement vient du statut 450 (commande finalisée), rien d\'autre')
+    : nok('la date de versement vient du statut 450', 'lecture absente ou autre statut');
+  // Les deux rapports datent au versement, pas à la vente.
+  const mens = SRC.slice(SRC.indexOf('const report = useMemo'), SRC.indexOf('const openReport'));
+  const ann = SRC.slice(SRC.indexOf('const annual = useMemo'), SRC.indexOf('const openAnnual'));
+  for (const [nom, t] of [['mensuel', mens], ['annuel', ann]]) {
+    /versements\s*\?\s*versements\[String\(o\.transaction_id\)\]/.test(t) && /\bversements\]\);/.test(t)
+      ? ok(`le rapport ${nom} date au versement (et se recalcule quand les dates arrivent)`)
+      : nok(`le rapport ${nom} date au versement`, 'lecture ou dépendance absente');
+  }
+  // L'extension va les chercher.
+  const BG = fs.readFileSync(path.join(__dirname, '..', 'vinted-sync-extension', 'background.js'), 'utf8');
+  /async function capterDatesVersement\(uid\)/.test(BG) && /await capterDatesVersement\(uid\)/.test(BG)
+    ? ok('l\'extension va chercher les dates de versement à chaque visite')
+    : nok('l\'extension va chercher les dates de versement', 'fonction absente ou jamais appelée');
 }
 
 // ── 2. Les deux rapports n'écartent plus les ventes masquées ───────────────
@@ -204,8 +264,8 @@ libelles.length === 2
       ? nok('les deux rapports ne disent plus « CA encaissé »', libelles.filter(l=>/encaiss/i.test(l)).join(' · '))
       : ok('les deux rapports annoncent « CA des ventes finalisées », pas « encaissé »'))
   : nok('les deux cartes de CA des rapports sont lisibles', libelles.length + ' trouvée(s)');
-/pas au jour où (Vinted|la plateforme) t'a versé l'argent/.test(SRC)
-  ? ok("le tableau de bord DIT que ses ventes sont datées au jour de la vente")
+/datées au jour où la plateforme t'a <b>versé l'argent<\/b>/.test(SRC)
+  ? ok("le tableau de bord DIT que ses ventes sont datées au jour du versement")
   : nok("le tableau de bord dit comment ses ventes sont datées", 'avertissement absent');
 
 // ── 3. Le tableau de bord ne lit plus une archive vide ─────────────────────
@@ -273,7 +333,7 @@ enDur.length
   ? ok("les ventes du mois pas encore finalisées sont comptées (montantCommande : le prix est un objet)")
   : nok("les ventes du mois pas encore finalisées sont comptées");
 
-/if \(classifyOrderStatus\(o\.status\)!=='cancelled'\) \{ nAttente\+=1;/.test(SRC)
+/classifyOrderStatus\(o\.status\)!=='cancelled'\) \{ nAttente\+=1;/.test(SRC)
   ? ok("une annulée n'est jamais comptée comme « en attente »")
   : nok("une annulée n'est jamais comptée comme « en attente »");
 

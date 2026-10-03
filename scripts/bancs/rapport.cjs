@@ -28,6 +28,11 @@ const VENTES = [
   vente(9004, 'Asics Gel-Kayano taille 41', 60, 'Paiement validé', J),        // en cours : hors CA
   vente(9005, 'New Balance 990 taille 44', 70, 'Commande annulée', J),       // annulée : hors tout
 ];
+// DATÉ AU VERSEMENT (3 octobre) : 9001 et 9002 versées ce mois-ci ; 9003
+// finalisée SANS date de versement (« à dater », dans aucun mois) ; 9006 VENDUE
+// le mois dernier mais versée ce mois-ci → elle compte CE mois.
+VENTES.push({ transaction_id: 9006, title: 'Puma Suede vendue le mois dernier', price: { amount: '30', currency_code: 'EUR' }, status: 'Commande finalisée', date: new Date(auj.getFullYear(), auj.getMonth() - 1, 15, 12).toISOString() });
+const VERS = { 9001: jour(Math.max(1, J - 1)), 9002: jour(J), 9006: jour(1) };
 const ACHATS = [
   { transaction_id: 7001, title: 'Lot Nike Air Max', price: { amount: '35', currency_code: 'EUR' }, status: 'Commande finalisée', date: jour(1), seller: 'vendeur_test' },
 ];
@@ -45,6 +50,8 @@ const rows = [
   { id: 'lbc_ventes', data: { ventes: LBC } },
   { id: 'ebay_orders', data: { orders: EBAY } },
   { id: 'harvest_111_orders_sold', data: { capturedAt: auj.toISOString(), payload: { my_orders: VENTES } } },
+  ...Object.entries(VERS).map(([tx, d]) => ({ id: 'harvest_111_txn_' + tx, data: { capturedAt: auj.toISOString(), payload: { transaction: { id: Number(tx), status: 450, status_updated_at: d } } } })),
+  { id: 'harvest_111_txn_9003', data: { capturedAt: auj.toISOString(), payload: { transaction: { id: 9003, status: 300, status_updated_at: jour(1) } } } },
   { id: 'harvest_111_orders_purchased', data: { capturedAt: auj.toISOString(), payload: { my_orders: ACHATS } } },
 ];
 
@@ -86,6 +93,11 @@ srv.listen(PORT);
         const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || '';
         const forme = (r) => {
           if (/^[a-z]+:data->[a-z]+$/i.test(sel)) { const [al, src] = sel.split(':'); return { [al]: (r.data || {})[src.split('->')[1]] }; }
+          if (/^[a-z]+:data->/i.test(sel)) {   // projection en chaîne (`tx:data->payload->transaction->>id,…`)
+            const o = {};
+            for (const champ of sel.split(',')) { const m = /^([a-z]+):data->(.+)$/i.exec(champ); if (!m) continue; let v = r.data; for (const p of m[2].split(/->>?/)) v = v == null ? v : v[p]; o[m[1]] = (v != null && /->>/.test(m[2])) ? String(v) : v; }
+            return o;
+          }
           return { ...r, updated_at: auj.toISOString(), cap: r.data.capturedAt };
         };
         const eq = /id=eq\.([^&]*)/.exec(u);
@@ -110,12 +122,14 @@ srv.listen(PORT);
       });
       dit(Array.isArray(r.lignes), 'le rapport a un registre des ventes');
       const L = r.lignes || [];
-      dit(L.length === 5, 'une ligne par vente FINALISÉE du mois, TOUTES PLATEFORMES (3 Vinted + 1 Leboncoin + 1 eBay), ni l’en cours ni l’annulée', `${L.length} ligne(s)`);
+      dit(L.length === 5, 'une ligne par vente FINALISÉE et VERSÉE ce mois, TOUTES PLATEFORMES (3 Vinted + 1 Leboncoin + 1 eBay), ni l’en cours ni l’annulée', `${L.length} ligne(s)`);
+      dit(L.some((t) => /Puma Suede/.test(t)), 'une vente du mois DERNIER versée ce mois-ci compte CE mois (mois du versement)');
+      dit(!L.some((t) => /Spezial/.test(t)), 'une vente finalisée sans date de versement n’est dans AUCUN mois (jamais la date de vente à la place)');
       dit(L.some((t) => /Leboncoin/.test(t) && /75,00/.test(t)) && L.some((t) => /eBay/.test(t) && /60,00/.test(t)), 'la vente Leboncoin (centimes → 75 €) et la vente eBay sont dans le registre, avec leur plateforme');
       dit(!L.some((t) => /sans date|côté inconnu/.test(t)), 'ni la vente sans date, ni la transaction au côté inconnu');
       const couv = await pg.evaluate(() => (document.querySelector('[data-registre-couverture]') || {}).innerText || '');
       dit(/dont Vinted/.test(couv) && /Leboncoin 75,00/.test(couv) && /eBay 60,00/.test(couv), 'la répartition par plateforme est dite à côté du total', couv.slice(0, 120));
-      dit(/1 vente sans date \(58,00/.test(couv), 'et la vente sans date est annoncée avec son montant, hors du mois', couv.slice(0, 160));
+      dit(/2 ventes finalisées sans date \(103,00/.test(couv), 'les ventes sans date (Leboncoin 58 € + Vinted non versée 45 €) sont annoncées avec leur montant, hors du mois', couv.slice(0, 200));
       dit(!L.some((t) => /Kayano|990/.test(t)), 'la vente en cours et l’annulée n’y sont pas');
       const somme = L.reduce((a, t) => a + nombre(t.split('\n').pop()), 0);
       const caTxt = (/CA des ventes finalisées\s*\n?\s*([^\n]+)/i.exec(r.modale) || [])[1] || '';

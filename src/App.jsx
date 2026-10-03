@@ -35,7 +35,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.132.0';
+const EXT_ATTENDUE = '5.133.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -150,7 +150,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 //   releve  `capterReleves`       5.52.0  (5 sept.)   le relevé daté du porte-monnaie
 // `audit-coherence.cjs` vérifie que ces trois fonctions existent toujours dans
 // l'extension : une capacité annoncée mais retirée serait le même mensonge.
-const EXT_CAPACITES = { codes: '5.45.0', offres: '5.38.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', repond: '5.77.0', commande: '5.129.0', offresapp: '5.130.0', publication: '5.130.0', lbcdate: '5.131.0' };
+const EXT_CAPACITES = { codes: '5.45.0', offres: '5.38.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', repond: '5.77.0', commande: '5.129.0', offresapp: '5.130.0', publication: '5.130.0', lbcdate: '5.131.0', versement: '5.133.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -2407,6 +2407,25 @@ const fetchTxnItemIds = async () => {
     return map;
   } catch (_) { return {}; }
 };
+// ── LA DATE DE VERSEMENT DE CHAQUE VENTE VINTED (3 octobre) ────────────────
+// Julien : « il faut dater la vente pour le CA du mois à la date de réception
+// d'argent, c'est ça les ventes finalisées ». Vinted libère l'argent quand
+// l'acheteur valide la commande : la transaction passe au statut 450
+// (« Commande finalisée ») et `status_updated_at` porte CE moment — mesuré sur
+// 179 transactions finalisées, 8 jours après le paiement en moyenne.
+// tx → date ISO, seulement pour une transaction FINALISÉE (450) ; une autre
+// date (paiement, envoi) n'est pas un versement. `null` = la base n'a pas
+// répondu (« pas su » ≠ « aucune date »). Paginé : la famille dépasse 800
+// lignes et Supabase coupe à 1 000 sans le dire (§4.5).
+const fetchVersementsVinted = async () => {
+  try {
+    const rows = await lireTout('id=like.harvest_%25_txn_%25&select=tx:data->payload->transaction->>id,s:data->payload->transaction->>status,su:data->payload->transaction->>status_updated_at');
+    if (rows === null) return null;
+    const map = {};
+    for (const r of rows) if (r && r.tx && String(r.s) === '450' && r.su && !isNaN(Date.parse(r.su))) map[String(r.tx)] = r.su;
+    return map;
+  } catch (_) { return null; }
+};
 // Les octets d'UN bordereau précis (par id de ligne) — seulement à l'impression.
 const fetchLabelPdf = async (rowId) => {
   if (!rowId) return null;
@@ -2758,7 +2777,7 @@ const venteFinalisee = (o) => classifyOrderStatus(o && o.status) === 'completed'
 // à part ce que l'app cache à l'écran : le total, lui, ne l'écarte jamais.
 // (Vinted seul — l'enveloppe d'avant, gardée pour ses lecteurs ; la règle est
 // `ventesDeclarables` juste en dessous, §11.)
-const caUrssafParMois = (ventes, masquee) => caDeclarableParMois(ventesDeclarables({ vinted: ventes, masquee }).lignes);
+const caUrssafParMois = (ventes, masquee, versements) => caDeclarableParMois(ventesDeclarables({ vinted: ventes, masquee, versements }).lignes);
 // ══════════════════════════════════════════════════════════════════════════════
 // LE CA DÉCLARÉ, TOUTES PLATEFORMES — UNE SEULE RÈGLE (3 octobre)
 // ══════════════════════════════════════════════════════════════════════════════
@@ -2769,24 +2788,32 @@ const caUrssafParMois = (ventes, masquee) => caDeclarableParMois(ventesDeclarabl
 // ⚠️ L'IDENTITÉ est `plateforme:id` (vinted:transaction, lbc:purchase_id,
 //    ebay:orderId) — jamais un titre, jamais une paire (§5). Une même vente vue
 //    deux fois n'est comptée qu'une fois.
-// ⚠️ DATÉ AU JOUR DE LA VENTE (§5). Une vente Leboncoin dont on n'a pas la date
-//    de vente (l'extension ne la capte que depuis la 5.131) n'est placée dans
-//    AUCUN mois : elle va dans « à dater », avec son montant. L'heure de capture
-//    serait une date FAUSSE, et un chiffre faux sur une déclaration ne se voit pas.
+// ⚠️⚠️ DATÉ AU JOUR DU VERSEMENT (Julien, 3 octobre : « dater la vente à la
+//    date de réception d'argent, c'est ça les ventes finalisées »). Pour Vinted,
+//    c'est la date où la transaction passe « finalisée » (`versements`, lue
+//    dans le détail de la transaction). Une vente finalisée dont on n'a PAS
+//    encore cette date n'est placée dans AUCUN mois : elle va dans « à dater »,
+//    avec son montant — la date de la vente serait une date FAUSSE pour ce
+//    chiffre, et un chiffre faux sur une déclaration ne se voit pas.
+//    (Leboncoin : la date de versement n'est pas encore captée — c'est la date
+//    de vente qui sert, et l'écran le DIT. eBay : date de la commande payée.)
 // ⚠️ Leboncoin : seule une vente PROUVÉE (`isSeller === true`), finalisée, au
 //    prix FINAL du détail (en centimes). eBay : commande PAYÉE, en euros, datée
 //    de sa création. Une autre devise est écartée et COMPTÉE à part, jamais
 //    convertie au hasard.
 const ymDeTs = (t) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
-const ventesDeclarables = ({ vinted, lbc, ebay, masquee } = {}) => {
+const ventesDeclarables = ({ vinted, lbc, ebay, masquee, versements } = {}) => {
   const lignes = [], aDater = [], ecartees = [], vus = new Set();
   const garde = (l) => { if (vus.has(l.id)) return false; vus.add(l.id); return true; };
   for (const o of (vinted || [])) {
     if (!o || !venteFinalisee(o)) continue;
-    const t = tsCommande(o); if (!t) continue;
     const tx = o.transaction_id != null ? o.transaction_id : o.id;
-    const l = { id: 'vinted:' + (tx != null ? tx : ('?' + lignes.length)), plateforme: 'Vinted', ts: t, ym: ymDeTs(t), eur: montantCommande(o),
-      titre: o.title || '', masquee: !!(masquee && masquee(o)), o };
+    const id = 'vinted:' + (tx != null ? tx : ('?' + lignes.length));
+    const eur = montantCommande(o), masq = !!(masquee && masquee(o));
+    const v = (versements && tx != null) ? versements[String(tx)] : null;
+    const t = v ? Date.parse(v) : 0;
+    if (!t) { if (!vus.has(id)) { vus.add(id); aDater.push({ id, plateforme: 'Vinted', eur, titre: o.title || '', masquee: masq, o }); } continue; }
+    const l = { id, plateforme: 'Vinted', ts: t, ym: ymDeTs(t), eur, titre: o.title || '', masquee: masq, o, dateVente: o.date };
     if (garde(l)) lignes.push(l);
   }
   for (const v of (lbc || [])) {
@@ -9338,7 +9365,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
               endroit possible pour un chiffre invérifiable (§2.7). */}
           {moisCourantCA==null
             ? <>Ce chiffre se calcule sur l'écran <b>Ventes</b> : ouvre-le une fois sur cet appareil et il s'affichera ici.</>
-            : <>Calculé sur le CA des ventes <b>finalisées</b> de {moisCourant.nom}, <b>toutes plateformes</b> (<b>{fmt(moisCourantCA)}</b>), ventes masquées comprises. C'est la somme à verser à la fin du mois (versement libératoire).</>}
+            : <>Calculé sur le CA des ventes <b>finalisées</b> (argent versé) en {moisCourant.nom}, <b>toutes plateformes</b> (<b>{fmt(moisCourantCA)}</b>), ventes masquées comprises. C'est la somme à verser à la fin du mois (versement libératoire).</>}
         </div>
         {/* TOUTES PLATEFORMES (3 octobre) — les « dont » viennent de la MÊME
             ligne publiée que le total : ils somment au total, ils ne peuvent
@@ -9354,7 +9381,11 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
           const morceaux = [];
           if (par.length > 1 || (par.length === 1 && par[0][0] !== 'Vinted')) morceaux.push(<span key="d">dont {par.map(([k,v])=>`${k} ${fmt(v.ca)}`).join(' · ')}</span>);
           if (pasSu.length) morceaux.push(<span key="p" style={{color:C.warn}}>{pasSu.join(' et ')} : pas pu lire — {pasSu.length>1?'leurs':'ses'} ventes ne sont pas dans ce chiffre, rouvre l'écran dans un moment</span>);
-          if (ad && ad.n > 0) morceaux.push(<span key="a" style={{color:C.warn}}>{ad.n} vente{ad.n>1?'s':''} Leboncoin sans date ({fmt(ad.ca)}) : dans aucun mois tant que leur date n'est pas captée — {extSait('lbcdate')==='ok' ? <>ouvre « Mes transactions » sur leboncoin.fr, l'extension la relève au passage</> : extSait('lbcdate')==='retard' ? <>mets d'abord l'extension à jour ({EXT_CAPACITES.lbcdate}), puis ouvre « Mes transactions » sur leboncoin.fr</> : <>depuis l'ordinateur où l'extension est installée, ouvre « Mes transactions » sur leboncoin.fr</>}</span>);
+          const adV = ad && ad.par && ad.par.Vinted;
+          if (adV && adV.n > 0) morceaux.push(<span key="av" style={{color:C.warn}}>{adV.n} vente{adV.n>1?'s':''} Vinted finalisée{adV.n>1?'s':''} sans date de versement ({fmt(adV.ca)}) : dans aucun mois pour l'instant — {extSait('versement')==='ok' ? <>l'extension va chercher leur date à tes prochaines visites sur Vinted (compte par compte)</> : extSait('versement')==='retard' ? <>mets l'extension à jour ({EXT_CAPACITES.versement}) : c'est elle qui va chercher ces dates</> : <>c'est l'extension, sur ton ordinateur, qui va chercher ces dates</>}</span>);
+          const adL = ad && (ad.par ? ad.par.Leboncoin : (ad.n > 0 ? ad : null));
+          if (adL && adL.n > 0) morceaux.push(<span key="a" style={{color:C.warn}}>{adL.n} vente{adL.n>1?'s':''} Leboncoin sans date ({fmt(adL.ca)}) : dans aucun mois tant que leur date n'est pas captée — {extSait('lbcdate')==='ok' ? <>ouvre « Mes transactions » sur leboncoin.fr, l'extension la relève au passage</> : extSait('lbcdate')==='retard' ? <>mets d'abord l'extension à jour ({EXT_CAPACITES.lbcdate}), puis ouvre « Mes transactions » sur leboncoin.fr</> : <>depuis l'ordinateur où l'extension est installée, ouvre « Mes transactions » sur leboncoin.fr</>}</span>);
+          if ((e.par||{}).Leboncoin) morceaux.push(<span key="lv">Leboncoin : daté au jour de la vente (sa date de versement n'est pas encore captée)</span>);
           if (src.Vestiaire === 'nonRelie') morceaux.push(<span key="v">Vestiaire Collective : pas encore relié</span>);
           if (!morceaux.length) return null;
           return <div data-urssaf-couverture style={{fontSize:11,color:C.muted,marginTop:6,lineHeight:1.6,display:'flex',flexDirection:'column',gap:2}}>{morceaux}</div>;
@@ -9366,7 +9397,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             silence. L'écart est de quelques jours à quelques semaines : on le
             DIT au lieu de laisser croire à un chiffre officiel. */}
         <div style={{fontSize:11,color:C.muted,marginTop:6,lineHeight:1.5}}>
-          ⚠️ Ces ventes sont datées au jour de la <b>vente</b>, pas au jour où la plateforme t'a versé l'argent (l'app ne connaît pas cette date pour toutes). Sur une fin de mois, un ou deux jours d'écart sont possibles — vérifie ton taux et ton chiffre sur autoentrepreneur.urssaf.fr, je ne suis pas comptable.
+          Ces ventes sont datées au jour où la plateforme t'a <b>versé l'argent</b> (la commande finalisée par l'acheteur), pas au jour de la vente. Vérifie ton taux et ton chiffre sur autoentrepreneur.urssaf.fr — je ne suis pas comptable.
         </div>
         {/* Prochaine échéance de DÉCLARATION (rappel) */}
         <div style={{marginTop:14,paddingTop:14,borderTop:`1px solid ${C.border}`}}>
@@ -15536,6 +15567,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Trois états pour le CA déclaré : `undefined` en cours · `null` pas su · lu.
   const [lbcLu, setLbcLu] = useState(undefined);
   const [ebayCmd, setEbayCmd] = useState(undefined);
+  // Les dates de VERSEMENT des ventes Vinted — trois états (undefined en
+  // cours · null pas su · map lue). Relues quand l'extension annonce des ventes.
+  const [versements, setVersements] = useState(undefined);
+  useEffect(() => {
+    let mort = false;
+    const lire = () => fetchVersementsVinted().then((m) => { if (!mort) setVersements(m); });
+    lire();
+    const f = (e) => { const d = e && e.detail; if (d && d.type === 'maj' && (d.quoi === 'ventes' || d.quoi === 'versements')) lire(); };
+    window.addEventListener('vrm:ext', f);
+    return () => { mort = true; window.removeEventListener('vrm:ext', f); };
+  }, []);
   useEffect(() => { (async () => {
     try {
       // §4.4 : seulement le tableau des commandes, jamais le blob de la ligne.
@@ -17137,22 +17179,28 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   //    été lues (« pas su » ≠ « aucune vente »), `aDater` ce qui n'a pas de date.
   useEffect(() => {
     if (!sales.items) return;                       // rien de sûr à publier
-    if (lbcLu === undefined || ebayCmd === undefined) return;   // on attend de savoir
+    if (lbcLu === undefined || ebayCmd === undefined || versements === undefined) return;   // on attend de savoir
+    // Les dates de versement illisibles : on ne publie RIEN plutôt qu'un mois où
+    // toutes les ventes Vinted seraient « à dater » (« rien lu » ≠ « rien »).
+    if (versements === null) return;
     try {
-      const { lignes, aDater, ecartees } = ventesDeclarables({ vinted: sales.items, lbc: lbcLu ? lbcVentes.ventes : [], ebay: ebayCmd || [], masquee: isHidden });
+      const { lignes, aDater, ecartees } = ventesDeclarables({ vinted: sales.items, lbc: lbcLu ? lbcVentes.ventes : [], ebay: ebayCmd || [], masquee: isHidden, versements });
       const r2 = (x) => Math.round(x * 100) / 100;
       const liste = Object.values(caDeclarableParMois(lignes))
         .map(m => ({ ym: m.ym, n: m.n, ca: r2(m.ca), nMasq: m.nMasq, caMasq: r2(m.caMasq),
           par: Object.fromEntries(Object.entries(m.par).map(([k, v]) => [k, { n: v.n, ca: r2(v.ca) }])) }))
         .sort((a,b)=> a.ym < b.ym ? 1 : -1);
-      const ad = { n: aDater.length, ca: r2(aDater.reduce((t, l) => t + l.eur, 0)) };
+      const parAd = {};
+      for (const l of aDater) { const q = parAd[l.plateforme] || (parAd[l.plateforme] = { n: 0, ca: 0 }); q.n += 1; q.ca += l.eur; }
+      for (const k in parAd) parAd[k].ca = r2(parAd[k].ca);
+      const ad = { n: aDater.length, ca: r2(aDater.reduce((t, l) => t + l.eur, 0)), par: parAd };
       const sources = { Vinted: 'lu', Leboncoin: lbcLu ? 'lu' : 'pasSu', eBay: ebayCmd ? 'lu' : 'pasSu', Vestiaire: 'nonRelie' };
       const avant = load('vinted_urssaf_mois', null);
       const charge = { mois: liste, aDater: ad, ecartees: ecartees.length, sources };
       const memeChose = avant && JSON.stringify({ mois: avant.mois, aDater: avant.aDater, ecartees: avant.ecartees, sources: avant.sources }) === JSON.stringify(charge);
       if (!memeChose) save('vinted_urssaf_mois', { ...charge, at: Date.now() });
     } catch (_) {}
-  }, [sales.items, hiddenSales, hiddenAccts, lbcLu, lbcVentes, ebayCmd]);
+  }, [sales.items, hiddenSales, hiddenAccts, lbcLu, lbcVentes, ebayCmd, versements]);
 
   // Filet prix d'achat : si l'entrée a un N° mais pas de prix d'achat, on va le
   // chercher dans le miroir PAR NUMÉRO (buyByNum) — c'est ce qui fait remonter
@@ -19746,16 +19794,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // à marquer les mois de la grille.
   const derniersMoisDeclarables = useMemo(() => {
     const s = new Set();
-    (sales.items||[]).forEach(o=>{ if(venteFinalisee(o)){ const m=ymOf(o.date); if(m) s.add(m); } });
+    (sales.items||[]).forEach(o=>{ if(venteFinalisee(o)){ const v = versements ? versements[String(o.transaction_id)] : null; const m=ymOf(v); if(m) s.add(m); } });
     return [...s].sort().reverse();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items]);
+  }, [sales.items, versements]);
   // ── LE RELEVÉ DU PORTE-MONNAIE : l'argent réellement crédité ────────────
   // ⚠️ CE QUE CE RAPPORT NE PEUT PAS DIRE, ET POURQUOI ON L'AFFICHE QUAND MÊME.
-  // Julien déclare l'argent REÇU ; ce rapport date tout au jour de la VENTE
-  // (§5.57 — la date d'encaissement n'existe nulle part dans la moisson des
-  // commandes, elle a donc été retirée). Mesuré : 7 jours d'écart en médiane,
-  // jusqu'à 25. Le relevé du porte-monnaie Vinted, lui, est daté — l'extension
+  // Julien déclare l'argent REÇU ; depuis le 3 octobre (sa demande) ce rapport
+  // date chaque vente Vinted au jour où la transaction passe « finalisée »
+  // (statut 450 — l'argent est versé). Le relevé du porte-monnaie Vinted est daté lui aussi — l'extension
   // le capte depuis la 5.52 (§5.91) et le range par mois.
   // On le montre À CÔTÉ du CA, comme une VÉRIFICATION, jamais à sa place :
   // c'est un fait mesuré, pas un chiffre de déclaration.
@@ -19809,23 +19856,26 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // l'exclusion retirait 101 ventes finalisées / 2 174,80 €, et faisait
       // afficher 41 € au lieu de 1 512,70 € sur juin 2026. On les compte, et
       // on affiche à part combien elles pèsent pour que ce soit vérifiable.
-      if (ymOf(o.date)!==reportMonth) continue;
+      // ⚠️⚠️ LE MOIS EST CELUI DU VERSEMENT (3 octobre) : une vente finalisée
+      //    compte dans le mois où l'argent lui a été versé (statut « finalisée »
+      //    de la transaction). Sans cette date, elle n'est dans AUCUN mois —
+      //    elle est comptée à part (« sans date de versement »), jamais devinée.
       if (!venteFinalisee(o)) {
-        // ⚠️ Un mois n'est PAS complet le jour où il se termine : une vente se
-        // finalise ~2 semaines après. Mesuré le 3 septembre, août portait 110
-        // ventes finalisées (3 345,20 €) et 59 ENCORE EN COURS (1 174,90 €).
-        // Annoncer le premier chiffre sans dire que le second existe, c'est
-        // présenter comme définitif un CA qui va encore monter.
-        if (classifyOrderStatus(o.status)!=='cancelled') { nAttente+=1; caAttente+=montantCommande(o); }
+        // Les ventes du mois encore en cours : rattachées au mois de la VENTE
+        // (elles n'ont pas de versement) — information, jamais du CA.
+        if (ymOf(o.date)===reportMonth && classifyOrderStatus(o.status)!=='cancelled') { nAttente+=1; caAttente+=montantCommande(o); }
         continue;
       }
+      const vers = versements ? versements[String(o.transaction_id)] : null;
+      if (!vers) continue;
+      if (ymOf(vers)!==reportMonth) continue;
       if (isHidden(o)) { nMasq+=1; caMasq+=montantCommande(o); }
       const sell = o.price?.amount!=null?Number(o.price.amount):0;
       const e = effEntry(o); const fee=feesOf(e);
       const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null;
       ca+=sell; nb+=1; frais+=fee;
       if (buy!=null && !isNaN(buy)) { cout+=buy; nbCout+=1; margeKnown+=(sell-buy); fraisConnu+=fee; }
-      saleLines.push({ date:o.date, num:e?.numero||'', title:o.title, sell, buy:(buy!=null&&!isNaN(buy))?buy:null, fee, plateforme:'Vinted' });
+      saleLines.push({ date:vers, dateVente:o.date, num:e?.numero||'', title:o.title, sell, buy:(buy!=null&&!isNaN(buy))?buy:null, fee, plateforme:'Vinted' });
     }
     // ⚠️ TOUTES PLATEFORMES (3 octobre) : les ventes Leboncoin et eBay
     //    finalisées du mois entrent dans le CA déclaré, par la MÊME règle que le
@@ -19841,8 +19891,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       pp.n += 1; pp.ca += l.eur;
       saleLines.push({ date: new Date(l.ts).toISOString(), num: '', title: l.titre, sell: l.eur, buy: null, fee: 0, plateforme: l.plateforme });
     }
-    const aDater = { n: autres.aDater.length, ca: autres.aDater.reduce((t, l) => t + l.eur, 0) };
-    const sourcesKO = [lbcLu === null ? 'Leboncoin' : null, ebayCmd === null ? 'eBay' : null].filter(Boolean);
+    // « À dater », toutes plateformes : Vinted sans date de versement compris.
+    const tousADater = ventesDeclarables({ vinted: sales.items, lbc: lbcLu ? lbcVentes.ventes : [], ebay: ebayCmd || [], versements: versements || {} }).aDater;
+    const aDater = { n: tousADater.length, ca: tousADater.reduce((t, l) => t + l.eur, 0) };
+    const sourcesKO = [versements === null ? 'Vinted (dates de versement)' : null, lbcLu === null ? 'Leboncoin' : null, ebayCmd === null ? 'eBay' : null].filter(Boolean);
     // Registre des ventes : dans l'ordre du mois, comme le relevé d'un comptable.
     saleLines.sort((a,b)=> new Date(a.date)-new Date(b.date));
     // Registre d'achats du mois (hors annulés).
@@ -19868,7 +19920,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const urssaf = ca * (taux/100);
     return { regime, tvaRate, monthLabel, ca, cout, frais, nb, nbCout, benefNet, marge, tvaMarge, margeHT, taux, urssaf, nMasq, caMasq, nAttente, caAttente, saleLines, buyLines, achatsTotal, parPlateforme, aDater, sourcesKO };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, buysBase, reportMonth, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, lbcLu, lbcVentes, ebayCmd]);
+  }, [sales.items, buysBase, reportMonth, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, lbcLu, lbcVentes, ebayCmd, versements]);
 
   // ⚠️ Il a choisi un mois : on ne le déplace plus sous ses doigts.
   const moisChoisiMain = useRef(false);
@@ -19981,8 +20033,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     for (const o of (sales.items||[])) {
       // ⚠️ MÊME RÈGLE QUE LE RAPPORT MENSUEL : une vente masquée à l'écran
       // reste du chiffre d'affaires. On la compte, et on dit combien elle pèse.
-      if (!venteFinalisee(o) || !o.date) continue;
-      const d=new Date(o.date); if(isNaN(d) || d.getFullYear()!==reportYear) continue;
+      // Même règle que le mensuel : l'année et le mois du VERSEMENT.
+      if (!venteFinalisee(o)) continue;
+      const vers = versements ? versements[String(o.transaction_id)] : null;
+      if (!vers) continue;
+      const d=new Date(vers); if(isNaN(d) || d.getFullYear()!==reportYear) continue;
       if (isHidden(o)) { nMasq+=1; caMasq+=montantCommande(o); }
       const sell = o.price?.amount!=null?Number(o.price.amount):0;
       const e = effEntry(o); const fee=feesOf(e);
@@ -19990,7 +20045,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const mo=months[d.getMonth()];
       ca+=sell; nb+=1; frais+=fee; mo.ca+=sell; mo.nb+=1; mo.frais+=fee;
       if (buy!=null && !isNaN(buy)) { cout+=buy; nbCout+=1; margeKnown+=(sell-buy); fraisConnu+=fee; mo.cout+=buy; mo.nbCout+=1; }
-      saleLines.push({ date:o.date, num:(e&&e.numero)||'', title:o.title||'', account:accName(o._acc), sell, buy:(buy!=null&&!isNaN(buy))?buy:null, fee, marge:(buy!=null&&!isNaN(buy))?(sell-buy-fee):null });
+      saleLines.push({ date:vers, dateVente:o.date, num:(e&&e.numero)||'', title:o.title||'', account:accName(o._acc), sell, buy:(buy!=null&&!isNaN(buy))?buy:null, fee, marge:(buy!=null&&!isNaN(buy))?(sell-buy-fee):null });
     }
     saleLines.sort((a,b)=> new Date(a.date)-new Date(b.date));
     let achatsTotal=0, achatsNb=0;
@@ -20016,7 +20071,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const urssaf = ca*(taux/100);
     return { regime, tvaRate, year:reportYear, months, ca, cout, frais, nb, nbCout, benefNet, marge, tvaMarge, margeHT, taux, urssaf, nMasq, caMasq, achatsTotal, achatsNb, buyLines, saleLines };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, buysBase, reportYear, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts]);
+  }, [sales.items, buysBase, reportYear, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, versements]);
   const [capturedReceipts, setCapturedReceipts] = useState([]); // reçus officiels Vinted captés (compta pro)
   const openAnnual = async () => {
     setShowAnnual(true);
@@ -24696,9 +24751,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </div>}
               {/* ── LE RELEVÉ DU PORTE-MONNAIE ────────────────────────────
                   Une VÉRIFICATION à côté du CA, jamais à sa place : le CA
-                  ci-dessus date au jour de la VENTE, le relevé date au jour du
-                  mouvement. Les deux ne peuvent pas coïncider (Vinted finalise
-                  ~2 semaines après) et c'est normal — l'écart, c'est le décalage.
+                  ci-dessus date au jour de la finalisation, le relevé au jour du
+                  mouvement — ce sont deux sources, elles peuvent différer d'un jour.
                   ⚠️ On n'affiche que des faits : Vinted ne nous dit avec
                   certitude qu'une chose, c'est qu'un mouvement `payout` est un
                   virement vers SA banque. On ne baptise donc pas « recette » ce
@@ -24714,7 +24768,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <div><div className="vrm-label" style={{fontSize:9,color:C.muted}}>VIRÉ VERS TA BANQUE</div><div style={{fontSize:15,fontWeight:700,color:C.text}}>{fmtE(Math.abs(releveTotaux.virements))}</div></div>
                   </div>
                   <div style={{fontSize:11.5,color:C.muted,marginTop:5,lineHeight:1.4}}>
-                    Ces montants sont datés au jour du mouvement ; le CA ci-dessus est daté au jour de la vente. L'écart entre les deux, c'est le délai de finalisation. Un virement vers ta banque déplace ton propre argent — ce n'est pas une recette.
+                    Ces montants sont datés au jour du mouvement ; le CA ci-dessus est daté au jour où la vente est finalisée (l'argent versé). Les deux viennent de deux sources différentes : un jour d'écart est normal. Un virement vers ta banque déplace ton propre argent — ce n'est pas une recette.
                   </div>
                 </div>
               ) : (
@@ -24746,7 +24800,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 const bits = [];
                 if (pp.length > 1) bits.push('dont ' + pp.map(([k,v])=>`${k} ${fmtE(v.ca)}`).join(' · '));
                 if ((report.sourcesKO||[]).length) bits.push(`${report.sourcesKO.join(' et ')} : pas pu lire — rouvre le rapport dans un moment`);
-                if (report.aDater && report.aDater.n) bits.push(`${report.aDater.n} vente${report.aDater.n>1?'s':''} sans date (${fmtE(report.aDater.ca)}) : dans aucun mois tant que leur date n'est pas captée`);
+                if (report.aDater && report.aDater.n) bits.push(`${report.aDater.n} vente${report.aDater.n>1?'s':''} finalisée${report.aDater.n>1?'s':''} sans date (${fmtE(report.aDater.ca)}, tous mois) : dans aucun mois tant que leur date n'est pas captée`);
+                bits.push('mois du versement de l\'argent (commande finalisée)');
                 bits.push('Vestiaire Collective : pas encore relié');
                 return <div data-registre-couverture style={{fontSize:11,color:C.muted,margin:'-4px 0 8px',lineHeight:1.5}}>{bits.join(' · ')}</div>;
               })()}
