@@ -35,7 +35,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.134.0';
+const EXT_ATTENDUE = '5.135.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -150,7 +150,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 //   releve  `capterReleves`       5.52.0  (5 sept.)   le relevé daté du porte-monnaie
 // `audit-coherence.cjs` vérifie que ces trois fonctions existent toujours dans
 // l'extension : une capacité annoncée mais retirée serait le même mensonge.
-const EXT_CAPACITES = { codes: '5.45.0', offres: '5.38.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', repond: '5.77.0', commande: '5.129.0', offresapp: '5.130.0', publication: '5.130.0', lbcdate: '5.131.0', versement: '5.133.0' };
+const EXT_CAPACITES = { codes: '5.45.0', offres: '5.38.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', repond: '5.77.0', commande: '5.129.0', offresapp: '5.130.0', publication: '5.130.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -3050,7 +3050,13 @@ const fetchVintedConversationDetail = async (account, conversationId) => {
   // 1) Données moissonnées (si tu as déjà ouvert ce fil sur vinted.fr).
   const h = await fetchHarvestConversation(account.vinted_user_id, conversationId);
   if (h && h.conversation) return { ok: true, conversation: h.conversation, source: 'harvest' };
-  // 2) Repli : proxy.
+  // 2) L'extension, depuis TON navigateur (5.135) : une lecture, au nom du
+  //    compte connecté dans Chrome. Refusée (autre compte, absente) ⇒ repli.
+  if (extSait('messagerie') === 'ok') {
+    const r = await vmrExec({ uid: account.vinted_user_id, method: 'GET', endpoint: `/api/v2/conversations/${conversationId}` });
+    if (r && r.ok && r.data && r.data.conversation) return { ok: true, conversation: r.data.conversation, source: 'extension' };
+  }
+  // 3) Repli : proxy.
   const res = await vintedApiCall(account, `/api/v2/conversations/${conversationId}`);
   if (!res.ok) return { ok: false, error: res.status || res.error, conversation: null };
   return { ok: true, conversation: res.data?.conversation || null };
@@ -3125,6 +3131,31 @@ const normalizeConversationMessages = (conversation) => {
     // codes de retrait compris.
     return { kind: 'event', body: extractEventText(e, m.entity_type), ts, links };
   });
+};
+// L'offre d'un ACHETEUR encore en attente dans ce fil — la même règle que le
+// moteur d'acceptation de l'extension (`offresEnAttente`) : c'est l'acheteur
+// qui propose, l'offre est la courante, Vinted la dit en attente (10), aucun
+// libellé tranché, un montant lisible, et son identité (transaction + offre).
+// Une forme inattendue ⇒ `null` : jamais un bouton « Accepter » sur une offre
+// qu'on ne sait pas lire.
+const offreEnAttenteDe = (conversation) => {
+  try {
+    const c = conversation || {};
+    const opp = c.opposite_user && c.opposite_user.id != null ? c.opposite_user.id : null;
+    let derniere = null;
+    for (const m of (Array.isArray(c.messages) ? c.messages : [])) {
+      if (!m || m.entity_type !== 'offer_request_message') continue;
+      const e = m.entity || {};
+      if (opp != null && e.user_id !== opp) continue;
+      if (e.current === false || e.status !== 10) continue;
+      if (/accept|refus|reject|expir|annul|cancel|retir/i.test(String(e.status_title || ''))) continue;
+      const px = e.price && (e.price.amount != null ? e.price.amount : e.price);
+      const prix = Number(String(px == null ? '' : px).replace(',', '.'));
+      if (!isFinite(prix) || prix <= 0 || e.transaction_id == null || e.offer_request_id == null) continue;
+      derniere = { prix, tx: String(e.transaction_id), oid: String(e.offer_request_id) };
+    }
+    return derniere;
+  } catch (_) { return null; }
 };
 
 // ── Pont vers l'extension VRM (v3.4+) ───────────────────────────────────────
@@ -17003,6 +17034,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [replyText, setReplyText] = useState('');
   const [replyBusy, setReplyBusy] = useState(false);
   const [replyErr, setReplyErr] = useState(null);
+  // Messagerie intégrée (3 octobre) : la liste, et les gestes d'offre du fil.
+  const [convMax, setConvMax] = useState(40);
+  const [prixOffre, setPrixOffre] = useState('');
+  const [offreBusy, setOffreBusy] = useState(false);
+  const [offreMsg, setOffreMsg] = useState(null);
   const bordRef = React.useRef(null); const bordCtx = React.useRef(null);
   // Formats de bordereaux mémorisés : { [empreinte dimensions] : {xr,yr} }.
   const [bordFormats, setBordFormats] = useState(() => load('vinted_bordereau_formats', {}));
@@ -19070,6 +19106,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
   const openConversation = async (conv) => {
     setReplyText(''); setReplyErr(null); setReplyBusy(false);
+    setPrixOffre(''); setOffreMsg(null); setOffreBusy(false);
     setOpenConv({ loading:true, error:null, conversation:null, messages:[], acc:conv._acc, convId:conv.id, header:{ login:conv.opposite_user?.login, title:conv.description, photo:conv.opposite_user?.photo?.url||conv.item_photos?.[0]?.url||null } });
     const res = await fetchVintedConversationDetail(conv._acc, conv.id);
     if (!res.ok) { setOpenConv(o => ({ ...o, loading:false, error:res.error })); return; }
@@ -19090,6 +19127,39 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       setOpenConv(o => o ? ({ ...o, messages:[...o.messages, { kind:'message', mine:true, body:text }] }) : o);
     } else {
       setReplyErr((r && (r.error || (r.status ? 'HTTP '+r.status : ''))) || "Échec de l'envoi");
+    }
+  };
+
+  // ── LES GESTES D'OFFRE, DEPUIS L'APP (5.135) ────────────────────────────────
+  // Julien, 3 octobre : « la messagerie intégrée avec la possibilité de
+  // répondre et de faire l'offre ». Toujours sur SON clic, par l'extension, au
+  // nom du compte connecté dans Chrome (garde stricte, 20 actions/heure, une
+  // requête à la fois). Accepter vend la paire à ce prix : on demande d'abord.
+  const actionOffre = async (quoi, off) => {
+    const oc = openConv;
+    if (!oc || !oc.acc || offreBusy) return;
+    let method = 'PUT', endpoint = '', body = null, p = 0;
+    if (quoi === 'accept' || quoi === 'reject') {
+      if (!off) return;
+      if (quoi === 'accept' && !(await askConfirm({ title: `Accepter ${fmtE(off.prix)} ?`, desc: 'La paire sera vendue à ce prix sur Vinted.', ok: 'Accepter', cancel: 'Annuler' }))) return;
+      endpoint = `/api/v2/transactions/${off.tx}/offer_requests/${off.oid}/${quoi}`;
+    } else {
+      const tx = oc.conversation && oc.conversation.transaction && oc.conversation.transaction.id;
+      p = Number(String(prixOffre).replace(',', '.'));
+      if (!tx) { setOffreMsg({ err: "Pas d'article rattaché à cette conversation : rien à proposer." }); return; }
+      if (!(p > 0)) { setOffreMsg({ err: 'Indique un prix.' }); return; }
+      method = 'POST'; endpoint = `/api/v2/transactions/${tx}/offers`; body = { offer: { price: String(p), currency: 'EUR' } };
+    }
+    setOffreBusy(true); setOffreMsg(null);
+    const r = await vmrExec({ uid: oc.acc.vinted_user_id, method, endpoint, body });
+    setOffreBusy(false);
+    if (r && r.ok) {
+      setOffreMsg({ ok: quoi === 'accept' ? 'Offre acceptée sur Vinted.' : quoi === 'reject' ? 'Offre refusée.' : `Offre de ${fmtE(p)} envoyée.` });
+      setPrixOffre('');
+      const res = await fetchVintedConversationDetail(oc.acc, oc.convId);
+      if (res.ok) setOpenConv(o => o && o.convId === oc.convId ? ({ ...o, conversation: res.conversation, messages: normalizeConversationMessages(res.conversation) }) : o);
+    } else {
+      setOffreMsg({ err: (r && (r.error || (r.status ? 'HTTP ' + r.status : ''))) || "Vinted n'a pas répondu." });
     }
   };
 
@@ -23449,7 +23519,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
       {/* ── Messages (séparés par compte via le sélecteur) ── */}
       {curSub==='messages' && (<>
-        <ScreenHead icon="chat" title="Messages" desc="On te dit juste s'il y a du nouveau. Les réponses rapides se copient en un clic ; tu réponds sur Vinted."/>
+        <ScreenHead icon="chat" title="Messages" desc="Tes conversations, tous comptes. Réponds et tranche les offres ici : l'extension envoie depuis ton Chrome."/>
         <NoAcc/>
         {/* ── RÉSUMÉ, PAS LA LISTE ──────────────────────────────────────────
             Julien : « enlève les messages, mets juste qu'il y en a de nouveaux ».
@@ -23458,56 +23528,56 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             (répondre depuis l'app n'est pas possible, cf. section 5). */}
         {convs.loading && <Skeleton variant="row" count={2}/>}
         {convs.error && <LoadError onRetry={()=>loadConvs(true)}/>}
+        {/* ── LA MESSAGERIE INTÉGRÉE (3 octobre) ─────────────────────────────
+            Julien : « il doit y avoir la messagerie intégrée des derniers
+            comptes, avec la possibilité de répondre et de faire l'offre ».
+            ⚠️ Ça REMPLACE sa demande de septembre (« enlève les messages, mets
+            juste qu'il y en a de nouveaux ») — c'est lui qui la redemande.
+            Les non lus d'abord, puis les plus récents ; le compte est nommé sur
+            chaque ligne (la liste mélange ses comptes). Un clic ouvre le fil :
+            répondre et trancher une offre se font là, par l'extension. */}
         {convs.items && !convs.error && (()=>{
-          const nonLus = (convs.items||[]).filter(c=>!acctOffOf(c) && c.unread).length;
-          const total  = (convs.items||[]).filter(c=>!acctOffOf(c)).length;
-          const inboxUrl = 'https://www.vinted.fr/inbox';
+          const liste = (convs.items||[]).filter(c=>!acctOffOf(c));
+          const nonLus = liste.filter(c=>c.unread).length;
+          const tri = [...liste].sort((a,b)=> (b.unread?1:0)-(a.unread?1:0) || (new Date(b.updated_at||0)-new Date(a.updated_at||0)));
+          const plusieurs = new Set(liste.map(c=>String((c._acc&&c._acc.vinted_user_id)||''))).size > 1;
+          const quand = (d)=>{ const t=Date.parse(d||''); if(!t) return ''; const h=(Date.now()-t)/3600000; return h<1?"à l'instant":h<24?`${Math.round(h)} h`:h<24*7?`${Math.round(h/24)} j`:new Date(t).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}); };
+          const affiches = tri.slice(0, convMax);
           return (
-            /* ⚠️ SURFACE NEUTRE, LE CHIFFRE PORTE LA COULEUR (§5.90). Le fond
-               teinté pleine largeur faisait de cette carte la tache la plus
-               forte de l'écran ; et l'emoji servait d'icône, alors que la barre
-               du bas dessine le même symbole au trait (§5.55). */
-            <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'16px',boxShadow:C.shadow||'none',display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
-              <span aria-hidden="true" style={{flexShrink:0,width:38,height:38,borderRadius:10,background:C.card2||C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',color:nonLus?C.accent:C.muted}}><Icon name="chat" size={19}/></span>
-              <div style={{flex:'1 1 165px',minWidth:0}}>
-                <div style={{fontSize:15,fontWeight:700,color:C.text,lineHeight:1.2}}>
-                  {nonLus>0 ? <><span style={{color:C.accent,fontSize:19,letterSpacing:-0.3}}>{nonLus}</span> {`nouveau${nonLus>1?'x':''} message${nonLus>1?'s':''}`}</> : 'Aucun nouveau message'}
+            <div data-messagerie style={{marginBottom:12}}>
+              <div style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:8,flexWrap:'wrap'}}>
+                <div style={{fontSize:14,fontWeight:700,color:C.text}}>
+                  {nonLus>0 ? <><span style={{color:C.accent}}>{nonLus}</span> non lu{nonLus>1?'s':''}</> : 'Tout est lu'}
+                  <span style={{fontWeight:500,color:C.muted}}> · {liste.length} conversation{liste.length>1?'s':''}</span>
                 </div>
-                <div style={{fontSize:12,color:C.muted,marginTop:2}}>
-                  {total>0 ? `${total} conversation${total>1?'s':''} en tout` : 'Tes échanges apparaîtront ici'}
-                </div>
-                {nonLus>0 && (()=>{
-                  const par = {};
-                  for (const c of (convs.items||[])) {
-                    if (acctOffOf(c) || !c.unread) continue;
-                    const n = c._acc ? accName(c._acc) : '?';
-                    par[n] = (par[n]||0) + 1;
-                  }
-                  const tri = Object.entries(par).sort((x,y)=>y[1]-x[1]);
-                  if (!tri.length) return null;
-                  const tete = tri.slice(0,3).map(([n,k])=>`${n} (${k})`);
-                  const reste = tri.length - 3;
-                  return (
-                    <div style={{fontSize:11.5,color:C.muted,marginTop:4}}>
-                      sur <b style={{color:C.text,fontWeight:600}}>{tete.join(', ')}</b>
-                      {reste>0 ? ` et ${reste} autre${reste>1?'s':''} compte${reste>1?'s':''}` : ''}
-                      {' '}— connecte-toi dessus pour répondre
-                    </div>
-                  );
-                })()}
+                <button type="button" onClick={()=>loadConvs(true)} style={{marginLeft:'auto',border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'5px 11px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>↻ Actualiser</button>
               </div>
-              <a href={inboxUrl} target="_blank" rel="noreferrer"
-                /* ⚠️ `flex:'1 1 130px'` sans plafond : sur un écran large ce
-                   bouton s'étirait sur 500 px (même défaut que « Imprimer »,
-                   §5.84). Il grandit toujours sur téléphone, il s'arrête à une
-                   taille de bouton sur ordinateur. */
-                style={{flex:'1 1 130px',maxWidth:260,textAlign:'center',textDecoration:'none',border:'none',borderRadius:10,background:nonLus?C.accent:C.border,color:nonLus?'#fff':C.text,fontSize:13,fontWeight:600,padding:'10px 15px'}}>
-                {nonLus>0?'Répondre sur Vinted':'Ouvrir Vinted'}
-              </a>
+              {liste.length===0 && <div style={{fontSize:13,color:C.muted,padding:'14px 0'}}>Aucune conversation captée pour l'instant — elles arrivent quand l'extension passe sur la messagerie Vinted de chaque compte.</div>}
+              <div style={{border:liste.length?`1px solid ${C.border}`:'none',borderRadius:10,background:C.card,overflow:'hidden'}}>
+                {affiches.map((c,i)=>{
+                  const photo = (c.opposite_user&&c.opposite_user.photo&&c.opposite_user.photo.url) || (c.item_photos&&c.item_photos[0]&&c.item_photos[0].url) || null;
+                  return (
+                    <button key={(c._acc?c._acc.vinted_user_id:'')+'_'+c.id} type="button" data-conv={c.id} onClick={()=>openConversation(c)}
+                      style={{display:'flex',gap:10,alignItems:'center',width:'100%',textAlign:'left',padding:'10px 12px',border:'none',borderTop:i?`1px solid ${C.border}`:'none',background:'transparent',color:C.text,cursor:'pointer',fontFamily:'inherit'}}>
+                      {photo ? <img src={photo} alt="" loading="lazy" style={{width:40,height:40,borderRadius:8,objectFit:'cover',flexShrink:0}}/> : <span style={{width:40,height:40,borderRadius:8,background:C.card2||C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',color:C.muted,flexShrink:0}}><Icon name="chat" size={17}/></span>}
+                      <span style={{flex:1,minWidth:0}}>
+                        <span style={{display:'flex',alignItems:'baseline',gap:6}}>
+                          <span style={{fontSize:13.5,fontWeight:c.unread?700:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{(c.opposite_user&&c.opposite_user.login)||'Conversation'}</span>
+                          {plusieurs && c._acc && <span style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>· {accName(c._acc)}</span>}
+                          <span style={{marginLeft:'auto',fontSize:11,color:C.muted,flexShrink:0}}>{quand(c.updated_at)}</span>
+                        </span>
+                        <span style={{display:'block',fontSize:12.5,color:c.unread?C.text:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',marginTop:2}}>{c.description||''}</span>
+                      </span>
+                      {c.unread && <span aria-label="non lu" style={{width:8,height:8,borderRadius:999,background:C.accent,flexShrink:0}}/>}
+                    </button>
+                  );
+                })}
+              </div>
+              {tri.length>convMax && <button type="button" onClick={()=>setConvMax(m=>m+40)} style={{display:'block',margin:'8px auto 0',border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'7px 14px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Voir plus — {convMax} affichées sur {tri.length}</button>}
             </div>
           );
         })()}
-        {/* Réponses rapides : modèles copiables en 1 clic (répondre se fait sur Vinted). */}
+        {/* Réponses rapides : modèles éditables, proposés dans chaque conversation. */}
         <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'10px 12px',marginBottom:12}}>
           <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
             <span style={{fontSize:13,fontWeight:700,color:C.text,flex:1}}>Réponses rapides</span>
@@ -23527,7 +23597,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             ))}
             {showQR && <button type="button" onClick={async ()=>{ const v=await askText({ desc: 'Nouveau message rapide :', value: '' }); if(v&&v.trim()) saveQR([...quickReplies,v.trim()]); }} style={{border:`1px dashed ${C.accent}`,borderRadius:8,background:'transparent',color:C.accent,fontSize:12,fontWeight:600,padding:'4px 12px',cursor:'pointer',fontFamily:'inherit'}}>＋ Ajouter</button>}
           </div>
-          <div style={{fontSize:11,color:C.muted,marginTop:6}}>Clique un message pour le <b>copier</b>, puis colle-le dans la conversation Vinted.</div>
+          <div style={{fontSize:11,color:C.muted,marginTop:6}}>Ils apparaissent aussi dans chaque conversation : un clic remplit la réponse.</div>
         </div>
       </>)}
 
@@ -24937,10 +25007,45 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {/* Barre de réponse : envoi via l'extension (ton navigateur/IP). */}
             {!openConv.loading && !openConv.error && openConv.convId && (
               <div style={{flexShrink:0,borderTop:`1px solid ${C.border}`,padding:'10px 12px',background:C.bg}}>
+                {/* ── L'OFFRE (5.135) : trancher celle de l'acheteur, ou en faire
+                    une. Par l'extension, sur le compte connecté dans Chrome. */}
+                {(()=>{
+                  const off = offreEnAttenteDe(openConv.conversation);
+                  const tx = openConv.conversation && openConv.conversation.transaction && openConv.conversation.transaction.id;
+                  if (!off && !tx) return null;
+                  const etat = extSait('messagerie');
+                  if (etat !== 'ok') return (
+                    <div data-offre="indisponible" style={{fontSize:11.5,color:C.muted,marginBottom:8,lineHeight:1.4}}>
+                      {off ? <><b style={{color:C.text}}>Offre de {fmtE(off.prix)}</b> en attente — </> : null}
+                      {etat==='retard' ? `mets l'extension à jour (${EXT_CAPACITES.messagerie}) pour trancher ou faire une offre d'ici.` : "les offres se font depuis le Chrome où l'extension est installée."}
+                      {' '}<a href={`https://www.vinted.fr/inbox/${openConv.convId}`} target="_blank" rel="noreferrer" style={{color:C.accent,fontWeight:600}}>Ouvrir sur Vinted</a>
+                    </div>
+                  );
+                  return (
+                    <div data-offre={off?'attente':'libre'} style={{border:`1px solid ${C.border}`,borderRadius:10,background:C.card,padding:'9px 10px',marginBottom:8}}>
+                      {off && (
+                        <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:tx?8:0}}>
+                          <span style={{fontSize:13,color:C.text,flex:'1 1 140px'}}>Offre de <b>{fmtE(off.prix)}</b> en attente</span>
+                          <button type="button" disabled={offreBusy} onClick={()=>actionOffre('accept', off)} style={{border:'none',borderRadius:8,background:C.accent,color:C.onAccent||'#fff',padding:'7px 12px',fontSize:12.5,fontWeight:700,cursor:offreBusy?'default':'pointer',fontFamily:'inherit',opacity:offreBusy?0.6:1}}>Accepter</button>
+                          <button type="button" disabled={offreBusy} onClick={()=>actionOffre('reject', off)} style={{border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,padding:'7px 12px',fontSize:12.5,fontWeight:600,cursor:offreBusy?'default':'pointer',fontFamily:'inherit',opacity:offreBusy?0.6:1}}>Refuser</button>
+                        </div>
+                      )}
+                      {tx && (
+                        <div style={{display:'flex',alignItems:'center',gap:8}}>
+                          <span style={{fontSize:12.5,color:C.muted,flexShrink:0}}>{off?'Contre-offre':'Faire une offre'}</span>
+                          <input inputMode="decimal" value={prixOffre} onChange={e=>setPrixOffre(e.target.value)} placeholder="Prix €" aria-label="Prix de l'offre"
+                            style={{width:90,border:`1px solid ${C.border}`,borderRadius:8,padding:'7px 9px',fontSize:13,background:C.bg,color:C.text,fontFamily:'inherit'}}/>
+                          <button type="button" disabled={offreBusy||!prixOffre.trim()} onClick={()=>actionOffre('offre')} style={{border:`1px solid ${C.accent}`,borderRadius:8,background:'transparent',color:C.accent,padding:'7px 12px',fontSize:12.5,fontWeight:700,cursor:(offreBusy||!prixOffre.trim())?'default':'pointer',fontFamily:'inherit',opacity:(offreBusy||!prixOffre.trim())?0.5:1}}>Envoyer l'offre</button>
+                        </div>
+                      )}
+                      {offreMsg && <div style={{fontSize:11.5,marginTop:6,color:offreMsg.err?C.danger:C.text}}>{offreMsg.err||('✓ '+offreMsg.ok)}</div>}
+                    </div>
+                  );
+                })()}
                 {replyErr && <div style={{fontSize:11,color:C.danger,marginBottom:6,lineHeight:1.35}}>{replyErr}</div>}
                 {/* Réponses rapides : remplissent la zone (tu ajustes puis envoies) */}
                 <div style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:8,margin:'0 -2px',WebkitOverflowScrolling:'touch'}}>
-                  {QUICK_REPLIES.map((q,i)=>(
+                  {(quickReplies&&quickReplies.length?quickReplies.map(t=>({e:'',t})):QUICK_REPLIES).map((q,i)=>(
                     <button key={i} type="button" onClick={()=>setReplyText(q.t)} title={q.t}
                       style={{flexShrink:0,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:8,padding:'5px 10px',fontSize:12,fontWeight:500,cursor:'pointer',whiteSpace:'nowrap'}}>
                       {q.e} {q.t.length>24?q.t.slice(0,24)+'…':q.t}

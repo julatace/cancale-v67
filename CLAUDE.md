@@ -3833,6 +3833,30 @@ sur **les ~5 000 lignes** `harvest_*`.
 - La cloche lisait 3 lignes par compte **à la queue leu leu** : elles partent
   ensemble (lectures de NOTRE base, pas de Vinted).
 
+### ⚠️⚠️ LA MESSAGERIE INTÉGRÉE REVIENT — IL L'A REDEMANDÉE (3 octobre, 5.135)
+Julien : « il doit y avoir la messagerie intégrée des derniers comptes, avec la
+possibilité de répondre et de faire l'offre ». Ça **remplace** sa demande de
+septembre (« enlève les messages, mets juste qu'il y en a de nouveaux ») :
+c'est lui qui la redemande, ce n'est pas un retour en arrière à corriger.
+- **La liste** (`data-messagerie`) : toutes les conversations captées, tous
+  comptes, **non lues d'abord**, le compte nommé sur chaque ligne (la liste
+  mélange ses comptes — là, la ligne distingue). 40 puis « Voir plus ».
+- **Le fil** s'ouvre au clic : moisson d'abord, sinon **l'extension le lit**
+  (`GET /api/v2/conversations/{id}`, au nom du compte connecté dans Chrome),
+  sinon le repli serveur d'avant.
+- **Les offres** : `offreEnAttenteDe` (même règle que le moteur de l'extension :
+  l'acheteur, la courante, statut 10, un montant, transaction + offre) →
+  « Accepter » (**confirmation d'abord** : ça vend la paire) / « Refuser », et
+  « Faire une offre » / « Contre-offre » sur la transaction du fil.
+- Côté extension, `EXEC_PERMIS` s'élargit à **ces trois gestes et cette seule
+  lecture** — rien d'autre (`audit-exec.cjs`, 12 contrôles : DELETE et variantes
+  refusés, autre compte refusé). Tout passe par `executerPourApp` : origine de
+  l'app, garde STRICTE, **dans la file Vinted** (une requête à la fois). Une
+  LECTURE ne consomme pas le plafond de 20 actions/heure ; un geste, si.
+- `EXT_CAPACITES.messagerie = '5.135.0'` : une extension plus ancienne ne voit
+  **aucun bouton d'offre** (il ne pourrait pas marcher), et la raison est dite.
+- Banc `messagerie.cjs` (rejoue le vrai dialogue du pont, deux tailles).
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
@@ -3855,6 +3879,8 @@ arrivée** — vérifiée commit par commit sur `manifest.json`, pas devinée.
 | `offresapp` | `offresAutoActif` | **5.130.0** (3 oct.) | l'interrupteur des offres auto se règle dans l'app |
 | `publication` | `publierDepuisApp` | **5.130.0** (3 oct.) | « Publier sur Leboncoin » / « Préparer sur eBay » depuis l'app |
 | `lbcdate` | `dateVenteLbc` | **5.131.0** (3 oct.) | « ouvre Mes transactions, l'extension relève la date de vente » |
+| `versement` | `capterDatesVersement` | **5.133.0** (3 oct.) | « l'extension va chercher la date de versement de tes ventes finalisées » |
+| `messagerie` | `executerPourApp` | **5.135.0** (3 oct.) | lire un fil, accepter/refuser/faire une offre depuis l'app |
 
 ⚠️ **DEUX SEUILS POUR UNE MÊME NOTION, EXPRÈS.** Les photos s'attachent côté
 Leboncoin depuis la 5.58 et côté eBay depuis la 5.59 : un seul seuil aurait
