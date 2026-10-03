@@ -35,7 +35,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.131.0';
+const EXT_ATTENDUE = '5.132.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -3257,6 +3257,10 @@ const mapWardrobeItem = (it) => ({
   favourites: Number.isFinite(it.favourite_count) ? it.favourite_count
             : (Number.isFinite(it.favourites_count) ? it.favourites_count : null),
   // Timestamp de mise en ligne (secondes epoch) si Vinted le fournit -> "âge".
+  // Boost en cours (3 octobre) — Vinted l'envoie dans le dressing. TROIS états :
+  // `true` boostée · `false` non · `null` pas su (capture ancienne, champ
+  // absent) : on n'affiche alors RIEN, jamais un « non boostée » inventé.
+  promoted: typeof it.promoted === 'boolean' ? it.promoted : null,
   createdTs: Number.isFinite(it.created_at_ts) ? it.created_at_ts
            : (it.photo?.high_resolution?.timestamp && Number.isFinite(it.photo.high_resolution.timestamp) ? it.photo.high_resolution.timestamp : null),
   // Qualité d'annonce (défensif : selon ce que la penderie renvoie). Nb de photos
@@ -15495,6 +15499,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // ne trompe pas ; une fausse pastille verte, si). Le « sur quel COMPTE LBC »
   // reste gaté sur la capture de ses propres annonces LBC (lbc_accounts vide).
   const [lbcPosted, setLbcPosted] = useState(() => new Set());
+  // Les planchers posés DANS L'ANCIEN PANNEAU de l'extension (`panel_min_prices`)
+  // — l'extension les applique toujours (`planchers()`), l'app ne les montrait
+  // pas : « Min. accepté » vide sur une paire que l'extension traite avec un
+  // plancher (§11). Lus en repli, AFFICHÉS ; la saisie de l'app prime.
+  const [panelMins, setPanelMins] = useState({});
+  useEffect(() => { (async () => {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_min_prices&select=data`, { headers: sbAuth() });
+      if (!r.ok) return;
+      const rows = await r.json();
+      const d = (rows && rows[0] && rows[0].data) || {};
+      const out = {}; for (const k in d) { const n = Number(d[k]); if (isFinite(n) && n > 0) out[String(k)] = n; }
+      setPanelMins(out);
+    } catch (_) {}
+  })(); }, []);
   useEffect(() => { (async () => {
     try {
       const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_lbc_posted&select=data`, { headers: sbAuth() });
@@ -15727,7 +15746,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const sold = (sales.items||[]).find(o=>{ const ee=effEntry(o); return ee && num && String(ee.numero)===String(num); });
     if (sold) { const st=classifyOrderStatus(sold.status); const sp=sold.price?.amount!=null?Number(sold.price.amount):null; steps.push({ icon: st==='cancelled'?'✖️':'💸', label: st==='cancelled'?'Vente annulée':(st==='completed'?'Vendue':'Vente en cours'), detail:[sp!=null?`${sp.toFixed(0)} €`:null, sold.date?`le ${new Date(sold.date).toLocaleDateString('fr-FR')}`:null].filter(Boolean).join(' '), done:st==='completed' }); }
     // 6) Bordereau / expédition
-    const bord = bordForItem(it?it.title:(e?e.title:''), num);
+    const bord = bordForItem(it ? it.id : null, num);
     if (bord) steps.push({ icon:'📮', label:'Bordereau reçu — à expédier', detail: bord.dateLimite?`avant le ${bord.dateLimite}`:'', done:true });
     return steps;
   };
@@ -15751,14 +15770,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     });
   };
   // Bordereau reçu pour une annonce = la paire est VENDUE, même si la synchro
-  // Vinted (extension) ne l'a pas encore reflété. Déduction par N° d'abord,
-  // sinon par titre — JAMAIS sur un titre ambigu (annonces en double).
-  const bordForItem = (title, numero) => {
+  // Vinted (extension) ne l'a pas encore reflété. PAR IDENTITÉ SEULEMENT (§5) :
+  // le N° d'abord, sinon la transaction du bordereau → son annonce, telle que
+  // Vinted la dit (`txnItem`). ⚠️ Le repli PAR TITRE est retiré (3 octobre) :
+  // mesuré, 7 couples annonce/bordereau au titre identique, 0 même article —
+  // et 177 des 178 bordereaux portent leur transaction. Sans identité : rien.
+  const bordForItem = (itemId, numero) => {
     const list = emailBords || [];
     if (numero) { const hit = list.find(bb => bb.numero && String(bb.numero) === String(numero)); if (hit) return hit; }
-    const n = normTitle(title || '');
-    if (!n || titleAmbiguous(title)) return null;
-    return list.find(bb => normTitle(bb.modele || bb.article || '') === n) || null;
+    if (!itemId) return null;
+    return list.find(bb => bb.transaction && String(txnItem[String(bb.transaction)] || '') === String(itemId)) || null;
   };
   // Photo de la paire d'un bordereau : par N° (annonces numérotées, fiable),
   // sinon par titre non ambigu, sinon dans les annonces/ventes chargées.
@@ -17430,7 +17451,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (emailBords && emailBords.length) {
       for (const it of listings.items) {
         if (out.has(String(it.id))) continue;
-        const bord = bordForItem(it.title, numeros[it.id]?.numero);
+        const bord = bordForItem(it.id, numeros[it.id]?.numero);
         if (!bord) continue;
         const bordTs = new Date(bord.receivedAt || 0).getTime();
         if (republishedAfter(it, isNaN(bordTs) ? 0 : bordTs)) continue;
@@ -17938,8 +17959,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // en annonce (`photoCount`/nPhotos) ET une description. C'est la mesure que
     // Julien demande : savoir si une paire est PRÊTE à partir sur Leboncoin.
     // Un total inconnu ne se juge pas (mieux vaut un blanc qu'un faux, §5).
-    let pretLbc=0, aRecapturer=0;
+    let pretLbc=0, aRecapturer=0, boostees=0, aussiLbc=0;
     for (const it of arr) {
+      if (it.promoted === true) boostees++;
+      if (lbcPosted.has(String(it.id))) aussiLbc++;
       const p = it.price!=null ? Number(it.price) : 0;
       if (it.price!=null) val += p;
       if (it.favourites!=null) { favs+=it.favourites; hasFav=true; }
@@ -17948,7 +17971,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // ⚠️ UN SEUL PROPRIÉTAIRE (§11) : le compte de prix planchers se calcule
       //    ICI, sur la MÊME base que la grille — pas une seconde fois dans le
       //    bandeau qui l'annonce. Sinon les deux finissent par se contredire.
-      const mp = numeros[it.id] && numeros[it.id].minPrice;
+      // (le plancher posé dans l'ancien panneau compte aussi : l'extension
+      //  l'applique — `panelMins`, même repli que la carte)
+      const mp0 = numeros[it.id] && numeros[it.id].minPrice;
+      const mp = (mp0 != null && String(mp0).trim() !== '') ? mp0 : panelMins[String(it.id)];
       if (mp != null && String(mp).trim() !== '') planchers++;
       // Combien partent aussi sur Leboncoin — compté ICI, sur la même base que
       // la grille, jamais recalculé par le bandeau qui l'annonce (§11).
@@ -17961,9 +17987,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if (total > 0) { if (capt >= total && descOk) pretLbc++; else aRecapturer++; }
       }
     }
-    return { n:arr.length, val, favs, views, hasFav, hasView, sansNum, sleeping, sleepingVal, datesKnown, planchers, surLbc, surEbay, pretLbc, aRecapturer };
+    return { n:arr.length, val, favs, views, hasFav, hasView, sansNum, sleeping, sleepingVal, datesKnown, planchers, surLbc, surEbay, pretLbc, aRecapturer, boostees, aussiLbc };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [annBase, numeros, listingDates]);
+  }, [annBase, numeros, listingDates, lbcPosted, panelMins]);
   // ── RENUMÉROTER À LA SUITE ────────────────────────────────────────────────
   // Le numéro sert à retrouver un carton sur l'étagère : avec 116 paires en ligne
   // il ne devrait pas monter à 172. Au fil des ventes, la séquence se troue et
@@ -22764,7 +22790,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           )}
           {/* Bandeau de stats façon outil pro */}
           <div className="vrm-rangee" style={{display:'flex',gap:8,marginBottom:10,alignItems:'center',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',paddingBottom:2}}>
-            <span style={{flexShrink:0,fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:'4px 11px'}}>{annStats.n} en ligne</span>
+            <span style={{flexShrink:0,fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:'4px 11px'}}>{annStats.n} en ligne sur Vinted{annStats.aussiLbc>0?` · ${annStats.aussiLbc} aussi sur Leboncoin`:''}{annStats.boostees>0?` · ${annStats.boostees} boostée${annStats.boostees>1?'s':''}`:''}</span>
             <span style={{flexShrink:0,fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:'4px 11px'}}>{annStats.val.toFixed(0)} € de valeur</span>
             {annStats.hasFav && <span title="Favoris cumulés sur tes annonces en ligne" style={{flexShrink:0,display:'inline-flex',alignItems:'center',gap:5,fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:'4px 11px'}}><Icon name="heart" size={13}/> {annStats.favs}</span>}
             {annStats.hasView && <span title="Vues cumulées sur tes annonces en ligne" style={{flexShrink:0,display:'inline-flex',alignItems:'center',gap:5,fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:'4px 11px'}}><Icon name="eye" size={13}/> {annStats.views}</span>}
@@ -23002,7 +23028,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <option value="price_asc">Prix ↑</option>
               {annStats.hasFav && <option value="favs">Plus aimées ❤️</option>}
               {annStats.hasView && <option value="views">Plus vues 👁</option>}
-              {annStats.hasView && <option value="boost">À booster 💡</option>}
+              {annStats.hasView && <option value="boost">Vues sans favoris</option>}
               {annStats.sleeping>0 && <option value="sleeping">Qui dorment 😴</option>}
               <option value="nonum">Sans numéro</option>
             </select>
@@ -23140,202 +23166,148 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
           </>);
         })()}
-        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(clamp(160px, 25%, 240px), 1fr))',gap:14}}>
+        {/* ══ LA CARTE D'ANNONCE (3 octobre) ══════════════════════════════════
+            Julien : « c'est totalement n'importe quoi ; on ne sait pas sur quelle
+            application, c'est quoi le prix, le boost ». Mesuré : 70 cartes sur
+            71 n'affichaient que la MARQUE (jamais le titre), quatre montants
+            dont deux sans libellé, six teintes, le sommeil dit trois fois, et
+            « Leboncoin » pour deux notions côte à côte (la file ET la présence).
+            ⇒ Une carte qui se LIT : le PRIX, le TITRE, la présence prouvée
+            ailleurs, puis une ligne de chiffres TOUS libellés ; la saisie (N°,
+            achat) en bas ; le reste dans « ⋯ ». Une seule couleur d'accent,
+            rare (§7) : l'ambre ne sert qu'à « dort » et à une marge négative. */}
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(min(100%, 330px), 1fr))',gap:10}}>
           {annShown.map(it=>{
-            const item = { id:it.id, title:it.title, photo:it.photo, price:it.price, _acc:it._acc };
+            // ⚠️ `item` porte TOUT ce que la carte lit (photos captées, date) :
+            //    reconstruit avec 5 champs, la pastille « prête » valait
+            //    « à capter » sur toutes les cartes, par construction.
+            const item = it;
             const e = numeros[it.id] || {}; const num = e.numero || ''; const buy = e.buyPrice ?? '';
             const atGarage = inGarage(num);
             const age = listedAgeDays(it); const sleeps = age!=null && age>=SLEEP_DAYS;
-            // Bordereau reçu pour cette paire → elle est vendue, même si la
-            // synchro Vinted ne l'a pas encore retirée des annonces. MAIS si
-            // l'annonce a été (re)numérotée APRÈS ce bordereau, c'est une paire
-            // REPUBLIÉE (le N° a resservi) : elle n'est PAS vendue → pas de badge.
-            const soldBord = (()=>{ const b = bordForItem(it.title, num); if(!b) return null; const en=numeros[it.id]; const et=en?new Date(en.repriseAt||en.numberedAt||0).getTime():0; const bt=new Date(b.receivedAt||0).getTime(); return (et&&bt&&et>bt)?null:b; })();
+            // Bordereau reçu pour cette paire → elle est vendue (par IDENTITÉ,
+            // §5). Renumérotée APRÈS ce bordereau ⇒ republiée, pas vendue.
+            const soldBord = (()=>{ const b = bordForItem(it.id, num); if(!b) return null; const en=numeros[it.id]; const et=en?new Date(en.repriseAt||en.numberedAt||0).getTime():0; const bt=new Date(b.receivedAt||0).getTime(); return (et&&bt&&et>bt)?null:b; })();
+            const effBuy = buy!=='' ? buy : (num && buyByNum[num]!=null ? buyByNum[num] : '');
+            const achat = effBuy==='' ? null : parseFloat(String(effBuy).replace(',','.'));
+            const boost = feesOf(e);
+            const marge = (it.price!=null && achat!=null && !isNaN(achat)) ? Math.round(Number(it.price) - achat - boost) : null;
+            const ailleurs = lbcPosted.has(String(it.id));
+            const minAff = (e.minPrice != null && String(e.minPrice).trim() !== '') ? e.minPrice : (panelMins[String(it.id)] != null ? panelMins[String(it.id)] : '');
+            const sugg = (it.price!=null && (sleeps || (it.views>=30 && it.favourites===0))) ? Math.max(1, Math.round(Number(it.price)*0.85)) : null;
+            const lab = { fontSize:11, color:C.muted };
+            const val = { fontSize:12, fontWeight:600, color:C.text };
             return (
-              // Carte d'annonce : coins plus généreux + ombre douce. La bordure
-              // colorée d'1,5 px pour signaler « numérotée » était lourde sur une
-              // grille entière — on garde une bordure fine et c'est la PASTILLE
-              // du numéro qui porte la couleur.
-              <div key={it._acc.vinted_user_id+'_'+it.id} style={{borderRadius:10,overflow:'hidden',background:C.card,border:`1px solid ${soldBord?C.warn:C.border}`,boxShadow:C.shadow||'none',...(soldBord?{opacity:0.85}:{}),display:'flex',flexDirection:'column'}}>
-                <a href={it.url||undefined} target="_blank" rel="noreferrer" style={{textDecoration:'none',display:'block',position:'relative'}}>
-                  <div style={{width:'100%',aspectRatio:'3/4',maxHeight:250,background:C.border,display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
-                    {it.photo?<img src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:32}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
-                  </div>
-                  {soldBord && <div title="Un bordereau d'envoi a été reçu pour cette paire : elle est vendue. Elle disparaîtra des annonces à la prochaine synchro Vinted." style={{position:'absolute',bottom:8,left:8,right:8,background:C.warn,color:'#fff',fontSize:11,fontWeight:700,padding:'4px 8px',borderRadius:8,textAlign:'center',display:'flex',alignItems:'center',justifyContent:'center',gap:5}}><Icon name="box" size={12}/> VENDUE — bordereau reçu</div>}
-                  {num && <div style={{position:'absolute',top:8,left:8,background:C.accent,color:'#fff',fontSize:13,fontWeight:700,padding:'4px 10px',borderRadius:8,boxShadow:'0 2px 8px rgba(0,0,0,.28)',letterSpacing:-0.2}}>N°{num}</div>}
-                  {sleeps && <div title={`En ligne depuis ${age} jours`} style={{position:'absolute',top:8,right:8,background:C.danger,color:'#fff',fontSize:11,fontWeight:700,padding:'3px 8px',borderRadius:8,display:'flex',alignItems:'center',gap:4}}><Icon name="sleep" size={12}/>{age}j</div>}
-                </a>
-                <div style={{padding:'8px 10px 6px'}}>
-                  <div style={{display:'flex',alignItems:'baseline',gap:6,flexWrap:'wrap'}}>
-                    <div style={{fontSize:17,fontWeight:700,color:C.text}}>{prix(it.price,it.currency)}</div>
-                    {(()=>{
-                      // Marge potentielle = prix en ligne − prix d'achat − boost.
-                      // Le prix d'achat vient du champ ci-dessous, sinon du mémo par N°.
-                      const effBuy = buy!=='' ? buy : (num && buyByNum[num]!=null ? buyByNum[num] : '');
-                      const b = parseFloat(String(effBuy).replace(',','.'));
-                      if(it.price==null || effBuy==='' || isNaN(b)) return null;
-                      const m = Math.round(Number(it.price) - b - feesOf(e));
-                      const pos = m>=0;
-                      return <span data-marge="1" title="Marge potentielle si vendue à ce prix (prix en ligne − prix d'achat − boost)" style={{fontSize:12,fontWeight:700,color:pos?INV_STATUS.online.color:C.danger,background:(pos?INV_STATUS.online.color:C.danger)+'18',borderRadius:8,padding:'1px 6px'}}>{pos?`+${m}`:m} €</span>;
-                    })()}
-                    <button type="button" onClick={()=>setPassportFor({it,e,num})} title="Passeport de la paire : son achat, son numéro, sa vente — toute sa vie" aria-label="Passeport de la paire" style={{marginLeft:'auto',border:'none',background:'transparent',padding:0,cursor:'pointer',color:C.muted,display:'inline-flex',alignItems:'center',minHeight:0}}><Icon name="doc" size={15}/></button>
-                  </div>
-                  <div style={{fontSize:11,color:C.text,marginTop:2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{it.brand||it.title}</div>
-                  <div style={{fontSize:11,color:C.muted,marginTop:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{[it.size,it.condition].filter(Boolean).join(' · ')}</div>
-                  {(it.views!=null||it.favourites!=null) && (
-                    <div style={{marginTop:4,display:'flex',alignItems:'center',gap:8,fontSize:11,color:C.muted,fontWeight:500}}>
-                      {it.views!=null && <span style={{display:'inline-flex',alignItems:'center',gap:3}}><Icon name="eye" size={12}/> {it.views}</span>}
-                      {it.favourites!=null && <span style={{display:'inline-flex',alignItems:'center',gap:3}}><Icon name="heart" size={12}/> {it.favourites}</span>}
-                      {it.views>=30 && it.favourites===0 && <span title="Beaucoup de vues mais aucun favori : le prix est peut-être trop haut." style={{display:'inline-flex',alignItems:'center',gap:3,color:C.warn}}><Icon name="spark" size={12}/> prix ?</span>}
+              <div key={it._acc.vinted_user_id+'_'+it.id} data-carte-annonce={it.id} style={{borderRadius:10,background:C.card,border:`1px solid ${soldBord?C.warn:C.border}`,boxShadow:C.shadow||'none',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+                <div style={{display:'flex',gap:10,padding:10}}>
+                  <a href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted" style={{flexShrink:0,width:88,height:118,borderRadius:8,overflow:'hidden',background:C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',position:'relative'}}>
+                    {it.photo?<img src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/>}
+                    {it.promoted===true && <span data-boostee title="Vinted dit que cette annonce est boostée en ce moment" style={{position:'absolute',left:4,right:4,bottom:4,textAlign:'center',fontSize:10,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:5,padding:'1px 0'}}>Boostée</span>}
+                  </a>
+                  <div style={{flex:1,minWidth:0,display:'flex',flexDirection:'column',gap:2}}>
+                    <div style={{display:'flex',alignItems:'baseline',gap:8}}>
+                      <span data-prix style={{fontSize:19,fontWeight:700,color:C.text,fontVariantNumeric:'tabular-nums'}}>{prix(it.price,it.currency)||'—'}</span>
+                      {num
+                        ? <span title="Numéro de rangement (écrit sur la boîte)" style={{marginLeft:'auto',flexShrink:0,fontSize:12,fontWeight:700,color:C.text,background:C.bg,border:`1px solid ${C.border}`,borderRadius:5,padding:'1px 7px'}}>N°{num}</span>
+                        : <span style={{marginLeft:'auto',flexShrink:0,fontSize:11,color:C.muted}}>sans N°</span>}
                     </div>
-                  )}
-                  <div style={{marginTop:5,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
-                    {!annUnCompte && <AcctTag acc={it._acc} name={accNameOf(it._acc)}/>}
-                    {num && <button type="button" onClick={()=>atGarage?(onLocate&&onLocate(num)):(onStore&&onStore(num))} style={{border:'none',background:'transparent',padding:0,cursor:'pointer',fontSize:11,fontWeight:500,color:atGarage?(C.blue||C.accent):C.muted,display:'inline-flex',alignItems:'center',gap:3,minHeight:0}}><Icon name="home" size={12}/>{atGarage?'Au stock':'Ranger'}</button>}
-                    {/* « Relier à un achat » remonté ici (1er oct.) : sur téléphone, trois
-                        éléments côte à côte tronquaient le champ du prix d'achat. */}
-                    <button type="button" onClick={()=>openPicker(item)} title="Relier à un achat" aria-label="Relier cette annonce à un achat Vinted" style={{marginLeft:'auto',flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:e.buyFromId?INV_STATUS.online.color:C.text,cursor:'pointer',padding:'3px 7px',display:'flex',alignItems:'center',minHeight:0}}><Icon name="link" size={13}/></button>
-                    <button type="button" onClick={async ()=>{ if(await askConfirm('Marquer cette paire VENDUE et la retirer des annonces ?')) markSold(it.id); }} title="Marquer vendue : la retire des annonces tout de suite (sans attendre la synchro Vinted)" style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'3px 9px',cursor:'pointer',fontSize:11,fontWeight:600,fontFamily:'inherit'}}>✓ Vendue</button>
-                    {/* Pas d'alerte « titre en double » : chaque annonce a sa propre identité (id) et son propre N°. */}
+                    <div data-titre style={{fontSize:12.5,fontWeight:500,color:C.text,lineHeight:1.3,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{it.title||it.brand||'—'}</div>
+                    <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{[it.size,it.condition].filter(Boolean).join(' · ')}</div>
+                    {soldBord && <div title="Un bordereau d'envoi a été reçu pour cette paire : elle est vendue. Elle disparaîtra des annonces à la prochaine synchro Vinted." style={{fontSize:11,fontWeight:600,color:C.warn}}>Vendue — bordereau reçu</div>}
+                    {/* La présence AILLEURS, prouvée seulement (Vinted : l'en-tête le dit une fois). */}
+                    {ailleurs && <div data-aussi-sur style={{fontSize:11,color:C.text}}>Aussi sur <b>Leboncoin</b></div>}
+                    {/* Les chiffres, TOUS libellés ; « — » quand on ne sait pas, jamais 0 (§7). */}
+                    <div data-chiffres style={{display:'flex',flexWrap:'wrap',gap:'2px 10px',marginTop:2}}>
+                      <span><span style={lab}>achat </span><span style={val}>{achat!=null&&!isNaN(achat)?fmtE(achat):'—'}</span></span>
+                      {boost>0 && <span><span style={lab}>boost </span><span style={val}>{fmtE(boost)}</span></span>}
+                      {marge!=null && <span title="Si elle part à ce prix : prix − achat − boost"><span style={lab}>marge </span><span style={{...val,color:marge<0?C.warn:C.text}}>{marge>=0?'+':''}{marge} €</span></span>}
+                    </div>
+                    <div style={{display:'flex',flexWrap:'wrap',alignItems:'center',gap:'2px 10px',fontSize:11,color:C.muted,marginTop:'auto'}}>
+                      {it.views!=null && <span style={{display:'inline-flex',alignItems:'center',gap:3}}><Icon name="eye" size={12}/>{it.views}</span>}
+                      {it.favourites!=null && <span style={{display:'inline-flex',alignItems:'center',gap:3}}><Icon name="heart" size={12}/>{it.favourites}</span>}
+                      {age!=null && <span title={`En ligne depuis ${age} jours`} style={{color:sleeps?C.warn:C.muted,fontWeight:sleeps?600:400}}>{age} j{sleeps?' · dort':''}</span>}
+                      {!annUnCompte && <span style={{whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:120}}>{accNameOf(it._acc)}</span>}
+                    </div>
                   </div>
                 </div>
-                <div style={{marginTop:'auto',display:'flex',gap:6,padding:'0 10px 10px'}}>
-                  <div style={{flex:'0 0 64px',minWidth:0,display:'flex',alignItems:'center',gap:3,border:`1px solid ${C.border}`,borderRadius:8,padding:'2px 6px',background:C.bg}}>
+                {/* La saisie : N° et prix d'achat, puis « ⋯ » pour le reste. */}
+                <div style={{display:'flex',gap:6,padding:'0 10px 10px',alignItems:'center'}}>
+                  <div style={{flex:'0 0 78px',minWidth:0,display:'flex',alignItems:'center',gap:3,border:`1px solid ${C.border}`,borderRadius:8,padding:'2px 6px',background:C.bg}}>
                     <span style={{fontSize:11,color:C.muted,fontWeight:500}}>N°</span>
                     <ChampSaisie value={num} onCommit={(v,avant)=>poserNumero(item,v,avant)} inputMode="numeric" placeholder={String(nextNumero)} style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
                   </div>
-                  <div style={{flex:'1 1 0',minWidth:0,display:'flex',alignItems:'center',gap:2,border:`1px solid ${e.buyFromId?INV_STATUS.online.color:C.border}`,borderRadius:8,padding:'2px 6px',background:C.bg}}>
-                    <ChampSaisie value={buy} onCommit={v=>updatePair(item,{buyPrice:v,buyFromId:null,buyFrom:null})} placeholder="achat" inputMode="decimal" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
+                  <div style={{flex:'1 1 0',minWidth:0,display:'flex',alignItems:'center',gap:3,border:`1px solid ${C.border}`,borderRadius:8,padding:'2px 6px',background:C.bg}}>
+                    <span style={{fontSize:11,color:C.muted,fontWeight:500}}>achat</span>
+                    <ChampSaisie value={buy} onCommit={v=>updatePair(item,{buyPrice:v,buyFromId:null,buyFrom:null})} placeholder="—" inputMode="decimal" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
                     <span style={{fontSize:11,color:C.muted}}>€</span>
                   </div>
+                  <button type="button" onClick={async ()=>{ if(await askConfirm('Marquer cette paire VENDUE et la retirer des annonces ?')) markSold(it.id); }} title="Marquer vendue : la retire des annonces tout de suite (sans attendre la synchro Vinted)" style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'4px 9px',cursor:'pointer',fontSize:11.5,fontWeight:600,fontFamily:'inherit'}}>Vendue</button>
                 </div>
-                {/* L'achat relié, avec SA photo et SON reçu — demande de Julien :
-                    « quand l'annonce est en ligne, pouvoir relier un achat avec la
-                    photo de l'achat ainsi que sa facture d'achat ». */}
-                <div style={{padding:'0 10px'}}><AchatRelie entry={e} numero={num}/></div>
-                {/* ── AUSSI SUR ─────────────────────────────────────────────
-                    Le choix de Julien, annonce par annonce. Une seule ligne,
-                    des puces qui se lisent d'un coup d'œil : c'est ce qu'il
-                    regarde en passant sur sa grille, pas un formulaire.
-                    ⚠️ Sans numéro, l'annonce ne peut pas partir ailleurs (la
-                    référence « VRM-{n} » est ce qui permet de la reconnaître
-                    ensuite sur l'autre site) : on le DIT, au lieu de laisser
-                    cocher pour rien. */}
-                {/* ⚠️ §7 — « Aussi sur » écrit sur 44 cartes est UNE phrase.
-                    Elle vit au-dessus de la grille ; ici il ne reste que la
-                    PUCE, dont l'état change d'une carte à l'autre — c'est elle
-                    qui distingue, pas le libellé. */}
-                <div style={{padding:'6px 10px 0',display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
-                  {MP_PLACES.map(pl => {
-                    const on = mpChoisi(e, pl.cle);
-                    return (
-                      <button key={pl.cle} type="button"
-                        onClick={()=>updatePair(item,{ mp: { ...(e.mp||{}), [pl.cle]: !on } })}
-                        title={!num
-                          ? `Mets un N° à cette paire d'abord : c'est la référence qui permet de la retrouver ensuite sur ${pl.nom}.`
-                          : on ? `Elle est dans la file ${pl.nom}. Clique pour l'en retirer.`
-                               : `Elle n'ira pas sur ${pl.nom}. Clique pour l'y mettre.`}
-                        style={{border:`1px solid ${on?C.accent:C.border}`,background:on?`${C.accent}14`:'transparent',
-                          color:on?C.accent:C.muted,borderRadius:8,padding:'2px 9px',fontSize:11,fontWeight:600,
-                          cursor:'pointer',fontFamily:'inherit',minHeight:0}}>
-                        {on ? '✓ ' : ''}{pl.nom}
-                      </button>
-                    );
-                  })}
-                  {!num && <span style={{fontSize:10.5,color:C.warn}}>il lui faut un N°</span>}
-                  {/* ⚠️ « Toute l'annonce captée ? » — demande de Julien : savoir
-                      quand une paire est PRÊTE à partir sur Leboncoin. On compare
-                      les photos captées de la page au compte RÉEL de Vinted
-                      (`photoCount`/nPhotos). Le chiffre, jamais la promesse : un
-                      total inconnu ne se juge pas (§5). */}
-                  {num && (() => {
-                    const total = Number(item.photoCount)||0, capt = Number(item.captPhotos)||0, descOk = (Number(item.descLen)||0) > 0;
-                    let txt=null, warn=false, tip='';
-                    if (capt===0) { txt='à capter — ouvre-la sur Vinted'; warn=true; tip="Ouvre-la une fois sur Vinted : l'extension lira ses photos et sa description."; }
-                    else if (total>0 && capt<total) { txt=`📷 ${capt}/${total} photos — rouvre-la sur Vinted`; warn=true; tip="Le carrousel Vinted n'a pas encore livré toutes ses photos : rouvre-la pour les capter toutes."; }
-                    else if (!descOk) { txt='description à capter — rouvre-la sur Vinted'; warn=true; tip='Rouvre-la sur Vinted pour capter sa description.'; }
-                    else if (total>0) { txt='✓ prête pour Leboncoin'; warn=false; tip='Toutes ses photos et sa description sont captées : elle peut partir sur Leboncoin.'; }
-                    return txt ? <span title={tip} style={{fontSize:10.5,fontWeight:600,color:warn?C.warn:C.muted}}>{txt}</span> : null;
-                  })()}
-                  {/* ⚠️ OÙ EST CETTE PAIRE — demande de Julien (20 sept.). On
-                      n'affiche que du PROUVÉ : « publiée sur Leboncoin » vient de
-                      SA marque (`vinted_lbc_posted`, indexée par id d'annonce =
-                      `item.id`). Pas de pastille ⇒ on ne prétend rien ; jamais un
-                      faux « publiée ». Le « sur quel COMPTE » reste gaté sur la
-                      capture de ses annonces LBC. */}
-                  {/* ⚠️ SUR QUELLE PLATEFORME — demande de Julien (21 sept.) :
-                      « un logo par application pour dire sur quoi est postée la
-                      paire ». Vinted TOUJOURS (la paire EST une annonce Vinted) ;
-                      Leboncoin seulement si SA marque `vinted_lbc_posted` la porte
-                      (§5, jamais déduit d'un titre). Lecture ratée/vide ⇒ pas de
-                      logo LBC : jamais un faux « publiée ». */}
-                  <span style={{display:'inline-flex',alignItems:'center',gap:4}}>
-                    <PlateformeLogo p="vinted" title="En ligne sur Vinted"/>
-                    {lbcPosted.has(String(item.id)) && <PlateformeLogo p="lbc" title="Publiée sur Leboncoin (par l'extension, ou marquée « Déjà publiée » dans VRM). Elle est donc sur Vinted ET sur Leboncoin."/>}
-                  </span>
-                  {/* La paire qui DORT : en ligne depuis longtemps sans partir.
-                      Le CHIFFRE (jours en ligne), pas une promesse — l'âge vient
-                      de la date de mise en ligne captée (`listedAgeDays`), sinon
-                      rien (on n'invente pas d'ancienneté, §5.34). */}
-                  {(() => { const age = listedAgeDays(item); return age != null && age >= SLEEP_DAYS
-                    ? <span title="En ligne depuis longtemps sans se vendre : pense à baisser le prix, la remettre aux favoris, ou relancer les personnes intéressées."
-                        style={{fontSize:10.5,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}44`,borderRadius:8,padding:'2px 8px'}}>😴 en ligne depuis {age} j</span>
-                    : null; })()}
-                </div>
-                {/* ⚠️ LE PRIX MINIMUM ACCEPTÉ — demande de Julien : « pour chaque
-                    annonce que je poste je mets un prix minimum que l'app accepte
-                    dès que je reçois une offre ».
-                    L'app en est PROPRIÉTAIRE (`vinted_annonce_numeros[id].minPrice`,
-                    là où vivent déjà le numéro, le prix d'achat et le boost) ;
-                    l'extension le LIT et l'applique quand l'acceptation
-                    automatique est activée dans son panneau. Deux écrivains sur la
-                    même donnée finiraient par diverger (§5.15).
-                    ⚠️ Il ne se remplit JAMAIS tout seul : sans plancher sur cette
-                    annonce, l'extension ne touche à aucune offre. */}
-                {/* ⚠️ CES DEUX CHAMPS SE REPLIENT. Mesuré : 0 prix plancher et
-                    0 boost posés sur 255 paires — ils occupaient pourtant deux
-                    rangées permanentes sur CHAQUE carte, donc la moitié des
-                    contrôles d'un écran qui en affiche jusqu'à quatre de front.
-                    Une carte d'annonce doit se lire comme une paire, pas comme un
-                    formulaire. Ils restent DÉPLIÉS D'OFFICE dès qu'une valeur est
-                    posée : un réglage rempli ne doit jamais se cacher. */}
+                {/* ⋯ : tout le secondaire, replié. Déplié d'office si un réglage
+                    est posé (un réglage rempli ne se cache jamais). */}
                 {(() => {
-                  const rempli = (e.minPrice != null && e.minPrice !== '') || (e.fees != null && e.fees !== '');
+                  const rempli = minAff !== '' || (e.fees != null && e.fees !== '') || !!e.buyFromId;
                   return (
-                    <details open={rempli} style={{margin:'0 10px 10px'}}>
-                      <summary style={{listStyle:'none',cursor:'pointer',fontSize:11,color:C.muted,fontWeight:600,padding:'3px 0',userSelect:'none'}}>
-                        Prix plancher &amp; boost{rempli ? '' : ' ›'}
-                      </summary>
-                      <div style={{display:'flex',alignItems:'center',gap:4,border:`1px solid ${e.minPrice?C.accent:C.border}`,borderRadius:8,padding:'2px 6px',background:C.bg,marginTop:5}}
-                           title={extSait('offres')==='ok'
-                             ? "Offre acceptée automatiquement à partir de ce montant (si tu as activé l'acceptation auto dans l'extension). Vide = aucune offre n'est acceptée toute seule."
-                             : "Ton minimum est enregistré ici, mais l'extension installée ne sait pas encore accepter une offre toute seule : mets-la à jour d'abord. Vide = aucune offre n'est acceptée toute seule."}>
-                        <span style={{fontSize:11,color:e.minPrice?C.accent:C.muted,fontWeight:600,whiteSpace:'nowrap'}}>Min. accepté</span>
-                        <ChampSaisie value={e.minPrice ?? ''} onCommit={v=>updatePair(item,{minPrice:v})} placeholder="—" inputMode="decimal" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
-                        <span style={{fontSize:11,color:C.muted}}>€</span>
-                      </div>
-                      {num && (
-                        <div style={{display:'flex',alignItems:'center',gap:4,border:`1px solid ${C.border}`,borderRadius:8,padding:'2px 6px',background:C.bg,marginTop:6}} title="Coût d'un boost / mise en avant payée sur cette annonce (déduit du bénéfice net)">
-                          <span style={{fontSize:11,color:C.muted,fontWeight:500,whiteSpace:'nowrap'}}>💡 boost</span>
-                          <ChampSaisie value={e.fees ?? ''} onCommit={v=>updatePair(item,{fees:v})} placeholder="0" inputMode="decimal" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
-                          <span style={{fontSize:11,color:C.muted}}>€</span>
+                    <details open={rempli} style={{borderTop:`1px solid ${C.border}`,padding:'6px 10px 8px'}}>
+                      <summary style={{listStyle:'none',cursor:'pointer',fontSize:11.5,color:C.muted,fontWeight:600,userSelect:'none'}}>⋯ Plancher, boost, achat relié, places</summary>
+                      <div style={{display:'flex',flexDirection:'column',gap:7,marginTop:7}}>
+                        <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                          <div style={{flex:'1 1 130px',display:'flex',alignItems:'center',gap:4,border:`1px solid ${C.border}`,borderRadius:8,padding:'2px 6px',background:C.bg}}
+                               title={extSait('offres')==='ok'
+                                 ? "Offre acceptée automatiquement à partir de ce montant (si l'acceptation auto est allumée dans Réglages). Vide = aucune offre n'est acceptée toute seule."
+                                 : "Ton minimum est enregistré ici, mais l'extension installée ne sait pas encore accepter une offre toute seule : mets-la à jour d'abord. Vide = aucune offre n'est acceptée toute seule."}>
+                            <span style={{fontSize:11,color:C.muted,fontWeight:600,whiteSpace:'nowrap'}}>Min. accepté</span>
+                            <ChampSaisie value={minAff} onCommit={v=>updatePair(item,{minPrice:v})} placeholder="—" inputMode="decimal" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
+                            <span style={{fontSize:11,color:C.muted}}>€</span>
+                          </div>
+                          {num && (
+                            <div style={{flex:'1 1 110px',display:'flex',alignItems:'center',gap:4,border:`1px solid ${C.border}`,borderRadius:8,padding:'2px 6px',background:C.bg}} title="Coût d'un boost / mise en avant payée sur cette annonce (déduit de la marge et du bénéfice)">
+                              <span style={{fontSize:11,color:C.muted,fontWeight:600,whiteSpace:'nowrap'}}>Boost payé</span>
+                              <ChampSaisie value={e.fees ?? ''} onCommit={v=>updatePair(item,{fees:v})} placeholder="—" inputMode="decimal" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
+                              <span style={{fontSize:11,color:C.muted}}>€</span>
+                            </div>
+                          )}
                         </div>
-                      )}
+                        <AchatRelie entry={e} numero={num}/>
+                        <div style={{display:'flex',gap:10,flexWrap:'wrap',alignItems:'center',fontSize:11.5}}>
+                          <button type="button" onClick={()=>openPicker(item)} style={{border:'none',background:'transparent',padding:0,minHeight:0,color:C.accent,fontWeight:600,cursor:'pointer',fontFamily:'inherit',fontSize:11.5}}>Relier un achat</button>
+                          {num && <button type="button" onClick={()=>atGarage?(onLocate&&onLocate(num)):(onStore&&onStore(num))} style={{border:'none',background:'transparent',padding:0,minHeight:0,color:C.accent,fontWeight:600,cursor:'pointer',fontFamily:'inherit',fontSize:11.5}}>{atGarage?'Voir au stock':'Ranger au stock'}</button>}
+                          <button type="button" onClick={()=>setPassportFor({it,e,num})} style={{border:'none',background:'transparent',padding:0,minHeight:0,color:C.accent,fontWeight:600,cursor:'pointer',fontFamily:'inherit',fontSize:11.5}}>Passeport de la paire</button>
+                          {sugg!=null && sugg < Number(it.price) && <a href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted pour baisser le prix" style={{color:C.accent,fontWeight:600,textDecoration:'none'}}>Baisser à {sugg} {cur(it.currency)} ↗</a>}
+                        </div>
+                        {/* La FILE vers les autres places (ce qui SERA préparé),
+                            distincte de la présence ci-dessus (ce qui EST publié). */}
+                        <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                          <span style={{fontSize:11,color:C.muted}}>À publier aussi sur</span>
+                          {MP_PLACES.map(pl => {
+                            const on = mpChoisi(e, pl.cle);
+                            return (
+                              <button key={pl.cle} type="button"
+                                onClick={()=>updatePair(item,{ mp: { ...(e.mp||{}), [pl.cle]: !on } })}
+                                title={!num
+                                  ? `Mets un N° à cette paire d'abord : c'est la référence qui permet de la retrouver ensuite sur ${pl.nom}.`
+                                  : on ? `Elle est dans la file ${pl.nom}. Clique pour l'en retirer.`
+                                       : `Elle n'ira pas sur ${pl.nom}. Clique pour l'y mettre.`}
+                                style={{border:`1px solid ${on?C.accent:C.border}`,background:on?`${C.accent}14`:'transparent',
+                                  color:on?C.accent:C.muted,borderRadius:8,padding:'2px 9px',fontSize:11,fontWeight:600,
+                                  cursor:'pointer',fontFamily:'inherit',minHeight:0}}>
+                                {on ? '✓ ' : ''}{pl.nom}
+                              </button>
+                            );
+                          })}
+                          {!num && <span style={{fontSize:10.5,color:C.warn}}>il lui faut un N°</span>}
+                          {num && (() => {
+                            const total = Number(item.photoCount)||0, capt = Number(item.captPhotos)||0, descOk = (Number(item.descLen)||0) > 0;
+                            let txt=null;
+                            if (total>0 && capt===0) txt='photos à capter — ouvre-la sur Vinted';
+                            else if (total>0 && capt<total) txt=`${capt}/${total} photos captées — rouvre-la sur Vinted`;
+                            else if (total>0 && !descOk) txt='description à capter — rouvre-la sur Vinted';
+                            else if (total>0) txt='prête pour Leboncoin';
+                            return txt ? <span data-prepa style={{fontSize:10.5,color:C.muted}}>{txt}</span> : null;
+                          })()}
+                        </div>
+                      </div>
                     </details>
-                  );
-                })()}
-                {/* Assistant de baisse de prix : sur les paires qui dorment ou tres
-                    vues sans favori, on suggere un prix (-15%, arrondi) et un lien
-                    direct vers l'annonce pour le baisser. Le vrai 1-clic (ecriture
-                    directe) viendra une fois la requete captee par l'extension. */}
-                {it.price!=null && (sleeps || (it.views>=30 && it.favourites===0)) && (()=>{
-                  const sugg = Math.max(1, Math.round(Number(it.price)*0.85));
-                  if (!(sugg < Number(it.price))) return null;
-                  return (
-                    <div style={{display:'flex',alignItems:'center',gap:8,margin:'0 10px 10px',padding:'6px 8px',borderRadius:8,background:`${C.warn}14`,border:`1px solid ${C.warn}55`}}>
-                      <span style={{fontSize:11,color:C.text,fontWeight:500,flex:1,minWidth:0,lineHeight:1.3,display:'flex',alignItems:'center',gap:5,flexWrap:'wrap'}}><Icon name="cash" size={12}/>Prix conseillé <b>{sugg} {cur(it.currency)}</b> <span style={{color:C.muted}}>(−15 %{sleeps?` · dort ${age}j`:''})</span></span>
-                      <a href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted pour baisser le prix" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.warn}55`,background:'transparent',color:C.warn,fontSize:11,fontWeight:600,padding:'4px 9px',borderRadius:8,display:'inline-flex',alignItems:'center',gap:4}}><Icon name="tag" size={12}/>Baisser</a>
-                    </div>
                   );
                 })()}
               </div>

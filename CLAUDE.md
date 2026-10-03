@@ -3702,6 +3702,44 @@ Leboncoin et eBay n'apparaissaient que dans un total « depuis le début », san
   (total ou sous-total + port) ; (4) « Chiffre d'affaires » sur Ma journée et le
   widget compte les ventes EN COURS. Ne pas trancher à sa place.
 
+### ⚠️⚠️ « L'ÉCRAN ANNONCES, C'EST TOTALEMENT N'IMPORTE QUOI » (3 octobre, 5.132)
+Julien : « on ne sait pas sur quelle application, c'est quoi le prix, le boost ».
+Mesuré : 70 cartes sur 71 affichaient la **marque** (`it.brand||it.title`),
+jamais le titre ; quatre montants dont deux sans libellé ; six teintes (dont
+`#0F8A6A`, `#09B1BA` et l'orange Leboncoin en dur) ; le sommeil dit trois fois.
+- **La carte** : photo 88×118, **prix** en grand, N° en encre neutre, **titre**
+  sur deux lignes, taille · état, « Aussi sur **Leboncoin** » seulement si
+  PROUVÉ (`vinted_lbc_posted`), puis une ligne de chiffres **tous libellés**
+  (achat · boost · marge ; « — » si inconnu), vues/favoris/âge (« dort » une
+  fois, en ambre), compte si plusieurs. Saisie N° + achat + « Vendue » en bas ;
+  le reste dans « ⋯ » (plancher, boost payé, achat relié, ranger, passeport,
+  baisser le prix, la FILE Leboncoin/eBay — distincte de la présence). L'en-tête
+  dit « N en ligne sur Vinted · X aussi sur Leboncoin · Y boostées » UNE fois.
+- ⚠️ **La pastille « prête pour Leboncoin » mentait par construction** : `item`
+  était reconstruit avec 5 champs, donc `captPhotos` valait toujours 0 →
+  « à capter » sur toutes les cartes. La carte lit l'annonce entière.
+- ⚠️⚠️ **« Vendue — bordereau reçu » se décidait encore PAR TITRE** en repli
+  (`bordForItem`), et ce même repli **retirait l'annonce des annonces en ligne**.
+  Mesuré : 7 couples annonce/bordereau au titre identique, 0 même article ; 177
+  des 178 bordereaux portent leur transaction. Désormais : N°, sinon
+  transaction → annonce (`txnItem`), sinon rien. `audit-identite` le vérifie.
+- **Boosts** : Vinted envoie `promoted` dans le dressing ; l'allègement le jetait.
+  L'extension le garde (avec `can_push_up`) et la carte dit « Boostée » quand
+  c'est `true` — rien quand c'est absent (pas su ≠ non). **Le MONTANT par paire
+  reste impossible aujourd'hui** : aucune trace de boost en base (0 nœud dans les
+  porte-monnaie, 0 email, 71 réponses « billing » jetées sans échantillon).
+  L'extension relève désormais la FORME d'une réponse qui parle de boost (noms de
+  clés seulement : `boost_vu`, `boost_forme` dans `panel_diag_capture`). **Ne
+  rattacher un coût à une paire que si cette forme prouve un `item_id` et un
+  montant par article** — sinon c'est un coût de compte, jamais réparti.
+  En attendant, le champ « Boost payé » (⋯) entre dans la marge et le bénéfice.
+- Les planchers posés dans l'ANCIEN panneau (`panel_min_prices`, que
+  l'extension applique toujours) sont lus en repli et affichés (§11).
+- Tri « À booster 💡 » renommé « Vues sans favoris » (deux sens pour 💡).
+- Banc `annonces-carte.cjs` (titre, chiffres libellés, Boostée trois états,
+  présence prouvée, sommeil une fois, préparation qui suit la donnée, vendue par
+  identité, aucune couleur hors palette, 390 px sans débordement).
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
