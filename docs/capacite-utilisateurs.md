@@ -25,13 +25,15 @@ bornée, pas un nombre inventé. C'est le domaine de la session « fiabilité /
   212 Mo + WAL 128 Mo + système 168 Mo. **La taille n'est pas le problème.**
 
 ### Tiers compute → actifs SIMULTANÉS (estimation ancrée sur 62 %/1 user)
-| tier | RAM | ~€/mois | simultanés réalistes |
+Plan confirmé = **Pro (25 €/mois)**, qui inclut **10 $ de crédit compute/mois**,
+8 Go de base et 250 Go d'égress. Le « coût de plus » ci-dessous est NET du crédit :
+| tier | RAM | coût NET /mois | simultanés réalistes |
 |---|---|---|---|
 | Nano (actuel) | 0,5 Go partagé | inclus | ~2-4 |
-| Micro (upgrade gratuit) | 1 Go partagé | 0 € | ~4-6 |
-| Small | 2 Go partagé | ~15 € | ~10-15 |
-| Medium | 4 Go partagé | ~60 € | ~25-40 |
-| Large (dédié 2 vCPU) | 8 Go | ~110 € | dizaines à ~100 |
+| **Micro (upgrade GRATUIT)** | 1 Go partagé | **0 €** (couvert par le crédit) | ~4-6 |
+| Small | 2 Go partagé | **~+5 $** (15 − 10 crédit) | ~10-15 |
+| Medium | 4 Go partagé | ~+50 $ | ~25-40 |
+| Large (dédié 2 vCPU) | 8 Go | ~+100 $ | dizaines à ~100 |
 
 ⚠️ Estimations : le seul point **mesuré** est « 62 % CPU à 1 user sur Nano ». Un
 vrai test de charge donnerait mieux, mais on ne le lance pas contre la prod.
