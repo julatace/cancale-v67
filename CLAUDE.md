@@ -3871,6 +3871,43 @@ d'achat **écrits deux fois** (le texte, puis une ligne de champs de saisie).
 - Banc `annonces-carte.cjs` : aucune saisie visible hors « ⋯ » au repos, et
   modifier « achat — » → « achat 30,00 € » pour de vrai (rouge sur l'avant).
 
+### Numéros à lettres : B125, C123… (3 octobre, 5.137)
+Demande du 2 octobre : « toutes les personnes n'utilisent pas les mêmes numéros :
+des fois B125, C123 ; rends la chose adaptable ». Cartographie complète d'abord
+(tout ce qui supposait un ENTIER), et trois défauts **critiques** trouvés :
+- ⚠️⚠️ **un numéro à lettres n'était jamais brûlé** (`recordUsed` faisait
+  `parseInt`) **et la numérotation automatique EFFAÇAIT du pool tout ce qui
+  n'était pas un entier** en le réécrivant — « jamais réattribué » ne tenait pas ;
+- ⚠️⚠️ **« b125 » et « B125 » étaient deux numéros** (comparaison de chaînes
+  exactes) : deux paires, un carton, sans alerte ;
+- ⚠️⚠️ **« VRM-B125 » se lisait « 125 »** dans l'extension (`/(\d{1,5})/`) : la
+  paire N°125 — une AUTRE — sortait de la file Leboncoin comme « déjà en ligne »,
+  et B125 était proposée une seconde fois.
+Ce qui est en place :
+- **Une identité** : `cleNum` (majuscules, sans espace ni tiret, « 007 » = « 7 »),
+  la MÊME dans l'app et l'extension (`audit-numeros-lettres.cjs` compare leurs
+  sorties). `NUM_OK` : des chiffres, ou 1 à 3 lettres puis des chiffres.
+- **Le pool** garde un entier pour un numéro en chiffres (comme avant — tous les
+  lecteurs le comprennent) et la clé texte pour un numéro à lettres
+  (`entreePool`). `applyRenum` (injoignable) part désormais du pool existant.
+- **La pose à la main** (`poserNumero`) juge par clé, refuse une forme invalide,
+  et **demande** quand le numéro a déjà servi sans fiche (avant : repris sans un
+  mot, y compris en chiffres).
+- **Réglages → « Tes numéros de rangement »** : Chiffres (défaut, rien ne change)
+  ou une série à lettre (B1, B2…). Ne porte que sur les **prochains** numéros
+  (`prochainLibre`, `vrm_num_prefixe` synchronisé, rattrapé par `onCloudReady`).
+  Avec une série, les champs N° ouvrent le clavier à lettres (`clavierNum`).
+- Mesuré chez lui : **0 numéro à lettres, 0 zéro de tête** — rien ne change pour
+  ses données. Extension **5.137.0**, zip régénéré, aucune entrée
+  d'`EXT_CAPACITES` (l'app ne promet rien de neuf).
+- Preuves sur le code d'avant : banc `numeros-lettres.cjs` **3 rouges** (B125 perdu
+  du pool, « b125 » accepté sur le même carton, pas de série) ;
+  `audit-numeros-lettres.cjs` **3 rouges** (« VRM-B125 » → `["125"]`).
+- ⚠️ **Pas couvert, volontairement** : les piles du Garage 3D se numérotent en
+  entiers (`pileNums`) ; une boîte seule accepte « B125 ». Les titres Vinted
+  « n125 » restent lus en chiffres (c'est une suggestion, pas une identité).
+  `api/email-inbound` ne lit pas « nB125 » dans un email.
+
 ### ⚠️⚠️⚠️ UNE RECONNEXION POUVAIT RENUMÉROTER SES CARTONS (3 octobre)
 Trouvé en cartographiant la numérotation. Trois migrations « une seule fois »
 d'août réécrivaient les numéros (`vinted_num_fix1` : purge de TOUS les numéros

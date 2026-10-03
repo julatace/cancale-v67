@@ -4597,10 +4597,28 @@ function buildLbcAd(raw, det, num, account) {
 // Extrait NOTRE numéro depuis n'importe quel texte d'annonce Leboncoin (titre +
 // description). Marche pour un compte PRO (numérotation auto ignorée) comme pour
 // un compte normal, car on lit d'abord notre jeton « VRM-{num} », puis « Réf X ».
+// ── L'IDENTITÉ D'UN NUMÉRO : « 125 », « B125 »… (la MÊME règle que l'app,
+// `cleNum`, §11). « VRM-b125 » et « B125 » désignent le même carton ; « 007 »
+// vaut « 7 ». Sans ça, « VRM-B125 » se lisait « 125 » — une AUTRE paire.
+function cleNum(v) {
+  let s = String(v == null ? '' : v).trim().toUpperCase().replace(/[\s\-_.]/g, '');
+  if (/^\d+$/.test(s)) s = String(parseInt(s, 10));
+  return s;
+}
+// Le numéro porté par « VRM-B125 » / « VRM-125 » ; sans « VRM- », l'ancienne
+// lecture (les chiffres seuls). Identique à `refVRMDe` dans l'app.
+const RE_VRM = /VRM[-\s]?((?:[A-Z]{1,3})?\d{1,6})(?!\d)/i;
+function refVRMDe(txt) {
+  const t = String(txt == null ? '' : txt);
+  const m = RE_VRM.exec(t);
+  if (m) return cleNum(m[1]);
+  const d = /(\d{1,5})/.exec(t); return d ? cleNum(d[1]) : '';
+}
+function refFromVRM(text) { const m = RE_VRM.exec(String(text || '')); return m ? cleNum(m[1]) : ''; }
 function refFromText(text) {
   const s = String(text || '');
-  let m = /VRM[-\s]?(\d{1,5})/i.exec(s);
-  if (m) return m[1];
+  let m = RE_VRM.exec(s);
+  if (m) return cleNum(m[1]);
   m = /r[ée]f\.?\s*[:#]?\s*(\d{1,5})/i.exec(s);
   return m ? m[1] : null;
 }
@@ -4638,12 +4656,13 @@ async function readLbcItems() {
 // règle (`adKeys`), sinon l'app relie et le panneau ne relie pas (§11).
 function adRefKeys(ad, liens) {
   const keys = [];
-  const push = (v) => { const t = String(v == null ? '' : v).trim(); if (t && !keys.includes(t)) keys.push(t); };
+  // Toutes les clés passent par `cleNum` — des deux côtés (`vintedKeys`).
+  const push = (v) => { const t = cleNum(v); if (t && !keys.includes(t)) keys.push(t); };
   if (liens && ad && ad.id != null && liens[String(ad.id)] != null) push(liens[String(ad.id)]);
-  if (ad.customRef) { const m = /(\d{1,5})/.exec(String(ad.customRef)); if (m) push(m[1]); }
+  if (ad.customRef) push(refVRMDe(ad.customRef));
   if (ad.ref) push(ad.ref);
   const t = String(ad.subject || '');
-  let m = /VRM[-\s]?(\d{1,5})/i.exec(t); if (m) push(m[1]);
+  let m = RE_VRM.exec(t); if (m) push(m[1]);
   m = /\bn\s*°?\s*(\d{1,5})\b/i.exec(t); if (m) push(m[1]);
   return keys;
 }
@@ -4944,10 +4963,10 @@ async function buildLbcData() {
   // présent dans son titre (les deux numérotations coexistent chez toi).
   const vintedKeys = (o, num) => {
     const keys = [];
-    if (num != null && String(num).trim() !== '') keys.push(String(num).trim());
+    if (num != null && String(num).trim() !== '') keys.push(cleNum(num));
     const t = String((o.raw && o.raw.title) || '');
     const m = /\bn\s*°?\s*(\d{1,5})\b/i.exec(t);
-    if (m) keys.push(m[1]);
+    if (m) keys.push(cleNum(m[1]));
     return keys;
   };
   const autoMatched = new Map(); // id d'annonce Vinted -> annonce LBC trouvée
@@ -5017,9 +5036,9 @@ async function buildLbcData() {
     const keysKnown = new Set();
     for (const id in numeros) {
       const e = numeros[id] || {};
-      if (e.numero != null && String(e.numero).trim() !== '') keysKnown.add(String(e.numero).trim());
+      if (e.numero != null && String(e.numero).trim() !== '') keysKnown.add(cleNum(e.numero));
       const m = /\bn\s*°?\s*(\d{1,5})\b/i.exec(String(e.title || ''));
-      if (m) keysKnown.add(m[1]);
+      if (m) keysKnown.add(cleNum(m[1]));
     }
     for (const ad of lbcItems) {
       if (/(supprim|delete|expir|refus|sold|vendu)/i.test(String(ad.status || ''))) continue;
@@ -5036,7 +5055,7 @@ async function buildLbcData() {
       let etat = 'inconnue';
       for (const id in numeros) {
         const en = numeros[id] || {};
-        const k2 = String(en.numero || '').trim();
+        const k2 = cleNum(en.numero);
         if (k2 && keys.includes(k2)) { etat = etatDe(id); break; }
       }
       removals.push({
@@ -5586,7 +5605,7 @@ async function handleLbcRaw(url, body) {
         body: '',
         // Référence : le champ pro CustomRef d'abord (c'est le bon), sinon
         // un VRM-xxx écrit dans le titre.
-        ref: (custom.match(/(\d{1,5})/) || [])[1] || (title.match(/VRM[-\s]?(\d{1,5})/i) || [])[1] || null,
+        ref: refVRMDe(custom) || (title.match(RE_VRM) ? cleNum(title.match(RE_VRM)[1]) : '') || null,
         customRef: custom || null,
         url: info.URL || '',
         images: info.ImageSmall ? [info.ImageSmall] : [],
@@ -5629,7 +5648,7 @@ async function handleLbcRaw(url, body) {
       if (!seen.has(sid)) {
         seen.add(sid);
         const bodyTxt = String(node.body || node.description || '');
-        const refVRM = (bodyTxt.match(/VRM[-\s]?(\d{1,5})/i) || [])[1] || (String(title).match(/VRM[-\s]?(\d{1,5})/i) || [])[1] || null;
+        const refVRM = refFromVRM(bodyTxt) || refFromVRM(title) || null;
         // ⚠️⚠️ ON NE RANGE QUE SES ANNONCES (§5). Une réponse générique
         //    (`dashboard/v1/search`, `discovery/…`) MÊLE ses annonces au flux
         //    « découverte » d'autrui — mesuré le 20 sept. : 183 annonces rangées,

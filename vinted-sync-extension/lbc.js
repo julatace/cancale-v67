@@ -102,6 +102,14 @@
     }
     return out;
   }
+  // Le numéro porté par « VRM-B125 » / « VRM-125 » (la même règle que l'app et
+  // le fond : majuscules, sans tiret, « 007 » = « 7 »).
+  function refVRMTexte(txt) {
+    const m = /VRM[-\s]?((?:[A-Z]{1,3})?\d{1,6})(?!\d)/i.exec(String(txt || ''));
+    if (!m) return '';
+    let s = m[1].toUpperCase(); if (/^\d+$/.test(s)) s = String(parseInt(s, 10));
+    return s;
+  }
   function captureLbcListings() {
     let listings = [];
     const src = donneesNext();
@@ -124,7 +132,7 @@
               found.push({
                 id, subject: node.subject || node.title || '', price, url: node.url || '',
                 body: body.slice(0, 400),
-                ref: (body.match(/VRM[-\s]?(\d{1,5})/i) || [])[1] || (String(node.subject || '').match(/VRM[-\s]?(\d{1,5})/i) || [])[1] || null,
+                ref: refVRMTexte(body) || refVRMTexte(node.subject) || null,
                 images: (node.images && (node.images.urls || node.images.thumb_urls)) || node.image_urls || [],
                 category: (node.category_name || node.category_id || ''),
                 status: node.status || node.ad_status || '',
@@ -1016,8 +1024,9 @@
     if (!el) return { trouve: false, fait: false, garde: false, ref: false };
     const ref = ad.ref || ('VRM-' + ad.numero);
     const actuel = String(el.value || '');
-    if (!actuel.trim()) { const ok = setField(el, ad.description); return { trouve: true, fait: ok, garde: false, ref: /VRM-\d/i.test(ad.description) }; }
-    const dejaRef = new RegExp(ref.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(actuel);
+    if (!actuel.trim()) { const ok = setField(el, ad.description); return { trouve: true, fait: ok, garde: false, ref: /VRM-(?:[A-Z]{1,3})?\d/i.test(ad.description) }; }
+    // La réf ENTIÈRE, jamais un morceau : « VRM-12 » n'est pas dans « VRM-125 ».
+    const dejaRef = new RegExp(ref.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![0-9A-Z])', 'i').test(actuel);
     if (dejaRef) return { trouve: true, fait: false, garde: true, ref: true };
     const ok = setField(el, actuel.replace(/\s+$/, '') + '\n\nRéférence : ' + ref);
     return { trouve: true, fait: false, garde: true, ref: ok };
