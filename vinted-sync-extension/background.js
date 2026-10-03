@@ -861,6 +861,16 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     // canvas le « tainte », donc l'export devient impossible (§4.93). Le service
     // worker, lui, a les permissions d'hôte. Sans extension : pas de photo sur
     // le reçu, et c'est tout — rien ne casse.
+    if (msg && msg.from === 'vmr-bridge' && msg.action === 'pdfLbc') {
+      (async () => {
+        try {
+          const src = (sender && sender.origin) || (sender && sender.url) || '';
+          if (!ORIGINE_APP.test(src)) { sendResponse({ ok: false, error: 'origine non autorisee' }); return; }
+          sendResponse(await pdfBordereauLbc(msg.url));
+        } catch (e) { sendResponse({ ok: false, error: String(e) }); }
+      })();
+      return true;
+    }
     if (msg && msg.from === 'vmr-bridge' && msg.action === 'photo') {
       (async () => {
         try {
@@ -3434,6 +3444,30 @@ async function archiverLot(uid, items, tous) {
 // on ne pourrait ni recadrer ni enregistrer. Le service worker, lui, a les
 // permissions d'hôte : il récupère les octets, et une data: URL se recadre sans
 // aucune restriction.
+// ── LE PDF D'UN BORDEREAU LEBONCOIN (5.136, 3 octobre) ──────────────────────
+// « Le tampon titre + N° partout » : sur Leboncoin, « Imprimer » ouvrait le PDF
+// tel quel, sans N° ni titre. Ce PDF vit derrière SA session Leboncoin
+// (`api.leboncoin.fr/api/shippingproxy/v1/parcels/{id}/label`, mesuré sur ses
+// 3 bordereaux captés) : l'app ne peut pas le lire, l'extension si (elle a les
+// droits sur leboncoin.fr). C'est une LECTURE de SON bordereau — rien d'autre
+// n'est lisible par ce pont (adresse exacte exigée, PDF exigé).
+const URL_PDF_LBC = /^https:\/\/api\.leboncoin\.fr\/api\/shippingproxy\/v1\/parcels\/[A-Za-z0-9-]+\/label$/;
+async function pdfBordereauLbc(url) {
+  try {
+    if (!URL_PDF_LBC.test(String(url || ''))) return { ok: false, error: 'adresse non autorisée' };
+    const res = await fetch(url, { credentials: 'include' });
+    if (!res.ok) return { ok: false, error: `bordereau ${res.status}` };
+    const buf = await res.arrayBuffer();
+    const bytes = new Uint8Array(buf);
+    // %PDF en tête : une page de connexion HTML n'est pas un bordereau.
+    if (bytes.length < 5 || bytes[0] !== 0x25 || bytes[1] !== 0x50 || bytes[2] !== 0x44 || bytes[3] !== 0x46) return { ok: false, error: 'pas un PDF (session Leboncoin expirée ?)' };
+    if (bytes.byteLength > 12000000) return { ok: false, error: 'PDF trop lourd' };
+    let bin = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    return { ok: true, dataUrl: `data:application/pdf;base64,${btoa(bin)}` };
+  } catch (e) { return { ok: false, error: String(e).slice(0, 80) }; }
+}
+
 async function photoBytes(url) {
   try {
     if (!/^https:/i.test(String(url || ''))) return { ok: false };

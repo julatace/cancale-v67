@@ -133,6 +133,22 @@ const REPONSE = { uid: UID, method: 'POST', endpoint: '/api/v2/conversations/123
     await envoyer({ uid: UID, method: 'PUT', endpoint: '/api/v2/transactions/123/offer_requests/456/delete' });
     dit(envois.length === 0, 'une variante hors liste (DELETE, autre verbe) ne part pas', envois.join(','));
   });
+  // ── 5.136 : le PDF d'un bordereau Leboncoin, et RIEN d'autre ──────────────
+  await essaie('pdfBordereauLbc', async () => {
+    const { ctx } = faireCtx();
+    if (typeof ctx.pdfBordereauLbc !== 'function') { dit(false, 'pdfBordereauLbc existe'); return; }
+    const appels = [];
+    const rep = (octets, ok = true) => ({ ok, status: ok ? 200 : 403, arrayBuffer: async () => octets.buffer.slice(octets.byteOffset, octets.byteOffset + octets.byteLength), headers: { get: () => 'application/pdf' } });
+    ctx.fetch = async (u) => { appels.push(String(u)); return /html/.test(String(u)) ? rep(Buffer.from('<html>login</html>')) : rep(Buffer.from('%PDF-1.7 test')); };
+    const a = await ctx.pdfBordereauLbc('https://api.leboncoin.fr/api/shippingproxy/v1/parcels/abc-123/label');
+    dit(a && a.ok && /^data:application\/pdf;base64,/.test(a.dataUrl), 'le PDF du bordereau de CE colis est lu', JSON.stringify(a).slice(0, 80));
+    const b = await ctx.pdfBordereauLbc('https://api.leboncoin.fr/api/messaging/v1/conversations');
+    const c = await ctx.pdfBordereauLbc('https://www.vinted.fr/api/v2/users/1');
+    dit(b && !b.ok && c && !c.ok && appels.length === 1, 'aucune autre adresse ne passe par ce pont (messagerie, Vinted…)', appels.join(','));
+    ctx.fetch = async () => rep(Buffer.from('<html>connexion</html>'));
+    const d = await ctx.pdfBordereauLbc('https://api.leboncoin.fr/api/shippingproxy/v1/parcels/abc-123/label');
+    dit(d && !d.ok, 'une page HTML (session expirée) n\'est jamais prise pour un bordereau', JSON.stringify(d));
+  });
   console.log(`\n${ok} ✅ · ${ko} ❌`);
   process.exit(ko ? 1 : 0);
 })();

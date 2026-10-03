@@ -35,7 +35,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.135.0';
+const EXT_ATTENDUE = '5.136.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -150,7 +150,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 //   releve  `capterReleves`       5.52.0  (5 sept.)   le relevé daté du porte-monnaie
 // `audit-coherence.cjs` vérifie que ces trois fonctions existent toujours dans
 // l'extension : une capacité annoncée mais retirée serait le même mensonge.
-const EXT_CAPACITES = { codes: '5.45.0', offres: '5.38.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', repond: '5.77.0', commande: '5.129.0', offresapp: '5.130.0', publication: '5.130.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0' };
+const EXT_CAPACITES = { codes: '5.45.0', offres: '5.38.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', repond: '5.77.0', commande: '5.129.0', offresapp: '5.130.0', publication: '5.130.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -3217,6 +3217,21 @@ function vmrPhoto(url, timeoutMs = 8000) {
     window.addEventListener('message', onMsg);
     setTimeout(() => fin(null), timeoutMs);
     try { window.postMessage({ __vmr: 'photo', reqId, url }, '*'); } catch (_) { fin(null); }
+  });
+}
+
+// Le PDF d'un bordereau Leboncoin, lu par l'extension (5.136) : il est derrière
+// SA session Leboncoin, la page ne peut pas le lire. `{dataUrl}` ou `{error}`.
+function vmrPdfLbc(url, timeoutMs = 15000) {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined' || !__vmrExtReady || !url) { resolve({ error: 'extension absente' }); return; }
+    const reqId = 'l' + Date.now() + '_' + Math.random().toString(36).slice(2);
+    let done = false;
+    const fin = (v) => { if (done) return; done = true; window.removeEventListener('message', onMsg); resolve(v); };
+    const onMsg = (e) => { if (e.source === window && e.data && e.data.__vmr === 'pdfLbc:result' && e.data.reqId === reqId) fin({ dataUrl: e.data.dataUrl || null, error: e.data.error || '' }); };
+    window.addEventListener('message', onMsg);
+    setTimeout(() => fin({ error: 'pas de réponse' }), timeoutMs);
+    try { window.postMessage({ __vmr: 'pdfLbc', reqId, url }, '*'); } catch (_) { fin({ error: 'pont' }); }
   });
 }
 
@@ -7239,6 +7254,19 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
   const numDe = (o) => { const e = o && o.itemId && numD[o.itemId]; return (e && e.numero != null && String(e.numero).trim()) ? String(e.numero).trim() : ''; };
   // Pastille N° accent — IDENTIQUE à l'écran Colis Vinted (fond accent, blanc).
   const badgeNum = (n) => n ? <span style={{ flexShrink: 0, fontSize: 15, fontWeight: 700, color: C.onAccent || '#fff', background: C.accent, borderRadius: 8, padding: '3px 9px', letterSpacing: -0.2 }}>N°{n}</span> : null;
+  // ── « LE TAMPON TITRE + N° PARTOUT » (3 octobre, 5.136) ───────────────────
+  // Le PDF Leboncoin sort tamponné comme celui de Vinted (même fonction : même
+  // cartouche, même place), puis s'ouvre dans l'onglet réservé au clic. Un N°
+  // qu'on ne sait pas relier n'est pas inventé : le titre seul est tamponné.
+  const imprimerLbc = async (o, n) => {
+    const r = await vmrPdfLbc(o.label && o.label.voucherUrl);
+    if (!r.dataUrl) { libererOngletPdf(); toast(`Bordereau Leboncoin illisible${r.error ? ' — ' + r.error : ''}. Il s'ouvre tel quel.`); try { window.open(o.label.voucherUrl, '_blank'); } catch (_) {} return; }
+    try {
+      const bytes = b64ToBytes(r.dataUrl.split(',')[1] || '');
+      const { width, height } = await readPdfFirstPageSize(bytes);
+      await annotateAndDownloadBordereau(n || '', o.title || '', bytes, smartDefaultBordPos(width, height));
+    } catch (e) { libererOngletPdf(); toast('Impossible de tamponner ce bordereau : ' + String(e)); }
+  };
   // Carte d'un colis — même squelette que l'écran Colis Vinted : photo 58 ·
   // N° + titre · transporteur + prix · UNE action principale (🖨 Imprimer) + Colis fait.
   const carte = (o, { principal }) => {
@@ -7266,8 +7294,10 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
             ouvre le PDF du bordereau Leboncoin ; « Générer » ouvre la vente sur
             Leboncoin pour qu'il y soit créé (l'extension le capte ensuite). */}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12, flexWrap: 'wrap' }}>
-          {principal === 'imprimer'
-            ? <a href={o.label.voucherUrl} target="_blank" rel="noreferrer" style={{ flex: '1 1 160px', maxWidth: 340, textAlign: 'center', border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '12px', fontSize: 15, fontWeight: 600, textDecoration: 'none' }}>🖨 Imprimer le bordereau</a>
+          {principal === 'imprimer' && extSait('lbcpdf') === 'ok'
+            ? <button type="button" data-imprime="1" data-imprime-lbc={o.txId} onClick={() => imprimerLbc(o, n)} style={{ flex: '1 1 160px', maxWidth: 340, textAlign: 'center', border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '12px', fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>🖨 Imprimer le bordereau</button>
+            : principal === 'imprimer'
+            ? <a href={o.label.voucherUrl} target="_blank" rel="noreferrer" title={extSait('lbcpdf') === 'retard' ? `Mets l'extension à jour (${EXT_CAPACITES.lbcpdf}) pour qu'il sorte tamponné du titre et du N°` : "Sans l'extension, le bordereau s'ouvre tel quel (sans N° ni titre)"} style={{ flex: '1 1 160px', maxWidth: 340, textAlign: 'center', border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '12px', fontSize: 15, fontWeight: 600, textDecoration: 'none' }}>🖨 Imprimer le bordereau</a>
             : <a href={lbcUrl(o)} target="_blank" rel="noreferrer" style={{ flex: '1 1 160px', maxWidth: 340, textAlign: 'center', border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '12px', fontSize: 15, fontWeight: 600, textDecoration: 'none' }}>↗ Générer le bordereau</a>}
           {principal === 'imprimer' && <button type="button" onClick={() => generateEtiquetteSku(n, { title: o.title, transaction_id: o.txId })} title={n ? `Étiquette N°${n} à coller` : 'Étiquette avec le titre (en attendant le numéro)'} style={{ flexShrink: 0, border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 10, padding: '12px 13px', fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>🏷️ Étiquette {n ? `N°${n}` : '(titre)'}</button>}
           <button type="button" onClick={() => toggleFait(o)} title={posted ? 'Remettre dans les colis à poster' : 'Marquer comme posté'} style={{ flexShrink: 0, border: `1px solid ${posted ? INV_STATUS.online.color : C.border}`, background: posted ? `${INV_STATUS.online.color}18` : 'transparent', color: posted ? INV_STATUS.online.color : C.muted, borderRadius: 10, padding: '12px 13px', fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>{posted ? '↺ Pas encore' : '✓ Colis fait'}</button>

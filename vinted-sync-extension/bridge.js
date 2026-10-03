@@ -76,6 +76,15 @@
     // Octets d'une photo Vinted (pour l'imprimer sur un reçu d'achat).
     // Le CDN Vinted n'autorise pas la lecture cross-origin depuis la page :
     // l'extension, elle, en a le droit. Simple relais, aucun appel API Vinted.
+    if (d.__vmr === 'pdfLbc' && d.reqId) {
+      try {
+        chrome.runtime.sendMessage({ from: 'vmr-bridge', action: 'pdfLbc', url: d.url }, (resp) => {
+          const err = chrome.runtime.lastError;
+          try { window.postMessage({ __vmr: 'pdfLbc:result', reqId: d.reqId, dataUrl: (!err && resp && resp.ok) ? resp.dataUrl : null, error: err ? String(err.message || err) : (resp && resp.error) || '' }, '*'); } catch (_) {}
+        });
+      } catch (_) { try { window.postMessage({ __vmr: 'pdfLbc:result', reqId: d.reqId, dataUrl: null, error: 'pont' }, '*'); } catch (_) {} }
+      return;
+    }
     if (d.__vmr === 'photo' && d.reqId) {
       try {
         chrome.runtime.sendMessage({ from: 'vmr-bridge', action: 'photo', url: d.url }, (resp) => {
