@@ -4020,6 +4020,55 @@ production), corrigé sur ce qui ne change rien à l'écran :
   **3 rouges** sur l'avant. `audit-push.cjs` suit désormais la clé jusqu'à
   `src/vapid.js` (vingt-cinquième cri au loup évité : la règle, pas l'endroit).
 
+### ⚠️⚠️ « MÊME S'IL Y A DES MISES À JOUR, PLUS AUCUN PROBLÈME DE CAPTURE » — LA DÉRIVE DE CHAMP (3 octobre, 5.141)
+Consigne permanente de Julien. La sentinelle de forme (5.139) attrapait déjà le
+cas où Vinted/LBC/eBay **renomme la clé de liste** (`my_orders` → `orders`) : la
+capture tombe à 0 en silence. **Mais elle revenait dès que la clé de liste était
+présente** — or le vrai bug déjà vécu est **un champ INTÉRIEUR renommé**
+(`brand_title` vs `brand`, § allègement) : la liste a l'air pleine, `articleMaigre`
+garde un champ qui n'existe plus, et **tout le stock affiche « marque manquante »
+sans la moindre erreur**. Une mise à jour de Vinted qui déplace `price` casserait
+le prix de toutes les annonces, pareil, en silence.
+⇒ `verifChampsListe` vérifie, quand la clé de liste est bonne, que les **champs
+STRUCTURELS** qu'on lit sont encore là (`CHAMPS_CRITIQUES` : `id`, `title`,
+`price` pour les annonces ; `transaction_id`, `title` pour les commandes ; `id`
+pour l'inbox).
+- ⚠️ **UNIQUEMENT des champs structurels** (indépendants de la catégorie) : Julien
+  veut servir aussi un reseller de livres/sacs, donc `brand`/`size` peuvent
+  légitimement manquer à tout un stock — les exiger crierait au loup.
+- ⚠️ **Seuil anti-fausse-alerte : 0/N.** On n'alerte que si le champ est absent de
+  **TOUS** les items d'une liste **non vide**. Un item isolé sans prix (un
+  brouillon) laisse les autres le porter → rien. Seul un **renommage** le fait
+  disparaître de tout le monde d'un coup — et c'est ça, et seulement ça, qu'on
+  attrape. Liste vide (compte neuf) ⇒ rien.
+- **On ne devine aucun parser** (interdit) : on note `forme_inconnue_champ_<type>`
+  + le **nom** du champ perdu + les noms de clés d'un item (jamais une valeur),
+  la passe suivante aliase sur la forme mesurée.
+- **Aucun changement côté app** : la clé `forme_champ_<type>` remonte toute seule
+  dans l'alerte « Format d'un site » de Réglages (l'écran scanne `/^forme_/` et
+  mappe par sous-chaîne). Rien rendu à l'aveugle.
+- `audit-forme-capture.cjs` étendu : champ renommé → déclenche et NOMME le champ ;
+  un seul item sans le champ → rien (seuil 0/N) ; liste vide → rien ; aucune
+  valeur ne fuit. **6 rouges sur le code d'avant** (le silence), 0 après — mesurés
+  en relançant le banc étendu depuis l'arbre `HEAD` (§6.1).
+- **Aucune entrée d'`EXT_CAPACITES`** : c'est un diagnostic de capture, l'app ne
+  promet rien de neuf. Extension en **5.141.0**, zip régénéré, `EXT_ATTENDUE`
+  suivie.
+
+**Suite (5.142) — même blindage sur les captures OBJET (transaction, conversation).**
+Les listes ne sont pas les seules à casser en silence : une **transaction** porte
+la preuve de vente et la date de versement (`transaction.status`), une
+**conversation** porte la messagerie et les offres (`messages`). Un renommage de
+ces champs par Vinted viderait la preuve de vente ou la messagerie sans erreur.
+`verifFormeObjet` les garde par **présence de clé** (false-alarm-proof : un
+renommage fait disparaître `messages`/`status`, une valeur vide — `messages:[]`,
+`status:0` — garde la clé), et **uniquement** si l'objet métier est substantiel
+(≥ 3 clés) — un objet maigre/raté n'est pas jugé (mieux vaut un blanc qu'un faux).
+Le renommage AMBIGU du conteneur (`transaction` absent) n'est pas jugé, seul le
+champ interne l'est. `nomFamille` mappe `transaction`→ventes, `conversation`→
+messages pour l'alerte « Format d'un site ». **6 rouges de plus sur le code
+d'avant.** Extension **5.142.0**, zip régénéré, `EXT_ATTENDUE` suivie.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
