@@ -29780,11 +29780,10 @@ function AppCoeur() {
               L'onglet Achats n'apparaît que si des achats sont captés — sinon il
               ne mentirait pas, il resterait vide (mieux vaut un blanc, §5). */}
           {(() => { const ar = lbcArgent(lbcVentes); const e2 = (n) => n.toFixed(2).replace('.', ',') + ' €'; return (
-            <PlatResume baseKO={baseKO} cases={[[`CA finalisé${ar.nRecu ? ' · ' + ar.nRecu : ''}`, ar.actives ? e2(ar.recu) : null], [`En attente${ar.nAttente ? ' · ' + ar.nAttente : ''}`, ar.actives ? e2(ar.attente) : null, true]]}
-              note={ar.n ? null : "Aucune vente Leboncoin captée pour l'instant — elles arrivent quand l'extension passe sur leboncoin.fr (Mes transactions)."}/>
+            <PlatResume baseKO={baseKO} cases={[[`CA finalisé${ar.nRecu ? ' · ' + ar.nRecu : ''}`, ar.actives ? e2(ar.recu) : null], [`En attente${ar.nAttente ? ' · ' + ar.nAttente : ''}`, ar.actives ? e2(ar.attente) : null, true]]}/>
           ); })()}
           <PlatSubNav sub={platSub} setSub={setPlatSub} sections={[['ventes','Ventes'],...(((lbcVentes.achats||[]).length>0)?[['achats','Achats']]:[]),['annonces','Annonces'],['colis','Colis']]}/>
-          {platSub==='ventes'&&<div style={{padding:16}}>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:(((lbcVentes.ventes||[]).length>0||lbcVentes.inconnues>0)?<VentesLeboncoin lbcVentes={lbcVentes} sansTotaux/>:<div style={{fontSize:13,color:C.muted,lineHeight:1.5}}>Pas encore de vente Leboncoin. Une vente n'est comptée que si elle est <b>prouvée</b> (tu es bien le vendeur) — jamais devinée d'après un titre.</div>)}</div>}
+          {platSub==='ventes'&&<div style={{padding:16}}>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:(((lbcVentes.ventes||[]).length>0||lbcVentes.inconnues>0)?<VentesLeboncoin lbcVentes={lbcVentes} sansTotaux/>:<div style={{fontSize:13,color:C.muted,lineHeight:1.5}}>Pas encore de vente Leboncoin captée — elles arrivent quand l'extension passe sur leboncoin.fr (Mes transactions). Une vente n'est comptée que si elle est <b>prouvée</b> (tu es bien le vendeur), jamais devinée d'après un titre.</div>)}</div>}
           {platSub==='achats'&&<div style={{padding:16}}>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:<AchatsLeboncoin lbcVentes={lbcVentes}/>}</div>}
           {platSub==='colis'&&(baseKO?<div style={{padding:16}}><LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne></div>:<LeboncoinColis lbcVentes={lbcVentes}/>)}
           {platSub==='annonces'&&<LeboncoinScreen/>}
@@ -29795,8 +29794,7 @@ function AppCoeur() {
               connexion + la publication ; Ventes liste les commandes captées ;
               Achats dit honnêtement qu'ils ne sont pas encore récupérés. */}
           {(() => { const pe = caParPlateforme(liveStats, lbcVentes, ebayCa).find(x => x.nom === 'eBay') || {}; return (
-            <PlatResume dark baseKO={baseKO} cases={[['Ventes payées', pe.ca != null ? fmt(pe.ca) : null]]}
-              note={pe.ca != null ? null : "Pas encore de vente eBay captée. Relie ton compte dans « Compte eBay » : VRM lit alors tes ventes et tes annonces."}/>
+            <PlatResume dark baseKO={baseKO} cases={[['Ventes payées', pe.ca != null ? fmt(pe.ca) : null]]}/>
           ); })()}
           <div style={{background:'#000000'}}><PlatSubNav sub={platSub} setSub={setPlatSub} sections={[['ventes','Ventes'],['achats','Achats'],['annonces','Annonces'],['compte','Compte eBay']]} dark/></div>
           {platSub==='ventes'&&<EbayVentes baseKO={baseKO}/>}

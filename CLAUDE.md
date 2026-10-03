@@ -3871,6 +3871,24 @@ d'achat **écrits deux fois** (le texte, puis une ligne de champs de saisie).
 - Banc `annonces-carte.cjs` : aucune saisie visible hors « ⋯ » au repos, et
   modifier « achat — » → « achat 30,00 € » pour de vrai (rouge sur l'avant).
 
+### Leboncoin et eBay rangés comme Vinted : résumé, puis Ventes / Achats / Annonces (3 octobre)
+Demande du 2 octobre : « plus d'écran Aperçu intermédiaire ». Les deux onglets
+ouvrent sur **Ventes**, avec un résumé compact au-dessus (`PlatResume`, même forme
+que `VintedResume`) :
+- **Leboncoin** : CA finalisé · En attente, calculés par `lbcArgent` — la MÊME
+  règle que la liste des ventes (§11) ; la liste ne répète plus ses totaux sous le
+  résumé (`sansTotaux`). Sections : Ventes · Achats (si captés) · Annonces (l'ex
+  « À publier ») · Colis.
+- **eBay** : « Ventes payées » (`caParPlateforme`). Sections : Ventes · Achats ·
+  Annonces · **Compte eBay** — c'est là que vivent la connexion et la publication
+  (`EbayConnexion`), qui étaient dans l'Aperçu. Rien n'est perdu (§4.11).
+- `Plateforme` ne sert plus qu'à Vestiaire ; ses branches eBay/Leboncoin, devenues
+  mortes, sont retirées. Une liste vide dit sa cause UNE fois (pas sous le résumé
+  ET dans la liste, §7 — vu au rendu sur eBay).
+- ⚠️ `ebay-form.cjs` sort **déjà** rouge sur « Optimiser le titre avec l'IA » sur
+  le build d'AVANT ce changement : défaut du banc ou de l'IA, pas des onglets. À
+  regarder.
+
 ### Bordereau Leboncoin tamponné comme celui de Vinted (3 octobre, 5.136)
 Demande du 2 octobre : « le titre et le N° sur TOUS les bordereaux ». Celui de
 Leboncoin s'ouvrait par un simple lien (`voucherUrl`) : le PDF arrivait **nu**,
