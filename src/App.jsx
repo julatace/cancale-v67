@@ -35,7 +35,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.136.0';
+const EXT_ATTENDUE = '5.137.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -801,7 +801,7 @@ const SYNC_KEYS = [
   'vinted_invoice_settings','vinted_custom_logo','vinted_dark','vinted_stock_vinted',
   'vinted_accounts','vinted_account_labels','vinted_account_emails','vinted_account_phones',
   'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros','vinted_annonces_vendues','vinted_bords_shipped',
-  'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats','vinted_bords_printed','vrm_imprimante','vrm_prenom', 'vinted_repond_auto','vinted_offres_auto','vrm_points_relais','vrm_ville','vrm_colis_collected','vrm_colis_collected_at',
+  'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats','vinted_bords_printed','vrm_imprimante','vrm_prenom','vrm_num_prefixe', 'vinted_repond_auto','vinted_offres_auto','vrm_points_relais','vrm_ville','vrm_colis_collected','vrm_colis_collected_at',
   'vinted_txn_link','vinted_sales_hidden','vinted_purchases_hidden','vinted_accounts_hidden','vinted_autonum','vinted_urssaf_freq','vinted_urssaf_taux',
   'vinted_sale_overrides','vinted_bord_links','vinted_pickup_done','vinted_bords_hidden','vinted_ship_done','vinted_pairs_lost','vinted_retours_recus','vinted_retours_dismissed',
   'vinted_offvinted_buys','vinted_buyprice_by_num','vinted_quick_replies','vinted_ca_keep_removed','vinted_achat_notes','vrm_lbc_colis_done',
@@ -3493,6 +3493,58 @@ const extractPairNumber = (text) => {
   if (!text) return null;
   const m = /\bn\s*°?\s*(\d{1,5})\b/i.exec(text);
   return m ? m[1] : null;
+};
+
+// ── L'IDENTITÉ D'UN NUMÉRO DE RANGEMENT : « 125 », « B125 », « C123 »… ──────
+// Julien, 2 octobre : « toutes les personnes n'utilisent pas les mêmes numéros :
+// des fois elles commencent par B125, C123 ». Deux saisies désignent le MÊME
+// carton si leur CLÉ est la même : majuscules, sans espace ni tiret, et « 007 »
+// vaut « 7 ». Sans ça « b125 » et « B125 » étaient deux numéros — deux paires
+// sous le même carton sans alerte, le seul risque irréversible de l'app (§5).
+const cleNum = (v) => {
+  let s = String(v == null ? '' : v).trim().toUpperCase().replace(/[\s\-_.]/g, '');
+  if (/^\d+$/.test(s)) s = String(parseInt(s, 10));
+  return s;
+};
+// Le numéro porté par une référence Leboncoin (« VRM-B125 », « VRM-125 »). Une
+// référence sans « VRM- » garde l'ancienne lecture (les chiffres seuls).
+const refVRMDe = (txt) => {
+  const t = String(txt == null ? '' : txt);
+  const m = /VRM[-\s]?((?:[A-Z]{1,3})?\d{1,6})(?!\d)/i.exec(t);
+  if (m) return cleNum(m[1]);
+  const d = /(\d{1,5})/.exec(t); return d ? cleNum(d[1]) : '';
+};
+// Un numéro accepté : des chiffres, ou 1 à 3 lettres puis des chiffres (B125).
+const NUM_OK = /^([A-Z]{1,3})?\d{1,6}$/;
+// Ce qu'on range dans le pool (`vinted_used_numeros`, append-only) : un ENTIER
+// pour un numéro en chiffres (comme avant, tous les lecteurs le comprennent),
+// la CLÉ texte pour un numéro à lettres. null = pas un numéro.
+const entreePool = (v) => {
+  const c = cleNum(v); if (!c || !NUM_OK.test(c)) return null;
+  if (/^\d+$/.test(c)) { const n = Number(c); return n > 0 ? n : null; }
+  return c;
+};
+const triPool = (a, b) => (typeof a === 'number' && typeof b === 'number') ? a - b
+  : typeof a === 'number' ? -1 : typeof b === 'number' ? 1 : String(a).localeCompare(String(b), 'fr', { numeric: true });
+// Tri d'affichage : série (lettres) puis valeur — « 7, 125, B2, B125, C1 ».
+const triNum = (a, b) => {
+  const ka = cleNum(a), kb = cleNum(b);
+  const pa = (/^[A-Z]*/.exec(ka) || [''])[0], pb = (/^[A-Z]*/.exec(kb) || [''])[0];
+  if (pa !== pb) return pa.localeCompare(pb);
+  return (parseInt(ka.slice(pa.length), 10) || 0) - (parseInt(kb.slice(pb.length), 10) || 0);
+};
+// Le préfixe choisi pour les NOUVEAUX numéros (Réglages → Tes numéros) : '' =
+// des chiffres, comme toujours. Réglage synchronisé (`vrm_num_prefixe`).
+const prefixeNumeros = () => { const p = String(load('vrm_num_prefixe', '') || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3); return p; };
+// Le clavier d'un champ N° : chiffres tant qu'il numérote en chiffres, lettres
+// dès qu'il a choisi une série (sinon un téléphone ne laisse pas taper « B »).
+const clavierNum = () => (prefixeNumeros() ? 'text' : 'numeric');
+// Le prochain numéro LIBRE : le premier jamais donné. Sans préfixe, l'entier
+// comme avant (prisInt) ; avec préfixe, dans SA série (prisCles). On n'en
+// libère jamais aucun : la séquence monte, elle compte les paires passées.
+const prochainLibre = (prisInt, prisCles, pref) => {
+  if (!pref) { let c = 1; while (prisInt.has(c)) c += 1; prisInt.add(c); return String(c); }
+  let c = 1; while (prisCles.has(pref + c)) c += 1; prisCles.add(pref + c); return pref + c;
 };
 
 // Annote un bordereau (PDF) en imprimant le NUMERO de la paire (en gros) et le
@@ -11456,7 +11508,7 @@ function LocalPhoto({ locate, onLocateConsumed }) {
     const r = imgWrapRef.current?.getBoundingClientRect(); if (!r) return;
     const x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
     if (x < 0 || x > 1 || y < 0 || y > 1) return;
-    const numero = (await askText({ numeric: true, desc: 'Numéro de la paire rangée à cet endroit :', value: '' }) || '').trim();
+    const numero = (await askText({ numeric: clavierNum() === 'numeric', desc: 'Numéro de la paire rangée à cet endroit :', value: '' }) || '').trim();
     if (!numero) return;
     const pin = { id: 'pn' + Date.now(), numero, x, y };
     persist(photos.map((p, i) => i === active ? { ...p, pins: [...(p.pins || []), pin] } : p));
@@ -12852,7 +12904,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
     // endroit libre ; l'utilisateur l'empile ensuite en la glissant sur une autre.
     if (t.box) {
       let mx = 0; items.forEach(o => { if ((FURN_TYPES[o.type] || {}).box) { const v = parseInt(o.num, 10); if (!isNaN(v) && v > mx) mx = v; } });
-      const num = (await askText({ numeric: true, desc: 'Numéro de la boîte :', value: mx > 0 ? String(mx + 1) : '' }) || '').trim();
+      const num = (await askText({ numeric: clavierNum() === 'numeric', desc: 'Numéro de la boîte :', value: mx > 0 ? String(mx + 1) : '' }) || '').trim();
       if (!num) return;
       setItems(list => {
         // pose sur une colonne au sol pas encore occupée (empilage ensuite à la main)
@@ -12908,7 +12960,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
     if (sel !== itemId) { setSel(itemId); return; } // 1er tap : on sélectionne la pile
     const it = items.find(o => o.id === itemId); if (!it) return;
     const nums = pileNums(it).slice(); if (idx < 0 || idx >= nums.length) return;
-    const v = await askText({ numeric: true, desc: 'Numéro de cette boîte (laisse VIDE pour la retirer, les autres descendent) :', value: nums[idx] });
+    const v = await askText({ numeric: clavierNum() === 'numeric', desc: 'Numéro de cette boîte (laisse VIDE pour la retirer, les autres descendent) :', value: nums[idx] });
     if (v == null) return;
     const t = String(v).trim();
     if (!t) { nums.splice(idx, 1); pileSet(it, nums); return; }
@@ -12941,7 +12993,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
       patch = { cols: newCols, w: +(newCols * (it.cell || 0.5)).toFixed(2) };
     }
     let mx = 0; for (const k in (it.slots || {})) { const v = parseInt(((it.slots[k] || [])[0]) || '', 10); if (!isNaN(v) && v > mx) mx = v; }
-    const n = await askText({ numeric: true, desc: 'Numéro de la boîte (elle s\'empile toute seule à la prochaine place, bien alignée) :', value: mx > 0 ? String(mx + 1) : '' });
+    const n = await askText({ numeric: clavierNum() === 'numeric', desc: 'Numéro de la boîte (elle s\'empile toute seule à la prochaine place, bien alignée) :', value: mx > 0 ? String(mx + 1) : '' });
     if (n == null) return; const v = String(n).trim(); if (!v) return;
     updateItem(it.id, { ...patch, slots: { ...(it.slots || {}), [target]: [v] } });
   };
@@ -12992,7 +13044,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
     // rangée ailleurs, passait sans un mot. La feuille ne propose que des paires
     // réellement chez lui et pas encore posées.
     if (!cur && aRanger.length) { setRanger({ itemId, cellKey }); return; }
-    poserDansCase(itemId, cellKey, await askText({ numeric: true, desc: 'N° de la boîte (laisse vide pour effacer) :', value: cur }));
+    poserDansCase(itemId, cellKey, await askText({ numeric: clavierNum() === 'numeric', desc: 'N° de la boîte (laisse vide pour effacer) :', value: cur }));
   };
 
   // Écrit le numéro dans la case (gravité + croissance de la grille) puis lance
@@ -13331,7 +13383,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
   };
 
   // Ajoute/retire un N° dans une case (empilable).
-  const cellAdd = async (it, cell) => { const n = (await askText({ numeric: true, desc: 'Numéro à ranger dans cette case (empilable) :', value: '' }) || '').trim(); if (!n) return; const cur = (it.slots && it.slots[cell]) || []; updateItem(it.id, { slots: { ...(it.slots || {}), [cell]: [...cur, n] } }); };
+  const cellAdd = async (it, cell) => { const n = (await askText({ numeric: clavierNum() === 'numeric', desc: 'Numéro à ranger dans cette case (empilable) :', value: '' }) || '').trim(); if (!n) return; const cur = (it.slots && it.slots[cell]) || []; updateItem(it.id, { slots: { ...(it.slots || {}), [cell]: [...cur, n] } }); };
   const cellRemove = (it, cell, n) => { const cur = ((it.slots && it.slots[cell]) || []).filter(x => x !== n); const slots = { ...(it.slots || {}) }; if (cur.length) slots[cell] = cur; else delete slots[cell]; updateItem(it.id, { slots }); };
   const setGrid = (it, rows, cols) => updateItem(it.id, { rows: Math.max(1, rows), cols: Math.max(1, cols) });
 
@@ -13370,7 +13422,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
           paires={aRanger}
           cellNom={(() => { const p = String(ranger.cellKey).split('_'); const it = items.find(x => x.id === ranger.itemId); const nr = it ? Math.max(1, it.rows || 1) : 1; return `colonne ${(+p[1]) + 1} · ${nr - (+p[0])}ᵉ depuis le bas`; })()}
           onPick={(p) => { const r = ranger; setRanger(null); poserDansCase(r.itemId, r.cellKey, p.numero); }}
-          onLibre={async () => { const r = ranger; setRanger(null); poserDansCase(r.itemId, r.cellKey, await askText({ numeric: true, desc: 'Numéro à ranger dans cette case :', value: '' })); }}
+          onLibre={async () => { const r = ranger; setRanger(null); poserDansCase(r.itemId, r.cellKey, await askText({ numeric: clavierNum() === 'numeric', desc: 'Numéro à ranger dans cette case :', value: '' })); }}
           onClose={() => setRanger(null)}
         />
       )}
@@ -13536,7 +13588,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
             <div style={{ flex: '1 1 100%', display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 4 }}>
               <button onClick={() => setStackSrc(selItem.id)} style={{ flex: '1 1 auto', border: 'none', borderRadius: 8, background: C.accent, color: '#fff', fontSize: 12.5, fontWeight: 900, padding: '9px 12px', cursor: 'pointer' }}>⬆️ Poser sur une autre boîte</button>
               {(selItem.lvl || 0) > 0 && <button onClick={() => boxToFloor(selItem)} style={{ flex: '0 0 auto', border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 800, padding: '9px 11px', cursor: 'pointer' }}>⬇️ Au sol</button>}
-              <button onClick={async ()=>{ const n = (await askText({ numeric: true, desc: 'Numéro de cette boîte :', value: selItem.num || '' }) || '').trim(); if (n) updateItem(selItem.id, { num: n }); }} style={{ flex: '0 0 auto', border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 800, padding: '9px 11px', cursor: 'pointer' }}>✏️ N°{selItem.num || '?'}</button>
+              <button onClick={async ()=>{ const n = (await askText({ numeric: clavierNum() === 'numeric', desc: 'Numéro de cette boîte :', value: selItem.num || '' }) || '').trim(); if (n) updateItem(selItem.id, { num: n }); }} style={{ flex: '0 0 auto', border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, fontSize: 12, fontWeight: 800, padding: '9px 11px', cursor: 'pointer' }}>✏️ N°{selItem.num || '?'}</button>
             </div>
           )}
           {/* Personnalisation : couleur + hauteur */}
@@ -16458,7 +16510,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       return u;
     });
   };
-  const recordUsed = (num) => { const n=parseInt(String(num),10); if(isNaN(n)||n<=0) return; setUsedNumeros(prev=>{ if(prev.includes(n))return prev; const u=[...prev,n]; save('vinted_used_numeros',u); return u; }); };
+  // ⚠️ Un numéro à lettres (B125) se brûle AUSSI : avant, `parseInt` le jetait
+  //    et le pool ne le gardait jamais — « jamais réattribué » ne tenait pas.
+  const recordUsed = (num) => { const n=entreePool(num); if(n==null) return; setUsedNumeros(prev=>{ if(prev.some(x=>cleNum(x)===cleNum(n)))return prev; const u=[...prev,n].sort(triPool); save('vinted_used_numeros',u); return u; }); };
+  // Le préfixe des nouveaux numéros (Réglages). Lu au montage puis rattrapé
+  // quand le nuage arrive (§5.49), et suivi quand il change dans Réglages.
+  const [prefNum, setPrefNum] = useState(() => prefixeNumeros());
+  useEffect(() => {
+    const maj = () => setPrefNum(prefixeNumeros());
+    const off = onCloudReady(maj);
+    window.addEventListener('vrm-prefixe', maj);
+    return () => { window.removeEventListener('vrm-prefixe', maj); if (typeof off === 'function') off(); };
+  }, []);
   // (nextNumero est déclaré plus bas, après saleOv dont il dépend.)
   const garageNums = useMemo(()=>{ const s=new Set(); Object.values(garageGrid||{}).forEach(a=>{ if(Array.isArray(a)) a.forEach(v=>{const t=(v||'').trim().toLowerCase(); if(t)s.add(t);}); }); return s; }, [garageGrid]);
   const inGarage = (n)=> !!n && garageNums.has(String(n).trim().toLowerCase());
@@ -17268,7 +17331,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     garageNums.forEach(g=>{ const n=parseInt(String(g),10); if(!isNaN(n)) taken.add(n); });
     return taken;
   }, [usedNumeros, numeros, saleOv, listings.items, garageNums]);
-  const nextNumero = useMemo(() => { let n=1; while(takenNums.has(n)) n++; return n; }, [takenNums]);
+  // Les mêmes sources, en CLÉS (B125, 125…) : c'est ce qui protège un numéro à
+  // lettres, que l'ensemble d'entiers ci-dessus ne voit pas.
+  const takenCles = useMemo(() => {
+    const t = new Set(); const add = (v) => { const c = cleNum(v); if (c) t.add(c); };
+    usedNumeros.forEach(add);
+    Object.values(numeros).forEach(e => add(e && e.numero));
+    Object.values(saleOv).forEach(e => add(e && e.numero));
+    garageNums.forEach(add);
+    return t;
+  }, [usedNumeros, numeros, saleOv, garageNums]);
+  const nextNumero = useMemo(() => prochainLibre(new Set(takenNums), new Set(takenCles), prefNum), [takenNums, takenCles, prefNum]);
 
 
   // ── LES PAIRES QUI EXISTENT VRAIMENT (pour le Garage) ───────────────────────
@@ -17385,7 +17458,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
   const porteursNum = useMemo(() => {
     const m = {};
-    const add = (num, quoi) => { const n = String(num || '').trim(); if (!n) return; (m[n] = m[n] || []).push(quoi); };
+    // Rangé par CLÉ : « b125 » et « B125 » sont le même carton.
+    const add = (num, quoi) => { const n = cleNum(num); if (!n) return; (m[n] = m[n] || []).push(quoi); };
     // ⚠️ TOUS les comptes, même masqués : masquer un compte cache sa COMPTA,
     // ça ne sort pas le carton de l'étagère. (`listings.items` ne contient déjà
     // que des annonces en ligne, le filtre est fait à la lecture.)
@@ -17436,7 +17510,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if (!(p.length === 2 && titres.size === 1)) out.push({ numero: n, porteurs: p });
       }
     }
-    return out.sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0));
+    return out.sort((a, b) => triNum(a.numero, b.numero));
   }, [porteursNum]);
   // ── CHANGER LE NUMÉRO D'UNE PAIRE À LA MAIN ────────────────────────────────
   // Julien : « on peut donner la possibilité aux gens de changer de numéro, et
@@ -17457,18 +17531,38 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // `avant` = la valeur du champ AU MOMENT OÙ ON L'A OUVERT (mémorisée par
   // `ChampSaisie` au focus), pour pouvoir la remettre si on refuse le nouveau.
   const poserNumero = async (item, valeur, avant) => {
-    const n = String(valeur || '').trim();
+    const brut = String(valeur || '').trim();
     // Champ vidé : on ne retire JAMAIS un numéro (§5.40, il est écrit sur une
     // boîte). L'affichage se remet tout seul sur la valeur enregistrée.
-    if (!n) return;
+    if (!brut) return;
     const moi = String(item.id);
     avant = String(avant ?? '');
-    if (n === avant) return;                                   // rien n'a changé
-    const autres = Object.keys(numeros).filter(k => k !== moi && String((numeros[k] || {}).numero || '').trim() === n);
+    const cle = cleNum(brut);
+    if (cle === cleNum(avant)) return;                         // rien n'a changé (« b125 » = « B125 »)
+    if (!NUM_OK.test(cle)) {
+      updatePair(item, { numero: avant });
+      toast('Un numéro, ce sont des chiffres (125) ou 1 à 3 lettres suivies de chiffres (B125).');
+      return;
+    }
+    // Ce qu'on écrit : tel quel pour des chiffres, la clé (majuscules) sinon.
+    const n = /^\d+$/.test(brut) ? brut : cle;
+    const autres = Object.keys(numeros).filter(k => k !== moi && cleNum((numeros[k] || {}).numero) === cle);
+    // ⚠️ Un numéro BRÛLÉ sans fiche (une vente passée, un numéro posé sur une
+    //    vente) a déjà été écrit sur un carton : avant, on le reprenait sans un
+    //    mot. On demande — c'est la même paire qui revient, ou un autre numéro.
+    if (!autres.length && takenCles.has(cle) && !(porteursNum[cle] || []).some(p => String(p.id) !== moi)) {
+      const meme = await askConfirm({
+        title: `Le N°${n} a déjà servi`,
+        desc: `Ce numéro a déjà été donné à une paire (il est peut-être écrit sur un carton).\n\nEst-ce bien la MÊME paire qui revient ? Sinon, prends un numéro neuf.`,
+        ok: 'Oui, la même paire', cancel: `Non — N°${nextNumero}`,
+      });
+      const v = meme ? n : String(nextNumero);
+      updatePair(item, { numero: v }); recordUsed(v); return;
+    }
     // ⚠️ C'EST ICI qu'on écrit le numéro (le champ ne valide qu'à la sortie,
     //    cf. `ChampSaisie` — il n'écrit plus à chaque frappe).
     if (!autres.length) { updatePair(item, { numero: n }); recordUsed(n); return; }
-    const presents = (porteursNum[n] || []).filter(p => String(p.id) !== moi);
+    const presents = (porteursNum[cle] || []).filter(p => String(p.id) !== moi);
     if (presents.length) {
       const qui = presents.map(p => p.type === 'annonce' ? `📦 en ligne « ${p.titre} »`
         : p.type === 'vente' ? `📮 à expédier « ${p.titre} »`
@@ -17825,7 +17919,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const numDoublons = useMemo(() => {
     const par = new Map();
     for (const it of (listings.items || [])) {
-      const n = String((numeros[it.id] || {}).numero || '').trim();
+      const n = cleNum((numeros[it.id] || {}).numero);
       if (!n) continue;
       if (!par.has(n)) par.set(n, []);
       par.get(n).push(it);
@@ -17833,7 +17927,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return [...par.entries()]
       .filter(([, list]) => list.length > 1)
       .map(([numero, list]) => ({ numero, items: list }))
-      .sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0));
+      .sort((a, b) => triNum(a.numero, b.numero));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listings.items, numeros]);
 
@@ -18271,11 +18365,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     }
     setNumeros(next); save('vinted_annonce_numeros', next);
     setBuyByNum(byNum); save('vinted_buyprice_by_num', byNum);
-    const used = new Set();
-    Object.values(next).forEach(e => { const n = parseInt(String(e && e.numero), 10); if (!isNaN(n)) used.add(n); });
-    Object.values(saleOv).forEach(e => { const n = parseInt(String(e && e.numero), 10); if (!isNaN(n)) used.add(n); });
-    garageNums.forEach(g => { const n = parseInt(String(g), 10); if (!isNaN(n)) used.add(n); });
-    const ua = [...used].sort((a, b) => a - b);
+    // Le pool est append-only (§5) : on PART de l'existant, on n'en retire rien.
+    const used = new Set(usedNumeros.map(entreePool).filter(x => x != null));
+    Object.values(next).forEach(e => { const n = entreePool(e && e.numero); if (n != null) used.add(n); });
+    Object.values(saleOv).forEach(e => { const n = entreePool(e && e.numero); if (n != null) used.add(n); });
+    garageNums.forEach(g => { const n = entreePool(g); if (n != null) used.add(n); });
+    const ua = [...used].sort(triPool);
     setUsedNumeros(ua); save('vinted_used_numeros', ua);
     setRenumOpen(false);
     toast(`✓ ${moves.length} paire${moves.length > 1 ? 's' : ''} renumérotée${moves.length > 1 ? 's' : ''}`);
@@ -18480,6 +18575,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // paire présente (annonce en ligne, autre colis à envoyer, case du garage) —
     // même si la libération le croyait disponible.
     const dejaPris = new Set([...takenNums, ...numsOccupes]);
+    const dejaPrisK = new Set([...takenCles, ...Object.keys(porteursNum)]);
     let changed = false;
     // ⚠️ CHANGEMENT (juillet 2026) : on n'INVENTE plus JAMAIS de numéro pour une
     // vente. Inventer des numéros pour des ventes non reconnues faisait grimper le
@@ -18524,8 +18620,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // (`VENTE_NUM_MAX_J`) est ce qui empêche de renuméroter les 140 ventes
         // anciennes — c'est exactement l'inflation de juillet (50 → 120).
         if (!(cur && cur.numero != null && String(cur.numero).trim() !== '')) {
-          let cand = 1; while (dejaPris.has(cand)) cand += 1;
-          dejaPris.add(cand);
+          const cand = prochainLibre(dejaPris, dejaPrisK, prefNum);
           ovNext[tid] = { ...(cur||{}), numero: String(cand), autoAssigned: true, autoShip: true };
           changed = true;
         }
@@ -19020,7 +19115,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const pk = entryPhotoKey(e); if (pk && !byPhoto[pk]) byPhoto[pk] = String(e.numero);
     }
     const nextNum = { ...numeros };
-    const nextUsed = new Set(usedNumeros.map(x => parseInt(String(x), 10)).filter(n => !isNaN(n)));
+    // ⚠️ Le pool garde AUSSI les numéros à lettres (B125) : avant, cette ligne
+    //    ne gardait que les entiers et la réécriture plus bas les EFFAÇAIT.
+    const nextUsed = new Set(usedNumeros.map(entreePool).filter(x => x != null));
+    const takenK = new Set(takenCles);
     let changed = false;
     const sorted = [...items].sort((a, b) => (a.createdTs || 0) - (b.createdTs || 0));
     for (const it of sorted) {
@@ -19041,9 +19139,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // Prochain numéro = le premier JAMAIS UTILISÉ. `taken` contient tous les
       // numéros déjà donnés (à vie, §5.40) : la séquence monte et ne redescend
       // pas. C'est voulu — elle compte les paires passées, pas le stock.
-      if (!num) { let cand = 1; while (taken.has(cand)) cand += 1; num = String(cand); taken.add(cand); }
+      if (!num) num = prochainLibre(taken, takenK, prefNum);
       nextNum[it.id] = { ...(cur || {}), numero: String(num), title: it.title, photo: it.photo || null, photoK: pk || (cur && cur.photoK) || null, price: it.price ?? null, size: it.size ?? (cur && cur.size) ?? null, accountId: it._acc?.vinted_user_id, numberedAt: (cur && cur.numberedAt) || new Date().toISOString(), auto: true };
-      nextUsed.add(parseInt(num, 10));
+      { const ep = entreePool(num); if (ep != null) nextUsed.add(ep); }
       if (pk && !byPhoto[pk]) byPhoto[pk] = String(num);
       changed = true;
     }
@@ -19051,12 +19149,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // (annonces + ventes) pour qu'aucun ne soit jamais réattribué, même a
     // posteriori. Converge (ne re-déclenche pas une fois « used » complet).
     const beforeSize = nextUsed.size;
-    Object.values(saleOv).forEach(e => { const n = parseInt(String(e && e.numero), 10); if (!isNaN(n)) nextUsed.add(n); });
-    Object.values(nextNum).forEach(e => { const n = parseInt(String(e && e.numero), 10); if (!isNaN(n)) nextUsed.add(n); });
+    Object.values(saleOv).forEach(e => { const n = entreePool(e && e.numero); if (n != null) nextUsed.add(n); });
+    Object.values(nextNum).forEach(e => { const n = entreePool(e && e.numero); if (n != null) nextUsed.add(n); });
     if (nextUsed.size !== beforeSize) changed = true;
     if (changed) {
       setNumeros(nextNum); save('vinted_annonce_numeros', nextNum);
-      const ua = [...nextUsed].sort((a,b)=>a-b); setUsedNumeros(ua); save('vinted_used_numeros', ua);
+      const ua = [...nextUsed].sort(triPool); setUsedNumeros(ua); save('vinted_used_numeros', ua);
     }
   // ⚠️ `numVentesParIdentite` DOIT être dans les dépendances : les ventes
   // arrivent souvent APRÈS les annonces. Sans elle, une annonce déjà rendue
@@ -20529,7 +20627,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (f.type!=='application/pdf' && !f.name.toLowerCase().endsWith('.pdf')) { toast('Choisis le bordereau PDF téléchargé depuis Vinted.'); return; }
     // Import direct (pas depuis une vente) : on demande le N° + le titre.
     if (ctx.standalone) {
-      const numero = (await askText({ numeric: true, desc: 'Numéro de la paire (laisse vide si aucun) :', value: '' }) || '').trim();
+      const numero = (await askText({ numeric: clavierNum() === 'numeric', desc: 'Numéro de la paire (laisse vide si aucun) :', value: '' }) || '').trim();
       const title = (await askText({ desc: 'Titre / description (ex : Nike Air Max 90) :', value: '' }) || '').trim();
       ctx = { numero, title };
     }
@@ -21738,7 +21836,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div style={{display:'flex',gap:6,alignItems:'center',flex:'1 1 200px',minWidth:0}}>
                     <div title={num?undefined:"Paire pas encore identifiée automatiquement : pose son N° ici"} style={{display:'flex',alignItems:'center',gap:3,border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 7px',background:C.bg,width:74,flexShrink:0}}>
                       <span style={{fontSize:11,color:C.muted,fontWeight:500}}>N°</span>
-                      <ChampSaisie value={ov.numero ?? ''} onCommit={v=>setSaleOverride(o.transaction_id,{numero:v})} placeholder={baseNum||'?'} inputMode="numeric" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
+                      <ChampSaisie value={ov.numero ?? ''} onCommit={v=>setSaleOverride(o.transaction_id,{numero:v})} placeholder={baseNum||'?'} inputMode={clavierNum()} style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
                     </div>
                     <div style={{flex:1,minWidth:0,display:'flex',alignItems:'center',gap:3,border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 8px',background:C.bg}}>
                       <ChampSaisie value={ov.buyPrice ?? ''} onCommit={v=>setSaleOverride(o.transaction_id,{buyPrice:v})} placeholder={baseBuy?`achat ${baseBuy}€ (auto)`:"prix d'achat"} inputMode="decimal" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
@@ -22621,7 +22719,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               ) : null; })()}
               <div style={{display:'flex',gap:9}}>
                 <Field label="Prix payé €"><input value={offDraft.price} onChange={e=>setOffDraft(d=>({...d,price:e.target.value}))} inputMode="decimal" placeholder="0" style={inp}/></Field>
-                <Field label="N° de la paire"><input value={offDraft.numero} onChange={e=>setOffDraft(d=>({...d,numero:e.target.value.replace(/[^\d]/g,'')}))} inputMode="numeric" placeholder={String(nextNumero)} style={inp}/></Field>
+                <Field label="N° de la paire"><input value={offDraft.numero} onChange={e=>setOffDraft(d=>({...d,numero:e.target.value.toUpperCase().replace(/[^0-9A-Z]/g,'').slice(0,9)}))} inputMode={clavierNum()} placeholder={String(nextNumero)} style={inp}/></Field>
               </div>
               <div style={{display:'flex',gap:9}}>
                 <Field label="Provenance"><select value={offDraft.source} onChange={e=>setOffDraft(d=>({...d,source:e.target.value}))} style={inp}>{Object.entries(SRC).map(([k,v])=><option key={k} value={k}>{v.e} {v.l}</option>)}</select></Field>
@@ -23348,7 +23446,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <div style={{display:'flex',alignItems:'baseline',gap:8}}>
                       <span data-prix style={{fontSize:19,fontWeight:700,color:C.text,fontVariantNumeric:'tabular-nums'}}>{prix(it.price,it.currency)||'—'}</span>
                       <span style={{marginLeft:'auto',flexShrink:0,fontSize:12,fontWeight:700,color:num?C.text:C.muted,background:C.bg,border:`1px solid ${C.border}`,borderRadius:5,padding:'1px 7px'}}>
-                        <EnLigne data="numero" value={num} onCommit={(v,avant)=>poserNumero(item,v,avant)} inputMode="numeric" placeholder={String(nextNumero)} largeur={46}
+                        <EnLigne data="numero" value={num} onCommit={(v,avant)=>poserNumero(item,v,avant)} inputMode={clavierNum()} placeholder={String(nextNumero)} largeur={46}
                           titre="Numéro de rangement (écrit sur la boîte) — cliquer pour le changer" rendu={num?`N°${num}`:'+ N°'}/>
                       </span>
                     </div>
@@ -23945,7 +24043,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           celui de l'annonce, §24) : c'est toi qui le donnes, et il
                           est mémorisé sur la vente (`vinted_sale_overrides`). */}
                       {!num && !b && o && o.transaction_id!=null && <button type="button" onClick={async ()=>{
-                        const v=(await askText({numeric:true,desc:`Quel numéro porte cette paire ? « ${titre} »`,value:''})||'').trim();
+                        const v=(await askText({numeric:clavierNum()==='numeric',desc:`Quel numéro porte cette paire ? « ${titre} »`,value:''})||'').trim();
                         if(v) setSaleOverride(o.transaction_id,{numero:v});
                       }} title="Poser le numéro de boîte de cette paire" style={{...sec,border:`1px solid ${C.warn}`,background:`${C.warn}14`,color:C.warn,padding:'12px 13px',fontSize:13}}>🔢 Poser le N°</button>}
                       {/* ⚠️ UNE SEULE RANGÉE D'ACTIONS. Les états (imprimé, colis
@@ -25715,9 +25813,13 @@ function LbcRelier({ ad, numsConnus, onRelie }) {
   const photo = (Array.isArray(ad.images) && ad.images[0]) || ad.image || '';
   const id = ad.id != null ? String(ad.id) : '';
   const relier = () => {
-    const n = String(num || '').trim().replace(/^n[°o]?\s*/i, '');
+    // « n125 » (l'écriture des titres Vinted) vaut 125 — sauf s'il existe une
+    // vraie série « N » : alors N125 est un numéro à part entière.
+    const brut = cleNum(num);
+    const sansN = brut.replace(/^N[°O]?(?=\d)/, '');
+    const n = numsConnus.includes(brut) ? brut : sansN;
     if (!id) { setMsg("Cette annonce n'a pas d'identifiant Leboncoin : impossible de la relier."); return; }
-    if (!/^\d{1,5}$/.test(n)) { setMsg('Tape le numéro de la paire (des chiffres).'); return; }
+    if (!NUM_OK.test(n)) { setMsg('Tape le numéro de la paire (125, ou B125).'); return; }
     if (!numsConnus.includes(n)) { setMsg(`Aucune paire ne porte le N°${n} dans VRM.`); return; }
     const liens = { ...(load('vrm_lbc_liens', {}) || {}), [id]: n };
     // ⚠️ `save` écrit 500 ms plus tard : l'écran se rechargeait AVANT et ne
@@ -25925,11 +26027,13 @@ function LeboncoinScreen() {
     const adKeys = (ad) => {
       const ks = [];
       const lien = ad && ad.id != null ? liens[String(ad.id)] : null;
-      if (lien != null && String(lien).trim()) ks.push(String(lien).trim());
-      const c = ad.customRef != null ? String(ad.customRef) : '';
-      const mc = /(\d{1,5})/.exec(c); if (mc && !ks.includes(mc[1])) ks.push(mc[1]);
-      if (ad.ref && !ks.includes(String(ad.ref))) ks.push(String(ad.ref));
-      const mt = numFrom(ad.subject); if (mt && !ks.includes(mt)) ks.push(mt);
+      // Toutes les clés passent par `cleNum` (« VRM-b125 » = « B125 »), des deux
+      // côtés — la même règle que l'extension (`adRefKeys`, §11).
+      const push = (v) => { const k = cleNum(v); if (k && !ks.includes(k)) ks.push(k); };
+      if (lien != null && String(lien).trim()) push(lien);
+      push(refVRMDe(ad.customRef));
+      if (ad.ref) push(ad.ref);
+      const mt = numFrom(ad.subject); if (mt) push(mt);
       return ks;
     };
     const isDead = (ad) => /(supprim|delete|expir|refus|sold|vendu)/i.test(String(ad.status || ''));
@@ -25943,7 +26047,7 @@ function LeboncoinScreen() {
     const liveAds = lbcAds.filter(ad => !isDead(ad) && aLui(ad));
     const refToAd = new Map();
     liveAds.forEach(ad => adKeys(ad).forEach(k => { if (!refToAd.has(k)) refToAd.set(k, ad); }));
-    const vKeys = (id, title) => { const e = numeros[id] || {}; const ks = []; if (e.numero) ks.push(String(e.numero).trim()); const m = numFrom(title || e.title); if (m) ks.push(m); return ks; };
+    const vKeys = (id, title) => { const e = numeros[id] || {}; const ks = []; if (e.numero) ks.push(cleNum(e.numero)); const m = numFrom(title || e.title); if (m) ks.push(cleNum(m)); return ks; };
 
     // ⚠️ CET ÉCRAN ET LE PANNEAU DE L'EXTENSION CALCULENT LA MÊME FILE, CHACUN
     //    DE SON CÔTÉ (le panneau tourne sur leboncoin.fr, où l'app n'est pas
@@ -25988,7 +26092,7 @@ function LeboncoinScreen() {
         url: 'https://www.vinted.fr/items/' + o.id,
       });
     }
-    queue.sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0));
+    queue.sort((a, b) => triNum(a.numero, b.numero));
 
     const removals = [];
     const etatDe = (oid) => etatVinted[String(oid)] || (vendus.has(String(oid)) ? 'vendue' : 'inconnue');
@@ -25997,7 +26101,7 @@ function LeboncoinScreen() {
     // Vinted = vendue → à retirer. Uniquement si la paire est connue de VRM.
     const keysOnline = new Set(); online.forEach(o => vKeys(o.id, o.title).forEach(k => keysOnline.add(k)));
     const keysKnown = new Set();
-    for (const id in numeros) { const e = numeros[id] || {}; if (e.numero) keysKnown.add(String(e.numero).trim()); const m = numFrom(e.title); if (m) keysKnown.add(m); }
+    for (const id in numeros) { const e = numeros[id] || {}; if (e.numero) keysKnown.add(cleNum(e.numero)); const m = numFrom(e.title); if (m) keysKnown.add(cleNum(m)); }
     const unlinked = [];
     for (const ad of liveAds) {
       const ks = adKeys(ad);
@@ -26006,10 +26110,10 @@ function LeboncoinScreen() {
       // L'état vient de l'annonce VINTED que ces clés désignent : l'annonce
       // Leboncoin, elle, ne sait rien de la vente.
       let etat = 'inconnue';
-      for (const id in numeros) { const en = numeros[id] || {}; const k2 = String(en.numero || '').trim(); if (k2 && ks.includes(k2)) { etat = etatDe(id); break; } }
+      for (const id in numeros) { const en = numeros[id] || {}; const k2 = cleNum(en.numero); if (k2 && ks.includes(k2)) { etat = etatDe(id); break; } }
       removals.push({ numero: ks[0], title: ad.subject || '', lbc: true, url: ad.url || '', etat });
     }
-    removals.sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0));
+    removals.sort((a, b) => triNum(a.numero, b.numero));
     // Répartition des annonces LBC par compte (plusieurs comptes possibles).
     const parCompte = {};
     for (const ad of liveAds) { const k = String(ad.lbcUser || '?'); (parCompte[k] = parCompte[k] || []).push(ad); }
@@ -26630,6 +26734,7 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
         )}
 
         <PrenomSetting/>
+        <NumerosSetting/>
 
         <RepondreSetting/>
 
@@ -26872,6 +26977,59 @@ function PrenomSetting() {
       </div>
       <input value={v} onChange={(e)=>ecrire(e.target.value)} placeholder="Prénom" autoComplete="given-name"
         style={{marginTop:10,width:'100%',boxSizing:'border-box',padding:'10px 12px',borderRadius:8,border:`1px solid ${C.border}`,background:C.bg,color:C.text,fontSize:14,fontFamily:'inherit'}}/>
+    </div>
+  );
+}
+
+// ── TES NUMÉROS DE RANGEMENT : CHIFFRES OU SÉRIE À LETTRE ──────────────────
+// Julien, 2 octobre : « toutes les personnes n'utilisent pas les mêmes numéros :
+// des fois elles commencent par B125, C123 ; rends la chose adaptable ».
+// Deux façons de numéroter, au choix de chacun : des chiffres (1, 2, 3… —
+// défaut, rien ne change pour lui) ou une série à lettre (B1, B2…). Le choix ne
+// porte QUE sur les numéros à venir : un numéro déjà donné est écrit sur un
+// carton, il ne bouge jamais (§5). Et quelle que soit la série choisie, un N°
+// tapé à la main peut toujours être « 125 » ou « C40 ».
+function NumerosSetting() {
+  const [p, setP] = React.useState(() => prefixeNumeros());
+  const [mode, setMode] = React.useState(() => (prefixeNumeros() ? 'lettre' : 'chiffres'));
+  const touche = React.useRef(false);
+  React.useEffect(() => onCloudReady(() => {
+    if (touche.current) return;                            // §5.49 : ne remplacer que le vide
+    const v = prefixeNumeros(); if (v) { setP(v); setMode('lettre'); }
+  }), []);
+  const poser = (v) => {
+    touche.current = true;
+    const n = String(v || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3);
+    setP(n);
+    // La copie locale tout de suite (`save` écrit 500 ms plus tard) : les champs
+    // N° et la numérotation automatique la lisent dès le prochain rendu.
+    try { localStorage.setItem('vrm_num_prefixe', JSON.stringify(n)); } catch (_) {}
+    save('vrm_num_prefixe', n);
+    try { window.dispatchEvent(new Event('vrm-prefixe')); } catch (_) {}
+  };
+  const choix = (m) => { setMode(m); poser(m === 'chiffres' ? '' : (p || 'B')); };
+  const pill = (on) => ({ border: `1px solid ${on ? C.accent : C.border}`, background: on ? C.accent : C.card, color: on ? (C.onAccent || '#fff') : C.text, borderRadius: 999, padding: '7px 14px', fontSize: 13, fontWeight: on ? 700 : 600, cursor: 'pointer', fontFamily: 'inherit' });
+  const ex = p || 'B';
+  return (
+    <div data-numeros-reglage={mode} style={{padding:'13px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
+      <div style={{fontSize:13,fontWeight:600,color:C.text}}>Tes numéros de rangement</div>
+      <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.5}}>
+        Comment tu écris le numéro sur tes cartons. Ça ne change que les <b>prochains</b> numéros : ceux déjà donnés ne bougent jamais.
+      </div>
+      <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:10}}>
+        <button type="button" onClick={() => choix('chiffres')} style={pill(mode === 'chiffres')}>Chiffres · 1, 2, 3…</button>
+        <button type="button" onClick={() => choix('lettre')} style={pill(mode === 'lettre')}>Avec une lettre · {ex}1, {ex}2…</button>
+      </div>
+      {mode === 'lettre' && (
+        <label style={{display:'flex',alignItems:'center',gap:8,marginTop:10,fontSize:12.5,color:C.text}}>
+          Lettre(s) de ta série
+          <input value={p} onChange={(e) => poser(e.target.value)} placeholder="B" autoCapitalize="characters" aria-label="Lettres de la série"
+            style={{width:70,padding:'8px 10px',borderRadius:8,border:`1px solid ${C.border}`,background:C.bg,color:C.text,fontSize:14,fontFamily:'inherit',textTransform:'uppercase'}}/>
+        </label>
+      )}
+      <div style={{fontSize:11.5,color:C.muted,marginTop:8,lineHeight:1.5}}>
+        Tu peux toujours taper un numéro à la main, dans n'importe quelle forme : 125, B125, C40. « b125 » et « B125 » sont le même carton.
+      </div>
     </div>
   );
 }

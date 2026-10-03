@@ -205,7 +205,7 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
     ? ok('une paire vendue est signalée avant toute reprise de son numéro')
     : nok('une paire vendue est signalée avant toute reprise de son numéro');
   // Saisie manuelle : un numéro déjà porté par une paire PRÉSENTE doit être refusé.
-  /const poserNumero = async/.test(SRC) && /porteursNum\[n\] \|\| \[\]/.test(SRC)
+  /const poserNumero = async/.test(SRC) && /porteursNum\[\w+\] \|\| \[\]/.test(SRC)
     ? ok('changer un N° à la main : refus si une paire le porte encore')
     : nok('changer un N° à la main : refus si une paire le porte encore');
 }
