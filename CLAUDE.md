@@ -3993,6 +3993,33 @@ sans N° — il fallait recopier le numéro à la main sur l'étiquette.
   ses flux, le banc les décompresse avant de chercher le texte) ; `audit-exec.cjs`
   à 15 contrôles, dont « aucune autre adresse ne passe par ce pont ».
 
+### « Plusieurs milliers de personnes » — lot 1 : le cache et les notifications (3 octobre)
+Mesuré par la cartographie du 3 octobre (bundle, service worker, en-têtes de
+production), corrigé sur ce qui ne change rien à l'écran :
+- ⚠️ **Le cache du service worker gardait TOUTES les versions** (`vrm-shell-v4` :
+  1,4 → 3,3 Mo en trois déploiements, 13 à 21 déploiements par jour, jamais
+  purgé). Il passe en **v5** (l'activation jette la v4 chez tout le monde) et,
+  quand la page annonce un **autre** script principal, retire de `/assets/` tout
+  ce qu'elle ne nomme pas. Même version rouverte ⇒ rien n'est jeté (sinon la 3D
+  et pdf-lib se retéléchargeraient à chaque ouverture).
+- ⚠️⚠️ **Tout fichier même-origine était servi « cache d'abord »**, y compris
+  `/VRM-extension.zip` (même nom à chaque version) : le lien sans `?v=` rendait
+  l'**ancien zip, pour toujours** — le défaut le plus coûteux du projet (§ zip),
+  par un autre chemin. Seul `/assets/` (hashé) est « cache d'abord » ; le reste
+  est réseau d'abord, cache en secours.
+- **`/assets/` en cache long** (`vercel.json`, `immutable`) : la production
+  servait tout en `max-age=0`. Rien d'autre n'est figé.
+- ⚠️ **Trois clés de notifications coexistaient** (main.jsx, sw.js, App.jsx) :
+  seule celle d'App.jsx était celle du serveur. À chaque ouverture, main.jsx
+  renvoyait un abonnement périmé ou en recréait un avec la mauvaise clé —
+  refusé par Apple/Google, sans un mot. Une seule source : `src/vapid.js`
+  (sw.js en porte une copie, il ne peut pas importer) ; un abonnement à une
+  autre clé est remplacé à l'ouverture.
+- Preuves : banc `sw-cache.cjs` (trois déploiements synthétiques avec le VRAI
+  `sw.js`, aucune fixture) — **2 rouges** sur l'avant ; `audit-vapid.cjs` —
+  **3 rouges** sur l'avant. `audit-push.cjs` suit désormais la clé jusqu'à
+  `src/vapid.js` (vingt-cinquième cri au loup évité : la règle, pas l'endroit).
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
