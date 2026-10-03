@@ -4156,6 +4156,35 @@ Vinted », avec un lien « scanne ton code de retrait ». L'app n'en montrait ri
 orange ; régénérées depuis `logo-vrm.png` (VRM Noir), maskable avec marge sur
 fond `#07090D`. iOS cache l'icône d'accueil : retirer le raccourci et le rajouter.
 
+### Relier un achat DEPUIS la vente (3 octobre)
+Julien : « dans les ventes finalisées / en cours, relier les achats avec les
+ventes — un gain de temps de ouf ; même si l'app ne trouve pas, elle fait une
+sélection et je tranche. »
+- **Mesuré dans le code** : tout existait déjà — le picker `openPicker`/
+  `choosePick` (écran Annonces), le classement par `scoreAchat` (même marque/
+  taille en tête), `AchatRelie` (photo + reçu), et la carte de vente AFFICHAIT
+  déjà l'achat relié (`<AchatRelie entry={e}/>`). **Le seul trou : aucun moyen de
+  CRÉER le lien depuis la vente** — on ne pouvait le faire que depuis Annonces.
+- Ajouté sur chaque carte de vente (sauf annulée) : **« Relier l'achat »** quand
+  aucun coût n'est connu, **« changer »** quand un achat est déjà relié. Le clic
+  ouvre le MÊME picker (§11), trié par pertinence — « la sélection » qu'il
+  demande ; c'est toujours SON clic qui relie, **jamais un rapprochement
+  automatique par titre** (§5, garanti par `audit-identite`).
+- **Deux chemins, une seule info** : une vente AVEC identité d'annonce
+  (`identiteAnnonce` → item_id) relie la **paire** (`numeros[id]`, partagé avec la
+  compta et l'écran Annonces) ; une vente SANS identité relie la **vente**
+  elle-même (override `saleOv[tx]`, `_saleTx`). `choosePick` branche sur `_saleTx`,
+  `effEntry` fait ressortir `buyFromId`/`buyFrom` de l'override, `linkedBuyIds`
+  inclut les deux (un achat déjà relié ne se repropose pas). `withBuyByNum` ne
+  remplit que si vide → l'override n'est jamais écrasé.
+- Le coût rempli alimente la marge, le bénéfice et la compta par les voies
+  existantes (`buyOf`/`benef`), sans second calcul.
+- ⚠️ **Non render-vérifié ici** (pas de fixtures dans ce conteneur) : build +
+  `audit-identite/chiffres/variables/icones/coherence` verts, la logique réutilise
+  le flux déjà éprouvé de l'écran Annonces, mais le rendu de la carte de vente est
+  à regarder au banc dès qu'il y a des fixtures. C'est de la plomberie + UI, pas
+  une nouvelle règle de rapprochement.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
