@@ -3547,6 +3547,17 @@ const prochainLibre = (prisInt, prisCles, pref) => {
   let c = 1; while (prisCles.has(pref + c)) c += 1; prisCles.add(pref + c); return pref + c;
 };
 
+// Les numéros PHYSIQUEMENT présents (annonce en ligne ou colis pas encore
+// parti), publiés par l'écran Annonces dans `vinted_nums_physiques` sous la
+// forme `{ nums, at }` (§11 : un propriétaire, des lecteurs). ⚠️ Trois lecteurs
+// testaient `Array.isArray(phys)` sur cet objet : toujours faux, donc « pas de
+// liste » — le Garage 3D proposait de ranger tout l'historique. Clés `cleNum`.
+// null = la liste n'a jamais été publiée sur cet appareil (on ne filtre pas).
+const numsPresents = () => {
+  const p = load('vinted_nums_physiques', null);
+  const l = Array.isArray(p) ? p : (p && Array.isArray(p.nums) ? p.nums : null);
+  return l && l.length ? new Set(l.map(cleNum)) : null;
+};
 // Annote un bordereau (PDF) en imprimant le NUMERO de la paire (en gros) et le
 // TITRE en bas de la premiere page, sur un bandeau blanc, puis declenche le
 // telechargement. But : ne pas se tromper de paire quand on prepare un envoi.
@@ -8186,8 +8197,7 @@ function EbayConnexion({ comptes = [] }) {
   React.useEffect(() => { let stop = false; (async () => {
     try {
       const fiches = load('vinted_annonce_numeros', {}) || {};
-      const phys = load('vinted_nums_physiques', null);
-      const presents = Array.isArray(phys) && phys.length ? new Set(phys.map(String)) : null;
+      const presents = numsPresents();
       // ⚠️ NE PROPOSER QUE LES PAIRES EN LIGNE (plainte de Julien : « il y a des
       // paires déjà vendues »). On lit les annonces de chaque compte et on garde
       // les id dont l'annonce Vinted est ACTIVE (is_closed=false). Aucune annonce
@@ -8215,7 +8225,7 @@ function EbayConnexion({ comptes = [] }) {
         const f = fiches[id] || {}; const n = f.numero != null ? String(f.numero).trim() : '';
         if (!n || vus.has(n)) continue;
         if (online && !online.has(String(id))) continue;      // en ligne seulement (vendue/retirée écartée)
-        if (!online && presents && !presents.has(n)) continue; // à défaut : au moins « en stock » si on le sait
+        if (!online && presents && !presents.has(cleNum(n))) continue; // à défaut : au moins « en stock » si on le sait
         vus.add(n);
         const cover = f.photo || null;
         const dphotos = Array.isArray(details[id] && details[id].photos) ? details[id].photos.map(norm).filter(Boolean) : [];
@@ -13304,13 +13314,12 @@ function RoomPlan({ locate, onLocateConsumed }) {
 
   const aRanger = useMemo(() => {
     const fiches = load('vinted_annonce_numeros', {}) || {};
-    const phys = load('vinted_nums_physiques', null);
-    const presents = Array.isArray(phys) && phys.length ? new Set(phys.map(String)) : null;
+    const presents = numsPresents();
     const vues = new Set(), out = [];
     Object.values(fiches).forEach(f => {
       const n = f && f.numero != null ? String(f.numero).trim() : '';
       if (!n || vues.has(n) || dejaRangees.has(n)) return;
-      if (presents && !presents.has(n)) return;
+      if (presents && !presents.has(cleNum(n))) return;
       vues.add(n);
       out.push({ numero: n, title: f.title || '', photo: f.photo || null, taille: extractSize(f.title || ''), at: f.numberedAt || 0, sur: !!presents });
     });
@@ -13320,7 +13329,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
     // contient tout l'historique — des paires parties depuis des mois. On
     // remonte alors les plus RÉCEMMENT numérotées : ce sont celles en stock.
     return presents
-      ? out.sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0))
+      ? out.sort((a, b) => triNum(a.numero, b.numero))
       : out.sort((a, b) => (b.at || 0) - (a.at || 0));
   }, [dejaRangees]);
 
@@ -13339,8 +13348,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
   // SIGNALE au lieu de choisir en silence.
   const ficheParNum = useMemo(() => {
     const fiches = load('vinted_annonce_numeros', {}) || {};
-    const phys = load('vinted_nums_physiques', null);
-    const presents = Array.isArray(phys) && phys.length ? new Set(phys.map(String)) : null;
+    const presents = numsPresents();
     const par = {};
     Object.values(fiches).forEach(f => {
       const n = f && f.numero != null ? String(f.numero).trim() : ''; if (!n) return;
@@ -13348,7 +13356,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
     });
     const out = {};
     Object.entries(par).forEach(([n, arr]) => {
-      const vivantes = presents ? arr.filter(f => presents.has(n)) : arr;
+      const vivantes = presents ? arr.filter(f => presents.has(cleNum(n))) : arr;
       const pool = vivantes.length ? vivantes : arr;
       const best = pool.slice().sort((a, b) => (b.numberedAt || 0) - (a.numberedAt || 0))[0];
       const titres = new Set(arr.map(f => normTitle(f.title || '')).filter(Boolean));

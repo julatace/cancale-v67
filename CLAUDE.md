@@ -3903,6 +3903,11 @@ Ce qui est en place :
 - Preuves sur le code d'avant : banc `numeros-lettres.cjs` **3 rouges** (B125 perdu
   du pool, « b125 » accepté sur le même carton, pas de série) ;
   `audit-numeros-lettres.cjs` **3 rouges** (« VRM-B125 » → `["125"]`).
+- ⚠️ **Trouvé au passage** : trois lecteurs (Garage 3D « à ranger », la fiche
+  par numéro, le sélecteur de paires à publier) testaient `Array.isArray(phys)`
+  sur `vinted_nums_physiques`, publiée en `{ nums, at }` — toujours faux, donc
+  le filtre « paires présentes » **n'a jamais joué** : le Garage 3D proposait de
+  ranger tout l'historique. Une règle, `numsPresents()` ; l'audit refuse le motif.
 - ⚠️ **Pas couvert, volontairement** : les piles du Garage 3D se numérotent en
   entiers (`pileNums`) ; une boîte seule accepte « B125 ». Les titres Vinted
   « n125 » restent lus en chiffres (c'est une suggestion, pas une identité).
