@@ -123,6 +123,19 @@ const projette = (row, sel) => {
       const horsPalette = /#0F8A6A|#09B1BA|#EC5A13|rgb\(15, 138, 106\)|rgb\(9, 177, 186\)|rgb\(236, 90, 19\)/i;
       dit(![c.a, c.b, c.c].some((x) => horsPalette.test(x.html)), 'aucune couleur hors palette sur les cartes (§7)');
       dit(c.sw <= c.cw + 1, 'aucun débordement horizontal', `${c.sw} > ${c.cw}`);
+      // 3 octobre (« trop brouillon ») : le N° et l'achat ne sont plus écrits deux
+      // fois (texte + champ) ; le TEXTE se modifie en place. On le prouve en le
+      // modifiant pour de vrai.
+      const visibles = await pg.evaluate(() => [...document.querySelectorAll('[data-carte-annonce="9102"] input')].filter((i) => i.offsetParent !== null && !i.closest('details')).map((i) => (i.closest('div') || {}).innerText + '|' + i.placeholder));
+      dit(visibles.length === 0, 'au repos, aucune ligne de saisie sous la carte (le N° et l’achat ne sont écrits qu’une fois)', JSON.stringify(visibles));
+      try {
+        await pg.click('[data-carte-annonce="9102"] [data-edition="achat"]', { timeout: 4000 });
+        await pg.keyboard.type('30');
+        await pg.keyboard.press('Enter');
+        await pg.waitForTimeout(500);
+      } catch (e) { dit(false, 'l’achat se modifie en place (texte cliquable)', String(e.message).slice(0, 80)); }
+      const apres = await pg.evaluate(() => (document.querySelector('[data-carte-annonce="9102"]') || {}).innerText || '');
+      dit(/achat\s*30,00/.test(apres), 'cliquer sur « achat — », taper 30, Entrée : la carte dit « achat 30,00 € »', (apres.match(/achat[^\n]*/) || [''])[0]);
       await pg.screenshot({ path: path.join(require('os').tmpdir(), 'annonces-' + vp.width + '.png') });
       await ctx.close();
     }
