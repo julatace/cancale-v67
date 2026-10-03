@@ -54,18 +54,24 @@ const cles = (ad) => essaie('adRefKeys', () => ctx.adRefKeys(ad, {})) || [];
 }
 
 // ── L'app : les helpers du module, extraits tels quels ─────────────────────
+dit(!/Array\.isArray\(phys\) && phys\.length/.test(APP), 'app : aucun lecteur ne teste encore `Array.isArray(phys)` sur { nums, at }');
 const debut = APP.indexOf('const cleNum = ');
 const fin = APP.indexOf('// Annote un bordereau (PDF)', debut);
 const H = {};
 if (debut < 0 || fin < 0) dit(false, 'app : les helpers de numéro existent (cleNum…)', 'introuvables');
 else {
-  const hctx = { load: (k, d) => (k === 'vrm_num_prefixe' ? H.pref : d), H };
+  const hctx = { load: (k, d) => (k === 'vrm_num_prefixe' ? H.pref : k === 'vinted_nums_physiques' ? H.phys : d), H };
   vm.createContext(hctx);
-  essaie('app : helpers chargés', () => vm.runInContext(APP.slice(debut, fin) + '\nH.cleNum=cleNum;H.refVRMDe=refVRMDe;H.entreePool=entreePool;H.prochainLibre=prochainLibre;H.NUM_OK=NUM_OK;', hctx, { filename: 'App.jsx' }));
+  essaie('app : helpers chargés', () => vm.runInContext(APP.slice(debut, fin) + '\nH.cleNum=cleNum;H.refVRMDe=refVRMDe;H.entreePool=entreePool;H.prochainLibre=prochainLibre;H.NUM_OK=NUM_OK;H.numsPresents=typeof numsPresents===\'function\'?numsPresents:null;', hctx, { filename: 'App.jsx' }));
   if (H.cleNum) {
     dit(H.cleNum('b 125') === 'B125' && H.cleNum('B-125') === 'B125' && H.cleNum('007') === '7', 'app : « b 125 », « B-125 » = B125 ; « 007 » = 7');
     dit(H.entreePool('B125') === 'B125' && H.entreePool('125') === 125 && H.entreePool('n/d') === null, 'app : le pool garde B125 (texte) et 125 (entier), refuse le reste');
     dit(H.prochainLibre(new Set([1, 2]), new Set(), '') === '3' && H.prochainLibre(new Set(), new Set(['B1', 'B2']), 'B') === 'B3', 'app : prochain libre = 3 en chiffres, B3 dans la série B');
+    // La liste des paires présentes est publiée en { nums, at } : un lecteur qui
+    // testait `Array.isArray` sur cet objet ne filtrait JAMAIS (Garage 3D).
+    H.phys = { nums: ['B125', '7'], at: 1 };
+    const pr = H.numsPresents ? essaie('numsPresents', () => H.numsPresents()) : null;
+    dit(!!(pr && pr.has('B125') && pr.has('7')), 'app : la liste des paires présentes publiée en { nums, at } est bien LUE', pr ? JSON.stringify([...pr]) : 'non lue');
     const entrees = ['VRM-B125', 'VRM-125', 'VRM-b12', 'Ref 2024-15', 'VRM-C40', 'VRM-007'];
     const ecarts = entrees.filter((t) => H.refVRMDe(t) !== ctx.refVRMDe(t));
     dit(ecarts.length === 0, 'app et extension lisent la MÊME référence (§11)', ecarts.map((t) => `${t}: app ${H.refVRMDe(t)} / ext ${ctx.refVRMDe(t)}`).join(' · '));
