@@ -3857,6 +3857,20 @@ c'est lui qui la redemande, ce n'est pas un retour en arrière à corriger.
   **aucun bouton d'offre** (il ne pourrait pas marcher), et la raison est dite.
 - Banc `messagerie.cjs` (rejoue le vrai dialogue du pont, deux tailles).
 
+### « L'onglet Annonces est trop brouillon » (3 octobre)
+Vu au rendu : huit pastilles encadrées en rang (lues comme huit choses à faire),
+puis cinq blocs avant la première carte, et sur CHAQUE carte le N° et le prix
+d'achat **écrits deux fois** (le texte, puis une ligne de champs de saisie).
+- Les **chiffres** (en ligne, valeur, favoris, vues) sont une **ligne de texte
+  neutre** (`data-ann-resume`) ; ne restent en pastilles que les **gestes**
+  (sans N°, à recapturer, qui dorment, sans prix d'achat, Aide à la vente).
+- Le N° et l'achat se **modifient en place** (`EnLigne` : le texte reste, un clic
+  en fait un champ, Entrée enregistre, Échap annule). La ligne de saisie sous
+  chaque carte est retirée ; « Marquer vendue » passe dans « ⋯ ».
+- « Publier aussi ailleurs » tient sur une ligne (Leboncoin · eBay côte à côte).
+- Banc `annonces-carte.cjs` : aucune saisie visible hors « ⋯ » au repos, et
+  modifier « achat — » → « achat 30,00 € » pour de vrai (rouge sur l'avant).
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par

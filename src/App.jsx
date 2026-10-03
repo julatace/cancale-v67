@@ -4442,6 +4442,25 @@ function Input({label,...p}) {
    pas dedans, il suit la donnée (numéro posé automatiquement, prix repris
    d'un achat relié…). `onCommit` n'est appelé QUE si la valeur a changé —
    sinon entrer puis sortir d'un champ prix effacerait l'achat relié. */
+// ── ÉDITER EN PLACE (3 octobre, écran Annonces) ─────────────────────────────
+// « L'onglet Annonces est trop brouillon » : chaque carte écrivait son N° et son
+// prix d'achat DEUX fois (le texte, puis un champ de saisie juste dessous). Le
+// texte reste — c'est lui qu'on lit — et un clic le transforme en champ ;
+// Entrée ou un clic ailleurs enregistre (ChampSaisie), Échap annule.
+function EnLigne({ value, onCommit, rendu, placeholder, inputMode, largeur = 64, titre, data }) {
+  const [edit, setEdit] = useState(false);
+  if (edit) return (
+    <span onBlur={() => setEdit(false)} style={{display:'inline-flex'}}>
+      <ChampSaisie autoFocus value={value} onCommit={onCommit} placeholder={placeholder} inputMode={inputMode}
+        style={{width:largeur,border:'none',borderBottom:`1.5px solid ${C.accent}`,background:'transparent',color:C.text,fontSize:12.5,fontWeight:600,outline:'none',padding:'0 2px',fontFamily:'inherit'}}/>
+    </span>
+  );
+  return (
+    <button type="button" data-edition={data} onClick={() => setEdit(true)} title={titre || 'Cliquer pour modifier'}
+      style={{border:'none',borderBottom:`1px dashed ${C.border}`,background:'transparent',padding:0,minHeight:0,margin:0,color:'inherit',font:'inherit',cursor:'text',lineHeight:'inherit'}}>{rendu}</button>
+  );
+}
+
 function ChampSaisie({ value, onCommit, apresEntree, style, ...p }) {
   const [txt, setTxt] = useState(value == null ? '' : String(value));
   const [actif, setActif] = useState(false);
@@ -22967,29 +22986,27 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </div>
             </div>
           )}
-          {/* Bandeau de stats façon outil pro */}
+          {/* ── L'EN-TÊTE (3 octobre, « trop brouillon ») ───────────────────────
+              Huit pastilles en rang, toutes encadrées, se lisaient comme huit
+              choses à faire. Les CHIFFRES (combien en ligne, valeur, favoris,
+              vues) sont une ligne de texte neutre ; seules les pastilles qui
+              demandent un GESTE restent des pastilles. §7 : la couleur est
+              réservée à ce qui est à rattraper. */}
+          <div data-ann-resume style={{fontSize:12.5,color:C.muted,marginBottom:8,lineHeight:1.5}}>
+            <b style={{color:C.text,fontWeight:700}}>{annStats.n} en ligne sur Vinted</b>
+            {annStats.aussiLbc>0?` · ${annStats.aussiLbc} aussi sur Leboncoin`:''}
+            {annStats.boostees>0?` · ${annStats.boostees} boostée${annStats.boostees>1?'s':''}`:''}
+            {` · ${annStats.val.toFixed(0)} € de valeur`}
+            {annStats.hasFav?<> · <Icon name="heart" size={12} style={{verticalAlign:'-2px'}}/> {annStats.favs}</>:null}
+            {annStats.hasView?<> · <Icon name="eye" size={12} style={{verticalAlign:'-2px'}}/> {annStats.views}</>:null}
+            {annStats.pretLbc>0 && annStats.aRecapturer===0 ? ` · ✓ ${annStats.pretLbc} prêtes pour Leboncoin` : ''}
+          </div>
           <div className="vrm-rangee" style={{display:'flex',gap:8,marginBottom:10,alignItems:'center',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',paddingBottom:2}}>
-            <span style={{flexShrink:0,fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:'4px 11px'}}>{annStats.n} en ligne sur Vinted{annStats.aussiLbc>0?` · ${annStats.aussiLbc} aussi sur Leboncoin`:''}{annStats.boostees>0?` · ${annStats.boostees} boostée${annStats.boostees>1?'s':''}`:''}</span>
-            <span style={{flexShrink:0,fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:'4px 11px'}}>{annStats.val.toFixed(0)} € de valeur</span>
-            {annStats.hasFav && <span title="Favoris cumulés sur tes annonces en ligne" style={{flexShrink:0,display:'inline-flex',alignItems:'center',gap:5,fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:'4px 11px'}}><Icon name="heart" size={13}/> {annStats.favs}</span>}
-            {annStats.hasView && <span title="Vues cumulées sur tes annonces en ligne" style={{flexShrink:0,display:'inline-flex',alignItems:'center',gap:5,fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:'4px 11px'}}><Icon name="eye" size={13}/> {annStats.views}</span>}
-            {annStats.sansNum>0 && <span style={{fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'4px 11px'}}>{annStats.sansNum} sans N°</span>}
-            {/* ⚠️ « Toute l'annonce captée ? » — même base que la grille (§11).
-                On compare les photos captées au compte RÉEL de Vinted : tant
-                qu'il en manque, la paire n'a pas toutes ses photos pour partir
-                sur Leboncoin. Rouvrir l'annonce sur Vinted les capte. */}
+            {annStats.sansNum>0 && <span style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'4px 11px'}}>{annStats.sansNum} sans N°</span>}
+            {/* ⚠️ « Toute l'annonce captée ? » — même base que la grille (§11). */}
             {annStats.aRecapturer>0 && <span title={`${annStats.pretLbc} paire(s) ont TOUTES leurs photos + une description captées — prêtes pour Leboncoin. ${annStats.aRecapturer} n'ont pas encore toutes leurs photos : rouvre-les sur Vinted (extension à jour) pour que l'extension les capte en entier.`} style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'4px 11px'}}>{annStats.aRecapturer} à recapturer pour Leboncoin</span>}
-            {annStats.pretLbc>0 && annStats.aRecapturer===0 && <span title="Toutes tes paires numérotées ont leurs photos et leur description captées : elles peuvent partir sur Leboncoin." style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:'4px 11px'}}>✓ {annStats.pretLbc} prêtes pour Leboncoin</span>}
-            {/* ⚠️ « qui dorment » était en ROUGE, à côté d'un « sans N° » ambre et
-                d'un bouton bleu plein : trois couleurs dans une rangée de stats.
-                Le rouge est réservé à ce qui est irréversible — deux paires sous
-                le même numéro (§5.56). Une paire qui dort depuis un mois se
-                rattrape ; c'est de l'ambre. */}
+            {/* Une paire qui dort se rattrape : de l'ambre, jamais du rouge (§5.56). */}
             {annStats.sleeping>0 && <button onClick={()=>setAnnSort('sleeping')} style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'4px 11px',cursor:'pointer',display:'inline-flex',alignItems:'center',gap:5}}><Icon name="sleep" size={13}/>{annStats.sleeping} qui dorment{annStats.sleepingVal>0?` · ${annStats.sleepingVal.toFixed(0)} €`:''}</button>}
-
-            {/* La seule ACTION de la rangée garde l'accent, mais en contour :
-                un aplat de couleur posé à côté de cinq pastilles neutres tirait
-                l'œil vers un raccourci, pas vers les chiffres. */}
             {fillBuyRows.length>0 && <button onClick={()=>setFillBuyOpen(true)} title="Sans prix d'achat, la marge de chaque annonce reste vide et le bénéfice est faux. Une liste, un champ par ligne, Entrée passe à la suivante." style={{flexShrink:0,whiteSpace:'nowrap',display:'inline-flex',alignItems:'center',gap:5,fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:'4px 11px',cursor:'pointer'}}><Icon name="cash" size={13}/>{fillBuyRows.length} paires sans prix d'achat</button>}
             <button onClick={()=>setShowLister(true)} title="Prix conseillé + titre & description prêts à coller" style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.accent,background:C.card,border:`1px solid ${C.accent}`,borderRadius:8,padding:'4px 12px',cursor:'pointer',display:'inline-flex',alignItems:'center',gap:5}}><Icon name="spark" size={13}/>Aide à la vente</button>
           </div>
@@ -23323,9 +23340,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {/* 1er oct. — « trop chargé » : les places tiennent dans UNE carte,
                 une ligne chacune (nom · combien · Toutes / Aucune). La phrase
                 commune dessous, en petit. */}
-            <div style={{marginBottom:12,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'4px 12px 10px',boxShadow:C.shadow||'none'}}>
+            <div style={{marginBottom:12,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'6px 12px 10px',boxShadow:C.shadow||'none'}}>
+              <div style={{fontSize:11,color:C.muted,fontWeight:600,paddingTop:2}}>Publier aussi ailleurs</div>
+              <div style={{display:'flex',flexWrap:'wrap',columnGap:22}}>
               {lignes.map((l, i) => (
-                <div key={l.pl.cle} style={{padding:'8px 0',borderTop:i?`1px solid ${C.border}`:'none'}}>
+                <div key={l.pl.cle} style={{padding:'6px 0',flex:'1 1 260px',minWidth:0}}>
                   <div style={{display:'flex',alignItems:'center',gap:10}}>
                     <div style={{flex:1,minWidth:0,fontSize:13,color:C.text}}>
                       <b style={{fontWeight:700}}>{l.pl.nom}</b>
@@ -23341,7 +23360,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {!uniforme && <div style={{fontSize:11.5,color:C.muted,lineHeight:1.45,marginTop:4}}>{phrase(l, true)}</div>}
                 </div>
               ))}
-              {uniforme && <div style={{fontSize:11.5,color:C.muted,lineHeight:1.45,paddingTop:8,borderTop:`1px solid ${C.border}`}}>{phrase(lignes[0], false)}</div>}
+              </div>
+              {uniforme && <div style={{fontSize:11.5,color:C.muted,lineHeight:1.45,paddingTop:6}}>{phrase(lignes[0], false)}</div>}
             </div>
           </>);
         })()}
@@ -23386,9 +23406,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div style={{flex:1,minWidth:0,display:'flex',flexDirection:'column',gap:2}}>
                     <div style={{display:'flex',alignItems:'baseline',gap:8}}>
                       <span data-prix style={{fontSize:19,fontWeight:700,color:C.text,fontVariantNumeric:'tabular-nums'}}>{prix(it.price,it.currency)||'—'}</span>
-                      {num
-                        ? <span title="Numéro de rangement (écrit sur la boîte)" style={{marginLeft:'auto',flexShrink:0,fontSize:12,fontWeight:700,color:C.text,background:C.bg,border:`1px solid ${C.border}`,borderRadius:5,padding:'1px 7px'}}>N°{num}</span>
-                        : <span style={{marginLeft:'auto',flexShrink:0,fontSize:11,color:C.muted}}>sans N°</span>}
+                      <span style={{marginLeft:'auto',flexShrink:0,fontSize:12,fontWeight:700,color:num?C.text:C.muted,background:C.bg,border:`1px solid ${C.border}`,borderRadius:5,padding:'1px 7px'}}>
+                        <EnLigne data="numero" value={num} onCommit={(v,avant)=>poserNumero(item,v,avant)} inputMode="numeric" placeholder={String(nextNumero)} largeur={46}
+                          titre="Numéro de rangement (écrit sur la boîte) — cliquer pour le changer" rendu={num?`N°${num}`:'+ N°'}/>
+                      </span>
                     </div>
                     <div data-titre style={{fontSize:12.5,fontWeight:500,color:C.text,lineHeight:1.3,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{it.title||it.brand||'—'}</div>
                     <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{[it.size,it.condition].filter(Boolean).join(' · ')}</div>
@@ -23397,7 +23418,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {ailleurs && <div data-aussi-sur style={{fontSize:11,color:C.text}}>Aussi sur <b>Leboncoin</b></div>}
                     {/* Les chiffres, TOUS libellés ; « — » quand on ne sait pas, jamais 0 (§7). */}
                     <div data-chiffres style={{display:'flex',flexWrap:'wrap',gap:'2px 10px',marginTop:2}}>
-                      <span><span style={lab}>achat </span><span style={val}>{achat!=null&&!isNaN(achat)?fmtE(achat):'—'}</span></span>
+                      <span><span style={lab}>achat </span><EnLigne data="achat" value={buy} onCommit={v=>updatePair(item,{buyPrice:v,buyFromId:null,buyFrom:null})} inputMode="decimal" placeholder={achat!=null&&!isNaN(achat)?String(achat):'€'} largeur={56}
+                        titre="Prix d'achat — cliquer pour le saisir" rendu={<span style={val}>{achat!=null&&!isNaN(achat)?fmtE(achat):'—'}</span>}/></span>
                       {boost>0 && <span><span style={lab}>boost </span><span style={val}>{fmtE(boost)}</span></span>}
                       {marge!=null && <span title="Si elle part à ce prix : prix − achat − boost"><span style={lab}>marge </span><span style={{...val,color:marge<0?C.warn:C.text}}>{marge>=0?'+':''}{marge} €</span></span>}
                     </div>
@@ -23409,26 +23431,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     </div>
                   </div>
                 </div>
-                {/* La saisie : N° et prix d'achat, puis « ⋯ » pour le reste. */}
-                <div style={{display:'flex',gap:6,padding:'0 10px 10px',alignItems:'center'}}>
-                  <div style={{flex:'0 0 78px',minWidth:0,display:'flex',alignItems:'center',gap:3,border:`1px solid ${C.border}`,borderRadius:8,padding:'2px 6px',background:C.bg}}>
-                    <span style={{fontSize:11,color:C.muted,fontWeight:500}}>N°</span>
-                    <ChampSaisie value={num} onCommit={(v,avant)=>poserNumero(item,v,avant)} inputMode="numeric" placeholder={String(nextNumero)} style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
-                  </div>
-                  <div style={{flex:'1 1 0',minWidth:0,display:'flex',alignItems:'center',gap:3,border:`1px solid ${C.border}`,borderRadius:8,padding:'2px 6px',background:C.bg}}>
-                    <span style={{fontSize:11,color:C.muted,fontWeight:500}}>achat</span>
-                    <ChampSaisie value={buy} onCommit={v=>updatePair(item,{buyPrice:v,buyFromId:null,buyFrom:null})} placeholder="—" inputMode="decimal" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
-                    <span style={{fontSize:11,color:C.muted}}>€</span>
-                  </div>
-                  <button type="button" onClick={async ()=>{ if(await askConfirm('Marquer cette paire VENDUE et la retirer des annonces ?')) markSold(it.id); }} title="Marquer vendue : la retire des annonces tout de suite (sans attendre la synchro Vinted)" style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'4px 9px',cursor:'pointer',fontSize:11.5,fontWeight:600,fontFamily:'inherit'}}>Vendue</button>
-                </div>
                 {/* ⋯ : tout le secondaire, replié. Déplié d'office si un réglage
                     est posé (un réglage rempli ne se cache jamais). */}
                 {(() => {
                   const rempli = minAff !== '' || (e.fees != null && e.fees !== '') || !!e.buyFromId;
                   return (
                     <details open={rempli} style={{borderTop:`1px solid ${C.border}`,padding:'6px 10px 8px'}}>
-                      <summary style={{listStyle:'none',cursor:'pointer',fontSize:11.5,color:C.muted,fontWeight:600,userSelect:'none'}}>⋯ Plancher, boost, achat relié, places</summary>
+                      <summary style={{listStyle:'none',cursor:'pointer',fontSize:11.5,color:C.muted,fontWeight:600,userSelect:'none'}}>⋯ Plancher, boost, vendue, places</summary>
                       <div style={{display:'flex',flexDirection:'column',gap:7,marginTop:7}}>
                         <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
                           <div style={{flex:'1 1 130px',display:'flex',alignItems:'center',gap:4,border:`1px solid ${C.border}`,borderRadius:8,padding:'2px 6px',background:C.bg}}
@@ -23452,6 +23461,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           <button type="button" onClick={()=>openPicker(item)} style={{border:'none',background:'transparent',padding:0,minHeight:0,color:C.accent,fontWeight:600,cursor:'pointer',fontFamily:'inherit',fontSize:11.5}}>Relier un achat</button>
                           {num && <button type="button" onClick={()=>atGarage?(onLocate&&onLocate(num)):(onStore&&onStore(num))} style={{border:'none',background:'transparent',padding:0,minHeight:0,color:C.accent,fontWeight:600,cursor:'pointer',fontFamily:'inherit',fontSize:11.5}}>{atGarage?'Voir au stock':'Ranger au stock'}</button>}
                           <button type="button" onClick={()=>setPassportFor({it,e,num})} style={{border:'none',background:'transparent',padding:0,minHeight:0,color:C.accent,fontWeight:600,cursor:'pointer',fontFamily:'inherit',fontSize:11.5}}>Passeport de la paire</button>
+                          <button type="button" onClick={async ()=>{ if(await askConfirm('Marquer cette paire VENDUE et la retirer des annonces ?')) markSold(it.id); }} title="Marquer vendue : la retire des annonces tout de suite (sans attendre la synchro Vinted)" style={{border:'none',background:'transparent',padding:0,minHeight:0,color:C.accent,fontWeight:600,cursor:'pointer',fontFamily:'inherit',fontSize:11.5}}>Marquer vendue</button>
                           {sugg!=null && sugg < Number(it.price) && <a href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted pour baisser le prix" style={{color:C.accent,fontWeight:600,textDecoration:'none'}}>Baisser à {sugg} {cur(it.currency)} ↗</a>}
                         </div>
                         {/* La FILE vers les autres places (ce qui SERA préparé),
