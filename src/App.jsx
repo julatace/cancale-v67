@@ -23319,7 +23319,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <div className="vrm-rangee" style={{display:'flex',gap:8,marginBottom:10,alignItems:'center',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',paddingBottom:2}}>
             {annStats.sansNum>0 && <span style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'4px 11px'}}>{annStats.sansNum} sans N°</span>}
             {/* ⚠️ « Toute l'annonce captée ? » — même base que la grille (§11). */}
-            {annStats.aRecapturer>0 && <span title={`${annStats.pretLbc} paire(s) ont TOUTES leurs photos + une description captées — prêtes pour Leboncoin. ${annStats.aRecapturer} n'ont pas encore toutes leurs photos : rouvre-les sur Vinted (extension à jour) pour que l'extension les capte en entier.`} style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'4px 11px'}}>{annStats.aRecapturer} à recapturer pour Leboncoin</span>}
+            {annStats.aRecapturer>0 && <span title={`${annStats.pretLbc} paire(s) ont TOUTES leurs photos + une description captées — prêtes pour Leboncoin. ${annStats.aRecapturer} n'ont pas encore toutes leurs photos : tu n'as rien à rouvrir — passe simplement sur Vinted connecté sur leurs comptes (extension à jour) et l'extension les complète toute seule, quelques annonces par visite. Si l'une reste incomplète après plusieurs passages, rouvre-la pour forcer.`} style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'4px 11px'}}>{annStats.aRecapturer} à recapturer pour Leboncoin</span>}
             {/* Une paire qui dort se rattrape : de l'ambre, jamais du rouge (§5.56). */}
             {annStats.sleeping>0 && <button onClick={()=>setAnnSort('sleeping')} style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'4px 11px',cursor:'pointer',display:'inline-flex',alignItems:'center',gap:5}}><Icon name="sleep" size={13}/>{annStats.sleeping} qui dorment{annStats.sleepingVal>0?` · ${annStats.sleepingVal.toFixed(0)} €`:''}</button>}
             {fillBuyRows.length>0 && <button onClick={()=>setFillBuyOpen(true)} title="Sans prix d'achat, la marge de chaque annonce reste vide et le bénéfice est faux. Une liste, un champ par ligne, Entrée passe à la suivante." style={{flexShrink:0,whiteSpace:'nowrap',display:'inline-flex',alignItems:'center',gap:5,fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:'4px 11px',cursor:'pointer'}}><Icon name="cash" size={13}/>{fillBuyRows.length} paires sans prix d'achat</button>}
@@ -23803,9 +23803,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           {num && (() => {
                             const total = Number(item.photoCount)||0, capt = Number(item.captPhotos)||0, descOk = (Number(item.descLen)||0) > 0;
                             let txt=null;
-                            if (total>0 && capt===0) txt='photos à capter — ouvre-la sur Vinted';
-                            else if (total>0 && capt<total) txt=`${capt}/${total} photos captées — rouvre-la sur Vinted`;
-                            else if (total>0 && !descOk) txt='description à capter — rouvre-la sur Vinted';
+                            if (total>0 && capt===0) txt='photos à capter — passe sur Vinted (ce compte)';
+                            else if (total>0 && capt<total) txt=`${capt}/${total} photos — passe sur Vinted (ce compte)`;
+                            else if (total>0 && !descOk) txt='description à capter — passe sur Vinted (ce compte)';
                             else if (total>0) txt='prête pour Leboncoin';
                             return txt ? <span data-prepa style={{fontSize:10.5,color:C.muted}}>{txt}</span> : null;
                           })()}
