@@ -3871,6 +3871,25 @@ d'achat **écrits deux fois** (le texte, puis une ligne de champs de saisie).
 - Banc `annonces-carte.cjs` : aucune saisie visible hors « ⋯ » au repos, et
   modifier « achat — » → « achat 30,00 € » pour de vrai (rouge sur l'avant).
 
+### Bordereau Leboncoin tamponné comme celui de Vinted (3 octobre, 5.136)
+Demande du 2 octobre : « le titre et le N° sur TOUS les bordereaux ». Celui de
+Leboncoin s'ouvrait par un simple lien (`voucherUrl`) : le PDF arrivait **nu**,
+sans N° — il fallait recopier le numéro à la main sur l'étiquette.
+- Le PDF est derrière la session Leboncoin (cookies) : l'app ne peut pas le lire,
+  l'extension si. `pdfBordereauLbc(url)` le lit **uniquement** à l'adresse
+  `api.leboncoin.fr/api/shippingproxy/v1/parcels/{id}/label` (liste blanche par
+  motif), vérifie qu'il commence par `%PDF` (une page HTML de session expirée
+  n'est jamais prise pour un bordereau), plafonne à 12 Mo, et ne répond qu'à
+  l'origine de l'app. C'est une **lecture** de ses propres colis.
+- L'app (`imprimerLbc`) le tamponne avec **le même code que Vinted**
+  (`annotateAndDownloadBordereau`, titre + N°) et l'ouvre dans l'onglet réservé
+  au clic. PDF illisible ⇒ on le dit et on ouvre le lien d'origine — jamais rien.
+- Extension en retard ⇒ le lien d'avant reste, et son infobulle dit pourquoi il
+  n'est pas tamponné (`extSait('lbcpdf')`).
+- Banc `lbc-bordereau.cjs` (le PDF ouvert PORTE le titre ; ⚠️ pdf-lib compresse
+  ses flux, le banc les décompresse avant de chercher le texte) ; `audit-exec.cjs`
+  à 15 contrôles, dont « aucune autre adresse ne passe par ce pont ».
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
@@ -3889,12 +3908,12 @@ arrivée** — vérifiée commit par commit sur `manifest.json`, pas devinée.
 | `photosebay` | `photosPourEbay` | **5.59.0** (13 sept.) | la même promesse, pour eBay |
 | `repond` | `repondreAuxMessages` | **5.77.0** (19 sept.) | « elle répond aux questions posées sur tes annonces » |
 | `commande` | `executerCommande` | **5.129.0** (2 oct.) | « Générer le bordereau » depuis l'app : l'app COMMANDE l'extension |
-| `versement` | `capterDatesVersement` | **5.133.0** (3 oct.) | « l'extension va chercher la date de versement de tes ventes finalisées » |
 | `offresapp` | `offresAutoActif` | **5.130.0** (3 oct.) | l'interrupteur des offres auto se règle dans l'app |
 | `publication` | `publierDepuisApp` | **5.130.0** (3 oct.) | « Publier sur Leboncoin » / « Préparer sur eBay » depuis l'app |
 | `lbcdate` | `dateVenteLbc` | **5.131.0** (3 oct.) | « ouvre Mes transactions, l'extension relève la date de vente » |
 | `versement` | `capterDatesVersement` | **5.133.0** (3 oct.) | « l'extension va chercher la date de versement de tes ventes finalisées » |
 | `messagerie` | `executerPourApp` | **5.135.0** (3 oct.) | lire un fil, accepter/refuser/faire une offre depuis l'app |
+| `lbcpdf` | `pdfBordereauLbc` | **5.136.0** (3 oct.) | « 🖨 Imprimer le bordereau » Leboncoin, tamponné du titre et du N° |
 
 ⚠️ **DEUX SEUILS POUR UNE MÊME NOTION, EXPRÈS.** Les photos s'attachent côté
 Leboncoin depuis la 5.58 et côté eBay depuis la 5.59 : un seul seuil aurait
