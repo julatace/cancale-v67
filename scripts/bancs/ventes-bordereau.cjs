@@ -115,9 +115,17 @@ const projette = (row, sel) => {
       dit(bb.includes('pdf:9001'), 'la vente 9001 a son bouton « Bordereau » (relié par sa transaction)', JSON.stringify(bb));
       dit(!bb.includes('pdf:9002'), 'la vente 9002 n’a PAS d’impression : un bordereau au même titre, sans transaction, ne relie rien (§5)', JSON.stringify(bb));
       dit(!bb.some((x) => /:9003$/.test(x)), 'une vente FINALISÉE n’a plus aucun bouton de bordereau', JSON.stringify(bb));
+      // 3 octobre : « sur ordi ça télécharge le bordereau et ça ne l'ouvre pas ».
+      // Un clic doit OUVRIR un onglet sur le PDF, jamais télécharger un fichier.
+      const onglets = [], telecharges = [];
+      ctx.on('page', (p) => onglets.push(p));
+      pg.on('download', (d) => telecharges.push(d.suggestedFilename()));
       const avant = pdfDemandes.length;
       try { await pg.click('[data-bouton-bord="pdf"][data-tx="9001"]', { timeout: 5000 }); } catch (e) { dit(false, 'le bouton se clique', String(e.message).slice(0, 90)); }
       await pg.waitForTimeout(2500);
+      const urls = onglets.map((p) => p.url());
+      dit(onglets.length === 1 && /^blob:/.test(urls[0] || ''), 'un clic OUVRE le bordereau dans un onglet (pas un fichier téléchargé)', JSON.stringify(urls));
+      dit(telecharges.length === 0, 'aucun téléchargement', JSON.stringify(telecharges));
       dit(pdfDemandes.slice(avant).includes('email_bord_test1'), 'un clic demande le PDF de CE bordereau, et de lui seul', JSON.stringify(pdfDemandes.slice(avant)));
       const txt = await pg.evaluate(() => document.body.innerText);
       dit(!/PDF du bordereau illisible|Erreur impression/.test(txt), 'le PDF est produit sans erreur');

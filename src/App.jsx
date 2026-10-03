@@ -3736,6 +3736,49 @@ const drawSkuThermique = (page, rgb, bold, numero, zone) => {
   return true;
 };
 
+// ── OUVRIR UN PDF, JAMAIS LE TÉLÉCHARGER EN DOUCE (3 octobre) ──────────────
+// Julien : « quand j'appuie sur imprimer sur ordi, ça télécharge le bordereau et
+// ça ne l'ouvre pas comme sur téléphone ». Le PDF partait en `download` (et le
+// bouton « Ouvrir » de la modale portait lui aussi `download`), puis une iframe
+// CACHÉE tentait `print()` — or Chrome ne charge pas sa visionneuse PDF dans
+// une iframe 0×0 invisible : rien ne s'imprimait, il ne restait qu'un fichier
+// dans Téléchargements. On ouvre donc le PDF dans un ONGLET (visionneuse +
+// bouton imprimer), comme sur téléphone. Bloqué par le navigateur (le geste
+// est trop loin) ⇒ `false`, et la modale offre un vrai bouton « Ouvrir ».
+const estIOS = () => /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
+// ⚠️ LE PDF ARRIVE ~1 s APRÈS LE CLIC (lecture du PDF + tampon) : un
+// `window.open` fait si tard est souvent BLOQUÉ par le navigateur (le geste de
+// l'utilisateur a expiré). On RÉSERVE donc l'onglet au moment même du clic —
+// tout bouton marqué `data-imprime` — et on y charge le PDF quand il est prêt.
+// Rien n'est arrivé en 25 s (PDF illisible, erreur) ⇒ l'onglet vide se referme.
+let ONGLET_PDF = null;
+const libererOngletPdf = () => { try { if (ONGLET_PDF && ONGLET_PDF.w && !ONGLET_PDF.w.closed) ONGLET_PDF.w.close(); } catch (_) {} ONGLET_PDF = null; };
+const reserverOngletPdf = () => {
+  try {
+    if (estIOS()) return;
+    libererOngletPdf();
+    const w = window.open('', '_blank');
+    if (!w) return;
+    try { w.document.title = 'Bordereau…'; w.document.body.style.cssText = 'font:15px system-ui,sans-serif;color:#555;display:flex;align-items:center;justify-content:center;height:100vh;margin:0'; w.document.body.textContent = 'Préparation du bordereau…'; } catch (_) {}
+    const at = Date.now();
+    ONGLET_PDF = { w, at };
+    setTimeout(() => { if (ONGLET_PDF && ONGLET_PDF.at === at) libererOngletPdf(); }, 25000);
+  } catch (_) {}
+};
+if (typeof document !== 'undefined') {
+  document.addEventListener('click', (e) => {
+    try { const b = e.target && e.target.closest && e.target.closest('[data-imprime]'); if (b && !b.disabled) reserverOngletPdf(); } catch (_) {}
+  }, true);
+}
+const ouvrirPdfOnglet = (url) => {
+  try {
+    if (estIOS()) return false;            // iPhone : le bouton de la modale fait le geste
+    const r = ONGLET_PDF; ONGLET_PDF = null;
+    if (r && r.w && !r.w.closed) { r.w.location.href = url; return true; }
+    const w = window.open(url, '_blank');
+    return !!w;
+  } catch (_) { return false; }
+};
 const annotateAndDownloadBordereau = async (numero, title, pdfArrayBuffer, pos) => {
   const PL = await import('pdf-lib');
   const { PDFDocument, rgb, StandardFonts } = PL;
@@ -3749,16 +3792,9 @@ const annotateAndDownloadBordereau = async (numero, title, pdfArrayBuffer, pos) 
   const url = URL.createObjectURL(blob);
   const safeTitle = (title||'').replace(/[^\w\-]+/g,'_').slice(0,40);
   const filename = `bordereau${hasNum?'-N'+numero:''}${safeTitle?'-'+safeTitle:''}.pdf`;
-  // Sur ordinateur, on déclenche le téléchargement direct. Sur iOS/iPhone, le
-  // `download` programmatique ne marche pas (le dossier reste vide) -> on renvoie
-  // l'URL pour que l'appelant affiche un bouton « Ouvrir » (vrai geste utilisateur).
-  const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
-  if (!isIOS) {
-    const a = document.createElement('a');
-    a.href = url; a.download = filename;
-    document.body.appendChild(a); a.click(); a.remove();
-  }
-  return { url, filename };
+  // Ouvert dans un onglet (ordinateur) ; sinon la modale propose « Ouvrir ».
+  const ouvert = ouvrirPdfOnglet(url);
+  return { url, filename, printed: ouvert, ouvert };
 };
 // Regroupe plusieurs bordereaux en UN seul PDF (chaque bordereau tamponné à la
 // suite, une page par bordereau) pour tout imprimer d'un coup. `items` =
@@ -3808,15 +3844,9 @@ const mergeAndDownloadBordereaux = async (items, resolvePos, opts = {}) => {
   const blob = new Blob([bytes], { type:'application/pdf' });
   const url = URL.createObjectURL(blob);
   const filename = `bordereaux-${count}${nInv?'-'+nInv+'factures':''}${thermique?'-thermique':''}-a-la-suite.pdf`;
-  const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
-  // « génère + lance l'impression » (ordinateur) ; sinon téléchargement.
-  const printed = opts.autoprint ? autoPrintUrl(url) : false;
-  if (!isIOS && !printed) {
-    const a = document.createElement('a');
-    a.href = url; a.download = filename;
-    document.body.appendChild(a); a.click(); a.remove();
-  }
-  return { url, filename, count, nInv, printed, thermique, isoles, entiers };
+  // Ouvert dans un onglet (ordinateur) ; sinon la modale propose « Ouvrir ».
+  const printed = ouvrirPdfOnglet(url);
+  return { url, filename, count, nInv, printed, ouvert: printed, thermique, isoles, entiers };
 };
 
 // Génère un JUSTIFICATIF D'ACHAT (PDF) à partir des données de la commande —
@@ -6510,7 +6540,7 @@ function BoutonBordereau({ uid, tx, login, aGenerer, pdf, onImprimer, onFait, gr
   const base = { display: 'inline-flex', alignItems: 'center', gap: 6, borderRadius: 10, fontFamily: 'inherit', fontWeight: 700,
     fontSize: grand ? 14 : 12.5, padding: grand ? '11px 14px' : '7px 11px', cursor: 'pointer', whiteSpace: 'nowrap' };
   if (pdf) {
-    return <button type="button" data-bouton-bord="pdf" data-tx={tx} onClick={onImprimer} title="Bordereau tamponné (titre + N°), puis impression"
+    return <button type="button" data-bouton-bord="pdf" data-imprime="1" data-tx={tx} onClick={onImprimer} title="Bordereau tamponné (titre + N°), puis impression"
       style={{ ...base, border: 'none', background: C.accent, color: C.onAccent || '#fff' }}><Icon name="doc" size={grand ? 16 : 14}/>{grand ? '🖨 Imprimer le bordereau' : 'Bordereau'}</button>;
   }
   if (!aGenerer || !uid || !tx) return null;
@@ -11210,22 +11240,6 @@ async function buildFacturXBytes(inv, ent){
   }
   return await pdf.save({ useObjectStreams:false });
 }
-// Lance l'impression d'un PDF (URL blob) sans clic : iframe caché + print().
-// Marche sur ordinateur (Chrome/Firefox/Edge). Sur iOS l'impression PDF via
-// iframe est bloquée → l'appelant garde le repli « Ouvrir → Partager → Imprimer ».
-const autoPrintUrl = (url) => {
-  try {
-    const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
-    if (isIOS) return false;
-    const ifr = document.createElement('iframe');
-    ifr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
-    ifr.src = url;
-    ifr.onload = () => { setTimeout(()=>{ try { ifr.contentWindow.focus(); ifr.contentWindow.print(); } catch(_){} }, 300); };
-    document.body.appendChild(ifr);
-    setTimeout(()=>{ try{ ifr.remove(); }catch(_){} }, 120000);
-    return true;
-  } catch(_) { return false; }
-};
 async function generateFacturXPdf(inv, ent){
   try{
     const out = await buildFacturXBytes(inv, ent);
@@ -20156,7 +20170,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const pos = posForFormat(width, height);
       const r = await annotateAndDownloadBordereau(numero, title, pdfBuf, pos);
       setBordResult({ ...r, numero, title, pdfBuf, key, w:width, h:height });
-    } catch(err){ toast('Impossible de lire ce PDF : '+String(err)); }
+    } catch(err){ libererOngletPdf(); toast('Impossible de lire ce PDF : '+String(err)); }
   };
   // ── FACTURE liée à un bordereau (comptes PRO uniquement) ────────────────────
   // La facture vient des emails que l'app reçoit (pipeline Gmail/Apps Script §3) :
@@ -20206,14 +20220,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     let bytes = null;
     if (capte) { const l = await fetchLabelPdf(capte.row); bytes = l && l.pdfB64 ? b64ToBytes(l.pdfB64) : null; }
     if (!bytes && b && b.hasPdf) { const p = await fetchBordPdf(b._row); bytes = p && p.pdfB64 ? b64ToBytes(p.pdfB64) : null; }
-    if (!bytes) { toast('PDF illisible — réessaie dans un instant.'); return; }
+    if (!bytes) { libererOngletPdf(); toast('PDF illisible — réessaie dans un instant.'); return; }
     processBordereau(num, titre, bytes);
   };
   const printBordAndInvoice = async (b) => {
     try {
       const pdf = await fetchBordPdf(b._row);
       const buf = pdf && pdf.pdfB64 ? b64ToBytes(pdf.pdfB64) : null;
-      if (!buf) { toast('PDF du bordereau illisible.'); return; }
+      if (!buf) { libererOngletPdf(); toast('PDF du bordereau illisible.'); return; }
       const numero = numForBord(b), title = b.modele || b.article || '';
       const { width, height } = await readPdfFirstPageSize(buf);
       const pos = posForFormat(width, height);
@@ -20250,14 +20264,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const url = URL.createObjectURL(new Blob([bytes], { type:'application/pdf' }));
       const safeTitle = (title || '').replace(/[^\w\-]+/g, '_').slice(0, 40);
       const filename = `bordereau${numero?'-N'+numero:''}${joined?'-facture':''}${safeTitle?'-'+safeTitle:''}.pdf`;
-      // Sur ordinateur : lance l'impression tout de suite (iframe caché). Sur
-      // iPhone (bloqué) : la modale « Ouvrir → Partager → Imprimer » prend le relais.
-      const printed = autoPrintUrl(url);
-      const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
-      if (!isIOS && !printed) { const a=document.createElement('a'); a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove(); }
+      // Sur ordinateur : le PDF s'ouvre dans un onglet (bouton imprimer de
+      // Chrome). Sur iPhone : la modale « Ouvrir → Partager → Imprimer ».
+      const printed = ouvrirPdfOnglet(url);
       setBordResult({ url, filename, numero, title, pdfBuf: buf, key: bordereauFormatKey(width, height), w:width, h:height, withInvoice: joined, printed,
                       thermique: imprMode(imprimante) === 'thermique', isoles: thermiqueOK ? 1 : 0, entiers: thermiqueOK ? [] : (thermiqueRaison ? [{ titre: title || '', raison: thermiqueRaison }] : []) });
-    } catch(err){ toast('Erreur impression : '+String(err)); }
+    } catch(err){ libererOngletPdf(); toast('Erreur impression : '+String(err)); }
   };
   // Le N° d'un bordereau reçu par email : celui de l'email, sinon retrouvé via le
   // titre dans les annonces numérotées (si le titre n'est pas ambigu).
@@ -20381,10 +20393,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if (inv) { const ent = entForBordInvoice(inv); if (ent) { try { invBytes = await buildFacturXBytes(inv, ent); } catch(_) {} } }
         items.push({ numero, title, pdfBuf: buf, invBytes });
       }
-      if (!items.length) { toast('Les PDF n\'ont pas pu être lus. Réessaie dans un instant.'); setBatchBusy(false); return; }
+      if (!items.length) { libererOngletPdf(); toast('Les PDF n\'ont pas pu être lus. Réessaie dans un instant.'); setBatchBusy(false); return; }
       const r = await mergeAndDownloadBordereaux(items, (w, h) => posForFormat(w, h, false), { autoprint: true, imprimante });
       setBordResult({ ...r, batch: true });
-    } catch(err){ toast('Erreur : ' + String(err)); }
+    } catch(err){ libererOngletPdf(); toast('Erreur : ' + String(err)); }
     setBatchBusy(false);
   };
   // Deep-link « Tout imprimer » depuis l'extension (?print=bord) : dès que les
@@ -23521,7 +23533,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     return <div style={{fontSize:11.5,color:u.danger?C.danger:C.warn,fontWeight:600,marginTop:3}}>{u.parts.join(' · ')} — {ouSontLesPresses(u)}</div>; })()}
                 </div>
                 {avecPdf.length>0 && (
-                  <button type="button" onClick={batchBordereaux} disabled={batchBusy}
+                  <button type="button" data-imprime="1" onClick={batchBordereaux} disabled={batchBusy}
                     title="Tamponne tous les bordereaux reçus (numéro + titre) et les met à la suite dans un seul PDF"
                     style={{flexShrink:0,border:'none',borderRadius:10,background:C.accent,color:'#fff',padding:'11px 15px',cursor:batchBusy?'default':'pointer',fontSize:13,fontWeight:600,fontFamily:'inherit',opacity:batchBusy?0.6:1}}>
                     {batchBusy?'Préparation…':avecPdf.length===1?'🖨 Imprimer':`🖨 Tout imprimer (${avecPdf.length})`}
@@ -23824,7 +23836,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         celui qui n'a pas branché sa boîte mail. */}
                     <div style={{display:'flex',gap:8,alignItems:'center',marginTop:12,flexWrap:'wrap'}}>
                       {pdf ? (
-                        <button type="button" onClick={async ()=>{
+                        <button type="button" data-imprime="1" onClick={async ()=>{
                           if (b && b.hasPdf && inv) { await printBordAndInvoice(b); return; }
                           // Le PDF vient de l'email s'il y en a un, sinon de la
                           // capture faite par l'extension au moment de générer.
@@ -23837,7 +23849,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           let bytes = null;
                           if (capte) { const l=await fetchLabelPdf(capte.row); bytes = l&&l.pdfB64?b64ToBytes(l.pdfB64):null; }
                           if (!bytes && b && b.hasPdf) { const p=await fetchBordPdf(b._row); bytes = p&&p.pdfB64?b64ToBytes(p.pdfB64):null; }
-                          if (!bytes) { toast('PDF illisible.'); return; }
+                          if (!bytes) { libererOngletPdf(); toast('PDF illisible.'); return; }
                           processBordereau(num, titre, bytes);
                         }} title={inv?'Bordereau tamponné + facture pro, puis impression':'Bordereau tamponné, puis impression'}
                         style={{flex:'1 1 160px',maxWidth:340,border:'none',background:C.accent,color:'#fff',borderRadius:10,padding:'12px',cursor:'pointer',fontSize:15,fontWeight:600,fontFamily:'inherit'}}>🖨 Imprimer{inv?' + facture':''}</button>
@@ -23934,7 +23946,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <div style={{fontSize:12,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{numForBord(b)?`N°${numForBord(b)} · `:''}{b.modele||b.article||'Bordereau'}</div>
                     <div style={{fontSize:11,color:C.muted}}>{b.receivedAt?`reçu le ${new Date(b.receivedAt).toLocaleDateString('fr-FR')}`:''}</div>
                   </div>
-                  {b.hasPdf && <button type="button" onClick={async ()=>{ const p=await fetchBordPdf(b._row); const bytes=p&&p.pdfB64?b64ToBytes(p.pdfB64):null; if(!bytes){toast('PDF illisible.');return;} processBordereau(numForBord(b), b.modele||b.article||'', bytes); }} style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:8,padding:'6px 10px',cursor:'pointer',fontSize:12,fontWeight:600,fontFamily:'inherit'}}>🖨 Réimprimer</button>}
+                  {b.hasPdf && <button type="button" data-imprime="1" onClick={async ()=>{ const p=await fetchBordPdf(b._row); const bytes=p&&p.pdfB64?b64ToBytes(p.pdfB64):null; if(!bytes){libererOngletPdf();toast('PDF illisible.');return;} processBordereau(numForBord(b), b.modele||b.article||'', bytes); }} style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:8,padding:'6px 10px',cursor:'pointer',fontSize:12,fontWeight:600,fontFamily:'inherit'}}>🖨 Réimprimer</button>}
                 </div>
               ))}
           </div>
@@ -24090,8 +24102,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <div onClick={e=>e.stopPropagation()} style={{background:C.bg,borderRadius:10,maxWidth:360,width:'100%',padding:20,textAlign:'center'}}>
             <div style={{fontSize:32,marginBottom:6}}>✅</div>
             <div style={{fontSize:17,fontWeight:700,color:C.text,marginBottom:4}}>{bordResult.batch?`${bordResult.count} bordereaux prêts`:bordResult.withInvoice?'Bordereau + facture prêts':'Bordereau prêt'}</div>
-            <div style={{fontSize:13,color:C.muted,lineHeight:1.45,marginBottom:16}}>{bordResult.batch?<>Tous les bordereaux{bordResult.nInv>0?<> et <b>{bordResult.nInv} facture{bordResult.nInv>1?'s':''}</b> (comptes pro)</>:null} sont <b>à la suite dans un seul PDF</b> (le N° au même endroit sur chacun). {bordResult.printed?<>L'impression est <b>lancée</b> ; si la fenêtre ne s'est pas ouverte, utilise le bouton ci-dessous.</>:<>Ouvre-le puis <b>Imprimer</b> — tu peux tout imprimer d'un coup.</>}</>:bordResult.printed?<>L'impression est <b>lancée</b>{bordResult.withInvoice?<> (bordereau <b>+ facture</b>)</>:null}. Si la fenêtre d'impression ne s'est pas ouverte, utilise le bouton ci-dessous.</>:<>{bordResult.withInvoice?<>Le PDF contient le <b>bordereau + la facture</b>. </>:null}Ouvre-le puis <b>Partager → Imprimer</b> (ou enregistre-le). Sur iPhone c'est le bouton de partage en bas.</>}</div>
-            <a href={bordResult.url} target="_blank" rel="noreferrer" download={bordResult.filename}
+            <div style={{fontSize:13,color:C.muted,lineHeight:1.45,marginBottom:16}}>{bordResult.batch?<>Tous les bordereaux{bordResult.nInv>0?<> et <b>{bordResult.nInv} facture{bordResult.nInv>1?'s':''}</b> (comptes pro)</>:null} sont <b>à la suite dans un seul PDF</b> (le N° au même endroit sur chacun). {bordResult.printed?<>Ils sont <b>ouverts dans un nouvel onglet</b> : clique sur l'imprimante en haut à droite. Onglet pas ouvert ? Utilise le bouton ci-dessous.</>:<>Ouvre-le puis <b>Imprimer</b> — tu peux tout imprimer d'un coup.</>}</>:bordResult.printed?<>Le bordereau{bordResult.withInvoice?<> (avec <b>la facture</b>)</>:null} est <b>ouvert dans un nouvel onglet</b> : clique sur l'imprimante en haut à droite. Onglet pas ouvert ? Utilise le bouton ci-dessous.</>:<>{bordResult.withInvoice?<>Le PDF contient le <b>bordereau + la facture</b>. </>:null}Ouvre-le puis <b>Partager → Imprimer</b> (ou enregistre-le). Sur iPhone c'est le bouton de partage en bas.</>}</div>
+            <a href={bordResult.url} target="_blank" rel="noreferrer"
               style={{display:'block',background:C.accent,color:C.onAccent,borderRadius:10,padding:'13px 16px',fontSize:15,fontWeight:600,textDecoration:'none',marginBottom:8}}>📄 {bordResult.batch?'Ouvrir les bordereaux':bordResult.withInvoice?'Ouvrir bordereau + facture':'Ouvrir le bordereau'}</a>
             {bordResult.pdfBuf && !bordResult.batch && <button onClick={adjustBordPlacement} style={{width:'100%',border:`1px solid ${C.border}`,borderRadius:10,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,fontWeight:500,padding:'11px',marginBottom:8}}>✋ Le N° n'est pas au bon endroit ? Le déplacer</button>}
             {bordResult.batch && !bordResult.thermique && <div style={{fontSize:11,color:C.muted,marginBottom:8,lineHeight:1.4}}>Le N° pas au bon endroit ? Imprime un bordereau seul (bouton 🖨 sur une ligne), déplace-le une fois — le nouvel emplacement s'appliquera à tous les prochains lots.</div>}
