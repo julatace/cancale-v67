@@ -7394,7 +7394,39 @@ function CarteLbc({ o }) {
     </div>
   );
 }
-function VentesLeboncoin({ lbcVentes = {ventes:[],inconnues:0} }) {
+// L'argent Leboncoin, UNE règle (§11) : le résumé en haut de l'onglet et la
+// liste des ventes la lisent tous les deux — jamais deux calculs.
+function lbcArgent(lbcVentes) {
+  const ventes = (lbcVentes && lbcVentes.ventes) || [];
+  const actives = ventes.filter(o => !lbcAnnulee(o));
+  const finals = actives.filter(lbcFinalisee);
+  const enCours = actives.filter(o => !lbcFinalisee(o));
+  const somme = (arr) => arr.reduce((s, o) => s + (o.price != null ? Number(o.price) / 100 : 0), 0);
+  return { n: ventes.length, actives: actives.length, recu: somme(finals), nRecu: finals.length, attente: somme(enCours), nAttente: enCours.length };
+}
+// Résumé COMPACT d'une plateforme, toujours visible en haut de son onglet —
+// la même forme que `VintedResume` (Julien : « eBay et Leboncoin comme Vinted :
+// le résumé en haut, puis Ventes / Achats / Annonces, pas d'Aperçu »).
+// Une valeur inconnue s'écrit « — », jamais 0 (§7).
+function PlatResume({ cases, note, dark, baseKO }) {
+  if (baseKO) return null;   // la coque dit déjà la panne (§7)
+  const T = dark ? EBAY_SKIN : C;
+  const eti = { fontSize: 10.5, color: T.muted, textTransform: 'uppercase', letterSpacing: 0.7, fontWeight: 600 };
+  return (
+    <div style={{ padding: '12px 16px 0', background: dark ? EBAY_SKIN.bg : 'transparent' }} data-plat-resume="1">
+      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', border: `1px solid ${T.border}`, background: T.card, borderRadius: 12, padding: '12px 15px', boxShadow: dark ? 'none' : (C.shadow || 'none') }}>
+        {cases.map(([lib, val, sourd]) => (
+          <div key={lib} style={{ flex: '1 1 90px', minWidth: 0 }}>
+            <div style={eti}>{lib}</div>
+            <div className="vrm-display" style={{ fontSize: 20, fontWeight: 700, color: (val == null || sourd) ? T.muted : T.text }}>{val == null ? '—' : val}</div>
+          </div>
+        ))}
+      </div>
+      {note && <div style={{ fontSize: 11.5, color: T.muted, marginTop: 6, lineHeight: 1.45 }}>{note}</div>}
+    </div>
+  );
+}
+function VentesLeboncoin({ lbcVentes = {ventes:[],inconnues:0}, sansTotaux = false }) {
   // « À confirmer » replié par défaut : l'écran Ventes reste propre, comme Vinted
   // (Julien, 2 oct. : « pourquoi il y a Nike Pro là, je veux que tout soit comme
   // Vinted »). Ces transactions sont au côté PAS ENCORE SU — ni vente ni achat
@@ -7422,7 +7454,7 @@ function VentesLeboncoin({ lbcVentes = {ventes:[],inconnues:0} }) {
       </div>
       {/* ⚠️ ARGENT REÇU ≠ ARGENT EN ATTENTE (Julien : « exactement comme Vinted »).
           Deux chiffres, deux mots — jamais mélangés (comme walletDispo/escrow). */}
-      {actives.length > 0 && (
+      {actives.length > 0 && !sansTotaux && (
         <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', padding: '2px 0 10px' }}>
           <div>
             <div className="vrm-display" style={{ fontSize: 20, fontWeight: 800, color: C.text }}>{fmt2(somme(finals))}</div>
@@ -8335,7 +8367,7 @@ function EbayVentes({ baseKO }) {
   if (baseKO) return wrap(<>{head}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué. Réessaie dans un instant.</div></>);
   if (orders === undefined) return wrap(<>{head}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Chargement…</div></>);
   if (orders === null) return wrap(<>{head}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Je n'ai pas pu lire tes ventes eBay. Réessaie dans un instant.</div></>);
-  if (!orders.length) return wrap(<>{head}<div style={{ color: E.muted, fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>Pas encore de vente eBay captée. Connecte ton compte eBay dans l'onglet Aperçu et synchronise — tes ventes apparaîtront ici.</div></>);
+  if (!orders.length) return wrap(<>{head}<div style={{ color: E.muted, fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>Pas encore de vente eBay captée. Connecte ton compte eBay dans l'onglet « Compte eBay » et synchronise — tes ventes apparaîtront ici.</div></>);
   const euro = (v, c) => v == null ? '' : Number(v).toFixed(2).replace('.', ',') + ' ' + (c === 'USD' ? '$' : '€');
   const payees = orders.filter(o => String((o && o.orderPaymentStatus) || '').toUpperCase() === 'PAID').length;
   return wrap(<>
@@ -8442,7 +8474,7 @@ function EbayAnnonces({ baseKO }) {
   if (baseKO) return wrap(<>{head()}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué. Réessaie dans un instant.</div></>);
   if (items === undefined) return wrap(<>{head()}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Chargement…</div></>);
   if (items === null) return wrap(<>{head()}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Je n'ai pas pu lire tes annonces eBay. Réessaie dans un instant.</div></>);
-  if (!items.length) return wrap(<>{head(0)}<div style={{ color: E.muted, fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>Pas encore d'annonce eBay captée. Connecte ton compte eBay dans l'onglet Aperçu et synchronise — tes annonces apparaîtront ici.</div></>);
+  if (!items.length) return wrap(<>{head(0)}<div style={{ color: E.muted, fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>Pas encore d'annonce eBay captée. Connecte ton compte eBay dans l'onglet « Compte eBay » et synchronise — tes annonces apparaîtront ici.</div></>);
   const euro = (p) => { const n = Number(p); return isFinite(n) ? n.toFixed(2).replace('.', ',') + ' €' : ''; };
   const jours = (iso) => { const t = Date.parse(iso || ''); return isNaN(t) ? null : Math.max(0, Math.round((Date.now() - t) / 86400000)); };
   return wrap(<>
@@ -8492,30 +8524,8 @@ function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, ebay
   // même visuel que dans eBay », « tout, rien ne va »). L'onglet eBay entier —
   // fond noir, en-tête eBay, cartes eBay — pas seulement le sous-formulaire.
   // Exception ASSUMÉE à §7, bornée à l'espace eBay, à la demande de l'owner.
-  if (plat === 'eBay') {
-    const E = EBAY_SKIN;
-    return (
-      <div style={{ background: E.bg, minHeight: '100vh', padding: 16, paddingBottom: 48, display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingTop: 4 }}>
-          <span style={{ flexShrink: 0, width: 40, height: 40, borderRadius: 10, background: E.accent, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="tag" size={20}/></span>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 26, fontWeight: 800, color: E.text, letterSpacing: -0.5, lineHeight: 1.1 }}>eBay</div>
-            <div style={{ fontSize: 12.5, color: E.muted }}>Vends tes paires sur eBay</div>
-          </div>
-        </div>
-        {baseKO ? (
-          <div style={{ background: E.card, borderRadius: 14, padding: 16, color: E.text, fontSize: 13, lineHeight: 1.5 }}>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué. Réessaie dans un instant.</div>
-        ) : (<>
-          <div style={{ background: E.card, borderRadius: 14, padding: 18 }}>
-            <div style={{ fontSize: 12.5, color: E.muted, marginBottom: 4 }}>Chiffre d'affaires eBay</div>
-            <div className="vrm-display" style={{ fontSize: 30, fontWeight: 800, color: p.ca != null ? E.text : E.muted }}>{p.ca != null ? fmt(p.ca) : '—'}</div>
-            <div style={{ fontSize: 11.5, color: E.muted, marginTop: 2 }}>{p.ca != null ? 'ventes eBay payées' : 'pas encore de vente captée'}</div>
-          </div>
-          <EbayConnexion comptes={comptes}/>
-        </>)}
-      </div>
-    );
-  }
+  // eBay et Leboncoin n'ont plus d'« Aperçu » (3 oct.) : résumé + sections,
+  // comme Vinted. Ce composant ne sert plus qu'aux plateformes non reliées.
   return (
     <div style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
       <ScreenHead icon="tag" title={court} desc={estVinted ? 'Tes annonces, ventes et achats sur Vinted' : `Ce que VRM sait de ${court}`}/>
@@ -8576,24 +8586,6 @@ function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, ebay
           <div className="vrm-display" style={{fontSize:30,fontWeight:700,color:p.ca!=null?C.text:C.muted}}>{p.ca!=null?fmt(p.ca):'—'}</div>
           <div style={{fontSize:11.5,color:C.muted,marginTop:2}}>{p.ca!=null?'ventes prouvées captées':'pas encore de vente captée'}</div>
         </Card>
-        {plat==='eBay' && <EbayConnexion comptes={comptes}/>}
-        {plat==='Leboncoin' && (
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(150px,1fr))',gap:10}}>
-            <button type="button" onClick={()=>aller('apublier','leboncoin')} style={carte}>
-              <div style={eti}>À publier</div>
-              <div className="vrm-display" style={{...gros,fontSize:18,color:C.text}}>Ouvrir ›</div>
-              <div style={{fontSize:11,color:C.muted,marginTop:2}}>Tes annonces à mettre sur Leboncoin, et à retirer</div>
-            </button>
-            <button type="button" onClick={()=>onGo&&onGo('cat_annonces')} style={carte}>
-              <div style={eti}>Ventes prouvées</div>
-              <div className="vrm-display" style={gros}>{(lbcVentes&&Array.isArray(lbcVentes.ventes))?lbcVentes.ventes.length:0}</div>
-              <div style={{fontSize:11,color:C.muted,marginTop:2}}>reliées à une paire par la référence VRM</div>
-            </button>
-          </div>
-        )}
-        {/* Les ventes Leboncoin (avec leur bordereau) vivent ICI, dans l'espace
-            Leboncoin — plus dans les ventes Vinted (§11, une notion un endroit). */}
-        {plat==='Leboncoin' && <VentesLeboncoin lbcVentes={lbcVentes}/>}
         <Card style={{padding:16}}>
           <div style={{fontSize:13.5,color:C.text,lineHeight:1.55}}>
             {plat==='Vestiaire Collective'
@@ -28289,12 +28281,12 @@ function AppCoeur() {
   //    d'avoir vente, achat »). Le hub Vinted/Leboncoin porte une sous-navigation
   //    qui rend les écrans détaillés À L'INTÉRIEUR de l'onglet (mêmes composants,
   //    aucune duplication §11) au lieu d'envoyer vers un autre onglet.
-  const [platSub,setPlatSub]=useState('apercu');
+  const [platSub,setPlatSub]=useState('ventes');
   // En changeant d'onglet, la sous-navigation revient à sa section par défaut :
   // Vinted ouvre DIRECTEMENT sur les ventes (le résumé CA/argent reste en haut,
   // pas d'écran « Aperçu » à traverser — demande de Julien) ; les autres
   // plateformes ouvrent sur leur aperçu.
-  React.useEffect(()=>{ setPlatSub(tab==='plat_vinted'?'ventes':'apercu'); },[tab]);
+  React.useEffect(()=>{ setPlatSub('ventes'); },[tab]);   // plus d'« Aperçu » nulle part : la liste d'abord, le résumé au-dessus
   // ⚠️ Flèche « retour » RETIRÉE le 1er octobre (demande de Julien : « elle sert
   // à rien »). La navigation se fait par le menu des écrans / la barre latérale,
   // toujours joignables ; un bouton retour de plus n'apprenait rien.
@@ -29787,23 +29779,30 @@ function AppCoeur() {
               VentesLeboncoin/AchatsLeboncoin), les Colis, et « À publier ».
               L'onglet Achats n'apparaît que si des achats sont captés — sinon il
               ne mentirait pas, il resterait vide (mieux vaut un blanc, §5). */}
-          <PlatSubNav sub={platSub} setSub={setPlatSub} sections={[['apercu','Aperçu'],['ventes','Ventes'],...(((lbcVentes.achats||[]).length>0)?[['achats','Achats']]:[]),['colis','Colis'],['apublier','À publier']]}/>
-          {platSub==='apercu'&&<Plateforme plat="Leboncoin" liveStats={liveStats} lbcVentes={lbcVentes} onGo={setTab} onSub={setPlatSub} baseKO={baseKO}/>}
-          {platSub==='ventes'&&<div style={{padding:16}}><ScreenHead icon="tag" title="Ventes Leboncoin" desc="Tes ventes Leboncoin, reliées par identité (jamais par titre)"/>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:<VentesLeboncoin lbcVentes={lbcVentes}/>}</div>}
-          {platSub==='achats'&&<div style={{padding:16}}><ScreenHead icon="bag" title="Achats Leboncoin" desc="Tes achats Leboncoin, avec photos et suivi"/>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:<AchatsLeboncoin lbcVentes={lbcVentes}/>}</div>}
-          {platSub==='colis'&&(baseKO?<div style={{padding:16}}><ScreenHead icon="box" title="Colis Leboncoin"/><LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne></div>:<LeboncoinColis lbcVentes={lbcVentes}/>)}
-          {platSub==='apublier'&&<LeboncoinScreen/>}
+          {(() => { const ar = lbcArgent(lbcVentes); const e2 = (n) => n.toFixed(2).replace('.', ',') + ' €'; return (
+            <PlatResume baseKO={baseKO} cases={[[`CA finalisé${ar.nRecu ? ' · ' + ar.nRecu : ''}`, ar.actives ? e2(ar.recu) : null], [`En attente${ar.nAttente ? ' · ' + ar.nAttente : ''}`, ar.actives ? e2(ar.attente) : null, true]]}
+              note={ar.n ? null : "Aucune vente Leboncoin captée pour l'instant — elles arrivent quand l'extension passe sur leboncoin.fr (Mes transactions)."}/>
+          ); })()}
+          <PlatSubNav sub={platSub} setSub={setPlatSub} sections={[['ventes','Ventes'],...(((lbcVentes.achats||[]).length>0)?[['achats','Achats']]:[]),['annonces','Annonces'],['colis','Colis']]}/>
+          {platSub==='ventes'&&<div style={{padding:16}}>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:(((lbcVentes.ventes||[]).length>0||lbcVentes.inconnues>0)?<VentesLeboncoin lbcVentes={lbcVentes} sansTotaux/>:<div style={{fontSize:13,color:C.muted,lineHeight:1.5}}>Pas encore de vente Leboncoin. Une vente n'est comptée que si elle est <b>prouvée</b> (tu es bien le vendeur) — jamais devinée d'après un titre.</div>)}</div>}
+          {platSub==='achats'&&<div style={{padding:16}}>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:<AchatsLeboncoin lbcVentes={lbcVentes}/>}</div>}
+          {platSub==='colis'&&(baseKO?<div style={{padding:16}}><LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne></div>:<LeboncoinColis lbcVentes={lbcVentes}/>)}
+          {platSub==='annonces'&&<LeboncoinScreen/>}
         </>)}
         {tab==='plat_ebay'&&(<>
           {/* Julien : « eBay, je veux tout pareil que Vinted — les onglets achats,
               ventes ». Même structure, dans le skin eBay (noir). Aperçu garde la
               connexion + la publication ; Ventes liste les commandes captées ;
               Achats dit honnêtement qu'ils ne sont pas encore récupérés. */}
-          <div style={{background:'#000000'}}><PlatSubNav sub={platSub} setSub={setPlatSub} sections={[['apercu','Aperçu'],['annonces','Annonces'],['ventes','Ventes'],['achats','Achats']]} dark/></div>
-          {platSub==='apercu'&&<Plateforme plat="eBay" liveStats={liveStats} lbcVentes={lbcVentes} ebayCa={ebayCa} comptes={vintedAccounts} onGo={setTab} baseKO={baseKO}/>}
-          {platSub==='annonces'&&<EbayAnnonces baseKO={baseKO}/>}
+          {(() => { const pe = caParPlateforme(liveStats, lbcVentes, ebayCa).find(x => x.nom === 'eBay') || {}; return (
+            <PlatResume dark baseKO={baseKO} cases={[['Ventes payées', pe.ca != null ? fmt(pe.ca) : null]]}
+              note={pe.ca != null ? null : "Pas encore de vente eBay captée. Relie ton compte dans « Compte eBay » : VRM lit alors tes ventes et tes annonces."}/>
+          ); })()}
+          <div style={{background:'#000000'}}><PlatSubNav sub={platSub} setSub={setPlatSub} sections={[['ventes','Ventes'],['achats','Achats'],['annonces','Annonces'],['compte','Compte eBay']]} dark/></div>
           {platSub==='ventes'&&<EbayVentes baseKO={baseKO}/>}
           {platSub==='achats'&&<EbayAchats/>}
+          {platSub==='annonces'&&<EbayAnnonces baseKO={baseKO}/>}
+          {platSub==='compte'&&<div style={{ background: EBAY_SKIN.bg, minHeight: '100vh', padding: 16, paddingBottom: 48 }}>{baseKO?<div style={{ color: EBAY_SKIN.muted, fontSize: 13 }}>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</div>:<EbayConnexion comptes={vintedAccounts}/>}</div>}
         </>)}
         {tab==='plat_vestiaire'&&<Plateforme plat="Vestiaire Collective" liveStats={liveStats} lbcVentes={lbcVentes} onGo={setTab} baseKO={baseKO}/>}
         {tab==='prixmarche'&&<PrixMarche data={pqmData} baseKO={baseKO}/>}
