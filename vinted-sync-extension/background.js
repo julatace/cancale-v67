@@ -597,6 +597,51 @@ async function dressingPlusRiche(rowId, parsed) {
   } catch (_) { return true; }
 }
 
+// ── SENTINELLE DE FORME ──────────────────────────────────────────────────────
+// ⚠️⚠️ LE DÉFAUT D'UNE MISE À JOUR DE VINTED/LBC/eBAY, et la raison d'être de
+// cette passe (Julien : « même s'il y a des mises à jour, plus aucun problème
+// dans la récupération »). Le jour où le site renomme la clé de liste
+// (`my_orders` → `orders`, `items` → `catalog_items`…), `parsed[cle]` devient
+// `undefined`, la capture tombe à 0, et `listePlusRiche` l'ignore EN SILENCE
+// (ou l'écrit vide sur un compte neuf). Personne ne sait POURQUOI — c'est
+// exactement « rien lu ne vaut pas rien », mais déclenché par une dérive de
+// forme au lieu d'une panne.
+// ⚠️ ON NE DEVINE PAS UN NOUVEAU PARSER. Le dossier l'interdit : pas de parser
+// pour une forme jamais vue (ce serait promettre ce qu'on n'a pas mesuré). On
+// rend la dérive BRUYANTE et MESURABLE : si la clé attendue est absente alors
+// qu'une AUTRE clé de tête porte une liste NON VIDE, on note
+// `forme_inconnue_<type>` + les NOMS des clés de tête (jamais leur contenu) et
+// la clé-candidate. La prochaine passe aliasera sur une forme RÉELLEMENT
+// mesurée, pas supposée.
+// ⚠️ Une réponse légitimement VIDE (clé présente, tableau vide) ne déclenche
+// RIEN — sinon la sentinelle crierait au loup sur chaque compte sans vente.
+function verifFormeListe(type, parsed, id) {
+  try {
+    const cle = CLE_LISTE[type];
+    if (!cle || !parsed || typeof parsed !== 'object') return;
+    if (!Array.isArray(parsed) && Array.isArray(parsed[cle])) return; // forme attendue : rien à signaler
+    let cand = null, cles = [];
+    if (Array.isArray(parsed)) {
+      // Vinted a renvoyé un tableau NU au lieu de `{ <cle>: [...] }`.
+      if (parsed.length > 0) cand = '(racine)';
+    } else {
+      cles = Object.keys(parsed);
+      cand = cles.find(k => Array.isArray(parsed[k]) && parsed[k].length > 0) || null;
+    }
+    if (!cand) return;                            // aucune liste ailleurs : vide légitime, pas une dérive
+    noterDiag(`forme_inconnue_${type}`);
+    majTampon((buf) => {
+      buf.rates[`forme_${type}`] = {
+        id: String(id == null ? '' : id).slice(0, 40),
+        attendu: cle,
+        candidate: String(cand).slice(0, 40),
+        cles: cles.slice(0, 20).map(k => String(k).slice(0, 40)),
+        at: new Date().toISOString(),
+      };
+    });
+  } catch (_) { /* une sentinelle ne casse jamais la capture */ }
+}
+
 async function storeHarvest(domain, type, id, body) {
   noterDiag(`recu_${type || 'inconnu'}`);
   const uid = await activeAccountId(domain);
@@ -613,6 +658,9 @@ async function storeHarvest(domain, type, id, body) {
     echantillonRate(type, id, body);
     return;
   }
+  // Le corps a parsé : la clé de liste attendue est-elle toujours là ? (sentinelle
+  // de dérive de forme, sur le BRUT, avant tout allègement qui pourrait la masquer).
+  verifFormeListe(type, parsed, id);
 
   // Cle de ligne app_data selon le type de donnee.
   let rowId;
@@ -2111,6 +2159,8 @@ async function storeHarvestRow(uid, type, payload, domain) {
   // ni photos pour la plupart des paires. On archive depuis le payload BRUT
   // (l'allègement ci-dessous ne laisse qu'une photo par annonce).
   const brut = payload;
+  // Sentinelle de dérive de forme, sur le BRUT (voie active : même protection).
+  verifFormeListe(type, brut, '');
   payload = alleger(type, payload);
   // ⚠️ MÊME GARDE QUE LA VOIE PASSIVE, ICI AUSSI. Le test `estPorteMonnaie`
   // n'existait que chez l'APPELANT (la moisson active) : n'importe quel autre
