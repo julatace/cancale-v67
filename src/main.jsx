@@ -1,3 +1,4 @@
+import { cleVapid, abonnementAJour } from './vapid.js';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
@@ -75,12 +76,17 @@ if ('serviceWorker' in navigator) {
       // serveur. Silencieux, ne redemande jamais la permission.
       try {
         if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-          const VAPID = 'BBQbRWE86gwZClx3buB8J2JJrd-Kg7aYR-HJqev811KmNnTxLxOAwxFhwF8MfvzHp1-K4tnmjFfQZxVaoB7psi8';
-          const key = (b64) => { const pad = '='.repeat((4 - (b64.length % 4)) % 4); const s = (b64 + pad).replace(/-/g, '+').replace(/_/g, '/'); const raw = atob(s); const a = new Uint8Array(raw.length); for (let i = 0; i < raw.length; i++) a[i] = raw.charCodeAt(i); return a; };
-          reg.pushManager.getSubscription().then((sub) => {
+          // ⚠️ La MÊME clé que le serveur (src/vapid.js). Elle valait une autre
+          // clé ici : chaque ouverture recréait un abonnement que le service de
+          // push refuse, et en renvoyait un périmé tel quel.
+          reg.pushManager.getSubscription().then(async (sub) => {
             const send = (s) => fetch('/api/push', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'subscribe', sub: s.toJSON() }) }).catch(() => {});
-            if (sub) return send(sub);
-            return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key(VAPID) }).then(send).catch(() => {});
+            if (sub && abonnementAJour(sub)) return send(sub);
+            if (sub) {
+              await fetch('/api/push', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'unsubscribe', endpoint: sub.endpoint }) }).catch(() => {});
+              await sub.unsubscribe().catch(() => {});
+            }
+            return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: cleVapid() }).then(send).catch(() => {});
           }).catch(() => {});
         }
       } catch (_) {}

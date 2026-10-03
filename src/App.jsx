@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
+import { VAPID_PUBLIC_KEY } from "./vapid.js";
 // La migration qui cloisonne les vendeurs, lue depuis LE fichier (pas recopiée) :
 // deux copies finiraient par diverger, et c'est le genre de texte qu'on colle
 // dans une base de production sans le relire.
@@ -27537,7 +27538,7 @@ function EmailStartSetting() {
 // Notifications push : ventes / bordereaux / argent reçu en temps réel, même
 // app fermée. Nécessite l'app installée sur l'écran d'accueil (iPhone) et le
 // pipeline email branché (api/email-inbound.js). Un abonnement par appareil.
-const VAPID_PUBLIC_KEY='BIImaPEF-sZb0ohfXGjjR2eKYVVAyz1I3-fYXNlsSUrTQfGM4le_OxJbUML2YyL5ctFea-LS7NfPD9RotDJ0bbc';
+// La clé vit dans src/vapid.js (une seule source, §11).
 function PushSetting() {
   const [state, setState] = useState('checking'); // checking | unsupported | off | on | busy
   const [msg, setMsg] = useState(null);

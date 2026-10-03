@@ -1,7 +1,12 @@
 // Service worker : (1) rend l'app installable + consultable hors-ligne (PWA) ;
 // (2) sert les PDFs bordereaux via une vraie URL HTTPS pour AirPrint.
 
-const CACHE = 'vrm-shell-v4';
+// ⚠️ v5 (3 octobre) : la v4 gardait les fichiers de TOUS les déploiements —
+// mesuré +1,1 Mo par déploiement, jamais purgé (13 à 21 déploiements par jour).
+// Changer le nom fait jeter la v4 entière à l'activation, chez tout le monde.
+const CACHE = 'vrm-shell-v5';
+// Repère de la version servie : le nom du script principal de la page.
+const REPERE = '/__vrm_build';
 const pdfStore = {};
 
 self.addEventListener('install', () => self.skipWaiting());
@@ -18,6 +23,31 @@ self.addEventListener('message', event => {
     if (event.ports[0]) event.ports[0].postMessage({ ok: true });
   }
 });
+
+// ── Une seule version en cache ─────────────────────────────────────────────
+// Chaque déploiement renomme ses fichiers (`/assets/index-<hash>.js`). Le cache
+// « d'abord » les gardait TOUS : l'ancienne version ne sert plus jamais, elle
+// ne fait qu'occuper le téléphone. Quand la page annonce un AUTRE script
+// principal, on retire tout `/assets/` qu'elle ne nomme pas. Les morceaux
+// chargés plus tard (3D, PDF) de la nouvelle version arrivent APRÈS et restent
+// jusqu'au déploiement suivant. Rien à purger si la page est illisible, ou si
+// c'est la même version (sinon on jetterait à chaque ouverture les morceaux
+// chargés à la demande).
+async function purgerAncienneVersion(res) {
+  const html = await res.text();
+  const noms = html.match(/\/assets\/[A-Za-z0-9._-]+/g) || [];
+  const principal = noms.find(n => /\/assets\/index-[^/]+\.js$/.test(n));
+  if (!principal) return;
+  const cache = await caches.open(CACHE);
+  const avant = await cache.match(REPERE);
+  if (avant && (await avant.text()) === principal) return;
+  const garder = new Set(noms);
+  for (const r of await cache.keys()) {
+    const p = new URL(r.url).pathname;
+    if (p.startsWith('/assets/') && !garder.has(p)) await cache.delete(r);
+  }
+  await cache.put(REPERE, new Response(principal));
+}
 
 // ── Notifications push (ventes en temps réel, même app fermée) ──
 self.addEventListener('push', event => {
@@ -62,7 +92,9 @@ self.addEventListener('notificationclick', event => {
 // notifications s'arrêtent SANS erreur visible — c'est exactement le « je reçois
 // plus de notif » de Julien. Ici on se ré-abonne tout seul et on renvoie le
 // nouveau jeton au serveur.
-const VAPID_PUBLIC = 'BLw4VOxC3CXI_yY521zsKXiVbjbQ_YsQtNWqHBDBWsPBD6y4AdCrA_rBv-9vJ3_UgtfcKBjPLPyGFRwANjfBFSk';
+// ⚠️ ÉGALE à src/vapid.js et à api/_lib/push.js (audit-vapid.cjs) : un
+// service worker ne peut pas importer un module de l'app.
+const VAPID_PUBLIC = 'BIImaPEF-sZb0ohfXGjjR2eKYVVAyz1I3-fYXNlsSUrTQfGM4le_OxJbUML2YyL5ctFea-LS7NfPD9RotDJ0bbc';
 function vapidKey(b64) {
   const pad = '='.repeat((4 - (b64.length % 4)) % 4);
   const s = (b64 + pad).replace(/-/g, '+').replace(/_/g, '/');
@@ -134,6 +166,7 @@ self.addEventListener('fetch', event => {
         const fresh = await fetch(req);
         const cache = await caches.open(CACHE);
         cache.put('/', fresh.clone()).catch(() => {});
+        if (fresh.ok) event.waitUntil(purgerAncienneVersion(fresh.clone()).catch(() => {}));
         return fresh;
       } catch (_) {
         const cache = await caches.open(CACHE);
@@ -164,11 +197,18 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // 3) Assets du build (immuables, hashés) : cache d'abord.
+  // 3) Fichiers du build (`/assets/`, hashés donc immuables) : cache d'abord.
+  //    ⚠️ SEULEMENT eux. Tout le reste (le zip de l'extension, les logos, le
+  //    manifeste) garde le MÊME nom d'un déploiement à l'autre : servi « cache
+  //    d'abord », il restait figé pour toujours sur sa première version — le
+  //    lien « Télécharger l'extension » sans `?v=` rendait l'ANCIEN zip, le
+  //    défaut le plus coûteux du projet (§ zip). Ceux-là : réseau d'abord,
+  //    cache en secours (hors-ligne).
+  const immuable = url.pathname.startsWith('/assets/');
   event.respondWith((async () => {
     const cache = await caches.open(CACHE);
     const hit = await cache.match(req);
-    if (hit) return hit;
+    if (hit && immuable) return hit;
     try {
       const res = await fetch(req);
       if (res && res.status === 200 && res.type === 'basic') cache.put(req, res.clone()).catch(() => {});

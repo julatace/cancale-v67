@@ -28,7 +28,10 @@ const app = R('src/App.jsx');
 const srv = R('api/_lib/push.js');
 
 // 1) une seule clé publique, des deux côtés
-const kApp = (app.match(/VAPID_PUBLIC_KEY\s*=\s*'([^']+)'/) || [])[1] || '';
+// La clé de l'app vit dans src/vapid.js depuis le 3 octobre (une seule source
+// pour App.jsx et main.jsx) : on suit l'import jusqu'à la définition — un audit
+// suit la RÈGLE, pas l'endroit où elle est écrite.
+const kApp = (app.match(/VAPID_PUBLIC_KEY\s*=\s*'([^']+)'/) || R('src/vapid.js').match(/VAPID_PUBLIC_KEY\s*=\s*'([^']+)'/) || [])[1] || '';
 const kSrv = (srv.match(/VAPID_PUBLIC\s*=\s*'([^']+)'/) || [])[1] || '';
 if (!kApp || !kSrv) nok('les deux clés publiques sont présentes', `app=${!!kApp} serveur=${!!kSrv}`);
 else if (kApp !== kSrv) nok('app et serveur partagent LA MÊME clé publique',
