@@ -4538,6 +4538,17 @@ function ChampSaisie({ value, onCommit, apresEntree, style, ...p }) {
   const [actif, setActif] = useState(false);
   const avantRef = useRef(value == null ? '' : String(value));
   const annuleRef = useRef(false);
+  // ⚠️ iOS Safari ZOOME dès qu'un champ focalisé fait MOINS de 16px (plainte de
+  // Julien : « quand j'appuie sur le prix d'achat sur le téléphone, ça zoome »).
+  // ChampSaisie est l'éditeur inline UNIQUE (N°, prix d'achat, plancher, boost,
+  // N° de vente) : on impose le plancher de 16px ICI, une seule fois (§11), pour
+  // tous les champs qu'il tape — le publieur eBay fait déjà pareil.
+  const styleSansZoom = (() => {
+    const s = { ...(style || {}) };
+    const t = parseFloat(s.fontSize);
+    if (!isFinite(t) || t < 16) s.fontSize = 16;
+    return s;
+  })();
   useEffect(() => { if (!actif) setTxt(value == null ? '' : String(value)); }, [value, actif]);
   const sortir = (v) => {
     setActif(false);
@@ -4546,7 +4557,7 @@ function ChampSaisie({ value, onCommit, apresEntree, style, ...p }) {
     else setTxt(value == null ? '' : String(value));
   };
   return (
-    <input {...p} value={txt} style={style}
+    <input {...p} value={txt} style={styleSansZoom}
       onFocus={() => { setActif(true); avantRef.current = value == null ? '' : String(value); annuleRef.current = false; }}
       onChange={ev => setTxt(ev.target.value)}
       onBlur={ev => sortir(ev.target.value)}
