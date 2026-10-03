@@ -733,6 +733,9 @@ const pushSessionToExtension = () => {
     window.postMessage({ __vmr: 'session', session: s ? {
       access_token: s.access_token, refresh_token: s.refresh_token,
       expires_at: s.expires_at, user_id: AUTH.user && AUTH.user.id,
+      // L'email voyage avec la session : c'est lui que l'extension affiche
+      // (« compte VRM utilisé »). Sans lui elle ne pouvait pas le nommer.
+      email: (AUTH.user && AUTH.user.email) || '',
     } : null }, window.location.origin);
   } catch (_) {}
 };

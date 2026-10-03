@@ -96,11 +96,16 @@ async function refreshSession() {
     });
     if (!res.ok) return null;
     const j = await res.json();
+    // ⚠️ L'EMAIL SE PERDAIT ICI (mesuré le 2 octobre) : la session renouvelée
+    //    était reconstruite SANS lui, donc « compte VRM utilisé » devenait vide
+    //    au bout d'une heure — l'information même qui manquait le jour où ses
+    //    captures sont parties dans un autre compte VRM.
     const next = {
       access_token: j.access_token,
       refresh_token: j.refresh_token,
       expires_at: Date.now() + ((j.expires_in || 3600) * 1000),
       user_id: (j.user && j.user.id) || s.user_id || null,
+      email: (j.user && j.user.email) || s.email || emailDuJwt(j.access_token) || '',
     };
     await saveSession(next);
     return next;
@@ -164,7 +169,13 @@ async function authEtat() {
   // Un refresh_token périmé (longue absence) rend la session inutilisable : on
   // le vérifie vraiment au lieu d'afficher « connecté » sur un jeton mort.
   const vivant = await authToken();
-  return { ok: true, connecte: !!vivant, expiree: !vivant, email: s.email || '', cloisonne: cl };
+  const email = (vivant && vivant.email) || s.email || emailDuJwt((vivant || s).access_token) || '';
+  return { ok: true, connecte: !!vivant, expiree: !vivant, email, cloisonne: cl };
+}
+// L'email est une REVENDICATION du jeton Supabase (`email`) : une identité, pas
+// une ressemblance — c'est le repli quand la session n'a pas gardé l'adresse.
+function emailDuJwt(token) {
+  try { const p = jwtPayload(token); return (p && typeof p.email === 'string') ? p.email : ''; } catch (_) { return ''; }
 }
 
 async function authLogout() { await saveSession(null); return { ok: true }; }
@@ -635,6 +646,7 @@ async function storeHarvest(domain, type, id, body) {
   // Dernière sortie muette possible : l'écriture elle-même. On la mesure aussi,
   // sinon « rien en base » resterait indiscernable de « jamais reçu ».
   noterDiag(`${ecrit === false ? 'ecriture_ratee' : 'ecrit'}_${type || 'inconnu'}`);
+  noterFlux('vinted', ecrit !== false);
   // Des ventes viennent d'être rangées : l'app ouverte les relit TOUT DE SUITE
   // (« presque instantanément dès que je fais une vente », 2 octobre).
   if (ecrit !== false && type === 'orders_sold') notifierApp({ type: 'maj', quoi: 'ventes', uid: String(uid) });
@@ -745,7 +757,23 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       const from = (sender && sender.origin) || (sender && sender.url) || '';
       const trusted = /^https:\/\/(cancale-v67(-ten)?\.vercel\.app|(www\.)?vrm\.center)/.test(from);
       if (!trusted) { sendResponse({ ok: false, error: 'origine non autorisee' }); return true; }
-      saveSession(msg.session || null).then(() => sendResponse({ ok: true }));
+      (async () => {
+        // ⚠️⚠️ L'APP TRANSMET SA SESSION, ET L'EXTENSION L'ADOPTE. Mesuré le
+        //    2 octobre : quelqu'un s'est connecté à VRM avec une AUTRE adresse
+        //    dans ce Chrome, et pendant quatre minutes les captures de
+        //    `angeled92` (bordereaux compris) sont parties dans cette autre
+        //    boutique — sans un mot nulle part. On garde la trace de la bascule
+        //    pour que le petit écran de l'extension la DISE.
+        try {
+          const avant = await loadSession();
+          const apres = msg.session || null;
+          if (avant && apres && avant.user_id && apres.user_id && String(avant.user_id) !== String(apres.user_id)) {
+            await chrome.storage.local.set({ vrmBascule: { de: avant.email || emailDuJwt(avant.access_token) || '', vers: apres.email || emailDuJwt(apres.access_token) || '', at: Date.now() } });
+          }
+        } catch (_) {}
+        await saveSession(msg.session || null);
+        sendResponse({ ok: true });
+      })();
       return true;
     }
 
@@ -2197,6 +2225,7 @@ async function storeHarvestRow(uid, type, payload, domain) {
   // app, mais autant que la colonne cesse de mentir aux autres lecteurs.
   const ecritRow = await supabaseUpsert('app_data', [{ id: `harvest_${uid}_${type}`, data, updated_at: maintenant }], 'id');
   if (ecritRow !== false && type === 'orders_sold') notifierApp({ type: 'maj', quoi: 'ventes', uid: String(uid) });
+  noterFlux('vinted', ecritRow !== false);
   if (type === 'listings') {
     try { const tous = (brut && brut.items) || []; await archiverLot(uid, tous.filter(it => it && !it.is_closed && !it.is_hidden && !it.is_draft), tous); } catch (_) {}
   }
@@ -3145,6 +3174,19 @@ async function majCmd(jobId, patch) {
   try { await chrome.storage.local.set({ vrmCmds: cmds }); } catch (_) {}
   notifierApp(Object.assign({ type: 'cmd', jobId }, cmds[jobId]));
   return cmds[jobId];
+}
+// ── « LES INFORMATIONS CIRCULENT-ELLES BIEN ? » ─────────────────────────────
+// Le petit écran de l'extension le dit, plateforme par plateforme : dernier
+// envoi réussi, dernier envoi refusé. MESURÉ aux points d'écriture, jamais
+// supposé (« pas su » ≠ « oui ») — c'est `chrome.storage` (§4.9).
+async function noterFlux(plateforme, ok) {
+  try {
+    const cur = (await chrome.storage.local.get('vrmFlux')).vrmFlux || {};
+    const p = cur[plateforme] || {};
+    if (ok) p.okAt = Date.now(); else p.koAt = Date.now();
+    cur[plateforme] = p;
+    await chrome.storage.local.set({ vrmFlux: cur });
+  } catch (_) {}
 }
 // Prévenir les onglets de l'app (bridge.js relaie à la page). Sans onglet
 // ouvert : rien, et l'app relira l'état au retour (`cmd:statut`).
@@ -6505,7 +6547,8 @@ async function storeLbcListings(url, listings) {
     const prev = (prevRows[0] && prevRows[0].data && prevRows[0].data.items) || {};
     const merged = Object.assign({}, prev);
     for (const l of listings) { if (l && l.id) merged[String(l.id)] = Object.assign({}, merged[String(l.id)], l, { seenAt: new Date().toISOString() }); }
-    await supabaseUpsert('app_data', [{ id: 'lbc_listings', data: { items: merged, updatedAt: new Date().toISOString(), lastUrl: url } }], 'id');
+    const _okFlux = await supabaseUpsert('app_data', [{ id: 'lbc_listings', data: { items: merged, updatedAt: new Date().toISOString(), lastUrl: url } }], 'id');
+    noterFlux('leboncoin', _okFlux !== false);
   } catch (_) {}
 }
 // COMPTES LEBONCOIN connectes. Julien en a plusieurs : on garde la liste des
@@ -6529,7 +6572,8 @@ async function storeLbcAccount(acc) {
       if (s && LBC_URL_AUTRUI.test(String(s))) delete merged[id];
     }
     merged[String(acc.id)] = Object.assign({}, merged[String(acc.id)], acc, { seenAt: new Date().toISOString() });
-    await supabaseUpsert('app_data', [{ id: 'lbc_accounts', data: { accounts: merged, updatedAt: new Date().toISOString() } }], 'id');
+    const _okFlux = await supabaseUpsert('app_data', [{ id: 'lbc_accounts', data: { accounts: merged, updatedAt: new Date().toISOString() } }], 'id');
+    noterFlux('leboncoin', _okFlux !== false);
   } catch (_) {}
 }
 // RECON : on garde un échantillon des réponses Leboncoin (chemins d'API + un bout
@@ -6578,7 +6622,8 @@ async function storeLbcRecon(patch) {
       next[k] = patch[k];
     }
     next.updatedAt = new Date().toISOString();
-    await supabaseUpsert('app_data', [{ id: 'lbc_recon', data: next }], 'id');
+    const _okFlux = await supabaseUpsert('app_data', [{ id: 'lbc_recon', data: next }], 'id');
+    noterFlux('leboncoin', _okFlux !== false);
     if (patch.etapes || patch.envois) await publierPrepLbc();   // idem
   } catch (_) {}
 }
@@ -6750,7 +6795,8 @@ async function rangerLbcVentes(list) {
   }
   const noms = Object.keys(ventes);
   if (noms.length > 500) { const g = noms.sort((x, y) => Date.parse((ventes[y] || {}).at || 0) - Date.parse((ventes[x] || {}).at || 0)).slice(0, 500); for (const n of noms) if (!g.includes(n)) delete ventes[n]; }
-  await supabaseUpsert('app_data', [{ id: 'lbc_ventes', data: { ventes, updatedAt: new Date().toISOString() } }], 'id');
+  const _okFlux = await supabaseUpsert('app_data', [{ id: 'lbc_ventes', data: { ventes, updatedAt: new Date().toISOString() } }], 'id');
+  noterFlux('leboncoin', _okFlux !== false);
 }
 // Le panneau AFFICHE ses ventes Leboncoin : on rend la liste, triée sur ce qu'il
 // PEUT faire — d'abord celles qui portent un bordereau à imprimer, puis les
