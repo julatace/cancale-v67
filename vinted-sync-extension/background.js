@@ -878,14 +878,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg && msg.from === 'cancale-ebay') {
       (async () => {
         try {
-          if (msg.action === 'getQueue') { const r = await buildEbayData(); sendResponse({ ok: true, ...r }); return; }
-          if (msg.action === 'downloadPhotos' && Array.isArray(msg.urls)) { const nb = await downloadPhotos(msg.urls, msg.numero); sendResponse({ ok: true, count: nb }); return; }
           // Les OCTETS des photos, pour les ATTACHER au formulaire eBay au lieu
           // de les déposer sur son disque. Le fond les lit parce que le CDN de
           // Vinted ne renvoie aucun en-tête CORS — la page seule ne peut pas.
           if (msg.action === 'photoBytes' && Array.isArray(msg.urls)) { const ph = await photosPourEbay(msg.urls, msg.max); sendResponse({ ok: true, photos: ph }); return; }
-          if (msg.action === 'markPosted' && msg.id) { sendResponse({ ok: await markEbayPosted(msg.id, true) }); return; }
-          if (msg.action === 'unmarkPosted' && msg.id) { sendResponse({ ok: await markEbayPosted(msg.id, false) }); return; }
           if (msg.action === 'setPending') { await chrome.storage.local.set({ vrmPendingEbay: msg.ad ? { ad: msg.ad, at: Date.now() } : null }); sendResponse({ ok: true }); return; }
           if (msg.action === 'getPending') {
             const g = await chrome.storage.local.get('vrmPendingEbay');
@@ -920,10 +916,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg && msg.from === 'cancale-lbc') {
       (async () => {
         try {
-          if (msg.action === 'getQueue') { const r = await buildLbcData(); const ventes = await lireLbcVentes(); sendResponse({ ok: true, queue: r.queue, removals: r.removals, stats: r.stats, postedList: r.postedList, ventes }); return; }
-          if (msg.action === 'setLimit') { await setLbcLimit(msg.limit, msg.plan); sendResponse({ ok: true }); return; }
-          if (msg.action === 'getPhotos') { const r = await getPairPhotos(msg.numero); sendResponse({ ok: true, numero: r.numero, title: r.title, photos: r.photos }); return; }
-          if (msg.action === 'downloadPhotos' && Array.isArray(msg.urls)) { const nb = await downloadPhotos(msg.urls, msg.numero); sendResponse({ ok: true, count: nb }); return; }
           // Les OCTETS des photos, pour les ATTACHER au formulaire au lieu de
           // les télécharger sur son disque. Le fond les lit parce que le CDN de
           // Vinted ne renvoie aucun en-tête CORS : la page seule ne peut pas.
@@ -971,9 +963,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             }
             sendResponse({ ok: true }); return;
           }
-          if (msg.action === 'markPosted' && msg.id) { await markLbcPosted(msg.id); sendResponse({ ok: true }); return; }
-          if (msg.action === 'unmarkPosted' && msg.id) { await unmarkLbcPosted(msg.id); sendResponse({ ok: true }); return; }
-          if (msg.action === 'markRemoved' && msg.id) { await unmarkLbcPosted(msg.id); sendResponse({ ok: true }); return; }
+          if (msg.action === 'markPosted' && msg.id) {
+            await markLbcPosted(msg.id);
+            // Publiée depuis une commande de l'app : l'app le sait tout de suite.
+            const jid = 'lbc:' + String(msg.id);
+            if ((await lireCmds())[jid]) await majCmd(jid, { etape: 'fait' });
+            notifierApp({ type: 'maj', quoi: 'lbc' });
+            sendResponse({ ok: true }); return;
+          }
           if (msg.action === 'lbcCapture') {
             if (Array.isArray(msg.listings) && msg.listings.length) await storeLbcListings(msg.url, msg.listings);
             if (msg.account && msg.account.id) await storeLbcAccount(msg.account);
@@ -2895,6 +2892,46 @@ async function labelDejaRange(uid, tx) {
   if (rows === null) return null;
   return Array.isArray(rows) && rows.length ? rows[0] : false;
 }
+// ══════════════════════════════════════════════════════════════════════════
+// PUBLIER DEPUIS L'APP (5.130) — les panneaux Leboncoin et eBay sont retirés
+// ══════════════════════════════════════════════════════════════════════════
+// Julien, 2 octobre : « tout doit être centralisé dans VRM ». La liste vit dans
+// l'app ; l'app ne transmet qu'un IDENTIFIANT d'annonce, jamais un contenu : la
+// paire est relue dans la file que l'extension construit elle-même
+// (`buildLbcData` / `buildEbayData` — mêmes règles que l'app, §11). Une paire
+// prouvée vendue, décochée ou déjà publiée n'y est plus : refusée.
+// ⚠️ Aucune requête vers Leboncoin, eBay ou Vinted ici : on MÉMORISE la paire et
+//    on OUVRE la page de dépôt ; c'est lbc.js / ebay.js qui remplissent (et, sur
+//    Leboncoin, publient sans booster — décision du 20 septembre).
+async function publierDepuisApp(msg) {
+  const cmd = String(msg.cmd || '');
+  const id = String(msg.id || '');
+  if (cmd === 'lbcQuota') {
+    const ok = await setLbcLimit(msg.limit, msg.plan);
+    notifierApp({ type: 'maj', quoi: 'lbc' });
+    return ok === false ? { accepte: false, code: 'lecture', raison: "la base n'a pas répondu — réessaie dans un moment" } : { accepte: true, etape: 'fait' };
+  }
+  if (!/^\d+$/.test(id)) return { accepte: false, code: 'invalide', raison: 'annonce inconnue' };
+  if (cmd === 'lbcMarque' || cmd === 'ebayMarque') {
+    const pose = msg.etat === 'posted';
+    if (cmd === 'lbcMarque') { if (pose) await markLbcPosted(id); else await unmarkLbcPosted(id); }
+    else await markEbayPosted(id, pose);
+    notifierApp({ type: 'maj', quoi: cmd === 'lbcMarque' ? 'lbc' : 'ebay' });
+    return { accepte: true, etape: 'fait' };
+  }
+  const lbc = cmd === 'lbcPublier';
+  const r = lbc ? await buildLbcData() : await buildEbayData();
+  const preuveKO = lbc ? !!(r && r.stats && r.stats.preuveKO) : !!(r && r.preuveKO);
+  if (preuveKO) return { accepte: false, code: 'preuve', raison: "je n'ai pas pu vérifier qu'elle n'est pas déjà vendue — réessaie dans un moment" };
+  const ad = ((r && r.queue) || []).find((a) => String(a.id) === id);
+  if (!ad) return { accepte: false, code: 'absente', raison: "elle n'est plus dans la file (vendue, déjà publiée, ou décochée)" };
+  const jobId = (lbc ? 'lbc:' : 'ebay:') + id;
+  if (lbc) await chrome.storage.local.set({ vrmPendingAd: { ad: Object.assign({}, ad, { publier: true }), at: Date.now() } });
+  else await chrome.storage.local.set({ vrmPendingEbay: { ad, at: Date.now() } });
+  await majCmd(jobId, { etape: 'depot', id, numero: ad.numero || '' });
+  try { await chrome.tabs.create({ url: lbc ? 'https://www.leboncoin.fr/deposer-une-annonce' : 'https://www.ebay.fr/sl/sell', active: true }); } catch (_) {}
+  return { accepte: true, jobId, etape: 'depot' };
+}
 async function executerCommande(msg) {
   // « Relis mes ventes » : l'app vient d'ouvrir Ventes / Colis / Ma journée.
   // UNE lecture (my_orders) du compte connecté dans Chrome — jamais d'un autre —
@@ -2910,6 +2947,7 @@ async function executerCommande(msg) {
     avecVinted(() => rafraichirVentes(uid)).catch(() => {});
     return { accepte: true, etape: 'ventes' };
   }
+  if (msg && /^(lbcPublier|lbcMarque|lbcQuota|ebayPreparer|ebayMarque)$/.test(String(msg.cmd || ''))) return await publierDepuisApp(msg);
   if (!msg || msg.cmd !== 'bordereau') return { accepte: false, code: 'inconnue', raison: 'commande inconnue' };
   const uid = String(msg.uid || ''), tx = String(msg.tx || '');
   if (!/^\d+$/.test(uid) || !/^\d+$/.test(tx)) return { accepte: false, code: 'invalide', raison: 'vente incomplète' };
@@ -5184,23 +5222,6 @@ async function rangerLbcVentes(list) {
   const _okFlux = await supabaseUpsert('app_data', [{ id: 'lbc_ventes', data: { ventes, updatedAt: new Date().toISOString() } }], 'id');
   noterFlux('leboncoin', _okFlux !== false);
 }
-// Le panneau AFFICHE ses ventes Leboncoin : on rend la liste, triée sur ce qu'il
-// PEUT faire — d'abord celles qui portent un bordereau à imprimer, puis les
-// autres en cours, puis les terminées/annulées. Lecture seule ; `[]` si rien ou
-// lecture ratée (l'affichage ne détruit rien, il n'apparaît juste pas).
-async function lireLbcVentes() {
-  const rows = await sbGet('app_data?id=eq.lbc_ventes&select=data');
-  if (!rows || !rows[0] || !rows[0].data) return [];
-  const v = rows[0].data.ventes || {};
-  const rang = (o) => {
-    const s = (o.stepStatus || '') + ' ' + (o.stepLabel || '');
-    if (/annul|cancel|refund|rembours/i.test(s)) return 3;
-    if (o.label && o.label.voucherUrl) return 0;      // un bordereau à imprimer
-    if (/action|envoy|à envoyer|ship/i.test(s)) return 1;
-    return 2;
-  };
-  return Object.values(v).sort((a, b) => rang(a) - rang(b) || (Date.parse(b.at || 0) - Date.parse(a.at || 0)));
-}
 // ══════════════════════════════════════════════════════════════════════════════
 // LE CATALOGUE LEBONCOIN — SES CODES EXACTS DE CATÉGORIE, MARQUE, TAILLE, ÉTAT
 // ══════════════════════════════════════════════════════════════════════════════
@@ -5481,40 +5502,6 @@ async function handleLbcRaw(url, body) {
   await storeLbcRecon({ url, quota: quota || undefined, sample: { url, at: new Date().toISOString(), found: found.length, quota, body: String(body).slice(0, 9000) } });
   if (found.length) await storeLbcListings(url, found);
 }
-// Toutes les photos Vinted (HD) d'une paire, par son N°. Leboncoin limite le
-// nombre de photos ; ici on récupère TOUTES celles de Vinted (déjà moissonnées)
-// pour pouvoir en envoyer davantage à un acheteur qui en demande, sans rien
-// re-télécharger. Cherche dans le détail complet (item) puis dans le dressing.
-async function getPairPhotos(numero) {
-  const num = String(numero || '').trim();
-  if (!num) return { numero: num, title: '', photos: [] };
-  const mainRows = await lireMain(['vinted_annonce_numeros']);
-  const numeros = (mainRows && mainRows.vinted_annonce_numeros) || {};
-  const ids = Object.keys(numeros).filter((k) => String(numeros[k] && numeros[k].numero) === num);
-  const photos = []; const seen = new Set(); let title = '';
-  const add = (u) => { const s = typeof u === 'string' ? u : (u && (u.full_size_url || u.url)); if (s && !seen.has(s)) { seen.add(s); photos.push(s); } };
-  const itemRows = (await sbGet('app_data?id=like.harvest_*_item_*&select=id,data')) || [];
-  const detById = {}; for (const r of itemRows) { const p = (r.data && r.data.payload) || {}; const it = p.item || p; if (it && it.id) detById[String(it.id)] = it; }
-  // Photos HD lues sur la page de l'annonce (voir saveItemDetail).
-  const pageRows2 = await sbGet('app_data?id=eq.vinted_item_details&select=data');
-  const pageDet2 = (pageRows2 && pageRows2[0] && pageRows2[0].data) || {};
-  for (const id in pageDet2) {
-    const ph = (pageDet2[id] || {}).photos || [];
-    if (!ph.length) continue;
-    const cur = detById[id] || {};
-    if (!cur.photos || !cur.photos.length) cur.photos = ph.map(u => ({ url: u }));
-    detById[id] = cur;
-  }
-  const listRows = (await sbGet('app_data?id=like.harvest_*_listings&select=id,data')) || [];
-  const rawById = {}; for (const r of listRows) { const p = (r.data && r.data.payload) || {}; for (const it of (p.items || [])) rawById[String(it.id)] = it; }
-  for (const id of ids) {
-    title = title || (numeros[id] && numeros[id].title) || '';
-    const det = detById[id]; if (det && Array.isArray(det.photos)) det.photos.forEach(add);
-    const raw = rawById[id]; if (raw) { (raw.photos || []).forEach(add); if (raw.photo) add(raw.photo); }
-    if (numeros[id] && numeros[id].photo) add(numeros[id].photo);
-  }
-  return { numero: num, title, photos };
-}
 // Télécharge les photos d'une paire en FICHIERS (fini les onglets). Rangées dans
 // un sous-dossier VRM-{N°} pour les retrouver et les glisser dans Leboncoin.
 // ⚠️⚠️ LE MUR DES PHOTOS N'EXISTE PAS — CE QUE J'AVAIS ÉCRIT ÉTAIT FAUX.
@@ -5555,16 +5542,6 @@ async function photosEnOctets(urls, max) {
 //    fonction, oui.
 async function photosPourEbay(urls, max) { return await photosEnOctets(urls, max); }
 
-async function downloadPhotos(urls, numero) {
-  if (!chrome.downloads) return 0;
-  const list = urls.filter(Boolean); let n = 0;
-  for (let i = 0; i < list.length; i++) {
-    const u = list[i];
-    const ext = ((String(u).split('?')[0].match(/\.(jpe?g|png|webp)$/i) || [])[1] || 'jpg');
-    try { await chrome.downloads.download({ url: u, filename: `VRM-${numero || 'paire'}/photo-${i + 1}.${ext}`, conflictAction: 'uniquify' }); n++; } catch (_) {}
-  }
-  return n;
-}
 async function readPostedData() {
   const rows = await sbGet('app_data?id=eq.vinted_lbc_posted&select=data');
   const d = (rows && rows[0] && rows[0].data) || {};

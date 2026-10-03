@@ -1,11 +1,15 @@
-// lbc.js — Assistant Leboncoin (tourne sur leboncoin.fr, dans TON navigateur).
+// lbc.js — sur leboncoin.fr, dans TON navigateur. Plus aucun panneau (5.130).
 //
-// Il ne publie RIEN tout seul : il te PRÉPARE le travail. Il lit les annonces
-// Vinted en ligne (déjà moissonnées + détaillées par l'extension), et pour
-// chacune il affiche une annonce Leboncoin prête (titre, description avec le N°,
-// prix, catégorie, photos). Tu ouvres « Déposer une annonce », tu peux
-// pré-remplir le formulaire ou copier chaque champ, tu vérifies, et c'est TOI
-// qui cliques sur « Publier ». Un humain publie → pas de risque pour ton compte.
+// Julien, 2 octobre : « tout doit être centralisé dans VRM ; l'extension est
+// simplement là pour capter ». Ce fichier fait trois choses, sans rien afficher
+// d'autre que la petite carte VRM (vrm-badge.js) :
+//  1. il RELAIE ce que lbc-inject.js capte (annonces, ventes, codes, étapes) ;
+//  2. il enregistre la carte du formulaire de dépôt (noms de champs, jamais un
+//     contenu saisi) ;
+//  3. quand l'APP a demandé « Publier sur Leboncoin » pour une paire, il remplit
+//     le dépôt (photos, titre, description, prix, catégorie, pointure, état) et
+//     publie SANS booster — décision de Julien du 20 septembre. Le bandeau en
+//     bas à gauche dit, pendant ce temps, ce qui est fait.
 (function () {
   if (window.__vrmLbcLoaded) return; window.__vrmLbcLoaded = true;
   // ⚠️⚠️ ET SI LE FORMULAIRE DE DÉPÔT VIT DANS UN CADRE (iframe) ? Le script ne
@@ -31,28 +35,6 @@
     else if (d.kind === 'lbcschema' && d.cles) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcSchema', endpoint: d.endpoint, cles: d.cles }); } catch (_) {} }
   }, false);
 
-  let queue = [];
-  let removals = []; // paires vendues sur Vinted → à retirer de Leboncoin
-  let unlinked = []; // annonces LBC que VRM n'a pas su relier à une paire connue
-  let ventes = []; // ses ventes Leboncoin captées (état + bordereau), lecture seule
-  let stats = { postedCount: 0, lbcCount: 0, limit: null, plan: null, detected: null }; // compteur d'annonces LBC + offre
-  let loadError = false; // vrai si getQueue a échoué (≠ file vide)
-  let postedList = []; // paires marquées « publiées » (pour annuler une erreur)
-  let showPosted = false;
-  let photoRes = null; // { numero, title, photos:[...] } — photos d'une paire à envoyer à un acheteur
-  let pageRefs = new Set(); // NOS numéros (VRM-X) déjà repérés sur la page Leboncoin
-  // Lit toute l'annonce (titre + description) de la page courante et récupère nos
-  // références « VRM-{num} ». Marche pour un compte PRO comme normal : on lit
-  // NOTRE jeton, pas la numérotation Leboncoin. Sert à savoir ce qui est déjà en ligne.
-  function scanPageRefs() {
-    const s = new Set();
-    try {
-      const txt = (document.body && document.body.innerText || '').slice(0, 500000);
-      const re = /VRM[-\s]?(\d{1,5})/gi; let m;
-      while ((m = re.exec(txt))) s.add(m[1]);
-    } catch (_) {}
-    pageRefs = s;
-  }
 
   // ── CAPTURE de TES annonces Leboncoin (passif : on lit ce que la page a déjà
   //    chargé, aucune requête en plus). Leboncoin est du Next.js → les données
@@ -227,385 +209,21 @@
       send({ action: 'lbcCapture', url: location.href, listings, account });
     }
   }
-  const host = document.createElement('div');
-  host.style.cssText = 'position:fixed;z-index:2147483647;right:16px;bottom:16px;';
-  const root = host.attachShadow({ mode: 'open' });
-  document.documentElement.appendChild(host);
-
-  // ⚠️ DESIGN — Julien : « j'aime pas trop les couleurs ni les boutons, ça fait
-  //    un peu simple ». On aligne le panneau sur la SIGNATURE de VRM (§7) :
-  //    encre ardoise #10151B, UNE seule couleur d'accent (bleu #1E5FCC, rare),
-  //    fond gris froid #F6F7F9, cartes blanches, rayons 8/10/12/14, ombres à
-  //    deux couches (contact serré + diffusion large et pâle). Plus d'orange
-  //    Leboncoin partout. Boutons : UNE seule forme (hauteur, rayon, graisse) —
-  //    la dispersion est ce qui se lit « pas fini », pas la couleur.
-  const css = `
-    *{box-sizing:border-box;font-family:-apple-system,Segoe UI,Roboto,sans-serif}
-    .fab{background:#10151b;color:#fff;border:none;border-radius:999px;padding:9px 15px 9px 9px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 1px 2px rgba(16,21,27,.16),0 8px 24px rgba(16,21,27,.22);display:flex;align-items:center;gap:9px;letter-spacing:.2px}
-    .fab img{width:30px;height:30px;border-radius:7px;object-fit:cover;display:block}
-    .fab .b{background:#1e5fcc;color:#fff;border-radius:999px;min-width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;padding:0 6px}
-    .hd img{width:24px;height:24px;border-radius:6px;object-fit:cover;display:block}
-    .panel{width:384px;max-width:92vw;max-height:82vh;background:#fff;border-radius:16px;box-shadow:0 1px 3px rgba(16,21,27,.14),0 16px 44px rgba(16,21,27,.22);overflow:hidden;display:flex;flex-direction:column}
-    .hd{background:#10151b;color:#fff;padding:13px 15px;display:flex;align-items:center;gap:8px}
-    .hd .t{font-size:14px;font-weight:800;flex:1;letter-spacing:.2px}
-    .hd button{background:rgba(255,255,255,.16);color:#fff;border:none;width:28px;height:28px;border-radius:999px;font-size:16px;cursor:pointer}
-    .body{overflow:auto;padding:11px;background:#f6f7f9}
-    .empty{padding:26px 16px;text-align:center;color:#6b7684;font-size:13px;line-height:1.5}
-    .card{background:#fff;border:1px solid #e6e8eb;border-radius:12px;padding:11px;margin-bottom:10px;box-shadow:0 1px 2px rgba(16,21,27,.05)}
-    /* ⚠️ « flouter pour dire que je l'ai déjà publié » (Julien) : une paire
-       déjà en ligne sur Leboncoin est estompée, pour ne pas la republier. */
-    .card.deja{opacity:.5;filter:grayscale(.55)}
-    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-    .num{background:#10151b;color:#fff;border-radius:999px;font-size:11px;font-weight:800;padding:2px 9px}
-    .cat{background:#eef1f6;color:#3a4351;border-radius:999px;font-size:10.5px;font-weight:700;padding:2px 9px}
-    .done{background:#e9f0fb;color:#1e5fcc;border-radius:999px;font-size:10.5px;font-weight:800;padding:2px 9px}
-    .acc{color:#8a919c;font-size:10.5px;font-weight:700;margin-left:auto}
-    .tt{font-size:13.5px;font-weight:700;color:#10151b;margin-top:8px;line-height:1.35}
-    .pr{font-size:15px;font-weight:800;color:#10151b;margin-top:2px}
-    .ph{display:flex;gap:5px;margin-top:8px;overflow-x:auto}
-    .ph img{width:52px;height:52px;object-fit:cover;border-radius:8px;flex-shrink:0;cursor:pointer;border:1px solid #e6e8eb}
-    .desc{font-size:11.5px;color:#3a4351;white-space:pre-wrap;background:#f6f7f9;border-radius:8px;padding:8px;margin-top:8px;max-height:110px;overflow:auto}
-    .btns{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
-    .btn{border:1px solid #dce0e6;background:#fff;color:#10151b;border-radius:8px;padding:7px 11px;font-size:12px;font-weight:700;cursor:pointer;min-height:32px;transition:background .12s,border-color .12s}
-    .btn:hover{border-color:#c3c9d2}
-    .btn.p{background:#1e5fcc;color:#fff;border-color:#1e5fcc}
-    .btn.p:hover{background:#1a54b6;border-color:#1a54b6}
-    .btn.g{background:#fff;color:#1e5fcc;border-color:#1e5fcc}
-    .btn[disabled]{opacity:.5;cursor:not-allowed}
-    .hint{font-size:10.5px;color:#8a919c;padding:4px 2px 8px;line-height:1.45}
-    .toast{position:fixed;left:50%;bottom:80px;transform:translateX(-50%);background:#10151b;color:#fff;padding:10px 15px;border-radius:10px;font-size:12.5px;font-weight:600;opacity:0;transition:opacity .2s;z-index:2147483647;box-shadow:0 8px 24px rgba(16,21,27,.28)}
-    .remsec{border:1px solid #e6e8eb;background:#fff;border-radius:12px;padding:9px;margin-bottom:10px;box-shadow:0 1px 2px rgba(16,21,27,.05)}
-    .remhd{font-size:12px;font-weight:800;color:#10151b;margin-bottom:6px}
-    .rem{display:flex;align-items:center;gap:8px;background:#f6f7f9;border:1px solid #e6e8eb;border-radius:9px;padding:7px 9px;margin-bottom:6px;font-size:12px}
-    .counter{background:#fff;border:1px solid #e6e8eb;border-radius:12px;padding:10px 12px;margin-bottom:10px;box-shadow:0 1px 2px rgba(16,21,27,.05)}
-    .crow{display:flex;align-items:center;gap:6px;font-size:12.5px;color:#10151b;font-weight:600}
-    .cbar{height:7px;border-radius:999px;background:#eef0f2;overflow:hidden;margin-top:8px}
-    .cbarfill{height:100%;border-radius:999px;transition:width .3s;background:#1e5fcc}
-    .cmsg{font-size:11px;font-weight:600;margin-top:5px;line-height:1.45}
-    .deposit{display:block;text-align:center;background:#1e5fcc;color:#fff;text-decoration:none;font-size:13px;font-weight:800;padding:11px;margin:0 11px 8px;border-radius:10px;box-shadow:0 1px 2px rgba(16,21,27,.1)}
-    .grp{font-size:11px;font-weight:800;color:#10151b;margin:10px 2px 5px;letter-spacing:.2px;text-transform:uppercase}
-    .pko{font-size:10.5px;color:#c0392b;line-height:1.45;margin-top:5px}
-    .pko a{color:#c0392b;font-weight:700}
-    .pnote{font-size:10.5px;color:#6b7684;line-height:1.45;margin-top:5px}
-    .pnote a{color:#1e5fcc;font-weight:700}
-`;
-
-  // Le vrai logo VRM (demande de Julien : « mets le logo du site en bas, "VRM 52"
-  // c'est dégueulasse »). Exposé en web_accessible_resource ; si getURL échoue
-  // pour une raison quelconque, on retombe sur le texte — jamais d'image cassée.
-  let LOGO = ''; try { LOGO = chrome.runtime.getURL('logo-vrm.png'); } catch (_) { LOGO = ''; }
-  let open = false;
-  function render() {
-    const items = queue;
-    const badge = items.length + (removals.length ? '+' + removals.length : '');
-    // Annonces Leboncoin non rapprochées : informatif, JAMAIS présenté comme
-    // « à retirer » (VRM ne connaît pas la paire, il ne peut pas trancher).
-    const unlHtml = unlinked.length
-      ? `<div class="remsec"><div class="remhd" style="color:#7a8">❔ ${unlinked.length} annonce${unlinked.length > 1 ? 's' : ''} Leboncoin non reliée${unlinked.length > 1 ? 's' : ''} à une paire VRM</div>`
-        + unlinked.slice(0, 20).map((u) => `<div class="rem"><div class="remt">${esc(u.title || '(sans titre)')}</div>`
-          + `<div class="remm">réf ${esc(u.ref || '—')}${u.price != null ? ' · ' + esc(u.price) + ' €' : ''}${u.issue ? ' · ⚠️ ' + esc(u.issue) : ''}`
-          + `${u.url ? ` · <a href="${esc(u.url)}" target="_blank" rel="noreferrer">voir</a>` : ''}</div></div>`).join('')
-        + `<div class="remm" style="padding:4px 2px">VRM ne connaît pas ces numéros — à toi de voir. Ajoute la référence de la paire sur l&#39;annonce pour qu&#39;elles se relient toutes seules.</div></div>`
-      : '';
-    // ⚠️⚠️ « VENDUE » SE PROUVE, ELLE NE SE DÉDUIT PAS D'UNE ABSENCE.
-    // Ce bandeau écrivait « N vendues sur Vinted — à retirer », en rouge, dès
-    // qu'une annonce n'était plus en ligne. Or elle peut sortir de la liste
-    // parce qu'il l'a MISE EN PAUSE. Mesuré le 12 septembre sur ses vraies
-    // données : sur ses 400 annonces fermées, **151 seulement** portent une
-    // vente prouvée par identité (`transaction → item_id`, §5). Pour les 249
-    // autres, « supprime-la de Leboncoin » lui ferait perdre une vente sur une
-    // paire qu'il a encore. Trois états, et le rouge est réservé à la preuve.
-    const parEtat = { vendue: [], doute: [], pause: [] };
-    for (const r of removals) parEtat[r.etat === 'vendue' ? 'vendue' : (r.etat === 'pause' ? 'pause' : 'doute')].push(r);
-    const remHtml =
-      (parEtat.vendue.length
-        ? `<div class="remsec"><div class="remhd">🔴 ${parEtat.vendue.length} vendue${parEtat.vendue.length > 1 ? 's' : ''} sur Vinted — à retirer de Leboncoin</div>`
-          + `<div class="remm" style="padding:2px 2px 6px">La vente est certaine. Retire-les pour ne pas vendre la même paire deux fois — le numéro de la paire, lui, ne change pas.</div>`
-          + parEtat.vendue.map((r) => remHtmlOne(r, 'vendue')).join('') + '</div>'
-        : '')
-      + (parEtat.doute.length
-        ? `<div class="remsec" style="border-color:#e8a33d"><div class="remhd" style="color:#9a5b16">⚠️ ${parEtat.doute.length} plus en ligne sur Vinted — à vérifier</div>`
-          + `<div class="remm" style="padding:2px 2px 6px">Je n&#39;ai <b>pas la preuve</b> qu&#39;elles sont vendues : tu as peut-être juste retiré l&#39;annonce. Ouvre et décide — je ne te dis pas de les supprimer.</div>`
-          + parEtat.doute.map((r) => remHtmlOne(r, 'doute')).join('') + '</div>'
-        : '')
-      + (parEtat.pause.length
-        ? `<div class="remsec" style="border-color:#d7dce2"><div class="remhd" style="color:#6b7684">⏸ ${parEtat.pause.length} en pause sur Vinted</div>`
-          + `<div class="remm" style="padding:2px 2px 6px">Masquées sur Vinted, pas vendues. Elles peuvent rester sur Leboncoin : <b>rien à faire</b>.</div>`
-          + parEtat.pause.map((r) => remHtmlOne(r, 'pause')).join('') + '</div>'
-        : '');
-    root.innerHTML = `<style>${css}</style>` + (open
-      ? `<div class="panel">
-           <div class="hd">${LOGO ? `<img src="${LOGO}" alt="VRM">` : ''}<span class="t">${items.length} à publier${removals.length ? ' · ' + removals.length + ' à retirer' : ''}</span>
-             <button data-a="refresh" title="Rafraîchir">⟳</button>
-             <button data-a="close" title="Fermer">×</button></div>
-           <a class="deposit" href="https://www.leboncoin.fr/deposer-une-annonce" target="_blank" rel="noreferrer">➕ Déposer une annonce sur Leboncoin</a>
-           <div class="body">${photoHtml()}${counterHtml()}${preuveHtml()}${exclusHtml()}${ventesHtml()}${remHtml}${unlHtml}${items.length ? listeGroupee(items) : emptyHtml()}${donePostedHtml()}</div>
-           <div class="hint">1) Clique <b>➕ Déposer une annonce</b>. 2) Sur la page, clique <b>✍️ Pré-remplir</b> sur la paire voulue. 3) Vérifie et publie toi-même. Rien n&#39;est publié automatiquement.</div>
-         </div>`
-      : `<button class="fab" data-a="open" title="Ouvrir VRM">${LOGO ? `<img src="${LOGO}" alt="VRM">` : '<b>VRM</b>'}${(items.length || removals.length) ? `<span class="b">${badge}</span>` : ''}</button>`);
-  }
-  // La liste se groupe sur CE QU'IL PEUT FAIRE, pas sur le numéro — c'est la loi
-  // de l'écran Colis : trier par numéro mettait devant des annonces qui
-  // partiraient bâclées. Le titre de groupe ne s'affiche que s'il y a plusieurs
-  // groupes, sinon il répète le compte de l'en-tête (§7).
-  function listeGroupee(items) {
-    const nb = (a) => (a.photos || []).length;
-    const pretes = items.filter((a) => nb(a) >= 2);
-    const une = items.filter((a) => nb(a) === 1);
-    const nues = items.filter((a) => nb(a) === 0);
-    const groupes = [pretes, une, nues].filter((g) => g.length).length;
-    const titre = (t, n, coul) => (groupes > 1 ? `<div class="grp"${coul ? ` style="color:${coul}"` : ''}>${t} — ${n}</div>` : '');
-    return titre('Aucune photo', nues.length, '#c0392b') + nues.map(cardHtml).join('')
-      + titre('Prêtes, avec toutes leurs photos', pretes.length) + pretes.map(cardHtml).join('')
-      + titre('Une seule photo', une.length) + une.map(cardHtml).join('');
-  }
-  // ⚠️ UNE FILE QUI RÉTRÉCIT SANS EXPLICATION SE LIT COMME UNE PERTE.
-  // Mesuré le 13 septembre : la N°118 vient de `liliand653`, le compte que
-  // Julien a lui-même mis de côté dans l'app — le panneau la proposait quand
-  // même. Elle en sort ; on le DIT, en gris et sans consigne : c'est son choix,
-  // pas une panne (§ « un CHOIX n'est pas une panne »), et le geste pour la
-  // récupérer est de remettre le compte dans l'app.
-  // ⚠️⚠️ QUAND LA PREUVE DE VENTE N'A PAS PU ÊTRE LUE, LA LISTE N'EST PAS SÛRE.
-  // Mesuré le 15 septembre : cette lecture a raté une fois et la file est passée
-  // de 40 à **55** paires — quinze paires déjà vendues reproposées à la
-  // publication, sans un mot. On ne cache pas la liste (elle reste utile), on
-  // dit ce qu'on n'a pas pu vérifier, et ce que ça change.
-  // ⚠️ TES VENTES LEBONCOIN — l'état + le BORDEREAU, comme sur Vinted.
-  // Tout vient de `lbc_ventes` (capté par l'extension, §« capter les ventes »).
-  // On n'AFFICHE que ce qui est MESURÉ : titre, prix, état ; et le bordereau
-  // seulement quand la vente le porte (`label.voucherUrl`) ET que c'est bien
-  // une vente à lui (`isSeller === true`, jamais déduit). Liste vide ⇒ aucune
-  // section (rien de capté encore ≠ « aucune vente », on n'invente pas).
-  function ventesHtml() {
-    if (!ventes.length) return '';
-    const euro = (c) => (c == null ? '' : (Number(c) / 100).toFixed(2).replace('.', ',') + ' €');
-    const etat = (o) => o.stepLabel || ({ ongoing: 'En cours', cancelled: 'Annulée', done: 'Terminée', refunded: 'Remboursée', action: 'À expédier' }[o.stepStatus] || o.stepStatus || '');
-    const annulee = (o) => /annul|cancel|refund|rembours/i.test((o.stepStatus || '') + ' ' + (o.stepLabel || ''));
-    // ⚠️⚠️ §5 : une VENTE, c'est `isSeller === true` — jamais déduit. La liste v3
-    // (`mes-transactions`) ne porte PAS ce champ : toutes ses lignes sont
-    // `isSeller: undefined`, et elle MÊLE ses ventes ET ses achats (mesuré : une
-    // montre Rolex, une bague… sont ses ACHATS). Compter tout ça « Tes ventes »
-    // désignerait le mauvais rôle — le §5 mot pour mot. Seul le DÉTAIL d'une
-    // transaction porte `is_seller`, et il se capte tout seul quand il ouvre la
-    // transaction sur Leboncoin (aucune requête lancée à l'aveugle).
-    // ⇒ On n'affiche comme vente QUE `isSeller === true`. Un achat prouvé
-    //   (`isSeller === false`) est écarté (ce n'est pas son sujet ici). Le côté
-    //   pas encore su (`isSeller == null`) n'est PAS une vente non plus, mais on
-    //   le DIT (une liste qui rétrécit sans un mot se lit comme une perte, §5).
-    const vraies = ventes.filter((o) => o.isSeller === true);
-    const inconnues = ventes.filter((o) => o.isSeller == null).length;
-    if (!vraies.length && !inconnues) return '';   // que des achats prouvés : rien à montrer ici
-    const lignes = vraies.slice(0, 40).map((o) => {
-      const bord = (o.label && o.label.voucherUrl)
-        ? `<a href="${esc(o.label.voucherUrl)}" target="_blank" rel="noreferrer" style="display:inline-block;margin-top:6px;background:#10151B;color:#fff;border-radius:8px;padding:6px 11px;font-weight:700;font-size:12px;text-decoration:none">🧾 Ouvrir le bordereau${o.label.reference ? ' · ' + esc(o.label.reference) : ''}</a>`
-        : (o.label && o.label.trackingUrl ? `<a href="${esc(o.label.trackingUrl)}" target="_blank" rel="noreferrer" class="vrm-link" style="display:inline-block;margin-top:4px;font-size:12px">Suivre le colis ↗</a>` : '');
-      return `<div class="rem" style="${annulee(o) ? 'opacity:.55' : ''}">
-        <div class="remt">${esc(o.title || '(sans titre)')}</div>
-        <div class="remm">${esc(etat(o))}${o.price != null ? ' · ' + esc(euro(o.price)) : ''}${o.deliveryLabel ? ' · ' + esc(o.deliveryLabel) : ''}</div>
-        ${bord}
-      </div>`;
-    }).join('');
-    const note = inconnues
-      ? `<div class="remm" style="padding:4px 2px 6px;color:#8a8f98">${inconnues} autre${inconnues > 1 ? 's' : ''} transaction${inconnues > 1 ? 's' : ''} vue${inconnues > 1 ? 's' : ''} sur Leboncoin — vente ou achat <b>pas encore confirmé</b>. Ouvre-la sur Leboncoin : le côté se lit tout seul au passage.</div>`
-      : '';
-    if (!vraies.length) {
-      // Aucune vente confirmée, mais des transactions vues : on ne fête rien, on explique.
-      return `<div class="remsec"><div class="remhd">🧾 Tes ventes Leboncoin</div>${note}</div>`;
-    }
-    return `<div class="remsec"><div class="remhd">🧾 Tes ventes Leboncoin (${vraies.length})</div>
-      <div class="remm" style="padding:2px 2px 6px">Capté depuis Leboncoin. Le bordereau s'ouvre quand la vente le porte — comme sur Vinted.</div>
-      ${lignes}${note}</div>`;
-  }
-  function preuveHtml() {
-    if (!stats || !stats.preuveKO) return '';
-    return `<div class="counter" style="margin-top:8px">
-      <div class="cmsg" style="color:#9a5b16">Je n&#39;ai pas pu vérifier lesquelles sont <b>déjà vendues sur Vinted</b> : la lecture a échoué. La liste ci-dessous peut donc en contenir. Rien n&#39;est perdu — clique <b>↻</b> dans un moment.</div>
-    </div>`;
-  }
-  function exclusHtml() {
-    const n = (stats && stats.exclues) || 0;
-    if (!n) return '';
-    return `<div class="counter" style="margin-top:8px">
-      <div class="cmsg" style="color:#8a8f98">${n} paire${n > 1 ? 's ne sont' : ' n\'est'} pas dans la liste : ${n > 1 ? 'leurs comptes Vinted sont exclus' : 'son compte Vinted est exclu'} de l&#39;app — ton choix. Ça se règle dans <b>Réglages → Comptes liés</b>.</div>
-    </div>`;
-  }
-  function donePostedHtml() {
-    if (!postedList.length) return '';
-    return `<div class="counter" style="margin-top:10px">
-      <div class="crow"><b>✓ ${postedList.length} déjà publiée${postedList.length > 1 ? 's' : ''}</b>
-        <button class="btn" data-a="togdone" style="margin-left:auto">${showPosted ? 'masquer' : 'gérer / annuler'}</button></div>
-      ${showPosted ? postedList.map((p) => `<div class="rem" data-pid="${esc(p.id)}"><div style="flex:1;min-width:0"><b>N°${esc(p.numero)}</b> ${esc((p.title || '').slice(0, 30))}</div><button class="btn" data-a="unpost">↩︎ Remettre</button></div>`).join('') : ''}
-    </div>`;
-  }
-  function emptyHtml() {
-    if (loadError) return '<div class="empty" style="color:#c0392b">⚠️ Chargement impossible (extension endormie ?). Clique sur ⟳ en haut, ou recharge la page.</div>';
-    const s = stats || {};
-    if ((s.onlineCount || 0) === 0) return '<div class="empty">Aucune annonce Vinted captée.<br>Passe sur ton dressing vinted.fr avec l&#39;extension, puis reviens ici et clique ⟳.</div>';
-    if ((s.numberedCount || 0) === 0) return `<div class="empty">${s.onlineCount} annonce${s.onlineCount > 1 ? 's' : ''} en ligne sur Vinted, mais <b>aucune numérotée</b>.<br>Mets un N° sur tes annonces dans l&#39;app VRM, elles apparaîtront ici.</div>`;
-    return `<div class="empty">Tout est déjà publié 🎉<br><span style="font-size:10.5px">${s.numberedCount} paire${s.numberedCount > 1 ? 's' : ''} numérotée${s.numberedCount > 1 ? 's' : ''}, toutes marquées publiées sur Leboncoin.</span></div>`;
-  }
-  function photoHtml() {
-    const res = photoRes;
-    const grid = res && res.photos && res.photos.length
-      ? `<div class="ph" style="flex-wrap:wrap">${res.photos.map((u) => `<img src="${esc(u)}" data-full="${esc(u)}" title="Ouvrir en grand">`).join('')}</div>
-         <div class="btns" style="margin-top:6px">
-           <button class="btn p" data-a="photoall">⬇️ Télécharger (${res.photos.length})</button>
-           <button class="btn" data-a="photocopy">Copier les liens</button>
-           <button class="btn" data-a="photoclose">Fermer</button>
-         </div>`
-      : (res ? '<div style="font-size:11.5px;color:#a33;margin-top:5px">Aucune photo trouvée pour ce N° (la paire n&#39;a peut-être pas encore été captée sur Vinted).</div>' : '');
-    return `<div class="counter">
-      <div class="crow"><b>📷 Photos d&#39;une paire</b> <span style="font-size:10.5px;color:#8a8f98;font-weight:700">pour un acheteur</span>
-        <button class="btn" data-a="photolookup" style="margin-left:auto">Chercher un N°</button></div>
-      ${res && res.numero ? `<div style="font-size:11px;color:#555;font-weight:700;margin-top:4px">N°${esc(res.numero)}${res.title ? ' · ' + esc(String(res.title).slice(0, 32)) : ''} — ${res.photos.length} photo${res.photos.length > 1 ? 's' : ''} Vinted</div>` : ''}
-      ${grid}
-    </div>`;
-  }
-  function counterHtml() {
-    // ⚠️⚠️ UN ZÉRO INVENTÉ EST PIRE QU'UN CHIFFRE ABSENT. Tant que ses annonces
-    // Leboncoin n'ont jamais été captées, « 📊 0 annonce sur Leboncoin » est
-    // faux — et surtout il CACHE que « vendue sur Vinted → à retirer » ne peut
-    // pas fonctionner (ça se rapproche par la référence de l'annonce Leboncoin).
-    // Un tiret et la raison, jamais un zéro (§7).
-    if (stats.lbcJamaisLu && !(stats.postedCount > 0)) {
-      return `<div class="counter">
-        <div class="crow"><b>📊 —</b> annonces sur Leboncoin
-          <button class="btn" data-a="setplan" style="margin-left:auto">Choisir mon offre</button></div>
-        <div class="cmsg" style="color:#9a5b16">Je n&#39;ai pas encore vu tes annonces Leboncoin. Ouvre la page de <b>tes annonces</b> une fois : je les lirai au passage.<br>Tant que c&#39;est le cas, je ne peux pas te dire <b>lesquelles retirer</b> quand une paire se vend sur Vinted.</div>
-      </div>`;
-    }
-    const n = Math.max(stats.postedCount || 0, stats.lbcCount || 0); // le plus fiable des deux
-    // Limite effective : celle que TU as choisie, sinon celle détectée sur ton offre.
-    const lim = stats.limit != null ? stats.limit : (stats.detected || null);
-    const auto = stats.limit == null && stats.detected;
-    const planLbl = stats.plan ? stats.plan : (auto ? 'offre détectée' : (lim ? '' : 'Gratuit'));
-    let bar = '';
-    if (lim) {
-      const pct = Math.min(100, Math.round((n / lim) * 100));
-      const near = n >= lim ? 'full' : (n >= lim - 3 ? 'warn' : 'ok');
-      const col = near === 'full' ? '#c0392b' : near === 'warn' ? '#e67e22' : '#0a7f3f';
-      bar = `<div class="cbar"><div class="cbarfill" style="width:${pct}%;background:${col}"></div></div>
-        <div class="cmsg" style="color:${col}">${n >= lim ? '⚠️ Limite atteinte — Leboncoin peut te bloquer la prochaine publication.' : near === 'warn' ? '⚠️ Tu approches de ta limite.' : 'Il te reste ' + (lim - n) + ' annonce' + ((lim - n) > 1 ? 's' : '') + '.'}</div>`;
-    }
-    return `<div class="counter">
-      <div class="crow"><b>📊 ${n}</b> annonce${n > 1 ? 's' : ''} sur Leboncoin${lim ? ' / ' + lim : ''}
-        <button class="btn" data-a="setplan" style="margin-left:auto">${lim || stats.plan ? '✎ Mon offre' : 'Choisir mon offre'}</button></div>
-      ${planLbl ? `<div style="font-size:10.5px;color:#8a8f98;font-weight:700;margin-top:3px">Offre : ${esc(planLbl)}${auto ? ' · adaptée automatiquement' : ''}</div>` : ''}
-      ${bar}
-    </div>`;
-  }
-  function remHtmlOne(r, cas) {
-    // Le geste dépend de la PREUVE : on ne demande de supprimer que ce qui est
-    // prouvé vendu. Sur un doute on propose d'ouvrir, pas de supprimer ; sur une
-    // pause on ne demande rien du tout.
-    const sous = cas === 'vendue'
-      ? `<div style="font-size:10.5px;color:#a33">cherche « ${esc(r.ref)} » dans tes annonces Leboncoin et supprime-la</div>`
-      : cas === 'doute'
-        ? `<div style="font-size:10.5px;color:#9a5b16">vendue ? retirée ? ouvre-la pour décider${r.url ? ` · <a href="${esc(r.url)}" target="_blank" rel="noreferrer">voir sur Leboncoin</a>` : ''}</div>`
-        : `<div style="font-size:10.5px;color:#6b7684">en pause sur Vinted — elle peut rester ici</div>`;
-    const bouton = cas === 'pause' ? ''
-      : `<button class="btn" data-a="removed" style="border-color:${cas === 'vendue' ? '#c0392b;color:#c0392b' : '#9a5b16;color:#9a5b16'}">✓ Retirée</button>`;
-    return `<div class="rem" data-rid="${esc(r.id)}">
-      <div style="flex:1;min-width:0"><b>N°${esc(r.numero)}</b> ${esc((r.title || '').slice(0, 34))}${sous}</div>
-      ${bouton}
-    </div>`;
-  }
-  // ⚠️⚠️ 54 DE SES 59 ANNONCES PARTIRAIENT AVEC UNE SEULE PHOTO.
-  // Mesuré le 12 septembre : les photos HD ne viennent QUE de la page de
-  // l'annonce Vinted (l'API n'en renvoie AUCUNE — 0 sur 57 lignes
-  // `harvest_*_item_*`, captures jusqu'au 9 septembre). Les annonces qu'il a
-  // déjà ouvertes ont 5 photos en moyenne ; les autres, une seule — celle de la
-  // vignette. Une annonce Leboncoin à une photo se vend mal, et il ne pouvait
-  // pas le savoir : la carte n'en disait rien.
-  // On écrit le CHIFFRE et on donne la porte (même règle que le bandeau eBay :
-  // ne pas écrire « ton annonce est prête », écrire combien).
-  // Le montant brut de Vinted est à l'anglaise (« 24.0 »). Deux décimales et une
-  // virgule — c'est déjà la règle sur l'écran Achats (§7).
-  // ⚠️ Seulement pour l'AFFICHAGE : la valeur injectée dans le formulaire reste
-  //    celle de Vinted, qu'un champ numérique sait lire.
-  function euro(v) {
-    const n = Number(String(v == null ? '' : v).replace(',', '.'));
-    return isFinite(n) ? n.toFixed(2).replace('.', ',') + ' €' : String(v || '') + ' €';
-  }
-  function photosLigne(ad) {
-    const n = (ad.photos || []).length;
-    const sansDesc = ad.aDescription === false;
-    if (n >= 2 && !sansDesc) return '';
-    // ⚠️ UNE SEULE LIGNE POUR LES DEUX MANQUES, parce que le geste est le MÊME :
-    //    ouvrir l'annonce sur Vinted capte la description ET les photos. Deux
-    //    lignes diraient deux problèmes pour une seule cause (§7).
-    //    Mesuré le 12 septembre : 53 des 59 annonces n'ont pas de description
-    //    captée, 54 n'ont qu'une photo — ce sont les mêmes.
-    const lien = ad.vintedUrl ? ` <a href="${esc(ad.vintedUrl)}" target="_blank" rel="noreferrer">ouvrir l&#39;annonce Vinted</a>` : '';
-    const manques = [];
-    if (n === 0) manques.push('aucune photo');
-    else if (n === 1) manques.push('1 seule photo');
-    if (sansDesc) manques.push('pas de description');
-    if (n === 0) {
-      return `<div class="pnote" style="color:#c0392b">${manques.join(' · ')} — Leboncoin refuse une annonce sans photo.${lien}</div>`;
-    }
-    return `<div class="pnote">${manques.join(' · ')}. Tout est sur la page Vinted : ouvre-la une fois, l&#39;extension lit le reste toute seule.${lien}</div>`;
-  }
-  function cardHtml(ad) {
-    // ⚠️ « IL Y A DES PHOTOS QUI N'APPARAISSENT PAS » (Julien, 13 septembre).
-    //    Je n'ai pas pu vérifier pourquoi depuis mes outils : Vinted bloque mes
-    //    requêtes, et l'URL d'une photo ne porte qu'une signature `?s=…`, sans
-    //    date d'expiration lisible. Plutôt que de deviner, **la carte le dit
-    //    elle-même** : si l'image ne charge pas, on l'écrit et on donne la porte
-    //    (rouvrir l'annonce sur Vinted recapte des URL fraîches).
-    //    C'est la méthode du bandeau eBay : faire constater par ce qui y a accès.
-    const ph = (ad.photos || []).slice(0, 6).map((u) => `<img src="${esc(u)}" data-full="${esc(u)}" title="Ouvrir la photo" onerror="this.remove();const c=this.closest('.card');if(c){const n=c.querySelector('.pko');if(n)n.hidden=false;}">`).join('');
-    // ⚠️ « on les a déjà republiés… ça peut les flouter pour dire que je l'ai
-    //    déjà publié » (Julien). On repère NOTRE référence VRM-{n°} sur la page
-    //    Leboncoin (identité, jamais une ressemblance de titre, §5) : si elle y
-    //    est, la paire est DÉJÀ en ligne → carte estompée + « Tout préparer »
-    //    désactivé, pour ne pas la republier deux fois.
-    const onPage = pageRefs.has(String(ad.numero));
-    return `<div class="card${onPage ? ' deja' : ''}" data-id="${esc(ad.id)}">
-      <div class="row"><span class="num">N°${esc(ad.numero)}</span><span class="cat">${esc(ad.category)}</span>${onPage ? '<span class="done">✓ déjà en ligne</span>' : ''}<span class="acc">${esc(ad.account)}</span></div>
-      <div class="tt">${esc(ad.title)}</div>
-      <div class="pr">${esc(euro(ad.price))}</div>
-      ${ph ? `<div class="ph">${ph}</div>` : ''}
-      <div class="pko" hidden>⚠️ Une photo ne s'affiche plus (le lien Vinted a expiré). Ouvre l'annonce sur Vinted${ad.vintedUrl ? ` — <a href="${esc(ad.vintedUrl)}" target="_blank" rel="noreferrer">ici</a>` : ''} : l'extension recapte des liens frais au passage.</div>
-      ${photosLigne(ad)}
-      <div class="desc">${esc(ad.description)}</div>
-      <div class="btns">
-        <button class="btn p" data-a="prepare" style="flex:1 1 100%"${onPage ? ' disabled' : ''} title="${onPage ? "Cette paire porte déjà ta référence VRM sur Leboncoin — inutile de la republier." : "Ouvre Leboncoin et fait TOUT tout seul : photos, titre, description, prix, catégorie, puis publie SANS booster."}">${onPage ? '✓ déjà en ligne sur Leboncoin' : '🚀 Publier sur Leboncoin'}</button>
-        <button class="btn" data-a="posted" style="flex:1 1 100%;border-color:#0a7f3f;color:#0a7f3f" title="À cliquer SEULEMENT si tu l'as publiée toi-même. Ça ne publie rien, ça la retire juste de la liste.">✓ Je l'ai déjà publiée</button>
-      </div>
-    </div>`;
-  }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
-  function toast(t) {
-    const el = document.createElement('div'); el.className = 'toast'; el.textContent = t; root.appendChild(el);
-    requestAnimationFrame(() => { el.style.opacity = '1'; });
-    setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 250); }, 1600);
-  }
-  // ⚠️⚠️ UNE PROMESSE REJETÉE NE PASSE PAS PAR `catch`. Écrit ainsi —
-  // `try { navigator.clipboard.writeText(t) } catch (_) { …repli… }` — le repli
-  // ne se déclenchait QUE si l'appel levait sur place. Or `writeText` échoue en
-  // rendant une promesse rejetée (document pas au premier plan, permission
-  // refusée, contexte non sécurisé) : le repli ne partait pas, **rien n'était
-  // copié**, et le panneau annonçait quand même « texte copié ». C'est la même
-  // famille que « 1 champ pré-rempli » sur une page où rien n'a été rempli.
-  // ⇒ On attend la réponse, et on retombe sur l'ancienne méthode si ça a raté.
-  function copyLegacy(t) {
-    const ta = document.createElement('textarea');
-    ta.value = t; ta.style.cssText = 'position:fixed;opacity:0;left:-9999px';
-    document.body.appendChild(ta); ta.select();
-    let ok = false;
-    try { ok = document.execCommand('copy'); } catch (_) { ok = false; }
-    ta.remove();
-    return ok;
-  }
-  function copy(t) {
-    try {
-      const p = navigator.clipboard && navigator.clipboard.writeText(t);
-      if (p && typeof p.then === 'function') { p.catch(() => { copyLegacy(t); }); return; }
-    } catch (_) {}
-    copyLegacy(t);
-  }
 
+  // Un message bref sur la page de dépôt (ce qui vient d'être rempli). Plus de
+  // panneau : il vit seul, en bas, et disparaît. VRM Noir (§7).
+  function toast(t) {
+    try {
+      const el = document.createElement('div');
+      el.setAttribute('data-vrm', 'toast');
+      el.textContent = t;
+      el.style.cssText = 'position:fixed;left:50%;bottom:84px;transform:translateX(-50%);max-width:min(460px,calc(100vw - 32px));background:#10141B;color:#E8ECF2;border:1px solid #1E2530;padding:10px 14px;border-radius:10px;font:600 12.5px/1.45 -apple-system,system-ui,sans-serif;z-index:2147483646;box-shadow:0 1px 2px rgba(0,0,0,.35),0 12px 30px rgba(0,0,0,.3);opacity:0;transition:opacity .2s';
+      document.documentElement.appendChild(el);
+      requestAnimationFrame(() => { el.style.opacity = '1'; });
+      setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 250); }, 2200);
+    } catch (_) {}
+  }
   // Pré-remplissage BEST-EFFORT du formulaire « Déposer une annonce ».
   // Leboncoin change souvent son formulaire : si un champ n'est pas trouvé, on
   // ne casse rien (l'utilisateur a toujours les boutons « copier »).
@@ -827,34 +445,6 @@
     const nom = ((el.name || '') + ' ' + (el.id || '') + ' ' + (el.getAttribute('aria-label') || '')).toLowerCase();
     return setField(el, /cent/.test(nom) ? String(Math.round(n * 100)) : String(n));
   }
-  function prefill(ad) {
-    const ref = ad.ref || ('VRM-' + ad.numero);
-    const faits = [];
-    if (setField(findField([/titre|title|subject|proposez/]), ad.title)) faits.push('le titre');
-    // ⚠️ Leboncoin écrit parfois la description lui-même : on ne l'écrase pas,
-    //    on garde la sienne et on y GARANTIT la référence (§5).
-    const desc = poserDescription(ad);
-    if (desc.fait) faits.push('la description');
-    else if (desc.garde && desc.ref) faits.push('ta référence ajoutée à la description que Leboncoin a déjà écrite');
-    if (poserPrix(ad.price)) faits.push('le prix');
-    // Champ RÉFÉRENCE des comptes PRO : on y met VRM-{N°} → pas besoin de le mettre
-    // dans le titre, et tu peux rechercher la paire par ce numéro dans ton profil.
-    const refMise = setField(findField([/référ|referen|\bref\b|\bsku\b|identifiant|code.?article|numéro.?article/]), ref);
-    if (refMise) faits.push('la référence ' + ref);
-    if (choisirCategorie(ad)) faits.push('la catégorie ' + ad.category);
-    remplirComposants(ad);   // pointure + état (menus React)
-    if (activerLivraison() === 'active') faits.push('la livraison');
-    if (!faits.length) {
-      copy(ad.title + '\n\n' + ad.description);
-      toast('Aucun champ reconnu sur cette page — titre + description copiés (la réf ' + ref + ' est dedans). Le dépôt Leboncoin se fait en plusieurs étapes : reviens cliquer ici à l\'étape du titre.');
-      return;
-    }
-    const manque = refMise ? '' : ' La référence ' + ref + ' n\'a PAS pu être mise dans un champ : elle est dans la description (en haut et en bas) — garde-la, c\'est elle qui relie l\'annonce à ta paire.';
-    // La catégorie n'est nommée que si on la connaît ; sinon on dit de la choisir
-    // (un reseller hors chaussures n'a pas de catégorie devinée).
-    const catPhrase = ad.category ? ' Vérifie la catégorie « ' + ad.category + ' »' : ' Choisis la catégorie';
-    toast(faits.length + ' champ' + (faits.length > 1 ? 's' : '') + ' rempli' + (faits.length > 1 ? 's' : '') + ' : ' + faits.join(', ') + '.' + manque + catPhrase + ' et les photos, puis publie.');
-  }
   // Capture la STRUCTURE du formulaire de dépôt Leboncoin (noms/libellés des champs)
   // pour que je puisse brancher le pré-remplissage exactement (réf, catégorie…).
   let derniereEtape = '';
@@ -993,35 +583,6 @@
     return (l && l.choisi) || '';
   }
 
-  // Le témoin : discret, en bas à gauche, il disparaît tout seul. Il ne
-  // s'affiche QUE sur une page de dépôt et QUE dans la page du haut.
-  function temoinEtape(n, nChamps, nListes, nFichiers, categorie) {
-    try {
-      if (DANS_UN_CADRE || !document.body) return;
-      let t = document.getElementById('vrm-temoin-etape');
-      if (!t) {
-        t = document.createElement('div');
-        t.id = 'vrm-temoin-etape';
-        t.style.cssText = 'position:fixed;left:14px;bottom:14px;z-index:2147483646;max-width:330px;'
-          + 'background:#10151B;color:#fff;border-radius:10px;padding:9px 12px;'
-          + 'font:500 12.5px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;'
-          + 'box-shadow:0 1px 2px rgba(0,0,0,.28),0 10px 26px rgba(0,0,0,.22)';
-        document.body.appendChild(t);
-      }
-      // Ce qui MANQUE se dit en premier : c'est ça qui doit le faire s'arrêter.
-      const manque = [];
-      if (!nListes) manque.push('aucune liste déroulante vue');
-      if (!categorie) manque.push('catégorie inconnue');
-      t.innerHTML = '<div style="font-weight:800;margin-bottom:2px">VRM · étape ' + n + ' enregistrée</div>'
-        + '<div style="opacity:.82">' + nChamps + ' champ' + (nChamps > 1 ? 's' : '') + ' · '
-        + nListes + ' liste' + (nListes > 1 ? 's' : '') + ' · '
-        + nFichiers + ' champ photo' + (nFichiers > 1 ? 's' : '') + '</div>'
-        + (categorie ? '<div style="opacity:.82">catégorie : ' + String(categorie).replace(/[<>&]/g, '').slice(0, 60) + '</div>' : '')
-        + (manque.length ? '<div style="margin-top:4px;color:#FFC38A">⚠️ ' + manque.join(' · ') + ' — dis-le-moi, je corrige avant que tu continues.</div>' : '');
-      clearTimeout(temoinEtape._t);
-      temoinEtape._t = setTimeout(() => { try { t.remove(); } catch (_) {} }, manque.length ? 14000 : 7000);
-    } catch (_) {}
-  }
 
   // ══════════════════════════════════════════════════════════════════════════
   // ⚠️⚠️ CE QUI N'EST PAS LE FORMULAIRE DE DÉPÔT
@@ -1109,90 +670,11 @@
           fields: fields.slice(0, 150), selects: sels.slice(0, 30), livraison: livraison.slice(0, 30), fichiers, fichiersMultiple,
           categorie, depot: DEPOT_ID, ordre: ordreEtape, ver: EXT_VER,
           etape: signature.slice(0, 160) });
-        // ⚠️⚠️ « LÀ C'EST SÛR ? » — Julien, 17 septembre. NON, et c'est la bonne
-        //    réponse : je n'ai jamais pu voir la vraie page (leboncoin.fr me
-        //    répond 403), donc mon banc sert une page que J'AI écrite. Ce que je
-        //    PEUX faire, c'est qu'il n'ait pas à me croire : le témoin écrit, à
-        //    chaque étape, CE QUI A ÉTÉ ENREGISTRÉ. S'il lit « 0 liste » il
-        //    arrête tout de suite, au lieu de faire le dépôt entier pour rien.
-        //    *Le chiffre, jamais la promesse.*
-        temoinEtape(ordreEtape, fields.length, sels.length, fichiers, categorie);
       }
     } catch (_) {}
   }
 
 
-  root.addEventListener('click', async (e) => {
-    // ⚠️ Un clic sur le LOGO (ou le badge) à l'intérieur du bouton a pour cible
-    //    l'<img>/<span>, pas le bouton : lire `data-a` sur la cible exacte
-    //    laissait le panneau fermé. On remonte au plus proche porteur de `data-a`.
-    if (e.target.tagName === 'IMG' && e.target.dataset.full) { window.open(e.target.dataset.full, '_blank'); return; }
-    const porteur = e.target.closest && e.target.closest('[data-a]');
-    const a = porteur && porteur.getAttribute('data-a');
-    if (!a) return;
-    if (a === 'open') { open = true; render(); return; }
-    if (a === 'close') { open = false; render(); return; }
-    if (a === 'refresh') { await load(); toast('Actualisé'); return; }
-    if (a === 'togdone') { showPosted = !showPosted; render(); return; }
-    if (a === 'unpost') {
-      const pid = e.target.closest('.rem') && e.target.closest('.rem').getAttribute('data-pid');
-      if (!pid) return;
-      await send({ action: 'unmarkPosted', id: pid });
-      await load(); toast('Remise dans la liste à publier ✓');
-      return;
-    }
-    if (a === 'photolookup') {
-      const num = window.prompt('Numéro (N°) de la paire dont tu veux les photos :', (photoRes && photoRes.numero) || '');
-      if (num === null || !num.trim()) return;
-      toast('Recherche des photos…');
-      const r = await send({ action: 'getPhotos', numero: num.trim() });
-      photoRes = (r && r.ok) ? { numero: r.numero, title: r.title, photos: r.photos || [] } : { numero: num.trim(), title: '', photos: [] };
-      render();
-      return;
-    }
-    if (a === 'photoall') { const r = await send({ action: 'downloadPhotos', urls: (photoRes && photoRes.photos) || [], numero: (photoRes && photoRes.numero) || 'paire' }); toast((r && r.count ? r.count : 0) + ' photo(s) téléchargée(s) → dossier VRM-' + ((photoRes && photoRes.numero) || '')); return; }
-    if (a === 'photocopy') { copy((photoRes && photoRes.photos || []).join('\n')); toast('Liens copiés'); return; }
-    if (a === 'photoclose') { photoRes = null; render(); return; }
-    if (a === 'setplan') {
-      const plan = window.prompt('Nom de ton offre Leboncoin (ex. Gratuit, Pack Pro…) :', stats.plan || 'Gratuit');
-      if (plan === null) return;
-      const cur = stats.limit != null ? stats.limit : (stats.detected || '');
-      const v = window.prompt('Nombre d\'annonces incluses dans cette offre.\n(Laisse vide = illimité / pas de limite)', cur);
-      if (v === null) return;
-      await send({ action: 'setLimit', limit: v.trim() === '' ? 0 : v.trim(), plan });
-      await load(); toast('Offre mise à jour');
-      return;
-    }
-    if (a === 'removed') {
-      const rid = e.target.closest('.rem') && e.target.closest('.rem').getAttribute('data-rid');
-      if (!rid) return;
-      await send({ action: 'markRemoved', id: rid });
-      removals = removals.filter((x) => x.id !== rid); render(); toast('Retirée de la synchro ✓');
-      return;
-    }
-    const card = e.target.closest('.card'); const id = card && card.getAttribute('data-id');
-    const ad = queue.find((x) => x.id === id); if (!ad && a !== 'open') return;
-    if (a === 'ctitle') { copy(ad.title); toast('Titre copié'); }
-    else if (a === 'cdesc') { copy(ad.description); toast('Description copiée'); }
-    else if (a === 'cprice') { copy(ad.price); toast('Prix copié'); }
-    else if (a === 'photos') { const r = await send({ action: 'downloadPhotos', urls: ad.photos || [], numero: ad.numero }); toast((r && r.count ? r.count : 0) + ' photo(s) téléchargée(s) → dossier VRM-' + ad.numero); }
-    else if (a === 'prepare') {
-      // ⚠️ ON NE TÉLÉCHARGE PLUS RIEN SUR SON DISQUE. « Ça me fait télécharger
-      //    des photos dans mon ordi » — et pour rien : les photos s'attachent
-      //    directement au formulaire (mesuré le 13 septembre).
-      // ON MEMORISE L'ANNONCE EN COURS (+ le feu vert pour publier sans booster :
-      // c'est LUI qui lance, donc l'onglet de dépôt a le droit de publier). La
-      // page de dépôt s'ouvre dans un nouvel onglet et fait tout tout seul.
-      await send({ action: 'setPending', ad: Object.assign({}, ad, { publier: true }) });
-      window.open('https://www.leboncoin.fr/deposer-une-annonce', '_blank');
-      toast('🚀 J\'ouvre Leboncoin et je remplis tout (photos, titre, description, prix, catégorie) puis je publie SANS booster. Laisse l\'onglet faire — tu peux relire avant que ça parte.');
-    }
-    else if (a === 'posted') {
-      if (!confirm('⚠️ Ceci NE publie PAS l\'annonce.\n\nÀ cliquer seulement si tu as DÉJÀ publié la N°' + ad.numero + ' toi-même sur Leboncoin.\nÇa la retire juste de la liste « à publier ». Continuer ?')) return;
-      await send({ action: 'markPosted', id: ad.id });
-      queue = queue.filter((x) => x.id !== ad.id); render(); toast('N°' + ad.numero + ' retirée de la liste (tu peux annuler dans « déjà publiées »)');
-    }
-  });
 
   // ── REMPLISSAGE AUTOMATIQUE DE LA PAGE DE DEPOT ─────────────────────────
   // Leboncoin est une application a page unique : le formulaire n'existe pas
@@ -1545,41 +1027,41 @@
     if (!el) {
       el = document.createElement('div');
       el.id = 'vrm-lbc-banner';
-      el.style.cssText = 'position:fixed;left:16px;bottom:16px;z-index:2147483646;max-width:300px;background:#0d1210;color:#eef4f0;border:1px solid #28322d;border-radius:14px;padding:12px 14px;font:12px/1.5 -apple-system,system-ui,sans-serif;box-shadow:0 18px 40px -12px rgba(0,0,0,.5)';
+      el.style.cssText = 'position:fixed;left:16px;bottom:16px;z-index:2147483646;max-width:300px;background:#10141B;color:#E8ECF2;border:1px solid #1E2530;border-radius:12px;padding:12px 14px;font:12px/1.5 -apple-system,system-ui,sans-serif;box-shadow:0 1px 2px rgba(0,0,0,.35),0 16px 40px rgba(0,0,0,.36)';
       document.documentElement.appendChild(el);
     }
     el.innerHTML =
       '<div style="font-weight:700;font-size:13px;margin-bottom:3px">N°' + (pending.numero || '?') + ' — ' + esc(String(pending.title || '').slice(0, 46)) + '</div>' +
-      '<div style="color:#8b9b92">' + pendingDone + ' champ' + (pendingDone > 1 ? 's' : '') + ' rempli' + (pendingDone > 1 ? 's' : '') +
-      '. Catégorie <b style="color:#eef4f0">' + esc(pending.category || '—') + '</b>.</div>' +
-      '<div style="color:#8b9b92;margin-top:3px">' + (photosEtat
+      '<div style="color:#8A93A3">' + pendingDone + ' champ' + (pendingDone > 1 ? 's' : '') + ' rempli' + (pendingDone > 1 ? 's' : '') +
+      '. Catégorie <b style="color:#E8ECF2">' + esc(pending.category || '—') + '</b>.</div>' +
+      '<div style="color:#8A93A3;margin-top:3px">' + (photosEtat
         ? (photosEtat.n > 0
             // On dit ce qu'on SAIT : « confirmées » quand on a pu compter les
             // vignettes, sinon « envoyées » + vérifie (les vignettes de Leboncoin
             // ne sont pas comptables de l'extérieur — mesuré le 20 sept.).
             ? (photosEtat.confirmees != null
-                ? '📷 <b style="color:#eef4f0">' + photosEtat.confirmees + '/' + photosEtat.total + ' photo' + (photosEtat.total > 1 ? 's' : '') + ' attachée' + (photosEtat.confirmees > 1 ? 's' : '') + '</b>'
-                : '📷 <b style="color:#eef4f0">' + photosEtat.envoyees + ' photo' + (photosEtat.envoyees > 1 ? 's' : '') + ' envoyée' + (photosEtat.envoyees > 1 ? 's' : '') + '</b> au formulaire — <b style="color:#e8b35d">vérifie qu\'elles y sont toutes</b> avant de publier')
+                ? '📷 <b style="color:#E8ECF2">' + photosEtat.confirmees + '/' + photosEtat.total + ' photo' + (photosEtat.total > 1 ? 's' : '') + ' attachée' + (photosEtat.confirmees > 1 ? 's' : '') + '</b>'
+                : '📷 <b style="color:#E8ECF2">' + photosEtat.envoyees + ' photo' + (photosEtat.envoyees > 1 ? 's' : '') + ' envoyée' + (photosEtat.envoyees > 1 ? 's' : '') + '</b> au formulaire — <b style="color:#F5A524">vérifie qu\'elles y sont toutes</b> avant de publier')
               + (photosEtat.rates ? ' (' + photosEtat.rates + ' illisible' + (photosEtat.rates > 1 ? 's' : '') + ')' : '')
-              + (photosEtat.total <= 6 ? '<br><span style="color:#e8b35d">Seules ' + photosEtat.total + ' photos sont captées de Vinted : rouvre l\'annonce sur Vinted (extension à jour) pour les avoir toutes.</span>' : '')
+              + (photosEtat.total <= 6 ? '<br><span style="color:#F5A524">Seules ' + photosEtat.total + ' photos sont captées de Vinted : rouvre l\'annonce sur Vinted (extension à jour) pour les avoir toutes.</span>' : '')
             : '📷 aucune photo attachée — ' + esc(photosEtat.raison || 'raison inconnue'))
         : '📷 j\'attache les photos dès que l\'étape photo s\'affiche.') + '</div>' +
       // Statut de PUBLICATION : ce qui compte, dit clairement.
       (publieEtat
         ? '<div style="margin-top:6px">' + (publieEtat.ok
-            ? '✅ <b style="color:#5fd08a">Publiée sans booster.</b>'
-            : '<span style="color:#e8b35d">Je n\'ai pas publié — ' + esc(publieEtat.raison || 'à faire toi-même') + '.</span>') + '</div>'
+            ? '✅ <b style="color:#E8ECF2">Publiée sans booster.</b>'
+            : '<span style="color:#F5A524">Je n\'ai pas publié — ' + esc(publieEtat.raison || 'à faire toi-même') + '.</span>') + '</div>'
         : '') +
       (pendingArrete && !(publieEtat && publieEtat.ok)
-        ? '<div style="color:#e8b35d;margin-top:6px">Le dépôt se fait en étapes ; si une nouvelle étape s\'affiche, clique <b style="color:#eef4f0">↻ Reprendre</b>.</div>'
+        ? '<div style="color:#F5A524;margin-top:6px">Le dépôt se fait en étapes ; si une nouvelle étape s\'affiche, clique <b style="color:#E8ECF2">↻ Reprendre</b>.</div>'
         : '') +
       '<div style="display:flex;gap:6px;margin-top:9px">' +
       (pendingArrete && !(publieEtat && publieEtat.ok)
-        ? '<button id="vrm-refill" style="flex:1;border:1px solid #3a4a43;background:transparent;color:#eef4f0;border-radius:9px;padding:7px;font-size:11.5px;font-weight:600;cursor:pointer">↻ Reprendre</button>'
+        ? '<button id="vrm-refill" style="flex:1;border:1px solid #1E2530;background:transparent;color:#E8ECF2;border-radius:9px;padding:7px;font-size:11.5px;font-weight:600;cursor:pointer">↻ Reprendre</button>'
         : '') +
-      '<button id="vrm-close" title="Fermer" style="border:1px solid #3a4a43;background:transparent;color:#8b9b92;border-radius:9px;padding:7px 11px;font-size:11.5px;cursor:pointer">✕</button>' +
+      '<button id="vrm-close" title="Fermer" style="border:1px solid #1E2530;background:transparent;color:#8A93A3;border-radius:9px;padding:7px 11px;font-size:11.5px;cursor:pointer">✕</button>' +
       '</div>' +
-      '<div style="color:#6f7f77;font-size:10px;margin-top:7px">VRM remplit tout et publie <b>sans booster</b> (aucune option payante). Tu peux relire avant que ça parte.</div>';
+      '<div style="color:#6B7485;font-size:10px;margin-top:7px">VRM remplit tout et publie <b>sans booster</b> (aucune option payante). Tu peux relire avant que ça parte.</div>';
     const refill = el.querySelector('#vrm-refill');
     if (refill) refill.onclick = () => {
       pendingDone = fillNowForce(pending);
@@ -1615,29 +1097,20 @@
     return n;
   }
 
-  async function load() {
+  // Le démarrage : capter, et — sur une page de dépôt lancée depuis l'APP —
+  // remplir et publier. Plus de panneau ni de liste à charger (5.130).
+  function demarrer() {
     autoPrefill();
-    scanPageRefs();
     captureLbcListings();
     captureDepositForm();
-    const r = await send({ action: 'getQueue' });
-    loadError = !(r && r.ok);
-    queue = (r && r.ok && Array.isArray(r.queue)) ? r.queue : [];
-    removals = (r && r.ok && Array.isArray(r.removals)) ? r.removals : [];
-    unlinked = (r && r.ok && Array.isArray(r.unlinked)) ? r.unlinked : [];
-    postedList = (r && r.ok && Array.isArray(r.postedList)) ? r.postedList : [];
-    ventes = (r && r.ok && Array.isArray(r.ventes)) ? r.ventes : [];
-    if (r && r.ok && r.stats) stats = r.stats;
-    render();
   }
   if (!DANS_UN_CADRE) {
-    render();
-    load();
-    // Rafraîchit quand on revient sur l'onglet (nouvelle annonce entre-temps) et
-    // re-scanne la page après navigation interne (Leboncoin est une SPA).
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
+    demarrer();
+    // Leboncoin est une SPA : on relit après une navigation interne, et au
+    // retour sur l'onglet.
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) demarrer(); });
     let lastUrl = location.href;
-    setInterval(() => { if (location.href !== lastUrl) { lastUrl = location.href; setTimeout(load, 1200); } }, 2000);
+    setInterval(() => { if (location.href !== lastUrl) { lastUrl = location.href; setTimeout(demarrer, 1200); } }, 2000);
   } else {
     // Dans un cadre : la seule chose qui compte est d'enregistrer l'étape.
     captureDepositForm();

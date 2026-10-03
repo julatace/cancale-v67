@@ -160,6 +160,7 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
         sendMessage: (msg, cb) => {
           const rep = (o) => { try { cb && cb(o); } catch (_) {} };
           if (!msg || msg.action === undefined) return rep({ ok: true });
+          (window.__demandes = window.__demandes || []).push(msg.action);
           if (msg.action === 'getQueue') return rep({ ok: true, queue: d.queue, removals: d.removals, unlinked: [], postedList: [], ventes: d.ventes, stats: { onlineCount: 3, numberedCount: 3, postedCount: 0, lbcCount: 0 } });
           return rep({ ok: true });
         },
@@ -172,87 +173,23 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
   await pg.addScriptTag({ content: SRC });
   await pg.waitForTimeout(1200);
 
-  // Le panneau s'ouvre (il démarre replié sur une pastille).
-  const fab = await pg.$('[data-a="open"]');
-  dit(!!fab, 'la pastille VRM apparaît sur la page Leboncoin', fab ? '' : 'aucun panneau : le script n\'a pas démarré');
-  if (fab) { await fab.click(); await pg.waitForTimeout(700); }
-  const txt = await pg.evaluate(() => {
-    const h = document.querySelector('div');
-    const racines = [...document.querySelectorAll('*')].map(e => e.shadowRoot).filter(Boolean);
-    const t = racines.map(r => r.textContent || '').join('\n');
-    return t || (document.body.innerText || '');
-  });
+  // ── PLUS AUCUN PANNEAU SUR LEBONCOIN (5.130) ──────────────────────────────
+  // Julien, 2 octobre : « tout doit être centralisé dans VRM ; l'extension est
+  // là pour capter ». La file, ses ventes, les preuves « vendue / à vérifier /
+  // en pause » vivent dans l'APP (écran Leboncoin). Sur leboncoin.fr il ne reste
+  // que la petite carte VRM (vrm-badge.js, banc badge.cjs).
+  const surPage = await pg.evaluate(() => ({
+    pastille: !!document.querySelector('[data-a="open"]'),
+    racines: [...document.querySelectorAll('*')].filter((e) => e.shadowRoot).length,
+    texte: document.body.innerText,
+    demandes: window.__demandes || [],
+  }));
   dit(!errs.length, 'aucune erreur de page', errs[0] || '');
-  dit(/Salomon XT-6 blanc T40/.test(txt), 'la liste montre le titre LEBONCOIN, pas le titre Vinted brut');
-  dit(/99[.,]00 €|99 €/.test(txt), 'et le prix');
-
-  // ── SES VENTES LEBONCOIN : l'état + le bordereau (comme sur Vinted) ────────
-  dit(/Tes ventes Leboncoin/.test(txt), 'le panneau MONTRE ses ventes Leboncoin');
-  dit(/New Balance 990 gris taille 44/.test(txt), 'la vente PROUVÉE porte son titre');
-  dit(/Colis à envoyer/.test(txt) && /75[.,]00 €/.test(txt), 'et son état + son prix (centimes → €)');
-  const hrefsV = await pg.evaluate(() => {
-    const rs = [...document.querySelectorAll('*')].map(e => e.shadowRoot).filter(Boolean);
-    return rs.flatMap(r => [...r.querySelectorAll('a[href]')].map(a => a.getAttribute('href')));
-  });
-  dit(hrefsV.some((h) => /71977917\.pdf/.test(h || '')), 'le BORDEREAU s\'ouvre (voucher PDF), comme sur Vinted');
-  // ⚠️⚠️ §5 : un ACHAT n'est JAMAIS affiché comme une vente. La Rolex est un
-  //   `isSeller: false` — la montrer sous « Tes ventes » désignerait le mauvais
-  //   rôle. Et le compte du titre ne porte QUE les ventes prouvées (1), pas le
-  //   total des transactions (3). Sur le code d'avant : Rolex présente, « (3) ».
-  dit(!/Rolex/i.test(txt), 'un ACHAT prouvé (Rolex) n\'est JAMAIS montré comme une vente (§5)');
-  dit(/Tes ventes Leboncoin \(1\)/.test(txt), 'le compte ne porte QUE les ventes prouvées (1), pas les 3 transactions');
-  dit(/pas encore confirmé/.test(txt), 'le côté pas encore su est DIT, jamais compté comme vente (une liste qui rétrécit sans un mot se lit comme une perte)');
-
-  // ── LE GROUPEMENT : ce qu'il peut faire, pas le numéro ────────────────────
-  const iNue = txt.indexOf('Autry medalist');        // 0 photo
-  const iPrete = txt.indexOf('Salomon XT-6');        // 3 photos
-  const iUne = txt.indexOf('Nike air max 1');        // 1 photo
-  dit(iNue > -1 && iPrete > -1 && iUne > -1, 'les trois annonces sont listées');
-  dit(iNue < iPrete && iNue < iUne, 'l\'annonce SANS photo est en haut',
-    'Leboncoin la refuse : la mettre après les autres, c\'est la laisser bloquée');
-  dit(iPrete < iUne, 'les annonces prêtes passent avant celles à une seule photo',
-    'trier par numéro mettait devant ce qui partirait bâclé');
-  dit(/Aucune photo/.test(txt) && /Une seule photo/.test(txt), 'les groupes sont nommés');
-
-  // ── LE CHIFFRE, PAS LA PROMESSE ───────────────────────────────────────────
-  dit(/Leboncoin refuse une annonce sans photo/i.test(txt), 'une annonce sans photo dit pourquoi c\'est bloquant');
-  dit(/1 seule photo/.test(txt), 'une annonce à une seule photo le DIT',
-    '54 de ses 59 annonces sont dans ce cas, et rien ne le disait');
-  const liens = await pg.evaluate(() => {
-    const rs = [...document.querySelectorAll('*')].map(e => e.shadowRoot).filter(Boolean);
-    return rs.flatMap(r => [...r.querySelectorAll('a[href]')].map(a => a.getAttribute('href')));
-  });
-  dit(liens.some(h => /vinted\.fr\/items\/1002/.test(h || '')), 'et elle donne la porte : le lien vers l\'annonce Vinted',
-    'les autres photos ne s\'obtiennent QUE sur cette page — sans le lien, la consigne est creuse');
-
-  // ── « VENDUE » SE PROUVE ──────────────────────────────────────────────────
-  dit(/vendue.{0,30}sur Vinted/i.test(txt), 'la vente PROUVÉE est annoncée comme telle');
-  dit(/à vérifier/i.test(txt), 'la vente NON prouvée se dit « à vérifier »',
-    'sinon il supprime une annonce Leboncoin sur une supposition — 249 fois sur 400');
-  dit(/en pause sur Vinted/i.test(txt), 'une annonce en pause est dite en pause');
-  dit(/rien à faire/i.test(txt), 'et elle ne demande AUCUN geste');
-  // Le point qui coûte : aucune paire non prouvée ne doit être appelée vendue.
-  const bloc = (s2, e2) => { const i = txt.indexOf(s2); const j = e2 ? txt.indexOf(e2, i) : txt.length; return i < 0 ? '' : txt.slice(i, j < 0 ? txt.length : j); };
-  const zoneDoute = bloc('à vérifier', 'en pause');
-  // ⚠️⚠️ DEUX FOIS DE SUITE MON CONTRÔLE A CRIÉ AU LOUP, ET LE SECOND EST LE PLUS
-  //    INSTRUCTIF. Jet 1 : « le mot "vendue" est interdit ici » → il attrapait
-  //    « je n'ai pas la preuve qu'elles sont vendues ». Jet 2 : « le mot
-  //    "supprime" est interdit ici » → il attrapait « je ne te dis pas de les
-  //    supprimer », c'est-à-dire la NÉGATION de ce qu'il traque. Neuvième et
-  //    dixième fois dans ce projet (§6.5).
-  //    ⇒ Ce qui est interdit n'est pas un mot, c'est l'INSTRUCTION de supprimer,
-  //    et elle se compte : la consigne « supprime-la » ne doit être rendue
-  //    QU'AUTANT DE FOIS qu'il y a de ventes PROUVÉES. C'est la donnée qui
-  //    déclenche, pas la formulation — si quelqu'un l'ajoute au groupe du doute,
-  //    le compte monte et ce banc passe au rouge.
-  const nVendues = REMOVALS.filter((r) => r.etat === 'vendue').length;
-  const nConsignes = (txt.match(/supprime-la/gi) || []).length;
-  dit(nConsignes === nVendues, `la consigne « supprime-la » est rendue ${nVendues} fois — une par vente PROUVÉE`,
-    nConsignes !== nVendues ? `rendue ${nConsignes} fois pour ${nVendues} vente(s) prouvée(s) : une bonne annonce se fait retirer` : '');
-  dit(/pas la preuve/i.test(zoneDoute), 'et le doute est écrit en toutes lettres',
-    'un groupe « à vérifier » sans raison se lit comme une alerte de plus');
-  const zonePause = bloc('en pause sur Vinted', null);
-  dit(!/supprime-la/i.test(zonePause), 'et aucune consigne de suppression sur une annonce en pause');
+  dit(!surPage.pastille && surPage.racines === 0, 'aucun panneau VRM sur la page Leboncoin',
+    surPage.pastille ? 'la pastille du panneau est encore là' : surPage.racines + ' racine(s) d\'ombre posée(s)');
+  dit(!/à publier|Tes ventes Leboncoin|supprime-la/i.test(surPage.texte), 'aucune liste ni consigne écrite dans la page');
+  dit(!surPage.demandes.includes('getQueue'), 'et la page ne recalcule plus la file à chaque chargement (zéro lecture pour rien)',
+    'demandes : ' + surPage.demandes.join(', '));
 
   // ── LE PRÉ-REMPLISSAGE SUR LA VRAIE PAGE DE DÉPÔT ─────────────────────────
   // ⚠️⚠️ Le panneau annonçait « pré-rempli (dont la réf VRM-401) » À CHAQUE FOIS,
@@ -367,8 +304,6 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
     await p4.goto('http://localhost:4491/', { waitUntil: 'domcontentloaded' });
     await p4.addScriptTag({ content: SRC });
     await p4.waitForTimeout(1100);
-    const f4 = await p4.$('[data-a="open"]'); if (f4) { await f4.click(); await p4.waitForTimeout(500); }
-    const t4 = await p4.evaluate(() => [...document.querySelectorAll('*')].map(e => e.shadowRoot).filter(Boolean).map(r => r.textContent || '').join(' '));
     dit(!e4.length, 'aucune erreur sur une page au nouveau format', e4[0] || '');
     // 1. La nouvelle source est lue.
     dit(!!capture, 'la capture REMONTE ce qu\'elle a vu', capture ? '' : 'sans ça, « 0 annonce » et « rien pu lire » sont le même silence');
@@ -378,93 +313,19 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
       dit(capture.a_next_data === false && capture.a_next_f === true,
         'elle dit quel format porte la page', `__NEXT_DATA__:${capture.a_next_data} · __next_f:${capture.a_next_f}`);
     }
-    // 2. Et tant que rien n'a été capté, aucun zéro inventé.
-    dit(!/0\s*annonces?\s*sur Leboncoin/i.test(t4), 'aucun « 0 annonce sur Leboncoin » quand rien n\'a été lu',
-      'un zéro inventé cache que « vendue → à retirer » ne peut pas fonctionner');
-    dit(/pas encore vu tes annonces/i.test(t4), 'il dit qu\'il n\'a pas encore vu ses annonces');
-    dit(/lesquelles retirer/i.test(t4), 'et ce que ça empêche', 'une alerte qui ne dit pas ce qu\'on perd ne sert à rien');
+    // 2. « Jamais lu » n'est pas « zéro » : c'est l'APP qui le dit désormais
+    //    (écran Leboncoin, `lbcJamaisLu`) — plus aucun panneau ici.
     dit(!!recu && Array.isArray(recu.listings) && recu.listings.length >= 1,
       'et la VRAIE capture des annonces part toujours vers le fond',
       recu ? (recu.listings || []).length + ' annonce(s) transmise(s)' : 'aucun message `lbcCapture` : le diagnostic a pris sa place');
     await p4.close();
   }
 
-  // ── « 🚀 TOUT PRÉPARER » : LE BOUTON PRINCIPAL, JAMAIS EXÉCUTÉ ─────────────
-  // C'est le geste que l'app lui dit de faire (« bouton 🚀 Tout préparer »), et
-  // il n'avait jamais tourné. Il doit faire QUATRE choses, et chacune compte :
-  // télécharger les photos, copier le texte complet, MÉMORISER la paire choisie
-  // (sinon le nouvel onglet ne sait pas laquelle remplir) et ouvrir la page de
-  // dépôt.
-  {
-    const p5 = await b.newPage({ viewport: { width: 1280, height: 900 } });
-    const e5 = []; p5.on('pageerror', (e) => e5.push(e.message));
-    const vus = { photos: null, pending: null, ouvert: null, copie: null };
-    await p5.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => {
-      const t = r.request().resourceType();
-      return (t === 'image' || t === 'font' || t === 'media') ? r.abort() : r.continue();
-    });
-    await p5.exposeFunction('__banc_msg', (m) => {
-      if (m.action === 'downloadPhotos') vus.photos = m;
-      if (m.action === 'setPending') vus.pending = m;
-    });
-    await p5.exposeFunction('__banc_open', (u) => { vus.ouvert = u; });
-    await p5.exposeFunction('__banc_copy', (t) => { vus.copie = t; });
-    await p5.addInitScript((d) => {
-      window.open = (u) => { try { window.__banc_open(String(u)); } catch (_) {} return null; };
-      // ⚠️ ON SERT LE CAS QUI ÉCHOUE : `navigator.clipboard.writeText` rend une
-      //    promesse REJETÉE (document pas au premier plan, permission refusée).
-      //    C'est exactement le cas où l'ancien code ne copiait rien tout en
-      //    annonçant « copié » — un `try/catch` n'attrape pas un rejet.
-      Object.defineProperty(navigator, 'clipboard', { configurable: true, value: {
-        writeText: () => Promise.reject(new Error('NotAllowed')),
-      } });
-      document.execCommand = function () { try { const ta = document.querySelector('textarea'); window.__banc_copy(ta ? ta.value : ''); } catch (_) {} return true; };
-      window.chrome = { runtime: { id: 'banc', lastError: null, sendMessage: (m, cb) => {
-        const rep = (o) => { try { cb && cb(o); } catch (_) {} };
-        try { window.__banc_msg(m); } catch (_) {}
-        if (m && m.action === 'getQueue') return rep({ ok: true, queue: d.queue, removals: [], unlinked: [], postedList: [], stats: { onlineCount: 3, numberedCount: 3, postedCount: 2, lbcCount: 2 } });
-        if (m && m.action === 'downloadPhotos') return rep({ ok: true, count: (m.urls || []).length });
-        return rep({ ok: true }); }, onMessage: { addListener() {} } } };
-    }, { queue: QUEUE });
-    await p5.goto('http://localhost:4491/', { waitUntil: 'domcontentloaded' });
-    await p5.addScriptTag({ content: SRC });
-    await p5.waitForTimeout(1000);
-    const f5 = await p5.$('[data-a="open"]'); if (f5) { await f5.click(); await p5.waitForTimeout(500); }
-    // On prépare la paire qui a TROIS photos (celle des « prêtes »).
-    const idPrepare = await p5.evaluate(() => {
-      const rs = [...document.querySelectorAll('*')].map(e => e.shadowRoot).filter(Boolean);
-      for (const r of rs) {
-        for (const c of r.querySelectorAll('.card')) {
-          if (c.getAttribute('data-id') === '1001') { const b2 = c.querySelector('[data-a="prepare"]'); if (b2) { b2.click(); return '1001'; } }
-        }
-      }
-      return null;
-    });
-    dit(idPrepare === '1001', 'le bouton « Tout préparer » existe sur la carte voulue');
-    await p5.waitForTimeout(900);
-    dit(!e5.length, 'aucune erreur pendant « Tout préparer »', e5[0] || '');
-    // ⚠️ CES DEUX CONTRÔLES EXIGEAIENT LE TÉLÉCHARGEMENT — le comportement que
-    //    Julien a signalé (« ça me fait télécharger des photos dans mon ordi »)
-    //    et que j'ai retiré. Un contrôle qui garde l'ancienne règle rend le
-    //    correctif rouge : c'est la règle NOUVELLE qu'il doit mesurer.
-    dit(!vus.photos, '« Tout préparer » ne télécharge RIEN sur son ordinateur',
-      vus.photos ? 'il a demandé ' + (vus.photos.urls || []).length + ' téléchargement(s)' : 'les photos partiront par le formulaire');
-    // ⚠️ CELUI-CI EST LE PLUS IMPORTANT : sans la paire mémorisée, le nouvel
-    //    onglet ne sait pas laquelle remplir — c'est le défaut qui obligeait à
-    //    tout recoller à la main.
-    dit(!!vus.pending && vus.pending.ad && vus.pending.ad.numero === '401',
-      'il MÉMORISE la paire choisie pour le nouvel onglet',
-      vus.pending ? '' : 'sans ça, la page de dépôt s\'ouvre sans savoir quoi remplir');
-    // ⚠️ ET LE FEU VERT POUR PUBLIER : c'est LUI qui lance, donc l'onglet de dépôt
-    //    a le droit de publier (sans booster). Une page de dépôt ouverte à la main
-    //    sans ce drapeau n'est jamais publiée toute seule.
-    dit(!!vus.pending && vus.pending.ad && vus.pending.ad.publier === true,
-      'il autorise la publication (sans booster) pour CETTE paire lancée par le bouton',
-      vus.pending && vus.pending.ad ? 'publier=' + vus.pending.ad.publier : '');
-    dit(/leboncoin\.fr\/deposer-une-annonce/.test(String(vus.ouvert || '')), 'et il ouvre la page de dépôt',
-      'ouvert : ' + String(vus.ouvert || 'rien'));
-    await p5.close();
-  }
+  // ── « PUBLIER » SE DÉCLENCHE DEPUIS L'APP (5.130) ────────────────────────
+  // Le bouton « 🚀 Tout préparer » du panneau est retiré : l'app commande
+  // (`lbcPublier`), le fond mémorise la paire et ouvre le dépôt — vérifié par
+  // audit-publier-app.cjs sur le VRAI background.js. Ici on garde la suite :
+  // la page de dépôt se remplit et publie toute seule (blocs suivants).
 
   // ── LES PHOTOS S'ATTACHENT, ET LA CATÉGORIE SE CHOISIT ────────────────────
   // ⚠️⚠️ LE DOSSIER AFFIRMAIT QUE C'ÉTAIT IMPOSSIBLE, ET C'ÉTAIT FAUX (je
@@ -856,13 +717,8 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
     const opts = (brut.selects || []).flatMap((x) => x.options || []);
     dit(opts.some((o) => /vêtements|sacs/i.test(o)), 'avec les options proposées', `${opts.length} option(s)`);
 
-    // ⚠️⚠️ « LÀ C'EST SÛR ? » — il ne doit pas avoir à me croire. Le TÉMOIN écrit
-    //    sur la page ce qui vient d'être enregistré : s'il lit « 0 liste », il
-    //    arrête tout de suite au lieu de faire le dépôt entier pour rien.
-    const temoin = await p7.evaluate(() => { const t = document.getElementById('vrm-temoin-etape'); return t ? t.innerText : ''; });
-    dit(/étape\s*2/i.test(temoin), 'un témoin dit à l’écran QUELLE étape vient d’être enregistrée', `« ${temoin.replace(/\n/g, ' · ').slice(0, 90) }»`);
-    dit(/2\s*listes?/i.test(temoin) && /champ photo/i.test(temoin), 'et il écrit les CHIFFRES — pas « c’est bon »');
-    dit(/chaussure/i.test(temoin), 'et la catégorie qu’il a reconnue');
+    // Le témoin d'étape à l'écran est retiré (5.130 : aucune information sur la
+    // page en dehors de la carte VRM). L'étape, elle, est toujours ENREGISTRÉE.
 
     // ⚠️⚠️ ET LE SHADOW DOM : une application moderne peut y enfermer son
     //    formulaire. `querySelectorAll` ne le traverse pas — on chercherait dans
