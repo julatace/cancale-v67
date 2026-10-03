@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "VRM - Vinted Sync",
   "version": "5.129.0",
-  "description": "Synchronise tes comptes et donnees Vinted (annonces detaillees, ventes, achats, messages) vers VRM, depuis TON navigateur. + Panneau VRM sur Vinted (numero de la paire, prix achat, case garage, paires a relancer - affichage seul). + Assistants Leboncoin et eBay : prepare tes annonces (titre, description, prix, categorie, photos) et remplit le formulaire de depot des qu'il s'affiche, pour que tu n'aies plus qu'a relire et publier. Aucune publication automatique : c'est toi qui cliques sur Publier.",
+  "description": "Capte tes donnees Vinted et Leboncoin (annonces, ventes, achats, messages, bordereaux) et les envoie a VRM, depuis TON navigateur. Tout se pilote dans l'app VRM (vrm.center) : l'extension execute ce que tu y demandes, avec ses garde-fous (le compte connecte dans l'onglet, 20 actions par heure, une requete a la fois).",
   "permissions": [
     "cookies",
     "storage",
@@ -100,6 +100,23 @@
       ],
       "run_at": "document_idle",
       "all_frames": false
+    },
+    {
+      "matches": [
+        "https://*.vinted.fr/*",
+        "https://*.vinted.com/*",
+        "https://*.vinted.it/*",
+        "https://*.vinted.de/*",
+        "https://*.leboncoin.fr/*",
+        "https://*.ebay.fr/*",
+        "https://*.ebay.com/*",
+        "https://*.vestiairecollective.com/*"
+      ],
+      "js": [
+        "vrm-badge.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": false
     }
   ],
   "web_accessible_resources": [
@@ -122,10 +139,38 @@
       "matches": [
         "https://*.leboncoin.fr/*"
       ]
+    },
+    {
+      "resources": [
+        "logo-vrm-96.png",
+        "popup.html"
+      ],
+      "matches": [
+        "https://*.vinted.fr/*",
+        "https://*.vinted.com/*",
+        "https://*.vinted.it/*",
+        "https://*.vinted.de/*",
+        "https://*.leboncoin.fr/*",
+        "https://*.ebay.fr/*",
+        "https://*.ebay.com/*",
+        "https://*.vestiairecollective.com/*"
+      ]
     }
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "VRM - Vinted Sync"
+    "default_title": "VRM",
+    "default_icon": {
+      "16": "icon-16.png",
+      "32": "icon-32.png",
+      "48": "icon-48.png",
+      "128": "icon-128.png"
+    }
+  },
+  "icons": {
+    "16": "icon-16.png",
+    "32": "icon-32.png",
+    "48": "icon-48.png",
+    "128": "icon-128.png"
   }
 }

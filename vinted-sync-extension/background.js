@@ -57,8 +57,18 @@ const APP_URL_VRM = 'https://vrm.center';
 function majIcone(connecte) {
   try { chrome.action.setPopup({ popup: connecte ? '' : 'popup.html' }); } catch (_) {}
 }
+// Le site d'où l'on vient décide l'onglet de VRM : on arrive là où l'on travaille.
+function plateformeDe(url) {
+  const u = String(url || '');
+  if (/leboncoin\.fr/i.test(u)) return 'leboncoin';
+  if (/ebay\.(fr|com)/i.test(u)) return 'ebay';
+  if (/vestiairecollective\./i.test(u)) return 'vestiaire';
+  if (/vinted\.(fr|com|it|de)/i.test(u)) return 'vinted';
+  return '';
+}
 function ouvrirVRMDepuis(urlActive) {
-  const cible = APP_URL_VRM + '/?tab=' + (/leboncoin\.fr/i.test(urlActive || '') ? 'plat_leboncoin' : 'plat_vinted');
+  const p = plateformeDe(urlActive);
+  const cible = APP_URL_VRM + '/?tab=' + (p ? 'plat_' + p : 'plat_vinted');
   try {
     chrome.tabs.query({ url: APP_URL_VRM + '/*' }, (ouverts) => {
       const t = (ouverts || [])[0];
@@ -733,6 +743,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }
     if (msg && msg.from === 'cancale-popup' && msg.action === 'authLogout') {
       authLogout().then(sendResponse); return true;
+    }
+    // LA PETITE CARTE (vrm-badge.js) : son état, et « ouvrir VRM ». Le site est
+    // celui de l'ONGLET qui demande (sender.tab), jamais ce que dit le message.
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'etat') {
+      etatSite(sender && sender.tab && sender.tab.url).then(sendResponse, () => sendResponse({ ok: false }));
+      return true;
+    }
+    if (msg && (msg.from === 'vrm-badge' || msg.from === 'cancale-popup') && msg.action === 'ouvrirVRM') {
+      // La carte de connexion vit dans un iframe de l'onglet : sender.tab est
+      // l'onglet du site, c'est lui qui décide l'onglet de VRM.
+      ouvrirVRMDepuis((sender && sender.tab && sender.tab.url) || '');
+      sendResponse({ ok: true });
+      return true;
     }
     if (msg && msg.from === 'cancale-popup' && msg.action === 'syncNow') {
       captureAllAccounts().then((r) => { activeFetchAll(); sendResponse({ ok: true, accounts: r }); });
@@ -3211,6 +3234,39 @@ async function loginDe(uid) {
     return map[uid] || '';
   } catch (_) { return ''; }
 }
+// ── LA PETITE CARTE EN BAS À DROITE (vrm-badge.js) ──────────────────────────
+// Julien, 2 octobre : « il ne doit pas y avoir d'informations autres que les
+// moyens de connexion, le compte utilisé, le compte connecté, si les
+// informations circulent bien ». ZÉRO requête Vinted, ZÉRO lecture de données :
+// la session VRM, le cookie du site, et ce que les écritures ont noté.
+// Trois états partout : une information qu'on n'a pas est `null` (« pas su »),
+// jamais un « oui » ni un « non » inventé.
+const BASCULE_VISIBLE_MS = 7 * 86400000;
+async function etatSite(url) {
+  const plateforme = plateformeDe(url);
+  let version = ''; try { version = chrome.runtime.getManifest().version; } catch (_) {}
+  const vrm = await authEtat().catch(() => null);
+  let local = {};
+  try { local = await chrome.storage.local.get(['vrmFlux', 'vrmBascule', 'vrmLbcCompte']); } catch (_) {}
+  // Le compte du SITE : sur Vinted le cookie le dit (une identité) ; sur
+  // Leboncoin le dernier compte « moi » vu ; eBay et Vestiaire ne sont pas
+  // encore captés par VRM — on le dit plutôt que de laisser croire.
+  let site = null;
+  if (plateforme === 'vinted') {
+    let dom = 'www.vinted.fr'; try { dom = new URL(url).hostname || dom; } catch (_) {}
+    const uid = await compteConnecte(dom);
+    site = uid ? { id: String(uid), nom: await loginDe(String(uid)) } : { id: null, nom: '' };
+  } else if (plateforme === 'leboncoin') {
+    const c = local.vrmLbcCompte;
+    site = c && c.name ? { id: c.id || null, nom: c.name, type: c.type || '' } : { id: null, nom: '' };
+  }
+  const capte = plateforme === 'vinted' || plateforme === 'leboncoin';
+  const flux = capte ? ((local.vrmFlux || {})[plateforme] || {}) : null;
+  const b = local.vrmBascule;
+  const bascule = b && Date.now() - Number(b.at || 0) < BASCULE_VISIBLE_MS ? b : null;
+  return { ok: true, plateforme, capte, version, vrm, site, flux, bascule };
+}
+
 // L'état que l'app interroge toutes les 20 s : ZÉRO requête Vinted (cookie,
 // stockage local, session VRM).
 async function etatPourApp() {
@@ -6572,6 +6628,14 @@ async function storeLbcAccount(acc) {
       if (s && LBC_URL_AUTRUI.test(String(s))) delete merged[id];
     }
     merged[String(acc.id)] = Object.assign({}, merged[String(acc.id)], acc, { seenAt: new Date().toISOString() });
+    // Le compte Leboncoin CONNECTÉ, gardé dans le navigateur : la petite carte
+    // de l'extension le nomme sans relire la base. Seulement sur un endpoint
+    // « moi » (jamais la fiche d'autrui — même règle que la détection, §11).
+    try {
+      if (!acc.source || !LBC_URL_AUTRUI.test(String(acc.source))) {
+        await chrome.storage.local.set({ vrmLbcCompte: { id: String(acc.id), name: String(acc.name || ''), type: acc.type || '', at: Date.now() } });
+      }
+    } catch (_) {}
     const _okFlux = await supabaseUpsert('app_data', [{ id: 'lbc_accounts', data: { accounts: merged, updatedAt: new Date().toISOString() } }], 'id');
     noterFlux('leboncoin', _okFlux !== false);
   } catch (_) {}
