@@ -3871,6 +3871,29 @@ d'achat **écrits deux fois** (le texte, puis une ligne de champs de saisie).
 - Banc `annonces-carte.cjs` : aucune saisie visible hors « ⋯ » au repos, et
   modifier « achat — » → « achat 30,00 € » pour de vrai (rouge sur l'avant).
 
+### ⚠️⚠️⚠️ UNE RECONNEXION POUVAIT RENUMÉROTER SES CARTONS (3 octobre)
+Trouvé en cartographiant la numérotation. Trois migrations « une seule fois »
+d'août réécrivaient les numéros (`vinted_num_fix1` : purge de TOUS les numéros
+auto ; `vinted_num_compact_v1` : renumérotation des annonces auto > 42 au plus
+petit numéro libre, SANS regarder le pool ; `vinted_used_cleaned_v1` : pool
+rétréci, déjà désactivé). Leur drapeau « déjà fait » vivait dans le
+**navigateur** — et `authSignOut` efface tout `vinted_*`. Après une reconnexion
+(ou sur un appareil neuf), le nuage remplissait le navigateur, l'onglet Vinted se
+montait, et la migration **repartait** sur ses vraies données.
+- **Prouvé** (`scripts/bancs/numeros-reconnexion.cjs`, aucune fixture) : sur le
+  code d'avant, les numéros 50…54 repartaient au nuage en **1…5** — des numéros
+  déjà écrits sur des cartons de paires passées. Mesuré chez lui : **401 numéros
+  dont 384 auto**. Pas de dégât récent (1 seule annonce en ligne « auto ≤ 42 ») —
+  c'était à une reconnexion près.
+- Les trois sont **retirées**, pas « re-gardées » : leur travail est fait depuis
+  août, et un numéro ne change JAMAIS tout seul (§5).
+- ⚠️ **Règle** : aucune migration ne s'arme sur un drapeau du `localStorage` —
+  il ne survit ni à une déconnexion ni à un autre appareil. Une migration de
+  données appartient au serveur (SQL), une fois, avec une sauvegarde.
+- Mesuré au passage, **laissé tel quel** : 13 numéros portés par plusieurs
+  entrées (1…16), l'héritage connu d'août ; la détection de doublons de l'app
+  (`conflitsNum`) les juge sur les paires PRÉSENTES.
+
 ### Leboncoin et eBay rangés comme Vinted : résumé, puis Ventes / Achats / Annonces (3 octobre)
 Demande du 2 octobre : « plus d'écran Aperçu intermédiaire ». Les deux onglets
 ouvrent sur **Ventes**, avec un résumé compact au-dessus (`PlatResume`, même forme

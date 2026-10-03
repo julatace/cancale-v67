@@ -18541,75 +18541,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, numeros, autoNum, cloudReady]);
 
-  // ── NETTOYAGE (une seule fois) de la liste des numéros utilisés ───────────
-  // Un bug passé avait « brûlé » des numéros (43→88, 116→144) qui n'ont jamais
-  // été posés sur une vraie boîte : ils gonflaient la séquence pour rien. On
-  // reconstruit `vinted_used_numeros` à partir des SEULS numéros réels :
-  //   • annonces numérotées (vinted_annonce_numeros),
-  //   • numéros rangés au garage (vinted_garage_grid),
-  //   • numéros saisis À LA MAIN sur des ventes (saleOv non auto).
-  // Les numéros fantômes disparaissent → la prochaine paire repart au 1er trou
-  // réel (43). Aucune vraie boîte ne perd son numéro. Idempotent + une seule fois.
-  // ⚠️ DÉSACTIVÉ (août 2026) — un numéro est désormais PRIS À VIE (voir plus haut).
-  //    Ce nettoyage retirait des numéros de `vinted_used_numeros`, donc les
-  //    remettait en circulation : c'est exactement ce qui crée deux paires au
-  //    même numéro quand l'une revient en litige. Le code est conservé pour
-  //    mémoire, mais il ne s'exécute plus.
-  useEffect(() => {
-    if (true) return;                                        // règle « jamais réattribué »
-    if (!cloudReady) return;
-    if (load('vinted_used_cleaned_v1', false)) return;      // déjà nettoyé sur cet appareil
-    if (!numeros || !Object.keys(numeros).length) return;    // données pas prêtes → on ne touche à rien
-    const real = new Set();
-    Object.values(numeros).forEach(e => { const n = parseInt(String(e && e.numero), 10); if (!isNaN(n)) real.add(n); });
-    Object.values(saleOv).forEach(e => { if (e && !e.autoAssigned) { const n = parseInt(String(e.numero), 10); if (!isNaN(n)) real.add(n); } });
-    const collect = (g) => { if (Array.isArray(g)) g.forEach(collect); else if (g && typeof g === 'object') Object.values(g).forEach(collect); else { const n = parseInt(String(g), 10); if (!isNaN(n)) real.add(n); } };
-    collect(garageGrid);
-    const cleaned = [...real].sort((a, b) => a - b);
-    const cur = (usedNumeros || []).map(x => parseInt(String(x), 10)).filter(n => !isNaN(n));
-    save('vinted_used_cleaned_v1', true);
-    // On n'écrit que si ça change vraiment (évite un save inutile).
-    if (cleaned.length !== cur.length || cleaned.some((v, i) => v !== cur[i])) {
-      setUsedNumeros(cleaned); save('vinted_used_numeros', cleaned);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cloudReady, numeros, saleOv, garageGrid]);
+  // ⚠️⚠️ ICI VIVAIENT TROIS MIGRATIONS « UNE SEULE FOIS » SUR LES NUMÉROS
+  //    (nettoyage du pool, compactage des numéros auto > 42, purge des numéros
+  //    auto). RETIRÉES le 3 octobre : leur drapeau « déjà fait » vivait dans le
+  //    NAVIGATEUR, et `authSignOut` l'efface. Après une reconnexion, le nuage
+  //    remplissait le navigateur et la migration REPARTAIT — prouvé au banc
+  //    `numeros-reconnexion.cjs` : les numéros 50…54 repartaient au nuage en
+  //    1…5, des numéros déjà écrits sur des cartons. Chez lui : 384 numéros auto.
+  //    Un numéro ne change JAMAIS tout seul (§5). Ne pas les remettre.
 
-  // ── COMPACTAGE (une seule fois) des numéros d'annonces trop hauts ──────────
-  // Un ancien bug a attribué AUTOMATIQUEMENT des numéros gonflés (92, 115, 133…)
-  // à des annonces alors que les vraies boîtes vont de 1 à 42. On remet ces
-  // annonces (uniquement celles au numéro AUTO, jamais un numéro saisi à la main)
-  // au plus petit numéro libre → la séquence redevient continue (43, 44, 45…).
-  // GARDE-FOUS : on ne touche jamais un numéro manuel, un numéro déjà rangé au
-  // garage, ni un numéro d'une paire vendue (il reste réservé). Une seule fois.
-  useEffect(() => {
-    if (!cloudReady) return;
-    if (load('vinted_num_compact_v1', false)) return;
-    if (!listings.items || !listings.items.length) return;   // besoin des annonces en ligne
-    if (!numeros || !Object.keys(numeros).length) return;
-    const onlineIds = new Set(listings.items.map(it => String(it.id)));
-    const taken = new Set();                                  // numéros à ne PAS réutiliser
-    const addN = (x) => { const n = parseInt(String(x), 10); if (!isNaN(n)) taken.add(n); };
-    for (const k in numeros) { const e = numeros[k]; if (!e) continue; if (!e.auto) addN(e.numero); if (!onlineIds.has(String(k))) addN(e.numero); }
-    Object.values(saleOv).forEach(e => { if (e && !e.autoAssigned) addN(e.numero); });
-    const collect = (g) => { if (Array.isArray(g)) g.forEach(collect); else if (g && typeof g === 'object') Object.values(g).forEach(collect); else addN(g); };
-    collect(garageGrid);
-    // Les annonces en ligne au numéro ≤ 42 gardent leur numéro (déjà « taken »).
-    for (const k of onlineIds) { const e = numeros[k]; if (e && /^\d+$/.test(String(e.numero)) && parseInt(e.numero, 10) <= 42) addN(e.numero); }
-    // Cibles = annonces EN LIGNE, numéro AUTO, > 42.
-    const targets = [];
-    for (const k of onlineIds) { const e = numeros[k]; if (e && e.auto && /^\d+$/.test(String(e.numero)) && parseInt(e.numero, 10) > 42) targets.push([parseInt(e.numero, 10), String(k)]); }
-    save('vinted_num_compact_v1', true);
-    if (!targets.length) return;
-    targets.sort((a, b) => a[0] - b[0]);
-    const next = { ...numeros };
-    const usedSet = new Set((usedNumeros || []).map(x => parseInt(String(x), 10)).filter(n => !isNaN(n)));
-    const smallestFree = () => { let n = 1; while (taken.has(n)) n++; taken.add(n); return n; };
-    for (const [, k] of targets) { const nn = smallestFree(); next[k] = { ...next[k], numero: String(nn) }; usedSet.add(nn); }
-    setNumeros(next); save('vinted_annonce_numeros', next);
-    const ua = [...usedSet].sort((a, b) => a - b); setUsedNumeros(ua); save('vinted_used_numeros', ua);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cloudReady, listings.items]);
 
   const loadListings = async (force) => {
     const cached = !force && fromCache('listings');
@@ -18993,27 +18933,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (L'affichage « à retirer » est groupé PAR POINT RELAIS dans l'onglet
   //  Achats, avec le nombre de colis en badge sur chaque point.)
 
-  // ── Migration one-shot : purge des numéros AUTO pollués ────────────────────
-  // Une version antérieure basait l'auto-numérotation sur le garage (ancien) et a
-  // pu attribuer d'énormes numéros (ex. 1959+). On supprime les entrées AUTO (elles
-  // seront recréées proprement, à la suite des numéros manuels) et on ne garde
-  // dans l'historique que les numéros posés À LA MAIN. Tourne une seule fois.
-  useEffect(() => {
-    if (load('vinted_num_fix1', false)) return;
-    const cur = load('vinted_annonce_numeros', {}) || {};
-    const kept = {}; const manual = new Set();
-    for (const k in cur) {
-      const e = cur[k];
-      if (e && !e.auto) { kept[k] = e; const n = parseInt(String(e.numero), 10); if (!isNaN(n)) manual.add(n); }
-    }
-    const hadAuto = Object.keys(cur).length !== Object.keys(kept).length;
-    if (hadAuto) {
-      setNumeros(kept); save('vinted_annonce_numeros', kept);
-      const ua = [...manual].sort((a,b)=>a-b); setUsedNumeros(ua); save('vinted_used_numeros', ua);
-    }
-    save('vinted_num_fix1', true);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // ── LE NUMÉRO DÉJÀ POSÉ SUR UNE VENTE (§5.69) ─────────────────────────────
   // ⚠️ LE TROU SIGNALÉ PAR JULIEN : « si je poste une annonce depuis ma tablette
