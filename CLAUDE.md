@@ -3805,6 +3805,34 @@ Trois plaintes de Julien, **une cause racine pour les deux premières** :
 - Bancs : `demarrage.cjs` (5 rouges sur l'avant, dont la phrase exacte qu'il a
   vue) · `ventes-bordereau.cjs` + onglet ouvert / aucun téléchargement (4 rouges).
 
+### ⚠️⚠️ VITESSE POUR 1 000 VENDEURS : LA COLONNE `meta` (3 octobre, 5.134)
+Mesuré dans `pg_stat_statements` : les requêtes les plus coûteuses (400 à
+950 ms, des milliers d'appels) lisaient UN petit champ (statut, n° de
+transaction, date de capture) dans des lignes de **29 Ko** (`txn_*`) ou
+**100 à 200 Ko** (`email_bord_*`, `label_*` : le PDF). Postgres décompresse la
+ligne ENTIÈRE pour en sortir un champ. Et deux écrans relisaient `capturedAt`
+sur **les ~5 000 lignes** `harvest_*`.
+- **`app_data.meta`**, rempli par un **déclencheur** à chaque écriture
+  (`vrm_meta(id, data)`) : les scalaires de premier niveau ≤ 600 car., `_pdf`
+  (la ligne porte un PDF), et pour `harvest_{uid}_txn_*` les champs de la
+  transaction (`id, item_id, status, status_title, status_updated_at,
+  ship_status_title`). Rattrapé sur les 5 959 lignes, **0 écart** avec `data`.
+- **Toute lecture d'un petit champ passe par `meta->>`** (app, extension), et
+  la présence d'un PDF se teste par `meta->>_pdf=eq.true` (pas
+  `data->>pdfB64=not.is.null`, qui décompresse le PDF pour rien). Mesuré :
+  transactions **2 140 → 8 ms**.
+- RLS : `owner = (select auth.uid())` (identité évaluée une fois, recommandation
+  Supabase) + index `(owner, id text_pattern_ops)`. Migration consignée dans
+  `supabase/migrations/004-meta-et-rls-rapide.sql`.
+- ⚠️ L'outil SQL de la session attend une **confirmation humaine** pour tout
+  `DROP` : il expire sans rien dire. Les politiques en double (`tout_*`) restent
+  donc en place (mêmes droits, coût négligeable désormais).
+- Les bancs servent des lignes `{id, data}` : `scripts/bancs/_meta.cjs`
+  (`metaVersData`) retraduit `meta->>k` vers le chemin d'origine, avec la MÊME
+  règle que le SQL. Tous les bancs et audits à faux Supabase l'appliquent.
+- La cloche lisait 3 lignes par compte **à la queue leu leu** : elles partent
+  ensemble (lectures de NOTRE base, pas de Vinted).
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par

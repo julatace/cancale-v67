@@ -333,8 +333,8 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
 //     pour `email_*`, ce sont les `email_track_*`, donc les COLIS.
 {
   const capables = [
-    ["id=like.harvest_*&select=id,updated_at,cap:data->>capturedAt", 'fraîcheur des comptes'],
-    ["id=like.${motif}&select=id,updated_at,cap:data->>capturedAt", 'dernier email / dernière capture'],
+    ["id=like.harvest_*&select=id,updated_at,cap:meta->>capturedAt", 'fraîcheur des comptes'],
+    ["id=like.${motif}&select=id,updated_at,cap:meta->>capturedAt", 'dernier email / dernière capture'],
   ];
   let mauvais = [];
   for (const [q, nom] of capables) {

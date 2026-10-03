@@ -17,6 +17,7 @@
 //  fausse alerte quand tout va bien.
 // ════════════════════════════════════════════════════════════════════════════
 const { chromium } = require('playwright');
+const { metaVersData } = require('./_meta.cjs');
 const path = require('path');
 const fs = require('fs');
 
@@ -48,7 +49,7 @@ async function rendre(nav, etat, { url = 'https://www.vinted.fr/items/1', deuxFo
   const erreurs = [];
   pg.on('pageerror', (e) => erreurs.push(String(e).slice(0, 160)));
   await pg.route('**/*', (r) => {
-    const u = r.request().url();
+    const u = metaVersData(r.request().url());
     if (/logo-vrm-96\.png/.test(u)) return r.fulfill({ status: 200, contentType: 'image/png', body: LOGO });
     if (/popup\.html/.test(u)) return r.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><body style="background:#07090D;color:#fff">connexion</body>' });
     return r.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><html><body style="margin:0;background:#fff;font-family:sans-serif"><h1 style="padding:20px">Une page du site</h1><iframe id="sous" src="/sous" style="width:300px;height:120px"></iframe></body></html>' });

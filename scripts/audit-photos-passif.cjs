@@ -15,6 +15,7 @@
 //  « la fonction n'existait pas avant » n'est pas une preuve.
 // ════════════════════════════════════════════════════════════════════════════
 const fs = require('fs'), vm = require('vm'), path = require('path');
+const { metaVersData } = require('./bancs/_meta.cjs');
 const racine = path.join(__dirname, '..');
 const SRC = fs.readFileSync(path.join(racine, 'vinted-sync-extension', 'background.js'), 'utf8');
 const dual = (v) => function (...a) { const cb = a[a.length - 1]; if (typeof cb === 'function') { cb(v); return; } return Promise.resolve(v); };
@@ -63,7 +64,7 @@ function faireCtx({ items = LISTINGS, dejaPhotos = {}, gardeStop = null, srcOver
       } },
     },
     fetch: async (url, opts = {}) => {
-      const u = String(url);
+      const u = metaVersData(String(url));
       const rep = (body, status = 200) => ({ ok: status < 400, status, json: async () => JSON.parse(body), text: async () => body, headers: { get: () => 'application/json' } });
       if ((opts.method || 'GET') === 'POST' && /\/rest\/v1\//.test(u)) {
         try { const corps = JSON.parse(opts.body || '[]'); journal.ecrits.push(corps);

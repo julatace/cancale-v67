@@ -1220,7 +1220,7 @@ async function storeLabel(domain, url, b64) {
     const rows = await sbGet(`app_data?id=eq.harvest_${uid}_orders_sold&select=data`);
     const ventes = (rows && rows[0] && rows[0].data && rows[0].data.payload && rows[0].data.payload.my_orders) || [];
     const dejaCapte = new Set();
-    const cur = await sbGet(`app_data?id=like.harvest_${uid}_label_*&select=tx:data->>tx`);
+    const cur = await sbGet(`app_data?id=like.harvest_${uid}_label_*&select=tx:meta->>tx`);
     for (const r of (cur || [])) if (r && r.tx) dejaCapte.add(String(r.tx));
     const cands = ventes.filter(o => o && o.transaction_id != null && AWAITING_SHIP(o.status) && !dejaCapte.has(String(o.transaction_id)));
     if (cands.length === 1) tx = String(cands[0].transaction_id);
@@ -1693,7 +1693,7 @@ async function capterReleves(uid) {
     if (muet[String(uid)]) return 0;                    // ce compte a déjà prouvé que le paramètre ne passe pas
     // Ce qu'on a déjà (une seule lecture, deux scalaires — jamais le payload).
     let cur = [];
-    try { cur = await sbGet(`app_data?id=like.harvest_${uid}_releve_*&select=m:data->>mois`); } catch (_) {}
+    try { cur = await sbGet(`app_data?id=like.harvest_${uid}_releve_*&select=m:meta->>mois`); } catch (_) {}
     const dejaMois = new Set((cur || []).map(r => r && r.m).filter(Boolean));
     const bill = await sbGet(`app_data?id=eq.harvest_${uid}_billing&select=h:data->payload->history`);
     const hist = (bill && bill[0] && bill[0].h) || [];
@@ -2922,7 +2922,7 @@ async function etatPourApp() {
 // Le bordereau de CETTE vente est-il déjà rangé (avec son PDF) ? Une lecture
 // scalaire (§4.4) — `null` = la base n'a pas répondu (« pas su » ≠ « non »).
 async function labelDejaRange(uid, tx) {
-  const rows = await sbGet(`app_data?id=eq.harvest_${uid}_label_${tx}&data->>pdfB64=not.is.null&select=id,cap:data->>capturedAt`);
+  const rows = await sbGet(`app_data?id=eq.harvest_${uid}_label_${tx}&meta->>_pdf=eq.true&select=id,cap:meta->>capturedAt`);
   if (rows === null) return null;
   return Array.isArray(rows) && rows.length ? rows[0] : false;
 }
@@ -3889,7 +3889,7 @@ async function capterDatesVersement(uid) {
     const finalisees = ventes.filter(o => o && o.transaction_id != null
       && /finalis/i.test(String(o.status || '')) && !/annul|cancel|refus|rembours|retour|suspend/i.test(String(o.status || '')));
     if (!finalisees.length) return 0;
-    const det = await sbGetTout(`app_data?id=like.harvest_${uid}_txn_*&select=id,s:data->payload->transaction->>status,su:data->payload->transaction->>status_updated_at`);
+    const det = await sbGetTout(`app_data?id=like.harvest_${uid}_txn_*&select=id,s:meta->>status,su:meta->>status_updated_at`);
     if (det === null) return 0;                                           // pas su
     const datees = new Set();
     for (const r of det) {
@@ -4146,7 +4146,7 @@ async function genererBordereauxEnAttente(uid, opts = {}) {
     // `select=data`), et il fait foi quand il est plus frais ET lisible.
     const detFrais = new Map();
     try {
-      const dr = await sbGetMemo(`app_data?id=like.harvest_${uid}_txn_*&select=id,st:data->payload->transaction->shipment->>status_title,cap:data->>capturedAt`);
+      const dr = await sbGetMemo(`app_data?id=like.harvest_${uid}_txn_*&select=id,st:meta->>ship_status_title,cap:meta->>capturedAt`);
       for (const r of (dr || [])) {
         const tx = (/_txn_(\d+)$/.exec(String(r.id || '')) || [])[1];
         if (!tx || !r.st) continue;
@@ -4168,7 +4168,7 @@ async function genererBordereauxEnAttente(uid, opts = {}) {
     // Un bordereau reçu par email prouve qu'il existe déjà : on ne regénère pas.
     const dejaMail = new Set();
     try {
-      const mails = await sbGet('app_data?id=like.email_bord_*&select=tx:data->>transaction');
+      const mails = await sbGet('app_data?id=like.email_bord_*&select=tx:meta->>transaction');
       for (const m of (mails || [])) if (m && m.tx) dejaMail.add(String(m.tx));
     } catch (_) { /* sans cette lecture on retombe sur le statut Vinted, qui suffit */ }
     const memo = (await chrome.storage.local.get('vrmBordFaits')).vrmBordFaits || {};
@@ -4209,7 +4209,7 @@ async function genererBordereauxEnAttente(uid, opts = {}) {
     // clé « label » — la fonction n'avait jamais été atteinte.
     const dejaCapte = new Set();
     try {
-      const cur = await sbGet(`app_data?id=like.harvest_${uid}_label_*&select=tx:data->>tx`);
+      const cur = await sbGet(`app_data?id=like.harvest_${uid}_label_*&select=tx:meta->>tx`);
       for (const r of (cur || [])) if (r && r.tx) dejaCapte.add(String(r.tx));
     } catch (_) { /* pas de ligne : rien de capté, on tente */ }
     // ⚠️⚠️ ON N'ABANDONNE PLUS DÈS QUE VINTED FAIT AVANCER LE STATUT (27 août).
@@ -4647,7 +4647,7 @@ function mpChoisi(e, place) {
 //   `classifyOrderStatus` côté app.
 const PAS_UNE_VENTE = /annul|cancel|refus|rembours|retour|suspend|[ée]chou/i;
 async function lireVentesProuvees() {
-  const rows = await sbGetTout('app_data?id=like.harvest_*_txn_*&select=it:data->payload->transaction->>item_id,ti:data->payload->transaction->>status_title');
+  const rows = await sbGetTout('app_data?id=like.harvest_*_txn_*&select=it:meta->>item_id,ti:meta->>status_title');
   if (rows === null) return { echec: true, vendus: new Set() };
   const vendus = new Set();
   for (const r of rows) {

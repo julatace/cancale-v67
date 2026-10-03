@@ -19,6 +19,7 @@
 //  ⚠️ §4.10 : `node --check` ne voit rien de tout ça. On EXÉCUTE.
 // ════════════════════════════════════════════════════════════════════════════
 const fs = require('fs'), vm = require('vm'), path = require('path');
+const { metaVersData } = require('./bancs/_meta.cjs');
 const racine = path.join(__dirname, '..');
 const src = fs.readFileSync(path.join(racine, 'vinted-sync-extension', 'background.js'), 'utf8');
 const dual = (v) => function (...a) { const cb = a[a.length - 1]; if (typeof cb === 'function') { cb(v); return; } return Promise.resolve(v); };
@@ -62,7 +63,7 @@ function faireCtx({ lignes = {}, vinted = () => ({ status: 404, json: null }) } 
       } },
     },
     fetch: async (url, opts = {}) => {
-      const u = String(url);
+      const u = metaVersData(String(url));
       // ⚠️ `status` par défaut : sans lui, `ok` valait `undefined < 400` =
       //    FAUX, `sbGetTout` rendait `null`, et le banc mesurait « aucune
       //    offre » sur un code intact. §6.3, dans mon propre banc.

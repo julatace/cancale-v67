@@ -22,6 +22,7 @@
 // n'aurait que la première moitié serait vert sur une app qui alerte tout le
 // temps.
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { metaVersData } = require('./_meta.cjs');
 const fs=require('fs'), http=require('http'), path=require('path');
 // ⚠️⚠️ JAMAIS UN CHEMIN ABSOLU ICI. La méthode de preuve du dossier (§6.1)
 // extrait le code d'AVANT dans /tmp/avN, y copie le banc et le lance DEPUIS
@@ -110,7 +111,7 @@ const AVEU=/Je n'arrive pas à joindre tes données|Je n'ai pas pu lire tes donn
       await pg.route('**/rest/v1/**',r=>r.fulfill({status:522,contentType:'text/html',headers:{'access-control-allow-origin':'*'},body:HTML522}));
       await pg.route('**/api/**',r=>r.fulfill({status:522,contentType:'text/html',body:HTML522}));
     } else {
-      await pg.route('**/rest/v1/**',route=>{const u=route.request().url();
+      await pg.route('**/rest/v1/**',route=>{const u=metaVersData(route.request().url());
         const j=d=>route.fulfill({status:200,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:JSON.stringify(d)});
         if(route.request().method()!=='GET') return j([]);
         if(/select=owner/.test(u)) return route.fulfill({status:400,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:'{"m":1}'});

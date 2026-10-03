@@ -18,6 +18,7 @@
 //   4. ce qui est parti est relisible, avec la personne NOMMÉE ;
 //   5. ⚠️ l'autre sens : *tout retirer* passerait les contrôles 1-3.
 const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
+const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 
 const DIST = path.join(__dirname, '..', '..', 'dist');   // ⚠️ JAMAIS un chemin absolu (§6.1)
@@ -73,7 +74,7 @@ async function rendre(nav, etat) {
   await pg.route('**/auth/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json',
     body: JSON.stringify({ access_token: 'jeton-de-banc', refresh_token: 'r', expires_in: 3600, user: SESSION.user }) }));
   await pg.route('**/rest/v1/**', (r) => {
-    const u = r.request().url();
+    const u = metaVersData(r.request().url());
     if (/select=owner/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
     if (/select=id&limit=1/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
     if (/id=eq\.panel_msg_repondus/.test(u)) {

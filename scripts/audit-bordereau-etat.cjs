@@ -106,7 +106,7 @@ if (/const encoreAExpedier = /.test(BG)) {
   ? ok('la génération lit le statut le plus frais (plus de regénération d\'une étiquette existante)')
   : nok('genererBordereauxEnAttente travaille encore sur le statut de la commande',
         '1ʳᵉ passe : regénère pour rien · 2ᵉ passe : refuse d\'aller chercher le PDF');
-/harvest_\$\{uid\}_txn_\*&select=id,st:data->payload->transaction->shipment->>status_title,cap:data->>capturedAt/.test(BG)
+/harvest_\$\{uid\}_txn_\*&select=id,st:(data->payload->transaction->shipment->>status_title|meta->>ship_status_title),cap:(data|meta)->>capturedAt/.test(BG)
   ? ok('… et le lit en SCALAIRES (§34 : jamais select=data)')
   : nok('la lecture du détail n\'est pas projetée en scalaires');
 

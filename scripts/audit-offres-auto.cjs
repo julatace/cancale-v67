@@ -2,6 +2,7 @@
 // On relève les requêtes réellement envoyées à Vinted -> on voit exactement
 // quelles offres ont été acceptées, et lesquelles ne l'ont PAS été.
 const fs = require('fs'), vm = require('vm');
+const { metaVersData } = require('./bancs/_meta.cjs');
 const path = require('path');
 
 // Applique le `select=` comme PostgREST : sans ça un banc sert une FORME que le
@@ -76,7 +77,7 @@ function faireBanc({ convs, mins = {}, minsApp = {}, actif = true, connecte = '1
       action: { setBadgeText() {}, setBadgeBackgroundColor() {}, setTitle() {} },
     },
     fetch: async (url, opt = {}) => {
-      const u = String(url); const m = (opt.method || 'GET').toUpperCase();
+      const u = metaVersData(String(url)); const m = (opt.method || 'GET').toUpperCase();
       const J = (o, st = 200) => ({ ok: st < 400, status: st, json: async () => o, text: async () => JSON.stringify(o), headers: { get: () => 'application/json' }, arrayBuffer: async () => new ArrayBuffer(0) });
       if (/\/rest\/v1\/vinted_accounts/.test(u)) return J([{ vinted_user_id: '111', login: 'moi', domain: 'www.vinted.fr', access_token: 't', anon_id: 'a', csrf_token: 'c' }]);
       if (/id=eq\.panel_min_prices/.test(u)) return J([{ data: mins }]);

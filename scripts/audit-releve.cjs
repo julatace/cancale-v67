@@ -9,6 +9,7 @@
 // puisqu'il n'y a qu'une ligne `harvest_{uid}_billing`.
 // Ce script exécute le VRAI code du service worker dans un `vm`.
 const fs = require('fs'), vm = require('vm'), path = require('path');
+const { metaVersData } = require('./bancs/_meta.cjs');
 const src = fs.readFileSync(path.join(__dirname, '..', 'vinted-sync-extension', 'background.js'), 'utf8');
 const dual = (v) => function (...a) { const cb = a[a.length - 1]; if (typeof cb === 'function') { cb(v); return; } return Promise.resolve(v); };
 
@@ -50,7 +51,7 @@ function banc({ releves = {}, hist = null, profil = '3166370055', reponses = nul
         remove: dual(undefined) } },
     },
     fetch: async (url, opts) => {
-      const u = String(url);
+      const u = metaVersData(String(url));
       const J = (o, st = 200) => ({ ok: st < 400, status: st, json: async () => o, text: async () => JSON.stringify(o), headers: { get: () => 'application/json' } });
       // ── VINTED : c'est ce qu'on mesure ──
       const pa = /vinted\.fr\/api\/v2\/users\/(\d+)\/payouts(?:\?(.*))?$/.exec(u);

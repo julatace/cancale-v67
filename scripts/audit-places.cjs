@@ -20,6 +20,7 @@
 // chargée), donc une règle appliquée d'un seul côté fait diverger les deux
 // écrans — « 12 à publier » ici, 8 là-bas.
 const fs = require('fs'), vm = require('vm'), path = require('path');
+const { metaVersData } = require('./bancs/_meta.cjs');
 const racine = path.join(__dirname, '..');
 const src = fs.readFileSync(path.join(racine, 'vinted-sync-extension', 'background.js'), 'utf8');
 const APP = fs.readFileSync(path.join(racine, 'src', 'App.jsx'), 'utf8');
@@ -86,7 +87,7 @@ function ctxAvec(numeros, txns, lbcItems, exclus, quiEchoue, bloquesDef) {
       storage: { local: { get: dual({}), set: dual(undefined), remove: dual(undefined) } },
     },
     fetch: async (url, opts = {}) => {
-      const u = String(url);
+      const u = metaVersData(String(url));
       // ⚠️ On sert la VRAIE forme d'un échec : 522 + HTML, pas un JSON d'erreur.
       if (quiEchoue && u.includes(quiEchoue) && (opts.method || 'GET') === 'GET') {
         return { ok: false, status: 522, json: async () => { throw new Error('HTML'); }, text: async () => '<html>522</html>', headers: { get: () => 'text/html' } };

@@ -1,5 +1,6 @@
 // Banc : aucun écran vide, aucun débordement horizontal, aucune erreur.
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { metaVersData } = require('./_meta.cjs');
 const fs=require('fs'), http=require('http'), path=require('path');
 // ⚠️⚠️ JAMAIS UN CHEMIN ABSOLU ICI. La méthode de preuve du dossier (§6.1)
 // extrait le code d'AVANT dans /tmp/avN, y copie le banc et le lance DEPUIS
@@ -79,7 +80,7 @@ const TABS=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','pl
       if (t3 === 'image' || t3 === 'media' || t3 === 'font') return r3.abort();
       return r3.continue();
     });
-    await pg.route('**/rest/v1/**',route=>{const u=route.request().url();
+    await pg.route('**/rest/v1/**',route=>{const u=metaVersData(route.request().url());
       const j=d=>route.fulfill({status:200,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:JSON.stringify(d)});
       if(/select=owner/.test(u)) return route.fulfill({status:400,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:'{"m":1}'});
       if(/\/rest\/v1\/vinted_accounts/.test(u)) return j(accounts);

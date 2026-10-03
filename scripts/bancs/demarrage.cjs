@@ -16,6 +16,7 @@
 //  Aucune fixture : tout est synthétique.
 // ════════════════════════════════════════════════════════════════════════════
 const { chromium } = require('playwright');
+const { metaVersData } = require('./_meta.cjs');
 const http = require('http'), fs = require('fs'), path = require('path');
 
 const DIST = path.join(__dirname, '..', '..', 'dist');   // jamais un chemin absolu (§6.1)
@@ -49,7 +50,7 @@ async function ouvrir(ctx, { sondeKO = false, ventesKO = false, nVentes = 300 } 
   await pg.route('**/auth/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json',
     body: JSON.stringify({ access_token: JETON, refresh_token: 'r', expires_in: 3600, user: SESSION.user }) }));
   await pg.route('**/rest/v1/**', (r) => {
-    const u = decodeURIComponent(r.request().url());
+    const u = decodeURIComponent(metaVersData(r.request().url()));
     const h = r.request().headers();
     const json = (d, extra) => r.fulfill({ status: 200, contentType: 'application/json', headers: Object.assign({ 'access-control-allow-origin': '*' }, extra || {}), body: JSON.stringify(d) });
     if (/select=owner/.test(u)) return sondeKO ? r.fulfill({ status: 502, contentType: 'text/html', body: '<html>502</html>' }) : json([]);
