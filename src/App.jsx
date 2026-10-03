@@ -23568,7 +23568,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         </span>
                         <span style={{display:'block',fontSize:12.5,color:c.unread?C.text:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',marginTop:2}}>{c.description||''}</span>
                       </span>
-                      {c.unread && <span aria-label="non lu" style={{width:8,height:8,borderRadius:4,background:C.accent,flexShrink:0}}/>}
+                      {c.unread && <span aria-label="non lu" style={{width:8,height:8,borderRadius:999,background:C.accent,flexShrink:0}}/>}
                     </button>
                   );
                 })}
