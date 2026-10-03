@@ -3771,6 +3771,40 @@ il l'a redemandé.
   exécute la vraie fonction (12 contrôles, réaffaiblie → rouge) ;
   `bancs/rapport.cjs` sert une vente vendue le mois dernier et versée ce mois.
 
+### ⚠️⚠️ « 300 NOTIFS », « COMME SI JE DÉBUTAIS », « ÇA TÉLÉCHARGE » (3 octobre)
+Trois plaintes de Julien, **une cause racine pour les deux premières** :
+- ⚠️⚠️ **LES EFFETS DE L'APP PARTAIENT AVANT LA SESSION.** La porte de connexion
+  était vérifiée à la FIN du composant `App`, après la déclaration de ses effets :
+  au montage, comptes, ligne `main`, ventes LBC/eBay étaient lus **avec la clé
+  publique**. Base cloisonnée ⇒ RLS répond `[]` **sans erreur** ⇒ boutique vide,
+  « Bienvenue — il reste une chose à brancher » après chaque reconnexion, et
+  rien ne se relisait ensuite. Mesuré au banc : **22 lectures anonymes** à
+  chaque ouverture. ⇒ `App` n'est plus que la porte ; `AppCoeur` ne monte
+  qu'avec une session prête, et `key = user.id` (changer de vendeur remonte tout
+  à neuf). **Ne jamais remettre un effet de données dans `App`.**
+- **La sonde de schéma rendait `false` sur tout échec** (502, > 4 s) ⇒ lecture
+  anonyme. Trois états (200 oui · 400 non · reste = pas su), 3 essais, et le
+  résultat est **mémorisé sur l'appareil** (`schema_cloisonne` : on ne
+  dé-cloisonne jamais une base). `sbAuth` passe le jeton dès qu'il y a une
+  session, cloisonné ou non.
+- **« ~300 notifications »** : les nouvelles ventes se comptaient par
+  **différence de total** avec l'ouverture précédente ; une ouverture qui avait
+  lu `[]` mémorisait 0. Elles se comptent maintenant par **identité**
+  (`vinted_notif_seen_ventes`, transactions vues, qui ne fait que grandir), le
+  mémo des conversations **fusionne** au lieu d'être reconstruit, et le
+  « déjà montré » ne se pose qu'en fin de passage (un passage interrompu le
+  consommait : une vraie nouvelle vente n'était jamais annoncée).
+- **`cloudLoad` : trois états.** Un échec rendait `null` comme « pas de ligne »,
+  et l'appelant **poussait les données du navigateur dans le nuage**. Échec ⇒
+  `undefined` ⇒ on réessaie (2 → 30 s), rien n'est poussé.
+- **Imprimer un bordereau sur ordinateur le téléchargeait** (et l'iframe cachée
+  qui devait imprimer ne charge pas la visionneuse PDF de Chrome). Il s'ouvre
+  dans un **onglet réservé au clic** (`data-imprime`, sinon le navigateur bloque
+  l'ouverture faite ~1 s plus tard) ; le bouton « Ouvrir » de la modale n'a plus
+  `download`.
+- Bancs : `demarrage.cjs` (5 rouges sur l'avant, dont la phrase exacte qu'il a
+  vue) · `ventes-bordereau.cjs` + onglet ouvert / aucun téléchargement (4 rouges).
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par

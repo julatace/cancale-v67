@@ -334,15 +334,44 @@ const writeSession = (s) => {
 // avant (clé publique, ligne « main » partagée). Envoyer une colonne `owner`
 // inexistante ferait échouer toutes les sauvegardes ; se croire cloisonné alors
 // qu'on ne l'est pas serait pire encore.
-let CLOISONNE = false;
-let SB_CONFLICT = 'id';
-const detectSchema = async () => {
+// ⚠️⚠️ 3 OCTOBRE — « PAS SU » LISAIT EN ANONYME, ET L'APP SE CROYAIT VIDE.
+// La sonde rendait `false` sur TOUT échec (502, réseau, ou plus de 4 s au
+// démarrage). Or la base EST cloisonnée : en se croyant non cloisonnée, l'app
+// lisait avec la clé publique, que RLS filtre en `[]` SANS ERREUR. Conséquences
+// mesurées le 2-3 octobre, base qui répondait 502 :
+//   · « installe l'extension, comme si je débutais » (zéro compte lu) ;
+//   · « ~300 notifications » à l'ouverture suivante (le centre avait mémorisé
+//     « 0 vente », puis comptait toutes les ventes comme nouvelles).
+// Trois états, jamais deux : seul un 400 PostgREST dit « colonne absente » ;
+// une réponse 2xx dit « cloisonnée » ; tout le reste est « pas su ». Et la
+// migration est un aller SIMPLE (on ne dé-cloisonne jamais une base) : le
+// dernier résultat connu est gardé sur l'appareil (clé hors `vrm_`/`vinted_`,
+// donc conservée au changement de vendeur — elle ne dit rien de personne).
+const SCHEMA_MEMO = 'schema_cloisonne';
+let CLOISONNE = (() => { try { return localStorage.getItem(SCHEMA_MEMO) === '1'; } catch (_) { return false; } })();
+let SB_CONFLICT = CLOISONNE ? 'owner,id' : 'id';
+const sondeSchema = async () => {
   try {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?select=owner&limit=1`, {
       headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
     });
-    CLOISONNE = r.ok;                       // 400 « column does not exist » → pas encore migré
-  } catch (_) { CLOISONNE = false; }
+    if (r.ok) return true;
+    if (r.status === 400) return false;     // « column does not exist » → pas encore migré
+    return null;                            // 5xx, 401… : pas su
+  } catch (_) { return null; }
+};
+const detectSchema = async () => {
+  let v = null;
+  for (let essai = 0; essai < 3 && v === null; essai++) {
+    if (essai) await new Promise(r => setTimeout(r, 600 * essai));
+    v = await sondeSchema();
+  }
+  if (v !== null) {
+    CLOISONNE = v;
+    try { if (v) localStorage.setItem(SCHEMA_MEMO, '1'); else localStorage.removeItem(SCHEMA_MEMO); } catch (_) {}
+  }
+  // Pas su et rien de mémorisé : on garde la valeur courante (le repli
+  // historique). Une session existante passe quand même son jeton (sbAuth).
   SB_CONFLICT = CLOISONNE ? 'owner,id' : 'id';
   return CLOISONNE;
 };
@@ -352,7 +381,10 @@ const sbAuth = (extra) => {
   // migration on garde la clé publique : le rôle « connecté » n'a pas forcément
   // les mêmes autorisations, et on ne prend pas le risque de casser les
   // sauvegardes pour un gain nul (il n'y a rien à cloisonner encore).
-  const useUser = MULTI_USER && CLOISONNE && AUTH.session && AUTH.session.access_token;
+  // ⚠️ 3 octobre : une session ouverte passe TOUJOURS son jeton. Le conditionner
+  // à CLOISONNE faisait lire en anonyme dès que la sonde de schéma échouait —
+  // et une base cloisonnée répond alors `[]` sans erreur (boutique « vide »).
+  const useUser = MULTI_USER && AUTH.session && AUTH.session.access_token;
   const tok = useUser ? AUTH.session.access_token : SUPABASE_KEY;
   return Object.assign({ apikey: SUPABASE_KEY, Authorization: `Bearer ${tok}` }, extra || {});
 };
@@ -661,7 +693,7 @@ const authSignOut = () => { writeSession(null); wipeLocalData(); };
 // le cloud sous SON compte. On efface donc toutes les clés de données quand
 // l'identité change (on garde les préférences d'affichage, elles ne trahissent
 // personne).
-const KEEP_ON_SWITCH = ['vinted_dark', SESSION_KEY];
+const KEEP_ON_SWITCH = ['vinted_dark', SESSION_KEY, 'schema_cloisonne'];
 const wipeLocalData = () => {
   try {
     const doomed = [];
@@ -699,10 +731,11 @@ const authBoot = async () => {
   //   Au-delà, on garde le comportement d'aujourd'hui (non cloisonné), qui est
   //   le repli sûr décrit dans CLAUDE.md.
   if (MULTI_USER) loadAuthSettings();
-  await Promise.race([
-    detectSchema(),
-    new Promise(r => setTimeout(r, 4000)),
-  ]);
+  // Base déjà connue comme cloisonnée sur cet appareil : on ne l'attend plus
+  // (la sonde tourne en fond). Sinon on l'attend un peu plus longtemps — ses
+  // trois essais servent justement les jours où la base traîne.
+  if (CLOISONNE) detectSchema();
+  else await Promise.race([detectSchema(), new Promise(r => setTimeout(r, 6000))]);
   if (!MULTI_USER) { AUTH = { ...AUTH, ready: true }; _emitAuth(); return; }
   // Retour de Google / Discord / d'un lien email : ça prime sur tout le reste.
   try { AUTH_REDIRECT = await consumeAuthRedirect(); } catch (_) { AUTH_REDIRECT = null; }
@@ -1026,16 +1059,22 @@ const load = (k,d) => {
 let _pendingBordPrint = false;
 
 // Recupere TOUT le contenu du cloud (au demarrage)
+// ⚠️ TROIS ÉTATS (3 octobre) : un objet = lu · `null` = la ligne n'existe pas
+// (vrai premier jour) · `undefined` = la base n'a pas répondu. Avant, un échec
+// rendait `null` comme « pas de ligne », et l'appelant concluait « cloud vide :
+// j'y envoie les données de ce navigateur » — un appareil périmé pouvait donc
+// RÉÉCRIRE le nuage sur un simple 502. Rien lu ne vaut pas rien.
 const cloudLoad = async () => {
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${SUPABASE_ROW}&select=data`, {
       headers: sbAuth(),
     });
-    if (!res.ok) return null;
+    if (!res.ok) return undefined;
     const rows = await res.json();
-    if (rows && rows[0] && rows[0].data) return rows[0].data;
+    if (!Array.isArray(rows)) return undefined;
+    if (rows[0] && rows[0].data) return rows[0].data;
     return null;
-  } catch (_) { return null; }
+  } catch (_) { return undefined; }
 };
 
 // Envoie TOUT le contenu local vers le cloud (groupe, differe)
@@ -28050,14 +28089,37 @@ function RegimeSetting() {
   );
 }
 
+// ══════════════════════════════════════════════════════════════════════════
+// ⚠️⚠️ LA PORTE D'ENTRÉE PASSE AVANT LE CŒUR (3 octobre)
+// ══════════════════════════════════════════════════════════════════════════
+// La porte de connexion était vérifiée À LA FIN du composant de l'app — donc
+// APRÈS la déclaration de tous ses effets. Or un effet tourne au montage, que
+// l'écran affiche l'app ou la page de connexion : les premières lectures
+// (comptes Vinted, ligne `main`, ventes Leboncoin/eBay) partaient AVANT que la
+// session soit chargée, avec la clé publique. Sur une base cloisonnée, RLS
+// répond `[]` sans erreur : l'app se croyait vide et le restait — « quand je
+// me suis reconnecté, ça m'a redit d'installer l'extension, comme si je
+// débutais » (Julien, 3 oct.), et un nouveau compte « prenait beaucoup trop de
+// temps à charger ». Mesuré au banc `demarrage.cjs` : 5 lectures anonymes à
+// chaque ouverture.
+// ⇒ Le cœur ne monte QU'UNE FOIS la session prête, et il est remonté à neuf
+//   quand le vendeur change (`key`) : rien d'un compte ne survit dans l'autre.
 export default function App() {
-  // ── PORTE D'ENTRÉE (multi-vendeurs) ─────────────────────────────────────
+  const [authState,setAuthState]=useState(AUTH);
+  React.useEffect(()=>{ const off=onAuthChange(setAuthState); authBoot(); return off; },[]);
+  if (MULTI_USER && !authState.ready) return <div style={{minHeight:'100vh',background:C.bg}}/>;
+  const bypass = !CLOISONNE && (() => { try { return localStorage.getItem('vrm_acces_direct') === '1'; } catch (_) { return false; } })();
+  if (MULTI_USER && !bypass && (!authState.session || RECOVERY_PENDING)) return <AuthScreen/>;
+  return <AppCoeur key={(authState.user && authState.user.id) || 'local'}/>;
+}
+
+function AppCoeur() {
   // En mode solo (MULTI_USER=false) `authState.ready` est vrai d'emblée et
   // l'app démarre directement : rien ne change pour un usage à un seul vendeur.
   const [authState,setAuthState]=useState(AUTH);
   // Ordinateur ou téléphone : décide la NAVIGATION et la largeur de lecture.
   const ordi = useOrdinateur();
-  React.useEffect(()=>{ const off=onAuthChange(setAuthState); authBoot(); return off; },[]);
+  React.useEffect(()=>onAuthChange(setAuthState),[]);
   // Clé du widget iPhone : créée une seule fois, après le chargement du cloud
   // (sinon chaque appareil en générerait une différente et se voleraient la
   // place à tour de rôle).
@@ -28477,7 +28539,14 @@ export default function App() {
     const off = onSyncChange((st)=>{ if(!stop){ setSyncStatus(st); if(st==='synced') setLastSync(new Date()); } });
     setSyncStatus('loading');
     (async () => {
-      const cloud = await cloudLoad();
+      // La base n'a pas répondu : on RÉESSAIE (2 s, 4 s, 8 s… plafonné à 30 s)
+      // au lieu de conclure « nuage vide ». Rien n'est poussé entre-temps.
+      let cloud = await cloudLoad();
+      for (let attente = 2000; cloud === undefined && !stop; attente = Math.min(attente * 2, 30000)) {
+        setSyncStatus('error');
+        await new Promise(r => setTimeout(r, attente));
+        if (!stop) cloud = await cloudLoad();
+      }
       if (stop) return;
       if (cloud && Object.keys(cloud).length > 0) {
         // 1) On restaure D'ABORD TOUTES les clés synchronisées dans le localStorage,
@@ -28876,8 +28945,6 @@ export default function App() {
     // la 1ʳᵉ exécution sortait à `if(cancelled) return`, et la 2ᵉ sortait
     // immédiatement sur le drapeau → **la cloche restait vide pour toujours**.
     // Mesuré en base au même moment : 37 messages non lus et 6 ventes à expédier.
-    const dejaVu = vintedNotifChecked.current;
-    vintedNotifChecked.current = true;
     let cancelled=false;
     (async()=>{
       // Messages : on ne signale QUE le NOUVEAU depuis la dernière ouverture.
@@ -28889,11 +28956,16 @@ export default function App() {
       // cette logique, on initialise en silence (on ne re-nag pas sur l'existant).
       const seenConvs = load('vinted_notif_seen_convs', {});
       const firstMsgRun = localStorage.getItem('vinted_notif_seen_convs')===null;
-      const nextSeen = {}; // reconstruit à chaque passage -> se purge tout seul
+      // ⚠️ 3 octobre : on FUSIONNE, on ne reconstruit plus. Reconstruit à partir
+      // de ce qu'on vient de lire, le mémo PERDAIT les conversations d'un compte
+      // dont la lecture avait échoué — et au passage suivant elles re-sonnaient
+      // toutes comme « nouvelles ». Rien lu ne vaut pas rien.
+      const nextSeen = { ...seenConvs };
       const nums = load('vinted_annonce_numeros', {}); // pour repérer les annonces sans N°
       const acctLabels = load('vinted_account_labels', {}); // pour dire SUR QUEL COMPTE aller voir
       const ageDays=(it)=>{ let ts=null; if(it.createdTs!=null) ts=it.createdTs<1e12?it.createdTs*1000:it.createdTs; else { const e=nums[it.id]; if(e&&e.numberedAt){ const d=new Date(e.numberedAt).getTime(); if(!isNaN(d)) ts=d; } } return ts!=null?Math.floor((Date.now()-ts)/86400000):null; };
-      let newMsgs=0, salesCount=0, unreadTotal=0, toShipCount=0, sleepCount=0, noNumCount=0;
+      let newMsgs=0, unreadTotal=0, toShipCount=0, sleepCount=0, noNumCount=0;
+      const venteIds=[]; // identités (transaction) des ventes lues — jamais un total
       // ⚠️ DEUX PAIRES AVEC LE MÊME NUMÉRO = la mauvaise chaussure dans le carton
       // (§19, le risque n°1). C'est signalé sur l'écran Annonces, mais il faut y
       // aller pour le voir. Mesuré le 23 août : le N°4 était porté par DEUX
@@ -28928,7 +29000,7 @@ export default function App() {
         }
         const sold=await fetchHarvestOrders(a.vinted_user_id,'sold');
         if(sold && Array.isArray(sold.my_orders)){
-          salesCount += sold.my_orders.filter(o=>classifyOrderStatus(o.status)!=='cancelled').length;
+          sold.my_orders.forEach(o=>{ if(o && o.transaction_id!=null && classifyOrderStatus(o.status)!=='cancelled') venteIds.push(String(o.transaction_id)); });
           toShipCount += sold.my_orders.filter(o=>needsBordereau(o.status) && !shipDoneN[String(o.transaction_id)]).length;
         }
         // Annonces en ligne (moisson, 0 requête) : compte celles qui DORMENT
@@ -29028,12 +29100,28 @@ export default function App() {
         if(j<=3) items.push({icon:'🧾', ic:'receipt', text:`Nouveau mois : pense à ta déclaration URSSAF`, n:1, tab:'dashboard'});
       }
       setNotifItems(items);
-      save('vinted_notif_seen_convs',nextSeen);
-      const prevS=parseInt(localStorage.getItem('vinted_notif_last_vsales')||'-1',10);
-      const newSales = prevS<0 ? 0 : Math.max(0, salesCount-prevS);
-      save('vinted_notif_last_vsales',salesCount);
+      // Le mémo des conversations reste borné (les plus récentes gardées).
+      { const ks=Object.keys(nextSeen); if(ks.length>4000){ const garde={}; ks.slice(-4000).forEach(k=>{ garde[k]=nextSeen[k]; }); save('vinted_notif_seen_convs',garde); } else save('vinted_notif_seen_convs',nextSeen); }
+      // ⚠️⚠️ « ~300 NOTIFICATIONS À L'OUVERTURE » (3 octobre). Les nouvelles
+      // ventes se comptaient par DIFFÉRENCE DE TOTAL avec la dernière
+      // ouverture : une ouverture où la lecture avait échoué (ou lu en anonyme,
+      // donc `[]`) mémorisait 0, et la suivante annonçait toutes les ventes
+      // comme nouvelles. Une vente a une IDENTITÉ — sa transaction : est
+      // nouvelle celle qu'on n'a jamais vue, et le mémo ne fait que GRANDIR
+      // (une lecture ratée ne lui retire rien). Premier passage : silencieux.
+      const seenV = load('vinted_notif_seen_ventes', null);
+      const vuesV = new Set(Array.isArray(seenV) ? seenV.map(String) : []);
+      const newSales = seenV==null ? 0 : venteIds.filter(id=>!vuesV.has(id)).length;
+      venteIds.forEach(id=>vuesV.add(id));
+      save('vinted_notif_seen_ventes', [...vuesV].slice(-6000));
       // Le bandeau ne s'affiche qu'à la PREMIÈRE passe : un recalcul déclenché
       // par un rafraîchissement de comptes ne doit pas re-sonner.
+      // ⚠️ Le « déjà montré » ne se pose qu'ICI, une fois le passage ARRIVÉ au
+      // bout. Posé au début (avant), un premier passage interrompu par un
+      // rafraîchissement des comptes le consommait : le second calculait bien
+      // la nouvelle vente… et ne la montrait jamais (banc `demarrage.cjs`).
+      const dejaVu = vintedNotifChecked.current;
+      vintedNotifChecked.current = true;
       if(!dejaVu && (newMsgs>0 || newSales>0)){
         setVintedNotif({messages:newMsgs, ventes:newSales});
         if(notifEnabled){
