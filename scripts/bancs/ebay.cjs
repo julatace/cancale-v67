@@ -120,26 +120,12 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
     const { pg, errs } = await ouvrir('/sl/sell');
     await pg.waitForTimeout(3000);
 
-    dit(await pg.locator('#vrm-ebay').count() === 1, 'le panneau VRM est bien là');
-    await pg.click('#vrm-ebay [data-a="toggle"]');
-    await pg.waitForTimeout(800);
-    const txt = await pg.locator('#vrm-ebay').innerText();
-    dit(/N°101/.test(txt), 'il liste la paire cochée', txt.split('\n')[1] || '');
-    dit(/1 paire cochée pour eBay/.test(txt), 'et il dit combien', '');
-
-    // ⚠️ ET IL DIT COMBIEN IL A ÉCARTÉ : une file qui rétrécit sans explication se
-    //    lit comme une perte. Mesuré sur ses vraies données : 14 des 53 annonces
-    //    « en ligne » sont prouvées vendues.
-    dit(/2 paires déjà vendues/.test(txt), 'il dit combien de paires vendues sont écartées',
-      (txt.match(/.{0,40}vendue.{0,40}/) || ['(rien)'])[0]);
-    // ⚠️ ONZIÈME FOIS QU'UN DE MES CONTRÔLES CRIE AU LOUP, et c'est la même
-    //    erreur que sur `leboncoin.cjs` : mon premier jet interdisait le MOT
-    //    « télécharg », et il attrapait la phrase HONNÊTE que je venais
-    //    d'écrire — « rien n'est téléchargé sur ton ordinateur ». Ce qui est
-    //    interdit n'est pas un mot mais l'INSTRUCTION d'aller chercher un
-    //    dossier sur son disque. *La donnée déclenche, jamais la formulation.*
-    dit(!/dossier/i.test(txt), 'et il ne l\'envoie plus chercher un dossier sur son disque',
-      (txt.match(/.{0,50}dossier.{0,30}/i) || [''])[0]);
+    // ── PLUS AUCUN PANNEAU (5.130) : la liste vit dans l'app, qui commande
+    //    « Préparer sur eBay » (audit-publier-app.cjs). Ici il ne reste que le
+    //    remplissage de la mise en vente — et la page ne recalcule plus la file.
+    dit(await pg.locator('#vrm-ebay').count() === 0, 'aucun panneau VRM sur la page eBay');
+    const demandes = await pg.evaluate(() => window.__vrmEnvois || []);
+    dit(!demandes.includes('getQueue'), 'et la page ne charge plus la file', demandes.join(', '));
 
     const lire = () => pg.evaluate(() => {
       const texte = (el) => (el && el.selectedIndex >= 0 ? String(el.options[el.selectedIndex].textContent || '').trim() : '');
@@ -298,7 +284,8 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
       window.chrome = { runtime: { sendMessage(m, cb) {
         if (m.action === 'downloadPhotos') window.__dl++;
         const rep = m.action === 'getQueue' ? { ok: true, queue: [ad], retirees: 0, postedCount: 0, vendues: 0, echec: false }
-          : m.action === 'getPending' ? { ok: true, ad: null }
+          : m.action === 'getPending' ? { ok: true, ad }
+          : m.action === 'photoBytes' ? { ok: true, photos: [] }
           : { ok: true };
         if (typeof cb === 'function') setTimeout(() => cb(rep), 0);
       } } };
@@ -306,28 +293,18 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
     await pg.goto('http://localhost:4488/sl/sell', { waitUntil: 'domcontentloaded' });
     await pg.addScriptTag({ content: SRC });
     await pg.waitForTimeout(700);
-    await pg.click('#vrm-ebay [data-a="toggle"]');
-    await pg.waitForTimeout(600);
-    await pg.click('#vrm-ebay [data-a="csku"]');
+    // Le bandeau de la mise en vente garde « Copier la description » : c'est
+    // là que le presse-papier refusé doit retomber sur l'ancienne méthode.
+    await pg.waitForTimeout(1500);
+    await pg.click('#vrm-eb-cdesc');
     await pg.waitForTimeout(500);
-    dit(String(copie || '') === AD.sku, 'le presse-papier refusé retombe sur l\'ancienne méthode',
-      copie === null ? 'RIEN n\'a été copié, et le panneau annonçait « copié »' : 'copié : « ' + copie + ' »');
+    dit(String(copie || '') === AD.description, 'le presse-papier refusé retombe sur l\'ancienne méthode',
+      copie === null ? 'RIEN n\'a été copié, et le bandeau annonçait « copié »' : 'copié : « ' + String(copie).slice(0, 40) + ' »');
     const t3 = await pg.evaluate(() => (document.getElementById('vrm-ebay-toast') || {}).innerText || '');
-    dit(/VRM-101/.test(t3), 'et le message nomme la référence copiée', t3.slice(0, 60));
+    dit(/Description copiée/.test(t3), 'et le message dit ce qui a été copié', t3.slice(0, 60));
 
-    // « Tout préparer » : plus AUCUN téléchargement, et la paire est mémorisée.
-    copie = null;
-    await pg.click('#vrm-ebay [data-a="prepare"]');
-    await pg.waitForTimeout(700);
-    const fin = await pg.evaluate(() => ({
-      dl: window.__dl, ouvert: window.__vrmOuvert || '',
-      toast: (document.getElementById('vrm-ebay-toast') || {}).innerText || '',
-    }));
-    dit(fin.dl === 0, '« Tout préparer » ne télécharge RIEN sur son ordinateur',
-      fin.dl ? 'il a demandé ' + fin.dl + ' téléchargement(s)' : 'les photos partent par le formulaire');
-    dit(/VRM-101/.test(String(copie || '')), 'le texte préparé porte la référence VRM-101',
-      'sans elle, « vendue sur Vinted → retire-la » ne reconnaît plus l\'annonce');
-    dit(/3 photos prêtes/.test(fin.toast), 'et le message écrit le CHIFFRE des photos', fin.toast.slice(0, 80));
+    // « Préparer sur eBay » part de l'app (audit-publier-app.cjs) : plus de
+    // bouton ici, donc rien à télécharger ni à copier depuis la page.
     dit(errs.length === 0, 'aucune erreur non plus', errs.slice(0, 2).join(' | '));
     await pg.close();
   }

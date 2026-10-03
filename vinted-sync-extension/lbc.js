@@ -916,7 +916,7 @@
     // ⚠️ On exclut NOTRE PROPRE interface (bandeau/témoin VRM) : sinon la
     //   recherche du bouton « le plus bas » cliquerait un bouton de notre bandeau,
     //   pas celui de Leboncoin (le bandeau est en position fixe, tout en bas).
-    const NOTRE_UI = (el) => !!el.closest('#vrm-lbc-banner,#vrm-temoin-etape,#vrm-fab,#vrm-panel,#vrm-badge');
+    const NOTRE_UI = (el) => !!el.closest('#vrm-lbc-banner,#vrm-badge,[data-vrm]');
     const btns = Array.from(document.querySelectorAll('button,[role="button"],input[type="submit"]')).filter((el) => !DANS_ENTETE(el) && !NOTRE_UI(el));
     let publier = btns.find((b) => {
       if (!actif(b)) return false;

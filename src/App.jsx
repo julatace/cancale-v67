@@ -150,7 +150,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 //   releve  `capterReleves`       5.52.0  (5 sept.)   le relevé daté du porte-monnaie
 // `audit-coherence.cjs` vérifie que ces trois fonctions existent toujours dans
 // l'extension : une capacité annoncée mais retirée serait le même mensonge.
-const EXT_CAPACITES = { codes: '5.45.0', offres: '5.38.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', repond: '5.77.0', commande: '5.129.0', offresapp: '5.130.0' };
+const EXT_CAPACITES = { codes: '5.45.0', offres: '5.38.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', repond: '5.77.0', commande: '5.129.0', offresapp: '5.130.0', publication: '5.130.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -3126,11 +3126,15 @@ if (typeof window !== 'undefined') {
 // Ce qui empêche l'app de faire agir l'extension, au niveau de l'EXTENSION (pas
 // du compte) : la même raison pour toutes les ventes, donc dite UNE fois au
 // lieu d'être répétée sur chaque ligne (§7). `null` = rien ne bloque ici.
-function raisonExtGlobale(sansSouris) {
-  if (sansSouris) return { code: 'telephone', texte: "Depuis ton ordinateur : c'est là que tourne l'extension qui génère les bordereaux." };
-  if (!vmrExtPresent()) return { code: 'absente', texte: "Extension VRM pas détectée dans ce navigateur — c'est elle qui génère les bordereaux." };
+// `opt.cap` : la capacité qu'exige le geste (bordereau → `commande`, publier →
+// `publication`) ; `opt.role` : ce que fait l'extension, dit dans la phrase.
+function raisonExtGlobale(sansSouris, opt) {
+  const cap = (opt && opt.cap) || 'commande';
+  const role = (opt && opt.role) || 'génère les bordereaux';
+  if (sansSouris) return { code: 'telephone', texte: `Depuis ton ordinateur : c'est là que tourne l'extension qui ${role}.` };
+  if (!vmrExtPresent()) return { code: 'absente', texte: `Extension VRM pas détectée dans ce navigateur — c'est elle qui ${role}.` };
   if (__vmrEtat === null) return { code: 'muette', texte: "L'extension ne répond pas — recharge cette page (après une mise à jour), ou réactive-la dans chrome://extensions." };
-  if (extSait('commande') === 'retard') return { code: 'retard', texte: `Mets l'extension à jour (${EXT_ATTENDUE}) : celle installée ne sait pas encore recevoir les commandes de l'app.` };
+  if (extSait(cap) === 'retard') return { code: 'retard', texte: `Mets l'extension à jour (${EXT_ATTENDUE}) : celle installée ne sait pas encore recevoir cette commande de l'app.` };
   if (__vmrEtat === undefined) return { code: 'verif', texte: "Vérification de l'extension…" };
   const v = __vmrEtat.vrm;
   if (v && v.connecte === false) return { code: 'vrm', texte: "Connecte l'extension à ton compte VRM (clique sur son icône)." };
@@ -6472,6 +6476,68 @@ function BoutonBordereau({ uid, tx, login, aGenerer, pdf, onImprimer, onFait, gr
         </a>
       )}
     </span>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PUBLIER DEPUIS L'APP (5.130) — « c'est l'application qui contrôle l'extension »
+// ══════════════════════════════════════════════════════════════════════════════
+// Les panneaux sur leboncoin.fr et ebay.fr sont retirés : le geste vit ici. L'app
+// n'envoie qu'un IDENTIFIANT ; l'extension relit la paire dans SA file (vendue,
+// décochée ou preuve illisible → refusée), ouvre le dépôt et remplit — et sur
+// Leboncoin publie sans booster (décision du 20 septembre).
+// GRISÉ et jamais caché quand l'extension ne peut pas (§ BoutonBordereau) ; la
+// raison commune est dite UNE fois au-dessus de la liste (`RaisonPublication`).
+function BoutonPublier({ place, id }) {
+  const { jobs } = useExtVivante();
+  const sansSouris = useSansSouris();
+  const [refus, setRefus] = React.useState(null);
+  const [envoi, setEnvoi] = React.useState(false);
+  const lbc = place === 'lbc';
+  const jobId = (lbc ? 'lbc:' : 'ebay:') + id;
+  const job = jobs[jobId] || null;
+  const glob = raisonExtGlobale(sansSouris, { cap: 'publication', role: 'publie tes annonces' });
+  const fait = job && job.etape === 'fait';
+  const enCours = job && job.etape === 'depot' && (Date.now() - Number(job.at || 0) < 15 * 60000);
+  const lancer = async () => {
+    if (glob || envoi) return;
+    setRefus(null); setEnvoi(true);
+    const r = await vmrCmd({ cmd: lbc ? 'lbcPublier' : 'ebayPreparer', id: String(id) }, 30000);
+    setEnvoi(false);
+    if (!r) { setRefus("L'extension n'a pas répondu — recharge cette page et réessaie."); return; }
+    if (!r.accepte) { setRefus(r.raison || "Refusé par l'extension."); return; }
+    __vmrJobs[r.jobId] = { etape: r.etape, at: Date.now() };
+    __vmrNotifier();
+  };
+  const libelle = envoi ? 'Envoi…' : fait ? (lbc ? 'Publiée ✓' : 'Préparée ✓')
+    : enCours ? (lbc ? 'Publication en cours…' : 'Formulaire eBay ouvert')
+    : (lbc ? 'Publier sur Leboncoin' : 'Préparer sur eBay');
+  const grise = !!glob || fait;
+  return (
+    <span data-bouton-publier={glob ? 'grise' : fait ? 'fait' : enCours ? 'encours' : 'pret'} data-id={id}
+      style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3, maxWidth: '100%' }}>
+      <button type="button" onClick={lancer} aria-disabled={grise ? 'true' : undefined}
+        title={glob ? glob.texte : lbc ? "L'extension ouvre Leboncoin, remplit tout (photos, titre, description, prix, catégorie) et publie sans option payante" : "L'extension ouvre la mise en vente eBay et remplit ce qu'elle reconnaît — tu relis et tu mets en vente"}
+        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, borderRadius: 8, fontFamily: 'inherit', fontWeight: 600, fontSize: 12.5,
+          padding: '7px 11px', whiteSpace: 'nowrap', cursor: grise ? 'not-allowed' : 'pointer',
+          border: `1px solid ${glob ? C.border : C.accent}`, background: glob ? 'transparent' : (fait ? 'transparent' : `${C.accent}14`),
+          color: glob ? C.muted : C.accent, opacity: glob ? 0.55 : 1, filter: glob ? 'grayscale(1)' : 'none' }}>
+        {libelle}
+      </button>
+      {refus && <span style={{ fontSize: 11, color: C.warn, lineHeight: 1.35, whiteSpace: 'normal' }}>{refus}</span>}
+    </span>
+  );
+}
+function RaisonPublication({ n, place }) {
+  const sansSouris = useSansSouris();
+  useExtVivante();
+  const r = raisonExtGlobale(sansSouris, { cap: 'publication', role: 'publie tes annonces' });
+  if (!r || !n) return null;
+  return (
+    <div data-raison-publier={r.code} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12.5, color: C.text, background: C.card,
+      border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.warn}`, borderRadius: 10, padding: '9px 12px', marginBottom: 10, lineHeight: 1.45 }}>
+      <span><b>Publier sur {place === 'lbc' ? 'Leboncoin' : 'eBay'}</b> — {r.texte}</span>
+    </div>
   );
 }
 
@@ -23075,7 +23141,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       logo LBC : jamais un faux « publiée ». */}
                   <span style={{display:'inline-flex',alignItems:'center',gap:4}}>
                     <PlateformeLogo p="vinted" title="En ligne sur Vinted"/>
-                    {lbcPosted.has(String(item.id)) && <PlateformeLogo p="lbc" title="Tu l'as marquée publiée sur Leboncoin (bouton « ✓ Je l'ai déjà publiée » du panneau). Elle est donc sur Vinted ET sur Leboncoin."/>}
+                    {lbcPosted.has(String(item.id)) && <PlateformeLogo p="lbc" title="Publiée sur Leboncoin (par l'extension, ou marquée « Déjà publiée » dans VRM). Elle est donc sur Vinted ET sur Leboncoin."/>}
                   </span>
                   {/* La paire qui DORT : en ligne depuis longtemps sans partir.
                       Le CHIFFRE (jours en ligne), pas une promesse — l'âge vient
@@ -25409,6 +25475,37 @@ function LbcRelier({ ad, numsConnus, onRelie }) {
   );
 }
 const MAIN_LEBONCOIN = ['vinted_annonce_numeros', 'vinted_accounts_hidden', 'vinted_accounts_blocked', 'vinted_pairs_lost', 'vrm_lbc_liens'];
+// La limite d'annonces de son offre Leboncoin (le compteur la compare au nombre
+// en ligne). Elle se réglait dans le panneau sur leboncoin.fr, retiré en 5.130 :
+// elle se règle ici, et c'est l'extension qui l'écrit (propriétaire de la ligne
+// `vinted_lbc_posted`, §11).
+function QuotaLbc({ limit, plan, onFait }) {
+  const [ouvert, setOuvert] = React.useState(false);
+  const [v, setV] = React.useState(limit ? String(limit) : '');
+  const [msg, setMsg] = React.useState(null);
+  const cap = extSait('publication');
+  if (cap !== 'ok') return limit ? null : <div style={{ fontSize: 11, color: C.muted, marginTop: 6 }}>La limite de ton offre se règle ici depuis l'ordinateur où l'extension {cap === 'retard' ? `est installée, une fois passée en ${EXT_CAPACITES.publication}` : 'est installée'}.</div>;
+  const enregistrer = async () => {
+    setMsg(null);
+    const r = await vmrCmd({ cmd: 'lbcQuota', limit: v, plan: plan || '' });
+    if (r && r.accepte) { setOuvert(false); onFait && onFait(); } else setMsg((r && r.raison) || "L'extension n'a pas répondu — réessaie.");
+  };
+  if (!ouvert) return (
+    <button type="button" onClick={() => setOuvert(true)} style={{ marginTop: 6, border: 'none', background: 'transparent', padding: 0, minHeight: 0, color: C.accent, fontSize: 11.5, fontWeight: 600, cursor: 'pointer' }}>
+      {limit ? 'Changer la limite de mon offre' : 'Indiquer la limite de mon offre Leboncoin'}
+    </button>
+  );
+  return (
+    <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8, flexWrap: 'wrap' }}>
+      <input value={v} onChange={(e) => setV(e.target.value.replace(/[^0-9]/g, '').slice(0, 4))} inputMode="numeric" placeholder="ex. 50"
+        style={{ width: 80, padding: '7px 9px', borderRadius: 8, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 13, fontFamily: 'inherit' }}/>
+      <span style={{ fontSize: 12, color: C.muted }}>annonces au maximum</span>
+      <button type="button" onClick={enregistrer} style={{ border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 8, padding: '7px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Enregistrer</button>
+      {msg && <span style={{ fontSize: 11, color: C.warn, width: '100%' }}>{msg}</span>}
+    </div>
+  );
+}
+
 function LeboncoinScreen() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -25643,6 +25740,15 @@ function LeboncoinScreen() {
     setLoading(false);
   };
   useEffect(() => { reload(); /* eslint-disable-next-line */ }, []);
+  // L'extension prévient quand une paire vient d'être publiée (ou marquée) :
+  // la file se relit toute seule.
+  useEffect(() => {
+    const f = (e) => { const d = e && e.detail; if (d && d.type === 'maj' && d.quoi === 'lbc') reload(); };
+    window.addEventListener('vrm:ext', f);
+    return () => window.removeEventListener('vrm:ext', f);
+    /* eslint-disable-next-line */
+  }, []);
+  const marquer = async (id) => { const r = await vmrCmd({ cmd: 'lbcMarque', id: String(id), etat: 'posted' }); if (r && r.accepte) reload(); };
   const n = data ? Math.max(data.postedCount, data.lbcCount) : 0;
   const lim = data ? (data.limit || null) : null;
   const pct = lim ? Math.min(100, Math.round((n / lim) * 100)) : 0;
@@ -25651,7 +25757,7 @@ function LeboncoinScreen() {
   return (
     <div style={{ padding: '16px 14px 40px', maxWidth: 600, margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-        <h2 style={{ fontSize: 18, fontWeight: 800, color: C.text, margin: 0 }}>🟠 Leboncoin</h2>
+        <h2 style={{ fontSize: 18, fontWeight: 700, color: C.text, margin: 0 }}>À publier sur Leboncoin</h2>
         <button onClick={reload} style={{ background: 'transparent', border: `1px solid ${C.border}`, borderRadius: 999, padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: C.text }}>{loading ? '…' : '↻ Actualiser'}</button>
       </div>
       {/* ══════════════════════════════════════════════════════════════════════
@@ -25682,6 +25788,8 @@ function LeboncoinScreen() {
         const coupes = PIECES.filter(([k]) => aPiece(k) === 'coupe').length;
         const pastille = (e) => e === 'ok' ? { t: '✓', c: INV_STATUS.online.color } : e === 'coupe' ? { t: '⚠', c: C.warn } : { t: '·', c: C.muted };
         // Le geste : un seul, celui qui débloque le plus. Jamais une liste.
+        // Tout reçu : la carte n'a plus rien à apprendre — elle disparaît (§7).
+        if (p && p.majAt && ['codes', 'config', 'prerempli', 'soumission'].every((k) => { const m = morceaux[k]; return m && m.taille > 0 && !m.coupe; })) return null;
         const geste = p === null ? null
           : !p.majAt ? { q: 'Mets l’extension à jour, puis passe une fois sur leboncoin.fr.', d: 'Rien n’a encore été relevé : c’est la visite qui déclenche tout.' }
           : aPiece('codes') !== 'ok' ? { q: 'Passe une fois sur leboncoin.fr.', d: 'Leboncoin envoie ses codes au chargement — l’extension les attrape au passage.' }
@@ -25718,11 +25826,7 @@ function LeboncoinScreen() {
                 <b>{geste.q}</b> <span style={{ color: C.muted }}>{geste.d}</span>
               </div>
             )}
-            {p !== null && !geste && (
-              <div style={{ fontSize: 12, color: C.text }}>
-                J’ai tout ce qu’il me faut pour préparer le remplissage. <span style={{ color: C.muted }}>C’est toi qui cliqueras « Publier » — rien ne part tout seul.</span>
-              </div>
-            )}
+
           </Card>
         );
       })()}
@@ -25741,11 +25845,13 @@ function LeboncoinScreen() {
           du premier jet d'`extSaitLireCodes` (« l'extension la plus en retard
           était la seule à ne rien déclencher »), et l'écran Annonces, lui,
           traitait déjà les trois. *« Pas su » ne vaut pas « oui ».* */}
-      <div style={{ fontSize: 12, color: C.muted, marginBottom: 14, lineHeight: 1.5 }}>La file de publication est construite à partir de tes <b>annonces réellement en ligne sur Vinted</b> (comptes actifs uniquement, paires retirées exclues). {(() => {
-        const e = extSait('photoslbc');
-        if (e === 'ok') return <>La <b>publication</b> se fait via l'extension sur leboncoin.fr, bouton « 🚀 Tout préparer » : <b>photos attachées au formulaire</b> (rien sur ton ordinateur), texte copié, champs remplis — tu valides.</>;
-        if (e === 'retard') return <>La <b>publication</b> se fait via l'extension sur leboncoin.fr, bouton « 🚀 Tout préparer » : photos téléchargées dans un dossier, texte copié, formulaire pré-rempli — tu valides. À partir de la <b>{EXT_CAPACITES.photoslbc}</b> elles s'attachent directement au formulaire : mets-la à jour depuis <b>Réglages</b>.</>;
-        return <>La <b>publication</b> se fait depuis l'ordinateur où l'extension est installée : c'est elle qui prépare chaque annonce sur leboncoin.fr. Cette liste, elle, se consulte de partout.</>;
+      <div style={{ fontSize: 12, color: C.muted, marginBottom: 14, lineHeight: 1.5 }}>La file est construite à partir de tes <b>annonces réellement en ligne sur Vinted</b> (comptes actifs uniquement, paires retirées exclues). {(() => {
+        // Trois états, jamais deux (§ extSait) — et la phrase suit la version
+        // INSTALLÉE : c'est l'extension qui publie, avec SA règle.
+        const e = extSait('publication');
+        if (e === 'ok') return <>Chaque paire a son bouton <b>« Publier sur Leboncoin »</b> : l'extension ouvre le dépôt, attache les photos, remplit tout et publie <b>sans option payante</b>.</>;
+        if (e === 'retard') return <>Le bouton <b>« Publier sur Leboncoin »</b> arrive avec l'extension <b>{EXT_CAPACITES.publication}</b> : mets-la à jour depuis <b>Réglages</b>. En attendant, celle installée publie encore depuis son panneau sur leboncoin.fr.</>;
+        return <>La publication part de l'ordinateur où l'extension est installée : ouvre cet écran là-bas et clique « Publier » sur la paire. Cette liste, elle, se consulte de partout.</>;
       })()}</div>
 
       {/* COMPTES LEBONCOIN — plusieurs comptes possibles. On liste ceux que
@@ -25761,7 +25867,7 @@ function LeboncoinScreen() {
             const jours = vu ? Math.floor((Date.now() - vu.getTime()) / 86400000) : null;
             return (
               <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderTop: `1px solid ${C.border}` }}>
-                <span style={{ width: 30, height: 30, borderRadius: 999, flexShrink: 0, background: LBC_ORANGE + '18', color: LBC_ORANGE, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700 }}>
+                <span style={{ width: 30, height: 30, borderRadius: 999, flexShrink: 0, background: C.bg, border: `1px solid ${C.border}`, color: C.text, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700 }}>
                   {String(a.name || '?').slice(0, 1).toUpperCase()}
                 </span>
                 <span style={{ flex: 1, minWidth: 0 }}>
@@ -25795,7 +25901,8 @@ function LeboncoinScreen() {
           {lim ? (<>
             <div style={{ height: 8, borderRadius: 999, background: C.border, overflow: 'hidden', marginTop: 9 }}><div style={{ width: pct + '%', height: '100%', background: barCol, borderRadius: 999 }} /></div>
             <div style={{ fontSize: 11.5, fontWeight: 700, marginTop: 5, color: barCol }}>{n >= lim ? '⚠️ Limite atteinte' : n >= lim - 3 ? '⚠️ Tu approches de ta limite' : `Il te reste ${lim - n} annonce${lim - n > 1 ? 's' : ''}`}</div>
-          </>) : <div style={{ fontSize: 11, color: C.muted, marginTop: 6 }}>Définis ta limite d'offre dans le panneau VRM sur Leboncoin pour suivre ton quota.</div>}
+          </>) : null}
+          <QuotaLbc limit={lim} plan={data.plan} onFait={reload}/>
         </Card>
         {/* À retirer (vendues sur Vinted) */}
         {/* ⚠️⚠️ « VENDUE » SE PROUVE, ELLE NE SE DÉDUIT PAS D'UNE ABSENCE.
@@ -25882,7 +25989,7 @@ function LeboncoinScreen() {
         })()}
         {/* À publier */}
         <Card>
-          <div style={{ fontSize: 13, fontWeight: 900, color: C.text, marginBottom: 6 }}>🟠 {data.queue.length} à publier sur Leboncoin{data.autoMatched > 0 ? <span style={{ fontSize: 11, color: C.muted, fontWeight: 700 }}> · {data.autoMatched} déjà reconnue{data.autoMatched > 1 ? 's' : ''} en ligne</span> : null}</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 6 }}>{data.queue.length} à publier sur Leboncoin{data.autoMatched > 0 ? <span style={{ fontSize: 11, color: C.muted, fontWeight: 700 }}> · {data.autoMatched} déjà reconnue{data.autoMatched > 1 ? 's' : ''} en ligne</span> : null}</div>
           {/* ⚠️ UNE ANNONCE QUE TU AS RETIRÉE NE DISPARAÎT PAS EN SILENCE.
               Sans cette ligne, désélectionner faisait fondre la file sans que
               rien ne dise pourquoi — et « 0 à publier » se serait lu « tout est
@@ -25926,7 +26033,7 @@ function LeboncoinScreen() {
                 quatre fois (le zip, les codes de retrait, les places, eBay). */}
             <div style={{ fontSize: 11, color: C.muted, marginBottom: 10 }}>
               {extSait('lbctitre') === 'ok'
-                ? <>Voici le titre <b>exactement tel qu'il partira</b> sur Leboncoin (50 caractères max, la taille à la fin). La description et les photos sont préparées par l'extension — tu valides.</>
+                ? <>Voici le titre <b>exactement tel qu'il partira</b> sur Leboncoin (50 caractères max, la taille à la fin). L'extension y joint la description et les photos, puis publie sans option payante.</>
                 : extSait('lbctitre') === 'absente'
                   ? <>Voici le titre <b>que l'extension proposera</b> sur Leboncoin (50 caractères max, la taille à la fin). La publication se fait depuis ton ordinateur, avec l'extension.</>
                   : <>Voici le titre <b>que VRM propose</b>. ⚠️ <b>Ton extension est plus ancienne que la {EXT_CAPACITES.lbctitre}</b> : elle publiera encore l'ancien titre (coupé en plein mot). Mets-la à jour depuis Réglages pour que ce soit ce titre-là qui parte.</>}
@@ -25937,6 +26044,7 @@ function LeboncoinScreen() {
                 lues que sur la page de l'annonce (l'API Vinted n'en renvoie
                 aucune — 0 sur 57 lignes, vérifié). Mettre ces 54 en haut, c'est
                 mettre devant ce qui fera une annonce bâclée. */}
+            <RaisonPublication n={data.queue.length} place="lbc"/>
             {(() => {
               const pretes = data.queue.filter(q => q.photos >= 2);
               const maigres = data.queue.filter(q => q.photos === 1);
@@ -25963,6 +26071,7 @@ function LeboncoinScreen() {
                       </span>
                     </span>
                   </div>
+
                   {/* TOUTES les photos captées, en bande qui défile (Julien l'a
                       demandé). Rien capté ⇒ un cadre neutre, jamais un trou. */}
                   <div className="vrm-rangee" style={{ display: 'flex', gap: 6, marginTop: 7, overflowX: 'auto', paddingBottom: 2 }}>
@@ -25972,6 +26081,11 @@ function LeboncoinScreen() {
                     {manque > 0 && (
                       <span style={{ width: 54, height: 54, borderRadius: 8, flexShrink: 0, background: C.bg, border: `1px dashed ${C.border}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: C.muted, textAlign: 'center', lineHeight: 1.2 }}>+{manque}<span style={{ fontSize: 8, fontWeight: 500 }}>rouvrir</span></span>
                     )}
+                  </div>
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginTop: 7 }}>
+                    {q.photos > 0 && <BoutonPublier place="lbc" id={q.id}/>}
+                    <button type="button" onClick={() => marquer(q.id)} title="Tu l'as déjà publiée toi-même : elle sort de la file"
+                      style={{ border: 'none', background: 'transparent', padding: 0, minHeight: 0, color: C.muted, fontSize: 11.5, fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}>Déjà publiée</button>
                   </div>
                 </div>
                 );
@@ -26002,7 +26116,6 @@ function LeboncoinScreen() {
             })()}
           </>)}
         </Card>
-        <a href="https://www.leboncoin.fr/deposer-une-annonce" target="_blank" rel="noreferrer" style={{ display: 'block', textAlign: 'center', background: LBC_ORANGE, color: '#fff', textDecoration: 'none', fontWeight: 900, fontSize: 14, padding: '12px', borderRadius: 12 }}>➕ Ouvrir « Déposer une annonce » sur Leboncoin</a>
       </>)}
     </div>
   );
