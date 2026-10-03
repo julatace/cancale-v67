@@ -38,8 +38,7 @@ const LISTINGS = [
   { id: 555, nPhotos: 5, is_closed: false, is_hidden: false },  // déjà 5/5 → complet
 ];
 
-function faireCtx({ items = LISTINGS, dejaPhotos = {}, gardeStop = null, srcOverride = null, detailKO = false } = {}) {
-  const store = {};
+function faireCtx({ items = LISTINGS, dejaPhotos = {}, gardeStop = null, srcOverride = null, detailKO = false, vraiGarde = false, store = {} } = {}) {
   const journal = { gets: [], ecrits: [] };
   const lignes = {
     [`harvest_${UID}_listings`]: { data: { payload: { items } } },
@@ -100,7 +99,12 @@ function faireCtx({ items = LISTINGS, dejaPhotos = {}, gardeStop = null, srcOver
   vm.createContext(ctx);
   vm.runInContext(srcOverride || SRC, ctx, { filename: 'background.js' });
   ctx.getStoredAccounts = async () => [{ vinted_user_id: UID, login: 'julatace3535', domain: 'www.vinted.fr' }];
-  ctx.garde = async () => gardeStop;
+  // ⚠️ `capterPhotosAnnonces` passe par `gardeLecture` (budget de LECTURE séparé,
+  //    3 oct.). On stubbe LES DEUX gardes pour les tests de refus ; `vraiGarde`
+  //    laisse tourner les vraies (pour prouver que le budget d'ACTIONS plein
+  //    n'affame plus la capture photo).
+  if (!vraiGarde) { ctx.garde = async () => gardeStop; ctx.gardeLecture = async () => gardeStop; }
+  else { ctx.compteConnecte = async () => UID; }
   ctx.logActivity = async () => {};
   ctx.noterDiag = async () => {};
   ctx.echantillonRate = async () => {};
@@ -179,6 +183,39 @@ const photosRangees = (j) => { let out = {}; for (const e of j.ecrits) { const l
     const ctx = faireCtx({ gardeStop: { error: 'plafond atteint' } });
     await ctx.capterPhotosAnnonces(UID);
     dit(idsVus(ctx.__journal).length === 0, 'aucune lecture Vinted quand garde refuse', idsVus(ctx.__journal).length + ' lues');
+  });
+
+  // ══ 3 bis. LE BUDGET D'ACTIONS PLEIN N'AFFAME PLUS LA CAPTURE PHOTO (3 oct.)
+  //   Avant, capterPhotosAnnonces passait par `garde` → budget d'ACTIONS :
+  //   20 offres/bordereaux dans l'heure, et plus une seule photo captée. Elle a
+  //   maintenant son PROPRE budget de LECTURE. §6.1 : sur le code d'avant,
+  //   budget d'actions plein ⇒ 0 lecture (rouge ici).
+  await essaie('budget d\'actions plein ⇒ la capture photo lit quand même (elle n\'affame plus tes offres/bordereaux)', async () => {
+    const t = Date.now();
+    const store = { vrmActions: { [UID]: Array.from({ length: 20 }, () => t) } };   // budget d'ACTIONS plein
+    const ctx = faireCtx({ vraiGarde: true, store });
+    await ctx.capterPhotosAnnonces(UID);
+    dit(idsVus(ctx.__journal).length > 0, 'elle a lu des annonces malgré le budget d\'actions plein', idsVus(ctx.__journal).length + ' lues');
+    const act = (store.vrmActions && store.vrmActions[UID] || []).length;
+    dit(act === 20, 'le budget d\'ACTIONS n\'a pas bougé (offres/bordereaux préservés)', 'actions=' + act);
+    const lec = (store.vrmLectures && store.vrmLectures[UID] || []).length;
+    dit(lec > 0, 'la capture a consommé le budget de LECTURE, séparé', 'lectures=' + lec);
+  });
+
+  // ══ 3 ter. CAPTURE AU CLIC « PUBLIER » (3 oct.) — §4.10 : la fonction neuve
+  //   doit être EXÉCUTÉE. Quand il lance la publication d'une paire sans photos,
+  //   on va les chercher TOUT DE SUITE (1 lecture, sur son clic).
+  await essaie('au clic Publier : une paire sans photo est captée à la demande (1 lecture)', async () => {
+    const ctx = faireCtx({ dejaPhotos: {} });
+    await ctx.completerPhotosSiManque(UID, '111');
+    dit(idsVus(ctx.__journal).includes('111'), 'la 111 est lue à la demande', idsVus(ctx.__journal).join(',') || 'aucune');
+    const rang = photosRangees(ctx.__journal);
+    dit((rang['111'] || {}).photos && rang['111'].photos.length === 9, 'ses 9 photos sont rangées tout de suite', 'rangées : ' + ((rang['111'] || {}).photos || []).length);
+  });
+  await essaie('au clic Publier : une paire qui a DÉJÀ des photos n\'est pas relue (0 requête inutile)', async () => {
+    const ctx = faireCtx({ dejaPhotos: { '111': { photos: [img(111, 0), img(111, 1)] } } });
+    await ctx.completerPhotosSiManque(UID, '111');
+    dit(idsVus(ctx.__journal).length === 0, 'aucune lecture : on a déjà des photos, le fond complétera le reste', idsVus(ctx.__journal).length + ' lues');
   });
 
   // ══ 4. §6.1 — LA RÈGLE, RÉAFFAIBLIE : sans le filtre « en ligne », une annonce

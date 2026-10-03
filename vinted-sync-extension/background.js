@@ -2030,7 +2030,7 @@ async function capterPhotosAnnonces(uid) {
       if (n >= PHOTOS_MAX_PAR_VISITE) break;
       const k = `${uid}_${it.id}`;
       if (memo[k] && Date.now() - Number(memo[k]) < PHOTOS_RETRY_MS) continue;
-      const refus = await garde(uid, acc);
+      const refus = await gardeLecture(uid, acc);
       if (refus) { logActivity(`⚠️ Photos non captées : ${refus.error}`); break; }
       memo[k] = Date.now();
       n++;
@@ -2072,6 +2072,41 @@ async function capterPhotosAnnonces(uid) {
     await chrome.storage.local.set({ vrmPhotosFaites: memo });
     return n;
   } catch (_) { return 0; }
+}
+
+// ⚠️ CAPTURE AU CLIC « PUBLIER » (Julien, 3 octobre). Plutôt que d'attendre le
+// goutte-à-goutte de fond, quand il lance la publication d'UNE paire on va
+// chercher SES photos TOUT DE SUITE : 1 lecture de la page de l'annonce,
+// déclenchée par SON clic (donc humaine), sous garde de LECTURE, dans la file
+// Vinted (une à la fois). Jamais de rafale. Il ne publie plus une annonce sans
+// ses photos, et il n'attend aucun fond.
+async function completerPhotos(uid, id) {
+  try {
+    const accts = await getStoredAccounts();
+    const acc = accts.find(a => String(a.vinted_user_id) === String(uid));
+    if (!acc) return false;
+    const refus = await gardeLecture(uid, acc);
+    if (refus) { logActivity(`⚠️ Photos non captées : ${refus.error}`); return false; }
+    const rep = await vintedGetHtml(acc, `/items/${encodeURIComponent(id)}`);
+    if (!rep.ok || !rep.text) { noterDiag(`photos_page_refuse_${rep.status}`); return false; }
+    const det = extraireDetailPage(rep.text, id);
+    if (!det || !Array.isArray(det.photos) || !det.photos.length) { noterDiag('photos_page_vide'); return false; }
+    await saveItemDetail(id, { description: det.description || '', photos: det.photos });
+    noterDiag('photos_page_ecrit');
+    return true;
+  } catch (_) { return false; }
+}
+// Ne va chercher QUE si ça manque (évite une lecture inutile quand c'est déjà là).
+async function completerPhotosSiManque(uid, id) {
+  try {
+    if (!uid || !id) return;
+    const dr = await sbGet('app_data?id=eq.vinted_item_details&select=data');
+    if (dr === null) return;                       // pas su : on ne force rien
+    const d0 = (dr[0] && dr[0].data && dr[0].data[String(id)]) || null;
+    const a = (d0 && Array.isArray(d0.photos)) ? d0.photos.length : 0;
+    if (a > 0) return;                             // on a déjà des photos : le fond complétera le reste
+    await completerPhotos(uid, id);
+  } catch (_) {}
 }
 
 // ⚠️ CAPTURE PLUS RAPIDE, SANS ATTENDRE UNE NAVIGATION (Julien, 29 sept. :
@@ -2901,6 +2936,46 @@ async function compterAction(uid) {
   } catch (_) { return { ok: true, n: 0 }; }
 }
 
+// ⚠️ BUDGET DE *LECTURE*, SÉPARÉ DU BUDGET D'ACTIONS (Julien, 3 octobre :
+// « capte toutes mes photos »). Lire la PAGE de ses propres annonces (photos,
+// description) est une LECTURE — pas un geste qui vend ou qui écrit chez Vinted.
+// Le dossier le pose déjà (§messagerie 5.135 : « une lecture ne consomme pas le
+// plafond de 20 actions/heure ; un geste, si »). Or `capterPhotosAnnonces`
+// passait par `garde` → `compterAction` : la capture photo MANGEAIT le budget
+// de tes vraies actions (accepter une offre, générer un bordereau) et les
+// bloquait. On lui donne son PROPRE compteur horaire, borné lui aussi (jamais
+// une rafale — toujours une par une, compte connecté). Les deux restent à 20/h
+// (le rythme qui tourne sans blocage) : ça n'ACCÉLÈRE pas la capture, ça
+// l'empêche d'affamer les actions. Monter ce chiffre = deviner le seuil de
+// Vinted (refusé, §3).
+const LECTURES_MAX_HEURE = 20;
+async function compterLecture(uid) {
+  try {
+    const cle = 'vrmLectures';
+    const cur = (await chrome.storage.local.get(cle))[cle] || {};
+    const t = Date.now(), ilYaUneHeure = t - 3600000;
+    const list = (cur[uid] || []).filter(x => x > ilYaUneHeure);
+    if (list.length >= LECTURES_MAX_HEURE) return { ok: false, n: list.length };
+    list.push(t); cur[uid] = list;
+    await chrome.storage.local.set({ [cle]: cur });
+    return { ok: true, n: list.length };
+  } catch (_) { return { ok: true, n: 0 }; }
+}
+// Garde d'une LECTURE : même exigence de compte connecté que `garde` (on ne lit
+// JAMAIS au nom d'un autre compte que celui du cookie — §3), mais sur le budget
+// de lecture, pas celui des actions.
+async function gardeLecture(uid, acc) {
+  const actif = await compteConnecte(acc && acc.domain);
+  if (actif && String(actif) !== String(uid)) {
+    return { ok: false, code: 'autre-compte',
+             error: "ton navigateur est connecté à un autre compte — bascule sur celui-ci sur Vinted" };
+  }
+  const c = await compterLecture(String(uid));
+  if (!c.ok) return { ok: false, code: 'trop-de-lectures',
+             error: `${LECTURES_MAX_HEURE} lectures sur ce compte dans l'heure — on s'arrête pour ne pas attirer l'attention. La suite au prochain passage.` };
+  return null;
+}
+
 // ── ACTIONS COMMANDÉES PAR L'APP : LA GARDE STRICTE ─────────────────────────
 // `garde` laisse passer quand aucun cookie n'est lisible (une détection ratée
 // ne doit pas casser une visite sur Vinted, où l'onglet prouve le compte). Une
@@ -3116,6 +3191,10 @@ async function publierDepuisApp(msg) {
     return { accepte: true, etape: 'fait' };
   }
   const lbc = cmd === 'lbcPublier';
+  // Capture au clic : si les photos de CETTE paire manquent, on les cherche
+  // MAINTENANT (1 lecture, sur son clic) avant de construire l'ad — ainsi
+  // l'annonce part avec ses photos, sans attendre le fond.
+  try { const cu = await compteConnecte('www.vinted.fr'); if (cu) await avecVinted(() => completerPhotosSiManque(cu, id)).catch(() => {}); } catch (_) {}
   const r = lbc ? await buildLbcData() : await buildEbayData();
   const preuveKO = lbc ? !!(r && r.stats && r.stats.preuveKO) : !!(r && r.preuveKO);
   if (preuveKO) return { accepte: false, code: 'preuve', raison: "je n'ai pas pu vérifier qu'elle n'est pas déjà vendue — réessaie dans un moment" };

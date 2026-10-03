@@ -4078,6 +4078,37 @@ retravaillé du projet (5.87, 5.91, 5.94, 5.95). Gardé par présence de clé
 `nomFamille` mappe `item`→annonces. **2 rouges de plus sur le code d'avant.**
 Extension **5.143.0**, zip régénéré, `EXT_ATTENDUE` suivie.
 
+### ⚠️ « CAPTE TOUTES MES PHOTOS » — TROIS VOIES, ZÉRO RAFALE (3 octobre, 5.144)
+Julien : « tu peux pas tout capter d'un coup ? imagine 100 annonces ». **Non — un
+envoi de 100 requêtes à Vinted en quelques secondes = signature de robot =
+blocage** (`vanessa5723`, §3). On refuse « tout d'un coup » définitivement. Les
+trois voies SÛRES, mesurées dans le code :
+1. **À l'affichage (gratuit, illimité, déjà là)** — `vinted-capture.js` lit photos
+   + description **de la page qu'il ouvre lui-même** : **zéro requête** à Vinted
+   (c'est lui qui l'a chargée). `onPage()` tourne à la 1re page ET à chaque
+   navigation, re-essais lazy. C'est le vrai levier de vitesse : parcourir ses
+   annonces les capte en entier, instantanément. Rien à coder.
+2. **Au clic « Publier » (1 lecture, sur son clic)** — `completerPhotosSiManque`
+   dans `publierDepuisApp`, AVANT de construire l'ad : si la paire n'a aucune
+   photo captée, on va la chercher tout de suite (`completerPhotos` → page de
+   l'annonce, sous garde de LECTURE, dans la file Vinted). Il ne publie plus sans
+   photos, sans attendre le fond. §4.10 : exécuté au banc (capte si manque, ne
+   relit pas si déjà là).
+3. ⚠️⚠️ **La capture de fond AFFAMAIT les vraies actions.** `capterPhotosAnnonces`
+   passait par `garde` → **budget d'ACTIONS** (20/h, partagé avec accepter une
+   offre, générer un bordereau). `tickPhotos` tourne chaque minute, 20/tour : elle
+   **vidait le budget**, et les offres/bordereaux tombaient en « 20 actions dans
+   l'heure ». Or lire la page de SES annonces est une **LECTURE** (§messagerie
+   5.135 : « une lecture ne consomme pas le plafond d'actions »). ⇒ `gardeLecture`
+   + `compterLecture` : un **budget de lecture séparé** (20/h aussi). Ça
+   n'ACCÉLÈRE pas (monter le chiffre = deviner le seuil de Vinted, refusé §3) —
+   ça **empêche la capture d'affamer les actions**.
+- `audit-photos-passif.cjs` : **21 contrôles**. §6.1 prouvé — budget d'actions
+  PLEIN : code d'avant **0 lecture** (2 rouges), après **lit quand même** et le
+  budget d'actions reste intact. Extension **5.144.0**, zip régénéré,
+  `EXT_ATTENDUE` suivie. Aucune entrée d'`EXT_CAPACITES` (pacing interne +
+  lecture à la demande ; l'app ne promet rien de neuf gaté sur une version).
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
