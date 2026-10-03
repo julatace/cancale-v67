@@ -3694,13 +3694,33 @@ Leboncoin et eBay n'apparaissaient que dans un total « depuis le début », san
 - Audits : `audit-urssaf.cjs` exécute la règle sur les trois plateformes (2
   rouges sur l'avant), `audit-lbc-ventes.cjs` la date et le prix (3 rouges),
   banc `rapport.cjs` (8 rouges sur un build d'avant).
-- ⚠️ **NON TRAITÉ, À TRANCHER PAR JULIEN** (mesuré par la cartographie du
-  3 octobre) : (1) **887 ventes / 37 827 € en 2026** sur des comptes retirés de
-  l'app (`shop_cancale`, l'orphelin vanessa5723) sont hors du bilan annuel —
-  les inclure ? (2) le compte `…377` est déclaré chez **deux** propriétaires
-  VRM (8 ventes / 497 € en septembre) — est-ce le sien ? (3) le montant eBay
-  (total ou sous-total + port) ; (4) « Chiffre d'affaires » sur Ma journée et le
-  widget compte les ventes EN COURS. Ne pas trancher à sa place.
+- **TRANCHÉ PAR JULIEN le 3 octobre** (ce qui était « à trancher ») :
+  1. **Bilan et CA déclaré = les comptes SÉLECTIONNÉS.** Les comptes retirés de
+     l'app n'y entrent pas (ils n'ont déjà plus de ventes dans la liste), et une
+     vente d'un compte **exclu** (`acctOffOf`) n'entre dans **aucun** total — ni
+     un mois, ni « à dater » (`ventesDeclarables({exclu})`, publication, rapport
+     mensuel, bilan annuel). Une vente **masquée d'un ✕** reste du CA, comptée à
+     part. ⚠️ **Ne plus lui parler des comptes retirés** : il l'a demandé, c'est
+     réglé — aucun texte visible ne les nomme (vérifié).
+  2. **Tous les comptes Vinted chargés par l'extension sont à lui.** Les comptes
+     VRM créés le 2 octobre (`julien.fournier3535@…` et un second) étaient des
+     **essais**. Mesuré : le second ne porte que sa ligne `main` ; le premier
+     porte 18 lignes (`angeled92`, dont 3 bordereaux) — **toutes existent
+     aussi chez lui**, rien n'est perdu. `angeled92` est donc déclaré chez deux
+     propriétaires. Supprimer ces comptes d'essai est irréversible : **à faire
+     sur sa demande**, pas avant.
+  3. **eBay = « l'argent que tu reçois »** (dû au vendeur − frais eBay). ⚠️ **Une
+     AUTRE session s'occupe d'eBay** (Julien, 3 octobre) : la règle a été codée
+     ici puis **retirée** pour ne pas écrire deux fois les mêmes lignes. C'est à
+     la session eBay de l'appliquer (`ventesDeclarables`, branche eBay, et le
+     résumé eBay) — `paymentSummary.totalDueSeller − totalMarketplaceFee`, frais
+     inconnus ou autre devise ⇒ commande écartée et dite, jamais comptée au
+     hasard.
+  4. Le bilan annuel compte désormais **Leboncoin et eBay** comme les mois
+     (§11) ; il ne comptait que Vinted. `audit-urssaf.cjs` : 7 rouges sur
+     l'avant.
+  5. Reste ouvert : « Chiffre d'affaires » sur Ma journée et le widget compte
+     les ventes EN COURS — c'est la demande « ventes du jour ≠ argent reçu ».
 
 ### ⚠️⚠️ « L'ÉCRAN ANNONCES, C'EST TOTALEMENT N'IMPORTE QUOI » (3 octobre, 5.132)
 Julien : « on ne sait pas sur quelle application, c'est quoi le prix, le boost ».
@@ -4175,6 +4195,13 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
    `**/api/**` posé après `**/api/relais**` avale la route précise et répond
    `{pret:true}` — la carte restait vide sans lever la moindre erreur.
 
+⚠️⚠️ **PLUSIEURS SESSIONS MERGENT SUR `main` EN MÊME TEMPS** (3 octobre : une
+session fait l'extension et les colis Leboncoin, une autre eBay). Pour amener
+`main` dans sa branche : **`git merge origin/main`, un VRAI merge**, conflits
+résolus à la main — **jamais `git merge -s ours`** : il garde l'arbre de la
+branche, la PR qui suit **défait en silence** tout ce que les autres ont mergé.
+Après le merge, `git diff origin/main --stat` ne doit montrer **que ses propres
+fichiers**. Et ne pas toucher au domaine d'une autre session (eBay) : lui laisser.
 ⚠️ Ne jamais lancer `npm run build` pendant qu'un banc sert `dist/`.
 ⚠️ `git fetch` avant toute comparaison avec la production : une référence locale
 jamais rafraîchie ment en silence.
