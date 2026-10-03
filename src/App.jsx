@@ -35,7 +35,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.137.0';
+const EXT_ATTENDUE = '5.140.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -7303,6 +7303,36 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
   const [lbcDone, setLbcDone] = React.useState(() => (typeof load === 'function' ? (load('vrm_lbc_colis_done', {}) || {}) : {}));
   const estFait = (o) => !!(o && lbcDone[o.txId]);
   const toggleFait = (o) => { if (!o || o.txId == null) return; setLbcDone(prev => { const u = { ...prev }; if (u[o.txId]) delete u[o.txId]; else u[o.txId] = Date.now(); if (typeof save === 'function') save('vrm_lbc_colis_done', u); return u; }); };
+  // ── IMPRESSION DU BORDEREAU « EXACTEMENT COMME VINTED » (Julien, 3 oct.) ────
+  // Le tampon N° + titre est posé à l'emplacement APPRIS pour ce format (taille
+  // de page = transporteur + forme), puis une modale permet de le DÉPLACER si
+  // besoin — et le nouvel emplacement est retenu pour tous les prochains
+  // bordereaux de ce format. C'est le MÊME store que Vinted
+  // (`vinted_bordereau_formats`) : un emplacement appris sur Vinted sert aussi
+  // sur Leboncoin et inversement (§11, un seul propriétaire de la donnée).
+  const [bordResult, setBordResult] = React.useState(null);
+  const [bordPlace, setBordPlace] = React.useState(null);
+  const [bordFormats, setBordFormats] = React.useState(() => (typeof load === 'function' ? (load('vinted_bordereau_formats', {}) || {}) : {}));
+  const posForFormat = (w, h) => {
+    const key = bordereauFormatKey(w, h);
+    let pos = bordFormats[key];
+    if (!pos) { pos = smartDefaultBordPos(w, h); const next = { ...bordFormats, [key]: pos }; setBordFormats(next); if (typeof save === 'function') save('vinted_bordereau_formats', next); }
+    return pos;
+  };
+  const adjustBordPlacement = () => {
+    const r = bordResult; if (!r || !r.pdfBuf) return;
+    const blobUrl = URL.createObjectURL(new Blob([r.pdfBuf], { type: 'application/pdf' }));
+    setBordPlace({ numero: r.numero, title: r.title, pdfBuf: r.pdfBuf, w: r.w, h: r.h, key: r.key, blobUrl, initPos: bordFormats[r.key] });
+    if (r.url) URL.revokeObjectURL(r.url);
+    setBordResult(null);
+  };
+  const confirmBordPlacement = async (pos) => {
+    const p = bordPlace; if (!p) return;
+    const next = { ...bordFormats, [p.key]: pos }; setBordFormats(next); if (typeof save === 'function') save('vinted_bordereau_formats', next);
+    try { const r = await annotateAndDownloadBordereau(p.numero, p.title, p.pdfBuf, pos); setBordResult({ ...r, numero: p.numero, title: p.title, pdfBuf: p.pdfBuf, key: p.key, w: p.w, h: p.h }); } catch (err) { toast('Erreur : ' + String(err)); }
+    URL.revokeObjectURL(p.blobUrl); setBordPlace(null);
+  };
+  const cancelBordPlacement = () => { if (bordPlace) { URL.revokeObjectURL(bordPlace.blobUrl); setBordPlace(null); } };
   const ventes = lbcVentes.ventes || [];
   const aLabel = (o) => !!(o.label && (o.label.voucherUrl || o.label.qrUrl || o.label.reference));
   // Un COLIS vendeur : vente prouvée (isSeller) OU un bordereau existe (un
@@ -7330,12 +7360,16 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
   // cartouche, même place), puis s'ouvre dans l'onglet réservé au clic. Un N°
   // qu'on ne sait pas relier n'est pas inventé : le titre seul est tamponné.
   const imprimerLbc = async (o, n) => {
-    const r = await vmrPdfLbc(o.label && o.label.voucherUrl);
-    if (!r.dataUrl) { libererOngletPdf(); toast(`Bordereau Leboncoin illisible${r.error ? ' — ' + r.error : ''}. Il s'ouvre tel quel.`); try { window.open(o.label.voucherUrl, '_blank'); } catch (_) {} return; }
+    const r0 = await vmrPdfLbc(o.label && o.label.voucherUrl);
+    if (!r0.dataUrl) { libererOngletPdf(); toast(`Bordereau Leboncoin illisible${r0.error ? ' — ' + r0.error : ''}. Il s'ouvre tel quel.`); try { window.open(o.label.voucherUrl, '_blank'); } catch (_) {} return; }
     try {
-      const bytes = b64ToBytes(r.dataUrl.split(',')[1] || '');
+      const bytes = b64ToBytes(r0.dataUrl.split(',')[1] || '');
       const { width, height } = await readPdfFirstPageSize(bytes);
-      await annotateAndDownloadBordereau(n || '', o.title || '', bytes, smartDefaultBordPos(width, height));
+      const key = bordereauFormatKey(width, height);
+      const pos = posForFormat(width, height);   // emplacement APPRIS pour ce format
+      const r = await annotateAndDownloadBordereau(n || '', o.title || '', bytes, pos);
+      // On garde le PDF SOUS LA MAIN pour permettre de DÉPLACER ensuite (comme Vinted).
+      setBordResult({ ...r, numero: n || '', title: o.title || '', pdfBuf: bytes, key, w: width, h: height });
     } catch (e) { libererOngletPdf(); toast('Impossible de tamponner ce bordereau : ' + String(e)); }
   };
   // Carte d'un colis — même squelette que l'écran Colis Vinted : photo 58 ·
@@ -7370,7 +7404,6 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
             : principal === 'imprimer'
             ? <a href={o.label.voucherUrl} target="_blank" rel="noreferrer" title={extSait('lbcpdf') === 'retard' ? `Mets l'extension à jour (${EXT_CAPACITES.lbcpdf}) pour qu'il sorte tamponné du titre et du N°` : "Sans l'extension, le bordereau s'ouvre tel quel (sans N° ni titre)"} style={{ flex: '1 1 160px', maxWidth: 340, textAlign: 'center', border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '12px', fontSize: 15, fontWeight: 600, textDecoration: 'none' }}>🖨 Imprimer le bordereau</a>
             : <a href={lbcUrl(o)} target="_blank" rel="noreferrer" style={{ flex: '1 1 160px', maxWidth: 340, textAlign: 'center', border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '12px', fontSize: 15, fontWeight: 600, textDecoration: 'none' }}>↗ Générer le bordereau</a>}
-          {principal === 'imprimer' && <button type="button" onClick={() => generateEtiquetteSku(n, { title: o.title, transaction_id: o.txId })} title={n ? `Étiquette N°${n} à coller` : 'Étiquette avec le titre (en attendant le numéro)'} style={{ flexShrink: 0, border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 10, padding: '12px 13px', fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>🏷️ Étiquette {n ? `N°${n}` : '(titre)'}</button>}
           <button type="button" onClick={() => toggleFait(o)} title={posted ? 'Remettre dans les colis à poster' : 'Marquer comme posté'} style={{ flexShrink: 0, border: `1px solid ${posted ? INV_STATUS.online.color : C.border}`, background: posted ? `${INV_STATUS.online.color}18` : 'transparent', color: posted ? INV_STATUS.online.color : C.muted, borderRadius: 10, padding: '12px 13px', fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>{posted ? '↺ Pas encore' : '✓ Colis fait'}</button>
         </div>
       </div>
@@ -7418,6 +7451,20 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
           </Card>
         </>)}
       </>)}
+      {/* ── BORDEREAU PRÊT : ouvre l'onglet d'impression + propose de DÉPLACER le
+          N° — exactement comme l'écran Colis Vinted (même modale, même store). */}
+      {bordResult && (
+        <div onClick={() => { if (bordResult.url) URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1250, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: C.bg, borderRadius: 10, maxWidth: 420, width: '100%', padding: 16 }}>
+            <div style={{ fontSize: 17, fontWeight: 700, color: C.text, marginBottom: 4 }}>Bordereau prêt</div>
+            <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.45, marginBottom: 16 }}>{bordResult.printed ? <>Il est <b>ouvert dans un nouvel onglet</b> : clique sur l'imprimante en haut à droite. Onglet pas ouvert ? Utilise le bouton ci-dessous.</> : <>Ouvre-le puis <b>Imprimer</b> (ou enregistre-le). Sur iPhone, le bouton de partage en bas.</>}</div>
+            <a href={bordResult.url} target="_blank" rel="noreferrer" style={{ display: 'block', background: C.accent, color: C.onAccent, borderRadius: 10, padding: '13px 16px', fontSize: 15, fontWeight: 600, textDecoration: 'none', marginBottom: 8, textAlign: 'center' }}>📄 Ouvrir le bordereau</a>
+            {bordResult.pdfBuf && <button onClick={adjustBordPlacement} style={{ width: '100%', border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.text, cursor: 'pointer', fontSize: 13, fontWeight: 500, padding: '11px', marginBottom: 8, fontFamily: 'inherit' }}>✋ Le N° n'est pas au bon endroit ? Le déplacer</button>}
+            <button onClick={() => { if (bordResult.url) URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{ width: '100%', border: 'none', background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 13, fontWeight: 500, padding: '8px', fontFamily: 'inherit' }}>Fermer</button>
+          </div>
+        </div>
+      )}
+      {bordPlace && <BordPlacer place={bordPlace} onConfirm={confirmBordPlacement} onCancel={cancelBordPlacement} />}
     </div>
   );
 }
