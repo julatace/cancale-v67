@@ -126,7 +126,9 @@ if (!bloc || !/caUrssafParMois/.test(bloc)) {
   let r = null;
   try {
     vm.createContext(ctxP);
-    vm.runInContext(lbcSrc + '\n' + bloc + "\n;Object.assign(this, { ventesDeclarables, caDeclarableParMois, caUrssafParMois });", ctxP);
+    // La règle « argent reçu » d'eBay est extraite du source, comme le reste.
+    const ebaySrc = (() => { const a = SRC.indexOf('function argentRecuEbay('); const b = SRC.indexOf('\n// ── CA eBay', a); return a > 0 && b > a ? SRC.slice(a, b) : ''; })();
+    vm.runInContext(lbcSrc + '\n' + ebaySrc + '\n' + bloc + "\n;Object.assign(this, { ventesDeclarables, caDeclarableParMois, caUrssafParMois });", ctxP);
     const VINTED = [
       { transaction_id: 1, date: '2026-09-10T12:00:00+02:00', price: { amount: '80.0' }, status: 'Commande finalisée' },
       { transaction_id: 2, date: '2026-09-11T12:00:00+02:00', price: { amount: '45.0' }, status: 'Paiement validé' },
@@ -139,18 +141,31 @@ if (!bloc || !/caUrssafParMois/.test(bloc)) {
       { txId: 'D', isSeller: false, price: 4000, stepStatus: 'done', dateVente: '2026-09-19T10:00:00+02:00', title: 'un ACHAT' },
       { txId: 'E', isSeller: true, price: 4500, stepLabel: 'Colis à envoyer', dateVente: '2026-09-20T10:00:00+02:00', title: 'en cours' },
     ];
+    // eBay : Julien, 3 oct. — « c'est l'argent que tu reçois pour le compte ».
+    // X1 : l'acheteur paie 66 € (port compris), eBay doit 60 €, garde 7,20 € de
+    // frais ⇒ 52,80 € reçus. X4 : frais inconnus ⇒ jamais compté (§5).
     const EBAY = [
-      { orderId: 'X1', orderPaymentStatus: 'PAID', creationDate: '2026-09-21T10:00:00.000Z', pricingSummary: { total: { value: '60.00', currency: 'EUR' } } },
-      { orderId: 'X2', orderPaymentStatus: 'FULLY_REFUNDED', creationDate: '2026-09-21T10:00:00.000Z', pricingSummary: { total: { value: '30.00', currency: 'EUR' } } },
-      { orderId: 'X3', orderPaymentStatus: 'PAID', creationDate: '2026-09-22T10:00:00.000Z', pricingSummary: { total: { value: '50.00', currency: 'USD' } } },
+      { orderId: 'X1', orderPaymentStatus: 'PAID', creationDate: '2026-09-21T10:00:00.000Z', pricingSummary: { total: { value: '66.00', currency: 'EUR' } }, paymentSummary: { totalDueSeller: { value: '60.00', currency: 'EUR' } }, totalMarketplaceFee: { value: '7.20', currency: 'EUR' } },
+      { orderId: 'X2', orderPaymentStatus: 'FULLY_REFUNDED', creationDate: '2026-09-21T10:00:00.000Z', pricingSummary: { total: { value: '30.00', currency: 'EUR' } }, paymentSummary: { totalDueSeller: { value: '30.00', currency: 'EUR' } }, totalMarketplaceFee: { value: '3.60', currency: 'EUR' } },
+      { orderId: 'X3', orderPaymentStatus: 'PAID', creationDate: '2026-09-22T10:00:00.000Z', pricingSummary: { total: { value: '50.00', currency: 'USD' } }, paymentSummary: { totalDueSeller: { value: '50.00', currency: 'USD' } }, totalMarketplaceFee: { value: '6.00', currency: 'USD' } },
+      { orderId: 'X4', orderPaymentStatus: 'PAID', creationDate: '2026-09-23T10:00:00.000Z', pricingSummary: { total: { value: '40.00', currency: 'EUR' } }, paymentSummary: { totalDueSeller: { value: '40.00', currency: 'EUR' } } },
     ];
     const VERS = { 1: '2026-09-18T09:00:00+02:00' };
     r = ctxP.ventesDeclarables({ vinted: VINTED, lbc: LBC, ebay: EBAY, versements: VERS });
     const sept = (ctxP.caDeclarableParMois(r.lignes))['2026-09'] || {};
     const par = sept.par || {};
-    Math.abs((sept.ca || 0) - 215) < 0.001
-      ? ok('septembre = 80 (Vinted finalisée) + 75 (Leboncoin, centimes) + 60 (eBay payée) — rien d\'autre')
-      : nok('le CA du mois additionne les trois plateformes, et elles seules', 'obtenu ' + sept.ca + ' au lieu de 215');
+    Math.abs((sept.ca || 0) - 207.8) < 0.001
+      ? ok('septembre = 80 (Vinted finalisée) + 75 (Leboncoin, centimes) + 52,80 (eBay : argent REÇU) — rien d\'autre')
+      : nok('le CA du mois additionne les trois plateformes, et elles seules', 'obtenu ' + sept.ca + ' au lieu de 207,80');
+    {
+      const x1 = r.lignes.find((l) => l.id === 'ebay:X1');
+      x1 && Math.abs(x1.eur - 52.8) < 0.001
+        ? ok('eBay compte l\'argent REÇU (dû au vendeur − frais eBay), pas le total payé par l\'acheteur')
+        : nok('eBay compte l\'argent reçu (60 − 7,20 = 52,80)', 'obtenu ' + (x1 ? x1.eur : 'rien'));
+      r.ecartees.some((e) => e.id === 'ebay:X4') && !r.lignes.some((l) => l.id === 'ebay:X4')
+        ? ok('eBay : frais inconnus ⇒ jamais compté, mis à part (mieux vaut un blanc qu\'un faux)')
+        : nok('eBay : une commande aux frais inconnus ne gonfle pas le CA', JSON.stringify(r.ecartees));
+    }
     Math.abs(((par.Vinted || {}).ca || 0) + ((par.Leboncoin || {}).ca || 0) + ((par.eBay || {}).ca || 0) - (sept.ca || 0)) < 0.001 && (par.Leboncoin || {}).n === 1
       ? ok('les « dont » somment au total, et une vente vue deux fois compte UNE fois')
       : nok('les « dont » somment au total sans doublon', JSON.stringify(par));
