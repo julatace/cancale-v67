@@ -2879,12 +2879,12 @@ const ventesDeclarables = ({ vinted, lbc, ebay, masquee, exclu, versements } = {
   }
   for (const e of (ebay || [])) {
     if (!e || String(e.orderPaymentStatus || '').toUpperCase() !== 'PAID' || !e.orderId) continue;
+    const tot = (e.pricingSummary && e.pricingSummary.total) || {};
     const id = 'ebay:' + e.orderId;
-    // L'argent REÇU (dû − frais eBay), décision de Julien du 3 octobre.
-    const ar = argentRecuEbay(e);
-    if (ar.eur == null) { if (!vus.has(id)) { vus.add(id); ecartees.push({ id, plateforme: 'eBay', raison: ar.raison, titre: (Array.isArray(e.lineItems) && e.lineItems[0] && e.lineItems[0].title) || '' }); } continue; }
-    const eur = ar.eur;
+    if (tot.currency && tot.currency !== 'EUR') { if (!vus.has(id)) { vus.add(id); ecartees.push({ id, plateforme: 'eBay', raison: 'devise ' + tot.currency, titre: '' }); } continue; }
+    const eur = Number(tot.value);
     const t = Date.parse(e.creationDate || '');
+    if (!isFinite(eur)) continue;
     if (!t) { if (!vus.has(id)) { vus.add(id); aDater.push({ id, plateforme: 'eBay', eur, titre: '' }); } continue; }
     const titre = (Array.isArray(e.lineItems) && e.lineItems[0] && e.lineItems[0].title) || '';
     const l = { id, plateforme: 'eBay', ts: t, ym: ymDeTs(t), eur, titre, masquee: false };
@@ -7050,36 +7050,18 @@ function Onboarding({ setTab }) {
   );
 }
 
-// ── L'ARGENT REÇU D'UNE COMMANDE eBay (propriétaire unique, §11) ─────────────
-// Julien, 3 octobre : « pour eBay, c'est l'argent que tu reçois pour le compte ».
-// Ce n'est donc PAS le total payé par l'acheteur (`pricingSummary.total`, port
-// compris), c'est ce qu'eBay doit au vendeur (`paymentSummary.totalDueSeller`)
-// MOINS ses frais (`totalMarketplaceFee`) — les deux champs de la commande
-// rendue par l'API Fulfillment (`api/ebay.js` → `ebay_orders`).
-// ⚠️ Frais inconnus ⇒ PAS de montant : compter le dû sans les frais gonflerait
-//    le chiffre déclaré (§5 : mieux vaut un blanc qu'un faux). Une autre devise
-//    n'est jamais convertie au hasard. Mesuré le 3 octobre : 0 commande captée,
-//    la règle suit donc la forme documentée par eBay ; audit-urssaf l'exécute.
-function argentRecuEbay(o) {
-  const amt = (a) => (a && a.value != null && a.value !== '') ? { v: Number(a.value), dev: a.currency || a.currencyCode || 'EUR' } : null;
-  const du = amt(o && o.paymentSummary && o.paymentSummary.totalDueSeller);
-  if (!du || !isFinite(du.v)) return { eur: null, raison: 'montant reçu inconnu' };
-  if (du.dev !== 'EUR') return { eur: null, raison: 'devise ' + du.dev };
-  const frais = amt(o && o.totalMarketplaceFee);
-  if (!frais || !isFinite(frais.v)) return { eur: null, raison: 'frais eBay inconnus' };
-  if (frais.dev !== 'EUR') return { eur: null, raison: 'devise ' + frais.dev };
-  return { eur: Math.round((du.v - frais.v) * 100) / 100, frais: frais.v, du: du.v };
-}
-// ── CA eBay = argent reçu des commandes PAYÉES (propriétaire unique, §11) ────
-// Une commande compte quand eBay dit `orderPaymentStatus PAID` ET que son argent
-// reçu est connu (`argentRecuEbay`). Rend `null` quand rien n'est connu — jamais
-// un 0 inventé (§5/§7) : le Collectif lit « pas encore de vente ».
+// ── CA eBay = commandes PAYÉES (propriétaire unique de la règle, §11) ───────
+// La MÊME règle que la carte « payées » de l'écran eBay : une commande compte
+// quand eBay dit `orderPaymentStatus PAID`, et son montant est
+// `pricingSummary.total.value`. Rend `null` quand AUCUNE commande payée n'est
+// captée — jamais un 0 inventé (§5/§7) : le Collectif lit « pas encore de vente ».
+// L'écran eBay, lui, retombe sur 0 (il y a des commandes, aucune payée : c'est un
+// chiffre mesuré, affiché à côté du total et de l'attente).
 function caEbayPayees(orders) {
   const arr = Array.isArray(orders) ? orders : [];
   const paid = arr.filter(o => String((o && o.orderPaymentStatus) || '').toUpperCase() === 'PAID');
-  const connus = paid.map(argentRecuEbay).filter(r => r.eur != null);
-  if (!connus.length) return null;
-  return Math.round(connus.reduce((s, r) => s + r.eur, 0) * 100) / 100;
+  if (!paid.length) return null;
+  return paid.reduce((s, o) => s + (Number((o && o.pricingSummary && o.pricingSummary.total && o.pricingSummary.total.value) || 0) || 0), 0);
 }
 
 // ── CA FINALISÉ PAR PLATEFORME (propriétaire unique, §11) ──────────────────
@@ -8371,8 +8353,7 @@ function EbayConnexion({ comptes = [] }) {
               const livre = (o) => String((o && o.orderFulfillmentStatus) || '').toUpperCase() === 'FULFILLED';
               const total = ords.reduce((s, o) => s + val(o), 0);
               const enAttente = ords.filter(o => !paye(o)).reduce((s, o) => s + val(o), 0);
-              const payeesCa = caEbayPayees(ords);   // même règle que le Collectif (§11) : l'argent REÇU
-              const payeesConnues = payeesCa != null; const payees = payeesCa || 0;
+              const payees = caEbayPayees(ords) || 0;   // même règle que le Collectif (§11)
               const aExpedier = ords.filter(o => paye(o) && !livre(o)).length;
               if (ords.length === 0) return <div style={{ fontSize: 12.5, color: C.muted, marginBottom: 10 }}>Aucune vente eBay pour l'instant — dès ta première vente, le montant, le paiement et les colis à expédier s'afficheront ici.</div>;
               const bloc = (v, lib, col) => <div><div className="vrm-display" style={{ fontSize: 20, fontWeight: 700, color: col || C.text }}>{v}</div><div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>{lib}</div></div>;
@@ -8381,7 +8362,7 @@ function EbayConnexion({ comptes = [] }) {
                   <div style={{ ...eti, marginBottom: 8 }}>Argent eBay · {ords.length} vente{ords.length > 1 ? 's' : ''}</div>
                   <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
                     {bloc(eur(total), 'total des ventes')}
-                    {bloc(payeesConnues ? eur(payees) : '—', payeesConnues ? 'argent reçu (après frais eBay)' : 'argent reçu — frais eBay pas encore connus')}
+                    {bloc(eur(payees), 'payées')}
                     {enAttente > 0 && bloc(eur(enAttente), 'en attente de paiement', C.warn)}
                     {aExpedier > 0 && bloc(String(aExpedier), 'à expédier', C.accent)}
                   </div>
@@ -8477,11 +8458,7 @@ function EbayVentes({ baseKO }) {
               <div style={{ fontWeight: 600, fontSize: 13.5, color: E.text, lineHeight: 1.25, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{li.title || '(sans titre)'}</div>
               <div style={{ fontSize: 11.5, color: col, marginTop: 2, fontWeight: 600 }}>{statut}{o.buyer && o.buyer.username ? ` · ${o.buyer.username}` : ''}</div>
             </div>
-            {(() => { const ar = argentRecuEbay(o); const tot = o.pricingSummary && o.pricingSummary.total; return (
-              <div style={{ flexShrink: 0, textAlign: 'right', alignSelf: 'flex-start' }}>
-                <div className="vrm-display" style={{ fontSize: 16, fontWeight: 800, color: ar.eur != null ? E.text : E.muted }}>{ar.eur != null ? euro(ar.eur) : '—'}</div>
-                <div style={{ fontSize: 10.5, color: E.muted }}>{ar.eur != null ? 'reçu' : (tot && tot.value != null ? `vendu ${euro(tot.value, tot.currency)} · frais inconnus` : 'montant inconnu')}</div>
-              </div>); })()}
+            <div className="vrm-display" style={{ flexShrink: 0, fontSize: 16, fontWeight: 800, color: E.text, alignSelf: 'flex-start' }}>{euro(o.pricingSummary && o.pricingSummary.total && o.pricingSummary.total.value, o.pricingSummary && o.pricingSummary.total && o.pricingSummary.total.currency)}</div>
           </div>
         );
       })}
@@ -29929,7 +29906,7 @@ function AppCoeur() {
               connexion + la publication ; Ventes liste les commandes captées ;
               Achats dit honnêtement qu'ils ne sont pas encore récupérés. */}
           {(() => { const pe = caParPlateforme(liveStats, lbcVentes, ebayCa).find(x => x.nom === 'eBay') || {}; return (
-            <PlatResume dark baseKO={baseKO} cases={[['Argent reçu', pe.ca != null ? fmt(pe.ca) : null]]}/>
+            <PlatResume dark baseKO={baseKO} cases={[['Ventes payées', pe.ca != null ? fmt(pe.ca) : null]]}/>
           ); })()}
           <div style={{background:'#000000'}}><PlatSubNav sub={platSub} setSub={setPlatSub} sections={[['ventes','Ventes'],['achats','Achats'],['annonces','Annonces'],['compte','Compte eBay']]} dark/></div>
           {platSub==='ventes'&&<EbayVentes baseKO={baseKO}/>}
