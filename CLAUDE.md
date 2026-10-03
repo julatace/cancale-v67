@@ -4109,6 +4109,53 @@ trois voies SÛRES, mesurées dans le code :
   `EXT_ATTENDUE` suivie. Aucune entrée d'`EXT_CAPACITES` (pacing interne +
   lecture à la demande ; l'app ne promet rien de neuf gaté sur une version).
 
+### ⚠️⚠️ « LE CODE DE RETRAIT EST DANS LA CONVERSATION — TU N'AS AUCUNE EXCUSE » (3 octobre, 5.145)
+Julien, capture à l'appui : « rends-toi au point relais Phone Cash » (Mondial
+Relay) montre le lieu ET le transporteur ; pour les Adidas Vinted Go et la paire
+de Nike, « le code de retrait + le QR sont DIRECTEMENT dans la conversation
+Vinted », avec un lien « scanne ton code de retrait ». L'app n'en montrait rien.
+- **Mesuré dans le code** (le défaut, pas une opinion) : l'affichage était DÉJÀ
+  complet — `relaisDe(o)` rend `{lieu, code, qr}` de `panel_colis_relais` et la
+  carte montre déjà lieu, code, lien QR, compte. Le trou était **deux gardes trop
+  étroites** côté extension, prouvé en exécutant le vrai parseur dans un `vm` :
+  1. **`AT_RELAY`** (quelle commande fait ouvrir sa conversation) ne connaissait
+     que « déposé en point relais / bureau de poste » → **Vinted Go (casier),
+     « prêt à être retiré », « disponible »** étaient INVISIBLES, conversation
+     jamais ouverte, code jamais capté. Élargi (casier/consigne/locker/Vinted Go,
+     prêt-à-retirer, disponible+lieu), en EXCLUANT livré-domicile/finalisé/annulé/
+     remboursé/retour. Lire une conversation de trop est une **lecture bornée sans
+     risque** ; en manquer une fait **perdre un colis** — l'asymétrie penche vers
+     l'élargissement. **Expression IDENTIQUE à `isAtRelayStatus` (app), §11** :
+     `audit-coherence` les compare (0 désaccord), et elles doivent rester
+     **mono-ligne** (le regex d'extraction n'avale pas les sauts de ligne).
+  2. **`CONV_ARRIVE`** (quel message est une arrivée) n'acceptait que « ton colis
+     est arrivé » / « t'attend à l'adresse » → « **rends-toi au point relais …** »
+     et « **récupère-le au casier … scanne ton code de retrait** » étaient
+     MANQUÉS. Élargi, avec `CONV_SORTANT` qui écarte EN PREMIER un colis qui PART
+     (« dépose ton colis dans n'importe quel point relais » = ENVOI). Lieu étendu
+     à « rends-toi au … » / « récupère-le au … », consigne « pour récupérer … »
+     coupée. **On ne prend PAS « est disponible » seul** (un bordereau disponible
+     n'est pas un retrait) : la garde reste l'extraction d'un code/lieu/qr, et le
+     code garde `CODE_APRES` (« suivant » reste écarté).
+- `audit-retrait-conv.cjs` : 3 cas de plus, **rouges sur le code d'avant**
+  (rends-toi Phone Cash, Vinted Go casier, AT_RELAY élargi), verts après ; les
+  gardes (envoi, côté vendeur, livré-domicile, « suivant ») tiennent, et le
+  **§11 app==ext** est vérifié sur les mêmes statuts.
+- **Aucune entrée d'`EXT_CAPACITES`** : l'affichage existait déjà, c'est la
+  capture qu'on débloque — l'app ne promet rien de neuf. Extension **5.145.0**,
+  zip régénéré, `EXT_ATTENDUE` suivie.
+- ⚠️ **Non render-vérifié ici** (pas de fixtures dans ce conteneur) : le
+  changement de `isAtRelayStatus` touche plusieurs écrans (Ma journée, Achats,
+  tableau de bord). Il n'AJOUTE que des statuts clairement « à retirer » et
+  n'en retire aucun ; le risque (un colis montré en trop) est bénin face au
+  défaut corrigé (un colis jamais montré). À re-regarder au rendu dès qu'un banc
+  a des fixtures.
+
+### Logo iPhone : icônes PWA régénérées (3 octobre)
+`apple-touch-icon.png` + `icon-192/512/maskable` portaient encore l'ancien logo
+orange ; régénérées depuis `logo-vrm.png` (VRM Noir), maskable avec marge sur
+fond `#07090D`. iOS cache l'icône d'accueil : retirer le raccourci et le rajouter.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par

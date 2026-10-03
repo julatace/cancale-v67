@@ -2133,7 +2133,16 @@ async function tickPhotos() {
 }
 
 const AWAITING_SHIP = (s) => /bordereau\s+envoy[ée]\s+au\s+vendeur/i.test(s || '') || /paiement.*valid/i.test(s || '');
-const AT_RELAY = (s) => /d[ée]pos[ée]/i.test(s || '') && /point\s+relais|bureau\s+de\s+poste/i.test(s || '');
+// ⚠️ ÉLARGI le 20 sept. : l'ancienne règle ne reconnaissait que « déposé en
+// point relais / bureau de poste ». Les colis Vinted Go (casier/consigne) et les
+// statuts « prêt à être retiré / disponible » étaient donc INVISIBLES — leur
+// conversation jamais ouverte, leur code jamais capté (plainte de Julien). On
+// ajoute ces formes, en EXCLUANT d'abord ce qui n'est pas à retirer (livré à
+// domicile, finalisé, annulé, remboursé, retour). Lire une conversation de trop
+// est une LECTURE bornée sans risque ; en manquer une fait perdre un colis —
+// l'asymétrie penche vers l'élargissement. EXPRESSION IDENTIQUE à
+// `isAtRelayStatus` (src/App.jsx), §11 : les deux comparées par audit-coherence.
+const AT_RELAY = (s) => !!(s) && !/livr[ée]\s+(?:chez|à\s+(?:ton|votre|son)\s+domicile|à\s+domicile)/i.test(s) && !/finalis|termin|annul|rembours|retour/i.test(s) && ((/d[ée]pos[ée]|arriv[ée]/i.test(s) && /point\s+relais|bureau\s+de\s+poste|casier|consigne|locker|vinted\s*go|point\s+de\s+retrait/i.test(s)) || /pr[êe]t\s+à\s+[êe]tre\s+retir/i.test(s) || (/disponible|à\s+retirer|au\s+point\s+de\s+retrait/i.test(s) && /relais|bureau\s+de\s+poste|casier|consigne|point|retrait|locker|vinted\s*go/i.test(s)));
 // ══════════════════════════════════════════════════════════════════════════════
 // LE CODE DE RETRAIT VINTED GO EST DANS LA CONVERSATION, PAS DANS UN EMAIL
 // ══════════════════════════════════════════════════════════════════════════════
@@ -2160,9 +2169,21 @@ const sansBalises = (s) => String(s == null ? '' : s)
 // On accepte donc au plus deux lettres majuscules suivies de 4 à 10 chiffres :
 // « suivant » n'a aucun chiffre, il reste écarté.
 const CODE_APRES = /^([A-Z]{0,2}\d{4,10})\b/;
-// Le message d'ARRIVÉE, et lui seul. « Article à emballer et envoyer » parle
-// aussi de point relais : c'est un colis qui PART, pas un colis à retirer.
-const CONV_ARRIVE = /(?:ton\s+colis|ta\s+commande)\s+est\s+arriv|t['’]attend\s+à\s+l['’]adresse/i;
+// ⚠️ UN COLIS QUI PART N'EST JAMAIS UN COLIS À RETIRER. « Article à emballer et
+// envoyer », « imprime le bordereau », « dépose ton colis dans n'importe quel
+// point relais » parlent de point relais mais pour un ENVOI. On l'écarte EN
+// PREMIER, avant toute reconnaissance d'arrivée.
+const CONV_SORTANT = /à\s+emballer|à\s+envoyer|imprime\s+(?:le|ton)\s+bordereau|bordereau\s+d['’]envoi|pr[ée]pare\s+ta\s+commande|d[ée]pose\s+(?:ensuite\s+)?(?:ton|votre)\s+colis/i;
+// Le message d'ARRIVÉE au point de retrait — dans TOUTES ses formulations.
+// ⚠️ ÉLARGI le 20 sept. : l'ancienne règle n'acceptait que « ton colis est
+// arrivé » / « t'attend à l'adresse ». « Rends-toi au point relais Phone Cash… »
+// (Mondial Relay) et « Récupère-le au casier Vinted Go. Scanne ton code de
+// retrait » étaient MANQUÉS — leur code jamais capté (plainte de Julien). On
+// reconnaît aussi « rends-toi », « récupère-le au », « livré dans le point
+// relais/casier/consigne », « prêt à être retiré », « scanne/code de retrait ».
+// On ne prend PAS « est disponible » seul (un « bordereau disponible » n'est pas
+// un retrait) : la garde reste l'extraction d'un code/lieu/qr plus bas.
+const CONV_ARRIVE = /(?:ton\s+colis|ta\s+commande)\s+est\s+arriv|t['’]attend\s+à\s+l['’]adresse|rends[-\s]toi\s+(?:au|à|dans|chez)|(?:a\s+été|est)\s+livr[ée]\s+(?:dans|au)\s+(?:le\s+|la\s+)?(?:point\s+relais|bureau|casier|consigne)|pr[êe]t\s+à\s+[êe]tre\s+retir|scanne\s+ton\s+code\s+de\s+retrait|code\s+de\s+retrait|r[ée]cup[èe]re[-\s]le\s+(?:au|à|dans|chez)/i;
 function retraitDeConversation(conv) {
   try {
     const c = (conv && conv.conversation) || conv || {};
@@ -2176,7 +2197,9 @@ function retraitDeConversation(conv) {
       const e = m.entity || {};
       const titre = sansBalises(e.title);
       const sous = sansBalises(e.subtitle);
-      if (!CONV_ARRIVE.test(titre + ' ' + sous)) continue;
+      const brut = titre + ' ' + sous;
+      if (CONV_SORTANT.test(brut)) continue;   // un colis qui PART, jamais à retirer
+      if (!CONV_ARRIVE.test(brut)) continue;
       // On garde le HTML BRUT : « Scanne ton code de retrait » est un LIEN, et
       // c'est derrière lui que vit le QR (capture d'écran de Julien).
       trouve = { titre, sous, html: String(e.subtitle || ''), actions: e.actions || [] };
@@ -2186,9 +2209,15 @@ function retraitDeConversation(conv) {
     // Lieu : ce qui suit le marqueur, jusqu'à la fin de la phrase.
     let lieu = '';
     for (const re of [/à\s+l['’]adresse\s+suivante\s*:\s*/i, /livr[ée]\s+dans\s+le\s+[Pp]oint\s+[Rr]elais\s+/i,
-                      /livr[ée]\s+(?:dans|à|au|chez)\s+/i, /t['’]attend\s+(?:dans|à|au|chez)\s+/i]) {
+                      /livr[ée]\s+(?:dans|à|au|chez)\s+/i, /t['’]attend\s+(?:dans|à|au|chez)\s+/i,
+                      /rends[-\s]toi\s+(?:au|à\s+la|à|dans\s+le|dans\s+la|chez)\s+/i,
+                      /r[ée]cup[èe]re[-\s]le\s+(?:au|à\s+la|à|dans\s+le|dans\s+la|chez)\s+/i]) {
       const m = txt.match(re); if (!m) continue;
       lieu = txt.slice(m.index + m[0].length).split(/\.\s|\.$/)[0].trim();
+      // ⚠️ « Rends-toi au … Saint-Malo POUR RÉCUPÉRER ta commande » : on coupe la
+      // consigne qui suit l'adresse, sans toucher aux adresses (elles ne portent
+      // pas « pour récupérer »).
+      if (lieu) { lieu = lieu.replace(/\s+pour\s+(?:le\s+|la\s+|les\s+|l['’])?r[ée]cup[ée]r\w*.*$/i, '').trim(); }
       if (lieu) break;
     }
     // Code : « saisis le code X », sinon « le code X pour ».
