@@ -247,6 +247,20 @@ async function diagO(type, parsed, id) {
     dit(!d.n.forme_inconnue_champ_transaction, 'transaction maigre (1 clé) ⇒ AUCUNE alerte (mieux vaut un blanc)');
   }
 
+  // 18. DÉTAIL D'ANNONCE — `photos` renommé : le coffre ET la capture photo
+  //     (Leboncoin/eBay) tombent à zéro en silence. Objet substantiel ⇒ déclenche.
+  {
+    const d = await diagO('item', { item: { id: 7, title: 'A', price: {}, photoz: [] } }, 'i1');
+    dit(d.n.forme_inconnue_champ_item === 1, 'annonce sans `photos` → forme_inconnue_champ_item');
+    dit((d.rates.forme_champ_item || {}).champ === 'photos', 'le champ photo perdu est nommé');
+  }
+
+  // 19. ANNONCE SANS PHOTO — `photos: []`, la clé est là ⇒ rien (présence de clé).
+  {
+    const d = await diagO('item', { item: { id: 7, title: 'A', price: {}, photos: [] } }, 'i2');
+    dit(!d.n.forme_inconnue_champ_item, 'photos présent mais vide ⇒ AUCUNE alerte');
+  }
+
   console.log(ko ? `\n❌ ${ko} échec(s)` : '\n✅ sentinelle de forme : tout vert');
   process.exit(ko ? 1 : 0);
 })();
