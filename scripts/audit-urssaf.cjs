@@ -105,6 +105,73 @@ if (!bloc || !/caUrssafParMois/.test(bloc)) {
     : nok('un taux illisible retombe sur le défaut', 'obtenu ' + ctx3.tauxUrssaf());
 }
 
+// ── 1 bis. TOUTES PLATEFORMES (3 octobre) — la MÊME règle pour Vinted,
+//    Leboncoin et eBay, exécutée dans un `vm`. Les prédicats Leboncoin viennent
+//    du source (recopiés, ils mesureraient MES règles, pas celles de l'app).
+{
+  const lbcSrc = (() => {
+    const a = SRC.indexOf('const lbcAnnulee = ');
+    const b = SRC.indexOf('\nconst lbcEuro', a);
+    return a > 0 && b > a ? SRC.slice(a, b) : '';
+  })();
+  const ctxP = {
+    console, Date, Number, String, isFinite, parseFloat, Object, Math, Array,
+    load: (k, d) => d,
+    classifyOrderStatus: (s) => /annul|cancel|refus|rembours/i.test(String(s || '')) ? 'cancelled' : (/finalis/i.test(String(s || '')) ? 'completed' : 'pending'),
+    tsCommande: (o) => Date.parse((o && o.date) || '') || 0,
+    montantCommande: (o) => { const p = o && o.price; const v = (p && typeof p === 'object') ? p.amount : p; const n = Number(String(v == null ? '' : v).replace(',', '.')); return isNaN(n) ? 0 : n; },
+  };
+  let r = null;
+  try {
+    vm.createContext(ctxP);
+    vm.runInContext(lbcSrc + '\n' + bloc + "\n;Object.assign(this, { ventesDeclarables, caDeclarableParMois, caUrssafParMois });", ctxP);
+    const VINTED = [
+      { transaction_id: 1, date: '2026-09-10T12:00:00+02:00', price: { amount: '80.0' }, status: 'Commande finalisée' },
+      { transaction_id: 2, date: '2026-09-11T12:00:00+02:00', price: { amount: '45.0' }, status: 'Paiement validé' },
+    ];
+    const LBC = [
+      { txId: 'A', isSeller: true, price: 7500, stepLabel: 'Paiement effectué', dateVente: '2026-09-18T14:02:11+02:00', title: 'Salomon' },
+      { txId: 'A', isSeller: true, price: 7500, stepLabel: 'Paiement effectué', dateVente: '2026-09-18T14:02:11+02:00', title: 'Salomon (vue deux fois)' },
+      { txId: 'B', isSeller: true, price: 5800, stepLabel: 'Paiement effectué', title: 'Nike sans date' },
+      { txId: 'C', price: 9900, stepStatus: 'done', dateVente: '2026-09-19T10:00:00+02:00', title: 'côté inconnu' },
+      { txId: 'D', isSeller: false, price: 4000, stepStatus: 'done', dateVente: '2026-09-19T10:00:00+02:00', title: 'un ACHAT' },
+      { txId: 'E', isSeller: true, price: 4500, stepLabel: 'Colis à envoyer', dateVente: '2026-09-20T10:00:00+02:00', title: 'en cours' },
+    ];
+    const EBAY = [
+      { orderId: 'X1', orderPaymentStatus: 'PAID', creationDate: '2026-09-21T10:00:00.000Z', pricingSummary: { total: { value: '60.00', currency: 'EUR' } } },
+      { orderId: 'X2', orderPaymentStatus: 'FULLY_REFUNDED', creationDate: '2026-09-21T10:00:00.000Z', pricingSummary: { total: { value: '30.00', currency: 'EUR' } } },
+      { orderId: 'X3', orderPaymentStatus: 'PAID', creationDate: '2026-09-22T10:00:00.000Z', pricingSummary: { total: { value: '50.00', currency: 'USD' } } },
+    ];
+    r = ctxP.ventesDeclarables({ vinted: VINTED, lbc: LBC, ebay: EBAY });
+    const sept = (ctxP.caDeclarableParMois(r.lignes))['2026-09'] || {};
+    const par = sept.par || {};
+    Math.abs((sept.ca || 0) - 215) < 0.001
+      ? ok('septembre = 80 (Vinted finalisée) + 75 (Leboncoin, centimes) + 60 (eBay payée) — rien d\'autre')
+      : nok('le CA du mois additionne les trois plateformes, et elles seules', 'obtenu ' + sept.ca + ' au lieu de 215');
+    Math.abs(((par.Vinted || {}).ca || 0) + ((par.Leboncoin || {}).ca || 0) + ((par.eBay || {}).ca || 0) - (sept.ca || 0)) < 0.001 && (par.Leboncoin || {}).n === 1
+      ? ok('les « dont » somment au total, et une vente vue deux fois compte UNE fois')
+      : nok('les « dont » somment au total sans doublon', JSON.stringify(par));
+    r.aDater.length === 1 && r.aDater[0].id === 'lbc:B' && Math.abs(r.aDater[0].eur - 58) < 0.001
+      ? ok('une vente Leboncoin SANS date n\'entre dans aucun mois : elle est « à dater », avec son montant')
+      : nok('la vente sans date est « à dater »', JSON.stringify(r.aDater));
+    !r.lignes.some((l) => l.id === 'lbc:C' || l.id === 'lbc:D' || l.id === 'lbc:E')
+      ? ok('ni côté inconnu, ni achat, ni vente en cours ne comptent (§5)')
+      : nok('seules les ventes PROUVÉES et finalisées comptent', r.lignes.map((l) => l.id).join(','));
+    r.ecartees.some((e) => e.id === 'ebay:X3') && !r.lignes.some((l) => l.id === 'ebay:X2')
+      ? ok('eBay : remboursée exclue, autre devise écartée et COMPTÉE à part (jamais convertie au hasard)')
+      : nok('eBay : remboursée exclue, autre devise écartée', JSON.stringify(r.ecartees));
+    const seul = ctxP.caDeclarableParMois(ctxP.ventesDeclarables({ vinted: VINTED }).lignes)['2026-09'] || {};
+    const avant = ctxP.caUrssafParMois(VINTED)['2026-09'] || {};
+    seul.ca === avant.ca && seul.n === avant.n
+      ? ok('l\'autre sens : sans Leboncoin ni eBay, le CA est exactement celui d\'avant')
+      : nok('sans Leboncoin ni eBay, rien ne change', `${seul.ca} contre ${avant.ca}`);
+  } catch (e) { nok('la règle toutes plateformes s\'exécute', e.message); }
+  // L'écran Ventes publie la répartition ET ce qu'il ne sait pas.
+  /ventesDeclarables\(\{ vinted: sales\.items, lbc: [^}]*ebay: [^}]*\}\)/.test(SRC) && /sources = \{ Vinted: 'lu', Leboncoin: lbcLu \? 'lu' : 'pasSu'/.test(SRC)
+    ? ok('l\'écran Ventes publie toutes plateformes, avec ce qui n\'a pas pu être lu')
+    : nok('l\'écran Ventes publie toutes plateformes', 'publication encore Vinted seule');
+}
+
 // ── 2. Les deux rapports n'écartent plus les ventes masquées ───────────────
 const mensuel = SRC.slice(SRC.indexOf('const report = useMemo'), SRC.indexOf('const openReport'));
 const annuel = SRC.slice(SRC.indexOf('const annual = useMemo'), SRC.indexOf('const openAnnual'));
@@ -137,7 +204,7 @@ libelles.length === 2
       ? nok('les deux rapports ne disent plus « CA encaissé »', libelles.filter(l=>/encaiss/i.test(l)).join(' · '))
       : ok('les deux rapports annoncent « CA des ventes finalisées », pas « encaissé »'))
   : nok('les deux cartes de CA des rapports sont lisibles', libelles.length + ' trouvée(s)');
-/pas au jour où Vinted t'a versé l'argent/.test(SRC)
+/pas au jour où (Vinted|la plateforme) t'a versé l'argent/.test(SRC)
   ? ok("le tableau de bord DIT que ses ventes sont datées au jour de la vente")
   : nok("le tableau de bord dit comment ses ventes sont datées", 'avertissement absent');
 

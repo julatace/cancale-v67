@@ -32,7 +32,18 @@ const ACHATS = [
   { transaction_id: 7001, title: 'Lot Nike Air Max', price: { amount: '35', currency_code: 'EUR' }, status: 'Commande finalisée', date: jour(1), seller: 'vendeur_test' },
 ];
 const ACCOUNTS = [{ id: 1, vinted_user_id: '111', login: 'compte_test', domain: 'www.vinted.fr', updated_at: auj.toISOString() }];
+// TOUTES PLATEFORMES (3 octobre) : une vente Leboncoin PROUVÉE, finalisée et
+// datée (75 € en centimes) ; une autre SANS date (« à dater », hors du mois) ;
+// une transaction au côté inconnu (jamais comptée) ; une commande eBay payée.
+const LBC = {
+  A: { txId: 'A', isSeller: true, price: 7500, stepLabel: 'Paiement effectué', dateVente: jour(Math.max(1, J - 2)), title: 'Jordan 1 mid leboncoin' },
+  B: { txId: 'B', isSeller: true, price: 5800, stepLabel: 'Paiement effectué', title: 'Nike sans date' },
+  C: { txId: 'C', price: 9900, stepStatus: 'done', dateVente: jour(Math.max(1, J - 2)), title: 'côté inconnu' },
+};
+const EBAY = [{ orderId: 'E1', orderPaymentStatus: 'PAID', creationDate: jour(Math.max(1, J - 1)), pricingSummary: { total: { value: '60.00', currency: 'EUR' } }, lineItems: [{ title: 'Salomon ebay' }] }];
 const rows = [
+  { id: 'lbc_ventes', data: { ventes: LBC } },
+  { id: 'ebay_orders', data: { orders: EBAY } },
   { id: 'harvest_111_orders_sold', data: { capturedAt: auj.toISOString(), payload: { my_orders: VENTES } } },
   { id: 'harvest_111_orders_purchased', data: { capturedAt: auj.toISOString(), payload: { my_orders: ACHATS } } },
 ];
@@ -71,7 +82,12 @@ srv.listen(PORT);
         if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCOUNTS);
         // L'app lit les ventes par MOTIF (`id=like.harvest_111_orders_%`) : un
         // banc qui ne sert que `id=eq.` mesure un écran vide (§6.3).
-        const forme = (r) => ({ ...r, updated_at: auj.toISOString(), cap: r.data.capturedAt });
+        // §6.3 : une requête PROJETÉE (`orders:data->orders`) reçoit la projection.
+        const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || '';
+        const forme = (r) => {
+          if (/^[a-z]+:data->[a-z]+$/i.test(sel)) { const [al, src] = sel.split(':'); return { [al]: (r.data || {})[src.split('->')[1]] }; }
+          return { ...r, updated_at: auj.toISOString(), cap: r.data.capturedAt };
+        };
         const eq = /id=eq\.([^&]*)/.exec(u);
         if (eq) return j(rows.filter((r) => r.id === eq[1]).map(forme));
         const lk = /id=like\.([^&]*)/.exec(u);
@@ -94,7 +110,12 @@ srv.listen(PORT);
       });
       dit(Array.isArray(r.lignes), 'le rapport a un registre des ventes');
       const L = r.lignes || [];
-      dit(L.length === 3, 'une ligne par vente FINALISÉE du mois (3), ni l’en cours ni l’annulée', `${L.length} ligne(s)`);
+      dit(L.length === 5, 'une ligne par vente FINALISÉE du mois, TOUTES PLATEFORMES (3 Vinted + 1 Leboncoin + 1 eBay), ni l’en cours ni l’annulée', `${L.length} ligne(s)`);
+      dit(L.some((t) => /Leboncoin/.test(t) && /75,00/.test(t)) && L.some((t) => /eBay/.test(t) && /60,00/.test(t)), 'la vente Leboncoin (centimes → 75 €) et la vente eBay sont dans le registre, avec leur plateforme');
+      dit(!L.some((t) => /sans date|côté inconnu/.test(t)), 'ni la vente sans date, ni la transaction au côté inconnu');
+      const couv = await pg.evaluate(() => (document.querySelector('[data-registre-couverture]') || {}).innerText || '');
+      dit(/dont Vinted/.test(couv) && /Leboncoin 75,00/.test(couv) && /eBay 60,00/.test(couv), 'la répartition par plateforme est dite à côté du total', couv.slice(0, 120));
+      dit(/1 vente sans date \(58,00/.test(couv), 'et la vente sans date est annoncée avec son montant, hors du mois', couv.slice(0, 160));
       dit(!L.some((t) => /Kayano|990/.test(t)), 'la vente en cours et l’annulée n’y sont pas');
       const somme = L.reduce((a, t) => a + nombre(t.split('\n').pop()), 0);
       const caTxt = (/CA des ventes finalisées\s*\n?\s*([^\n]+)/i.exec(r.modale) || [])[1] || '';

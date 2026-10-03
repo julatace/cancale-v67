@@ -23,8 +23,11 @@ const DETAIL = JSON.stringify({
   step: { status: 'action', label: 'Colis à envoyer' },
 });
 const URL_LISTE = 'https://api.leboncoin.fr/api/consumergoods/proxy/v3/pages/transactions';
+// ⚠️ La liste porte la DATE de la vente (`created_at`, relevée dans
+//    lbc_recon.schemas) et un prix qui n'est PAS celui de la vente : le total
+//    acheteur (mesuré 2928 contre 2500 dans le détail).
 const LISTE = JSON.stringify([
-  { id: { purchase_id: 362201423 }, item: { title: 'Salomon XT-6 noir taille 43,5', price: 7500, type: 'ad' }, step: 'ongoing', price: 7500 },
+  { id: { purchase_id: 362201423 }, created_at: '2026-09-18T14:02:11+02:00', item: { title: 'Salomon XT-6 noir taille 43,5', price: 8290, type: 'ad' }, step: 'ongoing', price: 8290 },
   { id: { purchase_id: 361842001 }, item: { title: 'Nike zoom', price: 5800, type: 'ad' }, step: 'ongoing', price: 5800 },
   { id: { purchase_id: 163516245 }, item: { title: 'autre', price: 1500, type: 'ad' }, step: 'cancelled', price: 1500 },
 ]);
@@ -86,7 +89,7 @@ const venteEcrite = () => { const w = ecrits.find((r) => r.id === 'lbc_ventes');
     const c = faireCtx();
     await c.rangerLbcVentes(c.extraireVentesLbc(URL_DETAIL, DETAIL));
     const t = (venteEcrite() || {})['362201423'] || {};
-    const clesOk = new Set(['txId', 'itemId', 'title', 'price', 'isSeller', 'stepStatus', 'stepLabel', 'deliveryMethod', 'deliveryLabel', 'label', 'at']);
+    const clesOk = new Set(['txId', 'itemId', 'title', 'price', 'prixListe', 'dateVente', 'isSeller', 'stepStatus', 'stepLabel', 'deliveryMethod', 'deliveryLabel', 'label', 'at']);
     const intruses = Object.keys(t).filter((k) => !clesOk.has(k));
     dit(intruses.length === 0, 'aucune clé inattendue (ni acheteur, ni adresse)', intruses.join(', '));
   });
@@ -129,6 +132,26 @@ const venteEcrite = () => { const w = ecrits.find((r) => r.id === 'lbc_ventes');
     const c = faireCtx();
     await c.rangerLbcVentes(c.extraireVentesLbc(URL_LISTE, LISTE));
     dit(!venteEcrite(), 'une lecture ratée n\'efface pas les ventes déjà captées');
+  });
+
+  // 6. LA DATE DE VENTE ET LE BON PRIX (3 octobre) — le CA URSSAF en dépend.
+  await essaie('date et prix', async () => {
+    ligne = {}; lectureKO = false;
+    const c = faireCtx();
+    // La base GARDE ce qui est écrit d'un passage à l'autre (sinon on mesure
+    // trois écritures isolées, pas la fusion).
+    const derniere = () => { const w = ecrits.filter((r) => r.id === 'lbc_ventes').pop(); return w ? w.data.ventes : null; };
+    const passe = async (u, b) => { await c.rangerLbcVentes(c.extraireVentesLbc(u, b)); const d = derniere(); if (d) ligne = { lbc_ventes: { ventes: d } }; };
+    await passe(URL_LISTE, LISTE);
+    await passe(URL_DETAIL, DETAIL);
+    // Une recapture de la liste, plus tard : elle ne doit rien abîmer.
+    await passe(URL_LISTE, LISTE.replace('2026-09-18T14:02:11+02:00', '2026-10-01T09:00:00+02:00'));
+    const t = (derniere() || {})['362201423'] || {};
+    dit(t.dateVente === '2026-09-18T14:02:11+02:00', 'la vente porte sa DATE DE VENTE (celle de Leboncoin), et elle ne bouge plus', t.dateVente || 'aucune date : la vente ne peut être placée dans aucun mois');
+    dit(t.price === 7500, 'le prix reste celui de la VENTE (détail), une recapture de la liste ne l\'écrase pas', 'price=' + t.price);
+    dit(t.prixListe === 8290, 'le total acheteur de la liste est gardé À PART', 'prixListe=' + t.prixListe);
+    const v = derniere() || {};
+    dit(!v['163516245'] || !v['163516245'].dateVente, 'une transaction sans date reste SANS date (jamais celle de la capture)');
   });
 
   console.log(ko ? `\n${ko} contrôle(s) non conforme(s).` : '\nCaptation des ventes Leboncoin conforme.');
