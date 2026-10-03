@@ -65,6 +65,8 @@ let ko = 0; const dit = (c,m,d)=>{ if(!c)ko++; console.log((c?'✅ ':'❌ ')+m+(
     return j({ ok:true }); });
   await pg.goto('http://localhost:4331/?tab=plat_ebay',{waitUntil:'domcontentloaded'});
   await pg.waitForTimeout(2500);
+  // Plus d'« Aperçu » (3 oct.) : la connexion et la publication vivent dans « Compte eBay ».
+  try { await pg.getByRole('button', { name: 'Compte eBay', exact: true }).first().click({ timeout: 5000 }); await pg.waitForTimeout(1500); } catch (_) {}
   const T = async () => (await pg.evaluate(()=>document.body.innerText));
 
   const openBtn = await pg.$('text=Vendre une paire sur eBay');
