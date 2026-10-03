@@ -1886,24 +1886,9 @@ const fetchEmailAchats = async () => {
     return rows.map(r => r.data).filter(Boolean);
   } catch (_) { return []; }
 };
-// Offres reçues (Copilote d'offres) : lignes email_offer_* = { qui, article,
-// montant, buy, net, receivedAt }. Le serveur y met déjà le conseil chiffré.
-// ⚠️ ÉGRESS (§4.4) : la ligne porte `extrait`, le morceau brut de l'email —
-// **102 Ko des 231 Ko** de la famille, et l'app ne le lit NULLE PART. On projette
-// les neuf champs utilisés. Mesuré le 15 septembre : **231 Ko / 1 192 ms →
-// 111 Ko / 402 ms**, valeurs identiques (518 lignes × 9 champs, 0 écart).
-const OFFRE_CHAMPS = ['article', 'receivedAt', 'montant', 'qui', 'uid', 'account', 'buy', 'net', 'type'];
-const fetchEmailOffers = async () => {
-  try {
-    const sel = OFFRE_CHAMPS.map((k) => `${k}:meta->>${k}`).join(',');
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_offer_*&select=id,${sel}`, {
-      headers: sbAuth(),
-    });
-    if (!res.ok) return [];
-    const rows = await res.json();
-    return (Array.isArray(rows) ? rows : []).sort((a, b) => new Date(b.receivedAt || 0) - new Date(a.receivedAt || 0));
-  } catch (_) { return []; }
-};
+// (Offres reçues par email, `email_offer_*` : leur lecture est retirée le
+//  3 octobre — Ma journée et Messages rapatriaient 573 offres / 142 Ko à chaque
+//  ouverture, et plus rien ne les affichait depuis le 28 septembre.)
 // Emails de VENTE (« X a acheté ton article ») : lignes email_sale_* =
 // { designation (titre), prix, account, receivedAt }. Source 24/7 sans appel
 // Vinted → sert à retirer AUTOMATIQUEMENT une annonce vendue.
@@ -5086,7 +5071,9 @@ let _logoSeq = 0;
 // Les coins sont arrondis ici pour ne jamais montrer le fond noir de l'image
 // sur le thème clair.
 function VrmLogo({ size = 40, style, anim = true }) {
-  return <img src="/logo-vrm-192.png" alt="VRM" width={size} height={size} className={anim ? 'vrm-logo-anim' : undefined}
+  // srcSet : le navigateur prend la 96 px (10 Ko) quand elle suffit — l'en-tête
+  // affiche le logo à 38-44 px — et la 192 px (32 Ko) sur un écran très dense.
+  return <img src="/logo-vrm-192.png" srcSet="/logo-vrm-96.png 96w, /logo-vrm-192.png 192w" sizes={`${size}px`} alt="VRM" width={size} height={size} className={anim ? 'vrm-logo-anim' : undefined}
     style={{ width: size, height: size, borderRadius: Math.round(size * 0.24), objectFit: 'cover', display: 'block', ...(style || {}) }}/>;
 }
 // Le sigle à plat, pour poser à côté du médaillon dans l'en-tête.
@@ -16042,11 +16029,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // ── Atelier de republication ──────────────────────────────────────────────
   // Brouillons de nouvelles versions d'annonces : clé = id d'annonce wardrobe,
   // valeur = { title, desc, price, versions:[{title,desc,price,at,scoreBefore,scoreAfter}], updatedAt }.
-  // Offres traitées à la main (bouton « ✓ Répondu ») : mémorisées par clé
-  // receivedAt|article pour ne plus les afficher dans Ma journée.
-  const [offersDone, setOffersDone] = useState(() => new Set(load('vinted_offers_done', []) || []));
-  const offerKey = (o) => `${o.receivedAt||''}|${normTitle(o.article||'')}`;
-  const markOfferDone = (o) => setOffersDone(prev => { const n = new Set(prev); n.add(offerKey(o)); save('vinted_offers_done', [...n]); return n; });
   // (brouillons de republication : état retiré avec l'atelier. La clé
   //  `vinted_annonce_drafts` reste synchronisée — on ne supprime pas des
   //  données du nuage au passage d'un écran.)
@@ -16155,7 +16137,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [achEmails, setAchEmails] = useState(null); // reçus d'achat archivés (emails)
   const [receiptView, setReceiptView] = useState(null); // reçu affiché dans une modale in-app
   const [lotView, setLotView] = useState(null); // détail d'un lot : { loading, order, items }
-  const [offers, setOffers] = useState(null); // offres reçues (Copilote d'offres)
   // Colis RETIRÉS à la main (par n° de suivi) : disparaissent de « à retirer ».
   const [collected, setCollected] = useState(() => new Set(load('vrm_colis_collected', [])));
   const [lastCollected, setLastCollected] = useState(null); // dernier colis retiré → bandeau « Annuler »
@@ -18821,7 +18802,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   useEffect(() => { if ((curSub==='annonces'||curSub==='journee'||curSub==='bordereaux') && accounts.length && listings.items===null) loadListings(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
   useEffect(() => { if ((curSub==='annonces'||curSub==='journee') && emailSales===null) fetchEmailSales().then(setEmailSales); /* eslint-disable-next-line */ }, [sub]);
   useEffect(() => { if ((curSub==='messages'||curSub==='journee') && accounts.length && convs.items===null) loadConvs(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
-  useEffect(() => { if ((curSub==='messages'||curSub==='journee') && offers===null) fetchEmailOffers().then(setOffers); /* eslint-disable-next-line */ }, [sub]);
   useEffect(() => { if ((curSub==='bordereaux'||curSub==='annonces'||curSub==='ventes'||curSub==='journee'||curSub==='achats') && emailBords===null) fetchEmailBordereaux().then(setEmailBords); /* eslint-disable-next-line */ }, [sub]);
   // Détecte un bordereau PDF capté par l'extension (téléchargé sur Vinted) et
   // encore frais (< 60 min) → on affiche un bandeau « tamponner en 1 clic ».
