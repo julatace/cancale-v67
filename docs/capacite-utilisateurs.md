@@ -14,6 +14,30 @@ bornée, pas un nombre inventé. C'est le domaine de la session « fiabilité /
   viennent donc du dossier (mesures sur le compte de Julien), pas d'une sonde
   live.
 
+## Mesuré au dashboard le 3 octobre (Julien quasiment seul sur la base)
+- **Compute : CPU 62 %, Disk IO 62 %, Mémoire 16 %** — avec **un seul** vrai
+  utilisateur. Le compute tourne déjà à ~60 % à vide d'autres vendeurs : très peu
+  de marge. La RAM, elle, va bien (16 %).
+- **Instance = Nano** (le plus petit tier, 0,5 Go RAM, partagé) — le dashboard
+  propose un **« Free Upgrade » vers Micro** (1 Go), inclus dans le plan Pro, **non
+  pris**. À faire : gratuit, double la RAM.
+- **Disque : 0,5 Go utilisé / 2 Go** provisionnés (auto-extensible à 8 Go). DB
+  212 Mo + WAL 128 Mo + système 168 Mo. **La taille n'est pas le problème.**
+
+### Tiers compute → actifs SIMULTANÉS (estimation ancrée sur 62 %/1 user)
+| tier | RAM | ~€/mois | simultanés réalistes |
+|---|---|---|---|
+| Nano (actuel) | 0,5 Go partagé | inclus | ~2-4 |
+| Micro (upgrade gratuit) | 1 Go partagé | 0 € | ~4-6 |
+| Small | 2 Go partagé | ~15 € | ~10-15 |
+| Medium | 4 Go partagé | ~60 € | ~25-40 |
+| Large (dédié 2 vCPU) | 8 Go | ~110 € | dizaines à ~100 |
+
+⚠️ Estimations : le seul point **mesuré** est « 62 % CPU à 1 user sur Nano ». Un
+vrai test de charge donnerait mieux, mais on ne le lance pas contre la prod.
+Le **Disk IO à 62 %** vient en bonne partie des gros PDF lus/écrits en base →
+levier « PDF vers Storage ».
+
 ## Poids par utilisateur (mesuré sur Julien = cas LOURD, 9 comptes Vinted)
 - ~**6 000 lignes** `app_data` (5 959 le 3 octobre, §5.134).
 - Taille dominée par **les PDF et les transactions** :
