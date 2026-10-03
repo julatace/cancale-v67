@@ -88,6 +88,17 @@ async function diag(type, parsed, id) {
   return { n: { ...(row.n || {}), ...(buf.n || {}) }, rates: { ...(row.rates || {}), ...(buf.rates || {}) } };
 }
 
+// Même chose pour la sentinelle OBJET (transaction/conversation). Absente sur le
+// code d'avant ⇒ no-op ⇒ silence : les contrôles « déclenche » virent au rouge.
+async function diagO(type, parsed, id) {
+  const ctx = faireCtx();
+  if (typeof ctx.verifFormeObjet === 'function') ctx.verifFormeObjet(type, parsed, id);
+  await ctx.noterDiag('__sync__');
+  const buf = ctx.__store.vrmDiagBuf || { n: {}, rates: {} };
+  const row = ctx.__diagRow || { n: {}, rates: {} };
+  return { n: { ...(row.n || {}), ...(buf.n || {}) }, rates: { ...(row.rates || {}), ...(buf.rates || {}) } };
+}
+
 (async () => {
   // 1. CLÉ RENOMMÉE — `my_orders` → `orders` (le cas d'une mise à jour Vinted).
   {
@@ -188,6 +199,52 @@ async function diag(type, parsed, id) {
     const d = await diag('listings', { items: [{ id: 1, title: 'A', prix_v2: {} }] }, 'z2');
     const k = Object.keys(d.rates).find(x => /^forme_/.test(x) && /listings/.test(x.slice('forme_'.length)));
     dit(!!k, 'la clé de dérive de champ est captée par le filtre /^forme_/ de l’app', 'clé=' + k);
+  }
+
+  // ── DÉRIVE SUR UNE CAPTURE OBJET (transaction, conversation) ────────────────
+  // Un renommage du champ lu casse en silence la preuve de vente / la messagerie.
+  // Sur le code d'avant, verifFormeObjet n'existe pas ⇒ no-op ⇒ silence ⇒ rouge.
+
+  // 12. CONVERSATION — `messages` renommé, objet substantiel ⇒ déclenche.
+  {
+    const d = await diagO('conversation', { id: 9, unread: true, user: { id: 1 }, msgs_v2: [] }, 'c1');
+    dit(d.n.forme_inconnue_champ_conversation === 1, 'conversation sans `messages` → forme_inconnue_champ_conversation',
+      'compteur=' + (d.n.forme_inconnue_champ_conversation || 0));
+    dit((d.rates.forme_champ_conversation || {}).champ === 'messages', 'le champ perdu (messages) est nommé');
+    dit(JSON.stringify(d.rates.forme_champ_conversation || {}).includes('msgs_v2'), 'les clés de l’objet sont relevées (msgs_v2 vu)');
+  }
+
+  // 13. CONVERSATION légitimement VIDE — `messages: []`, la clé est là ⇒ rien.
+  {
+    const d = await diagO('conversation', { id: 9, unread: false, user: { id: 1 }, messages: [] }, 'c2');
+    dit(!d.n.forme_inconnue_champ_conversation, 'messages présent mais vide ⇒ AUCUNE alerte (présence de clé)');
+  }
+
+  // 14. CONVERSATION ENVELOPPÉE `{conversation:{…}}` sans messages ⇒ déclenche
+  //     (on juge l'objet métier, pas l'enveloppe).
+  {
+    const d = await diagO('conversation', { conversation: { id: 9, unread: true, user: { id: 1 }, msgs_v2: [] } }, 'c3');
+    dit(d.n.forme_inconnue_champ_conversation === 1, 'enveloppe {conversation} sans messages → déclenche');
+  }
+
+  // 15. TRANSACTION — `status` renommé, transaction substantielle ⇒ déclenche.
+  {
+    const d = await diagO('transaction', { transaction: { id: 5, item_id: 7, status_v2: 450, buyer: 1 } }, 'x1');
+    dit(d.n.forme_inconnue_champ_transaction === 1, 'transaction sans `status` → forme_inconnue_champ_transaction');
+    dit((d.rates.forme_champ_transaction || {}).champ === 'status', 'le champ de vente perdu (status) est nommé');
+    dit(!JSON.stringify(d.rates.forme_champ_transaction || {}).includes('"buyer":1'), 'aucune valeur ne fuit');
+  }
+
+  // 16. TRANSACTION normale — `status` présent (même à 0) ⇒ rien.
+  {
+    const d = await diagO('transaction', { transaction: { id: 5, item_id: 7, status: 0, buyer: 1 } }, 'x2');
+    dit(!d.n.forme_inconnue_champ_transaction, 'status présent (0) ⇒ AUCUNE alerte (présence de clé, pas valeur)');
+  }
+
+  // 17. OBJET MAIGRE (< 3 clés) — réponse ratée/partielle, pas un jugement de forme.
+  {
+    const d = await diagO('transaction', { transaction: { id: 5 } }, 'x3');
+    dit(!d.n.forme_inconnue_champ_transaction, 'transaction maigre (1 clé) ⇒ AUCUNE alerte (mieux vaut un blanc)');
   }
 
   console.log(ko ? `\n❌ ${ko} échec(s)` : '\n✅ sentinelle de forme : tout vert');
