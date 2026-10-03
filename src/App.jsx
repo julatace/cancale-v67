@@ -16783,7 +16783,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (nextNumero est déclaré plus bas, après saleOv dont il dépend.)
   const garageNums = useMemo(()=>{ const s=new Set(); Object.values(garageGrid||{}).forEach(a=>{ if(Array.isArray(a)) a.forEach(v=>{const t=(v||'').trim().toLowerCase(); if(t)s.add(t);}); }); return s; }, [garageGrid]);
   const inGarage = (n)=> !!n && garageNums.has(String(n).trim().toLowerCase());
-  const linkedBuyIds = useMemo(()=>{ const s=new Set(); Object.values(numeros).forEach(e=>{ if(e&&e.buyFromId) s.add(String(e.buyFromId)); }); return s; }, [numeros]);
+  const linkedBuyIds = useMemo(()=>{ const s=new Set(); Object.values(numeros).forEach(e=>{ if(e&&e.buyFromId) s.add(String(e.buyFromId)); }); Object.values(saleOv).forEach(e=>{ if(e&&e.buyFromId) s.add(String(e.buyFromId)); }); return s; }, [numeros, saleOv]);
   const openPicker = async (item) => {
     // ⚠️ LA MODALE S'OUVRE TOUT DE SUITE. Avant, elle attendait le chargement de
     // TOUS les achats de TOUS les comptes — 11 s mesurées, à chaque clic. On
@@ -16816,16 +16816,30 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // fois, et le reçu d'achat reste générable même hors ligne.
   const choosePick = (p) => {
     const price = p.price?.amount!=null ? Number(p.price.amount) : null;
-    updatePair(pickerFor, {
-      buyPrice: price!=null?String(price):'',
-      buyFromId: p.transaction_id?String(p.transaction_id):null,
-      buyFrom: {
-        title: p.title||'', date: p.date||'', photo: orderPhoto(p)||'',
-        price: price, devise: p.price?.currency_code||'EUR',
-        seller: p.seller||p.user_login||'', status: p.status||'',
-        account: accNameOf(p._acc)||'',
-      },
-    });
+    const snap = {
+      title: p.title||'', date: p.date||'', photo: orderPhoto(p)||'',
+      price: price, devise: p.price?.currency_code||'EUR',
+      seller: p.seller||p.user_login||'', status: p.status||'',
+      account: accNameOf(p._acc)||'',
+    };
+    // ⚠️ DEUX CHEMINS, UNE SEULE ÉCRITURE DE L'INFO (§11). Depuis l'écran
+    // Annonces (ou une vente QUI A une identité d'annonce) on relie SUR LA PAIRE
+    // (`numeros[id]`, partagé avec la compta). Depuis une vente SANS identité
+    // d'annonce, il n'existe aucune paire où écrire : on relie alors sur la vente
+    // elle-même (override par n° de transaction), et `effEntry` le fait ressortir.
+    if (pickerFor && pickerFor._saleTx) {
+      setSaleOverride(pickerFor._saleTx, {
+        buyPrice: price!=null?String(price):'',
+        buyFromId: p.transaction_id?String(p.transaction_id):'',
+        buyFrom: snap,
+      });
+    } else {
+      updatePair(pickerFor, {
+        buyPrice: price!=null?String(price):'',
+        buyFromId: p.transaction_id?String(p.transaction_id):null,
+        buyFrom: snap,
+      });
+    }
     setPickerFor(null);
   };
   // L'achat relié à une paire, tel qu'on peut l'AFFICHER : la commande vivante
@@ -17684,6 +17698,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (ov.numero != null && ov.numero !== '') merged.numero = ov.numero;
     if (ov.buyPrice != null && ov.buyPrice !== '') merged.buyPrice = ov.buyPrice;
     if (ov.fees != null && ov.fees !== '') merged.fees = ov.fees;
+    // ⚠️ ACHAT RELIÉ DEPUIS LA VENTE (pour une vente SANS identité d'annonce :
+    // pas de paire où écrire, on relie sur la vente elle-même). `AchatRelie` lit
+    // `buyFromId`/`buyFrom` — sans ce passage, le reçu relié par l'écran Ventes
+    // n'apparaîtrait jamais. Même propriétaire que `choosePick` (§11).
+    if (ov.buyFromId) { merged.buyFromId = ov.buyFromId; merged.buyFrom = ov.buyFrom || merged.buyFrom; }
     return withBuyByNum(merged);
   };
 
@@ -22150,7 +22169,35 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                    numéro et l'achat qui correspond » — le N° est dans le titre de la
                    ligne, l'achat relié (photo + reçu) juste ici. Il vient de la paire
                    identifiée par Vinted (§5.34), jamais d'un rapprochement par titre. */}
-               {!hidden && <div><AchatRelie entry={e} numero={num}/></div>}
+               {/* ⚠️ RELIER L'ACHAT DEPUIS LA VENTE (demande de Julien : « relier
+                   les achats avec les ventes »). Sur une vente AVEC identité
+                   d'annonce on relie la PAIRE (le même geste que l'écran
+                   Annonces, §11) ; sans identité, on relie la vente elle-même
+                   (`_saleTx` → override). Le picker trie déjà les achats de même
+                   marque/taille en tête (`scoreAchat`) : « même si l'app ne
+                   trouve pas, elle fait une sélection » (sa demande) — et c'est
+                   TOUJOURS son clic qui tranche, jamais un rapprochement
+                   automatique par titre (§5). On ne le propose pas sur une vente
+                   annulée. */}
+               {!hidden && st!=='cancelled' && (()=>{
+                 const idf = identiteAnnonce(o);
+                 const saleItem = idf
+                   ? { id: idf, title: o.title, photo: orderPhoto(o), price: sell, _acc: o._acc }
+                   : { id: '_v'+o.transaction_id, _saleTx: String(o.transaction_id), title: o.title, photo: orderPhoto(o), price: sell, _acc: o._acc };
+                 if (e && e.buyFromId) return (
+                   <div style={{display:'flex',alignItems:'center',gap:8}}>
+                     <div style={{flex:1,minWidth:0}}><AchatRelie entry={e} numero={num}/></div>
+                     <button type="button" onClick={()=>openPicker(saleItem)} title="Relier un autre achat à cette vente" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.muted,cursor:'pointer',fontSize:11,fontWeight:600,padding:'5px 9px',fontFamily:'inherit'}}>changer</button>
+                   </div>
+                 );
+                 if (buy==null) return (
+                   <button type="button" onClick={()=>openPicker(saleItem)} title="Choisis l'achat correspondant : son prix remplit le coût, et la marge se calcule"
+                     style={{alignSelf:'flex-start',display:'inline-flex',alignItems:'center',gap:6,border:`1px dashed ${C.accent}88`,borderRadius:8,background:`${C.accent}10`,color:C.accent,cursor:'pointer',fontSize:12,fontWeight:600,padding:'7px 11px',fontFamily:'inherit'}}>
+                     <Icon name="link" size={14}/> Relier l'achat (remplit le coût)
+                   </button>
+                 );
+                 return null;
+               })()}
               </div>
             );
           })}
