@@ -28313,17 +28313,33 @@ function ConnexionsSetting() {
   // Chrome sait faire. Trois états, comme partout : `undefined` = en cours,
   // `null` = pas su, un objet = lu.
   const [derniereExt, setDerniereExt] = useState(undefined);
+  // ⚠️ DÉRIVE DE FORMAT (sentinelle 5.139). L'extension note `forme_inconnue_*`
+  // + un échantillon `rates.forme_<type>` quand Vinted/LBC/eBay renomme la clé de
+  // liste d'une réponse — la capture tombe à 0 sans erreur. On le SURFACE ici
+  // pour qu'il le sache (sinon la liste serait juste « vide »), mais SEULEMENT
+  // si c'est RÉCENT (< 7 j) : une dérive déjà corrigée laisse son compteur, et
+  // une alerte périmée fait cesser de lire les vraies.
+  const [drift, setDrift] = useState(undefined);
   useEffect(() => onVmrExt(() => setExt({ on: vmrExtPresent(), v: vmrExtVersion() })), []);
   useEffect(() => { (async () => {
     try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_diag_capture&select=ver:data->>ver,verAt:data->>verAt`, { headers: sbAuth() });
-      if (!r.ok) { setDerniereExt(null); return; }
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_diag_capture&select=ver:data->>ver,verAt:data->>verAt,rates:data->rates`, { headers: sbAuth() });
+      if (!r.ok) { setDerniereExt(null); setDrift(null); return; }
       const rows = await r.json();
-      if (!Array.isArray(rows)) { setDerniereExt(null); return; }
+      if (!Array.isArray(rows)) { setDerniereExt(null); setDrift(null); return; }
       const d = rows[0] || {};
       setDerniereExt(d.ver ? { v: String(d.ver), at: d.verAt || '' } : 'aucune');
-    } catch (_) { setDerniereExt(null); }
+      const rates = (d.rates && typeof d.rates === 'object') ? d.rates : {};
+      const recents = Object.keys(rates)
+        .filter(k => /^forme_/.test(k))
+        .map(k => ({ type: k.slice('forme_'.length), ...(rates[k] || {}) }))
+        .filter(x => { const t = Date.parse(x.at || '') || 0; return t && (Date.now() - t) < 7 * 864e5; });
+      setDrift(recents);
+    } catch (_) { setDerniereExt(null); setDrift(null); }
   })(); }, []);
+  // Le type de capture → un mot que Julien lit (jamais le nom technique brut).
+  const nomFamille = (t) => /orders_sold/.test(t) ? 'ventes' : /orders_purchased/.test(t) ? 'achats'
+    : /listings/.test(t) ? 'annonces' : /inbox|conv/.test(t) ? 'messages' : t;
   useEffect(() => { (async () => {
     const lire = async (motif) => {
       try {
@@ -28389,6 +28405,13 @@ function ConnexionsSetting() {
         d={capt && capt.ts && (Date.now() - capt.ts) > 2 * 864e5
             ? "Repasse sur vinted.fr avec l'extension — c'est la navigation qui capte."
             : "Annonces, ventes, achats et messages viennent de là."}/>
+      {/* ⚠️ DÉRIVE DE FORMAT DÉTECTÉE — l'alerte qui transforme un « vide
+          silencieux » en quelque chose d'actionnable. Ne s'affiche que si c'est
+          récent (la sentinelle 5.139 pose la date). */}
+      {Array.isArray(drift) && drift.length > 0 && (
+        <Ligne t="Format d'un site" coul={C.warn} etat="a changé récemment"
+          d={<>Un site a changé le format de sa réponse <b>{[...new Set(drift.map(x => nomFamille(x.type)))].join(', ')}</b> : la capture de ces données a pu en souffrir (une liste qui devient vide sans erreur). Ce n'est pas tes données qui sont perdues. <b>Signale-le dans une session VRM</b> pour qu'on adapte l'extension.</>}/>
+      )}
       <Ligne t="Emails" coul={teinte(mail && mail.ts)}
         etat={mail === 'vide' || !mail ? 'inconnu' : mail.ts ? `dernier ${depuis(mail.ts)}` : 'aucun reçu'}
         /* ⚠️ « Vinted ne les donne pas autrement » ÉTAIT FAUX pour les codes de
