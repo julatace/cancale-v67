@@ -12,6 +12,7 @@
 //  part chez Vinted. §6.1 : on prouve la règle en la RÉAFFAIBLISSANT.
 // ════════════════════════════════════════════════════════════════════════════
 const fs = require('fs'), vm = require('vm'), path = require('path');
+const { metaVersData } = require('./bancs/_meta.cjs');
 const racine = path.join(__dirname, '..');
 const SRC = fs.readFileSync(path.join(racine, 'vinted-sync-extension', 'background.js'), 'utf8');
 
@@ -58,7 +59,7 @@ function faireCtx({ ventes = VENTES, txn = TXN, gardeStop = null, srcOverride = 
       } },
     },
     fetch: async (url, opts = {}) => {
-      const u = String(url);
+      const u = metaVersData(String(url));
       const rep = (body, status = 200) => ({ ok: status < 400, status, json: async () => JSON.parse(body), text: async () => body, headers: { get: () => 'application/json' } });
       if ((opts.method || 'GET') === 'POST' && /\/rest\/v1\//.test(u)) {
         try { const corps = JSON.parse(opts.body || '[]'); journal.ecrits.push(corps);

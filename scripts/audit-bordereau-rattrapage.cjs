@@ -10,6 +10,7 @@
 // Ce script exécute le VRAI `genererBordereauxEnAttente()` dans un `vm` et
 // vérifie QUELLES transactions sont réellement demandées à Vinted.
 const fs = require('fs'), vm = require('vm'), path = require('path');
+const { metaVersData } = require('./bancs/_meta.cjs');
 const src = fs.readFileSync(path.join(__dirname, '..', 'vinted-sync-extension', 'background.js'), 'utf8');
 const dual = (v) => function (...a) { const cb = a[a.length - 1]; if (typeof cb === 'function') { cb(v); return; } return Promise.resolve(v); };
 const jours = (n) => new Date(Date.now() - n * 86400000).toISOString();
@@ -35,7 +36,7 @@ function banc({ ventes = [], labels = [], mails = [], commandeRepond = null }) {
         remove: dual(undefined) } },
     },
     fetch: async (url) => {
-      const u = String(url);
+      const u = metaVersData(String(url));
       const J = (o, st = 200) => ({ ok: st < 400, status: st, json: async () => o, text: async () => JSON.stringify(o), arrayBuffer: async () => new ArrayBuffer(0), headers: { get: () => 'application/json' } });
       // Appels VINTED : c'est ce qu'on mesure.
       // ⚠️ LE PUT « commander le bordereau » se distingue du GET qui va chercher

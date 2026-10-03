@@ -35,7 +35,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.133.0';
+const EXT_ATTENDUE = '5.134.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -1517,7 +1517,7 @@ const fetchEmailBordereaux = async () => {
     // Le PDF est récupéré à la demande, au moment d'imprimer (fetchBordPdf).
     const champs = ['uid','type','suivi','modele','numero','taille','account','article',
                     'filename','posKnown','dateLimite','receivedAt','transaction']
-                   .map(c => `${c}:data->>${c}`).join(',');
+                   .map(c => `${c}:meta->>${c}`).join(',');
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_bord_*&select=id,${champs}`, {
       headers: sbAuth(),
     });
@@ -1596,7 +1596,7 @@ const reclassifyTrack = (d) => {
 // Lecture SCALAIRE (une colonne, §34) et une seule requête.
 const fetchComptesSansEmailVente = async (comptes) => {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_sale_*&select=acc:data->>account&limit=1000`, { headers: sbAuth() });
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_sale_*&select=acc:meta->>account&limit=1000`, { headers: sbAuth() });
     if (!r.ok) return null;
     const vus = new Set();
     for (const row of await r.json()) { const a = String(row.acc || '').trim(); if (a) vus.add(a); }
@@ -1608,7 +1608,7 @@ const fetchEmailsParCompte = async () => {
   const out = {};
   try {
     for (const f of ['email_track_', 'email_sale_', 'email_bord_', 'email_achat_', 'email_final_', 'email_offer_']) {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.${f}*&select=acc:data->>account,at:data->>receivedAt&limit=1000`, { headers: sbAuth() });
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.${f}*&select=acc:meta->>account,at:meta->>receivedAt&limit=1000`, { headers: sbAuth() });
       if (!r.ok) continue;
       for (const row of await r.json()) {
         const a = String(row.acc || '').trim(); if (!a) continue;
@@ -1675,7 +1675,7 @@ const fetchDescLens = async () => {
 };
 const fetchEmailsIncompris = async () => {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_inconnu_*&select=id,subject:data->>subject,from:data->>from,forme:data->>forme,raison:data->>raison,famille:data->>famille,at:data->>receivedAt&limit=200`, { headers: sbAuth() });
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_inconnu_*&select=id,subject:meta->>subject,from:meta->>from,forme:meta->>forme,raison:meta->>raison,famille:meta->>famille,at:meta->>receivedAt&limit=200`, { headers: sbAuth() });
     if (!r.ok) return [];
     const rows = await r.json();
     return rows.sort((a, b) => String(b.at || '').localeCompare(String(a.at || '')));
@@ -1801,7 +1801,7 @@ const fetchWalletEscrow = async (uidsVivants) => {
 // réellement la moitié de ses colis.
 const fetchDropOffPoints = async (uidsVivants) => {
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_pickup_points&select=id,cap:data->>capturedAt`, { headers: sbAuth() });
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_pickup_points&select=id,cap:meta->>capturedAt`, { headers: sbAuth() });
     if (!res.ok) return { carriers: [], capturedAt: null };
     let metas = await res.json();
     const vus = new Set();
@@ -1894,7 +1894,7 @@ const fetchEmailAchats = async () => {
 const OFFRE_CHAMPS = ['article', 'receivedAt', 'montant', 'qui', 'uid', 'account', 'buy', 'net', 'type'];
 const fetchEmailOffers = async () => {
   try {
-    const sel = OFFRE_CHAMPS.map((k) => `${k}:data->>${k}`).join(',');
+    const sel = OFFRE_CHAMPS.map((k) => `${k}:meta->>${k}`).join(',');
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_offer_*&select=id,${sel}`, {
       headers: sbAuth(),
     });
@@ -2403,7 +2403,7 @@ const fetchCapturedLabel = async (uid) => {
 const fetchLabelFrais = async (uid) => {
   if (!uid) return null;
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.harvest_${uid}_label_latest&select=capturedAt:data->>capturedAt,tx:data->>tx&data->>pdfB64=not.is.null`, { headers: sbAuth() });
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.harvest_${uid}_label_latest&select=capturedAt:meta->>capturedAt,tx:meta->>tx&meta->>_pdf=eq.true`, { headers: sbAuth() });
     if (!res.ok) return null;                     // « pas su » ≠ « pas de PDF »
     const rows = await res.json();
     return Array.isArray(rows) && rows[0] ? rows[0] : null;
@@ -2420,7 +2420,7 @@ const fetchCapturedLabelMetas = async (uid) => {
     //    moment de la capture (elle a la transaction sous la main, c'est gratuit).
     //    C'est LA voie sans déduction pour savoir quelle paire part dans ce carton.
     //    Scalaires uniquement : les octets du PDF ne partent qu'à l'impression (§34).
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_${uid}_label_%25&select=id,tx:data->>tx,item:data->>item,capturedAt:data->>capturedAt`, { headers: sbAuth() });
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_${uid}_label_%25&select=id,tx:meta->>tx,item:meta->>item,capturedAt:meta->>capturedAt`, { headers: sbAuth() });
     if (!res.ok) return [];
     return await res.json();
   } catch (_) { return []; }
@@ -2439,10 +2439,13 @@ const fetchCapturedLabelMetas = async (uid) => {
 // certaine sur laquelle repose tout le reste (§5.34).
 const fetchTxnItemIds = async () => {
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_%25_txn_%25&select=tx:data->payload->transaction->>id,item:data->payload->transaction->>item_id`, { headers: sbAuth() });
-    if (!res.ok) return {};
+    // `meta` : la base y range les petits champs à chaque écriture — lire la
+    // transaction ne décompresse plus ses ~30 Ko (2 140 ms → 8 ms, 3 oct.).
+    // Paginé : la famille dépasse 800 lignes et Supabase coupe à 1 000 (§4.5).
+    const rows = await lireTout('id=like.harvest_%25_txn_%25&select=tx:meta->>id,item:meta->>item_id');
+    if (rows === null) return {};
     const map = {};
-    for (const r of await res.json()) { if (r && r.tx && r.item) map[String(r.tx)] = String(r.item); }
+    for (const r of rows) { if (r && r.tx && r.item) map[String(r.tx)] = String(r.item); }
     return map;
   } catch (_) { return {}; }
 };
@@ -2458,7 +2461,7 @@ const fetchTxnItemIds = async () => {
 // lignes et Supabase coupe à 1 000 sans le dire (§4.5).
 const fetchVersementsVinted = async () => {
   try {
-    const rows = await lireTout('id=like.harvest_%25_txn_%25&select=tx:data->payload->transaction->>id,s:data->payload->transaction->>status,su:data->payload->transaction->>status_updated_at');
+    const rows = await lireTout('id=like.harvest_%25_txn_%25&select=tx:meta->>id,s:meta->>status,su:meta->>status_updated_at');
     if (rows === null) return null;
     const map = {};
     for (const r of rows) if (r && r.tx && String(r.s) === '450' && r.su && !isNaN(Date.parse(r.su))) map[String(r.tx)] = r.su;
@@ -14421,7 +14424,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
       // en silence et des comptes n'auraient JAMAIS de fraîcheur (§A1).
       // On écarte aussi les lignes vidées (comptes supprimés) : elles ne disent
       // plus rien sur la fraîcheur d'un compte vivant.
-      const rows = await lireTout('id=like.harvest_*&select=id,updated_at,cap:data->>capturedAt&data->>supprime=is.null');
+      const rows = await lireTout('id=like.harvest_*&select=id,updated_at,cap:meta->>capturedAt&meta->>supprime=is.null');
       if (!rows) return; const by = {};
       rows.forEach(r => { const m = String(r.id || '').match(/^harvest_(\d+)_/); if (!m) return; const t = harvestTs(r) || 0; if (t && (!by[m[1]] || t > by[m[1]])) by[m[1]] = t; });
       setLastCap(by);
@@ -16217,7 +16220,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // en silence et des comptes n'auraient JAMAIS de fraîcheur (§A1).
       // On écarte aussi les lignes vidées (comptes supprimés) : elles ne disent
       // plus rien sur la fraîcheur d'un compte vivant.
-      const rows = await lireTout('id=like.harvest_*&select=id,updated_at,cap:data->>capturedAt&data->>supprime=is.null');
+      const rows = await lireTout('id=like.harvest_*&select=id,updated_at,cap:meta->>capturedAt&meta->>supprime=is.null');
       if (!rows) return; const parUid = {};
       rows.forEach(r => {
         const m = String(r.id || '').match(/^harvest_(\d+)_/); if (!m) return;
@@ -18661,7 +18664,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // ⚠️ `supprime` : une ligne déjà rejouée est VIDÉE, pas effacée (le
         //    `DELETE` sur `app_data` est sans effet avec la clé publique, §5.22).
         //    Sans ce filtre, on reprenait les 593 mêmes emails à chaque ouverture.
-        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_quarantaine_*&select=id,sujet:data->>subject,sup:data->>supprime`, { headers: sbAuth() });
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_quarantaine_*&select=id,sujet:meta->>subject,sup:meta->>supprime`, { headers: sbAuth() });
         if (!r.ok) return;
         lignes = ((await r.json()) || []).filter(x => !x.sup && x.sujet != null);
       } catch (_) { return; }
@@ -18771,7 +18774,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const sonde = async () => {
       if (document.hidden || !ecrans.includes(curSub)) return;
       try {
-        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_%25_orders_sold&select=id,cap:data->>capturedAt`, { headers: sbAuth() });
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_%25_orders_sold&select=id,cap:meta->>capturedAt`, { headers: sbAuth() });
         if (!r.ok) return;
         const rows = await r.json(); if (!Array.isArray(rows)) return;
         let bouge = null;
@@ -25798,7 +25801,7 @@ function LeboncoinScreen() {
     //    ⇒ Une vente est prouvée quand Vinted donne un ÉTAT DE COMMANDE à la
     //      transaction, et que cet état ne la fait pas REVENIR. On ne liste pas
     //      des codes : un code inconnu demain doit compter comme une vente.
-    const txnRows = await sbGet('app_data?id=like.harvest_*_txn_*&select=it:data->payload->transaction->>item_id,ti:data->payload->transaction->>status_title');
+    const txnRows = await sbGet('app_data?id=like.harvest_*_txn_*&select=it:meta->>item_id,ti:meta->>status_title');
     // ⚠️⚠️ ET « JE N'AI PAS PU LIRE » N'EST PAS « AUCUNE VENTE ». Mesuré en
     //    direct le 15 septembre : cette lecture a échoué une fois (base sous
     //    charge), le `|| []` l'a transformée en « aucune vente prouvée », et la
@@ -27679,7 +27682,7 @@ function EmailsSetting() {
       // ⚠️ Scalaires seulement : une ligne de quarantaine contient l'email
       // ENTIER (pièces jointes comprises) — un `select=data` ici referait le
       // trou d'égress de §34.
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_quarantaine_*&select=id,sujet:data->>subject,raison:data->>raison,quand:data->>at,sup:data->>supprime`, { headers: sbAuth() });
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_quarantaine_*&select=id,sujet:meta->>subject,raison:meta->>raison,quand:meta->>at,sup:meta->>supprime`, { headers: sbAuth() });
       setQuarantaine(r.ok ? ((await r.json()) || []).filter(x => !x.sup) : []);
     } catch (_) { setQuarantaine([]); }
   }, []);
@@ -27838,7 +27841,7 @@ function ConnexionsSetting() {
         // n'en lit que 1 000, et la coupure enlève justement les `email_track_*`
         // (les colis), donc « dernier email reçu » pouvait dater d'avant le
         // dernier colis arrivé (§A1). Lignes vidées écartées.
-        const rows = await lireTout(`id=like.${motif}&select=id,updated_at,cap:data->>capturedAt&data->>supprime=is.null`);
+        const rows = await lireTout(`id=like.${motif}&select=id,updated_at,cap:meta->>capturedAt&meta->>supprime=is.null`);
         if (!rows) return null;
         let ts = 0; rows.forEach(x => { const t = harvestTs(x) || 0; if (t > ts) ts = t; });
         return { n: rows.length, ts };
@@ -28896,7 +28899,7 @@ function AppCoeur() {
       try{
         const ecartes=new Set([...(load('vinted_accounts_hidden',[])||[]),...(load('vinted_accounts_blocked',[])||[])].map(String));
         const loginDe=(uid)=>{ const a=(vintedAccounts||[]).find(x=>String(x.vinted_user_id)===uid); return a?String(a.login||''):''; };
-        const rf=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_orders_sold&select=id,cap:data->>capturedAt`,{headers:sbAuth()});
+        const rf=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_orders_sold&select=id,cap:meta->>capturedAt`,{headers:sbAuth()});
         if(rf.ok){ const rows=await rf.json(); let vieux=null, qui='';
           for(const row of (Array.isArray(rows)?rows:[])){ const m=/^harvest_([^_]+)_/.exec(row&&row.id||''); if(!m||!uidsVivants.has(m[1])||ecartes.has(m[1])) continue; const t=Date.parse(row.cap||''); if(!isNaN(t)&&(vieux==null||t<vieux)){ vieux=t; qui=m[1]; } }
           if(vieux!=null){ dataAgeJours=Math.max(0,Math.round((Date.now()-vieux)/86400000)); dataAgeCompte=loginDe(qui); }
@@ -28983,10 +28986,23 @@ function AppCoeur() {
       const offAcc=new Set([...(load('vinted_accounts_blocked',[])||[]), ...(load('vinted_accounts_hidden',[])||[])].map(String));
       const shipDoneN=load('vinted_ship_done',{})||{};
       const soldIdsN=new Set([...(load('vinted_annonces_vendues',[])||[]), ...(load('vinted_annonces_email_sold',[])||[])].map(String));
+      // ⚠️ VITESSE (3 octobre) : trois lectures PAR compte, faites l'une après
+      // l'autre — 27 allers-retours en file pour neuf comptes, à chaque
+      // ouverture. Elles partent maintenant ensemble. Ce sont des lectures de
+      // NOTRE base : le garde-fou « une requête à la fois » (§3) porte sur
+      // Vinted, pas sur Supabase. `cachedRow` partage déjà une lecture en vol
+      // avec les écrans ouverts au même moment.
+      const lusParCompte = new Map(await Promise.all(vintedAccounts
+        .filter(a=>!offAcc.has(String(a.vinted_user_id)))
+        .map(async a=>[String(a.vinted_user_id), await Promise.all([
+          fetchHarvest(a.vinted_user_id,'inbox'),
+          fetchHarvestOrders(a.vinted_user_id,'sold'),
+          fetchHarvest(a.vinted_user_id,'listings'),
+        ])])));
       for(const a of vintedAccounts){
         if(offAcc.has(String(a.vinted_user_id))) continue;
         const acctName = acctLabels[a.vinted_user_id] || a.login || 'compte';
-        const inbox=await fetchHarvest(a.vinted_user_id,'inbox');
+        const [inbox, sold, listH] = lusParCompte.get(String(a.vinted_user_id)) || [null, null, null];
         if(inbox && Array.isArray(inbox.conversations)){
           for(const c of inbox.conversations){
             if(!c.unread) continue;
@@ -28998,14 +29014,12 @@ function AppCoeur() {
             nextSeen[cid]=stamp; // désormais "vu" : ne re-sonnera plus tant qu'inchangé
           }
         }
-        const sold=await fetchHarvestOrders(a.vinted_user_id,'sold');
         if(sold && Array.isArray(sold.my_orders)){
           sold.my_orders.forEach(o=>{ if(o && o.transaction_id!=null && classifyOrderStatus(o.status)!=='cancelled') venteIds.push(String(o.transaction_id)); });
           toShipCount += sold.my_orders.filter(o=>needsBordereau(o.status) && !shipDoneN[String(o.transaction_id)]).length;
         }
         // Annonces en ligne (moisson, 0 requête) : compte celles qui DORMENT
         // (≥30 j → baisser le prix, action GRATUITE) et celles SANS numéro.
-        const listH=await fetchHarvest(a.vinted_user_id,'listings');
         if(listH && Array.isArray(listH.items)){
           for(const raw of listH.items){
             if(!isOnlineListing(raw)) continue;

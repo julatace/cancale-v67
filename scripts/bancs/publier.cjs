@@ -14,6 +14,7 @@
 //     seul accent) ;
 //   · la paire sans photo n'a pas de bouton (Leboncoin la refuserait).
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = 4337;
@@ -88,7 +89,7 @@ const PONT = ({ mode, version }) => {
       await pg.addInitScript(PONT, cas);
       await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
       await pg.route('**/rest/v1/**', (route) => {
-        const u = decodeURIComponent(route.request().url());
+        const u = decodeURIComponent(metaVersData(route.request().url()));
         const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
         if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
         if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCS);

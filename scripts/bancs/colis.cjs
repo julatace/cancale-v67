@@ -5,6 +5,7 @@
 // et l'ecran affichait « 0 bordereau pret a imprimer ». C'etait un artefact du
 // banc, pas un defaut de l'app (§6.3 : servir TOUTES les formes de requete).
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { metaVersData } = require('./_meta.cjs');
 const fs=require('fs'), http=require('http'), path=require('path');
 // ⚠️⚠️ JAMAIS UN CHEMIN ABSOLU ICI. La méthode de preuve du dossier (§6.1)
 // extrait le code d'AVANT dans /tmp/avN, y copie le banc et le lance DEPUIS
@@ -113,7 +114,7 @@ const attendus=aEnvoyer.filter(o=>parTx[String(o.transaction_id)]).length;
     //    première : sans lui l'app reste sur son écran d'accueil de connexion
     //    et le banc mesure une page vide en croyant mesurer un écran.
     await p.addInitScript(()=>{try{localStorage.setItem('vrm_acces_direct','1');}catch(_){}});
-    await p.route('**/rest/v1/**',route=>{const u=route.request().url();
+    await p.route('**/rest/v1/**',route=>{const u=metaVersData(route.request().url());
     const j=d=>{const n=pesePdf(d); if(n){PDF.octets+=n; PDF.ou.push(decodeURIComponent(u.split('/rest/v1/')[1]||'').slice(0,90));}
       return route.fulfill({status:200,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:JSON.stringify(d)});};
     if(route.request().method()!=='GET') return j([]);

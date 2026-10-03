@@ -3,6 +3,7 @@
 // dans un `vm`, sur les FORMES réelles mesurées le 20 septembre (§6.3).
 // §6.1 — sur le code d'avant, `lbc_ventes` n'existe pas : aucun bordereau capté → rouge.
 const fs = require('fs');
+const { metaVersData } = require('./bancs/_meta.cjs');
 const path = require('path');
 const vm = require('vm');
 const racine = path.join(__dirname, '..');
@@ -53,7 +54,7 @@ function faireCtx() {
       storage: { local: { get: dual({}), set: dual(undefined), remove: dual(undefined) } },
     },
     fetch: async (url, opts = {}) => {
-      const u = String(url);
+      const u = metaVersData(String(url));
       const rep = (ok, body, status) => ({ ok, status: status || (ok ? 200 : 522), json: async () => JSON.parse(body), text: async () => body, headers: { get: () => 'application/json' } });
       if ((opts.method || 'GET') === 'POST') { try { JSON.parse(opts.body || '[]').forEach((r) => ecrits.push(r)); } catch (_) {} return rep(true, '', 201); }
       if (lectureKO) return { ok: false, status: 522, json: async () => { throw new Error('HTML'); }, text: async () => '<html>522</html>', headers: { get: () => 'text/html' } };

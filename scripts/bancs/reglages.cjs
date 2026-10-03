@@ -25,6 +25,7 @@
 // ⚠️ Les valeurs servies ici sont SYNTHÉTIQUES (aucune donnée réelle ne monte
 //    dans le dépôt, §6) : ce qui est mesuré est la RÈGLE, pas leur contenu.
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 // ⚠️⚠️ JAMAIS UN CHEMIN ABSOLU : la méthode de preuve (§6.1) lance le banc
 // depuis /tmp/avN, et un chemin en dur y servirait le build COURANT — le banc
@@ -102,7 +103,7 @@ const MENSONGES = [
     const ecrits = [];                       // les upserts réellement partis
     await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
     await pg.route('**/rest/v1/**', (route) => {
-      const u = route.request().url();
+      const u = metaVersData(route.request().url());
       const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
       if (route.request().method() === 'POST') {
         // ⚠️ L'ÉCRITURE PASSE (c'est le cas qui détruit). On la compte.

@@ -27,6 +27,7 @@
 //  vraie page et on regarde ce qu'il ENVOIE.
 // ════════════════════════════════════════════════════════════════════════════
 const { chromium } = require(require('path').join(__dirname, '..', 'node_modules', 'playwright'));
+const { metaVersData } = require('./bancs/_meta.cjs');
 const fs = require('fs'), path = require('path');
 const SRC = fs.readFileSync(path.join(__dirname, '..', 'vinted-sync-extension', 'inject.js'), 'utf8');
 const RELAIS = fs.readFileSync(path.join(__dirname, '..', 'vinted-sync-extension', 'content.js'), 'utf8');
@@ -171,7 +172,7 @@ const essaie = async (quoi, fn) => { try { return await fn(); } catch (e) { ko++
         tabs: { onUpdated: { addListener() {} }, query: dual([]), sendMessage: dual(undefined) },
         storage: { local: { get: dual({}), set: dual(undefined), remove: dual(undefined) } } },
       fetch: async (url, opts = {}) => {
-        const u = String(url);
+        const u = metaVersData(String(url));
         const rep = (b, st = 200) => ({ ok: st < 400, status: st, json: async () => JSON.parse(b), text: async () => b, headers: { get: () => 'application/json' } });
         if ((opts.method || 'GET') === 'POST' && /\/rest\/v1\//.test(u)) { try { ecrits.push(JSON.parse(opts.body || '[]')); } catch (_) {} return rep('[]', 201); }
         // La VRAIE liste noire de sa base, avec ce compte dedans.

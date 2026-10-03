@@ -24,6 +24,7 @@
 //
 // Il exécute le VRAI `background.js` dans un `vm`, comme audit-retrait-conv.
 const fs = require('fs'), vm = require('vm'), path = require('path');
+const { metaVersData } = require('./bancs/_meta.cjs');
 const racine = path.join(__dirname, '..');
 const src = fs.readFileSync(path.join(racine, 'vinted-sync-extension', 'background.js'), 'utf8');
 const dual = (v) => function (...a) { const cb = a[a.length - 1]; if (typeof cb === 'function') { cb(v); return; } return Promise.resolve(v); };
@@ -48,7 +49,7 @@ function faireCtx() {
       storage: { local: { get: dual({}), set: dual(undefined), remove: dual(undefined) } },
     },
     fetch: async (url, opts = {}) => {
-      const u = String(url);
+      const u = metaVersData(String(url));
       const rep = (ok, body, status) => ({ ok, status: status || (ok ? 200 : 522), json: async () => JSON.parse(body), text: async () => body, headers: { get: () => 'application/json' } });
       if ((opts.method || 'GET') === 'POST') {
         try { JSON.parse(opts.body || '[]').forEach(r => ecrits.push(r)); } catch (_) {}

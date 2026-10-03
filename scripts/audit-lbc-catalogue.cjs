@@ -32,6 +32,7 @@
 //      d'un catalogue, et l'analyser en le croyant entier serait promettre ce
 //      qu'on n'a pas mesuré.
 const { chromium } = require(require('path').join(__dirname, '..', 'node_modules', 'playwright'));
+const { metaVersData } = require('./bancs/_meta.cjs');
 const fs = require('fs'), vm = require('vm'), path = require('path');
 const racine = path.join(__dirname, '..');
 const INJ = fs.readFileSync(path.join(racine, 'vinted-sync-extension', 'lbc-inject.js'), 'utf8');
@@ -280,7 +281,7 @@ const VENTE_BODY = JSON.stringify({ pageProps: {
         storage: { local: { get: dual({}), set: dual(undefined), remove: dual(undefined) } },
       },
       fetch: async (url, opts = {}) => {
-        const u = String(url);
+        const u = metaVersData(String(url));
         const rep = (ok, body, status) => ({ ok, status: status || (ok ? 200 : 522), json: async () => JSON.parse(body), text: async () => body, headers: { get: () => 'application/json' } });
         if ((opts.method || 'GET') === 'POST') { try { JSON.parse(opts.body || '[]').forEach((r) => ecrits.push(r)); } catch (_) {} return rep(true, '', 201); }
         requetes.push(u);

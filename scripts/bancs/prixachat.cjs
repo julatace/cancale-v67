@@ -9,6 +9,7 @@
 // §6.1 : rouge sur le code d'avant (0 « à vérifier », ~111 pastilles en tout),
 // vert après (« à vérifier » > 0, total >= 200).
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { metaVersData } = require('./_meta.cjs');
 const fs=require('fs'), http=require('http'), path=require('path');
 const DIST=path.join(__dirname,'..','..','dist'), SC=__dirname;
 const FX=f=>JSON.parse(fs.readFileSync(path.join(SC,'fx',f+'.json'),'utf8'));
@@ -25,7 +26,7 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
   const pg=await b.newPage({viewport:{width:1512,height:950}});
   const errs=[]; pg.on('pageerror',e=>errs.push(e.message));
   await pg.addInitScript(()=>{try{localStorage.setItem('vrm_acces_direct','1');}catch(_){}});
-  await pg.route('**/rest/v1/**',route=>{const u=route.request().url();
+  await pg.route('**/rest/v1/**',route=>{const u=metaVersData(route.request().url());
     const j=d=>route.fulfill({status:200,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:JSON.stringify(d)});
     if(route.request().method()!=='GET') return j([]);
     if(/select=owner/.test(u)) return route.fulfill({status:400,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:'{"m":1}'});

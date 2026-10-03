@@ -5,6 +5,7 @@
 // publier. La logique d'envoi est couverte par ebay-write.cjs / ebay-api.cjs ;
 // ici c'est le RENDU + le flux « comme dans l'app ».
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const MIME = { '.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json','.png':'image/png','.svg':'image/svg+xml','.webmanifest':'application/manifest+json' };
@@ -29,7 +30,7 @@ let ko = 0; const dit = (c,m,d)=>{ if(!c)ko++; console.log((c?'✅ ':'❌ ')+m+(
   const errs=[]; pg.on('pageerror',e=>errs.push(e.message));
   await pg.addInitScript(([nums]) => { try{ localStorage.setItem('vrm_acces_direct','1'); localStorage.setItem('vinted_annonce_numeros', JSON.stringify(nums)); localStorage.setItem('vinted_nums_physiques', JSON.stringify(['401','402'])); }catch(_){}}, [NUMS]);
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r)=>{ const t=r.request().resourceType(); if(t==='image') return r.fulfill({status:200,contentType:'image/png',body:PNG}); if(t==='media'||t==='font') return r.abort(); return r.continue(); });
-  await pg.route('**/rest/v1/**', route=>{ const u=route.request().url(); const j=d=>route.fulfill({status:200,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:JSON.stringify(d)});
+  await pg.route('**/rest/v1/**', route=>{ const u=metaVersData(route.request().url()); const j=d=>route.fulfill({status:200,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:JSON.stringify(d)});
     if(/select=owner/.test(u)) return route.fulfill({status:400,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:'{"m":1}'});
     if(/\/vinted_accounts/.test(u)) return j(ACCOUNTS);
     if(/id=eq\.vinted_item_details/.test(u)) return j([{ data: DETAILS }]);

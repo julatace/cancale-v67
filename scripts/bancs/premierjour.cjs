@@ -20,6 +20,7 @@
 //  neuf comptes (mensonge du 10 septembre, retourné).
 // ════════════════════════════════════════════════════════════════════════════
 const { chromium } = require('playwright');
+const { metaVersData } = require('./_meta.cjs');
 const http = require('http'), fs = require('fs'), path = require('path');
 
 const DIST = path.join(__dirname, '..', '..', 'dist');   // ⚠️ JAMAIS un chemin
@@ -115,7 +116,7 @@ async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lectureP
     body: JSON.stringify({ access_token: 'jeton-de-banc', refresh_token: 'r', expires_in: 3600, user: SESSION.user }) }));
 
   await pg.route('**/rest/v1/**', (r) => {
-    const u = r.request().url();
+    const u = metaVersData(r.request().url());
     // La sonde de cloisonnement doit répondre 200 : base migrée.
     if (/select=owner/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
     // La sonde « la clé publique lit-elle encore ? » (§ porte d'entrée).

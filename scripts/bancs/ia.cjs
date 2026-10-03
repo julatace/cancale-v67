@@ -9,6 +9,7 @@
 // Avant ce correctif, le menu n'a pas l'entrée et la modale n'existe pas : le
 // banc échoue (fail-before d'une UI, comme ebay.cjs/lbc.cjs).
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { metaVersData } = require('./_meta.cjs');
 const fs=require('fs'), http=require('http'), path=require('path');
 const DIST=path.join(__dirname,'..','..','dist'), SC=__dirname;
 const FX=f=>JSON.parse(fs.readFileSync(path.join(SC,'fx',f+'.json'),'utf8'));
@@ -25,7 +26,7 @@ const aiPosts=[]; let aiMode='ok'; const vintedWrites=[];
   const pg=await b.newPage({viewport:{width:1512,height:950}});
   const errs=[]; pg.on('pageerror',e=>errs.push(e.message));
   await pg.addInitScript(()=>{try{localStorage.setItem('vrm_acces_direct','1');}catch(_){}});
-  await pg.route('**/rest/v1/**',route=>{const u=route.request().url();
+  await pg.route('**/rest/v1/**',route=>{const u=metaVersData(route.request().url());
     const j=d=>route.fulfill({status:200,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:JSON.stringify(d)});
     const meth=route.request().method();
     if(meth!=='GET'){ if(/app_data/.test(u)) vintedWrites.push(u); return j([]); }

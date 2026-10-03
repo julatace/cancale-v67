@@ -24,6 +24,7 @@
 // il publie `vinted_urssaf_mois`, le tableau de bord consomme. Ouvrir le
 // tableau de bord seul mesurerait un écran qui n'a pas encore sa source.
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { metaVersData } = require('./_meta.cjs');
 const fs=require('fs'), http=require('http'), path=require('path');
 // ⚠️⚠️ JAMAIS UN CHEMIN ABSOLU ICI. La méthode de preuve du dossier (§6.1)
 // extrait le code d'AVANT dans /tmp/avN, y copie le banc et le lance DEPUIS
@@ -65,7 +66,7 @@ const eur=(s)=>{ if(s==null) return null; const n=Number(String(s).replace(/\s|�
   const pg=await b.newPage({viewport:{width:1512,height:950}});
   const errs=[]; pg.on('pageerror',e=>errs.push(e.message));
   await pg.addInitScript(()=>{try{localStorage.setItem('vrm_acces_direct','1');}catch(_){}});
-  await pg.route('**/rest/v1/**',route=>{const u=route.request().url();
+  await pg.route('**/rest/v1/**',route=>{const u=metaVersData(route.request().url());
     const j=d=>route.fulfill({status:200,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:JSON.stringify(d)});
     if(route.request().method()!=='GET') return j([]);
     if(/select=owner/.test(u)) return route.fulfill({status:400,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:'{"m":1}'});
