@@ -143,9 +143,9 @@ qu'aucune règle n'en désigne une.
 - **Une seule règle par notion, un seul propriétaire** : un écran publie
   (`vinted_nums_physiques`, `vinted_urssaf_mois`, `widget_stats`), les autres
   consomment. Ne jamais recalculer ailleurs.
-- **Tout est daté au jour de la VENTE.** La date d'encaissement a été retirée
-  exprès (elle n'existait que pour une partie des ventes). Ne pas la réintroduire
-  sans qu'il le redemande.
+- ⚠️ **LE CA DÉCLARÉ EST DATÉ AU JOUR DU VERSEMENT** (il l'a redemandé le
+  3 octobre — voir « dater au versement » plus bas). Les autres écrans
+  (Statistiques, Ma journée) restent datés au jour de la vente.
 - Le rapport comptable dit « CA des ventes finalisées », **jamais « encaissé »** :
   l'URSSAF demande légalement les recettes encaissées, et l'app ne les connaît pas.
 - ⚠️⚠️ **LA PHRASE QUI EXPLIQUE UN CHIFFRE DOIT VENIR DE LA MÊME SOURCE QUE LUI.**
@@ -3740,6 +3740,37 @@ jamais le titre ; quatre montants dont deux sans libellé ; six teintes (dont
   présence prouvée, sommeil une fois, préparation qui suit la donnée, vendue par
   identité, aucune couleur hors palette, 390 px sans débordement).
 
+### ⚠️⚠️ « DATER LA VENTE À LA DATE DE RÉCEPTION D'ARGENT » (3 octobre, 5.133)
+Julien : « il faut dater la vente pour le CA du mois à la date de réception
+d'argent, c'est ça les ventes finalisées ». C'est la **réintroduction demandée**
+de ce que §5 avait retiré (« ne pas la réintroduire sans qu'il le redemande ») —
+il l'a redemandé.
+- **La date** : celle où la transaction Vinted passe **« Commande finalisée »**
+  (`harvest_{uid}_txn_{tx}` → `payload.transaction.status === 450`,
+  `status_updated_at`). C'est le moment où l'argent est versé. Lue par
+  `fetchVersementsVinted` en **trois scalaires** (§4.4), paginée (`lireTout`).
+- **Mesuré avant de coder** : septembre **26 ventes finalisées sur 56** portaient
+  déjà cette date (1 601 € sur 3 465 €), août 101/156, juillet 18/76, juin 1/62.
+  Les autres n'avaient jamais eu leur détail relu APRÈS la finalisation.
+- ⚠️⚠️ **Sans date de versement, une vente n'est dans AUCUN mois** : elle va dans
+  « à dater » avec son montant, et l'écran le dit. Retomber sur la date de vente
+  serait mettre un chiffre FAUX dans la déclaration (§5 : mieux vaut un blanc
+  qu'un faux). Dates illisibles (`null`) ⇒ l'écran Ventes **ne publie rien**.
+- **L'extension va chercher les dates** : `capterDatesVersement(uid)` à chaque
+  visite Vinted, après la moisson — lecture de `/api/v2/transactions/{tx}` pour
+  les ventes finalisées sans date, **5 par visite**, `garde`, pas de nouvel essai
+  avant 24 h, rien si les lectures en base ont échoué ; elle prévient l'app
+  (`evt maj versements`). Uniquement pour le compte connecté dans l'onglet : les
+  dates des autres comptes arrivent quand il y passe.
+- Leboncoin : daté au jour de la vente (sa date de versement n'est pas captée),
+  et l'écran le dit. eBay : date de la commande payée.
+- Les **deux rapports** (mensuel, annuel), la grille des mois déclarables et la
+  carte URSSAF du tableau de bord suivent la même règle (`ventesDeclarables`).
+  Le mot « encaissé » reste interdit (Leboncoin n'est pas daté au versement).
+- `audit-urssaf.cjs` : **9 rouges** sur le code d'avant ; `audit-versement.cjs`
+  exécute la vraie fonction (12 contrôles, réaffaiblie → rouge) ;
+  `bancs/rapport.cjs` sert une vente vendue le mois dernier et versée ce mois.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
@@ -3758,6 +3789,7 @@ arrivée** — vérifiée commit par commit sur `manifest.json`, pas devinée.
 | `photosebay` | `photosPourEbay` | **5.59.0** (13 sept.) | la même promesse, pour eBay |
 | `repond` | `repondreAuxMessages` | **5.77.0** (19 sept.) | « elle répond aux questions posées sur tes annonces » |
 | `commande` | `executerCommande` | **5.129.0** (2 oct.) | « Générer le bordereau » depuis l'app : l'app COMMANDE l'extension |
+| `versement` | `capterDatesVersement` | **5.133.0** (3 oct.) | « l'extension va chercher la date de versement de tes ventes finalisées » |
 | `offresapp` | `offresAutoActif` | **5.130.0** (3 oct.) | l'interrupteur des offres auto se règle dans l'app |
 | `publication` | `publierDepuisApp` | **5.130.0** (3 oct.) | « Publier sur Leboncoin » / « Préparer sur eBay » depuis l'app |
 | `lbcdate` | `dateVenteLbc` | **5.131.0** (3 oct.) | « ouvre Mes transactions, l'extension relève la date de vente » |

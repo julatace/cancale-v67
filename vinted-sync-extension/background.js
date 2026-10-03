@@ -2618,6 +2618,10 @@ async function visiteVinted() {
     // relais » vient des achats qu'on vient de capter. Sans ça, on lirait la
     // photo d'hier et on redemanderait des conversations pour rien.
     await capterRetraits(uid);
+    // ⚠️ APRÈS la moisson : les ventes « finalisées » viennent d'être captées.
+    // On relit le détail de celles dont on n'a pas encore la date de versement
+    // (le CA déclaré est daté à ce jour-là — demande du 3 octobre).
+    await capterDatesVersement(uid);
     // ⚠️ APRÈS la moisson : le mois COURANT vient d'être capté gratuitement par
     // `/payouts` (aucune requête ajoutée) ; ici on ne va chercher que les mois
     // PASSÉS encore absents, deux par visite au plus.
@@ -3854,6 +3858,71 @@ async function capterRetraits(uid) {
       if (ecrit) logActivity(`📦 Code de retrait récupéré — ${(r.code || r.lieu || '').slice(0, 40)}`);
     }
     await chrome.storage.local.set({ vrmRetraitFaits: memo });
+    return n;
+  } catch (_) { return 0; }
+}
+
+// ═══ LA DATE DE VERSEMENT (3 octobre, 5.133) ═══════════════════════════════
+// Julien : « il faut dater la vente pour le CA du mois à la date de réception
+// d'argent ». La seule date certaine que Vinted donne est celle où la
+// transaction passe « Commande finalisée » (statut 450,
+// `transaction.status_updated_at`) — c'est le moment où l'argent est versé.
+// Mesuré le 3 octobre : en septembre, 26 ventes finalisées sur 56 avaient déjà
+// cette ligne ; les autres n'avaient jamais eu leur détail relu APRÈS la
+// finalisation. On va le relire ici.
+// ⚠️ Une LECTURE sur ses propres ventes (§3 l'autorise), la forme exacte de
+// `capterRetraits` : compte connecté (`garde`), une requête à la fois, borné
+// par visite, pas de nouvel essai avant 24 h. Rien n'est décidé ici.
+// ⚠️ « Pas su » ne vaut pas « rien » : ventes ou détails illisibles ⇒ on ne
+// redemande RIEN (sinon une lecture ratée relancerait tout l'historique).
+const VERSEMENT_MAX_PAR_VISITE = 5;
+const VERSEMENT_RETRY_MS = 24 * 60 * 60 * 1000;
+async function capterDatesVersement(uid) {
+  try {
+    if (!uid) return 0;
+    const accts = await getStoredAccounts();
+    const acc = accts.find(a => String(a.vinted_user_id) === String(uid));
+    if (!acc) return 0;
+    const rows = await sbGet(`app_data?id=eq.harvest_${uid}_orders_sold&select=v:data->payload->my_orders`);
+    if (!Array.isArray(rows)) return 0;                                   // pas su
+    const ventes = (rows[0] && Array.isArray(rows[0].v)) ? rows[0].v : [];
+    const finalisees = ventes.filter(o => o && o.transaction_id != null
+      && /finalis/i.test(String(o.status || '')) && !/annul|cancel|refus|rembours|retour|suspend/i.test(String(o.status || '')));
+    if (!finalisees.length) return 0;
+    const det = await sbGetTout(`app_data?id=like.harvest_${uid}_txn_*&select=id,s:data->payload->transaction->>status,su:data->payload->transaction->>status_updated_at`);
+    if (det === null) return 0;                                           // pas su
+    const datees = new Set();
+    for (const r of det) {
+      const tx = (/_txn_(\d+)$/.exec(String((r && r.id) || '')) || [])[1];
+      if (tx && String(r.s) === '450' && r.su && !isNaN(Date.parse(r.su))) datees.add(tx);
+    }
+    const memo = (await chrome.storage.local.get('vrmVersementFaits')).vrmVersementFaits || {};
+    let n = 0, ecrites = 0;
+    for (const o of finalisees) {
+      if (n >= VERSEMENT_MAX_PAR_VISITE) break;
+      const tx = String(o.transaction_id);
+      if (!/^\d+$/.test(tx) || datees.has(tx)) continue;
+      if (memo[tx] && Date.now() - Number(memo[tx]) < VERSEMENT_RETRY_MS) continue;
+      const refus = await garde(uid, acc);
+      if (refus) { logActivity(`⚠️ Dates de versement non lues : ${refus.error}`); break; }
+      memo[tx] = Date.now();
+      n++;
+      const rep = await vintedGet(acc, `/api/v2/transactions/${encodeURIComponent(tx)}`);
+      if (!rep.ok || !rep.json) { noterDiag(`versement_refuse_${rep.status}`); continue; }
+      const t = rep.json.transaction;
+      if (!t || typeof t !== 'object') { noterDiag('versement_sans_transaction'); continue; }
+      const data = { type: 'transaction', uid: String(uid), domain: acc.domain || 'www.vinted.fr',
+        capturedAt: new Date().toISOString(), payload: alleger('transaction', rep.json) };
+      const ok = await supabaseUpsert('app_data', [{ id: `harvest_${uid}_txn_${tx}`, data }], 'id');
+      if (ok === false) { noterDiag('versement_ecriture_ratee'); continue; }
+      if (String(t.status) === '450' && t.status_updated_at) { ecrites++; noterDiag('versement_date_ecrit'); }
+      else noterDiag(`versement_statut_${String(t.status).slice(0, 8)}`);
+    }
+    await chrome.storage.local.set({ vrmVersementFaits: memo });
+    if (ecrites) {
+      logActivity(`💶 ${ecrites} date${ecrites > 1 ? 's' : ''} de versement récupérée${ecrites > 1 ? 's' : ''}`);
+      notifierApp({ type: 'maj', quoi: 'versements', uid: String(uid) });
+    }
     return n;
   } catch (_) { return 0; }
 }
