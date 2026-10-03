@@ -110,10 +110,11 @@ async function diag(type, parsed, id) {
     dit((d.rates.forme_listings || {}).candidate === '(racine)', 'candidate = (racine) pour un tableau nu');
   }
 
-  // 3. FORME ATTENDUE — rien à signaler.
+  // 3. FORME ATTENDUE — rien à signaler (clé de liste ET champs structurels présents).
   {
-    const d = await diag('orders_sold', { my_orders: [{ id: 1 }], pagination: { total_entries: 1 } }, 'z');
+    const d = await diag('orders_sold', { my_orders: [{ id: 1, transaction_id: 't1', title: 'X' }], pagination: { total_entries: 1 } }, 'z');
     dit(!d.n.forme_inconnue_orders_sold, 'forme attendue (my_orders présent) ⇒ AUCUNE alerte');
+    dit(!d.n.forme_inconnue_champ_orders_sold, 'et champs structurels présents ⇒ AUCUNE alerte de champ');
   }
 
   // 4. VIDE LÉGITIME — clé présente, tableau vide : un compte sans vente. Ne doit
@@ -136,6 +137,57 @@ async function diag(type, parsed, id) {
     const d = await diag('transaction', { transaction: { id: 1, status: 450 } }, 't');
     dit(Object.keys(d.n).filter(k => k.startsWith('forme_inconnue')).length === 0,
       'type sans clé de liste (transaction) ⇒ jamais de sentinelle');
+  }
+
+  // ── DÉRIVE DE CHAMP : la clé de liste est bonne, un champ INTÉRIEUR a changé ──
+  // C'est le vrai bug déjà vécu (`brand_title` vs `brand`) : l'allègement garde un
+  // champ qui n'existe plus, la capture a l'air pleine mais l'app affiche
+  // « manquant » partout, sans aucune erreur. Sur le code d'AVANT (5.139),
+  // `verifFormeListe` revient dès que la clé de liste est présente → ces contrôles
+  // tombent au ROUGE (silence), ce qui prouve la règle, pas l'absence de fonction.
+
+  // 7. CHAMP RENOMMÉ — `price` → autre chose : la liste est pleine, aucun item n'a
+  //    `price`. C'est une mise à jour de Vinted qui casse le prix de tout le stock.
+  {
+    const d = await diag('listings', { items: [{ id: 1, title: 'A', prix_v2: {} }, { id: 2, title: 'B', prix_v2: {} }] }, 'p');
+    dit(d.n.forme_inconnue_champ_listings === 1, 'champ `price` disparu de TOUS les items → forme_inconnue_champ_listings',
+      'compteur=' + (d.n.forme_inconnue_champ_listings || 0));
+    const r = d.rates.forme_champ_listings || {};
+    dit(r.champ === 'price', 'le champ perdu est NOMMÉ', 'champ=' + r.champ);
+    dit(Array.isArray(r.cles) && r.cles.includes('prix_v2'), 'les clés d’un item sont relevées (pour aliaser ensuite)', 'cles=' + JSON.stringify(r.cles));
+    dit(!JSON.stringify(r).includes('"title":"A"') && !JSON.stringify(r).includes('"id":1'),
+      'aucune VALEUR ne fuit (noms de champs seulement)');
+  }
+
+  // 8. ANTI-FAUSSE-ALERTE (0/N) — un SEUL item sans prix (un brouillon), les autres
+  //    l'ont : ce n'est PAS une dérive, c'est un item particulier. Rien ne doit se
+  //    déclencher, sinon l'alerte serait permanente dès qu'un article est atypique.
+  {
+    const d = await diag('listings', { items: [{ id: 1, title: 'A', price: { amount: '10' } }, { id: 2, title: 'B' }] }, 'q');
+    dit(!d.n.forme_inconnue_champ_listings, 'un seul item sans `price` (les autres l’ont) ⇒ AUCUNE alerte (seuil 0/N)');
+  }
+
+  // 9. CHAMP STRUCTUREL d'une VENTE renommé — `transaction_id` disparu de tout.
+  {
+    const d = await diag('orders_sold', { my_orders: [{ id: 1, title: 'X' }, { id: 2, title: 'Y' }], pagination: {} }, 'o');
+    dit(d.n.forme_inconnue_champ_orders_sold === 1, 'champ `transaction_id` disparu → forme_inconnue_champ_orders_sold');
+    dit((d.rates.forme_champ_orders_sold || {}).champ === 'transaction_id', 'le champ de vente perdu est nommé');
+  }
+
+  // 10. LISTE VIDE — champs non jugeables (aucun item). Un compte neuf ne doit
+  //     JAMAIS déclencher la dérive de champ (sinon alerte permanente).
+  {
+    const d = await diag('listings', { items: [] }, 'e');
+    dit(!d.n.forme_inconnue_champ_listings, 'liste vide (compte neuf) ⇒ AUCUNE alerte de champ');
+  }
+
+  // 11. L'ALERTE DE CHAMP REMONTE SOUS `forme_*` — l'app scanne `/^forme_/` et
+  //     mappe par sous-chaîne (`/listings/` → « annonces »). La clé `forme_champ_
+  //     listings` doit donc être lisible par ce même filtre, sans toucher l'app.
+  {
+    const d = await diag('listings', { items: [{ id: 1, title: 'A', prix_v2: {} }] }, 'z2');
+    const k = Object.keys(d.rates).find(x => /^forme_/.test(x) && /listings/.test(x.slice('forme_'.length)));
+    dit(!!k, 'la clé de dérive de champ est captée par le filtre /^forme_/ de l’app', 'clé=' + k);
   }
 
   console.log(ko ? `\n❌ ${ko} échec(s)` : '\n✅ sentinelle de forme : tout vert');
