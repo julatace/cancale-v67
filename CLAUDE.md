@@ -4810,6 +4810,35 @@ faisait ~11 px, la molette avançait de 5 % par cran vers le CENTRE de la pièce
   avant » n'y prouverait rien) : remettre le clic droit qui tape → **2 rouges** ;
   retirer l'attente du clic → le double-clic **rouge**.
 
+### Messages dans Vinted, et un écran Leboncoin qui commence par ce qu'on fait (4 octobre)
+Julien : « dans Vinted et dans Leboncoin il y ait les messages », « Leboncoin
+beaucoup plus intuitif ».
+- **Messages Vinted** : l'écran complet existait (liste tous comptes, fil,
+  réponse, offres) mais n'avait **plus aucune porte dans Vinted** — seulement la
+  cloche. Il est la 4ᵉ section de l'onglet Vinted (Ventes · Achats · Annonces ·
+  Messages). Un **point** (pas un nombre) signale des non-lus : trois règles de
+  comptage coexistent (coque, cloche, écran), un chiffre sur l'onglet pourrait
+  contredire celui de l'écran (§11). L'ancien `?tab=cat_msg` (cloche, bandeau,
+  « à faire ») y mène (`subVoulue`) ; `messagerie.cjs` le vérifie.
+- **Leboncoin → Annonces** : la liste « à publier » — la seule chose qu'il fait
+  ici — était le DERNIER de douze blocs. Ce qui se LIT une fois (préparation de
+  la publication, paragraphe d'explication, comptes, limite de l'offre) descend
+  dans **« Détails et réglages »**, replié en bas ; en haut il ne reste que ce
+  qui se FAIT (double vente, « quelle paire ? », à retirer, à publier).
+  - « Offre : **Gratuit** » s'affichait quand aucune offre n'était connue
+    (`plan`/`limit` jamais renseignés) — une valeur **inventée** : retirée.
+  - « Comptes Leboncoin détectés » ne s'affiche plus pour UN compte.
+  - **Un nom, une porte** : l'entrée de menu « À publier » ouvrait le même écran
+    sous un autre nom ; retirée, et `?tab=leboncoin` mène à Leboncoin →
+    Annonces.
+- **Reste à faire (mesuré par la carte du 4 octobre)** : les messages
+  **Leboncoin** — aucune conversation captée en base, mais l'extension a VU les
+  endpoints (compteur de non-lus `{userId, unread}`, détail de conversation,
+  envoi) ; il faut d'abord corriger la mesure (UUID non normalisés dans
+  `lbc_recon`, `paths` plein à 300/300) puis relever le compteur par compte. Les
+  messages **eBay** n'existent pas dans l'app (« comme pour eBay » n'a pas de
+  modèle) — à trancher avec lui, et c'est le domaine de la session eBay.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par

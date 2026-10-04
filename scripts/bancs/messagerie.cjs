@@ -120,6 +120,10 @@ async function rendre(b, { version, tel = false }) {
     for (const tel of [false, true]) {
       console.log(`── extension à jour (5.135) · ${tel ? '390 px' : '1512 px'}`);
       const r = await rendre(b, { version: '5.135.0', tel });
+      // 4 octobre : les messages vivent DANS l'onglet Vinted (4ᵉ section) ; l'ancien
+      // lien `?tab=cat_msg` (cloche, bandeau) doit y mener.
+      const porte = await r.pg.evaluate(() => { const b = document.querySelector('[data-section="messages"]'); return b ? b.getAttribute('aria-current') : 'absente'; });
+      dit(porte === 'page', 'l’ancien lien mène aux Messages DANS l’onglet Vinted (section active)', String(porte));
       const liste = await r.pg.evaluate(() => [...document.querySelectorAll('[data-messagerie] [data-conv]')].map((x) => ({ id: x.getAttribute('data-conv'), txt: x.innerText })));
       dit(liste.length === 3, 'les conversations des DEUX comptes sont listées', JSON.stringify(liste.map((x) => x.id)));
       dit(liste.length === 3 && liste[2].id === '303', 'les non lues d’abord, la lue en dernier', JSON.stringify(liste.map((x) => x.id)));

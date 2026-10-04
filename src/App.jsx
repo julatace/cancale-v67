@@ -5412,7 +5412,9 @@ const PLUS_TABS=[
      tous dans la BARRE DU BAS — retirés d'ici pour ne pas les montrer deux fois. */
   {id:'dashboard',    icon:'chart',   emoji:'📊',label:'Statistiques',  desc:'Chiffre d\'affaires, bénéfices, cotisations'},
   {id:'prixmarche',   icon:'spark',   emoji:'💡',label:'Prix qui marche',desc:'À quel prix tes modèles se vendent, par taille'},
-  {id:'leboncoin',    icon:'pin',     emoji:'🟠',label:'À publier',      desc:'Tes annonces à publier sur Leboncoin, et à retirer'},
+  /* ⚠️ « À publier » RETIRÉ du menu (4 octobre) : c'était une seconde porte —
+     avec un autre nom — vers l'écran Leboncoin → Annonces. Les liens qui
+     visent encore `leboncoin` (cloche, notifications) y mènent tout seuls. */
   /* ⚠️ « Messages » RETIRÉ du menu (demande de Julien, 24 sept. : « pas en
      onglet, mets les messages reçus dans les notifications »). Les non-lus
      restent dans le centre de notifications (job « Répondre à N messages »), qui
@@ -7380,11 +7382,17 @@ function PlatSubNav({ sub, setSub, sections, dark }) {
   const T = dark ? EBAY_SKIN : C;   // eBay garde son skin noir (Julien : « le même visuel qu'eBay »)
   return (
     <div className="vrm-rangee" style={{display:'flex',gap:8,padding:'12px 16px 0',overflowX:'auto',background:dark?EBAY_SKIN.bg:'transparent'}}>
-      {sections.map(([id,label])=>{ const on = sub===id; return (
-        <button key={id} type="button" onClick={()=>setSub(id)} aria-current={on?'page':undefined}
+      {sections.map(([id,label,point])=>{ const on = sub===id; return (
+        <button key={id} type="button" onClick={()=>setSub(id)} aria-current={on?'page':undefined} data-section={id}
           style={{flexShrink:0,border:`1px solid ${on?T.accent:T.border}`,background:on?T.accent:T.card,
             color:on?(T.onAccent||'#fff'):T.text,borderRadius:999,padding:'7px 14px',cursor:'pointer',
-            fontFamily:'inherit',fontSize:13,fontWeight:on?700:600,whiteSpace:'nowrap'}}>{label}</button>
+            fontFamily:'inherit',fontSize:13,fontWeight:on?700:600,whiteSpace:'nowrap',display:'inline-flex',alignItems:'center',gap:6}}>
+          {label}
+          {/* Un POINT, pas un nombre : il dit « il y a du nouveau ». Trois règles de
+              comptage des non lus coexistent (coque, cloche, écran) ; un chiffre
+              ici pourrait contredire celui de l'écran juste en dessous (§11). */}
+          {point && !on ? <span data-point="" aria-label="nouveau" style={{width:7,height:7,borderRadius:999,background:T.accent,flexShrink:0}}/> : null}
+        </button>
       );})}
     </div>
   );
@@ -26972,7 +26980,7 @@ function LeboncoinScreen() {
   return (
     <div style={{ padding: '16px 14px 40px', maxWidth: 600, margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-        <h2 style={{ fontSize: 18, fontWeight: 700, color: C.text, margin: 0 }}>À publier sur Leboncoin</h2>
+        <h2 style={{ fontSize: 18, fontWeight: 700, color: C.text, margin: 0 }}>Tes annonces Leboncoin</h2>
         <button onClick={reload} style={{ background: 'transparent', border: `1px solid ${C.border}`, borderRadius: 999, padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: C.text }}>{loading ? '…' : '↻ Actualiser'}</button>
       </div>
       {/* ── ANTI DOUBLE VENTE : EN PREMIER, C'EST LE SEUL GESTE URGENT DE L'ÉCRAN ──
@@ -27024,130 +27032,6 @@ function LeboncoinScreen() {
       {data && data.ventesLbcKO && (
         <div style={{ fontSize: 11.5, color: C.muted, marginBottom: 12, lineHeight: 1.5 }}>Je n'ai pas pu lire tes ventes Leboncoin : je n'ai donc pas pu vérifier qu'aucune paire vendue ici n'est encore en vente sur Vinted. Actualise dans un moment.</div>
       )}
-      {/* ══════════════════════════════════════════════════════════════════════
-          PUBLIER TOUT SEUL : OÙ ÇA EN EST, ET CE QUI FAIT AVANCER
-          ══════════════════════════════════════════════════════════════════════
-          L'extension collecte depuis quatre versions — le catalogue des codes de
-          Leboncoin, la config de son formulaire (qui est DYNAMIQUE : mesuré,
-          `api/adsubmit/dynamic-deposit/config`), la forme de ce qui part — et
-          l'app n'en montrait RIEN. Julien ne pouvait donc pas savoir si ça
-          avançait, ni quel geste faisait avancer : il a refait trois dépôts à la
-          main sans jamais voir de retour. C'est le motif du tiroir `Nav` (§4.11),
-          sur la chose qu'il attend.
-          ⚠️ On écrit des FAITS — des tailles, des dates, des noms d'endpoint — et
-             le GESTE. Jamais « bientôt », jamais un pourcentage inventé. */}
-      {(() => {
-        const p = data && data.prep;
-        if (p === undefined) return null;
-        // Trois états, jamais deux : pas su · jamais publié · lu.
-        const morceaux = (p && p.morceaux) || {};
-        const PIECES = [
-          ['codes', 'Les codes de Leboncoin', 'marques, tailles, états — leurs valeurs exactes'],
-          ['config', 'La composition du formulaire', 'quels champs, dans quel ordre, par catégorie'],
-          ['prerempli', 'Ce que Leboncoin remplit tout seul', 'la catégorie, la description et le prix qu’il propose'],
-          ['soumission', 'La forme de la publication', 'les champs attendus quand on valide'],
-        ];
-        const aPiece = (k) => { const m = morceaux[k]; return m && m.taille > 0 ? (m.coupe ? 'coupe' : 'ok') : 'non'; };
-        const faits = PIECES.filter(([k]) => aPiece(k) === 'ok').length;
-        const coupes = PIECES.filter(([k]) => aPiece(k) === 'coupe').length;
-        const pastille = (e) => e === 'ok' ? { t: '✓', c: INV_STATUS.online.color } : e === 'coupe' ? { t: '⚠', c: C.warn } : { t: '·', c: C.muted };
-        // Le geste : un seul, celui qui débloque le plus. Jamais une liste.
-        // Tout reçu : la carte n'a plus rien à apprendre — elle disparaît (§7).
-        if (p && p.majAt && ['codes', 'config', 'prerempli', 'soumission'].every((k) => { const m = morceaux[k]; return m && m.taille > 0 && !m.coupe; })) return null;
-        const geste = p === null ? null
-          : !p.majAt ? { q: 'Mets l’extension à jour, puis passe une fois sur leboncoin.fr.', d: 'Rien n’a encore été relevé : c’est la visite qui déclenche tout.' }
-          : aPiece('codes') !== 'ok' ? { q: 'Passe une fois sur leboncoin.fr.', d: 'Leboncoin envoie ses codes au chargement — l’extension les attrape au passage.' }
-          : aPiece('config') !== 'ok' || aPiece('soumission') !== 'ok'
-            ? { q: 'Dépose une annonce à la main, jusqu’au bout.', d: 'C’est le seul moment où Leboncoin envoie la composition du formulaire et la forme de la publication.' }
-            : null;
-        return (
-          <Card style={{ borderColor: C.border }}>
-            <div style={{ fontSize: 13, fontWeight: 800, color: C.text, marginBottom: 2 }}>Publier sans rien retaper — préparation</div>
-            <div style={{ fontSize: 11.5, color: C.muted, marginBottom: 10, lineHeight: 1.5 }}>
-              {p === null
-                ? 'Je n’ai pas pu lire où ça en est. Rien n’est perdu — rouvre cet écran dans un moment.'
-                : <>Le formulaire de Leboncoin n’est pas le même d’une annonce à l’autre : il est <b>construit</b> à partir d’une configuration qu’il envoie. Il me faut ces quatre pièces pour remplir juste — <b>{faits} sur {PIECES.length}</b> {faits > 1 ? 'reçues' : 'reçue'}{coupes ? `, ${coupes} incomplète${coupes > 1 ? 's' : ''}` : ''}.</>}
-            </div>
-            {p !== null && (
-              <div style={{ display: 'grid', gap: 5, marginBottom: geste ? 10 : 0 }}>
-                {PIECES.map(([k, titre, quoi]) => {
-                  const e = aPiece(k); const pa = pastille(e); const m = morceaux[k] || {};
-                  return (
-                    <div key={k} style={{ display: 'flex', gap: 8, alignItems: 'baseline', fontSize: 12 }}>
-                      <span style={{ color: pa.c, fontWeight: 800, width: 12, flexShrink: 0 }}>{pa.t}</span>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <span style={{ color: e === 'non' ? C.muted : C.text, fontWeight: e === 'non' ? 500 : 700 }}>{titre}</span>
-                        <span style={{ color: C.muted }}> — {quoi}</span>
-                        {e === 'coupe' && <span style={{ color: C.warn }}> · reçue incomplète, elle se recomplètera à ta prochaine visite</span>}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            {geste && (
-              <div style={{ fontSize: 12, color: C.text, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: '8px 10px' }}>
-                <b>{geste.q}</b> <span style={{ color: C.muted }}>{geste.d}</span>
-              </div>
-            )}
-
-          </Card>
-        );
-      })()}
-      {/* ⚠️ MÊME DÉFAUT QUE LA LIGNE DES PLACES, TROUVÉ EN BALAYANT « télécharg » :
-          cette phrase-ci disait aussi « photos téléchargées » et n'était gardée
-          par AUCUNE version. Depuis la 5.58 elles s'attachent au formulaire.
-          *Une suppression « terminée » se vérifie sur ce qui RESTE* — le premier
-          correctif n'avait touché qu'un des deux endroits. */}
-      {/* ⚠️⚠️ ET ELLE NE CONNAISSAIT QUE DEUX ÉTATS — vu au rendu le 15 septembre
-          sur ses vraies données. `extSait` en rend TROIS, et le troisième est
-          celui de son iPhone : **absente**. L'écran lui annonçait alors
-          « photos téléchargées dans un dossier » — la description d'un
-          comportement qui ne peut PAS avoir lieu (sans extension, rien n'est
-          téléchargé ni attaché), au lieu de lui dire le vrai geste : ouvrir
-          l'app sur l'ordinateur où elle est installée. C'est exactement le trou
-          du premier jet d'`extSaitLireCodes` (« l'extension la plus en retard
-          était la seule à ne rien déclencher »), et l'écran Annonces, lui,
-          traitait déjà les trois. *« Pas su » ne vaut pas « oui ».* */}
-      <div style={{ fontSize: 12, color: C.muted, marginBottom: 14, lineHeight: 1.5 }}>La file est construite à partir de tes <b>annonces réellement en ligne sur Vinted</b> (comptes actifs uniquement, paires retirées exclues). {(() => {
-        // Trois états, jamais deux (§ extSait) — et la phrase suit la version
-        // INSTALLÉE : c'est l'extension qui publie, avec SA règle.
-        const e = extSait('publication');
-        if (e === 'ok') return <>Chaque paire a son bouton <b>« Publier sur Leboncoin »</b> : l'extension ouvre le dépôt, attache les photos, remplit tout et publie <b>sans option payante</b>.</>;
-        if (e === 'retard') return <>Le bouton <b>« Publier sur Leboncoin »</b> arrive avec l'extension <b>{EXT_CAPACITES.publication}</b> : mets-la à jour depuis <b>Réglages</b>. En attendant, celle installée publie encore depuis son panneau sur leboncoin.fr.</>;
-        return <>La publication part de l'ordinateur où l'extension est installée : ouvre cet écran là-bas et clique « Publier » sur la paire. Cette liste, elle, se consulte de partout.</>;
-      })()}</div>
-
-      {/* COMPTES LEBONCOIN — plusieurs comptes possibles. On liste ceux que
-          l'extension a réellement vus connectés dans le navigateur, avec le
-          nombre d'annonces rattachées à chacun. Sans ça, impossible de savoir
-          depuis quel compte republier. */}
-      {data && (data.lbcAccounts || []).length > 0 && (
-        <div style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 16, padding: '13px 15px', marginBottom: 12 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 8 }}>Comptes Leboncoin détectés</div>
-          {data.lbcAccounts.map(a => {
-            const nb = ((data.parCompte || {})[String(a.id)] || []).length;
-            const vu = a.seenAt ? new Date(a.seenAt) : null;
-            const jours = vu ? Math.floor((Date.now() - vu.getTime()) / 86400000) : null;
-            return (
-              <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderTop: `1px solid ${C.border}` }}>
-                <span style={{ width: 30, height: 30, borderRadius: 999, flexShrink: 0, background: C.bg, border: `1px solid ${C.border}`, color: C.text, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700 }}>
-                  {String(a.name || '?').slice(0, 1).toUpperCase()}
-                </span>
-                <span style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.name || `#${a.id}`}</span>
-                  <span style={{ display: 'block', fontSize: 10.5, color: C.muted, marginTop: 1 }}>
-                    {nb} annonce{nb > 1 ? 's' : ''}{jours != null ? ` · vu ${jours === 0 ? "aujourd'hui" : `il y a ${jours} j`}` : ''}
-                  </span>
-                </span>
-              </div>
-            );
-          })}
-          <div style={{ fontSize: 10.5, color: C.muted, marginTop: 8, lineHeight: 1.5 }}>
-            Un compte apparaît ici dès que tu ouvres Leboncoin avec l'extension active, connecté dessus.
-          </div>
-        </div>
-      )}
       {loading && !data ? <div style={{ fontSize: 13, color: C.muted, textAlign: 'center', padding: '30px 16px' }}>Chargement…</div> : (<>
         {/* Compteur / offre */}
         <Card>
@@ -27161,12 +27045,13 @@ function LeboncoinScreen() {
               <br/>Tant que c'est le cas, je ne peux pas te dire <b>lesquelles retirer</b> quand une paire se vend sur Vinted.
             </div>
           )}
-          <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, marginTop: 2 }}>Offre : {data.plan || (lim ? '' : 'Gratuit')}{data.plan || !lim ? '' : ''}</div>
+          {/* ⚠️ « Offre : Gratuit » s'affichait quand AUCUNE offre n'était connue
+              (mesuré : `plan` et `limit` jamais renseignés) — une valeur inventée. */}
+          {data.plan ? <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, marginTop: 2 }}>Offre : {data.plan}</div> : null}
           {lim ? (<>
             <div style={{ height: 8, borderRadius: 999, background: C.border, overflow: 'hidden', marginTop: 9 }}><div style={{ width: pct + '%', height: '100%', background: barCol, borderRadius: 999 }} /></div>
             <div style={{ fontSize: 11.5, fontWeight: 700, marginTop: 5, color: barCol }}>{n >= lim ? '⚠️ Limite atteinte' : n >= lim - 3 ? '⚠️ Tu approches de ta limite' : `Il te reste ${lim - n} annonce${lim - n > 1 ? 's' : ''}`}</div>
           </>) : null}
-          <QuotaLbc limit={lim} plan={data.plan} onFait={reload}/>
         </Card>
         {/* À retirer (vendues sur Vinted) */}
         {/* ⚠️⚠️ « VENDUE » SE PROUVE, ELLE NE SE DÉDUIT PAS D'UNE ABSENCE.
@@ -27381,6 +27266,148 @@ function LeboncoinScreen() {
           </>)}
         </Card>
       </>)}
+      {/* ── DÉTAILS ET RÉGLAGES, REPLIÉS (4 octobre) ─────────────────────────
+          Julien : « que Leboncoin soit beaucoup plus intuitif ». Mesuré : la
+          liste « à publier » — la seule chose qu'il fait vraiment ici — était
+          le DERNIER de douze blocs, après la préparation de la publication, un
+          paragraphe d'explication, les comptes et la limite de l'offre. Ce qui
+          se LIT une fois descend ici ; ce qui se FAIT reste en haut. */}
+      {data && (
+        <details data-lbc-details="" style={{ marginTop: 6 }}>
+          <summary style={{ cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: C.muted, padding: '8px 2px' }}>Détails et réglages</summary>
+          <div style={{ paddingTop: 8 }}>
+      {/* ══════════════════════════════════════════════════════════════════════
+          PUBLIER TOUT SEUL : OÙ ÇA EN EST, ET CE QUI FAIT AVANCER
+          ══════════════════════════════════════════════════════════════════════
+          L'extension collecte depuis quatre versions — le catalogue des codes de
+          Leboncoin, la config de son formulaire (qui est DYNAMIQUE : mesuré,
+          `api/adsubmit/dynamic-deposit/config`), la forme de ce qui part — et
+          l'app n'en montrait RIEN. Julien ne pouvait donc pas savoir si ça
+          avançait, ni quel geste faisait avancer : il a refait trois dépôts à la
+          main sans jamais voir de retour. C'est le motif du tiroir `Nav` (§4.11),
+          sur la chose qu'il attend.
+          ⚠️ On écrit des FAITS — des tailles, des dates, des noms d'endpoint — et
+             le GESTE. Jamais « bientôt », jamais un pourcentage inventé. */}
+      {(() => {
+        const p = data && data.prep;
+        if (p === undefined) return null;
+        // Trois états, jamais deux : pas su · jamais publié · lu.
+        const morceaux = (p && p.morceaux) || {};
+        const PIECES = [
+          ['codes', 'Les codes de Leboncoin', 'marques, tailles, états — leurs valeurs exactes'],
+          ['config', 'La composition du formulaire', 'quels champs, dans quel ordre, par catégorie'],
+          ['prerempli', 'Ce que Leboncoin remplit tout seul', 'la catégorie, la description et le prix qu’il propose'],
+          ['soumission', 'La forme de la publication', 'les champs attendus quand on valide'],
+        ];
+        const aPiece = (k) => { const m = morceaux[k]; return m && m.taille > 0 ? (m.coupe ? 'coupe' : 'ok') : 'non'; };
+        const faits = PIECES.filter(([k]) => aPiece(k) === 'ok').length;
+        const coupes = PIECES.filter(([k]) => aPiece(k) === 'coupe').length;
+        const pastille = (e) => e === 'ok' ? { t: '✓', c: INV_STATUS.online.color } : e === 'coupe' ? { t: '⚠', c: C.warn } : { t: '·', c: C.muted };
+        // Le geste : un seul, celui qui débloque le plus. Jamais une liste.
+        // Tout reçu : la carte n'a plus rien à apprendre — elle disparaît (§7).
+        if (p && p.majAt && ['codes', 'config', 'prerempli', 'soumission'].every((k) => { const m = morceaux[k]; return m && m.taille > 0 && !m.coupe; })) return null;
+        const geste = p === null ? null
+          : !p.majAt ? { q: 'Mets l’extension à jour, puis passe une fois sur leboncoin.fr.', d: 'Rien n’a encore été relevé : c’est la visite qui déclenche tout.' }
+          : aPiece('codes') !== 'ok' ? { q: 'Passe une fois sur leboncoin.fr.', d: 'Leboncoin envoie ses codes au chargement — l’extension les attrape au passage.' }
+          : aPiece('config') !== 'ok' || aPiece('soumission') !== 'ok'
+            ? { q: 'Dépose une annonce à la main, jusqu’au bout.', d: 'C’est le seul moment où Leboncoin envoie la composition du formulaire et la forme de la publication.' }
+            : null;
+        return (
+          <Card style={{ borderColor: C.border }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: C.text, marginBottom: 2 }}>Publier sans rien retaper — préparation</div>
+            <div style={{ fontSize: 11.5, color: C.muted, marginBottom: 10, lineHeight: 1.5 }}>
+              {p === null
+                ? 'Je n’ai pas pu lire où ça en est. Rien n’est perdu — rouvre cet écran dans un moment.'
+                : <>Le formulaire de Leboncoin n’est pas le même d’une annonce à l’autre : il est <b>construit</b> à partir d’une configuration qu’il envoie. Il me faut ces quatre pièces pour remplir juste — <b>{faits} sur {PIECES.length}</b> {faits > 1 ? 'reçues' : 'reçue'}{coupes ? `, ${coupes} incomplète${coupes > 1 ? 's' : ''}` : ''}.</>}
+            </div>
+            {p !== null && (
+              <div style={{ display: 'grid', gap: 5, marginBottom: geste ? 10 : 0 }}>
+                {PIECES.map(([k, titre, quoi]) => {
+                  const e = aPiece(k); const pa = pastille(e); const m = morceaux[k] || {};
+                  return (
+                    <div key={k} style={{ display: 'flex', gap: 8, alignItems: 'baseline', fontSize: 12 }}>
+                      <span style={{ color: pa.c, fontWeight: 800, width: 12, flexShrink: 0 }}>{pa.t}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ color: e === 'non' ? C.muted : C.text, fontWeight: e === 'non' ? 500 : 700 }}>{titre}</span>
+                        <span style={{ color: C.muted }}> — {quoi}</span>
+                        {e === 'coupe' && <span style={{ color: C.warn }}> · reçue incomplète, elle se recomplètera à ta prochaine visite</span>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {geste && (
+              <div style={{ fontSize: 12, color: C.text, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: '8px 10px' }}>
+                <b>{geste.q}</b> <span style={{ color: C.muted }}>{geste.d}</span>
+              </div>
+            )}
+
+          </Card>
+        );
+      })()}
+      {/* ⚠️ MÊME DÉFAUT QUE LA LIGNE DES PLACES, TROUVÉ EN BALAYANT « télécharg » :
+          cette phrase-ci disait aussi « photos téléchargées » et n'était gardée
+          par AUCUNE version. Depuis la 5.58 elles s'attachent au formulaire.
+          *Une suppression « terminée » se vérifie sur ce qui RESTE* — le premier
+          correctif n'avait touché qu'un des deux endroits. */}
+      {/* ⚠️⚠️ ET ELLE NE CONNAISSAIT QUE DEUX ÉTATS — vu au rendu le 15 septembre
+          sur ses vraies données. `extSait` en rend TROIS, et le troisième est
+          celui de son iPhone : **absente**. L'écran lui annonçait alors
+          « photos téléchargées dans un dossier » — la description d'un
+          comportement qui ne peut PAS avoir lieu (sans extension, rien n'est
+          téléchargé ni attaché), au lieu de lui dire le vrai geste : ouvrir
+          l'app sur l'ordinateur où elle est installée. C'est exactement le trou
+          du premier jet d'`extSaitLireCodes` (« l'extension la plus en retard
+          était la seule à ne rien déclencher »), et l'écran Annonces, lui,
+          traitait déjà les trois. *« Pas su » ne vaut pas « oui ».* */}
+      <div style={{ fontSize: 12, color: C.muted, marginBottom: 14, lineHeight: 1.5 }}>La file est construite à partir de tes <b>annonces réellement en ligne sur Vinted</b> (comptes actifs uniquement, paires retirées exclues). {(() => {
+        // Trois états, jamais deux (§ extSait) — et la phrase suit la version
+        // INSTALLÉE : c'est l'extension qui publie, avec SA règle.
+        const e = extSait('publication');
+        if (e === 'ok') return <>Chaque paire a son bouton <b>« Publier sur Leboncoin »</b> : l'extension ouvre le dépôt, attache les photos, remplit tout et publie <b>sans option payante</b>.</>;
+        if (e === 'retard') return <>Le bouton <b>« Publier sur Leboncoin »</b> arrive avec l'extension <b>{EXT_CAPACITES.publication}</b> : mets-la à jour depuis <b>Réglages</b>. En attendant, celle installée publie encore depuis son panneau sur leboncoin.fr.</>;
+        return <>La publication part de l'ordinateur où l'extension est installée : ouvre cet écran là-bas et clique « Publier » sur la paire. Cette liste, elle, se consulte de partout.</>;
+      })()}</div>
+
+      {/* COMPTES LEBONCOIN — plusieurs comptes possibles. On liste ceux que
+          l'extension a réellement vus connectés dans le navigateur, avec le
+          nombre d'annonces rattachées à chacun. Sans ça, impossible de savoir
+          depuis quel compte republier. */}
+      {data && (data.lbcAccounts || []).length > 1 && (
+        <div style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 16, padding: '13px 15px', marginBottom: 12 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 8 }}>Comptes Leboncoin détectés</div>
+          {data.lbcAccounts.map(a => {
+            const nb = ((data.parCompte || {})[String(a.id)] || []).length;
+            const vu = a.seenAt ? new Date(a.seenAt) : null;
+            const jours = vu ? Math.floor((Date.now() - vu.getTime()) / 86400000) : null;
+            return (
+              <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderTop: `1px solid ${C.border}` }}>
+                <span style={{ width: 30, height: 30, borderRadius: 999, flexShrink: 0, background: C.bg, border: `1px solid ${C.border}`, color: C.text, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700 }}>
+                  {String(a.name || '?').slice(0, 1).toUpperCase()}
+                </span>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.name || `#${a.id}`}</span>
+                  <span style={{ display: 'block', fontSize: 10.5, color: C.muted, marginTop: 1 }}>
+                    {nb} annonce{nb > 1 ? 's' : ''}{jours != null ? ` · vu ${jours === 0 ? "aujourd'hui" : `il y a ${jours} j`}` : ''}
+                  </span>
+                </span>
+              </div>
+            );
+          })}
+          <div style={{ fontSize: 10.5, color: C.muted, marginTop: 8, lineHeight: 1.5 }}>
+            Un compte apparaît ici dès que tu ouvres Leboncoin avec l'extension active, connecté dessus.
+          </div>
+        </div>
+      )}
+            <Card>
+              <div style={{ fontSize: 12.5, fontWeight: 600, color: C.text, marginBottom: 2 }}>Limite de ton offre Leboncoin</div>
+              <div style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.5 }}>{data.limit ? `${data.limit} annonces au maximum${data.plan ? ` · offre ${data.plan}` : ''}.` : 'Pas encore indiquée : le compteur ne peut pas te prévenir avant la limite.'}</div>
+              <QuotaLbc limit={data.limit} plan={data.plan} onFait={reload}/>
+            </Card>
+          </div>
+        </details>
+      )}
     </div>
   );
 }
@@ -29543,7 +29570,14 @@ function AppCoeur() {
   // Vinted ouvre DIRECTEMENT sur les ventes (le résumé CA/argent reste en haut,
   // pas d'écran « Aperçu » à traverser — demande de Julien) ; les autres
   // plateformes ouvrent sur leur aperçu.
-  React.useEffect(()=>{ setPlatSub('ventes'); },[tab]);   // plus d'« Aperçu » nulle part : la liste d'abord, le résumé au-dessus
+  // Un lien peut demander une SECTION précise (ex. les messages) : `subVoulue`
+  // la porte le temps du changement d'onglet.
+  const subVoulue=React.useRef(null);
+  React.useEffect(()=>{ setPlatSub(subVoulue.current||'ventes'); subVoulue.current=null; },[tab]);   // plus d'« Aperçu » nulle part : la liste d'abord, le résumé au-dessus
+  // L'ancien onglet « Messages » (cloche, bandeau, « à faire ») mène désormais
+  // aux messages DANS Vinted : une seule porte pour un seul écran.
+  React.useEffect(()=>{ if(tab==='cat_msg'){ subVoulue.current='messages'; setTab('plat_vinted'); } },[tab]);
+  React.useEffect(()=>{ if(tab==='leboncoin'){ subVoulue.current='annonces'; setTab('plat_leboncoin'); } },[tab]);
   // ⚠️ Flèche « retour » RETIRÉE le 1er octobre (demande de Julien : « elle sert
   // à rien »). La navigation se fait par le menu des écrans / la barre latérale,
   // toujours joignables ; un bouton retour de plus n'apprenait rien.
@@ -31059,7 +31093,10 @@ function AppCoeur() {
               défaut) directement — plus d'écran « Aperçu » intermédiaire. Les
               sections restent les mêmes écrans (§11), juste à un tap. */}
           <VintedResume liveStats={liveStats} baseKO={baseKO}/>
-          <PlatSubNav sub={platSub} setSub={setPlatSub} sections={[['ventes','Ventes'],['achats','Achats'],['annonces','Annonces']]}/>
+          {/* ⚠️ 4 octobre — Julien : « dans Vinted […] il y ait les messages ».
+              L'écran complet existait (liste tous comptes, fil, réponse, offres)
+              mais n'avait plus AUCUNE porte dans Vinted : seulement la cloche. */}
+          <PlatSubNav sub={platSub} setSub={setPlatSub} sections={[['ventes','Ventes'],['achats','Achats'],['annonces','Annonces'],['messages','Messages', !!(liveStats && liveStats.unread > 0)]]}/>
           <Comptabilite key={'pv_'+platSub} accounts={vintedAccounts} only={platSub==='apercu'?'ventes':platSub} liveStats={liveStats} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}/>
         </>)}
         {tab==='plat_leboncoin'&&(<>
@@ -31108,9 +31145,8 @@ function AppCoeur() {
         {tab==='stockvinted'&&<StockVinted stockVinted={stockVinted} setStockVinted={setStockVinted} garageGrid={garageGrid} invoices={invoices}/>}
         {tab==='garage'   &&<Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} locate={garageLocate} onLocateConsumed={()=>setGarageLocate(null)} placeNum={garagePlace} onPlaced={()=>setGaragePlace(null)}/>}
         {tab==='comptabilite'&&<Comptabilite accounts={vintedAccounts} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}
-        {(()=>{ const map={cat_annonces:'annonces',cat_ventes:'ventes',cat_achats:'achats',cat_bord:'bordereaux',cat_msg:'messages',cat_expedition:'bordereaux'}; return map[tab] ? <Comptabilite key={tab} accounts={vintedAccounts} only={map[tab]} liveStats={liveStats} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}/> : null; })()}
+        {(()=>{ const map={cat_annonces:'annonces',cat_ventes:'ventes',cat_achats:'achats',cat_bord:'bordereaux',cat_expedition:'bordereaux'}; return map[tab] ? <Comptabilite key={tab} accounts={vintedAccounts} only={map[tab]} liveStats={liveStats} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}/> : null; })()}
         {tab==='vintedaccounts'&&<VintedAccounts accounts={vintedAccounts} setAccounts={setVintedAccounts} baseKO={baseKO}/>}
-        {tab==='leboncoin'&&<LeboncoinScreen/>}
         </EcranGardeFou>
       </main>
       {/* Une seule navigation à la fois : latérale sur ordinateur, en bas sur
