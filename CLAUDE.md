@@ -5008,9 +5008,16 @@ Sentry) : la politique de confidentialité n'a pas à changer.
   confirmée **reste en file**.
 - « État des connexions » dit « Écrans en erreur · N ces 7 derniers jours » —
   rien sur zéro, rien sur une lecture ratée.
+- ⚠️ Revue adverse : le premier jet laissait passer un login cité par le
+  navigateur (« reading 'julatace3535' »), un téléphone espacé, un prix, un
+  `refresh_token=…`, un UUID et une adresse encodée ; jugeait le bruit sur TOUTE
+  la pile (une extension tierce plus bas cachait une vraie erreur de l'app) ;
+  gardait le nom de fonction minifié dans l'empreinte (une ligne par
+  déploiement) ; et écrasait un plantage noté pendant l'envoi. Tout est corrigé
+  et au banc.
 - **Pour une prochaine session** : `select id, data from app_data where id like
   'plantage_%' order by data->>'at' desc` donne les écrans tombés chez les
-  vendeurs. Banc `plantages.cjs` (24 contrôles, 8 rouges en réaffaiblissant).
+  vendeurs. Banc `plantages.cjs` (29 contrôles, 8 rouges en réaffaiblissant).
 
 ### La sauvegarde complète l'est enfin (4 octobre)
 « Télécharge TOUT : catalogue, ventes, achats… » était faux : le fichier ne
@@ -5021,6 +5028,24 @@ dehors, et le fichier le DIT (`omis`) : les PDF de bordereau, le détail brut de
 transactions (on garde leur `meta`) et les jetons Vinted. Une page ratée donne
 `complet:false` et la liste de ce qui manque. La restauration ne réécrit PAS les
 données captées (une copie ancienne écraserait une capture plus fraîche, §4.2).
+⚠️⚠️ **Et le premier jet FAISAIT FUIR SEPT SECRETS** (revue adverse, prouvé au
+banc `sauvegarde.cjs` sur le code d'avant) : la boucle relisait le navigateur,
+qui garde `vinted_accounts` AVEC access/refresh/csrf, sans l'allègement que
+`cloudPush` applique — plus `ebay_tokens`, les clés des téléphones (`push_subs`)
+et la clé du widget. La règle est maintenant celle du nuage (§11), ces lignes ne
+quittent pas la base, et un filet retire tout champ de jeton du fichier.
+- **Restaurer une vieille sauvegarde rendait libres les numéros posés depuis**
+  (§5 : un numéro écrit sur un carton ne sert jamais deux fois). Le pool est
+  l'UNION ; pour les fiches numérotées, ce qui est en place gagne et le fichier ne
+  comble que les manques. Jamais de `vinted_accounts` ni de clé du widget depuis
+  un fichier.
+- **« ✓ restaurée » s'affichait même quand le nuage avait refusé l'écriture** —
+  et le rechargement relisait l'ancienne ligne : tout disparaissait sans un mot.
+  Écriture vérifiée ; sur un échec, valeurs d'avant remises, pas de rechargement,
+  et on le dit.
+- « Dernière sauvegarde : aujourd'hui ✅ » n'est posée que pour un fichier
+  complet ; des réglages lus avant l'arrivée du nuage rendent le fichier
+  « incomplet ». Banc `sauvegarde.cjs` : 19 contrôles, **9 rouges** sur l'avant.
 
 ### Code mort et rappels d'expédition à l'échelle (4 octobre)
 - **Sept fonctions sans appelant** retirées (graphique mensuel, export Factur-X
