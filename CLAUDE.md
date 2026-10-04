@@ -4542,7 +4542,7 @@ etc. lorsqu'elle ne paye plus ».
   reçoit 401, et c'est l'ouverture suivante de l'app qui ré-enregistre.
 - **Réglage** : `vrm_reglages.abonnement_obligatoire` vaut **'0'** — RIEN n'est
   bloqué aujourd'hui. Julien le passe à '1' quand Stripe est en mode réel ET que
-  les CGV et la page d'accueil (qui disent « gratuit ») sont à jour. Le
+  les CGV et la page d'accueil sont à jour (fait le 4 octobre, voir plus bas). Le
   propriétaire est `vrm_reglages.proprietaire` (= `VRM_OWNER_UID`).
 - **À lui** : `STRIPE_SECRET_KEY` (sk_test_…) sur Vercel — le webhook et son
   secret sont posés. La règle SQL a été exécutée sur la vraie base dans une
@@ -4553,6 +4553,29 @@ etc. lorsqu'elle ne paye plus ».
   banc `abonnement.cjs` (**27**, rendu : la porte suit `acces`, un impayé de
   plus de 14 jours envoie mettre la carte à jour, jamais repayer — 3 rouges sur
   le build d'avant).
+
+### L'onglet « Mon compte » : abonnement, carte, factures, résiliation (4 octobre)
+Julien : « un onglet pour gérer l'abonnement et les factures dans les
+paramètres, avec ses infos de compte regroupées ». Les Paramètres ont deux
+onglets (`data-onglets-reglages`) : **Réglages** (l'app) et **Mon compte** (la
+personne : identité, prénom, abonnement, carte, factures, connexion, ses
+données). Sans session, pas d'onglets. `?vue=compte` (retour de Stripe) ouvre
+le bon onglet.
+- `api/compte.js` : `mode=factures` (SES factures et SA carte — le client Stripe
+  vient de SA ligne lue avec son jeton, jamais d'un paramètre ; seules les
+  adresses `*.stripe.com` sont transmises ; Stripe muet ⇒ 502, **jamais** « aucune
+  facture ») · `mode=resilier` / `mode=reprendre` (POST seulement ;
+  `cancel_at_period_end` — la résiliation prend effet en FIN de période, comme le
+  portail ; l'abonnement doit appartenir à CE client, sinon 403 ; la ligne est
+  réécrite tout de suite depuis la réponse de Stripe). Résilier en ligne est une
+  obligation en France (art. L215-1-1).
+- **CGV et page d'accueil disent 9,99 € par mois.** Tant que
+  `abonnement_obligatoire` vaut '0', elles disent aussi que l'accès est offert —
+  ⚠️ **le jour où Julien passe le réglage à '1', retirer cette phrase** de
+  `src/Accueil.jsx` (FAQ « Combien ça coûte ? » et section Prix) et de l'encadré
+  des CGV. Le banc `accueil.cjs` lit le prix DANS les CGV.
+- Preuves : `audit-abonnement.cjs` **62 contrôles** (14 rouges sur l'avant) ;
+  banc `abonnement.cjs` **42** (13 rouges sur le build d'avant).
 
 ### ⚠️⚠️ AUDIT DE SÉCURITÉ DU 4 OCTOBRE — CE QUI ÉTAIT OUVERT, ET CE QUI NE L'EST PLUS
 Demande de Julien : « continue à améliorer la sécurité du site ». Outils :

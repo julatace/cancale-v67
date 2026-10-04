@@ -6,7 +6,10 @@
 //   /api/stripe-webhook   → ?mode=webhook     (POST, Stripe, SIGNÉ)
 //   /api/compte?mode=abonnement   (GET, session)  statut de MON abonnement
 //   /api/compte?mode=checkout     (POST, session) ouvre le paiement Stripe
-//   /api/compte?mode=portail      (POST, session) gérer / résilier
+//   /api/compte?mode=portail      (POST, session) changer de carte (page Stripe)
+//   /api/compte?mode=factures     (GET, session)  MES factures et MA carte
+//   /api/compte?mode=resilier     (POST, session) résilier à la fin de la période
+//   /api/compte?mode=reprendre    (POST, session) annuler la résiliation
 //
 // L'abonnement (Julien, 4 octobre) : 9,99 € par mois, prélevé chaque mois à la
 // date où la personne s'abonne, pour TOUT LE MONDE SAUF LUI (le propriétaire
@@ -231,8 +234,8 @@ async function checkout(req, res) {
   const params = {
     mode: 'subscription',
     line_items: [{ price: prix.id, quantity: 1 }],
-    success_url: `${APP_URL}/?tab=settings&abonnement=merci`,
-    cancel_url: `${APP_URL}/?tab=settings&abonnement=annule`,
+    success_url: `${APP_URL}/?tab=settings&vue=compte&abonnement=merci`,
+    cancel_url: `${APP_URL}/?tab=settings&vue=compte&abonnement=annule`,
     client_reference_id: u.id,
     metadata: { owner: u.id, app: 'vrm' },
     subscription_data: { metadata: { owner: u.id, app: 'vrm' } },
@@ -253,9 +256,97 @@ async function portail(req, res) {
   const ligne = await ligneDe(req);
   if (ligne === undefined) return repondre(res, 503, { erreur: 'base-injoignable', message: "Je n'ai pas pu lire ton abonnement. Réessaie dans un instant." });
   if (!ligne || !ligne.client_stripe) return repondre(res, 404, { erreur: 'aucun', message: "Tu n'as pas encore d'abonnement." });
-  const r = await stripeApi('POST', 'billing_portal/sessions', { customer: ligne.client_stripe, return_url: `${APP_URL}/?tab=settings` });
+  const r = await stripeApi('POST', 'billing_portal/sessions', { customer: ligne.client_stripe, return_url: `${APP_URL}/?tab=settings&vue=compte` });
   if (!r.ok || !r.data.url) return repondre(res, 502, { erreur: 'stripe', message: "Stripe n'a pas pu ouvrir la page de gestion. Réessaie dans un instant." });
   return repondre(res, 200, { url: r.data.url });
+}
+
+// ── MES FACTURES ET MA CARTE (onglet « Mon compte », 4 octobre) ─────────────
+// Julien : « un onglet pour gérer l'abonnement et les factures dans les
+// paramètres, avec ses infos de compte regroupées ».
+// ⚠️ Le client Stripe vient de SA ligne d'abonnement (lue avec son jeton, RLS) :
+//    jamais d'un identifiant envoyé par le navigateur — sinon on lirait les
+//    factures d'un autre en changeant un paramètre.
+const URL_STRIPE = /^https:\/\/(pay|invoice|files|invoicedata)\.stripe\.com\//;
+const lienStripe = (u) => (typeof u === 'string' && URL_STRIPE.test(u) ? u : null);
+export const factureLisible = (f) => ({
+  id: String(f.id || ''),
+  numero: f.number || null,
+  date: f.created ? new Date(f.created * 1000).toISOString() : null,
+  // Le montant FACTURÉ (total), pas ce qui reste à payer : une facture payée
+  // dirait sinon « 0,00 € ».
+  montant: Number.isFinite(f.total) ? f.total / 100 : null,
+  devise: f.currency || 'eur',
+  statut: String(f.status || ''),
+  pdf: lienStripe(f.invoice_pdf),
+  page: lienStripe(f.hosted_invoice_url),
+});
+export const carteLisible = (pm) => {
+  const c = pm && pm.card;
+  if (!c) return null;
+  return { marque: String(c.display_brand || c.brand || ''), fin: String(c.last4 || ''), mois: c.exp_month || null, annee: c.exp_year || null };
+};
+
+async function factures(req, res) {
+  const u = await utilisateurDe(req);
+  if (!u) return repondre(res, 401, { erreur: 'session' });
+  if (!stripePret()) return repondre(res, 503, { erreur: 'stripe', message: "Le paiement n'est pas encore branché." });
+  const ligne = await ligneDe(req);
+  if (ligne === undefined) return repondre(res, 503, { erreur: 'base-injoignable', message: "Je n'ai pas pu lire ton abonnement. Réessaie dans un instant." });
+  // Aucun client Stripe = jamais abonné : la liste est VRAIMENT vide (on le sait).
+  if (!ligne || !ligne.client_stripe) return repondre(res, 200, { ok: true, factures: [], carte: null });
+  const [rf, rs] = await Promise.all([
+    stripeApi('GET', 'invoices', { customer: ligne.client_stripe, limit: 24 }),
+    ligne.abonnement_stripe
+      ? stripeApi('GET', `subscriptions/${encodeURIComponent(ligne.abonnement_stripe)}`, { 'expand[]': 'default_payment_method' })
+      : Promise.resolve(null),
+  ]);
+  // « Pas su » ne vaut pas « aucune facture » : une lecture ratée chez Stripe
+  // répond une erreur, jamais une liste vide.
+  if (!rf.ok || !rf.data || !Array.isArray(rf.data.data)) return repondre(res, 502, { erreur: 'stripe', message: "Stripe n'a pas répondu pour tes factures. Réessaie dans un instant." });
+  const liste = rf.data.data
+    .filter((f) => f && f.status !== 'draft' && f.customer === ligne.client_stripe)
+    .map(factureLisible);
+  let carte = null;
+  if (rs && rs.ok && rs.data && rs.data.customer === ligne.client_stripe) carte = carteLisible(rs.data.default_payment_method);
+  if (!carte) {
+    // Repli : la carte par défaut du client (celle posée depuis le portail).
+    const rc = await stripeApi('GET', `customers/${encodeURIComponent(ligne.client_stripe)}`, { 'expand[]': 'invoice_settings.default_payment_method' });
+    if (rc.ok && rc.data && rc.data.invoice_settings) carte = carteLisible(rc.data.invoice_settings.default_payment_method);
+  }
+  return repondre(res, 200, { ok: true, factures: liste, carte });
+}
+
+// ── RÉSILIER / REPRENDRE, DIRECTEMENT DEPUIS L'APP ──────────────────────────
+// Julien : « il peut le résilier s'il le veut ». En France, un contrat conclu
+// en ligne doit pouvoir être résilié en ligne, simplement (loi du 16 août
+// 2022) : on ne renvoie pas la personne chercher le bouton chez Stripe.
+// La résiliation prend effet à la FIN DE LA PÉRIODE payée (le portail est réglé
+// pareil : `at_period_end`, sans prorata) — l'accès reste jusque-là, et aucun
+// autre prélèvement ne part. « Reprendre » annule la résiliation tant que la
+// période n'est pas finie.
+async function resilier(req, res, reprendre) {
+  const u = await utilisateurDe(req);
+  if (!u) return repondre(res, 401, { erreur: 'session' });
+  if (!stripePret()) return repondre(res, 503, { erreur: 'stripe', message: "Le paiement n'est pas encore branché." });
+  const ligne = await ligneDe(req);
+  if (ligne === undefined) return repondre(res, 503, { erreur: 'base-injoignable', message: "Je n'ai pas pu lire ton abonnement. Réessaie dans un instant." });
+  if (!ligne || !ligne.abonnement_stripe || !ligne.client_stripe) return repondre(res, 404, { erreur: 'aucun', message: "Tu n'as pas d'abonnement en cours." });
+  // L'abonnement doit être CELUI de ce client, et encore vivant.
+  const lu = await stripeApi('GET', `subscriptions/${encodeURIComponent(ligne.abonnement_stripe)}`);
+  if (!lu.ok || !lu.data) return repondre(res, 502, { erreur: 'stripe', message: "Stripe n'a pas répondu. Réessaie dans un instant." });
+  if (lu.data.customer !== ligne.client_stripe) return repondre(res, 403, { erreur: 'pas-a-toi' });
+  if (!abonnementActif(lu.data.status)) return repondre(res, 409, { erreur: 'fini', message: "Ton abonnement est déjà terminé." });
+  const r = await stripeApi('POST', `subscriptions/${encodeURIComponent(ligne.abonnement_stripe)}`,
+    { cancel_at_period_end: reprendre ? 'false' : 'true' },
+    `vrm-${reprendre ? 'rep' : 'res'}-${u.id}-${Math.floor(Date.now() / 60000)}`);
+  if (!r.ok || !r.data || !r.data.id) return repondre(res, 502, { erreur: 'stripe', message: "Stripe n'a pas pu enregistrer ton choix. Réessaie dans un instant." });
+  // Le webhook mettra la ligne à jour ; on l'écrit aussi tout de suite, depuis
+  // la réponse de Stripe elle-même, pour que l'écran rouvert dise juste. Une
+  // écriture ratée ici n'est pas grave : le webhook la refera.
+  await ecrireStatut(u.id, ligneDeLAbonnement(r.data, !!r.data.livemode), Math.floor(Date.now() / 1000)).catch(() => {});
+  const l = ligneDeLAbonnement(r.data, !!r.data.livemode);
+  return repondre(res, 200, { ok: true, annuleFinPeriode: l.annule_fin_periode, finPeriode: l.fin_periode });
 }
 
 // ── Santé : seulement des OUI/NON (route publique) ──────────────────────────
@@ -280,5 +371,8 @@ export default async function handler(req, res) {
   if (mode === 'abonnement') return m === 'GET' ? abonnement(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
   if (mode === 'checkout') return m === 'POST' ? checkout(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
   if (mode === 'portail') return m === 'POST' ? portail(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
+  if (mode === 'factures') return m === 'GET' ? factures(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
+  if (mode === 'resilier') return m === 'POST' ? resilier(req, res, false) : repondre(res, 405, { erreur: 'POST seulement' });
+  if (mode === 'reprendre') return m === 'POST' ? resilier(req, res, true) : repondre(res, 405, { erreur: 'POST seulement' });
   return repondre(res, 404, { erreur: 'mode inconnu' });
 }
