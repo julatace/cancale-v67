@@ -1,4 +1,5 @@
-// bridge.js — tourne sur la page de l'app VRM (cancale-v67*.vercel.app).
+// bridge.js — tourne sur la page de l'app VRM (vrm.center, et l'adresse Vercel
+// du projet qui y redirige — jamais une autre : voir ORIGINES_APP, background.js).
 // Role : faire le PONT entre l'app et le service worker de l'extension, pour
 // EXECUTER une action Vinted (repondre a un message, faire une offre...) depuis
 // TON navigateur / TON IP (jamais un serveur). L'app envoie un window.postMessage

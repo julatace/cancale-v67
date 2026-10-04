@@ -1040,7 +1040,7 @@
       document.documentElement.appendChild(el);
     }
     el.innerHTML =
-      '<div style="font-weight:700;font-size:13px;margin-bottom:3px">N°' + (pending.numero || '?') + ' — ' + esc(String(pending.title || '').slice(0, 46)) + '</div>' +
+      '<div style="font-weight:700;font-size:13px;margin-bottom:3px">N°' + esc(String(pending.numero || '?')) + ' — ' + esc(String(pending.title || '').slice(0, 46)) + '</div>' +
       '<div style="color:#8A93A3">' + pendingDone + ' champ' + (pendingDone > 1 ? 's' : '') + ' rempli' + (pendingDone > 1 ? 's' : '') +
       '. Catégorie <b style="color:#E8ECF2">' + esc(pending.category || '—') + '</b>.</div>' +
       '<div style="color:#8A93A3;margin-top:3px">' + (photosEtat

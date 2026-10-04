@@ -36,7 +36,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.148.0';
+const EXT_ATTENDUE = '5.149.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -7968,7 +7968,7 @@ function EbayPublier({ onPublie, paires = [] }) {
     if (!base.trim()) { setRes({ err: 'Choisis une paire (ou tape un titre) d\'abord.' }); return; }
     setAiBusy(true); setAiWhy(''); setRes(null);
     try {
-      const r = await fetch('/api/ai', { method: 'POST', headers: { 'content-type': 'application/json' },
+      const r = await fetch('/api/ai', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() },
         body: JSON.stringify({ title: base, brand: extractBrand(base) || '', size: (pairSel && pairSel.taille) || extractSize(base) || '', price: prix || undefined, desc: desc || '', key: (load('vrm_ai_key', '') || '').trim() || undefined }) });
       const j = await r.json().catch(() => ({}));
       if (j && j.ok && j.title) { setTitre(String(j.title).slice(0, 80)); if (!desc.trim() && j.desc) setDesc(String(j.desc)); setCat(null); setCheck(null); setAiWhy(j.why || ''); }
@@ -20140,7 +20140,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (!e) return;
     setRepubAi({ busy:true, key:String(e.numero||e.id||''), res:null, why:'', reason:'' });
     try {
-      const r = await fetch('/api/ai', { method:'POST', headers:{'content-type':'application/json'},
+      const r = await fetch('/api/ai', { method:'POST', headers:{'content-type':'application/json', ...enTeteSession()},
         body: JSON.stringify({ title:e.title||'', brand:extractBrand(e.title)||'',
           size:e.size||extractSize(e.title)||'', price:e.price, desc:e.desc||'',
           key: (load('vrm_ai_key','')||'').trim() || undefined }) });

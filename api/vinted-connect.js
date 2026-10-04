@@ -17,6 +17,13 @@
 
 import { withOwnerAll, conflictTarget } from './_lib/owner.js';
 import { sbCle } from './_lib/cle.js';
+import { vendeurExige, baseCloisonnee } from './_lib/session.js';
+// ⚠️⚠️ CETTE ROUTE ÉTAIT PUBLIQUE ET ÉCRIVAIT CHEZ LE PROPRIÉTAIRE DE
+//    L'INSTALLATION (`withOwnerAll` = VRM_OWNER_UID). N'importe qui pouvait
+//    coller un jeton Vinted et faire apparaître SON compte dans la boutique de
+//    Julien — et un second vendeur qui s'en servait aurait rangé ses comptes
+//    chez lui. Elle exige la session et range le compte chez CE vendeur
+//    (audit de sécurité, 4 octobre — banc routes-ecriture.cjs).
 
 const SUPABASE_URL = 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 // ⚠️ CLÉ DE SERVICE QUAND ELLE EXISTE. Ces routes tournent sur le serveur, sans
@@ -98,23 +105,27 @@ async function fetchProfile({ host, accessToken, anonId, csrfToken }) {
   } catch { return null; }
 }
 
-async function upsertAccount(row) {
+async function upsertAccount(row, owner) {
   // Multi-vendeurs : la clé d'unicité devient (owner, vinted_user_id) — deux
   // vendeurs peuvent très bien avoir lié le même compte Vinted.
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?on_conflict=${conflictTarget('vinted_user_id')}`, {
+  const cloisonnee = await baseCloisonnee();
+  const lignes = Array.isArray(row) ? row : [row];
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?on_conflict=${cloisonnee ? 'owner,vinted_user_id' : conflictTarget('vinted_user_id')}`, {
     method: 'POST',
     headers: {
       ...sbCle(SUPABASE_KEY),
       'Content-Type': 'application/json',
       Prefer: 'resolution=merge-duplicates,return=minimal',
     },
-    body: JSON.stringify(withOwnerAll(Array.isArray(row) ? row : [row])),
+    body: JSON.stringify(cloisonnee ? lignes.map((l) => ({ ...l, owner })) : withOwnerAll(lignes)),
   });
   return res.ok;
 }
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') { res.status(405).json({ error: 'POST uniquement' }); return; }
+  const u = await vendeurExige(req, res);
+  if (!u) return;
 
   let { refreshToken, accessToken, anonId, csrfToken, domain } = req.body || {};
   refreshToken = (refreshToken || '').trim();
@@ -173,7 +184,7 @@ export default async function handler(req, res) {
     if (login) row.login = login;
     if (anonId) row.anon_id = anonId;
     if (csrfToken) row.csrf_token = csrfToken;
-    const ok = await upsertAccount(row);
+    const ok = await upsertAccount(row, u.id);
     if (!ok) { res.status(502).json({ error: 'Compte vérifié mais enregistrement Supabase impossible.' }); return; }
 
     res.status(200).json({

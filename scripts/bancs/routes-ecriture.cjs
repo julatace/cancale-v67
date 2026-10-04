@@ -16,6 +16,12 @@
 //                       doit JAMAIS créer de ligne (pas de compte fantôme sans
 //                       jeton valide), et répondre l'échec — pas « ok ».
 //
+// ⚠️ 4 octobre (audit de sécurité) : les deux routes étaient PUBLIQUES.
+//   vinted-refresh rafraîchissait les comptes de TOUS les vendeurs à la demande
+//   de n'importe qui ; vinted-connect rangeait le compte collé chez le
+//   propriétaire de l'installation. Elles exigent la session et ne touchent
+//   qu'aux comptes de CE vendeur — le banc le vérifie aussi (section 5).
+//
 // §6.1 : la preuve que ces contrôles MORDENT se fait en réaffaiblissant la route
 // (persister même sur échec / upsert même sur jeton refusé) — voir le bandeau
 // final. Sur le code sain ils sont verts ; réaffaiblis, ils passent au rouge.
@@ -28,12 +34,21 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
 // ── Une fausse base + un faux Vinted ────────────────────────────────────────
 // `vintedRefuse` : Vinted répond non-ok au /auth/refresh (jeton expiré/invalide).
 const ecrites = []; // { method, table, body } de chaque écriture vers Supabase
+const lectures = []; // URL des lectures de vinted_accounts
+let appelsVinted = 0;
+const VENDEUR = '11111111-1111-4111-8111-111111111111';
+const SESSION = { authorization: 'Bearer aa.bb.cc' };   // un jeton inventé, reconnu par la fausse base
 function poserFetch({ vintedRefuse }) {
-  ecrites.length = 0;
+  ecrites.length = 0; lectures.length = 0; appelsVinted = 0;
   global.fetch = async (url, opts = {}) => {
     const u = String(url);
     const method = (opts.method || 'GET').toUpperCase();
     const J = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { 'content-type': 'application/json' } });
+    if (/\/auth\/v1\/user/.test(u)) {
+      const h = opts.headers || {};
+      return String(h.Authorization || '') === 'Bearer aa.bb.cc' ? J({ id: VENDEUR, email: 'v@exemple.test' }) : J({ msg: 'invalid' }, 401);
+    }
+    if (/vinted\./.test(u)) appelsVinted++;
 
     // ── Vinted ────────────────────────────────────────────────────────────
     if (/\/web\/api\/auth\/refresh$/.test(u)) {
@@ -45,6 +60,7 @@ function poserFetch({ vintedRefuse }) {
     // ── Supabase ────────────────────────────────────────────────────────────
     if (/\/rest\/v1\/vinted_accounts/.test(u)) {
       if (method === 'GET') {
+        lectures.push(u);
         // Un compte dont l'access_token est EXPIRÉ (exp dans le passé) mais qui a
         // un refresh_token : vinted-refresh va donc tenter un refresh.
         const vieux = jwtExpire(-3600);
@@ -81,7 +97,7 @@ const faireRes = () => {
   poserFetch({ vintedRefuse: true });
   {
     const res = faireRes();
-    await refresh.default({ method: 'GET', query: {}, headers: {} }, res);
+    await refresh.default({ method: 'GET', query: {}, headers: SESSION }, res);
     const patchs = ecrites.filter(e => e.method === 'PATCH');
     dit(patchs.length === 0,
       'vinted-refresh : refresh refusé → la ligne du compte n\'est PAS réécrite (bon jeton préservé)',
@@ -96,7 +112,7 @@ const faireRes = () => {
   poserFetch({ vintedRefuse: false });
   {
     const res = faireRes();
-    await refresh.default({ method: 'GET', query: {}, headers: {} }, res);
+    await refresh.default({ method: 'GET', query: {}, headers: SESSION }, res);
     const patchs = ecrites.filter(e => e.method === 'PATCH');
     dit(patchs.length === 1 && patchs[0].body.access_token === 'ACC_FRAIS',
       'vinted-refresh : refresh accepté → le jeton frais est bien persisté',
@@ -107,7 +123,7 @@ const faireRes = () => {
   poserFetch({ vintedRefuse: true });
   {
     const res = faireRes();
-    await connect.default({ method: 'POST', query: {}, headers: {}, body: { refreshToken: 'REF_POURRI' } }, res);
+    await connect.default({ method: 'POST', query: {}, headers: SESSION, body: { refreshToken: 'REF_POURRI' } }, res);
     const posts = ecrites.filter(e => e.method === 'POST');
     dit(posts.length === 0,
       'vinted-connect : jeton refusé → AUCUNE ligne vinted_accounts créée (pas de compte fantôme)',
@@ -121,11 +137,36 @@ const faireRes = () => {
   {
     const res = faireRes();
     // access_token frais fourni directement (chemin le plus fiable, pas de refresh)
-    await connect.default({ method: 'POST', query: {}, headers: {}, body: { accessToken: jwtExpire(3600) } }, res);
+    await connect.default({ method: 'POST', query: {}, headers: SESSION, body: { accessToken: jwtExpire(3600) } }, res);
     const posts = ecrites.filter(e => e.method === 'POST');
     dit(posts.length === 1 && posts[0].body[0] && posts[0].body[0].access_token,
       'vinted-connect : jeton valide → la ligne est bien écrite avec son jeton',
       'posts=' + posts.length);
+  }
+
+  // ── 5. Sans session : RIEN (audit de sécurité, 4 octobre) ──────────────────
+  poserFetch({ vintedRefuse: false });
+  {
+    const r1 = faireRes(); await refresh.default({ method: 'GET', query: {}, headers: {} }, r1);
+    const r2 = faireRes(); await connect.default({ method: 'POST', query: {}, headers: {}, body: { accessToken: jwtExpire(3600) } }, r2);
+    dit(r1.code === 401 && r2.code === 401 && appelsVinted === 0 && ecrites.length === 0 && lectures.length === 0,
+      'sans session VRM : 401, aucune requête à Vinted, aucun compte lu ni écrit (ces routes étaient publiques)',
+      `refresh ${r1.code} · connect ${r2.code} · Vinted ${appelsVinted} · écritures ${ecrites.length} · lectures ${lectures.length}`);
+  }
+  // ── 6. Avec session : seulement SES comptes, rangés chez LUI ──────────────
+  poserFetch({ vintedRefuse: false });
+  {
+    await refresh.default({ method: 'GET', query: {}, headers: SESSION }, faireRes());
+    const patchs = ecrites.filter(e => e.method === 'PATCH');
+    dit(lectures.length === 1 && lectures[0].includes('owner=eq.' + VENDEUR),
+      'vinted-refresh : ne lit QUE les comptes du vendeur connecté (jamais ceux des autres)', lectures.join(' | '));
+    dit(patchs.length === 1, 'vinted-refresh : et réécrit le jeton de SON compte', 'patchs=' + patchs.length);
+    poserFetch({ vintedRefuse: false });
+    await connect.default({ method: 'POST', query: {}, headers: SESSION, body: { accessToken: jwtExpire(3600) } }, faireRes());
+    const posts = ecrites.filter(e => e.method === 'POST');
+    dit(posts.length === 1 && posts[0].body[0] && posts[0].body[0].owner === VENDEUR,
+      'vinted-connect : le compte collé est rangé chez le vendeur de la SESSION (pas chez le propriétaire de l\'installation)',
+      'owner=' + (posts[0] && posts[0].body[0] && posts[0].body[0].owner));
   }
 
   console.log(ko

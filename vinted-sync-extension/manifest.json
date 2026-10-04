@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "VRM - Vinted Sync",
-  "version": "5.148.0",
+  "version": "5.149.0",
   "description": "Capte tes donnees Vinted et Leboncoin (annonces, ventes, achats, messages, bordereaux) et les envoie a VRM, depuis TON navigateur. Tout se pilote dans l'app VRM (vrm.center) : l'extension execute ce que tu y demandes, avec ses garde-fous (le compte connecte dans l'onglet, 20 actions par heure, une requete a la fois).",
   "permissions": [
     "cookies",
@@ -22,8 +22,6 @@
     "https://lgonxzrzjcqthjtbdpzo.supabase.co/*",
     "https://cancale-v67-ten.vercel.app/*",
     "https://vrm.center/*",
-    "https://cancale-v67.vercel.app/*",
-    "https://www.vrm.center/*",
     "https://*.ebay.fr/*",
     "https://*.ebay.com/*"
   ],
@@ -59,10 +57,8 @@
     },
     {
       "matches": [
-        "https://cancale-v67-ten.vercel.app/*",
-        "https://cancale-v67.vercel.app/*",
         "https://vrm.center/*",
-        "https://www.vrm.center/*"
+        "https://cancale-v67-ten.vercel.app/*"
       ],
       "js": [
         "bridge.js"
