@@ -375,6 +375,23 @@
       return true;
     } catch (_) { return false; }
   }
+  // La raison du serveur, dite en clair (§2.7 : il n'est pas développeur).
+  function raisonDetourage(r) {
+    const t = {
+      'session': 'connecte l\'extension à ton compte VRM',
+      'no-key': 'la clé Photoroom n\'est pas encore posée',
+      'plafond': 'le plafond de détourage du mois est atteint',
+      'abonnement': 'ton abonnement VRM est à régulariser',
+      'reserve': 'le détourage est réservé au compte principal',
+      'compteur': 'le compteur du mois n\'a pas pu être lu, réessaie',
+      'photoroom-402': 'les crédits Photoroom sont épuisés',
+      'photoroom-403': 'la clé Photoroom est refusée',
+      'delai': 'Photoroom a mis trop de temps à répondre',
+      'pas-une-photo': 'la couverture n\'est pas une photo de la paire',
+      'trop-lourde': 'la photo est trop lourde',
+    };
+    return t[r] || 'le détourage n\'a pas marché cette fois';
+  }
   async function attacherPhotos(ad) {
     // ⚠️ Compte PARTICULIER : jusqu'à 15 photos. Compte PRO : 5 max sans le pack.
     //    On ENVOIE jusqu'à 15 et Leboncoin plafonne lui-même selon le compte.
@@ -385,6 +402,10 @@
     const photos = (r && r.ok && Array.isArray(r.photos)) ? r.photos : [];
     const fichiers = fichiersDepuis(photos, ad.numero);
     const rates = photos.filter((p) => p && p.erreur).length;   // le CDN a refusé
+    // Détourage Photoroom (réglage de l'app) : le fond le fait AVANT de rendre les
+    // octets ; ici on ne fait que COMPTER ce qui est revenu détouré, pour le dire.
+    const detourees = photos.filter((p) => p && p.detoure === true).length;
+    const detourageRaison = ((photos.find((p) => p && p.detoure === false && p.detourage) || {}).detourage) || '';
     if (!fichiers.length) return { n: 0, rates, raison: rates ? 'les photos n\'ont pas pu être lues' : 'aucune photo lisible' };
 
     const base = apercusPhotos();
@@ -438,7 +459,7 @@
     // ── SONDE renvoyée au fond (lecture seule, aucun contenu) pour MESURER la
     //    vraie mécanique de l'uploader — le prochain dépôt me dira la vérité.
     try { send({ action: 'photoDiag', diag: Object.assign({ envoyees: placees, lisibles: fichiers.length, rates, voie, at: new Date().toISOString() }, sondePhotos()) }); } catch (_) {}
-    return { n: Math.min(n, fichiers.length), envoyees: placees, confirmees, rates, total: fichiers.length, voie };
+    return { n: Math.min(n, fichiers.length), envoyees: placees, confirmees, rates, total: fichiers.length, voie, detourees, detourageRaison };
   }
 
   // ⚠️⚠️ LE CHAMP PRIX S'APPELLE `price_cents` — IL ATTEND DES CENTIMES.
@@ -1056,6 +1077,9 @@
                 ? '📷 <b style="color:#E8ECF2">' + photosEtat.confirmees + '/' + photosEtat.total + ' photo' + (photosEtat.total > 1 ? 's' : '') + ' attachée' + (photosEtat.confirmees > 1 ? 's' : '') + '</b>'
                 : '📷 <b style="color:#E8ECF2">' + photosEtat.envoyees + ' photo' + (photosEtat.envoyees > 1 ? 's' : '') + ' envoyée' + (photosEtat.envoyees > 1 ? 's' : '') + '</b> au formulaire — <b style="color:#F5A524">vérifie qu\'elles y sont toutes</b> avant de publier')
               + (photosEtat.rates ? ' (' + photosEtat.rates + ' illisible' + (photosEtat.rates > 1 ? 's' : '') + ')' : '')
+              + (photosEtat.detourees ? ', dont <b style="color:#E8ECF2">' + photosEtat.detourees + ' détourée' + (photosEtat.detourees > 1 ? 's' : '') + '</b> (fond blanc)' : '')
+              + (photosEtat.detourageRaison && !(photosEtat.detourees && photosEtat.detourageRaison === 'pas-une-photo')
+                  ? '<br><span style="color:#8A93A3">Fond d\'origine gardé : ' + esc(raisonDetourage(photosEtat.detourageRaison)) + '.</span>' : '')
               + (photosEtat.total <= 6 ? '<br><span style="color:#F5A524">Seules ' + photosEtat.total + ' photos sont captées de Vinted : rouvre l\'annonce sur Vinted (extension à jour) pour les avoir toutes.</span>' : '')
             : '📷 aucune photo attachée — ' + esc(photosEtat.raison || 'raison inconnue'))
         : '📷 j\'attache les photos dès que l\'étape photo s\'affiche.') + '</div>' +

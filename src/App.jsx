@@ -159,7 +159,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 //   releve  `capterReleves`       5.52.0  (5 sept.)   le relevé daté du porte-monnaie
 // `audit-coherence.cjs` vérifie que ces trois fonctions existent toujours dans
 // l'extension : une capacité annoncée mais retirée serait le même mensonge.
-const EXT_CAPACITES = { codes: '5.45.0', offres: '5.38.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', repond: '5.77.0', commande: '5.129.0', offresapp: '5.130.0', publication: '5.130.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0' };
+const EXT_CAPACITES = { codes: '5.45.0', offres: '5.38.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', repond: '5.77.0', commande: '5.129.0', offresapp: '5.130.0', publication: '5.130.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', detourage: '5.156.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -816,7 +816,7 @@ const SYNC_KEYS = [
   'vinted_invoice_settings','vinted_custom_logo','vinted_dark','vinted_stock_vinted',
   'vinted_accounts','vinted_account_labels','vinted_account_emails','vinted_account_phones',
   'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros','vinted_annonces_vendues','vinted_bords_shipped',
-  'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats','vinted_bords_printed','vrm_imprimante','vrm_prenom','vrm_num_prefixe', 'vinted_repond_auto','vinted_offres_auto','vrm_points_relais','vrm_ville','vrm_colis_collected','vrm_colis_collected_at',
+  'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats','vinted_bords_printed','vrm_imprimante','vrm_prenom','vrm_num_prefixe', 'vinted_repond_auto','vinted_offres_auto','vrm_detourage','vrm_points_relais','vrm_ville','vrm_colis_collected','vrm_colis_collected_at',
   'vinted_txn_link','vinted_sales_hidden','vinted_purchases_hidden','vinted_accounts_hidden','vinted_autonum','vinted_urssaf_freq','vinted_urssaf_taux',
   'vinted_sale_overrides','vinted_bord_links','vinted_pickup_done','vinted_bords_hidden','vinted_ship_done','vinted_pairs_lost','vinted_retours_recus','vinted_retours_dismissed',
   'vinted_offvinted_buys','vinted_buyprice_by_num','vinted_quick_replies','vinted_ca_keep_removed','vinted_achat_notes','vrm_lbc_colis_done',
@@ -6062,7 +6062,7 @@ function SideBar({ tab, setTab }) {
             return (
               <button key={t.id} type="button" onClick={()=>setTab(t.id)} aria-current={on?'page':undefined}
                 style={{display:'flex',alignItems:'center',gap:12,width:'100%',textAlign:'left',
-                  padding:gros?'10px 10px':'8px 10px',marginBottom:2,borderRadius:9,border:'none',cursor:'pointer',fontFamily:'inherit',
+                  padding:gros?'10px 10px':'8px 10px',marginBottom:2,borderRadius:8,border:'none',cursor:'pointer',fontFamily:'inherit',
                   position:'relative',
                   // ⚠️ L'onglet actif est un LISERÉ, plus un pavé plein d'accent.
                   // La couleur d'accent doit rester rare : posée en aplat sur la
@@ -7099,7 +7099,7 @@ function ResteAFaire({ onNav, baseKO, premierJour }) {
       <div style={{fontWeight:800,marginBottom:3}}>⏳ {titre}</div>
       <div style={{color:C.muted}}>{quoi}</div>
       <button onClick={() => onNav && onNav('settings')} style={{marginTop:9,width:'100%',
-        background:C.accent,color:'#fff',border:'none',borderRadius:9,padding:'8px 10px',
+        background:C.accent,color:'#fff',border:'none',borderRadius:8,padding:'8px 10px',
         fontSize:12.5,fontWeight:600,cursor:'pointer'}}>Ouvrir Réglages pour la télécharger →</button>
     </div>
   );
@@ -10212,7 +10212,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         <Card>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:12}}>
             <div style={{fontSize:13,fontWeight:600,color:C.text}}>Ce qui rapporte le plus</div>
-            <div style={{display:'flex',gap:3,background:C.card2||C.bg,borderRadius:9,padding:3}}>
+            <div style={{display:'flex',gap:3,background:C.card2||C.bg,borderRadius:8,padding:3}}>
               {[['marques','Marques'],['tailles','Pointures']].map(([k,l])=>(
                 <button key={k} type="button" onClick={()=>setTopMode(k)} style={{border:'none',borderRadius:999,padding:'5px 11px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',background:topMode===k?C.accent:'transparent',color:topMode===k?(C.onAccent||'#fff'):C.muted}}>{l}</button>
               ))}
@@ -21820,7 +21820,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       ? <div style={{display:'flex',flexShrink:0,paddingRight:2}}>
                           {j.photos.map((ph,k)=>(
                             <img key={ph} src={ph} alt="" loading="lazy" onError={()=>noterImgMorte(ph)}
-                              style={{width:46,height:46,borderRadius:9,objectFit:'cover',border:`2px solid ${C.card}`,marginLeft:k?-18:0,background:C.bg,boxShadow:'0 1px 3px rgba(0,0,0,.25)'}}/>
+                              style={{width:46,height:46,borderRadius:8,objectFit:'cover',border:`2px solid ${C.card}`,marginLeft:k?-18:0,background:C.bg,boxShadow:'0 1px 3px rgba(0,0,0,.25)'}}/>
                           ))}
                         </div>
                       : <div style={{width:42,height:42,borderRadius:8,background:C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,color:j.color}}><Icon name={j.icon} size={20}/></div>}
@@ -25012,7 +25012,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   const ph = orderPhoto(o);
                   return (
                     <div key={String(o.transaction_id)} data-parti={st.label} style={{display:'flex',gap:10,alignItems:'center',padding:'7px 9px',border:`1px solid ${C.border}`,borderRadius:8,minWidth:0}}>
-                      <div style={{width:34,height:34,borderRadius:6,background:C.border,flexShrink:0,overflow:'hidden'}}>{ph && !imgMortes.has(ph) && <img src={ph} alt="" loading="lazy" onError={()=>noterImgMorte(ph)} style={{width:'100%',height:'100%',objectFit:'cover'}}/>}</div>
+                      <div style={{width:34,height:34,borderRadius:5,background:C.border,flexShrink:0,overflow:'hidden'}}>{ph && !imgMortes.has(ph) && <img src={ph} alt="" loading="lazy" onError={()=>noterImgMorte(ph)} style={{width:'100%',height:'100%',objectFit:'cover'}}/>}</div>
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{fontSize:12.5,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{o.title || 'Vente'}</div>
                         <div style={{fontSize:11,color:C.muted,marginTop:2,display:'flex',gap:8,flexWrap:'wrap'}}>
@@ -27995,7 +27995,7 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
           style={{display:'flex',gap:4,padding:4,borderRadius:12,background:C.bg,border:`1px solid ${C.border}`,margin:'0 0 16px',maxWidth:380}}>
           {[['reglages','Réglages'],['compte','Mon compte']].map(([k,l]) => (
             <button key={k} type="button" role="tab" aria-selected={vue===k} data-vue={k} onClick={()=>setVue(k)}
-              style={{flex:1,border:'none',borderRadius:9,padding:'9px 10px',fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit',
+              style={{flex:1,border:'none',borderRadius:8,padding:'9px 10px',fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit',
                 background:vue===k?C.card:'transparent',color:vue===k?C.text:C.muted,boxShadow:vue===k?(C.shadow||'none'):'none'}}>
               {l}
             </button>
@@ -28096,6 +28096,7 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
       {MULTI_USER && (<>
         <NumerosSetting/>
         <RepondreSetting/>
+        <DetourageSetting/>
         <OffresAutoSetting/>
       </>)}
 
@@ -28717,6 +28718,88 @@ function RepondreSetting() {
                 ))}
                 {envois.length > 8 ? <div style={{fontSize:11,color:C.muted}}>et {envois.length - 8} autre{envois.length - 8 > 1 ? 's' : ''}.</div> : null}
               </div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// DÉTOURAGE DES PHOTOS (Photoroom) — juste avant de les attacher à une annonce
+// ══════════════════════════════════════════════════════════════════════════════
+// Julien, 4 octobre : « intègre l'API de Photoroom pour le détourage des photos
+// avant chaque poste ». Le réglage vit ICI (`vrm_detourage`, ligne main) ;
+// l'EXTENSION le lit au moment où elle attache les photos à Leboncoin ou eBay
+// (`detourerPhotos`). Éteint par défaut : chaque photo détourée coûte.
+// Ce que l'écran dit vient de la MÊME source que ce qui se passe (§5, la phrase
+// qui explique un chiffre vient de la même source que lui) : le serveur rend
+// `ready` (la clé est posée ?), `autorise` (ce compte y a droit ?) et le
+// compteur du mois. Trois états, jamais deux : `undefined` en cours · `null`
+// pas su · un objet lu. « Pas su » n'affirme ni que ça marche ni que ça ne
+// marche pas.
+const DETOURAGE_MODES = [['eteint', 'Éteint'], ['couverture', 'Photo de couverture'], ['toutes', 'Toutes les photos']];
+const modeDetourageLu = () => { const v = load('vrm_detourage', 'eteint'); return DETOURAGE_MODES.some(([k]) => k === v) ? v : 'eteint'; };
+function DetourageSetting() {
+  const [mode, setMode] = React.useState(modeDetourageLu);
+  const [usage, setUsage] = React.useState(undefined);     // undefined = en cours · null = pas su · objet = lu
+  const touche = React.useRef(false);
+  React.useEffect(() => onCloudReady(() => {
+    if (touche.current) return;                            // §5.49 : ne remplacer que le défaut
+    setMode((m) => (m === 'eteint' ? modeDetourageLu() : m));
+  }), []);
+  React.useEffect(() => {
+    let vivant = true;
+    (async () => {
+      try {
+        const r = await fetch('/api/ai?mode=detourage&usage=1', { headers: enTeteSession() });
+        const j = await r.json().catch(() => null);
+        if (!vivant) return;
+        setUsage(r.ok && j && j.ok ? j : null);
+      } catch (_) { if (vivant) setUsage(null); }
+    })();
+    return () => { vivant = false; };
+  }, []);
+  const cap = extSait('detourage');
+  const reserve = !!usage && usage.autorise === false;
+  const choisir = (v) => { if (reserve) return; touche.current = true; setMode(v); save('vrm_detourage', v); };
+  const etat = usage === undefined ? 'attente' : usage === null ? 'pasSu' : reserve ? 'reserve' : !usage.ready ? 'sanscle' : 'pret';
+  const actif = mode !== 'eteint';
+  return (
+    <div style={{padding:'13px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}} data-detourage-mode={mode} data-detourage-etat={etat}>
+      <div style={{fontSize:13,fontWeight:600,color:C.text}}>Détourer mes photos avant de publier</div>
+      <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.5}}>
+        Quand l’extension attache tes photos à une annonce Leboncoin ou eBay, elle retire le fond (Photoroom) et met un <b>fond blanc</b>. Une photo déjà détourée n’est jamais repayée, et si le détourage ne marche pas, <b>la photo d’origine part telle quelle</b>. Tes photos sur Vinted ne changent pas.
+      </div>
+      <div role="group" aria-label="Détourage des photos"
+        style={{display:'flex',gap:4,background:C.bg,borderRadius:8,padding:3,border:`1px solid ${C.border}`,marginTop:10,opacity:reserve?0.55:1}}>
+        {DETOURAGE_MODES.map(([v, label]) => {
+          const on = v === mode;
+          return (
+            <button key={v} type="button" onClick={() => choisir(v)} aria-pressed={on} disabled={reserve} data-detourage-choix={v}
+              style={{flex:1,border:'none',borderRadius:8,padding:'8px 4px',fontSize:12,fontWeight:600,cursor:reserve?'not-allowed':'pointer',fontFamily:'inherit',
+                background:on?C.accent:'transparent',color:on?(C.onAccent||'#fff'):C.muted,transition:'background .18s ease, color .18s ease'}}>
+              {label}
+            </button>
+          );
+        })}
+      </div>
+      {/* Ce que dit le serveur — une phrase, celle qui correspond à l'état. */}
+      <div style={{marginTop:9,fontSize:11.5,lineHeight:1.5,color:etat==='sanscle'&&actif?C.warn:C.muted}} data-detourage-phrase>
+        {etat === 'attente' ? 'Je vérifie le service de détourage…'
+          : etat === 'pasSu' ? 'Je n’ai pas pu vérifier le service de détourage. Rien n’est cassé — rouvre cet écran dans un moment.'
+          : etat === 'reserve' ? 'Le détourage n’est pas encore ouvert à ton compte : tes photos partent telles quelles.'
+          : etat === 'sanscle' ? <>La clé Photoroom n’est pas encore posée sur le serveur&nbsp;: {actif ? 'tant qu’elle manque, tes photos partent telles quelles.' : 'le détourage ne pourra marcher qu’une fois posée.'}</>
+          : <>Ce mois-ci&nbsp;: <b style={{color:C.text}}>{usage.n}</b> photo{usage.n > 1 ? 's' : ''} détourée{usage.n > 1 ? 's' : ''} sur <b style={{color:C.text}}>{usage.plafond}</b> possibles. Environ 2 centimes par photo nouvelle.</>}
+      </div>
+      {/* Trois états de capacité, jamais deux — et le GESTE, jamais la promesse. */}
+      {actif && !reserve && cap === 'absente' && (
+        <div style={{marginTop:7,fontSize:11.5,color:C.muted,lineHeight:1.5}} data-detourage-cap="absente">
+          C’est l’extension, dans le Chrome de ton ordinateur, qui détoure au moment de publier — pas cette page.
+        </div>
+      )}
+      {actif && !reserve && cap === 'retard' && (
+        <div style={{marginTop:7,fontSize:11.5,color:C.warn,lineHeight:1.5}} data-detourage-cap="retard">
+          L’extension installée ici ne sait pas encore détourer. Remplace-la par la {EXT_ATTENDUE} d’abord&nbsp;: tant qu’elle est plus ancienne, tes photos partent telles quelles.
         </div>
       )}
     </div>

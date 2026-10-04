@@ -6284,7 +6284,134 @@ async function photosEnOctets(urls, max) {
       out.push({ url: u, b64: btoa(bin), type: type.split(';')[0].trim(), taille: buf.length });
     } catch (e) { out.push({ url: u, erreur: String((e && e.message) || e).slice(0, 60) }); }
   }
-  return out;
+  return await detourerPhotos(out);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// DÉTOURAGE PHOTOROOM — juste avant d'attacher les photos (5.156, 4 octobre)
+// ══════════════════════════════════════════════════════════════════════════════
+// Julien : « intègre l'API de Photoroom pour le détourage des photos avant chaque
+// poste ». C'est ICI le seul point où passent les photos de Leboncoin ET d'eBay
+// (photosPourEbay n'est qu'un alias) : un seul propriétaire de la règle (§11).
+// Le réglage vit dans l'APP (`vrm_detourage`, ligne main) : éteint · couverture ·
+// toutes. L'extension le LIT, elle ne décide rien.
+//
+// Les bornes, chacune pour une raison :
+//   • Réglage illisible (`null`) ⇒ ÉTEINT : « pas su » ne vaut pas « oui », et ici
+//     « oui » coûte de l'argent à chaque photo.
+//   • Seules les vraies photos du CDN Vinted partent (`images*.vinted.net/t/`) :
+//     12 des 780 photos captées sont le visuel générique du site, pas une paire —
+//     on ne paie pas pour détourer une affiche.
+//   • L'empreinte SHA-256 des octets D'ORIGINE est envoyée d'abord, SANS la photo :
+//     si le serveur l'a déjà détourée, il la rend (on ne paie jamais deux fois).
+//   • Toute autre issue — pas de session, clé non posée, plafond du mois atteint,
+//     Photoroom en panne, délai — GARDE LA PHOTO D'ORIGINE et note la raison.
+//     Jamais une photo perdue, jamais un faux « détourée » (le bandeau compte).
+//   • 3 envois en même temps au plus : c'est NOTRE serveur, pas Vinted (le
+//     garde-fou « une requête à la fois » du §3 porte sur Vinted et ne bouge pas).
+//   • 45 s de budget en tout : le remplissage Leboncoin abandonne à 90 s.
+//   • Aucun octet gardé en variable de module (§4.9) : le cache vit sur le serveur.
+const DETOURAGE_URL = `${VRM_APP_API}/api/ai?mode=detourage`;
+const PHOTO_VINTED_CDN = /^https:\/\/images\d*\.vinted\.net\/t\//;
+const DETOURAGE_MAX_B64 = 3000000;     // même borne que le serveur (api/_lib/detourage.js)
+const DETOURAGE_BUDGET_MS = 45000;
+// Une raison qui vaut pour TOUTES les photos suivantes : inutile d'insister.
+const DETOURAGE_ARRET = { session: 1, abonnement: 1, reserve: 1, 'no-key': 1, plafond: 1, compteur: 1 };
+
+async function modeDetourage() {
+  const m = await lireMain(['vrm_detourage']);
+  if (!m) return 'eteint';
+  const v = m.vrm_detourage;
+  return (v === 'couverture' || v === 'toutes') ? v : 'eteint';
+}
+
+async function empreinteB64(b64) {
+  const bin = atob(b64);
+  const u = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+  const d = await crypto.subtle.digest('SHA-256', u);
+  return Array.from(new Uint8Array(d), (x) => x.toString(16).padStart(2, '0')).join('');
+}
+
+// Un appel au serveur, borné dans le temps. Rend {status, j} ou {status:0}.
+async function appelDetourage(jeton, corps, restantMs) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), Math.max(1000, Math.min(25000, restantMs)));
+  try {
+    const r = await fetch(DETOURAGE_URL, {
+      method: 'POST', signal: ctrl.signal,
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${jeton}` },
+      body: JSON.stringify(corps),
+    });
+    const j = await r.json().catch(() => ({}));
+    return { status: r.status, j: (j && typeof j === 'object') ? j : {} };
+  } catch (_) { return { status: 0, j: {} }; }
+  finally { clearTimeout(t); }
+}
+
+// Rend la MÊME liste, dans le même ordre : une photo détourée porte `detoure:true`
+// (octets et type remplacés), une photo laissée telle quelle porte `detoure:false`
+// et `detourage` (la raison). Réglage éteint ⇒ la liste revient intacte.
+async function detourerPhotos(photos, modeForce) {
+  const liste = Array.isArray(photos) ? photos : [];
+  let mode = modeForce;
+  if (!mode) { try { mode = await modeDetourage(); } catch (_) { mode = 'eteint'; } }
+  if (mode !== 'couverture' && mode !== 'toutes') return liste;
+  const cibles = [];
+  for (let i = 0; i < liste.length; i++) {
+    const p = liste[i];
+    if (!p || !p.b64) continue;                       // illisible : rien à détourer
+    if (mode === 'couverture' && cibles.length >= 1) break;
+    if (!PHOTO_VINTED_CDN.test(String(p.url || ''))) {
+      liste[i] = Object.assign({}, p, { detoure: false, detourage: 'pas-une-photo' });
+      noterDiag('detourage_filtre_url').catch(() => {});
+      if (mode === 'couverture') break;               // la couverture n'est pas une photo de paire
+      continue;
+    }
+    cibles.push(i);
+  }
+  if (!cibles.length) return liste;
+  let s = null; try { s = await authToken(); } catch (_) {}
+  if (!s || !s.access_token) {
+    for (const i of cibles) liste[i] = Object.assign({}, liste[i], { detoure: false, detourage: 'session' });
+    noterDiag('detourage_session').catch(() => {});
+    return liste;
+  }
+  const debut = Date.now();
+  let arret = '';
+  const traiter = async (i) => {
+    const p = liste[i];
+    const garde = (raison) => { liste[i] = Object.assign({}, p, { detoure: false, detourage: raison }); noterDiag('detourage_' + raison.replace(/[^a-z0-9]+/gi, '_')).catch(() => {}); };
+    if (arret) return garde(arret);
+    const restant = DETOURAGE_BUDGET_MS - (Date.now() - debut);
+    if (restant < 1500) return garde('delai');
+    if (p.b64.length > DETOURAGE_MAX_B64) return garde('trop-lourde');
+    let sha;
+    try { sha = await empreinteB64(p.b64); } catch (_) { return garde('illisible'); }
+    // 1. La sonde : l'empreinte seule.
+    let r = await appelDetourage(s.access_token, { sha }, restant);
+    if (r.status === 200 && r.j.ok && !r.j.hit) {
+      // 2. Pas encore détourée : on envoie la photo.
+      r = await appelDetourage(s.access_token, { sha, b64: p.b64 }, DETOURAGE_BUDGET_MS - (Date.now() - debut));
+    }
+    if (r.status === 200 && r.j.ok && typeof r.j.b64 === 'string' && r.j.b64) {
+      liste[i] = Object.assign({}, p, { b64: r.j.b64, type: 'image/jpeg', taille: Number(r.j.bytes) || p.taille, detoure: true, detourageCache: !!r.j.hit });
+      noterDiag(r.j.hit ? 'detourage_cache' : 'detourage_ok').catch(() => {});
+      return;
+    }
+    const raison = r.status === 0 ? 'delai'
+      : (r.j && r.j.reason) ? String(r.j.reason)
+      : ('refus-' + r.status);
+    const finale = raison === 'photoroom' ? 'photoroom-' + (r.j.status || r.status) : raison;
+    // Photoroom 402 (crédits épuisés) ou 403 (clé refusée) : vrai pour toutes les suivantes.
+    if (DETOURAGE_ARRET[raison] || finale === 'photoroom-402' || finale === 'photoroom-403') arret = finale;
+    garde(finale);
+  };
+  // 3 en même temps au plus, dans l'ordre.
+  let k = 0;
+  const ouvrier = async () => { while (k < cibles.length) { const i = cibles[k++]; await traiter(i); } };
+  await Promise.all([ouvrier(), ouvrier(), ouvrier()]);
+  return liste;
 }
 
 // ⚠️ UNE FONCTION NOMMÉE, EXPRÈS : c'est elle que l'app DATE dans
