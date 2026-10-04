@@ -4705,6 +4705,34 @@ une vente Leboncoin ne disait rien de la paire, qui restait en vente sur Vinted.
 - **Reste à faire** : eBay (une autre session s'en occupe) n'entre pas encore
   dans ce contrôle — une vente eBay devra suivre la même règle (SKU `VRM-{n°}`).
 
+### La route des emails exige sa clé, et le script Gmail ne lit plus la base (4 octobre)
+Deux trous mesurés : (1) `EMAIL_INBOUND_SECRET` n'était pas posée — n'importe
+qui pouvait envoyer une fausse vente ou un faux bordereau, **rangés comme les
+vrais** (prouvé sur le code d'avant : un POST quelconque était écrit en base) ;
+(2) le script Gmail lisait la base **directement avec la clé publique** — depuis
+le cloisonnement elle ne lit plus rien (RLS rend `[]` sans erreur), donc la date
+de départ retombait sur sa valeur de secours et **aucune facture ne pouvait
+partir**, en silence.
+- `api/email-inbound` a trois modes pour le script, **tous derrière la clé** :
+  `?mode=config` (date de départ), `?mode=factures` (factures EN ATTENTE avec un
+  email d'acheteur), `?mode=facture-envoyee` (POST, ne vise que
+  `email_invoice_*`, relit puis réécrit la ligne ENTIÈRE). Le vendeur est celui
+  de l'installation (`VRM_OWNER_UID`). ⚠️ Ces modes rendent des données
+  personnelles : **sans clé posée sur le serveur, ils refusent (503)** — jamais
+  ouverts par défaut. Lecture ratée ⇒ 503, jamais « aucune facture ».
+- La clé se compare en temps constant (`cleValide`). L'arrivée d'un email sans
+  clé reste acceptée **tant que la variable n'est pas posée** : sinon les emails
+  s'arrêteraient le jour du changement.
+- `scripts/gmail-forwarder.gs` ne contient plus aucune clé de base ; `SECRET`
+  reste **vide dans le dépôt (public)**, il la colle chez lui.
+- **L'ordre des gestes** : il colle le nouveau script avec la clé → la route
+  journalise « script Gmail à jour (clé fournie) » → on pose
+  `EMAIL_INBOUND_SECRET` sur Vercel et on redéploie. Dans l'autre ordre rien ne
+  se perd non plus : un email refusé (401) n'est pas étiqueté, le script le
+  renverra.
+- `audit-email-cle.cjs` **exécute la route** : 20 contrôles, **18 rouges** sur
+  le code d'avant.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
@@ -4872,7 +4900,7 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | outil | quoi |
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
-| `node scripts/audit-*.cjs` | **61 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `node scripts/audit-*.cjs` | **62 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
 | `scripts/bancs/*.cjs` | les **53 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
@@ -5152,7 +5180,7 @@ script-là me fait croire à une catastrophe.
 src/App.jsx                     l'app (grep avant de lire — le fichier est énorme)
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
-scripts/audit-*.cjs             les 61 audits
+scripts/audit-*.cjs             les 62 audits
 scripts/bancs/                  les 53 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
