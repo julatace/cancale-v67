@@ -12210,7 +12210,9 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
         x.fillStyle = '#fff'; x.font = 'bold 26px system-ui,sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
         x.fillText(String(text).slice(0, 20), 128, 33);
         const tex = new THREE.CanvasTexture(c); const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
-        sp.scale.set(2.4, 0.6, 1); return sp;
+        // ⚠️ Une étiquette n'est pas une cible : son rectangle (transparent sur
+        //    les bords) recouvrait les cartons de devant et volait leurs clics.
+        sp.scale.set(2.4, 0.6, 1); sp.raycast = () => {}; return sp;
       };
       // CARTON numéroté (boîte à chaussures) — le NUMÉRO est imprimé EN GROS
       // sur la face avant, le dessus et les côtés → lisible directement dans la
@@ -12400,7 +12402,7 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
           const cc = Math.floor(i / rows), rr = i % rows; // cc = colonne, rr = niveau (0=bas)
           const bx = makeColis(String(nums[i]), s, s, s);
           bx.position.set(-((cols - 1) / 2) * cell + cc * cell, rr * cell + s / 2, 0);
-          bx.userData = { pileIdx: i };
+          bx.userData = { pileIdx: i, num: String(nums[i]) };
           g.add(bx);
         }
         return g;
@@ -12609,7 +12611,7 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
               const key = r + '_' + c; const arr = (it.slots || {})[key] || [];
               const cx = -w / 2 + (c + 0.5) * cellW, cbY = Math.max(0, ht - (r + 1) * cellH); // bas de la case
               if (arr.length) {
-                arr.forEach((num, i) => { if (total++ > 260) return; const m = makeColis(num, bw, bh, bd); m.userData = { cell: key }; m.position.set(cx, cbY + bh / 2 + i * (bh + 0.008), d / 2 - bd / 2 - 0.015); g.add(m); });
+                arr.forEach((num, i) => { if (total++ > 260) return; const m = makeColis(num, bw, bh, bd); m.userData = { cell: key, num: String(num) }; m.position.set(cx, cbY + bh / 2 + i * (bh + 0.008), d / 2 - bd / 2 - 0.015); g.add(m); });
               } else if (ghostM) {
                 const gh = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, bd), ghostM); gh.userData = { cell: key }; gh.position.set(cx, cbY + bh / 2, d / 2 - bd / 2 - 0.015); g.add(gh);
               }
@@ -12620,12 +12622,45 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
       };
       buildFurniture();
       const controls = new OrbitControls(camera, renderer.domElement);
-      controls.target.copy(cadre0.tgt); controls.enableDamping = true; controls.dampingFactor = 0.1;
+      // ── LA SOURIS, RÉGLÉE (4 octobre) ─────────────────────────────────────
+      // Julien : « améliore le stock en 3D pour que ce soit facile à la souris,
+      // mets-toi à la place de l'utilisateur ». Mesuré : quatre réglages posés,
+      // tout le reste aux défauts de la bibliothèque. Sur SA pièce (17 × 10 m),
+      // un carton faisait ~11 px au départ, la molette avançait de 5 % par cran
+      // (≈ 50 crans pour s'approcher d'un meuble) et zoomait vers le CENTRE de
+      // la pièce — le meuble visé sortait de l'écran ; la vue traînait 9 images
+      // derrière la main ; traverser la vue faisait plus de deux tours.
+      const pref = (q) => { try { return window.matchMedia(q).matches; } catch (_) { return false; } };
+      const reduit = pref('(prefers-reduced-motion: reduce)');
+      const sourisFine = pref('(pointer: fine)');
+      controls.target.copy(cadre0.tgt);
+      controls.enableDamping = !reduit; controls.dampingFactor = 0.2;   // 4 images de retard au lieu de 9
+      controls.rotateSpeed = sourisFine ? 0.6 : 1;                       // ≈ 0,47°/px à la souris
+      controls.zoomToCursor = true; controls.zoomSpeed = 3;              // ≈ 14 % par cran, VERS le point visé
+      controls.screenSpacePanning = false;                                // clic droit : on glisse au sol
       // ⚠️ La distance de cadrage doit tenir SOUS le plafond de zoom, sinon
       // OrbitControls ramène la caméra plus près à la première mise à jour et
-      // la pièce ressort coupée — le calcul serait annulé en silence.
-      controls.maxPolarAngle = Math.PI / 2 - 0.04; controls.minDistance = 1.6;
-      controls.maxDistance = Math.max(Math.max(room.w, room.h) * 2.6, cadre0.d * 1.35); controls.update();
+      // la pièce ressort coupée — le calcul serait annulé en silence. Mais pas
+      // 2,6 × la pièce (44 m chez lui) : au-delà de la vue d'ensemble, on ne
+      // voit plus rien d'utile.
+      controls.maxPolarAngle = Math.PI / 2 - 0.04; controls.minDistance = 1.2;
+      controls.maxDistance = Math.max(cadre0.d * 1.35, 4); controls.update();
+      // La cible reste DANS la pièce (un déplacement au clic droit ou un zoom vers
+      // le curseur pouvaient l'emmener sous le sol, où le plancher disparaît). On
+      // décale la caméra d'autant : la vue glisse, elle ne saute pas.
+      const borne = () => {
+        const t = controls.target, wh = room.wallH || 3.4;
+        const nx = Math.max(-room.w / 2, Math.min(room.w / 2, t.x)), ny = Math.max(0, Math.min(wh * 0.9, t.y)), nz = Math.max(-room.h / 2, Math.min(room.h / 2, t.z));
+        const dx = nx - t.x, dy = ny - t.y, dz = nz - t.z;
+        if (dx || dy || dz) { t.set(nx, ny, nz); camera.position.x += dx; camera.position.y += dy; camera.position.z += dz; }
+        if (camera.position.y < 0.15) camera.position.y = 0.15;
+        // Sonde du banc (lecture seule) : où est la caméra.
+        try {
+          const box = el.parentElement;
+          if (box) { box.dataset.camDist = camera.position.distanceTo(t).toFixed(3); box.dataset.camAz = (Math.atan2(camera.position.x - t.x, camera.position.z - t.z) * 180 / Math.PI).toFixed(1); }
+        } catch (_) {}
+      };
+      controls.addEventListener('change', borne); borne();
       // Position de départ mémorisée → bouton « Recentrer » qui remet la vue par défaut.
       let homePos = camera.position.clone(), homeTgt = controls.target.clone();
       // Rotation/zoom de la caméra pilotés par les BOUTONS de l'overlay (fiable
@@ -12658,7 +12693,7 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
       // sinon glisser = tourner la vue (OrbitControls) et un tap = sélectionner.
       const ray = new THREE.Raycaster(), ptr = new THREE.Vector2();
       const ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), hitPt = new THREE.Vector3();
-      let drag = null;
+      let drag = null, dernierTap = null, tapDiffere = 0;
       const setPtr = (e) => { const r = renderer.domElement.getBoundingClientRect(); ptr.x = ((e.clientX - r.left) / r.width) * 2 - 1; ptr.y = -((e.clientY - r.top) / r.height) * 2 + 1; };
       // pd est posé sur EL (le conteneur) en phase de CAPTURE → il s'exécute AVANT
       // OrbitControls (posé sur le canvas). Si on saisit un meuble à déplacer, on
@@ -12684,6 +12719,11 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
         return { x: Math.round((ncx + hW - w / 2) * 2) / 2, y: Math.round((ncz + hH - h / 2) * 2) / 2, rot };
       };
       const pd = (e) => {
+        // ⚠️ SEUL LE BOUTON GAUCHE « TAPE ». Un clic droit sans bouger (le début
+        //    d'un déplacement de vue) ouvrait la saisie d'une case — et, sur un
+        //    carton de pile, celle qui le RETIRE. Droit et milieu = caméra.
+        if (e.pointerType === 'mouse' && e.button !== 0) { drag = null; return; }
+        if (e.isPrimary === false) return;   // 2ᵉ doigt d'un pincement : la caméra
         setPtr(e); ray.setFromCamera(ptr, camera);
         const hits = ray.intersectObjects(furnGroup.children, true);
         if (!hits.length) { drag = null; return; } // vide → OrbitControls tourne
@@ -12752,21 +12792,141 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
           d.grp.position.x = nx + d.w / 2 - room.w / 2; d.grp.position.z = ny + d.h / 2 - room.h / 2; d.grp.rotation.y = rot; if (lift != null) d.grp.position.y = lift;
           cb.onMove && cb.onMove(d.id, nx, ny, rot, stackOn, lift);
         } else if (!d.moved) {
+          // DOUBLE-CLIC sur le même meuble / la même case (< 350 ms, < 6 px) : on
+          // se met EN FACE. Le 1er clic a déjà agi (sélectionner) ; le 2ᵉ ne doit
+          // surtout pas ouvrir la case ou la saisie qui retire un carton.
+          const now = Date.now(), prev = dernierTap;
+          dernierTap = { id: d.id, cell: d.cell, pileIdx: d.pileIdx, t: now, x: d.sx, y: d.sy };
+          if (prev && prev.id === d.id && prev.cell === d.cell && prev.pileIdx === d.pileIdx && now - prev.t < 350 && Math.abs(prev.x - d.sx) + Math.abs(prev.y - d.sy) < 6) {
+            if (tapDiffere) { clearTimeout(tapDiffere); tapDiffere = 0; }
+            dernierTap = null; flyTo(d.id, { cell: d.cell, pileIdx: d.pileIdx }); return;
+          }
           // tap : case de grille → remplir · boîte de pile → retirer · sinon sélectionner
-          if (d.cell != null && cb.onCellTap) cb.onCellTap(d.id, d.cell);
-          else if (d.pileIdx != null && cb.onPileTap) cb.onPileTap(d.id, d.pileIdx);
-          else (cb.onSelect || cb.onOpen) && (cb.onSelect || cb.onOpen)(d.id);
+          const agir = () => {
+            if (d.cell != null && cb.onCellTap) cb.onCellTap(d.id, d.cell);
+            else if (d.pileIdx != null && cb.onPileTap) cb.onPileTap(d.id, d.pileIdx);
+            else (cb.onSelect || cb.onOpen) && (cb.onSelect || cb.onOpen)(d.id);
+          };
+          // ⚠️ Sur une case d'un meuble DÉJÀ choisi, le clic ouvre une saisie : il
+          //    attend 280 ms qu'un double-clic ne vienne pas le remplacer. Sinon le
+          //    1er clic du double-clic ouvrait la saisie et le 2ᵉ tombait dessus
+          //    (vu au banc). Choisir un meuble, lui, reste instantané.
+          if ((cb.sel === d.id) && (d.cell != null || d.pileIdx != null)) { if (tapDiffere) clearTimeout(tapDiffere); tapDiffere = setTimeout(() => { tapDiffere = 0; agir(); }, 280); }
+          else agir();
         }
       };
       el.addEventListener('pointerdown', pd, true); // CAPTURE : avant OrbitControls
       window.addEventListener('pointermove', pm); window.addEventListener('pointerup', pu);
+      // ── CONTOURS : sélection, résultat de recherche, survol ────────────────
+      // ⚠️ LE SURLIGNAGE NE TOUCHAIT JAMAIS LES CARTONS : il teintait
+      //    `material.emissive`, or un carton porte un TABLEAU de six matériaux
+      //    (`Array.emissive` vaut undefined). Une pile n'était donc jamais
+      //    surlignée, ni choisie ni cherchée ; dans une grille, c'étaient les
+      //    cases VIDES qui s'allumaient. Et les matériaux sont partagés entre
+      //    meubles. ⇒ Un contour à part, posé sur la boîte englobante, dans la
+      //    couleur d'accent (§7 — le rouge est réservé au doublon de numéro).
+      const accent = () => { try { return new THREE.Color(C.accent || '#3D7BFF'); } catch (_) { return new THREE.Color('#3D7BFF'); } };
+      const aretesUnite = new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1)), boiteUnite = new THREE.BoxGeometry(1, 1, 1);
+      const faireContour = (opLigne, opFond) => {
+        const g = new THREE.Group();
+        const l = new THREE.LineSegments(aretesUnite, new THREE.LineBasicMaterial({ color: accent(), transparent: true, opacity: opLigne, depthTest: false })); l.renderOrder = 998;
+        const f = new THREE.Mesh(boiteUnite, new THREE.MeshBasicMaterial({ color: accent(), transparent: true, opacity: opFond, depthTest: false, depthWrite: false })); f.renderOrder = 997;
+        g.add(l, f); g.visible = false; scene.add(g); return g;
+      };
+      const contours = { sel: faireContour(0.85, 0.06), hi: faireContour(1, 0.2), survol: faireContour(0.7, 0.05) };
+      const poserContour = (c, objets) => {
+        const liste = (objets || []).filter(Boolean);
+        if (!liste.length) { c.visible = false; return; }
+        const b = new THREE.Box3();
+        liste.forEach((o) => { o.updateWorldMatrix(true, true); o.traverse((m) => { if (m.isMesh) b.expandByObject(m); }); });
+        if (b.isEmpty()) { c.visible = false; return; }
+        const ctr = b.getCenter(new THREE.Vector3()), sz = b.getSize(new THREE.Vector3());
+        c.position.copy(ctr); c.scale.set(Math.max(sz.x, 0.02) + 0.04, Math.max(sz.y, 0.02) + 0.04, Math.max(sz.z, 0.02) + 0.04);
+        c.children.forEach((m) => m.material && m.material.color && m.material.color.copy(accent()));
+        c.visible = true;
+      };
+      // Les maillages qu'un repère désigne : le meuble, une case, un carton de pile.
+      const maillages = (itemId, quoi = {}) => {
+        const g = furnGroup.children.find((o) => o.userData && o.userData.itemId === itemId);
+        if (!g) return [];
+        const enfants = []; g.traverse((m) => { if (m.isMesh) enfants.push(m); });
+        if (quoi.cell != null) {
+          const cases = enfants.filter((m) => m.userData && m.userData.cell === quoi.cell);
+          const memeNum = quoi.num != null ? cases.filter((m) => String(m.userData.num || '').toLowerCase() === String(quoi.num).toLowerCase()) : [];
+          if (memeNum.length) return memeNum; if (cases.length) return cases;
+        }
+        if (quoi.pileIdx != null) { const b = enfants.find((m) => m.userData && m.userData.pileIdx === quoi.pileIdx); if (b) return [b]; }
+        return [g];
+      };
+      // ── SURVOL (souris seulement) : curseur + contour + infobulle ──────────
+      // On ne voyait jamais ce qu'on allait cliquer : la flèche partout, aucun
+      // repère sur des cartons de quelques pixels. Le texte de la bulle ne vient
+      // QUE des données (nom du meuble, N° du carton) — rien n'est deviné.
+      const bulle = document.createElement('div');
+      Object.assign(bulle.style, { position: 'absolute', left: '0', top: '0', pointerEvents: 'none', display: 'none', zIndex: 5, maxWidth: '240px',
+        background: 'rgba(20,22,30,0.78)', color: '#fff', fontSize: '11.5px', fontWeight: '600', lineHeight: '1.35', padding: '5px 9px', borderRadius: '8px',
+        backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' });
+      bulle.setAttribute('data-bulle-3d', '');
+      el.appendChild(bulle);
+      let survolCle = '', glisseVue = false, rafSurvol = 0, dernierSurvol = null;
+      const curseur = (c) => { try { renderer.domElement.style.cursor = c; } catch (_) {} };
+      const viser = (cx, cy) => {
+        const r = renderer.domElement.getBoundingClientRect();
+        ptr.x = ((cx - r.left) / r.width) * 2 - 1; ptr.y = -((cy - r.top) / r.height) * 2 + 1; ray.setFromCamera(ptr, camera);
+        const hits = ray.intersectObjects(furnGroup.children, true);
+        if (!hits.length) return null;
+        let cellKey = null, pileIdx = null, num = null, probe = hits[0].object;
+        while (probe && cellKey == null && pileIdx == null) { const u = probe.userData || {}; if (u.cell != null) { cellKey = u.cell; num = u.num != null ? u.num : null; } else if (u.pileIdx != null) { pileIdx = u.pileIdx; num = u.num != null ? u.num : null; } probe = probe.parent; }
+        let o = hits[0].object; while (o && (!o.userData || o.userData.w == null)) o = o.parent;
+        return o ? { id: o.userData.itemId, cell: cellKey, pileIdx, num } : null;
+      };
+      const texteBulle = (v) => {
+        const it = (dataRef.current.items || []).find((i) => i.id === v.id) || {};
+        const ft = FURN_TYPES[it.type] || {};
+        const nom = String(it.name || ft.label || 'Meuble');
+        const choisi = (cbRef.current || {}).sel === v.id;
+        if (ft.box) return `Carton N°${it.num != null && it.num !== '' ? it.num : '?'}`;
+        if (v.pileIdx != null) return `${nom} · N°${v.num || '?'}${choisi ? ' — clic pour modifier ou retirer' : ' — clic pour choisir la pile'}`;
+        if (v.cell != null) return v.num != null ? `${nom} · N°${v.num}${choisi ? ' — clic pour modifier' : ''}` : `${nom} · case vide${choisi ? ' — clic pour ranger' : ''}`;
+        if (ft.deco) return nom;
+        return `${nom} — clic pour le choisir`;
+      };
+      const survoler = () => {
+        rafSurvol = 0;
+        const e = dernierSurvol; if (!e) return;
+        if (glisseVue || moveRef.current && drag) return;
+        const v = viser(e.clientX, e.clientY);
+        const cle = v ? `${v.id}|${v.cell == null ? '' : v.cell}|${v.pileIdx == null ? '' : v.pileIdx}` : '';
+        try { el.parentElement && (el.parentElement.dataset.hover = cle); } catch (_) {}
+        if (!v) { curseur(moveRef.current ? 'default' : 'grab'); bulle.style.display = 'none'; if (survolCle) poserContour(contours.survol, null); survolCle = ''; return; }
+        curseur(moveRef.current ? 'move' : 'pointer');
+        if (cle !== survolCle) { survolCle = cle; poserContour(contours.survol, maillages(v.id, v)); bulle.textContent = texteBulle(v); }
+        const r = el.getBoundingClientRect();
+        let x = e.clientX - r.left + 14, y = e.clientY - r.top + 16;
+        bulle.style.display = 'block';
+        const bw = bulle.offsetWidth || 120; if (x + bw > r.width - 6) x = Math.max(6, e.clientX - r.left - bw - 10);
+        if (y > r.height - 30) y = e.clientY - r.top - 30;
+        bulle.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+      };
+      const surMouvement = (e) => {
+        if (e.pointerType !== 'mouse') return;               // le survol n'existe pas au doigt
+        if (e.buttons) { if (!drag) { glisseVue = true; curseur('grabbing'); bulle.style.display = 'none'; } return; }
+        glisseVue = false; dernierSurvol = e;
+        if (!rafSurvol) rafSurvol = requestAnimationFrame(survoler);
+      };
+      const surSortie = () => { bulle.style.display = 'none'; poserContour(contours.survol, null); survolCle = ''; try { el.parentElement && (el.parentElement.dataset.hover = ''); } catch (_) {} };
+      const surRelache = () => { if (glisseVue) { glisseVue = false; curseur('grab'); } };
+      renderer.domElement.addEventListener('pointermove', surMouvement);
+      renderer.domElement.addEventListener('pointerleave', surSortie);
+      window.addEventListener('pointerup', surRelache);
+      curseur('grab');
       let raf; const animate = () => { controls.update(); renderer.render(scene, camera); raf = requestAnimationFrame(animate); }; animate();
       const onResize = () => {
         const w = el.clientWidth || W, h = el.clientHeight || H;
         renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix();
         // Le cadrage dépend du FORMAT : après une rotation d'écran, « Recentrer »
         // doit rendre la vue qui cadre CE format, pas l'ancien.
-        try { const c = cadrerPiece(); homePos = c.pos; homeTgt = c.tgt; } catch (_) {}
+        try { const c = cadrerPiece(); homePos = c.pos; homeTgt = c.tgt; controls.maxDistance = Math.max(controls.maxDistance, c.d * 1.35); } catch (_) {}
       };
       let ro; try { ro = new ResizeObserver(onResize); ro.observe(el); } catch (_) { window.addEventListener('resize', onResize); }
       // ── AMBIANCE (univers façon jeu) : mute les couleurs/lumières EN DIRECT
@@ -12792,12 +12952,19 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
       // jusqu'au meuble qui le contient (au lieu de le surligner sans bouger la
       // vue). Pure animation de caméra → si ça échoue, le garage reste utilisable.
       let flyRAF = 0;
-      const flyTo = (itemId) => {
+      // ⚠️ Attraper la vue pendant un vol l'ANNULE : avant, chaque image du vol
+      //    réécrivait la caméra et reprenait la main à l'utilisateur.
+      controls.addEventListener('start', () => { if (flyRAF) { cancelAnimationFrame(flyRAF); flyRAF = 0; } });
+      const flyTo = (itemId, quoi = {}) => {
         try {
           const g = furnGroup.children.find(o => o.userData && o.userData.itemId === itemId);
           if (!g) return;
-          const box = new THREE.Box3().setFromObject(g);
+          // La boîte des MAILLAGES seulement (l'étiquette flottante décalait le
+          // centre vers le haut) — ou d'une seule case / d'un seul carton.
+          const cible = (quoi.cell != null || quoi.pileIdx != null) ? maillages(itemId, quoi) : [g];
+          const box = new THREE.Box3(); cible.forEach((o) => { o.updateWorldMatrix(true, true); o.traverse((m) => { if (m.isMesh) box.expandByObject(m); }); });
           if (box.isEmpty()) return;
+          const versCase = cible[0] !== g;
           const c = box.getCenter(new THREE.Vector3());
           const size = box.getSize(new THREE.Vector3());
           // ⚠️ ON SE MET DE FACE, pas en trois-quarts.
@@ -12810,16 +12977,18 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
           let dx = -c.x, dz = -c.z;
           const n = Math.hypot(dx, dz);
           if (n < 0.35) { dx = 0; dz = 1; } else { dx /= n; dz /= n; }
-          const dist = Math.max(size.x, size.y, 0.6) * 1.45 + 1.5;
+          const dist = versCase ? Math.max(1.8, Math.max(size.x, size.y) * 4.5) : Math.max(size.x, size.y, 0.6) * 1.45 + 1.5;
           const destTgt = new THREE.Vector3(c.x, c.y, c.z);
           const destPos = new THREE.Vector3(c.x + dx * dist, c.y + size.y * 0.30, c.z + dz * dist);
           const startPos = camera.position.clone(), startTgt = controls.target.clone();
-          const t0 = (typeof performance !== 'undefined' ? performance.now() : Date.now()), dur = 720;
-          const ease = t => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+          // 420 ms (au lieu de 720), sortie douce — jamais un départ lent ; aucun
+          // mouvement si le système demande de les réduire.
+          const t0 = (typeof performance !== 'undefined' ? performance.now() : Date.now()), dur = reduit ? 0 : 420;
+          const ease = t => 1 - Math.pow(1 - t, 4);
           if (flyRAF) cancelAnimationFrame(flyRAF);
           const step = () => {
             const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
-            const k = Math.min(1, (now - t0) / dur), e = ease(k);
+            const k = dur > 0 ? Math.min(1, (now - t0) / dur) : 1, e = ease(k);
             camera.position.lerpVectors(startPos, destPos, e);
             controls.target.lerpVectors(startTgt, destTgt, e);
             controls.update();
@@ -12898,12 +13067,28 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
           pas();
         } catch (_) { fini && fini(); }
       };
-      st.current = { THREE, furnGroup, buildFurniture, rotateView, zoomView, topView, resetView, applyAmbiance, flyTo, animerDepot, animerSortie };
+      // Sonde du banc (lecture seule) : où se trouve à l'écran un meuble / une case.
+      try {
+        el.__vrmProbe = {
+          project: (itemId, quoi = {}) => {
+            const ms = maillages(itemId, quoi); if (!ms.length) return null;
+            const b = new THREE.Box3(); ms.forEach((o) => { o.updateWorldMatrix(true, true); o.traverse((m) => { if (m.isMesh) b.expandByObject(m); }); });
+            const c = b.getCenter(new THREE.Vector3()).project(camera); const r = renderer.domElement.getBoundingClientRect();
+            return { x: r.left + (c.x + 1) / 2 * r.width, y: r.top + (1 - c.y) / 2 * r.height };
+          },
+          contour: (quel) => { const c = contours[quel]; return c && c.visible ? { x: c.position.x, y: c.position.y, z: c.position.z, sx: c.scale.x, sy: c.scale.y, sz: c.scale.z } : null; },
+        };
+      } catch (_) {}
+      const marquer = (quoi) => { const h = quoi || {}; poserContour(contours.sel, h.sel ? maillages(h.sel) : null); poserContour(contours.hi, h.hi && h.hi.itemId ? maillages(h.hi.itemId, h.hi) : null); };
+      st.current = { THREE, furnGroup, buildFurniture, rotateView, zoomView, topView, resetView, applyAmbiance, flyTo, animerDepot, animerSortie, marquer };
       setLoading(false);
       cleanup = () => {
-        cancelAnimationFrame(raf);
+        cancelAnimationFrame(raf); if (flyRAF) cancelAnimationFrame(flyRAF); if (rafSurvol) cancelAnimationFrame(rafSurvol); if (tapDiffere) clearTimeout(tapDiffere);
         el.removeEventListener('pointerdown', pd, true);
         window.removeEventListener('pointermove', pm); window.removeEventListener('pointerup', pu);
+        try { renderer.domElement.removeEventListener('pointermove', surMouvement); renderer.domElement.removeEventListener('pointerleave', surSortie); } catch (_) {}
+        window.removeEventListener('pointerup', surRelache);
+        try { el.removeChild(bulle); } catch (_) {}
         try { ro && ro.disconnect(); } catch (_) {} window.removeEventListener('resize', onResize);
         try { controls.dispose(); } catch (_) {} renderer.dispose(); try { el.removeChild(renderer.domElement); } catch (_) {}
       };
@@ -12928,27 +13113,47 @@ function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, on
     try { st.current.animerSortie ? st.current.animerSortie(sortie.itemId, sortie.cellKey, sortie.fini) : (sortie.fini && sortie.fini()); }
     catch (_) { sortie.fini && sortie.fini(); }
   }, [sortie && sortie.at, loading]);
-  // Surlignage : rouge = N° cherché, bleu = meuble sélectionné (édition).
+  // Surlignage : un contour d'accent sur le meuble choisi, un contour plus marqué
+  // sur la boîte cherchée (la CASE ou le CARTON précis, pas tout le meuble).
   const flownRef = useRef(null);
+  cbRef.current.sel = sel;
   useEffect(() => {
-    const g = st.current.furnGroup; if (!g) return;
-    g.children.forEach(grp => {
-      if (!grp.userData || !grp.userData.itemId) return;
-      const isHi = hi && hi.itemId === grp.userData.itemId, isSel = sel && sel === grp.userData.itemId;
-      const col = isHi ? '#e5484d' : isSel ? '#2f7ae5' : '#000000', inten = isHi ? 0.55 : isSel ? 0.4 : 0;
-      grp.traverse(m => { if (m.isMesh && m.material && m.material.emissive) { m.material.emissive.set(col); m.material.emissiveIntensity = inten; } });
-    });
+    if (!st.current.marquer) return;
+    try { st.current.marquer({ sel, hi }); } catch (_) {}
     // Vole vers la boîte cherchée — seulement quand la CIBLE change (pas à chaque
     // reconstruction de meubles), pour ne pas secouer la caméra sans raison.
-    const target = hi && hi.itemId ? hi.itemId : null;
-    if (target && target !== flownRef.current && st.current.flyTo) { st.current.flyTo(target); }
+    const target = hi && hi.itemId ? `${hi.itemId}|${hi.cell || ''}|${hi.pileIdx == null ? '' : hi.pileIdx}` : null;
+    if (target && target !== flownRef.current && st.current.flyTo) { st.current.flyTo(hi.itemId, { cell: hi.cell, pileIdx: hi.pileIdx, num: hi.num }); }
     flownRef.current = target;
   }, [hi, sel, loading, items]);
+  // ── CLAVIER : la vue se pilote aussi sans souris ─────────────────────────────
+  // Aucune touche ne faisait rien sur la 3D. La zone prend le focus au clic et
+  // garde ses touches (stopPropagation : le raccourci global ← / → change
+  // d'onglet — le Stock n'est pas dans les onglets du bas aujourd'hui, mais il
+  // ne doit pas suffire de l'y ajouter pour que les flèches le fassent quitter).
+  const surTouche3D = (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const s = st.current || {}; let fait = true;
+    switch (e.key) {
+      case 'ArrowLeft': s.rotateView && s.rotateView(-12); break;
+      case 'ArrowRight': s.rotateView && s.rotateView(12); break;
+      case 'ArrowUp': case '+': case '=': s.zoomView && s.zoomView(0.85); break;
+      case 'ArrowDown': case '-': case '_': s.zoomView && s.zoomView(1.18); break;
+      case 'Home': case '0': s.resetView && s.resetView(); break;
+      case 'f': case 'F': if (sel && s.flyTo) s.flyTo(sel); else fait = false; break;
+      case 'Escape': if (sel && onSelect) onSelect(null); else fait = false; break;
+      default: fait = false;
+    }
+    if (fait) { e.preventDefault(); e.stopPropagation(); }
+  };
 
   if (err) return fallback || <div style={{ fontSize: 12, color: C.muted, padding: 16 }}>3D indisponible sur cet appareil.</div>;
   return (
-    <div data-noswipe="1" style={{ position: 'relative', width: '100%', height: 'min(52vh, 460px)', minHeight: 320, borderRadius: 16, overflow: 'hidden', border: `1px solid ${C.border}`, background: '#e9edf2', boxShadow: C.shadow }}>
-      <div ref={mountRef} style={{ width: '100%', height: '100%', touchAction: 'none' }} />
+    <div data-noswipe="1" data-stock3d="" tabIndex={0} role="application" onKeyDown={surTouche3D}
+      onPointerDown={(e) => { try { if (e.target && e.target.tagName === 'CANVAS') e.currentTarget.focus({ preventScroll: true }); } catch (_) {} }}
+      aria-label="Stock en 3D. Glisser : tourner. Molette : zoomer vers le point visé. Clic droit : déplacer. Double-clic : se mettre en face. Flèches : tourner et zoomer. Début : toute la pièce. Échap : désélectionner."
+      style={{ position: 'relative', width: '100%', height: 'min(52vh, 460px)', minHeight: 320, borderRadius: 16, overflow: 'hidden', border: `1px solid ${C.border}`, background: '#e9edf2', boxShadow: C.shadow, outlineOffset: -2 }}>
+      <div ref={mountRef} style={{ width: '100%', height: '100%', touchAction: 'none', userSelect: 'none' }} />
       {loading && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted, fontSize: 13, fontWeight: 700 }}>Chargement de la 3D…</div>}
       {/* ⚠️ LA DÉCO NE MANGE PLUS LE HAUT DE LA PIÈCE.
           Les cinq ambiances étaient une rangée de pastilles qui DÉFILAIT en
@@ -13505,11 +13710,13 @@ function RoomPlan({ locate, onLocateConsumed }) {
         // Pile de boîtes : les numéros sont dans it.nums (n'était PAS cherché avant).
         if (Array.isArray(it.nums) && it.nums.some(n => String(n).trim().toLowerCase() === t)) {
           if (rm.id !== plan.active) persist({ ...plan, active: rm.id });
-          setHi({ itemId: it.id, roomId: rm.id, roomName: rm.name }); setSel(it.id); return;
+          // Le CARTON précis (son rang dans la pile) : le contour et le vol le visent.
+          const pileIdx = it.nums.findIndex(n => String(n).trim().toLowerCase() === t);
+          setHi({ itemId: it.id, pileIdx, num: t, roomId: rm.id, roomName: rm.name }); setSel(it.id); return;
         }
         for (const cell in (it.slots || {})) if ((it.slots[cell] || []).some(n => String(n).trim().toLowerCase() === t)) {
           if (rm.id !== plan.active) persist({ ...plan, active: rm.id });
-          setHi({ itemId: it.id, cell, roomId: rm.id, roomName: rm.name }); setOpenItem(it.id); setSel(it.id); return;
+          setHi({ itemId: it.id, cell, num: t, roomId: rm.id, roomName: rm.name }); setOpenItem(it.id); setSel(it.id); return;
         }
       }
     }
