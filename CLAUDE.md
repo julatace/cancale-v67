@@ -4240,6 +4240,71 @@ sélection et je tranche. »
   à regarder au banc dès qu'il y a des fixtures. C'est de la plomberie + UI, pas
   une nouvelle règle de rapprochement.
 
+### ⚠️⚠️ MA JOURNÉE, VENTES, ANNONCES, ACHATS TOMBAIENT EN PRODUCTION — §4.6 (4 octobre)
+`linkedBuyIds` (#407, une autre session) était un `useMemo` posé ~800 lignes
+**au-dessus** de `saleOv` : « Cannot access 'saleOv' before initialization » au
+premier rendu, sur les quatre écrans du composant. Vu par le banc
+`premierjour.cjs` (22 rouges sur `main`), pas par le build ni par un audit.
+⇒ **`scripts/audit-tdz.cjs`** : il suit la **liaison** Babel de chaque
+identifiant lu AU RENDU (`useMemo`, initialiseur de `useState`, tableau de
+dépendances, `.map` dans du code immédiat, fonction appelée sur place) et
+refuse toute lecture d'un `const`/`let` déclaré plus bas dans la même fonction.
+Rouge sur `main` (il nomme `saleOv`), vert après. Il ne voit pas une lecture
+**indirecte** (un `useMemo` qui appelle une fonction qui lit une constante
+déclarée plus bas) — pour ça, il faut encore le rendu.
+
+### « Vendu » et « reçu » : deux notions, deux mots (n° 20, 4 octobre)
+Julien, 3 octobre : « il y a les ventes que l'on fait en une journée et
+l'argent que l'on reçoit — je veux un graphique avec les ventes de la journée ».
+Le héros de Ma journée écrivait « **Chiffre d'affaires** » sur les ventes FAITES
+(en cours comprises, Vinted seul, `liveStats` figé au montage) — le mot du CA
+déclaré, qui est l'argent reçu.
+- **VENDU** = `ventesFaites` : date de VENTE, toutes plateformes, en cours
+  comprises, hors annulées et hors ventes/comptes cachés (`isHidden`).
+  Leboncoin sans `dateVente` n'est dans aucun jour (`sansDate`). Propriétaire
+  dans l'écran : `vendus` → `bilanVentes` (« Vendu aujourd'hui », « Vendu en
+  {mois} ») et la colonne VENDU du graphique — une seule liste.
+- **REÇU** = `ventesDeclarables` (le CA déclaré, date de VERSEMENT). Le memo
+  `declarables` est partagé par la publication `vinted_urssaf_mois` ET l'écran :
+  « Reçu en {mois} » est le même nombre que la carte URSSAF du tableau de bord.
+- Carte **« Tes 14 derniers jours »** (`BarresVenduRecu`, qui remplace
+  `MiniBarres` jamais rendue) : deux barres par jour, VENDU à l'accent, REÇU à
+  l'encre neutre, même échelle. Versements illisibles ⇒ **aucune** barre
+  « reçu », jamais des zéros ; une vente finalisée sans date de versement est
+  dite une fois sous le graphique.
+- « Vendu aujourd'hui » dit des **ventes**, plus des « paires » (un lot vaut 1).
+- Statistiques : « CA du mois » → « **Vendu ce mois** » (même chiffre, bon mot).
+- Banc `vendu-recu.cjs` (ventes inventées, 30 contrôles, juge les `data-*`).
+  Réaffaibli (annulée comptée + reçu daté à la vente) → **11 rouges**.
+- ⚠️ **Encore ouvert** : `liveStats` (Statistiques « Aujourd'hui », « Vendu ce
+  mois », widget `caMois`) reste un SECOND calcul du vendu — Vinted seul, figé
+  au montage, comptes bloqués exclus. Le brancher sur le même propriétaire
+  demande que Ma journée/Ventes PUBLIE le vendu (motif `vinted_urssaf_mois`).
+
+### La page d'accueil publique (n° 22, 4 octobre)
+Julien : « une vraie page d'accueil… qui donne envie… avant d'arriver sur la
+connexion », avec une vidéo en motion design, inspirée de Vinteer.
+- `src/Accueil.jsx`, rendue par `main.jsx` (`Racine`) **seulement sans
+  session** ; l'app (`App.jsx`, ~340 Ko gzip) est un morceau à part, chargé au
+  clic et préchargé au survol des boutons. Une session, `?code=`,
+  `#access_token=`, `?tab=`, `?connexion`, `?inscription` ⇒ droit dans l'app,
+  **sans éclair** de page d'accueil. « Créer mon compte » ouvre le formulaire
+  d'inscription (`?inscription`), et l'écran de connexion a « ← Découvrir VRM ».
+- La démo est une **fonction pure du temps** (6 scènes × 4,2 s, dessinée en
+  720×470, ou 420×500 sous 560 px de large), arrêtée hors écran, immobile avec
+  « réduire les animations ». ⚠️ Le temps suit l'**horloge**, pas le nombre
+  d'images : bornée à 0,05 s par pas, elle tournait à moitié vitesse à 9 images/s
+  (mesuré en rendu logiciel à 1512 px).
+- ⚠️ `overflow-x:hidden` sur la racine empêchait la barre du haut de rester
+  collée : `overflow-x:clip` (repli `hidden` si non supporté).
+- **Honnêteté** : le prix « gratuit » vient des CGV, « aucune donnée revendue »
+  de la politique de confidentialité, aucun chiffre de clientèle ni étoile —
+  le banc `accueil.cjs` (36 contrôles) le vérifie.
+- **La vidéo** : `?film` rend l'animation seule ; `scripts/film-accueil.cjs`
+  l'exporte image par image en MP4 (1920×1080 et 1080×1920, 25,2 s, ~1 Mo).
+  Les MP4 ne montent pas dans le dépôt : ils se régénèrent après chaque
+  changement de la démo (`npm run build` puis le script).
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
@@ -4407,8 +4472,8 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | outil | quoi |
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
-| `node scripts/audit-*.cjs` | **40 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
-| `scripts/bancs/*.cjs` | les **23 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
+| `node scripts/audit-*.cjs` | **57 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `scripts/bancs/*.cjs` | les **48 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
 **Trois règles de preuve :**
@@ -4687,8 +4752,8 @@ script-là me fait croire à une catastrophe.
 src/App.jsx                     l'app (grep avant de lire — le fichier est énorme)
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
-scripts/audit-*.cjs             les 40 audits
-scripts/bancs/                  les 23 bancs (leur README dit comment les lancer)
+scripts/audit-*.cjs             les 57 audits
+scripts/bancs/                  les 48 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 ```
