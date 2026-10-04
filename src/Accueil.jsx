@@ -46,12 +46,12 @@ const mix = (a, b, x) => a + (b - a) * x;
 //    et « Tes chiffres… ») : garder ces débuts si on les réécrit.
 const SCENE_S = 5.2;
 const SCENES = [
-  { nav: 'Ma journée', titre: 'Tous tes comptes, un seul écran', sous: 'Dès que tu ouvres VRM, Vinted, Leboncoin et eBay sont là et à jour. Fini de jongler entre dix onglets.' },
-  { nav: 'Ventes', titre: 'Chaque vente arrive en direct', sous: 'Une vente tombe sur un de tes comptes ? Elle s’affiche ici tout de suite — payée, à expédier, en route.' },
-  { nav: 'Colis', titre: 'Le bordereau est prêt, tout seul', sous: 'VRM récupère le PDF du bordereau et y imprime le titre et le numéro de la paire. Tu n’as plus qu’à l’imprimer.' },
-  { nav: 'Annonces', titre: 'Un numéro de rangement par paire', sous: 'Carton, étagère ou bac — comme tu ranges. Chaque paire a son numéro, tu la retrouves en un coup d’œil, et un numéro n’est jamais redonné à une autre.' },
-  { nav: 'Messages', titre: 'Tes messages et tes offres', sous: 'Réponds et accepte une offre quand tu veux — depuis VRM, mais c’est toi qui cliques. Rien n’est envoyé à ta place.' },
-  { nav: 'Statistiques', titre: 'Tes chiffres, prêts pour l’URSSAF', sous: 'Ce que tu as vendu, l’argent reçu et le chiffre d’affaires à déclarer — chaque montant à sa date.' },
+  { nav: 'Ma journée', actif: 'Ma journée', titre: 'Tous tes comptes, un seul écran', sous: 'Dès que tu ouvres VRM, Vinted, Leboncoin et eBay sont là et à jour. Fini de jongler entre dix onglets.' },
+  { nav: 'Ventes', actif: 'Ventes', titre: 'Chaque vente arrive en direct', sous: 'Une vente tombe sur un de tes comptes ? Elle s’affiche ici tout de suite — payée, à expédier, en route.' },
+  { nav: 'Colis', actif: 'Colis', titre: 'Le bordereau est prêt, tout seul', sous: 'VRM récupère le PDF du bordereau et y imprime le titre et le numéro de la paire. Tu n’as plus qu’à l’imprimer.' },
+  { nav: 'Stock', actif: 'Stock', titre: 'Un numéro de rangement par paire', sous: 'Carton, étagère ou bac — comme tu ranges. Chaque paire a son numéro, tu la retrouves en un coup d’œil, et un numéro n’est jamais redonné à une autre.' },
+  { nav: 'Messages', actif: 'Vinted', titre: 'Tes messages et tes offres', sous: 'Réponds et accepte une offre quand tu veux — depuis VRM, mais c’est toi qui cliques. Rien n’est envoyé à ta place.' },
+  { nav: 'Statistiques', actif: 'Statistiques', titre: 'Tes chiffres, prêts pour l’URSSAF', sous: 'Ce que tu as vendu, l’argent reçu et le chiffre d’affaires à déclarer — chaque montant à sa date.' },
 ];
 const DUREE = SCENE_S * SCENES.length;
 // ⚠️ LE TEMPS EST TOUJOURS RAMENÉ DANS [0, DUREE[. Vu au banc : l'horodatage
@@ -101,36 +101,69 @@ const Photo = ({ s = 34, i = 0, r = 8 }) => {
 
 // ── Les six scènes. Chacune est une FONCTION DU TEMPS local u ∈ [0,1] : la
 //    même image pour le même u, ce qui permet de filmer image par image. ─────
-function SceneComptes({ u }) {
-  const lignes = [
-    { l: 'V', t: 'Vinted · compte 1', d: '12 annonces · 3 ventes en cours' },
-    { l: 'V', t: 'Vinted · compte 2', d: '8 annonces · 1 vente en cours' },
-    { l: 'L', t: 'Leboncoin', d: '5 annonces' },
-    { l: 'e', t: 'eBay', d: '2 annonces' },
+// ── Ma journée : la carte « Vendu / Reçu », le graphe 14 jours et les actions —
+//    comme le vrai écran d'accueil de l'app (chiffres de DÉMONSTRATION). ────────
+function SceneComptes({ u, c }) {
+  const carte = sortie(seg(u, 0.05, 0.24));
+  // ⚠️ On compte DEPUIS un socle non nul : un « 0 € » transitoire serait pris pour
+  //    un prix affiché « 0 € » par le banc d'honnêteté (le prix, c'est 9,99 €/mois).
+  const vendu = Math.round(mix(118, 142, douce(seg(u, 0.12, 0.46))));
+  const recu = Math.round(mix(74, 96, douce(seg(u, 0.22, 0.54))));
+  const jours = [2, 4, 3, 5, 2, 6, 4, 3, 7, 5, 4, 6, 5, 8];
+  const recus = [1, 3, 2, 4, 1, 5, 3, 2, 6, 4, 3, 5, 4, 6];
+  const maxJ = 8;
+  const cartes = [
+    { t: 'Expédier 3 colis', d: '1 bordereau prêt', dot: '#F2B33D' },
+    { t: 'Retirer 3 colis', d: '2 avec ton code', dot: K.accent },
   ];
-  const ok = sortie(seg(u, 0.62, 0.8));
   return (
     <div style={{ position: 'absolute', inset: 0 }}>
-      <div style={{ fontSize: 19, fontWeight: 700, color: K.text, marginBottom: 4 }} className="vrm-display">Bonjour</div>
-      <div style={{ fontSize: 12.5, color: K.muted, marginBottom: 18 }}>Voici ta boutique, tous comptes réunis.</div>
-      {lignes.map((r, i) => {
-        const x = sortie(seg(u, 0.06 + i * 0.09, 0.32 + i * 0.09));
-        const dx = [-260, 300, -220, 260][i];
-        return (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '11px 13px', marginBottom: 8, borderRadius: 11,
-            background: K.card, border: `1px solid ${K.line}`, opacity: x, transform: `translate(${mix(dx, 0, x)}px, ${mix(18, 0, x)}px) rotate(${mix(i % 2 ? 6 : -6, 0, x)}deg)` }}>
-            <Pastille lettre={r.l} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: K.text }}>{r.t}</div>
-              <div style={{ fontSize: 11.5, color: K.muted }}>{r.d}</div>
-            </div>
-            <div style={{ opacity: ok }}><Coche /></div>
+      <div style={{ fontSize: 11.5, color: K.faint, fontWeight: 600 }}>Dimanche 4 octobre</div>
+      <div className="vrm-display" style={{ fontSize: c ? 18 : 20, fontWeight: 700, color: K.text, margin: '2px 0 1px' }}>Bonjour 👋</div>
+      <div style={{ fontSize: 12, color: K.muted, marginBottom: 12 }}><b style={{ color: K.text }}>3 choses</b> à faire aujourd’hui.</div>
+      {/* Carte héros : Vendu / Reçu */}
+      <div style={{ borderRadius: 14, padding: '13px 15px', marginBottom: 11, background: 'linear-gradient(135deg, #0C0F15, #121824)', border: `1px solid ${K.line2}`, opacity: carte, transform: `translateY(${mix(10, 0, carte)}px)` }}>
+        <div style={{ fontSize: 9.5, letterSpacing: 0.8, textTransform: 'uppercase', color: K.muted, fontWeight: 700 }}>Vendu en octobre</div>
+        <div className="vrm-display" style={{ fontSize: c ? 32 : 40, fontWeight: 800, color: K.text, lineHeight: 1.04, margin: '1px 0' }}>{vendu} €</div>
+        <div style={{ fontSize: 11, color: K.muted }}>6 ventes ce mois-ci · voir mes ventes ›</div>
+        <div style={{ height: 1, background: K.line, margin: '10px 0' }} />
+        <div style={{ fontSize: 11, color: K.muted }}><span style={{ textTransform: 'uppercase', fontWeight: 700, fontSize: 9.5, letterSpacing: 0.6 }}>Reçu en octobre</span>&nbsp;&nbsp;<b className="vrm-display" style={{ color: K.text, fontSize: 15 }}>{recu} €</b>&nbsp; argent versé · ton CA déclaré</div>
+      </div>
+      {/* Tes 14 derniers jours : Vendu / Reçu */}
+      <div style={{ borderRadius: 12, padding: '10px 12px 8px', border: `1px solid ${K.line}`, background: K.card, marginBottom: 11 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 7 }}>
+          <div style={{ fontSize: 10.5, color: K.muted, fontWeight: 600 }}>Tes 14 derniers jours</div>
+          <div style={{ display: 'flex', gap: 10, fontSize: 9, color: K.faint }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><span style={{ width: 7, height: 7, borderRadius: 2, background: K.accent }} />Vendu</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><span style={{ width: 7, height: 7, borderRadius: 2, background: 'rgba(238,241,246,0.3)' }} />Reçu</span>
           </div>
-        );
-      })}
-      <div style={{ marginTop: 12, display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 999,
-        background: K.accentSoft, color: K.text, fontSize: 12, fontWeight: 600, opacity: ok, transform: `scale(${mix(0.9, 1, rebond(seg(u, 0.62, 0.82)))})` }}>
-        <Coche s={13} /> 4 comptes à jour
+        </div>
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: c ? 3 : 5, height: c ? 58 : 72 }}>
+          {jours.map((v, i) => {
+            const e = douce(seg(u, 0.18 + i * 0.02, 0.44 + i * 0.02));
+            return (
+              <div key={i} style={{ flex: 1, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 1.5, height: '100%' }}>
+                <div style={{ width: '42%', height: `${(v / maxJ) * 100 * e}%`, borderRadius: '3px 3px 1px 1px', background: K.accent }} />
+                <div style={{ width: '42%', height: `${(recus[i] / maxJ) * 100 * e}%`, borderRadius: '3px 3px 1px 1px', background: 'rgba(238,241,246,0.26)' }} />
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      {/* Les actions du jour */}
+      <div style={{ display: 'flex', gap: 10 }}>
+        {cartes.map((ca, i) => {
+          const e = sortie(seg(u, 0.42 + i * 0.08, 0.64 + i * 0.08));
+          return (
+            <div key={ca.t} style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 9, padding: '10px 12px', borderRadius: 11, background: K.card, border: `1px solid ${K.line}`, opacity: e, transform: `translateY(${mix(10, 0, e)}px)` }}>
+              <span style={{ width: 9, height: 9, borderRadius: 3, background: ca.dot, flexShrink: 0 }} />
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: K.text, whiteSpace: 'nowrap' }}>{ca.t}</div>
+                <div style={{ fontSize: 10.5, color: K.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ca.d}</div>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -195,26 +228,45 @@ function SceneBordereau({ u, c }) {
   const barres = [3, 1, 2, 1, 3, 1, 1, 2, 3, 1, 2, 1, 1, 3, 2, 1, 3, 1, 2, 2, 1, 3, 1, 2, 1, 3];
   return (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', gap: c ? 16 : 22, alignItems: 'flex-start' }}>
-      <div style={{ width: c ? 182 : 236, height: c ? 300 : 330, borderRadius: 10, background: K.paper, position: 'relative', overflow: 'hidden', flexShrink: 0,
+      <div style={{ width: c ? 188 : 244, height: c ? 300 : 342, borderRadius: 10, background: K.paper, position: 'relative', overflow: 'hidden', flexShrink: 0,
         boxShadow: '0 1px 2px rgba(0,0,0,.5), 0 22px 50px rgba(0,0,0,.5)', transform: `translateY(${mix(70, 0, feuille)}px)`, opacity: feuille }}>
-        <div style={{ padding: '14px 16px', borderBottom: `1.5px dashed #C7CDD6` }}>
-          <div style={{ fontSize: 10, letterSpacing: 1.6, fontWeight: 700, color: K.ink }}>BORDEREAU D’ENVOI</div>
-          <div style={{ fontSize: 9, color: '#5E6878', marginTop: 2 }}>Point relais · Colis 1/1</div>
-        </div>
-        <div style={{ padding: '12px 16px' }}>
-          {[78, 64, 88, 52].map((w, i) => <div key={i} style={{ height: 7, width: `${w}%`, background: '#D9DEE6', borderRadius: 3, marginBottom: 7 }} />)}
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 1.5, height: 64, marginTop: 14 }}>
-            {barres.map((b, i) => <div key={i} style={{ width: b * (c ? 1.5 : 2), height: '100%', background: K.ink }} />)}
+        {/* En-tête Mondial Relay + le tampon VRM (N° + titre), comme sur son vrai bordereau */}
+        <div style={{ padding: '12px 14px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+          <div>
+            <div style={{ fontSize: c ? 11 : 12.5, fontWeight: 800, color: '#C0392B', letterSpacing: 0.2 }}>Mondial Relay</div>
+            <div style={{ fontSize: 8, color: '#5E6878', marginTop: 2, lineHeight: 1.3 }}>Dépôt en point relais<br />ou casier</div>
           </div>
-          <div style={{ fontSize: 9, color: '#5E6878', marginTop: 5, letterSpacing: 1 }}>3S 4821 9067 55</div>
-          {[70, 46].map((w, i) => <div key={i} style={{ height: 7, width: `${w}%`, background: '#D9DEE6', borderRadius: 3, marginTop: 9 }} />)}
+          <div style={{ padding: '7px 9px', borderRadius: 7, border: `2px solid ${K.accent}`, background: '#FFFFFF', color: K.ink, flexShrink: 0,
+            opacity: tampon > 0 ? 1 : 0, transform: `scale(${mix(1.5, 1, rebond(tampon))}) rotate(${mix(-7, -2, sortie(tampon))}deg)`, transformOrigin: 'top right' }}>
+            <div style={{ fontSize: c ? 13 : 15, fontWeight: 800, letterSpacing: 0.3 }}>N° 128</div>
+            <div style={{ fontSize: 9, color: '#3A4352', fontWeight: 600 }}>Nike Air Max 90 · T42</div>
+          </div>
         </div>
-        {/* Le tampon VRM */}
-        <div style={{ position: 'absolute', left: 16, right: 16, bottom: 16, padding: '9px 11px', borderRadius: 8, border: `2px solid ${K.accent}`,
-          background: '#FFFFFF', color: K.ink, opacity: tampon > 0 ? 1 : 0,
-          transform: `scale(${mix(1.6, 1, rebond(tampon))}) rotate(${mix(-9, -2.5, sortie(tampon))}deg)` }}>
-          <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: 0.4 }}>N° 128</div>
-          <div style={{ fontSize: 10.5, color: '#3A4352', fontWeight: 600 }}>Nike Air Max 90 · T42</div>
+        {/* Ligne de découpe */}
+        <div style={{ borderTop: '1.5px dashed #C7CDD6', position: 'relative', margin: '3px 0 0' }}>
+          <span style={{ position: 'absolute', left: 10, top: -8, fontSize: 11, lineHeight: 1, color: '#9AA3B2', background: K.paper, padding: '0 3px' }}>✂</span>
+        </div>
+        {/* L'étiquette : code-barres + blocs expéditeur / point relais (noms masqués) */}
+        <div style={{ padding: '11px 14px' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 1.3, height: c ? 38 : 46 }}>
+            {barres.map((b, i) => <div key={i} style={{ width: b * (c ? 1.4 : 1.8), height: '100%', background: K.ink }} />)}
+          </div>
+          <div style={{ fontSize: 8, color: '#5E6878', marginTop: 4, letterSpacing: 1 }}>4278 3566 4901 0190</div>
+          <div style={{ display: 'flex', gap: 10, marginTop: 11 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 7.5, fontWeight: 700, color: '#9AA3B2', letterSpacing: 0.5 }}>EXPÉDITEUR</div>
+              {[70, 54].map((w, i) => <div key={i} style={{ height: 5, width: `${w}%`, background: '#D9DEE6', borderRadius: 2, marginTop: 4 }} />)}
+              <div style={{ fontSize: 7.5, fontWeight: 700, color: '#9AA3B2', letterSpacing: 0.5, marginTop: 10 }}>POINT RELAIS</div>
+              {[84, 62].map((w, i) => <div key={i} style={{ height: 5, width: `${w}%`, background: '#D9DEE6', borderRadius: 2, marginTop: 4 }} />)}
+              <div style={{ fontSize: 7.5, color: '#AEB7C6', marginTop: 5, fontStyle: 'italic' }}>nom de l’acheteur masqué</div>
+            </div>
+            <div style={{ textAlign: 'center', paddingTop: 2 }}>
+              <div style={{ fontSize: 15, fontWeight: 800, color: K.ink, lineHeight: 1 }}>LCC</div>
+              <div style={{ fontSize: 9, fontWeight: 700, color: K.ink }}>HUB</div>
+              <div style={{ fontSize: 8, color: '#5E6878', marginTop: 7 }}>1,10 kg</div>
+              <div style={{ fontSize: 8, color: '#5E6878' }}>1 / 1</div>
+            </div>
+          </div>
         </div>
       </div>
       <div style={{ flex: 1, paddingTop: 8 }}>
@@ -361,32 +413,81 @@ function SceneChiffres({ u }) {
 }
 const SCENE_COMP = [SceneComptes, SceneVentes, SceneBordereau, SceneRangement, SceneMessages, SceneChiffres];
 
+// ── La navigation RÉELLE de l'app (Julien, 27 sept.) : la barre, ce sont les
+//    plateformes ; les écrans de Vinted (Annonces, Ventes, Achats, Colis,
+//    Messages…) sont des sections de Vinted. On la reprend à l'identique pour
+//    que la démo ressemble vraiment au site. ──────────────────────────────────
+const RAIL = [
+  { g: 'Au quotidien', items: [
+    { label: 'Ma journée', dot: K.accent },
+    { label: 'Vinted', dot: '#12B7BE' },
+    { label: 'Leboncoin', dot: '#F56B2A' },
+    { label: 'Vestiaire', dot: '#C7A24C' },
+    { label: 'eBay', dot: '#4C8BF5' },
+  ] },
+  { g: 'Dans Vinted', items: [{ label: 'Annonces' }, { label: 'Ventes' }, { label: 'Achats' }] },
+  { g: 'Le reste', items: [{ label: 'Colis' }, { label: 'Collectif' }, { label: 'Statistiques' }, { label: 'À publier' }, { label: 'Stock' }, { label: 'Factures' }] },
+];
+const PLATEFORMES = [
+  { label: 'Ma journée', court: 'Journée', dot: K.accent },
+  { label: 'Vinted', dot: '#12B7BE' },
+  { label: 'Leboncoin', dot: '#F56B2A' },
+  { label: 'Vestiaire', dot: '#C7A24C' },
+  { label: 'eBay', dot: '#4C8BF5' },
+];
+
 // ── La fenêtre de l'app, à la taille de dessin ──────────────────────────────
 function Fenetre({ t, compact }) {
   const { s, u } = sceneDe(t);
-  const fw = compact ? WC : W, fh = compact ? HC : H, menu = compact ? 0 : 150;
+  const fw = compact ? WC : W, fh = compact ? HC : H, menu = compact ? 0 : 184;
   const entree = sortie(seg(u, 0, 0.1)), fin = 1 - douce(seg(u, 0.93, 1));
   const Scene = SCENE_COMP[s];
+  const sc = SCENES[s], actif = sc.actif;
+  const plat = actif === 'Ma journée' ? 'Ma journée' : 'Vinted';     // la plateforme active (barre du bas)
+  const Dot = ({ c, on }) => <span style={{ width: 8, height: 8, borderRadius: 2.5, background: c || 'rgba(255,255,255,0.3)', flexShrink: 0, boxShadow: on && c ? `0 0 0 3px ${c}22` : 'none', opacity: on ? 1 : 0.55 }} />;
   return (
     <div style={{ width: fw, height: fh, borderRadius: 18, background: K.surface, border: `1px solid ${K.line2}`, overflow: 'hidden', position: 'relative',
       boxShadow: '0 1px 2px rgba(0,0,0,.6), 0 40px 90px rgba(0,0,0,.55)' }}>
       <div style={{ height: 34, display: 'flex', alignItems: 'center', gap: 7, padding: '0 14px', borderBottom: `1px solid ${K.line}` }}>
         {[0, 1, 2].map((i) => <div key={i} style={{ width: 10, height: 10, borderRadius: 5, background: 'rgba(255,255,255,0.14)' }} />)}
-        <div style={{ marginLeft: 10, fontSize: 11, color: K.faint, letterSpacing: 0.3 }}>vrm.center{compact ? <span style={{ color: K.muted }}> · {SCENES[s].nav}</span> : null}</div>
+        <div style={{ marginLeft: 10, fontSize: 11, color: K.faint, letterSpacing: 0.3 }}>vrm.center{compact ? <span style={{ color: K.muted }}> · {sc.nav}</span> : null}</div>
       </div>
-      {!compact && <div style={{ position: 'absolute', top: 34, left: 0, bottom: 0, width: 150, borderRight: `1px solid ${K.line}`, padding: '16px 10px', background: '#090C10' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 8px', marginBottom: 18 }}>
-          <img src="/logo-vrm-96.png" alt="" width="24" height="24" style={{ borderRadius: 6, display: 'block' }} />
+      {/* RAIL ordinateur : la vraie barre de l'app, en trois groupes */}
+      {!compact && <div style={{ position: 'absolute', top: 34, left: 0, bottom: 0, width: menu, borderRight: `1px solid ${K.line}`, padding: '11px 9px', background: '#090C10', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 8px', marginBottom: 9 }}>
+          <img src="/logo-vrm-96.png" alt="" width="22" height="22" style={{ borderRadius: 6, display: 'block' }} />
           <div className="vrm-display" style={{ fontSize: 14, fontWeight: 700, color: K.text, letterSpacing: 0.5 }}>VRM</div>
         </div>
-        {SCENES.map((sc, i) => (
-          <div key={sc.nav} style={{ padding: '8px 9px', borderRadius: 8, fontSize: 12, fontWeight: i === s ? 700 : 500, marginBottom: 3,
-            color: i === s ? K.text : K.faint, background: i === s ? 'rgba(255,255,255,0.07)' : 'transparent' }}>{sc.nav}</div>
+        {RAIL.map((grp) => (
+          <div key={grp.g} style={{ marginBottom: 5 }}>
+            <div style={{ fontSize: 8.5, fontWeight: 700, letterSpacing: 0.7, textTransform: 'uppercase', color: K.faint, opacity: 0.7, padding: '0 9px', marginBottom: 2 }}>{grp.g}</div>
+            {grp.items.map((it) => {
+              const on = it.label === actif;
+              return (
+                <div key={it.label} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '4.5px 9px', borderRadius: 7, fontSize: 11.5, fontWeight: on ? 700 : 500, marginBottom: 1,
+                  color: on ? K.text : K.faint, background: on ? 'rgba(61,123,255,0.14)' : 'transparent' }}>
+                  <Dot c={it.dot} on={on} />{it.label}
+                </div>
+              );
+            })}
+          </div>
         ))}
       </div>}
-      <div style={{ position: 'absolute', top: 34 + 22, left: menu + (compact ? 20 : 26), right: compact ? 20 : 26, bottom: 22, opacity: entree * fin, transform: `translateY(${mix(10, 0, entree)}px)` }}>
+      <div style={{ position: 'absolute', top: 34 + 20, left: menu + (compact ? 20 : 24), right: compact ? 20 : 24, bottom: compact ? 60 : 22, opacity: entree * fin, transform: `translateY(${mix(10, 0, entree)}px)` }}>
         <Scene u={u} c={!!compact} />
       </div>
+      {/* BARRE DU BAS téléphone : les plateformes (comme l'app) */}
+      {compact && <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 52, borderTop: `1px solid ${K.line}`, background: '#090C10', display: 'flex', alignItems: 'center', justifyContent: 'space-around', padding: '0 6px' }}>
+        {PLATEFORMES.map((it) => {
+          const on = it.label === plat;
+          return (
+            <div key={it.label} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, flex: 1 }}>
+              <Dot c={it.dot} on={on} />
+              <span style={{ fontSize: 8.5, fontWeight: on ? 700 : 500, color: on ? K.text : K.faint, whiteSpace: 'nowrap' }}>{it.court || it.label}</span>
+            </div>
+          );
+        })}
+      </div>}
     </div>
   );
 }
