@@ -39,7 +39,7 @@ const ETATS = {
   connecte: { ok: true, plateforme: 'vinted', capte: true, version: '5.130.0', vrm: { ok: true, connecte: true, email: 'sophie@exemple.fr', cloisonne: true }, site: { id: '111', nom: 'angeled92' }, flux: { okAt: Date.now() - 3 * MIN }, bascule: null },
   expiree: { ok: true, plateforme: 'vinted', capte: true, version: '5.130.0', vrm: { ok: true, connecte: false, expiree: true, email: 'sophie@exemple.fr', cloisonne: true }, site: { id: '111', nom: 'angeled92' }, flux: { okAt: Date.now() - 90 * MIN }, bascule: null },
   refuse: { ok: true, plateforme: 'leboncoin', capte: true, version: '5.130.0', vrm: { ok: true, connecte: true, email: 'sophie@exemple.fr', cloisonne: true }, site: { id: '9', nom: 'Sophie B.', type: 'particulier' }, flux: { okAt: Date.now() - 60 * MIN, koAt: Date.now() - 2 * MIN }, bascule: null },
-  vestiaire: { ok: true, plateforme: 'vestiaire', capte: false, version: '5.130.0', vrm: { ok: true, connecte: true, email: 'sophie@exemple.fr', cloisonne: true }, site: null, flux: null, bascule: null },
+  vestiaire: { ok: true, plateforme: 'vestiaire', capte: false, mesure: true, version: '5.154.0', vrm: { ok: true, connecte: true, email: 'sophie@exemple.fr', cloisonne: true }, site: null, flux: { okAt: Date.now() - 120000 }, bascule: null },
   bascule: { ok: true, plateforme: 'vinted', capte: true, version: '5.130.0', vrm: { ok: true, connecte: true, email: 'autre@exemple.fr', cloisonne: true }, site: { id: '111', nom: 'angeled92' }, flux: { okAt: Date.now() - MIN }, bascule: { de: 'sophie@exemple.fr', vers: 'autre@exemple.fr', at: Date.now() - 30 * MIN } },
 };
 
@@ -187,14 +187,18 @@ const cliquer = async (pg) => { await pg.mouse.click(1512 - 16 - 22, 900 - 16 - 
     await ctx.close();
   });
 
-  // ── 6. VESTIAIRE : pas capté, et on le dit ───────────────────────────────
-  console.log('\n── Vestiaire Collective (pas capté par VRM)');
+  // ── 6. VESTIAIRE : MESURÉ, PAS CAPTÉ — et on le dit (5.154) ──────────────
+  // La carte dit que VRM apprend à lire le site (la forme des pages, jamais leur
+  // contenu), qu'aucune vente n'est captée, et quand le relevé est parti — sans
+  // jamais « Tes données » ni « Envoyées » (ce serait un faux vert).
+  console.log('\n── Vestiaire Collective (mesuré, pas encore capté)');
   await essaie('vestiaire', async () => {
     const { ctx, pg } = await rendre(nav, ETATS.vestiaire, { url: 'https://fr.vestiairecollective.com/' });
     await survoler(pg);
     const l = await lire(pg);
     dit(l.n === 1 && /logo-vrm-96/.test(l.imgSrc || ''), 'la même carte, le même logo');
-    dit(/ne capte pas encore Vestiaire/i.test(l.carte), 'elle dit que ce site n’est pas capté', l.carte.slice(0, 160));
+    dit(/apprend à lire Vestiaire/i.test(l.carte) && /Aucune vente ni annonce n'est encore captée/i.test(l.carte), 'elle dit que VRM apprend à lire ce site, et que rien n’est encore capté', l.carte.slice(0, 200));
+    dit(/Relevé envoyé/i.test(l.carte), 'elle dit quand le relevé est parti', l.carte.slice(0, 220));
     dit(!/Envoyées|Tes données/i.test(l.carte), 'et ne prétend jamais que des données circulent');
     await ctx.close();
   });

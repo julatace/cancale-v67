@@ -1072,6 +1072,20 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       })();
       return true;
     }
+    // ── VESTIAIRE COLLECTIVE : LA MESURE DU SITE (5.154) ─────────────────────
+    // Des chemins, des noms de champs, des types — jamais une valeur (voir
+    // vc-inject.js). On n'accepte que d'un onglet vestiairecollective.com.
+    if (msg && msg.from === 'cancale-vc' && msg.action === 'vcRecon') {
+      (async () => {
+        try {
+          let hote = ''; try { hote = new URL((sender && sender.tab && sender.tab.url) || '').hostname; } catch (_) {}
+          if (!/(^|\.)vestiairecollective\.com$/i.test(hote)) { sendResponse({ ok: false }); return; }
+          await storeVcRecon(msg.patch || {});
+          sendResponse({ ok: true });
+        } catch (e) { sendResponse({ ok: false, error: String(e) }); }
+      })();
+      return true;
+    }
     if (msg && msg.from === 'cancale-lbc') {
       (async () => {
         try {
@@ -3186,10 +3200,14 @@ async function etatSite(url) {
     site = c && c.name ? { id: c.id || null, nom: c.name, type: c.type || '' } : { id: null, nom: '' };
   }
   const capte = plateforme === 'vinted' || plateforme === 'leboncoin';
-  const flux = capte ? ((local.vrmFlux || {})[plateforme] || {}) : null;
+  // Vestiaire : rien n'est capté, mais le site est MESURÉ (5.154) — la carte le
+  // dit, avec le dernier envoi de la mesure. Jamais « Tes données » ni
+  // « Envoyées » : ce serait un faux vert sur des données qui ne sont pas lues.
+  const mesure = plateforme === 'vestiaire';
+  const flux = (capte || mesure) ? ((local.vrmFlux || {})[plateforme] || {}) : null;
   const b = local.vrmBascule;
   const bascule = b && Date.now() - Number(b.at || 0) < BASCULE_VISIBLE_MS ? b : null;
-  return { ok: true, plateforme, capte, version, vrm, site, flux, bascule };
+  return { ok: true, plateforme, capte, mesure, version, vrm, site, flux, bascule };
 }
 
 // L'état que l'app interroge toutes les 20 s : ZÉRO requête Vinted (cookie,
@@ -5581,6 +5599,55 @@ async function storeLbcListings(url, listings) {
 // (`null`) n'écrit RIEN (elle effacerait les autres comptes — la famille de
 // « rien lu ne vaut pas rien »). La page recharge le compteur en continu : on
 // n'écrit que si le nombre change, ou pour rafraîchir sa date toutes les 10 min.
+// ── VESTIAIRE : RANGER LA MESURE DANS `vc_recon` ─────────────────────────────
+// Lire-fusionner-réécrire, gardé : une lecture ratée (`null`) n'écrit RIEN.
+// Chaque morceau est borné (300 chemins, 60 pages, 40 hôtes, 60 schémas) et un
+// schéma n'est jamais remplacé par une version plus pauvre. Les SCALAIRES de tête
+// (nChemins, nPages, nSchemas, vuAt, ver) passent dans la colonne `meta` : l'app
+// les lit sans rapatrier la ligne (§4.4).
+// ⚠️ La page relève en continu : un mémo LOCAL (chrome.storage.local — jamais une
+//    variable de module, §4.9) retient ce qui a déjà été envoyé, et un envoi sans
+//    rien de neuf ne lit ni n'écrit la base.
+async function storeVcRecon(patch) {
+  try {
+    const sig = (x) => String(x).slice(0, 220);
+    const neuf = [];
+    for (const c of (patch.chemins || [])) neuf.push('c:' + sig(c));
+    for (const pg of (patch.pages || [])) neuf.push('p:' + sig(pg));
+    for (const h of Object.keys(patch.hotes || {})) neuf.push('h:' + sig(h));
+    for (const e of Object.keys(patch.schemas || {})) neuf.push('s:' + sig(e) + ':' + ((patch.schemas[e] || []).length));
+    let connu = {};
+    try { connu = (await chrome.storage.local.get('vrmVcConnu')).vrmVcConnu || {}; } catch (_) {}
+    const nouveaux = neuf.filter((k) => !connu[k]);
+    if (!nouveaux.length) return;
+    const rows = await sbGet('app_data?id=eq.vc_recon&select=data');
+    if (rows === null) return;                      // pas su ≠ vide : on n'écrit pas
+    const cur = (rows[0] && rows[0].data) || {};
+    const chemins = [...new Set([...(cur.chemins || []), ...(patch.chemins || [])])].slice(-300);
+    const pages = [...new Set([...(cur.pages || []), ...(patch.pages || [])])].slice(-60);
+    const hotes = Object.assign({}, cur.hotes || {});
+    for (const [h, n] of Object.entries(patch.hotes || {})) if (Object.keys(hotes).length < 40 || hotes[h] != null) hotes[h] = Math.max(Number(hotes[h]) || 0, Number(n) || 0);
+    const schemas = Object.assign({}, cur.schemas || {});
+    for (const [e, cles] of Object.entries(patch.schemas || {})) {
+      if (!Array.isArray(cles)) continue;
+      if (!schemas[e] && Object.keys(schemas).length >= 60) continue;
+      if (!schemas[e] || (schemas[e].cles || []).length < cles.length) schemas[e] = { cles: cles.slice(0, 200), at: new Date().toISOString() };
+    }
+    const now = new Date().toISOString();
+    const data = Object.assign({}, cur, {
+      nChemins: chemins.length, nPages: pages.length, nSchemas: Object.keys(schemas).length, nHotes: Object.keys(hotes).length,
+      vuAt: now, ver: EXT_VERSION, nextData: !!(patch.nextData || cur.nextData), nextFlux: !!(patch.nextFlux || cur.nextFlux),
+      chemins, pages, hotes, schemas,
+    });
+    const ok = await supabaseUpsert('app_data', [{ id: 'vc_recon', data }], 'id');
+    noterFlux('vestiaire', ok !== false);
+    if (ok !== false) {
+      for (const k of nouveaux) connu[k] = 1;
+      const cles = Object.keys(connu); if (cles.length > 900) for (const k of cles.slice(0, cles.length - 900)) delete connu[k];
+      try { await chrome.storage.local.set({ vrmVcConnu: connu }); } catch (_) {}
+    }
+  } catch (_) {}
+}
 async function storeLbcMessages(patch) {
   try {
     const rows = await sbGet('app_data?id=eq.lbc_messages&select=data');

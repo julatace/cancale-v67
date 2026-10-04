@@ -36,7 +36,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.153.0';
+const EXT_ATTENDUE = '5.154.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -159,7 +159,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 //   releve  `capterReleves`       5.52.0  (5 sept.)   le relevé daté du porte-monnaie
 // `audit-coherence.cjs` vérifie que ces trois fonctions existent toujours dans
 // l'extension : une capacité annoncée mais retirée serait le même mensonge.
-const EXT_CAPACITES = { codes: '5.45.0', offres: '5.38.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', repond: '5.77.0', commande: '5.129.0', offresapp: '5.130.0', publication: '5.130.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0' };
+const EXT_CAPACITES = { codes: '5.45.0', offres: '5.38.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', repond: '5.77.0', commande: '5.129.0', offresapp: '5.130.0', publication: '5.130.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -8785,6 +8785,43 @@ function EbayAchats() {
     </div>
   );
 }
+// ── VESTIAIRE : OÙ EN EST LA MESURE DU SITE (4 octobre, extension 5.154) ─────
+// On ne chiffre AUCUNE vente Vestiaire tant que la mesure n'a pas montré où vit
+// une vente, son montant net et sa date. En attendant, l'écran dit où en est la
+// mesure et quel geste la fait avancer — lu sur les SCALAIRES de `vc_recon`
+// (colonne meta, §4.4 : jamais la ligne entière).
+// Trois états, jamais deux : `undefined` en cours · `null` pas su · objet lu
+// (`{}` = jamais relevé).
+function VestiaireMesure() {
+  const [m, setM] = useState(undefined);
+  useEffect(() => { let stop = false; (async () => {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_recon&select=vuAt:meta->>vuAt,ver:meta->>ver,nChemins:meta->>nChemins,nPages:meta->>nPages,nSchemas:meta->>nSchemas`, { headers: sbAuth() });
+      if (!r.ok) { if (!stop) setM(null); return; }
+      const j = await r.json();
+      if (!stop) setM(Array.isArray(j) ? (j[0] || {}) : null);
+    } catch (_) { if (!stop) setM(null); }
+  })(); return () => { stop = true; }; }, []);
+  const cap = extSait('vestiaire');
+  if (m === undefined) return null;
+  const vu = m && m.vuAt ? Date.parse(m.vuAt) : 0;
+  const age = vu ? (() => { const h = Math.round((Date.now() - vu) / 3600000); return h < 1 ? "il y a moins d'une heure" : h < 24 ? `il y a ${h} h` : `il y a ${Math.round(h / 24)} j`; })() : '';
+  const style = { marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.border}`, fontSize: 12.5, color: C.muted, lineHeight: 1.55 };
+  if (m === null) return <div data-vc-mesure="pas-su" style={style}>Je n'ai pas pu lire où en est la mesure de Vestiaire — rien n'est perdu, réessaie dans un moment.</div>;
+  if (vu) return (
+    <div data-vc-mesure="lu" style={style}>
+      <b style={{ color: C.text }}>VRM apprend à lire Vestiaire.</b> Dernier relevé {age} : {Number(m.nPages) || 0} page{Number(m.nPages) > 1 ? 's' : ''}, {Number(m.nChemins) || 0} appel{Number(m.nChemins) > 1 ? 's' : ''}, {Number(m.nSchemas) || 0} forme{Number(m.nSchemas) > 1 ? 's' : ''} de réponse relevés — la forme des pages, jamais leur contenu. Passe sur <b>tes ventes</b>, <b>tes articles</b> et <b>tes paiements</b> pour compléter la carte.
+    </div>
+  );
+  return (
+    <div data-vc-mesure="jamais" style={style}>
+      {cap === 'ok' ? <>Pour que VRM apprenne à le lire : ouvre <b>Vestiaire Collective</b> dans ce Chrome, connecté à ton compte vendeur, et passe sur tes ventes, tes articles et tes paiements. L'extension relève la <b>forme</b> des pages — jamais leur contenu.</>
+        : cap === 'retard' ? <>Pour que VRM apprenne à lire Vestiaire, l'extension doit passer en <b>{EXT_CAPACITES.vestiaire}</b> : celle installée ne sait pas encore l'observer. Mets-la à jour depuis <b>Réglages</b>.</>
+        : <>C'est l'extension, dans le Chrome de ton ordinateur, qui apprendra à lire Vestiaire quand tu y passes.</>}
+    </div>
+  );
+}
+
 function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, ebayCa = null, comptes = [], onGo, onSub, baseKO }) {
   const p = caParPlateforme(liveStats, lbcVentes, ebayCa).find(x => x.nom === plat) || { nom:plat, ca:null };
   // Les cartes du hub ouvrent une SECTION dans l'onglet (onSub) si l'appelant le
@@ -8876,7 +8913,7 @@ function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, ebay
         <Card style={{padding:16}}>
           <div style={{fontSize:13.5,color:C.text,lineHeight:1.55}}>
             {plat==='Vestiaire Collective'
-              ? <>Vestiaire Collective n'est <b>pas encore reliée</b> à VRM : rien n'y est capté aujourd'hui. Le jour où une vente y remontera, elle apparaîtra ici et dans le total — jamais un chiffre inventé avant.</>
+              ? <>Vestiaire Collective n'est <b>pas encore reliée</b> à VRM : rien n'y est capté aujourd'hui. Le jour où une vente y remontera, elle apparaîtra ici et dans le total — jamais un chiffre inventé avant.<VestiaireMesure/></>
               : plat==='Leboncoin'
               ? <>Ce que VRM sait de Leboncoin passe par l'extension (elle tourne sur leboncoin.fr). Prépare tes annonces depuis <b>À publier</b> ; une vente n'est comptée que si la <b>référence VRM</b> de l'annonce la relie à une paire — jamais par ressemblance de titre. Rien n'est inventé tant qu'il n'y a pas de donnée.</>
               : <>Aucune vente n'a encore été captée sur {court}. Tu prépares tes paires depuis l'écran <b>Annonces</b> (coche « aussi sur {court} ») ; dès qu'une vente y sera reconnue, son chiffre s'ajoutera ici et au total. Rien n'est inventé tant qu'il n'y a pas de donnée.</>}

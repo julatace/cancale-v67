@@ -133,7 +133,8 @@
 
     const nomSite = NOM_SITE[e.plateforme] || 'ce site';
     let compteSite;
-    if (!e.capte) compteSite = `<div class="val gris">VRM ne capte pas encore ${esc(nomSite)}.</div>`;
+    if (!e.capte && !e.mesure) compteSite = `<div class="val gris">VRM ne capte pas encore ${esc(nomSite)}.</div>`;
+    else if (!e.capte) compteSite = '<div class="val gris">pas encore reconnu</div>';
     else if (e.site && e.site.nom) compteSite = `<div class="val">${esc(e.site.nom)}${e.site.type === 'pro' ? ' · pro' : ''}</div>`;
     else if (e.site && e.site.id) compteSite = `<div class="val">compte n° ${esc(e.site.id)}</div>`;
     else if (e.plateforme === 'vinted') compteSite = '<div class="val gris">aucun compte Vinted connecté dans ce navigateur</div>';
@@ -161,6 +162,7 @@
       <div class="ligne"><div class="lib">Compte VRM utilisé</div>${compteVrm}</div>
       <div class="ligne"><div class="lib">Compte ${esc(nomSite)}</div>${compteSite}</div>
       ${e.capte ? `<div class="ligne"><div class="lib">Tes données</div>${flux}</div>` : ''}
+      ${e.mesure ? `<div class="ligne"><div class="lib">Mesure</div><div class="val gris">VRM apprend à lire ${esc(nomSite)} : il relève la forme des pages, jamais leur contenu. Aucune vente ni annonce n'est encore captée.</div>${(() => { const f = e.flux || {}; return f.koAt && (!f.okAt || f.koAt > f.okAt) ? `<div class="val alerte">Dernier relevé refusé ${esc(depuis(f.koAt))}</div>` : f.okAt ? `<div class="val gris">Relevé envoyé ${esc(depuis(f.okAt))}</div>` : ''; })()}</div>` : ''}
       ${bascule}
       <div class="pied">${pied}</div>`;
   }

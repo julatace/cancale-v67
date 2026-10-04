@@ -159,6 +159,12 @@ const CAS = [
     quoi: 'les non-lus Leboncoin des autres comptes',
     geste: (c) => c.storeLbcMessages({ compteur: { userId: 'u2', unread: 5 } }),
     garde: (d) => d.compteurs && d.compteurs.u1 && d.compteurs.u1.unread === 3 && d.compteurs.u2 && d.compteurs.u2.unread === 5 && d.comptes && d.comptes.u1 },
+  // 4 octobre (5.154) : la mesure de Vestiaire — des semaines de visites. Une
+  // lecture ratée ne doit pas la remplacer par le seul relevé du moment.
+  { id: 'vc_recon', avant: { chemins: ['GET fr.vestiairecollective.com/api/a → 200 [json]'], pages: ['/'], hotes: { 'x.test': 1 }, schemas: { 'fr.vestiairecollective.com/api/a': { cles: ['a:string'] } } },
+    quoi: 'la carte de Vestiaire déjà relevée',
+    geste: (c) => c.storeVcRecon({ chemins: ['GET fr.vestiairecollective.com/api/b → 200 [json]'], pages: ['/ventes'], hotes: {}, schemas: {} }),
+    garde: (d) => (d.chemins || []).length === 2 && (d.pages || []).includes('/') && d.schemas && d.schemas['fr.vestiairecollective.com/api/a'] && d.hotes && d.hotes['x.test'] === 1 },
 ];
 
 (async () => {
