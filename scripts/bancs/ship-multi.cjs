@@ -30,32 +30,40 @@ const V = {
 
 const lus = [];            // toutes les URL GET vues
 const ecrits = [];         // { id, owner } de chaque POST
+const pushes = [];         // les envois vers un appareil (endpoint)
+let enVol = 0, maxEnVol = 0;
 
-function poserFetch() {
-  lus.length = 0; ecrits.length = 0;
+// sonde : 200 (cloisonnée) · 503 (base qui hoquette) ; mainKO : vendeurs dont la
+// ligne main ne répond pas ; vendeurs : la liste énumérée.
+function poserFetch({ sonde = 200, mainKO = new Set(), vendeurs = ['A', 'B'] } = {}) {
+  lus.length = 0; ecrits.length = 0; pushes.length = 0; enVol = 0; maxEnVol = 0;
   global.fetch = async (url, opts = {}) => {
     const u = String(url);
     const J = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { 'content-type': 'application/json' } });
+    if (/^https:\/\/push\//.test(u)) { pushes.push(u); return new Response('', { status: 201 }); }
     if ((opts.method || 'GET') === 'POST') {
       try { JSON.parse(opts.body || '[]').forEach(r => ecrits.push({ id: r.id, owner: r.owner || null })); } catch (_) {}
       return new Response('', { status: 201 });
     }
     lus.push(u);
     // Sonde de cloisonnement (ship-reminders ET push.js) : la colonne existe.
-    if (/select=owner&limit=1/.test(u)) return J([{ owner: 'A' }]);
+    if (/select=owner&limit=1/.test(u)) return sonde === 200 ? J([{ owner: 'A' }]) : new Response('<html>503</html>', { status: sonde });
     // Énumération des vendeurs : un `main` par vendeur, sans filtre owner.
-    if (/id=eq\.main/.test(u) && /select=owner/.test(u) && !/owner=eq\./.test(u)) return J([{ owner: 'A' }, { owner: 'B' }]);
+    if (/id=eq\.main/.test(u) && /select=owner/.test(u) && !/owner=eq\./.test(u)) return J(vendeurs.map(owner => ({ owner })));
     // À partir d'ici, tout doit être filtré par vendeur.
     const mo = u.match(/owner=eq\.([^&]+)/);
     const o = mo ? decodeURIComponent(mo[1]) : null;
+    if (/id=like\.email_bord_/.test(u)) { enVol++; maxEnVol = Math.max(maxEnVol, enVol); await new Promise(r => setTimeout(r, 10)); enVol--; }
+    if (/id=eq\.main/.test(u) && o && mainKO.has(o)) return new Response('<html>522</html>', { status: 522 });
     if (/id=eq\.main/.test(u)) return J([{ data: {} }]);
     if (/id=eq\.panel_bords_done/.test(u)) return J([{ data: {} }]);
     if (/id=eq\.ship_reminder_dedup/.test(u)) return J([{ data: {} }]);        // pas encore notifié
     if (/id=eq\.urssaf_reminder_dedup/.test(u)) return J([{ data: {} }]);
     if (/id=eq\.push_prefs/.test(u)) return J([{ data: { expedier: true } }]);
-    if (/id=eq\.push_subs/.test(u)) return J([{ data: { subs: (o && V[o]) ? V[o].subs : [] } }]);
-    if (/id=like\.email_bord_/.test(u)) return J((o && V[o]) ? [V[o].bord] : []);
-    if (/orders_sold/.test(u)) return J((o && V[o]) ? [{ txns: V[o].txns }] : []);
+    const v = o && (V[o] || (/^V\d+$/.test(o) ? { subs: [{ endpoint: 'https://push/' + o }], bord: { dateLimite: limiteAuj, transaction: 'TX' + o }, txns: ['TX' + o] } : null));
+    if (/id=eq\.push_subs/.test(u)) return J([{ data: { subs: v ? v.subs : [] } }]);
+    if (/id=like\.email_bord_/.test(u)) return J(v ? [v.bord] : []);
+    if (/orders_sold/.test(u)) return J(v ? [{ txns: v.txns }] : []);
     return J([]);
   };
 }
@@ -94,6 +102,38 @@ function poserFetch() {
   // 5. Le bilan nomme deux vendeurs.
   dit(res.corps && res.corps.vendeurs === 2,
     'la réponse rend un bilan par vendeur', 'vendeurs=' + (res.corps && res.corps.vendeurs));
+
+  const lancer = async () => { const r = { code: null, corps: null, status(n) { this.code = n; return this; }, json(o) { this.corps = o; return this; }, setHeader() {}, end() { return this; } }; await mod.default({ method: 'GET', headers: {}, query: {} }, r); return r; };
+  // Sans clé VAPID le banc n'envoie rien pour de vrai : ce qui prouve qu'un
+  // vendeur a été NOTIFIÉ est son mémo du jour (écrit après l'envoi) et la
+  // lecture de SES appareils. Indépendant de la date (le rappel URSSAF du 1er
+  // lit aussi les appareils, pas le mémo d'expédition).
+  const notifie = (o) => ecrits.filter(e => e.id === 'ship_reminder_dedup' && e.owner === o).length;
+
+  // 6. La sonde hoquette : PAS de passe globale (les vendeurs mélangés).
+  poserFetch({ sonde: 503 });
+  const r6 = await lancer();
+  const global6 = lus.some(u => /id=like\.email_bord_/.test(u) && !/owner=eq\./.test(u));
+  dit(!global6 && !ecrits.some(e => e.id === 'ship_reminder_dedup') && r6.code >= 500,
+    'sonde de cloisonnement en panne ⇒ ni passe globale, ni notification, et l\'échec est visible',
+    `code=${r6.code} global=${global6}`);
+
+  // 7. La ligne main de A ne répond pas : A se tait (ses colis « postés » sont
+  //    dedans), B reçoit quand même le sien.
+  poserFetch({ mainKO: new Set(['A']) });
+  await lancer();
+  dit(notifie('A') === 0, 'réglages de A illisibles ⇒ A ne reçoit PAS un compte gonflé', `mémo A=${notifie('A')}`);
+  dit(notifie('B') === 1, '… et B reçoit le sien quand même', `mémo B=${notifie('B')}`);
+
+  // 8. À l'échelle : 24 vendeurs, traités en parallèle borné, aucun oublié.
+  const vingt = Array.from({ length: 24 }, (_, i) => 'V' + i);
+  poserFetch({ vendeurs: vingt });
+  const r8 = await lancer();
+  const servis = new Set(lus.filter(u => /id=like\.email_bord_/.test(u)).map(u => (u.match(/owner=eq\.([^&]+)/) || [])[1]));
+  dit(r8.corps && r8.corps.vendeurs === 24 && servis.size === 24, '24 vendeurs : tous traités', `servis=${servis.size}`);
+  dit(maxEnVol > 1 && maxEnVol <= 8, 'en parallèle, mais borné (8 au plus)', `max=${maxEnVol}`);
+  const subs8 = new Set(lus.filter(u => /id=eq\.push_subs/.test(u)).map(u => (u.match(/owner=eq\.([^&]+)/) || [])[1]));
+  dit(vingt.every(o => notifie(o) === 1) && vingt.every(o => subs8.has(o)), 'chacun reçoit exactement SON rappel, une fois, sur SES appareils', `${ecrits.filter(e => e.id === 'ship_reminder_dedup').length} mémos`);
 
   console.log(ko ? `\n${ko} contrôle(s) en échec` : '\nTous les contrôles passent — chaque vendeur a son rappel, ses appareils, son mémo.');
   process.exit(ko ? 1 : 0);
