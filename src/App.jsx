@@ -1470,7 +1470,12 @@ const ROW_TTL_MS = 60 * 1000;
 const cachedRow = (cle, chercher) => {
   const e = _rowCache.get(cle);
   if (e && (Date.now() - e.at) < ROW_TTL_MS) return e.promesse;
-  const promesse = chercher().catch(err => { _rowCache.delete(cle); throw err; });
+  // ⚠️ Un « pas su » (`null`/`undefined` : la base n'a pas répondu) ne se garde
+  //    PAS 60 s en cache comme une vraie réponse : la lecture suivante réessaie.
+  //    Seul un rejet était retiré ; un échec qui RÉSOUT en `null` restait figé.
+  const promesse = chercher()
+    .then(v => { if (v == null && _rowCache.get(cle) && _rowCache.get(cle).promesse === promesse) _rowCache.delete(cle); return v; })
+    .catch(err => { _rowCache.delete(cle); throw err; });
   _rowCache.set(cle, { at: Date.now(), promesse });
   return promesse;
 };
@@ -1591,14 +1596,19 @@ const fetchEmailBordereaux = async () => {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_bord_*&select=id,${champs}`, {
       headers: sbAuth(),
     });
-    if (!res.ok) return [];
+    // ⚠️ « RIEN LU » NE VAUT PAS « AUCUN BORDEREAU » (4 octobre). Rendue `[]`,
+    //    une lecture ratée mettait TOUTES les ventes en « En attente de leur
+    //    bordereau » sur Colis, avec le bouton « Générer » — alors que leurs PDF
+    //    étaient en base. `null` = pas su : l'écran le dit et réessaie.
+    if (!res.ok) return null;
     const rows = await res.json();
+    if (!Array.isArray(rows)) return null;
     // `filename` est présent exactement quand un PDF l'est (vérifié : 50/50,
     // aucun écart) — il sert donc de témoin sans télécharger le PDF.
     return rows.filter(r => r && r.filename && r.filename !== 'None')
       .map(r => ({ ...r, _row: r.id, hasPdf: true }))
       .sort((a, b) => new Date(b.receivedAt || 0) - new Date(a.receivedAt || 0));
-  } catch (_) { return []; }
+  } catch (_) { return null; }
 };
 // Le PDF d'UN bordereau, à la demande (impression / tamponnage).
 const fetchBordPdf = async (rowId) => {
@@ -1766,11 +1776,12 @@ const fetchEmailTrackingBrut = async () => {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_track_*&select=id,data`, {
       headers: sbAuth(),
     });
-    if (!res.ok) return [];
+    if (!res.ok) return null;                    // pas su ≠ aucun suivi (voir fetchEmailBordereaux)
     const rows = await res.json();
+    if (!Array.isArray(rows)) return null;
     return rows.map(r => reclassifyTrack(r.data)).filter(Boolean)
       .sort((a, b) => new Date(b.receivedAt || 0) - new Date(a.receivedAt || 0));
-  } catch (_) { return []; }
+  } catch (_) { return null; }
 };
 const fetchEmailTracking = async (opts = {}) => {
   if (opts.force) _rowCache.delete('email_track');
@@ -2396,7 +2407,11 @@ const fetchHarvestOrders = async (uid, side, opts = {}) => {
   // le même aller-retour au lieu d'en faire deux.
   if (opts.force) _rowCache.delete(`o:${uid}`);
   const rows = await cachedRow(`o:${uid}`, () => fetchHarvestOrdersBrut(uid));
-  if (!rows) return null;
+  // ⚠️ `undefined` = la base n'a PAS répondu ; `null` (plus bas) = la ligne
+  //    n'existe pas. Les confondre envoyait un compte en panne de LECTURE
+  //    interroger Vinted par le relais du serveur (jusqu'à 12 pages, jetons
+  //    envoyés depuis l'IP de Vercel) — ce que `fetchVintedOrders` dit éviter.
+  if (!rows) return undefined;
   const wantSold = /sold|sell/i.test(String(side || ''));
   // ⚠️ On lit UNIQUEMENT la clé canonique `orders_sold` ou `orders_purchased`
   // — JAMAIS `orders_bought`. Vérifié en base : l'extension crée parfois une
@@ -2476,9 +2491,10 @@ const fetchCapturedLabelMetas = async (uid) => {
     //    C'est LA voie sans déduction pour savoir quelle paire part dans ce carton.
     //    Scalaires uniquement : les octets du PDF ne partent qu'à l'impression (§34).
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_${uid}_label_%25&select=id,tx:meta->>tx,item:meta->>item,capturedAt:meta->>capturedAt`, { headers: sbAuth() });
-    if (!res.ok) return [];
-    return await res.json();
-  } catch (_) { return []; }
+    if (!res.ok) return null;                    // pas su ≠ aucun bordereau capté
+    const rows = await res.json();
+    return Array.isArray(rows) ? rows : null;
+  } catch (_) { return null; }
 };
 // ── IDENTITÉ CERTAINE D'UNE VENTE : transaction → item_id ───────────────────
 // Une commande moissonnée ne porte PAS l'identifiant de l'annonce (mesuré sur
@@ -3138,6 +3154,9 @@ const fetchVintedOrders = async (account, type, page = 1, statusFilter = 'comple
     // « sold » ou « purchased ». Mesuré : la ligne générique est vide de toute
     // façon, ce repli ne rapportait rien et ne pouvait que tromper.
     const h = await fetchHarvestOrders(account.vinted_user_id, type);
+    // Lecture de NOTRE base en échec : c'est un échec, pas un compte jamais
+    // moissonné — on ne part surtout pas interroger Vinted pour autant.
+    if (h === undefined) return { ok: false, error: 'lecture', items: [], pagination: null, source: 'harvest-ko' };
     // ⚠️ Une moisson VIDE n'est pas une réponse. Une liste vide veut dire « la
     // page n'a pas encore été ouverte / la session a expiré », pas « aucune
     // vente ». En la prenant pour argent comptant, l'onglet Ventes affichait
@@ -16474,6 +16493,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     setCloudReady(true);
   }), []);
   const [emailBords, setEmailBords] = useState(null); // bordereaux reçus par email (pipeline usevrm)
+  const [emailBordsKO, setEmailBordsKO] = useState(false); // la lecture a échoué : « pas su », jamais « aucun »
+  // Une lecture ratée se RETENTE toute seule (20 s), tant qu'elle n'a pas réussi.
+  useEffect(() => {
+    if (!emailBordsKO || emailBords !== null) return;
+    const t = setTimeout(() => { fetchEmailBordereaux().then(v => { if (v) { setEmailBords(v); setEmailBordsKO(false); } }); }, 20000);
+    return () => clearTimeout(t);
+  }, [emailBordsKO, emailBords]);
   // ⚠️ LES N° DE SUIVI DE SES PROPRES BORDEREAUX = ses colis SORTANTS.
   // Preuve certaine (le n° de suivi est une identité, §24), et gratuite :
   // `fetchEmailBordereaux` projette déjà le champ `suivi` (§23).
@@ -16526,13 +16552,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     setLabelsCaptes((prev) => {
       const idx = seulUid ? { ...prev } : {};
       cibles.forEach((a, i) => {
-        for (const meta of (metas[i] || [])) {
+        // Compte non lu (`null`) : on garde ce qu'on savait de lui, on n'efface rien.
+        if (metas[i] == null) { for (const [k, v] of Object.entries(prev || {})) if (v && String(v.uid) === String(a.vinted_user_id)) idx[k] = v; return; }
+        for (const meta of metas[i]) {
           if (meta && meta.tx) idx[String(meta.tx)] = { uid: a.vinted_user_id, acc: a, row: meta.id, capturedAt: meta.capturedAt || null, item: meta.item || '' };
         }
       });
       return idx;
     });
-    setLabelsPrets(true);
+    // ⚠️ « Lu » seulement si TOUT a été lu : sinon « N prêts à imprimer » serait
+    //    un minorant présenté comme un total exact (et publié à Ma journée).
+    if (metas.every((m) => Array.isArray(m))) setLabelsPrets(true);
   }, [accounts]);
   // L'extension prévient : un bordereau vient d'être rangé → on relit CE compte.
   useEffect(() => {
@@ -17343,19 +17373,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // par n° de TRANSACTION : une identité, jamais un rapprochement par titre.
   // ⚠️ Une seule ligne lue, quelques Ko (§34).
   const [colisRelais, setColisRelais] = useState({});
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_colis_relais&select=data`, { headers: sbAuth() });
-        if (!res.ok) return;
-        const rows = await res.json();
-        const data = (rows && rows[0] && rows[0].data) || {};
-        if (alive && Object.keys(data).length) setColisRelais(data);
-      } catch (_) { /* réseau : on affiche simplement sans le lieu ni le code */ }
-    })();
-    return () => { alive = false; };
-  }, []);
+  // Lue au montage, et RELUE quand l'extension prévient qu'un code vient d'être
+  // lu dans une conversation (`maj retrait`, 5.155) — avant, elle n'était lue
+  // qu'une fois : un code arrivé pendant qu'il regardait l'écran n'apparaissait
+  // qu'après avoir rechargé l'app. Une lecture ratée ne vide rien.
+  const relireColisRelais = async () => {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_colis_relais&select=data`, { headers: sbAuth() });
+      if (!res.ok) return;
+      const rows = await res.json();
+      const data = (rows && rows[0] && rows[0].data) || {};
+      if (Object.keys(data).length) setColisRelais(data);
+    } catch (_) { /* réseau : on affiche simplement sans le lieu ni le code */ }
+  };
+  useEffect(() => { relireColisRelais(); /* eslint-disable-next-line */ }, []);
   // Le retrait connu pour CETTE commande — par transaction uniquement.
   const relaisDe = (o) => { const k = String((o && o.transaction_id) || ''); return (k && colisRelais[k]) || null; };
   // ── LA PORTE VERS LE CODE DE RETRAIT ──────────────────────────────────────
@@ -19127,10 +19158,24 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const fromCache = (key) => { const c=_acctCache[key]; return (c && Date.now()-c.ts<_CACHE_TTL) ? c.items : null; };
   const putCache = (key, items) => { _acctCache[key] = { ts:Date.now(), items }; _persistAcctCache(); };
 
-  const loadOrders = async (type, setter, force) => {
+  // ── RELIRE SANS FAIRE CLIGNOTER (4 octobre) ──────────────────────────────
+  // Chaque signal de l'extension (« ventes rangées », toutes les 90 s quand il
+  // navigue) remettait la liste à `items:null` : Ventes et Colis affichaient un
+  // squelette, la liste disparaissait et le défilement sautait. `silencieux` :
+  // on garde ce qui est affiché pendant la relecture, et un échec ne remplace
+  // rien (« rien lu » ne vaut pas « rien »). Le squelette reste pour le PREMIER
+  // chargement. Et un numéro de lecture : deux lectures qui se croisent, seule
+  // la plus RÉCENTE écrit — l'ancienne ne peut plus écraser la nouvelle.
+  const lectureOrders = React.useRef({ sold: 0, purchased: 0 });
+  const ventesPerimees = React.useRef(false);       // un signal « ventes » reçu hors des écrans qui les montrent
+  const vusSonde = React.useRef({});                // horodatages vus par la sonde de 60 s (survit au changement d'écran)
+  const buysCharges = React.useRef(false);          // les achats sont-ils déjà affichés quelque part ?
+  const loadOrders = async (type, setter, force, opts) => {
+    const silencieux = !!(opts && opts.silencieux);
+    const n = (lectureOrders.current[type] = (lectureOrders.current[type] || 0) + 1);
     const cached = !force && fromCache(type);
     if (cached) { setter({ loading:false, items:cached }); return; }
-    setter({ loading:true, items:null, error:false });
+    if (!silencieux) setter({ loading:true, items:null, error:false });
     // PARALLÈLE : on interroge tous les comptes en même temps (avant : un par un
     // en série → très lent avec 9 comptes). La lecture se fait d'abord sur la
     // moisson Supabase, donc paralléliser est sûr et bien plus rapide.
@@ -19173,10 +19218,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     out.sort((a,b) => new Date(b.date||0) - new Date(a.date||0));
     // Erreur seulement si RIEN n'a pu être chargé et qu'au moins un appel a échoué.
     const error = out.length===0 && anyErr && !anyOk;
+    if (n !== lectureOrders.current[type]) return;          // une lecture plus récente est partie après celle-ci
     if (!error) putCache(type, out);
+    if (silencieux && (error || anyErr)) {
+      // Relecture discrète ratée (tout ou partie) : on garde l'affichage — une
+      // vente déjà vue ne disparaît pas parce qu'un compte n'a pas répondu.
+      setter(prev => (prev && Array.isArray(prev.items)) ? { ...prev, loading:false, failed } : { loading:false, items: out, error, failed });
+      return;
+    }
     setter({ loading:false, items: out, error, failed });
   };
   useEffect(() => { if (accounts.length) loadOrders('sold', setSales); /* eslint-disable-next-line */ }, [accounts.length]);
+  useEffect(() => { buysCharges.current = Array.isArray(buys.items); }, [buys.items]);
   useEffect(() => { if ((curSub==='achats'||curSub==='journee') && accounts.length && buys.items===null) loadOrders('purchased', setBuys); /* eslint-disable-next-line */ }, [sub, accounts.length]);
 
   // AUTO-LOCK : dès qu'une vente finalisée correspond à UNE SEULE annonce
@@ -19362,7 +19415,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   useEffect(() => { if ((curSub==='annonces'||curSub==='journee'||curSub==='bordereaux') && accounts.length && listings.items===null) loadListings(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
   useEffect(() => { if ((curSub==='annonces'||curSub==='journee') && emailSales===null) fetchEmailSales().then(setEmailSales); /* eslint-disable-next-line */ }, [sub]);
   useEffect(() => { if ((curSub==='messages'||curSub==='journee') && accounts.length && convs.items===null) loadConvs(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
-  useEffect(() => { if ((curSub==='bordereaux'||curSub==='annonces'||curSub==='ventes'||curSub==='journee'||curSub==='achats') && emailBords===null) fetchEmailBordereaux().then(setEmailBords); /* eslint-disable-next-line */ }, [sub]);
+  useEffect(() => { if ((curSub==='bordereaux'||curSub==='annonces'||curSub==='ventes'||curSub==='journee'||curSub==='achats') && emailBords===null) fetchEmailBordereaux().then(v => { if (v) { setEmailBords(v); setEmailBordsKO(false); } else setEmailBordsKO(true); }); /* eslint-disable-next-line */ }, [sub]);
   // Détecte un bordereau PDF capté par l'extension (téléchargé sur Vinted) et
   // encore frais (< 60 min) → on affiche un bandeau « tamponner en 1 clic ».
   useEffect(() => { (async () => {
@@ -19421,7 +19474,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // un numéro n'est jamais repris (§5.40) l'erreur est définitive.
   const [txnPret, setTxnPret] = useState(false);
   useEffect(() => { let mort = false; fetchTxnItemIds().then(m => { if (mort) return; if (m && Object.keys(m).length) setTxnItem(m); setTxnPret(true); }).catch(() => { if (!mort) setTxnPret(true); }); return () => { mort = true; }; }, []);
-  useEffect(() => { if ((curSub==='bordereaux'||curSub==='achats') && tracking===null) fetchEmailTracking().then(setTracking); /* eslint-disable-next-line */ }, [sub]);
+  useEffect(() => { if ((curSub==='bordereaux'||curSub==='achats') && tracking===null) fetchEmailTracking().then(t => { if (t) setTracking(t); }); /* eslint-disable-next-line */ }, [sub]);
   // RATTRAPAGE AUTOMATIQUE (voir le commentaire au-dessus de `SUJET_COLIS`).
   // Aucun bouton : on répare, on montre l'avancement, et les colis apparaissent
   // au fur et à mesure. `silencieux` coupe les notifications — on rattrape de
@@ -19464,9 +19517,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if (ratesDeSuite >= 8) break;
         // Dès que les colis sont passés, on rafraîchit : le QR et le code
         // apparaissent sans attendre la fin du reste.
-        if (i + 1 === nColis || (i + 1) % 40 === 0) { try { const t = await fetchEmailTracking({ force: true }); if (!mort) setTracking(t); } catch (_) {} }
+        if (i + 1 === nColis || (i + 1) % 40 === 0) { try { const t = await fetchEmailTracking({ force: true }); if (!mort && t) setTracking(t); } catch (_) {} }
       }
-      if (!mort) { try { const t = await fetchEmailTracking({ force: true }); if (!mort) setTracking(t); } catch (_) {} }
+      if (!mort) { try { const t = await fetchEmailTracking({ force: true }); if (!mort && t) setTracking(t); } catch (_) {} }
     })();
     return () => { mort = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -19532,8 +19585,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       hiddenAt = 0;
       viderCacheLignes();                                          // vide le cache de lignes (relit la moisson fraîche)
       try { Object.keys(_acctCache).forEach(k => delete _acctCache[k]); _persistAcctCache(); } catch (_) {}
-      if (curSub === 'ventes' || curSub === 'journee') loadOrders('sold', setSales);
-      if (curSub === 'achats' || curSub === 'journee') { loadOrders('purchased', setBuys); fetchEmailTracking().then(setTracking); }
+      if (curSub === 'ventes' || curSub === 'journee') loadOrders('sold', setSales, false, { silencieux: true });
+      if (curSub === 'achats' || curSub === 'journee') { loadOrders('purchased', setBuys, false, { silencieux: true }); fetchEmailTracking().then(t => { if (t) setTracking(t); }); }
       if (curSub === 'annonces' || curSub === 'journee') loadListings();
       if (curSub === 'messages' || curSub === 'journee') loadConvs();
     };
@@ -19556,16 +19609,33 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const ecrans = ['ventes', 'journee', 'bordereaux'];
     let derniere = 0;
     const relire = (uid) => {
-      if (!ecrans.includes(curSub)) return;
-      if (Date.now() - derniere < 4000) return;      // deux signaux rapprochés = une relecture
-      derniere = Date.now();
       if (uid) _rowCache.delete(`o:${uid}`); else viderCacheLignes();
       try { delete _acctCache.sold; _persistAcctCache(); } catch (_) {}
-      loadOrders('sold', setSales);
+      // ⚠️ Hors de ces écrans, le signal était JETÉ : revenir sur Colis montrait
+      //    l'ancien état jusqu'au cycle suivant. On le retient, et l'entrée sur
+      //    un écran qui en dépend relit (plus bas).
+      if (!ecrans.includes(curSub)) { ventesPerimees.current = true; return; }
+      if (Date.now() - derniere < 4000) return;      // deux signaux rapprochés = une relecture
+      derniere = Date.now();
+      ventesPerimees.current = false;
+      loadOrders('sold', setSales, false, { silencieux: true });
     };
-    const ecoute = (e) => { const ev = e && e.detail; if (ev && ev.type === 'maj' && ev.quoi === 'ventes') relire(ev.uid); };
+    const ecoute = (e) => {
+      const ev = e && e.detail; if (!ev || ev.type !== 'maj') return;
+      if (ev.quoi === 'ventes') relire(ev.uid);
+      // Achats rangés par l'extension (5.155) : on relit les achats s'ils sont
+      // déjà affichés quelque part — sans squelette, sans perdre l'écran.
+      else if (ev.quoi === 'achats') {
+        if (ev.uid) _rowCache.delete(`o:${ev.uid}`); else viderCacheLignes();
+        try { delete _acctCache.purchased; _persistAcctCache(); } catch (_) {}
+        if (buysCharges.current) loadOrders('purchased', setBuys, false, { silencieux: true });
+      }
+      // Un code de retrait lu dans une conversation (5.155) : on relit la ligne.
+      else if (ev.quoi === 'retrait') relireColisRelais();
+    };
     window.addEventListener('vrm:ext', ecoute);
-    const vus = {};
+    if (ecrans.includes(curSub) && ventesPerimees.current) relire();
+    const vus = vusSonde.current;
     const sonde = async () => {
       if (document.hidden || !ecrans.includes(curSub)) return;
       try {
@@ -24474,6 +24544,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {/* RÉCAP EN HAUT : combien de COLIS restent à envoyer. On compte ce que
             Vinted attend de toi (moisson de l'extension), pas les emails reçus :
             un email peut manquer, une vente à expédier ne ment pas. */}
+        {/* ⚠️ « Pas su » se DIT : sans cette ligne, une lecture ratée des emails
+            rangeait chaque colis en « en attente de bordereau » avec le bouton
+            « Générer », alors que son PDF était en base (§4.1 retourné). */}
+        {emailBordsKO && emailBords===null && <div data-bords-ko style={{marginBottom:10}}><LignePanne>Les bordereaux reçus par email n'ont pas pu être lus pour l'instant — rien n'est perdu. Un colis « en attente de bordereau » ci-dessous a peut-être déjà le sien : l'écran réessaie tout seul.</LignePanne></div>}
         {(()=>{
           if (sales.loading && emailBords===null) return <div style={{fontSize:12,color:C.muted,marginBottom:10}}>Chargement des colis à envoyer…</div>;
           const ex = expeditions();
@@ -24492,7 +24566,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </div>
                   <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.45}}>
                     {aPoster.length>0
-                      ? `${avecPdf.length} bordereau${avecPdf.length>1?'x':''} prêt${avecPdf.length>1?'s':''} à imprimer${aPoster.length-avecPdf.length>0?` · ${aPoster.length-avecPdf.length} en attente de bordereau`:''}${proNb>0?` · ${proNb} avec facture (pro)`:''}`
+                      ? `${avecPdf.length} bordereau${avecPdf.length>1?'x':''} prêt${avecPdf.length>1?'s':''} à imprimer${aPoster.length-avecPdf.length>0 && !(emailBordsKO && emailBords===null)?` · ${aPoster.length-avecPdf.length} en attente de bordereau`:''}${proNb>0?` · ${proNb} avec facture (pro)`:''}`
                       : 'Vinted ne te demande aucun envoi en ce moment.'}
                   </div>
                   {/* ⚠️ L'URGENCE EST ÉCRITE ICI QUAND ELLE CONCERNE TOUS LES
