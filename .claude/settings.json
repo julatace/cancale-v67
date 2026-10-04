@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash",
+      "Read",
+      "Edit",
+      "Write",
+      "Glob",
+      "Grep",
+      "WebSearch",
+      "WebFetch",
+      "mcp__github",
+      "mcp__Supabase",
+      "mcp__Vercel",
+      "mcp__claude-code-remote"
+    ],
+    "deny": [
+      "mcp__Vercel__buy_pro",
+      "mcp__Vercel__buy_addon",
+      "mcp__Vercel__buy_credits",
+      "mcp__Vercel__buy_credits_endpoint",
+      "mcp__Vercel__buy_domain",
+      "mcp__Vercel__buy_domains",
+      "mcp__Vercel__buy_single_domain",
+      "mcp__Vercel__delete_project",
+      "mcp__Vercel__pause_project",
+      "mcp__Supabase__create_project",
+      "mcp__Supabase__pause_project",
+      "mcp__Supabase__delete_branch",
+      "mcp__Stripe__stripe_api_write"
+    ]
+  }
+}

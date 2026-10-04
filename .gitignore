@@ -6,6 +6,10 @@ dist/
 # Les compétences du projet sont partagées (design d'Emil Kowalski, MIT) ;
 # le reste de .claude/ (réglages locaux) reste hors du dépôt.
 !.claude/skills/
+# Les permissions du projet (aucune donnée, aucun secret), posées à la demande
+# de Julien (4 octobre) : chaque session accepte d'office les actions courantes.
+# `settings.local.json` reste local.
+!.claude/settings.json
 
 # ⚠️ Les fixtures des bancs : ce sont les VRAIES ventes, les vrais acheteurs,
 # les vraies adresses — et ce dépôt est PUBLIC. Elles ne montent jamais.
