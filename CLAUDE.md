@@ -4151,6 +4151,33 @@ Vinted », avec un lien « scanne ton code de retrait ». L'app n'en montrait ri
   défaut corrigé (un colis jamais montré). À re-regarder au rendu dès qu'un banc
   a des fixtures.
 
+### ⚠️ L'EMAIL VINTED GO ÉTAIT TAGUÉ « autre », PAS « Vinted Go » (4 octobre)
+Julien a envoyé le vrai email Vinted Go (capture). Mesuré en exécutant
+`parseCarrierEmail` + `detecterTransporteur` dessus : le **code (C49341), le suivi
+(VGS…), le lieu (Consigne Vinted Go, Speed Queen - Vannes) et la date limite
+(29/09)** s'extraient bien — mais `detecterTransporteur` rend **`autre`**, pas
+`vinted`. Cause : l'email vient d'un `noreply@vinted.com` **nu** (ni `vintedgo.com`
+ni `shipping@relay`) ; le narrowing `carrierSrc = mail.from` (posé pour ne pas
+classer une VENTE Vinted par son corps) cache « Vinted Go », et l'email retombait
+dans le filet `fromVinted` qui écrit `autre`. Conséquence : ligne
+`email_track_autre_VGS…`, badge « Transporteur » au lieu de « Vinted Go », et pas
+le mode de retrait Vinted Go dans l'app.
+⇒ Dans ce filet (déjà gardé par un **sujet de colis**, `colis && !pasColis`), on
+nomme `vinted` quand le sujet/corps dit « Vinted Go » **ou** porte un suivi `VGS…`.
+Ça ne crée **aucune ligne** (on y était déjà) — ça corrige seulement le
+transporteur, §11 (même carrier des deux côtés, sinon l'app n'affiche pas le bon
+point de retrait). ⚠️ Ça n'ouvre pas la porte aux ventes : le filet exige un
+sujet de colis, et « vente/offre/message/favori/bordereau » restent « pas un
+colis » (vérifié au banc).
+- `audit-transporteurs.cjs` : 2 cas du **vrai** email (`@vinted.com` nu + « Vinted
+  Go » / suivi VGS) → **rouges sur le code d'avant** (`obtenu autre`), verts après ;
+  `serveur.cjs` (la route exécutée) reste vert.
+- Correction **serveur uniquement** (`api/email-inbound.js`) : pas de changement
+  d'extension ni d'app, donc **pas de bump de version ni de zip**. §5 (note stale
+  « Vinted Go : aucun email ») est désormais périmée — un vrai email existe et est
+  capté. C'est le pendant **email** du fix conversation (5.145) : les deux voies
+  surfacent maintenant C49341 + lieu + suivi.
+
 ### Logo iPhone : icônes PWA régénérées (3 octobre)
 `apple-touch-icon.png` + `icon-192/512/maskable` portaient encore l'ancien logo
 orange ; régénérées depuis `logo-vrm.png` (VRM Noir), maskable avec marge sur
