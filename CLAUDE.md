@@ -4761,6 +4761,55 @@ aussi écrite deux fois.
   encore le bouton « Optimiser le titre avec l'IA », retiré exprès le 30
   septembre : il vérifie maintenant qu'il ne revient pas.
 
+### Le stock 3D à la souris (4 octobre)
+Julien : « améliore le stock en 3D pour que ce soit facile à la souris, mets-toi
+à la place de l'utilisateur ». **Mesuré d'abord** : quatre réglages posés sur
+OrbitControls, tout le reste aux défauts — sur sa pièce (17 × 10 m) un carton
+faisait ~11 px, la molette avançait de 5 % par cran vers le CENTRE de la pièce
+(le meuble visé sortait de l'écran), la vue traînait 9 images derrière la main.
+- **Réglages** (`Room3D`) : amortissement 0,2, rotation 0,6 à la souris,
+  `zoomToCursor` + `zoomSpeed 3` (≈ 14 %/cran vers le point visé), déplacement
+  au sol, distance max = 1,35 × la vue d'ensemble (44 m → ~27 m chez lui), cible
+  **bornée à la pièce** (on ne passe plus sous le plancher). Ce sont des valeurs
+  de RESSENTI : à ajuster avec sa main, sans toucher à la logique.
+- ⚠️⚠️ **UN CLIC DROIT POUVAIT RETIRER UN CARTON.** `pd`/`pu` ne regardaient pas
+  le bouton : un clic droit sans bouger (le début d'un déplacement de vue) sur
+  une pile choisie ouvrait la saisie « laisse VIDE pour la retirer ». Seul le
+  bouton gauche « tape » désormais.
+- ⚠️⚠️ **LE SURLIGNAGE NE TOUCHAIT JAMAIS LES CARTONS** : il teintait
+  `material.emissive`, or un carton porte un TABLEAU de six matériaux — une pile
+  n'était jamais surlignée, et dans une grille c'étaient les cases VIDES qui
+  s'allumaient (matériaux partagés en prime). Remplacé par des **contours**
+  posés sur la boîte englobante, couleur d'accent (§7 : plus de rouge, réservé
+  au doublon de numéro). La recherche vise **le carton précis** (`pileIdx`/`num`),
+  plus toute la pile.
+- **Survol** (souris seulement) : curseur main / attraper, contour, et une bulle
+  dont le texte vient **des données** (nom du meuble, N° du carton). Les
+  étiquettes flottantes ne volent plus les clics (`raycast` vide).
+- **Double-clic** : se mettre en face d'un meuble ou d'une case (vol de 420 ms,
+  sortie douce, **interrompu dès qu'on attrape la vue**). ⚠️ Sur une case d'un
+  meuble DÉJÀ choisi, le clic simple attend 280 ms : sans ça le 1er clic du
+  double-clic ouvrait la saisie et le 2ᵉ tombait dessus (vu au banc). Choisir un
+  meuble reste instantané.
+- **Clavier** (la zone prend le focus) : ← → tourner, ↑ ↓ + − zoomer, Début
+  toute la pièce, F de face, Échap désélectionner. **Mouvement réduit** respecté
+  (pas de vol, pas d'inertie).
+- ⚠️ **La carte de l'audit disait « ← → font quitter le Stock » : FAUX** — le
+  Stock n'est pas dans les onglets du bas, `slideTab` l'ignore. Le contrôle que
+  j'avais écrit pour ça ne pouvait pas échouer (prouvé en retirant la garde : il
+  restait vert) : retiré. *Un contrôle qui ne peut pas échouer est pire
+  qu'absent.*
+- **Pas fait, et pourquoi** : le rendu à la demande (la boucle tourne en continu,
+  ombres 2048 à chaque image) — c'est l'étape qui peut FIGER l'écran sans erreur
+  si une mutation oublie de redemander une image ; à faire seule, avec son
+  propre banc. Les étiquettes à taille constante à l'écran, l'aide au premier
+  passage, un canvas plus haut sur ordinateur.
+- Banc `garage3d.cjs` (pièce inventée, il vit dans le dépôt) : survol, clic
+  droit, surlignage du carton cherché, molette, clavier, double-clic. Preuve par
+  **réaffaiblissement** (la sonde n'existe pas sur le build d'avant, donc « rouge
+  avant » n'y prouverait rien) : remettre le clic droit qui tape → **2 rouges** ;
+  retirer l'attente du clic → le double-clic **rouge**.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
@@ -4929,7 +4978,7 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
 | `node scripts/audit-*.cjs` | **62 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
-| `scripts/bancs/*.cjs` | les **53 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
+| `scripts/bancs/*.cjs` | les **54 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
 **Trois règles de preuve :**
@@ -5209,7 +5258,7 @@ src/App.jsx                     l'app (grep avant de lire — le fichier est én
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
 scripts/audit-*.cjs             les 62 audits
-scripts/bancs/                  les 53 bancs (leur README dit comment les lancer)
+scripts/bancs/                  les 54 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 ```
