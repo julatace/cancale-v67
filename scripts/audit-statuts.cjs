@@ -85,6 +85,9 @@ const app = charge('src/App.jsx', APP_NOMS);
 const appComp = charge('src/App.jsx', ['venteStage', 'achatStage', 'purchasePhase', 'bordShipped'], Object.assign({}, app, {
   C, INV_STATUS: { online: { color: '#f' } },
   venteExpediee: () => false,
+  // `venteStage` lit aussi « coché posté à la main » (une vente cochée porte
+  // « Posté », plus « À expédier ») : ici, aucune ne l'est.
+  isShipDone: () => false,
   shippedSuivis: new Set(), soldByTxn: {},
 }));
 const ext = charge('vinted-sync-extension/background.js', ['AWAITING_SHIP', 'AT_RELAY', 'PAS_UN_ENVOI', 'besoinBordereauTexte', 'A_EXPEDIER', 'resumeCommandes'], {}, { sourceType: 'script', plugins: [] });

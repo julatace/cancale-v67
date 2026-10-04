@@ -18175,20 +18175,30 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const ventesAffichees = useMemo(() => (sales.items || [])
     .filter(o => showHidden ? true : !isHidden(o))
     .filter(o => { const st = classifyOrderStatus(o.status);
+      // ⚠️ « Commande non réclamée - Retournée à l'expéditeur » : le colis
+      // REVIENT vers lui (Vinted dit `waiting`), rien n'est encore annulé ni
+      // remboursé — son étiquette dit « Retournée », « vérifie qu'il arrive
+      // bien ». `classifyOrderStatus` la range en « cancelled » (le mot
+      // « Retourn… ») et ça reste juste pour l'ARGENT (elle n'entre dans aucun
+      // CA). Mais pour les FILTRES, c'est un colis en route : rangée dans
+      // « Annulées » seulement, elle disparaissait de « Toutes » et de « En
+      // transit » — le colis à surveiller n'était visible que sous un mot
+      // faux. Banc `statuts-colis.cjs` (4 octobre).
+      const revient = /non\s+r[ée]clam/i.test(String(o.status || ''));
       // « En cours » mélangeait les colis à poster et ceux déjà partis : ce sont
       // deux questions différentes (« qu'est-ce que je dois faire ? » / « qu'est-ce
       // qui est en route ? »). Deux filtres, la même règle que Colis (§11).
       if (vFilter === 'aexpedier') return aExpedier(o) && !isShipDone(o);
-      if (vFilter === 'transit') return st === 'pending' && !(aExpedier(o) && !isShipDone(o));
+      if (vFilter === 'transit') return (st === 'pending' || revient) && !(aExpedier(o) && !isShipDone(o));
       if (vFilter === 'encours') return st === 'pending';
       if (vFilter === 'finalisees') return st === 'completed';
-      if (vFilter === 'annulees') return st === 'cancelled';
+      if (vFilter === 'annulees') return st === 'cancelled' && !revient;
       if (vFilter === 'sanscout') return isSaleNoBuy(o);
       // « Toutes » = toutes SAUF les annulées (demande de Julien, 28 sept. : une
       // vente annulée sur Vinted ne doit plus apparaître dans les ventes, elle
       // vit dans l'onglet « Annulées »). Les annulées ne comptent nulle part
       // dans le CA (§5), c'est cohérent.
-      return st !== 'cancelled'; })
+      return st !== 'cancelled' || revient; })
     .filter(o => matchOrd(o))
     .sort(parDateDesc),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -19614,7 +19624,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       ? { label: 'Remboursée', color: C.danger, step: 0, aide: "Cette paire a bien été EXPÉDIÉE, puis remboursée à l'acheteur — la chaussure et l'argent sont partis. Ce n'est pas une commande annulée avant l'envoi." }
       : { label: 'Annulée', color: C.danger, step: 0, aide: "Commande annulée avant l'envoi — la paire n'est jamais partie." };
     if (/finalis/i.test(s) || tus === 'completed') return { label: 'Vendue', color: INV_STATUS.online.color, step: 4 };
-    if (aExpedier(o)) return { label: 'À expédier', color: C.warn, step: 1 };
+    // ⚠️ COCHÉ « POSTÉ » À LA MAIN (`isShipDone`) : le colis a quitté
+    // « À expédier » partout (Colis, Ma journée, la cloche, le filtre) et le
+    // filtre « En transit » le montre — mais son étiquette disait encore
+    // « À expédier », sous l'intitulé « En transit » (vu au banc
+    // `statuts-colis.cjs`, 4 octobre). Vinted le confirmera au premier scan.
+    if (aExpedier(o)) return isShipDone(o)
+      ? { label: 'Posté', color: C.blue || C.accent, step: 2, aide: "Tu l'as marqué posté : Vinted confirmera l'envoi au premier passage chez le transporteur." }
+      : { label: 'À expédier', color: C.warn, step: 1 };
     if (isAtRelayStatus(s)) return { label: 'Au relais', color: C.blue || C.accent, step: 3 };
     if (/\blivr[ée]|remis\b|r[ée]ceptionn/i.test(s)) return { label: 'Livrée', color: C.blue || C.accent, step: 3 };
     if (/transit|achemin|exp[ée]di[ée]|en\s+route/i.test(s) || tus === 'waiting') return { label: 'En transit', color: C.blue || C.accent, step: 2 };
@@ -30891,8 +30908,14 @@ function AppCoeur() {
       }
     })();
     return ()=>{cancelled=true;};
+  // ⚠️ `nuagePret` (4 octobre, banc `statuts-colis.cjs`) : le repli lit dans le
+  // NAVIGATEUR les colis cochés « posté », les ventes masquées et les comptes
+  // exclus — trois réglages SYNCHRONISÉS. Sur un appareil neuf, quand le nuage
+  // arrive après les comptes, la cloche annonçait « 3 ventes à expédier » pour
+  // 2 colis réels, et ne se recalculait jamais (§5.49). On recompte à
+  // l'arrivée du nuage.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[vintedAccounts, colisTick]);
+  },[vintedAccounts, colisTick, nuagePret]);
 
   // Multi-vendeurs : tant qu'on ne sait pas qui est là, on n'affiche rien (un
   // écran de connexion qui clignote avant de disparaître fait « bug »), et sans
