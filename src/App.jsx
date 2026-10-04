@@ -36,7 +36,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.150.0';
+const EXT_ATTENDUE = '5.151.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -27784,67 +27784,25 @@ function RepondreSetting() {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// ACCEPTER LES OFFRES AU-DESSUS DE MON PLANCHER — L'INTERRUPTEUR VIT DANS L'APP
+// LES OFFRES — C'EST TOI QUI DÉCIDES (plus d'acceptation automatique)
 // ══════════════════════════════════════════════════════════════════════════════
-// Julien, 2 octobre : « tout doit être centralisé dans VRM ». L'interrupteur
-// vivait dans le panneau de l'extension sur Vinted, qui est retiré : sans lui,
-// un moteur allumé n'aurait plus eu AUCUN moyen d'être éteint.
-// ⚠️ ÉTEINT PAR DÉFAUT (§3). Le moteur est bordé : plancher obligatoire annonce
-//    par annonce, compte connecté dans l'onglet, 3 par visite, jamais deux fois.
-// ⚠️ Trois états de capacité (`offresapp`, 5.130) : une extension plus ancienne
-//    lit encore l'interrupteur de SON panneau, pas celui-ci.
-// ⚠️ Jamais touché ici ⇒ l'extension garde l'interrupteur local d'avant : on
-//    l'AFFICHE (`offresAutoLocal`), sinon l'app dirait « éteint » pendant que
-//    l'extension accepte.
+// ⚠️⚠️ RETIRÉ LE 4 OCTOBRE — DÉCISION DE JULIEN : « je ne veux pas que ça accepte
+//    tout seul les offres ». Accepter une offre à sa place est une automatisation
+//    qui ressemble à un robot — même famille que les messages en série aux favoris
+//    ou la republication en file — et c'est exactement ce qui fait bloquer un
+//    compte (§3). Le moteur est COUPÉ côté extension (`offresAutoActif` rend
+//    toujours `false`), donc l'interrupteur n'aurait plus aucun effet : on ne le
+//    propose plus, on explique, et on renvoie vers l'acceptation MANUELLE depuis
+//    Messages — sur ton clic, elle, qui est gardée (§messagerie 5.135).
+//    ⚠️ On GARDE le composant (rendu dans Réglages) : le retirer d'un coup serait
+//    une coupe par numéros de ligne à vérifier (§4.11). Il devient informatif.
 function OffresAutoSetting() {
-  const lire = () => { const v = load('vinted_offres_auto', null); return v === true || v === false ? v : null; };
-  const [v, setV] = React.useState(lire);
-  const touche = React.useRef(false);
-  const ext = useExtVivante();
-  React.useEffect(() => onCloudReady(() => { if (!touche.current) setV((p) => p === null ? lire() : p); }), []);
-  const local = !!(ext.etat && ext.etat.offresAutoLocal);
-  const on = v === null ? local : v;
-  const cap = extSait('offresapp');
-  const planchers = React.useMemo(() => {
-    const m = load('vinted_annonce_numeros', {}) || {};
-    let n = 0; for (const k in m) { const x = Number(m[k] && m[k].minPrice); if (isFinite(x) && x > 0) n++; }
-    return n;
-  }, [v]);
-  const basculer = () => { touche.current = true; const n = !on; setV(n); save('vinted_offres_auto', n); };
   return (
-    <div style={{padding:'13px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}} data-offres-auto={on ? 'on' : 'off'}>
-      <div style={{display:'flex',alignItems:'center',gap:10}}>
-        <div style={{flex:1,minWidth:0}}>
-          <div style={{fontSize:13,fontWeight:600,color:C.text}}>Accepter les offres au-dessus de mon prix plancher</div>
-          <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.5}}>
-            À chaque passage sur Vinted, l’extension accepte à ta place une offre <b>égale ou supérieure</b> au prix plancher que tu as posé sur l’annonce (écran Annonces, champ «&nbsp;Min. accepté&nbsp;»). Sans plancher, elle ne touche à rien. Trois au plus par visite, jamais deux fois la même, et seulement sur le compte connecté.
-          </div>
-        </div>
-        <button type="button" onClick={basculer} aria-pressed={on}
-          style={{flexShrink:0,width:46,height:27,borderRadius:999,border:`1px solid ${on?C.accent:C.border}`,background:on?C.accent:C.bg,position:'relative',cursor:'pointer',padding:0}}>
-          <span style={{position:'absolute',top:2,left:on?21:2,width:21,height:21,borderRadius:999,background:on?(C.onAccent||'#fff'):C.muted,transition:'left .15s'}}/>
-        </button>
+    <div style={{padding:'13px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}} data-offres-auto="retire">
+      <div style={{fontSize:13,fontWeight:600,color:C.text}}>Les offres, c’est toi qui décides</div>
+      <div style={{fontSize:11.5,color:C.muted,marginTop:4,lineHeight:1.5}}>
+        VRM n’accepte plus les offres à ta place. Accepter des offres automatiquement est le genre d’automatisation qui fait repérer un robot et bloquer un compte — comme envoyer des messages en série aux personnes qui ont mis en favori, ou republier en boucle, deux choses que VRM ne fait pas non plus. Tu acceptes, tu refuses ou tu fais une contre-offre quand tu veux, depuis <b>Messages</b>.
       </div>
-      {v === null && local && (
-        <div style={{marginTop:9,fontSize:11.5,color:C.muted,lineHeight:1.5}}>
-          Allumé depuis l’ancien panneau de l’extension. C’est maintenant ici qu’il se règle.
-        </div>
-      )}
-      {on && planchers === 0 && (
-        <div style={{marginTop:9,fontSize:11.5,color:C.muted,lineHeight:1.5}}>
-          Aucune annonce n’a encore de prix plancher&nbsp;: rien ne sera accepté tant que tu n’en poses pas.
-        </div>
-      )}
-      {cap === 'retard' && (
-        <div style={{marginTop:9,fontSize:11.5,color:C.warn,lineHeight:1.5}}>
-          L’extension installée ici lit encore l’interrupteur de son ancien panneau, pas celui-ci. Remplace-la par la {EXT_ATTENDUE}&nbsp;: tant qu’elle est plus ancienne, ce réglage n’a pas d’effet.
-        </div>
-      )}
-      {on && cap === 'absente' && (
-        <div style={{marginTop:9,fontSize:11.5,color:C.muted,lineHeight:1.5}}>
-          C’est l’extension, dans le Chrome de ton ordinateur, qui accepte — pas cette page. Le réglage la suit d’un appareil à l’autre.
-        </div>
-      )}
     </div>
   );
 }

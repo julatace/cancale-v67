@@ -3461,12 +3461,20 @@ async function offresEnAttente(uid) {
 // - rien dans l'app (jamais touché) : on garde l'interrupteur local d'avant —
 //   une nouveauté n'éteint pas ce qui marchait ;
 // - la base n'a pas répondu : on n'allume RIEN (« pas su » ne vaut pas « oui »).
+// ⚠️⚠️ RETIRÉ LE 4 OCTOBRE — DÉCISION DE JULIEN (propriétaire) : « je ne veux pas
+//    que ça accepte tout seul les offres ». Accepter une offre à sa place est une
+//    automatisation qui ressemble à un robot — de la même famille que les messages
+//    en série aux favoris ou la republication en file — et c'est EXACTEMENT ce qui
+//    fait bloquer un compte (§3, `vanessa5723`). On ne retire pas le code (pour ne
+//    rien casser autour), on le COUPE à son unique chokepoint : la gare rend
+//    toujours `false`, donc `autoAccepterOffres` sort toujours à 0, quel que soit
+//    le réglage stocké ou l'ancien interrupteur local du panneau.
+//    ⚠️ L'acceptation MANUELLE d'une offre depuis la messagerie (5.135,
+//    `executerPourApp`, sur SON clic, avec confirmation) est une tout autre voie —
+//    elle n'est pas touchée. `audit-offres-auto.cjs` prouve que rien n'est accepté
+//    tout seul ; `audit-coherence.cjs` vérifie que la fonction existe toujours.
 async function offresAutoActif() {
-  const reglages = await lireMain(['vinted_offres_auto']);
-  if (reglages === null) return false;
-  const v = reglages.vinted_offres_auto;
-  if (v === true || v === false) return v;
-  try { return !!(((await chrome.storage.local.get('vrmAutoOffres')).vrmAutoOffres || {}).actif); } catch (_) { return false; }
+  return false;
 }
 async function autoAccepterOffres(uid) {
   try {
