@@ -4656,9 +4656,15 @@ du pont app↔extension. Ce qui a été trouvé et fermé :
   Le conseiller Supabase ne signale plus que deux choses VOULUES (`vrm_reglages`
   sans règle = serveur seul ; `vrm_acces*` exécutables par un vendeur connecté =
   elles ne disent que SON accès).
-- **Restent ouverts, notés** : `/api/vinted-proxy` relaie vers Vinted avec le
-  jeton fourni par l'appelant (il ne touche à aucune donnée stockée, mais c'est
-  un relais ouvert depuis l'IP de Vercel) ; le `pushsubscriptionchange` du
+- ✅ **`/api/vinted-proxy` FERMÉ (4 octobre, soir)** : c'était un relais OUVERT —
+  n'importe qui lui envoyait un jeton Vinted et une adresse de son choix, avec
+  n'importe quelle méthode (DELETE compris), et la requête partait de l'IP de
+  VRM. Il exige la **session**, ne prend **plus aucun jeton du navigateur** (il
+  lit ceux du compte `uid` en base, AVEC la session du vendeur — RLS — et filtré
+  sur son `owner`), ne fait que **lire** (GET, `LECTURES_PERMISES` : les sept
+  adresses que l'app lit vraiment), et répond 503 si la base ne répond pas.
+  Banc `proxy.cjs` (route exécutée, **17 contrôles, 13 rouges** sur l'avant).
+- **Reste ouvert, noté** : le `pushsubscriptionchange` du
   service worker n'a pas de session (ré-enregistré à l'ouverture suivante).
   **À Julien** : dépôt public, clé publique `anon` → clé « publishable »,
   réglages d'authentification (confirmation d'email, longueur du mot de passe)
@@ -5292,7 +5298,7 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
 | `node scripts/audit-*.cjs` | **68 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
-| `scripts/bancs/*.cjs` | les **63 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
+| `scripts/bancs/*.cjs` | les **64 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
 **Trois règles de preuve :**
@@ -5585,7 +5591,7 @@ src/App.jsx                     l'app (grep avant de lire — le fichier est én
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
 scripts/audit-*.cjs             les 68 audits
-scripts/bancs/                  les 63 bancs (leur README dit comment les lancer)
+scripts/bancs/                  les 64 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 ```

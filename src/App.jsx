@@ -2751,19 +2751,13 @@ const vintedApiCall = async (account, endpoint, opts = {}) => {
   try {
     const siteDomain = account.domain || 'www.vinted.fr';
     const host = opts.host || siteDomain;
+    // ⚠️ Le relais ne prend PLUS de jetons du navigateur (4 octobre : c'était un
+    // relais ouvert) : il exige la session VRM et lit lui-même les jetons du
+    // compte `uid`, en base, au nom du vendeur. Lecture seule (GET).
     const res = await fetch('/api/vinted-proxy', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        token: account.access_token,
-        refreshToken: account.refresh_token,
-        anonId: account.anon_id,
-        csrfToken: account.csrf_token,
-        host,
-        endpoint,
-        method: opts.method || 'GET',
-        body: opts.body,
-      }),
+      headers: { 'Content-Type': 'application/json', ...enTeteSession() },
+      body: JSON.stringify({ uid: String(account.vinted_user_id || ''), host, endpoint }),
     });
     const json = await res.json();
     // Le proxy a du rafraichir le token expire : on persiste les nouveaux tokens.
