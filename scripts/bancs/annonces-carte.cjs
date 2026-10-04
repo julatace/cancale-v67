@@ -103,9 +103,21 @@ const projette = (row, sel) => {
       await pg.waitForTimeout(4000);
       const c = await pg.evaluate(() => {
         const carte = (id) => { const el = document.querySelector(`[data-carte-annonce="${id}"]`); return el ? { t: el.innerText, html: el.outerHTML, boost: !!el.querySelector('[data-boostee]'), aussi: !!el.querySelector('[data-aussi-sur]'), prepa: (el.querySelector('[data-prepa]') || {}).textContent || '' } : null; };
-        return { a: carte('9101'), b: carte('9102'), c: carte('9103'), d: carte('9104'), sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth };
+        return { a: carte('9101'), b: carte('9102'), c: carte('9103'), d: carte('9104'), sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth,
+          ...(() => {
+            // La carte des places se trouve par son TITRE (elle n'a pas d'attribut
+            // sur le build d'avant : un contrôle qui ne la trouverait pas serait
+            // vert sur le défaut), plus les cartes d'annonce.
+            const places = [...document.querySelectorAll('div')].filter((d) => d.firstElementChild && d.firstElementChild.textContent === 'Publier aussi ailleurs');
+            const zones = [...places, ...document.querySelectorAll('[data-carte-annonce]')];
+            const trouves = zones.flatMap((z) => [...z.querySelectorAll('b,button')]).filter((e) => e.textContent.trim().replace(/^✓\s*/, '') === 'eBay');
+            return { ebay: trouves.length, ebayOu: trouves.map((e) => (e.parentElement.innerText || '').slice(0, 140)), nPlaces: places.length };
+          })() };
       });
       dit(!errs.length, 'aucune erreur', errs[0]);
+      // 4 octobre : eBay se publie par l'API (eBay → Annonces). La file de
+      // l'extension n'a plus aucun bouton : la cocher ici ne menait à rien.
+      dit(c.nPlaces > 0 && c.ebay === 0, 'plus de case « eBay » (file sans bouton) sur l’écran Annonces', `${c.ebay} trouvée(s) ${JSON.stringify(c.ebayOu)} · carte des places ${c.nPlaces ? 'trouvée' : 'INTROUVABLE'}`);
       // 9104 est VENDUE (son bordereau la désigne par transaction → annonce) :
       // elle sort des annonces ; 9103, au MÊME titre, reste. C'est l'identité
       // qui tranche, pas la ressemblance (§5).
