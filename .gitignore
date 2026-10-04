@@ -2,7 +2,10 @@ node_modules/
 dist/
 .env
 .env.local
-.claude/
+.claude/*
+# Les compétences du projet sont partagées (design d'Emil Kowalski, MIT) ;
+# le reste de .claude/ (réglages locaux) reste hors du dépôt.
+!.claude/skills/
 
 # ⚠️ Les fixtures des bancs : ce sont les VRAIES ventes, les vrais acheteurs,
 # les vraies adresses — et ce dépôt est PUBLIC. Elles ne montent jamais.
