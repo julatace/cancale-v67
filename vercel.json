@@ -13,6 +13,14 @@
     {
       "source": "/api/ebay-deletion",
       "destination": "/api/ebay?mode=deletion"
+    },
+    {
+      "source": "/api/sante",
+      "destination": "/api/compte?mode=sante"
+    },
+    {
+      "source": "/api/stripe-webhook",
+      "destination": "/api/compte?mode=webhook"
     }
   ],
   "headers": [
