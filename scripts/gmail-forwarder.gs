@@ -40,7 +40,20 @@ function getStartDate() {
   return DEFAULT_START;
 }
 
-const LABEL = 'vrm-traite'; // étiquette posée sur les emails déjà envoyés
+const LABEL = 'vrm-traite'; // PREUVE DE STOCKAGE : posée SEULEMENT quand VRM confirme (2xx)
+
+// ── MÉNAGE DE LA BOÎTE ───────────────────────────────────────────────
+// Julien, 4 oct. : « supprimer les mails si l'app conserve les données ».
+// On ne touche QU'AUX emails labellisés `vrm-traite` — donc confirmés rangés
+// dans VRM — et plus vieux que N jours. Jamais un email sans label.
+//   'archive'  (défaut, SÛR) → sortis de la boîte mais GARDÉS sous le label,
+//              récupérables : le filet de re-lecture reste intact (ex. l'email
+//              Vinted Go re-traité le 4 oct. parce qu'on l'avait encore).
+//   'corbeille' → vraie suppression (corbeille Gmail, purgée après ~30 j).
+//              Forcée à 90 j minimum : au-delà, tout correctif d'analyseur a
+//              déjà tourné. Ne bascule là que pour VRAIMENT libérer de l'espace.
+const CLEANUP_MODE = 'archive';   // 'archive' (sûr) | 'corbeille' (supprime, ≥90 j)
+const CLEANUP_MIN_AGE_DAYS = 6;   // Julien : « tous les mails de plus de 6 jours »
 
 function forwardVintedEmails() {
   const label = GmailApp.getUserLabelByName(LABEL) || GmailApp.createLabel(LABEL);
@@ -57,6 +70,15 @@ function forwardVintedEmails() {
 
   let sent = 0;
   threads.forEach(thread => {
+    // ⚠️⚠️ LE LABEL EST UNE PREUVE DE STOCKAGE — on ne le pose QUE si VRM a
+    //   confirmé (2xx) CHAQUE message du fil. api/email-inbound renvoie 503
+    //   quand il n'a PAS pu ranger (Supabase down). L'ancien code labellisait
+    //   quand même → un email « transféré » pendant une panne était marqué
+    //   traité puis jamais rangé, et le ménage l'aurait supprimé : ce sont les
+    //   3 jours de ventes/bordereaux/suivis perdus de septembre. Sans label, le
+    //   fil repasse au tour suivant ; api/email-inbound est idempotent (upsert
+    //   par id), donc re-transférer un message déjà rangé ne crée pas de doublon.
+    let tousOk = true;
     thread.getMessages().forEach(msg => {
       try {
         const attachments = msg.getAttachments().map(a => ({
@@ -82,19 +104,53 @@ function forwardVintedEmails() {
           muteHttpExceptions: true,
         });
 
-        Logger.log(msg.getSubject() + ' → ' + resp.getResponseCode() + ' ' + resp.getContentText().slice(0, 120));
-        sent += 1;
+        const code = resp.getResponseCode();
+        Logger.log(msg.getSubject() + ' → ' + code + ' ' + resp.getContentText().slice(0, 120));
+        if (code >= 200 && code < 300) sent += 1;   // VRM a confirmé le rangement
+        else tousOk = false;                        // 503/erreur → on réessaiera, pas de label
       } catch (e) {
+        tousOk = false;                             // échec réseau → surtout pas de label
         Logger.log('Erreur sur "' + msg.getSubject() + '" : ' + e);
       }
     });
-    thread.addLabel(label);
+    if (tousOk) thread.addLabel(label);   // confirmé rangé → marqué (et donc nettoyable)
   });
 
   Logger.log(sent + ' email(s) transférés à VRM.');
 
   // Envoie les factures Pro en attente (préparées par l'app).
   sendQueuedInvoices();
+
+  // Ménage : sort de la boîte les emails CONFIRMÉS rangés, de plus de 6 jours.
+  nettoyerTraites();
+}
+
+// ════════════════════════════════════════════════════════════════════
+// MÉNAGE — « supprimer les mails si l'app conserve les données »
+// On ne touche QU'AUX emails portant `vrm-traite` (= VRM a confirmé le
+// stockage, cf. la correction du label ci-dessus) ET plus vieux que
+// CLEANUP_MIN_AGE_DAYS. Un email SANS label n'est jamais touché : s'il n'est
+// pas confirmé rangé, le sortir serait la perte qu'on s'interdit.
+//   'archive'  → quitte la boîte, reste sous le label, récupérable.
+//   'corbeille'→ supprimé pour de bon (≥ 90 j seulement).
+// ════════════════════════════════════════════════════════════════════
+function nettoyerTraites() {
+  const label = GmailApp.getUserLabelByName(LABEL);
+  if (!label) return;                       // rien n'a encore été confirmé
+  const corbeille = (CLEANUP_MODE === 'corbeille');
+  const ageJours = corbeille ? Math.max(90, CLEANUP_MIN_AGE_DAYS) : CLEANUP_MIN_AGE_DAYS;
+  const avant = new Date(Date.now() - ageJours * 86400000);
+  const y = avant.getFullYear() + '/' + ('0' + (avant.getMonth() + 1)).slice(-2) + '/' + ('0' + avant.getDate()).slice(-2);
+  // Labellisé (= confirmé rangé), assez ancien, et — en archive — encore dans la boîte.
+  const q = 'label:' + LABEL + (corbeille ? '' : ' in:inbox') + ' before:' + y;
+  let n = 0;
+  for (let garde = 0; garde < 60; garde++) {   // par lots, quota Gmail
+    const lot = GmailApp.search(q, 0, 100);
+    if (!lot.length) break;
+    lot.forEach(t => { if (corbeille) t.moveToTrash(); else t.moveToArchive(); n++; });
+    if (lot.length < 100) break;
+  }
+  Logger.log(n + ' fil(s) ' + (corbeille ? 'mis à la corbeille' : 'archivés') + ' (déjà rangés par VRM, > ' + ageJours + ' j).');
 }
 
 // ════════════════════════════════════════════════════════════════════
