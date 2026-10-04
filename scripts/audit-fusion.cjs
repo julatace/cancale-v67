@@ -99,6 +99,22 @@ const CAS = [
     geste: (c) => c.noterUrlLabel('https://www.vinted.fr/api/v2/label_options/9999', true),
     garde: (d) => d.vus && d.vus['www.vinted.fr/api/v2/shipments/_id/label'] && Object.keys(d.vus).length >= 2 },
 
+  // ⚠️⚠️ ENCORE UNE, TROUVÉE LE 4 OCTOBRE EN BALAYANT TOUT `background.js` — LE
+  //    COFFRE. `archiverAnnonce` lit `coffre_{uid}_{id}` puis RÉÉCRIT la fiche ;
+  //    il complétait depuis l'ancienne (`const anc = (rows && …) || null`) SANS
+  //    garde `=== null`. Une lecture ratée (base debout) valait donc « aucun
+  //    enregistrement » → il réécrivait la fiche PAUVRE du dressing par-dessus
+  //    la fiche RICHE (la vraie description du vendeur + les photos HD, §47 —
+  //    ce qui sert à RECRÉER une annonce disparue). `null` = pas su (on n'écrit
+  //    pas) ; `[]` = première sauvegarde (écriture légitime). Seul `null` bloque.
+  //    (archiverLot, le chemin de LOT, est prouvé plus bas : c'est une FAMILLE
+  //    `id=like.coffre_*`, elle ne rentre pas dans le fetch `id=eq.` du harnais.)
+  { id: 'coffre_42_100',
+    avant: { id: '100', uid: '42', title: 'Nike Air', desc: 'RICHE : la vraie description du vendeur', brand: 'Nike', size: '42', etat: 'Très bon état', catalogId: 1, price: 90, photos: ['p1', 'p2', 'p3', 'p4', 'p5'], nPhotos: 5, savedAt: new Date().toISOString() },
+    quoi: 'la fiche riche du coffre (description + photos HD)',
+    geste: (c) => c.archiverAnnonce('42', { id: '100', title: 'Nike Air', photo: null }, null),
+    garde: (d) => /RICHE/.test(d.desc || '') && (d.photos || []).length >= 3 },
+
   // ⚠️⚠️ TROIS DE PLUS, TROUVÉES LE 17 SEPTEMBRE — LE CHEMIN LEBONCOIN N'AVAIT
   //    JAMAIS APPRIS LA LEÇON. Ce fichier listait les lire-fusionner-réécrire
   //    « de l'extension » et s'arrêtait à ceux du panneau Vinted : `storeLbcRecon`,
@@ -244,6 +260,61 @@ const CAS = [
         dit(!!res && res.memo === true, 'et le mémo est annoncé comme écrit',
           `elle rend ${JSON.stringify(res)}`);
       }
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // ET LE COFFRE EN LOT : `archiverLot` (famille `id=like.coffre_*`)
+  // ══════════════════════════════════════════════════════════════════════════
+  // archiverAnnonce est dans la table CAS ci-dessus. archiverLot, lui, lit une
+  // FAMILLE (`id=like.coffre_{uid}_*`) : il ne rentre pas dans le fetch `id=eq.`
+  // du harnais, on lui sert donc son propre faux Supabase. Il écrivait
+  // `sbGet(...) || []` : une lecture ratée (base debout) valait « coffre vide »
+  // → il réécrivait les fiches RICHES par la fiche pauvre du dressing. Et c'est
+  // le chemin le plus FRÉQUENT (il tourne à CHAQUE visite Vinted), et une
+  // famille NON BORNÉE (§4.5 : tronquée à 1000 en silence). Corrigé : `sbGetTout`
+  // (paginé, `null` si une page échoue) + garde `=== null` → on n'écrit pas.
+  console.log('\n── ET LE COFFRE EN LOT : archiverLot (famille `coffre_*`, lecture KO écriture OK)');
+  {
+    const riche = { id: '100', uid: '42', title: 'Nike Air', desc: 'RICHE : la vraie description du vendeur, photos HD', brand: 'Nike', size: '42', etat: 'Très bon état', catalogId: 1, price: 90, photos: ['p1', 'p2', 'p3', 'p4', 'p5'], nPhotos: 5, savedAt: new Date().toISOString() };
+    const lanceLot = async (coffreKO) => {
+      const partis = [];
+      const ctx = faireCtx();
+      ctx.activeAccountId = async () => '42';
+      // Fetch dédié : sert la FAMILLE coffre (que le harnais `id=eq.` ne gère pas)
+      // et `vinted_item_details`. Seul le coffre tombe en 522 — lecture KO,
+      // écriture OK, le cas qui détruit (la panne TOTALE ferait aussi rater
+      // l'écriture, et le défaut ne se verrait pas).
+      ctx.fetch = async (url, opts = {}) => {
+        const u = metaVersData(String(url)), meth = (opts.method || 'GET').toUpperCase();
+        if (meth === 'POST') { try { JSON.parse(opts.body || '[]').forEach(r => partis.push(r)); } catch (_) {} return { ok: true, status: 201, json: async () => [], text: async () => '', headers: { get: () => 'application/json' } }; }
+        if (/id=like\.coffre_42_/.test(u)) {
+          if (coffreKO) return { ok: false, status: 522, json: async () => { throw new Error('HTML'); }, text: async () => '<html>522</html>', headers: { get: () => 'text/html' } };
+          return { ok: true, status: 200, json: async () => ([{ id: 'coffre_42_100', data: riche }]), text: async () => '', headers: { get: () => 'application/json' } };
+        }
+        return { ok: true, status: 200, json: async () => ([]), text: async () => '', headers: { get: () => 'application/json' } };
+      };
+      // Le dressing n'apporte que la vignette : la fiche riche ne doit venir que du coffre.
+      const pauvre = { id: '100', title: 'Nike Air', photo: null };
+      try { await ctx.archiverLot('42', [pauvre], [pauvre]); } catch (_) {}
+      return partis;
+    };
+    // 1. Le cas qui détruit : coffre illisible, l'écriture marche.
+    {
+      const partis = await lanceLot(true);
+      const w = partis.find(r => r.id === 'coffre_42_100');
+      dit(!w, 'une lecture ratée du coffre n\'écrase pas la fiche riche',
+        w ? `la ligne est réécrite : desc=${JSON.stringify((w.data || {}).desc)}, ${((w.data || {}).photos || []).length} photo(s)` : '');
+    }
+    // 2. L'autre sens : coffre lisible, la description et les photos survivent.
+    {
+      const partis = await lanceLot(false);
+      const w = partis.find(r => r.id === 'coffre_42_100');
+      // Soit la fiche est inchangée (pas de réécriture), soit la réécriture GARDE
+      // la description et les photos riches — jamais une fiche appauvrie.
+      const okN = !w || (/RICHE/.test((w.data || {}).desc || '') && ((w.data || {}).photos || []).length >= 5);
+      dit(okN, 'en marche normale, la description et les photos riches sont gardées',
+        w ? JSON.stringify((w.data || {}).desc || '').slice(0, 60) : 'rien à réécrire (fiche inchangée)');
     }
   }
 
