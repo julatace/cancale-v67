@@ -4387,6 +4387,33 @@ touchées.
   répercute dans TOUS les vm qui exécutent le code touché.**
 - Extension **5.148.0**, zip régénéré, `EXT_ATTENDUE` suivie. Les 58 audits verts.
 
+### ⚠️⚠️ LE COFFRE EFFAÇAIT SA FICHE RICHE SUR UNE LECTURE RATÉE (4 octobre, 5.150)
+Suite de la passe fiabilité, et la leçon que ce fichier répète : *un banc qui
+énumère à la main ne couvre que ce qu'on a pensé à écrire*. En balayant **tout**
+`background.js` (14 lire-fusionner-réécrire), deux sites du COFFRE — la source
+qui sert à RECRÉER une annonce disparue (§47 : description + photos HD) — n'étaient
+**ni gardés, ni dans `audit-fusion`** :
+- **`archiverAnnonce`** (par article, appelé L841) lisait `coffre_{uid}_{id}`
+  puis complétait depuis l'ancienne fiche (`const anc = (rows && …) || null`)
+  **sans** garde `=== null`. `sbGet` rend `null` quand la base n'a pas répondu :
+  `anc` valait alors `null`, la branche « complète depuis l'existant » était
+  sautée, et la fiche **PAUVRE** du dressing (pas de description, une vignette)
+  était réécrite **par-dessus la fiche riche**. `null` = pas su (on n'écrit pas) ;
+  `[]` = première sauvegarde (écriture légitime) — seul `null` bloque.
+- **`archiverLot`** (le LOT, appelé à **CHAQUE visite Vinted**, L849/L2348 — le
+  chemin le plus fréquent) lisait la famille `id=like.coffre_{uid}_*` en
+  `sbGet(...) || []` : une lecture ratée valait « coffre vide » → mêmes fiches
+  riches réécrites appauvries. Et c'est une famille **NON BORNÉE** (une ligne par
+  annonce, tous comptes) → §4.5, tronquée à 1000 en silence. Passé en `sbGetTout`
+  (paginé, `null` si une page échoue) + garde `=== null` → on n'écrit pas.
+- `audit-fusion.cjs` porte les deux : `archiverAnnonce` dans la table CAS
+  (`id=eq.coffre_*`), `archiverLot` dans un bloc dédié (la famille ne rentre pas
+  dans le fetch `id=eq.` du harnais) — **lecture KO, écriture OK**, le cas qui
+  détruit, plus l'autre sens. **§6.1 : 2 rouges sur le code d'avant** (« la ligne
+  est réécrite : desc="", 0 photo(s) »), 0 après, les 59 audits verts, build vert.
+- **Aucune entrée d'`EXT_CAPACITES`** : correction de fiabilité, l'app ne promet
+  rien de neuf. Extension **5.150.0**, zip régénéré, `EXT_ATTENDUE` suivie.
+
 ### Logo iPhone : icônes PWA régénérées (3 octobre)
 `apple-touch-icon.png` + `icon-192/512/maskable` portaient encore l'ancien logo
 orange ; régénérées depuis `logo-vrm.png` (VRM Noir), maskable avec marge sur

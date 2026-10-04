@@ -3640,7 +3640,13 @@ async function archiverAnnonce(uid, it, fiche) {
     // On ne REMPLACE pas un enregistrement riche par un pauvre : si le coffre a
     // déjà la description et qu'on n'apporte que le dressing, on complète.
     const rows = await sbGet(`app_data?id=eq.coffre_${rec.uid}_${rec.id}&select=data`);
-    const anc = (rows && rows[0] && rows[0].data) || null;
+    // ⚠️ LECTURE RATÉE ≠ COFFRE VIDE (famille §5.53). `sbGet` rend `null` quand
+    //    la base n'a pas répondu : repartir de « aucun enregistrement » et
+    //    réécrire remplacerait une fiche RICHE (description + photos HD, §47)
+    //    par la fiche pauvre du dressing. `null` = pas su (on n'écrit pas) ;
+    //    `[]` = première sauvegarde (écriture légitime). Seul `null` bloque.
+    if (rows === null) return false;
+    const anc = (rows[0] && rows[0].data) || null;
     if (anc) {
       if (!rec.desc && anc.desc) rec.desc = anc.desc;
       if (!rec.brand && anc.brand) rec.brand = anc.brand;
@@ -3664,7 +3670,13 @@ async function archiverLot(uid, items, tous) {
   // complétion ci-dessous (le texte lu sur la page) doit tourner même pour un
   // compte dont tout le stock est vendu — c'est justement là qu'on republie.
   if (!items.length && !(tous && tous.length)) return false;
-  const rows = await sbGet(`app_data?id=like.coffre_${uid}_*&select=id,data`) || [];
+  // ⚠️ Famille NON BORNÉE (une ligne par annonce, tous comptes confondus) →
+  //    PAGINÉE (`sbGetTout`, §4.5 : au-delà de 1000 lignes Supabase tronque en
+  //    silence). ET LECTURE RATÉE ≠ COFFRE VIDE (§5.53) : `null` (pas su) ne
+  //    doit pas faire réécrire par-dessus des fiches riches — ce lot tourne à
+  //    CHAQUE visite Vinted (lignes 849, 2348), c'est le chemin le plus fréquent.
+  const rows = await sbGetTout(`app_data?id=like.coffre_${uid}_*&select=id,data`);
+  if (rows === null) return false;
   const anciens = {};
   for (const r of rows) { const d = r && r.data; if (d && d.id) anciens[String(d.id)] = d; }
   // ⚠️ LE COFFRE IGNORAIT LE SEUL ENDROIT OÙ LE TEXTE EXISTE VRAIMENT.
