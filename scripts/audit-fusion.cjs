@@ -83,6 +83,22 @@ const CAS = [
   { id: 'vinted_item_details',   avant: { '111': { description: 'd1', photos: [] } }, quoi: 'les descriptions captées',
     geste: (c) => c.saveItemDetail('222', { description: 'd2', photos: [] }), garde: (d) => d['111'] && d['222'] },
 
+  // ⚠️⚠️ TROUVÉE LE 4 OCTOBRE EN BALAYANT TOUT `background.js` — ce fichier
+  //    énumérait à la main et avait sauté `noterUrlLabel` (ligne `panel_label_urls`).
+  //    C'est la mesure « quel chemin Vinted rend le PDF du bordereau » (celle que
+  //    le dossier dit « remise à zéro sans cause trouvée », §« capture de
+  //    bordereau ») : elle ACCUMULE une observation par chemin, et s'écrivait
+  //    `const cur = (rows && rows[0] && rows[0].data) || {}` SANS garde `=== null`.
+  //    Un timeout de lecture (base debout) la réécrivait avec la seule URL du
+  //    moment — tous les chemins appris, effacés. *Un banc qui énumère à la main
+  //    ne couvre que ce qu'on a pensé à écrire* (mot pour mot la leçon du
+  //    17 septembre, refaite ici).
+  { id: 'panel_label_urls',
+    avant: { vus: { 'www.vinted.fr/api/v2/shipments/_id/label': { ok: true, vuAt: new Date().toISOString() } }, majAt: new Date().toISOString() },
+    quoi: 'les chemins de bordereau déjà observés (la mesure qui accélère la capture)',
+    geste: (c) => c.noterUrlLabel('https://www.vinted.fr/api/v2/label_options/9999', true),
+    garde: (d) => d.vus && d.vus['www.vinted.fr/api/v2/shipments/_id/label'] && Object.keys(d.vus).length >= 2 },
+
   // ⚠️⚠️ TROIS DE PLUS, TROUVÉES LE 17 SEPTEMBRE — LE CHEMIN LEBONCOIN N'AVAIT
   //    JAMAIS APPRIS LA LEÇON. Ce fichier listait les lire-fusionner-réécrire
   //    « de l'extension » et s'arrêtait à ceux du panneau Vinted : `storeLbcRecon`,

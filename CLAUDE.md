@@ -4288,6 +4288,30 @@ Demande de Julien : « améliore la fiabilité ». Mesuré d'abord (§6), pas de
   une écriture fautive — c'est pour ça qu'il est si difficile à faire tomber, et
   c'est tant mieux.
 
+### ⚠️⚠️ `noterUrlLabel` EFFAÇAIT SA MESURE DE BORDEREAU SUR UNE LECTURE RATÉE (4 octobre, 5.147)
+Suite de la passe fiabilité. `audit-fusion.cjs` énumérait les sites
+lire-fusionner-réécrire **à la main** — et le dossier posait déjà la règle :
+*« un banc qui énumère à la main ne couvre que ce qu'on a pensé à écrire »*. En
+balayant TOUT `background.js`, un site manquait : `noterUrlLabel`
+(ligne `panel_label_urls`), qui ACCUMULE une observation par chemin Vinted de
+bordereau — **la mesure même que le dossier dit « remise à zéro sans cause
+trouvée »** (§« capture de bordereau »). Elle lisait
+`const cur = (rows && rows[0] && rows[0].data) || {}` **sans** garde `=== null`,
+quand tous ses frères (panel_offer_statuts, seen_urls, colis_relais, item_details,
+listing_dates, msg_repondus, lbc_recon, ebay_form…) l'ont. Un timeout de lecture,
+la base debout, la réécrivait avec **la seule URL du moment** — tous les chemins
+appris, effacés. C'est très probablement la cause de la « remise à zéro ».
+⇒ Garde posée (`if (rows === null) return;`). `audit-fusion.cjs` porte désormais
+`panel_label_urls` dans sa liste de CAS — **§6.1 : rouge sur le code d'avant**
+(« la ligne est réécrite depuis une lecture ratée »), vert après, les deux sens
+vérifiés. Extension **5.147.0**, zip régénéré, `EXT_ATTENDUE` suivie.
+- **Reste constaté, laissé tel quel (pas la même famille)** : `storeReleve` écrit
+  une ligne FRAÎCHE complète (pas une fusion de clés accumulées) ; sur lecture
+  ratée de sa sonde `nLignes`, il saute seulement la garde « capture plus riche »
+  (§4.2) et réécrit — mineur et auto-réparant à la capture suivante, pas une
+  perte de données accumulées. Ne pas « durcir » au risque de bloquer une
+  écriture légitime.
+
 ### Logo iPhone : icônes PWA régénérées (3 octobre)
 `apple-touch-icon.png` + `icon-192/512/maskable` portaient encore l'ancien logo
 orange ; régénérées depuis `logo-vrm.png` (VRM Noir), maskable avec marge sur
