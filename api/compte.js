@@ -357,6 +357,7 @@ function sante(req, res) {
     serviceKey: !!process.env.SUPABASE_SERVICE_KEY,
     owner: !!process.env.VRM_OWNER_UID,
     ia: !!process.env.AI_API_KEY,
+    detourage: !!process.env.PHOTOROOM_API_KEY,
     stripe: stripePret(),
     stripeWebhook: !!process.env.STRIPE_WEBHOOK_SECRET,
   });

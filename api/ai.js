@@ -16,10 +16,16 @@
 
 import { utilisateurDe } from './_lib/session.js';
 import { accesVendeur } from './_lib/abonnement.js';
+import { handleDetourage } from './_lib/detourage.js';
 
 const MODEL = process.env.AI_MODEL || 'claude-haiku-4-5-20251001';
 
 export default async function handler(req, res) {
+  // ⚠️ LE DÉTOURAGE PHOTOROOM EST UN MODE DE CETTE ROUTE (/api/detourage par
+  //    réécriture) : le plan Hobby plafonne à 12 fonctions, et le projet y est.
+  //    Il passe AVANT tout le reste — en particulier avant le « no-key » de l'IA,
+  //    qui sinon répondrait pour lui tant que la clé de l'IA n'est pas posée.
+  if (req.query && req.query.mode === 'detourage') return handleDetourage(req, res);
   // Santé : l'app interroge cette route pour afficher « IA branchée / non ».
   if (req.method === 'GET') {
     res.status(200).json({ ok: true, ready: !!(process.env.AI_API_KEY || process.env.ANTHROPIC_API_KEY), model: MODEL });
