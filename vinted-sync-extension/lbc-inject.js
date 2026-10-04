@@ -115,17 +115,22 @@
     if (prefixe) out.push(prefixe + ':' + (v === null ? 'null' : typeof v));
     return out;
   }
+  // ⚠️ UN UUID EST UN IDENTIFIANT (4 octobre) : la règle « 3 chiffres ou plus →
+  //    {id} » mangeait le DÉBUT d'un UUID et laissait le reste — les UUID de ses
+  //    conversations et de son compte partaient dans `lbc_recon`, et chaque
+  //    conversation créait sa propre clé de schéma. On les remplace d'abord.
+  const sansUuid = (x) => String(x).replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '{uuid}');
   const noteEnvoi = (url, corps, methode) => {
     try {
       if (!DE_LEBONCOIN(url) || !ENVOI.test(url)) return;
       if (methode && !MODIFIE.test(methode)) return;
       // Un corps vide compte aussi : le bouton peut n'envoyer qu'une adresse.
-      if (!corps) { post({ kind: 'lbcenvoi', url, methode: String(methode || ''), cles: ['(sans corps)'] }); return; }
+      if (!corps) { post({ kind: 'lbcenvoi', url: sansUuid(url), methode: String(methode || ''), cles: ['(sans corps)'] }); return; }
       let cles = [];
       if (typeof corps === 'string') { try { cles = cheminsDeCles(JSON.parse(corps)); } catch (_) { return; } }
       else if (corps instanceof FormData) { cles = [...corps.keys()].slice(0, 80).map((k) => k + ':formdata'); }
       else return;
-      if (cles.length) post({ kind: 'lbcenvoi', url, methode: String(methode || ''), cles: cles.slice(0, 400) });
+      if (cles.length) post({ kind: 'lbcenvoi', url: sansUuid(url), methode: String(methode || ''), cles: cles.slice(0, 400) });
     } catch (_) {}
   };
   // ⚠️⚠️ LE MOUCHARD DE CHEMINS — À PARITÉ AVEC CELUI DE VINTED (`inject.js`).
@@ -155,7 +160,7 @@
       let host = '', chemin = '';
       try { const u = new URL(url, location.origin); host = u.host; chemin = u.pathname; }
       catch (_) { chemin = String(url).split('?')[0]; }
-      chemin = chemin.replace(/\/\d{3,}/g, '/{id}').replace(/\/[0-9a-f]{16,}/gi, '/{id}');
+      chemin = sansUuid(chemin).replace(/\/\d{3,}/g, '/{id}').replace(/\/[0-9a-f]{16,}/gi, '/{id}');
       const rec = ((methode ? String(methode).toUpperCase() + ' ' : '') + host + chemin
         + (s ? ' → ' + s : '') + (t ? ' [' + t + ']' : '')).slice(0, 160);
       if (!seenPaths.has(rec)) { seenPaths.add(rec); seenDirty = true; }
@@ -176,13 +181,13 @@
     try {
       let ep = '';
       try { const u = new URL(url, location.origin); ep = u.host + u.pathname; } catch (_) { ep = String(url).split('?')[0]; }
-      ep = ep.replace(/\/\d{3,}/g, '/{id}').replace(/\/[0-9a-f]{16,}/gi, '/{id}');
+      ep = sansUuid(ep).replace(/\/\d{3,}/g, '/{id}').replace(/\/[0-9a-f]{16,}/gi, '/{id}');
       if (schemaVus.has(ep)) return;
       let obj = null; try { obj = JSON.parse(text); } catch (_) { return; }
       if (!obj || typeof obj !== 'object') return;
       schemaVus.add(ep);
       const cles = cheminsDeCles(obj)
-        .map((c) => c.replace(/\.\d{3,}(?=[.:[])/g, '.{id}').replace(/\.[0-9a-f]{16,}(?=[.:[])/gi, '.{id}'))
+        .map((c) => sansUuid(c).replace(/\.\d{3,}(?=[.:[])/g, '.{id}').replace(/\.[0-9a-f]{16,}(?=[.:[])/gi, '.{id}'))
         .slice(0, 200);
       if (cles.length) post({ kind: 'lbcschema', endpoint: ep, cles });
     } catch (_) {}
@@ -244,7 +249,32 @@
       if (!text || text.length > 1500000) return;
       if (ctype && !/json/i.test(ctype)) return;
       if (!DE_LEBONCOIN(url)) return;                       // ni pub, ni tiers
+      // ⚠️ Un jeton de connexion temps réel : rien, nulle part, pas même ses clés.
+      if (/\/realtime\/credentials/i.test(url)) return;
       noteSchema(url, text);                                // la structure, jamais les valeurs
+      // ── LA MESSAGERIE (4 octobre) : SEULEMENT LE NOMBRE DE NON-LUS ─────────
+      // Julien : « dans Leboncoin, il y ait les messages ». Mesuré : la page
+      // recharge elle-même un compteur `{userId, unread, pollingTime}` — un
+      // NOMBRE, par compte. On relaie ce nombre et rien d'autre. ⚠️ Aucune
+      // réponse de messagerie ne part en `lbcraw` ni en échantillon : un jour un
+      // message contiendra « annonce » ou « owner », et le texte d'un client
+      // finirait dans la base. Lire les fils viendra après avoir MESURÉ leur
+      // forme (un passage de Julien), pas avant.
+      if (/\/messaging\//i.test(url)) {
+        const m = /\/messaging\/proxy\/api\/hal\/([0-9a-f-]{8,64})\/counter\/?(?:\?|$)/i.exec(url);
+        if (m) { try { const o = JSON.parse(text); const n = Number(o && o.unread); if (Number.isFinite(n) && n >= 0) post({ kind: 'lbcmsgcompteur', userId: m[1], unread: Math.round(n) }); } catch (_) {} }
+        return;
+      }
+      // Ses comptes Leboncoin liés (le sélecteur de compte) : identifiant, nom,
+      // pro ou non. JAMAIS l'email. Le relais habituel continue en dessous.
+      if (/\/authenticator\/v\d+\/users\/me\/linked_accounts/i.test(url)) {
+        try {
+          const o = JSON.parse(text);
+          const arr = Array.isArray(o) ? o : ((o && (o.linked_accounts || o.accounts)) || []);
+          const comptes = (Array.isArray(arr) ? arr : []).map((a) => a && ({ id: String(a.user_id || a.id || ''), name: String(a.display_name || a.name || '').slice(0, 60), pro: !!a.is_business_user })).filter((c) => c && c.id).slice(0, 10);
+          if (comptes.length) post({ kind: 'lbccomptes', comptes });
+        } catch (_) {}
+      }
       if (CATALOGUE.test(url)) {
         // On le garde entier dans la limite, et on DIT s'il a été coupé : la
         // moitié d'un catalogue a l'air d'un catalogue.

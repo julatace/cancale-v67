@@ -1167,6 +1167,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           // La carte complète de Leboncoin : structure (chemins de clés) d'une
           // réponse, par endpoint. Jamais de valeur (§ « capte tout »).
           if (msg.action === 'lbcSchema' && msg.endpoint && Array.isArray(msg.cles)) { await storeLbcRecon({ schemaOne: { endpoint: msg.endpoint, cles: msg.cles } }); sendResponse({ ok: true }); return; }
+          // La messagerie Leboncoin : le nombre de non-lus d'un compte, et ses
+          // comptes liés. Rangés dans `lbc_messages` (voir storeLbcMessages).
+          if (msg.action === 'lbcMsgCompteur' && msg.userId) { await storeLbcMessages({ compteur: { userId: String(msg.userId).slice(0, 64), unread: Number(msg.unread) } }); sendResponse({ ok: true }); return; }
+          if (msg.action === 'lbcComptes' && Array.isArray(msg.comptes)) { await storeLbcMessages({ comptes: msg.comptes }); sendResponse({ ok: true }); return; }
           // SONDE PHOTOS (lecture seule, aucun contenu) : à quoi ressemblent les
           // vignettes acceptées + combien l'extension a posé. Sert à MESURER la
           // vraie mécanique de l'uploader Leboncoin (blob ? http ? multiple ?),
@@ -5571,6 +5575,38 @@ async function storeLbcListings(url, listings) {
 // COMPTES LEBONCOIN connectes. Julien en a plusieurs : on garde la liste des
 // comptes reellement vus dans le navigateur, avec la date de derniere vue. L'app
 // s'en sert pour dire depuis quel compte publier, et pour repartir les annonces.
+// ── LA MESSAGERIE LEBONCOIN : LE NOMBRE DE NON-LUS, PAR COMPTE (4 octobre) ──
+// Une ligne dédiée, `lbc_messages` : `compteurs[userId] = {unread, at}` et
+// `comptes[id] = {name, pro, at}`. Lire-fusionner-réécrire : une lecture ratée
+// (`null`) n'écrit RIEN (elle effacerait les autres comptes — la famille de
+// « rien lu ne vaut pas rien »). La page recharge le compteur en continu : on
+// n'écrit que si le nombre change, ou pour rafraîchir sa date toutes les 10 min.
+async function storeLbcMessages(patch) {
+  try {
+    const rows = await sbGet('app_data?id=eq.lbc_messages&select=data');
+    if (rows === null) return;
+    const cur = (rows[0] && rows[0].data) || {};
+    const compteurs = Object.assign({}, cur.compteurs || {});
+    const comptes = Object.assign({}, cur.comptes || {});
+    const now = new Date().toISOString();
+    let change = false;
+    if (patch.compteur) {
+      const id = String(patch.compteur.userId || '');
+      const n = Math.max(0, Math.min(99999, Math.round(Number(patch.compteur.unread) || 0)));
+      const avant = compteurs[id];
+      if (id && (!avant || avant.unread !== n || Date.now() - Date.parse(avant.at || 0) > 10 * 60e3)) { compteurs[id] = { unread: n, at: now }; change = true; }
+    }
+    for (const c of (patch.comptes || [])) {
+      const id = String((c && c.id) || ''); if (!id) continue;
+      const avant = comptes[id] || {};
+      const nom = String(c.name || '').slice(0, 60), pro = !!c.pro;
+      if (avant.name !== nom || avant.pro !== pro || Date.now() - Date.parse(avant.at || 0) > 6 * 3600e3) { comptes[id] = { name: nom, pro, at: now }; change = true; }
+    }
+    if (!change) return;
+    const ok = await supabaseUpsert('app_data', [{ id: 'lbc_messages', data: { compteurs, comptes, updatedAt: now, ver: EXT_VERSION } }], 'id');
+    noterFlux('leboncoin', ok !== false);
+  } catch (_) {}
+}
 async function storeLbcAccount(acc) {
   try {
     const prevRows = await sbGet('app_data?id=eq.lbc_accounts&select=data');
