@@ -2830,6 +2830,10 @@ async function visiteVinted() {
     // ligne — 3 par visite, une par une, compte connecté (§3). Sans ouvrir
     // l'annonce : c'est l'extension qui lit le détail (Julien, 20 sept.).
     await capterPhotosAnnonces(uid);
+    // ⚠️ MÉNAGE : les PDF des bordereaux de ventes FINALISÉES (livrées depuis
+    // longtemps) sont retirés — métadonnée gardée, seul le poids part. Global,
+    // borné, cooldown 12 h, fail-safe par sens (voir `purgeBordereaux`).
+    await purgeBordereaux();
   } catch (_) { /* une visite ratée n'a pas à casser la navigation */ }
 }
 
@@ -4271,6 +4275,72 @@ async function capterDatesVersement(uid) {
       logActivity(`💶 ${ecrites} date${ecrites > 1 ? 's' : ''} de versement récupérée${ecrites > 1 ? 's' : ''}`);
       notifierApp({ type: 'maj', quoi: 'versements', uid: String(uid) });
     }
+    return n;
+  } catch (_) { return 0; }
+}
+
+// ═══ PURGE DES VIEUX BORDEREAUX (4 octobre) ════════════════════════════════
+// Julien : « 117 colis partis… après avoir expédié / au-delà de 2 semaines tu
+// peux supprimer les bordereaux, ça ferait énormément d'économie ». Il a tranché :
+// « après vente FINALISÉE ». Un bordereau sert jusqu'à l'envoi du colis ; une
+// vente finalisée (statut 450, argent versé) est livrée depuis longtemps — son
+// PDF (100-200 Ko, le gros du stockage/égress) est mort. On retire les OCTETS
+// (`pdfB64`, `pdfTamponneB64`) et on GARDE toute la métadonnée (date, N°, suivi,
+// transaction) : l'historique reste, seul le poids part.
+// ⚠️ DESTRUCTIF — donc FAIL-SAFE PAR SENS : on SOUS-purge au moindre doute.
+//   · lecture ratée (`null`) → on n'agit pas (« rien lu » ne vaut pas « rien ») ;
+//   · on ne purge QUE si on a trouvé de VRAIS octets — une forme inconnue
+//     (champs renommés) ne perd rien et ne se dit pas « purgée » ;
+//   · ceinture : jamais un bordereau de moins de 7 jours, même « finalisé ».
+// L'app liste les `email_bord` par `meta->>filename` (témoin du PDF) : vider
+// `filename` sort la ligne purgée de « à imprimer » — aucun bouton « Imprimer »
+// cassé, AUCUN changement côté app nécessaire. §3 ne s'applique pas (ce sont NOS
+// lectures/écritures Supabase, pas des requêtes Vinted).
+const PURGE_MAX_PAR_RUN = 20;
+const PURGE_COOLDOWN_MS = 12 * 60 * 60 * 1000;
+const PURGE_MIN_AGE_MS = 7 * 86400000;
+async function purgeBordereaux() {
+  try {
+    const cd = (await chrome.storage.local.get('vrmPurgeBord')).vrmPurgeBord || 0;
+    if (Date.now() - Number(cd) < PURGE_COOLDOWN_MS) return 0;
+    // Ventes finalisées (statut 450), TOUS comptes — `email_bord` est global.
+    const det = await sbGetTout('app_data?id=like.harvest_*_txn_*&meta->>status=eq.450&select=id');
+    if (det === null) return 0;                                   // pas su → on ne purge RIEN
+    const finalisees = new Set();
+    for (const r of det) { const tx = (/_txn_(\d+)$/.exec(String((r && r.id) || '')) || [])[1]; if (tx) finalisees.add(tx); }
+    if (!finalisees.size) { await chrome.storage.local.set({ vrmPurgeBord: Date.now() }); return 0; }
+    // Candidats : bordereaux qui PORTENT ENCORE un PDF (témoin `filename`), pas
+    // déjà purgés, d'une vente finalisée, et vieux d'au moins 7 jours.
+    const bords = await sbGetTout('app_data?id=like.email_bord_*&select=id,fn:meta->>filename,pg:meta->>pdfPurged,rc:meta->>receivedAt');
+    if (bords === null) return 0;                                 // pas su
+    const limite = Date.now() - PURGE_MIN_AGE_MS;
+    const candidats = bords.filter(r => {
+      if (!r || !r.fn || r.fn === 'None') return false;          // pas de PDF (déjà purgé / jamais eu)
+      if (String(r.pg) === 'true') return false;                 // déjà purgé
+      const tx = (/^email_bord_(\d+)$/.exec(String(r.id || '')) || [])[1];
+      if (!tx || !finalisees.has(tx)) return false;              // pas (encore) finalisée
+      const t = Date.parse(r.rc || '');
+      if (!isNaN(t) && t > limite) return false;                 // ceinture : trop récent
+      return true;
+    });
+    let n = 0;
+    for (const r of candidats) {
+      if (n >= PURGE_MAX_PAR_RUN) break;
+      const plein = await sbGet(`app_data?id=eq.${encodeURIComponent(r.id)}&select=data`);
+      if (!Array.isArray(plein)) continue;                       // lecture ratée → on saute
+      const data = plein[0] && plein[0].data;
+      if (!data || typeof data !== 'object') continue;
+      // ⚠️ On ne marque « purgé » QUE si on a trouvé de VRAIS octets : une forme
+      //    inconnue (champs renommés) ne doit RIEN perdre ni se dire purgée.
+      const avaitPdf = (data.pdfB64 && data.pdfB64 !== 'None') || (data.pdfTamponneB64 && data.pdfTamponneB64 !== 'None');
+      if (!avaitPdf) continue;
+      const neuf = { ...data, pdfB64: null, pdfTamponneB64: null, filename: '', pdfPurged: true, pdfPurgedAt: new Date().toISOString() };
+      const ok = await supabaseUpsert('app_data', [{ id: r.id, data: neuf }], 'id');
+      if (ok === false) { noterDiag('bordereau_purge_ecriture_ratee'); continue; }
+      n++; noterDiag('bordereau_purge');
+    }
+    await chrome.storage.local.set({ vrmPurgeBord: Date.now() });
+    if (n) logActivity(`🧹 ${n} vieux bordereau${n > 1 ? 'x' : ''} allégé${n > 1 ? 's' : ''} (vente finalisée — PDF retiré, infos gardées)`);
     return n;
   } catch (_) { return 0; }
 }

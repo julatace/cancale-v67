@@ -4178,6 +4178,34 @@ colis » (vérifié au banc).
   capté. C'est le pendant **email** du fix conversation (5.145) : les deux voies
   surfacent maintenant C49341 + lieu + suivi.
 
+### ⚠️ PURGE DES VIEUX BORDEREAUX — après vente finalisée (4 octobre, 5.146)
+Julien : « 117 colis partis… au-delà de 2 semaines / après expédition tu peux
+supprimer les bordereaux, ça ferait énormément d'économie. » Tranché par lui :
+**« après vente finalisée ».** Un bordereau (PDF 100-200 Ko, le gros du
+stockage/égress) sert jusqu'à l'envoi ; une vente **finalisée** (statut 450,
+argent versé) est livrée depuis longtemps.
+⇒ `purgeBordereaux()` (extension, à la visite Vinted, cooldown 12 h) retire les
+**octets** du PDF (`pdfB64`, `pdfTamponneB64`) des `email_bord_{tx}` dont la vente
+est finalisée, et **garde toute la métadonnée** (date, N°, suivi, transaction).
+L'app liste les bordereaux par `meta->>filename` : vider `filename` sort la ligne
+purgée de « à imprimer » — **aucun bouton « Imprimer » cassé, aucun changement
+app**.
+- ⚠️ **DESTRUCTIF → FAIL-SAFE PAR SENS, on SOUS-purge au moindre doute** :
+  lecture ratée (`null`, `sbGetTout`/`sbGet`) ⇒ on ne purge RIEN ; on ne marque
+  « purgé » QUE si on a trouvé de VRAIS octets (une forme inconnue ne perd rien
+  et ne se dit pas purgée) ; **ceinture** : jamais un bordereau de moins de 7 j,
+  même « finalisé ». Borné à 20/run.
+- ⚠️ **Statut 450 = le même signal que la date de versement** (`capterDatesVersement`),
+  fiable ; finalisé ⇒ livré ⇒ bordereau déjà utilisé. §3 ne s'applique pas (NOS
+  lectures/écritures Supabase, pas des requêtes Vinted).
+- `scripts/audit-purge-bordereaux.cjs` exécute le vrai `background.js` en `vm` :
+  purge la vente finalisée (octets retirés, filename vidé, métadonnée gardée),
+  **laisse** la non-finalisée · la trop-récente · la déjà-purgée · la sans-PDF,
+  et **ne purge RIEN** sur une lecture ratée (ventes / liste / ligne). **§6.1 : 7
+  rouges sur le code d'avant** (la fonction n'existe pas), 0 après.
+- **Aucune entrée d'`EXT_CAPACITES`** : c'est du ménage interne, l'app ne promet
+  rien de neuf. Extension **5.146.0**, zip régénéré, `EXT_ATTENDUE` suivie.
+
 ### Logo iPhone : icônes PWA régénérées (3 octobre)
 `apple-touch-icon.png` + `icon-192/512/maskable` portaient encore l'ancien logo
 orange ; régénérées depuis `logo-vrm.png` (VRM Noir), maskable avec marge sur
