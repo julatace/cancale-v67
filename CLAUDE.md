@@ -4346,6 +4346,38 @@ déclaré plus bas).
   `vinted_inventory`, `vinted_entreprise_active`. Même motif à appliquer, dans
   LEUR composant, render-vérifié.
 
+### ⚠️⚠️ CINQ BALAYAGES DE FAMILLE NON BORNÉS TRONQUÉS À 1000 EN SILENCE (4 octobre, 5.148)
+Suite de la passe fiabilité, famille §4.5. Supabase coupe une réponse à
+**1000 lignes sans le dire** ; un balayage `id=like.` lu par `sbGet` (un seul
+appel, pas d'en-tête `Range`) repart donc AMPUTÉ au-delà. Mesuré dans
+`background.js` : cinq scans de familles **non bornées** (une ligne par ANNONCE,
+par BORDEREAU, par ÉTIQUETTE — **tous comptes confondus**, donc 9 comptes ×
+centaines → dépasse 1000 chez un vendeur actif) le faisaient encore :
+`harvest_*_item_*` (×2, les files de publication Leboncoin/eBay → des paires
+sans photo), `email_bord_*`, `harvest_{uid}_label_*` (×2). Tronqués, ils
+produisent une file incomplète ou un bordereau « manquant » re-généré, **sans la
+moindre erreur**.
+⇒ Passés en `sbGetTout` (paginé par `Range`, et rend `null` si une page échoue —
+une demi-liste a l'air d'une réponse). `sbGetTout` a **exactement la même forme
+de retour** que `sbGet` (tableau, ou `null`) : le `|| []` des appelants est
+conservé → **changement neutre** hors la troncature corrigée. Les familles
+BORNÉES (une ligne par compte `*_listings`, par mois `*_releve_*`) ne sont pas
+touchées.
+- `scripts/audit-pagination-ext.cjs` (NOUVEAU) verrouille la règle : toute
+  famille non bornée (`_item_`, `_label_`, `email_bord_`) balayée en `id=like.`
+  doit passer par `sbGetTout`. ⚠️ Il **neutralise d'abord les commentaires** (mes
+  commentaires de correctif disent « sbGet tronquait » — sinon cri au loup, le
+  balayage des sondes refait). **§6.1 : rouge** quand on rebascule un scan sur
+  `sbGet` (il nomme la ligne), vert après.
+- ⚠️⚠️ **ET MON PROPRE BANC A ATTRAPÉ UNE RÉGRESSION QUE J'AVAIS INTRODUITE** :
+  `audit-bordereau-pdf.cjs` extrait `capterTelechargement` et lui fournissait un
+  faux `sbGet` **mais pas `sbGetTout`** — que le code appelle maintenant (L4631).
+  L'appel levait, le cas « un seul colis → toujours relié » tombait. C'est §6.3
+  (un banc doit servir la forme que le code utilise) : `sbGetTout` ajouté au vm,
+  à l'identique de `sbGet`. **La leçon : un changement d'API de lecture se
+  répercute dans TOUS les vm qui exécutent le code touché.**
+- Extension **5.148.0**, zip régénéré, `EXT_ATTENDUE` suivie. Les 58 audits verts.
+
 ### Logo iPhone : icônes PWA régénérées (3 octobre)
 `apple-touch-icon.png` + `icon-192/512/maskable` portaient encore l'ancien logo
 orange ; régénérées depuis `logo-vrm.png` (VRM Noir), maskable avec marge sur
