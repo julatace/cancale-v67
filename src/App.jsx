@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { VAPID_PUBLIC_KEY } from "./vapid.js";
+import { noterPlantage, viderPlantages } from "./plantages.js";
 // La migration qui cloisonne les vendeurs, lue depuis LE fichier (pas recopiée) :
 // deux copies finiraient par diverger, et c'est le genre de texte qu'on colle
 // dans une base de production sans le relire.
@@ -29265,7 +29266,12 @@ function PushSetting() {
 class EcranGardeFou extends React.Component {
   constructor(props) { super(props); this.state = { err: null }; }
   static getDerivedStateFromError(err) { return { err }; }
-  componentDidCatch(err, info) { try { console.error('[VRM] écran en erreur', err, info && info.componentStack); } catch (_) {} }
+  componentDidCatch(err, info) {
+    try { console.error('[VRM] écran en erreur', err, info && info.componentStack); } catch (_) {}
+    // Noté dans SA base (journal des plantages, sans fournisseur) : un écran mort
+    // se voyait jusqu'ici par une capture, jamais par un signal.
+    noterPlantage(err, { origine: 'ecran', ecran: String(this.props.resetKey || ''), version: BUILD_ID });
+  }
   componentDidUpdate(prev) { if (prev.resetKey !== this.props.resetKey && this.state.err) this.setState({ err: null }); }
   render() {
     if (!this.state.err) return this.props.children;
@@ -29668,7 +29674,20 @@ function ConnexionsSetting() {
   // si c'est RÉCENT (< 7 j) : une dérive déjà corrigée laisse son compteur, et
   // une alerte périmée fait cesser de lire les vraies.
   const [drift, setDrift] = useState(undefined);
+  // Les plantages notés ces 7 derniers jours (src/plantages.js). Lecture ratée
+  // ou aucun : rien n'est affiché — une alerte n'apparaît que sur un fait.
+  const [plantages, setPlantages] = useState(undefined);
   useEffect(() => onVmrExt(() => setExt({ on: vmrExtPresent(), v: vmrExtVersion() })), []);
+  useEffect(() => { (async () => {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.plantage_*&select=id,message:data->>message,at:data->>at,ecran:data->>ecran&limit=60`, { headers: sbAuth() });
+      if (!r.ok) { setPlantages(null); return; }
+      const rows = await r.json();
+      if (!Array.isArray(rows)) { setPlantages(null); return; }
+      setPlantages(rows.filter(x => { const t = Date.parse(x.at || '') || 0; return t && (Date.now() - t) < 7 * 864e5; })
+        .sort((a, b) => String(b.at).localeCompare(String(a.at))));
+    } catch (_) { setPlantages(null); }
+  })(); }, []);
   useEffect(() => { (async () => {
     try {
       const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_diag_capture&select=ver:data->>ver,verAt:data->>verAt,rates:data->rates`, { headers: sbAuth() });
@@ -29759,6 +29778,12 @@ function ConnexionsSetting() {
       {Array.isArray(drift) && drift.length > 0 && (
         <Ligne t="Format d'un site" coul={C.warn} etat="a changé récemment"
           d={<>Un site a changé le format de sa réponse <b>{[...new Set(drift.map(x => nomFamille(x.type)))].join(', ')}</b> : la capture de ces données a pu en souffrir (une liste qui devient vide sans erreur). Ce n'est pas tes données qui sont perdues. <b>Signale-le dans une session VRM</b> pour qu'on adapte l'extension.</>}/>
+      )}
+      {Array.isArray(plantages) && plantages.length > 0 && (
+        <div data-plantages={plantages.length}>
+        <Ligne t="Écrans en erreur" coul={C.warn} etat={`${plantages.length} ces 7 derniers jours`}
+          d={<>Le dernier : « {plantages[0].message} »{plantages[0].ecran ? <> (écran {plantages[0].ecran})</> : null}, {depuis(Date.parse(plantages[0].at) || 0)}. Tes données ne sont pas touchées : c'est l'affichage qui a échoué, et l'erreur est notée pour être corrigée. <b>Signale-le dans une session VRM.</b></>}/>
+        </div>
       )}
       <Ligne t="Emails" coul={teinte(mail && mail.ts)}
         etat={mail === 'vide' || !mail ? 'inconnu' : mail.ts ? `dernier ${depuis(mail.ts)}` : 'aucun reçu'}
@@ -29991,6 +30016,23 @@ function AppCoeur() {
   // Ordinateur ou téléphone : décide la NAVIGATION et la largeur de lecture.
   const ordi = useOrdinateur();
   React.useEffect(()=>onAuthChange(setAuthState),[]);
+  // ── LE JOURNAL DES PLANTAGES PART DANS SA BASE (src/plantages.js) ──────────
+  // AppCoeur ne monte qu'avec une session : c'est ici seulement qu'on peut
+  // écrire AU NOM du vendeur (RLS). Une écriture non confirmée reste en file et
+  // repart à l'ouverture suivante — « pas écrit » ne vaut pas « écrit ».
+  React.useEffect(()=>{
+    let t=null, vivant=true;
+    const envoyer = async (ligne) => {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
+        method:'POST', headers:{ ...sbAuth(), 'Content-Type':'application/json', Prefer:'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify([withOwner(ligne)]) });
+      return r.ok;
+    };
+    const plus_tard = () => { if (t) clearTimeout(t); t = setTimeout(() => { if (vivant) viderPlantages(envoyer).catch(()=>{}); }, 3000); };
+    plus_tard();
+    window.addEventListener('vrm:plantage', plus_tard);
+    return () => { vivant=false; if (t) clearTimeout(t); window.removeEventListener('vrm:plantage', plus_tard); };
+  },[]);
   // Clé du widget iPhone : créée une seule fois, après le chargement du cloud
   // (sinon chaque appareil en générerait une différente et se voleraient la
   // place à tour de rôle).
