@@ -4870,6 +4870,43 @@ Zéro requête de plus vers Leboncoin.
 - Extension **5.153.0**, zip régénéré, `EXT_ATTENDUE` suivie,
   `EXT_CAPACITES.lbcmsg`.
 
+### Vestiaire Collective : mesurer la forme AVANT de capter (4 octobre, 5.154)
+Julien : « commence à faire Vestiaire Collective bien ». **Mesuré d'abord** :
+**zéro ligne `vc_*`** en base, et le site me renvoie **403** — je ne connais ni
+ses adresses d'API ni la forme de ses pages. Écrire un analyseur de ventes
+aujourd'hui, ce serait deviner (§4.10, §6.3) et ranger des chiffres faux dans
+sa comptabilité. ⇒ Même méthode que Leboncoin et eBay : **on fait mesurer le
+site par SON navigateur**.
+- `vc-inject.js` (monde MAIN) enveloppe fetch/XHR et ne regarde que ce que la
+  page charge **déjà** — aucune requête de plus, aucun clic (§3). Il relève :
+  les **chemins** d'API (méthode + chemin normalisé + code + type), la
+  **structure** des réponses JSON (chemin de clé + TYPE de feuille), les
+  **familles** de pages, et les **hôtes** tiers (le nom seul, compté).
+- ⚠️⚠️ **JAMAIS UNE VALEUR** : ses pages vendeur portent nom, adresse, IBAN,
+  téléphone, messages. Les identifiants (nombres ≥ 3 chiffres, UUID, longues
+  suites hexadécimales) deviennent `{id}`/`{uuid}`, y compris quand ils sont une
+  CLÉ d'objet (une carte indexée par email ou par produit) ; un segment de
+  chemin qui n'a pas la forme d'un mot devient `{x}`. `vc.js` relaie (source =
+  cette page, notre étiquette, et c'est NOUS qui posons l'origine et l'action) ;
+  le fond (`storeVcRecon`) range `vc_recon` en lire-fusionner-réécrire gardé
+  contre la lecture ratée, et **n'écrit rien quand rien n'est neuf** (mémo
+  `vrmVcConnu` dans `chrome.storage.local`, §4.9).
+- **Aucune vente, aucune annonce n'est comptée** : l'onglet Vestiaire de l'app
+  dit ce qui a été relevé (`VestiaireMesure` : relevé · jamais · pas su) et le
+  bouton VRM du site le dit aussi (« VRM apprend à lire Vestiaire Collective »).
+  Le jour où la structure montre où vivent une vente, son montant net et sa
+  date, on écrira l'analyseur — pas avant.
+- **Le geste de Julien** : installer la 5.154, puis ouvrir dans ce Chrome ses
+  pages vendeur Vestiaire (ventes, articles en vente, paiements).
+- Preuves : `audit-vc-recon.cjs` (le VRAI `vc-inject.js` dans un vrai
+  navigateur sous le nom de vestiairecollective.com, nourri de données
+  personnelles inventées — **10 contrôles** ; réaffaibli pour relever des
+  valeurs au lieu de types → **3 rouges**) ; `audit-fusion.cjs` porte
+  `vc_recon` ; banc `vestiaire.cjs` (trois états, aucun chiffre inventé).
+- Extension **5.154.0**, zip régénéré, `EXT_ATTENDUE` suivie,
+  `EXT_CAPACITES.vestiaire`. Aucune permission d'hôte ajoutée : les scripts de
+  contenu suffisent, le fond n'appelle jamais Vestiaire.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
@@ -5039,8 +5076,8 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | outil | quoi |
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
-| `node scripts/audit-*.cjs` | **63 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
-| `scripts/bancs/*.cjs` | les **55 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
+| `node scripts/audit-*.cjs` | **64 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `scripts/bancs/*.cjs` | les **56 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
 **Trois règles de preuve :**
@@ -5319,8 +5356,8 @@ script-là me fait croire à une catastrophe.
 src/App.jsx                     l'app (grep avant de lire — le fichier est énorme)
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
-scripts/audit-*.cjs             les 63 audits
-scripts/bancs/                  les 55 bancs (leur README dit comment les lancer)
+scripts/audit-*.cjs             les 64 audits
+scripts/bancs/                  les 56 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 ```
