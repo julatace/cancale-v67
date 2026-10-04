@@ -1,4 +1,5 @@
 import { sbCle } from './_lib/cle.js';
+import { contexteVendeur, proprietaireCourant } from './_lib/owner.js';
 // api/widget.js
 // ────────────────────────────────────────────────────────────────────────────
 // DONNÉES DU WIDGET écran d'accueil (app Scriptable sur iPhone).
@@ -45,13 +46,68 @@ async function fetchPaginated(path) {
   return out;
 }
 
+// ── MULTI-VENDEURS ────────────────────────────────────────────────────────────
+// Le widget est appelé par UN vendeur (sa clé `?k=`). Mais `main()` prenait le
+// PREMIER `main` venu et toutes les lectures balayaient TOUS les vendeurs → le
+// vendeur B aurait vu les chiffres de A. On résout d'abord SON `owner` par le
+// token, puis toutes les lectures se filtrent sur lui (`scoped`). Vide hors
+// cloisonnement → URL inchangée, comportement d'aujourd'hui À L'IDENTIQUE.
+function scoped(path) {
+  const o = proprietaireCourant();
+  return o ? path + (path.includes('?') ? '&' : '?') + `owner=eq.${encodeURIComponent(o)}` : path;
+}
+async function cloisonnee() {
+  try { return (await fetch(`${SUPABASE_URL}/rest/v1/app_data?select=owner&limit=1`, { headers: HEADERS })).ok; }
+  catch (_) { return false; }
+}
+// Comparaison à durée constante (évite de deviner la clé au temps de réponse).
+function memeToken(a, b) {
+  a = String(a || ''); b = String(b || '');
+  if (a.length !== b.length) return false;
+  let d = 0; for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return d === 0;
+}
+
+// Résout le vendeur à partir de la clé du widget (?k=). C'est le SEUL endroit où
+// l'on regarde tous les vendeurs à la fois — et on n'en lit que DEUX scalaires
+// (l'owner + sa clé), jamais leurs données. Ensuite chaque lecture se filtre sur
+// l'owner rendu (`scoped`), donc le vendeur B ne peut plus voir les chiffres de A.
+//   • base NON cloisonnée → '' : une seule boutique, comportement d'aujourd'hui
+//     (la clé reste vérifiée plus bas, sur la ligne `main` globale) ;
+//   • cloisonnée → la clé DOIT correspondre à celle d'un vendeur ; sinon fermé.
+// Transition : un vendeur unique qui n'a pas encore de clé (avant d'avoir rouvert
+// l'app) est servi, sinon son widget tomberait avant qu'il récupère l'adresse.
+// Rend `null` APRÈS avoir répondu lui-même (503/401) quand il faut s'arrêter.
+async function ownerDuToken(req, res) {
+  if (!(await cloisonnee())) return ''; // une seule boutique : rien ne change
+  let mains;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=owner,vrm_widget_token:data->>vrm_widget_token`, { headers: HEADERS });
+    mains = r.ok ? await r.json() : null;
+  } catch (_) { mains = null; }
+  // « Pas su lire » ne vaut pas « aucun vendeur » : on ne devine pas, on le dit.
+  if (!Array.isArray(mains)) {
+    res.status(503).json({ erreur: 'base-injoignable', message: "Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui échoue." });
+    return null;
+  }
+  const given = String((req.query && (req.query.k || req.query.key)) || req.headers['x-vrm-key'] || '');
+  // Un vendeur dont la clé est posée : elle doit correspondre à LA SIENNE.
+  const parCle = mains.find((m) => m.vrm_widget_token && memeToken(given, m.vrm_widget_token));
+  if (parCle) return parCle.owner || '';
+  // Aucune correspondance. Un seul vendeur, pas encore de clé → on le sert
+  // (transition) ; sinon (clé fausse, ou plusieurs vendeurs) → fermé.
+  if (mains.length === 1 && !mains[0].vrm_widget_token) return mains[0].owner || '';
+  res.status(401).json({ error: 'cle invalide' });
+  return null;
+}
+
 // ⚠️⚠️ `[]` SUR UNE LECTURE RATÉE = « RIEN À FAIRE » SUR SON ÉCRAN D'ACCUEIL.
 // Ces lectures rendaient une liste vide aussi bien quand la base disait « rien »
 // que quand elle ne répondait pas — et le widget affichait alors `0 à expédier ·
 // 0 à retirer · 0 €` avec 14 colis à poster. C'est le mensonge que l'app a
 // appris à ne plus faire (§ baseKO), jamais reporté ici. `null` = « pas su ».
 async function rows(like) {
-  const j = await fetchPaginated(`app_data?id=like.${like}&select=data`);
+  const j = await fetchPaginated(scoped(`app_data?id=like.${like}&select=data`));
   return j ? j.map(x => x.data).filter(Boolean) : null;
 }
 // ⚠️ ÉGRESS SUPABASE — NE JAMAIS faire `select=data` sur `email_bord_*` : chaque
@@ -63,7 +119,7 @@ async function rows(like) {
 // bas (date limite + clés d'identification) → l'appel passe de ~6 Mo à ~1 Ko.
 const BORD_SELECT = 'dateLimite:data->>dateLimite,transaction:data->>transaction,suivi:data->>suivi,numero:data->>numero';
 async function bordRows() {
-  return await fetchPaginated(`app_data?id=like.email_bord_*&select=${BORD_SELECT}`);
+  return await fetchPaginated(scoped(`app_data?id=like.email_bord_*&select=${BORD_SELECT}`));
 }
 // Commandes Vinted moissonnées par l'extension (statut RÉEL, à jour) : c'est la
 // source AUTOMATIQUE — Vinted change le statut quand tu expédies / récupères.
@@ -78,7 +134,7 @@ async function bordRows() {
 async function comptesAExpedierOuRetirer(kind) {
   try {
     const sel = 'id,txns:data->resume->txns';
-    const rows = await fetchPaginated(`app_data?id=like.harvest_%25_orders_${kind}&select=${sel}`);
+    const rows = await fetchPaginated(scoped(`app_data?id=like.harvest_%25_orders_${kind}&select=${sel}`));
     if (!rows) return null;
     const vus = new Set(); let resumeTrouve = false;
     for (const row of rows) {
@@ -94,7 +150,7 @@ async function comptesAExpedierOuRetirer(kind) {
 }
 async function harvestOrders(kind) {
   try {
-    const j = await fetchPaginated(`app_data?id=like.harvest_%25_orders_${kind}&select=data`);
+    const j = await fetchPaginated(scoped(`app_data?id=like.harvest_%25_orders_${kind}&select=data`));
     if (!j) return null;
     const out = {};
     for (const row of j) {
@@ -123,7 +179,7 @@ const MAIN_WIDGET = ['vrm_widget_token', 'vinted_pickup_done', 'vinted_bords_pri
 async function main() {
   try {
     const sel = MAIN_WIDGET.map((k) => `${k}:data->${k}`).join(',');
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=${sel}`, { headers: HEADERS });
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${scoped(`app_data?id=eq.main&select=${sel}`)}`, { headers: HEADERS });
     if (!r.ok) return null;
     const j = await r.json();
     if (!Array.isArray(j)) return null;
@@ -134,7 +190,7 @@ async function main() {
 // PRIORITAIRE pour l'encaissé/ventes du mois, pour coller EXACTEMENT à l'app.
 async function snapshot() {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.widget_stats&select=data`, { headers: HEADERS });
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${scoped(`app_data?id=eq.widget_stats&select=data`)}`, { headers: HEADERS });
     if (!r.ok) return null;
     const j = await r.json(); return (j[0] && j[0].data) || null;
   } catch (_) { return null; }
@@ -157,6 +213,13 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   res.setHeader('Referrer-Policy', 'no-referrer');
   try {
+    // ⚠️ MULTI-VENDEURS : on résout SON owner par la clé AVANT toute lecture, et
+    //    on enveloppe tout le calcul dans son contexte → chaque `scoped(…)` se
+    //    filtre sur lui. Sans ça, `main()` prenait le premier `main` venu et les
+    //    balayages voyaient TOUS les vendeurs : B aurait lu les chiffres de A.
+    const owner = await ownerDuToken(req, res);
+    if (owner === null) return; // ownerDuToken a déjà répondu (503/401)
+    await contexteVendeur.run({ owner }, async () => {
     // On tente D'ABORD les résumés scalaires (~1 Ko). La lecture complète des
     // commandes (791 Ko) ne repart que si aucune ligne n'a encore de résumé,
     // c'est-à-dire tant que l'extension n'a pas recapté une fois.
@@ -256,6 +319,7 @@ export default async function handler(req, res) {
       appSyncedAt: snap ? snap.updatedAt : null,
       updatedAt: new Date().toISOString(),
     });
+    }); // fin contexteVendeur.run
   } catch (e) {
     // Une exception n'est pas « aucun colis » : on ne renvoie aucun chiffre.
     res.status(500).json({ erreur: 'panne', message: "Je n'ai pas pu calculer tes chiffres — ce n'est pas « rien à faire »." });

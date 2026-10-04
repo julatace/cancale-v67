@@ -4241,9 +4241,19 @@ cloisonné mais vendeurs non énumérables ⇒ on se tait, pas de résumé méla
   exige : bordereaux lus `owner=eq.` pour A ET B, **aucune lecture globale**,
   `push_subs` lu par vendeur (chacun ses appareils), dédoublonnage par owner,
   bilan à 2 vendeurs. **§6.1 : 5 rouges sur le code d'avant**, 0 après.
-- ⚠️ **Reste à faire (même famille)** : `widget.js` a le même défaut (il prend le
-  premier `main` venu et agrège tous les owners → le vendeur B verrait les
-  chiffres de A). À scoper par le token `?k=` → owner, dans une PR séparée.
+- ✅ **FAIT (même famille, PR suivante)** : `widget.js` avait le même défaut (il
+  prenait le premier `main` venu et agrégeait tous les owners → le vendeur B
+  voyait les chiffres de A, et une clé `?k=` inconnue était servie quand même).
+  `ownerDuToken(req,res)` résout SON owner par la clé AVANT toute lecture (seule
+  lecture globale : owner + sa clé, jamais ses données), puis tout le calcul
+  tourne dans `contexteVendeur.run({owner})` → chaque `scoped(…)` se filtre sur
+  lui. Base NON cloisonnée → `''`, comportement d'aujourd'hui à l'identique (banc
+  `serveur.cjs` toujours vert). Clé inconnue sur base cloisonnée multi-vendeurs
+  → 401, jamais les chiffres d'un autre. `scripts/bancs/widget-multi.cjs` sert
+  **2 vendeurs** (clés + colis distincts) et exige : la clé de A ⇒ lectures
+  `owner=eq.A` et SON total (pas A+B), la clé de B ⇒ `owner=eq.B` et SON total,
+  aucune lecture lourde globale, clé inconnue ⇒ 401. **§6.1 : 7 rouges sur le
+  code d'avant** (dont « HEAD sert l'agrégat A+B à une clé inconnue »), 0 après.
 - ⚠️ **À l'échelle (1000)** : la boucle fait N passes ; au-delà de quelques
   dizaines d'owners, grouper en mémoire (une lecture globale bucketée par owner)
   pour ne pas multiplier les requêtes par vendeur. Correction avant optimisation.
