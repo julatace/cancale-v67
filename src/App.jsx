@@ -15288,12 +15288,19 @@ const PICKUP_GRACE_DAYS = 10;   // au-delà, un point relais a forcément rendu 
 // Combien de temps on affiche un colis coché « retiré » en gris, le temps que
 // Vinted enregistre le retrait. Au-delà on n'attend plus : la ligne s'efface,
 // sinon un statut Vinted qui ne bouge jamais encombrerait la liste pour toujours.
+// ⚠️ 4 OCTOBRE — Julien : « les colis retirés qui montrent encore "en attente de
+// confirmation", enlève-les. » La ligne grise, c'est son idée (undo + QR gardé si
+// problème au comptoir) et on la garde, MAIS 7 j, c'est trop long : un colis qu'il
+// a déjà récupéré n'a plus rien à faire à l'écran. Ramené à 2 j — assez pour
+// annuler une erreur ou re-montrer le QR le lendemain, et ça DISPARAÎT ensuite
+// même si Vinted n'a toujours pas enregistré le retrait (souvent le cas). C'est
+// le « à enlever » qu'il demande, sans perdre le filet de sécurité d'origine.
 // ⚠️ AU-DELÀ, UN ACHAT « EN ROUTE » EST ANORMAL — mesuré sur ses 441 achats :
 // 12 colis en transit ont 7 à 15 j (le rythme normal Vinted), mais 4 dépassent
 // le mois avec un statut qui ne bouge plus. On ne les CACHE pas (un colis caché
 // est un colis perdu, §5.43) : on affiche leur âge en rouge pour qu'il réclame.
 const ACHAT_RETARD_J = 21;
-const PICKUP_CONFIRM_DAYS = 7;
+const PICKUP_CONFIRM_DAYS = 2;
 const loadCollected = () => new Set((load('vrm_colis_collected', []) || []).map(String));
 // ⚠️ LA DATE LIMITE DE L'EMAIL PRIME SUR LES 14 JOURS — dans UN SEUL SENS.
 // Les 14 jours (`PICKUP_MAX_DAYS`) sont une supposition : « un point relais ne
