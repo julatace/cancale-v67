@@ -13,8 +13,8 @@
 //     c'est zéro conflit.
 //
 // ⚠️ AUCUNE DONNÉE INVENTÉE (§2.3) : pas de faux avis, pas de faux « 10 000
-//    vendeurs », pas de prix imaginaire. Le prix est celui des CGV (« 9,99 €
-//    par mois », depuis le 4 octobre — le banc le vérifie), la confidentialité cite la politique publiée, et
+//    vendeurs », pas de prix imaginaire. Le prix est celui des CGV (« À ce
+//    jour, VRM est gratuit »), la confidentialité cite la politique publiée, et
 //    chaque fonction décrite existe dans l'app. Les chiffres de l'animation
 //    sont une DÉMONSTRATION (une paire, un numéro de carton) — aucun vrai
 //    compte, aucun vrai acheteur.
@@ -40,18 +40,14 @@ const douce = (x) => { x = clamp01(x); return x < 0.5 ? 4 * x * x * x : 1 - Math
 const rebond = (x) => { x = clamp01(x); const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
 const mix = (a, b, x) => a + (b - a) * x;
 
-// ⚠️ Chaque scène dure assez longtemps pour qu'on LISE sa phrase avant qu'elle
-//    change (mesuré : 4,2 s était trop court pour la sous-phrase explicative).
-// ⚠️ Deux titres sont des points de contrat du banc (il saute à « Le bordereau… »
-//    et « Tes chiffres… ») : garder ces débuts si on les réécrit.
-const SCENE_S = 5.2;
+const SCENE_S = 4.2;
 const SCENES = [
-  { nav: 'Ma journée', titre: 'Tous tes comptes, un seul écran', sous: 'Dès que tu ouvres VRM, Vinted, Leboncoin et eBay sont là et à jour. Fini de jongler entre dix onglets.' },
-  { nav: 'Ventes', titre: 'Chaque vente arrive en direct', sous: 'Une vente tombe sur un de tes comptes ? Elle s’affiche ici tout de suite — payée, à expédier, en route.' },
-  { nav: 'Colis', titre: 'Le bordereau est prêt, tout seul', sous: 'VRM récupère le PDF du bordereau et y imprime le titre et le numéro de la paire. Tu n’as plus qu’à l’imprimer.' },
-  { nav: 'Annonces', titre: 'Un numéro de rangement par paire', sous: 'Carton, étagère ou bac — comme tu ranges. Chaque paire a son numéro, tu la retrouves en un coup d’œil, et un numéro n’est jamais redonné à une autre.' },
-  { nav: 'Messages', titre: 'Tes messages et tes offres', sous: 'Réponds et accepte une offre quand tu veux — depuis VRM, mais c’est toi qui cliques. Rien n’est envoyé à ta place.' },
-  { nav: 'Statistiques', titre: 'Tes chiffres, prêts pour l’URSSAF', sous: 'Ce que tu as vendu, l’argent reçu et le chiffre d’affaires à déclarer — chaque montant à sa date.' },
+  { nav: 'Ma journée', titre: 'Tous tes comptes, un seul écran', sous: 'Vinted, Leboncoin et eBay réunis — à jour dès que tu ouvres le site.' },
+  { nav: 'Ventes', titre: 'Chaque vente arrive en direct', sous: 'Plus besoin de rafraîchir dix onglets pour savoir ce qui est parti.' },
+  { nav: 'Colis', titre: 'Le bordereau est prêt', sous: 'Récupéré tout seul, tamponné du titre et du numéro de la paire.' },
+  { nav: 'Annonces', titre: 'Un numéro par carton', sous: 'Tu sais toujours où est la paire. Un numéro n’est jamais réattribué.' },
+  { nav: 'Messages', titre: 'Tes messages et tes offres', sous: 'Réponds, accepte ou fais une contre-offre sans changer d’onglet.' },
+  { nav: 'Statistiques', titre: 'Tes chiffres, chacun à sa date', sous: 'Ventes du jour, argent reçu et chiffre d’affaires à déclarer.' },
 ];
 const DUREE = SCENE_S * SCENES.length;
 // ⚠️ LE TEMPS EST TOUJOURS RAMENÉ DANS [0, DUREE[. Vu au banc : l'horodatage
@@ -245,7 +241,7 @@ function SceneRangement({ u, c }) {
       <div style={{ position: 'absolute', left: c ? 0 : 400, top: c ? 290 : 130, width: c ? '100%' : 165, padding: '12px 13px', borderRadius: 12, background: K.card2,
         border: `1px solid ${K.line2}`, opacity: etiquette, transform: c ? `translateY(${mix(12, 0, etiquette)}px)` : `translateX(${mix(16, 0, etiquette)}px)` }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Basket s={22} c={K.text} /><div style={{ fontSize: 12, fontWeight: 700, color: K.text }}>Nike Air Max 90</div></div>
-        <div style={{ fontSize: 11.5, color: K.muted, marginTop: 6, lineHeight: 1.45 }}>Rangée en <b style={{ color: K.text }}>N° 128</b> · ce numéro ne sera jamais redonné à une autre paire.</div>
+        <div style={{ fontSize: 11.5, color: K.muted, marginTop: 6, lineHeight: 1.45 }}>Carton <b style={{ color: K.text }}>128</b> · ce numéro ne sera jamais redonné à une autre paire.</div>
       </div>
     </div>
   );
@@ -478,7 +474,7 @@ export function Film() {
 const FONCTIONS = [
   { t: 'Tous tes comptes, un tableau de bord', d: 'Vinted, Leboncoin et eBay : ventes, annonces et achats de chaque compte réunis au même endroit, à jour dès que tu ouvres le site.' },
   { t: 'Bordereaux prêts à imprimer', d: 'Le PDF est récupéré tout seul et tamponné du titre et du numéro de la paire. En A4 ou sur imprimante thermique, un bordereau par feuille.' },
-  { t: 'Un numéro de rangement par paire', d: 'Chaque paire reçoit son numéro, en chiffres ou en série (B125, C12…). Carton, étagère ou bac, peu importe comment tu ranges : un numéro n’est jamais redonné, jamais deux paires au même endroit.' },
+  { t: 'Un numéro par carton', d: 'Chaque paire reçoit son numéro de rangement, en chiffres ou en série (B125, C12…). Un numéro n’est jamais redonné : jamais deux paires dans le même carton.' },
   { t: 'Messages et offres', d: 'Les conversations de tous tes comptes au même endroit : réponds, accepte une offre ou fais une contre-offre sans changer d’onglet.' },
   { t: 'Publie aussi ailleurs', d: 'Envoie une paire sur Leboncoin — sans option payante — ou prépare-la pour eBay en un clic. Vendue sur Vinted ? Elle sort de la file.' },
   { t: 'Ta compta, prête pour l’URSSAF', d: 'Le chiffre d’affaires des ventes finalisées, mois par mois et toutes plateformes, avec les registres de ventes et d’achats en PDF et en tableur.' },
@@ -486,25 +482,23 @@ const FONCTIONS = [
   { t: 'Sur ton téléphone aussi', d: 'L’app s’ajoute à l’écran d’accueil de ton téléphone, avec une notification à chaque vente et un widget sur iPhone.' },
 ];
 const ETAPES = [
-  { t: 'Crée ton compte', d: 'Un email et un mot de passe. Aucune carte bancaire demandée.' },
+  { t: 'Crée ton compte', d: 'Un email et un mot de passe. C’est gratuit.' },
   { t: 'Installe l’extension Chrome', d: 'Une fois, sur ton ordinateur, et connecte-la avec le même email.' },
   { t: 'Ouvre Vinted', d: 'VRM se remplit tout seul : ventes, annonces, bordereaux, messages.' },
 ];
 const GARANTIES = [
   'L’extension agit uniquement au nom du compte connecté dans ton navigateur.',
   'Une requête à la fois, jamais en rafale, avec un plafond d’actions par heure.',
-  'Aucun message en série aux personnes qui ont mis un article en favori.',
   'Aucune republication automatique, aucune annonce supprimée à ta place.',
-  'Aucune offre acceptée à ta place : c’est toi qui cliques sur accepter.',
+  'Les automatismes sont éteints au départ : c’est toi qui les allumes.',
   'Ton mot de passe Vinted ne t’est jamais demandé.',
 ];
 const FAQ = [
   { q: 'Faut-il donner mon mot de passe Vinted ?', r: 'Non. L’extension travaille dans ton navigateur, sur les pages Vinted où tu es déjà connecté. Elle ne demande jamais ton mot de passe Vinted.' },
   { q: 'Ça marche sur iPhone ?', r: 'Oui pour l’app : ouvre vrm.center et ajoute-la à ton écran d’accueil. L’extension, elle, s’installe une fois dans Chrome sur un ordinateur — c’est elle qui récupère tes données.' },
   { q: 'J’ai plusieurs comptes Vinted.', r: 'C’est fait pour. Passe sur Vinted connecté à chacun de tes comptes : ils apparaissent tous dans VRM, et tu peux en exclure un quand tu veux.' },
-  { q: 'Vinted peut-il bloquer mon compte à cause de VRM ?', r: 'Personne ne peut garantir une décision de Vinted, mais VRM est conçu pour ne rien faire qu’une personne ne ferait pas : une action à la fois, jamais en rafale, seulement sur le compte connecté, avec un plafond par heure. Les comportements qui trahissent un robot, VRM les refuse par principe (question suivante).' },
-  { q: 'Est-ce que VRM fait des choses à ma place qui pourraient me faire bloquer ?', r: 'Non, et c’est un choix. Les automatisations qui font repérer un robot — relancer en série les personnes qui ont mis un article en favori, republier des annonces en boucle, accepter des offres automatiquement — VRM ne les fait pas. Il range tes données et prépare ton travail ; c’est toujours toi qui cliques sur publier, accepter ou envoyer.' },
-  { q: 'Combien ça coûte ?', r: '9,99 € par mois, sans engagement, résiliable à tout moment depuis l’app. Tant que l’abonnement n’est pas activé, l’accès est offert — et rien n’est jamais prélevé sans que tu t’abonnes toi-même.' },
+  { q: 'Vinted peut-il bloquer mon compte à cause de VRM ?', r: 'Personne ne peut garantir une décision de Vinted. VRM est conçu pour ne rien faire qu’une personne ne ferait pas : une action à la fois, seulement sur le compte connecté, aucune republication automatique.' },
+  { q: 'Combien ça coûte ?', r: 'Rien aujourd’hui : VRM est gratuit. Si une offre payante arrive un jour, rien ne te sera facturé sans que tu l’aies acceptée.' },
   { q: 'Que deviennent mes données ?', r: 'Elles servent à faire marcher ta boutique, rien d’autre : VRM ne vend aucune donnée et ne fait pas de publicité.' },
 ];
 const LEGAL = [
@@ -609,7 +603,7 @@ export default function Accueil({ onEntrer }) {
   const entrer = (mode) => () => onEntrer && onEntrer(mode);
   const Cta = ({ grand }) => (
     <div className="acc-cta" style={grand ? { justifyContent: 'center' } : undefined}>
-      <button type="button" className="acc-btn acc-p" data-cta="inscription" onPointerEnter={prepare} onFocus={prepare} onClick={entrer('up')}>Créer mon compte</button>
+      <button type="button" className="acc-btn acc-p" data-cta="inscription" onPointerEnter={prepare} onFocus={prepare} onClick={entrer('up')}>Créer mon compte gratuit</button>
       <button type="button" className="acc-btn acc-s" data-cta="connexion" onPointerEnter={prepare} onFocus={prepare} onClick={entrer('in')}>J’ai déjà un compte</button>
     </div>
   );
@@ -644,7 +638,7 @@ export default function Accueil({ onEntrer }) {
               <p className="acc-lead">Ventes en direct, bordereaux prêts à imprimer, numéros de rangement, messages et comptabilité — pour tous tes comptes. L’extension Chrome remplit tout, toute seule.</p>
               <Cta />
               <div className="acc-micro">
-                <span><Coche s={13} /> Sans engagement</span>
+                <span><Coche s={13} /> Gratuit aujourd’hui</span>
                 <span><Coche s={13} /> Aucun mot de passe Vinted demandé</span>
                 <span><Coche s={13} /> Aucune donnée revendue</span>
               </div>
@@ -710,17 +704,17 @@ export default function Accueil({ onEntrer }) {
           <div className="acc-in acc-deux">
             <div>
               <div className="acc-eyebrow">Prix</div>
-              <h2 className="acc-h2 vrm-display">Un prix. Sans piège.</h2>
-              <p className="acc-sub">9,99 € par mois, sans engagement : tu résilies quand tu veux, en deux clics, depuis l’app. Tant que l’abonnement n’est pas activé, l’accès est offert — et rien n’est jamais prélevé sans que tu t’abonnes toi-même.</p>
+              <h2 className="acc-h2 vrm-display">Gratuit. Sans piège.</h2>
+              <p className="acc-sub">VRM est gratuit aujourd’hui. Si une offre payante arrive un jour, elle sera annoncée à l’avance, et rien ne te sera facturé sans ton accord.</p>
             </div>
             <div className="acc-prix">
               <div style={{ fontSize: 14, color: K.muted, fontWeight: 600, marginBottom: 10 }}>VRM</div>
-              <div className="gros vrm-display">9,99 €</div>
-              <div style={{ fontSize: 14, color: K.muted, margin: '8px 0 20px' }}>par mois · toutes les fonctions, tous tes comptes.</div>
+              <div className="gros vrm-display">0 €</div>
+              <div style={{ fontSize: 14, color: K.muted, margin: '8px 0 20px' }}>Toutes les fonctions, tous tes comptes.</div>
               <ul className="acc-liste" style={{ marginBottom: 22 }}>
                 {['Vinted, Leboncoin et eBay réunis', 'Bordereaux tamponnés, prêts à imprimer', 'Numéros de rangement', 'Messages et offres', 'Rapports pour l’URSSAF et ton comptable'].map((x) => <li key={x} style={{ padding: '10px 0', fontSize: 15 }}><Coche s={15} />{x}</li>)}
               </ul>
-              <button type="button" className="acc-btn acc-p" style={{ width: '100%' }} onPointerEnter={prepare} onClick={entrer('up')}>Créer mon compte</button>
+              <button type="button" className="acc-btn acc-p" style={{ width: '100%' }} onPointerEnter={prepare} onClick={entrer('up')}>Créer mon compte gratuit</button>
             </div>
           </div>
         </section>

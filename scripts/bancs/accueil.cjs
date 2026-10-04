@@ -180,17 +180,8 @@ async function page(nav, { largeur = 1512, hauteur = 900, mobile = false, sessio
       const { ctx, pg } = await page(nav, {});
       const t = await pg.evaluate(() => document.querySelector('[data-accueil]').innerText);
       const cgv = fs.readFileSync(path.join(RACINE, 'public', 'legal', 'cgv.html'), 'utf8');
-      // ⚠️ Le prix vient des CGV, une seule source (§11). Depuis le 4 octobre
-      //    elles annoncent l'abonnement (« 9,99 € par mois ») : la page d'accueil
-      //    doit dire CE montant — et aucun autre montant mensuel, ni « 0 € ».
       const gratuitCgv = /VRM est gratuit/i.test(cgv);
-      const prixCgv = (/abonnement à (\d+,\d{2}) € par mois/i.exec(cgv) || [])[1] || null;
-      if (gratuitCgv) dit(/gratuit/i.test(t) && /0 €/.test(t), 'le prix affiché est celui des CGV (« gratuit »)');
-      else {
-        const montants = [...t.matchAll(/(\d+,\d{2})\s*€\s*(?:\/\s*mois|par mois)/gi)].map((m) => m[1]);
-        dit(!!prixCgv && montants.length > 0 && montants.every((m) => m === prixCgv) && !/(^|\s)0 €/.test(t), `le prix affiché est celui des CGV (${prixCgv} € par mois), aucun autre`, `CGV ${prixCgv} · page ${montants.join(', ')}`);
-        dit(/sans engagement/i.test(t) && /résili/i.test(t), '  et il dit « sans engagement » et comment résilier (comme les CGV)');
-      }
+      dit(gratuitCgv === /gratuit/i.test(t) && /0 €/.test(t) === gratuitCgv, 'le prix affiché est celui des CGV (« gratuit »)', `CGV gratuit=${gratuitCgv}`);
       // Aucun chiffre de clientèle inventé : « 10 000 vendeurs », « 4,9/5 »,
       // « +38 % de ventes ». La donnée déclenche, pas un mot : on cherche un
       // NOMBRE accolé à une promesse de résultat ou de foule.
