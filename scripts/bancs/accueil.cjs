@@ -97,6 +97,15 @@ async function page(nav, { largeur = 1512, hauteur = 900, mobile = false, sessio
         const liens = await pg.evaluate(() => [...document.querySelectorAll('[data-accueil] a[href^="/legal/"]')].map((a) => a.getAttribute('href')));
         const manquants = liens.filter((h) => !fs.existsSync(path.join(DIST, h)));
         dit(liens.length >= 5 && manquants.length === 0, `${nom} : les ${liens.length} liens légaux mènent à une vraie page`, manquants.join(', ') || `${liens.length} lien(s)`);
+        // Le bouton « Commencer » reste à portée en faisant défiler : la barre du
+        // haut est collante. Un `overflow-x:hidden` sur la racine en fait un
+        // conteneur de défilement et la barre partait avec la page (vu au rendu).
+        const barre = await pg.evaluate(async () => {
+          scrollTo(0, 3000); await new Promise((r) => setTimeout(r, 200));
+          const n = document.querySelector('[data-accueil] .acc-nav'); const r = n && n.getBoundingClientRect();
+          const out = r ? Math.round(r.top) : null; scrollTo(0, 0); return out;
+        });
+        dit(barre === 0, `${nom} : la barre du haut reste visible en faisant défiler`, `haut de la barre à ${barre} px`);
         if (CAPT) {
           await pg.screenshot({ path: path.join(CAPT, `accueil-${opt.largeur}.png`), fullPage: true });
           await pg.screenshot({ path: path.join(CAPT, `accueil-${opt.largeur}-haut.png`) });

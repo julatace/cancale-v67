@@ -401,7 +401,11 @@ function DemoAnimee() {
     if (immobile.current) return undefined;
     let raf = 0, prec = performance.now(), temps = 0;
     const tic = (now) => {
-      const dt = Math.max(0, Math.min(0.05, (now - prec) / 1000)); prec = now;
+      // Le temps suit l'HORLOGE, pas le nombre d'images : sur une machine qui
+      // n'affiche que 9 images/s (mesuré : rendu logiciel à 1512 px), borner
+      // chaque pas à 0,05 s faisait tourner la démo à moitié vitesse. On ne
+      // borne qu'un vrai trou (onglet en arrière-plan, machine en veille).
+      const dt = Math.max(0, Math.min(0.25, (now - prec) / 1000)); prec = now;
       if (visible.current && !document.hidden) { temps = dansBoucle(temps + dt); setT(dansBoucle(temps + decalage.current)); }
       raf = requestAnimationFrame(tic);
     };
@@ -503,7 +507,8 @@ const LEGAL = [
 ];
 
 const CSS = `
-.acc{background:${K.bg};color:${K.text};min-height:100vh;font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;overflow-x:hidden}
+.acc{background:${K.bg};color:${K.text};min-height:100vh;font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;overflow-x:clip}
+@supports not (overflow-x:clip){.acc{overflow-x:hidden}}
 .acc *{box-sizing:border-box}
 .acc a{color:inherit}
 .acc-in{max-width:1180px;margin:0 auto;padding:0 20px}
