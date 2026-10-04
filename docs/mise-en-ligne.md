@@ -77,20 +77,26 @@ avec bancs, jamais à l'aveugle.**
 | levier | pourquoi | risque si bâclé |
 |---|---|---|
 | **§4.5 pagination des balayages serveur** ✅ FAIT (4 oct, `widget` + `ship-reminders`) | au-delà de 1000 lignes Supabase tronque en silence | des rappels/colis perdus sans erreur |
-| **Crons par-propriétaire** (reste à faire) | `ship-reminders` et `widget` sont encore pensés pour UN vendeur (un seul `main`, `sendPushToAll`) | à l'échelle, le résumé d'un vendeur part à tout le monde, ou un seul reçoit tout |
+| **Crons / routes par-propriétaire** ✅ FAIT (4 oct) | `ship-reminders` (push par vendeur) ET `widget` (clé `?k=` → owner, lectures filtrées) ne mélangent plus les vendeurs | *(corrigé)* le résumé d'un vendeur partait à tout le monde, et le widget de B agrégeait A |
 | **PDF des bordereaux → Supabase Storage** | le Disk IO (62 %) et l'égress viennent surtout des PDF lus/écrits dans le JSONB ; la purge (5.146) soulage déjà | gros chantier : capture + lecture + purge à migrer ensemble |
 | **Adresse `+étiquette` par vendeur** | `recu+{token}@usevrm.com` rend l'attribution exacte même si le transfert masque le destinataire d'origine | sans ça, un transfert qui réécrit le « To » tombe en quarantaine |
 
-### Le crons par-propriétaire — la forme à viser (quand on le fera)
-- Grouper par `owner` : lire les lignes de CHAQUE vendeur, calculer SON total,
-  envoyer à SES abonnements push (`push_subs` filtré par owner).
-- `sendPushToAll` → `sendPushToOwner(owner, …)`.
-- Banc `serveur.cjs` : servir DEUX vendeurs et exiger que chacun reçoive SON
-  compte, jamais celui de l'autre. Prouver rouge sur le code mono-vendeur.
+### Les crons/routes par-propriétaire — la forme retenue (FAIT le 4 oct)
+- Chaque vendeur a SA ligne (`main`, `push_subs`…) grâce à la PK `(owner,id)` :
+  on résout SON `owner` d'abord, puis on calcule dans `contexteVendeur.run`, et
+  chaque lecture se filtre (`owner=eq.<lui>`). `ship-reminders` énumère les
+  owners actifs et pousse à chacun ; `widget` prend l'owner de la clé `?k=`.
+- Preuves 2-vendeurs : `scripts/bancs/ship-multi.cjs` (5 rouges sur l'avant) et
+  `scripts/bancs/widget-multi.cjs` (7 rouges sur l'avant) — chacun ne voit QUE
+  ses chiffres. `serveur.cjs` (base non cloisonnée) reste vert = rien ne change
+  tant qu'il n'y a qu'un vendeur.
 
 ---
 
 ## 4. Ce qui est DÉJÀ prêt pour l'échelle (ne pas refaire)
+- **Routes/crons par vendeur** : `ship-reminders` pousse le rappel au bon
+  vendeur (banc `ship-multi.cjs`), `widget` filtre par la clé `?k=` → owner
+  (banc `widget-multi.cjs`). Base non cloisonnée → comportement d'aujourd'hui.
 - **Isolation** : RLS `owner = auth.uid()` + `vinted_accounts` par owner, actif.
 - **Vitesse** : colonne `meta` (lecture d'un petit champ sans décompresser la
   ligne), lectures app en parallèle + paginées.
@@ -105,8 +111,8 @@ avec bancs, jamais à l'aveugle.**
 ## 5. L'ordre recommandé
 1. Julien prend le **Free Upgrade Micro** (gratuit, tout de suite).
 2. On teste **à 2–3 comptes réels** (Julien + un essai) : un email arrive, il
-   atterrit chez le bon, la quarantaine marche, l'isolation tient.
-3. Si ça tient, on fait le **cron par-propriétaire** (avec bancs) — le dernier
-   vrai trou mono-vendeur.
-4. Au-delà de ~quelques dizaines d'actifs : **PDF → Storage** et monter le tier
-   compute selon la courbe de `docs/capacite-utilisateurs.md`.
+   atterrit chez le bon, la quarantaine marche, l'isolation tient, et chaque
+   vendeur ne voit QUE son widget / ses rappels d'expédition.
+3. Au-delà de ~quelques dizaines d'actifs : **PDF → Storage** et monter le tier
+   compute selon la courbe de `docs/capacite-utilisateurs.md`. Et grouper les
+   crons par owner EN MÉMOIRE (une lecture globale bucketée) plutôt que N passes.
