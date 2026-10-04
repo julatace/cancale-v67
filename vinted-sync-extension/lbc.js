@@ -33,6 +33,10 @@
     else if (d.kind === 'lbcvente' && d.body) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcVente', url: d.url, body: d.body, coupe: !!d.coupe }); } catch (_) {} }
     else if (d.kind === 'lbcpaths' && d.paths) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcPaths', paths: d.paths, url: location.href }); } catch (_) {} }
     else if (d.kind === 'lbcschema' && d.cles) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcSchema', endpoint: d.endpoint, cles: d.cles }); } catch (_) {} }
+    // La messagerie : le NOMBRE de non-lus d'un compte, et la liste de ses comptes
+    // liés (sans email). Jamais un texte de message (voir lbc-inject.js).
+    else if (d.kind === 'lbcmsgcompteur' && d.userId) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcMsgCompteur', userId: String(d.userId).slice(0, 64), unread: Number(d.unread) }); } catch (_) {} }
+    else if (d.kind === 'lbccomptes' && Array.isArray(d.comptes)) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcComptes', comptes: d.comptes.slice(0, 10).map((c) => ({ id: String(c.id || '').slice(0, 64), name: String(c.name || '').slice(0, 60), pro: !!c.pro })) }); } catch (_) {} }
   }, false);
 
 

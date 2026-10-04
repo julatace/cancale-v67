@@ -153,6 +153,12 @@ const CAS = [
     quoi: 'ses comptes Leboncoin déjà vus',
     geste: (c) => c.storeLbcAccount({ id: 'a3', login: 'z' }),
     garde: (d) => d.accounts && d.accounts.a1 && d.accounts.a2 && d.accounts.a3 },
+  // 4 octobre (5.153) : les non-lus de la messagerie Leboncoin, compte par
+  // compte. Une lecture ratée ne doit pas effacer le compteur des AUTRES comptes.
+  { id: 'lbc_messages', avant: { compteurs: { u1: { unread: 3, at: new Date().toISOString() } }, comptes: { u1: { name: 'Compte un', pro: false, at: new Date().toISOString() } } },
+    quoi: 'les non-lus Leboncoin des autres comptes',
+    geste: (c) => c.storeLbcMessages({ compteur: { userId: 'u2', unread: 5 } }),
+    garde: (d) => d.compteurs && d.compteurs.u1 && d.compteurs.u1.unread === 3 && d.compteurs.u2 && d.compteurs.u2.unread === 5 && d.comptes && d.comptes.u1 },
 ];
 
 (async () => {

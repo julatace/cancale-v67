@@ -36,7 +36,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.152.0';
+const EXT_ATTENDUE = '5.153.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -159,7 +159,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 //   releve  `capterReleves`       5.52.0  (5 sept.)   le relevé daté du porte-monnaie
 // `audit-coherence.cjs` vérifie que ces trois fonctions existent toujours dans
 // l'extension : une capacité annoncée mais retirée serait le même mensonge.
-const EXT_CAPACITES = { codes: '5.45.0', offres: '5.38.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', repond: '5.77.0', commande: '5.129.0', offresapp: '5.130.0', publication: '5.130.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0' };
+const EXT_CAPACITES = { codes: '5.45.0', offres: '5.38.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', repond: '5.77.0', commande: '5.129.0', offresapp: '5.130.0', publication: '5.130.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -26709,6 +26709,79 @@ function QuotaLbc({ limit, plan, onFait }) {
   );
 }
 
+// ── MESSAGES LEBONCOIN : COMBIEN DE NON-LUS, SUR QUEL COMPTE (4 octobre) ──────
+// Julien : « dans Leboncoin, il y ait les messages ». Mesuré : AUCUNE conversation
+// n'est captée, mais la page Leboncoin recharge elle-même un compteur de non-lus
+// par compte ; l'extension (5.153) relaie ce NOMBRE et rien d'autre (aucun texte
+// de message ne quitte sa page). On dit donc combien, sur quel compte, et on
+// ouvre la messagerie de Leboncoin pour répondre. Lire les fils viendra après
+// avoir mesuré leur forme — pas avant (§4.10, §6.3).
+// Trois états, jamais deux : `undefined` en cours · `null` pas su · objet lu.
+// « 0 » ≠ « jamais relevé », et un relevé ancien le dit (il ne se met à jour
+// que quand une page leboncoin.fr est ouverte).
+function MessagesLeboncoin() {
+  const [d, setD] = useState(undefined);
+  useEffect(() => { let stop = false; (async () => {
+    try {
+      const [rm, ra] = await Promise.all([
+        fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_messages&select=data`, { headers: sbAuth() }),
+        fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_accounts&select=data`, { headers: sbAuth() }),
+      ]);
+      if (!rm.ok) { if (!stop) setD(null); return; }
+      const jm = await rm.json(); const ja = ra.ok ? await ra.json() : [];
+      if (!Array.isArray(jm)) { if (!stop) setD(null); return; }
+      const m = (jm[0] && jm[0].data) || {};
+      const acc = (Array.isArray(ja) && ja[0] && ja[0].data && ja[0].data.accounts) || {};
+      if (!stop) setD({ compteurs: m.compteurs || {}, comptes: m.comptes || {}, acc });
+    } catch (_) { if (!stop) setD(null); }
+  })(); return () => { stop = true; }; }, []);
+  const cap = extSait('lbcmsg');
+  const nomDe = (id) => { const c = (d && d.comptes[id]) || {}; const a = (d && d.acc[id]) || {}; return c.name || a.name || 'Compte Leboncoin'; };
+  const age = (iso) => { const t = Date.parse(iso || ''); if (!t) return null; const m = Math.round((Date.now() - t) / 60000); return m < 1 ? "à l'instant" : m < 60 ? `il y a ${m} min` : m < 1440 ? `il y a ${Math.round(m / 60)} h` : `il y a ${Math.round(m / 1440)} j`; };
+  const ouvrir = <a href="https://www.leboncoin.fr/messages" target="_blank" rel="noreferrer" data-ouvrir-messages-lbc="" style={{ display: 'inline-block', marginTop: 10, border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '10px 14px', fontSize: 13.5, fontWeight: 600, textDecoration: 'none' }}>Ouvrir mes messages Leboncoin ↗</a>;
+  if (d === undefined) return <div style={{ fontSize: 13, color: C.muted }}>Chargement…</div>;
+  if (d === null) return <div data-messages-lbc="pas-su" style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Je n'ai pas pu lire tes messages Leboncoin — rien n'est perdu, c'est la lecture qui a échoué. Réessaie dans un moment.<br/>{ouvrir}</div>;
+  // Les comptes à montrer : ceux qui ont un compteur, puis ses autres comptes liés.
+  const ids = [...new Set([...Object.keys(d.compteurs), ...Object.keys(d.comptes)])];
+  const lignes = ids.map((id) => ({ id, nom: nomDe(id), c: d.compteurs[id] || null }));
+  const releves = lignes.filter((l) => l.c);
+  if (!releves.length) {
+    return (
+      <div data-messages-lbc="jamais" style={{ fontSize: 13, color: C.text, lineHeight: 1.55 }}>
+        <div style={{ fontWeight: 600, marginBottom: 4 }}>Pas encore de messages relevés</div>
+        <div style={{ color: C.muted }}>
+          {cap === 'ok' ? <>Ouvre <b>leboncoin.fr</b> une fois, connecté à ton compte : l'extension relèvera combien de messages t'attendent, compte par compte.</>
+            : cap === 'retard' ? <>L'extension installée ne relève pas encore les messages : il lui faut la <b>{EXT_CAPACITES.lbcmsg}</b>. Mets-la à jour depuis <b>Réglages</b>.</>
+            : <>C'est l'extension, sur ton ordinateur, qui relève tes messages Leboncoin quand tu passes sur leboncoin.fr.</>}
+        </div>
+        {ouvrir}
+      </div>
+    );
+  }
+  return (
+    <div data-messages-lbc={String(releves.reduce((a, l) => a + l.c.unread, 0))}>
+      {lignes.map((l) => {
+        const vieux = l.c && Date.now() - Date.parse(l.c.at || 0) > 24 * 3600e3;
+        return (
+          <div key={l.id} data-compte-lbc={l.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 0', borderTop: `1px solid ${C.border}` }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13.5, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.nom}{(d.comptes[l.id] || {}).pro ? ' · pro' : ''}</div>
+              <div style={{ fontSize: 11.5, color: C.muted, marginTop: 1 }}>
+                {l.c ? <>relevé {age(l.c.at)}{vieux ? ' — ouvre leboncoin.fr sur ce compte pour le mettre à jour' : ''}</> : 'pas encore relevé — connecte-toi une fois à ce compte sur leboncoin.fr'}
+              </div>
+            </div>
+            <div style={{ flexShrink: 0, textAlign: 'right', opacity: vieux ? 0.55 : 1 }}>
+              {l.c ? <><span style={{ fontSize: 20, fontWeight: 700, color: l.c.unread > 0 ? C.text : C.muted, fontVariantNumeric: 'tabular-nums' }}>{l.c.unread}</span>{' '}<span style={{ fontSize: 11.5, color: C.muted }}>non lu{l.c.unread > 1 ? 's' : ''}</span></> : <span style={{ fontSize: 13, color: C.muted }}>—</span>}
+            </div>
+          </div>
+        );
+      })}
+      {ouvrir}
+      <div style={{ fontSize: 11, color: C.muted, marginTop: 10, lineHeight: 1.5 }}>On répond sur Leboncoin : leurs messages ne s'affichent pas encore ici.</div>
+    </div>
+  );
+}
+
 function LeboncoinScreen() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -31109,7 +31182,8 @@ function AppCoeur() {
           {(() => { const ar = lbcArgent(lbcVentes); const e2 = (n) => n.toFixed(2).replace('.', ',') + ' €'; return (
             <PlatResume baseKO={baseKO} cases={[[`CA finalisé${ar.nRecu ? ' · ' + ar.nRecu : ''}`, ar.actives ? e2(ar.recu) : null], [`En attente${ar.nAttente ? ' · ' + ar.nAttente : ''}`, ar.actives ? e2(ar.attente) : null, true]]}/>
           ); })()}
-          <PlatSubNav sub={platSub} setSub={setPlatSub} sections={[['ventes','Ventes'],...(((lbcVentes.achats||[]).length>0)?[['achats','Achats']]:[]),['annonces','Annonces'],['colis','Colis']]}/>
+          <PlatSubNav sub={platSub} setSub={setPlatSub} sections={[['ventes','Ventes'],...(((lbcVentes.achats||[]).length>0)?[['achats','Achats']]:[]),['annonces','Annonces'],['messages','Messages'],['colis','Colis']]}/>
+          {platSub==='messages'&&<div style={{padding:16}}>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:<MessagesLeboncoin/>}</div>}
           {platSub==='ventes'&&<div style={{padding:16}}>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:(((lbcVentes.ventes||[]).length>0||lbcVentes.inconnues>0)?<VentesLeboncoin lbcVentes={lbcVentes} sansTotaux/>:<div style={{fontSize:13,color:C.muted,lineHeight:1.5}}>Pas encore de vente Leboncoin captée — elles arrivent quand l'extension passe sur leboncoin.fr (Mes transactions). Une vente n'est comptée que si elle est <b>prouvée</b> (tu es bien le vendeur), jamais devinée d'après un titre.</div>)}</div>}
           {platSub==='achats'&&<div style={{padding:16}}>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:<AchatsLeboncoin lbcVentes={lbcVentes}/>}</div>}
           {platSub==='colis'&&(baseKO?<div style={{padding:16}}><LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne></div>:<LeboncoinColis lbcVentes={lbcVentes}/>)}

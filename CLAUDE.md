@@ -4839,6 +4839,37 @@ beaucoup plus intuitif ».
   messages **eBay** n'existent pas dans l'app (« comme pour eBay » n'a pas de
   modèle) — à trancher avec lui, et c'est le domaine de la session eBay.
 
+### Messages Leboncoin : le NOMBRE de non-lus, par compte — et un message client fuyait (4 octobre, 5.153)
+Julien : « dans Leboncoin, il y ait les messages ». **Mesuré** : aucune
+conversation captée, mais la page Leboncoin recharge elle-même un compteur
+`{userId, unread, pollingTime}` par compte, et `linked_accounts` liste ses
+comptes. L'extension relaie **ce nombre** (`lbcmsgcompteur`) et ses comptes liés
+**sans email** (`lbccomptes`) ; le fond range `lbc_messages`
+(`compteurs[userId]`, `comptes[id]`) en lire-fusionner-réécrire gardé contre la
+lecture ratée (dans `audit-fusion.cjs`), et n'écrit que si le nombre change.
+Zéro requête de plus vers Leboncoin.
+- L'app : **Leboncoin → Messages**, chaque compte nommé avec son nombre, « — »
+  pour un compte lié jamais relevé (jamais « 0 »), un relevé de plus de 24 h le
+  dit, et le bouton ouvre la messagerie de Leboncoin. On y répond là-bas : lire
+  les fils viendra après avoir MESURÉ leur forme (un passage de Julien sur
+  leboncoin.fr/messages avec la 5.153), jamais avant.
+- ⚠️⚠️ **LE TEXTE D'UN MESSAGE CLIENT QUITTAIT LA PAGE.** Une réponse de
+  conversation contient « subject », « owner », « annonce » : elle passait
+  `AD_HINT` et partait en `lbcraw` — dont le fond garde un échantillon de 9 000
+  caractères en base. Prouvé sur le code d'avant (« un message client est
+  parti »). Désormais **aucune réponse `/messaging/` ne sort**, sauf le nombre ;
+  le jeton `realtime/credentials` ne sort jamais (pas même ses clés).
+- **UUID** : la règle « 3 chiffres ou plus → {id} » mangeait le début d'un UUID
+  et laissait le reste — les UUID de ses conversations partaient à moitié en
+  clair dans `lbc_recon`, et chaque conversation créait sa clé de schéma.
+  `sansUuid` passe d'abord (chemins, schémas, envois).
+- Preuves : `audit-lbc-messages.cjs` (le VRAI `lbc-inject.js` dans un vrai
+  navigateur, sous le nom de leboncoin.fr — **10 contrôles, 8 rouges** sur le
+  code d'avant) ; banc `lbc-messages.cjs` (trois états : relevé · jamais · panne)
+  — il a attrapé « 4non lus » (l'espace n'était qu'une marge visuelle).
+- Extension **5.153.0**, zip régénéré, `EXT_ATTENDUE` suivie,
+  `EXT_CAPACITES.lbcmsg`.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
@@ -4863,6 +4894,7 @@ arrivée** — vérifiée commit par commit sur `manifest.json`, pas devinée.
 | `versement` | `capterDatesVersement` | **5.133.0** (3 oct.) | « l'extension va chercher la date de versement de tes ventes finalisées » |
 | `messagerie` | `executerPourApp` | **5.135.0** (3 oct.) | lire un fil, accepter/refuser/faire une offre depuis l'app |
 | `lbcpdf` | `pdfBordereauLbc` | **5.136.0** (3 oct.) | « 🖨 Imprimer le bordereau » Leboncoin, tamponné du titre et du N° |
+| `lbcmsg` | `storeLbcMessages` | **5.153.0** (4 oct.) | Leboncoin → Messages : « l'extension relève tes non-lus, compte par compte » |
 
 ⚠️ **DEUX SEUILS POUR UNE MÊME NOTION, EXPRÈS.** Les photos s'attachent côté
 Leboncoin depuis la 5.58 et côté eBay depuis la 5.59 : un seul seuil aurait
@@ -5006,8 +5038,8 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | outil | quoi |
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
-| `node scripts/audit-*.cjs` | **62 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
-| `scripts/bancs/*.cjs` | les **54 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
+| `node scripts/audit-*.cjs` | **63 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `scripts/bancs/*.cjs` | les **55 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
 **Trois règles de preuve :**
@@ -5286,8 +5318,8 @@ script-là me fait croire à une catastrophe.
 src/App.jsx                     l'app (grep avant de lire — le fichier est énorme)
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
-scripts/audit-*.cjs             les 62 audits
-scripts/bancs/                  les 54 bancs (leur README dit comment les lancer)
+scripts/audit-*.cjs             les 63 audits
+scripts/bancs/                  les 55 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 ```
