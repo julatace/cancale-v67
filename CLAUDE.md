@@ -4569,7 +4569,7 @@ etc. lorsqu'elle ne paye plus ».
   reçoit 401, et c'est l'ouverture suivante de l'app qui ré-enregistre.
 - **Réglage** : `vrm_reglages.abonnement_obligatoire` vaut **'0'** — RIEN n'est
   bloqué aujourd'hui. Julien le passe à '1' quand Stripe est en mode réel ET que
-  les CGV et la page d'accueil (qui disent « gratuit ») sont à jour. Le
+  les CGV et la page d'accueil sont à jour (fait le 4 octobre, voir plus bas). Le
   propriétaire est `vrm_reglages.proprietaire` (= `VRM_OWNER_UID`).
 - **À lui** : `STRIPE_SECRET_KEY` (sk_test_…) sur Vercel — le webhook et son
   secret sont posés. La règle SQL a été exécutée sur la vraie base dans une
@@ -4596,13 +4596,11 @@ le bon onglet.
   portail ; l'abonnement doit appartenir à CE client, sinon 403 ; la ligne est
   réécrite tout de suite depuis la réponse de Stripe). Résilier en ligne est une
   obligation en France (art. L215-1-1).
-- ⚠️ **RESTE À FAIRE : CGV et page d'accueil disent encore « gratuit ».** Le
-  correctif est écrit (9,99 € par mois, sans engagement, « accès offert tant que
-  l'abonnement n'est pas activé », et `accueil.cjs` qui lit le prix DANS les CGV)
-  mais il n'a pas pu partir : la page d'accueil venait d'être refaite par une
-  autre session (#430) et la fusion de `main` dans la branche a été refusée par
-  le mode Auto. Le refaire sur la version de `main`, puis — le jour où Julien
-  passe le réglage à '1' — retirer la phrase « accès offert ».
+- **CGV et page d'accueil disent 9,99 € par mois, sans engagement.** Tant que
+  `abonnement_obligatoire` vaut '0', elles disent aussi que l'accès est offert —
+  ⚠️ **le jour où Julien passe le réglage à '1', retirer cette phrase** de
+  `src/Accueil.jsx` (FAQ « Combien ça coûte ? » et section Prix) et de l'encadré
+  des CGV. Le banc `accueil.cjs` lit le prix DANS les CGV (une seule source).
 - Preuves : `audit-abonnement.cjs` **62 contrôles** (14 rouges sur l'avant) ;
   banc `abonnement.cjs` **42** (13 rouges sur le build d'avant).
 
