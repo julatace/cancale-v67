@@ -511,9 +511,15 @@ const authMagicLink = async (email) => {
 
 // Le serveur d'envoi intégré de Supabase est limité à quelques messages par
 // heure. « email rate limit exceeded » n'aide personne : on dit ce qui se passe
-// et par où passer en attendant.
+// et quoi faire.
+// ⚠️ CE TEXTE EST LU PAR N'IMPORTE QUEL INSCRIT, pas seulement par Julien. Il
+// envoyait dans le tableau de bord Supabase (« Authentication → Users ») —
+// un endroit auquel un revendeur qui s'inscrit n'a, et ne doit avoir, aucun
+// accès. Le vrai remède (brancher un serveur d'envoi, cf. la revue du
+// 4 octobre) est un geste du propriétaire, pas de l'utilisateur.
+const MAIL_QUOTA = "Trop d'emails envoyés en peu de temps : le serveur a atteint sa limite pour l'heure. Rien n'est perdu — réessaie dans une heure.";
 const mapMailError = (err) => {
-  if (/rate limit/i.test(err || '')) return "Quota d'emails Supabase atteint (quelques envois par heure). Réessaie dans une heure, ou confirme sans email : Supabase → Authentication → Users → clic sur ton email → Confirm email.";
+  if (/rate limit/i.test(err || '')) return MAIL_QUOTA;
   return err;
 };
 const authSignUp  = async (email, password) => {
@@ -524,9 +530,9 @@ const authSignUp  = async (email, password) => {
     // compte, alors que la cause est précise et la solution simple.
     let msg = r.error;
     if (/already registered/i.test(r.error)) msg = 'Un compte existe déjà avec cet email.';
-    else if (/rate limit/i.test(r.error)) msg = "Trop d'emails de confirmation demandés. Désactive « Confirm email » dans Supabase (Authentication → Providers → Email) : la création devient immédiate, sans email.";
+    else if (/rate limit/i.test(r.error)) msg = MAIL_QUOTA;
     else if (/invalid/i.test(r.error) && /email/i.test(r.error)) msg = 'Cette adresse email est refusée par le serveur.';
-    else if (/signups? not allowed|disabled/i.test(r.error)) msg = 'Les inscriptions sont désactivées côté Supabase.';
+    else if (/signups? not allowed|disabled/i.test(r.error)) msg = 'Les inscriptions sont fermées pour le moment.';
     return { ok: false, error: msg };
   }
   // Si la confirmation par email est activée côté Supabase, il n'y a pas encore

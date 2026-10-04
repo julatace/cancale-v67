@@ -239,8 +239,13 @@
        sans cette règle, certains gardaient la police système et juraient au
        milieu du reste. */
     button,input,textarea,select{font-family:inherit;}
+    /* ⚠️ `!important` est INDISPENSABLE : 46 des 105 champs de l'app portent
+          leur taille EN LIGNE (style={{fontSize:13}}), et un style en ligne gagne
+          sur une règle de feuille — sans lui, cette règle ne s'appliquait à
+          presque rien et l'iPhone zoomait la page à chaque champ touché.
+          `-webkit-touch-callout` n'existe que sur iOS : rien ne change ailleurs. */
     @supports (-webkit-touch-callout: none){
-      input,textarea,select{font-size:max(16px,1em);}
+      input:not([type=checkbox]):not([type=radio]):not([type=range]),textarea,select{font-size:max(16px,1em) !important;}
     }
 
     /* 7) CHANGEMENT D'ONGLET : le contenu arrive en fondu au lieu d'apparaître
