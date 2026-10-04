@@ -28165,7 +28165,7 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
           propre entrée « À publier » dans le menu (PLUS_TABS → leboncoin). */}
 
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Sauvegarde</div>
-      <Row icon="save" title="Sauvegarde complète (1 clic)" desc="Télécharge TOUT : catalogue, ventes, achats, numéros, comptes, garage, réglages. Ton filet de sécurité." onClick={onExport}/>
+      <Row icon="save" title="Sauvegarde complète (1 clic)" desc="Télécharge une copie de tes réglages, numéros, garage, saisies ET de tout ce que l'extension a capté (ventes, achats, messages, annonces). Sans les PDF de bordereau ni tes connexions Vinted." onClick={onExport}/>
       <Row icon="restore" title="Restaurer une sauvegarde" desc="Remplace tes données par un fichier de sauvegarde, puis recharge l'app." onClick={onImport} color={C.blue}/>
       {(()=>{ const t=Number(load('vinted_last_backup',0))||0; const days=t?Math.floor((Date.now()-t)/86400000):null;
         const old = days===null || days>=30;
@@ -31401,17 +31401,55 @@ function AppCoeur() {
               setNotifEnabled(false); save('vinted_notif_enabled',false);
             }
           }}
-          onExport={()=>{ try{
-            // SAUVEGARDE COMPLÈTE : toutes les clés synchronisées (catalogue,
-            // ventes, achats, numéros, comptes, garage, réglages…), pas juste 3.
+          onExport={async()=>{ try{
+            // ⚠️⚠️ « TÉLÉCHARGE TOUT : catalogue, ventes, achats… » — C'ÉTAIT FAUX
+            // (4 octobre). Le fichier ne portait que les réglages synchronisés
+            // (la ligne `main`) : ni les ventes, ni les achats, ni les messages, ni
+            // les annonces captées par l'extension, qui vivent dans leurs propres
+            // lignes. Un filet de sécurité qui ne contient pas ce qu'il annonce
+            // ne sert à rien le jour où on en a besoin.
+            // Maintenant : les réglages (restaurables, comme avant) + TOUTES ses
+            // lignes captées, en copie. Trois choses restent dehors, et le
+            // fichier le DIT (`omis`) : les PDF de bordereau (lourds, se
+            // retéléchargent), le détail brut des transactions (24 Mo — on garde
+            // ses champs utiles : article, état, dates), et les jetons de
+            // connexion Vinted (un fichier téléchargé ne doit jamais pouvoir
+            // ouvrir un compte). Une lecture ratée ne donne PAS un fichier qui a
+            // l'air complet : `complet:false` et la liste de ce qui manque.
+            toast('Sauvegarde en préparation… (quelques secondes)');
             const keys={};
             SYNC_KEYS.forEach(k=>{ const v=localStorage.getItem(k); if(v!=null){ try{ keys[k]=JSON.parse(v); }catch{ keys[k]=v; } } });
-            const data={ _cancale_backup:2, exportDate:new Date().toISOString(), keys };
+            const toutLire = async (query) => {
+              const out = [];
+              for (let p = 0; p < 200; p++) {
+                const from = p * 500;
+                const r = await fetch(`${SUPABASE_URL}/rest/v1/${query}`, { headers: sbAuth({ Range: `${from}-${from + 499}`, 'Range-Unit': 'items' }) });
+                if (!r.ok) return null;
+                const lot = await r.json();
+                if (!Array.isArray(lot)) return null;
+                out.push(...lot);
+                if (lot.length < 500) break;
+              }
+              return out;
+            };
+            const EXCLUS = ['harvest_*_txn_*','harvest_*_label_*','email_bord_*','lbc_catalogue','lbc_recon','backup_*','harvest_*_seen_urls','harvest_*_wreq_*','harvest_*_pickup_points'];
+            const [lignes, legeres, comptes] = await Promise.all([
+              toutLire(`app_data?select=id,data&and=(${EXCLUS.map(x=>`id.not.like.${x}`).join(',')})&order=id`),
+              toutLire(`app_data?select=id,meta&or=(id.like.harvest_*_txn_*,id.like.harvest_*_label_*,id.like.email_bord_*)&order=id`),
+              (async()=>{ try{ const r=await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=vinted_user_id,login,domain`,{headers:sbAuth()}); if(!r.ok) return null; const j=await r.json(); return Array.isArray(j)?j:null; }catch(_){ return null; } })(),
+            ]);
+            const manques=[]; if(!lignes) manques.push('tes données captées (ventes, achats, messages, annonces, emails)'); if(!legeres) manques.push('le résumé des transactions et des bordereaux'); if(!comptes) manques.push('la liste de tes comptes Vinted');
+            const data={ _cancale_backup:3, exportDate:new Date().toISOString(), keys,
+              donnees:{ lignes:lignes||[], resumes:legeres||[], comptes:comptes||[] },
+              complet: manques.length===0, manques,
+              omis:['PDF des bordereaux (ils se retéléchargent depuis Vinted ou ton email)','détail brut des transactions (on garde article, état et dates)','jetons de connexion Vinted (jamais dans un fichier)'] };
             const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
             const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url;
-            a.download=`cancale-sauvegarde-${new Date().toISOString().slice(0,10)}.json`;
+            a.download=`vrm-sauvegarde-${new Date().toISOString().slice(0,10)}.json`;
             document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
             try{ localStorage.setItem('vinted_last_backup', String(Date.now())); }catch(_){}
+            const n=(lignes||[]).length+(legeres||[]).length;
+            toast(manques.length ? `⚠ Sauvegarde INCOMPLÈTE : la base n'a pas répondu pour ${manques.join(', ')}. Réessaie dans un instant.` : `✓ Sauvegarde téléchargée : tes réglages + ${n} lignes de données captées.`);
           }catch(err){toast('Erreur export : '+err.message);} }}
           onImport={()=>{ const inp=document.createElement('input'); inp.type='file'; inp.accept='.json,application/json'; inp.onchange=async(e)=>{ const file=e.target.files[0]; if(!file) return; try{
             const data=JSON.parse(await file.text());
@@ -31433,7 +31471,10 @@ function AppCoeur() {
               const cat=Array.isArray(data.keys.vinted_catalog)?data.keys.vinted_catalog.length:0;
               const sal=Array.isArray(data.keys.vinted_sales)?data.keys.vinted_sales.length:0;
               const num=data.keys.vinted_annonce_numeros?Object.keys(data.keys.vinted_annonce_numeros).length:0;
-              if(!await askConfirm(`Restaurer cette sauvegarde complète ?\n\n📦 Catalogue : ${cat}\n💸 Ventes : ${sal}\n🔢 Numéros : ${num}\n📁 ${entries.length} rubriques au total\n\n⚠ Tes données actuelles seront REMPLACÉES, puis l'app se rechargera.`)) return;
+              // Les données CAPTÉES (ventes, achats, messages…) ne sont pas réécrites :
+              // une copie ancienne écraserait une capture plus fraîche (§4.2), et
+              // l'extension les recapte toute seule. On restaure ce que TU as saisi.
+              if(!await askConfirm(`Restaurer cette sauvegarde ?\n\n📦 Catalogue : ${cat}\n💸 Ventes saisies : ${sal}\n🔢 Numéros : ${num}\n📁 ${entries.length} rubriques de réglages et de saisies\n\nTes ventes, achats et messages captés sur Vinted ne sont pas remplacés : l'extension les recapte toute seule.\n\n⚠ Tes réglages actuels seront REMPLACÉS, puis l'app se rechargera.`)) return;
               await applyAndReload(entries); return;
             }
             // Ancien format (compat) : { catalog, sales, garageGrid }
