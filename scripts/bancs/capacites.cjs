@@ -183,15 +183,16 @@ const BANDEAU=/prix plancher[^\n]*rien ne les applique/i;
       // ⚠️ ET L'AUTRE MOITIE : la place ne disparait jamais. Un controle qui
       //    n'aurait que « pas de doublon » serait vert sur un ecran qui a perdu
       //    eBay — meme piege que le compte nomme sur les colis a retirer.
-      dit(/Leboncoin/.test(t) && /eBay/.test(t), 'et les deux places restent NOMMEES ('+c.nom+')',
+      // ⚠️ 4 octobre : eBay n'a plus de ligne ici (il se publie par l'API, depuis
+      //    eBay → Annonces ; la file de l'extension n'a plus aucun bouton). La
+      //    place restante, Leboncoin, doit rester NOMMEE.
+      dit(/Leboncoin/.test(t), 'et la place Leboncoin reste NOMMEE ('+c.nom+')',
         'une place effacee serait pire que la repetition qu\'on vient de retirer');
       if(c.places==='mixte'){
-        // Deux places « en retard » ne reclament pas la meme version (5.54 /
-        // 5.55) : la phrase DISTINGUE, elle doit rester sur la ligne. Fusionner
-        // la aurait donne une seule consigne, fausse pour l'une des deux.
-        dit(/5\.54\.0/.test(t) && /5\.55\.0/.test(t),
-          'places dans des etats DIFFERENTS ('+c.nom+') : chaque ligne garde sa consigne',
-          'les deux versions attendues doivent etre nommees, 5.54 et 5.55');
+        // Leboncoin en retard ne reclame que SA version : la consigne reste.
+        dit(/5\.54\.0/.test(t),
+          'place en retard ('+c.nom+') : la ligne garde sa consigne',
+          'la version attendue pour Leboncoin doit etre nommee, 5.54');
       }
     }
     // ⚠️ Le bandeau doit DIRE COMBIEN : un chiffre qu'on ne peut pas verifier

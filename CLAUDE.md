@@ -4733,6 +4733,34 @@ partir**, en silence.
 - `audit-email-cle.cjs` **exécute la route** : 20 contrôles, **18 rouges** sur
   le code d'avant.
 
+### eBay : UN seul bouton pour mettre une paire en vente (4 octobre)
+Julien : « il y a deux fois le bouton pour poster les paires, ça ne me convient
+pas du tout ». **Mesuré** : le même publieur (`EbayPublier`, « Vendre une paire
+sur eBay ») était monté dans **Annonces ET Compte eBay**. Le 3 octobre (#390) il
+avait été « déplacé » vers Annonces en l'AJOUTANT là-bas, sans le retirer de
+`EbayConnexion` — et la liste des annonces avec son « ✏️ Modifier » était elle
+aussi écrite deux fois.
+- **Mettre en vente et modifier vivent UNE fois, dans eBay → Annonces.** « Compte
+  eBay » ne garde que la connexion, l'argent et un renvoi (« Voir mes
+  annonces ») ; son titre ne dit plus « Publier ». `EbayLigne`, devenu sans
+  appelant, est retiré (§4.11) — `EbayAnnonceCard` porte la modification.
+- **Et le second chemin, mort, ne s'affiche plus** : la case « eBay » de « Publier
+  aussi ailleurs » et la puce « À publier aussi sur eBay » remplissaient la file
+  de l'EXTENSION (« Préparer sur eBay »), qui n'a plus aucun bouton depuis la
+  5.130 — et la phrase dessous promettait une préparation que rien ne
+  déclenche. `MP_PLACES` garde l'entrée (`ui: false` : `mpChoisi`, les audits et
+  l'extension la lisent) ; l'écran ne montre que `MP_PLACES_UI`. Mesuré : **0 des
+  401 fiches** avait coché eBay, rien n'est perdu.
+- ⚠️ **Le côté extension (`ebay.js`, `buildEbayData`, `ebayPreparer`) n'est PAS
+  retiré** : c'est le domaine de la session eBay, et ça impose un bump.
+- Bancs : `ebay-form.cjs` **compte** les `[data-poster="ebay"]` sur les quatre
+  sous-onglets (1, dans Annonces — **2 sur le build d'avant**) ;
+  `annonces-carte.cjs` trouve la carte des places par son TITRE (un attribut
+  absent du build d'avant aurait rendu le contrôle vert sur le défaut) — **4
+  cases eBay sur le build d'avant, 0 après**. Au passage, `ebay-form.cjs` exigeait
+  encore le bouton « Optimiser le titre avec l'IA », retiré exprès le 30
+  septembre : il vérifie maintenant qu'il ne revient pas.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par

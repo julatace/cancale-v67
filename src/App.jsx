@@ -58,10 +58,18 @@ const EXT_ATTENDUE = '5.152.0';
 //    Leboncoin vaut « oui » parce que sa file existait AVANT la sélection et
 //    qu'on ne l'éteint pas dans son dos. eBay n'a jamais rien préparé : cocher
 //    à sa place mettrait 44 annonces dans une file qu'il n'a pas demandée.
+// ⚠️ 4 octobre — eBay n'a plus de puce ici (`ui: false`). Il se publie par
+//    l'API officielle, depuis eBay → Annonces (« Vendre une paire sur eBay »).
+//    La file de l'extension (« Préparer sur eBay ») n'a plus AUCUN bouton depuis
+//    la 5.130 : cocher eBay ici la remplissait pour rien, et la phrase dessous
+//    promettait une préparation que rien ne déclenche. Mesuré : 0 des 401 fiches
+//    avait coché eBay — rien n'est perdu. L'entrée reste (la règle `mpChoisi`,
+//    les audits et l'extension la lisent encore) ; elle ne s'affiche plus.
 const MP_PLACES = [
   { cle: 'lbc',  nom: 'Leboncoin', defaut: true,  cap: 'places', capPhotos: 'photoslbc' },
-  { cle: 'ebay', nom: 'eBay',      defaut: false, cap: 'ebay',   capPhotos: 'photosebay' },
+  { cle: 'ebay', nom: 'eBay',      defaut: false, cap: 'ebay',   capPhotos: 'photosebay', ui: false },
 ];
+const MP_PLACES_UI = MP_PLACES.filter((p) => p.ui !== false);
 // ── LE TITRE LEBONCOIN : 50 caractères, et ils se gagnent ───────────────────
 // ⚠️⚠️ COPIE EXACTE DE `lbcTitre` DE `background.js`. Les deux calculent la file
 // chacun de leur côté (le panneau tourne sur leboncoin.fr, où l'app n'est pas
@@ -8079,7 +8087,7 @@ function EbayPublier({ onPublie, paires = [] }) {
   const eur = (n) => (Math.round(n * 100) / 100).toFixed(2).replace('.', ',') + ' €';
   const condLabel = (EBAY_CONDITIONS.find(([v]) => v === cond) || [, 'Occasion'])[1];
   if (!ouvert) return (
-    <button type="button" onClick={() => setOuvert(true)} style={{ marginTop: 10, width: '100%', border: 'none', background: C.accent, color: '#fff', borderRadius: 999, padding: '14px 16px', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+    <button type="button" data-poster="ebay" onClick={() => setOuvert(true)} style={{ marginTop: 10, width: '100%', border: 'none', background: C.accent, color: '#fff', borderRadius: 999, padding: '14px 16px', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
       <Icon name="tag" size={17}/> Vendre une paire sur eBay
     </button>
   );
@@ -8282,57 +8290,6 @@ function EbayPublier({ onPublie, paires = [] }) {
   );
 }
 
-// ── UNE ANNONCE eBay captée, modifiable depuis VRM (prix / stock) ───────────
-// La modification passe par l'action serveur `revise` (Trading
-// ReviseInventoryStatus) : elle change la VRAIE annonce eBay. C'est un geste
-// explicite (bouton ✏️ → Enregistrer), jamais automatique.
-function EbayLigne({ it, onSaved }) {
-  const [edit, setEdit] = React.useState(false);
-  const [price, setPrice] = React.useState(String(it.price || '').replace('.', ','));
-  const [qty, setQty] = React.useState(String(it.qty || ''));
-  const [saving, setSaving] = React.useState(false);
-  const [msg, setMsg] = React.useState('');
-  const enregistrer = async () => {
-    setSaving(true); setMsg('');
-    try {
-      const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'revise', itemId: it.itemId, price: String(price).replace(',', '.'), quantity: qty }) });
-      const j = await r.json();
-      if (j && j.ok) { setMsg('✓ Modifié sur eBay'); setEdit(false); if (onSaved) onSaved(); }
-      else { setMsg(j && j.error ? j.error : 'eBay a refusé la modification.'); }
-    } catch (_) { setMsg('Modification impossible (réseau).'); }
-    setSaving(false);
-  };
-  const inp = { width: 80, boxSizing: 'border-box', border: `1px solid ${C.border}`, background: C.bg || C.card, color: C.text, borderRadius: 8, padding: '7px 9px', fontSize: 13, fontFamily: 'inherit' };
-  return (
-    <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, padding: '9px 11px', background: C.card }}>
-      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-        {it.photo
-          ? <img src={it.photo} alt="" loading="lazy" style={{ width: 42, height: 42, borderRadius: 8, objectFit: 'cover', flexShrink: 0, border: `1px solid ${C.border}` }} />
-          : <span style={{ flexShrink: 0, color: C.muted, display: 'flex' }}><Icon name="tag" size={20} /></span>}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{it.title || ('Annonce ' + it.itemId)}</div>
-          <div style={{ fontSize: 11.5, color: C.muted, marginTop: 1 }}>
-            {it.price ? Number(String(it.price).replace(',', '.')).toFixed(2).replace('.', ',') + ' €' : '—'}
-            {it.qty ? ` · ${it.qty} en stock` : ''}
-            {it.detail && it.detail.categoryName ? ` · ${it.detail.categoryName}` : ''}
-            {it.vues && Number(it.vues) > 0 ? ` · ${it.vues} suivi${Number(it.vues) > 1 ? 's' : ''}` : ''}
-          </div>
-        </div>
-        {!edit && <button type="button" onClick={() => { setEdit(true); setMsg(''); }} title="Modifier le prix / le stock" style={{ flexShrink: 0, border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 8, padding: '6px 10px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>✏️ Modifier</button>}
-        {it.url && !edit && <a href={it.url} target="_blank" rel="noreferrer" style={{ flexShrink: 0, fontSize: 11.5, color: C.accent, fontWeight: 700, textDecoration: 'none' }}>Voir ↗</a>}
-      </div>
-      {edit && (
-        <div style={{ marginTop: 9, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <label style={{ fontSize: 11.5, color: C.muted }}>Prix €<br /><input value={price} onChange={e => setPrice(e.target.value)} inputMode="decimal" style={inp} /></label>
-          <label style={{ fontSize: 11.5, color: C.muted }}>Stock<br /><input value={qty} onChange={e => setQty(e.target.value)} inputMode="numeric" style={{ ...inp, width: 64 }} /></label>
-          <button type="button" onClick={enregistrer} disabled={saving} style={{ border: 'none', background: C.accent, color: '#fff', borderRadius: 8, padding: '9px 13px', fontSize: 13, fontWeight: 600, cursor: saving ? 'default' : 'pointer', fontFamily: 'inherit', opacity: saving ? 0.6 : 1, alignSelf: 'flex-end' }}>{saving ? 'Envoi…' : 'Enregistrer'}</button>
-          <button type="button" onClick={() => { setEdit(false); setMsg(''); }} style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.muted, borderRadius: 8, padding: '9px 11px', fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit', alignSelf: 'flex-end' }}>Annuler</button>
-        </div>
-      )}
-      {msg && <div style={{ fontSize: 11.5, color: /✓/.test(msg) ? INV_STATUS.online.color : C.danger, marginTop: 6 }}>{msg}</div>}
-    </div>
-  );
-}
 
 // ── CONNEXION eBay (API officielle) ─────────────────────────────────────────
 // Reflète HONNÊTEMENT l'état de `api/ebay` (jamais un « connecté » inventé) :
@@ -8394,7 +8351,7 @@ function useEbayPaires(comptes) {
   return paires;
 }
 
-function EbayConnexion({ comptes = [] }) {
+function EbayConnexion({ onAnnonces }) {
   const C = EBAY_SKIN;   // tout l'espace eBay est au look de l'appli eBay (Julien : « je veux exactement le même visuel que dans eBay »)
   const [st, setSt] = React.useState(null);          // {ready, canConsent} | null = en cours
   const [connected, setConnected] = React.useState(undefined); // true/false/null(pas su)/undefined(en cours)
@@ -8435,7 +8392,6 @@ function EbayConnexion({ comptes = [] }) {
   const [data, setData] = React.useState(null);   // {listings, orders, capturedAt} | null
   const [syncing, setSyncing] = React.useState(false);
   const [solde, setSolde] = React.useState(null);  // {ok,dispo,enAttente,retenu}|{reason:'scope'}|null
-  const paires = useEbayPaires(comptes);            // paires à vendre, source partagée (§11)
   const autoFait = React.useRef(false);
   // Solde à virer (getSellerFundsSummary). Lecture seule, une fois à l'ouverture.
   const lireSolde = React.useCallback(async () => {
@@ -8478,7 +8434,7 @@ function EbayConnexion({ comptes = [] }) {
   const boite = (bg, bord) => ({ border: `1px solid ${bord || C.border}`, background: bg || C.card, borderRadius: 10, padding: '14px 16px' });
   return (
     <div style={boite()}>
-      <div style={{ ...eti, marginBottom: 6 }}>Publier sur eBay · connexion</div>
+      <div style={{ ...eti, marginBottom: 6 }}>Compte eBay · connexion</div>
       {retour && <div style={{ fontSize: 12.5, color: C.text, background: C.bg || 'transparent', border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 10px', marginBottom: 10 }}>{retour}</div>}
       {st === null ? (
         <div style={{ fontSize: 13, color: C.muted }}>Vérification…</div>
@@ -8578,17 +8534,22 @@ function EbayConnexion({ comptes = [] }) {
                 </div>
               );
             })()}
-            {/* Annonces eBay en ligne */}
-            <div style={{ ...eti, marginBottom: 6 }}>Tes annonces eBay en ligne ({data.listings.length})</div>
-            {data.listings.length === 0 ? (
-              <div style={{ fontSize: 12.5, color: C.muted }}>Aucune annonce captée. Clique « Rafraîchir depuis eBay » si tu viens d'en publier.</div>
-            ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(300px,100%), 1fr))', gap: 8 }}>
-                {data.listings.map((it) => <EbayLigne key={it.itemId} it={it} onSaved={synchroniser} />)}
+            {/* ⚠️ 4 octobre — Julien : « il y a deux fois le bouton pour poster
+                les paires, ça ne me convient pas du tout ». Le publieur avait été
+                « déplacé » vers l'onglet Annonces le 3 octobre (#390) en
+                l'AJOUTANT là-bas, sans le retirer d'ici — et la liste des
+                annonces, avec son « Modifier », était elle aussi écrite deux
+                fois. Mettre en vente et modifier vivent UNE fois, dans Annonces ;
+                ici il ne reste que le compte, l'argent et un renvoi. */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', borderTop: `1px solid ${C.border}`, paddingTop: 10 }}>
+              <div style={{ flex: '1 1 180px', minWidth: 0, fontSize: 12.5, color: C.muted, lineHeight: 1.5 }}>
+                {data.listings.length} annonce{data.listings.length > 1 ? 's' : ''} eBay en ligne
+                {data.capturedAt ? <> · captées {(() => { const j = Math.round((Date.now() - data.capturedAt) / 3600000); return j < 1 ? 'à l\'instant' : j < 24 ? `il y a ${j} h` : `il y a ${Math.round(j / 24)} j`; })()}</> : null}.
+                {' '}Pour en mettre une en vente ou la modifier : l'onglet <b>Annonces</b>.
               </div>
-            )}
-            {data.capturedAt && <div style={{ fontSize: 10.5, color: C.muted, marginTop: 8 }}>Capté {(() => { const j = Math.round((Date.now() - data.capturedAt) / 3600000); return j < 1 ? 'à l\'instant' : j < 24 ? `il y a ${j} h` : `il y a ${Math.round(j / 24)} j`; })()} · eBay met à jour le nombre de vues avec un peu de retard.</div>}
-            <EbayPublier onPublie={synchroniser} paires={paires} />
+              {onAnnonces && <button type="button" data-vers-annonces="ebay" onClick={onAnnonces}
+                style={{ flexShrink: 0, border: `1px solid ${C.border}`, background: C.card, color: C.text, borderRadius: 10, padding: '9px 13px', cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>Voir mes annonces</button>}
+            </div>
           </>)}
         </>
       ) : (
@@ -23823,7 +23784,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
              5.55), donc leurs phrases DISTINGUENT et doivent rester sur la
              ligne. D'où une clé qui porte tout ce qui varie. Un contrôle posé
              sur l'état aurait fusionné deux consignes différentes. */
-          const lignes = MP_PLACES.map(pl => {
+          const lignes = MP_PLACES_UI.map(pl => {
             const n = pl.cle === 'lbc' ? annStats.surLbc : annStats.surEbay;
             const etat = extSait(pl.cap);
             const ph = extSait(pl.capPhotos) === 'ok';
@@ -23859,7 +23820,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {/* 1er oct. — « trop chargé » : les places tiennent dans UNE carte,
                 une ligne chacune (nom · combien · Toutes / Aucune). La phrase
                 commune dessous, en petit. */}
-            <div style={{marginBottom:12,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'6px 12px 10px',boxShadow:C.shadow||'none'}}>
+            <div data-places="" style={{marginBottom:12,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'6px 12px 10px',boxShadow:C.shadow||'none'}}>
               <div style={{fontSize:11,color:C.muted,fontWeight:600,paddingTop:2}}>Publier aussi ailleurs</div>
               <div style={{display:'flex',flexWrap:'wrap',columnGap:22}}>
               {lignes.map((l, i) => (
@@ -23987,7 +23948,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             distincte de la présence ci-dessus (ce qui EST publié). */}
                         <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
                           <span style={{fontSize:11,color:C.muted}}>À publier aussi sur</span>
-                          {MP_PLACES.map(pl => {
+                          {MP_PLACES_UI.map(pl => {
                             const on = mpChoisi(e, pl.cle);
                             return (
                               <button key={pl.cle} type="button"
@@ -30922,7 +30883,7 @@ function AppCoeur() {
           {platSub==='ventes'&&<EbayVentes baseKO={baseKO}/>}
           {platSub==='achats'&&<EbayAchats/>}
           {platSub==='annonces'&&<EbayAnnonces baseKO={baseKO} comptes={vintedAccounts}/>}
-          {platSub==='compte'&&<div style={{ background: EBAY_SKIN.bg, minHeight: '100vh', padding: 16, paddingBottom: 48 }}>{baseKO?<div style={{ color: EBAY_SKIN.muted, fontSize: 13 }}>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</div>:<EbayConnexion comptes={vintedAccounts}/>}</div>}
+          {platSub==='compte'&&<div style={{ background: EBAY_SKIN.bg, minHeight: '100vh', padding: 16, paddingBottom: 48 }}>{baseKO?<div style={{ color: EBAY_SKIN.muted, fontSize: 13 }}>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</div>:<EbayConnexion onAnnonces={()=>setPlatSub('annonces')}/>}</div>}
         </>)}
         {tab==='plat_vestiaire'&&<Plateforme plat="Vestiaire Collective" liveStats={liveStats} lbcVentes={lbcVentes} onGo={setTab} baseKO={baseKO}/>}
         {tab==='prixmarche'&&<PrixMarche data={pqmData} baseKO={baseKO}/>}

@@ -65,8 +65,21 @@ let ko = 0; const dit = (c,m,d)=>{ if(!c)ko++; console.log((c?'✅ ':'❌ ')+m+(
     return j({ ok:true }); });
   await pg.goto('http://localhost:4331/?tab=plat_ebay',{waitUntil:'domcontentloaded'});
   await pg.waitForTimeout(2500);
-  // Plus d'« Aperçu » (3 oct.) : la connexion et la publication vivent dans « Compte eBay ».
-  try { await pg.getByRole('button', { name: 'Compte eBay', exact: true }).first().click({ timeout: 5000 }); await pg.waitForTimeout(1500); } catch (_) {}
+  // ⚠️ 4 octobre — Julien : « il y a deux fois le bouton pour poster les
+  //    paires ». Le publieur était monté dans « Annonces » ET dans « Compte
+  //    eBay ». On COMPTE les boutons qui portent `data-poster="ebay"` sur les
+  //    quatre sous-onglets (jamais un libellé, §6.5) : il en faut UN, dans
+  //    « Annonces ». Sur le build d'avant : 2 (et aucun ne portait l'attribut).
+  const parOnglet = {};
+  for (const nom of ['Ventes', 'Achats', 'Annonces', 'Compte eBay']) {
+    try { await pg.getByRole('button', { name: nom, exact: true }).first().click({ timeout: 5000 }); await pg.waitForTimeout(1500); } catch (_) {}
+    parOnglet[nom] = { n: (await pg.$$('[data-poster="ebay"]')).length, vendre: (await pg.$$('text=Vendre une paire sur eBay')).length,
+      titre: await pg.evaluate(() => /Publier sur eBay · connexion/.test(document.body.innerText)) };
+  }
+  const total = Object.values(parOnglet).reduce((a, x) => a + x.vendre, 0);
+  dit(total === 1 && parOnglet['Annonces'].n === 1, 'UN seul bouton pour mettre une paire en vente, dans « Annonces »', JSON.stringify(Object.fromEntries(Object.entries(parOnglet).map(([k, v]) => [k, v.vendre]))));
+  dit(parOnglet['Compte eBay'].vendre === 0 && !parOnglet['Compte eBay'].titre, '« Compte eBay » ne porte plus ni le bouton ni le titre « Publier sur eBay »');
+  try { await pg.getByRole('button', { name: 'Annonces', exact: true }).first().click({ timeout: 5000 }); await pg.waitForTimeout(1500); } catch (_) {}
   const T = async () => (await pg.evaluate(()=>document.body.innerText));
 
   const openBtn = await pg.$('text=Vendre une paire sur eBay');
@@ -106,12 +119,12 @@ let ko = 0; const dit = (c,m,d)=>{ if(!c)ko++; console.log((c?'✅ ':'❌ ')+m+(
   dit(nImgs >= 3, 'les photos de la paire arrivent toutes seules (≥3 vignettes)', 'images=' + nImgs);
   dit(/couverture/.test(await T()), 'la 1ʳᵉ photo est marquée « couverture »');
 
-  // IA : optimiser le titre (à partir des vraies infos de la paire)
+  // IA : la rédaction par IA a été ABANDONNÉE le 30 septembre (décision) — le
+  // bouton est retiré du formulaire (`{false && aiPret && …}`). Ce banc
+  // l'exigeait encore et sortait rouge sur un code conforme à la décision : il
+  // vérifie maintenant qu'il ne revient pas, même IA branchée.
   const aiBtn = await pg.$('text=Optimiser le titre avec l\'IA');
-  dit(!!aiBtn, 'le bouton « Optimiser le titre avec l\'IA » est proposé (IA branchée)');
-  if (aiBtn) { await aiBtn.click(); await pg.waitForTimeout(500);
-    const t2 = await pg.$eval('input[placeholder^="Nike Air Max"]', el=>el.value).catch(()=>'');
-    dit(/très bon état/i.test(t2), 'l\'IA remplit le titre optimisé', 'titre=' + t2.slice(0,40)); }
+  dit(!aiBtn, 'aucun bouton « Optimiser le titre avec l\'IA » (rédaction IA abandonnée le 30 sept.)');
 
   // Analyser la catégorie → sections + pointure pré-remplie depuis la paire
   await (await pg.$('text=Trouver la catégorie eBay')).click();
