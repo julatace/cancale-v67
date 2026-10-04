@@ -4258,6 +4258,94 @@ cloisonné mais vendeurs non énumérables ⇒ on se tait, pas de résumé méla
   dizaines d'owners, grouper en mémoire (une lecture globale bucketée par owner)
   pour ne pas multiplier les requêtes par vendeur. Correction avant optimisation.
 
+### Passe fiabilité — l'audit des routes qui ÉCRIVENT (4 octobre)
+Demande de Julien : « améliore la fiabilité ». Mesuré d'abord (§6), pas deviné :
+- **Les 57 audits sont verts** — aucune régression de la famille « rien lu ne
+  vaut pas rien ».
+- **Prod vérifiée en direct** (`GET vrm.center/api/sante`, public, OUI/NON seuls) :
+  `serviceKey:true · owner:true`. Le scénario catastrophe du dossier (RLS actif +
+  `SUPABASE_SERVICE_KEY` absente sur Vercel = **emails perdus en silence**, push
+  mort, widget 503, rappels morts) **n'a pas lieu**. `ia:false` : l'IA de réponse
+  auto n'est pas branchée — éteinte par défaut, pas une urgence.
+- **Revue route par route de la famille qui DÉTRUIT** (lecture ratée → réécriture
+  qui efface) sur TOUT `api/*.js` : `email-inbound`/`push`/`widget`/`ship-reminders`
+  déjà couverts (`serveur.cjs`) ; `email-rattacher` relit sa ligne et ne la
+  supprime QUE si `resultat.ok && !resultat.quarantaine` (jamais le seul
+  exemplaire) ; `vinted-refresh` rend 502 sur lecture ratée, aucune écriture ;
+  `vinted-connect` fait un upsert sans fusion-qui-efface ; `relais`/`sante` en
+  lecture seule / booléens. **Aucune route ne perd de données sur lecture ratée.**
+- ⚠️ **TROU §4.10 FERMÉ** : les deux routes qui écrivent la donnée la plus
+  coûteuse à perdre — les **jetons Vinted** — n'avaient **jamais** été exécutées
+  par un banc. `scripts/bancs/routes-ecriture.cjs` les lance pour de vrai et porte
+  l'invariant : **un refresh que Vinted REFUSE ne réécrit JAMAIS la ligne** (sinon
+  un bon jeton est remplacé par du vide → compte mort jusqu'à reconnexion, §5.22),
+  et **un jeton refusé ne crée AUCUNE ligne** (pas de compte fantôme). Les deux
+  sens sont vérifiés (refus → rien · valide → la ligne est bien écrite — un
+  contrôle qui n'aurait que l'absence serait vacant). **§6.1 prouvé en
+  réaffaiblissant** `vinted-refresh` (persister malgré l'échec) → **2 rouges**,
+  dont « PATCH écrit `access_token:null` ». `vinted-connect` a trois gardes en
+  couches (refresh null · newAccess null · account_id null) qui bloquent chacune
+  une écriture fautive — c'est pour ça qu'il est si difficile à faire tomber, et
+  c'est tant mieux.
+
+### ⚠️⚠️ `noterUrlLabel` EFFAÇAIT SA MESURE DE BORDEREAU SUR UNE LECTURE RATÉE (4 octobre, 5.147)
+Suite de la passe fiabilité. `audit-fusion.cjs` énumérait les sites
+lire-fusionner-réécrire **à la main** — et le dossier posait déjà la règle :
+*« un banc qui énumère à la main ne couvre que ce qu'on a pensé à écrire »*. En
+balayant TOUT `background.js`, un site manquait : `noterUrlLabel`
+(ligne `panel_label_urls`), qui ACCUMULE une observation par chemin Vinted de
+bordereau — **la mesure même que le dossier dit « remise à zéro sans cause
+trouvée »** (§« capture de bordereau »). Elle lisait
+`const cur = (rows && rows[0] && rows[0].data) || {}` **sans** garde `=== null`,
+quand tous ses frères (panel_offer_statuts, seen_urls, colis_relais, item_details,
+listing_dates, msg_repondus, lbc_recon, ebay_form…) l'ont. Un timeout de lecture,
+la base debout, la réécrivait avec **la seule URL du moment** — tous les chemins
+appris, effacés. C'est très probablement la cause de la « remise à zéro ».
+⇒ Garde posée (`if (rows === null) return;`). `audit-fusion.cjs` porte désormais
+`panel_label_urls` dans sa liste de CAS — **§6.1 : rouge sur le code d'avant**
+(« la ligne est réécrite depuis une lecture ratée »), vert après, les deux sens
+vérifiés. Extension **5.147.0**, zip régénéré, `EXT_ATTENDUE` suivie.
+- **Reste constaté, laissé tel quel (pas la même famille)** : `storeReleve` écrit
+  une ligne FRAÎCHE complète (pas une fusion de clés accumulées) ; sur lecture
+  ratée de sa sonde `nLignes`, il saute seulement la garde « capture plus riche »
+  (§4.2) et réécrit — mineur et auto-réparant à la capture suivante, pas une
+  perte de données accumulées. Ne pas « durcir » au risque de bloquer une
+  écriture légitime.
+
+### ⚠️⚠️ ONZE CARTES PARTAGÉES RESTAIENT FROIDES AU PREMIER RENDU D'UN APPAREIL NEUF (4 octobre)
+Suite de la passe fiabilité, famille §5.49. **Mesuré dans le code** : le démarrage
+(`useEffect` au montage d'`AppCoeur`) fait `cloudLoad`, restaure `localStorage`,
+appelle `apply()` sur **une liste précise** d'états racine, puis `markCloudReady`.
+Donc une clé **synchronisée** lue au montage (`useState(() => load(k))`) qui n'est
+**ni** dans `apply()` **ni** re-lue par un `onCloudReady` reste à sa valeur par
+défaut **jusqu'à ce qu'on quitte et revienne sur l'écran** — l'`AppCoeur` monte
+AVANT que le nuage soit là (appareil neuf, cache vidé, PWA réinstallée).
+⚠️⚠️ **Et ce n'est pas cosmétique** : ces cartes sont éditées au clic/à la saisie,
+et leur setter réécrit `localStorage` depuis l'état courant. Un clic pendant la
+fenêtre froide part donc d'une carte **vide** et **réécrit le nuage réduit à une
+entrée** — la famille destructrice §5 (comme les numéros repartis de 1 au
+montage). Croisé `SYNC_KEYS` × lectures-au-montage × couverture : **11 cartes
+partagées** manquaient, dont `vinted_sale_overrides` (tes corrections de compta,
+achats reliés), `vinted_achat_notes` (texte saisi), les états de bordereau
+(`bords_printed/hidden/shipped`, `bord_links`, `bordereau_formats`), les retours
+(`retours_recus/dismissed`), `pairs_lost`, `offvinted_buys`.
+⇒ Ajoutées au bloc `onCloudReady` **déjà existant** (celui des numéros/points
+relais, L19189), au **motif déjà béni** `setX(n => vide(n) ? load(k) : n)` : sûr
+par construction — il ne remplit QUE ce qui est resté par défaut, **jamais une
+saisie faite pendant le chargement** (sinon ce serait le pire défaut de l'app).
+Build + 57 audits verts (`audit-tdz` compris : un callback d'`onCloudReady`
+s'exécute après le montage, pas au rendu — pas de TDZ bien que `setOffBuys` soit
+déclaré plus bas).
+- ⚠️ **Non render-vérifié ici** (pas de fixtures dans ce conteneur) : le motif est
+  identique à celui que `comptes.cjs` a validé pour les comptes exclus, et le
+  `vide`-guard le rend non destructeur ; à re-regarder au rendu sur un appareil
+  neuf dès qu'un banc a des fixtures.
+- ⚠️ **Laissé pour une passe à portée de rendu** (setters dans d'AUTRES scopes de
+  composant, que je ne place pas à l'aveugle) : `vinted_regime` (base du taux
+  URSSAF — le plus visible), `vinted_urssaf_freq`, `vinted_account_emails/phones`,
+  `vinted_inventory`, `vinted_entreprise_active`. Même motif à appliquer, dans
+  LEUR composant, render-vérifié.
+
 ### Logo iPhone : icônes PWA régénérées (3 octobre)
 `apple-touch-icon.png` + `icon-192/512/maskable` portaient encore l'ancien logo
 orange ; régénérées depuis `logo-vrm.png` (VRM Noir), maskable avec marge sur

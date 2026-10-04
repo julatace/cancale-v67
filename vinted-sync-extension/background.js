@@ -1386,6 +1386,7 @@ async function noterUrlLabel(url, ok) {
     let hote = '', chemin = '';
     try { const u = new URL(url); hote = u.hostname; chemin = u.pathname.replace(/\/\d{4,}/g, '/_id'); } catch (_) { return; }
     const rows = await sbGet(`app_data?id=eq.${LABEL_VU}&select=data`);
+    if (rows === null) return;                     // « pas su » ≠ « rien vu » : une lecture ratée ne doit pas réécrire la ligne avec la seule URL du moment (famille §5.53)
     const cur = (rows && rows[0] && rows[0].data) || {};
     const vus = cur.vus || {};
     const cle = `${hote}${chemin}`;
