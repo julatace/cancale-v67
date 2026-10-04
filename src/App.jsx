@@ -9642,6 +9642,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
           qui arrive plusieurs jours après — deux choses différentes). */}
       {liveStats && liveStats.ventesJour!=null && (
         <button type="button" onClick={()=>onGo&&onGo('cat_ventes')}
+          data-dash-vendu-jour={Math.round((liveStats.caJour||0)*100)} data-dash-vendu-jour-n={liveStats.ventesJour}
           style={{width:'100%',textAlign:'left',border:`1px solid ${liveStats.ventesJour>0?C.accent:C.border}`,background:liveStats.ventesJour>0?`${C.accent}0e`:C.card,borderRadius:10,padding:'13px 15px',marginBottom:12,cursor:'pointer',fontFamily:'inherit'}}>
           <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:3}}>Aujourd'hui</div>
           {liveStats.ventesJour>0 ? (
@@ -9656,14 +9657,14 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
                passe, l'explication reste une légende. */
             <div style={{fontSize:15,fontWeight:600,color:C.text}}>Pas encore de vente aujourd'hui</div>
           )}
-          <div style={{fontSize:11,color:C.muted,fontWeight:400,marginTop:3}}>Paires vendues dans la journée — pas l'argent viré, qui arrive plus tard.</div>
+          <div style={{fontSize:11,color:C.muted,fontWeight:400,marginTop:3}}>Ventes faites dans la journée, toutes plateformes — pas l'argent viré, qui arrive plus tard.</div>
         </button>
       )}
 
       {/* Résumé Vinted EN DIRECT (cliquable) */}
       {liveStats && (
         <div>
-          <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:8}}>Vinted en direct · ce mois</div>
+          <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:8}}>En direct · ce mois</div>
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(96px, 1fr))',gap:0,border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 0',overflow:'hidden',boxShadow:C.shadow||'none'}}>
             {[
               /* ⚠️ CES CHIFFRES SONT DES REPÈRES, aucun n'appelle une action : ils
@@ -9679,7 +9680,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             ].map(s=>(
               <button key={s.k} onClick={()=>onGo&&onGo(s.go)} title={`Voir ${s.label.toLowerCase()}`}
                 style={{textAlign:'left',border:'none',background:'transparent',borderRadius:0,padding:0,cursor:'pointer',fontFamily:'inherit',display:'block',width:'100%'}}>
-                <StatBox compact label={s.label} value={s.val} color={s.color}/>
+                <span data-dash-stat={s.k} data-dash-cents={s.k==='caMois'?Math.round((liveStats.caMois||0)*100):undefined} style={{display:'contents'}}><StatBox compact label={s.label} value={s.val} color={s.color}/></span>
               </button>
             ))}
           </div>

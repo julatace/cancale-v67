@@ -4484,10 +4484,21 @@ déclaré, qui est l'argent reçu.
 - Statistiques : « CA du mois » → « **Vendu ce mois** » (même chiffre, bon mot).
 - Banc `vendu-recu.cjs` (ventes inventées, 30 contrôles, juge les `data-*`).
   Réaffaibli (annulée comptée + reçu daté à la vente) → **11 rouges**.
-- ⚠️ **Encore ouvert** : `liveStats` (Statistiques « Aujourd'hui », « Vendu ce
-  mois », widget `caMois`) reste un SECOND calcul du vendu — Vinted seul, figé
-  au montage, comptes bloqués exclus. Le brancher sur le même propriétaire
-  demande que Ma journée/Ventes PUBLIE le vendu (motif `vinted_urssaf_mois`).
+- ✅ **Fermé le 4 octobre** : `liveStats` (Statistiques « Aujourd'hui », « Vendu
+  ce mois », la courbe des mois, la jauge d'objectif, le widget `caMois`) était
+  un SECOND calcul du vendu — Vinted seul, comptes bloqués exclus, Leboncoin et
+  eBay oubliés. Mesuré au banc sur le code d'avant : « Aujourd'hui » **50 €** au
+  lieu de **90 €**, « Vendu ce mois » **175 €** au lieu de **275 €**, et le
+  widget pareil. ⇒ La coque relit les ventes de TOUS les comptes liés (même
+  lecture, `_acc` posé) et `liveStatsVus` passe par **`ventesFaites` puis
+  `resumeVendu`** — la même règle que Ma journée ; un compte s'écarte par
+  `compteEcarte` (masqué dans l'app ou éteint dans l'ancien panneau, une seule
+  définition pour la compta et la coque). Le widget n'écrit plus depuis l'effet
+  de lecture : il publie `widgetBase` + le vendu unifié, et seulement quand
+  le JSON change. Ventes illisibles ⇒ on garde l'ancien calcul (« rien lu » ne
+  vaut pas « rien »). Banc `vendu-recu.cjs` : **36 contrôles**, et **4 rouges**
+  sur le code d'avant **instrumenté des mêmes attributs** (« la fonction
+  n'existait pas » n'aurait rien prouvé).
 
 ### La page d'accueil publique (n° 22, 4 octobre)
 Julien : « une vraie page d'accueil… qui donne envie… avant d'arriver sur la

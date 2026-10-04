@@ -76,15 +76,21 @@ const srv = http.createServer((q, r) => {
 srv.on('error', (e) => { console.log('❌ le port ' + PORT + ' est pris (' + e.code + ') — relance le banc seul'); process.exit(1); });
 srv.listen(PORT);
 
-const ouvrir = async (b, vp, versementsLisibles) => {
+const ouvrir = async (b, vp, versementsLisibles, onglet = 'journee') => {
   const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
   const L = lignes(versementsLisibles);
+  const widget = [];
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
+    // Ce que l'app PUBLIE pour le widget de l'iPhone : on le garde pour le juger.
+    if (route.request().method() === 'POST') {
+      try { for (const r of [].concat(JSON.parse(route.request().postData() || '[]'))) if (r && r.id === 'widget_stats') widget.push(r.data); } catch (_) {}
+      return route.fulfill({ status: 201, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '[]' });
+    }
     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', 'content-range': `0-${Math.max(0, d.length - 1)}/${d.length}` }, body: JSON.stringify(d) });
     if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', body: '{"m":1}' });
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCOUNTS);
@@ -108,18 +114,21 @@ const ouvrir = async (b, vp, versementsLisibles) => {
     return j([]);
   });
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
-  await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
-  await pg.waitForFunction(() => document.querySelector('[data-vendu-mois]') || /pas pu s'afficher/.test(document.body.innerText), null, { timeout: 15000 }).catch(() => {});
+  await pg.goto(`http://localhost:${PORT}/?tab=${onglet}`, { waitUntil: 'domcontentloaded' });
+  const repere = onglet === 'journee' ? '[data-vendu-mois]' : '[data-dash-vendu-jour]';
+  await pg.waitForFunction((r) => document.querySelector(r) || /pas pu s'afficher/.test(document.body.innerText), repere, { timeout: 15000 }).catch(() => {});
   await pg.waitForTimeout(1500);
   const lu = await pg.evaluate(() => {
     const a = (sel, at) => { const e = document.querySelector(sel); return e ? e.getAttribute(at) : null; };
     const jours = {};
     for (const e of document.querySelectorAll('[data-vendu-recu] [data-jour]')) jours[e.getAttribute('data-jour')] = { vendu: e.getAttribute('data-vendu'), recu: e.getAttribute('data-recu') };
     return { venduMois: a('[data-vendu-mois]', 'data-vendu-mois'), recuMois: a('[data-recu-mois]', 'data-recu-mois'), venduJour: a('[data-vendu-jour]', 'data-vendu-jour'),
+      dashJour: a('[data-dash-vendu-jour]', 'data-dash-vendu-jour'), dashJourN: a('[data-dash-vendu-jour]', 'data-dash-vendu-jour-n'),
+      dashMois: a('[data-dash-stat="caMois"]', 'data-dash-cents'),
       aDater: a('[data-a-dater]', 'data-a-dater'), jours, tombe: /pas pu s'afficher|Cannot access|is not defined/.test(document.body.innerText),
       deb: document.documentElement.scrollWidth - window.innerWidth };
   });
-  return { ctx, pg, lu, errs };
+  return { ctx, pg, lu, errs, widget };
 };
 
 (async () => {
@@ -149,6 +158,23 @@ const ouvrir = async (b, vp, versementsLisibles) => {
         await ctx.close();
       });
     }
+    // §11 : « vendu » est UNE notion. Le tableau de bord (carte « Aujourd'hui »,
+    // « Vendu ce mois ») et le widget de l'iPhone recalculaient la leur — Vinted
+    // seul, comptes bloqués exclus, Leboncoin et eBay oubliés. Ils doivent dire
+    // les MÊMES nombres que Ma journée, calculés ici depuis les définitions.
+    console.log('\n── Statistiques et widget : le même « vendu » que Ma journée');
+    await essaie('tableau de bord', async () => {
+      const { ctx, lu, errs, widget } = await ouvrir(b, { width: 1512, height: 950 }, true, 'dashboard');
+      dit(!lu.tombe && errs.length === 0, 'l’écran Statistiques s’affiche, sans erreur', errs.join(' | ').slice(0, 160));
+      const nJour = lignesVendu.filter((l) => cle(l.d) === cle(il(0))).length;
+      dit(lu.dashJour === String(attendu.jour(0).vendu), '« Aujourd’hui » = le vendu du jour de Ma journée (toutes plateformes)', `rendu ${lu.dashJour} · attendu ${attendu.jour(0).vendu}`);
+      dit(lu.dashJourN === String(nJour), '« Aujourd’hui » compte les ventes du jour, Leboncoin compris', `rendu ${lu.dashJourN} · attendu ${nJour}`);
+      dit(lu.dashMois === String(attendu.venduMois), '« Vendu ce mois » = le vendu du mois de Ma journée', `rendu ${lu.dashMois} · attendu ${attendu.venduMois}`);
+      const w = widget[widget.length - 1];
+      dit(!!w, 'le widget de l’iPhone reçoit ses chiffres', `${widget.length} écriture(s)`);
+      dit(w && w.caMois === Math.round(attendu.venduMois / 100), 'le widget dit le même « vendu ce mois »', `widget ${w && w.caMois} · attendu ${Math.round(attendu.venduMois / 100)}`);
+      await ctx.close();
+    });
     console.log('\n── Dates de versement illisibles (522)');
     await essaie('versements illisibles', async () => {
       const { ctx, lu, errs } = await ouvrir(b, { width: 390, height: 844 }, false);
