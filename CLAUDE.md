@@ -4581,6 +4581,31 @@ etc. lorsqu'elle ne paye plus ».
   plus de 14 jours envoie mettre la carte à jour, jamais repayer — 3 rouges sur
   le build d'avant).
 
+### L'onglet « Mon compte » : abonnement, carte, factures, résiliation (4 octobre)
+Julien : « un onglet pour gérer l'abonnement et les factures dans les
+paramètres, avec ses infos de compte regroupées ». Les Paramètres ont deux
+onglets (`data-onglets-reglages`) : **Réglages** (l'app) et **Mon compte** (la
+personne : identité, prénom, abonnement, carte, factures, connexion, ses
+données). Sans session, pas d'onglets. `?vue=compte` (retour de Stripe) ouvre
+le bon onglet.
+- `api/compte.js` : `mode=factures` (SES factures et SA carte — le client Stripe
+  vient de SA ligne lue avec son jeton, jamais d'un paramètre ; seules les
+  adresses `*.stripe.com` sont transmises ; Stripe muet ⇒ 502, **jamais** « aucune
+  facture ») · `mode=resilier` / `mode=reprendre` (POST seulement ;
+  `cancel_at_period_end` — la résiliation prend effet en FIN de période, comme le
+  portail ; l'abonnement doit appartenir à CE client, sinon 403 ; la ligne est
+  réécrite tout de suite depuis la réponse de Stripe). Résilier en ligne est une
+  obligation en France (art. L215-1-1).
+- ⚠️ **RESTE À FAIRE : CGV et page d'accueil disent encore « gratuit ».** Le
+  correctif est écrit (9,99 € par mois, sans engagement, « accès offert tant que
+  l'abonnement n'est pas activé », et `accueil.cjs` qui lit le prix DANS les CGV)
+  mais il n'a pas pu partir : la page d'accueil venait d'être refaite par une
+  autre session (#430) et la fusion de `main` dans la branche a été refusée par
+  le mode Auto. Le refaire sur la version de `main`, puis — le jour où Julien
+  passe le réglage à '1' — retirer la phrase « accès offert ».
+- Preuves : `audit-abonnement.cjs` **62 contrôles** (14 rouges sur l'avant) ;
+  banc `abonnement.cjs` **42** (13 rouges sur le build d'avant).
+
 ### ⚠️⚠️ AUDIT DE SÉCURITÉ DU 4 OCTOBRE — CE QUI ÉTAIT OUVERT, ET CE QUI NE L'EST PLUS
 Demande de Julien : « continue à améliorer la sécurité du site ». Outils :
 **gitleaks** (historique complet), **semgrep** (règles open source de
