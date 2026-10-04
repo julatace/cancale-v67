@@ -83,6 +83,21 @@ const Imprimante = ({ s = 15, c = 'currentColor' }) => (
 const Pastille = ({ lettre, fond = K.card2 }) => (
   <div style={{ width: 26, height: 26, borderRadius: 7, background: fond, border: `1px solid ${K.line2}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: K.text, flexShrink: 0 }}>{lettre}</div>
 );
+// ⚠️ Vignette produit : une image PLAUSIBLE, jamais une vraie photo (§2.3, dépôt
+//    public). Un dégradé sobre + une silhouette de basket en filigrane : ça se
+//    lit comme une photo de l'app, sans exposer la moindre donnée.
+const PHOTO_TONS = [['#2B323E', '#1A2029'], ['#312A2C', '#1E1A1C'], ['#26303A', '#171E25'], ['#2C2A35', '#1A1920'], ['#28323C', '#181F26'], ['#332C2A', '#1F1A18']];
+const Photo = ({ s = 34, i = 0, r = 8 }) => {
+  const [a, b] = PHOTO_TONS[((i % PHOTO_TONS.length) + PHOTO_TONS.length) % PHOTO_TONS.length];
+  return (
+    <div style={{ width: s, height: s, borderRadius: r, background: `linear-gradient(135deg, ${a}, ${b})`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden', border: `1px solid ${K.line}` }}>
+      <svg width={s * 0.74} height={s * 0.74} viewBox="0 0 32 32" aria-hidden="true">
+        <path d="M3 21c0-2 1-3 3-3.4l5-1.1 3.2-5.3c.4-.7 1.3-.9 2-.4l1.6 1.1c.6.4 1.4.5 2.1.2l1.2-.5c.8-.3 1.6.1 1.9.9l1.6 4.4c.3.8 1 1.4 1.8 1.6l1.4.3c1.2.3 2.2 1.4 2.2 2.7V23c0 .6-.4 1-1 1H4c-.6 0-1-.4-1-1z" fill="#FFFFFF" fillOpacity="0.08" stroke="#FFFFFF" strokeOpacity="0.32" strokeWidth="1.5" strokeLinejoin="round" />
+        <path d="M3.5 21.5h25" stroke="#FFFFFF" strokeOpacity="0.22" strokeWidth="1.2" />
+      </svg>
+    </div>
+  );
+};
 
 // ── Les six scènes. Chacune est une FONCTION DU TEMPS local u ∈ [0,1] : la
 //    même image pour le même u, ce qui permet de filmer image par image. ─────
@@ -151,7 +166,7 @@ function SceneVentes({ u }) {
         return (
           <div key={v.t} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '9px 12px', marginBottom: 7, borderRadius: 10,
             background: v.neuf ? K.card2 : K.card, border: `1px solid ${v.neuf ? K.line2 : K.line}`, opacity: e, transform: `translateY(${mix(-10, 0, e)}px)` }}>
-            <div style={{ width: 34, height: 34, borderRadius: 8, background: K.surface, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Basket s={22} /></div>
+            <Photo s={34} i={i} r={8} />
             <div style={{ flex: 1, fontSize: 12.5, color: K.text, fontWeight: 600 }}>{v.t}</div>
             <div style={{ fontSize: 11, color: v.neuf ? K.text : K.muted, padding: '3px 8px', borderRadius: 999, background: v.neuf ? K.accentSoft : 'transparent', border: v.neuf ? 'none' : `1px solid ${K.line}` }}>{v.s}</div>
             <div style={{ fontSize: 13, fontWeight: 700, color: K.text, width: 64, textAlign: 'right' }}>{v.p}</div>
@@ -162,7 +177,7 @@ function SceneVentes({ u }) {
       <div style={{ position: 'absolute', right: 0, top: mix(-90, 0, arrivee) - 8, width: 260, padding: '12px 13px', borderRadius: 13,
         background: K.card2, border: `1px solid ${K.line2}`, boxShadow: '0 1px 2px rgba(0,0,0,.4), 0 18px 40px rgba(0,0,0,.45)',
         opacity: arrivee * (1 - seg(u, 0.5, 0.62)), display: 'flex', gap: 10, alignItems: 'center' }}>
-        <div style={{ width: 36, height: 36, borderRadius: 9, background: K.accentSoft, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Basket s={22} c={K.text} /></div>
+        <Photo s={36} i={0} r={9} />
         <div>
           <div style={{ fontSize: 11, color: K.muted, fontWeight: 600 }}>Nouvelle vente · Vinted</div>
           <div style={{ fontSize: 13, color: K.text, fontWeight: 700 }}>Nike Air Max 90 · 45,00 €</div>
@@ -218,33 +233,50 @@ function SceneBordereau({ u, c }) {
   );
 }
 
+// ── Le stock EN 3D (isométrique, dessiné en SVG — aucune bibliothèque, net à
+//    toutes les tailles, zéro donnée). Les cartons apparaissent un à un, puis
+//    celui de la paire s'élève et s'allume. Reprend le Garage 3D de l'app. ──────
 function SceneRangement({ u, c }) {
-  const cols = 6, rows = 4, debut = 121, cible = 128;
-  const montre = sortie(seg(u, 0.02, 0.3));
-  const choix = sortie(seg(u, 0.36, 0.56));
-  const etiquette = sortie(seg(u, 0.6, 0.78));
+  const cols = 5, rows = 4, debut = 121, cible = 128;
+  const montre = sortie(seg(u, 0.02, 0.42));
+  const choix = sortie(seg(u, 0.46, 0.66));
+  const etiquette = sortie(seg(u, 0.68, 0.84));
+  const TW = 24, TH = 12, OX = 150, OY = 44;
+  const cells = [];
+  for (let gy = 0; gy < rows; gy++) for (let gx = 0; gx < cols; gx++) {
+    const idx = gy * cols + gx, n = debut + idx;
+    cells.push({ gx, gy, n, idx, is: n === cible, vide: n % 6 === 0 });
+  }
+  cells.sort((a, b) => (a.gx + a.gy) - (b.gx + b.gy));     // du fond vers l'avant
   return (
     <div style={{ position: 'absolute', inset: 0 }}>
-      <div className="vrm-display" style={{ fontSize: 19, fontWeight: 700, color: K.text, marginBottom: 14 }}>Rangement</div>
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: c ? 7 : 8, width: c ? '100%' : 380 }}>
-        {Array.from({ length: cols * rows }, (_, i) => {
-          const n = debut + i, c = n === cible;
-          const apparait = sortie(seg(montre, (i % cols) * 0.06 + Math.floor(i / cols) * 0.08, 0.5 + (i % cols) * 0.06 + Math.floor(i / cols) * 0.08));
-          const hors = n % 5 === 0;               // quelques cartons déjà vides
+      <div className="vrm-display" style={{ fontSize: 19, fontWeight: 700, color: K.text, marginBottom: 5 }}>Ton stock en 3D</div>
+      <div style={{ fontSize: 12, color: K.muted, marginBottom: c ? 6 : 10 }}>Chaque paire à sa place — tu la retrouves d’un coup d’œil.</div>
+      <svg width="100%" viewBox="0 0 300 210" preserveAspectRatio="xMidYMid meet" style={{ maxHeight: c ? 250 : 320, display: 'block' }} aria-hidden="true">
+        {cells.map(({ gx, gy, n, idx, is, vide }) => {
+          const ap = sortie(seg(montre, idx * 0.02, 0.5 + idx * 0.02));
+          if (ap <= 0) return null;
+          const bh = is ? 14 + 22 * choix : 14;
+          const cx = OX + (gx - gy) * TW, cy = OY + (gx + gy) * TH, ty = cy - bh;
+          const top = `${cx},${ty - TH} ${cx + TW},${ty} ${cx},${ty + TH} ${cx - TW},${ty}`;
+          const left = `${cx - TW},${ty} ${cx},${ty + TH} ${cx},${cy + TH} ${cx - TW},${cy}`;
+          const right = `${cx + TW},${ty} ${cx},${ty + TH} ${cx},${cy + TH} ${cx + TW},${cy}`;
+          const topC = is ? K.accent : (vide ? '#1A202A' : '#232B37');
+          const lC = is ? '#2B57BD' : (vide ? '#121820' : '#1A212C');
+          const rC = is ? '#3568DB' : (vide ? '#0E131B' : '#141A23');
           return (
-            <div key={n} style={{ height: 50, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700,
-              background: c ? (choix > 0.5 ? K.accent : K.card2) : K.card, color: c && choix > 0.5 ? K.onAccent : (hors ? K.faint : K.text),
-              border: `1px solid ${c ? K.accent : K.line}`, opacity: apparait,
-              transform: `translateY(${mix(10, 0, apparait)}px) scale(${c ? mix(1, 1.12, choix) : 1})`,
-              boxShadow: c ? `0 12px 30px rgba(61,123,255,${0.35 * choix})` : 'none', zIndex: c ? 2 : 1, position: 'relative' }}>
-              {n}
-            </div>
+            <g key={n} opacity={ap} style={{ transition: 'none' }}>
+              <polygon points={left} fill={lC} stroke="#000" strokeOpacity="0.25" strokeWidth="0.4" />
+              <polygon points={right} fill={rC} stroke="#000" strokeOpacity="0.25" strokeWidth="0.4" />
+              <polygon points={top} fill={topC} stroke={is ? '#6CA0FF' : K.line2} strokeWidth={is ? 0.9 : 0.5} />
+              {!vide && <text x={cx} y={ty + 3.4} textAnchor="middle" fontSize="8.5" fontWeight="700" fill={is ? '#FFFFFF' : '#AEB7C6'} fontFamily="Inter, system-ui, sans-serif">{n}</text>}
+            </g>
           );
         })}
-      </div>
-      <div style={{ position: 'absolute', left: c ? 0 : 400, top: c ? 290 : 130, width: c ? '100%' : 165, padding: '12px 13px', borderRadius: 12, background: K.card2,
-        border: `1px solid ${K.line2}`, opacity: etiquette, transform: c ? `translateY(${mix(12, 0, etiquette)}px)` : `translateX(${mix(16, 0, etiquette)}px)` }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Basket s={22} c={K.text} /><div style={{ fontSize: 12, fontWeight: 700, color: K.text }}>Nike Air Max 90</div></div>
+      </svg>
+      <div style={{ position: 'absolute', left: c ? 0 : 'auto', right: c ? 0 : 24, top: c ? 300 : 118, width: c ? '100%' : 184, padding: '12px 13px', borderRadius: 12, background: K.card2,
+        border: `1px solid ${K.line2}`, opacity: etiquette, boxShadow: '0 1px 2px rgba(0,0,0,.4), 0 18px 40px rgba(0,0,0,.45)', transform: c ? `translateY(${mix(12, 0, etiquette)}px)` : `translateX(${mix(16, 0, etiquette)}px)` }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Photo s={28} i={2} r={7} /><div style={{ fontSize: 12, fontWeight: 700, color: K.text }}>Nike Air Max 90</div></div>
         <div style={{ fontSize: 11.5, color: K.muted, marginTop: 6, lineHeight: 1.45 }}>Rangée en <b style={{ color: K.text }}>N° 128</b> · ce numéro ne sera jamais redonné à une autre paire.</div>
       </div>
     </div>
