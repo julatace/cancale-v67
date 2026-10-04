@@ -213,7 +213,12 @@ if (!bloc || !/caUrssafParMois/.test(bloc)) {
   } catch (e) { nok('la règle des comptes sélectionnés s\'exécute', e.message); }
   // Les trois lecteurs de la règle l'appliquent : la publication, le mensuel, l'annuel.
   const pub = SRC.slice(SRC.indexOf('if (!sales.items) return;                       // rien de sûr à publier'), SRC.indexOf('const withBuyByNum'));
-  /exclu: acctOffOf/.test(pub)
+  // ⚠️ La règle, pas son orthographe : depuis le 4 octobre la publication lit le
+  //    memo `declarables` (partagé avec Ma journée). On suit le nom jusqu'à sa
+  //    définition au lieu d'exiger l'appel en place.
+  const defDecl = (() => { const i = SRC.indexOf('const declarables = useMemo('); return i < 0 ? '' : SRC.slice(i, SRC.indexOf('}, [', i)); })();
+  const pubLit = /exclu: acctOffOf/.test(pub) || (/\bdeclarables\b/.test(pub) && /exclu: acctOffOf/.test(defDecl));
+  pubLit
     ? ok('l\'écran Ventes publie le CA sans les comptes exclus')
     : nok('la publication écarte les comptes exclus', 'exclu absent');
   const mens = SRC.slice(SRC.indexOf('const report = useMemo'), SRC.indexOf('const openReport'));
@@ -263,7 +268,9 @@ if (!bloc || !/caUrssafParMois/.test(bloc)) {
       : nok('aucune date de versement ⇒ aucun mois', `${sans.lignes.length} ligne(s)`);
   } catch (e) { nok('la règle du versement s\'exécute', e.message); }
   // La publication attend les dates, et n'invente rien si elles sont illisibles.
-  /if \(versements === null\) return;/.test(SRC)
+  (/if \(versements === null\) return;/.test(SRC)
+    || ((() => { const i = SRC.indexOf('const declarables = useMemo('); return i < 0 ? '' : SRC.slice(i, SRC.indexOf('}, [', i)); })().includes('if (versements === null) return null;')
+        && /if \(!declarables\) return;/.test(SRC.slice(SRC.indexOf('if (!sales.items) return;                       // rien de sûr à publier'), SRC.indexOf('const withBuyByNum')))))
     ? ok('dates de versement illisibles ⇒ l\'écran Ventes ne publie RIEN (jamais un mois vidé)')
     : nok('dates illisibles ⇒ pas de publication', 'garde absente');
   // La source : uniquement le statut 450 (« commande finalisée ») et sa date.

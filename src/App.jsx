@@ -21283,8 +21283,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:10,flexWrap:'wrap',marginBottom:12}}>
                   <div style={{fontSize:14,fontWeight:700,color:C.text}}>Tes 14 derniers jours</div>
                   <div style={{display:'flex',gap:14,fontSize:11.5,color:C.muted,fontWeight:500}}>
-                    <span style={{display:'inline-flex',alignItems:'center',gap:6}}><span aria-hidden="true" style={{width:9,height:9,borderRadius:2,background:C.accent}}/>Vendu</span>
-                    <span style={{display:'inline-flex',alignItems:'center',gap:6}}><span aria-hidden="true" style={{width:9,height:9,borderRadius:2,background:C.muted}}/>Reçu</span>
+                    <span style={{display:'inline-flex',alignItems:'center',gap:6}}><span aria-hidden="true" style={{width:9,height:9,borderRadius:999,background:C.accent}}/>Vendu</span>
+                    <span style={{display:'inline-flex',alignItems:'center',gap:6}}><span aria-hidden="true" style={{width:9,height:9,borderRadius:999,background:C.muted}}/>Reçu</span>
                   </div>
                 </div>
                 <BarresVenduRecu jours={jours14}/>
