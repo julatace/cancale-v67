@@ -4258,6 +4258,36 @@ cloisonné mais vendeurs non énumérables ⇒ on se tait, pas de résumé méla
   dizaines d'owners, grouper en mémoire (une lecture globale bucketée par owner)
   pour ne pas multiplier les requêtes par vendeur. Correction avant optimisation.
 
+### Passe fiabilité — l'audit des routes qui ÉCRIVENT (4 octobre)
+Demande de Julien : « améliore la fiabilité ». Mesuré d'abord (§6), pas deviné :
+- **Les 57 audits sont verts** — aucune régression de la famille « rien lu ne
+  vaut pas rien ».
+- **Prod vérifiée en direct** (`GET vrm.center/api/sante`, public, OUI/NON seuls) :
+  `serviceKey:true · owner:true`. Le scénario catastrophe du dossier (RLS actif +
+  `SUPABASE_SERVICE_KEY` absente sur Vercel = **emails perdus en silence**, push
+  mort, widget 503, rappels morts) **n'a pas lieu**. `ia:false` : l'IA de réponse
+  auto n'est pas branchée — éteinte par défaut, pas une urgence.
+- **Revue route par route de la famille qui DÉTRUIT** (lecture ratée → réécriture
+  qui efface) sur TOUT `api/*.js` : `email-inbound`/`push`/`widget`/`ship-reminders`
+  déjà couverts (`serveur.cjs`) ; `email-rattacher` relit sa ligne et ne la
+  supprime QUE si `resultat.ok && !resultat.quarantaine` (jamais le seul
+  exemplaire) ; `vinted-refresh` rend 502 sur lecture ratée, aucune écriture ;
+  `vinted-connect` fait un upsert sans fusion-qui-efface ; `relais`/`sante` en
+  lecture seule / booléens. **Aucune route ne perd de données sur lecture ratée.**
+- ⚠️ **TROU §4.10 FERMÉ** : les deux routes qui écrivent la donnée la plus
+  coûteuse à perdre — les **jetons Vinted** — n'avaient **jamais** été exécutées
+  par un banc. `scripts/bancs/routes-ecriture.cjs` les lance pour de vrai et porte
+  l'invariant : **un refresh que Vinted REFUSE ne réécrit JAMAIS la ligne** (sinon
+  un bon jeton est remplacé par du vide → compte mort jusqu'à reconnexion, §5.22),
+  et **un jeton refusé ne crée AUCUNE ligne** (pas de compte fantôme). Les deux
+  sens sont vérifiés (refus → rien · valide → la ligne est bien écrite — un
+  contrôle qui n'aurait que l'absence serait vacant). **§6.1 prouvé en
+  réaffaiblissant** `vinted-refresh` (persister malgré l'échec) → **2 rouges**,
+  dont « PATCH écrit `access_token:null` ». `vinted-connect` a trois gardes en
+  couches (refresh null · newAccess null · account_id null) qui bloquent chacune
+  une écriture fautive — c'est pour ça qu'il est si difficile à faire tomber, et
+  c'est tant mieux.
+
 ### Logo iPhone : icônes PWA régénérées (3 octobre)
 `apple-touch-icon.png` + `icon-192/512/maskable` portaient encore l'ancien logo
 orange ; régénérées depuis `logo-vrm.png` (VRM Noir), maskable avec marge sur
