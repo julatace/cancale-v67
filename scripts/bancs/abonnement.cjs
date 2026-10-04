@@ -7,9 +7,12 @@
 //    · chaque état du serveur donne SA carte (`data-abonnement`) — et un état
 //      illisible n'affirme rien (« pas su » ≠ « pas abonné ») ;
 //    · le propriétaire ne voit aucun bouton de paiement ;
-//    · la porte ne se ferme QUE si l'abonnement est obligatoire ET inactif —
-//      jamais sur une réponse illisible (on ne bloque pas un abonné sur un
-//      hoquet), et pas tant que Julien n'a pas rendu l'abonnement obligatoire ;
+//    · la porte ne se ferme QUE si la BASE dit « pas d'accès » (`acces`, la
+//      règle `vrm_regle_acces` qui ferme aussi ses lignes) — jamais sur une
+//      réponse illisible (on ne bloque pas un abonné sur un hoquet), et l'app
+//      ne recalcule rien de son côté (§11) ;
+//    · un prélèvement en échec depuis plus de 14 jours envoie mettre la carte à
+//      jour (le portail), jamais repayer un second abonnement ;
 //    · « S'abonner » envoie vers une page Stripe et rien d'autre.
 //  Aucune fixture : comptes et statuts inventés ici (le dépôt est public).
 // ════════════════════════════════════════════════════════════════════════════
@@ -24,7 +27,7 @@ const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css
 const SESSION = { access_token: 'jeton-de-banc', refresh_token: 'r', expires_at: Date.now() + 3600e3,
   user: { id: '11111111-2222-3333-4444-555555555555', email: 'vendeuse@exemple.test' } };
 const PRIX = { montant: 9.99, devise: 'eur', intervalle: 'month' };
-const base = { ok: true, proprietaire: false, configure: true, modeTest: true, obligatoire: false, prix: PRIX, statut: null, finPeriode: null, annuleFinPeriode: false, peutGerer: false, actif: false };
+const base = { ok: true, proprietaire: false, configure: true, modeTest: true, obligatoire: false, prix: PRIX, statut: null, finPeriode: null, annuleFinPeriode: false, peutGerer: false, actif: false, acces: true };
 const ETATS = {
   sans: { ...base },
   actif: { ...base, statut: 'active', finPeriode: '2026-11-04T10:00:00.000Z', peutGerer: true, actif: true },
@@ -131,12 +134,28 @@ const boutons = (pg) => pg.evaluate(() => { const e = document.querySelector('[d
 
     console.log('\n── La porte');
     await essaie('porte fermée', async () => {
-      const { ctx, pg } = await ouvrir(nav, { abo: { ...ETATS.sans, obligatoire: true }, tab: 'journee' });
+      const { ctx, pg } = await ouvrir(nav, { abo: { ...ETATS.sans, obligatoire: true, acces: false }, tab: 'journee' });
       const porte = await pg.evaluate(() => !!document.querySelector('[data-abonnement-requis]'));
       const appVisible = await pg.evaluate(() => /Bonjour|Bonsoir|Bon après-midi/.test(document.body.innerText));
       dit(porte && !appVisible, 'obligatoire + pas abonné → l’écran d’abonnement, pas l’app');
       const t = await pg.evaluate(() => (document.querySelector('[data-abonnement-requis]') || {}).innerText || '');
       dit(/9,99/.test(t) && /déconnecter/i.test(t), '  il dit le prix et laisse se déconnecter', t.replace(/\n/g, ' ').slice(0, 120));
+      await ctx.close();
+    });
+    await essaie('impayé 14 jours', async () => {
+      const { ctx, pg, appels } = await ouvrir(nav, { abo: { ...ETATS.impaye, obligatoire: true, acces: false }, tab: 'journee' });
+      const porte = await pg.evaluate(() => !!document.querySelector('[data-abonnement-requis]'));
+      const t = await pg.evaluate(() => (document.querySelector('[data-abonnement-requis]') || {}).innerText || '');
+      dit(porte && /14 jours/.test(t) && /intactes/.test(t), 'impayé depuis plus de 14 jours → la porte, qui dit pourquoi et que rien n’est perdu', t.replace(/\n/g, ' ').slice(0, 140));
+      await pg.locator('[data-abonnement-requis] button', { hasText: /carte/i }).first().click();
+      await pg.waitForTimeout(1200);
+      dit(appels.some((a) => a.mode === 'portail') && !appels.some((a) => a.mode === 'checkout'), '  le bouton met la CARTE à jour (portail) — jamais un second abonnement', JSON.stringify(appels));
+      await ctx.close();
+    });
+    await essaie('la base décide', async () => {
+      const { ctx, pg } = await ouvrir(nav, { abo: { ...ETATS.actif, obligatoire: true, acces: false }, tab: 'journee' });
+      const porte = await pg.evaluate(() => !!document.querySelector('[data-abonnement-requis]'));
+      dit(porte, 'la porte suit la réponse de la BASE (`acces`), pas un recalcul à partir du statut');
       await ctx.close();
     });
     for (const [nom, abo] of [

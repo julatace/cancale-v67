@@ -9,7 +9,8 @@
 //   /api/compte?mode=portail      (POST, session) gérer / résilier
 //
 // L'abonnement (Julien, 4 octobre) : 9,99 € par mois, prélevé chaque mois à la
-// date où la personne s'abonne, pour TOUT LE MONDE SAUF LUI (VRM_OWNER_UID).
+// date où la personne s'abonne, pour TOUT LE MONDE SAUF LUI (le propriétaire
+// déclaré dans la base, `vrm_reglages`).
 // ⚠️ Qui est qui : le serveur ne croit jamais un identifiant envoyé par le
 //    navigateur — il prend le jeton de session et demande à Supabase (session.js).
 // ⚠️ Le statut ne s'écrit QUE sur un événement Stripe dont la signature est
@@ -28,15 +29,33 @@ const ANON = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e
 // requête (on ne renvoie personne vers un site choisi par l'appelant).
 const APP_URL = 'https://vrm.center';
 const PRIX_CLE = process.env.STRIPE_PRICE_LOOKUP || 'vrm_mensuel';
-// Tant que ce réglage n'est pas posé, l'abonnement est PROPOSÉ mais rien n'est
-// bloqué : l'app reste gratuite pour tous (CGV actuelles). Julien le pose le
-// jour où il passe Stripe en mode réel et met ses CGV à jour.
-const OBLIGATOIRE = () => process.env.VRM_ABONNEMENT_OBLIGATOIRE === '1';
-const proprietaire = (id) => !!process.env.VRM_OWNER_UID && id === process.env.VRM_OWNER_UID;
-// Un abonnement donne accès tant que Stripe le dit vivant. `past_due` : Stripe
-// est en train de réessayer le prélèvement — on ne coupe pas pendant ses essais.
+// ⚠️ QUI A ACCÈS, SI C'EST OBLIGATOIRE, QUI EST LE PROPRIÉTAIRE : la BASE le
+//    dit (`vrm_acces`, supabase/migrations/006-acces-abonnement.sql) — la même
+//    règle qui ferme ses lignes (RLS) et qui coupe notifications et widget.
+//    Ces réponses vivaient ici dans deux variables d'environnement : l'écran
+//    aurait pu dire « abonné » pendant que la base refusait ses données (§11).
+//    Le réglage `abonnement_obligatoire` vaut '0' : rien n'est bloqué tant que
+//    Julien ne l'a pas passé à '1' (Stripe en mode réel, CGV à jour).
+// Un abonnement « vivant » pour Stripe (la carte d'abonnement) : `past_due`,
+// Stripe réessaie le prélèvement — on ne propose pas un second abonnement.
 const STATUTS_ACTIFS = new Set(['active', 'trialing', 'past_due']);
 export const abonnementActif = (statut) => STATUTS_ACTIFS.has(String(statut || ''));
+
+// `{ obligatoire, proprietaire, acces }` lu avec le jeton du vendeur ;
+// `undefined` = pas su (on ne devine pas une réponse sur l'accès).
+async function accesDe(req) {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/vrm_acces`, {
+      method: 'POST',
+      headers: { apikey: ANON, Authorization: `Bearer ${jetonDe(req)}`, 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    if (!r.ok) return undefined;
+    const j = await r.json();
+    if (!j || typeof j !== 'object' || typeof j.acces !== 'boolean') return undefined;
+    return { obligatoire: j.obligatoire === true, proprietaire: j.proprietaire === true, acces: j.acces };
+  } catch (_) { return undefined; }
+}
 
 const repondre = (res, code, corps) => { res.status(code).json(corps); };
 
@@ -82,17 +101,27 @@ async function ecrireStatut(owner, ligne, evenementTs) {
   // Les webhooks arrivent dans le désordre : un événement plus ANCIEN que celui
   // déjà appliqué n'écrase rien (sinon un vieux « incomplete » effacerait un
   // « active » arrivé avant lui).
+  let avant = null;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/abonnements?owner=eq.${encodeURIComponent(owner)}&select=evenement_ts`, { headers: h });
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/abonnements?owner=eq.${encodeURIComponent(owner)}&select=evenement_ts,impaye_depuis`, { headers: h });
     if (!r.ok) return { ok: false, code: 'lecture' };
     const j = await r.json();
-    if (j[0] && Number(j[0].evenement_ts) > evenementTs) return { ok: true, ignore: 'plus-ancien' };
+    if (!Array.isArray(j)) return { ok: false, code: 'lecture' };
+    avant = j[0] || null;
+    if (avant && Number(avant.evenement_ts) > evenementTs) return { ok: true, ignore: 'plus-ancien' };
   } catch (_) { return { ok: false, code: 'lecture' }; }
+  // Depuis quand le prélèvement échoue : la base laisse 14 jours (Stripe
+  // réessaie pendant ce temps), puis coupe. On garde la PREMIÈRE date d'échec —
+  // chaque nouvel essai raté de Stripe ne doit pas relancer les 14 jours — et on
+  // l'efface dès que le statut n'est plus « impayé ».
+  const impaye_depuis = ligne.statut === 'past_due'
+    ? ((avant && avant.impaye_depuis) || new Date((evenementTs || Math.floor(Date.now() / 1000)) * 1000).toISOString())
+    : null;
   try {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/abonnements?on_conflict=owner`, {
       method: 'POST',
       headers: { ...h, Prefer: 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify([{ owner, ...ligne, evenement_ts: evenementTs, maj: new Date().toISOString() }]),
+      body: JSON.stringify([{ owner, ...ligne, impaye_depuis, evenement_ts: evenementTs, maj: new Date().toISOString() }]),
     });
     if (r.ok) return { ok: true };
     const t = await r.text().catch(() => '');
@@ -167,32 +196,34 @@ async function webhook(req, res) {
 async function abonnement(req, res) {
   const u = await utilisateurDe(req);
   if (!u) return repondre(res, 401, { erreur: 'session' });
-  const proprio = proprietaire(u.id);
-  const ligne = await ligneDe(req);
-  if (ligne === undefined) return repondre(res, 503, { erreur: 'base-injoignable', message: "Je n'ai pas pu lire ton abonnement. Réessaie dans un instant." });
+  const [acc, ligne] = await Promise.all([accesDe(req), ligneDe(req)]);
+  if (acc === undefined || ligne === undefined) return repondre(res, 503, { erreur: 'base-injoignable', message: "Je n'ai pas pu lire ton abonnement. Réessaie dans un instant." });
   const prix = stripePret() ? await lirePrix() : null;
   return repondre(res, 200, {
     ok: true,
-    proprietaire: proprio,
+    proprietaire: acc.proprietaire,
     configure: stripePret(),
     modeTest: stripePret() ? stripeModeTest() : null,
-    obligatoire: OBLIGATOIRE(),
+    obligatoire: acc.obligatoire,
     prix: prix ? { montant: prix.montant, devise: prix.devise, intervalle: prix.intervalle } : null,
     statut: ligne ? ligne.statut : null,
     finPeriode: ligne ? ligne.fin_periode : null,
     annuleFinPeriode: ligne ? !!ligne.annule_fin_periode : false,
     peutGerer: !!(ligne && ligne.client_stripe),
-    actif: proprio || !!(ligne && abonnementActif(ligne.statut)),
+    // `actif` : l'abonnement est vivant chez Stripe (ce que dit la carte).
+    // `acces` : la base laisse entrer (ce que décide la porte) — LA règle.
+    actif: acc.proprietaire || !!(ligne && abonnementActif(ligne.statut)),
+    acces: acc.acces,
   });
 }
 
 async function checkout(req, res) {
   const u = await utilisateurDe(req);
   if (!u) return repondre(res, 401, { erreur: 'session' });
-  if (proprietaire(u.id)) return repondre(res, 409, { erreur: 'proprietaire', message: 'Ton compte est gratuit : rien à payer.' });
   if (!stripePret()) return repondre(res, 503, { erreur: 'stripe', message: "Le paiement n'est pas encore branché." });
-  const ligne = await ligneDe(req);
-  if (ligne === undefined) return repondre(res, 503, { erreur: 'base-injoignable', message: "Je n'ai pas pu vérifier ton abonnement. Réessaie dans un instant." });
+  const [acc, ligne] = await Promise.all([accesDe(req), ligneDe(req)]);
+  if (acc === undefined || ligne === undefined) return repondre(res, 503, { erreur: 'base-injoignable', message: "Je n'ai pas pu vérifier ton abonnement. Réessaie dans un instant." });
+  if (acc.proprietaire) return repondre(res, 409, { erreur: 'proprietaire', message: 'Ton compte est gratuit : rien à payer.' });
   // Jamais deux abonnements pour un vendeur : déjà actif ⇒ on l'envoie gérer.
   if (ligne && abonnementActif(ligne.statut)) return repondre(res, 409, { erreur: 'deja', message: 'Tu es déjà abonné.' });
   const prix = await lirePrix();

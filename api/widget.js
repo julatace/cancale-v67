@@ -1,5 +1,6 @@
 import { sbCle } from './_lib/cle.js';
 import { contexteVendeur, proprietaireCourant } from './_lib/owner.js';
+import { accesVendeur } from './_lib/abonnement.js';
 // api/widget.js
 // ────────────────────────────────────────────────────────────────────────────
 // DONNÉES DU WIDGET écran d'accueil (app Scriptable sur iPhone).
@@ -219,6 +220,14 @@ export default async function handler(req, res) {
     //    balayages voyaient TOUS les vendeurs : B aurait lu les chiffres de A.
     const owner = await ownerDuToken(req, res);
     if (owner === null) return; // ownerDuToken a déjà répondu (503/401)
+    // ⚠️ QUI NE PAIE PLUS NE VOIT PLUS SES CHIFFRES (Julien, 4 octobre) : la
+    //    même règle que la base (`vrm_acces_pour`). Aucun nombre, comme une
+    //    lecture ratée — un widget sans `ship` affiche un tiret, jamais « 0 ».
+    //    « Pas su » ne coupe pas (un hoquet ne doit pas vider l'écran d'un payeur).
+    if (owner && (await accesVendeur(owner)) === false) {
+      res.status(402).json({ erreur: 'abonnement', message: "Ton abonnement VRM n'est plus actif." });
+      return;
+    }
     await contexteVendeur.run({ owner }, async () => {
     // On tente D'ABORD les résumés scalaires (~1 Ko). La lecture complète des
     // commandes (791 Ko) ne repart que si aucune ligne n'a encore de résumé,

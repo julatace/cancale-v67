@@ -6,7 +6,9 @@
 //   POST { action:'test' }                   → envoie une notification d'essai
 // ────────────────────────────────────────────────────────────────────────────
 
-import { loadSubs, saveSubs, sendPushToAll, pushConfigure } from './_lib/push.js';
+import { loadSubs, saveSubs, sendPushToAll, pushConfigure, cloisonnee } from './_lib/push.js';
+import { contexteVendeur } from './_lib/owner.js';
+import { utilisateurDe } from './_lib/session.js';
 
 // Ce que l'app montrera tel quel : pas de vocabulaire d'informaticien, et un
 // geste (§2.7). Ce n'est pas le téléphone qui est en cause — il ne faut surtout
@@ -14,7 +16,26 @@ import { loadSubs, saveSubs, sendPushToAll, pushConfigure } from './_lib/push.js
 const PAS_LU = { erreur: 'base-injoignable', message: "Je n'ai pas pu lire la liste de tes appareils : le serveur de données ne répond pas. Rien n'est perdu — réessaie dans quelques minutes." };
 const PAS_ECRIT = { erreur: 'base-injoignable', message: "Je n'ai pas pu enregistrer cet appareil : le serveur de données ne répond pas. Rien n'est perdu — réessaie dans quelques minutes." };
 
+// ⚠️⚠️ À QUI EST CET APPAREIL ? La route ne le demandait pas. Elle rangeait
+//    l'abonnement dans la liste du propriétaire de l'installation : le téléphone
+//    d'un second vendeur aurait reçu les ventes de Julien (et le bouton « test »
+//    sonnait chez lui). Sur une base cloisonnée, on exige la session — jamais un
+//    identifiant envoyé par le navigateur (session.js) — et tout se passe dans le
+//    contexte de CE vendeur : lecture, écriture, envoi.
+//    Base non cloisonnée (une seule boutique) : rien ne change.
+const SANS_SESSION = { erreur: 'session', message: "Reconnecte-toi à VRM, puis réactive les notifications sur cet appareil." };
+
 export default async function handler(req, res) {
+  let owner = '';
+  if (await cloisonnee()) {
+    const u = await utilisateurDe(req);
+    if (!u) { res.status(401).json(SANS_SESSION); return; }
+    owner = u.id;
+  }
+  return contexteVendeur.run({ owner }, () => traiter(req, res));
+}
+
+async function traiter(req, res) {
   // GET ?etat=1 → « le serveur peut-il envoyer ? ». Aucun secret exposé : on
   // répond oui/non. C'est la seule façon, depuis l'app, de distinguer « aucun
   // appareil abonné » de « le serveur n'a pas sa clé » — deux causes qui
