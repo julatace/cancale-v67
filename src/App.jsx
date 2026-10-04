@@ -1364,23 +1364,6 @@ const supprimerDonneesCompte = async (uid0, login, scopes) => {
   } catch (_) { return { ok: false, n: 0 }; }
 };
 
-// L'extension ne capture pas toujours le pseudo Vinted (colonne login vide) ->
-// on va le chercher via /api/v2/users/current et on le met en cache dans
-// Supabase pour ne pas refaire l'appel a chaque fois. Renvoie le login ou null.
-const fetchVintedLogin = async (account) => {
-  const res = await vintedApiCall(account, '/api/v2/users/current');
-  const login = res?.data?.user?.login || null;
-  if (login && account.vinted_user_id) {
-    try {
-      await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${account.vinted_user_id}`, {
-        method: 'PATCH',
-        headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
-        body: JSON.stringify({ login }),
-      });
-    } catch (_) { /* cache best-effort */ }
-  }
-  return login;
-};
 
 // Lit une donnee moissonnee PASSIVEMENT par l'extension (voir dossier
 // vinted-sync-extension) dans Supabase, table app_data, ligne
@@ -2639,13 +2622,6 @@ const garageCellOf = (grid, num) => {
   return null;
 };
 const garageCellLabel = (cell) => cell ? (cell.col != null ? `colonne ${cell.col}, place ${cell.slot}` : `place ${cell.slot}`) : null;
-// Distance approximative en mètres entre deux coordonnées (haversine).
-const distMeters = (aLat, aLon, bLat, bLon) => {
-  const R = 6371000, toR = Math.PI / 180;
-  const dLat = (bLat - aLat) * toR, dLon = (bLon - aLon) * toR;
-  const s = Math.sin(dLat / 2) ** 2 + Math.cos(aLat * toR) * Math.cos(bLat * toR) * Math.sin(dLon / 2) ** 2;
-  return 2 * R * Math.asin(Math.min(1, Math.sqrt(s)));
-};
 // Extrait des points relais depuis une réponse Vinted moissonnée, quel que soit
 // le format (Vinted a plusieurs formes selon le transporteur/version). Parcours
 // récursif : on retient tout nœud portant des coordonnées valides.
@@ -3609,10 +3585,6 @@ const isOnlineListing = (it) => it && !it.is_closed && !it.is_hidden && !it.is_d
 // Sans ce champ, `is_closed` mélange « vendue » et « retirée par moi » — deux
 // choses différentes pour la compta comme pour le taux d'écoulement.
 const venduChezVinted = (it) => !!(it && it.is_closed && /sold/i.test(String(it.item_closing_action || '')));
-// ⚠️ HONNÊTE : le champ n'arrive que depuis l'extension 5.31 (l'allègement le
-// jetait avant). Sur une annonce captée plus tôt il est absent — on ne conclut
-// alors RIEN (ni vendue, ni pas vendue), on ne devine pas.
-const etatConnuChezVinted = (it) => !!(it && it.item_closing_action != null);
 // LOT / BUNDLE : Vinted range le détail des articles d'un lot dans la
 // transaction. GET /api/v2/transactions/{id} → transaction.order.items = les
 // paires du lot. Renvoie [{ title, id, price }] ou [] si indisponible.
@@ -6249,55 +6221,6 @@ function Sparkline({data,color=C.accent,h=60}) {
   );
 }
 
-/* ── Month curve ─────────────────────────────────────── */
-function MonthChart({sales}) {
-  const monthly=useMemo(()=>{
-    const m={};
-    sales.forEach(v=>{
-      const p=(v.saleDate||''). split('/');
-      if(p.length!==3) return;
-      const k=p[1]+'/'+p[2];
-      if(!m[k]) m[k]={ca:0,profit:0};
-      m[k].ca+=+v.sellPrice;
-      m[k].profit+=(+v.sellPrice-+v.buyPrice);
-    });
-    return m;
-  },[sales]);
-  const keys=Object.keys(monthly).sort((a,b)=>{
-    const [ma,ya]=a.split('/'); const [mb,yb]=b.split('/');
-    return new Date(ya,ma-1)-new Date(yb,mb-1);
-  }).slice(-12);
-  if(keys.length<2) return <div style={{color:C.muted,fontSize:13}}>Pas assez de données.</div>;
-  const caD=keys.map(k=>monthly[k].ca), pD=keys.map(k=>monthly[k].profit);
-  const maxCA=Math.max(...caD,1);
-  const W=500,H=120;
-  const toP=(data,max)=>data.map((v,i)=>`${(i/(data.length-1))*W},${H-((Math.max(v,0)/max)*(H-16))-8}`).join(' ');
-  return (
-    <div style={{overflowX:'auto'}}>
-      {/* vectorEffect + suppression de preserveAspectRatio="none" : l'épaisseur
-          des courbes reste constante quelle que soit la largeur de l'écran. */}
-      <svg width="100%" viewBox={`0 0 ${W} ${H+24}`} style={{display:'block',minWidth:300}}>
-        <defs>
-          <linearGradient id="gCA2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={C.s1||C.accent} stopOpacity="0.18"/><stop offset="100%" stopColor={C.s1||C.accent} stopOpacity="0"/></linearGradient>
-          <linearGradient id="gP2"  x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={C.s2||C.purple} stopOpacity="0.18"/><stop offset="100%" stopColor={C.s2||C.purple} stopOpacity="0"/></linearGradient>
-        </defs>
-        <polygon points={`0,${H} ${toP(caD,maxCA)} ${W},${H}`} fill="url(#gCA2)"/>
-        <polyline points={toP(caD,maxCA)} fill="none" stroke={C.s1||C.accent} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke"/>
-        <polygon points={`0,${H} ${toP(pD,maxCA)} ${W},${H}`} fill="url(#gP2)"/>
-        <polyline points={toP(pD,maxCA)} fill="none" stroke={C.s2||C.purple} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" strokeDasharray="5,4" vectorEffect="non-scaling-stroke"/>
-        {keys.map((k,i)=><text key={k} x={(i/(keys.length-1))*W} y={H+16} textAnchor="middle" fill={C.muted} fontSize={8} fontFamily="monospace">{k}</text>)}
-        {caD.map((v,i)=><circle key={i} cx={(i/(caD.length-1))*W} cy={H-((Math.max(v,0)/maxCA)*(H-16))-8} r={3.5} fill={C.s1||C.accent} stroke={C.card} strokeWidth="1.5"/>)}
-      </svg>
-      {/* Légende : la couleur est portée par une PASTILLE, le texte reste neutre
-          (un libellé coloré se lit mal et la couleur ne doit pas être le seul
-          indice — le trait plein / pointillé distingue déjà les deux séries). */}
-      <div style={{display:'flex',gap:16,fontSize:11,marginTop:6,color:C.muted,fontWeight:500}}>
-        <span style={{display:'inline-flex',alignItems:'center',gap:6}}><span style={{width:14,height:3,borderRadius:5,background:C.s1||C.accent,display:'inline-block'}}/>CA</span>
-        <span style={{display:'inline-flex',alignItems:'center',gap:6}}><span style={{width:14,height:3,borderRadius:5,background:`repeating-linear-gradient(90deg, ${C.s2||C.purple} 0 5px, transparent 5px 9px)`,display:'inline-block'}}/>Bénéfice</span>
-      </div>
-    </div>
-  );
-}
 
 /* ── Dashboard ───────────────────────────────────────── */
 // Détail des ventes d'un mois (affiché au clic sur une barre du graphique)
@@ -11667,17 +11590,6 @@ function factureCII(inv, ent){
   </rsm:SupplyChainTradeTransaction>
 </rsm:CrossIndustryInvoice>`;
 }
-function downloadFacturX(inv, ent){
-  try{
-    const xml=factureCII(inv, ent);
-    const blob=new Blob([xml],{type:'application/xml'});
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement('a');
-    a.href=url; a.download=`facture-${String(inv.number||'').replace(/[^\w-]/g,'_')||'e-facture'}.xml`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    setTimeout(()=>URL.revokeObjectURL(url),2000);
-  }catch(e){ try{toast('Export e-facture impossible : '+e.message);}catch(_){} }
-}
 // XMP Factur-X (identification PDF/A-3 + schéma d'extension fx) — permet aux
 // outils (Indy…) de reconnaître la facture électronique embarquée.
 function facturxXMP(inv){
@@ -12033,107 +11945,6 @@ function CountUpEuro({ value }) {
   return <>{Math.round(v).toLocaleString('fr-FR')} €</>;
 }
 
-// ── SCÈNE 3D DU HÉROS : pile de cases glossy qui flottent (le garage) ────────
-// Décor du héros de l'accueil, validé par Julien (« fais de la 3D, des bangers »).
-// Même moteur que le garage (import dynamique de three, WebGL avec repli propre).
-// C'est de la DÉCORATION, pas de la donnée : des cases abstraites, aucun chiffre
-// dessus (un N° faux serait un mensonge, §5). Robuste : si three ou WebGL manque,
-// le canvas reste vide et le héros garde son dégradé. rAF en pause quand l'onglet
-// est masqué (batterie), et `prefers-reduced-motion` ⇒ une seule image fixe.
-function HeroScene3D() {
-  const mountRef = React.useRef(null);
-  React.useEffect(() => {
-    let cancelled = false; let cleanup = () => {};
-    (async () => {
-      let THREE; try { THREE = await import('three'); } catch (_) { return; }
-      const el = mountRef.current; if (cancelled || !el) return;
-      let renderer; try { renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); } catch (_) { return; }
-      let reduce = false; try { reduce = matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) {}
-      const W = el.clientWidth || 300, H = el.clientHeight || 220;
-      renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
-      renderer.setSize(W, H, false);
-      const dom = renderer.domElement;
-      dom.style.width = '100%'; dom.style.height = '100%'; dom.style.display = 'block'; dom.style.pointerEvents = 'none';
-      el.appendChild(dom);
-      const scene = new THREE.Scene();
-      const camera = new THREE.PerspectiveCamera(40, W / H, 0.1, 100);
-      camera.position.set(0, 0, 6.4);
-      try { renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15; } catch (_) {}
-      // Environnement studio menthe/bleu → vrais reflets sur le métal.
-      try {
-        const pm = new THREE.PMREMGenerator(renderer);
-        const cn = document.createElement('canvas'); cn.width = 512; cn.height = 256; const gx = cn.getContext('2d');
-        const gr = gx.createLinearGradient(0, 0, 0, 256); gr.addColorStop(0, '#0f4a54'); gr.addColorStop(.5, '#0a1622'); gr.addColorStop(1, '#0e3a2c'); gx.fillStyle = gr; gx.fillRect(0, 0, 512, 256);
-        gx.fillStyle = 'rgba(61,224,160,.95)'; gx.beginPath(); gx.arc(150, 70, 64, 0, 7); gx.fill();
-        gx.fillStyle = 'rgba(79,156,255,.85)'; gx.beginPath(); gx.arc(380, 110, 74, 0, 7); gx.fill();
-        gx.fillStyle = 'rgba(255,255,255,.9)'; gx.beginPath(); gx.arc(300, 40, 26, 0, 7); gx.fill();
-        const et = new THREE.CanvasTexture(cn); et.mapping = THREE.EquirectangularReflectionMapping; scene.environment = pm.fromEquirectangular(et).texture; et.dispose(); pm.dispose();
-      } catch (_) {}
-      const group = new THREE.Group(); scene.add(group);
-      // Face du médaillon : « VRM » à l'endroit (dessinée sur un canvas).
-      const fc = document.createElement('canvas'); fc.width = fc.height = 512;
-      { const x = fc.getContext('2d');
-        const g = x.createRadialGradient(256, 205, 30, 256, 256, 300); g.addColorStop(0, '#dff7ee'); g.addColorStop(1, '#37b98a'); x.fillStyle = g; x.beginPath(); x.arc(256, 256, 252, 0, 7); x.fill();
-        x.strokeStyle = 'rgba(255,255,255,.55)'; x.lineWidth = 9; x.beginPath(); x.arc(256, 256, 226, 0, 7); x.stroke();
-        x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillStyle = '#08281d'; x.font = '800 176px system-ui, Arial, sans-serif'; x.fillText('VRM', 256, 246);
-        x.fillStyle = 'rgba(8,40,29,.6)'; x.font = '700 30px system-ui, Arial, sans-serif'; x.fillText('· SNEAKER RESELL ·', 256, 356); }
-      const ft = new THREE.CanvasTexture(fc); try { ft.colorSpace = THREE.SRGBColorSpace; } catch (_) {}
-      const rimMat = new THREE.MeshStandardMaterial({ color: 0x2fb98a, metalness: 1, roughness: 0.22, envMapIntensity: 1.3 });
-      const faceMat = new THREE.MeshStandardMaterial({ map: ft, metalness: 0.55, roughness: 0.32, envMapIntensity: 1.05 });
-      const body = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 0.3, 90), rimMat); body.rotation.x = Math.PI / 2; group.add(body);
-      const f1 = new THREE.Mesh(new THREE.CircleGeometry(1.46, 72), faceMat); f1.position.z = 0.151; group.add(f1);
-      const f2 = new THREE.Mesh(new THREE.CircleGeometry(1.46, 72), faceMat); f2.position.z = -0.151; f2.rotation.y = Math.PI; group.add(f2);
-      const edge = new THREE.Mesh(new THREE.TorusGeometry(1.5, 0.11, 20, 90), rimMat); group.add(edge);
-      // Emblème en HAUT À DROITE, plus petit : le gros chiffre vit en bas à
-      // gauche, l'emblème ne le recouvre pas (surtout sur téléphone étroit).
-      group.scale.setScalar((W < 520) ? 0.56 : 0.9);
-      const BX = (W < 520) ? 1.25 : 1.95;
-      const BY = (W < 520) ? 0.95 : 0.35;
-      // Ombre de contact + particules (vie).
-      let ptsMesh = null;
-      try { const s2 = document.createElement('canvas'); s2.width = s2.height = 128; const sg = s2.getContext('2d'); const rg = sg.createRadialGradient(64, 64, 4, 64, 64, 62); rg.addColorStop(0, 'rgba(0,0,0,.5)'); rg.addColorStop(1, 'rgba(0,0,0,0)'); sg.fillStyle = rg; sg.fillRect(0, 0, 128, 128);
-        const sh = new THREE.Mesh(new THREE.PlaneGeometry(5, 2.2), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(s2), transparent: true, depthWrite: false })); sh.rotation.x = -Math.PI / 2; sh.position.set(BX, BY - 1.7, 0); sh.scale.setScalar(0.85); scene.add(sh); } catch (_) {}
-      try { const NP = 56, po = new Float32Array(NP * 3); for (let i = 0; i < NP; i++) { po[i * 3] = (Math.random() - .5) * 11; po[i * 3 + 1] = (Math.random() - .5) * 7; po[i * 3 + 2] = (Math.random() - .5) * 6 - 1; }
-        const pgeo = new THREE.BufferGeometry(); pgeo.setAttribute('position', new THREE.BufferAttribute(po, 3)); ptsMesh = new THREE.Points(pgeo, new THREE.PointsMaterial({ color: 0x8fe8d0, size: 0.045, transparent: true, opacity: 0.7, depthWrite: false })); scene.add(ptsMesh); } catch (_) {}
-      let tX = 0, tY = 0;
-      scene.add(new THREE.AmbientLight(0x2a4a5a, 0.6));
-      const key = new THREE.PointLight(0x3DE0A0, 2.4, 30); key.position.set(-4, 3, 6); scene.add(key);
-      const rim = new THREE.PointLight(0x4F9CFF, 2.2, 30); rim.position.set(4, -1, 5); scene.add(rim);
-      const keyD = new THREE.DirectionalLight(0xffffff, 1.25); keyD.position.set(0, 4, 7); scene.add(keyD);
-      const pointer = { x: 0, y: 0 };
-      const parent = el.parentElement || el;
-      const onMove = (e) => { try { const r = parent.getBoundingClientRect(); pointer.x = (e.clientX - r.left) / r.width - 0.5; pointer.y = (e.clientY - r.top) / r.height - 0.5; } catch (_) {} };
-      parent.addEventListener('pointermove', onMove);
-      const onResize = () => { const w = el.clientWidth || W, h = el.clientHeight || H; camera.aspect = w / h; camera.updateProjectionMatrix(); renderer.setSize(w, h, false); };
-      let ro; try { ro = new ResizeObserver(onResize); ro.observe(el); } catch (_) {}
-      const frame = () => {
-        const t = performance.now() * 0.001;
-        tX += ((pointer.y * 0.28) - tX) * 0.06; tY += ((pointer.x * 0.6) - tY) * 0.06;
-        group.rotation.y = Math.sin(t * 0.6) * 0.22 + tY;   // léger balancement, le logo reste DROIT et lisible
-        group.rotation.x = Math.sin(t * 0.9) * 0.05 + tX;
-        group.position.set(BX, BY + Math.sin(t * 0.85) * 0.1, 0);
-        if (ptsMesh) ptsMesh.rotation.y = t * 0.05;
-        renderer.render(scene, camera);
-      };
-      let raf = 0, running = true;
-      const tick = () => { if (!running) return; frame(); raf = requestAnimationFrame(tick); };
-      const onVis = () => { if (document.hidden) { running = false; cancelAnimationFrame(raf); } else if (!running) { running = true; tick(); } };
-      document.addEventListener('visibilitychange', onVis);
-      if (reduce) { group.rotation.set(0.02, 0.15, 0); frame(); } else tick();
-      cleanup = () => {
-        running = false; cancelAnimationFrame(raf);
-        parent.removeEventListener('pointermove', onMove); document.removeEventListener('visibilitychange', onVis);
-        try { ro && ro.disconnect(); } catch (_) {}
-        try { scene.traverse(o => { if (o.geometry) o.geometry.dispose(); const m = o.material; if (m) { (Array.isArray(m) ? m : [m]).forEach(mm => { if (mm && mm.map) mm.map.dispose(); mm && mm.dispose && mm.dispose(); }); } }); } catch (_) {}
-        try { ft.dispose(); } catch (_) {}
-        try { renderer.dispose(); } catch (_) {} try { el.removeChild(dom); } catch (_) {}
-      };
-    })();
-    return () => { cancelled = true; cleanup(); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  return <div ref={mountRef} aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }} />;
-}
 
 function Room3D({ items, room, hi, sel, canMove, onOpen, onSelect, onCellTap, onPileTap, onMove, colorOf, emojiOf, h3dOf, storedCount, depot, sortie, fallback }) {
   const mountRef = React.useRef(null);
@@ -29247,13 +29058,6 @@ function PushSetting() {
   );
 }
 
-// Réglage du régime fiscal : détermine comment le rapport comptable présente les
-// chiffres. Micro-entrepreneur (CA + estimation cotisations) ou société au
-// régime de la marge (marge + TVA sur la marge). Synchronisé (vinted_regime/tva).
-// Clé de l'assistant IA. ⚠️ VOLONTAIREMENT PAS dans SYNC_KEYS : c'est un secret,
-// il ne doit jamais partir dans la ligne Supabase partagée. Il reste sur CET
-// appareil. Le mieux reste la variable d'environnement Vercel (AI_API_KEY) —
-// ce champ est le raccourci « je veux tester tout de suite » pour Julien.
 // ── ÉCRAN QUI TOMBE ≠ APPLICATION QUI TOMBE ───────────────────────────────────
 // ⚠️ Sans garde-fou, UNE erreur de rendu dans un seul écran vide la page
 // entière : écran blanc, barre du bas comprise, plus rien à faire que recharger
@@ -29812,33 +29616,6 @@ function ConnexionsSetting() {
   );
 }
 
-function AiKeySetting() {
-  const [key, setKey] = useState(() => load('vrm_ai_key', ''));
-  const [ready, setReady] = useState(null); // null = inconnu, true/false = clé serveur présente ?
-  const [show, setShow] = useState(false);
-  useEffect(() => { fetch('/api/ai').then(r=>r.json()).then(j=>setReady(!!(j&&j.ready))).catch(()=>setReady(false)); }, []);
-  const commit = (v) => { setKey(v); if (v.trim()) save('vrm_ai_key', v.trim()); else localStorage.removeItem('vrm_ai_key'); };
-  const on = ready || (key && key.trim());
-  return (
-    <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px'}}>
-      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
-        <div style={{fontSize:13,fontWeight:600,color:C.text}}>Rédaction d'annonces par l'IA</div>
-        <span style={{fontSize:11,fontWeight:600,color:on?INV_STATUS.online.color:C.muted,background:(on?INV_STATUS.online.color:C.muted)+'18',borderRadius:8,padding:'1px 8px'}}>{on?'branchée':'non branchée'}</span>
-      </div>
-      <div style={{fontSize:12,color:C.muted,marginBottom:10,lineHeight:1.45}}>
-        Sert à réécrire titres et descriptions dans l'atelier <b>Republier ✨</b>. {ready
-          ? "La clé est configurée côté serveur (Vercel) — rien à faire ici."
-          : "Colle ta clé Anthropic (commence par « sk-ant- ») ou, mieux, ajoute-la sur Vercel (variable AI_API_KEY). Elle reste sur cet appareil et n'est jamais synchronisée."}
-      </div>
-      {!ready && (
-        <div style={{display:'flex',gap:8,alignItems:'center'}}>
-          <input type={show?'text':'password'} value={key} onChange={e=>commit(e.target.value)} placeholder="sk-ant-…" style={{flex:1,minWidth:0,border:`1px solid ${C.border}`,borderRadius:8,padding:'8px 10px',fontSize:13,background:C.bg,color:C.text,outline:'none',fontFamily:'inherit'}}/>
-          <button type="button" onClick={()=>setShow(s=>!s)} style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.muted,fontSize:12,fontWeight:600,padding:'8px 10px',cursor:'pointer',fontFamily:'inherit'}}>{show?'Cacher':'Voir'}</button>
-        </div>
-      )}
-    </div>
-  );
-}
 
 // ── ONGLET « MASQUÉS » — VENTES MASQUÉES · ACHATS MASQUÉS ────────────────────
 // 30 sept. : d'abord rangé dans Réglages, puis Julien : « fais un onglet dédié,
@@ -29915,6 +29692,9 @@ function EcranMasques({ comptes, ordi }) {
   );
 }
 
+// Réglage du régime fiscal : détermine comment le rapport comptable présente les
+// chiffres. Micro-entrepreneur (CA + estimation cotisations) ou société au
+// régime de la marge (marge + TVA sur la marge). Synchronisé (vinted_regime/tva).
 function RegimeSetting() {
   const [regime, setRegime] = useState(() => load('vinted_regime', 'micro'));
   // §5.49 : la base du régime URSSAF (donc du taux affiché) est synchronisée et
