@@ -14,6 +14,9 @@
 // qu'on lui donne (marque, taille, état) — jamais un état ou une matière non
 // fournis. On ne veut pas de belles annonces mensongères.
 
+import { utilisateurDe } from './_lib/session.js';
+import { accesVendeur } from './_lib/abonnement.js';
+
 const MODEL = process.env.AI_MODEL || 'claude-haiku-4-5-20251001';
 
 export default async function handler(req, res) {
@@ -25,8 +28,18 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') { res.status(405).json({ ok: false, error: 'POST' }); return; }
 
   const b = req.body || {};
-  const key = process.env.AI_API_KEY || process.env.ANTHROPIC_API_KEY || b.key;
+  const cleServeur = process.env.AI_API_KEY || process.env.ANTHROPIC_API_KEY || '';
+  const key = cleServeur || b.key;
   if (!key) { res.status(200).json({ ok: false, reason: 'no-key' }); return; }
+  // ⚠️ LA CLÉ DU SERVEUR SE PAIE : la route était ouverte à tous, donc le jour
+  //    où Julien pose AI_API_KEY, n'importe qui pouvait la dépenser. Elle exige
+  //    la session d'un vendeur (et un abonnement en règle, la règle de la base).
+  //    Une clé apportée par l'appareil lui-même ne coûte rien à personne d'autre.
+  if (cleServeur) {
+    const u = await utilisateurDe(req);
+    if (!u) { res.status(401).json({ ok: false, reason: 'session', message: 'Connecte-toi à VRM pour utiliser l\'assistant.' }); return; }
+    if ((await accesVendeur(u.id)) === false) { res.status(402).json({ ok: false, reason: 'abonnement', message: "Ton abonnement VRM n'est plus actif." }); return; }
+  }
 
   // ── MODE « aide à la réponse » (spec Messaging Intelligence) : on analyse le
   //    message d'un ACHETEUR et on propose des réponses NATURELLES. L'humain

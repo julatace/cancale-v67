@@ -1,5 +1,15 @@
 import { sbCle } from './_lib/cle.js';
+import { vendeurExige, baseCloisonnee } from './_lib/session.js';
 // api/vinted-refresh.js
+//
+// ⚠️⚠️ CETTE ROUTE ÉTAIT PUBLIQUE, ET ELLE RAFRAÎCHISSAIT TOUS LES COMPTES DE
+//    TOUS LES VENDEURS. Plus rien ne l'appelle (voir plus bas : retirée exprès
+//    en juillet, « un refresh en masse depuis l'IP de Vercel ressemble à du
+//    multi-comptes piloté par un robot », après un compte bloqué) — mais
+//    n'importe qui pouvait encore la déclencher en ouvrant son adresse, et la
+//    réponse listait les identifiants Vinted de chacun. Elle exige désormais la
+//    session d'un vendeur et ne touche QU'À SES comptes (audit de sécurité,
+//    4 octobre — banc routes-ecriture.cjs).
 // Rafraichit de facon CENTRALISEE les tokens Vinted de tous les comptes lies,
 // puis les persiste dans Supabase. But : que Julien puisse consulter ses comptes
 // depuis n'importe quel appareil SANS avoir a se reconnecter ni a repasser par
@@ -77,8 +87,8 @@ async function refreshOne(acc) {
   return { access_token: newAccess, refresh_token: newRefresh };
 }
 
-async function persist(acc, tokens) {
-  await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${acc.vinted_user_id}`, {
+async function persist(acc, tokens, filtre) {
+  await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${encodeURIComponent(acc.vinted_user_id)}${filtre}`, {
     method: 'PATCH',
     headers: { ...sbCle(SUPABASE_KEY), 'Content-Type': 'application/json', Prefer: 'return=minimal' },
     body: JSON.stringify({ access_token: tokens.access_token, refresh_token: tokens.refresh_token, updated_at: new Date().toISOString() }),
@@ -86,8 +96,11 @@ async function persist(acc, tokens) {
 }
 
 export default async function handler(req, res) {
+  const u = await vendeurExige(req, res);
+  if (!u) return;
+  const filtre = (await baseCloisonnee()) ? `&owner=eq.${encodeURIComponent(u.id)}` : '';
   try {
-    const listRes = await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=*`, {
+    const listRes = await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=*${filtre}`, {
       headers: { ...sbCle(SUPABASE_KEY) },
     });
     if (!listRes.ok) { res.status(502).json({ error: 'Lecture Supabase impossible' }); return; }
@@ -99,7 +112,7 @@ export default async function handler(req, res) {
       const exp = jwtExp(acc.access_token);
       if (exp && exp - now > REFRESH_MARGIN_S) { summary.push({ id: acc.vinted_user_id, action: 'still_valid' }); continue; }
       const tokens = await refreshOne(acc);
-      if (tokens) { await persist(acc, tokens); summary.push({ id: acc.vinted_user_id, action: 'refreshed' }); }
+      if (tokens) { await persist(acc, tokens, filtre); summary.push({ id: acc.vinted_user_id, action: 'refreshed' }); }
       else { summary.push({ id: acc.vinted_user_id, action: 'refresh_failed' }); }
     }
     res.status(200).json({ ok: true, count: accounts.length, summary });

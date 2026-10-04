@@ -23,3 +23,26 @@ export async function utilisateurDe(req) {
     return { id, email: String((j && j.email) || '') };
   } catch (_) { return null; }
 }
+
+// La base sait-elle séparer les vendeurs ? 200 → oui · 400 (colonne absente) →
+// non · le reste (522, délai) → on le suppose (filtrer sur le vendeur au pire
+// fait échouer la lecture ; ne PAS filtrer mélangerait les boutiques).
+let _cloisonnee = null;
+export async function baseCloisonnee() {
+  if (_cloisonnee !== null) return _cloisonnee;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?select=owner&limit=1`, { headers: { apikey: ANON, Authorization: `Bearer ${ANON}` } });
+    if (r.ok) _cloisonnee = true;
+    else if (r.status === 400) _cloisonnee = false;
+    else return true;
+  } catch (_) { return true; }
+  return _cloisonnee;
+}
+
+// Une route qui touche aux comptes Vinted d'un vendeur exige SA session.
+// Rend `{ id, email }`, ou `null` APRÈS avoir répondu 401.
+export async function vendeurExige(req, res) {
+  const u = await utilisateurDe(req);
+  if (!u) { res.status(401).json({ erreur: 'session', message: 'Connecte-toi à VRM pour faire ça.' }); return null; }
+  return u;
+}

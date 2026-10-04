@@ -932,7 +932,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     // adresse tu es connecté.
     if (msg && msg.from === 'vmr-bridge' && msg.action === 'authEtat') {
       const src = (sender && sender.origin) || (sender && sender.url) || '';
-      if (!/^https:\/\/(cancale-v67(-ten)?\.vercel\.app|(www\.)?vrm\.center)/.test(src)) {
+      if (!ORIGINE_APP.test(src)) {
         sendResponse({ ok: false, error: 'origine non autorisee' }); return true;
       }
       authEtat().then(sendResponse);
@@ -940,7 +940,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }
     if (msg && msg.from === 'vmr-bridge' && msg.action === 'session') {
       const from = (sender && sender.origin) || (sender && sender.url) || '';
-      const trusted = /^https:\/\/(cancale-v67(-ten)?\.vercel\.app|(www\.)?vrm\.center)/.test(from);
+      const trusted = ORIGINE_APP.test(from);
       if (!trusted) { sendResponse({ ok: false, error: 'origine non autorisee' }); return true; }
       (async () => {
         // ⚠️⚠️ L'APP TRANSMET SA SESSION, ET L'EXTENSION L'ADOPTE. Mesuré le
@@ -3015,7 +3015,19 @@ async function gardeLecture(uid, acc) {
 // ne doit pas casser une visite sur Vinted, où l'onglet prouve le compte). Une
 // commande venue de l'APP n'a pas cette preuve : on ne sait pas quel compte est
 // connecté, donc on n'agit pas. « Pas su » ne vaut pas « oui ».
-const ORIGINE_APP = /^https:\/\/(cancale-v67(-ten)?\.vercel\.app|(www\.)?vrm\.center)/;
+// ⚠️⚠️ LES SEULES ADRESSES DE L'APP — vérifiées sur le projet Vercel le
+//    4 octobre : `vrm.center` et `cancale-v67-ten.vercel.app` (qui redirige
+//    dessus). La liste faisait aussi confiance à `cancale-v67.vercel.app` et à
+//    `www.vrm.center`, qui ne sont PAS au projet — la première est à quelqu'un
+//    d'autre ou à prendre (Vercel a ajouté « -ten » parce que le nom était
+//    pris). Une page servie là recevait le pont : elle pouvait faire adopter SA
+//    session VRM à l'extension (les captures de Julien, jetons Vinted compris,
+//    partaient dans sa boutique) et commander des actions Vinted (accepter une
+//    offre, répondre). Et la règle n'était pas ancrée à droite :
+//    `https://vrm.center.autre-site.com` passait. Une seule liste, ici, pour
+//    tous les messages du pont, et `APP_URLS` en découle.
+const ORIGINES_APP = ['https://vrm.center', 'https://cancale-v67-ten.vercel.app'];
+const ORIGINE_APP = { test: (src) => { try { return ORIGINES_APP.includes(new URL(String(src || '')).origin); } catch (_) { return false; } } };
 // Ce que l'app peut faire passer par `exec`, et RIEN d'autre (§3 : jamais de
 // suppression, jamais de requête arbitraire).
 // 5.135 (3 octobre, « la messagerie intégrée, répondre et faire l'offre ») :
@@ -3092,7 +3104,7 @@ function avecVinted(fn) {
 // L'app demande ; l'extension vérifie (garde STRICTE, plafond), exécute dans la
 // file, et prévient l'app à chaque étape. L'état de chaque demande vit dans
 // `chrome.storage.local` (§4.9 : un service worker meurt au bout de 30 s).
-const APP_URLS = ['https://vrm.center/*', 'https://www.vrm.center/*', 'https://cancale-v67.vercel.app/*', 'https://cancale-v67-ten.vercel.app/*'];
+const APP_URLS = ORIGINES_APP.map((o) => o + '/*');
 const CMD_EN_COURS = ['file', 'generation', 'pdf'];
 async function lireCmds() {
   try { return (await chrome.storage.local.get('vrmCmds')).vrmCmds || {}; } catch (_) { return {}; }
@@ -4693,9 +4705,12 @@ async function genererBordereauxEnAttente(uid, opts = {}) {
 const VRM_APP_API = 'https://vrm.center';
 async function aiReply(message, article, price) {
   try {
+    // La clé de l'IA est celle du serveur : il exige la session du vendeur
+    // (sinon n'importe qui la dépenserait — audit de sécurité, 4 octobre).
+    let s = null; try { s = await authToken(); } catch (_) {}
     const r = await fetch(`${VRM_APP_API}/api/ai`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: Object.assign({ 'Content-Type': 'application/json' }, s && s.access_token ? { Authorization: `Bearer ${s.access_token}` } : {}),
       body: JSON.stringify({ mode: 'reply', message: String(message || '').slice(0, 1000), article: String(article || '').slice(0, 160), price }),
     });
     const j = await r.json().catch(() => ({}));

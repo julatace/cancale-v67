@@ -329,6 +329,22 @@ const SUB = (owner, status = 'active', extra = {}) => ({ id: 'sub_' + owner.slic
     dit(rb.code !== 402, 'B paie → son widget répond', `HTTP ${rb.code}`);
   });
 
+  console.log('\n── L’assistant IA : la clé du serveur se paie');
+  const ia = (await charge('api/ai.js')).default;
+  const appelIa = async (jeton) => { const r = faireRes(); await ia({ method: 'POST', query: {}, headers: jeton ? { authorization: 'Bearer ' + jeton } : {}, body: { title: 'Nike', brand: 'Nike' } }, r); return r; };
+  await essaie('ia', async () => {
+    reset(); process.env.AI_API_KEY = 'cle-ia-banc';
+    const sans = await appelIa('');
+    dit(sans.code === 401, 'sans session, la clé IA du serveur ne sert à personne', `HTTP ${sans.code}`);
+    obligatoire = true;
+    const coupe = await appelIa('aa.bb.A');
+    dit(coupe.code === 402, 'un vendeur qui ne paie plus ne s’en sert plus non plus', `HTTP ${coupe.code}`);
+    obligatoire = false; if (oublierAcces) oublierAcces();   // la mémoire d'une minute du serveur
+    const avec = await appelIa('aa.bb.A');
+    dit(avec.code !== 401 && avec.code !== 402, 'autre sens : un vendeur connecté s’en sert', `HTTP ${avec.code}`);
+    delete process.env.AI_API_KEY;
+  });
+
   console.log('\n── L’écran lit la règle de la BASE');
   await essaie('accès de la base', async () => {
     reset(); obligatoire = true; delete process.env.VRM_ABONNEMENT_OBLIGATOIRE;

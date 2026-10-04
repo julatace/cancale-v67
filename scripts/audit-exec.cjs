@@ -149,6 +149,42 @@ const REPONSE = { uid: UID, method: 'POST', endpoint: '/api/v2/conversations/123
     const d = await ctx.pdfBordereauLbc('https://api.leboncoin.fr/api/shippingproxy/v1/parcels/abc-123/label');
     dit(d && !d.ok, 'une page HTML (session expirée) n\'est jamais prise pour un bordereau', JSON.stringify(d));
   });
+  // ── 4 octobre : SEULES les adresses du projet sont « l'app » ───────────────
+  // L'extension faisait confiance à `cancale-v67.vercel.app` et `www.vrm.center`,
+  // qui ne sont PAS au projet Vercel (la première est à quelqu'un d'autre ou à
+  // prendre). Une page servie là pouvait faire adopter SA session VRM (les
+  // captures de Julien partaient dans sa boutique) et commander des actions
+  // Vinted. Et la règle n'était pas ancrée : `https://vrm.center.x.example` passait.
+  const POSSEDEES = ['https://vrm.center', 'https://cancale-v67-ten.vercel.app'];   // vérifiées sur le projet le 4 octobre
+  const IMPOSTEURS = ['https://cancale-v67.vercel.app', 'https://www.vrm.center', 'https://vrm.center.autre-site.example', 'http://vrm.center', 'https://cancale-v67-ten.vercel.app.autre.example'];
+  await essaie('imposteurs', async () => {
+    const acceptes = [];
+    for (const o of IMPOSTEURS) {
+      const { envois, envoyer } = faireCtx();
+      const s1 = await envoyer({ action: 'session', session: { access_token: 'a.b.c', user_id: 'pirate' } }, o);
+      const e1 = await envoyer(REPONSE, o);
+      const a1 = await envoyer({ action: 'authEtat' }, o);
+      if ((s1 && s1.ok) || (e1 && e1.ok) || envois.length || (a1 && a1.ok !== false)) acceptes.push(o);
+    }
+    dit(acceptes.length === 0, 'une adresse qui n\'est pas au projet (cancale-v67.vercel.app, www.vrm.center, vrm.center.autre…) ne transmet ni session, ni action, ni question', acceptes.join(', '));
+  });
+  await essaie('autre sens : les adresses du projet', async () => {
+    const refuses = [];
+    for (const o of POSSEDEES) {
+      const { envois, envoyer } = faireCtx();
+      const s1 = await envoyer({ action: 'session', session: null }, o);
+      const e1 = await envoyer(REPONSE, o);
+      if (!(s1 && s1.ok) || !(e1 && e1.ok) || envois.length !== 1) refuses.push(o);
+    }
+    dit(refuses.length === 0, 'autre sens : vrm.center et l\'adresse Vercel du projet restent l\'app', refuses.join(', '));
+  });
+  await essaie('manifeste', async () => {
+    const m = JSON.parse(fs.readFileSync(path.join(racine, 'vinted-sync-extension', 'manifest.json'), 'utf8'));
+    const pont = (m.content_scripts || []).filter((c) => (c.js || []).includes('bridge.js')).flatMap((c) => c.matches || []);
+    const appLike = (u) => /vrm\.center|vercel\.app/.test(u);
+    const hors = [...pont, ...(m.host_permissions || []).filter(appLike)].filter((u) => !POSSEDEES.some((o) => u === o + '/*'));
+    dit(pont.length > 0 && hors.length === 0, 'le pont n\'est injecté, et l\'app n\'est autorisée, QUE sur les adresses du projet', hors.join(', '));
+  });
   console.log(`\n${ok} ✅ · ${ko} ❌`);
   process.exit(ko ? 1 : 0);
 })();

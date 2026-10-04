@@ -4554,6 +4554,55 @@ etc. lorsqu'elle ne paye plus ».
   plus de 14 jours envoie mettre la carte à jour, jamais repayer — 3 rouges sur
   le build d'avant).
 
+### ⚠️⚠️ AUDIT DE SÉCURITÉ DU 4 OCTOBRE — CE QUI ÉTAIT OUVERT, ET CE QUI NE L'EST PLUS
+Demande de Julien : « continue à améliorer la sécurité du site ». Outils :
+**gitleaks** (historique complet), **semgrep** (règles open source de
+`semgrep/semgrep-rules` : le registre semgrep.dev est bloqué par le réseau du
+conteneur), `npm audit`, le conseiller Supabase, puis une relecture des routes et
+du pont app↔extension. Ce qui a été trouvé et fermé :
+- ⚠️⚠️ **L'EXTENSION FAISAIT CONFIANCE À DEUX ADRESSES QUI NE SONT PAS À JULIEN.**
+  `cancale-v67.vercel.app` et `www.vrm.center` étaient dans le manifeste (le pont
+  y était injecté) et dans `ORIGINE_APP`. Vérifié sur le projet Vercel : seuls
+  `vrm.center` et `cancale-v67-ten.vercel.app` (qui redirige) lui appartiennent
+  — Vercel a ajouté « -ten » parce que `cancale-v67` était déjà pris. Une page
+  servie là pouvait faire **adopter SA session VRM** à l'extension (les captures
+  de Julien, jetons Vinted compris, partaient dans sa boutique) et **commander
+  des actions Vinted** (accepter une offre, répondre). Et la règle n'était pas
+  ancrée : `https://vrm.center.autre-site.com` passait. ⇒ `ORIGINES_APP`, UNE
+  liste exacte comparée à `new URL(src).origin` ; `APP_URLS` en découle.
+  **Extension 5.149.0.** `audit-exec.cjs` : 2 rouges sur l'avant (les 4
+  imposteurs nommés). ⚠️ **Ne jamais remettre une adresse dans cette liste sans
+  l'avoir vue dans les domaines du projet Vercel.**
+- ⚠️⚠️ **`/api/vinted-refresh` ÉTAIT PUBLIQUE** : n'importe qui déclenchait le
+  renouvellement en masse des jetons de TOUS les comptes de TOUS les vendeurs
+  depuis l'IP de Vercel — le schéma que le journal (juillet) accuse d'avoir fait
+  bloquer un compte — et la réponse listait leurs identifiants Vinted.
+  **`/api/vinted-connect` aussi** : il rangeait le compte collé chez le
+  propriétaire de l'installation. ⇒ Les deux exigent la session
+  (`vendeurExige`) et ne touchent qu'aux comptes de CE vendeur.
+  `routes-ecriture.cjs` : 3 rouges sur l'avant.
+- **`/api/ai`** : la clé IA du serveur (pas encore posée) aurait servi à
+  n'importe qui. Elle exige la session et un abonnement en règle ; l'app et
+  l'extension envoient le jeton. Une clé apportée par l'appareil reste libre.
+- **Base (migration 007)** : la clé publique ne peut plus que LIRE (RLS lui rend
+  `[]`) — elle avait encore insert/update/delete et **TRUNCATE, que RLS ne
+  filtre pas**. `search_path` figé sur `vrm_meta` et son déclencheur.
+- **Ce qui a été vérifié et qui va bien** : gitleaks → 30 « fuites », toutes la
+  clé publique `anon` (vérifié rôle par rôle) et la clé PUBLIQUE des
+  notifications ; aucun secret dans l'historique. `npm audit` : 0 vulnérabilité
+  en production. Les insertions de HTML de l'extension passent toutes par
+  `esc()` ; les écoutes de messages vérifient `event.source === window`.
+  Le conseiller Supabase ne signale plus que deux choses VOULUES (`vrm_reglages`
+  sans règle = serveur seul ; `vrm_acces*` exécutables par un vendeur connecté =
+  elles ne disent que SON accès).
+- **Restent ouverts, notés** : `/api/vinted-proxy` relaie vers Vinted avec le
+  jeton fourni par l'appelant (il ne touche à aucune donnée stockée, mais c'est
+  un relais ouvert depuis l'IP de Vercel) ; le `pushsubscriptionchange` du
+  service worker n'a pas de session (ré-enregistré à l'ouverture suivante).
+  **À Julien** : dépôt public, clé publique `anon` → clé « publishable »,
+  réglages d'authentification (confirmation d'email, longueur du mot de passe)
+  dans le tableau de bord Supabase.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
