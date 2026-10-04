@@ -37,7 +37,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.156.0';
+const EXT_ATTENDUE = '5.157.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -1573,7 +1573,7 @@ const fetchEmailBordereaux = async () => {
     // base64 (deux fois : brut + tamponné). Mesuré, 51 bordereaux = 6 Mo dont
     // 99 % de PDF — et la liste était chargée deux fois, soit 12 Mo pour
     // afficher des titres. On ne prend que les champs utiles : 21 Ko.
-    // Le PDF est récupéré à la demande, au moment d'imprimer (fetchBordPdf).
+    // Le PDF est récupéré à la demande, au moment d'imprimer (lirePdfLigne).
     const champs = ['uid','type','suivi','modele','numero','taille','account','article',
                     'filename','posKnown','dateLimite','receivedAt','transaction']
                    .map(c => `${c}:meta->>${c}`).join(',');
@@ -1594,20 +1594,51 @@ const fetchEmailBordereaux = async () => {
       .sort((a, b) => new Date(b.receivedAt || 0) - new Date(a.receivedAt || 0));
   } catch (_) { return null; }
 };
-// Le PDF d'UN bordereau, à la demande (impression / tamponnage).
-const fetchBordPdf = async (rowId) => {
-  if (!rowId) return null;
+// ── LES OCTETS D'UN BORDEREAU : UN SEUL LECTEUR, TROIS ÉTATS (4 octobre) ─────
+// Sept endroits impriment un bordereau (Ventes, carte Colis, lot, Réimprimer,
+// bordereau + facture, tamponnage en 1 clic, reçu du bilan) et chacun relisait
+// la ligne à sa façon : `select=data` (toute la ligne), ou `pdfB64` ET
+// `pdfTamponneB64` — une copie tamponnée par le serveur que PERSONNE ne lit
+// (8,9 Mo en base, rapatriés à chaque impression d'un PDF venu par email :
+// l'égress de chaque impression était doublé). Et tous écrasaient les trois
+// états : une base qui ne répond pas et une ligne sans PDF donnaient le même
+// « PDF illisible ».
+// ⇒ `lirePdfLigne` ne lit que `pdfB64`, vérifie que ce sont bien les octets d'un
+//   PDF (`%PDF` — une page HTML de session expirée rangée par une vieille
+//   extension n'est pas un bordereau), et rend :
+//     { octets } · { absent: true } (la ligne n'a pas ou plus de PDF) · null
+//     (la base n'a pas répondu : « pas su » ≠ « pas de PDF »).
+const estOctetsPdf = (u) => !!(u && u.length >= 4 && u[0] === 0x25 && u[1] === 0x50 && u[2] === 0x44 && u[3] === 0x46);
+const lirePdfLigne = async (rowId) => {
+  if (!rowId) return { absent: true };
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(rowId)}&select=pdfB64:data->>pdfB64,pdfTamponneB64:data->>pdfTamponneB64`, {
-      headers: sbAuth(),
-    });
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(rowId)}&select=b:data->>pdfB64`, { headers: sbAuth() });
     if (!res.ok) return null;
-    const r = (await res.json())[0];
-    if (!r) return null;
-    const net = (v) => (v && v !== 'None') ? v : null;
-    return { pdfB64: net(r.pdfB64), pdfTamponneB64: net(r.pdfTamponneB64) };
+    const rows = await res.json();
+    if (!Array.isArray(rows)) return null;
+    const v = rows[0] && rows[0].b;
+    if (!v || v === 'None') return { absent: true };
+    const octets = b64ToBytes(v);
+    return estOctetsPdf(octets) ? { octets } : { absent: true };
   } catch (_) { return null; }
 };
+// La règle « le PDF capté par l'extension d'abord, l'email en secours », UNE
+// fois (§11) — elle était recopiée à cinq endroits. Même rendu à trois états :
+// on ne conclut « absent » que si AUCUNE des deux lectures n'a échoué.
+const octetsBordereau = async (capteRow, bordRow) => {
+  let pasSu = false;
+  for (const row of [capteRow, bordRow]) {
+    if (!row) continue;
+    const r = await lirePdfLigne(row);
+    if (r && r.octets) return r;
+    if (r === null) pasSu = true;
+  }
+  return pasSu ? null : { absent: true };
+};
+// Ce qu'on dit quand il n'y a pas d'octets : deux causes, deux phrases.
+const messagePdfManquant = (r) => r === null
+  ? "La base n'a pas répondu — réessaie dans un instant."
+  : "Ce bordereau n'a plus son PDF — retélécharge-le depuis la vente sur Vinted.";
 // Suivi colis reçu par EMAIL (Mondial Relay / Chronopost) : lignes email_track_*
 // = { carrier, suivi, status, statusLabel, subject, receivedAt }.
 // Un email de CONFIRMATION de retrait/livraison ⟹ le colis n'est plus « à
@@ -2429,16 +2460,14 @@ const fetchHarvestOrdersBrut = async (uid) => {
 };
 // Récupère le dernier bordereau (PDF) capté par l'extension pour ce compte
 // (ligne harvest_{uid}_label_latest = {url, capturedAt, pdfB64}).
+// ⚠️ Plus de `select=data` (§4.4) : les SCALAIRES d'abord (quelle vente, quand),
+// les octets seulement s'il y a un PDF, par le lecteur unique.
 const fetchCapturedLabel = async (uid) => {
   if (!uid) return null;
-  try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.harvest_${uid}_label_latest&select=data`, {
-      headers: sbAuth(),
-    });
-    if (!res.ok) return null;
-    const rows = await res.json();
-    return rows[0]?.data || null;
-  } catch (_) { return null; }
+  const meta = await fetchLabelFrais(uid);
+  if (!meta) return null;
+  const r = await lirePdfLigne(`harvest_${uid}_label_latest`);
+  return r && r.octets ? { ...meta, octets: r.octets } : null;
 };
 // ⚠️⚠️ ET C'EST EXACTEMENT CE QUI SE PASSAIT ENCORE, MESURÉ LE 15 SEPTEMBRE.
 // La version scalaire ci-dessous existait déjà, avec ce commentaire — mais
@@ -2523,33 +2552,20 @@ const fetchVersementsVinted = async () => {
     return map;
   } catch (_) { return null; }
 };
-// Les octets d'UN bordereau précis (par id de ligne) — seulement à l'impression.
-const fetchLabelPdf = async (rowId) => {
-  if (!rowId) return null;
-  try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(rowId)}&select=data`, { headers: sbAuth() });
-    if (!res.ok) return null;
-    const rows = await res.json();
-    return rows[0]?.data || null;
-  } catch (_) { return null; }
-};
 // Dernier REÇU / FACTURE officiel Vinted capté par l'extension quand tu l'as
 // consulté sur Vinted (ligne harvest_{uid}_receipt_latest). Pour la compta pro.
+// Scalaires seulement (§4.4) — le PDF ne part qu'au clic « Télécharger ».
+// Rend { row, capturedAt } · false (aucun reçu) · null (la base n'a pas répondu).
 const fetchCapturedReceipt = async (uid) => {
-  if (!uid) return null;
+  if (!uid) return false;
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.harvest_${uid}_receipt_latest&select=data`, {
-      headers: sbAuth(),
-    });
+    const row = `harvest_${uid}_receipt_latest`;
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${row}&select=capturedAt:meta->>capturedAt&meta->>_pdf=eq.true`, { headers: sbAuth() });
     if (!res.ok) return null;
     const rows = await res.json();
-    return rows[0]?.data || null;
+    if (!Array.isArray(rows)) return null;
+    return rows[0] ? { row, capturedAt: rows[0].capturedAt || null } : false;
   } catch (_) { return null; }
-};
-const b64ToArrayBuffer = (b64) => {
-  const bin = atob(b64); const len = bin.length; const bytes = new Uint8Array(len);
-  for (let i = 0; i < len; i++) bytes[i] = bin.charCodeAt(i);
-  return bytes.buffer;
 };
 // Extrait les dépenses de BOOST (remontée d'annonce, mise en avant) d'une réponse
 // facturation Vinted moissonnée, quel que soit le format exact. Parcours récursif :
@@ -20944,16 +20960,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, buysBase, reportYear, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements]);
   const [capturedReceipts, setCapturedReceipts] = useState([]); // reçus officiels Vinted captés (compta pro)
+  const [recusPasLus, setRecusPasLus] = useState(0); // comptes dont la lecture du reçu a échoué (pas su ≠ aucun)
   const openAnnual = async () => {
     setShowAnnual(true);
     if (buys.items===null && accounts.length) loadOrders('purchased', setBuys);
     // Reçus officiels Vinted captés par l'extension (compta pro), par compte.
-    const out=[];
-    for (const a of accounts) { const r = await fetchCapturedReceipt(a.vinted_user_id); if (r && r.pdfB64) out.push({ name: accName(a), ...r }); }
-    setCapturedReceipts(out);
+    // Les comptes sont lus ENSEMBLE (lectures de NOTRE base, pas de Vinted), et
+    // une lecture ratée ne se fait pas passer pour « aucun reçu ».
+    const lus = await Promise.all(accounts.map(a => fetchCapturedReceipt(a.vinted_user_id).then(r => ({ a, r }))));
+    setCapturedReceipts(lus.filter(x => x.r).map(x => ({ name: accName(x.a), ...x.r })));
+    setRecusPasLus(lus.filter(x => x.r === null).length);
   };
-  const downloadReceipt = (rec) => {
-    try { const buf=b64ToArrayBuffer(rec.pdfB64); const blob=new Blob([buf],{type:'application/pdf'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`recu-vinted-${(rec.name||'compte').replace(/[^a-z0-9]/gi,'_')}.pdf`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),3000); } catch(_){ toast('Impossible d\'ouvrir ce reçu.'); }
+  const downloadReceipt = async (rec) => {
+    const lu = await lirePdfLigne(rec.row);
+    if (!lu || !lu.octets) { toast(lu === null ? "La base n'a pas répondu — réessaie dans un instant." : "Ce reçu n'a plus son PDF."); return; }
+    try { const buf=lu.octets; const blob=new Blob([buf],{type:'application/pdf'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`recu-vinted-${(rec.name||'compte').replace(/[^a-z0-9]/gi,'_')}.pdf`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),3000); } catch(_){ toast('Impossible d\'ouvrir ce reçu.'); }
   };
   const exportAnnualCsv = () => {
     const R=annual; const e=(v)=>`"${String(v==null?'':v).replace(/"/g,'""')}"`;
@@ -21075,17 +21096,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const num = (effEntry(o) && effEntry(o).numero) || (b ? numForBord(b) : '') || '';
     const titre = (o && o.title) || (b ? (b.modele || b.article || '') : '');
     if (b && b.hasPdf && invForBord(b)) { await printBordAndInvoice(b); return; }
-    let bytes = null;
-    if (capte) { const l = await fetchLabelPdf(capte.row); bytes = l && l.pdfB64 ? b64ToBytes(l.pdfB64) : null; }
-    if (!bytes && b && b.hasPdf) { const p = await fetchBordPdf(b._row); bytes = p && p.pdfB64 ? b64ToBytes(p.pdfB64) : null; }
-    if (!bytes) { libererOngletPdf(); toast('PDF illisible — réessaie dans un instant.'); return; }
-    processBordereau(num, titre, bytes);
+    const lu = await octetsBordereau(capte && capte.row, b && b.hasPdf ? b._row : null);
+    if (!lu || !lu.octets) { libererOngletPdf(); toast(messagePdfManquant(lu)); return; }
+    processBordereau(num, titre, lu.octets);
   };
   const printBordAndInvoice = async (b) => {
     try {
-      const pdf = await fetchBordPdf(b._row);
-      const buf = pdf && pdf.pdfB64 ? b64ToBytes(pdf.pdfB64) : null;
-      if (!buf) { libererOngletPdf(); toast('PDF du bordereau illisible.'); return; }
+      const lu = await lirePdfLigne(b._row);
+      const buf = lu && lu.octets ? lu.octets : null;
+      if (!buf) { libererOngletPdf(); toast(messagePdfManquant(lu)); return; }
       const numero = numForBord(b), title = b.modele || b.article || '';
       const { width, height } = await readPdfFirstPageSize(buf);
       const pos = posForFormat(width, height);
@@ -21229,16 +21248,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // Les PDF sont téléchargés MAINTENANT, et seulement ceux à imprimer :
       // les embarquer dans la liste coûtait 6 Mo à chaque ouverture de l'écran.
       const items = [];
+      let pasLus = 0, sansPdf = 0;
       for (const e of aImprimer) {
         const o = e.o, b = e.b;
         // ⚠️ LE PDF CAPTÉ PAR L'EXTENSION PASSE EN PREMIER (même règle que la
         //    carte, § per-card) : c'est l'étiquette prise chez Vinted, rattachée
         //    par n° de transaction ; l'email n'est qu'un secours.
-        let buf = null;
         const capte = e.txn ? labelsCaptes[e.txn] : null;
-        if (capte) { const l = await fetchLabelPdf(capte.row); buf = l && l.pdfB64 ? b64ToBytes(l.pdfB64) : null; }
-        if (!buf && b && b.hasPdf) { const p = await fetchBordPdf(b._row); buf = p && p.pdfB64 ? b64ToBytes(p.pdfB64) : null; }
-        if (!buf) continue;   // PDF illisible : on saute, on n'imprime pas du vide
+        const lu = await octetsBordereau(capte && capte.row, b && b.hasPdf ? b._row : null);
+        if (lu === null) pasLus++; else if (!lu.octets) sansPdf++;
+        const buf = lu && lu.octets ? lu.octets : null;
+        if (!buf) continue;   // pas d'octets : on saute, on n'imprime pas du vide — et on le DIT après
         // Numéro et titre : même dérivation que la carte (identité Vinted, jamais
         // le titre — §5). Numéro depuis le bordereau si on l'a, sinon la vente.
         const numero = (b ? numForBord(b) : '') || (o ? (effEntry(o)?.numero || '') : '');
@@ -21250,9 +21270,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if (inv) { const ent = entForBordInvoice(inv); if (ent) { try { invBytes = await buildFacturXBytes(inv, ent); } catch(_) {} } }
         items.push({ numero, title, pdfBuf: buf, invBytes });
       }
-      if (!items.length) { libererOngletPdf(); toast('Les PDF n\'ont pas pu être lus. Réessaie dans un instant.'); setBatchBusy(false); return; }
+      if (!items.length) { libererOngletPdf(); toast(pasLus ? "La base n'a pas répondu — réessaie dans un instant." : "Ces bordereaux n'ont plus leur PDF — retélécharge-les depuis les ventes sur Vinted."); setBatchBusy(false); return; }
       const r = await mergeAndDownloadBordereaux(items, (w, h) => posForFormat(w, h, false), { autoprint: true, imprimante });
       setBordResult({ ...r, batch: true });
+      // Un lot imprimé en partie ne se présente pas comme complet (§5).
+      if (pasLus || sansPdf) toast(`${items.length} sur ${aImprimer.length} imprimé${items.length>1?'s':''} — ${[pasLus?`${pasLus} que la base n'a pas rendu${pasLus>1?'s':''} (réessaie)`:'', sansPdf?`${sansPdf} sans PDF`:''].filter(Boolean).join(', ')}.`);
     } catch(err){ libererOngletPdf(); toast('Erreur : ' + String(err)); }
     setBatchBusy(false);
   };
@@ -21292,18 +21314,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     //    que le bordereau porte SA transaction ; sinon on ne propose rien.
     let lbl = null;
     if (tx && labelsCaptes[String(tx)]) {
-      const l = await fetchLabelPdf(labelsCaptes[String(tx)].row);
-      if (l && l.pdfB64) lbl = { pdfB64: l.pdfB64, capturedAt: labelsCaptes[String(tx)].capturedAt, tx: String(tx) };
+      const l = await lirePdfLigne(labelsCaptes[String(tx)].row);
+      if (l && l.octets) lbl = { octets: l.octets, capturedAt: labelsCaptes[String(tx)].capturedAt, tx: String(tx) };
     }
     if (!lbl && acc) {
       const dernier = await fetchCapturedLabel(acc.vinted_user_id);
       if (dernier && (!tx || String(dernier.tx || '') === String(tx))) lbl = dernier;
     }
-    if (lbl && lbl.pdfB64) {
+    if (lbl && lbl.octets) {
       const age = lbl.capturedAt ? (Date.now()-new Date(lbl.capturedAt).getTime())/60000 : 999;
       const mins = Math.max(0, Math.round(age));
       if (age<60 && await askConfirm(`📄 Tamponner en 1 clic le bordereau téléchargé il y a ${mins} min, avec le N°${numero} (${title}) ?\n\nOK = oui (auto) · Annuler = choisir un fichier`)) {
-        try { await processBordereau(numero, title, b64ToArrayBuffer(lbl.pdfB64)); return; } catch(_){}
+        try { await processBordereau(numero, title, lbl.octets); return; } catch(_){}
       }
     }
     bordRef.current?.click();
@@ -24758,11 +24780,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           // VÉRIFICATION (il arrive plus tard, et son numéro vient
                           // d'un rapprochement par titre, §5.17) — donc un secours,
                           // pas la source.
-                          let bytes = null;
-                          if (capte) { const l=await fetchLabelPdf(capte.row); bytes = l&&l.pdfB64?b64ToBytes(l.pdfB64):null; }
-                          if (!bytes && b && b.hasPdf) { const p=await fetchBordPdf(b._row); bytes = p&&p.pdfB64?b64ToBytes(p.pdfB64):null; }
-                          if (!bytes) { libererOngletPdf(); toast('PDF illisible.'); return; }
-                          processBordereau(num, titre, bytes);
+                          const lu = await octetsBordereau(capte && capte.row, b && b.hasPdf ? b._row : null);
+                          if (!lu || !lu.octets) { libererOngletPdf(); toast(messagePdfManquant(lu)); return; }
+                          processBordereau(num, titre, lu.octets);
                         }} title={inv?'Bordereau tamponné + facture pro, puis impression':'Bordereau tamponné, puis impression'}
                         style={{flex:'1 1 160px',maxWidth:340,border:'none',background:C.accent,color:'#fff',borderRadius:10,padding:'12px',cursor:'pointer',fontSize:15,fontWeight:600,fontFamily:'inherit'}}>🖨 Imprimer{inv?' + facture':''}</button>
                       ) : (<>
@@ -24908,7 +24928,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <div style={{fontSize:12,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{numForBord(b)?`N°${numForBord(b)} · `:''}{b.modele||b.article||'Bordereau'}</div>
                     <div style={{fontSize:11,color:C.muted}}>{b.receivedAt?`reçu le ${new Date(b.receivedAt).toLocaleDateString('fr-FR')}`:''}</div>
                   </div>
-                  {b.hasPdf && <button type="button" data-imprime="1" onClick={async ()=>{ const p=await fetchBordPdf(b._row); const bytes=p&&p.pdfB64?b64ToBytes(p.pdfB64):null; if(!bytes){libererOngletPdf();toast('PDF illisible.');return;} processBordereau(numForBord(b), b.modele||b.article||'', bytes); }} style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:8,padding:'6px 10px',cursor:'pointer',fontSize:12,fontWeight:600,fontFamily:'inherit'}}>🖨 Réimprimer</button>}
+                  {b.hasPdf && <button type="button" data-imprime="1" onClick={async ()=>{ const lu=await lirePdfLigne(b._row); if(!lu||!lu.octets){libererOngletPdf();toast(messagePdfManquant(lu));return;} processBordereau(numForBord(b), b.modele||b.article||'', lu.octets); }} style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:8,padding:'6px 10px',cursor:'pointer',fontSize:12,fontWeight:600,fontFamily:'inherit'}}>🖨 Réimprimer</button>}
                 </div>
               ))}
           </div>
@@ -25184,6 +25204,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       </div>
                     ))}
                   </>
+                ) : recusPasLus>0 ? (
+                  <div data-recus-pas-lus={recusPasLus} style={{fontSize:11,color:C.muted,lineHeight:1.5}}>La base n'a pas répondu pour {recusPasLus} compte{recusPasLus>1?'s':''} — rouvre le bilan dans un instant.</div>
                 ) : (
                   <div style={{fontSize:11,color:C.muted,lineHeight:1.5}}>Aucun reçu capté pour l'instant. Ouvre/télécharge un reçu ou une facture officielle sur Vinted (avec l'extension active) → il apparaîtra ici, prêt pour ta compta.</div>
                 )}

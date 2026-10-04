@@ -11,7 +11,14 @@
 //     reste « à générer » ;
 //   · une vente FINALISÉE n'a plus aucun bouton de bordereau (2 octobre :
 //     « il ne devrait même pas y en avoir », le colis est parti) ;
-//   · un clic ⇒ le PDF est réellement demandé, puis produit sans erreur.
+//   · un clic ⇒ le PDF est réellement demandé, puis produit sans erreur ;
+//   · ÉGRESS (4 octobre) : la copie TAMPONNÉE par le serveur (`pdfTamponneB64`)
+//     n'est lue par personne — un clic n'en rapatrie aucun octet (avant : une
+//     copie entière de plus à chaque impression) ;
+//   · TROIS ÉTATS : la base qui ne répond pas sur la ligne du PDF dit « n'a pas
+//     répondu, réessaie » ; une ligne qui porte autre chose qu'un PDF (une page
+//     HTML de session expirée) dit « n'a plus son PDF ». Avant, les deux
+//     donnaient le même « PDF illisible » — ou une erreur de pdf-lib.
 //
 // (Reprise de la base du banc rapport.cjs.)
 //
@@ -50,7 +57,7 @@ const ACHATS = [
 const ACCOUNTS = [{ id: 1, vinted_user_id: '111', login: 'compte_test', domain: 'www.vinted.fr', updated_at: auj.toISOString() }];
 const PDF_B64 = fs.readFileSync(path.join(__dirname, 'bordereau-test.b64'), 'utf8').trim();
 const rows = [
-  { id: 'email_bord_test1', data: { transaction: '9001', filename: 'bordereau.pdf', modele: 'Nike Air Max 1', receivedAt: auj.toISOString(), pdfB64: PDF_B64 } },
+  { id: 'email_bord_test1', data: { transaction: '9001', filename: 'bordereau.pdf', modele: 'Nike Air Max 1', receivedAt: auj.toISOString(), pdfB64: PDF_B64, pdfTamponneB64: PDF_B64 } },
   { id: 'email_bord_test2', data: { filename: 'bordereau2.pdf', modele: 'Salomon XT-6 blanc 👟 taille 40', article: 'Salomon XT-6 blanc 👟 taille 40', receivedAt: auj.toISOString(), pdfB64: PDF_B64 } },
   { id: 'harvest_111_orders_sold', data: { capturedAt: auj.toISOString(), payload: { my_orders: VENTES } } },
   { id: 'harvest_111_orders_purchased', data: { capturedAt: auj.toISOString(), payload: { my_orders: ACHATS } } },
@@ -83,6 +90,11 @@ const projette = (row, sel) => {
   return out;
 };
 
+// Ce que sert la ligne du PDF au clic : 'ok' · 'panne' (522 + HTML, la vraie
+// forme) · 'html' (la colonne porte une page HTML, pas un PDF).
+let modePdf = 'ok', tamponOctets = 0;
+const HTML_B64 = Buffer.from('<html><body>Session expirée</body></html>').toString('base64');
+
 (async () => {
   let b; const pdfDemandes = [];
   try {
@@ -102,7 +114,16 @@ const projette = (row, sel) => {
         const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
         const forme = (r) => (sel && sel !== 'data,updated_at,cap:data->>capturedAt' && !/^id,data/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: auj.toISOString(), cap: r.data.capturedAt });
         const eq = /id=eq\.([^&]*)/.exec(u);
-        if (eq) { if (/pdfB64/.test(sel || '')) pdfDemandes.push(eq[1]); return j(rows.filter((r) => r.id === eq[1]).map(forme)); }
+        if (eq) {
+          if (/pdfB64/.test(sel || '')) {
+            pdfDemandes.push(eq[1]);
+            if (modePdf === 'panne') return route.fulfill({ status: 522, contentType: 'text/html', body: '<html>522</html>' });
+            if (modePdf === 'html') return j(rows.filter((r) => r.id === eq[1]).map((r) => forme({ ...r, data: { ...r.data, pdfB64: HTML_B64, pdfTamponneB64: HTML_B64 } })));
+          }
+          const rendu = rows.filter((r) => r.id === eq[1]).map(forme);
+          for (const r of rendu) for (const v of Object.values(r || {})) if (typeof v === 'string' && v === (rows[0].data.pdfTamponneB64) && /pdfTamponneB64/.test(sel || '')) tamponOctets += v.length;
+          return j(rendu);
+        }
         const lk = /id=like\.([^&]*)/.exec(u);
         if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(rows.filter((r) => re.test(r.id)).map(forme)); }
         return j([]);
@@ -128,6 +149,7 @@ const projette = (row, sel) => {
       dit(onglets.length === 1 && /^blob:/.test(urls[0] || ''), 'un clic OUVRE le bordereau dans un onglet (pas un fichier téléchargé)', JSON.stringify(urls));
       dit(telecharges.length === 0, 'aucun téléchargement', JSON.stringify(telecharges));
       dit(pdfDemandes.slice(avant).includes('email_bord_test1'), 'un clic demande le PDF de CE bordereau, et de lui seul', JSON.stringify(pdfDemandes.slice(avant)));
+      dit(tamponOctets === 0, 'et ne rapatrie AUCUN octet de la copie tamponnée par le serveur (personne ne la lit)', `${tamponOctets} octets base64`);
       const txt = await pg.evaluate(() => document.body.innerText);
       dit(!/PDF du bordereau illisible|Erreur impression/.test(txt), 'le PDF est produit sans erreur');
       const r = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
@@ -136,6 +158,48 @@ const projette = (row, sel) => {
       await pg.screenshot({ path: path.join(require('os').tmpdir(), 'ventes-bord-' + vp.width + '.png') });
       await ctx.close();
     }
+    // ── Trois états : la base qui ne répond pas ≠ une ligne sans PDF ──────────
+    for (const [mode, attendu, interdit, nom] of [
+      ['panne', /n'a pas répondu/, /n'a plus son PDF|illisible/i, 'la base ne répond pas sur la ligne du PDF ⇒ « n’a pas répondu, réessaie »'],
+      ['html', /n'a plus son PDF/, /n'a pas répondu|illisible|Erreur/i, 'la colonne porte une page HTML, pas un PDF ⇒ « n’a plus son PDF », jamais une erreur'],
+    ]) {
+      modePdf = mode;
+      const ctx = await b.newContext({ viewport: { width: 1512, height: 950 } });
+      const pg = await ctx.newPage();
+      const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
+      await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
+      await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+      await pg.route('**/rest/v1/**', (route) => {
+        const u = decodeURIComponent(metaVersData(route.request().url()));
+        const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
+        if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', body: '{"m":1}' });
+        if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCOUNTS);
+        const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
+        const forme = (r) => (sel && sel !== 'data,updated_at,cap:data->>capturedAt' && !/^id,data/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: auj.toISOString(), cap: r.data.capturedAt });
+        const eq = /id=eq\.([^&]*)/.exec(u);
+        if (eq) {
+          if (/pdfB64/.test(sel || '')) {
+            if (modePdf === 'panne') return route.fulfill({ status: 522, contentType: 'text/html', body: '<html>522</html>' });
+            if (modePdf === 'html') return j(rows.filter((r) => r.id === eq[1]).map((r) => forme({ ...r, data: { ...r.data, pdfB64: HTML_B64, pdfTamponneB64: HTML_B64 } })));
+          }
+          return j(rows.filter((r) => r.id === eq[1]).map(forme));
+        }
+        const lk = /id=like\.([^&]*)/.exec(u);
+        if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(rows.filter((r) => re.test(r.id)).map(forme)); }
+        return j([]);
+      });
+      await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
+      await pg.goto(`http://localhost:${PORT}/?tab=cat_ventes`, { waitUntil: 'domcontentloaded' });
+      await pg.waitForTimeout(3500);
+      try { await pg.getByText('Toutes', { exact: true }).first().click({ timeout: 3000 }); await pg.waitForTimeout(800); } catch (_) {}
+      try { await pg.click('[data-bouton-bord="pdf"][data-tx="9001"]', { timeout: 5000 }); } catch (e) { dit(false, mode + ' : le bouton se clique', String(e.message).slice(0, 90)); }
+      let txt = '';
+      for (let i = 0; i < 20; i++) { await pg.waitForTimeout(150); txt = await pg.evaluate(() => document.body.innerText); if (attendu.test(txt) || interdit.test(txt)) break; }
+      dit(attendu.test(txt) && !interdit.test(txt), nom, (txt.match(/[^\n]*(répondu|PDF|illisible|Erreur)[^\n]*/i) || [''])[0].slice(0, 120));
+      dit(errs.length === 0, mode + ' : aucune erreur d’app', errs.join(' | ').slice(0, 160));
+      await ctx.close();
+    }
+    modePdf = 'ok';
   } catch (e) { dit(false, 'le banc a tourné jusqu’au bout', String(e && e.message).slice(0, 160)); }
   finally { if (b) await b.close(); srv.close(); }
   console.log(ko ? `\n❌ bordereau par vente : ${ko} rouge(s)` : '\n✅ bordereau par vente : tout est vert');

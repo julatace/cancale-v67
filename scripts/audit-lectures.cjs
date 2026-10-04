@@ -63,6 +63,25 @@ for (const f of FICHIERS) {
   }
 }
 
+// ── LES LIGNES QUI PORTENT UN PDF (4 octobre) ───────────────────────────────
+// `harvest_*_label_*`, `*_receipt_latest`, `email_bord_*` portent 100 à 700 Ko
+// de PDF en base64. L'app les lisait encore en entier à trois endroits, et
+// projetait `pdfTamponneB64` — une copie tamponnée par le serveur que personne
+// ne lit — à chaque impression d'un PDF venu par email. Les octets passent par
+// UN lecteur (`lirePdfLigne`), qui ne demande que `pdfB64`.
+console.log('\n── LES LIGNES QUI PORTENT UN PDF NE SONT JAMAIS LUES EN ENTIER (app)');
+{
+  const app = sansCommentaires(fs.readFileSync(path.join(racine, 'src/App.jsx'), 'utf8'));
+  const PDF_FAMILLES = /app_data\?id=(?:eq|like)\.[^`&]*(?:_label_|_receipt_latest|email_bord_)[^`&]*&select=(?:id,)?data(?![-,>])/g;
+  const blobs = app.match(PDF_FAMILLES) || [];
+  dit(blobs.length === 0, 'aucun `select=data` sur une ligne de bordereau ou de reçu', blobs.map((x) => x.slice(0, 70)).join(' | '));
+  const tampon = (app.match(/select=[^`]*pdfTamponneB64/g) || []);
+  dit(tampon.length === 0, 'la copie tamponnée par le serveur n\'est jamais rapatriée (personne ne la lit)', tampon.map((x) => x.slice(0, 80)).join(' | '));
+  const lecteur = /const lirePdfLigne = async[\s\S]*?\n};/.exec(app);
+  dit(!!lecteur && /select=[a-z]+:data->>pdfB64`/.test(lecteur[0]), 'un seul lecteur d\'octets, qui ne demande QUE `pdfB64`');
+  dit(!!lecteur && /return null/.test(lecteur[0]) && /absent:\s*true/.test(lecteur[0]), 'et il distingue « pas su » (null) de « pas de PDF »');
+}
+
 console.log('\n── LES FAMILLES QUI APPROCHENT DES 1 000 LIGNES SONT PAGINÉES');
 {
   const bg = sansCommentaires(fs.readFileSync(path.join(racine, 'vinted-sync-extension/background.js'), 'utf8'));

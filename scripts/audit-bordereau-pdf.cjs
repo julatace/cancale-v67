@@ -63,28 +63,30 @@ const essai = async (nom, reponses, attenduOk, attenduEssais) => {
   const iAx = SRC.indexOf('function A_EXPEDIER(');
   const regleAx = (iAw >= 0 && iAx > iAw) ? SRC.slice(iAw, SRC.indexOf('\n}\n', iAx) + 3) : null;
   {
-    const monter = (magasin, ventes, dejaCapte) => {
-      const ecrites = [];
+    // Ce que le code demande pour la liste des ventes : la PROJECTION (§4.4)
+    // depuis le 4 octobre, la ligne entière avant. Le banc sert la forme
+    // demandée (§6.3) — sinon il mesure une fiction.
+    const ventesRendues = (q, ventes) => (/select=ventes:data->payload->my_orders/.test(q)
+      ? [{ ventes }] : [{ data: { payload: { my_orders: ventes } } }]);
+    const monter = (magasin, ventes, dejaCapte, opts = {}) => {
+      const ecrites = [], lectures = [], diag = [], journal = [];
       const chrome = { storage: { local: {
         get: async (k) => (k in magasin ? { [k]: magasin[k] } : {}),
         set: async (o) => { Object.assign(magasin, o); },
         remove: async (k) => { delete magasin[k]; },
       } } };
-      const ctx = { chrome, console, Date, Set, String, Object, JSON,
+      const ctx = { chrome, console, Date, Set, String, Object, JSON, atob: (x) => Buffer.from(String(x), 'base64').toString('latin1'),
+        noterDiag: async (k) => { diag.push(k); },
         activeAccountId: async () => '42',
         ...(regleAx ? {} : { AWAITING_SHIP: (st) => /bordereau|paiement/i.test(String(st || '')) }),
-        logActivity: () => {},
+        logActivity: (m) => { journal.push(String(m)); },
         // ⚠️ `_label_*` est un balayage de famille NON BORNÉ : le code le lit
         //    désormais en PAGINÉ (`sbGetTout`, §4.5). Le vm doit donc le fournir,
         //    sinon l'appel lève et le cas « un seul colis » tombe — artefact de
         //    banc (§6.3 : servir la forme que le code utilise vraiment).
-        sbGet: async (q) => (/orders_sold/.test(q)
-          ? [{ data: { payload: { my_orders: ventes } } }]
-          : dejaCapte.map(tx => ({ tx }))),
-        sbGetTout: async (q) => (/orders_sold/.test(q)
-          ? [{ data: { payload: { my_orders: ventes } } }]
-          : dejaCapte.map(tx => ({ tx }))),
-        supabaseUpsert: async (_t, lignes) => { ecrites.push(...lignes.map(l => l.id)); },
+        sbGet: async (q) => { lectures.push(q); return (/orders_sold/.test(q) ? ventesRendues(q, ventes) : dejaCapte.map(tx => ({ tx }))); },
+        sbGetTout: async (q) => { lectures.push(q); return (/orders_sold/.test(q) ? ventesRendues(q, ventes) : dejaCapte.map(tx => ({ tx }))); },
+        supabaseUpsert: async (_t, lignes) => { if (opts.ecritureKO) return false; ecrites.push(...lignes.map(l => l.id)); return true; },
       };
       vm.createContext(ctx);
       if (regleAx) vm.runInContext(regleAx, ctx);
@@ -92,8 +94,12 @@ const essai = async (nom, reponses, attenduOk, attenduEssais) => {
       // Sur l'ancien code, la fonction n'existe pas : on la remplace par un
       // no-op pour que les contrôles s'exécutent quand même et disent la vérité.
       if (typeof ctx.attendreBordereau !== 'function') ctx.attendreBordereau = async () => ({ ok: false });
-      return { ctx, ecrites };
+      return { ctx, ecrites, lectures, diag, journal };
     };
+    // Les octets d'un vrai PDF (« %PDF-1.7 … »), et ceux d'une page de session
+    // expirée servie sous l'en-tête `application/pdf`.
+    const PDF = Buffer.from('%PDF-1.7\n%fake\n').toString('base64');
+    const HTML = Buffer.from('<html><body>Connecte-toi</body></html>').toString('base64');
     const deuxVentes = [
       { transaction_id: 21883380310, status: 'Bordereau envoyé au vendeur' },
       { transaction_id: 21928427030, status: 'Bordereau envoyé au vendeur' },
@@ -101,7 +107,7 @@ const essai = async (nom, reponses, attenduOk, attenduEssais) => {
     // 1) DEUX colis en attente : sans rendez-vous, on ne devine pas (règle §24).
     {
       const { ctx, ecrites } = monter({}, deuxVentes, []);
-      await ctx.storeLabel('www.vinted.fr', 'https://x/l.pdf', 'AA');
+      await ctx.storeLabel('www.vinted.fr', 'https://x/l.pdf', PDF);
       ecrites.some(id => /_label_\d+$/.test(id))
         ? nok('sans rendez-vous, deux colis possibles → aucune attribution', 'un colis a été choisi au hasard : ' + ecrites.join(','))
         : ok('sans rendez-vous, deux colis possibles → aucune attribution (§24)');
@@ -111,7 +117,7 @@ const essai = async (nom, reponses, attenduOk, attenduEssais) => {
       const magasin = {};
       const { ctx, ecrites } = monter(magasin, deuxVentes, []);
       await ctx.attendreBordereau('42', '21928427030');
-      await ctx.storeLabel('www.vinted.fr', 'https://x/l.pdf', 'AA');
+      await ctx.storeLabel('www.vinted.fr', 'https://x/l.pdf', PDF);
       ecrites.includes('harvest_42_label_21928427030')
         ? ok('avec rendez-vous, le PDF est relié à la bonne vente')
         : nok('avec rendez-vous, le PDF est relié à la bonne vente', ecrites.join(',') || 'aucune ligne');
@@ -121,9 +127,9 @@ const essai = async (nom, reponses, attenduOk, attenduEssais) => {
       const magasin = {};
       const { ctx, ecrites } = monter(magasin, deuxVentes, []);
       await ctx.attendreBordereau('42', '21928427030');
-      await ctx.storeLabel('www.vinted.fr', 'https://x/1.pdf', 'AA');
+      await ctx.storeLabel('www.vinted.fr', 'https://x/1.pdf', PDF);
       const apres = ecrites.length;
-      await ctx.storeLabel('www.vinted.fr', 'https://x/2.pdf', 'BB');
+      await ctx.storeLabel('www.vinted.fr', 'https://x/2.pdf', PDF);
       ecrites.slice(apres).some(id => id === 'harvest_42_label_21928427030')
         ? nok('le rendez-vous est à usage unique', 'le 2e PDF a repris la même vente')
         : ok('le rendez-vous est à usage unique');
@@ -132,7 +138,7 @@ const essai = async (nom, reponses, attenduOk, attenduEssais) => {
     {
       const magasin = { vrmBordAttendu: { uid: '42', tx: '21928427030', at: Date.now() - 20 * 60 * 1000 } };
       const { ctx, ecrites } = monter(magasin, deuxVentes, []);
-      await ctx.storeLabel('www.vinted.fr', 'https://x/l.pdf', 'AA');
+      await ctx.storeLabel('www.vinted.fr', 'https://x/l.pdf', PDF);
       ecrites.some(id => /_label_\d+$/.test(id))
         ? nok('un rendez-vous périmé ne relie plus rien', 'attribution sur un souvenir de 20 min')
         : ok('un rendez-vous périmé ne relie plus rien');
@@ -141,18 +147,41 @@ const essai = async (nom, reponses, attenduOk, attenduEssais) => {
     {
       const magasin = { vrmBordAttendu: { uid: '99', tx: '21928427030', at: Date.now() } };
       const { ctx, ecrites } = monter(magasin, deuxVentes, []);
-      await ctx.storeLabel('www.vinted.fr', 'https://x/l.pdf', 'AA');
+      await ctx.storeLabel('www.vinted.fr', 'https://x/l.pdf', PDF);
       ecrites.some(id => /_label_\d+$/.test(id))
         ? nok("un rendez-vous d'un autre compte ne s'applique pas", ecrites.join(','))
         : ok("un rendez-vous d'un autre compte ne s'applique pas");
     }
     // 6) La règle « un seul candidat » marche toujours (aucune régression).
     {
-      const { ctx, ecrites } = monter({}, [deuxVentes[0]], []);
-      await ctx.storeLabel('www.vinted.fr', 'https://x/l.pdf', 'AA');
+      const { ctx, ecrites, lectures } = monter({}, [deuxVentes[0]], []);
+      await ctx.storeLabel('www.vinted.fr', 'https://x/l.pdf', PDF);
       ecrites.includes('harvest_42_label_21883380310')
         ? ok('un seul colis possible → toujours relié (aucune régression)')
         : nok('un seul colis possible → toujours relié', ecrites.join(',') || 'aucune ligne');
+      // §4.4 : la liste des ventes, jamais la ligne entière.
+      const lv = lectures.filter(q => /orders_sold/.test(q));
+      lv.length && lv.every(q => !/select=data(?![-,>])/.test(q))
+        ? ok('la liste des ventes est lue en projection, jamais la ligne entière (§4.4)')
+        : nok('la liste des ventes est lue en projection', lv.join(' | ') || 'aucune lecture');
+    }
+    // 7) UN BORDEREAU EST UN PDF (4 octobre) : une page HTML servie sous
+    //    `application/pdf` (session expirée) n'est jamais rangée — sinon `_pdf`
+    //    passe à vrai et le vrai bordereau n'est plus jamais redemandé.
+    {
+      const { ctx, ecrites } = monter({}, [deuxVentes[0]], []);
+      const r = await ctx.storeLabel('www.vinted.fr', 'https://x/l.pdf', HTML);
+      ecrites.length === 0 && r === false
+        ? ok('une page HTML servie comme un PDF n\'est jamais rangée comme bordereau')
+        : nok('une page HTML servie comme un PDF n\'est jamais rangée', `écrit : ${ecrites.join(',') || 'rien'} · rendu ${r}`);
+    }
+    // 8) « capté » ne se dit que si la base l'a RANGÉ.
+    {
+      const { ctx, journal } = monter({}, [deuxVentes[0]], [], { ecritureKO: true });
+      const r = await ctx.storeLabel('www.vinted.fr', 'https://x/l.pdf', PDF);
+      r === false && !journal.some(m => /capté/.test(m))
+        ? ok('écriture refusée par la base : le bordereau n\'est pas annoncé « capté »')
+        : nok('écriture refusée : pas de « capté »', `rendu ${r} · journal ${JSON.stringify(journal)}`);
     }
   }
   // Un échec de récupération a une porte de sortie (5.130 : le panneau est

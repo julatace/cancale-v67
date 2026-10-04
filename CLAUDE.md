@@ -4414,6 +4414,52 @@ qui sert à RECRÉER une annonce disparue (§47 : description + photos HD) — n
 - **Aucune entrée d'`EXT_CAPACITES`** : correction de fiabilité, l'app ne promet
   rien de neuf. Extension **5.150.0**, zip régénéré, `EXT_ATTENDUE` suivie.
 
+### PDF de bordereaux — étape 0 : un seul lecteur, trois états, 5.157 (4 octobre)
+Préalable au passage des PDF dans le stockage de fichiers (plan complet dans
+la cartographie du 4 octobre, résumée ici). **Mesuré sur sa vraie base** :
+~38 Mo de PDF dans le JSONB (`email_bord_*` 179 lignes dont 161 portent
+`pdfB64` **et** `pdfTamponneB64` ; `harvest_*_label_{tx}` 95 lignes, 19 Mo ;
+`label_latest` 8 lignes, toutes des doublons octet pour octet d'un
+`label_{tx}`). **108 bordereaux de ventes finalisées sont purgeables et 0 l'a
+été : son extension installée est la 5.128** (`panel_diag_capture.ver`), la
+purge est arrivée en 5.146. *Le premier geste reste d'installer le zip.*
+- **Un seul lecteur d'octets** (`lirePdfLigne`, `octetsBordereau`) pour les sept
+  endroits qui impriment : il ne demande que `pdfB64` (la copie tamponnée par
+  le serveur, `pdfTamponneB64`, n'est lue par personne — elle doublait l'égress
+  de chaque impression d'un PDF venu par email), vérifie `%PDF`, et rend
+  **trois états** : octets · absent · `null` (la base n'a pas répondu). Avant,
+  « pas su » et « pas de PDF » donnaient le même « PDF illisible », et une page
+  HTML rangée par erreur faisait remonter l'erreur brute de pdf-lib.
+- Plus aucun `select=data` sur une ligne de bordereau ou de reçu dans l'app
+  (`fetchCapturedLabel`, `fetchCapturedReceipt` lisent des scalaires d'abord) ;
+  les reçus du bilan annuel ne téléchargent leur PDF qu'au clic, les comptes
+  sont lus ensemble, et une lecture ratée ne s'affiche pas « aucun reçu ».
+- Un lot imprimé en partie le DIT (« 7 sur 9 imprimés — 2 que la base n'a pas
+  rendus »), jamais comme complet (§5).
+- **Extension 5.157** : les trois portes de capture (`recupererLabel`,
+  `capterTelechargement`, `inject.js`) vérifient les **octets** `%PDF`, plus
+  seulement l'en-tête — une page de session expirée servie en
+  `application/pdf` passait `_pdf` à vrai, et `labelDejaRange` ne redemandait
+  plus jamais le vrai bordereau. `storeLabel`/`storeReceipt` ne disent plus
+  « capté » sur une écriture refusée, et `storeLabel` ne lit plus la ligne
+  `orders_sold` entière (§4.4).
+- Preuves : `ventes-bordereau.cjs` **4 rouges** sur l'avant (copie tamponnée
+  rapatriée aux deux tailles, « PDF illisible » sur une panne, erreur pdf-lib
+  sur une page HTML) ; `audit-lectures.cjs` **4** ; `audit-bordereau-pdf.cjs`
+  **3** ; `audit-recap-bordereau.cjs` **2**.
+- ⚠️ Deux audits servaient « un PDF » de **4 octets** (`%PDF`) : le contrôle
+  accepte donc ≥ 4 octets — un vrai PDF en a toujours plus.
+- **La suite (non faite, chacune sa PR)** : compartiment `bordereaux` privé +
+  règle `_pdf` élargie à `pdfPath` (migration 009) ; l'app lit les deux formes ;
+  le serveur puis l'extension rangent dans le stockage
+  (`{owner}/{famille}/{sha256}.pdf`, objet écrit AVANT la ligne) ; rattrapage
+  en deux phases, la seconde (vider la colonne) **sur un oui de Julien**.
+  **À faire trancher par lui** : purger aussi `harvest_*_label_{tx}` des ventes
+  finalisées (55 lignes, 10,8 Mo, aucune règle ne les purge) ; le sort des
+  tables `sauvegarde.app_data_2026093{0}`/`_20261002` (~76 Mo de PDF).
+  ⚠️ Les mesures de l'étape « stockage » (doublon, 400 vs 404, CORS) se font sur
+  une branche Supabase ou en local, **jamais en production** (§2.3).
+
 ### Logo iPhone : icônes PWA régénérées (3 octobre)
 `apple-touch-icon.png` + `icon-192/512/maskable` portaient encore l'ancien logo
 orange ; régénérées depuis `logo-vrm.png` (VRM Noir), maskable avec marge sur
