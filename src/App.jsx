@@ -2988,6 +2988,32 @@ const ventesFaites = ({ vinted, lbc, ebay, cachee } = {}) => {
   }
   return { lignes, sansDate };
 };
+// Le résumé VENDU — aujourd'hui, ce mois, mois par mois — avec les bornes de
+// Ma journée (minuit LOCAL, le 1er du mois LOCAL). ⚠️ Pour les écrans qui ne
+// montent pas l'écran Ventes (accueil, Statistiques, widget) : ils affichaient
+// « vendu » calculé sur Vinted SEUL, figé à l'ouverture, pendant que Ma journée
+// comptait les trois plateformes — deux nombres pour une même notion (§11).
+const resumeVendu = (lignes, maintenant = Date.now()) => {
+  const minuit = new Date(maintenant); minuit.setHours(0, 0, 0, 0);
+  const debutMois = new Date(minuit); debutMois.setDate(1);
+  const out = { jour: { n: 0, eur: 0 }, mois: { n: 0, eur: 0 }, caParMois: {}, ventesParMois: {} };
+  for (const l of (lignes || [])) {
+    if (l.ts >= minuit.getTime()) { out.jour.n += 1; out.jour.eur += l.eur; }
+    if (l.ts >= debutMois.getTime()) { out.mois.n += 1; out.mois.eur += l.eur; }
+    const d = new Date(l.ts); const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    out.caParMois[k] = (out.caParMois[k] || 0) + l.eur; out.ventesParMois[k] = (out.ventesParMois[k] || 0) + 1;
+  }
+  return out;
+};
+// Un compte écarté des totaux par SON choix : masqué dans l'app, ou depuis le
+// panneau de l'extension (`panel_accounts_off`, trois états : `false` = rallumé
+// exprès, ça prime). Une seule règle pour l'écran Ventes et la coque (§11).
+const compteEcarte = (uid, masques, panneau) => {
+  const k = String(uid ?? '');
+  const pa = panneau || {};
+  if (pa[k] === false) return false;
+  return (masques && masques.has(k)) || pa[k] === true;
+};
 // Clé de jour LOCALE : toISOString() est en UTC et mettrait une vente de 23 h
 // sur le lendemain.
 const cleJourLocal = (t) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
@@ -9430,10 +9456,15 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
     return {marques:top(parM), tailles:top(parT)};
   },[sales,catInfo]);
   // CA du mois courant (par date de VENTE, §5) pour la jauge d'objectif.
+  // ⚠️ Elle sommait l'ANCIENNE archive (`sales`, vide depuis juillet 2026) : la
+  //    jauge restait à 0 € quoi qu'il vende. Elle lit maintenant « vendu ce
+  //    mois », la règle de Ma journée (`liveStats.caMois`, §11) ; l'archive ne
+  //    sert plus qu'en repli tant que les ventes ne sont pas lues.
   const caMoisCourant=useMemo(()=>{
+    if (liveStats && liveStats.caMois!=null) return liveStats.caMois;
     const now=new Date(); const ym=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
     return sales.reduce((s,v)=>{ const p=(v.saleDate||'').trim().split('/'); return (p.length===3 && `${p[2]}-${p[1]}`===ym) ? s+(+v.sellPrice||0) : s; },0);
-  },[sales]);
+  },[sales, liveStats]);
 
   // Paires ajoutées par jour (basé sur addedAt JJ/MM/AAAA).
   // On ignore la date d'init "01/01/2024" qui regroupe tout l'historique importé,
@@ -16879,9 +16910,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   //   • `panel_accounts_off`      → « ✕ Masquer » depuis le panneau (§35)
   // ⚠️ Le trois-états du panneau est conservé : `false` = rallumé exprès, ça prime.
   const acctOff = (uid) => {
-    const k = String(uid ?? '');
-    if (panelAcctOff[k] === false) return false;      // rallumé depuis le panneau
-    return hiddenAccts.has(k) || panelAcctOff[k] === true;
+    // La règle vit dans `compteEcarte` (partagée avec la coque, §11).
+    return compteEcarte(uid, hiddenAccts, panelAcctOff);
   };
   // ── LES COMPTES QUI EXISTENT VRAIMENT ────────────────────────────────────
   // Un compte existe s'il a des jetons (ligne `vinted_accounts`), pas parce
@@ -30180,6 +30210,11 @@ function AppCoeur() {
   //    l'extension ».
   const premierJour = accountsLoaded && !baseKO && vintedAccounts.length === 0;
   const [liveStats,setLiveStats]=useState(null); // résumé Vinted en direct pour l'accueil
+  // Les ventes Vinted de TOUS les comptes liés, telles que l'écran Ventes les lit
+  // (`_acc` posé) : `undefined` pas encore lu · `null` aucune lecture n'a abouti.
+  const [ventesCoque,setVentesCoque]=useState(undefined);
+  // Ce que le widget publie hors « vendu » (attente, encaissé, stock, messages).
+  const [widgetBase,setWidgetBase]=useState(null);
   // ── « Le prix qui marche » : chargé À LA DEMANDE (onglet ouvert), une fois ──
   // Lit les ventes FINALISÉES et les annonces en ligne, regroupe par
   // modèle+taille (grouperPrixMarche). `null` = pas encore lu · [] = lu, rien
@@ -30229,6 +30264,20 @@ function AppCoeur() {
   // Collectif lit « pas encore de vente », jamais 0 € (§5). Une lecture ratée
   // reste `null` : « pas su » ne vaut pas « zéro vente ».
   const [ebayCa,setEbayCa]=useState(null);
+  // Les commandes eBay brutes, pour « vendu » (même règle que Ma journée).
+  const [ebayCommandes,setEbayCommandes]=useState(null);
+  // `panel_accounts_off` : les comptes écartés depuis le panneau (§35), lus ici
+  // aussi pour que « vendu » écarte exactement les mêmes comptes que Ma journée.
+  const [panelOffCoque,setPanelOffCoque]=useState({});
+  useEffect(()=>{ (async()=>{
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_accounts_off&select=data`, { headers: sbAuth() });
+      if (!r.ok) return;
+      const j = await r.json();
+      const d = (j && j[0] && j[0].data) || {};
+      if (d && typeof d === 'object') setPanelOffCoque(d);
+    } catch (_) {}
+  })(); }, []);
   useEffect(()=>{ (async()=>{
     try {
       const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.ebay_orders&select=data`, { headers: sbAuth() });
@@ -30236,6 +30285,7 @@ function AppCoeur() {
       const rows = await r.json();
       const orders = (rows && rows[0] && rows[0].data && rows[0].data.orders) || [];
       setEbayCa(caEbayPayees(orders));
+      setEbayCommandes(Array.isArray(orders) ? orders : []);
     } catch (_) { /* pas su ⇒ null : jamais un faux CA eBay */ }
   })(); }, []);
   useEffect(()=>{
@@ -30533,15 +30583,27 @@ function AppCoeur() {
       // → chargement du tableau de bord bien plus rapide (avant : 9 comptes × 3
       // appels en série). Lecture moissonnée d'abord, donc paralléliser est sûr.
       const activeAccts=vintedAccounts.filter(a=>!skipAcc(a.vinted_user_id));
-      const perAcc=await Promise.all(activeAccts.map(async a=>{
+      // ⚠️ Les VENTES de tous les comptes liés (bloqués compris) partent aussi
+      //    dans « vendu » (`ventesFaites`, la règle de Ma journée) : un compte que
+      //    Vinted a refusé a quand même vendu. Seuls les comptes que Julien a
+      //    écartés (`compteEcarte`) en sortent — comme sur l'écran Ventes.
+      const perAcc=await Promise.all(vintedAccounts.map(async a=>{
+        const actif=!skipAcc(a.vinted_user_id);
         const [sold,list,conv]=await Promise.all([
           fetchVintedOrders(a,'sold',1,'all'),
-          fetchVintedListings(a,1),
-          fetchVintedConversations(a,1),
+          actif?fetchVintedListings(a,1):Promise.resolve({ok:false,items:[]}),
+          actif?fetchVintedConversations(a,1):Promise.resolve({ok:false,items:[]}),
         ]);
-        return { a, sold, list, conv };
+        return { a, sold, list, conv, actif };
       }));
-      for(const { a, sold, list, conv } of perAcc){
+      const ventesToutes=[]; let ventesLues=false; const vusTx=new Set();
+      for(const { a, sold } of perAcc){
+        if(!sold.ok) continue; ventesLues=true;
+        for(const o of sold.items){ const id=String(o.transaction_id!=null?o.transaction_id:o.id); if(vusTx.has(id)) continue; vusTx.add(id); ventesToutes.push({ ...o, _acc: a }); }
+      }
+      if(!stop) setVentesCoque(ventesLues?ventesToutes:null);
+      for(const { a, sold, list, conv, actif } of perAcc){
+        if(!actif) continue;
         if(sold.ok){ ok=true; for(const o of sold.items){
           if(hiddenTx.has(String(o.transaction_id))) continue;
           const st=classifyOrderStatus(o.status);
@@ -30645,20 +30707,55 @@ function AppCoeur() {
         walletComptes:(walletEsc&&walletEsc.accounts)||0,
         walletAgeJours:(walletEsc&&walletEsc.plusVieuxJours!=null)?walletEsc.plusVieuxJours:null});
         // Photo des chiffres pour le WIDGET écran d'accueil : l'app publie ce
-        // qu'elle affiche → le widget montre EXACTEMENT la même chose. « Synchroniser »
-        // le widget = simplement ouvrir l'app (qui réécrit cette ligne).
-        try{
-          await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`,{
-            method:'POST',
-            headers:sbAuth({ 'Content-Type':'application/json',Prefer:'resolution=merge-duplicates,return=minimal' }),
-            body:JSON.stringify([withOwner({id:'widget_stats',data:{caMois:Math.round(caMois),ventesMois,enAttente:Math.round(enAttenteReel),caEncaisse:Math.round(caEncaisse),online,unread,pairesStock,updatedAt:new Date().toISOString()}})]),
-          });
-        }catch(_){}
+        // qu'elle affiche → le widget montre EXACTEMENT la même chose. « Vendu ce
+        // mois » est complété plus bas avec `ventesFaites` (toutes plateformes),
+        // quand Leboncoin et eBay sont lus — c'est l'effet du widget qui écrit.
+        setWidgetBase({enAttente:Math.round(enAttenteReel),caEncaisse:Math.round(caEncaisse),online,unread,pairesStock});
       }
     })();
     return ()=>{stop=true;};
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[accountsLoaded, vintedAccounts, nuagePret]);
+
+  // ── « VENDU » : UNE RÈGLE, CELLE DE MA JOURNÉE (§11, 4 octobre) ────────────
+  // L'accueil (« Aujourd'hui »), Statistiques (« Vendu ce mois », la courbe) et
+  // le widget de l'iPhone lisaient `liveStats` : Vinted SEUL, comptes bloqués
+  // exclus, figé à l'ouverture — pendant que Ma journée comptait Vinted +
+  // Leboncoin + eBay par `ventesFaites`. Deux nombres pour une même notion.
+  // Ils lisent maintenant le résultat de la MÊME fonction, sur les mêmes ventes
+  // (tous les comptes liés, `_acc` posé), les mêmes exclusions (ventes masquées,
+  // `compteEcarte`) et les mêmes bornes (`resumeVendu`). Tant que les ventes
+  // Vinted ne sont pas lues, on garde ce qu'on a (jamais un zéro inventé).
+  const liveStatsVus = useMemo(() => {
+    if (!liveStats || !Array.isArray(ventesCoque)) return liveStats;
+    try {
+      const hTx = new Set((load('vinted_sales_hidden', []) || []).map(String));
+      const hAcc = new Set((load('vinted_accounts_hidden', []) || []).map(String));
+      const cachee = (o) => hTx.has(String(o && o.transaction_id)) || compteEcarte(o && o._acc && o._acc.vinted_user_id, hAcc, panelOffCoque);
+      const v = ventesFaites({ vinted: ventesCoque, lbc: (lbcVentes && lbcVentes.ventes) || [], ebay: ebayCommandes || [], cachee });
+      const r = resumeVendu(v.lignes);
+      return { ...liveStats, caJour: r.jour.eur, ventesJour: r.jour.n, caMois: r.mois.eur, ventesMois: r.mois.n,
+        caParMois: r.caParMois, ventesParMois: r.ventesParMois, venduSansDate: v.sansDate };
+    } catch (_) { return liveStats; }
+  }, [liveStats, ventesCoque, lbcVentes, ebayCommandes, panelOffCoque, nuagePret]);
+  // Le widget : écrit quand ce qu'il afficherait CHANGE (pas à chaque rendu).
+  const widgetEcrit = React.useRef('');
+  useEffect(() => {
+    if (!widgetBase || !liveStatsVus) return;
+    const data = { ...widgetBase, caMois: Math.round(liveStatsVus.caMois || 0), ventesMois: liveStatsVus.ventesMois || 0 };
+    const cle = JSON.stringify(data);
+    if (cle === widgetEcrit.current) return;
+    widgetEcrit.current = cle;
+    (async () => {
+      try {
+        await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
+          method: 'POST',
+          headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }),
+          body: JSON.stringify([withOwner({ id: 'widget_stats', data: { ...data, updatedAt: new Date().toISOString() } })]),
+        });
+      } catch (_) {}
+    })();
+  }, [widgetBase, liveStatsVus]);
 
   const vintedNotifChecked = React.useRef(false);
   // Le propriétaire des colis à retirer (`pickupUnion`) publie ses comptes ;
@@ -31489,14 +31586,14 @@ function AppCoeur() {
             annoncer « 🎉 Tout est à jour ! » pendant la panne, c'est-à-dire
             précisément l'écran qu'il ouvre le matin. Corriger « partout » se
             vérifie au rendu, écran par écran, pas en lisant le code. */}
-        {tab==='journee'&&<Comptabilite key="journee" accounts={vintedAccounts} only="journee" liveStats={liveStats} onNav={setTab} baseKO={baseKO} accountsReady={accountsLoaded} premierJour={premierJour} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}
+        {tab==='journee'&&<Comptabilite key="journee" accounts={vintedAccounts} only="journee" liveStats={liveStatsVus} onNav={setTab} baseKO={baseKO} accountsReady={accountsLoaded} premierJour={premierJour} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}
         {/* ⚠️ « Bienvenue 👋 · connecte ton compte Vinted pour commencer » à
             quelqu'un qui a neuf comptes : c'est ce qu'il voyait quand la base
             ne répondait pas. `baseKO` distingue « aucun compte » de « je n'ai
             pas pu lire », et l'écran le DIT au lieu de repartir de zéro. */}
         {tab==='dashboard'&&premierJour&&<Onboarding setTab={setTab}/>}
-        {tab==='dashboard'&&<Dashboard premierJour={premierJour} catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices} liveStats={liveStats} lbcVentes={lbcVentes} ebayCa={ebayCa} onGo={setTab} actions={notifItems} baseKO={baseKO}/>}
-        {tab==='collectif'&&<Collectif liveStats={liveStats} lbcVentes={lbcVentes} ebayCa={ebayCa} onGo={setTab} baseKO={baseKO} actions={notifItems} premierJour={premierJour}/>}
+        {tab==='dashboard'&&<Dashboard premierJour={premierJour} catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices} liveStats={liveStatsVus} lbcVentes={lbcVentes} ebayCa={ebayCa} onGo={setTab} actions={notifItems} baseKO={baseKO}/>}
+        {tab==='collectif'&&<Collectif liveStats={liveStatsVus} lbcVentes={lbcVentes} ebayCa={ebayCa} onGo={setTab} baseKO={baseKO} actions={notifItems} premierJour={premierJour}/>}
         {/* ⚠️ UN SEUL ONGLET VINTED QUI CONTIENT TOUT : Aperçu (CA, argent,
             compteurs) + Annonces / Ventes / Achats rendus À L'INTÉRIEUR, via les
             MÊMES composants que les écrans séparés (aucune duplication §11). Les
@@ -31507,12 +31604,12 @@ function AppCoeur() {
           {/* Résumé CA/argent TOUJOURS visible en haut, puis la liste (ventes par
               défaut) directement — plus d'écran « Aperçu » intermédiaire. Les
               sections restent les mêmes écrans (§11), juste à un tap. */}
-          <VintedResume liveStats={liveStats} baseKO={baseKO}/>
+          <VintedResume liveStats={liveStatsVus} baseKO={baseKO}/>
           {/* ⚠️ 4 octobre — Julien : « dans Vinted […] il y ait les messages ».
               L'écran complet existait (liste tous comptes, fil, réponse, offres)
               mais n'avait plus AUCUNE porte dans Vinted : seulement la cloche. */}
           <PlatSubNav sub={platSub} setSub={setPlatSub} sections={[['ventes','Ventes'],['achats','Achats'],['annonces','Annonces'],['messages','Messages', !!(liveStats && liveStats.unread > 0)]]}/>
-          <Comptabilite key={'pv_'+platSub} accounts={vintedAccounts} only={platSub==='apercu'?'ventes':platSub} liveStats={liveStats} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}/>
+          <Comptabilite key={'pv_'+platSub} accounts={vintedAccounts} only={platSub==='apercu'?'ventes':platSub} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}/>
         </>)}
         {tab==='plat_leboncoin'&&(<>
           {/* Julien : « Leboncoin, la même mise en page que Vinted ». Vinted a
@@ -31545,7 +31642,7 @@ function AppCoeur() {
           {platSub==='annonces'&&<EbayAnnonces baseKO={baseKO} comptes={vintedAccounts}/>}
           {platSub==='compte'&&<div style={{ background: EBAY_SKIN.bg, minHeight: '100vh', padding: 16, paddingBottom: 48 }}>{baseKO?<div style={{ color: EBAY_SKIN.muted, fontSize: 13 }}>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</div>:<EbayConnexion onAnnonces={()=>setPlatSub('annonces')}/>}</div>}
         </>)}
-        {tab==='plat_vestiaire'&&<Plateforme plat="Vestiaire Collective" liveStats={liveStats} lbcVentes={lbcVentes} onGo={setTab} baseKO={baseKO}/>}
+        {tab==='plat_vestiaire'&&<Plateforme plat="Vestiaire Collective" liveStats={liveStatsVus} lbcVentes={lbcVentes} onGo={setTab} baseKO={baseKO}/>}
         {tab==='prixmarche'&&<PrixMarche data={pqmData} baseKO={baseKO}/>}
         {tab==='inventory'&&<Inventory inventory={inventory} setInventory={setInventory} accounts={vintedAccounts} garageGrid={garageGrid} labels={accountLabels} onLocate={(numero)=>{ setGarageLocate(String(numero)); setTab('garage'); }}/>}
         {tab==='catalog'  &&<Catalog   catalog={catalog} setCatalog={setCatalog} onDeleteId={(id)=>{
@@ -31561,7 +31658,7 @@ function AppCoeur() {
         {tab==='stockvinted'&&<StockVinted stockVinted={stockVinted} setStockVinted={setStockVinted} garageGrid={garageGrid} invoices={invoices}/>}
         {tab==='garage'   &&<Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} locate={garageLocate} onLocateConsumed={()=>setGarageLocate(null)} placeNum={garagePlace} onPlaced={()=>setGaragePlace(null)}/>}
         {tab==='comptabilite'&&<Comptabilite accounts={vintedAccounts} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}
-        {(()=>{ const map={cat_annonces:'annonces',cat_ventes:'ventes',cat_achats:'achats',cat_bord:'bordereaux',cat_expedition:'bordereaux'}; return map[tab] ? <Comptabilite key={tab} accounts={vintedAccounts} only={map[tab]} liveStats={liveStats} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}/> : null; })()}
+        {(()=>{ const map={cat_annonces:'annonces',cat_ventes:'ventes',cat_achats:'achats',cat_bord:'bordereaux',cat_expedition:'bordereaux'}; return map[tab] ? <Comptabilite key={tab} accounts={vintedAccounts} only={map[tab]} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}/> : null; })()}
         {tab==='vintedaccounts'&&<VintedAccounts accounts={vintedAccounts} setAccounts={setVintedAccounts} baseKO={baseKO}/>}
         </EcranGardeFou>
       </main>
