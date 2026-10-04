@@ -118,7 +118,7 @@ async function page(nav, { largeur = 1512, hauteur = 900, mobile = false, sessio
     await essaie('animation', async () => {
       const { ctx, pg } = await page(nav, {});
       const titre = () => pg.evaluate(() => { const d = document.querySelector('[data-demo-animee] [aria-live]'); return d ? d.innerText.trim() : ''; });
-      const a = await titre(); await pg.waitForTimeout(4600); const b = await titre();
+      const a = await titre(); await pg.waitForTimeout(6200); const b = await titre();
       dit(!!a && !!b && a !== b, 'les scènes s\'enchaînent toutes seules', `« ${a.slice(0, 40)} » puis « ${b.slice(0, 40)} »`);
       // La barre de progression saute à une scène précise.
       await pg.click('[data-demo-animee] button[aria-label^="Voir : Tes chiffres"]');
@@ -190,6 +190,12 @@ async function page(nav, { largeur = 1512, hauteur = 900, mobile = false, sessio
       dit(!/(★|⭐)/.test(t), 'aucune note en étoiles (aucun avis réel à afficher)');
       const conf = fs.readFileSync(path.join(RACINE, 'public', 'legal', 'confidentialite.html'), 'utf8');
       dit(!/donnée revendue|ne vend aucune donnée/i.test(t) || /ne vend aucune donnée/i.test(conf), '« aucune donnée revendue » s\'appuie sur la politique publiée');
+      // Julien, 4 oct. : « insiste bien dans la FAQ qu'on évite les automatisations
+      // comme les messages aux favoris et les republications pour éviter les bans. »
+      // On juge sur la DONNÉE rendue (les deux notions NOMMÉES), jamais une formule
+      // (§6.5) : « favori » n'apparaît nulle part avant ce changement → rouge sur
+      // le code d'avant, vert après.
+      dit(/favori/i.test(t) && /republi/i.test(t), 'la page insiste : pas de relance en série aux favoris ni de republication automatique', `favori=${/favori/i.test(t)} republi=${/republi/i.test(t)}`);
       await ctx.close();
     });
   } finally {
