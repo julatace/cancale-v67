@@ -13,8 +13,8 @@
 //     c'est zéro conflit.
 //
 // ⚠️ AUCUNE DONNÉE INVENTÉE (§2.3) : pas de faux avis, pas de faux « 10 000
-//    vendeurs », pas de prix imaginaire. Le prix est celui des CGV (« À ce
-//    jour, VRM est gratuit »), la confidentialité cite la politique publiée, et
+//    vendeurs », pas de prix imaginaire. Le prix est celui des CGV (« 9,99 €
+//    par mois », depuis le 4 octobre — le banc le vérifie), la confidentialité cite la politique publiée, et
 //    chaque fonction décrite existe dans l'app. Les chiffres de l'animation
 //    sont une DÉMONSTRATION (une paire, un numéro de carton) — aucun vrai
 //    compte, aucun vrai acheteur.
@@ -486,7 +486,7 @@ const FONCTIONS = [
   { t: 'Sur ton téléphone aussi', d: 'L’app s’ajoute à l’écran d’accueil de ton téléphone, avec une notification à chaque vente et un widget sur iPhone.' },
 ];
 const ETAPES = [
-  { t: 'Crée ton compte', d: 'Un email et un mot de passe. C’est gratuit.' },
+  { t: 'Crée ton compte', d: 'Un email et un mot de passe. Aucune carte bancaire demandée.' },
   { t: 'Installe l’extension Chrome', d: 'Une fois, sur ton ordinateur, et connecte-la avec le même email.' },
   { t: 'Ouvre Vinted', d: 'VRM se remplit tout seul : ventes, annonces, bordereaux, messages.' },
 ];
@@ -504,7 +504,7 @@ const FAQ = [
   { q: 'J’ai plusieurs comptes Vinted.', r: 'C’est fait pour. Passe sur Vinted connecté à chacun de tes comptes : ils apparaissent tous dans VRM, et tu peux en exclure un quand tu veux.' },
   { q: 'Vinted peut-il bloquer mon compte à cause de VRM ?', r: 'Personne ne peut garantir une décision de Vinted, mais VRM est conçu pour ne rien faire qu’une personne ne ferait pas : une action à la fois, jamais en rafale, seulement sur le compte connecté, avec un plafond par heure. Les comportements qui trahissent un robot, VRM les refuse par principe (question suivante).' },
   { q: 'Est-ce que VRM fait des choses à ma place qui pourraient me faire bloquer ?', r: 'Non, et c’est un choix. Les automatisations qui font repérer un robot — relancer en série les personnes qui ont mis un article en favori, republier des annonces en boucle, accepter des offres automatiquement — VRM ne les fait pas. Il range tes données et prépare ton travail ; c’est toujours toi qui cliques sur publier, accepter ou envoyer.' },
-  { q: 'Combien ça coûte ?', r: 'Rien aujourd’hui : VRM est gratuit. Si une offre payante arrive un jour, rien ne te sera facturé sans que tu l’aies acceptée.' },
+  { q: 'Combien ça coûte ?', r: '9,99 € par mois, sans engagement, résiliable à tout moment depuis l’app. Tant que l’abonnement n’est pas activé, l’accès est offert — et rien n’est jamais prélevé sans que tu t’abonnes toi-même.' },
   { q: 'Que deviennent mes données ?', r: 'Elles servent à faire marcher ta boutique, rien d’autre : VRM ne vend aucune donnée et ne fait pas de publicité.' },
 ];
 const LEGAL = [
@@ -609,7 +609,7 @@ export default function Accueil({ onEntrer }) {
   const entrer = (mode) => () => onEntrer && onEntrer(mode);
   const Cta = ({ grand }) => (
     <div className="acc-cta" style={grand ? { justifyContent: 'center' } : undefined}>
-      <button type="button" className="acc-btn acc-p" data-cta="inscription" onPointerEnter={prepare} onFocus={prepare} onClick={entrer('up')}>Créer mon compte gratuit</button>
+      <button type="button" className="acc-btn acc-p" data-cta="inscription" onPointerEnter={prepare} onFocus={prepare} onClick={entrer('up')}>Créer mon compte</button>
       <button type="button" className="acc-btn acc-s" data-cta="connexion" onPointerEnter={prepare} onFocus={prepare} onClick={entrer('in')}>J’ai déjà un compte</button>
     </div>
   );
@@ -644,7 +644,7 @@ export default function Accueil({ onEntrer }) {
               <p className="acc-lead">Ventes en direct, bordereaux prêts à imprimer, numéros de rangement, messages et comptabilité — pour tous tes comptes. L’extension Chrome remplit tout, toute seule.</p>
               <Cta />
               <div className="acc-micro">
-                <span><Coche s={13} /> Gratuit aujourd’hui</span>
+                <span><Coche s={13} /> Sans engagement</span>
                 <span><Coche s={13} /> Aucun mot de passe Vinted demandé</span>
                 <span><Coche s={13} /> Aucune donnée revendue</span>
               </div>
@@ -710,17 +710,17 @@ export default function Accueil({ onEntrer }) {
           <div className="acc-in acc-deux">
             <div>
               <div className="acc-eyebrow">Prix</div>
-              <h2 className="acc-h2 vrm-display">Gratuit. Sans piège.</h2>
-              <p className="acc-sub">VRM est gratuit aujourd’hui. Si une offre payante arrive un jour, elle sera annoncée à l’avance, et rien ne te sera facturé sans ton accord.</p>
+              <h2 className="acc-h2 vrm-display">Un prix. Sans piège.</h2>
+              <p className="acc-sub">9,99 € par mois, sans engagement : tu résilies quand tu veux, en deux clics, depuis l’app. Tant que l’abonnement n’est pas activé, l’accès est offert — et rien n’est jamais prélevé sans que tu t’abonnes toi-même.</p>
             </div>
             <div className="acc-prix">
               <div style={{ fontSize: 14, color: K.muted, fontWeight: 600, marginBottom: 10 }}>VRM</div>
-              <div className="gros vrm-display">0 €</div>
-              <div style={{ fontSize: 14, color: K.muted, margin: '8px 0 20px' }}>Toutes les fonctions, tous tes comptes.</div>
+              <div className="gros vrm-display">9,99 €</div>
+              <div style={{ fontSize: 14, color: K.muted, margin: '8px 0 20px' }}>par mois · toutes les fonctions, tous tes comptes.</div>
               <ul className="acc-liste" style={{ marginBottom: 22 }}>
                 {['Vinted, Leboncoin et eBay réunis', 'Bordereaux tamponnés, prêts à imprimer', 'Numéros de rangement', 'Messages et offres', 'Rapports pour l’URSSAF et ton comptable'].map((x) => <li key={x} style={{ padding: '10px 0', fontSize: 15 }}><Coche s={15} />{x}</li>)}
               </ul>
-              <button type="button" className="acc-btn acc-p" style={{ width: '100%' }} onPointerEnter={prepare} onClick={entrer('up')}>Créer mon compte gratuit</button>
+              <button type="button" className="acc-btn acc-p" style={{ width: '100%' }} onPointerEnter={prepare} onClick={entrer('up')}>Créer mon compte</button>
             </div>
           </div>
         </section>
