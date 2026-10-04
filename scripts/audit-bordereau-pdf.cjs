@@ -64,7 +64,14 @@ const essai = async (nom, reponses, attenduOk, attenduEssais) => {
         activeAccountId: async () => '42',
         AWAITING_SHIP: (st) => /bordereau|paiement/i.test(String(st || '')),
         logActivity: () => {},
+        // ⚠️ `_label_*` est un balayage de famille NON BORNÉ : le code le lit
+        //    désormais en PAGINÉ (`sbGetTout`, §4.5). Le vm doit donc le fournir,
+        //    sinon l'appel lève et le cas « un seul colis » tombe — artefact de
+        //    banc (§6.3 : servir la forme que le code utilise vraiment).
         sbGet: async (q) => (/orders_sold/.test(q)
+          ? [{ data: { payload: { my_orders: ventes } } }]
+          : dejaCapte.map(tx => ({ tx }))),
+        sbGetTout: async (q) => (/orders_sold/.test(q)
           ? [{ data: { payload: { my_orders: ventes } } }]
           : dejaCapte.map(tx => ({ tx }))),
         supabaseUpsert: async (_t, lignes) => { ecrites.push(...lignes.map(l => l.id)); },
