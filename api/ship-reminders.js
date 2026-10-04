@@ -170,14 +170,14 @@ async function traiterVendeur() {
     let vivants = null;
     try {
       const va = await fetchPaginated(scoped('vinted_accounts?select=vinted_user_id'));
-      if (va) vivants = new Set(va.map((r) => String(r.vinted_user_id || '')).filter(Boolean));
+      if (va) { const s = new Set(va.map((r) => String(r.vinted_user_id || '')).filter(Boolean)); vivants = s.size ? s : null; } // vide n'est pas une réponse (§4.1)
     } catch (_) { vivants = null; }
     try {
       const lignes = await fetchPaginated(scoped(`app_data?id=like.harvest_%25_orders_sold&select=id,txns:data->resume->txns`));
       if (lignes) {
         for (const l of lignes) {
           const um = String(l.id || '').match(/^harvest_(.+?)_orders_/);
-          if (vivants && !(um && vivants.has(um[1]))) continue;
+          if (vivants && um && !vivants.has(um[1])) continue;            // on n'écarte que ce qu'on SAIT retiré
           if (!Array.isArray(l.txns)) continue;
           if (!attente) attente = new Set();
           for (const t of l.txns) attente.add(String(t));

@@ -139,14 +139,22 @@ async function bordRows() {
 // (`vinted_accounts`) comptent, comme dans l'app. `null` = pas su lire la liste :
 // on ne filtre RIEN (sous-filtrer rend le chiffre d'avant ; sur-filtrer ferait
 // disparaître les colis d'un compte vivant sur un hoquet).
+// ⚠️ ET UNE LISTE VIDE N'EST PAS UNE RÉPONSE (§4.1) : la même lecture faite avec
+// la clé publique sur une base cloisonnée rend `[]` SANS erreur. La prendre pour
+// « aucun compte » viderait le widget de tous ses colis — le zéro inventé que
+// cette route a appris à ne plus afficher. Vide ⇒ on ne filtre pas.
 async function comptesVivants() {
   try {
     const j = await fetchPaginated(scoped('vinted_accounts?select=vinted_user_id'));
     if (!j) return null;
-    return new Set(j.map((r) => String(r.vinted_user_id || '')).filter(Boolean));
+    const s = new Set(j.map((r) => String(r.vinted_user_id || '')).filter(Boolean));
+    return s.size ? s : null;
   } catch (_) { return null; }
 }
 const uidDeLigne = (id) => { const m = String(id || '').match(/^harvest_(.+?)_orders_/); return m ? m[1] : ''; };
+// On n'écarte une ligne que si on SAIT qu'elle est d'un compte retiré : liste des
+// comptes lue ET identifiant de ligne lisible. Un doute ne fait rien disparaître.
+const ligneDunCompteRetire = (vivants, id) => { const u = uidDeLigne(id); return !!(vivants && u && !vivants.has(u)); };
 async function comptesAExpedierOuRetirer(kind, vivants) {
   try {
     const sel = 'id,txns:data->resume->txns';
@@ -154,7 +162,7 @@ async function comptesAExpedierOuRetirer(kind, vivants) {
     if (!rows) return null;
     const vus = new Set(); let resumeTrouve = false;
     for (const row of rows) {
-      if (vivants && !vivants.has(uidDeLigne(row.id))) continue;
+      if (ligneDunCompteRetire(vivants, row.id)) continue;
       if (!Array.isArray(row.txns)) continue;
       resumeTrouve = true;
       for (const t of row.txns) vus.add(String(t));
@@ -171,7 +179,7 @@ async function harvestOrders(kind, vivants) {
     if (!j) return null;
     const out = {};
     for (const row of j) {
-      if (vivants && !vivants.has(uidDeLigne(row.id))) continue;
+      if (ligneDunCompteRetire(vivants, row.id)) continue;
       const items = (row.data && row.data.payload && row.data.payload.my_orders) || [];
       for (const o of items) if (o && o.transaction_id != null) out[o.transaction_id] = o; // dédoublonne par transaction
     }
