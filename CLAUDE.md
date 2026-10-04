@@ -4206,6 +4206,48 @@ app**.
 - **Aucune entrée d'`EXT_CAPACITES`** : c'est du ménage interne, l'app ne promet
   rien de neuf. Extension **5.146.0**, zip régénéré, `EXT_ATTENDUE` suivie.
 
+### ⚠️⚠️ « PRÉPARE LE SITE POUR BEAUCOUP DE PERSONNES » — SCALE + EMAILS (4 octobre)
+Demande de Julien : préparer la mise en ligne multi-vendeurs + « comment
+redistribuer les infos qui arrivent par mail aux bonnes personnes ». **Mesuré
+d'abord (§6), et l'essentiel était DÉJÀ bâti** :
+- **Redistribution email = résolue, de la seule façon sûre.**
+  `resoudreProprietaire` (api/_lib/proprietaire-email.js) décide par **l'adresse
+  de RÉCEPTION**, jamais le contenu ; `email-inbound` **tague chaque ligne du
+  `owner`** → RLS isole ; inconnu → **quarantaine** (jamais au hasard) +
+  rattachement (`/api/email-rattacher`) ; le repli « seul vendeur » **s'éteint
+  dès qu'un 2ᵉ owner existe**. Prouvé (`audit-proprietaire-email.cjs`). RLS
+  **déjà actif** (migration 004, `app_data` PK = `(owner,id)` via 002). Rien à
+  coder — par vendeur : déclarer son adresse (Réglages) + faire suivre sa boîte.
+- **Checklist de mise en ligne** consignée dans `docs/mise-en-ligne.md` (ce qui
+  est prêt, les gestes de Julien, les leviers classés). **Free Upgrade Micro
+  pris** le 4 oct (compute = ce qui casse en premier, mesuré 62 % CPU à 1 user).
+- **§4.5 pagination** des balayages serveur (`widget`, `ship-reminders`) :
+  au-delà de 1000 lignes Supabase tronque en silence → des rappels/colis perdus.
+  `fetchPaginated` (Range, `null` si une page échoue). Vérifié `bancs/serveur.cjs`.
+
+**⚠️⚠️ LE DERNIER VRAI TROU MONO-VENDEUR : `ship-reminders` poussait UN résumé
+global à TOUT LE MONDE.** Le cron calculait un total unique (toutes lignes, tous
+owners mélangés) et `sendPushToAll` SANS contexte → le résumé d'un vendeur
+partait sur le téléphone d'un autre dès qu'il y en a deux. L'infra par-vendeur
+existait pourtant déjà (`contexteVendeur` + `duVendeur`, que le pipeline email
+utilise). ⇒ `traiterVendeur()` extrait, et le handler **boucle par propriétaire**
+quand la base est cloisonnée : `ownersActifs()` (un `main` par owner, clé de
+service), `contexteVendeur.run({owner}, …)`, lectures `scoped()` (`owner=eq.`),
+dédoublonnage `ecrireDedup` par owner (clé `(owner,id)`). **Base non cloisonnée
+⇒ passe unique, comportement d'aujourd'hui À L'IDENTIQUE** (le banc serveur, qui
+sert une base non cloisonnée, reste vert). On ne pousse **jamais** hors contexte :
+cloisonné mais vendeurs non énumérables ⇒ on se tait, pas de résumé mélangé.
+- `scripts/bancs/ship-multi.cjs` sert une base cloisonnée à **2 vendeurs** et
+  exige : bordereaux lus `owner=eq.` pour A ET B, **aucune lecture globale**,
+  `push_subs` lu par vendeur (chacun ses appareils), dédoublonnage par owner,
+  bilan à 2 vendeurs. **§6.1 : 5 rouges sur le code d'avant**, 0 après.
+- ⚠️ **Reste à faire (même famille)** : `widget.js` a le même défaut (il prend le
+  premier `main` venu et agrège tous les owners → le vendeur B verrait les
+  chiffres de A). À scoper par le token `?k=` → owner, dans une PR séparée.
+- ⚠️ **À l'échelle (1000)** : la boucle fait N passes ; au-delà de quelques
+  dizaines d'owners, grouper en mémoire (une lecture globale bucketée par owner)
+  pour ne pas multiplier les requêtes par vendeur. Correction avant optimisation.
+
 ### Logo iPhone : icônes PWA régénérées (3 octobre)
 `apple-touch-icon.png` + `icon-192/512/maskable` portaient encore l'ancien logo
 orange ; régénérées depuis `logo-vrm.png` (VRM Noir), maskable avec marge sur
