@@ -23799,7 +23799,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   const rempli = minAff !== '' || (e.fees != null && e.fees !== '') || !!e.buyFromId;
                   return (
                     <details open={rempli} style={{borderTop:`1px solid ${C.border}`,padding:'6px 10px 8px'}}>
-                      <summary style={{listStyle:'none',cursor:'pointer',fontSize:11.5,color:C.muted,fontWeight:600,userSelect:'none'}}>⋯ Plancher, boost, vendue, places</summary>
+                      <summary style={{listStyle:'none',cursor:'pointer',fontSize:11.5,color:C.muted,fontWeight:600,userSelect:'none'}}>⋯ Prix plancher · boost · vendue · publier ailleurs</summary>
                       <div style={{display:'flex',flexDirection:'column',gap:7,marginTop:7}}>
                         <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
                           <div style={{flex:'1 1 130px',display:'flex',alignItems:'center',gap:4,border:`1px solid ${C.border}`,borderRadius:8,padding:'2px 6px',background:C.bg}}
