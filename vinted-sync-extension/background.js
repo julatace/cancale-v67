@@ -1352,7 +1352,7 @@ async function storeLabel(domain, url, b64) {
     const rows = await sbGet(`app_data?id=eq.harvest_${uid}_orders_sold&select=data`);
     const ventes = (rows && rows[0] && rows[0].data && rows[0].data.payload && rows[0].data.payload.my_orders) || [];
     const dejaCapte = new Set();
-    const cur = await sbGet(`app_data?id=like.harvest_${uid}_label_*&select=tx:meta->>tx`);
+    const cur = await sbGetTout(`app_data?id=like.harvest_${uid}_label_*&select=tx:meta->>tx`); // §4.5 : un compte à fort volume dépasse 1000 bordereaux — sbGet tronquait en silence
     for (const r of (cur || [])) if (r && r.tx) dejaCapte.add(String(r.tx));
     const cands = ventes.filter(o => o && o.transaction_id != null && AWAITING_SHIP(o.status) && !dejaCapte.has(String(o.transaction_id)));
     if (cands.length === 1) tx = String(cands[0].transaction_id);
@@ -4587,7 +4587,7 @@ async function genererBordereauxEnAttente(uid, opts = {}) {
     // Un bordereau reçu par email prouve qu'il existe déjà : on ne regénère pas.
     const dejaMail = new Set();
     try {
-      const mails = await sbGet('app_data?id=like.email_bord_*&select=tx:meta->>transaction');
+      const mails = await sbGetTout('app_data?id=like.email_bord_*&select=tx:meta->>transaction'); // §4.5 : les bordereaux s'accumulent au-delà de 1000 — sbGet tronquait en silence
       for (const m of (mails || [])) if (m && m.tx) dejaMail.add(String(m.tx));
     } catch (_) { /* sans cette lecture on retombe sur le statut Vinted, qui suffit */ }
     const memo = (await chrome.storage.local.get('vrmBordFaits')).vrmBordFaits || {};
@@ -4628,7 +4628,7 @@ async function genererBordereauxEnAttente(uid, opts = {}) {
     // clé « label » — la fonction n'avait jamais été atteinte.
     const dejaCapte = new Set();
     try {
-      const cur = await sbGet(`app_data?id=like.harvest_${uid}_label_*&select=tx:meta->>tx`);
+      const cur = await sbGetTout(`app_data?id=like.harvest_${uid}_label_*&select=tx:meta->>tx`); // §4.5 : un compte à fort volume dépasse 1000 bordereaux — sbGet tronquait en silence
       for (const r of (cur || [])) if (r && r.tx) dejaCapte.add(String(r.tx));
     } catch (_) { /* pas de ligne : rien de capté, on tente */ }
     // ⚠️⚠️ ON N'ABANDONNE PLUS DÈS QUE VINTED FAIT AVANCER LE STATUT (27 août).
@@ -5158,7 +5158,7 @@ async function buildEbayData() {
   const pos = await readEbayPosted();
   const posted = new Set(pos.ids);
   const listRows = (await sbGet('app_data?id=like.harvest_*_listings&select=id,data')) || [];
-  const itemRows = (await sbGet('app_data?id=like.harvest_*_item_*&select=id,data')) || [];
+  const itemRows = (await sbGetTout('app_data?id=like.harvest_*_item_*&select=id,data')) || []; // §4.5 : une ligne par annonce, tous comptes → dépasse 1000 chez un vendeur actif, sbGet tronquait
   const details = {};
   for (const r of itemRows) { const p = (r.data || {}).payload || {}; const it = (p && p.item) || p; if (it && it.id) details[String(it.id)] = it; }
   const pageRows = await sbGet('app_data?id=eq.vinted_item_details&select=data');
@@ -5267,7 +5267,7 @@ async function buildLbcData() {
     }
   }
   // Détails complets (harvest_{uid}_item_{id}).
-  const itemRows = (await sbGet('app_data?id=like.harvest_*_item_*&select=id,data')) || [];
+  const itemRows = (await sbGetTout('app_data?id=like.harvest_*_item_*&select=id,data')) || []; // §4.5 : une ligne par annonce, tous comptes → dépasse 1000 chez un vendeur actif, sbGet tronquait
   const details = {};
   for (const r of itemRows) { const d = r.data || {}; const p = d.payload || {}; const it = (p && p.item) || p; if (it && it.id) details[String(it.id)] = it; }
   // Détails lus sur la PAGE de l'annonce (description + photos HD). Vinted ne
