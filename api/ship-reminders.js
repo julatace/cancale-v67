@@ -14,7 +14,7 @@
 
 import { sendPushToAll, pushCategorieActive } from './_lib/push.js';
 
-import { withOwnerAll, conflictTarget } from './_lib/owner.js';
+import { withOwnerAll, conflictTarget, contexteVendeur, proprietaireCourant } from './_lib/owner.js';
 import { sbCle } from './_lib/cle.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
@@ -40,11 +40,55 @@ function frToIso(s) {
 }
 async function getRow(id) {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(id)}&select=data`, { headers: HEADERS });
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${scoped(`app_data?id=eq.${encodeURIComponent(id)}&select=data`)}`, { headers: HEADERS });
     if (!r.ok) return null;
     const rows = await r.json();
     return (rows[0] && rows[0].data) || null;
   } catch (_) { return null; }
+}
+// ── MULTI-VENDEURS ────────────────────────────────────────────────────────────
+// Ce cron tourne SANS vendeur connecté. Tant que la base n'était pas cloisonnée,
+// il calculait UN total global et le poussait à tout le monde (`sendPushToAll`) :
+// juste tant qu'il n'y a qu'un vendeur, faux dès qu'il y en a deux (le résumé de
+// l'un part sur le téléphone de l'autre). On tourne donc une fois PAR vendeur,
+// dans son contexte (`contexteVendeur`), et toutes les lectures/écritures se
+// filtrent sur `owner` — exactement l'infra que le pipeline email utilise déjà.
+//
+// `scoped(path)` ajoute `owner=eq.<vendeur du tour>` ; vide hors boucle (base non
+// cloisonnée) → URL inchangée, comportement d'aujourd'hui À L'IDENTIQUE.
+function scoped(path) {
+  const o = proprietaireCourant();
+  return o ? path + (path.includes('?') ? '&' : '?') + `owner=eq.${encodeURIComponent(o)}` : path;
+}
+// La base sait-elle séparer les vendeurs ? Un `select=owner` répond 400 sinon.
+async function cloisonnee() {
+  try { return (await fetch(`${SUPABASE_URL}/rest/v1/app_data?select=owner&limit=1`, { headers: HEADERS })).ok; }
+  catch (_) { return false; }
+}
+// Les vendeurs actifs = un `main` par vendeur (clé (owner,id)). La clé de service
+// contourne RLS → on les voit tous. `null` si on ne peut pas énumérer (lecture en
+// panne) → on ne devine pas, on ne pousse rien plutôt qu'un résumé mélangé.
+async function ownersActifs() {
+  const rows = await fetchPaginated('app_data?id=eq.main&select=owner');
+  if (!rows) return null;
+  const s = new Set();
+  for (const r of rows) if (r && r.owner) s.add(String(r.owner));
+  return [...s];
+}
+// Écrit un mémo de dédoublonnage POUR LE VENDEUR DU TOUR (clé (owner,id) quand on
+// est cloisonné, `id` seul sinon). Sans ça, deux vendeurs partageraient le même
+// `ship_reminder_dedup` et l'un ferait taire l'autre.
+async function ecrireDedup(id, data) {
+  const o = proprietaireCourant();
+  const row = o ? { owner: o, id, data } : withOwnerAll([{ id, data }])[0];
+  const conflict = o ? 'owner,id' : conflictTarget('id');
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${conflict}`, {
+      method: 'POST',
+      headers: { ...HEADERS, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify([row]),
+    });
+  } catch (_) { /* un mémo raté n'empêche pas le rappel suivant */ }
 }
 // ⚠️ §4.5 — Supabase tronque à 1000 lignes SANS LE DIRE. Ce cron balaie
 // `email_bord_*` et `harvest_%25_orders_sold` de TOUS les utilisateurs : à
@@ -66,23 +110,15 @@ async function fetchPaginated(path) {
   return out;
 }
 
-export default async function handler(req, res) {
-  // Sécurité optionnelle : si CRON_SECRET est défini sur Vercel, on l'exige
-  // (Vercel envoie « Authorization: Bearer <CRON_SECRET> » sur les crons).
-  const secret = process.env.CRON_SECRET;
-  if (secret) {
-    const auth = req.headers.authorization || '';
-    const qk = (req.query && req.query.key) || '';
-    if (auth !== `Bearer ${secret}` && qk !== secret) { res.status(401).json({ error: 'clé invalide' }); return; }
-  }
-
-  try {
+// Le traitement d'UN vendeur (celui du `contexteVendeur` courant, ou l'unique
+// vendeur d'une base non cloisonnée). Rend un bilan, n'écrit jamais dans `res`.
+async function traiterVendeur() {
     // ⚠️ ÉGRESS : surtout PAS `select=data` — chaque bordereau embarque son PDF
     // en base64 (deux fois), ~6 Mo au total pour ~50 lignes, alors qu'on ne lit
     // que la date limite + les clés. On projette donc ces 4 champs scalaires
     // (même correctif que dans api/widget.js et §23 côté app).
     const BORD_SELECT = 'dateLimite:data->>dateLimite,transaction:data->>transaction,suivi:data->>suivi,numero:data->>numero';
-    const rows = (await fetchPaginated(`app_data?id=like.email_bord_*&select=${BORD_SELECT}`)) || [];
+    const rows = (await fetchPaginated(scoped(`app_data?id=like.email_bord_*&select=${BORD_SELECT}`))) || [];
     // ⚠️⚠️ CE COMPTE ÉTAIT FAUX, ET LA NOTIFICATION MENTAIT EN GRAND.
     // Il ne regardait QUE `vinted_bords_printed`. Or depuis §24 imprimer ne
     // marque plus rien comme fait : cette liste est donc quasi vide, et le cron
@@ -118,11 +154,7 @@ export default async function handler(req, res) {
             tag: 'urssaf-' + mois,
             url: '/?tab=dashboard',
           });
-          await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${conflictTarget('id')}`, {
-            method: 'POST',
-            headers: { ...HEADERS, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
-            body: JSON.stringify(withOwnerAll([{ id: 'urssaf_reminder_dedup', data: { mois } }])),
-          });
+          await ecrireDedup('urssaf_reminder_dedup', { mois });
           urssaf = 'envoyé';
         }
       }
@@ -131,7 +163,7 @@ export default async function handler(req, res) {
     // Transactions encore en attente d'expédition, d'après la moisson.
     let attente = null;
     try {
-      const lignes = await fetchPaginated(`app_data?id=like.harvest_%25_orders_sold&select=id,txns:data->resume->txns`);
+      const lignes = await fetchPaginated(scoped(`app_data?id=like.harvest_%25_orders_sold&select=id,txns:data->resume->txns`));
       if (lignes) {
         for (const l of lignes) {
           if (!Array.isArray(l.txns)) continue;
@@ -143,7 +175,7 @@ export default async function handler(req, res) {
     // ⚠️ Aucune ligne ne porte encore de résumé (extension pas rechargée) : on
     // se TAIT. Une notification fausse est pire que pas de notification — c'est
     // très exactement le « 51 bordereaux » qu'on corrige ici.
-    if (!attente) { res.status(200).json({ ok: true, urssaf, skipped: 'resume absent — aucune notification envoyee' }); return; }
+    if (!attente) return { urssaf, skipped: 'resume absent — aucune notification envoyee' };
 
     const tomorrow = parisDate(1);
     let overdue = 0, dueToday = 0, dueTomorrow = 0;
@@ -161,9 +193,7 @@ export default async function handler(req, res) {
 
     // Anti-doublon : une seule notification par jour pour un même total.
     const dedup = (await getRow('ship_reminder_dedup')) || {};
-    if (dedup.date === today && dedup.total === total) {
-      res.status(200).json({ ok: true, skipped: 'déjà notifié', total }); return;
-    }
+    if (dedup.date === today && dedup.total === total) return { urssaf, skipped: 'déjà notifié', total };
 
     if (total > 0 && await pushCategorieActive('expedier')) {
       const parts = [];
@@ -177,12 +207,39 @@ export default async function handler(req, res) {
         url: '/?tab=cat_bord',
       });
     }
-    await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${conflictTarget('id')}`, {
-      method: 'POST',
-      headers: { ...HEADERS, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify(withOwnerAll([{ id: 'ship_reminder_dedup', data: { date: today, total } }])),
-    });
-    res.status(200).json({ ok: true, overdue, dueToday, dueTomorrow, total });
+    await ecrireDedup('ship_reminder_dedup', { date: today, total });
+    return { urssaf, overdue, dueToday, dueTomorrow, total };
+}
+
+export default async function handler(req, res) {
+  // Sécurité optionnelle : si CRON_SECRET est défini sur Vercel, on l'exige
+  // (Vercel envoie « Authorization: Bearer <CRON_SECRET> » sur les crons).
+  const secret = process.env.CRON_SECRET;
+  if (secret) {
+    const auth = req.headers.authorization || '';
+    const qk = (req.query && req.query.key) || '';
+    if (auth !== `Bearer ${secret}` && qk !== secret) { res.status(401).json({ error: 'clé invalide' }); return; }
+  }
+
+  try {
+    // ── Base NON cloisonnée (comportement d'aujourd'hui, à l'identique) ───────
+    //    Un seul jeu de données, aucune colonne `owner` : une passe, sans filtre.
+    if (!(await cloisonnee())) {
+      const out = await traiterVendeur();
+      res.status(200).json({ ok: true, ...out });
+      return;
+    }
+    // ── Base cloisonnée : UNE passe PAR vendeur, chacun dans son contexte ─────
+    //    (ses bordereaux, son dédoublonnage, ses appareils). On ne pousse JAMAIS
+    //    hors contexte : si on ne peut pas énumérer, on ne devine pas.
+    const owners = await ownersActifs();
+    if (!owners) { res.status(200).json({ ok: true, skipped: 'vendeurs non énumérables (lecture en panne)' }); return; }
+    const bilans = [];
+    for (const o of owners) {
+      const out = await contexteVendeur.run({ owner: o }, () => traiterVendeur());
+      bilans.push({ owner: o, ...out });
+    }
+    res.status(200).json({ ok: true, vendeurs: owners.length, bilans });
   } catch (e) {
     // Une tâche planifiée qui répond 200 sur une panne n'apparaît nulle part :
     // le tableau de bord la compte réussie, et les rappels d'expédition
