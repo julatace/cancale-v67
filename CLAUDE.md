@@ -4907,6 +4907,122 @@ site par SON navigateur**.
   `EXT_CAPACITES.vestiaire`. Aucune permission d'hôte ajoutée : les scripts de
   contenu suffisent, le fond n'appelle jamais Vestiaire.
 
+### ⚠️⚠️ « À EXPÉDIER » : UNE SEULE RÈGLE, LE CHAMP MACHINE DE VINTED (4 octobre)
+Julien : « le statut en transit, colis à faire, vendu… doit être beaucoup plus
+fluide et fiable quand l'extension est connectée ». **Mesuré** : le même jour,
+quatre lecteurs donnaient quatre nombres pour « à expédier » — **Colis 2 · Ma
+journée 3 · la cloche 3 · le widget 6** — chacun avec SA lecture du texte du
+statut.
+- **La règle** (`aExpedier`, la MÊME dans `src/App.jsx`, l'extension
+  `A_EXPEDIER` et `api/widget.js`) : le champ machine de Vinted
+  `transaction_user_status` d'abord — sur une VENTE, `needs_action` = à expédier,
+  `waiting`/`completed`/`failed` = pas à expédier ; le texte n'est lu qu'en repli
+  quand le champ manque. `PAS_UN_ENVOI` (annulée, remboursée, retour, suspendue,
+  finalisée, paiement échoué) gagne toujours. ⚠️ Sur un ACHAT `needs_action` veut
+  dire « à retirer » : ne jamais réutiliser la règle des ventes.
+- « Bordereau envoyé au vendeur » n'affichait plus « En transit », un colis au
+  relais n'affiche plus « Livrée » ni « Reçu » (le test du relais passe AVANT
+  « livr »), et la vente « bordereau commandé » ne disparaît plus de Colis.
+- **Un propriétaire** : `toShip` publie `vrm_colis_aposter`, la cloche le
+  consomme (< 12 h), son repli recompte avec `aExpedier` — et se recalcule à
+  l'arrivée du nuage (`nuagePret`, §5.49 : sur un appareil neuf elle disait 3
+  pour 2 et ne se corrigeait jamais).
+- **Coché « posté » à la main** (`isShipDone`) : hors d'« À expédier » partout,
+  sous « En transit » avec l'étiquette **« Posté »** (elle disait encore
+  « À expédier »).
+- **« Commande non réclamée — retournée »** est un colis qui REVIENT : rangé
+  « annulé » pour l'ARGENT (aucun CA), mais visible dans « En transit » et
+  « Toutes » — il n'était que sous « Annulées », un mot faux.
+- Ventes : pastilles **« À expédier » / « En transit »** (deux questions
+  différentes). Colis : un groupe replié **« Partis — Vinted suit le colis »**
+  en lecture seule. Colis à retirer : le même colis se reconnaît à son **code de
+  retrait**, jamais à son titre.
+- Widget et rappels : ni compte retiré, ni colis coché « posté », ni faux retard
+  (date limite de l'email, sinon vente + 7 j) — et une liste de comptes vide ne
+  filtre rien (§4.1).
+- **Fluidité** : une relecture ne vide plus la liste (`loadOrders` garde ce qui
+  est affiché, un numéro de séquence empêche une lecture plus ancienne d'écraser
+  une plus récente), un signal de l'extension reçu sur un autre écran n'est plus
+  perdu, une lecture ratée n'efface plus les bordereaux d'un compte, et une
+  panne de NOTRE base ne déclenche plus d'appel au relais Vinted.
+- Preuves : `audit-statuts.cjs` (18 rouges sur l'avant), bancs `statuts-colis.cjs`
+  (rendu des cinq écrans, aucune fixture — 38 rouges sur c117b30, 6 sur le
+  premier jet), `fluidite.cjs` (12), `widget-colis.cjs` (5).
+
+### Détourage Photoroom avant chaque publication (4 octobre, 5.156)
+Julien : « intègre l'API de Photoroom pour le détourage des photos avant chaque
+poste ». L'ancienne route (25 sept.) avait été retirée pour rester à 12
+fonctions ; elle n'avait ni session, ni cache, ni plafond.
+- **Serveur** : un MODE de `api/ai.js` (`?mode=detourage`, rewrite
+  `/api/detourage`), logique dans `api/_lib/detourage.js`. Session + abonnement
+  exigés ; **réservé au propriétaire** sauf `PHOTOROOM_POUR=tous` (c'est sa clé,
+  facturée à la photo) ; **cache par empreinte SHA-256** des octets d'origine
+  (recalculée par le serveur — une photo ne peut pas être rangée sous
+  l'empreinte d'une autre), dans un compartiment PRIVÉ rangé par vendeur ;
+  **plafond mensuel** réservé par la base en une instruction
+  (`vrm_detourage_reserver`, migration 008 — jamais un lire-ajouter-réécrire) ;
+  compteur illisible ⇒ on ne paie PAS ; un échec de Photoroom rend l'unité.
+  `audit-fonctions-api.cjs` refuse une 13ᵉ fonction (#250 avait bloqué TOUS les
+  déploiements).
+- **Extension** : `detourerPhotos`, en fin de `photosEnOctets` — le seul point
+  par où passent les photos de Leboncoin ET d'eBay. Réglage illisible = éteint ;
+  l'affiche générique de Vinted (12 des 780 photos captées) n'est jamais envoyée ;
+  l'empreinte part d'abord SANS la photo ; 3 envois à la fois, 45 s de budget ;
+  arrêt sur clé absente, plafond, crédits épuisés, compte non autorisé. **Toute
+  issue autre qu'un succès garde la photo d'origine** et note la raison ; le
+  bandeau Leboncoin écrit « dont N détourées » ou la raison en clair.
+- **App** : Réglages → « Détourer mes photos avant de publier » (Éteint par
+  défaut · Photo de couverture · Toutes), `vrm_detourage` synchronisé. La carte
+  dit ce que le SERVEUR dit (`usage=1` : clé posée ? compte autorisé ? N sur
+  plafond) — cinq états, et « pas su » n'affiche aucun nombre.
+- Preuves : `audit-detourage-ext.cjs` (le vrai `background.js` : 29 contrôles,
+  18 rouges sur l'avant, 9 en réaffaiblissant), bancs `detourage.cjs` (la route :
+  21 rouges sur l'avant) et `detourage-reglage.cjs`. Guide : `docs/photoroom.md`.
+- ⚠️ **Pas de préchauffage au clic « Publier »** : deux instances qui manquent le
+  cache en même temps paieraient deux fois. Le détourage se fait quand les
+  octets sont lus, c'est tout.
+
+### Le journal des plantages, sans fournisseur (4 octobre)
+Un écran mort se voyait par une capture, jamais par un signal — et ceux d'un
+autre vendeur ne nous arriveraient jamais. `src/plantages.js` note chaque
+erreur (garde-fou d'écran, dernier filet, `error`/`unhandledrejection` écoutés
+dès `main.jsx`) dans **sa propre base** : `plantage_{empreinte}`, au nom du
+vendeur, envoyé depuis `AppCoeur` (session obligatoire). **Aucun tiers** (pas de
+Sentry) : la politique de confidentialité n'a pas à changer.
+- Gardé : message, 6 lignes de pile, écran, version, navigateur en deux mots.
+  **Jamais** un email, un jeton, une suite de 5 chiffres ou plus, ni les
+  paramètres d'une adresse. Bruit écarté (réseau, extensions). Une même erreur
+  une fois par heure et par appareil, dix par ouverture ; une écriture non
+  confirmée **reste en file**.
+- « État des connexions » dit « Écrans en erreur · N ces 7 derniers jours » —
+  rien sur zéro, rien sur une lecture ratée.
+- **Pour une prochaine session** : `select id, data from app_data where id like
+  'plantage_%' order by data->>'at' desc` donne les écrans tombés chez les
+  vendeurs. Banc `plantages.cjs` (24 contrôles, 8 rouges en réaffaiblissant).
+
+### La sauvegarde complète l'est enfin (4 octobre)
+« Télécharge TOUT : catalogue, ventes, achats… » était faux : le fichier ne
+portait que la ligne `main`. Il porte maintenant les réglages (restaurables,
+comme avant) **et toutes les lignes captées** (ventes, achats, messages,
+annonces, emails), lues par pages de 500 — mesuré : 4 487 lignes, 12 Mo. Restent
+dehors, et le fichier le DIT (`omis`) : les PDF de bordereau, le détail brut des
+transactions (on garde leur `meta`) et les jetons Vinted. Une page ratée donne
+`complet:false` et la liste de ce qui manque. La restauration ne réécrit PAS les
+données captées (une copie ancienne écraserait une capture plus fraîche, §4.2).
+
+### Code mort et rappels d'expédition à l'échelle (4 octobre)
+- **Sept fonctions sans appelant** retirées (graphique mensuel, export Factur-X
+  seul, scène 3D de l'accueil, clé IA locale, pseudo Vinted, distance, état
+  Vinted) : 220 lignes. ⚠️ `moisDeVente`, `caUrssafParMois` et `heureCommande`
+  n'ont PAS d'appelant dans l'app mais `audit-urssaf.cjs` les exécute : les
+  garder. 32 écrans montés avant et après (§4.11).
+- **`ship-reminders`** : 8 vendeurs à la fois (mille à la queue leu leu
+  dépassaient les 300 s de Vercel), un vendeur qui plante n'arrête plus les
+  autres (réponse 500 pour rester visible), la sonde de cloisonnement en panne
+  vaut « pas su » (elle faisait basculer en passe GLOBALE, vendeurs mélangés), et
+  ses réglages illisibles le font se taire au lieu de compter ses colis déjà
+  postés. `ship-multi.cjs` : 3 rouges sur l'avant.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
@@ -4933,6 +5049,7 @@ arrivée** — vérifiée commit par commit sur `manifest.json`, pas devinée.
 | `lbcpdf` | `pdfBordereauLbc` | **5.136.0** (3 oct.) | « 🖨 Imprimer le bordereau » Leboncoin, tamponné du titre et du N° |
 | `lbcmsg` | `storeLbcMessages` | **5.153.0** (4 oct.) | Leboncoin → Messages : « l'extension relève tes non-lus, compte par compte » |
 | `vestiaire` | `storeVcRecon` | **5.154.0** (4 oct.) | Vestiaire : « ouvre Vestiaire dans ce Chrome, l'extension apprend à le lire » |
+| `detourage` | `detourerPhotos` | **5.156.0** (4 oct.) | « tes photos sont détourées (fond blanc) avant d'être attachées à Leboncoin et eBay » |
 
 ⚠️ **DEUX SEUILS POUR UNE MÊME NOTION, EXPRÈS.** Les photos s'attachent côté
 Leboncoin depuis la 5.58 et côté eBay depuis la 5.59 : un seul seuil aurait
