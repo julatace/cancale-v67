@@ -24,18 +24,35 @@ const HEADERS = { ...sbCle(SUPABASE_KEY) };
 const parisDate = (off = 0) => new Date(Date.now() + off * 86400000).toLocaleDateString('en-CA', { timeZone: 'Europe/Paris' });
 const frToIso = (s) => { const m = String(s || '').match(/(\d{2})\/(\d{2})\/(\d{4})/); return m ? `${m[3]}-${m[2]}-${m[1]}` : null; };
 
+// ⚠️ §4.5 — SUPABASE PLAFONNE UNE RÉPONSE À 1000 LIGNES SANS LE DIRE. À
+// 1000 utilisateurs, un balayage `email_bord_*` / `harvest_%25_*` dépasse le
+// millier et serait TRONQUÉ en silence → des colis/ventes invisibles sur le
+// widget, sans aucune erreur. On pagine par en-tête Range, et on rend `null`
+// si UNE page échoue : une demi-liste a l'air d'une réponse complète, c'est
+// pire qu'une lecture ratée (même règle que `sbGetTout` côté app).
+async function fetchPaginated(path) {
+  const out = []; const page = 1000;
+  for (let from = 0; from < 500000; from += page) {
+    let r;
+    try { r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, { headers: { ...HEADERS, 'Range-Unit': 'items', Range: `${from}-${from + page - 1}` } }); }
+    catch (_) { return null; }
+    if (!r.ok) return null;
+    let j; try { j = await r.json(); } catch (_) { return null; }
+    if (!Array.isArray(j)) return null;
+    out.push(...j);
+    if (j.length < page) break;
+  }
+  return out;
+}
+
 // ⚠️⚠️ `[]` SUR UNE LECTURE RATÉE = « RIEN À FAIRE » SUR SON ÉCRAN D'ACCUEIL.
 // Ces lectures rendaient une liste vide aussi bien quand la base disait « rien »
 // que quand elle ne répondait pas — et le widget affichait alors `0 à expédier ·
 // 0 à retirer · 0 €` avec 14 colis à poster. C'est le mensonge que l'app a
 // appris à ne plus faire (§ baseKO), jamais reporté ici. `null` = « pas su ».
 async function rows(like) {
-  try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.${like}&select=data`, { headers: HEADERS });
-    if (!r.ok) return null;
-    const j = await r.json();
-    return Array.isArray(j) ? j.map(x => x.data).filter(Boolean) : null;
-  } catch (_) { return null; }
+  const j = await fetchPaginated(`app_data?id=like.${like}&select=data`);
+  return j ? j.map(x => x.data).filter(Boolean) : null;
 }
 // ⚠️ ÉGRESS SUPABASE — NE JAMAIS faire `select=data` sur `email_bord_*` : chaque
 // ligne embarque le PDF du bordereau en base64 (brut + tamponné = deux fois),
@@ -46,12 +63,7 @@ async function rows(like) {
 // bas (date limite + clés d'identification) → l'appel passe de ~6 Mo à ~1 Ko.
 const BORD_SELECT = 'dateLimite:data->>dateLimite,transaction:data->>transaction,suivi:data->>suivi,numero:data->>numero';
 async function bordRows() {
-  try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_bord_*&select=${BORD_SELECT}`, { headers: HEADERS });
-    if (!r.ok) return null;
-    const j = await r.json();
-    return Array.isArray(j) ? j : null;
-  } catch (_) { return null; }
+  return await fetchPaginated(`app_data?id=like.email_bord_*&select=${BORD_SELECT}`);
 }
 // Commandes Vinted moissonnées par l'extension (statut RÉEL, à jour) : c'est la
 // source AUTOMATIQUE — Vinted change le statut quand tu expédies / récupères.
@@ -66,9 +78,8 @@ async function bordRows() {
 async function comptesAExpedierOuRetirer(kind) {
   try {
     const sel = 'id,txns:data->resume->txns';
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_%25_orders_${kind}&select=${sel}`, { headers: HEADERS });
-    if (!r.ok) return null;
-    const rows = await r.json();
+    const rows = await fetchPaginated(`app_data?id=like.harvest_%25_orders_${kind}&select=${sel}`);
+    if (!rows) return null;
     const vus = new Set(); let resumeTrouve = false;
     for (const row of rows) {
       if (!Array.isArray(row.txns)) continue;
@@ -83,10 +94,8 @@ async function comptesAExpedierOuRetirer(kind) {
 }
 async function harvestOrders(kind) {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_%25_orders_${kind}&select=data`, { headers: HEADERS });
-    if (!r.ok) return null;
-    const j = await r.json();
-    if (!Array.isArray(j)) return null;
+    const j = await fetchPaginated(`app_data?id=like.harvest_%25_orders_${kind}&select=data`);
+    if (!j) return null;
     const out = {};
     for (const row of j) {
       const items = (row.data && row.data.payload && row.data.payload.my_orders) || [];

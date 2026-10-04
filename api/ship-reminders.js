@@ -46,6 +46,25 @@ async function getRow(id) {
     return (rows[0] && rows[0].data) || null;
   } catch (_) { return null; }
 }
+// ⚠️ §4.5 — Supabase tronque à 1000 lignes SANS LE DIRE. Ce cron balaie
+// `email_bord_*` et `harvest_%25_orders_sold` de TOUS les utilisateurs : à
+// l'échelle, au-delà de 1000 lignes il en perdrait en silence → des vendeurs
+// sans rappel d'expédition. On pagine, et `null` si une page échoue (jamais une
+// demi-liste prise pour complète — même règle que `sbGetTout` côté app).
+async function fetchPaginated(path) {
+  const out = []; const page = 1000;
+  for (let from = 0; from < 500000; from += page) {
+    let r;
+    try { r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, { headers: { ...HEADERS, 'Range-Unit': 'items', Range: `${from}-${from + page - 1}` } }); }
+    catch (_) { return null; }
+    if (!r.ok) return null;
+    let j; try { j = await r.json(); } catch (_) { return null; }
+    if (!Array.isArray(j)) return null;
+    out.push(...j);
+    if (j.length < page) break;
+  }
+  return out;
+}
 
 export default async function handler(req, res) {
   // Sécurité optionnelle : si CRON_SECRET est défini sur Vercel, on l'exige
@@ -63,8 +82,7 @@ export default async function handler(req, res) {
     // que la date limite + les clés. On projette donc ces 4 champs scalaires
     // (même correctif que dans api/widget.js et §23 côté app).
     const BORD_SELECT = 'dateLimite:data->>dateLimite,transaction:data->>transaction,suivi:data->>suivi,numero:data->>numero';
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_bord_*&select=${BORD_SELECT}`, { headers: HEADERS });
-    const rows = r.ok ? await r.json() : [];
+    const rows = (await fetchPaginated(`app_data?id=like.email_bord_*&select=${BORD_SELECT}`)) || [];
     // ⚠️⚠️ CE COMPTE ÉTAIT FAUX, ET LA NOTIFICATION MENTAIT EN GRAND.
     // Il ne regardait QUE `vinted_bords_printed`. Or depuis §24 imprimer ne
     // marque plus rien comme fait : cette liste est donc quasi vide, et le cron
@@ -113,9 +131,8 @@ export default async function handler(req, res) {
     // Transactions encore en attente d'expédition, d'après la moisson.
     let attente = null;
     try {
-      const rr = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_%25_orders_sold&select=id,txns:data->resume->txns`, { headers: HEADERS });
-      if (rr.ok) {
-        const lignes = await rr.json();
+      const lignes = await fetchPaginated(`app_data?id=like.harvest_%25_orders_sold&select=id,txns:data->resume->txns`);
+      if (lignes) {
         for (const l of lignes) {
           if (!Array.isArray(l.txns)) continue;
           if (!attente) attente = new Set();
