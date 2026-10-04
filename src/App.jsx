@@ -17453,8 +17453,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const pickupUnion = useMemo(() => {
     const retires = suivisRetires(tracking);
     const emailList = (tracking || []).filter(t => isColisRetirable(t, collected, suivisEnvoyes) && !colisRetireAilleurs(t, retires));
-    const seen = new Set(emailList.map(t => normTitle(t.artTitle || t.article || t.modele || '')).filter(Boolean));
-    const extra = vintedToPickup.filter(o => { const n = normTitle(o.title || ''); return !n || !seen.has(n); });
+    // ⚠️ LE MÊME COLIS VU DES DEUX CÔTÉS SE RECONNAÎT PAR SON CODE DE RETRAIT,
+    // JAMAIS PAR SON TITRE (§5, 4 octobre). L'ancien dédoublonnage comparait le
+    // titre de l'email à celui de l'achat — or AUCUN email transporteur ne porte
+    // le titre de l'article (mesuré : 192 sur 192 vides) : il ne retirait donc
+    // rien, et le jour où il l'aurait fait c'était une ressemblance. Un code de
+    // retrait, lui, n'existe que pour UN colis : l'email et la conversation
+    // Vinted (`panel_colis_relais`, extension ≥ 5.45) qui portent le même code
+    // désignent le même carton. Sans code commun, les deux restent — un colis en
+    // trop se voit au comptoir, un colis caché est un colis perdu.
+    const normCode = (c) => codeRetrait(String(c == null ? '' : c).toUpperCase().replace(/\s+/g, ''));
+    const codesEmail = new Set(emailList.map(t => normCode(t.code)).filter(Boolean));
+    const extra = vintedToPickup.filter(o => { const r = colisRelais[String((o && o.transaction_id) || '')]; const c = r ? normCode(r.code) : ''; return !c || !codesEmail.has(c); });
     // ── « JE L'AI RETIRÉ » : GRISÉ, PAS DISPARU ───────────────────────────────
     // Idée de Julien, et c'est la bonne : cocher ✓ faisait disparaître le colis
     // d'un coup, alors que Vinted, lui, dit encore « déposé en point relais ».

@@ -202,5 +202,19 @@ essaie('(g) délai', () => {
   dit(app.joursAvantLimiteFr(fr) === 2, 'une date limite dans deux jours donne 2 jours restants', String(app.joursAvantLimiteFr(fr)));
 });
 
+// (h) Colis à retirer : le même colis vu par l'email ET par Vinted se reconnaît
+// par son CODE de retrait (une identité), jamais par son titre (§5). Mesuré :
+// aucun email transporteur ne porte le titre (192/192).
+essaie('(h) dédoublonnage des colis à retirer', () => {
+  const src = fs.readFileSync(path.join(R, 'src/App.jsx'), 'utf8');
+  const i = src.indexOf('const pickupUnion = useMemo(');
+  const corps = i >= 0 ? src.slice(i, src.indexOf('\n  }, [', i)) : '';
+  const code = corps.split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n');
+  const iExtra = code.indexOf('const extra');
+  const avantExtra = iExtra >= 0 ? code.slice(Math.max(0, iExtra - 600), code.indexOf('\n', iExtra)) : '';
+  dit(iExtra >= 0 && !/normTitle\(/.test(avantExtra), 'les colis à retirer ne sont jamais fusionnés sur une ressemblance de TITRE', avantExtra ? '' : 'pickupUnion introuvable');
+  dit(/codeRetrait|normCode/.test(avantExtra) && /colisRelais/.test(avantExtra), '… mais sur le CODE de retrait lu des deux côtés (email et conversation Vinted)');
+});
+
 console.log(`\n${ko ? `❌ ${ko} échec(s)` : '✅ tout est vert'}`);
 process.exit(ko ? 1 : 0);
