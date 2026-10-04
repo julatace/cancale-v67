@@ -14,6 +14,16 @@
 //    · un prélèvement en échec depuis plus de 14 jours envoie mettre la carte à
 //      jour (le portail), jamais repayer un second abonnement ;
 //    · « S'abonner » envoie vers une page Stripe et rien d'autre.
+//  ONGLET « MON COMPTE » (Julien, 4 octobre : « un onglet pour gérer
+//  l'abonnement et les factures dans les paramètres, avec ses infos de compte
+//  regroupées ») :
+//    · les Paramètres ont deux onglets ; l'abonnement vit dans « Mon compte » ;
+//    · la carte bancaire est dite (marque, 4 derniers chiffres, expiration) ;
+//    · les factures sont listées — et « pas su » n'est JAMAIS « aucune facture » ;
+//    · un lien de facture qui ne mène pas chez Stripe n'est pas cliquable ;
+//    · « Résilier » demande confirmation, part AVEC la session, et la carte dit
+//      aussitôt jusqu'à quand l'accès reste ; « Reprendre » l'annule ;
+//    · `?vue=compte` (retour de Stripe) ouvre directement le bon onglet.
 //  Aucune fixture : comptes et statuts inventés ici (le dépôt est public).
 // ════════════════════════════════════════════════════════════════════════════
 const path = require('path'), http = require('http'), fs = require('fs');
@@ -28,6 +38,12 @@ const SESSION = { access_token: 'jeton-de-banc', refresh_token: 'r', expires_at:
   user: { id: '11111111-2222-3333-4444-555555555555', email: 'vendeuse@exemple.test' } };
 const PRIX = { montant: 9.99, devise: 'eur', intervalle: 'month' };
 const base = { ok: true, proprietaire: false, configure: true, modeTest: true, obligatoire: false, prix: PRIX, statut: null, finPeriode: null, annuleFinPeriode: false, peutGerer: false, actif: false, acces: true };
+const FACTURES = { ok: true,
+  carte: { marque: 'visa', fin: '4242', mois: 12, annee: 2027 },
+  factures: [
+    { id: 'in_2', numero: 'VRM-0002', date: '2026-10-04T10:00:00.000Z', montant: 9.99, devise: 'eur', statut: 'paid', pdf: 'https://pay.stripe.com/invoice/acct_x/in_2/pdf', page: 'https://invoice.stripe.com/i/acct_x/in_2' },
+    { id: 'in_1', numero: 'VRM-0001', date: '2026-09-04T10:00:00.000Z', montant: 9.99, devise: 'eur', statut: 'paid', pdf: 'https://site-pirate.example/facture.pdf', page: null },
+  ] };
 const ETATS = {
   sans: { ...base },
   actif: { ...base, statut: 'active', finPeriode: '2026-11-04T10:00:00.000Z', peutGerer: true, actif: true },
@@ -49,7 +65,9 @@ const srv = http.createServer((q, r) => {
 });
 
 // `abo` : la réponse de /api/compte?mode=abonnement — un objet, ou 'panne' (503).
-async function ouvrir(nav, { abo, tab = 'settings', checkoutUrl = 'https://checkout.stripe.com/c/pay/cs_banc' }) {
+// `fx` : la réponse de ?mode=factures — un objet, ou 'panne' (502).
+// `compte` : cliquer l'onglet « Mon compte » après le chargement.
+async function ouvrir(nav, { abo, tab = 'settings', checkoutUrl = 'https://checkout.stripe.com/c/pay/cs_banc', fx = FACTURES, compte = true, extra = '' }) {
   const ctx = await nav.newContext({ viewport: { width: 1512, height: 950 } });
   const pg = await ctx.newPage();
   const erreurs = []; pg.on('pageerror', (e) => erreurs.push(e.message));
@@ -74,14 +92,28 @@ async function ouvrir(nav, { abo, tab = 'settings', checkoutUrl = 'https://check
       return abo === 'panne' ? r.fulfill({ status: 503, contentType: 'application/json', body: '{"erreur":"base-injoignable"}' })
         : r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(abo) });
     }
+    if (/\/api\/compte\?mode=factures/.test(u)) {
+      appels.push({ mode: 'factures', auth: r.request().headers().authorization || '' });
+      return fx === 'panne' ? r.fulfill({ status: 502, contentType: 'application/json', body: '{"erreur":"stripe"}' })
+        : r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(fx) });
+    }
+    if (/\/api\/compte\?mode=(resilier|reprendre)/.test(u)) {
+      const mode = /resilier/.test(u) ? 'resilier' : 'reprendre';
+      appels.push({ mode, methode: r.request().method(), auth: r.request().headers().authorization || '' });
+      return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, annuleFinPeriode: mode === 'resilier', finPeriode: '2026-11-04T10:00:00.000Z' }) });
+    }
     if (/\/api\/compte\?mode=(checkout|portail)/.test(u)) {
       appels.push({ mode: /checkout/.test(u) ? 'checkout' : 'portail', auth: r.request().headers().authorization || '' });
       return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ url: checkoutUrl }) });
     }
     return r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' });
   });
-  await pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' });
+  await pg.goto(`http://localhost:${PORT}/?tab=${tab}${extra}`, { waitUntil: 'domcontentloaded' });
   await pg.waitForTimeout(3500);
+  if (tab === 'settings' && compte) {
+    const onglet = pg.locator('[data-onglets-reglages] [data-vue="compte"]');
+    if (await onglet.count()) { await onglet.first().click(); await pg.waitForTimeout(1200); }
+  }
   return { ctx, pg, erreurs, appels };
 }
 const etatCarte = (pg) => pg.evaluate(() => { const e = document.querySelector('[data-abonnement]'); return e ? e.getAttribute('data-abonnement') : null; });
@@ -100,8 +132,9 @@ const boutons = (pg) => pg.evaluate(() => { const e = document.querySelector('[d
         const e = await etatCarte(pg), b = await boutons(pg), t = await texteCarte(pg);
         dit(e === rendu && erreurs.length === 0, `serveur « ${nom} » → carte « ${rendu} »`, `rendu ${e} ${erreurs.join(' | ')}`);
         if (nom === 'sans') dit(b.some((x) => /abonner/i.test(x)) && /9,99/.test(t), '  sans abonnement : le prix et le bouton pour s’abonner', b.join(' · '));
-        if (nom === 'actif') dit(b.some((x) => /gérer|résilier/i.test(x)) && !b.some((x) => /abonner/i.test(x)) && /4 novembre 2026/.test(t), '  abonné : la date du prochain prélèvement et « gérer », jamais un second « s’abonner »', t.replace(/\n/g, ' ').slice(0, 120));
-        if (nom === 'resilie') dit(/accès jusqu'au 4 novembre 2026/.test(t), '  résilié : jusqu’à quand l’accès reste ouvert', t.replace(/\n/g, ' ').slice(0, 120));
+        if (nom === 'actif') dit(b.some((x) => /^résilier$/i.test(x)) && b.some((x) => /carte/i.test(x)) && !b.some((x) => /abonner/i.test(x)) && /prochain prélèvement le 4 novembre 2026/i.test(t), '  abonné : la date du prochain prélèvement, « changer de carte » et « résilier », jamais un second « s’abonner »', b.join(' · ') + ' / ' + t.replace(/\n/g, ' ').slice(0, 120));
+        if (nom === 'actif') dit(/Visa •••• 4242/.test(t) && /12\/27/.test(t), '  abonné : la carte est dite (marque, 4 derniers chiffres, expiration)', t.replace(/\n/g, ' ').slice(0, 160));
+        if (nom === 'resilie') dit(/jusqu'au 4 novembre 2026/.test(t) && b.some((x) => /reprendre/i.test(x)) && !b.some((x) => /^résilier$/i.test(x)), '  résilié : jusqu’à quand l’accès reste, et « reprendre »', b.join(' · ') + ' / ' + t.replace(/\n/g, ' ').slice(0, 120));
         if (nom === 'proprietaire') dit(b.length === 0 && /gratuit/i.test(t), '  propriétaire : gratuit, et AUCUN bouton de paiement', b.join(' · '));
         if (nom === 'nonBranche') dit(b.length === 0, '  paiement pas branché : aucun bouton qui mènerait nulle part', b.join(' · '));
         if (nom === 'sans' || nom === 'actif') dit(/mode test/i.test(t), '  le mode test est dit (aucune vraie carte débitée)');
@@ -129,6 +162,80 @@ const boutons = (pg) => pg.evaluate(() => { const e = document.querySelector('[d
       await pg.locator('[data-abonnement] button', { hasText: /abonner/i }).first().click();
       await pg.waitForTimeout(1200);
       dit(!/site-pirate/.test(pg.url()), 'une adresse de paiement qui n’est pas Stripe n’est jamais suivie', pg.url());
+      await ctx.close();
+    });
+
+    console.log('\n── Deux onglets : « Réglages » et « Mon compte »');
+    await essaie('onglets', async () => {
+      const { ctx, pg } = await ouvrir(nav, { abo: ETATS.actif, compte: false });
+      const onglets = await pg.evaluate(() => [...document.querySelectorAll('[data-onglets-reglages] [data-vue]')].map((b) => b.innerText.trim()));
+      const aboAvant = await etatCarte(pg);
+      const reglagesAvant = await pg.evaluate(() => /Comptes Vinted/i.test(document.body.innerText));
+      dit(onglets.length === 2 && /réglages/i.test(onglets[0]) && /compte/i.test(onglets[1]), 'les Paramètres ont deux onglets', onglets.join(' · '));
+      dit(!aboAvant && reglagesAvant, '  par défaut « Réglages » : les réglages de l’app, pas l’abonnement', `abonnement=${aboAvant} réglages=${reglagesAvant}`);
+      await pg.locator('[data-onglets-reglages] [data-vue="compte"]').click(); await pg.waitForTimeout(1200);
+      const apres = await pg.evaluate(() => ({ abo: (document.querySelector('[data-abonnement]') || {}).getAttribute ? document.querySelector('[data-abonnement]').getAttribute('data-abonnement') : null,
+        email: /vendeuse@exemple\.test/.test(document.body.innerText), reglages: /Comptes Vinted/i.test(document.body.innerText), mdp: /mot de passe/i.test(document.body.innerText) }));
+      dit(apres.abo === 'actif' && apres.email && apres.mdp && !apres.reglages, '  « Mon compte » regroupe : identité, abonnement, connexion — et pas les réglages de l’app', JSON.stringify(apres));
+      await ctx.close();
+    });
+    await essaie('lien direct', async () => {
+      const { ctx, pg } = await ouvrir(nav, { abo: ETATS.actif, compte: false, extra: '&vue=compte' });
+      dit((await etatCarte(pg)) === 'actif', '`?vue=compte` (retour de Stripe) ouvre directement « Mon compte »');
+      await ctx.close();
+    });
+
+    console.log('\n── Les factures');
+    await essaie('liste', async () => {
+      const { ctx, pg, appels } = await ouvrir(nav, { abo: ETATS.actif });
+      const f = await pg.evaluate(() => { const e = document.querySelector('[data-factures]'); return e ? { etat: e.getAttribute('data-factures'), t: e.innerText, liens: [...e.querySelectorAll('a')].map((a) => a.href) } : null; });
+      dit(f && f.etat === '2' && (f.t.match(/9,99/g) || []).length === 2 && /Payée/.test(f.t) && /4 octobre 2026/.test(f.t), 'deux factures : date, montant, statut', f ? f.t.replace(/\n/g, ' ').slice(0, 160) : 'aucune liste');
+      dit(f && f.liens.length === 1 && /^https:\/\/pay\.stripe\.com\//.test(f.liens[0]), '  seul le PDF hébergé chez Stripe est un lien — une adresse étrangère ne l’est pas', f ? f.liens.join(' · ') : '');
+      dit(appels.some((a) => a.mode === 'factures' && a.auth === 'Bearer jeton-de-banc'), '  demandées AVEC la session (le serveur sait de qui il s’agit)', JSON.stringify(appels.filter((a) => a.mode === 'factures')));
+      await ctx.close();
+    });
+    await essaie('factures illisibles', async () => {
+      const { ctx, pg } = await ouvrir(nav, { abo: ETATS.actif, fx: 'panne' });
+      const f = await pg.evaluate(() => { const e = document.querySelector('[data-factures]'); return e ? { etat: e.getAttribute('data-factures'), t: e.innerText } : null; });
+      dit(f && f.etat === 'pas-su' && !/aucune facture/i.test(f.t), 'Stripe n’a pas répondu → « pas su », jamais « aucune facture »', f ? `${f.etat} · ${f.t.replace(/\n/g, ' ').slice(0, 100)}` : 'rien');
+      await ctx.close();
+    });
+    await essaie('jamais abonné', async () => {
+      const { ctx, pg, appels } = await ouvrir(nav, { abo: ETATS.sans });
+      const f = await pg.evaluate(() => !!document.querySelector('[data-factures]'));
+      dit(!f && !appels.some((a) => a.mode === 'factures'), 'jamais abonné : pas de liste de factures, et rien n’est demandé à Stripe');
+      await ctx.close();
+    });
+
+    console.log('\n── Résilier, reprendre');
+    await essaie('résilier : on change d’avis', async () => {
+      const { ctx, pg, appels } = await ouvrir(nav, { abo: ETATS.actif });
+      await pg.locator('[data-abonnement] button', { hasText: /^Résilier$/ }).first().click(); await pg.waitForTimeout(600);
+      const garder = pg.getByRole('button', { name: 'Garder mon abonnement' });
+      const vu = await garder.count();
+      if (vu) { await garder.first().click(); await pg.waitForTimeout(600); }
+      dit(vu > 0 && !appels.some((a) => a.mode === 'resilier'), '« Résilier » demande confirmation ; « Garder » n’envoie RIEN', JSON.stringify(appels.filter((a) => a.mode !== 'factures')));
+      await ctx.close();
+    });
+    await essaie('résilier', async () => {
+      const { ctx, pg, appels } = await ouvrir(nav, { abo: ETATS.actif });
+      await pg.locator('[data-abonnement] button', { hasText: /^Résilier$/ }).first().click(); await pg.waitForTimeout(600);
+      const conf = await pg.evaluate(() => document.body.innerText);
+      dit(/4 novembre 2026/.test(conf) && /aucun autre prélèvement/i.test(conf), '  la confirmation dit jusqu’à quand l’accès reste, et qu’aucun prélèvement ne suit');
+      // Le bouton de la fenêtre de confirmation : celui qui suit « Garder mon
+      // abonnement » (la carte porte aussi un « Résilier », sous le voile).
+      await pg.locator('button', { hasText: 'Garder mon abonnement' }).locator('xpath=following-sibling::button[1]').click(); await pg.waitForTimeout(1200);
+      const a = appels.find((x) => x.mode === 'resilier');
+      dit(a && a.methode === 'POST' && a.auth === 'Bearer jeton-de-banc', '  confirmé : la demande part, AVEC la session', JSON.stringify(a || null));
+      const t = await texteCarte(pg), b = await boutons(pg);
+      dit(/jusqu'au 4 novembre 2026/.test(t) && b.some((x) => /reprendre/i.test(x)), '  la carte dit aussitôt « résilié » et propose de reprendre', b.join(' · ') + ' / ' + t.replace(/\n/g, ' ').slice(0, 120));
+      await ctx.close();
+    });
+    await essaie('reprendre', async () => {
+      const { ctx, pg, appels } = await ouvrir(nav, { abo: ETATS.resilie });
+      await pg.locator('[data-abonnement] button', { hasText: /reprendre/i }).first().click(); await pg.waitForTimeout(1200);
+      const t = await texteCarte(pg);
+      dit(appels.some((a) => a.mode === 'reprendre' && a.auth === 'Bearer jeton-de-banc') && /prochain prélèvement/i.test(t), '« Reprendre » annule la résiliation : la carte redit le prochain prélèvement', t.replace(/\n/g, ' ').slice(0, 120));
       await ctx.close();
     });
 

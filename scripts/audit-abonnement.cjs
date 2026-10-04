@@ -36,9 +36,10 @@ const SECRET = 'whsec_banc_abonnement';
 const JETONS = { 'aa.bb.A': { id: A, email: 'a@exemple.test' }, 'aa.bb.B': { id: B, email: 'b@exemple.test' }, 'aa.bb.P': { id: PROPRIO, email: 'p@exemple.test' } };
 
 // ── Fausse base + faux Stripe ───────────────────────────────────────────────
-let base, ecritures, appelsStripe, panneEcriture, fkInconnue, obligatoire, panneRpc, appData, lecturesSubs, ecrituresData, mains;
+let base, ecritures, appelsStripe, panneEcriture, fkInconnue, obligatoire, panneRpc, appData, lecturesSubs, ecrituresData, mains, subsStripe, facturesStripe, panneFactures;
 const reset = () => {
   base = {}; ecritures = []; appelsStripe = []; panneEcriture = false; fkInconnue = false;
+  subsStripe = {}; facturesStripe = []; panneFactures = false;
   obligatoire = false; panneRpc = false; appData = {}; lecturesSubs = []; ecrituresData = []; mains = [];
   if (oublierAcces) oublierAcces();
 };
@@ -107,7 +108,22 @@ global.fetch = async (url, opts = {}) => {
     if (chemin === 'prices') return rep({ data: [{ id: 'price_banc', unit_amount: 999, currency: 'eur', recurring: { interval: 'month' } }] });
     if (chemin === 'checkout/sessions') return rep({ id: 'cs_banc', url: 'https://checkout.stripe.com/c/pay/cs_banc' });
     if (chemin === 'billing_portal/sessions') return rep({ url: 'https://billing.stripe.com/p/session/banc' });
-    if (chemin.startsWith('subscriptions/')) return rep({ id: chemin.split('/')[1], status: 'active', customer: 'cus_A', metadata: { owner: A }, items: { data: [{ current_period_end: 1800000000 }] } });
+    // ⚠️ Le faux Stripe rend TOUTES les factures qu'on lui a données, quel que
+    //    soit le client demandé : c'est le serveur qui doit ne garder que celles
+    //    de SON client (une défense, pas une confiance).
+    if (chemin === 'invoices') return panneFactures ? rep({ error: { message: 'panne' } }, 500) : rep({ object: 'list', data: facturesStripe });
+    if (chemin.startsWith('customers/')) return rep({ id: chemin.split('/')[1], invoice_settings: { default_payment_method: { card: { brand: 'mastercard', last4: '5555', exp_month: 1, exp_year: 2030 } } } });
+    if (chemin.startsWith('subscriptions/')) {
+      const id = chemin.split('/')[1];
+      if (subsStripe[id]) {
+        if (m === 'POST') {
+          const p = new URLSearchParams(opts.body || '');
+          if (p.has('cancel_at_period_end')) subsStripe[id] = { ...subsStripe[id], cancel_at_period_end: p.get('cancel_at_period_end') === 'true' };
+        }
+        return rep(subsStripe[id]);
+      }
+      return rep({ id, status: 'active', customer: 'cus_A', metadata: { owner: A }, items: { data: [{ current_period_end: 1800000000 }] } });
+    }
     return rep({ error: { message: 'inconnu' } }, 404);
   }
   return rep({}, 404);
@@ -356,6 +372,67 @@ const SUB = (owner, status = 'active', extra = {}) => ({ id: 'sub_' + owner.slic
     reset(); panneRpc = true;
     const rp = faireRes(); await compte(req({ mode: 'abonnement', headers: { authorization: 'Bearer aa.bb.A' } }), rp);
     dit(rp.code === 503, 'la base ne dit pas qui a accès → 503 « pas su » (jamais une réponse devinée)', `HTTP ${rp.code}`);
+  });
+
+  console.log('\n── Mon compte : SES factures, SA carte, résilier / reprendre');
+  const abonneA = () => {
+    base[A] = { owner: A, statut: 'active', client_stripe: 'cus_A', abonnement_stripe: 'sub_A', fin_periode: '2026-11-04T10:00:00.000Z', annule_fin_periode: false };
+    subsStripe.sub_A = { id: 'sub_A', object: 'subscription', status: 'active', customer: 'cus_A', livemode: false, cancel_at_period_end: false, metadata: { owner: A },
+      default_payment_method: { card: { brand: 'visa', last4: '4242', exp_month: 12, exp_year: 2027 } }, items: { data: [{ current_period_end: 1800000000 }] } };
+    subsStripe.sub_B = { id: 'sub_B', object: 'subscription', status: 'active', customer: 'cus_B', livemode: false, cancel_at_period_end: false, metadata: { owner: B }, items: { data: [{ current_period_end: 1800000000 }] } };
+    facturesStripe = [
+      { id: 'in_1', customer: 'cus_A', status: 'paid', total: 999, currency: 'eur', created: 1791100000, number: 'VRM-1', invoice_pdf: 'https://pay.stripe.com/invoice/x/pdf', hosted_invoice_url: 'https://invoice.stripe.com/i/x' },
+      { id: 'in_B', customer: 'cus_B', status: 'paid', total: 999, currency: 'eur', created: 1791100000, invoice_pdf: 'https://pay.stripe.com/invoice/b/pdf' },
+      { id: 'in_brouillon', customer: 'cus_A', status: 'draft', total: 999, currency: 'eur', created: 1791200000 },
+      { id: 'in_lien', customer: 'cus_A', status: 'paid', total: 999, currency: 'eur', created: 1788500000, invoice_pdf: 'https://site-pirate.example/f.pdf', hosted_invoice_url: 'javascript:alert(1)' },
+    ];
+  };
+  await essaie('factures', async () => {
+    reset(); abonneA();
+    const r = faireRes(); await compte(req({ mode: 'factures', headers: { authorization: 'Bearer aa.bb.A' } }), r);
+    const ids = r.corps && Array.isArray(r.corps.factures) ? r.corps.factures.map((f) => f.id) : null;
+    dit(r.code === 200 && ids && ids.join(',') === 'in_1,in_lien', 'A reçoit SES factures — jamais celle d’un autre client, jamais un brouillon', `HTTP ${r.code} · ${JSON.stringify(ids)}`);
+    const appel = appelsStripe.find((x) => x.chemin === 'invoices');
+    dit(appel && /customer=cus_A/.test(appel.corps), '  Stripe est interrogé avec le client lu dans SA ligne (pas un paramètre du navigateur)', appel && appel.corps);
+    const f1 = ids && r.corps.factures[0], f2 = ids && r.corps.factures[1];
+    dit(f1 && f1.montant === 9.99 && f1.pdf === 'https://pay.stripe.com/invoice/x/pdf' && f1.statut === 'paid', '  montant (9,99, pas 999), statut et PDF Stripe', JSON.stringify(f1));
+    dit(f2 && f2.pdf === null && f2.page === null, '  un lien qui ne mène pas chez Stripe n’est jamais transmis', JSON.stringify(f2));
+    dit(r.corps && r.corps.carte && r.corps.carte.fin === '4242' && r.corps.carte.marque === 'visa', '  la carte de l’abonnement (marque, 4 derniers chiffres)', JSON.stringify(r.corps && r.corps.carte));
+  });
+  await essaie('factures sans abonnement', async () => {
+    reset(); abonneA();
+    const r = faireRes(); await compte(req({ mode: 'factures', headers: { authorization: 'Bearer aa.bb.B' } }), r);
+    dit(r.code === 200 && r.corps.factures.length === 0 && !appelsStripe.some((x) => x.chemin === 'invoices'), 'B, jamais abonné : aucune facture, et Stripe n’est même pas interrogé (rien de A ne fuit)', `HTTP ${r.code} · ${JSON.stringify(r.corps)}`);
+    const rn = faireRes(); await compte(req({ mode: 'factures', headers: {} }), rn);
+    dit(rn.code === 401, '  sans session : 401');
+  });
+  await essaie('factures illisibles', async () => {
+    reset(); abonneA(); panneFactures = true;
+    const r = faireRes(); await compte(req({ mode: 'factures', headers: { authorization: 'Bearer aa.bb.A' } }), r);
+    dit(r.code >= 500 && !(r.corps && Array.isArray(r.corps.factures)), 'Stripe ne répond pas → une erreur, JAMAIS « aucune facture »', `HTTP ${r.code}`);
+  });
+  await essaie('résilier', async () => {
+    reset(); abonneA();
+    const r = faireRes(); await compte(req({ method: 'POST', mode: 'resilier', headers: { authorization: 'Bearer aa.bb.A' } }), r);
+    const post = appelsStripe.find((x) => x.m === 'POST' && x.chemin === 'subscriptions/sub_A');
+    dit(r.code === 200 && r.corps.annuleFinPeriode === true && post && /cancel_at_period_end=true/.test(post.corps), 'résilier : à la FIN de la période (cancel_at_period_end), jamais une coupure immédiate', `HTTP ${r.code} · ${post && post.corps}`);
+    dit(base[A].annule_fin_periode === true, '  la ligne est mise à jour tout de suite (l’écran rouvert dit « résilié »)', JSON.stringify(base[A]));
+    const r2 = faireRes(); await compte(req({ method: 'POST', mode: 'reprendre', headers: { authorization: 'Bearer aa.bb.A' } }), r2);
+    dit(r2.code === 200 && r2.corps.annuleFinPeriode === false && subsStripe.sub_A.cancel_at_period_end === false, 'reprendre : la résiliation est annulée', `HTTP ${r2.code}`);
+  });
+  await essaie('résilier un abonnement qui n’est pas le sien', async () => {
+    reset(); abonneA(); base[A].abonnement_stripe = 'sub_B';
+    const r = faireRes(); await compte(req({ method: 'POST', mode: 'resilier', headers: { authorization: 'Bearer aa.bb.A' } }), r);
+    dit(r.code === 403 && !appelsStripe.some((x) => x.m === 'POST' && x.chemin.startsWith('subscriptions/')), 'un abonnement qui appartient à un autre client Stripe n’est JAMAIS modifié', `HTTP ${r.code}`);
+  });
+  await essaie('résilier sans abonnement', async () => {
+    reset(); abonneA();
+    const r = faireRes(); await compte(req({ method: 'POST', mode: 'resilier', headers: { authorization: 'Bearer aa.bb.B' } }), r);
+    dit(r.code === 404 && !appelsStripe.some((x) => x.m === 'POST'), 'rien à résilier → 404, rien n’est envoyé à Stripe', `HTTP ${r.code}`);
+    const rn = faireRes(); await compte(req({ method: 'POST', mode: 'resilier', headers: {} }), rn);
+    dit(rn.code === 401, '  sans session : 401');
+    const rg = faireRes(); await compte(req({ method: 'GET', mode: 'resilier', headers: { authorization: 'Bearer aa.bb.A' } }), rg);
+    dit(rg.code === 405, '  un simple lien (GET) ne résilie jamais', `HTTP ${rg.code}`);
   });
 
   console.log('\n── Lire son statut');

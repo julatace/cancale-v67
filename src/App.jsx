@@ -27174,17 +27174,46 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
     );
   };
 
+  // ── DEUX ONGLETS : « Réglages » et « Mon compte » (Julien, 4 octobre) ─────
+  // « un onglet pour gérer l'abonnement et les factures dans les paramètres,
+  // avec ses infos de compte regroupées ». Tout ce qui concerne LA PERSONNE
+  // (identité, abonnement, carte, factures, connexion, ses données) vit dans
+  // « Mon compte » ; ce qui règle l'APP reste dans « Réglages ».
+  // Sans session (accès temporaire), pas d'onglets : l'écran reste d'un bloc,
+  // et le bouton « Aller à l'écran de connexion » reste visible tout de suite.
+  const ongletsCompte = MULTI_USER && !!AUTH.user;
+  const [vue, setVueBrute] = React.useState(() => {
+    // Retour de Stripe (paiement, page de gestion) : on revient sur le compte.
+    if (RETOUR_ABONNEMENT || RETOUR_VUE === 'compte') return 'compte';
+    try { return localStorage.getItem('vrm_reglages_vue') === 'compte' ? 'compte' : 'reglages'; } catch (_) { return 'reglages'; }
+  });
+  const setVue = (v) => { setVueBrute(v); try { localStorage.setItem('vrm_reglages_vue', v); } catch (_) {} };
+  const voirCompte = !ongletsCompte || vue === 'compte';
+  const voirReglages = !ongletsCompte || vue === 'reglages';
   return (
     <div style={{padding:'16px 14px 40px',maxWidth:600,margin:'0 auto'}}>
       <AcctSheet/>
       <h2 style={{fontSize:26,fontWeight:700,color:C.text,margin:'4px 0 18px',letterSpacing:'-0.03em'}}>Paramètres</h2>
       <ReglagesPasLus/>
 
+      {ongletsCompte && (
+        <div role="tablist" aria-label="Paramètres" data-onglets-reglages=""
+          style={{display:'flex',gap:4,padding:4,borderRadius:12,background:C.bg,border:`1px solid ${C.border}`,margin:'0 0 16px',maxWidth:380}}>
+          {[['reglages','Réglages'],['compte','Mon compte']].map(([k,l]) => (
+            <button key={k} type="button" role="tab" aria-selected={vue===k} data-vue={k} onClick={()=>setVue(k)}
+              style={{flex:1,border:'none',borderRadius:9,padding:'9px 10px',fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit',
+                background:vue===k?C.card:'transparent',color:vue===k?C.text:C.muted,boxShadow:vue===k?(C.shadow||'none'):'none'}}>
+              {l}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* ── TON COMPTE VRM ──────────────────────────────────────────────────
           Toujours présent en multi-vendeurs, y compris quand on est entré par la
           porte de secours : sans ça, une fois passé par « Entrer sans compte »
           il n'y avait AUCUN moyen de revenir à l'écran de connexion. */}
-      {MULTI_USER && (<>
+      {MULTI_USER && voirCompte && (<>
         <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'0 0 8px 2px'}}>Ton compte</div>
 
         {AUTH.user ? (
@@ -27213,13 +27242,8 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
           </div>
         )}
 
-        {AUTH.user && <AbonnementSetting/>}
         <PrenomSetting/>
-        <NumerosSetting/>
-
-        <RepondreSetting/>
-
-        <OffresAutoSetting/>
+        {AUTH.user && <MonAbonnement/>}
 
         {/* MOYENS DE CONNEXION — on affiche l'état RÉEL de chacun, pas une liste
             décorative. Un bouton Google qui mène à une page d'erreur ne rend
@@ -27262,6 +27286,23 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
             desc="Efface aussi les données de ce navigateur — elles restent dans ton compte."
             onClick={()=>{ setAcct({ mode:'out', val:'', err:'', busy:false }); }}/>
         </>)}
+      </>)}
+
+      {voirCompte && (<>
+        <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Tes données et les conditions</div>
+        <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px',fontSize:12.5,color:C.muted,lineHeight:1.55}}>
+          Tu peux <b style={{color:C.text}}>exporter tes données</b> avec « Sauvegarde complète » {ongletsCompte ? '(onglet Réglages)' : 'ci-dessous'}. Pour <b style={{color:C.text}}>supprimer ton compte</b> ou exercer tes droits (accès, rectification, effacement), écris à l’adresse indiquée dans la <a href="/legal/confidentialite.html" target="_blank" rel="noopener" style={{color:C.accent}}>politique de confidentialité</a>.
+          <div style={{display:'flex',flexWrap:'wrap',gap:'4px 14px',marginTop:9}}>
+            {DOCS_LEGAUX.map(([h,t]) => <a key={h} href={h} target="_blank" rel="noopener" style={{color:C.accent,fontWeight:500,textDecoration:'none'}}>{t}</a>)}
+          </div>
+        </div>
+      </>)}
+
+      {voirReglages && (<>
+      {MULTI_USER && (<>
+        <NumerosSetting/>
+        <RepondreSetting/>
+        <OffresAutoSetting/>
       </>)}
 
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Comptes Vinted</div>
@@ -27386,17 +27427,12 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
 
       {/* « Facturation Pro » déménagée dans l'onglet Factures (30 sept.). */}
 
-      <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Tes données et les conditions</div>
-      <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px',fontSize:12.5,color:C.muted,lineHeight:1.55}}>
-        Tu peux <b style={{color:C.text}}>exporter toutes tes données</b> avec « Sauvegarde complète » ci-dessus. Pour <b style={{color:C.text}}>supprimer ton compte</b> ou exercer tes droits (accès, rectification, effacement), écris à l’adresse indiquée dans la <a href="/legal/confidentialite.html" target="_blank" rel="noopener" style={{color:C.accent}}>politique de confidentialité</a>.
-        <div style={{display:'flex',flexWrap:'wrap',gap:'4px 14px',marginTop:9}}>
-          {DOCS_LEGAUX.map(([h,t]) => <a key={h} href={h} target="_blank" rel="noopener" style={{color:C.accent,fontWeight:500,textDecoration:'none'}}>{t}</a>)}
-        </div>
-      </div>
+      {/* « Tes données et les conditions » vit dans l'onglet « Mon compte ». */}
 
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Affichage</div>
       <Row icon={dark?'☀️':'🌙'} title={dark?'Passer en mode clair':'Passer en mode sombre'} onClick={toggleDark}/>
       <ZoomSetting/>
+      </>)}
     </div>
   );
 }
@@ -27449,6 +27485,9 @@ const applyZoom = (z) => {
 // Le retour de Stripe (`?abonnement=merci|annule`) est capté AU CHARGEMENT :
 // la navigation par `?tab=` efface ensuite l'adresse.
 const RETOUR_ABONNEMENT = (() => { try { return new URLSearchParams(window.location.search).get('abonnement') || ''; } catch (_) { return ''; } })();
+// `?vue=compte` : ouvrir les Paramètres sur l'onglet « Mon compte » (retour de
+// la page de gestion Stripe, lien direct). Capté au chargement pour la même raison.
+const RETOUR_VUE = (() => { try { return new URLSearchParams(window.location.search).get('vue') || ''; } catch (_) { return ''; } })();
 const enTeteSession = () => (AUTH.session && AUTH.session.access_token ? { Authorization: `Bearer ${AUTH.session.access_token}` } : {});
 // Trois états : `undefined` en cours · `null` pas su · l'objet du serveur.
 async function lireAbonnement() {
@@ -27471,8 +27510,42 @@ async function ouvrirStripe(mode) {
 const prixLisible = (p) => p ? `${Number(p.montant).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € / ${p.intervalle === 'year' ? 'an' : 'mois'}` : '9,99 € / mois';
 const dateLisible = (iso) => { try { return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }); } catch (_) { return ''; } };
 
-function AbonnementSetting() {
+// MES FACTURES ET MA CARTE — trois états : `undefined` en cours · `null` pas su
+// · `{ factures, carte }` lu. ⚠️ « Pas su » ne s'affiche JAMAIS comme « aucune
+// facture » : quelqu'un qui cherche une facture pour sa compta en conclurait
+// qu'elle n'existe pas.
+async function lireFactures() {
+  try {
+    const r = await fetch('/api/compte?mode=factures', { headers: enTeteSession(), cache: 'no-store' });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return j && j.ok && Array.isArray(j.factures) ? { factures: j.factures, carte: j.carte || null } : null;
+  } catch (_) { return null; }
+}
+// Résilier (à la fin de la période payée) ou annuler la résiliation.
+async function choisirResiliation(reprendre) {
+  try {
+    const r = await fetch(`/api/compte?mode=${reprendre ? 'reprendre' : 'resilier'}`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: '{}' });
+    const j = await r.json().catch(() => ({}));
+    if (r.ok && j && j.ok) return { ok: true, annuleFinPeriode: !!j.annuleFinPeriode, finPeriode: j.finPeriode || null };
+    return { ok: false, message: (j && j.message) || "Stripe n'a pas répondu. Réessaie dans un instant." };
+  } catch (_) { return { ok: false, message: 'Pas de connexion. Réessaie dans un instant.' }; }
+}
+const montantLisible = (n, devise) => {
+  if (!Number.isFinite(Number(n))) return '—';
+  try { return Number(n).toLocaleString('fr-FR', { style: 'currency', currency: String(devise || 'eur').toUpperCase() }); }
+  catch (_) { return `${Number(n).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`; }
+};
+const STATUT_FACTURE = { paid: 'Payée', open: 'À payer', void: 'Annulée', uncollectible: 'Impayée' };
+// Seuls les liens de Stripe s'ouvrent depuis la liste (le serveur filtre déjà ;
+// on ne fait pas confiance à une seule moitié).
+const lienFacture = (u) => (typeof u === 'string' && /^https:\/\/(pay|invoice|files|invoicedata)\.stripe\.com\//.test(u) ? u : null);
+
+// L'onglet « Mon compte » : l'abonnement (statut, prochain prélèvement, carte,
+// résilier / reprendre) puis la liste des factures — sur la MÊME lecture.
+function MonAbonnement() {
   const [e, setE] = React.useState(undefined);
+  const [fx, setFx] = React.useState(undefined);
   const [occupe, setOccupe] = React.useState('');
   const [msg, setMsg] = React.useState('');
   React.useEffect(() => {
@@ -27484,11 +27557,29 @@ function AbonnementSetting() {
         await new Promise((r) => setTimeout(r, 2000));
         x = await lireAbonnement();
       }
-      if (!mort) setE(x);
+      if (mort) return;
+      setE(x);
+      // Les factures n'existent que pour quelqu'un qui a (eu) un client Stripe.
+      if (x && x.configure && !x.proprietaire && x.peutGerer) { const f = await lireFactures(); if (!mort) setFx(f); }
     })();
     return () => { mort = true; };
   }, []);
   const agir = async (mode) => { setOccupe(mode); setMsg(''); const m = await ouvrirStripe(mode); if (m) { setMsg(m); setOccupe(''); } };
+  const resilierOuReprendre = async (reprendre) => {
+    if (!reprendre) {
+      const fin = e && e.finPeriode ? dateLisible(e.finPeriode) : 'la fin du mois payé';
+      const oui = await askConfirm({ title: 'Résilier ton abonnement ?',
+        desc: `Tu gardes VRM jusqu'au ${fin}, et aucun autre prélèvement ne partira. Tes données restent intactes. Tu peux changer d'avis jusqu'à cette date.`,
+        ok: 'Résilier', cancel: 'Garder mon abonnement', danger: true });
+      if (!oui) return;
+    }
+    setOccupe(reprendre ? 'reprendre' : 'resilier'); setMsg('');
+    const r = await choisirResiliation(reprendre);
+    setOccupe('');
+    if (!r.ok) { setMsg(r.message); return; }
+    setE((x) => (x ? { ...x, annuleFinPeriode: r.annuleFinPeriode, finPeriode: r.finPeriode || x.finPeriode } : x));
+    toast(r.annuleFinPeriode ? `✓ Abonnement résilié — VRM reste ouvert jusqu'au ${dateLisible(r.finPeriode || e.finPeriode)}` : '✓ Abonnement repris — rien ne change pour toi');
+  };
   const carte = { padding: '15px 16px', borderRadius: 10, border: `1px solid ${C.border}`, background: C.card, marginBottom: 8 };
   const bouton = (plein) => ({ marginTop: 10, border: plein ? 'none' : `1px solid ${C.border}`, background: plein ? C.accent : 'transparent', color: plein ? (C.onAccent || '#fff') : C.text,
     borderRadius: 10, padding: '11px 16px', fontSize: 13.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', maxWidth: 320 });
@@ -27498,33 +27589,54 @@ function AbonnementSetting() {
   if (e.proprietaire) return <div style={carte} data-abonnement="proprietaire">{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3, lineHeight: 1.5 }}>Compte propriétaire de VRM : gratuit, aucun abonnement.</div></div>;
   if (!e.configure) return <div style={carte} data-abonnement="non-branche">{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3, lineHeight: 1.5 }}>Le paiement n'est pas encore ouvert : VRM reste gratuit pour l'instant.</div></div>;
   const test = e.modeTest ? <div data-mode-test="" style={{ fontSize: 11.5, color: C.muted, marginTop: 6, lineHeight: 1.5 }}>Paiement en <b style={{ color: C.text }}>mode test</b> : aucune vraie carte n'est débitée (carte d'essai 4242 4242 4242 4242).</div> : null;
+  const cb = fx && fx.carte;
+  const ligneCarte = cb ? (
+    <div data-carte="" style={{ fontSize: 12.5, color: C.muted, marginTop: 4 }}>
+      Carte {cb.marque ? cb.marque.charAt(0).toUpperCase() + cb.marque.slice(1) : ''} •••• {cb.fin}{cb.mois && cb.annee ? ` · expire ${String(cb.mois).padStart(2, '0')}/${String(cb.annee).slice(-2)}` : ''}
+    </div>
+  ) : null;
+  const listeFactures = e.peutGerer ? <FacturesAbonnement fx={fx}/> : null;
   const actifs = ['active', 'trialing'];
   if (actifs.includes(e.statut)) {
-    return (
-      <div style={carte} data-abonnement="actif">
+    const annule = !!e.annuleFinPeriode;
+    return (<>
+      <div style={carte} data-abonnement="actif" data-resilie={annule ? '' : undefined}>
         {titre}
-        <div style={{ fontSize: 12.5, color: C.text, marginTop: 4, lineHeight: 1.5 }}>
-          Abonné · {prixLisible(e.prix)}
-          {e.finPeriode && <span style={{ color: C.muted }}> · {e.annuleFinPeriode ? `résilié — accès jusqu'au ${dateLisible(e.finPeriode)}` : `prochain prélèvement le ${dateLisible(e.finPeriode)}`}</span>}
-        </div>
+        <div style={{ fontSize: 12.5, color: C.text, marginTop: 4, lineHeight: 1.5 }}>Abonné · {prixLisible(e.prix)}</div>
+        {e.finPeriode && (
+          <div style={{ fontSize: 12.5, color: C.muted, marginTop: 2, lineHeight: 1.5 }}>
+            {annule ? `Résilié : VRM reste ouvert jusqu'au ${dateLisible(e.finPeriode)}, aucun autre prélèvement.` : `Prochain prélèvement le ${dateLisible(e.finPeriode)}.`}
+          </div>
+        )}
+        {ligneCarte}
         {test}
-        <button type="button" disabled={!!occupe} onClick={() => agir('portail')} style={bouton(false)}>{occupe ? 'Ouverture…' : 'Gérer ou résilier'}</button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {annule
+            ? <button type="button" disabled={!!occupe} onClick={() => resilierOuReprendre(true)} style={bouton(true)}>{occupe === 'reprendre' ? 'Un instant…' : 'Reprendre mon abonnement'}</button>
+            : <>
+                <button type="button" disabled={!!occupe} onClick={() => agir('portail')} style={bouton(false)}>{occupe === 'portail' ? 'Ouverture…' : 'Changer de carte'}</button>
+                <button type="button" disabled={!!occupe} onClick={() => resilierOuReprendre(false)} style={bouton(false)}>{occupe === 'resilier' ? 'Un instant…' : 'Résilier'}</button>
+              </>}
+        </div>
         {msg && <div style={{ fontSize: 12, color: C.warn, marginTop: 6 }}>{msg}</div>}
       </div>
-    );
+      {listeFactures}
+    </>);
   }
   if (e.statut === 'past_due' || e.statut === 'unpaid') {
-    return (
+    return (<>
       <div style={{ ...carte, border: `1px solid ${C.warn}55` }} data-abonnement="impaye">
         {titre}
         <div style={{ fontSize: 12.5, color: C.text, marginTop: 4, lineHeight: 1.5 }}>Le dernier prélèvement n'est pas passé. Mets à jour ta carte pour garder VRM : au bout de 14 jours sans paiement, l'app se met en pause et les notifications s'arrêtent (tes données restent intactes).</div>
+        {ligneCarte}
         {test}
         <button type="button" disabled={!!occupe} onClick={() => agir('portail')} style={bouton(true)}>{occupe ? 'Ouverture…' : 'Mettre à jour ma carte'}</button>
         {msg && <div style={{ fontSize: 12, color: C.warn, marginTop: 6 }}>{msg}</div>}
       </div>
-    );
+      {listeFactures}
+    </>);
   }
-  return (
+  return (<>
     <div style={carte} data-abonnement="sans">
       {titre}
       <div style={{ fontSize: 12.5, color: C.text, marginTop: 4, lineHeight: 1.5 }}>
@@ -27535,8 +27647,42 @@ function AbonnementSetting() {
       {test}
       <button type="button" disabled={!!occupe} onClick={() => agir('checkout')} style={bouton(true)}>{occupe ? 'Ouverture…' : "S'abonner"}</button>
       <div style={{ fontSize: 11, color: C.muted, marginTop: 6 }}>Paiement sécurisé par Stripe — VRM ne voit jamais ta carte. <a href="/legal/cgv.html" target="_blank" rel="noopener noreferrer" style={{ color: C.muted }}>Conditions de vente</a></div>
-      {e.peutGerer && <button type="button" disabled={!!occupe} onClick={() => agir('portail')} style={{ ...bouton(false), marginLeft: 8 }}>Mes factures</button>}
       {msg && <div style={{ fontSize: 12, color: C.warn, marginTop: 6 }}>{msg}</div>}
+    </div>
+    {/* Un ancien abonné garde l'accès à ses factures passées (sa compta). */}
+    {listeFactures}
+  </>);
+}
+
+// La liste des factures, sous la carte d'abonnement. Une ligne par facture :
+// date · montant · statut · le PDF. Rien d'autre (§7).
+function FacturesAbonnement({ fx }) {
+  const carte = { padding: '13px 16px', borderRadius: 10, border: `1px solid ${C.border}`, background: C.card, marginBottom: 8 };
+  const titre = <div style={{ fontSize: 15, fontWeight: 600, color: C.text }}>Tes factures</div>;
+  if (fx === undefined) return <div style={carte} data-factures="chargement">{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3 }}>Je regarde…</div></div>;
+  if (fx === null) return <div style={carte} data-factures="pas-su">{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3, lineHeight: 1.5 }}>Je n'ai pas pu lire tes factures chez Stripe. Rouvre cet écran dans un instant — elles sont bien gardées.</div></div>;
+  if (!fx.factures.length) return <div style={carte} data-factures="vide">{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3, lineHeight: 1.5 }}>Aucune facture pour l'instant : la première arrive avec ton premier prélèvement.</div></div>;
+  return (
+    <div style={carte} data-factures={String(fx.factures.length)}>
+      {titre}
+      <div style={{ marginTop: 6 }}>
+        {fx.factures.map((f, i) => {
+          const lien = lienFacture(f.pdf) || lienFacture(f.page);
+          const st = STATUT_FACTURE[f.statut] || f.statut;
+          return (
+            <div key={f.id || i} data-facture="" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderTop: i ? `1px solid ${C.border}` : 'none' }}>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: 'block', fontSize: 13, color: C.text, fontWeight: 500 }}>{f.date ? dateLisible(f.date) : '—'}</span>
+                <span style={{ display: 'block', fontSize: 11, color: f.statut === 'open' || f.statut === 'uncollectible' ? C.warn : C.muted, marginTop: 1 }}>{st}{f.numero ? ` · n° ${f.numero}` : ''}</span>
+              </span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: C.text, fontVariantNumeric: 'tabular-nums' }}>{montantLisible(f.montant, f.devise)}</span>
+              {lien
+                ? <a href={lien} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, fontWeight: 600, color: C.accent, textDecoration: 'none', minWidth: 34, textAlign: 'right' }}>{lienFacture(f.pdf) ? 'PDF' : 'Voir'}</a>
+                : <span style={{ minWidth: 34 }}/>}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
