@@ -174,6 +174,14 @@ const texte = (pg) => pg.evaluate(() => document.body.innerText);
         dit(n === 1, 'Colis DIT que les bordereaux email n’ont pas pu être lus (une fois)', `${n} ligne(s)`);
         const recap = await pg.evaluate(() => { const e = document.querySelector('[data-colis-recap]'); return e ? e.innerText : null; });
         dit(recap !== null && !/en attente de bordereau/.test(recap), 'le récapitulatif n’annonce pas « en attente de bordereau » sur une lecture ratée', JSON.stringify(recap).slice(0, 160));
+        // Les colis PARTIS ont leur groupe, replié, en lecture seule — et ils ne
+        // gonflent pas le compte des colis à envoyer.
+        const p = await pg.evaluate(() => { const d = document.querySelector('[data-colis-partis]');
+          return d ? { n: Number(d.getAttribute('data-colis-partis')), ouvert: d.open, etats: [...d.querySelectorAll('[data-parti]')].map((x) => x.getAttribute('data-parti')), boutons: d.querySelectorAll('button').length } : null; });
+        dit(p && p.n === 1 && p.etats.join() === 'En transit', 'Colis montre le colis PARTI (en transit), à part', JSON.stringify(p));
+        dit(p && p.ouvert === false && p.boutons === 0, 'ce groupe est replié et ne porte aucun bouton (rien à faire)', JSON.stringify(p));
+        const aPoster = await pg.evaluate(() => { const e = document.querySelector('[data-colis-recap]'); return e ? Number(e.getAttribute('data-colis-recap')) : null; });
+        dit(aPoster === 1, 'le compte des colis à envoyer ne compte que la vente à poster (pas les partis, pas la finalisée)', String(aPoster));
         const sw = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
         dit(sw.sw <= sw.cw + 1, 'aucun débordement horizontal', `${sw.sw} > ${sw.cw}`);
         dit(errs.length === 0, 'aucune erreur d’app', errs.join(' | ').slice(0, 160));

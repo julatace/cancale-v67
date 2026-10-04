@@ -24968,6 +24968,56 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
           );
         })()}
+        {/* ── PARTIS : CE QUE VINTED SUIT APRÈS TON ENVOI (4 octobre) ───────────
+            Julien : « en transit, colis à faire, vendu… ». Colis ne montrait que
+            ce qu'il reste à POSTER : un colis parti disparaissait de l'écran, et
+            ceux qui attendent au relais ou reviennent n'étaient lisibles que
+            noyés dans Ventes. Lecture seule, rangée sur l'ÉTAT de Vinted (la même
+            étiquette que la liste des ventes, `venteStage`, §11) : aucun bouton,
+            aucune décision automatique. Replié : ce n'est pas du travail. Un
+            retour ou un colis non réclamé passe en tête — c'est le seul qui
+            peut demander un geste (vérifier que la paire revient). */}
+        {curSub==='bordereaux' && Array.isArray(sales.items) && (()=>{
+          const LIMITE_J = 45;
+          const ordre = { 'Retournée': 0, 'Retour en cours': 0, 'Au relais': 1, 'En transit': 2, 'Livrée': 3 };
+          const partis = sales.items
+            .filter(o => o && !hiddenSales.has(String(o.transaction_id)) && !aExpedier(o))
+            .map(o => ({ o, st: venteStage(o), j: o.date ? Math.floor((Date.now() - new Date(o.date).getTime()) / 86400000) : null }))
+            .filter(x => ordre[x.st.label] != null && (x.j == null || x.j <= LIMITE_J))
+            .sort((a, b) => (ordre[a.st.label] - ordre[b.st.label]) || ((b.j ?? 0) - (a.j ?? 0)));
+          if (!partis.length) return null;
+          const nb = (l) => partis.filter(x => x.st.label === l).length;
+          const retours = nb('Retournée') + nb('Retour en cours');
+          const morceaux = [[nb('En transit'), 'en transit'], [nb('Au relais'), 'au relais'], [nb('Livrée'), 'livré' + (nb('Livrée') > 1 ? 's' : '')], [retours, 'retour' + (retours > 1 ? 's' : '') + ' à vérifier']].filter(([n]) => n > 0).map(([n, t]) => `${n} ${t}`);
+          const plusieursComptes = (accounts || []).length > 1;
+          return (
+            <details data-colis-partis={partis.length} style={{marginTop:14,border:`1px solid ${C.border}`,borderRadius:10,background:C.card,padding:'10px 12px'}}>
+              <summary style={{cursor:'pointer',fontSize:13,fontWeight:600,color:C.text,listStyle:'revert'}}>
+                Partis — Vinted suit le colis · {partis.length}
+                <span style={{fontWeight:500,color:C.muted}}> ({morceaux.join(' · ')})</span>
+              </summary>
+              <div style={{fontSize:11.5,color:C.muted,margin:'6px 0 8px',lineHeight:1.45}}>Rien à faire ici : ces colis sont chez le transporteur ou chez l'acheteur. Ils quittent cette liste quand Vinted finalise la vente.{retours > 0 ? ' Un retour se vérifie : la paire doit te revenir.' : ''}</div>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(430px,100%), 1fr))',gap:6}}>
+                {partis.map(({ o, st, j }) => {
+                  const ph = orderPhoto(o);
+                  return (
+                    <div key={String(o.transaction_id)} data-parti={st.label} style={{display:'flex',gap:10,alignItems:'center',padding:'7px 9px',border:`1px solid ${C.border}`,borderRadius:8,minWidth:0}}>
+                      <div style={{width:34,height:34,borderRadius:6,background:C.border,flexShrink:0,overflow:'hidden'}}>{ph && !imgMortes.has(ph) && <img src={ph} alt="" loading="lazy" onError={()=>noterImgMorte(ph)} style={{width:'100%',height:'100%',objectFit:'cover'}}/>}</div>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:12.5,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{o.title || 'Vente'}</div>
+                        <div style={{fontSize:11,color:C.muted,marginTop:2,display:'flex',gap:8,flexWrap:'wrap'}}>
+                          <span title={st.aide||undefined} style={{display:'inline-flex',alignItems:'center',gap:5,color:C.text,fontWeight:600}}><span style={{width:7,height:7,borderRadius:999,background:st.color,display:'inline-block'}}/>{st.label}</span>
+                          {j != null && <span>vendue il y a {j} j</span>}
+                          {plusieursComptes && o._acc && <span>· {accNameOf(o._acc)}</span>}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </details>
+          );
+        })()}
         {/* Historique : les bordereaux déjà partis restent consultables, mais ils
             n'encombrent plus la liste de travail. */}
         {Array.isArray(emailBords) && (()=>{
