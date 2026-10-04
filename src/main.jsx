@@ -1,7 +1,10 @@
 import { cleVapid, abonnementAJour } from './vapid.js';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './App.jsx';
+import Accueil, { Film } from './Accueil.jsx';
+// L'app n'est téléchargée que par ceux qui y entrent : un visiteur qui lit la
+// page d'accueil ne charge pas 340 Ko compressés pour rien (§ montée en charge).
+const App = React.lazy(() => import('./App.jsx'));
 // Polices HÉBERGÉES SUR LE SITE (30 sept.) : charger Google Fonts envoyait
 // l'adresse IP de chaque visiteur à Google (recommandation CNIL, jugement
 // LG München 3 O 17493/20). Mêmes familles, même rendu, plus aucun tiers.
@@ -53,8 +56,44 @@ class DernierFilet extends React.Component {
   }
 }
 
+// ── QUI VOIT QUOI À L'OUVERTURE (3 octobre) ──────────────────────────────────
+// Un visiteur sans session voit la page d'accueil publique ; tout le reste va
+// droit dans l'app — celui qui a une session, le retour d'un lien email ou
+// d'une connexion Google (`?code=`, `#access_token=`, `error=`), un lien vers
+// un onglet (`?tab=`), et `?connexion` / `?inscription` (les boutons de la page
+// d'accueil). Les bancs qui posent `vrm_acces_direct` entrent aussi tout droit.
+const aUneSession = () => { try { return !!localStorage.getItem('vrm_session') || localStorage.getItem('vrm_acces_direct') === '1'; } catch (_) { return false; } };
+const veutLApp = () => {
+  const q = window.location.search || '', h = window.location.hash || '';
+  return /[?&](connexion|inscription|tab|code|error|error_description|type)(=|&|$)/.test(q) || /(access_token|error|type)=/.test(h);
+};
+const versApp = () => aUneSession() || veutLApp();
+const filmDemande = /[?&]film(=|&|$)/.test(window.location.search || '');
+// Une session existe : on lance le téléchargement de l'app TOUT DE SUITE, avant
+// même le premier rendu, pour ne pas ajouter un aller-retour à son ouverture.
+if (!filmDemande && versApp()) { try { import('./App.jsx'); } catch (_) {} }
+
+const FondApp = () => <div style={{ minHeight: '100vh', background: '#07090D' }} />;
+function Racine() {
+  const [vue, setVue] = React.useState(() => (versApp() ? 'app' : 'accueil'));
+  React.useEffect(() => {
+    const f = () => setVue(versApp() ? 'app' : 'accueil');
+    window.addEventListener('popstate', f);
+    return () => window.removeEventListener('popstate', f);
+  }, []);
+  if (filmDemande) return <Film />;
+  if (vue === 'accueil') {
+    return <Accueil onEntrer={(mode) => {
+      try { window.history.pushState({}, '', mode === 'up' ? '/?inscription' : '/?connexion'); } catch (_) {}
+      window.scrollTo(0, 0);
+      setVue('app');
+    }} />;
+  }
+  return <React.Suspense fallback={<FondApp />}><App /></React.Suspense>;
+}
+
 ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode><DernierFilet><App /></DernierFilet></React.StrictMode>
+  <React.StrictMode><DernierFilet><Racine /></DernierFilet></React.StrictMode>
 );
 
 // PWA : enregistre le service worker (app installable + consultable hors-ligne).

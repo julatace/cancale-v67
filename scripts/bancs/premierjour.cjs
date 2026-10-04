@@ -136,7 +136,7 @@ async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lectureP
 
   const erreurs = [];
   pg.on('pageerror', (e) => erreurs.push(String(e).slice(0, 140)));
-  await pg.goto(`http://localhost:${PORT}/${sansSession ? '' : '?tab=' + tab}`, { waitUntil: 'domcontentloaded' });
+  await pg.goto(`http://localhost:${PORT}/${sansSession ? '?connexion' : '?tab=' + tab}`, { waitUntil: 'domcontentloaded' });
   await pg.waitForTimeout(5000);
 
   const txt = await pg.evaluate(() => document.body.innerText);

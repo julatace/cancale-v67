@@ -6235,7 +6235,11 @@ function AuthScreen() {
   }, []);
   const [codeAcces, setCodeAcces] = React.useState('');
   const [codeErr, setCodeErr] = React.useState('');
-  const [mode, setMode] = React.useState(() => (AUTH_REDIRECT && AUTH_REDIRECT.recovery) ? 'newpw' : 'in'); // in · up · reset · newpw
+  // `?inscription` = le bouton « Créer mon compte » de la page d'accueil : on
+  // ouvre directement le bon formulaire (un clic de plus pour s'inscrire, c'est
+  // des inscriptions en moins).
+  const [mode, setMode] = React.useState(() => (AUTH_REDIRECT && AUTH_REDIRECT.recovery) ? 'newpw'
+    : (/[?&]inscription(=|&|$)/.test(window.location.search || '') ? 'up' : 'in')); // in · up · reset · newpw
   const [email, setEmail] = React.useState('');
   // Le prénom demandé à l'inscription : il sert au bonjour de l'accueil, rien
   // d'autre. Rangé dans le même réglage synchronisé que le champ de Réglages
@@ -6298,6 +6302,9 @@ function AuthScreen() {
   return (
     <div style={{minHeight:'100vh',background:C.bg,display:'flex',alignItems:'center',justifyContent:'center',padding:'24px 20px'}}>
       <div style={{width:'100%',maxWidth:380}}>
+        {/* Retour vers la page d'accueil publique (main.jsx l'affiche à qui n'a
+            pas de session) : sans lui, l'écran de connexion est un cul-de-sac. */}
+        <a href="/" data-retour-accueil="" style={{display:'inline-block',fontSize:13,color:C.muted,textDecoration:'none',marginBottom:14}}>← Découvrir VRM</a>
         <div style={{textAlign:'center',marginBottom:26}}>
           <VrmLogo size={76} style={{filter:'drop-shadow(0 8px 22px rgba(10,10,12,.22))'}}/>
         </div>
@@ -16783,7 +16790,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (nextNumero est déclaré plus bas, après saleOv dont il dépend.)
   const garageNums = useMemo(()=>{ const s=new Set(); Object.values(garageGrid||{}).forEach(a=>{ if(Array.isArray(a)) a.forEach(v=>{const t=(v||'').trim().toLowerCase(); if(t)s.add(t);}); }); return s; }, [garageGrid]);
   const inGarage = (n)=> !!n && garageNums.has(String(n).trim().toLowerCase());
-  const linkedBuyIds = useMemo(()=>{ const s=new Set(); Object.values(numeros).forEach(e=>{ if(e&&e.buyFromId) s.add(String(e.buyFromId)); }); Object.values(saleOv).forEach(e=>{ if(e&&e.buyFromId) s.add(String(e.buyFromId)); }); return s; }, [numeros, saleOv]);
   const openPicker = async (item) => {
     // ⚠️ LA MODALE S'OUVRE TOUT DE SUITE. Avant, elle attendait le chargement de
     // TOUS les achats de TOUS les comptes — 11 s mesurées, à chaque clic. On
@@ -17562,6 +17568,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // prix d'achat / un N° / un boost DIRECTEMENT sur une vente — même une paire
   // jamais numérotée (orpheline). L'override PRIME sur l'entrée reliée.
   const [saleOv, setSaleOv] = useState(() => load('vinted_sale_overrides', {}));
+  // ⚠️ §4.6 : ce useMemo lit `saleOv` — il vit APRÈS sa déclaration. Posé plus
+  //    haut (#407), il tuait Ma journée, Ventes, Annonces et Achats sur
+  //    « Cannot access 'saleOv' before initialization » ; aucun build ne le voit.
+  const linkedBuyIds = useMemo(()=>{ const s=new Set(); Object.values(numeros).forEach(e=>{ if(e&&e.buyFromId) s.add(String(e.buyFromId)); }); Object.values(saleOv).forEach(e=>{ if(e&&e.buyFromId) s.add(String(e.buyFromId)); }); return s; }, [numeros, saleOv]);
   const setSaleOverride = (tid, patch) => {
     const k = String(tid);
     setSaleOv(prev => {
