@@ -19195,6 +19195,24 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     setTxnLink(n => vide(n) ? load('vinted_txn_link', {}) : n);
     setCollectedAt(n => vide(n) ? load('vrm_colis_collected_at', {}) : n);
     setCollected(c => (c && c.size) ? c : loadCollected());
+    // §5.49 — mêmes cartes PARTAGÉES lues au montage (appareil neuf : vides tant
+    // que le nuage n'est pas arrivé) qu'`apply()` ne gère PAS. Sans ça, sur un
+    // appareil neuf, un clic avant l'arrivée du nuage réécrit la carte réduite à
+    // une entrée (famille destructrice §5, comme les numéros). `vide` : on ne
+    // remplit QUE ce qui est resté par défaut — jamais une saisie faite pendant
+    // le chargement. Ce sont des corrections de compta (sale_overrides), notes,
+    // états de bordereau/retour, achats hors-Vinted : les plus coûteux à perdre.
+    setBordsPrinted(n => vide(n) ? load('vinted_bords_printed', {}) : n);
+    setBordLinks(n => vide(n) ? load('vinted_bord_links', {}) : n);
+    setBordsHidden(n => vide(n) ? load('vinted_bords_hidden', {}) : n);
+    setBordsShipped(n => vide(n) ? load('vinted_bords_shipped', {}) : n);
+    setBordFormats(n => vide(n) ? load('vinted_bordereau_formats', {}) : n);
+    setSaleOv(n => vide(n) ? load('vinted_sale_overrides', {}) : n);
+    setPairsLost(n => vide(n) ? load('vinted_pairs_lost', {}) : n);
+    setRetoursRecus(n => vide(n) ? load('vinted_retours_recus', {}) : n);
+    setRetoursDismissed(n => vide(n) ? load('vinted_retours_dismissed', {}) : n);
+    setAchatNotes(n => vide(n) ? load('vinted_achat_notes', {}) : n);
+    setOffBuys(n => vide(n) ? load('vinted_offvinted_buys', []) : n);
   }), []);
   // Un colis est à retirer → on charge les achats (harvest, gratuit) pour
   // retrouver la photo de l'article correspondant.

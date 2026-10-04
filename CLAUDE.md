@@ -4312,6 +4312,40 @@ vérifiés. Extension **5.147.0**, zip régénéré, `EXT_ATTENDUE` suivie.
   perte de données accumulées. Ne pas « durcir » au risque de bloquer une
   écriture légitime.
 
+### ⚠️⚠️ ONZE CARTES PARTAGÉES RESTAIENT FROIDES AU PREMIER RENDU D'UN APPAREIL NEUF (4 octobre)
+Suite de la passe fiabilité, famille §5.49. **Mesuré dans le code** : le démarrage
+(`useEffect` au montage d'`AppCoeur`) fait `cloudLoad`, restaure `localStorage`,
+appelle `apply()` sur **une liste précise** d'états racine, puis `markCloudReady`.
+Donc une clé **synchronisée** lue au montage (`useState(() => load(k))`) qui n'est
+**ni** dans `apply()` **ni** re-lue par un `onCloudReady` reste à sa valeur par
+défaut **jusqu'à ce qu'on quitte et revienne sur l'écran** — l'`AppCoeur` monte
+AVANT que le nuage soit là (appareil neuf, cache vidé, PWA réinstallée).
+⚠️⚠️ **Et ce n'est pas cosmétique** : ces cartes sont éditées au clic/à la saisie,
+et leur setter réécrit `localStorage` depuis l'état courant. Un clic pendant la
+fenêtre froide part donc d'une carte **vide** et **réécrit le nuage réduit à une
+entrée** — la famille destructrice §5 (comme les numéros repartis de 1 au
+montage). Croisé `SYNC_KEYS` × lectures-au-montage × couverture : **11 cartes
+partagées** manquaient, dont `vinted_sale_overrides` (tes corrections de compta,
+achats reliés), `vinted_achat_notes` (texte saisi), les états de bordereau
+(`bords_printed/hidden/shipped`, `bord_links`, `bordereau_formats`), les retours
+(`retours_recus/dismissed`), `pairs_lost`, `offvinted_buys`.
+⇒ Ajoutées au bloc `onCloudReady` **déjà existant** (celui des numéros/points
+relais, L19189), au **motif déjà béni** `setX(n => vide(n) ? load(k) : n)` : sûr
+par construction — il ne remplit QUE ce qui est resté par défaut, **jamais une
+saisie faite pendant le chargement** (sinon ce serait le pire défaut de l'app).
+Build + 57 audits verts (`audit-tdz` compris : un callback d'`onCloudReady`
+s'exécute après le montage, pas au rendu — pas de TDZ bien que `setOffBuys` soit
+déclaré plus bas).
+- ⚠️ **Non render-vérifié ici** (pas de fixtures dans ce conteneur) : le motif est
+  identique à celui que `comptes.cjs` a validé pour les comptes exclus, et le
+  `vide`-guard le rend non destructeur ; à re-regarder au rendu sur un appareil
+  neuf dès qu'un banc a des fixtures.
+- ⚠️ **Laissé pour une passe à portée de rendu** (setters dans d'AUTRES scopes de
+  composant, que je ne place pas à l'aveugle) : `vinted_regime` (base du taux
+  URSSAF — le plus visible), `vinted_urssaf_freq`, `vinted_account_emails/phones`,
+  `vinted_inventory`, `vinted_entreprise_active`. Même motif à appliquer, dans
+  LEUR composant, render-vérifié.
+
 ### Logo iPhone : icônes PWA régénérées (3 octobre)
 `apple-touch-icon.png` + `icon-192/512/maskable` portaient encore l'ancien logo
 orange ; régénérées depuis `logo-vrm.png` (VRM Noir), maskable avec marge sur
