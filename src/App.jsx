@@ -27173,6 +27173,7 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
           </div>
         )}
 
+        {AUTH.user && <AbonnementSetting/>}
         <PrenomSetting/>
         <NumerosSetting/>
 
@@ -27399,6 +27400,156 @@ const applyZoom = (z) => {
 // Réglage SYNCHRONISÉ (il suit la personne d'un appareil à l'autre) ; vide par
 // défaut, et alors l'accueil dit « Bonjour » tout court. On ne le déduit PAS de
 // l'email : un prénom inventé est un faux, et un blanc vaut mieux (§5).
+// ══════════════════════════════════════════════════════════════════════════
+// L'ABONNEMENT (4 octobre) — 9,99 €/mois, pour tout le monde sauf le propriétaire
+// ══════════════════════════════════════════════════════════════════════════
+// Le serveur décide (api/compte.js) : qui est propriétaire (VRM_OWNER_UID), si
+// Stripe est branché, si l'abonnement est obligatoire, et le statut — lu dans
+// une table que le vendeur ne peut pas écrire. L'app ne fait que l'afficher.
+// Le retour de Stripe (`?abonnement=merci|annule`) est capté AU CHARGEMENT :
+// la navigation par `?tab=` efface ensuite l'adresse.
+const RETOUR_ABONNEMENT = (() => { try { return new URLSearchParams(window.location.search).get('abonnement') || ''; } catch (_) { return ''; } })();
+const enTeteSession = () => (AUTH.session && AUTH.session.access_token ? { Authorization: `Bearer ${AUTH.session.access_token}` } : {});
+// Trois états : `undefined` en cours · `null` pas su · l'objet du serveur.
+async function lireAbonnement() {
+  try {
+    const r = await fetch('/api/compte?mode=abonnement', { headers: enTeteSession(), cache: 'no-store' });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return j && j.ok ? j : null;
+  } catch (_) { return null; }
+}
+// Ouvre Stripe (paiement ou gestion). Rend un message à afficher si ça échoue.
+async function ouvrirStripe(mode) {
+  try {
+    const r = await fetch(`/api/compte?mode=${mode}`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: '{}' });
+    const j = await r.json().catch(() => ({}));
+    if (r.ok && j && typeof j.url === 'string' && /^https:\/\/(checkout|billing)\.stripe\.com\//.test(j.url)) { window.location.assign(j.url); return ''; }
+    return (j && j.message) || "Stripe n'a pas répondu. Réessaie dans un instant.";
+  } catch (_) { return "Pas de connexion. Réessaie dans un instant."; }
+}
+const prixLisible = (p) => p ? `${Number(p.montant).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € / ${p.intervalle === 'year' ? 'an' : 'mois'}` : '9,99 € / mois';
+const dateLisible = (iso) => { try { return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }); } catch (_) { return ''; } };
+
+function AbonnementSetting() {
+  const [e, setE] = React.useState(undefined);
+  const [occupe, setOccupe] = React.useState('');
+  const [msg, setMsg] = React.useState('');
+  React.useEffect(() => {
+    let mort = false;
+    (async () => {
+      let x = await lireAbonnement();
+      // De retour de Stripe : le webhook peut avoir quelques secondes de retard.
+      for (let i = 0; RETOUR_ABONNEMENT === 'merci' && x && !x.actif && i < 8 && !mort; i++) {
+        await new Promise((r) => setTimeout(r, 2000));
+        x = await lireAbonnement();
+      }
+      if (!mort) setE(x);
+    })();
+    return () => { mort = true; };
+  }, []);
+  const agir = async (mode) => { setOccupe(mode); setMsg(''); const m = await ouvrirStripe(mode); if (m) { setMsg(m); setOccupe(''); } };
+  const carte = { padding: '15px 16px', borderRadius: 10, border: `1px solid ${C.border}`, background: C.card, marginBottom: 8 };
+  const bouton = (plein) => ({ marginTop: 10, border: plein ? 'none' : `1px solid ${C.border}`, background: plein ? C.accent : 'transparent', color: plein ? (C.onAccent || '#fff') : C.text,
+    borderRadius: 10, padding: '11px 16px', fontSize: 13.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', maxWidth: 320 });
+  const titre = <div style={{ fontSize: 15, fontWeight: 600, color: C.text }}>Ton abonnement</div>;
+  if (e === undefined) return <div style={carte} data-abonnement="chargement">{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3 }}>Je regarde…</div></div>;
+  if (e === null) return <div style={carte} data-abonnement="pas-su">{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3, lineHeight: 1.5 }}>Je n'ai pas pu lire ton abonnement. Rouvre cet écran dans un instant — rien n'a changé de ton côté.</div></div>;
+  if (e.proprietaire) return <div style={carte} data-abonnement="proprietaire">{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3, lineHeight: 1.5 }}>Compte propriétaire de VRM : gratuit, aucun abonnement.</div></div>;
+  if (!e.configure) return <div style={carte} data-abonnement="non-branche">{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3, lineHeight: 1.5 }}>Le paiement n'est pas encore ouvert : VRM reste gratuit pour l'instant.</div></div>;
+  const test = e.modeTest ? <div data-mode-test="" style={{ fontSize: 11.5, color: C.muted, marginTop: 6, lineHeight: 1.5 }}>Paiement en <b style={{ color: C.text }}>mode test</b> : aucune vraie carte n'est débitée (carte d'essai 4242 4242 4242 4242).</div> : null;
+  const actifs = ['active', 'trialing'];
+  if (actifs.includes(e.statut)) {
+    return (
+      <div style={carte} data-abonnement="actif">
+        {titre}
+        <div style={{ fontSize: 12.5, color: C.text, marginTop: 4, lineHeight: 1.5 }}>
+          Abonné · {prixLisible(e.prix)}
+          {e.finPeriode && <span style={{ color: C.muted }}> · {e.annuleFinPeriode ? `résilié — accès jusqu'au ${dateLisible(e.finPeriode)}` : `prochain prélèvement le ${dateLisible(e.finPeriode)}`}</span>}
+        </div>
+        {test}
+        <button type="button" disabled={!!occupe} onClick={() => agir('portail')} style={bouton(false)}>{occupe ? 'Ouverture…' : 'Gérer ou résilier'}</button>
+        {msg && <div style={{ fontSize: 12, color: C.warn, marginTop: 6 }}>{msg}</div>}
+      </div>
+    );
+  }
+  if (e.statut === 'past_due' || e.statut === 'unpaid') {
+    return (
+      <div style={{ ...carte, border: `1px solid ${C.warn}55` }} data-abonnement="impaye">
+        {titre}
+        <div style={{ fontSize: 12.5, color: C.text, marginTop: 4, lineHeight: 1.5 }}>Le dernier prélèvement n'est pas passé. Mets à jour ta carte pour garder VRM.</div>
+        {test}
+        <button type="button" disabled={!!occupe} onClick={() => agir('portail')} style={bouton(true)}>{occupe ? 'Ouverture…' : 'Mettre à jour ma carte'}</button>
+        {msg && <div style={{ fontSize: 12, color: C.warn, marginTop: 6 }}>{msg}</div>}
+      </div>
+    );
+  }
+  return (
+    <div style={carte} data-abonnement="sans">
+      {titre}
+      <div style={{ fontSize: 12.5, color: C.text, marginTop: 4, lineHeight: 1.5 }}>
+        {prixLisible(e.prix)}, sans engagement : prélevé chaque mois à la date où tu t'abonnes, résiliable à tout moment.
+        {!e.obligatoire && <span style={{ color: C.muted }}> Pour l'instant VRM reste gratuit pour toi.</span>}
+      </div>
+      {RETOUR_ABONNEMENT === 'merci' && <div style={{ fontSize: 12, color: C.muted, marginTop: 6 }}>Paiement reçu par Stripe — ton abonnement apparaîtra ici dans quelques secondes. Rouvre l'écran si besoin.</div>}
+      {test}
+      <button type="button" disabled={!!occupe} onClick={() => agir('checkout')} style={bouton(true)}>{occupe ? 'Ouverture…' : "S'abonner"}</button>
+      <div style={{ fontSize: 11, color: C.muted, marginTop: 6 }}>Paiement sécurisé par Stripe — VRM ne voit jamais ta carte. <a href="/legal/cgv.html" target="_blank" rel="noopener noreferrer" style={{ color: C.muted }}>Conditions de vente</a></div>
+      {e.peutGerer && <button type="button" disabled={!!occupe} onClick={() => agir('portail')} style={{ ...bouton(false), marginLeft: 8 }}>Mes factures</button>}
+      {msg && <div style={{ fontSize: 12, color: C.warn, marginTop: 6 }}>{msg}</div>}
+    </div>
+  );
+}
+
+// La porte de l'abonnement : quand le propriétaire l'a rendu OBLIGATOIRE, un
+// vendeur sans abonnement actif voit cet écran au lieu de l'app.
+// ⚠️ « Pas su » ne ferme PAS la porte : bloquer un abonné parce que le serveur
+//    a hoqueté coûte plus cher que laisser passer quelqu'un une minute. Et la
+//    dernière réponse connue est gardée sur l'appareil pour décider tout de
+//    suite à l'ouverture suivante (sans éclair d'app).
+const cleAbo = (uid) => `vrm_abo_porte_${uid}`;
+function PorteAbonnement({ uid, children }) {
+  const [bloque, setBloque] = React.useState(() => { try { return localStorage.getItem(cleAbo(uid)) === 'bloque'; } catch (_) { return false; } });
+  const [info, setInfo] = React.useState(null);
+  React.useEffect(() => {
+    let mort = false;
+    lireAbonnement().then((x) => {
+      if (mort || !x) return;           // pas su : on garde la décision d'avant
+      const b = !!(x.obligatoire && !x.actif);
+      setBloque(b); setInfo(x);
+      try { b ? localStorage.setItem(cleAbo(uid), 'bloque') : localStorage.removeItem(cleAbo(uid)); } catch (_) {}
+    });
+    return () => { mort = true; };
+  }, [uid]);
+  if (!bloque) return children;
+  return <AbonnementRequis info={info}/>;
+}
+function AbonnementRequis({ info }) {
+  const [occupe, setOccupe] = React.useState(false);
+  const [msg, setMsg] = React.useState('');
+  const agir = async () => { setOccupe(true); setMsg(''); const m = await ouvrirStripe('checkout'); if (m) { setMsg(m); setOccupe(false); } };
+  return (
+    <div data-abonnement-requis="" style={{ minHeight: '100vh', background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div style={{ width: '100%', maxWidth: 420, background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: '26px 22px', boxShadow: C.shadowLg || 'none' }}>
+        <img src="/logo-vrm-96.png" alt="VRM" width="44" height="44" style={{ borderRadius: 10, display: 'block' }}/>
+        <div style={{ fontSize: 22, fontWeight: 700, color: C.text, marginTop: 16, letterSpacing: -0.4 }}>Ton abonnement VRM</div>
+        <div style={{ fontSize: 14, color: C.muted, marginTop: 8, lineHeight: 1.55 }}>
+          {prixLisible(info && info.prix)}, sans engagement, résiliable à tout moment. Tes données sont intactes : elles t'attendent dès que l'abonnement est actif.
+        </div>
+        {info && info.modeTest && <div style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>Mode test : aucune vraie carte n'est débitée.</div>}
+        <button type="button" disabled={occupe} onClick={agir} style={{ marginTop: 18, width: '100%', border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '13px 16px', fontSize: 15, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+          {occupe ? 'Ouverture du paiement…' : "S'abonner"}
+        </button>
+        {msg && <div style={{ fontSize: 12.5, color: C.warn, marginTop: 8 }}>{msg}</div>}
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 14, fontSize: 12.5 }}>
+          <a href="/legal/cgv.html" target="_blank" rel="noopener noreferrer" style={{ color: C.muted }}>Conditions de vente</a>
+          <button type="button" onClick={() => { authSignOut(); }} style={{ border: 'none', background: 'transparent', color: C.muted, cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5, padding: 0, minHeight: 0 }}>Se déconnecter</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PrenomSetting() {
   const [v, setV] = React.useState(() => String(load('vrm_prenom', '') || ''));
   const touche = React.useRef(false);
@@ -28790,7 +28941,8 @@ export default function App() {
   if (MULTI_USER && !authState.ready) return <div style={{minHeight:'100vh',background:C.bg}}/>;
   const bypass = !CLOISONNE && (() => { try { return localStorage.getItem('vrm_acces_direct') === '1'; } catch (_) { return false; } })();
   if (MULTI_USER && !bypass && (!authState.session || RECOVERY_PENDING)) return <AuthScreen/>;
-  return <AppCoeur key={(authState.user && authState.user.id) || 'local'}/>;
+  const coeur = <AppCoeur key={(authState.user && authState.user.id) || 'local'}/>;
+  return (MULTI_USER && authState.user) ? <PorteAbonnement uid={authState.user.id}>{coeur}</PorteAbonnement> : coeur;
 }
 
 function AppCoeur() {
