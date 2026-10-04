@@ -4069,6 +4069,149 @@ champ interne l'est. `nomFamille` mappe `transaction`→ventes, `conversation`�
 messages pour l'alerte « Format d'un site ». **6 rouges de plus sur le code
 d'avant.** Extension **5.142.0**, zip régénéré, `EXT_ATTENDUE` suivie.
 
+**Suite (5.143) — le détail d'annonce (`item`).** Même sentinelle objet, sur le
+champ qui porte **toutes les photos** : le coffre ET la capture photo passive
+(Leboncoin/eBay) lisent `(p.item||p).photos`. Un renommage de `photos` par Vinted
+ferait tomber à zéro toute la publication photo en silence — le point le plus
+retravaillé du projet (5.87, 5.91, 5.94, 5.95). Gardé par présence de clé
+(`photos:[]` ne déclenche pas, seul un renommage le fait), objet substantiel.
+`nomFamille` mappe `item`→annonces. **2 rouges de plus sur le code d'avant.**
+Extension **5.143.0**, zip régénéré, `EXT_ATTENDUE` suivie.
+
+### ⚠️ « CAPTE TOUTES MES PHOTOS » — TROIS VOIES, ZÉRO RAFALE (3 octobre, 5.144)
+Julien : « tu peux pas tout capter d'un coup ? imagine 100 annonces ». **Non — un
+envoi de 100 requêtes à Vinted en quelques secondes = signature de robot =
+blocage** (`vanessa5723`, §3). On refuse « tout d'un coup » définitivement. Les
+trois voies SÛRES, mesurées dans le code :
+1. **À l'affichage (gratuit, illimité, déjà là)** — `vinted-capture.js` lit photos
+   + description **de la page qu'il ouvre lui-même** : **zéro requête** à Vinted
+   (c'est lui qui l'a chargée). `onPage()` tourne à la 1re page ET à chaque
+   navigation, re-essais lazy. C'est le vrai levier de vitesse : parcourir ses
+   annonces les capte en entier, instantanément. Rien à coder.
+2. **Au clic « Publier » (1 lecture, sur son clic)** — `completerPhotosSiManque`
+   dans `publierDepuisApp`, AVANT de construire l'ad : si la paire n'a aucune
+   photo captée, on va la chercher tout de suite (`completerPhotos` → page de
+   l'annonce, sous garde de LECTURE, dans la file Vinted). Il ne publie plus sans
+   photos, sans attendre le fond. §4.10 : exécuté au banc (capte si manque, ne
+   relit pas si déjà là).
+3. ⚠️⚠️ **La capture de fond AFFAMAIT les vraies actions.** `capterPhotosAnnonces`
+   passait par `garde` → **budget d'ACTIONS** (20/h, partagé avec accepter une
+   offre, générer un bordereau). `tickPhotos` tourne chaque minute, 20/tour : elle
+   **vidait le budget**, et les offres/bordereaux tombaient en « 20 actions dans
+   l'heure ». Or lire la page de SES annonces est une **LECTURE** (§messagerie
+   5.135 : « une lecture ne consomme pas le plafond d'actions »). ⇒ `gardeLecture`
+   + `compterLecture` : un **budget de lecture séparé** (20/h aussi). Ça
+   n'ACCÉLÈRE pas (monter le chiffre = deviner le seuil de Vinted, refusé §3) —
+   ça **empêche la capture d'affamer les actions**.
+- `audit-photos-passif.cjs` : **21 contrôles**. §6.1 prouvé — budget d'actions
+  PLEIN : code d'avant **0 lecture** (2 rouges), après **lit quand même** et le
+  budget d'actions reste intact. Extension **5.144.0**, zip régénéré,
+  `EXT_ATTENDUE` suivie. Aucune entrée d'`EXT_CAPACITES` (pacing interne +
+  lecture à la demande ; l'app ne promet rien de neuf gaté sur une version).
+
+### ⚠️⚠️ « LE CODE DE RETRAIT EST DANS LA CONVERSATION — TU N'AS AUCUNE EXCUSE » (3 octobre, 5.145)
+Julien, capture à l'appui : « rends-toi au point relais Phone Cash » (Mondial
+Relay) montre le lieu ET le transporteur ; pour les Adidas Vinted Go et la paire
+de Nike, « le code de retrait + le QR sont DIRECTEMENT dans la conversation
+Vinted », avec un lien « scanne ton code de retrait ». L'app n'en montrait rien.
+- **Mesuré dans le code** (le défaut, pas une opinion) : l'affichage était DÉJÀ
+  complet — `relaisDe(o)` rend `{lieu, code, qr}` de `panel_colis_relais` et la
+  carte montre déjà lieu, code, lien QR, compte. Le trou était **deux gardes trop
+  étroites** côté extension, prouvé en exécutant le vrai parseur dans un `vm` :
+  1. **`AT_RELAY`** (quelle commande fait ouvrir sa conversation) ne connaissait
+     que « déposé en point relais / bureau de poste » → **Vinted Go (casier),
+     « prêt à être retiré », « disponible »** étaient INVISIBLES, conversation
+     jamais ouverte, code jamais capté. Élargi (casier/consigne/locker/Vinted Go,
+     prêt-à-retirer, disponible+lieu), en EXCLUANT livré-domicile/finalisé/annulé/
+     remboursé/retour. Lire une conversation de trop est une **lecture bornée sans
+     risque** ; en manquer une fait **perdre un colis** — l'asymétrie penche vers
+     l'élargissement. **Expression IDENTIQUE à `isAtRelayStatus` (app), §11** :
+     `audit-coherence` les compare (0 désaccord), et elles doivent rester
+     **mono-ligne** (le regex d'extraction n'avale pas les sauts de ligne).
+  2. **`CONV_ARRIVE`** (quel message est une arrivée) n'acceptait que « ton colis
+     est arrivé » / « t'attend à l'adresse » → « **rends-toi au point relais …** »
+     et « **récupère-le au casier … scanne ton code de retrait** » étaient
+     MANQUÉS. Élargi, avec `CONV_SORTANT` qui écarte EN PREMIER un colis qui PART
+     (« dépose ton colis dans n'importe quel point relais » = ENVOI). Lieu étendu
+     à « rends-toi au … » / « récupère-le au … », consigne « pour récupérer … »
+     coupée. **On ne prend PAS « est disponible » seul** (un bordereau disponible
+     n'est pas un retrait) : la garde reste l'extraction d'un code/lieu/qr, et le
+     code garde `CODE_APRES` (« suivant » reste écarté).
+- `audit-retrait-conv.cjs` : 3 cas de plus, **rouges sur le code d'avant**
+  (rends-toi Phone Cash, Vinted Go casier, AT_RELAY élargi), verts après ; les
+  gardes (envoi, côté vendeur, livré-domicile, « suivant ») tiennent, et le
+  **§11 app==ext** est vérifié sur les mêmes statuts.
+- **Aucune entrée d'`EXT_CAPACITES`** : l'affichage existait déjà, c'est la
+  capture qu'on débloque — l'app ne promet rien de neuf. Extension **5.145.0**,
+  zip régénéré, `EXT_ATTENDUE` suivie.
+- ⚠️ **Non render-vérifié ici** (pas de fixtures dans ce conteneur) : le
+  changement de `isAtRelayStatus` touche plusieurs écrans (Ma journée, Achats,
+  tableau de bord). Il n'AJOUTE que des statuts clairement « à retirer » et
+  n'en retire aucun ; le risque (un colis montré en trop) est bénin face au
+  défaut corrigé (un colis jamais montré). À re-regarder au rendu dès qu'un banc
+  a des fixtures.
+
+### ⚠️ L'EMAIL VINTED GO ÉTAIT TAGUÉ « autre », PAS « Vinted Go » (4 octobre)
+Julien a envoyé le vrai email Vinted Go (capture). Mesuré en exécutant
+`parseCarrierEmail` + `detecterTransporteur` dessus : le **code (C49341), le suivi
+(VGS…), le lieu (Consigne Vinted Go, Speed Queen - Vannes) et la date limite
+(29/09)** s'extraient bien — mais `detecterTransporteur` rend **`autre`**, pas
+`vinted`. Cause : l'email vient d'un `noreply@vinted.com` **nu** (ni `vintedgo.com`
+ni `shipping@relay`) ; le narrowing `carrierSrc = mail.from` (posé pour ne pas
+classer une VENTE Vinted par son corps) cache « Vinted Go », et l'email retombait
+dans le filet `fromVinted` qui écrit `autre`. Conséquence : ligne
+`email_track_autre_VGS…`, badge « Transporteur » au lieu de « Vinted Go », et pas
+le mode de retrait Vinted Go dans l'app.
+⇒ Dans ce filet (déjà gardé par un **sujet de colis**, `colis && !pasColis`), on
+nomme `vinted` quand le sujet/corps dit « Vinted Go » **ou** porte un suivi `VGS…`.
+Ça ne crée **aucune ligne** (on y était déjà) — ça corrige seulement le
+transporteur, §11 (même carrier des deux côtés, sinon l'app n'affiche pas le bon
+point de retrait). ⚠️ Ça n'ouvre pas la porte aux ventes : le filet exige un
+sujet de colis, et « vente/offre/message/favori/bordereau » restent « pas un
+colis » (vérifié au banc).
+- `audit-transporteurs.cjs` : 2 cas du **vrai** email (`@vinted.com` nu + « Vinted
+  Go » / suivi VGS) → **rouges sur le code d'avant** (`obtenu autre`), verts après ;
+  `serveur.cjs` (la route exécutée) reste vert.
+- Correction **serveur uniquement** (`api/email-inbound.js`) : pas de changement
+  d'extension ni d'app, donc **pas de bump de version ni de zip**. §5 (note stale
+  « Vinted Go : aucun email ») est désormais périmée — un vrai email existe et est
+  capté. C'est le pendant **email** du fix conversation (5.145) : les deux voies
+  surfacent maintenant C49341 + lieu + suivi.
+
+### Logo iPhone : icônes PWA régénérées (3 octobre)
+`apple-touch-icon.png` + `icon-192/512/maskable` portaient encore l'ancien logo
+orange ; régénérées depuis `logo-vrm.png` (VRM Noir), maskable avec marge sur
+fond `#07090D`. iOS cache l'icône d'accueil : retirer le raccourci et le rajouter.
+
+### Relier un achat DEPUIS la vente (3 octobre)
+Julien : « dans les ventes finalisées / en cours, relier les achats avec les
+ventes — un gain de temps de ouf ; même si l'app ne trouve pas, elle fait une
+sélection et je tranche. »
+- **Mesuré dans le code** : tout existait déjà — le picker `openPicker`/
+  `choosePick` (écran Annonces), le classement par `scoreAchat` (même marque/
+  taille en tête), `AchatRelie` (photo + reçu), et la carte de vente AFFICHAIT
+  déjà l'achat relié (`<AchatRelie entry={e}/>`). **Le seul trou : aucun moyen de
+  CRÉER le lien depuis la vente** — on ne pouvait le faire que depuis Annonces.
+- Ajouté sur chaque carte de vente (sauf annulée) : **« Relier l'achat »** quand
+  aucun coût n'est connu, **« changer »** quand un achat est déjà relié. Le clic
+  ouvre le MÊME picker (§11), trié par pertinence — « la sélection » qu'il
+  demande ; c'est toujours SON clic qui relie, **jamais un rapprochement
+  automatique par titre** (§5, garanti par `audit-identite`).
+- **Deux chemins, une seule info** : une vente AVEC identité d'annonce
+  (`identiteAnnonce` → item_id) relie la **paire** (`numeros[id]`, partagé avec la
+  compta et l'écran Annonces) ; une vente SANS identité relie la **vente**
+  elle-même (override `saleOv[tx]`, `_saleTx`). `choosePick` branche sur `_saleTx`,
+  `effEntry` fait ressortir `buyFromId`/`buyFrom` de l'override, `linkedBuyIds`
+  inclut les deux (un achat déjà relié ne se repropose pas). `withBuyByNum` ne
+  remplit que si vide → l'override n'est jamais écrasé.
+- Le coût rempli alimente la marge, le bénéfice et la compta par les voies
+  existantes (`buyOf`/`benef`), sans second calcul.
+- ⚠️ **Non render-vérifié ici** (pas de fixtures dans ce conteneur) : build +
+  `audit-identite/chiffres/variables/icones/coherence` verts, la logique réutilise
+  le flux déjà éprouvé de l'écran Annonces, mais le rendu de la carte de vente est
+  à regarder au banc dès qu'il y a des fixtures. C'est de la plomberie + UI, pas
+  une nouvelle règle de rapprochement.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par

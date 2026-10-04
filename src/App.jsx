@@ -36,7 +36,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.142.0';
+const EXT_ATTENDUE = '5.145.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -2792,7 +2792,7 @@ const classifyOrderStatus = (status) => {
 // expédier ? » et « le colis attend-il au relais ? ». Ils étaient définis à
 // l'intérieur d'un composant, donc invisibles pour `needsBordereau` juste
 // en dessous — d'où le désaccord corrigé ci-après.
-const isAtRelayStatus = (s) => /d[ée]pos[ée]/i.test(s || '') && /point\s+relais|bureau\s+de\s+poste/i.test(s || '');
+const isAtRelayStatus = (s) => !!(s) && !/livr[ée]\s+(?:chez|à\s+(?:ton|votre|son)\s+domicile|à\s+domicile)/i.test(s) && !/finalis|termin|annul|rembours|retour/i.test(s) && ((/d[ée]pos[ée]|arriv[ée]/i.test(s) && /point\s+relais|bureau\s+de\s+poste|casier|consigne|locker|vinted\s*go|point\s+de\s+retrait/i.test(s)) || /pr[êe]t\s+à\s+[êe]tre\s+retir/i.test(s) || (/disponible|à\s+retirer|au\s+point\s+de\s+retrait/i.test(s) && /relais|bureau\s+de\s+poste|casier|consigne|point|retrait|locker|vinted\s*go/i.test(s)));
 // Fenêtre pendant laquelle une vente mérite encore un numéro de boîte : la paire
 // est passée par le garage récemment, donc le numéro a un sens pour l'historique.
 // ⚠️ C'est CETTE borne qui empêche de renuméroter tout l'historique (140 ventes
@@ -16790,7 +16790,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (nextNumero est déclaré plus bas, après saleOv dont il dépend.)
   const garageNums = useMemo(()=>{ const s=new Set(); Object.values(garageGrid||{}).forEach(a=>{ if(Array.isArray(a)) a.forEach(v=>{const t=(v||'').trim().toLowerCase(); if(t)s.add(t);}); }); return s; }, [garageGrid]);
   const inGarage = (n)=> !!n && garageNums.has(String(n).trim().toLowerCase());
-  const linkedBuyIds = useMemo(()=>{ const s=new Set(); Object.values(numeros).forEach(e=>{ if(e&&e.buyFromId) s.add(String(e.buyFromId)); }); return s; }, [numeros]);
+  const linkedBuyIds = useMemo(()=>{ const s=new Set(); Object.values(numeros).forEach(e=>{ if(e&&e.buyFromId) s.add(String(e.buyFromId)); }); Object.values(saleOv).forEach(e=>{ if(e&&e.buyFromId) s.add(String(e.buyFromId)); }); return s; }, [numeros, saleOv]);
   const openPicker = async (item) => {
     // ⚠️ LA MODALE S'OUVRE TOUT DE SUITE. Avant, elle attendait le chargement de
     // TOUS les achats de TOUS les comptes — 11 s mesurées, à chaque clic. On
@@ -16823,16 +16823,30 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // fois, et le reçu d'achat reste générable même hors ligne.
   const choosePick = (p) => {
     const price = p.price?.amount!=null ? Number(p.price.amount) : null;
-    updatePair(pickerFor, {
-      buyPrice: price!=null?String(price):'',
-      buyFromId: p.transaction_id?String(p.transaction_id):null,
-      buyFrom: {
-        title: p.title||'', date: p.date||'', photo: orderPhoto(p)||'',
-        price: price, devise: p.price?.currency_code||'EUR',
-        seller: p.seller||p.user_login||'', status: p.status||'',
-        account: accNameOf(p._acc)||'',
-      },
-    });
+    const snap = {
+      title: p.title||'', date: p.date||'', photo: orderPhoto(p)||'',
+      price: price, devise: p.price?.currency_code||'EUR',
+      seller: p.seller||p.user_login||'', status: p.status||'',
+      account: accNameOf(p._acc)||'',
+    };
+    // ⚠️ DEUX CHEMINS, UNE SEULE ÉCRITURE DE L'INFO (§11). Depuis l'écran
+    // Annonces (ou une vente QUI A une identité d'annonce) on relie SUR LA PAIRE
+    // (`numeros[id]`, partagé avec la compta). Depuis une vente SANS identité
+    // d'annonce, il n'existe aucune paire où écrire : on relie alors sur la vente
+    // elle-même (override par n° de transaction), et `effEntry` le fait ressortir.
+    if (pickerFor && pickerFor._saleTx) {
+      setSaleOverride(pickerFor._saleTx, {
+        buyPrice: price!=null?String(price):'',
+        buyFromId: p.transaction_id?String(p.transaction_id):'',
+        buyFrom: snap,
+      });
+    } else {
+      updatePair(pickerFor, {
+        buyPrice: price!=null?String(price):'',
+        buyFromId: p.transaction_id?String(p.transaction_id):null,
+        buyFrom: snap,
+      });
+    }
     setPickerFor(null);
   };
   // L'achat relié à une paire, tel qu'on peut l'AFFICHER : la commande vivante
@@ -17691,6 +17705,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (ov.numero != null && ov.numero !== '') merged.numero = ov.numero;
     if (ov.buyPrice != null && ov.buyPrice !== '') merged.buyPrice = ov.buyPrice;
     if (ov.fees != null && ov.fees !== '') merged.fees = ov.fees;
+    // ⚠️ ACHAT RELIÉ DEPUIS LA VENTE (pour une vente SANS identité d'annonce :
+    // pas de paire où écrire, on relie sur la vente elle-même). `AchatRelie` lit
+    // `buyFromId`/`buyFrom` — sans ce passage, le reçu relié par l'écran Ventes
+    // n'apparaîtrait jamais. Même propriétaire que `choosePick` (§11).
+    if (ov.buyFromId) { merged.buyFromId = ov.buyFromId; merged.buyFrom = ov.buyFrom || merged.buyFrom; }
     return withBuyByNum(merged);
   };
 
@@ -22157,7 +22176,35 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                    numéro et l'achat qui correspond » — le N° est dans le titre de la
                    ligne, l'achat relié (photo + reçu) juste ici. Il vient de la paire
                    identifiée par Vinted (§5.34), jamais d'un rapprochement par titre. */}
-               {!hidden && <div><AchatRelie entry={e} numero={num}/></div>}
+               {/* ⚠️ RELIER L'ACHAT DEPUIS LA VENTE (demande de Julien : « relier
+                   les achats avec les ventes »). Sur une vente AVEC identité
+                   d'annonce on relie la PAIRE (le même geste que l'écran
+                   Annonces, §11) ; sans identité, on relie la vente elle-même
+                   (`_saleTx` → override). Le picker trie déjà les achats de même
+                   marque/taille en tête (`scoreAchat`) : « même si l'app ne
+                   trouve pas, elle fait une sélection » (sa demande) — et c'est
+                   TOUJOURS son clic qui tranche, jamais un rapprochement
+                   automatique par titre (§5). On ne le propose pas sur une vente
+                   annulée. */}
+               {!hidden && st!=='cancelled' && (()=>{
+                 const idf = identiteAnnonce(o);
+                 const saleItem = idf
+                   ? { id: idf, title: o.title, photo: orderPhoto(o), price: sell, _acc: o._acc }
+                   : { id: '_v'+o.transaction_id, _saleTx: String(o.transaction_id), title: o.title, photo: orderPhoto(o), price: sell, _acc: o._acc };
+                 if (e && e.buyFromId) return (
+                   <div style={{display:'flex',alignItems:'center',gap:8}}>
+                     <div style={{flex:1,minWidth:0}}><AchatRelie entry={e} numero={num}/></div>
+                     <button type="button" onClick={()=>openPicker(saleItem)} title="Relier un autre achat à cette vente" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.muted,cursor:'pointer',fontSize:11,fontWeight:600,padding:'5px 9px',fontFamily:'inherit'}}>changer</button>
+                   </div>
+                 );
+                 if (buy==null) return (
+                   <button type="button" onClick={()=>openPicker(saleItem)} title="Choisis l'achat correspondant : son prix remplit le coût, et la marge se calcule"
+                     style={{alignSelf:'flex-start',display:'inline-flex',alignItems:'center',gap:6,border:`1px dashed ${C.accent}88`,borderRadius:8,background:`${C.accent}10`,color:C.accent,cursor:'pointer',fontSize:12,fontWeight:600,padding:'7px 11px',fontFamily:'inherit'}}>
+                     <Icon name="link" size={14}/> Relier l'achat (remplit le coût)
+                   </button>
+                 );
+                 return null;
+               })()}
               </div>
             );
           })}
@@ -23326,7 +23373,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <div className="vrm-rangee" style={{display:'flex',gap:8,marginBottom:10,alignItems:'center',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',paddingBottom:2}}>
             {annStats.sansNum>0 && <span style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'4px 11px'}}>{annStats.sansNum} sans N°</span>}
             {/* ⚠️ « Toute l'annonce captée ? » — même base que la grille (§11). */}
-            {annStats.aRecapturer>0 && <span title={`${annStats.pretLbc} paire(s) ont TOUTES leurs photos + une description captées — prêtes pour Leboncoin. ${annStats.aRecapturer} n'ont pas encore toutes leurs photos : rouvre-les sur Vinted (extension à jour) pour que l'extension les capte en entier.`} style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'4px 11px'}}>{annStats.aRecapturer} à recapturer pour Leboncoin</span>}
+            {annStats.aRecapturer>0 && <span title={`${annStats.pretLbc} paire(s) ont TOUTES leurs photos + une description captées — prêtes pour Leboncoin. ${annStats.aRecapturer} n'ont pas encore toutes leurs photos : tu n'as rien à rouvrir — passe simplement sur Vinted connecté sur leurs comptes (extension à jour) et l'extension les complète toute seule, quelques annonces par visite. Si l'une reste incomplète après plusieurs passages, rouvre-la pour forcer.`} style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'4px 11px'}}>{annStats.aRecapturer} à recapturer pour Leboncoin</span>}
             {/* Une paire qui dort se rattrape : de l'ambre, jamais du rouge (§5.56). */}
             {annStats.sleeping>0 && <button onClick={()=>setAnnSort('sleeping')} style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'4px 11px',cursor:'pointer',display:'inline-flex',alignItems:'center',gap:5}}><Icon name="sleep" size={13}/>{annStats.sleeping} qui dorment{annStats.sleepingVal>0?` · ${annStats.sleepingVal.toFixed(0)} €`:''}</button>}
             {fillBuyRows.length>0 && <button onClick={()=>setFillBuyOpen(true)} title="Sans prix d'achat, la marge de chaque annonce reste vide et le bénéfice est faux. Une liste, un champ par ligne, Entrée passe à la suivante." style={{flexShrink:0,whiteSpace:'nowrap',display:'inline-flex',alignItems:'center',gap:5,fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:'4px 11px',cursor:'pointer'}}><Icon name="cash" size={13}/>{fillBuyRows.length} paires sans prix d'achat</button>}
@@ -23810,9 +23857,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           {num && (() => {
                             const total = Number(item.photoCount)||0, capt = Number(item.captPhotos)||0, descOk = (Number(item.descLen)||0) > 0;
                             let txt=null;
-                            if (total>0 && capt===0) txt='photos à capter — ouvre-la sur Vinted';
-                            else if (total>0 && capt<total) txt=`${capt}/${total} photos captées — rouvre-la sur Vinted`;
-                            else if (total>0 && !descOk) txt='description à capter — rouvre-la sur Vinted';
+                            if (total>0 && capt===0) txt='photos à capter — passe sur Vinted (ce compte)';
+                            else if (total>0 && capt<total) txt=`${capt}/${total} photos — passe sur Vinted (ce compte)`;
+                            else if (total>0 && !descOk) txt='description à capter — passe sur Vinted (ce compte)';
                             else if (total>0) txt='prête pour Leboncoin';
                             return txt ? <span data-prepa style={{fontSize:10.5,color:C.muted}}>{txt}</span> : null;
                           })()}
@@ -28346,7 +28393,7 @@ function ConnexionsSetting() {
   })(); }, []);
   // Le type de capture → un mot que Julien lit (jamais le nom technique brut).
   const nomFamille = (t) => /orders_sold|transaction|txn/.test(t) ? 'ventes' : /orders_purchased/.test(t) ? 'achats'
-    : /listings/.test(t) ? 'annonces' : /inbox|conv/.test(t) ? 'messages' : t;
+    : /listings|item/.test(t) ? 'annonces' : /inbox|conv/.test(t) ? 'messages' : t;
   useEffect(() => { (async () => {
     const lire = async (motif) => {
       try {

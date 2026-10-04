@@ -991,7 +991,18 @@ export function detecterTransporteur(mail) {
     const sj = subject.toLowerCase();
     const colis = /colis|point\s+relais|à\s*retirer|a\s*retirer|code\s+de\s+retrait|consigne|casier|pickup/.test(sj);
     const pasColis = /vendu|offre|message|facture|paiement|transfert|favori|évaluation|evaluation|bordereau/.test(sj);
-    if (colis && !pasColis) carrier = 'autre';
+    // ⚠️ VINTED GO ENVOYÉ DEPUIS UN `@vinted.com` NU (mesuré 2 oct. sur le vrai
+    // email : from `noreply@vinted.com`, sujet « Ton colis Vinted Go est
+    // arrivé », corps « Scanne ce QR… code suivant : C49341 », suivi VGS…). Le
+    // narrowing `carrierSrc = mail.from` plus haut (posé pour ne pas classer une
+    // VENTE Vinted par son corps) cache « Vinted Go » → le colis repartait en
+    // « autre » (badge « Transporteur », pas « Vinted Go »). On est DÉJÀ dans un
+    // sujet de colis (`colis && !pasColis`) : nommer « Vinted Go » ne crée aucune
+    // ligne, ça corrige seulement le TRANSPORTEUR. §11 : même carrier des deux
+    // côtés, sinon l'app n'affiche pas le bon point de retrait.
+    if (colis && !pasColis) {
+      carrier = (/vinted\s*go|vintedgo|\bvgs\d{6,}/.test(`${sj} ${String(corpsTexte).slice(0, 600).toLowerCase()}`)) ? 'vinted' : 'autre';
+    }
   }
   if (isBordereauSubject) return null; // un bordereau n'est pas un suivi
   return carrier;

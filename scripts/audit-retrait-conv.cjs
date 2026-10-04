@@ -35,6 +35,9 @@ const ctx = {
 ctx.self = ctx; ctx.globalThis = ctx; ctx.window = undefined;
 vm.createContext(ctx); vm.runInContext(src, ctx, { filename: 'background.js' });
 
+// Extrait une fonction pure par son texte source et l'évalue (comme audit-coherence).
+const extraireFn = (s, motif) => { const m = motif.exec(s); if (!m) return null; try { return eval('(' + m[1] + ')'); } catch (_) { return null; } };
+
 const conv = (msgs, side = 'buyer', extra = {}) => ({ conversation: {
   id: 22488948907, conversation_url: 'https://www.vinted.fr/inbox/22488948907',
   transaction: Object.assign({ id: 19746253045, item_id: 8886625895, item_title: 'Adidas 37,5', current_user_side: side }, extra),
@@ -131,6 +134,44 @@ const dit = (ok, nom, det) => { if (!ok) ko++; console.log(`${ok ? '✅' : '❌'
   dit(i > 0 && /retraitMode\(/.test(corps), '`methodeDuPoint` dérive de `retraitMode`', i < 0 ? 'fonction absente' : 'ok');
   // Et le lieu/geste ne sont plus répétés sur CHAQUE ligne de colis.
   dit(!/Donne ce code au comptoir 👉/.test(app), 'le geste n\'est plus répété sur chaque ligne de colis');
+}
+// 13. ⚠️ « RENDS-TOI AU POINT RELAIS … » (Mondial Relay) — MANQUÉ avant le 20 sept.
+//     La plainte de Julien : l'info est dans la conversation, le code aussi.
+{
+  const r = ctx.retraitDeConversation(conv([act('Ton colis est bientôt prêt',
+    'Rends-toi au point relais Phone Cash, 12 rue de la Gare, 35400 Saint-Malo pour récupérer ta commande. Saisis le code 48213 pour le récupérer.')]));
+  dit(!!r && r.code === '48213' && /Phone Cash/.test(r.lieu) && /35400 Saint-Malo/.test(r.lieu) && !/pour\s+r[ée]cup/i.test(r.lieu),
+    '« rends-toi au point relais … » → lieu (sans la consigne) + code', r ? `${r.lieu} | ${r.code}` : 'null');
+}
+// 14. ⚠️ VINTED GO CASIER : « Récupère-le au casier … Scanne ton code de retrait ».
+{
+  const r = ctx.retraitDeConversation(conv([act('Ton colis est disponible',
+    'Récupère-le au casier Vinted Go. <a href="https://www.vinted.fr/pickup/z9">Scanne ton code de retrait</a> ou saisis le code 90871.')]));
+  dit(!!r && r.code === '90871' && /casier Vinted Go/.test(r.lieu) && r.qr === 'https://www.vinted.fr/pickup/z9',
+    'Vinted Go casier → code + QR + lieu', r ? `${r.lieu} | ${r.code} | ${r.qr}` : 'null');
+}
+// 15. ⚠️ « Dépose ton colis dans n'importe quel point relais » = ENVOI, jamais retrait,
+//     même sans le titre « à emballer » (la garde CONV_SORTANT seule doit suffire).
+{
+  const r = ctx.retraitDeConversation(conv([act('Ta commande',
+    'Dépose ton colis dans n\'importe quel point relais Mondial Relay. Saisis le code 11111 pour l\'affranchir.')]));
+  dit(r === null, 'un colis à déposer (envoi) ne devient jamais un colis à retirer', r ? JSON.stringify(r) : 'null');
+}
+// 16. ⚠️ LA RÈGLE « AU POINT RELAIS » EST ÉLARGIE, ET IDENTIQUE APP↔EXTENSION (§11).
+//     Avant le 20 sept. : seul « déposé en point relais » comptait → Vinted Go
+//     (casier) et « prêt à être retiré » étaient INVISIBLES.
+{
+  const bgRelay = extraireFn(src, /const AT_RELAY = (\(s\) => [^\n]*?);\n/);
+  const appSrc = fs.readFileSync(path.join(racine, 'src', 'App.jsx'), 'utf8');
+  const appRelay = extraireFn(appSrc, /^const isAtRelayStatus = (\(s\) => [^\n]*?);$/m);
+  const vrais = ['Colis déposé en point relais', 'Prêt à être retiré', 'Disponible au point relais', 'Déposé en consigne Vinted Go'];
+  const faux = ['Livré à ton domicile', 'Commande finalisée', 'En cours d\'acheminement', 'Remboursé'];
+  const okBg = !!bgRelay && vrais.every(s => bgRelay(s) === true) && faux.every(s => bgRelay(s) === false);
+  dit(okBg, 'AT_RELAY reconnaît casier/prêt/disponible, écarte livré-domicile/finalisé',
+    bgRelay ? vrais.map(s => `${s}:${bgRelay(s)}`).join(' ') : 'non extrait');
+  const memeRegle = !!(bgRelay && appRelay) && [...vrais, ...faux].every(s => bgRelay(s) === appRelay(s));
+  dit(memeRegle, 'app.isAtRelayStatus === ext.AT_RELAY sur les mêmes statuts (§11)',
+    (bgRelay && appRelay) ? 'ok' : 'une des deux non extraite');
 }
 console.log(ko ? `\n${ko} contrôle(s) en échec` : '\nTous les contrôles passent');
 process.exit(ko ? 1 : 0);

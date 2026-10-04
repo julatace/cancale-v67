@@ -25,6 +25,12 @@ T('Mondial Relay via Vinted', { from: 'Mondial Relay via Vinted <shipping@relay.
 T('Mondial Relay (direct)', { from: 'noreply@mondialrelay.fr', subject: 'Votre colis 60385202 est disponible' }, 'mondialrelay');
 T('Vinted Go (@vintedgo.com)', { from: 'Vinted Go <noreply@vintedgo.com>', subject: 'Ton colis est arrivé au point relais' }, 'vinted');
 T('Vinted Go nommé dans le sujet', { from: 'shipping@relay.vinted.com', subject: 'Vinted Go — ton colis est à retirer' }, 'vinted');
+// ⚠️ LE VRAI EMAIL (capture de Julien, 2 oct.) : from `noreply@vinted.com` nu
+// (ni vintedgo.com, ni shipping@relay), « Vinted Go » dans le sujet/corps + suivi
+// VGS. Le narrowing `carrierSrc = mail.from` le classait « autre » → badge
+// « Transporteur » au lieu de « Vinted Go ». Doit être 'vinted'.
+T('Vinted Go depuis @vinted.com nu (vrai email)', { from: 'noreply@vinted.com', subject: 'Ton colis Vinted Go est arrivé', text: 'Ton colis Vinted Go est arrivé. Scanne ce QR code ou saisis le code suivant : C49341. Numéro de suivi : VGS0000906049457' }, 'vinted');
+T('Vinted Go reconnu par le suivi VGS dans le corps', { from: 'noreply@vinted.com', subject: 'Ton colis est arrivé', text: 'Code de retrait C49341. Numéro de suivi : VGS0000906049457' }, 'vinted');
 T('Vinted shipping générique', { from: 'shipping@relay.vinted.com', subject: 'Ton colis est en chemin' }, 'vinted');
 T('Colis annoncé par Vinted lui-même', { from: "L'équipe Vinted <no-reply@vinted.fr>", subject: 'Ton colis est arrivé au point relais' }, 'autre');
 T('Transporteur inconnu, mots de colis', { from: 'info@transporteur-x.com', subject: 'Votre colis est à retirer', text: 'code de retrait 1234' }, 'autre');
