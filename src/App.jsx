@@ -9625,7 +9625,10 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
                  restent à l'encre (§5.90). « Messages non lus » a été RETIRÉ d'ici
                  (demande de Julien, 24 sept.) — les non-lus vivent dans le centre
                  de notifications, pas en doublon sur cet écran. */
-              {k:'caMois', icon:'💸', label:'CA du mois', val:`${liveStats.caMois.toFixed(0)} €`, go:'cat_ventes', color:C.text},
+              /* « CA du mois » nommait les ventes FAITES (en cours comprises) avec le
+                 mot du CA déclaré (l'argent reçu) — même correction que le héros
+                 de Ma journée (4 octobre). */
+              {k:'caMois', icon:'💸', label:'Vendu ce mois', val:`${liveStats.caMois.toFixed(0)} €`, go:'cat_ventes', color:C.text},
               {k:'enCours', icon:'⏳', label:'Ventes en cours', val:liveStats.enCours, go:'cat_ventes', color:C.text},
               {k:'online', icon:'🟢', label:'Annonces en ligne', val:liveStats.online, go:'cat_annonces', color:C.text},
             ].map(s=>(

@@ -129,7 +129,8 @@ const ouvrir = async (b, vp, versementsLisibles) => {
     for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }]) {
       console.log(`\n── Ma journée, ${vp.width} px`);
       await essaie(`${vp.width} px`, async () => {
-        const { ctx, lu, errs } = await ouvrir(b, vp, true);
+        const { ctx, pg, lu, errs } = await ouvrir(b, vp, true);
+        if (process.env.CAPTURES) await pg.screenshot({ path: path.join(process.env.CAPTURES, `vendu-recu-${vp.width}.png`), fullPage: true });
         dit(!lu.tombe && errs.length === 0, 'l’écran s’affiche, sans erreur', errs.join(' | ').slice(0, 160));
         dit(lu.deb <= 1, 'aucun débordement horizontal', `${lu.deb} px`);
         dit(lu.venduMois === String(attendu.venduMois), 'VENDU ce mois = ventes faites ce mois, toutes plateformes, en cours comprises, hors annulée', `rendu ${lu.venduMois} · attendu ${attendu.venduMois}`);
