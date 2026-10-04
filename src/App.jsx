@@ -9316,6 +9316,10 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
   // Échéance de déclaration URSSAF (fréquence réglable) + CA encaissé de la
   // période concernée → somme estimée à déclarer/payer à cette date.
   const [urssafFreq,setUrssafFreq]=useState(()=>load('vinted_urssaf_freq','trimestriel'));
+  // §5.49 : réglage synchronisé lu au montage → froid tant que le nuage n'est pas
+  // arrivé (appareil neuf). Scalaire à défaut non vide : on ne remplace QUE s'il
+  // est resté au défaut, jamais un choix fait pendant le chargement.
+  useEffect(() => onCloudReady(() => setUrssafFreq(v => v === 'trimestriel' ? load('vinted_urssaf_freq', 'trimestriel') : v)), []);
   const urssafDue=useMemo(()=>nextUrssafDeadline(urssafFreq),[urssafFreq]);
   const urssafPeriodCA=useMemo(()=>{
     if(!urssafDue) return 0;
@@ -14751,6 +14755,15 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
   // multi-compte, savoir si les numéros ont servi »). Saisi à la main — Vinted
   // ne l'expose pas dans ce qu'on capte, on ne le devine pas. Synchronisé.
   const [acctPhones, setAcctPhones] = useState(() => load('vinted_account_phones', {}));
+  // §5.49 : étiquettes/emails/téléphones des comptes, synchronisés, lus au
+  // montage → froids sur un appareil neuf. Cartes : on ne remplit que si vide,
+  // jamais par-dessus une saisie faite pendant le chargement.
+  useEffect(() => onCloudReady(() => {
+    const vide = (o) => !o || Object.keys(o).length === 0;
+    setLabels(n => vide(n) ? load('vinted_account_labels', {}) : n);
+    setAcctEmails(n => vide(n) ? load('vinted_account_emails', {}) : n);
+    setAcctPhones(n => vide(n) ? load('vinted_account_phones', {}) : n);
+  }), []);
   const setAcctPhone = (uid, val) => {
     const u = { ...acctPhones, [String(uid)]: val };
     if (!String(val).trim()) delete u[String(uid)];
@@ -28892,6 +28905,10 @@ function EcranMasques({ comptes, ordi }) {
 
 function RegimeSetting() {
   const [regime, setRegime] = useState(() => load('vinted_regime', 'micro'));
+  // §5.49 : la base du régime URSSAF (donc du taux affiché) est synchronisée et
+  // lue au montage. Scalaire à défaut non vide : remplacer SEULEMENT s'il est
+  // resté au défaut, jamais un choix fait pendant le chargement.
+  useEffect(() => onCloudReady(() => setRegime(v => v === 'micro' ? load('vinted_regime', 'micro') : v)), []);
   const [tva, setTva] = useState(() => Number(load('vinted_tva', 20)) || 20);
   // ⚠️ LE TAUX DE COTISATIONS EST UN RÉGLAGE, PAS UNE CONSTANTE. Il était écrit
   // 13,5 % en dur à SIX endroits, et il tombe sur un document qu'il recopie
@@ -29125,6 +29142,9 @@ function AppCoeur() {
   const [vintedAccounts,setVintedAccounts]=useState(()=>load('vinted_accounts',[]));
   const [accountLabels]=useState(()=>load('vinted_account_labels',{}));
   const [inventory,setInventory]=useState(()=>load('vinted_inventory',[]));
+  // §5.49 : inventaire synchronisé lu au montage → froid sur un appareil neuf.
+  // Liste : on ne remplit que si vide, jamais par-dessus une édition en cours.
+  useEffect(() => onCloudReady(() => setInventory(n => (n && n.length) ? n : load('vinted_inventory', []))), []);
   const [garageLocate,setGarageLocate]=useState(null); // numéro à localiser dans le garage
   const [garagePlace,setGaragePlace]=useState(null); // numéro à ranger dans une case du garage
   // Recherche globale : trouve une paire par N°, titre ou marque dans TOUS les
@@ -29201,6 +29221,10 @@ function AppCoeur() {
   });
   const setEntreprises=(v)=>{ setEntreprisesRaw(v); save('vinted_entreprises',v); };
   const [activeEnt,setActiveEntRaw]=useState(()=>load('vinted_entreprise_active','ent_1'));
+  // §5.49 : l'entreprise active (de quelle micro-entreprise le reçu porte la
+  // raison sociale/SIRET) est synchronisée et lue au montage. Scalaire à défaut
+  // non vide : on restaure le choix persisté SEULEMENT s'il est resté au défaut.
+  useEffect(() => onCloudReady(() => setActiveEntRaw(v => v === 'ent_1' ? load('vinted_entreprise_active', 'ent_1') : v)), []);
   const setActiveEnt=(id)=>{ setActiveEntRaw(id); save('vinted_entreprise_active',id); };
   const [showBackup,setShowBackup]=useState(false);
   const [synced,setSynced]=useState(false);

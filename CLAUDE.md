@@ -4340,11 +4340,20 @@ déclaré plus bas).
   identique à celui que `comptes.cjs` a validé pour les comptes exclus, et le
   `vide`-guard le rend non destructeur ; à re-regarder au rendu sur un appareil
   neuf dès qu'un banc a des fixtures.
-- ⚠️ **Laissé pour une passe à portée de rendu** (setters dans d'AUTRES scopes de
-  composant, que je ne place pas à l'aveugle) : `vinted_regime` (base du taux
-  URSSAF — le plus visible), `vinted_urssaf_freq`, `vinted_account_emails/phones`,
-  `vinted_inventory`, `vinted_entreprise_active`. Même motif à appliquer, dans
-  LEUR composant, render-vérifié.
+- ✅ **FAIT dans la foulée (même passe)** : les clés dont le setter vit dans un
+  autre composant ont reçu leur propre `onCloudReady` local (juste après leur
+  `useState`, scope garanti) — `vinted_regime` (base du taux URSSAF),
+  `vinted_urssaf_freq`, `vinted_account_labels/emails/phones`, `vinted_inventory`,
+  `vinted_entreprise_active`. ⚠️ **Deux gardes selon le type** : carte/liste →
+  « remplir si vide » ; **scalaire à défaut non vide** (régime `'micro'`,
+  fréquence `'trimestriel'`, entreprise `'ent_1'`) → « remplacer SEULEMENT s'il
+  est resté au défaut » — `v => v === DEFAUT ? load(k) : v` — jamais par-dessus un
+  choix fait pendant le chargement. Build + 58 audits verts (`audit-tdz` compris).
+  Non render-vérifié ici (pas de fixtures) ; sûr par construction (la garde ne
+  remplace jamais une saisie). ⚠️ Reste `vinted_account_labels` lu EN LECTURE
+  SEULE dans un second composant (`const [accountLabels]=useState(…)`, pas de
+  setter) : cosmétique (affichage froid jusqu'au remontage), non destructif —
+  laissé tel quel.
 
 ### ⚠️⚠️ CINQ BALAYAGES DE FAMILLE NON BORNÉS TRONQUÉS À 1000 EN SILENCE (4 octobre, 5.148)
 Suite de la passe fiabilité, famille §4.5. Supabase coupe une réponse à
