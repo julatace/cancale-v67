@@ -2933,6 +2933,71 @@ const ventesDeclarables = ({ vinted, lbc, ebay, masquee, exclu, versements } = {
   }
   return { lignes, aDater, ecartees, exclues };
 };
+// ══════════════════════════════════════════════════════════════════════════════
+// LES VENTES FAITES, toutes plateformes — l'AUTRE notion (4 octobre)
+// ══════════════════════════════════════════════════════════════════════════════
+// Julien (3 octobre) : « il faut que tu distingues deux choses : il y a les
+// ventes que l'on fait en une journée et l'argent que l'on reçoit ».
+//   · VENDU = une paire partie, au jour de la VENTE, en cours comprises (le
+//     paiement de l'acheteur est fait, l'argent n'est pas encore à lui) ;
+//   · REÇU  = `ventesDeclarables` ci-dessus : finalisée, au jour du VERSEMENT.
+// Ma journée affichait « Chiffre d'affaires » sur le premier — le mot du second.
+// ⚠️ Vinted : hors annulées et hors ventes/comptes cachés (`cachee`, la règle
+//    de l'écran Ventes). Leboncoin : vente PROUVÉE (`isSeller`), non annulée,
+//    DATÉE — sans `dateVente` elle n'est dans aucun jour (l'heure de capture
+//    serait une date fausse), elle est comptée dans `sansDate`. eBay : commande
+//    payée, en euros, datée de sa création (même lecture que le CA déclaré).
+//    Identité `plateforme:id`, jamais un titre (§5).
+const ventesFaites = ({ vinted, lbc, ebay, cachee } = {}) => {
+  const lignes = [], vus = new Set();
+  let sansDate = 0;
+  const garde = (id) => { if (vus.has(id)) return false; vus.add(id); return true; };
+  for (const o of (vinted || [])) {
+    if (!o || (cachee && cachee(o))) continue;
+    if (classifyOrderStatus(o.status) === 'cancelled') continue;
+    const t = tsCommande(o); if (!t) continue;
+    const tx = o.transaction_id != null ? o.transaction_id : o.id;
+    if (tx != null && !garde('vinted:' + tx)) continue;
+    lignes.push({ plateforme: 'Vinted', ts: t, eur: montantCommande(o) });
+  }
+  for (const v of (lbc || [])) {
+    if (!v || v.isSeller !== true || !v.txId || lbcAnnulee(v)) continue;
+    const eur = v.price != null ? Number(v.price) / 100 : NaN;
+    if (!isFinite(eur)) continue;
+    const t = Date.parse(v.dateVente || '');
+    if (!t) { if (garde('lbc:' + v.txId)) sansDate += 1; continue; }
+    if (garde('lbc:' + v.txId)) lignes.push({ plateforme: 'Leboncoin', ts: t, eur });
+  }
+  for (const e of (ebay || [])) {
+    if (!e || String(e.orderPaymentStatus || '').toUpperCase() !== 'PAID' || !e.orderId) continue;
+    const tot = (e.pricingSummary && e.pricingSummary.total) || {};
+    if (tot.currency && tot.currency !== 'EUR') continue;
+    const eur = Number(tot.value), t = Date.parse(e.creationDate || '');
+    if (!isFinite(eur) || !t) continue;
+    if (garde('ebay:' + e.orderId)) lignes.push({ plateforme: 'eBay', ts: t, eur });
+  }
+  return { lignes, sansDate };
+};
+// Clé de jour LOCALE : toISOString() est en UTC et mettrait une vente de 23 h
+// sur le lendemain.
+const cleJourLocal = (t) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+// Les N derniers jours, VENDU et REÇU côte à côte, chacun par SA règle.
+// `recues` = les lignes de `ventesDeclarables` (null = pas su : la série reste
+// vide et le dit, jamais des zéros). Un seul parcours de chaque liste.
+const joursVenduRecu = (vendues, recues, n = 14, maintenant = Date.now()) => {
+  const d0 = new Date(maintenant); d0.setHours(0, 0, 0, 0);
+  const J = [], par = {};
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(d0); d.setDate(d0.getDate() - i);
+    const j = { cle: cleJourLocal(d.getTime()), jour: ['D', 'L', 'M', 'M', 'J', 'V', 'S'][d.getDay()], num: d.getDate(),
+      long: d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'short' }),
+      vendu: { n: 0, eur: 0 }, recu: recues ? { n: 0, eur: 0 } : null };
+    J.push(j); par[j.cle] = j;
+  }
+  for (const l of (vendues || [])) { const j = par[cleJourLocal(l.ts)]; if (j) { j.vendu.n += 1; j.vendu.eur += l.eur; } }
+  for (const l of (recues || [])) { const j = par[cleJourLocal(l.ts)]; if (j && j.recu) { j.recu.n += 1; j.recu.eur += l.eur; } }
+  return J;
+};
 // Par mois : le total ET sa répartition par plateforme — les « dont » somment au
 // total, ils viennent des mêmes lignes (§5 : la phrase vient de la même source).
 const caDeclarableParMois = (lignes) => {
@@ -4820,31 +4885,39 @@ function StatBox({label,value,color=C.text,sub=null,subColor=null,onClick=null,t
   );
 }
 
-// LE SEUL GRAPHIQUE DE L'APP : la forme des 14 derniers jours.
-// ⚠️ Une seule série, donc UNE seule couleur et aucune légende — le titre au-dessus
-// nomme ce qu'on regarde. Un jour sans vente garde une trace grise : un trou dans
-// la rangée se lirait comme une donnée manquante, pas comme un zéro.
-function MiniBarres({ jours, hauteur = 84, surSombre = false }) {
-  const max = Math.max(1, ...jours.map(j => j.eur));
-  const plein = surSombre ? 'rgba(255,255,255,.92)' : C.accent;
-  const vide = surSombre ? 'rgba(255,255,255,.16)' : C.border;
+// ── VENDU / REÇU, JOUR PAR JOUR (4 octobre) ──────────────────────────────────
+// Julien : « distingue les ventes que l'on fait en une journée et l'argent que
+// l'on reçoit — je veux un graphique avec les ventes de la journée ».
+// Deux séries, deux règles (`ventesFaites` · `ventesDeclarables`), même échelle.
+// VENDU porte l'accent — la seule couleur (§7) ; REÇU reste à l'encre neutre.
+// Un jour sans rien garde une trace grise : un trou se lirait comme une donnée
+// manquante, pas comme un zéro. Quand le reçu n'a pas pu être lu (`recu:null`),
+// sa barre n'est PAS dessinée — des zéros seraient un faux (§5).
+// (Remplace `MiniBarres`, définie et jamais rendue — §4.11.)
+function BarresVenduRecu({ jours, hauteur = 96 }) {
+  const max = Math.max(1, ...jours.map(j => Math.max(j.vendu.eur, j.recu ? j.recu.eur : 0)));
+  const eur = (x) => `${Math.round(x).toLocaleString('fr-FR')} €`;
+  const h = (v) => v > 0 ? Math.max(4, Math.round((v / max) * (hauteur - 4))) : 2;
+  const totV = jours.reduce((a, j) => a + j.vendu.eur, 0);
+  const totR = jours.every(j => j.recu) ? jours.reduce((a, j) => a + j.recu.eur, 0) : null;
   return (
-    <div>
-      <div style={{display:'flex',alignItems:'flex-end',gap:5,height:hauteur}}>
-        {jours.map((j) => {
-          const h = j.eur > 0 ? Math.max(6, Math.round((j.eur / max) * hauteur)) : 3;
-          return (
-            <div key={j.cle} title={`${j.long} · ${j.n} vente${j.n > 1 ? 's' : ''} · ${j.eur.toFixed(0)} €`}
-              style={{flex:1,minWidth:0,display:'flex',flexDirection:'column',justifyContent:'flex-end',height:'100%'}}>
-              <div style={{height:h,background:j.eur > 0 ? plein : vide,borderRadius:'4px 4px 0 0'}}/>
-            </div>
-          );
-        })}
-      </div>
-      <div style={{display:'flex',gap:5,marginTop:6,borderTop:`1px solid ${surSombre?'rgba(255,255,255,.14)':C.border}`,paddingTop:5}}>
+    <div data-vendu-recu="">
+      <div role="img" aria-label={`${jours.length} derniers jours : vendu ${eur(totV)}${totR != null ? ` · reçu ${eur(totR)}` : ''}`}
+        style={{display:'flex',alignItems:'flex-end',gap:4,height:hauteur}}>
         {jours.map((j) => (
-          <div key={j.cle} style={{flex:1,minWidth:0,textAlign:'center',fontSize:9,letterSpacing:.2,color:surSombre?'rgba(255,255,255,.55)':C.muted,fontWeight:600,overflow:'hidden'}}>{j.jour}</div>
+          <div key={j.cle} data-jour={j.cle} data-vendu={Math.round(j.vendu.eur * 100)} data-recu={j.recu ? Math.round(j.recu.eur * 100) : ''}
+            title={`${j.long} · vendu ${eur(j.vendu.eur)} (${j.vendu.n} vente${j.vendu.n > 1 ? 's' : ''})${j.recu ? ` · reçu ${eur(j.recu.eur)}` : ''}`}
+            style={{flex:1,minWidth:0,height:'100%',display:'flex',alignItems:'flex-end',justifyContent:'center',gap:2}}>
+            <div style={{width:'44%',maxWidth:14,height:h(j.vendu.eur),background:j.vendu.eur > 0 ? C.accent : C.border,borderRadius:'3px 3px 0 0'}}/>
+            {j.recu && <div style={{width:'44%',maxWidth:14,height:h(j.recu.eur),background:j.recu.eur > 0 ? C.muted : C.border,borderRadius:'3px 3px 0 0'}}/>}
+          </div>
         ))}
+      </div>
+      <div style={{display:'flex',gap:4,marginTop:6,borderTop:`1px solid ${C.border}`,paddingTop:5}}>
+        {jours.map((j, i) => {
+          const auj = i === jours.length - 1;
+          return <div key={j.cle} style={{flex:1,minWidth:0,textAlign:'center',fontSize:9.5,color:auj ? C.text : C.muted,fontWeight:auj ? 700 : 500,fontVariantNumeric:'tabular-nums'}}>{j.num}</div>;
+        })}
       </div>
     </div>
   );
@@ -17195,44 +17268,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // hors ventes masquées et hors comptes masqués (`isHidden` = la définition
   // déjà partagée par tout l'écran Ventes). Même source que `liveStats`, donc
   // les deux écrans ne peuvent plus se contredire.
-  const bilanVentes = React.useCallback((depuisTs, jusquaTs) => {
-    let n = 0, eur = 0;
-    for (const o of (sales.items || [])) {
-      if (isHidden(o)) continue;
-      if (classifyOrderStatus(o.status) === 'cancelled') continue;
-      const t = tsCommande(o);
-      if (!t || t < depuisTs || (jusquaTs != null && t > jusquaTs)) continue;
-      n += 1; eur += montantCommande(o);
-    }
-    return { n, eur };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, hiddenSales, hiddenAccts, blockedAccts]);
-
-  // Les 14 derniers jours, en UN SEUL parcours des ventes — appeler bilanVentes
-  // quatorze fois relirait la liste entière autant de fois. Mêmes règles que les
-  // tuiles du jour et de la semaine (§11) : moisson, hors annulées, hors ventes
-  // et comptes masqués. ⚠️ Clé de jour LOCALE : toISOString() est en UTC et
-  // décalerait chaque vente d'après 22 h sur le lendemain.
-  const jours14 = useMemo(() => {
-    const cle = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-    const d0 = new Date(); d0.setHours(0,0,0,0);
-    const J = [], par = {};
-    for (let i = 13; i >= 0; i--) {
-      const d = new Date(d0.getTime() - i*86400000);
-      const j = { cle: cle(d), jour: ['D','L','M','M','J','V','S'][d.getDay()],
-        long: d.toLocaleDateString('fr-FR', { weekday:'long', day:'numeric', month:'short' }), n:0, eur:0 };
-      J.push(j); par[j.cle] = j;
-    }
-    for (const o of (sales.items || [])) {
-      if (isHidden(o)) continue;
-      if (classifyOrderStatus(o.status) === 'cancelled') continue;
-      const t = tsCommande(o); if (!t) continue;
-      const j = par[cle(new Date(t))]; if (!j) continue;
-      j.n += 1; j.eur += montantCommande(o);
-    }
-    return J;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, hiddenSales, hiddenAccts, blockedAccts]);
+  // (`bilanVentes` vit plus bas, après `vendus` — §4.6 : il en dépend.)
 
   // Les six dernières ventes, mêmes règles que les autres compteurs (§11).
   const dernieresVentes = useMemo(() => {
@@ -17665,14 +17701,43 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   //    règle (`ventesDeclarables`). On n'attend pas Leboncoin/eBay pour publier
   //    Vinted, mais on PUBLIE ce qu'on sait d'eux : `sources` dit lesquelles ont
   //    été lues (« pas su » ≠ « aucune vente »), `aDater` ce qui n'a pas de date.
+  // L'argent REÇU, une seule fois pour tout l'écran (§11) : cette publication
+  // ET la carte « Vendu / reçu » de Ma journée lisent le MÊME calcul.
+  // Trois états : `undefined` on attend de savoir · `null` dates de versement
+  // illisibles (« rien lu » ≠ « rien ») · l'objet de `ventesDeclarables`.
+  const declarables = useMemo(() => {
+    if (!sales.items) return undefined;
+    if (lbcLu === undefined || ebayCmd === undefined || versements === undefined) return undefined;
+    if (versements === null) return null;
+    try {
+      return ventesDeclarables({ vinted: sales.items, lbc: lbcLu ? lbcVentes.ventes : [], ebay: ebayCmd || [], masquee: (o) => hiddenSales.has(String(o.transaction_id)), exclu: acctOffOf, versements });
+    } catch (_) { return null; }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sales.items, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements]);
+  // Les ventes FAITES, toutes plateformes (`ventesFaites`) : « Vendu aujourd'hui »,
+  // « Vendu ce mois » et la colonne VENDU du graphique.
+  const vendus = useMemo(() => ventesFaites({ vinted: sales.items || [], lbc: lbcLu ? lbcVentes.ventes : [], ebay: ebayCmd || [], cachee: isHidden }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [sales.items, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd]);
+  // VENDU sur une période (aujourd'hui, ce mois) — sur `vendus`, la même liste
+  // que le graphique : la carte et la colonne du jour ne peuvent pas diverger.
+  const bilanVentes = React.useCallback((depuisTs, jusquaTs) => {
+    let n = 0, eur = 0;
+    for (const l of vendus.lignes) {
+      if (l.ts < depuisTs || (jusquaTs != null && l.ts > jusquaTs)) continue;
+      n += 1; eur += l.eur;
+    }
+    return { n, eur };
+  }, [vendus]);
+  // Les 14 derniers jours, VENDU et REÇU côte à côte (`joursVenduRecu`).
+  const jours14 = useMemo(() => joursVenduRecu(vendus.lignes, declarables ? declarables.lignes : null, 14), [vendus, declarables]);
   useEffect(() => {
     if (!sales.items) return;                       // rien de sûr à publier
-    if (lbcLu === undefined || ebayCmd === undefined || versements === undefined) return;   // on attend de savoir
-    // Les dates de versement illisibles : on ne publie RIEN plutôt qu'un mois où
-    // toutes les ventes Vinted seraient « à dater » (« rien lu » ≠ « rien »).
-    if (versements === null) return;
+    // On attend de savoir ; et les dates de versement illisibles : on ne publie
+    // RIEN plutôt qu'un mois où toutes les ventes Vinted seraient « à dater ».
+    if (!declarables) return;
     try {
-      const { lignes, aDater, ecartees } = ventesDeclarables({ vinted: sales.items, lbc: lbcLu ? lbcVentes.ventes : [], ebay: ebayCmd || [], masquee: (o) => hiddenSales.has(String(o.transaction_id)), exclu: acctOffOf, versements });
+      const { lignes, aDater, ecartees } = declarables;
       const r2 = (x) => Math.round(x * 100) / 100;
       const liste = Object.values(caDeclarableParMois(lignes))
         .map(m => ({ ym: m.ym, n: m.n, ca: r2(m.ca), nMasq: m.nMasq, caMasq: r2(m.caMasq),
@@ -17688,7 +17753,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const memeChose = avant && JSON.stringify({ mois: avant.mois, aDater: avant.aDater, ecartees: avant.ecartees, sources: avant.sources }) === JSON.stringify(charge);
       if (!memeChose) save('vinted_urssaf_mois', { ...charge, at: Date.now() });
     } catch (_) {}
-  }, [sales.items, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements]);
+  }, [sales.items, declarables, lbcLu, ebayCmd]);
 
   // Filet prix d'achat : si l'entrée a un N° mais pas de prix d'achat, on va le
   // chercher dans le miroir PAR NUMÉRO (buyByNum) — c'est ce qui fait remonter
@@ -21085,6 +21150,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // `bilanVentes` plus haut). Les emails ratent une vente sur trois.
         const minuit = new Date(); minuit.setHours(0,0,0,0);
         const { n: jourN, eur: jourEur } = bilanVentes(minuit.getTime());
+        // VENDU ce mois (date de vente, toutes plateformes) et REÇU ce mois
+        // (ventes finalisées, date de versement = le CA déclaré, même calcul que
+        // l'écran Ventes publie au tableau de bord). Deux notions, deux mots.
+        const debutMois = new Date(minuit); debutMois.setDate(1);
+        const { n: moisN, eur: moisEur } = bilanVentes(debutMois.getTime());
+        const ymIci = ymDeTs(Date.now());
+        const recuMois = declarables ? declarables.lignes.reduce((a, l) => l.ym === ymIci ? a + l.eur : a, 0) : null;
+        const moisNom = new Date().toLocaleDateString('fr-FR',{month:'long'});
+        const adVinted = declarables ? declarables.aDater.filter(l => l.plateforme === 'Vinted').length : 0;
+        const joursActifs = jours14.some(j => j.vendu.eur > 0 || (j.recu && j.recu.eur > 0));
         return (
           <div>
             <div style={{marginBottom:16}}>
@@ -21130,7 +21205,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 déjà. Le halo est une DÉCORATION, pas une courbe de données —
                 une fausse tendance mentirait (§5). Le dégradé vient des jetons
                 de thème (`chrome`→`accent`), donc il suit la palette. */}
-            {!baseKO && !premierJour && liveStats && liveStats.caMois!=null && (
+            {!baseKO && !premierJour && !loading && sales.items && (
               <button type="button" onClick={()=>onNav&&onNav('cat_ventes')}
                 style={{width:'100%',textAlign:'left',border:'none',cursor:'pointer',fontFamily:'inherit',
                   borderRadius:12,marginBottom:16,position:'relative',overflow:'hidden',color:'#fff',minHeight:0,display:'block',
@@ -21152,22 +21227,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{position:'relative',zIndex:3,padding:'22px 20px 20px'}}>
                   <div style={{fontSize:11,fontWeight:600,letterSpacing:0.7,textTransform:'uppercase',opacity:.78,display:'flex',alignItems:'center',gap:9}}>
                     <span aria-hidden="true" style={{width:22,height:2,borderRadius:999,background:'currentColor',opacity:.8,display:'inline-block'}}/>
-                    Chiffre d'affaires · {new Date().toLocaleDateString('fr-FR',{month:'long'})}
+                    Vendu en {moisNom}
                   </div>
-                  <div className="vrm-display" style={{fontSize:'clamp(40px, 12vw, 60px)',fontWeight:800,letterSpacing:-1.5,marginTop:8,lineHeight:.95,fontVariantNumeric:'tabular-nums'}}><CountUpEuro value={liveStats.caMois}/></div>
+                  {/* ⚠️ « Chiffre d'affaires » nommait ici les ventes FAITES (en
+                      cours comprises), figées au montage de l'app — le mot du CA
+                      DÉCLARÉ, qui est l'argent reçu. Deux notions (Julien,
+                      3 octobre) : le vendu en grand, le reçu juste dessous. */}
+                  <div data-vendu-mois={Math.round(moisEur*100)} className="vrm-display" style={{fontSize:'clamp(40px, 12vw, 60px)',fontWeight:800,letterSpacing:-1.5,marginTop:8,lineHeight:.95,fontVariantNumeric:'tabular-nums'}}><CountUpEuro value={moisEur}/></div>
                   <div style={{fontSize:13,opacity:.85,marginTop:8,display:'flex',alignItems:'center',gap:7,flexWrap:'wrap'}}>
-                    {liveStats.ventesMois!=null
-                      ? <><b style={{fontWeight:700}}>{liveStats.ventesMois}</b> vente{liveStats.ventesMois>1?'s':''} ce mois-ci</>
-                      : <>ventes finalisées du mois</>}
+                    <span><b style={{fontWeight:700}}>{moisN}</b> vente{moisN>1?'s':''} ce mois-ci</span>
                     <span style={{opacity:.55}}>·</span>
                     <span style={{opacity:.9,fontWeight:600}}>voir mes ventes ›</span>
                   </div>
-                  {/* 30 sept. — « trop de texte, trop chargé » : les 14 derniers
-                      jours vivent ICI, dans le bloc du chiffre, au lieu d'une
-                      seconde carte « Ta semaine » qui redisait les mêmes ventes
-                      en trois autres nombres (§7 : un nombre ne s'écrit qu'une
-                      fois). */}
-                  {jours14.some(j=>j.eur>0) && <div style={{marginTop:18}}><CourbeVentes jours={jours14} hauteur={64} surSombre/></div>}
+                  <div data-recu-mois={recuMois==null?'':Math.round(recuMois*100)} style={{marginTop:16,paddingTop:13,borderTop:'1px solid rgba(255,255,255,.13)',display:'flex',alignItems:'baseline',gap:10,flexWrap:'wrap'}}>
+                    <span style={{fontSize:11,fontWeight:600,letterSpacing:0.7,textTransform:'uppercase',opacity:.72}}>Reçu en {moisNom}</span>
+                    <span className="vrm-display" style={{fontSize:22,fontWeight:700,fontVariantNumeric:'tabular-nums'}}>{declarables === undefined ? '…' : recuMois == null ? '—' : `${Math.round(recuMois).toLocaleString('fr-FR')} €`}</span>
+                    <span style={{fontSize:12,opacity:.72}}>{declarables === null ? 'dates de versement illisibles pour l\'instant' : 'ventes finalisées, argent versé · ton CA déclaré'}</span>
+                  </div>
                 </div>
               </button>
             )}
@@ -21188,12 +21264,33 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {jourN>0 && (
               <button type="button" onClick={()=>onNav&&onNav('cat_ventes')}
                 style={{width:'100%',textAlign:'left',border:`1px solid ${C.accent}55`,background:`${C.accent}0e`,borderRadius:10,padding:'14px 16px',marginBottom:14,cursor:'pointer',fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
-                <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1.2,fontWeight:600}}>Vendu aujourd'hui</div>
+                <div data-vendu-jour={Math.round(jourEur*100)} style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1.2,fontWeight:600}}>Vendu aujourd'hui</div>
                 <div style={{display:'flex',alignItems:'baseline',gap:8,flexWrap:'wrap',marginTop:4}}>
                   <span style={{fontSize:32,fontWeight:700,color:C.accent,letterSpacing:-1,lineHeight:1}}>{jourEur.toFixed(0)} €</span>
-                  <span style={{fontSize:15,fontWeight:600,color:C.text}}>{jourN} paire{jourN>1?'s':''}</span>
+                  <span style={{fontSize:15,fontWeight:600,color:C.text}}>{jourN} vente{jourN>1?'s':''}</span>
                 </div>
               </button>
+            )}
+
+            {/* VENDU / REÇU, JOUR PAR JOUR — sa propre carte, avec un titre :
+                dans le héros, la courbe des 14 jours était coiffée d'un total
+                MENSUEL d'une autre source (deux périodes, deux règles). */}
+            {!baseKO && !premierJour && !loading && sales.items && joursActifs && (
+              <div data-carte-jours="" style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'14px 16px',marginBottom:14,boxShadow:C.shadow||'none'}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:10,flexWrap:'wrap',marginBottom:12}}>
+                  <div style={{fontSize:14,fontWeight:700,color:C.text}}>Tes 14 derniers jours</div>
+                  <div style={{display:'flex',gap:14,fontSize:11.5,color:C.muted,fontWeight:500}}>
+                    <span style={{display:'inline-flex',alignItems:'center',gap:6}}><span aria-hidden="true" style={{width:9,height:9,borderRadius:2,background:C.accent}}/>Vendu</span>
+                    <span style={{display:'inline-flex',alignItems:'center',gap:6}}><span aria-hidden="true" style={{width:9,height:9,borderRadius:2,background:C.muted}}/>Reçu</span>
+                  </div>
+                </div>
+                <BarresVenduRecu jours={jours14}/>
+                <div style={{fontSize:11.5,color:C.muted,marginTop:10,lineHeight:1.5}}>
+                  <b style={{color:C.text,fontWeight:600}}>Vendu</b> : au jour de la vente, avant que l'argent arrive. <b style={{color:C.text,fontWeight:600}}>Reçu</b> : au jour où la vente est finalisée et l'argent versé dans ton porte-monnaie.
+                  {declarables === null && <> Les dates de versement n'ont pas pu être lues : la colonne « reçu » n'est pas dessinée — ce n'est pas zéro.</>}
+                  {adVinted > 0 && <span data-a-dater={adVinted}> {adVinted} vente{adVinted>1?'s':''} finalisée{adVinted>1?'s':''} attend{adVinted>1?'ent':''} encore {adVinted>1?'leur':'sa'} date de versement : pas encore dans « reçu » — {extSait('versement')==='ok' ? <>l'extension va {adVinted>1?'les':'la'} chercher à tes prochaines visites sur Vinted.</> : extSait('versement')==='retard' ? <>mets l'extension à jour ({EXT_CAPACITES.versement}) : c'est elle qui va chercher ces dates.</> : <>c'est l'extension, sur ton ordinateur, qui va chercher ces dates.</>}</span>}
+                </div>
+              </div>
             )}
 
             {/* « Ta semaine » RETIRÉE le 30 sept. : ses 3 nombres redisaient le
