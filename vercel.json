@@ -1,4 +1,5 @@
 {
+  "regions": ["dub1"],
   "crons": [
     {
       "path": "/api/ship-reminders",
@@ -24,6 +25,19 @@
     }
   ],
   "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Frame-Options",
+          "value": "SAMEORIGIN"
+        },
+        {
+          "key": "Content-Security-Policy",
+          "value": "frame-ancestors 'self'"
+        }
+      ]
+    },
     {
       "source": "/assets/(.*)",
       "headers": [
