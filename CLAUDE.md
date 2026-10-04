@@ -4445,6 +4445,74 @@ connexion », avec une vidéo en motion design, inspirée de Vinteer.
   Les MP4 ne montent pas dans le dépôt : ils se régénèrent après chaque
   changement de la démo (`npm run build` puis le script).
 
+### ⚠️⚠️ L'ABONNEMENT : 9,99 €/MOIS, ET QUI NE PAIE PLUS NE VOIT PLUS RIEN (4 octobre)
+Julien : « un abonnement à 10 € par mois » puis « **9,99** », « pour tout le monde
+sauf moi », « prélevé chaque mois à partir du moment où la personne s'abonne »,
+puis « la personne ne doit plus recevoir de notifications, voir ses données,
+etc. lorsqu'elle ne paye plus ».
+- **Stripe en MODE TEST seulement**, sans bibliothèque (`api/_lib/stripe.js`) :
+  Checkout (abonnement), portail de gestion, webhook signé (HMAC sur le corps
+  BRUT, comparaison en temps constant, 5 min de tolérance), version d'API
+  **figée** (`2026-08-26.dahlia` : `current_period_end` vit sur l'article).
+  Prix : clé `vrm_mensuel`. Tout passe par **`api/compte.js`** (le plan Hobby
+  plafonne à **12 fonctions** et le projet y est : `api/sante.js` y est devenu
+  un mode, `vercel.json` garde `/api/sante` et `/api/stripe-webhook`).
+- **Qui paie** : le serveur ne croit JAMAIS un identifiant du navigateur — il
+  demande à Supabase qui porte le jeton (`api/_lib/session.js`). Le statut ne
+  s'écrit QUE sur un événement Stripe signé, dans `abonnements` (lisible par le
+  vendeur, inscriptible par la clé de service seule — migration 005). Un
+  événement plus ancien n'écrase pas un plus récent ; une écriture ratée
+  répond 5xx (Stripe réessaie). Retour de paiement : adresse FIXE.
+- ⚠️⚠️ **LA RÈGLE D'ACCÈS VIT DANS LA BASE, EN UN SEUL ENDROIT** (migration 006,
+  `vrm_regle_acces`) : accès si l'abonnement n'est pas obligatoire · ou
+  propriétaire · ou `active`/`trialing` · ou `past_due` depuis **moins de
+  14 jours** (Stripe réessaie ; `impaye_depuis` garde le PREMIER échec, posé
+  par le webhook, effacé au retour du paiement). Elle est lue par :
+  · **la base elle-même** — politiques RESTRICTIVES `abonnement_requis` sur
+    `app_data` et `vinted_accounts` (en « ET » avec les règles d'owner) : ni
+    l'app, ni l'extension, ni un appel à la main ne lisent ni n'écrivent ;
+  · **l'app** — `vrm_acces` → `/api/compte?mode=abonnement` rend `acces`, et
+    `PorteAbonnement` se ferme sur `acces === false`, sans rien recalculer ;
+  · **le serveur** — `vrm_acces_pour` (`api/_lib/abonnement.js`) : plus aucune
+    notification (`sendPushToAll` → `coupe:'abonnement'`, sa liste d'appareils
+    n'est même pas lue) et le widget répond **402 sans aucun chiffre**.
+  ⚠️ Avant, « obligatoire » et « propriétaire » étaient deux variables
+  d'environnement : l'écran aurait pu dire « abonné » pendant que la base
+  refusait ses lignes (§11). Elles ne sont plus lues.
+- **Rien n'est supprimé** : les données d'un vendeur coupé restent intactes
+  (la clé de service continue de ranger ses emails) et réapparaissent dès qu'il
+  reprend. Ses appareils restent enregistrés : les notifications reviennent
+  sans rien réactiver.
+- **« Pas su » ne coupe pas** : la base ne répond pas sur l'accès ⇒ on notifie,
+  le widget répond, la porte reste ouverte (on ne fait pas rater une vente à un
+  payeur pour un hoquet) — mais `/api/compte?mode=abonnement` répond 503, jamais
+  une réponse devinée. Le verrou qui compte, ses DONNÉES, est tenu par RLS.
+- ⚠️⚠️ **TROUVÉ EN BRANCHANT LA COUPURE : `/api/push` NE SAVAIT PAS À QUI ÉTAIT
+  UN TÉLÉPHONE.** Il rangeait l'appareil chez le propriétaire de l'installation :
+  le téléphone d'un second vendeur aurait reçu les ventes de Julien. Prouvé au
+  banc (« rangé chez 9999… »). Base cloisonnée ⇒ la route exige la session
+  (401 sinon) et tout se passe dans le contexte de CE vendeur ; l'app et
+  `main.jsx` envoient le jeton (main.jsx attend qu'il soit frais, jamais
+  d'envoi anonyme). Et deux défauts voisins : la sonde `cloisonnee()` mémorisait
+  « non » sur une panne (lecture SANS filtre = les appareils d'un autre), et
+  `pushCategorieActive` passait un booléen à `duVendeur` — dès qu'un vendeur
+  était connu, ses préférences de notification étaient ignorées.
+  ⚠️ Le `pushsubscriptionchange` du service worker n'a pas de session : il
+  reçoit 401, et c'est l'ouverture suivante de l'app qui ré-enregistre.
+- **Réglage** : `vrm_reglages.abonnement_obligatoire` vaut **'0'** — RIEN n'est
+  bloqué aujourd'hui. Julien le passe à '1' quand Stripe est en mode réel ET que
+  les CGV et la page d'accueil (qui disent « gratuit ») sont à jour. Le
+  propriétaire est `vrm_reglages.proprietaire` (= `VRM_OWNER_UID`).
+- **À lui** : `STRIPE_SECRET_KEY` (sk_test_…) sur Vercel — le webhook et son
+  secret sont posés. La règle SQL a été exécutée sur la vraie base dans une
+  transaction ANNULÉE (cinq cas, rien n'a persisté).
+- Preuves : `audit-abonnement.cjs` (**44 contrôles**, exécute les vraies routes —
+  **14 rouges** sur le code d'avant, dont le téléphone rangé chez le
+  propriétaire et le widget qui montre ses chiffres ; réaffaibli → 5 rouges) ;
+  banc `abonnement.cjs` (**27**, rendu : la porte suit `acces`, un impayé de
+  plus de 14 jours envoie mettre la carte à jour, jamais repayer — 3 rouges sur
+  le build d'avant).
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
@@ -4612,8 +4680,8 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | outil | quoi |
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
-| `node scripts/audit-*.cjs` | **57 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
-| `scripts/bancs/*.cjs` | les **48 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
+| `node scripts/audit-*.cjs` | **58 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `scripts/bancs/*.cjs` | les **52 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
 **Trois règles de preuve :**
@@ -4892,8 +4960,8 @@ script-là me fait croire à une catastrophe.
 src/App.jsx                     l'app (grep avant de lire — le fichier est énorme)
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
-scripts/audit-*.cjs             les 57 audits
-scripts/bancs/                  les 48 bancs (leur README dit comment les lancer)
+scripts/audit-*.cjs             les 58 audits
+scripts/bancs/                  les 52 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 ```

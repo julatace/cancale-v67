@@ -13,17 +13,41 @@
 
 import webpush from 'web-push';
 
-import { withOwnerAll, conflictTarget, duVendeur } from './owner.js';
+import { withOwnerAll, conflictTarget, proprietaireCourant } from './owner.js';
 import { sbCle } from './cle.js';
+import { accesVendeur } from './abonnement.js';
 
-// La base sait-elle séparer les vendeurs ? (sondé une fois par instance)
+// La base sait-elle séparer les vendeurs ? Trois réponses, jamais deux :
+// 200 → oui · 400 (colonne inconnue) → non · le reste (522, délai) → PAS SU.
+// ⚠️ « Pas su » valait « non » ET restait en mémoire pour toute la vie de
+//    l'instance : la liste des appareils se lisait alors SANS filtre, donc
+//    celle du premier vendeur venu — une vente de Julien faisait sonner le
+//    téléphone de quelqu'un d'autre. Pas su ⇒ on filtre quand même (au pire la
+//    lecture échoue et on n'envoie rien) et on ne mémorise rien.
 let _cl = null;
-const cloisonnee = async () => {
+export const cloisonnee = async () => {
   if (_cl !== null) return _cl;
-  try { _cl = (await fetch(`${SUPABASE_URL}/rest/v1/app_data?select=owner&limit=1`, { headers: HEADERS })).ok; }
-  catch (_) { _cl = false; }
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?select=owner&limit=1`, { headers: HEADERS });
+    if (r.ok) _cl = true;
+    else if (r.status === 400) _cl = false;
+    else return true;
+  } catch (_) { return true; }
   return _cl;
 };
+
+// Le vendeur dont on lit/écrit les appareils : celui de la requête (session
+// vérifiée, adresse de réception d'un email, tour du rappel quotidien), sinon le
+// propriétaire de l'installation. ⚠️ Jamais « tout le monde » : sur une base
+// cloisonnée sans vendeur, on ne lit rien et on n'écrit rien.
+const OWNER_INSTALL = process.env.VRM_OWNER_UID || '';
+export const vendeurDuPush = () => proprietaireCourant() || OWNER_INSTALL;
+async function pourCeVendeur(url) {
+  if (!(await cloisonnee())) return url;            // une seule boutique : inchangé
+  const o = vendeurDuPush();
+  if (!o) return null;
+  return url + (url.includes('?') ? '&' : '?') + `owner=eq.${encodeURIComponent(o)}`;
+}
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 // ⚠️ CLÉ DE SERVICE QUAND ELLE EXISTE. Ces routes tournent sur le serveur, sans
@@ -89,7 +113,12 @@ export const PUSH_DEFAUT = {
 export async function pushCategorieActive(cat) {
   if (!cat) return true;
   try {
-    const res = await fetch(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.push_prefs&select=data`, await cloisonnee()), { headers: HEADERS });
+    // ⚠️ On passait ici `await cloisonnee()` — un BOOLÉEN — là où l'aide attend
+    //    la fonction : dès qu'un vendeur était connu, l'appel levait, et ses
+    //    préférences de notification étaient ignorées (le défaut s'appliquait).
+    const url = await pourCeVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.push_prefs&select=data`);
+    if (!url) return PUSH_DEFAUT[cat] !== false;
+    const res = await fetch(url, { headers: HEADERS });
     if (!res.ok) return PUSH_DEFAUT[cat] !== false;
     const rows = await res.json();
     const prefs = (rows && rows[0] && rows[0].data) || {};
@@ -102,7 +131,9 @@ export async function loadSubs() {
   try {
     // ⚠️ Les abonnements sont PAR VENDEUR : sans ce filtre, une vente de Julien
     // ferait sonner le téléphone de Marie.
-    const res = await fetch(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.push_subs&select=data`, cloisonnee), { headers: HEADERS });
+    const url = await pourCeVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.push_subs&select=data`);
+    if (!url) return null;                              // aucun vendeur : on ne lit pas ceux des autres
+    const res = await fetch(url, { headers: HEADERS });
     // ⚠️⚠️ `[]` VOULAIT DIRE DEUX CHOSES, ET LA SECONDE EFFAÇAIT SES TÉLÉPHONES.
     // « aucun appareil abonné » et « je n'ai pas pu lire la liste » rendaient la
     // MÊME valeur. Or `subscribe` fait lire-ajouter-réécrire : une lecture
@@ -118,12 +149,24 @@ export async function loadSubs() {
 
 // Rend VRAI seulement si la base a confirmé l'écriture. Avaler l'échec faisait
 // répondre « ✅ Activé sur cet appareil » à l'app alors que rien n'était rangé.
+// ⚠️ Sur une base cloisonnée, la ligne porte le vendeur DE LA REQUÊTE — pas
+//    celui de l'installation : l'appareil d'un second vendeur s'ajoutait sinon
+//    à la liste de Julien, et recevait ses ventes.
 export async function saveSubs(subs) {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${conflictTarget('id')}`, {
+    const data = { subs, updatedAt: new Date().toISOString() };
+    let row, conflit;
+    if (await cloisonnee()) {
+      const o = vendeurDuPush();
+      if (!o) return false;                             // à qui serait cette ligne ? personne
+      row = { owner: o, id: 'push_subs', data }; conflit = 'owner,id';
+    } else {
+      row = withOwnerAll([{ id: 'push_subs', data }])[0]; conflit = conflictTarget('id');
+    }
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${conflit}`, {
       method: 'POST',
       headers: { ...HEADERS, Prefer: 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify(withOwnerAll([{ id: 'push_subs', data: { subs, updatedAt: new Date().toISOString() } }])),
+      body: JSON.stringify([row]),
     });
     return !!(r && r.ok);
   } catch (_) { return false; }
@@ -155,6 +198,12 @@ const cleSansRapport = (e) => {
 // Les abonnements morts (appli désinstallée, permission retirée) sont purgés,
 // ainsi que ceux scellés sur une clé qui n'est plus la nôtre (voir ci-dessus).
 export async function sendPushToAll(payload) {
+  // ⚠️ QUI NE PAIE PLUS NE REÇOIT PLUS RIEN (Julien, 4 octobre). La règle est
+  //    celle de la base (`vrm_acces_pour`), la même qui ferme ses données. On
+  //    ne touche PAS à sa liste d'appareils : il reprend l'abonnement, les
+  //    notifications reviennent sans rien réactiver. « Pas su » ne coupe pas.
+  const owner = vendeurDuPush();
+  if (owner && (await accesVendeur(owner)) === false) return { sent: 0, total: null, coupe: 'abonnement' };
   // ⚠️ Sans clé privée (variable d'environnement absente), on n'envoie RIEN et
   // on le dit clairement — plutôt que de repartir sur la clé qui traînait dans
   // le dépôt public. Un envoi silencieusement impossible est pire qu'un refus

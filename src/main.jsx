@@ -118,11 +118,30 @@ if ('serviceWorker' in navigator) {
           // ⚠️ La MÊME clé que le serveur (src/vapid.js). Elle valait une autre
           // clé ici : chaque ouverture recréait un abonnement que le service de
           // push refuse, et en renvoyait un périmé tel quel.
+          // ⚠️ Le serveur range l'appareil chez le vendeur de la SESSION (sinon le
+          //    téléphone d'un vendeur recevait les ventes d'un autre). Le jeton
+          //    vit dans `vrm_session` ; s'il a expiré, l'app le renouvelle dans
+          //    la minute qui suit l'ouverture — on l'attend, sans rien envoyer
+          //    d'anonyme entre-temps. Pas de session (page d'accueil) : rien.
+          const jetonFrais = async () => {
+            for (let i = 0; i < 13; i++) {
+              try {
+                const s = JSON.parse(localStorage.getItem('vrm_session') || 'null');
+                if (!s || !s.access_token) return '';
+                if (!s.expires_at || Number(s.expires_at) > Date.now() + 30000) return s.access_token;
+              } catch (_) { return ''; }
+              await new Promise((r) => setTimeout(r, 5000));
+            }
+            return '';
+          };
           reg.pushManager.getSubscription().then(async (sub) => {
-            const send = (s) => fetch('/api/push', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'subscribe', sub: s.toJSON() }) }).catch(() => {});
+            const jeton = await jetonFrais();
+            if (!jeton) return;
+            const h = { 'Content-Type': 'application/json', Authorization: `Bearer ${jeton}` };
+            const send = (s) => fetch('/api/push', { method: 'POST', headers: h, body: JSON.stringify({ action: 'subscribe', sub: s.toJSON() }) }).catch(() => {});
             if (sub && abonnementAJour(sub)) return send(sub);
             if (sub) {
-              await fetch('/api/push', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'unsubscribe', endpoint: sub.endpoint }) }).catch(() => {});
+              await fetch('/api/push', { method: 'POST', headers: h, body: JSON.stringify({ action: 'unsubscribe', endpoint: sub.endpoint }) }).catch(() => {});
               await sub.unsubscribe().catch(() => {});
             }
             return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: cleVapid() }).then(send).catch(() => {});
