@@ -5034,6 +5034,56 @@ données captées (une copie ancienne écraserait une capture plus fraîche, §4
   vaut « pas su » (elle faisait basculer en passe GLOBALE, vendeurs mélangés), et
   ses réglages illisibles le font se taire au lieu de compter ses colis déjà
   postés. `ship-multi.cjs` : 3 rouges sur l'avant.
+### L'extension prévient l'app de ce qui a VRAIMENT eu lieu (4 octobre, 5.155)
+Aucune requête Vinted de plus ; tous les garde-fous du §3 inchangés.
+- **Achats** : une écriture d'`orders_purchased` qui ABOUTIT (voie passive
+  `storeHarvest` et active `storeHarvestRow`) envoie `maj · achats · uid` —
+  comme `maj · ventes`. Écriture ratée ⇒ rien.
+- **Code de retrait** : `noterRetrait(r, uid)` envoie `maj · retrait · uid · tx`
+  uniquement si un code NEUF a été écrit ET accepté. Elle rendait `true` même
+  quand l'écriture échouait (le journal disait « code récupéré » sur un code
+  rangé nulle part). Un seul endroit pour les trois chemins (conversation
+  passive, `capterRetraits`, direct).
+- L'app les écoute (`vrm:ext`) : `achats` relit les achats en silence, `retrait`
+  relit `panel_colis_relais` — un code lu dans une conversation apparaît sans
+  recharger.
+- **Capture plus pauvre refusée sur la voie active** : comptée
+  (`ignore_partiel_actif_<type>`, même famille que `ignore_partiel_<type>`),
+  elle se taisait.
+- **« Relis mes ventes »** : `rafraichirVentes` rend `{ok, ecrit, raison}`
+  (`compte · lecture · aucune · plus-pauvre · ecriture`) au lieu de `true` sans
+  rien écrit. Lecture « ratée » = Vinted n'a rendu AUCUNE page (`pagesLues`), pas
+  une liste vide. La commande `ventes` suit la forme de `bordereau` : accusé
+  `file` + `jobId = ventes:{uid}`, puis `fait` · `rien` (avec la raison) ·
+  `echec` dans `vrmCmds`. La garde des 90 s est **relâchée** sur un échec
+  (lecture ou écriture : la demande suivante réessaie), **gardée** sur un succès
+  ET sur un refus « plus pauvre » (sinon un refus durable relirait à chaque
+  ouverture d'écran). Même règle pour la visite (`prendreGardeVentes` /
+  `rendreGardeVentes`, qui ne relâche que SA marque).
+  ⚠️ **Relâcher n'est pas effacer (§3)** : la visite tourne à chaque page
+  Vinted — une garde effacée sur un échec DURABLE (jeton mort, base en panne)
+  relirait `my_orders` à chaque page. Elle est ramenée à **20 s**
+  (`VENTES_REESSAI_MS`), et quand c'est **Vinted qui freine (429/403)** elle
+  reste entière (`raison: 'vinted-freine'`).
+- **`supabaseUpsert`** : toujours un booléen, mais un refus est noté
+  `ecriture_ratee_<famille>_<code HTTP|reseau>` — la famille ne garde que les
+  mots de l'id (aucun n° de compte, de transaction, de suivi), jamais le corps.
+  UN seul nouvel essai après un **401 sur base cloisonnée**, et seulement si
+  `refreshSession` rend un jeton (un seul renouvellement en vol) ; jamais sur un
+  5xx ni le réseau (l'écriture a pu passer).
+  ⚠️ `noterDiag` n'y est **pas** attendu : `viderTampon` écrit par
+  `supabaseUpsert` depuis la chaîne du tampon — l'attendre la bloquerait.
+- **`viderTampon` vidait le tampon même quand son écriture échouait** (son
+  commentaire disait le contraire) : les compteurs d'un tour partaient avec.
+  Il ne vide plus que ce qui est arrivé en base.
+- `scripts/audit-evt-extension.cjs` exécute le vrai `background.js` (base à
+  état, projection `select=` appliquée) : **47 contrôles, 23 rouges sur
+  c117b30**, et **14 mutations sur 14** repassent au rouge (un envoi retiré, la
+  garde jamais rendue / effacée / rendue sur un 429, le compteur d'écriture
+  retiré, un nouvel essai sur un 5xx, la famille qui laisse passer le n° de
+  compte…). `--src chemin` lance l'audit sur une copie mutée.
+- Extension **5.155.0**, zip régénéré, `EXT_ATTENDUE` suivie. Aucune entrée
+  d'`EXT_CAPACITES` : rien de neuf n'est promis.
 
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée

@@ -262,9 +262,34 @@ function getCookie(domain, name) {
   });
 }
 
+// ⚠️ UNE ÉCRITURE RATÉE SE DIT AVEC SON CODE (4 octobre, 5.155). `supabaseUpsert`
+//    rendait `res.ok` et rien d'autre : « la base a refusé » (401 jeton mort,
+//    403 abonnement, 400 colonne absente, 413 trop gros) et « la base n'a pas
+//    répondu » (522, réseau) finissaient tous en un même `false`, et chaque
+//    appelant notait au mieux `ecriture_ratee_<type>` — sans dire POURQUOI.
+//    Ces cas ne se corrigent pas de la même façon. On note donc la FAMILLE de la
+//    ligne et le CODE HTTP (`ecriture_ratee_<famille>_<code>`), jamais le corps.
+//    Le contrat ne bouge pas : on rend toujours un booléen.
+//    La famille retire les identifiants (compte, transaction, UUID) : le nombre
+//    de clés reste borné, et aucun identifiant ne part dans le diagnostic.
+function familleEcriture(table, rows) {
+  if (table !== 'app_data') return String(table || 'table').replace(/[^a-zA-Z_]/g, '').slice(0, 30) || 'table';
+  const id = String((rows && rows[0] && rows[0].id) || '');
+  // Un segment qui porte un chiffre ou un signe (n° de compte, de transaction,
+  // de suivi, UUID) est une IDENTITÉ, pas une famille : on le retire en entier
+  // (sinon `XW476115185SP` laisserait `XWSP`). Quatre mots au plus.
+  return id.split('_').filter((s) => /^[a-zA-Z]+$/.test(s)).slice(0, 4).join('_').slice(0, 40) || 'inconnu';
+}
+// Un seul renouvellement de session en vol : deux écritures refusées en même
+// temps ne doivent pas consommer deux fois le même jeton de renouvellement.
+let _renouvEnVol = null;
+function renouvelerUneFois() {
+  if (!_renouvEnVol) _renouvEnVol = refreshSession().catch(() => null).finally(() => { _renouvEnVol = null; });
+  return _renouvEnVol;
+}
 async function supabaseUpsert(table, rows, onConflict) {
-  try {
-    const list = Array.isArray(rows) ? rows : [rows];
+  const list = Array.isArray(rows) ? rows : [rows];
+  const envoyer = async () => {
     const owned = [];
     for (const r of list) owned.push(await withOwner(r));
     // Sur app_data la cible du conflit depend du mode (solo / multi-vendeurs).
@@ -274,13 +299,33 @@ async function supabaseUpsert(table, rows, onConflict) {
       const s = await authToken();
       if (s && s.user_id) target = 'owner,vinted_user_id';
     }
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?on_conflict=${target}`, {
+    return fetch(`${SUPABASE_URL}/rest/v1/${table}?on_conflict=${target}`, {
       method: 'POST',
       headers: await sbHeaders({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }),
       body: JSON.stringify(owned),
     });
-    return res.ok;
-  } catch (_) { return false; }
+  };
+  let statut = 'reseau';
+  try {
+    let res = await envoyer();
+    // ⚠️ UN SEUL nouvel essai, et SEULEMENT après un 401 sur une base
+    //    cloisonnée dont la session vient d'être renouvelée : un 401 veut dire
+    //    « la base a refusé AVANT d'écrire » (jeton périmé), donc rejouer ne peut
+    //    pas écrire deux fois — et l'upsert fusionne de toute façon sur l'id.
+    //    Aucun nouvel essai sur un 5xx / réseau : l'écriture a pu passer, et la
+    //    rejouer à l'aveugle n'est pas notre affaire ici (l'appelant réessaie au
+    //    cycle suivant, avec une donnée fraîche).
+    if (res.status === 401 && await isCloisonne()) {
+      const s2 = await renouvelerUneFois();
+      if (s2 && s2.access_token) res = await envoyer();
+    }
+    if (res.ok) return true;
+    statut = String(res.status || 'inconnu');
+  } catch (_) { statut = 'reseau'; }
+  // ⚠️ JAMAIS `await` ici : `viderTampon` écrit lui-même par `supabaseUpsert`
+  //    depuis la chaîne du tampon — attendre `noterDiag` l'y bloquerait.
+  try { noterDiag(`ecriture_ratee_${familleEcriture(table, list)}_${statut}`); } catch (_) {}
+  return false;
 }
 
 // --- Capture des comptes ---------------------------------------------------
@@ -517,10 +562,14 @@ async function viderTampon(buf) {
   // iPhone ce qu'un Chrome sait faire, c'est-à-dire le défaut le plus coûteux
   // du projet. `audit-coherence.cjs` l'interdit.
   const ver = (() => { try { return String(chrome.runtime.getManifest().version || ''); } catch (_) { return ''; } })();
-  await supabaseUpsert('app_data', [{ id: 'panel_diag_capture', data: {
+  const okDiag = await supabaseUpsert('app_data', [{ id: 'panel_diag_capture', data: {
     ...tout, n, rates: { ...(tout.rates || {}), ...(buf.rates || {}) }, majAt: new Date().toISOString(),
     ...(ver ? { ver, verAt: new Date().toISOString() } : {}),
   } }], 'id');
+  // ⚠️ LE TITRE DE CETTE FONCTION LE DISAIT, LE CODE NE LE FAISAIT PAS : le
+  //    tampon était vidé même quand l'écriture avait échoué — les compteurs d'un
+  //    tour partaient avec elle. On ne vide que ce qui est arrivé en base.
+  if (okDiag === false) return;
   buf.n = {}; buf.rates = {};
   try { await chrome.storage.local.set({ [DIAG_BUF]: buf }); } catch (_) {}
 }
@@ -822,6 +871,11 @@ async function storeHarvest(domain, type, id, body) {
   // Des ventes viennent d'être rangées : l'app ouverte les relit TOUT DE SUITE
   // (« presque instantanément dès que je fais une vente », 2 octobre).
   if (ecrit !== false && type === 'orders_sold') notifierApp({ type: 'maj', quoi: 'ventes', uid: String(uid) });
+  // Même chose pour les ACHATS (4 octobre) : un colis qui passe « déposé en point
+  // relais » est vu ici en premier — l'app ne le voyait qu'à sa relecture
+  // suivante. Seulement si l'écriture a ABOUTI : prévenir sur un échec ferait
+  // relire une ligne qui n'a pas bougé.
+  if (ecrit !== false && type === 'orders_purchased') notifierApp({ type: 'maj', quoi: 'achats', uid: String(uid) });
 
   // Apprentissage passif des codes de statut d'offre (voir noterStatutsOffres).
   if (type === 'conversation') { try { await noterStatutsOffres(parsed); } catch (_) {} }
@@ -830,7 +884,7 @@ async function storeHarvest(domain, type, id, body) {
   // suite. C'est le moment où on les a sous la main, et c'est la seule source
   // pour Vinted Go (aucun email ne les porte).
   if (type === 'conversation') {
-    try { const r = retraitDeConversation(parsed); if (r) await noterRetrait(r); } catch (_) {}
+    try { const r = retraitDeConversation(parsed); if (r) await noterRetrait(r, uid); } catch (_) {}
   }
 
   // Une fiche d'annonce vient d'arriver → on la met au COFFRE (texte complet +
@@ -2310,7 +2364,12 @@ function retraitDeConversation(conv) {
 // un rapprochement par titre. Une entrée de plus de 45 jours est purgée : un
 // colis n'attend pas si longtemps, et la ligne doit rester légère (§34).
 const RETRAIT_MAX_J = 45;
-async function noterRetrait(r) {
+// ⚠️ Rend `true` UNIQUEMENT si quelque chose de NEUF a été écrit ET que la base
+//    l'a accepté (avant : `true` même quand l'écriture échouait — le journal
+//    annonçait « code récupéré » sur un code qui n'était nulle part). C'est
+//    aussi ce qui prévient l'app (`maj · retrait`) : un seul endroit, quel que
+//    soit le chemin (conversation passive ou `capterRetraits`).
+async function noterRetrait(r, uid) {
   if (!r || !r.tx) return false;
   try {
     const rows = await sbGet('app_data?id=eq.panel_colis_relais&select=data');
@@ -2327,8 +2386,10 @@ async function noterRetrait(r) {
     const out = {};
     for (const k in cur) { const v = cur[k]; if (v && Date.parse(v.at || '') > limite) out[k] = v; }
     out[r.tx] = r;
-    await supabaseUpsert('app_data', [{ id: 'panel_colis_relais', data: out }], 'id');
+    const ok = await supabaseUpsert('app_data', [{ id: 'panel_colis_relais', data: out }], 'id');
+    if (ok === false) { noterDiag('retrait_conv_ecriture_ratee'); return false; }
     noterDiag('retrait_conv_ecrit');
+    if (uid) notifierApp({ type: 'maj', quoi: 'retrait', uid: String(uid), tx: String(r.tx) });
     return true;
   } catch (_) { return false; }
 }
@@ -2375,7 +2436,7 @@ async function storeHarvestRow(uid, type, payload, domain) {
   // Idem côté moisson active — depuis le payload BRUT : l'allègement ne touche
   // pas `billing` aujourd'hui, mais un relevé ne doit pas dépendre de ça.
   if (type === 'billing') { try { await storeReleve(uid, brut, domain); } catch (_) {} }
-  if (type === 'billing' && !estPorteMonnaie(payload)) return;
+  if (type === 'billing' && !estPorteMonnaie(payload)) return 'hors-sujet';
   const maintenant = new Date().toISOString();
   const data = { type, uid, domain: domain || 'www.vinted.fr', capturedAt: maintenant, payload };
   // Même règle que la voie passive : un dressing partiel n'écrase pas un
@@ -2384,7 +2445,16 @@ async function storeHarvestRow(uid, type, payload, domain) {
   // veut pas que le résultat tronqué remplace la bonne capture.
   if (CLE_LISTE[type]) {
     data.nItems = ((payload && payload[CLE_LISTE[type]]) || []).length;
-    if (!(await listePlusRiche(`harvest_${uid}_${type}`, payload, CLE_LISTE[type]))) return;
+    // ⚠️ UN REFUS SE COMPTE, COMME SUR LA VOIE PASSIVE (`ignore_partiel_<type>`).
+    //    Ici il se taisait : une lecture active tronquée (une page qui échoue en
+    //    cours de route) ne laissait AUCUNE trace, et « rien écrit » restait
+    //    indiscernable de « rien lu ». Même famille de nom, suffixe `actif` :
+    //    sur cette voie le refus veut dire « une page a manqué », pas « la page
+    //    affichait un aperçu ».
+    if (!(await listePlusRiche(`harvest_${uid}_${type}`, payload, CLE_LISTE[type]))) {
+      noterDiag(`ignore_partiel_actif_${type}`);
+      return 'plus-pauvre';
+    }
   }
   data.resume = resumeCommandes(type, payload) || undefined;
   // On ecrit AUSSI updated_at : la table n'a pas de trigger, la colonne gardait
@@ -2393,10 +2463,14 @@ async function storeHarvestRow(uid, type, payload, domain) {
   // app, mais autant que la colonne cesse de mentir aux autres lecteurs.
   const ecritRow = await supabaseUpsert('app_data', [{ id: `harvest_${uid}_${type}`, data, updated_at: maintenant }], 'id');
   if (ecritRow !== false && type === 'orders_sold') notifierApp({ type: 'maj', quoi: 'ventes', uid: String(uid) });
+  if (ecritRow !== false && type === 'orders_purchased') notifierApp({ type: 'maj', quoi: 'achats', uid: String(uid) });
   noterFlux('vinted', ecritRow !== false);
   if (type === 'listings') {
     try { const tous = (brut && brut.items) || []; await archiverLot(uid, tous.filter(it => it && !it.is_closed && !it.is_hidden && !it.is_draft), tous); } catch (_) {}
   }
+  // Ce qui s'est PASSÉ, pour qui veut le savoir (`rafraichirVentes`) : les
+  // autres appelants l'ignorent, rien ne change pour eux.
+  return ecritRow !== false ? 'ecrit' : 'ecriture-ratee';
 }
 
 // Recupere TOUTES les pages du dressing. Vinted plafonne per_page a ~96 : sans
@@ -2420,11 +2494,16 @@ async function fetchAllWardrobe(getter, profileId, maxPages = 10) {
 
 // Recupere TOUTES les pages de commandes d'un type (ventes/achats), en douceur.
 // On s'arrete quand une page est incomplete (derniere) ou au plafond de securite.
-async function fetchAllOrders(acc, type, maxPages = 8) {
+// `suivi` (facultatif) reçoit `pagesLues` : 0 = Vinted n'a RIEN rendu (lecture
+// ratée), ce qu'une liste vide ne dit pas — un compte sans vente rend aussi `[]`.
+// Il vit à côté du résultat, jamais dedans : le résultat part tel quel en base.
+async function fetchAllOrders(acc, type, maxPages = 8, suivi) {
   let all = []; let pagination = null;
+  if (suivi) suivi.pagesLues = 0;
   for (let page = 1; page <= maxPages; page++) {
     const r = await vintedGet(acc, `/api/v2/my_orders?type=${type}&page=${page}&per_page=40`);
-    if (!r.ok || !r.json || !Array.isArray(r.json.my_orders)) break;
+    if (!r.ok || !r.json || !Array.isArray(r.json.my_orders)) { if (suivi) suivi.statut = r && r.status; break; }
+    if (suivi) suivi.pagesLues++;
     all = all.concat(r.json.my_orders);
     pagination = r.json.pagination || pagination;
     if (r.json.my_orders.length < 40) break; // derniere page atteinte
@@ -2802,18 +2881,81 @@ let visiteTimer = null;
 // ⚠️ Réutilise `fetchAllOrders` + `storeHarvestRow` (donc les garde-fous
 //    existants : jamais écraser une capture plus riche par une plus pauvre,
 //    §5.19). On n'écrit pas une deuxième façon de lire les ventes (§11).
+// ⚠️⚠️ ELLE RENDAIT `true` SANS AVOIR RIEN ÉCRIT (4 octobre, 5.155). Une capture
+//    plus pauvre refusée, une écriture que la base n'a pas prise : `true` quand
+//    même, `ventes_rafraichies` au compteur, et la garde de 90 s restait posée —
+//    la demande suivante de l'app tombait sur « récent » alors que RIEN n'avait
+//    été rafraîchi. « Rien écrit » ne vaut pas « rafraîchi ».
+//    Elle rend maintenant ce qui s'est passé :
+//      { ok, ecrit, raison }
+//      · ok    = la lecture ET l'écriture ont fonctionné (ou il n'y avait
+//                légitimement rien à écrire) — la garde reste posée ;
+//      · ecrit = des ventes sont arrivées en base ;
+//      · raison ∈ compte · lecture · vinted-freine (429/403) · aucune ·
+//                 plus-pauvre · ecriture.
 async function rafraichirVentes(uid) {
   const accts = await getStoredAccounts();
   const acc = accts.find(a => String(a.vinted_user_id) === String(uid));
-  if (!acc) return false;
-  const sold = await fetchAllOrders(acc, 'sold');
-  if (!sold || !sold.my_orders || !sold.my_orders.length) return false;
-  await storeHarvestRow(uid, 'orders_sold', sold, acc.domain || 'www.vinted.fr');
+  if (!acc) return { ok: false, ecrit: false, raison: 'compte' };
+  const suivi = { pagesLues: 0 };
+  const sold = await fetchAllOrders(acc, 'sold', undefined, suivi);
+  // Aucune page rendue par Vinted : c'est une lecture RATÉE, pas « aucune vente ».
+  if (!sold || !Array.isArray(sold.my_orders) || !suivi.pagesLues) {
+    noterDiag('ventes_lecture_ratee');
+    // 429 / 403 : c'est VINTED qui dit « ralentis » ou « non ». Ce n'est pas un
+    // échec à réessayer vite — la garde entière reste (§3, la limite de volume).
+    const freine = suivi.statut === 429 || suivi.statut === 403;
+    return { ok: false, ecrit: false, raison: freine ? 'vinted-freine' : 'lecture', garder: freine };
+  }
+  if (!sold.my_orders.length) return { ok: true, ecrit: false, raison: 'aucune' };
+  const issue = await storeHarvestRow(uid, 'orders_sold', sold, acc.domain || 'www.vinted.fr');
+  if (issue === 'plus-pauvre') return { ok: true, ecrit: false, raison: 'plus-pauvre' };
+  if (issue !== 'ecrit') return { ok: false, ecrit: false, raison: 'ecriture' };
   // ⚠️ On vient d'écrire des ventes FRAÎCHES : tout ce que le mémo de visite
   // garde sur ce compte est périmé à la milliseconde près. On le vide.
   viderMemoVisite(uid);
   noterDiag('ventes_rafraichies');
-  return true;
+  return { ok: true, ecrit: true, raison: '' };
+}
+// ── LA GARDE DES 90 s, POSÉE AVANT, RENDUE SUR UN ÉCHEC ────────────────────
+// Elle est posée AVANT la lecture (deux demandes simultanées ne lisent pas deux
+// fois). Mais si la lecture ou l'écriture ÉCHOUE, la garder reviendrait à dire
+// « récent » pendant 90 s sur des ventes qui n'ont pas bougé : on la RELÂCHE,
+// pour que la demande suivante réessaie. On ne relâche que SA propre marque —
+// jamais celle qu'une autre demande aurait posée entre-temps.
+// ⚠️ Une capture plus pauvre REFUSÉE n'est pas un échec : la lecture a eu lieu,
+//    la garde reste (sinon un refus durable relancerait une lecture à chaque
+//    ouverture d'écran — la limite de volume des 90 s tomberait).
+// ⚠️ « RELÂCHER » NE VEUT PAS DIRE « EFFACER » (§3). La visite tourne à chaque
+//    page Vinted chargée : une garde effacée sur un échec DURABLE (jeton mort,
+//    base en panne) relirait `my_orders` à chaque page — la limite de volume
+//    tomberait exactement quand quelque chose va mal. On la ramène donc à
+//    `VENTES_REESSAI_MS` (20 s) : la demande suivante réessaie, jamais en rafale.
+//    Et quand c'est Vinted qui freine (429/403), on ne relâche RIEN.
+const VENTES_REESSAI_MS = 20 * 1000;
+async function prendreGardeVentes(uid) {
+  const dv = (await chrome.storage.local.get('vrmDerniereVente')).vrmDerniereVente || {};
+  if (Date.now() - Number(dv[uid] || 0) < VENTES_DELAI_MS) return null;
+  const marque = Date.now();
+  dv[uid] = marque;
+  await chrome.storage.local.set({ vrmDerniereVente: dv });
+  return marque;
+}
+async function rendreGardeVentes(uid, marque) {
+  try {
+    const dv = (await chrome.storage.local.get('vrmDerniereVente')).vrmDerniereVente || {};
+    if (Number(dv[uid]) !== Number(marque)) return;
+    // La garde expire désormais dans 20 s au lieu de 90.
+    dv[uid] = Date.now() - VENTES_DELAI_MS + VENTES_REESSAI_MS;
+    await chrome.storage.local.set({ vrmDerniereVente: dv });
+  } catch (_) {}
+}
+// Rafraîchit sous la garde : rend le résultat, et relâche la garde sur un échec.
+async function rafraichirVentesGarde(uid, marque) {
+  let r;
+  try { r = await rafraichirVentes(uid); } catch (_) { r = { ok: false, ecrit: false, raison: 'lecture' }; }
+  if (!r || (!r.ok && !r.garder)) await rendreGardeVentes(uid, marque);
+  return r;
 }
 
 async function visiteVinted() {
@@ -2830,12 +2972,8 @@ async function visiteVinted() {
     // alors que la vente ne demande QU'UNE requête (`my_orders?type=sold`).
     // Ce bloc ne coûte rien de plus : ce sont les mêmes appels, simplement
     // placés avant le lourd. Rien à voir avec un « rythme humain » (§32).
-    const dv = (await chrome.storage.local.get('vrmDerniereVente')).vrmDerniereVente || {};
-    if (Date.now() - Number(dv[uid] || 0) >= VENTES_DELAI_MS) {
-      dv[uid] = Date.now();
-      await chrome.storage.local.set({ vrmDerniereVente: dv });
-      try { await rafraichirVentes(uid); } catch (_) {}
-    }
+    const marqueVentes = await prendreGardeVentes(uid);
+    if (marqueVentes !== null) await rafraichirVentesGarde(uid, marqueVentes);
     // ⚠️ LA VISITE GÉNÈRE, TOUTE SEULE (Julien, 27 août puis 3 septembre :
     // « que ça envoie direct dans l'app sans me demander »). Cohérent avec
     // §5.29 : générer un bordereau n'engage AUCUN argent et ne décide de rien
@@ -3312,15 +3450,27 @@ async function executerCommande(msg) {
   // UNE lecture (my_orders) du compte connecté dans Chrome — jamais d'un autre —
   // bornée par le même délai que la visite (90 s) : ouvrir l'app dix fois ne
   // fait pas dix requêtes. C'est une LECTURE de ses propres ventes (§3).
+  // ⚠️ ELLE RÉPONDAIT « ventes » TOUT DE SUITE, AVANT D'AVOIR LU QUOI QUE CE SOIT,
+  //    et rien ne disait ensuite si des ventes étaient vraiment arrivées. Elle
+  //    suit maintenant la forme de la commande « bordereau » : accusé immédiat
+  //    (`file`), puis l'étape VRAIE dans `vrmCmds` sous `ventes:{uid}` —
+  //    `fait` (des ventes sont arrivées) · `rien` (lu, rien de neuf à écrire,
+  //    avec la raison) · `echec` (lecture ou écriture ratée — la garde est
+  //    ramenée à 20 s, la prochaine demande réessaie ; Vinted qui freine en
+  //    429/403 : garde entière).
   if (msg && msg.cmd === 'ventes') {
     const uid = await compteConnecte('www.vinted.fr');
     if (!uid) return { accepte: false, code: 'vinted-absent', raison: "aucun compte Vinted connecté dans ce Chrome" };
-    const dv = (await chrome.storage.local.get('vrmDerniereVente')).vrmDerniereVente || {};
-    if (Date.now() - Number(dv[uid] || 0) < VENTES_DELAI_MS) return { accepte: true, etape: 'recent' };
-    dv[uid] = Date.now();
-    await chrome.storage.local.set({ vrmDerniereVente: dv });
-    avecVinted(() => rafraichirVentes(uid)).catch(() => {});
-    return { accepte: true, etape: 'ventes' };
+    const jobId = `ventes:${uid}`;
+    const marque = await prendreGardeVentes(uid);
+    if (marque === null) return { accepte: true, jobId, etape: 'recent' };
+    await majCmd(jobId, { etape: 'file', uid: String(uid), raison: null });
+    avecVinted(async () => {
+      const r = await rafraichirVentesGarde(uid, marque);
+      const etape = r && r.ecrit ? 'fait' : (r && r.ok ? 'rien' : 'echec');
+      await majCmd(jobId, { etape, raison: (r && r.raison) || null });
+    }).catch(() => {});
+    return { accepte: true, jobId, etape: 'file' };
   }
   if (msg && /^(lbcPublier|lbcMarque|lbcQuota|ebayPreparer|ebayMarque)$/.test(String(msg.cmd || ''))) return await publierDepuisApp(msg);
   if (!msg || msg.cmd !== 'bordereau') return { accepte: false, code: 'inconnue', raison: 'commande inconnue' };
@@ -4293,7 +4443,7 @@ async function capterRetraits(uid) {
       const r = retraitDeConversation(rep.json);
       if (!r) { noterDiag('retrait_conv_sans_message'); continue; }
       if (!r.tx && tx) r.tx = tx;                                 // identité de l'achat
-      const ecrit = await noterRetrait(r);
+      const ecrit = await noterRetrait(r, uid);
       if (ecrit) logActivity(`📦 Code de retrait récupéré — ${(r.code || r.lieu || '').slice(0, 40)}`);
     }
     await chrome.storage.local.set({ vrmRetraitFaits: memo });
