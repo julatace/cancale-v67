@@ -2793,6 +2793,9 @@ const classifyOrderStatus = (status) => {
   // ou la transaction n'est pas validée). Si Vinted finalise ensuite, le statut
   // capté redevient « finalisée » et la vente se reclasse automatiquement.
   if (/annul|cancel|refus|rembours|retour|suspend/i.test(s)) return 'cancelled';
+  // « Le paiement a échoué » (statut 220, vu en base) : aucune vente n'a eu lieu.
+  // Sans ce test il comptait dans les « ventes en cours » et comme colis à poster.
+  if (/paiement\s+a\s+[ée]chou|[ée]chec\s+du\s+paiement/i.test(s)) return 'cancelled';
   if (/finalis/i.test(s)) return 'completed';
   return 'pending';
 };
@@ -3030,7 +3033,13 @@ const heureCommande = (o) => {
   const t = tsCommande(o); if (!t) return '';
   try { return new Date(t).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }); } catch (_) { return ''; }
 };
-const isAwaitingShipStatus = (s) => /bordereau\s+envoy[ée]\s+au\s+vendeur/i.test(s || '') || /paiement.*valid/i.test(s || '');
+// ⚠️ « Bordereau d'envoi commandé » (4 octobre) et « Commande du bordereau
+// d'envoi validée » (1er septembre) : Vinted change la tournure d'une époque à
+// l'autre pour la MÊME étape — la vente attend toujours ton envoi. Avec les deux
+// seules phrases d'avant, la vente que l'app venait de faire générer disparaissait
+// de Colis dès que son PDF arrivait. MÊME EXPRESSION dans l'extension
+// (`AWAITING_SHIP`) et le widget (`awaitingShip`) — `audit-statuts.cjs` compare.
+const isAwaitingShipStatus = (s) => /bordereau\s+envoy[ée]\s+au\s+vendeur|bordereau\s+d.envoi\s+command|commande\s+du\s+bordereau/i.test(s || '') || /paiement.*valid/i.test(s || '');
 // Une vente attend une GÉNÉRATION de bordereau quand Vinted dit que le paiement
 // est validé et qu'aucun bordereau n'a encore été émis. ⚠️ « Bordereau envoyé au
 // vendeur » veut dire qu'il EXISTE DÉJÀ : la paire attend l'envoi, pas la
@@ -3048,6 +3057,8 @@ const needsBordereau = (status) => {
   const s = (status || '').toLowerCase();
   if (!s) return true;
   if (/annul|refus|rembours|cancel|retour|suspend/.test(s)) return false;
+  // « Le paiement a échoué » : aucune paire ne part (mesuré : statut 220 en base).
+  if (/paiement\s+a\s+[ée]chou|[ée]chec\s+du\s+paiement/.test(s)) return false;
   if (/finalis|termin|complet|cl[oô]tur/.test(s)) return false;            // vente finie
   // ⚠️ « BORDEREAU ENVOYÉ AU VENDEUR » N'EST PAS UN COLIS PARTI. Le test
   // « déjà expédié » ci-dessous attrape le mot « envoyé » — donc au moment
@@ -3061,6 +3072,50 @@ const needsBordereau = (status) => {
   if (/exp[eé]di|envoy|transit|achemin|en route|livr|remis|r[ée]ception/.test(s)) return false; // déjà parti/arrivé
   return true;                                                              // à expédier
 };
+
+// ── « CETTE VENTE ATTEND-ELLE MON ENVOI ? » — UNE SEULE RÈGLE (4 octobre) ──
+// Vinted fournit un champ MACHINE, `transaction_user_status`, présent sur
+// 1 505 lignes de vente sur 1 505 (mesuré). Il découpe les neuf libellés sans
+// une exception : `needs_action` = exactement les 8 ventes à poster,
+// `waiting` = en route / au relais / non réclamée / retour, `completed` =
+// finalisées, `failed` = remboursées. Le TEXTE, lui, change de tournure d'une
+// époque à l'autre (« Commande du bordereau d'envoi validée » → « Bordereau
+// d'envoi commandé ») et chaque tournure nouvelle faisait diverger les écrans :
+// le 4 octobre, Colis comptait 2 colis à poster, Ma journée 3, la cloche 3 et le
+// widget 6, pour 3 colis réels.
+// ⇒ Le champ machine d'abord ; le texte seulement pour une vieille capture qui
+//   ne le porte pas. Et un texte qui dit « annulé / remboursé / retour /
+//   finalisé / paiement échoué » l'emporte TOUJOURS : si Vinted réutilise un jour
+//   `needs_action` pour « accepte ou refuse le retour », ce n'est pas un colis.
+// ⚠️ LISTE DES VENTES SEULEMENT. Sur les ACHATS, `needs_action` veut dire « va
+//    retirer ton colis » (4 achats au relais le portent) : ne jamais appliquer
+//    cette règle à un achat. MÊME RÈGLE dans l'extension (`A_EXPEDIER`) et le
+//    widget — `scripts/audit-statuts.cjs` les exécute toutes sur le même corpus.
+const PAS_UN_ENVOI = /annul|cancel|refus|rembours|retour|suspend|finalis|paiement\s+a\s+[ée]chou|[ée]chec\s+du\s+paiement/i;
+const tusDe = (o) => String((o && o.transaction_user_status) || '').toLowerCase();
+const aExpedier = (o) => {
+  if (!o) return false;
+  const s = String(o.status || '');
+  if (PAS_UN_ENVOI.test(s)) return false;
+  const t = tusDe(o);
+  if (t === 'needs_action') return true;
+  if (t === 'waiting' || t === 'completed' || t === 'failed') return false;
+  return needsBordereau(s);
+};
+// Délai d'expédition d'une date limite Vinted (« JJ/MM/AAAA ») : jours restants
+// jusqu'à la fin de ce jour-là (négatif = dépassé). Partagé par la carte du
+// bordereau et le rappel de Ma journée (§11).
+const joursAvantLimiteFr = (dateLimite) => {
+  const m = String(dateLimite || '').match(/(\d{2})\/(\d{2})\/(\d{4})/); if (!m) return null;
+  const d = new Date(+m[3], +m[2] - 1, +m[1], 23, 59, 59);
+  return Math.floor((d - new Date()) / 86400000);
+};
+// ⚠️ 7 JOURS, PAS 5. Mesuré sur 176 bordereaux dont la vente est connue :
+// date limite − date de vente = 7 j (123 fois), 8 (24), 9 (26), 10 (3) — JAMAIS
+// moins de 7. Avec 5, Ma journée criait « en retard » deux jours trop tôt. Ce
+// n'est qu'un repli : la date limite écrite dans l'email du bordereau passe
+// devant quand on l'a.
+const DELAI_EXPEDITION_J = 7;
 
 // Recupere une page d'achats ou de ventes pour un compte (endpoint reel
 // trouve via "Copy as fetch" : www.vinted.fr/api/v2/my_orders).
@@ -17205,7 +17260,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       </div>
     );
   };
-  const [vFilter, setVFilter] = useState('all'); // encours | finalisees | annulees | all
+  const [vFilter, setVFilter] = useState('all'); // aexpedier | transit | finalisees | annulees | all (encours : ancien lien)
   // Par défaut : « En attente » = ce que je dois recevoir (les annulées sont
   // nombreuses et n'apparaissent que dans « Tous »).
   const [aFilter, setAFilter] = useState('attente'); // attente | recus | all
@@ -17495,7 +17550,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
   // Même règle que `toShip` : un compte masqué ne fait pas disparaître un colis
   // à poster (seule une vente masquée à la main sort de la liste).
-  const vintedToShip = useMemo(() => (sales.items || []).filter(o => !hiddenSales.has(String(o.transaction_id)) && isAwaitingShipStatus(o.status)),
+  const vintedToShip = useMemo(() => (sales.items || []).filter(o => !hiddenSales.has(String(o.transaction_id)) && aExpedier(o)),
   // eslint-disable-next-line react-hooks/exhaustive-deps
   [sales.items, hiddenSales, hiddenAccts, blockedAccts]);
   // ── BILAN DES VENTES SUR UNE PÉRIODE — LA règle, une seule fois (§11) ──────
@@ -17553,7 +17608,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // effectué » et 2 « Transaction suspendue ». On réutilise la référence
     // unique `isAwaitingShipStatus` (§5.15) : tout ce qui n'attend plus mon
     // envoi sort de la liste. 64 → 68 bordereaux correctement classés.
-    return !isAwaitingShipStatus(o.status || '');
+    // ⚠️ 4 octobre : la référence est maintenant `aExpedier` (le champ machine de
+    // Vinted d'abord). Avec la liste de deux phrases, la vente que l'app venait
+    // de faire générer (« Bordereau d'envoi commandé ») était jugée « partie »
+    // dès que son PDF arrivait — elle disparaissait de Colis pendant que Ma
+    // journée et la cloche la comptaient encore.
+    return !aExpedier(o);
   };
   // Expédié À LA MAIN (quand le statut Vinted est en retard, ex. tu as posté
   // aujourd'hui mais Vinted dit encore « bordereau envoyé »).
@@ -17639,9 +17699,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (!parTxn[k]) parTxn[k] = b;                      // le 1er reçu fait foi
     }
     // 1) Ce que Vinted attend de moi (identité certaine : le n° de transaction).
+    // ⚠️ UNE VENTE MASQUÉE À LA MAIN sort, un COMPTE masqué non : masquer un
+    // compte range la compta, ça ne fait pas disparaître un carton de
+    // l'étagère (même règle que `toShip` — avant, Colis écartait le compte et
+    // Ma journée le gardait : deux nombres pour la même obligation, §11).
     const items = (sales.items || [])
-      .filter(o => !isHidden(o))
-      .filter(o => needsBordereau(o.status))
+      .filter(o => !hiddenSales.has(String(o.transaction_id)))
+      .filter(o => aExpedier(o))
       .map(o => {
         const b = o.transaction_id != null ? parTxn[String(o.transaction_id)] || null : null;
         return { key: 'v' + o.transaction_id, o, b, txn: String(o.transaction_id || '') };
@@ -18258,6 +18322,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const ventesAffichees = useMemo(() => (sales.items || [])
     .filter(o => showHidden ? true : !isHidden(o))
     .filter(o => { const st = classifyOrderStatus(o.status);
+      // « En cours » mélangeait les colis à poster et ceux déjà partis : ce sont
+      // deux questions différentes (« qu'est-ce que je dois faire ? » / « qu'est-ce
+      // qui est en route ? »). Deux filtres, la même règle que Colis (§11).
+      if (vFilter === 'aexpedier') return aExpedier(o) && !isShipDone(o);
+      if (vFilter === 'transit') return st === 'pending' && !(aExpedier(o) && !isShipDone(o));
       if (vFilter === 'encours') return st === 'pending';
       if (vFilter === 'finalisees') return st === 'completed';
       if (vFilter === 'annulees') return st === 'cancelled';
@@ -18270,7 +18339,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     .filter(o => matchOrd(o))
     .sort(parDateDesc),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [sales.items, showHidden, hiddenSales, hiddenAccts, blockedAccts, vFilter, ordSearchDiff, periode, numeros, saleOv]);
+    [sales.items, showHidden, hiddenSales, hiddenAccts, blockedAccts, vFilter, ordSearchDiff, periode, numeros, saleOv, shipDone]);
   // Combien on en DESSINE. Le reste s'ouvre d'un bouton : rien n'est perdu, et
   // le compte total est écrit dessus.
   const [ventesMax, setVentesMax] = useState(60);
@@ -19552,11 +19621,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
   // Étape de suivi d'un achat (payé → expédié → au relais → reçu) à partir du
   // statut Vinted + de l'email transporteur. step: 1=payé 2=transit 3=relais 4=reçu.
+  // ⚠️ « AU RELAIS » AVANT « REÇU » (4 octobre). « La livraison n'a pas encore
+  // eu lieu - colis déposé en point relais » s'affichait « Reçu » : le mot
+  // « livraison » passait le test « livr », et la carte cachait du même coup le
+  // lieu, le code et le QR de retrait (ils ne s'affichent qu'à l'étape 3) —
+  // 4 achats ce jour-là. `phaseReception` avait déjà la parade ; l'étiquette
+  // ne l'avait jamais reprise.
   const achatStage = (o, tk) => {
     const s = o.status || '';
     if (/annul|rembours|refus/i.test(s)) return { label: 'Annulé', step: 0, color: C.danger };
-    if (/finalis|livr|remis|r[ée]ception/i.test(s) || purchasePhase(s) === 'completed') return { label: 'Reçu', step: 4, color: INV_STATUS.online.color };
+    if (/finalis/i.test(s) || tusDe(o) === 'completed') return { label: 'Reçu', step: 4, color: INV_STATUS.online.color };
     if (isAtRelayStatus(s) || (tk && tk.status === 'available')) return { label: 'À retirer', step: 3, color: C.warn };
+    if (/\blivr[ée]|remis\b|r[ée]ceptionn/i.test(s) || purchasePhase(s) === 'completed') return { label: 'Reçu', step: 4, color: INV_STATUS.online.color };
     if (/exp[eé]di|transit|achemin|en route|envoy/i.test(s)) return { label: 'En transit', step: 2, color: C.blue || C.accent };
     if (/pay|valid|pr[ée]par|attente|confirm/i.test(s)) return { label: 'Payé', step: 1, color: C.muted };
     return { label: s ? (s.length > 26 ? s.slice(0, 26) + '…' : s) : 'En cours', step: 1, color: C.muted };
@@ -19626,18 +19702,31 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   useEffect(() => { setAchatsMax(60); }, [aFilter, ordSearchDiff, periode]);
 
 
+  // ⚠️⚠️ L'ORDRE DES TESTS EST LA RÈGLE (4 octobre). Avant, « transit » passait
+  // avant « à expédier » et attrapait le mot « envoyé » : « Bordereau envoyé au
+  // vendeur » — le colis qu'il doit ENCORE poster — s'affichait « En transit »
+  // (5 ventes sur 7 le 4 octobre), pendant que Colis le mettait « à envoyer ».
+  // Et « La livraison n'a pas encore eu lieu - colis déposé en point relais »
+  // s'affichait « Livrée » (le mot « livraison »). On décide donc dans cet
+  // ordre : retourné, annulé/remboursé, vendu, À EXPÉDIER (la règle unique
+  // `aExpedier`), au relais (`isAtRelayStatus`, la règle partagée), livré (le
+  // mot « livré·e » seul, jamais « livraison »), en transit.
   const venteStage = (o) => {
-    const s = o.status || ''; const tus = String(o.transaction_user_status || '').toLowerCase();
+    const s = o.status || ''; const tus = tusDe(o);
+    // « Commande non réclamée - Retournée à l'expéditeur » n'est PAS un
+    // remboursement établi (le mot « expéditeur » faisait conclure « expédiée
+    // puis remboursée ») : la paire revient, Vinted rembourse souvent tout seul.
+    if (/non\s+r[ée]clam/i.test(s)) return { label: 'Retournée', color: C.warn, step: 0, aide: "L'acheteur n'a pas retiré le colis : il te revient. Vérifie qu'il arrive bien — Vinted règle souvent le remboursement tout seul." };
+    if (/retour\s+initi|retour\s+en\s+cours|retour\s+demand/i.test(s)) return { label: 'Retour en cours', color: C.warn, step: 0, aide: "L'acheteur a ouvert un retour : la paire doit te revenir avant le remboursement." };
     if (classifyOrderStatus(o.status) === 'cancelled') return venteExpediee(o)
       ? { label: 'Remboursée', color: C.danger, step: 0, aide: "Cette paire a bien été EXPÉDIÉE, puis remboursée à l'acheteur — la chaussure et l'argent sont partis. Ce n'est pas une commande annulée avant l'envoi." }
       : { label: 'Annulée', color: C.danger, step: 0, aide: "Commande annulée avant l'envoi — la paire n'est jamais partie." };
     if (/finalis/i.test(s) || tus === 'completed') return { label: 'Vendue', color: INV_STATUS.online.color, step: 4 };
-    if (/livr|remis|r[ée]ception/i.test(s)) return { label: 'Livrée', color: C.blue || C.accent, step: 3 };
-    if (/d[ée]pos|point\s+relais|bureau\s+de\s+poste/i.test(s)) return { label: 'Au relais', color: C.blue || C.accent, step: 3 };
-    if (/transit|achemin|exp[eé]di|envoy|en\s+route/i.test(s)) return { label: 'En transit', color: C.blue || C.accent, step: 2 };
-    if (/bordereau\s+envoy|paiement.*valid/i.test(s) || tus === 'needs_action' || needsBordereau(s)) return { label: 'À expédier', color: C.warn, step: 1 };
-    if (/pay|valid|pr[ée]par/i.test(s)) return { label: 'Payée', color: C.muted, step: 1 };
-    return { label: 'En cours', color: C.warn, step: 1 };
+    if (aExpedier(o)) return { label: 'À expédier', color: C.warn, step: 1 };
+    if (isAtRelayStatus(s)) return { label: 'Au relais', color: C.blue || C.accent, step: 3 };
+    if (/\blivr[ée]|remis\b|r[ée]ceptionn/i.test(s)) return { label: 'Livrée', color: C.blue || C.accent, step: 3 };
+    if (/transit|achemin|exp[ée]di[ée]|en\s+route/i.test(s) || tus === 'waiting') return { label: 'En transit', color: C.blue || C.accent, step: 2 };
+    return { label: 'En cours', color: C.muted, step: 1 };
   };
   // (L'affichage « à retirer » est groupé PAR POINT RELAIS dans l'onglet
   //  Achats, avec le nombre de colis en badge sur chaque point.)
@@ -20212,12 +20301,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, buysBase, hiddenSales, hiddenAccts]);
   // ── Rappel d'expédition : ventes à expédier, triées par urgence ────────────
-  // Vinted laisse ~5 jours pour expédier après la vente ; expédier en retard
-  // abîme la note vendeur et le classement des annonces. my_orders ne donne pas
-  // la deadline exacte → on l'estime à (date de vente + 5 j).
-  const SHIP_DAYS = 5;
+  // Expédier en retard abîme la note vendeur et le classement des annonces.
+  // Délai : la date limite de l'email du bordereau quand on l'a, sinon date de
+  // vente + `DELAI_EXPEDITION_J` (7 j, mesuré — voir sa définition).
+  const SHIP_DAYS = DELAI_EXPEDITION_J;
   const toShip = useMemo(() => {
     const out = [];
+    // Bordereau email par transaction — la même table que `expeditions()`
+    // (le premier reçu fait foi, un bordereau masqué ne compte pas).
+    const bordParTxn = {};
+    for (const b of (emailBords || [])) {
+      if (!b || b.transaction == null || isBordHidden(b)) continue;
+      const k = String(b.transaction);
+      if (!bordParTxn[k]) bordParTxn[k] = b;
+    }
     for (const o of (sales.items || [])) {
       // ⚠️ UN COLIS À POSTER N'EST PAS UNE PRÉFÉRENCE D'AFFICHAGE. On écarte une
       // vente masquée À LA MAIN, jamais une vente dont le COMPTE est masqué :
@@ -20227,22 +20324,46 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // sur un compte masqué → l'écran Bordereaux en listait 3 et la carte
       // « à expédier » en annonçait 1. Deux chiffres pour la même obligation.
       if (hiddenSales.has(String(o.transaction_id))) continue;
-      if (!needsBordereau(o.status)) continue;
+      if (!aExpedier(o)) continue;
       // Déjà coché « posté » : ce colis ne fait plus partie du travail du jour.
       // Avant, la carte « Expédier N colis » comptait les colis déjà postés alors
       // que l'onglet Bordereaux les mettait de côté → deux nombres différents
       // pour la même chose.
       if (isShipDone(o)) continue;
+      // ⚠️ Et la MÊME sortie que Colis (§11) : un bordereau marqué « expédié »
+      // à la main, traité depuis le panneau, ou dont le n° de suivi est déjà
+      // dans le réseau du transporteur — le colis est parti.
+      const b = o.transaction_id != null ? bordParTxn[String(o.transaction_id)] : null;
+      if (b && isBordDone(b)) continue;
+      const dl = b ? joursAvantLimiteFr(b.dateLimite) : null;
+      if (dl != null) { out.push({ o, daysLeft: dl, shipBy: null, limite: 'email' }); continue; }
       const d = o.date ? new Date(o.date) : null;
       if (!d || isNaN(d)) { out.push({ o, daysLeft: null, shipBy: null }); continue; }
       const shipBy = new Date(d.getTime() + SHIP_DAYS * 86400000);
-      const daysLeft = Math.ceil((shipBy - Date.now()) / 86400000);
-      out.push({ o, daysLeft, shipBy });
+      const daysLeft = Math.floor((new Date(shipBy.getFullYear(), shipBy.getMonth(), shipBy.getDate(), 23, 59, 59) - Date.now()) / 86400000);
+      out.push({ o, daysLeft, shipBy, limite: 'estimee' });
     }
     out.sort((a, b) => (a.daysLeft ?? 999) - (b.daysLeft ?? 999));
     return out;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, hiddenSales, hiddenAccts, shipDone]);
+  }, [sales.items, hiddenSales, hiddenAccts, shipDone, emailBords, tracking, bordsShipped, panelBordsDone, bordsHidden]);
+  // ── « COLIS À POSTER » EST PUBLIÉ, LA CLOCHE LE CONSOMME (§11) ────────────
+  // Même motif que `vrm_colis_retirer` : l'écran qui a toutes les sources
+  // publie, le centre de notifications lit. Il recalculait de son côté (sans
+  // les ventes masquées, sans les bordereaux marqués expédiés) et annonçait un
+  // autre nombre que Ma journée. ⚠️ On ne publie que COMPLET : ventes ET
+  // emails de bordereau lus — sinon un colis déjà parti compterait encore.
+  useEffect(() => {
+    if (!Array.isArray(sales.items) || !Array.isArray(emailBords)) return;
+    try {
+      const v = { total: toShip.length, enRetard: toShip.filter(t => t.daysLeft != null && t.daysLeft < 0).length, at: Date.now() };
+      const avant = load('vrm_colis_aposter', null);
+      if (!avant || avant.total !== v.total || avant.enRetard !== v.enRetard) {
+        save('vrm_colis_aposter', v);
+        try { window.dispatchEvent(new CustomEvent('vrm:colis')); } catch (_) {}
+      }
+    } catch (_) {}
+  }, [toShip, sales.items, emailBords]);
 
   // ── Vérificateur d'achat ───────────────────────────────────────────
   // En friperie : tape un modèle (+ prix demandé) → stats de TES ventes sur ce
@@ -21142,8 +21263,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const m = s.match(/(\d{2})\/(\d{2})\/(\d{4})/); if (!m) return { text: s, level: 'muted', days: null };
     // Date SEULE (sans l'heure) → texte court qui ne part pas en colonne.
     const text = `${m[1]}/${m[2]}/${m[3]}`;
-    const d = new Date(+m[3], +m[2] - 1, +m[1], 23, 59, 59);
-    const days = Math.floor((d - new Date()) / 86400000);
+    const days = joursAvantLimiteFr(s);              // même calcul que le rappel de Ma journée (§11)
     const level = days <= 1 ? 'danger' : days <= 2 ? 'warn' : 'muted';
     return { text, level, days };
   };
@@ -22327,7 +22447,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           </div>
         )}
         <div className="vrm-rangee" style={{display:'flex',gap:6,marginBottom:12,alignItems:'center',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',paddingBottom:2}}>
-          {[['encours','En cours'],['finalisees','Finalisées'],['annulees','Annulées'],['all','Toutes'],...(totals.sansCout>0?[['sanscout',"Sans prix d'achat"]]:[])].map(([id,label])=>(
+          {[['aexpedier','À expédier'],['transit','En transit'],['finalisees','Finalisées'],['annulees','Annulées'],['all','Toutes'],...(totals.sansCout>0?[['sanscout',"Sans prix d'achat"]]:[])].map(([id,label])=>(
             <button key={id} onClick={()=>setVFilter(id)} style={{flexShrink:0,whiteSpace:'nowrap',padding:'7px 14px',borderRadius:8,border:`1px solid ${vFilter===id?C.accent:C.border}`,background:vFilter===id?C.accent:'transparent',color:vFilter===id?'#fff':C.muted,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',boxShadow:vFilter===id?`0 2px 8px ${C.accent}44`:'none',transition:'all .18s ease'}}>{label}</button>
           ))}
           {/* OUTILS regroupés : la barre mélangeait filtres et outils (10 boutons
@@ -22430,7 +22550,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             absente, muette ou en retard, TOUS les boutons « Générer le
             bordereau » sont grisés pour la même raison : on la dit ici, au-dessus
             de la liste, au lieu de la répéter sous chaque vente. */}
-        <RaisonBordereauxGrises ventes={ventesAffichees.filter(o=>o && o.transaction_id!=null && !isHidden(o) && classifyOrderStatus(o.status)!=='cancelled' && needsBordereau(o.status) && !isShipDone(o) && !labelsCaptes[String(o.transaction_id)] && !bordParTx[String(o.transaction_id)])}/>
+        <RaisonBordereauxGrises ventes={ventesAffichees.filter(o=>o && o.transaction_id!=null && !isHidden(o) && classifyOrderStatus(o.status)!=='cancelled' && aExpedier(o) && !isShipDone(o) && !labelsCaptes[String(o.transaction_id)] && !bordParTx[String(o.transaction_id)])}/>
         <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,overflow:'hidden',boxShadow:C.shadow||'none'}}>
           {ventesAffichees.slice(0, ventesMax).map((o,i)=>{
             const st = classifyOrderStatus(o.status);
@@ -22461,7 +22581,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {!ventesUnCompte && <AcctTag acc={o._acc} name={accNameOf(o._acc)}/>}
                     {o._fromEmail && <span title="Reconstituée depuis l'email — pas encore confirmée par Vinted" style={{flexShrink:0,fontSize:10,fontWeight:600,color:C.muted,border:`1px solid ${C.border}`,borderRadius:8,padding:'1px 6px'}}>email</span>}
                     <span style={{flexShrink:0}}>{o.date?new Date(o.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):''}</span>
-                    {num && needsBordereau(o.status) && (()=>{ const cell=garageCellOf(garageGrid,num); return cell ? <span onClick={()=>onLocate&&onLocate(num)} title="Voir la paire au stock" style={{color:C.blue||C.accent,fontWeight:600,cursor:'pointer'}}>{garageCellLabel(cell)}</span> : (garageUtilise ? <span style={{color:C.muted,fontWeight:500}} title="Cette paire n'est pas rangée au garage">pas au garage</span> : null); })()}
+                    {num && aExpedier(o) && (()=>{ const cell=garageCellOf(garageGrid,num); return cell ? <span onClick={()=>onLocate&&onLocate(num)} title="Voir la paire au stock" style={{color:C.blue||C.accent,fontWeight:600,cursor:'pointer'}}>{garageCellLabel(cell)}</span> : (garageUtilise ? <span style={{color:C.muted,fontWeight:500}} title="Cette paire n'est pas rangée au garage">pas au garage</span> : null); })()}
                     {st==='cancelled' && num && (()=>{
                       const out = saleOutcome(o);
                       if (isPairLost(num)) return <span style={{color:C.danger,fontWeight:600,background:`${C.danger}18`,border:`1px solid ${C.danger}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title="Paire déclarée perdue : son numéro est libéré et sa case au garage vidée.">❌ N°{num} perdue</span>;
@@ -22484,7 +22604,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       ⚠️ Seulement tant que le colis doit partir : une fois expédiée
                       ou finalisée, une vente n'a plus de bordereau à afficher
                       (« il ne devrait même pas y en avoir », Julien). */}
-                  {!hidden && st!=='cancelled' && needsBordereau(o.status) && !isShipDone(o) && o.transaction_id!=null && (
+                  {!hidden && st!=='cancelled' && aExpedier(o) && !isShipDone(o) && o.transaction_id!=null && (
                     <div style={{marginTop:6,display:'flex',justifyContent:'flex-end'}}>
                       <BoutonBordereau uid={o._acc && o._acc.vinted_user_id} tx={String(o.transaction_id)} login={accNameOf(o._acc)}
                         aGenerer pdf={!!(labelsCaptes[String(o.transaction_id)] || bordParTx[String(o.transaction_id)])}
@@ -22511,7 +22631,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </div>
                 )}
                 <div style={{display:'flex',alignItems:'center',gap:6,flexShrink:0,marginLeft:'auto'}}>
-                {num && needsBordereau(o.status) && !hidden && inGarage(num) && (
+                {num && aExpedier(o) && !hidden && inGarage(num) && (
                   <button type="button" onClick={()=>onLocate&&onLocate(num)} title={`Voir la paire N°${num} au stock`} aria-label="Voir au stock" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.blue||C.accent,cursor:'pointer',fontSize:15,padding:'6px 8px'}}><Icon name="pin" size={15}/></button>
                 )}
                 {st==='cancelled' && num && saleOutcome(o)==='rembourse' && !isPairLost(num) && (
@@ -24438,7 +24558,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // S'il n'y en a qu'UNE, on la pré-associe : bouton « Tamponner N°X » en
           // 1 tap (auto number + titre + fichier capté). Sinon on invite à cliquer
           // 📄 sur la bonne vente.
-          const pending = (sales.items||[]).filter(o=> String(o._acc?.vinted_user_id)===String(freshLabel.acc?.vinted_user_id) && isAwaitingShipStatus(o.status) && !isShipDone(o));
+          const pending = (sales.items||[]).filter(o=> String(o._acc?.vinted_user_id)===String(freshLabel.acc?.vinted_user_id) && aExpedier(o) && !isShipDone(o));
           const one = pending.length===1 ? pending[0] : null;
           const e = one ? effEntry(one) : null; const num = e?.numero || '';
           return (
@@ -30530,6 +30650,7 @@ function AppCoeur() {
       // onglets ne montraient pas.
       const offAcc=new Set([...(load('vinted_accounts_blocked',[])||[]), ...(load('vinted_accounts_hidden',[])||[])].map(String));
       const shipDoneN=load('vinted_ship_done',{})||{};
+      const ventesMasqueesN=new Set((load('vinted_sales_hidden',[])||[]).map(String));
       const soldIdsN=new Set([...(load('vinted_annonces_vendues',[])||[]), ...(load('vinted_annonces_email_sold',[])||[])].map(String));
       // ⚠️ VITESSE (3 octobre) : trois lectures PAR compte, faites l'une après
       // l'autre — 27 allers-retours en file pour neuf comptes, à chaque
@@ -30561,7 +30682,10 @@ function AppCoeur() {
         }
         if(sold && Array.isArray(sold.my_orders)){
           sold.my_orders.forEach(o=>{ if(o && o.transaction_id!=null && classifyOrderStatus(o.status)!=='cancelled') venteIds.push(String(o.transaction_id)); });
-          toShipCount += sold.my_orders.filter(o=>needsBordereau(o.status) && !shipDoneN[String(o.transaction_id)]).length;
+          // Repli seulement (la ligne publiée par Ma journée passe devant, plus
+          // bas) — mais avec la MÊME règle qu'elle : `aExpedier`, hors ventes
+          // masquées à la main, hors colis cochés « posté ».
+          toShipCount += sold.my_orders.filter(o=>aExpedier(o) && !shipDoneN[String(o.transaction_id)] && !ventesMasqueesN.has(String(o.transaction_id))).length;
         }
         // Annonces en ligne (moisson, 0 requête) : compte celles qui DORMENT
         // (≥30 j → baisser le prix, action GRATUITE) et celles SANS numéro.
@@ -30661,6 +30785,16 @@ function AppCoeur() {
                 : `${sans} colis à retirer — l'extension va chercher leur code`;
           items.push({icon:'📦', ic:'box', text, n:total, tab:'cat_achats'});
         }
+      }
+      // ⚠️ ON CONSOMME LE NOMBRE PUBLIÉ (§11), comme pour les colis à retirer.
+      // Le 4 octobre, la cloche disait 3, Ma journée 3, Colis 2 et le widget 6
+      // pour 3 colis réels : chacun recalculait. Ma journée publie
+      // `vrm_colis_aposter` dès qu'elle a les ventes ET les bordereaux ; sans
+      // publication (premier écran, appareil neuf), on retombe sur le repli.
+      {
+        const pub = load('vrm_colis_aposter', null);
+        // Une publication de plus de 12 h n'est plus une mesure : le repli d'abord.
+        if (pub && Number.isFinite(pub.total) && Date.now() - (Number(pub.at) || 0) < 12 * 3600000) toShipCount = pub.total;
       }
       if(toShipCount>0)  items.push({icon:'⏰', ic:'truck', text:`${toShipCount} vente${toShipCount>1?'s':''} à expédier`, n:toShipCount, tab:'cat_bord'});
       if(ebayShipCount>0) items.push({icon:'📮', ic:'truck', text:`${ebayShipCount} vente${ebayShipCount>1?'s':''} eBay à expédier`, n:ebayShipCount, tab:'plat_ebay'});

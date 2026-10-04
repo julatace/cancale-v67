@@ -1372,7 +1372,7 @@ async function storeLabel(domain, url, b64) {
     const dejaCapte = new Set();
     const cur = await sbGetTout(`app_data?id=like.harvest_${uid}_label_*&select=tx:meta->>tx`); // §4.5 : un compte à fort volume dépasse 1000 bordereaux — sbGet tronquait en silence
     for (const r of (cur || [])) if (r && r.tx) dejaCapte.add(String(r.tx));
-    const cands = ventes.filter(o => o && o.transaction_id != null && AWAITING_SHIP(o.status) && !dejaCapte.has(String(o.transaction_id)));
+    const cands = ventes.filter(o => o && o.transaction_id != null && A_EXPEDIER(o) && !dejaCapte.has(String(o.transaction_id)));
     if (cands.length === 1) tx = String(cands[0].transaction_id);
   } catch (_) { /* sans certitude, le PDF reste simplement « le dernier capté » */ }
   const data = { uid, url, capturedAt: new Date().toISOString(), pdfB64: b64, ...(tx ? { tx } : {}) };
@@ -2151,7 +2151,39 @@ async function tickPhotos() {
   } catch (_) { /* une capture ratée n'a pas à réveiller d'erreur */ }
 }
 
-const AWAITING_SHIP = (s) => /bordereau\s+envoy[ée]\s+au\s+vendeur/i.test(s || '') || /paiement.*valid/i.test(s || '');
+// MÊME EXPRESSION que `isAwaitingShipStatus` (src/App.jsx) et `awaitingShip`
+// (api/widget.js) — « Bordereau d'envoi commandé » (4 oct.) et « Commande du
+// bordereau d'envoi validée » (1er sept.) sont la même étape que « bordereau
+// envoyé » : la vente attend l'envoi. `audit-statuts.cjs` compare les trois.
+const AWAITING_SHIP = (s) => /bordereau\s+envoy[ée]\s+au\s+vendeur|bordereau\s+d.envoi\s+command|commande\s+du\s+bordereau/i.test(s || '') || /paiement.*valid/i.test(s || '');
+// ── « CETTE VENTE ATTEND-ELLE L'ENVOI ? » — LA RÈGLE DE L'APP (`aExpedier`) ──
+// Le champ machine de Vinted (`transaction_user_status`, présent sur 1 505
+// ventes sur 1 505) d'abord ; le texte seulement pour une vieille capture. Un
+// texte qui dit annulé / remboursé / retour / finalisé / paiement échoué gagne
+// toujours. Sur une liste d'ACHATS, `needs_action` veut dire « va retirer » :
+// cette règle ne s'applique qu'aux VENTES. Le repli texte est celui de l'app
+// (`needsBordereau`) — un statut inconnu compte comme à expédier : mieux vaut
+// proposer un colis que le cacher.
+const PAS_UN_ENVOI = /annul|cancel|refus|rembours|retour|suspend|finalis|paiement\s+a\s+[ée]chou|[ée]chec\s+du\s+paiement/i;
+function besoinBordereauTexte(status) {
+  const s = String(status || '').toLowerCase();
+  if (!s) return true;
+  if (/annul|refus|rembours|cancel|retour|suspend/.test(s)) return false;
+  if (/paiement\s+a\s+[ée]chou|[ée]chec\s+du\s+paiement/.test(s)) return false;
+  if (/finalis|termin|complet|cl[oô]tur/.test(s)) return false;
+  if (AWAITING_SHIP(s)) return true;
+  if (/exp[eé]di|envoy|transit|achemin|en route|livr|remis|r[ée]ception/.test(s)) return false;
+  return true;
+}
+function A_EXPEDIER(o) {
+  if (!o) return false;
+  const s = String(o.status || '');
+  if (PAS_UN_ENVOI.test(s)) return false;
+  const t = String(o.transaction_user_status || '').toLowerCase();
+  if (t === 'needs_action') return true;
+  if (t === 'waiting' || t === 'completed' || t === 'failed') return false;
+  return besoinBordereauTexte(s);
+}
 // ⚠️ ÉLARGI le 20 sept. : l'ancienne règle ne reconnaissait que « déposé en
 // point relais / bureau de poste ». Les colis Vinted Go (casier/consigne) et les
 // statuts « prêt à être retiré / disponible » étaient donc INVISIBLES — leur
@@ -2314,7 +2346,7 @@ function resumeCommandes(type, payload) {
   const txns = [];
   for (const o of cmds) {
     if (!o) continue;
-    const ok = vente ? AWAITING_SHIP(o.status) : AT_RELAY(o.status);
+    const ok = vente ? A_EXPEDIER(o) : AT_RELAY(o.status);
     if (ok && o.transaction_id != null) txns.push(String(o.transaction_id));
   }
   // Les transactions (pas seulement le compte) : le widget dédoublonne entre
@@ -4714,7 +4746,7 @@ async function genererBordereauxEnAttente(uid, opts = {}) {
       if (memo[mk] && Date.now() - Number(memo[mk].t || 0) < BORD_RETRY_MS) return false;
       return true;
     }).sort((a, b) => {
-      const pa = AWAITING_SHIP(a.status) ? 0 : 1, pb = AWAITING_SHIP(b.status) ? 0 : 1;
+      const pa = A_EXPEDIER(a) ? 0 : 1, pb = A_EXPEDIER(b) ? 0 : 1;
       if (pa !== pb) return pa - pb;                             // ce qui attend TON envoi d'abord
       return (Date.parse(b.date || '') || 0) - (Date.parse(a.date || '') || 0);
     });
@@ -4728,7 +4760,7 @@ async function genererBordereauxEnAttente(uid, opts = {}) {
       // sur une vente qui attend encore l'envoi. Sur une vente déjà partie, un
       // « pas d'expédition exposée » ne s'arrangera pas : réessayer 4 fois, ce
       // serait 4 requêtes pour rien dans l'empreinte du compte (§5, §48).
-      const eu = AWAITING_SHIP(o.status)
+      const eu = A_EXPEDIER(o)
         ? (await recupererLabelInsiste(acc, uid, tx)).ok
         : (await recupererLabel(acc, uid, tx)).ok;
       recup++;

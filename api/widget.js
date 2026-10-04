@@ -132,13 +132,29 @@ async function bordRows() {
 // (`data.resume`, posé à la capture) : on le lit en scalaire.
 // La propriété qui compte est conservée — ça se met à jour **même app fermée**,
 // puisque c'est l'extension qui capture.
-async function comptesAExpedierOuRetirer(kind) {
+// ⚠️ UN COMPTE SUPPRIMÉ NE FAIT PAS DE COLIS (4 octobre). Les lignes de moisson
+// d'un compte retiré de VRM restent en base : le widget les comptait — mesuré,
+// 2 « à expédier » et 1 « à retirer » sur un compte qui n'existe plus, sur
+// l'écran d'accueil de son iPhone. Seuls les comptes encore liés
+// (`vinted_accounts`) comptent, comme dans l'app. `null` = pas su lire la liste :
+// on ne filtre RIEN (sous-filtrer rend le chiffre d'avant ; sur-filtrer ferait
+// disparaître les colis d'un compte vivant sur un hoquet).
+async function comptesVivants() {
+  try {
+    const j = await fetchPaginated(scoped('vinted_accounts?select=vinted_user_id'));
+    if (!j) return null;
+    return new Set(j.map((r) => String(r.vinted_user_id || '')).filter(Boolean));
+  } catch (_) { return null; }
+}
+const uidDeLigne = (id) => { const m = String(id || '').match(/^harvest_(.+?)_orders_/); return m ? m[1] : ''; };
+async function comptesAExpedierOuRetirer(kind, vivants) {
   try {
     const sel = 'id,txns:data->resume->txns';
     const rows = await fetchPaginated(scoped(`app_data?id=like.harvest_%25_orders_${kind}&select=${sel}`));
     if (!rows) return null;
     const vus = new Set(); let resumeTrouve = false;
     for (const row of rows) {
+      if (vivants && !vivants.has(uidDeLigne(row.id))) continue;
       if (!Array.isArray(row.txns)) continue;
       resumeTrouve = true;
       for (const t of row.txns) vus.add(String(t));
@@ -149,20 +165,45 @@ async function comptesAExpedierOuRetirer(kind) {
     return resumeTrouve ? [...vus] : null;
   } catch (_) { return null; }
 }
-async function harvestOrders(kind) {
+async function harvestOrders(kind, vivants) {
   try {
-    const j = await fetchPaginated(scoped(`app_data?id=like.harvest_%25_orders_${kind}&select=data`));
+    const j = await fetchPaginated(scoped(`app_data?id=like.harvest_%25_orders_${kind}&select=id,data`));
     if (!j) return null;
     const out = {};
     for (const row of j) {
+      if (vivants && !vivants.has(uidDeLigne(row.id))) continue;
       const items = (row.data && row.data.payload && row.data.payload.my_orders) || [];
       for (const o of items) if (o && o.transaction_id != null) out[o.transaction_id] = o; // dédoublonne par transaction
     }
     return Object.values(out);
   } catch (_) { return null; }
 }
-// À expédier : la vente attend que TU postes le colis.
-const awaitingShip = (s) => /bordereau\s+envoy[ée]\s+au\s+vendeur/i.test(s || '') || /paiement.*valid/i.test(s || '');
+// À expédier : la vente attend que TU postes le colis. MÊME RÈGLE que l'app
+// (`aExpedier`) et l'extension (`A_EXPEDIER`) : le champ machine de Vinted
+// d'abord, le texte seulement pour une vieille capture (§11, comparées par
+// `scripts/audit-statuts.cjs`). Ne sert qu'en repli : d'habitude le widget lit
+// le résumé que l'extension a posé avec cette même règle.
+const awaitingShip = (s) => /bordereau\s+envoy[ée]\s+au\s+vendeur|bordereau\s+d.envoi\s+command|commande\s+du\s+bordereau/i.test(s || '') || /paiement.*valid/i.test(s || '');
+const PAS_UN_ENVOI = /annul|cancel|refus|rembours|retour|suspend|finalis|paiement\s+a\s+[ée]chou|[ée]chec\s+du\s+paiement/i;
+function besoinBordereauTexte(status) {
+  const s = String(status || '').toLowerCase();
+  if (!s) return true;
+  if (/annul|refus|rembours|cancel|retour|suspend/.test(s)) return false;
+  if (/paiement\s+a\s+[ée]chou|[ée]chec\s+du\s+paiement/.test(s)) return false;
+  if (/finalis|termin|complet|cl[oô]tur/.test(s)) return false;
+  if (awaitingShip(s)) return true;
+  if (/exp[eé]di|envoy|transit|achemin|en route|livr|remis|r[ée]ception/.test(s)) return false;
+  return true;
+}
+export function aExpedier(o) {
+  if (!o) return false;
+  const s = String(o.status || '');
+  if (PAS_UN_ENVOI.test(s)) return false;
+  const t = String(o.transaction_user_status || '').toLowerCase();
+  if (t === 'needs_action') return true;
+  if (t === 'waiting' || t === 'completed' || t === 'failed') return false;
+  return besoinBordereauTexte(s);
+}
 // À retirer : l'achat est déposé au point relais, en attente que tu le récupères.
 const atRelay = (s) => /d[ée]pos[ée]/i.test(s || '') && /point\s+relais|bureau\s+de\s+poste/i.test(s || '');
 // ⚠️⚠️ CETTE ROUTE RAPATRIAIT 197 Ko POUR EN LIRE 1. Mesuré le 15 septembre sur
@@ -176,7 +217,12 @@ const atRelay = (s) => /d[ée]pos[ée]/i.test(s || '') && /point\s+relais|bureau
 // 1 Ko / 494 ms**, valeurs identiques.
 // ⚠️ L'alias porte le nom de la clé : la ligne rendue se lit exactement comme
 //    avant (`m.vrm_widget_token`), donc aucun appelant à renommer.
-const MAIN_WIDGET = ['vrm_widget_token', 'vinted_pickup_done', 'vinted_bords_printed'];
+// ⚠️ Et les colis qu'il a COCHÉS « posté » (`vinted_ship_done`, par transaction)
+// ou marqués expédiés sur leur bordereau (`vinted_bords_shipped`), et les ventes
+// qu'il a masquées : l'app les sort de « à expédier », le widget les comptait
+// encore — et les annonçait « en retard » une fois la date limite passée
+// (2 colis déjà postés, le 4 octobre).
+const MAIN_WIDGET = ['vrm_widget_token', 'vinted_pickup_done', 'vinted_bords_printed', 'vinted_ship_done', 'vinted_bords_shipped', 'vinted_sales_hidden'];
 async function main() {
   try {
     const sel = MAIN_WIDGET.map((k) => `${k}:data->${k}`).join(',');
@@ -232,12 +278,13 @@ export default async function handler(req, res) {
     // On tente D'ABORD les résumés scalaires (~1 Ko). La lecture complète des
     // commandes (791 Ko) ne repart que si aucune ligne n'a encore de résumé,
     // c'est-à-dire tant que l'extension n'a pas recapté une fois.
+    const vivants = await comptesVivants();
     const [bords, txSold, txBuy, finals, sales, m, snap] = await Promise.all([
-      bordRows(), comptesAExpedierOuRetirer('sold'), comptesAExpedierOuRetirer('purchased'),
+      bordRows(), comptesAExpedierOuRetirer('sold', vivants), comptesAExpedierOuRetirer('purchased', vivants),
       rows('email_final_*'), rows('email_sale_*'), main(), snapshot(),
     ]);
-    const sold = txSold ? [] : await harvestOrders('sold');
-    const purchased = txBuy ? [] : await harvestOrders('purchased');
+    const sold = txSold ? [] : await harvestOrders('sold', vivants);
+    const purchased = txBuy ? [] : await harvestOrders('purchased', vivants);
 
     // ⚠️ AVANT TOUT LE RESTE : a-t-on seulement pu LIRE ? Un chiffre absent est
     //    honnête, un zéro inventé ne l'est pas — et c'est lui qu'il regarde le
@@ -269,7 +316,11 @@ export default async function handler(req, res) {
     // À expédier + à retirer = STATUT VINTED (automatique, à jour). Fini les
     // emails imprécis : Vinted sait quand c'est expédié / récupéré.
     const pickupDone = m.vinted_pickup_done || {};
-    const shipTxns = new Set(txSold ? txSold : sold.filter(o => awaitingShip(o.status)).map(o => String(o.transaction_id)));
+    const shipDone = (m.vinted_ship_done && typeof m.vinted_ship_done === 'object') ? m.vinted_ship_done : {};
+    const bordsShipped = (m.vinted_bords_shipped && typeof m.vinted_bords_shipped === 'object') ? m.vinted_bords_shipped : {};
+    const ventesMasquees = new Set(Array.isArray(m.vinted_sales_hidden) ? m.vinted_sales_hidden.map(String) : []);
+    const pasPartie = (t) => !shipDone[t] && !bordsShipped[t] && !ventesMasquees.has(t);
+    const shipTxns = new Set((txSold ? txSold : sold.filter(o => aExpedier(o)).map(o => String(o.transaction_id))).map(String).filter(pasPartie));
     const shipTotal = shipTxns.size;
     const pickup = txBuy
       ? txBuy.filter(t => !pickupDone[String(t)]).length
@@ -280,7 +331,7 @@ export default async function handler(req, res) {
     const bKey = (b) => String(b.transaction || b.suivi || b.numero || '');
     let shipOverdue = 0, shipToday = 0, shipTomorrow = 0;
     for (const b of bords) {
-      if (printed[bKey(b)] || (b.transaction && !shipTxns.has(String(b.transaction)))) continue;
+      if (printed[bKey(b)] || bordsShipped[bKey(b)] || (b.transaction && !shipTxns.has(String(b.transaction)))) continue;
       const iso = frToIso(b.dateLimite); if (!iso) continue;
       if (iso < today) shipOverdue += 1; else if (iso === today) shipToday += 1; else if (iso === tomorrow) shipTomorrow += 1;
     }

@@ -134,6 +134,9 @@ async function traiterVendeur() {
     const shippedManual = m.vinted_bords_shipped || {};
     const hidden = m.vinted_bords_hidden || {};
     const panelDone = (await getRow('panel_bords_done')) || {};
+    // Colis cochés « posté » dans l'app (par transaction) : ils ne sont plus à
+    // expédier — l'app les sort, la notification les comptait encore (4 oct.).
+    const shipDone = (m.vinted_ship_done && typeof m.vinted_ship_done === 'object') ? m.vinted_ship_done : {};
     const key = (b) => String(b.transaction || b.suivi || b.numero || '');
 
     // RAPPEL URSSAF — le 1er de chaque mois (Julien, 30 sept. : « envoie
@@ -162,10 +165,19 @@ async function traiterVendeur() {
 
     // Transactions encore en attente d'expédition, d'après la moisson.
     let attente = null;
+    // Seuls les comptes encore liés comptent (comme l'app et le widget) : la
+    // moisson d'un compte retiré reste en base. `null` = pas su → on ne filtre pas.
+    let vivants = null;
+    try {
+      const va = await fetchPaginated(scoped('vinted_accounts?select=vinted_user_id'));
+      if (va) vivants = new Set(va.map((r) => String(r.vinted_user_id || '')).filter(Boolean));
+    } catch (_) { vivants = null; }
     try {
       const lignes = await fetchPaginated(scoped(`app_data?id=like.harvest_%25_orders_sold&select=id,txns:data->resume->txns`));
       if (lignes) {
         for (const l of lignes) {
+          const um = String(l.id || '').match(/^harvest_(.+?)_orders_/);
+          if (vivants && !(um && vivants.has(um[1]))) continue;
           if (!Array.isArray(l.txns)) continue;
           if (!attente) attente = new Set();
           for (const t of l.txns) attente.add(String(t));
@@ -184,6 +196,7 @@ async function traiterVendeur() {
       const k = key(b);
       if (printed[k] || shippedManual[k] || hidden[k] || panelDone[k]) continue;   // déjà traité, ici ou depuis le panneau
       if (!b.transaction || !attente.has(String(b.transaction))) continue;         // Vinted n'attend plus ce colis
+      if (shipDone[String(b.transaction)]) continue;                               // coché « posté » dans l'app
       const iso = frToIso(b.dateLimite); if (!iso) continue;
       if (iso < today) overdue += 1;
       else if (iso === today) dueToday += 1;
