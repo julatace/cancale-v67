@@ -36,7 +36,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.145.0';
+const EXT_ATTENDUE = '5.146.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -23809,7 +23809,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   const rempli = minAff !== '' || (e.fees != null && e.fees !== '') || !!e.buyFromId;
                   return (
                     <details open={rempli} style={{borderTop:`1px solid ${C.border}`,padding:'6px 10px 8px'}}>
-                      <summary style={{listStyle:'none',cursor:'pointer',fontSize:11.5,color:C.muted,fontWeight:600,userSelect:'none'}}>⋯ Plancher, boost, vendue, places</summary>
+                      <summary style={{listStyle:'none',cursor:'pointer',fontSize:11.5,color:C.muted,fontWeight:600,userSelect:'none'}}>⋯ Prix plancher · boost · vendue · publier ailleurs</summary>
                       <div style={{display:'flex',flexDirection:'column',gap:7,marginTop:7}}>
                         <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
                           <div style={{flex:'1 1 130px',display:'flex',alignItems:'center',gap:4,border:`1px solid ${C.border}`,borderRadius:8,padding:'2px 6px',background:C.bg}}
