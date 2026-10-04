@@ -52,7 +52,22 @@ async function partieModule() {
   }
   const ext = new Error('boom'); ext.stack = 'Error: boom\n    at chrome-extension://abcdef/content.js:1:2';
   dit(m.noterPlantage(ext) === null, 'une erreur venue d\'une extension n\'est pas notée');
-  let n = 1;
+  // ⚠️ Revue adverse : une extension qui enveloppe setTimeout apparaît PLUS BAS
+  //    dans la pile d'une vraie erreur de l'app — elle ne doit pas la cacher.
+  const app = new Error("Cannot read properties of undefined (reading 'numero')");
+  app.stack = `TypeError: ${app.message}\n    at Xc (https://vrm.center/assets/App-abc.js:1:2345)\n    at chrome-extension://abcdef/inject.js:3:4`;
+  dit(m.noterPlantage(app) !== null, 'une erreur de l\'APP reste notée même si une extension est plus bas dans la pile');
+  // ⚠️ Et les formes de données que la première version laissait passer.
+  const fuites = ["reading 'julatace3535'", 'Tel 06 12 34 56 78', 'Prix 149,99 €', 'refresh_token=QWERTYUIOPASDFGHJ', '75f6c9fa-dc8e-4e52-a000-e09dd4084b3e', 'julien.fournier3535%40gmail.com'];
+  const sorties = fuites.map((t) => m.nettoyer(t));
+  dit(!/julatace3535|06 12 34|149,99|QWERTYUIOP|75f6c9fa|fournier3535/.test(sorties.join(' ')), 'login, téléphone, prix, jeton, UUID, adresse encodée : tous retirés', sorties.join(' · '));
+  dit(m.nettoyer("reading 'title'") === "reading 'title'", 'un nom de propriété du code reste lisible');
+  // Même erreur, autre déploiement (fonction minifiée renommée) : MÊME ligne.
+  const d1 = new Error('Erreur stable de banc'); d1.stack = 'Error\n    at Ab (https://vrm.center/assets/index-AAA.js:1:100)';
+  const d2 = new Error('Erreur stable de banc'); d2.stack = 'Error\n    at Zq (https://vrm.center/assets/index-BBB.js:1:999)';
+  const e1 = m.noterPlantage(d1);
+  dit(e1 && m.noterPlantage(d2) === null, 'la même erreur après un nouveau déploiement garde la même empreinte (une ligne, pas une par déploiement)');
+  let n = JSON.parse(store.vrm_plantages_attente || '[]').length;
   for (let i = 0; i < 15; i++) { const x = new Error('erreur distincte ' + i + ' a'); x.stack = 'Error\n at f' + i + ' (https://vrm.center/assets/a.js:1:1)'; if (m.noterPlantage(x)) n++; }
   dit(n === 10, 'dix par ouverture au plus', `${n}`);
   const enFile = JSON.parse(store.vrm_plantages_attente || '[]').length;
@@ -63,6 +78,12 @@ async function partieModule() {
   dit(partis === 5 && restent === 5, 'une écriture non confirmée RESTE en file', `partis=${partis} restent=${restent}`);
   const partis2 = await m.viderPlantages(async () => true);
   dit(partis2 === 5 && JSON.parse(store.vrm_plantages_attente || '[]').length === 0, 'et repart au passage suivant');
+  // ⚠️ Un plantage noté PENDANT l'envoi n'est pas écrasé par la fin du vidage.
+  store.vrm_plantages_attente = JSON.stringify([{ id: 'aaa', at: 't1', message: 'x' }]);
+  const pendant = m.viderPlantages(async () => { const f = JSON.parse(store.vrm_plantages_attente); f.push({ id: 'bbb', at: 't2', message: 'y' }); store.vrm_plantages_attente = JSON.stringify(f); return true; });
+  await pendant;
+  const reste = JSON.parse(store.vrm_plantages_attente || '[]').map((e) => e.id);
+  dit(reste.length === 1 && reste[0] === 'bbb', 'un plantage noté pendant l\'envoi reste en file', JSON.stringify(reste));
 }
 
 async function partieRendu() {

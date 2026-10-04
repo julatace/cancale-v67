@@ -29510,7 +29510,10 @@ function ConnexionsSetting() {
   useEffect(() => onVmrExt(() => setExt({ on: vmrExtPresent(), v: vmrExtVersion() })), []);
   useEffect(() => { (async () => {
     try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.plantage_*&select=id,message:data->>message,at:data->>at,ecran:data->>ecran&limit=60`, { headers: sbAuth() });
+      // Trié et filtré PAR LA BASE (la date est copiée dans `meta`) : sans
+      // `order`, 60 lignes quelconques pouvaient laisser dehors celles de la semaine.
+      const depuis7 = new Date(Date.now() - 7 * 864e5).toISOString();
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.plantage_*&meta->>at=gte.${encodeURIComponent(depuis7)}&select=id,message:data->>message,at:data->>at,ecran:data->>ecran&order=meta->>at.desc&limit=60`, { headers: sbAuth() });
       if (!r.ok) { setPlantages(null); return; }
       const rows = await r.json();
       if (!Array.isArray(rows)) { setPlantages(null); return; }
@@ -31354,8 +31357,21 @@ function AppCoeur() {
             // ouvrir un compte). Une lecture ratée ne donne PAS un fichier qui a
             // l'air complet : `complet:false` et la liste de ce qui manque.
             toast('Sauvegarde en préparation… (quelques secondes)');
+            // ⚠️⚠️ LES JETONS PARTAIENT QUAND MÊME (revue adverse, 4 octobre) : le
+            //    navigateur garde `vinted_accounts` AVEC access/refresh/csrf, et la
+            //    boucle relisait le navigateur sans l'allègement que `cloudPush`
+            //    applique. La règle est la MÊME que pour le nuage (§11), plus la clé
+            //    du widget (elle suffit à lire ses chiffres). Et un filet : tout
+            //    champ de jeton, où qu'il soit, est retiré du fichier.
+            const SANS_FICHIER = new Set(['vrm_widget_token']);
+            const SECRET = /^(access_token|refresh_token|csrf_token|id_token|client_secret|password|p256dh)$/i;
+            const sansSecrets = (v, prof = 0) => {
+              if (prof > 40 || v === null || typeof v !== 'object') return v;
+              if (Array.isArray(v)) return v.map((x) => sansSecrets(x, prof + 1));
+              const o = {}; for (const k of Object.keys(v)) { if (!SECRET.test(k)) o[k] = sansSecrets(v[k], prof + 1); } return o;
+            };
             const keys={};
-            SYNC_KEYS.forEach(k=>{ const v=localStorage.getItem(k); if(v!=null){ try{ keys[k]=JSON.parse(v); }catch{ keys[k]=v; } } });
+            SYNC_KEYS.forEach(k=>{ if(SANS_FICHIER.has(k)) return; const v=localStorage.getItem(k); if(v!=null){ let val; try{ val=JSON.parse(v); }catch{ val=v; } const f=ALLEGER_AVANT_CLOUD[k]; keys[k]=sansSecrets(f?f(val):val); } });
             const toutLire = async (query) => {
               const out = [];
               for (let p = 0; p < 200; p++) {
@@ -31369,22 +31385,30 @@ function AppCoeur() {
               }
               return out;
             };
-            const EXCLUS = ['harvest_*_txn_*','harvest_*_label_*','email_bord_*','lbc_catalogue','lbc_recon','backup_*','harvest_*_seen_urls','harvest_*_wreq_*','harvest_*_pickup_points'];
+            // `ebay_tokens` (jeton eBay) et `push_subs` (les clés de ses téléphones)
+            // ne quittent pas la base.
+            const EXCLUS = ['harvest_*_txn_*','harvest_*_label_*','email_bord_*','lbc_catalogue','lbc_recon','backup_*','harvest_*_seen_urls','harvest_*_wreq_*','harvest_*_pickup_points','ebay_tokens','push_subs'];
             const [lignes, legeres, comptes] = await Promise.all([
               toutLire(`app_data?select=id,data&and=(${EXCLUS.map(x=>`id.not.like.${x}`).join(',')})&order=id`),
               toutLire(`app_data?select=id,meta&or=(id.like.harvest_*_txn_*,id.like.harvest_*_label_*,id.like.email_bord_*)&order=id`),
               (async()=>{ try{ const r=await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=vinted_user_id,login,domain`,{headers:sbAuth()}); if(!r.ok) return null; const j=await r.json(); return Array.isArray(j)?j:null; }catch(_){ return null; } })(),
             ]);
             const manques=[]; if(!lignes) manques.push('tes données captées (ventes, achats, messages, annonces, emails)'); if(!legeres) manques.push('le résumé des transactions et des bordereaux'); if(!comptes) manques.push('la liste de tes comptes Vinted');
+            // Réglages lus dans le navigateur AVANT que le nuage soit arrivé : ils
+            // peuvent être vides ou périmés — le fichier ne se dit pas complet.
+            if(!isCloudReady()) manques.push('tes réglages (pas encore chargés depuis ton compte)');
             const data={ _cancale_backup:3, exportDate:new Date().toISOString(), keys,
-              donnees:{ lignes:lignes||[], resumes:legeres||[], comptes:comptes||[] },
+              donnees:{ lignes:(lignes||[]).map(l=>({ id:l.id, data:sansSecrets(l.data) })), resumes:legeres||[], comptes:comptes||[] },
               complet: manques.length===0, manques,
-              omis:['PDF des bordereaux (ils se retéléchargent depuis Vinted ou ton email)','détail brut des transactions (on garde article, état et dates)','jetons de connexion Vinted (jamais dans un fichier)'] };
+              omis:['PDF des bordereaux (ils se retéléchargent depuis Vinted ou ton email)','détail brut des transactions (on garde article, état et dates)','jetons de connexion Vinted et eBay, clé du widget, clés de tes téléphones (jamais dans un fichier)'] };
             const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
             const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url;
             a.download=`vrm-sauvegarde-${new Date().toISOString().slice(0,10)}.json`;
-            document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-            try{ localStorage.setItem('vinted_last_backup', String(Date.now())); }catch(_){}
+            // Révoquer plus tard : un fichier de 12 Mo révoqué aussitôt peut ne
+            // jamais se télécharger (Safari).
+            document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>{ try{ URL.revokeObjectURL(url); }catch(_){} }, 4000);
+            // « Dernière sauvegarde : aujourd'hui ✅ » seulement pour un fichier COMPLET.
+            if(!manques.length){ try{ localStorage.setItem('vinted_last_backup', String(Date.now())); }catch(_){} }
             const n=(lignes||[]).length+(legeres||[]).length;
             toast(manques.length ? `⚠ Sauvegarde INCOMPLÈTE : la base n'a pas répondu pour ${manques.join(', ')}. Réessaie dans un instant.` : `✓ Sauvegarde téléchargée : tes réglages + ${n} lignes de données captées.`);
           }catch(err){toast('Erreur export : '+err.message);} }}
@@ -31393,12 +31417,47 @@ function AppCoeur() {
             // Écrit les clés puis POUSSE tout de suite au cloud (sinon le
             // rechargement rechargerait l'ancienne version depuis Supabase et
             // écraserait la restauration), puis recharge pour tout ré-appliquer.
-            const applyAndReload=async(entries)=>{
+            // ⚠️⚠️ TROIS DÉFAUTS (revue adverse, 4 octobre) :
+            //  1. « ✓ restaurée » s'affichait même quand l'écriture dans le nuage
+            //     échouait — et le rechargement relisait l'ANCIENNE ligne : la
+            //     restauration disparaissait sans un mot. On vérifie, et sur un
+            //     échec on remet les valeurs d'avant et on ne recharge pas.
+            //  2. Restaurer une sauvegarde ANCIENNE remplaçait le pool des numéros :
+            //     les N° posés depuis redevenaient libres et la numérotation auto
+            //     les redonnait — §5, un numéro écrit sur un carton n'est JAMAIS
+            //     réattribué. Le pool est désormais l'UNION des deux, et pour les
+            //     fiches qui portent un N°, ce qui est en place GAGNE (le fichier ne
+            //     comble que les manques).
+            //  3. Jamais de `vinted_accounts` (ni de jetons) depuis un fichier : la
+            //     table est la source ; ni la clé du widget.
+            const NUMEROS_FUSION = ['vinted_annonce_numeros','vinted_sale_overrides'];
+            const applyAndReload=async(entriesBrutes)=>{
+              const lireLocal=(k)=>{ const raw=localStorage.getItem(k); if(raw==null) return undefined; try{ return JSON.parse(raw); }catch{ return raw; } };
+              const entries=entriesBrutes.filter(([k])=>k!=='vinted_accounts' && k!=='vrm_widget_token').map(([k,v])=>{
+                const cur=lireLocal(k);
+                if(k==='vinted_used_numeros' && Array.isArray(v)){
+                  const vu=new Set(); const out=[];
+                  for(const x of [...(Array.isArray(cur)?cur:[]), ...v]){ const c=String(x); if(!vu.has(c)){ vu.add(c); out.push(x); } }
+                  return [k,out];
+                }
+                if(NUMEROS_FUSION.includes(k) && v && typeof v==='object' && !Array.isArray(v) && cur && typeof cur==='object' && !Array.isArray(cur)) return [k,{ ...v, ...cur }];
+                return [k,v];
+              });
+              const avant=entries.map(([k])=>[k,localStorage.getItem(k)]);
               entries.forEach(([k,v])=>{ try{ localStorage.setItem(k, typeof v==='string'?v:JSON.stringify(v)); }catch(_){} });
+              let enregistre=false;
               try{
-                const payload={}; SYNC_KEYS.forEach(k=>{ const raw=localStorage.getItem(k); if(raw!=null){ try{ payload[k]=JSON.parse(raw); }catch{ payload[k]=raw; } } });
-                if(Object.keys(payload).length){ await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${SUPABASE_ROW}`, { method:'PATCH', headers:sbAuth({ 'Content-Type':'application/json', Prefer:'return=minimal' }), body: JSON.stringify({ data:payload, updated_at:new Date().toISOString() }) }); }
-              }catch(_){}
+                const payload={}; SYNC_KEYS.forEach(k=>{ const raw=localStorage.getItem(k); if(raw!=null){ let val; try{ val=JSON.parse(raw); }catch{ val=raw; } const f=ALLEGER_AVANT_CLOUD[k]; payload[k]=f?f(val):val; } });
+                if(Object.keys(payload).length){
+                  const r=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${SUPABASE_ROW}`, { method:'PATCH', headers:sbAuth({ 'Content-Type':'application/json', Prefer:'return=minimal' }), body: JSON.stringify({ data:payload, updated_at:new Date().toISOString() }) });
+                  enregistre=r.ok;
+                }
+              }catch(_){ enregistre=false; }
+              if(!enregistre){
+                avant.forEach(([k,raw])=>{ try{ if(raw==null) localStorage.removeItem(k); else localStorage.setItem(k,raw); }catch(_){} });
+                toast('⚠ La restauration n\'a pas pu être enregistrée dans ton compte (la base n\'a pas répondu). Rien n\'a changé — réessaie dans un instant.');
+                return;
+              }
               toast('✓ Sauvegarde restaurée ! L\'app va se recharger.');
               location.reload();
             };
@@ -31411,7 +31470,7 @@ function AppCoeur() {
               // Les données CAPTÉES (ventes, achats, messages…) ne sont pas réécrites :
               // une copie ancienne écraserait une capture plus fraîche (§4.2), et
               // l'extension les recapte toute seule. On restaure ce que TU as saisi.
-              if(!await askConfirm(`Restaurer cette sauvegarde ?\n\n📦 Catalogue : ${cat}\n💸 Ventes saisies : ${sal}\n🔢 Numéros : ${num}\n📁 ${entries.length} rubriques de réglages et de saisies\n\nTes ventes, achats et messages captés sur Vinted ne sont pas remplacés : l'extension les recapte toute seule.\n\n⚠ Tes réglages actuels seront REMPLACÉS, puis l'app se rechargera.`)) return;
+              if(!await askConfirm(`Restaurer cette sauvegarde ?\n\n📦 Catalogue : ${cat}\n💸 Ventes saisies : ${sal}\n🔢 Numéros : ${num}\n📁 ${entries.length} rubriques de réglages et de saisies\n\nTes ventes, achats et messages captés sur Vinted ne sont pas remplacés : l'extension les recapte toute seule. Les numéros donnés depuis cette sauvegarde restent réservés (un numéro écrit sur un carton ne sert jamais deux fois).\n\n⚠ Tes autres réglages seront REMPLACÉS, puis l'app se rechargera.`)) return;
               await applyAndReload(entries); return;
             }
             // Ancien format (compat) : { catalog, sales, garageGrid }
