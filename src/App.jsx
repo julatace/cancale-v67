@@ -16790,7 +16790,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (nextNumero est déclaré plus bas, après saleOv dont il dépend.)
   const garageNums = useMemo(()=>{ const s=new Set(); Object.values(garageGrid||{}).forEach(a=>{ if(Array.isArray(a)) a.forEach(v=>{const t=(v||'').trim().toLowerCase(); if(t)s.add(t);}); }); return s; }, [garageGrid]);
   const inGarage = (n)=> !!n && garageNums.has(String(n).trim().toLowerCase());
-  const linkedBuyIds = useMemo(()=>{ const s=new Set(); Object.values(numeros).forEach(e=>{ if(e&&e.buyFromId) s.add(String(e.buyFromId)); }); Object.values(saleOv).forEach(e=>{ if(e&&e.buyFromId) s.add(String(e.buyFromId)); }); return s; }, [numeros, saleOv]);
   const openPicker = async (item) => {
     // ⚠️ LA MODALE S'OUVRE TOUT DE SUITE. Avant, elle attendait le chargement de
     // TOUS les achats de TOUS les comptes — 11 s mesurées, à chaque clic. On
@@ -17569,6 +17568,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // prix d'achat / un N° / un boost DIRECTEMENT sur une vente — même une paire
   // jamais numérotée (orpheline). L'override PRIME sur l'entrée reliée.
   const [saleOv, setSaleOv] = useState(() => load('vinted_sale_overrides', {}));
+  // ⚠️ §4.6 : ce useMemo lit `saleOv` — il vit APRÈS sa déclaration. Posé plus
+  //    haut (#407), il tuait Ma journée, Ventes, Annonces et Achats sur
+  //    « Cannot access 'saleOv' before initialization » ; aucun build ne le voit.
+  const linkedBuyIds = useMemo(()=>{ const s=new Set(); Object.values(numeros).forEach(e=>{ if(e&&e.buyFromId) s.add(String(e.buyFromId)); }); Object.values(saleOv).forEach(e=>{ if(e&&e.buyFromId) s.add(String(e.buyFromId)); }); return s; }, [numeros, saleOv]);
   const setSaleOverride = (tid, patch) => {
     const k = String(tid);
     setSaleOv(prev => {
