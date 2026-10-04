@@ -26287,6 +26287,48 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 // ressemblance : on n'en propose aucun, il tape le N° qu'il reconnaît sur la
 // photo. Un N° que VRM ne connaît pas est refusé (sinon le lien ne mènerait à
 // aucune paire, et l'annonce resterait « non reliée » sans le dire).
+// Pose le lien « annonce Leboncoin → N° de paire » (une identité qu'il pose
+// lui-même, §5). Une seule écriture pour les deux chemins (champ N° et clic sur
+// une suggestion) — sinon l'un des deux finirait par ne plus écrire pareil (§11).
+function relierAnnonceLbc(id, n) {
+  const liens = { ...(load('vrm_lbc_liens', {}) || {}), [String(id)]: String(n) };
+  // ⚠️ `save` écrit 500 ms plus tard : l'écran se rechargeait AVANT et ne
+  //    voyait pas le lien (vu au banc). On pose la copie locale tout de
+  //    suite ; `save` garde la synchro vers le nuage.
+  try { localStorage.setItem('vrm_lbc_liens', JSON.stringify(liens)); } catch (_) {}
+  save('vrm_lbc_liens', liens);
+}
+
+// ── SUGGESTIONS POUR RELIER UNE ANNONCE — JAMAIS UNE DÉCISION (§5) ──────────
+// Julien, 4 octobre : « quand une paire est vendue sur une plateforme, elle
+// doit disparaître des autres, pour ne pas vendre deux fois la même paire ».
+// Mesuré le jour même : 3 ventes Leboncoin (dont un colis à envoyer) portaient
+// sur des annonces reliées à AUCUNE paire — ni référence VRM, ni N° dans le
+// titre. Impossible, donc, de savoir laquelle est encore en vente sur Vinted.
+// ⇒ On PROPOSE les paires en ligne qui ressemblent (mots du titre, pointure,
+//   prix) pour qu'il reconnaisse la sienne en un clic. ⚠️ Une ressemblance ne
+//   relie RIEN toute seule : 22 % des ventes portent un titre en double, et le
+//   titre a déjà désigné la mauvaise paire (§5). C'est SON clic qui pose
+//   l'identité ; la suggestion ne fait qu'éviter de taper le numéro.
+const motsDeTitre = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+  .replace(/[^a-z0-9,.]+/g, ' ').split(' ').filter((w) => w.length >= 2 && !/^(taille|pointure|neuf|neuve|tres|bon|etat|avec|pour|les|des|une|homme|femme|paire)$/.test(w));
+const pointureDe = (s) => { const m = /(?:^|[^\d])(\d{2}(?:[.,]5)?)(?=[^\d]|$)/.exec(String(s || '')); return m ? m[1].replace(',', '.') : null; };
+function suggestionsPaires(cible, candidats, max = 3) {
+  const mc = new Set(motsDeTitre(cible && cible.titre));
+  const tc = pointureDe(cible && cible.titre);
+  const pc = Number(cible && cible.prix);
+  return (candidats || []).map((c) => {
+    let note = 0;
+    for (const w of new Set(motsDeTitre(`${c.titre || ''} ${c.marque || ''}`))) if (mc.has(w)) note += /^\d/.test(w) ? 1 : 2;
+    const t = pointureDe(c.taille) || pointureDe(c.titre);
+    // Une pointure DIFFÉRENTE écarte presque sûrement la paire : c'est le cas
+    // des « 50 paires identiques » (§2.4) — même modèle, autre taille.
+    if (tc && t) note += tc === t ? 3 : -4;
+    if (pc > 0 && Number(c.prix) > 0) { const r = Math.abs(pc - c.prix) / Math.max(pc, c.prix); if (r <= 0.15) note += 2; else if (r > 0.6) note -= 1; }
+    return { ...c, note };
+  }).filter((x) => x.note >= 4).sort((a, b) => b.note - a.note).slice(0, max);
+}
+
 function LbcRelier({ ad, numsConnus, onRelie }) {
   const [num, setNum] = useState('');
   const [msg, setMsg] = useState('');
@@ -26301,12 +26343,7 @@ function LbcRelier({ ad, numsConnus, onRelie }) {
     if (!id) { setMsg("Cette annonce n'a pas d'identifiant Leboncoin : impossible de la relier."); return; }
     if (!NUM_OK.test(n)) { setMsg('Tape le numéro de la paire (125, ou B125).'); return; }
     if (!numsConnus.includes(n)) { setMsg(`Aucune paire ne porte le N°${n} dans VRM.`); return; }
-    const liens = { ...(load('vrm_lbc_liens', {}) || {}), [id]: n };
-    // ⚠️ `save` écrit 500 ms plus tard : l'écran se rechargeait AVANT et ne
-    //    voyait pas le lien (vu au banc). On pose la copie locale tout de
-    //    suite ; `save` garde la synchro vers le nuage.
-    try { localStorage.setItem('vrm_lbc_liens', JSON.stringify(liens)); } catch (_) {}
-    save('vrm_lbc_liens', liens);
+    relierAnnonceLbc(id, n);
     setMsg('');
     toast(`Annonce reliée à la paire N°${n}.`);
     onRelie && onRelie();
