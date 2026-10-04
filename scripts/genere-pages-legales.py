@@ -38,6 +38,7 @@ SOUS=f'''<table>
 <tr><td>Vercel Inc.</td><td>Hébergement du site et des fonctions serveur</td><td>Données en transit, journaux techniques</td><td>États-Unis / réseau mondial</td></tr>
 <tr><td>Cloudflare Inc.</td><td>Réception et routage des e-mails transférés vers VRM</td><td>Contenu des e-mails reçus</td><td>États-Unis / réseau mondial</td></tr>
 <tr><td>Anthropic PBC</td><td>Suggestions et réponses automatiques aux messages (uniquement si tu les actives)</td><td>Texte du message de l’acheteur, titre et prix de l’annonce</td><td>États-Unis</td></tr>
+<tr><td>Photoroom SAS</td><td>Retrait du fond des photos d’annonce avant publication (uniquement si tu l’actives)</td><td>Les photos de l’annonce concernée, rien d’autre</td><td>Société française ; lieu des traitements : voir la politique de Photoroom</td></tr>
 <tr><td>Google LLC, Discord Inc.</td><td>Connexion « Continuer avec Google / Discord » (si tu la choisis)</td><td>Adresse e-mail, identifiant du compte</td><td>États-Unis</td></tr>
 <tr><td>Apple, Google, Mozilla (services de notification)</td><td>Acheminement des notifications sur ton téléphone</td><td>Jeton de l’appareil, texte de la notification</td><td>États-Unis / Union européenne</td></tr>
 <tr><td>Fondation OpenStreetMap (Nominatim), CARTO</td><td>Recherche de ville et fond de carte des points relais</td><td>Nom de la ville saisie, adresse IP</td><td>Union européenne / Royaume-Uni</td></tr>

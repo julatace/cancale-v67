@@ -81,6 +81,13 @@ async function rendre(nav, etat) {
   pg.on('pageerror', (e) => erreurs.push(String(e).slice(0, 140)));
   await pg.goto(`http://localhost:${PORT}/?tab=leboncoin`, { waitUntil: 'domcontentloaded' });
   await pg.waitForTimeout(4500);
+  // ⚠️ Depuis le 4 octobre (#438), la préparation vit dans « Détails et réglages »,
+  //    REPLIÉ en bas de l'écran : ce qui se lit une fois descend, ce qui se fait
+  //    reste en haut. Replié, son texte n'est pas dans `innerText` — le banc
+  //    déclarait le bloc « absent » sur un écran intact (11 rouges sur main). On
+  //    le déplie comme Julien le ferait, puis on lit.
+  await pg.evaluate(() => document.querySelectorAll('details[data-lbc-details]').forEach((d) => { d.open = true; }));
+  await pg.waitForTimeout(300);
   const txt = await pg.evaluate(() => document.body.innerText || '');
   await ctx.close();
   // On ne juge que le BLOC concerné : un contrôle posé sur toute la page
@@ -99,11 +106,16 @@ async function rendre(nav, etat) {
     const r = await rendre(nav, etat);
     vus[etat] = r;
     dit(!r.erreurs.length, `${etat} : l'écran se rend sans erreur`, r.erreurs[0] || '');
-    dit(!!r.bloc, `${etat} : le bloc de préparation est là`, r.bloc ? '' : 'absent — il ne verra rien avancer');
+    // ⚠️ TOUT REÇU : la carte DISPARAÎT, exprès (App.jsx : « la carte n'a plus
+    //    rien à apprendre », §7 — une carte qui ne sert plus est du bruit). Le banc
+    //    l'exigeait encore et sortait rouge sur un écran juste. Dans les autres
+    //    états, elle doit être là : il doit voir avancer.
+    if (etat === 'complet') dit(!r.bloc, 'complet : la carte de préparation a disparu (plus rien à apprendre)', r.bloc ? r.bloc.replace(/\s+/g, ' ').slice(0, 90) : '');
+    else dit(!!r.bloc, `${etat} : le bloc de préparation est là`, r.bloc ? '' : 'absent — il ne verra rien avancer');
   }
 
-  console.log('\n── QUATRE ÉTATS, QUATRE PHRASES (deux qui se ressemblent = un état oublié)');
-  const clefs = ['pasSu', 'rienRelevé', 'partiel', 'complet'];
+  console.log('\n── TROIS ÉTATS, TROIS PHRASES (deux qui se ressemblent = un état oublié)');
+  const clefs = ['pasSu', 'rienRelevé', 'partiel'];
   const phr = clefs.map((k) => (vus[k].bloc || '').replace(/\s+/g, ' ').trim());
   const distinctes = new Set(phr).size;
   dit(distinctes === clefs.length, `les ${clefs.length} états donnent ${clefs.length} phrases différentes`, `${distinctes}/${clefs.length}`);
@@ -136,8 +148,11 @@ async function rendre(nav, etat) {
   const tous = clefs.concat('coupé').map((k) => vus[k].bloc).join(' ');
   dit(!/bient[oô]t|dans quelques|sous peu|d'ici (demain|peu)|\b\d+\s*%/i.test(tous),
     'aucune promesse de délai ni pourcentage inventé');
-  dit(a("rien ne part tout seul|c'est toi qui").test(vus.complet.bloc),
-    'et quand tout est prêt, il est dit que c\'est LUI qui publie');
+  // ⚠️ Retiré le 4 octobre : « quand tout est prêt, il est dit que c'est LUI qui
+  //    publie ». (1) Tout prêt, la carte n'existe plus. (2) Et la phrase serait
+  //    FAUSSE aujourd'hui : depuis le 20 septembre l'extension publie elle-même,
+  //    sans booster — c'est la décision de Julien. Un contrôle qui exige une
+  //    phrase devenue fausse pousserait à remettre un mensonge.
 
   // ⚠️⚠️ TROUVÉ AU RENDU, PAS DANS LE CODE (§6.2). Mon premier jet affichait
   //    « n\\'est pas le même » — **l'antislash à l'écran** : dans du JSX, `\\'`

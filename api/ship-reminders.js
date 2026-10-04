@@ -27,6 +27,7 @@ const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.s
 // l'est pas : le comportement d'aujourd'hui reste identique.
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ';
 const HEADERS = { ...sbCle(SUPABASE_KEY) };
+const VENDEURS_EN_PARALLELE = 8;
 
 // Date du jour (et de demain) dans le fuseau de Paris, en 'YYYY-MM-DD'.
 function parisDate(offsetDays = 0) {
@@ -38,13 +39,16 @@ function frToIso(s) {
   const m = String(s || '').match(/(\d{2})\/(\d{2})\/(\d{4})/);
   return m ? `${m[3]}-${m[2]}-${m[1]}` : null;
 }
+// Trois états, jamais deux : la ligne (objet) · `null` = elle n'existe pas ·
+// `undefined` = la base n'a pas répondu (« rien lu » ne vaut pas « rien »).
 async function getRow(id) {
   try {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/${scoped(`app_data?id=eq.${encodeURIComponent(id)}&select=data`)}`, { headers: HEADERS });
-    if (!r.ok) return null;
+    if (!r.ok) return undefined;
     const rows = await r.json();
+    if (!Array.isArray(rows)) return undefined;
     return (rows[0] && rows[0].data) || null;
-  } catch (_) { return null; }
+  } catch (_) { return undefined; }
 }
 // ── MULTI-VENDEURS ────────────────────────────────────────────────────────────
 // Ce cron tourne SANS vendeur connecté. Tant que la base n'était pas cloisonnée,
@@ -60,10 +64,19 @@ function scoped(path) {
   const o = proprietaireCourant();
   return o ? path + (path.includes('?') ? '&' : '?') + `owner=eq.${encodeURIComponent(o)}` : path;
 }
-// La base sait-elle séparer les vendeurs ? Un `select=owner` répond 400 sinon.
+// La base sait-elle séparer les vendeurs ? 200 = oui · 400 (colonne absente) =
+// non · tout le reste = PAS SU (`null`). ⚠️ Une panne prise pour « non » faisait
+// basculer le cron en passe GLOBALE sur une base cloisonnée : les bordereaux de
+// tous les vendeurs comptés ensemble, et le résumé poussé sans vendeur — le
+// mélange que la boucle par vendeur existe pour empêcher. (push.js avait le même
+// défaut, corrigé le 4 octobre.)
 async function cloisonnee() {
-  try { return (await fetch(`${SUPABASE_URL}/rest/v1/app_data?select=owner&limit=1`, { headers: HEADERS })).ok; }
-  catch (_) { return false; }
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?select=owner&limit=1`, { headers: HEADERS });
+    if (r.ok) return true;
+    if (r.status === 400) return false;
+    return null;
+  } catch (_) { return null; }
 }
 // Les vendeurs actifs = un `main` par vendeur (clé (owner,id)). La clé de service
 // contourne RLS → on les voit tous. `null` si on ne peut pas énumérer (lecture en
@@ -129,11 +142,16 @@ async function traiterVendeur() {
     // envoi ?** C'est exactement ce que l'extension écrit à la capture
     // (`data.resume.txns`, §5.14) — même règle que l'app, lu en scalaire.
     const today = parisDate(0);
-    const m = (await getRow('main')) || {};
+    const mLu = await getRow('main');
+    const panelLu = await getRow('panel_bords_done');
+    const m = mLu || {};
     const printed = m.vinted_bords_printed || {};
     const shippedManual = m.vinted_bords_shipped || {};
     const hidden = m.vinted_bords_hidden || {};
-    const panelDone = (await getRow('panel_bords_done')) || {};
+    const panelDone = panelLu || {};
+    // Colis cochés « posté » dans l'app (par transaction) : ils ne sont plus à
+    // expédier — l'app les sort, la notification les comptait encore (4 oct.).
+    const shipDone = (m.vinted_ship_done && typeof m.vinted_ship_done === 'object') ? m.vinted_ship_done : {};
     const key = (b) => String(b.transaction || b.suivi || b.numero || '');
 
     // RAPPEL URSSAF — le 1er de chaque mois (Julien, 30 sept. : « envoie
@@ -162,10 +180,19 @@ async function traiterVendeur() {
 
     // Transactions encore en attente d'expédition, d'après la moisson.
     let attente = null;
+    // Seuls les comptes encore liés comptent (comme l'app et le widget) : la
+    // moisson d'un compte retiré reste en base. `null` = pas su → on ne filtre pas.
+    let vivants = null;
+    try {
+      const va = await fetchPaginated(scoped('vinted_accounts?select=vinted_user_id'));
+      if (va) { const s = new Set(va.map((r) => String(r.vinted_user_id || '')).filter(Boolean)); vivants = s.size ? s : null; } // vide n'est pas une réponse (§4.1)
+    } catch (_) { vivants = null; }
     try {
       const lignes = await fetchPaginated(scoped(`app_data?id=like.harvest_%25_orders_sold&select=id,txns:data->resume->txns`));
       if (lignes) {
         for (const l of lignes) {
+          const um = String(l.id || '').match(/^harvest_(.+?)_orders_/);
+          if (vivants && um && !vivants.has(um[1])) continue;            // on n'écarte que ce qu'on SAIT retiré
           if (!Array.isArray(l.txns)) continue;
           if (!attente) attente = new Set();
           for (const t of l.txns) attente.add(String(t));
@@ -176,6 +203,10 @@ async function traiterVendeur() {
     // se TAIT. Une notification fausse est pire que pas de notification — c'est
     // très exactement le « 51 bordereaux » qu'on corrige ici.
     if (!attente) return { urssaf, skipped: 'resume absent — aucune notification envoyee' };
+    // ⚠️ Ses colis cochés « posté », imprimés ou masqués vivent dans `main` et
+    //    `panel_bords_done` : lus en échec, ils compteraient comme « à expédier »
+    //    et la notification annoncerait des colis déjà partis. On se tait.
+    if (mLu === undefined || panelLu === undefined) return { urssaf, skipped: 'réglages illisibles — aucune notification envoyée' };
 
     const tomorrow = parisDate(1);
     let overdue = 0, dueToday = 0, dueTomorrow = 0;
@@ -184,6 +215,7 @@ async function traiterVendeur() {
       const k = key(b);
       if (printed[k] || shippedManual[k] || hidden[k] || panelDone[k]) continue;   // déjà traité, ici ou depuis le panneau
       if (!b.transaction || !attente.has(String(b.transaction))) continue;         // Vinted n'attend plus ce colis
+      if (shipDone[String(b.transaction)]) continue;                               // coché « posté » dans l'app
       const iso = frToIso(b.dateLimite); if (!iso) continue;
       if (iso < today) overdue += 1;
       else if (iso === today) dueToday += 1;
@@ -222,9 +254,13 @@ export default async function handler(req, res) {
   }
 
   try {
+    const cl = await cloisonnee();
+    // Pas su : on ne devine pas (ni passe globale, ni passe par vendeur). 503 =
+    // visible dans le tableau de bord des crons ; demain le cron repassera.
+    if (cl === null) { res.status(503).json({ ok: false, skipped: 'base injoignable — aucun rappel envoyé' }); return; }
     // ── Base NON cloisonnée (comportement d'aujourd'hui, à l'identique) ───────
     //    Un seul jeu de données, aucune colonne `owner` : une passe, sans filtre.
-    if (!(await cloisonnee())) {
+    if (!cl) {
       const out = await traiterVendeur();
       res.status(200).json({ ok: true, ...out });
       return;
@@ -234,12 +270,28 @@ export default async function handler(req, res) {
     //    hors contexte : si on ne peut pas énumérer, on ne devine pas.
     const owners = await ownersActifs();
     if (!owners) { res.status(200).json({ ok: true, skipped: 'vendeurs non énumérables (lecture en panne)' }); return; }
-    const bilans = [];
-    for (const o of owners) {
-      const out = await contexteVendeur.run({ owner: o }, () => traiterVendeur());
-      bilans.push({ owner: o, ...out });
-    }
-    res.status(200).json({ ok: true, vendeurs: owners.length, bilans });
+    // ⚠️ À L'ÉCHELLE : un vendeur coûte ~6 lectures. À la queue leu leu, mille
+    //    vendeurs dépassent les 300 s d'une fonction Vercel et les derniers n'ont
+    //    jamais leur rappel. On en traite VENDEURS_EN_PARALLELE à la fois — chacun
+    //    dans SON contexte (AsyncLocalStorage : deux vendeurs simultanés ne
+    //    partagent ni filtre, ni mémo, ni appareils). Ce sont NOS lectures, pas
+    //    des requêtes à Vinted (le garde-fou « une à la fois » du §3 n'est pas ici).
+    // ⚠️ Et un vendeur qui plante n'arrête plus les autres : son bilan porte
+    //    l'erreur, les suivants reçoivent leur rappel, et la réponse est 500 pour
+    //    que l'échec reste visible.
+    const bilans = new Array(owners.length);
+    let suivant = 0, echecs = 0;
+    const ouvrier = async () => {
+      while (suivant < owners.length) {
+        const i = suivant++; const o = owners[i];
+        try {
+          const out = await contexteVendeur.run({ owner: o }, () => traiterVendeur());
+          bilans[i] = { owner: o, ...out };
+        } catch (e) { echecs++; bilans[i] = { owner: o, erreur: String((e && e.message) || e).slice(0, 200) }; }
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(VENDEURS_EN_PARALLELE, owners.length) }, ouvrier));
+    res.status(echecs ? 500 : 200).json({ ok: !echecs, vendeurs: owners.length, echecs, bilans });
   } catch (e) {
     // Une tâche planifiée qui répond 200 sur une panne n'apparaît nulle part :
     // le tableau de bord la compte réussie, et les rappels d'expédition

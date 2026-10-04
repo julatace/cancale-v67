@@ -2,6 +2,11 @@ import { cleVapid, abonnementAJour } from './vapid.js';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import Accueil, { Film } from './Accueil.jsx';
+import { ecouterPlantages, noterPlantage } from './plantages.js';
+// Le journal des plantages écoute dès le démarrage : une erreur AVANT que l'app
+// soit montée est justement celle qu'aucun écran ne montre (src/plantages.js).
+ecouterPlantages(() => ({ ecran: (() => { try { return new URLSearchParams(location.search).get('tab') || ''; } catch (_) { return ''; } })(),
+  version: typeof __BUILD__ !== 'undefined' ? String(__BUILD__) : '' }));
 // L'app n'est téléchargée que par ceux qui y entrent : un visiteur qui lit la
 // page d'accueil ne charge pas 340 Ko compressés pour rien (§ montée en charge).
 const App = React.lazy(() => import('./App.jsx'));
@@ -23,7 +28,7 @@ import '@fontsource/space-grotesk/700.css';
 class DernierFilet extends React.Component {
   constructor(p) { super(p); this.state = { err: null }; }
   static getDerivedStateFromError(err) { return { err }; }
-  componentDidCatch(err, info) { try { console.error('[VRM] application en erreur', err, info && info.componentStack); } catch (_) {} }
+  componentDidCatch(err, info) { try { console.error('[VRM] application en erreur', err, info && info.componentStack); } catch (_) {} noterPlantage(err, { origine: 'demarrage', version: typeof __BUILD__ !== 'undefined' ? String(__BUILD__) : '' }); }
   render() {
     if (!this.state.err) return this.props.children;
     const msg = String((this.state.err && this.state.err.message) || this.state.err);

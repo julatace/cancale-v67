@@ -52,6 +52,16 @@ const essai = async (nom, reponses, attenduOk, attenduEssais) => {
   const blocRdv = SRC.slice(iRdv >= 0 ? iRdv : iSL, SRC.indexOf('// CAPTURE DU BORDEREAU — PAR LES TÉLÉCHARGEMENTS'));
   const avecRdv = /function attendreBordereau/.test(blocRdv);
   if (!avecRdv) nok('le rendez-vous de bordereau existe', 'attendreBordereau introuvable — on rejoue l\'ancien storeLabel');
+  // ⚠️ Depuis le 4 octobre, `storeLabel` choisit ses candidats avec la règle
+  // unique `A_EXPEDIER` (le champ machine de Vinted d'abord), définie AILLEURS
+  // dans le fichier. Le vm ne fournissait qu'un faux `AWAITING_SHIP` : l'appel
+  // levait dans le `try`, aucun candidat, et le cas « un seul colis » tombait —
+  // artefact de banc, pas défaut (§6.3 : servir ce que le code appelle
+  // vraiment). On extrait la VRAIE règle ; sur un code qui ne l'a pas encore,
+  // on garde le faux d'avant.
+  const iAw = SRC.indexOf('const AWAITING_SHIP =');
+  const iAx = SRC.indexOf('function A_EXPEDIER(');
+  const regleAx = (iAw >= 0 && iAx > iAw) ? SRC.slice(iAw, SRC.indexOf('\n}\n', iAx) + 3) : null;
   {
     const monter = (magasin, ventes, dejaCapte) => {
       const ecrites = [];
@@ -62,7 +72,7 @@ const essai = async (nom, reponses, attenduOk, attenduEssais) => {
       } } };
       const ctx = { chrome, console, Date, Set, String, Object, JSON,
         activeAccountId: async () => '42',
-        AWAITING_SHIP: (st) => /bordereau|paiement/i.test(String(st || '')),
+        ...(regleAx ? {} : { AWAITING_SHIP: (st) => /bordereau|paiement/i.test(String(st || '')) }),
         logActivity: () => {},
         // ⚠️ `_label_*` est un balayage de famille NON BORNÉ : le code le lit
         //    désormais en PAGINÉ (`sbGetTout`, §4.5). Le vm doit donc le fournir,
@@ -76,7 +86,9 @@ const essai = async (nom, reponses, attenduOk, attenduEssais) => {
           : dejaCapte.map(tx => ({ tx }))),
         supabaseUpsert: async (_t, lignes) => { ecrites.push(...lignes.map(l => l.id)); },
       };
-      vm.createContext(ctx); vm.runInContext(blocRdv, ctx);
+      vm.createContext(ctx);
+      if (regleAx) vm.runInContext(regleAx, ctx);
+      vm.runInContext(blocRdv, ctx);
       // Sur l'ancien code, la fonction n'existe pas : on la remplace par un
       // no-op pour que les contrôles s'exécutent quand même et disent la vérité.
       if (typeof ctx.attendreBordereau !== 'function') ctx.attendreBordereau = async () => ({ ok: false });

@@ -22,6 +22,10 @@
     {
       "source": "/api/stripe-webhook",
       "destination": "/api/compte?mode=webhook"
+    },
+    {
+      "source": "/api/detourage",
+      "destination": "/api/ai?mode=detourage"
     }
   ],
   "headers": [
