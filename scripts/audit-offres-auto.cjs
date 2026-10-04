@@ -134,114 +134,50 @@ const convAvecQuestion = ({ id, tx, oid, item, prix, question, allowReply = true
   } } },
 });
 
-const A = (n) => `PUT /api/v2/transactions/${n}`;
-
+// ⚠️⚠️ RETIRÉ LE 4 OCTOBRE — DÉCISION DE JULIEN : « je ne veux pas que ça accepte
+//    tout seul les offres ». Cet audit PROUVAIT que le moteur accepte (au-dessus du
+//    plancher, trois par visite, etc.) ; il prouve maintenant qu'il n'accepte
+//    JAMAIS — quelles que soient les conditions les plus favorables à une
+//    acceptation. C'est le nouvel invariant (§3, anti-blocage : une acceptation
+//    automatique est de la même famille que les messages en série aux favoris et
+//    la republication en file). L'acceptation MANUELLE depuis la messagerie reste
+//    une autre voie, non testée ici.
+//    §6.1 : rouge sur le code d'avant (il acceptait 1, 3, etc.), vert après.
 (async () => {
+  // Les conditions les PLUS favorables à une acceptation — interrupteur ON, bon
+  // compte connecté, offre au-dessus (ou pile) du plancher : rien ne doit partir.
   const cas = [
-    { nom: "offre EN ATTENTE au-dessus du plancher -> acceptée",
-      convs: [conv({ id: 1, tx: 900, oid: 5001, item: 'i1', prix: 45 })],
-      mins: { i1: 40 }, attendu: 1 },
-
-    { nom: "offre EN DESSOUS du plancher -> jamais touchée",
-      convs: [conv({ id: 1, tx: 900, oid: 5001, item: 'i1', prix: 30 })],
-      mins: { i1: 40 }, attendu: 0 },
-
-    { nom: "AUCUN plancher sur cette annonce -> on ne touche à rien",
-      convs: [conv({ id: 1, tx: 900, oid: 5001, item: 'i1', prix: 999 })],
-      mins: {}, attendu: 0 },
-
-    { nom: "offre DÉJÀ ACCEPTÉE (status 20) -> rien",
-      convs: [conv({ id: 1, tx: 900, oid: 5001, item: 'i1', prix: 45, status: 20 })],
-      mins: { i1: 40 }, attendu: 0 },
-
-    { nom: "offre REFUSÉE (status 30) -> rien",
-      convs: [conv({ id: 1, tx: 900, oid: 5001, item: 'i1', prix: 45, status: 30 })],
-      mins: { i1: 40 }, attendu: 0 },
-
-    { nom: "offre remplacée par une plus récente (current:false) -> rien",
-      convs: [conv({ id: 1, tx: 900, oid: 5001, item: 'i1', prix: 45, current: false })],
-      mins: { i1: 40 }, attendu: 0 },
-
-    { nom: "MA propre contre-offre -> jamais acceptée",
-      convs: [conv({ id: 1, tx: 900, oid: 5001, item: 'i1', prix: 45, deMoi: true })],
-      mins: { i1: 40 }, attendu: 0 },
-
-    { nom: "interrupteur ÉTEINT -> rien, même au-dessus du plancher",
-      convs: [conv({ id: 1, tx: 900, oid: 5001, item: 'i1', prix: 45 })],
-      mins: { i1: 40 }, actif: false, attendu: 0 },
-
-    { nom: "navigateur sur un AUTRE compte -> rien (garde-fou §48)",
-      convs: [conv({ id: 1, tx: 900, oid: 5001, item: 'i1', prix: 45 })],
-      mins: { i1: 40 }, connecte: '999', attendu: 0 },
-
-    { nom: "déjà traitée -> jamais deux fois",
-      convs: [conv({ id: 1, tx: 900, oid: 5001, item: 'i1', prix: 45 })],
-      mins: { i1: 40 }, memo: { '5001': Date.now() - 60000 }, attendu: 0 },
-
-    { nom: "plafond 3 par visite (5 offres acceptables)",
+    { nom: "offre au-dessus du plancher, interrupteur ON, bon compte → JAMAIS acceptée",
+      convs: [conv({ id: 1, tx: 900, oid: 5001, item: 'i1', prix: 45 })], mins: { i1: 40 } },
+    { nom: "offre PILE au plancher → JAMAIS acceptée",
+      convs: [conv({ id: 1, tx: 900, oid: 5001, item: 'i1', prix: 40 })], mins: { i1: 40 } },
+    { nom: "plancher posé dans l'APP (vinted_annonce_numeros) → JAMAIS acceptée",
+      convs: [conv({ id: 1, tx: 900, oid: 5001, item: 'i1', prix: 45 })], mins: {}, minsApp: { i1: { minPrice: 40 } } },
+    { nom: "cinq offres toutes acceptables → AUCUNE acceptée (plus de « 3 par visite »)",
       convs: [1, 2, 3, 4, 5].map(i => conv({ id: i, tx: 900 + i, oid: 5000 + i, item: 'i' + i, prix: 45 })),
-      mins: { i1: 40, i2: 40, i3: 40, i4: 40, i5: 40 }, attendu: 3 },
-
-    { nom: "le plancher de l'APP (vinted_annonce_numeros) est appliqué",
-      convs: [conv({ id: 1, tx: 900, oid: 5001, item: 'i1', prix: 45 })],
-      mins: {}, minsApp: { i1: { minPrice: 40 } }, attendu: 1 },
-
-    { nom: "l'APP prime sur l'ancienne ligne du panneau (60 > 45 -> refus)",
-      convs: [conv({ id: 1, tx: 900, oid: 5001, item: 'i1', prix: 45 })],
-      mins: { i1: 10 }, minsApp: { i1: { minPrice: 60 } }, attendu: 0 },
-
-    { nom: "offre pile AU plancher -> acceptée (>=)",
-      convs: [conv({ id: 1, tx: 900, oid: 5001, item: 'i1', prix: 40 })],
-      mins: { i1: 40 }, attendu: 1 },
-
-    // ── SALUT + RÉPONSE APRÈS ACCEPTATION (Julien, 16 sept. / 3 oct.) ─────────
-    { nom: "accepte ET salue l'acheteur (bonjour + offre acceptée)",
-      convs: [conv({ id: 1, tx: 900, oid: 5001, item: 'i1', prix: 45 })],
-      mins: { i1: 40 }, attendu: 1, salut: /accept/i },
-
-    { nom: "salut + RÉPONSE à la question (IA confiante)",
-      convs: [convAvecQuestion({ id: 1, tx: 900, oid: 5001, item: 'i1', prix: 45, question: 'elle taille comment ?' })],
-      mins: { i1: 40 }, ia: { ok: true, confidence: 80, intent: 'size', suggestions: [{ text: 'Elle taille normalement, prends ta pointure habituelle.' }] },
-      attendu: 1, salut: /accept.*taille normalement|taille normalement/is },
-
-    { nom: "IA qui hésite (confiance < 55) -> salut SEUL, jamais de faux",
-      convs: [convAvecQuestion({ id: 1, tx: 900, oid: 5001, item: 'i1', prix: 45, question: 'bonjour ?' })],
-      mins: { i1: 40 }, ia: { ok: true, confidence: 30, suggestions: [{ text: 'peut-être' }] },
-      attendu: 1, salut: /accept/i, pasDans: /peut-être/i },
-
-    { nom: "Vinted refuse la réponse (allow_reply:false) -> accepte mais NE salue pas",
-      convs: [convAvecQuestion({ id: 1, tx: 900, oid: 5001, item: 'i1', prix: 45, question: 'q', allowReply: false })],
-      mins: { i1: 40 }, attendu: 1, reponses: 0 },
-
-    { nom: "déjà salué sur cette offre -> jamais deux fois",
-      convs: [conv({ id: 1, tx: 900, oid: 5001, item: 'i1', prix: 45 })],
-      mins: { i1: 40 }, repondus: { '1:offre': { at: 't' } }, attendu: 1, reponses: 0 },
+      mins: { i1: 40, i2: 40, i3: 40, i4: 40, i5: 40 } },
   ];
 
   let ko = 0;
   for (const c of cas) {
     const b = faireBanc(c);
-    await b.ctx.autoAccepterOffres('111');
+    const n = await b.ctx.autoAccepterOffres('111');
     const acc = b.envois.filter(e => /offer_requests\/\d+\/accept$/.test(e));
-    let ok = acc.length === c.attendu;
-    let det = `accepté ${acc.length}, attendu ${c.attendu}`;
-    // Assertion sur le salut / la réponse, quand le cas la définit.
-    if (c.salut !== undefined) {
-      const corps = (b.reponses[0] && b.reponses[0].body) || '';
-      const envoye = b.reponses.length === 1 && c.salut.test(corps);
-      const pasDeFaux = !c.pasDans || !c.pasDans.test(corps);
-      ok = ok && envoye && pasDeFaux;
-      det += ` · réponse=${b.reponses.length} corps=«${corps.slice(0, 45)}»`;
-    }
-    if (c.reponses !== undefined) {
-      const rok = b.reponses.length === c.reponses;
-      ok = ok && rok;
-      det += ` · réponses=${b.reponses.length}/${c.reponses}`;
-    }
+    const ok = acc.length === 0 && !n;
     if (!ok) ko++;
-    console.log(`${ok ? '✅' : '❌'} ${c.nom} — ${det}`);
+    console.log(`${ok ? '✅' : '❌'} ${c.nom} — accepté ${acc.length}, retour ${n}`);
     if (!ok) console.log('     envois :', JSON.stringify(b.envois));
   }
-  console.log(ko ? `\n${ko} cas non conforme(s).` : "\nLe moteur d'offres accepte, salue et répond — sans jamais de faux.");
+
+  // La gare rend toujours « éteint », même interrupteur ON : c'est le chokepoint.
+  {
+    const b = faireBanc({ convs: [], actif: true });
+    const actif = await b.ctx.offresAutoActif();
+    const ok = actif === false;
+    if (!ok) ko++;
+    console.log(`${ok ? '✅' : '❌'} offresAutoActif() rend toujours false (interrupteur ON ignoré) — ${actif}`);
+  }
+
+  console.log(ko ? `\n${ko} cas non conforme(s).` : "\nL'acceptation automatique des offres est retirée : rien n'est accepté à sa place.");
   process.exit(ko ? 1 : 0);
 })();
