@@ -36,7 +36,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.151.0';
+const EXT_ATTENDUE = '5.152.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -26284,9 +26284,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 // ── RELIER UNE ANNONCE LEBONCOIN À UNE PAIRE, À LA MAIN (C4, 30 sept.) ─────
 // « Annonce Leboncoin non reliée : afficher la photo + pouvoir la relier à un N°
 // dans l'app. » Le lien est une IDENTITÉ posée par lui (son clic), jamais une
-// ressemblance : on n'en propose aucun, il tape le N° qu'il reconnaît sur la
-// photo. Un N° que VRM ne connaît pas est refusé (sinon le lien ne mènerait à
-// aucune paire, et l'annonce resterait « non reliée » sans le dire).
+// ressemblance : il tape le N° qu'il reconnaît sur la photo, ou clique une des
+// paires proposées (4 octobre) — la proposition ne relie rien toute seule. Un
+// N° que VRM ne connaît pas est refusé (sinon le lien ne mènerait à aucune
+// paire, et l'annonce resterait « non reliée » sans le dire).
 // Pose le lien « annonce Leboncoin → N° de paire » (une identité qu'il pose
 // lui-même, §5). Une seule écriture pour les deux chemins (champ N° et clic sur
 // une suggestion) — sinon l'un des deux finirait par ne plus écrire pareil (§11).
@@ -26312,7 +26313,17 @@ function relierAnnonceLbc(id, n) {
 //   l'identité ; la suggestion ne fait qu'éviter de taper le numéro.
 const motsDeTitre = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
   .replace(/[^a-z0-9,.]+/g, ' ').split(' ').filter((w) => w.length >= 2 && !/^(taille|pointure|neuf|neuve|tres|bon|etat|avec|pour|les|des|une|homme|femme|paire)$/.test(w));
-const pointureDe = (s) => { const m = /(?:^|[^\d])(\d{2}(?:[.,]5)?)(?=[^\d]|$)/.exec(String(s || '')); return m ? m[1].replace(',', '.') : null; };
+// La pointure : d'abord ce qui suit « taille », « pointure » ou « T » ; sinon le
+// DERNIER nombre de 16 à 50. ⚠️ Pas le premier nombre venu : dans « Nike Air
+// Max 90 … taille 44 », c'était « 90 », et une paire en 42 était proposée
+// (vu par `audit-double-vente.cjs`).
+const pointureDe = (s) => {
+  const t = String(s || '');
+  const m = /(?:taille|pointure|\bt|\bp)\s*(\d{2}(?:[.,]5)?)(?!\d)/i.exec(t);
+  if (m) return m[1].replace(',', '.');
+  const tous = [...t.matchAll(/(?:^|[^\d])(\d{2}(?:[.,]5)?)(?=[^\d]|$)/g)].map((x) => x[1].replace(',', '.')).filter((x) => { const n = parseFloat(x); return n >= 16 && n <= 50; });
+  return tous.length ? tous[tous.length - 1] : null;
+};
 function suggestionsPaires(cible, candidats, max = 3) {
   const mc = new Set(motsDeTitre(cible && cible.titre));
   const tc = pointureDe(cible && cible.titre);
@@ -26321,42 +26332,146 @@ function suggestionsPaires(cible, candidats, max = 3) {
     let note = 0;
     for (const w of new Set(motsDeTitre(`${c.titre || ''} ${c.marque || ''}`))) if (mc.has(w)) note += /^\d/.test(w) ? 1 : 2;
     const t = pointureDe(c.taille) || pointureDe(c.titre);
-    // Une pointure DIFFÉRENTE écarte presque sûrement la paire : c'est le cas
-    // des « 50 paires identiques » (§2.4) — même modèle, autre taille.
-    if (tc && t) note += tc === t ? 3 : -4;
+    // Une pointure DIFFÉRENTE écarte la paire, quoi que disent les mots : c'est
+    // le cas des « 50 paires identiques » (§2.4) — même modèle, autre paire.
+    if (tc && t && tc !== t) return { ...c, note: -1 };
+    if (tc && t) note += 3;
     if (pc > 0 && Number(c.prix) > 0) { const r = Math.abs(pc - c.prix) / Math.max(pc, c.prix); if (r <= 0.15) note += 2; else if (r > 0.6) note -= 1; }
     return { ...c, note };
   }).filter((x) => x.note >= 4).sort((a, b) => b.note - a.note).slice(0, max);
 }
 
-function LbcRelier({ ad, numsConnus, onRelie }) {
+// ── LES CLÉS D'UNE ANNONCE LEBONCOIN : CE QUI LA RELIE À UNE PAIRE (§5) ──────
+// Le lien posé à la main d'abord (`vrm_lbc_liens`), puis la référence VRM
+// (CustomRef, ou VRM-xxx lu dans la description), puis le « nXXX » qu'il écrit
+// lui-même dans ses titres. Toutes passent par `cleNum`. Une seule règle pour
+// l'écran Leboncoin ET le tableau de bord (§11) — la même que `adRefKeys` dans
+// l'extension.
+const numDeTitreLbc = (s) => { const m = /\bn\s*°?\s*(\d{1,5})\b/i.exec(String(s || '')); return m ? m[1] : null; };
+function clesAnnonceLbc(ad, liens) {
+  const ks = [];
+  if (!ad) return ks;
+  const push = (v) => { const k = cleNum(v); if (k && !ks.includes(k)) ks.push(k); };
+  const lien = ad.id != null && liens ? liens[String(ad.id)] : null;
+  if (lien != null && String(lien).trim()) push(lien);
+  push(refVRMDe(ad.customRef));
+  if (ad.ref) push(ad.ref);
+  const mt = numDeTitreLbc(ad.subject || ad.title); if (mt) push(mt);
+  return ks;
+}
+
+// ── QUELS COMPTES LEBONCOIN SONT À LUI : CEUX DONT IL A VENDU UNE ANNONCE ────
+// Mesuré le 4 octobre : 58 annonces portent un champ `account`, réparties sur
+// **48 comptes différents** — une ancienne version de l'extension (5.88)
+// étiquetait les annonces d'AUTRUI avec leur propre propriétaire. `account`
+// seul ne prouve donc RIEN. Ce qui prouve : une vente où il est le VENDEUR
+// (`isSeller === true`, lu sur le détail de la transaction) désigne une
+// annonce, et le compte de cette annonce est le sien. Les 3 ventes mesurées
+// pointent toutes vers le même compte, qui porte 8 annonces — les seules qui
+// sont à lui parmi les 58. C'est une identité (le même compte), pas une
+// ressemblance. La MÊME règle vit dans l'extension (`comptesLbcProuves`).
+function comptesLbcProuves(ventes, items) {
+  const s = new Set();
+  for (const v of Object.values(ventes || {})) {
+    if (!v || v.isSeller !== true || v.itemId == null) continue;
+    const ad = items && items[String(v.itemId)];
+    if (ad && ad.account) s.add(String(ad.account));
+  }
+  return s;
+}
+function annonceLbcALui(ad, prouves) {
+  return !!(ad && (ad.ref || ad.customRef || ad.lbcUser || (ad.account && prouves && prouves.has(String(ad.account)))));
+}
+
+// Les annonces Leboncoin captées (226 Ko mesurés le 4 octobre) : lues une fois
+// par session au plus pour le centre de notifications. `null` = pas su.
+let _lbcAnnoncesSession = null;
+async function lbcAnnoncesSession() {
+  if (_lbcAnnoncesSession && Date.now() - _lbcAnnoncesSession.t < 10 * 60000) return _lbcAnnoncesSession.items;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_listings&select=data`, { headers: sbAuth() });
+    if (!r.ok) return null;
+    const rows = await r.json();
+    if (!Array.isArray(rows)) return null;
+    const items = (rows[0] && rows[0].data && rows[0].data.items) || {};
+    _lbcAnnoncesSession = { t: Date.now(), items };
+    return items;
+  } catch (_) { return null; }
+}
+
+// ── VENDUE SUR LEBONCOIN, ENCORE EN VENTE SUR VINTED (anti double vente) ─────
+// Julien, 4 octobre : « quand une paire est vendue sur une plateforme, elle
+// doit disparaître des autres, pour éviter de vendre deux fois la même paire ».
+// Le sens Vinted → Leboncoin existait (« à retirer de Leboncoin ») ; l'autre
+// sens n'existait PAS : une vente Leboncoin ne disait rien de la paire, qui
+// restait en vente sur Vinted. Un seul chemin d'identité :
+//   vente Leboncoin (il est le VENDEUR, pas annulée) → son annonce (`itemId`)
+//   → ses clés (lien, réf, « nXXX ») → le N° → l'annonce Vinted de ce N°.
+// ⚠️ Retirer l'annonce Vinted TOUT SEUL est refusé (§3 : irréversible, sans
+//    confirmation côté Vinted). On le DIT, avec le lien, et c'est lui qui agit.
+// ⚠️ Une vente dont l'annonce n'est reliée à aucune paire n'est PAS devinée :
+//    elle part dans `aRelier`, où il désigne la paire d'un clic (§5).
+// `ventes` : l'objet `lbc_ventes.data.ventes` ; `items` : `lbc_listings.data.items`
+// (peut manquer : on retombe sur le titre de la vente, qui porte le « nXXX ») ;
+// `enLigne` : annonces Vinted encore en vente ; `vendusVinted` : annonces Vinted
+// prouvées vendues (alors la paire est vendue DEUX fois).
+function doublesVenteLbc({ ventes, items, liens, numeros, enLigne, vendusVinted }) {
+  const parNum = new Map();
+  for (const id in (numeros || {})) {
+    const k = cleNum((numeros[id] || {}).numero);
+    if (!k) continue;
+    if (!parNum.has(k)) parNum.set(k, []);
+    parNum.get(k).push(String(id));
+  }
+  const doublons = []; const aRelier = []; const vendusLbc = new Set();
+  for (const v of Object.values(ventes || {})) {
+    if (!v || v.isSeller !== true || v.itemId == null || lbcAnnulee(v)) continue;
+    const iid = String(v.itemId);
+    vendusLbc.add(iid);
+    const ad = (items && items[iid]) || { id: iid, subject: v.title || '' };
+    const connus = clesAnnonceLbc(ad, liens).filter((k) => parNum.has(k));
+    if (!connus.length) { aRelier.push({ vente: v, ad }); continue; }
+    const ids = [...new Set(connus.flatMap((k) => parNum.get(k)))];
+    const surVinted = ids.filter((id) => enLigne && enLigne.has(id));
+    const vendueVinted = ids.filter((id) => vendusVinted && vendusVinted.has(id));
+    if (surVinted.length || vendueVinted.length) doublons.push({ vente: v, ad, numero: connus[0], surVinted, vendueVinted });
+  }
+  return { doublons, aRelier, vendusLbc };
+}
+
+function LbcRelier({ ad, numsConnus, onRelie, suggestions, detail }) {
   const [num, setNum] = useState('');
   const [msg, setMsg] = useState('');
   const photo = (Array.isArray(ad.images) && ad.images[0]) || ad.image || '';
   const id = ad.id != null ? String(ad.id) : '';
+  const poser = (n) => {
+    if (!id) { setMsg("Cette annonce n'a pas d'identifiant Leboncoin : impossible de la relier."); return; }
+    relierAnnonceLbc(id, n);
+    setMsg('');
+    toast(`Annonce reliée à la paire N°${n}.`);
+    onRelie && onRelie();
+  };
   const relier = () => {
     // « n125 » (l'écriture des titres Vinted) vaut 125 — sauf s'il existe une
     // vraie série « N » : alors N125 est un numéro à part entière.
     const brut = cleNum(num);
     const sansN = brut.replace(/^N[°O]?(?=\d)/, '');
     const n = numsConnus.includes(brut) ? brut : sansN;
-    if (!id) { setMsg("Cette annonce n'a pas d'identifiant Leboncoin : impossible de la relier."); return; }
     if (!NUM_OK.test(n)) { setMsg('Tape le numéro de la paire (125, ou B125).'); return; }
     if (!numsConnus.includes(n)) { setMsg(`Aucune paire ne porte le N°${n} dans VRM.`); return; }
-    relierAnnonceLbc(id, n);
-    setMsg('');
-    toast(`Annonce reliée à la paire N°${n}.`);
-    onRelie && onRelie();
+    poser(n);
   };
+  const sugg = (suggestions || []).filter((s) => s && s.numero);
   return (
-    <div data-lbc-relier={id} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 0', borderTop: `1px solid ${C.border}` }}>
+    <div data-lbc-relier={id} style={{ padding: '8px 0', borderTop: `1px solid ${C.border}` }}>
+    <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
       <div style={{ width: 52, height: 52, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: C.card2 || C.border, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {photo ? <img src={photo} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : <Icon name="image" size={18} style={{ color: C.muted, opacity: .55 }}/>}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 12.5, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ad.subject || ad.title || '—'}</div>
         <div style={{ fontSize: 11, color: C.muted }}>
-          {ad.price != null ? `${ad.price} €` : ''}{ad.customRef ? ` · réf ${ad.customRef}` : ''}
+          {detail || (ad.price != null ? `${ad.price} €` : '')}{ad.customRef ? ` · réf ${ad.customRef}` : ''}
           {ad.url ? <> · <a href={ad.url} target="_blank" rel="noreferrer" style={{ color: C.accent, fontWeight: 600 }}>voir</a></> : null}
         </div>
         {msg && <div style={{ fontSize: 11, color: C.warn, marginTop: 2 }}>{msg}</div>}
@@ -26367,6 +26482,22 @@ function LbcRelier({ ad, numsConnus, onRelie }) {
           style={{ width: 54, border: `1px solid ${C.border}`, borderRadius: 8, padding: '6px 7px', background: C.bg, color: C.text, fontSize: 13, outline: 'none', fontFamily: 'inherit' }}/>
         <button type="button" onClick={relier} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, padding: '6px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Relier</button>
       </div>
+    </div>
+      {/* Les paires qui y ressemblent, À CONFIRMER : c'est son clic qui relie,
+          jamais la ressemblance (§5). Elles évitent juste de taper le N°. */}
+      {sugg.length > 0 && (
+        <div data-lbc-suggestions={id} style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginTop: 7, paddingLeft: 62 }}>
+          <span style={{ fontSize: 11, color: C.muted }}>C'est peut-être :</span>
+          {sugg.map((s) => (
+            <button key={s.numero} type="button" data-suggestion={s.numero} onClick={() => poser(s.numero)} title={s.titre || ''}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, maxWidth: 260, border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, padding: '4px 8px 4px 4px', fontSize: 11.5, cursor: 'pointer', fontFamily: 'inherit', minHeight: 0 }}>
+              {s.photo ? <img src={s.photo} alt="" loading="lazy" style={{ width: 24, height: 24, borderRadius: 5, objectFit: 'cover', flexShrink: 0 }}/> : null}
+              <b style={{ flexShrink: 0 }}>N°{s.numero}</b>
+              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: C.muted }}>{s.titre || ''}</span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -26534,25 +26665,23 @@ function LeboncoinScreen() {
     const lbcJamaisLu = lbcRows !== null && !(lbcRows && lbcRows[0]);
     const lbcItems = (lbcRows && lbcRows[0] && lbcRows[0].data && lbcRows[0].data.items) || {};
     const lbcAds = Object.values(lbcItems).filter(Boolean);
-    const numFrom = (s) => { const m = /\bn\s*°?\s*(\d{1,5})\b/i.exec(String(s || '')); return m ? m[1] : null; };
+    // Ses ventes Leboncoin PROUVÉES (il est le vendeur) : elles disent quels
+    // comptes Leboncoin sont les siens, et quelles paires sont déjà parties.
+    // `null` = pas su : on n'en tire RIEN (ni compte, ni double vente).
+    const lbcVentesRows = await sbGet('app_data?id=eq.lbc_ventes&select=data');
+    const ventesLbcKO = lbcVentesRows === null;
+    const ventesLbc = (lbcVentesRows && lbcVentesRows[0] && lbcVentesRows[0].data && lbcVentesRows[0].data.ventes) || {};
+    const prouves = comptesLbcProuves(ventesLbc, lbcItems);
+    const numFrom = numDeTitreLbc;
     // ⚠️ LE LIEN POSÉ À LA MAIN D'ABORD (C4) : « Relier » écrit annonce LBC →
     //    N° dans `vrm_lbc_liens`. C'est une identité qu'il pose lui-même — la
     //    même règle vit dans l'extension (`adRefKeys`), sinon l'app relie et le
     //    panneau ne relie pas (§11). La copie locale prime sur le nuage : elle
     //    est plus récente que la dernière synchro (l'envoi est différé).
     const liens = { ...(main.vrm_lbc_liens || {}), ...(load('vrm_lbc_liens', {}) || {}) };
-    const adKeys = (ad) => {
-      const ks = [];
-      const lien = ad && ad.id != null ? liens[String(ad.id)] : null;
-      // Toutes les clés passent par `cleNum` (« VRM-b125 » = « B125 »), des deux
-      // côtés — la même règle que l'extension (`adRefKeys`, §11).
-      const push = (v) => { const k = cleNum(v); if (k && !ks.includes(k)) ks.push(k); };
-      if (lien != null && String(lien).trim()) push(lien);
-      push(refVRMDe(ad.customRef));
-      if (ad.ref) push(ad.ref);
-      const mt = numFrom(ad.subject); if (mt) push(mt);
-      return ks;
-    };
+    // Toutes les clés passent par `cleNum` (« VRM-b125 » = « B125 »), des deux
+    // côtés — la même règle que l'extension (`adRefKeys`, §11).
+    const adKeys = (ad) => clesAnnonceLbc(ad, liens);
     const isDead = (ad) => /(supprim|delete|expir|refus|sold|vendu)/i.test(String(ad.status || ''));
     // ⚠️ ET ON NE GARDE QUE CE QU'ON PEUT LUI ATTRIBUER. Mesuré le 13 septembre :
     //    81 annonces rangées par la capture n'étaient pas les siennes (chalets,
@@ -26560,8 +26689,14 @@ function LeboncoinScreen() {
     //    filtre elles ressortaient toutes en « annonces non reliées », et le
     //    compteur annonçait 81. Une annonce est à lui si elle porte notre
     //    référence VRM, ou si son propriétaire est connu.
-    const aLui = (ad) => !!(ad && (ad.ref || ad.customRef || ad.lbcUser));
-    const liveAds = lbcAds.filter(ad => !isDead(ad) && aLui(ad));
+    // ⚠️ Et un compte dont il a VENDU une annonce est le sien (`comptesLbcProuves`,
+    //    4 octobre) : ses 7 autres annonces étaient invisibles ici.
+    const aLui = (ad) => annonceLbcALui(ad, prouves);
+    // Une annonce qu'il a VENDUE sur Leboncoin n'y est plus en vente : elle ne
+    // compte ni « en ligne », ni « à retirer », ni « non reliée » — elle a son
+    // propre bloc (vendue ici, encore sur Vinted ?).
+    const { vendusLbc } = doublesVenteLbc({ ventes: ventesLbc, items: lbcItems, liens, numeros });
+    const liveAds = lbcAds.filter(ad => !isDead(ad) && aLui(ad) && !vendusLbc.has(String(ad.id)));
     const refToAd = new Map();
     liveAds.forEach(ad => adKeys(ad).forEach(k => { if (!refToAd.has(k)) refToAd.set(k, ad); }));
     const vKeys = (id, title) => { const e = numeros[id] || {}; const ks = []; if (e.numero) ks.push(cleNum(e.numero)); const m = numFrom(title || e.title); if (m) ks.push(cleNum(m)); return ks; };
@@ -26631,10 +26766,24 @@ function LeboncoinScreen() {
       removals.push({ numero: ks[0], title: ad.subject || '', lbc: true, url: ad.url || '', etat });
     }
     removals.sort((a, b) => triNum(a.numero, b.numero));
+    // ── L'AUTRE SENS : VENDUE SUR LEBONCOIN, ENCORE EN VENTE SUR VINTED ────────
+    // Les paires que Vinted propose encore à la vente (`onlineIds`), et celles que
+    // Vinted a déjà vendues (`vendus`) : vendue ici ET là, c'est une vente qu'il
+    // ne pourra pas honorer.
+    const dv = ventesLbcKO ? { doublons: [], aRelier: [] }
+      : doublesVenteLbc({ ventes: ventesLbc, items: lbcItems, liens, numeros, enLigne: onlineIds, vendusVinted: vendus });
+    // Les paires qu'il a encore en ligne sur Vinted, avec leur N° : ce sont elles
+    // qu'une annonce Leboncoin peut désigner. Proposées, jamais reliées seules.
+    const candidats = online.filter((o) => numeros[o.id] && numeros[o.id].numero)
+      .map((o) => ({ numero: String(numeros[o.id].numero), titre: o.title || '', marque: o.brand || '', taille: o.size || '', prix: o.price != null ? Number(o.price) : null, photo: o.photo || '' }));
+    const suggPour = (titre, prix) => suggestionsPaires({ titre, prix }, candidats);
+    const aRelierVentes = dv.aRelier.map(({ vente, ad }) => ({ vente, ad, suggestions: suggPour(vente.title || ad.subject, vente.price != null ? Number(vente.price) / 100 : ad.price) }));
+    const doublons = dv.doublons.map((d) => ({ ...d, vintedUrl: d.surVinted[0] ? 'https://www.vinted.fr/items/' + d.surVinted[0] : '' }));
+    unlinked.forEach((u) => { u.suggestions = suggPour(u.subject || u.title, u.price); });
     // Répartition des annonces LBC par compte (plusieurs comptes possibles).
     const parCompte = {};
     for (const ad of liveAds) { const k = String(ad.lbcUser || '?'); (parCompte[k] = parCompte[k] || []).push(ad); }
-    setData({ preuveKO, echecLecture: echecLecture || listRowsBrut === null, lbcJamaisLu: lbcJamaisLu || liveAds.length === 0, vendues, nEnLigne: online.length, nNumerotees, queue, removals, unlinked, numsConnus: [...keysKnown], liveAds, autoMatched, retirees, lbcAccounts, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: liveAds.length, limit: pd.limit, plan: pd.plan, prep });
+    setData({ preuveKO, echecLecture: echecLecture || listRowsBrut === null, lbcJamaisLu: lbcJamaisLu || liveAds.length === 0, vendues, nEnLigne: online.length, nNumerotees, queue, removals, unlinked, doublons, aRelierVentes, ventesLbcKO, numsConnus: [...keysKnown], liveAds, autoMatched, retirees, lbcAccounts, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: liveAds.length, limit: pd.limit, plan: pd.plan, prep });
     setLoading(false);
   };
   useEffect(() => { reload(); /* eslint-disable-next-line */ }, []);
@@ -26658,6 +26807,55 @@ function LeboncoinScreen() {
         <h2 style={{ fontSize: 18, fontWeight: 700, color: C.text, margin: 0 }}>À publier sur Leboncoin</h2>
         <button onClick={reload} style={{ background: 'transparent', border: `1px solid ${C.border}`, borderRadius: 999, padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: C.text }}>{loading ? '…' : '↻ Actualiser'}</button>
       </div>
+      {/* ── ANTI DOUBLE VENTE : EN PREMIER, C'EST LE SEUL GESTE URGENT DE L'ÉCRAN ──
+          Une paire vendue ici et encore en vente sur Vinted peut être achetée
+          une deuxième fois. On le dit avec le N° et le lien ; VRM ne retire pas
+          l'annonce Vinted tout seul (§3 : irréversible côté Vinted). */}
+      {data && data.doublons && data.doublons.length > 0 && (
+        <Card style={{ borderColor: C.warn }}>
+          <div data-lbc-doublons={data.doublons.length} style={{ fontSize: 13.5, fontWeight: 800, color: C.text, marginBottom: 3 }}>
+            {data.doublons.length} paire{data.doublons.length > 1 ? 's' : ''} vendue{data.doublons.length > 1 ? 's' : ''} sur Leboncoin — encore sur Vinted
+          </div>
+          <div style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.5, marginBottom: 6 }}>
+            Retire-{data.doublons.length > 1 ? 'les' : 'la'} de Vinted maintenant, sinon quelqu'un peut l'acheter une deuxième fois. VRM ne le fait pas à ta place : sur Vinted, c'est sans retour.
+          </div>
+          {data.doublons.map((d) => {
+            const ph = (Array.isArray(d.ad.images) && d.ad.images[0]) || '';
+            return (
+              <div key={String(d.vente.txId || d.ad.id)} data-doublon={d.numero} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 0', borderTop: `1px solid ${C.border}` }}>
+                <div style={{ width: 44, height: 44, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: C.card2 || C.border }}>
+                  {ph ? <img src={ph} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : null}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 700, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>N°{d.numero} · {d.vente.title || d.ad.subject || ''}</div>
+                  <div style={{ fontSize: 11, color: C.muted }}>
+                    Leboncoin : {d.vente.stepLabel || 'vendue'}{d.vente.price != null ? ` · ${lbcEuro(d.vente.price)}` : ''}
+                    {d.vendueVinted.length > 0 && <span style={{ color: C.warn, fontWeight: 700 }}> · vendue AUSSI sur Vinted : une des deux ventes ne pourra pas partir — annule-en une</span>}
+                  </div>
+                </div>
+                {d.vintedUrl && <a href={d.vintedUrl} target="_blank" rel="noreferrer" style={{ flexShrink: 0, border: `1px solid ${C.border}`, borderRadius: 8, padding: '6px 10px', fontSize: 12, fontWeight: 600, color: C.text, textDecoration: 'none' }}>Ouvrir sur Vinted</a>}
+              </div>
+            );
+          })}
+        </Card>
+      )}
+      {data && data.aRelierVentes && data.aRelierVentes.length > 0 && (
+        <Card>
+          <div data-lbc-ventes-a-relier={data.aRelierVentes.length} style={{ fontSize: 13, fontWeight: 800, color: C.text, marginBottom: 3 }}>
+            {data.aRelierVentes.length} vente{data.aRelierVentes.length > 1 ? 's' : ''} Leboncoin : quelle paire ?
+          </div>
+          <div style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.5 }}>
+            Ces annonces ne sont reliées à aucune paire : je ne peux donc pas vérifier que la paire n'est plus en vente sur Vinted. Clique la bonne paire, ou tape son N°.
+          </div>
+          {data.aRelierVentes.map(({ vente, ad, suggestions }) => (
+            <LbcRelier key={String(vente.txId || ad.id)} ad={ad} numsConnus={data.numsConnus || []} onRelie={reload} suggestions={suggestions}
+              detail={`Vendue${vente.price != null ? ' ' + lbcEuro(vente.price) : ''}${vente.stepLabel ? ' · ' + vente.stepLabel : ''}`}/>
+          ))}
+        </Card>
+      )}
+      {data && data.ventesLbcKO && (
+        <div style={{ fontSize: 11.5, color: C.muted, marginBottom: 12, lineHeight: 1.5 }}>Je n'ai pas pu lire tes ventes Leboncoin : je n'ai donc pas pu vérifier qu'aucune paire vendue ici n'est encore en vente sur Vinted. Actualise dans un moment.</div>
+      )}
       {/* ══════════════════════════════════════════════════════════════════════
           PUBLIER TOUT SEUL : OÙ ÇA EN EST, ET CE QUI FAIT AVANCER
           ══════════════════════════════════════════════════════════════════════
@@ -26863,8 +27061,8 @@ function LeboncoinScreen() {
         {data.unlinked && data.unlinked.length > 0 && (
           <Card>
             <div style={{ fontSize: 13, fontWeight: 900, color: C.text, marginBottom: 4 }}>❔ {data.unlinked.length} annonce{data.unlinked.length > 1 ? 's' : ''} Leboncoin non reliée{data.unlinked.length > 1 ? 's' : ''}</div>
-            <div style={{ fontSize: 11.5, color: C.muted, marginBottom: 10, lineHeight: 1.45 }}>VRM ne sait pas quelle paire c'est. Si tu la reconnais, tape son <b>N°</b> et « Relier » : elle sera suivie comme les autres (« vendue sur Vinted → à retirer »).</div>
-            {data.unlinked.slice(0, 40).map((u) => <LbcRelier key={String(u.id || u.url || u.subject)} ad={u} numsConnus={data.numsConnus || []} onRelie={reload}/>)}
+            <div style={{ fontSize: 11.5, color: C.muted, marginBottom: 10, lineHeight: 1.45 }}>VRM ne sait pas quelle paire c'est. Clique la bonne paire si elle est proposée, ou tape son <b>N°</b> et « Relier » : elle sera suivie comme les autres (vendue sur Vinted → à retirer d'ici, et l'inverse).</div>
+            {data.unlinked.slice(0, 40).map((u) => <LbcRelier key={String(u.id || u.url || u.subject)} ad={u} numsConnus={data.numsConnus || []} onRelie={reload} suggestions={u.suggestions}/>)}
             {data.unlinked.length > 40 && <div style={{ fontSize: 11.5, color: C.muted, marginTop: 6 }}>… et {data.unlinked.length - 40} autre{data.unlinked.length - 40 > 1 ? 's' : ''}.</div>}
           </Card>
         )}
@@ -30074,12 +30272,36 @@ function AppCoeur() {
       // Colis à retirer (emails transporteurs) : source légère, module-level.
       let colisCount=0;
       try{ const tr=await fetchEmailTracking(); const col=loadCollected(); const ret=suivisRetires(tr); colisCount=(tr||[]).filter(t=>isColisRetirable(t,col) && !colisRetireAilleurs(t,ret)).length; }catch(_){}
-      // Leboncoin : paires publiées sur LBC mais VENDUES sur Vinted (plus en ligne)
-      // → à retirer de Leboncoin pour ne pas les vendre deux fois.
+      // Leboncoin : paires publiées sur LBC mais VENDUES sur Vinted → à retirer de
+      // Leboncoin pour ne pas les vendre deux fois.
+      // ⚠️ « VENDUE » SE PROUVE (§5), elle ne se déduit pas d'une absence : une
+      //    annonce sort aussi de la liste quand il la met en PAUSE. Ce compte
+      //    disait « vendues sur Vinted » pour toute annonce plus en ligne — la
+      //    règle que l'écran Leboncoin a abandonnée le 12 septembre (151 ventes
+      //    prouvées sur 400 annonces fermées). Il ne compte plus que les ventes
+      //    PROUVÉES ; le doute, lui, se règle sur l'écran Leboncoin.
       let lbcRemoveCount=0;
       try{
         const r=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_lbc_posted&select=data`,{headers:sbAuth()});
-        if(r.ok){ const rows=await r.json(); const posted=(rows&&rows[0]&&rows[0].data&&rows[0].data.ids)||[]; lbcRemoveCount=posted.filter(x=>/^\d+$/.test(String(x))&&!lbcOnlineIds.has(String(x))).length; }
+        if(r.ok){ const rows=await r.json(); const posted=(rows&&rows[0]&&rows[0].data&&rows[0].data.ids)||[]; lbcRemoveCount=posted.filter(x=>/^\d+$/.test(String(x))&&soldIdsN.has(String(x))).length; }
+      }catch(_){}
+      // ── ET L'AUTRE SENS : VENDUE SUR LEBONCOIN, ENCORE EN VENTE SUR VINTED ──
+      // La MÊME règle que l'écran Leboncoin (`doublesVenteLbc`, §11). Les ventes
+      // Leboncoin pèsent 5 Ko ; les annonces (226 Ko) ne sont lues que si une
+      // vente ne se relie pas sans elles (sa clé est une référence portée par
+      // l'annonce), et une fois par session au plus.
+      let lbcDoubles=0, lbcVentesSansPaire=0;
+      try{
+        const r=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=data`,{headers:sbAuth()});
+        if(r.ok){
+          const rows=await r.json();
+          const ventesL=(rows&&rows[0]&&rows[0].data&&rows[0].data.ventes)||{};
+          const liensL=load('vrm_lbc_liens',{})||{};
+          const calc=(items)=>doublesVenteLbc({ventes:ventesL, items, liens:liensL, numeros:nums, enLigne:lbcOnlineIds, vendusVinted:soldIdsN});
+          let dv=calc(null);
+          if(dv.aRelier.length){ const items=await lbcAnnoncesSession(); if(items) dv=calc(items); }
+          lbcDoubles=dv.doublons.length; lbcVentesSansPaire=dv.aRelier.length;
+        }
       }catch(_){}
       // eBay : ventes PAYÉES pas encore expédiées — le MÊME to-do qu'un colis
       // Vinted (« tout centralisé dans VRM », §11). Lu sur les commandes captées
@@ -30130,7 +30352,9 @@ function AppCoeur() {
       }
       if(toShipCount>0)  items.push({icon:'⏰', ic:'truck', text:`${toShipCount} vente${toShipCount>1?'s':''} à expédier`, n:toShipCount, tab:'cat_bord'});
       if(ebayShipCount>0) items.push({icon:'📮', ic:'truck', text:`${ebayShipCount} vente${ebayShipCount>1?'s':''} eBay à expédier`, n:ebayShipCount, tab:'plat_ebay'});
+      if(lbcDoubles>0) items.push({icon:'🟠', ic:'tag', text:`${lbcDoubles} paire${lbcDoubles>1?'s':''} vendue${lbcDoubles>1?'s':''} sur Leboncoin, encore en vente sur Vinted — à retirer de Vinted`, n:lbcDoubles, tab:'leboncoin'});
       if(lbcRemoveCount>0) items.push({icon:'🟠', ic:'tag', text:`${lbcRemoveCount} à retirer de Leboncoin (vendue${lbcRemoveCount>1?'s':''} sur Vinted)`, n:lbcRemoveCount, tab:'leboncoin'});
+      if(lbcVentesSansPaire>0) items.push({icon:'🟠', ic:'tag', text:`${lbcVentesSansPaire} vente${lbcVentesSansPaire>1?'s':''} Leboncoin sans paire reliée — dis laquelle pour éviter une double vente`, n:lbcVentesSansPaire, tab:'leboncoin'});
       // ⚠️ Retirés le 30 septembre, à la demande de Julien : « N messages non
       // lus » et « N offres reçues » ne sont pas intéressants ici — les offres
       // et les messages auront leur propre onglet (captation + envoi, comme
