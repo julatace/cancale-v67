@@ -15,8 +15,11 @@
 // ════════════════════════════════════════════════════════════════════
 
 const ENDPOINT = 'https://vrm.center/api/email-inbound';
-// Clé secrète (optionnelle) : si la variable EMAIL_INBOUND_SECRET est un jour
-// définie sur Vercel, mettre la même valeur ici.
+// ⚠️ CLÉ SECRÈTE — À REMPLIR (4 octobre). C'est la même valeur que la
+// variable EMAIL_INBOUND_SECRET sur Vercel : sans elle, n'importe qui pouvait
+// envoyer de fausses ventes ou de faux bordereaux à l'app. Colle ici la clé
+// que Claude t'a donnée (entre les apostrophes), puis 💾 Enregistrer.
+// Ne la mets jamais dans le dépôt GitHub : il est public.
 const SECRET = '';
 
 // La date de départ se règle DANS L'APP (Paramètres → Import des emails).
@@ -24,18 +27,27 @@ const SECRET = '';
 // Valeur de secours si l'app n'a encore rien réglé :
 const DEFAULT_START = '2026/07/15';
 
-const SUPA = 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
-const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ';
+// ⚠️ Le script ne lit plus la base directement : depuis qu'elle est
+// cloisonnée, la clé publique n'y lit plus RIEN (la date retombait sur sa
+// valeur de secours, et aucune facture ne partait). Il passe par l'app, avec
+// la clé secrète ci-dessus.
+function appVRM(mode, methode, corps) {
+  const url = ENDPOINT + '?mode=' + mode + '&key=' + encodeURIComponent(SECRET);
+  const opts = { method: methode || 'get', muteHttpExceptions: true };
+  if (corps) { opts.contentType = 'application/json'; opts.payload = JSON.stringify(corps); }
+  const r = UrlFetchApp.fetch(url, opts);
+  const code = r.getResponseCode();
+  let j = null; try { j = JSON.parse(r.getContentText()); } catch (e) {}
+  return { code: code, ok: code >= 200 && code < 300 && j && j.ok, data: j || {} };
+}
 
 function getStartDate() {
+  if (!SECRET) return DEFAULT_START;
   try {
-    const r = UrlFetchApp.fetch(SUPA + '/rest/v1/app_data?id=eq.vrm_email_config&select=data', {
-      headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY },
-      muteHttpExceptions: true,
-    });
-    const rows = JSON.parse(r.getContentText());
-    const d = rows[0] && rows[0].data && rows[0].data.startDate; // 'AAAA-MM-JJ'
+    const r = appVRM('config');
+    const d = r.ok && r.data.startDate; // 'AAAA-MM-JJ'
     if (d) return d.replace(/-/g, '/');
+    if (!r.ok) Logger.log('Date de départ : VRM a répondu ' + r.code + ' — valeur de secours.');
   } catch (e) {}
   return DEFAULT_START;
 }
@@ -161,21 +173,17 @@ function nettoyerTraites() {
 // les envoie depuis cette boîte Gmail puis les marque 'sent'.
 // ════════════════════════════════════════════════════════════════════
 function sendQueuedInvoices() {
-  const headers = { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY };
-  let rows, cfg;
-  try {
-    rows = JSON.parse(UrlFetchApp.fetch(SUPA + '/rest/v1/app_data?id=like.email_invoice_*&select=id,data', { headers: headers, muteHttpExceptions: true }).getContentText());
-    const cfgRows = JSON.parse(UrlFetchApp.fetch(SUPA + '/rest/v1/app_data?id=eq.vrm_pro_facture&select=data', { headers: headers, muteHttpExceptions: true }).getContentText());
-    cfg = (cfgRows[0] && cfgRows[0].data) || null;
-  } catch (e) { Logger.log('Factures : lecture impossible — ' + e); return; }
-
-  if (!cfg || !cfg.actif) return; // facturation coupée dans l'app → on ne touche à rien
-  const queued = (rows || []).filter(r => r.data && r.data.status === 'queued' && r.data.buyerEmail);
+  if (!SECRET) { Logger.log('Factures : pas de clé secrète — rien à envoyer.'); return; }
+  let r;
+  try { r = appVRM('factures'); } catch (e) { Logger.log('Factures : VRM injoignable — ' + e); return; }
+  if (!r.ok) { Logger.log('Factures : VRM a répondu ' + r.code + ' — rien envoyé.'); return; }
+  if (!r.data.actif) return; // facturation coupée dans l'app → on ne touche à rien
+  const cfg = { nom: r.data.nom, logo: r.data.logo };
+  const queued = r.data.factures || [];
   if (queued.length === 0) return;
 
-  queued.forEach(row => {
+  queued.forEach(d => {
     try {
-      const d = row.data;
       const opts = { htmlBody: d.html, name: cfg.nom || 'Facturation' };
       // Logo intégré dans l'email (le base64 des réglages devient une image inline)
       if (cfg.logo && cfg.logo.indexOf('base64,') > -1) {
@@ -191,19 +199,10 @@ function sendQueuedInvoices() {
         'Bonjour,\n\nVeuillez trouver votre facture ' + d.number + ' pour votre achat Vinted.\n\nMerci pour votre achat !',
         opts
       );
-      // Marque la facture comme envoyée.
-      const sentData = {};
-      for (const k in d) sentData[k] = d[k];
-      sentData.status = 'sent';
-      sentData.sentAt = new Date().toISOString();
-      UrlFetchApp.fetch(SUPA + '/rest/v1/app_data?id=eq.' + encodeURIComponent(row.id), {
-        method: 'patch',
-        contentType: 'application/json',
-        headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY, Prefer: 'return=minimal' },
-        payload: JSON.stringify({ data: sentData }),
-        muteHttpExceptions: true,
-      });
-      Logger.log('Facture ' + d.number + ' envoyée à ' + d.buyerEmail);
+      // Marque la facture comme envoyée (sinon elle repartirait au passage
+      // suivant : le dire au journal si VRM ne l'a pas noté).
+      const m = appVRM('facture-envoyee', 'post', { id: d.id });
+      Logger.log('Facture ' + d.number + ' envoyée à ' + d.buyerEmail + (m.ok ? '' : ' — ⚠️ VRM ne l\'a pas notée envoyée (' + m.code + ')'));
     } catch (e) {
       Logger.log('Erreur envoi facture : ' + e);
     }

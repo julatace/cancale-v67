@@ -4653,6 +4653,86 @@ du pont app↔extension. Ce qui a été trouvé et fermé :
   réglages d'authentification (confirmation d'email, longueur du mot de passe)
   dans le tableau de bord Supabase.
 
+### ⚠️⚠️ VENDUE SUR LEBONCOIN → À RETIRER DE VINTED (anti double vente, 4 octobre, 5.152)
+Julien : « quand une paire est vendue sur une plateforme, elle doit disparaître
+des autres, pour éviter de vendre deux fois la même paire ». Le sens Vinted →
+Leboncoin existait (« à retirer de Leboncoin ») ; **l'autre sens n'existait pas** :
+une vente Leboncoin ne disait rien de la paire, qui restait en vente sur Vinted.
+**Mesuré avant de coder** : 3 ventes Leboncoin où il est le vendeur (dont un colis
+à envoyer), toutes sur des annonces reliées à **aucune** paire.
+- **Un seul chemin d'identité** (`doublesVenteLbc`, une règle pour l'écran
+  Leboncoin ET le tableau de bord, §11) : vente (il est le VENDEUR, pas annulée —
+  `lbcAnnulee`) → son annonce (`itemId`) → ses clés (`clesAnnonceLbc` : lien posé
+  à la main, réf VRM, « nXXX » du titre) → le N° → l'annonce Vinted de ce N°.
+  Encore en vente ⇒ alerte en tête de l'écran Leboncoin, avec le lien Vinted ;
+  prouvée vendue sur Vinted aussi ⇒ « vendue deux fois, annule-en une ».
+- ⚠️ **VRM ne retire pas l'annonce Vinted tout seul** : §3 (irréversible, sans
+  confirmation côté Vinted). C'est lui qui agit ; l'app dit quoi et où.
+- **Une vente non reliée ne désigne JAMAIS une paire toute seule** : elle demande
+  « quelle paire ? » et PROPOSE jusqu'à trois paires en ligne qui ressemblent
+  (`suggestionsPaires` : mots, pointure, prix) — **c'est son clic qui relie**
+  (`relierAnnonceLbc`, la même écriture que le champ N°). Une pointure
+  DIFFÉRENTE exclut (même modèle, autre paire, §2.4).
+  ⚠️ **L'audit a attrapé ma première règle de pointure** : elle prenait le
+  premier nombre venu, donc « 90 » dans « Nike Air Max **90** … taille 44 », et
+  proposait une paire en 42.
+- ⚠️⚠️ **`account` NE PROUVE PAS QU'UNE ANNONCE EST À LUI.** Mesuré : 58
+  annonces portent ce champ, sur **48 comptes** — la 5.88 étiquetait celles
+  d'AUTRUI de leur propre propriétaire. J'ai failli l'ajouter à `aLui` (« 57
+  annonces à lui ») : ça aurait mis 50 annonces d'inconnus dans « non reliées ».
+  Ce qui prouve : une vente où il est le VENDEUR désigne une annonce, dont le
+  compte est donc le sien (`comptesLbcProuves`). Chez lui : **1 compte, 8
+  annonces, dont 7 qu'aucune règle ne voyait**. Même règle dans l'extension
+  (`estALui(ad, prouves)`), `audit-places` compare les deux.
+- Une annonce **vendue** sur Leboncoin n'y est plus en vente : elle sort de « en
+  ligne », « à retirer » et « non reliées » (app et extension).
+- **Le tableau de bord disait « vendue sur Vinted » sur une ABSENCE** (annonce
+  publiée sur Leboncoin et plus en ligne sur Vinted — une mise en pause suffisait,
+  la règle que l'écran Leboncoin a abandonnée le 12 septembre). Il ne compte plus
+  que les ventes prouvées (`soldIdsN`). Il lit les ventes Leboncoin (5 Ko) et ne
+  lit les annonces (226 Ko) que si une vente ne se relie pas sans elles, une fois
+  par session (`lbcAnnoncesSession`).
+- Preuves : `audit-double-vente.cjs` (**20 contrôles**, exécute les vraies règles
+  de l'app et de l'extension ; `--prouve` réaffaiblit → **6 rouges**) ; banc
+  `double-vente.cjs` (**28**, deux tailles, données inventées, il vit dans le
+  dépôt — **20 rouges** sur le build d'avant). Le banc écrit `main` pour de vrai
+  quand l'app sauvegarde : sans ça le lien posé « disparaissait » au rechargement
+  (§6.3, un banc qui ne garde pas les écritures mesure une fiction).
+- Au passage : `lbc-relier.cjs` était rouge depuis la 5.137 (`adRefKeys` appelle
+  `cleNum` et `RE_VRM`, que son `vm` ne chargeait pas).
+- Extension **5.152.0**, zip régénéré, `EXT_ATTENDUE` suivie. Aucune entrée
+  d'`EXT_CAPACITES` : l'app ne promet rien de neuf de l'extension.
+- **Reste à faire** : eBay (une autre session s'en occupe) n'entre pas encore
+  dans ce contrôle — une vente eBay devra suivre la même règle (SKU `VRM-{n°}`).
+
+### La route des emails exige sa clé, et le script Gmail ne lit plus la base (4 octobre)
+Deux trous mesurés : (1) `EMAIL_INBOUND_SECRET` n'était pas posée — n'importe
+qui pouvait envoyer une fausse vente ou un faux bordereau, **rangés comme les
+vrais** (prouvé sur le code d'avant : un POST quelconque était écrit en base) ;
+(2) le script Gmail lisait la base **directement avec la clé publique** — depuis
+le cloisonnement elle ne lit plus rien (RLS rend `[]` sans erreur), donc la date
+de départ retombait sur sa valeur de secours et **aucune facture ne pouvait
+partir**, en silence.
+- `api/email-inbound` a trois modes pour le script, **tous derrière la clé** :
+  `?mode=config` (date de départ), `?mode=factures` (factures EN ATTENTE avec un
+  email d'acheteur), `?mode=facture-envoyee` (POST, ne vise que
+  `email_invoice_*`, relit puis réécrit la ligne ENTIÈRE). Le vendeur est celui
+  de l'installation (`VRM_OWNER_UID`). ⚠️ Ces modes rendent des données
+  personnelles : **sans clé posée sur le serveur, ils refusent (503)** — jamais
+  ouverts par défaut. Lecture ratée ⇒ 503, jamais « aucune facture ».
+- La clé se compare en temps constant (`cleValide`). L'arrivée d'un email sans
+  clé reste acceptée **tant que la variable n'est pas posée** : sinon les emails
+  s'arrêteraient le jour du changement.
+- `scripts/gmail-forwarder.gs` ne contient plus aucune clé de base ; `SECRET`
+  reste **vide dans le dépôt (public)**, il la colle chez lui.
+- **L'ordre des gestes** : il colle le nouveau script avec la clé → la route
+  journalise « script Gmail à jour (clé fournie) » → on pose
+  `EMAIL_INBOUND_SECRET` sur Vercel et on redéploie. Dans l'autre ordre rien ne
+  se perd non plus : un email refusé (401) n'est pas étiqueté, le script le
+  renverra.
+- `audit-email-cle.cjs` **exécute la route** : 20 contrôles, **18 rouges** sur
+  le code d'avant.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
@@ -4820,8 +4900,8 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | outil | quoi |
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
-| `node scripts/audit-*.cjs` | **58 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
-| `scripts/bancs/*.cjs` | les **52 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
+| `node scripts/audit-*.cjs` | **62 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `scripts/bancs/*.cjs` | les **53 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
 **Trois règles de preuve :**
@@ -5100,8 +5180,8 @@ script-là me fait croire à une catastrophe.
 src/App.jsx                     l'app (grep avant de lire — le fichier est énorme)
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
-scripts/audit-*.cjs             les 58 audits
-scripts/bancs/                  les 52 bancs (leur README dit comment les lancer)
+scripts/audit-*.cjs             les 62 audits
+scripts/bancs/                  les 53 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 ```

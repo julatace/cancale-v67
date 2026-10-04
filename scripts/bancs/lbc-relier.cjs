@@ -69,8 +69,12 @@ const projette = (row, sel) => {
   try {
     const vm = require('vm');
     const bg = fs.readFileSync(path.join(__dirname, '..', '..', 'vinted-sync-extension', 'background.js'), 'utf8');
-    const i = bg.indexOf('function adRefKeys('); const fin = bg.indexOf('\n}\n', i) + 3;
-    const ctx = {}; vm.createContext(ctx); vm.runInContext(bg.slice(i, fin) + '\nthis.adRefKeys = adRefKeys;', ctx);
+    // ⚠️ `adRefKeys` passe par `cleNum` et `refVRMDe` depuis la 5.137 (numéros à
+    //    lettres) : sans elles le vm levait « cleNum is not defined » et ce
+    //    contrôle était rouge pour une raison qui n'avait rien à voir (§6.3).
+    const fn = (nom) => { const i = bg.indexOf('function ' + nom + '('); return bg.slice(i, bg.indexOf('\n}\n', i) + 3); };
+    const ctx = {}; vm.createContext(ctx); const reVrm = (/^const RE_VRM = .*$/m.exec(bg) || [''])[0];
+    vm.runInContext(reVrm + '\n' + ['cleNum', 'refVRMDe', 'adRefKeys'].map(fn).join('\n') + '\nthis.adRefKeys = adRefKeys;', ctx);
     const k1 = ctx.adRefKeys(AD, { lbc777: '12' });
     dit(Array.isArray(k1) && k1[0] === '12', 'le panneau relie la même annonce au même N° (adRefKeys)', JSON.stringify(k1));
     dit(JSON.stringify(ctx.adRefKeys(AD, {})) === '[]', 'sans lien posé, il ne devine rien', JSON.stringify(ctx.adRefKeys(AD, {})));

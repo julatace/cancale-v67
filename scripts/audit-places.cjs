@@ -304,11 +304,17 @@ function ctxAvec(numeros, txns, lbcItems, exclus, quiEchoue, bloquesDef) {
       `lbcCount ${st.lbcCount} / lbcSeen ${st.lbcSeen} — deux règles pour une notion, c'est §11`);
     // L'app applique la MÊME règle (elle la portait déjà — c'est l'extension qui
     // avait dérivé). On compare les PRÉDICATS sur les mêmes entrées.
-    const mApp = /const aLui = \(ad\) => [^;]+;/.exec(APP);
+    // ⚠️ La règle de l'app vit dans `annonceLbcALui(ad, prouves)` depuis le
+    //    4 octobre (un compte dont il a VENDU une annonce est le sien) : `aLui`
+    //    n'en est plus qu'un appel. On suit la règle jusqu'à sa définition — un
+    //    audit suit la RÈGLE, pas son orthographe — et on compare à prouvés égaux.
+    const mApp = /^function annonceLbcALui\(ad, prouves\) \{\n[^\n]*\n\}/m.exec(APP);
     if (!mApp) {
-      dit(false, 'l\'app a sa règle d\'attribution', '`aLui` introuvable dans App.jsx');
+      dit(false, 'l\'app a sa règle d\'attribution', '`annonceLbcALui` introuvable dans App.jsx');
     } else {
-      const aLuiApp = new Function('"use strict"; ' + mApp[0] + ' return aLui;')();
+      const PROUVES = new Set(['777']);
+      const regleApp = new Function('"use strict"; ' + mApp[0] + ' return annonceLbcALui;')();
+      const aLuiApp = (ad) => regleApp(ad, PROUVES);
       const aLuiExt = ctxAvec(tous, [], items).estALui;
       // ⚠️ UN AUDIT NE MEURT PAS, IL RAPPORTE — et c'est la TROISIÈME fois que je
       //    l'oublie ici même. Sur le code d'avant `estALui` n'existe pas : mon
@@ -318,8 +324,9 @@ function ctxAvec(numeros, txns, lbcItems, exclus, quiEchoue, bloquesDef) {
         dit(false, 'l\'app et l\'extension attribuent EXACTEMENT pareil',
           '`estALui` n\'existe pas dans background.js — la règle vit chez un seul des deux lecteurs');
       } else {
-        const cas = Object.values(items).concat([{ id: 'x', lbcUser: 'julatace' }, { id: 'y' }]);
-        const memes = cas.every((ad) => !!aLuiApp(ad) === !!aLuiExt(ad));
+        const cas = Object.values(items).concat([{ id: 'x', lbcUser: 'julatace' }, { id: 'y' }, { id: 'z', account: '777' }, { id: 'w', account: '888' }]);
+        let memes = false;
+        try { memes = cas.every((ad) => !!aLuiApp(ad) === !!aLuiExt(ad, PROUVES)); } catch (e) { memes = false; }
         dit(memes, 'l\'app et l\'extension attribuent EXACTEMENT pareil',
           memes ? `${cas.length} cas` : 'l\'app en montre un nombre, le panneau un autre');
       }

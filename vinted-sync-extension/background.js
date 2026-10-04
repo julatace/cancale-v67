@@ -5047,14 +5047,46 @@ function refFromText(text) {
 //     ressemblance (§5) sur des données qui ne sont même pas les siennes.
 // ⇒ Une seule règle, un seul propriétaire : `estALui` est la MÊME que celle de
 //   l'app (`ad.ref || ad.customRef || ad.lbcUser`). Rien n'est supprimé en base.
-function estALui(ad) { return !!(ad && (ad.ref || ad.customRef || ad.lbcUser)); }
+// ⚠️⚠️ ET UN COMPTE DONT IL A VENDU UNE ANNONCE EST LE SIEN (4 octobre). Mesuré :
+//    58 annonces portent un champ `account`, réparties sur **48 comptes** — la
+//    5.88 étiquetait les annonces d'AUTRUI avec leur propre propriétaire, donc
+//    `account` seul ne prouve rien. Une vente où il est le VENDEUR (`isSeller`)
+//    désigne une annonce : le compte de cette annonce est le sien, et ses autres
+//    annonces aussi (8 sur 58 chez lui, dont 7 qu'aucune règle ne voyait).
+//    C'est une identité (le même compte), pas une ressemblance. La MÊME règle
+//    vit dans l'app (`comptesLbcProuves` / `annonceLbcALui`, §11).
+function comptesLbcProuves(ventes, items) {
+  const s = new Set();
+  for (const v of Object.values(ventes || {})) {
+    if (!v || v.isSeller !== true || v.itemId == null) continue;
+    const ad = items && items[String(v.itemId)];
+    if (ad && ad.account) s.add(String(ad.account));
+  }
+  return s;
+}
+function estALui(ad, prouves) { return !!(ad && (ad.ref || ad.customRef || ad.lbcUser || (ad.account && prouves && prouves.has(String(ad.account))))); }
+// Une vente Leboncoin annulée ne fait pas partir la paire (même règle que
+// `lbcAnnulee` dans l'app).
+const venteLbcAnnulee = (o) => o.stepStatus === 'cancelled' || /annul|cancel|refund|rembours/i.test((o.parcelStatus || '') + ' ' + (o.stepStatus || '') + ' ' + (o.stepLabel || ''));
+// Ses annonces Leboncoin : celles qu'on peut lui attribuer, moins celles qu'il
+// a VENDUES là-bas (elles n'y sont plus en vente). `ok:false` = la base n'a pas
+// répondu sur les annonces. Une lecture ratée des VENTES n'attribue rien de plus
+// (on retombe sur la règle d'avant) — jamais l'inverse.
+async function lireLbcAnnonces() {
+  const [rows, vRows] = await Promise.all([
+    sbGet('app_data?id=eq.lbc_listings&select=data'),
+    sbGet('app_data?id=eq.lbc_ventes&select=data'),
+  ]);
+  if (rows === null) return { ok: false, ligne: false, items: [] };
+  const items = (rows && rows[0] && rows[0].data && rows[0].data.items) || {};
+  const ventes = (vRows && vRows[0] && vRows[0].data && vRows[0].data.ventes) || {};
+  const prouves = comptesLbcProuves(ventes, items);
+  const vendus = new Set(Object.values(ventes).filter((v) => v && v.isSeller === true && v.itemId != null && !venteLbcAnnulee(v)).map((v) => String(v.itemId)));
+  return { ok: true, ligne: !!(rows && rows[0]), items: Object.values(items).filter((ad) => ad && estALui(ad, prouves) && !vendus.has(String(ad.id))) };
+}
 // Lit les annonces Leboncoin captées (ligne lbc_listings) sous forme de tableau.
 async function readLbcItems() {
-  try {
-    const rows = await sbGet('app_data?id=eq.lbc_listings&select=data');
-    const items = (rows && rows[0] && rows[0].data && rows[0].data.items) || {};
-    return Object.values(items).filter((ad) => ad && estALui(ad));
-  } catch (_) { return []; }
+  try { return (await lireLbcAnnonces()).items; } catch (_) { return []; }
 }
 // Clés de rapprochement d'une annonce Leboncoin : sa référence pro (CustomRef),
 // le VRM-xxx éventuel, et tout numéro « nXXXX » présent dans son titre.
@@ -5484,15 +5516,13 @@ async function buildLbcData() {
   let lbcCount = 0;
   let lbcJamaisLu = true;
   try {
-    const lbcRows = await sbGet('app_data?id=eq.lbc_listings&select=data');
-    if (lbcRows !== null) {                       // `null` = la base n'a pas répondu
-      const ligne = lbcRows && lbcRows[0];
+    const lu = await lireLbcAnnonces();
+    if (lu.ok) {                                  // `ok:false` = la base n'a pas répondu
       // ⚠️ « jamais capté » veut dire : aucune annonce QUI SOIT À LUI. La ligne
       //    peut exister et ne contenir que des annonces d'autres (les 81 du
       //    13 septembre) — auquel cas on n'a toujours rien vu de son côté, et
       //    afficher « 0 » serait le zéro inventé qu'on vient de retirer.
-      lbcJamaisLu = !ligne;
-      const items = (ligne && ligne.data && ligne.data.items) || {};
+      lbcJamaisLu = !lu.ligne;
       // ⚠️ 81 annonces rangées le 13 septembre n'étaient PAS à lui (le flux
       //    « découverte » de la page). Elles restent en base — on ne supprime
       //    rien — mais elles ne COMPTENT pas : une annonce qu'on ne peut pas
@@ -5500,8 +5530,7 @@ async function buildLbcData() {
       // ⚠️ LA MÊME règle que `readLbcItems` (`estALui`), pas une copie qui dérive :
       //    celle-ci oubliait `customRef`, que l'app accepte — un troisième écart
       //    sur la même notion.
-      lbcCount = Object.values(items).filter((v) => estALui(v)
-        && !/(supprim|delete|expir|refus|sold|vendu)/i.test(String(v.status || ''))).length;
+      lbcCount = lu.items.filter((v) => !/(supprim|delete|expir|refus|sold|vendu)/i.test(String(v.status || ''))).length;
     }
   } catch (_) {}
   if (lbcCount === 0) lbcJamaisLu = true;       // rien d'attribuable = rien vu

@@ -17,6 +17,7 @@
 // contentType, content(base64)}] } — ce que renvoie un Worker Cloudflare.
 // ────────────────────────────────────────────────────────────────────────────
 
+import crypto from 'crypto';
 import { sendPushToAll, pushCategorieActive } from './_lib/push.js';
 import { stampBordereau } from './_lib/stamp.js';
 
@@ -1059,7 +1060,89 @@ export function bodyNotifColis(track, carrier) {
   return `${nom}${t.suivi ? ' — n°' + t.suivi : ''} : ${t.label || ''}.`;
 }
 
+// ── LA CLÉ PARTAGÉE AVEC LE SCRIPT GMAIL ────────────────────────────────────
+// Comparée en temps constant (une comparaison qui s'arrête au premier écart
+// laisse deviner la clé caractère par caractère).
+function cleValide(req) {
+  const secret = process.env.EMAIL_INBOUND_SECRET || '';
+  const key = String((req.query && req.query.key) || '');
+  if (!secret) return null;                       // pas de clé posée sur le serveur
+  const a = crypto.createHash('sha256').update(key).digest();
+  const b = crypto.createHash('sha256').update(secret).digest();
+  return crypto.timingSafeEqual(a, b);
+}
+
+// ── CE QUE LE SCRIPT GMAIL LIT ET ÉCRIT, PAR LA ROUTE (4 octobre) ───────────
+// Le script lisait la base DIRECTEMENT avec la clé publique : la date de départ
+// (`vrm_email_config`), les factures à envoyer (`email_invoice_*`) et l'entité
+// (`vrm_pro_facture`). Depuis que la base est cloisonnée, la clé publique ne lit
+// plus RIEN (RLS rend `[]`, sans erreur) : la date retombait sur sa valeur de
+// secours, et aucune facture ne pouvait plus partir — en silence.
+// ⇒ Il passe par ici, avec la clé partagée. ⚠️ Ces modes rendent des données
+//    personnelles (l'email de l'acheteur, la facture) : SANS clé posée sur le
+//    serveur ils refusent (503), ils ne s'ouvrent jamais « par défaut ».
+// Le vendeur est celui de l'installation (`VRM_OWNER_UID`) : un script Gmail
+// appartient à UNE boîte, donc à un vendeur.
+async function lireLignes(requete) {
+  try {
+    const r = await fetch(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?${requete}`), { headers: { ...sbCle(SUPABASE_KEY) } });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return Array.isArray(j) ? j : null;
+  } catch (_) { return null; }
+}
+export async function modeScript(mode, req, res) {
+  const ok = cleValide(req);
+  if (ok === null) {
+    // Le signe que le script Gmail a été mis à jour (il envoie une clé) alors
+    // que le serveur n'en a pas encore : c'est le moment de poser la variable.
+    // Jamais la clé elle-même dans le journal.
+    if (req.query && req.query.key) console.log('[email-inbound] script Gmail à jour (clé fournie) — EMAIL_INBOUND_SECRET pas encore posée');
+    res.status(503).json({ ok: false, error: 'cle-non-configuree', message: "La clé EMAIL_INBOUND_SECRET n'est pas posée sur le serveur." }); return;
+  }
+  if (!ok) { res.status(401).json({ ok: false, error: 'clé invalide' }); return; }
+  if (!proprietaireCourant() && await baseCloisonnee()) { res.status(503).json({ ok: false, error: 'vendeur-inconnu', message: "VRM_OWNER_UID n'est pas réglé : je ne sais pas à quelle boutique appartient cette boîte." }); return; }
+
+  if (mode === 'config' && req.method === 'GET') {
+    const rows = await lireLignes('id=eq.vrm_email_config&select=data');
+    if (rows === null) { res.status(503).json({ ok: false, error: 'base-injoignable' }); return; }
+    const d = rows[0] && rows[0].data && rows[0].data.startDate;
+    res.status(200).json({ ok: true, startDate: /^\d{4}-\d{2}-\d{2}$/.test(String(d || '')) ? d : null });
+    return;
+  }
+  if (mode === 'factures' && req.method === 'GET') {
+    const [cfgRows, rows] = await Promise.all([
+      lireLignes('id=eq.vrm_pro_facture&select=data'),
+      lireLignes('id=like.email_invoice_*&data->>status=eq.queued&select=id,data'),
+    ]);
+    if (cfgRows === null || rows === null) { res.status(503).json({ ok: false, error: 'base-injoignable' }); return; }
+    const cfg = (cfgRows[0] && cfgRows[0].data) || null;
+    if (!cfg || !cfg.actif) { res.status(200).json({ ok: true, actif: false, factures: [] }); return; }
+    const factures = rows.filter((r) => r && r.data && r.data.buyerEmail)
+      .map((r) => ({ id: r.id, number: r.data.number || '', buyerEmail: r.data.buyerEmail, html: r.data.html || '' }));
+    res.status(200).json({ ok: true, actif: true, nom: cfg.nom || '', logo: cfg.logo || '', factures });
+    return;
+  }
+  if (mode === 'facture-envoyee' && req.method === 'POST') {
+    let corps = req.body;
+    try { if (typeof corps === 'string') corps = JSON.parse(corps); } catch (_) { corps = null; }
+    const id = String((corps && corps.id) || '');
+    if (!/^email_invoice_[\w.-]{1,120}$/.test(id)) { res.status(400).json({ ok: false, error: 'identifiant de facture invalide' }); return; }
+    const rows = await lireLignes(`id=eq.${encodeURIComponent(id)}&select=id,data`);
+    if (rows === null) { res.status(503).json({ ok: false, error: 'base-injoignable' }); return; }
+    if (!rows[0]) { res.status(404).json({ ok: false, error: 'facture introuvable' }); return; }
+    const data = { ...(rows[0].data || {}), status: 'sent', sentAt: new Date().toISOString() };
+    const ecrit = await supabaseUpsert([{ id, data }]);
+    if (!ecrit) { res.status(503).json({ ok: false, error: 'base-injoignable' }); return; }
+    res.status(200).json({ ok: true });
+    return;
+  }
+  res.status(400).json({ ok: false, error: 'mode inconnu' });
+}
+
 export default async function handler(req, res) {
+  const mode = String((req.query && req.query.mode) || '');
+  if (mode) return contexteVendeur.run({ owner: process.env.VRM_OWNER_UID || '' }, () => modeScript(mode, req, res));
   return contexteVendeur.run({ owner: '' }, () => traiterEmail(req, res));
 }
 
@@ -1075,11 +1158,7 @@ export async function traiterEmail(req, res) {
   if (req.method !== 'POST') { res.status(405).json({ error: 'POST only' }); return; }
 
   // Garde-fou : clé secrète partagée avec le service de réception.
-  const secret = process.env.EMAIL_INBOUND_SECRET;
-  if (secret) {
-    const key = (req.query && req.query.key) || '';
-    if (key !== secret) { res.status(401).json({ error: 'clé invalide' }); return; }
-  }
+  if (cleValide(req) === false) { res.status(401).json({ error: 'clé invalide' }); return; }
 
   let mail, corpsBrut;
   try {
