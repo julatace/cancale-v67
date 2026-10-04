@@ -114,5 +114,17 @@ avec bancs, jamais à l'aveugle.**
    atterrit chez le bon, la quarantaine marche, l'isolation tient, et chaque
    vendeur ne voit QUE son widget / ses rappels d'expédition.
 3. Au-delà de ~quelques dizaines d'actifs : **PDF → Storage** et monter le tier
-   compute selon la courbe de `docs/capacite-utilisateurs.md`. Et grouper les
-   crons par owner EN MÉMOIRE (une lecture globale bucketée) plutôt que N passes.
+   compute selon la courbe de `docs/capacite-utilisateurs.md`.
+
+### Fait le 4 octobre (session fiabilité / échelle)
+- **`ship-reminders` en parallèle borné** : 8 vendeurs à la fois (mille à la
+  queue leu leu dépassaient les 300 s de Vercel), un vendeur qui plante n'arrête
+  plus les autres, sonde de cloisonnement en panne = « pas su » (plus de passe
+  globale qui mélangerait les vendeurs). Banc `ship-multi.cjs` (24 vendeurs).
+  Grouper en mémoire (une lecture globale bucketée) reste possible plus tard ;
+  avec 8 en parallèle, mille vendeurs tiennent dans la fenêtre.
+- **Journal des plantages** (`plantage_*`, au nom de chaque vendeur) : à
+  l'échelle, c'est lui qui dit quel écran tombe chez qui — sans fournisseur tiers.
+- **Code mort retiré** (7 fonctions, 220 lignes).
+- **Détourage Photoroom** : coût borné par vendeur (plafond mensuel atomique,
+  cache par empreinte) et réservé aux abonnés qui paient vraiment.
