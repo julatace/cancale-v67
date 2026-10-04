@@ -23,7 +23,7 @@ let etat;
 let oublier = () => {};
 function base(over = {}) {
   oublier();
-  etat = Object.assign({ cache: new Map(), compteur: new Map(), plafond: null, compteurKO: false, photoroom: [], reponsePR: 200, acces: true, cacheKO: false }, over);
+  etat = Object.assign({ cache: new Map(), compteur: new Map(), plafond: null, compteurKO: false, photoroom: [], reponsePR: 200, acces: true, cacheKO: false, abo: {}, aboKO: false, coupure: false }, over);
   global.fetch = async (url, opts = {}) => {
     const u = String(url); const m = (opts.method || 'GET').toUpperCase();
     const J = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { 'content-type': 'application/json' } });
@@ -33,6 +33,11 @@ function base(over = {}) {
       return id ? J({ id, email: id === PROPRIO ? 'p@test' : 'a@test' }) : J({ msg: 'no' }, 401);
     }
     if (/rpc\/vrm_acces_pour/.test(u)) return J(etat.acces);
+    if (/\/rest\/v1\/abonnements/.test(u)) {
+      if (etat.aboKO) return new Response('<html>522</html>', { status: 522 });
+      const o = decodeURIComponent((u.match(/owner=eq\.([^&]+)/) || [])[1] || '');
+      return J(etat.abo[o] ? [etat.abo[o]] : []);
+    }
     if (/storage\/v1\/object\/detourage\//.test(u)) {
       const cle = u.split('/storage/v1/object/detourage/')[1];
       if (m === 'GET') { if (etat.cacheKO) return new Response('x', { status: 522 }); return etat.cache.has(cle) ? new Response(etat.cache.get(cle), { status: 200 }) : J({ error: 'not_found' }, 400); }
@@ -49,6 +54,9 @@ function base(over = {}) {
     if (/sdk\.photoroom\.com/.test(u)) {
       etat.photoroom.push({ headers: opts.headers, corps: JSON.parse(opts.body) });
       if (etat.reponsePR !== 200) return J({ detail: 'refus' }, etat.reponsePR);
+      // La coupure APRÈS un 200 : l'image est produite (facturée), le corps ne
+      // nous arrive jamais.
+      if (etat.coupure) return { ok: true, status: 200, headers: new Headers({ 'content-type': 'image/jpeg' }), arrayBuffer: async () => { throw new Error('socket hang up'); } };
       return new Response(DETOUREE, { status: 200, headers: { 'content-type': 'image/jpeg' } });
     }
     return J([]);
@@ -91,9 +99,35 @@ async function appeler({ methode = 'POST', qui = PROPRIO, corps = {}, query = {}
     r = await appeler({ qui: AUTRE, corps: { sha: h1, b64: p1.toString('base64') } });
     dit(r.code === 403 && etat.photoroom.length === 0, 'un AUTRE vendeur : 403 tant que Julien ne l’a pas ouvert à tous (PHOTOROOM_POUR)', String(r.code));
     process.env.PHOTOROOM_POUR = 'tous';
+    // ⚠️ Revue adverse du 4 octobre : « tous » ouvrait la clé à TOUT compte
+    //    inscrit (l'abonnement n'est pas obligatoire aujourd'hui, la règle
+    //    d'accès laisse passer). Un compte GRATUIT ne dépense pas sa clé.
+    base();
     r = await appeler({ qui: AUTRE, corps: { sha: h1, b64: p1.toString('base64') } });
-    dit(r.code === 200 && etat.photoroom.length === 1, '… et ouvert à tous quand il le décide', String(r.code));
+    dit(r.code === 403 && etat.photoroom.length === 0, '« tous » + un compte GRATUIT (aucun abonnement) : 403, aucun appel payé', String(r.code));
+    base({ abo: { [AUTRE]: { statut: 'active' } } });
+    r = await appeler({ qui: AUTRE, corps: { sha: h1, b64: p1.toString('base64') } });
+    dit(r.code === 200 && etat.photoroom.length === 1, '« tous » + un abonné qui PAIE : détouré', String(r.code));
+    base({ abo: { [AUTRE]: { statut: 'past_due', impaye_depuis: new Date(Date.now() - 20 * 864e5).toISOString() } } });
+    r = await appeler({ qui: AUTRE, corps: { sha: h1, b64: p1.toString('base64') } });
+    dit(r.code === 403 && etat.photoroom.length === 0, '« tous » + impayé depuis 20 jours : 403', String(r.code));
+    base({ aboKO: true });
+    r = await appeler({ qui: AUTRE, corps: { sha: h1, b64: p1.toString('base64') } });
+    dit(r.code === 503 && etat.photoroom.length === 0, '« tous » + abonnement illisible : 503, on ne dépense pas à l’aveugle', String(r.code));
     delete process.env.PHOTOROOM_POUR;
+
+    // ── L'argent : ce qui ne se repaie pas, ce qui ne se rend pas ─────────
+    base({ cacheKO: true });
+    r = await appeler({ corps: { sha: h1, b64: p1.toString('base64') } });
+    dit(r.code === 503 && r.corps.reason === 'cache' && etat.photoroom.length === 0, 'cache ILLISIBLE : 503, on ne repaie pas une photo peut-être déjà détourée', `${r.code} ${etat.photoroom.length} appel(s)`);
+    base({ compteur: new Map([[PROPRIO + ':' + new Date().toISOString().slice(0, 7), 150]]) });
+    r = await appeler({ corps: { sha: h1 } });
+    dit(r.code === 429 && r.corps.reason === 'plafond', 'plafond atteint : la SONDE le dit déjà (pas d’octets envoyés pour rien)', String(r.code));
+    base({ coupure: true });
+    r = await appeler({ corps: { sha: h1, b64: p1.toString('base64') } });
+    const kc = PROPRIO + ':' + new Date().toISOString().slice(0, 7);
+    dit(r.code >= 500 && etat.compteur.get(kc) === 1 && etat.cache.size === 0,
+      'coupure APRÈS le 200 de Photoroom : l’unité reste COMPTÉE (l’image a pu être facturée)', `${r.code} · compteur ${etat.compteur.get(kc)}`);
 
     // ── L'argent : le cache ──────────────────────────────────────────────
     base();

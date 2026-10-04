@@ -48,6 +48,9 @@ const ETATS = {
   sanscle: { attendu: 'sanscle', rep: { ok: true, ready: false, mois: '2026-10', n: 0,  plafond: 150, autorise: true } },
   reserve: { attendu: 'reserve', rep: { ok: true, ready: true,  mois: '2026-10', n: 0,  plafond: 150, autorise: false } },
   pasSu:   { attendu: 'pasSu',   rep: null },   // 503 HTML : la vraie forme d'une panne
+  // 503 JSON « compteur » : le serveur SAIT que son compteur est illisible — et
+  // tant que ça dure, aucune photo ne sera détourée. Ce n'est pas un « pas su ».
+  compteur: { attendu: 'compteur', rep: 'COMPTEUR' },
 };
 
 async function rendre(nav, etat, { mode = 'couverture', cliquer = null } = {}) {
@@ -72,6 +75,7 @@ async function rendre(nav, etat, { mode = 'couverture', cliquer = null } = {}) {
     vues.push(r.request().url());
     const v = ETATS[etat].rep;
     if (v === null) return r.fulfill({ status: 503, contentType: 'text/html', body: '<html>503</html>' });
+    if (v === 'COMPTEUR') return r.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ ok: false, reason: 'compteur', ready: true }) });
     return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(v) });
   });
   await pg.route('**://*.vinted.net/**', (r) => r.abort());
@@ -123,8 +127,10 @@ async function rendre(nav, etat, { mode = 'couverture', cliquer = null } = {}) {
     dit(ph('pret') !== ph('autre'), 'les deux rendus diffèrent : le texte n\'est pas figé');
 
     console.log('\n── CINQ ÉTATS, AUCUN NE SE FAIT PASSER POUR UN AUTRE');
-    const distinctes = new Set(['pret', 'sanscle', 'reserve', 'pasSu'].map(ph));
-    dit(distinctes.size === 4, 'prêt · sans clé · réservé · pas su ⇒ quatre phrases différentes', `${distinctes.size}/4`);
+    const distinctes = new Set(['pret', 'sanscle', 'reserve', 'pasSu', 'compteur'].map(ph));
+    dit(distinctes.size === 5, 'prêt · sans clé · réservé · pas su · compteur illisible ⇒ cinq phrases différentes', `${distinctes.size}/5`);
+    dit(!/rien n.est cass/i.test(ph('pasSu')), '« pas su » n\'affirme pas que tout va bien (il ne le sait pas)', ph('pasSu'));
+    dit(/aucune photo/i.test(ph('compteur')), 'compteur illisible : il sait qu\'aucune photo ne sera détourée', ph('compteur'));
     dit(!/\d/.test(ph('pasSu')), '« pas su » : AUCUN nombre affiché', ph('pasSu'));
     dit(!/cl[ée] photoroom|r[ée]serv/i.test(ph('pasSu')), '« pas su » n\'accuse rien (ni clé manquante, ni réservé)');
     dit(!/\b150\b/.test(ph('sanscle')), 'sans clé : pas de compteur présenté comme s\'il tournait', ph('sanscle'));

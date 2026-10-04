@@ -28572,10 +28572,14 @@ function DetourageSetting() {
   const [mode, setMode] = React.useState(modeDetourageLu);
   const [usage, setUsage] = React.useState(undefined);     // undefined = en cours · null = pas su · objet = lu
   const touche = React.useRef(false);
+  // §5.49 : le nuage arrive après le montage. Pas touché ⇒ on prend ce qu'il dit
+  // (c'est ce que l'extension lira). Touché pendant le chargement ⇒ on garde le
+  // choix ET on le réécrit, pour que ce qui est affiché soit ce qui part au nuage.
   React.useEffect(() => onCloudReady(() => {
-    if (touche.current) return;                            // §5.49 : ne remplacer que le défaut
-    setMode((m) => (m === 'eteint' ? modeDetourageLu() : m));
+    if (touche.current) { setMode((m) => { save('vrm_detourage', m); return m; }); return; }
+    setMode(modeDetourageLu());
   }), []);
+  const [raisonPasSu, setRaisonPasSu] = React.useState('');
   React.useEffect(() => {
     let vivant = true;
     (async () => {
@@ -28584,6 +28588,7 @@ function DetourageSetting() {
         const j = await r.json().catch(() => null);
         if (!vivant) return;
         setUsage(r.ok && j && j.ok ? j : null);
+        setRaisonPasSu(!r.ok && j && j.reason ? String(j.reason) : '');
       } catch (_) { if (vivant) setUsage(null); }
     })();
     return () => { vivant = false; };
@@ -28591,13 +28596,16 @@ function DetourageSetting() {
   const cap = extSait('detourage');
   const reserve = !!usage && usage.autorise === false;
   const choisir = (v) => { if (reserve) return; touche.current = true; setMode(v); save('vrm_detourage', v); };
-  const etat = usage === undefined ? 'attente' : usage === null ? 'pasSu' : reserve ? 'reserve' : !usage.ready ? 'sanscle' : 'pret';
+  const etat = usage === undefined ? 'attente' : usage === null ? (raisonPasSu === 'compteur' ? 'compteur' : 'pasSu') : reserve ? 'reserve' : !usage.ready ? 'sanscle' : 'pret';
   const actif = mode !== 'eteint';
   return (
     <div style={{padding:'13px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}} data-detourage-mode={mode} data-detourage-etat={etat}>
       <div style={{fontSize:13,fontWeight:600,color:C.text}}>Détourer mes photos avant de publier</div>
       <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.5}}>
-        Quand l’extension attache tes photos à une annonce Leboncoin ou eBay, elle retire le fond (Photoroom) et met un <b>fond blanc</b>. Une photo déjà détourée n’est jamais repayée, et si le détourage ne marche pas, <b>la photo d’origine part telle quelle</b>. Tes photos sur Vinted ne changent pas.
+        Quand l’extension attache tes photos à une annonce <b>Leboncoin</b>, elle retire le fond (Photoroom) et met un <b>fond blanc</b>. Une photo déjà détourée n’est jamais repayée, et si le détourage ne marche pas, <b>la photo d’origine part telle quelle</b>. Tes photos sur Vinted ne changent pas. Sur eBay, la mise en vente passe par eBay directement, sans l’extension : ses photos ne sont pas détourées.
+        {/* ⚠️ « Leboncoin ou eBay » était FAUX (revue adverse, 4 octobre) : la seule
+            voie de publication eBay restante (`EbayPublier` → /api/ebay) envoie les
+            liens Vinted bruts, sans passer par l'extension. */}
       </div>
       <div role="group" aria-label="Détourage des photos"
         style={{display:'flex',gap:4,background:C.bg,borderRadius:8,padding:3,border:`1px solid ${C.border}`,marginTop:10,opacity:reserve?0.55:1}}>
@@ -28615,7 +28623,8 @@ function DetourageSetting() {
       {/* Ce que dit le serveur — une phrase, celle qui correspond à l'état. */}
       <div style={{marginTop:9,fontSize:11.5,lineHeight:1.5,color:etat==='sanscle'&&actif?C.warn:C.muted}} data-detourage-phrase>
         {etat === 'attente' ? 'Je vérifie le service de détourage…'
-          : etat === 'pasSu' ? 'Je n’ai pas pu vérifier le service de détourage. Rien n’est cassé — rouvre cet écran dans un moment.'
+          : etat === 'pasSu' ? 'Je n’ai pas pu vérifier le service de détourage. Rouvre cet écran dans un moment.'
+          : etat === 'compteur' ? 'Le compteur du détourage est illisible côté serveur : tant que ça dure, aucune photo n’est détourée (elles partent telles quelles).'
           : etat === 'reserve' ? 'Le détourage n’est pas encore ouvert à ton compte : tes photos partent telles quelles.'
           : etat === 'sanscle' ? <>La clé Photoroom n’est pas encore posée sur le serveur&nbsp;: {actif ? 'tant qu’elle manque, tes photos partent telles quelles.' : 'le détourage ne pourra marcher qu’une fois posée.'}</>
           : <>Ce mois-ci&nbsp;: <b style={{color:C.text}}>{usage.n}</b> photo{usage.n > 1 ? 's' : ''} détourée{usage.n > 1 ? 's' : ''} sur <b style={{color:C.text}}>{usage.plafond}</b> possibles. Environ 2 centimes par photo nouvelle.</>}

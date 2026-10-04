@@ -4961,16 +4961,28 @@ fonctions ; elle n'avait ni session, ni cache, ni plafond.
   l'empreinte d'une autre), dans un compartiment PRIVÉ rangé par vendeur ;
   **plafond mensuel** réservé par la base en une instruction
   (`vrm_detourage_reserver`, migration 008 — jamais un lire-ajouter-réécrire) ;
-  compteur illisible ⇒ on ne paie PAS ; un échec de Photoroom rend l'unité.
+  compteur illisible ⇒ on ne paie PAS ; un REFUS de Photoroom rend l'unité, mais
+  un délai ou une coupure APRÈS sa réponse la garde (l'image a pu être facturée) ;
+  cache illisible ⇒ 503 (on ne repaie pas) ; plafond atteint ⇒ dès la sonde.
+  ⚠️ `PHOTOROOM_POUR=tous` exige un abonnement Stripe **réellement payé** : la
+  règle d'accès générique laisse passer tout compte tant que l'abonnement n'est
+  pas obligatoire, un compte gratuit aurait dépensé sa clé.
   `audit-fonctions-api.cjs` refuse une 13ᵉ fonction (#250 avait bloqué TOUS les
   déploiements).
 - **Extension** : `detourerPhotos`, en fin de `photosEnOctets` — le seul point
-  par où passent les photos de Leboncoin ET d'eBay. Réglage illisible = éteint ;
+  par où passent les photos que l'extension attache. ⚠️ **eBay n'en profite
+  PAS** : sa seule voie de publication restante (`EbayPublier` → `/api/ebay`)
+  envoie les liens Vinted bruts, sans l'extension. L'écrire « Leboncoin ou eBay »
+  était faux (revue adverse) ; le brancher appartient à la session eBay. Réglage illisible = éteint ;
   l'affiche générique de Vinted (12 des 780 photos captées) n'est jamais envoyée ;
   l'empreinte part d'abord SANS la photo ; 3 envois à la fois, 45 s de budget ;
   arrêt sur clé absente, plafond, crédits épuisés, compte non autorisé. **Toute
   issue autre qu'un succès garde la photo d'origine** et note la raison ; le
-  bandeau Leboncoin écrit « dont N détourées » ou la raison en clair.
+  bandeau Leboncoin écrit « dont N détourées » (parmi les photos POSÉES) ou la
+  raison qui compte (une raison d'arrêt avant « l'affiche du site »).
+  ⚠️ **« Continuer » attend les photos** : elles peuvent mettre 45 s à revenir du
+  détourage, et l'enchaînement des étapes partait sans elles (banc
+  `leboncoin.cjs`, vu au rouge : clic à 2,1 s, photos à 4 s).
 - **App** : Réglages → « Détourer mes photos avant de publier » (Éteint par
   défaut · Photo de couverture · Toutes), `vrm_detourage` synchronisé. La carte
   dit ce que le SERVEUR dit (`usage=1` : clé posée ? compte autorisé ? N sur
@@ -5049,7 +5061,7 @@ arrivée** — vérifiée commit par commit sur `manifest.json`, pas devinée.
 | `lbcpdf` | `pdfBordereauLbc` | **5.136.0** (3 oct.) | « 🖨 Imprimer le bordereau » Leboncoin, tamponné du titre et du N° |
 | `lbcmsg` | `storeLbcMessages` | **5.153.0** (4 oct.) | Leboncoin → Messages : « l'extension relève tes non-lus, compte par compte » |
 | `vestiaire` | `storeVcRecon` | **5.154.0** (4 oct.) | Vestiaire : « ouvre Vestiaire dans ce Chrome, l'extension apprend à le lire » |
-| `detourage` | `detourerPhotos` | **5.156.0** (4 oct.) | « tes photos sont détourées (fond blanc) avant d'être attachées à Leboncoin et eBay » |
+| `detourage` | `detourerPhotos` | **5.156.0** (4 oct.) | « tes photos sont détourées (fond blanc) avant d'être attachées à Leboncoin » |
 
 ⚠️ **DEUX SEUILS POUR UNE MÊME NOTION, EXPRÈS.** Les photos s'attachent côté
 Leboncoin depuis la 5.58 et côté eBay depuis la 5.59 : un seul seuil aurait

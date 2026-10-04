@@ -6316,7 +6316,7 @@ const PHOTO_VINTED_CDN = /^https:\/\/images\d*\.vinted\.net\/t\//;
 const DETOURAGE_MAX_B64 = 3000000;     // même borne que le serveur (api/_lib/detourage.js)
 const DETOURAGE_BUDGET_MS = 45000;
 // Une raison qui vaut pour TOUTES les photos suivantes : inutile d'insister.
-const DETOURAGE_ARRET = { session: 1, abonnement: 1, reserve: 1, 'no-key': 1, plafond: 1, compteur: 1 };
+const DETOURAGE_ARRET = { session: 1, abonnement: 1, reserve: 1, 'no-key': 1, plafond: 1, compteur: 1, cache: 1, acces: 1 };
 
 async function modeDetourage() {
   const m = await lireMain(['vrm_detourage']);

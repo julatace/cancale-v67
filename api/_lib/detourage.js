@@ -127,11 +127,17 @@ async function appelerPhotoroom(cle, b64) {
       // lourd, et Leboncoin/eBay l'affichent sur fond noir ou gris).
       body: JSON.stringify({ image_file_b64: b64, bg_color: 'white', format: 'jpg' }),
     });
-    if (!r.ok) return { ok: false, status: r.status };
-    const buf = Buffer.from(await r.arrayBuffer());
-    if (!buf.length) return { ok: false, status: 502 };
+    // `certain` : Photoroom a REFUSÉ (réponse HTTP d'échec reçue) — rien n'a été
+    // produit, donc rien facturé, on rend l'unité. Un délai, une coupure ou un
+    // corps illisible APRÈS un 200 laissent l'issue INCONNUE : l'image a pu être
+    // produite et facturée, l'unité reste comptée (sinon le plafond sous-compte
+    // et la même photo se repaie à chaque publication).
+    if (!r.ok) return { ok: false, status: r.status, certain: true };
+    let buf;
+    try { buf = Buffer.from(await r.arrayBuffer()); } catch (_) { return { ok: false, status: 504, certain: false }; }
+    if (!buf.length) return { ok: false, status: 502, certain: false };
     return { ok: true, buf };
-  } catch (_) { return { ok: false, status: 504 }; }
+  } catch (_) { return { ok: false, status: 504, certain: false }; }
   finally { clearTimeout(t); }
 }
 
@@ -148,14 +154,16 @@ export async function handleDetourage(req, res) {
     const mois = moisCourant();
     const n = await lireUsage(u.id, mois);
     if (n === undefined) { res.status(503).json({ ok: false, reason: 'compteur', ready: !!cle }); return; }
-    res.status(200).json({ ok: true, ready: !!cle, mois, n, plafond: plafondMois(), autorise: autorise(u.id) });
+    res.status(200).json({ ok: true, ready: !!cle, mois, n, plafond: plafondMois(), autorise: await autorise(u.id) });
     return;
   }
   if (req.method !== 'POST') { res.status(405).json({ ok: false, error: 'POST' }); return; }
   const u = await utilisateurDe(req);
   if (!u) { res.status(401).json({ ok: false, reason: 'session' }); return; }
   if ((await accesVendeur(u.id)) === false) { res.status(402).json({ ok: false, reason: 'abonnement' }); return; }
-  if (!autorise(u.id)) { res.status(403).json({ ok: false, reason: 'reserve' }); return; }
+  const droit = await autorise(u.id);
+  if (droit === null) { res.status(503).json({ ok: false, reason: 'acces' }); return; }
+  if (!droit) { res.status(403).json({ ok: false, reason: 'reserve' }); return; }
   if (!cle) { res.status(503).json({ ok: false, reason: 'no-key' }); return; }
   const b = req.body || {};
   const sha = String(b.sha || '').toLowerCase();
@@ -164,8 +172,19 @@ export async function handleDetourage(req, res) {
   // 1. Déjà détourée ? On ne paie pas, on ne compte pas.
   const cache = await lireCache(u.id, sha);
   if (cache) { res.status(200).json({ ok: true, hit: true, b64: cache.b64, type: 'image/jpeg', bytes: cache.bytes }); return; }
-  // 2. Sonde sans octets : l'extension n'envoie la photo que si on ne l'a pas.
-  if (b.b64 == null) { res.status(200).json({ ok: true, hit: false }); return; }
+  // Cache ILLISIBLE ≠ absent : la photo est peut-être déjà payée. On ne repaie
+  // pas à l'aveugle — l'extension garde la photo d'origine.
+  if (cache === undefined) { res.status(503).json({ ok: false, reason: 'cache' }); return; }
+  // 2. Sonde sans octets : l'extension n'envoie la photo que si on ne l'a pas —
+  //    et pas du tout si le plafond du mois est déjà atteint (sinon chaque
+  //    publication renverrait ses photos pour s'entendre dire 429).
+  if (b.b64 == null) {
+    const n = await lireUsage(u.id, moisCourant());
+    if (n === undefined) { res.status(503).json({ ok: false, reason: 'compteur' }); return; }
+    if (n >= plafondMois()) { res.status(429).json({ ok: false, reason: 'plafond', plafond: plafondMois() }); return; }
+    res.status(200).json({ ok: true, hit: false });
+    return;
+  }
 
   let b64 = String(b.b64 || '').replace(/^data:[^,]*,/, '');
   if (b64.length > MAX_B64) { res.status(413).json({ ok: false, reason: 'trop-lourde' }); return; }
@@ -188,7 +207,7 @@ export async function handleDetourage(req, res) {
       if (n === null) return { status: 429, corps: { ok: false, reason: 'plafond', plafond: plafondMois() } };
       const r = await appelerPhotoroom(cle, b64);
       if (!r.ok) {
-        await rendre(u.id, mois);                       // un échec ne se paie pas sur le plafond
+        if (r.certain) await rendre(u.id, mois);        // un REFUS ne se paie pas sur le plafond
         const s = r.status;
         const status = (s === 402 || s === 403 || s === 429) ? s : (s >= 500 ? 502 : 502);
         return { status, corps: { ok: false, reason: 'photoroom', status: s } };
@@ -202,12 +221,29 @@ export async function handleDetourage(req, res) {
   res.status(out.status).json(out.corps);
 }
 
-// Qui a droit au détourage : le propriétaire de l'installation, ou tout le monde
-// si Julien l'a décidé (`PHOTOROOM_POUR=tous`).
-export function autorise(uid) {
-  if (String(process.env.PHOTOROOM_POUR || '').toLowerCase() === 'tous') return true;
+// Qui a droit au détourage : le propriétaire de l'installation ; et, si Julien
+// l'a décidé (`PHOTOROOM_POUR=tous`), les vendeurs qui PAIENT VRAIMENT.
+// ⚠️ Pas la règle d'accès générique (`accesVendeur`) : tant que l'abonnement
+//    n'est pas obligatoire elle laisse passer tout compte inscrit — et un compte
+//    gratuit dépenserait la clé de Julien. Ici on lit le statut Stripe lui-même :
+//    active / trialing, ou un impayé de moins de 14 jours (Stripe réessaie).
+// Rend true · false · null (pas su : on ne dépense pas à l'aveugle).
+export async function autorise(uid) {
   const proprio = String(process.env.VRM_OWNER_UID || '');
-  return !!proprio && String(uid) === proprio;
+  if (proprio && String(uid) === proprio) return true;
+  if (String(process.env.PHOTOROOM_POUR || '').toLowerCase() !== 'tous') return false;
+  if (!service()) return null;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/abonnements?owner=eq.${encodeURIComponent(uid)}&select=statut,impaye_depuis`, { headers: sbCle(service()) });
+    if (!r.ok) return null;
+    const j = await r.json();
+    if (!Array.isArray(j)) return null;
+    const a = j[0];
+    if (!a) return false;
+    if (a.statut === 'active' || a.statut === 'trialing') return true;
+    if (a.statut === 'past_due') { const t = Date.parse(a.impaye_depuis || '') || Date.now(); return Date.now() - t < 14 * 864e5; }
+    return false;
+  } catch (_) { return null; }
 }
 
 // Pour les bancs.

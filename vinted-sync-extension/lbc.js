@@ -389,6 +389,8 @@
       'delai': 'Photoroom a mis trop de temps à répondre',
       'pas-une-photo': 'la couverture n\'est pas une photo de la paire',
       'trop-lourde': 'la photo est trop lourde',
+      'cache': 'le serveur n\'a pas pu vérifier si elle était déjà détourée',
+      'acces': 'le serveur n\'a pas pu vérifier ton abonnement',
     };
     return t[r] || 'le détourage n\'a pas marché cette fois';
   }
@@ -404,8 +406,11 @@
     const rates = photos.filter((p) => p && p.erreur).length;   // le CDN a refusé
     // Détourage Photoroom (réglage de l'app) : le fond le fait AVANT de rendre les
     // octets ; ici on ne fait que COMPTER ce qui est revenu détouré, pour le dire.
-    const detourees = photos.filter((p) => p && p.detoure === true).length;
-    const detourageRaison = ((photos.find((p) => p && p.detoure === false && p.detourage) || {}).detourage) || '';
+    // La raison qui compte : une raison d'ARRÊT (clé, plafond, crédits…) passe
+    // avant « la couverture n'est pas une photo de la paire », qui ne vaut que
+    // pour une photo.
+    const raisons = photos.filter((p) => p && p.detoure === false && p.detourage).map((p) => p.detourage);
+    const detourageRaison = raisons.find((r) => r !== 'pas-une-photo') || raisons[0] || '';
     if (!fichiers.length) return { n: 0, rates, raison: rates ? 'les photos n\'ont pas pu être lues' : 'aucune photo lisible' };
 
     const base = apercusPhotos();
@@ -459,6 +464,10 @@
     // ── SONDE renvoyée au fond (lecture seule, aucun contenu) pour MESURER la
     //    vraie mécanique de l'uploader — le prochain dépôt me dira la vérité.
     try { send({ action: 'photoDiag', diag: Object.assign({ envoyees: placees, lisibles: fichiers.length, rates, voie, at: new Date().toISOString() }, sondePhotos()) }); } catch (_) {}
+    // « dont N détourées » ne compte que les photos réellement POSÉES : un
+    // sous-total plus grand que le total serait un chiffre faux (§5).
+    const lisibles = photos.filter((p) => p && p.b64);
+    const detourees = lisibles.slice(0, Math.min(placees, fichiers.length)).filter((p) => p.detoure === true).length;
     return { n: Math.min(n, fichiers.length), envoyees: placees, confirmees, rates, total: fichiers.length, voie, detourees, detourageRaison };
   }
 
@@ -722,7 +731,14 @@
   //    qui RESTE*, commentaires compris : un commentaire faux se relit comme une
   //    règle.
   let pending = null, pendingTries = 0, pendingDone = 0, pendingTimer = null, pendingArrete = false;
-  let photosFaites = false, photosEtat = null;
+  // `photosEnCours` : le fond lit (et détoure) les photos — jusqu'à 45 s. Tant
+  // qu'elles ne sont pas posées, on NE clique PAS « Continuer » : l'étape photo
+  // partirait sans elles.
+  let photosFaites = false, photosEtat = null, photosEnCours = false;
+  const lancerPhotos = () => {
+    photosFaites = true; photosEnCours = true;
+    attacherPhotos(pending).then((r) => { photosEtat = r; }, () => {}).finally(() => { photosEnCours = false; banner(); });
+  };
   let publieFait = false, publieEtat = null;
   async function autoPrefill() {
     if (!/deposer|depot|d[ée]p[oô]t/i.test(location.href)) return;
@@ -737,10 +753,7 @@
       if (n > pendingDone) { pendingDone = n; banner(); }
       // Les photos : dès qu'une étape porte un champ fichier, on attache. Une
       // seule fois — ré-attacher écraserait ce qu'il vient d'ajouter lui-même.
-      if (!photosFaites && champsFichier().length) {
-        photosFaites = true;
-        attacherPhotos(pending).then((r) => { photosEtat = r; banner(); });
-      }
+      if (!photosFaites && champsFichier().length) lancerPhotos();
       // ⚠️ PUBLIER SANS BOOSTER — seulement pour une paire qu'IL a lancée par le
       //   bouton (`pending.publier !== false`), seulement à l'étape des boosts
       //   (mesurée), et seulement si des photos ont été ENVOYÉES (sinon Leboncoin
@@ -906,11 +919,14 @@
   // (ex. Univers/Type) : on le DIT plutôt que de tourner en rond.
   let _avanceFaite = new Set(); const _avanceEssais = {}; let _avanceEnCours = false;
   async function avancer() {
-    if (_avanceEnCours) return; const sig = derniereEtape; if (!sig || _avanceFaite.has(sig)) return;
+    // Une étape qui porte un champ photo n'avance pas avant que les photos soient
+    // POSÉES (elles peuvent mettre 45 s à revenir du détourage).
+    const photosAttendues = () => photosEnCours || (!photosFaites && champsFichier().length > 0);
+    if (_avanceEnCours || photosAttendues()) return; const sig = derniereEtape; if (!sig || _avanceFaite.has(sig)) return;
     const n = (_avanceEssais[sig] = (_avanceEssais[sig] || 0) + 1);
     if (n > 4) { if (n === 5) toast('⚠️ Un champ obligatoire reste à choisir (ex. Univers) — fais-le, je continue'); return; }
     _avanceEnCours = true;
-    try { await attendre(1100); if (cliquerContinuer()) { _avanceFaite.add(sig); toast('→ étape suivante'); } } catch (_) {}
+    try { await attendre(1100); if (!photosAttendues() && cliquerContinuer()) { _avanceFaite.add(sig); toast('→ étape suivante'); } } catch (_) {}
     _avanceEnCours = false;
   }
   // ══════════════════════════════════════════════════════════════════════════
@@ -1103,12 +1119,15 @@
     if (refill) refill.onclick = () => {
       pendingDone = fillNowForce(pending);
       pendingArrete = false; pendingTries = 0; publieFait = false;
+      // « Reprendre » rend ses essais à l'enchaînement des étapes (sinon une étape
+      // tentée 4 fois pendant le détourage resterait bloquée pour toujours).
+      for (const k of Object.keys(_avanceEssais)) delete _avanceEssais[k];
       clearInterval(pendingTimer);
       pendingTimer = setInterval(() => {
         pendingTries++;
         const n2 = fillNow(pending);
         if (n2 > pendingDone) { pendingDone = n2; banner(); }
-        if (!photosFaites && champsFichier().length) { photosFaites = true; attacherPhotos(pending).then((r) => { photosEtat = r; banner(); }); }
+        if (!photosFaites && champsFichier().length) lancerPhotos();
         if (!publieFait && pending.publier !== false && estEtapePublication() && photosEtat && (photosEtat.envoyees || photosEtat.n || 0) > 0) {
           publieFait = true;
           publierSansBooster().then((r) => { publieEtat = r; banner(); if (r && r.ok) { clearInterval(pendingTimer); send({ action: 'markPosted', id: pending.id }); send({ action: 'setPending', ad: null }); } });

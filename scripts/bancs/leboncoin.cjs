@@ -103,6 +103,15 @@ const PAGE = (depot) => `<!doctype html><html lang="fr"><head><meta charset="utf
       + '<scr'+'ipt>document.getElementById("livsw").addEventListener("click",function(){this.setAttribute("aria-checked",this.getAttribute("aria-checked")==="true"?"false":"true");});</scr'+'ipt>'
       + '<scr'+'ipt>document.querySelectorAll("[role=combobox]").forEach(function(cb){var menu=document.getElementById(cb.id+"-menu");cb.addEventListener("click",function(){menu.hidden=false;});menu.querySelectorAll("[role=option]").forEach(function(o){o.addEventListener("click",function(){cb.value=o.textContent;cb.setAttribute("data-choisi",o.textContent);menu.hidden=true;});});});'
       + 'window.__cont=0;window.__pub=0;document.getElementById("continuer").addEventListener("click",function(){window.__cont++;});document.getElementById("publier").addEventListener("click",function(){window.__pub++;});</scr'+'ipt>'
+    : depot === 'photoscont'
+    // ⚠️ DÉTOURAGE (4 oct.) : le fond rend les photos après jusqu'à 45 s. Une
+    //    étape qui porte un champ photo ET « Continuer » : on ne doit PAS
+    //    enchaîner avant que les photos soient posées. Le banc note l'heure de
+    //    chaque clic et de chaque photo reçue.
+    ? '<div class="dropzone" aria-label="Ajouter des photos"><input id="uf" name="images" type="file" multiple accept="image/*"></div><div id="previews"></div>'
+      + '<button type="button" id="continuer">Continuer</button>'
+      + '<scr'+'ipt>window.__t0=Date.now();window.__contAt=[];window.__photoAt=[];var uf=document.getElementById("uf");uf.addEventListener("change",function(){for(var i=0;i<uf.files.length;i++){window.__photoAt.push(Date.now()-window.__t0);var img=document.createElement("img");img.src="blob:"+uf.files[i].name;document.getElementById("previews").appendChild(img);}});'
+      + 'document.getElementById("continuer").addEventListener("click",function(){window.__contAt.push(Date.now()-window.__t0);});</scr'+'ipt>'
     : depot === 'etape2'
     ? '<label for="s2">Titre de l’annonce</label><input id="s2" name="subject" type="text">'
       + '<label for="d2">Description</label><textarea id="d2" name="body"></textarea>'
@@ -142,7 +151,7 @@ let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
 
 (async () => {
-  const srv = http.createServer((q, r) => { r.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); r.end(PAGE(/basdepage/.test(q.url) ? 'basdepage' : /boost/.test(q.url) ? 'boost' : /photosreel/.test(q.url) ? 'photosreel' : /photos1/.test(q.url) ? 'photos1' : /etape3/.test(q.url) ? 'etape3' : /etape2/.test(q.url) ? 'etape2' : /depot/.test(q.url))); });
+  const srv = http.createServer((q, r) => { r.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); r.end(PAGE(/basdepage/.test(q.url) ? 'basdepage' : /boost/.test(q.url) ? 'boost' : /photosreel/.test(q.url) ? 'photosreel' : /photoscont/.test(q.url) ? 'photoscont' : /photos1/.test(q.url) ? 'photos1' : /etape3/.test(q.url) ? 'etape3' : /etape2/.test(q.url) ? 'etape2' : /depot/.test(q.url))); });
   await new Promise((res) => srv.listen(4491, res));
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   const pg = await b.newPage({ viewport: { width: 1280, height: 900 } });
@@ -431,6 +440,49 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
     await pg.close();
     return r;
   };
+  // ══════════════════════════════════════════════════════════════════════════
+  //  DÉTOURAGE : « CONTINUER » ATTEND LES PHOTOS, ET LE BANDEAU COMPTE JUSTE
+  // ══════════════════════════════════════════════════════════════════════════
+  // Revue adverse du 4 octobre : le fond détoure les photos AVANT de les rendre
+  // (jusqu'à 45 s). Pendant ce temps l'enchaînement cliquait « Continuer » :
+  // l'étape photo partait SANS photo. Et « dont N détourées » comptait toutes
+  // les photos revenues, posées ou non.
+  {
+    const pg = await b.newPage({ viewport: { width: 1280, height: 900 } });
+    const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
+    await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => r.abort());
+    await pg.addInitScript((d) => {
+      const JPEG = 'ffd8ffe000104a46494600010100000100010000ffd9';
+      const b64 = (() => { const bin = JPEG.match(/../g).map(h => String.fromCharCode(parseInt(h, 16))).join(''); return btoa(bin); })();
+      window.chrome = { runtime: { id: 'banc', lastError: null, sendMessage: (m, cb) => {
+        const rep = (o) => { try { cb && cb(o); } catch (_) {} };
+        if (m && m.action === 'getPending') return rep({ ok: true, ad: d.ad });
+        // 3 s pour rendre les photos (le détourage) ; la 1re revient détourée,
+        // la 2e garde son fond (plafond), la 3e est l'affiche du site.
+        if (m && m.action === 'photoBytes') { setTimeout(() => rep({ ok: true, photos: (m.urls || []).map((u, i) => ({ url: u, b64, type: 'image/jpeg', taille: 22,
+          detoure: i === 0, detourage: i === 0 ? undefined : (i === 1 ? 'plafond' : 'pas-une-photo') })) }), 3000); return; }
+        if (m && m.action === 'getQueue') return rep({ ok: true, queue: [d.ad], removals: [], unlinked: [], postedList: [], stats: { onlineCount: 1, numberedCount: 1 } });
+        return rep({ ok: true }); }, onMessage: { addListener() {} } } };
+    }, { ad: QUEUE[0] });
+    await pg.goto('http://localhost:4491/depot/photoscont', { waitUntil: 'domcontentloaded' });
+    await pg.addScriptTag({ content: SRC });
+    await pg.waitForTimeout(8000);
+    const r = await pg.evaluate(() => ({ cont: window.__contAt || [], photos: window.__photoAt || [],
+      bandeau: (document.getElementById('vrm-lbc-banner') || {}).innerText || '' }));
+    await pg.close();
+    dit(!errs.length, 'aucune erreur pendant une attache de photos lente', errs[0] || '');
+    dit(r.photos.length >= 1, 'les photos finissent par être posées', r.photos.length + ' photo(s)');
+    const premierClic = r.cont.length ? r.cont[0] : null;
+    dit(premierClic === null || (r.photos.length && premierClic > r.photos[0]),
+      '« Continuer » n’est PAS cliqué avant que les photos soient posées',
+      'clics à ' + JSON.stringify(r.cont) + ' ms · photos à ' + JSON.stringify(r.photos) + ' ms');
+    const ban = r.bandeau.replace(/\s+/g, ' ');
+    const m = ban.match(/dont (\d+) détourée/);
+    dit(m && Number(m[1]) === 1, 'le bandeau compte UNE photo détourée (celle qui l’est vraiment)', ban.slice(0, 160));
+    dit(/plafond/i.test(ban) && !/n.est pas une photo de la paire/i.test(ban),
+      'la raison dite est celle qui compte (le plafond), pas « l’affiche du site »', ban.slice(0, 220));
+  }
+
   {
     // Positif : sa taille (40) et son état (Très bon état) collent → choisis.
     const ok = await monteCombos(QUEUE[0]);

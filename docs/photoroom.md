@@ -2,7 +2,10 @@
 
 Le détourage (retirer le fond, ne garder que la chaussure sur fond blanc) se
 fait avec l'API **Photoroom**, **juste avant** que l'extension attache tes
-photos à une annonce Leboncoin ou eBay. Tes photos sur Vinted ne changent pas.
+photos à une annonce **Leboncoin**. Tes photos sur Vinted ne changent pas.
+⚠️ **eBay** : la mise en vente passe par l'API d'eBay (`EbayPublier` → `/api/ebay`),
+sans l'extension — ses photos partent telles quelles. La brancher serait une
+modification de `api/ebay.js`, qui appartient à la session eBay.
 
 Tout le code est en place (4 octobre). Il ne manque que **ta clé Photoroom**,
 parce que c'est **ton** compte et que ça t'est **facturé à l'image**.
@@ -34,7 +37,7 @@ Deux réglages facultatifs, au même endroit :
 | variable | ce qu'elle décide | sans elle |
 |---|---|---|
 | `PHOTOROOM_PLAFOND_MOIS` | combien de photos **un vendeur** peut faire détourer par mois | **150** (≈ 3 $) |
-| `PHOTOROOM_POUR` | `tous` = tous les abonnés y ont droit, à tes frais | **toi seul** (`VRM_OWNER_UID`) |
+| `PHOTOROOM_POUR` | `tous` = les abonnés qui **paient vraiment** (Stripe actif, ou impayé de moins de 14 jours) y ont droit, à tes frais — un compte gratuit, jamais | **toi seul** (`VRM_OWNER_UID`) |
 
 ⚠️ Avant de mettre `PHOTOROOM_POUR=tous` : un abonné qui publie beaucoup peut te
 coûter plus que son abonnement — c'est pour ça que le plafond existe. Photoroom
@@ -50,7 +53,8 @@ mois-ci sur combien. L'extension doit être en **5.156** ou plus.
 ## Ce que VRM fait (et ne fait pas)
 
 - **Où** : `detourerPhotos` dans l'extension (`background.js`), le seul point où
-  passent les photos de Leboncoin **et** d'eBay. Le serveur est un mode de
+  passent les photos que l'extension attache (Leboncoin ; et eBay le jour où sa
+  publication repassera par l'extension). Le serveur est un mode de
   `api/ai.js` (`?mode=detourage`, rewrite `/api/detourage`) — le plan Vercel
   gratuit plafonne à 12 fonctions, `scripts/audit-fonctions-api.cjs` y veille.
 - **L'empreinte d'abord** : l'extension envoie l'empreinte SHA-256 de la photo
@@ -60,7 +64,10 @@ mois-ci sur combien. L'extension doit être en **5.156** ou plus.
   JPEG).
 - **Le plafond** est compté par la base en une seule instruction
   (`vrm_detourage_reserver`, migration 008) : un compteur illisible fait
-  **refuser** de payer, jamais compter zéro. Un échec de Photoroom rend l'unité.
+  **refuser** de payer, jamais compter zéro. Un REFUS de Photoroom rend l'unité ;
+  un délai ou une coupure après sa réponse la garde comptée (l'image a pu être
+  facturée). Plafond atteint ⇒ la sonde le dit, aucune photo n'est envoyée.
+- **Cache illisible** ⇒ on ne repaie pas une photo peut-être déjà détourée.
 - **L'affiche générique de Vinted** (12 des 780 photos captées) n'est jamais
   envoyée : on ne paie pas pour détourer une affiche.
 - **Toute autre issue garde la photo d'origine** — pas de clé, plafond atteint,
