@@ -5322,6 +5322,19 @@ résolus à la main — **jamais `git merge -s ours`** : il garde l'arbre de la
 branche, la PR qui suit **défait en silence** tout ce que les autres ont mergé.
 Après le merge, `git diff origin/main --stat` ne doit montrer **que ses propres
 fichiers**. Et ne pas toucher au domaine d'une autre session (eBay) : lui laisser.
+⚠️⚠️ **LE PLAN GRATUIT DE VERCEL PLAFONNE À 100 DÉPLOIEMENTS PAR 24 H — ET LES
+BRANCHES `claude/…` LES AVAIENT TOUS MANGÉS** (4 octobre). Chaque `git push` sur
+une branche créait une prévisualisation : 59 ce jour-là (36 pour une seule
+session), plus 24 mises en production. Le merge de la PR #441 est tombé sur
+« Deployment rate limited — retry in 24 hours » : `main` était à jour, le site,
+lui, restait sur la version d'avant. ⇒ `vercel.json` coupe désormais les
+déploiements des branches `claude/**` (`git.deploymentEnabled`) ; seul `main`
+se déploie. La preuve d'une branche, ce sont **nos** audits et bancs, pas une
+prévisualisation. ⚠️ **Ne jamais « promouvoir » une prévisualisation pour
+contourner la limite** : les clés de service (Supabase, notifications, cron,
+Stripe, eBay) n'existent qu'en Production — la promouvoir couperait la réception
+des emails, les notifications et les paiements. Attendre la fenêtre, ou que
+Julien décide de passer en Pro.
 ⚠️ Ne jamais lancer `npm run build` pendant qu'un banc sert `dist/`.
 ⚠️ `git fetch` avant toute comparaison avec la production : une référence locale
 jamais rafraîchie ment en silence.
