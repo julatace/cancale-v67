@@ -4598,9 +4598,49 @@ async function purgeBordereaux() {
       if (ok === false) { noterDiag('bordereau_purge_ecriture_ratee'); continue; }
       n++; noterDiag('bordereau_purge');
     }
-    await chrome.storage.local.set({ vrmPurgeBord: Date.now() });
+    // ── Les bordereaux CAPTÉS PAR L'EXTENSION (`harvest_{uid}_label_{tx}`) ──────
+    // Autorisé par Julien le 4 octobre (mesuré : 55 lignes de ventes finalisées,
+    // 10,8 Mo, qu'aucune règle ne purgeait). Même règle, mêmes ceintures, et une
+    // de plus : ici la date doit être LISIBLE et vieille de 7 jours — sans date,
+    // on ne sait pas, donc on garde. On ne lit que les lignes qui portent ENCORE
+    // un PDF (`_pdf`, posé par la base) : une ligne purgée ne revient jamais.
+    // `label_latest` (le « dernier capté » d'un compte) suit la même règle par sa
+    // transaction : il n'est qu'une copie d'un `label_{tx}`.
+    const labels = await sbGetTout('app_data?id=like.harvest_*_label_*&meta->>_pdf=eq.true&select=id,tx:meta->>tx,cap:meta->>capturedAt');
+    let nl = 0, resteLabels = 0;
+    if (labels !== null) {                                        // pas su → on ne touche à aucun
+      const candLabels = labels.filter(r => {
+        const id = String((r && r.id) || '');
+        const m = /^harvest_\d+_label_(\d+|latest)$/.exec(id);
+        if (!m) return false;
+        const tx = m[1] === 'latest' ? String(r.tx || '') : m[1];
+        if (!/^\d+$/.test(tx)) return false;                     // latest sans transaction : on ne sait pas
+        if (r.tx && String(r.tx) !== tx) return false;            // ligne incohérente : doute → on garde
+        if (!finalisees.has(tx)) return false;                    // pas (encore) finalisée
+        const t = Date.parse(r.cap || '');
+        if (isNaN(t) || t > limite) return false;                 // date illisible ou trop récente
+        return true;
+      });
+      for (const r of candLabels) {
+        if (nl >= PURGE_MAX_PAR_RUN) { resteLabels++; continue; }
+        const plein = await sbGet(`app_data?id=eq.${encodeURIComponent(r.id)}&select=data`);
+        if (!Array.isArray(plein)) continue;                     // lecture ratée → on saute
+        const data = plein[0] && plein[0].data;
+        if (!data || typeof data !== 'object') continue;
+        if (!(data.pdfB64 && data.pdfB64 !== 'None')) continue;  // pas de vrais octets : rien à retirer
+        const neuf = { ...data, pdfB64: null, pdfPurged: true, pdfPurgedAt: new Date().toISOString() };
+        const ok = await supabaseUpsert('app_data', [{ id: r.id, data: neuf }], 'id');
+        if (ok === false) { noterDiag('label_purge_ecriture_ratee'); continue; }
+        nl++; noterDiag('label_purge');
+      }
+    }
+    // Un arriéré (plus de 20 candidats) se résorbe en une heure de visites, pas
+    // en trois jours ; sans arriéré, on attend 12 h.
+    const reste = candidats.length > PURGE_MAX_PAR_RUN || resteLabels > 0;
+    await chrome.storage.local.set({ vrmPurgeBord: reste ? Date.now() - PURGE_COOLDOWN_MS + 3600000 : Date.now() });
     if (n) logActivity(`🧹 ${n} vieux bordereau${n > 1 ? 'x' : ''} allégé${n > 1 ? 's' : ''} (vente finalisée — PDF retiré, infos gardées)`);
-    return n;
+    if (nl) logActivity(`🧹 ${nl} bordereau${nl > 1 ? 'x' : ''} capté${nl > 1 ? 's' : ''} allégé${nl > 1 ? 's' : ''} (vente finalisée — PDF retiré, infos gardées)`);
+    return n + nl;
   } catch (_) { return 0; }
 }
 

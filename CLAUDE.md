@@ -4454,11 +4454,40 @@ purge est arrivée en 5.146. *Le premier geste reste d'installer le zip.*
   le serveur puis l'extension rangent dans le stockage
   (`{owner}/{famille}/{sha256}.pdf`, objet écrit AVANT la ligne) ; rattrapage
   en deux phases, la seconde (vider la colonne) **sur un oui de Julien**.
-  **À faire trancher par lui** : purger aussi `harvest_*_label_{tx}` des ventes
-  finalisées (55 lignes, 10,8 Mo, aucune règle ne les purge) ; le sort des
-  tables `sauvegarde.app_data_2026093{0}`/`_20261002` (~76 Mo de PDF).
+  **Tranché par Julien le 4 octobre au soir** (« je te donne toutes les
+  autorisations ») : les `harvest_*_label_{tx}` des ventes finalisées sont
+  purgés (5.158, ci-dessous) et les tables `sauvegarde.app_data_2026093{0}` /
+  `_20261002` (~76 Mo de PDF) peuvent partir — ⚠️ mais un `DROP` exige une
+  confirmation HUMAINE dans l'outil SQL : **il reste à faire, avec lui devant
+  l'écran**, jamais en tâche de fond.
   ⚠️ Les mesures de l'étape « stockage » (doublon, 400 vs 404, CORS) se font sur
   une branche Supabase ou en local, **jamais en production** (§2.3).
+
+### Purge des bordereaux CAPTÉS par l'extension — ventes finalisées (5 octobre, 5.158)
+Suite de la purge des `email_bord_*` (5.146) : les `harvest_{uid}_label_{tx}`
+(et le « dernier capté » `label_latest`, une copie) gardaient leur PDF pour
+toujours — mesuré : **55 lignes de ventes finalisées, 10,8 Mo**. Autorisé par
+Julien le 4 octobre. `purgeBordereaux` les allège dans le même passage, avec les
+mêmes ceintures et deux de plus :
+- on ne liste que les lignes qui portent **encore** un PDF
+  (`meta->>_pdf=eq.true`, posé par la base) — une ligne purgée ne revient jamais ;
+- la vente doit être **finalisée** (450) **et** la capture **datée et vieille de
+  7 jours** — sans date lisible, on garde ;
+- la transaction se lit **dans l'identifiant** de la ligne ; si `meta->>tx` en
+  dit une autre, doute → on garde. `label_latest` sans transaction : on garde ;
+- on retire `pdfB64` et rien d'autre : `tx`, `item`, `url`, `capturedAt`
+  restent — l'app relie toujours la paire (`labelsCaptes[tx].item`) et
+  `venteExpediee` voit toujours la preuve ;
+- lecture ratée (ventes, liste, ligne) ⇒ rien n'est touché ;
+- 20 par passage ; s'il en reste, le passage suivant vient **dans l'heure**
+  (sinon 12 h) — l'arriéré se résorbe en une journée de visites.
+Côté app rien ne change : une vente finalisée n'est jamais `aExpedier`, elle n'a
+donc plus de bouton de bordereau ; et si un PDF purgé était quand même demandé,
+`lirePdfLigne` répond « absent » et l'écran le dit (étape 0).
+- `audit-purge-bordereaux.cjs` : **29 contrôles** ; **4 rouges** sur la 5.157 ;
+  chacune des trois gardes retirée tour à tour le fait repasser au rouge.
+- Aucune entrée d'`EXT_CAPACITES` (ménage interne). Extension **5.158.0**, zip
+  régénéré, `EXT_ATTENDUE` suivie.
 
 ### Logo iPhone : icônes PWA régénérées (3 octobre)
 `apple-touch-icon.png` + `icon-192/512/maskable` portaient encore l'ancien logo

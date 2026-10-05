@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "VRM - Vinted Sync",
-  "version": "5.157.0",
+  "version": "5.158.0",
   "description": "Capte tes donnees Vinted et Leboncoin (annonces, ventes, achats, messages, bordereaux) et les envoie a VRM, depuis TON navigateur. Tout se pilote dans l'app VRM (vrm.center) : l'extension execute ce que tu y demandes, avec ses garde-fous (le compte connecte dans l'onglet, 20 actions par heure, une requete a la fois).",
   "permissions": [
     "cookies",
