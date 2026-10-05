@@ -300,6 +300,11 @@ async function supabaseGetRow(id) {
 }
 
 function buildInvoiceHtml(cfg, sale, number, dateStr) {
+  // ⚠️ Le nom, l'adresse, l'email de l'ACHETEUR et la désignation viennent de
+  // l'email de vente, donc de ce que l'acheteur a écrit lui-même sur Vinted : ils
+  // s'échappent, sinon « <img src=x onerror=…> » s'exécutait chez Julien quand
+  // il imprime la facture (et partait tel quel dans l'email envoyé à l'acheteur).
+  const h = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const tauxTva = parseFloat(cfg.tauxTva || '0') || 0;
   const ttc = parseFloat(sale.prix) || 0;
   const ht = tauxTva > 0 ? Math.round(ttc / (1 + tauxTva / 100) * 100) / 100 : ttc;
@@ -312,21 +317,21 @@ function buildInvoiceHtml(cfg, sale, number, dateStr) {
     : `<tr><td colspan="2" style="padding:6px 8px;color:#666;font-size:12px">TVA non applicable – art. 293 B du CGI</td></tr>`;
   return `<div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;color:#222">` +
     (cfg.logo ? `<img src="cid:logoFacture" style="max-height:80px;margin-bottom:16px" alt="logo"/>` : '') +
-    `<h2 style="margin:0 0 4px">FACTURE ${number}</h2>` +
-    `<p style="color:#666;margin:0 0 20px">Date : ${dateStr}</p>` +
+    `<h2 style="margin:0 0 4px">FACTURE ${h(number)}</h2>` +
+    `<p style="color:#666;margin:0 0 20px">Date : ${h(dateStr)}</p>` +
     `<table style="width:100%;margin-bottom:20px"><tr>` +
-    `<td style="vertical-align:top;font-size:13px"><b>${cfg.nom || ''}</b><br>${adresse}` +
-    (cfg.siret ? `<br>SIRET : ${cfg.siret}` : '') + (cfg.tva ? `<br>N° TVA : ${cfg.tva}` : '') + `</td>` +
-    `<td style="vertical-align:top;text-align:right;font-size:13px"><b>${sale.nomComplet || ''}</b><br>${sale.adresse || ''}<br>${sale.email}</td></tr></table>` +
+    `<td style="vertical-align:top;font-size:13px"><b>${h(cfg.nom)}</b><br>${h(adresse)}` +
+    (cfg.siret ? `<br>SIRET : ${h(cfg.siret)}` : '') + (cfg.tva ? `<br>N° TVA : ${h(cfg.tva)}` : '') + `</td>` +
+    `<td style="vertical-align:top;text-align:right;font-size:13px"><b>${h(sale.nomComplet)}</b><br>${h(sale.adresse)}<br>${h(sale.email)}</td></tr></table>` +
     `<table style="width:100%;border-collapse:collapse;font-size:13px">` +
     `<tr style="background:#f5f5f5"><th style="text-align:left;padding:8px">Article</th><th style="text-align:right;padding:8px">Montant</th></tr>` +
-    `<tr><td style="padding:8px;border-bottom:1px solid #eee">${sale.designation || 'Article Vinted'}</td>` +
+    `<tr><td style="padding:8px;border-bottom:1px solid #eee">${h(sale.designation || 'Article Vinted')}</td>` +
     `<td style="padding:8px;text-align:right;border-bottom:1px solid #eee">${eur(ttc)}</td></tr>` +
     lignesTva +
     `<tr><td style="padding:8px"><b>Total TTC</b></td><td style="padding:8px;text-align:right"><b>${eur(ttc)}</b></td></tr>` +
     `</table>` +
     `<p style="color:#27a85d;font-weight:bold">Facture acquittée</p>` +
-    (cfg.mentions ? `<p style="font-size:12px;color:#666;white-space:pre-line">${cfg.mentions}</p>` : '') +
+    (cfg.mentions ? `<p style="font-size:12px;color:#666;white-space:pre-line">${h(cfg.mentions)}</p>` : '') +
     `</div>`;
 }
 

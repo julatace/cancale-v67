@@ -11278,7 +11278,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
                     </div>
                   </div>
                   <div style={{display:'flex',gap:6,flexShrink:0}}>
-                    <button type="button" onClick={()=>{ const w=window.open('','_blank'); if(w){ w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Facture ${inv.number}</title></head><body>${(inv.html||'').replace('cid:logoFacture','')}<script>setTimeout(()=>window.print(),400);<\/script></body></html>`); w.document.close(); } }}
+                    <button type="button" onClick={()=>{ ouvrirDocumentImprimable(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Facture ${xmlEsc(inv.number)}</title></head><body>${(inv.html||'').replace('cid:logoFacture','')}</body></html>`); }}
                       style={{padding:'6px 12px',borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Voir</button>
                     {inv.status==='draft'&&inv.buyerEmail&&(
                       <button type="button" onClick={async()=>{
@@ -11557,11 +11557,31 @@ function entForInvoice(inv, entreprises, activeEnt, fallback) {
 }
 
 // Génération du PDF (HTML imprimable qui s'ouvre dans une nouvelle fenêtre)
+// ⚠️⚠️ UN DOCUMENT IMPRIMABLE N'EXÉCUTE RIEN (sécurité, 5 octobre).
+// `window.open('')` ouvre une fenêtre de MÊME ORIGINE que l'app : un script qui
+// s'y glisse lit la session de Julien. Or une facture porte le nom, l'adresse et
+// l'email de l'ACHETEUR — écrits par l'acheteur lui-même sur Vinted — et ils
+// partaient tels quels dans le document (« <img src=x onerror=…> » suffisait).
+// Mesuré dans Chromium : sans politique, le code injecté s'exécute ; avec cette
+// politique écrite EN TÊTE du document, plus rien ne s'exécute, et l'app garde
+// la main pour lancer l'impression (`w.print()` depuis cette page).
+// Les valeurs sont AUSSI échappées (xmlEsc) : la politique couvre ce qui est
+// déjà rangé en base (factures construites avant ce correctif).
+const CSP_DOCUMENT = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data: blob: https: http:; style-src 'unsafe-inline'; font-src data: https:">`;
+function ouvrirDocumentImprimable(html) {
+  const w = window.open('', '_blank'); if (!w) return null;
+  const doc = String(html || '').replace(/<script[\s\S]*?<\/script>/gi, '');
+  const tete = /<head(\s[^>]*)?>/i;
+  w.document.write(tete.test(doc) ? doc.replace(tete, (m) => m + CSP_DOCUMENT) : CSP_DOCUMENT + doc);
+  w.document.close();
+  setTimeout(() => { try { w.focus(); w.print(); } catch (_) {} }, 400);
+  return w;
+}
 function generatePDF(inv,settings) {
   let _logo=LOGO_CANCALE;
   try{ const _c=localStorage.getItem('vinted_custom_logo'); if(_c){ _logo=JSON.parse(_c); } }catch(_){}
   const html=`<!DOCTYPE html>
-<html><head><meta charset="UTF-8"><title>Facture ${inv.number}</title>
+<html><head><meta charset="UTF-8"><title>Facture ${xmlEsc(inv.number)}</title>
 <style>
 body{font-family:Arial,sans-serif;color:#222;max-width:800px;margin:30px auto;padding:30px;background:#fff;}
 .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:30px;}
@@ -11595,27 +11615,27 @@ td.right{text-align:right;}
 </style></head><body>
 <div class="header">
   <div class="logo">
-    <img src="${_logo}" alt="Cancale Shoes Store" style="width:140px;height:auto;border-radius:8px;" />
+    <img src="${xmlEsc(_logo)}" alt="Cancale Shoes Store" style="width:140px;height:auto;border-radius:8px;" />
   </div>
   <div class="title">
     <h1>FACTURE</h1>
-    <div class="num"># ${inv.number}</div>
+    <div class="num"># ${xmlEsc(inv.number)}</div>
     <div class="num">Date : ${fmtDate(inv.saleDate)}</div>
   </div>
 </div>
 <div class="parties">
   <div class="party">
     <div class="party-label">De :</div>
-    <div class="party-info"><b>${settings.companyName}</b><br>${settings.companyType}<br>${settings.companyAddress}<br>SIRET : ${settings.siret}</div>
+    <div class="party-info"><b>${xmlEsc(settings.companyName)}</b><br>${xmlEsc(settings.companyType)}<br>${xmlEsc(settings.companyAddress)}<br>SIRET : ${xmlEsc(settings.siret)}</div>
   </div>
   <div class="party" style="text-align:right">
     <div class="party-label">À :</div>
-    <div class="party-info"><b>${inv.buyerName||inv.buyerEmail||'Client'}</b>${inv.buyerAddress?'<br>'+inv.buyerAddress:''}${inv.buyerEmail&&inv.buyerName?'<br>'+inv.buyerEmail:''}</div>
+    <div class="party-info"><b>${xmlEsc(inv.buyerName||inv.buyerEmail||'Client')}</b>${inv.buyerAddress?'<br>'+xmlEsc(inv.buyerAddress):''}${inv.buyerEmail&&inv.buyerName?'<br>'+xmlEsc(inv.buyerEmail):''}</div>
   </div>
 </div>
 <table>
   <thead><tr><th>Objet</th><th class="right">Quantité</th><th class="right">Prix unitaire (HT)</th><th class="right">Montant (HT)</th></tr></thead>
-  <tbody><tr><td>${inv.itemName||''}</td><td class="right">1</td><td class="right">${(+inv.sellPrice).toFixed(2)} €</td><td class="right">${(+inv.sellPrice).toFixed(2)} €</td></tr></tbody>
+  <tbody><tr><td>${xmlEsc(inv.itemName||'')}</td><td class="right">1</td><td class="right">${(+inv.sellPrice).toFixed(2)} €</td><td class="right">${(+inv.sellPrice).toFixed(2)} €</td></tr></tbody>
 </table>
 <div class="totals">
   <div class="row"><b>Sous-total :</b> <b>${(+inv.sellPrice).toFixed(2)} €</b></div>
@@ -11626,15 +11646,12 @@ td.right{text-align:right;}
 <div class="acquittee">Facture acquittée</div>
 <div class="remarques">
   <div class="label">Remarques :</div>
-  ${inv.vintedNumber?`<p>Transaction Vinted n°${inv.vintedNumber}</p>`:''}
-  <p>${settings.footer||'Merci pour votre achat !'}</p>
+  ${inv.vintedNumber?`<p>Transaction Vinted n°${xmlEsc(inv.vintedNumber)}</p>`:''}
+  <p>${xmlEsc(settings.footer||'Merci pour votre achat !')}</p>
 </div>
-<div class="footer">N° d'étiquetage : ${inv.productId}</div>
-<script>setTimeout(()=>{window.print();},400);</script>
+<div class="footer">N° d'étiquetage : ${xmlEsc(inv.productId)}</div>
 </body></html>`;
-  const w=window.open('','_blank');
-  w.document.write(html);
-  w.document.close();
+  ouvrirDocumentImprimable(html);
 }
 
 // ── FACTURATION ÉLECTRONIQUE (Factur-X / CII, profil EN16931 BASIC) ─────────
