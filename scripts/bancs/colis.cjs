@@ -130,12 +130,14 @@ const attendus=aEnvoyer.filter(o=>parTx[String(o.transaction_id)]).length;
   const pg=await b.newPage({viewport:{width:1512,height:950}});
   const errs=[]; pg.on('pageerror',e=>errs.push(e.message));
   await pg.addInitScript(()=>{try{localStorage.setItem('vrm_acces_direct','1');}catch(_){}});
-  const brancher=async(p)=>{
+  const brancher=async(p,lent)=>{
     // ⚠️ `vrm_acces_direct` DOIT être posé sur CHAQUE page, pas seulement la
     //    première : sans lui l'app reste sur son écran d'accueil de connexion
     //    et le banc mesure une page vide en croyant mesurer un écran.
     await p.addInitScript(()=>{try{localStorage.setItem('vrm_acces_direct','1');}catch(_){}});
-    await p.route('**/rest/v1/**',route=>{const u=metaVersData(route.request().url());
+    await p.route('**/rest/v1/**',async route=>{const u=metaVersData(route.request().url());
+    // Réseau de téléphone lent : les lectures visées par `lent` arrivent 4 s après les autres.
+    if(lent && lent.test(decodeURIComponent(u))) await new Promise(r=>setTimeout(r,4000));
     const j=d=>{const n=pesePdf(d); if(n){PDF.octets+=n; PDF.ou.push(decodeURIComponent(u.split('/rest/v1/')[1]||'').slice(0,90));}
       return route.fulfill({status:200,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:JSON.stringify(d)});};
     if(route.request().method()!=='GET') return j([]);
@@ -331,6 +333,42 @@ const attendus=aEnvoyer.filter(o=>parTx[String(o.transaction_id)]).length;
     } else if (bandeau) {
       dit(true, 'aucun colis pressé hors du premier groupe — le bandeau peut renvoyer en haut');
     }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // PENDANT LA LECTURE, L'EN-TÊTE NE PRÉSENTE PAS UN TOTAL PARTIEL COMME EXACT
+  // ══════════════════════════════════════════════════════════════════════════
+  // Constaté au tri du 5 octobre, sur ses vraies données, en retardant de 4 s les
+  // lectures des bordereaux (un téléphone sur un réseau lent) : l'en-tête
+  // écrivait « 0 bordereau prêt à imprimer · 3 en attente de bordereau », puis
+  // « 2 · 1 », puis « 3 ». Des colis dont le PDF est en base annoncés « en
+  // attente », et un nombre partiel présenté comme exact (§5 Colis : « pas
+  // encore lu n'est pas aucun »).
+  // ⚠️ CE SONT LES NOMBRES QUI JUGENT (§6.5) : chaque en-tête vu pendant la
+  // lecture doit soit se dire minorant (« au moins »), soit annoncer EXACTEMENT
+  // le nombre final ; et il n'annonce jamais plus de colis « en attente » que
+  // la fin n'en compte.
+  {
+    const ctx = await b2.newContext({viewport:{width:1512,height:950}});
+    const p3 = await ctx.newPage();
+    await brancher(p3, /_label_|email_bord/);
+    await p3.goto('http://localhost:4403/?tab=cat_bord',{waitUntil:'domcontentloaded'});
+    const lire = (t) => { const l=(t.split('\n').find(x=>/bordereaux? prêts? à imprimer/.test(x))||'');
+      const m=/((?:au moins )?)(\d+) bordereaux? prêts? à imprimer/.exec(l); const a=/(\d+) en attente de bordereau/.exec(l);
+      return m ? { ligne:l.trim(), n:+m[2], approx:!!m[1].trim(), att:a?+a[1]:0 } : null; };
+    const vus = new Map(); const t0 = Date.now();
+    while (Date.now() - t0 < 6500) {
+      const x = lire(await p3.evaluate(()=>document.body.innerText||'')); if (x) vus.set(x.ligne, x);
+      await p3.waitForTimeout(250);
+    }
+    await attendPublie(p3, 30000);
+    const fin = lire(await p3.evaluate(()=>document.body.innerText||''));
+    console.log('    pendant la lecture : ' + ([...vus.keys()].join(' | ') || '(aucun en-tête)') + '  →  à la fin : ' + (fin ? fin.ligne : '(rien)'));
+    dit(!!fin && !fin.approx, 'à la fin de la lecture, l’en-tête annonce un total exact', fin ? fin.ligne : '');
+    const faux = [...vus.values()].filter(x => fin && !x.approx && (x.n !== fin.n || x.att > fin.att));
+    dit(!!fin && faux.length === 0, 'pendant la lecture, aucun total partiel n’est présenté comme exact',
+      faux.map(x => `« ${x.ligne} » alors que la fin dit ${fin.n} prêts · ${fin.att} en attente`).join(' ; '));
+    await ctx.close();
   }
 
   await b.close(); await b2.close(); srv.close();

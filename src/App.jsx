@@ -17319,6 +17319,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   useEffect(() => { save('vinted_tips_open', tipsOpen); }, [tipsOpen]);
   const [toolsOpen, setToolsOpen] = useState(false); // menu « ⋯ Outils » (Ventes)
   const [annToolsOpen, setAnnToolsOpen] = useState(false); // menu « ⋯ Outils » (Annonces)
+  const [annToolsCote, setAnnToolsCote] = useState('droite'); // côté où s'ancre ce menu (mesuré au clic)
   // Encart « achats hors Vinted » (saisie occasionnelle) : replié par défaut.
   // NB : offOpen existe déjà plus bas pour le FORMULAIRE d'ajout — d'où un nom
   // distinct ici, qui pilote la SECTION entière.
@@ -24084,11 +24085,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {/* Outils ponctuels regroupés : « Répartir un lot » et « Audit stock »
                 ne servent pas tous les jours et encombraient la barre. */}
             <div style={{position:'relative'}}>
-              <button type="button" onClick={()=>setAnnToolsOpen(v=>!v)} title="Outils : répartir un lot, audit du stock"
+              <button type="button" onClick={(e)=>{ try { const r=e.currentTarget.getBoundingClientRect(); setAnnToolsCote(r.right>=246?'droite':'gauche'); } catch(_){} setAnnToolsOpen(v=>!v); }} title="Outils : répartir un lot, audit du stock"
                 style={{border:`1px solid ${annToolsOpen?C.accent:C.border}`,borderRadius:8,padding:'8px 12px',fontSize:13,fontWeight:600,background:annToolsOpen?`${C.accent}12`:'transparent',color:annToolsOpen?C.accent:C.text,cursor:'pointer',fontFamily:'inherit'}}>⋯ Outils</button>
               {annToolsOpen && (<>
                 <div onClick={()=>setAnnToolsOpen(false)} style={{position:'fixed',inset:0,zIndex:70}}/>
-                <div style={{position:'absolute',left:0,top:'calc(100% + 6px)',zIndex:71,minWidth:230,background:C.card,border:`1px solid ${C.border}`,borderRadius:10,boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.2)',padding:6,display:'flex',flexDirection:'column',gap:2}}>
+                {/* Le menu s'ancrait à GAUCHE du bouton, posé au bord droit de la ligne :
+                    ses quatre outils sortaient de l'écran (1512 px : 1332→1562 pour une zone
+                    visible jusqu'à 1452 ; 390 px : 274→504), leurs noms coupés, sans erreur.
+                    Il s'ancre à droite comme le menu de l'écran Ventes — sauf si le bouton,
+                    passé à la ligne, est trop près du bord gauche pour cela. */}
+                <div style={{position:'absolute',...(annToolsCote==='gauche'?{left:0}:{right:0}),top:'calc(100% + 6px)',zIndex:71,minWidth:230,maxWidth:'calc(100vw - 32px)',background:C.card,border:`1px solid ${C.border}`,borderRadius:10,boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.2)',padding:6,display:'flex',flexDirection:'column',gap:2}}>
                   {[
                     {k:'lot', icon:'🧮', lab:'Répartir un lot', desc:"Ventiler le prix d'un achat groupé", on:()=>{ setAnnToolsOpen(false); setLotSel(new Set()); setLotTotal(''); setLotSearch(''); setLotMode('equal'); setLotOpen(true); }},
                     {k:'inv', icon:'📋', lab:'Inventaire physique', desc:'Les paires qui doivent être chez toi, par numéro', on:()=>{ setAnnToolsOpen(false); setInventOpen(true); }},
@@ -24483,6 +24489,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const aPoster = ex.filter(e=>!(e.o && isShipDone(e.o)));
           const avecPdf = ex.filter(e=>((e.b && e.b.hasPdf) || (e.txn && labelsCaptes[e.txn])) && !(e.o && isShipDone(e.o)));
           const proNb = avecPdf.filter(e=>e.b && invForBord(e.b)).length;   // comptes pro : facture jointe
+          // ⚠️ « PAS ENCORE LU » N'EST PAS « AUCUN » (§5 Colis). Pendant que les
+          // bordereaux captés et les emails se lisent, l'en-tête écrivait « 0
+          // bordereau prêt à imprimer · 3 en attente de bordereau », puis « 2 · 1 »,
+          // puis « 3 » : un total partiel présenté comme exact, et des colis dont
+          // le PDF est en base annoncés sans bordereau. Tant que la lecture n'est
+          // pas complète, on écrit « au moins » et on ne dit rien de l'attente.
+          const lectureComplete = labelsPrets && emailBords!==null;
           return (
             <div data-colis-recap={aPoster.length} style={{position:'relative',display:'flex',gap:11,alignItems:'flex-start',flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:'11px 13px 11px 15px',marginBottom:12,overflow:'hidden'}}>
               <span aria-hidden="true" style={{position:'absolute',left:0,top:0,bottom:0,width:3,background:aPoster.length?C.accent:C.border}}/>
@@ -24495,7 +24508,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </div>
                   <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.45}}>
                     {aPoster.length>0
-                      ? `${avecPdf.length} bordereau${avecPdf.length>1?'x':''} prêt${avecPdf.length>1?'s':''} à imprimer${aPoster.length-avecPdf.length>0 && !(emailBordsKO && emailBords===null)?` · ${aPoster.length-avecPdf.length} en attente de bordereau`:''}${proNb>0?` · ${proNb} avec facture (pro)`:''}`
+                      ? (!lectureComplete && avecPdf.length===0) ? 'Je lis encore tes bordereaux…'
+                      : `${lectureComplete?'':'au moins '}${avecPdf.length} bordereau${avecPdf.length>1?'x':''} prêt${avecPdf.length>1?'s':''} à imprimer${lectureComplete && aPoster.length-avecPdf.length>0 && !(emailBordsKO && emailBords===null)?` · ${aPoster.length-avecPdf.length} en attente de bordereau`:''}${proNb>0?` · ${proNb} avec facture (pro)`:''}${lectureComplete?'':' — je n’ai pas encore pu lire tous tes bordereaux'}`
                       : 'Vinted ne te demande aucun envoi en ce moment.'}
                   </div>
                   {/* ⚠️ L'URGENCE EST ÉCRITE ICI QUAND ELLE CONCERNE TOUS LES
@@ -24687,9 +24701,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // reste écrite sur chaque carte et dans l'en-tête du haut.
           const aSonPdf = (x) => !!((x.b && x.b.hasPdf) || (x.txn && labelsCaptes[x.txn]));
           const groupeDe = (x) => estPoste(x) ? 'fait' : (aSonPdf(x) ? 'pret' : 'attente');
+          // Même règle que l'en-tête : tant que tous les bordereaux ne sont pas
+          // lus, un colis sans PDF trouvé n'est pas « en attente » — on ne sait pas.
+          const lectureFinie = labelsPrets && emailBords!==null;
           const TITRE_GROUPE = {
             pret:    ['Prêts à imprimer', 'Le bordereau est là : imprime, colle, dépose.'],
-            attente: ['En attente de leur bordereau', "« Générer le bordereau » le demande à l'extension, qui le fait sur Vinted et le dépose ici (l'email reste un filet). Tu peux aussi déposer un PDF déjà téléchargé."],
+            attente: lectureFinie ? ['En attente de leur bordereau', "« Générer le bordereau » le demande à l'extension, qui le fait sur Vinted et le dépose ici (l'email reste un filet). Tu peux aussi déposer un PDF déjà téléchargé."] : ['Bordereau pas encore vérifié', "Je n'ai pas encore pu lire tous tes bordereaux : celui de ces colis est peut-être déjà là. L'écran se met à jour tout seul."],
             fait:    ['Déjà postés', "Ils quittent la liste quand Vinted confirme l'envoi. « ↺ Pas encore » les remet dans les colis à envoyer."],
           };
           const nbParGroupe = {};
@@ -27246,7 +27263,7 @@ function LeboncoinScreen() {
     // Répartition des annonces LBC par compte (plusieurs comptes possibles).
     const parCompte = {};
     for (const ad of liveAds) { const k = String(ad.lbcUser || '?'); (parCompte[k] = parCompte[k] || []).push(ad); }
-    setData({ preuveKO, echecLecture: echecLecture || listRowsBrut === null, lbcJamaisLu: lbcJamaisLu || liveAds.length === 0, vendues, nEnLigne: online.length, nNumerotees, queue, removals, unlinked, doublons, aRelierVentes, ventesLbcKO, numsConnus: [...keysKnown], liveAds, autoMatched, retirees, lbcAccounts, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: liveAds.length, limit: pd.limit, plan: pd.plan, prep });
+    setData({ preuveKO, echecLecture: echecLecture || listRowsBrut === null, lbcJamaisLu: lbcJamaisLu || (lbcRows !== null && liveAds.length === 0), lbcKO: lbcRows === null, vendues, nEnLigne: online.length, nNumerotees, queue, removals, unlinked, doublons, aRelierVentes, ventesLbcKO, numsConnus: [...keysKnown], liveAds, autoMatched, retirees, lbcAccounts, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: liveAds.length, limit: pd.limit, plan: pd.plan, prep });
     setLoading(false);
   };
   useEffect(() => { reload(); /* eslint-disable-next-line */ }, []);
@@ -27316,14 +27333,32 @@ function LeboncoinScreen() {
           ))}
         </Card>
       )}
-      {data && data.ventesLbcKO && (
-        <div style={{ fontSize: 11.5, color: C.muted, marginBottom: 12, lineHeight: 1.5 }}>Je n'ai pas pu lire tes ventes Leboncoin : je n'ai donc pas pu vérifier qu'aucune paire vendue ici n'est encore en vente sur Vinted. Actualise dans un moment.</div>
-      )}
+      {/* ⚠️ UNE LECTURE RATÉE SE DIT UNE FOIS (§7). L'écran la disait jusqu'à quatre
+          fois (ventes Leboncoin, compteur, preuve de vente, file vide) et, sur une
+          lecture ratée de ses annonces Leboncoin, il affirmait « je n'ai pas encore
+          vu tes annonces, ouvre leboncoin.fr » : le mauvais geste. Un seul bloc
+          nomme ce qui n'a pas pu être lu, et ce que ça empêche. */}
+      {data && (() => {
+        const rates = [data.echecLecture && 'tes annonces Vinted', data.preuveKO && 'tes ventes Vinted', data.ventesLbcKO && 'tes ventes Leboncoin', data.lbcKO && 'tes annonces Leboncoin'].filter(Boolean);
+        if (!rates.length) return null;
+        const liste = rates.length === 1 ? rates[0] : rates.slice(0, -1).join(', ') + ' ni ' + rates[rates.length - 1];
+        const effets = [
+          data.preuveKO && 'la liste à publier peut contenir des paires déjà vendues sur Vinted',
+          data.ventesLbcKO && "je n'ai pas pu vérifier qu'aucune paire vendue ici n'est encore en vente sur Vinted",
+          data.lbcKO && 'je ne peux pas te dire lesquelles retirer de Leboncoin',
+          data.echecLecture && 'la file à publier est incomplète',
+        ].filter(Boolean);
+        return (
+          <div data-lbc-lecture-ratee={rates.length} style={{ marginBottom: 12 }}>
+            <LignePanne>Je n'ai pas pu lire {liste} — rien n'est perdu, c'est la lecture qui a échoué ; rouvre l'écran dans un moment. En attendant, {effets.join(', et ')}.</LignePanne>
+          </div>
+        );
+      })()}
       {loading && !data ? <div style={{ fontSize: 13, color: C.muted, textAlign: 'center', padding: '30px 16px' }}>Chargement…</div> : (<>
         {/* Compteur / offre */}
         <Card>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 26, fontWeight: 900, color: C.text }}>{data.lbcJamaisLu && !data.postedCount ? '—' : n}</span>
+            <span style={{ fontSize: 26, fontWeight: 900, color: C.text }}>{(data.lbcJamaisLu || data.lbcKO) && !data.postedCount ? '—' : n}</span>
             <span style={{ fontSize: 13, color: C.muted, fontWeight: 700 }}>annonce{n > 1 ? 's' : ''} sur Leboncoin{lim ? ` / ${lim}` : ''}</span>
           </div>
           {data.lbcJamaisLu && !data.postedCount && (
@@ -27388,14 +27423,8 @@ function LeboncoinScreen() {
             paires déjà vendues. Mesuré le 15 septembre — une lecture ratée a fait
             passer la file de 40 à 55. On ne cache pas la liste, on dit ce qu'on
             n'a pas pu vérifier. */}
-        {data.preuveKO && (
-          <Card style={{ borderColor: C.warn }}>
-            <div style={{ fontSize: 12.5, color: C.warn, lineHeight: 1.5 }}>
-              <b>Je n'ai pas pu vérifier lesquelles sont déjà vendues sur Vinted</b> — la lecture a échoué.
-              La liste ci-dessous peut donc en contenir. Rien n'est perdu : rouvre l'écran dans un moment.
-            </div>
-          </Card>
-        )}
+        {/* « Je n'ai pas pu vérifier lesquelles sont déjà vendues » est dit une fois,
+            dans le bloc des lectures ratées en haut de l'écran. */}
         {/* Annonces Leboncoin non reliées à une paire VRM : informatif. On ne les
             présente JAMAIS comme « à retirer » (VRM ne connaît pas la paire). */}
         {data.unlinked && data.unlinked.length > 0 && (
@@ -27425,7 +27454,7 @@ function LeboncoinScreen() {
         })()}
         {/* À publier */}
         <Card>
-          <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 6 }}>{data.queue.length} à publier sur Leboncoin{data.autoMatched > 0 ? <span style={{ fontSize: 11, color: C.muted, fontWeight: 700 }}> · {data.autoMatched} déjà reconnue{data.autoMatched > 1 ? 's' : ''} en ligne</span> : null}</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 6 }}>{data.echecLecture ? '—' : data.queue.length} à publier sur Leboncoin{data.autoMatched > 0 ? <span style={{ fontSize: 11, color: C.muted, fontWeight: 700 }}> · {data.autoMatched} déjà reconnue{data.autoMatched > 1 ? 's' : ''} en ligne</span> : null}</div>
           {/* ⚠️ UNE ANNONCE QUE TU AS RETIRÉE NE DISPARAÎT PAS EN SILENCE.
               Sans cette ligne, désélectionner faisait fondre la file sans que
               rien ne dise pourquoi — et « 0 à publier » se serait lu « tout est
@@ -27444,7 +27473,7 @@ function LeboncoinScreen() {
               parce que la base n'avait pas répondu — une fête sur une lecture
               ratée. Le 🎉 ne sort que si on a pu REGARDER. */}
           {data.queue.length === 0 ? (data.echecLecture
-            ? <LignePanne>Je n'ai pas pu lire tes annonces Vinted — cette file est vide parce que la lecture a échoué, pas parce qu'il ne reste rien à publier.</LignePanne>
+            ? <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>Cette file est vide parce que la lecture a échoué (voir plus haut), pas parce qu'il ne reste rien à publier.</div>
             /* ⚠️⚠️ TROISIÈME CAUSE, VUE AU RENDU LE 16 SEPTEMBRE SUR UNE
                INSTALLATION NEUVE : « Tout est publié 🎉 (toutes tes paires
                numérotées en ligne sont sur Leboncoin) » s'affichait à quelqu'un
@@ -31759,7 +31788,10 @@ function AppCoeur() {
           {platSub==='ventes'&&<div style={{padding:16}}>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:(((lbcVentes.ventes||[]).length>0||lbcVentes.inconnues>0)?<VentesLeboncoin lbcVentes={lbcVentes} sansTotaux/>:<div style={{fontSize:13,color:C.muted,lineHeight:1.5}}>Pas encore de vente Leboncoin captée — elles arrivent quand l'extension passe sur leboncoin.fr (Mes transactions). Une vente n'est comptée que si elle est <b>prouvée</b> (tu es bien le vendeur), jamais devinée d'après un titre.</div>)}</div>}
           {platSub==='achats'&&<div style={{padding:16}}>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:<AchatsLeboncoin lbcVentes={lbcVentes}/>}</div>}
           {platSub==='colis'&&(baseKO?<div style={{padding:16}}><LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne></div>:<LeboncoinColis lbcVentes={lbcVentes}/>)}
-          {platSub==='annonces'&&<LeboncoinScreen/>}
+          {/* ⚠️ Les quatre sous-onglets voisins se gardaient de la panne, celui-ci
+              non : pendant une panne il disait sa lecture ratée en quatre
+              messages, plus « ouvre leboncoin.fr » — le mauvais geste (§7). */}
+          {platSub==='annonces'&&(baseKO?<div style={{padding:16}}><LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne></div>:<LeboncoinScreen/>)}
         </>)}
         {tab==='plat_ebay'&&(<>
           {/* Julien : « eBay, je veux tout pareil que Vinted — les onglets achats,
