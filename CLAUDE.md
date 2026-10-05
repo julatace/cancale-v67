@@ -49,7 +49,7 @@ Ce ne sont pas des positions de principe : chacune a une raison technique.
 | demande | pourquoi non |
 |---|---|
 | republication automatique en file, avec délais aléatoires | un délai « faussement humain » n'a qu'un usage : tromper la détection bot. C'est ce qui a fait bloquer `vanessa5723`. |
-| ~~accepter une offre automatiquement~~ ⚠️ **PÉRIMÉ — VOIR §5** | le refus tenait à une **mesure**, pas à un principe : le code « offre encore en attente » n'avait jamais été observé. Un relevé du **26 août sur 326 offres** l'a trouvé (**10 = En attente**, 4 cas ; 20 acceptée ×118, 30 refusée ×195, 40 annulée ×9). La raison est tombée, et le moteur est livré depuis la **5.38** — bordé : éteint par défaut, plancher obligatoire annonce par annonce, `garde`, 3 par visite, jamais deux fois la même offre. **Ne pas le retirer en relisant cette table.** |
+| **accepter une offre automatiquement** — ⛔ **RETIRÉ, sa décision** | coupée le 4 octobre (« je ne veux pas que ça accepte tout seul les offres »), **retirée** le 5 octobre (« enlève l'acceptation de l'offre ») : le moteur de l'extension, ses planchers, le champ « Min. accepté », l'interrupteur de Réglages. Accepter engage une vente ferme, et un programme qui accepte ressemble à un robot (le compte bloqué). **Ne jamais le reproposer** — je l'ai fait par erreur le 5 octobre en lisant l'ancienne version de cette ligne. Reste permis : accepter UNE offre depuis la messagerie, sur son clic, avec confirmation (`executerPourApp`). `audit-offres-auto.cjs` refuse tout autre chemin vers `/accept`. |
 | piloter la souris / le clavier | Vinted reçoit la **même requête** ; en plus un événement synthétique porte `isTrusted:false`, donc ça **ajoute** une preuve d'automatisation. Et un clic aveugle agit à côté quand la page bouge. |
 | modifier les photos pour republier / passer sur un autre compte | Vinted relie les comptes par **appareil, navigateur, adresse, moyen de paiement** — pas par les images. Tourner une photo ne protège de rien. |
 | supprimer une annonce automatiquement | irréversible et sans confirmation côté Vinted. |
@@ -3646,10 +3646,10 @@ appuies dessus, le site VRM s'ouvre ».
   d'étapes, remplissage, publication sans booster (LBC) et leur bandeau de
   dépôt. ~1 600 lignes sans appelant retirées du fond (`buildPanelData`, récap
   plein écran, réglages du panneau).
-- **Ce qui est passé dans l'app** : l'interrupteur « accepter les offres
-  au-dessus du plancher » (Réglages, `vinted_offres_auto` ; jamais touché →
-  l'interrupteur local d'avant est gardé ET affiché ; lecture ratée → rien ne
-  s'allume) ; le bouton **« Publier sur Leboncoin »** / « Préparer sur eBay »
+- **Ce qui est passé dans l'app** : ~~l'interrupteur « accepter les offres
+  au-dessus du plancher »~~ (⛔ retiré le 5 octobre avec l'acceptation
+  automatique, voir §3 ; `vinted_offres_auto` reste synchronisé à `false` pour
+  les extensions 5.130 à 5.150) ; le bouton **« Publier sur Leboncoin »** / « Préparer sur eBay »
   par paire (`publierDepuisApp` : l'app n'envoie qu'un IDENTIFIANT, la paire
   est relue dans la file de l'extension — vendue, décochée ou preuve illisible
   → refusée) ; « Déjà publiée » et la limite de l'offre (`lbcMarque`,
@@ -4574,6 +4574,28 @@ colis, comptes, ia, oublies, perfv, postes, retrait, serie, urssaf. Restent
 **instables sous charge** (4 cœurs) : la modale de `serie` (< 1,2 s) et le
 tableau de bord de `retrait` — à relancer SEULS, jamais à élargir.
 
+### ⛔ L'acceptation automatique des offres est RETIRÉE (5 octobre, 5.159)
+Julien : « enlève l'acceptation de l'offre » — après que je la lui ai reproposée
+par erreur (elle était coupée depuis le 4 octobre, mais la ligne du §3 la disait
+encore « livrée, ne pas retirer » : un dossier en retard sur une décision fait
+refaire l'erreur à la session suivante).
+- **Extension** : le moteur (`autoAccepterOffres`, `offresEnAttente`,
+  `planchers`, le salut automatique, `repondreOffre`, l'interrupteur local) est
+  supprimé, son appel à chaque visite aussi. Reste `EXEC_PERMIS` : l'acceptation
+  d'UNE offre depuis la messagerie, sur son clic.
+- **App** : plus de champ « Min. accepté », plus de bandeau « N prix planchers »,
+  plus de carte dans Réglages, plus de capacités `offres`/`offresapp`. Les
+  planchers déjà saisis restent en base (rien n'est effacé), sans effet.
+- **Mesuré avant** : son extension installée (5.128) n'a que l'ancien
+  interrupteur local ; `panel_min_prices` porte 5 planchers (1 à 20 €), sur des
+  annonces **toutes fermées ou disparues** — elle ne peut donc rien accepter
+  aujourd'hui. Le geste qui ferme la question pour de bon : installer la 5.159.
+- `audit-offres-auto.cjs` porte l'invariant (aucun code ne construit `/accept`
+  hors de la liste blanche, aucun reste du moteur, aucune promesse dans l'app,
+  et l'autre sens) : **8 rouges** sur le code d'avant. `capacites.cjs` exige,
+  même avec des planchers en base et dans les six états du pont, qu'aucune
+  promesse ni aucun « Min. accepté » n'apparaisse.
+
 ### Mise en production du 5 octobre
 PR #442 mergée à 10:24 UTC (80 déploiements sur 24 h : sous la limite), déploiement
 de production READY sur le commit de merge, `/api/sante` répond, le zip servi
@@ -5303,7 +5325,6 @@ arrivée** — vérifiée commit par commit sur `manifest.json`, pas devinée.
 | capacité | fonction de l'extension | arrivée en | ce que l'app promet |
 |---|---|---|---|
 | `codes` | `capterRetraits` | **5.45.0** (27 août) | « l'extension va chercher les codes toute seule » |
-| `offres` | `autoAccepterOffres` | **5.38.0** (26 août) | « offre acceptée automatiquement au-dessus de ton plancher » |
 | `releve` | `capterReleves` | **5.52.0** (5 sept.) | « l'extension récupère le relevé à ta prochaine visite » |
 | `places` | `mpChoisi` | **5.54.0** (11 sept.) | « seules les annonces cochées partent sur Leboncoin » |
 | `ebay` | `buildEbayData` | **5.55.0** (12 sept.) | « l'extension prépare tes annonces sur eBay » |
@@ -5312,7 +5333,6 @@ arrivée** — vérifiée commit par commit sur `manifest.json`, pas devinée.
 | `photosebay` | `photosPourEbay` | **5.59.0** (13 sept.) | la même promesse, pour eBay |
 | `repond` | `repondreAuxMessages` | **5.77.0** (19 sept.) | « elle répond aux questions posées sur tes annonces » |
 | `commande` | `executerCommande` | **5.129.0** (2 oct.) | « Générer le bordereau » depuis l'app : l'app COMMANDE l'extension |
-| `offresapp` | `offresAutoActif` | **5.130.0** (3 oct.) | l'interrupteur des offres auto se règle dans l'app |
 | `publication` | `publierDepuisApp` | **5.130.0** (3 oct.) | « Publier sur Leboncoin » / « Préparer sur eBay » depuis l'app |
 | `lbcdate` | `dateVenteLbc` | **5.131.0** (3 oct.) | « ouvre Mes transactions, l'extension relève la date de vente » |
 | `versement` | `capterDatesVersement` | **5.133.0** (3 oct.) | « l'extension va chercher la date de versement de tes ventes finalisées » |

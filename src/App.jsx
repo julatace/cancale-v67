@@ -37,7 +37,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.158.0';
+const EXT_ATTENDUE = '5.159.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -156,11 +156,12 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // l'autre sens, et il aurait cherché une mise à jour qui ne changeait rien.
 // Vérifié commit par commit sur `vinted-sync-extension/manifest.json` :
 //   codes   `capterRetraits`      5.45.0  (27 août)   le code de retrait, lu dans la conversation
-//   offres  `autoAccepterOffres`  5.38.0  (26 août)   accepter une offre au-dessus du plancher
+//   (offres  `autoAccepterOffres` — RETIRÉE le 5 octobre à sa demande : l'app ne
+//    promet plus aucune acceptation automatique, voir CLAUDE.md §3)
 //   releve  `capterReleves`       5.52.0  (5 sept.)   le relevé daté du porte-monnaie
 // `audit-coherence.cjs` vérifie que ces trois fonctions existent toujours dans
 // l'extension : une capacité annoncée mais retirée serait le même mensonge.
-const EXT_CAPACITES = { codes: '5.45.0', offres: '5.38.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', repond: '5.77.0', commande: '5.129.0', offresapp: '5.130.0', publication: '5.130.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', detourage: '5.156.0' };
+const EXT_CAPACITES = { codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', repond: '5.77.0', commande: '5.129.0', publication: '5.130.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', detourage: '5.156.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -811,6 +812,13 @@ const ENTREPRISE_VIDE = {
   footer: 'Merci pour votre achat !',
 };
 
+// ⚠️ `vinted_offres_auto` RESTE synchronisé alors que l'acceptation automatique
+// des offres est retirée (5 octobre) : les extensions 5.130 à 5.150 encore
+// installées la lisent, et son ABSENCE les ferait retomber sur l'ancien
+// interrupteur local du panneau (la coupure n'est arrivée qu'en 5.151). Elle doit
+// rester à `false` dans la ligne `main`. (Une 5.128, la sienne, n'a que
+// l'interrupteur local : aucune annonce en ligne n'a de plancher — mesuré —
+// donc elle n'accepte rien.)
 const SYNC_KEYS = [
   'vinted_catalog','vinted_sales','vinted_garage_grid','vinted_blocked',
   'vinted_extracols','vinted_colors','vinted_invoices',
@@ -3393,8 +3401,8 @@ const normalizeConversationMessages = (conversation) => {
     return { kind: 'event', body: extractEventText(e, m.entity_type), ts, links };
   });
 };
-// L'offre d'un ACHETEUR encore en attente dans ce fil — la même règle que le
-// moteur d'acceptation de l'extension (`offresEnAttente`) : c'est l'acheteur
+// L'offre d'un ACHETEUR encore en attente dans ce fil — la règle qu'utilisait le
+// moteur d'acceptation automatique, RETIRÉ le 5 octobre : c'est l'acheteur
 // qui propose, l'offre est la courante, Vinted la dit en attente (10), aucun
 // libellé tranché, un montant lisible, et son identité (transaction + offre).
 // Une forme inattendue ⇒ `null` : jamais un bouton « Accepter » sur une offre
@@ -16288,21 +16296,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // ne trompe pas ; une fausse pastille verte, si). Le « sur quel COMPTE LBC »
   // reste gaté sur la capture de ses propres annonces LBC (lbc_accounts vide).
   const [lbcPosted, setLbcPosted] = useState(() => new Set());
-  // Les planchers posés DANS L'ANCIEN PANNEAU de l'extension (`panel_min_prices`)
-  // — l'extension les applique toujours (`planchers()`), l'app ne les montrait
-  // pas : « Min. accepté » vide sur une paire que l'extension traite avec un
-  // plancher (§11). Lus en repli, AFFICHÉS ; la saisie de l'app prime.
-  const [panelMins, setPanelMins] = useState({});
-  useEffect(() => { (async () => {
-    try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_min_prices&select=data`, { headers: sbAuth() });
-      if (!r.ok) return;
-      const rows = await r.json();
-      const d = (rows && rows[0] && rows[0].data) || {};
-      const out = {}; for (const k in d) { const n = Number(d[k]); if (isFinite(n) && n > 0) out[String(k)] = n; }
-      setPanelMins(out);
-    } catch (_) {}
-  })(); }, []);
   useEffect(() => { (async () => {
     try {
       const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_lbc_posted&select=data`, { headers: sbAuth() });
@@ -18863,7 +18856,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // est affiché en dessous. Avant, il partait de listings.items (TOUS les
     // comptes, même déconnectés) → « 42 en ligne » avec 30 cartes visibles.
     const arr = annBase;
-    let val=0, favs=0, views=0, hasFav=false, hasView=false, sansNum=0, sleeping=0, sleepingVal=0, datesKnown=0, planchers=0, surLbc=0, surEbay=0;
+    let val=0, favs=0, views=0, hasFav=false, hasView=false, sansNum=0, sleeping=0, sleepingVal=0, datesKnown=0, surLbc=0, surEbay=0;
     // « Toute l'annonce captée » = on a lu de la page AUTANT de photos que Vinted
     // en annonce (`photoCount`/nPhotos) ET une description. C'est la mesure que
     // Julien demande : savoir si une paire est PRÊTE à partir sur Leboncoin.
@@ -18877,14 +18870,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (it.favourites!=null) { favs+=it.favourites; hasFav=true; }
       if (it.views!=null) { views+=it.views; hasView=true; }
       if (!(numeros[it.id]?.numero)) sansNum++;
-      // ⚠️ UN SEUL PROPRIÉTAIRE (§11) : le compte de prix planchers se calcule
-      //    ICI, sur la MÊME base que la grille — pas une seconde fois dans le
-      //    bandeau qui l'annonce. Sinon les deux finissent par se contredire.
-      // (le plancher posé dans l'ancien panneau compte aussi : l'extension
-      //  l'applique — `panelMins`, même repli que la carte)
-      const mp0 = numeros[it.id] && numeros[it.id].minPrice;
-      const mp = (mp0 != null && String(mp0).trim() !== '') ? mp0 : panelMins[String(it.id)];
-      if (mp != null && String(mp).trim() !== '') planchers++;
       // Combien partent aussi sur Leboncoin — compté ICI, sur la même base que
       // la grille, jamais recalculé par le bandeau qui l'annonce (§11).
       if (numeros[it.id]?.numero && mpChoisi(numeros[it.id], 'lbc')) surLbc++;
@@ -18896,9 +18881,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if (total > 0) { if (capt >= total && descOk) pretLbc++; else aRecapturer++; }
       }
     }
-    return { n:arr.length, val, favs, views, hasFav, hasView, sansNum, sleeping, sleepingVal, datesKnown, planchers, surLbc, surEbay, pretLbc, aRecapturer, boostees, aussiLbc };
+    return { n:arr.length, val, favs, views, hasFav, hasView, sansNum, sleeping, sleepingVal, datesKnown, surLbc, surEbay, pretLbc, aRecapturer, boostees, aussiLbc };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [annBase, numeros, listingDates, lbcPosted, panelMins]);
+  }, [annBase, numeros, listingDates, lbcPosted]);
   // ── RENUMÉROTER À LA SUITE ────────────────────────────────────────────────
   // Le numéro sert à retrouver un carton sur l'étagère : avec 116 paires en ligne
   // il ne devrait pas monter à 172. Au fil des ventes, la séquence se troue et
@@ -23823,27 +23808,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               les puces de comptes (donc à côté de l'information qu'elle
               qualifie, et repliée). Deux blocs pour la même notion (§11), dont
               un plein écran au-dessus de la grille. */}
-          {/* ⚠️ UNE FOIS, PAS SUR 43 CARTES (§7 : la même phrase répétée sur
-              chaque ligne est UNE phrase). Le prix plancher n'a d'effet que si
-              l'extension installée sait accepter une offre — `autoAccepterOffres`
-              est arrivé en 5.38. En dessous, il pose un minimum et attend une
-              acceptation qui ne viendra jamais : c'est le défaut des codes de
-              retrait, à l'identique.
-              ⚠️ ET SEULEMENT S'IL EN A POSÉ. Mesuré le 8 septembre : 0 plancher
-              sur 329 paires. Un bandeau permanent serait du bruit sur un écran
-              qu'il ouvre tous les jours ; il ne s'affiche que quand la promesse
-              est réellement en jeu, et il DIT COMBIEN (un chiffre qu'on peut
-              vérifier). */}
-          {annStats.planchers > 0 && extSait('offres') !== 'ok' && (
-            <div style={{marginBottom:10,background:`${C.warn}12`,border:`1px solid ${C.warn}55`,borderRadius:10,padding:'10px 12px'}}>
-              <div style={{fontSize:13,fontWeight:700,color:C.warn,marginBottom:2}}>
-                {annStats.planchers} prix plancher{annStats.planchers>1?'s':''} posé{annStats.planchers>1?'s':''}, mais rien ne les applique
-              </div>
-              <div style={{fontSize:11.5,color:C.text,lineHeight:1.45}}>{extSait('offres')==='absente'
-                ? <>C'est l'extension, dans ton Chrome, qui accepte une offre au-dessus de ton minimum. Ouvre l'app sur l'ordinateur où elle est installée — tes montants sont enregistrés, ils ne bougent pas.</>
-                : <>L'extension installée ne sait pas encore accepter une offre toute seule (il faut la <b>5.38</b> au minimum). Mets-la à jour depuis <b>Réglages</b>, puis active l'acceptation automatique, dans Réglages aussi. Tes montants sont enregistrés, ils ne bougent pas.</>}</div>
-            </div>
-          )}
+          {/* Le bandeau « N prix planchers posés, mais rien ne les applique » est
+              RETIRÉ avec l'acceptation automatique des offres (5 octobre, à sa
+              demande) : il n'y a plus rien à appliquer. */}
           {numeroReprises.length > 0 && (
             <div style={{marginBottom:10,background:`${C.blue||C.accent}0e`,border:`1px solid ${C.blue||C.accent}55`,borderRadius:10,padding:'10px 12px'}}>
               <div style={{fontSize:13,fontWeight:700,color:C.blue||C.accent,marginBottom:2}}>♻️ {numeroReprises.length} paire{numeroReprises.length>1?'s':''} déjà connue{numeroReprises.length>1?'s':''} ?</div>
@@ -24279,7 +24246,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const boost = feesOf(e);
             const marge = (it.price!=null && achat!=null && !isNaN(achat)) ? Math.round(Number(it.price) - achat - boost) : null;
             const ailleurs = lbcPosted.has(String(it.id));
-            const minAff = (e.minPrice != null && String(e.minPrice).trim() !== '') ? e.minPrice : (panelMins[String(it.id)] != null ? panelMins[String(it.id)] : '');
             const sugg = (it.price!=null && (sleeps || (it.views>=30 && it.favourites===0))) ? Math.max(1, Math.round(Number(it.price)*0.85)) : null;
             const lab = { fontSize:11, color:C.muted };
             const val = { fontSize:12, fontWeight:600, color:C.text };
@@ -24321,20 +24287,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {/* ⋯ : tout le secondaire, replié. Déplié d'office si un réglage
                     est posé (un réglage rempli ne se cache jamais). */}
                 {(() => {
-                  const rempli = minAff !== '' || (e.fees != null && e.fees !== '') || !!e.buyFromId;
+                  const rempli = (e.fees != null && e.fees !== '') || !!e.buyFromId;
                   return (
                     <details open={rempli} style={{borderTop:`1px solid ${C.border}`,padding:'6px 10px 8px'}}>
-                      <summary style={{listStyle:'none',cursor:'pointer',fontSize:11.5,color:C.muted,fontWeight:600,userSelect:'none'}}>⋯ Prix plancher · boost · vendue · publier ailleurs</summary>
+                      <summary style={{listStyle:'none',cursor:'pointer',fontSize:11.5,color:C.muted,fontWeight:600,userSelect:'none'}}>⋯ Boost · vendue · publier ailleurs</summary>
                       <div style={{display:'flex',flexDirection:'column',gap:7,marginTop:7}}>
                         <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-                          <div style={{flex:'1 1 130px',display:'flex',alignItems:'center',gap:4,border:`1px solid ${C.border}`,borderRadius:8,padding:'2px 6px',background:C.bg}}
-                               title={extSait('offres')==='ok'
-                                 ? "Offre acceptée automatiquement à partir de ce montant (si l'acceptation auto est allumée dans Réglages). Vide = aucune offre n'est acceptée toute seule."
-                                 : "Ton minimum est enregistré ici, mais l'extension installée ne sait pas encore accepter une offre toute seule : mets-la à jour d'abord. Vide = aucune offre n'est acceptée toute seule."}>
-                            <span style={{fontSize:11,color:C.muted,fontWeight:600,whiteSpace:'nowrap'}}>Min. accepté</span>
-                            <ChampSaisie value={minAff} onCommit={v=>updatePair(item,{minPrice:v})} placeholder="—" inputMode="decimal" style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
-                            <span style={{fontSize:11,color:C.muted}}>€</span>
-                          </div>
+                          {/* « Min. accepté » (le prix plancher) est RETIRÉ avec l'acceptation
+                              automatique des offres (5 octobre, à sa demande) : il ne servait
+                              qu'à elle. Les montants déjà saisis restent en base, rien n'est effacé. */}
                           {num && (
                             <div style={{flex:'1 1 110px',display:'flex',alignItems:'center',gap:4,border:`1px solid ${C.border}`,borderRadius:8,padding:'2px 6px',background:C.bg}} title="Coût d'un boost / mise en avant payée sur cette annonce (déduit de la marge et du bénéfice)">
                               <span style={{fontSize:11,color:C.muted,fontWeight:600,whiteSpace:'nowrap'}}>Boost payé</span>
@@ -28079,7 +28040,6 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
         <NumerosSetting/>
         <RepondreSetting/>
         <DetourageSetting/>
-        <OffresAutoSetting/>
       </>)}
 
       <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Comptes Vinted</div>
@@ -28797,29 +28757,10 @@ function DetourageSetting() {
   );
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// LES OFFRES — C'EST TOI QUI DÉCIDES (plus d'acceptation automatique)
-// ══════════════════════════════════════════════════════════════════════════════
-// ⚠️⚠️ RETIRÉ LE 4 OCTOBRE — DÉCISION DE JULIEN : « je ne veux pas que ça accepte
-//    tout seul les offres ». Accepter une offre à sa place est une automatisation
-//    qui ressemble à un robot — même famille que les messages en série aux favoris
-//    ou la republication en file — et c'est exactement ce qui fait bloquer un
-//    compte (§3). Le moteur est COUPÉ côté extension (`offresAutoActif` rend
-//    toujours `false`), donc l'interrupteur n'aurait plus aucun effet : on ne le
-//    propose plus, on explique, et on renvoie vers l'acceptation MANUELLE depuis
-//    Messages — sur ton clic, elle, qui est gardée (§messagerie 5.135).
-//    ⚠️ On GARDE le composant (rendu dans Réglages) : le retirer d'un coup serait
-//    une coupe par numéros de ligne à vérifier (§4.11). Il devient informatif.
-function OffresAutoSetting() {
-  return (
-    <div style={{padding:'13px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}} data-offres-auto="retire">
-      <div style={{fontSize:13,fontWeight:600,color:C.text}}>Les offres, c’est toi qui décides</div>
-      <div style={{fontSize:11.5,color:C.muted,marginTop:4,lineHeight:1.5}}>
-        VRM n’accepte plus les offres à ta place. Accepter des offres automatiquement est le genre d’automatisation qui fait repérer un robot et bloquer un compte — comme envoyer des messages en série aux personnes qui ont mis en favori, ou republier en boucle, deux choses que VRM ne fait pas non plus. Tu acceptes, tu refuses ou tu fais une contre-offre quand tu veux, depuis <b>Messages</b>.
-      </div>
-    </div>
-  );
-}
+// La carte « Les offres, c'est toi qui décides » (Réglages) est RETIRÉE avec
+// l'acceptation automatique des offres (5 octobre, à sa demande) : une carte qui
+// explique une fonction qui n'existe plus est du bruit (§7). Les offres se
+// tranchent dans Messages, sur son clic.
 
 function ZoomSetting() {
   const [z, setZ] = React.useState(readZoom);

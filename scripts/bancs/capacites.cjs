@@ -8,6 +8,13 @@
 // Ce banc traite la RÈGLE : pour chaque capacité de `EXT_CAPACITES`, l'app
 // change de discours selon la version que le pont annonce.
 //
+// ⚠️ 5 OCTOBRE — L'ACCEPTATION AUTOMATIQUE DES OFFRES EST RETIRÉE (sa demande).
+// Le prix plancher ne servait qu'à elle : le bandeau « N prix planchers posés,
+// mais rien ne les applique » et le champ « Min. accepté » sont partis. La
+// première section garde ses six états du pont et ses planchers posés dans la
+// fixture, mais exige l'INVERSE : quoi que dise la version, et même avec des
+// planchers en base, l'app ne promet plus jamais une offre acceptée toute seule.
+//
 // ⚠️ ON FORCE LE CAS, comme `conflit.cjs`. Mesuré le 8 septembre : **0 prix
 // plancher sur 329 paires**. Sans plancher posé, le bandeau ne doit PAS
 // s'afficher — donc un banc qui se contenterait de regarder mesurerait son
@@ -140,6 +147,9 @@ const BANDEAU=/prix plancher[^\n]*rien ne les applique/i;
     //    on juge ce qui s'affiche une fois ouvert, pas le source.
     if(onglet==='leboncoin'){ await pg.evaluate(()=>document.querySelectorAll('[data-lbc-details]').forEach(d=>{d.open=true;})); await pg.waitForTimeout(300); }
     const t=await pg.evaluate(()=>document.body.innerText||'');
+    // textContent voit AUSSI le contenu des <details> fermés (le « ⋯ » des
+    // cartes) : un champ caché dans un menu replié reste un champ proposé.
+    const tc=await pg.evaluate(()=>document.body.textContent||'');
     if(process.env.DEBUG) console.log('      diag:',JSON.stringify(await pg.evaluate(()=>{
       let n={}; try{n=JSON.parse(localStorage.getItem('vinted_annonce_numeros')||'{}');}catch(_){}
       const avec=Object.keys(n).filter(k=>n[k]&&n[k].minPrice!=null&&String(n[k].minPrice).trim()!=='');
@@ -149,20 +159,20 @@ const BANDEAU=/prix plancher[^\n]*rien ne les applique/i;
     const nom=(onglet||'ann')+'-'+(pont===null?'absente':(pont===''?'muette':pont))+(diagVer===undefined?'':'-diag'+String(diagVer).replace(/\./g,'_'));
     await pg.screenshot({path:SC+'/z-cap-'+nom.replace(/\./g,'_')+'.png',fullPage:true});
     await pg.close();
-    return {t, errs, pret};
+    return {t, tc, errs, pret};
   };
 
-  // 5.38 est la version d'ARRIVÉE de `autoAccepterOffres` : 5.37 ne sait pas,
-  // 5.38 sait. On teste des deux cotes de la frontiere, sinon on ne mesure
-  // qu'un seuil, pas LE seuil.
+  // Les six etats du pont d'avant (5.37/5.38 etaient la frontiere de
+  // l'ancien moteur) : AUCUN ne doit plus faire apparaitre le bandeau.
   const cas=[
-    {pont:'5.37.0', nom:'en retard (5.37, juste sous le seuil)', attendu:true},
-    {pont:'5.38.0', nom:'a jour pour les offres (5.38, le seuil)', attendu:false},
-    {pont:'5.52.0', nom:'a jour (5.52)',                          attendu:false, places:'mixte'},
-    {pont:'',       nom:'MUETTE sur sa version (< 5.26)',         attendu:true},
-    {pont:null,     nom:'absente (telephone)',                    attendu:true,  places:'uniforme'},
-    {pont:'5.59.0', nom:'a jour pour tout (5.59)',                attendu:false, places:'uniforme'},
+    {pont:'5.37.0', nom:'5.37 (ancienne frontiere, dessous)', attendu:false},
+    {pont:'5.38.0', nom:'5.38 (ancienne frontiere, dessus)',  attendu:false},
+    {pont:'5.52.0', nom:'a jour (5.52)',                      attendu:false, places:'mixte'},
+    {pont:'',       nom:'MUETTE sur sa version (< 5.26)',     attendu:false},
+    {pont:null,     nom:'absente (telephone)',                attendu:false, places:'uniforme'},
+    {pont:'5.59.0', nom:'a jour pour tout (5.59)',            attendu:false, places:'uniforme'},
   ];
+  const PROMESSE=/accept\w*[^\n]{0,40}(automatiquement|toute?\s+seule?)|acceptation\s+auto/i;
   // ⚠️ §7 : LA MEME PHRASE REPETEE SUR CHAQUE LIGNE EST **UNE** PHRASE.
   // Vu au rendu le 13 septembre : les deux places (Leboncoin, eBay) portaient
   // mot pour mot la meme explication de 150 caracteres, dont seul le nom de la
@@ -191,10 +201,10 @@ const BANDEAU=/prix plancher[^\n]*rien ne les applique/i;
     return out;
   };
   for(const c of cas){
-    const {t,errs,pret}=await lis(c.pont);
+    const {t,tc,errs,pret}=await lis(c.pont);
     const vu=BANDEAU.test(t);
     console.log('   '+c.nom.padEnd(40)+' → bandeau '+(vu?'AFFICHE':'absent')+(pret?'':' (GRILLE JAMAIS RENDUE)'));
-    dit(pret && vu===c.attendu, 'extension '+c.nom+' : '+(c.attendu?'l\'app dit que rien ne l\'applique':'l\'app ne crie pas pour rien'),
+    dit(pret && vu===c.attendu, 'extension '+c.nom+' : aucun bandeau de prix planchers (l\'acceptation automatique est retiree)',
       !pret?'la grille n\'a jamais ete rendue (20 s) — un ecran vide ne prouve ni la presence ni l\'absence du bandeau'
       :vu===c.attendu?'':'bandeau '+(vu?'affiche':'absent')+' alors qu\'on attend '+(c.attendu?'affiche':'absent'));
     dit(errs.length===0, 'aucune erreur d\'app ('+c.nom+')', errs.slice(0,2).join(' | '));
@@ -220,20 +230,13 @@ const BANDEAU=/prix plancher[^\n]*rien ne les applique/i;
           'la version attendue pour Leboncoin doit etre nommee, 5.54');
       }
     }
-    // ⚠️ Le bandeau doit DIRE COMBIEN : un chiffre qu'on ne peut pas verifier
-    //    est invendable (§2.7). On en a pose exactement un.
-    if(vu){
-      const sans=t.normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-      const nBandeau=(/(\d+)\s+prix\s+planchers?\s+poses?/i.exec(sans)||[])[1];
-      const nGrille =(/(\d+)\s+en\s+ligne/i.exec(sans)||[])[1];
-      dit(!!nBandeau, 'et il dit COMBIEN de planchers sont poses',
-        'un chiffre qu\'on ne peut pas verifier est invendable');
-      // §11 : le bandeau compte sur la MEME base que la grille. Deux calculs
-      // separes finiraient par se contredire — ici ils ne peuvent pas.
-      dit(nBandeau && nGrille && nBandeau===nGrille,
-        'et il compte sur la MEME base que la grille',
-        'bandeau '+nBandeau+' / grille '+nGrille);
-    }
+    // ⚠️ Et rien, nulle part, ne la promet : ni phrase, ni champ « Min. accepte »
+    //    — y compris dans les menus replies des cartes (textContent). La fixture
+    //    porte des planchers : c'est exactement la situation ou l'ancien ecran
+    //    les proposait.
+    const pr=(PROMESSE.exec(tc)||[])[0];
+    dit(pret && !pr, 'extension '+c.nom+' : aucune phrase ne promet une offre acceptee toute seule', pr?'« '+pr+' »':'');
+    dit(pret && !/Min\. accept/.test(tc), 'extension '+c.nom+' : plus aucun champ « Min. accepte » sur les cartes', '');
   }
   // ══════════════════════════════════════════════════════════════════════════
   // L'ECRAN LEBONCOIN DOIT CONNAITRE LES **TROIS** ETATS, PAS DEUX

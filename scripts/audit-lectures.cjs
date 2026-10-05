@@ -43,9 +43,30 @@ const FICHIERS = ['src/App.jsx', 'vinted-sync-extension/background.js',
 
 // Un audit lit le CODE : les commentaires sortent d'abord (ils citent les
 // anciennes requêtes pour expliquer pourquoi elles sont parties).
-const sansCommentaires = (t) => t
-  .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '))
-  .replace(/(^|[^:])\/\/[^\n]*/g, (m, p1) => p1 + ' '.repeat(Math.max(0, m.length - p1.length)));
+// ⚠️ PAR UN VRAI ANALYSEUR, PLUS PAR DES EXPRESSIONS RÉGULIÈRES. La version
+// naïve prenait le `*/*` d'un en-tête HTTP (`'Accept': '*/*'`) pour le début
+// d'un commentaire : le « commentaire » se refermait par hasard 20 000
+// caractères plus loin. Le 5 octobre, retirer le moteur d'acceptation des
+// offres a supprimé ce `*/` de hasard, et l'audit a avalé 81 000 caractères —
+// `recupererLabel` compris — puis crié « la récupération du bordereau a
+// disparu » sur un code intact. Un audit qui lit le code doit le lire comme un
+// moteur JavaScript : chaînes, gabarits et expressions régulières compris.
+let babel = null;
+try { babel = require(path.join(__dirname, '..', 'node_modules', '@babel', 'parser')); }
+catch (_) { try { babel = require('/home/user/cancale-v67/node_modules/@babel/parser'); } catch (_) {} }
+const sansCommentaires = (t) => {
+  if (babel) {
+    try {
+      const ast = babel.parse(t, { sourceType: 'unambiguous', errorRecovery: true, allowReturnOutsideFunction: true, plugins: ['jsx'] });
+      const c = t.split('');
+      for (const k of ast.comments || []) for (let i = k.start; i < k.end; i++) if (c[i] !== '\n') c[i] = ' ';
+      return c.join('');
+    } catch (_) { /* repli ci-dessous */ }
+  }
+  return t
+    .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '))
+    .replace(/(^|[^:])\/\/[^\n]*/g, (m, p1) => p1 + ' '.repeat(Math.max(0, m.length - p1.length)));
+};
 
 console.log('── AUCUNE LECTURE NE RAPATRIE LE BLOB D\'UNE FAMILLE LOURDE');
 for (const f of FICHIERS) {
@@ -123,7 +144,9 @@ console.log('\n── LES FAMILLES QUI APPROCHENT DES 1 000 LIGNES SONT PAGINÉE
     //    donc l'expression jusqu'à sa définition, comme `audit-panneau.cjs`.
     const pagine = (nom) => {
       if (nom === 'sbGetTout') return true;
-      const def = new RegExp('const ' + nom + ' = async \\(q\\) => \\{[\\s\\S]{0,400}?\\n  \\};').exec(bg);
+      const def = new RegExp('const ' + nom + ' = async \\(q\\) => \\{[\\s\\S]{0,400}?\\n  \\};').exec(bg)
+        // …ou une déclaration `function nom(…) { … }` (sbGetMemo, 5 octobre)
+        || new RegExp('(?:async\\s+)?function ' + nom + '\\([^)]*\\)\\s*\\{[\\s\\S]*?\\n\\}').exec(bg);
       return !!def && /sbGetTout/.test(def[0]);
     };
     const mauvais = lecteurs.filter((l) => !pagine(l));
