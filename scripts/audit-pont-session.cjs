@@ -131,6 +131,7 @@ const FAUX_CHROME = (etiquette) => `(() => {
     sendMessage(msg, cb) {
       if (!rt.id) throw new Error('Extension context invalidated.');
       appels.push(msg.action);
+      (globalThis.__messages = globalThis.__messages || []).push(JSON.parse(JSON.stringify(msg)));
       const r = { ok: true, vivant: ${JSON.stringify(etiquette)}, action: msg.action, dataUrl: 'data:,x' };
       setTimeout(() => { if (typeof cb === 'function') cb(r); }, 15);
     },
@@ -358,6 +359,27 @@ const quiRepond = (r, t) => (t.vivante(r) ? String(t.vivante(r)) : 'vide/erreur'
         const ret = await P.demander({ __vmr: 'etat' });
         const ex = await P.demander(TYPES[6].msg);
         dit(ret.length === 0 && ex.length === 0, "f · un pont orphelin SEUL ne répond rien (l'app dira elle-même, à l'échéance, que l'extension ne répond pas)", `état : ${ret.length} réponse(s) · exec : ${ex.length} réponse(s) ${JSON.stringify(ex.map((x) => x.error || x.ok))}`);
+        await P.ctx.close();
+      });
+      // ⚠️ Le relais d'une commande recopiait une liste FIXE (`cmd, uid, tx,
+      //    jobId`) : l'identifiant d'une paire à publier (`id`), « déjà publiée »
+      //    (`etat`) et la limite de l'offre (`limit`, `plan`) n'arrivaient jamais
+      //    — « Publier sur Leboncoin » depuis l'app était refusé depuis la 5.130.
+      await essaie('f · une commande arrive ENTIÈRE au service worker', async () => {
+        const P = await nouvellePage(nav);
+        const w = await P.monde('pont-charge');
+        await P.dans(w, FAUX_CHROME('5.160') + SRC_PONT);
+        await attendre(50);
+        await P.demander({ __vmr: 'cmd', cmd: 'lbcPublier', id: '7700112233' });
+        await P.demander({ __vmr: 'cmd', cmd: 'lbcMarque', id: '7700112233', etat: 'posted' });
+        await P.demander({ __vmr: 'cmd', cmd: 'lbcQuota', limit: 5, plan: 'pro' });
+        await P.demander({ __vmr: 'cmd', cmd: 'bordereau', uid: '1', tx: '2', from: 'page-malveillante', action: 'exec' });
+        const m = (await P.dans(w, 'globalThis.__messages || []')).filter((x) => x.action === 'cmd' || x.from !== 'vmr-bridge');
+        const pub = m.find((x) => x.cmd === 'lbcPublier'), mar = m.find((x) => x.cmd === 'lbcMarque'), quo = m.find((x) => x.cmd === 'lbcQuota'), bor = m.find((x) => x.cmd === 'bordereau');
+        dit(!!(pub && pub.id === '7700112233'), "f · « Publier sur Leboncoin » : l'identifiant de la paire arrive au service worker", JSON.stringify(pub));
+        dit(!!(mar && mar.id === '7700112233' && mar.etat === 'posted'), '« Déjà publiée » : identifiant ET état arrivent', JSON.stringify(mar));
+        dit(!!(quo && quo.limit === 5 && quo.plan === 'pro'), "la limite de l'offre Leboncoin arrive", JSON.stringify(quo));
+        dit(!!(bor && bor.from === 'vmr-bridge' && bor.action === 'cmd' && bor.uid === '1' && bor.tx === '2'), 'et la page ne peut dicter ni `from` ni `action` (posés par le pont)', JSON.stringify(bor));
         await P.ctx.close();
       });
       await essaie('f · double injection du pont vivant', async () => {

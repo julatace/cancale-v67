@@ -92,8 +92,20 @@
     // L'ÉTAT, LES COMMANDES ET LEUR SUIVI (5.129). Simple relais, comme le
     // reste : c'est le service worker qui vérifie l'origine, le compte et le
     // plafond, et qui parle à Vinted.
+    // ⚠️⚠️ ON RELAIE TOUT CE QUE L'APP ENVOIE (5.160). Ce relais recopiait une
+    //    liste fixe (`cmd, uid, tx, jobId`) : `id`, `etat`, `limit` et `plan`
+    //    n'arrivaient JAMAIS au service worker — « Publier sur Leboncoin »,
+    //    « Préparer sur eBay », « Déjà publiée » et la limite de l'offre étaient
+    //    refusés (« annonce inconnue ») depuis la 5.130, sans qu'aucun banc ne
+    //    le voie : ils parlaient au service worker DIRECTEMENT, jamais à travers
+    //    ce pont. C'est le défaut de `content.js` (5.80) refait ici : un raccord
+    //    qui énumère ne transporte que ce qu'on a pensé à écrire.
+    //    `from` et `action` restent posés par NOUS (la page ne les dicte pas) ;
+    //    le service worker vérifie l'origine et chaque champ qu'il lit.
     if ((d.__vmr === 'etat' || d.__vmr === 'cmd' || d.__vmr === 'cmd:statut') && d.reqId) {
-      relayer({ from: 'vmr-bridge', action: d.__vmr, cmd: d.cmd, uid: d.uid, tx: d.tx, jobId: d.jobId },
+      const charge = {};
+      for (const k of Object.keys(d)) if (k !== '__vmr' && k !== 'reqId' && k !== 'from' && k !== 'action') charge[k] = d[k];
+      relayer(Object.assign(charge, { from: 'vmr-bridge', action: d.__vmr }),
         (resp) => poster({ __vmr: d.__vmr + ':result', reqId: d.reqId, resp: resp || null }));
       return;
     }
