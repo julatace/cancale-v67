@@ -36,30 +36,50 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   if (req.method !== 'POST') { res.status(405).json({ error: 'POST only' }); return; }
 
-  const jeton = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+  const jeton = String((req.headers && req.headers.authorization) || '').replace(/^Bearer\s+/i, '');
   const owner = await vendeurDuJeton(jeton);
-  // Tant que la base n'est pas cloisonnée, il n'y a qu'un jeu de données et
-  // personne n'est connecté : on accepte alors le rattachement sans jeton, mais
-  // SANS propriétaire (comportement identique à aujourd'hui). Dès qu'une session
-  // existe, elle fait foi.
-  const corps = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
+  // ⚠️ Rattacher, c'est dire « cet email est À MOI » : sans session prouvée, il
+  // n'y a personne à qui le donner. (Avant le cloisonnement on acceptait le
+  // rattachement sans jeton ; la base est cloisonnée et l'app n'appelle plus
+  // cette route que connectée. Sans jeton, l'appel repartait dans la
+  // résolution — et chaque appel créait une copie de plus en quarantaine.)
+  if (!owner) { res.status(401).json({ ok: false, error: 'connexion requise' }); return; }
+  let corps = {};
+  try { corps = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {}); }
+  catch (_) { res.status(400).json({ ok: false, error: 'corps illisible' }); return; }
   const id = String(corps.id || '');
   if (!/^email_quarantaine_[A-Za-z0-9_-]+$/.test(id)) { res.status(400).json({ error: 'identifiant invalide' }); return; }
 
   // On relit l'email conservé.
-  let ligne = null;
+  // ⚠️⚠️ AVEC LA CLÉ DE SERVICE, QUI VOIT TOUS LES VENDEURS. Sans filtre,
+  // n'importe quel vendeur connecté pouvait faire rejouer CHEZ LUI l'email mis
+  // de côté d'un autre (bordereau, adresse, acheteur) en donnant son
+  // identifiant. On ne lit que les lignes de CE vendeur — celles que l'app lui
+  // montre, sous RLS. Base sans colonne `owner` (une seule boutique) : le
+  // filtre répond 400 et on lit comme avant.
+  // ⚠️ Et une lecture ratée n'est pas « déjà rattaché » : c'est un 503.
+  const indispo = () => res.status(503).json({ ok: false, error: 'base-injoignable', message: "Le serveur de données ne répond pas — rien n'est perdu, réessaie." });
+  let ligne = null, cloisonnee = true;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(id)}&select=data`, { headers: HEADERS });
-    if (r.ok) { const j = await r.json(); ligne = (j[0] && j[0].data) || null; }
-  } catch (_) {}
+    let r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(id)}&owner=eq.${encodeURIComponent(owner)}&select=data`, { headers: HEADERS });
+    if (r.status === 400) {
+      cloisonnee = false;
+      r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(id)}&select=data`, { headers: HEADERS });
+    }
+    if (!r.ok) { indispo(); return; }
+    const j = await r.json();
+    if (!Array.isArray(j)) { indispo(); return; }
+    ligne = (j[0] && j[0].data) || null;
+  } catch (_) { indispo(); return; }
   if (!ligne) { res.status(404).json({ error: 'email introuvable (déjà rattaché ?)' }); return; }
+  const leSien = cloisonnee ? `&owner=eq.${encodeURIComponent(owner)}` : '';
 
   // Rejeu : exactement le même traitement que si l'email venait d'arriver, mais
   // avec le propriétaire imposé. `__ownerForce` est posé ici, côté serveur.
   const faux = {
     method: 'POST', query: { key: process.env.EMAIL_INBOUND_SECRET || '' }, headers: {},
     body: { from: ligne.from, to: ligne.to, subject: ligne.subject, text: ligne.text, html: ligne.html },
-    __ownerForce: owner || '',
+    __ownerForce: owner,
     // ⚠️ LA DATE D'ORIGINE, PAS CELLE DU REJEU. Sans ça, un email d'il y a six
     //    jours ressort daté d'aujourd'hui : le colis afficherait « arrivé le 22 »
     //    alors qu'il attend depuis le 17, et la fenêtre d'ancienneté serait fausse.
@@ -82,7 +102,7 @@ export default async function handler(req, res) {
     // Achats. On VIDE donc la ligne (un upsert, lui, passe), et les listes
     // ignorent ce qui porte `supprime`.
     try {
-      await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE', headers: HEADERS });
+      await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(id)}${leSien}`, { method: 'DELETE', headers: HEADERS });
     } catch (_) {}
     try {
       await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${conflictTarget('id')}`, {

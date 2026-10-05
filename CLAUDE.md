@@ -4596,6 +4596,49 @@ refaire l'erreur à la session suivante).
   même avec des planchers en base et dans les six états du pont, qu'aucune
   promesse ni aucun « Min. accepté » n'apparaisse.
 
+### ⚠️⚠️ Les emails de deux vendeurs : le registre se lit EN ENTIER, et rattacher ne prend que ce qui est à soi (5 octobre)
+Trouvé par l'audit de sécurité du 5 octobre, prouvé en exécutant les vraies routes.
+- ⚠️⚠️ **`email-inbound` ne lisait que la PREMIÈRE ligne `vrm_email_owners`.**
+  Or, une fois la base cloisonnée, il y en a une **par vendeur** (chacun écrit
+  la sienne sous RLS), et la route les lit avec la clé de service. Elle ne
+  gardait que `j[0]`. Conséquence : l'adresse d'un second vendeur n'existait
+  pas pour elle, et son bordereau tombait dans le repli « installation »,
+  c'est-à-dire chez Julien.
+  ⚠️⚠️ **Pire, le vendeur d'une adresse venait du champ `owner` écrit DANS le
+  JSON, donc par le navigateur.** Un vendeur qui déclarait dans SA ligne
+  « julien@… → moi » recevait les ventes de Julien. Prouvé au banc sur le code
+  d'avant : la vente de Julien était écrite chez l'autre.
+  ⇒ `fusionnerRegistres` (dans `api/_lib/proprietaire-email.js`, une fonction
+  pure) lit **toutes** les lignes, et le vendeur d'une adresse est **celui de
+  la LIGNE** (la colonne `owner`, posée par la base). Une adresse déclarée par
+  deux vendeurs ne désigne personne (`conflits`) : l'email part en quarantaine,
+  jamais chez l'un des deux au hasard.
+- **La sonde de cloisonnement mémorisait « non » sur un 502**, pour toute la vie
+  de l'instance, et la quarantaine était alors sautée. Elle a maintenant trois
+  états : seul un 400 dit « non », un échec n'est jamais mémorisé.
+- **Un registre illisible valait « personne n'a déclaré d'adresse ».** Sonde ou
+  registre illisibles ⇒ **503**, « renvoie-le ». Un email retardé se rattrape ;
+  un email donné au mauvais vendeur, non.
+- **Mesuré en production : 0 ligne de registre aujourd'hui** (Julien n'a déclaré
+  aucune adresse). Pour lui seul, rien ne change : le repli « installation »
+  joue comme avant (contrôlé dans l'autre sens, l'incident du 16 août).
+- ⚠️⚠️ **`email-rattacher` relisait la ligne mise de côté SANS filtre de
+  vendeur** (clé de service). N'importe quel vendeur connecté faisait rejouer
+  chez lui l'email d'un autre en donnant son identifiant, et pouvait aussi
+  l'effacer. Sans session, l'email était rejoué quand même. La route exige
+  maintenant la session, ne lit et n'efface que **les lignes de ce vendeur**,
+  et une lecture ratée répond 503 (et non plus « déjà rattaché »).
+- ⚠️ **Reste à faire pour le multi-vendeurs** : la quarantaine est rangée chez
+  le propriétaire de l'installation. Un second vendeur ne voit donc pas la
+  sienne, et seul Julien peut rattacher. C'est cohérent avec la règle, mais ce
+  n'est pas encore un service pour lui.
+- `audit-proprietaire-email.cjs` : **32 contrôles**, dont la vraie route avec
+  deux vendeurs. Il sort **8 rouges** sur le code d'avant.
+- `audit-email-rattacher.cjs` (nouveau, la route n'avait jamais tourné, §4.10) :
+  **8 contrôles**, **6 rouges** sur le code d'avant.
+- **`ship-reminders` appelable sans clé : faux en production.** `CRON_SECRET`
+  y est posée depuis le 4 octobre (vérifié par nom, sans lire la valeur).
+
 ### Mise en production du 5 octobre
 PR #442 mergée à 10:24 UTC (80 déploiements sur 24 h : sous la limite), déploiement
 de production READY sur le commit de merge, `/api/sante` répond, le zip servi
@@ -5484,7 +5527,7 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | outil | quoi |
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
-| `node scripts/audit-*.cjs` | **69 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `node scripts/audit-*.cjs` | **70 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
 | `scripts/bancs/*.cjs` | les **66 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
@@ -5777,7 +5820,7 @@ script-là me fait croire à une catastrophe.
 src/App.jsx                     l'app (grep avant de lire — le fichier est énorme)
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
-scripts/audit-*.cjs             les 69 audits
+scripts/audit-*.cjs             les 70 audits
 scripts/bancs/                  les 66 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt

@@ -74,12 +74,55 @@ export function adressesDeLivraison(body, mailNormalise) {
   return out;
 }
 
+// ── LE REGISTRE DE TOUS LES VENDEURS (fonction PURE) ──────────────────────────
+// ⚠️⚠️ Base cloisonnée = UNE ligne `vrm_email_owners` PAR VENDEUR (chacun écrit
+// la sienne, sous RLS). Le serveur la lisait avec la clé de service et ne
+// gardait que `j[0]` : les adresses des autres vendeurs n'existaient pas pour
+// lui. Un email arrivé sur l'adresse d'un second vendeur tombait alors dans le
+// repli « installation » — et partait chez Julien. Ici on lit TOUTES les lignes.
+//
+// ⚠️ Et le vendeur d'une adresse est celui de la LIGNE (colonne `owner`, posée
+// par la base sous RLS), JAMAIS le champ `owner` rangé dans le JSON : celui-là
+// est écrit par le navigateur, n'importe qui y met l'identifiant qu'il veut.
+// Sans ça, un vendeur déclarerait dans SA ligne « julien@… → moi » et
+// recevrait ses bordereaux.
+//
+// Une adresse déclarée par DEUX vendeurs ne désigne personne : elle part dans
+// `conflits`, et l'email qui y arrive est mis de côté (jamais l'un des deux au
+// hasard — §5 : mieux vaut un blanc qu'un faux).
+//
+// `lignes` : [{ owner?, data }] tels que rendus par PostgREST.
+// `cloisonnee` : la base sait-elle séparer les vendeurs ? Sans colonne
+//   `owner`, il n'y a qu'une boutique : on garde le champ du JSON, comme avant.
+export function fusionnerRegistres(lignes, cloisonnee) {
+  const registre = {}, conflits = new Set();
+  for (const l of (Array.isArray(lignes) ? lignes : [])) {
+    const d = (l && l.data && typeof l.data === 'object') ? l.data : {};
+    const adresses = (d.adresses && typeof d.adresses === 'object') ? d.adresses : d;
+    const proprioLigne = String((l && l.owner) || '').trim();
+    if (cloisonnee && !proprioLigne) continue;            // ligne sans vendeur : elle ne désigne personne
+    for (const k in adresses) {
+      const cle = normAdresse(k);
+      if (!cle || !cle.includes('@')) continue;           // `updatedAt` et autres clés qui ne sont pas des adresses
+      const v = adresses[k];
+      const declare = String((v && (v.owner || v.uid)) || (typeof v === 'string' ? v : '') || '').trim();
+      const owner = cloisonnee ? proprioLigne : declare;
+      if (!owner) continue;
+      if (registre[cle] && registre[cle] !== owner) { conflits.add(cle); continue; }
+      registre[cle] = owner;
+    }
+  }
+  for (const c of conflits) delete registre[c];
+  return { registre, conflits: [...conflits] };
+}
+
 // ── LA RÉSOLUTION (fonction PURE, donc testable exhaustivement) ───────────────
-// `registre` : { "<adresse>": { owner, label } }  — écrit par l'app.
+// `registre` : { "<adresse>": { owner, label } } ou { "<adresse>": owner }.
 // `defaut`   : propriétaire de l'installation (VRM_OWNER_UID), ou ''.
+// `conflits` : adresses déclarées par plusieurs vendeurs (voir plus haut).
 //
 // Renvoie { owner, via, adresse } ou { owner:'', via:'quarantaine', raison }.
-export function resoudreProprietaire(adresses, registre, defaut) {
+export function resoudreProprietaire(adresses, registre, defaut, conflits) {
   const reg = {};
   for (const k in (registre || {})) {
     const cle = normAdresse(k);
@@ -88,6 +131,15 @@ export function resoudreProprietaire(adresses, registre, defaut) {
     if (cle && owner) reg[cle] = owner;
   }
   const liste = (adresses || []).map(normAdresse).filter(Boolean);
+
+  // 0. Une adresse revendiquée par deux vendeurs : personne ne tranche à leur
+  //    place, et surtout pas le repli « installation » plus bas.
+  const disputees = new Set((conflits || []).map(normAdresse));
+  //    (Le repli sur l'adresse sans « +étiquette » ne compte que si l'adresse
+  //    exacte n'est déclarée par personne — l'exacte gagne toujours.)
+  if (liste.some((a) => disputees.has(a) || (!reg[a] && disputees.has(sansEtiquette(a))))) {
+    return { owner: '', via: 'quarantaine', raison: 'adresse de réception déclarée par plusieurs vendeurs' };
+  }
 
   // 1. Correspondance EXACTE sur l'adresse complète (le cas normal).
   const exacts = [];
