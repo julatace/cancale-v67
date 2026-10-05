@@ -2893,6 +2893,23 @@ const tauxUrssaf = () => {
   const v = parseFloat(String(load('vinted_urssaf_taux', TAUX_URSSAF_DEFAUT)).replace(',', '.'));
   return (isFinite(v) && v >= 0 && v <= 50) ? v : TAUX_URSSAF_DEFAUT;
 };
+// À payer à l'URSSAF, arrondi UNE fois au centime (en centimes entiers), et le
+// net qui s'en DÉDUIT. Vu au banc le 5 octobre sur ses vraies données : CA
+// 157,00 €, « à payer 21,20 € », « net 135,81 € » — 157 × 13,5 % = 21,195,
+// arrondi à l'affichage d'un côté, gardé entier de l'autre : la carte ne se
+// vérifiait plus à la main, au centime près (§2.7, §5 « CA − à payer = net »).
+// La carte du mois, le récap mensuel, l'échéance, le CSV et les deux rapports
+// passent tous par ici (§11) : arrondir à un seul endroit aurait fait dire
+// deux nombres différents pour le même mois sur le même écran.
+const aPayerUrssaf = (ca, tauxPct = tauxUrssaf()) => {
+  if (ca == null || !isFinite(Number(ca))) return null;
+  const centimes = Math.round(Number(ca) * 100);
+  return Math.round(Number((centimes * Number(tauxPct) / 100).toFixed(6))) / 100;
+};
+const netApresUrssafDe = (ca, tauxPct = tauxUrssaf()) => {
+  const u = aPayerUrssaf(ca, tauxPct); if (u == null) return null;
+  return (Math.round(Number(ca) * 100) - Math.round(u * 100)) / 100;
+};
 const moisDeVente = (o) => {
   const t = tsCommande(o); if (!t) return null;
   const d = new Date(t);
@@ -9386,8 +9403,8 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
     const e = urssafMois.find(m=>m.ym===ym);
     return e ? (e.n || 0) : 0;
   }, [urssafMois]);
-  const urssafEstime=moisCourantCA==null?null:moisCourantCA*TAUX_URSSAF;
-  const netApresUrssaf=moisCourantCA==null?null:moisCourantCA-urssafEstime;
+  const urssafEstime=moisCourantCA==null?null:aPayerUrssaf(moisCourantCA, TAUX_URSSAF*100);
+  const netApresUrssaf=moisCourantCA==null?null:netApresUrssafDe(moisCourantCA, TAUX_URSSAF*100);
   // Échéance de déclaration URSSAF (fréquence réglable) + CA encaissé de la
   // période concernée → somme estimée à déclarer/payer à cette date.
   const [urssafFreq,setUrssafFreq]=useState(()=>load('vinted_urssaf_freq','trimestriel'));
@@ -9541,7 +9558,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
       ym:k,
       label:`${moisNoms[map[k].mois-1]||map[k].mois} ${map[k].annee}`,
       ca:map[k].ca, profit:map[k].profit, count:map[k].count,
-      urssaf:map[k].ca*TAUX_URSSAF, net:map[k].ca-map[k].ca*TAUX_URSSAF
+      urssaf:aPayerUrssaf(map[k].ca, TAUX_URSSAF*100), net:netApresUrssafDe(map[k].ca, TAUX_URSSAF*100)
     }));
     if (!urssafMois) return depuisArchive;
     // ⚠️ Le bénéfice n'est PAS calculable ici (les prix d'achat vivent sur
@@ -9551,7 +9568,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
       const [y,mo]=m.ym.split('-');
       return { ym:m.ym, label:`${moisNoms[Number(mo)-1]||mo} ${y}`, ca:m.ca, profit:null, count:m.n,
                nMasq:m.nMasq, caMasq:m.caMasq,
-               urssaf:m.ca*TAUX_URSSAF, net:m.ca-m.ca*TAUX_URSSAF };
+               urssaf:aPayerUrssaf(m.ca, TAUX_URSSAF*100), net:netApresUrssafDe(m.ca, TAUX_URSSAF*100) };
     });
   },[encaissees,urssafMois,TAUX_URSSAF]);
 
@@ -9974,7 +9991,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
                   <span style={{fontSize:15,fontWeight:700,color:col}}>{urssafDue.dueDate.toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})}</span>
                   <span style={{fontSize:12,fontWeight:600,color:col}}>{late?`en retard de ${-urssafDue.daysLeft} j`:urssafDue.daysLeft===0?"aujourd'hui !":`dans ${urssafDue.daysLeft} j`}</span>
                 </div>
-                <div style={{fontSize:12,color:C.text,marginTop:4}}>Période <b>{urssafDue.label}</b> · CA finalisé <b>{fmt(urssafPeriodCA)}</b> → à payer ≈ <b style={{color:C.warn}}>{fmt(urssafPeriodCA*TAUX_URSSAF)}</b></div>
+                <div style={{fontSize:12,color:C.text,marginTop:4}}>Période <b>{urssafDue.label}</b> · CA finalisé <b>{fmt(urssafPeriodCA)}</b> → à payer ≈ <b style={{color:C.warn}}>{fmt(aPayerUrssaf(urssafPeriodCA, TAUX_URSSAF*100))}</b></div>
                 <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',marginTop:7}}>
                   <a href="https://www.autoentrepreneur.urssaf.fr" target="_blank" rel="noopener noreferrer" style={{fontSize:12,fontWeight:700,color:'#fff',background:C.accent,borderRadius:8,padding:'6px 12px',textDecoration:'none'}}>Déclarer sur l'URSSAF →</a>
                   <span style={{fontSize:9,color:C.muted}}>Estimation ({String(tauxUrssaf()).replace('.',',')} %) — le chiffre officiel se saisit là-bas.</span>
@@ -20836,7 +20853,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const tvaMarge = (regime==='marge' && marge>0) ? marge * (tvaRate/(100+tvaRate)) : 0;
     const margeHT = marge - tvaMarge;
     const taux = tauxUrssaf();
-    const urssaf = ca * (taux/100);
+    const urssaf = aPayerUrssaf(ca, taux);
     return { regime, tvaRate, monthLabel, ca, cout, frais, nb, nbCout, benefNet, marge, tvaMarge, margeHT, taux, urssaf, nMasq, caMasq, nAttente, caAttente, saleLines, buyLines, achatsTotal, parPlateforme, aDater, sourcesKO };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, buysBase, reportMonth, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements]);
@@ -21002,7 +21019,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const tvaMarge = (regime==='marge' && marge>0) ? marge*(tvaRate/(100+tvaRate)) : 0;
     const margeHT = marge - tvaMarge;
     const taux = tauxUrssaf();
-    const urssaf = ca*(taux/100);
+    const urssaf = aPayerUrssaf(ca, taux);
     return { regime, tvaRate, year:reportYear, months, ca, cout, frais, nb, nbCout, benefNet, marge, tvaMarge, margeHT, taux, urssaf, nMasq, caMasq, achatsTotal, achatsNb, buyLines, saleLines, parPlateforme };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, buysBase, reportYear, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements]);
