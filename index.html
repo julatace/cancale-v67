@@ -197,7 +197,9 @@
        donc être retirées du `style={{…}}` des rangées concernées. */
     /* L'île d'actions flotte en haut à droite : la ligne de titre lui laisse
        la place, sinon les boutons d'écran passent dessous. */
-    @media (min-width: 1024px){ .vrm-tete-row{ padding-right: 208px; } }
+    /* Sa largeur RÉELLE est publiée par l'app (`--vrm-ile`) : elle change
+       avec la pastille « Actions possibles · compte ». 208 px en repli. */
+    @media (min-width: 1024px){ .vrm-tete-row{ padding-right: var(--vrm-ile, 208px); } }
     .vrm-rangee{ flex-wrap:nowrap; overflow-x:auto; }
     @media (min-width: 1024px){ .vrm-rangee{ flex-wrap:wrap; overflow-x:visible; } }
     /* Carrousel photo (dernières ventes) : on fait défiler au doigt sur

@@ -4709,6 +4709,86 @@ pouvait lire sa session. Mesuré au banc sur le code d'avant : **18 exécutions*
   servent `dist/` **sans les en-têtes de Vercel** : rien ne verrait la casse.
   Il faut d'abord un banc qui sert les vrais en-têtes.
 
+### ⚠️⚠️ « JE NE PEUX PAS APPUYER SUR LE BORDEREAU, ÇA MET QUE L'EXTENSION NE RÉPOND PAS » (5 octobre, 5.160)
+Une vente à expédier, l'extension allumée, et le bouton grisé. **Trois causes,
+mesurées, et aucune n'était « l'extension est éteinte »** :
+1. ⚠️⚠️ **UN PONT ORPHELIN RÉPONDAIT « RIEN » PLUS VITE QUE LE PONT VIVANT.**
+   Après une mise à jour (ou un rechargement) de l'extension, l'ancien
+   `bridge.js` reste dans la page VRM, sans service worker derrière lui. Il
+   répondait `resp: null` **tout de suite** ; `reinjecterPont` remet bien un
+   pont neuf dans la page, mais l'app prenait la **première** réponse et
+   concluait « muette » pour de bon. Pareil pour `exec`, `photo`, `pdfLbc`,
+   `authEtat` (`sendMessage` lève sur un orphelin, le `catch` répondait une
+   erreur). ⇒ Deux moitiés : l'**app** n'écoute plus une réponse vide (grâce de
+   1,5 s pour qu'un pont vivant réponde — ça protège aussi les extensions déjà
+   installées), et le **pont 5.160** orphelin se tait sur TOUT et retire son
+   écouteur ; un seul pont vivant par monde isolé (`globalThis.__vrmPontVivant`
+   — deux ponts vivants relaieraient une réponse à un acheteur deux fois).
+2. **2,5 s pour répondre, et « muette » au premier raté.** Au réveil, le service
+   worker sondait la base et renouvelait sa session AVANT de répondre (plusieurs
+   secondes quand Supabase traîne). ⇒ L'app attend 6 s, relance à 3 s, et seul
+   le **deuxième** raté d'affilée vaut « muette » ; un `ready` relance la
+   vérification. L'extension 5.160 répond **sans réseau** (`authEtatRapide`,
+   `loginDe` servi périmé et rafraîchi en fond, cloisonnement rangé) — moins de
+   300 ms même si tout le réseau pend (`audit-pont-session.cjs`).
+3. ⚠️⚠️ **L'APP ET L'EXTENSION PARTAGEAIENT LA MÊME FAMILLE DE JETONS.** L'app
+   envoyait SON jeton de renouvellement à chaque changement et à chaque
+   `ready`. Avec la rotation de Supabase, celle qui renouvelle en second
+   présente un jeton consommé : journaux d'auth de la production le 5 octobre,
+   `refresh_token_already_used` puis une rafale de **429** (l'extension
+   renouvelait sans « un seul en vol » ni pause). ⇒ L'extension reçoit **SA**
+   session : `POST /api/compte?mode=session-extension` fabrique, pour le MÊME
+   vendeur, un lien magique côté serveur (aucun email) aussitôt échangé —
+   autre `session_id`, autre famille. Prouvé sur un GoTrue v2.197 **local**
+   (`audit-session-extension.cjs --local`, jamais la production). L'app ne la
+   donne que **quand il faut** (pas de session, session morte, autre compte) ;
+   une extension déjà connectée ne reçoit RIEN. L'adresse vient de
+   `/auth/v1/user`, jamais de la requête ; identité vérifiée deux fois ;
+   `hashed_token`, `email_otp`, `action_link` ne sortent jamais ; frein doux
+   6/h par vendeur. ⚠️ Effet de bord mesuré : générer un lien magique invalide
+   un lien de réinitialisation de mot de passe encore en attente.
+   ⚠️ Le repli d'avant (notre propre session) ne sert plus qu'à **amorcer** une
+   extension qui n'a aucune session quand le serveur ne sait pas en fabriquer
+   une (404/405/503) — jamais pour remplacer une session morte, c'est
+   exactement le cas qui s'entre-tuait.
+- Extension 5.160 : renouvellement **un seul en vol** ; refus définitif (400-404
+  + code d'auth) ⇒ session marquée `mort`, plus aucune requête tant qu'une
+  NOUVELLE session n'arrive ; 429/5xx/réseau ⇒ pause 30 s → 10 min rangée dans
+  `chrome.storage.local` (§4.9). `isCloisonne` à **trois états** (il mémorisait
+  `false` sur un simple 502 : toutes les captures partaient sans propriétaire
+  pour la vie du service worker), même règle que `baseCloisonnee` du serveur.
+- ⚠️⚠️ **TROUVÉ AU PASSAGE : « PUBLIER SUR LEBONCOIN » DEPUIS L'APP ÉTAIT REFUSÉ
+  DEPUIS LA 5.130.** Le relais des commandes recopiait `cmd, uid, tx, jobId` :
+  `id`, `etat`, `limit` et `plan` n'arrivaient **jamais** au service worker
+  (« annonce inconnue »). Aucun banc ne passait par le pont — ils parlaient au
+  service worker directement. C'est `content.js` (5.80) refait : *un raccord
+  qui énumère ne transporte que ce qu'on a pensé à écrire*. Le pont relaie la
+  commande entière ; `from`/`action` restent posés par lui. 3 rouges avant.
+- Muette ⇒ bouton **« Recharger la page »** ; chaque vente grisée par
+  l'extension propose son repli **« sur Vinted ↗ »** (la conversation de la
+  vente) — le PDF remonte ensuite par l'email de Vinted. Pas sur une vente
+  grisée pour une raison de COMPTE : là le geste est de basculer.
+- **L'indicateur demandé par Julien** (« je veux savoir si je peux faire des
+  actions ou si c'est de la lecture ») : une pastille dans l'en-tête,
+  **« Actions possibles · {compte Vinted} »** / **« Lecture seule »** /
+  « Vérification… », et un panneau : extension, compte VRM, compte Vinted
+  ouvert dans Chrome, et LE geste qui débloque ; en lecture seule il dit ce qui
+  marche quand même (données, colis à retirer, bordereaux déjà reçus). Une
+  seule règle (`raisonExtGlobale`) + le cookie Vinted. Elle **remplace** le petit
+  onglet « Extension à mettre à jour » (deux voix, §7) ; une extension capable
+  de commandes mais pas à jour le dit dans la ligne « Extension ».
+  Couleur seulement s'il y a un geste ICI (sur téléphone, la lecture seule est
+  normale, le point reste gris).
+- Preuves : banc `pont.cjs` **19 rouges** sur le build d'avant (orphelin,
+  réponse lente, session, indicateur), tout vert après ;
+  `audit-pont-session.cjs` **29 rouges** sur l'extension d'avant, 41 verts ;
+  `audit-session-extension.cjs` **29 rouges** sur la route d'avant.
+- ⚠️ **VINGT-SEPTIÈME cri au loup** : `audit-bordereau-pdf.cjs` exigeait
+  l'orthographe `member/transactions/` près de `genere_sans_pdf` ; le lien passe
+  maintenant par une variable. Il suit la variable jusqu'à sa définition — et
+  repasse au rouge quand on y retire l'adresse Vinted (prouvé).
+- ⚠️ **Le chantier PDF→stockage avait réservé la 5.160** : il passera en 5.161.
+
 ### Mise en production du 5 octobre
 PR #442 mergée à 10:24 UTC (80 déploiements sur 24 h : sous la limite), déploiement
 de production READY sur le commit de merge, `/api/sante` répond, le zip servi
@@ -5597,7 +5677,7 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | outil | quoi |
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
-| `node scripts/audit-*.cjs` | **72 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `node scripts/audit-*.cjs` | **74 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
 | `scripts/bancs/*.cjs` | les **66 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
@@ -5890,7 +5970,7 @@ script-là me fait croire à une catastrophe.
 src/App.jsx                     l'app (grep avant de lire — le fichier est énorme)
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
-scripts/audit-*.cjs             les 72 audits
+scripts/audit-*.cjs             les 74 audits
 scripts/bancs/                  les 66 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt

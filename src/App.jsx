@@ -30431,6 +30431,20 @@ function AppCoeur() {
   const [customLogo,setCustomLogo]=useState(()=>load('vinted_custom_logo',null));
   const logoSrc = customLogo || LOGO_CANCALE;
   const logoInputRef = React.useRef(null);
+  // ⚠️ LA PLACE DE L'ÎLE SE MESURE, ELLE NE SE DEVINE PLUS. La ligne de titre
+  // des écrans lui réservait 208 px en dur ; la pastille « Actions possibles ·
+  // compte » (5 octobre) l'a élargie, et « Exporter Excel », « Coller en
+  // masse », « Réglages » repassaient DESSOUS (verif_visuel). On publie sa
+  // largeur réelle dans `--vrm-ile`, que la règle de index.html lit.
+  const ileRef = React.useRef(null);
+  React.useEffect(() => {
+    const el = ileRef.current;
+    if (!ordi || !el || typeof ResizeObserver === 'undefined') { try { document.documentElement.style.removeProperty('--vrm-ile'); } catch (_) {} return undefined; }
+    const poser = () => { try { document.documentElement.style.setProperty('--vrm-ile', Math.ceil(el.getBoundingClientRect().width + 16) + 'px'); } catch (_) {} };
+    poser();
+    const ro = new ResizeObserver(poser); ro.observe(el);
+    return () => ro.disconnect();
+  }, [ordi]);
   const handleLogoChange = (e) => {
     const file = e.target.files && e.target.files[0];
     if(!file) return;
@@ -31509,7 +31523,7 @@ function AppCoeur() {
           en `fixed`, le titre de l'écran remonte et partage la ligne avec les
           actions, comme dans une vraie application. Sur téléphone il porte le
           menu, le logo et la synchro : il reste `sticky`, rien ne change. */}
-      <header style={{position: ordi ? 'fixed' : 'sticky',top: ordi ? 12 : 0,zIndex:50,display:'flex',alignItems:'center',justifyContent:'space-between',
+      <header ref={ileRef} style={{position: ordi ? 'fixed' : 'sticky',top: ordi ? 12 : 0,zIndex:50,display:'flex',alignItems:'center',justifyContent:'space-between',
         padding: ordi ? '7px 10px' : '11px 16px',
         // ⚠️ SUR ORDINATEUR C'EST UNE ÎLE, PAS UNE BARRE. Un bandeau pleine
         // largeur avec un flou d'arrière-plan rendait le TITRE DE L'ÉCRAN
