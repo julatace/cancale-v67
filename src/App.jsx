@@ -21541,8 +21541,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             : (()=>{ const cs = (pickupUnion.comptesSansCode||[]).map(a=>accName(a)).filter(Boolean);
                      const qui = cs.length===1 ? `sur ${cs[0]}` : cs.length>1 ? `sur ${cs.slice(0,3).join(', ')}${cs.length>3?'…':''}` : 'avec le bon compte';
                      const e = extSaitLireCodes();
-                     if (e === 'retard') return `Mets d'abord ton extension à jour — celle installée ne sait pas encore lire les codes`;
-                     if (e === 'absente') return `Ouvre la conversation Vinted du colis : le code y est`;
+                     // ⚠️ Le COMPTE se dit dans les trois états, comme sur l'écran Achats
+                     // (§11). Vu au banc le 5 octobre : sur le téléphone (extension
+                     // « absente ») ou avec une extension en retard, Ma journée ne disait
+                     // pas sur lequel de ses comptes se connecter — ouvrir la conversation
+                     // depuis le mauvais compte ne montre rien.
+                     if (e === 'retard') return `Mets d'abord ton extension à jour (celle installée ne sait pas encore lire les codes), puis passe sur Vinted connecté ${qui}`;
+                     if (e === 'absente') return cs.length ? `Ouvre la conversation Vinted du colis, connecté ${qui} : le code y est` : `Ouvre la conversation Vinted du colis : le code y est`;
                      return `Passe sur Vinted connecté ${qui} : l'extension va chercher les codes toute seule`; })();
           jobs.push({icon:'box',color:hd>0?C.danger:(pr>0?(C.blue||C.accent):C.muted),urgent:hd>0,title:`Retirer ${pickupCount} colis`,sub,tab:'cat_achats',prio:hd>0?0.5:(pr>0?2:6)});
         }
