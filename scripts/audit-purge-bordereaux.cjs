@@ -42,9 +42,24 @@ const BORDS = {
 };
 const metaFn = (b) => (b.filename == null ? null : b.filename);
 
-function faireCtx({ txnKO = false, bordsKO = false, dataKO = null } = {}) {
+// Les bordereaux CAPTÉS par l'extension (`harvest_{uid}_label_{tx}` + le
+// « dernier capté » `label_latest`), forme réelle : {uid,url,tx,item,capturedAt,pdfB64}.
+// Autorisé par Julien le 4 octobre : 55 lignes de ventes finalisées qu'aucune
+// règle ne purgeait.
+const LABELS = {
+  harvest_9_label_111: { uid: '9', url: 'u111', tx: '111', item: '7001', capturedAt: vieux, pdfB64: PDF },   // → PURGE
+  harvest_9_label_latest: { uid: '9', url: 'u111', tx: '111', item: '7001', capturedAt: vieux, pdfB64: PDF }, // copie du 111 → PURGE
+  harvest_9_label_222: { uid: '9', url: 'u222', tx: '222', capturedAt: vieux, pdfB64: PDF },                 // non finalisée → garder
+  harvest_9_label_333: { uid: '9', url: 'u333', tx: '333', capturedAt: recent, pdfB64: PDF },                // trop récent → garder
+  harvest_9_label_444: { uid: '9', url: 'u444', tx: '444', pdfB64: PDF },                                     // sans date → garder
+  harvest_9_label_555: { uid: '9', url: 'u555', tx: '999', capturedAt: vieux, pdfB64: PDF },                 // tx incohérente → garder
+  harvest_8_label_latest: { uid: '8', url: 'u8', capturedAt: vieux, pdfB64: PDF },                            // latest sans tx → garder
+};
+
+function faireCtx({ txnKO = false, bordsKO = false, dataKO = null, labelsKO = false, labels = LABELS, finalisees = FINALISEES } = {}) {
   const journal = { ecrits: [] };
-  const lignes = JSON.parse(JSON.stringify(BORDS));   // copie mutable
+  const lignes = JSON.parse(JSON.stringify({ ...BORDS, ...labels }));   // copie mutable
+  journal.stock = [];
   const ctx = {
     console: { log() {}, warn() {}, error() {} },
     setTimeout: (fn, ms) => setTimeout(fn, Math.min(ms || 0, 1)), clearTimeout, setInterval: () => 0, clearInterval,
@@ -57,7 +72,7 @@ function faireCtx({ txnKO = false, bordsKO = false, dataKO = null } = {}) {
       downloads: { onCreated: { addListener() {} } },
       action: { setBadgeText() {}, setBadgeBackgroundColor() {}, setTitle() {} },
       tabs: { onUpdated: { addListener() {} }, query: dual([]), sendMessage: dual(undefined) },
-      storage: { local: { get: dual({}), set: dual(undefined), remove: dual(undefined) } },
+      storage: { local: { get: dual({}), set: (o) => { journal.stock.push(o); return Promise.resolve(); }, remove: dual(undefined) } },
     },
     fetch: async (url, opts = {}) => {
       const u = String(url);
@@ -70,16 +85,26 @@ function faireCtx({ txnKO = false, bordsKO = false, dataKO = null } = {}) {
       // Ventes finalisées (filtre serveur meta->>status=eq.450)
       if (/id=like\.harvest_\*_txn_\*/.test(u) && /meta->>status=eq\.450/.test(u)) {
         if (txnKO) return rep('db down', 522);
-        return rep(JSON.stringify(FINALISEES.map(tx => ({ id: `harvest_9_txn_${tx}` }))));
+        return rep(JSON.stringify(finalisees.map(tx => ({ id: `harvest_9_txn_${tx}` }))));
       }
       // Liste des bordereaux (projection meta->>filename / pdfPurged / receivedAt)
       if (/id=like\.email_bord_\*/.test(u)) {
         if (bordsKO) return rep('db down', 522);
-        const out = Object.keys(lignes).map(id => ({ id, fn: metaFn(lignes[id]), pg: lignes[id].pdfPurged ? 'true' : null, rc: lignes[id].receivedAt }));
+        const out = Object.keys(lignes).filter(id => /^email_bord_/.test(id)).map(id => ({ id, fn: metaFn(lignes[id]), pg: lignes[id].pdfPurged ? 'true' : null, rc: lignes[id].receivedAt }));
+        return rep(JSON.stringify(out));
+      }
+      // Liste des bordereaux CAPTÉS : le filtre `meta->>_pdf=eq.true` est appliqué
+      // comme le ferait la base (le déclencheur pose `_pdf` quand pdfB64 est non vide).
+      if (/id=like\.harvest_\*_label_\*/.test(u)) {
+        if (labelsKO) return rep('db down', 522);
+        const filtre = /meta->>_pdf=eq\.true/.test(u);
+        const out = Object.keys(lignes).filter(id => /^harvest_\d+_label_/.test(id))
+          .filter(id => !filtre || !!(lignes[id] && lignes[id].pdfB64))
+          .map(id => ({ id, tx: lignes[id].tx || null, cap: lignes[id].capturedAt || null }));
         return rep(JSON.stringify(out));
       }
       // Lecture d'UNE ligne complète (select=data)
-      const m = /id=eq\.(email_bord_\d+)/.exec(u);
+      const m = /id=eq\.(email_bord_\d+|harvest_\d+_label_\w+)/.exec(u);
       if (m && /select=data/.test(u)) {
         if (dataKO === m[1]) return rep('db down', 522);
         return rep(JSON.stringify([{ data: lignes[m[1]] }]));
@@ -121,7 +146,8 @@ const ecritPour = (j, id) => j.ecrits.filter(e => e && e.id === id).map(e => e.d
     dit(ecritPour(j, 'email_bord_333').length === 0, 'bordereau trop récent (< 7 j) → pas touché (333, ceinture)');
     dit(ecritPour(j, 'email_bord_444').length === 0, 'déjà purgé → pas re-touché (444)');
     dit(ecritPour(j, 'email_bord_555').length === 0, 'jamais eu de PDF → pas touché (555)');
-    dit(j.ecrits.length === 1, 'une seule écriture au total (le seul vrai candidat)', `${j.ecrits.length} écriture(s)`);
+    const nb = j.ecrits.filter(e => /^email_bord_/.test(e.id)).length;
+    dit(nb === 1, 'une seule écriture d\'email_bord au total (le seul vrai candidat)', `${nb} écriture(s)`);
   }
   // ── 3. FAIL-SAFE : une lecture ratée ⇒ on ne purge RIEN ──────────────────────
   {
@@ -138,6 +164,57 @@ const ecritPour = (j, id) => j.ecrits.filter(e => e && e.id === id).map(e => e.d
     const ctx = faireCtx({ dataKO: 'email_bord_111' });
     await essaie('purge (ligne candidate illisible)', () => ctx.purgeBordereaux());
     dit(ecritPour(ctx.__journal, 'email_bord_111').length === 0, 'ligne candidate illisible → on la saute (pas de purge à l\'aveugle)');
+  }
+
+  // ── 4. LES BORDEREAUX CAPTÉS PAR L'EXTENSION (label_{tx}, label_latest) ──────
+  {
+    const ctx = faireCtx();
+    await essaie('purge (bordereaux captés)', () => ctx.purgeBordereaux());
+    const j = ctx.__journal;
+    for (const id of ['harvest_9_label_111', 'harvest_9_label_latest']) {
+      const w = ecritPour(j, id); const d = w[w.length - 1];
+      dit(!!d && d.pdfB64 === null, `${id} (vente finalisée, vieux) : PDF retiré`, d ? `pdfB64=${d.pdfB64}` : 'AUCUNE écriture');
+      if (d) dit(d.tx === '111' && d.item === '7001' && d.url === 'u111' && d.capturedAt === vieux && d.pdfPurged === true,
+        `${id} : transaction, annonce, lien et date GARDÉS (l'app relie toujours la paire)`, `${d.tx}/${d.item}/${d.url}`);
+    }
+    for (const [id, pourquoi] of [['harvest_9_label_222', 'vente non finalisée'], ['harvest_9_label_333', 'capté il y a moins de 7 j'],
+      ['harvest_9_label_444', 'sans date lisible'], ['harvest_9_label_555', 'transaction incohérente avec la ligne'],
+      ['harvest_8_label_latest', '« dernier capté » sans transaction']]) {
+      dit(ecritPour(j, id).length === 0, `${id} (${pourquoi}) → pas touché`);
+    }
+    // Idempotence : la base ne relit que ce qui porte ENCORE un PDF.
+    j.ecrits.length = 0;
+    await essaie('purge (second passage)', () => ctx.purgeBordereaux());
+    dit(j.ecrits.length === 0, 'un second passage ne réécrit rien (ligne purgée = plus de `_pdf`)', `${j.ecrits.length} écriture(s)`);
+  }
+  {
+    const ctx = faireCtx({ labelsKO: true });
+    await essaie('purge (liste des bordereaux captés illisible)', () => ctx.purgeBordereaux());
+    const nl = ctx.__journal.ecrits.filter(e => /_label_/.test(e.id)).length;
+    dit(nl === 0, 'liste des bordereaux captés illisible (522) → aucun touché', `${nl} écriture(s)`);
+    dit(ecritPour(ctx.__journal, 'email_bord_111').length === 1, '… et la purge des email_bord n\'en dépend pas');
+  }
+  {
+    const ctx = faireCtx({ dataKO: 'harvest_9_label_111' });
+    await essaie('purge (bordereau capté illisible)', () => ctx.purgeBordereaux());
+    dit(ecritPour(ctx.__journal, 'harvest_9_label_111').length === 0, 'bordereau capté illisible → sauté (pas de purge à l\'aveugle)');
+  }
+  {
+    const ctx = faireCtx({ txnKO: true });
+    await essaie('purge (ventes illisibles, captés)', () => ctx.purgeBordereaux());
+    dit(ctx.__journal.ecrits.length === 0, 'ventes finalisées illisibles → aucun bordereau capté touché non plus');
+  }
+  // ── 5. UN ARRIÉRÉ : 25 candidats → 20 par passage, et le suivant vient vite ──
+  {
+    const beaucoup = {}, fin = [];
+    for (let i = 0; i < 25; i++) { const tx = String(5000 + i); fin.push(tx); beaucoup[`harvest_9_label_${tx}`] = { uid: '9', url: 'u', tx, capturedAt: vieux, pdfB64: PDF }; }
+    const ctx = faireCtx({ labels: beaucoup, finalisees: fin });
+    await essaie('purge (arriéré)', () => ctx.purgeBordereaux());
+    const nl = ctx.__journal.ecrits.filter(e => /_label_/.test(e.id)).length;
+    dit(nl === 20, 'borné à 20 bordereaux captés par passage', `${nl}`);
+    const cd = (ctx.__journal.stock.filter(o => o && o.vrmPurgeBord).pop() || {}).vrmPurgeBord || 0;
+    const prochain = cd + 12 * 3600000 - Date.now();
+    dit(prochain > 0 && prochain <= 3600000 + 5000, 'l\'arriéré est repris dans l\'heure, pas dans 12 h', `prochain passage dans ${Math.round(prochain / 60000)} min`);
   }
 
   console.log(ko ? `\n${ko} contrôle(s) en échec` : '\nTous les contrôles passent — un bordereau n\'est allégé que pour une vente finalisée, jamais à l\'aveugle.');

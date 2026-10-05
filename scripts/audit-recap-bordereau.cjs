@@ -145,6 +145,30 @@ const conv = (cid, oid, prix) => ({
       `${ctx.__journal.vinted.length} requêtes : ${ctx.__journal.vinted.join(' · ')}`);
   }
 
+  {
+    // 4 OCTOBRE — UN BORDEREAU EST UN PDF. L'URL répond, mais avec une page
+    // HTML (session expirée, erreur du stockage). Rangée, elle passerait `_pdf`
+    // à vrai : l'app proposerait « Imprimer » et le vrai PDF ne serait plus
+    // jamais redemandé. On ne la range pas, et on réessaie (transitoire).
+    const vinted = (chemin) => /transactions\//.test(chemin)
+      ? { status: 200, json: { transaction: { shipment: { id: 555 } }, order: { items: [{ id: 1 }] } } }
+      : /label_url/.test(chemin) ? { status: 200, json: { label_url: 'https://exemple/x.pdf' } }
+      : { status: 404, json: {} };
+    const ctx = faireCtx({ vinted });
+    const ecrits = [];
+    const vraiFetch = ctx.fetch;
+    ctx.fetch = async (u, o) => {
+      if (/exemple\/x\.pdf/.test(String(u))) return { ok: true, status: 200, arrayBuffer: async () => new TextEncoder().encode('<html><body>Connecte-toi</body></html>').buffer };
+      if ((o && o.method) === 'POST' && /app_data/.test(String(u))) { try { for (const l of JSON.parse(o.body)) ecrits.push(l.id); } catch (_) {} }
+      return vraiFetch(u, o);
+    };
+    const r = await ctx.recupererLabelInsiste({ vinted_user_id: '9' }, '9', '1234');
+    dit(!r.ok && !ecrits.some((id) => /_label_/.test(id)), 'une page HTML à la place du PDF n’est jamais rangée comme bordereau',
+      `ok=${r.ok} · écrit : ${ecrits.filter((id) => /_label_/.test(id)).join(',') || 'rien'}`);
+    const nPdf = ctx.__journal.vinted.filter((c) => /label_url/.test(c)).length;
+    dit(nPdf > 1, 'et on réessaie (le PDF peut ne pas être encore déposé)', `${nPdf} tentative(s)`);
+  }
+
   console.log(`\n${ko ? '❌' : '✅'} ${ok} vert${ok > 1 ? 's' : ''}, ${ko} rouge${ko > 1 ? 's' : ''}`);
   process.exit(ko ? 1 : 0);
 })().catch((e) => { console.error('❌ l’audit est tombé :', e && e.stack); process.exit(1); });

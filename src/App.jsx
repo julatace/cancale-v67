@@ -37,7 +37,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.156.0';
+const EXT_ATTENDUE = '5.158.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -1151,6 +1151,9 @@ const save = (k,v) => {
   _saveTimers[k] = setTimeout(() => {
     try { localStorage.setItem(k,JSON.stringify(v)); } catch {}
     delete _saveTimers[k];
+    // Les lecteurs qui ne sont pas des états React (ex. « vendu » de la coque,
+    // qui relit les ventes masquées) savent ainsi qu'une clé vient de changer.
+    try { window.dispatchEvent(new CustomEvent('vrm:save', { detail: { k } })); } catch {}
     if (SYNC_KEYS.includes(k)) cloudPush(); // declenche la synchro cloud
   }, 500);
 };
@@ -1573,7 +1576,7 @@ const fetchEmailBordereaux = async () => {
     // base64 (deux fois : brut + tamponné). Mesuré, 51 bordereaux = 6 Mo dont
     // 99 % de PDF — et la liste était chargée deux fois, soit 12 Mo pour
     // afficher des titres. On ne prend que les champs utiles : 21 Ko.
-    // Le PDF est récupéré à la demande, au moment d'imprimer (fetchBordPdf).
+    // Le PDF est récupéré à la demande, au moment d'imprimer (lirePdfLigne).
     const champs = ['uid','type','suivi','modele','numero','taille','account','article',
                     'filename','posKnown','dateLimite','receivedAt','transaction']
                    .map(c => `${c}:meta->>${c}`).join(',');
@@ -1594,20 +1597,57 @@ const fetchEmailBordereaux = async () => {
       .sort((a, b) => new Date(b.receivedAt || 0) - new Date(a.receivedAt || 0));
   } catch (_) { return null; }
 };
-// Le PDF d'UN bordereau, à la demande (impression / tamponnage).
-const fetchBordPdf = async (rowId) => {
-  if (!rowId) return null;
+// ── LES OCTETS D'UN BORDEREAU : UN SEUL LECTEUR, TROIS ÉTATS (4 octobre) ─────
+// Sept endroits impriment un bordereau (Ventes, carte Colis, lot, Réimprimer,
+// bordereau + facture, tamponnage en 1 clic, reçu du bilan) et chacun relisait
+// la ligne à sa façon : `select=data` (toute la ligne), ou `pdfB64` ET
+// `pdfTamponneB64` — une copie tamponnée par le serveur que PERSONNE ne lit
+// (8,9 Mo en base, rapatriés à chaque impression d'un PDF venu par email :
+// l'égress de chaque impression était doublé). Et tous écrasaient les trois
+// états : une base qui ne répond pas et une ligne sans PDF donnaient le même
+// « PDF illisible ».
+// ⇒ `lirePdfLigne` ne lit que `pdfB64`, vérifie que ce sont bien les octets d'un
+//   PDF (`%PDF` — une page HTML de session expirée rangée par une vieille
+//   extension n'est pas un bordereau), et rend :
+//     { octets } · { absent: true } (la ligne n'a pas ou plus de PDF) · null
+//     (la base n'a pas répondu : « pas su » ≠ « pas de PDF »).
+const estOctetsPdf = (u) => !!(u && u.length >= 4 && u[0] === 0x25 && u[1] === 0x50 && u[2] === 0x44 && u[3] === 0x46);
+// `avec` : des scalaires à lire DANS LA MÊME requête que les octets (ex.
+// `tx:meta->>tx`). ⚠️ Sur `label_latest`, que l'extension réécrit à chaque
+// capture, deux requêtes séparées pouvaient rendre la transaction d'une capture
+// et le PDF de la suivante — le N° d'une paire tamponné sur l'étiquette d'une
+// autre (revue du 5 octobre). Une seule lecture = une seule version de la ligne.
+const lirePdfLigne = async (rowId, avec = '') => {
+  if (!rowId) return { absent: true };
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(rowId)}&select=pdfB64:data->>pdfB64,pdfTamponneB64:data->>pdfTamponneB64`, {
-      headers: sbAuth(),
-    });
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(rowId)}&select=b:data->>pdfB64${avec ? ',' + avec : ''}`, { headers: sbAuth() });
     if (!res.ok) return null;
-    const r = (await res.json())[0];
-    if (!r) return null;
-    const net = (v) => (v && v !== 'None') ? v : null;
-    return { pdfB64: net(r.pdfB64), pdfTamponneB64: net(r.pdfTamponneB64) };
+    const rows = await res.json();
+    if (!Array.isArray(rows)) return null;
+    const ligne = rows[0] || {};
+    const { b: v, ...scalaires } = ligne;
+    if (!v || v === 'None') return { absent: true, ...scalaires };
+    const octets = b64ToBytes(v);
+    return estOctetsPdf(octets) ? { octets, ...scalaires } : { absent: true, ...scalaires };
   } catch (_) { return null; }
 };
+// La règle « le PDF capté par l'extension d'abord, l'email en secours », UNE
+// fois (§11) — elle était recopiée à cinq endroits. Même rendu à trois états :
+// on ne conclut « absent » que si AUCUNE des deux lectures n'a échoué.
+const octetsBordereau = async (capteRow, bordRow) => {
+  let pasSu = false;
+  for (const row of [capteRow, bordRow]) {
+    if (!row) continue;
+    const r = await lirePdfLigne(row);
+    if (r && r.octets) return r;
+    if (r === null) pasSu = true;
+  }
+  return pasSu ? null : { absent: true };
+};
+// Ce qu'on dit quand il n'y a pas d'octets : deux causes, deux phrases.
+const messagePdfManquant = (r) => r === null
+  ? "La base n'a pas répondu — réessaie dans un instant."
+  : "Ce bordereau n'a plus son PDF — retélécharge-le depuis la vente sur Vinted.";
 // Suivi colis reçu par EMAIL (Mondial Relay / Chronopost) : lignes email_track_*
 // = { carrier, suivi, status, statusLabel, subject, receivedAt }.
 // Un email de CONFIRMATION de retrait/livraison ⟹ le colis n'est plus « à
@@ -2429,16 +2469,14 @@ const fetchHarvestOrdersBrut = async (uid) => {
 };
 // Récupère le dernier bordereau (PDF) capté par l'extension pour ce compte
 // (ligne harvest_{uid}_label_latest = {url, capturedAt, pdfB64}).
+// ⚠️ Plus de `select=data` (§4.4) : les SCALAIRES d'abord (quelle vente, quand),
+// les octets seulement s'il y a un PDF, par le lecteur unique.
 const fetchCapturedLabel = async (uid) => {
   if (!uid) return null;
-  try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.harvest_${uid}_label_latest&select=data`, {
-      headers: sbAuth(),
-    });
-    if (!res.ok) return null;
-    const rows = await res.json();
-    return rows[0]?.data || null;
-  } catch (_) { return null; }
+  // UNE requête : la transaction, la date et les octets viennent de la même
+  // version de la ligne (voir `lirePdfLigne`).
+  const r = await lirePdfLigne(`harvest_${uid}_label_latest`, 'capturedAt:meta->>capturedAt,tx:meta->>tx');
+  return r && r.octets ? { capturedAt: r.capturedAt || null, tx: r.tx || null, octets: r.octets } : null;
 };
 // ⚠️⚠️ ET C'EST EXACTEMENT CE QUI SE PASSAIT ENCORE, MESURÉ LE 15 SEPTEMBRE.
 // La version scalaire ci-dessous existait déjà, avec ce commentaire — mais
@@ -2467,6 +2505,13 @@ const fetchLabelFrais = async (uid) => {
 // d'abord les SCALAIRES (quelle vente, quand) pour savoir quoi afficher, et on
 // ne va chercher les octets qu'au moment d'imprimer. Sans ça, ouvrir l'écran
 // Bordereaux retéléchargerait un PDF par compte à chaque fois.
+// Les bordereaux captés, indexés par transaction : UNIQUEMENT les lignes
+// `label_{tx}`. ⚠️ `label_latest` n'est qu'une COPIE du dernier capté, que
+// l'extension réécrit à chaque capture : la retenir ici, c'était imprimer plus
+// tard le PDF d'une AUTRE vente sous ce N° (revue du 5 octobre). La ligne
+// `label_{tx}` existe toujours à côté (l'extension écrit les deux ensemble).
+const labelsParTransaction = (metas) => (Array.isArray(metas) ? metas : [])
+  .filter((m) => m && m.tx && !/_label_latest$/.test(String(m.id || '')));
 const fetchCapturedLabelMetas = async (uid) => {
   if (!uid) return [];
   try {
@@ -2523,33 +2568,20 @@ const fetchVersementsVinted = async () => {
     return map;
   } catch (_) { return null; }
 };
-// Les octets d'UN bordereau précis (par id de ligne) — seulement à l'impression.
-const fetchLabelPdf = async (rowId) => {
-  if (!rowId) return null;
-  try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(rowId)}&select=data`, { headers: sbAuth() });
-    if (!res.ok) return null;
-    const rows = await res.json();
-    return rows[0]?.data || null;
-  } catch (_) { return null; }
-};
 // Dernier REÇU / FACTURE officiel Vinted capté par l'extension quand tu l'as
 // consulté sur Vinted (ligne harvest_{uid}_receipt_latest). Pour la compta pro.
+// Scalaires seulement (§4.4) — le PDF ne part qu'au clic « Télécharger ».
+// Rend { row, capturedAt } · false (aucun reçu) · null (la base n'a pas répondu).
 const fetchCapturedReceipt = async (uid) => {
-  if (!uid) return null;
+  if (!uid) return false;
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.harvest_${uid}_receipt_latest&select=data`, {
-      headers: sbAuth(),
-    });
+    const row = `harvest_${uid}_receipt_latest`;
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${row}&select=capturedAt:meta->>capturedAt&meta->>_pdf=eq.true`, { headers: sbAuth() });
     if (!res.ok) return null;
     const rows = await res.json();
-    return rows[0]?.data || null;
+    if (!Array.isArray(rows)) return null;
+    return rows[0] ? { row, capturedAt: rows[0].capturedAt || null } : false;
   } catch (_) { return null; }
-};
-const b64ToArrayBuffer = (b64) => {
-  const bin = atob(b64); const len = bin.length; const bytes = new Uint8Array(len);
-  for (let i = 0; i < len; i++) bytes[i] = bin.charCodeAt(i);
-  return bytes.buffer;
 };
 // Extrait les dépenses de BOOST (remontée d'annonce, mise en avant) d'une réponse
 // facturation Vinted moissonnée, quel que soit le format exact. Parcours récursif :
@@ -2722,13 +2754,18 @@ const setVintedTokensRefreshedHandler = (fn) => { onVintedTokensRefreshed = fn; 
 
 const persistRefreshedTokens = async (account, refreshed) => {
   if (!refreshed || !refreshed.access_token) return;
-  // Mutation en memoire : les appels suivants de la meme sequence utilisent
-  // deja le token frais sans attendre le re-render React.
+  // L'état local suit (affichage, extension) — mais depuis le 4 octobre le
+  // relais relit les jetons EN BASE à chaque appel : seule la base compte.
   account.access_token = refreshed.access_token;
   account.refresh_token = refreshed.refresh_token;
-  try {
-    if (account.vinted_user_id) {
-      await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${account.vinted_user_id}`, {
+  // Le relais range lui-même les jetons qu'il vient de renouveler
+  // (`refreshed.persiste`). S'il n'a pas pu, on réessaie d'ici — et on regarde
+  // la réponse : une écriture ratée laisse en base un refresh_token déjà
+  // consommé, et le compte cesse de répondre au relais (revue du 5 octobre).
+  if (refreshed.persiste !== true && account.vinted_user_id) {
+    let ok = false;
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${account.vinted_user_id}`, {
         method: 'PATCH',
         headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
         body: JSON.stringify({
@@ -2737,8 +2774,10 @@ const persistRefreshedTokens = async (account, refreshed) => {
           updated_at: new Date().toISOString(),
         }),
       });
-    }
-  } catch (_) { /* best effort : la mutation memoire suffit pour la session */ }
+      ok = r.ok;
+    } catch (_) { ok = false; }
+    if (!ok) { try { console.warn('[VRM] jetons Vinted renouvelés mais non enregistrés — repasse sur Vinted avec ce compte pour les recapter'); } catch (_) {} }
+  }
   if (onVintedTokensRefreshed) {
     try { onVintedTokensRefreshed(account.vinted_user_id, refreshed); } catch (_) { /* ignore */ }
   }
@@ -2751,19 +2790,13 @@ const vintedApiCall = async (account, endpoint, opts = {}) => {
   try {
     const siteDomain = account.domain || 'www.vinted.fr';
     const host = opts.host || siteDomain;
+    // ⚠️ Le relais ne prend PLUS de jetons du navigateur (4 octobre : c'était un
+    // relais ouvert) : il exige la session VRM et lit lui-même les jetons du
+    // compte `uid`, en base, au nom du vendeur. Lecture seule (GET).
     const res = await fetch('/api/vinted-proxy', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        token: account.access_token,
-        refreshToken: account.refresh_token,
-        anonId: account.anon_id,
-        csrfToken: account.csrf_token,
-        host,
-        endpoint,
-        method: opts.method || 'GET',
-        body: opts.body,
-      }),
+      headers: { 'Content-Type': 'application/json', ...enTeteSession() },
+      body: JSON.stringify({ uid: String(account.vinted_user_id || ''), host, endpoint }),
     });
     const json = await res.json();
     // Le proxy a du rafraichir le token expire : on persiste les nouveaux tokens.
@@ -2987,6 +3020,32 @@ const ventesFaites = ({ vinted, lbc, ebay, cachee } = {}) => {
     if (garde('ebay:' + e.orderId)) lignes.push({ plateforme: 'eBay', ts: t, eur });
   }
   return { lignes, sansDate };
+};
+// Le résumé VENDU — aujourd'hui, ce mois, mois par mois — avec les bornes de
+// Ma journée (minuit LOCAL, le 1er du mois LOCAL). ⚠️ Pour les écrans qui ne
+// montent pas l'écran Ventes (accueil, Statistiques, widget) : ils affichaient
+// « vendu » calculé sur Vinted SEUL, figé à l'ouverture, pendant que Ma journée
+// comptait les trois plateformes — deux nombres pour une même notion (§11).
+const resumeVendu = (lignes, maintenant = Date.now()) => {
+  const minuit = new Date(maintenant); minuit.setHours(0, 0, 0, 0);
+  const debutMois = new Date(minuit); debutMois.setDate(1);
+  const out = { jour: { n: 0, eur: 0 }, mois: { n: 0, eur: 0 }, caParMois: {}, ventesParMois: {} };
+  for (const l of (lignes || [])) {
+    if (l.ts >= minuit.getTime()) { out.jour.n += 1; out.jour.eur += l.eur; }
+    if (l.ts >= debutMois.getTime()) { out.mois.n += 1; out.mois.eur += l.eur; }
+    const d = new Date(l.ts); const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    out.caParMois[k] = (out.caParMois[k] || 0) + l.eur; out.ventesParMois[k] = (out.ventesParMois[k] || 0) + 1;
+  }
+  return out;
+};
+// Un compte écarté des totaux par SON choix : masqué dans l'app, ou depuis le
+// panneau de l'extension (`panel_accounts_off`, trois états : `false` = rallumé
+// exprès, ça prime). Une seule règle pour l'écran Ventes et la coque (§11).
+const compteEcarte = (uid, masques, panneau) => {
+  const k = String(uid ?? '');
+  const pa = panneau || {};
+  if (pa[k] === false) return false;
+  return (masques && masques.has(k)) || pa[k] === true;
 };
 // Clé de jour LOCALE : toISOString() est en UTC et mettrait une vente de 23 h
 // sur le lendemain.
@@ -9430,10 +9489,16 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
     return {marques:top(parM), tailles:top(parT)};
   },[sales,catInfo]);
   // CA du mois courant (par date de VENTE, §5) pour la jauge d'objectif.
+  // ⚠️ Elle sommait l'ANCIENNE archive (`sales`, vide depuis juillet 2026) : la
+  //    jauge restait à 0 € quoi qu'il vende. Elle lit maintenant « vendu ce
+  //    mois », la règle de Ma journée (`liveStats.caMois`, §11) ; l'archive ne
+  //    sert plus qu'en repli tant que les ventes ne sont pas lues.
   const caMoisCourant=useMemo(()=>{
+    if (liveStats && liveStats.caMois!=null) return liveStats.caMois;
+    if (liveStats && liveStats.venduPasSu) return null;     // pas su : jamais l'archive vide (0 €)
     const now=new Date(); const ym=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
     return sales.reduce((s,v)=>{ const p=(v.saleDate||'').trim().split('/'); return (p.length===3 && `${p[2]}-${p[1]}`===ym) ? s+(+v.sellPrice||0) : s; },0);
-  },[sales]);
+  },[sales, liveStats]);
 
   // Paires ajoutées par jour (basé sur addedAt JJ/MM/AAAA).
   // On ignore la date d'init "01/01/2024" qui regroupe tout l'historique importé,
@@ -9609,8 +9674,16 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
 
       {/* AUJOURD'HUI : ce que tu as VENDU dans la journée (pas l'argent viré,
           qui arrive plusieurs jours après — deux choses différentes). */}
+      {liveStats && liveStats.venduPasSu && (
+        <div data-dash-vendu-pas-su="1" style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'13px 15px',marginBottom:12}}>
+          <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:3}}>Aujourd'hui</div>
+          <div style={{fontSize:15,fontWeight:600,color:C.text}}>—</div>
+          <div style={{fontSize:11,color:C.muted,fontWeight:400,marginTop:3}}>Tes ventes n'ont pas pu être lues — rien n'est perdu, rouvre l'app dans un instant.</div>
+        </div>
+      )}
       {liveStats && liveStats.ventesJour!=null && (
         <button type="button" onClick={()=>onGo&&onGo('cat_ventes')}
+          data-dash-vendu-jour={Math.round((liveStats.caJour||0)*100)} data-dash-vendu-jour-n={liveStats.ventesJour}
           style={{width:'100%',textAlign:'left',border:`1px solid ${liveStats.ventesJour>0?C.accent:C.border}`,background:liveStats.ventesJour>0?`${C.accent}0e`:C.card,borderRadius:10,padding:'13px 15px',marginBottom:12,cursor:'pointer',fontFamily:'inherit'}}>
           <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:3}}>Aujourd'hui</div>
           {liveStats.ventesJour>0 ? (
@@ -9625,14 +9698,18 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
                passe, l'explication reste une légende. */
             <div style={{fontSize:15,fontWeight:600,color:C.text}}>Pas encore de vente aujourd'hui</div>
           )}
-          <div style={{fontSize:11,color:C.muted,fontWeight:400,marginTop:3}}>Paires vendues dans la journée — pas l'argent viré, qui arrive plus tard.</div>
+          <div style={{fontSize:11,color:C.muted,fontWeight:400,marginTop:3}}>Ventes faites dans la journée, toutes plateformes — pas l'argent viré, qui arrive plus tard.</div>
+          {/* Un total partiel nomme ce qui manque, à côté — jamais à la place (§5). */}
+          {(liveStats.venduManque||[]).length>0 && (
+            <div data-dash-vendu-manque={liveStats.venduManque.join(',')} style={{fontSize:11,color:C.muted,fontWeight:500,marginTop:3}}>Sans {liveStats.venduManque.join(', ')} : pas pu être lu, rouvre l'app dans un instant.</div>
+          )}
         </button>
       )}
 
       {/* Résumé Vinted EN DIRECT (cliquable) */}
       {liveStats && (
         <div>
-          <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:8}}>Vinted en direct · ce mois</div>
+          <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:8}}>En direct · ce mois</div>
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(96px, 1fr))',gap:0,border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 0',overflow:'hidden',boxShadow:C.shadow||'none'}}>
             {[
               /* ⚠️ CES CHIFFRES SONT DES REPÈRES, aucun n'appelle une action : ils
@@ -9642,13 +9719,13 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
               /* « CA du mois » nommait les ventes FAITES (en cours comprises) avec le
                  mot du CA déclaré (l'argent reçu) — même correction que le héros
                  de Ma journée (4 octobre). */
-              {k:'caMois', icon:'💸', label:'Vendu ce mois', val:`${liveStats.caMois.toFixed(0)} €`, go:'cat_ventes', color:C.text},
-              {k:'enCours', icon:'⏳', label:'Ventes en cours', val:liveStats.enCours, go:'cat_ventes', color:C.text},
+              {k:'caMois', icon:'💸', label:'Vendu ce mois', val:liveStats.caMois!=null?`${liveStats.caMois.toFixed(0)} €`:'—', go:'cat_ventes', color:C.text},
+              {k:'enCours', icon:'⏳', label:'Ventes en cours', val:liveStats.enCours!=null?liveStats.enCours:'—', go:'cat_ventes', color:C.text},
               {k:'online', icon:'🟢', label:'Annonces en ligne', val:liveStats.online, go:'cat_annonces', color:C.text},
             ].map(s=>(
               <button key={s.k} onClick={()=>onGo&&onGo(s.go)} title={`Voir ${s.label.toLowerCase()}`}
                 style={{textAlign:'left',border:'none',background:'transparent',borderRadius:0,padding:0,cursor:'pointer',fontFamily:'inherit',display:'block',width:'100%'}}>
-                <StatBox compact label={s.label} value={s.val} color={s.color}/>
+                <span data-dash-stat={s.k} data-dash-cents={s.k==='caMois'&&liveStats.caMois!=null?Math.round(liveStats.caMois*100):undefined} style={{display:'contents'}}><StatBox compact label={s.label} value={s.val} color={s.color}/></span>
               </button>
             ))}
           </div>
@@ -9815,7 +9892,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>Bénéfice</div>
             {/* ⚠️ « n/d » est du vocabulaire d'informaticien : un tiret, et la
                 raison en clair — il n'est pas développeur. */}
-            <div className="vrm-display" style={{fontSize:27,fontWeight:700,color:C.muted}}>{liveStats&&liveStats.caMois!=null?'—':fmt(moisCourant.profit)}</div>
+            <div className="vrm-display" style={{fontSize:27,fontWeight:700,color:C.muted}}>{liveStats&&(liveStats.caMois!=null||liveStats.venduPasSu)?'—':fmt(moisCourant.profit)}</div>
             {liveStats&&liveStats.caMois!=null&&<div style={{fontSize:11,color:C.warn,fontWeight:600,marginTop:2}}>saisis tes prix d'achat</div>}
           </div>
           <div>
@@ -9933,7 +10010,8 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             trompeur. */}
         {(()=>{
           const hv = liveStats && liveStats.soldTotal!=null;
-          const venteMoy = hv && liveStats.soldTotal>0 ? liveStats.caEncaisse/liveStats.soldTotal : avgSale;
+          // Ventes illisibles : un tiret, jamais la moyenne de l'archive vide (0 €).
+          const venteMoy = liveStats && liveStats.venduPasSu ? null : (hv && liveStats.soldTotal>0 ? liveStats.caEncaisse/liveStats.soldTotal : avgSale);
           return (
         <>
         <div style={{display:'flex',flexWrap:'wrap',gap:10}}>
@@ -9943,7 +10021,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
               faire. Les cartes voisines le faisaient déjà — ces trois-là
               étaient restées en arrière (vues en capture le 7 septembre). */}
           <StatCard icon="⭐" label="× moyen" value={hv?'—':`×${avgX}`} color={C.muted}/>
-          <StatCard icon="💵" label="Vente moyenne" value={fmt(venteMoy)} color={C.text} sub={hv?`sur ${liveStats.soldTotal} vente${liveStats.soldTotal>1?'s':''}`:undefined}/>
+          <StatCard icon="💵" label="Vente moyenne" value={venteMoy==null?'—':fmt(venteMoy)} color={C.text} sub={hv?`sur ${liveStats.soldTotal} vente${liveStats.soldTotal>1?'s':''}`:undefined}/>
           <StatCard icon="✨" label="Bénéf. moyen / vente" value={hv?'—':fmt(avgProfit)} color={C.muted}/>
           {/* ⚠️ TRANCHÉ. Cette carte s'appelait « CA / jour actif » et comptait
               les jours d'après `receiveDate`, la date d'ENCAISSEMENT — retirée
@@ -10168,6 +10246,8 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             <input type="number" inputMode="decimal" value={objTmp} onChange={e=>setObjTmp(e.target.value)} placeholder="ex. 2000" style={{flex:1,minWidth:0,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,padding:'11px 12px',fontSize:16,fontFamily:'inherit',outline:'none'}}/>
             <button type="button" onClick={()=>{ const n=Math.max(0,+objTmp||0); setObjectif(n); save('vrm_ca_objectif',n); setObjEdit(false); }} style={{border:'none',background:C.accent,color:'#fff',borderRadius:10,padding:'11px 16px',fontSize:13.5,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>OK</button>
           </div>
+        ) : objectif>0 && caMoisCourant==null ? (
+          <div style={{fontSize:12,color:C.muted,marginTop:6,lineHeight:1.5}}>— · tes ventes n'ont pas pu être lues, la jauge revient dès qu'elles le sont.</div>
         ) : objectif>0 ? (()=>{ const pct=Math.min(100,Math.round(caMoisCourant/objectif*100)); const done=caMoisCourant>=objectif; return (
           <>
             <div style={{display:'flex',alignItems:'baseline',gap:8}}>
@@ -16366,8 +16446,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       cibles.forEach((a, i) => {
         // Compte non lu (`null`) : on garde ce qu'on savait de lui, on n'efface rien.
         if (metas[i] == null) { for (const [k, v] of Object.entries(prev || {})) if (v && String(v.uid) === String(a.vinted_user_id)) idx[k] = v; return; }
-        for (const meta of metas[i]) {
-          if (meta && meta.tx) idx[String(meta.tx)] = { uid: a.vinted_user_id, acc: a, row: meta.id, capturedAt: meta.capturedAt || null, item: meta.item || '' };
+        for (const meta of labelsParTransaction(metas[i])) {
+          idx[String(meta.tx)] = { uid: a.vinted_user_id, acc: a, row: meta.id, capturedAt: meta.capturedAt || null, item: meta.item || '' };
         }
       });
       return idx;
@@ -16879,9 +16959,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   //   • `panel_accounts_off`      → « ✕ Masquer » depuis le panneau (§35)
   // ⚠️ Le trois-états du panneau est conservé : `false` = rallumé exprès, ça prime.
   const acctOff = (uid) => {
-    const k = String(uid ?? '');
-    if (panelAcctOff[k] === false) return false;      // rallumé depuis le panneau
-    return hiddenAccts.has(k) || panelAcctOff[k] === true;
+    // La règle vit dans `compteEcarte` (partagée avec la coque, §11).
+    return compteEcarte(uid, hiddenAccts, panelAcctOff);
   };
   // ── LES COMPTES QUI EXISTENT VRAIMENT ────────────────────────────────────
   // Un compte existe s'il a des jetons (ligne `vinted_accounts`), pas parce
@@ -20919,16 +20998,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, buysBase, reportYear, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements]);
   const [capturedReceipts, setCapturedReceipts] = useState([]); // reçus officiels Vinted captés (compta pro)
+  const [recusPasLus, setRecusPasLus] = useState(0); // comptes dont la lecture du reçu a échoué (pas su ≠ aucun)
   const openAnnual = async () => {
     setShowAnnual(true);
     if (buys.items===null && accounts.length) loadOrders('purchased', setBuys);
     // Reçus officiels Vinted captés par l'extension (compta pro), par compte.
-    const out=[];
-    for (const a of accounts) { const r = await fetchCapturedReceipt(a.vinted_user_id); if (r && r.pdfB64) out.push({ name: accName(a), ...r }); }
-    setCapturedReceipts(out);
+    // Les comptes sont lus ENSEMBLE (lectures de NOTRE base, pas de Vinted), et
+    // une lecture ratée ne se fait pas passer pour « aucun reçu ».
+    const lus = await Promise.all(accounts.map(a => fetchCapturedReceipt(a.vinted_user_id).then(r => ({ a, r }))));
+    setCapturedReceipts(lus.filter(x => x.r).map(x => ({ name: accName(x.a), ...x.r })));
+    setRecusPasLus(lus.filter(x => x.r === null).length);
   };
-  const downloadReceipt = (rec) => {
-    try { const buf=b64ToArrayBuffer(rec.pdfB64); const blob=new Blob([buf],{type:'application/pdf'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`recu-vinted-${(rec.name||'compte').replace(/[^a-z0-9]/gi,'_')}.pdf`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),3000); } catch(_){ toast('Impossible d\'ouvrir ce reçu.'); }
+  const downloadReceipt = async (rec) => {
+    const lu = await lirePdfLigne(rec.row);
+    if (!lu || !lu.octets) { toast(lu === null ? "La base n'a pas répondu — réessaie dans un instant." : "Ce reçu n'a plus son PDF."); return; }
+    try { const buf=lu.octets; const blob=new Blob([buf],{type:'application/pdf'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`recu-vinted-${(rec.name||'compte').replace(/[^a-z0-9]/gi,'_')}.pdf`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),3000); } catch(_){ toast('Impossible d\'ouvrir ce reçu.'); }
   };
   const exportAnnualCsv = () => {
     const R=annual; const e=(v)=>`"${String(v==null?'':v).replace(/"/g,'""')}"`;
@@ -21050,17 +21134,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const num = (effEntry(o) && effEntry(o).numero) || (b ? numForBord(b) : '') || '';
     const titre = (o && o.title) || (b ? (b.modele || b.article || '') : '');
     if (b && b.hasPdf && invForBord(b)) { await printBordAndInvoice(b); return; }
-    let bytes = null;
-    if (capte) { const l = await fetchLabelPdf(capte.row); bytes = l && l.pdfB64 ? b64ToBytes(l.pdfB64) : null; }
-    if (!bytes && b && b.hasPdf) { const p = await fetchBordPdf(b._row); bytes = p && p.pdfB64 ? b64ToBytes(p.pdfB64) : null; }
-    if (!bytes) { libererOngletPdf(); toast('PDF illisible — réessaie dans un instant.'); return; }
-    processBordereau(num, titre, bytes);
+    const lu = await octetsBordereau(capte && capte.row, b && b.hasPdf ? b._row : null);
+    if (!lu || !lu.octets) { libererOngletPdf(); toast(messagePdfManquant(lu)); return; }
+    processBordereau(num, titre, lu.octets);
   };
   const printBordAndInvoice = async (b) => {
     try {
-      const pdf = await fetchBordPdf(b._row);
-      const buf = pdf && pdf.pdfB64 ? b64ToBytes(pdf.pdfB64) : null;
-      if (!buf) { libererOngletPdf(); toast('PDF du bordereau illisible.'); return; }
+      const lu = await lirePdfLigne(b._row);
+      const buf = lu && lu.octets ? lu.octets : null;
+      if (!buf) { libererOngletPdf(); toast(messagePdfManquant(lu)); return; }
       const numero = numForBord(b), title = b.modele || b.article || '';
       const { width, height } = await readPdfFirstPageSize(buf);
       const pos = posForFormat(width, height);
@@ -21204,16 +21286,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // Les PDF sont téléchargés MAINTENANT, et seulement ceux à imprimer :
       // les embarquer dans la liste coûtait 6 Mo à chaque ouverture de l'écran.
       const items = [];
+      let pasLus = 0, sansPdf = 0;
       for (const e of aImprimer) {
         const o = e.o, b = e.b;
         // ⚠️ LE PDF CAPTÉ PAR L'EXTENSION PASSE EN PREMIER (même règle que la
         //    carte, § per-card) : c'est l'étiquette prise chez Vinted, rattachée
         //    par n° de transaction ; l'email n'est qu'un secours.
-        let buf = null;
         const capte = e.txn ? labelsCaptes[e.txn] : null;
-        if (capte) { const l = await fetchLabelPdf(capte.row); buf = l && l.pdfB64 ? b64ToBytes(l.pdfB64) : null; }
-        if (!buf && b && b.hasPdf) { const p = await fetchBordPdf(b._row); buf = p && p.pdfB64 ? b64ToBytes(p.pdfB64) : null; }
-        if (!buf) continue;   // PDF illisible : on saute, on n'imprime pas du vide
+        const lu = await octetsBordereau(capte && capte.row, b && b.hasPdf ? b._row : null);
+        if (lu === null) pasLus++; else if (!lu.octets) sansPdf++;
+        const buf = lu && lu.octets ? lu.octets : null;
+        if (!buf) continue;   // pas d'octets : on saute, on n'imprime pas du vide — et on le DIT après
         // Numéro et titre : même dérivation que la carte (identité Vinted, jamais
         // le titre — §5). Numéro depuis le bordereau si on l'a, sinon la vente.
         const numero = (b ? numForBord(b) : '') || (o ? (effEntry(o)?.numero || '') : '');
@@ -21225,10 +21308,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if (inv) { const ent = entForBordInvoice(inv); if (ent) { try { invBytes = await buildFacturXBytes(inv, ent); } catch(_) {} } }
         items.push({ numero, title, pdfBuf: buf, invBytes });
       }
-      if (!items.length) { libererOngletPdf(); toast('Les PDF n\'ont pas pu être lus. Réessaie dans un instant.'); setBatchBusy(false); return; }
+      if (!items.length) { libererOngletPdf(); toast(pasLus ? "La base n'a pas répondu — réessaie dans un instant." : "Ces bordereaux n'ont plus leur PDF — retélécharge-les depuis les ventes sur Vinted."); setBatchBusy(false); return; }
       const r = await mergeAndDownloadBordereaux(items, (w, h) => posForFormat(w, h, false), { autoprint: true, imprimante });
       setBordResult({ ...r, batch: true });
-    } catch(err){ libererOngletPdf(); toast('Erreur : ' + String(err)); }
+      // Un lot imprimé en partie ne se présente pas comme complet (§5). Le
+      // nombre imprimé est celui que la fusion a VRAIMENT gardé (`r.count`) :
+      // un PDF qui commence par %PDF mais que pdf-lib refuse (chiffré, abîmé)
+      // est écarté par la fusion, et il doit être compté ici aussi.
+      const imprimes = Number(r && r.count) || 0;
+      const illisibles = Math.max(0, items.length - imprimes);
+      if (pasLus || sansPdf || illisibles) toast(`${imprimes} sur ${aImprimer.length} imprimé${imprimes>1?'s':''} — ${[pasLus?`${pasLus} que la base n'a pas rendu${pasLus>1?'s':''} (réessaie)`:'', sansPdf?`${sansPdf} sans PDF`:'', illisibles?`${illisibles} PDF illisible${illisibles>1?'s':''} (retélécharge-le${illisibles>1?'s':''} depuis la vente sur Vinted)`:''].filter(Boolean).join(', ')}.`);
+    } catch(err){ libererOngletPdf(); toast(/Aucun bordereau exploitable/.test(String(err && err.message || err)) ? "Aucun de ces PDF n'a pu être lu — retélécharge-les depuis les ventes sur Vinted." : 'Erreur : ' + String(err)); }
     setBatchBusy(false);
   };
   // Deep-link « Tout imprimer » depuis l'extension (?print=bord) : dès que les
@@ -21267,18 +21357,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     //    que le bordereau porte SA transaction ; sinon on ne propose rien.
     let lbl = null;
     if (tx && labelsCaptes[String(tx)]) {
-      const l = await fetchLabelPdf(labelsCaptes[String(tx)].row);
-      if (l && l.pdfB64) lbl = { pdfB64: l.pdfB64, capturedAt: labelsCaptes[String(tx)].capturedAt, tx: String(tx) };
+      const l = await lirePdfLigne(labelsCaptes[String(tx)].row);
+      if (l && l.octets) lbl = { octets: l.octets, capturedAt: labelsCaptes[String(tx)].capturedAt, tx: String(tx) };
     }
     if (!lbl && acc) {
       const dernier = await fetchCapturedLabel(acc.vinted_user_id);
       if (dernier && (!tx || String(dernier.tx || '') === String(tx))) lbl = dernier;
     }
-    if (lbl && lbl.pdfB64) {
+    if (lbl && lbl.octets) {
       const age = lbl.capturedAt ? (Date.now()-new Date(lbl.capturedAt).getTime())/60000 : 999;
       const mins = Math.max(0, Math.round(age));
       if (age<60 && await askConfirm(`📄 Tamponner en 1 clic le bordereau téléchargé il y a ${mins} min, avec le N°${numero} (${title}) ?\n\nOK = oui (auto) · Annuler = choisir un fichier`)) {
-        try { await processBordereau(numero, title, b64ToArrayBuffer(lbl.pdfB64)); return; } catch(_){}
+        try { await processBordereau(numero, title, lbl.octets); return; } catch(_){}
       }
     }
     bordRef.current?.click();
@@ -24733,11 +24823,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           // VÉRIFICATION (il arrive plus tard, et son numéro vient
                           // d'un rapprochement par titre, §5.17) — donc un secours,
                           // pas la source.
-                          let bytes = null;
-                          if (capte) { const l=await fetchLabelPdf(capte.row); bytes = l&&l.pdfB64?b64ToBytes(l.pdfB64):null; }
-                          if (!bytes && b && b.hasPdf) { const p=await fetchBordPdf(b._row); bytes = p&&p.pdfB64?b64ToBytes(p.pdfB64):null; }
-                          if (!bytes) { libererOngletPdf(); toast('PDF illisible.'); return; }
-                          processBordereau(num, titre, bytes);
+                          const lu = await octetsBordereau(capte && capte.row, b && b.hasPdf ? b._row : null);
+                          if (!lu || !lu.octets) { libererOngletPdf(); toast(messagePdfManquant(lu)); return; }
+                          processBordereau(num, titre, lu.octets);
                         }} title={inv?'Bordereau tamponné + facture pro, puis impression':'Bordereau tamponné, puis impression'}
                         style={{flex:'1 1 160px',maxWidth:340,border:'none',background:C.accent,color:'#fff',borderRadius:10,padding:'12px',cursor:'pointer',fontSize:15,fontWeight:600,fontFamily:'inherit'}}>🖨 Imprimer{inv?' + facture':''}</button>
                       ) : (<>
@@ -24883,7 +24971,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <div style={{fontSize:12,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{numForBord(b)?`N°${numForBord(b)} · `:''}{b.modele||b.article||'Bordereau'}</div>
                     <div style={{fontSize:11,color:C.muted}}>{b.receivedAt?`reçu le ${new Date(b.receivedAt).toLocaleDateString('fr-FR')}`:''}</div>
                   </div>
-                  {b.hasPdf && <button type="button" data-imprime="1" onClick={async ()=>{ const p=await fetchBordPdf(b._row); const bytes=p&&p.pdfB64?b64ToBytes(p.pdfB64):null; if(!bytes){libererOngletPdf();toast('PDF illisible.');return;} processBordereau(numForBord(b), b.modele||b.article||'', bytes); }} style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:8,padding:'6px 10px',cursor:'pointer',fontSize:12,fontWeight:600,fontFamily:'inherit'}}>🖨 Réimprimer</button>}
+                  {b.hasPdf && <button type="button" data-imprime="1" onClick={async ()=>{ const lu=await lirePdfLigne(b._row); if(!lu||!lu.octets){libererOngletPdf();toast(messagePdfManquant(lu));return;} processBordereau(numForBord(b), b.modele||b.article||'', lu.octets); }} style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:8,padding:'6px 10px',cursor:'pointer',fontSize:12,fontWeight:600,fontFamily:'inherit'}}>🖨 Réimprimer</button>}
                 </div>
               ))}
           </div>
@@ -25158,7 +25246,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         <button type="button" onClick={()=>downloadReceipt(rec)} style={{flexShrink:0,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,borderRadius:8,padding:'5px 11px',cursor:'pointer',fontSize:12,fontWeight:600}}>⬇️ Télécharger</button>
                       </div>
                     ))}
+                    {/* Une liste partielle ne se présente pas comme complète (§5) :
+                        un compte dont la lecture a échoué ne disparaît pas en
+                        silence derrière les reçus des autres. */}
+                    {recusPasLus>0 && <div data-recus-pas-lus={recusPasLus} style={{fontSize:11,color:C.muted,lineHeight:1.5,marginTop:4}}>Et la base n'a pas répondu pour {recusPasLus} autre{recusPasLus>1?'s':''} compte{recusPasLus>1?'s':''} — rouvre le bilan dans un instant.</div>}
                   </>
+                ) : recusPasLus>0 ? (
+                  <div data-recus-pas-lus={recusPasLus} style={{fontSize:11,color:C.muted,lineHeight:1.5}}>La base n'a pas répondu pour {recusPasLus} compte{recusPasLus>1?'s':''} — rouvre le bilan dans un instant.</div>
                 ) : (
                   <div style={{fontSize:11,color:C.muted,lineHeight:1.5}}>Aucun reçu capté pour l'instant. Ouvre/télécharge un reçu ou une facture officielle sur Vinted (avec l'extension active) → il apparaîtra ici, prêt pour ta compta.</div>
                 )}
@@ -30180,6 +30274,14 @@ function AppCoeur() {
   //    l'extension ».
   const premierJour = accountsLoaded && !baseKO && vintedAccounts.length === 0;
   const [liveStats,setLiveStats]=useState(null); // résumé Vinted en direct pour l'accueil
+  // Les ventes Vinted de TOUS les comptes liés, telles que l'écran Ventes les lit
+  // (`_acc` posé) : `undefined` pas encore lu · `null` aucune lecture n'a abouti.
+  const [ventesCoque,setVentesCoque]=useState(undefined);
+  // Les comptes dont la lecture des ventes a ÉCHOUÉ (uid) : sans eux, « vendu »
+  // est un total PARTIEL — dit comme tel, jamais publié au widget (§5).
+  const [ventesKO,setVentesKO]=useState([]);
+  // Ce que le widget publie hors « vendu » (attente, encaissé, stock, messages).
+  const [widgetBase,setWidgetBase]=useState(null);
   // ── « Le prix qui marche » : chargé À LA DEMANDE (onglet ouvert), une fois ──
   // Lit les ventes FINALISÉES et les annonces en ligne, regroupe par
   // modèle+taille (grouperPrixMarche). `null` = pas encore lu · [] = lu, rien
@@ -30207,10 +30309,12 @@ function AppCoeur() {
   // la section « Ventes Leboncoin » de l'écran Ventes (§11) ; ici c'est le seul
   // lecteur côté COQUE, pour alimenter le tableau de bord.
   const [lbcVentes,setLbcVentes]=useState({ ventes:[], inconnues:0 });
+  // Trois états : `undefined` pas encore lu · `null` pas su · `true` lu.
+  const [lbcCoqueLu,setLbcCoqueLu]=useState(undefined);
   useEffect(()=>{ (async()=>{
     try {
       const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=data`, { headers: sbAuth() });
-      if (!r.ok) return;
+      if (!r.ok) { setLbcCoqueLu(null); return; }
       const rows = await r.json();
       const obj = (rows && rows[0] && rows[0].data && rows[0].data.ventes) || {};
       const arr = Object.values(obj);
@@ -30221,7 +30325,8 @@ function AppCoeur() {
       // ventes (photo, titre, prix, statut). Avant, ils étaient simplement jetés.
       setLbcVentes({ ventes: arr.filter(o => o && o.isSeller === true), achats: arr.filter(o => o && o.isSeller === false), inconnues: inc.length,
         inconnuesListe: inc.slice().sort((a,b)=>String(b.at||'').localeCompare(String(a.at||''))) });
-    } catch (_) { /* pas su ⇒ rien : jamais un faux « vendu » */ }
+      setLbcCoqueLu(true);
+    } catch (_) { setLbcCoqueLu(null); /* pas su ⇒ rien : jamais un faux « vendu » */ }
   })(); }, []);
   // CA eBay pour le Tableau de bord / le Collectif : la somme des commandes
   // PAYÉES captées (`caEbayPayees`, la MÊME règle que la carte « payées » de
@@ -30229,14 +30334,30 @@ function AppCoeur() {
   // Collectif lit « pas encore de vente », jamais 0 € (§5). Une lecture ratée
   // reste `null` : « pas su » ne vaut pas « zéro vente ».
   const [ebayCa,setEbayCa]=useState(null);
+  // Les commandes eBay brutes, pour « vendu » (même règle que Ma journée).
+  // `undefined` pas encore lu · `null` pas su · tableau lu.
+  const [ebayCommandes,setEbayCommandes]=useState(undefined);
+  // `panel_accounts_off` : les comptes écartés depuis le panneau (§35), lus ici
+  // aussi pour que « vendu » écarte exactement les mêmes comptes que Ma journée.
+  const [panelOffCoque,setPanelOffCoque]=useState({});
+  useEffect(()=>{ (async()=>{
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_accounts_off&select=data`, { headers: sbAuth() });
+      if (!r.ok) return;
+      const j = await r.json();
+      const d = (j && j[0] && j[0].data) || {};
+      if (d && typeof d === 'object') setPanelOffCoque(d);
+    } catch (_) {}
+  })(); }, []);
   useEffect(()=>{ (async()=>{
     try {
       const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.ebay_orders&select=data`, { headers: sbAuth() });
-      if (!r.ok) return;
+      if (!r.ok) { setEbayCommandes(null); return; }
       const rows = await r.json();
       const orders = (rows && rows[0] && rows[0].data && rows[0].data.orders) || [];
       setEbayCa(caEbayPayees(orders));
-    } catch (_) { /* pas su ⇒ null : jamais un faux CA eBay */ }
+      setEbayCommandes(Array.isArray(orders) ? orders : []);
+    } catch (_) { setEbayCommandes(null); /* pas su ⇒ null : jamais un faux CA eBay */ }
   })(); }, []);
   useEffect(()=>{
     let stop=false;
@@ -30533,15 +30654,27 @@ function AppCoeur() {
       // → chargement du tableau de bord bien plus rapide (avant : 9 comptes × 3
       // appels en série). Lecture moissonnée d'abord, donc paralléliser est sûr.
       const activeAccts=vintedAccounts.filter(a=>!skipAcc(a.vinted_user_id));
-      const perAcc=await Promise.all(activeAccts.map(async a=>{
+      // ⚠️ Les VENTES de tous les comptes liés (bloqués compris) partent aussi
+      //    dans « vendu » (`ventesFaites`, la règle de Ma journée) : un compte que
+      //    Vinted a refusé a quand même vendu. Seuls les comptes que Julien a
+      //    écartés (`compteEcarte`) en sortent — comme sur l'écran Ventes.
+      const perAcc=await Promise.all(vintedAccounts.map(async a=>{
+        const actif=!skipAcc(a.vinted_user_id);
         const [sold,list,conv]=await Promise.all([
           fetchVintedOrders(a,'sold',1,'all'),
-          fetchVintedListings(a,1),
-          fetchVintedConversations(a,1),
+          actif?fetchVintedListings(a,1):Promise.resolve({ok:false,items:[]}),
+          actif?fetchVintedConversations(a,1):Promise.resolve({ok:false,items:[]}),
         ]);
-        return { a, sold, list, conv };
+        return { a, sold, list, conv, actif };
       }));
-      for(const { a, sold, list, conv } of perAcc){
+      const ventesToutes=[]; let ventesLues=false; const vusTx=new Set();
+      for(const { a, sold } of perAcc){
+        if(!sold.ok) continue; ventesLues=true;
+        for(const o of sold.items){ const id=String(o.transaction_id!=null?o.transaction_id:o.id); if(vusTx.has(id)) continue; vusTx.add(id); ventesToutes.push({ ...o, _acc: a }); }
+      }
+      if(!stop){ setVentesCoque(ventesLues?ventesToutes:null); setVentesKO(perAcc.filter(p=>!p.sold.ok).map(p=>String(p.a.vinted_user_id))); }
+      for(const { a, sold, list, conv, actif } of perAcc){
+        if(!actif) continue;
         if(sold.ok){ ok=true; for(const o of sold.items){
           if(hiddenTx.has(String(o.transaction_id))) continue;
           const st=classifyOrderStatus(o.status);
@@ -30645,20 +30778,117 @@ function AppCoeur() {
         walletComptes:(walletEsc&&walletEsc.accounts)||0,
         walletAgeJours:(walletEsc&&walletEsc.plusVieuxJours!=null)?walletEsc.plusVieuxJours:null});
         // Photo des chiffres pour le WIDGET écran d'accueil : l'app publie ce
-        // qu'elle affiche → le widget montre EXACTEMENT la même chose. « Synchroniser »
-        // le widget = simplement ouvrir l'app (qui réécrit cette ligne).
-        try{
-          await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`,{
-            method:'POST',
-            headers:sbAuth({ 'Content-Type':'application/json',Prefer:'resolution=merge-duplicates,return=minimal' }),
-            body:JSON.stringify([withOwner({id:'widget_stats',data:{caMois:Math.round(caMois),ventesMois,enAttente:Math.round(enAttenteReel),caEncaisse:Math.round(caEncaisse),online,unread,pairesStock,updatedAt:new Date().toISOString()}})]),
-          });
-        }catch(_){}
+        // qu'elle affiche → le widget montre EXACTEMENT la même chose. « Vendu ce
+        // mois » est complété plus bas avec `ventesFaites` (toutes plateformes),
+        // quand Leboncoin et eBay sont lus — c'est l'effet du widget qui écrit.
+        setWidgetBase({enAttente:Math.round(enAttenteReel),caEncaisse:Math.round(caEncaisse),online,unread,pairesStock});
       }
     })();
     return ()=>{stop=true;};
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[accountsLoaded, vintedAccounts, nuagePret]);
+
+  // ── « VENDU » : UNE RÈGLE, CELLE DE MA JOURNÉE (§11, 4 octobre) ────────────
+  // L'accueil (« Aujourd'hui »), Statistiques (« Vendu ce mois », la courbe) et
+  // le widget de l'iPhone lisaient `liveStats` : Vinted SEUL, comptes bloqués
+  // exclus, figé à l'ouverture — pendant que Ma journée comptait Vinted +
+  // Leboncoin + eBay par `ventesFaites`. Deux nombres pour une même notion.
+  // Ils lisent maintenant le résultat de la MÊME fonction, sur les mêmes ventes
+  // (tous les comptes liés, `_acc` posé), les mêmes exclusions (ventes masquées,
+  // `compteEcarte`) et les mêmes bornes (`resumeVendu`). Tant que les ventes
+  // ne sont pas encore revenues, on garde ce qu'on a ; quand AUCUNE n'a pu être
+  // lue, chaque chiffre tiré des ventes vaut `null` (voir plus bas).
+  // « Vendu » doit suivre ce qui le change, pas seulement l'ouverture de l'app
+  // (revue du 5 octobre) : une vente masquée d'un ✕, un compte écarté, une
+  // nouvelle vente rangée par l'extension, et MINUIT (une PWA reste ouverte).
+  const [masquesTick, setMasquesTick] = useState(0);
+  useEffect(() => {
+    const f = (e) => { const k = e && e.detail && e.detail.k; if (k === 'vinted_sales_hidden' || k === 'vinted_accounts_hidden') setMasquesTick(t => t + 1); };
+    window.addEventListener('vrm:save', f);
+    return () => window.removeEventListener('vrm:save', f);
+  }, []);
+  const [jourCle, setJourCle] = useState(() => new Date().toDateString());
+  useEffect(() => {
+    const t = setInterval(() => { const k = new Date().toDateString(); setJourCle(p => (p === k ? p : k)); }, 60000);
+    return () => clearInterval(t);
+  }, []);
+  useEffect(() => {
+    const f = async (e) => {
+      const d = e && e.detail;
+      if (!d || d.type !== 'maj' || d.quoi !== 'ventes' || !d.uid) return;
+      const uid = String(d.uid);
+      const a = (vintedAccounts || []).find(x => String(x.vinted_user_id) === uid);
+      if (!a) return;
+      try { _rowCache.delete(`o:${uid}`); } catch (_) {}
+      const sold = await fetchVintedOrders(a, 'sold', 1, 'all');
+      setVentesKO(ko => { const n = new Set(ko); if (sold.ok) n.delete(uid); else n.add(uid); return [...n]; });
+      if (!sold.ok) return;
+      setVentesCoque(prev => {
+        if (prev === undefined) return prev;                    // pas encore lu : l'effet principal s'en charge
+        const autres = (Array.isArray(prev) ? prev : []).filter(o => String(o && o._acc && o._acc.vinted_user_id) !== uid);
+        const vus = new Set(autres.map(o => String(o.transaction_id != null ? o.transaction_id : o.id)));
+        const neuves = [];
+        for (const o of sold.items) { const id = String(o.transaction_id != null ? o.transaction_id : o.id); if (vus.has(id)) continue; vus.add(id); neuves.push({ ...o, _acc: a }); }
+        return [...autres, ...neuves];
+      });
+    };
+    window.addEventListener('vrm:ext', f);
+    return () => window.removeEventListener('vrm:ext', f);
+  }, [vintedAccounts]);
+  // ⚠️⚠️ « RIEN LU » NE VAUT PAS « RIEN » (revue du 5 octobre). Quand AUCUNE
+  //    lecture de ventes n'a abouti, la boucle d'au-dessus a quand même posé
+  //    `liveStats` avec des ZÉROS (une lecture d'annonces avait réussi) : l'écran
+  //    disait « Pas encore de vente aujourd'hui · Vendu ce mois 0 € » et le
+  //    widget publiait 0 €. Pas su ⇒ chaque chiffre tiré des ventes vaut `null`.
+  //    Et un total PARTIEL (un compte, Leboncoin ou eBay illisibles) NOMME ce
+  //    qui manque (`venduManque`) — jamais présenté comme complet (§5).
+  const VENDU_PAS_SU = { caJour: null, ventesJour: null, caMois: null, ventesMois: null, caParMois: null, ventesParMois: null,
+    caEncaisse: null, enCours: null, soldTotal: null, joursVente: null, caParCompte: null, venduPasSu: true };
+  const liveStatsVus = useMemo(() => {
+    if (!liveStats) return liveStats;
+    if (ventesCoque === null) return { ...liveStats, ...VENDU_PAS_SU };
+    if (!Array.isArray(ventesCoque)) return liveStats;
+    try {
+      const hTx = new Set((load('vinted_sales_hidden', []) || []).map(String));
+      const hAcc = new Set((load('vinted_accounts_hidden', []) || []).map(String));
+      const ecarte = (uid) => compteEcarte(uid, hAcc, panelOffCoque);
+      const cachee = (o) => hTx.has(String(o && o.transaction_id)) || ecarte(o && o._acc && o._acc.vinted_user_id);
+      const v = ventesFaites({ vinted: ventesCoque, lbc: lbcCoqueLu === true ? ((lbcVentes && lbcVentes.ventes) || []) : [], ebay: Array.isArray(ebayCommandes) ? ebayCommandes : [], cachee });
+      const r = resumeVendu(v.lignes);
+      const loginDe = (uid) => { const a = (vintedAccounts || []).find(x => String(x.vinted_user_id) === String(uid)); return (a && a.login) || String(uid); };
+      const venduManque = [
+        ...ventesKO.filter(uid => !ecarte(uid)).map(loginDe),
+        ...(lbcCoqueLu === null ? ['Leboncoin'] : []),
+        ...(ebayCommandes === null ? ['eBay'] : []),
+      ];
+      return { ...liveStats, caJour: r.jour.eur, ventesJour: r.jour.n, caMois: r.mois.eur, ventesMois: r.mois.n,
+        caParMois: r.caParMois, ventesParMois: r.ventesParMois, venduSansDate: v.sansDate,
+        venduManque, venduEnAttente: lbcCoqueLu === undefined || ebayCommandes === undefined };
+    } catch (_) { return liveStats; }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveStats, ventesCoque, ventesKO, lbcVentes, lbcCoqueLu, ebayCommandes, panelOffCoque, nuagePret, masquesTick, jourCle, vintedAccounts]);
+  // Le widget : écrit quand ce qu'il afficherait CHANGE (pas à chaque rendu),
+  // et SEULEMENT un « vendu » complet : sources pas encore revenues, illisibles
+  // ou un compte manquant ⇒ on n'écrit pas, l'iPhone garde la dernière photo
+  // complète plutôt qu'un chiffre plus petit présenté comme le bon (§5).
+  const widgetEcrit = React.useRef('');
+  useEffect(() => {
+    if (!widgetBase || !liveStatsVus) return;
+    if (liveStatsVus.venduPasSu || liveStatsVus.venduEnAttente || (liveStatsVus.venduManque || []).length || liveStatsVus.caMois == null) return;
+    const data = { ...widgetBase, caMois: Math.round(liveStatsVus.caMois || 0), ventesMois: liveStatsVus.ventesMois || 0 };
+    const cle = JSON.stringify(data);
+    if (cle === widgetEcrit.current) return;
+    widgetEcrit.current = cle;
+    (async () => {
+      try {
+        await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
+          method: 'POST',
+          headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }),
+          body: JSON.stringify([withOwner({ id: 'widget_stats', data: { ...data, updatedAt: new Date().toISOString() } })]),
+        });
+      } catch (_) {}
+    })();
+  }, [widgetBase, liveStatsVus]);
 
   const vintedNotifChecked = React.useRef(false);
   // Le propriétaire des colis à retirer (`pickupUnion`) publie ses comptes ;
@@ -31489,14 +31719,14 @@ function AppCoeur() {
             annoncer « 🎉 Tout est à jour ! » pendant la panne, c'est-à-dire
             précisément l'écran qu'il ouvre le matin. Corriger « partout » se
             vérifie au rendu, écran par écran, pas en lisant le code. */}
-        {tab==='journee'&&<Comptabilite key="journee" accounts={vintedAccounts} only="journee" liveStats={liveStats} onNav={setTab} baseKO={baseKO} accountsReady={accountsLoaded} premierJour={premierJour} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}
+        {tab==='journee'&&<Comptabilite key="journee" accounts={vintedAccounts} only="journee" liveStats={liveStatsVus} onNav={setTab} baseKO={baseKO} accountsReady={accountsLoaded} premierJour={premierJour} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}
         {/* ⚠️ « Bienvenue 👋 · connecte ton compte Vinted pour commencer » à
             quelqu'un qui a neuf comptes : c'est ce qu'il voyait quand la base
             ne répondait pas. `baseKO` distingue « aucun compte » de « je n'ai
             pas pu lire », et l'écran le DIT au lieu de repartir de zéro. */}
         {tab==='dashboard'&&premierJour&&<Onboarding setTab={setTab}/>}
-        {tab==='dashboard'&&<Dashboard premierJour={premierJour} catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices} liveStats={liveStats} lbcVentes={lbcVentes} ebayCa={ebayCa} onGo={setTab} actions={notifItems} baseKO={baseKO}/>}
-        {tab==='collectif'&&<Collectif liveStats={liveStats} lbcVentes={lbcVentes} ebayCa={ebayCa} onGo={setTab} baseKO={baseKO} actions={notifItems} premierJour={premierJour}/>}
+        {tab==='dashboard'&&<Dashboard premierJour={premierJour} catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices} liveStats={liveStatsVus} lbcVentes={lbcVentes} ebayCa={ebayCa} onGo={setTab} actions={notifItems} baseKO={baseKO}/>}
+        {tab==='collectif'&&<Collectif liveStats={liveStatsVus} lbcVentes={lbcVentes} ebayCa={ebayCa} onGo={setTab} baseKO={baseKO} actions={notifItems} premierJour={premierJour}/>}
         {/* ⚠️ UN SEUL ONGLET VINTED QUI CONTIENT TOUT : Aperçu (CA, argent,
             compteurs) + Annonces / Ventes / Achats rendus À L'INTÉRIEUR, via les
             MÊMES composants que les écrans séparés (aucune duplication §11). Les
@@ -31507,12 +31737,12 @@ function AppCoeur() {
           {/* Résumé CA/argent TOUJOURS visible en haut, puis la liste (ventes par
               défaut) directement — plus d'écran « Aperçu » intermédiaire. Les
               sections restent les mêmes écrans (§11), juste à un tap. */}
-          <VintedResume liveStats={liveStats} baseKO={baseKO}/>
+          <VintedResume liveStats={liveStatsVus} baseKO={baseKO}/>
           {/* ⚠️ 4 octobre — Julien : « dans Vinted […] il y ait les messages ».
               L'écran complet existait (liste tous comptes, fil, réponse, offres)
               mais n'avait plus AUCUNE porte dans Vinted : seulement la cloche. */}
           <PlatSubNav sub={platSub} setSub={setPlatSub} sections={[['ventes','Ventes'],['achats','Achats'],['annonces','Annonces'],['messages','Messages', !!(liveStats && liveStats.unread > 0)]]}/>
-          <Comptabilite key={'pv_'+platSub} accounts={vintedAccounts} only={platSub==='apercu'?'ventes':platSub} liveStats={liveStats} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}/>
+          <Comptabilite key={'pv_'+platSub} accounts={vintedAccounts} only={platSub==='apercu'?'ventes':platSub} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}/>
         </>)}
         {tab==='plat_leboncoin'&&(<>
           {/* Julien : « Leboncoin, la même mise en page que Vinted ». Vinted a
@@ -31545,7 +31775,7 @@ function AppCoeur() {
           {platSub==='annonces'&&<EbayAnnonces baseKO={baseKO} comptes={vintedAccounts}/>}
           {platSub==='compte'&&<div style={{ background: EBAY_SKIN.bg, minHeight: '100vh', padding: 16, paddingBottom: 48 }}>{baseKO?<div style={{ color: EBAY_SKIN.muted, fontSize: 13 }}>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</div>:<EbayConnexion onAnnonces={()=>setPlatSub('annonces')}/>}</div>}
         </>)}
-        {tab==='plat_vestiaire'&&<Plateforme plat="Vestiaire Collective" liveStats={liveStats} lbcVentes={lbcVentes} onGo={setTab} baseKO={baseKO}/>}
+        {tab==='plat_vestiaire'&&<Plateforme plat="Vestiaire Collective" liveStats={liveStatsVus} lbcVentes={lbcVentes} onGo={setTab} baseKO={baseKO}/>}
         {tab==='prixmarche'&&<PrixMarche data={pqmData} baseKO={baseKO}/>}
         {tab==='inventory'&&<Inventory inventory={inventory} setInventory={setInventory} accounts={vintedAccounts} garageGrid={garageGrid} labels={accountLabels} onLocate={(numero)=>{ setGarageLocate(String(numero)); setTab('garage'); }}/>}
         {tab==='catalog'  &&<Catalog   catalog={catalog} setCatalog={setCatalog} onDeleteId={(id)=>{
@@ -31561,7 +31791,7 @@ function AppCoeur() {
         {tab==='stockvinted'&&<StockVinted stockVinted={stockVinted} setStockVinted={setStockVinted} garageGrid={garageGrid} invoices={invoices}/>}
         {tab==='garage'   &&<Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} locate={garageLocate} onLocateConsumed={()=>setGarageLocate(null)} placeNum={garagePlace} onPlaced={()=>setGaragePlace(null)}/>}
         {tab==='comptabilite'&&<Comptabilite accounts={vintedAccounts} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}
-        {(()=>{ const map={cat_annonces:'annonces',cat_ventes:'ventes',cat_achats:'achats',cat_bord:'bordereaux',cat_expedition:'bordereaux'}; return map[tab] ? <Comptabilite key={tab} accounts={vintedAccounts} only={map[tab]} liveStats={liveStats} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}/> : null; })()}
+        {(()=>{ const map={cat_annonces:'annonces',cat_ventes:'ventes',cat_achats:'achats',cat_bord:'bordereaux',cat_expedition:'bordereaux'}; return map[tab] ? <Comptabilite key={tab} accounts={vintedAccounts} only={map[tab]} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}/> : null; })()}
         {tab==='vintedaccounts'&&<VintedAccounts accounts={vintedAccounts} setAccounts={setVintedAccounts} baseKO={baseKO}/>}
         </EcranGardeFou>
       </main>

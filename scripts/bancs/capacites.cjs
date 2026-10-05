@@ -115,6 +115,30 @@ const BANDEAU=/prix plancher[^\n]*rien ne les applique/i;
     await pg.route('**/api/**',r2=>r2.fulfill({status:200,contentType:'application/json',body:'{"pret":true,"devices":1}'}));
     await pg.goto('http://localhost:4472/?tab='+(onglet||'cat_annonces'),{waitUntil:'domcontentloaded'});
     await pg.waitForTimeout(4500);
+    // ⚠️ 4,5 s NE SUFFISENT PAS SOUS CHARGE (mesure le 5 octobre). Lances en
+    //    parallele avec les autres bancs, la grille d'Annonces sortait entre
+    //    5,4 et 11,9 s (cinq chromiums + 12 boucles CPU, 15 passages) — et le
+    //    bandeau EN MEME TEMPS qu'elle, a chaque fois. Le banc jugeait donc un
+    //    ecran pas encore dessine : rouge sur « bandeau attendu », et surtout
+    //    VERT PAR ACCIDENT sur « bandeau absent » (un ecran vide n'affiche aucun
+    //    bandeau). On attend donc que l'ecran a juger soit RENDU — jamais moins
+    //    que les 4,5 s d'avant — et on le DIT s'il ne l'est jamais : un
+    //    « absent » mesure sur un ecran vide ne prouve rien.
+    const PRET={
+      cat_annonces: ()=>/\d+\s+en\s+ligne/i.test(document.body.innerText||''),
+      // Le paragraphe d'introduction vit dans « Details et reglages » (replie
+      // depuis le 4 octobre) : l'ecran est pret quand ce bloc existe.
+      leboncoin:    ()=>!!document.querySelector('[data-lbc-details]'),
+      settings:     ()=>/(^|\n)\s*Extension Chrome\b/.test(document.body.innerText||''),
+    }[onglet||'cat_annonces'];
+    let pret=true;
+    if(PRET){ pret=false; const t0=Date.now();
+      while(Date.now()-t0<20000){ if(await pg.evaluate(PRET)){ pret=true; break; } await pg.waitForTimeout(250); }
+      if(pret) await pg.waitForTimeout(300); }
+    // ⚠️ Un <details> FERME ne rend pas son contenu : `innerText` ne le voit
+    //    pas. On ouvre « Details et reglages » comme il le ferait d'un clic —
+    //    on juge ce qui s'affiche une fois ouvert, pas le source.
+    if(onglet==='leboncoin'){ await pg.evaluate(()=>document.querySelectorAll('[data-lbc-details]').forEach(d=>{d.open=true;})); await pg.waitForTimeout(300); }
     const t=await pg.evaluate(()=>document.body.innerText||'');
     if(process.env.DEBUG) console.log('      diag:',JSON.stringify(await pg.evaluate(()=>{
       let n={}; try{n=JSON.parse(localStorage.getItem('vinted_annonce_numeros')||'{}');}catch(_){}
@@ -125,7 +149,7 @@ const BANDEAU=/prix plancher[^\n]*rien ne les applique/i;
     const nom=(onglet||'ann')+'-'+(pont===null?'absente':(pont===''?'muette':pont))+(diagVer===undefined?'':'-diag'+String(diagVer).replace(/\./g,'_'));
     await pg.screenshot({path:SC+'/z-cap-'+nom.replace(/\./g,'_')+'.png',fullPage:true});
     await pg.close();
-    return {t, errs};
+    return {t, errs, pret};
   };
 
   // 5.38 est la version d'ARRIVÉE de `autoAccepterOffres` : 5.37 ne sait pas,
@@ -167,11 +191,12 @@ const BANDEAU=/prix plancher[^\n]*rien ne les applique/i;
     return out;
   };
   for(const c of cas){
-    const {t,errs}=await lis(c.pont);
+    const {t,errs,pret}=await lis(c.pont);
     const vu=BANDEAU.test(t);
-    console.log('   '+c.nom.padEnd(40)+' → bandeau '+(vu?'AFFICHE':'absent'));
-    dit(vu===c.attendu, 'extension '+c.nom+' : '+(c.attendu?'l\'app dit que rien ne l\'applique':'l\'app ne crie pas pour rien'),
-      vu===c.attendu?'':'bandeau '+(vu?'affiche':'absent')+' alors qu\'on attend '+(c.attendu?'affiche':'absent'));
+    console.log('   '+c.nom.padEnd(40)+' → bandeau '+(vu?'AFFICHE':'absent')+(pret?'':' (GRILLE JAMAIS RENDUE)'));
+    dit(pret && vu===c.attendu, 'extension '+c.nom+' : '+(c.attendu?'l\'app dit que rien ne l\'applique':'l\'app ne crie pas pour rien'),
+      !pret?'la grille n\'a jamais ete rendue (20 s) — un ecran vide ne prouve ni la presence ni l\'absence du bandeau'
+      :vu===c.attendu?'':'bandeau '+(vu?'affiche':'absent')+' alors qu\'on attend '+(c.attendu?'affiche':'absent'));
     dit(errs.length===0, 'aucune erreur d\'app ('+c.nom+')', errs.slice(0,2).join(' | '));
     // ── §7 : une phrase commune se dit UNE fois ─────────────────────────────
     if(c.places){
@@ -230,10 +255,36 @@ const BANDEAU=/prix plancher[^\n]*rien ne les applique/i;
   //    DIFFERENTES. Deux etats qui se ressemblent, c'est un etat oublie.
   {
     console.log('\n── L\'ECRAN LEBONCOIN : TROIS ETATS, TROIS PHRASES');
+    // ⚠️ 5 OCTOBRE — L'ECRAN A CHANGE EXPRES, DEUX FOIS, ET LE BANC ETAIT RESTE
+    //    SUR L'ANCIENNE FORME (rouge sur un ecran juste) :
+    //    · 5.130 (#371) : plus aucun panneau sur leboncoin.fr, on publie depuis
+    //      l'APP (« Publier sur Leboncoin » par paire). La clause d'etat suit
+    //      donc la capacite `publication` (5.130.0), plus `photoslbc` (5.58) :
+    //      c'est elle qui decide ce que la phrase peut promettre. 5.57 et 5.62
+    //      sont toutes deux « en retard » aujourd'hui — les garder aurait
+    //      compare deux fois le meme etat.
+    //    · #438 : le paragraphe vit dans « Details et reglages », replie (ce
+    //      qui se LIT une fois descend ; ce qui se FAIT reste en haut). `lis`
+    //      l'ouvre avant de lire.
+    //    La REGLE ne change pas : trois etats, trois phrases ; l'absente dit OU ;
+    //    la retardataire NOMME la version qui manque. On lit le seuil dans la
+    //    table de l'app (§11 : une seule source) et on teste les deux cotes de
+    //    la frontiere, comme 5.37/5.38 plus haut.
+    const CAP = 'publication';
+    const capSrc = (/const EXT_CAPACITES = \{([^}]*)\}/.exec(fs.readFileSync(path.join(__dirname,'..','..','src','App.jsx'),'utf8'))||[])[1]||'';
+    const SEUIL = (new RegExp('\\b'+CAP+":\\s*'([0-9.]+)'").exec(capSrc)||[])[1]||'';
+    dit(!!SEUIL, 'le seuil `'+CAP+'` est lu dans EXT_CAPACITES', SEUIL||'introuvable — le banc ne peut pas placer la frontiere');
+    // Juste sous le seuil : 5.130.0 → 5.129.0 (5.130.2 → 5.130.1).
+    const sous = (v) => { const a = String(v).split('.').map(n => parseInt(n, 10) || 0);
+      if (a[2] > 0) a[2]--; else if (a[1] > 0) { a[1]--; a[2] = 0; } else { a[0]--; a[1] = 999; a[2] = 0; }
+      return a.join('.'); };
     const intro = async (pont) => {
-      const { t } = await lis(pont, 'leboncoin');
+      const { t, pret } = await lis(pont, 'leboncoin');
+      // La phrase qui decrit la FILE (« la file … est construite a partir de
+      // tes annonces reellement en ligne »), quelle que soit sa formulation.
       const l = t.split('\n').map(x => x.trim())
-        .find(x => /La file de publication est construite/i.test(x)) || '';
+        .find(x => /\bfile\b[^.]*\bconstruite\b/i.test(x)) || '';
+      if (!pret) console.log('      (ecran Leboncoin jamais rendu, pont ' + pont + ')');
       // ⚠️ DIX-NEUVIEME FOIS QU'UN DE MES CONTROLES CRIE AU LOUP : la PREMIERE
       //    moitie de cette phrase decrit la FILE (« construite a partir de tes
       //    annonces reellement en ligne… ») — elle est la meme dans les trois
@@ -242,14 +293,15 @@ const BANDEAU=/prix plancher[^\n]*rien ne les applique/i;
       return l.replace(/^.*?paires? retir[ée]es? exclues?\)\.?\s*/i, '');
     };
     const absente = await intro(null);
-    const retard  = await intro('5.57.0');   // juste sous la 5.58 (arrivee des photos attachees)
-    const ajour   = await intro('5.62.0');
+    const retard  = SEUIL ? await intro(sous(SEUIL)) : '';   // juste sous le seuil
+    const ajour   = SEUIL ? await intro(SEUIL) : '';         // le seuil lui-meme
     dit(!!absente && !!retard && !!ajour, 'la phrase d\'introduction est rendue dans les trois etats',
-      `absente ${absente.length} car · retard ${retard.length} · a jour ${ajour.length}`);
+      `absente ${absente.length} car · retard (${sous(SEUIL||'0.0.0')}) ${retard.length} · a jour (${SEUIL}) ${ajour.length}`);
     // ⚠️ ET LE SEUIL DE §7 NE S'APPLIQUE PAS TEL QUEL ICI : cette phrase a TROIS
     //    morceaux (la file · ou ca se passe · les photos), et les deux premiers
     //    sont legitimement communs — c'est le meme fait vrai dans les trois
-    //    etats. Ce qui doit distinguer, c'est CE QU'ELLE DIT DES PHOTOS.
+    //    etats. Ce qui doit distinguer, c'est CE QU'ELLE DIT DE L'EXTENSION
+    //    (depuis la 5.130 : qui publie, et d'ou).
     //    On mesure donc le recouvrement RELATIF : deux phrases dont la plus
     //    courte est contenue a plus de 80 % dans l'autre n'ajoutent rien l'une
     //    a l'autre — c'est un etat oublie. Mesure sur le defaut : « absente »
@@ -270,15 +322,18 @@ const BANDEAU=/prix plancher[^\n]*rien ne les applique/i;
                     ['absente', absente, 'a jour', ajour]];
     for (const [na, a2, nb, b2] of paires) {
       const r = recouvrement(a2, b2);
-      dit(r <= 0.8, `« ${na} » et « ${nb} » ne disent pas la meme chose`,
-        `${Math.round(r * 100)} % de la plus courte est dans l'autre`);
+      // ⚠️ Deux phrases VIDES ne « different » pas : `recouvrement` rend 0 sur
+      //    du vide, et ce controle passait au vert alors qu'aucune phrase
+      //    n'etait rendue (journal du 5 octobre : 0 car partout, trois OK).
+      dit(!!a2 && !!b2 && r <= 0.8, `« ${na} » et « ${nb} » ne disent pas la meme chose`,
+        (!a2 || !b2) ? 'phrase absente — rien a comparer' : `${Math.round(r * 100)} % de la plus courte est dans l'autre`);
     }
     // Et l'autre sens : sans extension, on ne se tait pas non plus — il doit
     // savoir OU se fait la publication, sinon la liste n'a pas de mode d'emploi.
     dit(/ordinateur/i.test(absente), 'et sans extension, l\'ecran dit OU ca se passe',
       'se taire laisserait croire que le bouton existe ici');
     // La version qui change le comportement est NOMMEE quand elle manque.
-    dit(/5\.58\.0/.test(retard), 'et en retard, il NOMME la version qui attache les photos',
+    dit(!!SEUIL && retard.includes(SEUIL), 'et en retard, il NOMME la version qui publie depuis l\'app (' + SEUIL + ')',
       '« mets-la a jour » sans numero ne dit pas quoi verifier');
   }
 
@@ -315,19 +370,30 @@ const BANDEAU=/prix plancher[^\n]*rien ne les applique/i;
 
     // ⚠️ RIEN LU NE VAUT PAS RIEN, et « aucune ligne » ne vaut pas « ancienne ».
     //    Dans les deux cas on n'invente aucune version.
+    // (`pret` : l'ecran Reglages est rendu — un « absent » mesure sur un ecran
+    //  vide ne prouve rien.)
     const absente = await lis(null, 'settings', undefined);
-    dit(!/derni[eè]re capture/i.test(absente.t), 'ligne de diagnostic absente : aucune version inventee');
+    dit(absente.pret && !/derni[eè]re capture/i.test(absente.t), 'ligne de diagnostic absente : aucune version inventee',
+      absente.pret ? '' : 'ecran Reglages jamais rendu');
     const ko2 = await lis(null, 'settings', 'KO');
-    dit(!/derni[eè]re capture/i.test(ko2.t), 'lecture ratee : aucune version inventee non plus');
+    dit(ko2.pret && !/derni[eè]re capture/i.test(ko2.t), 'lecture ratee : aucune version inventee non plus',
+      ko2.pret ? '' : 'ecran Reglages jamais rendu');
 
     // ⚠️ ET SURTOUT : connaitre la version ne doit RIEN promettre ici. Sans
     //    extension dans ce navigateur, l'ecran ne peut pas annoncer qu'elle
     //    travaille sur cette page.
-    dit(/pas d[ée]tect[ée]e ici/i.test(aJour.t),
+    // ⚠️ SUR LA LIGNE DE REGLAGES, PAS DANS TOUTE LA PAGE. Depuis la 5.85 le
+    //    petit onglet de la coque (bas a droite) dit lui aussi « Extension pas
+    //    detectee ici », sur TOUS les ecrans : ce controle etait donc vert meme
+    //    si la ligne « Extension Chrome » de Reglages affirmait l'inverse
+    //    (prouve le 5 octobre en lui faisant dire « detectee » : vert avant,
+    //    rouge apres). Meme famille que la version cherchee dans toute la page.
+    const ligneExt = (aJour.t.split('\n').map(x => x.trim()).find(x => /^Extension Chrome\b/.test(x))) || '';
+    dit(/pas d[ée]tect[ée]e ici/i.test(ligneExt),
       'et l\'ecran dit toujours qu\'aucune extension ne tourne DANS CE navigateur',
-      'une version connue ne vaut pas une extension presente');
-    dit(!/branch[ée]e sur cette page/i.test(aJour.t),
-      'il ne promet pas qu\'elle est branchee sur cette page');
+      'une version connue ne vaut pas une extension presente — ligne : « ' + ligneExt + ' »');
+    dit(aJour.pret && !/branch[ée]e sur cette page/i.test(aJour.t),
+      'il ne promet pas qu\'elle est branchee sur cette page', aJour.pret ? '' : 'ecran Reglages jamais rendu');
   }
 
   // ── L'ONGLET « CE QU'IL TE RESTE A FAIRE » (bas a droite) ──────────────────
@@ -342,8 +408,9 @@ const BANDEAU=/prix plancher[^\n]*rien ne les applique/i;
     dit(new RegExp(EXT.replace(/\./g,'\\.')).test(vieille.t),
       'et il NOMME la version a installer', 'attendu ' + EXT);
     const ajour = await lis(EXT, 'cat_annonces');          // extension a jour
-    dit(!/Ouvrir R[ée]glages pour la t[ée]l[ée]charger/i.test(ajour.t),
-      'et il DISPARAIT quand l\'extension est a jour (pas de badge permanent)');
+    dit(ajour.pret && !/Ouvrir R[ée]glages pour la t[ée]l[ée]charger/i.test(ajour.t),
+      'et il DISPARAIT quand l\'extension est a jour (pas de badge permanent)',
+      ajour.pret ? '' : 'grille jamais rendue — un onglet absent d\'un ecran vide ne prouve rien');
     dit(vieille.errs.length===0 && ajour.errs.length===0, 'aucune erreur d\'app avec l\'onglet', (vieille.errs[0]||ajour.errs[0]||''));
   }
 

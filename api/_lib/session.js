@@ -46,3 +46,35 @@ export async function vendeurExige(req, res) {
   if (!u) { res.status(401).json({ erreur: 'session', message: 'Connecte-toi à VRM pour faire ça.' }); return null; }
   return u;
 }
+
+// Lit une table AU NOM du vendeur (son jeton, pas la clé de service) : RLS ne
+// lui rend que SES lignes. Rend le tableau, ou `null` si la base n'a pas
+// répondu ou a refusé (« pas su » n'ouvre aucune porte).
+// Écrit AU NOM du vendeur (son jeton : RLS ne le laisse toucher qu'à SES
+// lignes). Rend le nombre de lignes modifiées, ou `null` si la base n'a pas
+// répondu ou a refusé — jamais un succès supposé.
+export async function modifierCommeVendeur(req, chemin, corps) {
+  const jeton = jetonDe(req);
+  if (!jeton) return null;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${chemin}`, {
+      method: 'PATCH',
+      headers: { apikey: ANON, Authorization: `Bearer ${jeton}`, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify(corps),
+    });
+    if (!r.ok) return null;
+    const j = await r.json().catch(() => null);
+    return Array.isArray(j) ? j.length : null;
+  } catch (_) { return null; }
+}
+
+export async function lireCommeVendeur(req, chemin) {
+  const jeton = jetonDe(req);
+  if (!jeton) return null;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${chemin}`, { headers: { apikey: ANON, Authorization: `Bearer ${jeton}` } });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return Array.isArray(j) ? j : null;
+  } catch (_) { return null; }
+}

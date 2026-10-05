@@ -43,14 +43,35 @@ const labelRows = FX('label').map((r) => {
 // mesuré : `label_url_introuvable` 61 contre `label_url_trouve` 29). C'est ce
 // second cas qui PROUVE que le filtre `data->>pdfB64=not.is.null` est appliqué :
 // sans lui le bandeau nomme le mauvais compte, celui qui n'a rien à tamponner.
-const FRAIS = 'harvest_147827838_label_latest';   // julatace3535 — avec son PDF
-const SANS  = 'harvest_3175765377_label_latest';  // angeled92 — PDF jamais arrivé
+// ⚠️⚠️ LES DEUX COMPTES SE CHOISISSENT DANS LA BASE SERVIE, JAMAIS EN DUR.
+//    Premier jet : deux identifiants écrits ici. Le 5 octobre, le compte
+//    « frais » avait été retiré de `vinted_accounts` (et masqué dans `main`) :
+//    l'app — à raison — n'interroge que les comptes LIÉS, le bandeau ne pouvait
+//    plus s'afficher, et le banc criait au défaut sur une app intacte. Un
+//    contrôle qui dépend d'un identifiant figé mesure la base d'un jour, pas la
+//    règle. On prend donc deux lignes `label_latest` de comptes liés et non
+//    masqués, et on PRÉPARE la situation en mémoire (rien n'est écrit sur disque).
+const mainData = (main[0] && main[0].data) || {};
+const masques = new Set((mainData.vinted_accounts_hidden || []).map(String));
+const lies = new Set(accounts.map((a) => String(a.vinted_user_id)));
+const uidDe = (id) => String(id).split('_')[1];
+const eligibles = labelRows.filter((r) => /_label_latest$/.test(r.id) && lies.has(uidDe(r.id)) && !masques.has(uidDe(r.id))
+  && r.data && typeof r.data.pdfB64 === 'string' && r.data.pdfB64.length > 0);
+const FRAIS = eligibles[0] && eligibles[0].id;   // capté il y a 7 min, AVEC son PDF
+const SANS  = eligibles[1] && eligibles[1].id;   // capté il y a 2 min, PDF jamais arrivé
 labelRows.forEach((r) => {
+  if (!/_label_latest$/.test(r.id) || !r.data) return;
   if (r.id === FRAIS) r.data.capturedAt = new Date(MAINTENANT - 7 * 60000).toISOString();
-  if (r.id === SANS) { r.data.capturedAt = new Date(MAINTENANT - 2 * 60000).toISOString(); r.data.pdfB64 = null; }
+  else if (r.id === SANS) { r.data.capturedAt = new Date(MAINTENANT - 2 * 60000).toISOString(); r.data.pdfB64 = null; }
+  // Toute AUTRE ligne est vieillie de 3 h : une capture réelle de moins d'une
+  // heure dans la fixture changerait le compte que le bandeau doit nommer.
+  else r.data.capturedAt = new Date(MAINTENANT - 180 * 60000).toISOString();
 });
-const nomDe = (uid) => { const a = accounts.find((x) => String(x.vinted_user_id) === String(uid)); return (a && (a.login || a.username)) || uid; };
-const NOM_FRAIS = nomDe(FRAIS.split('_')[1]), NOM_SANS = nomDe(SANS.split('_')[1]);
+// Le nom tel que l'app l'écrit (`accNameOf`) : l'étiquette choisie, sinon le login.
+const etiquettes = mainData.vinted_account_labels || {};
+const nomDe = (uid) => { if (etiquettes[uid]) return etiquettes[uid];
+  const a = accounts.find((x) => String(x.vinted_user_id) === String(uid)); return (a && (a.login || a.username)) || `#${uid}`; };
+const NOM_FRAIS = FRAIS ? nomDe(uidDe(FRAIS)) : '(aucun)', NOM_SANS = SANS ? nomDe(uidDe(SANS)) : '(aucun)';
 
 // Ce que la page a réellement rapatrié comme octets de PDF.
 const PDF = { octets: 0, ou: [] };
@@ -137,9 +158,34 @@ const attendus=aEnvoyer.filter(o=>parTx[String(o.transaction_id)]).length;
     return j([]);});
     await p.route('**/api/**',r2=>r2.fulfill({status:200,contentType:'application/json',body:'{"pret":true,"devices":1}'}));
   };
+  // ⚠️⚠️ ON ATTEND LE SIGNAL DE L'APP, PAS UNE HORLOGE.
+  //    Premier jet : 5 s puis 5,5 s d'attente fixe. Lancé seul, toujours vert ;
+  //    lancé avec les autres bancs (le 5 octobre, ~20 navigateurs sur 4 cœurs,
+  //    charge 44), 7 passages sur 8 lisaient Colis AVANT qu'il ait fini de lire
+  //    ses bordereaux captés — « Colis : 2 », voire « Colis : 0 », et
+  //    « accueil ensuite : au moins 2 » puisque rien n'avait été publié. Le
+  //    banc mesurait la charge de la machine, pas la règle.
+  //    Colis ne publie `vrm_colis_prets` qu'une fois TOUT lu (ventes, emails de
+  //    bordereau, bordereaux captés) : c'est exactement l'instant « Colis
+  //    ouvert » dont parlent les contrôles. On l'attend, BORNÉ : si la
+  //    publication n'arrive jamais, on lit quand même et les contrôles qui en
+  //    dépendent tombent en rouge — l'attente ne peut rien rendre vert.
+  const attendPublie = async (p, ms) => {
+    try { await p.waitForFunction(() => { try { return !!localStorage.getItem('vrm_colis_prets'); } catch (_) { return false; } },
+      null, { timeout: ms, polling: 200 }); await p.waitForTimeout(400); return true; }
+    catch (_) { console.log(`    (Colis n'a rien publié en ${ms/1000} s — lecture faite quand même)`); return false; }
+  };
+  // Ma journée ne publie rien : on attend que sa carte « Expédier » soit là
+  // (borné), puis un temps de repos — jamais moins que la règle n'exige.
+  const attendCarte = async (p, ms) => {
+    try { await p.waitForFunction(() => /pr[êe]ts?\s+[àa]\s+imprimer/i.test(document.body.innerText || ''),
+      null, { timeout: ms, polling: 200 }); } catch (_) {}
+    await p.waitForTimeout(1500);
+  };
   await brancher(pg);
   await pg.goto('http://localhost:4403/?tab=cat_bord',{waitUntil:'domcontentloaded'});
-  await pg.waitForTimeout(5000);
+  await pg.waitForTimeout(1000);
+  await attendPublie(pg, 30000);
   await pg.screenshot({path:SC+'/z-colis.png',fullPage:true});
   const v=await pg.evaluate(()=>({txt:document.body.innerText||'',
     imprimer:[...document.querySelectorAll('button')].filter(x=>/Imprimer/i.test(x.textContent)).length}));
@@ -186,6 +232,10 @@ const attendus=aEnvoyer.filter(o=>parTx[String(o.transaction_id)]).length;
   {
     const ligne = v.txt.split('\n').map(x=>x.trim()).find(l=>/Bordereau téléchargé il y a/i.test(l)) || '';
     console.log(`    bandeau frais : ${ligne||'(aucun)'}`);
+    // Sans deux comptes liés porteurs d'une ligne `label_latest`, la situation
+    // ne peut pas être préparée : on le DIT en rouge, on ne passe pas en silence.
+    dit(!!(FRAIS && SANS), 'la base servie permet de préparer un bordereau frais avec PDF et un plus frais sans',
+      `${eligibles.length} ligne(s) label_latest de comptes liés non masqués`);
     dit(!!ligne, 'un bordereau capté il y a 7 min ouvre le tamponnage en 1 clic',
       `${NOM_FRAIS} a son PDF — sans ce bandeau, il refait le tamponnage à la main`);
     dit(!!ligne && ligne.includes(NOM_FRAIS), 'et il nomme le compte dont le PDF est là',
@@ -223,13 +273,17 @@ const attendus=aEnvoyer.filter(o=>parTx[String(o.transaction_id)]).length;
     const p2 = await ctx.newPage();
     await brancher(p2);
     await p2.goto('http://localhost:4403/?tab=journee',{waitUntil:'domcontentloaded'});
-    await p2.waitForTimeout(5500);
+    await attendCarte(p2, 20000);
     const av = lit(await p2.evaluate(()=>document.body.innerText||''));
+    // Une publication restée d'avant (nuage, passage précédent) ne doit pas
+    // tenir lieu de celle de CETTE ouverture : on l'efface, Colis doit republier.
+    await p2.evaluate(()=>{ try { localStorage.removeItem('vrm_colis_prets'); } catch (_) {} });
     await p2.goto('http://localhost:4403/?tab=cat_bord',{waitUntil:'domcontentloaded'});
-    await p2.waitForTimeout(5500);
+    await p2.waitForTimeout(1000);
+    await attendPublie(p2, 30000);
     const colis = lit(await p2.evaluate(()=>document.body.innerText||''));
     await p2.goto('http://localhost:4403/?tab=journee',{waitUntil:'domcontentloaded'});
-    await p2.waitForTimeout(5500);
+    await attendCarte(p2, 20000);
     const ap = lit(await p2.evaluate(()=>document.body.innerText||''));
     console.log(`    accueil seul : ${av?(av.approx?'au moins ':'')+av.n:'—'} · Colis : ${colis?colis.n:'—'} · accueil ensuite : ${ap?(ap.approx?'au moins ':'')+ap.n:'—'}`);
     dit(!!(av && colis && ap), 'les deux écrans annoncent un nombre de bordereaux prêts');

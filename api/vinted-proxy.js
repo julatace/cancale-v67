@@ -6,11 +6,11 @@
 // il n'y a plus de CORS : le front appelle "/api/vinted-proxy" (même origine),
 // et c'est CE fichier qui parle à Vinted pour de vrai.
 //
-// Utilisation depuis App.jsx :
+// Utilisation depuis App.jsx (`vintedApiCall`) :
 //   fetch('/api/vinted-proxy', {
 //     method: 'POST',
-//     headers: {'Content-Type':'application/json'},
-//     body: JSON.stringify({ token: accessTokenWeb, endpoint: '/api/v2/users/current' })
+//     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer <session VRM>' },
+//     body: JSON.stringify({ uid: '<vinted_user_id>', endpoint: '/api/v2/users/current' })
 //   })
 //
 // AUTO-REFRESH DES TOKENS (ajouté) : les access_token Vinted expirent au bout
@@ -22,6 +22,36 @@
 // le champ "refreshed" pour qu'App.jsx les persiste (state + Supabase). SANS
 // cette persistance, le refresh suivant échouerait car le refresh_token stocké
 // serait déjà consommé.
+
+import { vendeurExige, baseCloisonnee, lireCommeVendeur, modifierCommeVendeur } from './_lib/session.js';
+
+// ⚠️⚠️ 4 OCTOBRE — CE PROXY ÉTAIT UN RELAIS OUVERT. N'importe qui pouvait lui
+// envoyer un jeton Vinted (volé ou non) et n'importe quelle adresse Vinted,
+// avec n'importe quelle méthode — DELETE compris — et la requête partait de
+// l'IP de Vercel, celle de VRM. C'est le schéma que le journal accuse d'avoir
+// fait bloquer un compte (§3), et il ne demandait même pas d'être connecté.
+// Désormais :
+//   1. la SESSION VRM est exigée (401 sinon, aucune requête à Vinted) ;
+//   2. les jetons ne viennent PLUS du navigateur : on lit ceux du compte
+//      demandé (`uid`) en base, AU NOM du vendeur — RLS ne lui rend que ses
+//      comptes, et on filtre en plus sur son `owner` quand la base est
+//      cloisonnée. Un compte qui n'est pas à lui → 403, rien ne part ;
+//   3. LECTURE seulement : GET, et uniquement les adresses que l'app lit
+//      vraiment (`LECTURES_PERMISES`). Les gestes (offres, réponses,
+//      bordereaux) passent par l'extension, dans le navigateur du vendeur,
+//      avec ses garde-fous — jamais par ici.
+// Lecture des comptes ratée → 503 : on ne relaie pas sur une mesure qui n'a pas
+// eu lieu.
+const LECTURES_PERMISES = [
+  /^\/api\/v2\/my_orders\?[\w=&.%-]*$/,
+  /^\/api\/v2\/inbox\?[\w=&.%-]*$/,
+  /^\/api\/v2\/conversations\/\d{1,20}$/,
+  /^\/api\/v2\/transactions\/\d{1,20}$/,
+  /^\/api\/v2\/users\/current$/,
+  /^\/api\/v2\/wardrobe\/\d{1,20}\/items\?[\w=&.%-]*$/,
+  /^\/inbox-notifications\/v1\/notifications\/unread_count$/,
+];
+export const lecturePermise = (endpoint) => typeof endpoint === 'string' && endpoint.length <= 300 && LECTURES_PERMISES.some((re) => re.test(endpoint));
 
 // Vinted utilise DEUX hosts differents selon l'endpoint (trouve via plusieurs
 // "Copy as fetch" reels) : www.vinted.fr/api/v2/... pour les commandes/ventes,
@@ -112,31 +142,46 @@ export default async function handler(req, res) {
     res.status(405).json({ error: 'Méthode non supportée, utilise POST' });
     return;
   }
+  const u = await vendeurExige(req, res);
+  if (!u) return;
 
-  const { token, refreshToken, anonId, csrfToken, endpoint, host, method, body } = req.body || {};
-
-  if (!token) {
-    res.status(400).json({ error: 'Paramètre "token" manquant (cookie access_token_web capturé par l\'extension)' });
+  const { uid, endpoint, host, method, body } = req.body || {};
+  if ((method && String(method).toUpperCase() !== 'GET') || body != null) {
+    res.status(403).json({ erreur: 'lecture', message: 'Ce relais ne fait que lire. Les gestes passent par l\'extension.' });
     return;
   }
-  if (!endpoint || !endpoint.startsWith('/')) {
-    res.status(400).json({ error: 'Paramètre "endpoint" manquant ou invalide (doit commencer par /)' });
+  if (!lecturePermise(endpoint)) {
+    res.status(403).json({ erreur: 'adresse', message: 'Adresse Vinted non autorisée.' });
     return;
   }
-
-  const targetHost = host && ALLOWED_HOSTS.includes(host) ? host : 'www.vinted.fr';
+  if (!/^\d{1,20}$/.test(String(uid || ''))) {
+    res.status(400).json({ erreur: 'compte', message: 'Compte Vinted manquant.' });
+    return;
+  }
+  const filtre = (await baseCloisonnee()) ? `&owner=eq.${encodeURIComponent(u.id)}` : '';
+  const lignes = await lireCommeVendeur(req, `vinted_accounts?select=access_token,refresh_token,anon_id,csrf_token,domain&vinted_user_id=eq.${encodeURIComponent(uid)}${filtre}&limit=1`);
+  if (lignes === null) {
+    res.status(503).json({ erreur: 'base', message: 'La base ne répond pas — réessaie dans un instant.' });
+    return;
+  }
+  const acc = lignes[0];
+  if (!acc || !acc.access_token) {
+    res.status(403).json({ erreur: 'compte', message: 'Ce compte Vinted n\'est pas relié à ta boutique.' });
+    return;
+  }
+  const token = acc.access_token, refreshToken = acc.refresh_token, anonId = acc.anon_id, csrfToken = acc.csrf_token;
+  const siteDomain = ALLOWED_HOSTS.includes(acc.domain) ? acc.domain : 'www.vinted.fr';
+  const targetHost = host && ALLOWED_HOSTS.includes(host) ? host : siteDomain;
   const url = `https://${targetHost}${endpoint}`;
   const isApiSubdomain = targetHost.startsWith('api.');
-  const hasBody = !!body;
 
-  // Effectue l'appel Vinted avec un access_token donne. Renvoie l'objet Response fetch.
+  // Effectue l'appel Vinted (LECTURE) avec un access_token donne.
   const doCall = (accessToken, refreshTok) => fetch(url, {
-    method: method || 'GET',
+    method: 'GET',
     headers: {
-      ...buildHeaders({ token: accessToken, anonId, csrfToken, isApiSubdomain, hasBody }),
+      ...buildHeaders({ token: accessToken, anonId, csrfToken, isApiSubdomain, hasBody: false }),
       'Cookie': buildCookie({ token: accessToken, refreshToken: refreshTok, anonId }),
     },
-    body: hasBody ? JSON.stringify(body) : undefined,
   });
 
   try {
@@ -150,6 +195,16 @@ export default async function handler(req, res) {
       });
       if (nt) {
         refreshed = nt;
+        // ⚠️ Vinted vient de CONSOMMER l'ancien refresh_token : c'est ICI que les
+        //    nouveaux doivent être rangés. Depuis que ce relais relit les jetons
+        //    en base à chaque appel (et ignore ceux du navigateur), une écriture
+        //    laissée au navigateur — qui pouvait échouer en silence — cassait le
+        //    compte pour tous les appels suivants (revue du 5 octobre). On écrit
+        //    avec SA session (RLS : seulement sa ligne), filtré sur lui.
+        const n = await modifierCommeVendeur(req,
+          `vinted_accounts?vinted_user_id=eq.${encodeURIComponent(uid)}${filtre}&select=vinted_user_id`,
+          { access_token: nt.access_token, refresh_token: nt.refresh_token, updated_at: new Date().toISOString() });
+        refreshed = { ...nt, persiste: n != null && n > 0 };
         vintedRes = await doCall(nt.access_token, nt.refresh_token);
       }
     }
@@ -162,8 +217,8 @@ export default async function handler(req, res) {
       status: vintedRes.status,
       ok: vintedRes.ok,
       data: json,
-      // Present uniquement si un refresh a eu lieu : le client DOIT persister
-      // ces tokens (sinon le refresh_token consomme rend les appels suivants KO).
+      // Présent uniquement si un refresh a eu lieu. `persiste` dit si le relais
+      // les a rangés lui-même ; sinon le client les réécrit (et le vérifie).
       refreshed,
     });
   } catch (err) {

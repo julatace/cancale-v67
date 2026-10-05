@@ -264,7 +264,11 @@
       if (!/application\/pdf/i.test(contentType || '')) return;
       const isReceipt = RECEIPT_URL.test(url || '');
       getArrayBuffer().then((buf) => {
-        if (buf && buf.byteLength && buf.byteLength < 4000000) {
+        // Les OCTETS d'un PDF (`%PDF`), pas seulement l'en-tête : une page de
+        // session expirée servie en `application/pdf` n'est pas un bordereau.
+        const t = buf && buf.byteLength >= 4 ? new Uint8Array(buf, 0, 4) : null;
+        const estPdf = !!(t && t[0] === 0x25 && t[1] === 0x50 && t[2] === 0x44 && t[3] === 0x46);
+        if (estPdf && buf.byteLength < 4000000) {
           post({ kind: isReceipt ? 'receipt' : 'label', url, b64: abToB64(buf) });
         }
       }).catch(() => {});

@@ -63,6 +63,38 @@ for (const f of FICHIERS) {
   }
 }
 
+// ── LES LIGNES QUI PORTENT UN PDF (4 octobre) ───────────────────────────────
+// `harvest_*_label_*`, `*_receipt_latest`, `email_bord_*` portent 100 à 700 Ko
+// de PDF en base64. L'app les lisait encore en entier à trois endroits, et
+// projetait `pdfTamponneB64` — une copie tamponnée par le serveur que personne
+// ne lit — à chaque impression d'un PDF venu par email. Les octets passent par
+// UN lecteur (`lirePdfLigne`), qui ne demande que `pdfB64`.
+console.log('\n── LES LIGNES QUI PORTENT UN PDF NE SONT JAMAIS LUES EN ENTIER (app)');
+{
+  const app = sansCommentaires(fs.readFileSync(path.join(racine, 'src/App.jsx'), 'utf8'));
+  const PDF_FAMILLES = /app_data\?id=(?:eq|like)\.[^`&]*(?:_label_|_receipt_latest|email_bord_)[^`&]*&select=(?:id,)?data(?![-,>])/g;
+  const blobs = app.match(PDF_FAMILLES) || [];
+  dit(blobs.length === 0, 'aucun `select=data` sur une ligne de bordereau ou de reçu', blobs.map((x) => x.slice(0, 70)).join(' | '));
+  const tampon = (app.match(/select=[^`]*pdfTamponneB64/g) || []);
+  dit(tampon.length === 0, 'la copie tamponnée par le serveur n\'est jamais rapatriée (personne ne la lit)', tampon.map((x) => x.slice(0, 80)).join(' | '));
+  const lecteur = /const lirePdfLigne = async[\s\S]*?\n};/.exec(app);
+  // ⚠️ La règle n'est pas l'orthographe `select=b:data->>pdfB64\`` : depuis le
+  //    5 octobre le lecteur peut lire des SCALAIRES dans la même requête (la
+  //    transaction de `label_latest` doit venir de la même version que ses
+  //    octets). Ce qui est interdit : la ligne entière, la copie tamponnée, un
+  //    autre champ de `data`. Donc : le lecteur demande `pdfB64` et rien d'autre
+  //    dans `data`, et chaque appel qui ajoute des colonnes n'ajoute que des
+  //    `meta->>` (le suivre jusqu'aux appels, pas s'arrêter à la définition).
+  const selLecteur = lecteur ? ((/select=([^`]*)`/.exec(lecteur[0]) || [])[1] || '') : '';
+  const dataDemandes = (selLecteur.match(/data->>?[A-Za-z0-9_]+/g) || []);
+  const appelsAvec = [...app.matchAll(/lirePdfLigne\(([^()]*?),\s*'([^']*)'\)/g)].map((m) => m[2]);
+  const horsMeta = appelsAvec.flatMap((a) => a.split(',')).filter((c) => !/^[a-zA-Z0-9]+:meta->>[A-Za-z0-9_]+$/.test(c.trim()));
+  dit(!!lecteur && dataDemandes.length === 1 && /data->>pdfB64$/.test(dataDemandes[0]) && horsMeta.length === 0,
+    'un seul lecteur d\'octets, qui ne demande QUE `pdfB64` (et, au besoin, des scalaires `meta->>` de la même ligne)',
+    `data: ${dataDemandes.join(',') || '(rien)'} · ajouts hors meta: ${horsMeta.join(',') || 'aucun'}`);
+  dit(!!lecteur && /return null/.test(lecteur[0]) && /absent:\s*true/.test(lecteur[0]), 'et il distingue « pas su » (null) de « pas de PDF »');
+}
+
 console.log('\n── LES FAMILLES QUI APPROCHENT DES 1 000 LIGNES SONT PAGINÉES');
 {
   const bg = sansCommentaires(fs.readFileSync(path.join(racine, 'vinted-sync-extension/background.js'), 'utf8'));

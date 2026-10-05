@@ -1411,18 +1411,34 @@ async function bordereauAttendu(uid) {
   } catch (_) { return null; }
 }
 
+// ⚠️ UN BORDEREAU EST UN PDF (4 octobre). Les trois portes de capture ne
+// regardaient que l'en-tête `application/pdf` ou l'extension du fichier : une
+// page HTML de session expirée servie sous ce type, ou un lien « .pdf » qui
+// redirige vers la connexion, était rangée comme un bordereau — `_pdf` passait
+// à vrai, l'app proposait « Imprimer », et le vrai bordereau n'était plus
+// jamais redemandé (`labelDejaRange`). On vérifie les OCTETS : `%PDF`.
+function estPdfOctets(u8) {
+  return !!(u8 && u8.length >= 4 && u8[0] === 0x25 && u8[1] === 0x50 && u8[2] === 0x44 && u8[3] === 0x46);
+}
+function estPdfB64(b64) {
+  try { const t = atob(String(b64 || '').slice(0, 8)); return t.length >= 4 && t.slice(0, 4) === '%PDF'; } catch (_) { return false; }
+}
+
 // Range le dernier bordereau (PDF) telecharge, pour que l'app le tamponne.
+// Rend true si la base l'a RANGÉ, false sinon.
 async function storeLabel(domain, url, b64) {
+  if (!estPdfB64(b64)) { await noterDiag('label_pas_un_pdf'); return false; }
   const uid = await activeAccountId(domain);
-  if (!uid) return;
+  if (!uid) return false;
   // À quel colis appartient ce PDF ? Le téléchargement ne le dit pas. On ne
   // DEVINE pas (§24) : soit on l'a envoyé télécharger CETTE vente-là (rendez-
   // vous ci-dessus, identité certaine), soit il n'y a QU'UN SEUL colis possible
   // pour ce compte — là ce n'est plus une supposition, c'est le seul candidat.
   let tx = await bordereauAttendu(uid);
   if (!tx) try {
-    const rows = await sbGet(`app_data?id=eq.harvest_${uid}_orders_sold&select=data`);
-    const ventes = (rows && rows[0] && rows[0].data && rows[0].data.payload && rows[0].data.payload.my_orders) || [];
+    // §4.4 : la liste des ventes seulement, jamais la ligne entière.
+    const rows = await sbGet(`app_data?id=eq.harvest_${uid}_orders_sold&select=ventes:data->payload->my_orders`);
+    const ventes = (rows && rows[0] && Array.isArray(rows[0].ventes) && rows[0].ventes) || [];
     const dejaCapte = new Set();
     const cur = await sbGetTout(`app_data?id=like.harvest_${uid}_label_*&select=tx:meta->>tx`); // §4.5 : un compte à fort volume dépasse 1000 bordereaux — sbGet tronquait en silence
     for (const r of (cur || [])) if (r && r.tx) dejaCapte.add(String(r.tx));
@@ -1432,8 +1448,11 @@ async function storeLabel(domain, url, b64) {
   const data = { uid, url, capturedAt: new Date().toISOString(), pdfB64: b64, ...(tx ? { tx } : {}) };
   const lignes = [{ id: `harvest_${uid}_label_latest`, data }];
   if (tx) lignes.unshift({ id: `harvest_${uid}_label_${tx}`, data });
-  await supabaseUpsert('app_data', lignes, 'id');
+  // « capté » ne se dit que si la base l'a RANGÉ (comme `recupererLabel`).
+  const range = await supabaseUpsert('app_data', lignes, 'id');
+  if (range === false) { await noterDiag('label_ecriture_ratee'); logActivity('⚠️ Bordereau lu, mais la base ne l\'a pas enregistré'); return false; }
   logActivity(tx ? '📎 Bordereau capté et relié à sa vente' : '📄 Bordereau capté (prêt à imprimer)');
+  return true;
 }
 // ══════════════════════════════════════════════════════════════════════════════
 // CAPTURE DU BORDEREAU — PAR LES TÉLÉCHARGEMENTS DU NAVIGATEUR
@@ -1493,7 +1512,7 @@ async function capterTelechargement(item) {
       const res = await fetch(url, { credentials: 'include' });
       if (res.ok) {
         const buf = await res.arrayBuffer();
-        if (buf.byteLength && buf.byteLength < 4000000) {
+        if (buf.byteLength && buf.byteLength < 4000000 && estPdfOctets(new Uint8Array(buf, 0, Math.min(8, buf.byteLength)))) {
           const bytes = new Uint8Array(buf);
           let bin = '';
           for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
@@ -1516,10 +1535,13 @@ try {
 
 // Range le dernier REÇU / FACTURE officiel Vinted (PDF) consulte, pour la compta pro.
 async function storeReceipt(domain, url, b64) {
+  if (!estPdfB64(b64)) { await noterDiag('recu_pas_un_pdf'); return false; }
   const uid = await activeAccountId(domain);
-  if (!uid) return;
+  if (!uid) return false;
   const data = { uid, url, capturedAt: new Date().toISOString(), pdfB64: b64 };
-  await supabaseUpsert('app_data', [{ id: `harvest_${uid}_receipt_latest`, data }], 'id');
+  const range = await supabaseUpsert('app_data', [{ id: `harvest_${uid}_receipt_latest`, data }], 'id');
+  if (range === false) { await noterDiag('recu_ecriture_ratee'); return false; }
+  return true;
 }
 
 // --- FETCH ACTIF (v3) ------------------------------------------------------
@@ -4576,9 +4598,49 @@ async function purgeBordereaux() {
       if (ok === false) { noterDiag('bordereau_purge_ecriture_ratee'); continue; }
       n++; noterDiag('bordereau_purge');
     }
-    await chrome.storage.local.set({ vrmPurgeBord: Date.now() });
+    // ── Les bordereaux CAPTÉS PAR L'EXTENSION (`harvest_{uid}_label_{tx}`) ──────
+    // Autorisé par Julien le 4 octobre (mesuré : 55 lignes de ventes finalisées,
+    // 10,8 Mo, qu'aucune règle ne purgeait). Même règle, mêmes ceintures, et une
+    // de plus : ici la date doit être LISIBLE et vieille de 7 jours — sans date,
+    // on ne sait pas, donc on garde. On ne lit que les lignes qui portent ENCORE
+    // un PDF (`_pdf`, posé par la base) : une ligne purgée ne revient jamais.
+    // `label_latest` (le « dernier capté » d'un compte) suit la même règle par sa
+    // transaction : il n'est qu'une copie d'un `label_{tx}`.
+    const labels = await sbGetTout('app_data?id=like.harvest_*_label_*&meta->>_pdf=eq.true&select=id,tx:meta->>tx,cap:meta->>capturedAt');
+    let nl = 0, resteLabels = 0;
+    if (labels !== null) {                                        // pas su → on ne touche à aucun
+      const candLabels = labels.filter(r => {
+        const id = String((r && r.id) || '');
+        const m = /^harvest_\d+_label_(\d+|latest)$/.exec(id);
+        if (!m) return false;
+        const tx = m[1] === 'latest' ? String(r.tx || '') : m[1];
+        if (!/^\d+$/.test(tx)) return false;                     // latest sans transaction : on ne sait pas
+        if (r.tx && String(r.tx) !== tx) return false;            // ligne incohérente : doute → on garde
+        if (!finalisees.has(tx)) return false;                    // pas (encore) finalisée
+        const t = Date.parse(r.cap || '');
+        if (isNaN(t) || t > limite) return false;                 // date illisible ou trop récente
+        return true;
+      });
+      for (const r of candLabels) {
+        if (nl >= PURGE_MAX_PAR_RUN) { resteLabels++; continue; }
+        const plein = await sbGet(`app_data?id=eq.${encodeURIComponent(r.id)}&select=data`);
+        if (!Array.isArray(plein)) continue;                     // lecture ratée → on saute
+        const data = plein[0] && plein[0].data;
+        if (!data || typeof data !== 'object') continue;
+        if (!(data.pdfB64 && data.pdfB64 !== 'None')) continue;  // pas de vrais octets : rien à retirer
+        const neuf = { ...data, pdfB64: null, pdfPurged: true, pdfPurgedAt: new Date().toISOString() };
+        const ok = await supabaseUpsert('app_data', [{ id: r.id, data: neuf }], 'id');
+        if (ok === false) { noterDiag('label_purge_ecriture_ratee'); continue; }
+        nl++; noterDiag('label_purge');
+      }
+    }
+    // Un arriéré (plus de 20 candidats) se résorbe en une heure de visites, pas
+    // en trois jours ; sans arriéré, on attend 12 h.
+    const reste = candidats.length > PURGE_MAX_PAR_RUN || resteLabels > 0;
+    await chrome.storage.local.set({ vrmPurgeBord: reste ? Date.now() - PURGE_COOLDOWN_MS + 3600000 : Date.now() });
     if (n) logActivity(`🧹 ${n} vieux bordereau${n > 1 ? 'x' : ''} allégé${n > 1 ? 's' : ''} (vente finalisée — PDF retiré, infos gardées)`);
-    return n;
+    if (nl) logActivity(`🧹 ${nl} bordereau${nl > 1 ? 'x' : ''} capté${nl > 1 ? 's' : ''} allégé${nl > 1 ? 's' : ''} (vente finalisée — PDF retiré, infos gardées)`);
+    return n + nl;
   } catch (_) { return 0; }
 }
 
@@ -4714,6 +4776,11 @@ async function recupererLabel(acc, uid, tx, connu) {
     if (!buf.byteLength) { await noterDiag('label_pdf_vide'); return { ok: false, raison: 'PDF vide' }; }
     if (buf.byteLength > 12000000) return { ok: false, raison: 'PDF trop lourd' };
     const bytes = new Uint8Array(buf);
+    // Une page HTML (session expirée, erreur S3) n'est pas un bordereau : on ne
+    // la range pas, sinon `_pdf` passerait à vrai et le vrai PDF ne serait plus
+    // jamais redemandé. Transitoire (le PDF peut ne pas être encore déposé) :
+    // `recupererLabelInsiste` réessaie.
+    if (!estPdfOctets(bytes)) { await noterDiag('label_pas_un_pdf'); return { ok: false, raison: "Le fichier reçu n'est pas encore le PDF du bordereau" }; }
     let bin = ''; for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
     // ⚠️ UNE LIGNE PAR BORDEREAU, PAS UNE SEULE « DERNIÈRE ». `label_latest` est
     // écrasée à chaque capture : avec 3 colis à envoyer, l'app n'en voyait qu'UN.
@@ -4770,7 +4837,7 @@ async function recupererLabelInsiste(acc, uid, tx) {
     if (dernier.ok) { if (i) await noterDiag('label_ok_apres_' + i + '_essai'); return dernier; }
     // On n'insiste que sur les échecs TRANSITOIRES (le PDF n'est pas encore là).
     // Un refus dur (permissions, PDF vide, 4xx) ne s'arrangera pas en attendant.
-    const transitoire = /pas donné l'URL|n'expose pas encore/i.test(dernier.raison || '');
+    const transitoire = /pas donné l'URL|n'expose pas encore|pas encore le PDF/i.test(dernier.raison || '');
     if (!transitoire || i === LABEL_ATTENTES_MS.length) break;
     await new Promise(r => setTimeout(r, LABEL_ATTENTES_MS[i]));
   }

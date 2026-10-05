@@ -4414,6 +4414,123 @@ qui sert à RECRÉER une annonce disparue (§47 : description + photos HD) — n
 - **Aucune entrée d'`EXT_CAPACITES`** : correction de fiabilité, l'app ne promet
   rien de neuf. Extension **5.150.0**, zip régénéré, `EXT_ATTENDUE` suivie.
 
+### PDF de bordereaux — étape 0 : un seul lecteur, trois états, 5.157 (4 octobre)
+Préalable au passage des PDF dans le stockage de fichiers (plan complet dans
+la cartographie du 4 octobre, résumée ici). **Mesuré sur sa vraie base** :
+~38 Mo de PDF dans le JSONB (`email_bord_*` 179 lignes dont 161 portent
+`pdfB64` **et** `pdfTamponneB64` ; `harvest_*_label_{tx}` 95 lignes, 19 Mo ;
+`label_latest` 8 lignes, toutes des doublons octet pour octet d'un
+`label_{tx}`). **108 bordereaux de ventes finalisées sont purgeables et 0 l'a
+été : son extension installée est la 5.128** (`panel_diag_capture.ver`), la
+purge est arrivée en 5.146. *Le premier geste reste d'installer le zip.*
+- **Un seul lecteur d'octets** (`lirePdfLigne`, `octetsBordereau`) pour les sept
+  endroits qui impriment : il ne demande que `pdfB64` (la copie tamponnée par
+  le serveur, `pdfTamponneB64`, n'est lue par personne — elle doublait l'égress
+  de chaque impression d'un PDF venu par email), vérifie `%PDF`, et rend
+  **trois états** : octets · absent · `null` (la base n'a pas répondu). Avant,
+  « pas su » et « pas de PDF » donnaient le même « PDF illisible », et une page
+  HTML rangée par erreur faisait remonter l'erreur brute de pdf-lib.
+- Plus aucun `select=data` sur une ligne de bordereau ou de reçu dans l'app
+  (`fetchCapturedLabel`, `fetchCapturedReceipt` lisent des scalaires d'abord) ;
+  les reçus du bilan annuel ne téléchargent leur PDF qu'au clic, les comptes
+  sont lus ensemble, et une lecture ratée ne s'affiche pas « aucun reçu ».
+- Un lot imprimé en partie le DIT (« 7 sur 9 imprimés — 2 que la base n'a pas
+  rendus »), jamais comme complet (§5).
+- **Extension 5.157** : les trois portes de capture (`recupererLabel`,
+  `capterTelechargement`, `inject.js`) vérifient les **octets** `%PDF`, plus
+  seulement l'en-tête — une page de session expirée servie en
+  `application/pdf` passait `_pdf` à vrai, et `labelDejaRange` ne redemandait
+  plus jamais le vrai bordereau. `storeLabel`/`storeReceipt` ne disent plus
+  « capté » sur une écriture refusée, et `storeLabel` ne lit plus la ligne
+  `orders_sold` entière (§4.4).
+- Preuves : `ventes-bordereau.cjs` **4 rouges** sur l'avant (copie tamponnée
+  rapatriée aux deux tailles, « PDF illisible » sur une panne, erreur pdf-lib
+  sur une page HTML) ; `audit-lectures.cjs` **4** ; `audit-bordereau-pdf.cjs`
+  **3** ; `audit-recap-bordereau.cjs` **2**.
+- ⚠️ Deux audits servaient « un PDF » de **4 octets** (`%PDF`) : le contrôle
+  accepte donc ≥ 4 octets — un vrai PDF en a toujours plus.
+- **La suite (non faite, chacune sa PR)** : compartiment `bordereaux` privé +
+  règle `_pdf` élargie à `pdfPath` (migration 009) ; l'app lit les deux formes ;
+  le serveur puis l'extension rangent dans le stockage
+  (`{owner}/{famille}/{sha256}.pdf`, objet écrit AVANT la ligne) ; rattrapage
+  en deux phases, la seconde (vider la colonne) **sur un oui de Julien**.
+  **Tranché par Julien le 4 octobre au soir** (« je te donne toutes les
+  autorisations ») : les `harvest_*_label_{tx}` des ventes finalisées sont
+  purgés (5.158, ci-dessous) et les tables `sauvegarde.app_data_2026093{0}` /
+  `_20261002` (~76 Mo de PDF) peuvent partir — ⚠️ mais un `DROP` exige une
+  confirmation HUMAINE dans l'outil SQL : **il reste à faire, avec lui devant
+  l'écran**, jamais en tâche de fond.
+  ⚠️ Les mesures de l'étape « stockage » (doublon, 400 vs 404, CORS) se font sur
+  une branche Supabase ou en local, **jamais en production** (§2.3).
+
+### Revue contradictoire des trois commits du 4 octobre au soir — 8 défauts confirmés (5 octobre)
+Trois relecteurs (un par commit), puis deux sceptiques indépendants par défaut :
+**8 confirmés, 0 rejeté**. Tous corrigés, chacun prouvé rouge sur le code d'avant.
+- ⚠️⚠️ **« Vendu » inventait des zéros quand les ventes étaient illisibles.** Si
+  AUCUNE lecture de ventes n'aboutissait mais qu'une lecture d'annonces
+  réussissait, la coque posait `liveStats` à zéro : « Pas encore de vente
+  aujourd'hui · Vendu ce mois 0 € », et le **widget de l'iPhone publiait 0 €**.
+  Pas su ⇒ chaque chiffre tiré des ventes vaut `null` (`VENDU_PAS_SU`),
+  l'écran dit « — » et pourquoi. Un total **partiel** (un compte, Leboncoin ou
+  eBay illisibles) **nomme ce qui manque** (`venduManque`), et le widget n'écrit
+  **que** un vendu complet — sinon il garde sa dernière photo complète.
+  `lbcCoqueLu` et `ebayCommandes` ont maintenant **trois états**.
+- **Le vendu était figé à l'ouverture** : masquer une vente (✕), une vente rangée
+  par l'extension, minuit (une PWA reste ouverte) ne changeaient rien. `save()`
+  émet `vrm:save`, la coque écoute `vrm:ext maj ventes` (relit CE compte) et
+  une horloge de jour (`jourCle`). Banc `vendu-recu.cjs` : **51 contrôles, 11
+  rouges** sur le build d'avant (minuit compris, avec l'horloge de Playwright).
+- ⚠️ **Le relais (`/api/vinted-proxy`) range lui-même les jetons qu'il vient de
+  renouveler**, avec la session du vendeur (`modifierCommeVendeur`, RLS : sa
+  ligne seulement). Depuis qu'il relit les jetons en base, l'écriture laissée au
+  navigateur — qui ne regardait pas `r.ok` — laissait un refresh_token CONSOMMÉ
+  en base sur un simple hoquet : compte cassé côté relais. `refreshed.persiste`
+  dit s'il a rangé ; sinon l'app réécrit et vérifie. `proxy.cjs` : **4 rouges**.
+- ⚠️⚠️ **Le N° d'une paire pouvait être tamponné sur l'étiquette d'une autre.**
+  (1) `fetchCapturedLabel` lisait la transaction puis le PDF de `label_latest` en
+  DEUX requêtes — l'extension réécrit cette ligne à chaque capture. Une seule
+  lecture désormais (`lirePdfLigne(id, 'tx:meta->>tx,…')`). (2) l'index des
+  bordereaux captés retenait `label_latest` : `labelsParTransaction` ne garde
+  que les `label_{tx}`. `audit-label-latest.cjs` **exécute** les vraies fonctions
+  contre une base qui change de version entre deux lectures : sur l'avant,
+  « tx annoncée A · PDF de B ».
+- **« Tout imprimer » annonçait « 2 sur 3 imprimés »** quand la fusion avait
+  écarté un PDF abîmé (commence par %PDF, refusé par pdf-lib) : il compte
+  `r.count`, et nomme le PDF illisible. Banc `lot-bordereaux.cjs` (**2 rouges**).
+- **Registre annuel** : un compte dont le reçu était illisible disparaissait dès
+  qu'un autre compte avait un reçu. Banc `recus.cjs` (**1 rouge**).
+- ⚠️ **VINGT-SIXIÈME fois qu'un de mes contrôles crie au loup** :
+  `audit-lectures.cjs` exigeait l'orthographe `` select=b:data->>pdfB64` `` ; le
+  lecteur accepte maintenant des scalaires dans la même requête. Il suit la
+  règle (rien d'autre que `pdfB64` dans `data`, et chaque appel n'ajoute que des
+  `meta->>`) — rouge quand on ajoute `pdfTamponneB64` à un appel (prouvé).
+
+### Purge des bordereaux CAPTÉS par l'extension — ventes finalisées (5 octobre, 5.158)
+Suite de la purge des `email_bord_*` (5.146) : les `harvest_{uid}_label_{tx}`
+(et le « dernier capté » `label_latest`, une copie) gardaient leur PDF pour
+toujours — mesuré : **55 lignes de ventes finalisées, 10,8 Mo**. Autorisé par
+Julien le 4 octobre. `purgeBordereaux` les allège dans le même passage, avec les
+mêmes ceintures et deux de plus :
+- on ne liste que les lignes qui portent **encore** un PDF
+  (`meta->>_pdf=eq.true`, posé par la base) — une ligne purgée ne revient jamais ;
+- la vente doit être **finalisée** (450) **et** la capture **datée et vieille de
+  7 jours** — sans date lisible, on garde ;
+- la transaction se lit **dans l'identifiant** de la ligne ; si `meta->>tx` en
+  dit une autre, doute → on garde. `label_latest` sans transaction : on garde ;
+- on retire `pdfB64` et rien d'autre : `tx`, `item`, `url`, `capturedAt`
+  restent — l'app relie toujours la paire (`labelsCaptes[tx].item`) et
+  `venteExpediee` voit toujours la preuve ;
+- lecture ratée (ventes, liste, ligne) ⇒ rien n'est touché ;
+- 20 par passage ; s'il en reste, le passage suivant vient **dans l'heure**
+  (sinon 12 h) — l'arriéré se résorbe en une journée de visites.
+Côté app rien ne change : une vente finalisée n'est jamais `aExpedier`, elle n'a
+donc plus de bouton de bordereau ; et si un PDF purgé était quand même demandé,
+`lirePdfLigne` répond « absent » et l'écran le dit (étape 0).
+- `audit-purge-bordereaux.cjs` : **29 contrôles** ; **4 rouges** sur la 5.157 ;
+  chacune des trois gardes retirée tour à tour le fait repasser au rouge.
+- Aucune entrée d'`EXT_CAPACITES` (ménage interne). Extension **5.158.0**, zip
+  régénéré, `EXT_ATTENDUE` suivie.
+
 ### Logo iPhone : icônes PWA régénérées (3 octobre)
 `apple-touch-icon.png` + `icon-192/512/maskable` portaient encore l'ancien logo
 orange ; régénérées depuis `logo-vrm.png` (VRM Noir), maskable avec marge sur
@@ -4484,10 +4601,21 @@ déclaré, qui est l'argent reçu.
 - Statistiques : « CA du mois » → « **Vendu ce mois** » (même chiffre, bon mot).
 - Banc `vendu-recu.cjs` (ventes inventées, 30 contrôles, juge les `data-*`).
   Réaffaibli (annulée comptée + reçu daté à la vente) → **11 rouges**.
-- ⚠️ **Encore ouvert** : `liveStats` (Statistiques « Aujourd'hui », « Vendu ce
-  mois », widget `caMois`) reste un SECOND calcul du vendu — Vinted seul, figé
-  au montage, comptes bloqués exclus. Le brancher sur le même propriétaire
-  demande que Ma journée/Ventes PUBLIE le vendu (motif `vinted_urssaf_mois`).
+- ✅ **Fermé le 4 octobre** : `liveStats` (Statistiques « Aujourd'hui », « Vendu
+  ce mois », la courbe des mois, la jauge d'objectif, le widget `caMois`) était
+  un SECOND calcul du vendu — Vinted seul, comptes bloqués exclus, Leboncoin et
+  eBay oubliés. Mesuré au banc sur le code d'avant : « Aujourd'hui » **50 €** au
+  lieu de **90 €**, « Vendu ce mois » **175 €** au lieu de **275 €**, et le
+  widget pareil. ⇒ La coque relit les ventes de TOUS les comptes liés (même
+  lecture, `_acc` posé) et `liveStatsVus` passe par **`ventesFaites` puis
+  `resumeVendu`** — la même règle que Ma journée ; un compte s'écarte par
+  `compteEcarte` (masqué dans l'app ou éteint dans l'ancien panneau, une seule
+  définition pour la compta et la coque). Le widget n'écrit plus depuis l'effet
+  de lecture : il publie `widgetBase` + le vendu unifié, et seulement quand
+  le JSON change. Ventes illisibles ⇒ on garde l'ancien calcul (« rien lu » ne
+  vaut pas « rien »). Banc `vendu-recu.cjs` : **36 contrôles**, et **4 rouges**
+  sur le code d'avant **instrumenté des mêmes attributs** (« la fonction
+  n'existait pas » n'aurait rien prouvé).
 
 ### La page d'accueil publique (n° 22, 4 octobre)
 Julien : « une vraie page d'accueil… qui donne envie… avant d'arriver sur la
@@ -4645,9 +4773,15 @@ du pont app↔extension. Ce qui a été trouvé et fermé :
   Le conseiller Supabase ne signale plus que deux choses VOULUES (`vrm_reglages`
   sans règle = serveur seul ; `vrm_acces*` exécutables par un vendeur connecté =
   elles ne disent que SON accès).
-- **Restent ouverts, notés** : `/api/vinted-proxy` relaie vers Vinted avec le
-  jeton fourni par l'appelant (il ne touche à aucune donnée stockée, mais c'est
-  un relais ouvert depuis l'IP de Vercel) ; le `pushsubscriptionchange` du
+- ✅ **`/api/vinted-proxy` FERMÉ (4 octobre, soir)** : c'était un relais OUVERT —
+  n'importe qui lui envoyait un jeton Vinted et une adresse de son choix, avec
+  n'importe quelle méthode (DELETE compris), et la requête partait de l'IP de
+  VRM. Il exige la **session**, ne prend **plus aucun jeton du navigateur** (il
+  lit ceux du compte `uid` en base, AVEC la session du vendeur — RLS — et filtré
+  sur son `owner`), ne fait que **lire** (GET, `LECTURES_PERMISES` : les sept
+  adresses que l'app lit vraiment), et répond 503 si la base ne répond pas.
+  Banc `proxy.cjs` (route exécutée, **17 contrôles, 13 rouges** sur l'avant).
+- **Reste ouvert, noté** : le `pushsubscriptionchange` du
   service worker n'a pas de session (ré-enregistré à l'ouverture suivante).
   **À Julien** : dépôt public, clé publique `anon` → clé « publishable »,
   réglages d'authentification (confirmation d'email, longueur du mot de passe)
@@ -5280,8 +5414,8 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | outil | quoi |
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
-| `node scripts/audit-*.cjs` | **68 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
-| `scripts/bancs/*.cjs` | les **63 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
+| `node scripts/audit-*.cjs` | **69 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `scripts/bancs/*.cjs` | les **66 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
 **Trois règles de preuve :**
@@ -5322,6 +5456,19 @@ résolus à la main — **jamais `git merge -s ours`** : il garde l'arbre de la
 branche, la PR qui suit **défait en silence** tout ce que les autres ont mergé.
 Après le merge, `git diff origin/main --stat` ne doit montrer **que ses propres
 fichiers**. Et ne pas toucher au domaine d'une autre session (eBay) : lui laisser.
+⚠️⚠️ **LE PLAN GRATUIT DE VERCEL PLAFONNE À 100 DÉPLOIEMENTS PAR 24 H — ET LES
+BRANCHES `claude/…` LES AVAIENT TOUS MANGÉS** (4 octobre). Chaque `git push` sur
+une branche créait une prévisualisation : 59 ce jour-là (36 pour une seule
+session), plus 24 mises en production. Le merge de la PR #441 est tombé sur
+« Deployment rate limited — retry in 24 hours » : `main` était à jour, le site,
+lui, restait sur la version d'avant. ⇒ `vercel.json` coupe désormais les
+déploiements des branches `claude/**` (`git.deploymentEnabled`) ; seul `main`
+se déploie. La preuve d'une branche, ce sont **nos** audits et bancs, pas une
+prévisualisation. ⚠️ **Ne jamais « promouvoir » une prévisualisation pour
+contourner la limite** : les clés de service (Supabase, notifications, cron,
+Stripe, eBay) n'existent qu'en Production — la promouvoir couperait la réception
+des emails, les notifications et les paiements. Attendre la fenêtre, ou que
+Julien décide de passer en Pro.
 ⚠️ Ne jamais lancer `npm run build` pendant qu'un banc sert `dist/`.
 ⚠️ `git fetch` avant toute comparaison avec la production : une référence locale
 jamais rafraîchie ment en silence.
@@ -5560,8 +5707,8 @@ script-là me fait croire à une catastrophe.
 src/App.jsx                     l'app (grep avant de lire — le fichier est énorme)
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
-scripts/audit-*.cjs             les 68 audits
-scripts/bancs/                  les 63 bancs (leur README dit comment les lancer)
+scripts/audit-*.cjs             les 69 audits
+scripts/bancs/                  les 66 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 ```
