@@ -7257,10 +7257,40 @@ function etatActionsExt(sansSouris) {
   if (!vinted) return { niveau: 'lecture', glob: { code: 'vinted', texte: "Aucun compte Vinted n'est ouvert dans ce Chrome." }, vinted: null };
   return { niveau: 'ok', glob: null, vinted };
 }
+// La DERNIÈRE capture reçue d'une extension (où qu'elle tourne) : l'extension
+// inscrit sa version et l'heure dans sa ligne de diagnostic à chaque passage
+// (`panel_diag_capture`, depuis la 5.63). C'est un CONSTAT — jamais une capacité
+// de CE navigateur (`extSait` n'écoute que le pont) — mais c'est la seule chose
+// qu'un téléphone puisse savoir de l'extension de l'ordinateur. Mesuré le
+// 5 octobre : la sienne n'écrivait plus depuis 15:51, six minutes après la
+// rafale de refus de connexion — c'est ce que ce constat aurait montré.
+// Trois états : objet lu · 'aucune' (jamais écrit) · null (pas su).
+// « il y a 12 min / 5 h / 3 j » — à la minute près : c'est l'écart qui dit si
+// l'extension tourne en ce moment.
+const ilYaCourt = (ts) => {
+  const m = Math.max(0, Math.round((Date.now() - ts) / 60000));
+  return m < 1 ? "à l'instant" : m < 60 ? `il y a ${m} min` : m < 48 * 60 ? `il y a ${Math.round(m / 60)} h` : `il y a ${Math.round(m / 1440)} j`;
+};
+async function lireDerniereCaptureExt() {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_diag_capture&select=ver:data->>ver,verAt:data->>verAt,majAt:data->>majAt`, { headers: sbAuth() });
+    if (!r.ok) return null;
+    const rows = await r.json();
+    if (!Array.isArray(rows)) return null;
+    const d = rows[0] || {};
+    const at = Date.parse(d.majAt || d.verAt || '') || 0;
+    return (d.ver || at) ? { v: d.ver ? String(d.ver) : '', at } : 'aucune';
+  } catch (_) { return null; }
+}
 function EtatActions({ onNav, ordi, sombre }) {
   useExtVivante();
   const sansSouris = useSansSouris();
   const [ouvert, setOuvert] = React.useState(false);
+  const [derniere, setDerniere] = React.useState(undefined);
+  // Relue à chaque ouverture du panneau : c'est là qu'on la regarde, fraîche.
+  React.useEffect(() => { if (!ouvert) return undefined; let stop = false;
+    lireDerniereCaptureExt().then((d) => { if (!stop) setDerniere(d); });
+    return () => { stop = true; }; }, [ouvert]);
   const boite = React.useRef(null);
   React.useEffect(() => {
     if (!ouvert) return undefined;
@@ -7351,8 +7381,21 @@ function EtatActions({ onNav, ordi, sombre }) {
             </div>
           )}
           <Ligne nom="Extension" l={ligneExt}/>
-          <Ligne nom="Ton compte VRM" l={ligneVrm}/>
-          <Ligne nom="Compte Vinted dans Chrome" l={ligneVinted}/>
+          {/* Sans extension ici (téléphone, autre navigateur), ces deux lignes
+              n'ont rien à dire : vides, elles se liraient comme deux problèmes. */}
+          {(ligneVrm.t || ligneVrm.s !== '—') && <Ligne nom="Ton compte VRM" l={ligneVrm}/>}
+          {(ligneVinted.t || ligneVinted.s !== '—') && <Ligne nom="Compte Vinted dans Chrome" l={ligneVinted}/>}
+          {/* Le constat qui vaut aussi d'un téléphone : quand l'extension (où
+              qu'elle tourne) a écrit pour la dernière fois. Elle n'écrit que
+              quand tu passes sur Vinted : un long silence n'est pas une panne,
+              on le dit sans l'accuser. */}
+          <div data-etat-derniere={derniere === undefined ? 'encours' : derniere === null ? 'passu' : derniere === 'aucune' ? 'aucune' : 'lue'}
+            style={{ padding: '5px 0 0', borderTop: `1px solid ${C.border}`, color: C.muted }}>
+            {derniere === undefined ? 'Dernière capture reçue : je regarde…'
+              : derniere === null ? 'Dernière capture reçue : pas su (la base n’a pas répondu).'
+              : derniere === 'aucune' ? 'Aucune capture reçue de ton extension pour l’instant.'
+              : <>Dernière capture reçue de ton extension : <b style={{ color: C.text }}>{derniere.at ? ilYaCourt(derniere.at) : 'date inconnue'}</b>{derniere.v ? ` (version ${derniere.v})` : ''}. Elle écrit quand tu passes sur Vinted.</>}
+          </div>
           {geste && <div style={{ marginTop: 10 }}>{geste}</div>}
         </div>
       )}

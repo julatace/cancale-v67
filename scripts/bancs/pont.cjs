@@ -46,6 +46,8 @@ const ACCS = [
 const rows = [
   { id: 'harvest_111_orders_sold', data: { capturedAt: auj.toISOString(), payload: { my_orders: [vente(7001, 'Paire test A', 'Le paiement a été validé')] } } },
   { id: 'harvest_222_orders_sold', data: { capturedAt: auj.toISOString(), payload: { my_orders: [vente(7002, 'Paire test B', 'Le paiement a été validé')] } } },
+  // Ce que l'extension (de l'ordinateur) a écrit en dernier : il y a 5 h, en 5.143.
+  { id: 'panel_diag_capture', data: { ver: '5.143.0', verAt: new Date(auj.getTime() - 5 * 3600e3).toISOString(), majAt: new Date(auj.getTime() - 5 * 3600e3).toISOString() } },
 ];
 const PDF_B64 = fs.readFileSync(path.join(__dirname, 'bordereau-test.b64'), 'utf8').trim();
 
@@ -114,7 +116,7 @@ const SESSION = { access_token: 'jeton-de-l-app', refresh_token: 'jeton-de-renou
 const FOURCHE = { access_token: 'jeton-de-l-extension', refresh_token: 'renouvellement-propre-a-l-extension', expires_at: Date.now() + 3600e3,
   user_id: SESSION.user.id, email: SESSION.user.email };
 
-async function rendre(b, { mode, connecte, tel = false, vrm = null, session = false, routeFourche = 200, attente = null }) {
+async function rendre(b, { mode, connecte, tel = false, vrm = null, session = false, routeFourche = 200, attente = null, diagKO = false }) {
   const vp = tel ? { width: 390, height: 844 } : { width: 1512, height: 950 };
   const ctx = await b.newContext({ viewport: vp, ...(tel ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
@@ -132,6 +134,7 @@ async function rendre(b, { mode, connecte, tel = false, vrm = null, session = fa
     if (/select=owner/.test(u)) return session ? j([]) : route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCS);
     const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
+    if (diagKO && /id=eq\.panel_diag_capture/.test(u)) return route.fulfill({ status: 522, contentType: 'text/html', body: '<html>522</html>' });
     // Les bordereaux captés : vides tant que l'extension n'a pas « rangé » le PDF.
     if (/id=like\.harvest_111_label_/.test(u)) return j(labelPret ? [{ id: 'harvest_111_label_7001', tx: '7001', item: '', capturedAt: auj.toISOString() }] : []);
     if (/id=eq\.harvest_111_label_7001/.test(u)) return j([{ pdfB64: PDF_B64 }]);
@@ -271,6 +274,13 @@ async function rendre(b, { mode, connecte, tel = false, vrm = null, session = fa
       dit(v.sessions.filter((x) => x && x.refresh_token === SESSION.refresh_token).length === 0, 'serveur muet + session MORTE : on ne lui redonne pas la nôtre (c’est le cas qui s’entre-tue)', JSON.stringify(v.sessions.map((x) => x && x.refresh_token)));
       await r.ctx.close(); }
 
+    console.log('── TÉLÉPHONE, base qui ne rend pas le diagnostic');
+    { const r = await rendre(b, { mode: 'ok', connecte: '111', tel: true, diagKO: true });
+      const p = await r.panneau(); await r.pg.waitForTimeout(600);
+      const der = await r.pg.evaluate(() => { const x = document.querySelector('[data-etat-derniere]'); return x ? { e: x.getAttribute('data-etat-derniere'), t: x.innerText } : null; });
+      dit(p && der && der.e === 'passu' && !/il y a/.test(der.t), '« pas su » quand la base ne répond pas — aucune date inventée', JSON.stringify(der));
+      await r.ctx.close(); }
+
     console.log('── TÉLÉPHONE');
     { const r = await rendre(b, { mode: 'ok', connecte: '111', tel: true }); const v = await r.lire();
       dit(!v.boutons.some((x) => x.etat === 'pret'), 'aucun bouton actif sur un téléphone', JSON.stringify(v.boutons.map((x) => x.etat)));
@@ -278,6 +288,10 @@ async function rendre(b, { mode, connecte, tel = false, vrm = null, session = fa
       dit(v.etat && v.etat.niveau === 'lecture' && v.etat.code === 'telephone', 'l’en-tête dit « Lecture » sur le téléphone', JSON.stringify(v.etat));
       const p = await r.panneau();
       dit(p && p.dedans && /ordinateur/.test(p.txt) && /colis|bordereaux déjà reçus/.test(p.txt), 'son panneau tient dans l’écran, dit OÙ agir et ce qui marche déjà ici', JSON.stringify(p && p.txt).slice(0, 200));
+      // Le seul fait qu'un téléphone puisse savoir de l'extension de l'ordinateur.
+      await r.pg.waitForTimeout(600);
+      const der = await r.pg.evaluate(() => { const x = document.querySelector('[data-etat-derniere]'); return x ? { e: x.getAttribute('data-etat-derniere'), t: x.innerText } : null; });
+      dit(der && der.e === 'lue' && /il y a 5 h/.test(der.t) && /5\.143\.0/.test(der.t), 'et il dit QUAND l’extension (de l’ordinateur) a écrit pour la dernière fois, et sa version', JSON.stringify(der));
       dit(v.sw <= v.cw + 1, 'aucun débordement horizontal', `${v.sw} > ${v.cw}`);
       await r.pg.screenshot({ path: path.join(require('os').tmpdir(), 'pont-390.png') });
       await r.ctx.close(); }
