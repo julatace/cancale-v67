@@ -3484,7 +3484,9 @@ const vmrExtVersion = () => __vmrExtVersion;
 const pontOrphelin = (err) => /context invalidated|contexte|^pont$|Receiving end does not exist/i.test(String(err || ''));
 // ⚠️ Une réponse VIDE peut venir d'un pont ORPHELIN (voir `vmrDemande`) : on
 //    attend encore celle d'un pont vivant avant de conclure.
-function vmrAuthEtat(timeoutMs = 6000) {
+// 4 s (2,5 avant) : l'extension 5.159 et avant renouvelait sa session AVANT de
+// répondre ; la 5.160 répond en moins de 2 s quoi qu'il arrive.
+function vmrAuthEtat(timeoutMs = 4000) {
   return new Promise((resolve) => {
     if (typeof window === 'undefined' || !__vmrExtReady) { resolve(null); return; }
     const reqId = 'a' + Date.now() + '_' + Math.random().toString(36).slice(2);

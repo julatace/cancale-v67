@@ -193,7 +193,20 @@ const essai = async (nom, reponses, attenduOk, attenduEssais) => {
   /attendreBordereau\(uid, tx\)[\s\S]{0,200}genere_sans_pdf/.test(corps)
     ? ok("la commande sans PDF pose le rendez-vous (le PDF téléchargé à la main sera relié à CETTE vente)")
     : nok("la commande sans PDF pose le rendez-vous", 'attendreBordereau absent de executerCommande');
-  /genere_sans_pdf[\s\S]{0,400}member\/transactions\//.test(APP)
+  // ⚠️ Un audit suit la RÈGLE, pas son orthographe : le lien peut être écrit
+  //    en dur ou passer par une variable (`href={surVinted}`, 5 octobre — la
+  //    conversation de la vente quand on la connaît). On suit la variable
+  //    jusqu'à sa définition et on exige une adresse vinted.fr.
+  const lienVinted = (() => {
+    const m = /genere_sans_pdf[\s\S]{0,400}?<a[^>]*href=\{([^}]+)\}/.exec(APP);
+    if (!m) return false;
+    const expr = m[1].trim();
+    if (/vinted\.fr\/(member\/transactions|inbox)\//.test(expr)) return true;
+    if (!/^[A-Za-z_$][\w$]*$/.test(expr)) return false;
+    const def = new RegExp('const ' + expr + '\\s*=([^;]+);').exec(APP);
+    return !!(def && /vinted\.fr\/(member\/transactions|inbox)\//.test(def[1]));
+  })();
+  lienVinted
     ? ok("un échec de récupération propose d'ouvrir la vente sur Vinted (dans l'app)")
     : nok("un échec de récupération propose d'ouvrir la vente sur Vinted", 'le message d\'erreur reste un cul-de-sac');
 
