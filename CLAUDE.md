@@ -4672,6 +4672,43 @@ l'autre session, sa logique n'a pas été touchée) :
   d'autres vendeurs, il faudra une ligne de jetons par vendeur. Ce sera alors à
   elle de relâcher la garde « propriétaire ».
 
+### ⚠️⚠️ LA FACTURE EXÉCUTAIT CE QUE L'ACHETEUR ÉCRIT DANS SON NOM (5 octobre)
+Trouvé par l'audit de sécurité du 5 octobre. Une facture porte le nom, l'adresse
+et l'email de l'**acheteur** (qu'il écrit lui-même sur Vinted) et la
+désignation de l'article. Ces valeurs partaient sans échappement :
+- dans `buildInvoiceHtml` (serveur), c'est-à-dire le HTML de la facture Pro,
+  rangé en base puis envoyé par email à l'acheteur ;
+- dans `generatePDF` (app), écrit avec `window.open('')` + `document.write`.
+
+Or une fenêtre ouverte ainsi a **la même origine que l'app**. Un nom
+« `<svg onload=…>` » y exécutait son code au moment où Julien imprime, et
+pouvait lire sa session. Mesuré au banc sur le code d'avant : **18 exécutions**.
+
+⇒ **Deux défenses, chacune prouvée :**
+- toutes les valeurs sont échappées, côté serveur (`h()`) et côté app
+  (`xmlEsc`) ;
+- `ouvrirDocumentImprimable` écrit en tête du document une politique
+  (`default-src 'none'`). Elle couvre aussi les factures **déjà rangées en
+  base**, construites avant le correctif. Mesuré dans Chromium : sans elle le
+  code s'exécute, avec elle plus rien. L'impression est lancée depuis l'app
+  (`w.print()`), car aucun script de la fenêtre ne tourne plus.
+- `audit-xss-facture.cjs` exécute les vraies fonctions dans un vrai Chromium.
+  Il donne **9 contrôles**, **6 rouges** sur le code d'avant, et repasse au
+  rouge quand on retire la politique (`--mutation sanscsp`, les factures
+  rangées).
+  ⚠️ **Son premier jet était vert sur le défaut** : le piège `<img src=x>`
+  attendait une réponse réseau qui ne venait jamais, et le gestionnaire ne se
+  déclenchait pas. Le piège n'utilise désormais **aucun réseau**
+  (`data:` et `<svg onload>`). *Un banc qui dépend du réseau mesure le réseau.*
+- Le **reçu d'achat** (`openReceipt`) échappait déjà ses valeurs, et il garde
+  ses boutons en ligne. Il n'est pas touché.
+- **Ajouté** : `X-Content-Type-Options: nosniff` (`vercel.json`).
+- ⚠️ **Pas fait, et pourquoi** : une vraie politique `script-src` sur toute
+  l'app. `index.html` a deux scripts en ligne, et la fenêtre du reçu hérite
+  de la politique de l'app (ses `onclick` casseraient). Surtout, les bancs
+  servent `dist/` **sans les en-têtes de Vercel** : rien ne verrait la casse.
+  Il faut d'abord un banc qui sert les vrais en-têtes.
+
 ### Mise en production du 5 octobre
 PR #442 mergée à 10:24 UTC (80 déploiements sur 24 h : sous la limite), déploiement
 de production READY sur le commit de merge, `/api/sante` répond, le zip servi
@@ -5560,7 +5597,7 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | outil | quoi |
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
-| `node scripts/audit-*.cjs` | **71 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `node scripts/audit-*.cjs` | **72 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
 | `scripts/bancs/*.cjs` | les **66 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
@@ -5853,7 +5890,7 @@ script-là me fait croire à une catastrophe.
 src/App.jsx                     l'app (grep avant de lire — le fichier est énorme)
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
-scripts/audit-*.cjs             les 71 audits
+scripts/audit-*.cjs             les 72 audits
 scripts/bancs/                  les 66 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
