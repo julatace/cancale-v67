@@ -113,7 +113,13 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
             nb:(/(\d+) ventes/.exec(t)||[])[1]||null};
   });
   dit(!!av.bouton, `${tag} : le bouton « Voir plus » dit le total`, av.bouton||'absent');
-  dit(av.bouton && /sur 2\d\d/.test(av.bouton), `${tag} : et ce total est celui de TOUTES les ventes`, av.bouton||'');
+  // ⚠️ On repère la LISTE une fois pour toutes (elle précède le bouton) : après
+  // dépliage complet le bouton disparaît, et c'est elle qu'on comptera. Une
+  // marque posée par le banc survit aux rendus tant que React ne remonte pas
+  // le nœud — et s'il le remonte, la liste est introuvable et le contrôle
+  // sort ROUGE, jamais vert.
+  await pg.evaluate(()=>{const b=[...document.querySelectorAll('button')].find(x=>/Voir plus/.test(x.textContent));
+    if(b && b.previousElementSibling) b.previousElementSibling.setAttribute('data-banc-liste','1');});
   await pg.evaluate(()=>{const b=[...document.querySelectorAll('button')].find(x=>/Voir plus/.test(x.textContent)); if(b)b.click();});
   await pg.waitForTimeout(400);
   const ap=await pg.evaluate(()=>{
@@ -126,6 +132,40 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
   dit(av.ca === ap.ca && av.nb === ap.nb,
     `${tag} : les totaux du haut ne bougent pas — ils portent sur tout`,
     `CA ${av.ca} -> ${ap.ca} · ${av.nb} -> ${ap.nb} ventes`);
+  // ⚠️ « ET CE TOTAL EST CELUI DE TOUTES LES VENTES ». Ce contrôle s'écrivait
+  // `/sur 2\d\d/` : le nombre de ventes de la vraie base le jour où il a été
+  // posé (287). La base a bougé (ventes masquées, et « Toutes » n'affiche plus
+  // les annulées depuis le 28 septembre, décision de Julien) : 195 ventes,
+  // toutes bien là — et le banc criait au défaut sur un écran juste. Un seuil
+  // recopié d'un jour donné mesure la base de ce jour-là, pas la règle.
+  // La RÈGLE, jugée sans aucun chiffre écrit en dur, par deux voies :
+  //   1. on déplie TOUT : le nombre de lignes obtenu est celui écrit sur le
+  //      bouton (rien n'est perdu, et le total n'est pas celui de la tranche) ;
+  //   2. ce même nombre est celui que l'EN-TÊTE compte de son côté (il porte
+  //      sur l'ensemble, §11) : finalisées + en cours, plus les colis
+  //      « Retournée » qui reviennent (montrés dans « Toutes », hors de tout
+  //      total d'argent). Une liste amputée dirait le même nombre sur son
+  //      bouton et dans ses lignes — c'est l'en-tête qui la trahit.
+  const tout=await pg.evaluate(async()=>{
+    for(let k=0;k<30;k++){ const b=[...document.querySelectorAll('button')].find(x=>/Voir plus/.test(x.textContent));
+      if(!b) break; b.click(); await new Promise(r=>setTimeout(r,300)); }
+    const reste=!![...document.querySelectorAll('button')].find(x=>/Voir plus/.test(x.textContent));
+    const L=document.querySelector('[data-banc-liste]');
+    const lignes=L?[...L.children]:null;
+    const retournees=lignes?lignes.filter(r=>(r.innerText||'').split('\n').some(l=>l.trim()==='Retournée')).length:null;
+    const t=(document.body.innerText||'').split('\n').map(s=>s.trim());
+    const apres=(re,re2)=>{const i=t.findIndex(l=>re.test(l)); if(i<0) return null;
+      for(let j=i+1;j<Math.min(t.length,i+4);j++){const m=re2.exec(t[j]); if(m) return Number(m[1]);} return null;};
+    return {reste, lignes:lignes?lignes.length:null, retournees,
+            finalisees:apres(/^CA finalis/i,/^(\d+) ventes?$/), enCours:apres(/^En attente$/i,/^(\d+) en cours$/)};
+  });
+  const N=Number((/sur (\d+)/.exec(av.bouton||'')||[])[1]);
+  // « En attente » ne s'affiche que s'il y a des ventes en cours : absent = 0.
+  const entete=(tout.finalisees==null)?null:tout.finalisees+(tout.enCours||0)+(tout.retournees||0);
+  dit(!!N && N>60 && !tout.reste && tout.lignes===N && entete===N,
+    `${tag} : et ce total est celui de TOUTES les ventes`,
+    `bouton « sur ${N||'?'} » · tout déplié : ${tout.lignes==null?'liste introuvable':tout.lignes+' lignes'}${tout.reste?' (le bouton reste)':''}`
+    +` · en-tête : ${tout.finalisees==null?'illisible':tout.finalisees+' finalisées + '+(tout.enCours||0)+' en cours + '+(tout.retournees||0)+' retournées = '+entete}`);
   await pg.close();
   }
   await b.close(); srv.close();
