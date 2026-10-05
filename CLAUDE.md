@@ -4531,6 +4531,56 @@ donc plus de bouton de bordereau ; et si un PDF purgé était quand même demand
 - Aucune entrée d'`EXT_CAPACITES` (ménage interne). Extension **5.158.0**, zip
   régénéré, `EXT_ATTENDUE` suivie.
 
+### Les bancs à fixtures relancés sur la base du jour — six défauts d'app, et des bancs qui ne pouvaient plus échouer (5 octobre)
+Les 19 bancs qui lisent `scripts/bancs/fx/` (copie de sa vraie base, gitignorée,
+exportée le 5 octobre avec son accord) ont été relancés UN PAR UN, chaque rouge
+trié (défaut de l'app · banc en retard · donnée qui a changé · instable) puis
+contre-vérifié par deux sceptiques. Corrigés dans l'app, chacun rouge avant :
+- **Colis pendant la lecture** : « 0 bordereau prêt · 3 en attente », puis
+  « 2 · 1 », puis « 3 ». Tant que bordereaux captés ET emails ne sont pas tous
+  lus : « au moins N prêts », aucun « en attente » (le groupe dit « pas encore
+  vérifié »). `colis.cjs` sert un réseau lent (4 s sur `_label_`/`email_bord`).
+- **Menu « ⋯ Outils » d'Annonces** coupé par le bord aux deux tailles : il
+  s'ancre à droite comme celui de Ventes, à gauche si le bouton est passé à la
+  ligne près du bord (côté mesuré au clic).
+- **Leboncoin → Annonces pendant une panne** : gardé par `baseKO` comme ses
+  quatre voisins ; une lecture ratée de `lbc_listings` ne dit plus « jamais vu,
+  ouvre leboncoin.fr » ; les lectures ratées sont dites UNE fois avec ce
+  qu'elles empêchent ; « — à publier » au lieu de « 0 ».
+- **URSSAF** : « à payer 21,20 € · net 135,81 € » sur 157 € (21,195 arrondi d'un
+  seul côté). `aPayerUrssaf` / `netApresUrssafDe` arrondissent UNE fois, en
+  centimes entiers, pour la carte, le récap, l'échéance, le CSV et les deux
+  rapports — 0 incohérence sur 200 001 montants. ⚠️ Le premier correctif
+  proposé ne touchait que la carte : le récap mensuel du même écran aurait dit
+  un autre centime (c'est un sceptique qui l'a vu).
+- **Retrait sur Ma journée** : en extension absente (téléphone) ou en retard, la
+  consigne ne nommait pas le compte ; l'écran Achats, si (§11).
+- **Ventes** : un « Retour initié » n'était visible que sous « Annulées »
+  (`venteQuiRevient`, même défaut que la « non réclamée » du 4 octobre).
+
+⚠️⚠️ **TROIS BANCS ÉTAIENT VERTS (OU MUETS) SUR N'IMPORTE QUEL DÉFAUT** :
+- `urssaf.cjs` cherchait `transaction->>id` sur l'URL BRUTE — le navigateur
+  encode `>` en `%3E` : la transaction n'était **jamais servie**, le CA valait
+  0 €, et « 0 × 13,5 % = 0 » passait. **Toute route de banc se teste sur l'URL
+  DÉCODÉE** (§6.3, la forme de la requête).
+- `retrait.cjs` lisait un bloc à partir de « Point relais » ; l'étiquette est en
+  `textTransform:uppercase` et `innerText` rend « POINT RELAIS » : bloc vide,
+  « 0 colis », exigences sautées. Et `/inbox\/(\d+)/` prenait un identifiant
+  de conversation en UUID (232 sur 236) pour une conversation inventée.
+- Un contrôle qui dépend d'une situation que la base du jour n'a plus (« non
+  réclamée ») ne mesure rien : le banc la PRÉPARE en mémoire.
+Bancs mis à jour sur la forme actuelle sans les affaiblir : capacites, carte,
+colis, comptes, ia, oublies, perfv, postes, retrait, serie, urssaf. Restent
+**instables sous charge** (4 cœurs) : la modale de `serie` (< 1,2 s) et le
+tableau de bord de `retrait` — à relancer SEULS, jamais à élargir.
+
+### Mise en production du 5 octobre
+PR #442 mergée à 10:24 UTC (80 déploiements sur 24 h : sous la limite), déploiement
+de production READY sur le commit de merge, `/api/sante` répond, le zip servi
+est celui de la 5.158 (382 238 octets). ⚠️ vrm.center et supabase.co sont
+**bloqués par le proxy de ce conteneur** : la vérification passe par l'outil
+Vercel (`web_fetch_vercel_url`), pas par `curl`.
+
 ### Logo iPhone : icônes PWA régénérées (3 octobre)
 `apple-touch-icon.png` + `icon-192/512/maskable` portaient encore l'ancien logo
 orange ; régénérées depuis `logo-vrm.png` (VRM Noir), maskable avec marge sur
