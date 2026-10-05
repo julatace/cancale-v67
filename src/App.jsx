@@ -773,29 +773,48 @@ if (MULTI_USER && typeof window !== 'undefined') {
 // L'EXTENSION A BESOIN DE SAVOIR QUI TU ES.
 // Elle écrit dans la même base (annonces, ventes, messages captés au passage).
 // Une fois l'isolation activée, la clé publique n'a plus le droit d'écrire :
-// il faut qu'elle écrive sous TON compte. On lui transmet donc la session dès
-// qu'elle change — l'extension la garde et la renouvelle toute seule ensuite.
-// À la déconnexion on envoie null : elle oublie tout.
-const pushSessionToExtension = () => {
-  if (!MULTI_USER) return;
-  try {
-    const s = AUTH.session;
-    window.postMessage({ __vmr: 'session', session: s ? {
-      access_token: s.access_token, refresh_token: s.refresh_token,
-      expires_at: s.expires_at, user_id: AUTH.user && AUTH.user.id,
-      // L'email voyage avec la session : c'est lui que l'extension affiche
-      // (« compte VRM utilisé »). Sans lui elle ne pouvait pas le nommer.
-      email: (AUTH.user && AUTH.user.email) || '',
-    } : null }, window.location.origin);
-  } catch (_) {}
+// il faut qu'elle écrive sous TON compte.
+// ⚠️⚠️ L'APP NE LUI PRÊTE PLUS SA PROPRE SESSION (5 octobre). Jusqu'ici on lui
+//    envoyait NOTRE jeton de renouvellement à chaque changement et à chaque
+//    « ready » : l'app et l'extension renouvelaient alors la MÊME famille de
+//    jetons. Avec la rotation de Supabase, la seconde qui renouvelle présente
+//    un jeton déjà consommé — mesuré dans les journaux d'authentification de
+//    la production le 5 octobre : `refresh_token_already_used`, puis une
+//    rafale de 429. L'extension perdait sa session (« l'extension ne répond
+//    pas » sur le bouton du bordereau), et l'app risquait la sienne.
+//    ⇒ L'extension reçoit SA session, fabriquée par le serveur pour le même
+//      compte (`/api/compte?mode=session-extension`) : deux familles de jetons
+//      indépendantes, qui ne se marchent plus dessus. On ne la lui donne que
+//      quand elle en a BESOIN (pas de session, session morte, autre compte),
+//      jamais à chaque rafraîchissement. Voir `assurerSessionExtension`.
+// À la déconnexion on envoie toujours null : elle oublie tout.
+const posterSessionExtension = (session) => {
+  try { window.postMessage({ __vmr: 'session', session: session || null }, window.location.origin); } catch (_) {}
 };
+// Le repli d'AVANT (notre propre session) ne sert plus qu'à amorcer une
+// extension qui n'a AUCUNE session quand le serveur ne sait pas en fabriquer
+// une (route pas encore déployée, clé de service absente) — jamais pour
+// remplacer une session morte : c'est exactement le cas qui faisait s'entre-
+// tuer les deux familles.
+const sessionAppPourExtension = () => {
+  const s = AUTH.session;
+  return s ? {
+    access_token: s.access_token, refresh_token: s.refresh_token,
+    expires_at: s.expires_at, user_id: AUTH.user && AUTH.user.id,
+    // L'email voyage avec la session : c'est lui que l'extension affiche
+    // (« compte VRM utilisé »). Sans lui elle ne pouvait pas le nommer.
+    email: (AUTH.user && AUTH.user.email) || '',
+  } : null;
+};
+let __sessionAvait = false;
 if (MULTI_USER && typeof window !== 'undefined') {
-  onAuthChange(pushSessionToExtension);
-  // L'extension annonce sa présence au chargement de la page ; on en profite
-  // pour lui donner la session tout de suite (elle démarre parfois après nous).
-  window.addEventListener('message', (ev) => {
-    if (ev.source === window && ev.data && ev.data.__vmr === 'ready') pushSessionToExtension();
-  }, false);
+  onAuthChange(() => {
+    const a = !!(AUTH.session && AUTH.user);
+    if (__sessionAvait && !a) posterSessionExtension(null);   // déconnexion : elle oublie
+    __sessionAvait = a;
+    // Connexion (ou nouveau compte) : on vérifie si l'extension a ce qu'il faut.
+    if (a) setTimeout(() => { try { assurerSessionExtension(); } catch (_) {} }, 50);
+  });
 }
 
 // Liste des cles synchronisees dans le cloud
@@ -3460,13 +3479,22 @@ const vmrExtVersion = () => __vmrExtVersion;
 // Qui est connecté DANS l'extension ? L'app ne peut pas lire son stockage
 // (c'est le but) : elle le lui demande par le pont. Renvoie null si l'extension
 // n'est pas là ou ne répond pas — jamais une supposition.
-function vmrAuthEtat(timeoutMs = 2500) {
+// L'erreur qu'un bridge.js ORPHELIN renvoie (extension rechargée ou mise à
+// jour : son service worker n'existe plus). Ce n'est pas une réponse.
+const pontOrphelin = (err) => /context invalidated|contexte|^pont$|Receiving end does not exist/i.test(String(err || ''));
+// ⚠️ Une réponse VIDE peut venir d'un pont ORPHELIN (voir `vmrDemande`) : on
+//    attend encore celle d'un pont vivant avant de conclure.
+function vmrAuthEtat(timeoutMs = 6000) {
   return new Promise((resolve) => {
     if (typeof window === 'undefined' || !__vmrExtReady) { resolve(null); return; }
     const reqId = 'a' + Date.now() + '_' + Math.random().toString(36).slice(2);
-    let done = false;
-    const fin = (v) => { if (done) return; done = true; window.removeEventListener('message', onMsg); resolve(v); };
-    const onMsg = (e) => { if (e.source === window && e.data && e.data.__vmr === 'authEtat:result' && e.data.reqId === reqId) fin(e.data.etat || null); };
+    let done = false, grace = null;
+    const fin = (v) => { if (done) return; done = true; clearTimeout(grace); window.removeEventListener('message', onMsg); resolve(v); };
+    const onMsg = (e) => {
+      if (!(e.source === window && e.data && e.data.__vmr === 'authEtat:result' && e.data.reqId === reqId)) return;
+      if (e.data.etat) { fin(e.data.etat); return; }
+      if (!grace) grace = setTimeout(() => fin(null), VMR_GRACE_VIDE_MS);
+    };
     window.addEventListener('message', onMsg);
     setTimeout(() => fin(null), timeoutMs);
     try { window.postMessage({ __vmr: 'authEtat', reqId }, '*'); } catch (_) { fin(null); }
@@ -3480,9 +3508,14 @@ function vmrPhoto(url, timeoutMs = 8000) {
   return new Promise((resolve) => {
     if (typeof window === 'undefined' || !__vmrExtReady || !url) { resolve(null); return; }
     const reqId = 'p' + Date.now() + '_' + Math.random().toString(36).slice(2);
-    let done = false;
-    const fin = (v) => { if (done) return; done = true; window.removeEventListener('message', onMsg); resolve(v); };
-    const onMsg = (e) => { if (e.source === window && e.data && e.data.__vmr === 'photo:result' && e.data.reqId === reqId) fin(e.data.dataUrl || null); };
+    let done = false, grace = null;
+    const fin = (v) => { if (done) return; done = true; clearTimeout(grace); window.removeEventListener('message', onMsg); resolve(v); };
+    // Réponse vide : peut-être un pont orphelin (voir `vmrDemande`) — on attend encore un peu.
+    const onMsg = (e) => {
+      if (!(e.source === window && e.data && e.data.__vmr === 'photo:result' && e.data.reqId === reqId)) return;
+      if (e.data.dataUrl) { fin(e.data.dataUrl); return; }
+      if (!grace) grace = setTimeout(() => fin(null), VMR_GRACE_VIDE_MS);
+    };
     window.addEventListener('message', onMsg);
     setTimeout(() => fin(null), timeoutMs);
     try { window.postMessage({ __vmr: 'photo', reqId, url }, '*'); } catch (_) { fin(null); }
@@ -3495,9 +3528,17 @@ function vmrPdfLbc(url, timeoutMs = 15000) {
   return new Promise((resolve) => {
     if (typeof window === 'undefined' || !__vmrExtReady || !url) { resolve({ error: 'extension absente' }); return; }
     const reqId = 'l' + Date.now() + '_' + Math.random().toString(36).slice(2);
-    let done = false;
-    const fin = (v) => { if (done) return; done = true; window.removeEventListener('message', onMsg); resolve(v); };
-    const onMsg = (e) => { if (e.source === window && e.data && e.data.__vmr === 'pdfLbc:result' && e.data.reqId === reqId) fin({ dataUrl: e.data.dataUrl || null, error: e.data.error || '' }); };
+    let done = false, grace = null, dernier = null;
+    const fin = (v) => { if (done) return; done = true; clearTimeout(grace); window.removeEventListener('message', onMsg); resolve(v); };
+    // Une erreur de PONT (« Extension context invalidated », « pont ») vient d'un
+    // bridge orphelin (voir `vmrDemande`) : on attend encore le pont vivant.
+    const onMsg = (e) => {
+      if (!(e.source === window && e.data && e.data.__vmr === 'pdfLbc:result' && e.data.reqId === reqId)) return;
+      const v = { dataUrl: e.data.dataUrl || null, error: e.data.error || '' };
+      if (v.dataUrl || !pontOrphelin(v.error)) { fin(v); return; }
+      dernier = v;
+      if (!grace) grace = setTimeout(() => fin(dernier), VMR_GRACE_VIDE_MS);
+    };
     window.addEventListener('message', onMsg);
     setTimeout(() => fin({ error: 'pas de réponse' }), timeoutMs);
     try { window.postMessage({ __vmr: 'pdfLbc', reqId, url }, '*'); } catch (_) { fin({ error: 'pont' }); }
@@ -3508,8 +3549,16 @@ function vmrExec({ uid, method, endpoint, body }, timeoutMs = 15000) {
   return new Promise((resolve) => {
     if (typeof window === 'undefined') { resolve({ ok: false, error: 'no window' }); return; }
     const reqId = 'r' + Date.now() + '_' + Math.random().toString(36).slice(2);
-    const cleanup = () => { clearTimeout(to); window.removeEventListener('message', onMsg); };
-    const onMsg = (e) => { if (e.source === window && e.data && e.data.__vmr === 'result' && e.data.reqId === reqId) { cleanup(); resolve(e.data); } };
+    let grace = null, dernier = null;
+    const cleanup = () => { clearTimeout(to); clearTimeout(grace); window.removeEventListener('message', onMsg); };
+    // Une erreur de PONT vient d'un bridge orphelin (voir `vmrDemande`) : on
+    // attend encore la réponse du pont vivant avant de dire que ça a échoué.
+    const onMsg = (e) => {
+      if (!(e.source === window && e.data && e.data.__vmr === 'result' && e.data.reqId === reqId)) return;
+      if (e.data.ok || !pontOrphelin(e.data.error)) { cleanup(); resolve(e.data); return; }
+      dernier = e.data;
+      if (!grace) grace = setTimeout(() => { cleanup(); resolve(dernier); }, VMR_GRACE_VIDE_MS);
+    };
     const to = setTimeout(() => { cleanup(); resolve({ ok: false, error: 'timeout' }); }, timeoutMs);
     window.addEventListener('message', onMsg);
     try { window.postMessage({ __vmr: 'exec', reqId, uid, method, endpoint, body }, '*'); }
@@ -3529,33 +3578,112 @@ function vmrExec({ uid, method, endpoint, body }, timeoutMs = 15000) {
 let __vmrEtat = undefined, __vmrRates = 0;
 const __vmrJobs = {};                       // jobId → dernière étape connue
 const __vmrNotifier = () => __vmrExtSubs.forEach(fn => { try { fn(); } catch (_) {} });
+// ⚠️⚠️ UN PONT ORPHELIN RÉPONDAIT « RIEN » PLUS VITE QUE LE PONT VIVANT
+//    (5 octobre — « je ne peux pas appuyer sur le bordereau, ça met que
+//    l'extension ne répond pas »). Après une mise à jour ou un rechargement de
+//    l'extension, l'ancien bridge.js reste dans la page, sans service worker
+//    derrière lui : il répondait `null` sur-le-champ, et l'extension le remet
+//    à neuf dans la page (`reinjecterPont`) — mais la réponse vide de l'ancien
+//    arrivait la première, et l'app concluait « muette » pour de bon.
+//    ⇒ Une réponse VIDE n'est pas une réponse : on attend encore un peu celle
+//      d'un pont vivant, et seulement ensuite on dit « pas de réponse ».
+//      (Les ponts 5.160+ se taisent quand ils sont orphelins ; ceci protège
+//      aussi les extensions déjà installées.)
+const VMR_GRACE_VIDE_MS = 1500;
 function vmrDemande(type, payload, timeoutMs) {
   return new Promise((resolve) => {
     if (typeof window === 'undefined' || !__vmrExtReady) { resolve(null); return; }
     const reqId = 'q' + Date.now() + '_' + Math.random().toString(36).slice(2);
-    let done = false;
-    const fin = (v) => { if (done) return; done = true; window.removeEventListener('message', onMsg); resolve(v); };
-    const onMsg = (e) => { if (e.source === window && e.data && e.data.__vmr === type + ':result' && e.data.reqId === reqId) fin(e.data.resp || null); };
+    let done = false, grace = null, to = null;
+    const fin = (v) => { if (done) return; done = true; clearTimeout(grace); clearTimeout(to); window.removeEventListener('message', onMsg); resolve(v); };
+    const onMsg = (e) => {
+      if (e.source !== window || !e.data || e.data.__vmr !== type + ':result' || e.data.reqId !== reqId) return;
+      if (e.data.resp) { fin(e.data.resp); return; }
+      if (!grace) grace = setTimeout(() => fin(null), VMR_GRACE_VIDE_MS);
+    };
     window.addEventListener('message', onMsg);
-    setTimeout(() => fin(null), timeoutMs);
+    to = setTimeout(() => fin(null), timeoutMs);
     try { window.postMessage(Object.assign({ __vmr: type, reqId }, payload || {}), '*'); } catch (_) { fin(null); }
   });
 }
-const vmrEtat = (timeoutMs = 2500) => vmrDemande('etat', {}, timeoutMs);
+// ⚠️ 2,5 s ÉTAIT TROP COURT : au réveil, le service worker de l'extension
+//    (5.159 et avant) sondait la base et renouvelait sa session AVANT de
+//    répondre — plusieurs secondes quand Supabase traîne. L'app le déclarait
+//    muette. L'extension 5.160 répond sans réseau ; on laisse quand même le
+//    temps aux versions déjà installées.
+const vmrEtat = (timeoutMs = 6000) => vmrDemande('etat', {}, timeoutMs);
 const vmrCmd = (p, timeoutMs = 9000) => vmrDemande('cmd', p, timeoutMs);
+let __vmrBattementEnVol = false, __vmrRelance = null;
 async function battementExt() {
   if (typeof document !== 'undefined' && document.hidden) return;
-  if (!__vmrExtReady) return;
-  const r = await vmrEtat();
+  if (!__vmrExtReady || __vmrBattementEnVol) return;
+  __vmrBattementEnVol = true;
+  let r = null;
+  try { r = await vmrEtat(); } finally { __vmrBattementEnVol = false; }
   if (r && r.ok) { __vmrEtat = r; __vmrRates = 0; if (r.cmds && typeof r.cmds === 'object') Object.assign(__vmrJobs, r.cmds); }
-  else { __vmrRates++; if (__vmrRates >= 2 || __vmrEtat === undefined) __vmrEtat = null; }
+  else {
+    __vmrRates++;
+    // ⚠️ UN raté ne vaut pas « muette » : un service worker qui se réveille, un
+    //    onglet qui revient au premier plan. On redemande vite, et seulement
+    //    au DEUXIÈME raté d'affilée on le dit (trois états, jamais deux :
+    //    `undefined` on vérifie encore · `null` elle ne répond pas).
+    if (__vmrRates >= 2) __vmrEtat = null;
+    else { clearTimeout(__vmrRelance); __vmrRelance = setTimeout(battementExt, 3000); }
+  }
   __vmrNotifier();
+  if (r && r.ok) { try { assurerSessionExtension(); } catch (_) {} }
+}
+// L'EXTENSION REÇOIT SA PROPRE SESSION QUAND ELLE EN A BESOIN (voir
+// `posterSessionExtension`). Besoin = elle n'en a pas, la sienne est morte, ou
+// elle écrit sous un AUTRE compte VRM que celui de cette page (c'est la
+// personne au clavier qui décide : l'extension note la bascule et la dit).
+// Pas su (`connecte: null`, renouvellement en cours) ⇒ on ne touche à rien.
+let __sessExtEnVol = false, __sessExtPasAvant = 0;
+async function assurerSessionExtension() {
+  if (!MULTI_USER || typeof window === 'undefined') return;
+  const s = AUTH.session, u = AUTH.user;
+  if (!s || !s.access_token || !u || !u.id) return;
+  const e = __vmrEtat;
+  const v = e && e.ok ? e.vrm : null;
+  if (!v || typeof v !== 'object') return;
+  const monId = String(u.id), monMail = String(u.email || '').trim().toLowerCase();
+  const sonId = String(v.user_id || ''), sonMail = String(v.email || '').trim().toLowerCase();
+  const autre = (sonId && sonId !== monId) || (!sonId && sonMail && monMail && sonMail !== monMail);
+  if (!(v.connecte === false || autre)) return;
+  if (__sessExtEnVol || Date.now() < __sessExtPasAvant) return;
+  __sessExtEnVol = true;
+  try {
+    let r = null;
+    try { r = await fetch('/api/compte?mode=session-extension', { method: 'POST', cache: 'no-store', headers: { Authorization: `Bearer ${s.access_token}` } }); } catch (_) { r = null; }
+    const j = r && r.ok ? await r.json().catch(() => null) : null;
+    const neuve = j && j.ok && j.session && j.session.access_token && j.session.refresh_token ? j.session : null;
+    if (neuve && String(neuve.user_id || '') === monId) {
+      posterSessionExtension(neuve);
+      __sessExtPasAvant = Date.now() + 60000;
+      // Elle vient de changer de session : on relit son état tout de suite.
+      setTimeout(battementExt, 800);
+      return;
+    }
+    // Le serveur ne sait pas (encore) en fabriquer une : repli d'avant, mais
+    // SEULEMENT pour amorcer une extension qui n'a aucune session du tout.
+    const pasDeServeur = r && (r.status === 404 || r.status === 405 || r.status === 503);
+    if (pasDeServeur && v.connecte === false && !v.expiree && !v.email) {
+      posterSessionExtension(sessionAppPourExtension());
+      __sessExtPasAvant = Date.now() + 10 * 60000;
+      setTimeout(battementExt, 800);
+      return;
+    }
+    __sessExtPasAvant = Date.now() + (r && r.status === 429 ? 15 * 60000 : 5 * 60000);
+  } finally { __sessExtEnVol = false; }
 }
 if (typeof window !== 'undefined') {
   try {
     window.addEventListener('message', (e) => {
       if (e.source !== window || !e.data) return;
-      if (e.data.__vmr === 'ready' && __vmrEtat === undefined) { setTimeout(battementExt, 30); return; }
+      // Un pont qui (ré)apparaît — premier chargement, ou remis à neuf après une
+      // mise à jour de l'extension : on lui redemande son état tout de suite,
+      // y compris si on l'avait cru muette.
+      if (e.data.__vmr === 'ready') { if (__vmrEtat === undefined || __vmrEtat === null) { __vmrRates = 0; setTimeout(battementExt, 30); } return; }
       if (e.data.__vmr !== 'evt' || !e.data.evt) return;
       const ev = e.data.evt;
       if (ev.type === 'cmd' && ev.jobId) { __vmrJobs[ev.jobId] = ev; __vmrNotifier(); }
@@ -3577,11 +3705,15 @@ function raisonExtGlobale(sansSouris, opt) {
   const role = (opt && opt.role) || 'génère les bordereaux';
   if (sansSouris) return { code: 'telephone', texte: `Depuis ton ordinateur : c'est là que tourne l'extension qui ${role}.` };
   if (!vmrExtPresent()) return { code: 'absente', texte: `Extension VRM pas détectée dans ce navigateur — c'est elle qui ${role}.` };
-  if (__vmrEtat === null) return { code: 'muette', texte: "L'extension ne répond pas — recharge cette page (après une mise à jour), ou réactive-la dans chrome://extensions." };
+  if (__vmrEtat === null) return { code: 'muette', geste: 'recharger', texte: "L'extension ne répond pas — recharge cette page (après une mise à jour), ou réactive-la dans chrome://extensions." };
   if (extSait(cap) === 'retard') return { code: 'retard', texte: `Mets l'extension à jour (${EXT_ATTENDUE}) : celle installée ne sait pas encore recevoir cette commande de l'app.` };
   if (__vmrEtat === undefined) return { code: 'verif', texte: "Vérification de l'extension…" };
   const v = __vmrEtat.vrm;
-  if (v && v.connecte === false) return { code: 'vrm', texte: "Connecte l'extension à ton compte VRM (clique sur son icône)." };
+  // L'app lui transmet d'elle-même sa connexion quand elle n'en a pas
+  // (`assurerSessionExtension`) : on le dit pendant que ça se fait.
+  if (v && v.connecte === false) return { code: 'vrm', texte: __sessExtEnVol
+    ? "Je connecte l'extension à ton compte VRM…"
+    : "Connecte l'extension à ton compte VRM (clique sur son icône en haut de Chrome)." };
   const monMail = String((AUTH.user && AUTH.user.email) || '').trim().toLowerCase();
   const sonMail = String((v && v.email) || '').trim().toLowerCase();
   if (monMail && sonMail && monMail !== sonMail) return { code: 'autre-vrm', texte: `L'extension est connectée au compte VRM ${sonMail}, pas au tien (${monMail}).` };
@@ -6937,11 +7069,22 @@ function RaisonBordereauxGrises({ ventes }) {
     <div data-raison-bord={r.code} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12.5, color: C.text, background: C.card,
       border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.warn}`, borderRadius: 10, padding: '9px 12px', marginBottom: 10, lineHeight: 1.45 }}>
       <Icon name="doc" size={15} style={{ color: C.warn, flexShrink: 0, marginTop: 2 }}/>
-      <span><b>{n} bordereau{n > 1 ? 'x' : ''} à générer</b> — {r.texte}</span>
+      <span style={{ minWidth: 0 }}>
+        <b>{n} bordereau{n > 1 ? 'x' : ''} à générer</b> — {r.texte}
+        {r.geste === 'recharger' && (
+          <> <button type="button" data-recharger="1" onClick={() => { try { window.location.reload(); } catch (_) {} }}
+            style={{ marginLeft: 4, border: `1px solid ${C.accent}`, background: 'transparent', color: C.accent, borderRadius: 8, padding: '3px 9px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Recharger la page</button></>
+        )}
+        {/* ⚠️ Le repli qui ne dépend PAS de l'extension de cette page : générer
+            le bordereau sur Vinted. Le PDF remonte ensuite ici par l'email de
+            Vinted (et par l'extension si elle tourne dans ce Chrome). Le lien
+            de CHAQUE vente est sur sa ligne (« sur Vinted ↗ »). */}
+        <span style={{ display: 'block', color: C.muted, marginTop: 3 }}>Tu peux aussi le générer sur Vinted (lien « sur Vinted » de chaque vente) : le PDF remonte ici avec l'email de Vinted.</span>
+      </span>
     </div>
   );
 }
-function BoutonBordereau({ uid, tx, login, aGenerer, pdf, onImprimer, onFait, grand }) {
+function BoutonBordereau({ uid, tx, conv, login, aGenerer, pdf, onImprimer, onFait, grand }) {
   const { etat, jobs } = useExtVivante();
   const sansSouris = useSansSouris();
   const [refus, setRefus] = React.useState(null);
@@ -6973,7 +7116,7 @@ function BoutonBordereau({ uid, tx, login, aGenerer, pdf, onImprimer, onFait, gr
     setRefus(null); setEnvoi(true);
     const r = await vmrCmd({ cmd: 'bordereau', uid: String(uid), tx: String(tx) });
     setEnvoi(false);
-    if (!r) { setRefus("L'extension n'a pas répondu — recharge cette page et réessaie."); return; }
+    if (!r) { setRefus("L'extension n'a pas répondu — recharge cette page et réessaie, ou génère-le sur Vinted (lien ci-dessous)."); __vmrRates = 1; battementExt(); return; }
     if (!r.accepte) {
       setRefus(r.code === 'vinted-autre' ? `Chrome est connecté sur ${r.actifLogin || 'un autre compte'} — bascule sur ${login || 'ce compte'} sur vinted.fr.`
         : r.code === 'vinted-absent' ? `Connecte-toi sur vinted.fr avec ${login || 'ce compte'} dans ce Chrome.`
@@ -6991,6 +7134,10 @@ function BoutonBordereau({ uid, tx, login, aGenerer, pdf, onImprimer, onFait, gr
     // capture, 390 px). La raison est dite au-dessus de la liste.
     : (sansSouris && !grand) ? 'Bordereau' : 'Générer le bordereau';
   const grise = !!raison;
+  // Le repli sur Vinted, propre à CETTE vente (son adresse distingue la ligne,
+  // §7) : la conversation de la vente porte le bouton « Imprimer le bordereau ».
+  const surVinted = conv ? `https://www.vinted.fr/inbox/${encodeURIComponent(conv)}` : `https://www.vinted.fr/member/transactions/${encodeURIComponent(tx)}`;
+  const repliVinted = grise && glob && glob.code !== 'verif';
   return (
     <span data-bouton-bord={grise ? 'grise' : enCours ? 'encours' : ko ? 'echec' : 'pret'} data-tx={tx} style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3, maxWidth: '100%' }}>
       <button type="button" onClick={lancer} aria-disabled={grise || enCours ? 'true' : undefined}
@@ -7007,10 +7154,14 @@ function BoutonBordereau({ uid, tx, login, aGenerer, pdf, onImprimer, onFait, gr
       {/* Le repli à la main : l'extension a posé un rendez-vous de 15 min, le PDF
           téléchargé depuis la vente sera relié à ELLE (une identité, §5). */}
       {ko && job.etape === 'genere_sans_pdf' && (
-        <a href={`https://www.vinted.fr/member/transactions/${encodeURIComponent(tx)}`} target="_blank" rel="noreferrer"
+        <a href={surVinted} target="_blank" rel="noreferrer"
           style={{ fontSize: 11.5, color: C.accent, fontWeight: 600, textDecoration: 'none' }}>
           Ouvrir la vente sur Vinted et télécharger le PDF ↗
         </a>
+      )}
+      {repliVinted && !(ko && job.etape === 'genere_sans_pdf') && (
+        <a data-bord-vinted={tx} href={surVinted} target="_blank" rel="noreferrer"
+          style={{ fontSize: 11.5, color: C.accent, fontWeight: 600, textDecoration: 'none' }}>sur Vinted ↗</a>
       )}
     </span>
   );
@@ -7078,43 +7229,131 @@ function RaisonPublication({ n, place }) {
   );
 }
 
-// ⚠️ « un petit onglet en bas à droite tant que l'extension n'a pas tout capté,
-//    pour voir ce que j'ai à faire » (Julien, 19 sept.). Il ne dit QUE ce qui
-//    est MESURABLE et ACTIONNABLE ici :
-//     • il LIT `extSait('_maj')` — le propriétaire de la version (§11), qui
-//       compare l'extension de CE navigateur à `EXT_ATTENDUE` ; aucun recalcul ;
-//     • extension à jour ⇒ plus rien à faire ⇒ l'onglet DISPARAÎT (§7, on ne
-//       laisse pas un badge permanent qui a fini son travail) ;
-//     • sur le TÉLÉPHONE (`useSansSouris`) l'install se fait sur l'ordinateur :
-//       on ne harcèle pas un geste impossible ici (leçon iPhone), l'onglet se tait ;
-//     • base injoignable ⇒ `BaseInjoignable` dit déjà la panne, on ne double pas ;
-//     • premier jour ⇒ `PremiersPas` dit déjà tout, on ne double pas.
-//    « Tout capté » n'est pas devinable côté app (la capture vit dans la base de
-//    l'extension) : tant qu'elle n'est pas à jour, elle ne capte pas tout — c'est
-//    CE geste-là, mesurable, que l'onglet porte. Le reste se branchera quand un
-//    signal de capture existera, jamais avant (on ne devine pas).
-function ResteAFaire({ onNav, baseKO, premierJour }) {
-  const [, force] = React.useReducer((n) => n + 1, 0);
-  React.useEffect(() => onVmrExt(force), []);
+// ══════════════════════════════════════════════════════════════════════════════
+// PUIS-JE AGIR SUR VINTED DEPUIS CETTE PAGE ? (Julien, 5 octobre)
+// ══════════════════════════════════════════════════════════════════════════════
+// « Quand je me connecte sur VRM, je veux savoir s'il y a un compte connecté et
+// allumé, pour savoir si je peux faire des actions, ou si c'est simplement de la
+// lecture de données, la récupération de colis, l'impression de bordereaux qui
+// sont déjà dans l'application. »
+// ⇒ UNE pastille dans l'en-tête, sur tous les écrans : « Actions possibles » ou
+//   « Lecture seule ». Un clic l'explique : l'extension, le compte VRM sous
+//   lequel elle écrit, le compte Vinted ouvert dans Chrome — et LE geste qui
+//   débloque, jamais une liste de consignes.
+// ⚠️ Une seule règle (§11) : l'état de l'extension vient de `raisonExtGlobale`
+//    (la même phrase que sous les boutons grisés) ; on n'y ajoute que ce
+//    qu'elle ne regarde pas — un compte Vinted ouvert dans ce Chrome.
+// ⚠️ Elle remplace le petit onglet « Extension à mettre à jour » d'en bas à
+//    droite : deux voix pour la même chose, c'est une de trop (§7).
+// Trois états, jamais deux : `verif` (on demande encore) n'est ni oui ni non.
+function etatActionsExt(sansSouris) {
+  const glob = raisonExtGlobale(sansSouris);
+  if (glob && glob.code === 'verif') return { niveau: 'verif', glob, vinted: null };
+  if (glob) return { niveau: 'lecture', glob, vinted: null };
+  const e = __vmrEtat && __vmrEtat.ok ? __vmrEtat : null;
+  const vinted = e && e.vinted && e.vinted.uid ? e.vinted : null;
+  if (!vinted) return { niveau: 'lecture', glob: { code: 'vinted', texte: "Aucun compte Vinted n'est ouvert dans ce Chrome." }, vinted: null };
+  return { niveau: 'ok', glob: null, vinted };
+}
+function EtatActions({ onNav, ordi, sombre }) {
+  useExtVivante();
   const sansSouris = useSansSouris();
-  if (baseKO || premierJour || sansSouris) return null;
-  const maj = extSait('_maj');                 // 'absente' | 'retard' | 'ok' vs EXT_ATTENDUE
-  if (maj === 'ok') return null;               // à jour ⇒ rien à faire, l'onglet s'efface
-  const v = vmrExtVersion();
-  const titre = maj === 'absente' ? 'Extension pas détectée ici' : 'Extension à mettre à jour';
-  const quoi = maj === 'absente'
-    ? <>Installe l'extension VRM dans <b>ce</b> navigateur — c'est elle qui capte tes annonces, tes ventes et les codes Leboncoin.</>
-    : <>La version installée{v ? <> (<b>{v}</b>)</> : null} ne capte pas encore tout. Passe à la <b>{EXT_ATTENDUE}</b> pour débloquer le reste (codes Leboncoin, prix, description).</>;
+  const [ouvert, setOuvert] = React.useState(false);
+  const boite = React.useRef(null);
+  React.useEffect(() => {
+    if (!ouvert) return undefined;
+    const dehors = (ev) => { if (boite.current && !boite.current.contains(ev.target)) setOuvert(false); };
+    const echap = (ev) => { if (ev.key === 'Escape') setOuvert(false); };
+    document.addEventListener('mousedown', dehors); document.addEventListener('touchstart', dehors); document.addEventListener('keydown', echap);
+    return () => { document.removeEventListener('mousedown', dehors); document.removeEventListener('touchstart', dehors); document.removeEventListener('keydown', echap); };
+  }, [ouvert]);
+  const st = etatActionsExt(sansSouris);
+  const code = st.glob ? st.glob.code : 'ok';
+  const e = __vmrEtat && __vmrEtat.ok ? __vmrEtat : null;
+  const v = e && e.vrm ? e.vrm : null;
+  const version = (e && e.version) || vmrExtVersion() || '';
+  const monMail = String((AUTH.user && AUTH.user.email) || '').trim();
+  const sonMail = String((v && v.email) || '').trim();
+  const loginVinted = st.vinted ? (st.vinted.login || ('compte ' + st.vinted.uid)) : '';
+  // Une couleur seulement s'il y a un geste à faire ICI (§7) : sur un téléphone
+  // il n'y en a pas, la lecture seule y est normale.
+  const aRattraper = st.niveau === 'lecture' && code !== 'telephone';
+  const point = st.niveau === 'ok' ? C.accent : aRattraper ? C.warn : C.muted;
+  const libelle = st.niveau === 'ok' ? 'Actions possibles' : st.niveau === 'verif' ? 'Vérification…' : 'Lecture seule';
+  const court = !ordi;                       // en-tête de téléphone : peu de place
+  const ink = sombre ? '#fff' : C.text, bd = sombre ? '#3A3A3C' : C.border;
+
+  // ── Les trois lignes : extension · compte VRM · compte Vinted ──────────────
+  const extKo = ['telephone', 'absente', 'muette', 'retard'].includes(code);
+  const majDispo = !extKo && extSait('_maj') === 'retard';
+  const ligneExt = code === 'telephone' ? { s: '—', t: "s'utilise sur l'ordinateur où elle est installée" }
+    : code === 'absente' ? { s: 'non', t: 'pas détectée dans ce navigateur' }
+    : code === 'muette' ? { s: 'non', t: 'ne répond pas' }
+    : code === 'retard' ? { s: 'non', t: `version ${version || '?'} — trop ancienne pour recevoir des commandes (passe à la ${EXT_ATTENDUE})` }
+    : st.niveau === 'verif' ? { s: '…', t: 'je lui demande…' }
+    : { s: 'oui', t: `allumée${version ? ' · ' + version : ''}${majDispo ? ` (la ${EXT_ATTENDUE} existe)` : ''}` };
+  const ligneVrm = extKo || st.niveau === 'verif' ? { s: '—', t: '' }
+    : code === 'vrm' ? { s: 'non', t: __sessExtEnVol ? 'je lui transmets ta connexion…' : 'pas connectée' }
+    : code === 'autre-vrm' ? { s: 'non', t: `connectée à ${sonMail}, pas à ${monMail}` }
+    : v && v.connecte === null ? { s: '…', t: 'renouvellement de sa connexion…' }
+    : { s: 'oui', t: sonMail || monMail || 'connectée' };
+  const ligneVinted = extKo || st.niveau === 'verif' || code === 'vrm' || code === 'autre-vrm' ? { s: '—', t: '' }
+    : st.vinted ? { s: 'oui', t: loginVinted }
+    : { s: 'non', t: 'aucun compte ouvert' };
+
+  // ── LE geste qui débloque (un seul) ─────────────────────────────────────────
+  const btn = { border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 8, padding: '8px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'none', display: 'inline-block' };
+  let geste = null;
+  if (code === 'telephone') geste = <span>Ouvre VRM sur l'ordinateur où l'extension est installée pour générer un bordereau, répondre ou publier.</span>;
+  else if (code === 'absente' || code === 'retard') geste = <button type="button" data-etat-geste="maj" style={btn} onClick={() => { setOuvert(false); onNav && onNav('settings'); }}>{code === 'absente' ? "Installer l'extension (Réglages)" : `Mettre à jour en ${EXT_ATTENDUE} (Réglages)`}</button>;
+  else if (code === 'muette') geste = <button type="button" data-etat-geste="recharger" style={btn} onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button>;
+  else if (code === 'vrm') geste = <span>{__sessExtEnVol ? 'Un instant…' : <>Clique l'icône VRM en haut de Chrome et connecte-toi avec <b>{monMail || 'ton email VRM'}</b>.</>}</span>;
+  else if (code === 'autre-vrm') geste = <span>Clique l'icône VRM en haut de Chrome, déconnecte-la, puis reconnecte-la avec <b>{monMail}</b>.</span>;
+  else if (code === 'vinted') geste = <a data-etat-geste="vinted" href="https://www.vinted.fr" target="_blank" rel="noreferrer" style={btn}>Ouvrir vinted.fr et me connecter</a>;
+
+  const Ligne = ({ nom, l }) => (
+    <div style={{ display: 'flex', gap: 8, alignItems: 'baseline', padding: '5px 0', borderTop: `1px solid ${C.border}` }}>
+      <span style={{ width: 14, flexShrink: 0, textAlign: 'center', fontWeight: 700, color: l.s === 'oui' ? C.accent : l.s === 'non' ? C.warn : C.muted }}>{l.s === 'oui' ? '✓' : l.s === 'non' ? '✕' : l.s}</span>
+      <span style={{ minWidth: 0 }}><b>{nom}</b>{l.t ? <span style={{ color: C.muted }}> — {l.t}</span> : null}</span>
+    </div>
+  );
+
   return (
-    <div data-onglet="reste-a-faire" style={{position:'fixed',right:16,bottom:16,zIndex:2147483646,maxWidth:300,
-      background:C.card,color:C.text,border:`1px solid ${C.border}`,borderRadius:12,
-      padding:'12px 14px',fontSize:12.5,lineHeight:1.45,
-      boxShadow:'0 1px 2px rgba(0,0,0,.10),0 12px 30px rgba(0,0,0,.16)'}}>
-      <div style={{fontWeight:800,marginBottom:3}}>⏳ {titre}</div>
-      <div style={{color:C.muted}}>{quoi}</div>
-      <button onClick={() => onNav && onNav('settings')} style={{marginTop:9,width:'100%',
-        background:C.accent,color:'#fff',border:'none',borderRadius:8,padding:'8px 10px',
-        fontSize:12.5,fontWeight:600,cursor:'pointer'}}>Ouvrir Réglages pour la télécharger →</button>
+    <div ref={boite} style={{ position: 'relative', flexShrink: 0 }}>
+      <button type="button" data-etat-actions={st.niveau} data-etat-code={code} onClick={() => setOuvert((o) => !o)}
+        aria-expanded={ouvert ? 'true' : 'false'}
+        title={st.niveau === 'ok' ? `Actions Vinted possibles, au nom de ${loginVinted}` : st.glob ? st.glob.texte : ''}
+        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'transparent', border: `1px solid ${bd}`, borderRadius: 8,
+          padding: court ? '6px 8px' : '6px 11px', color: ink, cursor: 'pointer', fontSize: 12.5, fontWeight: 600, fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
+        <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: 5, background: point, flexShrink: 0 }}/>
+        <span>{court && st.niveau === 'lecture' ? 'Lecture' : court && st.niveau === 'ok' ? 'Actions' : libelle}</span>
+        {!court && st.niveau === 'ok' && loginVinted ? <span style={{ color: C.muted, fontWeight: 500, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis' }}>· {loginVinted}</span> : null}
+      </button>
+      {ouvert && (
+        <div data-etat-panneau={st.niveau} role="dialog" aria-label="Ce que VRM peut faire depuis cette page"
+          style={{ position: ordi ? 'absolute' : 'fixed', right: ordi ? 0 : 12, left: ordi ? undefined : 12, top: ordi ? 'calc(100% + 10px)' : 64,
+            width: ordi ? 360 : undefined, maxWidth: 'calc(100vw - 24px)', zIndex: 80, background: C.card, color: C.text, border: `1px solid ${C.border}`,
+            borderRadius: 12, padding: '12px 14px', fontSize: 12.5, lineHeight: 1.45, textAlign: 'left', whiteSpace: 'normal',
+            boxShadow: '0 1px 2px rgba(0,0,0,.10),0 12px 30px rgba(0,0,0,.16)' }}>
+          <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 4 }}>
+            {st.niveau === 'ok' ? 'Tu peux agir sur Vinted depuis VRM' : st.niveau === 'verif' ? "Je vérifie l'extension…" : 'Lecture seule pour l’instant'}
+          </div>
+          {st.niveau === 'ok' ? (
+            <div style={{ color: C.muted, marginBottom: 8 }}>
+              Générer un bordereau, répondre, faire une offre, publier sur Leboncoin ou eBay : ça part au nom de <b style={{ color: C.text }}>{loginVinted}</b>, le compte ouvert dans ce Chrome. Pour un autre de tes comptes, connecte-toi avec lui sur vinted.fr.
+            </div>
+          ) : (
+            <div style={{ color: C.muted, marginBottom: 8 }}>
+              Tout ce qui est déjà dans VRM marche : tes ventes, achats, annonces et messages, les colis à retirer et leurs codes, l'impression des bordereaux déjà reçus.
+              {' '}Générer un bordereau, répondre ou publier demande l'extension allumée, connectée à ton compte, avec un compte Vinted ouvert.
+            </div>
+          )}
+          <Ligne nom="Extension" l={ligneExt}/>
+          <Ligne nom="Ton compte VRM" l={ligneVrm}/>
+          <Ligne nom="Compte Vinted dans Chrome" l={ligneVinted}/>
+          {geste && <div style={{ marginTop: 10 }}>{geste}</div>}
+        </div>
+      )}
     </div>
   );
 }
@@ -22638,7 +22877,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       (« il ne devrait même pas y en avoir », Julien). */}
                   {!hidden && st!=='cancelled' && aExpedier(o) && !isShipDone(o) && o.transaction_id!=null && (
                     <div style={{marginTop:6,display:'flex',justifyContent:'flex-end'}}>
-                      <BoutonBordereau uid={o._acc && o._acc.vinted_user_id} tx={String(o.transaction_id)} login={accNameOf(o._acc)}
+                      <BoutonBordereau uid={o._acc && o._acc.vinted_user_id} tx={String(o.transaction_id)} conv={o.conversation_id} login={accNameOf(o._acc)}
                         aGenerer pdf={!!(labelsCaptes[String(o.transaction_id)] || bordParTx[String(o.transaction_id)])}
                         onImprimer={()=>imprimerBordereauVente(o)} onFait={(u)=>rechargerLabels(u)}/>
                     </div>
@@ -24869,7 +25108,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         {/* L'app COMMANDE l'extension (2 octobre) : le bouton dit ce
                             qui l'empêche s'il est grisé, l'étape s'il travaille. */}
                         {o && o.transaction_id!=null && (
-                          <BoutonBordereau grand uid={acc && acc.vinted_user_id} tx={String(o.transaction_id)} login={accNameOf(acc)}
+                          <BoutonBordereau grand uid={acc && acc.vinted_user_id} tx={String(o.transaction_id)} conv={o.conversation_id} login={accNameOf(acc)}
                             aGenerer pdf={false} onFait={(u)=>rechargerLabels(u)}/>
                         )}
                         <button type="button" onClick={()=>startBordereau(num, titre, acc, o && o.transaction_id)} title="J'ai déjà téléchargé le PDF : le tamponner avec le numéro"
@@ -31384,6 +31623,9 @@ function AppCoeur() {
               {notifEnabled?'🔔':'🔕'}
             </button>}
             {(() => { const eD = !ordi && tab==='plat_ebay'; const ink = eD ? '#fff' : C.text; const bd = eD ? '#3A3A3C' : C.border; return (<>
+            {/* « Puis-je agir sur Vinted depuis cette page ? » — sur tous les
+                écrans (Julien, 5 octobre). Voir `EtatActions`. */}
+            {MULTI_USER && <EtatActions onNav={setTab} ordi={ordi} sombre={eD}/>}
             <button type="button" onClick={()=>{setGsOpen(true);}} title="Rechercher" aria-label="Rechercher une paire"
               style={{background:gsOpen?C.accent:'transparent',border:`1px solid ${gsOpen?C.accent:bd}`,borderRadius:8,padding:'6px 11px',color:gsOpen?C.onAccent:ink,cursor:'pointer',fontSize:15,fontWeight:500,fontFamily:'inherit'}}>
               <Icon name="search" size={17}/>
@@ -31569,7 +31811,6 @@ function AppCoeur() {
             LIGNE de panne (`LignePanne`) là où leur propre liste vide
             mentirait — le bloc, lui, ne s'affiche qu'une fois. */}
         {baseKO && <BaseInjoignable/>}
-        <ResteAFaire onNav={setTab} baseKO={baseKO} premierJour={premierJour}/>
         {tab==='settings'&&<SettingsScreen setTab={setTab} comptes={vintedAccounts}
           customLogo={customLogo} onPickLogo={()=>logoInputRef.current&&logoInputRef.current.click()} onResetLogo={resetLogo}
           notifEnabled={notifEnabled}
