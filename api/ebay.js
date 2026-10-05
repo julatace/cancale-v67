@@ -6,7 +6,8 @@
 // échouait (« exceeded_serverless_functions_per_deployment »), et la prod
 // restait bloquée sur l'ancienne version. On route donc par `?mode=` :
 //   • (défaut)        → pilotage par l'app : GET santé, POST authurl/apptoken/
-//                       exchange/status ;
+//                       exchange/status/sync/finances/pubinfo/pubverify/publish/
+//                       revise, et (5 octobre) sku · offreinfo · offre · retirer ;
 //   • ?mode=callback  → retour de consentement eBay (redirige vers l'app) ;
 //   • ?mode=deletion  → conformité : notification de suppression de compte.
 // `vercel.json` redirige /api/ebay-callback et /api/ebay-deletion vers ici, pour
@@ -34,6 +35,35 @@ async function ebayJson(url, token, extra) {
     return { status: r.status, ok: r.ok, data: j, raw: txt.slice(0, 400) };
   } catch (e) { return { status: 0, ok: false, error: String((e && e.message) || '').slice(0, 120) }; }
 }
+// ── L'IDENTITÉ D'UNE ANNONCE eBAY : SON SKU « VRM-{n°} » (§5, 5 octobre) ────
+// Julien : « tu as accès à mon compte et tu ne fais rien de ouf ». Mesuré le
+// 5 octobre : ses 2 annonces eBay actives n'ont AUCUN SKU, et rien ne les relie
+// à une paire. Sans ce lien, une paire vendue sur Vinted reste en vente sur
+// eBay sans que VRM puisse le voir — sauf à rapprocher par le titre, ce que §5
+// interdit (22 % des ventes portent un titre en double).
+// ⇒ Le champ SKU d'eBay (« étiquette personnalisée ») porte `VRM-{n°}`. Le
+//   numéro passe par la MÊME règle que `cleNum` dans l'app (majuscules, sans
+//   espace ni tiret, « 007 » = « 7 ») — `audit-ebay-route.cjs` compare leurs
+//   sorties : une seule des deux modifiée, et le lien ne se refait plus.
+const cleNum = (v) => {
+  let s = String(v == null ? '' : v).trim().toUpperCase().replace(/[\s\-_.]/g, '');
+  if (/^\d+$/.test(s)) s = String(parseInt(s, 10));
+  return s;
+};
+const NUM_OK = /^([A-Z]{1,3})?\d{1,6}$/;
+// Le SKU d'un numéro, ou '' quand le numéro n'en est pas un (on n'écrit JAMAIS
+// un SKU approximatif : un faux lien ferait retirer la mauvaise annonce).
+const skuDe = (numero) => { const c = cleNum(numero); return (c && NUM_OK.test(c)) ? 'VRM-' + c : ''; };
+// Un identifiant d'annonce eBay : des chiffres, rien d'autre (il part dans du
+// XML et dans un corps JSON envoyés à eBay).
+const ID_EBAY = /^\d{1,19}$/;
+// Le message d'erreur d'eBay, rendu tel quel mais SANS rien qui ressemble à un
+// jeton (eBay ne devrait pas en renvoyer ; on ne le parie pas).
+function messageEbaySur(m) {
+  return String(m || '').replace(/Bearer\s+\S+/gi, '').replace(/v\^1\.1#\S+/g, '')
+    .replace(/[\u0000-\u0008\u000b-\u001f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 300);
+}
+
 // Trading API (XML) : le seul moyen fiable de récupérer les annonces créées sur
 // le SITE eBay (l'Inventory API ne voit que celles créées par API).
 async function tradingActiveList(token) {
@@ -59,14 +89,25 @@ async function tradingActiveList(token) {
     const re = /<Item>([\s\S]*?)<\/Item>/g; let m;
     while ((m = re.exec(xml)) && items.length < 300) {
       const blk = m[1];
-      const g = (t) => { const x = new RegExp('<' + t + '[^>]*>([\\s\\S]*?)</' + t + '>').exec(blk); return x ? x[1].trim() : ''; };
+      const g = (t, src) => { const x = new RegExp('<' + t + '[^>]*>([\\s\\S]*?)</' + t + '>').exec(src || blk); return x ? x[1].trim() : ''; };
+      // ⚠️ Le SKU de l'ANNONCE, pas celui d'une de ses variantes : une annonce à
+      //    variantes porte un <SKU> par variante dans <Variations>, et le premier
+      //    venu relierait l'annonce entière à une seule paire.
+      const sansVariantes = blk.replace(/<Variations>[\s\S]*?<\/Variations>/g, '');
+      // WatchCount = le nombre de personnes qui SUIVENT l'annonce (les
+      // « observateurs » d'eBay). Ce n'était pas des « vues » : `vues` est gardé
+      // pour les lecteurs d'avant, `observateurs` dit la chose par son nom.
+      // Absent ⇒ null (« pas su »), jamais 0.
+      const wc = g('WatchCount');
       items.push({
         itemId: g('ItemID'),
         title: g('Title'),
         price: g('CurrentPrice') || g('BuyItNowPrice') || g('StartPrice'),
         qty: g('QuantityAvailable') || g('Quantity'),
         vendus: g('QuantitySold'),
-        vues: g('WatchCount'),
+        vues: wc,
+        observateurs: /^\d+$/.test(wc) ? Number(wc) : null,
+        sku: g('SKU', sansVariantes),
         photo: g('GalleryURL') || g('PictureURL'),
         depuis: g('StartTime'),
         url: g('ViewItemURL'),
@@ -152,6 +193,9 @@ function itemXml(it) {
     .map(([n, v]) => `<NameValueList><Name>${esc(n)}</Name><Value>${esc(v)}</Value></NameValueList>`).join('');
   return '<Item>' +
     `<Title>${esc(String(it.title || '').slice(0, 80))}</Title>` +
+    // L'identité de la paire (`VRM-{n°}`). ⚠️ Posée par `avecSku` à partir du
+    // NUMÉRO, jamais recopiée d'un `sku` envoyé par le navigateur.
+    (it.sku ? `<SKU>${esc(it.sku)}</SKU>` : '') +
     `<Description><![CDATA[${String(it.description || it.title || '')}]]></Description>` +
     `<PrimaryCategory><CategoryID>${esc(it.categoryId)}</CategoryID></PrimaryCategory>` +
     `<StartPrice>${Number(String(it.price).replace(',', '.')).toFixed(2)}</StartPrice>` +
@@ -211,16 +255,31 @@ async function tradingVerifyAddFixedPriceItem(token, it) {
   const res = await tradingCall(token, 'VerifyAddFixedPriceItem', itemXml(it));
   return Object.assign(res, { fees: totalFrais(res.xml) });
 }
+// Le SKU d'une annonce publiée vient du NUMÉRO de la paire (`item.numero`),
+// jamais d'un `item.sku` fourni par le navigateur : c'est une identité, pas un
+// champ libre. Numéro absent ⇒ pas de SKU (l'annonce se reliera plus tard, d'un
+// clic). Numéro présent mais illisible ⇒ on refuse : publier avec un faux lien
+// ferait un jour retirer la mauvaise annonce.
+function avecSku(it) {
+  const brut = it && it.numero != null ? String(it.numero).trim() : '';
+  if (!brut) return { item: { ...it, sku: '' } };
+  const sku = skuDe(brut);
+  if (!sku) return { err: 'Numéro de paire illisible : rien n\'a été envoyé à eBay.' };
+  return { item: { ...it, sku } };
+}
 async function handlePublish(b) {
-  const it = b.item || {};
-  if (!it.title || !it.categoryId || it.price == null || it.price === '') return { status: 400, body: { ok: false, error: 'titre, catégorie et prix requis' } };
+  const it0 = b.item || {};
+  if (!it0.title || !it0.categoryId || it0.price == null || it0.price === '') return { status: 400, body: { ok: false, error: 'titre, catégorie et prix requis' } };
+  const s = avecSku(it0);
+  if (s.err) return { status: 400, body: { ok: false, reason: 'numero', error: s.err } };
+  const it = s.item;
   const at = await accessToken();
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
   const r = await tradingAddFixedPriceItem(at.token, it);
   // ⚠️ L'API Trading renvoie HTTP 200 même sur un refus (l'erreur est dans le
   // corps, Ack=Failure). On répond donc un vrai code d'échec (422) dans ce cas.
   if (!r.ok || !r.itemId) return { status: r.status >= 400 ? r.status : 422, body: { ok: false, error: r.err || 'eBay a refusé la publication', ack: r.ack } };
-  return { status: 200, body: { ok: true, itemId: r.itemId, url: `https://www.ebay.fr/itm/${r.itemId}` } };
+  return { status: 200, body: { ok: true, itemId: r.itemId, url: `https://www.ebay.fr/itm/${r.itemId}`, sku: it.sku || null } };
 }
 
 // VÉRIFIER sans publier : mêmes champs requis que publish, mais RIEN n'est créé.
@@ -228,14 +287,131 @@ async function handlePublish(b) {
 // (avec les frais estimés), `ok:false` = « eBay refuserait : <raison> » — une
 // information à corriger, pas une panne. Réseau/jeton KO → vrai code d'échec.
 async function handleVerify(b) {
-  const it = b.item || {};
-  if (!it.title || !it.categoryId || it.price == null || it.price === '') return { status: 400, body: { ok: false, error: 'titre, catégorie et prix requis' } };
+  const it0 = b.item || {};
+  if (!it0.title || !it0.categoryId || it0.price == null || it0.price === '') return { status: 400, body: { ok: false, error: 'titre, catégorie et prix requis' } };
+  // Le MÊME payload que la publication (§11) : SKU compris.
+  const s = avecSku(it0);
+  if (s.err) return { status: 400, body: { ok: false, reason: 'numero', error: s.err } };
+  const it = s.item;
   const at = await accessToken();
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
   const r = await tradingVerifyAddFixedPriceItem(at.token, it);
   if (r.status === 0) return { status: 503, body: { ok: false, error: r.error || 'eBay injoignable' } };
   if (!r.ok) return { status: 200, body: { ok: false, error: r.err || 'eBay refuserait cette annonce', ack: r.ack } };
   return { status: 200, body: { ok: true, fees: r.fees } };
+}
+
+// ── RELIER UNE ANNONCE eBAY EXISTANTE À SA PAIRE (Trading ReviseFixedPriceItem) ─
+// Pour les annonces publiées AVANT le SKU (ses 2 annonces actives, mesuré le
+// 5 octobre). C'est SON clic qui choisit le numéro, jamais une suggestion
+// appliquée toute seule (§5). Réversible : il peut la relier à un autre numéro.
+async function handleSku(b) {
+  const itemId = String(b.itemId || '').trim();
+  if (!ID_EBAY.test(itemId)) return { status: 400, body: { ok: false, error: 'annonce eBay invalide' } };
+  const sku = skuDe(b.numero);
+  if (!sku) return { status: 400, body: { ok: false, reason: 'numero', error: 'Numéro de paire illisible (125, ou B125) : rien n\'a été envoyé à eBay.' } };
+  const at = await accessToken();
+  if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
+  const r = await tradingCall(at.token, 'ReviseFixedPriceItem', `<Item><ItemID>${itemId}</ItemID><SKU>${esc(sku)}</SKU></Item>`);
+  if (r.status === 0) return { status: 503, body: { ok: false, error: 'eBay injoignable — la référence n\'a pas été posée, réessaie.' } };
+  if (!r.ok) return { status: r.status >= 400 ? r.status : 422, body: { ok: false, error: messageEbaySur(r.err) || 'eBay a refusé la référence.', ack: r.ack } };
+  return { status: 200, body: { ok: true, sku } };
+}
+
+// ── OFFRE AUX OBSERVATEURS (Negotiation API) ────────────────────────────────
+// L'équivalent eBay de la remise aux favoris de Vinted : c'est eBay qui choisit
+// les destinataires (les personnes qui suivent l'annonce) et l'envoi part sur
+// SON clic — VRM ne nomme personne et n'écrit à personne (§3 : la remise
+// native touche tout le monde en un clic, pas un envoi en série). Droit
+// `sell.inventory`, déjà accordé.
+const NEGO = `${EBAY_API}/sell/negotiation/v1`;
+const MARCHE_FR = { 'X-EBAY-C-MARKETPLACE-ID': 'EBAY_FR' };
+// Les annonces pour lesquelles eBay ACCEPTE une offre (au moins un observateur
+// éligible). Trois états, jamais deux : `{ok:true, ids, complet}` lu ·
+// `{ok:false}` pas su. ⚠️ eBay répond 204 (sans corps) quand AUCUNE annonce
+// n'est éligible — c'est « lu, aucune », pas une panne.
+async function eligiblesOffre(token) {
+  const ids = []; let url = `${NEGO}/find_eligible_items?limit=200`;
+  for (let p = 0; p < 5 && url; p++) {
+    const r = await ebayJson(url, token, MARCHE_FR);
+    if (r.status === 204) return { ok: true, ids, complet: true };
+    if (r.status === 403) return { ok: false, status: 200, reason: 'scope', error: 'Reconnecte-toi à eBay pour envoyer des offres (l\'accès n\'a pas été autorisé).' };
+    if (r.status === 0) return { ok: false, status: 503, error: 'eBay injoignable' };
+    if (!r.ok || !r.data) return { ok: false, status: r.status >= 400 ? r.status : 502, error: messageEbaySur(r.data && r.data.errors && r.data.errors[0] && (r.data.errors[0].longMessage || r.data.errors[0].message)) || 'eBay n\'a pas dit quelles annonces ont des observateurs.' };
+    for (const e of (r.data.eligibleItems || [])) if (e && e.listingId != null && ID_EBAY.test(String(e.listingId))) ids.push(String(e.listingId));
+    // La page suivante : seulement chez eBay (on y envoie le jeton).
+    url = (typeof r.data.next === 'string' && /^https:\/\/api\.ebay\.com\//.test(r.data.next)) ? r.data.next : '';
+  }
+  return { ok: true, ids, complet: !url };
+}
+async function handleOffreInfo() {
+  const at = await accessToken();
+  if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
+  const e = await eligiblesOffre(at.token);
+  if (!e.ok) return { status: e.status || 502, body: { ok: false, reason: e.reason, error: e.error } };
+  return { status: 200, body: { ok: true, eligibles: e.ids, complet: e.complet } };
+}
+// Le message joint à l'offre : du texte, 2 000 caractères au plus (limite
+// d'eBay). `null` = trop long (on refuse plutôt que de couper sa phrase).
+function texteOffre(m) {
+  const t = String(m == null ? '' : m).replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, ' ').trim();
+  return t.length > 2000 ? null : t;
+}
+async function handleOffre(b) {
+  // ⚠️ Une offre acceptée VEND la paire : sans confirmation explicite, rien ne
+  //    part — pas même la vérification chez eBay.
+  if (b.confirme !== true) return { status: 400, body: { ok: false, reason: 'confirmation', error: 'Confirme l\'envoi de l\'offre : rien n\'a été envoyé.' } };
+  const listingId = String(b.listingId || '').trim();
+  if (!ID_EBAY.test(listingId)) return { status: 400, body: { ok: false, error: 'annonce eBay invalide' } };
+  const remise = Number(b.remise);
+  if (!Number.isInteger(remise) || remise < 5 || remise > 50) return { status: 400, body: { ok: false, reason: 'remise', error: 'La remise doit être un nombre entier entre 5 et 50 %.' } };
+  const message = texteOffre(b.message);
+  if (message === null) return { status: 400, body: { ok: false, reason: 'message', error: 'Message trop long (2 000 caractères au plus).' } };
+  const at = await accessToken();
+  if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
+  // On REVÉRIFIE chez eBay, au moment d'envoyer : l'écran a pu être ouvert il y
+  // a une heure. « Pas su » ⇒ on n'envoie pas.
+  const e = await eligiblesOffre(at.token);
+  if (!e.ok) return { status: e.status || 502, body: { ok: false, reason: e.reason, error: 'Je n\'ai pas pu vérifier chez eBay que cette annonce a des observateurs — rien n\'a été envoyé.' } };
+  if (!e.ids.includes(listingId)) return { status: 409, body: { ok: false, reason: 'non-eligible', error: 'eBay n\'a personne à qui envoyer une offre pour cette annonce en ce moment — rien n\'a été envoyé.' } };
+  const corps = { allowCounterOffer: false, offerDuration: { unit: 'DAY', value: 2 }, offeredItems: [{ listingId, discountPercentage: String(remise), quantity: 1 }] };
+  if (message) corps.message = message;
+  let r;
+  try {
+    r = await fetch(`${NEGO}/send_offer_to_interested_buyers`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${at.token}`, Accept: 'application/json', 'Content-Type': 'application/json', 'Content-Language': 'fr-FR', ...MARCHE_FR },
+      body: JSON.stringify(corps),
+    });
+  } catch (_) {
+    // La requête a pu ARRIVER chez eBay avant la coupure : on ne dit ni
+    // « envoyée » ni « pas envoyée ».
+    return { status: 504, body: { ok: false, reason: 'incertain', error: 'eBay n\'a pas répondu — je ne sais pas si l\'offre est partie. Regarde sur eBay avant de la renvoyer.' } };
+  }
+  const txt = await r.text().catch(() => '');
+  let j = null; try { j = JSON.parse(txt); } catch (_) {}
+  if (!r.ok) {
+    const e0 = j && Array.isArray(j.errors) && j.errors[0];
+    return { status: r.status >= 400 ? r.status : 502, body: { ok: false, error: messageEbaySur(e0 && (e0.longMessage || e0.message)) || 'eBay a refusé l\'offre.' } };
+  }
+  const offres = (j && Array.isArray(j.offers)) ? j.offers : [];
+  return { status: 200, body: { ok: true, remise, envoyees: offres.length } };
+}
+
+// ── RETIRER UNE ANNONCE eBAY (Trading EndFixedPriceItem) ────────────────────
+// Pour la paire VENDUE AILLEURS (anti double vente). Sans retour côté eBay : il
+// faudrait republier. D'où la confirmation exigée ICI, et pas seulement à
+// l'écran.
+async function handleRetirer(b) {
+  if (b.confirme !== true) return { status: 400, body: { ok: false, reason: 'confirmation', error: 'Confirme le retrait : rien n\'a été envoyé à eBay.' } };
+  const itemId = String(b.itemId || '').trim();
+  if (!ID_EBAY.test(itemId)) return { status: 400, body: { ok: false, error: 'annonce eBay invalide' } };
+  const at = await accessToken();
+  if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
+  const r = await tradingCall(at.token, 'EndFixedPriceItem', `<ItemID>${itemId}</ItemID><EndingReason>NotAvailable</EndingReason>`);
+  if (r.status === 0) return { status: 504, body: { ok: false, reason: 'incertain', error: 'eBay n\'a pas répondu — je ne sais pas si l\'annonce a été retirée. Regarde sur eBay avant de recommencer.' } };
+  if (!r.ok) return { status: r.status >= 400 ? r.status : 422, body: { ok: false, error: messageEbaySur(r.err) || 'eBay a refusé le retrait.', ack: r.ack } };
+  return { status: 200, body: { ok: true, fin: (/<EndTime>([\s\S]*?)<\/EndTime>/.exec(r.xml || '') || [])[1] || null } };
 }
 
 // ── SOLDE eBay À VIRER (getSellerFundsSummary, lecture seule) ────────────────
@@ -357,13 +533,21 @@ async function handleSync() {
     else if (d && d._err && detailDiag.length < 3) detailDiag.push({ itemId: it.itemId, err: d._err });
   }
   // Range ce qu'on a (fusion par id). On garde le brut pour mesurer la forme.
+  // ⚠️⚠️ « RIEN LU » NE VAUT PAS « RIEN » (5 octobre). Chaque lecture ratée
+  //    réécrivait sa ligne avec une liste VIDE : un hoquet d'eBay effaçait ses
+  //    annonces de l'app (« Pas encore d'annonce eBay en ligne »), et l'anti
+  //    double vente ne voyait plus qu'une paire vendue sur Vinted était encore
+  //    en vente sur eBay. Une source qui n'a pas répondu garde sa dernière
+  //    capture.
   const at2 = Date.now();
-  await storeData('ebay_listings', { items: lst, ack: listings.ack, status: listings.status, capturedAt: at2 });
-  await storeData('ebay_orders', { orders: (orders.data && orders.data.orders) || [], status: orders.status, capturedAt: at2 });
-  await storeData('ebay_inventory', { items: (inv.data && inv.data.inventoryItems) || [], status: inv.status, capturedAt: at2 });
+  if (listings.ok) await storeData('ebay_listings', { items: lst, ack: listings.ack, status: listings.status, capturedAt: at2 });
+  if (orders.ok && orders.data) await storeData('ebay_orders', { orders: orders.data.orders || [], status: orders.status, capturedAt: at2 });
+  if (inv.ok && inv.data) await storeData('ebay_inventory', { items: inv.data.inventoryItems || [], status: inv.status, capturedAt: at2 });
   // Résumé de MESURE : comptes + statuts + petits échantillons (pour voir la forme).
   return { status: 200, body: {
     ok: true,
+    // Ce qui a VRAIMENT été lu (et donc rangé) — le reste garde sa dernière capture.
+    lu: { annonces: !!listings.ok, commandes: !!(orders.ok && orders.data), stock: !!(inv.ok && inv.data) },
     listings: { status: listings.status, ack: listings.ack, count: (listings.items || []).length, sample: (listings.items || []).slice(0, 3), detailDiag, raw: listings.raw, error: listings.error },
     orders: { status: orders.status, count: ((orders.data && orders.data.orders) || []).length, total: (orders.data && orders.data.total), sample: (((orders.data && orders.data.orders) || []).slice(0, 1)), raw: orders.ok ? undefined : orders.raw },
     inventory: { status: inv.status, count: ((inv.data && inv.data.inventoryItems) || []).length, total: (inv.data && inv.data.total), raw: inv.ok ? undefined : inv.raw },
@@ -507,6 +691,14 @@ async function handleApp(req, res) {
       res.status(r.status).json(r.body);
       return;
     }
+    // Relier une annonce à sa paire · l'offre aux observateurs · retirer une
+    // annonce vendue ailleurs. Mêmes gardes que tout le reste (session du
+    // propriétaire, plus haut) ; `offre` et `retirer` exigent en plus
+    // `confirme:true` — vérifié AVANT tout appel à eBay.
+    if (action === 'sku') { const r = await handleSku(b); res.status(r.status).json(r.body); return; }
+    if (action === 'offreinfo') { const r = await handleOffreInfo(); res.status(r.status).json(r.body); return; }
+    if (action === 'offre') { const r = await handleOffre(b); res.status(r.status).json(r.body); return; }
+    if (action === 'retirer') { const r = await handleRetirer(b); res.status(r.status).json(r.body); return; }
     res.status(400).json({ ok: false, error: 'action inconnue' });
   } catch (e) {
     res.status(502).json({ ok: false, error: 'eBay injoignable', detail: String((e && e.message) || '').slice(0, 200) });

@@ -13,8 +13,14 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
 const APP = 'davidfou-VRM-PRD-xxxx', CERT = 'PRD-secret-cert-zzzz', RU = 'David_F-VRM-abcde';
 const REFRESH = 'v^1.1#i^1#REFRESHSECRET', ACCESS = 'v^1.1#i^1#ACCESSTOKEN';
 let supaWriteOk = true, ebayMode = 'ok';
+// Depuis le 5 octobre, le retour n'échange un code que si la demande a été
+// SIGNÉE par le serveur (`authurl`, réservé au propriétaire connecté). Le banc
+// la demande donc comme l'app : session du propriétaire, faux service d'identité.
+const PROPRIO = '11111111-1111-1111-1111-111111111111';
+process.env.VRM_OWNER_UID = PROPRIO;
 global.fetch = async (url, opts = {}) => {
   const u = String(url);
+  if (u.includes('/auth/v1/user')) return new Response(JSON.stringify({ id: PROPRIO, email: 'p@exemple.test' }), { status: 200 });
   if (u.includes('identity/v1/oauth2/token')) {
     if (ebayMode === 'bad') return new Response(JSON.stringify({ error: 'invalid_grant' }), { status: 400 });
     return new Response(JSON.stringify({ access_token: ACCESS, refresh_token: REFRESH, expires_in: 7200, refresh_token_expires_in: 47304000 }), { status: 200 });
@@ -29,6 +35,10 @@ const loc = (res) => res.headers.Location || '';
   process.env.EBAY_APP_ID = APP; process.env.EBAY_CERT_ID = CERT; process.env.EBAY_RUNAME = RU; process.env.EBAY_SERVICE_KEY; process.env.SUPABASE_SERVICE_KEY = 'svc';
   const mod = await import('file://' + path.join(RACINE, 'api', 'ebay.js'));
   const handler = mod.default;
+  const demande = faireRes();
+  await handler({ method: 'POST', query: {}, headers: { authorization: 'Bearer eyJh.banc-proprio.sig' }, body: { action: 'authurl' } }, demande);
+  const etat = decodeURIComponent((/[?&]state=([^&]+)/.exec((demande.body && demande.body.url) || '') || [])[1] || '');
+  dit(!!etat, 'la demande de consentement porte un state signé par le serveur', etat || '(aucun)');
 
   { const res = faireRes(); await handler({ query: { mode: 'callback', error: 'access_denied' } }, res);
     dit(res.code === 302 && /ebay=refus/.test(loc(res)), 'refus de consentement → retour ?ebay=refus', loc(res)); }
@@ -36,15 +46,15 @@ const loc = (res) => res.headers.Location || '';
     dit(res.code === 302 && /ebay=erreur/.test(loc(res)), 'aucun code → retour ?ebay=erreur', loc(res)); }
 
   ebayMode = 'ok'; supaWriteOk = true;
-  { const res = faireRes(); await handler({ query: { mode: 'callback', code: 'C123', state: 'x' } }, res);
+  { const res = faireRes(); await handler({ query: { mode: 'callback', code: 'C123', state: etat } }, res);
     dit(res.code === 302 && /ebay=connecte/.test(loc(res)), 'code valide + rangement OK → ?ebay=connecte', loc(res));
     dit(!loc(res).includes(REFRESH) && !loc(res).includes(ACCESS), 'AUCUN jeton dans l\'URL de retour', loc(res)); }
 
   supaWriteOk = false;
-  { const res = faireRes(); await handler({ query: { mode: 'callback', code: 'C123' } }, res);
+  { const res = faireRes(); await handler({ query: { mode: 'callback', code: 'C123', state: etat } }, res);
     dit(res.code === 302 && /ebay=erreur/.test(loc(res)) && !/connecte/.test(loc(res)), 'rangement échoué → ?ebay=erreur, JAMAIS connecte', loc(res)); }
   supaWriteOk = true; ebayMode = 'bad';
-  { const res = faireRes(); await handler({ query: { mode: 'callback', code: 'BADCODE' } }, res);
+  { const res = faireRes(); await handler({ query: { mode: 'callback', code: 'BADCODE', state: etat } }, res);
     dit(res.code === 302 && /ebay=erreur/.test(loc(res)), 'code refusé par eBay → ?ebay=erreur', loc(res)); }
 
   // sans clés → erreur honnête (pas de crash)

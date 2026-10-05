@@ -4789,6 +4789,104 @@ mesurées, et aucune n'était « l'extension est éteinte »** :
   repasse au rouge quand on y retire l'adresse Vinted (prouvé).
 - ⚠️ **Le chantier PDF→stockage avait réservé la 5.160** : il passera en 5.161.
 
+### eBay « de ouf » : l'annonce reliée à sa paire, l'offre aux observateurs, l'anti double vente (5 octobre)
+Julien : « pour eBay je ne sais pas pourquoi le site est si peu développé, tu as
+accès à mon compte et tu ne fais rien de ouf ». **Mesuré le jour même** :
+`ebay_listings` = **2 annonces actives, AUCUNE n'a de SKU** ; `ebay_orders` = 0.
+Rien ne reliait donc une annonce eBay à une paire : une paire vendue sur Vinted
+pouvait rester en vente sur eBay sans que VRM le voie — sauf à comparer les
+titres, ce que §5 interdit.
+- **L'identité d'une annonce eBay = son SKU `VRM-{cleNum(n°)}`** (champ
+  « étiquette personnalisée »). La publication le pose à partir du **numéro** de
+  la paire choisie (`item.numero`), **jamais** d'un `sku` envoyé par le
+  navigateur ; un numéro illisible ⇒ 400, rien n'est publié (pas de faux lien).
+  Une annonce existante se relie d'un clic (« Relier à une paire », N° tapé ou
+  choisi, confirmation qui montre les DEUX titres) — la paire à la **même
+  photo** est proposée en tête, **jamais** un classement par titre. Lecture
+  STRICTE (`numDeSkuEbay`) : seul un SKU « VRM-… » entier donne un numéro, un SKU
+  à lui (« 12345-ABC ») ou des chiffres nus ne désignent rien. Le serveur porte
+  une copie de `cleNum` : `audit-ebay-route.cjs` exécute celle de l'app et
+  compare leurs sorties (§11).
+- **`api/ebay` — quatre actions, toutes derrière la session du propriétaire
+  (401/403, zéro appel eBay sinon)** :
+  · `sku` `{itemId, numero}` → Trading `ReviseFixedPriceItem`
+    `<Item><ItemID/><SKU>VRM-n</SKU></Item>` ;
+  · `offreinfo` → `GET /sell/negotiation/v1/find_eligible_items?limit=200`
+    (`X-EBAY-C-MARKETPLACE-ID: EBAY_FR`), rend `{eligibles:[listingId], complet}`.
+    ⚠️ eBay répond **204** quand aucune annonce n'est éligible : c'est « lu,
+    aucune », pas une panne ; une panne rend 5xx **sans liste** ;
+  · `offre` `{listingId, remise (entier 5–50), message? (≤ 2 000), confirme:true}`
+    → éligibilité **revérifiée chez eBay** au moment d'envoyer (pas éligible ⇒
+    409, vérification ratée ⇒ 5xx, rien n'est posté), puis
+    `POST …/send_offer_to_interested_buyers` `{allowCounterOffer:false,
+    offerDuration:{DAY,2}, offeredItems:[{listingId, discountPercentage:"N",
+    quantity:1}]}`. Une coupure après l'envoi ⇒ 504 `incertain` (« je ne sais
+    pas si elle est partie, regarde sur eBay ») ;
+  · `retirer` `{itemId, confirme:true}` → Trading `EndFixedPriceItem`
+    (`NotAvailable`) — sans retour côté eBay, d'où la confirmation exigée **par
+    le serveur**, pas seulement par l'écran ; une coupure ⇒ 504 `incertain`.
+  `offre` et `retirer` refusent **avant tout appel eBay** sans `confirme === true`
+  (un `'true'` ou un `1` ne suffit pas). Les messages d'eBay remontent tels
+  quels, **sans rien qui ressemble à un jeton** (`messageEbaySur`).
+- **L'offre aux observateurs est l'équivalent eBay de la remise aux favoris de
+  Vinted (§3 l'autorise)** : c'est eBay qui choisit les destinataires, VRM ne
+  nomme personne et n'écrit à personne, et l'envoi part sur SON clic + une
+  confirmation qui dit « si l'une accepte, la paire est vendue à ce prix ». Le
+  bouton n'existe **que** sur une annonce qu'eBay déclare éligible (« Faire une
+  offre aux N observateurs ») ; « pas d'observateur à qui l'envoyer » est dit
+  **une fois** au-dessus de la liste (§7) ; éligibilité illisible ⇒ ni bouton
+  ni phrase. `WatchCount` est maintenant rangé en `observateurs` (nombre, `null`
+  si absent) : c'étaient des personnes qui suivent l'annonce, l'écran disait
+  « vues » — `vues` reste pour les lecteurs d'avant.
+- **L'anti double vente eBay, dans les deux sens — UNE règle**
+  (`doublesVenteEbay`, à côté de `doublesVenteLbc`), rendue par l'écran
+  eBay → Annonces **et** le centre de notifications (`?tab=ebay_annonces`) :
+  · paire **prouvée** vendue sur Vinted (`lireVentesVintedProuvees` : transaction
+    → `item_id` + un état de commande qui ne la fait pas revenir — la règle de
+    l'écran Leboncoin et de l'extension, paginée et **stricte** : `lireTout(…,
+    {strict:true})` rend `null` plutôt qu'une demi-liste) dont le SKU est sur une
+    annonce eBay active ⇒ « Retirer d'eBay » (une confirmation « sans retour »).
+    Une AUTRE annonce Vinted du même N° en vente et pas vendue ⇒ la paire est
+    revenue : rien. Une conversation (état vide) ou une vente annulée : rien ;
+  · commande eBay **engagée** (ni annulée, ni remboursée, ni paiement échoué) dont
+    le SKU désigne une paire encore en vente sur Vinted ⇒ « retire-la de Vinted »
+    avec le lien vers SON annonce — VRM ne touche jamais une annonce Vinted (§3).
+    Vendue aussi sur Vinted ⇒ « une des deux ventes ne pourra pas partir ».
+  · une annonce ou une commande **sans SKU** ne désigne RIEN, même au titre
+    identique : l'écran la dit « pas reliée » (une phrase au-dessus de la liste,
+    la pastille sur la carte).
+  · « pas su » (ventes Vinted, ventes eBay, annonces Vinted illisibles) ⇒ AUCUNE
+    alerte, et **une** ligne qui dit ce qui n'a pas pu être lu et ce que ça
+    empêche. Les alertes passent AVANT « pas encore d'annonce » : une paire
+    vendue sur eBay sort justement de la liste.
+- ⚠️⚠️ **TROUVÉ EN ÉCRIVANT : LA SYNCHRO EFFAÇAIT SES ANNONCES SUR UN HOQUET
+  D'eBAY.** `handleSync` réécrivait `ebay_listings`, `ebay_orders` et
+  `ebay_inventory` **même quand la lecture avait échoué** — avec une liste vide.
+  L'écran disait alors « pas encore d'annonce eBay », et l'anti double vente ne
+  voyait plus rien à retirer. Une source qui n'a pas répondu garde sa dernière
+  capture ; la réponse dit ce qui a été lu (`lu`).
+- **Le SKU d'une variante n'est pas celui de l'annonce** : `<Variations>` est
+  retiré avant de lire `<SKU>`.
+- Trois bancs eBay étaient **rouges depuis la fermeture de la route le matin
+  même** (ils appelaient sans session) : `ebay-api`, `ebay-write` et
+  `ebay-callback` présentent maintenant la session du propriétaire (et la
+  demande signée pour le retour de consentement) — ils mesuraient le 401, plus
+  la route.
+- Preuves : `audit-ebay-route.cjs` **77 contrôles, 55 rouges** sur le code
+  d'avant ; banc `scripts/bancs/ebay-annonces.cjs` (données inventées, il vit
+  dans le dépôt, deux tailles + un passage « pas su ») — **59 contrôles, 24
+  rouges** sur le build d'avant (les 9 verts y sont les contrôles d'ABSENCE,
+  vacants par construction). Il juge les `data-*` et le **corps exact** de ce
+  qui part vers `/api/ebay`, et vérifie que **Annuler n'envoie rien**.
+  `verif_visuel.cjs` (vraies fixtures) reste conforme aux deux tailles.
+- ⚠️ **Rien n'a été appelé chez eBay pour de vrai** (ni en production) : les
+  noms d'éléments (`SKU`, `WatchCount` dans `GetMyeBaySelling`) et les deux
+  routes de négociation viennent de la documentation d'eBay. **Le premier geste
+  de Julien** : ouvrir eBay → Annonces, relier ses 2 annonces (« Relier à une
+  paire »), puis « ↻ Rafraîchir depuis eBay » sur Compte eBay — si la carte
+  repasse « pas reliée », c'est que `GetMyeBaySelling` ne rend pas le SKU comme
+  prévu, et c'est ça qu'il faut regarder, pas l'écran.
+
 ### Mise en production du 5 octobre
 PR #442 mergée à 10:24 UTC (80 déploiements sur 24 h : sous la limite), déploiement
 de production READY sur le commit de merge, `/api/sante` répond, le zip servi

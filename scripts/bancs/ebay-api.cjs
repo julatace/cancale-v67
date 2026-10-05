@@ -16,10 +16,16 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
 const APP = 'davidfou-VRM-PRD-xxxx', CERT = 'PRD-secret-cert-value-zzzz', RU = 'David_Fournier-david-VRM-abcde';
 const REFRESH = 'v^1.1#i^1#REFRESHTOKENSECRET', ACCESS = 'v^1.1#i^1#ACCESSTOKEN';
 
+const PROPRIO = '11111111-1111-1111-1111-111111111111';
+process.env.VRM_OWNER_UID = PROPRIO;
 let ebayBody = null, ebayAuth = null, supaWrites = [], supaHasRow = false, supaReadOk = true, ebayMode = 'ok', finMode = 'ok';
 function poserFetch() {
   global.fetch = async (url, opts = {}) => {
     const u = String(url); const h = opts.headers || {};
+    // ⚠️ Depuis le 5 octobre la route exige la session du PROPRIÉTAIRE
+    //    (`vendeurExige` + VRM_OWNER_UID) : le faux service d'identité la
+    //    reconnaît. Sans lui, ce banc mesurait le refus 401, plus la route.
+    if (u.includes('/auth/v1/user')) return new Response(JSON.stringify({ id: PROPRIO, email: 'p@exemple.test' }), { status: 200 });
     if (u.includes('identity/v1/oauth2/token')) {
       ebayBody = String(opts.body || ''); ebayAuth = h.Authorization || h.authorization || '';
       if (ebayMode === 'badkey') return new Response(JSON.stringify({ error: 'invalid_client', error_description: 'client authentication failed' }), { status: 401 });
@@ -48,7 +54,8 @@ const noSecret = (o) => { const s = JSON.stringify(o || {}); return !s.includes(
 
 (async () => {
   const mod = await import('file://' + path.join(RACINE, 'api', 'ebay.js'));
-  const handler = mod.default;
+  // Chaque appel porte la session du propriétaire (forme d'un JWT : trois morceaux).
+  const handler = (req, res) => mod.default({ query: {}, headers: { authorization: 'Bearer eyJh.banc-proprio.sig' }, ...req }, res);
   poserFetch();
 
   // ── 1. SANS CLÉS : rien n'est promis ────────────────────────────────────────
