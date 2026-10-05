@@ -67,8 +67,27 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
     const t=Date.parse(((r.data)||{}).capturedAt||0)||0; if(t) ages[m[1]]=Math.max(ages[m[1]]||0,t); }
   const vieux=Object.keys(parUid).sort((x,y)=>(ages[x]||0)-(ages[y]||0))[0];
   console.log(`fixture : on masque « ${parUid[vieux]} » (le moins frais), comme Julien l'a fait pour liliand653`);
+  // ⚠️ ON VIEILLIT SA DERNIÈRE CAPTURE, EN MÉMOIRE. Mesuré le 5 octobre : les
+  //    comptes en retard de la base (`julatace3535`, `liliand653`) ont été
+  //    RETIRÉS de l'app (décision du 3 octobre), et les sept comptes restants
+  //    sont tous captés depuis moins de 24 h. Le « compte en panne » que ce banc
+  //    exige n'existait donc plus — et la fixture étant fraîche, il serait
+  //    réapparu tout seul trois jours plus tard : un banc qui dépend de la date
+  //    de sa copie mesure l'horloge, pas l'app. On rejoue donc la situation
+  //    mesurée le 9 septembre (« Pas capté (il y a 38 j) ») sur ce compte-là :
+  //    seul `capturedAt` change, rien n'est écrit sur le disque. Le contrôle
+  //    reste capable d'échouer : c'est l'APP qui doit lire cette date et en
+  //    déduire « en panne ».
+  const VIEILLI_J = 38;
+  const ilYa = new Date(Date.now() - VIEILLI_J * 86400000).toISOString();
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    if (String(r.id || '').startsWith(`harvest_${vieux}_`) && r.data && r.data.capturedAt)
+      rows[i] = { ...r, data: { ...r.data, capturedAt: ilYa } };
+  }
+  console.log(`          sa dernière capture est reportée à il y a ${VIEILLI_J} j (en mémoire)`);
 
-  const lire=async(masque, onglet, nuage)=>{
+  const lire=async(masque, onglet, nuage, sonde)=>{
     const ctx=await b.newContext({viewport:{width:1512,height:950}});
     const pg=await ctx.newPage();
     const errs=[]; pg.on('pageerror',e=>errs.push(e.message));
@@ -95,6 +114,7 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
     await pg.waitForTimeout(onglet?6500:4500);
     if(masque && !onglet) await pg.screenshot({path:SC+'/z-comptes.png',fullPage:true});
     const brut=await pg.evaluate(()=>document.body.innerText||'');
+    const lu = sonde ? await sonde(pg) : null;
     const L=brut.split('\n').map(x=>x.trim());
     const k=L.findIndex(x=>x.startsWith('État des comptes'));
     const tete=k<0?'':L.slice(k,k+6).join(' · ');
@@ -102,7 +122,7 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
     const q=L.findIndex(x=>x===parUid[vieux]);
     const carte=q<0?'':L.slice(q,q+5).join(' · ');
     await ctx.close();
-    return { tete, carte, errs, txt:brut,
+    return { tete, carte, errs, txt:brut, lu,
       panne:n(/(\d+) en panne/), exclu:n(/(\d+) exclus? —/), aJour:n(/(\d+) à jour/), rafr:n(/(\d+) à rafraîchir/) };
   };
 
@@ -113,7 +133,7 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
   console.log(`    sa carte    : ${ap.carte}`);
 
   dit(av.panne >= 1, 'la base sert bien au moins un compte en panne',
-    'sinon ce banc ne prouve rien — il faut un compte réellement en retard');
+    `sinon ce banc ne prouve rien — « ${parUid[vieux]} », capté il y a ${VIEILLI_J} j, doit sortir en panne`);
   // ⚠️ LE CŒUR : masquer un compte le SORT des pannes.
   dit(ap.panne === av.panne - 1,
     "un compte exclu ne compte plus parmi les comptes en panne",
@@ -150,12 +170,32 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
   //    les onglets dans la meme page serait vert sur le defaut.
   {
     console.log('\n── UN COMPTE EXCLU DANS LE NUAGE COMPTE DES LE PREMIER ECRAN');
-    const nAnn = (t) => { const m=/(\d+)\s+en ligne/.exec(t); return m?+m[1]:null; };
-    const nDash = (t) => { const i=t.indexOf('ANNONCES EN LIGNE'); if(i<0) return null;
-      const m=/(\d+)/.exec(t.slice(i,i+40)); return m?+m[1]:null; };
-    const a5 = await lire(vieux, 'cat_annonces', true);
-    const d5 = await lire(vieux, 'dashboard', true);
-    const na = nAnn(a5.txt), nd = nDash(d5.txt);
+    // ⚠️ LE COMPTE EXCLU DOIT PORTER DES ANNONCES EN LIGNE, sinon l'exclure ne
+    //    change aucun nombre et « les deux écrans disent le même » est vert par
+    //    accident, défaut ou pas. Mesuré le 5 octobre : le compte le moins frais
+    //    a ZÉRO annonce en ligne — l'ancien choix rendait ce contrôle
+    //    vacant. On prend le compte lié qui en a le moins, mais au moins une
+    //    (au 15 septembre, `liliand653` en avait une : 64 contre 63).
+    const ouvertes = {};
+    for (const r of rows) { const m = /^harvest_(\d+)_listings$/.exec(String(r.id || '')); if (!m || !parUid[m[1]]) continue;
+      const it = (((r.data || {}).payload || {}).items) || [];
+      ouvertes[m[1]] = it.filter(i => i && !i.is_closed && !i.is_hidden && !i.is_draft).length; }
+    const exclu2 = Object.keys(ouvertes).filter(u => ouvertes[u] > 0).sort((x, y) => ouvertes[x] - ouvertes[y] || x.localeCompare(y))[0];
+    dit(!!exclu2, 'la base sert un compte lie qui a au moins une annonce en ligne',
+      exclu2 ? `on exclut « ${parUid[exclu2]} » dans le nuage (${ouvertes[exclu2]} en ligne)`
+             : 'sinon exclure un compte ne change aucun nombre et ce controle ne prouve rien');
+    // On lit le nombre là où l'écran le POSE, pas dans une phrase : le Tableau
+    // de bord l'a dans `data-dash-stat="online"` (depuis le 30 septembre son
+    // libellé n'est plus en capitales, « ANNONCES EN LIGNE » n'existe plus dans
+    // le rendu), l'écran Annonces dans sa ligne `data-ann-resume`.
+    const nAnn = (t) => { const m=/(\d+)\s+en ligne/.exec(t||''); return m?+m[1]:null; };
+    const nDash = (t) => { const m=/^\s*(\d+)\s*$/.exec(t||''); return m?+m[1]:null; };
+    const lu5 = (pg) => pg.evaluate(() => ({
+      ann: ((document.querySelector('[data-ann-resume] b')||{}).textContent)||null,
+      dash: ((document.querySelector('[data-dash-stat="online"] .vrm-display')||{}).textContent)||null }));
+    const a5 = await lire(exclu2, 'cat_annonces', true, lu5);
+    const d5 = await lire(exclu2, 'dashboard', true, lu5);
+    const na = nAnn(a5.lu && a5.lu.ann), nd = nDash(d5.lu && d5.lu.dash);
     console.log(`    Annonces ${na===null?'—':na} · Tableau de bord ${nd===null?'—':nd}`);
     dit(na!==null && nd!==null, 'les deux ecrans annoncent un nombre d\'annonces en ligne');
     if(na!==null && nd!==null)
