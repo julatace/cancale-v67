@@ -3,8 +3,12 @@
 // jamais un identifiant envoyé par le navigateur : elle prend le jeton de
 // session et demande à Supabase à qui il appartient. Même vérification que
 // api/email-rattacher.js (§11, une règle) — ici partagée.
-// Rend `{ id, email }`, ou `null` si le jeton manque, est faux ou expiré, ou si
-// Supabase n'a pas répondu (« pas su » n'ouvre aucune porte).
+// Rend `{ id, email, emailConfirme }`, ou `null` si le jeton manque, est faux ou
+// expiré, ou si Supabase n'a pas répondu (« pas su » n'ouvre aucune porte).
+// `emailConfirme` : Supabase dit que l'adresse a été PROUVÉE (lien cliqué, ou
+// confirmation automatique à l'inscription). Seule la session de l'extension
+// s'en sert (api/compte.js) : elle ne fabrique jamais de session sur une
+// adresse que la personne n'a pas prouvée.
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const ANON = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ';
 
@@ -20,7 +24,7 @@ export async function utilisateurDe(req) {
     const j = await r.json();
     const id = String((j && j.id) || '');
     if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
-    return { id, email: String((j && j.email) || '') };
+    return { id, email: String((j && j.email) || ''), emailConfirme: !!(j && j.email_confirmed_at) };
   } catch (_) { return null; }
 }
 
