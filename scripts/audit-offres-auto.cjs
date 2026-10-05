@@ -1,183 +1,105 @@
-// Banc `vm` : exécute le VRAI autoAccepterOffres() du background.
-// On relève les requêtes réellement envoyées à Vinted -> on voit exactement
-// quelles offres ont été acceptées, et lesquelles ne l'ont PAS été.
-const fs = require('fs'), vm = require('vm');
-const { metaVersData } = require('./bancs/_meta.cjs');
-const path = require('path');
+// L'ACCEPTATION AUTOMATIQUE DES OFFRES EST RETIRÉE — et ne doit pas revenir.
+//
+// Julien, 4 octobre : « je ne veux pas que ça accepte tout seul les offres »
+// (coupée), puis 5 octobre : « enlève l'acceptation de l'offre » (retirée).
+// Accepter une offre engage une VENTE FERME, et une acceptation faite par un
+// programme ressemble à un robot (§3, le compte bloqué). Ce qui reste permis :
+// accepter UNE offre précise depuis la messagerie de l'app, sur SON clic, avec
+// confirmation — c'est la voie `executerPourApp` / `EXEC_PERMIS`, couverte par
+// `audit-exec.cjs` (origine de l'app, compte connecté strict, plafond).
+//
+// Avant, cet audit EXÉCUTAIT le moteur pour prouver qu'il n'acceptait rien.
+// Le moteur n'existe plus : on vérifie l'INVARIANT, sur le code SANS ses
+// commentaires (un commentaire qui raconte l'histoire n'est pas du code — leçon
+// des sondes et de « télécharg », treizième cri au loup) :
+//   1. dans l'extension, la route `/offer_requests/{id}/accept` n'apparaît QUE
+//      dans la liste blanche `EXEC_PERMIS` — aucun code ne la construit ;
+//   2. aucun reste du moteur (fonctions, planchers, interrupteur local) ;
+//   3. dans l'app : plus de champ « Min. accepté », plus de capacité « offres »,
+//      plus aucune phrase qui promet une acceptation automatique ;
+//   4. l'AUTRE SENS : l'acceptation manuelle existe toujours (liste blanche +
+//      bouton de la messagerie), et `vinted_offres_auto` reste synchronisé (les
+//      extensions 5.130 à 5.150 retomberaient sinon sur l'interrupteur local).
+//
+// `--src dossier` : lance l'audit sur une autre copie du dépôt (preuve §6.1).
+const fs = require('fs'), path = require('path');
+let parser;
+try { parser = require(path.join(__dirname, '..', 'node_modules', '@babel', 'parser')); }
+catch (_) { parser = require('/home/user/cancale-v67/node_modules/@babel/parser'); }
 
-// Applique le `select=` comme PostgREST : sans ça un banc sert une FORME que le
-// code ne sait pas lire, et il mesure une fiction (§6.3).
-function projette(rows, url) {
-  const sel = decodeURIComponent((/[?&]select=([^&]*)/.exec(url) || [])[1] || '');
-  if (!sel || sel === '*') return rows;
-  return rows.map((row) => {
-    const out = {};
-    for (const part of sel.split(',').map((x) => x.trim()).filter(Boolean)) {
-      const m = /^(?:([^:]+):)?(.+)$/.exec(part); if (!m) continue;
-      const src = m[2];
-      const alias = m[1] || src.split('->').pop().replace(/^>/, '');
-      if (src === 'id' || src === 'updated_at') { out[alias] = row[src]; continue; }
-      if (src === 'data') { out[alias] = row.data; continue; }
-      if (/^data(->|->>)/.test(src)) {
-        let v = row.data;
-        for (const seg of src.replace(/^data(->>|->)/, '').split(/->>|->/)) v = (v == null ? null : v[seg]);
-        out[alias] = (v == null) ? null : v;
-        continue;
-      }
-      out[alias] = row[src];
-    }
-    return out;
-  });
+const iSrc = process.argv.indexOf('--src');
+const RACINE = iSrc > 0 ? path.resolve(process.argv[iSrc + 1]) : path.join(__dirname, '..');
+let ko = 0, ok = 0;
+const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '✅ ' : '❌ ') + m + (d ? ' — ' + d : '')); };
+const essaie = (nom, f) => { try { f(); } catch (e) { dit(false, nom, 'le contrôle a levé : ' + String(e && e.message || e).slice(0, 160)); } };
+
+// Le code sans ses commentaires, positions et retours à la ligne conservés.
+function sansCommentaires(texte, jsx) {
+  const ast = parser.parse(texte, { sourceType: jsx ? 'module' : 'script', errorRecovery: true, allowReturnOutsideFunction: true, plugins: jsx ? ['jsx'] : [] });
+  const t = texte.split('');
+  for (const c of ast.comments || []) for (let i = c.start; i < c.end; i++) if (t[i] !== '\n') t[i] = ' ';
+  return t.join('');
 }
+const lire = (rel) => fs.readFileSync(path.join(RACINE, rel), 'utf8');
+const ligneDe = (txt, idx) => txt.slice(0, idx).split('\n').length;
 
-const src = fs.readFileSync(path.join(__dirname, '..', 'vinted-sync-extension', 'background.js'), 'utf8');
-const dual = (v) => function (...a) { const cb = a[a.length - 1]; if (typeof cb === 'function') { cb(v); return; } return Promise.resolve(v); };
-
-// Une conversation captée qui porte une offre de l'acheteur.
-const conv = ({ id, tx, oid, item, prix, status = 10, current = true, titre = 'paire', deMoi = false }) => ({
-  id: `harvest_111_conv_${id}`,
-  data: {
-    capturedAt: new Date().toISOString(),
-    payload: {
-      conversation: {
-        id, description: titre,
-        opposite_user: { id: 42 },
-        transaction: { item_id: item },
-        messages: [{
-          entity_type: 'offer_request_message',
-          entity: {
-            user_id: deMoi ? 7 : 42, current, status,
-            price: { amount: String(prix) },
-            transaction_id: tx, offer_request_id: oid,
-          },
-        }],
-      },
-    },
-  },
+let BG = '', APP = '';
+essaie('lecture du code', () => {
+  BG = sansCommentaires(lire('vinted-sync-extension/background.js'), false);
+  APP = sansCommentaires(lire('src/App.jsx'), true);
 });
 
-function faireBanc({ convs, mins = {}, minsApp = {}, actif = true, connecte = '111', memo = {}, ia = null, repondus = {} }) {
-  const envois = [], logs = [], reponses = [];
-  const store = { vrmAutoOffres: { actif }, vrmOffresFaites: memo, vrmActions: {} };
-  const ctx = {
-    console: { log: (...a) => logs.push(a.join(' ')), warn() {}, error() {} },
-    setTimeout, clearTimeout, setInterval, clearInterval,
-    btoa: (s) => Buffer.from(s, 'binary').toString('base64'),
-    atob: (s) => Buffer.from(s, 'base64').toString('binary'), URL, TextDecoder, TextEncoder,
-    chrome: {
-      runtime: { onInstalled: { addListener() {} }, onStartup: { addListener() {} }, onMessage: { addListener() {} }, getManifest: () => ({ version: 'test' }), lastError: null, id: 'x' },
-      alarms: { create() {}, onAlarm: { addListener() {} } },
-      tabs: { onUpdated: { addListener() {} }, query: dual([]) },
-      cookies: { get: dual(null), getAll: dual([]), onChanged: { addListener() {} } },
-      downloads: { onCreated: { addListener() {} } },
-      storage: { local: {
-        get: function (k, cb) { const out = {}; const ks = typeof k === 'string' ? [k] : (Array.isArray(k) ? k : Object.keys(k || {})); ks.forEach(x => { if (store[x] !== undefined) out[x] = store[x]; }); if (typeof cb === 'function') { cb(out); return; } return Promise.resolve(out); },
-        set: function (o, cb) { Object.assign(store, o); if (typeof cb === 'function') { cb(); return; } return Promise.resolve(); },
-        remove: dual(undefined) } },
-      action: { setBadgeText() {}, setBadgeBackgroundColor() {}, setTitle() {} },
-    },
-    fetch: async (url, opt = {}) => {
-      const u = metaVersData(String(url)); const m = (opt.method || 'GET').toUpperCase();
-      const J = (o, st = 200) => ({ ok: st < 400, status: st, json: async () => o, text: async () => JSON.stringify(o), headers: { get: () => 'application/json' }, arrayBuffer: async () => new ArrayBuffer(0) });
-      if (/\/rest\/v1\/vinted_accounts/.test(u)) return J([{ vinted_user_id: '111', login: 'moi', domain: 'www.vinted.fr', access_token: 't', anon_id: 'a', csrf_token: 'c' }]);
-      if (/id=eq\.panel_min_prices/.test(u)) return J([{ data: mins }]);
-      if (/id=eq\.main.*vinted_annonce_numeros/.test(u)) return J([{ nums: minsApp }]);
-      if (/id=eq\.panel_msg_repondus/.test(u)) return J([{ data: repondus }]);
-      // Réponse de l'IA (/api/ai, mode reply) : stubée par cas via `ia`.
-      if (/\/api\/ai(\b|$)/.test(u) || /vrm\.center\/api\/ai/.test(u)) return J(ia || {});
-      // ⚠️⚠️ ON APPLIQUE LA PROJECTION POUR DE VRAI (§6.3). `capterOffres` demande
-      //    `select=id,cap:…,cid:…,msgs:…` : servir la ligne BRUTE ferait lire
-      //    `r.msgs` sur un objet qui ne l'a pas, donc « aucune offre » — et
-      //    l'audit mesurerait une fiction en se croyant vert. C'est le piège qui
-      //    avait fait afficher « 0 bordereau prêt » sur l'écran Colis.
-      if (/id=like\.harvest_111_conv_/.test(u)) return J(projette(convs, u));
-      // Lecture d'UNE conversation par son id (convDernierMessageId, select=data).
-      {
-        const mc = /id=eq\.harvest_\d+_conv_(\d+)/.exec(u);
-        if (mc) { const row = convs.find((c) => c.id.endsWith('_conv_' + mc[1])); return J(row ? [{ data: row.data }] : []); }
-      }
-      if (/\/rest\/v1\//.test(u)) return J([]);
-      if (/vinted\.[a-z]+\/api\//.test(u)) {
-        const chemin = u.replace(/^https:\/\/[^/]+/, '');
-        envois.push(m + ' ' + chemin);
-        if (/\/conversations\/\d+\/replies$/.test(chemin)) {
-          let body = null; try { body = JSON.parse(opt.body || '{}'); } catch (_) {}
-          reponses.push({ chemin, body: (body && body.reply && body.reply.body) || '' });
-        }
-        return J({ ok: true });
-      }
-      return J({});
-    },
-  };
-  ctx.self = ctx; ctx.globalThis = ctx; ctx.window = undefined;
-  vm.createContext(ctx);
-  vm.runInContext(src, ctx, { filename: 'background.js' });
-  ctx.activeUidForDomain = async () => connecte;
-  ctx.activeAccountId = async () => connecte;
-  return { ctx, envois, logs, store, reponses };
-}
-
-// Une conversation qui porte une offre acceptable ET un message texte de
-// l'acheteur (une question), pour tester la réponse après acceptation.
-const convAvecQuestion = ({ id, tx, oid, item, prix, question, allowReply = true }) => ({
-  id: `harvest_111_conv_${id}`,
-  data: { capturedAt: new Date().toISOString(), payload: { conversation: {
-    id, description: 'paire', allow_reply: allowReply,
-    opposite_user: { id: 42 },
-    transaction: { item_id: item },
-    messages: [
-      { entity_type: 'message', entity: { id: 7001, user_id: 42, body: question } },
-      { entity_type: 'offer_request_message', entity: {
-        user_id: 42, current: true, status: 10, price: { amount: String(prix) },
-        transaction_id: tx, offer_request_id: oid } },
-    ],
-  } } },
+// ── 1. La route d'acceptation n'existe que dans la liste blanche ────────────
+essaie('route accept', () => {
+  const debut = BG.indexOf('EXEC_PERMIS');
+  const fin = debut >= 0 ? BG.indexOf('];', debut) : -1;
+  const hors = [];
+  const re = /accept/g; let m;
+  while ((m = re.exec(BG))) {
+    if (debut >= 0 && m.index > debut && m.index < fin) continue;           // la liste blanche
+    const autour = BG.slice(Math.max(0, m.index - 60), m.index + 30);
+    // `Accept:` / `'accept'` d'un en-tête HTTP ne sont pas une offre
+    if (/offer|offre|\/accept\b|quoi\s*:\s*['"]accept/i.test(autour)) hors.push('l.' + ligneDe(BG, m.index) + ' « ' + autour.replace(/\s+/g, ' ').trim().slice(0, 70) + ' »');
+  }
+  dit(debut >= 0, "l'extension garde sa liste blanche des actions permises (EXEC_PERMIS)");
+  dit(hors.length === 0, "aucun code de l'extension ne construit l'acceptation d'une offre hors de la liste blanche",
+    hors.slice(0, 3).join(' · '));
 });
 
-// ⚠️⚠️ RETIRÉ LE 4 OCTOBRE — DÉCISION DE JULIEN : « je ne veux pas que ça accepte
-//    tout seul les offres ». Cet audit PROUVAIT que le moteur accepte (au-dessus du
-//    plancher, trois par visite, etc.) ; il prouve maintenant qu'il n'accepte
-//    JAMAIS — quelles que soient les conditions les plus favorables à une
-//    acceptation. C'est le nouvel invariant (§3, anti-blocage : une acceptation
-//    automatique est de la même famille que les messages en série aux favoris et
-//    la republication en file). L'acceptation MANUELLE depuis la messagerie reste
-//    une autre voie, non testée ici.
-//    §6.1 : rouge sur le code d'avant (il acceptait 1, 3, etc.), vert après.
-(async () => {
-  // Les conditions les PLUS favorables à une acceptation — interrupteur ON, bon
-  // compte connecté, offre au-dessus (ou pile) du plancher : rien ne doit partir.
-  const cas = [
-    { nom: "offre au-dessus du plancher, interrupteur ON, bon compte → JAMAIS acceptée",
-      convs: [conv({ id: 1, tx: 900, oid: 5001, item: 'i1', prix: 45 })], mins: { i1: 40 } },
-    { nom: "offre PILE au plancher → JAMAIS acceptée",
-      convs: [conv({ id: 1, tx: 900, oid: 5001, item: 'i1', prix: 40 })], mins: { i1: 40 } },
-    { nom: "plancher posé dans l'APP (vinted_annonce_numeros) → JAMAIS acceptée",
-      convs: [conv({ id: 1, tx: 900, oid: 5001, item: 'i1', prix: 45 })], mins: {}, minsApp: { i1: { minPrice: 40 } } },
-    { nom: "cinq offres toutes acceptables → AUCUNE acceptée (plus de « 3 par visite »)",
-      convs: [1, 2, 3, 4, 5].map(i => conv({ id: i, tx: 900 + i, oid: 5000 + i, item: 'i' + i, prix: 45 })),
-      mins: { i1: 40, i2: 40, i3: 40, i4: 40, i5: 40 } },
-  ];
+// ── 2. Aucun reste du moteur ────────────────────────────────────────────────
+essaie('restes du moteur', () => {
+  const restes = ['autoAccepterOffres', 'offresAutoActif', 'offresEnAttente', 'saluerAcheteurApresOffre', 'repondreOffre',
+    'OFFRE_SALUT', 'OFFRES_MAX_PAR_VISITE', 'panel_min_prices', 'vrmAutoOffres', 'offresAutoLocal']
+    .filter((n) => new RegExp('\\b' + n + '\\b').test(BG));
+  dit(restes.length === 0, "aucun reste du moteur d'acceptation dans l'extension", restes.join(', '));
+  dit(!/\bfunction\s+planchers\b/.test(BG), "plus aucune lecture des prix planchers dans l'extension");
+});
 
-  let ko = 0;
-  for (const c of cas) {
-    const b = faireBanc(c);
-    const n = await b.ctx.autoAccepterOffres('111');
-    const acc = b.envois.filter(e => /offer_requests\/\d+\/accept$/.test(e));
-    const ok = acc.length === 0 && !n;
-    if (!ok) ko++;
-    console.log(`${ok ? '✅' : '❌'} ${c.nom} — accepté ${acc.length}, retour ${n}`);
-    if (!ok) console.log('     envois :', JSON.stringify(b.envois));
-  }
+// ── 3. L'app ne promet plus rien ────────────────────────────────────────────
+essaie('app', () => {
+  dit(!/Min\. accepté/.test(APP), "l'app ne propose plus de champ « Min. accepté »");
+  dit(!/onCommit=\{[^}]*minPrice/.test(APP), "aucun champ de l'app n'écrit un prix plancher (minPrice)");
+  const cap = /const EXT_CAPACITES\s*=\s*\{([^}]*)\}/.exec(APP);
+  dit(!!cap && !/\boffres\s*:|\boffresapp\s*:/.test(cap[1]), "l'app ne déclare plus de capacité « offres » à l'extension",
+    cap ? '' : 'EXT_CAPACITES introuvable');
+  dit(!/extSait\(\s*['"]offres(app)?['"]\s*\)/.test(APP), "plus aucune décision de l'app sur cette capacité");
+  const promesses = [];
+  const re = /accept\w*[^\n<>{}]{0,40}(automatiquement|tout(?:e)?\s+seule?)|acceptation\s+auto/gi; let m;
+  while ((m = re.exec(APP))) promesses.push('l.' + ligneDe(APP, m.index) + ' « ' + m[0].slice(0, 60) + ' »');
+  dit(promesses.length === 0, "aucune phrase de l'app ne promet une acceptation automatique", promesses.slice(0, 3).join(' · '));
+});
 
-  // La gare rend toujours « éteint », même interrupteur ON : c'est le chokepoint.
-  {
-    const b = faireBanc({ convs: [], actif: true });
-    const actif = await b.ctx.offresAutoActif();
-    const ok = actif === false;
-    if (!ok) ko++;
-    console.log(`${ok ? '✅' : '❌'} offresAutoActif() rend toujours false (interrupteur ON ignoré) — ${actif}`);
-  }
+// ── 4. L'autre sens : la voie manuelle reste, et l'ancien réglage reste éteint
+essaie('autre sens', () => {
+  const debut = BG.indexOf('EXEC_PERMIS'), fin = BG.indexOf('];', debut);
+  const liste = debut >= 0 ? BG.slice(debut, fin) : '';
+  dit(/offer_requests[^\n]*\(accept\|reject\)|offer_requests[^\n]*accept/.test(liste),
+    "l'acceptation MANUELLE (son clic dans la messagerie) reste dans la liste blanche");
+  dit(/offreEnAttenteDe/.test(APP) && /Accepter/.test(APP), "la messagerie de l'app propose toujours d'accepter une offre précise, sur son clic");
+  const sync = /const SYNC_KEYS\s*=\s*\[([\s\S]*?)\];/.exec(APP);
+  dit(!!sync && /'vinted_offres_auto'/.test(sync[1]),
+    "`vinted_offres_auto` reste synchronisé (les extensions 5.130 à 5.150 retomberaient sinon sur l'interrupteur local)");
+});
 
-  console.log(ko ? `\n${ko} cas non conforme(s).` : "\nL'acceptation automatique des offres est retirée : rien n'est accepté à sa place.");
-  process.exit(ko ? 1 : 0);
-})();
+console.log(ko ? `\n❌ audit-offres-auto : ${ko} contrôle(s) rouge(s), ${ok} vert(s)` : `\n✅ audit-offres-auto : ${ok} contrôles — rien n'accepte une offre tout seul`);
+process.exit(ko ? 1 : 0);

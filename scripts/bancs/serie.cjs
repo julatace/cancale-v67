@@ -62,12 +62,31 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
   // ⚠️ LE NOMBRE DE SUGGESTIONS EST LA PREUVE QU'UNE OPTIMISATION NE CHANGE
   // RIEN. Le barème est un jugement métier (§5.23) : il doit rendre EXACTEMENT
   // les mêmes achats, quelle que soit la façon dont on l'exécute.
-  const sug=await pg.evaluate(()=>{
+  // ⚠️ L'EN-TÊTE A CHANGÉ EXPRÈS. Il disait « N achats retrouvés » quand la
+  // modale ne gardait que LA suggestion sûre (>= SEUIL_SUGGERE) par paire. Depuis
+  // que chaque paire montre aussi ses pistes « à vérifier » (>= SEUIL_CANDIDAT,
+  // jusqu'à 3 — voir `fillBuySugg` et le banc `prixachat.cjs` : 111 sûres → 236
+  // avec une piste), l'en-tête compte les PAIRES : « N paires avec une piste ».
+  // Chercher l'ancienne phrase rendait `null` sur une app intacte.
+  // On juge la même règle sur la forme actuelle, et on la serre : le nombre
+  // annoncé doit être celui des lignes qui portent VRAIMENT une piste rendue
+  // (§5 : la phrase qui explique un chiffre vient de la même source que lui).
+  // Et on attend la fin de « recherche de tes achats… » : l'en-tête ne dit le
+  // nombre qu'une fois les achats lus.
+  for(let i=0;i<80;i++){ const enCours=await pg.evaluate(()=>/recherche de tes achats/i.test(document.body.innerText||'')); if(!enCours) break; await pg.waitForTimeout(100); }
+  const sugInfo=await pg.evaluate(()=>{
     const t=document.body.innerText||'';
-    const m=/(\d+)\s+achats?\s+retrouv/.exec(t);
-    return m?+m[1]:null;
+    const m=/(\d+)\s+paires?\s+avec\s+une\s+piste/.exec(t);
+    // une ligne = le plus haut ancêtre du champ qui ne contient QUE ce champ
+    const ligne=inp=>{ let n=inp; while(n.parentElement && n.parentElement.querySelectorAll('[data-fillbuy]').length===1) n=n.parentElement; return n; };
+    const rendues=[...document.querySelectorAll('[data-fillbuy]')].map(ligne)
+      .filter(n=>[...n.querySelectorAll('button')].some(b=>/C'est [çc]a|à v[ée]rifier/i.test(b.innerText||''))).length;
+    return {annonce:m?+m[1]:null, rendues};
   });
-  dit(sug!=null, 'des achats sont retrouvés', sug+' suggestions');
+  const sug=sugInfo.annonce;
+  dit(sug!=null && sug>0, 'des achats sont retrouvés', sug+' paires avec une piste');
+  dit(sug!=null && sug===sugInfo.rendues, 'le nombre de paires « avec une piste » est celui des lignes qui en montrent une',
+    `${sug} annoncées · ${sugInfo.rendues} rendues`);
   console.log('    >>> SUGGESTIONS : '+sug);
   // ⚠️ L'EN-TÊTE COMPTAIT 320 PAIRES, LA LISTE EN RENDAIT 300 (plafond en dur) :
   // vingt paires n'étaient atteignables nulle part, et la chaîne « Entrée » —

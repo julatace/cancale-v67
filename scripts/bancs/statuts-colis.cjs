@@ -10,7 +10,7 @@
 // `aExpedier(o)` (le champ machine `transaction_user_status` d'abord).
 //
 // Ce banc rend l'app sur UN compte INVENTÉ (aucune fixture : il vit dans le
-// dépôt, qui est public) et huit ventes qui couvrent les libellés réels :
+// dépôt, qui est public) et neuf ventes qui couvrent les libellés réels :
 //   9101 « Bordereau envoyé au vendeur »             needs_action, sans bordereau
 //   9102 « Bordereau d'envoi commandé »              needs_action, bordereau email + PDF
 //   9103 « Le paiement a été validé »                needs_action, coché « posté » (nuage)
@@ -19,6 +19,7 @@
 //   9106 « Commande non réclamée - Retournée à l'expéditeur.rice »  waiting
 //   9107 « Commande finalisée - l'acheteur a validé la commande »   completed
 //   9108 « Le paiement a échoué »                    failed
+//   9109 « Retour initié »                            waiting (la paire REVIENT)
 // et un ACHAT déposé en point relais (needs_action côté acheteur = « va le
 // retirer », jamais « reçu »).
 //
@@ -73,6 +74,7 @@ const V = {
   9106: { titre: 'Foxtrot Runner taille 44', status: "Commande non réclamée - Retournée à l'expéditeur.rice", tus: 'waiting', j: 2.4 },
   9107: { titre: 'Golf Runner taille 38', status: "Commande finalisée - l'acheteur a validé la commande", tus: 'completed', j: 2.6 },
   9108: { titre: 'Hotel Runner taille 45', status: 'Le paiement a échoué', tus: 'failed', j: 2.8 },
+  9109: { titre: 'India Runner taille 37', status: 'Retour initié', tus: 'waiting', j: 3 },
 };
 const TITRES = Object.values(V).map((v) => v.titre);
 const titreDe = (tx) => V[tx].titre;
@@ -275,6 +277,13 @@ async function filtre(pg, nom) {
         dit(!!vu['À expédier'] && memes(ax, ['9101', '9102']), 'filtre « À expédier » : exactement 9101 et 9102', JSON.stringify(vu['À expédier'] || null));
         dit(!!vu.boutons && memes(vu.boutons, ['9101', '9102']), 'filtre « À expédier » : les boutons de bordereau portent 9101 et 9102, rien d’autre', JSON.stringify(vu.boutons || null));
         dit(!!vu['En transit'] && ['9104', '9105', '9106'].every((t) => tr.includes(t)), 'filtre « En transit » : 9104, 9105 et 9106 y sont', JSON.stringify(vu['En transit'] || null));
+        // ⚠️ 9109 « Retour initié » : l'acheteur RENVOIE la paire. Comme 9106,
+        // c'est un colis qui revient — rangé « annulé » pour l'argent seulement.
+        // Vu le 5 octobre : il n'était que sous « Annulées ».
+        dit(!!vu['En transit'] && tr.includes('9109') && !(vu['Annulées'] || []).includes('9109'),
+          '9109 « Retour initié » (la paire revient) est sous « En transit », pas sous « Annulées »',
+          'En transit=' + JSON.stringify(vu['En transit'] || null) + ' · Annulées=' + JSON.stringify(vu['Annulées'] || null));
+        dit(etapes[9109] === 'Retour en cours', '9109 porte « Retour en cours »', etapes[9109] || 'rendue nulle part');
         dit(!!vu['En transit'] && !['9101', '9102', '9107', '9108'].some((t) => tr.includes(t)), 'filtre « En transit » : ni 9101/9102 (à poster), ni 9107 (finalisée), ni 9108 (paiement échoué)', JSON.stringify(vu['En transit'] || null));
         // L'étiquette d'une ligne ne contredit pas le filtre qui la montre :
         // sous « En transit », jamais « À expédier » (9103, cochée « posté »,

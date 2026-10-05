@@ -3020,10 +3020,6 @@ async function visiteVinted() {
     await chrome.storage.local.set({ vrmDerniereVisite: st });
     const ok = await runActive();
     logActivity(ok ? '🔄 Données rafraîchies en arrivant sur Vinted' : '🔄 Rien de neuf à capter');
-    // ⚠️ APRÈS la moisson : les offres viennent des conversations captées, donc
-    //    travailler avant la capture reviendrait à décider sur des données
-    //    périmées. Éteint par défaut, un plancher par annonce est obligatoire.
-    await avecVinted(() => autoAccepterOffres(uid));
     // ⚠️ APRÈS la moisson elle aussi : la liste des colis « déposés en point
     // relais » vient des achats qu'on vient de capter. Sans ça, on lirait la
     // photo d'hier et on redemanderait des conversations pour rien.
@@ -3409,12 +3405,7 @@ async function etatPourApp() {
   const uid = await compteConnecte('www.vinted.fr');
   const vrm = await authEtat().catch(() => null);
   const cmds = await lireCmds();
-  // L'interrupteur LOCAL d'avant (ancien panneau) : l'app l'affiche tant
-  // qu'elle n'a pas son propre réglage — sinon elle dirait « éteint » pendant
-  // que l'extension accepte.
-  let offresAutoLocal = false;
-  try { offresAutoLocal = !!(((await chrome.storage.local.get('vrmAutoOffres')).vrmAutoOffres || {}).actif); } catch (_) {}
-  return { ok: true, version, vrm, vinted: uid ? { uid: String(uid), login: await loginDe(String(uid)) } : null, cmds, offresAutoLocal };
+  return { ok: true, version, vrm, vinted: uid ? { uid: String(uid), login: await loginDe(String(uid)) } : null, cmds };
 }
 // Le bordereau de CETTE vente est-il déjà rangé (avec son PDF) ? Une lecture
 // scalaire (§4.4) — `null` = la base n'a pas répondu (« pas su » ≠ « non »).
@@ -3561,259 +3552,15 @@ async function garde(uid, acc) {
   return null;
 }
 
-// ── RÉPONDRE À UNE OFFRE, EN UN CLIC DEPUIS LE PANNEAU ──────────────────────
-// Julien voulait que ça parte tout seul dès qu'une offre arrive. Refusé, et la
-// raison n'est pas le risque de blocage : accepter une offre engage une VENTE
-// FERME qu'on n'annule pas, et le champ qui dit « cette offre est encore en
-// attente » n'a jamais été observé (aucune offre ouverte dans les conversations
-// captées — que des 20 « acceptée » et 30 « refusée »). Un moteur qui décide
-// seul sur un champ inconnu peut vendre une paire à n'importe quel prix.
-// Ici : un clic = une requête, et il vient de lui.
-//
-// Les deux routes viennent de SES propres actions, captées par `storeWriteReq`
-// sur 5 comptes (jamais devinées) :
-//   PUT  /api/v2/transactions/{tx}/offer_requests/{oid}/accept   (corps vide)
-//   PUT  /api/v2/transactions/{tx}/offer_requests/{oid}/reject   (corps vide)
-//   POST /api/v2/transactions/{tx}/offers  {"offer":{"price":"32","currency":"EUR"}}
-// ══════════════════════════════════════════════════════════════════════════════
-// ACCEPTER AUTOMATIQUEMENT UNE OFFRE ≥ TON PRIX PLANCHER
-// ══════════════════════════════════════════════════════════════════════════════
-// Julien, plusieurs fois : « pour chaque annonce que je poste je mets un prix
-// minimum que l'app accepte dès que je reçois une offre ».
-//
-// ⚠️ CE QUI BLOQUAIT AVANT, ET QUI EST LEVÉ (26 août). Le refus précédent
-// n'était pas de principe : accepter engage une VENTE FERME qu'on n'annule pas,
-// et le champ qui dit « cette offre est ENCORE EN ATTENTE » n'avait jamais été
-// observé — les 21 offres captées étaient toutes en 20 (acceptée) ou 30
-// (refusée). Un moteur aurait tranché sur un code inconnu, avec de l'argent au
-// bout. Relevé du 26 août sur **326 offres** dans 557 conversations captées :
-//   10 = En attente (4)   ·   20 = Offre acceptée (118)
-//   30 = Refusée (195)    ·   40 = Annulée (9)
-// Le code « en attente » EXISTE et vaut **10**. On sait donc lire l'état, et le
-// moteur peut être écrit sans deviner.
-//
-// ⚠️ CE QUI DÉCIDE, C'EST TOI, À L'AVANCE. Le plancher est posé annonce par
-// annonce : accepter au-dessus n'est pas une décision de la machine, c'est
-// l'exécution d'un ordre déjà donné — comme un ordre à cours limité. Sans
-// plancher sur CETTE annonce, on ne touche à rien.
-const OFFRE_EN_ATTENTE = 10;                 // relevé en base, pas deviné
-const OFFRES_MAX_PAR_VISITE = 3;             // limite de VOLUME, pas un rythme déguisé
-
-// Le prix plancher d'une annonce. ⚠️ UN SEUL PROPRIÉTAIRE : l'app l'écrit dans
-// `vinted_annonce_numeros[itemId].minPrice` (elle est déjà propriétaire de cette
-// structure — numéro, prix d'achat, boost). L'extension le LIT, et garde sa
-// propre ligne `panel_min_prices` en repli pour ce qui a été saisi ici avant.
-// Deux écrivains sur la même donnée finissent toujours par diverger (§5.15).
-async function planchers() {
-  const out = {};
-  try {
-    const rows = await sbGet('app_data?id=eq.panel_min_prices&select=data');
-    const d = (rows && rows[0] && rows[0].data) || {};
-    for (const k in d) { const n = Number(d[k]); if (isFinite(n) && n > 0) out[String(k)] = n; }
-  } catch (_) {}
-  try {
-    const rows = await sbGet('app_data?id=eq.main&select=nums:data->vinted_annonce_numeros');
-    const nums = (rows && rows[0] && rows[0].nums) || {};
-    for (const k in nums) {
-      const n = Number(nums[k] && nums[k].minPrice);
-      if (isFinite(n) && n > 0) out[String(k)] = n;      // l'app prime
-    }
-  } catch (_) {}
-  return out;
-}
-
-// Les offres de CE compte qui attendent VRAIMENT une réponse, lues dans les
-// conversations déjà captées (aucun appel Vinted ajouté).
-async function offresEnAttente(uid) {
-  const out = [];
-  try {
-    // ⚠️ MÊME PROJECTION QUE LE PANNEAU (§4.4) : sur ses 939 conversations,
-    //    `select=id,data` rend 4,3 Mo quand les champs utiles tiennent en
-    //    994 Ko — et ce chemin-ci tourne à CHAQUE visite sur Vinted.
-    const rows = (await sbGetTout(`app_data?id=like.harvest_${uid}_conv_*&select=id,cap:data->>capturedAt,cid:data->payload->conversation->>id,opp:data->payload->conversation->opposite_user->>id,descr:data->payload->conversation->>description,it:data->payload->conversation->transaction->>item_id,msgs:data->payload->conversation->messages`) || [])
-      .map((r) => ({ id: r.id, data: { capturedAt: r.cap, payload: { conversation: {
-        id: r.cid, opposite_user: r.opp != null ? { id: Number(r.opp) } : null,
-        description: r.descr, transaction: r.it != null ? { item_id: r.it } : null,
-        messages: Array.isArray(r.msgs) ? r.msgs : [],
-      } } } }));
-    // ⚠️ TRI INLINÉ, PAS `parFraicheur` : ce helper vit DANS `buildPanelData`.
-    //    L'appeler d'ici lève une ReferenceError avalée par le try/catch — la
-    //    fonction rendait donc toujours une liste vide, en silence. Troisième
-    //    fois que ce piège se présente (§5.46, §5.48) : dans ce fichier, un
-    //    helper n'existe que dans la fonction où il est déclaré.
-    rows.sort((a, b) => (Date.parse((b.data && b.data.capturedAt) || '') || 0) - (Date.parse((a.data && a.data.capturedAt) || '') || 0));
-    const vus = new Set();
-    for (const r of rows) {
-      const p = (r.data && r.data.payload) || {};
-      const c = p.conversation || p;
-      const cid = String(c.id || ''); if (!cid || vus.has(cid)) continue; vus.add(cid);
-      const opp = (c.opposite_user && c.opposite_user.id) != null ? c.opposite_user.id : null;
-      let derniere = null;
-      for (const m of (Array.isArray(c.messages) ? c.messages : [])) {
-        if (!m || m.entity_type !== 'offer_request_message') continue;
-        const e = m.entity || {};
-        // Quatre conditions, toutes nécessaires :
-        //  • c'est l'ACHETEUR qui propose (sinon c'est ma propre contre-offre) ;
-        //  • l'offre est la COURANTE (une plus récente l'a peut-être remplacée) ;
-        //  • Vinted la dit EN ATTENTE (10), pas acceptée/refusée/annulée ;
-        //  • le libellé ne dit rien de tranché non plus (ceinture + bretelles).
-        if (opp != null && e.user_id !== opp) continue;
-        if (e.current === false) continue;
-        if (e.status !== OFFRE_EN_ATTENTE) continue;
-        if (/accept|refus|reject|expir|annul|cancel|retir/i.test(String(e.status_title || ''))) continue;
-        const px = e.price && (e.price.amount != null ? e.price.amount : e.price);
-        const prix = Number(String(px == null ? '' : px).replace(',', '.'));
-        if (!isFinite(prix) || prix <= 0) continue;      // sans montant, on ne décide rien
-        if (e.transaction_id == null || e.offer_request_id == null) continue;
-        derniere = { conv: cid, prix,
-          tx: String(e.transaction_id), oid: String(e.offer_request_id),
-          item: String((c.transaction && c.transaction.item_id) || ''),
-          titre: String(c.description || '') };
-      }
-      if (derniere) out.push(derniere);
-    }
-  } catch (_) { /* forme inattendue → aucune offre plutôt qu'une fausse */ }
-  return out;
-}
-
-// Le moteur. Appelé à chaque visite sur Vinted, APRÈS la moisson (sinon on
-// travaillerait sur des offres périmées).
-// ── QUI ALLUME L'ACCEPTATION AUTOMATIQUE ? L'APP (5.130) ────────────────────
-// Julien, 2 octobre : « tout doit être centralisé dans VRM ». L'interrupteur
-// vivait dans le panneau de Vinted, qui est retiré : il passe dans Réglages de
-// l'app (`vinted_offres_auto`, ligne `main` — l'extension la LIT, ne l'écrit
-// jamais). Trois cas, jamais deux :
-// - un booléen dans l'app (il a touché l'interrupteur) : c'est lui qui décide ;
-// - rien dans l'app (jamais touché) : on garde l'interrupteur local d'avant —
-//   une nouveauté n'éteint pas ce qui marchait ;
-// - la base n'a pas répondu : on n'allume RIEN (« pas su » ne vaut pas « oui »).
-// ⚠️⚠️ RETIRÉ LE 4 OCTOBRE — DÉCISION DE JULIEN (propriétaire) : « je ne veux pas
-//    que ça accepte tout seul les offres ». Accepter une offre à sa place est une
-//    automatisation qui ressemble à un robot — de la même famille que les messages
-//    en série aux favoris ou la republication en file — et c'est EXACTEMENT ce qui
-//    fait bloquer un compte (§3, `vanessa5723`). On ne retire pas le code (pour ne
-//    rien casser autour), on le COUPE à son unique chokepoint : la gare rend
-//    toujours `false`, donc `autoAccepterOffres` sort toujours à 0, quel que soit
-//    le réglage stocké ou l'ancien interrupteur local du panneau.
-//    ⚠️ L'acceptation MANUELLE d'une offre depuis la messagerie (5.135,
-//    `executerPourApp`, sur SON clic, avec confirmation) est une tout autre voie —
-//    elle n'est pas touchée. `audit-offres-auto.cjs` prouve que rien n'est accepté
-//    tout seul ; `audit-coherence.cjs` vérifie que la fonction existe toujours.
-async function offresAutoActif() {
-  return false;
-}
-async function autoAccepterOffres(uid) {
-  try {
-    if (!(await offresAutoActif())) return 0;            // ÉTEINT PAR DÉFAUT
-    const accts = await getStoredAccounts();
-    const acc = accts.find(a => String(a.vinted_user_id) === String(uid));
-    if (!acc) return 0;
-    // ⚠️ Jamais au nom d'un compte qui n'est pas celui connecté dans cet onglet :
-    //    c'est LE signal multi-comptes que Vinted sanctionne (§48).
-    if (await garde(uid, acc)) return 0;
-
-    const [offres, mins] = await Promise.all([offresEnAttente(uid), planchers()]);
-    if (!offres.length) return 0;
-    const st = (await chrome.storage.local.get('vrmOffresFaites')).vrmOffresFaites || {};
-    const limite = Date.now() - 7 * 86400000;
-    for (const k in st) if (!st[k] || st[k] < limite) delete st[k];
-
-    let faites = 0;
-    for (const o of offres) {
-      if (faites >= OFFRES_MAX_PAR_VISITE) break;        // limite de volume
-      if (st[o.oid]) continue;                           // déjà traitée : jamais deux fois
-      const min = o.item ? mins[o.item] : null;
-      if (!(isFinite(min) && min > 0)) continue;         // pas de plancher → on ne touche à rien
-      if (o.prix < min) continue;                        // en dessous : c'est à toi de contrer
-      const r = await repondreOffre({ uid, tx: o.tx, oid: o.oid, quoi: 'accept' });
-      st[o.oid] = Date.now();
-      await chrome.storage.local.set({ vrmOffresFaites: st });
-      if (r && r.ok) {
-        faites += 1;
-        logActivity(`✅ Offre de ${o.prix.toFixed(2)} € acceptée automatiquement (ton minimum : ${min} €) — ${o.titre.slice(0, 40)}`);
-        // ⚠️ Julien (16 sept., redemandé) : « elle accepte ET répond —
-        //    "bonjour, je viens d'accepter votre offre" — et répond à sa
-        //    question ». UN message part (salut fixe + réponse IA si question).
-        await saluerAcheteurApresOffre({ uid, acc, conv: o.conv, titre: o.titre });
-      } else {
-        logActivity(`⚠️ Offre de ${o.prix.toFixed(2)} € : Vinted a refusé (${(r && r.error) || '?'})`);
-        if (r && r.code) break;                          // garde-fou atteint : on arrête le lot
-      }
-    }
-    return faites;
-  } catch (_) { return 0; }
-}
-
-// ── SALUT + RÉPONSE APRÈS UNE OFFRE ACCEPTÉE ────────────────────────────────
-// Julien (16 sept., redemandé le 3 oct.) : quand on accepte, il faut dire bonjour
-// ET répondre à la question de l'acheteur. UN SEUL message part (salut fixe +
-// réponse IA si question) : moins de requêtes Vinted, jamais deux « bonjour ».
-// Garde-fous §3 : compte de l'onglet, plafond horaire au moment de l'envoi,
-// jamais deux fois le même message. L'IA est GATÉE (seuil de confiance, rien sur
-// réponse vide) : mieux vaut un blanc qu'un faux — on envoie alors le salut seul.
-const OFFRE_SALUT = 'Bonjour, je viens d’accepter votre offre, merci beaucoup ! 😊';
-async function saluerAcheteurApresOffre({ uid, acc, conv, titre }) {
-  try {
-    if (!conv) return;
-    const det = await convDernierMessageId(uid, String(conv));
-    if (!det) return;                                   // conversation pas captée : rien à envoyer
-    if (det.allowReply === false) return;               // Vinted refuse la réponse ici
-    // Lire-fusionner-réécrire, garde du dossier : « pas su » ne vaut pas « jamais
-    // salué » — on n'envoie pas à l'aveugle, et on ne réécrira pas sur du vide.
-    const lu = await sbGet('app_data?id=eq.panel_msg_repondus&select=data');
-    if (lu === null) return;
-    const deja = (lu[0] && lu[0].data) || {};
-    const cle = String(conv) + ':offre';
-    if (deja[cle]) return;                              // déjà salué sur cette offre : jamais deux fois
-    // La question de l'acheteur. Si le moteur de messages (qui tourne AVANT dans
-    // la visite) y a déjà répondu — clé `conv:idMessage` présente —, on ne
-    // ré-répond pas : on envoie le salut seul (pas de double réponse).
-    let texte = OFFRE_SALUT, intention = '', confiance = 0;
-    const dejaRepondu = det.id && deja[String(conv) + ':' + det.id];
-    if (det.body && !dejaRepondu) {
-      const sugg = await aiReply(det.body, det.article || titre || '', det.price);
-      const rep = (sugg && sugg.ok && Array.isArray(sugg.suggestions) && sugg.suggestions[0]
-        && String(sugg.suggestions[0].text || '').trim()) || '';
-      if (rep && Number(sugg.confidence || 0) >= MSG_MIN_CONFIANCE) {
-        texte = OFFRE_SALUT + '\n\n' + rep;
-        intention = String(sugg.intent || ''); confiance = Number(sugg.confidence || 0);
-      }
-      // IA qui hésite ou se tait ⇒ salut seul (mieux vaut un blanc qu'un faux).
-    }
-    const stop = await garde(uid, acc);                 // compte de l'onglet + plafond horaire
-    if (stop) return;
-    const r = await vintedSend(acc, 'POST', `/api/v2/conversations/${conv}/replies`,
-      { reply: { body: texte, photo_temp_uuids: null, is_personal_data_sharing_check_skipped: false } });
-    noterDiag(r.ok ? 'offre_salut_envoye' : `offre_salut_refuse_${r.status}`);
-    if (!r.ok) return;
-    // Il doit pouvoir relire ce que j'ai dit en son nom.
-    const neuf = Object.assign({}, deja, { [cle]: { conv: String(conv), at: new Date().toISOString(),
-      texte: texte.slice(0, 400), intention, confiance, apresOffre: true, titre: String(titre || '').slice(0, 80) } });
-    await supabaseUpsert('app_data', [{ id: 'panel_msg_repondus', data: neuf }], 'id');
-    logActivity(`💬 Message envoyé à l'acheteur — « ${texte.slice(0, 50)}${texte.length > 50 ? '…' : ''} »`);
-  } catch (_) { /* un salut raté n'annule JAMAIS l'acceptation */ }
-}
-
-async function repondreOffre({ uid, tx, oid, quoi, prix }) {
-  if (!uid || !tx) return { ok: false, error: 'offre incomplète' };
-  if (quoi !== 'contre' && !oid) return { ok: false, error: 'offre incomplète' };
-  const accts = await getStoredAccounts();
-  const acc = accts.find(a => String(a.vinted_user_id) === String(uid));
-  if (!acc) return { ok: false, error: 'compte introuvable' };
-  const stop = await garde(uid, acc); if (stop) return stop;   // anti-blocage
-  let r;
-  if (quoi === 'accept') r = await vintedSend(acc, 'PUT', `/api/v2/transactions/${tx}/offer_requests/${oid}/accept`, null);
-  else if (quoi === 'reject') r = await vintedSend(acc, 'PUT', `/api/v2/transactions/${tx}/offer_requests/${oid}/reject`, null);
-  else if (quoi === 'contre') {
-    const p = Number(prix);
-    if (!isFinite(p) || p <= 0) return { ok: false, error: 'prix invalide' };
-    r = await vintedSend(acc, 'POST', `/api/v2/transactions/${tx}/offers`, { offer: { price: String(p), currency: 'EUR' } });
-  } else return { ok: false, error: 'action inconnue' };
-  const mot = quoi === 'accept' ? 'acceptée' : quoi === 'reject' ? 'refusée' : `contrée à ${prix} €`;
-  logActivity(r.ok ? `💶 Offre ${mot}` : `⚠️ Offre ${mot} : Vinted a refusé (${r.status})`);
-  return { ok: !!r.ok, status: r.status, error: r.ok ? '' : ((r.json && (r.json.message || r.json.error)) || `erreur ${r.status}`) };
-}
-
+// ── L'ACCEPTATION AUTOMATIQUE DES OFFRES A ÉTÉ RETIRÉE (5.159, 5 octobre) ───
+// Coupée le 4 octobre (« je ne veux pas que ça accepte tout seul les offres »),
+// puis RETIRÉE le 5 octobre à sa demande (« enlève l'acceptation de l'offre ») :
+// le moteur, ses planchers, son salut automatique et `repondreOffre` ne servaient
+// plus qu'à lui. Accepter une offre à sa place ressemble à un robot (§3) et
+// engage une vente ferme. ⚠️ NE PAS LE RÉÉCRIRE sans sa demande explicite.
+// L'acceptation MANUELLE depuis la messagerie de l'app (son clic, avec
+// confirmation) passe par `executerPourApp` / EXEC_PERMIS : elle reste.
+// `scripts/audit-offres-auto.cjs` refuse tout autre chemin vers /accept.
 // ══════════════════════════════════════════════════════════════════════════════
 // LE COFFRE — chaque annonce enregistrée EN ENTIER, chez toi
 // ══════════════════════════════════════════════════════════════════════════════
@@ -5113,7 +4860,13 @@ const _memoVisite = new Map();          // requête → { at, p }
 function sbGetMemo(query) {
   const e = _memoVisite.get(query);
   if (e && Date.now() - e.at < VISITE_MEMO_MS) return e.p;
-  const p = sbGet(query);
+  // §4.5 : un BALAYAGE de famille (`id=like.`) passe par la pagination — Supabase
+  // coupe une réponse à 1 000 lignes sans le dire. Vu le 5 octobre par
+  // audit-lectures (enfin capable de lire tout le fichier) : les transactions
+  // d'un compte lues ici auraient été tronquées, et l'extension aurait redemandé
+  // à Vinted un bordereau qui existe déjà. `sbGetTout` rend `null` si une page
+  // échoue, comme `sbGet` sur un échec.
+  const p = /[?&]id=like\./.test(query) ? sbGetTout(query) : sbGet(query);
   _memoVisite.set(query, { at: Date.now(), p });
   return p;
 }

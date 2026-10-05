@@ -31,10 +31,54 @@ const AT=(s)=>/d[ée]pos[ée]/i.test(s||'')&&/point\s+relais|bureau\s+de\s+poste
 // `o.account || o.uid` : toujours vide, donc un Set de [''] de taille 1 — le
 // banc annonçait « sur 1 compte(s) » en ne mesurant rien du tout. §6 : vérifier
 // le NOM et la FORME du champ avant de conclure.
-const cmds=[]; purch.forEach(r=>{ const uid=(/^harvest_([^_]+)_/.exec(r.id)||[])[1]||'';
-  (((r.data||{}).payload||{}).my_orders||[]).forEach(o=>cmds.push(Object.assign({__uid:uid}, o))); });
-const aRetirer=cmds.filter(o=>AT(o.status));
-const nonRecl=cmds.filter(o=>/non r[ée]clam/i.test(o.status||''));
+const uidDe=(id)=>(/^harvest_([^_]+)_/.exec(id||'')||[])[1]||'';
+// ── CE QUE JULIEN A DÉJÀ TRANCHÉ, ET QUE LA BASE PORTE ────────────────────
+// ⚠️ Mesuré sur la copie du 5 octobre : 5 achats « déposé en point relais »,
+// l'app en montre 3 — et elle a raison. Les deux autres sont des décisions
+// RANGÉES dans la base : l'un est coché « récupéré » par lui
+// (`vinted_pickup_done`, depuis juillet), l'autre est sur un compte qui n'est
+// plus lié (aucune ligne `vinted_accounts`, le compte supprimé — « ne plus lui
+// en parler », §5). Un compte masqué ne compte plus nulle part non plus
+// (`buysBase`). Le banc comptait ces cinq comme « à retirer » et réclamait une
+// porte pour des colis que l'app ne doit PAS lui montrer : un faux rouge, qui
+// à force fait cesser de lire les vrais. On compte donc ce qu'il a encore à
+// faire — la porte reste exigée pour CHACUN de ceux-là.
+const M0=((main.find(r=>r.id==='main')||{}).data)||{};
+const comptesLies=new Set(accounts.map(a=>String(a.vinted_user_id||'')).filter(Boolean));
+const comptesMasques=new Set((M0.vinted_accounts_hidden||[]).map(String));
+const dejaRetires=M0.vinted_pickup_done||{};
+const visible=(o)=>comptesLies.has(o.__uid)&&!comptesMasques.has(o.__uid);
+// ── LES COLIS « NON RÉCLAMÉS », PRÉPARÉS EN MÉMOIRE ──────────────────────
+// ⚠️ LA VRAIE BASE N'EN PORTE PLUS. Le 6 septembre elle en avait trois
+// (84,94 €) ; sur la copie du 5 octobre, 0 achat dans cet état (le seul
+// « non réclamée » restant est une VENTE, sur un compte masqué). Le bloc
+// « N colis sont repartis » ne se rendait donc pas, et les contrôles 3)
+// mesuraient l'ABSENCE de la situation, pas la règle.
+// On la PRÉPARE ici, en mémoire (aucun fichier écrit, aucune donnée inventée) :
+// l'achat finalisé le plus récent de chacun de ses comptes liés et visibles,
+// les trois plus récents, passés au texte EXACT que Vinted écrit (relu dans
+// la base quand elle le porte encore). Ni un transfert entre ses comptes
+// (transaction aussi vendue, titre « nXXX ») — l'app les écarte des achats.
+// Si une copie future en porte de vrais, on les prend tels quels.
+const NR_RE=/non r[ée]clam/i;
+const ordresDe=(r)=>(((r.data||{}).payload||{}).my_orders||[]);
+const STATUT_NR=(()=>{ for(const r of rows) for(const o of ordresDe(r)) if(NR_RE.test(o.status||'')) return o.status;
+  return "Commande non réclamée - Retournée à l'expéditeur.rice"; })();
+const venduesTx=new Set(); rows.filter(r=>/_orders_sold$/.test(r.id)).forEach(r=>ordresDe(r).forEach(o=>venduesTx.add(String(o.transaction_id))));
+let nrPrepares=0;
+if(!purch.some(r=>visible({__uid:uidDe(r.id)})&&ordresDe(r).some(o=>NR_RE.test(o.status||'')))){
+  const parCompte=new Map();
+  purch.forEach(r=>{ const uid=uidDe(r.id); if(!visible({__uid:uid})) return;
+    ordresDe(r).forEach(o=>{ if(!/finalis/i.test(o.status||'')||!o.conversation_id) return;
+      if(venduesTx.has(String(o.transaction_id))||/\bn\s?\d{3,4}\b/i.test(o.title||'')) return;
+      const b=parCompte.get(uid); if(!b||new Date(o.date)>new Date(b.date)) parCompte.set(uid,o); }); });
+  [...parCompte.values()].sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,3)
+    .forEach(o=>{ o.status=STATUT_NR; nrPrepares++; });   // mute la ligne SERVIE (même objet)
+}
+const cmds=[]; purch.forEach(r=>{ const uid=uidDe(r.id);
+  ordresDe(r).forEach(o=>cmds.push(Object.assign({__uid:uid}, o))); });
+const aRetirer=cmds.filter(o=>AT(o.status)&&visible(o)&&!dejaRetires[String(o.transaction_id)]);
+const nonRecl=cmds.filter(o=>NR_RE.test(o.status||'')&&visible(o));
 // Les codes DEJA en base (panel_colis_relais) : un colis qui en a un n'attend
 // plus rien, donc il n'appelle aucune consigne de connexion.
 let codes={}; try { const pr=main.find(r=>r.id==='panel_colis_relais'); const d=(pr&&pr.data)||{};
@@ -42,7 +86,7 @@ let codes={}; try { const pr=main.find(r=>r.id==='panel_colis_relais'); const d=
 const totNR=nonRecl.reduce((t,o)=>t+parseFloat(String((o.price&&o.price.amount)||0)||0),0);
 let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' — '+d:''));};
 (async()=>{
-  console.log('base servie : '+aRetirer.length+' colis a retirer · '+nonRecl.length+' non reclames ('+totNR.toFixed(2)+' EUR)');
+  console.log('base servie : '+aRetirer.length+' colis a retirer · '+nonRecl.length+' non reclames ('+totNR.toFixed(2)+' EUR'+(nrPrepares?', prepares en memoire':'')+')');
   const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
   const pg=await b.newPage({viewport:{width:1512,height:950}});
   const errs=[]; pg.on('pageerror',e=>errs.push(e.message));
@@ -69,13 +113,27 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
   // ⚠️ On reconnaît le lien par ce qu'il FAIT (ouvrir la conversation), pas par
   // une formule exacte : le libellé a changé pour dire ce que ça rapporte
   // (« le code revient ici »), et le banc mesurait alors 3 liens sur 6.
+  // ⚠️ ET CHAQUE COLIS A LA SIENNE — on ne compte plus les liens en vrac. Le
+  // bloc « non réclamés » porte lui aussi des « Ouvrir la conversation » : un
+  // total `liens >= colis` passait au vert avec les portes des colis REPARTIS,
+  // même si celles des colis à retirer avaient disparu. On exige, colis par
+  // colis, un lien vers SA conversation (son identifiant, jamais un titre).
+  const idDuLien=(h)=>decodeURIComponent(String((/inbox\/([^/?#]+)/.exec(h||'')||[])[1]));
   const codeLiens=v.liens.filter(l=>/conversation|code de retrait/i.test(l.t));
-  dit(codeLiens.length>=aRetirer.length,
+  const portes=new Set(codeLiens.map(l=>idDuLien(l.h)));
+  const sansPorte=aRetirer.filter(o=>!portes.has(String(o.conversation_id)));
+  dit(sansPorte.length===0,
     'chaque colis a retirer offre une porte vers son code',
-    codeLiens.length+' lien(s) pour '+aRetirer.length+' colis');
+    (aRetirer.length-sansPorte.length)+' colis sur '+aRetirer.length+' ont un lien vers leur conversation'
+      +(sansPorte.length?' — sans porte : '+sansPorte.map(o=>String(o.title||'').slice(0,20)).join(', '):''));
   // 2) chaque lien porte un VRAI identifiant de conversation de la base
   const convs=new Set(aRetirer.concat(nonRecl).map(o=>String(o.conversation_id)));
-  const inconnus=v.liens.filter(l=>!convs.has(String((/inbox\/(\d+)/.exec(l.h)||[])[1])));
+  // ⚠️ L'IDENTIFIANT ENTIER, PAS SES PREMIERS CHIFFRES. Mesuré sur la copie du
+  // 5 octobre : 232 des 236 achats finalisés portent un `conversation_id` en
+  // UUID (forme « xxxxxxxx-xxxx-… »). `/inbox\/(\d+)/` n'en lisait que les premiers chiffres et
+  // aurait déclaré « inventée » la vraie conversation (§6.3 : le banc lit la
+  // FORME réelle). On compare l'identifiant complet, chiffres ou UUID.
+  const inconnus=v.liens.filter(l=>!convs.has(idDuLien(l.h)));
   dit(inconnus.length===0, 'aucun lien ne pointe vers une conversation inventee',
     inconnus.slice(0,2).map(x=>x.h).join(' '));
   // 3) les colis non reclames sont dits, avec leur montant
@@ -140,7 +198,13 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
     // partir de « Point relais » — ça débordait sur le bandeau voisin « 2
     // comptes Vinted ne reçoivent aucun email — tomj606, angeled92 », et le
     // banc y trouvait un login qui n'a rien à voir avec ce groupe.
-    const dep = v.txt.indexOf('Point relais');
+    // ⚠️ ET L'ANCRE « Point relais » NE SE TROUVAIT PLUS : l'étiquette du
+    // groupe est en `text-transform: uppercase`, et `innerText` rend
+    // « POINT RELAIS ». Le bloc était VIDE, le banc imprimait « 0 colis » et
+    // sautait les deux exigences : un contrôle qui ne pouvait plus échouer.
+    // Mêmes bornes qu'au 5 ter, qui avait déjà payé ce piège : l'en-tête
+    // « colis à retirer » et le pied « Coche ✓ quand tu l… ».
+    const dep = v.txt.indexOf('colis à retirer');
     const suite = dep < 0 ? -1 : v.txt.indexOf('Coche \u2713 quand tu l', dep);
     const bloc = dep < 0 ? '' : v.txt.slice(dep, suite > 0 ? suite : dep + 1400);
     // ⚠️ ET C'EST LE GROUPE QUI COMPTE, PAS L'ENSEMBLE. Mesuré : les 6 colis

@@ -73,7 +73,16 @@ const eur=(s)=>{ if(s==null) return null; const n=Number(String(s).replace(/\s|�
     const sel=(/[?&]select=([^&]*)/.exec(u)||[])[1]; const S=sel?decodeURIComponent(sel):null;
     if(/\/rest\/v1\/vinted_accounts/.test(u)) return j(accounts);
     if(/id=eq\.main/.test(u)) return j(main.map(r=>projette(r,S)));
-    if(/transaction->>id/.test(u)) return j(txn);
+    // ⚠️ LE NAVIGATEUR ENCODE `>` DANS LA REQUÊTE (`-%3E%3E`) : testé sur
+    //    l'URL brute, ce motif ne se déclenchait JAMAIS — la famille `txn`
+    //    tombait dans `id=like.` (qui ne la porte pas) et l'app lisait `[]`.
+    //    Depuis la 5.133 (029d44a, « CA déclaré daté au jour du versement »)
+    //    c'est la transaction qui DATE le CA : sans elle, toutes les ventes
+    //    finalisées partaient « à dater », le mois courant valait 0 €, et
+    //    « CA × taux = à payer » se vérifiait sur 0 × 13,5 % = 0 — vert sur
+    //    n'importe quel défaut (§6.3 : servir la forme que l'app demande).
+    let ud=u; try{ ud=decodeURIComponent(u); }catch(_){}
+    if(/transaction->>id/.test(ud)) return j(txn);
     const eq=/id=eq\.([^&]*)/.exec(u); if(eq){const k=decodeURIComponent(eq[1]);return j(rows.filter(r=>r.id===k).map(r=>projette(r,S)));}
     const m=/id=like\.([^&]*)/.exec(u); if(m){const pat=decodeURIComponent(m[1]).replace(/[*%]/g,'.*');const re=new RegExp('^'+pat+'$');
       return j(rows.filter(r=>re.test(r.id)).map(r=>projette(r,S)));}
@@ -82,7 +91,14 @@ const eur=(s)=>{ if(s==null) return null; const n=Number(String(s).replace(/\s|�
 
   // L'écran Ventes publie, le tableau de bord consomme (§11).
   await pg.goto('http://localhost:4474/?tab=cat_ventes',{waitUntil:'domcontentloaded'});
-  await pg.waitForTimeout(4000);
+  // ⚠️ On attend la PUBLICATION, pas un délai. Depuis la 5.133, Ventes ne
+  //    publie qu'une fois les dates de versement lues (`declarables` reste
+  //    `undefined` avant) : servies pour de vrai, elles arrivent après les 4 s
+  //    d'avant — le banc concluait « pas de source » sur un écran qui allait
+  //    publier. Pas de publication au bout de 25 s ⇒ le contrôle suivant est
+  //    rouge, comme avant.
+  await pg.waitForFunction(()=>{ try{ const v=JSON.parse(localStorage.getItem('vinted_urssaf_mois')||'null');
+    return !!(v&&Array.isArray(v.mois)); }catch(_){ return false; } },null,{timeout:25000}).catch(()=>{});
   const publie=await pg.evaluate(()=>{ try{ const v=JSON.parse(localStorage.getItem('vinted_urssaf_mois')||'null');
     if(!v||!Array.isArray(v.mois)) return null;
     const d=new Date(); const ym=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
@@ -99,7 +115,14 @@ const eur=(s)=>{ if(s==null) return null; const n=Number(String(s).replace(/\s|�
   const taux   = eur((/À PAYER \(([\d,.]+) ?%\)/i.exec(t)||[])[1]);
   const aPayer = eur((/À PAYER \([\d,.]+ ?%\)\s*\n\s*([\d\s.,  ]+€)/i.exec(t)||[])[1]);
   const net    = eur((/NET APRÈS PAIEMENT\s*\n\s*([\d\s.,  ]+€)/i.exec(t)||[])[1]);
-  const caCite = eur((/CA des ventes finalisées de [a-zûéô]+ \(([\d\s.,  ]+€)\)/i.exec(t)||[])[1]);
+  // Le CA CITÉ : le montant entre parenthèses de la phrase qui commence par
+  // « CA des ventes finalisées », sur la même ligne. Depuis la 5.131/5.133 la
+  // phrase dit « …finalisées (argent versé) en octobre, toutes plateformes
+  // (157,00 €)… » : l'ancien motif exigeait « de {mois} (X €) » collés et ne
+  // trouvait plus rien. On prend la première parenthèse qui porte un MONTANT
+  // (« (argent versé) » n'en porte pas) ; sans phrase de CA (« ce chiffre se
+  // calcule sur l'écran Ventes »), rien n'est trouvé et le contrôle est rouge.
+  const caCite = eur((/CA des ventes finalisées[^\n]*?\(([\d\s.,  ]+€)\)/i.exec(t)||[])[1]);
   const nFinal = Number((/VENTES FINALISÉES\s*\n\s*(\d+)/i.exec(t)||[])[1]);
   console.log(`   rendu : taux ${taux} % · CA cité ${caCite} € · à payer ${aPayer} € · net ${net} € · ${nFinal} vente(s) finalisée(s)`);
 
@@ -110,13 +133,18 @@ const eur=(s)=>{ if(s==null) return null; const n=Number(String(s).replace(/\s|�
   if(caCite!=null && aPayer!=null && taux!=null){
     // ⚠️ LE CŒUR DU BANC. « 19,32 € à payer » ne peut pas venir de « 0,00 € ».
     const attendu = caCite*taux/100;
-    dit(Math.abs(attendu-aPayer) < 0.02,
+    // L'à payer affiché est CE produit arrondi au centime (au plus un
+    // demi-centime d'écart), pas un nombre voisin.
+    dit(Math.abs(attendu-aPayer) <= 0.005 + 1e-9,
       "le CA cité dans la phrase est bien celui qui produit le montant à payer",
       `${caCite} € × ${taux} % = ${attendu.toFixed(2)} €, affiché ${aPayer} €`);
   }
   if(caCite!=null && aPayer!=null && net!=null){
-    dit(Math.abs((caCite-aPayer)-net) < 0.02,
-      "et le net est bien ce CA moins ce montant",
+    // ⚠️ AU CENTIME PRÈS, SUR LES NOMBRES AFFICHÉS. Tolérer 0,02 € laissait
+    // passer « 157,00 − 21,20 = 135,81 » (vu le 5 octobre) : un calcul qu'il
+    // refait à la main et qui ne tombe pas juste (§2.7).
+    dit(Math.round(caCite*100) - Math.round(aPayer*100) === Math.round(net*100),
+      "et le net est bien ce CA moins ce montant, au centime près",
       `${caCite} − ${aPayer} = ${(caCite-aPayer).toFixed(2)} €, affiché ${net} €`);
   }
   // Le CA cité doit être CELUI de la ligne publiée : même notion, un seul
