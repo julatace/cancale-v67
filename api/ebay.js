@@ -17,6 +17,7 @@
 // navigateur ; échecs honnêtes (503 sans clés, un refus eBay remonte).
 
 import crypto from 'crypto';
+import { vendeurExige } from './_lib/session.js';
 import { keysReady, canConsent, ruName, authUrl, appToken, exchangeCode, hasRefresh, accessToken, storeData } from './_lib/ebay.js';
 
 // ── LECTURE des données eBay du vendeur (centraliser dans VRM) ───────────────
@@ -396,12 +397,40 @@ function retour(res, statut, reason) {
   res.setHeader('Location', '/?' + q);
   res.status(302).end();
 }
+// ⚠️⚠️ QUI A DEMANDÉ CE CONSENTEMENT ? (sécurité, 5 octobre)
+// Le retour d'eBay arrive SANS session (une navigation du navigateur), et il
+// rangeait le jeton de n'importe quel code reçu. N'importe qui pouvait donc
+// ouvrir lui-même la page de consentement d'eBay (l'adresse ne contient rien de
+// secret), se connecter avec SON compte eBay, et remplacer la connexion eBay de
+// Julien par la sienne : ses publications partaient alors sur le compte d'un
+// inconnu, et ses acheteurs payaient l'inconnu.
+// ⇒ `authurl` (réservé au propriétaire connecté) fabrique un `state` SIGNÉ par
+// le serveur, daté ; eBay le renvoie tel quel au retour, qui le vérifie avant
+// de ranger quoi que ce soit. La clé de signature est un secret serveur
+// (EBAY_CERT_ID), jamais envoyé au navigateur.
+const ETAT_VALIDITE_MS = 30 * 60 * 1000;
+const macEtat = (owner, ts) => crypto.createHmac('sha256', 'vrm-ebay-consentement|' + (process.env.EBAY_CERT_ID || ''))
+  .update(String(owner) + '|' + String(ts)).digest('hex').slice(0, 40);
+function signerEtat(owner) { const ts = Date.now().toString(36); return ts + '.' + macEtat(owner, ts); }
+function etatValide(state, owner) {
+  const m = /^([0-9a-z]{6,12})\.([0-9a-f]{40})$/.exec(String(state || ''));
+  if (!m || !process.env.EBAY_CERT_ID) return false;
+  const age = Date.now() - parseInt(m[1], 36);
+  if (!(age >= -60000 && age <= ETAT_VALIDITE_MS)) return false;
+  const attendu = Buffer.from(macEtat(owner, m[1])), recu = Buffer.from(m[2]);
+  return attendu.length === recu.length && crypto.timingSafeEqual(attendu, recu);
+}
+// Les jetons eBay sont ceux de l'INSTALLATION (une ligne `ebay_tokens`, rangée
+// au nom de VRM_OWNER_UID) : seul ce vendeur-là pilote eBay.
+const proprioEbay = () => process.env.VRM_OWNER_UID || '';
+
 async function handleCallback(req, res) {
   const q = req.query || {};
   if (q.error) { retour(res, 'refus', String(q.error).slice(0, 60)); return; }
   const code = String(q.code || '').trim();
   if (!code) { retour(res, 'erreur', 'aucun code'); return; }
   if (!keysReady()) { retour(res, 'erreur', 'clés absentes'); return; }
+  if (!etatValide(q.state, proprioEbay())) { retour(res, 'erreur', 'demande expirée ou inconnue — relance la connexion eBay depuis VRM'); return; }
   try {
     const r = await exchangeCode(code);
     retour(res, r.ok ? 'connecte' : 'erreur', r.ok ? '' : (r.reason || (r.error || '').slice(0, 60)));
@@ -415,13 +444,21 @@ async function handleApp(req, res) {
     return;
   }
   if (req.method !== 'POST') { res.status(405).json({ ok: false, error: 'POST' }); return; }
+  // ⚠️⚠️ SESSION OBLIGATOIRE (sécurité, 5 octobre). Cette route n'en exigeait
+  // AUCUNE : n'importe qui sur Internet pouvait lister ses commandes eBay (avec
+  // les acheteurs), lire ses finances, publier ou modifier une annonce sur SON
+  // compte eBay. Et seul le propriétaire de l'installation (à qui appartiennent
+  // les jetons) pilote eBay — un autre vendeur connecté n'y touche pas.
+  const u = await vendeurExige(req, res);
+  if (!u) return;
+  if (proprioEbay() && u.id !== proprioEbay()) { res.status(403).json({ ok: false, reason: 'pas-proprietaire', error: "Ce compte eBay n'est pas relié à ton compte VRM." }); return; }
   const b = req.body || {};
   const action = String(b.action || '');
   if (!keysReady()) { res.status(503).json({ ok: false, reason: 'no-key', error: 'eBay indisponible : EBAY_APP_ID / EBAY_CERT_ID ne sont pas configurés sur Vercel.' }); return; }
   try {
     if (action === 'authurl') {
       if (!ruName()) { res.status(503).json({ ok: false, reason: 'no-runame', error: 'Le RuName (EBAY_RUNAME) n\'est pas configuré.' }); return; }
-      res.status(200).json({ ok: true, url: authUrl(b.state) });
+      res.status(200).json({ ok: true, url: authUrl(signerEtat(u.id)) });
       return;
     }
     if (action === 'apptoken') {

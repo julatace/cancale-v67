@@ -22,7 +22,7 @@ import { sendPushToAll, pushCategorieActive } from './_lib/push.js';
 import { stampBordereau } from './_lib/stamp.js';
 
 import { withOwnerAll, conflictTarget, contexteVendeur, proprietaireCourant, duVendeur as duVendeurLib } from './_lib/owner.js';
-import { adressesDeLivraison, resoudreProprietaire } from './_lib/proprietaire-email.js';
+import { adressesDeLivraison, resoudreProprietaire, fusionnerRegistres } from './_lib/proprietaire-email.js';
 import { normaliserEntrant, formeRecue, demasquerRelais } from './_lib/lire-email.js';
 import { sbCle } from './_lib/cle.js';
 
@@ -877,6 +877,12 @@ function extractPickupQr(mail, status) {
 // Chaque lecture est donc filtrée sur le vendeur résolu pour CETTE requête.
 // Tant que la colonne `owner` n'existe pas, on n'ajoute rien (un filtre sur une
 // colonne inconnue ferait échouer la lecture avec un 400).
+// ⚠️ TROIS ÉTATS : true · false · null (pas su). Avant, tout échec (un 502, un
+// délai) valait « non cloisonnée » et RESTAIT mémorisé pour la vie de
+// l'instance : la quarantaine était sautée, et un email qu'aucune adresse
+// déclarée ne désignait partait chez le propriétaire de l'installation —
+// même avec plusieurs vendeurs. Seul un 400 (colonne inconnue) dit « non ».
+// On ne mémorise jamais un échec. (Même règle que `push` et `ship-reminders`.)
 let _cloisonnee = null;
 async function baseCloisonnee() {
   if (_cloisonnee !== null) return _cloisonnee;
@@ -884,24 +890,30 @@ async function baseCloisonnee() {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?select=owner&limit=1`, {
       headers: { ...sbCle(SUPABASE_KEY) },
     });
-    _cloisonnee = r.ok;
-  } catch (_) { _cloisonnee = false; }
+    if (r.ok) _cloisonnee = true;
+    else if (r.status === 400) _cloisonnee = false;
+    else return null;
+  } catch (_) { return null; }
   return _cloisonnee;
 }
 const duVendeur = (url) => duVendeurLib(url, baseCloisonnee);
 
 // Registre « adresse de réception → vendeur », écrit par l'app (Réglages →
-// Emails). Ligne dédiée : l'app en est propriétaire, le serveur ne fait que lire.
-async function lireRegistreEmails() {
+// Emails). Une ligne PAR VENDEUR (base cloisonnée) : on les lit TOUTES et le
+// vendeur d'une adresse est celui de la ligne (`fusionnerRegistres`).
+// ⚠️ `null` = la base n'a pas répondu. Avant, un échec rendait `{}` — c'est-à-
+// dire « personne n'a déclaré d'adresse » — et l'email tombait dans le repli
+// « installation ». « Rien lu » ne vaut pas « rien ».
+async function lireRegistreEmails(cloisonnee) {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_email_owners&select=data`, {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_email_owners&select=${cloisonnee ? 'owner,data' : 'data'}`, {
       headers: { ...sbCle(SUPABASE_KEY) },
     });
-    if (!r.ok) return {};
+    if (!r.ok) return null;
     const j = await r.json();
-    const d = (j[0] && j[0].data) || {};
-    return (d && typeof d === 'object') ? (d.adresses || d) : {};
-  } catch (_) { return {}; }
+    if (!Array.isArray(j)) return null;
+    return fusionnerRegistres(j, cloisonnee);
+  } catch (_) { return null; }
 }
 
 // Email non attribuable : on le garde ENTIER, avec la raison et les adresses
@@ -1101,7 +1113,9 @@ export async function modeScript(mode, req, res) {
     res.status(503).json({ ok: false, error: 'cle-non-configuree', message: "La clé EMAIL_INBOUND_SECRET n'est pas posée sur le serveur." }); return;
   }
   if (!ok) { res.status(401).json({ ok: false, error: 'clé invalide' }); return; }
-  if (!proprietaireCourant() && await baseCloisonnee()) { res.status(503).json({ ok: false, error: 'vendeur-inconnu', message: "VRM_OWNER_UID n'est pas réglé : je ne sais pas à quelle boutique appartient cette boîte." }); return; }
+  const cloisonneeScript = await baseCloisonnee();
+  if (cloisonneeScript === null) { res.status(503).json({ ok: false, error: 'base-injoignable' }); return; }
+  if (!proprietaireCourant() && cloisonneeScript) { res.status(503).json({ ok: false, error: 'vendeur-inconnu', message: "VRM_OWNER_UID n'est pas réglé : je ne sais pas à quelle boutique appartient cette boîte." }); return; }
 
   if (mode === 'config' && req.method === 'GET') {
     const rows = await lireLignes('id=eq.vrm_email_config&select=data');
@@ -1176,11 +1190,28 @@ export async function traiterEmail(req, res) {
   // Décidé par l'ADRESSE DE RÉCEPTION, que le vendeur a enregistrée lui-même
   // dans l'app. Jamais par l'expéditeur ni par le contenu : ils sont écrits par
   // l'extérieur (voir api/_lib/proprietaire-email.js).
-  const registre = await lireRegistreEmails();
+  // ⚠️ On ne décide RIEN sur une lecture ratée : ni la sonde de cloisonnement,
+  // ni le registre. Répondre 503, c'est dire au service de réception « garde-le
+  // et renvoie-le » — un email retardé se rattrape, un email donné au mauvais
+  // vendeur non. (Base sans colonne `owner` : une seule boutique, rien à
+  // protéger, on garde le comportement d'avant.)
+  const cloisonnee = req.__ownerForce ? true : await baseCloisonnee();
+  if (cloisonnee === null) {
+    console.log('[email-inbound] base injoignable (sonde de cloisonnement) — email à renvoyer');
+    repondre(res, 503, { ok: false, erreur: 'base-injoignable', message: "Je n'ai pas pu savoir à quelle boutique appartient cet email : le serveur de données ne répond pas. Ne le supprime pas, renvoie-le." });
+    return;
+  }
+  const lu = req.__ownerForce ? { registre: {}, conflits: [] } : await lireRegistreEmails(cloisonnee);
+  if (lu === null && cloisonnee) {
+    console.log('[email-inbound] registre des adresses illisible — email à renvoyer');
+    repondre(res, 503, { ok: false, erreur: 'base-injoignable', message: "Je n'ai pas pu lire à qui appartient cette adresse de réception : le serveur de données ne répond pas. Ne le supprime pas, renvoie-le." });
+    return;
+  }
+  const registre = (lu && lu.registre) || {};
   const adresses = adressesDeLivraison(corpsBrut, mail);
   const proprio = req.__ownerForce
     ? { owner: String(req.__ownerForce), via: 'rattachement' }
-    : resoudreProprietaire(adresses, registre, process.env.VRM_OWNER_UID || '');
+    : resoudreProprietaire(adresses, registre, process.env.VRM_OWNER_UID || '', (lu && lu.conflits) || []);
   { const st = contexteVendeur.getStore(); if (st) st.owner = proprio.owner || ''; }
   // ⚠️⚠️ INCIDENT DU 16 AU 22 AOÛT — À NE JAMAIS REFAIRE.
   // La quarantaine (§5.16) a été posée AVANT que la base sache séparer les
