@@ -3145,6 +3145,12 @@ const needsBordereau = (status) => {
 //    widget — `scripts/audit-statuts.cjs` les exécute toutes sur le même corpus.
 const PAS_UN_ENVOI = /annul|cancel|refus|rembours|retour|suspend|finalis|paiement\s+a\s+[ée]chou|[ée]chec\s+du\s+paiement/i;
 const tusDe = (o) => String((o && o.transaction_user_status) || '').toLowerCase();
+// Une VENTE dont le colis REVIENT vers le vendeur : l'acheteur ne l'a pas retiré
+// (« non réclamée »), ou il a ouvert un retour. Rangée « annulée » pour l'ARGENT
+// (`classifyOrderStatus` : aucun CA), mais c'est un colis en route qu'il faut
+// surveiller — pas une vente qui n'a pas eu lieu. Même partition que les
+// étiquettes « Retournée » / « Retour en cours » (`venteStage`).
+const venteQuiRevient = (o) => /non\s+r[ée]clam|retour\s+initi|retour\s+en\s+cours|retour\s+demand/i.test(String((o && o.status) || ''));
 const aExpedier = (o) => {
   if (!o) return false;
   const s = String(o.status || '');
@@ -18264,7 +18270,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // « Annulées » seulement, elle disparaissait de « Toutes » et de « En
       // transit » — le colis à surveiller n'était visible que sous un mot
       // faux. Banc `statuts-colis.cjs` (4 octobre).
-      const revient = /non\s+r[ée]clam/i.test(String(o.status || ''));
+      // ⚠️ Et « Retour initié » (l'acheteur renvoie la paire) avait le même
+      // défaut : visible sous « Annulées » seulement, alors que le colis revient.
+      const revient = venteQuiRevient(o);
       // « En cours » mélangeait les colis à poster et ceux déjà partis : ce sont
       // deux questions différentes (« qu'est-ce que je dois faire ? » / « qu'est-ce
       // qui est en route ? »). Deux filtres, la même règle que Colis (§11).
