@@ -8128,7 +8128,7 @@ function EbayPublier({ onPublie, paires = [] }) {
     try {
       const body = { action: 'pubinfo', title: titre };
       if (categoryId) body.categoryId = categoryId;   // choisir une autre catégorie → ses caractéristiques
-      const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+      const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify(body) });
       appliquerPubinfo(await r.json(), nomForce, !!categoryId);
     } catch (_) { setRes({ err: 'Analyse impossible (réseau).' }); }
     setAnalyse(false);
@@ -8152,7 +8152,7 @@ function EbayPublier({ onPublie, paires = [] }) {
     const b = buildItem(); if (b.err) { setRes({ err: b.err }); setCheck(null); return; }
     setVerif(true); setRes(null); setCheck(null);
     try {
-      const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'pubverify', item: b.item }) });
+      const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'pubverify', item: b.item }) });
       const j = await r.json();
       if (j && j.ok) setCheck({ ok: true, fees: j.fees });
       else setCheck({ err: (j && j.error) || 'eBay refuserait cette annonce.' });
@@ -8163,7 +8163,7 @@ function EbayPublier({ onPublie, paires = [] }) {
     const b = buildItem(); if (b.err) { setRes({ err: b.err }); return; }
     setBusy(true); setRes(null); setCheck(null);
     try {
-      const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'publish', item: b.item }) });
+      const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'publish', item: b.item }) });
       const j = await r.json();
       if (j && j.ok) { setRes({ ok: true, url: j.url, itemId: j.itemId }); if (onPublie) onPublie(); }
       else setRes({ err: (j && j.error) || 'eBay a refusé la publication.' });
@@ -8469,14 +8469,14 @@ function EbayConnexion({ onAnnonces }) {
   React.useEffect(() => {
     let stop = false;
     fetch('/api/ebay').then(r => r.json()).then(j => { if (!stop) setSt({ ready: !!(j && j.ready), canConsent: !!(j && j.canConsent) }); }).catch(() => { if (!stop) setSt({ ready: false, canConsent: false }); });
-    fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'status' }) })
+    fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'status' }) })
       .then(r => r.json()).then(j => { if (!stop) setConnected(j && j.ok ? !!j.connected : null); }).catch(() => { if (!stop) setConnected(null); });
     return () => { stop = true; };
   }, []);
   const connecter = async () => {
     setBusy(true);
     try {
-      const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'authurl', state: 'vrm' }) });
+      const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'authurl', state: 'vrm' }) });
       const j = await r.json();
       if (j && j.ok && j.url) { window.location.href = j.url; return; }
     } catch (_) {}
@@ -8492,7 +8492,7 @@ function EbayConnexion({ onAnnonces }) {
   // Solde à virer (getSellerFundsSummary). Lecture seule, une fois à l'ouverture.
   const lireSolde = React.useCallback(async () => {
     try {
-      const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'finances' }) });
+      const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'finances' }) });
       setSolde(await r.json());
     } catch (_) { setSolde(null); }
   }, []);
@@ -8509,7 +8509,7 @@ function EbayConnexion({ onAnnonces }) {
   }, []);
   const synchroniser = React.useCallback(async () => {
     setSyncing(true);
-    try { await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'sync' }) }); } catch (_) {}
+    try { await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'sync' }) }); } catch (_) {}
     await lireData();
     setSyncing(false);
   }, [lireData]);
@@ -8732,7 +8732,7 @@ function EbayAnnonceCard({ it, first, onSaved }) {
   const enregistrer = async () => {
     setSaving(true); setMsg('');
     try {
-      const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'revise', itemId: it.itemId, price: String(price).replace(',', '.'), quantity: qty }) });
+      const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'revise', itemId: it.itemId, price: String(price).replace(',', '.'), quantity: qty }) });
       const j = await r.json();
       if (j && j.ok) { setMsg('✓ Modifié sur eBay'); setEdit(false); if (onSaved) onSaved(); }
       else setMsg(j && j.error ? j.error : 'eBay a refusé la modification.');
@@ -8829,12 +8829,12 @@ function EbayAnnonces({ baseKO, comptes = [] }) {
   // relié — on l'affiche alors seulement quand c'est le cas, sinon on renvoie
   // vers l'onglet « Compte eBay » (jamais un formulaire mort).
   React.useEffect(() => { let stop = false;
-    fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'status' }) })
+    fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'status' }) })
       .then(r => r.json()).then(j => { if (!stop) setConnected(j && j.ok ? !!j.connected : null); }).catch(() => { if (!stop) setConnected(null); });
     return () => { stop = true; }; }, []);
   // Après une publication / modif : on resynchronise depuis eBay puis on relit.
   const resync = React.useCallback(async () => {
-    try { await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'sync' }) }); } catch (_) {}
+    try { await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'sync' }) }); } catch (_) {}
     await charger();
   }, [charger]);
   const wrap = (kids) => <div style={{ background: E.bg, minHeight: '100vh', padding: 16, paddingBottom: 48 }}>{kids}</div>;

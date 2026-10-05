@@ -4639,6 +4639,39 @@ Trouvé par l'audit de sécurité du 5 octobre, prouvé en exécutant les vraies
 - **`ship-reminders` appelable sans clé : faux en production.** `CRON_SECRET`
   y est posée depuis le 4 octobre (vérifié par nom, sans lire la valeur).
 
+### ⚠️⚠️⚠️ `/api/ebay` ÉTAIT OUVERTE À TOUT INTERNET, AVEC SON COMPTE eBAY CONNECTÉ (5 octobre)
+Trouvé par l'audit de sécurité du 5 octobre. **Mesuré en production** : la ligne
+`ebay_tokens` porte bien un jeton de renouvellement, son compte eBay est donc
+relié. La route n'exigeait **aucune session**. N'importe qui pouvait :
+- lister ses commandes eBay, avec les acheteurs, et lire ses finances ;
+- publier ou modifier une annonce sur **son** compte eBay ;
+- ⚠️⚠️ **et remplacer sa connexion eBay par la sienne.** Il suffisait d'ouvrir la
+  page de consentement d'eBay (son adresse ne contient rien de secret) et de
+  s'y connecter avec son propre compte. Le retour rangeait ce jeton à la place
+  de celui de Julien, et ses publications partaient alors sur le compte d'un
+  inconnu.
+
+⇒ **Correctif minimal, posé À L'ENTRÉE de la route** (eBay reste le domaine de
+l'autre session, sa logique n'a pas été touchée) :
+- Toute action `POST` exige la session (`vendeurExige`) et le **propriétaire de
+  l'installation** (`VRM_OWNER_UID`, à qui appartient la ligne `ebay_tokens`).
+  Un autre vendeur reçoit 403.
+- `authurl` fabrique un `state` **signé par le serveur** et daté (HMAC dont la
+  clé dérive d'`EBAY_CERT_ID`, jamais envoyée au navigateur). Le retour de
+  consentement le vérifie avant d'échanger le code. Sans `state` valide, ou au
+  bout de 30 minutes, rien n'est rangé.
+- La lecture `GET` (« eBay est-il prêt ? ») reste publique : elle ne dit rien
+  de ses données.
+- L'app envoie son jeton (`enTeteSession()`) sur ses 10 appels.
+- Le jeton déjà rangé reste valable : rien à refaire pour lui. La prochaine
+  reconnexion passera par la demande signée.
+- `audit-ebay-route.cjs` exécute la vraie route : **12 contrôles**, **10 rouges**
+  sur le code d'avant, dont « jetons écrits : true » pour le code d'un inconnu.
+- ⚠️ **Pour la session eBay** : `ebay_tokens` est une ligne d'installation, lue
+  avec la clé de service, sans filtre de vendeur. Le jour où eBay sera ouvert à
+  d'autres vendeurs, il faudra une ligne de jetons par vendeur. Ce sera alors à
+  elle de relâcher la garde « propriétaire ».
+
 ### Mise en production du 5 octobre
 PR #442 mergée à 10:24 UTC (80 déploiements sur 24 h : sous la limite), déploiement
 de production READY sur le commit de merge, `/api/sante` répond, le zip servi
@@ -5527,7 +5560,7 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | outil | quoi |
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
-| `node scripts/audit-*.cjs` | **70 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `node scripts/audit-*.cjs` | **71 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
 | `scripts/bancs/*.cjs` | les **66 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
@@ -5820,7 +5853,7 @@ script-là me fait croire à une catastrophe.
 src/App.jsx                     l'app (grep avant de lire — le fichier est énorme)
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
-scripts/audit-*.cjs             les 70 audits
+scripts/audit-*.cjs             les 71 audits
 scripts/bancs/                  les 66 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
