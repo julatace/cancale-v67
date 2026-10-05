@@ -23,7 +23,7 @@
 // cette persistance, le refresh suivant échouerait car le refresh_token stocké
 // serait déjà consommé.
 
-import { vendeurExige, baseCloisonnee, lireCommeVendeur } from './_lib/session.js';
+import { vendeurExige, baseCloisonnee, lireCommeVendeur, modifierCommeVendeur } from './_lib/session.js';
 
 // ⚠️⚠️ 4 OCTOBRE — CE PROXY ÉTAIT UN RELAIS OUVERT. N'importe qui pouvait lui
 // envoyer un jeton Vinted (volé ou non) et n'importe quelle adresse Vinted,
@@ -195,6 +195,16 @@ export default async function handler(req, res) {
       });
       if (nt) {
         refreshed = nt;
+        // ⚠️ Vinted vient de CONSOMMER l'ancien refresh_token : c'est ICI que les
+        //    nouveaux doivent être rangés. Depuis que ce relais relit les jetons
+        //    en base à chaque appel (et ignore ceux du navigateur), une écriture
+        //    laissée au navigateur — qui pouvait échouer en silence — cassait le
+        //    compte pour tous les appels suivants (revue du 5 octobre). On écrit
+        //    avec SA session (RLS : seulement sa ligne), filtré sur lui.
+        const n = await modifierCommeVendeur(req,
+          `vinted_accounts?vinted_user_id=eq.${encodeURIComponent(uid)}${filtre}&select=vinted_user_id`,
+          { access_token: nt.access_token, refresh_token: nt.refresh_token, updated_at: new Date().toISOString() });
+        refreshed = { ...nt, persiste: n != null && n > 0 };
         vintedRes = await doCall(nt.access_token, nt.refresh_token);
       }
     }
@@ -207,8 +217,8 @@ export default async function handler(req, res) {
       status: vintedRes.status,
       ok: vintedRes.ok,
       data: json,
-      // Present uniquement si un refresh a eu lieu : le client DOIT persister
-      // ces tokens (sinon le refresh_token consomme rend les appels suivants KO).
+      // Présent uniquement si un refresh a eu lieu. `persiste` dit si le relais
+      // les a rangés lui-même ; sinon le client les réécrit (et le vérifie).
       refreshed,
     });
   } catch (err) {

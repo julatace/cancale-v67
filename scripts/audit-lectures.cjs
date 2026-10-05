@@ -78,7 +78,20 @@ console.log('\n── LES LIGNES QUI PORTENT UN PDF NE SONT JAMAIS LUES EN ENTIE
   const tampon = (app.match(/select=[^`]*pdfTamponneB64/g) || []);
   dit(tampon.length === 0, 'la copie tamponnée par le serveur n\'est jamais rapatriée (personne ne la lit)', tampon.map((x) => x.slice(0, 80)).join(' | '));
   const lecteur = /const lirePdfLigne = async[\s\S]*?\n};/.exec(app);
-  dit(!!lecteur && /select=[a-z]+:data->>pdfB64`/.test(lecteur[0]), 'un seul lecteur d\'octets, qui ne demande QUE `pdfB64`');
+  // ⚠️ La règle n'est pas l'orthographe `select=b:data->>pdfB64\`` : depuis le
+  //    5 octobre le lecteur peut lire des SCALAIRES dans la même requête (la
+  //    transaction de `label_latest` doit venir de la même version que ses
+  //    octets). Ce qui est interdit : la ligne entière, la copie tamponnée, un
+  //    autre champ de `data`. Donc : le lecteur demande `pdfB64` et rien d'autre
+  //    dans `data`, et chaque appel qui ajoute des colonnes n'ajoute que des
+  //    `meta->>` (le suivre jusqu'aux appels, pas s'arrêter à la définition).
+  const selLecteur = lecteur ? ((/select=([^`]*)`/.exec(lecteur[0]) || [])[1] || '') : '';
+  const dataDemandes = (selLecteur.match(/data->>?[A-Za-z0-9_]+/g) || []);
+  const appelsAvec = [...app.matchAll(/lirePdfLigne\(([^()]*?),\s*'([^']*)'\)/g)].map((m) => m[2]);
+  const horsMeta = appelsAvec.flatMap((a) => a.split(',')).filter((c) => !/^[a-zA-Z0-9]+:meta->>[A-Za-z0-9_]+$/.test(c.trim()));
+  dit(!!lecteur && dataDemandes.length === 1 && /data->>pdfB64$/.test(dataDemandes[0]) && horsMeta.length === 0,
+    'un seul lecteur d\'octets, qui ne demande QUE `pdfB64` (et, au besoin, des scalaires `meta->>` de la même ligne)',
+    `data: ${dataDemandes.join(',') || '(rien)'} · ajouts hors meta: ${horsMeta.join(',') || 'aucun'}`);
   dit(!!lecteur && /return null/.test(lecteur[0]) && /absent:\s*true/.test(lecteur[0]), 'et il distingue « pas su » (null) de « pas de PDF »');
 }
 

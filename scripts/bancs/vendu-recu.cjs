@@ -54,7 +54,15 @@ const attendu = {
 };
 
 const ACCOUNTS = [{ id: 1, vinted_user_id: '111', login: 'compte_test', domain: 'www.vinted.fr', updated_at: maintenant.toISOString() }];
+// Un second compte, pour le cas « UN compte illisible » (total partiel).
+const ACCOUNTS2 = [...ACCOUNTS, { id: 2, vinted_user_id: '222', login: 'compte_deux', domain: 'www.vinted.fr', updated_at: maintenant.toISOString() }];
+const V2 = [vente(9201, 25, 'Paiement validé', il(0))];
+// Une annonce en ligne par compte : la lecture des annonces RÉUSSIT, c'est
+// exactement le cas où l'ancienne boucle posait des ventes à zéro (revue du 5 oct.).
+const annonce = (uid) => ({ id: 'harvest_' + uid + '_listings', data: { capturedAt: maintenant.toISOString(), payload: { items: [{ id: Number(uid) * 10, title: 'Annonce ' + uid, price: { amount: '40.0', currency_code: 'EUR' }, is_closed: false, is_hidden: false, is_draft: false }] } } });
 const lignes = (versementsLisibles) => [
+  annonce('111'), annonce('222'),
+  { id: 'harvest_222_orders_sold', data: { capturedAt: maintenant.toISOString(), payload: { my_orders: V2 } } },
   { id: 'lbc_ventes', data: { ventes: LBC } },
   { id: 'ebay_orders', data: { orders: EBAY } },
   { id: 'harvest_111_orders_sold', data: { capturedAt: maintenant.toISOString(), payload: { my_orders: V.map((x) => x.o) } } },
@@ -76,10 +84,12 @@ const srv = http.createServer((q, r) => {
 srv.on('error', (e) => { console.log('❌ le port ' + PORT + ' est pris (' + e.code + ') — relance le banc seul'); process.exit(1); });
 srv.listen(PORT);
 
-const ouvrir = async (b, vp, versementsLisibles, onglet = 'journee') => {
+// `opts` : { comptes, ventesKO: [uid], lbcKO, horloge: Date, plus: [ventes ajoutées au compte 111 quand `ajout.on`] }
+const ouvrir = async (b, vp, versementsLisibles, onglet = 'journee', opts = {}) => {
   const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
+  if (opts.horloge) await pg.clock.install({ time: opts.horloge });
   await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
   const L = lignes(versementsLisibles);
@@ -93,7 +103,12 @@ const ouvrir = async (b, vp, versementsLisibles, onglet = 'journee') => {
     }
     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', 'content-range': `0-${Math.max(0, d.length - 1)}/${d.length}` }, body: JSON.stringify(d) });
     if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', body: '{"m":1}' });
-    if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCOUNTS);
+    if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(opts.comptes || ACCOUNTS);
+    // Une lecture de VENTES qui échoue, la base debout par ailleurs (la vraie
+    // forme : 522 + HTML) — le cas où l'ancienne coque inventait des zéros.
+    const koVentes = (opts.ventesKO || []).find((uid) => new RegExp('harvest_' + uid + '_orders').test(u));
+    if (koVentes) return route.fulfill({ status: 522, contentType: 'text/html', body: '<html>522</html>' });
+    if (opts.lbcKO && /lbc_ventes/.test(u)) return route.fulfill({ status: 522, contentType: 'text/html', body: '<html>522</html>' });
     // Dates de versement illisibles : la VRAIE forme d'une panne (522 + HTML).
     if (!versementsLisibles && /_txn_/.test(u) && /like\./.test(u)) return route.fulfill({ status: 522, contentType: 'text/html', body: '<html>522</html>' });
     // §6.3 : une requête PROJETÉE reçoit la projection, pas la ligne brute.
@@ -107,29 +122,38 @@ const ouvrir = async (b, vp, versementsLisibles, onglet = 'journee') => {
       }
       return { ...r, updated_at: maintenant.toISOString(), cap: r.data.capturedAt };
     };
+    // Une vente rangée APRÈS l'ouverture : la base la rend, sous TOUTES les
+    // formes de requête (l'app lit `id=like.harvest_111_orders_%`, §6.3).
+    const Lx = (opts.ajout && opts.ajout.on) ? L.map((r) => r.id !== 'harvest_111_orders_sold' ? r
+      : { ...r, data: { ...r.data, payload: { my_orders: [...r.data.payload.my_orders, ...opts.ajout.ventes] } } }) : L;
     const eq = /id=eq\.([^&]*)/.exec(u);
-    if (eq) return j(L.filter((r) => r.id === eq[1]).map(forme));
+    if (eq) return j(Lx.filter((r) => r.id === eq[1]).map(forme));
     const lk = /id=like\.([^&]*)/.exec(u);
-    if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(L.filter((r) => re.test(r.id)).map(forme)); }
+    if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(Lx.filter((r) => re.test(r.id)).map(forme)); }
     return j([]);
   });
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
   await pg.goto(`http://localhost:${PORT}/?tab=${onglet}`, { waitUntil: 'domcontentloaded' });
-  const repere = onglet === 'journee' ? '[data-vendu-mois]' : '[data-dash-vendu-jour]';
+  const repere = onglet === 'journee' ? '[data-vendu-mois]' : '[data-dash-vendu-jour],[data-dash-vendu-pas-su]';
   await pg.waitForFunction((r) => document.querySelector(r) || /pas pu s'afficher/.test(document.body.innerText), repere, { timeout: 15000 }).catch(() => {});
   await pg.waitForTimeout(1500);
-  const lu = await pg.evaluate(() => {
+  const lu = await lire(pg);
+  return { ctx, pg, lu, errs, widget };
+};
+const lire = (pg) => pg.evaluate(() => {
     const a = (sel, at) => { const e = document.querySelector(sel); return e ? e.getAttribute(at) : null; };
     const jours = {};
     for (const e of document.querySelectorAll('[data-vendu-recu] [data-jour]')) jours[e.getAttribute('data-jour')] = { vendu: e.getAttribute('data-vendu'), recu: e.getAttribute('data-recu') };
     return { venduMois: a('[data-vendu-mois]', 'data-vendu-mois'), recuMois: a('[data-recu-mois]', 'data-recu-mois'), venduJour: a('[data-vendu-jour]', 'data-vendu-jour'),
       dashJour: a('[data-dash-vendu-jour]', 'data-dash-vendu-jour'), dashJourN: a('[data-dash-vendu-jour]', 'data-dash-vendu-jour-n'),
       dashMois: a('[data-dash-stat="caMois"]', 'data-dash-cents'),
+      dashMoisTxt: (() => { const e = document.querySelector('[data-dash-stat="caMois"]'); return e ? e.innerText.replace(/\s+/g, ' ').trim() : null; })(),
+      pasSu: !!document.querySelector('[data-dash-vendu-pas-su]'),
+      manque: a('[data-dash-vendu-manque]', 'data-dash-vendu-manque'),
+      texte: document.body.innerText,
       aDater: a('[data-a-dater]', 'data-a-dater'), jours, tombe: /pas pu s'afficher|Cannot access|is not defined/.test(document.body.innerText),
       deb: document.documentElement.scrollWidth - window.innerWidth };
   });
-  return { ctx, pg, lu, errs, widget };
-};
 
 (async () => {
   let b;
@@ -183,6 +207,72 @@ const ouvrir = async (b, vp, versementsLisibles, onglet = 'journee') => {
       dit(lu.recuMois === '', 'aucun montant « reçu » inventé', `rendu « ${lu.recuMois} »`);
       const recus = Object.values(lu.jours).map((j) => j.recu);
       dit(recus.length === 14 && recus.every((r) => r === ''), 'aucune barre « reçu » — jamais des zéros', recus.slice(-3).join(','));
+      await ctx.close();
+    });
+    // ── « RIEN LU » NE VAUT PAS « RIEN » (revue du 5 octobre) ────────────────
+    // La lecture des annonces réussit, celle des ventes échoue : l'ancienne
+    // coque posait « Pas encore de vente aujourd'hui · Vendu ce mois 0 € » et
+    // publiait 0 € au widget de l'iPhone.
+    console.log('\n── Ventes illisibles, annonces lisibles');
+    await essaie('ventes illisibles', async () => {
+      const { ctx, lu, errs, widget } = await ouvrir(b, { width: 1512, height: 950 }, true, 'dashboard', { ventesKO: ['111'] });
+      dit(!lu.tombe && errs.length === 0, 'l’écran Statistiques s’affiche', errs.join(' | ').slice(0, 160));
+      dit(lu.pasSu && lu.dashJour == null, '« Aujourd’hui » dit qu’il n’a pas pu lire — jamais « Pas encore de vente »', `pas-su=${lu.pasSu} · rendu ${lu.dashJour}`);
+      dit(!/Pas encore de vente aujourd/.test(lu.texte), 'aucune affirmation « pas de vente » sur une lecture ratée');
+      dit(lu.dashMois == null && /—/.test(lu.dashMoisTxt || ''), '« Vendu ce mois » : un tiret, jamais 0 €', `« ${lu.dashMoisTxt} » · cents ${lu.dashMois}`);
+      dit(widget.length === 0, 'le widget de l’iPhone ne reçoit AUCUN chiffre (il garde la dernière photo complète)', `${widget.length} écriture(s) · ${JSON.stringify(widget[0] || {}).slice(0, 80)}`);
+      await ctx.close();
+    });
+    console.log('\n── Un compte sur deux illisible : total partiel');
+    await essaie('un compte illisible', async () => {
+      const { ctx, lu, errs, widget } = await ouvrir(b, { width: 1512, height: 950 }, true, 'dashboard', { comptes: ACCOUNTS2, ventesKO: ['222'] });
+      dit(!lu.tombe && errs.length === 0, 'l’écran s’affiche', errs.join(' | ').slice(0, 160));
+      dit(lu.dashJour === String(attendu.jour(0).vendu), 'le vendu des comptes lus est montré', `rendu ${lu.dashJour} · attendu ${attendu.jour(0).vendu}`);
+      dit(lu.manque === 'compte_deux', 'et il NOMME le compte qui manque — un total partiel ne se présente pas comme complet', `manque=${lu.manque}`);
+      dit(widget.length === 0, 'le widget ne reçoit pas ce total partiel', `${widget.length} écriture(s)`);
+      await ctx.close();
+    });
+    console.log('\n── Leboncoin illisible');
+    await essaie('lbc illisible', async () => {
+      const { ctx, lu, errs, widget } = await ouvrir(b, { width: 1512, height: 950 }, true, 'dashboard', { lbcKO: true });
+      dit(!lu.tombe && errs.length === 0, 'l’écran s’affiche', errs.join(' | ').slice(0, 160));
+      dit(lu.manque === 'Leboncoin', 'le vendu dit qu’il est sans Leboncoin', `manque=${lu.manque}`);
+      dit(widget.length === 0, 'le widget ne publie pas un « toutes plateformes » sans Leboncoin', `${widget.length} écriture(s)`);
+      await ctx.close();
+    });
+    console.log('\n── Le vendu suit ce qui le change, app ouverte');
+    await essaie('vente masquée', async () => {
+      const { ctx, pg, lu } = await ouvrir(b, { width: 1512, height: 950 }, true, 'dashboard');
+      const avant = Number(lu.dashJour);
+      // Ce que fait le ✕ d'une vente : `save('vinted_sales_hidden', …)`, qui
+      // écrit le navigateur puis prévient (`vrm:save`).
+      await pg.evaluate(() => { localStorage.setItem('vinted_sales_hidden', JSON.stringify(['9101'])); window.dispatchEvent(new CustomEvent('vrm:save', { detail: { k: 'vinted_sales_hidden' } })); });
+      await pg.waitForTimeout(800);
+      const apres = await lire(pg);
+      dit(Number(apres.dashJour) === avant - 5000, 'masquer une vente du jour la retire aussitôt de « Aujourd’hui »', `${avant} → ${apres.dashJour} (attendu ${avant - 5000})`);
+      await ctx.close();
+    });
+    await essaie('nouvelle vente', async () => {
+      const ajout = { on: false, ventes: [vente(9301, 35, 'Paiement validé', il(0))] };
+      const { ctx, pg, lu } = await ouvrir(b, { width: 1512, height: 950 }, true, 'dashboard', { ajout });
+      const avant = Number(lu.dashJour);
+      ajout.on = true;
+      // Ce que l'extension envoie quand elle range des ventes (pont, `evt`).
+      await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:ext', { detail: { type: 'maj', quoi: 'ventes', uid: '111' } })));
+      await pg.waitForFunction((a) => { const e = document.querySelector('[data-dash-vendu-jour]'); return e && Number(e.getAttribute('data-dash-vendu-jour')) !== a; }, avant, { timeout: 8000 }).catch(() => {});
+      const apres = await lire(pg);
+      dit(Number(apres.dashJour) === avant + 3500, 'une vente rangée par l’extension arrive dans « Aujourd’hui » sans recharger', `${avant} → ${apres.dashJour} (attendu ${avant + 3500})`);
+      await ctx.close();
+    });
+    await essaie('minuit', async () => {
+      // L'app reste ouverte passé minuit (une PWA ne se recharge pas).
+      const h = new Date(maintenant); h.setHours(23, 58, 30, 0);
+      const { ctx, pg, lu } = await ouvrir(b, { width: 1512, height: 950 }, true, 'dashboard', { horloge: h });
+      const nAvant = Number(lu.dashJourN);
+      await pg.clock.fastForward('03:00');
+      await pg.waitForTimeout(500);
+      const apres = await lire(pg);
+      dit(nAvant > 0 && apres.dashJourN === '0', 'passé minuit, « Aujourd’hui » repart à zéro sans recharger', `${nAvant} → ${apres.dashJourN}`);
       await ctx.close();
     });
   } catch (e) { dit(false, 'le banc s’exécute', String(e.message || e).slice(0, 160)); }

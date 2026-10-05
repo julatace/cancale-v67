@@ -4463,6 +4463,48 @@ purge est arrivée en 5.146. *Le premier geste reste d'installer le zip.*
   ⚠️ Les mesures de l'étape « stockage » (doublon, 400 vs 404, CORS) se font sur
   une branche Supabase ou en local, **jamais en production** (§2.3).
 
+### Revue contradictoire des trois commits du 4 octobre au soir — 8 défauts confirmés (5 octobre)
+Trois relecteurs (un par commit), puis deux sceptiques indépendants par défaut :
+**8 confirmés, 0 rejeté**. Tous corrigés, chacun prouvé rouge sur le code d'avant.
+- ⚠️⚠️ **« Vendu » inventait des zéros quand les ventes étaient illisibles.** Si
+  AUCUNE lecture de ventes n'aboutissait mais qu'une lecture d'annonces
+  réussissait, la coque posait `liveStats` à zéro : « Pas encore de vente
+  aujourd'hui · Vendu ce mois 0 € », et le **widget de l'iPhone publiait 0 €**.
+  Pas su ⇒ chaque chiffre tiré des ventes vaut `null` (`VENDU_PAS_SU`),
+  l'écran dit « — » et pourquoi. Un total **partiel** (un compte, Leboncoin ou
+  eBay illisibles) **nomme ce qui manque** (`venduManque`), et le widget n'écrit
+  **que** un vendu complet — sinon il garde sa dernière photo complète.
+  `lbcCoqueLu` et `ebayCommandes` ont maintenant **trois états**.
+- **Le vendu était figé à l'ouverture** : masquer une vente (✕), une vente rangée
+  par l'extension, minuit (une PWA reste ouverte) ne changeaient rien. `save()`
+  émet `vrm:save`, la coque écoute `vrm:ext maj ventes` (relit CE compte) et
+  une horloge de jour (`jourCle`). Banc `vendu-recu.cjs` : **51 contrôles, 11
+  rouges** sur le build d'avant (minuit compris, avec l'horloge de Playwright).
+- ⚠️ **Le relais (`/api/vinted-proxy`) range lui-même les jetons qu'il vient de
+  renouveler**, avec la session du vendeur (`modifierCommeVendeur`, RLS : sa
+  ligne seulement). Depuis qu'il relit les jetons en base, l'écriture laissée au
+  navigateur — qui ne regardait pas `r.ok` — laissait un refresh_token CONSOMMÉ
+  en base sur un simple hoquet : compte cassé côté relais. `refreshed.persiste`
+  dit s'il a rangé ; sinon l'app réécrit et vérifie. `proxy.cjs` : **4 rouges**.
+- ⚠️⚠️ **Le N° d'une paire pouvait être tamponné sur l'étiquette d'une autre.**
+  (1) `fetchCapturedLabel` lisait la transaction puis le PDF de `label_latest` en
+  DEUX requêtes — l'extension réécrit cette ligne à chaque capture. Une seule
+  lecture désormais (`lirePdfLigne(id, 'tx:meta->>tx,…')`). (2) l'index des
+  bordereaux captés retenait `label_latest` : `labelsParTransaction` ne garde
+  que les `label_{tx}`. `audit-label-latest.cjs` **exécute** les vraies fonctions
+  contre une base qui change de version entre deux lectures : sur l'avant,
+  « tx annoncée A · PDF de B ».
+- **« Tout imprimer » annonçait « 2 sur 3 imprimés »** quand la fusion avait
+  écarté un PDF abîmé (commence par %PDF, refusé par pdf-lib) : il compte
+  `r.count`, et nomme le PDF illisible. Banc `lot-bordereaux.cjs` (**2 rouges**).
+- **Registre annuel** : un compte dont le reçu était illisible disparaissait dès
+  qu'un autre compte avait un reçu. Banc `recus.cjs` (**1 rouge**).
+- ⚠️ **VINGT-SIXIÈME fois qu'un de mes contrôles crie au loup** :
+  `audit-lectures.cjs` exigeait l'orthographe `` select=b:data->>pdfB64` `` ; le
+  lecteur accepte maintenant des scalaires dans la même requête. Il suit la
+  règle (rien d'autre que `pdfB64` dans `data`, et chaque appel n'ajoute que des
+  `meta->>`) — rouge quand on ajoute `pdfTamponneB64` à un appel (prouvé).
+
 ### Purge des bordereaux CAPTÉS par l'extension — ventes finalisées (5 octobre, 5.158)
 Suite de la purge des `email_bord_*` (5.146) : les `harvest_{uid}_label_{tx}`
 (et le « dernier capté » `label_latest`, une copie) gardaient leur PDF pour
@@ -5372,8 +5414,8 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | outil | quoi |
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
-| `node scripts/audit-*.cjs` | **68 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
-| `scripts/bancs/*.cjs` | les **64 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
+| `node scripts/audit-*.cjs` | **69 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `scripts/bancs/*.cjs` | les **66 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
 **Trois règles de preuve :**
@@ -5665,8 +5707,8 @@ script-là me fait croire à une catastrophe.
 src/App.jsx                     l'app (grep avant de lire — le fichier est énorme)
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
-scripts/audit-*.cjs             les 68 audits
-scripts/bancs/                  les 64 bancs (leur README dit comment les lancer)
+scripts/audit-*.cjs             les 69 audits
+scripts/bancs/                  les 66 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 ```

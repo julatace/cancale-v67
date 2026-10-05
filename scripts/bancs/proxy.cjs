@@ -15,7 +15,9 @@
 //   6. son compte, une lecture permise : la requête part AVEC LE JETON DE LA
 //      BASE, jamais celui envoyé par le navigateur, et la base est lue avec SA
 //      session et filtrée sur lui ;
-//   7. jeton expiré : le relais rafraîchit et rend les jetons neufs à l'app.
+//   7. jeton expiré : le relais rafraîchit, RANGE lui-même les jetons neufs en
+//      base (avec la session du vendeur) et le dit à l'app — une écriture
+//      refusée est dite (`persiste: false`), jamais supposée.
 // Aucune donnée réelle : tout est inventé, le banc vit dans le dépôt.
 const path = require('path');
 const RACINE = process.env.RACINE || path.join(__dirname, '..', '..');
@@ -28,14 +30,19 @@ const VENDEUR = '22222222-2222-4222-8222-222222222222';
 const SESSION = { authorization: 'Bearer ss.tt.uu' };
 const J = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { 'content-type': 'application/json' } });
 
-let vinted = [], lectures = [];
-function poserFetch({ base = 'ok', expire = false } = {}) {
-  vinted = []; lectures = [];
+let vinted = [], lectures = [], ecritures = [];
+function poserFetch({ base = 'ok', expire = false, ecriture = 'ok' } = {}) {
+  vinted = []; lectures = []; ecritures = [];
   global.fetch = async (url, opts = {}) => {
     const u = String(url);
     const h = opts.headers || {};
     if (/\/auth\/v1\/user/.test(u)) return String(h.Authorization || '') === 'Bearer ss.tt.uu' ? J({ id: VENDEUR, email: 'v@exemple.test' }) : J({ msg: 'invalid' }, 401);
     if (/\/rest\/v1\/app_data\?select=owner/.test(u)) return J([{ owner: VENDEUR }]);
+    if (/\/rest\/v1\/vinted_accounts/.test(u) && String(opts.method || 'GET').toUpperCase() === 'PATCH') {
+      ecritures.push({ u, auth: String(h.Authorization || ''), corps: JSON.parse(opts.body || '{}') });
+      if (ecriture === 'panne') return new Response('<html>522</html>', { status: 522, headers: { 'content-type': 'text/html' } });
+      return J(/vinted_user_id=eq\.42(&|$)/.test(u) ? [{ vinted_user_id: '42' }] : []);
+    }
     if (/\/rest\/v1\/vinted_accounts/.test(u)) {
       lectures.push({ u, auth: String(h.Authorization || '') });
       if (base === 'panne') return new Response('<html>522</html>', { status: 522, headers: { 'content-type': 'text/html' } });
@@ -122,7 +129,21 @@ const faireRes = () => {
     poserFetch({ expire: true });
     const r = await appel(SESSION, attaque);
     dit(r.code === 200 && r.corps && r.corps.ok === true, 'le relais rafraîchit puis rejoue la lecture', `HTTP ${r.code} · ok=${r.corps && r.corps.ok}`);
-    dit(r.corps && r.corps.refreshed && r.corps.refreshed.access_token === 'JETON_NEUF', 'et rend les jetons neufs à l’app, qui les enregistre', JSON.stringify(r.corps && r.corps.refreshed));
+    dit(r.corps && r.corps.refreshed && r.corps.refreshed.access_token === 'JETON_NEUF', 'et rend les jetons neufs à l’app', JSON.stringify(r.corps && r.corps.refreshed));
+    // Vinted vient de CONSOMMER l'ancien refresh_token : le relais, qui relit
+    // les jetons en base à chaque appel, doit ranger les neufs LUI-MÊME.
+    const e = ecritures[0] || {};
+    dit(ecritures.length === 1 && e.corps && e.corps.refresh_token === 'REF_NEUF' && e.corps.access_token === 'JETON_NEUF',
+      'le relais range lui-même les jetons neufs en base', `${ecritures.length} écriture(s) · ${JSON.stringify(e.corps || {}).slice(0, 80)}`);
+    dit(e.auth === 'Bearer ss.tt.uu' && new RegExp('vinted_user_id=eq\\.42').test(e.u || '') && new RegExp('owner=eq\\.' + VENDEUR).test(e.u || ''),
+      'avec SA session, sur SON compte, filtré sur lui', (e.u || '').slice(-90));
+    dit(r.corps && r.corps.refreshed && r.corps.refreshed.persiste === true, 'et dit à l’app que c’est rangé (persiste: true)');
+  });
+  await essaie('refresh, écriture refusée', async () => {
+    poserFetch({ expire: true, ecriture: 'panne' });
+    const r = await appel(SESSION, attaque);
+    dit(r.code === 200 && r.corps && r.corps.ok === true, 'écriture des jetons refusée : la lecture passe quand même', `HTTP ${r.code}`);
+    dit(r.corps && r.corps.refreshed && r.corps.refreshed.persiste === false, 'et l’app est prévenue que rien n’est rangé (persiste: false) — jamais un succès supposé', JSON.stringify(r.corps && r.corps.refreshed));
   });
 
   console.log(ko ? `\n❌ vinted-proxy : ${ko} rouge(s), ${ok} vert(s)` : `\n✅ vinted-proxy : ${ok} verts, 0 rouge`);
