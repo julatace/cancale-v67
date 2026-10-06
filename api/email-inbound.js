@@ -937,16 +937,23 @@ async function mettreEnQuarantaine(mail, adresses, raison, cloisonnee) {
   try {
     const id = 'email_quarantaine_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
     // Les adresses aussi en UNE chaîne : la base ne copie dans `meta` que les
-    // valeurs simples (≤ 600 octets). La liste des emails à réclamer se lit
-    // alors sans décompresser l'email entier (§4.4). Trop longue : pas de
-    // chaîne (jamais une liste tronquée — elle pourrait cacher un second
-    // destinataire), et la liste relit `data.adresses` pour cette ligne-là.
-    const dest = (adresses || []).join(' ');
+    // valeurs simples dont le JSON tient en 600 octets (`vrm_meta`,
+    // `octet_length(v::text) <= 600`). La liste des emails à réclamer y trouve
+    // ses CANDIDATS sans décompresser l'email entier (§4.4). Trop longue : pas
+    // de chaîne (jamais une liste tronquée — elle pourrait cacher un second
+    // destinataire), et la route cherche alors dans `data->adresses`.
+    // ⚠️ EN JSON, PLUS JOINTE PAR DES ESPACES : une adresse de livraison peut
+    //    elle-même contenir une espace (« x@inconnu.fr b@vrm.center », un To mal
+    //    formé, mesuré par la relecture du 6 octobre). Découpée sur les espaces,
+    //    la liste proposait un email que la réclamation refusait ensuite (404),
+    //    et le rattrapage le retentait à chaque ouverture. Le JSON se relit à
+    //    l'identique de `data.adresses` (§11).
+    const dest = JSON.stringify(adresses || []);
     const ligne = {
       id,
       data: {
         raison, adresses, at: new Date().toISOString(),
-        ...(Buffer.byteLength(dest, 'utf8') <= 560 ? { destinataires: dest } : {}),
+        ...(Buffer.byteLength(JSON.stringify(dest), 'utf8') <= 590 ? { destinataires: dest } : {}),
         from: mail.from || '', to: mail.to || '', subject: mail.subject || '',
         text: String(mail.text || '').slice(0, 20000),
         html: String(mail.html || '').slice(0, 40000),

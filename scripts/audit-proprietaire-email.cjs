@@ -227,9 +227,47 @@ const B = '22222222-2222-2222-2222-222222222222';   // un second vendeur
       `HTTP ${o.code} · ${q.map((x) => x.id + '@' + (x.owner === J ? 'J (Julien)' : x.owner || '(aucun)')).join(', ')}`);
     dit(q.length === 1 && /on_conflict=owner,id/.test(q[0].url || ''),
       'route : et il s’écrit sur la clé (owner, id) de la base cloisonnée', q[0] && q[0].url);
-    dit(q.length === 1 && q[0].data && Array.isArray(q[0].data.adresses) && q[0].data.destinataires === 'inconnue@vrm.center',
-      'route : ses adresses d’arrivée sont gardées — en liste, et en une chaîne que la base copie dans `meta`',
+    dit(q.length === 1 && q[0].data && Array.isArray(q[0].data.adresses) && q[0].data.destinataires === JSON.stringify(q[0].data.adresses),
+      'route : ses adresses d’arrivée sont gardées — en liste, et en une chaîne (JSON, la même liste) que la base copie dans `meta`',
       q[0] && JSON.stringify({ adresses: q[0].data.adresses, destinataires: q[0].data.destinataires }));
+    // ⚠️ Une adresse de livraison peut contenir une espace (un To mal formé) :
+    //    jointe par des espaces, la chaîne se relisait en DEUX adresses, et la
+    //    liste proposait ce que la réclamation refusait. Elle doit se relire à
+    //    l'identique de `data.adresses` (§11).
+    const route2 = await nouvelle('espace');
+    const o2 = await envoyer(route2, 'x@inconnu.fr b@vrm.center', { lignes: [LIGNE_J, LIGNE_B] });
+    const q2 = quar(o2.ecrites);
+    let relue = null; try { relue = JSON.parse(q2[0].data.destinataires); } catch (_) {}
+    dit(q2.length === 1 && Array.isArray(relue) && JSON.stringify(relue) === JSON.stringify(q2[0].data.adresses),
+      'route : la chaîne des destinataires se relit EXACTEMENT comme `data.adresses` — une adresse avec une espace reste une adresse',
+      q2[0] && JSON.stringify({ adresses: q2[0].data.adresses, destinataires: q2[0].data.destinataires }));
+  });
+  // ── Pourquoi PERSONNE ne peut réclamer, et le repli qui s'éteint ─────────
+  await essaie('pourquoi personne', () => {
+    const pp = mod.pourquoiPersonne, ri = mod.repliInstallation;
+    dit(typeof pp === 'function' && typeof ri === 'function', 'la cause d’un email que personne ne peut réclamer, et l’état du repli, se calculent', `${typeof pp} · ${typeof ri}`);
+    if (typeof pp !== 'function' || typeof ri !== 'function') return;
+    const reg = { 'sophie@vrm.center': B, 'recu@vrm.center': J };
+    // §11 : `pourquoiPersonne` est l'envers EXACT de `peutReclamer` — sur une
+    // grille de cas, jamais l'un sans l'autre.
+    const cas = [['sophie@vrm.center'], ['inconnue@vrm.center'], ['disputee@vrm.center'], ['sophie@vrm.center', 'recu@vrm.center'],
+      ['sophie+vinted@vrm.center'], [], ['x@inconnu.fr sophie@vrm.center'], ['b+y@autre.fr sophie@vrm.center']];
+    const ecarts = cas.filter((a) => {
+      const quelquun = [B, J, C].some((v) => mod.peutReclamer(a, reg, ['disputee@vrm.center'], v));
+      return quelquun === !!pp(a, reg, ['disputee@vrm.center']);
+    });
+    dit(ecarts.length === 0, '« personne ne peut réclamer » est exactement l’envers de la réclamation (§11)', ecarts.map((a) => JSON.stringify(a)).join(' · '));
+    dit(pp(['inconnue@vrm.center'], reg, []) === 'inconnue' && pp(['disputee@vrm.center'], reg, ['disputee@vrm.center']) === 'disputee'
+      && pp(['sophie@vrm.center', 'recu@vrm.center'], reg, []) === 'plusieurs' && pp([], reg, []) === 'aucune',
+      'et la cause est nommée : adresse non déclarée · disputée · deux vendeurs · aucune adresse',
+      [pp(['inconnue@vrm.center'], reg, []), pp(['disputee@vrm.center'], reg, ['disputee@vrm.center']), pp(['sophie@vrm.center', 'recu@vrm.center'], reg, []), pp([], reg, [])].join(','));
+    // Le repli : allumé tant que personne d'autre n'a déclaré, éteint dès qu'un
+    // autre compte déclare UNE adresse — exactement ce que fait l'arrivée.
+    dit(ri({}, J) === true && ri({ 'recu@vrm.center': J }, J) === true && ri({ 'essai@vrm.center': { owner: B } }, J) === false && ri({}, '') === false,
+      'le repli « installation » : allumé seul, éteint dès qu’un autre compte déclare, jamais sans propriétaire réglé');
+    const arrivee = (regX) => r(['inconnue@vrm.center'], regX, J).via === 'installation';
+    dit([{}, { 'recu@vrm.center': J }, { 'essai@vrm.center': B }].every((regX) => arrivee(regX) === ri(regX, J)),
+      'et c’est LA règle de l’arrivée (§11) — l’écran ne peut pas dire autre chose que ce qui se passe');
   });
   await essaie('route : base non cloisonnée', async () => {
     const route = await nouvelle('sansColonne');

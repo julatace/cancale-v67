@@ -45,10 +45,32 @@ let etat = {};
 const journal = [];   // { m, id, owner, url }
 const rep = (corps, status = 200, type = 'application/json') =>
   new Response(typeof corps === 'string' ? corps : JSON.stringify(corps), { status, headers: { 'content-type': type } });
+const T = '44444444-4444-4444-4444-444444444444';   // un compte d'essai de Julien (ou un second vendeur)
 const authDe = (opts) => {
   const a = String((opts.headers && (opts.headers.Authorization || opts.headers.authorization)) || '');
-  return { 'Bearer jeton-de-B': B, 'Bearer jeton-de-J': J, 'Bearer jeton-de-C': C }[a] || '';
+  return { 'Bearer jeton-de-B': B, 'Bearer jeton-de-J': J, 'Bearer jeton-de-C': C, 'Bearer jeton-de-T': T }[a] || '';
 };
+// `or=(col.ilike."motif",…)` de PostgREST : valeurs entre guillemets, `\` et `"`
+// échappés par une barre oblique inverse. `*`/`%` = n'importe quoi, `_` = un
+// caractère, sans casse (ilike). Rend `null` si la forme est inconnue (le banc
+// répond alors 400 : un filtre qu'il ne comprend pas ne passe JAMAIS pour vrai).
+const parseOu = (v) => {
+  if (!/^\(.*\)$/.test(v)) return null;
+  const s = v.slice(1, -1), termes = [];
+  let i = 0;
+  while (i < s.length) {
+    const m = /^([a-z_]+(?:->>?[a-zA-Z_]+)?)\.(ilike|eq|is)\./.exec(s.slice(i));
+    if (!m) return null;
+    i += m[0].length;
+    let val = '';
+    if (s[i] === '"') { i++; while (i < s.length && s[i] !== '"') { if (s[i] === '\\') i++; val += s[i]; i++; } i++; }
+    else { while (i < s.length && s[i] !== ',') val += s[i++]; }
+    termes.push({ col: m[1], op: m[2], val });
+    if (s[i] === ',') i++; else if (i < s.length) return null;
+  }
+  return termes;
+};
+const motifRe = (m) => new RegExp('^' + m.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/[*%]/g, '.*').replace(/_/g, '.') + '$', 'is');
 const fetchPartie1 = async (url, opts = {}) => {
   const u = decodeURIComponent(String(url));
   const m = (opts.method || 'GET').toUpperCase();
@@ -113,6 +135,11 @@ const fetchPartie2 = async (url, opts = {}) => {
     else if (k === 'id' && val.startsWith('in.(')) { const l = val.slice(4, -1).split(','); rows = rows.filter((r) => l.includes(r.id)); }
     else if (k === 'owner' && val.startsWith('eq.')) rows = rows.filter((r) => r.owner === val.slice(3));
     else if (/^meta->>/.test(k) && val === 'is.null') rows = rows.filter((r) => champ(r, k) == null);
+    else if (k === 'or') {
+      const t = parseOu(val);
+      if (!t || t.some((x) => x.op !== 'ilike')) return rep({ message: 'or= inconnu du banc : ' + val }, 400);
+      rows = rows.filter((r) => t.some((x) => { const v = champ(r, x.col); return v != null && motifRe(x.val).test(String(v)); }));
+    }
     else return rep({ message: 'filtre inconnu du banc : ' + k + '=' + val }, 400);
   }
   // Pannes ciblées : la base debout par ailleurs.
@@ -141,7 +168,7 @@ const fetchPartie2 = async (url, opts = {}) => {
 const registre = (owner, adresses) => ({ owner, id: 'vrm_email_owners', data: { adresses: Object.fromEntries(adresses.map((a) => [a, { owner, label: '' }])), updatedAt: '2026-10-05T10:00:00Z' } });
 const neutre = (id, adresses, extra = {}) => ({ owner: NEUTRE, id, data: {
   raison: 'adresse de réception inconnue, et l’app compte plusieurs vendeurs', adresses,
-  ...(adresses.join(' ').length <= 560 && !extra.sansDest ? { destinataires: adresses.join(' ') } : {}),
+  ...(JSON.stringify(JSON.stringify(adresses)).length <= 590 && !extra.sansDest ? { destinataires: JSON.stringify(adresses) } : {}),
   at: '2026-09-28T07:15:00.000Z', from: 'no-reply@vinted.fr', to: adresses[0] || '',
   subject: extra.subject || 'Ton article est vendu !',
   text: "acheteur-de-banc a acheté [Paire de banc] n°9001 42,00 €\nPrépare ton colis.", html: '<p>vendu</p>', pieces: [],
@@ -353,6 +380,176 @@ const BASE_TROIS = () => [
       `HTTP ${o.code} · ${del.map((x) => x.url.replace(/^.*\/rest\/v1\//, '')).join(' · ')}`);
     const b = await reclamer('jeton-de-B', 'email_quarantaine_j1avant');
     dit(b.code === 404 && nonGet(b.journal).length === 0, "réclamer : et B ne prend pas une ligne d'avant de Julien", `HTTP ${b.code}`);
+  });
+
+  // ══ PARTIE 3 (relecture du 6 octobre) : JULIEN À 0 ADRESSE, UN AUTRE DÉCLARE ═
+  //  Une base À ÉTAT : les vraies routes écrivent dedans (email-inbound range,
+  //  email-rattacher relit), et chaque requête est COMPTÉE.
+  //   · Julien (propriétaire de l'installation) n'a déclaré AUCUNE adresse —
+  //     son état réel, mesuré. Dès qu'un autre compte en déclare une, le repli
+  //     s'éteint : ses emails partent au neutre. Ça ne doit plus être muet.
+  //   · Le nombre n'est donné QU'À LUI, jamais le contenu.
+  //   · La liste ne relit plus tout le tas (25 000 lignes ⇒ 503 pour tous).
+  //   · La liste juge comme la réclamation (§11).
+  let base3 = [], panne3 = {}, req3 = 0;
+  const fetchPartie3 = async (url, opts = {}) => {
+    const u = decodeURIComponent(String(url));
+    const m = (opts.method || 'GET').toUpperCase();
+    if (u.includes('/rest/v1/')) req3++;
+    if (u.includes('/auth/v1/user')) { const id = authDe(opts); return id ? rep({ id }) : rep({ msg: 'invalid' }, 401); }
+    if (!u.includes('/rest/v1/app_data')) return m === 'GET' ? rep([]) : rep('', 201);
+    const q = u.split('?')[1] || '';
+    const params = q.split('&').filter(Boolean).map((x) => { const i = x.indexOf('='); return [x.slice(0, i), x.slice(i + 1)]; });
+    if (m === 'POST') {
+      let arr = []; try { arr = JSON.parse(opts.body || '[]'); } catch (_) {}
+      for (const x of (Array.isArray(arr) ? arr : [arr])) {
+        const owner = x.owner || J;
+        const i = base3.findIndex((r) => r.id === x.id && r.owner === owner);
+        if (i >= 0) base3[i] = { owner, id: x.id, data: x.data }; else base3.push({ owner, id: x.id, data: x.data });
+      }
+      return rep('', 201);
+    }
+    if (/select=owner&limit=1/.test(u)) return rep([{ owner: J }]);
+    let rows = base3.slice(), select = null, ordre = false;
+    for (const [k, v] of params) {
+      if (k === 'select') { select = v; continue; }
+      if (k === 'order') { ordre = true; continue; }
+      if (k === 'on_conflict' || k === 'limit') continue;
+      const val = v || '';
+      if (k === 'id' && val.startsWith('eq.')) rows = rows.filter((r) => r.id === val.slice(3));
+      else if (k === 'id' && val.startsWith('like.')) { const re = new RegExp('^' + val.slice(5).replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') + '$'); rows = rows.filter((r) => re.test(r.id)); }
+      else if (k === 'id' && val.startsWith('in.(')) { const l = val.slice(4, -1).split(','); rows = rows.filter((r) => l.includes(r.id)); }
+      else if (k === 'owner' && val.startsWith('eq.')) rows = rows.filter((r) => r.owner === val.slice(3));
+      else if (/^(meta|data)->>/.test(k) && val === 'is.null') rows = rows.filter((r) => champ(r, k) == null);
+      else if (k === 'or') {
+        const t = parseOu(val);
+        if (!t || t.some((x) => x.op !== 'ilike')) return rep({ message: 'or= inconnu du banc : ' + val }, 400);
+        rows = rows.filter((r) => t.some((x) => { const w = champ(r, x.col); return w != null && motifRe(x.val).test(String(w)); }));
+      }
+      else return rep({ message: 'filtre inconnu du banc : ' + k + '=' + val }, 400);
+    }
+    if (m === 'DELETE') { const set = new Set(rows); base3 = base3.filter((r) => !set.has(r)); return rep('', 204); }
+    if (panne3.compte && /select=id,dest:/.test(u)) return rep('<html>522</html>', 522, 'text/html');
+    if (ordre) rows.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    const range = String((opts.headers && (opts.headers.Range || opts.headers.range)) || '');
+    const mr = /^(\d+)-(\d+)$/.exec(range);
+    const debut = mr ? +mr[1] : 0, fin = mr ? +mr[2] : 999;
+    rows = rows.slice(debut, Math.min(fin, debut + 999) + 1);
+    const proj = (r) => {
+      if (!select) return { id: r.id, owner: r.owner, data: r.data };
+      const o = {};
+      for (const item of select.split(',')) {
+        const i = item.indexOf(':');
+        const [alias, chemin] = i > 0 ? [item.slice(0, i), item.slice(i + 1)] : [item.replace(/^.*(->>|->)/, ''), item];
+        o[alias] = champ(r, chemin);
+      }
+      return o;
+    };
+    return rep(rows.map(proj));
+  };
+  global.fetch = fetchPartie3;
+  let inbound3 = null;
+  await essaie('partie 3 : chargement', async () => { inbound3 = await import('file://' + path.join(RACINE, 'api', 'email-inbound.js')); });
+  const SHOP = 'boutique-de-banc@exemple.test';
+  const venteVers = (to, n) => ({ method: 'POST', query: {}, headers: {}, body: {
+    from: 'no-reply@vinted.fr', to, subject: `Ton article est vendu ! (banc ${n})`,
+    text: `acheteur-de-banc a acheté [Paire de banc ${n}] n°${n} 42,00 €\nPrépare ton colis.`, html: '<p>vendu</p>', attachments: [] } });
+  const envoyer3 = async (mail) => { const r = faireRes(); await inbound3.default(mail, r); return r; };
+  const lister3 = async (jeton) => {
+    const r = faireRes(); req3 = 0;
+    await route.default({ method: 'GET', query: { mode: 'liste' }, headers: { authorization: 'Bearer ' + jeton } }, r);
+    return { code: r.code, corps: r.corps || {}, brut: JSON.stringify(r.corps || {}), ids: ((r.corps && r.corps.emails) || []).map((x) => x.id), req: req3 };
+  };
+  const reclamer3 = async (jeton, id) => { const r = faireRes(); await route.default({ method: 'POST', query: {}, headers: { authorization: 'Bearer ' + jeton }, body: { id, silencieux: true } }, r); return { code: r.code, corps: r.corps }; };
+  const neutres3 = () => base3.filter((r) => r.owner === NEUTRE && /^email_quarantaine_/.test(r.id) && !(r.data && r.data.supprime));
+  const perso = (o) => o.corps && o.corps.installation && o.corps.installation.personne;
+
+  await essaie('partie 3 : Julien à 0 adresse, un autre déclare', async () => {
+    if (!inbound3) return;
+    base3 = [registre(T, ['essai@vrm.center'])]; panne3 = {};
+    const e = await envoyer3(venteVers(SHOP, 9101));
+    const n = neutres3();
+    dit(e.code === 200 && n.length === 1, "(constat) un email de Julien arrivé sur une adresse qu'il n'a pas déclarée part au neutre quand un autre compte a déclaré la sienne",
+      `HTTP ${e.code} · ${n.length} au neutre`);
+    const lj = await lister3('jeton-de-J');
+    const p = perso(lj);
+    dit(lj.code === 200 && !!p && p.n === 1 && p.causes && p.causes.inconnue === 1 && !p.auMoins,
+      "Julien (propriétaire de l'installation) reçoit le NOMBRE d'emails que personne ne peut récupérer, et pourquoi — ce n'est plus silencieux",
+      `HTTP ${lj.code} · ${JSON.stringify(lj.corps.installation)}`);
+    dit(lj.code === 200 && lj.corps.installation && lj.corps.installation.repli === false,
+      "et il sait que le repli « installation » ne joue plus (Réglages en tire sa phrase)", JSON.stringify(lj.corps.installation));
+    dit(lj.code === 200 && !lj.brut.includes('banc 9101') && !lj.brut.includes(SHOP) && !lj.brut.includes('acheteur-de-banc'),
+      "le nombre seul : ni le sujet, ni l'adresse, ni le contenu de ces emails", lj.brut.slice(0, 200));
+    for (const [jeton, nom] of [['jeton-de-T', 'le compte qui a déclaré'], ['jeton-de-B', 'un autre vendeur']]) {
+      const lo = await lister3(jeton);
+      dit(lo.code === 200 && lo.corps.installation === undefined && !/personne|repli/.test(lo.brut) && lo.ids.length === 0,
+        `${nom} ne reçoit JAMAIS ce nombre, ni ce booléen, ni l'email`, `HTTP ${lo.code} · ${lo.brut.slice(0, 160)}`);
+    }
+    // e) Il déclare SON adresse : il récupère son arriéré par le chemin existant.
+    base3.push(registre(J, [SHOP]));
+    const l2 = await lister3('jeton-de-J');
+    const id = n[0] && n[0].id;
+    dit(l2.code === 200 && l2.ids.includes(id), "une fois son adresse déclarée, l'email lui est proposé (liste)", `${l2.ids.join(', ')}`);
+    const r = await reclamer3('jeton-de-J', id);
+    const vente = base3.find((x) => x.owner === J && /^email_sale_/.test(x.id));
+    dit(r.code === 200 && r.corps && r.corps.ok && !!vente, 'et il le récupère (POST) — la vente est rangée chez LUI', `HTTP ${r.code} · ${vente ? vente.id : 'aucune vente chez J'}`);
+    const l3 = await lister3('jeton-de-J');
+    dit(l3.code === 200 && perso(l3) && perso(l3).n === 0, 'après quoi le nombre retombe à 0', JSON.stringify(l3.corps.installation));
+  });
+  await essaie('partie 3 : seul à déclarer', async () => {
+    if (!inbound3) return;
+    base3 = [registre(J, ['recu@vrm.center'])]; panne3 = {};
+    const lj = await lister3('jeton-de-J');
+    dit(lj.code === 200 && lj.corps.installation && lj.corps.installation.repli === true && perso(lj) && perso(lj).n === 0,
+      "l'autre sens : seul à avoir déclaré, le repli joue encore — et rien n'est annoncé à tort", JSON.stringify(lj.corps.installation));
+    const ancien = process.env.VRM_OWNER_UID; process.env.VRM_OWNER_UID = '';
+    const sans = await lister3('jeton-de-J');
+    process.env.VRM_OWNER_UID = ancien;
+    dit(sans.code === 200 && sans.corps.installation === undefined, "aucun propriétaire d'installation réglé : personne ne reçoit le nombre", sans.brut.slice(0, 120));
+  });
+  await essaie('partie 3 : compte illisible', async () => {
+    if (!inbound3) return;
+    base3 = [registre(T, ['essai@vrm.center']), neutre('email_quarantaine_q1', [SHOP]), { owner: J, id: 'email_quarantaine_q0avant', data: { ...LIGNE, adresses: [SHOP] } }];
+    panne3 = { compte: true };
+    const lj = await lister3('jeton-de-J');
+    dit(lj.code === 200 && lj.ids.includes('email_quarantaine_q0avant') && lj.corps.installation && lj.corps.installation.personne === null,
+      "le compte ne se lit pas : « pas su » (null), jamais 0 — et sa liste reste rendue", `HTTP ${lj.code} · ${JSON.stringify(lj.corps.installation)}`);
+    panne3 = {};
+  });
+  await essaie('partie 3 : liste == réclamation', async () => {
+    if (!inbound3) return;
+    base3 = [registre(J, ['recu@vrm.center']), registre(B, ['b@vrm.center']),
+      neutre('email_quarantaine_r1avantdecl', ['b@vrm.center'])];   // arrivé avant que B déclare : à lui
+    panne3 = {};
+    const e = await envoyer3(venteVers('x@inconnu.fr b@vrm.center', 9102));   // un To mal formé, mesuré par la relecture
+    // Le même, que le TAMIS de la base laisse passer (l'étiquette « + » de
+    // « b+y@ » fait un candidat) : c'est le JUGEMENT qui doit être celui du POST.
+    await envoyer3(venteVers('b+y@autre.fr b@vrm.center', 9103));
+    const lb = await lister3('jeton-de-B');
+    const refus = [];
+    for (const id of lb.ids) { const r = await reclamer3('jeton-de-B', id); if (r.code !== 200) refus.push(`${id} → ${r.code}`); }
+    dit(e.code === 200 && lb.code === 200 && lb.ids.length >= 1 && refus.length === 0,
+      "liste == réclamation : tout email proposé à B se réclame — « x@inconnu.fr b@vrm.center » et « b+y@autre.fr b@vrm.center », que la réclamation refuse, ne sont plus proposés",
+      `liste ${lb.code} · ${lb.ids.join(', ')} · refusés : ${refus.join(', ') || 'aucun'}`);
+    dit(lb.ids.includes('email_quarantaine_r1avantdecl'), "et l'autre sens : celui arrivé sur son adresse avant qu'il la déclare lui est bien proposé", lb.ids.join(', '));
+  });
+  await essaie('partie 3 : 25 000 lignes neutres', async () => {
+    if (!inbound3) return;
+    base3 = [registre(J, ['recu@vrm.center']), registre(B, ['b@vrm.center']),
+      { owner: B, id: 'email_quarantaine_aaaasienne', data: { ...LIGNE, adresses: ['b@vrm.center'] } },
+      neutre('email_quarantaine_aaabpourb', ['b@vrm.center'])];
+    for (let i = 0; i < 25001; i++) base3.push({ owner: NEUTRE, id: 'email_quarantaine_z' + String(i).padStart(6, '0'), data: { subject: 'spam', raison: 'aucune adresse de réception lisible', at: '2026-10-01', adresses: [], destinataires: '[]' } });
+    panne3 = {};
+    const lb = await lister3('jeton-de-B');
+    dit(lb.code === 200 && lb.ids.includes('email_quarantaine_aaaasienne') && lb.ids.includes('email_quarantaine_aaabpourb') && lb.req <= 8,
+      'liste bornée : 25 001 lignes neutres à personne n’empêchent pas B de voir les siennes — sans relire le tas',
+      `HTTP ${lb.code} · ${lb.ids.length} rendus · ${lb.req} requêtes`);
+    const lj = await lister3('jeton-de-J');
+    const p = perso(lj);
+    dit(lj.code === 200 && !!p && p.auMoins === true && p.n >= 1000 && lj.req <= 15,
+      'et le compte du propriétaire est borné : « au moins N », en un nombre fixe de requêtes',
+      `HTTP ${lj.code} · ${JSON.stringify(p)} · ${lj.req} requêtes`);
+    base3 = [];
   });
 
   // ── En dernier : base non cloisonnée (la sonde d'email-inbound se mémorise) ──

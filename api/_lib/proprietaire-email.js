@@ -122,7 +122,8 @@ export function fusionnerRegistres(lignes, cloisonnee) {
 // `conflits` : adresses déclarées par plusieurs vendeurs (voir plus haut).
 //
 // Renvoie { owner, via, adresse } ou { owner:'', via:'quarantaine', raison }.
-export function resoudreProprietaire(adresses, registre, defaut, conflits) {
+// Le registre réduit à { adresse normalisée: vendeur } (accepte les deux formes).
+function regNormalise(registre) {
   const reg = {};
   for (const k in (registre || {})) {
     const cle = normAdresse(k);
@@ -130,6 +131,27 @@ export function resoudreProprietaire(adresses, registre, defaut, conflits) {
     const owner = String((v && (v.owner || v.uid)) || (typeof v === 'string' ? v : '') || '').trim();
     if (cle && owner) reg[cle] = owner;
   }
+  return reg;
+}
+
+// ── LE REPLI « INSTALLATION » JOUE-T-IL ENCORE ? (fonction PURE) ─────────────
+// Vrai tant que le registre ne déclare AUCUN propriétaire autre que celui de
+// l'installation : un email arrivé sur une adresse non déclarée lui revient.
+// Faux dès qu'un AUTRE compte a déclaré une adresse — un second vendeur, ou un
+// compte d'essai du propriétaire lui-même : ses emails arrivés sur une adresse
+// qu'il n'a pas déclarée sont alors mis de côté.
+// ⚠️ Une seule règle (§11) : `resoudreProprietaire` l'appelle, et l'écran de
+// Réglages en tire sa phrase (par la route) au lieu d'affirmer que tout revient
+// au propriétaire de l'installation.
+export function repliInstallation(registre, defaut) {
+  const dft = String(defaut || '').trim();
+  if (!dft) return false;
+  const reg = regNormalise(registre);
+  return !Object.keys(reg).some((a) => reg[a] && reg[a] !== dft);
+}
+
+export function resoudreProprietaire(adresses, registre, defaut, conflits) {
+  const reg = regNormalise(registre);
   const liste = (adresses || []).map(normAdresse).filter(Boolean);
 
   // 0. Une adresse revendiquée par deux vendeurs : personne ne tranche à leur
@@ -138,7 +160,7 @@ export function resoudreProprietaire(adresses, registre, defaut, conflits) {
   //    (Le repli sur l'adresse sans « +étiquette » ne compte que si l'adresse
   //    exacte n'est déclarée par personne — l'exacte gagne toujours.)
   if (liste.some((a) => disputees.has(a) || (!reg[a] && disputees.has(sansEtiquette(a))))) {
-    return { owner: '', via: 'quarantaine', raison: 'adresse de réception déclarée par plusieurs vendeurs' };
+    return { owner: '', via: 'quarantaine', cause: 'disputee', raison: 'adresse de réception déclarée par plusieurs vendeurs' };
   }
 
   // 1. Correspondance EXACTE sur l'adresse complète (le cas normal).
@@ -147,7 +169,7 @@ export function resoudreProprietaire(adresses, registre, defaut, conflits) {
   if (exacts.length === 1) return { owner: exacts[0], via: 'adresse', adresse: liste.find(a => reg[a]) };
   if (exacts.length > 1) {
     // Deux vendeurs en destinataires : personne ne peut trancher à leur place.
-    return { owner: '', via: 'quarantaine', raison: 'plusieurs vendeurs destinataires' };
+    return { owner: '', via: 'quarantaine', cause: 'plusieurs', raison: 'plusieurs vendeurs destinataires' };
   }
 
   // 2. Repli : l'adresse SANS son étiquette « + ». Un vendeur qui a enregistré
@@ -155,7 +177,7 @@ export function resoudreProprietaire(adresses, registre, defaut, conflits) {
   const bases = [];
   for (const a of liste) { const b = sansEtiquette(a); if (reg[b] && !bases.includes(reg[b])) bases.push(reg[b]); }
   if (bases.length === 1) return { owner: bases[0], via: 'adresse-base', adresse: liste.find(a => reg[sansEtiquette(a)]) };
-  if (bases.length > 1) return { owner: '', via: 'quarantaine', raison: 'plusieurs vendeurs destinataires' };
+  if (bases.length > 1) return { owner: '', via: 'quarantaine', cause: 'plusieurs', raison: 'plusieurs vendeurs destinataires' };
 
   // 3. Installation à UN SEUL vendeur : tout lui appartient, c'est explicite et
   //    réglé par lui (VRM_OWNER_UID). Ce n'est PAS une devinette.
@@ -175,15 +197,15 @@ export function resoudreProprietaire(adresses, registre, defaut, conflits) {
   //      l'incident du 16 au 22 août (593 emails en quarantaine, zéro traité,
   //      ses codes de retrait perdus) qu'on ne refait pas.
   const dft = String(defaut || '').trim();
-  const autresVendeurs = Object.keys(reg).some((a) => reg[a] && reg[a] !== dft);
-  if (dft && !autresVendeurs) return { owner: dft, via: 'installation' };
-  if (dft && autresVendeurs) {
-    return { owner: '', via: 'quarantaine',
+  if (dft && repliInstallation(reg, dft)) return { owner: dft, via: 'installation' };
+  if (dft) {
+    return { owner: '', via: 'quarantaine', cause: liste.length ? 'inconnue' : 'aucune',
       raison: 'adresse de réception inconnue, et l’app compte plusieurs vendeurs' };
   }
 
   // 4. On ne sait pas → quarantaine. Jamais d'attribution au hasard.
-  return { owner: '', via: 'quarantaine', raison: liste.length ? 'adresse de réception inconnue' : 'aucune adresse de réception lisible' };
+  return { owner: '', via: 'quarantaine', cause: liste.length ? 'inconnue' : 'aucune',
+    raison: liste.length ? 'adresse de réception inconnue' : 'aucune adresse de réception lisible' };
 }
 
 // ── LA QUARANTAINE N'APPARTIENT À AUCUN VENDEUR ──────────────────────────────
@@ -214,4 +236,21 @@ export function peutReclamer(adresses, registre, conflits, vendeur) {
   if (!v || v === PROPRIETAIRE_NEUTRE) return false;
   const r = resoudreProprietaire(Array.isArray(adresses) ? adresses : [], registre || {}, '', conflits || []);
   return !!r.owner && r.owner === v;
+}
+
+// ── POURQUOI PERSONNE NE PEUT RÉCLAMER CET EMAIL ? (fonction PURE) ───────────
+// La MÊME règle que la réclamation (`peutReclamer`), retournée : '' si un
+// vendeur peut le réclamer aujourd'hui, sinon la cause —
+//   'inconnue'  arrivé sur une adresse que personne n'a déclarée ;
+//   'disputee'  arrivé sur une adresse déclarée par deux comptes ;
+//   'plusieurs' adressé à deux vendeurs à la fois ;
+//   'aucune'    aucune adresse de réception lisible.
+// Sert au NOMBRE que la route rend au seul propriétaire de l'installation : sans
+// lui, ses propres emails mis de côté (adresse jamais déclarée, un autre compte
+// ayant éteint le repli) disparaissaient sans un mot — l'incident du 16 août,
+// rendu invisible.
+export function pourquoiPersonne(adresses, registre, conflits) {
+  const r = resoudreProprietaire(Array.isArray(adresses) ? adresses : [], registre || {}, '', conflits || []);
+  if (r.owner) return '';
+  return r.cause || 'inconnue';
 }

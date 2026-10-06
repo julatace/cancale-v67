@@ -4,6 +4,9 @@
 //   POST { id, silencieux? }     → rejoue CET email chez le vendeur connecté
 //   GET  ?mode=liste             → les emails que CE vendeur peut réclamer
 //                                  (scalaires seulement : id, sujet, raison, date)
+//                                  + au SEUL propriétaire de l'installation :
+//                                  le NOMBRE de ceux que personne ne peut
+//                                  réclamer, et si le repli joue encore
 //
 // Pourquoi ça existe : la règle d'attribution refuse de deviner (voir
 // api/_lib/proprietaire-email.js). Sans ce bouton, un email non reconnu serait
@@ -25,7 +28,7 @@
 // ratée (ligne, registre, liste) répond 503.
 import { traiterEmail, lireRegistreEmails } from './email-inbound.js';
 import { contexteVendeur, withOwnerAll, conflictTarget } from './_lib/owner.js';
-import { PROPRIETAIRE_NEUTRE, peutReclamer } from './_lib/proprietaire-email.js';
+import { PROPRIETAIRE_NEUTRE, peutReclamer, pourquoiPersonne, repliInstallation } from './_lib/proprietaire-email.js';
 import { sbCle } from './_lib/cle.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
@@ -54,19 +57,24 @@ const jetonDe = (req) => String((req.headers && (req.headers.authorization || re
 const indispo = (res) => res.status(503).json({ ok: false, error: 'base-injoignable', message: "Le serveur de données ne répond pas — rien n'est perdu, réessaie." });
 
 // Lit TOUTES les lignes d'une requête, page par page (§4.5 : Supabase coupe à
-// 1 000 lignes sans le dire). Rend `{ rows }`, `{ status }` si la base refuse
-// (un 400 dit « colonne `owner` absente »), ou `null` si elle n'a pas répondu.
+// 1 000 lignes sans le dire). Rend `{ rows }`, ou `null` si la base n'a pas
+// répondu OU a refusé la requête.
 // ⚠️ Une page ratée rend `null` : une demi-liste a l'air d'une réponse.
-async function lirePages(requete) {
+// ⚠️ Un 400 n'est PLUS lu « colonne `owner` absente » : sur une requête
+//    composée il peut venir de n'importe quel filtre (une colonne `meta`
+//    absente, un motif refusé), et le lire « une seule boutique » faisait relire
+//    la quarantaine SANS filtre de vendeur. La forme de la base se mesure à part
+//    (`sondeCloisonnee`).
+async function lirePages(requete, compte) {
   const PAGE = 500, rows = [];
   for (let debut = 0; debut < 50 * PAGE; debut += PAGE) {
     let r;
     try {
+      if (compte) compte.n++;
       r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?${requete}&order=id.asc`, {
         headers: { ...HEADERS, 'Range-Unit': 'items', Range: `${debut}-${debut + PAGE - 1}` },
       });
     } catch (_) { return null; }
-    if (r.status === 400) return { status: 400 };
     if (!r.ok) return null;
     let j; try { j = await r.json(); } catch (_) { return null; }
     if (!Array.isArray(j)) return null;
@@ -76,47 +84,164 @@ async function lirePages(requete) {
   return null;   // au-delà de 25 000 lignes : on ne prétend pas avoir tout lu
 }
 
-// La quarantaine lisible par CE vendeur : la sienne (lignes d'avant) et celles
-// du propriétaire neutre dont l'adresse d'arrivée est À LUI. Rend
-// `{ emails, cloisonnee }` ou `null` (pas su).
+// La base sait-elle séparer les vendeurs ? 200 = oui · 400 = colonne `owner`
+// absente (une seule boutique) · le reste = pas su. Seul un « oui » se
+// mémorise : une colonne ne disparaît pas, une panne si.
+let _cloisonnee = false;
+async function sondeCloisonnee() {
+  if (_cloisonnee) return true;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?select=owner&limit=1`, { headers: HEADERS });
+    if (r.ok) { _cloisonnee = true; return true; }
+    if (r.status === 400) return false;
+    return null;
+  } catch (_) { return null; }
+}
+
+// ── LES CANDIDATS, JAMAIS LE TAS ENTIER ──────────────────────────────────────
+// ⚠️⚠️ La liste relisait TOUT le tas neutre à chaque appel, pour chaque vendeur :
+//    au-delà de 25 000 lignes (un spammeur suffit) elle répondait 503 à TOUT LE
+//    MONDE — y compris pour leurs propres lignes. On ne lit plus que les lignes
+//    neutres dont la liste des destinataires CONTIENT une adresse déclarée par
+//    CE vendeur (le filtre tourne dans la base, sur `meta`, sans décompresser
+//    l'email — §4.4). Le motif est un TAMIS, jamais une décision : chaque
+//    candidat est jugé ensuite par `peutReclamer`, exactement comme la
+//    réclamation (§11). Un tamis trop large coûte une ligne lue de plus ; un
+//    tamis trop étroit cacherait un email à son vendeur — d'où l'étiquette « + »
+//    et les adresses trop longues pour `meta` (cherchées dans `data->adresses`).
+const morceauSur = (x) => String(x).split(/["\\]/).sort((p, q) => q.length - p.length)[0] || '';
+function motifsDe(a) {
+  const sur = !/["\\]/.test(a);
+  const out = [sur ? `*"${a}"*` : `*${morceauSur(a)}*`];
+  const i = a.indexOf('@');
+  // Une adresse arrivée avec une étiquette (« recu+vinted@ ») retombe sur
+  // « recu@ » quand celle-ci est déclarée (la même règle qu'à l'arrivée).
+  if (i > 0 && !a.slice(0, i).includes('+')) {
+    out.push(sur ? `*"${a.slice(0, i)}+*${a.slice(i)}"*` : `*${morceauSur(a.slice(i))}*`);
+  }
+  return out;
+}
+// Une valeur dans un `or=(…)` de PostgREST : entre guillemets, `\` et `"` échappés.
+const valeurOu = (v) => '"' + String(v).replace(/[\\"]/g, '\\$&') + '"';
 const CHAMPS = 'id,sujet:meta->>subject,raison:meta->>raison,quand:meta->>at';
 const VIVANTES = 'id=like.email_quarantaine_*&meta->>supprime=is.null';
-async function emailsReclamables(owner) {
-  const siennes = await lirePages(`${VIVANTES}&owner=eq.${enc(owner)}&select=${CHAMPS}`);
-  if (siennes === null) return null;
-  if (siennes.status === 400) {
-    // Base sans colonne `owner` : une seule boutique, la liste d'avant.
-    const toutes = await lirePages(`${VIVANTES}&select=${CHAMPS}`);
-    return toutes && toutes.rows ? { emails: toutes.rows, cloisonnee: false } : null;
+async function candidatsDe(owner, registre, compte) {
+  const mes = Object.keys(registre || {}).filter((a) => registre[a] === owner);
+  if (!mes.length) return [];
+  const motifs = [...new Set(mes.flatMap(motifsDe))];
+  const vus = new Map();
+  for (let i = 0; i < motifs.length; i += 8) {
+    const lot = motifs.slice(i, i + 8);
+    const ou = (col) => enc('(' + lot.map((m) => `${col}.ilike.${valeurOu(m)}`).join(',') + ')');
+    const courts = await lirePages(`${VIVANTES}&owner=eq.${NEUTRE}&or=${ou('meta->>destinataires')}&select=${CHAMPS},adresses:data->adresses`, compte);
+    if (!courts) return null;
+    // Les adresses trop longues pour `meta` : la ligne n'a pas de
+    // `destinataires`, on cherche dans `data->adresses` — sur ces lignes-là seules.
+    const longs = await lirePages(`${VIVANTES}&owner=eq.${NEUTRE}&meta->>destinataires=is.null&or=${ou('data->>adresses')}&select=${CHAMPS},adresses:data->adresses`, compte);
+    if (!longs) return null;
+    for (const x of [...courts.rows, ...longs.rows]) vus.set(x.id, x);
   }
-  if (!siennes.rows) return null;
-  const neutres = await lirePages(`${VIVANTES}&owner=eq.${NEUTRE}&select=${CHAMPS},dest:meta->>destinataires`);
-  if (!neutres || !neutres.rows) return null;
-  if (!neutres.rows.length) return { emails: siennes.rows, cloisonnee: true };
+  return [...vus.values()];
+}
+
+// La quarantaine lisible par CE vendeur : la sienne (lignes d'avant) et celles
+// du propriétaire neutre dont l'adresse d'arrivée est À LUI. Rend
+// `{ emails, cloisonnee, lu }` ou `null` (pas su).
+async function emailsReclamables(owner, compte) {
+  const cl = await sondeCloisonnee();
+  if (cl === null) return null;
+  if (!cl) {
+    // Base sans colonne `owner` : une seule boutique, la liste d'avant.
+    const toutes = await lirePages(`${VIVANTES}&select=${CHAMPS}`, compte);
+    return toutes ? { emails: toutes.rows, cloisonnee: false } : null;
+  }
+  const siennes = await lirePages(`${VIVANTES}&owner=eq.${enc(owner)}&select=${CHAMPS}`, compte);
+  if (!siennes) return null;
   const lu = await lireRegistreEmails(true);
   if (!lu) return null;
-  // Une ligne dont la liste d'adresses était trop longue pour `meta` : on relit
-  // ses adresses seules (jamais l'email entier).
-  const sansDest = neutres.rows.filter((x) => x.dest == null).map((x) => x.id);
-  const adressesDe = {};
-  for (let i = 0; i < sansDest.length; i += 40) {
-    const lot = await lirePages(`id=in.(${sansDest.slice(i, i + 40).join(',')})&owner=eq.${NEUTRE}&select=id,adresses:data->adresses`);
-    if (!lot || !lot.rows) return null;
-    for (const x of lot.rows) adressesDe[x.id] = Array.isArray(x.adresses) ? x.adresses : [];
+  const candidats = await candidatsDe(owner, lu.registre, compte);
+  if (!candidats) return null;
+  // ⚠️ JUGÉ EXACTEMENT COMME LA RÉCLAMATION : `peutReclamer` sur `data.adresses`
+  //    (la même valeur que le POST relit). Avant, la liste découpait
+  //    `destinataires` sur les espaces et proposait des emails que le POST
+  //    refusait (404) — le rattrapage les retentait à chaque ouverture.
+  const aLui = candidats.filter((x) => peutReclamer(Array.isArray(x.adresses) ? x.adresses : [], lu.registre, lu.conflits, owner));
+  return { emails: [...siennes.rows, ...aLui.map(({ adresses, ...reste }) => reste)], cloisonnee: true, lu };
+}
+
+// ── CE QUE PERSONNE NE PEUT RÉCLAMER — LE NOMBRE, AU SEUL PROPRIÉTAIRE ────────
+// ⚠️⚠️ Julien n'a déclaré AUCUNE adresse (mesuré le 6 octobre). Dès qu'un AUTRE
+//    compte en déclare une (un second vendeur, ou son propre compte d'essai), le
+//    repli « installation » s'éteint, et tout ce qui arrive sur ses adresses non
+//    déclarées part sous le propriétaire neutre. Sa liste rendait `[]`, son POST
+//    404, et Réglages affirmait encore que tout lui revenait : l'incident du
+//    16 août, rendu INVISIBLE. On lui rend donc le NOMBRE — jamais le contenu,
+//    jamais le sujet, jamais une adresse : ce tas peut contenir les emails d'un
+//    autre vendeur — avec la cause, pour que l'écran dise le geste.
+// Borné : au plus 5 pages de 1 000 lignes (« au moins » au-delà), en
+// scalaires (`meta`, jamais l'email). Une page ratée ⇒ `null` (« pas su »),
+// jamais zéro.
+const PAGE_COMPTE = 1000, PAGES_COMPTE = 5, RELUS_MAX = 200;
+async function compterPersonne(lu, compte) {
+  const causes = {};
+  let n = 0, auMoins = false;
+  const note = (adresses) => {
+    const c = pourquoiPersonne(adresses, lu.registre, lu.conflits);
+    if (c) { n++; causes[c] = (causes[c] || 0) + 1; }
+  };
+  const aRelire = [];
+  for (let p = 0; p < PAGES_COMPTE; p++) {
+    let r;
+    try {
+      compte.n++;
+      r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?${VIVANTES}&owner=eq.${NEUTRE}&select=id,dest:meta->>destinataires&order=id.asc`, {
+        headers: { ...HEADERS, 'Range-Unit': 'items', Range: `${p * PAGE_COMPTE}-${(p + 1) * PAGE_COMPTE - 1}` },
+      });
+    } catch (_) { return null; }
+    if (!r.ok) return null;
+    let j; try { j = await r.json(); } catch (_) { return null; }
+    if (!Array.isArray(j)) return null;
+    for (const x of j) {
+      // `destinataires` est la liste JSON des adresses — la même que
+      // `data.adresses`. Absente (trop longue) ou d'une autre forme : on relit
+      // les adresses seules, jamais l'email.
+      let adr = null;
+      if (typeof x.dest === 'string' && x.dest.startsWith('[')) { try { const v = JSON.parse(x.dest); if (Array.isArray(v)) adr = v; } catch (_) {} }
+      if (adr) note(adr); else aRelire.push(x.id);
+    }
+    if (j.length < PAGE_COMPTE) break;
+    if (p === PAGES_COMPTE - 1) auMoins = true;
   }
-  const aLui = neutres.rows.filter((x) => peutReclamer(
-    x.dest != null ? String(x.dest).split(/\s+/).filter(Boolean) : (adressesDe[x.id] || []),
-    lu.registre, lu.conflits, owner));
-  return { emails: [...siennes.rows, ...aLui.map(({ dest, ...reste }) => reste)], cloisonnee: true };
+  for (let i = 0; i < aRelire.length; i += 50) {
+    if (i >= RELUS_MAX) { auMoins = true; break; }
+    const lot = await lirePages(`id=in.(${aRelire.slice(i, i + 50).map(enc).join(',')})&owner=eq.${NEUTRE}&select=id,adresses:data->adresses`, compte);
+    if (!lot) return null;
+    for (const x of lot.rows) note(Array.isArray(x.adresses) ? x.adresses : []);
+  }
+  return { n, auMoins, causes };
 }
 
 async function lister(req, res) {
   const owner = await vendeurDuJeton(jetonDe(req));
   if (!owner) { res.status(401).json({ ok: false, error: 'connexion requise' }); return; }
-  const lu = await emailsReclamables(owner);
+  const compte = { n: 0 };
+  const lu = await emailsReclamables(owner, compte);
   if (!lu) { indispo(res); return; }
   const emails = lu.emails.slice().sort((a, b) => String(b.quand || '').localeCompare(String(a.quand || '')));
-  res.status(200).json({ ok: true, emails });
+  const corps = { ok: true, emails, cloisonnee: lu.cloisonnee };
+  // ⚠️ Au SEUL propriétaire de l'installation (VRM_OWNER_UID), et seulement sur
+  //    une base cloisonnée (sinon rien n'est jamais mis de côté). Un autre
+  //    vendeur ne reçoit ni ce nombre, ni ce booléen.
+  const proprio = String(process.env.VRM_OWNER_UID || '').trim();
+  if (lu.cloisonnee && proprio && owner === proprio) {
+    corps.installation = {
+      // Le repli joue-t-il encore ? Réglages en tire sa phrase, au lieu
+      // d'affirmer que tout revient au propriétaire de l'installation.
+      repli: repliInstallation(lu.lu.registre, proprio),
+      personne: await compterPersonne(lu.lu, compte),
+    };
+  }
+  res.status(200).json(corps);
 }
 
 // La ligne demandée, si CE vendeur a le droit de la rejouer.

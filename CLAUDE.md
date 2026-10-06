@@ -4681,16 +4681,104 @@ en écriture.
   **26, 14 rouges** sur le build d'avant. Mutations : repli « installation »
   rendu à la réclamation, une seule lecture sans pagination, registre illisible
   lu « vide », ligne vidée rejouée ⇒ chacune repasse au rouge.
-- ⚠️ **Pas fait, à savoir** : (1) **une adresse déclarée n'est pas PROUVÉE**
-  (aucun email de confirmation) — vrai à l'arrivée comme à la réclamation, mais
-  le tas rend ça plus coûteux : un vendeur qui déclare l'adresse non déclarée
-  d'un autre prend aussi ses emails mis de côté. À fermer avant d'ouvrir à des
-  inconnus. (2) Un email « corps illisible » (`garderInconnu`, avant toute
+- ⚠️ **Pas fait, à savoir** : (1) ⛔ **BLOQUANT AVANT D'OUVRIR VRM À DES
+  INCONNUS — une adresse déclarée n'est pas PROUVÉE** (aucun email de
+  confirmation). Vrai à l'arrivée comme à la réclamation, mais le tas rend ça
+  plus coûteux : un vendeur qui déclare APRÈS COUP l'adresse non déclarée d'un
+  autre **vide son arriéré mis de côté** (ventes, bordereaux, nom et adresse
+  des acheteurs), sans que l'autre le voie partir. Reproduit le 6 octobre.
+  ⚠️ **Rien de spéculatif n'a été codé contre ça, exprès** : la date d'une
+  déclaration ne peut pas servir de garde (c'est le NAVIGATEUR qui l'écrit dans
+  `vrm_email_owners`), et comparer la date d'arrivée de l'email à celle de la
+  déclaration ferait perdre au vrai vendeur l'arriéré qu'il réclame justement
+  APRÈS coup — c'est le cas normal. Le seul vrai correctif est une adresse
+  PROUVÉE (lien de confirmation envoyé à l'adresse déclarée, cliqué depuis la
+  session du vendeur, preuve rangée côté serveur) — il faut un envoi d'email
+  (SMTP), qui n'existe pas ici. Tant que ce n'est pas fait : **VRM ne s'ouvre
+  qu'à des gens de confiance**. (2) Un email « corps illisible » (`garderInconnu`, avant toute
   attribution) part encore chez le propriétaire de l'installation. (3) Un email
   sans adresse lisible reste au neutre pour toujours : personne ne peut le
   réclamer (mieux vaut un blanc qu'un faux). (4) Le 404 « pas à toi » se
   distingue d'un 404 « n'existe pas » par le temps de réponse (une lecture du
   registre de plus) — identifiants aléatoires, risque faible.
+
+#### Relecture du 6 octobre : l'incident du 16 août était devenu INVISIBLE
+Un relecteur a reproduit, sur une fausse base à état, quatre défauts du commit
+ci-dessus. Tous corrigés, chacun rouge sur ce commit et repassé au rouge sous
+mutation.
+- ⚠️⚠️ **HAUT — Julien à 0 adresse, un autre compte déclare.** Son état réel
+  (mesuré : **aucune** ligne `vrm_email_owners`). Dès qu'un AUTRE compte déclare
+  une adresse — un second vendeur, ou son propre compte d'essai — le repli
+  « installation » s'éteint, et tout ce qui arrive sur ses adresses non
+  déclarées part au neutre. Sa liste rendait `[]`, son POST `404`, et Réglages
+  affirmait encore « les emails reçus sont attribués au propriétaire de cette
+  installation ». **Ses ventes partaient de côté sans un mot.**
+  ⇒ `GET ?mode=liste` rend, au **seul** propriétaire de l'installation
+  (`VRM_OWNER_UID`, base cloisonnée) : `installation.personne` = le **NOMBRE**
+  d'emails neutres que personne ne peut réclamer, et leur **cause**
+  (`pourquoiPersonne` : `inconnue` · `disputee` · `plusieurs` · `aucune`,
+  l'envers EXACT de `peutReclamer`, §11) — **jamais** un sujet, une adresse ou
+  un contenu (ce tas peut contenir les emails d'un autre vendeur). Compté en
+  scalaires (`meta->>destinataires`), **au plus 5 pages de 1 000** (« au moins »
+  au-delà), et `null` (« pas su ») si une page échoue — jamais 0. Plus
+  `installation.repli` (`repliInstallation`, la règle même de l'arrivée).
+  Un autre vendeur ne reçoit **ni le nombre, ni le booléen**.
+  ⇒ L'app (`phrasePersonne`, une phrase pour deux écrans) : Réglages → Mes
+  adresses de réception écrit le nombre, la cause et le geste ; **Ma journée**
+  porte UNE ligne tant qu'il y en a (`data-job="emails-personne"`), qui mène au
+  panneau. La phrase « aucune adresse déclarée » **suit le registre** (seul à
+  déclarer / un autre compte a déclaré / pas le propriétaire / une seule
+  boutique / pas su — cinq phrases, aucune n'affirme ce qui n'est pas mesuré).
+  ⇒ **Les suggestions** : ses adresses déjà vues, ajoutables d'un clic.
+  **Mesuré (lecture seule, sa vraie base)** : parmi les familles `email_*`,
+  **seules `email_inconnu_*` gardent la destination** — `meta->>to`, l'en-tête
+  « À » (1 053/1 053, 17 formes dont « Hide My Email <…@icloud.com> ») ; aucune
+  autre famille ne la porte. C'est un champ que la règle d'arrivée lit
+  (`adressesDeLivraison`) : la déclarer suffit. Lues sous SA session (RLS),
+  normalisées par **le `normAdresse` du serveur** (importé, §11), avec le
+  nombre et la date pour qu'il reconnaisse les siennes. Jamais celles du tas.
+  ⚠️ Limite : une ligne rangée chez lui par le REPLI pendant qu'un autre vendeur
+  n'avait rien déclaré porterait l'adresse de l'autre — c'est pourquoi c'est
+  une suggestion à SON clic, jamais un ajout automatique.
+  ⇒ Une fois l'adresse déclarée, il récupère son arriéré par le chemin existant
+  (liste + POST) — vérifié en exécutant les deux vraies routes.
+- **Bas — la liste relisait TOUT le tas neutre**, pour chaque vendeur, à chaque
+  appel : **25 001 lignes ⇒ 503 pour tout le monde** (51 requêtes). Elle ne lit
+  plus que les **candidats** : les lignes neutres dont `meta->>destinataires`
+  contient une adresse déclarée par CE vendeur (`or=(…ilike…)` dans la base,
+  étiquette « + » comprise ; une liste trop longue pour `meta` est cherchée dans
+  `data->>adresses`). Mesuré au banc : **4 requêtes**. Aucun email n'est
+  supprimé (§5) — pas de purge.
+- **Bas — liste ≠ réclamation.** La liste découpait `destinataires` sur les
+  ESPACES, la réclamation lisait `data.adresses` : « x@inconnu.fr
+  b@vrm.center » (un To mal formé, une seule adresse pour la règle) était
+  proposé à B puis refusé (404), et le rattrapage le retentait à chaque
+  ouverture. La liste juge maintenant chaque candidat avec `peutReclamer` sur
+  `data->adresses` projeté — la MÊME valeur que le POST. Et `destinataires`
+  s'écrit en **JSON** (`JSON.stringify(adresses)`, ≤ 590 octets une fois
+  encodé : `vrm_meta` garde `octet_length(v::text) <= 600`, vérifié sur la
+  fonction en base) : une adresse avec une espace reste une adresse.
+- La forme de la base se mesure à part (`select=owner&limit=1`) : un **400**
+  sur une requête composée n'est plus lu « colonne `owner` absente » (il aurait
+  fait relire la quarantaine sans filtre de vendeur).
+- Preuves : `audit-email-rattacher.cjs` **48 contrôles** — **12 rouges** sur
+  7b9b04b (dont « 503 · 51 requêtes » sur 25 001 lignes, « refusés : … → 404 »,
+  aucun nombre ; 3 de ces 12 viennent de ce que l'ancienne liste ne sait pas
+  lire `destinataires` en JSON) ; 5 mutations, chacune rouge : nombre donné à tout vendeur (4),
+  jugement par découpe sur les espaces (1), tas relu en entier (2), compte raté
+  lu 0 (1), repli toujours allumé (5). `audit-proprietaire-email.cjs` **51** —
+  3 rouges sur 7b9b04b ; cause aplatie et découpe sur les espaces ⇒ rouges.
+  Banc `emails-mis-de-cote.cjs` **52** (deux tailles, données inventées) —
+  **18 rouges** sur le build de 7b9b04b ; `phrasePersonne` neutralisée ⇒ 4
+  rouges, l'ancienne phrase « attribués au propriétaire » remise ⇒ 4 rouges.
+- ⚠️ **Non mesuré sur la vraie base** : le filtre
+  `or=(meta->>destinataires.ilike."*\"a@b\"*")` (valeur entre guillemets, `"`
+  échappé par `\`). Vérifié dans la grammaire de PostgREST v12.2.3
+  (`pLogicSingleVal` → `pQuotedValue`, `pCharsOrSlashed`) — aucun appel n'a été
+  fait ici (§2.3). Si la base le refusait, la liste répondrait 503 (« pas su »)
+  à tous : **à regarder en premier** si Réglages dit « pas pu vérifier » après
+  le déploiement. Pas mesuré non plus : `order=meta->>receivedAt.desc` des
+  suggestions (une lecture refusée ne suggère rien, n'affirme rien).
 
 ### ⚠️⚠️⚠️ `/api/ebay` ÉTAIT OUVERTE À TOUT INTERNET, AVEC SON COMPTE eBAY CONNECTÉ (5 octobre)
 Trouvé par l'audit de sécurité du 5 octobre. **Mesuré en production** : la ligne

@@ -2,6 +2,9 @@ import React, { useState, useMemo, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { VAPID_PUBLIC_KEY } from "./vapid.js";
 import { noterPlantage, viderPlantages } from "./plantages.js";
+// §11 : l'adresse de réception se compare avec LA forme du serveur (celle qui
+// décide à qui appartient un email) — jamais une seconde normalisation ici.
+import { normAdresse } from "../api/_lib/proprietaire-email.js";
 // La migration qui cloisonne les vendeurs, lue depuis LE fichier (pas recopiée) :
 // deux copies finiraient par diverger, et c'est le genre de texte qu'on colle
 // dans une base de production sans le relire.
@@ -20144,6 +20147,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [txnPret, setTxnPret] = useState(false);
   useEffect(() => { let mort = false; fetchTxnItemIds().then(m => { if (mort) return; if (m && Object.keys(m).length) setTxnItem(m); setTxnPret(true); }).catch(() => { if (!mort) setTxnPret(true); }); return () => { mort = true; }; }, []);
   useEffect(() => { if ((curSub==='bordereaux'||curSub==='achats') && tracking===null) fetchEmailTracking().then(t => { if (t) setTracking(t); }); /* eslint-disable-next-line */ }, [sub]);
+  // La réponse de la route des emails mis de côté (la MÊME que Réglages lit,
+  // §11) : Ma journée en tire la ligne « que personne ne peut récupérer ».
+  const misDeCote = useMisDeCote();
   // RATTRAPAGE AUTOMATIQUE (voir le commentaire au-dessus de `SUJET_COLIS`).
   // Aucun bouton : on répare, on montre l'avancement, et les colis apparaissent
   // au fur et à mesure. `silencieux` coupe les notifications — on rattrape de
@@ -22286,6 +22292,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         }
         if(unread) jobs.push({icon:'chat',color:C.warn,title:`Répondre à ${unread} message${unread>1?'s':''}`,sub:'Un acheteur attend — réponds vite pour vendre',tab:'cat_msg',prio:3});
         if(repriceList.length) jobs.push({icon:'tag',color:C.warn,title:`Baisser ${repriceList.length} prix`,sub:'Des paires vues mais qui ne partent pas',tab:'cat_annonces',prio:5});
+        // ⚠️⚠️ SES EMAILS MIS DE CÔTÉ QUE PERSONNE NE PEUT RÉCUPÉRER. Au seul
+        //    propriétaire de l'installation (la route ne le dit qu'à lui), UNE
+        //    ligne tant qu'il y en a, avec le geste : déclarer ses adresses.
+        //    Sans elle, dès qu'un autre compte déclare une adresse, ses ventes et
+        //    bordereaux partaient de côté sans un mot (l'incident du 16 août,
+        //    rendu invisible). Le détail (causes) vit dans Réglages.
+        { const pp = misDeCote && misDeCote.installation ? phrasePersonne(misDeCote.installation.personne) : null;
+          if (pp) jobs.push({id:'emails-personne',icon:'mail',color:C.warn,title:pp.titre,sub:pp.geste,tab:'settings',prio:4,
+            avant:()=>{ DEMANDE_ADRESSES.on = true; try { localStorage.setItem('vrm_reglages_vue','reglages'); } catch (_) {} }}); }
         jobs.sort((a,b)=>a.prio-b.prio);
         // RÉSULTAT DU JOUR : les paires VENDUES aujourd'hui (pas l'argent viré,
         // qui arrive plusieurs jours après). Source = les emails de vente, la
@@ -22489,7 +22504,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                      « brouillon ». La couleur reste sur l'icône et le chevron —
                      elle sert à reconnaître la nature de l'action, pas à
                      repeindre un quart de l'écran. */
-                  <button key={i} type="button" onClick={()=>onNav && onNav(j.tab)} style={{display:'flex',alignItems:'center',gap:13,padding:'14px 15px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',cursor:'pointer',textAlign:'left',width:'100%',minWidth:0,fontFamily:'inherit'}}>
+                  <button key={i} type="button" data-job={j.id||undefined} onClick={()=>{ if (j.avant) j.avant(); if (onNav) onNav(j.tab); }} style={{display:'flex',alignItems:'center',gap:13,padding:'14px 15px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',cursor:'pointer',textAlign:'left',width:'100%',minWidth:0,fontFamily:'inherit'}}>
                     {/* ⚠️ Avant : un carré de 46 px teinté à la couleur du statut,
                         avec un EMOJI de 24 px dedans. Trois de ces pavés colorés
                         empilés, c'est ce qui faisait « application générée ».
@@ -30249,13 +30264,94 @@ function SecuriteSetting() {
 // vendeur atterrissait chez le propriétaire de l'installation). Seul le serveur
 // sait lesquels sont à toi : ceux arrivés sur une adresse que TU as déclarée
 // ci-dessous. Scalaires seulement (id, sujet, raison, date — §4.4).
-// Deux réponses : un tableau = lu · `null` = pas su (jamais « aucun »).
-async function lireEmailsMisDeCote() {
+// Deux réponses : un objet = lu (`emails`, et pour le seul propriétaire de
+// l'installation `installation`) · `null` = pas su (jamais « aucun »).
+// ⚠️ UNE lecture pour deux écrans (§11) : Réglages et Ma journée lisent la même
+//    réponse, gardée ici et diffusée à ceux qui l'écoutent (`useMisDeCote`).
+let _misDeCote;                              // undefined = pas encore demandé
+const _misDeCoteAbonnes = new Set();
+async function lireMisDeCote() {
+  let v = null;
   try {
     const r = await fetch('/api/email-rattacher?mode=liste', { headers: { ...enTeteSession() } });
+    if (r.ok) { const j = await r.json(); if (j && j.ok && Array.isArray(j.emails)) v = j; }
+  } catch (_) { v = null; }
+  _misDeCote = v;
+  for (const f of _misDeCoteAbonnes) { try { f(v); } catch (_) {} }
+  return v;
+}
+async function lireEmailsMisDeCote() { const v = await lireMisDeCote(); return v ? v.emails : null; }
+function useMisDeCote() {
+  const [v, setV] = useState(_misDeCote);
+  useEffect(() => { _misDeCoteAbonnes.add(setV); setV(_misDeCote); return () => { _misDeCoteAbonnes.delete(setV); }; }, []);
+  return v;
+}
+
+// ── CE QUE PERSONNE NE PEUT RÉCUPÉRER — UNE PHRASE, DEUX ÉCRANS (§11) ────────
+// ⚠️⚠️ Julien n'a déclaré AUCUNE adresse. Dès qu'un autre compte en déclare une
+//    (un second vendeur, ou son propre compte d'essai), tout ce qui arrive sur
+//    ses adresses non déclarées est mis de côté sous un propriétaire que
+//    personne n'a : sa liste était vide, et rien ne le disait — l'incident du
+//    16 août, rendu invisible. La route lui rend le NOMBRE (à lui seul, jamais
+//    le contenu) et la cause ; on écrit ici le geste. Une cause à zéro n'est
+//    pas écrite.
+const CAUSES_PERSONNE = [
+  ['inconnue', 'est arrivé', 'sont arrivés', "sur une adresse que tu n'as pas déclarée — ajoute tes adresses de réception"],
+  ['disputee', 'est arrivé', 'sont arrivés', 'sur une adresse déclarée par deux comptes — un seul doit la garder'],
+  ['plusieurs', 'est adressé', 'sont adressés', 'à deux comptes à la fois — personne ne tranche à leur place'],
+  ['aucune', "n'a", "n'ont", 'aucune adresse de réception lisible'],
+];
+function phrasePersonne(p) {
+  if (!p || !(p.n > 0)) return null;
+  const c = p.causes || {};
+  const titre = `${p.auMoins ? 'Au moins ' : ''}${p.n} email${p.n > 1 ? 's' : ''} mis de côté que personne ne peut récupérer`;
+  const presentes = CAUSES_PERSONNE.filter(([k]) => c[k] > 0);
+  const lignes = presentes.map(([k, sg, pl, reste]) => {
+    const plur = c[k] > 1 || (presentes.length === 1 && (p.n > 1 || p.auMoins));
+    return presentes.length === 1 ? `${plur ? 'Ils' : 'Il'} ${plur ? pl : sg} ${reste}.` : `${c[k]} ${c[k] > 1 ? pl : sg} ${reste}.`;
+  });
+  const i = Math.max(0, presentes.findIndex(([k]) => k === 'inconnue'));
+  return { titre, lignes, geste: lignes[i] || '' };
+}
+// Le panneau des adresses se fait défiler jusqu'à lui quand on y arrive par le
+// geste de Ma journée (au moment du clic, Réglages n'est pas monté).
+const DEMANDE_ADRESSES = { on: false };
+// La forme acceptée pour une adresse de réception (saisie à la main OU
+// suggérée) : une seule règle.
+const ADRESSE_RECEPTION_OK = /^[^@\s]+@[^@\s.]+\.[^@\s]+$/;
+
+// ── LES ADRESSES OÙ ARRIVENT DÉJÀ TES EMAILS ─────────────────────────────────
+// Mesuré le 6 octobre (lecture seule, sa vraie base) : parmi les lignes
+// `email_*`, SEULES `email_inconnu_*` gardent l'adresse de destination — le
+// champ `to` (l'en-tête « À », 1 053 lignes sur 1 053, 17 formes, dont
+// « Hide My Email <…@icloud.com> »). C'est l'un des champs que lit la règle
+// d'arrivée (`adressesDeLivraison`) : la déclarer suffit à ce que les emails
+// suivants lui reviennent. Une IDENTITÉ — l'adresse où ses propres emails sont
+// arrivés —, jamais une ressemblance.
+// ⚠️ SES lignes seulement (session, RLS) : jamais les adresses du tas mis de
+//    côté, qui peuvent être celles d'un autre vendeur.
+// ⚠️ Des suggestions, pas un total : les 1 000 plus récentes suffisent (§4.5
+//    vaut pour un total ; aucun n'est affiché ici). Scalaire `meta->>to` : la
+//    ligne porte jusqu'à 200 Ko d'email brut, jamais rapatrié (§4.4).
+// Rend un tableau `{ adresse, n, dernier }` (le plus fréquent d'abord), ou
+// `null` si la lecture a échoué — rien n'est alors suggéré, rien n'est affirmé.
+async function lireAdressesVues() {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_inconnu_*&select=to:meta->>to,quand:meta->>receivedAt&order=meta->>receivedAt.desc&limit=1000`, { headers: sbAuth() });
     if (!r.ok) return null;
     const j = await r.json();
-    return (j && j.ok && Array.isArray(j.emails)) ? j.emails : null;
+    if (!Array.isArray(j)) return null;
+    const vues = {};
+    for (const x of j) {
+      for (const brut of String((x && x.to) || '').split(/[,;]/)) {
+        const a = normAdresse(brut);
+        if (!a || !ADRESSE_RECEPTION_OK.test(a)) continue;
+        const v = vues[a] || (vues[a] = { adresse: a, n: 0, dernier: '' });
+        v.n++;
+        if (String((x && x.quand) || '') > v.dernier) v.dernier = String(x.quand || '');
+      }
+    }
+    return Object.values(vues).sort((a, b) => b.n - a.n || (a.dernier < b.dernier ? 1 : -1));
   } catch (_) { return null; }
 }
 function EmailsSetting() {
@@ -30264,10 +30360,21 @@ function EmailsSetting() {
   //    déclarée » — une AFFIRMATION sur l'attribution de ses emails, faite sur
   //    une mesure qui n'a pas eu lieu.
   const [reg, setReg] = useState(undefined);     // { adresse: {owner,label} }
-  // Même trois états : `undefined` en cours · `null` pas su · tableau lu.
-  const [quarantaine, setQuarantaine] = useState(undefined);
+  // Même trois états : `undefined` en cours · `null` pas su · objet lu (la
+  // réponse de la route : `emails`, et `installation` pour le seul propriétaire).
+  const misDeCote = useMisDeCote();
+  const quarantaine = misDeCote ? misDeCote.emails : misDeCote;
+  // Les adresses où arrivent déjà SES emails (suggestions) : `null` = pas lu.
+  const [vues, setVues] = useState(null);
   const [busy, setBusy] = useState('');
   const uid = (AUTH.user && AUTH.user.id) || '';
+  const racine = useRef(null);
+  useEffect(() => {
+    if (!DEMANDE_ADRESSES.on) return;
+    DEMANDE_ADRESSES.on = false;
+    const t = setTimeout(() => { try { racine.current && racine.current.scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch (_) {} }, 250);
+    return () => clearTimeout(t);
+  }, []);
   const charger = React.useCallback(async () => {
     try {
       // ⚠️⚠️ C'EST L'ADRESSE DE RÉCEPTION QUI DÉCIDE à quel vendeur appartient
@@ -30281,31 +30388,51 @@ function EmailsSetting() {
     } catch (_) { setReg(null); }
     // ⚠️ Une lecture ratée rendait `[]` : la section se taisait comme s'il n'y
     //    avait rien à réclamer. « Rien lu » ne vaut pas « rien ».
-    setQuarantaine(await lireEmailsMisDeCote());
+    lireMisDeCote();
+    lireAdressesVues().then(setVues);
   }, []);
   useEffect(() => { charger(); }, [charger]);
 
   const ecrire = async (adresses) => {
-    if (reg === null) return;                 // pas lu : on n'écrase pas la liste
+    if (reg === null || reg === undefined) return;   // pas lu : on n'écrase pas la liste
+    const avant = reg;
     setReg(adresses);
+    // ⚠️ Une écriture REFUSÉE (la base répond, mais non) s'affichait comme
+    //    réussie : l'adresse semblait déclarée, ses emails continuaient de
+    //    partir de côté. On remet la liste d'avant et on le dit.
+    let ok = false;
     try {
-      await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
         method: 'POST',
         headers: { ...sbAuth(), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
         body: JSON.stringify([withOwner({ id: 'vrm_email_owners', data: { adresses, updatedAt: new Date().toISOString() } })]),
       });
-    } catch (_) { toast("La liste n'a pas pu être enregistrée — réessaie."); }
+      ok = !!(r && r.ok);
+    } catch (_) { ok = false; }
+    if (!ok) { setReg(avant); toast("La liste n'a pas pu être enregistrée — réessaie."); return; }
     // Une adresse ajoutée (ou retirée) change ce qui t'est proposé en dessous :
     // on relit, sans attendre la prochaine ouverture de l'écran.
-    setQuarantaine(await lireEmailsMisDeCote());
+    lireMisDeCote();
+  };
+  // Une ou plusieurs adresses d'un coup (saisie à la main, ou suggestion).
+  const ajouterAdresses = async (liste) => {
+    const nouv = { ...(reg || {}) };
+    let n = 0;
+    for (const a of liste) {
+      const adr = normAdresse(a);
+      if (!adr || !ADRESSE_RECEPTION_OK.test(adr) || Object.keys(nouv).some((k) => normAdresse(k) === adr)) continue;
+      nouv[adr] = { owner: uid || '', label: '', at: new Date().toISOString() };
+      n++;
+    }
+    if (n) await ecrire(nouv);
   };
   const ajouter = async () => {
     const a = await askText({ desc: "Ton adresse de réception.\n\nC'est l'adresse vers laquelle tu fais suivre tes emails Vinted (bordereaux, ventes, colis). Tout ce qui arrive dessus sera à toi.", value: '', ok: 'Ajouter' });
-    const adr = String(a || '').trim().toLowerCase();
+    const adr = normAdresse(a);
     if (!adr) return;
-    if (!/^[^@\s]+@[^@\s.]+\.[^@\s]+$/.test(adr)) { toast("Cette adresse ne ressemble pas à une adresse email."); return; }
-    if (reg && reg[adr]) { toast('Cette adresse est déjà à toi.'); return; }
-    await ecrire({ ...(reg || {}), [adr]: { owner: uid || '', label: '', at: new Date().toISOString() } });
+    if (!ADRESSE_RECEPTION_OK.test(adr)) { toast("Cette adresse ne ressemble pas à une adresse email."); return; }
+    if (reg && Object.keys(reg).some((k) => normAdresse(k) === adr)) { toast('Cette adresse est déjà à toi.'); return; }
+    await ajouterAdresses([adr]);
   };
   const retirer = async (adr) => {
     const ok = await askConfirm({ title: `Retirer ${adr} ?`, desc: "Les emails qui arriveront ensuite sur cette adresse ne te seront plus attribués : ils seront mis de côté en attendant que tu les réclames. Rien de déjà reçu n'est supprimé.", ok: 'Retirer', danger: true });
@@ -30359,8 +30486,39 @@ function EmailsSetting() {
   };
   const liste = Object.keys(reg || {});
   const enAttente = Array.isArray(quarantaine) ? quarantaine : [];
+  // ── CE QUE LA ROUTE DIT AU SEUL PROPRIÉTAIRE DE L'INSTALLATION ─────────────
+  const inst = (misDeCote && misDeCote.installation) || null;
+  const pers = inst ? phrasePersonne(inst.personne) : null;
+  // ⚠️⚠️ « Aucune adresse déclarée… les emails reçus sont attribués au
+  //    propriétaire de cette installation » s'affichait QUOI QU'IL ARRIVE —
+  //    y compris quand un autre compte avait déclaré la sienne, c'est-à-dire
+  //    quand ce repli ne jouait PLUS et que ses emails partaient de côté. La
+  //    phrase suit ce que la règle d'arrivée fait vraiment (la route le dit) ;
+  //    sans réponse, elle n'affirme rien sur l'attribution.
+  const vide = (misDeCote && misDeCote.cloisonnee === false)
+      ? { t: "Aucune adresse déclarée. Cette installation n'a qu'une boutique : tous les emails reçus y sont rangés.", alerte: false }
+    : inst && inst.repli === true
+      ? { t: "Aucune adresse déclarée. Personne d'autre n'en a déclaré : pour l'instant, les emails reçus te reviennent (tu es le propriétaire de cette installation). Dès qu'un autre compte déclarera la sienne, un email arrivé sur une adresse que tu n'as pas déclarée sera mis de côté — déclare les tiennes dès maintenant.", alerte: false }
+    : inst && inst.repli === false
+      // Le geste ne se dit qu'une fois (§7) : quand le nombre est écrit juste
+      // dessous, c'est lui qui le porte.
+      ? { t: "Aucune adresse déclarée — et un autre compte a déclaré les siennes : un email arrivé sur une adresse que tu n'as pas déclarée ne t'est plus attribué, il est mis de côté." + (pers ? '' : ' Ajoute tes adresses de réception.'), alerte: true }
+    : misDeCote
+      ? { t: "Aucune adresse déclarée : tant que tu n'en déclares aucune, aucun email ne t'est attribué. Ajoute l'adresse vers laquelle tu fais suivre tes emails Vinted.", alerte: true }
+      : { t: "Aucune adresse déclarée. Ajoute l'adresse vers laquelle tu fais suivre tes emails Vinted.", alerte: false };
+  // Les suggestions : SES adresses déjà vues, pas encore déclarées.
+  const declarees = new Set(liste.map(normAdresse));
+  const sugg = Array.isArray(vues) ? vues.filter((v) => !declarees.has(v.adresse)) : [];
+  const toutesSugg = async () => {
+    const ok = await askConfirm({
+      title: `Ajouter ${sugg.length} adresses ?`,
+      desc: `Les emails qui arrivent dessus te seront attribués, et ceux déjà mis de côté te seront proposés.\n\n${sugg.map((v) => v.adresse).join('\n')}`,
+      ok: 'Les ajouter',
+    });
+    if (ok) await ajouterAdresses(sugg.map((v) => v.adresse));
+  };
   return (
-    <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px'}}>
+    <div ref={racine} data-reglage-adresses="" style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px'}}>
       <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:2}}>Mes adresses de réception</div>
       <div style={{fontSize:12,color:C.muted,marginBottom:10,lineHeight:1.45}}>
         Les emails Vinted (bordereaux, ventes, colis) que tu fais suivre ici t'appartiennent. <b>C'est l'adresse d'arrivée qui décide</b> — jamais l'expéditeur ni le contenu, qui se falsifient. Une adresse inconnue n'est jamais attribuée au hasard : l'email est mis de côté, et il t'est proposé ici dès que l'adresse où il est arrivé figure dans ta liste.
@@ -30368,8 +30526,8 @@ function EmailsSetting() {
       {reg === undefined ? <div style={{fontSize:12,color:C.muted}}>Chargement…</div>
       : reg === null ? <span style={{display:'inline-block',fontSize:11,fontWeight:600,color:C.muted,background:C.bg,border:`1px solid ${C.border}`,borderRadius:999,padding:'2px 9px'}}>{REGLAGE_PAS_LU}</span>
       : liste.length === 0 ? (
-        <div style={{fontSize:12,color:C.warn,background:`${C.warn}12`,border:`1px solid ${C.warn}44`,borderRadius:8,padding:'9px 11px',lineHeight:1.45}}>
-          Aucune adresse déclarée. Tant qu'il n'y en a pas, les emails reçus sont attribués au propriétaire de cette installation — ce qui va très bien tant que tu es seul dessus.
+        <div data-adresses-vide={vide.alerte ? 'alerte' : 'info'} style={{fontSize:12,color:vide.alerte?C.warn:C.muted,background:vide.alerte?`${C.warn}12`:C.bg,border:`1px solid ${vide.alerte?`${C.warn}44`:C.border}`,borderRadius:8,padding:'9px 11px',lineHeight:1.45}}>
+          {vide.t}
         </div>
       ) : liste.map(adr => (
         <div key={adr} style={{display:'flex',alignItems:'center',gap:8,padding:'8px 0',borderTop:`1px solid ${C.border}`}}>
@@ -30378,6 +30536,52 @@ function EmailsSetting() {
             style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:8,padding:'5px 9px',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Retirer</button>
         </div>
       ))}
+      {/* ── CE QUE PERSONNE NE PEUT RÉCUPÉRER (le seul propriétaire le voit) ──
+          Le nombre et la cause, jamais le contenu : ce tas peut contenir les
+          emails d'un autre vendeur. Placé AVANT les suggestions : on lit le
+          problème, puis le geste qui le règle juste dessous. */}
+      {pers && (
+        <div data-personne={inst.personne.n} style={{marginTop:12,borderTop:`1px solid ${C.border}`,paddingTop:10}}>
+          <div style={{fontSize:12.5,fontWeight:600,color:C.warn,marginBottom:3}}>{pers.titre}</div>
+          {pers.lignes.map((l) => <div key={l} style={{fontSize:11.5,color:C.muted,lineHeight:1.45}}>{l}</div>)}
+          <div style={{fontSize:11.5,color:C.muted,lineHeight:1.45,marginTop:3}}>Conservés entiers — rien n'est perdu.</div>
+        </div>
+      )}
+      {inst && inst.personne === null && (
+        <div data-personne="pas-su" style={{marginTop:10,fontSize:11.5,color:C.muted,lineHeight:1.45}}>
+          Je n'ai pas pu compter les emails mis de côté que personne ne peut récupérer — rouvre cet écran dans un moment.
+        </div>
+      )}
+      {/* ── SES ADRESSES DÉJÀ VUES, ajoutables d'un clic ──────────────────
+          Lues sur SES emails déjà rangés (jamais sur le tas mis de côté) : une
+          identité, pas une ressemblance. Le nombre et la date l'aident à
+          reconnaître les siennes. Rien quand la lecture a échoué (on ne
+          suggère pas sur du vide) ni quand le registre n'est pas lu (on ne
+          pourrait pas l'écrire). */}
+      {reg && sugg.length > 0 && (
+        <div data-suggestions={sugg.length} style={{marginTop:10,borderTop:`1px solid ${C.border}`,paddingTop:10}}>
+          <div style={{fontSize:12.5,fontWeight:600,color:C.text}}>Adresses où arrivent déjà tes emails</div>
+          <div style={{fontSize:11.5,color:C.muted,lineHeight:1.45,margin:'2px 0 4px'}}>Lues sur les emails déjà rangés chez toi, et pas encore dans ta liste. Ajoute celles qui sont à toi.</div>
+          {sugg.slice(0, 8).map((v) => (
+            <div key={v.adresse} data-suggestion={v.adresse} style={{display:'flex',alignItems:'center',gap:8,padding:'7px 0',borderTop:`1px solid ${C.border}`}}>
+              <span style={{flex:'1 1 140px',minWidth:0}}>
+                <span style={{display:'block',fontSize:12.5,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{v.adresse}</span>
+                <span style={{display:'block',fontSize:11,color:C.muted,marginTop:1}}>
+                  {v.n} email{v.n>1?'s':''}{v.dernier ? ` · dernier le ${new Date(v.dernier).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}` : ''}
+                </span>
+              </span>
+              <button type="button" onClick={()=>ajouterAdresses([v.adresse])} aria-label={`Ajouter ${v.adresse}`}
+                style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'5px 10px',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>+ Ajouter</button>
+            </div>
+          ))}
+          {sugg.length > 1 && (
+            <button type="button" onClick={toutesSugg}
+              style={{marginTop:6,border:'none',background:'transparent',color:C.accent,padding:'4px 0',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+              Les ajouter toutes ({sugg.length})
+            </button>
+          )}
+        </div>
+      )}
       <button type="button" onClick={ajouter} disabled={reg === null || reg === undefined}
         style={{marginTop:10,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'8px 12px',fontSize:12.5,fontWeight:600,cursor:reg?'pointer':'default',fontFamily:'inherit',opacity:reg?1:0.45}}>
         + Ajouter une adresse
