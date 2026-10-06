@@ -81,7 +81,7 @@ const projette = (row, sel) => {
 // dont l'extension a été rechargée) · orphelin+ok (l'orphelin ET un pont
 // vivant) · lent (répond au bout de 4 s) · ok ; `connecte` : uid du cookie
 // Vinted ; `vrm` : ce que l'extension dit de sa session VRM.
-const PONT = ({ mode, connecte, vrm }) => {
+const PONT = ({ mode, connecte, vrm, version = '5.143.0', cmdLente = 0 }) => {
   window.__sessions = [];                               // ce que l'app envoie à l'extension
   window.addEventListener('message', (e) => { const d = e.data; if (e.source === window && d && d.__vmr === 'session') window.__sessions.push(d.session || null); });
   if (mode === 'absente') return;
@@ -89,42 +89,46 @@ const PONT = ({ mode, connecte, vrm }) => {
   const orphelin = mode === 'orphelin' || mode === 'orphelin+ok';
   window.addEventListener('message', (e) => {
     const d = e.data; if (e.source !== window || !d || typeof d !== 'object') return;
-    if (d.__vmr === 'ping') post({ __vmr: 'ready', version: '5.143.0' });
+    if (d.__vmr === 'ping') post({ __vmr: 'ready', version });
     // L'ancien bridge.js (5.159 et avant) quand il est orphelin : `repondre(null)`.
     if (orphelin && (d.__vmr === 'etat' || d.__vmr === 'cmd') && d.reqId) post({ __vmr: d.__vmr + ':result', reqId: d.reqId, resp: null });
     if (mode === 'muette' || mode === 'orphelin') return;  // plus rien derrière
+    // Un pont 5.128 ne connaît pas « état » (arrivé en 5.129) : il ne répond rien.
+    if (d.__vmr === 'etat' && version < '5.129.0' && version.split('.')[1].length === 3) return;
     const delai = mode === 'lent' ? 4000 : mode === 'orphelin+ok' ? 300 : 0;
-    if (d.__vmr === 'etat') setTimeout(() => post({ __vmr: 'etat:result', reqId: d.reqId, resp: { ok: true, version: '5.143.0', vrm: vrm || { ok: true, connecte: true, email: '' },
+    if (d.__vmr === 'etat') setTimeout(() => post({ __vmr: 'etat:result', reqId: d.reqId, resp: { ok: true, version, vrm: vrm || { ok: true, connecte: true, email: '' },
       vinted: connecte ? { uid: connecte, login: connecte === '111' ? 'compte_a' : 'compte_b' } : null, cmds: {} } }), delai);
     if (d.__vmr === 'cmd' && d.cmd === 'ventes') post({ __vmr: 'cmd:result', reqId: d.reqId, resp: { accepte: true, etape: 'recent' } });
     if (d.__vmr === 'cmd' && d.cmd === 'bordereau') {
       const jobId = `bord:${d.uid}:${d.tx}`;
       if (String(d.uid) !== String(connecte)) { post({ __vmr: 'cmd:result', reqId: d.reqId, resp: { accepte: false, code: 'vinted-autre', actifLogin: 'x' } }); return; }
-      post({ __vmr: 'cmd:result', reqId: d.reqId, resp: { accepte: true, jobId, etape: 'file' } });
+      setTimeout(() => post({ __vmr: 'cmd:result', reqId: d.reqId, resp: { accepte: true, jobId, etape: 'file' } }), cmdLente);
       window.__cmdRecu && window.__cmdRecu(String(d.tx));
-      setTimeout(() => post({ __vmr: 'evt', evt: { type: 'cmd', jobId, etape: 'generation', at: Date.now() } }), 300);
+      setTimeout(() => post({ __vmr: 'evt', evt: { type: 'cmd', jobId, etape: 'generation', at: Date.now() } }), cmdLente + 300);
       setTimeout(() => {
         post({ __vmr: 'evt', evt: { type: 'cmd', jobId, etape: 'fait', at: Date.now() } });
         post({ __vmr: 'evt', evt: { type: 'maj', quoi: 'label', uid: String(d.uid), tx: String(d.tx) } });
-      }, 900);
+      }, cmdLente + 900);
     }
   });
-  post({ __vmr: 'ready', version: '5.143.0' });
+  post({ __vmr: 'ready', version });
 };
 const SESSION = { access_token: 'jeton-de-l-app', refresh_token: 'jeton-de-renouvellement-de-l-app', expires_at: Date.now() + 3600e3,
   user: { id: '11111111-2222-3333-4444-555555555555', email: 'vendeur@exemple.test' } };
 const FOURCHE = { access_token: 'jeton-de-l-extension', refresh_token: 'renouvellement-propre-a-l-extension', expires_at: Date.now() + 3600e3,
   user_id: SESSION.user.id, email: SESSION.user.email };
 
-async function rendre(b, { mode, connecte, tel = false, vrm = null, session = false, routeFourche = 200, attente = null, diagKO = false }) {
-  const vp = tel ? { width: 390, height: 844 } : { width: 1512, height: 950 };
+async function rendre(b, { mode, connecte, tel = false, vrm = null, session = false, routeFourche = 200, attente = null, diagKO = false, version = '5.143.0', cmdLente = 0, separee = false, largeur = null }) {
+  const vp = tel ? { width: largeur || 390, height: 844 } : { width: 1512, height: 950 };
   const ctx = await b.newContext({ viewport: vp, ...(tel ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   let labelPret = false; const cmds = [];
   await pg.exposeFunction('__cmdRecu', (tx) => { cmds.push(tx); setTimeout(() => { labelPret = true; }, 600); });
   await pg.addInitScript((sess) => { try { if (sess) localStorage.setItem('vrm_session', JSON.stringify(sess)); else localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} }, session ? SESSION : null);
-  await pg.addInitScript(PONT, { mode, connecte, vrm });
+  await pg.addInitScript(PONT, { mode, connecte, vrm, version, cmdLente });
+  // L'appareil a-t-il déjà séparé la session de l'extension (une fois par compte) ?
+  if (separee) await pg.addInitScript((uid) => { try { localStorage.setItem('vrm_ext_separee_' + uid, '1'); } catch (_) {} }, SESSION.user.id);
   const fourches = [];
   if (session) await pg.route('**/auth/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ...SESSION, expires_in: 3600 }) }));
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
@@ -267,11 +271,41 @@ async function rendre(b, { mode, connecte, tel = false, vrm = null, session = fa
       dit(propres.length === 1, 'l’extension reçoit UNE session, la sienne', JSON.stringify(v.sessions.map((x) => x && x.refresh_token)));
       dit(siennes.length === 0, 'et JAMAIS le jeton de renouvellement de l’app (même famille → jetons qui s’annulent)', JSON.stringify(v.sessions.map((x) => x && x.refresh_token)));
       await r.ctx.close(); }
+    { const r = await rendre(b, { mode: 'ok', connecte: '111', session: true, separee: true, vrm: { ok: true, connecte: true, email: SESSION.user.email, user_id: SESSION.user.id }, attente: 5000 }); const v = await r.lire();
+      dit(r.fourches.length === 0 && v.sessions.length === 0, 'autre sens : une extension déjà connectée au bon compte (et déjà séparée) ne reçoit RIEN', `demandes : ${r.fourches.length} · sessions envoyées : ${v.sessions.length}`);
+      await r.ctx.close(); }
+    // Une extension qui a encore la session donnée par l'app avant le 5 octobre
+    // partage sa famille de jetons : on la sépare UNE fois, d'avance.
     { const r = await rendre(b, { mode: 'ok', connecte: '111', session: true, vrm: { ok: true, connecte: true, email: SESSION.user.email, user_id: SESSION.user.id }, attente: 5000 }); const v = await r.lire();
-      dit(r.fourches.length === 0 && v.sessions.length === 0, 'autre sens : une extension déjà connectée au bon compte ne reçoit RIEN', `demandes : ${r.fourches.length} · sessions envoyées : ${v.sessions.length}`);
+      dit(v.sessions.length === 1 && v.sessions[0] && v.sessions[0].refresh_token === FOURCHE.refresh_token, 'jamais séparée : elle reçoit UNE session à elle (séparation d’avance), pas la nôtre', JSON.stringify(v.sessions.map((x) => x && x.refresh_token)));
       await r.ctx.close(); }
     { const r = await rendre(b, { mode: 'ok', connecte: '111', session: true, routeFourche: 404, vrm: { ok: true, connecte: false, expiree: true, email: SESSION.user.email }, attente: 5000 }); const v = await r.lire();
       dit(v.sessions.filter((x) => x && x.refresh_token === SESSION.refresh_token).length === 0, 'serveur muet + session MORTE : on ne lui redonne pas la nôtre (c’est le cas qui s’entre-tue)', JSON.stringify(v.sessions.map((x) => x && x.refresh_token)));
+      await r.ctx.close(); }
+
+    console.log('── EXTENSION 5.128 (ne connaît pas « état ») : « à mettre à jour », jamais « recharge la page »');
+    { const r = await rendre(b, { mode: 'ok', connecte: '111', version: '5.128.0', attente: 17000 }); const v = await r.lire();
+      dit(v.raisons.length === 1 && /^retard/.test(v.raisons[0]) && v.recharger === 0, 'la raison dit de METTRE À JOUR, sans bouton « recharger » (recharger ne change rien)', JSON.stringify(v.raisons));
+      dit(v.etat && v.etat.code === 'retard', 'l’en-tête dit « en retard », pas « muette », même après 17 s', JSON.stringify(v.etat));
+      await r.ctx.close(); }
+
+    console.log('── COMMANDE LENTE avec un orphelin (l’accusé du pont vivant met 2,5 s)');
+    { const r = await rendre(b, { mode: 'orphelin+ok', connecte: '111', cmdLente: 2500 });
+      await r.pg.click('[data-bouton-bord="pret"][data-tx="7001"] button');
+      // Juste APRÈS la grâce de 1,5 s et AVANT l'accusé (2,5 s) : c'est là que
+      // l'ancienne version disait « n'a pas répondu, réessaie ».
+      await r.pg.waitForTimeout(2000);
+      const v = await r.lire(); const a = v.boutons.find((x) => x.tx === '7001');
+      dit(r.cmds.includes('7001') && a && !/pas répondu/.test(a.txt), 'la réponse vide de l’orphelin n’est pas un échec : on attend l’accusé du pont vivant (pas de « réessaie » → pas de bordereau demandé deux fois)', JSON.stringify(a));
+      await r.pg.waitForTimeout(2500);
+      const v2 = await r.lire(); const a2 = v2.boutons.find((x) => x.tx === '7001');
+      dit(a2 && a2.etat !== 'pret', 'et l’accusé, arrivé à 2,5 s, est bien pris en compte', JSON.stringify(a2));
+      await r.ctx.close(); }
+
+    console.log('── iPHONE ÉTROIT (360 px)');
+    { const r = await rendre(b, { mode: 'ok', connecte: '111', tel: true, largeur: 360 }); const v = await r.lire();
+      dit(v.sw <= v.cw + 1, 'la pastille ne fait pas déborder l’en-tête à 360 px', `${v.sw} > ${v.cw}`);
+      await r.pg.screenshot({ path: path.join(require('os').tmpdir(), 'pont-360.png') });
       await r.ctx.close(); }
 
     console.log('── TÉLÉPHONE, base qui ne rend pas le diagnostic');

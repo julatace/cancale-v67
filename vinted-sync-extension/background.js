@@ -3666,15 +3666,21 @@ async function etatSite(url) {
 //    `user_id` voyage avec : l'app compare des IDENTITÉS, pas des adresses.
 async function etatPourApp() {
   let version = ''; try { version = chrome.runtime.getManifest().version; } catch (_) {}
-  const uid = await avecDelai(compteConnecte('www.vinted.fr'), 300, null).catch(() => null);
+  // ⚠️ « Pas su » n'est pas « aucun compte » (revue du 5 octobre) : un cookie
+  //    pas lu à temps se dit `vintedPasSu`, jamais `vinted: null` — l'app
+  //    affichait « aucun compte Vinted ouvert » sur une simple lenteur.
+  const PAS_SU = {};
+  const uid = await avecDelai(compteConnecte('www.vinted.fr'), 1000, PAS_SU).catch(() => PAS_SU);
+  const vintedPasSu = uid === PAS_SU;
   const [e, cmds, login] = await Promise.all([
     authEtatRapide(1500).catch(() => null),
     avecDelai(lireCmds(), 300, {}).catch(() => ({})),
-    uid ? avecDelai(loginDe(String(uid), { attendreMs: 250 }), 300, '').catch(() => '') : Promise.resolve(''),
+    uid && !vintedPasSu ? avecDelai(loginDe(String(uid), { attendreMs: 250 }), 300, '').catch(() => '') : Promise.resolve(''),
   ]);
   const vrm = e ? Object.assign({ ok: true, connecte: e.connecte, expiree: e.expiree, email: e.email || '', user_id: e.user_id || null, cloisonne: e.cloisonne === undefined ? null : e.cloisonne },
     e.mort ? { mort: true } : {}, e.renouvellement ? { renouvellement: e.renouvellement } : {}) : null;
-  return { ok: true, version, vrm, vinted: uid ? { uid: String(uid), login: login || '' } : null, cmds };
+  return Object.assign({ ok: true, version, vrm, vinted: uid && !vintedPasSu ? { uid: String(uid), login: login || '' } : null, cmds },
+    vintedPasSu ? { vintedPasSu: true } : {});
 }
 // Le bordereau de CETTE vente est-il déjà rangé (avec son PDF) ? Une lecture
 // scalaire (§4.4) — `null` = la base n'a pas répondu (« pas su » ≠ « non »).
@@ -3711,6 +3717,27 @@ async function publierDepuisApp(msg) {
     return { accepte: true, etape: 'fait' };
   }
   const lbc = cmd === 'lbcPublier';
+  // ⚠️⚠️ UNE PUBLICATION À LA FOIS PAR PAIRE (revue du 5 octobre). Avec le pont
+  //    qui relaie enfin la commande entière (5.160), un double clic — ou deux
+  //    onglets VRM — ouvrait DEUX dépôts, et Leboncoin publie sans booster tout
+  //    seul : deux annonces pour la même paire. Un dépôt de moins de 15 min pour
+  //    CETTE paire ⇒ refusé, avec la raison. L'état vit dans `chrome.storage`
+  //    (§4.9), pas dans une variable du service worker.
+  const cleJob = (lbc ? 'lbc:' : 'ebay:') + id;
+  // Le verrou est posé AVANT toute attente : deux clics simultanés passeraient
+  // sinon tous les deux la lecture de l'état (prouvé par l'audit).
+  if (PUBLICATIONS_EN_VOL.has(cleJob)) return { accepte: false, code: 'en-cours', raison: 'elle est déjà en train de partir' };
+  PUBLICATIONS_EN_VOL.add(cleJob);
+  try {
+    const jobDeja = (await lireCmds())[cleJob];
+    if (jobDeja && jobDeja.etape === 'depot' && Date.now() - Number(jobDeja.at || 0) < 15 * 60000) {
+      return { accepte: false, code: 'en-cours', raison: lbc ? 'sa publication est déjà en cours dans un autre onglet' : 'sa préparation eBay est déjà ouverte dans un autre onglet' };
+    }
+    return await publierDepuisAppSuite(msg, cmd, id, lbc);
+  } finally { PUBLICATIONS_EN_VOL.delete(cleJob); }
+}
+const PUBLICATIONS_EN_VOL = new Set();
+async function publierDepuisAppSuite(msg, cmd, id, lbc) {
   // Capture au clic : si les photos de CETTE paire manquent, on les cherche
   // MAINTENANT (1 lecture, sur son clic) avant de construire l'ad — ainsi
   // l'annonce part avec ses photos, sans attendre le fond.

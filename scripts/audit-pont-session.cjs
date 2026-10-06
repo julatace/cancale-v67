@@ -64,7 +64,7 @@ const JETON_NEUF = { access_token: jwt({ sub: 'vendeur-1', email: 'essai@exemple
 // ne répond JAMAIS (base injoignable). `store` peut être partagé entre deux
 // contextes : c'est un service worker qui redémarre (§4.9 — seul
 // `chrome.storage.local` survit).
-function faireBg({ store = {}, jeton = () => rep(200, JETON_NEUF), sonde = () => rep(200, '[]'), autre = () => rep(200, '[]'), cookieUid = UID } = {}) {
+function faireBg({ store = {}, jeton = () => rep(200, JETON_NEUF), sonde = () => rep(200, '[]'), autre = () => rep(200, '[]'), cookieUid = UID, cookieMuet = false } = {}) {
   const j = { jetons: 0, sondes: 0 };
   let ecouteur = null;
   const ctx = {
@@ -77,7 +77,7 @@ function faireBg({ store = {}, jeton = () => rep(200, JETON_NEUF), sonde = () =>
       runtime: { onInstalled: { addListener() {} }, onStartup: { addListener() {} }, onMessage: { addListener(fn) { ecouteur = fn; } }, getManifest: () => ({ version: 'essai' }), lastError: null, id: 'x' },
       alarms: { create() {}, onAlarm: { addListener() {} }, clear() {} },
       cookies: {
-        get: (q, cb) => { const v = q && q.name === 'access_token_web' && cookieUid ? { value: jwt({ account_id: Number(cookieUid) }) } : null; if (typeof cb === 'function') { cb(v); return; } return Promise.resolve(v); },
+        get: (q, cb) => { if (cookieMuet) return typeof cb === 'function' ? undefined : JAMAIS(); const v = q && q.name === 'access_token_web' && cookieUid ? { value: jwt({ account_id: Number(cookieUid) }) } : null; if (typeof cb === 'function') { cb(v); return; } return Promise.resolve(v); },
         getAll: (q, cb) => { if (typeof cb === 'function') { cb([]); return; } return Promise.resolve([]); },
         onChanged: { addListener() {} },
       },
@@ -316,6 +316,31 @@ const quiRepond = (r, t) => (t.vivante(r) ? String(t.vivante(r)) : 'vide/erreur'
     b.ctx.getStoredAccounts = async () => [{ vinted_user_id: UID, login: 'angeled92' }];
     const e = await borne(b.ctx.etatPourApp(), 3000);
     dit(e !== 'pend' && e && e.vinted && e.vinted.login === 'angeled92', 'e · autre sens : sans mémo, une base qui répond donne quand même le login', JSON.stringify(e && e !== 'pend' && e.vinted));
+  });
+
+  // ══ g. « PAS SU » N'EST PAS « AUCUN COMPTE VINTED » (revue du 5 octobre) ══
+  await essaie('g · cookie Vinted muet', async () => {
+    const b = faireBg({ store: { vrmSession: session(3600e3), vrmCloisonne: true }, cookieMuet: true });
+    const e = await borne(b.ctx.etatPourApp(), 4000);
+    dit(e !== 'pend' && e && e.vintedPasSu === true && !e.vinted, "g · un cookie Vinted pas lu à temps se dit « pas su » (vintedPasSu), jamais « aucun compte ouvert »", JSON.stringify(e && e !== 'pend' ? { vinted: e.vinted, vintedPasSu: e.vintedPasSu } : e));
+  });
+  // ══ h. UNE PAIRE NE PART PAS DEUX FOIS SUR LEBONCOIN (revue du 5 octobre) ══
+  //    Le pont relaie enfin la commande entière : un double clic, ou deux
+  //    onglets, ouvraient DEUX dépôts — et Leboncoin publie sans booster seul.
+  await essaie('h · deux « Publier » sur la même paire', async () => {
+    const b = faireBg({ store: { vrmSession: session(3600e3), vrmCloisonne: true } });
+    b.ctx.completerPhotosSiManque = async () => {};
+    b.ctx.buildLbcData = async () => { await attendre(60); return { stats: {}, queue: [{ id: '7700112233', numero: '12' }] }; };
+    const ouverts = []; b.ctx.chrome.tabs.create = async (o) => { ouverts.push(o && o.url); return {}; };
+    const [r1, r2] = await Promise.all([
+      b.ctx.publierDepuisApp({ cmd: 'lbcPublier', id: '7700112233' }),
+      b.ctx.publierDepuisApp({ cmd: 'lbcPublier', id: '7700112233' }),
+    ]);
+    const r3 = await b.ctx.publierDepuisApp({ cmd: 'lbcPublier', id: '7700112233' });
+    const acceptes = [r1, r2, r3].filter((r) => r && r.accepte).length;
+    dit(acceptes === 1 && ouverts.length === 1, 'h · deux clics simultanés puis un troisième : UN seul dépôt ouvert', `acceptés : ${acceptes} · onglets : ${ouverts.length} · ${JSON.stringify([r1, r2, r3].map((r) => r && (r.accepte ? 'ok' : r.code)))}`);
+    const autre = await b.ctx.publierDepuisApp({ cmd: 'lbcPublier', id: '7700119999' });
+    dit(!(autre && autre.code === 'en-cours'), 'h · autre sens : une AUTRE paire reste publiable', JSON.stringify(autre));
   });
 
   // ══ f. LE PONT : UN ORPHELIN SE TAIT, UN DOUBLON NE RELAIE PAS DEUX FOIS ══
