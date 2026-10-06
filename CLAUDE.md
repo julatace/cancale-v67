@@ -5209,10 +5209,114 @@ EXÉCUTANT la vraie route.
     « 2 annonces VRM-22 » et « HTTP 422 eBay a refusé » sur une annonce créée ;
   - `bancs/ebay-callback.cjs` porte le nonce. Ses cas d'erreur doivent ATTEINDRE
     l'échange, sinon ils passeraient sur le refus du nonce, vides de sens.
+- **Suite, même jour (revue des propositions 6, 8, 9, 10)** :
+  - `revise` (changer un prix) n'avait pas appris `sansAck`. Il annonçait « eBay a
+    refusé » sur un réseau coupé, alors que le prix avait pu changer.
+  - Une annonce terminée par `retirer` (à la main ou automatiquement) **sort
+    tout de suite de `ebay_listings`**, en lire-fusionner-réécrire gardé
+    (`sortirDesAnnonces` : une lecture ratée n'écrit rien, la réponse dit
+    `listes:null`). Avant, l'alerte « à retirer » restait, et le retrait
+    automatique reprenait la même annonce à chaque ouverture, en occupant les
+    5 places d'une vraie vente.
+  - `audit-ebay-route.cjs` : 185 contrôles, 3 rouges sur le code d'avant.
 - ⚠️ Deux branches de sauvegarde (`claude/wip-ext-5162`, `claude/wip-bilan-lancement`)
   ont été poussées par erreur le 6 octobre. Le proxy a refusé leur
   suppression : à effacer sur GitHub. Elles ne se déploient pas
   (`claude/**` est coupé dans `vercel.json`).
+
+### ⚠️⚠️ UNE FILE, UN FREIN, L'ARGENT AVANT LES PHOTOS, LA BOÎTE QUI BOUGE, LE COLIS COCHÉ MAIS JAMAIS PARTI (6 octobre, 5.162)
+Quatre défauts d'une revue appuyée sur sa base, **remesurés avant de coder**.
+- ⚠️⚠️ **UN 429/403 DE VINTED NE STOPPAIT RIEN, ET LA MOITIÉ DES REQUÊTES
+  ÉTAIT HORS FILE.** `avecVinted` ne couvrait que la génération de bordereaux,
+  les réponses et les commandes de l'app ; la moisson, les codes, les
+  versements, les relevés et les photos (chaque minute) partaient à côté — le
+  banc mesure **jusqu'à 4 requêtes en vol** sur l'avant. Et après un 429 reçu
+  dans la moisson d'une visite, **19 requêtes partaient encore** (ventes,
+  achats, boîte, porte-monnaie, codes, versements, photos).
+  ⇒ **Toute requête Vinted passe par `requeteVinted`**, dans les primitives
+  (`vintedGet`, `vintedSend`, `vintedGetHtml`, `vintedGetCookie`, le
+  renouvellement de session, la série faite dans la page) : une en vol, quelle
+  que soit la source. `avecVinted` reste AU-DESSUS pour l'ordre des gestes ; les
+  deux chaînes sont distinctes, donc aucune n'attend l'autre. ⚠️ Une primitive
+  ne s'appelle JAMAIS de l'intérieur d'une autre place de la file (elle
+  attendrait la sienne pour toujours) : `vintedSend` refait sa requête après un
+  401 dans une NOUVELLE place.
+  ⇒ Un 429/403 ouvre une **pause rangée dans `chrome.storage.local`**
+  (`vrmPauseVinted`, §4.9) : 15 min, puis 30, 1 h, 2 h, 4 h si Vinted recommence
+  dans les 6 h ; deux freins à la suite ne montent pas deux paliers. Pendant la
+  pause, RIEN ne part : visite, moisson, lecteurs, photos, et les gardes
+  (`garde`, `gardeLecture`, `gardeStricte`) refusent — un clic de l'app reçoit
+  `code: 'vinted-pause'` et « **Vinted demande de ralentir — réessaie dans X
+  min** ». Diagnostic : `vinted_frein_*`, `vinted_pause_palier_*`,
+  `vinted_pause_refus`, `rates.vinted_pause`. Aucun plafond monté.
+  ⇒ **La moisson faite DANS LA PAGE** (`inject.js`, `activeHarvest`) s'arrête au
+  premier 429/403, prévient le fond (`vintedFrein` → même pause) et ne démarre
+  pas pendant une pause : `content.js` lui transmet la fin de la pause (un
+  nombre). Le fond ne pose une pause que sur NOS requêtes, jamais sur celles que
+  la page fait d'elle-même.
+- ⚠️ **L'ARGENT ET LES COLIS MANGEAIENT LE BUDGET DES ACTIONS.**
+  `capterRetraits`, `capterDatesVersement` et `capterReleves` passaient par
+  `garde` → `compterAction` : jusqu'à **10 des 20 actions/heure** par visite
+  pour de simples lectures — un bordereau ou une réponse pouvaient ensuite se
+  faire refuser. Elles passent sur le budget de LECTURE (`gardeLecture`, 5.144).
+  ⚠️ Mais ce budget-là, les photos le vidaient (`tickPhotos`). **Mesuré : 238
+  ventes finalisées sans date de versement** (hors compte supprimé) — c'est le
+  CA qu'il déclare. Les classes `argent`/`colis`/`clic` ont tout le budget ; les
+  `photos` s'arrêtent avant une **réserve** = ce que les lecteurs prioritaires
+  ont encore à lire (au plus 5 + 2 + 3), qu'ils notent dans `vrmLecturesDues`.
+  « Pas su » (jamais noté, plus d'une heure, une lecture ratée) garde la réserve
+  entière ; plus rien à lire ⇒ les photos retrouvent les 20. Le total reste 20.
+- ⚠️⚠️ **LA BOÎTE DE RÉCEPTION ÉTAIT FIGÉE SUR UNE PAGE ANCIENNE.** Mesuré :
+  `24602614` sur la **page 5** (dernière conversation captée le 27 juillet,
+  dernière vente le 2 octobre), `3156028798` sur la page 3. `listePlusRiche`
+  compare des NOMBRES : une page profonde rangée en faisant défiler (50
+  conversations) refusait toute page 1 fraîche (30). ⇒ `fusionnerInbox`, sur
+  les deux voies d'écriture : `current_page === 1` met à jour le HAUT, une page
+  profonde ne fait que compléter (jamais une version plus ancienne d'une
+  conversation), fusion par identifiant, triée, **bornée à 300**, même forme
+  `{pagination, conversations}`. Lecture de la ligne ratée ⇒ rien n'est écrit
+  (une page 1 seule effacerait le reste) ; page vide ⇒ rien.
+  Côté app (Messages) : quand la dernière vente d'un compte est plus récente
+  (de plus d'1 h) que sa dernière conversation captée, une ligne le dit UNE fois
+  et nomme le compte — « ouvre ta messagerie Vinted sur ce compte ». Ventes
+  illisibles ou aucune conversation captée : on ne juge pas.
+- ⚠️⚠️ **« COCHÉ POSTÉ » MAIS JAMAIS VU PARTIR.** Cocher « Colis fait » sort la
+  vente de « à envoyer » partout ; rien ne revenait vérifier. **Mesuré : 4 ventes
+  cochées dont Vinted dit encore « à expédier »** — mais seules **2** (65 € et
+  75 €, cochées il y a 159 h et 92 h) ont un statut lu **après** la coche ; les
+  2 autres (compte `3168505556`) ne sont connues que par une capture du
+  20 septembre, antérieure à la coche du 29 : **pas su, pas d'alerte**.
+  ⇒ `posteSansDepart` (une règle) : coche datée, `aExpedier` encore vrai, aucun
+  email du transporteur ne l'a vu passer, statut lu APRÈS la coche
+  (`_harvestSeen`), et date limite dépassée OU coche de plus de 48 h.
+  `cochesNonPartis` (un propriétaire) est lu par **Colis** (bloc
+  `data-poste-sans-depart`, le geste dit une fois, « ↺ Pas encore posté » la
+  remet dans « à envoyer ») et **Ma journée** (action « Vérifier N colis
+  cochés « posté » », même nombre). `limiteExpedition` porte maintenant la date
+  limite pour `toShip` ET cette alerte (§11).
+- **Preuves** (le vrai `background.js` dans un `vm`, banc commun
+  `scripts/_fond-vm.cjs` : base à état, projection appliquée, Vinted qui compte
+  les requêtes en vol, `executeScript` qui exécute vraiment la fonction de la
+  page) — **rouges sur 9d71641 (5.161), verts après** :
+  `audit-frein-vinted.cjs` **23 contrôles, 17 rouges** (dont « 19 requêtes
+  après le 429 », « jusqu'à 4 en vol », le vrai `inject.js` qui continue après
+  le 429) ; `audit-budget-lectures.cjs` **13, 8 rouges** ;
+  `audit-inbox-fusion.cjs` **26, 16 rouges** ; banc `poste-sans-depart.cjs`
+  (données inventées, deux tailles) **24 contrôles, 12 rouges** sur le build
+  d'avant, et **8 rouges** quand on retire la condition « lu après la coche »
+  (preuve par réaffaiblissement) ; `messagerie.cjs` + 5 contrôles (boîte figée
+  dite une fois, et l'autre sens), **4 rouges** sur le build d'avant.
+- `audit-versement.cjs` stubbait `garde` pour tester « garde refuse ⇒ rien » :
+  il stubbe maintenant AUSSI `gardeLecture` (la règle est la même : un refus de
+  la garde ⇒ zéro requête) — forme du banc, pas affaiblissement.
+- Extension **5.162.0**, zip régénéré, `EXT_ATTENDUE` suivie. **Aucune entrée
+  d'`EXT_CAPACITES`** : l'app ne promet rien de neuf (la ligne de Messages dit
+  le geste, pas ce que l'extension fera).
+- ⚠️ **Hors périmètre, constaté** : `inject.js` fait sa PROPRE moisson complète
+  (jusqu'à ~66 requêtes, 1 fois / 30 min / onglet) en plus de `runActive` — et
+  avec des délais **aléatoires** (`jitter`). Elle respecte désormais la pause et
+  le frein, mais elle reste hors de la file du fond (elle vit dans la page). À
+  trancher : la garder, ou la confier au fond.
 
 ### « Bilan de la semaine » et préparation du lancement (6 octobre, propositions 11 et 15)
 **Le bilan (proposition 11).** Une notification par semaine et par vendeur :
@@ -6244,8 +6348,8 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | outil | quoi |
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
-| `node scripts/audit-*.cjs` | **77 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
-| `scripts/bancs/*.cjs` | les **69 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
+| `node scripts/audit-*.cjs` | **80 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `scripts/bancs/*.cjs` | les **70 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
 **Trois règles de preuve :**
@@ -6537,8 +6641,8 @@ script-là me fait croire à une catastrophe.
 src/App.jsx                     l'app (grep avant de lire — le fichier est énorme)
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
-scripts/audit-*.cjs             les 77 audits
-scripts/bancs/                  les 69 bancs (leur README dit comment les lancer)
+scripts/audit-*.cjs             les 80 audits
+scripts/bancs/                  les 70 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 ```

@@ -14,7 +14,12 @@
 //      saisi ;
 //   4. un fil pas encore capté lu PAR L'EXTENSION (`GET …/conversations/{id}`) ;
 //   5. une extension trop ancienne (5.134) : aucun geste d'offre proposé, la
-//      raison dite — jamais un bouton qui ne peut pas marcher.
+//      raison dite — jamais un bouton qui ne peut pas marcher ;
+//   6. (6 octobre) une BOÎTE FIGÉE se dit : la dernière vente de `compte_a`
+//      est plus récente que sa dernière conversation captée ⇒ une ligne,
+//      UNE fois, qui nomme ce compte (et pas `compte_b`, à jour) ; l'autre
+//      sens : boîtes à jour ⇒ aucune ligne. Mesuré sur sa base : deux comptes
+//      figés sur une page ancienne de leur messagerie (27 juillet / 2 octobre).
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
@@ -35,9 +40,12 @@ const FIL_OFFRE = { id: 301, opposite_user: { id: 5301, login: 'acheteuse_1' }, 
   ] };
 const FIL_EXT = { id: 402, opposite_user: { id: 5402, login: 'acheteur_2' }, transaction: { id: 9002 },
   messages: [{ entity_type: 'message', entity: { user_id: 5402, body: 'Message lu par extension' } }] };
-const rows = [
-  { id: 'harvest_111_inbox', data: { capturedAt: iso(0), payload: { conversations: [conv(301, 'acheteuse_1', 'Vous feriez 45 € ?', true, 2), conv(303, 'curieux', 'Merci !', false, 1)] } } },
-  { id: 'harvest_222_inbox', data: { capturedAt: iso(0), payload: { conversations: [conv(402, 'acheteur_2', 'Toujours dispo ?', true, 5)] } } },
+// Les conversations de `compte_a` datent d'il y a 26-30 h ; ses ventes (servies
+// à part) disent si sa boîte est figée.
+const vente = (tx, h) => ({ transaction_id: tx, title: 'Vente ' + tx, price: { amount: '40.0', currency_code: 'EUR' }, status: 'Bordereau envoyé au vendeur', transaction_user_status: 'needs_action', date: iso(h) });
+const rowsDe = ({ venteA = 3 } = {}) => [
+  { id: 'harvest_111_inbox', data: { capturedAt: iso(0), payload: { conversations: [conv(301, 'acheteuse_1', 'Vous feriez 45 € ?', true, 30), conv(303, 'curieux', 'Merci !', false, 26)] } } },
+  { id: 'harvest_222_inbox', data: { capturedAt: iso(0), payload: { conversations: [conv(402, 'acheteur_2', 'Toujours dispo ?', true, 1)] } } },
   { id: 'harvest_111_conv_301', data: { capturedAt: iso(0), payload: { conversation: FIL_OFFRE } } },
   // Proposition 6 (6 octobre) : les offres reçues PAR EMAIL, en tête de Messages.
   //  · O1 : récente, sur compte_a → à trancher ;
@@ -54,8 +62,12 @@ const rows = [
     { transaction_id: 8701, title: 'Adidas Samba noir 41', price: { amount: '50.0', currency_code: 'EUR' }, status: 'Commande finalisée', date: iso(300) },
     { transaction_id: 8702, title: 'Samba OG 40', price: { amount: '55.0', currency_code: 'EUR' }, status: 'Commande finalisée', date: iso(400) },
     { transaction_id: 8703, title: 'adidas samba 43', price: { amount: '60.0', currency_code: 'EUR' }, status: 'Commande finalisée', date: iso(500) },
+    // 5.162 : la dernière vente de compte_a (il y a `venteA` h) — plus récente que
+    // sa dernière conversation captée (26 h) ⇒ sa boîte est figée.
+    vente(8811, venteA),
   ] } } },
 ];
+const rows = rowsDe();
 
 let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
@@ -99,7 +111,7 @@ const PONT = ({ version, filExt }) => {
   post({ __vmr: 'ready', version });
 };
 
-async function rendre(b, { version, tel = false }) {
+async function rendre(b, { version, tel = false, lignes = rows }) {
   const vp = tel ? { width: 390, height: 844 } : { width: 1512, height: 950 };
   const ctx = await b.newContext({ viewport: vp, ...(tel ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
@@ -117,9 +129,9 @@ async function rendre(b, { version, tel = false }) {
     const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
     const forme = (r) => (sel && !/^id,data|^data,updated_at/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: iso(0), cap: r.data.capturedAt });
     const eq = /id=eq\.([^&]*)/.exec(u);
-    if (eq) return j(rows.filter((r) => r.id === eq[1]).map(forme));
+    if (eq) return j(lignes.filter((r) => r.id === eq[1]).map(forme));
     const lk = /id=like\.([^&]*)/.exec(u);
-    if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(rows.filter((r) => re.test(r.id)).map(forme)); }
+    if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(lignes.filter((r) => re.test(r.id)).map(forme)); }
     return j([]);
   });
   const proxy = [];
@@ -144,6 +156,10 @@ async function rendre(b, { version, tel = false }) {
       dit(liste.length === 3, 'les conversations des DEUX comptes sont listées', JSON.stringify(liste.map((x) => x.id)));
       dit(liste.length === 3 && liste[2].id === '303', 'les non lues d’abord, la lue en dernier', JSON.stringify(liste.map((x) => x.id)));
       dit(liste.some((x) => /compte_a/.test(x.txt)) && liste.some((x) => /compte_b/.test(x.txt)), 'le compte est nommé sur chaque ligne (la liste mélange les comptes)');
+      // 6. la boîte figée de compte_a (vente il y a 3 h, dernière conversation il y a 26 h)
+      const fige = await r.pg.evaluate(() => { const e = document.querySelectorAll('[data-boites-perimees]'); return { n: e.length, uids: e[0] ? e[0].getAttribute('data-boites-perimees') : null, txt: e[0] ? e[0].innerText : '' }; });
+      dit(fige.n === 1 && fige.uids === '111', 'une boîte figée se dit, UNE fois, pour le compte concerné seulement', JSON.stringify(fige));
+      dit(/compte_a/.test(fige.txt) && !/compte_b/.test(fige.txt) && /messagerie Vinted/.test(fige.txt), 'elle nomme compte_a (pas compte_b, à jour) et dit le geste : ouvrir sa messagerie Vinted', fige.txt);
       // 1 bis. Les offres reçues par email, en tête (proposition 6).
       await r.pg.waitForTimeout(800);
       const ofs = await r.pg.evaluate(() => { const b = document.querySelector('[data-offres-messages]'); return b ? { n: b.getAttribute('data-offres-messages'), txt: b.innerText, ids: [...b.querySelectorAll('[data-offre-email]')].map((x) => x.getAttribute('data-offre-email')) } : null; });
@@ -194,6 +210,15 @@ async function rendre(b, { version, tel = false }) {
       dit(sw.sw <= sw.cw + 1, 'aucun débordement horizontal', `${sw.sw} > ${sw.cw}`);
       dit(r.errs.length === 0, 'aucune erreur d’app', r.errs.join(' | ').slice(0, 160));
       await r.pg.screenshot({ path: path.join(require('os').tmpdir(), 'messagerie-' + (tel ? 390 : 1512) + '.png') });
+      await r.ctx.close();
+    }
+    console.log('── boîtes à jour (l’autre sens)');
+    {
+      // La vente de compte_a est plus ANCIENNE que sa dernière conversation captée.
+      const r = await rendre(b, { version: '5.135.0', lignes: rowsDe({ venteA: 40 }) });
+      const n = await r.pg.evaluate(() => document.querySelectorAll('[data-boites-perimees]').length);
+      const liste = await r.pg.evaluate(() => document.querySelectorAll('[data-messagerie] [data-conv]').length);
+      dit(liste === 3 && n === 0, 'boîtes à jour : aucune ligne « n’est plus à jour »', `liste=${liste} · lignes=${n}`);
       await r.ctx.close();
     }
     console.log('── extension TROP ANCIENNE (5.134)');
