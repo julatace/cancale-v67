@@ -3791,6 +3791,112 @@ il l'a redemandé.
   exécute la vraie fonction (12 contrôles, réaffaiblie → rouge) ;
   `bancs/rapport.cjs` sert une vente vendue le mois dernier et versée ce mois.
 
+### « J'ai déclaré ce mois » — le registre de ses déclarations URSSAF (6 octobre)
+Proposition n° 13, acceptée le 5 octobre. Le passage au versement (3 octobre)
+crée un risque mesuré : **30 ventes vendues en août et versées en septembre
+(657,80 €)** — s'il a déclaré août à la date de vente, elles sont dans août ET
+dans septembre (~89 € de cotisations payés deux fois, sans rien voir).
+- `vrm_urssaf_declare` (synchronisé) = `{ [ym]: { ids, n, ca, montant, regle, at } }`,
+  écrit **uniquement sur son clic** dans le rapport comptable (« J'ai déclaré ce
+  mois » / « retirer »). L'app ne coche jamais « déclaré » à sa place.
+- **Une vente déclarée compte dans le mois de sa déclaration, plus nulle part
+  ailleurs** — par son identité `plateforme:id` (§5). Une vente arrivée APRÈS dans
+  un mois déclaré est « à régulariser » (comptée, dite, jamais cachée) ; une vente
+  déclarée dans deux mois compte une fois et le dit ; le mois du versement dit ce
+  qui est déjà déclaré ailleurs.
+- Pour un mois ≤ septembre 2026, le formulaire écrit **les deux totaux côte à
+  côte** (versement · date de vente, l'ancienne règle) et c'est LUI qui dit lequel
+  il a déclaré ; le montant de son espace URSSAF, s'il le tape, est comparé.
+- **« Pas su » ne déplace rien** : avant l'arrivée du nuage le registre vaut
+  `null` (`isCloudReady` + `onCloudReady`), et l'écran le dit.
+- §11 : le rapport mensuel et le bilan annuel refaisaient leur propre boucle
+  Vinted — ils lisent maintenant `declarables`, comme le tableau de bord (une
+  règle, un propriétaire). `audit-urssaf.cjs` suit le nom jusqu'à sa définition.
+- Preuves : `audit-urssaf.cjs` **11 rouges** sur le code d'avant, **5** en
+  réaffaiblissant la règle (le registre ignoré) ; banc `rapport.cjs` déroule le
+  geste aux deux tailles (déclare août à la date de vente → septembre ne recompte
+  plus la vente de fin août, et le dit).
+- ⚠️ **À lui** : dire ce qu'il a réellement déclaré pour août et septembre — le
+  geste est dans Ventes → Outils → Rapport comptable → choisir le mois.
+
+### Paires qui dorment, toutes plateformes (proposition 9, 6 octobre)
+L'assistant « Repricing » (Annonces → Conseils & signalements) disait seulement
+quoi baisser sur Vinted. Une paire qui dort y est souvent AUSSI en vente sur eBay
+ou Leboncoin, à un autre prix.
+- **eBay** : l'annonce de la paire est reconnue par son SKU `VRM-{n°}` (identité,
+  §5 — une annonce eBay au même titre sans SKU ne déclenche rien ; deux annonces
+  pour un même N° ⇒ aucune n'est touchée). La baisse conseillée est la MÊME en
+  proportion que sur Vinted, jamais sous le prix d'achat, et se fait d'ici en un
+  clic **confirmé** (`revise` → ReviseInventoryStatus). eBay refuse ⇒ la raison
+  d'eBay est écrite, rien n'est marqué baissé.
+- **Vinted** reste un lien (c'est lui qui baisse) ; **Leboncoin** : la ligne le
+  dit (« baisse-la là-bas dans Mes annonces »), sans lien deviné.
+- `ebay_listings` n'est lu que quand le panneau est ouvert (§4.4) ; illisible ⇒
+  aucune baisse eBay proposée, et c'est écrit.
+- Le bandeau « paires qui dorment » n'est plus en rouge (§7 : le rouge est pour
+  deux paires sous un même numéro).
+- Banc `annonces-carte.cjs` : la bonne annonce (SKU), le bon prix (60 → 53 €),
+  rien avant la confirmation, une seule baisse, l'écran qui le dit.
+
+### Repère d'achat par modèle (proposition 10, 6 octobre)
+Ventes → Analyse de tes ventes → « Repère d'achat par modèle » : par modèle
+reconnu dans le titre (`extractModel`), prix moyen de revente (ventes non
+annulées, comptes exclus écartés) moins prix moyen d'achat (achats non annulés).
+- ⚠️ **Un repère pour acheter, JAMAIS de la compta** : deux moyennes, pas la
+  marge d'une paire ; aucune paire n'est reliée à un achat (§5) ; n'entre dans
+  aucun total, rapport ni export — l'écran le dit.
+- Moins de 3 ventes OU 3 achats d'un modèle ⇒ pas de ligne. Les achats ne sont
+  lus qu'à l'ouverture du bloc ; illisibles ⇒ rien n'est calculé, et c'est dit.
+- Mesuré chez lui le 5 octobre : Samba +4,60 € (47 achetées / 26 vendues),
+  Spezial +20,60 €, Air Max 1 +29,10 €, XT-6 +39,30 €. Seules **8 de ses 401
+  paires** ont un prix d'achat saisi : ce repère ne remplace pas la saisie.
+- Banc `rapport.cjs` : Samba +20 € (l'annulée à 999 € écartée), Gazelle à une
+  seule paire absente ; réaffaibli (annulée comptée) ⇒ rouge.
+
+### Les offres reçues reviennent, en tête de Messages (proposition 6, 6 octobre)
+Retirées de l'accueil (28 sept.) puis de la cloche (30 sept.) avec la promesse
+d'un « onglet dédié » ; leur lecture avait disparu le 3 octobre. Mesuré : **37
+offres en 14 jours, toutes connues par EMAIL** (`email_offer_*`) ; seules 3
+conversations captées portent une offre en attente, et elles sont vieilles.
+- Messages ouvre sur « N offres à trancher » : la règle `offresAtraiter` (compte,
+  chronologie, titre non ambigu) écarte celles réglées par une vente, et **le
+  dit** (« 1 autre déjà réglée par une vente, mise de côté »). « c'est fait »
+  range une offre (`vinted_offers_done`, synchronisé, rattrapé par `onCloudReady`).
+- Lecture des **14 derniers jours seulement, en scalaires** (`meta->>`, §4.4).
+- ⚠️ **L'email ne porte aucun identifiant d'annonce** (0/518) : ni « ton prix »
+  ni « la remise demandée » ne sont écrits — les tirer du titre serait le
+  rapprochement interdit (§5). Le repère montré est celui du **modèle** (prix
+  moyen de revente, au moins 3 ventes), dit comme tel.
+- On y répond sur Vinted, sur le compte nommé (une ligne d'en-tête quand elles
+  sont toutes sur le même, sur chaque ligne sinon — §7).
+- Banc `messagerie.cjs` : l'offre récente seule (ni la vieille, ni la réglée),
+  le repère du modèle, aucune remise inventée, « c'est fait » gardé ; règle
+  retirée ⇒ 4 rouges. `audit-offres-titre.cjs` accepte la phrase en ternaire
+  (vingt-septième cri au loup évité : la règle, pas l'orthographe).
+
+### Retrait automatique d'eBay quand la paire est prouvée vendue sur Vinted (proposition 8, 6 octobre)
+Accepté par Julien le 5 octobre. Avant, l'alerte « vendue sur Vinted → retire-la
+d'eBay » proposait un clic confirmé ; maintenant il peut l'allumer pour que ça se
+fasse tout seul. **Éteint par défaut** (`vrm_ebay_retrait_auto`, synchronisé,
+rattrapé par `onCloudReady`), et allumer demande une confirmation.
+- **La même règle que l'alerte** (`doublesVenteEbay`, §11) : SKU `VRM-{n°}` sur une
+  annonce eBay active + vente Vinted **prouvée** (transaction → `item_id`, état qui
+  ne la fait pas revenir). Une annonce sans SKU ne désigne rien (§5).
+- **Rien ne part sur « pas su »** : ventes Vinted illisibles, annonces illisibles,
+  réglage pas encore arrivé du nuage (`isCloudReady`) ⇒ aucun retrait. 5 retraits
+  au plus par passage, une seule tentative par annonce et par ouverture.
+- **Le serveur revérifie, il ne croit pas le navigateur** (`handleRetirer`, mode
+  `auto:true`) : SKU de paire exigé ; le réglage relu **chez ce vendeur**
+  (illisible ⇒ 503, éteint ⇒ 403) ; puis `GetItem` relit l'annonce et son SKU
+  doit être celui attendu (sinon 409 `sku-change`, rien n'est retiré) — une
+  annonce dont le SKU a été changé entre-temps n'est plus la même paire.
+- **Ce qui part en son nom se relit** : journal `ebay_retraits_auto` (50 derniers,
+  écrit seulement si sa lecture a réussi), affiché sous l'alerte eBay. La réponse
+  dit `journal:false` si l'écriture a échoué.
+- Preuves : `audit-ebay-route.cjs` 162 contrôles (dont 9 pour ce mode) ; banc
+  `ebay-annonces.cjs` (allumé : retrait parti avec le bon SKU ; éteint ou preuve
+  illisible : rien). Mutation « réglage ignoré par le serveur » ⇒ rouge.
+
 ### ⚠️⚠️ « 300 NOTIFS », « COMME SI JE DÉBUTAIS », « ÇA TÉLÉCHARGE » (3 octobre)
 Trois plaintes de Julien, **une cause racine pour les deux premières** :
 - ⚠️⚠️ **LES EFFETS DE L'APP PARTAIENT AVANT LA SESSION.** La porte de connexion
@@ -4915,6 +5021,199 @@ titres, ce que §5 interdit.
   repasse « pas reliée », c'est que `GetMyeBaySelling` ne rend pas le SKU comme
   prévu, et c'est ça qu'il faut regarder, pas l'écran.
 
+### ⚠️⚠️ eBay : CHAQUE VENDEUR SON eBAY, des BROUILLONS, et un PLANIFICATEUR (5 octobre)
+Julien : « tout doit être adaptable en fonction de la personne en face », puis
+« tout doit être personnalisable : le nombre d'annonces qu'il peut poster,
+sélectionner ses brouillons, ce qu'il veut mettre en ligne, etc. Tout doit être
+parfait. »
+
+**0. Deux défauts d'avant, corrigés d'abord (`api/ebay.js`).**
+- ⚠️⚠️ **« Vérifier sans publier » DOUBLAIT les frais.** `totalFrais`
+  additionnait TOUS les `<Fee>` ; or le guide Trading « Fees » dit que
+  `ListingFee` EST le total. Dès qu'un frais n'était pas nul, le montant
+  annoncé était faux (0,35 € affichés 0,70 €). Le banc `ebay-write.cjs` était
+  **vert dessus** : sa fixture servait « ListingFee 0,35 + InsertionFee 0,00 »,
+  une forme irréaliste où additionner et lire donnent le même nombre (§6.3).
+  ⇒ `fraisParNom` range chaque frais **sous son nom** ; `total` = `ListingFee`,
+  **absent ⇒ `null` (« pas su »), jamais 0** ; `programmation` = le frais
+  d'option (`SchedulingFee` — nom NON mesuré sur eBay.fr : absent ⇒ null) ; une
+  remise éventuelle est rendue à côté, jamais soustraite.
+- ⚠️ **`tradingCall` ne gardait que le PREMIER `<LongMessage>`** : sur un Ack
+  Warning ou avec plusieurs `<Errors>`, il montrait un simple avertissement à la
+  place du vrai refus, et perdait l'ErrorCode (le 488 du planificateur). Il rend
+  maintenant `erreurs` (`{code, severite, message, params}`), `err` = la
+  première **Error**, `avertissements` = les Warning.
+
+**1. Chaque vendeur son eBay.** `ebay_tokens` et les lignes `ebay_*` étaient
+celles de l'INSTALLATION (écrites au nom de `VRM_OWNER_UID`, lues avec la clé
+de service **sans filtre**), et la route refusait tout autre vendeur (403).
+- Base cloisonnée : toute lecture est filtrée `owner=eq.{vendeur de la
+  session}`, toute écriture porte `owner` = lui, cible `(owner,id)`. Le vendeur
+  est **passé explicitement** à chaque fonction de `api/_lib/ebay.js`
+  (`portee(owner)`) — jamais une variable de module (deux requêtes se traitent
+  en parallèle). Un vendeur ne lit jamais les jetons d'un autre, et ses appels
+  partent chez eBay avec **son** jeton.
+- Le `state` de consentement **porte le vendeur** (`ts.vendeur.mac`, HMAC par
+  `EBAY_CERT_ID`, 30 min, comparaison en temps constant) : le retour range les
+  jetons chez CELUI qui a demandé. Le vendeur fait partie de ce qui est signé :
+  un state dont on remplace le vendeur est refusé.
+- La garde « propriétaire seulement » est retirée sur base cloisonnée ; un
+  abonnement coupé (`vrm_acces_pour` = false) ⇒ **402**, zéro appel eBay (« pas
+  su » ne coupe pas, comme ailleurs).
+- ⚠️ **Rétrocompatible sans rien faire** : sa ligne `ebay_tokens` porte déjà
+  owner = `VRM_OWNER_UID` = son identifiant. **Base pas encore cloisonnée ⇒
+  exactement comme avant** (un seul jeu de données, seul le propriétaire de
+  l'installation) — c'est pourquoi le 403 y est GARDÉ.
+- « Pas su » ≠ « pas relié » : la lecture du refresh_token a trois états ; une
+  base qui hoquette répond 503 (« je n'ai pas pu lire ta connexion eBay »), plus
+  « aucun compte eBay relié ».
+- L'app lisait déjà toutes ses lignes eBay avec `sbAuth()` (RLS ne lui rend que
+  les siennes) — vérifié ligne par ligne.
+
+**2. Brouillons et planificateur.**
+- **Brouillons** : une ligne DÉDIÉE par vendeur (`ebay_brouillons`, jamais
+  `main`, lue projetée). « Enregistrer en brouillon » dans le formulaire ;
+  « Modifier » rouvre un brouillon dans ce même formulaire. Relire-fusionner-
+  écrire, et **une lecture ratée n'écrit RIEN** (repartir de vide remplacerait
+  ses six brouillons par un seul — prouvé au banc en réaffaiblissant). Une
+  seule règle « brouillon → annonce » (`itemDeBrouillon`) pour le formulaire ET
+  la liste (§11). Cocher un, plusieurs ou tous ; « Vérifier la sélection »
+  (une vérification à blanc par brouillon, l'une après l'autre, frais par nom).
+- **Planificateur** (« Programmer la sélection ») : départ (préréglages
+  **modifiables et synchronisés** : Maintenant · Ce soir 20 h · Demain 12 h 30 ·
+  Dimanche 20 h, ou une date et une heure), N par jour, plage de–à, jours de la
+  semaine, **écart FIXE** (aucun hasard, §3), ordre (sélection / N° / prix).
+  Le rythme est `vrm_ebay_rythme` (SYNC_KEYS, rattrapé par `onCloudReady`
+  seulement s'il est resté au défaut, §5.49).
+  - L'heure est celle de **PARIS**, calculée par `Intl` (`partsParis`,
+    `parisVersUtc`) — jamais l'heure locale de l'appareil. Le changement d'heure
+    du 25 octobre 2026 est juste (19:00 = 17:00 UTC le samedi, 18:00 UTC le
+    dimanche) ; une heure ambiguë ou inexistante est refusée ; « un jour plus
+    tard » avance le CALENDRIER, pas 24 h. Le banc tourne exprès avec un
+    navigateur à l'heure de **New York**.
+  - `heuresDuLot` est une fonction pure du temps : premier moment autorisé,
+    puis l'écart ; quota du jour ou plage dépassés ⇒ jour coché suivant. Jamais
+    une annonce programmée à moins de 20 min (eBay en exige 15) ; au-delà de
+    3 semaines (la limite d'eBay) les brouillons **restent des brouillons**, et
+    l'écran dit combien.
+  - L'aperçu donne l'heure exacte de chaque paire, groupé par jour, puis les
+    frais **lus chez eBay pour CETTE heure** (vérification à blanc avec
+    `ScheduleTime`) : programmation ligne par ligne et au total, « pas su »
+    quand eBay ne l'annonce pas (jamais 0), et « facturés à la création, non
+    remboursés si tu annules » **seulement** si un frais de programmation non
+    nul est revenu. Une paire déjà en ligne / déjà programmée sur eBay (SKU),
+    prouvée vendue sur Vinted, sans N° ou incomplète est écartée **avec sa
+    raison** ; preuve de vente illisible ⇒ rien ne part.
+  - La limite de vente (`GET /sell/account/v1/privilege`) est lue et dite ; un
+    lot qui la dépasserait est signalé (« pas su » si illisible). ⚠️ C'est une
+    LIMITE mensuelle, pas ce qu'il reste ce mois-ci (non exposé là).
+  - ⚠️⚠️ **CE QUI N'EST PAS PROUVÉ EST DIT, JAMAIS PROMIS.** Avant sa PREMIÈRE
+    programmation, une case à cocher : l'annulation par VRM n'est pas garantie
+    (il faudra peut-être annuler sur eBay), et une paire vendue ailleurs avant
+    son heure peut quand même partir. C'est SA décision (la revue proposait
+    d'attendre la mesure de l'annulation ; Julien a demandé le planificateur —
+    il décide en connaissance de cause). Mémorisée (`risqueCompris`).
+- **Programmer** (`programmer`, une annonce par appel, l'une après l'autre) :
+  `confirme:true`, heure ISO UTC validée par le serveur (15 min – 3 semaines),
+  N° exigé (sans SKU, une paire vendue ailleurs ne se retrouve pas), **état
+  exigé** (plus d'« Occasion » posé en silence), UUID 32 hex, frais vus. Puis :
+  relecture de SES annonces (en ligne + programmées) ⇒ SKU déjà présent = 409
+  (eBay, lui, ne l'empêche pas) ; illisible = 503 · vérification à blanc **sans
+  UUID** ⇒ frais inconnus = refus, plus chers que vus = 409 · ajout **avec
+  l'UUID** dans `<Item>`, `<ScheduleTime>` dans `<Item>`. La vérité rendue est
+  celle d'eBay (ItemID, StartTime, EndTime) ; eBay qui ignore l'heure ⇒
+  `enLigneMaintenant`. Coupure ⇒ « incertain » : l'app relit chez eBay par SKU
+  AVANT tout nouvel essai, puis UN seul essai avec le MÊME UUID ; un 488 n'est
+  « déjà programmée » qu'après un GetItem qui confirme le SKU. Bilan par
+  brouillon (« 4 sur 6 programmées · 2 refusées : … »), jamais d'arrêt muet.
+- **Programmées** : `GetMyeBaySelling` demande `<ScheduledList>` (sans elle une
+  programmée est invisible : « pas vu » ≠ « aucune »), découpé **par
+  conteneur** avant d'en extraire les `<Item>`, paginé (5 pages, sinon
+  `complet:false`). Rangées dans `ebay_programmees` seulement si eBay a
+  répondu ; ligne absente = « jamais lue » ⇒ l'écran la demande une fois.
+  Groupées par jour ; statuts Programmée · En ligne · « Pas partie à l'heure »
+  (+30 min, eBay la garde en attente, avec le geste) · « à relire » ; Échec sur
+  le brouillon.
+- **Déplacer** (`reprogrammer`) : refusé à moins d'1 h du départ (relu chez
+  eBay), grisé avec la raison à l'écran. **Annuler** (`deprogrammer`) :
+  EndFixedPriceItem **essayé** sur une programmée relue à l'instant, puis
+  relecture ; la réponse d'eBay est montrée TELLE QUELLE, et sur un refus
+  « annule-la dans le Seller Hub » avec le lien.
+- **Double vente** : une programmée dont la paire est prouvée vendue sur Vinted
+  rejoint l'alerte eBay (« programmée sur eBay — à annuler »), sur l'écran ET
+  le tableau de bord (`doublesVenteEbay`, `programmees`, §11).
+
+⚠️ **NON MESURÉ (eBay et la production bloqués ici — rien n'a été appelé pour
+de vrai)** : le nom `SchedulingFee` sur eBay.fr et son montant (≈ 0,20 € selon
+l'aide, la vérification à blanc fait foi) ; qu'EndFixedPriceItem accepte une
+annonce pas encore commencée ; ReviseFixedPriceItem + ScheduleTime ; qu'eBay
+omette un conteneur vide dans GetMyeBaySelling (lu « vide » sur un Ack
+Success) ; l'adresse `ebay.fr/sh/lst/scheduled` du Seller Hub (un repli, pas une
+promesse) ; le délai maximal de la fonction Vercel (un ajout lent devient
+« incertain », couvert par la relecture par SKU). **Le premier geste de
+Julien** : programmer UNE paire, une heure à l'avance, regarder la ligne de
+frais de programmation, puis essayer « Annuler » — la réponse d'eBay dira si
+l'annulation par VRM marche.
+
+- Preuves : `audit-ebay-route.cjs` **153 contrôles** (dont 6 dans un processus
+  neuf sur base NON cloisonnée), **73 rouges** sur e50cd28 ; et chacune de huit
+  mutations le refait passer au rouge (lecture sans filtre de vendeur · UUID à
+  la vérification · frais additionnés · garde d'identité retirée · 488 cru sans
+  GetItem · XML lu sans conteneur · state non vérifié · premier message gardé).
+  `ebay-write.cjs` : forme réaliste, **5 rouges** sur l'avant (`fees=1.1`).
+  Banc `scripts/bancs/ebay-programmer.cjs` (données inventées, port 4721, deux
+  tailles + un passage « brouillons illisibles ») : **71 contrôles**, rouge sur
+  le build d'avant, et rouge sous quatre mutations (heure locale · décalage fixe
+  +2 h · risque non coché · brouillons écrits depuis vide).
+  `ebay-annonces.cjs` : + l'alerte « à annuler » (écran, tableau de bord,
+  « pas su ») — **7 rouges** sur l'avant.
+
+### ⚠️⚠️ Revue du 6 octobre, côté serveur eBay : le lien de connexion capturait le compte d'un autre
+Revue contradictoire du planificateur eBay. Chaque défaut a été confirmé en
+EXÉCUTANT la vraie route.
+- ⚠️⚠️ **Le `state` signé prouvait QUI avait demandé, jamais que le retour arrivait
+  dans SON navigateur.** Le vendeur B demandait un lien de connexion et
+  l'envoyait à quelqu'un (« reconnecte ton eBay à VRM » : c'est une vraie page
+  eBay, au nom de VRM). La victime acceptait, et **SON** refresh_token était
+  rangé chez B : ses commandes, ses acheteurs, ses annonces. Le même lien
+  servait 30 minutes, pour plusieurs victimes. C'est arrivé avec
+  « chaque vendeur son eBay » (avant, seul le propriétaire obtenait un `state`).
+  ⇒ `authurl` pose un **nonce** dans un cookie `HttpOnly; Secure; SameSite=Lax;
+  Path=/api/` et le nonce entre dans la signature. Le retour l'exige, puis
+  l'**efface quoi qu'il arrive**. Le lien ne marche donc que dans le navigateur
+  qui l'a demandé, et une seule fois (RFC 6749 §10.12).
+  ⚠️ Conséquence à connaître : une connexion lancée dans un navigateur et finie
+  dans un autre échoue, avec « relance la connexion eBay depuis VRM, dans ce
+  navigateur ». Ça peut arriver dans une PWA iPhone qui ouvre eBay dans une vue
+  à part. Son jeton actuel n'est pas touché, et rien n'est à refaire pour lui.
+- ⚠️⚠️ **« Publier » n'avait AUCUNE garde d'identité.** Une paire déjà en vente,
+  ou programmée pour ce soir, repartait en seconde annonce (prouvé : deux
+  annonces VRM-30). `publish` passe maintenant par la même règle que
+  `programmer` (`dejaChezEbay` : relue chez eBay, en ligne ET programmées ;
+  illisible ou incomplète ⇒ 503 « pas su » ; présente ⇒ 409 `deja-*` avec son
+  `itemId`). Une annonce SANS N° part comme avant (rien à comparer).
+- **Le SKU se compare par le N°, pas par la chaîne** (`numDeSku` / `memePaire`,
+  même lecture stricte que `numDeSkuEbay` dans l'app). « VRM-030 », « vrm-30 »
+  et « VRM 30 », retapés dans le Seller Hub, sont la N°30. Avant, ces formes
+  laissaient programmer et publier une seconde annonce. Le retrait automatique
+  suit la même règle.
+- **Une écriture sans `<Ack>` est « incertaine », jamais « refusée »**
+  (`sansAck`). Une passerelle eBay qui répond 503 en HTML APRÈS avoir créé,
+  annulé, déplacé ou retiré une annonce était rendue « eBay a refusé ». Le
+  brouillon restait alors à republier, d'où une seconde annonce. Concerne
+  `publish`, `programmer`, `deprogrammer`, `reprogrammer` et `retirer`. Un VRAI
+  refus (Ack Failure) reste un refus.
+- Preuves :
+  - `audit-ebay-route.cjs` : **181 contrôles, 16 rouges** sur le code d'avant,
+    dont « le lien de B ouvert dans le navigateur de Julien : rangé chez B »,
+    « 2 annonces VRM-22 » et « HTTP 422 eBay a refusé » sur une annonce créée ;
+  - `bancs/ebay-callback.cjs` porte le nonce. Ses cas d'erreur doivent ATTEINDRE
+    l'échange, sinon ils passeraient sur le refus du nonce, vides de sens.
+- ⚠️ Deux branches de sauvegarde (`claude/wip-ext-5162`, `claude/wip-bilan-lancement`)
+  ont été poussées par erreur le 6 octobre. Le proxy a refusé leur
+  suppression : à effacer sur GitHub. Elles ne se déploient pas
+  (`claude/**` est coupé dans `vercel.json`).
+
 ### « Bilan de la semaine » et préparation du lancement (6 octobre, propositions 11 et 15)
 **Le bilan (proposition 11).** Une notification par semaine et par vendeur :
 vendu (nombre de ventes et montant), reçu, colis à expédier, paires qui dorment.
@@ -4929,7 +5228,11 @@ vendu (nombre de ventes et montant), reçu, colis à expédier, paires qui dorme
   cron refusé au déploiement bloquerait TOUS les déploiements (comme le défaut
   #250 des 13 fonctions).
 - **Aucune règle n'est réécrite.** Vendu = `ventesFaites` (date de vente). Reçu
-  = `ventesDeclarables`, daté au versement, c'est-à-dire le CA déclaré. À
+  = `ventesDeclarables`, daté au versement. ⚠️ Le bilan ne lui passe **pas** le
+  registre « J'ai déclaré ce mois » : le reçu de la semaine est l'argent
+  ARRIVÉ ces sept jours-là, pas ce qu'il a déclaré (sinon une vente déclarée
+  sans date de versement sortirait des « sans date », et le reçu se dirait
+  complet sans l'être). L'audit le vérifie sur l'appel lui-même. À
   expédier = la règle du widget (`aExpedier`, colis cochés « posté » exclus). Le
   serveur ne peut pas importer `App.jsx`. `api/_lib/ventes-regle.js` est donc
   une **copie exacte**, refabriquée par
@@ -5018,12 +5321,16 @@ vendu (nombre de ventes et montant), reçu, colis à expédier, paires qui dorme
 
   | contrôle | sur le code d'avant | sous les mutations |
   |---|---|---|
-  | `audit-bilan-semaine.cjs` (42 contrôles) | 31 rouges | règle du miroir modifiée → 6 · partiel affiché comme sûr → 4 · bilan éteint par défaut → 2 · publication hors synchro → 1 |
+  | `audit-bilan-semaine.cjs` (46 contrôles) | 34 rouges | règle du miroir modifiée → 6 · partiel affiché comme sûr → 4 · bilan éteint par défaut → 2 · publication hors synchro → 1 · reçu passé par le registre des déclarations → 1 |
   | banc `bilan-semaine.cjs` (20, la vraie route, deux vendeurs, faux Web Push) | 14 rouges | règle du miroir modifiée → 1 · partiel affiché comme sûr → 2 · envoi malgré un mémo non écrit → 1 · mémo illisible pris pour « jamais envoyé » → 1 · préférence ignorée → 1 |
   | `audit-fermer-compte.cjs` (25) | 22 rouges | effacement sans filtre de vendeur → 3 · propriétaire accepté → 2 · échec partiel annoncé réussi → 3 |
   | `audit-lancement.cjs` (22) | 16 rouges | case CGV retirée → 2 · `redirect_to` retiré → 5 · adresse écrite en dur sur l'accueil → 2 |
   | bancs `abonnement.cjs` (53) et `accueil.cjs` (40) | 7 et 2 rouges | — |
 
+  Les mutations ont été relancées **après la fusion** avec la branche du jour :
+  mêmes rouges. Cette fusion a apporté le registre des déclarations, et
+  `ventesDeclarables` appelle maintenant `indexDeclarations` et `moisDeclare`.
+  Le miroir les porte (refabriqué par `--recopie`, jamais à la main).
   ⚠️ **Le premier banc du bilan était vert sur un miroir qui comptait les
   ventes remboursées**, car aucune n'était servie. Il en sert une maintenant.
   **Le premier contrôle du contact** ne regardait que les liens `mailto:` : une
@@ -5937,8 +6244,8 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | outil | quoi |
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
-| `node scripts/audit-*.cjs` | **74 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
-| `scripts/bancs/*.cjs` | les **66 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
+| `node scripts/audit-*.cjs` | **77 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `scripts/bancs/*.cjs` | les **69 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
 **Trois règles de preuve :**
@@ -6230,8 +6537,8 @@ script-là me fait croire à une catastrophe.
 src/App.jsx                     l'app (grep avant de lire — le fichier est énorme)
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
-scripts/audit-*.cjs             les 74 audits
-scripts/bancs/                  les 66 bancs (leur README dit comment les lancer)
+scripts/audit-*.cjs             les 77 audits
+scripts/bancs/                  les 69 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 ```

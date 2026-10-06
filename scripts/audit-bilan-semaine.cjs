@@ -29,7 +29,10 @@ let parser;
 try { parser = require(path.join(R, 'node_modules', '@babel', 'parser')); }
 catch (e) { console.log('❌ analyseur Babel introuvable — ' + e.message); process.exit(1); }
 
-const NOMS = ['classifyOrderStatus', 'tsCommande', 'montantCommande', 'lbcAnnulee', 'lbcFinalisee', 'venteFinalisee', 'ymDeTs', 'ventesDeclarables', 'ventesFaites', 'compteEcarte'];
+// `indexDeclarations` et `moisDeclare` : le registre « J'ai déclaré ce mois »
+// (6 octobre), lu par `ventesDeclarables`. Le miroir doit les porter pour que la
+// règle s'exécute ; le BILAN, lui, ne lui passe aucun registre (voir plus bas).
+const NOMS = ['classifyOrderStatus', 'tsCommande', 'montantCommande', 'lbcAnnulee', 'lbcFinalisee', 'venteFinalisee', 'ymDeTs', 'indexDeclarations', 'moisDeclare', 'ventesDeclarables', 'ventesFaites', 'compteEcarte'];
 const lire = (f) => { try { return fs.readFileSync(path.join(R, f), 'utf8'); } catch (_) { return null; } };
 // Les déclarations de premier niveau `const X = …` d'un fichier, par nom.
 function declarations(src, plugins) {
@@ -111,6 +114,26 @@ if (process.argv.includes('--recopie')) {
   await essaie('ventesDeclarables', async () => {
     const a = ctxApp.ventesDeclarables({ vinted, lbc, ebay, exclu, versements }), b = srv.ventesDeclarables({ vinted, lbc, ebay, exclu, versements });
     dit(sansObjets(a) === sansObjets(b) && a.lignes.length > 0, 'ventesDeclarables : même résultat (app = serveur)', `${a.lignes.length} lignes · à dater ${a.aDater.length} · écartées ${a.ecartees.length}`);
+    // Avec un registre de déclarations : la même règle des deux côtés aussi.
+    const declare = { '2026-08': { ids: ['vinted:4', 'lbc:L2'] }, '2026-09': { ids: ['vinted:4'] } };
+    const c = ctxApp.ventesDeclarables({ vinted, lbc, ebay, exclu, versements, declare }), d = srv.ventesDeclarables({ vinted, lbc, ebay, exclu, versements, declare });
+    dit(sansObjets(c) === sansObjets(d) && c.declare === 'lu' && c.lignes.some((l) => l.declaree), 'ventesDeclarables avec un registre « déclaré » : même résultat (app = serveur)');
+  });
+  await essaie('le bilan ne lit pas le registre', async () => {
+    // « Reçu » dans le bilan = l'argent ARRIVÉ dans la semaine (date de
+    // versement). Le registre dit dans quel mois une vente a été DÉCLARÉE : il
+    // ne change pas le jour où l'argent est arrivé. Le bilan n'en passe donc
+    // aucun — sinon une vente déclarée sans date de versement sortirait des
+    // « sans date » et le reçu se dirait complet sans l'être.
+    const src = (lire('api/_lib/bilan-semaine.js') || '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+    // L'argument entier de chaque appel, parenthèses équilibrées.
+    const appels = [];
+    for (let i = src.indexOf('ventesDeclarables('); i >= 0; i = src.indexOf('ventesDeclarables(', i + 1)) {
+      let j = i + 'ventesDeclarables('.length, prof = 1;
+      while (j < src.length && prof) { if (src[j] === '(') prof++; else if (src[j] === ')') prof--; j++; }
+      appels.push(src.slice(i + 'ventesDeclarables('.length, j - 1).replace(/\s+/g, ' '));
+    }
+    dit(appels.length > 0 && appels.every((a) => !/\bdeclare\b/.test(a)), 'le bilan compte le reçu au jour du versement, sans le registre des déclarations', appels.join(' | '));
   });
   await essaie('compteEcarte', async () => {
     const cas = [['1', new Set(['1']), {}], ['1', new Set(['1']), { 1: false }], ['2', new Set(), { 2: true }], ['3', null, null]];

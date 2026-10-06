@@ -39,6 +39,14 @@ const loc = (res) => res.headers.Location || '';
   await handler({ method: 'POST', query: {}, headers: { authorization: 'Bearer eyJh.banc-proprio.sig' }, body: { action: 'authurl' } }, demande);
   const etat = decodeURIComponent((/[?&]state=([^&]+)/.exec((demande.body && demande.body.url) || '') || [])[1] || '');
   dit(!!etat, 'la demande de consentement porte un state signé par le serveur', etat || '(aucun)');
+  // Le navigateur renvoie le nonce posé par `authurl` (6 octobre) : sans lui, le
+  // retour est refusé — c'est ce qui lie le consentement au navigateur qui l'a
+  // demandé. Les cas d'erreur ci-dessous doivent donc ATTEINDRE l'échange
+  // (sinon ils passeraient sur le refus du nonce, vides de sens).
+  const cookie = (/^(vrm_ebay_etat=[0-9a-f]{32})/.exec(String(demande.headers['Set-Cookie'] || '')) || [])[1] || '';
+  dit(!!cookie, 'et elle pose son nonce dans un cookie', String(demande.headers['Set-Cookie'] || '(aucun)'));
+  const avecCookie = { cookie };
+  const pasLeNonce = (res) => !/autre%20navigateur|expir/.test(loc(res));
 
   { const res = faireRes(); await handler({ query: { mode: 'callback', error: 'access_denied' } }, res);
     dit(res.code === 302 && /ebay=refus/.test(loc(res)), 'refus de consentement → retour ?ebay=refus', loc(res)); }
@@ -46,16 +54,19 @@ const loc = (res) => res.headers.Location || '';
     dit(res.code === 302 && /ebay=erreur/.test(loc(res)), 'aucun code → retour ?ebay=erreur', loc(res)); }
 
   ebayMode = 'ok'; supaWriteOk = true;
-  { const res = faireRes(); await handler({ query: { mode: 'callback', code: 'C123', state: etat } }, res);
+  { const res = faireRes(); await handler({ query: { mode: 'callback', code: 'C123', state: etat }, headers: avecCookie }, res);
     dit(res.code === 302 && /ebay=connecte/.test(loc(res)), 'code valide + rangement OK → ?ebay=connecte', loc(res));
     dit(!loc(res).includes(REFRESH) && !loc(res).includes(ACCESS), 'AUCUN jeton dans l\'URL de retour', loc(res)); }
 
   supaWriteOk = false;
-  { const res = faireRes(); await handler({ query: { mode: 'callback', code: 'C123', state: etat } }, res);
-    dit(res.code === 302 && /ebay=erreur/.test(loc(res)) && !/connecte/.test(loc(res)), 'rangement échoué → ?ebay=erreur, JAMAIS connecte', loc(res)); }
+  { const res = faireRes(); await handler({ query: { mode: 'callback', code: 'C123', state: etat }, headers: avecCookie }, res);
+    dit(res.code === 302 && /ebay=erreur/.test(loc(res)) && !/connecte/.test(loc(res)) && pasLeNonce(res), 'rangement échoué → ?ebay=erreur, JAMAIS connecte', loc(res)); }
   supaWriteOk = true; ebayMode = 'bad';
-  { const res = faireRes(); await handler({ query: { mode: 'callback', code: 'BADCODE', state: etat } }, res);
-    dit(res.code === 302 && /ebay=erreur/.test(loc(res)), 'code refusé par eBay → ?ebay=erreur', loc(res)); }
+  { const res = faireRes(); await handler({ query: { mode: 'callback', code: 'BADCODE', state: etat }, headers: avecCookie }, res);
+    dit(res.code === 302 && /ebay=erreur/.test(loc(res)) && pasLeNonce(res), 'code refusé par eBay → ?ebay=erreur', loc(res)); }
+  ebayMode = 'ok';
+  { const res = faireRes(); await handler({ query: { mode: 'callback', code: 'C123', state: etat } }, res);
+    dit(res.code === 302 && /ebay=erreur/.test(loc(res)) && !/connecte/.test(loc(res)), 'le même lien ouvert dans un AUTRE navigateur (sans le nonce) → ?ebay=erreur, rien de relié', loc(res)); }
 
   // sans clés → erreur honnête (pas de crash)
   ebayMode = 'ok'; delete process.env.EBAY_APP_ID;

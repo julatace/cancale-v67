@@ -62,10 +62,42 @@ export const venteFinalisee = (o) => classifyOrderStatus(o && o.status) === 'com
 
 export const ymDeTs = (t) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
 
-export const ventesDeclarables = ({ vinted, lbc, ebay, masquee, exclu, versements } = {}) => {
+export const indexDeclarations = (reg) => {
+  if (!reg || typeof reg !== 'object' || Array.isArray(reg)) return null;
+  const idx = new Map();
+  for (const ym of Object.keys(reg).sort()) {
+    const d = reg[ym]; if (!d || !Array.isArray(d.ids)) continue;
+    for (const id of d.ids) {
+      const k = String(id); const a = idx.get(k);
+      if (a) { if (!a.includes(ym)) a.push(ym); } else idx.set(k, [ym]);
+    }
+  }
+  return idx;
+};
+
+export const moisDeclare = (reg, ym) => !!(reg && typeof reg === 'object' && reg[ym] && Array.isArray(reg[ym].ids));
+
+export const ventesDeclarables = ({ vinted, lbc, ebay, masquee, exclu, versements, declare } = {}) => {
   const lignes = [], aDater = [], ecartees = [], vus = new Set();
   let exclues = 0;
   const garde = (l) => { if (vus.has(l.id)) return false; vus.add(l.id); return true; };
+  const idx = indexDeclarations(declare);
+  // Le mois où la vente COMPTE : celui de sa déclaration s'il y en a une, sinon
+  // celui du versement (ou de la vente pour Leboncoin, de la commande pour eBay).
+  const place = (l) => {
+    if (!idx) return l;
+    const d = idx.get(l.id);
+    if (d) { l.ymVers = l.ym || null; l.ym = d[0]; l.declaree = true; if (d.length > 1) l.double = d.slice(); }
+    else if (l.ym && moisDeclare(declare, l.ym)) l.apres = true;
+    return l;
+  };
+  // Une vente sans date mais DÉCLARÉE n'est plus « à dater » : son mois est
+  // celui où il l'a déclarée. `ts` reste vide (aucune date de versement connue).
+  const aDaterOuDeclaree = (l) => {
+    const d = idx && idx.get(l.id);
+    if (!d) { aDater.push(l); return; }
+    lignes.push(Object.assign(l, { ts: null, ym: d[0], ymVers: null, declaree: true }, d.length > 1 ? { double: d.slice() } : {}));
+  };
   for (const o of (vinted || [])) {
     if (!o || !venteFinalisee(o)) continue;
     if (exclu && exclu(o)) { exclues += 1; continue; }
@@ -74,9 +106,9 @@ export const ventesDeclarables = ({ vinted, lbc, ebay, masquee, exclu, versement
     const eur = montantCommande(o), masq = !!(masquee && masquee(o));
     const v = (versements && tx != null) ? versements[String(tx)] : null;
     const t = v ? Date.parse(v) : 0;
-    if (!t) { if (!vus.has(id)) { vus.add(id); aDater.push({ id, plateforme: 'Vinted', eur, titre: o.title || '', masquee: masq, o }); } continue; }
+    if (!t) { if (!vus.has(id)) { vus.add(id); aDaterOuDeclaree({ id, plateforme: 'Vinted', eur, titre: o.title || '', masquee: masq, o, dateVente: o.date }); } continue; }
     const l = { id, plateforme: 'Vinted', ts: t, ym: ymDeTs(t), eur, titre: o.title || '', masquee: masq, o, dateVente: o.date };
-    if (garde(l)) lignes.push(l);
+    if (garde(l)) lignes.push(place(l));
   }
   for (const v of (lbc || [])) {
     if (!v || v.isSeller !== true || !v.txId) continue;
@@ -85,9 +117,9 @@ export const ventesDeclarables = ({ vinted, lbc, ebay, masquee, exclu, versement
     const id = 'lbc:' + v.txId;
     if (!isFinite(eur)) { if (!vus.has(id)) { vus.add(id); ecartees.push({ id, plateforme: 'Leboncoin', raison: 'prix inconnu', titre: v.title || '' }); } continue; }
     const t = Date.parse(v.dateVente || '');
-    if (!t) { if (!vus.has(id)) { vus.add(id); aDater.push({ id, plateforme: 'Leboncoin', eur, titre: v.title || '' }); } continue; }
+    if (!t) { if (!vus.has(id)) { vus.add(id); aDaterOuDeclaree({ id, plateforme: 'Leboncoin', eur, titre: v.title || '', masquee: false }); } continue; }
     const l = { id, plateforme: 'Leboncoin', ts: t, ym: ymDeTs(t), eur, titre: v.title || '', masquee: false };
-    if (garde(l)) lignes.push(l);
+    if (garde(l)) lignes.push(place(l));
   }
   for (const e of (ebay || [])) {
     if (!e || String(e.orderPaymentStatus || '').toUpperCase() !== 'PAID' || !e.orderId) continue;
@@ -97,12 +129,12 @@ export const ventesDeclarables = ({ vinted, lbc, ebay, masquee, exclu, versement
     const eur = Number(tot.value);
     const t = Date.parse(e.creationDate || '');
     if (!isFinite(eur)) continue;
-    if (!t) { if (!vus.has(id)) { vus.add(id); aDater.push({ id, plateforme: 'eBay', eur, titre: '' }); } continue; }
+    if (!t) { if (!vus.has(id)) { vus.add(id); aDaterOuDeclaree({ id, plateforme: 'eBay', eur, titre: '', masquee: false }); } continue; }
     const titre = (Array.isArray(e.lineItems) && e.lineItems[0] && e.lineItems[0].title) || '';
     const l = { id, plateforme: 'eBay', ts: t, ym: ymDeTs(t), eur, titre, masquee: false };
-    if (garde(l)) lignes.push(l);
+    if (garde(l)) lignes.push(place(l));
   }
-  return { lignes, aDater, ecartees, exclues };
+  return { lignes, aDater, ecartees, exclues, declare: idx ? 'lu' : 'pasSu' };
 };
 
 export const ventesFaites = ({ vinted, lbc, ebay, cachee } = {}) => {
