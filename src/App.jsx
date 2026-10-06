@@ -17017,7 +17017,40 @@ const _CACHE_TTL = 180000; // 3 min
 // reload au lieu de re-solliciter Supabase. Purge auto par TTL (3 min).
 const _acctCache = (()=>{ try{ const raw=sessionStorage.getItem('vrm_acct_cache'); if(raw){ const o=JSON.parse(raw); const now=Date.now(); Object.keys(o).forEach(k=>{ if(!o[k]||now-o[k].ts>=_CACHE_TTL) delete o[k]; }); return o; } }catch(_){} return {}; })();
 const _persistAcctCache = ()=>{ try{ sessionStorage.setItem('vrm_acct_cache', JSON.stringify(_acctCache)); }catch(_){} };
-function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp }) {
+// ── SÉLECTEUR DE COMPTE (onglets d'une plateforme) ───────────────────────────
+// Julien, 6 oct. : « si on sélectionne un compte et qu'on est dans l'onglet
+// annonce, il n'y a que les annonces de ce compte qui apparaissent ; par défaut
+// tous les comptes ; et le compte sur lequel l'extension est connectée mis en
+// avant d'abord ». Une rangée de puces : « Tous » + un compte par puce, le
+// compte connecté en TÊTE avec 📍. Un seul compte ⇒ rien à filtrer, on n'affiche
+// pas la rangée (§7, pas de bruit).
+function SelecteurCompte({ accounts, sel, setSel, connecte }) {
+  const labels = (typeof load === 'function' ? (load('vinted_account_labels', {}) || {}) : {});
+  const nom = (a) => labels[a.vinted_user_id] || a.login || `#${a.vinted_user_id}`;
+  const list = (accounts || []).filter(a => a && a.vinted_user_id != null);
+  if (list.length < 2) return null;
+  const co = String(connecte || '');
+  const tri = [...list].sort((a, b) => {
+    const ac = String(a.vinted_user_id) === co, bc = String(b.vinted_user_id) === co;
+    if (ac !== bc) return ac ? -1 : 1;
+    return nom(a).localeCompare(nom(b));
+  });
+  const puce = (actif, onClick, kids, key) => (
+    <button key={key} type="button" onClick={onClick} style={{
+      flexShrink: 0, border: `1px solid ${actif ? C.accent : C.border}`, background: actif ? C.accent : 'transparent',
+      color: actif ? (C.onAccent || '#fff') : C.text, borderRadius: 999, padding: '5px 12px', fontSize: 12.5,
+      fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>{kids}</button>
+  );
+  return (
+    <div className="vrm-rangee" style={{ display: 'flex', gap: 8, padding: '10px 16px 0', alignItems: 'center' }}>
+      {puce(!sel, () => setSel(''), 'Tous les comptes', '_tous')}
+      {tri.map(a => { const uid = String(a.vinted_user_id);
+        return puce(String(sel) === uid, () => setSel(String(sel) === uid ? '' : uid),
+          <>{uid === co ? '📍 ' : ''}{nom(a)}</>, uid); })}
+    </div>
+  );
+}
+function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', compteConnecte = '' }) {
   const [numeros, setNumeros] = useState(() => load('vinted_annonce_numeros', {}));
   // Dates de mise en ligne réelles, lues sur la page de l'annonce par l'extension
   // (ligne Supabase vinted_listing_dates = { idAnnonce: {ts, text} }). Seule
@@ -19015,7 +19048,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // La chaîne de filtres vivait en plein milieu du JSX : impossible de savoir
   // combien de ventes elle rendait sans la recopier. Elle vit ici, et l'écran
   // n'en dessine qu'une tranche.
-  const ventesAffichees = useMemo(() => (sales.items || [])
+  const ventesAffichees = useMemo(() => { let arr = (sales.items || [])
     .filter(o => showHidden ? true : !isHidden(o))
     .filter(o => { const st = classifyOrderStatus(o.status);
       // ⚠️ « Commande non réclamée - Retournée à l'expéditeur » : le colis
@@ -19045,9 +19078,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // dans le CA (§5), c'est cohérent.
       return st !== 'cancelled' || revient; })
     .filter(o => matchOrd(o))
-    .sort(parDateDesc),
+    // ── FILTRE PAR COMPTE (sélecteur de l'onglet) ────────────────────────────
+    // `_acc` d'une vente est l'uid (chaîne). Compte choisi ⇒ ses ventes seules ;
+    // « Tous » ⇒ celles du compte connecté d'abord (tri STABLE, l'ordre par date
+    // ci-dessous est conservé dans chaque groupe).
+    .filter(o => !compteSel || String(o._acc || '') === String(compteSel))
+    .sort(parDateDesc);
+    if (!compteSel && compteConnecte) { const c = String(compteConnecte);
+      arr = [...arr].sort((a,b) => { const ac = String(a._acc||'')===c, bc = String(b._acc||'')===c; return ac===bc ? 0 : (ac ? -1 : 1); }); }
+    return arr;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [sales.items, showHidden, hiddenSales, hiddenAccts, blockedAccts, vFilter, ordSearchDiff, periode, numeros, saleOv, shipDone]);
+    }, [sales.items, showHidden, hiddenSales, hiddenAccts, blockedAccts, vFilter, ordSearchDiff, periode, numeros, saleOv, shipDone, compteSel, compteConnecte]);
   // Combien on en DESSINE. Le reste s'ouvre d'un bouton : rien n'est perdu, et
   // le compte total est écrit dessus.
   const [ventesMax, setVentesMax] = useState(60);
@@ -19353,9 +19394,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       arr = arr.map(it=>({it,age:listedAgeDays(it)})).filter(x=>x.age!=null&&x.age>=SLEEP_DAYS)
                .sort((a,b)=>b.age-a.age).map(x=>x.it);
     }
+    // ── FILTRE PAR COMPTE (sélecteur de l'onglet) + mise en avant du connecté ──
+    // Un compte choisi ⇒ seulement SES annonces. « Tous » ⇒ celles du compte
+    // connecté dans l'extension d'abord (tri STABLE : l'ordre choisi ci-dessus
+    // est conservé à l'intérieur de chaque groupe). `_acc` d'une annonce est
+    // l'OBJET compte ; son uid vit dans `_acc.vinted_user_id`.
+    const uidAnn = it => String((it && it._acc && it._acc.vinted_user_id) || '');
+    if (compteSel) arr = arr.filter(it => uidAnn(it) === String(compteSel));
+    else if (compteConnecte) { const c = String(compteConnecte);
+      arr = [...arr].sort((a,b) => { const ac = uidAnn(a)===c, bc = uidAnn(b)===c; return ac===bc ? 0 : (ac ? -1 : 1); }); }
     return arr;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [annBase, annSearch, annSort, numeros]);
+  }, [annBase, annSearch, annSort, numeros, compteSel, compteConnecte]);
   // Un seul compte à l'écran ⇒ le nommer sur chaque carte ne distingue rien (§7).
   const annUnCompte = useMemo(() => new Set(annShown.map(x => String(x._acc && x._acc.vinted_user_id || ''))).size <= 1, [annShown]);
   // Comptes bloqués actuellement présents (pour le bandeau d'alerte).
@@ -30781,6 +30831,21 @@ function AppCoeur() {
   // la porte le temps du changement d'onglet.
   const subVoulue=React.useRef(null);
   React.useEffect(()=>{ setPlatSub(subVoulue.current||'ventes'); subVoulue.current=null; },[tab]);   // plus d'« Aperçu » nulle part : la liste d'abord, le résumé au-dessus
+  // ── FILTRE PAR COMPTE sur les onglets d'une plateforme (Julien, 6 oct.) ──────
+  // « Tous les comptes » par défaut. En choisir un ne montre QUE ses annonces /
+  // ventes / messages, sur l'onglet où on est — pas ailleurs. `''` = tous.
+  // Remis à « tous » quand on change d'onglet-plateforme (une sélection ne doit
+  // pas suivre en douce sur une autre plateforme) ; conservé d'un sous-onglet à
+  // l'autre d'une même plateforme (choisir le compte une fois, le voir sur
+  // Annonces PUIS Ventes PUIS Messages).
+  const [compteSel,setCompteSel]=useState('');
+  React.useEffect(()=>{ setCompteSel(''); },[tab]);
+  // Le compte sur lequel l'EXTENSION est connectée (pont `authEtat`) : c'est
+  // celui qu'on est en train de traiter, on le met en avant (puce d'abord + 📍,
+  // et ses lignes remontent quand « Tous » est choisi). « pas su » ⇒ '' (on ne
+  // met rien en avant à tort). Même source que la carte des premiers pas (§11).
+  const [compteConnecte,setCompteConnecte]=useState('');
+  React.useEffect(()=>{ let stop=false; (async()=>{ try{ const e=await vmrAuthEtat(); const uid=String((e&&e.vinted&&e.vinted.uid)||''); if(!stop) setCompteConnecte(uid); }catch(_){} })(); return ()=>{stop=true;}; },[]);
   // L'ancien onglet « Messages » (cloche, bandeau, « à faire ») mène désormais
   // aux messages DANS Vinted : une seule porte pour un seul écran.
   React.useEffect(()=>{ if(tab==='cat_msg'){ subVoulue.current='messages'; setTab('plat_vinted'); } },[tab]);
@@ -32592,7 +32657,12 @@ function AppCoeur() {
               L'écran complet existait (liste tous comptes, fil, réponse, offres)
               mais n'avait plus AUCUNE porte dans Vinted : seulement la cloche. */}
           <PlatSubNav sub={platSub} setSub={setPlatSub} sections={[['ventes','Ventes'],['achats','Achats'],['annonces','Annonces'],['messages','Messages', !!(liveStats && liveStats.unread > 0)]]}/>
-          <Comptabilite key={'pv_'+platSub} accounts={vintedAccounts} only={platSub==='apercu'?'ventes':platSub} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}/>
+          {/* Filtre par compte (Julien, 6 oct.) — d'abord Ventes / Annonces (là
+              où le filtre est câblé) ; Achats et Messages suivent. Les Colis ne
+              sont pas filtrés (« pour les colis pas forcément »). Un seul compte
+              ⇒ la rangée ne s'affiche pas. */}
+          {(platSub==='ventes'||platSub==='annonces') && <SelecteurCompte accounts={vintedAccounts} sel={compteSel} setSel={setCompteSel} connecte={compteConnecte}/>}
+          <Comptabilite key={'pv_'+platSub} accounts={vintedAccounts} only={platSub==='apercu'?'ventes':platSub} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum} compteSel={compteSel} compteConnecte={compteConnecte}/>
         </>)}
         {tab==='plat_leboncoin'&&(<>
           {/* Julien : « Leboncoin, la même mise en page que Vinted ». Vinted a
