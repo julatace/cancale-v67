@@ -21943,6 +21943,42 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, annBase, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts]);
 
+  // ── REPÈRE D'ACHAT PAR MODÈLE (proposition 10, 6 octobre) ────────────────
+  // « Combien je gagne en moyenne sur une Samba ? » : le prix moyen de REVENTE
+  // (ses ventes non annulées) moins le prix moyen d'ACHAT (ses achats non
+  // annulés), par modèle reconnu dans le titre (`extractModel`).
+  // ⚠️ C'est un REPÈRE pour acheter, JAMAIS un chiffre de compta : deux
+  //    moyennes, pas la marge d'une paire. Aucune paire n'est reliée à un achat
+  //    ici (§5), et ça n'entre dans aucun total, aucun rapport, aucun export.
+  // ⚠️ Moins de 3 ventes OU moins de 3 achats d'un modèle : pas de ligne (une
+  //    moyenne sur une seule paire est un hasard présenté comme un repère).
+  // Les achats ne sont lus qu'à l'ouverture du bloc (`buys` se charge à la demande).
+  // Trois états : `null` bloc fermé · `undefined` lecture en cours · objet.
+  const [repereOuvert, setRepereOuvert] = useState(false);
+  const margeModeles = useMemo(() => {
+    if (!repereOuvert) return null;
+    if (buys.error) return { pasSu: true };
+    if (!buys.items || !sales.items) return undefined;
+    const par = {};
+    const ajoute = (o, cote) => {
+      const k = extractModel(o && o.title); if (!k) return false;
+      const p = montantCommande(o); if (!(p > 0)) return false;
+      const e = par[k] || (par[k] = { k, nV: 0, sV: 0, nA: 0, sA: 0, marques: {} });
+      if (cote === 'V') { e.nV += 1; e.sV += p; } else { e.nA += 1; e.sA += p; }
+      const b = extractBrand(o.title); if (b) e.marques[b] = (e.marques[b] || 0) + 1;
+      return true;
+    };
+    for (const o of sales.items) { if (!o || acctOffOf(o) || classifyOrderStatus(o.status) === 'cancelled') continue; ajoute(o, 'V'); }
+    for (const o of buysBase) { if (!o || classifyOrderStatus(o.status) === 'cancelled') continue; ajoute(o, 'A'); }
+    const nom = (e) => { const b = Object.entries(e.marques).sort((a, c) => c[1] - a[1])[0]; const mo = e.k.replace(/\b\w/g, (c) => c.toUpperCase()); return (b ? b[0] + ' ' : '') + mo; };
+    const lignes = Object.values(par).filter((e) => e.nV >= 3 && e.nA >= 3)
+      .map((e) => ({ k: e.k, nom: nom(e), nV: e.nV, nA: e.nA, pV: e.sV / e.nV, pA: e.sA / e.nA, marge: e.sV / e.nV - e.sA / e.nA }))
+      .sort((a, c) => c.marge - a.marge);
+    const tropPeu = Object.values(par).filter((e) => !(e.nV >= 3 && e.nA >= 3)).length;
+    return { lignes, tropPeu };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [repereOuvert, buys.items, buys.error, buysBase, sales.items, hiddenAccts, panelAcctOff]);
+
   // Pour le taux d'écoulement, on s'assure que les annonces en ligne sont
   // chargées même en étant sur l'onglet Ventes (harvest-first, donc gratuit).
   useEffect(() => { if (curSub==='ventes' && accounts.length && listings.items===null) loadListings(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
@@ -24200,6 +24236,34 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {perf.ecoul!=null && <StatBox label="Écoulement" value={`${perf.ecoul.toFixed(0)} %`} sub={`${perf.vendues} vendu / ${perf.online} en ligne`}/>}
             {perf.bestBrand && <StatBox label="Top marque" value={perf.bestBrand.brand} color={INV_STATUS.online.color} sub={`+${perf.bestBrand.moy.toFixed(0)} €/paire`}/>}
           </div>
+        )}
+        {/* Repère d'achat par modèle (proposition 10) : deux moyennes, jamais de la compta. */}
+        {totals.nb>0 && (
+          <details data-repere-modeles onToggle={(e)=>{ if (e.currentTarget.open) { setRepereOuvert(true); if (buys.items===null && !buys.loading && accounts.length) loadOrders('purchased', setBuys); } }}
+            style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'9px 13px',marginBottom:8}}>
+            <summary style={{cursor:'pointer',fontSize:12.5,fontWeight:600,color:C.text}}>Repère d'achat par modèle <span style={{fontWeight:500,color:C.muted}}>— combien tu gagnes en moyenne sur chaque modèle</span></summary>
+            {(() => {
+              const r = margeModeles;
+              if (r === null) return null;
+              if (r === undefined) return <div style={{fontSize:12,color:C.muted,marginTop:8}}>Lecture de tes achats…</div>;
+              if (r.pasSu) return <div style={{fontSize:12,color:C.muted,marginTop:8}}>Tes achats n'ont pas pu être lus : je ne calcule rien pour l'instant. Referme et rouvre ce bloc dans un moment.</div>;
+              if (!r.lignes.length) return <div style={{fontSize:12,color:C.muted,marginTop:8}}>Pas encore assez de ventes et d'achats d'un même modèle : il en faut au moins 3 de chaque pour qu'une moyenne veuille dire quelque chose.</div>;
+              return (
+                <div style={{marginTop:8,display:'flex',flexDirection:'column',gap:4}}>
+                  {r.lignes.map((l)=>(
+                    <div key={l.k} data-repere-modele={l.k} style={{display:'flex',alignItems:'baseline',gap:8,fontSize:12,color:C.text,padding:'4px 0',borderTop:`1px solid ${C.border}`}}>
+                      <span style={{flex:1,minWidth:0,fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{l.nom}</span>
+                      <span style={{color:C.muted,fontSize:11,whiteSpace:'nowrap'}}>revendue {fmtE(l.pV)} ({l.nV}) · achetée {fmtE(l.pA)} ({l.nA})</span>
+                      <span style={{fontWeight:700,whiteSpace:'nowrap',color:l.marge<0?C.warn:C.text}}>{l.marge>=0?'+':'−'}{fmtE(Math.abs(l.marge))}</span>
+                    </div>
+                  ))}
+                  <div style={{fontSize:11,color:C.muted,marginTop:4,lineHeight:1.45}}>
+                    Prix moyen de revente moins prix moyen d'achat, avant frais de port, de protection et de boost — deux moyennes, pas la marge d'une paire précise. Un lot acheté compte comme un achat. C'est un repère pour acheter : il n'entre dans aucun total, rapport ni export.{r.tropPeu>0?` ${r.tropPeu} autre${r.tropPeu>1?'s':''} modèle${r.tropPeu>1?'s':''} : pas encore assez de ventes ou d'achats.`:''}
+                  </div>
+                </div>
+              );
+            })()}
+          </details>
         )}
         {/* Saisonnalité : meilleurs mois de vente → acheter avant les pics */}
         {seasonality && seasonality.top.length>0 && (

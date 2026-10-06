@@ -3838,6 +3838,21 @@ ou Leboncoin, à un autre prix.
 - Banc `annonces-carte.cjs` : la bonne annonce (SKU), le bon prix (60 → 53 €),
   rien avant la confirmation, une seule baisse, l'écran qui le dit.
 
+### Repère d'achat par modèle (proposition 10, 6 octobre)
+Ventes → Analyse de tes ventes → « Repère d'achat par modèle » : par modèle
+reconnu dans le titre (`extractModel`), prix moyen de revente (ventes non
+annulées, comptes exclus écartés) moins prix moyen d'achat (achats non annulés).
+- ⚠️ **Un repère pour acheter, JAMAIS de la compta** : deux moyennes, pas la
+  marge d'une paire ; aucune paire n'est reliée à un achat (§5) ; n'entre dans
+  aucun total, rapport ni export — l'écran le dit.
+- Moins de 3 ventes OU 3 achats d'un modèle ⇒ pas de ligne. Les achats ne sont
+  lus qu'à l'ouverture du bloc ; illisibles ⇒ rien n'est calculé, et c'est dit.
+- Mesuré chez lui le 5 octobre : Samba +4,60 € (47 achetées / 26 vendues),
+  Spezial +20,60 €, Air Max 1 +29,10 €, XT-6 +39,30 €. Seules **8 de ses 401
+  paires** ont un prix d'achat saisi : ce repère ne remplace pas la saisie.
+- Banc `rapport.cjs` : Samba +20 € (l'annulée à 999 € écartée), Gazelle à une
+  seule paire absente ; réaffaibli (annulée comptée) ⇒ rouge.
+
 ### ⚠️⚠️ « 300 NOTIFS », « COMME SI JE DÉBUTAIS », « ÇA TÉLÉCHARGE » (3 octobre)
 Trois plaintes de Julien, **une cause racine pour les deux premières** :
 - ⚠️⚠️ **LES EFFETS DE L'APP PARTAIENT AVANT LA SESSION.** La porte de connexion
