@@ -5008,6 +5008,56 @@ déclaré, qui est l'argent reçu.
   sur le code d'avant **instrumenté des mêmes attributs** (« la fonction
   n'existait pas » n'aurait rien prouvé).
 
+### « Ce que Vinted transmet aux impôts » — les seuils DAC7, compte par compte (6 octobre)
+Chaque année, Vinted transmet aux impôts les vendeurs qui font **au moins 30
+ventes OU plus de 2 000 €** dans l'année civile (directive européenne DAC7).
+**Mesuré avant de coder** (lecture seule, sa base) : `grep DAC7` = 0 dans l'app ;
+7 comptes liés, aucun exclu ; ventes **finalisées** de 2026 — `julatace35260`
+**101 · 3 721,10 €** (les deux seuils), `llloollllaa` **49 · 1 775,70 €**,
+`tomj606` **33 · 1 433,50 €** (30 ventes), puis 27 · 20 · 16 · 0, sous les seuils.
+- **Où** : Ventes → Outils → **Registre annuel**, UNE carte (`CarteSeuilsVinted`),
+  pour l'année choisie. Ton informatif : aucun rouge ni ambre (§7), un seuil
+  atteint se dit par le mot, en gras ; la phrase « pour qu'il n'y ait jamais
+  d'écart avec ce que tu déclares » est dite une fois.
+- **Une seule règle de vente** (§11) : `seuilsVintedParCompte` appelle
+  `ventesDeclarables` — finalisée, datée du **versement** — et **pas**
+  `ventesFaites` : la directive compte la contrepartie « versée ou créditée » au
+  vendeur ; une vente en cours ne l'est pas encore, une remboursée jamais. C'est
+  aussi la règle du CA déclaré, d'où « aucun écart ».
+- ⚠️ **« À dater » n'est pas « hors de l'année »** : seules **42 des 101** ventes du
+  plus gros compte ont leur date de versement. Le versement tombe après la vente
+  (mesuré : **0 sur 173** avant elle) et au plus **25 jours** après (médiane
+  7,8 j) ; la borne haute est donc `min(aujourd'hui, vente + 45 j)`
+  (`VERSEMENT_MAX_J`). Deux bornes dans la même année ⇒ comptée ; à cheval ⇒
+  **« incertaine », comptée à part** et le verdict devient « ça dépend ».
+  Sans la borne des 45 jours, ses **41 ventes 2023-2025 non datées** rendaient
+  `llloollllaa` « incertain » pour 2026 — une fausse alerte. ⚠️ Ces 45 jours
+  sont une **borne mesurée, pas une certitude** : à revoir si un versement de
+  plus de 25 jours apparaît.
+- **Trois états** : ventes pas encore lues · **lecture ratée de CE compte ⇒ « — »
+  et la raison, jamais « 0 vente »** · lu. Un compte **exclu** n'y entre pas
+  (décision du 3 octobre) ; une ligne neutre dit que les exclus ne sont pas
+  comptés, **sans les nommer**. « Plus de 2 000 € » se compare en centimes :
+  2 000,00 € pile ne l'atteint pas.
+- **Preuves** : `audit-seuils-vinted.cjs` exécute la vraie règle (extraite par
+  Babel avec TOUT ce qu'elle appelle, de proche en proche — `--deps` les liste :
+  la `ventesDeclarables` du registre URSSAF tire `indexDeclarations`, une liste
+  recopiée à la main aurait cassé), `vm`, ventes inventées — **21 contrôles** ; rouge sur le code d'avant
+  (fonction absente), et **chacune des 8 mutations** le refait passer au rouge
+  (`exclus` 3 · `passu` 1 · `seuil2000` 1 · `adater` 3 · `strict` 2 · `sansdater` 10
+  · `datevente` 2 · `encours` 2). Banc `bancs/seuils-vinted.cjs` (port 4802,
+  aucune fixture, 390 et 1512 px) : jugé sur les `data-*` ET le texte rendu —
+  **30 rouges** sur le build d'avant, **10** sur un build réaffaibli (exclusion
+  retirée, panne lue comme 0, rouge sur « atteint »).
+- **Pas mesuré / pas affirmé** : les sources primaires (impots.gouv.fr,
+  economie.gouv.fr, Légifrance, EUR-Lex, BOFiP) sont **bloquées par le proxy du
+  conteneur** — les seuils sont écrits tels quels, recoupés sur des sources
+  secondaires, et **rien d'autre n'est affirmé** (ni date de début, ni ce que
+  Vinted envoie au vendeur). Non mesuré : si Vinted juge chaque compte à part ou
+  regroupe les comptes d'une même personne ; le montant exact qu'il retient (VRM
+  prend le prix de l'article, comme le CA déclaré) ; Leboncoin et eBay, soumis
+  aussi à DAC7, ne sont pas dans cette carte.
+
 ### La page d'accueil publique (n° 22, 4 octobre)
 Julien : « une vraie page d'accueil… qui donne envie… avant d'arriver sur la
 connexion », avec une vidéo en motion design, inspirée de Vinteer.

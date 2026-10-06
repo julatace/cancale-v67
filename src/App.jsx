@@ -3095,6 +3095,75 @@ const compteEcarte = (uid, masques, panneau) => {
   if (pa[k] === false) return false;
   return (masques && masques.has(k)) || pa[k] === true;
 };
+// ══════════════════════════════════════════════════════════════════════════════
+// CE QUE VINTED TRANSMET AUX IMPÔTS — LES SEUILS, COMPTE PAR COMPTE (6 octobre)
+// ══════════════════════════════════════════════════════════════════════════════
+// Chaque année, Vinted transmet aux impôts les vendeurs qui atteignent 30 ventes
+// OU dépassent 2 000 € dans l'année civile (directive européenne DAC7). Mesuré le
+// 6 octobre : trois de ses comptes y sont déjà (101 · 49 · 33 ventes finalisées
+// en 2026, l'un à 3 721,10 €), et l'app n'en disait rien.
+// ⚠️ UNE SEULE RÈGLE DE « VENTE » (§11) : celle du CA déclaré,
+//    `ventesDeclarables` — finalisée (annulée, remboursée, en cours : jamais),
+//    datée du VERSEMENT. La directive compte la contrepartie « versée ou
+//    créditée » au vendeur dans l'année : une vente en cours ne l'est pas
+//    encore, une remboursée ne le sera jamais. C'est aussi ce qui garantit
+//    qu'il n'y a pas d'écart avec ce qu'il déclare.
+// ⚠️ « À DATER » NE VEUT PAS DIRE « HORS DE L'ANNÉE » : mesuré, seules 42 des
+//    101 ventes de son plus gros compte ont leur date de versement. Mais le
+//    versement tombe APRÈS la vente (mesuré : 0 sur 173 avant elle) et AVANT
+//    aujourd'hui (elle est déjà finalisée) — et jamais plus de 25 jours après
+//    elle sur les 173 mesurés (médiane 7,8 j). La borne haute est donc
+//    aujourd'hui, ou la vente + `VERSEMENT_MAX_J` (presque deux fois le plus
+//    long mesuré). Si les deux bornes tombent dans la même année, l'année est
+//    sûre ; sinon la vente est « incertaine » et COMPTÉE À PART, jamais devinée
+//    (§5). Sans la seconde borne, ses 41 ventes de 2023-2025 pas encore datées
+//    devenaient « incertaines » pour 2026 — une fausse alerte (§7).
+// ⚠️ TROIS ÉTATS : `enCours` (ventes pas encore lues) · `pasSu` (la lecture de
+//    CE compte a échoué : un tiret, jamais 0) · `lu`. Un compte exclu de l'app
+//    n'y entre pas (décision du 3 octobre).
+// ⚠️ « Plus de 2 000 € » : 2 000,00 € pile ne l'atteint pas. Comparé en
+//    centimes entiers, jamais en flottants.
+const SEUIL_VINTED_VENTES = 30;
+const SEUIL_VINTED_EUR = 2000;
+const VERSEMENT_MAX_J = 45;
+const seuilsVintedParCompte = ({ comptes, ventes, ecarte, echoues, versements, annee, maintenant = Date.now() } = {}) => {
+  const anneeDe = (t) => new Date(t).getFullYear();
+  const uidDe = (o) => String((o && o._acc && o._acc.vinted_user_id) ?? '');
+  const lu = Array.isArray(ventes);
+  const parUid = {}, liste = [];
+  for (const c of (comptes || [])) {
+    const uid = String((c && c.uid) ?? '');
+    if (!uid || parUid[uid] || (ecarte && ecarte(uid))) continue;
+    const etat = !lu ? 'enCours' : ((echoues && echoues.has(uid)) ? 'pasSu' : 'lu');
+    const r = { uid, nom: (c && c.nom) || uid, etat, n: 0, cts: 0, nInc: 0, ctsInc: 0 };
+    parUid[uid] = r; liste.push(r);
+  }
+  if (lu) {
+    const d = ventesDeclarables({ vinted: ventes, exclu: (o) => !!(ecarte && ecarte(uidDe(o))), versements: versements || {} });
+    const ajoute = (o, eur, certaine) => {
+      const r = parUid[uidDe(o)]; if (!r || r.etat !== 'lu') return;
+      const c = Math.round(Number(eur) * 100); if (!isFinite(c)) return;
+      if (certaine) { r.n += 1; r.cts += c; } else { r.nInc += 1; r.ctsInc += c; }
+    };
+    for (const l of d.lignes) if (l.plateforme === 'Vinted' && anneeDe(l.ts) === annee) ajoute(l.o, l.eur, true);
+    for (const l of d.aDater) {
+      if (l.plateforme !== 'Vinted') continue;
+      const t = tsCommande(l.o);
+      const yMin = t ? anneeDe(t) : -Infinity;                                       // le versement suit la vente…
+      const yMax = anneeDe(t ? Math.min(maintenant, t + VERSEMENT_MAX_J * 86400e3) : maintenant);   // …et la suit de près
+      if (annee < yMin || annee > yMax) continue;
+      ajoute(l.o, l.eur, yMin === yMax);
+    }
+  }
+  const atteint = (n, cts) => n >= SEUIL_VINTED_VENTES || cts > SEUIL_VINTED_EUR * 100;
+  for (const r of liste) {
+    r.eur = r.cts / 100; r.eurInc = r.ctsInc / 100;
+    r.verdict = r.etat !== 'lu' ? null
+      : atteint(r.n, r.cts) ? 'atteint'
+      : atteint(r.n + r.nInc, r.cts + r.ctsInc) ? 'peutEtre' : 'sous';
+  }
+  return liste;
+};
 // Clé de jour LOCALE : toISOString() est en UTC et mettrait une vente de 23 h
 // sur le lendemain.
 const cleJourLocal = (t) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
@@ -5234,6 +5303,63 @@ function StatBox({label,value,color=C.text,sub=null,subColor=null,onClick=null,t
       <div className="vrm-display" style={{fontSize:compact?'clamp(17px,5vw,22px)':fs,fontWeight:700,color,lineHeight:1.05,marginTop:compact?4:2,whiteSpace:'nowrap'}}>{value}</div>
       {sub && <div style={{fontSize:11.5,color:subColor||C.muted,fontWeight:subColor?600:400,marginTop:4,lineHeight:1.35}}>{sub}</div>}
     </Balise>
+  );
+}
+
+// ── CE QUE VINTED TRANSMET AUX IMPÔTS, compte par compte (6 octobre) ─────────
+// La carte du registre annuel. Elle ne calcule RIEN : elle rend
+// `seuilsVintedParCompte` (§11). Ton informatif : aucun rouge, aucun ambre (§7 —
+// le rouge est pour deux paires sous un même numéro) ; un seuil atteint se dit
+// par le MOT, en gras. Les nombres sont portés en `data-*` pour le banc.
+function CarteSeuilsVinted({ annee, ventes, echecs, comptes, ecarte, nomDe, versements }) {
+  const tous = Array.isArray(comptes) ? comptes : [];
+  const nomsKO = new Set(Array.isArray(echecs) ? echecs : []);
+  const echoues = new Set(tous.filter(a => nomsKO.has(nomDe(a))).map(a => String(a.vinted_user_id)));
+  const lignes = seuilsVintedParCompte({ comptes: tous.map(a => ({ uid: a.vinted_user_id, nom: nomDe(a) })), ventes, ecarte, echoues, versements, annee });
+  if (!lignes.length) return null;
+  const nExclus = tous.filter(a => ecarte && ecarte(String(a.vinted_user_id))).length;
+  const eur = (v) => Number(v).toFixed(2).replace('.', ',') + ' €';
+  const pl = (n, mot) => `${n} ${mot}${n > 1 ? 's' : ''}`;
+  const seuilEur = String(SEUIL_VINTED_EUR).replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0') + '\u00a0€';
+  const verdictTxt = (r) => {
+    if (r.verdict === 'atteint') {
+      const parN = r.n >= SEUIL_VINTED_VENTES, parE = r.cts > SEUIL_VINTED_EUR * 100;
+      return `${parN && parE ? 'Les deux seuils sont atteints' : parN ? `${SEUIL_VINTED_VENTES} ventes atteintes` : `Plus de ${seuilEur}`} : Vinted transmet ce compte.`;
+    }
+    if (r.verdict === 'peutEtre') return `Ça dépend de ${pl(r.nInc, 'vente')} (${eur(r.eurInc)}) dont le versement n'est pas encore daté : l'année n'est pas sûre.`;
+    return 'Sous les seuils.';
+  };
+  return (
+    <div data-seuils-vinted={annee} style={{border:`1px solid ${C.border}`,borderRadius:10,background:C.card,padding:'10px 12px',marginBottom:12}}>
+      <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:3}}>Ce que Vinted transmet aux impôts pour {annee}</div>
+      <div style={{fontSize:11.5,color:C.muted,lineHeight:1.45,marginBottom:8}}>
+        Chaque année, Vinted transmet aux impôts les vendeurs qui font au moins {SEUIL_VINTED_VENTES} ventes ou plus de {seuilEur} dans l'année (directive européenne DAC7).
+        VRM les compte comme ton CA déclaré — ventes finalisées, datées du versement — pour qu'il n'y ait jamais d'écart avec ce que tu déclares.
+      </div>
+      {lignes.map(r => {
+        const lu = r.etat === 'lu';
+        return (
+          <div key={r.uid} data-seuil-compte={r.uid} data-etat={r.etat} data-n={lu ? r.n : ''} data-eur={lu ? r.eur.toFixed(2) : ''} data-verdict={r.verdict || ''} data-incertaines={lu ? r.nInc : ''}
+            style={{display:'flex',alignItems:'flex-start',gap:10,padding:'8px 0',borderTop:`1px solid ${C.border}`}}>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:12.5,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.nom}</div>
+              <div style={{fontSize:11.5,lineHeight:1.4,marginTop:2,color:r.verdict==='atteint'?C.text:C.muted,fontWeight:r.verdict==='atteint'?700:400}}>
+                {r.etat === 'pasSu' ? "Ses ventes n'ont pas pu être lues : impossible de dire où en est ce compte. Rouvre l'écran Ventes dans un instant."
+                  : r.etat === 'enCours' ? 'Lecture des ventes…' : verdictTxt(r)}
+              </div>
+              {lu && r.nInc > 0 && r.verdict !== 'peutEtre' && (
+                <div style={{fontSize:11,color:C.muted,lineHeight:1.4,marginTop:2}}>+ {pl(r.nInc, 'vente')} ({eur(r.eurInc)}) dont le versement n'est pas encore daté : l'année n'est pas sûre.</div>
+              )}
+            </div>
+            <div style={{flexShrink:0,textAlign:'right',whiteSpace:'nowrap'}}>
+              <div style={{fontSize:13,fontWeight:700,color:C.text}}>{lu ? pl(r.n, 'vente') : '—'}</div>
+              {lu && <div style={{fontSize:11.5,color:C.muted,marginTop:2}}>{eur(r.eur)}</div>}
+            </div>
+          </div>
+        );
+      })}
+      {nExclus > 0 && <div style={{fontSize:11,color:C.muted,lineHeight:1.4,marginTop:4}}>Les comptes que tu as exclus de l'app ne sont pas comptés ici.</div>}
+    </div>
   );
 }
 
@@ -25974,6 +26100,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </tbody>
                 </table>
               </div>
+              <CarteSeuilsVinted annee={annual.year} ventes={sales.items} echecs={sales.failed} comptes={accounts} ecarte={acctOff} nomDe={accNameOf} versements={versements}/>
               <div style={{fontSize:12,fontWeight:600,color:C.text,margin:'6px 0 8px'}}>Registre d'achats — {fmtE(annual.achatsTotal)} ({annual.buyLines.length})</div>
               {buys.items===null && <div style={{fontSize:12,color:C.muted,marginBottom:8}}>Registre en cours de chargement…</div>}
               {buys.items!==null && annual.buyLines.length===0 && <div style={{fontSize:12,color:C.muted,padding:'6px 0 12px'}}>Aucun achat cette année.</div>}
