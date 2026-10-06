@@ -229,7 +229,14 @@ if (!bloc || !/caUrssafParMois/.test(bloc)) {
   // ⚠️ La règle, pas son orthographe (6 octobre) : les deux rapports lisent
   //    désormais le memo `declarables` (la même source que le tableau de bord).
   //    On suit le nom jusqu'à sa définition au lieu d'exiger la boucle en place.
-  const litDecl = (t) => /for \(const l of \(declarables \? declarables\.lignes : \[\]\)\)/.test(t) && /\bdeclarables\]\);|\bdeclarables, /.test(t.slice(t.lastIndexOf('}, [')));
+  // ⚠️ (revue du 6 octobre) Les rapports lisent `declRapport`, qui DÉRIVE de
+  //    `declarables` (dates de versement illisibles : il n'y ajoute que
+  //    Leboncoin et eBay, sans aucune ligne Vinted). On suit le nom jusqu'à sa
+  //    définition — la règle, pas son orthographe.
+  const defRap = (() => { const i = SRC.indexOf('const declRapport = useMemo('); return i < 0 ? '' : SRC.slice(i, SRC.indexOf(']);', i)); })();
+  const rapDeriveDecl = /if \(declarables\) return \{ lignes: declarables\.lignes/.test(defRap) && !/ventesDeclarables\(\{ vinted:/.test(defRap);
+  const boucleDecl = (t) => /for \(const l of \(declarables \? declarables\.lignes : \[\]\)\)/.test(t) || (/for \(const l of declRapport\.lignes\)/.test(t) && rapDeriveDecl);
+  const litDecl = (t) => boucleDecl(t) && /\bdeclarables\]\);|\bdeclarables, |\bdeclRapport\]\);|\bdeclRapport, /.test(t.slice(t.lastIndexOf('}, [')));
   for (const [nom, t] of [['mensuel', mens], ['annuel', ann]]) {
     ((/if \(acctOffOf\(o\)\) continue;/.test(t) && !litDecl(t) && !/if \(isHidden\(o\)\) \{ nMasq/.test(t))
       || (litDecl(t) && /exclu: acctOffOf/.test(defDecl)))
@@ -292,7 +299,10 @@ if (!bloc || !/caUrssafParMois/.test(bloc)) {
   const mens = memoDe2('const report = useMemo');
   const ann = memoDe2('const annual = useMemo');
   const defDecl2 = (() => { const i = SRC.indexOf('const declarables = useMemo('); return i < 0 ? '' : SRC.slice(i, SRC.indexOf(']);', i)); })();
-  const litDecl2 = (t) => /for \(const l of \(declarables \? declarables\.lignes : \[\]\)\)/.test(t) && /\bdeclarables\b/.test(t.slice(t.lastIndexOf('}, [')));
+  const defRap2 = (() => { const i = SRC.indexOf('const declRapport = useMemo('); return i < 0 ? '' : SRC.slice(i, SRC.indexOf(']);', i)); })();
+  const litDecl2 = (t) => (/for \(const l of \(declarables \? declarables\.lignes : \[\]\)\)/.test(t)
+      || (/for \(const l of declRapport\.lignes\)/.test(t) && /if \(declarables\) return \{ lignes: declarables\.lignes/.test(defRap2)))
+    && /\bdeclarables\b|\bdeclRapport\b/.test(t.slice(t.lastIndexOf('}, [')));
   for (const [nom, t] of [['mensuel', mens], ['annuel', ann]]) {
     ((/versements\s*\?\s*versements\[String\(o\.transaction_id\)\]/.test(t) && /\bversements\]\);/.test(t))
       || (litDecl2(t) && /\bversements\b/.test(defDecl2) && /\bversements\b[^\]]*\]\);?\s*$/.test(defDecl2 + ']);')))
@@ -391,10 +401,160 @@ if (!bloc || !/caUrssafParMois/.test(bloc)) {
   // Jamais l'app ne coche « déclaré » à sa place : on n'écrit QUE dans les deux
   // gestes de son clic.
   const ecritures = [...SRC.matchAll(/save\('vrm_urssaf_declare'/g)].map((m) => m.index);
-  const dansGeste = (i) => { const avant = SRC.slice(Math.max(0, i - 1400), i); const a = avant.lastIndexOf('const declarerMois = '), b = avant.lastIndexOf('const annulerDeclaration = '); const k = Math.max(a, b); return k >= 0 && !/\n  const (?!declarerMois|annulerDeclaration)\w+ = /.test(avant.slice(k + 10)); };
+  const dansGeste = (i) => { const avant = SRC.slice(Math.max(0, i - 4000), i); const a = avant.lastIndexOf('const declarerMois = '), b = avant.lastIndexOf('const annulerDeclaration = '); const k = Math.max(a, b); return k >= 0 && !/\n  const (?!declarerMois|annulerDeclaration)\w+ = /.test(avant.slice(k + 10)); };
   ecritures.length === 2 && ecritures.every(dansGeste)
     ? ok('le registre ne s\'écrit que sur son clic (« J\'ai déclaré ce mois » / « retirer »), jamais tout seul')
     : nok('le registre ne s\'écrit que sur son clic', `${ecritures.length} écriture(s), hors geste : ${ecritures.filter((i) => !dansGeste(i)).length}`);
+}
+
+// ── 1 sexies. LA REVUE DU 6 OCTOBRE — chaque constat exécuté sur le VRAI code ─
+{
+  const lbcSrc = (() => { const a = SRC.indexOf('const lbcAnnulee = '); const b = SRC.indexOf('\nconst lbcEuro', a); return a > 0 && b > a ? SRC.slice(a, b) : ''; })();
+  const c = {
+    console, Date, Number, String, isFinite, parseFloat, Object, Math, Array, Map, Set, load: (k, d) => d,
+    classifyOrderStatus: (s) => /annul|cancel|refus|rembours/i.test(String(s || '')) ? 'cancelled' : (/finalis/i.test(String(s || '')) ? 'completed' : 'pending'),
+    tsCommande: (o) => Date.parse((o && o.date) || '') || 0,
+    montantCommande: (o) => { const p = o && o.price; const v = (p && typeof p === 'object') ? p.amount : p; const n = Number(String(v == null ? '' : v).replace(',', '.')); return isNaN(n) ? 0 : n; },
+  };
+  // ⚠️ Un audit ne meurt pas, il rapporte : tout ce qui lève devient un contrôle
+  //    ROUGE (sur le code d'avant, `recuDuMois` et `lectureIncomplete` n'existent
+  //    pas — ce qui compte, c'est que la RÈGLE fautive soit attrapée, prouvé en
+  //    la réaffaiblissant : voir CLAUDE.md).
+  const essaie = (nom, f) => { try { f(); } catch (e) { nok(nom, 'a levé : ' + e.message); } };
+  try {
+    vm.createContext(c);
+    vm.runInContext(lbcSrc + '\n' + bloc + "\n;Object.assign(this, { ventesDeclarables, caDeclarableParMois, joursVenduRecu, ymDeTs });"
+      + "\ntry { Object.assign(this, { recuDuMois, lectureIncomplete }); } catch (_) {}", c);
+  } catch (e) { nok('la règle se charge', e.message); }
+
+  // Constat 1 — mois déclaré « à la date de VENTE ».
+  essaie('un mois déclaré à la date de vente', () => {
+    // 30 ventes vendues le 25 août et versées le 4 septembre (le cas mesuré :
+    // 657,80 €), 5 vendues et versées en septembre, 1 vente Leboncoin de
+    // septembre (l'ancienne règle ne comptait que Vinted).
+    const V = [], VERS = {};
+    for (let n = 0; n < 30; n++) { V.push({ transaction_id: 1000 + n, date: '2026-08-25T12:00:00+02:00', price: { amount: '21.93' }, status: 'Commande finalisée' }); VERS[1000 + n] = '2026-09-04T10:00:00+02:00'; }
+    for (let n = 0; n < 5; n++) { V.push({ transaction_id: 2000 + n, date: '2026-09-10T12:00:00+02:00', price: { amount: '40' }, status: 'Commande finalisée' }); VERS[2000 + n] = '2026-09-20T10:00:00+02:00'; }
+    const LBC = [{ txId: 'L1', isSeller: true, price: 7500, stepLabel: 'Paiement effectué', dateVente: '2026-09-18T14:00:00+02:00', title: 'lbc' }];
+    const SEPT_VENTE = { '2026-09': { ids: [2000, 2001, 2002, 2003, 2004].map((t) => 'vinted:' + t), n: 5, ca: 200, regle: 'vente', at: 1 } };
+    const r = c.ventesDeclarables({ vinted: V, lbc: LBC, versements: VERS, declare: SEPT_VENTE });
+    const s = c.caDeclarableParMois(r.lignes)['2026-09'] || {};
+    const vApres = r.lignes.filter((l) => l.apres && l.plateforme === 'Vinted').length;
+    vApres === 0
+      ? ok('septembre déclaré À LA DATE DE VENTE : les 30 ventes vendues en août (versées en septembre) ne sont PAS « à régulariser »')
+      : nok('déclaré à la date de vente, une vente vendue le mois d\'avant n\'est pas à régulariser', `${vApres} vente(s) Vinted « à régulariser » (cotisations payées deux fois)`);
+    s.nVenteAvant === 30 && Math.abs(s.caVenteAvant - 657.9) < 0.005 && (s.venteAvant || {})['2026-08'] === 30
+      ? ok('…elles sont comptées à part, avec leur mois de vente (août : 30 ventes, 657,90 €)')
+      : nok('les ventes du mois de vente d\'avant sont dites à part', `nVenteAvant=${s.nVenteAvant} caVenteAvant=${s.caVenteAvant}`);
+    s.nApres === 1 && Math.abs(s.caApres - 75) < 0.005
+      ? ok('…et la vente Leboncoin de septembre, que l\'ancienne règle ne comptait pas, reste à régulariser (75 €)')
+      : nok('la vente Leboncoin absente de la déclaration reste à régulariser', `nApres=${s.nApres} caApres=${s.caApres}`);
+    Math.abs(s.ca - (657.9 + 200 + 75)) < 0.005
+      ? ok('le CA du mois n\'en perd aucune (932,90 €)')
+      : nok('le CA du mois reste entier', `ca=${s.ca}`);
+    // L'autre sens : août noté AU VERSEMENT ne les contient pas (versées en
+    // septembre) — elles ne sont dans AUCUNE déclaration : vraiment à régulariser.
+    const DEUX = { ...SEPT_VENTE, '2026-08': { ids: [], n: 0, ca: 0, regle: 'versement', at: 1 } };
+    const s2 = c.caDeclarableParMois(c.ventesDeclarables({ vinted: V, versements: VERS, declare: DEUX }).lignes)['2026-09'] || {};
+    s2.nApres === 30 && !s2.nVenteAvant
+      ? ok('l\'autre sens : leur mois de vente noté sans elles (au versement), elles sont dans AUCUNE déclaration — « à régulariser »')
+      : nok('une vente dans aucune déclaration reste à régulariser', `nApres=${s2.nApres} nVenteAvant=${s2.nVenteAvant}`);
+    // Et la règle « versement » ne change pas : absente de la liste = à régulariser.
+    const VERSR = { '2026-09': { ids: [2000, 2001, 2002, 2003, 2004].map((t) => 'vinted:' + t), regle: 'versement', at: 1 } };
+    const s3 = c.caDeclarableParMois(c.ventesDeclarables({ vinted: V, versements: VERS, declare: VERSR }).lignes)['2026-09'] || {};
+    s3.nApres === 30 && !s3.nVenteAvant
+      ? ok('déclaré AU VERSEMENT, une vente versée ce mois et absente de la liste reste à régulariser (la règle d\'avant ne bouge pas)')
+      : nok('déclaré au versement, l\'absence reste un oubli', `nApres=${s3.nApres} nVenteAvant=${s3.nVenteAvant}`);
+  });
+
+  // Constat 5 — « Reçu en {mois} » se juge au mois du VERSEMENT.
+  essaie('le reçu du mois', () => {
+    const V5 = [{ transaction_id: 5, date: '2026-09-28T12:00:00+02:00', price: { amount: '80' }, status: 'Commande finalisée' },
+      { transaction_id: 6, date: '2026-10-01T12:00:00+02:00', price: { amount: '20' }, status: 'Commande finalisée' }];
+    const r5 = c.ventesDeclarables({ vinted: V5, versements: { 5: '2026-10-03T10:00:00+02:00', 6: '2026-10-04T10:00:00+02:00' }, declare: { '2026-09': { ids: ['vinted:5'], regle: 'vente', at: 1 } } });
+    const J = c.joursVenduRecu([], r5.lignes, 14, Date.parse('2026-10-06T12:00:00+02:00'));
+    const barres = J.filter((j) => j.cle.startsWith('2026-10')).reduce((a, j) => a + j.recu.eur, 0);
+    const recu = c.recuDuMois(r5.lignes, '2026-10');
+    recu === 100 && recu === barres
+      ? ok('« Reçu en octobre » compte une vente versée en octobre et DÉCLARÉE en septembre — le même chiffre que les barres « reçu » (100 €)')
+      : nok('« reçu » se juge au mois du versement, comme les barres', `reçu ${recu} · barres ${barres}`);
+    c.recuDuMois(r5.lignes, '2026-09') === 0
+      ? ok('…et pas en septembre (mois de sa déclaration, pas de son versement)')
+      : nok('une vente déclarée n\'est pas « reçue » dans le mois de sa déclaration');
+  });
+  const journee = (() => { const i = SRC.indexOf('const recuMois = declarables'); return i < 0 ? '' : SRC.slice(i, SRC.indexOf('\n', i)); })();
+  /recuDuMois\(declarables\.lignes/.test(journee) && !/l\.ym === ymIci/.test(journee)
+    ? ok('Ma journée lit « Reçu en {mois} » par cette règle (jamais `l.ym`, le mois de déclaration)')
+    : nok('Ma journée lit le reçu au mois du versement', journee.trim().slice(0, 120));
+  /data-urssaf-ailleurs=\{/.test(SRC) && /urssafInfo && urssafInfo\.declare/.test(SRC) && /declare: v\.declare/.test(SRC)
+    ? ok('la carte URSSAF du tableau de bord dit ce qui est déclaré ailleurs, et lit « registre pas su », de la ligne publiée')
+    : nok('la carte URSSAF dit ce qui est déclaré ailleurs et lit declare:pasSu');
+
+  // Constat 3 — on ne note pas une déclaration sur une lecture incomplète.
+  essaie('la lecture complète', () => {
+    const L = c.lectureIncomplete;
+    const base = { registre: {}, ventes: [], ventesErreur: false, comptesEchec: [], versements: {}, lbc: true, ebay: [] };
+    L(base) === null
+      ? ok('tout est lu ⇒ rien ne bloque (l\'autre sens : le geste reste possible)')
+      : nok('tout est lu ⇒ rien ne bloque', JSON.stringify(L(base)));
+    const cas = [
+      ['dates de versement illisibles', { versements: null }, 'rates'],
+      ['dates de versement en cours', { versements: undefined }, 'enCours'],
+      ['ventes Vinted pas encore lues', { ventes: null }, 'enCours'],
+      ['ventes Vinted en erreur', { ventesErreur: true }, 'rates'],
+      ['un compte non lu', { comptesEchec: ['compte_deux'] }, 'rates'],
+      ['Leboncoin illisible', { lbc: null }, 'rates'],
+      ['eBay illisible', { ebay: null }, 'rates'],
+      ['registre pas encore chargé', { registre: null }, 'enCours'],
+    ];
+    const rates = cas.filter(([, d, ou]) => { const r = L({ ...base, ...d }); return !(r && r[ou] && r[ou].length); }).map(([n]) => n);
+    rates.length === 0
+      ? ok('lecture ratée OU partielle (dates, ventes, un compte, Leboncoin, eBay, registre) ⇒ « J\'ai déclaré ce mois » est bloqué, avec la cause')
+      : nok('chaque lecture incomplète bloque la déclaration', rates.join(' · '));
+  });
+  const geste = (() => { const i = SRC.indexOf('const declarerMois = '); return i < 0 ? '' : SRC.slice(i, SRC.indexOf('\n  };', i)); })();
+  const iGarde = geste.search(/lectureIncomplete\(/), iEcrit = geste.indexOf('setDeclUrssaf(');
+  iGarde > 0 && iEcrit > iGarde && /if \(manque\b[^\n]*return; \}/.test(geste)
+    ? ok('le GESTE refuse lui-même avant d\'écrire (pas seulement le bouton) : une lecture peut tomber formulaire ouvert')
+    : nok('declarerMois refuse une lecture incomplète avant d\'écrire', 'garde absente ou après l\'écriture');
+  /data-decl-ouvrir disabled=\{!!report\.incomplet\}/.test(SRC)
+    ? ok('le bouton « J\'ai déclaré ce mois » est grisé par la même règle')
+    : nok('le bouton est grisé par la même règle');
+
+  // Constat 2 — dates illisibles : les rapports gardent Leboncoin et eBay.
+  essaie('ce que lisent les rapports', () => {
+    const i = SRC.indexOf('const declRapport = useMemo(');
+    if (i < 0) throw new Error('declRapport introuvable');
+    const j = SRC.indexOf('}, [declarables', i);
+    const corps = SRC.slice(SRC.indexOf('() =>', i), j + 1);
+    const run = (declarables, lbcLu, ebayCmd) => {
+      c.__arg = { declarables, lbcLu, lbcVentes: { ventes: [{ txId: 'A', isSeller: true, price: 7500, stepLabel: 'Paiement effectué', dateVente: '2026-10-02T10:00:00+02:00', title: 'lbc' }] }, ebayCmd, declUrssaf: {} };
+      return vm.runInContext(`(() => { const { declarables, lbcLu, lbcVentes, ebayCmd, declUrssaf } = __arg; return (${corps})(); })()`, c);
+    };
+    const EB = [{ orderId: 'E1', orderPaymentStatus: 'PAID', creationDate: '2026-10-03T10:00:00.000Z', pricingSummary: { total: { value: '60.00', currency: 'EUR' } } }];
+    const pasSu = run(null, true, EB);
+    const tot = pasSu.lignes.reduce((a, l) => a + l.eur, 0);
+    pasSu.vinted === 'passu' && tot === 135 && !pasSu.lignes.some((l) => l.plateforme === 'Vinted')
+      ? ok('dates de versement illisibles : les rapports gardent Leboncoin et eBay (135 €) et PORTENT « Vinted pas su »')
+      : nok('dates illisibles : Leboncoin et eBay restent, Vinted est dit absent', `vinted=${pasSu.vinted} total=${tot}`);
+    const enc = run(undefined, true, EB);
+    enc.vinted === 'encours' && enc.lignes.length === 0
+      ? ok('pendant la lecture : « en cours », jamais un total à zéro présenté comme lu')
+      : nok('pendant la lecture, l\'état est « en cours »', `vinted=${enc.vinted}`);
+    const lu = run({ lignes: [{ id: 'x', eur: 1 }], aDater: [] }, true, EB);
+    lu.vinted === 'lu' && lu.lignes.length === 1
+      ? ok('l\'autre sens : lecture complète, les rapports lisent exactement `declarables`')
+      : nok('lecture complète : les rapports lisent declarables', `vinted=${lu.vinted}`);
+  });
+  for (const [nom, deb] of [['mensuel', 'const report = useMemo'], ['annuel', 'const annual = useMemo']]) {
+    const t = (() => { const i = SRC.indexOf(deb); const j = SRC.indexOf('\n  }, [', i); return i < 0 || j < 0 ? '' : SRC.slice(i, SRC.indexOf('\n', j + 5)); })();
+    /for \(const l of declRapport\.lignes\)/.test(t) && /vinted: declRapport\.vinted/.test(t) && /\bdeclRapport\b/.test(t.slice(t.lastIndexOf('}, [')))
+      ? ok(`le rapport ${nom} lit cette source, et rend l'état de Vinted`)
+      : nok(`le rapport ${nom} lit declRapport et rend l'état de Vinted`);
+  }
+  /data-annuel-vinted=\{annual\.enCours/.test(SRC) && /data-rapport-vinted=\{report\.enCours/.test(SRC)
+    ? ok('les deux rapports RENDENT « en cours » / « Vinted pas su » (le bilan annuel ne rendait pas `enCours`)')
+    : nok('les deux rapports rendent l\'état de la lecture');
 }
 
 // ── 2. Les deux rapports n'écartent plus les ventes masquées ───────────────
@@ -422,7 +582,7 @@ for (const [nom, txt] of [['mensuel', mensuel], ['annuel', annuel]]) {
 // pour une partie des ventes). Un rapport destiné à l'URSSAF qui annonce un
 // « CA encaissé » alors qu'il somme par DATE DE VENTE ment sur un document
 // officiel — et l'écart peut faire basculer une fin de mois.
-const carteCA = /<StatBox label="CA[^"]*" value=\{fmtE\((report|annual)\.ca\)\}/g;
+const carteCA = /<StatBox label="CA[^"]*" value=\{[^\n]*?fmtE\((report|annual)\.ca\)\}/g;
 const libelles = [...SRC.matchAll(carteCA)].map(m => m[0]);
 libelles.length === 2
   ? (libelles.some(l => /encaiss/i.test(l))
