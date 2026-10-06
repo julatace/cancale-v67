@@ -131,8 +131,19 @@ const ast = parser.parse(app, { sourceType: 'module', plugins: ['jsx'], errorRec
     const acc = lire('src/Accueil.jsx') || '';
     dit(/from '\.\/contact\.js'/.test(acc) && /contactEmail\(\)/.test(acc), 'la page d’accueil lit l’adresse dans src/contact.js');
     dit(/from "\.\/contact\.js"/.test(app) && /contactEmail\(\)/.test(app), 'Réglages → Mon compte la lit au même endroit');
-    const enDur = [...acc.matchAll(/mailto:([^`'"${}\s]+@[^`'"${}\s]+)/g)].map((x) => x[1]);
-    dit(enDur.length === 0, 'aucune adresse écrite en dur dans la page d’accueil', enDur.join(', '));
+    // Aucune SECONDE valeur : ni une adresse écrite en toutes lettres (dans un
+    // lien OU dans un texte), ni une copie de « à venir » à côté de la ligne.
+    // La règle porte sur ce qui s'AFFICHE, pas sur la seule forme `mailto:` —
+    // une adresse posée en texte brut serait une seconde valeur tout autant.
+    const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+\.[A-Za-z]{2,}/g;
+    const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, (x) => x.replace(/[^\n]/g, ' ')).replace(/(^|[^:])\/\/.*$/gm, '$1');
+    const ligneApp = (/function LigneContact\(\)[\s\S]*?\n\}/.exec(app) || [''])[0];
+    const blocs = { 'page d’accueil': sansCommentaires(acc), 'Réglages (LigneContact)': sansCommentaires(ligneApp) };
+    const enDur = Object.entries(blocs).flatMap(([ou, s]) => (s.match(EMAIL) || []).map((x) => `${ou} : ${x}`));
+    dit(ligneApp && enDur.length === 0, 'aucune adresse écrite en dur, ni dans la page d’accueil ni dans Réglages (lien ou texte)', enDur.join(', ') || (ligneApp ? '' : 'LigneContact introuvable'));
+    const copies = Object.entries(blocs).filter(([, s]) => /à venir/.test(s) && !/CONTACT_A_VENIR/.test(s)).map(([ou]) => ou);
+    dit(/\{CONTACT_A_VENIR\}/.test(blocs['page d’accueil']) && /\{CONTACT_A_VENIR\}/.test(blocs['Réglages (LigneContact)']) && copies.length === 0,
+      '« adresse de contact à venir » vient de la même constante sur les deux écrans', copies.join(', '));
   });
   await essaie('pages légales', async () => {
     const src = lire('public/legal/editeur.js');

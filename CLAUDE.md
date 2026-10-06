@@ -4915,6 +4915,140 @@ titres, ce que §5 interdit.
   repasse « pas reliée », c'est que `GetMyeBaySelling` ne rend pas le SKU comme
   prévu, et c'est ça qu'il faut regarder, pas l'écran.
 
+### « Bilan de la semaine » et préparation du lancement (6 octobre, propositions 11 et 15)
+**Le bilan (proposition 11).** Une notification par semaine et par vendeur :
+vendu (nombre de ventes et montant), reçu, colis à expédier, paires qui dorment.
+- ⚠️ **Le lundi vers 10 h (Paris), pas le dimanche soir. C'est un choix.** Le
+  seul cron du projet (`ship-reminders`, 08:00 UTC) tourne une fois par jour, à
+  ± 59 min près (plan Hobby). Un « bilan du dimanche » partirait le dimanche à
+  10 h, sur une semaine pas finie présentée comme complète (§5). Le lundi, la
+  semaine du lundi 00:00 au lundi 00:00 (heure de Paris) est terminée. La
+  semaine du passage à l'heure d'hiver fait 169 h, et l'audit le vérifie.
+  Si la base ne répond pas le lundi, mardi et mercredi réessaient. Le jeudi,
+  plus rien. **Un second cron le dimanche soir est à trancher par Julien** : un
+  cron refusé au déploiement bloquerait TOUS les déploiements (comme le défaut
+  #250 des 13 fonctions).
+- **Aucune règle n'est réécrite.** Vendu = `ventesFaites` (date de vente). Reçu
+  = `ventesDeclarables`, daté au versement, c'est-à-dire le CA déclaré. À
+  expédier = la règle du widget (`aExpedier`, colis cochés « posté » exclus). Le
+  serveur ne peut pas importer `App.jsx`. `api/_lib/ventes-regle.js` est donc
+  une **copie exacte**, refabriquée par
+  `node scripts/audit-bilan-semaine.cjs --recopie`. ⚠️ **Ne jamais la modifier à
+  la main.** L'audit compare les deux codes (hors commentaires) ET leurs
+  résultats.
+- **Les paires qui dorment.** L'écran Annonces publie `vrm_paires_dorment`
+  (clé synchronisée, `{n, total, datesKnown, at}`) et le serveur la lit (§11).
+  Une publication de plus de 8 jours vaut « pas su ». Des dates de mise en
+  ligne incomplètes donnent « au moins ».
+- **Trois états par chiffre, jamais deux.** Chaque chiffre est soit sûr, soit
+  partiel (« au moins », avec ce qui manque **nommé**), soit inconnu (aucun
+  nombre, « à voir dans l'app »). Le bilan devient partiel dans ces cas :
+  - un compte jamais capté, ou capté avant la fin de la semaine
+    (« vendeuse_a (lu jeudi) ») ;
+  - Vinted, Leboncoin ou eBay illisible ;
+  - des ventes Leboncoin sans date ;
+  - pour le reçu, des ventes finalisées sans date de versement.
+  Si tout est illisible, rien n'est envoyé ni mémorisé, et le cron réessaie
+  le lendemain. Jamais « 0 vente ».
+- **Un bilan par semaine, jamais deux.** Le mémo `bilan_semaine_dedup` est
+  écrit **AVANT** l'envoi, et sa bonne écriture est **vérifiée**. Mémo illisible
+  ⇒ rien. Mémo non écrit ⇒ rien. Le bilan passe par la boucle par vendeur déjà
+  en place : toutes ses lectures portent `owner=eq.`. La réponse du cron ne
+  contient **aucun montant**.
+- **Préférence « 📊 Bilan de la semaine »** (`push_prefs.bilan`), activée par
+  défaut et coupable dans Réglages → Notifications. Les défauts sont les mêmes
+  dans l'app et sur le serveur (l'audit compare `PUSH_CATS` et `PUSH_DEFAUT`).
+  Un abonnement coupé coupe déjà tout envoi.
+
+**Le lancement (proposition 15).**
+- **(a) Les liens des emails d'inscription ramenaient sur `localhost`.** Mesuré
+  le 5 octobre dans les journaux d'authentification : une vraie confirmation
+  d'inscription y venait de `http://localhost:3000`, donc le Site URL de
+  Supabase est encore `localhost`. L'app envoie maintenant `redirect_to` (son
+  adresse ouverte) sur cinq chemins : l'inscription, le renvoi de confirmation,
+  le lien magique, l'oubli de mot de passe et le changement d'adresse.
+  ⚠️ **Ça ne suffit pas seul.** Supabase ignore un `redirect_to` absent de sa
+  liste d'adresses autorisées, et retombe sur le Site URL.
+  L'aide de l'inscription parlait d'une « adresse de test » d'envoi, à
+  **toute** personne qui s'inscrivait. Elle dit maintenant seulement d'ouvrir
+  l'email, et de regarder les indésirables si rien n'arrive. Elle est vraie
+  avec ou sans SMTP personnalisé.
+- **(b) Stripe exige la case « j'accepte les CGV »**
+  (`consent_collection[terms_of_service]=required`), avec un lien vers NOS CGV.
+  Stripe refuse la session si le compte n'a pas d'adresse de conditions. On
+  répond alors **503 `cgv-stripe`** et on le dit. On ne réessaie **jamais** sans
+  la case.
+- **(c) « Fermer mon compte »** (Réglages → Mon compte), mode `fermer` de
+  `api/compte.js`. Il fallait l'écrire : la politique de confidentialité promet
+  l'effacement, et aucun bouton ne le faisait.
+  ⚠️ **Mesuré sur la vraie base avant d'écrire** : `app_data.owner` et
+  `vinted_accounts.owner` n'ont **aucune clé étrangère** vers `auth.users`.
+  Seule `abonnements` en a une. La migration 001 en prévoyait, elle n'est pas
+  en place. Supprimer l'utilisateur n'effacerait donc rien : la route efface
+  elle-même, table par table, uniquement `owner=eq.<celui du jeton>`.
+  Les garde-fous :
+  - l'adresse email retapée est vérifiée **par le serveur** ;
+  - c'est **refusé au propriétaire** de l'installation, et « pas su » vaut
+    refus aussi ;
+  - l'ordre est choisi pour qu'un échec se rattrape :
+    1. l'abonnement : résilié en fin de période, ou arrêté tout de suite s'il
+       est impayé. Stripe ne répond pas ⇒ **rien** n'est effacé ;
+    2. les sessions ;
+    3. les données, les comptes Vinted, les compteurs ;
+    4. les photos détourées ;
+    5. **en dernier**, le compte de connexion. Tant qu'il existe, le vendeur
+       peut se reconnecter et relancer.
+  - Un échec partiel répond 502 « Fermeture INCOMPLÈTE », avec ce qui est fait
+    et ce qui ne l'est pas. Jamais « compte fermé ».
+  - ⚠️ **Limite dite à l'écran** : un jeton déjà délivré reste valable environ
+    1 h. Une extension encore installée peut donc écrire une capture dans
+    l'heure (l'écran conseille de la retirer).
+  - Les copies du schéma `sauvegarde` ne sont pas touchées : la politique les
+    autorise 90 jours.
+  - Les CGU donnent le chemin.
+- **(d) Le contact vient d'un seul endroit**, `src/contact.js`
+  (`CONTACT_EMAIL = ''`). La page d'accueil et Réglages le lisent. Vide, ils
+  disent « adresse de contact à venir », jamais une adresse inventée.
+  `audit-lancement.cjs` exige que ce soit **la même valeur** que `email` dans
+  `public/legal/editeur.js`. Il refuse aussi toute adresse écrite en dur, en
+  lien comme en texte. Il exécute `editeur.js` : un champ vide s'affiche
+  « à compléter », jamais « null ».
+- **Les preuves.** Chaque contrôle sort rouge sur le code d'avant (5ea2602),
+  puis rouge sous une **mutation** posée sur le code d'après :
+
+  | contrôle | sur le code d'avant | sous les mutations |
+  |---|---|---|
+  | `audit-bilan-semaine.cjs` (42 contrôles) | 31 rouges | règle du miroir modifiée → 6 · partiel affiché comme sûr → 4 · bilan éteint par défaut → 2 · publication hors synchro → 1 |
+  | banc `bilan-semaine.cjs` (20, la vraie route, deux vendeurs, faux Web Push) | 14 rouges | règle du miroir modifiée → 1 · partiel affiché comme sûr → 2 · envoi malgré un mémo non écrit → 1 · mémo illisible pris pour « jamais envoyé » → 1 · préférence ignorée → 1 |
+  | `audit-fermer-compte.cjs` (25) | 22 rouges | effacement sans filtre de vendeur → 3 · propriétaire accepté → 2 · échec partiel annoncé réussi → 3 |
+  | `audit-lancement.cjs` (22) | 16 rouges | case CGV retirée → 2 · `redirect_to` retiré → 5 · adresse écrite en dur sur l'accueil → 2 |
+  | bancs `abonnement.cjs` (53) et `accueil.cjs` (40) | 7 et 2 rouges | — |
+
+  ⚠️ **Le premier banc du bilan était vert sur un miroir qui comptait les
+  ventes remboursées**, car aucune n'était servie. Il en sert une maintenant.
+  **Le premier contrôle du contact** ne regardait que les liens `mailto:` : une
+  adresse écrite en texte passait. C'est la règle qu'il fallait juger, pas son
+  orthographe.
+- **Les gestes de Julien :**
+  - **Supabase → Authentication → URL Configuration** : Site URL
+    `https://vrm.center`, et `https://vrm.center/**` dans les Redirect URLs.
+    Puis un **SMTP personnalisé** : l'expéditeur par défaut de Supabase est
+    limité et fait pour les essais.
+  - **Stripe → Settings → Public details** : Terms of service =
+    `https://vrm.center/legal/cgv.html`. Sans ça, le paiement répond « CGV
+    absentes ».
+  - **Remplir l'adresse de contact** dans `src/contact.js` ET dans
+    `public/legal/editeur.js`, avec ses autres mentions légales.
+  - Décider s'il veut un second cron le dimanche soir.
+- **Non mesuré, ni en production ni ici** :
+  - l'heure réelle du cron de Vercel ;
+  - le texte exact du refus de Stripe sans adresse de CGV ;
+  - Supabase face à un `redirect_to` non autorisé ;
+  - la suppression du stockage, de `logout?scope=global` et de
+    `admin/users` sur la vraie base ;
+  - l'arrivée réelle d'une notification ;
+  - ce qu'une extension écrit dans l'heure qui suit une fermeture.
+
 ### Mise en production du 5 octobre
 PR #442 mergée à 10:24 UTC (80 déploiements sur 24 h : sous la limite), déploiement
 de production READY sur le commit de merge, `/api/sante` répond, le zip servi

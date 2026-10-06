@@ -51,6 +51,9 @@ const vendeurs = () => ({
       { transaction_id: 106, status: 'Le paiement a été validé', date: new Date(DANS + J).toISOString(), price: { amount: '30' }, transaction_user_status: 'needs_action' },
       { transaction_id: 103, status: 'Commande finalisée', date: new Date(AVANT).toISOString(), price: { amount: '70' } },
       { transaction_id: 105, status: 'Commande finalisée', date: new Date(DANS).toISOString(), price: { amount: '999' } },
+      // Remboursée DANS la semaine : ni vendue, ni reçue (le miroir serveur doit
+      // l'écarter comme l'app — sans elle, un miroir qui la compterait passait).
+      { transaction_id: 107, status: 'Remboursée', date: new Date(DANS).toISOString(), price: { amount: '55' } },
     ] } },
     txn: [{ tx: '101', s: '450', su: new Date(DANS + J).toISOString() }, { tx: '103', s: '450', su: new Date(DANS).toISOString() }, { tx: '105', s: '450', su: new Date(DANS).toISOString() }],
     lbc: { L1: { txId: 'L1', isSeller: true, price: 2000, dateVente: new Date(DANS).toISOString(), stepStatus: 'done', at: new Date(DANS).toISOString() } },
