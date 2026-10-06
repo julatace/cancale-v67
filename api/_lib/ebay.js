@@ -186,4 +186,33 @@ async function storeData(id, data, owner) {
   return ecrireLignes([{ id, data }], owner);
 }
 
-export { SCOPES, appId, certId, ruName, keysReady, canConsent, authUrl, appToken, exchangeCode, hasRefresh, readRefresh, lireRefresh, accessToken, storeData, portee };
+// Un réglage de CE vendeur (ligne `main`), lu en SCALAIRE (§4.4 : jamais la
+// ligne entière, elle pèse ~200 Ko). TROIS états : `undefined` pas su ·
+// `''` absent · la valeur en texte (`->>` rend « true » pour un booléen).
+async function lireReglageVendeur(cle, owner) {
+  if (!sbKey() || !/^[a-z0-9_]+$/i.test(String(cle || ''))) return undefined;
+  const p = await portee(owner);
+  if (!p) return undefined;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main${p.filtre}&select=v:data->>${cle}`, { headers: { ...sbCle(sbKey()) } });
+    if (!r.ok) return undefined;
+    const rows = await r.json();
+    if (!Array.isArray(rows)) return undefined;
+    return (rows[0] && rows[0].v != null) ? String(rows[0].v) : '';
+  } catch (_) { return undefined; }
+}
+// Une PETITE ligne de CE vendeur : `undefined` pas su · `null` absente · data.
+async function lireDonnee(id, owner) {
+  if (!sbKey() || !/^[a-z0-9_]+$/i.test(String(id || ''))) return undefined;
+  const p = await portee(owner);
+  if (!p) return undefined;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}${p.filtre}&select=data`, { headers: { ...sbCle(sbKey()) } });
+    if (!r.ok) return undefined;
+    const rows = await r.json();
+    if (!Array.isArray(rows)) return undefined;
+    return rows[0] ? (rows[0].data || {}) : null;
+  } catch (_) { return undefined; }
+}
+
+export { SCOPES, appId, certId, ruName, keysReady, canConsent, authUrl, appToken, exchangeCode, hasRefresh, readRefresh, lireRefresh, accessToken, storeData, portee, lireReglageVendeur, lireDonnee };

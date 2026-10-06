@@ -22,7 +22,7 @@
 import crypto from 'crypto';
 import { vendeurExige, baseCloisonnee } from './_lib/session.js';
 import { accesVendeur } from './_lib/abonnement.js';
-import { keysReady, canConsent, ruName, authUrl, appToken, exchangeCode, hasRefresh, accessToken, storeData } from './_lib/ebay.js';
+import { keysReady, canConsent, ruName, authUrl, appToken, exchangeCode, hasRefresh, accessToken, storeData, lireReglageVendeur, lireDonnee } from './_lib/ebay.js';
 
 // ── LECTURE des données eBay du vendeur (centraliser dans VRM) ───────────────
 // Julien : « capte absolument tout d'eBay ». C'est une LECTURE (comme la moisson
@@ -712,16 +712,52 @@ async function handleOffre(b, owner) {
 // Pour la paire VENDUE AILLEURS (anti double vente). Sans retour côté eBay : il
 // faudrait republier. D'où la confirmation exigée ICI, et pas seulement à
 // l'écran.
+// ── RETRAIT AUTOMATIQUE (proposition 8, 6 octobre) ─────────────────────────
+// Julien l'a accepté « à activer toi-même ». L'app ne l'envoie (`auto:true`)
+// que si son interrupteur est allumé ; la route le RE-VÉRIFIE dans SA ligne
+// `main` (« pas su » ⇒ rien n'est envoyé), puis demande à eBay le SKU de
+// l'annonce : il doit être EXACTEMENT celui de la paire vendue (`VRM-{n°}`,
+// une identité, §5). Un SKU changé entre-temps ⇒ rien n'est retiré.
+// Chaque retrait automatique est noté (`ebay_retraits_auto`) : il peut relire
+// ce qui a été fait en son nom.
+const SKU_PAIRE = /^VRM[-\s]?[A-Z]{0,3}\d{1,6}$/i;
+const normSku = (x) => String(x || '').toUpperCase().replace(/[\s-]/g, '');
 async function handleRetirer(b, owner) {
   if (b.confirme !== true) return { status: 400, body: { ok: false, reason: 'confirmation', error: 'Confirme le retrait : rien n\'a été envoyé à eBay.' } };
   const itemId = String(b.itemId || '').trim();
   if (!ID_EBAY.test(itemId)) return { status: 400, body: { ok: false, error: 'annonce eBay invalide' } };
+  const auto = b.auto === true;
+  const skuAttendu = String(b.sku || '').trim();
+  if (auto) {
+    if (!SKU_PAIRE.test(skuAttendu)) return { status: 400, body: { ok: false, reason: 'sku', error: 'Retrait automatique : la paire n\'est pas identifiée par son SKU (VRM-n°) — rien n\'a été envoyé à eBay.' } };
+    const v = await lireReglageVendeur('vrm_ebay_retrait_auto', owner);
+    if (v === undefined) return { status: 503, body: { ok: false, reason: 'reglage-pas-su', error: 'Je n\'ai pas pu relire ton réglage de retrait automatique — rien n\'a été envoyé à eBay.' } };
+    if (v !== 'true') return { status: 403, body: { ok: false, reason: 'auto-eteint', error: 'Le retrait automatique est éteint — rien n\'a été envoyé à eBay.' } };
+  }
   const at = await accessToken(owner);
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
+  if (auto) {
+    const g = await tradingCall(at.token, 'GetItem', `<ItemID>${itemId}</ItemID>`);
+    if (g.status === 0 || !g.ok) return { status: 503, body: { ok: false, reason: 'sku-pas-su', error: 'eBay n\'a pas dit quelle paire porte cette annonce — rien n\'a été retiré.' } };
+    const skuEbay = lireBalise(String(g.xml || '').replace(/<Variations>[\s\S]*?<\/Variations>/g, ''), 'SKU');
+    if (normSku(skuEbay) !== normSku(skuAttendu)) return { status: 409, body: { ok: false, reason: 'sku-change', error: `L'annonce eBay ne porte plus ${skuAttendu} — rien n'a été retiré.` } };
+  }
   const r = await tradingCall(at.token, 'EndFixedPriceItem', `<ItemID>${itemId}</ItemID><EndingReason>NotAvailable</EndingReason>`);
   if (r.status === 0) return { status: 504, body: { ok: false, reason: 'incertain', error: 'eBay n\'a pas répondu — je ne sais pas si l\'annonce a été retirée. Regarde sur eBay avant de recommencer.' } };
   if (!r.ok) return { status: r.status >= 400 ? r.status : 422, body: { ok: false, error: messageEbaySur(r.err) || 'eBay a refusé le retrait.', ack: r.ack } };
-  return { status: 200, body: { ok: true, fin: (/<EndTime>([\s\S]*?)<\/EndTime>/.exec(r.xml || '') || [])[1] || null } };
+  const fin = (/<EndTime>([\s\S]*?)<\/EndTime>/.exec(r.xml || '') || [])[1] || null;
+  let journal = null;
+  if (auto) {
+    // Le journal ne se réécrit QUE sur une lecture réussie (« rien lu » ne vaut
+    // pas « rien », sinon un hoquet effacerait l'historique de ses retraits).
+    const j = await lireDonnee('ebay_retraits_auto', owner);
+    journal = false;
+    if (j !== undefined) {
+      const l = (j && Array.isArray(j.items)) ? j.items : [];
+      journal = await storeData('ebay_retraits_auto', { items: [{ itemId, sku: skuAttendu, titre: String(b.titre || '').slice(0, 140), at: Date.now() }, ...l].slice(0, 50) }, owner);
+    }
+  }
+  return { status: 200, body: { ok: true, fin, ...(auto ? { auto: true, journal } : {}) } };
 }
 
 // ── SOLDE eBay À VIRER (getSellerFundsSummary, lecture seule) ────────────────

@@ -849,6 +849,9 @@ const SYNC_KEYS = [
   // « J'ai déclaré ce mois » : quelles ventes il a déclarées, et dans quel mois
   // (`ventesDeclarables`). Écrit sur SON clic uniquement.
   'vrm_urssaf_declare',
+  // Retirer d'eBay, sans demander, une paire PROUVÉE vendue sur Vinted
+  // (proposition 8). Éteint par défaut ; la route le relit elle-même.
+  'vrm_ebay_retrait_auto',
   'vinted_sale_overrides','vinted_bord_links','vinted_pickup_done','vinted_bords_hidden','vinted_ship_done','vinted_pairs_lost','vinted_retours_recus','vinted_retours_dismissed',
   'vinted_offvinted_buys','vinted_buyprice_by_num','vinted_quick_replies','vinted_ca_keep_removed','vinted_achat_notes','vrm_lbc_colis_done',
   // Annonce Leboncoin → N° de paire, posé À LA MAIN (« Relier », écran
@@ -10271,6 +10274,30 @@ function EbayAnnonces({ baseKO, comptes = [] }) {
   const [vendusVinted, setVendusVinted] = React.useState(undefined); // prouvées vendues : undefined · null · Set
   const [eligibles, setEligibles] = React.useState(undefined);       // offre : undefined · null · { ids:Set, complet }
   const [retraits, setRetraits] = React.useState({});                // itemId → '…' (en cours) | message
+  // Retrait automatique (proposition 8) : l'interrupteur, et ce qui a été retiré
+  // en son nom (`ebay_retraits_auto`, écrit par la route). Trois états pour le
+  // journal : `undefined` en cours · `null` pas su · tableau.
+  const [retraitAuto, setRetraitAuto] = React.useState(() => load('vrm_ebay_retrait_auto', false) === true);
+  React.useEffect(() => onCloudReady(() => setRetraitAuto((v) => v || load('vrm_ebay_retrait_auto', false) === true)), []);
+  const [journalAuto, setJournalAuto] = React.useState(undefined);
+  React.useEffect(() => { let stop = false; (async () => {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.ebay_retraits_auto&select=items:data->items`, { headers: sbAuth() });
+      if (!r.ok) { if (!stop) setJournalAuto(null); return; }
+      const rows = await r.json();
+      if (!stop) setJournalAuto(Array.isArray(rows) ? ((rows[0] && Array.isArray(rows[0].items)) ? rows[0].items : []) : null);
+    } catch (_) { if (!stop) setJournalAuto(null); }
+  })(); return () => { stop = true; }; }, [retraits]);
+  const basculerRetraitAuto = async () => {
+    if (retraitAuto) { setRetraitAuto(false); save('vrm_ebay_retrait_auto', false); return; }
+    const ok = await askConfirm({
+      title: 'Retirer d\'eBay, sans te demander, une paire vendue sur Vinted ?',
+      desc: 'Seulement quand la vente Vinted est PROUVÉE (sa transaction) et que l\'annonce eBay porte le N° de la paire (SKU VRM-n°). Ça se fait quand VRM est ouvert. Une annonce eBay terminée ne revient pas : il faudrait la republier.',
+      ok: 'Allumer', cancel: 'Annuler',
+    });
+    if (!ok) return;
+    setRetraitAuto(true); save('vrm_ebay_retrait_auto', true);
+  };
   // ── BROUILLONS ET PROGRAMMÉES (5 octobre) ──
   const [brouillons, setBrouillons] = React.useState(undefined);     // ebay_brouillons : undefined · null · {id: brouillon}
   const [programmees, setProgrammees] = React.useState(undefined);   // ebay_programmees : undefined · null · 'jamais' · {items, enLigne, capturedAt}
@@ -10527,6 +10554,22 @@ function EbayAnnonces({ baseKO, comptes = [] }) {
         ))}
       </div>
     )}
+    {/* Retrait automatique (proposition 8) — éteint par défaut, son choix. */}
+    <div data-ebay-retrait-auto={retraitAuto ? 'allume' : 'eteint'} style={{ ...bloc(), display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ flex: '1 1 200px', minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: E.text }}>Retrait automatique d'eBay</div>
+          <div style={{ fontSize: 11.5, color: E.muted, lineHeight: 1.45 }}>{retraitAuto ? 'Allumé : une paire prouvée vendue sur Vinted est retirée d\'eBay quand VRM est ouvert, si son annonce porte son N°.' : 'Éteint : VRM te montre les paires à retirer, c\'est toi qui cliques.'}</div>
+        </div>
+        <button type="button" data-ebay-retrait-auto-bouton onClick={basculerRetraitAuto} style={lienE}>{retraitAuto ? 'Éteindre' : 'Allumer'}</button>
+      </div>
+      {Array.isArray(journalAuto) && journalAuto.length > 0 && (
+        <div data-ebay-retraits-faits={journalAuto.length} style={{ fontSize: 11.5, color: E.muted, lineHeight: 1.5, borderTop: `1px solid ${E.border}`, paddingTop: 6 }}>
+          Retirées en ton nom : {journalAuto.slice(0, 5).map((x) => `${x.sku || x.itemId}${x.titre ? ' · ' + x.titre : ''} (${new Date(x.at).toLocaleDateString('fr-FR')})`).join(' — ')}{journalAuto.length > 5 ? ` — et ${journalAuto.length - 5} autre${journalAuto.length - 5 > 1 ? 's' : ''}` : ''}
+        </div>
+      )}
+      {journalAuto === null && retraitAuto && <div style={{ fontSize: 11.5, color: E.muted }}>Je n'ai pas pu relire la liste de ce qui a été retiré en ton nom — rouvre l'écran dans un moment.</div>}
+    </div>
   </>);
   // ── 2. CE QUI N'A PAS PU ÊTRE LU, DIT UNE FOIS (§7) ────────────────────────
   // « Pas su » ne vaut pas « rien à retirer » : sans les ventes Vinted, une
@@ -28977,6 +29020,37 @@ const commandeEbayEngagee = (o) => !!o
 // (`ebay_programmees.items`, et celles que VRM vient de programmer). Une paire
 // prouvée vendue sur Vinted qui y figure ⇒ `aAnnulerEbay` : « programmée sur
 // eBay — à annuler », avant qu'eBay ne la mette en ligne tout seul.
+// ── RETRAIT AUTOMATIQUE D'eBAY (proposition 8, 6 octobre) ───────────────────
+// Allumé par LUI (`vrm_ebay_retrait_auto`), jamais par défaut. Quand l'app
+// s'ouvre et que la règle commune (`doublesVenteEbay`) trouve une paire PROUVÉE
+// vendue sur Vinted encore en vente sur eBay (SKU `VRM-{n°}`), on la retire —
+// une à la fois, 5 au plus par passage, et chaque annonce n'est tentée qu'une
+// fois par ouverture de l'app (un refus ne boucle pas). La route relit
+// l'interrupteur et le SKU chez eBay avant de terminer quoi que ce soit.
+// ⚠️ L'appelant ne l'appelle que si TOUTES les annonces Vinted ont été lues :
+//    sinon une paire revenue (retour, republiée sur un compte illisible)
+//    passerait pour vendue.
+let __retraitEbayAutoEnVol = false;
+const __retraitEbayAutoTentes = new Set();
+const retirerEbayAuto = async (liste) => {
+  if (__retraitEbayAutoEnVol || !Array.isArray(liste) || !liste.length) return;
+  __retraitEbayAutoEnVol = true;
+  try {
+    let n = 0;
+    for (const d of liste) {
+      if (n >= 5) break;
+      const a = (d && d.annonce) || {}; const id = String(a.itemId || '');
+      if (!id || !a.sku || __retraitEbayAutoTentes.has(id)) continue;
+      __retraitEbayAutoTentes.add(id); n += 1;
+      try {
+        const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() },
+          body: JSON.stringify({ action: 'retirer', itemId: id, confirme: true, auto: true, sku: a.sku, titre: a.title || '' }) });
+        const j = await r.json().catch(() => null);
+        if (j && j.ok) toast(`N°${d.numero} retirée d'eBay automatiquement : elle est vendue sur Vinted.`, 'ok');
+      } catch (_) { /* il la verra dans « à retirer », avec le bouton */ }
+    }
+  } finally { __retraitEbayAutoEnVol = false; }
+};
 function doublesVenteEbay({ annonces, commandes, numeros, enLigne, vendusVinted, programmees }) {
   const parNum = new Map();
   for (const id in (numeros || {})) {
@@ -33144,6 +33218,7 @@ function AppCoeur() {
       const numPorteurs={};
       const unreadByAcct={}; // nom du compte -> nb de messages non lus (pour l'indice)
       const lbcOnlineIds=new Set(); // ids d'annonces encore en ligne (pour la synchro Leboncoin)
+      let annoncesToutesLues=true;  // retrait eBay automatique : seulement si TOUTES ont été lues
       // MÊMES RÈGLES QUE LES ÉCRANS : un compte masqué/bloqué ne génère aucune
       // notification, un colis déjà coché « posté » n'est plus à expédier, et une
       // paire déjà vendue ne compte ni comme « qui dort » ni comme « sans N° ».
@@ -33190,6 +33265,7 @@ function AppCoeur() {
         }
         // Annonces en ligne (moisson, 0 requête) : compte celles qui DORMENT
         // (≥30 j → baisser le prix, action GRATUITE) et celles SANS numéro.
+        if(!(listH && Array.isArray(listH.items))) annoncesToutesLues=false;
         if(listH && Array.isArray(listH.items)){
           for(const raw of listH.items){
             if(!isOnlineListing(raw)) continue;
@@ -33267,6 +33343,9 @@ function AppCoeur() {
         const vendusE=relieesE?await lireVentesVintedProuvees():null;
         const dvE=doublesVenteEbay({annonces:annE||[], commandes:ords||[], numeros:nums, enLigne:lbcOnlineIds, vendusVinted:vendusE, programmees:progE||[]});
         ebayARetirer=dvE.aRetirerEbay.length; ebayARetirerVinted=dvE.aRetirerVinted.length; ebayAAnnuler=dvE.aAnnulerEbay.length;
+        // Retrait automatique (proposition 8) : allumé par lui, preuve lue, toutes
+        // les annonces Vinted lues. Sinon : rien, et la cloche dit « à retirer ».
+        if(load('vrm_ebay_retrait_auto',false)===true && vendusE && annoncesToutesLues && isCloudReady() && dvE.aRetirerEbay.length) retirerEbayAuto(dvE.aRetirerEbay);
       }catch(_){}
       if(cancelled) return;
       // ── Centre de notifications : ce qui demande une action, ici et maintenant.

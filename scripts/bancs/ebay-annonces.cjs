@@ -363,6 +363,51 @@ const deborde = (pg) => pg.evaluate(() => ({ sw: document.documentElement.scroll
       dit(r.sw <= r.cw + 1 && errs.length === 0, 'aucun débordement, aucune erreur', errs.join(' | ').slice(0, 160));
     });
     await ctx.close();
+    // ── RETRAIT AUTOMATIQUE (proposition 8, 6 octobre) ─────────────────────
+    //    Éteint ⇒ rien ne part tout seul. Allumé (confirmation d'abord) ⇒ à la
+    //    réouverture, la paire PROUVÉE vendue part, et elle seule ; « pas su »
+    //    sur la preuve ⇒ rien.
+    console.log('── retrait automatique (1512 px)');
+    {
+      remettre();
+      const o = await ouvrir(b, { width: 1512, height: 950 }, false);
+      await essaie('retrait automatique', async () => {
+        const auto = () => o.envois.filter((x) => x.action === 'retirer' && x.auto === true);
+        await o.pg.goto(`http://localhost:${PORT}/?tab=dashboard`, { waitUntil: 'domcontentloaded' });
+        await o.pg.waitForTimeout(6000);
+        dit(auto().length === 0 && !o.envois.some((x) => x.action === 'retirer'), 'éteint (le défaut) : rien ne part tout seul', JSON.stringify(o.envois));
+        await versAnnoncesEbay(o.pg);
+        dit((await o.pg.getAttribute('[data-ebay-retrait-auto]', 'data-ebay-retrait-auto')) === 'eteint', 'l’interrupteur est sur l’écran eBay → Annonces, éteint');
+        await o.pg.click('[data-ebay-retrait-auto-bouton]');
+        await o.pg.waitForTimeout(300);
+        dit((await o.pg.getAttribute('[data-ebay-retrait-auto]', 'data-ebay-retrait-auto')) === 'eteint', 'allumer DEMANDE d’abord (une annonce terminée ne revient pas)');
+        await feuille(o.pg).locator('button', { hasText: 'Allumer' }).click();
+        await o.pg.waitForTimeout(900);
+        const memo = await o.pg.evaluate(() => localStorage.getItem('vrm_ebay_retrait_auto'));
+        dit(memo === 'true', 'confirmé, le réglage est gardé', String(memo));
+        await o.pg.goto(`http://localhost:${PORT}/?tab=dashboard`, { waitUntil: 'domcontentloaded' });
+        await o.pg.waitForFunction(() => true, null, { timeout: 1000 });
+        for (let i = 0; i < 20 && !auto().length; i++) await o.pg.waitForTimeout(500);
+        const a = auto();
+        dit(a.length === 1 && a[0].itemId === '110000000001' && a[0].sku === 'VRM-22' && a[0].confirme === true,
+          'allumé : la paire N°22, PROUVÉE vendue sur Vinted, est retirée d’eBay — elle seule, avec son SKU', JSON.stringify(a));
+        dit(!o.envois.some((x) => x.action === 'retirer' && /11000000000[35]/.test(x.itemId)), 'ni la N°23 (vente annulée), ni la N°25 (une conversation)');
+        await o.pg.reload({ waitUntil: 'domcontentloaded' });
+        await o.pg.waitForTimeout(5000);
+        dit(auto().length === 1, 'une annonce retirée ne repart pas (la synchro l’a sortie de la liste)', `${auto().length} envoi(s)`);
+      });
+      await o.ctx.close();
+      remettre();
+      const p2 = await ouvrir(b, { width: 1512, height: 950 }, true);
+      await essaie('retrait automatique, preuve illisible', async () => {
+        await p2.pg.addInitScript(() => { try { localStorage.setItem('vrm_ebay_retrait_auto', 'true'); } catch (_) {} });
+        rows[0].data.vrm_ebay_retrait_auto = true;
+        await p2.pg.goto(`http://localhost:${PORT}/?tab=dashboard`, { waitUntil: 'domcontentloaded' });
+        await p2.pg.waitForTimeout(7000);
+        dit(!p2.envois.some((x) => x.action === 'retirer'), 'allumé mais ventes Vinted illisibles ⇒ « pas su » ne retire RIEN', JSON.stringify(p2.envois));
+      });
+      await p2.ctx.close();
+    }
   } catch (e) { dit(false, 'le banc a tourné jusqu’au bout', String(e && e.message).slice(0, 160)); }
   finally { if (b) await b.close(); srv.close(); }
   console.log(ko ? `\n❌ eBay → Annonces : ${ko} rouge(s)` : '\n✅ eBay → Annonces : reliées par identité, double vente dite dans les deux sens, offre et retrait derrière confirmation, « pas su » jamais inventé');

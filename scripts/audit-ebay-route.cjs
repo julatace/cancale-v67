@@ -134,7 +134,7 @@ const fee = (n, v) => `<Fee><Name>${n}</Name><Fee currencyID="EUR">${v}</Fee></F
 const ELIGIBLE = '110000000002';
 let mode = {};
 const uuidsVus = new Map();       // UUID déjà utilisé → ItemID (comme eBay : 488)
-const remettre = () => { mode = { liste: 'ok', commandes: 'ok', eligibles: 'ok', envoi: 'ok', trading: 'ok', verif: 'ok', add: 'ok', end: 'ok', revise: 'ok', priv: 'ok', getitem: 'ok' }; remettreEbay(); uuidsVus.clear(); };
+const remettre = () => { mode = { liste: 'ok', commandes: 'ok', eligibles: 'ok', envoi: 'ok', trading: 'ok', verif: 'ok', add: 'ok', end: 'ok', revise: 'ok', priv: 'ok', getitem: 'ok', mainKo: false, journalKo: false }; remettreEbay(); uuidsVus.clear(); };
 remettre();
 
 const journal = [];       // ce qui part chez eBay, ce qui s'écrit en base, avec quel jeton
@@ -267,6 +267,9 @@ global.fetch = async (url, opts = {}) => {
     const id = (/[?&]id=eq\.([^&]*)/.exec(q) || [])[1];
     const owner = (/[?&]owner=eq\.([^&]*)/.exec(q) || [])[1];
     const sel = (/[?&]select=([^&]*)/.exec(q) || [])[1];
+    // Une lecture qui échoue, ligne par ligne (retrait automatique, 6 octobre).
+    if (id === 'main' && mode.mainKo) return rep({ message: 'boom' }, 500);
+    if (id === 'ebay_retraits_auto' && mode.journalKo) return rep({ message: 'boom' }, 500);
     const out = lignes.filter((r) => (!id || r.id === id) && (!owner || r.owner === owner));
     return rep(out.map((r) => projette(r, sel)));
   }
@@ -608,6 +611,42 @@ const RA = {};
     mode.trading = 'reseau';
     const o3 = await app(JWT_J, { action: 'retirer', itemId: '110000000001', confirme: true });
     dit(o3.code === 504 && o3.corps && o3.corps.reason === 'incertain', 'eBay ne répond pas ⇒ « je ne sais pas si elle a été retirée »', `HTTP ${o3.code}`);
+  });
+
+  // ── 5 bis. LE RETRAIT AUTOMATIQUE (proposition 8, 6 octobre) ──────────────
+  //    L'interrupteur est relu PAR LA ROUTE dans SA ligne `main` ; le SKU de
+  //    l'annonce est redemandé à eBay et doit être celui de la paire vendue.
+  await essaie('retrait automatique', async () => {
+    const fin = (o) => auCompte(o.journal).some((x) => x.appel === 'EndFixedPriceItem');
+    const AUTO = { action: 'retirer', itemId: '110000000001', confirme: true, auto: true, sku: 'VRM-22', titre: 'Adidas Gazelle bleu taille 40' };
+    remettre(); remettreBase();
+    let o = await app(JWT_J, AUTO);
+    dit(o.code === 403 && o.corps.reason === 'auto-eteint' && !fin(o), 'automatique, interrupteur jamais allumé ⇒ 403, rien n\'est envoyé à eBay', `HTTP ${o.code} · ${appels(o.journal)}`);
+    remettre(); remettreBase(); lignes.push({ owner: J, id: 'main', data: { vrm_ebay_retrait_auto: false } });
+    o = await app(JWT_J, AUTO);
+    dit(o.code === 403 && !fin(o), 'interrupteur éteint ⇒ rien n\'est envoyé', `HTTP ${o.code}`);
+    remettre(); remettreBase(); lignes.push({ owner: J, id: 'main', data: { vrm_ebay_retrait_auto: true } }); mode.mainKo = true;
+    o = await app(JWT_J, AUTO);
+    dit(o.code === 503 && o.corps.reason === 'reglage-pas-su' && !fin(o), 'réglage illisible ⇒ « pas su » ne vaut pas « allumé » : rien n\'est envoyé', `HTTP ${o.code}`);
+    remettre(); remettreBase(); lignes.push({ owner: J, id: 'main', data: { vrm_ebay_retrait_auto: true } });
+    o = await app(JWT_J, { ...AUTO, sku: '' });
+    dit(o.code === 400 && !fin(o), 'automatique sans SKU de paire ⇒ refusé avant eBay', `HTTP ${o.code}`);
+    mode.getitem = 'autre';
+    o = await app(JWT_J, AUTO);
+    dit(o.code === 409 && o.corps.reason === 'sku-change' && !fin(o), 'l\'annonce eBay ne porte plus ce SKU ⇒ 409, rien n\'est retiré (identité, §5)', `HTTP ${o.code} · ${appels(o.journal)}`);
+    remettre(); remettreBase(); lignes.push({ owner: J, id: 'main', data: { vrm_ebay_retrait_auto: true } });
+    o = await app(JWT_J, AUTO);
+    const ordre = auCompte(o.journal).map((x) => x.appel).filter(Boolean);
+    const jr = lignes.find((r) => r.id === 'ebay_retraits_auto' && r.owner === J);
+    dit(o.code === 200 && ordre.indexOf('GetItem') >= 0 && ordre.indexOf('GetItem') < ordre.indexOf('EndFixedPriceItem'), 'allumé et même SKU ⇒ eBay est relu PUIS l\'annonce est terminée', `HTTP ${o.code} · ${ordre.join(',')}`);
+    dit(jr && jr.data && Array.isArray(jr.data.items) && jr.data.items[0].sku === 'VRM-22' && o.corps.journal === true, 'et le retrait est NOTÉ (il peut relire ce qui a été fait en son nom)', JSON.stringify(jr && jr.data));
+    remettre(); remettreBase(); lignes.push({ owner: J, id: 'main', data: { vrm_ebay_retrait_auto: true } }, { owner: J, id: 'ebay_retraits_auto', data: { items: [{ itemId: '1', sku: 'VRM-1', at: 1 }] } }); mode.journalKo = true;
+    o = await app(JWT_J, AUTO);
+    const jr2 = lignes.find((r) => r.id === 'ebay_retraits_auto' && r.owner === J);
+    dit(o.code === 200 && o.corps.journal === false && jr2.data.items.length === 1 && jr2.data.items[0].sku === 'VRM-1', 'journal illisible ⇒ il n\'est PAS réécrit depuis le vide (son historique reste)', JSON.stringify(jr2 && jr2.data));
+    remettre(); remettreBase();
+    o = await app(JWT_B, AUTO);
+    dit(!fin(o), 'un AUTRE vendeur ne retire rien chez Julien, même en « automatique »', `HTTP ${o.code}`);
   });
 
   // ── 6. LES FRAIS, PAR NOM ; LES ERREURS, TOUTES ────────────────────────────

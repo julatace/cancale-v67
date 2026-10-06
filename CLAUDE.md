@@ -3874,6 +3874,29 @@ conversations captées portent une offre en attente, et elles sont vieilles.
   retirée ⇒ 4 rouges. `audit-offres-titre.cjs` accepte la phrase en ternaire
   (vingt-septième cri au loup évité : la règle, pas l'orthographe).
 
+### Retrait automatique d'eBay quand la paire est prouvée vendue sur Vinted (proposition 8, 6 octobre)
+Accepté par Julien le 5 octobre. Avant, l'alerte « vendue sur Vinted → retire-la
+d'eBay » proposait un clic confirmé ; maintenant il peut l'allumer pour que ça se
+fasse tout seul. **Éteint par défaut** (`vrm_ebay_retrait_auto`, synchronisé,
+rattrapé par `onCloudReady`), et allumer demande une confirmation.
+- **La même règle que l'alerte** (`doublesVenteEbay`, §11) : SKU `VRM-{n°}` sur une
+  annonce eBay active + vente Vinted **prouvée** (transaction → `item_id`, état qui
+  ne la fait pas revenir). Une annonce sans SKU ne désigne rien (§5).
+- **Rien ne part sur « pas su »** : ventes Vinted illisibles, annonces illisibles,
+  réglage pas encore arrivé du nuage (`isCloudReady`) ⇒ aucun retrait. 5 retraits
+  au plus par passage, une seule tentative par annonce et par ouverture.
+- **Le serveur revérifie, il ne croit pas le navigateur** (`handleRetirer`, mode
+  `auto:true`) : SKU de paire exigé ; le réglage relu **chez ce vendeur**
+  (illisible ⇒ 503, éteint ⇒ 403) ; puis `GetItem` relit l'annonce et son SKU
+  doit être celui attendu (sinon 409 `sku-change`, rien n'est retiré) — une
+  annonce dont le SKU a été changé entre-temps n'est plus la même paire.
+- **Ce qui part en son nom se relit** : journal `ebay_retraits_auto` (50 derniers,
+  écrit seulement si sa lecture a réussi), affiché sous l'alerte eBay. La réponse
+  dit `journal:false` si l'écriture a échoué.
+- Preuves : `audit-ebay-route.cjs` 162 contrôles (dont 9 pour ce mode) ; banc
+  `ebay-annonces.cjs` (allumé : retrait parti avec le bon SKU ; éteint ou preuve
+  illisible : rien). Mutation « réglage ignoré par le serveur » ⇒ rouge.
+
 ### ⚠️⚠️ « 300 NOTIFS », « COMME SI JE DÉBUTAIS », « ÇA TÉLÉCHARGE » (3 octobre)
 Trois plaintes de Julien, **une cause racine pour les deux premières** :
 - ⚠️⚠️ **LES EFFETS DE L'APP PARTAIENT AVANT LA SESSION.** La porte de connexion
