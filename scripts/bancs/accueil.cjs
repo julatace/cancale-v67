@@ -101,7 +101,9 @@ async function page(nav, { largeur = 1512, hauteur = 900, mobile = false, sessio
         // l'adresse n'existe pas, la page le DIT — jamais une adresse inventée
         // qui ne recevrait rien. La donnée décide : on lit la constante, on ne
         // suppose pas qu'elle est vide.
-        const constante = ((/CONTACT_EMAIL\s*=\s*'([^']*)'/.exec(fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'contact.js'), 'utf8')) || [])[1] || '').trim();
+        // (un banc ne meurt pas : sans src/contact.js — le code d'avant — la ligne
+        //  Contact est simplement absente, et le contrôle le dit en rouge)
+        let constante = ''; try { constante = ((/CONTACT_EMAIL\s*=\s*'([^']*)'/.exec(fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'contact.js'), 'utf8')) || [])[1] || '').trim(); } catch (_) { constante = ''; }
         const contact = await pg.evaluate(() => { const e = document.querySelector('[data-accueil] [data-contact]'); return e ? { texte: e.innerText, absent: e.hasAttribute('data-contact-absent'), href: e.getAttribute('href') || '' } : null; });
         dit(!!contact && (constante
           ? contact.href === `mailto:${constante}`

@@ -294,7 +294,9 @@ const boutons = (pg) => pg.evaluate(() => { const e = document.querySelector('[d
     const etatFermer = (pg) => pg.evaluate(() => { const e = document.querySelector('[data-fermer-compte] [data-fermer-etat]'); return e ? e.getAttribute('data-fermer-etat') : null; });
     await essaie('contact', async () => {
       const { ctx, pg } = await ouvrir(nav, { abo: ETATS.actif });
-      const constante = ((/CONTACT_EMAIL\s*=\s*'([^']*)'/.exec(fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'contact.js'), 'utf8')) || [])[1] || '').trim();
+      // (un banc ne meurt pas : sans src/contact.js — le code d'avant — la ligne
+      //  Contact est simplement absente, et le contrôle le dit en rouge)
+      let constante = ''; try { constante = ((/CONTACT_EMAIL\s*=\s*'([^']*)'/.exec(fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'contact.js'), 'utf8')) || [])[1] || '').trim(); } catch (_) { constante = ''; }
       const c = await pg.evaluate(() => { const e = document.querySelector('[data-contact]'); return e ? { t: e.innerText, absent: !!e.querySelector('[data-contact-absent]'), mail: (e.querySelector('a[href^="mailto:"]') || {}).href || '' } : null; });
       dit(!!c && (constante ? c.mail === `mailto:${constante}` : (c.absent && /à venir/.test(c.t) && !c.mail)), `une ligne Contact dans « Mon compte » — ${constante ? 'l’adresse de src/contact.js' : '« à venir », aucune adresse inventée'}`, c ? c.t : 'absente');
       await ctx.close();

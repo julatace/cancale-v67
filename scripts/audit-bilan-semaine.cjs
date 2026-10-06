@@ -147,7 +147,11 @@ if (process.argv.includes('--recopie')) {
   });
 
   console.log('\n── 5. Ce que le bilan dit — trois états, et la DONNÉE qui déclenche');
-  const sem = (bil.semainePassee || (() => ({})))(Date.parse('2026-10-05T08:00:00Z'));
+  // ⚠️ Un audit ne meurt pas, il rapporte : sur le code d'avant `semainePassee`
+  //    n'existe pas — les bornes sont alors posées à la main (les mêmes), et
+  //    chaque contrôle ci-dessous sort ROUGE au lieu de tuer le processus.
+  const sem = typeof bil.semainePassee === 'function' ? bil.semainePassee(Date.parse('2026-10-05T08:00:00Z'))
+    : { lundi: '2026-09-28', dimanche: '2026-10-04', debut: Date.parse('2026-09-27T22:00:00Z'), fin: Date.parse('2026-10-04T22:00:00Z'), jour: 1 };
   const DANS = sem.debut + 2 * J, AVANT = sem.debut - 2 * J, APRES_FIN = new Date(sem.fin + 3600000).toISOString();
   const base = () => ({
     comptes: [{ uid: '11', login: 'paire_a' }, { uid: '22', login: 'paire_b' }],
