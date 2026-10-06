@@ -3853,6 +3853,27 @@ annulées, comptes exclus écartés) moins prix moyen d'achat (achats non annul�
 - Banc `rapport.cjs` : Samba +20 € (l'annulée à 999 € écartée), Gazelle à une
   seule paire absente ; réaffaibli (annulée comptée) ⇒ rouge.
 
+### Les offres reçues reviennent, en tête de Messages (proposition 6, 6 octobre)
+Retirées de l'accueil (28 sept.) puis de la cloche (30 sept.) avec la promesse
+d'un « onglet dédié » ; leur lecture avait disparu le 3 octobre. Mesuré : **37
+offres en 14 jours, toutes connues par EMAIL** (`email_offer_*`) ; seules 3
+conversations captées portent une offre en attente, et elles sont vieilles.
+- Messages ouvre sur « N offres à trancher » : la règle `offresAtraiter` (compte,
+  chronologie, titre non ambigu) écarte celles réglées par une vente, et **le
+  dit** (« 1 autre déjà réglée par une vente, mise de côté »). « c'est fait »
+  range une offre (`vinted_offers_done`, synchronisé, rattrapé par `onCloudReady`).
+- Lecture des **14 derniers jours seulement, en scalaires** (`meta->>`, §4.4).
+- ⚠️ **L'email ne porte aucun identifiant d'annonce** (0/518) : ni « ton prix »
+  ni « la remise demandée » ne sont écrits — les tirer du titre serait le
+  rapprochement interdit (§5). Le repère montré est celui du **modèle** (prix
+  moyen de revente, au moins 3 ventes), dit comme tel.
+- On y répond sur Vinted, sur le compte nommé (une ligne d'en-tête quand elles
+  sont toutes sur le même, sur chaque ligne sinon — §7).
+- Banc `messagerie.cjs` : l'offre récente seule (ni la vieille, ni la réglée),
+  le repère du modèle, aucune remise inventée, « c'est fait » gardé ; règle
+  retirée ⇒ 4 rouges. `audit-offres-titre.cjs` accepte la phrase en ternaire
+  (vingt-septième cri au loup évité : la règle, pas l'orthographe).
+
 ### ⚠️⚠️ « 300 NOTIFS », « COMME SI JE DÉBUTAIS », « ÇA TÉLÉCHARGE » (3 octobre)
 Trois plaintes de Julien, **une cause racine pour les deux premières** :
 - ⚠️⚠️ **LES EFFETS DE L'APP PARTAIENT AVANT LA SESSION.** La porte de connexion

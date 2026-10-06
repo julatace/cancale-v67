@@ -21177,6 +21177,31 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   useEffect(() => { if ((curSub==='annonces'||curSub==='journee'||curSub==='bordereaux') && accounts.length && listings.items===null) loadListings(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
   useEffect(() => { if ((curSub==='annonces'||curSub==='journee') && emailSales===null) fetchEmailSales().then(setEmailSales); /* eslint-disable-next-line */ }, [sub]);
   useEffect(() => { if ((curSub==='messages'||curSub==='journee') && accounts.length && convs.items===null) loadConvs(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
+  // ── LES OFFRES REÇUES, EN TÊTE DE MESSAGES (proposition 6, 6 octobre) ─────
+  // Mesuré : 37 offres en 14 jours, toutes connues par EMAIL (`email_offer_*`),
+  // et seulement 3 conversations captées portent une offre en attente — vieilles.
+  // Leur lecture avait été retirée le 3 octobre (573 offres / 142 Ko à chaque
+  // ouverture, plus rien ne les affichait). On ne lit que les 14 derniers jours,
+  // en SCALAIRES (§4.4), et seulement sur cet écran.
+  // ⚠️ L'email ne porte AUCUN identifiant d'annonce (mesuré 0/518) : on n'écrit
+  //    donc pas « ton prix » ni « la remise demandée » — les déduire du titre
+  //    serait le rapprochement par ressemblance interdit (§5). Le repère montré
+  //    est celui du MODÈLE (prix moyen de revente), dit comme tel.
+  // Trois états : `undefined` en cours · `null` pas su · tableau.
+  const [offresEmail, setOffresEmail] = useState(undefined);
+  const [offresFaites, setOffresFaites] = useState(() => new Set(load('vinted_offers_done', []) || []));
+  useEffect(() => onCloudReady(() => setOffresFaites((v) => v.size ? v : new Set(load('vinted_offers_done', []) || []))), []);
+  useEffect(() => {
+    if (curSub !== 'messages') return;
+    let stop = false;
+    const depuis = new Date(Date.now() - OFFRE_FENETRE_J * 86400000).toISOString().slice(0, 10);
+    lireTout(`id=like.email_offer_*&meta->>receivedAt=gte.${depuis}&select=id,article:meta->>article,montant:meta->>montant,qui:meta->>qui,uid:meta->>uid,account:meta->>account,receivedAt:meta->>receivedAt`)
+      .then((l) => { if (!stop) setOffresEmail(Array.isArray(l) ? l : null); })
+      .catch(() => { if (!stop) setOffresEmail(null); });
+    return () => { stop = true; };
+  }, [curSub]);
+  const cleOffre = (of) => `${of.receivedAt || ''}|${of.article || ''}`;
+  const offreTraitee = (of) => setOffresFaites((prev) => { const u = new Set(prev); u.add(cleOffre(of)); save('vinted_offers_done', [...u].slice(-500)); return u; });
   useEffect(() => { if ((curSub==='bordereaux'||curSub==='annonces'||curSub==='ventes'||curSub==='journee'||curSub==='achats') && emailBords===null) fetchEmailBordereaux().then(v => { if (v) { setEmailBords(v); setEmailBordsKO(false); } else setEmailBordsKO(true); }); /* eslint-disable-next-line */ }, [sub]);
   // Détecte un bordereau PDF capté par l'extension (téléchargé sur Vinted) et
   // encore frais (< 60 min) → on affiche un bandeau « tamponner en 1 clic ».
@@ -26358,6 +26383,45 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             On ne déroule plus toutes les conversations : une seule carte dit
             combien de messages non lus, et un bouton emmène répondre sur Vinted
             (répondre depuis l'app n'est pas possible, cf. section 5). */}
+        {/* ── OFFRES REÇUES, EN TÊTE (proposition 6) ── */}
+        {(()=>{
+          if (offresEmail === undefined || !sales.items) return null;   // on attend de savoir lesquelles sont déjà réglées
+          if (offresEmail === null) return <div data-offres-messages="passu" style={{fontSize:12,color:C.muted,marginBottom:10}}>Les offres reçues par email n'ont pas pu être lues pour l'instant — rouvre cet écran dans un moment.</div>;
+          const { gardees, reglees } = offresAtraiter(offresEmail, sales.items, offresFaites, cleOffre);
+          if (!gardees.length) return null;
+          // Le repère du MODÈLE (jamais le prix de LA paire : l'email ne dit pas laquelle).
+          const repere = {};
+          for (const o of sales.items) { if (!o || classifyOrderStatus(o.status)==='cancelled') continue; const k = extractModel(o.title); const p = montantCommande(o); if (!k || !(p>0)) continue; const r = repere[k] || (repere[k] = { n:0, s:0 }); r.n += 1; r.s += p; }
+          const nomModele = (k) => k.replace(/\b\w/g, (c) => c.toUpperCase());
+          const quand = (d)=>{ const t=Date.parse(d||''); if(!t) return ''; const h=(Date.now()-t)/3600000; return h<1?"à l'instant":h<24?`il y a ${Math.round(h)} h`:`il y a ${Math.round(h/24)} j`; };
+          const euros = (m) => { const n = parseFloat(String(m||'').replace(/\s/g,'').replace(',','.')); return n > 0 ? n : null; };
+          const tri = [...gardees].sort((a,b)=> (Date.parse(b.receivedAt||0)||0) - (Date.parse(a.receivedAt||0)||0));
+          const comptes = new Set(tri.map((o)=>String(o.uid||o.account||'')));
+          return (
+            <div data-offres-messages={tri.length} style={{border:`1px solid ${C.border}`,borderRadius:10,background:C.card,marginBottom:12,overflow:'hidden'}}>
+              <div style={{padding:'10px 12px 6px'}}>
+                <div style={{fontSize:14,fontWeight:700,color:C.text}}><span style={{color:C.accent}}>{tri.length}</span> offre{tri.length>1?'s':''} à trancher</div>
+                <div style={{fontSize:11.5,color:C.muted,marginTop:2,lineHeight:1.4}}>Reçues par email ces {OFFRE_FENETRE_J} derniers jours{comptes.size===1&&tri[0].account?` · toutes sur ${tri[0].account}`:''}. On y répond sur Vinted, sur le compte nommé.{reglees.length>0?` ${reglees.length} autre${reglees.length>1?'s':''} déjà réglée${reglees.length>1?'s':''} par une vente, mise${reglees.length>1?'s':''} de côté.`:''}</div>
+              </div>
+              {tri.map((of,i)=>{
+                const m = euros(of.montant); const k = extractModel(of.article); const r = k && repere[k];
+                return (
+                  <div key={of.id||i} data-offre-email={of.id} style={{display:'flex',gap:10,alignItems:'center',padding:'9px 12px',borderTop:`1px solid ${C.border}`}}>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{m!=null?<b>{fmtE(m)}</b>:'Une offre'}{of.qui?` · ${of.qui}`:''}</div>
+                      <div style={{fontSize:12,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{of.article||'—'}</div>
+                      <div style={{fontSize:11,color:C.muted}}>{quand(of.receivedAt)}{comptes.size>1&&of.account?` · ${of.account}`:''}{r && r.n>=3 ? ` · repère : tes ${nomModele(k)} se revendent ${fmtE(r.s/r.n)} en moyenne (${r.n} ventes)` : ''}</div>
+                    </div>
+                    <div style={{display:'flex',flexDirection:'column',gap:5,flexShrink:0}}>
+                      <a href="https://www.vinted.fr/inbox" target="_blank" rel="noreferrer" style={{textDecoration:'none',border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 10px',fontSize:11.5,fontWeight:600,color:C.text,textAlign:'center'}}>Répondre sur Vinted</a>
+                      <button type="button" data-offre-traitee={of.id} onClick={()=>offreTraitee(of)} style={{border:'none',background:'transparent',color:C.muted,fontSize:11.5,cursor:'pointer',fontFamily:'inherit',textDecoration:'underline'}}>c'est fait</button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
         {convs.loading && <Skeleton variant="row" count={2}/>}
         {convs.error && <LoadError onRetry={()=>loadConvs(true)}/>}
         {/* ── LA MESSAGERIE INTÉGRÉE (3 octobre) ─────────────────────────────
