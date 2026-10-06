@@ -25202,10 +25202,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             chaque ligne (la liste mélange ses comptes). Un clic ouvre le fil :
             répondre et trancher une offre se font là, par l'extension. */}
         {convs.items && !convs.error && (()=>{
-          const liste = (convs.items||[]).filter(c=>!acctOffOf(c));
+          // Filtre par compte (sélecteur de l'onglet) : `_acc` d'une conversation
+          // est l'OBJET compte. Choisi ⇒ ses conversations seules.
+          const uidC = c => String((c._acc&&c._acc.vinted_user_id)||'');
+          const liste = (convs.items||[]).filter(c=>!acctOffOf(c)).filter(c=>!compteSel || uidC(c)===String(compteSel));
           const nonLus = liste.filter(c=>c.unread).length;
-          const tri = [...liste].sort((a,b)=> (b.unread?1:0)-(a.unread?1:0) || (new Date(b.updated_at||0)-new Date(a.updated_at||0)));
-          const plusieurs = new Set(liste.map(c=>String((c._acc&&c._acc.vinted_user_id)||''))).size > 1;
+          // « Tous » ⇒ les conversations du compte connecté d'abord, puis non lus,
+          // puis les plus récentes (le compte qu'on traite remonte, §Julien 6 oct.).
+          const coMsg = (!compteSel && compteConnecte) ? String(compteConnecte) : '';
+          const tri = [...liste].sort((a,b)=>
+            (coMsg ? ((uidC(b)===coMsg?1:0)-(uidC(a)===coMsg?1:0)) : 0)
+            || (b.unread?1:0)-(a.unread?1:0)
+            || (new Date(b.updated_at||0)-new Date(a.updated_at||0)));
+          const plusieurs = new Set(liste.map(c=>uidC(c))).size > 1;
           const quand = (d)=>{ const t=Date.parse(d||''); if(!t) return ''; const h=(Date.now()-t)/3600000; return h<1?"à l'instant":h<24?`${Math.round(h)} h`:h<24*7?`${Math.round(h/24)} j`:new Date(t).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}); };
           const affiches = tri.slice(0, convMax);
           return (
@@ -32667,11 +32676,10 @@ function AppCoeur() {
               L'écran complet existait (liste tous comptes, fil, réponse, offres)
               mais n'avait plus AUCUNE porte dans Vinted : seulement la cloche. */}
           <PlatSubNav sub={platSub} setSub={setPlatSub} sections={[['ventes','Ventes'],['achats','Achats'],['annonces','Annonces'],['messages','Messages', !!(liveStats && liveStats.unread > 0)]]}/>
-          {/* Filtre par compte (Julien, 6 oct.) — Ventes / Annonces / Achats.
-              Les Messages ont leur propre filtre interne ; les Colis ne sont pas
-              filtrés (« pour les colis pas forcément »). Un seul compte ⇒ la
-              rangée ne s'affiche pas. */}
-          {(platSub==='ventes'||platSub==='annonces'||platSub==='achats') && <SelecteurCompte accounts={vintedAccounts} sel={compteSel} setSel={setCompteSel} connecte={compteConnecte}/>}
+          {/* Filtre par compte (Julien, 6 oct.) — Ventes / Annonces / Achats /
+              Messages. Les Colis ne sont pas filtrés (« pour les colis pas
+              forcément »). Un seul compte ⇒ la rangée ne s'affiche pas. */}
+          {(platSub==='ventes'||platSub==='annonces'||platSub==='achats'||platSub==='messages') && <SelecteurCompte accounts={vintedAccounts} sel={compteSel} setSel={setCompteSel} connecte={compteConnecte}/>}
           <Comptabilite key={'pv_'+platSub} accounts={vintedAccounts} only={platSub==='apercu'?'ventes':platSub} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum} compteSel={compteSel} compteConnecte={compteConnecte}/>
         </>)}
         {tab==='plat_leboncoin'&&(<>
