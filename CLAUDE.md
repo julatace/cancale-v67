@@ -3819,6 +3819,25 @@ dans septembre (~89 € de cotisations payés deux fois, sans rien voir).
 - ⚠️ **À lui** : dire ce qu'il a réellement déclaré pour août et septembre — le
   geste est dans Ventes → Outils → Rapport comptable → choisir le mois.
 
+### Paires qui dorment, toutes plateformes (proposition 9, 6 octobre)
+L'assistant « Repricing » (Annonces → Conseils & signalements) disait seulement
+quoi baisser sur Vinted. Une paire qui dort y est souvent AUSSI en vente sur eBay
+ou Leboncoin, à un autre prix.
+- **eBay** : l'annonce de la paire est reconnue par son SKU `VRM-{n°}` (identité,
+  §5 — une annonce eBay au même titre sans SKU ne déclenche rien ; deux annonces
+  pour un même N° ⇒ aucune n'est touchée). La baisse conseillée est la MÊME en
+  proportion que sur Vinted, jamais sous le prix d'achat, et se fait d'ici en un
+  clic **confirmé** (`revise` → ReviseInventoryStatus). eBay refuse ⇒ la raison
+  d'eBay est écrite, rien n'est marqué baissé.
+- **Vinted** reste un lien (c'est lui qui baisse) ; **Leboncoin** : la ligne le
+  dit (« baisse-la là-bas dans Mes annonces »), sans lien deviné.
+- `ebay_listings` n'est lu que quand le panneau est ouvert (§4.4) ; illisible ⇒
+  aucune baisse eBay proposée, et c'est écrit.
+- Le bandeau « paires qui dorment » n'est plus en rouge (§7 : le rouge est pour
+  deux paires sous un même numéro).
+- Banc `annonces-carte.cjs` : la bonne annonce (SKU), le bon prix (60 → 53 €),
+  rien avant la confirmation, une seule baisse, l'écran qui le dit.
+
 ### ⚠️⚠️ « 300 NOTIFS », « COMME SI JE DÉBUTAIS », « ÇA TÉLÉCHARGE » (3 octobre)
 Trois plaintes de Julien, **une cause racine pour les deux premières** :
 - ⚠️⚠️ **LES EFFETS DE L'APP PARTAIENT AVANT LA SESSION.** La porte de connexion

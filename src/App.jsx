@@ -20804,6 +20804,65 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return out;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [annBase, numeros]);
+  // ── PAIRES QUI DORMENT, TOUTES PLATEFORMES (proposition 9, 6 octobre) ──────
+  // La paire à baisser est peut-être AUSSI en vente sur eBay : son annonce
+  // porte le SKU `VRM-{n°}` (une identité, §5 — jamais un titre). Sur Vinted la
+  // baisse reste un lien (c'est lui qui la fait) ; sur eBay elle se fait d'ici,
+  // en un clic CONFIRMÉ (`revise`, ReviseInventoryStatus). Trois états :
+  // `undefined` pas encore lu · `null` pas su (rien n'est proposé) · Map.
+  // ⚠️ Deux annonces eBay pour un même N° : on ne touche à AUCUNE (ambigu).
+  // Lu seulement quand le panneau est ouvert (§4.4 : la ligne porte du détail),
+  // c'est-à-dire « Conseils & signalements » déplié et le repricing ouvert.
+  const [ebayVivantes, setEbayVivantes] = useState(undefined);
+  const [ebayBaisse, setEbayBaisse] = useState({});   // itemId → { etat, prix, msg }
+  useEffect(() => {
+    if (!tipsOpen || !showReprice || !repriceList.length || ebayVivantes !== undefined) return;
+    let stop = false;
+    (async () => {
+      try {
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.ebay_listings&select=items:data->items`, { headers: sbAuth() });
+        if (!r.ok) { if (!stop) setEbayVivantes(null); return; }
+        const rows = await r.json();
+        if (!Array.isArray(rows)) { if (!stop) setEbayVivantes(null); return; }
+        const m = new Map();
+        for (const x of ((rows[0] && Array.isArray(rows[0].items)) ? rows[0].items : [])) {
+          const c = numDeSkuEbay(x && x.sku); const prix = parseFloat(String((x && x.price) || '').replace(',', '.'));
+          if (!c || !x.itemId || !(prix > 0)) continue;
+          if (m.has(c)) { m.set(c, { ambigu: true }); continue; }
+          m.set(c, { itemId: String(x.itemId), prix, url: x.url || `https://www.ebay.fr/itm/${x.itemId}` });
+        }
+        if (!stop) setEbayVivantes(m);
+      } catch (_) { if (!stop) setEbayVivantes(null); }
+    })();
+    return () => { stop = true; };
+  }, [tipsOpen, showReprice, repriceList.length, ebayVivantes]);
+  // Le prix conseillé sur eBay : la MÊME baisse (en proportion) que celle
+  // conseillée sur Vinted, appliquée au prix eBay, jamais sous le prix d'achat.
+  const baisseEbayDe = (r) => {
+    const num = numeros[r.it.id]?.numero; if (!num || !(ebayVivantes instanceof Map)) return null;
+    const e = ebayVivantes.get(cleNum(num)); if (!e || e.ambigu) return e && e.ambigu ? { ambigu: true } : null;
+    const fait = ebayBaisse[e.itemId];
+    const prixActuel = fait && fait.etat === 'ok' ? fait.prix : e.prix;
+    let sugg = Math.round(prixActuel * (r.sugg / r.price));
+    const buy = numeros[r.it.id]?.buyPrice != null && numeros[r.it.id].buyPrice !== '' ? Number(String(numeros[r.it.id].buyPrice).replace(',', '.')) : null;
+    if (buy != null && !isNaN(buy) && sugg < buy) sugg = Math.ceil(buy);
+    sugg = Math.max(1, sugg);
+    return { ...e, prixActuel, sugg, utile: sugg < prixActuel, fait };
+  };
+  const baisserSurEbay = async (e, titre) => {
+    if (!e || !e.itemId || !(e.sugg > 0)) return;
+    const prix = (n) => Number(n).toFixed(2).replace('.', ',') + ' €';
+    const okc = await askConfirm({ title: `Baisser le prix sur eBay : ${prix(e.prixActuel)} → ${prix(e.sugg)} ?`,
+      desc: `« ${titre} ». L'annonce eBay change tout de suite. Sur Vinted, c'est toi qui le fais (bouton « Baisser »).`, ok: 'Baisser sur eBay' });
+    if (!okc) return;
+    setEbayBaisse((m) => ({ ...m, [e.itemId]: { etat: 'envoi', prix: e.sugg } }));
+    try {
+      const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'revise', itemId: e.itemId, price: e.sugg }) });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j && j.ok) setEbayBaisse((m) => ({ ...m, [e.itemId]: { etat: 'ok', prix: e.sugg } }));
+      else setEbayBaisse((m) => ({ ...m, [e.itemId]: { etat: 'ko', prix: e.prixActuel, msg: (j && j.error) || "eBay n'a pas répondu — rien n'a changé, réessaie." } }));
+    } catch (_) { setEbayBaisse((m) => ({ ...m, [e.itemId]: { etat: 'ko', prix: e.prixActuel, msg: "Le serveur n'a pas répondu — rien n'a changé, réessaie." } })); }
+  };
   // ── Qualité d'annonce : ce qui plombe la conversion (photos, marque, taille,
   // description). On ne signale QUE ce que Vinted nous confirme (champ présent)
   // → pas de faux positif. But : dire quoi améliorer pour vendre plus.
@@ -25837,7 +25896,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
           ); })()}
           {annStats.sleeping>0 && annSort!=='sleeping' && (
-            <div style={{fontSize:12,color:C.text,background:`${C.danger}12`,border:`1px solid ${C.danger}44`,borderRadius:8,padding:'8px 12px',marginBottom:10,lineHeight:1.4}}>
+            <div style={{fontSize:12,color:C.text,background:`${C.warn}10`,border:`1px solid ${C.warn}44`,borderRadius:8,padding:'8px 12px',marginBottom:10,lineHeight:1.4}}>
               😴 {annStats.sleeping} paire{annStats.sleeping>1?'s':''} en ligne depuis plus de {SLEEP_DAYS} jours{annStats.sleepingVal>0?<>, soit <b>{annStats.sleepingVal.toFixed(0)} € qui dorment</b></>:''} — pense à <b>baisser le prix</b> ou <b>republier</b>. <button onClick={()=>setAnnSort('sleeping')} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',padding:0,fontSize:12}}>Voir →</button>
               {annStats.datesKnown<annStats.n && <div style={{fontSize:11,color:C.muted,marginTop:3}}>Calculé sur les {annStats.datesKnown} annonce{annStats.datesKnown>1?'s':''} dont la date est connue (sur {annStats.n}).</div>}
             </div>
@@ -25862,10 +25921,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </button>
               {showReprice && (
                 <div style={{borderTop:`1px solid ${C.warn}33`}}>
-                  {repriceList.slice(0,30).map(({it,price,sugg,age,views,favs,why,atFloor})=>{
+                  {repriceList.slice(0,30).map((rp)=>{
+                    const {it,price,sugg,why,atFloor} = rp;
                     const num = numeros[it.id]?.numero;
+                    const eb = baisseEbayDe(rp);
+                    const surLbcAussi = lbcPosted.has(String(it.id));
                     return (
-                      <div key={it.id} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 12px',borderTop:`1px solid ${C.warn}22`}}>
+                      <div key={it.id} style={{borderTop:`1px solid ${C.warn}22`}}>
+                      <div style={{display:'flex',gap:10,alignItems:'center',padding:'8px 12px'}}>
                         <div style={{width:40,height:40,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
                           {it.photo?<img src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
                         </div>
@@ -25879,8 +25942,29 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         </div>
                         <a href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted pour baisser le prix" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.warn}55`,background:'transparent',color:C.warn,fontSize:11,fontWeight:600,padding:'5px 10px',borderRadius:8,display:'inline-flex',alignItems:'center',gap:4}}><Icon name="tag" size={12}/>Baisser</a>
                       </div>
+                      {/* Les AUTRES plateformes de la même paire (proposition 9). */}
+                      {(eb || surLbcAussi) && (
+                        <div data-reprice-ailleurs={it.id} style={{display:'flex',flexWrap:'wrap',gap:8,alignItems:'center',padding:'0 12px 8px 62px',fontSize:11.5,color:C.muted,lineHeight:1.4}}>
+                          {eb && eb.ambigu && <span>eBay : deux annonces portent ce N° — je n'en baisse aucune, vérifie sur eBay.</span>}
+                          {eb && !eb.ambigu && (eb.fait && eb.fait.etat === 'ok'
+                            ? <span data-reprice-ebay="fait">eBay : baissé à <b style={{color:C.text}}>{eb.fait.prix} €</b> ✓</span>
+                            : eb.utile
+                              ? <>
+                                  <span>Aussi sur eBay à <b style={{color:C.text}}>{eb.prixActuel} €</b></span>
+                                  <button type="button" data-reprice-ebay={eb.itemId} disabled={eb.fait && eb.fait.etat === 'envoi'} onClick={()=>baisserSurEbay(eb, it.title||'Annonce')}
+                                    style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,fontSize:11,fontWeight:600,padding:'4px 9px',borderRadius:8,cursor:'pointer',fontFamily:'inherit'}}>
+                                    {eb.fait && eb.fait.etat === 'envoi' ? 'Envoi…' : `Baisser sur eBay à ${eb.sugg} €`}
+                                  </button>
+                                  {eb.fait && eb.fait.etat === 'ko' && <span style={{color:C.warn}}>{eb.fait.msg}</span>}
+                                </>
+                              : <span>Aussi sur eBay à {eb.prixActuel} € (déjà au plus bas conseillé)</span>)}
+                          {surLbcAussi && <span>Aussi sur Leboncoin : baisse-la là-bas dans « Mes annonces ».</span>}
+                        </div>
+                      )}
+                      </div>
                     );
                   })}
+                  {ebayVivantes === null && <div style={{padding:'6px 12px',fontSize:11,color:C.muted}}>Tes annonces eBay n'ont pas pu être lues : je ne propose pas de baisse sur eBay pour l'instant.</div>}
                   {repriceList.length>30 && <div style={{padding:'8px 12px',fontSize:11,color:C.muted}}>+ {repriceList.length-30} autres paires à baisser…</div>}
                 </div>
               )}
