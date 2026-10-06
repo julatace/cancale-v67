@@ -37,7 +37,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.161.0';
+const EXT_ATTENDUE = '5.162.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -3222,6 +3222,49 @@ const joursAvantLimiteFr = (dateLimite) => {
 // n'est qu'un repli : la date limite écrite dans l'email du bordereau passe
 // devant quand on l'a.
 const DELAI_EXPEDITION_J = 7;
+// La date limite d'envoi d'une vente : celle de l'email du bordereau quand on
+// l'a, sinon vente + `DELAI_EXPEDITION_J`. UNE règle (§11) pour la carte
+// « Expédier N colis » (`toShip`) et l'alerte « coché posté, jamais vu partir ».
+const limiteExpedition = (o, b) => {
+  const dl = b ? joursAvantLimiteFr(b.dateLimite) : null;
+  if (dl != null) return { daysLeft: dl, shipBy: null, limite: 'email' };
+  const d = o && o.date ? new Date(o.date) : null;
+  if (!d || isNaN(d)) return { daysLeft: null, shipBy: null };
+  const shipBy = new Date(d.getTime() + DELAI_EXPEDITION_J * 86400000);
+  const daysLeft = Math.floor((new Date(shipBy.getFullYear(), shipBy.getMonth(), shipBy.getDate(), 23, 59, 59) - Date.now()) / 86400000);
+  return { daysLeft, shipBy, limite: 'estimee' };
+};
+// ── « COCHÉ POSTÉ » MAIS JAMAIS VU PARTIR (6 octobre) ───────────────────────
+// Cocher « Colis fait » (`vinted_ship_done`) sort la vente de « à envoyer »
+// PARTOUT — c'est voulu, il vient de la déposer. Mais rien ne revenait vérifier
+// que Vinted l'avait bien vue partir. MESURÉ le 6 octobre sur sa base : deux
+// ventes (65 € et 75 €) cochées « posté » il y a 159 h et 92 h, que Vinted
+// disait TOUJOURS « Bordereau envoyé au vendeur » dans une capture faite APRÈS
+// la coche — aucune alerte nulle part. Un colis oublié sur l'étagère, c'est une
+// vente que Vinted annule à la date limite.
+// RÈGLE (une seule, consommée par Colis et Ma journée) — tout doit être SU :
+//   · la date de la coche (un horodatage ; autre chose ⇒ pas su, on se tait) ;
+//   · Vinted dit encore « à expédier » (`aExpedier`, le champ machine d'abord),
+//     et aucun email du transporteur ne l'a vu passer ;
+//   · ce statut a été lu APRÈS la coche (`captureAt` > coche) — un statut lu
+//     avant ne prouve rien : deux autres ventes cochées le 29 septembre ne sont
+//     connues que par une capture du 20, on ne les accuse pas ;
+//   · et la date limite est dépassée, OU la coche a plus de 48 h (le temps
+//     qu'un transporteur scanne un dépôt du soir ou du week-end).
+const POSTE_SANS_DEPART_H = 48;
+const posteSansDepart = ({ o, cocheLe, captureAt, joursLimite, vuParTransporteur, maintenant = Date.now() }) => {
+  if (!o) return null;
+  const t = Number(cocheLe);
+  if (!isFinite(t) || t < 1e12) return null;            // pas su QUAND il l'a coché
+  if (vuParTransporteur) return null;                   // le transporteur l'a vu passer
+  if (!aExpedier(o)) return null;                       // Vinted l'a vu partir (ou n'attend plus d'envoi)
+  const cap = Number(captureAt);
+  if (!isFinite(cap) || cap <= t) return null;          // statut lu AVANT la coche : pas su
+  const heures = (maintenant - t) / 3600000;
+  const limiteDepassee = joursLimite != null && joursLimite < 0;
+  if (heures < POSTE_SANS_DEPART_H && !limiteDepassee) return null;
+  return { heures: Math.floor(heures), limiteDepassee, joursLimite: joursLimite == null ? null : joursLimite };
+};
 
 // Recupere une page d'achats ou de ventes pour un compte (endpoint reel
 // trouve via "Copy as fetch" : www.vinted.fr/api/v2/my_orders).
@@ -21051,16 +21094,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Délai : la date limite de l'email du bordereau quand on l'a, sinon date de
   // vente + `DELAI_EXPEDITION_J` (7 j, mesuré — voir sa définition).
   const SHIP_DAYS = DELAI_EXPEDITION_J;
-  const toShip = useMemo(() => {
-    const out = [];
-    // Bordereau email par transaction — la même table que `expeditions()`
-    // (le premier reçu fait foi, un bordereau masqué ne compte pas).
-    const bordParTxn = {};
+  // Bordereau email par transaction — la même table que `expeditions()`
+  // (le premier reçu fait foi, un bordereau masqué ne compte pas). Partagée par
+  // `toShip` et `cochesNonPartis` (§11).
+  const bordsParTxn = useMemo(() => {
+    const m = {};
     for (const b of (emailBords || [])) {
       if (!b || b.transaction == null || isBordHidden(b)) continue;
       const k = String(b.transaction);
-      if (!bordParTxn[k]) bordParTxn[k] = b;
+      if (!m[k]) m[k] = b;
     }
+    return m;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [emailBords, bordsHidden]);
+  const toShip = useMemo(() => {
+    const out = [];
+    const bordParTxn = bordsParTxn;
     for (const o of (sales.items || [])) {
       // ⚠️ UN COLIS À POSTER N'EST PAS UNE PRÉFÉRENCE D'AFFICHAGE. On écarte une
       // vente masquée À LA MAIN, jamais une vente dont le COMPTE est masqué :
@@ -21081,18 +21130,32 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // dans le réseau du transporteur — le colis est parti.
       const b = o.transaction_id != null ? bordParTxn[String(o.transaction_id)] : null;
       if (b && isBordDone(b)) continue;
-      const dl = b ? joursAvantLimiteFr(b.dateLimite) : null;
-      if (dl != null) { out.push({ o, daysLeft: dl, shipBy: null, limite: 'email' }); continue; }
-      const d = o.date ? new Date(o.date) : null;
-      if (!d || isNaN(d)) { out.push({ o, daysLeft: null, shipBy: null }); continue; }
-      const shipBy = new Date(d.getTime() + SHIP_DAYS * 86400000);
-      const daysLeft = Math.floor((new Date(shipBy.getFullYear(), shipBy.getMonth(), shipBy.getDate(), 23, 59, 59) - Date.now()) / 86400000);
-      out.push({ o, daysLeft, shipBy, limite: 'estimee' });
+      out.push({ o, ...limiteExpedition(o, b) });
     }
     out.sort((a, b) => (a.daysLeft ?? 999) - (b.daysLeft ?? 999));
     return out;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, hiddenSales, hiddenAccts, shipDone, emailBords, tracking, bordsShipped, panelBordsDone, bordsHidden]);
+  }, [sales.items, hiddenSales, hiddenAccts, shipDone, bordsParTxn, tracking, bordsShipped, panelBordsDone]);
+  // ── « COCHÉ POSTÉ » MAIS JAMAIS VU PARTIR — UN PROPRIÉTAIRE (§11) ─────────
+  // La règle vit dans `posteSansDepart` ; la liste se calcule ICI, une fois, et
+  // Colis comme Ma journée la LISENT. La capture qui a lu le statut de la vente
+  // est celle de SON compte (`_harvestSeen`, posé à la lecture de la moisson).
+  const cochesNonPartis = useMemo(() => {
+    const out = [];
+    for (const o of (sales.items || [])) {
+      if (!o || o.transaction_id == null) continue;
+      const k = String(o.transaction_id);
+      if (hiddenSales.has(k) || !shipDone[k]) continue;
+      const b = bordsParTxn[k] || null;
+      const lim = limiteExpedition(o, b);
+      const cap = o._acc ? _harvestSeen[`${o._acc.vinted_user_id}_orders_sold`] : null;
+      const vu = !!(b && b.suivi && shippedSuivis.has(String(b.suivi).toUpperCase()));
+      const r = posteSansDepart({ o, cocheLe: shipDone[k], captureAt: cap, joursLimite: lim.daysLeft, vuParTransporteur: vu });
+      if (r) out.push({ o, ...r });
+    }
+    out.sort((a, b) => (b.limiteDepassee ? 1 : 0) - (a.limiteDepassee ? 1 : 0) || b.heures - a.heures);
+    return out;
+  }, [sales.items, hiddenSales, shipDone, bordsParTxn, shippedSuivis]);
   // ── « COLIS À POSTER » EST PUBLIÉ, LA CLOCHE LE CONSOMME (§11) ────────────
   // Même motif que `vrm_colis_retirer` : l'écran qui a toutes les sources
   // publie, le centre de notifications lit. Il recalculait de son côté (sans
@@ -22253,6 +22316,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           jobs.push({icon:'truck',color:late>0?C.danger:C.warn,urgent:late>0,title:`Expédier ${toShip.length} colis`,sub,tab:'cat_bord',prio:late>0?0:1,
             photos:toShip.map(x=>orderPhoto(x.o)).filter(ph=>ph && !imgMortes.has(ph)).slice(0,3)});
         }
+        // ⚠️ « COCHÉ POSTÉ » MAIS VINTED NE L'A PAS VU PARTIR (6 octobre) : la
+        // même liste que l'alerte de Colis (`cochesNonPartis`, §11). Coché, le
+        // colis a quitté « Expédier N colis » — sans ça, il ne réapparaissait
+        // nulle part, même date limite passée.
+        if(cochesNonPartis.length){
+          const nb=cochesNonPartis.length, pl=nb>1?'s':'';
+          const limite=cochesNonPartis.some(x=>x.limiteDepassee);
+          jobs.push({id:'poste-sans-depart',n:nb,icon:'truck',color:limite?C.danger:C.warn,urgent:limite,
+            title:`Vérifier ${nb} colis coché${pl} « posté »`,
+            sub:`${nb>1?'Vinted ne les a pas vus partir':"Vinted ne l'a pas vu partir"}${limite?' et la date limite est passée':''} — vérifie le dépôt`,
+            tab:'cat_bord',prio:limite?0.2:1.5,
+            photos:cochesNonPartis.map(x=>orderPhoto(x.o)).filter(ph=>ph && !imgMortes.has(ph)).slice(0,3)});
+        }
         const pickupCount=pickupUnion.total; // UNION email + statut Vinted — EXACTEMENT le compte de l'onglet Achats
         // ⚠️ LE SOUS-TITRE DOIT DIRE CE QU'IL PEUT FAIRE, PAS SEULEMENT COMBIEN.
         // Mesuré le 1er septembre : « Retirer 15 colis — récupère-les avec ton
@@ -22488,7 +22564,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                      « brouillon ». La couleur reste sur l'icône et le chevron —
                      elle sert à reconnaître la nature de l'action, pas à
                      repeindre un quart de l'écran. */
-                  <button key={i} type="button" onClick={()=>onNav && onNav(j.tab)} style={{display:'flex',alignItems:'center',gap:13,padding:'14px 15px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',cursor:'pointer',textAlign:'left',width:'100%',minWidth:0,fontFamily:'inherit'}}>
+                  <button key={i} type="button" data-job={j.id||undefined} data-n={j.n!=null?j.n:undefined} onClick={()=>onNav && onNav(j.tab)} style={{display:'flex',alignItems:'center',gap:13,padding:'14px 15px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',cursor:'pointer',textAlign:'left',width:'100%',minWidth:0,fontFamily:'inherit'}}>
                     {/* ⚠️ Avant : un carré de 46 px teinté à la couleur du statut,
                         avec un EMOJI de 24 px dedans. Trois de ces pavés colorés
                         empilés, c'est ce qui faisait « application générée ».
@@ -25148,6 +25224,31 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const plusieurs = new Set(liste.map(c=>String((c._acc&&c._acc.vinted_user_id)||''))).size > 1;
           const quand = (d)=>{ const t=Date.parse(d||''); if(!t) return ''; const h=(Date.now()-t)/3600000; return h<1?"à l'instant":h<24?`${Math.round(h)} h`:h<24*7?`${Math.round(h/24)} j`:new Date(t).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}); };
           const affiches = tri.slice(0, convMax);
+          // ⚠️ UNE BOÎTE FIGÉE SE DIT (6 octobre). Mesuré : deux comptes avaient
+          // leur boîte bloquée sur une page ANCIENNE (dernière conversation captée
+          // le 27 juillet pour une vente du 2 octobre). Chaque vente ouvre une
+          // conversation : quand la dernière vente d'un compte est plus récente
+          // que sa dernière conversation captée (au-delà d'une heure, le temps que
+          // la conversation de la vente soit captée), sa boîte n'est plus à jour.
+          // On ne juge que ce qu'on SAIT : ventes lues, au moins une conversation
+          // captée sur ce compte. Dit UNE fois, au-dessus de la liste.
+          const boitesPerimees = (()=>{
+            if (!Array.isArray(sales.items)) return [];
+            const derVente = new Map(), derConv = new Map();
+            for (const o of sales.items) {
+              if (!o || !o._acc || acctOffOf(o)) continue;
+              const k = String(o._acc.vinted_user_id), t = Date.parse(o.date||'');
+              if (t && (!derVente.has(k) || t > derVente.get(k).t)) derVente.set(k, { t, acc: o._acc });
+            }
+            for (const c of liste) {
+              const k = String((c._acc && c._acc.vinted_user_id) || ''), t = Date.parse(c.updated_at||'');
+              if (k && t && (!derConv.has(k) || t > derConv.get(k))) derConv.set(k, t);
+            }
+            const out = [];
+            for (const [k, v] of derVente) { const tc = derConv.get(k); if (tc && v.t - tc > 3600000) out.push({ acc: v.acc, conv: tc, vente: v.t }); }
+            return out;
+          })();
+          const jourCourt = (t)=> new Date(t).toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
           return (
             <div data-messagerie style={{marginBottom:12}}>
               <div style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:8,flexWrap:'wrap'}}>
@@ -25157,6 +25258,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 </div>
                 <button type="button" onClick={()=>loadConvs(true)} style={{marginLeft:'auto',border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'5px 11px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>↻ Actualiser</button>
               </div>
+              {boitesPerimees.length>0 && (
+                <div data-boites-perimees={boitesPerimees.map(b=>String(b.acc.vinted_user_id)).join(',')} style={{display:'flex',gap:8,alignItems:'flex-start',fontSize:12.5,color:C.text,lineHeight:1.45,border:`1px solid ${C.warn}55`,background:`${C.warn}0e`,borderRadius:8,padding:'8px 11px',marginBottom:10}}>
+                  <span aria-hidden="true" style={{color:C.warn,flexShrink:0,marginTop:1}}><Icon name="chat" size={15}/></span>
+                  <span>
+                    {boitesPerimees.length===1
+                      ? <>La boîte de <b>{accName(boitesPerimees[0].acc)}</b> n'est plus à jour (dernière conversation captée le {jourCourt(boitesPerimees[0].conv)}, dernière vente le {jourCourt(boitesPerimees[0].vente)}) — ouvre ta messagerie Vinted sur ce compte.</>
+                      : <>Les boîtes de {boitesPerimees.map((b,i)=><React.Fragment key={String(b.acc.vinted_user_id)}>{i?(i===boitesPerimees.length-1?' et ':', '):''}<b>{accName(b.acc)}</b></React.Fragment>)} ne sont plus à jour (leur dernière vente est plus récente que leur dernière conversation captée) — ouvre ta messagerie Vinted sur chacun de ces comptes.</>}
+                  </span>
+                </div>
+              )}
               {liste.length===0 && <div style={{fontSize:13,color:C.muted,padding:'14px 0'}}>Aucune conversation captée pour l'instant — elles arrivent quand l'extension passe sur la messagerie Vinted de chaque compte.</div>}
               <div style={{border:liste.length?`1px solid ${C.border}`:'none',borderRadius:10,background:C.card,overflow:'hidden'}}>
                 {affiches.map((c,i)=>{
@@ -25300,6 +25411,59 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </div>
                 </div>
               )}
+            </div>
+          );
+        })()}
+        {/* ── « COCHÉ POSTÉ » MAIS VINTED NE L'A PAS VU PARTIR (6 octobre) ───────
+            La liste vient de `cochesNonPartis` (la règle `posteSansDepart`, une
+            seule — Ma journée lit la même). Le geste est dit UNE fois en tête ;
+            la ligne ne garde que ce qui la distingue (depuis quand, la date
+            limite, le compte). « ↺ Pas encore posté » la remet dans « à
+            envoyer » avec son bordereau, si le carton est encore là. */}
+        {cochesNonPartis.length>0 && (()=>{
+          const nb = cochesNonPartis.length, pl = nb>1?'s':'';
+          const plusieursComptes = (accounts || []).length > 1;
+          return (
+            <div data-poste-sans-depart={nb} style={{border:`1px solid ${C.warn}66`,background:`${C.warn}10`,borderRadius:10,padding:'11px 13px',marginBottom:12}}>
+              <div style={{display:'flex',gap:9,alignItems:'flex-start'}}>
+                <span aria-hidden="true" style={{color:C.warn,flexShrink:0,marginTop:1}}><Icon name="truck" size={18}/></span>
+                <div style={{minWidth:0}}>
+                  <div style={{fontSize:13.5,fontWeight:700,color:C.text}}>{nb} colis coché{pl} « posté » que Vinted n'a pas vu{pl} partir</div>
+                  <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.45}}>Vinted dit toujours qu'il{nb>1?'s attendent':' attend'} ton envoi — un statut lu après ta coche. Vérifie que le colis a bien été déposé (garde le reçu du point relais) ; s'il est encore chez toi, dépose-le ou remets-le dans « à envoyer ». Passé la date limite, Vinted peut annuler la vente.</div>
+                </div>
+              </div>
+              <div style={{display:'grid',gap:6,marginTop:9}}>
+                {cochesNonPartis.map(({ o, heures, limiteDepassee, joursLimite })=>{
+                  const ph = orderPhoto(o);
+                  const tx = String(o.transaction_id);
+                  const conv = o.conversation_id;
+                  const surVinted = conv ? `https://www.vinted.fr/inbox/${encodeURIComponent(conv)}` : `https://www.vinted.fr/member/transactions/${encodeURIComponent(tx)}`;
+                  const j = Math.floor(heures/24);
+                  const depuis = heures < 48 ? `${heures} h` : `${j} j`;
+                  const prix = o.price && o.price.amount != null ? `${Number(o.price.amount).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})} €` : '';
+                  const b = bordsParTxn[tx] || null;
+                  return (
+                    <div key={tx} data-tx={tx} data-limite={limiteDepassee?'depassee':'ok'} style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap',padding:'7px 9px',border:`1px solid ${C.border}`,borderRadius:8,background:C.card,minWidth:0}}>
+                      <div style={{width:34,height:34,borderRadius:5,background:C.border,flexShrink:0,overflow:'hidden'}}>{ph && !imgMortes.has(ph) && <img src={ph} alt="" loading="lazy" onError={()=>noterImgMorte(ph)} style={{width:'100%',height:'100%',objectFit:'cover'}}/>}</div>
+                      <div style={{flex:'1 1 180px',minWidth:0}}>
+                        <div style={{fontSize:12.5,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{o.title || 'Vente'}</div>
+                        <div style={{fontSize:11,color:C.muted,marginTop:2,display:'flex',gap:8,flexWrap:'wrap'}}>
+                          <span>coché il y a {depuis}</span>
+                          {limiteDepassee
+                            ? <span style={{color:C.danger,fontWeight:600}}>date limite dépassée</span>
+                            : joursLimite!=null && <span>{joursLimite===0 ? 'limite aujourd’hui' : `limite dans ${joursLimite} j`}</span>}
+                          {prix && <span>{prix}</span>}
+                          {plusieursComptes && o._acc && <span>· {accNameOf(o._acc)}</span>}
+                        </div>
+                      </div>
+                      <a href={surVinted} target="_blank" rel="noreferrer" style={{fontSize:12,fontWeight:600,color:C.text,textDecoration:'none',border:`1px solid ${C.border}`,borderRadius:8,padding:'6px 10px'}}>Ouvrir sur Vinted ↗</a>
+                      <button type="button" data-annuler-poste={tx} onClick={()=>{ if(isShipDone(o)) toggleShipDone(o); if(b && isBordShippedManual(b)) unmarkBordShipped(b); }}
+                        title="Le colis est encore chez toi : il revient dans « à envoyer », avec son bordereau"
+                        style={{border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:8,padding:'6px 10px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>↺ Pas encore posté</button>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           );
         })()}
