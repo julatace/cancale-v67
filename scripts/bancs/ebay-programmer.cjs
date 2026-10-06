@@ -57,22 +57,101 @@ const BROUILLONS = () => Object.fromEntries(PAIRES.filter(([n]) => n !== 21).map
 const EBAY_ANNONCES = [{ itemId: '110000000027', title: 'Vans Old Skool noir taille 42', price: '50.0', sku: 'VRM-27', photo: 'https://img.test/e27.jpg' }];
 const PROG_INITIALES = () => [{ itemId: '110000000930', sku: 'VRM-30', title: 'Converse Chuck 70 blanc taille 41', price: '65.0', debut: new Date(MAINTENANT + 40 * 60000).toISOString(), photo: '' }];
 
-let rows = [], progEbay = [], envois = [], ecritures = [], prochainId = 110000000801;
+// ══ (6 octobre) LA REVUE CONTRADICTOIRE DU PLANIFICATEUR — scénarios inventés ══
+// Chacun est un défaut CONFIRMÉ en exécutant le code d'avant ; le banc le sert
+// tel quel et juge ce qui PART vers `/api/ebay` et ce qui est ÉCRIT en base.
+const annonceV = (id, t, p, ferme) => ({ id, title: t, price: { amount: String(p), currency_code: 'EUR' }, brand_title: t.split(' ')[0], is_closed: !!ferme, is_hidden: false, is_draft: false, nPhotos: 2, photo: { url: `https://img.test/v${id}.jpg` } });
+const titreDe = (n) => (PAIRES.find((x) => x[0] === n) || [n, 'Paire ' + n, 50])[1];
+const prixDe = (n) => (PAIRES.find((x) => x[0] === n) || [n, '', 50])[2];
+const txnV = (k, item, titre) => ({ id: `harvest_111_txn_${k}`, data: { payload: { transaction: { id: k, item_id: item, status: titre ? 450 : 1, status_title: titre } } } });
+// Des brouillons nommés : [id, N°, pairId|null, minutes depuis la dernière modif]
+const brouillonsDe = (liste) => () => Object.fromEntries(liste.map(([id, n, pairId, k]) => {
+  const num = String(n).replace(/^0+/, '') || String(n);
+  const d = brouillon(Number(num), titreDe(Number(num)), prixDe(Number(num)), k);
+  return [id, { ...d, id, numero: String(n), pairId: pairId == null ? null : String(pairId) }];
+}));
+// ── A. « DÉJÀ VENDUE AILLEURS », UN LOT EN DOUBLE, DES SKU MAL ÉCRITS ──────
+//   N°21 : à programmer — une ANCIENNE annonce du N°21 (9021) est vendue, mais
+//          la 7021 est en vente et pas vendue : la paire est REVENUE ;
+//   N°22 : vendue sur eBay (commande PAID, SKU VRM-22) ;
+//   N°23 : vendue sur Leboncoin — reliée SEULEMENT par son annonce (réf VRM-23) ;
+//   N°24 : revendue sur Vinted sous une AUTRE annonce (8024) ; la sienne (7024) fermée ;
+//   N°25 : deux brouillons de la même paire (« 25 » et « 025 ») ;
+//   N°26 : vendue sur Vinted, brouillon SANS pairId ;
+//   N°27 : en vente sur eBay sous le SKU « vrm-027 » ;
+//   N°28 : programmée sur eBay sous le SKU « VRM 028 ».
+const SC_AILLEURS = {
+  fiches: { ...FICHES, '8024': { numero: '24', title: titreDe(24), photo: '' }, '9021': { numero: '21', title: titreDe(21), photo: '' } },
+  listings: { capturedAt: new Date(MAINTENANT).toISOString(), payload: { items: [
+    annonceV(7021, titreDe(21), 95), annonceV(7022, titreDe(22), 80), annonceV(7023, titreDe(23), 120), annonceV(7024, titreDe(24), 90, true),
+    annonceV(7025, titreDe(25), 70), annonceV(7026, titreDe(26), 60, true), annonceV(7027, titreDe(27), 50), annonceV(8024, titreDe(24), 90, true), annonceV(9021, titreDe(21), 95, true),
+  ] } },
+  annonces: [{ itemId: '110000000027', title: titreDe(27), price: '50.0', sku: 'vrm-027', photo: '' }],
+  commandes: [{ orderId: '07-022', orderPaymentStatus: 'PAID', lineItems: [{ sku: 'VRM-22', title: titreDe(22) }] }],
+  prog: () => [{ itemId: '110000000928', sku: 'VRM 028', title: 'Paire 28', price: '40.0', debut: new Date(MAINTENANT + 2 * 86400000).toISOString(), photo: '' }],
+  brouillons: brouillonsDe([['b-21', 21, 7021, 9], ['b-22', 22, 7022, 8], ['b-23', 23, 7023, 7], ['b-24', 24, 7024, 6], ['b-25', 25, 7025, 1], ['b-25bis', '025', 7025, 2], ['b-26', 26, null, 4], ['b-27', 27, 7027, 3], ['b-28', 28, null, 5]]),
+  lignes: [
+    txnV(1, 8024, 'Commande finalisée'), txnV(2, 7026, 'Commande finalisée'), txnV(3, 9021, 'Commande finalisée'),
+    txnV(4, 7025, ''),   // une CONVERSATION sur la N°25 : pas une vente
+    { id: 'lbc_ventes', data: { ventes: { v23: { isSeller: true, itemId: 5023, title: 'Salomon XT-6', stepStatus: 'finished' } } } },
+    { id: 'lbc_listings', data: { items: { 5023: { id: '5023', subject: 'Salomon XT-6 noir', customRef: 'VRM-23' } } } },
+  ],
+};
+// ── B. LE SECOND ESSAI ne doit pas effacer le doute du premier ; l'UUID rangé
+//    en base est gardé. N°21 : coupure, eBay a créé l'annonce mais ne la liste
+//    pas encore, puis « les frais ont changé » au second essai. N°22 : coupure,
+//    puis la route RETROUVE la paire (409 « déjà programmée » + son numéro).
+const U1 = 'ABCDEF0123456789ABCDEF0123456789';
+const SC_INCERTAIN = {
+  brouillons: brouillonsDe([['b-21', 21, 7021, 2], ['b-22', 22, 7022, 1]]),
+  programmer: (body, num, essai) => {
+    const coupe = { status: 504, body: { ok: false, reason: 'incertain', uuid: body.uuid, error: 'eBay n\'a pas répondu à temps — je ne sais pas si elle est programmée. VRM relit tes annonces eBay avant de redemander quoi que ce soit.' } };
+    if (num === '21') return essai === 1 ? coupe : { status: 409, body: { ok: false, reason: 'frais', error: 'Les frais ont changé depuis ta vérification (0,55 € au lieu de 0,20 €) — rien n\'a été envoyé.' } };
+    if (num === '22') return essai === 1 ? coupe : { status: 409, body: { ok: false, reason: 'deja-programmee', itemId: '110000000822', error: 'La paire VRM-22 est déjà programmée sur eBay — rien n\'a été envoyé.' } };
+    return null;
+  },
+};
+// ── C. L'HORLOGE QUI AVANCE : 19:10 à Paris, « Maintenant », 3 brouillons. ──
+const SOIR = '2026-10-20T17:10:00.000Z';
+const SC_HORLOGE = { brouillons: brouillonsDe([['b-22', 22, 7022, 3], ['b-23', 23, 7023, 2], ['b-24', 24, 7024, 1]]), annonces: [] };
+// ── D. « PUBLIER » (immédiat) passe par les mêmes gardes. ──────────────────
+//   N°21 programmée sur eBay ; N°26 vendue sur Vinted (brouillon rouvert) ;
+//   N°24 plus en vente sur Vinted (fermée, pas prouvée vendue) ; N°23 sera
+//   programmée « entre-temps » pendant que son brouillon est ouvert ; N°25,
+//   libre, se publie (l'autre sens : on ne bloque pas tout).
+const SC_PUBLIER = {
+  listings: { capturedAt: new Date(MAINTENANT).toISOString(), payload: { items: [
+    annonceV(7021, titreDe(21), 95), annonceV(7022, titreDe(22), 80), annonceV(7023, titreDe(23), 120), annonceV(7024, titreDe(24), 90, true),
+    annonceV(7025, titreDe(25), 70), annonceV(7026, titreDe(26), 60, true), annonceV(7027, titreDe(27), 50),
+  ] } },
+  prog: () => [{ itemId: '110000000921', sku: 'VRM-21', title: titreDe(21), price: '95.0', debut: new Date(MAINTENANT + 2 * 86400000).toISOString(), photo: '' }],
+  brouillons: brouillonsDe([['b-23', 23, 7023, 3], ['b-24', 24, 7024, 2], ['b-26', 26, 7026, 1]]),
+  lignes: [txnV(1, 7026, 'Commande finalisée')],
+};
+
+let rows = [], progEbay = [], envois = [], ecritures = [], lectures = [], essais = {}, prochainId = 110000000801;
 // La ligne des brouillons ne répond plus (la base debout par ailleurs) : le cas
 // « lecture KO, écriture OK », celui qui EFFACE si on repart de vide (§5).
 let panneBrouillons = false;
-const remettre = () => {
+// (6 octobre) Le scénario courant : `null` = le scénario principal. Un scénario
+// remplace les fiches, les annonces Vinted, eBay, les commandes, les brouillons,
+// les programmées, ajoute des lignes (ventes, Leboncoin) et peut répondre à
+// `programmer` à la place du faux eBay (`programmer(body, num, essai)`).
+let SC = null;
+const remettre = (sc) => {
+  SC = sc || null;
   rows = [
-    { id: 'main', data: { vinted_annonce_numeros: FICHES } },
-    { id: 'harvest_111_listings', data: LISTINGS },
+    { id: 'main', data: { vinted_annonce_numeros: (SC && SC.fiches) || FICHES } },
+    { id: 'harvest_111_listings', data: (SC && SC.listings) || LISTINGS },
     { id: 'vinted_item_details', data: DETAILS },
-    { id: 'ebay_listings', data: { items: EBAY_ANNONCES, capturedAt: MAINTENANT } },
-    { id: 'ebay_orders', data: { orders: [], capturedAt: MAINTENANT } },
-    { id: 'ebay_brouillons', data: { items: BROUILLONS(), majAt: MAINTENANT } },
+    { id: 'ebay_listings', data: { items: (SC && SC.annonces) || EBAY_ANNONCES, capturedAt: MAINTENANT } },
+    { id: 'ebay_orders', data: { orders: (SC && SC.commandes) || [], capturedAt: MAINTENANT } },
+    { id: 'ebay_brouillons', data: { items: (SC && SC.brouillons) ? SC.brouillons() : BROUILLONS(), majAt: MAINTENANT } },
     // ⚠️ PAS de ligne `ebay_programmees` : « jamais lue » — l'écran doit la
     //    demander à eBay, jamais conclure « aucune ».
+    ...((SC && SC.lignes) || []),
   ];
-  progEbay = PROG_INITIALES(); envois = []; ecritures = []; prochainId = 110000000801;
+  progEbay = (SC && SC.prog) ? SC.prog() : PROG_INITIALES(); envois = []; ecritures = []; lectures = []; essais = {}; prochainId = 110000000801;
 };
 
 let ko = 0;
@@ -103,16 +182,20 @@ const projette = (row, sel) => {
   return out;
 };
 
-async function ouvrir(b, vp) {
+async function ouvrir(b, vp, opts = {}) {
   const ctx = await b.newContext({ viewport: vp, locale: 'fr-FR', timezoneId: 'America/New_York', ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
-  await pg.clock.setFixedTime(new Date(MAINTENANT));
-  await pg.addInitScript(([fiches]) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_annonce_numeros', JSON.stringify(fiches)); } catch (_) {} }, [FICHES]);
+  // (6 octobre) `horloge` : une horloge INSTALLÉE qui avance (pour faire passer
+  // le tic de 30 s du planificateur avec `runFor`) ; sinon l'heure est figée.
+  if (opts.horloge) await pg.clock.install({ time: new Date(opts.horloge) });
+  else await pg.clock.setFixedTime(new Date(MAINTENANT));
+  await pg.addInitScript(([fiches]) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_annonce_numeros', JSON.stringify(fiches)); } catch (_) {} }, [(SC && SC.fiches) || FICHES]);
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
     const j = (d, st) => route.fulfill({ status: st || 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
+    if (route.request().method() === 'GET') lectures.push(u);
     if (route.request().method() !== 'GET') {
       try {
         for (const l of [].concat(JSON.parse(route.request().postData() || 'null') || [])) {
@@ -158,7 +241,10 @@ async function ouvrir(b, vp) {
       if (prog && num === '26') return j({ ok: true, fees: 0, frais: { total: 0, insertion: 0, programmation: null, remises: null, devise: 'EUR', lignes: [] }, programme: body.scheduleTime });
       return j({ ok: true, fees: prog ? 0.2 : 0, frais: { total: prog ? 0.2 : 0, insertion: 0, programmation: prog ? 0.2 : null, remises: null, devise: 'EUR', lignes: prog ? [{ nom: 'SchedulingFee', montant: 0.2, devise: 'EUR', remise: null }] : [] }, programme: body.scheduleTime || null });
     }
+    if (body.action === 'publish') return j({ ok: true, itemId: '110000000777', url: 'https://www.ebay.fr/itm/110000000777', sku: num ? 'VRM-' + num : null });
     if (body.action === 'programmer') {
+      essais[num] = (essais[num] || 0) + 1;
+      if (SC && SC.programmer) { const r = SC.programmer(body, num, essais[num]); if (r) return j(r.body, r.status); }
       if (num === '24') return j({ ok: false, reason: 'frais', error: 'Les frais ont changé depuis ta vérification (0,55 € au lieu de 0,20 €) — rien n\'a été envoyé.' }, 409);
       if (num === '25') return j({ ok: false, error: 'La catégorie ne convient pas à cet objet.' }, 422);
       const itemId = String(prochainId++);
@@ -166,7 +252,7 @@ async function ouvrir(b, vp) {
       return j({ ok: true, itemId, sku: 'VRM-' + num, demande: body.scheduleTime, debut: body.scheduleTime, fin: null, enLigneMaintenant: false, frais: { total: 0.2 } });
     }
     if (body.action === 'programmees') {
-      const data = { items: progEbay.slice(), enLigne: EBAY_ANNONCES.map((a) => ({ itemId: a.itemId, sku: a.sku })), complet: true, capturedAt: MAINTENANT };
+      const data = { items: progEbay.slice(), enLigne: ((SC && SC.annonces) || EBAY_ANNONCES).map((a) => ({ itemId: a.itemId, sku: a.sku })), complet: true, capturedAt: MAINTENANT };
       const i = rows.findIndex((r) => r.id === 'ebay_programmees');
       if (i >= 0) rows[i] = { id: 'ebay_programmees', data }; else rows.push({ id: 'ebay_programmees', data });
       return j({ ok: true, ...data });
@@ -371,6 +457,191 @@ const lignesPlan = (pg) => pg.$$eval('[data-planif-ligne]', (els) => els.map((e)
         dit(r.sw <= r.cw + 1, 'aucun débordement horizontal', `${r.sw} > ${r.cw}`);
         const garde = await pg.evaluate(() => /n'a pas pu s'afficher|Cannot access|is not defined/.test(document.body.innerText));
         dit(!garde && errs.length === 0, 'aucune erreur de page, aucun écran tombé sur le garde-fou', errs.join(' | ').slice(0, 160));
+      });
+      await ctx.close();
+    }
+    // ══ (6 octobre) LA REVUE CONTRADICTOIRE ══════════════════════════════════
+    const versAnnonces = async (pg) => {
+      await pg.goto(`http://localhost:${PORT}/?tab=plat_ebay`, { waitUntil: 'domcontentloaded' });
+      await pg.waitForTimeout(1500);
+      await pg.getByRole('button', { name: 'Annonces', exact: true }).first().click({ timeout: 8000 });
+      await pg.waitForSelector('[data-ebay-brouillons="lu"]', { timeout: 15000 });
+      await pg.waitForSelector('[data-ebay-programmees="lu"]', { timeout: 10000 }).catch(() => {});
+    };
+    const programmerTout = async (pg, nbFrais) => {
+      await pg.waitForFunction((n) => { const b = document.querySelector('[data-planif-verifier]'); return b && !b.disabled && document.querySelectorAll('[data-planif-ligne]').length === n; }, nbFrais, { timeout: 10000 }).catch(() => {});
+      await pg.click('[data-planif-verifier]');
+      await pg.waitForFunction((n) => document.querySelectorAll('[data-planif-frais]').length === n, nbFrais, { timeout: 15000 }).catch(() => {});
+      await pg.locator('[data-planif-compris]').evaluate((e) => e.scrollIntoView({ block: 'center' })).catch(() => {});
+      await pg.check('[data-planif-compris]').catch(() => {});
+      await pg.waitForFunction(() => { const b = document.querySelector('[data-planif-confirmer]'); return b && !b.disabled; }, null, { timeout: 15000 }).catch(() => {});
+      const n = await pg.$eval('[data-planif-confirmer]', (e) => e.getAttribute('data-planif-confirmer')).catch(() => null);
+      await pg.click('[data-planif-confirmer]', { timeout: 3000 }).catch(() => {});
+      await feuille(pg).getByRole('button', { name: 'Oui, programmer' }).click({ timeout: 5000 }).catch(() => {});
+      await pg.waitForSelector('[data-planif-bilan]', { timeout: 20000 }).catch(() => {});
+      return n;
+    };
+    const brouillonsEnBase = () => ((rows.find((r) => r.id === 'ebay_brouillons') || {}).data || {}).items || {};
+
+    // ── A. Déjà vendue ailleurs (toutes plateformes, par le N°), doublon dans
+    //       le lot, SKU mal écrits ─────────────────────────────────────────
+    console.log('── A. déjà vendue ailleurs · doublon dans le lot · SKU mal écrits (1512 px)');
+    {
+      remettre(SC_AILLEURS);
+      const { ctx, pg, errs } = await ouvrir(b, { width: 1512, height: 950 });
+      await essaie('A', async () => {
+        await versAnnonces(pg);
+        await pg.click('[data-brouillons-tout]');
+        await pg.click('[data-brouillons-programmer]');
+        await pg.waitForSelector('[data-planif]', { timeout: 5000 });
+        await pg.waitForFunction(() => !document.querySelector('[data-planif-ventes-en-cours]'), null, { timeout: 10000 }).catch(() => {});
+        const exclues = await pg.$eval('[data-planif-exclues]', (e) => e.textContent).catch(() => '');
+        const lignes = await pg.$$eval('[data-planif-ligne]', (els) => els.map((e) => e.getAttribute('data-planif-ligne')));
+        dit(/N°22 \(déjà vendue sur eBay\)/.test(exclues), 'N°22, vendue sur eBay (commande VRM-22) : écartée, avec sa raison', exclues.replace(/\s+/g, ' ').slice(0, 260));
+        dit(/N°23 \(déjà vendue sur Leboncoin\)/.test(exclues), 'N°23, vendue sur Leboncoin (reliée par son annonce, réf VRM-23) : écartée');
+        dit(/N°24 \(déjà vendue sur Vinted\)/.test(exclues), 'N°24, revendue sur Vinted sous une AUTRE annonce du même N° : écartée');
+        dit(/N°26 \(déjà vendue sur Vinted\)/.test(exclues), 'N°26, vendue sur Vinted, brouillon SANS pairId : écartée');
+        dit(/N°25 \(un autre brouillon de la même paire/.test(exclues) && lignes.filter((x) => /^b-25/.test(x)).length === 1, 'deux brouillons de la N°25 (« 25 » et « 025 ») : UN dans le lot, l\'autre écarté avec sa raison', JSON.stringify(lignes));
+        dit(/N°27 \(déjà en vente sur eBay\)/.test(exclues), 'N°27 en vente sur eBay sous « vrm-027 » : reconnue (forme canonique du SKU)');
+        dit(/N°28 \(déjà programmée sur eBay/.test(exclues), 'N°28 programmée sur eBay sous « VRM 028 » : reconnue');
+        dit(lignes.includes('b-21'), 'N°21 : une ancienne annonce vendue, mais la paire est REVENUE (une autre annonce en vente, pas vendue) ⇒ elle part', JSON.stringify(lignes));
+        await photo(pg, '[data-planif-exclues]', 'ebay-planif-exclues-1512');
+        dit(lectures.some((u) => /lbc_listings/.test(u)), 'les annonces Leboncoin ne sont lues que parce qu\'une vente ne se reliait pas sans elles');
+        await programmerTout(pg, 2);
+        const p = envois.filter((e) => e.action === 'programmer').map((e) => String(e.item && e.item.numero));
+        dit(JSON.stringify(p.slice().sort()) === '["21","25"]', 'ce qui part chez eBay : la N°21 et UNE N°25 — rien d\'autre', JSON.stringify(p));
+        await photo(pg, '[data-planif-bilan]', 'ebay-planif-ailleurs-1512');
+        dit(errs.length === 0, 'aucune erreur de page', errs.join(' | ').slice(0, 160));
+      });
+      await ctx.close();
+    }
+
+    // ── B. Second essai : le doute du premier ne s'efface pas ; l'UUID rangé
+    //       en base est gardé ───────────────────────────────────────────────
+    console.log('── B. coupure puis refus au second essai · UUID déjà rangé (390 px)');
+    {
+      remettre(SC_INCERTAIN);
+      const { ctx, pg, errs } = await ouvrir(b, { width: 390, height: 844 });
+      await essaie('B', async () => {
+        await versAnnonces(pg);
+        await pg.click('[data-brouillons-tout]');
+        await pg.click('[data-brouillons-programmer]');
+        await pg.waitForSelector('[data-planif]', { timeout: 5000 });
+        // Un AUTRE onglet (ou un essai « incertain » d'avant) a déjà rangé un
+        // identifiant d'envoi pour la N°21 : la copie de l'écran ne l'a pas.
+        brouillonsEnBase()['b-21'].uuid = U1;
+        await programmerTout(pg, 2);
+        const p21 = envois.filter((e) => e.action === 'programmer' && String(e.item && e.item.numero) === '21');
+        dit(p21.length === 2 && p21.every((e) => e.uuid === U1), 'l\'identifiant d\'envoi déjà RANGÉ en base est gardé, aux deux essais (eBay pourra dire « déjà fait », 488)', p21.map((e) => String(e.uuid).slice(0, 8)).join(' '));
+        dit(brouillonsEnBase()['b-21'].uuid === U1, 'et il n\'est pas écrasé en base', String(brouillonsEnBase()['b-21'].uuid));
+        const bl = await pg.$eval('[data-planif-bilan]', (e) => ({ p: e.getAttribute('data-programmees'), r: e.getAttribute('data-refusees'), i: e.getAttribute('data-incertaines'), t: e.innerText })).catch(() => ({}));
+        dit(bl.i === '1' && bl.r === '0', 'N°21 : coupure puis « les frais ont changé » au second essai ⇒ INCERTAINE, jamais « refusée »', JSON.stringify({ p: bl.p, r: bl.r, i: bl.i }));
+        dit(bl.p === '1' && /110000000822/.test(JSON.stringify(brouillonsEnBase()['b-22'].programme || {})) && brouillonsEnBase()['b-22'].etatBrouillon === 'programmee',
+          'N°22 : coupure puis la route la RETROUVE (« déjà programmée » + son numéro) ⇒ programmée, avec son numéro d\'annonce', JSON.stringify(brouillonsEnBase()['b-22'].programme || null));
+        const b21 = brouillonsEnBase()['b-21'];
+        dit(!(b21.envoi && b21.envoi.ok === false), 'le brouillon de la N°21 n\'est PAS marqué « échec » (il serait reprogrammé ou republié : une seconde annonce)', JSON.stringify(b21.envoi || null));
+        dit(/peut-être/.test(bl.t || '') && /frais ont changé/.test(bl.t || ''), 'le bilan le dit : « peut-être programmée », avec la réponse d\'eBay au second essai', String(bl.t || '').replace(/\s+/g, ' ').slice(0, 220));
+        dit(errs.length === 0, 'aucune erreur de page', errs.join(' | ').slice(0, 160));
+      });
+      await ctx.close();
+    }
+
+    // ── C. L'horloge avance de 31 s entre « Vérifier » et « Programmer » ─────
+    console.log('── C. l\'horloge avance entre la vérification et la confirmation (1512 px)');
+    {
+      remettre(SC_HORLOGE);
+      const { ctx, pg, errs } = await ouvrir(b, { width: 1512, height: 950 }, { horloge: SOIR });
+      await essaie('C', async () => {
+        await versAnnonces(pg);
+        await pg.click('[data-brouillons-tout]');
+        await pg.click('[data-brouillons-programmer]');
+        await pg.waitForSelector('[data-planif]', { timeout: 5000 });
+        await pg.waitForFunction(() => document.querySelectorAll('[data-planif-ligne]').length === 3, null, { timeout: 8000 });
+        await pg.click('[data-planif-verifier]');
+        await pg.waitForFunction(() => document.querySelectorAll('[data-planif-frais]').length === 3, null, { timeout: 15000 });
+        const avant = await lignesPlan(pg);
+        const nAvant = await pg.$eval('[data-planif-confirmer]', (e) => e.getAttribute('data-planif-confirmer'));
+        await pg.clock.runFor(31000);
+        await pg.waitForTimeout(600);
+        const apres = await lignesPlan(pg);
+        const nApres = await pg.$eval('[data-planif-confirmer]', (e) => e.getAttribute('data-planif-confirmer'));
+        dit(nAvant === '3' && avant[0] && avant[0].utc === '', '19:10 à Paris, « Maintenant » : la 1ʳᵉ part tout de suite, 3 annonces vérifiées', `${nAvant} · ${avant.map((x) => x.paris).join(' | ')}`);
+        dit(JSON.stringify(apres.map((x) => x.utc)) === JSON.stringify(avant.map((x) => x.utc)), '31 s plus tard (le tic du planificateur) : les heures n\'ont PAS bougé', apres.map((x) => (x.utc || 'immédiat').slice(11, 19)).join(' · '));
+        dit(nApres === '3', 'et les frais vérifiés tiennent toujours : « Programmer 3 annonces », pas 1', `${nAvant} → ${nApres}`);
+        await pg.locator('[data-planif-compris]').evaluate((e) => e.scrollIntoView({ block: 'center' }));
+        await pg.check('[data-planif-compris]');
+        await pg.click('[data-planif-confirmer]');
+        await feuille(pg).getByRole('button', { name: 'Oui, programmer' }).click({ timeout: 5000 });
+        await pg.waitForSelector('[data-planif-bilan]', { timeout: 20000 });
+        const st = envois.filter((e) => e.action === 'programmer').map((e) => e.scheduleTime || '');
+        const vu = envois.filter((e) => e.action === 'pubverify').map((e) => e.scheduleTime || '');
+        dit(st.length === 3 && JSON.stringify(st) === JSON.stringify(vu), 'ce qui part est EXACTEMENT ce qui a été vérifié (mêmes heures, à la seconde)', `${st.map((x) => (x || 'immédiat').slice(11, 19)).join(' ')} / vu ${vu.map((x) => (x || 'immédiat').slice(11, 19)).join(' ')}`);
+        dit(errs.length === 0, 'aucune erreur de page', errs.join(' | ').slice(0, 160));
+      });
+      await ctx.close();
+    }
+
+    // ── D. « Publier » (immédiat) : les mêmes gardes ─────────────────────────
+    console.log('── D. « Publier sur eBay » : paire programmée, vendue, plus en vente ; brouillon parti entre-temps (390 px)');
+    {
+      remettre(SC_PUBLIER);
+      const { ctx, pg, errs } = await ouvrir(b, { width: 390, height: 844 });
+      const publies = () => envois.filter((e) => e.action === 'publish');
+      const essayerPublier = async () => {
+        await pg.waitForSelector('button:has-text("Publier sur eBay")', { timeout: 8000 });
+        await pg.waitForFunction(() => !document.querySelector('[data-publier-garde="en-cours"]'), null, { timeout: 10000 }).catch(() => {});
+        const g = await pg.$eval('[data-publier-garde]', (e) => ({ k: e.getAttribute('data-publier-garde'), t: e.textContent })).catch(() => ({ k: null, t: '' }));
+        const dis = await pg.$eval('button:has-text("Publier sur eBay")', (e) => e.disabled).catch(() => null);
+        await pg.locator('button:has-text("Publier sur eBay")').click({ force: true, timeout: 3000 }).catch(() => {});
+        await pg.waitForTimeout(500);
+        return { g, dis };
+      };
+      await essaie('D', async () => {
+        await versAnnonces(pg);
+        await pg.click('[data-poster="ebay"]');
+        await pg.waitForSelector('button:has-text("N°21")', { timeout: 8000 });
+        const marque = await pg.$eval('button:has-text("N°21")', (e) => { const b = e.querySelector('[data-paire-deja-ebay]'); return b ? b.getAttribute('data-paire-deja-ebay') + ' · ' + b.textContent : ''; }).catch(() => '');
+        dit(/^programmee/.test(marque) && /déjà programmée sur eBay/.test(marque), 'le choix de la paire dit « déjà programmée sur eBay » pour la N°21 (pas seulement les annonces en ligne)', marque);
+        await pg.locator('button', { hasText: 'N°21' }).first().click();
+        await pg.getByRole('button', { name: 'Trouver la catégorie eBay' }).click({ timeout: 5000 });
+        await pg.waitForSelector('text=Catégorie eBay', { timeout: 8000 });
+        await pg.fill('input[placeholder="ex. 74"]', '95');
+        let r = await essayerPublier();
+        await photo(pg, '[data-publier-garde]', 'ebay-publier-garde-390');
+        dit(r.g.k === 'deja-programmee' && r.dis === true && publies().length === 0, 'une paire DÉJÀ PROGRAMMÉE ne se publie pas une seconde fois : bouton grisé, la raison dite, rien n\'est envoyé', `${r.g.k} · grisé=${r.dis} · ${publies().length} publish`);
+        await pg.click('[data-brouillon-modifier="b-26"]');
+        await pg.waitForFunction(() => { const e = document.querySelector('[data-publier-brouillon-id]'); return e && e.getAttribute('data-publier-brouillon-id') === 'b-26'; }, null, { timeout: 8000 });
+        r = await essayerPublier();
+        dit(r.g.k === 'vendue' && /vendue sur Vinted/.test(r.g.t) && publies().length === 0, 'un brouillon rouvert d\'une paire VENDUE sur Vinted ne part pas', `${r.g.k} · ${r.g.t.trim().slice(0, 90)} · ${publies().length} publish`);
+        await pg.click('[data-brouillon-modifier="b-24"]');
+        await pg.waitForFunction(() => { const e = document.querySelector('[data-publier-brouillon-id]'); return e && e.getAttribute('data-publier-brouillon-id') === 'b-24'; }, null, { timeout: 8000 });
+        r = await essayerPublier();
+        dit(r.g.k === 'plus-en-vente' && publies().length === 0, 'une paire qui n\'est PLUS en vente sur Vinted (sans preuve de vente) ne part pas non plus — et c\'est dit', `${r.g.k} · ${r.g.t.trim().slice(0, 90)} · ${publies().length} publish`);
+        // N°23 : son brouillon est ouvert ; il est programmé « entre-temps »
+        // (depuis la liste, ou un autre onglet).
+        await pg.click('[data-brouillon-modifier="b-23"]');
+        await pg.waitForFunction(() => { const e = document.querySelector('[data-publier-brouillon-id]'); return e && e.getAttribute('data-publier-brouillon-id') === 'b-23'; }, null, { timeout: 8000 });
+        const it = brouillonsEnBase();
+        it['b-23'] = { ...it['b-23'], etatBrouillon: 'programmee', uuid: U1, programme: { itemId: '110000000823', debut: new Date(MAINTENANT + 86400000).toISOString(), sku: 'VRM-23', at: MAINTENANT } };
+        const nAvant = ecritures.length;
+        await pg.click('[data-publier-brouillon]');
+        await pg.waitForFunction(() => { const e = document.querySelector('[data-brouillon-msg]'); return e && e.textContent.trim(); }, null, { timeout: 8000 });
+        const msg = await pg.$eval('[data-brouillon-msg]', (e) => e.textContent);
+        const apres = ecritures.slice(nAvant).filter((x) => x.id === 'ebay_brouillons').map((x) => (x.data.items['b-23'] || {}).etatBrouillon);
+        dit(apres.length === 0 && brouillonsEnBase()['b-23'].etatBrouillon === 'programmee' && brouillonsEnBase()['b-23'].uuid === U1 && /programmé/.test(msg),
+          '« Mettre à jour le brouillon » sur un brouillon programmé entre-temps : AUCUNE écriture (son état, son identifiant d\'envoi restent), et c\'est dit', `${JSON.stringify(apres)} · ${msg.trim().slice(0, 90)}`);
+        // L'autre sens : une paire libre se publie toujours (écran rouvert à neuf).
+        await versAnnonces(pg);
+        await pg.click('[data-poster="ebay"]');
+        await pg.locator('button', { hasText: 'N°25' }).first().click({ timeout: 8000 });
+        await pg.getByRole('button', { name: 'Trouver la catégorie eBay' }).click({ timeout: 5000 });
+        await pg.waitForSelector('text=Catégorie eBay', { timeout: 8000 });
+        await pg.fill('input[placeholder="ex. 74"]', '70');
+        r = await essayerPublier();
+        await pg.waitForTimeout(500);
+        dit(r.g.k === null && r.dis === false && publies().length === 1 && String(publies()[0].item.numero) === '25', 'l\'autre sens : la N°25, libre, se publie (on ne bloque pas tout)', `${r.g.k} · ${publies().map((x) => x.item && x.item.numero).join(',')}`);
+        await photo(pg, '[data-poster], [data-publier-brouillon-id]', 'ebay-publier-gardes-390');
+        dit(errs.length === 0, 'aucune erreur de page', errs.join(' | ').slice(0, 160));
       });
       await ctx.close();
     }

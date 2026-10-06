@@ -84,12 +84,28 @@ const remettre = () => {
     // (5 octobre) Deux annonces PROGRAMMÉES : la N°22, prouvée vendue sur
     // Vinted ⇒ « programmée sur eBay — à annuler » ; la N°25 (une simple
     // conversation, pas une vente) ⇒ rien.
+    // (6 octobre) + la N°24, VENDUE SUR eBAY (commande 01-001), et la N°21,
+    // VENDUE SUR LEBONCOIN : « à annuler » aussi — toutes plateformes, par le N°.
     { id: 'ebay_programmees', data: { items: [
       { itemId: '110000000922', sku: 'VRM-22', title: 'Adidas Gazelle bleu taille 40', price: '85.0', debut: new Date(Date.now() + 2 * 86400000).toISOString(), photo: '' },
       { itemId: '110000000925', sku: 'VRM-25', title: 'Asics Gel 1130 argent taille 39', price: '75.0', debut: new Date(Date.now() + 3 * 86400000).toISOString(), photo: '' },
-    ], enLigne: [], complet: true, capturedAt: Date.now() } },
+      { itemId: '110000000924', sku: 'VRM-24', title: 'New Balance 550 blanc taille 43', price: '90.0', debut: new Date(Date.now() + 4 * 86400000).toISOString(), photo: '' },
+      { itemId: '110000000921', sku: 'VRM-21', title: 'Nike Dunk Low panda taille 42', price: '95.0', debut: new Date(Date.now() + 5 * 86400000).toISOString(), photo: '' },
+    ], enLigne: [{ itemId: '110000000966', sku: 'VRM-22' }], complet: true, capturedAt: Date.now() } },
+    { id: 'lbc_ventes', data: { ventes: { vl21: { isSeller: true, itemId: 6021, title: 'Nike Dunk Low panda n21', stepStatus: 'finished' } } } },
+    // (6 octobre) Trois brouillons « programmee » : la N°22 (celle de la liste
+    // d'eBay, 922) ; une N°25 (955) qu'eBay ne liste PLUS, relue complète une
+    // heure après sa programmation (annulée dans le Seller Hub, ou terminée) ;
+    // une N°22 (966) passée EN LIGNE. Les deux dernières ne doivent plus
+    // revenir comme « programmées » — ni lever l'alerte « à annuler ».
+    { id: 'ebay_brouillons', data: { items: {
+      'b-22p': { id: 'b-22p', numero: '22', pairId: '7002', titre: 'Adidas Gazelle bleu taille 40', prix: '85', etatBrouillon: 'programmee', uuid: 'A'.repeat(32), programme: { itemId: '110000000922', sku: 'VRM-22', debut: new Date(Date.now() + 2 * 86400000).toISOString(), at: Date.now() - 3600000 } },
+      'b-25z': { id: 'b-25z', numero: '25', pairId: '7005', titre: 'Asics Gel 1130 argent taille 39', prix: '75', etatBrouillon: 'programmee', programme: { itemId: '110000000955', sku: 'VRM-25', debut: new Date(Date.now() - 1800000).toISOString(), at: Date.now() - 3600000 } },
+      'b-22e': { id: 'b-22e', numero: '22', pairId: '7002', titre: 'Adidas Gazelle bleu taille 40', prix: '85', etatBrouillon: 'programmee', programme: { itemId: '110000000966', sku: 'VRM-22', debut: new Date(Date.now() - 1800000).toISOString(), at: Date.now() - 3600000 } },
+    }, majAt: Date.now() } },
   ];
 };
+const brouillonsEnBase = () => ((rows.find((r) => r.id === 'ebay_brouillons') || {}).data || {}).items || {};
 
 let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
@@ -130,7 +146,9 @@ async function ouvrir(b, vp, panne) {
     const u = decodeURIComponent(metaVersData(route.request().url()));
     const j = (d, st) => route.fulfill({ status: st || 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
     if (route.request().method() !== 'GET') {
-      try { for (const l of [].concat(JSON.parse(route.request().postData() || 'null') || [])) if (l && l.id === 'main' && l.data) rows[0].data = l.data; } catch (_) {}
+      // Toute écriture est GARDÉE (§6.3) : `main`, et les brouillons eBay que
+      // l'écran remet en état après une annulation.
+      try { for (const l of [].concat(JSON.parse(route.request().postData() || 'null') || [])) { if (!l || !l.id || !l.data) continue; const i = rows.findIndex((r) => r.id === l.id); if (i >= 0) rows[i] = { id: l.id, data: l.data }; else rows.push({ id: l.id, data: l.data }); } } catch (_) {}
       return j([]);
     }
     if (/select=owner/.test(u)) return j({ m: 1 }, 400);
@@ -222,8 +240,8 @@ const deborde = (pg) => pg.evaluate(() => ({ sw: document.documentElement.scroll
         const v = /(\d+) paires? vendues? sur eBay, encore en vente sur Vinted/.exec(t);
         dit(a && a[1] === '1', 'le tableau de bord annonce 1 paire vendue sur Vinted à retirer d\'eBay', a ? a[0] : 'absent');
         dit(v && v[1] === '1', 'et 1 paire vendue sur eBay à retirer de Vinted', v ? v[0] : 'absent');
-        const p = /(\d+) paires? vendues? sur Vinted, programmées? sur eBay — à annuler/.exec(t);
-        dit(p && p[1] === '1', 'et 1 paire vendue sur Vinted, PROGRAMMÉE sur eBay — à annuler (même règle, §11)', p ? p[0] : 'absent');
+        const p = /(\d+) paires? vendues? (sur Vinted|ailleurs), programmées? sur eBay — à annuler/.exec(t);
+        dit(p && p[1] === '3' && p[2] === 'ailleurs', 'et 3 paires vendues AILLEURS (Vinted, eBay, Leboncoin), PROGRAMMÉES sur eBay — à annuler (même règle que l\'écran, §11)', p ? p[0] : 'absent');
       });
       await essaie('écran Annonces eBay', async () => {
         await versAnnoncesEbay(pg);
@@ -269,8 +287,11 @@ const deborde = (pg) => pg.evaluate(() => ({ sw: document.documentElement.scroll
       });
       // ── PROGRAMMÉE sur eBay, VENDUE sur Vinted : à annuler (5 octobre) ─────
       await essaie('à annuler', async () => {
-        const nums = await pg.$$eval('[data-ebay-a-annuler-paire]', (els) => els.map((e) => e.getAttribute('data-ebay-a-annuler-paire')));
-        dit(JSON.stringify(nums) === '["22"]', 'programmée sur eBay + prouvée vendue sur Vinted ⇒ « à annuler » pour la N°22, et elle seule (pas la N°25, une conversation)', JSON.stringify(nums));
+        const nums = await pg.$$eval('[data-ebay-a-annuler-paire]', (els) => els.map((e) => e.getAttribute('data-ebay-a-annuler-paire') + ':' + ((e.querySelector('[data-ebay-a-annuler-ou]') || {}).getAttribute ? e.querySelector('[data-ebay-a-annuler-ou]').getAttribute('data-ebay-a-annuler-ou') : '?')));
+        dit(JSON.stringify(nums) === '["22:Vinted","24:eBay","21:Leboncoin"]', 'programmée sur eBay + déjà vendue AILLEURS ⇒ « à annuler » : N°22 (Vinted), N°24 (eBay), N°21 (Leboncoin) — pas la N°25 (une conversation), et pas deux fois la N°22 (sa programmée passée en ligne ne revient pas)', JSON.stringify(nums));
+        const zombies = await pg.$$eval('[data-prog]', (els) => els.map((e) => e.getAttribute('data-prog')));
+        dit(!zombies.includes('110000000955') && !zombies.includes('110000000966') && zombies.includes('110000000922'),
+          'un brouillon « programmée » qu\'eBay ne liste plus (relu complet APRÈS) ou passé en ligne ne revient plus dans les programmées', JSON.stringify(zombies));
         await pg.click('[data-annuler-ebay="110000000922"]');
         await feuille(pg).getByRole('button', { name: "Oui, demander l'annulation" }).waitFor({ timeout: 5000 });
         const t = await feuille(pg).innerText();
@@ -280,10 +301,13 @@ const deborde = (pg) => pg.evaluate(() => ({ sw: document.documentElement.scroll
         dit(!envois.some((x) => x.action === 'deprogrammer'), '« Non » n\'envoie RIEN à eBay');
         await pg.click('[data-annuler-ebay="110000000922"]');
         await feuille(pg).getByRole('button', { name: "Oui, demander l'annulation" }).click({ timeout: 5000 });
-        await pg.waitForFunction(() => !document.querySelector('[data-ebay-a-annuler-paire]'), null, { timeout: 8000 }).catch(() => {});
+        await pg.waitForFunction(() => !document.querySelector('[data-ebay-a-annuler-paire="22"]'), null, { timeout: 8000 }).catch(() => {});
+        await pg.waitForTimeout(1200);
         const d = envois.filter((x) => x.action === 'deprogrammer');
-        dit(d.length === 1 && JSON.stringify(d[0]) === JSON.stringify({ action: 'deprogrammer', itemId: '110000000922', confirme: true }) && !(await pg.$('[data-ebay-a-annuler-paire]')),
-          'Oui envoie {action:deprogrammer, itemId, confirme:true} ; eBay a annulé ⇒ l\'alerte disparaît', JSON.stringify(d));
+        dit(d.length === 1 && JSON.stringify(d[0]) === JSON.stringify({ action: 'deprogrammer', itemId: '110000000922', confirme: true }) && !(await pg.$('[data-ebay-a-annuler-paire="22"]')),
+          'Oui envoie {action:deprogrammer, itemId, confirme:true} ; eBay a annulé ⇒ l\'alerte disparaît — et NE REVIENT PAS depuis le brouillon', JSON.stringify(d));
+        const b22 = brouillonsEnBase()['b-22p'] || {};
+        dit(b22.etatBrouillon === 'brouillon' && !b22.programme && !b22.uuid, 'son brouillon redevient un brouillon (nouvel identifiant d\'envoi au prochain essai)', JSON.stringify({ etat: b22.etatBrouillon, programme: b22.programme || null }));
       });
       // ── RETIRER D'eBAY la paire vendue sur Vinted ───────────────────────
       await essaie('retirer', async () => {
@@ -356,7 +380,9 @@ const deborde = (pg) => pg.evaluate(() => ({ sw: document.documentElement.scroll
       dit(v.pasSu.length === 1 && /ventes Vinted/.test(v.pasSu[0]) && /ventes eBay/.test(v.pasSu[0]),
         'ventes Vinted et ventes eBay illisibles ⇒ UNE ligne qui le dit, avec ce que ça empêche', JSON.stringify(v.pasSu).slice(0, 220));
       dit(v.doublons.length === 0 && v.retirer.length === 0 && v.vendues.length === 0, 'et AUCUNE alerte, aucun « Retirer d\'eBay » sur une preuve absente');
-      dit(!(await pg.$('[data-ebay-a-annuler]')), 'ni « programmée sur eBay — à annuler » sur une preuve absente');
+      const ou = await pg.$$eval('[data-ebay-a-annuler-ou]', (els) => els.map((e) => e.getAttribute('data-ebay-a-annuler-ou')));
+      dit(!ou.includes('Vinted') && !ou.includes('eBay'), 'ni « programmée sur eBay — à annuler » sur une preuve absente (ventes Vinted et eBay illisibles)', JSON.stringify(ou));
+      dit(ou.includes('Leboncoin'), 'mais ce qui EST su est dit : la N°21, vendue sur Leboncoin (ventes lues), reste « à annuler »', JSON.stringify(ou));
       dit(v.offres.length === 0 && v.sansObs === 0 && v.sansObsTxt === 0, 'éligibilité illisible ⇒ aucun bouton d\'offre, et pas de « pas d\'observateur » inventé');
       dit(v.relie['110000000002'] === '' && v.relierBtn.includes('110000000002'), 'le lien, lui, reste lisible (il vient du SKU déjà capté)');
       const r = await deborde(pg);

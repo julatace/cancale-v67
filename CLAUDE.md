@@ -5168,6 +5168,61 @@ l'annulation par VRM marche.
   `ebay-annonces.cjs` : + l'alerte « à annuler » (écran, tableau de bord,
   « pas su ») — **7 rouges** sur l'avant.
 
+### ⚠️⚠️ REVUE CONTRADICTOIRE DU PLANIFICATEUR eBAY : neuf défauts, côté app (6 octobre)
+Confirmés en EXÉCUTANT le code de f53df91 (rendu, `vm`), corrigés dans
+`src/App.jsx` ; le serveur (`api/ebay.js` : `publish` relit la liste d'eBay et
+répond 409 `deja-*` avec l'`itemId`, 503 `pas-su`, 504 `incertain` sans `<Ack>`)
+est traité à part — l'app AFFICHE `j.error` de ces réponses telle quelle.
+- ⚠️⚠️ **Une paire DÉJÀ VENDUE se programmait quand même** : la seule garde était
+  l'annonce Vinted du brouillon (`pairId`). Vendue sur Leboncoin, sur eBay
+  (commande SKU VRM-n), revendue sur Vinted sous une AUTRE annonce du même N°,
+  ou brouillon sans `pairId` : programmée. ⇒ **`numerosDejaVendus`**, UNE règle
+  par le N° (§5), à côté de `doublesVenteEbay`, consommée par le planificateur,
+  « Publier », l'alerte « à annuler » (avec OÙ : `ouVenduesTexte`) et le centre
+  de notifications (§11). « La paire est revenue » (une autre annonce du N° en
+  vente, pas vendue) est respecté ; une annonce de BROUILLON compte pour son N°
+  même si la fiche a disparu (`autres`). `lbc_ventes` est lue projetée, en
+  TROIS états ; les annonces Leboncoin (226 Ko) ne le sont que si une vente ne
+  se relie pas sans elles. **« Pas su » ⇒ rien ne part**, et l'écran nomme ce
+  qui n'a pas pu être lu.
+- **« Publier » (immédiat) ne vérifiait RIEN** : `gardePublier` applique les
+  mêmes règles — vendue (toutes plateformes), pas su, déjà en vente OU
+  PROGRAMMÉE sur eBay (`dejaSurEbay` porte maintenant les programmées et dit
+  laquelle), plus en vente sur Vinted. Bouton grisé, la raison dite UNE fois.
+  Une coupure n'est plus « Publication impossible (réseau) » : « je ne sais pas
+  si elle est partie ».
+- **Second essai** (après un « incertain ») : un refus (frais, vérification,
+  liste illisible) ne prouve pas que le premier n'a rien créé ⇒ « incertaine »,
+  jamais `envoi:{ok:false}` (le brouillon serait reprogrammé ou republié) ; un
+  409 `deja-*` avec `itemId` PROUVE l'annonce ⇒ programmée.
+- **L'UUID déjà rangé en base est gardé** (relu dans `modifierBrouillonsEbay`) ;
+  la copie de l'écran pouvait être périmée. `modifierBrouillonsEbay` accepte
+  `false` = « rien à écrire » (aucune écriture, pas même la ligne relue).
+- **SKU canoniques** dans le planificateur (`skuEbayDe(numDeSkuEbay(x))`) :
+  « vrm-027 », « VRM 028 » sont reconnus. **Doublon dans le lot** : deux
+  brouillons du même N° — le premier part, les suivants sont écartés et dits.
+- ⚠️ **Le brouillon « programmee » zombie** : `brouillonEncoreAttendu(pr, P)`
+  (relu COMPLET 2 min après la programmation et absent, ou parti en ligne ⇒
+  plus attendu) dans `programmeesConnues`, UNE règle pour la liste et l'alerte ;
+  `remettreBrouillon` est appelé par « Annuler » ET « Annuler sa programmation ».
+- **Les heures partent d'une ANCRE** (à la minute), plus de `maintenant` qui
+  avance toutes les 30 s : avec « Maintenant », « Programmer 3 annonces »
+  retombait à « 1 » au tic suivant. Réancrage sur un réglage, un préréglage
+  recliqué, ou une heure passée sous 16 min — jamais pendant une vérification
+  ni un envoi.
+- **`enregistrerBrouillon` ne réécrit pas un brouillon déjà parti** (programmé
+  ou publié entre-temps) — aucune écriture, et c'est dit.
+- Preuves (données inventées) : `ebay-programmer.cjs` **101 contrôles, 23
+  rouges** sur le build de f53df91 (scénarios A déjà vendue / doublon / SKU ·
+  B second essai et UUID · C horloge installée, `runFor(31000)` entre Vérifier
+  et Programmer · D « Publier »), 0 après ; `ebay-annonces.cjs` **83 contrôles,
+  11 rouges** sur l'avant (« à annuler » toutes plateformes, zombies, alerte qui
+  revenait), 0 après ; `audit-ebay-deja-vendue.cjs` (les vraies règles dans un
+  `vm`) : 25 contrôles, et **7 réaffaiblissements sur 7** attrapés (`--prouve`).
+- ⚠️ **Pas mesuré** : rien n'a été envoyé à eBay pour de vrai. La marge de 2 min
+  entre l'horloge de l'appareil et `capturedAt` (serveur) est une précaution,
+  pas une mesure du décalage réel.
+
 ### Mise en production du 5 octobre
 PR #442 mergée à 10:24 UTC (80 déploiements sur 24 h : sous la limite), déploiement
 de production READY sur le commit de merge, `/api/sante` répond, le zip servi
@@ -6056,7 +6111,7 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | outil | quoi |
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
-| `node scripts/audit-*.cjs` | **74 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `node scripts/audit-*.cjs` | **75 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
 | `scripts/bancs/*.cjs` | les **66 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
@@ -6349,7 +6404,7 @@ script-là me fait croire à une catastrophe.
 src/App.jsx                     l'app (grep avant de lire — le fichier est énorme)
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
-scripts/audit-*.cjs             les 74 audits
+scripts/audit-*.cjs             les 75 audits
 scripts/bancs/                  les 66 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
