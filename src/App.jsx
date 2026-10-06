@@ -19048,7 +19048,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // La chaîne de filtres vivait en plein milieu du JSX : impossible de savoir
   // combien de ventes elle rendait sans la recopier. Elle vit ici, et l'écran
   // n'en dessine qu'une tranche.
-  const ventesAffichees = useMemo(() => { let arr = (sales.items || [])
+  const ventesAffichees = useMemo(() => {
+    const uidV = o => String((o && o._acc && o._acc.vinted_user_id) || (o && o._uid) || '');
+    let arr = (sales.items || [])
     .filter(o => showHidden ? true : !isHidden(o))
     .filter(o => { const st = classifyOrderStatus(o.status);
       // ⚠️ « Commande non réclamée - Retournée à l'expéditeur » : le colis
@@ -19079,13 +19081,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       return st !== 'cancelled' || revient; })
     .filter(o => matchOrd(o))
     // ── FILTRE PAR COMPTE (sélecteur de l'onglet) ────────────────────────────
-    // `_acc` d'une vente est l'uid (chaîne). Compte choisi ⇒ ses ventes seules ;
-    // « Tous » ⇒ celles du compte connecté d'abord (tri STABLE, l'ordre par date
-    // ci-dessous est conservé dans chaque groupe).
-    .filter(o => !compteSel || String(o._acc || '') === String(compteSel))
+    // ⚠️ `_acc` d'une vente est l'OBJET compte (son uid vit dans
+    //    `_acc.vinted_user_id`, repli `_uid`) — comme les annonces, PAS une
+    //    chaîne. Compte choisi ⇒ ses ventes seules ; « Tous » ⇒ celles du compte
+    //    connecté d'abord (tri STABLE, l'ordre par date ci-dessous conservé dans
+    //    chaque groupe).
+    .filter(o => !compteSel || uidV(o) === String(compteSel))
     .sort(parDateDesc);
     if (!compteSel && compteConnecte) { const c = String(compteConnecte);
-      arr = [...arr].sort((a,b) => { const ac = String(a._acc||'')===c, bc = String(b._acc||'')===c; return ac===bc ? 0 : (ac ? -1 : 1); }); }
+      arr = [...arr].sort((a,b) => { const ac = uidV(a)===c, bc = uidV(b)===c; return ac===bc ? 0 : (ac ? -1 : 1); }); }
     return arr;
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [sales.items, showHidden, hiddenSales, hiddenAccts, blockedAccts, vFilter, ordSearchDiff, periode, numeros, saleOv, shipDone, compteSel, compteConnecte]);
