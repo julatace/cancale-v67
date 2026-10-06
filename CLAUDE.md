@@ -5168,6 +5168,52 @@ l'annulation par VRM marche.
   `ebay-annonces.cjs` : + l'alerte « à annuler » (écran, tableau de bord,
   « pas su ») — **7 rouges** sur l'avant.
 
+### ⚠️⚠️ Revue du 6 octobre, côté serveur eBay : le lien de connexion capturait le compte d'un autre
+Revue contradictoire du planificateur eBay. Chaque défaut a été confirmé en
+EXÉCUTANT la vraie route.
+- ⚠️⚠️ **Le `state` signé prouvait QUI avait demandé, jamais que le retour arrivait
+  dans SON navigateur.** Le vendeur B demandait un lien de connexion et
+  l'envoyait à quelqu'un (« reconnecte ton eBay à VRM » : c'est une vraie page
+  eBay, au nom de VRM). La victime acceptait, et **SON** refresh_token était
+  rangé chez B : ses commandes, ses acheteurs, ses annonces. Le même lien
+  servait 30 minutes, pour plusieurs victimes. C'est arrivé avec
+  « chaque vendeur son eBay » (avant, seul le propriétaire obtenait un `state`).
+  ⇒ `authurl` pose un **nonce** dans un cookie `HttpOnly; Secure; SameSite=Lax;
+  Path=/api/` et le nonce entre dans la signature. Le retour l'exige, puis
+  l'**efface quoi qu'il arrive**. Le lien ne marche donc que dans le navigateur
+  qui l'a demandé, et une seule fois (RFC 6749 §10.12).
+  ⚠️ Conséquence à connaître : une connexion lancée dans un navigateur et finie
+  dans un autre échoue, avec « relance la connexion eBay depuis VRM, dans ce
+  navigateur ». Ça peut arriver dans une PWA iPhone qui ouvre eBay dans une vue
+  à part. Son jeton actuel n'est pas touché, et rien n'est à refaire pour lui.
+- ⚠️⚠️ **« Publier » n'avait AUCUNE garde d'identité.** Une paire déjà en vente,
+  ou programmée pour ce soir, repartait en seconde annonce (prouvé : deux
+  annonces VRM-30). `publish` passe maintenant par la même règle que
+  `programmer` (`dejaChezEbay` : relue chez eBay, en ligne ET programmées ;
+  illisible ou incomplète ⇒ 503 « pas su » ; présente ⇒ 409 `deja-*` avec son
+  `itemId`). Une annonce SANS N° part comme avant (rien à comparer).
+- **Le SKU se compare par le N°, pas par la chaîne** (`numDeSku` / `memePaire`,
+  même lecture stricte que `numDeSkuEbay` dans l'app). « VRM-030 », « vrm-30 »
+  et « VRM 30 », retapés dans le Seller Hub, sont la N°30. Avant, ces formes
+  laissaient programmer et publier une seconde annonce. Le retrait automatique
+  suit la même règle.
+- **Une écriture sans `<Ack>` est « incertaine », jamais « refusée »**
+  (`sansAck`). Une passerelle eBay qui répond 503 en HTML APRÈS avoir créé,
+  annulé, déplacé ou retiré une annonce était rendue « eBay a refusé ». Le
+  brouillon restait alors à republier, d'où une seconde annonce. Concerne
+  `publish`, `programmer`, `deprogrammer`, `reprogrammer` et `retirer`. Un VRAI
+  refus (Ack Failure) reste un refus.
+- Preuves :
+  - `audit-ebay-route.cjs` : **181 contrôles, 16 rouges** sur le code d'avant,
+    dont « le lien de B ouvert dans le navigateur de Julien : rangé chez B »,
+    « 2 annonces VRM-22 » et « HTTP 422 eBay a refusé » sur une annonce créée ;
+  - `bancs/ebay-callback.cjs` porte le nonce. Ses cas d'erreur doivent ATTEINDRE
+    l'échange, sinon ils passeraient sur le refus du nonce, vides de sens.
+- ⚠️ Deux branches de sauvegarde (`claude/wip-ext-5162`, `claude/wip-bilan-lancement`)
+  ont été poussées par erreur le 6 octobre. Le proxy a refusé leur
+  suppression : à effacer sur GitHub. Elles ne se déploient pas
+  (`claude/**` est coupé dans `vercel.json`).
+
 ### Mise en production du 5 octobre
 PR #442 mergée à 10:24 UTC (80 déploiements sur 24 h : sous la limite), déploiement
 de production READY sur le commit de merge, `/api/sante` répond, le zip servi
