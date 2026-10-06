@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { VAPID_PUBLIC_KEY } from "./vapid.js";
 import { noterPlantage, viderPlantages } from "./plantages.js";
+import { contactEmail, CONTACT_A_VENIR } from "./contact.js";
 // La migration qui cloisonne les vendeurs, lue depuis LE fichier (pas recopiée) :
 // deux copies finiraient par diverger, et c'est le genre de texte qu'on colle
 // dans une base de production sans le relire.
@@ -427,6 +428,21 @@ const authCall = async (path, body) => {
   } catch (e) { return { ok: false, error: 'Pas de connexion internet.' }; }
 };
 
+// ── OÙ RAMÈNENT LES LIENS DES EMAILS DE COMPTE (5 octobre) ─────────────────
+// Confirmation d'inscription, mot de passe oublié, lien de connexion : sans
+// `redirect_to`, Supabase renvoie vers son « Site URL ». Mesuré dans ses
+// journaux le 5 octobre : une inscription réelle a été renvoyée vers
+// `http://localhost:3000` — la page « impossible d'accéder au site » que
+// l'écran de connexion explique plus bas. Seul le flux Google/Discord passait
+// déjà l'adresse de l'app. On la passe maintenant PARTOUT (`?redirect_to=`,
+// la forme qu'attend Supabase, en paramètre d'adresse et pas dans le corps).
+// ⚠️ Supabase n'accepte cette adresse que si elle figure dans ses « Redirect
+//    URLs » ; sinon il retombe sur le « Site URL » — le comportement
+//    d'aujourd'hui, rien ne casse. Régler les deux est un geste de Julien
+//    (tableau de bord Supabase), voir CLAUDE.md.
+const retourEmail = () => { try { const o = window.location.origin; return /^https?:\/\//.test(o) ? o : ''; } catch (_) { return ''; } };
+const avecRetour = (chemin) => { const r = retourEmail(); return r ? `${chemin}${chemin.includes('?') ? '&' : '?'}redirect_to=${encodeURIComponent(r)}` : chemin; };
+
 // Le jeton d'accès expire vite (≈1 h). On le renouvelle en silence avec le
 // jeton de renouvellement — sinon l'app se déconnecterait toute seule en
 // pleine journée.
@@ -503,7 +519,7 @@ const authConfirmFromLink = async (raw, email) => {
 // Renvoyer l'email de confirmation (le premier peut s'être perdu, ou avoir été
 // bloqué par le quota du serveur d'envoi de test de Supabase).
 const authResendConfirm = async (email) => {
-  const r = await authCall('resend', { type: 'signup', email: String(email).trim().toLowerCase() });
+  const r = await authCall(avecRetour('resend'), { type: 'signup', email: String(email).trim().toLowerCase() });
   if (!r.ok) return { ok: false, error: mapMailError(r.error) };
   return { ok: true };
 };
@@ -514,7 +530,7 @@ const authResendConfirm = async (email) => {
 // configurée dans Supabase (souvent restée sur localhost), on le fait plutôt
 // COLLER dans l'app, qui le vérifie elle-même.
 const authMagicLink = async (email) => {
-  const r = await authCall('otp', { email: String(email).trim().toLowerCase(), create_user: false });
+  const r = await authCall(avecRetour('otp'), { email: String(email).trim().toLowerCase(), create_user: false });
   if (!r.ok) return { ok: false, error: mapMailError(r.error) };
   return { ok: true };
 };
@@ -533,7 +549,7 @@ const mapMailError = (err) => {
   return err;
 };
 const authSignUp  = async (email, password) => {
-  const r = await authCall('signup', { email: String(email).trim().toLowerCase(), password });
+  const r = await authCall(avecRetour('signup'), { email: String(email).trim().toLowerCase(), password });
   if (!r.ok) {
     // On traduit les erreurs techniques de Supabase : « email rate limit
     // exceeded » ne veut rien dire pour quelqu'un qui essaie juste de créer un
@@ -550,7 +566,7 @@ const authSignUp  = async (email, password) => {
   if (r.json && r.json.access_token) { writeSession(sessionFrom(r.json)); return { ok: true }; }
   return { ok: true, needsConfirm: true };
 };
-const authReset   = (email) => authCall('recover', { email: String(email).trim().toLowerCase() });
+const authReset   = (email) => authCall(avecRetour('recover'), { email: String(email).trim().toLowerCase() });
 
 // ── CONNEXION AVEC GOOGLE / DISCORD (OAuth, méthode PKCE) ─────────────────
 // Comment ça marche : on n'échange JAMAIS de mot de passe. On envoie le vendeur
@@ -676,7 +692,8 @@ const authSetEmail = async (email) => {
   const tok = AUTH.session && AUTH.session.access_token;
   if (!tok) return { ok: false, error: 'Reconnecte-toi avant de changer ton email.' };
   try {
-    const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+    // Le lien de validation de la nouvelle adresse ramène sur l'app (`avecRetour`).
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/${avecRetour('user')}`, {
       method: 'PUT',
       headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${tok}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: String(email).trim().toLowerCase() }),
@@ -869,6 +886,10 @@ const SYNC_KEYS = [
   // Clé personnelle du widget iPhone (voir api/widget.js) : sans elle, la route
   // renverrait le chiffre d'affaires à qui connaît l'adresse.
   'vrm_widget_token',
+  // « Les paires qui dorment » : PUBLIÉ par l'écran Annonces (`annStats`, son
+  // propriétaire, §11), CONSOMMÉ par le bilan de la semaine du serveur
+  // (api/_lib/bilan-semaine.js) — qui ne le recalcule jamais.
+  'vrm_paires_dorment',
 ];
 // Réponses rapides par défaut aux messages Vinted (copiables en 1 clic, éditables).
 const DEFAULT_QUICK_REPLIES = [
@@ -6732,7 +6753,7 @@ function AuthScreen() {
               on prévient AVANT, sinon on tape son mot de passe pour rien. */}
           {mode==='up' && confirmRequired() && (
             <div style={{fontSize:11.5,color:C.warn,background:`${C.warn}12`,border:`1px solid ${C.warn}44`,borderRadius:8,padding:'9px 11px',marginBottom:10,lineHeight:1.45}}>
-              La confirmation par email est active côté Supabase, et son serveur d'envoi de test est limité. Décoche <b>« Confirm email »</b> (Authentication → Providers → Email) pour que la création soit immédiate.
+              Un <b>email de confirmation</b> va t'être envoyé : ouvre-le et clique le lien avant de te connecter. Rien reçu au bout de quelques minutes ? Regarde dans les indésirables.
             </div>
           )}
 
@@ -6761,8 +6782,12 @@ function AuthScreen() {
             <div style={{fontSize:12,color:C.text,background:`${C.warn}10`,border:`1px solid ${C.warn}44`,borderRadius:8,padding:'10px 11px',marginBottom:10,lineHeight:1.5}}>
               Ton compte <b>{email}</b> attend sa confirmation.
               <div style={{marginTop:8,fontSize:11.5,color:C.muted,lineHeight:1.5}}>
-                Si le lien du mail affiche « <i>impossible d'accéder au site</i> », c'est normal : il renvoie vers une adresse de test.
-                <b style={{color:C.text}}> Copie le lien</b> (appui long → Copier le lien) et colle-le ici — on s'occupe du reste.
+                {/* « il renvoie vers une adresse de test » : vrai le 5 octobre (Site URL
+                    resté sur localhost:3000, mesuré dans les journaux), faux dès que
+                    Julien règle Supabase. La phrase ne dit plus que ce qui reste vrai
+                    dans les deux cas. */}
+                Si le lien du mail affiche « <i>impossible d'accéder au site</i> »,
+                <b style={{color:C.text}}> copie le lien</b> (appui long → Copier le lien) et colle-le ici — on s'occupe du reste.
               </div>
               <input value={confirmLink} onChange={e=>setConfirmLink(e.target.value)} placeholder="Colle le lien du mail ici"
                 style={{width:'100%',boxSizing:'border-box',marginTop:8,border:`1px solid ${C.border}`,borderRadius:8,
@@ -17023,15 +17048,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (ligne Supabase vinted_listing_dates = { idAnnonce: {ts, text} }). Seule
   // source fiable de l'ancienneté d'une annonce — voir listedAgeDays.
   const [listingDates, setListingDates] = useState({});
+  // Trois états : `undefined` en cours · `null` pas su · `true` lu. « Pas
+  // encore lu » ne vaut pas « aucune date » : sans ça, « 0 paire qui dort »
+  // partirait au bilan de la semaine avant même que les dates soient arrivées.
+  const [listingDatesLu, setListingDatesLu] = useState(undefined);
   useEffect(() => { (async () => {
     try {
       const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_listing_dates&select=data`, {
         headers: sbAuth(),
       });
-      if (!r.ok) return;
+      if (!r.ok) { setListingDatesLu(null); return; }
       const rows = await r.json();
       setListingDates((rows && rows[0] && rows[0].data) || {});
-    } catch (_) { /* pas de date connue : l'âge restera « inconnu » */ }
+      setListingDatesLu(true);
+    } catch (_) { setListingDatesLu(null); /* pas de date connue : l'âge restera « inconnu » */ }
   })(); }, []);
   // Sur quelle plateforme est chaque paire — demande de Julien (20 sept.).
   // Signal HONNÊTE et déjà en base : `vinted_lbc_posted.ids` = les id d'annonce
@@ -19631,6 +19661,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return { n:arr.length, val, favs, views, hasFav, hasView, sansNum, sleeping, sleepingVal, datesKnown, surLbc, surEbay, pretLbc, aRecapturer, boostees, aussiLbc };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [annBase, numeros, listingDates, lbcPosted]);
+  // ── « LES PAIRES QUI DORMENT » EST PUBLIÉ, LE BILAN DE LA SEMAINE LE CONSOMME ──
+  // Même motif que `vrm_colis_aposter` (§11) : l'écran qui a toutes les sources
+  // publie, le serveur lit — il ne recalcule jamais `annBase`. ⚠️ On ne publie
+  // que COMPLET : annonces de TOUS les comptes lues (`incomplet === false`, donc
+  // une lecture fraîche, pas un cache) et dates de mise en ligne lues. Le
+  // nombre de dates connues part avec : moins de dates que d'annonces ⇒ le
+  // bilan dit « au moins N », jamais N tout court (§5).
+  useEffect(() => {
+    if (!Array.isArray(listings.items) || listings.loading || listings.incomplet !== false || listingDatesLu !== true) return;
+    try {
+      const v = { n: annStats.sleeping, total: annStats.n, datesKnown: annStats.datesKnown, at: Date.now() };
+      const avant = load('vrm_paires_dorment', null);
+      const memes = avant && avant.n === v.n && avant.total === v.total && avant.datesKnown === v.datesKnown;
+      // Inchangé : on ne republie qu'une fois par jour (l'âge sert au bilan).
+      if (memes && Date.now() - (Number(avant.at) || 0) < 20 * 3600000) return;
+      save('vrm_paires_dorment', v);
+    } catch (_) {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [annStats, listings, listingDatesLu]);
   // ── RENUMÉROTER À LA SUITE ────────────────────────────────────────────────
   // Le numéro sert à retrouver un carton sur l'étagère : avec 116 paires en ligne
   // il ne devrait pas monter à 172. Au fil des ventes, la séquence se troue et
@@ -20062,7 +20111,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (!error) putCache('listings', out);
     // Annonces que VINTED a marquées vendues (identité, jamais un titre).
     if (vendues.size) setVenduesVinted(vendues);
-    setListings({ loading:false, items: out, error });
+    // `incomplet` : au moins un compte n'a pas répondu. Les chiffres tirés de
+    // cette liste sont alors des minorants (le bilan de la semaine le dit).
+    setListings({ loading:false, items: out, error, incomplet: anyErr });
   };
   const loadConvs = async (force) => {
     const cached = !force && fromCache('convs');
@@ -28549,7 +28600,8 @@ const PUSH_CATS = [
   { id:'expedier', def:true,  titre:'📮 Colis à poster',    desc:"Rappel du matin, avec l'échéance." },
   { id:'offre',    def:true,  titre:'🏷️ Offre reçue',       desc:'Un acheteur propose un prix.' },
   { id:'urssaf',   def:true,  titre:'🧾 Déclaration URSSAF', desc:'Le 1er de chaque mois, pour penser à la faire.' },
-  { id:'suivi',    def:false, titre:'🚚 Suivi du colis',    desc:'« En transit », « livré ». Rien à faire.' },
+  { id:'bilan',    def:true,  titre:'📊 Bilan de la semaine', desc:"Le lundi matin : vendu, reçu, colis à poster, paires qui dorment." },
+  { id:'suivi',   def:false, titre:'🚚 Suivi du colis',    desc:'« En transit », « livré ». Rien à faire.' },
   { id:'achat',    def:false, titre:'🛍 Achat confirmé',    desc:"Tu viens de l'acheter, tu le sais déjà." },
   { id:'message',  def:false, titre:'💬 Message',           desc:"Le badge de l'app suffit." },
   { id:'favori',   def:false, titre:'❤️ Nouveau favori',    desc:'Vinted en envoie beaucoup.' },
@@ -28837,13 +28889,15 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
           <Row icon="door" title="Se déconnecter" color={C.danger}
             desc="Efface aussi les données de ce navigateur — elles restent dans ton compte."
             onClick={()=>{ setAcct({ mode:'out', val:'', err:'', busy:false }); }}/>
+          <FermerCompte/>
         </>)}
       </>)}
 
       {voirCompte && (<>
         <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,margin:'18px 0 8px 2px'}}>Tes données et les conditions</div>
         <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px',fontSize:12.5,color:C.muted,lineHeight:1.55}}>
-          Tu peux <b style={{color:C.text}}>exporter tes données</b> avec « Sauvegarde complète » {ongletsCompte ? '(onglet Réglages)' : 'ci-dessous'}. Pour <b style={{color:C.text}}>supprimer ton compte</b> ou exercer tes droits (accès, rectification, effacement), écris à l’adresse indiquée dans la <a href="/legal/confidentialite.html" target="_blank" rel="noopener" style={{color:C.accent}}>politique de confidentialité</a>.
+          Tu peux <b style={{color:C.text}}>exporter tes données</b> avec « Sauvegarde complète » {ongletsCompte ? '(onglet Réglages)' : 'ci-dessous'}{AUTH.user ? <>, et <b style={{color:C.text}}>fermer ton compte</b> avec « Fermer mon compte » ci-dessus</> : null}. Pour tes autres droits (accès, rectification), voir la <a href="/legal/confidentialite.html" target="_blank" rel="noopener" style={{color:C.accent}}>politique de confidentialité</a>.
+          <LigneContact/>
           <div style={{display:'flex',flexWrap:'wrap',gap:'4px 14px',marginTop:9}}>
             {DOCS_LEGAUX.map(([h,t]) => <a key={h} href={h} target="_blank" rel="noopener" style={{color:C.accent,fontWeight:500,textDecoration:'none'}}>{t}</a>)}
           </div>
@@ -29092,6 +29146,108 @@ const STATUT_FACTURE = { paid: 'Payée', open: 'À payer', void: 'Annulée', unc
 // Seuls les liens de Stripe s'ouvrent depuis la liste (le serveur filtre déjà ;
 // on ne fait pas confiance à une seule moitié).
 const lienFacture = (u) => (typeof u === 'string' && /^https:\/\/(pay|invoice|files|invoicedata)\.stripe\.com\//.test(u) ? u : null);
+
+// ── FERMER MON COMPTE (5 octobre) ────────────────────────────────────────────
+// La politique de confidentialité promet l'effacement ; il fallait écrire à une
+// adresse qui n'existe pas encore. Le serveur fait le travail
+// (api/compte.js?mode=fermer) et rend ce qui a été fait ET ce qui ne l'a pas
+// été : l'écran l'affiche tel quel — jamais « compte fermé » sur un échec.
+// Trois états de réponse : `{ ok:true }` fermé · `{ ok:false, message }` dit
+// par le serveur · pas de réponse = PAS SU (on ne prétend ni l'un ni l'autre).
+async function fermerMonCompte(confirmation) {
+  try {
+    const r = await fetch('/api/compte?mode=fermer', { method: 'POST', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ confirmation }) });
+    const j = await r.json().catch(() => null);
+    if (j && typeof j.message === 'string') return { ok: r.ok && j.ok === true, message: j.message };
+    return { ok: false, message: "Le serveur n'a pas répondu clairement : je ne sais pas si la fermeture a eu lieu. Reconnecte-toi — si ton compte existe encore, relance-la." };
+  } catch (_) { return { ok: false, message: "Pas de réponse (connexion coupée) : je ne sais pas si la fermeture a eu lieu. Reconnecte-toi — si ton compte existe encore, relance-la." }; }
+}
+function FermerCompte() {
+  const [ouvert, setOuvert] = React.useState(false);
+  // `undefined` en cours · `null` pas su · l'objet du serveur (`proprietaire`).
+  const [info, setInfo] = React.useState(undefined);
+  const [tape, setTape] = React.useState('');
+  const [occupe, setOccupe] = React.useState(false);
+  const [fin, setFin] = React.useState(null);
+  React.useEffect(() => {
+    if (!ouvert || info !== undefined) return;
+    let mort = false;
+    lireAbonnement().then((x) => { if (!mort) setInfo(x); });
+    return () => { mort = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ouvert]);
+  const email = String((AUTH.user && AUTH.user.email) || '');
+  const pareil = !!email && tape.trim().toLowerCase() === email.trim().toLowerCase();
+  const valider = async () => {
+    if (!pareil || occupe) return;
+    setOccupe(true);
+    const r = await fermerMonCompte(tape.trim());
+    setOccupe(false);
+    setFin(r);
+    // Fermé : on efface aussi ce navigateur, puis retour à l'accueil public.
+    if (r.ok) setTimeout(() => { try { authSignOut(); } catch (_) {} location.assign('/'); }, 4000);
+  };
+  const txt = { fontSize: 12, color: C.muted, lineHeight: 1.55 };
+  return (
+    <div data-fermer-compte="" style={{ padding: '13px 16px', borderRadius: 10, border: `1px solid ${C.border}`, background: C.card, marginBottom: 8 }}>
+      <button type="button" onClick={() => setOuvert((o) => !o)} aria-expanded={ouvert}
+        style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 10, border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
+        <span style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ display: 'block', fontSize: 13.5, fontWeight: 600, color: C.text }}>Fermer mon compte</span>
+          <span style={{ display: 'block', fontSize: 11.5, color: C.muted, marginTop: 2 }}>Efface tes données et ton compte VRM, définitivement.</span>
+        </span>
+        <span style={{ color: C.muted, fontSize: 13 }}>{ouvert ? '▴' : '▾'}</span>
+      </button>
+      {ouvert && (
+        <div style={{ marginTop: 10, borderTop: `1px solid ${C.border}`, paddingTop: 10 }}>
+          {fin ? (
+            <div data-fermer-resultat={fin.ok ? 'ferme' : 'incomplet'} style={{ ...txt, color: C.text }}>
+              {fin.message}
+              {fin.ok && <div style={{ ...txt, marginTop: 6 }}>Pense à retirer l'extension VRM de Chrome. Retour à l'accueil dans un instant…</div>}
+            </div>
+          ) : info === undefined ? (
+            <div style={txt}>Vérification de ton compte…</div>
+          ) : info === null ? (
+            <div data-fermer-etat="pas-su" style={txt}>Je n'ai pas pu vérifier ton compte : rien n'est proposé tant que je ne sais pas. Rouvre cet écran dans un instant.</div>
+          ) : info.proprietaire ? (
+            <div data-fermer-etat="proprietaire" style={txt}>
+              <b style={{ color: C.text }}>Tu es le propriétaire de cette installation VRM.</b> Fermer ce compte effacerait toute la boutique : c'est désactivé ici exprès, pour qu'un clic de travers ne puisse pas le faire.
+            </div>
+          ) : (
+            <div data-fermer-etat="possible">
+              <div style={txt}>
+                Seront effacés : <b style={{ color: C.text }}>tes données VRM</b> (ventes, annonces captées, numéros, compta, réglages), <b style={{ color: C.text }}>tes comptes Vinted liés</b> et <b style={{ color: C.text }}>ton compte de connexion</b>.
+                {(info.peutGerer && info.actif) ? ' Ton abonnement est résilié en même temps : aucun nouveau prélèvement ne part.' : ''}
+                {' '}C'est <b style={{ color: C.text }}>définitif</b> : pour garder une copie, fais d'abord une « Sauvegarde complète » (onglet Réglages). Ensuite, retire l'extension VRM de Chrome.
+              </div>
+              <label style={{ display: 'block', ...txt, marginTop: 10 }}>
+                Pour confirmer, recopie ton adresse : <b style={{ color: C.text }}>{email}</b>
+                <input type="email" autoComplete="off" autoCapitalize="none" value={tape} onChange={(e) => setTape(e.target.value)} placeholder={email}
+                  data-fermer-confirmation=""
+                  style={{ width: '100%', boxSizing: 'border-box', marginTop: 6, border: `1px solid ${C.border}`, borderRadius: 10, padding: '11px 12px', fontSize: 15, background: C.bg, color: C.text, outline: 'none', fontFamily: 'inherit' }} />
+              </label>
+              <button type="button" onClick={valider} disabled={!pareil || occupe} data-fermer-bouton=""
+                style={{ marginTop: 10, border: 'none', background: C.danger, color: '#fff', borderRadius: 10, padding: '11px 14px', fontSize: 13, fontWeight: 600, cursor: (!pareil || occupe) ? 'default' : 'pointer', opacity: (!pareil || occupe) ? 0.45 : 1, fontFamily: 'inherit' }}>
+                {occupe ? 'Fermeture en cours…' : 'Fermer définitivement mon compte'}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+// Le contact de VRM (src/contact.js, une seule source avec la page d'accueil).
+function LigneContact() {
+  const e = contactEmail();
+  return (
+    <div data-contact="" style={{ marginTop: 9, fontSize: 12.5 }}>
+      Contact : {e
+        ? <a href={`mailto:${e}`} style={{ color: C.accent, fontWeight: 500, textDecoration: 'none' }}>{e}</a>
+        : <span data-contact-absent="" style={{ color: C.muted }}>{CONTACT_A_VENIR}</span>}
+    </div>
+  );
+}
 
 // L'onglet « Mon compte » : l'abonnement (statut, prochain prélèvement, carte,
 // résilier / reprendre) puis la liste des factures — sur la MÊME lecture.

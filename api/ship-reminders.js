@@ -8,11 +8,19 @@
 // aujourd'hui, demain, ou déjà dépassée, puis envoie UNE notification push
 // récapitulative sur tous les appareils abonnés.
 //
+// Il porte aussi, faute d'un second cron : le rappel URSSAF du 1er du mois, et
+// le BILAN DE LA SEMAINE du lundi matin (api/_lib/bilan-semaine.js dit pourquoi
+// le lundi et pas le dimanche soir).
+//
 // ⚠ N'appelle JAMAIS l'API Vinted (aucun risque de blocage) : il ne lit que
 //   Supabase et envoie une notification. Déclenché par le cron Vercel (vercel.json).
 // ────────────────────────────────────────────────────────────────────────────
 
 import { sendPushToAll, pushCategorieActive } from './_lib/push.js';
+import { semainePassee, calculerBilan, bilanAEnvoyer, texteBilan, versementsDeLignes } from './_lib/bilan-semaine.js';
+// « À expédier » : la règle du widget (elle-même jugée identique à celle de
+// l'app et de l'extension par audit-statuts.cjs). Importée, jamais recopiée.
+import { aExpedier } from './widget.js';
 
 import { withOwnerAll, conflictTarget, contexteVendeur, proprietaireCourant } from './_lib/owner.js';
 import { sbCle } from './_lib/cle.js';
@@ -95,13 +103,16 @@ async function ecrireDedup(id, data) {
   const o = proprietaireCourant();
   const row = o ? { owner: o, id, data } : withOwnerAll([{ id, data }])[0];
   const conflict = o ? 'owner,id' : conflictTarget('id');
+  // Rend VRAI seulement si la base a confirmé : le bilan de la semaine ne part
+  // QUE si son mémo est rangé (sinon il repartirait le lendemain — deux bilans).
   try {
-    await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${conflict}`, {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${conflict}`, {
       method: 'POST',
       headers: { ...HEADERS, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify([row]),
     });
-  } catch (_) { /* un mémo raté n'empêche pas le rappel suivant */ }
+    return !!(r && r.ok);
+  } catch (_) { return false; /* un mémo raté n'empêche pas le rappel suivant */ }
 }
 // ⚠️ §4.5 — Supabase tronque à 1000 lignes SANS LE DIRE. Ce cron balaie
 // `email_bord_*` et `harvest_%25_orders_sold` de TOUS les utilisateurs : à
@@ -121,6 +132,107 @@ async function fetchPaginated(path) {
     if (j.length < page) break;
   }
   return out;
+}
+
+// ── LE BILAN DE LA SEMAINE (api/_lib/bilan-semaine.js) ───────────────────────
+// Une ligne de la base, projetée sur les seules clés voulues (§4.4 : `main`
+// pèse ~200 Ko). Trois états : objet · `null` (absente) · `undefined` (pas su).
+async function getRowProjete(id, cles) {
+  try {
+    const sel = cles.map((k) => `${k}:data->${k}`).join(',');
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${scoped(`app_data?id=eq.${encodeURIComponent(id)}&select=${sel}`)}`, { headers: HEADERS });
+    if (!r.ok) return undefined;
+    const rows = await r.json();
+    if (!Array.isArray(rows)) return undefined;
+    return rows[0] || null;
+  } catch (_) { return undefined; }
+}
+const MAIN_BILAN = ['vinted_sales_hidden', 'vinted_accounts_hidden', 'vinted_ship_done', 'vinted_bords_shipped', 'vrm_paires_dorment'];
+const ensemble = (v) => new Set(Array.isArray(v) ? v.map(String) : []);
+const objet = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
+
+// Lit tout ce que le bilan d'UN vendeur demande. Chaque source vaut `null`
+// quand sa lecture a échoué — jamais `[]` à sa place (« rien lu » ≠ « rien »).
+async function lireDonneesBilan() {
+  const [comptesL, m, panneau, lignes, lbcL, ebayL, txn] = await Promise.all([
+    fetchPaginated(scoped('vinted_accounts?select=vinted_user_id,login')),
+    getRowProjete('main', MAIN_BILAN),
+    getRow('panel_accounts_off'),
+    // Les ventes de chaque compte : la liste, le résumé « à expédier » posé par
+    // l'extension, et QUAND elle a été lue (data.capturedAt — `updated_at` ment).
+    fetchPaginated(scoped('app_data?id=like.harvest_%25_orders_sold&select=id,orders:data->payload->my_orders,txns:data->resume->txns,cap:data->>capturedAt')),
+    getRowProjete('lbc_ventes', ['ventes']),
+    getRowProjete('ebay_orders', ['orders']),
+    // Les dates de versement : trois scalaires par transaction (§4.4), paginé (§4.5).
+    fetchPaginated(scoped('app_data?id=like.harvest_%25_txn_%25&select=tx:meta->>id,s:meta->>status,su:meta->>status_updated_at')),
+  ]);
+  const comptes = Array.isArray(comptesL)
+    ? comptesL.map((c) => ({ uid: String((c && c.vinted_user_id) || ''), login: String((c && c.login) || '') })).filter((c) => c.uid)
+    : null;
+  let commandes = null;
+  if (Array.isArray(lignes)) {
+    commandes = {};
+    for (const l of lignes) {
+      const um = String((l && l.id) || '').match(/^harvest_(.+?)_orders_sold$/);
+      if (um) commandes[um[1]] = { orders: Array.isArray(l.orders) ? l.orders : [], txns: Array.isArray(l.txns) ? l.txns : null, cap: l.cap || null };
+    }
+  }
+  const mm = m === undefined ? null : objet(m);
+  return {
+    comptes, commandes,
+    masquesTx: mm ? ensemble(mm.vinted_sales_hidden) : null,
+    masquesComptes: mm ? ensemble(mm.vinted_accounts_hidden) : null,
+    panneau: panneau === undefined ? null : objet(panneau),
+    lbc: lbcL === undefined ? null : Object.values(objet(lbcL && lbcL.ventes)),
+    ebay: ebayL === undefined ? null : (Array.isArray(ebayL && ebayL.orders) ? ebayL.orders : []),
+    versements: versementsDeLignes(txn),
+    main: mm,
+  };
+}
+
+// « À expédier maintenant » : EXACTEMENT la composition du widget
+// (api/widget.js) — le résumé posé par l'extension, sinon `aExpedier` sur les
+// ventes, moins ce qu'il a coché « posté » ou masqué. Le banc
+// `bancs/bilan-semaine.cjs` exécute les DEUX routes et exige le même nombre.
+function colisAExpedier(d) {
+  if (!d.commandes || !d.main || !Array.isArray(d.comptes)) return null;
+  const vivants = new Set(d.comptes.map((c) => c.uid));
+  const shipDone = objet(d.main.vinted_ship_done), bordsShipped = objet(d.main.vinted_bords_shipped);
+  const masquees = ensemble(d.main.vinted_sales_hidden);
+  const pasPartie = (t) => !shipDone[t] && !bordsShipped[t] && !masquees.has(t);
+  const resume = new Set(); let resumeTrouve = false;
+  const parTx = {};
+  for (const [uid, l] of Object.entries(d.commandes)) {
+    if (vivants.size && !vivants.has(uid)) continue;            // compte retiré : sa moisson reste en base
+    if (Array.isArray(l.txns)) { resumeTrouve = true; for (const t of l.txns) resume.add(String(t)); }
+    for (const o of l.orders) if (o && o.transaction_id != null) parTx[o.transaction_id] = o;
+  }
+  const txs = resumeTrouve ? [...resume] : Object.values(parTx).filter((o) => aExpedier(o)).map((o) => String(o.transaction_id));
+  return new Set(txs.map(String).filter(pasPartie)).size;
+}
+
+async function bilanDeLaSemaine(maintenant = Date.now()) {
+  const sem = semainePassee(maintenant);
+  if (sem.jour > 3) return null;                                  // lundi, ou rattrapage mardi/mercredi
+  const deja = await getRow('bilan_semaine_dedup');
+  if (deja === undefined) return 'mémo illisible — rien envoyé';   // pas su ⇒ on ne risque pas un doublon
+  if (deja && deja.semaine === sem.lundi) return 'déjà envoyé';
+  if (!(await pushCategorieActive('bilan'))) return 'désactivé par le vendeur';
+  const d = await lireDonneesBilan();
+  if (Array.isArray(d.comptes) && !d.comptes.length) return 'aucun compte Vinted lié';
+  const b = calculerBilan({
+    ...d, colis: colisAExpedier(d),
+    dorment: d.main ? d.main.vrm_paires_dorment : null,
+    debut: sem.debut, fin: sem.fin, maintenant,
+  });
+  if (!bilanAEnvoyer(b)) return 'données illisibles — réessai demain';
+  // Le mémo AVANT l'envoi, et CONFIRMÉ : un bilan par semaine, jamais deux.
+  if (!(await ecrireDedup('bilan_semaine_dedup', { semaine: sem.lundi, at: new Date(maintenant).toISOString() }))) return 'mémo non écrit — rien envoyé';
+  const t = texteBilan(b, sem);
+  const envoi = await sendPushToAll({ title: t.titre, body: t.corps, tag: 'bilan-' + sem.lundi, url: '/?tab=journee' });
+  // Le bilan rendu ne porte AUCUN montant (la réponse d'un cron se lit dans un
+  // tableau de bord) : seulement les états, et le nombre de colis.
+  return { semaine: sem.lundi, vendu: b.vendu.etat, recu: b.recu.etat, colis: b.colis.n, envoi: envoi && (envoi.coupe || envoi.erreur || envoi.sent) };
 }
 
 // Le traitement d'UN vendeur (celui du `contexteVendeur` courant, ou l'unique
@@ -178,6 +290,13 @@ async function traiterVendeur() {
       }
     } catch (_) { urssaf = 'échec'; }
 
+    // BILAN DE LA SEMAINE — le lundi (rattrapage mardi et mercredi). Posé ici,
+    // AVANT le calcul des colis du jour : celui-ci se tait quand le résumé
+    // manque, le bilan ne doit pas se taire avec lui. Un échec du bilan
+    // n'empêche jamais le rappel d'expédition.
+    let bilan = null;
+    try { bilan = await bilanDeLaSemaine(); } catch (e) { bilan = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
+
     // Transactions encore en attente d'expédition, d'après la moisson.
     let attente = null;
     // Seuls les comptes encore liés comptent (comme l'app et le widget) : la
@@ -202,11 +321,11 @@ async function traiterVendeur() {
     // ⚠️ Aucune ligne ne porte encore de résumé (extension pas rechargée) : on
     // se TAIT. Une notification fausse est pire que pas de notification — c'est
     // très exactement le « 51 bordereaux » qu'on corrige ici.
-    if (!attente) return { urssaf, skipped: 'resume absent — aucune notification envoyee' };
+    if (!attente) return { urssaf, bilan, skipped: 'resume absent — aucune notification envoyee' };
     // ⚠️ Ses colis cochés « posté », imprimés ou masqués vivent dans `main` et
     //    `panel_bords_done` : lus en échec, ils compteraient comme « à expédier »
     //    et la notification annoncerait des colis déjà partis. On se tait.
-    if (mLu === undefined || panelLu === undefined) return { urssaf, skipped: 'réglages illisibles — aucune notification envoyée' };
+    if (mLu === undefined || panelLu === undefined) return { urssaf, bilan, skipped: 'réglages illisibles — aucune notification envoyée' };
 
     const tomorrow = parisDate(1);
     let overdue = 0, dueToday = 0, dueTomorrow = 0;
@@ -225,7 +344,7 @@ async function traiterVendeur() {
 
     // Anti-doublon : une seule notification par jour pour un même total.
     const dedup = (await getRow('ship_reminder_dedup')) || {};
-    if (dedup.date === today && dedup.total === total) return { urssaf, skipped: 'déjà notifié', total };
+    if (dedup.date === today && dedup.total === total) return { urssaf, bilan, skipped: 'déjà notifié', total };
 
     if (total > 0 && await pushCategorieActive('expedier')) {
       const parts = [];
@@ -240,7 +359,7 @@ async function traiterVendeur() {
       });
     }
     await ecrireDedup('ship_reminder_dedup', { date: today, total });
-    return { urssaf, overdue, dueToday, dueTomorrow, total };
+    return { urssaf, bilan, overdue, dueToday, dueTomorrow, total };
 }
 
 export default async function handler(req, res) {

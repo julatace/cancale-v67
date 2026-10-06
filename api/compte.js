@@ -12,6 +12,9 @@
 //   /api/compte?mode=reprendre    (POST, session) annuler la résiliation
 //   /api/compte?mode=session-extension (POST, session) une session À ELLE pour
 //                                 l'extension Chrome (même vendeur, autre famille)
+//   /api/compte?mode=fermer       (POST, session) FERMER MON COMPTE : résilie,
+//                                 efface ses données, puis son compte (refusé au
+//                                 propriétaire de l'installation)
 //
 // L'abonnement (Julien, 4 octobre) : 9,99 € par mois, prélevé chaque mois à la
 // date où la personne s'abonne, pour TOUT LE MONDE SAUF LUI (le propriétaire
@@ -242,11 +245,29 @@ async function checkout(req, res) {
     metadata: { owner: u.id, app: 'vrm' },
     subscription_data: { metadata: { owner: u.id, app: 'vrm' } },
     locale: 'fr',
+    // ⚠️ LES CGV SE FONT ACCEPTER AVANT DE PAYER (5 octobre). Un abonnement
+    //    vendu en ligne sans case « j'accepte les conditions de vente » n'a pas
+    //    de CGV opposables : la case est OBLIGATOIRE (`required`), Stripe
+    //    refuse le paiement tant qu'elle n'est pas cochée, et le lien mène à
+    //    NOS CGV (public/legal/cgv.html), pas à un texte générique.
+    // ⚠️ Stripe exige en plus l'adresse des conditions dans son tableau de bord
+    //    (Paramètres → Détails publics). Tant qu'elle manque, il refuse d'ouvrir
+    //    le paiement — c'est dit plus bas, jamais contourné en retirant la case.
+    consent_collection: { terms_of_service: 'required' },
+    custom_text: { terms_of_service_acceptance: { message: `J'accepte les [conditions générales de vente de VRM](${APP_URL}/legal/cgv.html).` } },
   };
   if (ligne && ligne.client_stripe) params.customer = ligne.client_stripe;
   else if (u.email) params.customer_email = u.email;
   // Un double clic ne crée pas deux sessions (même clé dans la même minute).
   const r = await stripeApi('POST', 'checkout/sessions', params, `vrm-co-${u.id}-${Math.floor(Date.now() / 60000)}`);
+  // L'adresse des CGV n'est pas encore réglée chez Stripe : on le dit (au
+  // vendeur sans jargon, au propriétaire dans les journaux), on ne fait jamais
+  // payer sans la case.
+  const erreurStripe = String((r.data && r.data.error && r.data.error.message) || '');
+  if (!r.ok && /terms of service/i.test(erreurStripe)) {
+    console.warn('[stripe] paiement refusé : adresse des CGV absente — Stripe → Paramètres → Détails publics → Conditions =', `${APP_URL}/legal/cgv.html`);
+    return repondre(res, 503, { erreur: 'cgv-stripe', message: "Le paiement n'est pas encore tout à fait prêt (il manque un réglage des conditions de vente). Réessaie un peu plus tard." });
+  }
   if (!r.ok || !r.data.url) return repondre(res, 502, { erreur: 'stripe', message: "Stripe n'a pas pu ouvrir le paiement. Réessaie dans un instant." });
   return repondre(res, 200, { url: r.data.url });
 }
@@ -495,6 +516,186 @@ async function sessionExtension(req, res) {
   });
 }
 
+// ── FERMER MON COMPTE (5 octobre) ────────────────────────────────────────────
+// La politique de confidentialité promet l'effacement (« supprimées dans un
+// délai de 30 jours après la clôture du compte ») — et aucun bouton ne le
+// faisait : il fallait écrire à une adresse qui n'existe pas encore.
+//
+// ⚠️ MESURÉ SUR LA VRAIE BASE LE 5 OCTOBRE, AVANT D'ÉCRIRE : `app_data.owner`
+//    et `vinted_accounts.owner` n'ont AUCUNE clé étrangère vers auth.users
+//    (seule `abonnements` en a une, ON DELETE CASCADE). La migration 001 en
+//    prévoyait une ; elle n'est pas en place. Supprimer l'utilisateur ne
+//    supprimerait donc RIEN de ses données : on les efface nous-mêmes, une
+//    table à la fois, AVANT l'utilisateur.
+//
+// ⚠️ CE QUI EST TOUCHÉ : uniquement les lignes `owner = <celui de la session>`.
+//    L'identifiant vient de Supabase (le jeton), jamais du corps de la requête ;
+//    il est vérifié comme un UUID ; chaque suppression porte `owner=eq.<lui>`
+//    et RIEN d'autre (`scripts/audit-fermer-compte.cjs` sert deux vendeurs et
+//    exige que l'autre reste intact).
+// ⚠️ REFUSÉ AU PROPRIÉTAIRE DE L'INSTALLATION (VRM_OWNER_UID, ou ce que dit la
+//    base) : c'est sa boutique — un clic de travers l'effacerait. « Pas su »
+//    s'il est le propriétaire ⇒ refus aussi.
+// ⚠️ L'ORDRE COMPTE, ET IL EST CHOISI POUR QU'UN ÉCHEC SE RATTRAPE :
+//    1. l'abonnement s'arrête D'ABORD — on n'efface jamais un compte qui serait
+//       encore prélevé. Résilié à la FIN de la période payée (comme « Résilier »,
+//       aucun nouveau prélèvement) ; en IMPAYÉ, arrêté tout de suite (sinon
+//       Stripe continuerait de retenter la carte d'un compte fermé).
+//       Stripe muet ⇒ RIEN n'est effacé ;
+//    2. ses sessions sont fermées (l'extension ne pourra plus renouveler la
+//       sienne, donc plus rien écrire au-delà de l'heure de son jeton) ;
+//    3. ses données, puis ses comptes Vinted (et leurs jetons), ses compteurs ;
+//    4. son cache de photos détourées ;
+//    5. EN DERNIER, son compte de connexion : tant qu'il existe, il peut se
+//       reconnecter et relancer la fermeture si une étape a raté.
+//    La réponse dit ce qui a été fait et ce qui ne l'a pas été — jamais
+//    « compte fermé » si une seule étape a échoué.
+// ⚠️ LIMITE CONNUE, DITE : un jeton d'accès déjà délivré reste valable jusqu'à
+//    son expiration (≈ 1 h). Une extension encore installée peut donc écrire
+//    une capture dans l'heure qui suit — d'où le conseil, à l'écran, de la
+//    retirer de Chrome. Les copies de sauvegarde techniques (schéma
+//    `sauvegarde`) ne sont pas touchées ici : la politique les autorise 90 jours.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+async function lireCorpsJson(req) {
+  if (req.body && typeof req.body === 'object' && !Buffer.isBuffer(req.body)) return req.body;
+  const b = await corpsBrut(req);
+  if (!b || !b.length) return {};
+  try { return JSON.parse(b.toString('utf8')); } catch (_) { return null; }
+}
+
+// Supprime au nom du SERVEUR (clé de service). Rend le nombre de lignes
+// effacées (`Content-Range: */N`), 0 si la table n'existe pas ici (404), ou
+// `null` si la base a refusé ou n'a pas répondu — jamais un succès supposé.
+async function effacer(chemin, SERVICE) {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${chemin}`, {
+      method: 'DELETE',
+      headers: { ...sbCle(SERVICE), Prefer: 'count=exact,return=minimal' },
+    });
+    if (r.status === 404) return 0;
+    if (!r.ok) return null;
+    const m = /\/(\d+)\s*$/.exec((r.headers && r.headers.get && r.headers.get('content-range')) || '');
+    return m ? Number(m[1]) : 0;
+  } catch (_) { return null; }
+}
+
+// Le cache de photos détourées du vendeur (compartiment privé `detourage`,
+// dossier `{owner}/`). Rend le nombre de fichiers effacés, ou `null`.
+async function viderCacheDetourage(owner, SERVICE) {
+  let n = 0;
+  try {
+    for (let tour = 0; tour < 50; tour++) {
+      const l = await fetch(`${SUPABASE_URL}/storage/v1/object/list/detourage`, {
+        method: 'POST',
+        headers: { ...sbCle(SERVICE), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prefix: owner, limit: 100, offset: 0 }),
+      });
+      if (l.status === 404 || l.status === 400) return n;     // pas de compartiment ici
+      if (!l.ok) return null;
+      const items = await l.json();
+      if (!Array.isArray(items)) return null;
+      const noms = items.map((x) => x && x.name).filter((x) => typeof x === 'string' && x && !x.includes('/') && x !== '.emptyFolderPlaceholder');
+      if (!noms.length) return n;
+      const d = await fetch(`${SUPABASE_URL}/storage/v1/object/detourage`, {
+        method: 'DELETE',
+        headers: { ...sbCle(SERVICE), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prefixes: noms.map((x) => `${owner}/${x}`) }),
+      });
+      if (!d.ok) return null;
+      n += noms.length;
+    }
+    return null;                                              // trop long : on ne dit pas « fini »
+  } catch (_) { return null; }
+}
+
+// Ferme TOUTES ses sessions (app, extension, autres appareils).
+async function fermerSessions(req) {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/auth/v1/logout?scope=global`, { method: 'POST', headers: { apikey: ANON, Authorization: `Bearer ${jetonDe(req)}` } });
+    return r.ok;
+  } catch (_) { return false; }
+}
+
+const NON_TOUCHE = "Rien n'a été effacé.";
+const nb = (n, un, plusieurs) => `${n} ${n > 1 ? plusieurs : un}`;
+const PROPRIO_REFUS = "Ce compte est celui du propriétaire de VRM : le fermer effacerait toute la boutique. C'est désactivé exprès.";
+
+async function fermerCompte(req, res) {
+  const u = await utilisateurDe(req);
+  if (!u) return repondre(res, 401, { erreur: 'session', message: 'Connecte-toi à VRM pour fermer ton compte.' });
+  if (!UUID_RE.test(u.id)) return repondre(res, 400, { erreur: 'identite', message: NON_TOUCHE });
+  const SERVICE = process.env.SUPABASE_SERVICE_KEY || '';
+  if (!SERVICE) return repondre(res, 503, { erreur: 'non-configure', message: `La fermeture de compte n'est pas encore branchée sur le serveur. ${NON_TOUCHE}` });
+  if (process.env.VRM_OWNER_UID && process.env.VRM_OWNER_UID === u.id) return repondre(res, 403, { erreur: 'proprietaire', message: PROPRIO_REFUS });
+  const acc = await accesDe(req);
+  if (acc === undefined) return repondre(res, 503, { erreur: 'base-injoignable', message: `Je n'ai pas pu vérifier ton compte. ${NON_TOUCHE} Réessaie dans un instant.` });
+  if (acc.proprietaire) return repondre(res, 403, { erreur: 'proprietaire', message: PROPRIO_REFUS });
+  // La confirmation est vérifiée ICI, pas seulement à l'écran.
+  const corps = await lireCorpsJson(req);
+  const tape = String((corps && corps.confirmation) || '').trim().toLowerCase();
+  const email = String(u.email || '').trim().toLowerCase();
+  if (!email || tape !== email) return repondre(res, 400, { erreur: 'confirmation', message: `Recopie exactement ton adresse email pour confirmer. ${NON_TOUCHE}` });
+
+  // 1) L'abonnement, d'abord.
+  const ligne = await ligneDe(req);
+  if (ligne === undefined) return repondre(res, 503, { erreur: 'base-injoignable', message: `Je n'ai pas pu lire ton abonnement. ${NON_TOUCHE} Réessaie dans un instant.` });
+  const etapes = { abonnement: 'aucun' };
+  if (ligne && ligne.abonnement_stripe && ligne.client_stripe && abonnementActif(ligne.statut)) {
+    const STRIPE_MUET = `Je n'ai pas pu arrêter ton abonnement chez Stripe. ${NON_TOUCHE} Réessaie dans un instant.`;
+    if (!stripePret()) return repondre(res, 503, { erreur: 'stripe', message: STRIPE_MUET });
+    const id = encodeURIComponent(ligne.abonnement_stripe);
+    const lu = await stripeApi('GET', `subscriptions/${id}`);
+    if (!lu.ok || !lu.data) return repondre(res, 502, { erreur: 'stripe', message: STRIPE_MUET });
+    if (lu.data.customer !== ligne.client_stripe) return repondre(res, 403, { erreur: 'pas-a-toi', message: NON_TOUCHE });
+    if (abonnementActif(lu.data.status)) {
+      const impaye = lu.data.status === 'past_due';
+      const r = impaye
+        ? await stripeApi('DELETE', `subscriptions/${id}`, null, `vrm-fer-${u.id}`)
+        : await stripeApi('POST', `subscriptions/${id}`, { cancel_at_period_end: 'true' }, `vrm-fer-${u.id}-${Math.floor(Date.now() / 60000)}`);
+      if (!r.ok || !r.data) return repondre(res, 502, { erreur: 'stripe', message: STRIPE_MUET });
+      etapes.abonnement = impaye ? 'arrete' : 'resilie';
+    } else etapes.abonnement = 'deja-fini';
+  }
+
+  // 2) Ses sessions. 3) Ses données. 4) Ses photos. 5) Son compte de connexion.
+  //    Chaque étape n'a lieu que si la précédente a réussi : un échec laisse un
+  //    compte qu'il peut rouvrir pour relancer, jamais des données orphelines.
+  etapes.sessions = (await fermerSessions(req)) ? 'fermees' : 'non-fermees';
+  const filtre = `owner=eq.${encodeURIComponent(u.id)}`;
+  etapes.donnees = await effacer(`app_data?${filtre}`, SERVICE);
+  etapes.comptesVinted = etapes.donnees === null ? null : await effacer(`vinted_accounts?${filtre}`, SERVICE);
+  etapes.compteurs = etapes.comptesVinted === null ? null : await effacer(`detourage_usage?${filtre}`, SERVICE);
+  etapes.photos = etapes.compteurs === null ? null : await viderCacheDetourage(u.id, SERVICE);
+  let connexion = false;
+  if (etapes.photos !== null) {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${encodeURIComponent(u.id)}`, { method: 'DELETE', headers: sbCle(SERVICE) });
+      connexion = r.ok;
+    } catch (_) { connexion = false; }
+  }
+  etapes.connexion = connexion ? 'supprimee' : 'conservee';
+
+  // Ce qui a été fait, ce qui ne l'a pas été — en clair.
+  const fait = [], pasFait = [];
+  if (etapes.abonnement === 'resilie') fait.push('abonnement résilié (aucun nouveau prélèvement)');
+  if (etapes.abonnement === 'arrete') fait.push('abonnement arrêté');
+  if (etapes.donnees !== null) fait.push(`tes données effacées (${nb(etapes.donnees, 'élément', 'éléments')})`);
+  if (etapes.comptesVinted != null) fait.push(nb(etapes.comptesVinted, 'compte Vinted délié', 'comptes Vinted déliés'));
+  if (etapes.photos != null && etapes.photos > 0) fait.push(nb(etapes.photos, 'photo détourée effacée', 'photos détourées effacées'));
+  if (etapes.donnees === null) pasFait.push('tes données', 'tes comptes Vinted');
+  else if (etapes.comptesVinted === null) pasFait.push('tes comptes Vinted');
+  else if (etapes.compteurs === null) pasFait.push('tes compteurs de détourage');
+  else if (etapes.photos === null) pasFait.push('tes photos détourées');
+  if (!connexion) pasFait.push('ton compte de connexion');
+  const ok = connexion && etapes.donnees !== null && etapes.comptesVinted !== null && etapes.compteurs !== null && etapes.photos !== null;
+  const message = ok
+    ? `Ton compte VRM est fermé : ${fait.join(', ')}.`
+    : `Fermeture INCOMPLÈTE. Fait : ${fait.length ? fait.join(', ') : 'rien'}. Pas encore effacé : ${pasFait.join(', ')}. Reconnecte-toi et relance « Fermer mon compte ».`;
+  if (!ok) console.warn('[fermer-compte] incomplet', JSON.stringify(etapes));
+  return repondre(res, ok ? 200 : 502, { ok, etapes, message });
+}
+
 // ── Santé : seulement des OUI/NON (route publique) ──────────────────────────
 function sante(req, res) {
   res.setHeader('Referrer-Policy', 'no-referrer');
@@ -522,5 +723,6 @@ export default async function handler(req, res) {
   if (mode === 'resilier') return m === 'POST' ? resilier(req, res, false) : repondre(res, 405, { erreur: 'POST seulement' });
   if (mode === 'reprendre') return m === 'POST' ? resilier(req, res, true) : repondre(res, 405, { erreur: 'POST seulement' });
   if (mode === 'session-extension') return m === 'POST' ? sessionExtension(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
+  if (mode === 'fermer') return m === 'POST' ? fermerCompte(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
   return repondre(res, 404, { erreur: 'mode inconnu' });
 }

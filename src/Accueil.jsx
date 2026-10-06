@@ -23,6 +23,7 @@
 //    composant sert à fabriquer le fichier MP4 (`?film`, scripts/film-accueil.cjs)
 //    — une seule source pour le site et pour les réseaux.
 import React from 'react';
+import { contactEmail, CONTACT_A_VENIR } from './contact.js';
 
 const K = {
   bg: '#07090D', surface: '#0B0E13', card: '#10141B', card2: '#151A23',
@@ -888,6 +889,12 @@ export default function Accueil({ onEntrer }) {
           </div>
           <nav aria-label="Informations légales">
             {LEGAL.map(([l, h]) => <a key={h} href={h}>{l}</a>)}
+            {/* CONTACT — une seule source (src/contact.js). Tant qu'elle est
+                vide, on le DIT au lieu d'inventer une adresse qui ne recevrait
+                rien (§2.3). */}
+            {contactEmail()
+              ? <a data-contact="" href={`mailto:${contactEmail()}`}>Contact</a>
+              : <span data-contact="" data-contact-absent="">Contact : {CONTACT_A_VENIR}</span>}
           </nav>
         </div>
       </footer>
