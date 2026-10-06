@@ -206,6 +206,9 @@ global.fetch = async (url, opts = {}) => {
         if (uuid) uuidsVus.set(uuid, id);
         // Le réseau tombe APRÈS qu'eBay a créé l'annonce : la réponse se perd.
         if (mode.add === 'reseau-apres') throw new Error('ECONNRESET');
+        // La passerelle d'eBay répond 503 en HTML APRÈS avoir créé l'annonce :
+        // aucun <Ack>, eBay n'a rien dit de ce qu'il a fait (revue du 6 octobre).
+        if (mode.add === '503-apres') return new Response('<html><body>503 Service Unavailable</body></html>', { status: 503, headers: { 'content-type': 'text/html' } });
         if (mode.add === '488') return xml(XML_ECHEC(ERR('488', 'Error', `The specified UUID has already been used; ListedByRequestAppId=1, item ID=${id}.`, [id])));
         return xml(XML_OK(`<ItemID>${id}</ItemID><StartTime>${a.debut}</StartTime><EndTime>${a.fin}</EndTime><Fees>${fee('ListingFee', quand ? '0.2' : '0.0')}</Fees>`));
       }
@@ -214,6 +217,7 @@ global.fetch = async (url, opts = {}) => {
         if (mode.trading === 'refus' || mode.end === 'refus') return xml(mode.end === 'refus' ? XML_ECHEC(ERR('1047', 'Error', 'Une annonce programmée ne peut pas être terminée par cet appel.')) : XML_REFUS);
         const id = balise(corps, 'ItemID');
         if (mode.end !== 'reste') { compte.programmees = compte.programmees.filter((x) => x.itemId !== id); compte.actives = compte.actives.filter((x) => x.itemId !== id); }
+        if (mode.end === '503-apres') return new Response('<html>503</html>', { status: 503, headers: { 'content-type': 'text/html' } });
         return xml(XML_OK('<EndTime>2026-10-05T12:00:00.000Z</EndTime>'));
       }
       if (appel === 'ReviseFixedPriceItem') {
@@ -222,6 +226,7 @@ global.fetch = async (url, opts = {}) => {
         const id = balise(corps, 'ItemID'); const st = balise(corps, 'ScheduleTime');
         const a = compte.programmees.find((x) => x.itemId === id);
         if (st && a) a.debut = st;
+        if (mode.revise === '503-apres') return new Response('<html>503</html>', { status: 503, headers: { 'content-type': 'text/html' } });
         return xml(XML_OK());
       }
       if (mode.trading === 'reseau') throw new Error('ECONNRESET');
@@ -317,14 +322,19 @@ const RA = {};
     journal.length = 0;
     const res = faireRes();
     await route.default({ method: 'POST', query: {}, headers: jwt ? { authorization: 'Bearer ' + jwt } : {}, body: corps }, res);
-    return { code: res.code, corps: res.corps, journal: journal.slice() };
+    return { code: res.code, corps: res.corps, journal: journal.slice(), entetes: res.entetes };
   };
-  const retourEbay = async (query) => {
+  // Le retour d'eBay, tel que le NAVIGATEUR le fait : avec ses cookies (le
+  // nonce posé par `authurl`), ou sans (le navigateur de quelqu'un d'autre).
+  const retourEbay = async (query, cookie) => {
     journal.length = 0;
     const res = faireRes();
-    await route.default({ method: 'GET', query: { mode: 'callback', ...query }, headers: {} }, res);
-    return { code: res.code, loc: res.entetes.location || '', journal: journal.slice() };
+    await route.default({ method: 'GET', query: { mode: 'callback', ...query }, headers: cookie ? { cookie } : {} }, res);
+    return { code: res.code, loc: res.entetes.location || '', journal: journal.slice(), cookie: String(res.entetes['set-cookie'] || '') };
   };
+  // Le cookie que le navigateur renverra, lu dans le Set-Cookie d'`authurl`.
+  const cookieDe = (d) => { const m = /^(vrm_ebay_etat=[^;]*)/.exec(String((d && d.entetes && d.entetes['set-cookie']) || '')); return m ? m[1] : ''; };
+  let cookieB = '', cookieJ = '';
   const chezEbay = (j) => j.filter((x) => x.ou === 'ebay');
   // Ce qui part chez eBay SANS compter le renouvellement du jeton (qui ne fait
   // rien au compte) : les vrais appels au compte eBay.
@@ -409,12 +419,35 @@ const RA = {};
     }
   });
   let etatB = '', etatJ = '';
+  // ⚠️⚠️ LE LIEN D'UN AUTRE (revue du 6 octobre) : B envoie SON lien de
+  // consentement à Julien ; Julien accepte chez eBay ; SON navigateur revient
+  // avec SON code et le state de B — mais sans le nonce de B. Rien ne doit
+  // être rangé, chez personne.
+  await essaie('le lien d\'un autre', async () => {
+    remettreBase(); remettre();
+    const d = await app(JWT_B, { action: 'authurl' });
+    const etat = decodeURIComponent((/[?&]state=([^&]+)/.exec((d.corps && d.corps.url) || '') || [])[1] || '');
+    const avant = JSON.stringify(lignes);
+    const sansCookie = await retourEbay({ code: 'CODE-DE-LA-VICTIME', state: etat });
+    const dJ = await app(JWT_J, { action: 'authurl' });
+    const autreNonce = await retourEbay({ code: 'CODE-DE-LA-VICTIME', state: etat }, cookieDe(dJ));
+    const n = chezEbay(sansCookie.journal).length + chezEbay(autreNonce.journal).length;
+    dit(n === 0 && !ecritJetons(sansCookie.journal) && !ecritJetons(autreNonce.journal) && JSON.stringify(lignes) === avant && /ebay=erreur/.test(sansCookie.loc) && /ebay=erreur/.test(autreNonce.loc),
+      'le lien de B ouvert dans le navigateur de Julien (sans le nonce de B, ou avec le sien) : aucun échange, aucun jeton rangé chez B', `${n} appel(s) eBay · ${sansCookie.loc}`);
+    const jb = lignes.find((x) => x.owner === B && x.id === 'ebay_tokens');
+    dit(!jb, 'et B n\'a toujours aucun eBay relié', jb ? JSON.stringify(jb.data) : 'aucun');
+  });
   await essaie('B relie SON eBay', async () => {
     remettreBase(); remettre();
     const d = await app(JWT_B, { action: 'authurl' });
     etatB = decodeURIComponent((/[?&]state=([^&]+)/.exec((d.corps && d.corps.url) || '') || [])[1] || '');
     dit(d.code === 200 && etatB.includes(B), 'B demande la connexion : le state signé PORTE son identifiant', etatB || `HTTP ${d.code}`);
-    const r = await retourEbay({ code: 'code-de-B', state: etatB });
+    cookieB = cookieDe(d);
+    const sc = String((d.entetes || {})['set-cookie'] || '');
+    dit(/^vrm_ebay_etat=[0-9a-f]{32};/.test(sc) && /HttpOnly/.test(sc) && /Secure/.test(sc) && /SameSite=Lax/.test(sc) && /Path=\/api\//.test(sc) && !(d.corps && JSON.stringify(d.corps).includes(cookieB.split('=')[1] || '§')),
+      'et la demande pose un NONCE dans un cookie HttpOnly, Secure, SameSite=Lax (jamais dans la réponse lisible par la page)', sc || 'aucun cookie');
+    const r = await retourEbay({ code: 'code-de-B', state: etatB }, cookieB);
+    dit(/vrm_ebay_etat=;/.test(r.cookie) && /Max-Age=0/.test(r.cookie), 'le retour EFFACE le nonce (un lien, un seul retour)', r.cookie || 'cookie gardé');
     const w = r.journal.filter((x) => x.ou === 'base' && /ebay_tokens/.test(x.corps));
     let ligne = null; try { ligne = [].concat(JSON.parse((w[0] || {}).corps || '[]'))[0]; } catch (_) {}
     dit(/ebay=connecte/.test(r.loc) && ligne && ligne.owner === B && ligne.data && ligne.data.refresh_token === 'rt-de-B' && /on_conflict=owner,id/.test((w[0] || {}).u || ''),
@@ -442,14 +475,15 @@ const RA = {};
     remettre();
     const d = await app(JWT_J, { action: 'authurl' });
     etatJ = decodeURIComponent((/[?&]state=([^&]+)/.exec((d.corps && d.corps.url) || '') || [])[1] || '');
+    cookieJ = cookieDe(d);
     const [ts, , mac] = etatJ.split('.');
     // Le state de Julien, dont on remplace le vendeur par B : la signature ne colle plus.
     const forge = [ts, B, mac].join('.');
     const avant = JSON.stringify(lignes);
-    const r1 = await retourEbay({ code: 'code-d-un-inconnu', state: forge });
-    const r2 = await retourEbay({ code: 'code-d-un-inconnu', state: ts + '.' + J + '.' + '0'.repeat(40) });
-    const r3 = await retourEbay({ code: 'code-d-un-inconnu', state: 'vrm' });
-    const r4 = await retourEbay({ code: 'code-d-un-inconnu' });
+    const r1 = await retourEbay({ code: 'code-d-un-inconnu', state: forge }, cookieJ);
+    const r2 = await retourEbay({ code: 'code-d-un-inconnu', state: ts + '.' + J + '.' + '0'.repeat(40) }, cookieJ);
+    const r3 = await retourEbay({ code: 'code-d-un-inconnu', state: 'vrm' }, cookieJ);
+    const r4 = await retourEbay({ code: 'code-d-un-inconnu' }, cookieJ);
     const n = [r1, r2, r3, r4].reduce((s, r) => s + chezEbay(r.journal).length, 0);
     dit(n === 0 && ![r1, r2, r3, r4].some((r) => ecritJetons(r.journal)) && JSON.stringify(lignes) === avant,
       'un state falsifié (vendeur remplacé, signature au hasard, « vrm », absent) : aucun échange, aucun jeton rangé chez personne', `${n} appel(s) eBay`);
@@ -458,13 +492,13 @@ const RA = {};
     const vrai = Date.now;
     try {
       Date.now = () => vrai() + 31 * MIN;
-      const o = await retourEbay({ code: 'code-de-B', state: etatB });
+      const o = await retourEbay({ code: 'code-de-B', state: etatB }, cookieB);
       dit(chezEbay(o.journal).length === 0, 'une demande de plus de 30 minutes ne sert plus', `${chezEbay(o.journal).length} appel(s) eBay`);
     } finally { Date.now = vrai; }
   });
   await essaie('retour valide de Julien', async () => {
     remettreBase();
-    const o = await retourEbay({ code: 'code-de-julien', state: etatJ });
+    const o = await retourEbay({ code: 'code-de-julien', state: etatJ }, cookieJ);
     const w = o.journal.find((x) => x.ou === 'base' && /ebay_tokens/.test(x.corps));
     dit(/ebay=connecte/.test(o.loc) && w && /"owner":"11111111/.test(w.corps), "l'autre sens : la connexion que Julien a lui-même demandée aboutit, chez lui", o.loc);
   });
@@ -673,7 +707,7 @@ const RA = {};
   });
   await essaie('toutes les erreurs', async () => {
     remettre(); mode.add = 'deuxErreurs';
-    const o = await app(JWT_J, { action: 'publish', item: { ...item, numero: '22' } });
+    const o = await app(JWT_J, { action: 'publish', item: { ...item, numero: '23' } });
     dit(o.code >= 400 && /catégorie ne convient pas/.test((o.corps && o.corps.error) || '') && !/titre est long/.test((o.corps && o.corps.error) || ''),
       'deux <Errors> (un Warning PUIS une Error) ⇒ c\'est le message de l\'ERREUR qui est rendu', `HTTP ${o.code} · ${o.corps && o.corps.error}`);
   });
@@ -755,6 +789,71 @@ const RA = {};
     const lectures = auCompte(o4.journal).filter((x) => x.appel === 'GetMyeBaySelling').length;
     dit(o4.code === 503 && o4.corps.reason === 'pas-su' && lectures === 5 && !auCompte(o4.journal).some((x) => /AddFixed|Verify/.test(x.appel)),
       'plus de 5 pages de programmées ⇒ liste incomplète (5 pages lues) : l\'absence n\'est pas prouvée, rien n\'est programmé', `HTTP ${o4.code} · ${lectures} page(s)`);
+  });
+  // « VRM-030 », « vrm-30 », « VRM 30 » (retapé dans le Seller Hub) désignent
+  // la N°30 — la même lecture que l'app (revue du 6 octobre).
+  await essaie('une paire, une annonce : formes du SKU', async () => {
+    for (const forme of ['VRM-030', 'vrm-30', 'VRM 30', 'VRM30']) {
+      remettre();
+      ebay['at-J'].programmees.push(annonce('110000000510', 'Salomon XT-6', forme, '120.0', iso(Date.now() + 3 * JOUR)));
+      const o = await app(JWT_J, prog());
+      remettre();
+      ebay['at-J'].actives.push(annonce('110000000511', 'Salomon XT-6', forme, '120.0', '2026-09-01T10:00:00.000Z'));
+      const o2 = await app(JWT_J, { action: 'publish', item: { ...item, numero: '30' } });
+      dit(o.code === 409 && o.corps.reason === 'deja-programmee' && o2.code === 409 && o2.corps.reason === 'deja-en-ligne' && ![o, o2].some((x) => auCompte(x.journal).some((y) => /AddFixed/.test(y.appel))),
+        `une annonce sous « ${forme} » est la N°30 : programmer et publier la refusent (409), rien d'ajouté`, `programmer HTTP ${o.code} · publier HTTP ${o2.code}`);
+    }
+    remettre();
+    ebay['at-J'].actives.push(annonce('110000000512', 'Autre', 'VRM-300', '50.0', '2026-09-01T10:00:00.000Z'));
+    const o3 = await app(JWT_J, { action: 'publish', item: { ...item, numero: '30' } });
+    dit(o3.code === 200 && o3.corps.ok === true, 'l\'autre sens : « VRM-300 » n\'est PAS la N°30 — la publication part', `HTTP ${o3.code}`);
+  });
+  // « Publier » avait AUCUNE garde : une paire déjà en vente ou programmée
+  // repartait en seconde annonce (revue du 6 octobre, prouvé).
+  await essaie('publier : une paire, une annonce', async () => {
+    remettre();
+    const o = await app(JWT_J, { action: 'publish', item: { ...item, numero: '22' } });
+    const n = ebay['at-J'].actives.filter((x) => x.sku === 'VRM-22').length;
+    dit(o.code === 409 && o.corps.reason === 'deja-en-ligne' && n === 1 && !auCompte(o.journal).some((x) => /AddFixed/.test(x.appel)),
+      'publier la N°22, déjà EN LIGNE ⇒ 409, eBay n\'a toujours qu\'une annonce VRM-22', `HTTP ${o.code} · ${n} annonce(s)`);
+    remettre();
+    ebay['at-J'].programmees.push(annonce('110000000777', 'Salomon XT-6', 'VRM-30', '120.0', iso(Date.now() + JOUR)));
+    const o2 = await app(JWT_J, { action: 'publish', item: { ...item, numero: '30' } });
+    const n2 = [...ebay['at-J'].actives, ...ebay['at-J'].programmees].filter((x) => x.sku === 'VRM-30').length;
+    dit(o2.code === 409 && o2.corps.reason === 'deja-programmee' && o2.corps.itemId === '110000000777' && n2 === 1,
+      'publier la N°30, PROGRAMMÉE pour demain ⇒ 409 « déjà programmée », une seule annonce VRM-30', `HTTP ${o2.code} · ${n2} annonce(s)`);
+    remettre(); mode.liste = 'ko';
+    const o3 = await app(JWT_J, { action: 'publish', item: { ...item, numero: '30' } });
+    dit(o3.code === 503 && o3.corps.reason === 'pas-su' && !auCompte(o3.journal).some((x) => /AddFixed/.test(x.appel)),
+      'ses annonces illisibles ⇒ 503 « pas su », rien n\'est publié', `HTTP ${o3.code}`);
+    remettre();
+    const o4 = await app(JWT_J, { action: 'publish', item: { ...item } });
+    dit(o4.code === 200 && o4.corps.ok === true && !auCompte(o4.journal).some((x) => x.appel === 'GetMyeBaySelling'),
+      'l\'autre sens : une annonce SANS N° (pas de SKU, rien à comparer) part comme avant', `HTTP ${o4.code} · ${appels(o4.journal)}`);
+  });
+  // Une passerelle 5xx sans <Ack> APRÈS qu'eBay a agi : « incertain », jamais
+  // « refusé » (sinon le brouillon reste à republier — une seconde annonce).
+  await essaie('eBay sans réponse claire', async () => {
+    remettre(); uuidsVus.clear(); mode.add = '503-apres';
+    const o = await app(JWT_J, prog());
+    const n = ebay['at-J'].programmees.filter((x) => x.sku === 'VRM-30').length;
+    dit(o.code === 504 && o.corps.reason === 'incertain' && n === 1, 'programmer : eBay crée l\'annonce puis répond 503 en HTML ⇒ 504 « incertain », jamais « refusée »', `HTTP ${o.code} · ${o.corps && o.corps.error}`);
+    remettre(); mode.add = '503-apres';
+    const o2 = await app(JWT_J, { action: 'publish', item: { ...item, numero: '401' } });
+    dit(o2.code === 504 && o2.corps.reason === 'incertain', 'publier : même cas ⇒ 504 « incertain »', `HTTP ${o2.code}`);
+    const avecProg0 = (dans) => { remettre(); ebay['at-J'].programmees.push(annonce('110000000900', 'Salomon XT-6', 'VRM-30', '120.0', iso(Date.now() + dans))); };
+    avecProg0(2 * JOUR); mode.end = '503-apres';
+    const o3 = await app(JWT_J, { action: 'deprogrammer', itemId: '110000000900', confirme: true });
+    dit(o3.code === 504 && o3.corps.reason === 'incertain', 'annuler : eBay annule puis répond 503 ⇒ « incertain », jamais « eBay a refusé »', `HTTP ${o3.code}`);
+    avecProg0(3 * JOUR); mode.revise = '503-apres';
+    const o4 = await app(JWT_J, { action: 'reprogrammer', itemId: '110000000900', scheduleTime: iso(Date.now() + 4 * JOUR), confirme: true });
+    dit(o4.code === 504 && o4.corps.reason === 'incertain', 'déplacer : même cas ⇒ « incertain »', `HTTP ${o4.code}`);
+    remettre(); mode.end = '503-apres';
+    const o5 = await app(JWT_J, { action: 'retirer', itemId: '110000000001', confirme: true });
+    dit(o5.code === 504 && o5.corps.reason === 'incertain', 'retirer : même cas ⇒ « incertain »', `HTTP ${o5.code}`);
+    remettre(); mode.end = 'refus';
+    const o6 = await app(JWT_J, { action: 'retirer', itemId: '110000000001', confirme: true });
+    dit(o6.code !== 504 && o6.corps.ok === false && o6.corps.reason !== 'incertain', 'l\'autre sens : un VRAI refus d\'eBay (Ack Failure) reste un refus', `HTTP ${o6.code}`);
   });
   await essaie('programmer : les frais', async () => {
     remettre(); mode.verif = 'cher';
