@@ -22,7 +22,7 @@ import { sendPushToAll, pushCategorieActive } from './_lib/push.js';
 import { stampBordereau } from './_lib/stamp.js';
 
 import { withOwnerAll, conflictTarget, contexteVendeur, proprietaireCourant, duVendeur as duVendeurLib } from './_lib/owner.js';
-import { adressesDeLivraison, resoudreProprietaire, fusionnerRegistres } from './_lib/proprietaire-email.js';
+import { adressesDeLivraison, resoudreProprietaire, fusionnerRegistres, PROPRIETAIRE_NEUTRE } from './_lib/proprietaire-email.js';
 import { normaliserEntrant, formeRecue, demasquerRelais } from './_lib/lire-email.js';
 import { sbCle } from './_lib/cle.js';
 
@@ -909,7 +909,9 @@ const duVendeur = (url) => duVendeurLib(url, baseCloisonnee);
 // ⚠️ `null` = la base n'a pas répondu. Avant, un échec rendait `{}` — c'est-à-
 // dire « personne n'a déclaré d'adresse » — et l'email tombait dans le repli
 // « installation ». « Rien lu » ne vaut pas « rien ».
-async function lireRegistreEmails(cloisonnee) {
+// Exportée : `api/email-rattacher.js` juge une réclamation avec CE registre-là,
+// lu de la même façon (§11).
+export async function lireRegistreEmails(cloisonnee) {
   try {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_email_owners&select=${cloisonnee ? 'owner,data' : 'data'}`, {
       headers: { ...sbCle(SUPABASE_KEY) },
@@ -922,28 +924,42 @@ async function lireRegistreEmails(cloisonnee) {
 }
 
 // Email non attribuable : on le garde ENTIER, avec la raison et les adresses
-// lues, sous le propriétaire de l'installation (sinon, une fois la base
-// cloisonnée, personne ne pourrait le relire pour le rattacher).
-async function mettreEnQuarantaine(mail, adresses, raison) {
+// lues.
+// ⚠️⚠️ BASE CLOISONNÉE : sous le propriétaire NEUTRE, plus sous celui de
+// l'installation. Rangé chez Julien, l'email non attribué d'un AUTRE vendeur
+// (sa vente, son bordereau, le nom et l'adresse de son acheteur) atterrissait
+// dans la boutique de Julien, et l'autre ne le voyait jamais. Sous le neutre,
+// personne ne le voit sous RLS ; `api/email-rattacher` le rend à celui qui a
+// déclaré son adresse d'arrivée (`peutReclamer`).
+// Base non cloisonnée (une seule boutique) : on n'arrive jamais ici (voir
+// l'appel), et la forme d'avant reste.
+async function mettreEnQuarantaine(mail, adresses, raison, cloisonnee) {
   try {
     const id = 'email_quarantaine_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    // Les adresses aussi en UNE chaîne : la base ne copie dans `meta` que les
+    // valeurs simples (≤ 600 octets). La liste des emails à réclamer se lit
+    // alors sans décompresser l'email entier (§4.4). Trop longue : pas de
+    // chaîne (jamais une liste tronquée — elle pourrait cacher un second
+    // destinataire), et la liste relit `data.adresses` pour cette ligne-là.
+    const dest = (adresses || []).join(' ');
     const ligne = {
       id,
       data: {
         raison, adresses, at: new Date().toISOString(),
+        ...(Buffer.byteLength(dest, 'utf8') <= 560 ? { destinataires: dest } : {}),
         from: mail.from || '', to: mail.to || '', subject: mail.subject || '',
         text: String(mail.text || '').slice(0, 20000),
         html: String(mail.html || '').slice(0, 40000),
         pieces: (mail.attachments || []).map(a => ({ filename: a.filename, contentType: a.contentType })),
       },
     };
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${conflictTarget('id')}`, {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${cloisonnee ? 'owner,id' : conflictTarget('id')}`, {
       method: 'POST',
       headers: {
         ...sbCle(SUPABASE_KEY),
         'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal',
       },
-      body: JSON.stringify(withOwnerAll([ligne])),
+      body: JSON.stringify(cloisonnee ? [{ owner: PROPRIETAIRE_NEUTRE, ...ligne }] : withOwnerAll([ligne])),
     });
     if (!r || !r.ok) marquerEcritureRatee();
   } catch (_) { marquerEcritureRatee(); }
@@ -1234,7 +1250,7 @@ export async function traiterEmail(req, res) {
     // ON NE DEVINE PAS, ET ON NE JETTE PAS. L'email est conservé entier avec sa
     // raison ; l'app le signale et permet de le rattacher. Un email égaré se
     // répare, un email livré au mauvais vendeur non.
-    await mettreEnQuarantaine(mail, adresses, proprio.raison || 'non attribué');
+    await mettreEnQuarantaine(mail, adresses, proprio.raison || 'non attribué', true);
     repondre(res, 200, { ok: true, quarantaine: true, raison: proprio.raison, adresses });
     return;
   }

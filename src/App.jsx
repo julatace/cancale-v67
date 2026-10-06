@@ -20158,15 +20158,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     _rattrapageLance = true;
     let mort = false;
     (async () => {
-      let lignes = [];
-      try {
-        // ⚠️ `supprime` : une ligne déjà rejouée est VIDÉE, pas effacée (le
-        //    `DELETE` sur `app_data` est sans effet avec la clé publique, §5.22).
-        //    Sans ce filtre, on reprenait les 593 mêmes emails à chaque ouverture.
-        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_quarantaine_*&select=id,sujet:meta->>subject,sup:meta->>supprime`, { headers: sbAuth() });
-        if (!r.ok) return;
-        lignes = ((await r.json()) || []).filter(x => !x.sup && x.sujet != null);
-      } catch (_) { return; }
+      // ⚠️ Par la ROUTE, plus sous RLS : base cloisonnée, un email non attribué
+      //    vit sous le propriétaire NEUTRE, invisible à tout vendeur ; seul le
+      //    serveur sait lesquels sont à lui (`lireEmailsMisDeCote`). Les lignes
+      //    déjà rejouées (VIDÉES, `supprime`) n'y sont pas — sans ce filtre on
+      //    reprenait les 593 mêmes emails à chaque ouverture.
+      // ⚠️ Pas su ⇒ on réessaiera à la prochaine ouverture (« rien lu » ne vaut
+      //    pas « rien à rattraper »).
+      const lu = await lireEmailsMisDeCote();
+      if (lu === null) { _rattrapageLance = false; return; }
+      const lignes = lu.filter(x => x && x.id);
       if (!lignes.length || mort) return;
       // Les colis passent devant : c'est ce qu'on attend à l'écran.
       lignes.sort((a, b) => (SUJET_COLIS.test(b.sujet || '') ? 1 : 0) - (SUJET_COLIS.test(a.sujet || '') ? 1 : 0));
@@ -30241,13 +30242,30 @@ function SecuriteSetting() {
 // sont écrits par l'extérieur et se falsifient en trois secondes.
 // Le registre vit dans une ligne dédiée (`vrm_email_owners`) que l'app écrit et
 // que le serveur se contente de lire.
+//
+// ── LES EMAILS MIS DE CÔTÉ QUE TU PEUX RÉCLAMER ──────────────────────────────
+// ⚠️ Lus par la ROUTE, plus sous RLS : base cloisonnée, un email non attribué
+// vit sous un propriétaire NEUTRE que personne n'a (sinon celui d'un autre
+// vendeur atterrissait chez le propriétaire de l'installation). Seul le serveur
+// sait lesquels sont à toi : ceux arrivés sur une adresse que TU as déclarée
+// ci-dessous. Scalaires seulement (id, sujet, raison, date — §4.4).
+// Deux réponses : un tableau = lu · `null` = pas su (jamais « aucun »).
+async function lireEmailsMisDeCote() {
+  try {
+    const r = await fetch('/api/email-rattacher?mode=liste', { headers: { ...enTeteSession() } });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return (j && j.ok && Array.isArray(j.emails)) ? j.emails : null;
+  } catch (_) { return null; }
+}
 function EmailsSetting() {
   // ⚠️ `undefined` = en cours · `null` = la base n'a pas répondu · objet = lu.
   //    Sans ce troisième état, une lecture ratée affichait « Aucune adresse
   //    déclarée » — une AFFIRMATION sur l'attribution de ses emails, faite sur
   //    une mesure qui n'a pas eu lieu.
   const [reg, setReg] = useState(undefined);     // { adresse: {owner,label} }
-  const [quarantaine, setQuarantaine] = useState(null);
+  // Même trois états : `undefined` en cours · `null` pas su · tableau lu.
+  const [quarantaine, setQuarantaine] = useState(undefined);
   const [busy, setBusy] = useState('');
   const uid = (AUTH.user && AUTH.user.id) || '';
   const charger = React.useCallback(async () => {
@@ -30261,13 +30279,9 @@ function EmailsSetting() {
       const d = await lireReglage('vrm_email_owners');
       setReg(d === null ? null : (d.adresses || {}));
     } catch (_) { setReg(null); }
-    try {
-      // ⚠️ Scalaires seulement : une ligne de quarantaine contient l'email
-      // ENTIER (pièces jointes comprises) — un `select=data` ici referait le
-      // trou d'égress de §34.
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_quarantaine_*&select=id,sujet:meta->>subject,raison:meta->>raison,quand:meta->>at,sup:meta->>supprime`, { headers: sbAuth() });
-      setQuarantaine(r.ok ? ((await r.json()) || []).filter(x => !x.sup) : []);
-    } catch (_) { setQuarantaine([]); }
+    // ⚠️ Une lecture ratée rendait `[]` : la section se taisait comme s'il n'y
+    //    avait rien à réclamer. « Rien lu » ne vaut pas « rien ».
+    setQuarantaine(await lireEmailsMisDeCote());
   }, []);
   useEffect(() => { charger(); }, [charger]);
 
@@ -30281,6 +30295,9 @@ function EmailsSetting() {
         body: JSON.stringify([withOwner({ id: 'vrm_email_owners', data: { adresses, updatedAt: new Date().toISOString() } })]),
       });
     } catch (_) { toast("La liste n'a pas pu être enregistrée — réessaie."); }
+    // Une adresse ajoutée (ou retirée) change ce qui t'est proposé en dessous :
+    // on relit, sans attendre la prochaine ouverture de l'écran.
+    setQuarantaine(await lireEmailsMisDeCote());
   };
   const ajouter = async () => {
     const a = await askText({ desc: "Ton adresse de réception.\n\nC'est l'adresse vers laquelle tu fais suivre tes emails Vinted (bordereaux, ventes, colis). Tout ce qui arrive dessus sera à toi.", value: '', ok: 'Ajouter' });
@@ -30341,12 +30358,12 @@ function EmailsSetting() {
     charger();
   };
   const liste = Object.keys(reg || {});
-  const enAttente = quarantaine || [];
+  const enAttente = Array.isArray(quarantaine) ? quarantaine : [];
   return (
     <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px'}}>
       <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:2}}>Mes adresses de réception</div>
       <div style={{fontSize:12,color:C.muted,marginBottom:10,lineHeight:1.45}}>
-        Les emails Vinted (bordereaux, ventes, colis) que tu fais suivre ici t'appartiennent. <b>C'est l'adresse d'arrivée qui décide</b> — jamais l'expéditeur ni le contenu, qui se falsifient. Une adresse inconnue n'est jamais attribuée au hasard : l'email est mis de côté, et tu le réclames d'un tap.
+        Les emails Vinted (bordereaux, ventes, colis) que tu fais suivre ici t'appartiennent. <b>C'est l'adresse d'arrivée qui décide</b> — jamais l'expéditeur ni le contenu, qui se falsifient. Une adresse inconnue n'est jamais attribuée au hasard : l'email est mis de côté, et il t'est proposé ici dès que l'adresse où il est arrivé figure dans ta liste.
       </div>
       {reg === undefined ? <div style={{fontSize:12,color:C.muted}}>Chargement…</div>
       : reg === null ? <span style={{display:'inline-block',fontSize:11,fontWeight:600,color:C.muted,background:C.bg,border:`1px solid ${C.border}`,borderRadius:999,padding:'2px 9px'}}>{REGLAGE_PAS_LU}</span>
@@ -30365,10 +30382,17 @@ function EmailsSetting() {
         style={{marginTop:10,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'8px 12px',fontSize:12.5,fontWeight:600,cursor:reg?'pointer':'default',fontFamily:'inherit',opacity:reg?1:0.45}}>
         + Ajouter une adresse
       </button>
+      {/* Pas su ≠ aucun. Une seule phrase, et seulement si le registre, lui, a
+          été lu (sinon la pastille du dessus et le bloc de Réglages le disent). */}
+      {quarantaine === null && reg !== null && reg !== undefined && (
+        <div data-mis-de-cote="pas-su" style={{marginTop:10,fontSize:11.5,color:C.muted,lineHeight:1.45}}>
+          Je n'ai pas pu vérifier s'il y a des emails mis de côté pour toi — rien n'est perdu, rouvre cet écran dans un moment.
+        </div>
+      )}
       {enAttente.length > 0 && (
         <div style={{marginTop:12,borderTop:`1px solid ${C.border}`,paddingTop:10}}>
           <div style={{fontSize:12.5,fontWeight:600,color:C.warn,marginBottom:6}}>📥 {enAttente.length} email{enAttente.length>1?'s':''} en attente d'un propriétaire</div>
-          <div style={{fontSize:11.5,color:C.muted,marginBottom:8,lineHeight:1.45}}>Arrivés sur une adresse non déclarée. Ils sont conservés entiers — rien n'est perdu.</div>
+          <div style={{fontSize:11.5,color:C.muted,marginBottom:8,lineHeight:1.45}}>Arrivés avant que leur adresse soit déclarée. Ils sont conservés entiers — rien n'est perdu.</div>
           <button type="button" disabled={!!lot} onClick={toutRejouer}
             style={{width:'100%',marginBottom:10,border:'none',background:lot?C.border:C.accent,color:lot?C.muted:(C.onAccent||'#fff'),borderRadius:8,padding:'10px 12px',fontSize:12.5,fontWeight:700,cursor:lot?'default':'pointer',fontFamily:'inherit'}}>
             {lot ? `Traitement… ${lot.fait}/${lot.total}` : `▶ Tout rejouer (${enAttente.length})`}

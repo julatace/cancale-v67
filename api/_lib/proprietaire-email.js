@@ -185,3 +185,33 @@ export function resoudreProprietaire(adresses, registre, defaut, conflits) {
   // 4. On ne sait pas → quarantaine. Jamais d'attribution au hasard.
   return { owner: '', via: 'quarantaine', raison: liste.length ? 'adresse de réception inconnue' : 'aucune adresse de réception lisible' };
 }
+
+// ── LA QUARANTAINE N'APPARTIENT À AUCUN VENDEUR ──────────────────────────────
+// ⚠️⚠️ Un email mis de côté était rangé sous le propriétaire de l'INSTALLATION
+// (Julien). Tant qu'il est seul, c'est sans conséquence. Le jour où un second
+// vendeur arrive, ses emails non attribués (vente, bordereau, nom et adresse de
+// l'acheteur) atterrissaient dans la boutique de Julien — et l'autre ne les
+// voyait jamais. Base cloisonnée ⇒ la quarantaine vit sous ce propriétaire
+// NEUTRE : aucune session ne porte cet identifiant (Supabase n'en émet jamais
+// de nul), donc RLS ne la montre à PERSONNE. Seul le serveur (clé de service)
+// la lit, et ne la rend qu'à celui qui prouve que l'email est à lui (ci-dessous).
+// Aucune clé étrangère ne pèse sur `app_data.owner` (mesuré le 6 octobre) :
+// l'identifiant nul s'écrit comme n'importe quel autre.
+export const PROPRIETAIRE_NEUTRE = '00000000-0000-0000-0000-000000000000';
+
+// ── QUI PEUT RÉCLAMER UN EMAIL MIS DE CÔTÉ ? (fonction PURE) ─────────────────
+// EXACTEMENT la règle d'arrivée (§11 : une seule règle), rejouée avec le
+// registre d'AUJOURD'HUI : l'email est à toi si l'adresse où il est arrivé est
+// une adresse que TU as déclarée, et que personne d'autre n'a déclarée. C'est le
+// cas normal — l'email est arrivé AVANT que tu déclares ton adresse.
+// ⚠️ SANS le repli « installation » (`defaut = ''`) : il désignerait le
+//    propriétaire de l'installation pour TOUT email dont l'adresse n'est à
+//    personne — la devinette que ce fichier interdit, appliquée à tout le tas.
+// ⚠️ Deux vendeurs destinataires, une adresse déclarée par deux vendeurs, aucune
+//    adresse lisible ⇒ PERSONNE. Mieux vaut un blanc qu'un faux (§5).
+export function peutReclamer(adresses, registre, conflits, vendeur) {
+  const v = String(vendeur || '').trim();
+  if (!v || v === PROPRIETAIRE_NEUTRE) return false;
+  const r = resoudreProprietaire(Array.isArray(adresses) ? adresses : [], registre || {}, '', conflits || []);
+  return !!r.owner && r.owner === v;
+}
