@@ -3791,6 +3791,34 @@ il l'a redemandé.
   exécute la vraie fonction (12 contrôles, réaffaiblie → rouge) ;
   `bancs/rapport.cjs` sert une vente vendue le mois dernier et versée ce mois.
 
+### « J'ai déclaré ce mois » — le registre de ses déclarations URSSAF (6 octobre)
+Proposition n° 13, acceptée le 5 octobre. Le passage au versement (3 octobre)
+crée un risque mesuré : **30 ventes vendues en août et versées en septembre
+(657,80 €)** — s'il a déclaré août à la date de vente, elles sont dans août ET
+dans septembre (~89 € de cotisations payés deux fois, sans rien voir).
+- `vrm_urssaf_declare` (synchronisé) = `{ [ym]: { ids, n, ca, montant, regle, at } }`,
+  écrit **uniquement sur son clic** dans le rapport comptable (« J'ai déclaré ce
+  mois » / « retirer »). L'app ne coche jamais « déclaré » à sa place.
+- **Une vente déclarée compte dans le mois de sa déclaration, plus nulle part
+  ailleurs** — par son identité `plateforme:id` (§5). Une vente arrivée APRÈS dans
+  un mois déclaré est « à régulariser » (comptée, dite, jamais cachée) ; une vente
+  déclarée dans deux mois compte une fois et le dit ; le mois du versement dit ce
+  qui est déjà déclaré ailleurs.
+- Pour un mois ≤ septembre 2026, le formulaire écrit **les deux totaux côte à
+  côte** (versement · date de vente, l'ancienne règle) et c'est LUI qui dit lequel
+  il a déclaré ; le montant de son espace URSSAF, s'il le tape, est comparé.
+- **« Pas su » ne déplace rien** : avant l'arrivée du nuage le registre vaut
+  `null` (`isCloudReady` + `onCloudReady`), et l'écran le dit.
+- §11 : le rapport mensuel et le bilan annuel refaisaient leur propre boucle
+  Vinted — ils lisent maintenant `declarables`, comme le tableau de bord (une
+  règle, un propriétaire). `audit-urssaf.cjs` suit le nom jusqu'à sa définition.
+- Preuves : `audit-urssaf.cjs` **11 rouges** sur le code d'avant, **5** en
+  réaffaiblissant la règle (le registre ignoré) ; banc `rapport.cjs` déroule le
+  geste aux deux tailles (déclare août à la date de vente → septembre ne recompte
+  plus la vente de fin août, et le dit).
+- ⚠️ **À lui** : dire ce qu'il a réellement déclaré pour août et septembre — le
+  geste est dans Ventes → Outils → Rapport comptable → choisir le mois.
+
 ### ⚠️⚠️ « 300 NOTIFS », « COMME SI JE DÉBUTAIS », « ÇA TÉLÉCHARGE » (3 octobre)
 Trois plaintes de Julien, **une cause racine pour les deux premières** :
 - ⚠️⚠️ **LES EFFETS DE L'APP PARTAIENT AVANT LA SESSION.** La porte de connexion
