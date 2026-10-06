@@ -3800,10 +3800,10 @@ dans septembre (~89 € de cotisations payés deux fois, sans rien voir).
   écrit **uniquement sur son clic** dans le rapport comptable (« J'ai déclaré ce
   mois » / « retirer »). L'app ne coche jamais « déclaré » à sa place.
 - **Une vente déclarée compte dans le mois de sa déclaration, plus nulle part
-  ailleurs** — par son identité `plateforme:id` (§5). Une vente arrivée APRÈS dans
-  un mois déclaré est « à régulariser » (comptée, dite, jamais cachée) ; une vente
-  déclarée dans deux mois compte une fois et le dit ; le mois du versement dit ce
-  qui est déjà déclaré ailleurs.
+  ailleurs** — par son identité `plateforme:id` (§5). Une vente d'un mois déclaré
+  qui n'est dans **aucune** déclaration est « à régulariser » (comptée, dite,
+  jamais cachée) ; une vente déclarée dans deux mois compte une fois et le dit ;
+  le mois du versement dit ce qui est déjà déclaré ailleurs.
 - Pour un mois ≤ septembre 2026, le formulaire écrit **les deux totaux côte à
   côte** (versement · date de vente, l'ancienne règle) et c'est LUI qui dit lequel
   il a déclaré ; le montant de son espace URSSAF, s'il le tape, est comparé.
@@ -3818,6 +3818,52 @@ dans septembre (~89 € de cotisations payés deux fois, sans rien voir).
   plus la vente de fin août, et le dit).
 - ⚠️ **À lui** : dire ce qu'il a réellement déclaré pour août et septembre — le
   geste est dans Ventes → Outils → Rapport comptable → choisir le mois.
+
+**Revue contradictoire du 6 octobre — cinq défauts réels, tous dans ce registre**
+(chacun vérifié en EXÉCUTANT le vrai code avant d'être corrigé) :
+- ⚠️⚠️ **« À régulariser » ne regardait pas la RÈGLE de la déclaration.** Un mois
+  noté « à la date de vente » ne retient que les ventes Vinted VENDUES ce mois-là
+  (`ancienneRegle`) ; les ventes vendues le mois d'avant et versées ce mois-ci
+  étaient dites « arrivées après ta déclaration — à ajouter (régularisation) ».
+  Exécuté : les **30 ventes d'août versées en septembre (657,90 €)** — le cas même
+  qui a motivé le registre, ~89 € payés deux fois en suivant le conseil.
+  ⇒ `place()` : à la date de vente, une vente Vinted vendue un mois plus tôt
+  relève de SON mois de vente (`moisVenteAvant`, dite à part : « rien à
+  régulariser, note ce mois-là ») ; elle ne redevient « à régulariser » que si
+  son mois de vente est noté SANS elle (elle n'est alors dans aucune déclaration).
+  Et le libellé ne dit plus « arrivées après » (aucune date n'est comparée) mais
+  « ne figure(nt) dans aucune de tes déclarations » — vrai dans les deux règles,
+  et pour Leboncoin/eBay, que l'ancienne règle ne comptait pas.
+- ⚠️⚠️ **Dates de versement illisibles ⇒ rapports à « 0,00 € · Aucune vente
+  finalisée »**, présenté comme un fait, et Leboncoin/eBay (lus correctement)
+  perdus avec ; le bilan annuel ne rendait pas `enCours` (« 0 € » pendant le
+  simple chargement). ⇒ `declRapport` (une source pour les deux rapports) :
+  `encours` · `passu` (Leboncoin et eBay comptés, « sans Vinted » dit, aucune
+  cotisation ni marge chiffrée dessus — « — ») · `lu`. La publication et Ma
+  journée gardent `declarables === null` (« pas su », rien de « reçu »). Les
+  exports CSV/PDF emportent la mention.
+- ⚠️⚠️ **« J'ai déclaré ce mois » s'enregistrait sur une lecture ratée** :
+  `{ ids: [], n: 0, ca: 0 }` écrit (prouvé au banc), puis tout le mois « à
+  régulariser ». `lectureIncomplete` (dates, ventes, un compte non lu hors comptes
+  exclus, Leboncoin, eBay, registre) grise le bouton avec la raison **et** le
+  GESTE refuse lui-même (`declarerMois`) — une lecture peut tomber formulaire
+  ouvert ; il dit alors « rien n'est noté ».
+- ⚠️ **« Reçu en {mois} » se jugeait au mois de DÉCLARATION** (`l.ym`) : une vente
+  versée en octobre et déclarée en septembre en sortait, pendant que la barre
+  « reçu » du jour la comptait — deux « reçu » sur un écran (§11). ⇒ `recuDuMois`
+  (au mois du versement, la date des barres), et la phrase dessous dit « dont X €
+  déjà dans ta déclaration de septembre ». La carte URSSAF du tableau de bord
+  (« argent versé en octobre ») dit ce qui en est EXCLU parce que déclaré ailleurs
+  (`nAilleurs`/`caAilleurs`/`ailleurs`, de la même ligne publiée) et lit
+  `declare: 'pasSu'` (registre pas encore lu au calcul).
+- Preuves : `audit-urssaf.cjs` **13 rouges** sur f53df91 ; bancs `rapport.cjs`
+  **16 rouges** et `vendu-recu.cjs` **3 rouges** sur le build de f53df91. Et
+  chaque règle réaffaiblie seule repasse au rouge (au banc ET à l'audit) :
+  « absente ⇒ à régulariser » quelle que soit la règle (2 rouges au banc) · reçu
+  au mois de déclaration (1) · dates illisibles non bloquantes (1 — le geste,
+  lui, refuse encore : défense en profondeur) · garde du geste retirée (2, la
+  déclaration vide est écrite) · rapports sans Leboncoin/eBay (3) · bilan annuel
+  qui ne rend plus le chargement (1).
 
 ### Paires qui dorment, toutes plateformes (proposition 9, 6 octobre)
 L'assistant « Repricing » (Annonces → Conseils & signalements) disait seulement

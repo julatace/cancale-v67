@@ -70,6 +70,16 @@ const lignes = (versementsLisibles) => [
   { id: 'harvest_111_txn_9105', data: { capturedAt: maintenant.toISOString(), payload: { transaction: { id: 9105, status: 300, status_updated_at: il(3).toISOString() } } } },
 ];
 
+// « J'AI DÉCLARÉ CE MOIS » (revue du 6 octobre) : une vente VENDUE le mois
+// dernier, versée AUJOURD'HUI, et déclarée le mois dernier (règle « à la date
+// de vente »). C'est de l'argent REÇU ce mois-ci : « Reçu en {mois} » et la
+// barre du jour doivent la compter tous les deux (§11) ; la carte URSSAF, elle,
+// ne la recompte pas (elle est déjà déclarée) mais doit le DIRE.
+const moisDernier = new Date(maintenant.getFullYear(), maintenant.getMonth() - 1, 15, 12);
+const ymMoisDernier = `${moisDernier.getFullYear()}-${String(moisDernier.getMonth() + 1).padStart(2, '0')}`;
+const VENTE_DECL = vente(9401, 55, 'Commande finalisée', moisDernier);
+const DECLARE = { [ymMoisDernier]: { ids: ['vinted:9401'], n: 1, ca: 55, montant: null, regle: 'vente', at: maintenant.getTime() - 86400000 } };
+
 let ko = 0, ok = 0;
 const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '  ✅ ' : '  ❌ ') + m + (d ? ' — ' + d : '')); };
 const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom, String(e.message || e).slice(0, 160)); } };
@@ -90,9 +100,13 @@ const ouvrir = async (b, vp, versementsLisibles, onglet = 'journee', opts = {}) 
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   if (opts.horloge) await pg.clock.install({ time: opts.horloge });
+  if (opts.declare) await pg.addInitScript((d) => { try { localStorage.setItem('vrm_urssaf_declare', JSON.stringify(d)); } catch (_) {} }, opts.declare);
+  if (opts.publie) await pg.addInitScript((d) => { try { localStorage.setItem('vinted_urssaf_mois', JSON.stringify(d)); } catch (_) {} }, opts.publie);
   await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
-  const L = lignes(versementsLisibles);
+  const L = lignes(versementsLisibles).map((r) => (opts.declare && r.id === 'harvest_111_orders_sold')
+    ? { ...r, data: { ...r.data, payload: { my_orders: [...r.data.payload.my_orders, VENTE_DECL] } } } : r);
+  if (opts.declare) L.push({ id: 'harvest_111_txn_' + VENTE_DECL.transaction_id, data: { capturedAt: maintenant.toISOString(), payload: { transaction: { id: VENTE_DECL.transaction_id, status: 450, status_updated_at: il(0).toISOString() } } } });
   const widget = [];
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
@@ -207,6 +221,33 @@ const lire = (pg) => pg.evaluate(() => {
       dit(lu.recuMois === '', 'aucun montant « reçu » inventé', `rendu « ${lu.recuMois} »`);
       const recus = Object.values(lu.jours).map((j) => j.recu);
       dit(recus.length === 14 && recus.every((r) => r === ''), 'aucune barre « reçu » — jamais des zéros', recus.slice(-3).join(','));
+      await ctx.close();
+    });
+    console.log('\n── Déclarée le mois dernier, versée aujourd’hui');
+    await essaie('declaree ailleurs', async () => {
+      const { ctx, pg, lu, errs } = await ouvrir(b, { width: 390, height: 844 }, true, 'journee', { declare: DECLARE });
+      dit(!lu.tombe && errs.length === 0, 'l’écran s’affiche', errs.join(' | ').slice(0, 160));
+      const rj = lu.jours[cle(il(0))] || {};
+      dit(rj.recu === String(attendu.jour(0).recu + 5500), 'la barre REÇU du jour compte la vente versée aujourd’hui', `${rj.recu} · attendu ${attendu.jour(0).recu + 5500}`);
+      dit(lu.recuMois === String(attendu.recuMois + 5500), '« Reçu en {mois} » = argent VERSÉ ce mois, y compris une vente déclarée le mois d’avant (même chiffre que les barres)', `rendu ${lu.recuMois} · attendu ${attendu.recuMois + 5500}`);
+      if (process.env.CAPTURES) await pg.screenshot({ path: path.join(process.env.CAPTURES, 'journee-recu-declaree.png') });
+      // La carte URSSAF du tableau de bord lit ce que Ventes vient de publier.
+      await pg.goto(`http://localhost:${PORT}/?tab=dashboard`, { waitUntil: 'domcontentloaded' });
+      await pg.waitForFunction(() => document.querySelector('[data-dash-vendu-jour],[data-dash-vendu-pas-su]'), null, { timeout: 15000 }).catch(() => {});
+      await pg.waitForTimeout(1200);
+      if (process.env.CAPTURES) { await pg.evaluate(() => { const e = document.querySelector('[data-urssaf-declare]'); if (e) e.scrollIntoView({ block: 'center' }); }); await pg.screenshot({ path: path.join(process.env.CAPTURES, 'dashboard-urssaf-ailleurs.png') }); }
+      const u = await pg.evaluate(() => { const e = document.querySelector('[data-urssaf-ailleurs]'); return e ? { cents: e.getAttribute('data-urssaf-ailleurs'), n: e.getAttribute('data-urssaf-ailleurs-n') } : null; });
+      dit(u && u.cents === '5500' && u.n === '1', 'la carte URSSAF dit qu’1 vente (55 €) versée ce mois-ci est déjà déclarée ailleurs — la phrase vient de la même ligne que le chiffre', JSON.stringify(u));
+      await ctx.close();
+    });
+    await essaie('registre pas su', async () => {
+      const ym = `${maintenant.getFullYear()}-${String(maintenant.getMonth() + 1).padStart(2, '0')}`;
+      const publie = { mois: [{ ym, n: 1, ca: 50, nMasq: 0, caMasq: 0, par: { Vinted: { n: 1, ca: 50 } }, nApres: 0, caApres: 0, nDouble: 0, caDouble: 0, nAilleurs: 0, caAilleurs: 0, declare: null }],
+        aDater: { n: 0, ca: 0, par: {} }, ecartees: 0, sources: { Vinted: 'lu', Leboncoin: 'lu', eBay: 'lu', Vestiaire: 'nonRelie' }, declare: 'pasSu', at: Date.now() };
+      const { ctx, pg, errs } = await ouvrir(b, { width: 1512, height: 950 }, true, 'dashboard', { publie });
+      const v = await pg.evaluate(() => { const e = document.querySelector('[data-urssaf-declare]'); return e ? e.getAttribute('data-urssaf-declare') : null; });
+      dit(v === 'pasSu', 'la carte URSSAF lit « registre pas encore lu » et le dit (le chiffre peut encore compter une vente déclarée ailleurs)', `declare=${v}`);
+      dit(errs.length === 0, 'aucune erreur d’app', errs.join(' | ').slice(0, 160));
       await ctx.close();
     });
     // ── « RIEN LU » NE VAUT PAS « RIEN » (revue du 5 octobre) ────────────────

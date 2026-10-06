@@ -3024,8 +3024,16 @@ const ymDeTs = (t) => { const d = new Date(t); return `${d.getFullYear()}-${Stri
 //    Une vente DÉCLARÉE compte dans le mois de sa déclaration, et plus nulle
 //    part ailleurs. C'est son IDENTITÉ (`plateforme:id`, §5) qui le dit — jamais
 //    un titre, jamais un montant.
-//    Une vente qui arrive APRÈS dans un mois déjà déclaré est marquée `apres` :
-//    « à régulariser », dite à côté du total, jamais cachée ni retirée.
+//    Une vente d'un mois déjà déclaré qui ne figure dans AUCUNE déclaration est
+//    marquée `apres` : « à régulariser », dite à côté du total, jamais cachée
+//    ni retirée. ⚠️ (revue du 6 octobre) Sauf si le mois a été déclaré « à la
+//    date de VENTE » (la règle d'avant le 3 octobre) et que la vente Vinted a
+//    été VENDUE un mois plus tôt : elle relève alors de la déclaration de SON
+//    mois de vente (`moisVenteAvant`), pas de celle-ci. La dire « à régulariser »
+//    faisait payer ses cotisations deux fois (mesuré : 30 ventes vendues en août
+//    et versées en septembre, 657,80 €). Elle ne redevient « à régulariser » que
+//    si son mois de vente est noté lui aussi — elle n'est alors dans aucune
+//    déclaration (le mois de vente noté au versement, par exemple).
 //    Une vente déclarée DEUX fois (deux mois la portent) compte une fois, dans
 //    le premier, et porte `double` : c'est à corriger auprès de l'URSSAF.
 // ⚠️ « Pas su » (registre pas encore chargé) ⇒ `null` : on ne déplace RIEN, et
@@ -3055,7 +3063,15 @@ const ventesDeclarables = ({ vinted, lbc, ebay, masquee, exclu, versements, decl
     if (!idx) return l;
     const d = idx.get(l.id);
     if (d) { l.ymVers = l.ym || null; l.ym = d[0]; l.declaree = true; if (d.length > 1) l.double = d.slice(); }
-    else if (l.ym && moisDeclare(declare, l.ym)) l.apres = true;
+    else if (l.ym && moisDeclare(declare, l.ym)) {
+      // L'absence de la liste ne prouve un oubli que selon la RÈGLE de la
+      // déclaration : à la date de vente, une vente Vinted vendue le mois d'avant
+      // appartient à la déclaration de ce mois-là.
+      const tv = l.plateforme === 'Vinted' ? Date.parse(l.dateVente || '') : 0;
+      const ymV = tv ? ymDeTs(tv) : null;
+      if (declare[l.ym].regle === 'vente' && ymV && ymV < l.ym && !moisDeclare(declare, ymV)) l.moisVenteAvant = ymV;
+      else l.apres = true;
+    }
     return l;
   };
   // Une vente sans date mais DÉCLARÉE n'est plus « à dater » : son mois est
@@ -3102,6 +3118,30 @@ const ventesDeclarables = ({ vinted, lbc, ebay, masquee, exclu, versements, decl
     if (garde(l)) lignes.push(place(l));
   }
   return { lignes, aDater, ecartees, exclues, declare: idx ? 'lu' : 'pasSu' };
+};
+// ⚠️⚠️ « J'AI DÉCLARÉ CE MOIS » NE S'ENREGISTRE QUE SUR UNE LECTURE COMPLÈTE
+// (revue du 6 octobre). La déclaration retient l'IDENTITÉ des ventes vues à cet
+// instant. Notée sur une lecture ratée (dates de versement illisibles ⇒ aucune
+// vente Vinted) ou partielle (un compte, Leboncoin ou eBay pas lus), elle
+// retenait une liste incomplète — `{ ids: [], n: 0, ca: 0 }` prouvé au banc — et
+// à la lecture suivante TOUT le mois passait « à régulariser » : payé deux fois
+// s'il suit le conseil. Le bouton est grisé avec la raison, et le GESTE refuse
+// lui-même (une lecture peut tomber pendant que le formulaire est ouvert).
+// Trois états, jamais deux : `null` = tout est lu ; sinon ce qui se lit encore
+// (`enCours`) et ce qui a échoué (`rates`). « Pas su » ne vaut pas « rien ».
+const lectureIncomplete = ({ registre, ventes, ventesErreur, comptesEchec, versements, lbc, ebay } = {}) => {
+  const enCours = [], rates = [];
+  if (registre == null) enCours.push('tes déclarations passées');
+  if (!Array.isArray(ventes)) enCours.push('tes ventes Vinted');
+  else if (ventesErreur) rates.push('tes ventes Vinted');
+  if (Array.isArray(comptesEchec) && comptesEchec.length) rates.push('les ventes de ' + comptesEchec.join(', '));
+  if (versements === undefined) enCours.push('les dates de versement Vinted');
+  else if (versements === null) rates.push('les dates de versement Vinted');
+  if (lbc === undefined) enCours.push('tes ventes Leboncoin');
+  else if (lbc === null) rates.push('tes ventes Leboncoin');
+  if (ebay === undefined) enCours.push('tes commandes eBay');
+  else if (!Array.isArray(ebay)) rates.push('tes commandes eBay');
+  return (enCours.length || rates.length) ? { enCours, rates } : null;
 };
 // ══════════════════════════════════════════════════════════════════════════════
 // LES VENTES FAITES, toutes plateformes — l'AUTRE notion (4 octobre)
@@ -3194,16 +3234,29 @@ const joursVenduRecu = (vendues, recues, n = 14, maintenant = Date.now()) => {
   for (const l of (recues || [])) { const j = par[cleJourLocal(l.ts)]; if (j && j.recu) { j.recu.n += 1; j.recu.eur += l.eur; } }
   return J;
 };
+// L'argent REÇU dans un mois = les lignes dont la date de VERSEMENT (`ts`) tombe
+// dans ce mois — la MÊME date que les barres « reçu » ci-dessus (§11).
+// ⚠️ Jamais `l.ym` (revue du 6 octobre) : depuis le registre « J'ai déclaré ce
+//    mois », `ym` est le mois de la DÉCLARATION — une vente versée en octobre
+//    et déclarée en septembre porte `ym = septembre`. C'est le bon mois pour
+//    l'URSSAF, pas pour « reçu » : « Reçu en octobre » l'excluait pendant que
+//    la barre du jour la comptait, deux « reçu » sur un écran.
+//    Une ligne sans date de versement (`ts` vide) n'est reçue dans aucun mois.
+const recuDuMois = (lignes, ym) => (lignes || []).reduce((a, l) => (l && l.ts && ymDeTs(l.ts) === ym) ? a + l.eur : a, 0);
 // Par mois : le total ET sa répartition par plateforme — les « dont » somment au
 // total, ils viennent des mêmes lignes (§5 : la phrase vient de la même source).
-// Et ce que le registre des déclarations change (6 octobre) : `apres` = arrivées
-// depuis la déclaration du mois (à régulariser), `double` = déclarées deux fois,
+// Et ce que le registre des déclarations change (6 octobre) : `apres` = dans un
+// mois déclaré, mais dans AUCUNE déclaration (à régulariser), `double` = déclarées deux fois,
 // `ailleurs` = versées ce mois-ci mais déclarées dans un AUTRE mois (comptées
 // là-bas, pas ici). Mêmes lignes que le total — la phrase vient de la même source.
+// `venteAvant` (revue du 6 octobre) = vendues un mois plus tôt, dans un mois
+// déclaré « à la date de vente » : elles relèvent de la déclaration de leur mois
+// de vente, elles ne sont PAS à régulariser ici (comptées, et dites à part).
 const caDeclarableParMois = (lignes) => {
   const map = {};
   const mois = (ym) => map[ym] || (map[ym] = { ym, n: 0, ca: 0, nMasq: 0, caMasq: 0, par: {},
-    nApres: 0, caApres: 0, nDouble: 0, caDouble: 0, nAilleurs: 0, caAilleurs: 0, ailleurs: {} });
+    nApres: 0, caApres: 0, nDouble: 0, caDouble: 0, nAilleurs: 0, caAilleurs: 0, ailleurs: {},
+    nVenteAvant: 0, caVenteAvant: 0, venteAvant: {} });
   for (const l of (lignes || [])) {
     const m = mois(l.ym);
     m.n += 1; m.ca += l.eur;
@@ -3211,6 +3264,7 @@ const caDeclarableParMois = (lignes) => {
     p.n += 1; p.ca += l.eur;
     if (l.masquee) { m.nMasq += 1; m.caMasq += l.eur; }
     if (l.apres) { m.nApres += 1; m.caApres += l.eur; }
+    if (l.moisVenteAvant) { m.nVenteAvant += 1; m.caVenteAvant += l.eur; m.venteAvant[l.moisVenteAvant] = (m.venteAvant[l.moisVenteAvant] || 0) + 1; }
     if (l.double) { m.nDouble += 1; m.caDouble += l.eur; }
     if (l.ymVers && l.ymVers !== l.ym) {
       const v = mois(l.ymVers);
@@ -5322,6 +5376,23 @@ const DEMANDE_SAISIE_PRIX = { on: false };
 // (21 sept.). Le teal #007782 ailleurs est « Vinted GO » le transporteur, une
 // autre notion — on n'y touche pas.
 const LBC_ORANGE = '#EC5A13';
+// Pourquoi « J'ai déclaré ce mois » ne s'enregistre pas (revue du 6 octobre) :
+// ce qui a ÉCHOUÉ et le geste, ou ce qui se lit ENCORE. `manque` vient de
+// `lectureIncomplete` (§11 : la même règle grise le bouton et arrête le geste).
+// `refus` = le geste vient d'être refusé (la lecture est tombée pendant que le
+// formulaire était ouvert) : on dit que RIEN n'est noté.
+function RaisonDeclBloquee({ manque, refus = false }) {
+  if (!manque) return null;
+  const rates = manque.rates || [], enCours = manque.enCours || [];
+  return (
+    <div data-decl-bloque="" {...(refus ? { 'data-decl-refus': '' } : {})} style={{fontSize:11.5,color:rates.length?C.warn:C.muted,lineHeight:1.45}}>
+      {refus && <b>Rien n'est noté. </b>}
+      {rates.length
+        ? <>Je n'ai pas pu lire {rates.join(', ')} : je ne note pas ta déclaration sur une liste incomplète — ce qui manquerait passerait ensuite « à régulariser ». Rouvre le rapport dans un moment.</>
+        : <>Lecture en cours ({enCours.join(', ')}) : le bouton s'active dès que tout est lu.</>}
+    </div>
+  );
+}
 function PlateformeLogo({ p, title }) {
   const M = {
     vinted: { bg: '#09B1BA', t: 'Vinted' },
@@ -11229,7 +11300,9 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
   // couverture À CÔTÉ du chiffre, jamais à la place).
   const urssafInfo = useMemo(() => {
     const v = load('vinted_urssaf_mois', null);
-    return v ? { aDater: v.aDater || null, sources: v.sources || null } : null;
+    // `declare` : le registre « J'ai déclaré ce mois » était-il lu quand la ligne
+    // a été publiée (`lu`) ou pas encore (`pasSu`) ? (revue du 6 octobre)
+    return v ? { aDater: v.aDater || null, sources: v.sources || null, declare: v.declare || null } : null;
   }, [liveStats]);
   const TAUX_URSSAF = tauxUrssaf()/100;
   // ⚠️ SANS LIGNE PUBLIÉE, ON NE RETOMBE PLUS SUR L'ARCHIVE (vide depuis
@@ -11786,9 +11859,26 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
               « 19,32 € à payer » et, dessous, « calculé sur 0,00 € ». Sur
               l'écran où il décide ce qu'il verse à l'URSSAF, c'est le pire
               endroit possible pour un chiffre invérifiable (§2.7). */}
+          {/* ⚠️ (revue du 6 octobre) « argent versé en octobre » sur un chiffre qui
+              EXCLUT une vente versée en octobre mais déjà déclarée en septembre
+              (registre « J'ai déclaré ce mois ») : la phrase le dit, des MÊMES
+              champs de la MÊME ligne publiée (`nAilleurs`, `caAilleurs`,
+              `ailleurs`) — et dit aussi quand le registre n'était pas encore lu
+              au moment du calcul (`declare: 'pasSu'`). */}
           {moisCourantCA==null
             ? <>Ce chiffre se calcule sur l'écran <b>Ventes</b> : ouvre-le une fois sur cet appareil et il s'affichera ici.</>
-            : <>Calculé sur le CA des ventes <b>finalisées</b> (argent versé) en {moisCourant.nom}, <b>toutes plateformes</b> (<b>{fmt(moisCourantCA)}</b>), ventes masquées comprises. C'est la somme à verser à la fin du mois (versement libératoire).</>}
+            : (() => {
+              const now=new Date(); const ym=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+              const e = (urssafMois||[]).find(m=>m.ym===ym) || {};
+              const nA = Number(e.nAilleurs)||0, caA = Number(e.caAilleurs)||0;
+              const ou = Object.keys(e.ailleurs||{}).sort().map(k=>{ const [y,m]=k.split('-'); return new Date(Number(y),Number(m)-1,1).toLocaleDateString('fr-FR',{month:'long',year:'numeric'}); }).join(', ');
+              const decl = (urssafInfo && urssafInfo.declare) || '';
+              return <span data-urssaf-declare={decl}>Calculé sur le CA des ventes <b>finalisées</b> (argent versé) en {moisCourant.nom}, <b>toutes plateformes</b> (<b>{fmt(moisCourantCA)}</b>), ventes masquées comprises
+                {nA > 0 && <span data-urssaf-ailleurs={Math.round(caA*100)} data-urssaf-ailleurs-n={nA}>, <b>hors {nA} vente{nA>1?'s':''} ({fmt(caA)})</b> versée{nA>1?'s':''} ce mois-ci mais déjà dans ta déclaration{ou ? <> de {ou}</> : null} — {nA>1?'elles ne sont pas recomptées':'elle n\'est pas recomptée'} ici</span>}
+                . C'est la somme à verser à la fin du mois (versement libératoire).
+                {decl === 'pasSu' && <span style={{color:C.warn}}> Tes déclarations passées (« J'ai déclaré ce mois ») n'étaient pas encore chargées quand ce chiffre a été calculé : une vente déjà déclarée peut encore y être comptée — ouvre l'écran <b>Ventes</b> pour le mettre à jour.</span>}
+              </span>;
+            })()}
         </div>
         {/* TOUTES PLATEFORMES (3 octobre) — les « dont » viennent de la MÊME
             ligne publiée que le total : ils somment au total, ils ne peuvent
@@ -19861,6 +19951,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     } catch (_) { return null; }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements, declUrssaf]);
+  // ⚠️⚠️ CE QUE LISENT LES DEUX RAPPORTS (mensuel, annuel) — revue du 6 octobre.
+  // Dates de versement illisibles ⇒ `declarables` vaut `null`, et c'est juste
+  // pour Ma journée et la publication (elles ne disent rien de « reçu »). Mais
+  // les rapports lisaient `declarables ? … : []` : ils perdaient AUSSI Leboncoin
+  // et eBay, lus correctement, et affichaient « 0,00 € · Aucune vente finalisée
+  // ce mois-ci » présenté comme un fait — et le bilan annuel « 0 € » pendant le
+  // simple chargement. Avant le registre (c0f69ca) Leboncoin et eBay y étaient.
+  // ⇒ Une seule règle (`ventesDeclarables`), et l'état de Vinted PORTÉ à côté :
+  //   `encours` (on ne sait pas encore) · `passu` (Leboncoin et eBay seuls, et
+  //   l'écran dit que Vinted manque) · `lu` (tout).
+  const declRapport = useMemo(() => {
+    if (declarables === undefined) return { lignes: [], aDater: [], vinted: 'encours' };
+    if (declarables) return { lignes: declarables.lignes, aDater: declarables.aDater, vinted: 'lu' };
+    if (lbcLu === undefined || ebayCmd === undefined) return { lignes: [], aDater: [], vinted: 'encours' };
+    try {
+      const r = ventesDeclarables({ lbc: lbcLu ? lbcVentes.ventes : [], ebay: ebayCmd || [], declare: declUrssaf });
+      return { lignes: r.lignes, aDater: r.aDater, vinted: 'passu' };
+    } catch (_) { return { lignes: [], aDater: [], vinted: 'passu' }; }
+  }, [declarables, lbcLu, lbcVentes, ebayCmd, declUrssaf]);
   // Les ventes FAITES, toutes plateformes (`ventesFaites`) : « Vendu aujourd'hui »,
   // « Vendu ce mois » et la colonne VENDU du graphique.
   const vendus = useMemo(() => ventesFaites({ vinted: sales.items || [], lbc: lbcLu ? lbcVentes.ventes : [], ebay: ebayCmd || [], cachee: isHidden }),
@@ -19894,8 +20003,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             // Le registre de ses déclarations (« J'ai déclaré ce mois ») : ce qui
             // a changé depuis, sur les MÊMES lignes que le total (§5).
             nApres: m.nApres, caApres: r2(m.caApres), nDouble: m.nDouble, caDouble: r2(m.caDouble),
-            nAilleurs: m.nAilleurs, caAilleurs: r2(m.caAilleurs),
-            declare: d ? { ca: d.ca, montant: d.montant != null ? d.montant : null, at: d.at || null } : null };
+            nAilleurs: m.nAilleurs, caAilleurs: r2(m.caAilleurs), ailleurs: m.ailleurs,
+            declare: d ?{ ca: d.ca, montant: d.montant != null ? d.montant : null, at: d.at || null } : null };
         })
         .sort((a,b)=> a.ym < b.ym ? 1 : -1);
       const parAd = {};
@@ -22847,10 +22956,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     //    · le mois : celui de la DÉCLARATION s'il y en a une, sinon celui du
     //      VERSEMENT (Vinted), de la vente (Leboncoin) ou de la commande (eBay).
     //    Le prix d'achat et le boost viennent de la fiche de la paire (`effEntry`).
-    let nApres=0, caApres=0, nDouble=0, caDouble=0, nAilleurs=0, caAilleurs=0;
-    const ailleurs = {}, doubles = new Set();
+    // ⚠️ (revue du 6 octobre) Via `declRapport` : dates de versement illisibles,
+    //    Leboncoin et eBay restent comptés et Vinted est DIT absent (`vinted`).
+    let nApres=0, caApres=0, nDouble=0, caDouble=0, nAilleurs=0, caAilleurs=0, nVenteAvant=0, caVenteAvant=0;
+    const ailleurs = {}, doubles = new Set(), venteAvant = {};
     const parPlateforme = { Vinted: { n: 0, ca: 0 } };
-    for (const l of (declarables ? declarables.lignes : [])) {
+    for (const l of declRapport.lignes) {
       if (l.ymVers === reportMonth && l.ym !== reportMonth) { nAilleurs+=1; caAilleurs+=l.eur; ailleurs[l.ym]=(ailleurs[l.ym]||0)+1; }
       if (l.ym !== reportMonth) continue;
       const sell = l.eur;
@@ -22863,18 +22974,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       }
       if (l.masquee) { nMasq+=1; caMasq+=sell; }
       if (l.apres) { nApres+=1; caApres+=sell; }
+      if (l.moisVenteAvant) { nVenteAvant+=1; caVenteAvant+=sell; venteAvant[l.moisVenteAvant]=(venteAvant[l.moisVenteAvant]||0)+1; }
       if (l.double) { nDouble+=1; caDouble+=sell; l.double.forEach(m => doubles.add(m)); }
       ca+=sell; nb+=1; frais+=fee;
       if (buy!=null) { cout+=buy; nbCout+=1; margeKnown+=(sell-buy); fraisConnu+=fee; }
       const pp = parPlateforme[l.plateforme] || (parPlateforme[l.plateforme] = { n: 0, ca: 0 });
       pp.n += 1; pp.ca += sell;
       saleLines.push({ id: l.id, date: l.ts ? new Date(l.ts).toISOString() : null, dateVente: l.dateVente, num, title: l.titre, sell, buy, fee,
-        plateforme: l.plateforme, apres: !!l.apres, declaree: !!l.declaree, ymVers: l.ymVers || null });
+        plateforme: l.plateforme, apres: !!l.apres, venteAvant: l.moisVenteAvant || null, declaree: !!l.declaree, ymVers: l.ymVers || null });
     }
     // « À dater », toutes plateformes : Vinted sans date de versement compris.
-    const tousADater = ventesDeclarables({ vinted: sales.items, lbc: lbcLu ? lbcVentes.ventes : [], ebay: ebayCmd || [], exclu: acctOffOf, versements: versements || {}, declare: declUrssaf }).aDater;
+    // ⚠️ Dates de versement ILLISIBLES : ses ventes Vinted ne sont pas « sans
+    //    date » (on n'a pas pu les lire) — seules Leboncoin et eBay comptent ici.
+    const tousADater = versements === null ? (declRapport.aDater || [])
+      : ventesDeclarables({ vinted: sales.items, lbc: lbcLu ? lbcVentes.ventes : [], ebay: ebayCmd || [], exclu: acctOffOf, versements: versements || {}, declare: declUrssaf }).aDater;
     const aDater = { n: tousADater.length, ca: tousADater.reduce((t, l) => t + l.eur, 0) };
-    const sourcesKO = [versements === null ? 'Vinted (dates de versement)' : null, lbcLu === null ? 'Leboncoin' : null, ebayCmd === null ? 'eBay' : null].filter(Boolean);
+    // Les comptes dont les ventes n'ont pas pu être lues — sauf ceux qu'il a
+    // EXCLUS (leurs ventes ne comptent jamais : leur absence ne manque à rien).
+    const comptesEchec = (sales.failed || []).filter(nom => !accounts.some(a => accNameOf(a) === nom && acctOff(a.vinted_user_id)));
+    const sourcesKO = [versements === null ? 'Vinted (dates de versement)' : null, comptesEchec.length ? `Vinted (${comptesEchec.join(', ')})` : null, lbcLu === null ? 'Leboncoin' : null, ebayCmd === null ? 'eBay' : null].filter(Boolean);
     // Registre des ventes : dans l'ordre du mois, comme le relevé d'un comptable.
     saleLines.sort((a,b)=> new Date(a.date)-new Date(b.date));
     // Registre d'achats du mois (hors annulés).
@@ -22900,11 +23018,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const urssaf = aPayerUrssaf(ca, taux);
     // Le registre de ses déclarations, pour CE mois (« J'ai déclaré ce mois »).
     const declaration = moisDeclare(declUrssaf, reportMonth) ? declUrssaf[reportMonth] : null;
-    const enCours = declarables === undefined;
+    const enCours = declRapport.vinted === 'encours';
+    // Peut-on noter « J'ai déclaré ce mois » ? Seulement sur une lecture complète.
+    const incomplet = lectureIncomplete({ registre: declUrssaf, ventes: sales.items, ventesErreur: !!sales.error, comptesEchec, versements, lbc: lbcLu, ebay: ebayCmd });
     return { regime, tvaRate, monthLabel, ca, cout, frais, nb, nbCout, benefNet, marge, tvaMarge, margeHT, taux, urssaf, nMasq, caMasq, nAttente, caAttente, saleLines, buyLines, achatsTotal, parPlateforme, aDater, sourcesKO,
-      nApres, caApres, nDouble, caDouble, doubles: [...doubles].sort(), nAilleurs, caAilleurs, ailleurs, declaration, declarePasSu: declUrssaf == null, enCours };
+      nApres, caApres, nDouble, caDouble, doubles: [...doubles].sort(), nAilleurs, caAilleurs, ailleurs, nVenteAvant, caVenteAvant, venteAvant, declaration, declarePasSu: declUrssaf == null, enCours,
+      vinted: declRapport.vinted, incomplet };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, buysBase, reportMonth, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements, declarables, declUrssaf]);
+  }, [sales.items, sales.failed, sales.error, accounts, buysBase, reportMonth, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements, declarables, declRapport, declUrssaf]);
 
   // ── « J'AI DÉCLARÉ CE MOIS » (6 octobre) ──────────────────────────────────
   // Il note, SUR SON CLIC, ce qu'il a déclaré à l'URSSAF pour un mois : l'app
@@ -22933,7 +23054,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [moisAncienneRegle, sales.items, reportMonth, hiddenAccts, panelAcctOff]);
   const declarerMois = (regle, montantTxt) => {
-    if (declUrssaf == null || report.enCours) return;
+    // ⚠️ LA GARDE EST DANS LE GESTE, pas seulement sur le bouton (revue du
+    //    6 octobre) : une lecture peut tomber PENDANT que le formulaire est
+    //    ouvert. Recalculée ici, sur l'état du moment — jamais une liste
+    //    incomplète notée comme sa déclaration (tout ce qui manque passerait
+    //    ensuite « à régulariser » : payé deux fois).
+    const comptesEchec = (sales.failed || []).filter(nom => !accounts.some(a => accNameOf(a) === nom && acctOff(a.vinted_user_id)));
+    const manque = lectureIncomplete({ registre: declUrssaf, ventes: sales.items, ventesErreur: !!sales.error, comptesEchec, versements, lbc: lbcLu, ebay: ebayCmd });
+    if (manque || !declarables) { setDeclForm(f => f ? { ...f, refus: manque || { enCours: [], rates: ['les dates de versement Vinted'] } } : f); return; }
     const ids = regle === 'vente' && ancienneRegle ? ancienneRegle.ids : report.saleLines.map(l => l.id).filter(Boolean);
     const ca = regle === 'vente' && ancienneRegle ? ancienneRegle.ca : Math.round(report.ca * 100) / 100;
     const m = parseFloat(String(montantTxt || '').replace(/\s/g, '').replace(',', '.'));
@@ -22981,7 +23109,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (R.nAttente>0) L.push([`Ventes de ce mois pas encore finalisees (hors CA)`,`${R.nAttente}`,R.caAttente.toFixed(2)]);
     // Le registre de ses déclarations : ce qui a été déclaré, et ce qui a bougé depuis.
     if (R.declaration) L.push([`Declare a l'URSSAF le ${new Date(R.declaration.at).toLocaleDateString('fr-FR')}`,`${R.declaration.n}`,Number(R.declaration.ca||0).toFixed(2)]);
-    if (R.nApres>0) L.push([`Ventes arrivees apres la declaration (a regulariser)`,`${R.nApres}`,R.caApres.toFixed(2)]);
+    if (R.nApres>0) L.push([`Ventes absentes de toute declaration (a regulariser)`,`${R.nApres}`,R.caApres.toFixed(2)]);
+    if (R.nVenteAvant>0) L.push([`Ventes vendues un mois plus tot (relevent de la declaration de leur mois de vente)`,`${R.nVenteAvant}`,R.caVenteAvant.toFixed(2)]);
+    if (R.vinted==='passu') L.push([`ATTENTION : dates de versement Vinted illisibles - ventes Vinted absentes de ce document`]);
+    if ((R.sourcesKO||[]).length) L.push([`Sources non lues : ${R.sourcesKO.join(', ')}`]);
     if (R.nDouble>0) L.push([`Ventes declarees deux fois (${R.doubles.join(', ')})`,`${R.nDouble}`,R.caDouble.toFixed(2)]);
     if (R.nAilleurs>0) L.push([`Ventes versees ce mois deja declarees dans un autre mois (non recomptees)`,`${R.nAilleurs}`,R.caAilleurs.toFixed(2)]);
     const csv = L.map(r=>r.map(e).join(';')).join('\n');
@@ -23005,6 +23136,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     else { kv('Bénéfice net', (R.nbCout===0&&R.nb>0) ? 'inconnu — aucun prix d\'achat saisi' : R.benefNet.toFixed(2)+' EUR'+(R.nbCout<R.nb?` (sur ${R.nbCout}/${R.nb} ventes au coût connu)`:''), true); kv('Estimation cotisations ('+String(R.taux).replace('.',',')+'%)', R.urssaf.toFixed(2)+' EUR'); }
     if (R.nMasq>0) kv('dont ventes masquees dans l\'app (comptees)', R.nMasq+' — '+R.caMasq.toFixed(2)+' EUR');
     if (R.nAttente>0) kv('Ventes de ce mois pas encore finalisees (hors CA)', R.nAttente+' — '+R.caAttente.toFixed(2)+' EUR');
+    if (R.vinted==='passu') kv('ATTENTION', 'dates de versement Vinted illisibles : ventes Vinted absentes');
     kv('Nombre de ventes', String(R.nb));
     kv('Achats du mois (registre)', R.buyLines.length+' — '+R.achatsTotal.toFixed(2)+' EUR');
     // ── Les REGISTRES, ligne par ligne (G2) : le comptable rapproche les ventes
@@ -23066,7 +23198,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     //    compte dans le mois où il l'a DÉCLARÉE, sinon celui du versement. Le
     //    total de l'année est donc, par construction, la somme des mois.
     const parPlateforme = { Vinted: { n: 0, ca: 0 } };
-    for (const l of (declarables ? declarables.lignes : [])) {
+    // ⚠️ (revue du 6 octobre) Via `declRapport` : dates de versement illisibles,
+    //    Leboncoin et eBay restent comptés et Vinted est DIT absent (`vinted`) ;
+    //    pendant la lecture, `vinted: 'encours'` — jamais « 0 € ».
+    for (const l of declRapport.lignes) {
       const [y, mm] = String(l.ym || '').split('-').map(Number);
       if (y !== reportYear || !(mm >= 1 && mm <= 12)) continue;
       const mo = months[mm - 1];
@@ -23108,9 +23243,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const margeHT = marge - tvaMarge;
     const taux = tauxUrssaf();
     const urssaf = aPayerUrssaf(ca, taux);
-    return { regime, tvaRate, year:reportYear, months, ca, cout, frais, nb, nbCout, benefNet, marge, tvaMarge, margeHT, taux, urssaf, nMasq, caMasq, achatsTotal, achatsNb, buyLines, saleLines, parPlateforme, enCours: declarables === undefined };
+    return { regime, tvaRate, year:reportYear, months, ca, cout, frais, nb, nbCout, benefNet, marge, tvaMarge, margeHT, taux, urssaf, nMasq, caMasq, achatsTotal, achatsNb, buyLines, saleLines, parPlateforme,
+      enCours: declRapport.vinted === 'encours', vinted: declRapport.vinted };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, buysBase, reportYear, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements, declarables]);
+  }, [sales.items, buysBase, reportYear, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements, declarables, declRapport]);
   const [capturedReceipts, setCapturedReceipts] = useState([]); // reçus officiels Vinted captés (compta pro)
   const [recusPasLus, setRecusPasLus] = useState(0); // comptes dont la lecture du reçu a échoué (pas su ≠ aucun)
   const openAnnual = async () => {
@@ -23150,6 +23286,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (R.regime==='marge') { L.push(['Marge TTC',R.marge.toFixed(2)]); L.push([`TVA sur marge (${R.tvaRate}%)`,R.tvaMarge.toFixed(2)]); L.push(['Marge HT',R.margeHT.toFixed(2)]); }
     else { L.push([`Estimation cotisations (${String(R.taux).replace('.',',')}%)`,R.urssaf.toFixed(2)]); }
     if (R.nMasq>0) L.push([`dont ${R.nMasq} vente(s) masquée(s) dans l'app, comptées dans le CA`,R.caMasq.toFixed(2)]);
+    // Ce qui manque part AVEC le document (§5) : il va chez un comptable.
+    if (R.vinted==='passu') L.push([`ATTENTION : dates de versement Vinted illisibles - ventes Vinted absentes de ce bilan`]);
     const csv = L.map(r=>r.map(e).join(';')).join('\n');
     const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'}); const url=URL.createObjectURL(blob);
     const a=document.createElement('a'); a.href=url; a.download=`bilan-${R.year}.csv`; document.body.appendChild(a); a.click(); a.remove();
@@ -23170,6 +23308,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     T('TOTAL',40,y-8,10,bold); T(R.ca.toFixed(0),150,y-8,10,bold); T(R.cout.toFixed(0),240,y-8,10,bold); T(R.frais.toFixed(0),330,y-8,10,bold); T(R.benefNet.toFixed(0),420,y-8,10,bold); T(String(R.nb),510,y-8,10,bold); y-=34;
     const kv=(k,v)=>{ T(k,40,y,10,reg,rgb(0.4,0.4,0.4)); T(v,300,y,11,bold); y-=20; };
     kv('Achats (registre)', R.achatsTotal.toFixed(2)+' EUR ('+R.achatsNb+')');
+    if (R.vinted==='passu') kv('ATTENTION', 'dates de versement Vinted illisibles : ventes Vinted absentes');
     if (R.regime==='marge') { kv('Marge TTC', R.marge.toFixed(2)+' EUR'); kv('TVA sur la marge ('+R.tvaRate+'%)', R.tvaMarge.toFixed(2)+' EUR'); kv('Marge HT', R.margeHT.toFixed(2)+' EUR'); }
     else { kv('Bénéfice net', R.benefNet.toFixed(2)+' EUR'+(R.nbCout<R.nb?` (sur ${R.nbCout}/${R.nb} ventes au coût connu)`:'')); kv('Estimation cotisations ('+String(R.taux).replace('.',',')+'%)', R.urssaf.toFixed(2)+' EUR'); }
     for (const [k,v] of Object.entries(R.parPlateforme||{})) if (k!=='Vinted' && v.n>0) kv('dont '+k, v.ca.toFixed(2)+' EUR ('+v.n+')');
@@ -23670,9 +23809,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const debutMois = new Date(minuit); debutMois.setDate(1);
         const { n: moisN, eur: moisEur } = bilanVentes(debutMois.getTime());
         const ymIci = ymDeTs(Date.now());
-        const recuMois = declarables ? declarables.lignes.reduce((a, l) => l.ym === ymIci ? a + l.eur : a, 0) : null;
+        // REÇU = au mois du VERSEMENT (`recuDuMois`, la date des barres) — jamais
+        // le mois de déclaration, qui peut être un autre (revue du 6 octobre).
+        const recuMois = declarables ? recuDuMois(declarables.lignes, ymIci) : null;
         const moisNom = new Date().toLocaleDateString('fr-FR',{month:'long'});
         const adVinted = declarables ? declarables.aDater.filter(l => l.plateforme === 'Vinted').length : 0;
+        // Ce qui a été versé ce mois-ci mais DÉCLARÉ dans un autre mois : c'est
+        // de l'argent reçu, ce n'est pas le CA déclaré de ce mois. La phrase sous
+        // le chiffre le dit, des MÊMES lignes (§5).
+        const recuDeclareAilleurs = declarables ? declarables.lignes.filter(l => l.ts && ymDeTs(l.ts) === ymIci && l.ym !== ymIci) : [];
+        const caDeclareAilleurs = recuDeclareAilleurs.reduce((a, l) => a + l.eur, 0);
+        const moisDeclAilleurs = [...new Set(recuDeclareAilleurs.map(l => l.ym))].sort().map(ym => { const [y, m] = ym.split('-'); return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString('fr-FR', { month: 'long' }); }).join(', ');
         const joursActifs = jours14.some(j => j.vendu.eur > 0 || (j.recu && j.recu.eur > 0));
         return (
           <div>
@@ -23756,7 +23903,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div data-recu-mois={recuMois==null?'':Math.round(recuMois*100)} style={{marginTop:16,paddingTop:13,borderTop:'1px solid rgba(255,255,255,.13)',display:'flex',alignItems:'baseline',gap:10,flexWrap:'wrap'}}>
                     <span style={{fontSize:11,fontWeight:600,letterSpacing:0.7,textTransform:'uppercase',opacity:.72}}>Reçu en {moisNom}</span>
                     <span className="vrm-display" style={{fontSize:22,fontWeight:700,fontVariantNumeric:'tabular-nums'}}>{declarables === undefined ? '…' : recuMois == null ? '—' : `${Math.round(recuMois).toLocaleString('fr-FR')} €`}</span>
-                    <span style={{fontSize:12,opacity:.72}}>{declarables === null ? 'dates de versement illisibles pour l\'instant' : 'ventes finalisées, argent versé · ton CA déclaré'}</span>
+                    <span style={{fontSize:12,opacity:.72}}>{declarables === null ? 'dates de versement illisibles pour l\'instant' : caDeclareAilleurs > 0 ? `ventes finalisées, argent versé · dont ${Math.round(caDeclareAilleurs).toLocaleString('fr-FR')} € déjà dans ta déclaration de ${moisDeclAilleurs}` : 'ventes finalisées, argent versé · ton CA déclaré'}</span>
                   </div>
                 </div>
               </button>
@@ -27474,19 +27621,29 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 </select>
               </div>
               {buys.loading && <div style={{fontSize:12,color:C.muted,marginBottom:10}}>Chargement du registre d'achats…</div>}
-              <div style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:14}}>
-                <StatBox label="CA des ventes finalisées" value={fmtE(annual.ca)} sub={`${annual.nb} vente${annual.nb>1?'s':''}`+Object.entries(annual.parPlateforme||{}).filter(([k,v])=>k!=='Vinted'&&v.n>0).map(([k,v])=>` · dont ${k} ${fmtE(v.ca)}`).join('')}/>
+              {/* ⚠️ (revue du 6 octobre) Le bilan ne rendait pas `enCours` : il
+                  affichait « 0 € » pendant le simple chargement, et « 0 € » aussi
+                  quand les dates de versement Vinted étaient illisibles — en
+                  perdant Leboncoin et eBay au passage. Pendant la lecture : « … ».
+                  Vinted illisible : le CA connu (Leboncoin, eBay) avec la mention
+                  « sans Vinted », et aucune cotisation chiffrée dessus. */}
+              {(() => { const inc = annual.enCours ? '…' : annual.vinted === 'passu' ? '—' : null; return (
+              <div data-annuel-vinted={annual.enCours ? 'encours' : annual.vinted} style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:14}}>
+                <StatBox label="CA des ventes finalisées" value={annual.enCours ? '…' : (annual.vinted === 'passu' && !annual.nb) ? '—' : fmtE(annual.ca)}
+                  subColor={annual.vinted === 'passu' ? C.warn : undefined}
+                  sub={annual.enCours ? 'lecture des ventes en cours' : (annual.vinted === 'passu' ? 'sans Vinted' + (annual.nb ? ` · ${annual.nb} vente${annual.nb>1?'s':''}` : '') : `${annual.nb} vente${annual.nb>1?'s':''}`)+Object.entries(annual.parPlateforme||{}).filter(([k,v])=>k!=='Vinted'&&v.n>0).map(([k,v])=>` · dont ${k} ${fmtE(v.ca)}`).join('')}/>
                 {annual.regime==='marge' ? (<>
-                  <StatBox label="Marge TTC" value={fmtE(annual.marge)} color={annual.marge>=0?INV_STATUS.online.color:C.danger}/>
-                  <StatBox label={`TVA marge ${annual.tvaRate}%`} value={fmtE(annual.tvaMarge)} color={C.warn}/>
-                  <StatBox label="Marge HT" value={fmtE(annual.margeHT)}/>
+                  <StatBox label="Marge TTC" value={inc ?? fmtE(annual.marge)} color={inc ? C.muted : annual.marge>=0?INV_STATUS.online.color:C.danger}/>
+                  <StatBox label={`TVA marge ${annual.tvaRate}%`} value={inc ?? fmtE(annual.tvaMarge)} color={inc ? C.muted : C.warn}/>
+                  <StatBox label="Marge HT" value={inc ?? fmtE(annual.margeHT)}/>
                 </>) : (<>
-                  <StatBox label="Bénéfice net" value={fmtE(annual.benefNet)} color={annual.benefNet>=0?INV_STATUS.online.color:C.danger}
+                  <StatBox label="Bénéfice net" value={inc ?? fmtE(annual.benefNet)} color={inc ? C.muted : annual.benefNet>=0?INV_STATUS.online.color:C.danger}
                     subColor={annual.nbCout<annual.nb?C.warn:undefined}
-                    sub={annual.nbCout<annual.nb?`sur ${annual.nbCout} vente${annual.nbCout>1?'s':''} sur ${annual.nb} — prix d'achat manquants`:(annual.frais>0?`boosts ${fmtE(annual.frais)}`:undefined)}/>
-                  <StatBox label="Cotisations est." value={fmtE(annual.urssaf)} color={C.warn} sub={`${String(annual.taux).replace('.',',')} % du CA · réglable`}/>
+                    sub={inc ? undefined : annual.nbCout<annual.nb?`sur ${annual.nbCout} vente${annual.nbCout>1?'s':''} sur ${annual.nb} — prix d'achat manquants`:(annual.frais>0?`boosts ${fmtE(annual.frais)}`:undefined)}/>
+                  <StatBox label="Cotisations est." value={inc ?? fmtE(annual.urssaf)} color={inc ? C.muted : C.warn} sub={inc === '—' ? 'attend tes ventes Vinted' : `${String(annual.taux).replace('.',',')} % du CA · réglable`}/>
                 </>)}
-              </div>
+              </div>); })()}
+              {annual.vinted === 'passu' && !annual.enCours && <div data-annuel-sans-vinted style={{fontSize:12,color:C.warn,lineHeight:1.45,marginBottom:12}}>Les dates de versement de tes ventes Vinted n'ont pas pu être lues : elles ne sont dans aucun mois ci-dessous — ce n'est pas zéro. Rouvre le registre dans un moment.</div>}
               {annual.nb>annual.nbCout && <div style={{fontSize:12,color:C.warn,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'8px 12px',marginBottom:12}}>⚠️ {annual.nb-annual.nbCout} vente(s) sans prix d'achat — le bénéfice est incomplet.</div>}
               {annual.nMasq>0 && <div style={{fontSize:12,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderLeft:`3px solid ${C.accent}`,borderRadius:8,padding:'8px 12px',marginBottom:12}}>
                 <b>{annual.nMasq} vente{annual.nMasq>1?'s':''} masquée{annual.nMasq>1?'s':''} dans l'app</b> ({fmtE(annual.caMasq)}) {annual.nMasq>1?'sont comptées':'est comptée'} dans ce CA.
@@ -27515,7 +27672,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     );})}
                     <tr style={{borderTop:`2px solid ${C.border}`,color:C.text,textAlign:'right',fontWeight:700}}>
                       <td style={{textAlign:'left',padding:'6px'}}>TOTAL</td>
-                      <td style={{padding:'6px'}}>{annual.ca.toFixed(0)} €</td>
+                      <td style={{padding:'6px'}}>{annual.enCours ? '…' : (annual.vinted === 'passu' && !annual.nb) ? '—' : `${annual.ca.toFixed(0)} €`}</td>
                       <td style={{padding:'6px'}}>{annual.cout.toFixed(0)} €</td>
                       <td style={{padding:'6px',color:annual.benefNet>=0?INV_STATUS.online.color:C.danger}}>{(annual.benefNet>=0?'+':'')+annual.benefNet.toFixed(0)} €</td>
                       <td style={{padding:'6px'}}>{annual.nb}</td>
@@ -28061,13 +28218,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 )}
               </div>
               {buys.loading && <div style={{fontSize:12,color:C.muted,marginBottom:10}}>Chargement du registre d'achats…</div>}
-              {/* Chiffres clés selon le régime */}
-              <div style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:14}}>
-                <StatBox label="CA des ventes finalisées" value={fmtE(report.ca)} sub={`${report.nb} vente${report.nb>1?'s':''}`}/>
+              {/* Chiffres clés selon le régime.
+                  ⚠️ (revue du 6 octobre) Pendant la lecture : « … », jamais
+                  « 0,00 € ». Dates de versement Vinted illisibles : le CA est
+                  celui qu'on CONNAÎT (Leboncoin, eBay) et le dit (« sans
+                  Vinted ») — « — » s'il n'y a rien ; aucune cotisation ni marge
+                  chiffrée sur un CA amputé de Vinted (un montant à payer partiel
+                  présenté comme complet est pire qu'un tiret, §5). */}
+              {(() => { const inc = report.enCours ? '…' : report.vinted === 'passu' ? '—' : null; return (
+              <div data-rapport-vinted={report.enCours ? 'encours' : report.vinted} style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:14}}>
+                <StatBox label="CA des ventes finalisées" value={report.enCours ? '…' : (report.vinted === 'passu' && !report.nb) ? '—' : fmtE(report.ca)}
+                  subColor={report.vinted === 'passu' ? C.warn : undefined}
+                  sub={report.enCours ? 'lecture des ventes en cours' : report.vinted === 'passu' ? `sans Vinted (dates de versement illisibles)${report.nb ? ` · ${report.nb} vente${report.nb>1?'s':''} Leboncoin/eBay` : ''}` : `${report.nb} vente${report.nb>1?'s':''}`}/>
                 {report.regime==='marge' ? (<>
-                  <StatBox label="Marge TTC" value={fmtE(report.marge)} color={report.marge>=0?INV_STATUS.online.color:C.danger}/>
-                  <StatBox label={`TVA marge ${report.tvaRate}%`} value={fmtE(report.tvaMarge)} color={C.warn}/>
-                  <StatBox label="Marge HT" value={fmtE(report.margeHT)}/>
+                  <StatBox label="Marge TTC" value={inc ?? fmtE(report.marge)} color={inc ? C.muted : report.marge>=0?INV_STATUS.online.color:C.danger}/>
+                  <StatBox label={`TVA marge ${report.tvaRate}%`} value={inc ?? fmtE(report.tvaMarge)} color={inc ? C.muted : C.warn}/>
+                  <StatBox label="Marge HT" value={inc ?? fmtE(report.margeHT)}/>
                 </>) : (<>
                   {/* ⚠️ UNE SEULE COULEUR, ET ELLE EST RARE (§5.90). La modale avait
                       gardé l'ancienne identité — un vert et un ambre côte à côte,
@@ -28075,12 +28241,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       derrière est passé à l'encre. Ces deux chiffres n'appellent
                       aucune action : ce sont des faits. Le rouge reste pour un
                       bénéfice NÉGATIF, qui lui en appelle une. */}
-                  <StatBox label="Bénéfice net" value={report.nbCout===0?'—':fmtE(report.benefNet)} color={report.nbCout===0||report.benefNet>=0?C.text:C.danger}
+                  <StatBox label="Bénéfice net" value={report.enCours?'…':report.nbCout===0?'—':fmtE(report.benefNet)} color={report.nbCout===0||report.benefNet>=0?C.text:C.danger}
                     subColor={report.nbCout<report.nb?C.warn:undefined}
                     sub={report.nbCout===0&&report.nb>0?`aucun prix d'achat saisi pour ${report.nb>1?'ces':'cette'} ${report.nb} vente${report.nb>1?'s':''}`:report.nbCout<report.nb?`sur ${report.nbCout} vente${report.nbCout>1?'s':''} sur ${report.nb} — prix d'achat manquants`:(report.frais>0?`boosts ${fmtE(report.frais)}`:undefined)}/>
-                  <StatBox label="Cotisations est." value={fmtE(report.urssaf)} sub={`${String(report.taux).replace('.',',')} % du CA · réglable`}/>
+                  <StatBox label="Cotisations est." value={inc ?? fmtE(report.urssaf)} sub={inc === '—' ? 'attend tes ventes Vinted' : `${String(report.taux).replace('.',',')} % du CA · réglable`}/>
                 </>)}
-              </div>
+              </div>); })()}
               {/* ⚠️ Les ventes masquées à l'écran COMPTENT dans le CA déclaré.
                   On l'écrit, sinon le chiffre paraîtrait inexplicablement plus
                   haut que la liste de l'onglet Ventes. */}
@@ -28111,7 +28277,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   const ou = Object.keys(report.ailleurs||{}).sort().map(nomMois).join(', ');
                   lignes.push(<div key="ail" data-decl="ailleurs"><b>{report.nAilleurs} vente{report.nAilleurs>1?'s':''} versée{report.nAilleurs>1?'s':''} ce mois-ci ({fmtE(report.caAilleurs)})</b> {report.nAilleurs>1?'sont':'est'} déjà dans ta déclaration {de(ou)} : {report.nAilleurs>1?'elles ne sont pas recomptées':'elle n\'est pas recomptée'} ici.</div>);
                 }
-                if (d && report.nApres>0) lignes.push(<div key="apr" data-decl="apres"><b style={{color:C.warn}}>+ {report.nApres} vente{report.nApres>1?'s':''} ({fmtE(report.caApres)})</b> {report.nApres>1?'sont arrivées':'est arrivée'} dans ce mois après ta déclaration : à ajouter à ta prochaine déclaration (régularisation).</div>);
+                // ⚠️ (revue du 6 octobre) Pas « arrivées APRÈS ta déclaration » : rien
+                //    ne compare de date. Ce qui est vrai, quelle que soit la règle
+                //    de la déclaration : ces ventes ne sont dans AUCUNE (une vente
+                //    déclarée ailleurs n'est pas ici, elle est « déjà déclarée »).
+                if (d && report.nApres>0) lignes.push(<div key="apr" data-decl="apres" data-decl-n={report.nApres} data-decl-cents={Math.round(report.caApres*100)}><b style={{color:C.warn}}>+ {report.nApres} vente{report.nApres>1?'s':''} ({fmtE(report.caApres)})</b> de ce mois {report.nApres>1?'ne figurent':'ne figure'} dans aucune de tes déclarations : à ajouter à ta prochaine déclaration (régularisation).</div>);
+                // Déclaré à la DATE DE VENTE : une vente vendue le mois d'avant relève
+                // de la déclaration de son mois de vente — la dire « à régulariser »
+                // faisait payer ses cotisations deux fois.
+                if (d && report.nVenteAvant>0) {
+                  const mv = Object.keys(report.venteAvant||{}).sort();
+                  lignes.push(<div key="va" data-decl="venteavant" data-decl-n={report.nVenteAvant} data-decl-cents={Math.round(report.caVenteAvant*100)}><b>{report.nVenteAvant} vente{report.nVenteAvant>1?'s':''} ({fmtE(report.caVenteAvant)})</b> {report.nVenteAvant>1?'ont été vendues':'a été vendue'} en {mv.map(nomMois).join(', ')} et versée{report.nVenteAvant>1?'s':''} ce mois-ci : déclaré à la date de vente, {report.nVenteAvant>1?'elles relèvent':'elle relève'} de ta déclaration {de(mv.map(nomMois).join(', '))}, pas de celle-ci : <b>rien à régulariser</b>. Note {mv.length>1?'ces mois-là':'ce mois-là'} dans ce rapport pour qu'{report.nVenteAvant>1?'elles n\'y soient':'elle n\'y soit'} plus comptée{report.nVenteAvant>1?'s':''}.</div>);
+                }
                 if (report.nDouble>0) lignes.push(<div key="dbl" data-decl="double"><b style={{color:C.warn}}>{report.nDouble} vente{report.nDouble>1?'s':''} ({fmtE(report.caDouble)})</b> {report.nDouble>1?'figurent':'figure'} dans deux de tes déclarations ({report.doubles.map(nomMois).join(' et ')}) : {report.nDouble>1?'elles sont comptées':'elle est comptée'} une fois ici. Signale-le à l'URSSAF lors de ta prochaine déclaration.</div>);
                 if (!d && !passe && !lignes.length) return null;
                 const ecart = d && d.montant != null ? Math.round((d.montant - Number(d.ca||0)) * 100) / 100 : null;
@@ -28147,15 +28324,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           <span style={{fontSize:11.5,color:C.muted}}>Montant de ta déclaration, tel qu'il est sur ton espace URSSAF (facultatif — je le compare)</span>
                           <input inputMode="decimal" value={declForm.montant} onChange={e=>setDeclForm(f=>({...f, montant:e.target.value}))} placeholder="ex. 1 234,50" style={{border:`1px solid ${C.border}`,borderRadius:8,padding:'7px 10px',fontSize:16,background:C.bg,color:C.text,maxWidth:200,fontFamily:'inherit'}}/>
                         </label>
+                        {(report.incomplet || (declForm.refus && !declarables)) && <RaisonDeclBloquee manque={report.incomplet || declForm.refus} refus={!!declForm.refus}/>}
                         <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
                           <button type="button" data-decl-enregistrer onClick={()=>declarerMois(declForm.regle, declForm.montant)} style={{border:'none',borderRadius:8,background:C.accent,color:C.onAccent,cursor:'pointer',fontSize:13,fontWeight:600,padding:'8px 14px'}}>Enregistrer</button>
                           <button type="button" onClick={()=>setDeclForm(null)} style={{border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,padding:'8px 14px'}}>Annuler</button>
                         </div>
                       </div>
                     ) : (
-                      <div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
-                        <span style={{flex:'1 1 220px',color:C.muted,fontSize:12}}>Note-le quand tu l'as déclaré : ses ventes ne seront plus recomptées dans un autre mois.</span>
-                        <button type="button" data-decl-ouvrir disabled={report.enCours} onClick={()=>setDeclForm({ regle:'versement', montant:'' })} style={{border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:report.enCours?'default':'pointer',fontSize:12.5,fontWeight:600,padding:'7px 12px',opacity:report.enCours?0.5:1}}>J'ai déclaré ce mois</button>
+                      <div style={{display:'flex',flexDirection:'column',gap:6}}>
+                        <div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
+                          <span style={{flex:'1 1 220px',color:C.muted,fontSize:12}}>Note-le quand tu l'as déclaré : ses ventes ne seront plus recomptées dans un autre mois.</span>
+                          <button type="button" data-decl-ouvrir disabled={!!report.incomplet} onClick={()=>{ if (!report.incomplet) setDeclForm({ regle:'versement', montant:'' }); }} style={{border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:report.incomplet?'default':'pointer',fontSize:12.5,fontWeight:600,padding:'7px 12px',opacity:report.incomplet?0.5:1}}>J'ai déclaré ce mois</button>
+                        </div>
+                        {report.incomplet && <RaisonDeclBloquee manque={report.incomplet}/>}
                       </div>
                     ))}
                     {lignes}
@@ -28206,7 +28387,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   ci-dessus (§11) — la somme des lignes est le CA, par
                   construction. Le prix d'achat n'est écrit que s'il est connu ;
                   sinon un tiret, jamais un 0 (§7). */}
-              <div style={{fontSize:12,fontWeight:600,color:C.text,margin:'6px 0 8px'}}>Registre des ventes — {fmtE(report.ca)} ({report.saleLines.length})</div>
+              <div style={{fontSize:12,fontWeight:600,color:C.text,margin:'6px 0 8px'}}>Registre des ventes{report.enCours ? ' — …' : (report.vinted === 'passu' && !report.nb) ? '' : ` — ${fmtE(report.ca)} (${report.saleLines.length})`}</div>
               {/* La répartition et ce qui MANQUE, à côté du total (§5). */}
               {(() => {
                 const pp = Object.entries(report.parPlateforme||{}).filter(([,v])=>v.n>0);
@@ -28218,7 +28399,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 bits.push('Vestiaire Collective : pas encore relié');
                 return <div data-registre-couverture style={{fontSize:11,color:C.muted,margin:'-4px 0 8px',lineHeight:1.5}}>{bits.join(' · ')}</div>;
               })()}
-              {report.saleLines.length===0 && <div style={{fontSize:12,color:C.muted,padding:'6px 0 12px'}}>{report.enCours ? 'Lecture des ventes en cours…' : 'Aucune vente finalisée ce mois-ci.'}</div>}
+              {report.saleLines.length===0 && <div data-registre-vide={report.enCours ? 'encours' : report.vinted === 'passu' ? 'passu' : 'aucune'} style={{fontSize:12,color:report.vinted === 'passu' && !report.enCours ? C.warn : C.muted,padding:'6px 0 12px'}}>{report.enCours ? 'Lecture des ventes en cours…'
+                : report.vinted === 'passu' ? 'Rien de lisible ce mois-ci pour l\'instant (voir juste au-dessus) — ce n\'est pas zéro.'
+                : 'Aucune vente finalisée ce mois-ci.'}</div>}
               <div data-registre="ventes" style={{display:'flex',flexDirection:'column',gap:6,marginBottom:14}}>
                 {report.saleLines.map((v,i)=>(
                   <div key={i} style={{display:'flex',gap:8,alignItems:'center',padding:'7px 10px',border:`1px solid ${C.border}`,borderRadius:8,background:C.card}}>
