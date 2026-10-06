@@ -5209,6 +5209,16 @@ EXÉCUTANT la vraie route.
     « 2 annonces VRM-22 » et « HTTP 422 eBay a refusé » sur une annonce créée ;
   - `bancs/ebay-callback.cjs` porte le nonce. Ses cas d'erreur doivent ATTEINDRE
     l'échange, sinon ils passeraient sur le refus du nonce, vides de sens.
+- **Suite, même jour (revue des propositions 6, 8, 9, 10)** :
+  - `revise` (changer un prix) n'avait pas appris `sansAck`. Il annonçait « eBay a
+    refusé » sur un réseau coupé, alors que le prix avait pu changer.
+  - Une annonce terminée par `retirer` (à la main ou automatiquement) **sort
+    tout de suite de `ebay_listings`**, en lire-fusionner-réécrire gardé
+    (`sortirDesAnnonces` : une lecture ratée n'écrit rien, la réponse dit
+    `listes:null`). Avant, l'alerte « à retirer » restait, et le retrait
+    automatique reprenait la même annonce à chaque ouverture, en occupant les
+    5 places d'une vraie vente.
+  - `audit-ebay-route.cjs` : 185 contrôles, 3 rouges sur le code d'avant.
 - ⚠️ Deux branches de sauvegarde (`claude/wip-ext-5162`, `claude/wip-bilan-lancement`)
   ont été poussées par erreur le 6 octobre. Le proxy a refusé leur
   suppression : à effacer sur GitHub. Elles ne se déploient pas

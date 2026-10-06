@@ -134,7 +134,7 @@ const fee = (n, v) => `<Fee><Name>${n}</Name><Fee currencyID="EUR">${v}</Fee></F
 const ELIGIBLE = '110000000002';
 let mode = {};
 const uuidsVus = new Map();       // UUID déjà utilisé → ItemID (comme eBay : 488)
-const remettre = () => { mode = { liste: 'ok', commandes: 'ok', eligibles: 'ok', envoi: 'ok', trading: 'ok', verif: 'ok', add: 'ok', end: 'ok', revise: 'ok', priv: 'ok', getitem: 'ok', mainKo: false, journalKo: false }; remettreEbay(); uuidsVus.clear(); };
+const remettre = () => { mode = { liste: 'ok', commandes: 'ok', eligibles: 'ok', envoi: 'ok', trading: 'ok', verif: 'ok', add: 'ok', end: 'ok', revise: 'ok', priv: 'ok', getitem: 'ok', mainKo: false, journalKo: false, listingsKo: false }; remettreEbay(); uuidsVus.clear(); };
 remettre();
 
 const journal = [];       // ce qui part chez eBay, ce qui s'écrit en base, avec quel jeton
@@ -275,6 +275,7 @@ global.fetch = async (url, opts = {}) => {
     // Une lecture qui échoue, ligne par ligne (retrait automatique, 6 octobre).
     if (id === 'main' && mode.mainKo) return rep({ message: 'boom' }, 500);
     if (id === 'ebay_retraits_auto' && mode.journalKo) return rep({ message: 'boom' }, 500);
+    if (id === 'ebay_listings' && mode.listingsKo) return rep({ message: 'boom' }, 500);
     const out = lignes.filter((r) => (!id || r.id === id) && (!owner || r.owner === owner));
     return rep(out.map((r) => projette(r, sel)));
   }
@@ -645,6 +646,32 @@ const RA = {};
     mode.trading = 'reseau';
     const o3 = await app(JWT_J, { action: 'retirer', itemId: '110000000001', confirme: true });
     dit(o3.code === 504 && o3.corps && o3.corps.reason === 'incertain', 'eBay ne répond pas ⇒ « je ne sais pas si elle a été retirée »', `HTTP ${o3.code}`);
+  });
+  // L'annonce terminée sort de la liste rangée TOUT DE SUITE (revue du 6
+  // octobre) : sinon l'alerte « à retirer » restait, et le retrait automatique
+  // reprenait la même annonce à chaque ouverture. Lecture ratée ⇒ rien d'écrit.
+  await essaie('retirer : la liste rangée suit', async () => {
+    remettre(); remettreBase();
+    lignes.push({ owner: J, id: 'ebay_listings', data: { items: [{ itemId: '110000000001', sku: 'VRM-22' }, { itemId: '110000000002', sku: '' }], capturedAt: 5 } });
+    const o = await app(JWT_J, { action: 'retirer', itemId: '110000000001', confirme: true });
+    const L = lignes.find((x) => x.owner === J && x.id === 'ebay_listings');
+    const ids = L && L.data && Array.isArray(L.data.items) ? L.data.items.map((x) => x.itemId) : [];
+    dit(o.code === 200 && o.corps.listes === true && ids.length === 1 && ids[0] === '110000000002' && L.data.capturedAt === 5,
+      'après un retrait réussi, l\'annonce terminée sort de ebay_listings (les autres et la date de capture restent)', `HTTP ${o.code} · listes=${o.corps && o.corps.listes} · ${ids.join(',')}`);
+    remettre(); remettreBase();
+    lignes.push({ owner: J, id: 'ebay_listings', data: { items: [{ itemId: '110000000001', sku: 'VRM-22' }, { itemId: '110000000002', sku: '' }], capturedAt: 5 } });
+    mode.listingsKo = true;
+    const o2 = await app(JWT_J, { action: 'retirer', itemId: '110000000001', confirme: true });
+    const ecritL = o2.journal.some((x) => x.ou === 'base' && /ebay_listings/.test(x.corps));
+    dit(o2.code === 200 && o2.corps.listes === null && !ecritL, 'liste rangée illisible ⇒ le retrait est dit fait, la liste n\'est PAS réécrite depuis une lecture ratée', `listes=${o2.corps && o2.corps.listes} · écrite=${ecritL}`);
+  });
+  await essaie('modifier : réponse sans Ack', async () => {
+    remettre(); mode.trading = 'reseau';
+    const o = await app(JWT_J, { action: 'revise', itemId: '110000000001', price: '70' });
+    dit(o.code === 504 && o.corps.reason === 'incertain', 'changer un prix, réseau coupé ⇒ « incertain », jamais « eBay a refusé »', `HTTP ${o.code} · ${o.corps && o.corps.error}`);
+    remettre(); mode.trading = 'refus';
+    const o2 = await app(JWT_J, { action: 'revise', itemId: '110000000001', price: '70' });
+    dit(o2.code !== 504 && o2.corps.ok === false && o2.corps.reason !== 'incertain', 'l\'autre sens : un vrai refus (Ack Failure) reste un refus', `HTTP ${o2.code}`);
   });
 
   // ── 5 bis. LE RETRAIT AUTOMATIQUE (proposition 8, 6 octobre) ──────────────

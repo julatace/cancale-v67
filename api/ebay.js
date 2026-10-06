@@ -238,6 +238,10 @@ async function handleRevise(b, owner) {
   const at = await accessToken(owner);
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
   const r = await tradingReviseInventoryStatus(at.token, itemId, b.price, b.quantity);
+  // Sans <Ack> (réseau coupé, passerelle 5xx), eBay n'a rien dit : le prix a pu
+  // changer. « Incertain », jamais « refusé » (revue du 6 octobre — le reste
+  // de la route l'avait appris, `revise` non).
+  if (sansAck(r)) return { status: 504, body: { ok: false, reason: 'incertain', error: 'eBay n\'a pas répondu clairement — je ne sais pas si le prix a changé. Regarde l\'annonce sur eBay avant de recommencer.' } };
   // Trading renvoie HTTP 200 même sur refus (erreur dans le corps) → vrai code 422.
   if (!r.ok) return { status: r.status >= 400 ? r.status : 422, body: { ok: false, error: r.err || 'eBay a refusé la modification', ack: r.ack } };
   return { status: 200, body: { ok: true, ack: r.ack } };
@@ -750,6 +754,15 @@ async function handleOffre(b, owner) {
 // Chaque retrait automatique est noté (`ebay_retraits_auto`) : il peut relire
 // ce qui a été fait en son nom.
 const SKU_PAIRE = /^VRM[-\s]?[A-Z]{0,3}\d{1,6}$/i;
+// Retire une annonce de la liste rangée `ebay_listings`. Trois issues : true
+// (retirée), false (l'écriture a échoué), null (pas su : lecture ratée, ou
+// aucune liste rangée) — on n'écrit jamais depuis une lecture ratée.
+async function sortirDesAnnonces(itemId, owner) {
+  const d = await lireDonnee('ebay_listings', owner);
+  if (d === undefined || !d || !Array.isArray(d.items)) return null;
+  if (!d.items.some((x) => x && String(x.itemId) === itemId)) return true;
+  return storeData('ebay_listings', { ...d, items: d.items.filter((x) => !(x && String(x.itemId) === itemId)) }, owner);
+}
 async function handleRetirer(b, owner) {
   if (b.confirme !== true) return { status: 400, body: { ok: false, reason: 'confirmation', error: 'Confirme le retrait : rien n\'a été envoyé à eBay.' } };
   const itemId = String(b.itemId || '').trim();
@@ -774,6 +787,12 @@ async function handleRetirer(b, owner) {
   if (sansAck(r)) return { status: 504, body: { ok: false, reason: 'incertain', error: 'eBay n\'a pas répondu — je ne sais pas si l\'annonce a été retirée. Regarde sur eBay avant de recommencer.' } };
   if (!r.ok) return { status: r.status >= 400 ? r.status : 422, body: { ok: false, error: messageEbaySur(r.err) || 'eBay a refusé le retrait.', ack: r.ack } };
   const fin = (/<EndTime>([\s\S]*?)<\/EndTime>/.exec(r.xml || '') || [])[1] || null;
+  // L'annonce terminée SORT de sa liste rangée (`ebay_listings`) tout de suite :
+  // sinon, jusqu'à la prochaine synchro, l'alerte « à retirer d'eBay » restait
+  // affichée et le retrait automatique reprenait la même annonce à chaque
+  // ouverture — en occupant les places d'une vraie vente (revue du 6 octobre).
+  // Lire-fusionner-réécrire GARDÉ : une lecture ratée n'écrit rien.
+  const listes = await sortirDesAnnonces(itemId, owner);
   let journal = null;
   if (auto) {
     // Le journal ne se réécrit QUE sur une lecture réussie (« rien lu » ne vaut
@@ -785,7 +804,7 @@ async function handleRetirer(b, owner) {
       journal = await storeData('ebay_retraits_auto', { items: [{ itemId, sku: skuAttendu, titre: String(b.titre || '').slice(0, 140), at: Date.now() }, ...l].slice(0, 50) }, owner);
     }
   }
-  return { status: 200, body: { ok: true, fin, ...(auto ? { auto: true, journal } : {}) } };
+  return { status: 200, body: { ok: true, fin, listes, ...(auto ? { auto: true, journal } : {}) } };
 }
 
 // ── SOLDE eBay À VIRER (getSellerFundsSummary, lecture seule) ────────────────
