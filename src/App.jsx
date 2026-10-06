@@ -31176,9 +31176,9 @@ async function lireAbonnement() {
   } catch (_) { return null; }
 }
 // Ouvre Stripe (paiement ou gestion). Rend un message à afficher si ça échoue.
-async function ouvrirStripe(mode) {
+async function ouvrirStripe(mode, extra) {
   try {
-    const r = await fetch(`/api/compte?mode=${mode}`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: '{}' });
+    const r = await fetch(`/api/compte?mode=${mode}`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: JSON.stringify(extra || {}) });
     const j = await r.json().catch(() => ({}));
     if (r.ok && j && typeof j.url === 'string' && /^https:\/\/(checkout|billing)\.stripe\.com\//.test(j.url)) { window.location.assign(j.url); return ''; }
     return (j && j.message) || "Stripe n'a pas répondu. Réessaie dans un instant.";
@@ -31322,7 +31322,20 @@ function LigneContact() {
 
 // L'onglet « Mon compte » : l'abonnement (statut, prochain prélèvement, carte,
 // résilier / reprendre) puis la liste des factures — sur la MÊME lecture.
+// LA CASE DES CGV, DANS VRM (6 octobre) : s'abonner exige de l'avoir cochée —
+// le serveur la redemande (`cgv: true`) et date l'acceptation. Elle ne dépend
+// plus d'un réglage du tableau de bord de Stripe. Une seule case pour les deux
+// écrans qui vendent l'abonnement (§11).
+function CaseCgv({ coche, onChange }) {
+  return (
+    <label data-case-cgv={coche ? 'cochee' : 'vide'} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12.5, color: C.text, marginTop: 10, lineHeight: 1.45, cursor: 'pointer' }}>
+      <input type="checkbox" checked={!!coche} onChange={(ev) => onChange(ev.target.checked)} style={{ marginTop: 2, width: 16, height: 16, flex: '0 0 auto' }}/>
+      <span>J'accepte les <a href="/legal/cgv.html" target="_blank" rel="noopener noreferrer" style={{ color: C.text }}>conditions générales de vente</a> de VRM.</span>
+    </label>
+  );
+}
 function MonAbonnement() {
+  const [cgv, setCgv] = React.useState(false);
   const [e, setE] = React.useState(undefined);
   const [fx, setFx] = React.useState(undefined);
   const [occupe, setOccupe] = React.useState('');
@@ -31343,7 +31356,12 @@ function MonAbonnement() {
     })();
     return () => { mort = true; };
   }, []);
-  const agir = async (mode) => { setOccupe(mode); setMsg(''); const m = await ouvrirStripe(mode); if (m) { setMsg(m); setOccupe(''); } };
+  const agir = async (mode) => {
+    if (mode === 'checkout' && !cgv) { setMsg("Coche « J'accepte les conditions générales de vente » avant de payer."); return; }
+    setOccupe(mode); setMsg('');
+    const m = await ouvrirStripe(mode, mode === 'checkout' ? { cgv: true } : null);
+    if (m) { setMsg(m); setOccupe(''); }
+  };
   const resilierOuReprendre = async (reprendre) => {
     if (!reprendre) {
       const fin = e && e.finPeriode ? dateLisible(e.finPeriode) : 'la fin du mois payé';
@@ -31424,8 +31442,9 @@ function MonAbonnement() {
       </div>
       {RETOUR_ABONNEMENT === 'merci' && <div style={{ fontSize: 12, color: C.muted, marginTop: 6 }}>Paiement reçu par Stripe — ton abonnement apparaîtra ici dans quelques secondes. Rouvre l'écran si besoin.</div>}
       {test}
-      <button type="button" disabled={!!occupe} onClick={() => agir('checkout')} style={bouton(true)}>{occupe ? 'Ouverture…' : "S'abonner"}</button>
-      <div style={{ fontSize: 11, color: C.muted, marginTop: 6 }}>Paiement sécurisé par Stripe — VRM ne voit jamais ta carte. <a href="/legal/cgv.html" target="_blank" rel="noopener noreferrer" style={{ color: C.muted }}>Conditions de vente</a></div>
+      <CaseCgv coche={cgv} onChange={setCgv}/>
+      <button type="button" disabled={!!occupe || !cgv} data-sabonner="" onClick={() => agir('checkout')} style={{ ...bouton(true), opacity: cgv ? 1 : 0.5 }}>{occupe ? 'Ouverture…' : "S'abonner"}</button>
+      <div style={{ fontSize: 11, color: C.muted, marginTop: 6 }}>Paiement sécurisé par Stripe — VRM ne voit jamais ta carte.</div>
       {msg && <div style={{ fontSize: 12, color: C.warn, marginTop: 6 }}>{msg}</div>}
     </div>
     {/* Un ancien abonné garde l'accès à ses factures passées (sa compta). */}
@@ -31500,7 +31519,13 @@ function AbonnementRequis({ info }) {
   // encore chez Stripe, on ne lui en vend pas un second — on l'envoie mettre
   // sa carte à jour (sinon « S'abonner » répondrait « tu es déjà abonné »).
   const impaye = !!(info && info.peutGerer && (info.statut === 'past_due' || info.statut === 'unpaid'));
-  const agir = async () => { setOccupe(true); setMsg(''); const m = await ouvrirStripe(impaye ? 'portail' : 'checkout'); if (m) { setMsg(m); setOccupe(false); } };
+  const [cgv, setCgv] = React.useState(false);
+  const agir = async () => {
+    if (!impaye && !cgv) { setMsg("Coche « J'accepte les conditions générales de vente » avant de payer."); return; }
+    setOccupe(true); setMsg('');
+    const m = await ouvrirStripe(impaye ? 'portail' : 'checkout', impaye ? null : { cgv: true });
+    if (m) { setMsg(m); setOccupe(false); }
+  };
   return (
     <div data-abonnement-requis="" style={{ minHeight: '100vh', background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ width: '100%', maxWidth: 420, background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: '26px 22px', boxShadow: C.shadowLg || 'none' }}>
@@ -31512,7 +31537,8 @@ function AbonnementRequis({ info }) {
             : `${prixLisible(info && info.prix)}, sans engagement, résiliable à tout moment. Tes données sont intactes : elles t'attendent dès que l'abonnement est actif.`}
         </div>
         {info && info.modeTest && <div style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>Mode test : aucune vraie carte n'est débitée.</div>}
-        <button type="button" disabled={occupe} onClick={agir} style={{ marginTop: 18, width: '100%', border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '13px 16px', fontSize: 15, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+        {!impaye && <CaseCgv coche={cgv} onChange={setCgv}/>}
+        <button type="button" disabled={occupe || (!impaye && !cgv)} data-sabonner="" onClick={agir} style={{ marginTop: 18, width: '100%', border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '13px 16px', fontSize: 15, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', opacity: (!impaye && !cgv) ? 0.5 : 1 }}>
           {occupe ? 'Ouverture du paiement…' : (impaye ? 'Mettre à jour ma carte' : "S'abonner")}
         </button>
         {msg && <div style={{ fontSize: 12.5, color: C.warn, marginTop: 8 }}>{msg}</div>}

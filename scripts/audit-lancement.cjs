@@ -96,7 +96,7 @@ const ast = parser.parse(app, { sourceType: 'module', plugins: ['jsx'], errorRec
         const chemin = u.slice('https://api.stripe.com/v1/'.length).split('?')[0];
         appelsStripe.push({ chemin, corps: decodeURIComponent(String(o.body || '')) });
         if (chemin === 'prices') return rep({ data: [{ id: 'price_banc', unit_amount: 999, currency: 'eur', recurring: { interval: 'month' } }] });
-        if (chemin === 'checkout/sessions') return refusCgv
+        if (chemin === 'checkout/sessions') return (refusCgv && /consent_collection/.test(decodeURIComponent(String(o.body || ''))))
           ? rep({ error: { message: 'You cannot collect consent to your terms of service unless a URL is set in the Stripe Dashboard.' } }, 400)
           : rep({ id: 'cs_banc', url: 'https://checkout.stripe.com/c/pay/cs_banc' });
       }
@@ -104,18 +104,37 @@ const ast = parser.parse(app, { sourceType: 'module', plugins: ['jsx'], errorRec
     };
     process.env.STRIPE_SECRET_KEY = 'sk_test_banc';
     const compte = (await import('file://' + path.join(R, 'api', 'compte.js'))).default;
-    const faire = async () => { const r = { code: null, corps: null }; r.status = (n) => { r.code = n; return r; }; r.json = (x) => { r.corps = x; return r; }; r.setHeader = () => {}; await compte({ method: 'POST', query: { mode: 'checkout' }, headers: { authorization: 'Bearer aa.bb.A' }, async *[Symbol.asyncIterator]() {} }, r); return r; };
-    const r1 = await faire();
+    const faire = async (body) => { const r = { code: null, corps: null }; r.status = (n) => { r.code = n; return r; }; r.json = (x) => { r.corps = x; return r; }; r.setHeader = () => {}; const req = { method: 'POST', query: { mode: 'checkout' }, headers: { authorization: 'Bearer aa.bb.A' }, async *[Symbol.asyncIterator]() {} }; if (body) req.body = body; await compte(req, r); return r; };
+    // Les CGV s'acceptent DANS VRM avant Stripe (6 octobre) : sans la case
+    // cochée, rien ne part chez Stripe.
+    const r0 = await faire();
+    dit(r0.code === 400 && r0.corps && r0.corps.erreur === 'cgv' && !appelsStripe.some((x) => x.chemin === 'checkout/sessions'),
+      'sans la case « j’accepte les CGV » cochée dans VRM : 400, aucune session de paiement', `HTTP ${r0.code} · ${r0.corps && r0.corps.erreur}`);
+    appelsStripe.length = 0;
+    const r1 = await faire({ cgv: true });
     const s = appelsStripe.find((x) => x.chemin === 'checkout/sessions');
     const corps = (s && s.corps) || '';
     dit(r1.code === 200 && /consent_collection\[terms_of_service\]=required/.test(corps), 'la session de paiement exige la case « j’accepte les CGV » (required)', `HTTP ${r1.code}`);
     dit(/custom_text\[terms_of_service_acceptance\]\[message\]=[^&]*https:\/\/vrm\.center\/legal\/cgv\.html/.test(corps), '… et son lien mène à NOS CGV (vrm.center/legal/cgv.html)');
     dit(fs.existsSync(path.join(R, 'public', 'legal', 'cgv.html')), '… qui existent bien');
+    const vers = (/CGV_VERSION\s*=\s*'(\d{4}-\d{2}-\d{2})'/.exec(lire('api/compte.js') || '') || [])[1] || '';
+    const MOIS = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+    const maj = /Dernière mise à jour : (\d{1,2}) (\S+) (\d{4})/.exec(lire('public/legal/cgv.html') || '');
+    const majIso = maj ? `${maj[3]}-${String(MOIS.indexOf(maj[2]) + 1).padStart(2, '0')}-${String(maj[1]).padStart(2, '0')}` : '?';
+    dit(/subscription_data\[metadata\]\[cgv_version\]=\d{4}-\d{2}-\d{2}/.test(corps) && /subscription_data\[metadata\]\[cgv_acceptees_le\]=\d{4}-\d{2}-\d{2}T/.test(corps) && vers === majIso,
+      'l’acceptation est DATÉE et rangée dans l’abonnement, avec la version des CGV (= leur date de mise à jour)', `version ${vers} · CGV du ${majIso}`);
     refusCgv = true; appelsStripe.length = 0;
-    const r2 = await faire();
+    const r2 = await faire({ cgv: true });
     const re = appelsStripe.filter((x) => x.chemin === 'checkout/sessions');
-    dit(r2.code === 503 && r2.corps && r2.corps.erreur === 'cgv-stripe' && !r2.corps.url && re.length === 1 && /required/.test(re[0].corps),
-      'Stripe refuse faute d’adresse des CGV : on le DIT (503), sans réessayer en retirant la case', `HTTP ${r2.code} · ${r2.corps && r2.corps.erreur}`);
+    // 1er appel refusé (case de Stripe impossible), 2e SANS la case : il ne
+    // reste plus refusé (le banc ne refuse que ce qui demande la case).
+    dit(r2.code === 200 && r2.corps && /checkout\.stripe\.com/.test(r2.corps.url || '') && re.length === 2 && /required/.test(re[0].corps) && !/consent_collection/.test(re[1].corps) && /cgv_acceptees_le/.test(re[1].corps),
+      'Stripe ne sait pas encore afficher sa case (adresse des CGV absente) : le paiement s’ouvre quand même, les CGV ayant été acceptées dans VRM', `${re.length} appel(s)`);
+  });
+  await essaie('écrans CGV', async () => {
+    const n = (app.match(/<CaseCgv /g) || []).length;
+    dit(n >= 2 && /disabled=\{!!occupe \|\| !cgv\}/.test(app) && /\(!impaye && !cgv\)/.test(app),
+      'les deux écrans qui vendent l’abonnement montrent la case et gardent « S’abonner » grisé tant qu’elle n’est pas cochée', `${n} case(s)`);
   });
 
   console.log('\n── (d) Une adresse de contact, une seule valeur, jamais inventée');

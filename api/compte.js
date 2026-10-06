@@ -225,9 +225,22 @@ async function abonnement(req, res) {
   });
 }
 
+// La version des CGV acceptées : la date de « Dernière mise à jour » de
+// public/legal/cgv.html (audit-lancement vérifie qu'elles concordent).
+const CGV_VERSION = '2026-10-04';
 async function checkout(req, res) {
   const u = await utilisateurDe(req);
   if (!u) return repondre(res, 401, { erreur: 'session' });
+  // ⚠️ LES CGV S'ACCEPTENT DANS VRM, AVANT STRIPE (décision du 6 octobre). La
+  //    case de Stripe dépend d'un réglage de son tableau de bord (adresse des
+  //    conditions) : tant qu'il manque, Stripe refusait d'ouvrir le paiement et
+  //    personne ne pouvait s'abonner. L'acceptation est donc exigée ICI (case
+  //    cochée dans l'app, `cgv: true`), datée et rangée dans les métadonnées de
+  //    l'abonnement — c'est elle qui rend les CGV opposables. La case de Stripe
+  //    reste demandée en plus quand il sait l'afficher.
+  const corps = await lireCorpsJson(req);
+  if (!corps || corps.cgv !== true) return repondre(res, 400, { erreur: 'cgv', message: "Coche « J'accepte les conditions générales de vente » avant de payer." });
+  const accepteLe = new Date().toISOString();
   if (!stripePret()) return repondre(res, 503, { erreur: 'stripe', message: "Le paiement n'est pas encore branché." });
   const [acc, ligne] = await Promise.all([accesDe(req), ligneDe(req)]);
   if (acc === undefined || ligne === undefined) return repondre(res, 503, { erreur: 'base-injoignable', message: "Je n'ai pas pu vérifier ton abonnement. Réessaie dans un instant." });
@@ -242,8 +255,8 @@ async function checkout(req, res) {
     success_url: `${APP_URL}/?tab=settings&vue=compte&abonnement=merci`,
     cancel_url: `${APP_URL}/?tab=settings&vue=compte&abonnement=annule`,
     client_reference_id: u.id,
-    metadata: { owner: u.id, app: 'vrm' },
-    subscription_data: { metadata: { owner: u.id, app: 'vrm' } },
+    metadata: { owner: u.id, app: 'vrm', cgv_version: CGV_VERSION, cgv_acceptees_le: accepteLe },
+    subscription_data: { metadata: { owner: u.id, app: 'vrm', cgv_version: CGV_VERSION, cgv_acceptees_le: accepteLe } },
     locale: 'fr',
     // ⚠️ LES CGV SE FONT ACCEPTER AVANT DE PAYER (5 octobre). Un abonnement
     //    vendu en ligne sans case « j'accepte les conditions de vente » n'a pas
@@ -259,14 +272,20 @@ async function checkout(req, res) {
   if (ligne && ligne.client_stripe) params.customer = ligne.client_stripe;
   else if (u.email) params.customer_email = u.email;
   // Un double clic ne crée pas deux sessions (même clé dans la même minute).
-  const r = await stripeApi('POST', 'checkout/sessions', params, `vrm-co-${u.id}-${Math.floor(Date.now() / 60000)}`);
-  // L'adresse des CGV n'est pas encore réglée chez Stripe : on le dit (au
-  // vendeur sans jargon, au propriétaire dans les journaux), on ne fait jamais
-  // payer sans la case.
+  const cle = `vrm-co-${u.id}-${Math.floor(Date.now() / 60000)}`;
+  let r = await stripeApi('POST', 'checkout/sessions', params, cle);
+  // L'adresse des CGV n'est pas encore réglée chez Stripe : sa case ne peut pas
+  // s'afficher. Les CGV ont DÉJÀ été acceptées dans VRM (ci-dessus, datées) :
+  // on ouvre le paiement sans la case de Stripe (autre clé d'idempotence :
+  // Stripe refuse de rejouer une clé avec d'autres paramètres), et on le note
+  // pour le propriétaire.
   const erreurStripe = String((r.data && r.data.error && r.data.error.message) || '');
   if (!r.ok && /terms of service/i.test(erreurStripe)) {
-    console.warn('[stripe] paiement refusé : adresse des CGV absente — Stripe → Paramètres → Détails publics → Conditions =', `${APP_URL}/legal/cgv.html`);
-    return repondre(res, 503, { erreur: 'cgv-stripe', message: "Le paiement n'est pas encore tout à fait prêt (il manque un réglage des conditions de vente). Réessaie un peu plus tard." });
+    console.warn('[stripe] case CGV de Stripe indisponible (adresse absente : Stripe → Paramètres → Détails publics → Conditions =', `${APP_URL}/legal/cgv.html) — CGV acceptées dans VRM, paiement ouvert sans la case de Stripe`);
+    const sansCase = { ...params };
+    delete sansCase.consent_collection;
+    delete sansCase.custom_text;
+    r = await stripeApi('POST', 'checkout/sessions', sansCase, cle + '-vrm');
   }
   if (!r.ok || !r.data.url) return repondre(res, 502, { erreur: 'stripe', message: "Stripe n'a pas pu ouvrir le paiement. Réessaie dans un instant." });
   return repondre(res, 200, { url: r.data.url });

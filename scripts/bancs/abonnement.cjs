@@ -109,7 +109,7 @@ async function ouvrir(nav, { abo, tab = 'settings', checkoutUrl = 'https://check
       return r.fulfill({ status: f.status, contentType: 'application/json', body: JSON.stringify(f.body) });
     }
     if (/\/api\/compte\?mode=(checkout|portail)/.test(u)) {
-      appels.push({ mode: /checkout/.test(u) ? 'checkout' : 'portail', auth: r.request().headers().authorization || '' });
+      appels.push({ mode: /checkout/.test(u) ? 'checkout' : 'portail', auth: r.request().headers().authorization || '', corps: r.request().postData() || '' });
       return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ url: checkoutUrl }) });
     }
     return r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' });
@@ -157,14 +157,24 @@ const boutons = (pg) => pg.evaluate(() => { const e = document.querySelector('[d
     console.log('\n── « S’abonner » mène à Stripe, avec la session');
     await essaie('clic', async () => {
       const { ctx, pg, appels } = await ouvrir(nav, { abo: ETATS.sans });
-      await pg.locator('[data-abonnement] button', { hasText: /abonner/i }).first().click();
+      // Les CGV s'acceptent DANS VRM (6 octobre) : tant que la case n'est pas
+      // cochée, le bouton est grisé et rien ne part.
+      const bouton = pg.locator('[data-abonnement] button', { hasText: /abonner/i }).first();
+      const grise = await bouton.isDisabled().catch(() => false);
+      await bouton.click({ force: true, timeout: 2000 }).catch(() => {});
+      await pg.waitForTimeout(400);
+      dit(grise && !appels.some((a) => a.mode === 'checkout'), 'case des CGV non cochée : « S’abonner » est grisé et aucune demande de paiement ne part', JSON.stringify(appels));
+      await pg.locator('[data-abonnement] [data-case-cgv] input').first().check();
+      await bouton.click();
       await pg.waitForURL(/checkout\.stripe\.com/, { timeout: 6000 }).catch(() => {});
+      dit(appels.some((a) => a.mode === 'checkout' && /"cgv":true/.test(a.corps)), 'case cochée : la demande dit au serveur que les CGV sont acceptées (cgv:true)', JSON.stringify(appels));
       dit(appels.some((a) => a.mode === 'checkout' && a.auth === 'Bearer jeton-de-banc'), 'le serveur reçoit la demande AVEC le jeton de session (c’est lui qui sait qui paie)', JSON.stringify(appels));
       dit(/checkout\.stripe\.com/.test(pg.url()), 'la page s’ouvre chez Stripe', pg.url());
       await ctx.close();
     });
     await essaie('url hostile', async () => {
       const { ctx, pg } = await ouvrir(nav, { abo: ETATS.sans, checkoutUrl: 'https://site-pirate.example/payer' });
+      await pg.locator('[data-abonnement] [data-case-cgv] input').first().check();
       await pg.locator('[data-abonnement] button', { hasText: /abonner/i }).first().click();
       await pg.waitForTimeout(1200);
       dit(!/site-pirate/.test(pg.url()), 'une adresse de paiement qui n’est pas Stripe n’est jamais suivie', pg.url());

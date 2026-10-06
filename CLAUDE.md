@@ -5426,11 +5426,29 @@ vendu (nombre de ventes et montant), reçu, colis à expédier, paires qui dorme
   **toute** personne qui s'inscrivait. Elle dit maintenant seulement d'ouvrir
   l'email, et de regarder les indésirables si rien n'arrive. Elle est vraie
   avec ou sans SMTP personnalisé.
-- **(b) Stripe exige la case « j'accepte les CGV »**
-  (`consent_collection[terms_of_service]=required`), avec un lien vers NOS CGV.
-  Stripe refuse la session si le compte n'a pas d'adresse de conditions. On
-  répond alors **503 `cgv-stripe`** et on le dit. On ne réessaie **jamais** sans
-  la case.
+- **(b) Les CGV s'acceptent DANS VRM, avant Stripe** (décision prise le 6
+  octobre, Julien : « arrête de demander »). Le premier jet faisait porter la
+  case par Stripe seul (`consent_collection[terms_of_service]=required`). Or
+  Stripe refuse d'ouvrir le paiement tant que l'adresse des conditions n'est
+  pas réglée dans SON tableau de bord : personne ne pouvait s'abonner tant que
+  Julien n'avait pas fait ce réglage.
+  ⇒ Les deux écrans qui vendent l'abonnement (Mon compte, la porte
+  d'abonnement) montrent une case **« J'accepte les conditions générales de
+  vente »** (`CaseCgv`, une seule pour les deux, §11). « S'abonner » reste grisé
+  tant qu'elle n'est pas cochée.
+  ⇒ Le serveur **exige** `cgv: true` (400 `cgv` sinon, rien ne part chez Stripe).
+  Il range la date d'acceptation et la version des CGV dans les métadonnées de
+  l'abonnement (`cgv_acceptees_le`, `cgv_version` = la date de « Dernière mise
+  à jour » de cgv.html, comparée par l'audit).
+  ⇒ La case de Stripe est toujours demandée en plus. Si Stripe ne sait pas
+  l'afficher (adresse absente), on rouvre la session **sans** sa case, sous
+  une autre clé d'idempotence (Stripe refuse de rejouer une clé avec d'autres
+  paramètres). L'acceptation a déjà eu lieu dans VRM, datée.
+  `audit-lancement.cjs` : **4 rouges** sur le code d'avant. Le banc
+  `abonnement.cjs` vérifie que le bouton est grisé et que rien ne part sans la
+  case, puis que la demande porte `cgv:true` une fois la case cochée.
+  ⚠️ Régler l'adresse des CGV dans Stripe reste recommandé (double
+  acceptation), mais n'est plus bloquant.
 - **(c) « Fermer mon compte »** (Réglages → Mon compte), mode `fermer` de
   `api/compte.js`. Il fallait l'écrire : la politique de confidentialité promet
   l'effacement, et aucun bouton ne le faisait.
