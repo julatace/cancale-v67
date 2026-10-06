@@ -88,7 +88,15 @@ export const ventesDeclarables = ({ vinted, lbc, ebay, masquee, exclu, versement
     if (!idx) return l;
     const d = idx.get(l.id);
     if (d) { l.ymVers = l.ym || null; l.ym = d[0]; l.declaree = true; if (d.length > 1) l.double = d.slice(); }
-    else if (l.ym && moisDeclare(declare, l.ym)) l.apres = true;
+    else if (l.ym && moisDeclare(declare, l.ym)) {
+      // L'absence de la liste ne prouve un oubli que selon la RÈGLE de la
+      // déclaration : à la date de vente, une vente Vinted vendue le mois d'avant
+      // appartient à la déclaration de ce mois-là.
+      const tv = l.plateforme === 'Vinted' ? Date.parse(l.dateVente || '') : 0;
+      const ymV = tv ? ymDeTs(tv) : null;
+      if (declare[l.ym].regle === 'vente' && ymV && ymV < l.ym && !moisDeclare(declare, ymV)) l.moisVenteAvant = ymV;
+      else l.apres = true;
+    }
     return l;
   };
   // Une vente sans date mais DÉCLARÉE n'est plus « à dater » : son mois est
