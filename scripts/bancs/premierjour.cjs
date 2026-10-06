@@ -137,7 +137,10 @@ async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lectureP
   const erreurs = [];
   pg.on('pageerror', (e) => erreurs.push(String(e).slice(0, 140)));
   await pg.goto(`http://localhost:${PORT}/${sansSession ? '?connexion' : '?tab=' + tab}`, { waitUntil: 'domcontentloaded' });
-  await pg.waitForTimeout(5000);
+  // ⚠️ « Muette » se conclut au bout du délai de la question (4 s depuis le
+  //    5 octobre : une extension qui se réveille met parfois 3 s à répondre,
+  //    et l'app la déclarait muette à tort) : on laisse ce délai s'écouler.
+  await pg.waitForTimeout(pont === 'muette' ? 8000 : 5000);
 
   const txt = await pg.evaluate(() => document.body.innerText);
   // ⚠️ On lit aussi les href : un geste qui se CLIQUE ne se voit pas dans

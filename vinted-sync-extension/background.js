@@ -37,13 +37,42 @@ async function loadSession() {
   } catch (_) { VRM_SESSION = null; }
   return VRM_SESSION;
 }
+// ⚠️ UNE SESSION PEUT ÊTRE « MORTE » (5.160). Quand Supabase refuse le jeton de
+//    renouvellement (déjà utilisé, introuvable, session effacée), la session
+//    ne reviendra JAMAIS toute seule : on la marque `mort` dans le stockage, et
+//    `authToken()` rend `null` SANS RÉSEAU jusqu'à ce qu'une NOUVELLE session
+//    arrive (l'app par le pont, ou la connexion dans la fenêtre). Sans cette
+//    marque, chaque écriture retentait le même jeton mort : c'est la rafale de
+//    429 + `refresh_token_already_used` mesurée le 5 octobre à 15:44 dans les
+//    journaux d'authentification de production.
+//    ⚠️ « Nouvelle » veut dire un AUTRE jeton de renouvellement : l'app renvoie
+//    sa session à chaque « ready » du pont ; si c'est le jeton qui vient de
+//    mourir, la ressusciter ne ferait que relancer un refus de plus.
+function normaliserSession(sess) {
+  if (!sess || typeof sess !== 'object') return null;
+  const s = Object.assign({}, sess);
+  // `expires_at` en SECONDES (forme Supabase) ⇒ en millisecondes, comme le
+  // reste du fichier — sinon un jeton neuf passerait pour périmé depuis 1970.
+  if (typeof s.expires_at === 'number' && s.expires_at > 0 && s.expires_at < 1e11) s.expires_at = s.expires_at * 1000;
+  return s;
+}
 async function saveSession(sess) {
-  VRM_SESSION = sess || null;
+  let s = normaliserSession(sess);
+  let avant = null;
+  try { avant = await loadSession(); } catch (_) {}
+  if (s && !s.mort && avant && avant.mort && avant.refresh_token && avant.refresh_token === s.refresh_token) {
+    s = Object.assign({}, s, { mort: true, mortAt: avant.mortAt || Date.now(), mortRaison: avant.mortRaison || '' });
+  }
+  VRM_SESSION = s;
   try {
-    if (sess) await chrome.storage.local.set({ [SESSION_STORE]: sess });
+    if (s) await chrome.storage.local.set({ [SESSION_STORE]: s });
     else await chrome.storage.local.remove(SESSION_STORE);
   } catch (_) {}
-  majIcone(!!sess);
+  // Une session VIVANTE et NEUVE (autre jeton de renouvellement) lève la pause
+  // des renouvellements : la pause portait sur l'ancien jeton. La même session
+  // renvoyée, elle, ne lève rien (sinon chaque « ready » relancerait un essai).
+  if (!s || (!s.mort && (!avant || avant.refresh_token !== s.refresh_token))) await effacerPauseRenouv(!s);
+  majIcone(!!s && !s.mort);
 }
 
 // ── L'ICÔNE OUVRE VRM, SANS FENÊTRE (1er octobre) ───────────────────────────
@@ -92,40 +121,144 @@ try {
   });
 } catch (_) {}
 // Au réveil du service worker : l'icône suit la session enregistrée.
-loadSession().then((s) => majIcone(!!s)).catch(() => {});
+loadSession().then((s) => majIcone(!!s && !s.mort)).catch(() => {});
+
+// Une promesse qui ne répond pas ne doit jamais bloquer un appelant : au bout de
+// `ms`, on rend `repli` (« pas su »). La promesse d'origine continue sa vie.
+function avecDelai(p, ms, repli) {
+  let t = null;
+  return Promise.race([
+    Promise.resolve(p).finally(() => { if (t) clearTimeout(t); }),
+    new Promise((r) => { t = setTimeout(() => r(repli), ms); }),
+  ]);
+}
+
+// ── LE RENOUVELLEMENT DE LA SESSION VRM (5.160) ─────────────────────────────
 // Le jeton d'acces dure ~1 h ; on le renouvelle tout seul, sinon l'extension
 // cesserait d'ecrire des que tu fermes l'app.
-async function refreshSession() {
+// ⚠️⚠️ MESURÉ LE 5 OCTOBRE (journaux d'authentification de production, 15:44) :
+//    une RAFALE de 429 puis `refresh_token_already_used`. Trois défauts ici :
+//    1. AUCUN « un seul en vol » : cinq écritures qui trouvent le jeton périmé
+//       en même temps envoyaient CINQ renouvellements avec le MÊME jeton de
+//       renouvellement — le premier le consomme, les quatre autres se font
+//       refuser « already used », et Supabase révoque alors toute la famille ;
+//    2. AUCUNE pause : un refus (429, 5xx, réseau) était retenté à l'appel
+//       suivant, c'est-à-dire à chaque écriture ;
+//    3. un refus DÉFINITIF (jeton mort) était retenté lui aussi, pour toujours.
+// ⇒ Un seul renouvellement en vol (la PROMESSE est partagée) ; un refus
+//    d'authentification marque la session MORTE (plus aucun appel tant qu'une
+//    nouvelle session n'est pas arrivée) ; un refus passager ouvre une PAUSE
+//    croissante (30 s → 1 min → … → 10 min), rangée dans `chrome.storage.local`
+//    (§4.9 : un service worker meurt au bout de 30 s, une variable de module ne
+//    retiendrait rien). Pendant la pause, un jeton d'accès encore valide sert.
+const RENOUV_STORE = 'vrmRenouv';          // { echecs, prochainAt, code, at, okAt }
+const RENOUV_PAUSE_MIN_MS = 30000, RENOUV_PAUSE_MAX_MS = 600000;
+const RENOUV_DELAI_MS = 10000;             // un renouvellement qui ne répond pas = échec passager
+async function lireRenouv() {
+  try { return (await chrome.storage.local.get(RENOUV_STORE))[RENOUV_STORE] || {}; } catch (_) { return {}; }
+}
+async function ecrireRenouv(v) { try { await chrome.storage.local.set({ [RENOUV_STORE]: v }); } catch (_) {} }
+// `toutOublier` : déconnexion (on oublie aussi la date du dernier succès).
+async function effacerPauseRenouv(toutOublier) {
+  const cur = toutOublier ? {} : await lireRenouv();
+  await ecrireRenouv(cur.okAt && !toutOublier ? { okAt: cur.okAt } : {});
+}
+// Un refus qui dit « ce jeton ne marchera plus jamais ». Seulement un statut
+// d'authentification ET un code d'erreur d'authentification : une page HTML de
+// proxy en 404, ou un 400 dont on ne reconnaît pas le corps, reste un échec
+// PASSAGER — « pas su » ne vaut pas « mort ».
+const RENOUV_MORT = /invalid_grant|refresh_token_not_found|refresh_token_already_used|session_not_found|session_expired|user_not_found|user_banned|invalid refresh token|refresh token not found|already used|session (?:not found|expired)/i;
+function renouvellementMort(status, corps) {
+  if (![400, 401, 403, 404].includes(Number(status))) return false;
+  const c = corps && typeof corps === 'object' ? corps : {};
+  const texte = [c.error_code, c.code, c.error, c.error_description, c.msg, c.message].filter((x) => typeof x === 'string').join(' ');
+  return RENOUV_MORT.test(texte);
+}
+let _refreshEnVol = null;
+// `force` : la base vient de refuser le jeton (401) alors qu'il n'est pas
+// encore périmé — on veut un jeton NEUF, pas celui qu'on a.
+function refreshSession(opts) {
+  if (!_refreshEnVol) {
+    _refreshEnVol = renouvelerSession(opts || {}).catch(() => null).finally(() => { _refreshEnVol = null; });
+  }
+  return _refreshEnVol;
+}
+async function renouvelerSession({ force = false } = {}) {
   const s = await loadSession();
-  if (!s || !s.refresh_token) return null;
+  if (!s || !s.refresh_token || s.mort) return null;
+  const maintenant = Date.now();
+  // Un appelant qui avait lu l'ancienne session arrive après le renouvellement :
+  // elle est déjà neuve, on ne consomme pas le nouveau jeton pour rien.
+  if (!force && s.access_token && s.expires_at && s.expires_at > maintenant + 60000) return s;
+  const rv = await lireRenouv();
+  if (rv.prochainAt && maintenant < Number(rv.prochainAt)) return null;            // en pause
+  // Forcé juste après un succès : le jeton a moins d'une minute, en refaire un
+  // ne changera rien au refus — c'est une autre cause (et une rafale évitée).
+  if (force && rv.okAt && maintenant - Number(rv.okAt) < 60000 && s.access_token && s.expires_at > maintenant) return s;
+  const jeton = s.refresh_token;
+  let res = null, corps = null;
   try {
-    const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+    const ctrl = typeof AbortController === 'function' ? new AbortController() : null;
+    const envoi = fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, Object.assign({
       method: 'POST',
       headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refresh_token: s.refresh_token }),
-    });
-    if (!res.ok) return null;
-    const j = await res.json();
+      body: JSON.stringify({ refresh_token: jeton }),
+    }, ctrl ? { signal: ctrl.signal } : {}));
+    res = await avecDelai(envoi, RENOUV_DELAI_MS, null);
+    if (!res && ctrl) { try { ctrl.abort(); } catch (_) {} }
+    if (res && typeof res.text === 'function') {
+      const t = await avecDelai(res.text().catch(() => ''), RENOUV_DELAI_MS, '');
+      try { corps = t ? JSON.parse(t) : null; } catch (_) { corps = null; }
+    } else if (res && typeof res.json === 'function') {
+      corps = await avecDelai(res.json().catch(() => null), RENOUV_DELAI_MS, null);
+    }
+  } catch (_) { res = null; }
+  // ⚠️ LA SESSION A PU CHANGER PENDANT LE VOL (l'app vient d'envoyer la sienne,
+  //    ou une déconnexion) : on n'écrase rien, et un refus de l'ANCIEN jeton ne
+  //    tue pas la NOUVELLE session.
+  const apres = await loadSession();
+  if (!apres || apres.refresh_token !== jeton) {
+    return (apres && !apres.mort && apres.access_token && apres.expires_at > Date.now()) ? apres : null;
+  }
+  if (res && res.ok && corps && corps.access_token) {
     // ⚠️ L'EMAIL SE PERDAIT ICI (mesuré le 2 octobre) : la session renouvelée
     //    était reconstruite SANS lui, donc « compte VRM utilisé » devenait vide
     //    au bout d'une heure — l'information même qui manquait le jour où ses
     //    captures sont parties dans un autre compte VRM.
     const next = {
-      access_token: j.access_token,
-      refresh_token: j.refresh_token,
-      expires_at: Date.now() + ((j.expires_in || 3600) * 1000),
-      user_id: (j.user && j.user.id) || s.user_id || null,
-      email: (j.user && j.user.email) || s.email || emailDuJwt(j.access_token) || '',
+      access_token: corps.access_token,
+      refresh_token: corps.refresh_token || jeton,
+      expires_at: Date.now() + ((corps.expires_in || 3600) * 1000),
+      user_id: (corps.user && corps.user.id) || s.user_id || subDuJwt(corps.access_token) || null,
+      email: (corps.user && corps.user.email) || s.email || emailDuJwt(corps.access_token) || '',
     };
     await saveSession(next);
+    await ecrireRenouv({ okAt: Date.now() });
     return next;
-  } catch (_) { return null; }
+  }
+  if (res && renouvellementMort(res.status, corps)) {
+    const raison = String((corps && (corps.error_code || corps.error || corps.code)) || res.status).slice(0, 60);
+    await saveSession(Object.assign({}, s, { mort: true, mortAt: Date.now(), mortRaison: raison }));
+    Promise.resolve().then(() => noterDiag('session_morte_' + raison.replace(/[^a-z_]/gi, '').slice(0, 40))).catch(() => {});
+    return null;
+  }
+  // Passager (429, 5xx, réseau, délai, réponse illisible) : pause croissante.
+  const echecs = Number(rv.echecs || 0) + 1;
+  const pause = Math.min(RENOUV_PAUSE_MAX_MS, RENOUV_PAUSE_MIN_MS * Math.pow(2, echecs - 1));
+  const code = res ? String(res.status || 'inconnu') : 'reseau';
+  await ecrireRenouv({ echecs, prochainAt: Date.now() + pause, code, at: Date.now(), okAt: rv.okAt || 0 });
+  Promise.resolve().then(() => noterDiag('session_renouv_pause_' + code)).catch(() => {});
+  return null;
 }
 async function authToken() {
-  let s = await loadSession();
-  if (!s) return null;
-  if (!s.expires_at || s.expires_at < Date.now() + 60000) s = await refreshSession();
-  return s && s.access_token ? s : null;
+  const s = await loadSession();
+  if (!s || s.mort) return null;                 // morte : AUCUN réseau
+  if (s.access_token && s.expires_at && s.expires_at > Date.now() + 60000) return s;
+  const r = await refreshSession();
+  if (r && r.access_token) return r;
+  // Pas renouvelée (pause, échec passager) : le jeton actuel tient-il ENCORE ?
+  const cur = await loadSession();
+  return (cur && !cur.mort && cur.access_token && cur.expires_at > Date.now()) ? cur : null;
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -172,15 +305,54 @@ async function authLogin(email, password) {
 // État de la session, pour l'afficher SANS mentir : connecté ou non, sous quelle
 // adresse, et surtout si la base sait aujourd'hui séparer les vendeurs. Tant que
 // `cloisonne` est faux, se connecter ne protège rien — on le dit.
-async function authEtat() {
+// ── SANS RÉSEAU (5.160) ──────────────────────────────────────────────────────
+// ⚠️⚠️ « L'EXTENSION NE RÉPOND PAS » (Julien, 5 octobre, en cliquant « Générer
+//    le bordereau »). L'app demande l'état toutes les 20 s et abandonne au bout
+//    de 2,5 s. Or l'état attendait le RÉSEAU : la sonde de cloisonnement (une
+//    fois par vie du service worker — donc à chaque réveil à froid), puis le
+//    renouvellement de la session, puis la liste des comptes. Un service
+//    worker qui se réveille, une base lente : la réponse arrivait après
+//    l'abandon, et l'app concluait que l'extension était morte.
+// ⇒ L'état se lit dans le STOCKAGE LOCAL. Si le jeton est à renouveler, on
+//    lance le renouvellement (le seul en vol) et on l'attend au plus
+//    `attenteMs` ; au-delà, on ne devine ni oui ni non : `connecte: null`
+//    (« pas su, renouvellement en cours »). TROIS états, jamais deux.
+function subDuJwt(token) {
+  try { const p = jwtPayload(token); return (p && typeof p.sub === 'string') ? p.sub : ''; } catch (_) { return ''; }
+}
+async function authEtatRapide(attenteMs = 1500, attenteCloisonneMs = 0) {
+  const cloisonneP = cloisonneConnu(attenteCloisonneMs).catch(() => null);
   const s = await loadSession();
-  const cl = await isCloisonne();
-  if (!s) return { ok: true, connecte: false, cloisonne: cl };
-  // Un refresh_token périmé (longue absence) rend la session inutilisable : on
-  // le vérifie vraiment au lieu d'afficher « connecté » sur un jeton mort.
-  const vivant = await authToken();
-  const email = (vivant && vivant.email) || s.email || emailDuJwt((vivant || s).access_token) || '';
-  return { ok: true, connecte: !!vivant, expiree: !vivant, email, cloisonne: cl };
+  const ident = (x) => ({
+    email: (x && (x.email || emailDuJwt(x.access_token))) || '',
+    user_id: (x && (x.user_id || subDuJwt(x.access_token))) || null,
+  });
+  const rendre = async (connecte, expiree, x, extra) => Object.assign(
+    { ok: true, connecte, expiree }, ident(x), { cloisonne: await cloisonneP }, extra || {});
+  if (!s) return rendre(false, false, null);
+  if (s.mort) return rendre(false, true, s, { mort: true });
+  const valide = (x) => !!(x && !x.mort && x.access_token && x.expires_at && x.expires_at > Date.now());
+  if (s.access_token && s.expires_at && s.expires_at > Date.now() + 60000) return rendre(true, false, s);
+  if (!s.refresh_token) return valide(s) ? rendre(true, false, s) : rendre(false, true, s);
+  // À renouveler : le renouvellement part (un seul en vol), on l'attend au plus
+  // `attenteMs`. Il continue sa vie au-delà — la question suivante en profite.
+  const enVol = refreshSession().catch(() => null);
+  const fait = await avecDelai(enVol.then((v) => ({ v })), attenteMs, null);
+  if (fait && fait.v && fait.v.access_token) return rendre(true, false, fait.v);
+  const cur = await loadSession();
+  if (!cur) return rendre(false, false, null);              // déconnecté entre-temps
+  if (cur.mort) return rendre(false, true, cur, { mort: true });
+  if (valide(cur)) return rendre(true, false, cur);
+  return rendre(null, null, cur, { renouvellement: fait ? 'pause' : 'en-cours' });
+}
+// L'état « complet », pour la fenêtre de connexion et l'icône : leur contrat est
+// À DEUX ÉTATS (connecté ou pas). On attend donc un peu plus le renouvellement,
+// et si on ne sait toujours pas, on dit « expirée » comme avant — avec
+// `incertain` pour qui sait le lire (se reconnecter règle le cas de toute façon).
+async function authEtat() {
+  const e = await authEtatRapide(2000, 1000);
+  if (e.connecte === null) return Object.assign({}, e, { connecte: false, expiree: true, incertain: true });
+  return e;
 }
 // L'email est une REVENDICATION du jeton Supabase (`email`) : une identité, pas
 // une ressemblance — c'est le repli quand la session n'a pas gardé l'adresse.
@@ -201,20 +373,68 @@ let CLOISONNE = null;   // null = pas encore verifie
 //    identiques** partaient avant que la première ne réponde — mesuré le
 //    15 septembre, 6× `select=owner&limit=1` sur une construction de panneau.
 let CLOISONNE_EN_VOL = null;
+// ⚠️⚠️ TROIS ÉTATS, COMME `baseCloisonnee` CÔTÉ SERVEUR (api/_lib/session.js,
+//    §11 : une règle, la même partout). La sonde mémorisait `false` sur TOUT
+//    échec (`CLOISONNE = r.ok`, et `false` dans le `catch`) : un 502 au réveil
+//    du service worker, et l'extension écrivait avec la clé publique pour toute
+//    sa vie — que RLS refuse en silence. Désormais :
+//      · 200 ⇒ cloisonnée : mémorisé ET rangé dans `chrome.storage.local`
+//        (une base n'est jamais dé-cloisonnée : au prochain réveil, plus besoin
+//        de sonder) ;
+//      · 400 ⇒ la colonne `owner` n'existe pas : mémorisé pour cette vie ;
+//      · tout le reste (5xx, réseau, délai) ⇒ PAS SU : rien n'est mémorisé ; on
+//        rend la valeur rangée s'il y en a une, sinon `true` — l'état de
+//        production. L'asymétrie décide : écrire AVEC `owner` dans une base
+//        non cloisonnée échoue BRUYAMMENT (400, compté, retenté au cycle
+//        suivant) ; écrire SANS `owner` dans une base cloisonnée est refusé EN
+//        SILENCE par RLS — la capture disparaît sans que rien ne le dise.
+const CLOISONNE_STORE = 'vrmCloisonne';
+const CLOISONNE_DELAI_MS = 8000;
+// Après un « pas su », on ne resonde pas avant 30 s : en pleine panne, chaque
+// écriture relancerait sinon une sonde. (Simple frein : le perdre au réveil du
+// service worker coûte au pire UNE sonde de plus — rien n'est retenu ici.)
+let CLOISONNE_ECHEC_AT = 0;
+async function cloisonneRange() {
+  try { return (await chrome.storage.local.get(CLOISONNE_STORE))[CLOISONNE_STORE] === true ? true : null; } catch (_) { return null; }
+}
+// Rend true · false · null (pas su). Une seule sonde en vol.
+function sonderCloisonne() {
+  if (CLOISONNE !== null) return Promise.resolve(CLOISONNE);
+  if (CLOISONNE_EN_VOL) return CLOISONNE_EN_VOL;
+  CLOISONNE_EN_VOL = (async () => {
+    if (await cloisonneRange() === true) { CLOISONNE = true; return true; }
+    if (Date.now() - CLOISONNE_ECHEC_AT < 30000) return null;
+    let r = null;
+    try {
+      r = await avecDelai(fetch(`${SUPABASE_URL}/rest/v1/app_data?select=owner&limit=1`, {
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+      }), CLOISONNE_DELAI_MS, null);
+    } catch (_) { r = null; }
+    if (r && r.ok) {
+      CLOISONNE = true;
+      try { await chrome.storage.local.set({ [CLOISONNE_STORE]: true }); } catch (_) {}
+      return true;
+    }
+    if (r && r.status === 400) { CLOISONNE = false; return false; }
+    CLOISONNE_ECHEC_AT = Date.now();
+    return null;
+  })().catch(() => null).finally(() => { CLOISONNE_EN_VOL = null; });
+  return CLOISONNE_EN_VOL;
+}
 async function isCloisonne() {
   if (CLOISONNE !== null) return CLOISONNE;
-  if (CLOISONNE_EN_VOL) return await CLOISONNE_EN_VOL;
-  CLOISONNE_EN_VOL = (async () => {
-    try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?select=owner&limit=1`, {
-        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
-      });
-      CLOISONNE = r.ok;
-    } catch (_) { CLOISONNE = false; }
-    CLOISONNE_EN_VOL = null;
-    return CLOISONNE;
-  })();
-  return await CLOISONNE_EN_VOL;
+  const v = await sonderCloisonne();
+  return v === null ? true : v;
+}
+// Pour un ÉTAT à afficher (jamais pour décider d'une écriture) : ce qu'on SAIT
+// déjà — mémoire, puis valeur rangée — sans attendre le réseau au-delà de
+// `attenteMs`. La sonde part en fond si on ne sait pas. `null` = pas su.
+async function cloisonneConnu(attenteMs) {
+  if (CLOISONNE !== null) return CLOISONNE;
+  const enVol = sonderCloisonne();
+  if (await cloisonneRange() === true) return true;
+  if (!attenteMs) return null;
+  return await avecDelai(enVol, attenteMs, null);
 }
 
 // En-tetes Supabase : jeton du vendeur UNIQUEMENT si la base sait s'en servir.
@@ -282,10 +502,10 @@ function familleEcriture(table, rows) {
 }
 // Un seul renouvellement de session en vol : deux écritures refusées en même
 // temps ne doivent pas consommer deux fois le même jeton de renouvellement.
-let _renouvEnVol = null;
+// (5.160 : c'est `refreshSession` lui-même qui partage sa promesse, et qui
+// respecte la session morte et la pause — ce chemin-ci en profite.)
 function renouvelerUneFois() {
-  if (!_renouvEnVol) _renouvEnVol = refreshSession().catch(() => null).finally(() => { _renouvEnVol = null; });
-  return _renouvEnVol;
+  return refreshSession({ force: true });
 }
 async function supabaseUpsert(table, rows, onConflict) {
   const list = Array.isArray(rows) ? rows : [rows];
@@ -2832,6 +3052,17 @@ function fullSync() { captureAllAccounts().then(() => runActive()); }
 // ⚠️ APRÈS UNE MISE À JOUR, Chrome n'injecte PAS le nouveau bridge.js dans les
 //    onglets de l'app déjà ouverts : l'app parlerait à l'ancien (orphelin,
 //    muet) jusqu'à ce qu'il recharge la page. On le réinjecte nous-mêmes.
+// ⚠️⚠️ 5.160 : SEULEMENT QUAND L'EXTENSION A CHANGÉ (`install`, `update`).
+//    `onInstalled` part AUSSI quand c'est CHROME qui se met à jour
+//    (`chrome_update`) ou un module partagé : l'extension n'a pas bougé, le pont
+//    du manifeste tourne déjà dans l'onglet, et un second pont VIVANT relaierait
+//    chaque demande DEUX fois — une réponse à un acheteur envoyée deux fois.
+//    bridge.js porte aussi sa propre garde (`__vrmPontVivant`) : si les deux
+//    sautaient un jour, le pire serait un pont de moins, jamais un de trop.
+function raisonReinjecte(details) {
+  const r = details && details.reason;
+  return !r || r === 'install' || r === 'update';
+}
 async function reinjecterPont() {
   try {
     const tabs = await chrome.tabs.query({ url: APP_URLS });
@@ -2840,7 +3071,7 @@ async function reinjecterPont() {
     }
   } catch (_) {}
 }
-chrome.runtime.onInstalled.addListener(() => { fullSync(); reinjecterPont(); });
+chrome.runtime.onInstalled.addListener((details) => { fullSync(); if (raisonReinjecte(details)) reinjecterPont(); });
 chrome.runtime.onStartup.addListener(() => { fullSync(); });
 
 try {
@@ -3350,15 +3581,37 @@ async function notifierApp(evt) {
 }
 // Le login lisible du compte connecté (l'app l'écrit à côté du bouton grisé :
 // « Chrome est connecté sur X »). Mémorisé 5 min, aucune requête Vinted.
-async function loginDe(uid) {
+// ⚠️ 5.160 : PÉRIMÉ-MAIS-SERVI. Le mémo avait 5 min de vie, et au-delà la
+//    réponse ATTENDAIT la liste des comptes en base (réseau) — dans l'état que
+//    l'app interroge toutes les 20 s avec 2,5 s de patience. Un login ne change
+//    presque jamais : on rend le mémo même ancien et on le rafraîchit EN FOND
+//    (un seul en vol). On n'attend la base que si ce compte n'est pas connu du
+//    tout, et au plus `attendreMs`.
+let _loginsEnVol = null;
+function rafraichirLogins() {
+  if (_loginsEnVol) return _loginsEnVol;
+  _loginsEnVol = (async () => {
+    const accts = await avecDelai(getStoredAccounts(), 15000, null);
+    if (!Array.isArray(accts) || !accts.length) return null;   // rien lu ⇒ on garde l'ancien mémo
+    const map = {}; for (const a of accts) map[String(a.vinted_user_id)] = a.login || '';
+    try { await chrome.storage.local.set({ vrmLogins: { at: Date.now(), map } }); } catch (_) {}
+    return map;
+  })().catch(() => null).finally(() => { _loginsEnVol = null; });
+  return _loginsEnVol;
+}
+async function loginDe(uid, opts) {
   if (!uid) return '';
+  const attendreMs = opts && typeof opts.attendreMs === 'number' ? opts.attendreMs : 1500;
   try {
     const memo = (await chrome.storage.local.get('vrmLogins')).vrmLogins || {};
-    if (memo.at && Date.now() - memo.at < 300000 && memo.map) return memo.map[uid] || '';
-    const accts = await getStoredAccounts();
-    const map = {}; for (const a of accts || []) map[String(a.vinted_user_id)] = a.login || '';
-    if ((accts || []).length) await chrome.storage.local.set({ vrmLogins: { at: Date.now(), map } });
-    return map[uid] || '';
+    const connu = !!(memo.map && Object.prototype.hasOwnProperty.call(memo.map, uid));
+    const frais = !!(memo.at && Date.now() - memo.at < 300000 && memo.map);
+    if (frais) return (memo.map && memo.map[uid]) || '';
+    const enVol = rafraichirLogins();
+    if (connu) return memo.map[uid] || '';
+    if (!attendreMs) return '';
+    const map = await avecDelai(enVol, attendreMs, null);
+    return (map && map[uid]) || '';
   } catch (_) { return ''; }
 }
 // ── LA PETITE CARTE EN BAS À DROITE (vrm-badge.js) ──────────────────────────
@@ -3372,7 +3625,10 @@ const BASCULE_VISIBLE_MS = 7 * 86400000;
 async function etatSite(url) {
   const plateforme = plateformeDe(url);
   let version = ''; try { version = chrome.runtime.getManifest().version; } catch (_) {}
-  const vrm = await authEtat().catch(() => null);
+  // La carte sait dire « pas su pour l'instant » (`vrm: null`) : elle lit l'état
+  // SANS RÉSEAU, et un renouvellement en cours n'y devient pas « pas connecté ».
+  const brut = await authEtatRapide(1500).catch(() => null);
+  const vrm = brut && brut.connecte !== null ? brut : null;
   let local = {};
   try { local = await chrome.storage.local.get(['vrmFlux', 'vrmBascule', 'vrmLbcCompte']); } catch (_) {}
   // Le compte du SITE : sur Vinted le cookie le dit (une identité) ; sur
@@ -3400,12 +3656,31 @@ async function etatSite(url) {
 
 // L'état que l'app interroge toutes les 20 s : ZÉRO requête Vinted (cookie,
 // stockage local, session VRM).
+// ⚠️⚠️ 5.160 : ET ZÉRO ATTENTE RÉSEAU. Il passait par `authEtat()` (sonde de
+//    cloisonnement + renouvellement de session) et `loginDe()` (liste des
+//    comptes en base toutes les 5 min) : au réveil à froid du service worker,
+//    ou base lente, la réponse dépassait les 2,5 s de l'app — qui affichait
+//    « L'extension ne répond pas » sur le bouton « Générer le bordereau ».
+//    Tout se lit maintenant dans le stockage local ; seul un jeton à renouveler
+//    fait attendre, au plus 1,5 s, et au-delà l'état dit `connecte: null`.
+//    `user_id` voyage avec : l'app compare des IDENTITÉS, pas des adresses.
 async function etatPourApp() {
   let version = ''; try { version = chrome.runtime.getManifest().version; } catch (_) {}
-  const uid = await compteConnecte('www.vinted.fr');
-  const vrm = await authEtat().catch(() => null);
-  const cmds = await lireCmds();
-  return { ok: true, version, vrm, vinted: uid ? { uid: String(uid), login: await loginDe(String(uid)) } : null, cmds };
+  // ⚠️ « Pas su » n'est pas « aucun compte » (revue du 5 octobre) : un cookie
+  //    pas lu à temps se dit `vintedPasSu`, jamais `vinted: null` — l'app
+  //    affichait « aucun compte Vinted ouvert » sur une simple lenteur.
+  const PAS_SU = {};
+  const uid = await avecDelai(compteConnecte('www.vinted.fr'), 1000, PAS_SU).catch(() => PAS_SU);
+  const vintedPasSu = uid === PAS_SU;
+  const [e, cmds, login] = await Promise.all([
+    authEtatRapide(1500).catch(() => null),
+    avecDelai(lireCmds(), 300, {}).catch(() => ({})),
+    uid && !vintedPasSu ? avecDelai(loginDe(String(uid), { attendreMs: 250 }), 300, '').catch(() => '') : Promise.resolve(''),
+  ]);
+  const vrm = e ? Object.assign({ ok: true, connecte: e.connecte, expiree: e.expiree, email: e.email || '', user_id: e.user_id || null, cloisonne: e.cloisonne === undefined ? null : e.cloisonne },
+    e.mort ? { mort: true } : {}, e.renouvellement ? { renouvellement: e.renouvellement } : {}) : null;
+  return Object.assign({ ok: true, version, vrm, vinted: uid && !vintedPasSu ? { uid: String(uid), login: login || '' } : null, cmds },
+    vintedPasSu ? { vintedPasSu: true } : {});
 }
 // Le bordereau de CETTE vente est-il déjà rangé (avec son PDF) ? Une lecture
 // scalaire (§4.4) — `null` = la base n'a pas répondu (« pas su » ≠ « non »).
@@ -3442,6 +3717,27 @@ async function publierDepuisApp(msg) {
     return { accepte: true, etape: 'fait' };
   }
   const lbc = cmd === 'lbcPublier';
+  // ⚠️⚠️ UNE PUBLICATION À LA FOIS PAR PAIRE (revue du 5 octobre). Avec le pont
+  //    qui relaie enfin la commande entière (5.160), un double clic — ou deux
+  //    onglets VRM — ouvrait DEUX dépôts, et Leboncoin publie sans booster tout
+  //    seul : deux annonces pour la même paire. Un dépôt de moins de 15 min pour
+  //    CETTE paire ⇒ refusé, avec la raison. L'état vit dans `chrome.storage`
+  //    (§4.9), pas dans une variable du service worker.
+  const cleJob = (lbc ? 'lbc:' : 'ebay:') + id;
+  // Le verrou est posé AVANT toute attente : deux clics simultanés passeraient
+  // sinon tous les deux la lecture de l'état (prouvé par l'audit).
+  if (PUBLICATIONS_EN_VOL.has(cleJob)) return { accepte: false, code: 'en-cours', raison: 'elle est déjà en train de partir' };
+  PUBLICATIONS_EN_VOL.add(cleJob);
+  try {
+    const jobDeja = (await lireCmds())[cleJob];
+    if (jobDeja && jobDeja.etape === 'depot' && Date.now() - Number(jobDeja.at || 0) < 15 * 60000) {
+      return { accepte: false, code: 'en-cours', raison: lbc ? 'sa publication est déjà en cours dans un autre onglet' : 'sa préparation eBay est déjà ouverte dans un autre onglet' };
+    }
+    return await publierDepuisAppSuite(msg, cmd, id, lbc);
+  } finally { PUBLICATIONS_EN_VOL.delete(cleJob); }
+}
+const PUBLICATIONS_EN_VOL = new Set();
+async function publierDepuisAppSuite(msg, cmd, id, lbc) {
   // Capture au clic : si les photos de CETTE paire manquent, on les cherche
   // MAINTENANT (1 lecture, sur son clic) avant de construire l'ad — ainsi
   // l'annonce part avec ses photos, sans attendre le fond.

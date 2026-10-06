@@ -37,7 +37,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.159.0';
+const EXT_ATTENDUE = '5.161.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -773,29 +773,48 @@ if (MULTI_USER && typeof window !== 'undefined') {
 // L'EXTENSION A BESOIN DE SAVOIR QUI TU ES.
 // Elle écrit dans la même base (annonces, ventes, messages captés au passage).
 // Une fois l'isolation activée, la clé publique n'a plus le droit d'écrire :
-// il faut qu'elle écrive sous TON compte. On lui transmet donc la session dès
-// qu'elle change — l'extension la garde et la renouvelle toute seule ensuite.
-// À la déconnexion on envoie null : elle oublie tout.
-const pushSessionToExtension = () => {
-  if (!MULTI_USER) return;
-  try {
-    const s = AUTH.session;
-    window.postMessage({ __vmr: 'session', session: s ? {
-      access_token: s.access_token, refresh_token: s.refresh_token,
-      expires_at: s.expires_at, user_id: AUTH.user && AUTH.user.id,
-      // L'email voyage avec la session : c'est lui que l'extension affiche
-      // (« compte VRM utilisé »). Sans lui elle ne pouvait pas le nommer.
-      email: (AUTH.user && AUTH.user.email) || '',
-    } : null }, window.location.origin);
-  } catch (_) {}
+// il faut qu'elle écrive sous TON compte.
+// ⚠️⚠️ L'APP NE LUI PRÊTE PLUS SA PROPRE SESSION (5 octobre). Jusqu'ici on lui
+//    envoyait NOTRE jeton de renouvellement à chaque changement et à chaque
+//    « ready » : l'app et l'extension renouvelaient alors la MÊME famille de
+//    jetons. Avec la rotation de Supabase, la seconde qui renouvelle présente
+//    un jeton déjà consommé — mesuré dans les journaux d'authentification de
+//    la production le 5 octobre : `refresh_token_already_used`, puis une
+//    rafale de 429. L'extension perdait sa session (« l'extension ne répond
+//    pas » sur le bouton du bordereau), et l'app risquait la sienne.
+//    ⇒ L'extension reçoit SA session, fabriquée par le serveur pour le même
+//      compte (`/api/compte?mode=session-extension`) : deux familles de jetons
+//      indépendantes, qui ne se marchent plus dessus. On ne la lui donne que
+//      quand elle en a BESOIN (pas de session, session morte, autre compte),
+//      jamais à chaque rafraîchissement. Voir `assurerSessionExtension`.
+// À la déconnexion on envoie toujours null : elle oublie tout.
+const posterSessionExtension = (session) => {
+  try { window.postMessage({ __vmr: 'session', session: session || null }, window.location.origin); } catch (_) {}
 };
+// Le repli d'AVANT (notre propre session) ne sert plus qu'à amorcer une
+// extension qui n'a AUCUNE session quand le serveur ne sait pas en fabriquer
+// une (route pas encore déployée, clé de service absente) — jamais pour
+// remplacer une session morte : c'est exactement le cas qui faisait s'entre-
+// tuer les deux familles.
+const sessionAppPourExtension = () => {
+  const s = AUTH.session;
+  return s ? {
+    access_token: s.access_token, refresh_token: s.refresh_token,
+    expires_at: s.expires_at, user_id: AUTH.user && AUTH.user.id,
+    // L'email voyage avec la session : c'est lui que l'extension affiche
+    // (« compte VRM utilisé »). Sans lui elle ne pouvait pas le nommer.
+    email: (AUTH.user && AUTH.user.email) || '',
+  } : null;
+};
+let __sessionAvait = false;
 if (MULTI_USER && typeof window !== 'undefined') {
-  onAuthChange(pushSessionToExtension);
-  // L'extension annonce sa présence au chargement de la page ; on en profite
-  // pour lui donner la session tout de suite (elle démarre parfois après nous).
-  window.addEventListener('message', (ev) => {
-    if (ev.source === window && ev.data && ev.data.__vmr === 'ready') pushSessionToExtension();
-  }, false);
+  onAuthChange(() => {
+    const a = !!(AUTH.session && AUTH.user);
+    if (__sessionAvait && !a) posterSessionExtension(null);   // déconnexion : elle oublie
+    __sessionAvait = a;
+    // Connexion (ou nouveau compte) : on vérifie si l'extension a ce qu'il faut.
+    if (a) setTimeout(() => { try { assurerSessionExtension(); } catch (_) {} }, 50);
+  });
 }
 
 // Liste des cles synchronisees dans le cloud
@@ -1444,9 +1463,13 @@ const lireTout = async (query, opts = {}) => {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?${query}`, {
       headers: sbAuth({ Range: `${from}-${from + PAGE_SB - 1}`, 'Range-Unit': 'items' }),
     });
-    if (!r.ok) return p === 0 ? null : out;   // 1re page en erreur = échec ; sinon on rend ce qu'on a
+    // `opts.strict` : une page ratée en cours de route vaut « pas su » (null),
+    // pas une demi-liste — pour les lecteurs dont un ABSENT déclenche un geste
+    // (une vente prouvée manquante = une annonce eBay qu'on ne propose pas de
+    // retirer, sans le dire).
+    if (!r.ok) return (p === 0 || opts.strict) ? null : out;   // 1re page en erreur = échec ; sinon on rend ce qu'on a
     const lot = await r.json();
-    if (!Array.isArray(lot)) return p === 0 ? null : out;
+    if (!Array.isArray(lot)) return (p === 0 || opts.strict) ? null : out;
     out.push(...lot);
     if (lot.length < PAGE_SB) break;
   }
@@ -3460,13 +3483,24 @@ const vmrExtVersion = () => __vmrExtVersion;
 // Qui est connecté DANS l'extension ? L'app ne peut pas lire son stockage
 // (c'est le but) : elle le lui demande par le pont. Renvoie null si l'extension
 // n'est pas là ou ne répond pas — jamais une supposition.
-function vmrAuthEtat(timeoutMs = 2500) {
+// L'erreur qu'un bridge.js ORPHELIN renvoie (extension rechargée ou mise à
+// jour : son service worker n'existe plus). Ce n'est pas une réponse.
+const pontOrphelin = (err) => /context invalidated|contexte|^pont$|Receiving end does not exist/i.test(String(err || ''));
+// ⚠️ Une réponse VIDE peut venir d'un pont ORPHELIN (voir `vmrDemande`) : on
+//    attend encore celle d'un pont vivant avant de conclure.
+// 4 s (2,5 avant) : l'extension 5.159 et avant renouvelait sa session AVANT de
+// répondre ; la 5.160 répond en moins de 2 s quoi qu'il arrive.
+function vmrAuthEtat(timeoutMs = 4000) {
   return new Promise((resolve) => {
     if (typeof window === 'undefined' || !__vmrExtReady) { resolve(null); return; }
     const reqId = 'a' + Date.now() + '_' + Math.random().toString(36).slice(2);
-    let done = false;
-    const fin = (v) => { if (done) return; done = true; window.removeEventListener('message', onMsg); resolve(v); };
-    const onMsg = (e) => { if (e.source === window && e.data && e.data.__vmr === 'authEtat:result' && e.data.reqId === reqId) fin(e.data.etat || null); };
+    let done = false, grace = null;
+    const fin = (v) => { if (done) return; done = true; clearTimeout(grace); window.removeEventListener('message', onMsg); resolve(v); };
+    const onMsg = (e) => {
+      if (!(e.source === window && e.data && e.data.__vmr === 'authEtat:result' && e.data.reqId === reqId)) return;
+      if (e.data.etat) { fin(e.data.etat); return; }
+      if (!grace) grace = setTimeout(() => fin(null), VMR_GRACE_VIDE_MS);
+    };
     window.addEventListener('message', onMsg);
     setTimeout(() => fin(null), timeoutMs);
     try { window.postMessage({ __vmr: 'authEtat', reqId }, '*'); } catch (_) { fin(null); }
@@ -3480,9 +3514,14 @@ function vmrPhoto(url, timeoutMs = 8000) {
   return new Promise((resolve) => {
     if (typeof window === 'undefined' || !__vmrExtReady || !url) { resolve(null); return; }
     const reqId = 'p' + Date.now() + '_' + Math.random().toString(36).slice(2);
-    let done = false;
-    const fin = (v) => { if (done) return; done = true; window.removeEventListener('message', onMsg); resolve(v); };
-    const onMsg = (e) => { if (e.source === window && e.data && e.data.__vmr === 'photo:result' && e.data.reqId === reqId) fin(e.data.dataUrl || null); };
+    let done = false, grace = null;
+    const fin = (v) => { if (done) return; done = true; clearTimeout(grace); window.removeEventListener('message', onMsg); resolve(v); };
+    // Réponse vide : peut-être un pont orphelin (voir `vmrDemande`) — on attend encore un peu.
+    const onMsg = (e) => {
+      if (!(e.source === window && e.data && e.data.__vmr === 'photo:result' && e.data.reqId === reqId)) return;
+      if (e.data.dataUrl) { fin(e.data.dataUrl); return; }
+      if (!grace) grace = setTimeout(() => fin(null), VMR_GRACE_VIDE_MS);
+    };
     window.addEventListener('message', onMsg);
     setTimeout(() => fin(null), timeoutMs);
     try { window.postMessage({ __vmr: 'photo', reqId, url }, '*'); } catch (_) { fin(null); }
@@ -3495,9 +3534,17 @@ function vmrPdfLbc(url, timeoutMs = 15000) {
   return new Promise((resolve) => {
     if (typeof window === 'undefined' || !__vmrExtReady || !url) { resolve({ error: 'extension absente' }); return; }
     const reqId = 'l' + Date.now() + '_' + Math.random().toString(36).slice(2);
-    let done = false;
-    const fin = (v) => { if (done) return; done = true; window.removeEventListener('message', onMsg); resolve(v); };
-    const onMsg = (e) => { if (e.source === window && e.data && e.data.__vmr === 'pdfLbc:result' && e.data.reqId === reqId) fin({ dataUrl: e.data.dataUrl || null, error: e.data.error || '' }); };
+    let done = false, grace = null, dernier = null;
+    const fin = (v) => { if (done) return; done = true; clearTimeout(grace); window.removeEventListener('message', onMsg); resolve(v); };
+    // Une erreur de PONT (« Extension context invalidated », « pont ») vient d'un
+    // bridge orphelin (voir `vmrDemande`) : on attend encore le pont vivant.
+    const onMsg = (e) => {
+      if (!(e.source === window && e.data && e.data.__vmr === 'pdfLbc:result' && e.data.reqId === reqId)) return;
+      const v = { dataUrl: e.data.dataUrl || null, error: e.data.error || '' };
+      if (v.dataUrl || !pontOrphelin(v.error)) { fin(v); return; }
+      dernier = v;
+      if (!grace) grace = setTimeout(() => fin(dernier), VMR_GRACE_VIDE_MS);
+    };
     window.addEventListener('message', onMsg);
     setTimeout(() => fin({ error: 'pas de réponse' }), timeoutMs);
     try { window.postMessage({ __vmr: 'pdfLbc', reqId, url }, '*'); } catch (_) { fin({ error: 'pont' }); }
@@ -3508,9 +3555,21 @@ function vmrExec({ uid, method, endpoint, body }, timeoutMs = 15000) {
   return new Promise((resolve) => {
     if (typeof window === 'undefined') { resolve({ ok: false, error: 'no window' }); return; }
     const reqId = 'r' + Date.now() + '_' + Math.random().toString(36).slice(2);
+    let dernier = null;
     const cleanup = () => { clearTimeout(to); window.removeEventListener('message', onMsg); };
-    const onMsg = (e) => { if (e.source === window && e.data && e.data.__vmr === 'result' && e.data.reqId === reqId) { cleanup(); resolve(e.data); } };
-    const to = setTimeout(() => { cleanup(); resolve({ ok: false, error: 'timeout' }); }, timeoutMs);
+    // ⚠️⚠️ UNE ERREUR DE PONT N'EST PAS UN ÉCHEC DE L'ENVOI (revue du 5 octobre).
+    //    Elle vient d'un bridge ORPHELIN (voir `vmrDemande`) pendant que le
+    //    pont vivant, lui, ENVOIE le message. La première version rendait cette
+    //    erreur au bout de 1,5 s : l'écran disait « échec », il renvoyait — et
+    //    l'acheteur recevait la réponse DEUX FOIS. On attend donc la réponse du
+    //    pont vivant jusqu'à l'échéance ; l'erreur d'orphelin n'est rendue que
+    //    s'il n'y a vraiment personne d'autre.
+    const onMsg = (e) => {
+      if (!(e.source === window && e.data && e.data.__vmr === 'result' && e.data.reqId === reqId)) return;
+      if (e.data.ok || !pontOrphelin(e.data.error)) { cleanup(); resolve(e.data); return; }
+      dernier = e.data;
+    };
+    const to = setTimeout(() => { cleanup(); resolve(dernier || { ok: false, error: 'timeout' }); }, timeoutMs);
     window.addEventListener('message', onMsg);
     try { window.postMessage({ __vmr: 'exec', reqId, uid, method, endpoint, body }, '*'); }
     catch (e) { cleanup(); resolve({ ok: false, error: String(e) }); }
@@ -3529,33 +3588,156 @@ function vmrExec({ uid, method, endpoint, body }, timeoutMs = 15000) {
 let __vmrEtat = undefined, __vmrRates = 0;
 const __vmrJobs = {};                       // jobId → dernière étape connue
 const __vmrNotifier = () => __vmrExtSubs.forEach(fn => { try { fn(); } catch (_) {} });
+// ⚠️⚠️ UN PONT ORPHELIN RÉPONDAIT « RIEN » PLUS VITE QUE LE PONT VIVANT
+//    (5 octobre — « je ne peux pas appuyer sur le bordereau, ça met que
+//    l'extension ne répond pas »). Après une mise à jour ou un rechargement de
+//    l'extension, l'ancien bridge.js reste dans la page, sans service worker
+//    derrière lui : il répondait `null` sur-le-champ, et l'extension le remet
+//    à neuf dans la page (`reinjecterPont`) — mais la réponse vide de l'ancien
+//    arrivait la première, et l'app concluait « muette » pour de bon.
+//    ⇒ Une réponse VIDE n'est pas une réponse : on attend encore un peu celle
+//      d'un pont vivant, et seulement ensuite on dit « pas de réponse ».
+//      (Les ponts 5.160+ se taisent quand ils sont orphelins ; ceci protège
+//      aussi les extensions déjà installées.)
+const VMR_GRACE_VIDE_MS = 1500;
+//    ⚠️ La grâce ne vaut que pour une LECTURE (l'état, un statut). Une
+//    COMMANDE agit sur Vinted : conclure « pas de réponse » pendant que le pont
+//    vivant la lance ferait réessayer — un bordereau demandé deux fois. Pour
+//    elle, une réponse vide attend l'échéance (revue du 5 octobre).
 function vmrDemande(type, payload, timeoutMs) {
   return new Promise((resolve) => {
     if (typeof window === 'undefined' || !__vmrExtReady) { resolve(null); return; }
     const reqId = 'q' + Date.now() + '_' + Math.random().toString(36).slice(2);
-    let done = false;
-    const fin = (v) => { if (done) return; done = true; window.removeEventListener('message', onMsg); resolve(v); };
-    const onMsg = (e) => { if (e.source === window && e.data && e.data.__vmr === type + ':result' && e.data.reqId === reqId) fin(e.data.resp || null); };
+    let done = false, grace = null, to = null;
+    const agit = type === 'cmd';
+    const fin = (v) => { if (done) return; done = true; clearTimeout(grace); clearTimeout(to); window.removeEventListener('message', onMsg); resolve(v); };
+    const onMsg = (e) => {
+      if (e.source !== window || !e.data || e.data.__vmr !== type + ':result' || e.data.reqId !== reqId) return;
+      if (e.data.resp) { fin(e.data.resp); return; }
+      if (!agit && !grace) grace = setTimeout(() => fin(null), VMR_GRACE_VIDE_MS);
+    };
     window.addEventListener('message', onMsg);
-    setTimeout(() => fin(null), timeoutMs);
+    to = setTimeout(() => fin(null), timeoutMs);
     try { window.postMessage(Object.assign({ __vmr: type, reqId }, payload || {}), '*'); } catch (_) { fin(null); }
   });
 }
-const vmrEtat = (timeoutMs = 2500) => vmrDemande('etat', {}, timeoutMs);
+// ⚠️ 2,5 s ÉTAIT TROP COURT : au réveil, le service worker de l'extension
+//    (5.159 et avant) sondait la base et renouvelait sa session AVANT de
+//    répondre — plusieurs secondes quand Supabase traîne. L'app le déclarait
+//    muette. L'extension 5.160 répond sans réseau ; on laisse quand même le
+//    temps aux versions déjà installées.
+const vmrEtat = (timeoutMs = 6000) => vmrDemande('etat', {}, timeoutMs);
 const vmrCmd = (p, timeoutMs = 9000) => vmrDemande('cmd', p, timeoutMs);
+let __vmrBattementEnVol = false, __vmrRelance = null;
+// ⚠️ Un pont plus ancien que la 5.129 ne sait pas répondre à « état » : le
+//    questionner le faisait passer pour MUET au bout de 15 s, et l'app disait
+//    « recharge la page » à quelqu'un qui devait METTRE À JOUR — recharger ne
+//    change rien (revue du 5 octobre). On ne le questionne pas : c'est
+//    `raisonExtGlobale` qui dit « en retard ».
+const pontSaitRepondreEtat = () => { const v = vmrExtVersion(); return !!v && cmpVersion(v, EXT_CAPACITES.commande) >= 0; };
 async function battementExt() {
   if (typeof document !== 'undefined' && document.hidden) return;
-  if (!__vmrExtReady) return;
-  const r = await vmrEtat();
+  if (!__vmrExtReady || __vmrBattementEnVol) return;
+  if (!pontSaitRepondreEtat()) { legacySessionExtension(); return; }
+  __vmrBattementEnVol = true;
+  let r = null;
+  try { r = await vmrEtat(); } finally { __vmrBattementEnVol = false; }
   if (r && r.ok) { __vmrEtat = r; __vmrRates = 0; if (r.cmds && typeof r.cmds === 'object') Object.assign(__vmrJobs, r.cmds); }
-  else { __vmrRates++; if (__vmrRates >= 2 || __vmrEtat === undefined) __vmrEtat = null; }
+  else {
+    __vmrRates++;
+    // ⚠️ UN raté ne vaut pas « muette » : un service worker qui se réveille, un
+    //    onglet qui revient au premier plan. On redemande vite, et seulement
+    //    au DEUXIÈME raté d'affilée on le dit (trois états, jamais deux :
+    //    `undefined` on vérifie encore · `null` elle ne répond pas).
+    if (__vmrRates >= 2) __vmrEtat = null;
+    else { clearTimeout(__vmrRelance); __vmrRelance = setTimeout(battementExt, 3000); }
+  }
   __vmrNotifier();
+  if (r && r.ok) { try { assurerSessionExtension(); } catch (_) {} }
+}
+// L'EXTENSION REÇOIT SA PROPRE SESSION QUAND ELLE EN A BESOIN (voir
+// `posterSessionExtension`). Besoin = elle n'en a pas, la sienne est morte, ou
+// elle écrit sous un AUTRE compte VRM que celui de cette page (c'est la
+// personne au clavier qui décide : l'extension note la bascule et la dit).
+// Pas su (`connecte: null`, renouvellement en cours) ⇒ on ne touche à rien.
+let __sessExtEnVol = false, __sessExtPasAvant = 0, __sessExtIncertain = 0;
+const enVolSession = (v) => { __sessExtEnVol = v; __vmrNotifier(); };   // l'indicateur le dit pendant que ça se fait
+// ⚠️ UNE EXTENSION QUI A ENCORE LA SESSION DE L'APP (donnée avant le 5 octobre)
+//    partage sa famille de jetons avec l'app jusqu'à ce que l'une des deux soit
+//    révoquée — et Supabase peut alors révoquer les DEUX. On la sépare UNE fois,
+//    d'avance, par appareil et par compte (revue du 5 octobre). Ce n'est pas une
+//    migration de données : au pire on refait une séparation de plus, sans perte.
+const cleSeparee = (uid) => 'vrm_ext_separee_' + uid;
+async function assurerSessionExtension() {
+  if (!MULTI_USER || typeof window === 'undefined') return;
+  const s = AUTH.session, u = AUTH.user;
+  if (!s || !s.access_token || !u || !u.id) return;
+  const e = __vmrEtat;
+  const v = e && e.ok ? e.vrm : null;
+  if (!v || typeof v !== 'object') return;
+  const monId = String(u.id), monMail = String(u.email || '').trim().toLowerCase();
+  const sonId = String(v.user_id || ''), sonMail = String(v.email || '').trim().toLowerCase();
+  const autre = (sonId && sonId !== monId) || (!sonId && sonMail && monMail && sonMail !== monMail);
+  // « Pas su » (renouvellement en cours) n'est pas « pas connectée » — mais s'il
+  // dure deux battements, sa session est en pause : on lui en donne une neuve.
+  __sessExtIncertain = v.connecte === null ? __sessExtIncertain + 1 : 0;
+  let separee = false; try { separee = !!localStorage.getItem(cleSeparee(monId)); } catch (_) { separee = true; }
+  const aSeparer = v.connecte === true && !autre && !separee;
+  // « Autre compte » : seul l'onglet AU PREMIER PLAN tranche — deux onglets sur
+  // deux comptes se renverraient l'extension toutes les minutes.
+  const auPremierPlan = typeof document === 'undefined' || (!document.hidden && (typeof document.hasFocus !== 'function' || document.hasFocus()));
+  if (!(v.connecte === false || __sessExtIncertain >= 2 || aSeparer || (autre && auPremierPlan))) return;
+  if (__sessExtEnVol || Date.now() < __sessExtPasAvant) return;
+  enVolSession(true);
+  try {
+    let r = null;
+    try { r = await fetch('/api/compte?mode=session-extension', { method: 'POST', cache: 'no-store', headers: { Authorization: `Bearer ${s.access_token}` } }); } catch (_) { r = null; }
+    const j = r ? await r.json().catch(() => null) : null;
+    // ⚠️ Déconnexion ou changement de compte PENDANT l'attente : on n'envoie pas
+    //    la session d'un compte qui n'est plus celui de cette page.
+    if (!AUTH.session || !AUTH.user || String(AUTH.user.id) !== monId) return;
+    const neuve = r && r.ok && j && j.ok && j.session && j.session.access_token && j.session.refresh_token ? j.session : null;
+    if (neuve && String(neuve.user_id || '') === monId) {
+      posterSessionExtension(neuve);
+      try { localStorage.setItem(cleSeparee(monId), String(Date.now())); } catch (_) {}
+      __sessExtPasAvant = Date.now() + 60000;
+      __sessExtIncertain = 0;
+      // Elle vient de changer de session : on relit son état tout de suite.
+      setTimeout(battementExt, 800);
+      return;
+    }
+    // Le serveur ne sait pas (encore) en fabriquer une — route absente ou pas
+    // configurée, et SEULEMENT ça (une panne passagère n'est pas une raison) :
+    // repli d'avant, pour amorcer une extension qui n'a AUCUNE session du tout.
+    const pasDeServeur = r && (r.status === 404 || r.status === 405 || (r.status === 503 && j && j.erreur === 'non-configure'));
+    if (pasDeServeur && v.connecte === false && !v.expiree && !v.email) {
+      posterSessionExtension(sessionAppPourExtension());
+      __sessExtPasAvant = Date.now() + 10 * 60000;
+      setTimeout(battementExt, 800);
+      return;
+    }
+    __sessExtPasAvant = Date.now() + (r && r.status === 429 ? 15 * 60000 : 5 * 60000);
+  } finally { enVolSession(false); }
+}
+// Un pont plus ancien que la 5.129 ne dit pas sous quel compte il écrit (pas
+// d'« état ») : on garde avec lui le comportement d'AVANT — notre session à
+// chaque « ready » — plutôt que de le laisser sans aucune session. Il partage
+// alors notre famille de jetons comme avant ; c'est lui qui doit être mis à jour.
+let __legacyPoste = 0;
+function legacySessionExtension() {
+  if (!MULTI_USER || !AUTH.session || !AUTH.user) return;
+  if (Date.now() - __legacyPoste < 30 * 60000) return;
+  __legacyPoste = Date.now();
+  posterSessionExtension(sessionAppPourExtension());
 }
 if (typeof window !== 'undefined') {
   try {
     window.addEventListener('message', (e) => {
       if (e.source !== window || !e.data) return;
-      if (e.data.__vmr === 'ready' && __vmrEtat === undefined) { setTimeout(battementExt, 30); return; }
+      // Un pont qui (ré)apparaît — premier chargement, ou remis à neuf après une
+      // mise à jour de l'extension : on lui redemande son état tout de suite,
+      // y compris si on l'avait cru muette.
+      if (e.data.__vmr === 'ready') { if (__vmrEtat === undefined || __vmrEtat === null) { __vmrRates = 0; setTimeout(battementExt, 30); } return; }
       if (e.data.__vmr !== 'evt' || !e.data.evt) return;
       const ev = e.data.evt;
       if (ev.type === 'cmd' && ev.jobId) { __vmrJobs[ev.jobId] = ev; __vmrNotifier(); }
@@ -3577,14 +3759,33 @@ function raisonExtGlobale(sansSouris, opt) {
   const role = (opt && opt.role) || 'génère les bordereaux';
   if (sansSouris) return { code: 'telephone', texte: `Depuis ton ordinateur : c'est là que tourne l'extension qui ${role}.` };
   if (!vmrExtPresent()) return { code: 'absente', texte: `Extension VRM pas détectée dans ce navigateur — c'est elle qui ${role}.` };
-  if (__vmrEtat === null) return { code: 'muette', texte: "L'extension ne répond pas — recharge cette page (après une mise à jour), ou réactive-la dans chrome://extensions." };
+  // ⚠️ « En retard » AVANT « muette » : un pont trop ancien ne sait pas
+  //    répondre, et lui dire « recharge la page » ne change rien (revue).
   if (extSait(cap) === 'retard') return { code: 'retard', texte: `Mets l'extension à jour (${EXT_ATTENDUE}) : celle installée ne sait pas encore recevoir cette commande de l'app.` };
+  if (__vmrEtat === null) return { code: 'muette', geste: 'recharger', texte: "L'extension ne répond pas — recharge cette page (après une mise à jour), ou réactive-la dans chrome://extensions." };
   if (__vmrEtat === undefined) return { code: 'verif', texte: "Vérification de l'extension…" };
   const v = __vmrEtat.vrm;
-  if (v && v.connecte === false) return { code: 'vrm', texte: "Connecte l'extension à ton compte VRM (clique sur son icône)." };
+  // ⚠️ « Pas su » ne vaut pas « oui » (revue du 5 octobre) : sans réponse sur
+  //    sa session VRM, on ne promet aucune action.
+  if (!v || typeof v !== 'object') return { code: 'vrm-passu', texte: "Je n'ai pas pu savoir sous quel compte VRM l'extension écrit — recharge cette page." };
+  // L'app lui transmet d'elle-même sa connexion quand elle n'en a pas
+  // (`assurerSessionExtension`) : on le dit pendant que ça se fait.
+  if (v.connecte === false) return { code: 'vrm', texte: __sessExtEnVol
+    ? "Je connecte l'extension à ton compte VRM…"
+    : "L'extension n'est pas connectée à ton compte VRM — je réessaie de la connecter ; sinon, recharge cette page." };
+  if (v.connecte === null) return { code: 'vrm-encours', texte: "L'extension renouvelle sa connexion à VRM — un instant." };
+  // Même compte ? Par IDENTITÉ (l'identifiant du compte), l'email en repli —
+  // la même règle que la session qu'on lui donne (§11).
+  const monId = String((AUTH.user && AUTH.user.id) || ''), sonId = String(v.user_id || '');
   const monMail = String((AUTH.user && AUTH.user.email) || '').trim().toLowerCase();
-  const sonMail = String((v && v.email) || '').trim().toLowerCase();
-  if (monMail && sonMail && monMail !== sonMail) return { code: 'autre-vrm', texte: `L'extension est connectée au compte VRM ${sonMail}, pas au tien (${monMail}).` };
+  const sonMail = String(v.email || '').trim().toLowerCase();
+  const autre = (monId && sonId) ? monId !== sonId : !!(monMail && sonMail && monMail !== sonMail);
+  // ⚠️ L'icône d'une extension connectée ouvre VRM, pas sa fenêtre : lui dire
+  //    « clique l'icône et déconnecte-la » était impossible à suivre. L'app la
+  //    reconnecte d'elle-même à ton compte (au premier plan).
+  if (autre) return { code: 'autre-vrm', texte: __sessExtEnVol
+    ? `L'extension écrivait dans le compte VRM ${sonMail || 'd’un autre'} — je la reconnecte au tien…`
+    : `L'extension est connectée au compte VRM ${sonMail || 'd’un autre'}, pas au tien (${monMail}) — je la reconnecte au tien ; si ça persiste, recharge cette page.` };
   return null;
 }
 
@@ -6937,11 +7138,24 @@ function RaisonBordereauxGrises({ ventes }) {
     <div data-raison-bord={r.code} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12.5, color: C.text, background: C.card,
       border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.warn}`, borderRadius: 10, padding: '9px 12px', marginBottom: 10, lineHeight: 1.45 }}>
       <Icon name="doc" size={15} style={{ color: C.warn, flexShrink: 0, marginTop: 2 }}/>
-      <span><b>{n} bordereau{n > 1 ? 'x' : ''} à générer</b> — {r.texte}</span>
+      <span style={{ minWidth: 0 }}>
+        <b>{n} bordereau{n > 1 ? 'x' : ''} à générer</b> — {r.texte}
+        {r.geste === 'recharger' && (
+          <> <button type="button" data-recharger="1" onClick={() => { try { window.location.reload(); } catch (_) {} }}
+            style={{ marginLeft: 4, border: `1px solid ${C.accent}`, background: 'transparent', color: C.accent, borderRadius: 8, padding: '3px 9px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Recharger la page</button></>
+        )}
+        {/* ⚠️ Le repli qui ne dépend PAS de l'extension de cette page : générer
+            le bordereau sur Vinted. Le lien de CHAQUE vente est sur sa ligne
+            (« sur Vinted ↗ »). */}
+        {/* ⚠️ Aucune promesse sur le retour du PDF : il dépend de la réception
+            des emails de chaque vendeur, que l'app ne peut pas vérifier d'ici
+            (revue du 5 octobre). On donne le geste, pas la suite. */}
+        <span style={{ display: 'block', color: C.muted, marginTop: 3 }}>Tu peux aussi le générer et l'imprimer directement sur Vinted (lien « sur Vinted » de chaque vente).</span>
+      </span>
     </div>
   );
 }
-function BoutonBordereau({ uid, tx, login, aGenerer, pdf, onImprimer, onFait, grand }) {
+function BoutonBordereau({ uid, tx, conv, login, aGenerer, pdf, onImprimer, onFait, grand }) {
   const { etat, jobs } = useExtVivante();
   const sansSouris = useSansSouris();
   const [refus, setRefus] = React.useState(null);
@@ -6973,7 +7187,7 @@ function BoutonBordereau({ uid, tx, login, aGenerer, pdf, onImprimer, onFait, gr
     setRefus(null); setEnvoi(true);
     const r = await vmrCmd({ cmd: 'bordereau', uid: String(uid), tx: String(tx) });
     setEnvoi(false);
-    if (!r) { setRefus("L'extension n'a pas répondu — recharge cette page et réessaie."); return; }
+    if (!r) { setRefus("L'extension n'a pas répondu — recharge cette page et réessaie, ou génère-le sur Vinted (lien ci-dessous)."); __vmrRates = 1; battementExt(); return; }
     if (!r.accepte) {
       setRefus(r.code === 'vinted-autre' ? `Chrome est connecté sur ${r.actifLogin || 'un autre compte'} — bascule sur ${login || 'ce compte'} sur vinted.fr.`
         : r.code === 'vinted-absent' ? `Connecte-toi sur vinted.fr avec ${login || 'ce compte'} dans ce Chrome.`
@@ -6991,6 +7205,10 @@ function BoutonBordereau({ uid, tx, login, aGenerer, pdf, onImprimer, onFait, gr
     // capture, 390 px). La raison est dite au-dessus de la liste.
     : (sansSouris && !grand) ? 'Bordereau' : 'Générer le bordereau';
   const grise = !!raison;
+  // Le repli sur Vinted, propre à CETTE vente (son adresse distingue la ligne,
+  // §7) : la conversation de la vente porte le bouton « Imprimer le bordereau ».
+  const surVinted = conv ? `https://www.vinted.fr/inbox/${encodeURIComponent(conv)}` : `https://www.vinted.fr/member/transactions/${encodeURIComponent(tx)}`;
+  const repliVinted = (grise && glob && glob.code !== 'verif') || !!refus;
   return (
     <span data-bouton-bord={grise ? 'grise' : enCours ? 'encours' : ko ? 'echec' : 'pret'} data-tx={tx} style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3, maxWidth: '100%' }}>
       <button type="button" onClick={lancer} aria-disabled={grise || enCours ? 'true' : undefined}
@@ -7007,10 +7225,14 @@ function BoutonBordereau({ uid, tx, login, aGenerer, pdf, onImprimer, onFait, gr
       {/* Le repli à la main : l'extension a posé un rendez-vous de 15 min, le PDF
           téléchargé depuis la vente sera relié à ELLE (une identité, §5). */}
       {ko && job.etape === 'genere_sans_pdf' && (
-        <a href={`https://www.vinted.fr/member/transactions/${encodeURIComponent(tx)}`} target="_blank" rel="noreferrer"
+        <a href={surVinted} target="_blank" rel="noreferrer"
           style={{ fontSize: 11.5, color: C.accent, fontWeight: 600, textDecoration: 'none' }}>
           Ouvrir la vente sur Vinted et télécharger le PDF ↗
         </a>
+      )}
+      {repliVinted && !(ko && job.etape === 'genere_sans_pdf') && (
+        <a data-bord-vinted={tx} href={surVinted} target="_blank" rel="noreferrer"
+          style={{ fontSize: 11.5, color: C.accent, fontWeight: 600, textDecoration: 'none' }}>sur Vinted ↗</a>
       )}
     </span>
   );
@@ -7037,7 +7259,10 @@ function BoutonPublier({ place, id }) {
   const fait = job && job.etape === 'fait';
   const enCours = job && job.etape === 'depot' && (Date.now() - Number(job.at || 0) < 15 * 60000);
   const lancer = async () => {
-    if (glob || envoi) return;
+    // ⚠️ « En cours » et « faite » bloquent aussi (revue du 5 octobre) : un
+    //    second clic ouvrait un second dépôt, et Leboncoin publie sans booster
+    //    tout seul — deux annonces pour la même paire.
+    if (glob || envoi || enCours || fait) return;
     setRefus(null); setEnvoi(true);
     const r = await vmrCmd({ cmd: lbc ? 'lbcPublier' : 'ebayPreparer', id: String(id) }, 30000);
     setEnvoi(false);
@@ -7078,43 +7303,189 @@ function RaisonPublication({ n, place }) {
   );
 }
 
-// ⚠️ « un petit onglet en bas à droite tant que l'extension n'a pas tout capté,
-//    pour voir ce que j'ai à faire » (Julien, 19 sept.). Il ne dit QUE ce qui
-//    est MESURABLE et ACTIONNABLE ici :
-//     • il LIT `extSait('_maj')` — le propriétaire de la version (§11), qui
-//       compare l'extension de CE navigateur à `EXT_ATTENDUE` ; aucun recalcul ;
-//     • extension à jour ⇒ plus rien à faire ⇒ l'onglet DISPARAÎT (§7, on ne
-//       laisse pas un badge permanent qui a fini son travail) ;
-//     • sur le TÉLÉPHONE (`useSansSouris`) l'install se fait sur l'ordinateur :
-//       on ne harcèle pas un geste impossible ici (leçon iPhone), l'onglet se tait ;
-//     • base injoignable ⇒ `BaseInjoignable` dit déjà la panne, on ne double pas ;
-//     • premier jour ⇒ `PremiersPas` dit déjà tout, on ne double pas.
-//    « Tout capté » n'est pas devinable côté app (la capture vit dans la base de
-//    l'extension) : tant qu'elle n'est pas à jour, elle ne capte pas tout — c'est
-//    CE geste-là, mesurable, que l'onglet porte. Le reste se branchera quand un
-//    signal de capture existera, jamais avant (on ne devine pas).
-function ResteAFaire({ onNav, baseKO, premierJour }) {
-  const [, force] = React.useReducer((n) => n + 1, 0);
-  React.useEffect(() => onVmrExt(force), []);
+// ══════════════════════════════════════════════════════════════════════════════
+// PUIS-JE AGIR SUR VINTED DEPUIS CETTE PAGE ? (Julien, 5 octobre)
+// ══════════════════════════════════════════════════════════════════════════════
+// « Quand je me connecte sur VRM, je veux savoir s'il y a un compte connecté et
+// allumé, pour savoir si je peux faire des actions, ou si c'est simplement de la
+// lecture de données, la récupération de colis, l'impression de bordereaux qui
+// sont déjà dans l'application. »
+// ⇒ UNE pastille dans l'en-tête, sur tous les écrans : « Actions possibles » ou
+//   « Lecture seule ». Un clic l'explique : l'extension, le compte VRM sous
+//   lequel elle écrit, le compte Vinted ouvert dans Chrome — et LE geste qui
+//   débloque, jamais une liste de consignes.
+// ⚠️ Une seule règle (§11) : l'état de l'extension vient de `raisonExtGlobale`
+//    (la même phrase que sous les boutons grisés) ; on n'y ajoute que ce
+//    qu'elle ne regarde pas — un compte Vinted ouvert dans ce Chrome.
+// ⚠️ Elle remplace le petit onglet « Extension à mettre à jour » d'en bas à
+//    droite : deux voix pour la même chose, c'est une de trop (§7).
+// Trois états, jamais deux : `verif` (on demande encore) n'est ni oui ni non.
+function etatActionsExt(sansSouris) {
+  const glob = raisonExtGlobale(sansSouris);
+  // Passager (on lui demande, elle renouvelle sa connexion) : ni oui ni non.
+  if (glob && (glob.code === 'verif' || glob.code === 'vrm-encours')) return { niveau: 'verif', glob, vinted: null };
+  if (glob) return { niveau: 'lecture', glob, vinted: null };
+  const e = __vmrEtat && __vmrEtat.ok ? __vmrEtat : null;
+  // Le cookie Vinted pas lu à temps (5.161 : `vintedPasSu`) n'est pas « aucun
+  // compte ouvert » (revue du 5 octobre).
+  if (e && e.vintedPasSu) return { niveau: 'verif', glob: { code: 'vinted-passu', texte: "Je regarde quel compte Vinted est ouvert dans Chrome…" }, vinted: null };
+  const vinted = e && e.vinted && e.vinted.uid ? e.vinted : null;
+  if (!vinted) return { niveau: 'lecture', glob: { code: 'vinted', texte: "Aucun compte Vinted n'est ouvert dans ce Chrome — les actions SUR VINTED (bordereau, répondre) attendent ; publier sur Leboncoin reste possible." }, vinted: null };
+  return { niveau: 'ok', glob: null, vinted };
+}
+// La DERNIÈRE capture reçue d'une extension (où qu'elle tourne) : l'extension
+// inscrit sa version et l'heure dans sa ligne de diagnostic à chaque passage
+// (`panel_diag_capture`, depuis la 5.63). C'est un CONSTAT — jamais une capacité
+// de CE navigateur (`extSait` n'écoute que le pont) — mais c'est la seule chose
+// qu'un téléphone puisse savoir de l'extension de l'ordinateur. Mesuré le
+// 5 octobre : la sienne n'écrivait plus depuis 15:51, six minutes après la
+// rafale de refus de connexion — c'est ce que ce constat aurait montré.
+// Trois états : objet lu · 'aucune' (jamais écrit) · null (pas su).
+// « il y a 12 min / 5 h / 3 j » — à la minute près : c'est l'écart qui dit si
+// l'extension tourne en ce moment.
+const ilYaCourt = (ts) => {
+  const m = Math.max(0, Math.round((Date.now() - ts) / 60000));
+  return m < 1 ? "à l'instant" : m < 60 ? `il y a ${m} min` : m < 48 * 60 ? `il y a ${Math.round(m / 60)} h` : `il y a ${Math.round(m / 1440)} j`;
+};
+async function lireDerniereCaptureExt() {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_diag_capture&select=ver:data->>ver,verAt:data->>verAt,majAt:data->>majAt`, { headers: sbAuth() });
+    if (!r.ok) return null;
+    const rows = await r.json();
+    if (!Array.isArray(rows)) return null;
+    const d = rows[0] || {};
+    const at = Date.parse(d.majAt || d.verAt || '') || 0;
+    return (d.ver || at) ? { v: d.ver ? String(d.ver) : '', at } : 'aucune';
+  } catch (_) { return null; }
+}
+function EtatActions({ onNav, ordi, sombre }) {
+  useExtVivante();
   const sansSouris = useSansSouris();
-  if (baseKO || premierJour || sansSouris) return null;
-  const maj = extSait('_maj');                 // 'absente' | 'retard' | 'ok' vs EXT_ATTENDUE
-  if (maj === 'ok') return null;               // à jour ⇒ rien à faire, l'onglet s'efface
-  const v = vmrExtVersion();
-  const titre = maj === 'absente' ? 'Extension pas détectée ici' : 'Extension à mettre à jour';
-  const quoi = maj === 'absente'
-    ? <>Installe l'extension VRM dans <b>ce</b> navigateur — c'est elle qui capte tes annonces, tes ventes et les codes Leboncoin.</>
-    : <>La version installée{v ? <> (<b>{v}</b>)</> : null} ne capte pas encore tout. Passe à la <b>{EXT_ATTENDUE}</b> pour débloquer le reste (codes Leboncoin, prix, description).</>;
+  const [ouvert, setOuvert] = React.useState(false);
+  const [derniere, setDerniere] = React.useState(undefined);
+  // Relue à chaque ouverture du panneau : c'est là qu'on la regarde, fraîche.
+  React.useEffect(() => { if (!ouvert) return undefined; let stop = false;
+    lireDerniereCaptureExt().then((d) => { if (!stop) setDerniere(d); });
+    return () => { stop = true; }; }, [ouvert]);
+  const boite = React.useRef(null);
+  React.useEffect(() => {
+    if (!ouvert) return undefined;
+    const dehors = (ev) => { if (boite.current && !boite.current.contains(ev.target)) setOuvert(false); };
+    const echap = (ev) => { if (ev.key === 'Escape') setOuvert(false); };
+    document.addEventListener('mousedown', dehors); document.addEventListener('touchstart', dehors); document.addEventListener('keydown', echap);
+    return () => { document.removeEventListener('mousedown', dehors); document.removeEventListener('touchstart', dehors); document.removeEventListener('keydown', echap); };
+  }, [ouvert]);
+  const st = etatActionsExt(sansSouris);
+  const code = st.glob ? st.glob.code : 'ok';
+  const e = __vmrEtat && __vmrEtat.ok ? __vmrEtat : null;
+  const v = e && e.vrm ? e.vrm : null;
+  const version = (e && e.version) || vmrExtVersion() || '';
+  const monMail = String((AUTH.user && AUTH.user.email) || '').trim();
+  const sonMail = String((v && v.email) || '').trim();
+  const loginVinted = st.vinted ? (st.vinted.login || ('compte ' + st.vinted.uid)) : '';
+  // Une couleur seulement s'il y a un geste à faire ICI (§7) : sur un téléphone
+  // il n'y en a pas, la lecture seule y est normale.
+  const aRattraper = st.niveau === 'lecture' && code !== 'telephone';
+  const point = st.niveau === 'ok' ? C.accent : aRattraper ? C.warn : C.muted;
+  const libelle = st.niveau === 'ok' ? 'Actions possibles' : st.niveau === 'verif' ? 'Vérification…' : 'Lecture seule';
+  const court = !ordi;                       // en-tête de téléphone : peu de place
+  const ink = sombre ? '#fff' : C.text, bd = sombre ? '#3A3A3C' : C.border;
+
+  // ── Les trois lignes : extension · compte VRM · compte Vinted ──────────────
+  const extKo = ['telephone', 'absente', 'muette', 'retard'].includes(code);
+  const ligneVrmVerif = code === 'vrm-encours';
+  const majDispo = !extKo && extSait('_maj') === 'retard';
+  const ligneExt = code === 'telephone' ? { s: '—', t: "s'utilise sur l'ordinateur où elle est installée" }
+    : code === 'absente' ? { s: 'non', t: 'pas détectée dans ce navigateur' }
+    : code === 'muette' ? { s: 'non', t: 'ne répond pas' }
+    : code === 'retard' ? { s: 'non', t: `version ${version || '?'} — trop ancienne pour recevoir des commandes (passe à la ${EXT_ATTENDUE})` }
+    : st.niveau === 'verif' ? { s: '…', t: 'je lui demande…' }
+    : { s: 'oui', t: `allumée${version ? ' · ' + version : ''}${majDispo ? ` (la ${EXT_ATTENDUE} existe)` : ''}` };
+  const ligneVrm = ligneVrmVerif ? { s: '…', t: 'renouvellement de sa connexion…' }
+    : extKo || st.niveau === 'verif' ? { s: '—', t: '' }
+    : code === 'vrm' ? { s: 'non', t: __sessExtEnVol ? 'je lui transmets ta connexion…' : 'pas connectée' }
+    : code === 'autre-vrm' ? { s: 'non', t: `connectée à ${sonMail || 'un autre compte'}, pas à ${monMail}` }
+    : code === 'vrm-passu' ? { s: '…', t: 'pas su' }
+    // Le ✓ n'est mis que sur ce que l'EXTENSION a dit (son adresse), jamais
+    // sur la nôtre par défaut (revue du 5 octobre).
+    : sonMail ? { s: 'oui', t: sonMail } : { s: 'oui', t: 'connectée' };
+  const ligneVinted = extKo || st.niveau === 'verif' || code === 'vrm' || code === 'autre-vrm' || code === 'vrm-passu' ? { s: '—', t: '' }
+    : st.vinted ? { s: 'oui', t: loginVinted }
+    : { s: 'non', t: 'aucun compte ouvert' };
+
+  // ── LE geste qui débloque (un seul) ─────────────────────────────────────────
+  const btn = { border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 8, padding: '8px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'none', display: 'inline-block' };
+  let geste = null;
+  if (code === 'telephone') geste = <span>Ouvre VRM sur l'ordinateur où l'extension est installée pour générer un bordereau, répondre ou publier.</span>;
+  else if (code === 'absente' || code === 'retard') geste = <button type="button" data-etat-geste="maj" style={btn} onClick={() => { setOuvert(false); onNav && onNav('settings'); }}>{code === 'absente' ? "Installer l'extension (Réglages)" : `Mettre à jour en ${EXT_ATTENDUE} (Réglages)`}</button>;
+  else if (code === 'muette') geste = <button type="button" data-etat-geste="recharger" style={btn} onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button>;
+  // Non connectée : son icône ouvre SA fenêtre de connexion (une extension
+  // connectée, elle, ouvre VRM) — c'est le repli si la reconnexion automatique
+  // n'aboutit pas.
+  else if (code === 'vrm') geste = <span>{__sessExtEnVol ? 'Un instant…' : <>Je réessaie de la connecter. Sinon : clique l'icône VRM en haut de Chrome et connecte-toi avec <b>{monMail || 'ton email VRM'}</b>.</>}</span>;
+  else if (code === 'autre-vrm' || code === 'vrm-passu') geste = __sessExtEnVol ? <span>Un instant…</span>
+    : <button type="button" data-etat-geste="recharger" style={btn} onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button>;
+  else if (code === 'vinted') geste = <a data-etat-geste="vinted" href="https://www.vinted.fr" target="_blank" rel="noreferrer" style={btn}>Ouvrir vinted.fr et me connecter</a>;
+
+  const Ligne = ({ nom, l }) => (
+    <div style={{ display: 'flex', gap: 8, alignItems: 'baseline', padding: '5px 0', borderTop: `1px solid ${C.border}` }}>
+      <span style={{ width: 14, flexShrink: 0, textAlign: 'center', fontWeight: 700, color: l.s === 'oui' ? C.accent : l.s === 'non' ? C.warn : C.muted }}>{l.s === 'oui' ? '✓' : l.s === 'non' ? '✕' : l.s}</span>
+      <span style={{ minWidth: 0 }}><b>{nom}</b>{l.t ? <span style={{ color: C.muted }}> — {l.t}</span> : null}</span>
+    </div>
+  );
+
   return (
-    <div data-onglet="reste-a-faire" style={{position:'fixed',right:16,bottom:16,zIndex:2147483646,maxWidth:300,
-      background:C.card,color:C.text,border:`1px solid ${C.border}`,borderRadius:12,
-      padding:'12px 14px',fontSize:12.5,lineHeight:1.45,
-      boxShadow:'0 1px 2px rgba(0,0,0,.10),0 12px 30px rgba(0,0,0,.16)'}}>
-      <div style={{fontWeight:800,marginBottom:3}}>⏳ {titre}</div>
-      <div style={{color:C.muted}}>{quoi}</div>
-      <button onClick={() => onNav && onNav('settings')} style={{marginTop:9,width:'100%',
-        background:C.accent,color:'#fff',border:'none',borderRadius:8,padding:'8px 10px',
-        fontSize:12.5,fontWeight:600,cursor:'pointer'}}>Ouvrir Réglages pour la télécharger →</button>
+    <div ref={boite} style={{ position: 'relative', flexShrink: 0 }}>
+      <button type="button" data-etat-actions={st.niveau} data-etat-code={code} onClick={() => setOuvert((o) => !o)}
+        aria-expanded={ouvert ? 'true' : 'false'}
+        title={st.niveau === 'ok' ? `Actions Vinted possibles, au nom de ${loginVinted}` : st.glob ? st.glob.texte : ''}
+        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'transparent', border: `1px solid ${bd}`, borderRadius: 8,
+          padding: court ? '6px 8px' : '6px 11px', color: ink, cursor: 'pointer', fontSize: 12.5, fontWeight: 600, fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
+        <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: 5, background: point, flexShrink: 0 }}/>
+        <span>{court && st.niveau === 'lecture' ? 'Lecture' : court && st.niveau === 'ok' ? 'Actions' : libelle}</span>
+        {!court && st.niveau === 'ok' && loginVinted ? <span style={{ color: C.muted, fontWeight: 500, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis' }}>· {loginVinted}</span> : null}
+      </button>
+      {ouvert && (
+        <div data-etat-panneau={st.niveau} role="dialog" aria-label="Ce que VRM peut faire depuis cette page"
+          style={{ position: ordi ? 'absolute' : 'fixed', right: ordi ? 0 : 12, left: ordi ? undefined : 12, top: ordi ? 'calc(100% + 10px)' : 64,
+            width: ordi ? 360 : undefined, maxWidth: 'calc(100vw - 24px)', zIndex: 80, background: C.card, color: C.text, border: `1px solid ${C.border}`,
+            borderRadius: 12, padding: '12px 14px', fontSize: 12.5, lineHeight: 1.45, textAlign: 'left', whiteSpace: 'normal',
+            boxShadow: '0 1px 2px rgba(0,0,0,.10),0 12px 30px rgba(0,0,0,.16)' }}>
+          <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 4 }}>
+            {st.niveau === 'ok' ? 'Tu peux agir sur Vinted depuis VRM' : st.niveau === 'verif' ? "Je vérifie l'extension…" : 'Lecture seule pour l’instant'}
+          </div>
+          {st.niveau === 'ok' ? (
+            <div style={{ color: C.muted, marginBottom: 8 }}>
+              {/* On ne promet que ce que l'extension INSTALLÉE sait faire (revue
+                  du 5 octobre) : chaque geste suit sa capacité. */}
+              {['Générer un bordereau', extSait('messagerie') === 'ok' ? 'répondre, faire une offre' : null].filter(Boolean).join(', ')} : ça part au nom de <b style={{ color: C.text }}>{loginVinted}</b>, le compte Vinted ouvert dans ce Chrome. Pour un autre de tes comptes, connecte-toi avec lui sur vinted.fr.
+              {extSait('publication') === 'ok' ? ' Publier sur Leboncoin passe aussi par l’extension.' : ''}
+            </div>
+          ) : (
+            <div style={{ color: C.muted, marginBottom: 8 }}>
+              Tout ce qui est déjà dans VRM marche : tes ventes, achats, annonces et messages, les colis à retirer et leurs codes, l'impression des bordereaux déjà reçus.
+              {' '}Générer un bordereau ou répondre demande l'extension allumée, connectée à ton compte VRM, avec un compte Vinted ouvert dans Chrome ; publier sur Leboncoin demande l'extension allumée.
+            </div>
+          )}
+          <Ligne nom="Extension" l={ligneExt}/>
+          {/* Sans extension ici (téléphone, autre navigateur), ces deux lignes
+              n'ont rien à dire : vides, elles se liraient comme deux problèmes. */}
+          {(ligneVrm.t || ligneVrm.s !== '—') && <Ligne nom="Ton compte VRM" l={ligneVrm}/>}
+          {(ligneVinted.t || ligneVinted.s !== '—') && <Ligne nom="Compte Vinted dans Chrome" l={ligneVinted}/>}
+          {/* Le constat qui vaut aussi d'un téléphone : quand l'extension (où
+              qu'elle tourne) a écrit pour la dernière fois. Elle n'écrit que
+              quand tu passes sur Vinted : un long silence n'est pas une panne,
+              on le dit sans l'accuser. */}
+          <div data-etat-derniere={derniere === undefined ? 'encours' : derniere === null ? 'passu' : derniere === 'aucune' ? 'aucune' : 'lue'}
+            style={{ padding: '5px 0 0', borderTop: `1px solid ${C.border}`, color: C.muted }}>
+            {derniere === undefined ? 'Dernière capture reçue : je regarde…'
+              : derniere === null ? 'Dernière capture reçue : pas su (la base n’a pas répondu).'
+              : derniere === 'aucune' ? 'Aucune capture reçue de ton extension pour l’instant.'
+              : <>Dernière capture reçue de ton extension : <b style={{ color: C.text }}>{derniere.at ? ilYaCourt(derniere.at) : 'date inconnue'}</b>{derniere.v ? ` (version ${derniere.v})` : ''}. Elle écrit quand tu passes sur Vinted.</>}
+          </div>
+          {geste && <div style={{ marginTop: 10 }}>{geste}</div>}
+        </div>
+      )}
     </div>
   );
 }
@@ -8015,7 +8386,7 @@ function autoRemplirAttributs(attributs, { titre, marque, taille }) {
   }
   return out;
 }
-function EbayPublier({ onPublie, paires = [] }) {
+function EbayPublier({ onPublie, paires = [], dejaSurEbay = null }) {
   const C = EBAY_SKIN;   // peau eBay : tout ce formulaire est au look de l'appli eBay (§ ci-dessus)
   const [ouvert, setOuvert] = React.useState(false);
   const [titre, setTitre] = React.useState('');
@@ -8143,7 +8514,12 @@ function EbayPublier({ onPublie, paires = [] }) {
     if (!prix.trim()) return { err: 'Mets un prix.' };
     // ebayGere: eBay gère la livraison (mesuré : son compte refuse un tarif fixe
     // envoyé par l'API). VRM n'impose aucun port ; eBay applique sa livraison gérée.
-    return { item: { title: titre, categoryId: cat.categoryId, price: String(prix).replace(',', '.'), quantity: qty, conditionId: cond, description: desc || titre, photos: urls, aspects: asp, ebayGere: true } };
+    // L'IDENTITÉ de la paire part avec l'annonce (5 octobre) : le serveur en
+    // fait le SKU `VRM-{n°}`, et c'est ce SKU qui permet ensuite de dire
+    // « vendue sur Vinted → retire-la d'eBay » sans jamais comparer un titre
+    // (§5). Un numéro illisible ne part pas : mieux vaut pas de lien qu'un faux.
+    const numero = pairSel && skuEbayDe(pairSel.num) ? cleNum(pairSel.num) : '';
+    return { item: { title: titre, categoryId: cat.categoryId, price: String(prix).replace(',', '.'), quantity: qty, conditionId: cond, description: desc || titre, photos: urls, aspects: asp, ebayGere: true, ...(numero ? { numero } : {}) } };
   };
   // VÉRIFIER À BLANC (VerifyAddFixedPriceItem) : eBay valide exactement ce qu'on
   // publierait et renvoie les frais, SANS rien créer. Le filet pour la première
@@ -8165,7 +8541,7 @@ function EbayPublier({ onPublie, paires = [] }) {
     try {
       const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'publish', item: b.item }) });
       const j = await r.json();
-      if (j && j.ok) { setRes({ ok: true, url: j.url, itemId: j.itemId }); if (onPublie) onPublie(); }
+      if (j && j.ok) { setRes({ ok: true, url: j.url, itemId: j.itemId, sku: j.sku || null }); if (onPublie) onPublie(); }
       else setRes({ err: (j && j.error) || 'eBay a refusé la publication.' });
     } catch (_) { setRes({ err: 'Publication impossible (réseau).' }); }
     setBusy(false);
@@ -8203,7 +8579,12 @@ function EbayPublier({ onPublie, paires = [] }) {
         <div style={{ padding: 20, textAlign: 'center' }}>
           <div style={{ width: 52, height: 52, margin: '0 auto 12px', borderRadius: 26, background: `${C.accent}15`, color: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26 }}>✓</div>
           <div style={{ fontSize: 16, fontWeight: 800, color: C.text, marginBottom: 4 }}>Annonce publiée sur eBay</div>
-          <div style={{ fontSize: 12.5, color: C.muted, marginBottom: 14 }}>N° {res.itemId}</div>
+          <div style={{ fontSize: 12.5, color: C.muted, marginBottom: res.sku ? 4 : 14 }}>N° {res.itemId}</div>
+          {/* Le lien à la paire se DIT : c'est lui qui fera apparaître « vendue
+              sur Vinted → retire-la d'eBay » le jour où elle part ailleurs. */}
+          <div data-publie-sku={res.sku || ''} style={{ fontSize: 12, color: C.muted, marginBottom: 14, lineHeight: 1.5 }}>{res.sku
+            ? <>Reliée à la paire par la référence <b style={{ color: C.text }}>{res.sku}</b> : si elle se vend sur Vinted, VRM te proposera de la retirer d'eBay.</>
+            : <>Pas reliée à une paire : relie-la depuis sa carte dans Annonces.</>}</div>
           <a href={res.url} target="_blank" rel="noreferrer" style={{ display: 'inline-block', border: 'none', background: C.accent, color: '#fff', borderRadius: 999, padding: '12px 20px', fontSize: 14, fontWeight: 700, textDecoration: 'none' }}>Voir l'annonce sur eBay ↗</a>
           <div style={{ marginTop: 12 }}><button type="button" onClick={reset} style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 10, padding: '9px 16px', fontSize: 13.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Terminé</button></div>
         </div>
@@ -8243,7 +8624,7 @@ function EbayPublier({ onPublie, paires = [] }) {
                       <span style={{ flex: 1, minWidth: 0 }}>
                         <span className="vrm-display" style={{ display: 'block', fontSize: 14, fontWeight: 700, color: C.accent }}>N°{p.num}</span>
                         <span style={{ display: 'block', fontSize: 12.5, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.title || '—'}</span>
-                        <span style={{ fontSize: 11, color: C.muted }}>{p.taille ? `Pointure ${p.taille} · ` : ''}{p.photos.length} photo{p.photos.length > 1 ? 's' : ''}</span>
+                        <span style={{ fontSize: 11, color: C.muted }}>{p.taille ? `Pointure ${p.taille} · ` : ''}{p.photos.length} photo{p.photos.length > 1 ? 's' : ''}{dejaSurEbay && dejaSurEbay.has(cleNum(p.num)) ? <b style={{ color: C.warn }}> · déjà en vente sur eBay</b> : null}</span>
                       </span>
                     </button>
                   ))}
@@ -8401,8 +8782,17 @@ function EbayPublier({ onPublie, paires = [] }) {
 // photos viennent toutes seules — plus aucun lien à coller. Partagé par l'onglet
 // « Compte eBay » ET l'onglet « Annonces eBay » : une seule règle, pas deux
 // listes qui divergeraient.
+// Rend `{ paires, enLigne }` : `enLigne` = les annonces Vinted EN VENTE (Set),
+// la base de l'anti double vente eBay — `undefined` en cours · `null` pas su
+// (aucune annonce lisible) · Set lu. Aucun compte Vinted lié ⇒ Set vide (rien
+// n'est en vente sur Vinted : c'est su, pas « pas su »).
 function useEbayPaires(comptes) {
   const [paires, setPaires] = React.useState([]);
+  const [enLigne, setEnLigne] = React.useState(undefined);
+  // Les fiches N° sont un réglage SYNCHRONISÉ lu au montage : sur le premier
+  // écran d'un appareil neuf, le nuage arrive après (§5.49) — on recalcule.
+  const [nuage, setNuage] = React.useState(0);
+  React.useEffect(() => onCloudReady(() => setNuage((n) => n + 1)), []);
   React.useEffect(() => { let stop = false; (async () => {
     try {
       const fiches = load('vinted_annonce_numeros', {}) || {};
@@ -8419,6 +8809,7 @@ function useEbayPaires(comptes) {
         }
         if (okAny) online = s;
       }
+      if (!stop) setEnLigne(Array.isArray(comptes) && !comptes.length ? new Set() : online);
       const PUB = /une communaut[ée].{0,60}marques|pour chaque achat effectu|thousands of brands|politique de rembours/i;
       let details = {};
       try {
@@ -8442,9 +8833,9 @@ function useEbayPaires(comptes) {
       }
       out.sort((a, b) => (parseInt(b.num, 10) || 0) - (parseInt(a.num, 10) || 0));
       if (!stop) setPaires(out);
-    } catch (_) { if (!stop) setPaires([]); }
-  })(); return () => { stop = true; }; }, [comptes]);
-  return paires;
+    } catch (_) { if (!stop) { setPaires([]); setEnLigne(null); } }
+  })(); return () => { stop = true; }; }, [comptes, nuage]);
+  return { paires, enLigne };
 }
 
 function EbayConnexion({ onAnnonces }) {
@@ -8717,9 +9108,100 @@ function EbayVentes({ baseKO }) {
 // caractéristiques captées (specifics, catégorie, état, nb de photos, description).
 // Julien veut voir que « tout est capté » ; c'est aussi la matière du
 // remplissage complet à la republication. Lecture seule.
-function EbayAnnonceCard({ it, first, onSaved }) {
+// (5 octobre) Elle porte aussi SON lien à une paire (le SKU `VRM-{n°}`), le geste
+// « Relier à une paire » quand il manque, et « Faire une offre aux observateurs »
+// quand eBay dit qu'il y a quelqu'un à qui l'envoyer. Rien ne part sans son clic,
+// et ce qui engage (une offre) passe par une confirmation.
+//   numero      : '' (pas reliée) ou le N° lu dans le SKU (`numDeSkuEbay`) ;
+//   eligible    : true (eBay accepte une offre) · false · undefined (pas su) ;
+//   paires      : ses paires en ligne (`useEbayPaires`) ; numsConnus : les N°
+//                 connus de VRM ; titreDeNum : N° → titre ; pris : N° → annonce
+//                 eBay qui le porte déjà (une paire, une annonce).
+function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [], numsConnus = null, titreDeNum = null, pris = null, onSku, onOffre }) {
   const E = EBAY_SKIN;
   const [open, setOpen] = React.useState(false);
+  // ── RELIER À UNE PAIRE (action `sku`) ────────────────────────────────────
+  const [relierOuvert, setRelierOuvert] = React.useState(false);
+  const [numSaisi, setNumSaisi] = React.useState('');
+  const [geste, setGeste] = React.useState('');   // '' · 'relier' · 'offre' : un envoi en cours
+  const [info, setInfo] = React.useState('');      // le résultat du dernier geste, dit sur la carte
+  // ── OFFRE AUX OBSERVATEURS (action `offre`) ──────────────────────────────
+  const [offreOuverte, setOffreOuverte] = React.useState(false);
+  const [remise, setRemise] = React.useState('10');
+  const [mot, setMot] = React.useState('');
+  const prixBase = Number(String(it.price == null ? '' : it.price).replace(',', '.'));
+  const remiseN = /^\d{1,2}$/.test(String(remise).trim()) ? parseInt(remise, 10) : NaN;
+  const remiseOk = Number.isInteger(remiseN) && remiseN >= 5 && remiseN <= 50;
+  const prixRemise = (isFinite(prixBase) && prixBase > 0 && remiseOk) ? Math.round(prixBase * (100 - remiseN)) / 100 : null;
+  const eurE = (n) => (Math.round(n * 100) / 100).toFixed(2).replace('.', ',') + ' €';
+  // Les observateurs : `WatchCount` d'eBay. Les captures d'avant le rangeaient
+  // sous `vues` (le mot était faux : ce sont des personnes qui SUIVENT
+  // l'annonce, pas des vues). Absent ⇒ on ne donne pas de nombre.
+  const obs = Number.isFinite(it.observateurs) ? it.observateurs : (/^\d+$/.test(String(it.vues == null ? '' : it.vues)) ? Number(it.vues) : null);
+  const relier = async (brut) => {
+    setInfo('');
+    // « n125 » (l'écriture de ses titres) vaut 125, comme sur Leboncoin.
+    const c = cleNum(brut);
+    const n = (numsConnus && numsConnus.has(c)) ? c : c.replace(/^N[°O]?(?=\d)/, '');
+    if (!NUM_OK.test(n)) { setInfo('Tape le numéro de la paire (125, ou B125).'); return; }
+    if (numsConnus && !numsConnus.has(n)) { setInfo(`Aucune paire ne porte le N°${n} dans VRM.`); return; }
+    if (pris && pris.has(n) && pris.get(n) !== String(it.itemId)) { setInfo(`La paire N°${n} est déjà reliée à une autre annonce eBay : une paire, une annonce.`); return; }
+    const tp = (titreDeNum && titreDeNum.get(n)) || '';
+    const ok = await askConfirm({
+      title: `Relier cette annonce eBay à la paire N°${n} ?`,
+      desc: `eBay : « ${it.title || it.itemId} »\nVRM : ${tp ? `« ${tp} »` : `paire N°${n}`}${numero && numero !== n ? `\nAujourd'hui : reliée à la N°${numero}.` : ''}\n\nVRM écrit la référence VRM-${n} dans l'étiquette personnalisée (SKU) de l'annonce eBay. Tu pourras la changer.`,
+      ok: 'Oui, relier', cancel: 'Annuler',
+    });
+    if (!ok) return;
+    setGeste('relier');
+    try {
+      const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'sku', itemId: it.itemId, numero: n }) });
+      const j = await r.json().catch(() => ({}));
+      if (j && j.ok) { setInfo(`✓ Reliée à la paire N°${n} (${j.sku}).`); setRelierOuvert(false); setNumSaisi(''); if (onSku) onSku(it.itemId, j.sku); }
+      else setInfo((j && j.error) || 'eBay a refusé la référence — rien n\'a changé.');
+    } catch (_) { setInfo('Liaison impossible (réseau) — rien n\'a changé.'); }
+    setGeste('');
+  };
+  const envoyerOffre = async () => {
+    setInfo('');
+    if (!remiseOk) { setInfo('La remise doit être un nombre entier entre 5 et 50 %.'); return; }
+    if (mot.length > 2000) { setInfo('Message trop long (2 000 caractères au plus).'); return; }
+    const prix = prixRemise != null ? eurE(prixRemise) : '';
+    const ok = await askConfirm({
+      title: `Envoyer une offre à −${remiseN} % ?`,
+      desc: `Les personnes qui suivent « ${it.title || it.itemId} » sur eBay${obs ? ` (${obs})` : ''} recevront une offre${prix ? ` à ${prix}` : ''}, valable 48 h. C'est eBay qui les choisit : VRM ne voit pas qui elles sont.\n\nSi l'une d'elles accepte, la paire est vendue à ce prix.`,
+      ok: 'Oui, envoyer', cancel: 'Annuler',
+    });
+    if (!ok) return;
+    setGeste('offre');
+    try {
+      const corps = { action: 'offre', listingId: String(it.itemId), remise: remiseN, confirme: true };
+      if (mot.trim()) corps.message = mot.trim();
+      const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify(corps) });
+      const j = await r.json().catch(() => ({}));
+      if (j && j.ok) {
+        const n = Number(j.envoyees) || 0;
+        setInfo(n ? `✓ Offre à −${remiseN} % envoyée à ${n} personne${n > 1 ? 's' : ''}, valable 48 h.` : `✓ Offre à −${remiseN} % envoyée par eBay, valable 48 h.`);
+        setOffreOuverte(false); if (onOffre) onOffre(it.itemId);
+      } else setInfo((j && j.error) || 'eBay a refusé l\'offre.');
+    } catch (_) { setInfo('Envoi impossible (réseau) — regarde sur eBay avant de recommencer.'); }
+    setGeste('');
+  };
+  // Les paires proposées : d'abord celles dont une PHOTO est exactement celle
+  // de l'annonce eBay (une identité, §5) — jamais un classement par
+  // ressemblance de titre. Sinon simplement par numéro.
+  const photosEbay = new Set([it.photo, ...(((it.detail || {}).photos) || [])].filter(Boolean).map(String));
+  const memePhoto = (p) => (p.photos || []).concat(p.cover ? [p.cover] : []).some((u) => photosEbay.has(String(u)));
+  const qN = numSaisi.trim().toLowerCase();
+  const choix = paires
+    // Une paire déjà reliée à une AUTRE annonce eBay n'est pas proposée (une
+    // paire, une annonce) — la taper reste possible, et le refus le dit.
+    .filter((p) => !(pris && pris.has(cleNum(p.num)) && pris.get(cleNum(p.num)) !== String(it.itemId)))
+    .filter((p) => !qN || String(p.num).toLowerCase().startsWith(qN.replace(/^n[°o]?/, '')) || String(p.title || '').toLowerCase().includes(qN))
+    .map((p) => ({ ...p, memePhoto: memePhoto(p) }))
+    .sort((a, b) => (Number(b.memePhoto) - Number(a.memePhoto)) || triNum(b.num, a.num))
+    .slice(0, 6);
+  const btnE = { border: `1px solid ${E.border}`, background: 'transparent', color: E.text, borderRadius: 8, padding: '8px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' };
   // ── MODIFIER L'ANNONCE (prix / stock) DEPUIS VRM, comme l'onglet Compte ────
   // Julien : « pouvoir modifier les annonces dans l'application ». Passe par
   // l'action serveur `revise` (Trading ReviseInventoryStatus) : ça change la
@@ -8757,9 +9239,11 @@ function EbayAnnonceCard({ it, first, onSaved }) {
         <div style={{ flex: '1 1 auto', minWidth: 0 }}>
           <div style={{ fontWeight: 600, fontSize: 13.5, color: E.text, lineHeight: 1.25, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{it.title || '(sans titre)'}</div>
           <div style={{ fontSize: 11.5, color: E.muted, marginTop: 2 }}>
-            {it.vues != null && it.vues !== '' ? `${it.vues} vue${Number(it.vues) > 1 ? 's' : ''}` : ''}
-            {nb ? `${it.vues ? ' · ' : ''}${nb} photo${nb > 1 ? 's' : ''}` : ''}
-            {j != null ? `${(it.vues || nb) ? ' · ' : ''}en ligne depuis ${j} j` : ''}
+            {/* Le lien à la paire : la pastille distingue, pas une phrase par carte (§7). */}
+            <span data-relie={numero} style={{ fontWeight: 700, color: numero ? E.text : E.warn }}>{numero ? `N°${numero}` : 'pas reliée'}</span>
+            {obs != null ? ` · ${obs} observateur${obs > 1 ? 's' : ''}` : ''}
+            {nb ? ` · ${nb} photo${nb > 1 ? 's' : ''}` : ''}
+            {j != null ? ` · en ligne depuis ${j} j` : ''}
           </div>
         </div>
         <div style={{ textAlign: 'right', flexShrink: 0 }}>
@@ -8767,6 +9251,51 @@ function EbayAnnonceCard({ it, first, onSaved }) {
           <div style={{ fontSize: 10.5, color: E.accentSoft, marginTop: 2, fontWeight: 600 }}>{open ? 'masquer ▲' : 'détails ▼'}</div>
         </div>
       </div>
+      {/* ── Les deux gestes, visibles sans déplier : relier (quand le lien
+          manque) et l'offre aux observateurs (quand eBay en accepte une). ── */}
+      {(!numero || eligible === true) && (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', padding: '0 14px 11px 14px' }}>
+          {!numero && <button type="button" data-relier-ouvrir={it.itemId} onClick={() => { setRelierOuvert((o) => !o); setOffreOuverte(false); setInfo(''); }} style={btnE}>Relier à une paire</button>}
+          {eligible === true && <button type="button" data-offre-ouvrir={it.itemId} onClick={() => { setOffreOuverte((o) => !o); setRelierOuvert(false); setInfo(''); }} style={{ ...btnE, border: 'none', background: E.accent, color: '#fff' }}>{obs ? `Faire une offre aux ${obs} observateur${obs > 1 ? 's' : ''}` : 'Faire une offre aux observateurs'}</button>}
+        </div>
+      )}
+      {relierOuvert && (
+        <div data-relier-panneau={it.itemId} style={{ margin: '0 14px 12px', background: E.card2, borderRadius: 12, padding: '11px 12px' }}>
+          <div style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, marginBottom: 8 }}>Quelle paire est en vente dans cette annonce ? C'est toi qui choisis : VRM ne la devine pas d'après le titre.</div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: choix.length ? 2 : 0 }}>
+            <input value={numSaisi} onChange={(e) => setNumSaisi(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') relier(numSaisi); }} data-relier-num={it.itemId}
+              inputMode={clavierNum()} placeholder="N° de la paire" aria-label="N° de la paire" style={{ ...inpE, width: 140 }} />
+            <button type="button" data-relier-valider={it.itemId} disabled={!!geste || !numSaisi.trim()} onClick={() => relier(numSaisi)} style={{ ...btnE, opacity: (geste || !numSaisi.trim()) ? 0.5 : 1 }}>{geste === 'relier' ? 'Envoi…' : 'Relier'}</button>
+          </div>
+          {choix.map((p) => (
+            <button key={p.id} type="button" data-relier-paire={p.num} disabled={!!geste} onClick={() => relier(p.num)}
+              style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left', border: `1px solid ${E.border}`, borderRadius: 10, background: E.card, padding: '7px 9px', marginTop: 6, cursor: 'pointer', fontFamily: 'inherit' }}>
+              <PhotoVente src={p.cover || (p.photos || [])[0]} size={38} />
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: 'block', fontSize: 12.5, fontWeight: 700, color: E.text }}>N°{p.num}{p.memePhoto ? <span style={{ color: E.accentSoft, fontWeight: 600 }}> · même photo</span> : null}</span>
+                <span style={{ display: 'block', fontSize: 11.5, color: E.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.title || '—'}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+      {offreOuverte && eligible === true && (
+        <div data-offre-panneau={it.itemId} style={{ margin: '0 14px 12px', background: E.card2, borderRadius: 12, padding: '11px 12px' }}>
+          <div style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, marginBottom: 8 }}>eBay envoie l'offre aux personnes qui suivent l'annonce, valable 48 h. Si l'une accepte, la paire est vendue à ce prix.</div>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            <label style={{ fontSize: 11.5, color: E.muted }}>Remise %<br /><input value={remise} onChange={(e) => setRemise(e.target.value)} inputMode="numeric" data-offre-remise={it.itemId} style={{ ...inpE, width: 76 }} /></label>
+            <div style={{ fontSize: 12.5, color: E.muted, paddingBottom: 10 }}>soit <b data-offre-prix={prixRemise != null ? prixRemise.toFixed(2) : ''} style={{ color: E.text, fontSize: 15 }}>{prixRemise != null ? eurE(prixRemise) : '—'}</b>{isFinite(prixBase) && prixBase > 0 ? <> au lieu de {eurE(prixBase)}</> : null}</div>
+          </div>
+          {!remiseOk && <div style={{ fontSize: 11.5, color: E.warn, marginTop: 6 }}>Entre 5 et 50 %, un nombre entier.</div>}
+          <textarea value={mot} onChange={(e) => setMot(e.target.value)} maxLength={2000} rows={2} placeholder="Message (facultatif)" data-offre-message={it.itemId}
+            style={{ ...inpE, width: '100%', marginTop: 9, resize: 'vertical', lineHeight: 1.45 }} />
+          <div style={{ display: 'flex', gap: 8, marginTop: 9, flexWrap: 'wrap' }}>
+            <button type="button" data-offre-envoyer={it.itemId} disabled={!!geste || !remiseOk} onClick={envoyerOffre} style={{ ...btnE, border: 'none', background: E.accent, color: '#fff', opacity: (geste || !remiseOk) ? 0.5 : 1 }}>{geste === 'offre' ? 'Envoi…' : 'Envoyer l\'offre'}</button>
+            <button type="button" onClick={() => setOffreOuverte(false)} style={{ ...btnE, color: E.muted }}>Annuler</button>
+          </div>
+        </div>
+      )}
+      {info && <div data-ebay-info={it.itemId} style={{ fontSize: 11.5, color: /^✓/.test(info) ? E.text : E.warn, margin: '0 14px 11px', lineHeight: 1.45 }}>{info}</div>}
       {open && (
         <div style={{ padding: '0 14px 13px 14px' }}>
           {(d.categoryName || d.condition) && (
@@ -8785,6 +9314,9 @@ function EbayAnnonceCard({ it, first, onSaved }) {
           {!edit ? (
             <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
               <button type="button" onClick={() => { setEdit(true); setMsg(''); }} style={{ border: `1px solid ${E.border}`, background: 'transparent', color: E.text, borderRadius: 8, padding: '8px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>✏️ Modifier le prix / le stock</button>
+              {/* Le lien se change ici (la confirmation dit « tu pourras la
+                  changer ») ; il ne s'affiche en façade que quand il MANQUE. */}
+              {numero && <button type="button" data-relier-changer={it.itemId} onClick={() => { setRelierOuvert((o) => !o); setOffreOuverte(false); setInfo(''); }} style={btnE}>Changer la paire reliée</button>}
               {url && <a href={url} target="_blank" rel="noreferrer" style={{ color: E.accentSoft, fontWeight: 700, fontSize: 12.5, textDecoration: 'none' }}>Voir sur eBay ↗</a>}
             </div>
           ) : (
@@ -8808,11 +9340,30 @@ function EbayAnnonceCard({ it, first, onSaved }) {
 // Aperçu ne les affichait que connexion OUVERTE). Cet onglet lit les annonces
 // captées DIRECTEMENT : « rien lu ≠ rien », on montre ce qu'on a même si la
 // connexion OAuth est momentanément tombée.
+// ⚠️⚠️ 5 octobre — Julien : « pour eBay je ne sais pas pourquoi le site est si
+// peu développé, tu as accès à mon compte et tu ne fais rien de ouf ». Mesuré le
+// jour même : ses 2 annonces eBay n'avaient AUCUN lien à une paire, donc une
+// paire vendue sur Vinted pouvait rester en vente ici sans que VRM le voie.
+// L'écran porte maintenant, dans cet ordre :
+//   1. l'anti double vente (`doublesVenteEbay`, la MÊME règle que le centre de
+//      notifications, §11) : « vendue sur Vinted → retire-la d'eBay » (un clic +
+//      une confirmation, eBay seul : sans retour) et « vendue sur eBay → retire-la
+//      de Vinted » (le lien ; VRM ne touche jamais une annonce Vinted, §3) ;
+//   2. ce qui n'a pas pu être lu, dit UNE fois (§7) — jamais « rien à retirer » ;
+//   3. le publieur, qui pose désormais le SKU `VRM-{n°}` ;
+//   4. l'offre aux observateurs (eBay choisit les destinataires, §3) et les
+//      annonces pas encore reliées, chacune dite une fois au-dessus de la liste.
 function EbayAnnonces({ baseKO, comptes = [] }) {
   const E = EBAY_SKIN;
   const [items, setItems] = React.useState(undefined); // undefined=en cours · null=pas su · []=lu
   const [connected, setConnected] = React.useState(undefined); // true/false/null(pas su)/undefined(en cours)
-  const paires = useEbayPaires(comptes);               // source partagée avec l'onglet Compte (§11)
+  const { paires, enLigne } = useEbayPaires(comptes);  // source partagée avec l'onglet Compte (§11)
+  const [commandes, setCommandes] = React.useState(undefined);       // ebay_orders : undefined · null · []
+  const [vendusVinted, setVendusVinted] = React.useState(undefined); // prouvées vendues : undefined · null · Set
+  const [eligibles, setEligibles] = React.useState(undefined);       // offre : undefined · null · { ids:Set, complet }
+  const [retraits, setRetraits] = React.useState({});                // itemId → '…' (en cours) | message
+  const [nuage, setNuage] = React.useState(0);
+  React.useEffect(() => onCloudReady(() => setNuage((n) => n + 1)), []);
   // Chargement rechargeable (pour rafraîchir après une publication / modif).
   const charger = React.useCallback(async () => {
     try {
@@ -8823,6 +9374,14 @@ function EbayAnnonces({ baseKO, comptes = [] }) {
       const L = (rows[0] && rows[0].data) || {};
       setItems(Array.isArray(L.items) ? L.items : []);
     } catch (_) { setItems(null); }
+    // Les commandes eBay : seulement la liste (§4.4), pour « vendue sur eBay ».
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.ebay_orders&select=orders:data->orders`, { headers: sbAuth() });
+      if (!r.ok) { setCommandes(null); return; }
+      const rows = await r.json();
+      if (!Array.isArray(rows)) { setCommandes(null); return; }
+      setCommandes(Array.isArray(rows[0] && rows[0].orders) ? rows[0].orders : []);
+    } catch (_) { setCommandes(null); }
   }, []);
   React.useEffect(() => { charger(); }, [charger]);
   // Sonde de connexion eBay : le publieur ne sert à rien si le compte n'est pas
@@ -8832,31 +9391,183 @@ function EbayAnnonces({ baseKO, comptes = [] }) {
     fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'status' }) })
       .then(r => r.json()).then(j => { if (!stop) setConnected(j && j.ok ? !!j.connected : null); }).catch(() => { if (!stop) setConnected(null); });
     return () => { stop = true; }; }, []);
+  // Quelles annonces eBay accepte-t-il d'offrir aux observateurs ? Seulement
+  // compte relié. Trois états : on ne montre un bouton que sur un OUI d'eBay.
+  const chargerEligibles = React.useCallback(async () => {
+    try {
+      const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'offreinfo' }) });
+      const j = await r.json().catch(() => null);
+      setEligibles(j && j.ok && Array.isArray(j.eligibles) ? { ids: new Set(j.eligibles.map(String)), complet: j.complet !== false } : null);
+    } catch (_) { setEligibles(null); }
+  }, []);
+  React.useEffect(() => { if (connected === true) chargerEligibles(); }, [connected, chargerEligibles]);
+  // La preuve de vente Vinted n'est lue que s'il y a quelque chose à vérifier :
+  // une annonce eBay reliée, ou une commande eBay qui porte un SKU VRM.
+  const aVerifier = (Array.isArray(items) && items.some((a) => a && numDeSkuEbay(a.sku)))
+    || (Array.isArray(commandes) && commandes.some((o) => o && Array.isArray(o.lineItems) && o.lineItems.some((li) => li && numDeSkuEbay(li.sku))));
+  React.useEffect(() => {
+    if (!aVerifier) return;
+    let stop = false;
+    lireVentesVintedProuvees().then((v) => { if (!stop) setVendusVinted(v); });
+    return () => { stop = true; };
+  }, [aVerifier, items]);
   // Après une publication / modif : on resynchronise depuis eBay puis on relit.
   const resync = React.useCallback(async () => {
     try { await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'sync' }) }); } catch (_) {}
     await charger();
   }, [charger]);
+  // ── L'ANTI DOUBLE VENTE : la règle partagée, sur ce que l'écran a lu ───────
+  const fiches = React.useMemo(() => load('vinted_annonce_numeros', {}) || {}, [nuage, items]);
+  const dv = React.useMemo(() => doublesVenteEbay({
+    annonces: Array.isArray(items) ? items : [],
+    commandes: Array.isArray(commandes) ? commandes : [],
+    numeros: fiches,
+    enLigne: enLigne || null,
+    vendusVinted: vendusVinted || null,
+  }), [items, commandes, fiches, enLigne, vendusVinted]);
+  const numsConnus = React.useMemo(() => new Set(Object.values(fiches).map((f) => cleNum(f && f.numero)).filter(Boolean)), [fiches]);
+  const titreDeNum = React.useMemo(() => { const m = new Map(); for (const f of Object.values(fiches)) { const k = cleNum(f && f.numero); if (k && !m.has(k)) m.set(k, (f && f.title) || ''); } return m; }, [fiches]);
+  const pris = React.useMemo(() => { const m = new Map(); for (const a of (Array.isArray(items) ? items : [])) { const k = numDeSkuEbay(a && a.sku); if (k && !m.has(k)) m.set(k, String(a.itemId)); } return m; }, [items]);
+  const surSku = React.useCallback((itemId, sku) => {
+    setItems((l) => Array.isArray(l) ? l.map((a) => String(a.itemId) === String(itemId) ? { ...a, sku } : a) : l);
+  }, []);
+  // Retirer d'eBay une paire VENDUE sur Vinted : sans retour côté eBay, donc
+  // une confirmation qui le dit — et le serveur exige `confirme:true` lui aussi.
+  const retirer = async (d) => {
+    const a = d.annonce;
+    const ok = await askConfirm({
+      title: `Retirer « ${a.title || a.itemId} » d'eBay ?`,
+      desc: `La paire N°${d.numero} est vendue sur Vinted. L'annonce eBay est terminée tout de suite : c'est sans retour côté eBay (il faudrait la republier).`,
+      ok: 'Oui, retirer d\'eBay', cancel: 'Annuler', danger: true,
+    });
+    if (!ok) return;
+    const id = String(a.itemId);
+    setRetraits((m) => ({ ...m, [id]: '…' }));
+    try {
+      const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'retirer', itemId: id, confirme: true }) });
+      const j = await r.json().catch(() => ({}));
+      if (j && j.ok) {
+        setRetraits((m) => { const n = { ...m }; delete n[id]; return n; });
+        setItems((l) => Array.isArray(l) ? l.filter((x) => String(x.itemId) !== id) : l);
+        toast(`N°${d.numero} retirée d'eBay.`, 'ok');
+        resync();
+      } else setRetraits((m) => ({ ...m, [id]: (j && j.error) || 'eBay a refusé le retrait.' }));
+    } catch (_) { setRetraits((m) => ({ ...m, [id]: 'eBay n\'a pas répondu — regarde sur eBay avant de recommencer.' })); }
+  };
   const wrap = (kids) => <div style={{ background: E.bg, minHeight: '100vh', padding: 16, paddingBottom: 48 }}>{kids}</div>;
   const head = (n) => <div style={{ fontSize: 22, fontWeight: 800, color: E.text, marginBottom: 2 }}>Annonces eBay{n != null ? ` (${n})` : ''}</div>;
   // Le publieur, EN HAUT de l'onglet Annonces (Julien : « poster plus naturel »).
   // Affiché seulement si le compte est relié ; sinon une ligne qui renvoie au
   // compte, jamais un bouton mort.
   const publier = connected === true
-    ? <EbayPublier paires={paires} onPublie={resync} />
+    ? <EbayPublier paires={paires} onPublie={resync} dejaSurEbay={new Set(pris.keys())} />
     : connected === false
       ? <div style={{ fontSize: 12.5, color: E.muted, lineHeight: 1.5, border: `1px solid ${E.border}`, background: E.card, borderRadius: 12, padding: '12px 14px', marginBottom: 14 }}>Pour mettre une paire en vente ici, relie d'abord ton compte eBay dans l'onglet <b style={{ color: E.text }}>« Compte eBay »</b>.</div>
       : null; // en cours / pas su : on ne dit rien plutôt qu'une fausse invite
+  const bloc = (bord) => ({ background: E.card, border: `1px solid ${bord || E.border}`, borderRadius: 14, padding: '12px 14px', marginBottom: 12 });
+  const lienE = { flexShrink: 0, border: `1px solid ${E.border}`, borderRadius: 8, padding: '7px 11px', fontSize: 12.5, fontWeight: 700, color: E.text, background: 'transparent', textDecoration: 'none', cursor: 'pointer', fontFamily: 'inherit' };
+  const euroE = (v) => { const n = Number(v); return isFinite(n) ? n.toFixed(2).replace('.', ',') + ' €' : ''; };
+  // ── 1. ANTI DOUBLE VENTE — EN PREMIER, c'est le seul geste urgent ─────────
+  const alertes = (<>
+    {dv.aRetirerEbay.length > 0 && (
+      <div data-ebay-a-retirer={dv.aRetirerEbay.length} style={bloc(E.warn)}>
+        <div style={{ fontSize: 14, fontWeight: 800, color: E.text }}>{dv.aRetirerEbay.length} paire{dv.aRetirerEbay.length > 1 ? 's' : ''} vendue{dv.aRetirerEbay.length > 1 ? 's' : ''} sur Vinted — encore en vente sur eBay</div>
+        <div style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, margin: '3px 0 4px' }}>Retire-{dv.aRetirerEbay.length > 1 ? 'les' : 'la'} d'eBay, sinon quelqu'un peut l'acheter une deuxième fois. VRM te demande de confirmer : une annonce eBay terminée ne revient pas.</div>
+        {dv.aRetirerEbay.map((d) => {
+          const id = String(d.annonce.itemId); const etat = retraits[id];
+          return (
+            <div key={id} data-ebay-doublon={d.numero} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 0', borderTop: `1px solid ${E.border}`, flexWrap: 'wrap' }}>
+              <PhotoVente src={d.annonce.photo} size={44} />
+              <div style={{ flex: '1 1 150px', minWidth: 0 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: E.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>N°{d.numero} · {d.annonce.title || id}</div>
+                <div style={{ fontSize: 11, color: E.muted }}>Vinted : vendue · eBay : encore en vente{d.annonce.price ? ` à ${euroE(d.annonce.price)}` : ''}</div>
+                {etat && etat !== '…' && <div data-ebay-retrait-erreur={id} style={{ fontSize: 11, color: E.warn, marginTop: 2 }}>{etat}</div>}
+              </div>
+              <button type="button" data-retirer-ebay={id} disabled={etat === '…'} onClick={() => retirer(d)} style={{ ...lienE, opacity: etat === '…' ? 0.6 : 1 }}>{etat === '…' ? 'Retrait…' : 'Retirer d\'eBay'}</button>
+            </div>
+          );
+        })}
+      </div>
+    )}
+    {dv.aRetirerVinted.length > 0 && (
+      <div data-ebay-retirer-vinted={dv.aRetirerVinted.length} style={bloc(E.warn)}>
+        <div style={{ fontSize: 14, fontWeight: 800, color: E.text }}>{dv.aRetirerVinted.length} paire{dv.aRetirerVinted.length > 1 ? 's' : ''} vendue{dv.aRetirerVinted.length > 1 ? 's' : ''} sur eBay — retire-{dv.aRetirerVinted.length > 1 ? 'les' : 'la'} de Vinted</div>
+        <div style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, margin: '3px 0 4px' }}>Sinon quelqu'un peut l'acheter une deuxième fois sur Vinted. VRM ne la retire pas de Vinted à ta place : là-bas, c'est sans retour.</div>
+        {dv.aRetirerVinted.map((d, i) => (
+          <div key={String((d.commande && d.commande.orderId) || i) + d.numero} data-ebay-vendue={d.numero} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 0', borderTop: `1px solid ${E.border}`, flexWrap: 'wrap' }}>
+            <div style={{ flex: '1 1 150px', minWidth: 0 }}>
+              <div style={{ fontSize: 12.5, fontWeight: 700, color: E.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>N°{d.numero} · {(d.ligne && d.ligne.title) || titreDeNum.get(d.numero) || ''}</div>
+              <div style={{ fontSize: 11, color: E.muted }}>
+                eBay : {String((d.commande && d.commande.orderPaymentStatus) || '').toUpperCase() === 'PAID' ? 'payée' : 'achetée, paiement en attente'}
+                {d.vendueVinted.length > 0 && <span style={{ color: E.warn, fontWeight: 700 }}> · vendue AUSSI sur Vinted : une des deux ventes ne pourra pas partir — annule-en une</span>}
+              </div>
+            </div>
+            {d.surVinted[0] && <a href={'https://www.vinted.fr/items/' + d.surVinted[0]} target="_blank" rel="noreferrer" style={lienE}>Ouvrir sur Vinted</a>}
+          </div>
+        ))}
+      </div>
+    )}
+  </>);
+  // ── 2. CE QUI N'A PAS PU ÊTRE LU, DIT UNE FOIS (§7) ────────────────────────
+  // « Pas su » ne vaut pas « rien à retirer » : sans les ventes Vinted, une
+  // paire vendue là-bas reste ici sans alerte — on le dit, avec ce que ça empêche.
+  const relieesEbay = Array.isArray(items) && items.some((a) => a && numDeSkuEbay(a.sku));
+  const skuCommandes = Array.isArray(commandes) && commandes.some((o) => o && Array.isArray(o.lineItems) && o.lineItems.some((li) => li && numDeSkuEbay(li.sku)));
+  const pasSu = [
+    relieesEbay && vendusVinted === null && 'tes ventes Vinted',
+    commandes === null && 'tes ventes eBay',
+    skuCommandes && enLigne === null && 'tes annonces Vinted',
+  ].filter(Boolean);
+  const effets = [
+    relieesEbay && vendusVinted === null && 'je ne peux pas te dire si une paire en vente ici est déjà partie sur Vinted',
+    (commandes === null || (skuCommandes && enLigne === null)) && 'je ne peux pas te dire si une paire vendue ici est encore en vente sur Vinted',
+  ].filter(Boolean);
+  const lignePasSu = pasSu.length > 0 && (
+    <div data-ebay-pas-su={pasSu.length} style={{ ...bloc(E.warn), fontSize: 12.5, color: E.text, lineHeight: 1.5 }}>
+      ⚠️ Je n'ai pas pu lire {pasSu.length === 1 ? pasSu[0] : pasSu.slice(0, -1).join(', ') + ' ni ' + pasSu[pasSu.length - 1]} — rien n'est perdu, rouvre l'écran dans un moment. En attendant, {effets.join(', et ')}.
+    </div>
+  );
   if (baseKO) return wrap(<>{head()}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué. Réessaie dans un instant.</div></>);
-  if (items === undefined) return wrap(<>{head()}{publier}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Chargement…</div></>);
-  if (items === null) return wrap(<>{head()}{publier}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Je n'ai pas pu lire tes annonces eBay. Réessaie dans un instant.</div></>);
-  if (!items.length) return wrap(<>{head(0)}{publier}<div style={{ color: E.muted, fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>Pas encore d'annonce eBay en ligne. {connected === true ? 'Mets une paire en vente ci-dessus — elle apparaîtra ici.' : 'Connecte ton compte eBay (onglet « Compte eBay ») et synchronise.'}</div></>);
+  if (items === undefined) return wrap(<>{head()}{alertes}{lignePasSu}{publier}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Chargement…</div></>);
+  if (items === null) return wrap(<>{head()}{alertes}{lignePasSu}{publier}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Je n'ai pas pu lire tes annonces eBay. Réessaie dans un instant.</div></>);
+  // ⚠️ Une paire VENDUE sur eBay sort de cette liste (l'annonce est terminée) :
+  //    c'est justement quand il n'en reste aucune que « retire-la de Vinted »
+  //    compte le plus. Les alertes passent donc AVANT ce cas.
+  if (!items.length) return wrap(<>{head(0)}{alertes}{lignePasSu}{publier}<div style={{ color: E.muted, fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>Pas encore d'annonce eBay en ligne. {connected === true ? 'Mets une paire en vente ci-dessus — elle apparaîtra ici.' : 'Connecte ton compte eBay (onglet « Compte eBay ») et synchronise.'}</div></>);
+  // ── 4. L'OFFRE AUX OBSERVATEURS et les annonces pas reliées : une phrase
+  //    chacune, au-dessus de la liste ; sur la carte, seulement le bouton ou la
+  //    pastille, qui distinguent (§7). ─────────────────────────────────────────
+  const elig = eligibles && eligibles.ids;
+  const nElig = elig ? items.filter((a) => elig.has(String(a.itemId))).length : 0;
+  const nSans = elig && eligibles.complet ? items.length - nElig : 0;
   return wrap(<>
     {head(items.length)}
     <div style={{ color: E.muted, fontSize: 12, marginBottom: 12 }}>Tes annonces en ligne sur eBay — touche une annonce pour la modifier</div>
+    {alertes}
+    {lignePasSu}
     {publier}
+    <div style={{ height: 12 }} />
+    {nSans > 0 && (
+      <div data-ebay-sans-observateur={nSans} style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, margin: '0 2px 8px' }}>
+        Offre aux observateurs : {nElig ? `possible sur ${nElig} annonce${nElig > 1 ? 's' : ''} ; pour ${nSans === 1 ? "l'autre" : `les ${nSans} autres`}, ` : ''}pas d'observateur à qui l'envoyer pour l'instant.
+      </div>
+    )}
+    {dv.nonReliees.length > 0 && (
+      <div data-ebay-non-reliees={dv.nonReliees.length} style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, margin: '0 2px 10px' }}>
+        <b style={{ color: E.text }}>{dv.nonReliees.length} annonce{dv.nonReliees.length > 1 ? 's' : ''} pas reliée{dv.nonReliees.length > 1 ? 's' : ''} à une paire</b> : sans ce lien, VRM ne peut pas te dire de {dv.nonReliees.length > 1 ? 'les' : 'la'} retirer d'ici quand la paire se vend sur Vinted. « Relier à une paire » sur sa carte — c'est toi qui choisis.
+      </div>
+    )}
     <div style={{ background: E.card, border: `1px solid ${E.border}`, borderRadius: 14, overflow: 'hidden' }}>
-      {items.map((it, i) => <EbayAnnonceCard key={it.itemId || i} it={it} first={i === 0} onSaved={resync} />)}
+      {items.map((it, i) => (
+        <div key={it.itemId || i} data-ebay-annonce={it.itemId || ''}>
+          <EbayAnnonceCard it={it} first={i === 0} onSaved={resync}
+            numero={numDeSkuEbay(it.sku)}
+            eligible={elig ? (elig.has(String(it.itemId)) ? true : (eligibles.complet ? false : undefined)) : undefined}
+            paires={paires} numsConnus={numsConnus} titreDeNum={titreDeNum} pris={pris}
+            onSku={(id, sku) => { surSku(id, sku); resync(); }}
+            onOffre={() => chargerEligibles()} />
+        </div>
+      ))}
     </div>
   </>);
 }
@@ -15518,6 +16229,25 @@ const normTitle = (t) => (t || '').toLowerCase().replace(/\s+/g, ' ').trim();
 // ⚠️ Même expression que côté extension (`background.js`) — une notion, une
 //    règle (§11). Deux copies qui divergeraient donneraient deux files.
 const PAS_UNE_VENTE = /annul|cancel|refus|rembours|retour|suspend|[ée]chou/i;
+// Les annonces Vinted PROUVÉES vendues (§5) : la transaction porte l'annonce
+// (`item_id`) et Vinted lui donne un ÉTAT DE COMMANDE qui ne la fait pas
+// revenir — la MÊME règle que l'écran Leboncoin et que l'extension
+// (`lireVentesProuvees`) : une conversation (état vide) n'est pas une vente.
+// Paginée et STRICTE (§4.5) : `null` = pas su, jamais une demi-liste.
+const lireVentesVintedProuvees = async () => {
+  try {
+    const rows = await lireTout('id=like.harvest_%25_txn_%25&select=it:meta->>item_id,ti:meta->>status_title', { strict: true });
+    if (rows === null) return null;
+    const vendus = new Set();
+    for (const r of rows) {
+      if (!r || !r.it) continue;
+      const etat = String(r.ti || '').trim();
+      if (!etat || PAS_UNE_VENTE.test(etat)) continue;
+      vendus.add(String(r.it));
+    }
+    return vendus;
+  } catch (_) { return null; }
+};
 
 // ══════════════════════════════════════════════════════════════════════════════
 // UNE OFFRE NE SE RANGE PAS PAR RESSEMBLANCE DE TITRE (§5)
@@ -22638,7 +23368,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       (« il ne devrait même pas y en avoir », Julien). */}
                   {!hidden && st!=='cancelled' && aExpedier(o) && !isShipDone(o) && o.transaction_id!=null && (
                     <div style={{marginTop:6,display:'flex',justifyContent:'flex-end'}}>
-                      <BoutonBordereau uid={o._acc && o._acc.vinted_user_id} tx={String(o.transaction_id)} login={accNameOf(o._acc)}
+                      <BoutonBordereau uid={o._acc && o._acc.vinted_user_id} tx={String(o.transaction_id)} conv={o.conversation_id} login={accNameOf(o._acc)}
                         aGenerer pdf={!!(labelsCaptes[String(o.transaction_id)] || bordParTx[String(o.transaction_id)])}
                         onImprimer={()=>imprimerBordereauVente(o)} onFait={(u)=>rechargerLabels(u)}/>
                     </div>
@@ -24869,7 +25599,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         {/* L'app COMMANDE l'extension (2 octobre) : le bouton dit ce
                             qui l'empêche s'il est grisé, l'étape s'il travaille. */}
                         {o && o.transaction_id!=null && (
-                          <BoutonBordereau grand uid={acc && acc.vinted_user_id} tx={String(o.transaction_id)} login={accNameOf(acc)}
+                          <BoutonBordereau grand uid={acc && acc.vinted_user_id} tx={String(o.transaction_id)} conv={o.conversation_id} login={accNameOf(acc)}
                             aGenerer pdf={false} onFait={(u)=>rechargerLabels(u)}/>
                         )}
                         <button type="button" onClick={()=>startBordereau(num, titre, acc, o && o.transaction_id)} title="J'ai déjà téléchargé le PDF : le tamponner avec le numéro"
@@ -26852,6 +27582,74 @@ function doublesVenteLbc({ ventes, items, liens, numeros, enLigne, vendusVinted 
     if (surVinted.length || vendueVinted.length) doublons.push({ vente: v, ad, numero: connus[0], surVinted, vendueVinted });
   }
   return { doublons, aRelier, vendusLbc };
+}
+
+// ── VENDUE SUR VINTED, ENCORE EN VENTE SUR eBAY — ET L'INVERSE (5 octobre) ────
+// Julien : « pour eBay […] tu as accès à mon compte et tu ne fais rien de
+// ouf ». Le MÊME contrôle que Leboncoin (`doublesVenteLbc`), avec la seule
+// identité qu'eBay porte : le SKU `VRM-{n°}` de l'annonce (posé à la
+// publication, ou d'un clic sur une annonce existante — `api/ebay` action
+// `sku`). ⚠️ Une annonce eBay SANS ce SKU n'est JAMAIS rapprochée par le titre
+// (§5 : 22 % des ventes portent un titre en double) : elle est « pas reliée »,
+// et l'écran le dit.
+//   · `aRetirerEbay`   : la paire est PROUVÉE vendue sur Vinted (transaction →
+//     item_id, `lireVentesVintedProuvees`) et son annonce eBay est en vente ;
+//   · `aRetirerVinted` : une commande eBay (non annulée) porte le SKU d'une
+//     paire encore en vente sur Vinted (ou déjà vendue là-bas aussi).
+// Entrées : `annonces` (`ebay_listings.items`), `commandes`
+// (`ebay_orders.orders`), `numeros` (`vinted_annonce_numeros`), `enLigne`
+// (annonces Vinted en vente, Set ; null = pas su), `vendusVinted` (prouvées
+// vendues, Set ; null = pas su). Un « pas su » ne produit AUCUNE alerte — c'est
+// l'écran qui dit qu'il n'a pas pu vérifier, jamais « rien à retirer ».
+// La règle est partagée par l'écran eBay → Annonces ET le centre de
+// notifications (§11).
+const numDeSkuEbay = (sku) => {
+  // STRICT : « VRM-125 », « VRM-B125 », et rien d'autre. Un SKU à lui
+  // (« 12345-ABC ») n'est pas un numéro de rangement.
+  const m = /^\s*VRM[-\s]?((?:[A-Z]{1,3})?\d{1,6})\s*$/i.exec(String(sku == null ? '' : sku));
+  const c = m ? cleNum(m[1]) : '';
+  return c && NUM_OK.test(c) ? c : '';
+};
+const skuEbayDe = (numero) => { const c = cleNum(numero); return c && NUM_OK.test(c) ? 'VRM-' + c : ''; };
+// Une commande eBay qui ENGAGE la paire : ni annulée, ni remboursée, ni en
+// paiement échoué. Un paiement en attente engage déjà : l'acheteur s'est engagé.
+const commandeEbayEngagee = (o) => !!o
+  && !/CANCEL/i.test(String((o.cancelStatus && o.cancelStatus.cancelState) || ''))
+  && !/FAILED|FULLY_REFUNDED/i.test(String(o.orderPaymentStatus || ''));
+function doublesVenteEbay({ annonces, commandes, numeros, enLigne, vendusVinted }) {
+  const parNum = new Map();
+  for (const id in (numeros || {})) {
+    const k = cleNum((numeros[id] || {}).numero);
+    if (!k) continue;
+    if (!parNum.has(k)) parNum.set(k, []);
+    parNum.get(k).push(String(id));
+  }
+  const aRetirerEbay = [], aRetirerVinted = [], nonReliees = [];
+  for (const a of (Array.isArray(annonces) ? annonces : [])) {
+    if (!a || !a.itemId) continue;
+    const n = numDeSkuEbay(a.sku);
+    if (!n) { nonReliees.push(a); continue; }
+    if (!vendusVinted) continue;                                  // pas su : on n'affirme rien
+    const ids = parNum.get(n) || [];
+    const vendues = ids.filter((id) => vendusVinted.has(id));
+    if (!vendues.length) continue;
+    // Une AUTRE annonce Vinted de ce numéro, en vente et pas vendue : la paire
+    // est revenue (retour, republiée) — elle n'est pas partie.
+    if (enLigne && ids.some((id) => enLigne.has(id) && !vendusVinted.has(id))) continue;
+    aRetirerEbay.push({ annonce: a, numero: n, vinted: vendues });
+  }
+  if (enLigne) for (const o of (Array.isArray(commandes) ? commandes : [])) {
+    if (!commandeEbayEngagee(o)) continue;
+    for (const li of (Array.isArray(o.lineItems) ? o.lineItems : [])) {
+      const n = numDeSkuEbay(li && li.sku);
+      if (!n) continue;
+      const ids = parNum.get(n) || [];
+      const vendueVinted = vendusVinted ? ids.filter((id) => vendusVinted.has(id)) : [];
+      const surVinted = ids.filter((id) => enLigne.has(id) && !vendueVinted.includes(id));
+      if (surVinted.length || vendueVinted.length) aRetirerVinted.push({ commande: o, ligne: li, numero: n, surVinted, vendueVinted });
+    }
+  }
+  return { aRetirerEbay, aRetirerVinted, nonReliees };
 }
 
 function LbcRelier({ ad, numsConnus, onRelie, suggestions, detail }) {
@@ -29987,6 +30785,9 @@ function AppCoeur() {
   // aux messages DANS Vinted : une seule porte pour un seul écran.
   React.useEffect(()=>{ if(tab==='cat_msg'){ subVoulue.current='messages'; setTab('plat_vinted'); } },[tab]);
   React.useEffect(()=>{ if(tab==='leboncoin'){ subVoulue.current='annonces'; setTab('plat_leboncoin'); } },[tab]);
+  // L'anti double vente eBay (cloche, notification) mène à eBay → Annonces, là
+  // où vivent « Retirer d'eBay » et le lien vers l'annonce Vinted.
+  React.useEffect(()=>{ if(tab==='ebay_annonces'){ subVoulue.current='annonces'; setTab('plat_ebay'); } },[tab]);
   // ⚠️ Flèche « retour » RETIRÉE le 1er octobre (demande de Julien : « elle sert
   // à rien »). La navigation se fait par le menu des écrans / la barre latérale,
   // toujours joignables ; un bouton retour de plus n'apprenait rien.
@@ -30016,7 +30817,7 @@ function AppCoeur() {
     // banc, qui navigue par `?tab=`, croyait rendre Leboncoin alors qu'il
     // mesurait l'accueil (un faux vert dans ma propre couverture d'hier).
     // `journee` manquait aussi : invisible parce que c'est l'état de départ.
-    const TABS_OK=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','invoices','masques','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin'];
+    const TABS_OK=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','invoices','masques','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces'];
     const goto=(search)=>{ try{ const p=new URLSearchParams(search); const t=p.get('tab'); if(p.get('print')==='bord') _pendingBordPrint=true; if(t&&TABS_OK.includes(t)){ setTab(t); window.history.replaceState({},'',window.location.pathname); } }catch(_){}};
     goto(window.location.search);
     const onMsg=(e)=>{ if(e.data&&e.data.type==='open-url'&&e.data.url){ try{ goto(new URL(e.data.url,window.location.origin).search); }catch(_){}} };
@@ -30190,6 +30991,20 @@ function AppCoeur() {
   const [customLogo,setCustomLogo]=useState(()=>load('vinted_custom_logo',null));
   const logoSrc = customLogo || LOGO_CANCALE;
   const logoInputRef = React.useRef(null);
+  // ⚠️ LA PLACE DE L'ÎLE SE MESURE, ELLE NE SE DEVINE PLUS. La ligne de titre
+  // des écrans lui réservait 208 px en dur ; la pastille « Actions possibles ·
+  // compte » (5 octobre) l'a élargie, et « Exporter Excel », « Coller en
+  // masse », « Réglages » repassaient DESSOUS (verif_visuel). On publie sa
+  // largeur réelle dans `--vrm-ile`, que la règle de index.html lit.
+  const ileRef = React.useRef(null);
+  React.useEffect(() => {
+    const el = ileRef.current;
+    if (!ordi || !el || typeof ResizeObserver === 'undefined') { try { document.documentElement.style.removeProperty('--vrm-ile'); } catch (_) {} return undefined; }
+    const poser = () => { try { document.documentElement.style.setProperty('--vrm-ile', Math.ceil(el.getBoundingClientRect().width + 16) + 'px'); } catch (_) {} };
+    poser();
+    const ro = new ResizeObserver(poser); ro.observe(el);
+    return () => ro.disconnect();
+  }, [ordi]);
   const handleLogoChange = (e) => {
     const file = e.target.files && e.target.files[0];
     if(!file) return;
@@ -31058,11 +31873,25 @@ function AppCoeur() {
       // Vinted (« tout centralisé dans VRM », §11). Lu sur les commandes captées
       // (scope fulfillment, déjà accordé — aucune reconnexion). Une lecture
       // ratée/vide ⇒ 0, jamais un colis inventé (§5).
-      let ebayShipCount=0;
+      let ebayShipCount=0, ebayARetirer=0, ebayARetirerVinted=0;
       try{
-        const r=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.ebay_orders&select=data`,{headers:sbAuth()});
-        if(r.ok){ const rows=await r.json(); const ords=(rows&&rows[0]&&rows[0].data&&rows[0].data.orders)||[];
-          ebayShipCount=ords.filter(o=>String((o&&o.orderPaymentStatus)||'').toUpperCase()==='PAID' && String((o&&o.orderFulfillmentStatus)||'').toUpperCase()!=='FULFILLED').length; }
+        // §4.4 : la liste des commandes seulement, et les annonces eBay (petites).
+        const [rO, rL]=await Promise.all([
+          fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.ebay_orders&select=orders:data->orders`,{headers:sbAuth()}),
+          fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.ebay_listings&select=items:data->items`,{headers:sbAuth()}),
+        ]);
+        let ords=null, annE=null;
+        if(rO.ok){ const rows=await rO.json(); if(Array.isArray(rows)) ords=(rows[0]&&Array.isArray(rows[0].orders))?rows[0].orders:[]; }
+        if(rL.ok){ const rows=await rL.json(); if(Array.isArray(rows)) annE=(rows[0]&&Array.isArray(rows[0].items))?rows[0].items:[]; }
+        if(ords) ebayShipCount=ords.filter(o=>String((o&&o.orderPaymentStatus)||'').toUpperCase()==='PAID' && String((o&&o.orderFulfillmentStatus)||'').toUpperCase()!=='FULFILLED').length;
+        // ── ET L'ANTI DOUBLE VENTE eBay (5 octobre) : la MÊME règle que l'écran
+        //    eBay → Annonces (`doublesVenteEbay`, §11). La preuve de vente Vinted
+        //    n'est lue que si une annonce eBay porte un SKU VRM ; « pas su » ne
+        //    produit aucune alerte (l'écran, lui, le dit).
+        const relieesE=(annE||[]).some(a=>a&&numDeSkuEbay(a.sku));
+        const vendusE=relieesE?await lireVentesVintedProuvees():null;
+        const dvE=doublesVenteEbay({annonces:annE||[], commandes:ords||[], numeros:nums, enLigne:lbcOnlineIds, vendusVinted:vendusE});
+        ebayARetirer=dvE.aRetirerEbay.length; ebayARetirerVinted=dvE.aRetirerVinted.length;
       }catch(_){}
       if(cancelled) return;
       // ── Centre de notifications : ce qui demande une action, ici et maintenant.
@@ -31116,6 +31945,8 @@ function AppCoeur() {
       if(lbcDoubles>0) items.push({icon:'🟠', ic:'tag', text:`${lbcDoubles} paire${lbcDoubles>1?'s':''} vendue${lbcDoubles>1?'s':''} sur Leboncoin, encore en vente sur Vinted — à retirer de Vinted`, n:lbcDoubles, tab:'leboncoin'});
       if(lbcRemoveCount>0) items.push({icon:'🟠', ic:'tag', text:`${lbcRemoveCount} à retirer de Leboncoin (vendue${lbcRemoveCount>1?'s':''} sur Vinted)`, n:lbcRemoveCount, tab:'leboncoin'});
       if(lbcVentesSansPaire>0) items.push({icon:'🟠', ic:'tag', text:`${lbcVentesSansPaire} vente${lbcVentesSansPaire>1?'s':''} Leboncoin sans paire reliée — dis laquelle pour éviter une double vente`, n:lbcVentesSansPaire, tab:'leboncoin'});
+      if(ebayARetirer>0) items.push({icon:'🔵', ic:'tag', text:`${ebayARetirer} paire${ebayARetirer>1?'s':''} vendue${ebayARetirer>1?'s':''} sur Vinted, encore en vente sur eBay — à retirer d'eBay`, n:ebayARetirer, tab:'ebay_annonces'});
+      if(ebayARetirerVinted>0) items.push({icon:'🔵', ic:'tag', text:`${ebayARetirerVinted} paire${ebayARetirerVinted>1?'s':''} vendue${ebayARetirerVinted>1?'s':''} sur eBay, encore en vente sur Vinted — à retirer de Vinted`, n:ebayARetirerVinted, tab:'ebay_annonces'});
       // ⚠️ Retirés le 30 septembre, à la demande de Julien : « N messages non
       // lus » et « N offres reçues » ne sont pas intéressants ici — les offres
       // et les messages auront leur propre onglet (captation + envoi, comme
@@ -31268,7 +32099,7 @@ function AppCoeur() {
           en `fixed`, le titre de l'écran remonte et partage la ligne avec les
           actions, comme dans une vraie application. Sur téléphone il porte le
           menu, le logo et la synchro : il reste `sticky`, rien ne change. */}
-      <header style={{position: ordi ? 'fixed' : 'sticky',top: ordi ? 12 : 0,zIndex:50,display:'flex',alignItems:'center',justifyContent:'space-between',
+      <header ref={ileRef} style={{position: ordi ? 'fixed' : 'sticky',top: ordi ? 12 : 0,zIndex:50,display:'flex',alignItems:'center',justifyContent:'space-between',
         padding: ordi ? '7px 10px' : '11px 16px',
         // ⚠️ SUR ORDINATEUR C'EST UNE ÎLE, PAS UNE BARRE. Un bandeau pleine
         // largeur avec un flou d'arrière-plan rendait le TITRE DE L'ÉCRAN
@@ -31384,6 +32215,9 @@ function AppCoeur() {
               {notifEnabled?'🔔':'🔕'}
             </button>}
             {(() => { const eD = !ordi && tab==='plat_ebay'; const ink = eD ? '#fff' : C.text; const bd = eD ? '#3A3A3C' : C.border; return (<>
+            {/* « Puis-je agir sur Vinted depuis cette page ? » — sur tous les
+                écrans (Julien, 5 octobre). Voir `EtatActions`. */}
+            {MULTI_USER && <EtatActions onNav={setTab} ordi={ordi} sombre={eD}/>}
             <button type="button" onClick={()=>{setGsOpen(true);}} title="Rechercher" aria-label="Rechercher une paire"
               style={{background:gsOpen?C.accent:'transparent',border:`1px solid ${gsOpen?C.accent:bd}`,borderRadius:8,padding:'6px 11px',color:gsOpen?C.onAccent:ink,cursor:'pointer',fontSize:15,fontWeight:500,fontFamily:'inherit'}}>
               <Icon name="search" size={17}/>
@@ -31569,7 +32403,6 @@ function AppCoeur() {
             LIGNE de panne (`LignePanne`) là où leur propre liste vide
             mentirait — le bloc, lui, ne s'affiche qu'une fois. */}
         {baseKO && <BaseInjoignable/>}
-        <ResteAFaire onNav={setTab} baseKO={baseKO} premierJour={premierJour}/>
         {tab==='settings'&&<SettingsScreen setTab={setTab} comptes={vintedAccounts}
           customLogo={customLogo} onPickLogo={()=>logoInputRef.current&&logoInputRef.current.click()} onResetLogo={resetLogo}
           notifEnabled={notifEnabled}

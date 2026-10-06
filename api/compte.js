@@ -10,6 +10,8 @@
 //   /api/compte?mode=factures     (GET, session)  MES factures et MA carte
 //   /api/compte?mode=resilier     (POST, session) résilier à la fin de la période
 //   /api/compte?mode=reprendre    (POST, session) annuler la résiliation
+//   /api/compte?mode=session-extension (POST, session) une session À ELLE pour
+//                                 l'extension Chrome (même vendeur, autre famille)
 //
 // L'abonnement (Julien, 4 octobre) : 9,99 € par mois, prélevé chaque mois à la
 // date où la personne s'abonne, pour TOUT LE MONDE SAUF LUI (le propriétaire
@@ -20,7 +22,7 @@
 //    vérifiée, dans une table que le vendeur peut lire mais pas écrire
 //    (supabase/migrations/005-abonnements.sql). Sinon on s'abonnerait soi-même
 //    depuis la console du navigateur.
-import { utilisateurDe, jetonDe } from './_lib/session.js';
+import { utilisateurDe, jetonDe, vendeurExige } from './_lib/session.js';
 import { stripeApi, stripePret, stripeModeTest, signatureValide, finPeriode } from './_lib/stripe.js';
 import { sbCle } from './_lib/cle.js';
 
@@ -349,6 +351,150 @@ async function resilier(req, res, reprendre) {
   return repondre(res, 200, { ok: true, annuleFinPeriode: l.annule_fin_periode, finPeriode: l.fin_periode });
 }
 
+// ── UNE SESSION À ELLE POUR L'EXTENSION (« session fourchée », 5 octobre) ───
+// ⚠️ POURQUOI : l'app passait à l'extension SA PROPRE session (jeton d'accès ET
+//    jeton de renouvellement). Les deux renouvelaient donc la MÊME famille de
+//    jetons. Or Supabase fait tourner le jeton de renouvellement : chaque
+//    renouvellement consomme l'ancien. Celle des deux qui renouvelle en second
+//    présente un jeton déjà consommé → refusé (`refresh_token_already_used`) :
+//    elle est déconnectée et réessaie — les journaux d'auth de la production
+//    montrent ces refus et des rafales de 429 ; selon la configuration, Supabase
+//    révoque en plus la famille entière (il croit à un vol de jeton), et l'app
+//    tombe avec elle. Mesuré sur un GoTrue v2.197 local : après deux rotations,
+//    l'ancien jeton est bien refusé avec cette erreur-là.
+// ⇒ L'extension reçoit une session INDÉPENDANTE, fabriquée ici pour le MÊME
+//    vendeur : un lien magique généré côté serveur (`admin/generate_link`,
+//    AUCUN email envoyé), aussitôt échangé (`verify`) contre une session neuve
+//    — autre `session_id`, autre famille. Chacune renouvelle la sienne ; la
+//    révocation de l'une ne touche pas l'autre (prouvé : audit
+//    `scripts/audit-session-extension.cjs --local`).
+//
+// ⚠️ QUI : la session de l'appelant, vérifiée par Supabase (vendeurExige). Son
+//    ADRESSE vient de la réponse de Supabase sur ce jeton (/auth/v1/user) —
+//    JAMAIS du corps ni de l'adresse de la requête (le corps n'est même pas lu) :
+//    sinon on fabriquerait la session de n'importe qui en tapant son email.
+//    Et on vérifie deux fois que la session fabriquée est bien à LUI (le lien
+//    généré, puis la session rendue) : un écart ⇒ refus, aucun jeton rendu.
+// ⚠️ CE QUE ÇA N'OUVRE PAS : une faille XSS dans l'app lirait déjà le jeton de
+//    renouvellement de l'app dans le stockage du navigateur — cette route ne
+//    donne donc aucun pouvoir de plus à qui détient déjà une session. La
+//    connexion propre de l'extension (sa fenêtre, email + mot de passe VRM)
+//    reste disponible : ceci n'en est que le raccourci.
+// ⚠️ CE QUI NE SORT JAMAIS : `hashed_token`, `email_otp`, `action_link` (de quoi
+//    ouvrir une session à volonté) ni le reste de la fiche Supabase. On rend
+//    cinq champs, construits ici, et aucun secret n'est écrit dans les journaux.
+// ⚠️ Effet de bord, mesuré sur le GoTrue local : générer un lien magique
+//    invalide un lien de réinitialisation de mot de passe encore en attente pour
+//    ce compte (`otp_expired` : Supabase n'en garde qu'un). Sans conséquence pour
+//    quelqu'un déjà connecté — il n'a qu'à redemander le sien.
+const FORK_MAX = 6;                 // sessions fabriquées par vendeur…
+const FORK_FENETRE = 3600 * 1000;   // …par heure glissante
+const FORK_DELAI = 5000;            // chaque appel à Supabase, au plus 5 s
+// Frein PAR INSTANCE, en mémoire du module : Vercel peut en faire tourner
+// plusieurs, et une instance froide repart de zéro. C'est voulu — c'est un frein
+// doux contre une boucle de l'extension (qui ferait sinon tourner des sessions
+// à la chaîne), pas un état qui doit survivre ; il n'y a donc rien à ranger en
+// base. Le vrai verrou est la session de l'appelant.
+const forksRecents = new Map();     // id vendeur → horodatages des essais
+function freinFork(uid) {
+  const maintenant = Date.now();
+  if (forksRecents.size > 5000) {
+    for (const [k, v] of forksRecents) if (!v.some((t) => maintenant - t < FORK_FENETRE)) forksRecents.delete(k);
+  }
+  const recents = (forksRecents.get(uid) || []).filter((t) => maintenant - t < FORK_FENETRE);
+  if (recents.length >= FORK_MAX) { forksRecents.set(uid, recents); return Math.ceil((recents[0] + FORK_FENETRE - maintenant) / 1000); }
+  recents.push(maintenant);
+  forksRecents.set(uid, recents);
+  return 0;
+}
+
+// Un appel à l'authentification de Supabase. Rend l'objet JSON, ou `null` si
+// Supabase a refusé, n'a pas répondu à temps ou a rendu autre chose que du JSON.
+// ⚠️ Le corps de la réponse n'est JAMAIS journalisé (il porte des secrets).
+async function appelAuth(chemin, entetes, corps) {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/auth/v1/${chemin}`, {
+      method: 'POST',
+      headers: { ...entetes, 'Content-Type': 'application/json' },
+      body: JSON.stringify(corps),
+      signal: AbortSignal.timeout(FORK_DELAI),
+    });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return j && typeof j === 'object' && !Array.isArray(j) ? j : null;
+  } catch (_) { return null; }
+}
+
+// Une session fabriquée qu'on ne rend pas ne doit pas rester vivante : on la
+// ferme (au mieux — un échec ici ne change rien à la réponse, déjà un refus).
+async function fermerSession(jeton) {
+  if (typeof jeton !== 'string' || jeton.split('.').length !== 3) return;
+  try {
+    await fetch(`${SUPABASE_URL}/auth/v1/logout?scope=local`, {
+      method: 'POST', headers: { apikey: ANON, Authorization: `Bearer ${jeton}` }, signal: AbortSignal.timeout(FORK_DELAI),
+    });
+  } catch (_) {}
+}
+
+const REESSAIE = "Je n'ai pas pu préparer la connexion de l'extension. Réessaie dans un instant.";
+
+async function sessionExtension(req, res) {
+  const SERVICE = process.env.SUPABASE_SERVICE_KEY || '';
+  // Sans clé de service, impossible de fabriquer quoi que ce soit : on le dit
+  // tout de suite, sans aucun appel.
+  if (!SERVICE) return repondre(res, 503, { erreur: 'non-configure', message: "La connexion automatique de l'extension n'est pas encore branchée sur le serveur. Connecte-toi depuis la fenêtre de l'extension." });
+  const u = await vendeurExige(req, res);   // 401 déjà répondu, aucun appel d'administration
+  if (!u) return;
+  // L'adresse vient de Supabase (la fiche de CE jeton), jamais de la requête.
+  const email = String(u.email || '').trim();
+  if (!email) return repondre(res, 409, { erreur: 'sans-email', message: "Ton compte VRM n'a pas d'adresse email : connecte l'extension depuis sa fenêtre." });
+  if (!u.emailConfirme) return repondre(res, 409, { erreur: 'email-non-confirme', message: "Ton adresse email n'est pas encore confirmée : clique le lien reçu par email, puis réessaie." });
+  const attente = freinFork(u.id);
+  if (attente) {
+    res.setHeader('Retry-After', String(attente));
+    return repondre(res, 429, { erreur: 'trop-souvent', message: "L'extension a demandé sa connexion trop souvent. Réessaie dans un moment." });
+  }
+
+  // 1) Le lien magique, généré côté serveur — aucun email ne part.
+  const lien = await appelAuth('admin/generate_link', sbCle(SERVICE), { type: 'magiclink', email });
+  const idLien = String((lien && (lien.id || (lien.user && lien.user.id))) || '');
+  const hache = lien && typeof lien.hashed_token === 'string' ? lien.hashed_token : '';
+  // ⚠️ `magiclink` seulement : `signup` voudrait dire que Supabase vient de
+  //    CRÉER un compte pour cette adresse — ce n'est plus la personne connectée.
+  if (!lien || !hache || lien.verification_type !== 'magiclink') return repondre(res, 502, { erreur: 'auth', message: REESSAIE });
+  if (idLien !== u.id) { console.warn('[session-extension] lien généré pour un autre compte — refusé'); return repondre(res, 502, { erreur: 'identite', message: REESSAIE }); }
+
+  // 2) Échangé aussitôt contre une session NEUVE (clé publique, comme le
+  //    navigateur le ferait en cliquant le lien).
+  const v = await appelAuth('verify', sbCle(ANON), { type: 'magiclink', token_hash: hache });
+  if (!v) return repondre(res, 502, { erreur: 'auth', message: REESSAIE });
+  const acces = typeof v.access_token === 'string' ? v.access_token : '';
+  const renouv = typeof v.refresh_token === 'string' ? v.refresh_token : '';
+  const duree = Number(v.expires_in);
+  const idSession = String((v.user && v.user.id) || '');
+  if (idSession !== u.id) {
+    console.warn('[session-extension] session fabriquée pour un autre compte — refusée et fermée');
+    await fermerSession(acces);
+    return repondre(res, 502, { erreur: 'identite', message: REESSAIE });
+  }
+  if (acces.split('.').length !== 3 || !renouv || !(duree > 0)) {
+    await fermerSession(acces);
+    return repondre(res, 502, { erreur: 'auth', message: REESSAIE });
+  }
+  // Cinq champs, construits ici — rien d'autre de la réponse de Supabase.
+  return repondre(res, 200, {
+    ok: true,
+    session: {
+      access_token: acces,
+      refresh_token: renouv,
+      // En millisecondes, comme `sessionFrom` dans l'app.
+      expires_at: Date.now() + duree * 1000,
+      user_id: u.id,
+      email,
+    },
+  });
+}
+
 // ── Santé : seulement des OUI/NON (route publique) ──────────────────────────
 function sante(req, res) {
   res.setHeader('Referrer-Policy', 'no-referrer');
@@ -375,5 +521,6 @@ export default async function handler(req, res) {
   if (mode === 'factures') return m === 'GET' ? factures(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
   if (mode === 'resilier') return m === 'POST' ? resilier(req, res, false) : repondre(res, 405, { erreur: 'POST seulement' });
   if (mode === 'reprendre') return m === 'POST' ? resilier(req, res, true) : repondre(res, 405, { erreur: 'POST seulement' });
+  if (mode === 'session-extension') return m === 'POST' ? sessionExtension(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
   return repondre(res, 404, { erreur: 'mode inconnu' });
 }

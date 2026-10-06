@@ -445,7 +445,11 @@ function ctxAvec(numeros, txns, lbcItems, exclus, quiEchoue, bloquesDef) {
     //    5.130 les panneaux sont retirés : c'est la COMMANDE de publication qui
     //    refuse (audit-publier-app.cjs l'exécute), et l'écran de l'app qui le dit.
     const BG = fs.readFileSync(path.join(racine, 'vinted-sync-extension', 'background.js'), 'utf8');
-    const pub = (BG.split('async function publierDepuisApp')[1] || '').split('\n}\n')[0];
+    // ⚠️ Un audit suit la RÈGLE, pas son orthographe : depuis la 5.161 la
+    //    commande pose un verrou puis délègue à `publierDepuisAppSuite` — on
+    //    suit l'appel au lieu d'exiger que le test vive dans la première.
+    const corpsDe = (nom) => (BG.split('async function ' + nom + '(')[1] || '').split('\n}\n')[0];
+    const pub = corpsDe('publierDepuisApp') + '\n' + (/publierDepuisAppSuite\(/.test(corpsDe('publierDepuisApp')) ? corpsDe('publierDepuisAppSuite') : '');
     dit(/preuveKO/.test(pub) && /code: 'preuve'/.test(pub), 'la commande « Publier » LIT cet échec et refuse', 'le fond le signale, la publication l\'ignorerait');
     dit(/preuveKO/.test(APP), 'et l\'écran Leboncoin de l\'app le dit');
   }

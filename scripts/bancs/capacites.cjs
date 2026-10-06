@@ -158,8 +158,14 @@ const BANDEAU=/prix plancher[^\n]*rien ne les applique/i;
     })));
     const nom=(onglet||'ann')+'-'+(pont===null?'absente':(pont===''?'muette':pont))+(diagVer===undefined?'':'-diag'+String(diagVer).replace(/\./g,'_'));
     await pg.screenshot({path:SC+'/z-cap-'+nom.replace(/\./g,'_')+'.png',fullPage:true});
+    // La pastille de l'en-tête (« Actions possibles / Lecture seule ») et ce que
+    // dit son panneau une fois ouvert — un clic, comme il le ferait.
+    const etat=await pg.evaluate(()=>{const x=document.querySelector('[data-etat-actions]');return x?{niveau:x.getAttribute('data-etat-actions'),code:x.getAttribute('data-etat-code')}:null;});
+    let panneau='';
+    if(etat){ await pg.click('[data-etat-actions]'); await pg.waitForTimeout(250);
+      panneau=await pg.evaluate(()=>{const p=document.querySelector('[data-etat-panneau]');return p?p.innerText:'';}); }
     await pg.close();
-    return {t, tc, errs, pret};
+    return {t, tc, errs, pret, etat, panneau};
   };
 
   // Les six etats du pont d'avant (5.37/5.38 etaient la frontiere de
@@ -399,22 +405,25 @@ const BANDEAU=/prix plancher[^\n]*rien ne les applique/i;
       'il ne promet pas qu\'elle est branchee sur cette page', aJour.pret ? '' : 'ecran Reglages jamais rendu');
   }
 
-  // ── L'ONGLET « CE QU'IL TE RESTE A FAIRE » (bas a droite) ──────────────────
-  // Il ne s'affiche QUE tant que l'extension de CE navigateur n'est pas a jour
-  // (donc ne capte pas encore tout), et DISPARAIT des qu'elle l'est.
+  // ── LA PASTILLE DE L'EN-TETE (5 octobre) : « Actions possibles / Lecture seule »
+  // Elle remplace le petit onglet « Extension a mettre a jour » d'en bas a
+  // droite (deux voix pour la meme chose, §7). Une extension trop ancienne pour
+  // recevoir des commandes : « Lecture seule », et le panneau NOMME la version
+  // a installer. A jour : elle ne reclame aucune mise a jour.
   {
     const EXT = (/const EXT_ATTENDUE = '([^']+)'/.exec(fs.readFileSync(path.join(__dirname,'..','..','src','App.jsx'),'utf8'))||[])[1]||'';
     const vieille = await lis('5.10.0', 'cat_annonces');   // extension tres en retard
-    dit(/Ouvrir R[ée]glages pour la t[ée]l[ée]charger/i.test(vieille.t),
-      'l\'onglet « reste a faire » s\'affiche quand l\'extension est en retard',
-      'attendu le bouton, ecran : ' + vieille.t.replace(/\n/g,' ').slice(0,80));
-    dit(new RegExp(EXT.replace(/\./g,'\\.')).test(vieille.t),
-      'et il NOMME la version a installer', 'attendu ' + EXT);
+    dit(vieille.etat && vieille.etat.niveau==='lecture' && vieille.etat.code==='retard',
+      'extension trop ancienne : la pastille dit « Lecture seule » (en retard)', JSON.stringify(vieille.etat));
+    dit(new RegExp(EXT.replace(/\./g,'\\.')).test(vieille.panneau),
+      'et son panneau NOMME la version a installer', 'attendu ' + EXT + ' — panneau : ' + vieille.panneau.replace(/\n/g,' ').slice(0,120));
+    dit(!/Ouvrir R[ée]glages pour la t[ée]l[ée]charger/i.test(vieille.t),
+      'l\'ancien onglet du bas n\'est plus la (une seule voix, §7)');
     const ajour = await lis(EXT, 'cat_annonces');          // extension a jour
-    dit(ajour.pret && !/Ouvrir R[ée]glages pour la t[ée]l[ée]charger/i.test(ajour.t),
-      'et il DISPARAIT quand l\'extension est a jour (pas de badge permanent)',
-      ajour.pret ? '' : 'grille jamais rendue — un onglet absent d\'un ecran vide ne prouve rien');
-    dit(vieille.errs.length===0 && ajour.errs.length===0, 'aucune erreur d\'app avec l\'onglet', (vieille.errs[0]||ajour.errs[0]||''));
+    dit(ajour.pret && ajour.etat && ajour.etat.code!=='retard' && !/Mettre à jour en/i.test(ajour.panneau),
+      'a jour : la pastille ne reclame aucune mise a jour',
+      ajour.pret ? JSON.stringify(ajour.etat) : 'grille jamais rendue — une absence sur un ecran vide ne prouve rien');
+    dit(vieille.errs.length===0 && ajour.errs.length===0, 'aucune erreur d\'app avec la pastille', (vieille.errs[0]||ajour.errs[0]||''));
   }
 
   await b.close(); srv.close();

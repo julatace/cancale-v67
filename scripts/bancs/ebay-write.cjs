@@ -9,8 +9,13 @@ const RACINE = path.join(__dirname, '..', '..');
 let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
 let tradingMode = 'ok', lastCall = '', lastBody = '';
+const PROPRIO = '11111111-1111-1111-1111-111111111111';
+process.env.VRM_OWNER_UID = PROPRIO;
 global.fetch = async (url, opts = {}) => {
   const u = String(url); const h = opts.headers || {};
+  // Depuis le 5 octobre la route exige la session du propriétaire : le faux
+  // service d'identité la reconnaît (sinon ce banc ne mesurait que le 401).
+  if (u.includes('/auth/v1/user')) return new Response(JSON.stringify({ id: PROPRIO, email: 'p@exemple.test' }), { status: 200 });
   if (u.includes('identity/v1/oauth2/token')) return new Response(JSON.stringify({ access_token: 'AT', refresh_token: 'RT', expires_in: 7200 }), { status: 200 });
   if (u.includes('/rest/v1/app_data')) {
     if (opts.method === 'POST') return new Response('', { status: 201 });
@@ -31,7 +36,7 @@ const item = { title: 'Nike Air Max 1 Aquatone Bleu T44', categoryId: '15709', p
 (async () => {
   process.env.EBAY_APP_ID = 'app'; process.env.EBAY_CERT_ID = 'cert'; process.env.EBAY_RUNAME = 'ru'; process.env.SUPABASE_SERVICE_KEY = 'svc';
   const mod = await import('file://' + path.join(RACINE, 'api', 'ebay.js'));
-  const handler = mod.default;
+  const handler = (req, res) => mod.default({ headers: { authorization: 'Bearer eyJh.banc-proprio.sig' }, ...req }, res);
 
   // 1. Publier OK
   tradingMode = 'ok';
