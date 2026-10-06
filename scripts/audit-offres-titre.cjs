@@ -137,7 +137,10 @@ console.log('\n── ET CE QU\'ON MET DE CÔTÉ EST DIT, PAS AVALÉ');
     dit(!/offresRecent|offres?\s+reçues?\s*—/.test(src), 'aucun écran n\'affiche d\'offres (retirées par décision de Julien, 28 et 30 sept.)',
       'un compte d\'offres est rendu sans passer par offresAtraiter');
   } else {
-    dit(/reglees\.length\s*>\s*0\s*&&/.test(src), 'l\'accueil affiche le nombre mis de côté',
+    // ⚠️ La règle, pas son orthographe (6 octobre) : l'écran qui montre les
+    //    offres (Messages, proposition 6) écrit le nombre mis de côté dans une
+    //    phrase conditionnelle — `&&` ou ternaire, c'est la même exigence.
+    dit(/reglees\.length\s*>\s*0\s*(&&|\?)/.test(src), 'l\'écran qui montre les offres dit combien sont mises de côté',
       'sinon la carte passe de 75 à 41 sans un mot');
     dit(true, 'et la règle a UN SEUL propriétaire (§11)');
   }

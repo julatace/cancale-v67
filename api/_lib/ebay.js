@@ -1,11 +1,14 @@
 import { sbCle } from './cle.js';
 // Base cloisonnée : sans propriétaire ni cible (owner,id), l'écriture est refusée.
 import { withOwnerAll, conflictTarget } from './owner.js';
+// La base sait-elle séparer les vendeurs ? (trois états, voir session.js)
+import { baseCloisonnee } from './session.js';
 // api/_lib/ebay.js — la logique OAuth eBay, en UN seul endroit (§11).
-// Utilisée par api/ebay.js (l'app pilote) ET api/ebay-callback.js (le retour de
-// consentement d'eBay). Deux routes, une seule règle : les clés vivent dans les
-// variables Vercel, les jetons ne repartent jamais vers le navigateur, et on ne
-// ment jamais sur un échec.
+// Utilisée par api/ebay.js (l'app pilote, et `?mode=callback`, le retour de
+// consentement d'eBay). Une seule règle : les clés vivent dans les variables
+// Vercel, les jetons ne repartent jamais vers le navigateur, on ne ment jamais
+// sur un échec — et (5 octobre) chaque vendeur a SES jetons et SES lignes :
+// toute fonction qui lit ou écrit reçoit le vendeur en paramètre (`owner`).
 
 const EBAY_AUTH_URL  = 'https://auth.ebay.com/oauth2/authorize';
 const EBAY_TOKEN_URL = 'https://api.ebay.com/identity/v1/oauth2/token';
@@ -64,23 +67,58 @@ async function appToken() {
   return { ok: true, status: 200, works: true, expires_in: j.expires_in || null };
 }
 
-// Range le refresh_token côté serveur. true seulement si l'écriture a ABOUTI
-// (§ « on n'acquitte pas ce qu'on n'a pas rangé »).
-async function storeRefresh(refresh, expiresInDays) {
+// ── À QUI APPARTIENT UNE LIGNE eBAY ? (5 octobre, chaque vendeur son eBay) ────
+// Julien : « tout doit être adaptable en fonction de la personne en face ».
+// Jusqu'ici `ebay_tokens` et les lignes `ebay_*` étaient celles de
+// l'INSTALLATION (écrites au nom de VRM_OWNER_UID, lues avec la clé de service
+// SANS filtre) : un second vendeur aurait lu les jetons eBay de Julien — ou la
+// première ligne venue, la sienne ou celle d'un autre.
+// ⇒ Le vendeur est passé EXPLICITEMENT à chaque fonction (jamais une variable
+//   de module : deux requêtes se traitent en parallèle dans la même instance).
+//   Base cloisonnée : on lit `owner=eq.{vendeur}` et on écrit `owner` = lui,
+//   cible `(owner,id)`. Base pas encore cloisonnée : EXACTEMENT comme avant
+//   (un seul jeu de données, `withOwnerAll` / `conflictTarget`).
+// ⚠️ Rétrocompatible : la ligne `ebay_tokens` de Julien porte déjà
+//   owner = VRM_OWNER_UID = son identifiant — elle reste la sienne, sans rien
+//   refaire.
+// `null` = on ne SAIT PAS pour qui (base cloisonnée, vendeur absent ou mal
+// formé) : on ne lit ni n'écrit rien — jamais « au hasard ».
+const UUID_VENDEUR = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+async function portee(owner) {
+  const cloison = await baseCloisonnee();
+  if (cloison) {
+    if (!owner || !UUID_VENDEUR.test(String(owner))) return null;
+    const o = String(owner);
+    return { filtre: `&owner=eq.${encodeURIComponent(o)}`, lignes: (rows) => rows.map((r) => ({ owner: o, ...r })), conflit: 'owner,id' };
+  }
+  return { filtre: '', lignes: withOwnerAll, conflit: conflictTarget('id') };
+}
+
+// Écrit (fusion par id) des lignes AU NOM du vendeur. true seulement si
+// l'écriture a ABOUTI (§ « on n'acquitte pas ce qu'on n'a pas rangé »).
+async function ecrireLignes(rows, owner) {
   if (!sbKey()) return false;
+  const p = await portee(owner);
+  if (!p) return false;
   try {
-    const body = [{ id: TOKENS_ID, data: { refresh_token: refresh, saved_at: Date.now(), refresh_expires_days: expiresInDays || null } }];
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${conflictTarget('id')}`, {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${p.conflit}`, {
       method: 'POST',
       headers: { ...sbCle(sbKey()), 'content-type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify(withOwnerAll(body)),
+      body: JSON.stringify(p.lignes(rows)),
     });
     return r.ok;
   } catch (_) { return false; }
 }
 
-// Échange le code de consentement contre les jetons ET range le refresh.
-async function exchangeCode(code) {
+// Range le refresh_token côté serveur, chez CE vendeur.
+async function storeRefresh(refresh, expiresInDays, owner) {
+  return ecrireLignes([{ id: TOKENS_ID, data: { refresh_token: refresh, saved_at: Date.now(), refresh_expires_days: expiresInDays || null } }], owner);
+}
+
+// Échange le code de consentement contre les jetons ET les range chez `owner`
+// — le vendeur qui a DEMANDÉ ce consentement (lu dans le `state` signé, ou la
+// session de l'appel), jamais un identifiant envoyé par le navigateur.
+async function exchangeCode(code, owner) {
   if (!code) return { ok: false, status: 400, error: 'code manquant' };
   if (!ruName()) return { ok: false, status: 503, reason: 'no-runame', error: 'RuName non configuré (EBAY_RUNAME).' };
   const r = await fetch(EBAY_TOKEN_URL, {
@@ -91,41 +129,41 @@ async function exchangeCode(code) {
   const j = await r.json().catch(() => ({}));
   if (!r.ok) return { ok: false, status: r.status >= 500 ? 502 : r.status, error: 'eBay a refusé l\'échange', detail: (j && (j.error_description || j.error)) || '' };
   if (!j.refresh_token) return { ok: false, status: 502, error: 'eBay n\'a pas renvoyé de refresh_token' };
-  const stored = await storeRefresh(j.refresh_token, j.refresh_token_expires_in && Math.round(j.refresh_token_expires_in / 86400));
+  const stored = await storeRefresh(j.refresh_token, j.refresh_token_expires_in && Math.round(j.refresh_token_expires_in / 86400), owner);
   if (!stored) return { ok: false, status: 500, reason: 'store-failed', error: 'Jetons reçus mais impossible de les ranger (SUPABASE_SERVICE_KEY manquante ou base injoignable).' };
   return { ok: true, status: 200, connected: true };
 }
 
-// Un compte est-il relié ? true / false / null (« pas su » : base injoignable).
-async function hasRefresh() {
-  if (!sbKey()) return null;
+// Le refresh_token rangé pour CE vendeur. TROIS états, jamais deux :
+// `undefined` = pas su (base injoignable, vendeur inconnu) · `''` = aucun
+// compte eBay relié · la valeur. Avant, « pas su » valait « pas connecté » :
+// un hoquet de la base disait « aucun compte eBay relié » à quelqu'un qui l'est.
+async function lireRefresh(owner) {
+  if (!sbKey()) return undefined;
+  const p = await portee(owner);
+  if (!p) return undefined;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${TOKENS_ID}&select=data->>refresh_token`, {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${TOKENS_ID}${p.filtre}&select=refresh_token:data->>refresh_token`, {
       headers: { ...sbCle(sbKey()) },
     });
-    if (!r.ok) return null;
+    if (!r.ok) return undefined;
     const rows = await r.json();
-    return !!(Array.isArray(rows) && rows[0] && rows[0].refresh_token);
-  } catch (_) { return null; }
+    if (!Array.isArray(rows)) return undefined;
+    return (rows[0] && rows[0].refresh_token) || '';
+  } catch (_) { return undefined; }
 }
-
-// Lit le refresh_token rangé (la valeur, pas juste sa présence).
-async function readRefresh() {
-  if (!sbKey()) return null;
-  try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${TOKENS_ID}&select=data->>refresh_token`, {
-      headers: { ...sbCle(sbKey()) },
-    });
-    if (!r.ok) return null;
-    const rows = await r.json();
-    return (Array.isArray(rows) && rows[0] && rows[0].refresh_token) || null;
-  } catch (_) { return null; }
+// Un compte est-il relié ? true / false / null (« pas su »).
+async function hasRefresh(owner) {
+  const v = await lireRefresh(owner);
+  return v === undefined ? null : !!v;
 }
+// La valeur seule (ou null) — pour les lecteurs d'avant.
+async function readRefresh(owner) { return (await lireRefresh(owner)) || null; }
 
-// Échange le refresh_token contre un access_token frais (valable ~2 h).
-// C'est ce jeton qui autorise la LECTURE des données eBay du vendeur.
-async function accessToken() {
-  const refresh = await readRefresh();
+// Échange le refresh_token de CE vendeur contre un access_token frais (~2 h).
+async function accessToken(owner) {
+  const refresh = await lireRefresh(owner);
+  if (refresh === undefined) return { ok: false, status: 503, reason: 'store-unreachable', error: 'Je n\'ai pas pu lire ta connexion eBay (base injoignable) — rien n\'a été envoyé à eBay.' };
   if (!refresh) return { ok: false, status: 401, reason: 'not-connected', error: 'Aucun compte eBay relié.' };
   // ⚠️ AUCUN `scope=` ici. eBay renvoie alors TOUS les droits déjà accordés à ce
   // refresh_token. Redemander `SCOPES` casserait tout le jour où on y ajoute un
@@ -143,17 +181,38 @@ async function accessToken() {
   return { ok: true, token: j.access_token, expires_in: j.expires_in || null };
 }
 
-// Range n'importe quelle donnée captée (fusion par id), comme storeRefresh.
-async function storeData(id, data) {
-  if (!sbKey()) return false;
-  try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${conflictTarget('id')}`, {
-      method: 'POST',
-      headers: { ...sbCle(sbKey()), 'content-type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify(withOwnerAll([{ id, data }])),
-    });
-    return r.ok;
-  } catch (_) { return false; }
+// Range n'importe quelle donnée captée (fusion par id), chez CE vendeur.
+async function storeData(id, data, owner) {
+  return ecrireLignes([{ id, data }], owner);
 }
 
-export { SCOPES, appId, certId, ruName, keysReady, canConsent, authUrl, appToken, exchangeCode, hasRefresh, readRefresh, accessToken, storeData };
+// Un réglage de CE vendeur (ligne `main`), lu en SCALAIRE (§4.4 : jamais la
+// ligne entière, elle pèse ~200 Ko). TROIS états : `undefined` pas su ·
+// `''` absent · la valeur en texte (`->>` rend « true » pour un booléen).
+async function lireReglageVendeur(cle, owner) {
+  if (!sbKey() || !/^[a-z0-9_]+$/i.test(String(cle || ''))) return undefined;
+  const p = await portee(owner);
+  if (!p) return undefined;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main${p.filtre}&select=v:data->>${cle}`, { headers: { ...sbCle(sbKey()) } });
+    if (!r.ok) return undefined;
+    const rows = await r.json();
+    if (!Array.isArray(rows)) return undefined;
+    return (rows[0] && rows[0].v != null) ? String(rows[0].v) : '';
+  } catch (_) { return undefined; }
+}
+// Une PETITE ligne de CE vendeur : `undefined` pas su · `null` absente · data.
+async function lireDonnee(id, owner) {
+  if (!sbKey() || !/^[a-z0-9_]+$/i.test(String(id || ''))) return undefined;
+  const p = await portee(owner);
+  if (!p) return undefined;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}${p.filtre}&select=data`, { headers: { ...sbCle(sbKey()) } });
+    if (!r.ok) return undefined;
+    const rows = await r.json();
+    if (!Array.isArray(rows)) return undefined;
+    return rows[0] ? (rows[0].data || {}) : null;
+  } catch (_) { return undefined; }
+}
+
+export { SCOPES, appId, certId, ruName, keysReady, canConsent, authUrl, appToken, exchangeCode, hasRefresh, readRefresh, lireRefresh, accessToken, storeData, portee, lireReglageVendeur, lireDonnee };

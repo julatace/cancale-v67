@@ -34,9 +34,30 @@ const VENTES = [
 // le mois dernier mais versée ce mois-ci → elle compte CE mois.
 VENTES.push({ transaction_id: 9006, title: 'Puma Suede vendue le mois dernier', price: { amount: '30', currency_code: 'EUR' }, status: 'Commande finalisée', date: new Date(auj.getFullYear(), auj.getMonth() - 1, 15, 12).toISOString() });
 const VERS = { 9001: jour(Math.max(1, J - 1)), 9002: jour(J), 9006: jour(1) };
+// « J'AI DÉCLARÉ CE MOIS » (6 octobre) — à dates FIXES, août et septembre 2026
+// (les mois de l'ancienne règle) : 9101 vendue fin août et versée en septembre,
+// 9102 vendue et versée en août, 9103 vendue et versée en septembre.
+VENTES.push(
+  { transaction_id: 9101, title: 'Vendue fin aout versee en septembre', price: { amount: '90', currency_code: 'EUR' }, status: 'Commande finalisée', date: '2026-08-28T12:00:00+02:00' },
+  { transaction_id: 9102, title: 'Vendue et versee en aout', price: { amount: '30', currency_code: 'EUR' }, status: 'Commande finalisée', date: '2026-08-10T12:00:00+02:00' },
+  { transaction_id: 9103, title: 'Vendue et versee en septembre', price: { amount: '40', currency_code: 'EUR' }, status: 'Commande finalisée', date: '2026-09-02T12:00:00+02:00' },
+);
+Object.assign(VERS, { 9101: '2026-09-05T08:00:00+02:00', 9102: '2026-08-20T08:00:00+02:00', 9103: '2026-09-12T08:00:00+02:00' });
 const ACHATS = [
   { transaction_id: 7001, title: 'Lot Nike Air Max', price: { amount: '35', currency_code: 'EUR' }, status: 'Commande finalisée', date: jour(1), seller: 'vendeur_test' },
 ];
+// REPÈRE PAR MODÈLE (6 octobre) — en juillet 2026, loin des mois jugés plus
+// haut : trois Samba revendues 60 € (dont une annulée à 999 € qui ne compte
+// pas), trois achetées 40 € ⇒ +20 €/paire ; une seule Gazelle revendue et une
+// seule achetée ⇒ pas de ligne (une moyenne sur une paire est un hasard).
+const JUIL = (d) => `2026-07-${String(d).padStart(2, '0')}T12:00:00+02:00`;
+for (const [id, t, p, st] of [[9201, 'Adidas Samba OG blanc taille 42', 60, 'Commande finalisée'], [9202, 'adidas samba noir 41', 60, 'Commande finalisée'], [9203, 'Samba OG taille 40', 60, 'Commande finalisée'], [9204, 'Adidas Samba taille 43', 999, 'Commande annulée'], [9205, 'Adidas Gazelle bleu 42', 70, 'Commande finalisée']]) {
+  VENTES.push({ transaction_id: id, title: t, price: { amount: String(p), currency_code: 'EUR' }, status: st, date: JUIL(id % 20 + 1) });
+  if (st === 'Commande finalisée') VERS[id] = JUIL(id % 20 + 5);
+}
+for (const [id, t, p] of [[7101, 'Adidas Samba OG 42', 40], [7102, 'samba noir 41', 40], [7103, 'Adidas Samba 40', 40], [7104, 'Gazelle bleu 42', 30]]) {
+  ACHATS.push({ transaction_id: id, title: t, price: { amount: String(p), currency_code: 'EUR' }, status: 'Commande finalisée', date: JUIL(id % 20 + 1), seller: 'vendeur_test' });
+}
 const ACCOUNTS = [{ id: 1, vinted_user_id: '111', login: 'compte_test', domain: 'www.vinted.fr', updated_at: auj.toISOString() }];
 // TOUTES PLATEFORMES (3 octobre) : une vente Leboncoin PROUVÉE, finalisée et
 // datée (75 € en centimes) ; une autre SANS date (« à dater », hors du mois) ;
@@ -147,6 +168,78 @@ srv.listen(PORT);
         pdfTxt = buf.toString('latin1');
         dit(buf.slice(0, 4).toString() === '%PDF', 'le PDF se génère malgré un emoji dans un titre', `${buf.length} octets`);
       } catch (e) { dit(false, 'le PDF se génère malgré un emoji dans un titre', String(e.message).slice(0, 100)); }
+      // ── « J'ai déclaré ce mois » : il déclare AOÛT à la date de VENTE (ancienne
+      //    règle), puis septembre ne doit plus recompter la vente déjà déclarée.
+      try {
+        const lireMois = async () => pg.evaluate(() => {
+          const reg = document.querySelector('[data-registre="ventes"]');
+          const L = reg ? [...reg.children].map((c) => c.innerText) : [];
+          const modale = reg ? reg.closest('div[style*="max-height"]') : null;
+          const d = document.querySelector('[data-declaration]');
+          return { L, modale: modale ? modale.innerText : '', decl: d ? d.getAttribute('data-declaration') : null, declTxt: d ? d.innerText : '',
+            ailleurs: (document.querySelector('[data-decl="ailleurs"]') || {}).innerText || '' };
+        });
+        const choisirMois = async (re) => {
+          await pg.evaluate(() => { const b = [...document.querySelectorAll('button')].find((x) => /▾/.test(x.innerText) && x.closest('div[style*="max-height"]')); if (b) b.click(); });
+          await pg.waitForTimeout(300);
+          for (let i = 0; i < 3; i++) {
+            const an = await pg.evaluate(() => { const m = [...document.querySelectorAll('div')].find((x) => /^\d{4}$/.test(x.innerText.trim()) && x.closest('div[style*="max-height"]')); return m ? Number(m.innerText.trim()) : null; });
+            if (an === 2026 || an == null) break;
+            await pg.click(an > 2026 ? '[aria-label="Année précédente"]' : '[aria-label="Année suivante"]');
+          }
+          const ok = await pg.evaluate((src) => { const re = new RegExp(src, 'i'); const b = [...document.querySelectorAll('button')].find((x) => re.test(x.innerText.trim()) && x.closest('div[style*="max-height"]')); if (b) { b.click(); return true; } return false; }, re);
+          await pg.waitForTimeout(500);
+          return ok;
+        };
+        dit(await choisirMois('^ao[uû]t'), 'le mois d’août 2026 s’ouvre depuis la grille');
+        let a = await lireMois();
+        const caDe = (t) => nombre((/CA des ventes finalisées\s*\n?\s*([^\n]+)/i.exec(t) || [])[1] || '');
+        dit(a.decl === 'libre' && caDe(a.modale) === 30, 'août, pas encore déclaré : le geste est proposé, et le CA au versement est 30 €', `${a.decl} · CA ${caDe(a.modale)}`);
+        await pg.click('[data-decl-ouvrir]');
+        await pg.waitForTimeout(300);
+        const radios = await pg.evaluate(() => [...document.querySelectorAll('[data-decl-form] label')].map((l) => l.innerText));
+        dit(radios.some((t) => /date de versement/.test(t) && /30,00/.test(t)) && radios.some((t) => /date de vente/.test(t) && /120,00/.test(t)),
+          'les DEUX totaux sont écrits côte à côte (versement 30 € · vente 120 €), c’est lui qui choisit', radios.join(' | ').slice(0, 200));
+        await pg.evaluate(() => { const l = [...document.querySelectorAll('[data-decl-form] label')].find((x) => /date de vente/.test(x.innerText)); if (l) l.querySelector('input').click(); });
+        await pg.fill('[data-decl-form] input[inputmode="decimal"]', '120');
+        await pg.click('[data-decl-enregistrer]');
+        await pg.waitForTimeout(600);
+        a = await lireMois();
+        const reg = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_urssaf_declare') || 'null'); } catch (_) { return null; } });
+        const aout = reg && reg['2026-08'];
+        dit(aout && aout.regle === 'vente' && [...(aout.ids || [])].sort().join(',') === 'vinted:9101,vinted:9102' && aout.montant === 120,
+          'la déclaration retient l’IDENTITÉ des ventes déclarées (9101, 9102), la règle choisie et le montant tapé', JSON.stringify(aout).slice(0, 160));
+        dit(a.decl === 'declare' && /120,00/.test(a.declTxt) && /C'est le montant de ta déclaration/.test(a.declTxt), 'août dit qu’il est déclaré, et que le montant tapé est celui qu’il retrouve', a.declTxt.slice(0, 160));
+        dit(caDe(a.modale) === 120 && a.L.length === 2, 'août compte maintenant les deux ventes déclarées (120 €)', `CA ${caDe(a.modale)} · ${a.L.length} ligne(s)`);
+        dit(await choisirMois('^septembre'), 'septembre s’ouvre');
+        const sp = await lireMois();
+        const sSomme = sp.L.reduce((t, x) => t + nombre(x.split('\n').pop()), 0);
+        dit(caDe(sp.modale) === 40 && sp.L.length === 1 && !sp.L.some((t) => /fin aout/.test(t)), 'septembre ne recompte PAS la vente déjà déclarée en août (40 €, pas 130 €)', `CA ${caDe(sp.modale)} · ${sp.L.length} ligne(s)`);
+        dit(Math.abs(sSomme - caDe(sp.modale)) < 0.005, 'la somme des lignes reste le CA affiché', `${sSomme} · ${caDe(sp.modale)}`);
+        dit(/1 vente versée ce mois-ci \(90,00/.test(sp.ailleurs) && /août 2026/.test(sp.ailleurs), 'septembre DIT qu’une vente versée chez lui est déjà déclarée en août (90 €)', sp.ailleurs.slice(0, 160));
+      } catch (e) { dit(false, '« J’ai déclaré ce mois » se déroule jusqu’au bout', String(e.message).slice(0, 160)); }
+      // ── Repère d'achat par modèle (proposition 10) : sous la modale, sur l'écran.
+      try {
+        await pg.keyboard.press('Escape').catch(() => {});
+        await pg.evaluate(() => { const x = [...document.querySelectorAll('button[aria-label="Fermer"]')].pop(); if (x) x.click(); });
+        await pg.waitForTimeout(400);
+        // Il vit sous « Analyse de tes ventes » (replié par défaut).
+        if (!(await pg.$('[data-repere-modeles]'))) await pg.getByText('Analyse de tes ventes', { exact: true }).click({ timeout: 4000 });
+        await pg.waitForTimeout(400);
+        await pg.click('[data-repere-modeles] summary');
+        await pg.waitForTimeout(1500);
+        const rp = await pg.evaluate(() => ({
+          ok: !!document.querySelector('[data-repere-modeles]'),
+          samba: (document.querySelector('[data-repere-modele="samba"]') || {}).innerText || '',
+          gazelle: !!document.querySelector('[data-repere-modele="gazelle"]'),
+          txt: (document.querySelector('[data-repere-modeles]') || {}).innerText || '',
+        }));
+        dit(rp.ok, 'le repère par modèle est sur l’écran Ventes');
+        dit(/revendue 60,00 € \(3\)/.test(rp.samba) && /achetée 40,00 € \(3\)/.test(rp.samba) && /\+20,00 €/.test(rp.samba),
+          'Samba : revendue 60 € (3, l’annulée à 999 € ne compte pas), achetée 40 € (3) ⇒ +20 €/paire', rp.samba.replace(/\n/g, ' '));
+        dit(!rp.gazelle, 'une seule Gazelle revendue et achetée : pas de ligne (une moyenne sur une paire est un hasard)');
+        dit(/n'entre dans aucun total, rapport ni export/.test(rp.txt), 'il dit que ce n’est PAS de la compta');
+      } catch (e) { dit(false, 'le repère par modèle s’ouvre', String(e.message).slice(0, 120)); }
       dit(errs.length === 0, 'aucune erreur d’app', errs.join(' | ').slice(0, 160));
             await pg.screenshot({ path: path.join(require('os').tmpdir(), 'rapport-'+vp.width+'.png') });
       await ctx.close();

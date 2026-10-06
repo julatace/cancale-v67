@@ -48,6 +48,13 @@ const rows = [
   // Un bordereau pour la transaction 777, que Vinted relie à l'annonce 9104.
   { id: 'email_bord_777', data: { transaction: '777', modele: 'Adidas Spezial noir taille 38', receivedAt: auj.toISOString(), filename: 'b.pdf' } },
   { id: 'harvest_111_txn_777', data: { payload: { transaction: { id: 777, item_id: 9104, status_title: 'Commande finalisée' } } } },
+  // Proposition 9 (6 octobre) : la paire N°41 (9101, qui dort depuis 45 j) est
+  // AUSSI en vente sur eBay, reconnue par son SKU — une identité, pas un titre.
+  // Une annonce eBay sans SKU de paire, au même titre, ne doit rien déclencher.
+  { id: 'ebay_listings', data: { items: [
+    { itemId: '5550001', sku: 'VRM-41', price: '60.00', title: 'Nike Air Max 1 obsidian lilac 42' },
+    { itemId: '5550002', sku: '', price: '49.00', title: 'Salomon XT-6 blanc taille 40' },
+  ] } },
 ];
 const ACCS = [{ id: 1, vinted_user_id: '111', login: 'compte_test', domain: 'www.vinted.fr', updated_at: auj.toISOString() }];
 let ko = 0;
@@ -98,7 +105,14 @@ const projette = (row, sel) => {
         if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(rows.filter((r) => re.test(r.id)).map(forme)); }
         return j([]);
       });
-      await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
+      const envoisEbay = [];
+      await pg.route('**/api/**', (r) => {
+        if (/\/api\/ebay/.test(r.request().url()) && r.request().method() === 'POST') {
+          let b = {}; try { b = JSON.parse(r.request().postData() || '{}'); } catch (_) {}
+          if (b.action === 'revise') { envoisEbay.push(b); return r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"ack":"Success"}' }); }
+        }
+        return r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' });
+      });
       await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
       await pg.waitForTimeout(4000);
       const c = await pg.evaluate(() => {
@@ -148,6 +162,29 @@ const projette = (row, sel) => {
       } catch (e) { dit(false, 'l’achat se modifie en place (texte cliquable)', String(e.message).slice(0, 80)); }
       const apres = await pg.evaluate(() => (document.querySelector('[data-carte-annonce="9102"]') || {}).innerText || '');
       dit(/achat\s*30,00/.test(apres), 'cliquer sur « achat — », taper 30, Entrée : la carte dit « achat 30,00 € »', (apres.match(/achat[^\n]*/) || [''])[0]);
+      // ── Proposition 9 : la paire qui dort, AUSSI sur eBay — baisse en un clic.
+      try {
+        // Le repricing vit sous « Conseils & signalements » (replié par défaut).
+        if (!(await pg.$('[data-reprice-ailleurs]'))) await pg.getByText('Conseils & signalements', { exact: true }).click({ timeout: 4000 });
+        await pg.waitForTimeout(800);
+        const av = await pg.evaluate(() => ({
+          a: (document.querySelector('[data-reprice-ailleurs="9101"]') || {}).innerText || '',
+          btn: (document.querySelector('[data-reprice-ebay="5550001"]') || {}).innerText || '',
+          autres: [...document.querySelectorAll('[data-reprice-ebay]')].map((x) => x.getAttribute('data-reprice-ebay')),
+        }));
+        dit(/Aussi sur eBay à 60 €/.test(av.a) && /Baisser sur eBay à 53 €/.test(av.btn),
+          'la paire qui dort est aussi sur eBay (SKU VRM-41) : même baisse en proportion (49 → 43 ⇒ 60 → 53 €)', `${av.a.slice(0, 120)} | ${av.btn}`);
+        dit(av.autres.length === 1 && !av.autres.includes('5550002'), 'une annonce eBay sans SKU de paire, même au même titre, ne déclenche rien (§5)', JSON.stringify(av.autres));
+        await pg.click('[data-reprice-ebay="5550001"]');
+        await pg.waitForTimeout(300);
+        dit(envoisEbay.length === 0, 'rien ne part avant la confirmation', `${envoisEbay.length} envoi(s)`);
+        await pg.getByRole('button', { name: 'Baisser sur eBay', exact: true }).click({ timeout: 4000 });
+        await pg.waitForTimeout(600);
+        const e = envoisEbay[0] || {};
+        dit(envoisEbay.length === 1 && e.itemId === '5550001' && Number(e.price) === 53, 'confirmée, UNE baisse part vers eBay, sur la bonne annonce et au bon prix', JSON.stringify(envoisEbay));
+        const fait = await pg.evaluate(() => (document.querySelector('[data-reprice-ebay="fait"]') || {}).innerText || '');
+        dit(/baissé à 53 €/.test(fait), 'et l’écran le dit (« baissé à 53 € »)', fait);
+      } catch (e) { dit(false, 'la baisse eBay se déroule jusqu’au bout', String(e.message).slice(0, 120)); }
       await pg.screenshot({ path: path.join(require('os').tmpdir(), 'annonces-' + vp.width + '.png') });
       await ctx.close();
     }
