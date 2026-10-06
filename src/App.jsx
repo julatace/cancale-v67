@@ -854,6 +854,9 @@ const SYNC_KEYS = [
   // Annonce Leboncoin → N° de paire, posé À LA MAIN (« Relier », écran
   // Leboncoin, C4). Une identité qu'il pose lui-même : l'extension la LIT.
   'vrm_lbc_liens',
+  // Son rythme de programmation eBay (par jour, plage, jours, écart, ordre,
+  // préréglages de départ) : le sien, sur tous ses appareils (5 octobre).
+  'vrm_ebay_rythme',
   // Offres marquées « traité » à la main (tu as répondu) → disparaissent de
   // « Ma journée ». Clé = receivedAt|article. Synchronisé entre appareils.
   'vinted_offers_done',
@@ -8451,9 +8454,249 @@ function autoRemplirAttributs(attributs, { titre, marque, taille }) {
   }
   return out;
 }
-function EbayPublier({ onPublie, paires = [], dejaSurEbay = null }) {
+// ════════════════════════════════════════════════════════════════════════════
+// eBay — BROUILLONS ET PLANIFICATEUR (5 octobre)
+// Julien : « tout doit être personnalisable : le nombre d'annonces qu'il peut
+// poster, sélectionner ses brouillons, ce qu'il veut mettre en ligne, etc.
+// Tout doit être parfait. »
+// ⚠️ C'EST eBAY QUI MET EN LIGNE, à l'heure demandée (`<ScheduleTime>`) : VRM
+//    n'a ni file ni minuterie (une publication VRM en son absence ressemblerait
+//    au motif refusé au §3). L'espacement est FIXE, choisi par lui, sans aucun
+//    hasard — ce sont des heures qu'il voit, une par une, avant de confirmer.
+// ════════════════════════════════════════════════════════════════════════════
+
+// ── L'HEURE DE PARIS, explicitement ──────────────────────────────────────────
+// L'écran dit « heure de Paris » : la conversion passe donc par le fuseau
+// Europe/Paris, JAMAIS par l'heure locale du navigateur (un téléphone réglé
+// ailleurs décalerait l'heure promise). Le changement d'heure du 25 octobre
+// 2026 est géré par Intl : 19:00 le samedi = 17:00 UTC, 19:00 le dimanche =
+// 18:00 UTC.
+const FUSEAU_PARIS = 'Europe/Paris';
+let _fmtParis = null;
+function partsParis(ms) {
+  if (!_fmtParis) _fmtParis = new Intl.DateTimeFormat('fr-FR', { timeZone: FUSEAU_PARIS, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+  const o = {};
+  for (const p of _fmtParis.formatToParts(new Date(ms))) o[p.type] = p.value;
+  const y = +o.year, mo = +o.month, d = +o.day, h = (+o.hour) % 24, mi = +o.minute;
+  const pad = (n) => String(n).padStart(2, '0');
+  return { y, mo, d, h, mi, date: `${y}-${pad(mo)}-${pad(d)}`, heure: `${pad(h)}:${pad(mi)}`, jour: new Date(Date.UTC(y, mo - 1, d)).getUTCDay() };
+}
+// « 2026-10-23 » + « 19:00 » (heure de Paris) → instant UTC. TROIS issues :
+// `{ms}` · `{ambigu, ms}` (la nuit du changement d'heure, 02:00–02:59 existe
+// deux fois : `ms` = la première) · `{inexistant}` (l'heure sautée au
+// printemps) · `{invalide}`.
+function parisVersUtc(date, heure) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(date || '')), h = /^(\d{1,2}):(\d{2})$/.exec(String(heure || ''));
+  if (!m || !h) return { invalide: true };
+  const y = +m[1], mo = +m[2], d = +m[3], hh = +h[1], mi = +h[2];
+  if (hh > 23 || mi > 59 || mo < 1 || mo > 12) return { invalide: true };
+  const base = Date.UTC(y, mo - 1, d, hh, mi);
+  if (new Date(base).getUTCDate() !== d) return { invalide: true };
+  const voulu = `${String(hh).padStart(2, '0')}:${String(mi).padStart(2, '0')}`;
+  const ok = [];
+  for (const dec of [1, 2]) { const t = base - dec * 3600000; const p = partsParis(t); if (p.date === `${m[1]}-${m[2]}-${m[3]}` && p.heure === voulu) ok.push(t); }
+  if (!ok.length) return { inexistant: true };
+  if (ok.length > 1) return { ambigu: true, ms: Math.min(...ok) };
+  return { ms: ok[0] };
+}
+// Le jour suivant, dans le calendrier (pas « + 24 h » : après le 25 octobre
+// une journée dure 25 h, et « 18:00 tous les jours » deviendrait 17:00).
+const jourSuivant = (date) => { const [y, mo, d] = date.split('-').map(Number); const t = new Date(Date.UTC(y, mo - 1, d + 1)); return t.toISOString().slice(0, 10); };
+const minutesDe = (hhmm) => { const m = /^(\d{1,2}):(\d{2})$/.exec(String(hhmm || '')); return m ? (+m[1]) * 60 + (+m[2]) : NaN; };
+const JOURS_COURTS = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
+const JOURS_LETTRE = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
+const JOURS_NOM = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+const MOIS_COURTS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+// « ven. 23 oct. » (un jour de Paris, donné « YYYY-MM-DD »).
+const jourParisTexte = (date) => { const [y, mo, d] = String(date).split('-').map(Number); return `${JOURS_COURTS[new Date(Date.UTC(y, mo - 1, d)).getUTCDay()]} ${d} ${MOIS_COURTS[mo - 1]}`; };
+// « ven. 23 oct. à 19:00 » pour un instant.
+const quandParisTexte = (ms) => { const p = partsParis(ms); return `${jourParisTexte(p.date)} à ${p.heure}`; };
+
+// ── LES HEURES D'UN LOT (une fonction PURE du temps, sans aucun hasard) ──────
+// Règle, dans le calendrier de Paris :
+//   · la première annonce part au premier moment AUTORISÉ à partir du départ
+//     (un jour coché, dans la plage « de–à ») ;
+//   · les suivantes, un ÉCART FIXE plus tard (des minutes réelles) ;
+//   · au plus `parJour` par jour ; plage dépassée ou quota du jour atteint ⇒
+//     le prochain jour coché, à l'ouverture de la plage ;
+//   · « Maintenant » : la première part tout de suite (sans programmation) si
+//     le moment est autorisé ; jamais une annonce programmée à moins de
+//     20 minutes (eBay en exige 15 ; 5 de marge pour confirmer) ;
+//   · au-delà de 3 semaines (la limite d'eBay), on s'arrête : les brouillons
+//     restants RESTENT des brouillons, et on dit combien.
+const PLANIF_MIN_MS = 20 * 60 * 1000;
+const PLANIF_HORIZON_MS = 21 * 86400000 - 10 * 60 * 1000;
+function heuresDuLot({ depart, parJour, de, a, jours, ecart, n, maintenant }) {
+  const deMin = minutesDe(de), aMin = minutesDe(a);
+  const pas = Number(ecart), quota = Math.floor(Number(parJour));
+  if (!(Number.isFinite(deMin) && Number.isFinite(aMin) && deMin <= aMin)) return { erreur: 'La plage horaire est mal réglée (« de » doit venir avant « à »).' };
+  if (!(pas >= 1 && quota >= 1)) return { erreur: 'Le rythme est mal réglé.' };
+  if (!Array.isArray(jours) || !jours.some(Boolean)) return { erreur: 'Coche au moins un jour de la semaine.' };
+  const ouverture = (date) => { const r = parisVersUtc(date, de); return r.ms != null ? r.ms : parisVersUtc(date, `${String(Math.min(23, Math.floor(deMin / 60) + 1)).padStart(2, '0')}:${String(deMin % 60).padStart(2, '0')}`).ms; };
+  let cur, immediatPossible = false;
+  if (depart === 'maintenant') { cur = maintenant; immediatPossible = true; }
+  else {
+    const r = parisVersUtc(depart && depart.date, depart && depart.heure);
+    if (r.invalide) return { erreur: 'Choisis une date et une heure de départ.' };
+    if (r.inexistant) return { erreur: 'Cette heure n\'existe pas cette nuit-là (changement d\'heure) — choisis-en une autre.' };
+    if (r.ambigu) return { erreur: 'Cette heure existe deux fois cette nuit-là (changement d\'heure) — choisis-en une autre.' };
+    cur = Math.max(r.ms, maintenant + PLANIF_MIN_MS);
+  }
+  const heures = []; let horsHorizon = 0; let jourCourant = null, nJour = 0, garde = 0;
+  while (heures.length + horsHorizon < n && garde++ < 20000) {
+    if (horsHorizon || cur > maintenant + PLANIF_HORIZON_MS) { horsHorizon++; continue; }
+    const p = partsParis(cur); const min = p.h * 60 + p.mi;
+    if (!jours[p.jour] || min > aMin || (jourCourant === p.date && nJour >= quota)) { cur = ouverture(jourSuivant(p.date)); immediatPossible = false; continue; }
+    if (min < deMin) { cur = ouverture(p.date); immediatPossible = false; continue; }
+    const immediat = immediatPossible && heures.length === 0 && cur === maintenant;
+    if (!immediat && cur < maintenant + PLANIF_MIN_MS) { cur = maintenant + PLANIF_MIN_MS; immediatPossible = false; continue; }
+    if (jourCourant !== p.date) { jourCourant = p.date; nJour = 0; }
+    heures.push({ ms: cur, immediat, date: p.date, heure: p.heure, utc: immediat ? '' : new Date(cur).toISOString() });
+    nJour++; immediatPossible = false;
+    cur += pas * 60000;
+  }
+  return { heures, horsHorizon };
+}
+
+// ── LE RYTHME : un réglage SYNCHRONISÉ, propre à chaque vendeur ───────────────
+// (`vrm_ebay_rythme`, rattrapé par `onCloudReady` seulement s'il est resté au
+// défaut, §5.49). Les préréglages de départ sont modifiables : « Ce soir
+// 20 h » n'est qu'une habitude, pas une mesure.
+const EBAY_ECARTS = [15, 30, 45, 60, 90, 120, 180];
+const EBAY_RYTHME_DEFAUT = {
+  parJour: 3, de: '18:00', a: '21:00', jours: [true, true, true, true, true, true, true], ecart: 30, ordre: 'selection',
+  preregles: [
+    { id: 'maintenant', jour: 'maintenant', heure: '' },
+    { id: 'soir', jour: 'auj', heure: '20:00' },
+    { id: 'demain', jour: 'demain', heure: '12:30' },
+    { id: 'dimanche', jour: 'dow0', heure: '20:00' },
+  ],
+  risqueCompris: false,
+};
+const rythmeEbay = (v) => {
+  const r = { ...EBAY_RYTHME_DEFAUT, ...(v && typeof v === 'object' ? v : {}) };
+  if (!Array.isArray(r.jours) || r.jours.length !== 7) r.jours = EBAY_RYTHME_DEFAUT.jours;
+  if (!Array.isArray(r.preregles) || !r.preregles.length) r.preregles = EBAY_RYTHME_DEFAUT.preregles;
+  return r;
+};
+const libellePreregle = (p) => {
+  if (!p || p.jour === 'maintenant') return 'Maintenant';
+  const h = String(p.heure || '').replace(/^0/, '').replace(':00', ' h').replace(':', ' h ');
+  if (p.jour === 'auj') return (minutesDe(p.heure) >= 17 * 60 ? 'Ce soir ' : 'Aujourd\'hui ') + h;
+  if (p.jour === 'demain') return 'Demain ' + h;
+  const k = /^dow(\d)$/.exec(p.jour || ''); return k ? JOURS_NOM[+k[1]].replace(/^./, (c) => c.toUpperCase()) + ' ' + h : h;
+};
+// Le départ concret d'un préréglage : `'maintenant'` ou `{date, heure}` (Paris).
+function departDePreregle(p, maintenant) {
+  if (!p || p.jour === 'maintenant') return 'maintenant';
+  const auj = partsParis(maintenant).date;
+  if (p.jour === 'auj') return { date: auj, heure: p.heure };
+  if (p.jour === 'demain') return { date: jourSuivant(auj), heure: p.heure };
+  const k = /^dow(\d)$/.exec(p.jour || ''); if (!k) return { date: auj, heure: p.heure };
+  let d = auj;
+  for (let i = 0; i < 8; i++) {
+    const [y, mo, dd] = d.split('-').map(Number);
+    const r = parisVersUtc(d, p.heure);
+    if (new Date(Date.UTC(y, mo - 1, dd)).getUTCDay() === +k[1] && r.ms != null && r.ms > maintenant) return { date: d, heure: p.heure };
+    d = jourSuivant(d);
+  }
+  return { date: auj, heure: p.heure };
+}
+
+// ── LES FRAIS D'eBAY, EN FRANÇAIS ─────────────────────────────────────────────
+// Lus PAR NOM par le serveur (`frais.total` = ListingFee, le total) ; un nom
+// qu'on ne connaît pas s'affiche tel quel plutôt que d'être deviné.
+const NOMS_FRAIS_EBAY = { InsertionFee: 'mise en vente', SchedulingFee: 'programmation', GalleryFee: 'galerie', GalleryPlusFee: 'galerie plus', SubtitleFee: 'sous-titre', BoldFee: 'gras', FeaturedFee: 'mise en avant', InternationalInsertionFee: 'mise en vente internationale', ListingDesignerFee: 'modèle d\'annonce' };
+const eurEbay = (n) => (Math.round(n * 100) / 100).toFixed(2).replace('.', ',') + ' €';
+// Les lignes à montrer pour une vérification : la programmation TOUJOURS (son
+// montant, ou « pas su » quand eBay ne l'a pas annoncée sur une annonce
+// programmée), la mise en vente, puis tout autre frais non nul.
+function lignesFraisEbay(frais, programmee) {
+  const f = frais || {};
+  const out = [];
+  if (programmee) out.push({ cle: 'programmation', nom: 'programmation', montant: f.programmation == null ? null : f.programmation });
+  out.push({ cle: 'insertion', nom: 'mise en vente', montant: f.insertion == null ? null : f.insertion });
+  for (const l of (f.lignes || [])) if (!/^(InsertionFee|Schedul)/i.test(l.nom)) out.push({ cle: l.nom, nom: NOMS_FRAIS_EBAY[l.nom] || l.nom, montant: l.montant });
+  return out;
+}
+
+// ── LES BROUILLONS eBAY : une ligne DÉDIÉE par vendeur (`ebay_brouillons`) ───
+// Jamais dans `main` (la ligne la plus lue du projet, §4.4). Lue projetée.
+// TROIS états : `null` = pas su (la base n'a pas répondu) · un objet = lu
+// (vide si aucun brouillon). Une modification relit, fusionne, réécrit — et
+// n'écrit RIEN si la lecture a échoué : repartir d'un objet vide effacerait
+// tous ses brouillons (la famille « lecture KO, écriture OK », §5).
+async function lireBrouillonsEbay() {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.ebay_brouillons&select=items:data->items`, { headers: sbAuth() });
+    if (!r.ok) return null;
+    const rows = await r.json();
+    if (!Array.isArray(rows)) return null;
+    const it = rows[0] && rows[0].items;
+    return (it && typeof it === 'object' && !Array.isArray(it)) ? it : {};
+  } catch (_) { return null; }
+}
+async function modifierBrouillonsEbay(changer) {
+  const cur = await lireBrouillonsEbay();
+  if (cur === null) return { ok: false, raison: 'lecture' };
+  let items;
+  try { items = changer({ ...cur }); } catch (_) { return { ok: false, raison: 'erreur' }; }
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
+      method: 'POST',
+      headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }),
+      body: JSON.stringify([withOwner({ id: 'ebay_brouillons', data: { items, majAt: Date.now() } })]),
+    });
+    return r.ok ? { ok: true, items } : { ok: false, raison: 'ecriture' };
+  } catch (_) { return { ok: false, raison: 'ecriture' }; }
+}
+const idBrouillonEbay = () => { try { if (crypto && crypto.randomUUID) return 'b-' + crypto.randomUUID().slice(0, 13); } catch (_) {} return 'b-' + Date.now().toString(36); };
+// L'identifiant d'ENVOI (32 hex) : eBay refuse un second ajout portant le même
+// (488) — c'est ce qui empêche une coupure réseau de créer deux annonces.
+const uuidEnvoiEbay = () => { try { if (crypto && crypto.randomUUID) return crypto.randomUUID().replace(/-/g, '').toUpperCase(); } catch (_) {} const h = () => Math.floor(Date.now() * 1000 % 65536).toString(16).padStart(4, '0'); return (Date.now().toString(16) + h() + h() + h() + h() + h()).toUpperCase().slice(0, 32).padEnd(32, '0'); };
+// Un brouillon → l'annonce qui part chez eBay. UNE règle pour le formulaire
+// (« Vérifier », « Publier ») ET la liste des brouillons (§11) : impossible de
+// vérifier autre chose que ce qu'on programme.
+function itemDeBrouillon(d) {
+  if (!d) return { err: 'Brouillon introuvable.' };
+  const cat = d.categorie || {};
+  if (!cat.id) return { err: 'Choisis la catégorie eBay.' };
+  const asp = d.aspects || {};
+  const manquants = (cat.requis || []).filter((n) => !String(asp[n] || '').trim());
+  if (manquants.length) return { err: 'À compléter : ' + manquants.join(', ') };
+  const urls = (d.photos || []).map((s) => String(s || '').trim()).filter((s) => /^https?:\/\//.test(s));
+  if (!urls.length) return { err: 'Choisis une paire — ses photos partent avec l\'annonce.' };
+  if (!String(d.prix == null ? '' : d.prix).trim()) return { err: 'Mets un prix.' };
+  // L'IDENTITÉ de la paire part avec l'annonce : le serveur en fait le SKU
+  // `VRM-{n°}` (§5). Un numéro illisible ne part pas : mieux vaut pas de lien
+  // qu'un faux.
+  const numero = d.numero && skuEbayDe(d.numero) ? cleNum(d.numero) : '';
+  return { item: { title: d.titre, categoryId: cat.id, price: String(d.prix).replace(',', '.'), quantity: d.quantite || '1', conditionId: d.etat || '3000', description: d.description || d.titre, photos: urls, aspects: asp, ebayGere: true, ...(numero ? { numero } : {}) } };
+}
+// Ce qui rend une vérification caduque : l'annonce OU l'heure ont changé.
+const cleVerifEbay = (item, utc) => { try { return JSON.stringify([item, utc || '']); } catch (_) { return ''; } };
+// Un appel à la route eBay, qui ne lève jamais : `{ code, j }` — `code` 0 =
+// réseau coupé (la requête a pu arriver), `j` null = réponse illisible (une
+// page d'erreur de Vercel n'est pas du JSON).
+async function appelEbay(corps) {
+  try {
+    const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify(corps) });
+    let j = null; try { j = await r.json(); } catch (_) {}
+    return { code: r.status, j };
+  } catch (_) { return { code: 0, j: null }; }
+}
+
+// `brouillon` (5 octobre) : un brouillon à rouvrir pour le modifier ; il
+// remplit le formulaire. `onBrouillon` : appelé après un enregistrement.
+function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = null, onBrouillon }) {
   const C = EBAY_SKIN;   // peau eBay : tout ce formulaire est au look de l'appli eBay (§ ci-dessus)
   const [ouvert, setOuvert] = React.useState(false);
+  // ── LE BROUILLON EN COURS (5 octobre) ──
+  const [brouillonId, setBrouillonId] = React.useState(null);     // null = nouvelle annonce
+  const [numeroBrouillon, setNumeroBrouillon] = React.useState(''); // le N° gardé si la paire n'est plus listée
+  const [brouillonMsg, setBrouillonMsg] = React.useState('');
+  const [enregistre, setEnregistre] = React.useState(false);
+  const racine = React.useRef(null);
   const [titre, setTitre] = React.useState('');
   const [prix, setPrix] = React.useState('');
   const [qty, setQty] = React.useState('1');
@@ -8535,8 +8778,9 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null }) {
   // Applique une réponse pubinfo → catégorie + caractéristiques eBay + pré-
   // remplissage prouvé. `nomForce` sert quand on CHOISIT une autre catégorie
   // (eBay renvoie toujours la 1ʳᵉ suggestion en `suggeree`, on garde le nom cliqué).
-  const appliquerPubinfo = (j, nomForce, fresh) => {
-    if (!(j && j.ok && (j.categorie && (j.categorie.categoryId || j.categorie.suggeree)))) { setRes({ err: (j && j.error) || 'eBay n\'a pas suggéré de catégorie pour ce titre.' }); return; }
+  // La catégorie telle qu'eBay la décrit (pubinfo), ou null.
+  const catDepuisPubinfo = (j, nomForce) => {
+    if (!(j && j.ok && (j.categorie && (j.categorie.categoryId || j.categorie.suggeree)))) return null;
     const attributs = Array.isArray(j.attributs) && j.attributs.length
       ? j.attributs
       : (j.attributsObligatoires || []).map(n => ({ nom: n, requis: true, mode: 'FREE_TEXT', valeurs: [] }));
@@ -8544,7 +8788,13 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null }) {
     const catId = (j.categorie && j.categorie.categoryId) || (j.categorie && j.categorie.suggeree && j.categorie.suggeree.categoryId) || '';
     const catNom = nomForce || (j.categorie && j.categorie.suggeree && j.categorie.suggeree.categoryName) || catId;
     const conditions = Array.isArray(j.conditions) && j.conditions.length ? j.conditions : null;
-    setCat({ categoryId: catId, categoryName: catNom, required, attributs, cats: Array.isArray(j.categories) ? j.categories : [], conditions });
+    return { categoryId: catId, categoryName: catNom, required, attributs, cats: Array.isArray(j.categories) ? j.categories : [], conditions };
+  };
+  const appliquerPubinfo = (j, nomForce, fresh) => {
+    const c = catDepuisPubinfo(j, nomForce);
+    if (!c) { setRes({ err: (j && j.error) || 'eBay n\'a pas suggéré de catégorie pour ce titre.' }); return; }
+    const { attributs, conditions } = c;
+    setCat(c);
     // Si eBay donne SA liste d'états pour cette catégorie et que l'état courant
     // n'y est pas, on prend « Occasion » (3000) si présent, sinon le premier.
     if (conditions && !conditions.some(c => c.id === cond)) {
@@ -8569,23 +8819,64 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null }) {
     } catch (_) { setRes({ err: 'Analyse impossible (réseau).' }); }
     setAnalyse(false);
   };
+  // Le formulaire, sous la forme d'un BROUILLON (5 octobre) : c'est ce qui est
+  // enregistré, et c'est de lui que part l'annonce — `itemDeBrouillon`, la
+  // MÊME règle que la liste des brouillons (§11). ebayGere: eBay gère la
+  // livraison (mesuré : son compte refuse un tarif fixe envoyé par l'API).
+  const brouillonCourant = () => ({
+    pairId: pairId || null,
+    numero: pairSel ? pairSel.num : numeroBrouillon,
+    titre, prix, quantite: qty, etat: cond, description: desc,
+    photos: photos.split(/\s+/).map(s => s.trim()).filter(s => /^https?:\/\//.test(s)),
+    categorie: cat ? { id: cat.categoryId, nom: cat.categoryName, requis: cat.required || [] } : null,
+    aspects: asp,
+    cover: (pairSel && pairSel.cover) || null,
+  });
   // Construit le payload OU dit ce qui manque — une seule règle pour vérifier
   // ET publier (§11) : impossible de vérifier autre chose que ce qu'on publie.
-  const buildItem = () => {
-    const manquants = (cat.required || []).filter(n => !String(asp[n] || '').trim());
-    if (manquants.length) return { err: 'À compléter : ' + manquants.join(', ') };
-    const urls = photos.split(/\s+/).map(s => s.trim()).filter(s => /^https?:\/\//.test(s));
-    if (!urls.length) return { err: 'Choisis une paire — ses photos partent avec l\'annonce.' };
-    if (!prix.trim()) return { err: 'Mets un prix.' };
-    // ebayGere: eBay gère la livraison (mesuré : son compte refuse un tarif fixe
-    // envoyé par l'API). VRM n'impose aucun port ; eBay applique sa livraison gérée.
-    // L'IDENTITÉ de la paire part avec l'annonce (5 octobre) : le serveur en
-    // fait le SKU `VRM-{n°}`, et c'est ce SKU qui permet ensuite de dire
-    // « vendue sur Vinted → retire-la d'eBay » sans jamais comparer un titre
-    // (§5). Un numéro illisible ne part pas : mieux vaut pas de lien qu'un faux.
-    const numero = pairSel && skuEbayDe(pairSel.num) ? cleNum(pairSel.num) : '';
-    return { item: { title: titre, categoryId: cat.categoryId, price: String(prix).replace(',', '.'), quantity: qty, conditionId: cond, description: desc || titre, photos: urls, aspects: asp, ebayGere: true, ...(numero ? { numero } : {}) } };
+  const buildItem = () => itemDeBrouillon(brouillonCourant());
+  // ── ENREGISTRER EN BROUILLON : rien ne part chez eBay ─────────────────────
+  // Relire-fusionner-écrire sur SA ligne `ebay_brouillons` ; une lecture ratée
+  // n'écrit RIEN (sinon ses autres brouillons seraient effacés) — et on le dit.
+  const enregistrerBrouillon = async () => {
+    if (!titre.trim()) { setBrouillonMsg('Mets au moins un titre pour l\'enregistrer.'); return; }
+    setEnregistre(true); setBrouillonMsg('');
+    const id = brouillonId || idBrouillonEbay();
+    const maintenant = Date.now();
+    const r = await modifierBrouillonsEbay((items) => {
+      const avant = items[id] || {};
+      items[id] = { ...avant, ...brouillonCourant(), id, creeLe: avant.creeLe || maintenant, majLe: maintenant, etatBrouillon: 'brouillon', verif: null, envoi: null };
+      return items;
+    });
+    setEnregistre(false);
+    if (r.ok) { setBrouillonId(id); setBrouillonMsg('✓ Brouillon enregistré — rien n\'est parti chez eBay.'); if (onBrouillon) onBrouillon(r.items); }
+    else setBrouillonMsg(r.raison === 'lecture' ? 'Je n\'ai pas pu relire tes brouillons — rien n\'a été enregistré (tes brouillons sont intacts). Réessaie dans un instant.' : 'L\'enregistrement a échoué — réessaie dans un instant.');
   };
+  // ── ROUVRIR UN BROUILLON ───────────────────────────────────────────────────
+  React.useEffect(() => {
+    if (!brouillon || !brouillon.id) return;
+    const d = brouillon;
+    setBrouillonId(d.id); setNumeroBrouillon(d.numero ? String(d.numero) : '');
+    setPairId(d.pairId || null); setPickerOpen(false);
+    setTitre(String(d.titre || '')); setPrix(String(d.prix == null ? '' : d.prix)); setQty(String(d.quantite || '1'));
+    setCond(String(d.etat || '3000')); setDesc(String(d.description || '')); setPhotos((d.photos || []).join('\n'));
+    setAsp(d.aspects || {}); setRes(null); setCheck(null); setBrouillonMsg('');
+    const c0 = d.categorie && d.categorie.id ? d.categorie : null;
+    if (c0) {
+      const requis = c0.requis || [];
+      const autres = Object.keys(d.aspects || {}).filter((n) => !requis.includes(n));
+      setCat({ categoryId: c0.id, categoryName: c0.nom || c0.id, required: requis, attributs: [...requis.map((n) => ({ nom: n, requis: true, mode: 'FREE_TEXT', valeurs: [] })), ...autres.map((n) => ({ nom: n, requis: false, mode: 'FREE_TEXT', valeurs: [] }))], cats: [], conditions: null });
+    } else setCat(null);
+    setOuvert(true);
+    try { setTimeout(() => { if (racine.current && racine.current.scrollIntoView) racine.current.scrollIntoView({ block: 'start', behavior: 'smooth' }); }, 60); } catch (_) {}
+    // Les listes de valeurs d'eBay (pour les menus) se rechargent à côté ; ses
+    // valeurs à lui ne sont jamais remplacées.
+    if (c0 && d.titre) {
+      let stop = false;
+      appelEbay({ action: 'pubinfo', title: d.titre, categoryId: c0.id }).then(({ j }) => { if (stop) return; const c = catDepuisPubinfo(j, c0.nom); if (c) setCat(c); });
+      return () => { stop = true; };
+    }
+  }, [brouillon]);
   // VÉRIFIER À BLANC (VerifyAddFixedPriceItem) : eBay valide exactement ce qu'on
   // publierait et renvoie les frais, SANS rien créer. Le filet pour la première
   // publication — les refus (attribut, photo) remontent avant d'engager.
@@ -8595,7 +8886,8 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null }) {
     try {
       const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'pubverify', item: b.item }) });
       const j = await r.json();
-      if (j && j.ok) setCheck({ ok: true, fees: j.fees });
+      // Les frais LUS PAR NOM (le total est `ListingFee`, jamais une somme).
+      if (j && j.ok) setCheck({ ok: true, fees: j.fees, frais: j.frais || null });
       else setCheck({ err: (j && j.error) || 'eBay refuserait cette annonce.' });
     } catch (_) { setCheck({ err: 'Vérification impossible (réseau).' }); }
     setVerif(false);
@@ -8606,7 +8898,11 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null }) {
     try {
       const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'publish', item: b.item }) });
       const j = await r.json();
-      if (j && j.ok) { setRes({ ok: true, url: j.url, itemId: j.itemId, sku: j.sku || null }); if (onPublie) onPublie(); }
+      if (j && j.ok) {
+        setRes({ ok: true, url: j.url, itemId: j.itemId, sku: j.sku || null }); if (onPublie) onPublie();
+        // Publiée depuis un brouillon : il sort de la liste des brouillons.
+        if (brouillonId) { const id = brouillonId; modifierBrouillonsEbay((items) => { if (items[id]) items[id] = { ...items[id], etatBrouillon: 'en-ligne', programme: { itemId: j.itemId, debut: null, demande: null, at: Date.now() } }; return items; }).then((w) => { if (w.ok && onBrouillon) onBrouillon(w.items); }); }
+      }
       else setRes({ err: (j && j.error) || 'eBay a refusé la publication.' });
     } catch (_) { setRes({ err: 'Publication impossible (réseau).' }); }
     setBusy(false);
@@ -8619,7 +8915,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null }) {
   // eyebrow numéroté + carte. §7 : une seule teinte d'accent, rayons 10/12.
   const urls = photos.split(/\s+/).map(s => s.trim()).filter(s => /^https?:\/\//.test(s));
   const setUrls = (arr) => { setPhotos(arr.join('\n')); setCheck(null); };
-  const reset = () => { setOuvert(false); setRes(null); setCheck(null); setTitre(''); setPrix(''); setCat(null); setAsp({}); setPhotos(''); setDesc(''); setPairId(null); };
+  const reset = () => { setOuvert(false); setRes(null); setCheck(null); setTitre(''); setPrix(''); setCat(null); setAsp({}); setPhotos(''); setDesc(''); setPairId(null); setBrouillonId(null); setNumeroBrouillon(''); setBrouillonMsg(''); };
   const listePaires = paires.filter(p => { const q = pairQ.trim().toLowerCase(); return !q || p.num.includes(q) || (p.title || '').toLowerCase().includes(q) || String(p.taille).toLowerCase().includes(q); });
   const eur = (n) => (Math.round(n * 100) / 100).toFixed(2).replace('.', ',') + ' €';
   const condLabel = (EBAY_CONDITIONS.find(([v]) => v === cond) || [, 'Occasion'])[1];
@@ -8629,13 +8925,13 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null }) {
     </button>
   );
   return (
-    <div style={{ marginTop: 10, border: `1px solid ${C.border}`, borderRadius: 14, background: C.bg || C.card, overflow: 'hidden', boxShadow: C.shadow }}>
+    <div ref={racine} data-publier-brouillon-id={brouillonId || ''} style={{ marginTop: 10, border: `1px solid ${C.border}`, borderRadius: 14, background: C.bg || C.card, overflow: 'hidden', boxShadow: C.shadow, scrollMarginTop: 12 }}>
       {/* En-tête façon feuille de vente eBay */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px', background: C.card, borderBottom: `1px solid ${C.border}` }}>
         <span style={{ flexShrink: 0, width: 32, height: 32, borderRadius: 9, background: `${C.accent}15`, color: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="tag" size={17}/></span>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 15, fontWeight: 800, color: C.text }}>Vendre sur eBay</div>
-          <div style={{ fontSize: 11.5, color: C.muted }}>Ton annonce, comme sur eBay — vérifiée avant publication</div>
+          <div style={{ fontSize: 11.5, color: C.muted }}>{brouillonId ? 'Brouillon enregistré — modifie-le, enregistre-le ou publie-le' : 'Ton annonce, comme sur eBay — vérifiée avant publication'}</div>
         </div>
         <button type="button" onClick={() => setOuvert(false)} aria-label="Fermer" style={{ flexShrink: 0, border: 'none', background: 'transparent', color: C.muted, fontSize: 22, cursor: 'pointer', lineHeight: 1 }}>×</button>
       </div>
@@ -8817,7 +9113,9 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null }) {
             </BlocEbay>
 
             {/* Vérif à blanc : eBay contrôle tout et donne les frais, sans rien créer. */}
-            {check && check.ok && <div style={{ fontSize: 12.5, color: C.text, background: `${C.accent}10`, border: `1px solid ${C.accent}`, borderRadius: 10, padding: '10px 12px', lineHeight: 1.5 }}>✓ <b>eBay accepterait cette annonce.</b>{check.fees != null ? ` Frais eBay estimés : ${eur(check.fees)}.` : ''} Tu peux publier.</div>}
+            {/* Les frais LUS PAR NOM (5 octobre) : le total est `ListingFee`,
+                jamais la somme de tous les frais (elle doublait). Absent ⇒ « — ». */}
+            {check && check.ok && <div data-publier-frais={check.fees == null ? 'pas-su' : String(check.fees)} style={{ fontSize: 12.5, color: C.text, background: `${C.accent}10`, border: `1px solid ${C.accent}`, borderRadius: 10, padding: '10px 12px', lineHeight: 1.5 }}>✓ <b>eBay accepterait cette annonce.</b> Frais annoncés par eBay : {lignesFraisEbay(check.frais, false).map((l) => `${l.nom} ${l.montant == null ? '—' : eurEbay(l.montant)}`).join(' · ')} · <b>total {check.fees == null ? '— (eBay ne l\'a pas annoncé)' : eurEbay(check.fees)}</b>. Tu peux publier.</div>}
             {check && check.err && <div style={{ fontSize: 12.5, color: C.warn, background: `${C.warn}12`, border: `1px solid ${C.warn}`, borderRadius: 10, padding: '10px 12px', lineHeight: 1.5 }}>⚠️ eBay signale : {check.err}<br /><span style={{ color: C.muted }}>Rien n'a été publié — corrige et revérifie.</span></div>}
 
             <div className="vrm-rangee" style={{ display: 'flex', gap: 10 }}>
@@ -8825,6 +9123,16 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null }) {
               <button type="button" onClick={publier} disabled={busy || verif} style={{ flex: 1, border: 'none', background: C.accent, color: '#fff', borderRadius: 999, padding: '14px 16px', fontSize: 14, fontWeight: 700, cursor: (busy || verif) ? 'default' : 'pointer', fontFamily: 'inherit', opacity: (busy || verif) ? 0.6 : 1 }}>{busy ? 'Publication…' : 'Publier sur eBay'}</button>
             </div>
           </>)}
+          {/* ENREGISTRER EN BROUILLON (5 octobre) : rien ne part chez eBay. Il
+              le retrouve dans « Brouillons », pour le reprendre ou le
+              programmer plus tard. Possible dès qu'il y a un titre. */}
+          {titre.trim() && (
+            <button type="button" data-publier-brouillon={brouillonId || 'nouveau'} onClick={enregistrerBrouillon} disabled={enregistre || busy}
+              style={{ width: '100%', border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 999, padding: '12px 16px', fontSize: 14, fontWeight: 700, cursor: (enregistre || busy) ? 'default' : 'pointer', fontFamily: 'inherit', opacity: (enregistre || busy) ? 0.6 : 1 }}>
+              {enregistre ? 'Enregistrement…' : (brouillonId ? 'Mettre à jour le brouillon' : 'Enregistrer en brouillon')}
+            </button>
+          )}
+          {brouillonMsg && <div data-brouillon-msg="1" style={{ fontSize: 12.5, color: /^✓/.test(brouillonMsg) ? C.text : C.warn, lineHeight: 1.5 }}>{brouillonMsg}</div>}
         </div>
       </>)}
       {res && res.err && <div style={{ fontSize: 12.5, color: C.danger, margin: '0 14px 14px', lineHeight: 1.5 }}>{res.err}</div>}
@@ -9399,6 +9707,542 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
     </div>
   );
 }
+// ── eBay → Annonces · BROUILLONS (5 octobre) ─────────────────────────────────
+// Ses annonces eBay prêtes mais pas parties : on en coche une, plusieurs ou
+// toutes, on les VÉRIFIE chez eBay (à blanc : rien n'est créé, les frais
+// remontent par nom), puis on les PROGRAMME. Ce qui manque est dit brouillon
+// par brouillon — la MÊME règle que le formulaire (`itemDeBrouillon`, §11).
+function EbayBrouillons({ brouillons, connected, paires = [], onModifier, onPlanifier, onBrouillons }) {
+  const E = EBAY_SKIN;
+  const [choix, setChoix] = React.useState(() => new Set());
+  const [verifs, setVerifs] = React.useState({});      // id → {etat:'en-cours'|'ok'|'refus'|'erreur', frais, err, cle}
+  const [busy, setBusy] = React.useState(false);
+  const [msg, setMsg] = React.useState('');
+  const liste = React.useMemo(() => {
+    if (!brouillons || typeof brouillons !== 'object') return [];
+    return Object.values(brouillons).filter((d) => d && d.id && (!d.etatBrouillon || d.etatBrouillon === 'brouillon'))
+      .sort((a, b) => (b.majLe || 0) - (a.majLe || 0));
+  }, [brouillons]);
+  // Les coches suivent la liste : un brouillon parti (programmé, supprimé)
+  // n'est plus coché en douce.
+  const ids = liste.map((d) => d.id);
+  const coches = ids.filter((id) => choix.has(id));
+  const couverture = (d) => d.cover || (d.photos || [])[0] || (paires.find((p) => p.id === d.pairId) || {}).cover || '';
+  const basculer = (id) => setChoix((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const tout = () => setChoix((s) => (coches.length === ids.length ? new Set() : new Set(ids)));
+  // VÉRIFIER LA SÉLECTION : une vérification à blanc PAR brouillon, l'une après
+  // l'autre (on attend chaque réponse). Le résultat est gardé dans le
+  // brouillon (une écriture à la fin, jamais sur une lecture ratée).
+  const verifierSelection = async () => {
+    const lot = liste.filter((d) => choix.has(d.id));
+    if (!lot.length) return;
+    setBusy(true); setMsg('');
+    const res = {};
+    for (const d of lot) {
+      const b = itemDeBrouillon(d);
+      if (b.err) { res[d.id] = { etat: 'refus', err: b.err, at: Date.now() }; setVerifs((v) => ({ ...v, [d.id]: res[d.id] })); continue; }
+      setVerifs((v) => ({ ...v, [d.id]: { etat: 'en-cours' } }));
+      const r = await appelEbay({ action: 'pubverify', item: b.item });
+      const j = r.j;
+      res[d.id] = (j && j.ok) ? { etat: 'ok', frais: j.frais || null, fees: j.fees == null ? null : j.fees, cle: cleVerifEbay(b.item, ''), at: Date.now() }
+        : (r.code === 200 && j) ? { etat: 'refus', err: j.error || 'eBay refuserait cette annonce.', at: Date.now() }
+        : { etat: 'erreur', err: (j && j.error) || 'eBay n\'a pas répondu — réessaie.', at: Date.now() };
+      setVerifs((v) => ({ ...v, [d.id]: res[d.id] }));
+    }
+    const w = await modifierBrouillonsEbay((items) => { for (const id in res) if (items[id]) items[id] = { ...items[id], verif: res[id] }; return items; });
+    if (w.ok) { if (onBrouillons) onBrouillons(w.items); }
+    else setMsg('Vérifié, mais je n\'ai pas pu garder le résultat dans tes brouillons (la base n\'a pas répondu).');
+    setBusy(false);
+  };
+  const supprimer = async (d) => {
+    const ok = await askConfirm({ title: `Supprimer le brouillon « ${d.titre || 'sans titre'} » ?`, desc: 'Rien n\'est parti chez eBay : seul ce brouillon disparaît de VRM.', ok: 'Oui, supprimer', cancel: 'Annuler', danger: true });
+    if (!ok) return;
+    const w = await modifierBrouillonsEbay((items) => { delete items[d.id]; return items; });
+    if (w.ok) { setChoix((s) => { const n = new Set(s); n.delete(d.id); return n; }); if (onBrouillons) onBrouillons(w.items); }
+    else setMsg(w.raison === 'lecture' ? 'Je n\'ai pas pu relire tes brouillons — rien n\'a été supprimé.' : 'La suppression a échoué — réessaie.');
+  };
+  const etatListe = brouillons === undefined ? 'charge' : brouillons === null ? 'pas-su' : 'lu';
+  const btn = { border: `1px solid ${E.border}`, background: 'transparent', color: E.text, borderRadius: 8, padding: '8px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' };
+  if (etatListe === 'lu' && !liste.length) return <div data-ebay-brouillons="lu" data-nb="0" style={{ fontSize: 12, color: E.muted, margin: '12px 2px 0', lineHeight: 1.5 }}>Aucun brouillon eBay. Prépare une annonce ci-dessus et « Enregistrer en brouillon » : tu pourras la vérifier, puis la programmer.</div>;
+  return (
+    <div data-ebay-brouillons={etatListe} data-nb={liste.length} style={{ background: E.card, border: `1px solid ${E.border}`, borderRadius: 14, padding: '12px 14px', marginTop: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
+        <span style={{ flex: '1 1 auto', fontSize: 16, fontWeight: 800, color: E.text }}>Brouillons{liste.length ? ` (${liste.length})` : ''}</span>
+        {liste.length > 1 && <button type="button" data-brouillons-tout="1" onClick={tout} style={{ ...btn, border: 'none', padding: '4px 0', color: E.accentSoft }}>{coches.length === ids.length ? 'Tout désélectionner' : 'Tout sélectionner'}</button>}
+      </div>
+      {etatListe === 'charge' && <div style={{ fontSize: 12.5, color: E.muted }}>Chargement…</div>}
+      {etatListe === 'pas-su' && <div style={{ fontSize: 12.5, color: E.warn, lineHeight: 1.5 }}>Je n'ai pas pu lire tes brouillons — rien n'est perdu, c'est la lecture qui a échoué. Rouvre l'écran dans un moment.</div>}
+      {liste.map((d, i) => {
+        const b = itemDeBrouillon(d);
+        const v0 = verifs[d.id] || d.verif || null;
+        const cle = b.item ? cleVerifEbay(b.item, '') : '';
+        // Une vérification ne vaut que pour l'annonce TELLE QU'ELLE EST : un
+        // brouillon modifié depuis redevient « à vérifier ».
+        const v = v0 && (v0.etat !== 'ok' || v0.cle === cle) ? v0 : null;
+        const etat = b.err ? 'incomplet' : v ? (v.etat === 'en-cours' ? 'verif-en-cours' : v.etat === 'ok' ? 'verifie' : 'refuse') : 'a-verifier';
+        const coche = choix.has(d.id);
+        return (
+          <div key={d.id} data-brouillon={d.id} data-brouillon-etat={etat} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '10px 0', borderTop: i ? `1px solid ${E.border}` : 'none' }}>
+            <input type="checkbox" checked={coche} onChange={() => basculer(d.id)} data-brouillon-choix={d.id} aria-label={`Choisir ${d.titre || 'ce brouillon'}`} style={{ width: 20, height: 20, marginTop: 14, flexShrink: 0, accentColor: E.accent }} />
+            <PhotoVente src={couverture(d)} size={48} />
+            <div style={{ flex: '1 1 auto', minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: E.text, lineHeight: 1.3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{d.numero ? <b>N°{cleNum(d.numero)} · </b> : null}{d.titre || '(sans titre)'}</div>
+              <div style={{ fontSize: 11.5, color: E.muted, marginTop: 2 }}>{d.prix ? eurEbay(Number(String(d.prix).replace(',', '.')) || 0) : 'prix —'}{d.categorie && d.categorie.nom ? ` · ${String(d.categorie.nom).split(':').pop()}` : ''}{!d.numero ? <span style={{ color: E.warn }}> · pas de N°</span> : null}</div>
+              {d.envoi && d.envoi.ok === false && <div data-brouillon-echec={d.id} style={{ fontSize: 11.5, color: E.warn, marginTop: 3, lineHeight: 1.45 }}>Échec de la programmation : {d.envoi.err}</div>}
+              {b.err ? <div style={{ fontSize: 11.5, color: E.warn, marginTop: 3, lineHeight: 1.45 }}>{b.err}</div>
+                : etat === 'verif-en-cours' ? <div style={{ fontSize: 11.5, color: E.muted, marginTop: 3 }}>eBay vérifie…</div>
+                : etat === 'verifie' ? <div data-brouillon-frais={v.fees == null ? 'pas-su' : String(v.fees)} style={{ fontSize: 11.5, color: E.text, marginTop: 3, lineHeight: 1.45 }}>✓ eBay l'accepterait · {lignesFraisEbay(v.frais, false).map((l) => `${l.nom} ${l.montant == null ? '—' : eurEbay(l.montant)}`).join(' · ')} · total {v.fees == null ? '— (pas annoncé)' : eurEbay(v.fees)}</div>
+                : etat === 'refuse' ? <div data-brouillon-refus={d.id} style={{ fontSize: 11.5, color: E.warn, marginTop: 3, lineHeight: 1.45 }}>⚠️ {v.err}</div>
+                : null}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
+              <button type="button" data-brouillon-modifier={d.id} onClick={() => onModifier && onModifier(d)} style={btn}>Modifier</button>
+              <button type="button" data-brouillon-supprimer={d.id} onClick={() => supprimer(d)} aria-label="Supprimer ce brouillon" style={btn}>Supprimer</button>
+            </div>
+          </div>
+        );
+      })}
+      {liste.length > 0 && (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+          <button type="button" data-brouillons-verifier={coches.length} disabled={busy || !coches.length || connected !== true} onClick={verifierSelection}
+            style={{ ...btn, flex: '1 1 160px', maxWidth: 320, padding: '11px 14px', opacity: (busy || !coches.length || connected !== true) ? 0.5 : 1 }}>{busy ? 'eBay vérifie…' : `Vérifier la sélection${coches.length ? ` (${coches.length})` : ''}`}</button>
+          <button type="button" data-brouillons-programmer={coches.length} disabled={busy || !coches.length || connected !== true} onClick={() => onPlanifier && onPlanifier(coches)}
+            style={{ ...btn, flex: '1 1 160px', maxWidth: 320, padding: '11px 14px', border: 'none', background: E.accent, color: '#fff', opacity: (busy || !coches.length || connected !== true) ? 0.5 : 1 }}>{`Programmer la sélection${coches.length ? ` (${coches.length})` : ''}`}</button>
+        </div>
+      )}
+      {liste.length > 0 && connected !== true && <div style={{ fontSize: 11.5, color: E.muted, marginTop: 6 }}>{connected === false ? 'Relie ton compte eBay (onglet « Compte eBay ») pour vérifier et programmer.' : connected === null ? 'Je n\'ai pas pu savoir si ton compte eBay est relié — rouvre l\'écran dans un moment.' : ''}</div>}
+      {msg && <div style={{ fontSize: 12, color: E.warn, marginTop: 8, lineHeight: 1.45 }}>{msg}</div>}
+    </div>
+  );
+}
+
+// ── LE PLANIFICATEUR (5 octobre) ─────────────────────────────────────────────
+// « Programmer la sélection » : il règle TOUT — le départ (préréglages qu'il
+// modifie, ou une date et une heure), le nombre par jour, la plage horaire,
+// les jours, l'écart fixe entre deux annonces, l'ordre. L'aperçu donne
+// l'heure EXACTE de chaque paire (heure de Paris), puis les frais LUS chez
+// eBay pour CETTE heure, avant la moindre confirmation.
+// ⚠️ Ce qu'on ne peut pas prouver est DIT, jamais promis : l'annulation d'une
+//    annonce programmée par l'API n'est pas garantie, et une paire vendue
+//    ailleurs avant son heure peut quand même partir. Il le lit et coche
+//    « j'ai compris » avant sa PREMIÈRE programmation — c'est sa décision.
+function EbayPlanificateur({ brouillons = [], annoncesEbay, programmees, vendusVinted, onFermer, onBrouillons, onFini }) {
+  const E = EBAY_SKIN;
+  const [rythme, setRythmeBrut] = React.useState(() => rythmeEbay(load('vrm_ebay_rythme', null)));
+  // §5.49 : un réglage synchronisé lu au montage — rattrapé à l'arrivée du
+  // nuage, et seulement s'il est resté au défaut (jamais par-dessus un choix).
+  React.useEffect(() => onCloudReady(() => {
+    setRythmeBrut((r) => (JSON.stringify(r) === JSON.stringify(rythmeEbay(null)) ? rythmeEbay(load('vrm_ebay_rythme', null)) : r));
+  }), []);
+  const changerRythme = (patch) => { const n = rythmeEbay({ ...rythme, ...patch }); setRythmeBrut(n); save('vrm_ebay_rythme', n); };
+  const [maintenant, setMaintenant] = React.useState(() => Date.now());
+  React.useEffect(() => { const t = setInterval(() => setMaintenant(Date.now()), 30000); return () => clearInterval(t); }, []);
+  const [depart, setDepart] = React.useState(() => ({ mode: 'preset', id: (rythme.preregles[0] || {}).id || 'maintenant' }));
+  const [editPre, setEditPre] = React.useState(false);
+  const [verifs, setVerifs] = React.useState({});
+  const [verifEnCours, setVerifEnCours] = React.useState(false);
+  const [limites, setLimites] = React.useState(undefined);   // undefined · null · {quantite, montant, devise} · {reason:'scope'}
+  const [compris, setCompris] = React.useState(false);
+  const [envoi, setEnvoi] = React.useState(null);            // {en: n/total} pendant · {bilan} après
+  React.useEffect(() => { let stop = false;
+    appelEbay({ action: 'limites' }).then(({ j }) => { if (stop) return; setLimites(j && j.ok ? j : (j && j.reason === 'scope' ? { reason: 'scope' } : null)); });
+    return () => { stop = true; }; }, []);
+
+  // ── Ce qui peut partir, et pourquoi pas le reste ──
+  const skusEnLigne = React.useMemo(() => new Set((Array.isArray(annoncesEbay) ? annoncesEbay : []).map((a) => a && a.sku).filter(Boolean)), [annoncesEbay]);
+  const progParSku = React.useMemo(() => { const m = new Map(); for (const p of (Array.isArray(programmees) ? programmees : [])) if (p && p.sku) m.set(p.sku, p); return m; }, [programmees]);
+  const analyse = React.useMemo(() => brouillons.map((d) => {
+    const b = itemDeBrouillon(d);
+    if (b.err) return { d, raison: b.err };
+    const sku = d.numero ? skuEbayDe(d.numero) : '';
+    if (!sku) return { d, raison: 'pas de N° : sans lui, VRM ne la retrouverait pas si elle se vendait ailleurs avant l\'heure' };
+    if (skusEnLigne.has(sku)) return { d, raison: 'déjà en vente sur eBay' };
+    const p = progParSku.get(sku);
+    if (p) return { d, raison: `déjà programmée sur eBay${p.debut && Number.isFinite(Date.parse(p.debut)) ? ` (${quandParisTexte(Date.parse(p.debut))})` : ''}` };
+    if (vendusVinted && d.pairId && vendusVinted.has(String(d.pairId))) return { d, raison: 'vendue sur Vinted' };
+    return { d, item: b.item, sku };
+  }), [brouillons, skusEnLigne, progParSku, vendusVinted]);
+  const ordonnes = React.useMemo(() => {
+    const ok = analyse.filter((x) => x.item);
+    if (rythme.ordre === 'numero') return [...ok].sort((a, b) => triNum(a.d.numero, b.d.numero));
+    if (rythme.ordre === 'prix') return [...ok].sort((a, b) => (Number(a.item.price) || 0) - (Number(b.item.price) || 0));
+    return ok;
+  }, [analyse, rythme.ordre]);
+  const preregle = rythme.preregles.find((p) => p.id === depart.id) || rythme.preregles[0];
+  const departConcret = depart.mode === 'libre' ? { date: depart.date, heure: depart.heure } : departDePreregle(preregle, maintenant);
+  const plan = React.useMemo(() => heuresDuLot({ depart: departConcret, parJour: rythme.parJour, de: rythme.de, a: rythme.a, jours: rythme.jours, ecart: rythme.ecart, n: ordonnes.length, maintenant }),
+    [JSON.stringify(departConcret), rythme.parJour, rythme.de, rythme.a, JSON.stringify(rythme.jours), rythme.ecart, ordonnes.length, maintenant]);
+  const lignes = React.useMemo(() => (plan.heures || []).map((h, i) => {
+    const x = ordonnes[i];
+    return { ...x, h, cle: cleVerifEbay(x.item, h.utc) };
+  }), [plan, ordonnes]);
+  const verifDe = (l) => { const v = verifs[l.d.id]; return v && v.cle === l.cle ? v : null; };
+  const verifier = async () => {
+    setVerifEnCours(true);
+    for (const l of lignes) {
+      setVerifs((v) => ({ ...v, [l.d.id]: { cle: l.cle, etat: 'en-cours' } }));
+      const r = await appelEbay({ action: 'pubverify', item: l.item, scheduleTime: l.h.utc || '' });
+      const j = r.j;
+      const res = (j && j.ok) ? { cle: l.cle, etat: 'ok', frais: j.frais || {}, fees: j.fees == null ? null : j.fees }
+        : (r.code === 200 && j) ? { cle: l.cle, etat: 'refus', err: j.error || 'eBay refuserait cette annonce.' }
+        : { cle: l.cle, etat: 'erreur', err: (j && j.error) || 'eBay n\'a pas répondu — revérifie.' };
+      setVerifs((v) => ({ ...v, [l.d.id]: res }));
+    }
+    setVerifEnCours(false);
+  };
+  // ── Les totaux : seulement ce qui est CONNU, et la couverture à côté (§5) ──
+  const verifiees = lignes.map((l) => ({ l, v: verifDe(l) }));
+  const pretes = verifiees.filter(({ v }) => v && v.etat === 'ok' && v.fees != null);
+  const totalConnu = pretes.length === lignes.length && lignes.length > 0;
+  const total = pretes.reduce((s, { v }) => s + v.fees, 0);
+  const progConnues = pretes.filter(({ l, v }) => !l.h.immediat && v.frais && v.frais.programmation != null);
+  const progPasSu = pretes.filter(({ l, v }) => !l.h.immediat && !(v.frais && v.frais.programmation != null)).length;
+  const totalProg = progConnues.reduce((s, { v }) => s + v.frais.programmation, 0);
+  const progPayante = progConnues.some(({ v }) => v.frais.programmation > 0);
+  const nonVerifiees = verifiees.filter(({ v }) => !v || v.etat !== 'ok').length;
+  const perime = pretes.some(({ l }) => !l.h.immediat && l.h.ms < Date.now() + 16 * 60000);
+  const programmees0 = Array.isArray(programmees) ? programmees.length : null;
+  const enLigne0 = Array.isArray(annoncesEbay) ? annoncesEbay.length : null;
+  const montantLot = lignes.reduce((s, l) => s + (Number(l.item.price) || 0), 0);
+  const montantEnVente = (Array.isArray(annoncesEbay) ? annoncesEbay : []).reduce((s, a) => s + (Number(String((a && a.price) || '').replace(',', '.')) || 0), 0) + (Array.isArray(programmees) ? programmees : []).reduce((s, a) => s + (Number(String((a && a.price) || '').replace(',', '.')) || 0), 0);
+  const besoinCompris = !rythme.risqueCompris;
+  const peutConfirmer = !envoi && !verifEnCours && pretes.length > 0 && vendusVinted instanceof Set && !perime && (!besoinCompris || compris);
+  // ── ENVOYER : une par une, chacune avec son UUID (gardé dans le brouillon
+  //    AVANT l'envoi : un second essai après une coupure réutilise le même). ──
+  const confirmer = async () => {
+    const lot = pretes.map(({ l, v }) => ({ l, v }));
+    const premiere = lot[0].l.h, derniere = lot[lot.length - 1].l.h;
+    const quand = (h) => h.immediat ? 'tout de suite' : `${jourParisTexte(h.date)} à ${h.heure}`;
+    const ok = await askConfirm({
+      title: `Programmer ${lot.length} annonce${lot.length > 1 ? 's' : ''} sur eBay ?`,
+      desc: `De ${quand(premiere)} à ${quand(derniere)} (heure de Paris, ± 15 min : c'est eBay qui arrondit).`
+        + `\nFrais annoncés par eBay : ${eurEbay(lot.reduce((s, x) => s + x.v.fees, 0))}${progConnues.length ? ` (dont programmation ${eurEbay(totalProg)})` : ''}${progPayante ? ' — facturés à la création, non remboursés si tu annules.' : '.'}`
+        + (progPasSu ? `\nFrais de programmation pas annoncés par eBay pour ${progPasSu} annonce${progPasSu > 1 ? 's' : ''}.` : '')
+        + `\nC'est eBay qui les mettra en ligne à ces heures, même si VRM est fermé. Si une paire se vend ailleurs avant son heure, VRM te le dira — mais l'annulation peut devoir se faire sur eBay.`,
+      ok: 'Oui, programmer', cancel: 'Annuler',
+    });
+    if (!ok) return;
+    if (besoinCompris) changerRythme({ risqueCompris: true });
+    const bilan = { programmees: [], refusees: [], incertaines: [] };
+    setEnvoi({ en: 0, total: lot.length });
+    for (let i = 0; i < lot.length; i++) {
+      const { l, v } = lot[i];
+      setEnvoi({ en: i + 1, total: lot.length });
+      const uuid = l.d.uuid || uuidEnvoiEbay();
+      if (!l.d.uuid) {
+        const w = await modifierBrouillonsEbay((items) => { if (items[l.d.id]) items[l.d.id] = { ...items[l.d.id], uuid }; return items; });
+        // Sans l'UUID gardé, un second essai pourrait créer une seconde
+        // annonce : on n'envoie pas celle-là.
+        if (!w.ok) { bilan.refusees.push({ d: l.d, err: 'Je n\'ai pas pu préparer son envoi (la base n\'a pas répondu) — rien n\'est parti.' }); continue; }
+      }
+      const corps = { action: 'programmer', confirme: true, uuid, fraisVus: v.fees, scheduleTime: l.h.utc || '', item: l.item };
+      let r = await appelEbay(corps);
+      const incertain = (x) => x.code === 0 || !x.j || x.code === 504 || (x.j && x.j.reason === 'incertain');
+      if (incertain(r)) {
+        // On regarde d'abord CHEZ eBAY si elle est partie (par son SKU), avant
+        // de redemander quoi que ce soit — puis UN seul nouvel essai.
+        const p = await appelEbay({ action: 'programmees' });
+        const trouve = p.j && p.j.ok ? [...(p.j.items || []), ...(p.j.enLigne || [])].find((x) => x && x.sku === l.sku) : null;
+        if (trouve) r = { code: 200, j: { ok: true, itemId: trouve.itemId, debut: trouve.debut || null, retrouvee: true } };
+        else if (p.j && p.j.ok) r = await appelEbay(corps);
+      }
+      const j = r.j || {};
+      if (j.ok) {
+        const enLigne = !!(l.h.immediat || j.enLigneMaintenant);
+        bilan.programmees.push({ d: l.d, debut: j.debut, enLigne });
+        await modifierBrouillonsEbay((items) => { if (items[l.d.id]) items[l.d.id] = { ...items[l.d.id], etatBrouillon: enLigne ? 'en-ligne' : 'programmee', programme: { itemId: j.itemId, debut: j.debut || null, fin: j.fin || null, demande: l.h.utc || null, sku: l.sku, enLigneMaintenant: !!j.enLigneMaintenant, at: Date.now() }, envoi: { ok: true, at: Date.now() } }; return items; });
+      } else if (incertain(r)) {
+        bilan.incertaines.push({ d: l.d, err: j.error || 'eBay n\'a pas répondu — je ne sais pas si elle est programmée. Rafraîchis depuis eBay avant de recommencer.' });
+      } else {
+        const err = j.error || 'eBay a refusé l\'annonce.';
+        bilan.refusees.push({ d: l.d, err });
+        await modifierBrouillonsEbay((items) => { if (items[l.d.id]) items[l.d.id] = { ...items[l.d.id], envoi: { ok: false, err, at: Date.now() } }; return items; });
+      }
+    }
+    setEnvoi({ bilan });
+    const fin = await lireBrouillonsEbay();
+    if (fin && onBrouillons) onBrouillons(fin);
+    if (onFini) onFini();
+  };
+
+  // ── RENDU ──
+  const inp = { boxSizing: 'border-box', border: '1px solid transparent', background: E.card2, color: E.text, borderRadius: 10, padding: '10px 11px', fontSize: 16, fontFamily: 'inherit', outline: 'none' };
+  const lab = { fontSize: 11.5, color: E.muted, display: 'block', marginBottom: 5, fontWeight: 500 };
+  const pastille = (actif) => ({ border: `1px solid ${actif ? E.accent : E.border}`, background: actif ? `${E.accent}22` : 'transparent', color: actif ? E.text : E.muted, borderRadius: 999, padding: '7px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' });
+  const groupes = [];
+  for (const l of lignes) { const g = groupes[groupes.length - 1]; if (g && g.date === l.h.date) g.lignes.push(l); else groupes.push({ date: l.h.date, lignes: [l] }); }
+  const exclues = analyse.filter((x) => !x.item);
+  const auj = partsParis(maintenant).date;
+  const dateLibre = depart.mode === 'libre' ? depart.date : (departConcret && departConcret.date) || auj;
+  const heureLibre = depart.mode === 'libre' ? depart.heure : (departConcret && departConcret.heure) || '20:00';
+  const bilan = envoi && envoi.bilan;
+  return (
+    <div data-planif="1" style={{ background: E.card, border: `1px solid ${E.accent}`, borderRadius: 14, padding: '14px', marginTop: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+        <span style={{ flex: 1, fontSize: 16, fontWeight: 800, color: E.text }}>Programmer la sélection ({brouillons.length})</span>
+        <button type="button" onClick={onFermer} aria-label="Fermer" style={{ border: 'none', background: 'transparent', color: E.muted, fontSize: 22, cursor: 'pointer', lineHeight: 1 }}>×</button>
+      </div>
+      <div style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, marginBottom: 10 }}>eBay les mettra en ligne lui-même aux heures choisies, même si VRM est fermé. Heure de Paris, jusqu'à 3 semaines à l'avance — ce sont exactement les heures que tu choisis, sans aucun hasard (± 15 min : c'est eBay qui arrondit).</div>
+
+      {bilan ? (
+        <div data-planif-bilan="1" data-programmees={bilan.programmees.length} data-refusees={bilan.refusees.length} data-incertaines={bilan.incertaines.length} style={{ fontSize: 13, color: E.text, lineHeight: 1.55 }}>
+          <div style={{ fontWeight: 800, fontSize: 14 }}>{bilan.programmees.length} sur {bilan.programmees.length + bilan.refusees.length + bilan.incertaines.length} programmée{bilan.programmees.length > 1 ? 's' : ''}{bilan.refusees.length ? ` · ${bilan.refusees.length} refusée${bilan.refusees.length > 1 ? 's' : ''}` : ''}{bilan.incertaines.length ? ` · ${bilan.incertaines.length} incertaine${bilan.incertaines.length > 1 ? 's' : ''}` : ''}</div>
+          {bilan.programmees.filter((x) => x.enLigne).length > 0 && <div style={{ color: E.warn, marginTop: 4 }}>⚠️ En ligne TOUT DE SUITE : {bilan.programmees.filter((x) => x.enLigne).map((x) => (x.d.numero ? `N°${cleNum(x.d.numero)}` : x.d.titre)).join(', ')}.</div>}
+          {[...bilan.refusees.map((x) => ({ ...x, k: 'refusée' })), ...bilan.incertaines.map((x) => ({ ...x, k: 'incertaine' }))].map((x) => (
+            <div key={x.d.id} data-planif-refus={x.d.id} style={{ color: E.warn, marginTop: 4 }}>{x.d.numero ? `N°${cleNum(x.d.numero)}` : x.d.titre} — {x.err}</div>
+          ))}
+          <button type="button" onClick={onFermer} style={{ marginTop: 10, border: `1px solid ${E.border}`, background: 'transparent', color: E.text, borderRadius: 10, padding: '9px 16px', fontSize: 13.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Terminé</button>
+        </div>
+      ) : (<>
+        {/* DÉPART */}
+        <div style={{ marginBottom: 10 }}>
+          <span style={lab}>Première mise en ligne</span>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {rythme.preregles.map((p) => <button key={p.id} type="button" data-planif-preset={p.id} aria-pressed={depart.mode === 'preset' && depart.id === p.id} onClick={() => setDepart({ mode: 'preset', id: p.id })} style={pastille(depart.mode === 'preset' && depart.id === p.id)}>{libellePreregle(p)}</button>)}
+            <button type="button" data-planif-libre="1" aria-pressed={depart.mode === 'libre'} onClick={() => setDepart({ mode: 'libre', date: dateLibre, heure: heureLibre })} style={pastille(depart.mode === 'libre')}>Choisir…</button>
+            <button type="button" data-planif-preregles="1" onClick={() => setEditPre((x) => !x)} style={{ ...pastille(false), border: 'none', color: E.accentSoft }}>{editPre ? 'Fermer les préréglages' : 'Modifier les préréglages'}</button>
+          </div>
+          {depart.mode === 'libre' && (
+            <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+              <input type="date" data-planif-depart-date="1" value={depart.date || ''} min={auj} onChange={(e) => setDepart((x) => ({ ...x, date: e.target.value }))} style={{ ...inp, width: 170 }} />
+              <input type="time" data-planif-depart-heure="1" value={depart.heure || ''} onChange={(e) => setDepart((x) => ({ ...x, heure: e.target.value }))} style={{ ...inp, width: 120 }} />
+            </div>
+          )}
+          {editPre && (
+            <div data-planif-edit-preregles="1" style={{ marginTop: 8, background: E.card2, borderRadius: 10, padding: '10px 11px' }}>
+              {rythme.preregles.map((p, i) => p.jour === 'maintenant' ? null : (
+                <div key={p.id} style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6, flexWrap: 'wrap' }}>
+                  <select value={p.jour} onChange={(e) => changerRythme({ preregles: rythme.preregles.map((q, k) => k === i ? { ...q, jour: e.target.value } : q) })} style={{ ...inp, padding: '8px 9px' }}>
+                    <option value="auj">Aujourd'hui</option><option value="demain">Demain</option>
+                    {JOURS_NOM.map((n, k) => <option key={k} value={'dow' + k}>{n.replace(/^./, (c) => c.toUpperCase())}</option>)}
+                  </select>
+                  <input type="time" value={p.heure} onChange={(e) => changerRythme({ preregles: rythme.preregles.map((q, k) => k === i ? { ...q, heure: e.target.value } : q) })} style={{ ...inp, width: 120, padding: '8px 9px' }} />
+                  <button type="button" onClick={() => changerRythme({ preregles: rythme.preregles.filter((_, k) => k !== i) })} style={{ ...pastille(false), padding: '6px 10px' }}>Retirer</button>
+                </div>
+              ))}
+              {rythme.preregles.length < 8 && <button type="button" onClick={() => changerRythme({ preregles: [...rythme.preregles, { id: 'p' + Date.now().toString(36), jour: 'demain', heure: '20:00' }] })} style={{ ...pastille(false), border: 'none', color: E.accentSoft, padding: '4px 0' }}>+ Ajouter un préréglage</button>}
+              <div style={{ fontSize: 11, color: E.muted, marginTop: 4 }}>Enregistrés pour toi, sur tous tes appareils. « Ce soir 20 h » n'est qu'une habitude, pas une mesure.</div>
+            </div>
+          )}
+        </div>
+        {/* RYTHME */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10, marginBottom: 10 }}>
+          <label><span style={lab}>Par jour</span><input type="number" min="1" max="50" inputMode="numeric" data-planif-parjour="1" value={rythme.parJour} onChange={(e) => changerRythme({ parJour: Math.max(1, Math.min(50, parseInt(e.target.value, 10) || 1)) })} style={{ ...inp, width: '100%' }} /></label>
+          <label><span style={lab}>De</span><input type="time" data-planif-de="1" value={rythme.de} onChange={(e) => changerRythme({ de: e.target.value })} style={{ ...inp, width: '100%' }} /></label>
+          <label><span style={lab}>À</span><input type="time" data-planif-a="1" value={rythme.a} onChange={(e) => changerRythme({ a: e.target.value })} style={{ ...inp, width: '100%' }} /></label>
+          <label><span style={lab}>Une toutes les</span><select data-planif-ecart="1" value={rythme.ecart} onChange={(e) => changerRythme({ ecart: Number(e.target.value) })} style={{ ...inp, width: '100%' }}>{EBAY_ECARTS.map((m) => <option key={m} value={m}>{m < 60 ? `${m} min` : m % 60 ? `${Math.floor(m / 60)} h ${m % 60}` : `${m / 60} h`}</option>)}</select></label>
+          <label><span style={lab}>Ordre</span><select data-planif-ordre="1" value={rythme.ordre} onChange={(e) => changerRythme({ ordre: e.target.value })} style={{ ...inp, width: '100%' }}><option value="selection">ma sélection</option><option value="numero">N° croissant</option><option value="prix">prix croissant</option></select></label>
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          <span style={lab}>Jours</span>
+          <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+            {[1, 2, 3, 4, 5, 6, 0].map((k) => <button key={k} type="button" data-planif-jour={k} aria-pressed={!!rythme.jours[k]} aria-label={JOURS_NOM[k]} onClick={() => changerRythme({ jours: rythme.jours.map((v, i) => i === k ? !v : v) })} style={{ ...pastille(!!rythme.jours[k]), width: 38, padding: '7px 0', textAlign: 'center' }}>{JOURS_LETTRE[k]}</button>)}
+          </div>
+        </div>
+
+        {/* LIMITES DE VENTE (lues chez eBay) */}
+        <div data-planif-limites={limites === undefined ? 'charge' : limites && limites.ok ? 'lu' : 'pas-su'} style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, marginBottom: 10 }}>
+          {limites === undefined ? 'Je lis tes limites de vente eBay…'
+            : limites && limites.ok ? (<>Ta limite eBay : <b style={{ color: E.text }}>{limites.quantite != null ? `${limites.quantite} annonces` : '— annonces'}</b> et <b style={{ color: E.text }}>{limites.montant != null ? eurEbay(limites.montant) : '— €'}</b> par mois.
+                {limites.quantite != null && enLigne0 != null && programmees0 != null && lignes.length + enLigne0 + programmees0 > limites.quantite && <span data-planif-limite-depassee="1" style={{ color: E.warn }}> Ce lot ({lignes.length}) et tes {enLigne0 + programmees0} annonce{enLigne0 + programmees0 > 1 ? 's' : ''} en ligne ou programmée{enLigne0 + programmees0 > 1 ? 's' : ''} dépassent {limites.quantite} : eBay pourrait refuser les dernières.</span>}
+                {limites.montant != null && montantLot + montantEnVente > limites.montant && <span style={{ color: E.warn }}> Le montant ({eurEbay(montantLot + montantEnVente)} avec ce lot) dépasse ta limite : eBay pourrait refuser les dernières.</span>}</>)
+            : <>Limites de vente eBay : pas su{limites && limites.reason === 'scope' ? ' (eBay n\'a pas autorisé VRM à les lire)' : ' (eBay n\'a pas répondu)'} — eBay refusera de lui-même ce qui les dépasse.</>}
+        </div>
+
+        {/* APERÇU EXACT */}
+        {plan.erreur ? <div data-planif-erreur="1" style={{ fontSize: 12.5, color: E.warn, marginBottom: 10 }}>{plan.erreur}</div> : (
+          <div data-planif-apercu={lignes.length} style={{ background: E.card2, borderRadius: 12, padding: '10px 12px', marginBottom: 10 }}>
+            {groupes.map((g) => (
+              <div key={g.date} data-planif-jour-groupe={g.date} style={{ marginBottom: 8 }}>
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: E.muted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>{jourParisTexte(g.date)}</div>
+                {g.lignes.map((l) => {
+                  const v = verifDe(l);
+                  return (
+                    <div key={l.d.id} data-planif-ligne={l.d.id} data-heure-paris={`${l.h.date} ${l.h.heure}`} data-utc={l.h.utc} data-immediat={l.h.immediat ? '1' : '0'} style={{ display: 'flex', gap: 10, alignItems: 'baseline', padding: '4px 0', flexWrap: 'wrap' }}>
+                      <span className="vrm-display" style={{ fontSize: 14, fontWeight: 800, color: E.text, width: 92, flexShrink: 0 }}>{l.h.immediat ? 'tout de suite' : l.h.heure}</span>
+                      <span style={{ flex: '1 1 140px', minWidth: 0, fontSize: 12.5, color: E.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.d.numero ? <b>N°{cleNum(l.d.numero)} · </b> : null}{l.d.titre}</span>
+                      {v && v.etat === 'ok' && <span data-planif-frais={l.d.id} data-frais-total={v.fees == null ? 'pas-su' : String(v.fees)} data-frais-programmation={l.h.immediat ? 'sans' : (v.frais && v.frais.programmation != null ? String(v.frais.programmation) : 'pas-su')} style={{ flexBasis: '100%', paddingLeft: 102, fontSize: 11.5, color: E.muted, lineHeight: 1.45 }}>
+                        {lignesFraisEbay(v.frais, !l.h.immediat).map((f) => `${f.nom} ${f.montant == null ? 'pas su' : eurEbay(f.montant)}`).join(' · ')} · total {v.fees == null ? 'pas su' : eurEbay(v.fees)}
+                      </span>}
+                      {v && v.etat === 'en-cours' && <span style={{ flexBasis: '100%', paddingLeft: 102, fontSize: 11.5, color: E.muted }}>eBay vérifie…</span>}
+                      {v && (v.etat === 'refus' || v.etat === 'erreur') && <span data-planif-verif-refus={l.d.id} style={{ flexBasis: '100%', paddingLeft: 102, fontSize: 11.5, color: E.warn, lineHeight: 1.45 }}>⚠️ {v.err}</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+            {!lignes.length && <div style={{ fontSize: 12.5, color: E.muted }}>Rien à programmer dans cette sélection.</div>}
+            {plan.horsHorizon > 0 && <div data-planif-hors-horizon={plan.horsHorizon} style={{ fontSize: 12, color: E.warn, lineHeight: 1.45, marginTop: 4 }}>{plan.horsHorizon} brouillon{plan.horsHorizon > 1 ? 's' : ''} tomberai{plan.horsHorizon > 1 ? 'ent' : 't'} au-delà de 3 semaines (la limite d'eBay) : {plan.horsHorizon > 1 ? 'ils restent' : 'il reste'} en brouillon{plan.horsHorizon > 1 ? 's' : ''}.</div>}
+          </div>
+        )}
+        {exclues.length > 0 && (
+          <div data-planif-exclues={exclues.length} style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, marginBottom: 10 }}>
+            <b style={{ color: E.text }}>{exclues.length} ne {exclues.length > 1 ? 'partiront' : 'partira'} pas :</b> {exclues.map((x) => `${x.d.numero ? 'N°' + cleNum(x.d.numero) : (x.d.titre || 'sans titre')} (${x.raison})`).join(' · ')}.
+          </div>
+        )}
+        {vendusVinted === null && <div data-planif-pas-su="1" style={{ fontSize: 12.5, color: E.warn, lineHeight: 1.5, marginBottom: 10 }}>Je n'ai pas pu vérifier tes ventes Vinted : je ne programme rien tant que je ne sais pas qu'aucune de ces paires n'est déjà vendue. Rouvre l'écran dans un moment.</div>}
+
+        {/* LES FRAIS, LUS CHEZ eBAY */}
+        {lignes.length > 0 && !plan.erreur && (
+          <button type="button" data-planif-verifier="1" disabled={verifEnCours} onClick={verifier} style={{ width: '100%', border: `1px solid ${E.border}`, background: E.card2, color: E.text, borderRadius: 999, padding: '12px 16px', fontSize: 14, fontWeight: 700, cursor: verifEnCours ? 'default' : 'pointer', fontFamily: 'inherit', opacity: verifEnCours ? 0.6 : 1, marginBottom: 10 }}>{verifEnCours ? 'eBay vérifie…' : (nonVerifiees ? `Vérifier les frais chez eBay (${lignes.length})` : 'Revérifier les frais')}</button>
+        )}
+        {pretes.length > 0 && (
+          <div data-planif-total={totalConnu ? String(Math.round(total * 100) / 100) : 'partiel'} data-planif-prog-total={String(Math.round(totalProg * 100) / 100)} data-planif-prog-pas-su={progPasSu} style={{ fontSize: 12.5, color: E.text, lineHeight: 1.55, marginBottom: 10 }}>
+            Frais annoncés par eBay : <b>{eurEbay(total)}</b>{totalConnu ? ` pour ${pretes.length} annonce${pretes.length > 1 ? 's' : ''}` : ` pour ${pretes.length} annonce${pretes.length > 1 ? 's' : ''} vérifiée${pretes.length > 1 ? 's' : ''} sur ${lignes.length}`}{progConnues.length ? <> · dont programmation <b>{eurEbay(totalProg)}</b></> : null}{progPasSu ? <> · frais de programmation : <b>pas su</b> pour {progPasSu}</> : null} (avant remise éventuelle).
+            {progPayante && <div data-planif-non-rembourse="1" style={{ color: E.warn }}>La programmation est facturée à la création, et non remboursée si tu annules.</div>}
+          </div>
+        )}
+        {perime && <div style={{ fontSize: 12.5, color: E.warn, marginBottom: 10 }}>Le planning a vieilli : une heure est à moins de 15 minutes. Change le départ, puis revérifie.</div>}
+        {/* LE RISQUE, DIT AVANT SA PREMIÈRE PROGRAMMATION */}
+        {besoinCompris && pretes.length > 0 && (
+          <label data-planif-risque="1" style={{ display: 'flex', gap: 9, alignItems: 'flex-start', fontSize: 12.5, color: E.text, lineHeight: 1.5, background: `${E.warn}14`, border: `1px solid ${E.warn}`, borderRadius: 10, padding: '10px 12px', marginBottom: 10, cursor: 'pointer' }}>
+            <input type="checkbox" data-planif-compris="1" checked={compris} onChange={(e) => setCompris(e.target.checked)} style={{ width: 20, height: 20, flexShrink: 0, marginTop: 1, accentColor: E.accent }} />
+            <span>Avant ta première programmation : <b>l'annulation d'une annonce programmée par VRM n'est pas garantie</b> — il faudra peut-être l'annuler sur eBay. Et une paire <b>vendue ailleurs avant son heure</b> peut quand même partir sur eBay (VRM te le dira, mais ne peut pas promettre de l'arrêter). J'ai compris.</span>
+          </label>
+        )}
+        {envoi && !envoi.bilan && <div style={{ fontSize: 12.5, color: E.muted, marginBottom: 8 }}>Envoi à eBay : {envoi.en} sur {envoi.total}…</div>}
+        <button type="button" data-planif-confirmer={pretes.length} disabled={!peutConfirmer} onClick={confirmer}
+          style={{ width: '100%', border: 'none', background: E.accent, color: '#fff', borderRadius: 999, padding: '14px 16px', fontSize: 14, fontWeight: 700, cursor: peutConfirmer ? 'pointer' : 'default', fontFamily: 'inherit', opacity: peutConfirmer ? 1 : 0.45 }}>
+          {pretes.length ? `Programmer ${pretes.length} annonce${pretes.length > 1 ? 's' : ''}${totalConnu ? ` — ${eurEbay(total)}` : ''}` : 'Vérifie d\'abord les frais'}
+        </button>
+      </>)}
+    </div>
+  );
+}
+
+// ── eBay → Annonces · PROGRAMMÉES (5 octobre) ────────────────────────────────
+// Ce qu'eBay mettra en ligne, groupé par jour (heure de Paris). La vérité est
+// la liste qu'eBay rend (`ebay_programmees`) ; ce que VRM vient de programmer
+// s'y ajoute en attendant la relecture. Statuts : Programmée · En ligne ·
+// « Pas partie à l'heure » (plus de 30 min après l'heure, eBay la garde
+// toujours en attente) · « à relire » (l'heure est passée depuis la dernière
+// lecture : on ne suppose rien).
+const SELLER_HUB_PROGRAMMEES = 'https://www.ebay.fr/sh/lst/scheduled';   // adresse non mesurée (eBay bloque nos lectures) : un repli, pas une promesse
+function EbayProgrammees({ programmees, brouillons, onRelire, onAnnule }) {
+  const E = EBAY_SKIN;
+  const [deplacer, setDeplacer] = React.useState(null);   // {itemId, date, heure}
+  const [infos, setInfos] = React.useState({});           // itemId → {texte, refus, lien}
+  const [geste, setGeste] = React.useState('');
+  const maintenant = Date.now();
+  const relu = React.useRef(false);
+  const P = programmees && typeof programmees === 'object' ? programmees : null;
+  const etat = programmees === undefined ? 'charge' : programmees === null ? 'pas-su' : programmees === 'jamais' ? 'jamais' : 'lu';
+  const lignes = React.useMemo(() => {
+    const out = [];
+    const vus = new Set();
+    for (const p of ((P && Array.isArray(P.items)) ? P.items : [])) { if (!p || !p.itemId) continue; vus.add(String(p.itemId)); out.push({ ...p, lu: true }); }
+    // Ce que VRM vient de programmer et qu'eBay n'a pas encore relu.
+    for (const d of Object.values(brouillons && typeof brouillons === 'object' ? brouillons : {})) {
+      const pr = d && d.etatBrouillon === 'programmee' && d.programme;
+      if (!pr || !pr.itemId || vus.has(String(pr.itemId))) continue;
+      out.push({ itemId: String(pr.itemId), sku: pr.sku || (d.numero ? skuEbayDe(d.numero) : ''), title: d.titre, price: d.prix, debut: pr.debut || pr.demande, photo: d.cover || (d.photos || [])[0] || '', lu: false });
+    }
+    return out.sort((a, b) => (Date.parse(a.debut) || 0) - (Date.parse(b.debut) || 0));
+  }, [programmees, brouillons]);
+  const enLigneIds = new Set(((P && P.enLigne) || []).map((x) => String(x && x.itemId)));
+  const capture = P && P.capturedAt ? Number(P.capturedAt) : null;
+  const statut = (l) => {
+    if (enLigneIds.has(String(l.itemId))) return 'en-ligne';
+    const t = Date.parse(l.debut || '');
+    if (!Number.isFinite(t) || maintenant < t) return 'programmee';
+    if (l.lu && capture && capture > t + 30 * 60000 && maintenant > t + 30 * 60000) return 'pas-partie';
+    return 'a-relire';
+  };
+  // Une heure passée depuis la dernière lecture : on relit chez eBay (une fois).
+  const aRelire = lignes.some((l) => statut(l) === 'a-relire');
+  React.useEffect(() => { if (aRelire && !relu.current && onRelire) { relu.current = true; onRelire(); } }, [aRelire]);
+  const annuler = async (l) => {
+    const t = Date.parse(l.debut || '');
+    const ok = await askConfirm({
+      title: `Annuler la mise en ligne prévue ${Number.isFinite(t) ? 'le ' + quandParisTexte(t) : ''} ?`,
+      desc: `« ${l.title || l.itemId} »${numDeSkuEbay(l.sku) ? ` · N°${numDeSkuEbay(l.sku)}` : ''}\n\nL'annulation par VRM n'est pas garantie : VRM la demande à eBay et te dit SA réponse. Si eBay refuse, annule-la dans le Seller Hub d'eBay. L'option de programmation déjà facturée ne sera probablement pas remboursée.`,
+      ok: 'Oui, demander l\'annulation', cancel: 'Non', danger: true,
+    });
+    if (!ok) return;
+    setGeste('annuler:' + l.itemId);
+    const { code, j } = await appelEbay({ action: 'deprogrammer', itemId: String(l.itemId), confirme: true });
+    let info;
+    if (j && j.ok) info = { texte: j.verifie === true ? '✓ eBay a annulé la programmation (vérifié chez eBay).' : '✓ eBay a répondu « annulée » — je n\'ai pas pu le revérifier : rafraîchis dans un moment.', ok: true };
+    else if (code === 0 || (j && j.reason === 'incertain')) info = { texte: 'eBay n\'a pas répondu — je ne sais pas si elle est annulée. Regarde sur eBay avant de recommencer.', refus: true, lien: true };
+    else info = { texte: `eBay a répondu : « ${(j && j.error) || 'refus'} ».${j && j.enLigne ? '' : ' Annule-la dans le Seller Hub d\'eBay.'}`, refus: true, lien: !(j && j.enLigne) };
+    setInfos((m) => ({ ...m, [l.itemId]: info }));
+    setGeste('');
+    if (info.ok && onAnnule) onAnnule(String(l.itemId));
+  };
+  const validerDeplacer = async (l) => {
+    const r = parisVersUtc(deplacer.date, deplacer.heure);
+    if (r.ambigu || r.inexistant || r.invalide) { setInfos((m) => ({ ...m, [l.itemId]: { texte: r.ambigu ? 'Cette heure existe deux fois cette nuit-là (changement d\'heure) — choisis-en une autre.' : r.inexistant ? 'Cette heure n\'existe pas cette nuit-là (changement d\'heure).' : 'Choisis une date et une heure.', refus: true } })); return; }
+    if (r.ms < Date.now() + PLANIF_MIN_MS || r.ms > Date.now() + PLANIF_HORIZON_MS) { setInfos((m) => ({ ...m, [l.itemId]: { texte: 'Entre 20 minutes et 3 semaines à l\'avance.', refus: true } })); return; }
+    const ok = await askConfirm({ title: `La mettre en ligne le ${quandParisTexte(r.ms)} ?`, desc: `« ${l.title || l.itemId} » — heure de Paris, ± 15 min (c'est eBay qui arrondit).`, ok: 'Oui, déplacer', cancel: 'Annuler' });
+    if (!ok) return;
+    setGeste('deplacer:' + l.itemId);
+    const { j } = await appelEbay({ action: 'reprogrammer', itemId: String(l.itemId), scheduleTime: new Date(r.ms).toISOString(), confirme: true });
+    setInfos((m) => ({ ...m, [l.itemId]: j && j.ok ? { texte: `✓ eBay la mettra en ligne le ${quandParisTexte(Date.parse(j.debut || j.demande))}.`, ok: true } : { texte: `eBay a répondu : « ${(j && j.error) || 'refus'} ».`, refus: true } }));
+    setGeste(''); setDeplacer(null);
+    if (j && j.ok && onRelire) onRelire();
+  };
+  if (etat === 'lu' && !lignes.length) return null;
+  const groupes = [];
+  for (const l of lignes) { const t = Date.parse(l.debut || ''); const date = Number.isFinite(t) ? partsParis(t).date : 'inconnue'; const g = groupes[groupes.length - 1]; if (g && g.date === date) g.lignes.push(l); else groupes.push({ date, lignes: [l] }); }
+  const btn = { border: `1px solid ${E.border}`, background: 'transparent', color: E.text, borderRadius: 8, padding: '7px 11px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' };
+  const inp = { boxSizing: 'border-box', border: '1px solid transparent', background: E.card2, color: E.text, borderRadius: 10, padding: '8px 10px', fontSize: 16, fontFamily: 'inherit', outline: 'none' };
+  return (
+    <div data-ebay-programmees={etat} data-nb={lignes.length} style={{ background: E.card, border: `1px solid ${E.border}`, borderRadius: 14, padding: '12px 14px', marginTop: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
+        <span style={{ flex: '1 1 auto', fontSize: 16, fontWeight: 800, color: E.text }}>Programmées sur eBay{lignes.length ? ` (${lignes.length})` : ''}</span>
+        {onRelire && <button type="button" data-prog-relire="1" onClick={onRelire} style={{ ...btn, border: 'none', padding: '4px 0', color: E.accentSoft }}>Relire chez eBay</button>}
+      </div>
+      {etat === 'charge' && <div style={{ fontSize: 12.5, color: E.muted }}>Chargement…</div>}
+      {etat === 'jamais' && <div style={{ fontSize: 12.5, color: E.muted }}>Je lis tes annonces programmées chez eBay…</div>}
+      {etat === 'pas-su' && <div style={{ fontSize: 12.5, color: E.warn, lineHeight: 1.5 }}>Je n'ai pas pu lire tes annonces programmées — rien n'est perdu. « Relire chez eBay » dans un moment.</div>}
+      {groupes.map((g) => (
+        <div key={g.date} data-prog-jour={g.date} style={{ marginTop: 6 }}>
+          <div style={{ fontSize: 11.5, fontWeight: 700, color: E.muted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 2 }}>{g.date === 'inconnue' ? 'heure inconnue' : jourParisTexte(g.date)}</div>
+          {g.lignes.map((l) => {
+            const s = statut(l);
+            const t = Date.parse(l.debut || '');
+            const derniereHeure = Number.isFinite(t) && t - maintenant < 60 * 60000;
+            const n = numDeSkuEbay(l.sku);
+            const info = infos[l.itemId];
+            return (
+              <div key={l.itemId} data-prog={l.itemId} data-prog-statut={s} style={{ padding: '8px 0', borderTop: `1px solid ${E.border}` }}>
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                  <PhotoVente src={l.photo} size={44} />
+                  <div style={{ flex: '1 1 auto', minWidth: 0 }}>
+                    <div style={{ fontSize: 12.5, fontWeight: 600, color: E.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}><span style={{ color: n ? E.text : E.warn, fontWeight: 700 }}>{n ? `N°${n}` : 'pas reliée'}</span> · {l.title || l.itemId}</div>
+                    <div style={{ fontSize: 11.5, color: s === 'pas-partie' ? E.warn : E.muted, marginTop: 2 }}>
+                      {s === 'en-ligne' ? 'En ligne ✓' : s === 'pas-partie' ? `Pas partie à l'heure — prévue à ${Number.isFinite(t) ? partsParis(t).heure : '?'}. Relis chez eBay ; si elle n'apparaît toujours pas, regarde dans le Seller Hub.` : s === 'a-relire' ? `devrait être en ligne depuis ${Number.isFinite(t) ? partsParis(t).heure : '?'} — je relis chez eBay` : `Programmée · ${Number.isFinite(t) ? partsParis(t).heure : 'heure inconnue'}`}
+                      {l.price ? ` · ${eurEbay(Number(String(l.price).replace(',', '.')) || 0)}` : ''}
+                    </div>
+                  </div>
+                </div>
+                {s === 'programmee' && (
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 7, paddingLeft: 54 }}>
+                    <button type="button" data-prog-deplacer={l.itemId} disabled={derniereHeure || !!geste} title={derniereHeure ? 'Elle part dans moins d\'une heure : eBay ne permet plus de la déplacer.' : ''}
+                      onClick={() => { const p = Number.isFinite(t) ? partsParis(t) : partsParis(Date.now() + 86400000); setDeplacer({ itemId: l.itemId, date: p.date, heure: p.heure }); }}
+                      style={{ ...btn, opacity: (derniereHeure || geste) ? 0.45 : 1, cursor: derniereHeure ? 'default' : 'pointer' }}>Déplacer</button>
+                    <button type="button" data-prog-annuler={l.itemId} disabled={!!geste} onClick={() => annuler(l)} style={{ ...btn, opacity: geste ? 0.5 : 1 }}>{geste === 'annuler:' + l.itemId ? 'Demande à eBay…' : 'Annuler'}</button>
+                    {derniereHeure && <span data-prog-derniere-heure={l.itemId} style={{ fontSize: 11, color: E.muted, alignSelf: 'center' }}>part dans moins d'une heure : plus déplaçable</span>}
+                  </div>
+                )}
+                {deplacer && deplacer.itemId === l.itemId && (
+                  <div data-prog-deplacer-panneau={l.itemId} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 7, paddingLeft: 54 }}>
+                    <input type="date" value={deplacer.date} onChange={(e) => setDeplacer((x) => ({ ...x, date: e.target.value }))} style={{ ...inp, width: 160 }} />
+                    <input type="time" value={deplacer.heure} onChange={(e) => setDeplacer((x) => ({ ...x, heure: e.target.value }))} style={{ ...inp, width: 110 }} />
+                    <button type="button" data-prog-deplacer-valider={l.itemId} disabled={!!geste} onClick={() => validerDeplacer(l)} style={{ ...btn, border: 'none', background: E.accent, color: '#fff' }}>{geste ? 'Envoi…' : 'Valider'}</button>
+                    <button type="button" onClick={() => setDeplacer(null)} style={{ ...btn, color: E.muted }}>Fermer</button>
+                  </div>
+                )}
+                {info && <div data-prog-info={l.itemId} data-prog-refus={info.refus ? '1' : '0'} style={{ fontSize: 11.5, color: info.ok ? E.text : E.warn, marginTop: 5, paddingLeft: 54, lineHeight: 1.45 }}>{info.texte}{info.lien && <> <a href={SELLER_HUB_PROGRAMMEES} target="_blank" rel="noreferrer" data-prog-seller-hub="1" style={{ color: E.accentSoft, fontWeight: 700 }}>Ouvrir le Seller Hub ↗</a></>}</div>}
+              </div>
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ── eBay · ANNONCES (captées par l'API officielle) ──────────────────────────
 // Julien : « l'extension ne capte rien, pourtant j'ai des annonces » — en fait
 // elles ÉTAIENT captées (ebay_listings), mais aucun onglet ne les montrait (le
@@ -9427,10 +10271,35 @@ function EbayAnnonces({ baseKO, comptes = [] }) {
   const [vendusVinted, setVendusVinted] = React.useState(undefined); // prouvées vendues : undefined · null · Set
   const [eligibles, setEligibles] = React.useState(undefined);       // offre : undefined · null · { ids:Set, complet }
   const [retraits, setRetraits] = React.useState({});                // itemId → '…' (en cours) | message
+  // ── BROUILLONS ET PROGRAMMÉES (5 octobre) ──
+  const [brouillons, setBrouillons] = React.useState(undefined);     // ebay_brouillons : undefined · null · {id: brouillon}
+  const [programmees, setProgrammees] = React.useState(undefined);   // ebay_programmees : undefined · null · 'jamais' · {items, enLigne, capturedAt}
+  const [ouvrirBrouillon, setOuvrirBrouillon] = React.useState(null); // le brouillon à rouvrir dans le formulaire
+  const [planif, setPlanif] = React.useState(null);                  // ids des brouillons à programmer
+  const [annulations, setAnnulations] = React.useState({});          // itemId → réponse d'eBay à « annuler »
   const [nuage, setNuage] = React.useState(0);
   React.useEffect(() => onCloudReady(() => setNuage((n) => n + 1)), []);
+  // La ligne `ebay_programmees` (écrite par la route, au nom du vendeur) —
+  // projetée (§4.4). Ligne ABSENTE = « jamais lue », pas « aucune » : on
+  // demande alors à eBay, une fois.
+  const chargerProgrammees = React.useCallback(async () => {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.ebay_programmees&select=items:data->items,enLigne:data->enLigne,capturedAt:data->>capturedAt,complet:data->>complet`, { headers: sbAuth() });
+      if (!r.ok) { setProgrammees(null); return; }
+      const rows = await r.json();
+      if (!Array.isArray(rows)) { setProgrammees(null); return; }
+      if (!rows[0]) { setProgrammees('jamais'); return; }
+      setProgrammees({ items: Array.isArray(rows[0].items) ? rows[0].items : [], enLigne: Array.isArray(rows[0].enLigne) ? rows[0].enLigne : [], capturedAt: Number(rows[0].capturedAt) || null, complet: rows[0].complet !== 'false' });
+    } catch (_) { setProgrammees(null); }
+  }, []);
+  const relireProgrammees = React.useCallback(async () => {
+    await appelEbay({ action: 'programmees' });
+    await chargerProgrammees();
+  }, [chargerProgrammees]);
   // Chargement rechargeable (pour rafraîchir après une publication / modif).
   const charger = React.useCallback(async () => {
+    lireBrouillonsEbay().then((b) => setBrouillons(b));
+    chargerProgrammees();
     try {
       const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.ebay_listings&select=data`, { headers: sbAuth() });
       if (!r.ok) { setItems(null); return; }
@@ -9447,7 +10316,7 @@ function EbayAnnonces({ baseKO, comptes = [] }) {
       if (!Array.isArray(rows)) { setCommandes(null); return; }
       setCommandes(Array.isArray(rows[0] && rows[0].orders) ? rows[0].orders : []);
     } catch (_) { setCommandes(null); }
-  }, []);
+  }, [chargerProgrammees]);
   React.useEffect(() => { charger(); }, [charger]);
   // Sonde de connexion eBay : le publieur ne sert à rien si le compte n'est pas
   // relié — on l'affiche alors seulement quand c'est le cas, sinon on renvoie
@@ -9466,10 +10335,26 @@ function EbayAnnonces({ baseKO, comptes = [] }) {
     } catch (_) { setEligibles(null); }
   }, []);
   React.useEffect(() => { if (connected === true) chargerEligibles(); }, [connected, chargerEligibles]);
+  // Jamais lue : on demande à eBay, une fois, compte relié.
+  const programmeesDemandees = React.useRef(false);
+  React.useEffect(() => { if (programmees === 'jamais' && connected === true && !programmeesDemandees.current) { programmeesDemandees.current = true; relireProgrammees(); } }, [programmees, connected, relireProgrammees]);
+  // Les programmées connues : la liste d'eBay + ce que VRM vient de programmer.
+  const listeProgrammees = React.useMemo(() => {
+    const out = (programmees && typeof programmees === 'object' && Array.isArray(programmees.items)) ? [...programmees.items] : [];
+    const vus = new Set(out.map((p) => String(p && p.itemId)));
+    for (const d of Object.values(brouillons && typeof brouillons === 'object' ? brouillons : {})) {
+      const pr = d && d.etatBrouillon === 'programmee' && d.programme;
+      if (pr && pr.itemId && !vus.has(String(pr.itemId))) out.push({ itemId: String(pr.itemId), sku: pr.sku || (d.numero ? skuEbayDe(d.numero) : ''), title: d.titre, price: d.prix, debut: pr.debut || pr.demande, photo: d.cover || (d.photos || [])[0] || '' });
+    }
+    return out;
+  }, [programmees, brouillons]);
   // La preuve de vente Vinted n'est lue que s'il y a quelque chose à vérifier :
-  // une annonce eBay reliée, ou une commande eBay qui porte un SKU VRM.
+  // une annonce eBay reliée, une commande eBay qui porte un SKU VRM, une annonce
+  // PROGRAMMÉE, ou un brouillon (on ne programme pas une paire déjà vendue).
   const aVerifier = (Array.isArray(items) && items.some((a) => a && numDeSkuEbay(a.sku)))
-    || (Array.isArray(commandes) && commandes.some((o) => o && Array.isArray(o.lineItems) && o.lineItems.some((li) => li && numDeSkuEbay(li.sku))));
+    || (Array.isArray(commandes) && commandes.some((o) => o && Array.isArray(o.lineItems) && o.lineItems.some((li) => li && numDeSkuEbay(li.sku))))
+    || listeProgrammees.some((p) => p && numDeSkuEbay(p.sku))
+    || !!(brouillons && typeof brouillons === 'object' && Object.keys(brouillons).length);
   React.useEffect(() => {
     if (!aVerifier) return;
     let stop = false;
@@ -9489,7 +10374,8 @@ function EbayAnnonces({ baseKO, comptes = [] }) {
     numeros: fiches,
     enLigne: enLigne || null,
     vendusVinted: vendusVinted || null,
-  }), [items, commandes, fiches, enLigne, vendusVinted]);
+    programmees: listeProgrammees,
+  }), [items, commandes, fiches, enLigne, vendusVinted, listeProgrammees]);
   const numsConnus = React.useMemo(() => new Set(Object.values(fiches).map((f) => cleNum(f && f.numero)).filter(Boolean)), [fiches]);
   const titreDeNum = React.useMemo(() => { const m = new Map(); for (const f of Object.values(fiches)) { const k = cleNum(f && f.numero); if (k && !m.has(k)) m.set(k, (f && f.title) || ''); } return m; }, [fiches]);
   const pris = React.useMemo(() => { const m = new Map(); for (const a of (Array.isArray(items) ? items : [])) { const k = numDeSkuEbay(a && a.sku); if (k && !m.has(k)) m.set(k, String(a.itemId)); } return m; }, [items]);
@@ -9524,16 +10410,85 @@ function EbayAnnonces({ baseKO, comptes = [] }) {
   // Le publieur, EN HAUT de l'onglet Annonces (Julien : « poster plus naturel »).
   // Affiché seulement si le compte est relié ; sinon une ligne qui renvoie au
   // compte, jamais un bouton mort.
-  const publier = connected === true
-    ? <EbayPublier paires={paires} onPublie={resync} dejaSurEbay={new Set(pris.keys())} />
+  // (5 octobre) Un brouillon rouvert s'édite aussi sans connexion : il ne part
+  // de toute façon chez eBay qu'au clic, et la route dit alors ce qui manque.
+  const publier = (connected === true || ouvrirBrouillon)
+    ? <EbayPublier paires={paires} onPublie={resync} dejaSurEbay={new Set(pris.keys())} brouillon={ouvrirBrouillon} onBrouillon={(b) => setBrouillons(b)} />
     : connected === false
       ? <div style={{ fontSize: 12.5, color: E.muted, lineHeight: 1.5, border: `1px solid ${E.border}`, background: E.card, borderRadius: 12, padding: '12px 14px', marginBottom: 14 }}>Pour mettre une paire en vente ici, relie d'abord ton compte eBay dans l'onglet <b style={{ color: E.text }}>« Compte eBay »</b>.</div>
       : null; // en cours / pas su : on ne dit rien plutôt qu'une fausse invite
+  // ── 3 bis. BROUILLONS · PLANIFICATEUR · PROGRAMMÉES (5 octobre) ────────────
+  const brouillonsChoisis = planif && brouillons && typeof brouillons === 'object' ? planif.map((id) => brouillons[id]).filter(Boolean) : [];
+  const outils = (<>
+    {publier}
+    <EbayBrouillons brouillons={brouillons} connected={connected} paires={paires}
+      onModifier={(d) => setOuvrirBrouillon({ ...d })}
+      onPlanifier={(ids) => setPlanif(ids)}
+      onBrouillons={(b) => setBrouillons(b)} />
+    {planif && brouillonsChoisis.length > 0 && (
+      <EbayPlanificateur key={planif.join(',')} brouillons={brouillonsChoisis}
+        annoncesEbay={Array.isArray(items) ? items : null}
+        programmees={programmees && typeof programmees === 'object' ? listeProgrammees : (programmees === 'jamais' ? [] : null)}
+        vendusVinted={vendusVinted}
+        onFermer={() => setPlanif(null)}
+        onBrouillons={(b) => setBrouillons(b)}
+        onFini={() => relireProgrammees()} />
+    )}
+    <EbayProgrammees programmees={programmees} brouillons={brouillons}
+      onRelire={relireProgrammees}
+      onAnnule={(itemId) => {
+        setProgrammees((p) => (p && typeof p === 'object' ? { ...p, items: (p.items || []).filter((x) => String(x.itemId) !== itemId) } : p));
+        // Le brouillon redevient un brouillon (nouvel identifiant d'envoi au
+        // prochain essai : l'ancien a déjà servi chez eBay).
+        modifierBrouillonsEbay((items0) => { for (const id in items0) { const d = items0[id]; if (d && d.programme && String(d.programme.itemId) === itemId) items0[id] = { ...d, etatBrouillon: 'brouillon', programme: null, uuid: null, verif: null }; } return items0; }).then((w) => { if (w.ok) setBrouillons(w.items); });
+      }} />
+  </>);
+  // Annuler la programmation d'une paire vendue sur Vinted : la réponse d'eBay
+  // est dite telle quelle (l'annulation par l'API n'est pas garantie).
+  const annulerVendue = async (d) => {
+    const a = d.annonce; const id = String(a.itemId);
+    const t = Date.parse(a.debut || '');
+    const ok = await askConfirm({
+      title: `Annuler la mise en ligne de la N°${d.numero} sur eBay ?`,
+      desc: `Elle est vendue sur Vinted, et eBay doit la mettre en ligne ${Number.isFinite(t) ? 'le ' + quandParisTexte(t) : 'bientôt'}.\n\nVRM demande l'annulation à eBay et te dit SA réponse. Si eBay refuse, annule-la dans le Seller Hub d'eBay avant cette heure.`,
+      ok: 'Oui, demander l\'annulation', cancel: 'Non', danger: true,
+    });
+    if (!ok) return;
+    setAnnulations((m) => ({ ...m, [id]: '…' }));
+    const { code, j } = await appelEbay({ action: 'deprogrammer', itemId: id, confirme: true });
+    if (j && j.ok) {
+      setAnnulations((m) => { const n = { ...m }; delete n[id]; return n; });
+      setProgrammees((p) => (p && typeof p === 'object' ? { ...p, items: (p.items || []).filter((x) => String(x.itemId) !== id) } : p));
+      toast(`N°${d.numero} : programmation annulée chez eBay.`, 'ok');
+    } else setAnnulations((m) => ({ ...m, [id]: code === 0 || (j && j.reason === 'incertain') ? 'eBay n\'a pas répondu — regarde sur eBay avant de recommencer.' : `eBay a répondu : « ${(j && j.error) || 'refus'} ». Annule-la dans le Seller Hub d'eBay.` }));
+  };
   const bloc = (bord) => ({ background: E.card, border: `1px solid ${bord || E.border}`, borderRadius: 14, padding: '12px 14px', marginBottom: 12 });
   const lienE = { flexShrink: 0, border: `1px solid ${E.border}`, borderRadius: 8, padding: '7px 11px', fontSize: 12.5, fontWeight: 700, color: E.text, background: 'transparent', textDecoration: 'none', cursor: 'pointer', fontFamily: 'inherit' };
   const euroE = (v) => { const n = Number(v); return isFinite(n) ? n.toFixed(2).replace('.', ',') + ' €' : ''; };
   // ── 1. ANTI DOUBLE VENTE — EN PREMIER, c'est le seul geste urgent ─────────
   const alertes = (<>
+    {/* (5 octobre) PROGRAMMÉE sur eBay, VENDUE sur Vinted : eBay la mettra en
+        ligne à l'heure dite si personne ne l'arrête. Identité par SKU (§5). */}
+    {dv.aAnnulerEbay.length > 0 && (
+      <div data-ebay-a-annuler={dv.aAnnulerEbay.length} style={bloc(E.warn)}>
+        <div style={{ fontSize: 14, fontWeight: 800, color: E.text }}>{dv.aAnnulerEbay.length} paire{dv.aAnnulerEbay.length > 1 ? 's' : ''} vendue{dv.aAnnulerEbay.length > 1 ? 's' : ''} sur Vinted — programmée{dv.aAnnulerEbay.length > 1 ? 's' : ''} sur eBay, à annuler</div>
+        <div style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, margin: '3px 0 4px' }}>Sinon eBay {dv.aAnnulerEbay.length > 1 ? 'les' : 'la'} mettra en vente à l'heure prévue, et quelqu'un pourra l'acheter une deuxième fois. L'annulation par VRM n'est pas garantie : si eBay refuse, fais-le dans le Seller Hub.</div>
+        {dv.aAnnulerEbay.map((d) => {
+          const id = String(d.annonce.itemId); const etat = annulations[id]; const t = Date.parse(d.annonce.debut || '');
+          return (
+            <div key={id} data-ebay-a-annuler-paire={d.numero} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 0', borderTop: `1px solid ${E.border}`, flexWrap: 'wrap' }}>
+              <PhotoVente src={d.annonce.photo} size={44} />
+              <div style={{ flex: '1 1 150px', minWidth: 0 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: E.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>N°{d.numero} · {d.annonce.title || id}</div>
+                <div style={{ fontSize: 11, color: E.muted }}>Vinted : vendue · eBay : programmée{Number.isFinite(t) ? ` le ${quandParisTexte(t)}` : ''}</div>
+                {etat && etat !== '…' && <div style={{ fontSize: 11, color: E.warn, marginTop: 2 }}>{etat} <a href={SELLER_HUB_PROGRAMMEES} target="_blank" rel="noreferrer" style={{ color: E.accentSoft, fontWeight: 700 }}>Seller Hub ↗</a></div>}
+              </div>
+              <button type="button" data-annuler-ebay={id} disabled={etat === '…'} onClick={() => annulerVendue(d)} style={{ ...lienE, opacity: etat === '…' ? 0.6 : 1 }}>{etat === '…' ? 'Demande à eBay…' : 'Annuler sa programmation'}</button>
+            </div>
+          );
+        })}
+      </div>
+    )}
     {dv.aRetirerEbay.length > 0 && (
       <div data-ebay-a-retirer={dv.aRetirerEbay.length} style={bloc(E.warn)}>
         <div style={{ fontSize: 14, fontWeight: 800, color: E.text }}>{dv.aRetirerEbay.length} paire{dv.aRetirerEbay.length > 1 ? 's' : ''} vendue{dv.aRetirerEbay.length > 1 ? 's' : ''} sur Vinted — encore en vente sur eBay</div>
@@ -9593,12 +10548,12 @@ function EbayAnnonces({ baseKO, comptes = [] }) {
     </div>
   );
   if (baseKO) return wrap(<>{head()}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué. Réessaie dans un instant.</div></>);
-  if (items === undefined) return wrap(<>{head()}{alertes}{lignePasSu}{publier}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Chargement…</div></>);
-  if (items === null) return wrap(<>{head()}{alertes}{lignePasSu}{publier}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Je n'ai pas pu lire tes annonces eBay. Réessaie dans un instant.</div></>);
+  if (items === undefined) return wrap(<>{head()}{alertes}{lignePasSu}{outils}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Chargement…</div></>);
+  if (items === null) return wrap(<>{head()}{alertes}{lignePasSu}{outils}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Je n'ai pas pu lire tes annonces eBay. Réessaie dans un instant.</div></>);
   // ⚠️ Une paire VENDUE sur eBay sort de cette liste (l'annonce est terminée) :
   //    c'est justement quand il n'en reste aucune que « retire-la de Vinted »
   //    compte le plus. Les alertes passent donc AVANT ce cas.
-  if (!items.length) return wrap(<>{head(0)}{alertes}{lignePasSu}{publier}<div style={{ color: E.muted, fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>Pas encore d'annonce eBay en ligne. {connected === true ? 'Mets une paire en vente ci-dessus — elle apparaîtra ici.' : 'Connecte ton compte eBay (onglet « Compte eBay ») et synchronise.'}</div></>);
+  if (!items.length) return wrap(<>{head(0)}{alertes}{lignePasSu}{outils}<div style={{ color: E.muted, fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>Pas encore d'annonce eBay en ligne. {connected === true ? 'Mets une paire en vente ci-dessus — elle apparaîtra ici.' : 'Connecte ton compte eBay (onglet « Compte eBay ») et synchronise.'}</div></>);
   // ── 4. L'OFFRE AUX OBSERVATEURS et les annonces pas reliées : une phrase
   //    chacune, au-dessus de la liste ; sur la carte, seulement le bouton ou la
   //    pastille, qui distinguent (§7). ─────────────────────────────────────────
@@ -9610,7 +10565,7 @@ function EbayAnnonces({ baseKO, comptes = [] }) {
     <div style={{ color: E.muted, fontSize: 12, marginBottom: 12 }}>Tes annonces en ligne sur eBay — touche une annonce pour la modifier</div>
     {alertes}
     {lignePasSu}
-    {publier}
+    {outils}
     <div style={{ height: 12 }} />
     {nSans > 0 && (
       <div data-ebay-sans-observateur={nSans} style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, margin: '0 2px 8px' }}>
@@ -27806,7 +28761,11 @@ const skuEbayDe = (numero) => { const c = cleNum(numero); return c && NUM_OK.tes
 const commandeEbayEngagee = (o) => !!o
   && !/CANCEL/i.test(String((o.cancelStatus && o.cancelStatus.cancelState) || ''))
   && !/FAILED|FULLY_REFUNDED/i.test(String(o.orderPaymentStatus || ''));
-function doublesVenteEbay({ annonces, commandes, numeros, enLigne, vendusVinted }) {
+// `programmees` (5 octobre) : les annonces PROGRAMMÉES sur eBay
+// (`ebay_programmees.items`, et celles que VRM vient de programmer). Une paire
+// prouvée vendue sur Vinted qui y figure ⇒ `aAnnulerEbay` : « programmée sur
+// eBay — à annuler », avant qu'eBay ne la mette en ligne tout seul.
+function doublesVenteEbay({ annonces, commandes, numeros, enLigne, vendusVinted, programmees }) {
   const parNum = new Map();
   for (const id in (numeros || {})) {
     const k = cleNum((numeros[id] || {}).numero);
@@ -27814,7 +28773,17 @@ function doublesVenteEbay({ annonces, commandes, numeros, enLigne, vendusVinted 
     if (!parNum.has(k)) parNum.set(k, []);
     parNum.get(k).push(String(id));
   }
-  const aRetirerEbay = [], aRetirerVinted = [], nonReliees = [];
+  const aRetirerEbay = [], aRetirerVinted = [], nonReliees = [], aAnnulerEbay = [];
+  if (vendusVinted) for (const p of (Array.isArray(programmees) ? programmees : [])) {
+    if (!p || !p.itemId) continue;
+    const n = numDeSkuEbay(p.sku);
+    if (!n) continue;                                             // pas de SKU : rien n'est rapproché (§5)
+    const ids = parNum.get(n) || [];
+    const vendues = ids.filter((id) => vendusVinted.has(id));
+    if (!vendues.length) continue;
+    if (enLigne && ids.some((id) => enLigne.has(id) && !vendusVinted.has(id))) continue;
+    aAnnulerEbay.push({ annonce: p, numero: n, vinted: vendues });
+  }
   for (const a of (Array.isArray(annonces) ? annonces : [])) {
     if (!a || !a.itemId) continue;
     const n = numDeSkuEbay(a.sku);
@@ -27839,7 +28808,7 @@ function doublesVenteEbay({ annonces, commandes, numeros, enLigne, vendusVinted 
       if (surVinted.length || vendueVinted.length) aRetirerVinted.push({ commande: o, ligne: li, numero: n, surVinted, vendueVinted });
     }
   }
-  return { aRetirerEbay, aRetirerVinted, nonReliees };
+  return { aRetirerEbay, aRetirerVinted, nonReliees, aAnnulerEbay };
 }
 
 function LbcRelier({ ad, numsConnus, onRelie, suggestions, detail }) {
@@ -32063,25 +33032,29 @@ function AppCoeur() {
       // Vinted (« tout centralisé dans VRM », §11). Lu sur les commandes captées
       // (scope fulfillment, déjà accordé — aucune reconnexion). Une lecture
       // ratée/vide ⇒ 0, jamais un colis inventé (§5).
-      let ebayShipCount=0, ebayARetirer=0, ebayARetirerVinted=0;
+      let ebayShipCount=0, ebayARetirer=0, ebayARetirerVinted=0, ebayAAnnuler=0;
       try{
         // §4.4 : la liste des commandes seulement, et les annonces eBay (petites).
-        const [rO, rL]=await Promise.all([
+        // (5 octobre) + les annonces PROGRAMMÉES : une paire vendue sur Vinted
+        // et programmée sur eBay se dit ici aussi (même règle, §11).
+        const [rO, rL, rP]=await Promise.all([
           fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.ebay_orders&select=orders:data->orders`,{headers:sbAuth()}),
           fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.ebay_listings&select=items:data->items`,{headers:sbAuth()}),
+          fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.ebay_programmees&select=items:data->items`,{headers:sbAuth()}),
         ]);
-        let ords=null, annE=null;
+        let ords=null, annE=null, progE=null;
         if(rO.ok){ const rows=await rO.json(); if(Array.isArray(rows)) ords=(rows[0]&&Array.isArray(rows[0].orders))?rows[0].orders:[]; }
         if(rL.ok){ const rows=await rL.json(); if(Array.isArray(rows)) annE=(rows[0]&&Array.isArray(rows[0].items))?rows[0].items:[]; }
+        if(rP.ok){ const rows=await rP.json(); if(Array.isArray(rows)) progE=(rows[0]&&Array.isArray(rows[0].items))?rows[0].items:[]; }
         if(ords) ebayShipCount=ords.filter(o=>String((o&&o.orderPaymentStatus)||'').toUpperCase()==='PAID' && String((o&&o.orderFulfillmentStatus)||'').toUpperCase()!=='FULFILLED').length;
         // ── ET L'ANTI DOUBLE VENTE eBay (5 octobre) : la MÊME règle que l'écran
         //    eBay → Annonces (`doublesVenteEbay`, §11). La preuve de vente Vinted
         //    n'est lue que si une annonce eBay porte un SKU VRM ; « pas su » ne
         //    produit aucune alerte (l'écran, lui, le dit).
-        const relieesE=(annE||[]).some(a=>a&&numDeSkuEbay(a.sku));
+        const relieesE=(annE||[]).some(a=>a&&numDeSkuEbay(a.sku))||(progE||[]).some(a=>a&&numDeSkuEbay(a.sku));
         const vendusE=relieesE?await lireVentesVintedProuvees():null;
-        const dvE=doublesVenteEbay({annonces:annE||[], commandes:ords||[], numeros:nums, enLigne:lbcOnlineIds, vendusVinted:vendusE});
-        ebayARetirer=dvE.aRetirerEbay.length; ebayARetirerVinted=dvE.aRetirerVinted.length;
+        const dvE=doublesVenteEbay({annonces:annE||[], commandes:ords||[], numeros:nums, enLigne:lbcOnlineIds, vendusVinted:vendusE, programmees:progE||[]});
+        ebayARetirer=dvE.aRetirerEbay.length; ebayARetirerVinted=dvE.aRetirerVinted.length; ebayAAnnuler=dvE.aAnnulerEbay.length;
       }catch(_){}
       if(cancelled) return;
       // ── Centre de notifications : ce qui demande une action, ici et maintenant.
@@ -32136,6 +33109,7 @@ function AppCoeur() {
       if(lbcRemoveCount>0) items.push({icon:'🟠', ic:'tag', text:`${lbcRemoveCount} à retirer de Leboncoin (vendue${lbcRemoveCount>1?'s':''} sur Vinted)`, n:lbcRemoveCount, tab:'leboncoin'});
       if(lbcVentesSansPaire>0) items.push({icon:'🟠', ic:'tag', text:`${lbcVentesSansPaire} vente${lbcVentesSansPaire>1?'s':''} Leboncoin sans paire reliée — dis laquelle pour éviter une double vente`, n:lbcVentesSansPaire, tab:'leboncoin'});
       if(ebayARetirer>0) items.push({icon:'🔵', ic:'tag', text:`${ebayARetirer} paire${ebayARetirer>1?'s':''} vendue${ebayARetirer>1?'s':''} sur Vinted, encore en vente sur eBay — à retirer d'eBay`, n:ebayARetirer, tab:'ebay_annonces'});
+      if(ebayAAnnuler>0) items.push({icon:'🔵', ic:'tag', text:`${ebayAAnnuler} paire${ebayAAnnuler>1?'s':''} vendue${ebayAAnnuler>1?'s':''} sur Vinted, programmée${ebayAAnnuler>1?'s':''} sur eBay — à annuler`, n:ebayAAnnuler, tab:'ebay_annonces'});
       if(ebayARetirerVinted>0) items.push({icon:'🔵', ic:'tag', text:`${ebayARetirerVinted} paire${ebayARetirerVinted>1?'s':''} vendue${ebayARetirerVinted>1?'s':''} sur eBay, encore en vente sur Vinted — à retirer de Vinted`, n:ebayARetirerVinted, tab:'ebay_annonces'});
       // ⚠️ Retirés le 30 septembre, à la demande de Julien : « N messages non
       // lus » et « N offres reçues » ne sont pas intéressants ici — les offres

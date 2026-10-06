@@ -81,6 +81,13 @@ const remettre = () => {
     ...TXN,
     { id: 'ebay_listings', data: { items: EBAY_ANNONCES(), capturedAt: Date.now() } },
     { id: 'ebay_orders', data: { orders: EBAY_COMMANDES, capturedAt: Date.now() } },
+    // (5 octobre) Deux annonces PROGRAMMÉES : la N°22, prouvée vendue sur
+    // Vinted ⇒ « programmée sur eBay — à annuler » ; la N°25 (une simple
+    // conversation, pas une vente) ⇒ rien.
+    { id: 'ebay_programmees', data: { items: [
+      { itemId: '110000000922', sku: 'VRM-22', title: 'Adidas Gazelle bleu taille 40', price: '85.0', debut: new Date(Date.now() + 2 * 86400000).toISOString(), photo: '' },
+      { itemId: '110000000925', sku: 'VRM-25', title: 'Asics Gel 1130 argent taille 39', price: '75.0', debut: new Date(Date.now() + 3 * 86400000).toISOString(), photo: '' },
+    ], enLigne: [], complet: true, capturedAt: Date.now() } },
   ];
 };
 
@@ -147,7 +154,11 @@ async function ouvrir(b, vp, panne) {
     const j = (d, st) => route.fulfill({ status: st || 200, contentType: 'application/json', body: JSON.stringify(d) });
     if (req.method() !== 'POST') return j({ ok: true, ready: true, canConsent: true });
     let body = {}; try { body = JSON.parse(req.postData() || '{}'); } catch (_) {}
-    if (['offre', 'retirer', 'sku', 'publish'].includes(body.action)) envois.push(body);
+    if (['offre', 'retirer', 'sku', 'publish', 'deprogrammer'].includes(body.action)) envois.push(body);
+    if (body.action === 'deprogrammer') {
+      const P = rows.find((r) => r.id === 'ebay_programmees'); P.data.items = P.data.items.filter((a) => a.itemId !== body.itemId);
+      return j({ ok: true, verifie: true });
+    }
     if (body.action === 'status') return j({ ok: true, connected: true });
     if (body.action === 'offreinfo') return panne ? j({ ok: false, error: 'eBay injoignable' }, 503) : j({ ok: true, eligibles: ['110000000002'], complet: true });
     if (body.action === 'offre') return j({ ok: true, remise: body.remise, envoyees: 3 });
@@ -211,6 +222,8 @@ const deborde = (pg) => pg.evaluate(() => ({ sw: document.documentElement.scroll
         const v = /(\d+) paires? vendues? sur eBay, encore en vente sur Vinted/.exec(t);
         dit(a && a[1] === '1', 'le tableau de bord annonce 1 paire vendue sur Vinted à retirer d\'eBay', a ? a[0] : 'absent');
         dit(v && v[1] === '1', 'et 1 paire vendue sur eBay à retirer de Vinted', v ? v[0] : 'absent');
+        const p = /(\d+) paires? vendues? sur Vinted, programmées? sur eBay — à annuler/.exec(t);
+        dit(p && p[1] === '1', 'et 1 paire vendue sur Vinted, PROGRAMMÉE sur eBay — à annuler (même règle, §11)', p ? p[0] : 'absent');
       });
       await essaie('écran Annonces eBay', async () => {
         await versAnnoncesEbay(pg);
@@ -253,6 +266,24 @@ const deborde = (pg) => pg.evaluate(() => ({ sw: document.documentElement.scroll
         dit(e.length === 1 && JSON.stringify(e[0]) === JSON.stringify(attendu), 'Oui envoie exactement {action:offre, listingId, remise:15, confirme:true}', JSON.stringify(e));
         const info = await pg.$eval('[data-ebay-info="110000000002"]', (x) => x.textContent);
         dit(/envoyée à 3/.test(info), 'la carte dit à combien de personnes l\'offre est partie', info);
+      });
+      // ── PROGRAMMÉE sur eBay, VENDUE sur Vinted : à annuler (5 octobre) ─────
+      await essaie('à annuler', async () => {
+        const nums = await pg.$$eval('[data-ebay-a-annuler-paire]', (els) => els.map((e) => e.getAttribute('data-ebay-a-annuler-paire')));
+        dit(JSON.stringify(nums) === '["22"]', 'programmée sur eBay + prouvée vendue sur Vinted ⇒ « à annuler » pour la N°22, et elle seule (pas la N°25, une conversation)', JSON.stringify(nums));
+        await pg.click('[data-annuler-ebay="110000000922"]');
+        await feuille(pg).getByRole('button', { name: "Oui, demander l'annulation" }).waitFor({ timeout: 5000 });
+        const t = await feuille(pg).innerText();
+        dit(/Seller Hub/.test(t) && /N°22/.test(t), 'la confirmation nomme la paire et dit où annuler si eBay refuse', t.replace(/\s+/g, ' ').slice(0, 120));
+        await feuille(pg).getByRole('button', { name: 'Non' }).click();
+        await pg.waitForTimeout(300);
+        dit(!envois.some((x) => x.action === 'deprogrammer'), '« Non » n\'envoie RIEN à eBay');
+        await pg.click('[data-annuler-ebay="110000000922"]');
+        await feuille(pg).getByRole('button', { name: "Oui, demander l'annulation" }).click({ timeout: 5000 });
+        await pg.waitForFunction(() => !document.querySelector('[data-ebay-a-annuler-paire]'), null, { timeout: 8000 }).catch(() => {});
+        const d = envois.filter((x) => x.action === 'deprogrammer');
+        dit(d.length === 1 && JSON.stringify(d[0]) === JSON.stringify({ action: 'deprogrammer', itemId: '110000000922', confirme: true }) && !(await pg.$('[data-ebay-a-annuler-paire]')),
+          'Oui envoie {action:deprogrammer, itemId, confirme:true} ; eBay a annulé ⇒ l\'alerte disparaît', JSON.stringify(d));
       });
       // ── RETIRER D'eBAY la paire vendue sur Vinted ───────────────────────
       await essaie('retirer', async () => {
@@ -325,6 +356,7 @@ const deborde = (pg) => pg.evaluate(() => ({ sw: document.documentElement.scroll
       dit(v.pasSu.length === 1 && /ventes Vinted/.test(v.pasSu[0]) && /ventes eBay/.test(v.pasSu[0]),
         'ventes Vinted et ventes eBay illisibles ⇒ UNE ligne qui le dit, avec ce que ça empêche', JSON.stringify(v.pasSu).slice(0, 220));
       dit(v.doublons.length === 0 && v.retirer.length === 0 && v.vendues.length === 0, 'et AUCUNE alerte, aucun « Retirer d\'eBay » sur une preuve absente');
+      dit(!(await pg.$('[data-ebay-a-annuler]')), 'ni « programmée sur eBay — à annuler » sur une preuve absente');
       dit(v.offres.length === 0 && v.sansObs === 0 && v.sansObsTxt === 0, 'éligibilité illisible ⇒ aucun bouton d\'offre, et pas de « pas d\'observateur » inventé');
       dit(v.relie['110000000002'] === '' && v.relierBtn.includes('110000000002'), 'le lien, lui, reste lisible (il vient du SKU déjà capté)');
       const r = await deborde(pg);

@@ -4943,6 +4943,153 @@ titres, ce que §5 interdit.
   repasse « pas reliée », c'est que `GetMyeBaySelling` ne rend pas le SKU comme
   prévu, et c'est ça qu'il faut regarder, pas l'écran.
 
+### ⚠️⚠️ eBay : CHAQUE VENDEUR SON eBAY, des BROUILLONS, et un PLANIFICATEUR (5 octobre)
+Julien : « tout doit être adaptable en fonction de la personne en face », puis
+« tout doit être personnalisable : le nombre d'annonces qu'il peut poster,
+sélectionner ses brouillons, ce qu'il veut mettre en ligne, etc. Tout doit être
+parfait. »
+
+**0. Deux défauts d'avant, corrigés d'abord (`api/ebay.js`).**
+- ⚠️⚠️ **« Vérifier sans publier » DOUBLAIT les frais.** `totalFrais`
+  additionnait TOUS les `<Fee>` ; or le guide Trading « Fees » dit que
+  `ListingFee` EST le total. Dès qu'un frais n'était pas nul, le montant
+  annoncé était faux (0,35 € affichés 0,70 €). Le banc `ebay-write.cjs` était
+  **vert dessus** : sa fixture servait « ListingFee 0,35 + InsertionFee 0,00 »,
+  une forme irréaliste où additionner et lire donnent le même nombre (§6.3).
+  ⇒ `fraisParNom` range chaque frais **sous son nom** ; `total` = `ListingFee`,
+  **absent ⇒ `null` (« pas su »), jamais 0** ; `programmation` = le frais
+  d'option (`SchedulingFee` — nom NON mesuré sur eBay.fr : absent ⇒ null) ; une
+  remise éventuelle est rendue à côté, jamais soustraite.
+- ⚠️ **`tradingCall` ne gardait que le PREMIER `<LongMessage>`** : sur un Ack
+  Warning ou avec plusieurs `<Errors>`, il montrait un simple avertissement à la
+  place du vrai refus, et perdait l'ErrorCode (le 488 du planificateur). Il rend
+  maintenant `erreurs` (`{code, severite, message, params}`), `err` = la
+  première **Error**, `avertissements` = les Warning.
+
+**1. Chaque vendeur son eBay.** `ebay_tokens` et les lignes `ebay_*` étaient
+celles de l'INSTALLATION (écrites au nom de `VRM_OWNER_UID`, lues avec la clé
+de service **sans filtre**), et la route refusait tout autre vendeur (403).
+- Base cloisonnée : toute lecture est filtrée `owner=eq.{vendeur de la
+  session}`, toute écriture porte `owner` = lui, cible `(owner,id)`. Le vendeur
+  est **passé explicitement** à chaque fonction de `api/_lib/ebay.js`
+  (`portee(owner)`) — jamais une variable de module (deux requêtes se traitent
+  en parallèle). Un vendeur ne lit jamais les jetons d'un autre, et ses appels
+  partent chez eBay avec **son** jeton.
+- Le `state` de consentement **porte le vendeur** (`ts.vendeur.mac`, HMAC par
+  `EBAY_CERT_ID`, 30 min, comparaison en temps constant) : le retour range les
+  jetons chez CELUI qui a demandé. Le vendeur fait partie de ce qui est signé :
+  un state dont on remplace le vendeur est refusé.
+- La garde « propriétaire seulement » est retirée sur base cloisonnée ; un
+  abonnement coupé (`vrm_acces_pour` = false) ⇒ **402**, zéro appel eBay (« pas
+  su » ne coupe pas, comme ailleurs).
+- ⚠️ **Rétrocompatible sans rien faire** : sa ligne `ebay_tokens` porte déjà
+  owner = `VRM_OWNER_UID` = son identifiant. **Base pas encore cloisonnée ⇒
+  exactement comme avant** (un seul jeu de données, seul le propriétaire de
+  l'installation) — c'est pourquoi le 403 y est GARDÉ.
+- « Pas su » ≠ « pas relié » : la lecture du refresh_token a trois états ; une
+  base qui hoquette répond 503 (« je n'ai pas pu lire ta connexion eBay »), plus
+  « aucun compte eBay relié ».
+- L'app lisait déjà toutes ses lignes eBay avec `sbAuth()` (RLS ne lui rend que
+  les siennes) — vérifié ligne par ligne.
+
+**2. Brouillons et planificateur.**
+- **Brouillons** : une ligne DÉDIÉE par vendeur (`ebay_brouillons`, jamais
+  `main`, lue projetée). « Enregistrer en brouillon » dans le formulaire ;
+  « Modifier » rouvre un brouillon dans ce même formulaire. Relire-fusionner-
+  écrire, et **une lecture ratée n'écrit RIEN** (repartir de vide remplacerait
+  ses six brouillons par un seul — prouvé au banc en réaffaiblissant). Une
+  seule règle « brouillon → annonce » (`itemDeBrouillon`) pour le formulaire ET
+  la liste (§11). Cocher un, plusieurs ou tous ; « Vérifier la sélection »
+  (une vérification à blanc par brouillon, l'une après l'autre, frais par nom).
+- **Planificateur** (« Programmer la sélection ») : départ (préréglages
+  **modifiables et synchronisés** : Maintenant · Ce soir 20 h · Demain 12 h 30 ·
+  Dimanche 20 h, ou une date et une heure), N par jour, plage de–à, jours de la
+  semaine, **écart FIXE** (aucun hasard, §3), ordre (sélection / N° / prix).
+  Le rythme est `vrm_ebay_rythme` (SYNC_KEYS, rattrapé par `onCloudReady`
+  seulement s'il est resté au défaut, §5.49).
+  - L'heure est celle de **PARIS**, calculée par `Intl` (`partsParis`,
+    `parisVersUtc`) — jamais l'heure locale de l'appareil. Le changement d'heure
+    du 25 octobre 2026 est juste (19:00 = 17:00 UTC le samedi, 18:00 UTC le
+    dimanche) ; une heure ambiguë ou inexistante est refusée ; « un jour plus
+    tard » avance le CALENDRIER, pas 24 h. Le banc tourne exprès avec un
+    navigateur à l'heure de **New York**.
+  - `heuresDuLot` est une fonction pure du temps : premier moment autorisé,
+    puis l'écart ; quota du jour ou plage dépassés ⇒ jour coché suivant. Jamais
+    une annonce programmée à moins de 20 min (eBay en exige 15) ; au-delà de
+    3 semaines (la limite d'eBay) les brouillons **restent des brouillons**, et
+    l'écran dit combien.
+  - L'aperçu donne l'heure exacte de chaque paire, groupé par jour, puis les
+    frais **lus chez eBay pour CETTE heure** (vérification à blanc avec
+    `ScheduleTime`) : programmation ligne par ligne et au total, « pas su »
+    quand eBay ne l'annonce pas (jamais 0), et « facturés à la création, non
+    remboursés si tu annules » **seulement** si un frais de programmation non
+    nul est revenu. Une paire déjà en ligne / déjà programmée sur eBay (SKU),
+    prouvée vendue sur Vinted, sans N° ou incomplète est écartée **avec sa
+    raison** ; preuve de vente illisible ⇒ rien ne part.
+  - La limite de vente (`GET /sell/account/v1/privilege`) est lue et dite ; un
+    lot qui la dépasserait est signalé (« pas su » si illisible). ⚠️ C'est une
+    LIMITE mensuelle, pas ce qu'il reste ce mois-ci (non exposé là).
+  - ⚠️⚠️ **CE QUI N'EST PAS PROUVÉ EST DIT, JAMAIS PROMIS.** Avant sa PREMIÈRE
+    programmation, une case à cocher : l'annulation par VRM n'est pas garantie
+    (il faudra peut-être annuler sur eBay), et une paire vendue ailleurs avant
+    son heure peut quand même partir. C'est SA décision (la revue proposait
+    d'attendre la mesure de l'annulation ; Julien a demandé le planificateur —
+    il décide en connaissance de cause). Mémorisée (`risqueCompris`).
+- **Programmer** (`programmer`, une annonce par appel, l'une après l'autre) :
+  `confirme:true`, heure ISO UTC validée par le serveur (15 min – 3 semaines),
+  N° exigé (sans SKU, une paire vendue ailleurs ne se retrouve pas), **état
+  exigé** (plus d'« Occasion » posé en silence), UUID 32 hex, frais vus. Puis :
+  relecture de SES annonces (en ligne + programmées) ⇒ SKU déjà présent = 409
+  (eBay, lui, ne l'empêche pas) ; illisible = 503 · vérification à blanc **sans
+  UUID** ⇒ frais inconnus = refus, plus chers que vus = 409 · ajout **avec
+  l'UUID** dans `<Item>`, `<ScheduleTime>` dans `<Item>`. La vérité rendue est
+  celle d'eBay (ItemID, StartTime, EndTime) ; eBay qui ignore l'heure ⇒
+  `enLigneMaintenant`. Coupure ⇒ « incertain » : l'app relit chez eBay par SKU
+  AVANT tout nouvel essai, puis UN seul essai avec le MÊME UUID ; un 488 n'est
+  « déjà programmée » qu'après un GetItem qui confirme le SKU. Bilan par
+  brouillon (« 4 sur 6 programmées · 2 refusées : … »), jamais d'arrêt muet.
+- **Programmées** : `GetMyeBaySelling` demande `<ScheduledList>` (sans elle une
+  programmée est invisible : « pas vu » ≠ « aucune »), découpé **par
+  conteneur** avant d'en extraire les `<Item>`, paginé (5 pages, sinon
+  `complet:false`). Rangées dans `ebay_programmees` seulement si eBay a
+  répondu ; ligne absente = « jamais lue » ⇒ l'écran la demande une fois.
+  Groupées par jour ; statuts Programmée · En ligne · « Pas partie à l'heure »
+  (+30 min, eBay la garde en attente, avec le geste) · « à relire » ; Échec sur
+  le brouillon.
+- **Déplacer** (`reprogrammer`) : refusé à moins d'1 h du départ (relu chez
+  eBay), grisé avec la raison à l'écran. **Annuler** (`deprogrammer`) :
+  EndFixedPriceItem **essayé** sur une programmée relue à l'instant, puis
+  relecture ; la réponse d'eBay est montrée TELLE QUELLE, et sur un refus
+  « annule-la dans le Seller Hub » avec le lien.
+- **Double vente** : une programmée dont la paire est prouvée vendue sur Vinted
+  rejoint l'alerte eBay (« programmée sur eBay — à annuler »), sur l'écran ET
+  le tableau de bord (`doublesVenteEbay`, `programmees`, §11).
+
+⚠️ **NON MESURÉ (eBay et la production bloqués ici — rien n'a été appelé pour
+de vrai)** : le nom `SchedulingFee` sur eBay.fr et son montant (≈ 0,20 € selon
+l'aide, la vérification à blanc fait foi) ; qu'EndFixedPriceItem accepte une
+annonce pas encore commencée ; ReviseFixedPriceItem + ScheduleTime ; qu'eBay
+omette un conteneur vide dans GetMyeBaySelling (lu « vide » sur un Ack
+Success) ; l'adresse `ebay.fr/sh/lst/scheduled` du Seller Hub (un repli, pas une
+promesse) ; le délai maximal de la fonction Vercel (un ajout lent devient
+« incertain », couvert par la relecture par SKU). **Le premier geste de
+Julien** : programmer UNE paire, une heure à l'avance, regarder la ligne de
+frais de programmation, puis essayer « Annuler » — la réponse d'eBay dira si
+l'annulation par VRM marche.
+
+- Preuves : `audit-ebay-route.cjs` **153 contrôles** (dont 6 dans un processus
+  neuf sur base NON cloisonnée), **73 rouges** sur e50cd28 ; et chacune de huit
+  mutations le refait passer au rouge (lecture sans filtre de vendeur · UUID à
+  la vérification · frais additionnés · garde d'identité retirée · 488 cru sans
+  GetItem · XML lu sans conteneur · state non vérifié · premier message gardé).
+  `ebay-write.cjs` : forme réaliste, **5 rouges** sur l'avant (`fees=1.1`).
+  Banc `scripts/bancs/ebay-programmer.cjs` (données inventées, port 4721, deux
+  tailles + un passage « brouillons illisibles ») : **71 contrôles**, rouge sur
+  le build d'avant, et rouge sous quatre mutations (heure locale · décalage fixe
+  +2 h · risque non coché · brouillons écrits depuis vide).
+  `ebay-annonces.cjs` : + l'alerte « à annuler » (écran, tableau de bord,
+  « pas su ») — **7 rouges** sur l'avant.
+
 ### Mise en production du 5 octobre
 PR #442 mergée à 10:24 UTC (80 déploiements sur 24 h : sous la limite), déploiement
 de production READY sur le commit de merge, `/api/sante` répond, le zip servi
