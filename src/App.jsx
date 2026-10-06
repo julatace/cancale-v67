@@ -20461,7 +20461,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (_acctCache['purchased']) { _acctCache['purchased'].items = (_acctCache['purchased'].items || []).filter(x => String(x.transaction_id) !== String(o.transaction_id)); _persistAcctCache(); }
     toast('Achat masqué — Réglages → Achats masqués pour le réafficher.');
   };
-  const achatsAffiches = useMemo(() => buysBase
+  const achatsAffiches = useMemo(() => { const uidA = o => String((o && o._acc && o._acc.vinted_user_id) || (o && o._uid) || '');
+    let arr = buysBase
+    .filter(o => !compteSel || uidA(o) === String(compteSel))   // filtre par compte (sélecteur de l'onglet)
     .filter(o => { const p = phaseReception(o);
       if (aFilter === 'attente') return false;
       if (aFilter === 'route') return p === 'route';
@@ -20475,9 +20477,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // traîne depuis trois semaines. Partout ailleurs le plus récent d'abord.
     .sort((a, b) => { const pr = x => x.st.step===3?0 : x.st.step===2?1 : x.st.step===1?2 : x.st.step===4?3 : 4;
       const d = pr(a) - pr(b); if (d !== 0) return d;
-      return aFilter === 'route' ? ((tsCommande(a.o)||0) - (tsCommande(b.o)||0)) : (new Date(b.o.date||0) - new Date(a.o.date||0)); }),
+      return aFilter === 'route' ? ((tsCommande(a.o)||0) - (tsCommande(b.o)||0)) : (new Date(b.o.date||0) - new Date(a.o.date||0)); });
+    // « Tous » ⇒ les achats du compte connecté d'abord (tri STABLE).
+    if (!compteSel && compteConnecte) { const c = String(compteConnecte);
+      arr = [...arr].sort((a,b)=>{ const ac=uidA(a.o)===c, bc=uidA(b.o)===c; return ac===bc?0:(ac?-1:1); }); }
+    return arr; },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [buysBase, aFilter, ordSearchDiff, periode, tracking, colisRelais, numeros]);
+    [buysBase, aFilter, ordSearchDiff, periode, tracking, colisRelais, numeros, compteSel, compteConnecte]);
   const [achatsMax, setAchatsMax] = useState(60);
   // ── ACHATS · ACTIONS RAPIDES (note interne + menu « … ») ──────────────────
   // Note interne par achat (synchronisée, clé = transaction_id) + menu groupant
@@ -32661,11 +32667,11 @@ function AppCoeur() {
               L'écran complet existait (liste tous comptes, fil, réponse, offres)
               mais n'avait plus AUCUNE porte dans Vinted : seulement la cloche. */}
           <PlatSubNav sub={platSub} setSub={setPlatSub} sections={[['ventes','Ventes'],['achats','Achats'],['annonces','Annonces'],['messages','Messages', !!(liveStats && liveStats.unread > 0)]]}/>
-          {/* Filtre par compte (Julien, 6 oct.) — d'abord Ventes / Annonces (là
-              où le filtre est câblé) ; Achats et Messages suivent. Les Colis ne
-              sont pas filtrés (« pour les colis pas forcément »). Un seul compte
-              ⇒ la rangée ne s'affiche pas. */}
-          {(platSub==='ventes'||platSub==='annonces') && <SelecteurCompte accounts={vintedAccounts} sel={compteSel} setSel={setCompteSel} connecte={compteConnecte}/>}
+          {/* Filtre par compte (Julien, 6 oct.) — Ventes / Annonces / Achats.
+              Les Messages ont leur propre filtre interne ; les Colis ne sont pas
+              filtrés (« pour les colis pas forcément »). Un seul compte ⇒ la
+              rangée ne s'affiche pas. */}
+          {(platSub==='ventes'||platSub==='annonces'||platSub==='achats') && <SelecteurCompte accounts={vintedAccounts} sel={compteSel} setSel={setCompteSel} connecte={compteConnecte}/>}
           <Comptabilite key={'pv_'+platSub} accounts={vintedAccounts} only={platSub==='apercu'?'ventes':platSub} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum} compteSel={compteSel} compteConnecte={compteConnecte}/>
         </>)}
         {tab==='plat_leboncoin'&&(<>
