@@ -4787,7 +4787,35 @@ mesurées, et aucune n'était « l'extension est éteinte »** :
   l'orthographe `member/transactions/` près de `genere_sans_pdf` ; le lien passe
   maintenant par une variable. Il suit la variable jusqu'à sa définition — et
   repasse au rouge quand on y retire l'adresse Vinted (prouvé).
-- ⚠️ **Le chantier PDF→stockage avait réservé la 5.160** : il passera en 5.161.
+- ⚠️ **Le chantier PDF→stockage avait réservé la 5.160** : il passera en **5.163**
+  (5.161 = suite de la revue ci-dessous, 5.162 = défauts d'extension mesurés).
+- **Revue contradictoire (26 constats, 5 octobre au soir)** — corrigé en 5.161 et
+  dans l'app, chacun prouvé rouge sur e50cd28 :
+  - ⚠️⚠️ **Une extension < 5.129 passait « muette » au bout de 15 s** (elle ne
+    connaît pas « état ») : « recharge la page », éternellement, à quelqu'un qui
+    devait METTRE À JOUR. « En retard » passe avant « muette », et un pont trop
+    ancien n'est plus questionné (il garde la session d'avant, à défaut).
+  - ⚠️⚠️ **La grâce de 1,5 s pouvait faire envoyer une réponse DEUX fois** : une
+    erreur d'orphelin rendue pendant que le pont vivant ENVOIE → « échec » →
+    il renvoie. Une COMMANDE et un ENVOI attendent l'échéance ; la grâce ne
+    vaut que pour une lecture.
+  - **Séparation d'avance** d'une extension qui a encore la famille de jetons
+    de l'app (une fois par appareil et par compte : `vrm_ext_separee_{uid}` —
+    pas une migration de données, au pire une séparation de plus) ; « autre
+    compte » tranché par l'onglet au premier plan (deux onglets se la
+    renvoyaient) ; rien n'est envoyé si le compte a changé pendant l'attente.
+  - **Une paire ne part plus deux fois sur Leboncoin** : avec le relais complet,
+    un double clic ouvrait deux dépôts (et Leboncoin publie seul). Verrou par
+    paire posé AVANT toute attente + dépôt de moins de 15 min refusé (audit :
+    3 dépôts pour 3 clics avant, 1 après).
+  - « Pas su » ne vaut plus ✓ (session VRM inconnue, renouvellement en cours,
+    cookie Vinted pas lu à temps : `vintedPasSu`, 5.161) ; l'indicateur ne
+    promet que les capacités INSTALLÉES ; plus de promesse « le PDF remonte
+    avec l'email » (elle dépend de la réception de chaque vendeur).
+  - Laissé tel quel, noté : un « Se déconnecter » volontaire dans la fenêtre
+    de l'extension est réparé par l'app au battement suivant (c'est la page
+    connectée qui décide) — pour la déconnecter, se déconnecter de VRM.
+
 
 ### eBay « de ouf » : l'annonce reliée à sa paire, l'offre aux observateurs, l'anti double vente (5 octobre)
 Julien : « pour eBay je ne sais pas pourquoi le site est si peu développé, tu as
