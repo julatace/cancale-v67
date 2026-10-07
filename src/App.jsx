@@ -7252,6 +7252,58 @@ function BoutonBordereau({ uid, tx, conv, login, aGenerer, pdf, onImprimer, onFa
     </span>
   );
 }
+// ── « TOUT GÉNÉRER » : commander tous les bordereaux manquants, SUR SON CLIC ──
+// Julien, 7 oct. : « ça ne doit pas être automatique, il doit y avoir un bouton
+// générer ET tout générer ». Le « Générer » par colis existe (BoutonBordereau) ;
+// ceci est le bouton d'ensemble. ⚠️ §3 : la génération part chez VINTED — on
+// envoie les commandes UNE PAR UNE (await séquentiel), jamais en rafale ; et
+// seulement pour le compte ouvert dans Chrome (garde stricte côté extension),
+// les autres sont comptés et il bascule. Rien ne part sans ce clic.
+function BoutonToutGenerer({ items }) {
+  const { etat } = useExtVivante();
+  const sansSouris = useSansSouris();
+  const [busy, setBusy] = React.useState(false);
+  const [prog, setProg] = React.useState(null);
+  const [resume, setResume] = React.useState(null);
+  const list = (items || []).filter(x => x && x.uid && x.tx);
+  if (list.length < 1) return null;
+  const glob = raisonExtGlobale(sansSouris);
+  const co = etat && etat.vinted ? String(etat.vinted.uid) : '';
+  const mine = co ? list.filter(x => String(x.uid) === co) : [];
+  const autres = list.length - mine.length;
+  const lancer = async () => {
+    if (glob || busy) return;
+    setResume(null);
+    if (!co) { setResume("Aucun compte Vinted ouvert dans ce Chrome — ouvre vinted.fr sur le compte des colis, puis réessaie."); return; }
+    if (!mine.length) { setResume(`Ces colis sont sur un autre compte — bascule sur vinted.fr pour les générer (${autres}).`); return; }
+    setBusy(true);
+    let ok = 0, ko = 0;
+    for (let i = 0; i < mine.length; i++) {
+      setProg({ k: i + 1, n: mine.length });
+      const x = mine[i];
+      // Une commande, on attend sa réponse avant la suivante ; l'extension les
+      // exécute en file (une requête Vinted à la fois, §3) sous son plafond 20/h.
+      const r = await vmrCmd({ cmd: 'bordereau', uid: String(x.uid), tx: String(x.tx) });
+      if (r && r.accepte) { ok++; if (r.jobId) { __vmrJobs[r.jobId] = { etape: r.etape, at: Date.now() }; __vmrNotifier(); } }
+      else ko++;
+    }
+    setBusy(false); setProg(null);
+    setResume(`${ok} bordereau${ok > 1 ? 'x' : ''} lancé${ok > 1 ? 's' : ''}${ko ? ` · ${ko} refusé${ko > 1 ? 's' : ''}` : ''}${autres ? ` · ${autres} sur un autre compte (bascule pour les générer)` : ''}. Chaque colis montre sa progression ci-dessous.`);
+  };
+  const grise = !!glob;
+  const n = co ? (mine.length || list.length) : list.length;
+  return (
+    <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3, maxWidth: '100%' }}>
+      <button type="button" data-tout-generer={grise ? 'grise' : 'pret'} onClick={lancer} disabled={busy} aria-disabled={grise ? 'true' : undefined}
+        title={glob ? glob.texte : "L'extension génère chaque bordereau sur Vinted, un par un (jamais en rafale)"}
+        style={{ flexShrink: 0, border: `1px solid ${grise ? C.border : C.accent}`, borderRadius: 10, background: grise ? 'transparent' : `${C.accent}14`, color: grise ? C.muted : C.accent,
+          padding: '11px 15px', cursor: grise || busy ? 'default' : 'pointer', fontSize: 13, fontWeight: 700, fontFamily: 'inherit', opacity: grise ? 0.55 : (busy ? 0.7 : 1), filter: grise ? 'grayscale(1)' : 'none', whiteSpace: 'nowrap' }}>
+        <Icon name="doc" size={14}/> {busy && prog ? `Génération… ${prog.k}/${prog.n}` : `Tout générer (${n})`}
+      </button>
+      {(resume || glob) && <span style={{ fontSize: 11, color: C.muted, lineHeight: 1.35, whiteSpace: 'normal' }}>{resume || glob.texte}</span>}
+    </span>
+  );
+}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // PUBLIER DEPUIS L'APP (5.130) — « c'est l'application qui contrôle l'extension »
@@ -17357,11 +17409,18 @@ function SelecteurCompte({ accounts, sel, setSel, connecte }) {
       color: actif ? (C.onAccent || '#fff') : C.text, borderRadius: 999, padding: '5px 12px', fontSize: 12.5,
       fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>{kids}</button>
   );
+  // ⚠️ PAR DÉFAUT, LE COMPTE DE L'EXTENSION (Julien, 7 oct. : « ça doit être
+  //    d'office celui sur lequel l'extension est, si elle est ouverte »).
+  //    `sel` vaut '' tant qu'il n'a rien choisi → le compte EFFECTIF est alors
+  //    celui connecté dans Chrome (`connecte`), et les autres sont floutés.
+  //    « Tous les comptes » est un choix EXPLICITE (sentinelle '*'), sinon un
+  //    clic sur « Tous » retomberait aussitôt sur le compte connecté.
+  const eff = String(sel) === '*' ? '' : String(sel || co || '');
   return (
     <div className="vrm-rangee" style={{ display: 'flex', gap: 8, padding: '10px 16px 0', alignItems: 'center' }}>
-      {puce(!sel, () => setSel(''), 'Tous les comptes', '_tous')}
+      {puce(eff === '', () => setSel('*'), 'Tous les comptes', '_tous')}
       {tri.map(a => { const uid = String(a.vinted_user_id);
-        return puce(String(sel) === uid, () => setSel(String(sel) === uid ? '' : uid),
+        return puce(eff === uid, () => setSel(eff === uid ? '*' : uid),
           <>{uid === co ? '📍 ' : ''}{nom(a)}</>, uid); })}
     </div>
   );
@@ -19370,7 +19429,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // valeur le compte choisi sans rien cacher. `uidLigne` lit l'OBJET `_acc`
   // (repli `_uid`), comme partout (§11). Rien sélectionné ⇒ aucun flou.
   const uidLigne = o => String((o && o._acc && o._acc.vinted_user_id) || (o && o._uid) || '');
-  const estFloute = (o) => !!(compteSel && uidLigne(o) !== String(compteSel));
+  // ⚠️ COMPTE EFFECTIF (Julien, 7 oct.) : tant qu'il n'a rien choisi (`compteSel`
+  //    vide), c'est le compte CONNECTÉ dans Chrome qui est mis en valeur et les
+  //    autres sont floutés — « d'office celui de l'extension ». « Tous » est un
+  //    choix explicite (sentinelle '*') qui éteint le flou. Sans extension
+  //    (téléphone), `compteConnecte` est vide ⇒ aucun flou. Une seule définition,
+  //    lue par le flou, les tris et la messagerie (§11).
+  const selEff = String(compteSel) === '*' ? '' : selEff;
+  const estFloute = (o) => !!(selEff && uidLigne(o) !== selEff);
   const STYLE_FLOU = { filter: 'blur(2px) grayscale(0.55)', opacity: 0.4, pointerEvents: 'none', transition: 'filter 160ms ease-out, opacity 160ms ease-out' };
   const ventesAffichees = useMemo(() => {
     const uidV = o => String((o && o._acc && o._acc.vinted_user_id) || (o && o._uid) || '');
@@ -19413,7 +19479,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     .sort(parDateDesc);
     // Compte sélectionné (ou connecté) EN TÊTE ; les autres restent (ils seront
     // FLOUTÉS à l'affichage, pas masqués — demande de Julien). Tri stable.
-    { const c = String(compteSel || compteConnecte || '');
+    { const c = selEff;
       if (c) arr = [...arr].sort((a,b) => { const ac = uidV(a)===c, bc = uidV(b)===c; return ac===bc ? 0 : (ac ? -1 : 1); }); }
     return arr;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -19731,7 +19797,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const uidAnn = it => String((it && it._acc && it._acc.vinted_user_id) || '');
     // Compte choisi (ou connecté) EN TÊTE ; les autres restent (floutés à
     // l'affichage, pas masqués — demande de Julien).
-    const c = String(compteSel || compteConnecte || '');
+    const c = selEff;
     if (c) arr = [...arr].sort((a,b) => { const ac = uidAnn(a)===c, bc = uidAnn(b)===c; return ac===bc ? 0 : (ac ? -1 : 1); });
     return arr;
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -20811,7 +20877,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       return aFilter === 'route' ? ((tsCommande(a.o)||0) - (tsCommande(b.o)||0)) : (new Date(b.o.date||0) - new Date(a.o.date||0)); });
     // Compte choisi (ou connecté) EN TÊTE ; les autres restent (floutés, pas
     // masqués — demande de Julien). Tri STABLE.
-    { const c = String(compteSel || compteConnecte || '');
+    { const c = selEff;
       if (c) arr = [...arr].sort((a,b)=>{ const ac=uidA(a.o)===c, bc=uidA(b.o)===c; return ac===bc?0:(ac?-1:1); }); }
     return arr; },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -25583,9 +25649,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const uidC = c => String((c._acc&&c._acc.vinted_user_id)||'');
           // Compte choisi ⇒ les AUTRES restent (floutés, pas masqués — Julien).
           const liste = (convs.items||[]).filter(c=>!acctOffOf(c));
-          const nonLus = liste.filter(c=>c.unread && (!compteSel || uidC(c)===String(compteSel))).length;
+          const nonLus = liste.filter(c=>c.unread && (!selEff || uidC(c)===selEff)).length;
           // Compte choisi (ou connecté) d'abord, puis non lus, puis les récents.
-          const coMsg = String(compteSel || compteConnecte || '');
+          const coMsg = selEff;
           const tri = [...liste].sort((a,b)=>
             (coMsg ? ((uidC(b)===coMsg?1:0)-(uidC(a)===coMsg?1:0)) : 0)
             || (b.unread?1:0)-(a.unread?1:0)
@@ -25608,7 +25674,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   const photo = (c.opposite_user&&c.opposite_user.photo&&c.opposite_user.photo.url) || (c.item_photos&&c.item_photos[0]&&c.item_photos[0].url) || null;
                   return (
                     <button key={(c._acc?c._acc.vinted_user_id:'')+'_'+c.id} type="button" data-conv={c.id} onClick={()=>openConversation(c)}
-                      style={{display:'flex',gap:10,alignItems:'center',width:'100%',textAlign:'left',padding:'10px 12px',border:'none',borderTop:i?`1px solid ${C.border}`:'none',background:'transparent',color:C.text,cursor:'pointer',fontFamily:'inherit',...(compteSel&&uidC(c)!==String(compteSel)?STYLE_FLOU:null)}}>
+                      style={{display:'flex',gap:10,alignItems:'center',width:'100%',textAlign:'left',padding:'10px 12px',border:'none',borderTop:i?`1px solid ${C.border}`:'none',background:'transparent',color:C.text,cursor:'pointer',fontFamily:'inherit',...(selEff&&uidC(c)!==selEff?STYLE_FLOU:null)}}>
                       {photo ? <img src={photo} alt="" loading="lazy" style={{width:40,height:40,borderRadius:8,objectFit:'cover',flexShrink:0}}/> : <span style={{width:40,height:40,borderRadius:8,background:C.card2||C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',color:C.muted,flexShrink:0}}><Icon name="chat" size={17}/></span>}
                       <span style={{flex:1,minWidth:0}}>
                         <span style={{display:'flex',alignItems:'baseline',gap:6}}>
@@ -25672,6 +25738,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const aPoster = ex.filter(e=>!(e.o && isShipDone(e.o)));
           const avecPdf = ex.filter(e=>((e.b && e.b.hasPdf) || (e.txn && labelsCaptes[e.txn])) && !(e.o && isShipDone(e.o)));
           const proNb = avecPdf.filter(e=>e.b && invForBord(e.b)).length;   // comptes pro : facture jointe
+          // « À générer » = colis à poster SANS bordereau (ni PDF capté, ni email).
+          // Chacun a son bouton « Générer » ; le bouton d'ensemble les commande
+          // sur son clic (§3). Offert seulement si la lecture est complète, pour
+          // ne pas « générer » un bordereau déjà là mais pas encore lu.
+          const aGenItems = (!labelsPrets || emailBords===null) ? [] : aPoster
+            .filter(e=>!(((e.b && e.b.hasPdf) || (e.txn && labelsCaptes[e.txn]))))
+            .map(e=>({ uid: e.o && e.o._acc && e.o._acc.vinted_user_id, tx: e.o && String(e.o.transaction_id), login: accNameOf(e.o && e.o._acc) }))
+            .filter(x=>x.uid && x.tx);
           // ⚠️ « PAS ENCORE LU » N'EST PAS « AUCUN » (§5 Colis). Pendant que les
           // bordereaux captés et les emails se lisent, l'en-tête écrivait « 0
           // bordereau prêt à imprimer · 3 en attente de bordereau », puis « 2 · 1 »,
@@ -25713,6 +25787,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {batchBusy?'Préparation…':avecPdf.length===1?'🖨 Imprimer':`🖨 Tout imprimer (${avecPdf.length})`}
                   </button>
                 )}
+                {aGenItems.length>0 && <BoutonToutGenerer items={aGenItems}/>}
               </div>
               {/* Retiré le 30 septembre (Julien) : « 1 imprime, colle, dépose et
                   clique sur fait, ça sert à rien, tu peux enlever ». */}
