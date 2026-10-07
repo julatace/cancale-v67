@@ -16943,6 +16943,24 @@ function ComptaPro({ liveStats, onNav }) {
   const depMois = somme(depenses.filter(d => ceMois(d.date)), x => x.montant);
   const chargesMois = fixesParMois + depMois + somme(packs.filter(p => ceMois(p.date)), x => x.montant);
 
+  // ── RÉSULTAT = recettes déclarées − charges ───────────────────────────────
+  // Les charges (packs, dépenses, coûts fixes) sont « prises en compte » ICI,
+  // au niveau qui est réellement calculable. On CONSOMME la ligne publiée par
+  // l'écran Ventes (`vinted_urssaf_mois`, le CA déclaré, toutes plateformes,
+  // §11) — on ne recalcule aucun CA. Ligne absente/pas encore publiée ⇒ `null`
+  // (on n'invente pas de recettes). ⚠️ Ce n'est PAS le bénéfice : le coût
+  // d'achat des paires n'est pas déduit ici (il n'est pas saisi, §2.5, et il
+  // vit dans Statistiques) — le libellé et la note le disent.
+  const recettesAnnee = (() => {
+    try {
+      const v = load('vinted_urssaf_mois', null);
+      if (!v || !Array.isArray(v.mois)) return null;
+      return v.mois.filter(m => String(m.ym || '').slice(0, 4) === String(annee))
+        .reduce((s, m) => s + (Number(m.ca) || 0), 0);
+    } catch (_) { return null; }
+  })();
+  const resultatAnnee = recettesAnnee == null ? null : recettesAnnee - chargesAnnee;
+
   // ── Formulaires d'ajout (états locaux) ────────────────────────────────────
   const auj = new Date().toISOString().slice(0, 10);
   const [dDate, setDDate] = React.useState(auj);
@@ -17007,6 +17025,41 @@ function ComptaPro({ liveStats, onNav }) {
       </div>
       <div style={{ fontSize: 12, color: C.muted, marginTop: -8, lineHeight: 1.5 }}>
         Ce sont les charges que <b>tu</b> renseignes. Ton chiffre d'affaires et ton bénéfice (ventes − prix d'achat) se lisent sur <button type="button" onClick={() => onNav && onNav('dashboard')} style={{ border: 'none', background: 'transparent', color: C.blue || C.accent, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', padding: 0, fontSize: 12 }}>Statistiques →</button>
+      </div>
+
+      {/* RÉSULTAT DE L'ANNÉE — recettes déclarées (consommées de la ligne publiée,
+          §11) moins les charges. Les packs/dépenses/coûts fixes sont « pris en
+          compte » ici. Recettes pas encore publiées ⇒ tiret + la porte (§5/§7). */}
+      <div style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 10, padding: '14px 16px' }}>
+        <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 500, marginBottom: 8 }}>Résultat {annee} · après tes charges</div>
+        {recettesAnnee == null ? (
+          <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>
+            <span className="vrm-display" style={{ fontSize: 23, fontWeight: 700, color: C.text }}>—</span>
+            <div style={{ marginTop: 4 }}>Ton CA déclaré n'est pas encore là sur cet appareil — ouvre <button type="button" onClick={() => onNav && onNav('cat_ventes')} style={{ border: 'none', background: 'transparent', color: C.blue || C.accent, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', padding: 0, fontSize: 13 }}>Ventes</button>, puis reviens : tes charges seront déduites ici.</div>
+          </div>
+        ) : (
+          <>
+            <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'baseline' }}>
+              <div>
+                <div className="vrm-display" style={{ fontSize: 24, fontWeight: 700, color: C.text }}>{fmt(recettesAnnee)}</div>
+                <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>CA déclaré {annee}</div>
+              </div>
+              <div style={{ fontSize: 18, color: C.muted, fontWeight: 600 }}>−</div>
+              <div>
+                <div className="vrm-display" style={{ fontSize: 24, fontWeight: 700, color: C.text }}>{fmt(chargesAnnee)}</div>
+                <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>tes charges</div>
+              </div>
+              <div style={{ fontSize: 18, color: C.muted, fontWeight: 600 }}>=</div>
+              <div>
+                <div className="vrm-display" style={{ fontSize: 26, fontWeight: 800, color: resultatAnnee < 0 ? C.warn : C.text }}>{fmt(resultatAnnee)}</div>
+                <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>résultat</div>
+              </div>
+            </div>
+            <div style={{ fontSize: 11.5, color: C.muted, marginTop: 8, lineHeight: 1.5 }}>
+              Recettes − charges d'entreprise. Le <b>coût d'achat de tes paires</b> n'est pas déduit ici (il se saisit par paire et vit dans <button type="button" onClick={() => onNav && onNav('dashboard')} style={{ border: 'none', background: 'transparent', color: C.blue || C.accent, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', padding: 0, fontSize: 11.5 }}>Statistiques</button>) — ce n'est donc pas encore ton bénéfice net.
+            </div>
+          </>
+        )}
       </div>
 
       {/* DÉPENSES PONCTUELLES */}
