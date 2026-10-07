@@ -31318,7 +31318,17 @@ function AppCoeur() {
   // et ses lignes remontent quand « Tous » est choisi). « pas su » ⇒ '' (on ne
   // met rien en avant à tort). Même source que la carte des premiers pas (§11).
   const [compteConnecte,setCompteConnecte]=useState('');
-  React.useEffect(()=>{ let stop=false; (async()=>{ try{ const e=await vmrAuthEtat(); const uid=String((e&&e.vinted&&e.vinted.uid)||''); if(!stop) setCompteConnecte(uid); }catch(_){} })(); return ()=>{stop=true;}; },[]);
+  React.useEffect(()=>{ let stop=false;
+    const relire=async()=>{ try{ const e=await vmrAuthEtat(); const uid=String((e&&e.vinted&&e.vinted.uid)||''); if(!stop) setCompteConnecte(uid); }catch(_){} };
+    relire();
+    // ⚠️ Re-lu quand il REVIENT sur l'onglet de l'app (après un tour sur Vinted,
+    //    où il a pu changer de compte, ou brancher l'extension) : sinon le
+    //    compte mis en avant d'office reste figé sur celui du chargement. C'est
+    //    une lecture du PONT (zéro requête Vinted), et ça ne touche QUE le défaut
+    //    — son choix explicite (`compteSel`) gagne toujours.
+    const relirePont=()=>{ if(!document.hidden) relire(); };
+    window.addEventListener('focus',relire); document.addEventListener('visibilitychange',relirePont);
+    return ()=>{ stop=true; window.removeEventListener('focus',relire); document.removeEventListener('visibilitychange',relirePont); }; },[]);
   // L'ancien onglet « Messages » (cloche, bandeau, « à faire ») mène désormais
   // aux messages DANS Vinted : une seule porte pour un seul écran.
   React.useEffect(()=>{ if(tab==='cat_msg'){ subVoulue.current='messages'; setTab('plat_vinted'); } },[tab]);
