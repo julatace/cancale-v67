@@ -161,7 +161,17 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 //   releve  `capterReleves`       5.52.0  (5 sept.)   le relevé daté du porte-monnaie
 // `audit-coherence.cjs` vérifie que ces trois fonctions existent toujours dans
 // l'extension : une capacité annoncée mais retirée serait le même mensonge.
-const EXT_CAPACITES = { codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', repond: '5.77.0', commande: '5.129.0', publication: '5.130.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', detourage: '5.156.0' };
+// ⚠️⚠️ LE SEUIL EST LA VERSION OÙ LA CHOSE MARCHE DE BOUT EN BOUT, PAS OÙ LE
+// BOUTON EST APPARU. `publierDepuisApp` est arrivé en 5.130, mais le relais de
+// `content.js` recopiait alors `cmd, uid, tx, jobId` et JETAIT `id, etat, limit,
+// plan` : « Publier sur Leboncoin » depuis l'app partait, et le service worker
+// répondait « annonce inconnue » (CLAUDE.md §5.160 — « REFUSÉ DEPUIS LA 5.130 »,
+// réparé en 5.160). Mettre le seuil à 5.130 faisait donc afficher un bouton qui
+// ÉCHOUE EN SILENCE sur toute 5.130–5.159 — le défaut le plus coûteux du projet,
+// exactement. Le seuil est 5.160 : en deçà, l'app dit « mets à jour », elle ne
+// laisse pas le bouton se casser. (Mesuré le 7 octobre : son extension installée
+// est en 5.143 — c'est pour ça que « publier depuis VRM ne marche pas ».)
+const EXT_CAPACITES = { codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', repond: '5.77.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', detourage: '5.156.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -7486,7 +7496,10 @@ function EtatActions({ onNav, ordi, sombre }) {
             {derniere === undefined ? 'Dernière capture reçue : je regarde…'
               : derniere === null ? 'Dernière capture reçue : pas su (la base n’a pas répondu).'
               : derniere === 'aucune' ? 'Aucune capture reçue de ton extension pour l’instant.'
-              : <>Dernière capture reçue de ton extension : <b style={{ color: C.text }}>{derniere.at ? ilYaCourt(derniere.at) : 'date inconnue'}</b>{derniere.v ? ` (version ${derniere.v})` : ''}. Elle écrit quand tu passes sur Vinted.</>}
+              : (() => { const retard = extEnRetard(derniere.v); return (
+                <>Dernière capture reçue de ton extension : <b style={{ color: C.text }}>{derniere.at ? ilYaCourt(derniere.at) : 'date inconnue'}</b>{derniere.v ? ` (version ${derniere.v})` : ''}. Elle écrit quand tu passes sur Vinted.
+                {retard ? <> <span style={{ color: C.warn, fontWeight: 600 }}>À mettre à jour en {EXT_ATTENDUE}</span> sur l'ordinateur où elle est installée (Réglages → Extension) : c'est la version à jour qui lit les codes de retrait <b style={{ color: C.text }}>Vinted&nbsp;Go</b>, rafraîchit tes ventes <b style={{ color: C.text }}>Leboncoin</b> et publie une annonce sur Leboncoin depuis VRM.</> : null}</>
+              ); })()}
           </div>
           {geste && <div style={{ marginTop: 10 }}>{geste}</div>}
         </div>
