@@ -31585,8 +31585,13 @@ function AppCoeur() {
       const inc = arr.filter(o => o && o.isSeller == null && !lbcAnnulee(o));
       // ACHATS = `isSeller === false` (jamais déduit, §5) — mêmes champs que les
       // ventes (photo, titre, prix, statut). Avant, ils étaient simplement jetés.
+      // `maj` = la dernière fois qu'une transaction Leboncoin a été captée.
+      // L'extension ne rafraîchit les ventes QUE sur « Mes transactions » :
+      // visiter Leboncoin en général ne suffit pas. On montre donc l'âge des
+      // montants (§7 : un chiffre qu'on ne peut pas dater n'est pas fiable).
+      const maj = arr.reduce((m, o) => { const t = Date.parse((o && o.at) || '') || 0; return t > m ? t : m; }, 0);
       setLbcVentes({ ventes: arr.filter(o => o && o.isSeller === true), achats: arr.filter(o => o && o.isSeller === false), inconnues: inc.length,
-        inconnuesListe: inc.slice().sort((a,b)=>String(b.at||'').localeCompare(String(a.at||''))) });
+        maj, inconnuesListe: inc.slice().sort((a,b)=>String(b.at||'').localeCompare(String(a.at||''))) });
       setLbcCoqueLu(true);
     } catch (_) { setLbcCoqueLu(null); /* pas su ⇒ rien : jamais un faux « vendu » */ }
   })(); }, []);
@@ -33035,8 +33040,12 @@ function AppCoeur() {
               VentesLeboncoin/AchatsLeboncoin), les Colis, et « À publier ».
               L'onglet Achats n'apparaît que si des achats sont captés — sinon il
               ne mentirait pas, il resterait vide (mieux vaut un blanc, §5). */}
-          {(() => { const ar = lbcArgent(lbcVentes); const e2 = (n) => n.toFixed(2).replace('.', ',') + ' €'; return (
-            <PlatResume baseKO={baseKO} cases={[[`CA finalisé${ar.nRecu ? ' · ' + ar.nRecu : ''}`, ar.actives ? e2(ar.recu) : null], [`En attente${ar.nAttente ? ' · ' + ar.nAttente : ''}`, ar.actives ? e2(ar.attente) : null, true]]}/>
+          {(() => { const ar = lbcArgent(lbcVentes); const e2 = (n) => n.toFixed(2).replace('.', ',') + ' €';
+            const note = (ar.actives && lbcVentes.maj)
+              ? `Montants à jour de ta dernière lecture Leboncoin (${ilYaCourt(lbcVentes.maj)}). Pour les rafraîchir, ouvre « Mes transactions » sur leboncoin.fr avec l'extension à jour.`
+              : null;
+            return (
+            <PlatResume baseKO={baseKO} note={note} cases={[[`CA finalisé${ar.nRecu ? ' · ' + ar.nRecu : ''}`, ar.actives ? e2(ar.recu) : null], [`En attente${ar.nAttente ? ' · ' + ar.nAttente : ''}`, ar.actives ? e2(ar.attente) : null, true]]}/>
           ); })()}
           <PlatSubNav sub={platSub} setSub={setPlatSub} sections={[['ventes','Ventes'],...(((lbcVentes.achats||[]).length>0)?[['achats','Achats']]:[]),['annonces','Annonces'],['messages','Messages'],['colis','Colis']]}/>
           {platSub==='messages'&&<div style={{padding:16}}>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:<MessagesLeboncoin/>}</div>}
