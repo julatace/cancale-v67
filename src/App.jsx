@@ -22682,7 +22682,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                      // depuis le mauvais compte ne montre rien.
                      if (e === 'retard') return `Mets d'abord ton extension à jour (celle installée ne sait pas encore lire les codes), puis passe sur Vinted connecté ${qui}`;
                      if (e === 'absente') return cs.length ? `Ouvre la conversation Vinted du colis, connecté ${qui} : le code y est` : `Ouvre la conversation Vinted du colis : le code y est`;
-                     return `Passe sur Vinted connecté ${qui} : l'extension va chercher les codes toute seule`; })();
+                     // Chemin sûr d'abord (le code est dans la conversation, bouton
+                     // dans Achats) ; l'auto-capture ne couvre les casiers Vinted Go
+                     // qu'avec une version récente — ne pas la promettre seule.
+                     return `Ouvre la conversation Vinted de chaque colis (bouton dans Achats) : le code y est. L'extension la lit aussi toute seule quand tu passes sur Vinted connecté ${qui}`; })();
           jobs.push({icon:'box',color:hd>0?C.danger:(pr>0?(C.blue||C.accent):C.muted),urgent:hd>0,title:`Retirer ${pickupCount} colis`,sub,tab:'cat_achats',prio:hd>0?0.5:(pr>0?2:6)});
         }
         if(unread) jobs.push({icon:'chat',color:C.warn,title:`Répondre à ${unread} message${unread>1?'s':''}`,sub:'Un acheteur attend — réponds vite pour vendre',tab:'cat_msg',prio:3});
@@ -24324,7 +24327,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         : (()=>{ const e = extSaitLireCodes();
                             if (e === 'retard') return "Ton extension est en retard : cette version-là ne sait pas encore aller lire les codes. Mets-la à jour (Réglages), puis passe sur Vinted avec le compte indiqué. En attendant, ouvre la conversation : le code y est.";
                             if (e === 'absente') return "Sur téléphone il n'y a pas d'extension : ouvre la conversation Vinted du colis, le code et le QR y sont.";
-                            return `L'extension va chercher le code toute seule : passe sur Vinted connecté ${memeCompte ? `sur ${memeCompte}` : 'avec le compte indiqué sur chaque ligne'} (elle en fait 3 par visite). Ouvrir la conversation le fait venir tout de suite.`; })()}
+                            // ⚠️ Le chemin SÛR en premier : le code est dans la
+                            //    conversation (bouton sous chaque colis), et il y
+                            //    est tout de suite. L'extension la lit aussi toute
+                            //    seule, mais pour les casiers Vinted Go il faut une
+                            //    version récente — ne pas en faire la promesse
+                            //    principale, sinon « j'ai attendu et rien n'est venu ».
+                            return `Le code (et le QR) est dans la conversation Vinted de chaque colis — ouvre-la avec le bouton sous le colis, il y est tout de suite. L'extension la lit aussi toute seule quand tu passes sur Vinted connecté ${memeCompte ? `sur ${memeCompte}` : 'avec le compte indiqué sur chaque ligne'}.`; })()}
                       {memeCompte && !avecCode && extSaitLireCodes() !== 'ok' && <> Ils sont tous sur <b style={{color:C.text,fontWeight:600}}>{memeCompte}</b>.</>}
                     </span>
                   </div>
