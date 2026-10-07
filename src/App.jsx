@@ -19351,6 +19351,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // La chaîne de filtres vivait en plein milieu du JSX : impossible de savoir
   // combien de ventes elle rendait sans la recopier. Elle vit ici, et l'écran
   // n'en dessine qu'une tranche.
+  // ── FLOU PAR COMPTE (demande de Julien) ───────────────────────────────────
+  // Un compte sélectionné dans la barre ⇒ les lignes des AUTRES comptes restent
+  // VISIBLES mais estompées (flou + gris + non cliquables), pour mettre en
+  // valeur le compte choisi sans rien cacher. `uidLigne` lit l'OBJET `_acc`
+  // (repli `_uid`), comme partout (§11). Rien sélectionné ⇒ aucun flou.
+  const uidLigne = o => String((o && o._acc && o._acc.vinted_user_id) || (o && o._uid) || '');
+  const estFloute = (o) => !!(compteSel && uidLigne(o) !== String(compteSel));
+  const STYLE_FLOU = { filter: 'blur(2px) grayscale(0.55)', opacity: 0.4, pointerEvents: 'none', transition: 'filter 160ms ease-out, opacity 160ms ease-out' };
   const ventesAffichees = useMemo(() => {
     const uidV = o => String((o && o._acc && o._acc.vinted_user_id) || (o && o._uid) || '');
     let arr = (sales.items || [])
@@ -19389,10 +19397,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     //    chaîne. Compte choisi ⇒ ses ventes seules ; « Tous » ⇒ celles du compte
     //    connecté d'abord (tri STABLE, l'ordre par date ci-dessous conservé dans
     //    chaque groupe).
-    .filter(o => !compteSel || uidV(o) === String(compteSel))
     .sort(parDateDesc);
-    if (!compteSel && compteConnecte) { const c = String(compteConnecte);
-      arr = [...arr].sort((a,b) => { const ac = uidV(a)===c, bc = uidV(b)===c; return ac===bc ? 0 : (ac ? -1 : 1); }); }
+    // Compte sélectionné (ou connecté) EN TÊTE ; les autres restent (ils seront
+    // FLOUTÉS à l'affichage, pas masqués — demande de Julien). Tri stable.
+    { const c = String(compteSel || compteConnecte || '');
+      if (c) arr = [...arr].sort((a,b) => { const ac = uidV(a)===c, bc = uidV(b)===c; return ac===bc ? 0 : (ac ? -1 : 1); }); }
     return arr;
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [sales.items, showHidden, hiddenSales, hiddenAccts, blockedAccts, vFilter, ordSearchDiff, periode, numeros, saleOv, shipDone, compteSel, compteConnecte]);
@@ -19707,9 +19716,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // est conservé à l'intérieur de chaque groupe). `_acc` d'une annonce est
     // l'OBJET compte ; son uid vit dans `_acc.vinted_user_id`.
     const uidAnn = it => String((it && it._acc && it._acc.vinted_user_id) || '');
-    if (compteSel) arr = arr.filter(it => uidAnn(it) === String(compteSel));
-    else if (compteConnecte) { const c = String(compteConnecte);
-      arr = [...arr].sort((a,b) => { const ac = uidAnn(a)===c, bc = uidAnn(b)===c; return ac===bc ? 0 : (ac ? -1 : 1); }); }
+    // Compte choisi (ou connecté) EN TÊTE ; les autres restent (floutés à
+    // l'affichage, pas masqués — demande de Julien).
+    const c = String(compteSel || compteConnecte || '');
+    if (c) arr = [...arr].sort((a,b) => { const ac = uidAnn(a)===c, bc = uidAnn(b)===c; return ac===bc ? 0 : (ac ? -1 : 1); });
     return arr;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [annBase, annSearch, annSort, numeros, compteSel, compteConnecte]);
@@ -20766,7 +20776,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
   const achatsAffiches = useMemo(() => { const uidA = o => String((o && o._acc && o._acc.vinted_user_id) || (o && o._uid) || '');
     let arr = buysBase
-    .filter(o => !compteSel || uidA(o) === String(compteSel))   // filtre par compte (sélecteur de l'onglet)
     .filter(o => { const p = phaseReception(o);
       if (aFilter === 'attente') return false;
       if (aFilter === 'route') return p === 'route';
@@ -20781,9 +20790,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     .sort((a, b) => { const pr = x => x.st.step===3?0 : x.st.step===2?1 : x.st.step===1?2 : x.st.step===4?3 : 4;
       const d = pr(a) - pr(b); if (d !== 0) return d;
       return aFilter === 'route' ? ((tsCommande(a.o)||0) - (tsCommande(b.o)||0)) : (new Date(b.o.date||0) - new Date(a.o.date||0)); });
-    // « Tous » ⇒ les achats du compte connecté d'abord (tri STABLE).
-    if (!compteSel && compteConnecte) { const c = String(compteConnecte);
-      arr = [...arr].sort((a,b)=>{ const ac=uidA(a.o)===c, bc=uidA(b.o)===c; return ac===bc?0:(ac?-1:1); }); }
+    // Compte choisi (ou connecté) EN TÊTE ; les autres restent (floutés, pas
+    // masqués — demande de Julien). Tri STABLE.
+    { const c = String(compteSel || compteConnecte || '');
+      if (c) arr = [...arr].sort((a,b)=>{ const ac=uidA(a.o)===c, bc=uidA(b.o)===c; return ac===bc?0:(ac?-1:1); }); }
     return arr; },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [buysBase, aFilter, ordSearchDiff, periode, tracking, colisRelais, numeros, compteSel, compteConnecte]);
@@ -23708,7 +23718,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             return (
               // Ligne de vente dans la liste groupée (filet fin entre les lignes,
               // pas de carte encadrée séparée — style démo, comme Achats).
-              <div key={o.transaction_id} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10}}>
+              <div key={o.transaction_id} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10,...(estFloute(o)?STYLE_FLOU:null)}}>
                {/* ── Haut : photo · titre + méta · prix ─────────────────────── */}
                <div style={{display:'flex',gap:12,alignItems:'flex-start'}}>
                 <div style={{width:72,height:72,borderRadius:10,background:C.card2||C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
@@ -24733,7 +24743,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const rc = receiptFor(o);
             const numA = buyNumByTxn[String(o.transaction_id)];
             return (
-            <div key={o.transaction_id} style={{padding:'12px 14px',borderTop:i>0?`1px solid ${C.border}`:'none',opacity:cancelled?0.55:1,display:'flex',alignItems:'center',gap:12}}>
+            <div key={o.transaction_id} style={{padding:'12px 14px',borderTop:i>0?`1px solid ${C.border}`:'none',opacity:cancelled?0.55:1,display:'flex',alignItems:'center',gap:12,...(estFloute(o)?STYLE_FLOU:null)}}>
               <div style={{width:46,height:46,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
                 {orderPhoto(o)?<img src={orderPhoto(o)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={18} style={{color:C.muted,opacity:.55}}/>}
               </div>
@@ -25376,7 +25386,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const lab = { fontSize:11, color:C.muted };
             const val = { fontSize:12, fontWeight:600, color:C.text };
             return (
-              <div key={it._acc.vinted_user_id+'_'+it.id} data-carte-annonce={it.id} style={{borderRadius:10,background:C.card,border:`1px solid ${soldBord?C.warn:C.border}`,boxShadow:C.shadow||'none',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+              <div key={it._acc.vinted_user_id+'_'+it.id} data-carte-annonce={it.id} style={{borderRadius:10,background:C.card,border:`1px solid ${soldBord?C.warn:C.border}`,boxShadow:C.shadow||'none',display:'flex',flexDirection:'column',overflow:'hidden',...(estFloute(it)?STYLE_FLOU:null)}}>
                 <div style={{display:'flex',gap:10,padding:10}}>
                   <a href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted" style={{flexShrink:0,width:88,height:118,borderRadius:8,overflow:'hidden',background:C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',position:'relative'}}>
                     {it.photo?<img src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/>}
@@ -25524,11 +25534,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // Filtre par compte (sélecteur de l'onglet) : `_acc` d'une conversation
           // est l'OBJET compte. Choisi ⇒ ses conversations seules.
           const uidC = c => String((c._acc&&c._acc.vinted_user_id)||'');
-          const liste = (convs.items||[]).filter(c=>!acctOffOf(c)).filter(c=>!compteSel || uidC(c)===String(compteSel));
-          const nonLus = liste.filter(c=>c.unread).length;
-          // « Tous » ⇒ les conversations du compte connecté d'abord, puis non lus,
-          // puis les plus récentes (le compte qu'on traite remonte, §Julien 6 oct.).
-          const coMsg = (!compteSel && compteConnecte) ? String(compteConnecte) : '';
+          // Compte choisi ⇒ les AUTRES restent (floutés, pas masqués — Julien).
+          const liste = (convs.items||[]).filter(c=>!acctOffOf(c));
+          const nonLus = liste.filter(c=>c.unread && (!compteSel || uidC(c)===String(compteSel))).length;
+          // Compte choisi (ou connecté) d'abord, puis non lus, puis les récents.
+          const coMsg = String(compteSel || compteConnecte || '');
           const tri = [...liste].sort((a,b)=>
             (coMsg ? ((uidC(b)===coMsg?1:0)-(uidC(a)===coMsg?1:0)) : 0)
             || (b.unread?1:0)-(a.unread?1:0)
@@ -25551,7 +25561,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   const photo = (c.opposite_user&&c.opposite_user.photo&&c.opposite_user.photo.url) || (c.item_photos&&c.item_photos[0]&&c.item_photos[0].url) || null;
                   return (
                     <button key={(c._acc?c._acc.vinted_user_id:'')+'_'+c.id} type="button" data-conv={c.id} onClick={()=>openConversation(c)}
-                      style={{display:'flex',gap:10,alignItems:'center',width:'100%',textAlign:'left',padding:'10px 12px',border:'none',borderTop:i?`1px solid ${C.border}`:'none',background:'transparent',color:C.text,cursor:'pointer',fontFamily:'inherit'}}>
+                      style={{display:'flex',gap:10,alignItems:'center',width:'100%',textAlign:'left',padding:'10px 12px',border:'none',borderTop:i?`1px solid ${C.border}`:'none',background:'transparent',color:C.text,cursor:'pointer',fontFamily:'inherit',...(compteSel&&uidC(c)!==String(compteSel)?STYLE_FLOU:null)}}>
                       {photo ? <img src={photo} alt="" loading="lazy" style={{width:40,height:40,borderRadius:8,objectFit:'cover',flexShrink:0}}/> : <span style={{width:40,height:40,borderRadius:8,background:C.card2||C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',color:C.muted,flexShrink:0}}><Icon name="chat" size={17}/></span>}
                       <span style={{flex:1,minWidth:0}}>
                         <span style={{display:'flex',alignItems:'baseline',gap:6}}>
