@@ -869,6 +869,10 @@ const SYNC_KEYS = [
   // Clé personnelle du widget iPhone (voir api/widget.js) : sans elle, la route
   // renverrait le chiffre d'affaires à qui connaît l'adresse.
   'vrm_widget_token',
+  // Comptabilité d'entreprise (onglet Comptabilité) : dépenses ponctuelles,
+  // coûts fixes mensuels, packs de photos payants. OWNED par l'app (§11),
+  // synchronisé entre appareils, jamais écrit par l'extension.
+  'vrm_compta',
 ];
 // Réponses rapides par défaut aux messages Vinted (copiables en 1 clic, éditables).
 const DEFAULT_QUICK_REPLIES = [
@@ -5749,6 +5753,7 @@ const PLUS_TABS=[
   /* ⚠️ `plat_vinted`, `plat_leboncoin`, `plat_vestiaire` ET `plat_ebay` sont
      tous dans la BARRE DU BAS — retirés d'ici pour ne pas les montrer deux fois. */
   {id:'dashboard',    icon:'chart',   emoji:'📊',label:'Statistiques',  desc:'Chiffre d\'affaires, bénéfices, cotisations'},
+  {id:'compta',       icon:'euro',    emoji:'🧮',label:'Comptabilité',   desc:'Dépenses, coûts fixes, packs photos, factures'},
   {id:'prixmarche',   icon:'spark',   emoji:'💡',label:'Prix qui marche',desc:'À quel prix tes modèles se vendent, par taille'},
   /* ⚠️ « À publier » RETIRÉ du menu (4 octobre) : c'était une seconde porte —
      avec un autre nom — vers l'écran Leboncoin → Annonces. Les liens qui
@@ -16882,6 +16887,200 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ── COMPTABILITÉ D'ENTREPRISE (onglet dédié) ─────────────────────────────
+   Demande de Julien, 6 octobre : « on va pouvoir connecter une banque qui fait
+   la facturation électronique, je veux que l'on puisse renseigner et recevoir
+   des factures électroniques, pouvoir renseigner les dépenses, les coûts fixes,
+   toutes les choses dont une entreprise a besoin doit être groupée. »
+
+   Ce que le reste de l'app NE faisait PAS encore : les CHARGES (dépenses
+   ponctuelles, coûts fixes mensuels, packs de photos payants). C'est ce que cet
+   écran POSSÈDE (§11). Il ne RECALCULE pas le CA ni le bénéfice — ceux-là vivent
+   dans Statistiques (un seul propriétaire) ; cet écran y renvoie et, à terme,
+   ses charges y seront déduites du bénéfice (§ packs photos « pris en compte du
+   bénéfice »). Les factures REÇUES (reçus Vinted par email) vivent déjà dans
+   Factures : on y renvoie plutôt que de dupliquer (§7).
+
+   Stockage : `vrm_compta`, une ligne APP (synchronisée via SYNC_KEYS), jamais
+   l'extension. Rattrapée par `onCloudReady` et seulement si restée VIDE (§5.49),
+   sinon une saisie faite pendant le chargement serait écrasée. */
+const COMPTA_DEFAUT = { depenses: [], fixes: [], packs: [] };
+const COMPTA_CATS = ['Emballage', 'Fournitures', 'Abonnement', 'Frais plateforme', 'Transport', 'Matériel', 'Autre'];
+const rCompId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const comptaVide = (d) => !((d.depenses || []).length || (d.fixes || []).length || (d.packs || []).length);
+// Montant saisi « 12,50 » ou « 12.50 » → nombre. Jamais NaN silencieux : on
+// renvoie null, et l'appelant refuse d'ajouter (mieux vaut un blanc qu'un faux).
+const parseMontant = (s) => { const n = parseFloat(String(s == null ? '' : s).replace(',', '.').replace(/[^0-9.]/g, '')); return isFinite(n) && n > 0 ? n : null; };
+
+function ComptaPro({ liveStats, onNav }) {
+  const [data, setData] = React.useState(() => {
+    try { const d = load('vrm_compta', null); return d && typeof d === 'object' ? { ...COMPTA_DEFAUT, ...d } : { ...COMPTA_DEFAUT }; }
+    catch (_) { return { ...COMPTA_DEFAUT }; }
+  });
+  // Rattrapage nuage : on ne remplace QUE si rien n'a encore été saisi (§5.49).
+  React.useEffect(() => onCloudReady(() => {
+    try { const d = load('vrm_compta', null); if (d && typeof d === 'object') setData(cur => comptaVide(cur) ? { ...COMPTA_DEFAUT, ...d } : cur); } catch (_) {}
+  }), []);
+  const maj = (next) => { setData(next); try { save('vrm_compta', next); } catch (_) {} };
+  const depenses = data.depenses || [], fixes = data.fixes || [], packs = data.packs || [];
+
+  // ── Totaux, tous OWNED (aucun CA recalculé ici) ───────────────────────────
+  const annee = new Date().getFullYear();
+  const moisEcoules = new Date().getMonth() + 1;          // janvier = 1
+  const moisCle = `${annee}-${String(moisEcoules).padStart(2, '0')}`;
+  const cetteAnnee = (d) => String(d || '').slice(0, 4) === String(annee);
+  const ceMois = (d) => String(d || '').slice(0, 7) === moisCle;
+  const somme = (arr, f) => arr.reduce((s, x) => s + (Number(f(x)) || 0), 0);
+  const fixesParMois = somme(fixes, x => x.montant);
+  const fixesAnnee = fixesParMois * moisEcoules;           // depuis janvier
+  const depAnnee = somme(depenses.filter(d => cetteAnnee(d.date)), x => x.montant);
+  const packsAnnee = somme(packs.filter(p => cetteAnnee(p.date)), x => x.montant);
+  const chargesAnnee = fixesAnnee + depAnnee + packsAnnee;
+  const depMois = somme(depenses.filter(d => ceMois(d.date)), x => x.montant);
+  const chargesMois = fixesParMois + depMois + somme(packs.filter(p => ceMois(p.date)), x => x.montant);
+
+  // ── Formulaires d'ajout (états locaux) ────────────────────────────────────
+  const auj = new Date().toISOString().slice(0, 10);
+  const [dDate, setDDate] = React.useState(auj);
+  const [dLib, setDLib] = React.useState('');
+  const [dCat, setDCat] = React.useState(COMPTA_CATS[0]);
+  const [dMnt, setDMnt] = React.useState('');
+  const [fLib, setFLib] = React.useState('');
+  const [fMnt, setFMnt] = React.useState('');
+  const [pPlat, setPPlat] = React.useState('Leboncoin');
+  const [pCpt, setPCpt] = React.useState('');
+  const [pMnt, setPMnt] = React.useState('');
+  const [pDate, setPDate] = React.useState(auj);
+
+  const ajouterDepense = () => {
+    const m = parseMontant(dMnt); if (!m || !dLib.trim()) return;
+    maj({ ...data, depenses: [{ id: rCompId(), date: dDate || auj, libelle: dLib.trim(), cat: dCat, montant: m }, ...depenses] });
+    setDLib(''); setDMnt(''); setDCat(COMPTA_CATS[0]); setDDate(auj);
+  };
+  const ajouterFixe = () => {
+    const m = parseMontant(fMnt); if (!m || !fLib.trim()) return;
+    maj({ ...data, fixes: [{ id: rCompId(), libelle: fLib.trim(), montant: m }, ...fixes] });
+    setFLib(''); setFMnt('');
+  };
+  const ajouterPack = () => {
+    const m = parseMontant(pMnt); if (!m) return;
+    maj({ ...data, packs: [{ id: rCompId(), plateforme: pPlat, compte: pCpt.trim(), montant: m, date: pDate || auj }, ...packs] });
+    setPCpt(''); setPMnt(''); setPDate(auj);
+  };
+  const retirer = (cle, id) => maj({ ...data, [cle]: (data[cle] || []).filter(x => x.id !== id) });
+
+  // Factures reçues (reçus Vinted par email) : on consomme juste le NOMBRE pour
+  // renvoyer vers l'écran Factures, on ne duplique pas la liste (§7/§11).
+  const [nFactures, setNFactures] = React.useState(null);
+  React.useEffect(() => { let stop = false; fetchProInvoices().then(r => { if (!stop) setNFactures(Array.isArray(r) ? r.length : null); }).catch(() => {}); return () => { stop = true; }; }, []);
+
+  const inp = { border: `1px solid ${C.border}`, background: C.bg, color: C.text, borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', minWidth: 0 };
+  const btnAdd = { border: 'none', background: C.accent, color: C.card, borderRadius: 8, padding: '8px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 };
+  const Stat = ({ label, value, sub }) => (
+    <div style={{ flex: '1 1 150px', maxWidth: 260, border: `1px solid ${C.border}`, background: C.card, borderRadius: 10, padding: '13px 15px' }}>
+      <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 500 }}>{label}</div>
+      <div className="vrm-display" style={{ fontSize: 23, fontWeight: 700, color: C.text, marginTop: 2 }}>{value}</div>
+      {sub && <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{sub}</div>}
+    </div>
+  );
+  const Ligne = ({ gauche, droite, onDel }) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderTop: `1px solid ${C.border}` }}>
+      <span style={{ flex: 1, minWidth: 0 }}>{gauche}</span>
+      <span style={{ fontSize: 14, fontWeight: 700, color: C.text, whiteSpace: 'nowrap' }}>{droite}</span>
+      <button type="button" onClick={onDel} title="Supprimer" aria-label="Supprimer" style={{ border: 'none', background: 'transparent', color: C.danger, fontSize: 16, cursor: 'pointer', flexShrink: 0, lineHeight: 1 }}>×</button>
+    </div>
+  );
+
+  return (
+    <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 18 }}>
+      <ScreenHead icon="euro" title="Comptabilité" desc="Tes dépenses, tes coûts fixes et tes factures — tout ce dont ton entreprise a besoin, groupé. Le chiffre d'affaires et le bénéfice vivent dans Statistiques." />
+
+      {/* RÉSUMÉ — 100 % de ce que TU as saisi (aucun chiffre deviné). */}
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <Stat label="Coûts fixes / mois" value={fmt(fixesParMois)} sub={fixes.length ? `${fixes.length} poste${fixes.length > 1 ? 's' : ''}` : 'rien de saisi'} />
+        <Stat label={`Charges ce mois`} value={fmt(chargesMois)} sub="fixes + dépenses + packs" />
+        <Stat label={`Total charges ${annee}`} value={fmt(chargesAnnee)} sub={`fixes × ${moisEcoules} mois + dépenses + packs`} />
+      </div>
+      <div style={{ fontSize: 12, color: C.muted, marginTop: -8, lineHeight: 1.5 }}>
+        Ce sont les charges que <b>tu</b> renseignes. Ton chiffre d'affaires et ton bénéfice (ventes − prix d'achat) se lisent sur <button type="button" onClick={() => onNav && onNav('dashboard')} style={{ border: 'none', background: 'transparent', color: C.blue || C.accent, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', padding: 0, fontSize: 12 }}>Statistiques →</button>
+      </div>
+
+      {/* DÉPENSES PONCTUELLES */}
+      <div>
+        <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 8 }}>Dépenses</div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 8 }}>
+          <input type="date" value={dDate} onChange={e => setDDate(e.target.value)} style={{ ...inp, width: 150 }} />
+          <input type="text" placeholder="Ex. rouleau de scotch" value={dLib} onChange={e => setDLib(e.target.value)} style={{ ...inp, flex: '2 1 160px' }} />
+          <select value={dCat} onChange={e => setDCat(e.target.value)} style={{ ...inp }}>{COMPTA_CATS.map(c => <option key={c} value={c}>{c}</option>)}</select>
+          <input type="text" inputMode="decimal" placeholder="€" value={dMnt} onChange={e => setDMnt(e.target.value)} style={{ ...inp, width: 90 }} />
+          <button type="button" onClick={ajouterDepense} style={btnAdd}>Ajouter</button>
+        </div>
+        {depenses.length === 0
+          ? <div style={{ fontSize: 12.5, color: C.muted, padding: '8px 2px' }}>Aucune dépense saisie pour l'instant.</div>
+          : <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: C.card, overflow: 'hidden' }}>
+            {depenses.map((d, i) => <div key={d.id} style={{ borderTop: i ? `1px solid ${C.border}` : 'none' }}><Ligne gauche={<><span style={{ fontSize: 13, color: C.text }}>{d.libelle}</span> <span style={{ fontSize: 11, color: C.muted }}>· {d.cat} · {String(d.date || '').split('-').reverse().join('/')}</span></>} droite={fmt(d.montant)} onDel={() => retirer('depenses', d.id)} /></div>)}
+          </div>}
+      </div>
+
+      {/* COÛTS FIXES MENSUELS */}
+      <div>
+        <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 8 }}>Coûts fixes <span style={{ fontWeight: 500, color: C.muted }}>— chaque mois (abonnement, logiciel, local…)</span></div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 8 }}>
+          <input type="text" placeholder="Ex. abonnement boost" value={fLib} onChange={e => setFLib(e.target.value)} style={{ ...inp, flex: '2 1 180px' }} />
+          <input type="text" inputMode="decimal" placeholder="€ / mois" value={fMnt} onChange={e => setFMnt(e.target.value)} style={{ ...inp, width: 110 }} />
+          <button type="button" onClick={ajouterFixe} style={btnAdd}>Ajouter</button>
+        </div>
+        {fixes.length === 0
+          ? <div style={{ fontSize: 12.5, color: C.muted, padding: '8px 2px' }}>Aucun coût fixe saisi.</div>
+          : <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: C.card, overflow: 'hidden' }}>
+            {fixes.map((f, i) => <div key={f.id} style={{ borderTop: i ? `1px solid ${C.border}` : 'none' }}><Ligne gauche={<span style={{ fontSize: 13, color: C.text }}>{f.libelle}</span>} droite={fmt(f.montant) + ' /mois'} onDel={() => retirer('fixes', f.id)} /></div>)}
+          </div>}
+      </div>
+
+      {/* PACKS DE PHOTOS (Leboncoin / eBay pro) — § Julien « packs de photos pris
+          en compte du bénéfice ». Saisis ici comme une charge ; ils seront
+          déduits du bénéfice dans Statistiques (prochaine passe). */}
+      <div>
+        <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 4 }}>Packs de photos</div>
+        <div style={{ fontSize: 12, color: C.muted, marginBottom: 8, lineHeight: 1.5 }}>Sur un compte pro, au-delà des photos gratuites tu achètes un pack. Note-le ici : c'est une charge de ton entreprise.</div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 8 }}>
+          <select value={pPlat} onChange={e => setPPlat(e.target.value)} style={{ ...inp }}>{['Leboncoin', 'eBay', 'Vinted', 'Vestiaire', 'Autre'].map(p => <option key={p} value={p}>{p}</option>)}</select>
+          <input type="text" placeholder="Compte (ex. pro Cancale)" value={pCpt} onChange={e => setPCpt(e.target.value)} style={{ ...inp, flex: '1 1 150px' }} />
+          <input type="date" value={pDate} onChange={e => setPDate(e.target.value)} style={{ ...inp, width: 150 }} />
+          <input type="text" inputMode="decimal" placeholder="€" value={pMnt} onChange={e => setPMnt(e.target.value)} style={{ ...inp, width: 90 }} />
+          <button type="button" onClick={ajouterPack} style={btnAdd}>Ajouter</button>
+        </div>
+        {packs.length === 0
+          ? <div style={{ fontSize: 12.5, color: C.muted, padding: '8px 2px' }}>Aucun pack de photos saisi.</div>
+          : <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: C.card, overflow: 'hidden' }}>
+            {packs.map((p, i) => <div key={p.id} style={{ borderTop: i ? `1px solid ${C.border}` : 'none' }}><Ligne gauche={<><span style={{ fontSize: 13, color: C.text }}>{p.plateforme}</span>{p.compte ? <span style={{ fontSize: 11, color: C.muted }}> · {p.compte}</span> : null} <span style={{ fontSize: 11, color: C.muted }}>· {String(p.date || '').split('-').reverse().join('/')}</span></>} droite={fmt(p.montant)} onDel={() => retirer('packs', p.id)} /></div>)}
+          </div>}
+      </div>
+
+      {/* FACTURES — reçues (reçus Vinted par email) + le reste vit dans Factures */}
+      <button type="button" onClick={() => onNav && onNav('invoices')} style={{ textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12, border: `1px solid ${C.border}`, background: C.card, borderRadius: 10, padding: '12px 14px', cursor: 'pointer', fontFamily: 'inherit' }}>
+        <span aria-hidden="true" style={{ flexShrink: 0, width: 34, height: 34, borderRadius: 8, background: C.card2 || C.bg, border: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted }}><Icon name="receipt" size={17} /></span>
+        <span style={{ flex: 1 }}>
+          <span style={{ display: 'block', fontSize: 14, fontWeight: 600, color: C.text }}>Factures{nFactures != null && nFactures > 0 ? ` — ${nFactures} reçue${nFactures > 1 ? 's' : ''}` : ''}</span>
+          <span style={{ display: 'block', fontSize: 12, color: C.muted, marginTop: 1 }}>Tes reçus Vinted arrivés par email, et tes factures à émettre pour tes clients.</span>
+        </span>
+        <span style={{ fontSize: 20, color: C.muted }}>›</span>
+      </button>
+
+      {/* BANQUE & FACTURATION ÉLECTRONIQUE — un geste qui t'appartient (comptes,
+          identifiants). On ne fait semblant de rien connecter (§ panneau de
+          sécurité : le vocabulaire technique assumé ne se cache pas). */}
+      <div style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 10, padding: '14px 16px' }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 6 }}>Banque & facturation électronique</div>
+        <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.6 }}>
+          La loi impose la <b>facturation électronique</b> aux entreprises à partir de 2026, via une plateforme agréée (PDP). Connecter ta banque ou une plateforme pour émettre et recevoir ces factures demande <b>tes identifiants</b> : c'est un geste qui n'appartient qu'à toi, l'app ne peut pas le faire à ta place.
+          <br />Quand tu auras choisi ta plateforme, dis-le-moi : je câble la réception des factures ici (comme les reçus Vinted arrivent déjà par email). D'ici là, <b>rien n'est connecté</b> — je ne fais pas semblant.
+        </div>
+      </div>
     </div>
   );
 }
@@ -30901,7 +31100,7 @@ function AppCoeur() {
     // banc, qui navigue par `?tab=`, croyait rendre Leboncoin alors qu'il
     // mesurait l'accueil (un faux vert dans ma propre couverture d'hier).
     // `journee` manquait aussi : invisible parce que c'est l'état de départ.
-    const TABS_OK=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','invoices','masques','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces'];
+    const TABS_OK=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','invoices','masques','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces'];
     const goto=(search)=>{ try{ const p=new URLSearchParams(search); const t=p.get('tab'); if(p.get('print')==='bord') _pendingBordPrint=true; if(t&&TABS_OK.includes(t)){ setTab(t); window.history.replaceState({},'',window.location.pathname); } }catch(_){}};
     goto(window.location.search);
     const onMsg=(e)=>{ if(e.data&&e.data.type==='open-url'&&e.data.url){ try{ goto(new URL(e.data.url,window.location.origin).search); }catch(_){}} };
@@ -32732,6 +32931,7 @@ function AppCoeur() {
         {tab==='stockvinted'&&<StockVinted stockVinted={stockVinted} setStockVinted={setStockVinted} garageGrid={garageGrid} invoices={invoices}/>}
         {tab==='garage'   &&<Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} locate={garageLocate} onLocateConsumed={()=>setGarageLocate(null)} placeNum={garagePlace} onPlaced={()=>setGaragePlace(null)}/>}
         {tab==='comptabilite'&&<Comptabilite accounts={vintedAccounts} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}
+        {tab==='compta'&&<ComptaPro liveStats={liveStatsVus} onNav={setTab}/>}
         {(()=>{ const map={cat_annonces:'annonces',cat_ventes:'ventes',cat_achats:'achats',cat_bord:'bordereaux',cat_expedition:'bordereaux'}; return map[tab] ? <Comptabilite key={tab} accounts={vintedAccounts} only={map[tab]} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}/> : null; })()}
         {tab==='vintedaccounts'&&<VintedAccounts accounts={vintedAccounts} setAccounts={setVintedAccounts} baseKO={baseKO}/>}
         </EcranGardeFou>
