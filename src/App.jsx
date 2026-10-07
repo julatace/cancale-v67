@@ -16915,6 +16915,30 @@ const comptaVide = (d) => !((d.depenses || []).length || (d.fixes || []).length 
 // Montant saisi « 12,50 » ou « 12.50 » → nombre. Jamais NaN silencieux : on
 // renvoie null, et l'appelant refuse d'ajouter (mieux vaut un blanc qu'un faux).
 const parseMontant = (s) => { const n = parseFloat(String(s == null ? '' : s).replace(',', '.').replace(/[^0-9.]/g, '')); return isFinite(n) && n > 0 ? n : null; };
+// Charges d'entreprise d'une ANNÉE, UNE seule règle (§11) : l'onglet Comptabilité
+// ET le rapport annuel la consomment. `data` = ligne `vrm_compta`. Les coûts
+// fixes sont au tarif ACTUEL × nombre de mois de l'année (12 pour une année
+// passée, le mois courant pour l'année en cours) — on le DIT au libellé, on ne
+// prétend pas connaître leur historique mois par mois.
+const comptaChargesAnnee = (data, annee) => {
+  const d = (data && typeof data === 'object') ? data : {};
+  const depenses = d.depenses || [], fixes = d.fixes || [], packs = d.packs || [];
+  const now = new Date(), thisY = now.getFullYear();
+  const mois = annee < thisY ? 12 : (annee > thisY ? 0 : now.getMonth() + 1);
+  const estAnnee = (x) => String(x || '').slice(0, 4) === String(annee);
+  const sum = (arr, f) => arr.reduce((s, x) => s + (Number(f(x)) || 0), 0);
+  const fixesParMois = sum(fixes, x => x.montant);
+  const depTotal = sum(depenses.filter(x => estAnnee(x.date)), x => x.montant);
+  const packTotal = sum(packs.filter(x => estAnnee(x.date)), x => x.montant);
+  const fixesTotal = fixesParMois * mois;
+  return {
+    fixesParMois, moisComptes: mois, fixesTotal, depTotal, packTotal,
+    total: fixesTotal + depTotal + packTotal,
+    depLignes: depenses.filter(x => estAnnee(x.date)),
+    packLignes: packs.filter(x => estAnnee(x.date)),
+    fixes,
+  };
+};
 
 function ComptaPro({ liveStats, onNav }) {
   const [data, setData] = React.useState(() => {
@@ -16936,10 +16960,8 @@ function ComptaPro({ liveStats, onNav }) {
   const ceMois = (d) => String(d || '').slice(0, 7) === moisCle;
   const somme = (arr, f) => arr.reduce((s, x) => s + (Number(f(x)) || 0), 0);
   const fixesParMois = somme(fixes, x => x.montant);
-  const fixesAnnee = fixesParMois * moisEcoules;           // depuis janvier
-  const depAnnee = somme(depenses.filter(d => cetteAnnee(d.date)), x => x.montant);
-  const packsAnnee = somme(packs.filter(p => cetteAnnee(p.date)), x => x.montant);
-  const chargesAnnee = fixesAnnee + depAnnee + packsAnnee;
+  // Total annuel : UNE seule règle, partagée avec le rapport annuel (§11).
+  const chargesAnnee = comptaChargesAnnee(data, annee).total;
   const depMois = somme(depenses.filter(d => ceMois(d.date)), x => x.montant);
   const chargesMois = fixesParMois + depMois + somme(packs.filter(p => ceMois(p.date)), x => x.montant);
 
@@ -16990,6 +17012,22 @@ function ComptaPro({ liveStats, onNav }) {
     setPCpt(''); setPMnt(''); setPDate(auj);
   };
   const retirer = (cle, id) => maj({ ...data, [cle]: (data[cle] || []).filter(x => x.id !== id) });
+  // Export CSV des charges pour le comptable (date · type · libellé · montant).
+  const exporterCharges = () => {
+    const e = (v) => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
+    const L = [[`Charges ${annee}`], [], ['Date', 'Type', 'Libelle', 'Montant']];
+    depenses.filter(d => cetteAnnee(d.date)).forEach(d => L.push([d.date ? d.date.split('-').reverse().join('/') : '', 'Depense' + (d.cat ? ' (' + d.cat + ')' : ''), d.libelle || '', (Number(d.montant) || 0).toFixed(2)]));
+    packs.filter(p => cetteAnnee(p.date)).forEach(p => L.push([p.date ? p.date.split('-').reverse().join('/') : '', 'Pack photos', `${p.plateforme || ''}${p.compte ? ' ' + p.compte : ''}`, (Number(p.montant) || 0).toFixed(2)]));
+    fixes.forEach(f => L.push(['', `Cout fixe x${moisEcoules} mois`, f.libelle || '', ((Number(f.montant) || 0) * moisEcoules).toFixed(2)]));
+    L.push(['', '', 'TOTAL', chargesAnnee.toFixed(2)]);
+    const csv = L.map(r => r.map(e).join(';')).join('\n');
+    try {
+      const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob); const a = document.createElement('a');
+      a.href = url; a.download = `charges-${annee}.csv`; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 3000);
+    } catch (_) {}
+  };
 
   // Factures reçues (reçus Vinted par email) : on consomme juste le NOMBRE pour
   // renvoyer vers l'écran Factures, on ne duplique pas la liste (§7/§11).
@@ -17026,6 +17064,11 @@ function ComptaPro({ liveStats, onNav }) {
       <div style={{ fontSize: 12, color: C.muted, marginTop: -8, lineHeight: 1.5 }}>
         Ce sont les charges que <b>tu</b> renseignes. Ton chiffre d'affaires et ton bénéfice (ventes − prix d'achat) se lisent sur <button type="button" onClick={() => onNav && onNav('dashboard')} style={{ border: 'none', background: 'transparent', color: C.blue || C.accent, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', padding: 0, fontSize: 12 }}>Statistiques →</button>
       </div>
+      {chargesAnnee > 0 && (
+        <button type="button" onClick={exporterCharges} style={{ alignSelf: 'flex-start', border: `1px solid ${C.border}`, background: C.card, color: C.text, borderRadius: 8, padding: '8px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <Icon name="save" size={14} />Exporter mes charges {annee} (CSV)
+        </button>
+      )}
 
       {/* RÉSULTAT DE L'ANNÉE — recettes déclarées (consommées de la ligne publiée,
           §11) moins les charges. Les packs/dépenses/coûts fixes sont « pris en
@@ -22053,7 +22096,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       buyLines.push({ o, date:o.date, seller:o.seller||o.user_login||o.opposite_user?.login||'', title:o.title, montant });
     }
     buyLines.sort((a,b)=> new Date(b.date)-new Date(a.date));
+    // Charges d'entreprise de l'année (packs, dépenses, coûts fixes) — même
+    // règle que l'onglet Comptabilité (§11). Déductibles : elles entrent dans le
+    // résultat APRÈS charges, pas dans la base URSSAF (micro = sur le CA).
+    const charges = comptaChargesAnnee(load('vrm_compta', null), reportYear);
     const benefNet = margeKnown - fraisConnu;   // ⚠️ ventes au coût connu uniquement (cf. rapport mensuel)
+    const resultatCharges = benefNet - charges.total;
     // ⚠️ `marge` retranchait `frais` (les boosts de TOUTES les ventes) d'un
     // `margeKnown` qui ne porte que les ventes au coût connu — deux ensembles
     // différents dans la même soustraction. §5.84 l'avait corrigé sur le
@@ -22064,7 +22112,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const margeHT = marge - tvaMarge;
     const taux = tauxUrssaf();
     const urssaf = aPayerUrssaf(ca, taux);
-    return { regime, tvaRate, year:reportYear, months, ca, cout, frais, nb, nbCout, benefNet, marge, tvaMarge, margeHT, taux, urssaf, nMasq, caMasq, achatsTotal, achatsNb, buyLines, saleLines, parPlateforme };
+    return { regime, tvaRate, year:reportYear, months, ca, cout, frais, nb, nbCout, benefNet, marge, tvaMarge, margeHT, taux, urssaf, nMasq, caMasq, achatsTotal, achatsNb, buyLines, saleLines, parPlateforme, charges, resultatCharges };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, buysBase, reportYear, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements]);
   const [capturedReceipts, setCapturedReceipts] = useState([]); // reçus officiels Vinted captés (compta pro)
@@ -22103,8 +22151,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     R.buyLines.forEach(b=>L.push([b.date?new Date(b.date).toLocaleDateString('fr-FR'):'',b.seller,b.title,b.montant.toFixed(2)]));
     L.push(['','','TOTAL',R.achatsTotal.toFixed(2)]);
     L.push([]);
+    // CHARGES d'entreprise (déductibles) : dépenses, packs photos, coûts fixes.
+    L.push(['CHARGES (registre)']); L.push(['Date','Type','Libelle','Montant']);
+    R.charges.depLignes.forEach(d=>L.push([d.date?new Date(d.date).toLocaleDateString('fr-FR'):'','Depense',`${d.libelle||''}${d.cat?' ('+d.cat+')':''}`,(Number(d.montant)||0).toFixed(2)]));
+    R.charges.packLignes.forEach(p=>L.push([p.date?new Date(p.date).toLocaleDateString('fr-FR'):'','Pack photos',`${p.plateforme||''}${p.compte?' '+p.compte:''}`,(Number(p.montant)||0).toFixed(2)]));
+    R.charges.fixes.forEach(f=>L.push(['',`Cout fixe x${R.charges.moisComptes} mois`,f.libelle||'',((Number(f.montant)||0)*R.charges.moisComptes).toFixed(2)]));
+    L.push(['','','TOTAL charges',R.charges.total.toFixed(2)]);
+    L.push([]);
     if (R.regime==='marge') { L.push(['Marge TTC',R.marge.toFixed(2)]); L.push([`TVA sur marge (${R.tvaRate}%)`,R.tvaMarge.toFixed(2)]); L.push(['Marge HT',R.margeHT.toFixed(2)]); }
     else { L.push([`Estimation cotisations (${String(R.taux).replace('.',',')}%)`,R.urssaf.toFixed(2)]); }
+    L.push([`Resultat apres charges (benefice net - charges)`,R.resultatCharges.toFixed(2)]);
+    if (R.nbCout<R.nb) L.push([`  benefice net sur ${R.nbCout}/${R.nb} ventes au cout d'achat connu`]);
+    if (R.charges.total>0) L.push([`  couts fixes au tarif actuel x ${R.charges.moisComptes} mois`]);
     if (R.nMasq>0) L.push([`dont ${R.nMasq} vente(s) masquée(s) dans l'app, comptées dans le CA`,R.caMasq.toFixed(2)]);
     const csv = L.map(r=>r.map(e).join(';')).join('\n');
     const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'}); const url=URL.createObjectURL(blob);
@@ -22128,6 +22186,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     kv('Achats (registre)', R.achatsTotal.toFixed(2)+' EUR ('+R.achatsNb+')');
     if (R.regime==='marge') { kv('Marge TTC', R.marge.toFixed(2)+' EUR'); kv('TVA sur la marge ('+R.tvaRate+'%)', R.tvaMarge.toFixed(2)+' EUR'); kv('Marge HT', R.margeHT.toFixed(2)+' EUR'); }
     else { kv('Bénéfice net', R.benefNet.toFixed(2)+' EUR'+(R.nbCout<R.nb?` (sur ${R.nbCout}/${R.nb} ventes au coût connu)`:'')); kv('Estimation cotisations ('+String(R.taux).replace('.',',')+'%)', R.urssaf.toFixed(2)+' EUR'); }
+    if (R.charges.total>0) { kv('Charges entreprise (packs, depenses, fixes)', R.charges.total.toFixed(2)+' EUR'); kv('Resultat apres charges', R.resultatCharges.toFixed(2)+' EUR'+(R.charges.moisComptes?` (fixes x${R.charges.moisComptes} mois)`:'')); }
     for (const [k,v] of Object.entries(R.parPlateforme||{})) if (k!=='Vinted' && v.n>0) kv('dont '+k, v.ca.toFixed(2)+' EUR ('+v.n+')');
     if (R.nMasq>0) kv('dont ventes masquees dans l\'app (comptees)', R.nMasq+' — '+R.caMasq.toFixed(2)+' EUR');
     y-=6; T('Document indicatif genere par l\'app. Ne remplace pas un conseil comptable.',40,y,8,reg,rgb(0.55,0.55,0.55));
@@ -26257,6 +26316,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     subColor={annual.nbCout<annual.nb?C.warn:undefined}
                     sub={annual.nbCout<annual.nb?`sur ${annual.nbCout} vente${annual.nbCout>1?'s':''} sur ${annual.nb} — prix d'achat manquants`:(annual.frais>0?`boosts ${fmtE(annual.frais)}`:undefined)}/>
                   <StatBox label="Cotisations est." value={fmtE(annual.urssaf)} color={C.warn} sub={`${String(annual.taux).replace('.',',')} % du CA · réglable`}/>
+                </>)}
+                {annual.charges && annual.charges.total>0 && (<>
+                  <StatBox label="Charges d'entreprise" value={fmtE(annual.charges.total)} sub={`packs + dépenses + fixes × ${annual.charges.moisComptes} mois`}/>
+                  <StatBox label="Résultat après charges" value={fmtE(annual.resultatCharges)} color={annual.resultatCharges>=0?INV_STATUS.online.color:C.danger} sub="bénéfice net − tes charges (hors coût d'achat manquant)"/>
                 </>)}
               </div>
               {annual.nb>annual.nbCout && <div style={{fontSize:12,color:C.warn,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'8px 12px',marginBottom:12}}>⚠️ {annual.nb-annual.nbCout} vente(s) sans prix d'achat — le bénéfice est incomplet.</div>}
