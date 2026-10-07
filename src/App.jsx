@@ -17403,25 +17403,24 @@ function SelecteurCompte({ accounts, sel, setSel, connecte }) {
     if (ac !== bc) return ac ? -1 : 1;
     return nom(a).localeCompare(nom(b));
   });
-  const puce = (actif, onClick, kids, key) => (
-    <button key={key} type="button" onClick={onClick} style={{
-      flexShrink: 0, border: `1px solid ${actif ? C.accent : C.border}`, background: actif ? C.accent : 'transparent',
-      color: actif ? (C.onAccent || '#fff') : C.text, borderRadius: 999, padding: '5px 12px', fontSize: 12.5,
-      fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>{kids}</button>
-  );
-  // ⚠️ PAR DÉFAUT, LE COMPTE DE L'EXTENSION (Julien, 7 oct. : « ça doit être
-  //    d'office celui sur lequel l'extension est, si elle est ouverte »).
-  //    `sel` vaut '' tant qu'il n'a rien choisi → le compte EFFECTIF est alors
-  //    celui connecté dans Chrome (`connecte`), et les autres sont floutés.
-  //    « Tous les comptes » est un choix EXPLICITE (sentinelle '*'), sinon un
-  //    clic sur « Tous » retomberait aussitôt sur le compte connecté.
-  const eff = String(sel) === '*' ? '' : String(sel || co || '');
+  // ⚠️ UNE LISTE DÉROULANTE (Julien, 7 oct.) : « en haut, une liste où on
+  //    sélectionne les données d'un compte OU de tous les comptes ».
+  //    Valeur affichée = son choix, sinon le compte CONNECTÉ dans Chrome
+  //    (l'extension — 📍), sinon « Tous les comptes ». Cohérent avec `selEff`
+  //    (Comptabilite) : '*' ⇒ tout visible, aucun flou ; sur ordi sans compte
+  //    connecté → « Tous » par défaut, donc rien n'est flouté.
+  const val = String(sel) === '*' ? '*' : (String(sel) || co || '*');
   return (
-    <div className="vrm-rangee" style={{ display: 'flex', gap: 8, padding: '10px 16px 0', alignItems: 'center' }}>
-      {puce(eff === '', () => setSel('*'), 'Tous les comptes', '_tous')}
-      {tri.map(a => { const uid = String(a.vinted_user_id);
-        return puce(eff === uid, () => setSel(eff === uid ? '*' : uid),
-          <>{uid === co ? '📍 ' : ''}{nom(a)}</>, uid); })}
+    <div style={{ display: 'flex', gap: 8, padding: '10px 16px 0', alignItems: 'center', flexWrap: 'wrap' }}>
+      <label htmlFor="vrm-sel-compte" style={{ fontSize: 12, color: C.muted, fontWeight: 600 }}>Compte</label>
+      <select id="vrm-sel-compte" value={val} onChange={(e) => setSel(e.target.value)}
+        style={{ flex: '0 1 280px', maxWidth: '100%', padding: '8px 11px', borderRadius: 8, border: `1px solid ${C.border}`,
+          background: C.card, color: C.text, fontSize: 13, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer' }}>
+        <option value="*">Tous les comptes</option>
+        {tri.map(a => { const uid = String(a.vinted_user_id);
+          return <option key={uid} value={uid}>{uid === co ? '📍 ' : ''}{nom(a)}</option>; })}
+      </select>
+      {co && val === co && <span style={{ fontSize: 11.5, color: C.muted }}>compte de l'extension</span>}
     </div>
   );
 }
