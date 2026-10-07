@@ -20748,6 +20748,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // ne l'avait jamais reprise.
   const achatStage = (o, tk) => {
     const s = o.status || '';
+    // ⚠️ « Retour initié » sur un ACHAT = litige, tu dois RENVOYER la paire.
+    //    Testé AVANT « annulé/remboursé » : ce n'est pas une commande morte,
+    //    c'est une action à faire (générer le bordereau de retour sur Vinted).
+    //    Motif précis (comme venteStage) pour ne pas attraper « Retournée à
+    //    l'expéditeur », qui est autre chose.
+    if (/retour\s*initi|retour\s+en\s+cours|retour\s+demand/i.test(s)) return { label: 'À renvoyer', step: 1, color: C.warn, retour: true };
     if (/annul|rembours|refus/i.test(s)) return { label: 'Annulé', step: 0, color: C.danger };
     if (/finalis/i.test(s) || tusDe(o) === 'completed') return { label: 'Reçu', step: 4, color: INV_STATUS.online.color };
     if (isAtRelayStatus(s) || (tk && tk.status === 'available')) return { label: 'À retirer', step: 3, color: C.warn };
@@ -24782,6 +24788,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {numA!=null && <span title="Numéro de la paire (lien avec l'annonce / la vente)" style={{fontSize:11,fontWeight:700,color:C.accent,background:`${C.accent}18`,borderRadius:5,padding:'0 6px'}}>N°{numA}</span>}
                   {o._fromEmail && <span title="Reconstituée depuis l'email — pas encore confirmée par Vinted" style={{fontSize:10,fontWeight:600,color:C.muted,border:`1px solid ${C.border}`,borderRadius:8,padding:'0 6px'}}>email</span>}
                 </div>
+                {/* ⚠️ LITIGE / RETOUR : il doit RENVOYER la paire, et générer le
+                    bordereau de retour. VRM ne le crée PAS à sa place : la route
+                    qui GÉNÈRE un retour n'a jamais été observée (§4.10), et agir
+                    tout seul sur un compte en litige est le pire endroit (§3 —
+                    un trafic inhabituel rend un blocage définitif). On l'amène en
+                    UN tap sur la commande Vinted, où Vinted fabrique l'étiquette,
+                    et on dit clairement ce que VRM fait et ne fait pas. Le lien
+                    de commande est celui déjà utilisé par le bouton bordereau. */}
+                {st.retour && (
+                  <div style={{marginTop:7}}>
+                    <a href={`https://www.vinted.fr/member/transactions/${encodeURIComponent(o.transaction_id)}`} target="_blank" rel="noreferrer"
+                      style={{display:'inline-flex',alignItems:'center',gap:6,border:`1.5px solid ${C.warn}`,background:`${C.warn}14`,color:C.warn,borderRadius:8,padding:'7px 12px',fontSize:12.5,fontWeight:700,textDecoration:'none'}}>
+                      ↩ Générer le bordereau de retour sur Vinted
+                    </a>
+                    <div style={{fontSize:11,color:C.muted,marginTop:4,lineHeight:1.4}}>
+                      Litige : la paire doit repartir. Vinted crée l'étiquette de retour dans cette commande — ouvre-la, choisis le point de dépôt et imprime le bordereau. VRM ne la génère pas tout seul (un retour engage l'envoi, et c'est un compte en litige).
+                    </div>
+                  </div>
+                )}
               </div>
               {/* Prix à deux décimales et une virgule (jamais « 21.0 € » brut). */}
               <div style={{fontSize:16,fontWeight:700,color:C.text,letterSpacing:-0.3,flexShrink:0}}>{montantCommande(o).toFixed(2).replace('.',',')} {cur(o.price?.currency_code)}</div>
