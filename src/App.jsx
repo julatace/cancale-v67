@@ -17034,149 +17034,157 @@ function ComptaPro({ liveStats, onNav }) {
   const [nFactures, setNFactures] = React.useState(null);
   React.useEffect(() => { let stop = false; fetchProInvoices().then(r => { if (!stop) setNFactures(Array.isArray(r) ? r.length : null); }).catch(() => {}); return () => { stop = true; }; }, []);
 
-  const inp = { border: `1px solid ${C.border}`, background: C.bg, color: C.text, borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', minWidth: 0 };
-  const btnAdd = { border: 'none', background: C.accent, color: C.card, borderRadius: 8, padding: '8px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 };
-  const Stat = ({ label, value, sub }) => (
-    <div style={{ flex: '1 1 150px', maxWidth: 260, border: `1px solid ${C.border}`, background: C.card, borderRadius: 10, padding: '13px 15px' }}>
-      <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 500 }}>{label}</div>
-      <div className="vrm-display" style={{ fontSize: 23, fontWeight: 700, color: C.text, marginTop: 2 }}>{value}</div>
-      {sub && <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{sub}</div>}
-    </div>
+  // ── Palette d'écran (§7 : neutre partout, UN accent rare) ──────────────────
+  const inp = { border: `1px solid ${C.border}`, background: C.bg, color: C.text, borderRadius: 8, padding: '9px 11px', fontSize: 13, fontFamily: 'inherit', minWidth: 0, outline: 'none', boxSizing: 'border-box' };
+  const btnAdd = { border: 'none', background: C.accent, color: '#fff', borderRadius: 8, padding: '9px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 };
+  const chip = (icon) => (
+    <span aria-hidden="true" style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 8, background: `${C.accent}14`, color: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name={icon} size={16} /></span>
   );
   const Ligne = ({ gauche, droite, onDel }) => (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderTop: `1px solid ${C.border}` }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', borderTop: `1px solid ${C.border}` }}>
       <span style={{ flex: 1, minWidth: 0 }}>{gauche}</span>
-      <span style={{ fontSize: 14, fontWeight: 700, color: C.text, whiteSpace: 'nowrap' }}>{droite}</span>
-      <button type="button" onClick={onDel} title="Supprimer" aria-label="Supprimer" style={{ border: 'none', background: 'transparent', color: C.danger, fontSize: 16, cursor: 'pointer', flexShrink: 0, lineHeight: 1 }}>×</button>
+      <span className="vrm-display" style={{ fontSize: 14, fontWeight: 700, color: C.text, whiteSpace: 'nowrap' }}>{droite}</span>
+      <button type="button" onClick={onDel} title="Supprimer" aria-label="Supprimer" style={{ border: 'none', background: 'transparent', color: C.muted, fontSize: 18, cursor: 'pointer', flexShrink: 0, lineHeight: 1, padding: '0 2px' }}>×</button>
     </div>
   );
+  // Carte de section : chip + titre + total à droite, corps (formulaire + liste).
+  const Section = ({ icon, titre, note, total, children }) => (
+    <Card style={{ padding: 0, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '13px 16px', borderBottom: `1px solid ${C.border}` }}>
+        {chip(icon)}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{titre}</div>
+          {note && <div style={{ fontSize: 11.5, color: C.muted, marginTop: 1 }}>{note}</div>}
+        </div>
+        {total != null && <div className="vrm-display" style={{ fontSize: 15, fontWeight: 700, color: C.text, whiteSpace: 'nowrap' }}>{fmt(total)}</div>}
+      </div>
+      <div style={{ padding: 14 }}>{children}</div>
+    </Card>
+  );
+  const vide = (txt) => <div style={{ fontSize: 12.5, color: C.muted, padding: '2px 2px 0', lineHeight: 1.5 }}>{txt}</div>;
+  const listeBox = (items) => <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden', marginTop: 10 }}>{items}</div>;
 
   return (
-    <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 18 }}>
-      <ScreenHead icon="euro" title="Comptabilité" desc="Tes dépenses, tes coûts fixes et tes factures — tout ce dont ton entreprise a besoin, groupé. Le chiffre d'affaires et le bénéfice vivent dans Statistiques." />
+    <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <ScreenHead icon="euro" title="Comptabilité" desc="Note tes charges au fil de l'eau — chaque euro compte dans ton résultat. Le chiffre d'affaires et le bénéfice vivent dans Statistiques." />
 
-      {/* RÉSUMÉ — 100 % de ce que TU as saisi (aucun chiffre deviné). */}
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-        <Stat label="Coûts fixes / mois" value={fmt(fixesParMois)} sub={fixes.length ? `${fixes.length} poste${fixes.length > 1 ? 's' : ''}` : 'rien de saisi'} />
-        <Stat label={`Charges ce mois`} value={fmt(chargesMois)} sub="fixes + dépenses + packs" />
-        <Stat label={`Total charges ${annee}`} value={fmt(chargesAnnee)} sub={`fixes × ${moisEcoules} mois + dépenses + packs`} />
-      </div>
-      <div style={{ fontSize: 12, color: C.muted, marginTop: -8, lineHeight: 1.5 }}>
-        Ce sont les charges que <b>tu</b> renseignes. Ton chiffre d'affaires et ton bénéfice (ventes − prix d'achat) se lisent sur <button type="button" onClick={() => onNav && onNav('dashboard')} style={{ border: 'none', background: 'transparent', color: C.blue || C.accent, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', padding: 0, fontSize: 12 }}>Statistiques →</button>
+      {/* ── HÉRO : LE RÉSULTAT ─────────────────────────────────────────────────
+          Recettes déclarées (ligne publiée par Ventes, §11) − charges. Le seul
+          endroit où l'accent est permis (§7 : rare) : le filet du haut. */}
+      <Card style={{ padding: 0, overflow: 'hidden' }}>
+        <div style={{ height: 3, background: C.accent }} />
+        <div style={{ padding: '16px 18px' }}>
+          <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, marginBottom: 10 }}>Résultat {annee} · après tes charges</div>
+          {recettesAnnee == null ? (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, flexWrap: 'wrap' }}>
+                <div className="vrm-display" style={{ fontSize: 34, fontWeight: 800, color: C.muted, letterSpacing: -1 }}>—</div>
+                <div style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>Tes charges {annee} : <span className="vrm-display">{fmt(chargesAnnee)}</span></div>
+              </div>
+              <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.6, marginTop: 8 }}>
+                Ton résultat s'affiche dès que ton CA déclaré arrive sur cet appareil — ouvre <button type="button" onClick={() => onNav && onNav('cat_ventes')} style={{ border: 'none', background: 'transparent', color: C.accent, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0, fontSize: 12.5 }}>Ventes</button> une fois, et tes charges y seront déduites.
+              </div>
+            </div>
+          ) : (
+            <div>
+              <div className="vrm-display" style={{ fontSize: 40, fontWeight: 800, color: resultatAnnee < 0 ? C.warn : C.text, letterSpacing: -1.5, lineHeight: 1 }}>{fmt(resultatAnnee)}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 12, fontSize: 12.5, color: C.muted }}>
+                <span className="vrm-display" style={{ color: C.text, fontWeight: 600 }}>{fmt(recettesAnnee)}</span>
+                <span>CA déclaré</span>
+                <span style={{ color: C.border }}>—</span>
+                <span className="vrm-display" style={{ color: C.text, fontWeight: 600 }}>{fmt(chargesAnnee)}</span>
+                <span>de charges</span>
+              </div>
+              <div style={{ fontSize: 11.5, color: C.muted, marginTop: 10, lineHeight: 1.5, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
+                Le <b>coût d'achat de tes paires</b> n'est pas déduit ici (il se saisit par paire, dans <button type="button" onClick={() => onNav && onNav('dashboard')} style={{ border: 'none', background: 'transparent', color: C.accent, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0, fontSize: 11.5 }}>Statistiques</button>) — ce n'est donc pas encore ton bénéfice net.
+              </div>
+            </div>
+          )}
+        </div>
+      </Card>
+
+      {/* Trois repères de charges — même carte, hiérarchie claire. */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
+        {[
+          { l: 'Coûts fixes / mois', v: fmt(fixesParMois), s: fixes.length ? `${fixes.length} poste${fixes.length > 1 ? 's' : ''}` : 'rien de saisi' },
+          { l: 'Charges ce mois', v: fmt(chargesMois), s: 'fixes + dépenses + packs' },
+          { l: `Total charges ${annee}`, v: fmt(chargesAnnee), s: `depuis janvier` },
+        ].map((x, i) => (
+          <Card key={i} style={{ padding: '13px 15px' }}>
+            <div style={{ fontSize: 10.5, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.8, fontWeight: 600 }}>{x.l}</div>
+            <div className="vrm-display" style={{ fontSize: 22, fontWeight: 700, color: C.text, marginTop: 3 }}>{x.v}</div>
+            <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{x.s}</div>
+          </Card>
+        ))}
       </div>
       {chargesAnnee > 0 && (
-        <button type="button" onClick={exporterCharges} style={{ alignSelf: 'flex-start', border: `1px solid ${C.border}`, background: C.card, color: C.text, borderRadius: 8, padding: '8px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+        <button type="button" onClick={exporterCharges} style={{ alignSelf: 'flex-start', border: `1px solid ${C.border}`, background: C.card, color: C.text, borderRadius: 8, padding: '8px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: -4 }}>
           <Icon name="save" size={14} />Exporter mes charges {annee} (CSV)
         </button>
       )}
 
-      {/* RÉSULTAT DE L'ANNÉE — recettes déclarées (consommées de la ligne publiée,
-          §11) moins les charges. Les packs/dépenses/coûts fixes sont « pris en
-          compte » ici. Recettes pas encore publiées ⇒ tiret + la porte (§5/§7). */}
-      <div style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 10, padding: '14px 16px' }}>
-        <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 500, marginBottom: 8 }}>Résultat {annee} · après tes charges</div>
-        {recettesAnnee == null ? (
-          <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>
-            <span className="vrm-display" style={{ fontSize: 23, fontWeight: 700, color: C.text }}>—</span>
-            <div style={{ marginTop: 4 }}>Ton CA déclaré n'est pas encore là sur cet appareil — ouvre <button type="button" onClick={() => onNav && onNav('cat_ventes')} style={{ border: 'none', background: 'transparent', color: C.blue || C.accent, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', padding: 0, fontSize: 13 }}>Ventes</button>, puis reviens : tes charges seront déduites ici.</div>
-          </div>
-        ) : (
-          <>
-            <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'baseline' }}>
-              <div>
-                <div className="vrm-display" style={{ fontSize: 24, fontWeight: 700, color: C.text }}>{fmt(recettesAnnee)}</div>
-                <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>CA déclaré {annee}</div>
-              </div>
-              <div style={{ fontSize: 18, color: C.muted, fontWeight: 600 }}>−</div>
-              <div>
-                <div className="vrm-display" style={{ fontSize: 24, fontWeight: 700, color: C.text }}>{fmt(chargesAnnee)}</div>
-                <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>tes charges</div>
-              </div>
-              <div style={{ fontSize: 18, color: C.muted, fontWeight: 600 }}>=</div>
-              <div>
-                <div className="vrm-display" style={{ fontSize: 26, fontWeight: 800, color: resultatAnnee < 0 ? C.warn : C.text }}>{fmt(resultatAnnee)}</div>
-                <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>résultat</div>
-              </div>
-            </div>
-            <div style={{ fontSize: 11.5, color: C.muted, marginTop: 8, lineHeight: 1.5 }}>
-              Recettes − charges d'entreprise. Le <b>coût d'achat de tes paires</b> n'est pas déduit ici (il se saisit par paire et vit dans <button type="button" onClick={() => onNav && onNav('dashboard')} style={{ border: 'none', background: 'transparent', color: C.blue || C.accent, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', padding: 0, fontSize: 11.5 }}>Statistiques</button>) — ce n'est donc pas encore ton bénéfice net.
-            </div>
-          </>
-        )}
-      </div>
-
       {/* DÉPENSES PONCTUELLES */}
-      <div>
-        <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 8 }}>Dépenses</div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 8 }}>
+      <Section icon="bag" titre="Dépenses" note="Emballage, fournitures, frais… tout ce que tu paies pour ton activité." total={depenses.length ? somme(depenses.filter(d => cetteAnnee(d.date)), x => x.montant) : null}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           <input type="date" value={dDate} onChange={e => setDDate(e.target.value)} style={{ ...inp, width: 150 }} />
-          <input type="text" placeholder="Ex. rouleau de scotch" value={dLib} onChange={e => setDLib(e.target.value)} style={{ ...inp, flex: '2 1 160px' }} />
+          <input type="text" placeholder="Ex. rouleau de scotch" value={dLib} onChange={e => setDLib(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterDepense(); }} style={{ ...inp, flex: '2 1 160px' }} />
           <select value={dCat} onChange={e => setDCat(e.target.value)} style={{ ...inp }}>{COMPTA_CATS.map(c => <option key={c} value={c}>{c}</option>)}</select>
-          <input type="text" inputMode="decimal" placeholder="€" value={dMnt} onChange={e => setDMnt(e.target.value)} style={{ ...inp, width: 90 }} />
+          <input type="text" inputMode="decimal" placeholder="€" value={dMnt} onChange={e => setDMnt(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterDepense(); }} style={{ ...inp, width: 90 }} />
           <button type="button" onClick={ajouterDepense} style={btnAdd}>Ajouter</button>
         </div>
         {depenses.length === 0
-          ? <div style={{ fontSize: 12.5, color: C.muted, padding: '8px 2px' }}>Aucune dépense saisie pour l'instant.</div>
-          : <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: C.card, overflow: 'hidden' }}>
-            {depenses.map((d, i) => <div key={d.id} style={{ borderTop: i ? `1px solid ${C.border}` : 'none' }}><Ligne gauche={<><span style={{ fontSize: 13, color: C.text }}>{d.libelle}</span> <span style={{ fontSize: 11, color: C.muted }}>· {d.cat} · {String(d.date || '').split('-').reverse().join('/')}</span></>} droite={fmt(d.montant)} onDel={() => retirer('depenses', d.id)} /></div>)}
-          </div>}
-      </div>
+          ? vide('Note ta première dépense — ça prend cinq secondes, et ça allège ton résultat.')
+          : listeBox(depenses.map((d, i) => <div key={d.id} style={{ borderTop: i ? `1px solid ${C.border}` : 'none' }}><Ligne gauche={<><span style={{ fontSize: 13, color: C.text }}>{d.libelle}</span> <span style={{ fontSize: 11, color: C.muted }}>· {d.cat} · {String(d.date || '').split('-').reverse().join('/')}</span></>} droite={fmt(d.montant)} onDel={() => retirer('depenses', d.id)} /></div>))}
+      </Section>
 
       {/* COÛTS FIXES MENSUELS */}
-      <div>
-        <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 8 }}>Coûts fixes <span style={{ fontWeight: 500, color: C.muted }}>— chaque mois (abonnement, logiciel, local…)</span></div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 8 }}>
-          <input type="text" placeholder="Ex. abonnement boost" value={fLib} onChange={e => setFLib(e.target.value)} style={{ ...inp, flex: '2 1 180px' }} />
-          <input type="text" inputMode="decimal" placeholder="€ / mois" value={fMnt} onChange={e => setFMnt(e.target.value)} style={{ ...inp, width: 110 }} />
+      <Section icon="clock" titre="Coûts fixes" note="Chaque mois : abonnement, logiciel, local…" total={fixesParMois ? fixesParMois : null}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <input type="text" placeholder="Ex. abonnement boost" value={fLib} onChange={e => setFLib(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterFixe(); }} style={{ ...inp, flex: '2 1 180px' }} />
+          <input type="text" inputMode="decimal" placeholder="€ / mois" value={fMnt} onChange={e => setFMnt(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterFixe(); }} style={{ ...inp, width: 120 }} />
           <button type="button" onClick={ajouterFixe} style={btnAdd}>Ajouter</button>
         </div>
         {fixes.length === 0
-          ? <div style={{ fontSize: 12.5, color: C.muted, padding: '8px 2px' }}>Aucun coût fixe saisi.</div>
-          : <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: C.card, overflow: 'hidden' }}>
-            {fixes.map((f, i) => <div key={f.id} style={{ borderTop: i ? `1px solid ${C.border}` : 'none' }}><Ligne gauche={<span style={{ fontSize: 13, color: C.text }}>{f.libelle}</span>} droite={fmt(f.montant) + ' /mois'} onDel={() => retirer('fixes', f.id)} /></div>)}
-          </div>}
-      </div>
+          ? vide('Un abonnement, un logiciel ? Ajoute-le une fois — il sera compté chaque mois.')
+          : listeBox(fixes.map((f, i) => <div key={f.id} style={{ borderTop: i ? `1px solid ${C.border}` : 'none' }}><Ligne gauche={<span style={{ fontSize: 13, color: C.text }}>{f.libelle}</span>} droite={fmt(f.montant) + ' /mois'} onDel={() => retirer('fixes', f.id)} /></div>))}
+      </Section>
 
       {/* PACKS DE PHOTOS (Leboncoin / eBay pro) — § Julien « packs de photos pris
-          en compte du bénéfice ». Saisis ici comme une charge ; ils seront
-          déduits du bénéfice dans Statistiques (prochaine passe). */}
-      <div>
-        <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 4 }}>Packs de photos</div>
-        <div style={{ fontSize: 12, color: C.muted, marginBottom: 8, lineHeight: 1.5 }}>Sur un compte pro, au-delà des photos gratuites tu achètes un pack. Note-le ici : c'est une charge de ton entreprise.</div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 8 }}>
+          en compte du bénéfice ». */}
+      <Section icon="camera" titre="Packs de photos" note="Au-delà des photos gratuites, un compte pro achète un pack : c'est une charge." total={packs.length ? somme(packs.filter(p => cetteAnnee(p.date)), x => x.montant) : null}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           <select value={pPlat} onChange={e => setPPlat(e.target.value)} style={{ ...inp }}>{['Leboncoin', 'eBay', 'Vinted', 'Vestiaire', 'Autre'].map(p => <option key={p} value={p}>{p}</option>)}</select>
-          <input type="text" placeholder="Compte (ex. pro Cancale)" value={pCpt} onChange={e => setPCpt(e.target.value)} style={{ ...inp, flex: '1 1 150px' }} />
+          <input type="text" placeholder="Compte (ex. pro Cancale)" value={pCpt} onChange={e => setPCpt(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterPack(); }} style={{ ...inp, flex: '1 1 150px' }} />
           <input type="date" value={pDate} onChange={e => setPDate(e.target.value)} style={{ ...inp, width: 150 }} />
-          <input type="text" inputMode="decimal" placeholder="€" value={pMnt} onChange={e => setPMnt(e.target.value)} style={{ ...inp, width: 90 }} />
+          <input type="text" inputMode="decimal" placeholder="€" value={pMnt} onChange={e => setPMnt(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterPack(); }} style={{ ...inp, width: 90 }} />
           <button type="button" onClick={ajouterPack} style={btnAdd}>Ajouter</button>
         </div>
         {packs.length === 0
-          ? <div style={{ fontSize: 12.5, color: C.muted, padding: '8px 2px' }}>Aucun pack de photos saisi.</div>
-          : <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: C.card, overflow: 'hidden' }}>
-            {packs.map((p, i) => <div key={p.id} style={{ borderTop: i ? `1px solid ${C.border}` : 'none' }}><Ligne gauche={<><span style={{ fontSize: 13, color: C.text }}>{p.plateforme}</span>{p.compte ? <span style={{ fontSize: 11, color: C.muted }}> · {p.compte}</span> : null} <span style={{ fontSize: 11, color: C.muted }}>· {String(p.date || '').split('-').reverse().join('/')}</span></>} droite={fmt(p.montant)} onDel={() => retirer('packs', p.id)} /></div>)}
-          </div>}
-      </div>
+          ? vide('Tu as acheté un pack de photos sur un compte pro ? Note-le ici.')
+          : listeBox(packs.map((p, i) => <div key={p.id} style={{ borderTop: i ? `1px solid ${C.border}` : 'none' }}><Ligne gauche={<><span style={{ fontSize: 13, color: C.text }}>{p.plateforme}</span>{p.compte ? <span style={{ fontSize: 11, color: C.muted }}> · {p.compte}</span> : null} <span style={{ fontSize: 11, color: C.muted }}>· {String(p.date || '').split('-').reverse().join('/')}</span></>} droite={fmt(p.montant)} onDel={() => retirer('packs', p.id)} /></div>))}
+      </Section>
 
       {/* FACTURES — reçues (reçus Vinted par email) + le reste vit dans Factures */}
-      <button type="button" onClick={() => onNav && onNav('invoices')} style={{ textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12, border: `1px solid ${C.border}`, background: C.card, borderRadius: 10, padding: '12px 14px', cursor: 'pointer', fontFamily: 'inherit' }}>
-        <span aria-hidden="true" style={{ flexShrink: 0, width: 34, height: 34, borderRadius: 8, background: C.card2 || C.bg, border: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted }}><Icon name="receipt" size={17} /></span>
+      <button type="button" onClick={() => onNav && onNav('invoices')} style={{ textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12, border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, padding: '13px 15px', cursor: 'pointer', fontFamily: 'inherit', boxShadow: C.shadow || 'none' }}>
+        {chip('receipt')}
         <span style={{ flex: 1 }}>
-          <span style={{ display: 'block', fontSize: 14, fontWeight: 600, color: C.text }}>Factures{nFactures != null && nFactures > 0 ? ` — ${nFactures} reçue${nFactures > 1 ? 's' : ''}` : ''}</span>
+          <span style={{ display: 'block', fontSize: 14, fontWeight: 700, color: C.text }}>Factures{nFactures != null && nFactures > 0 ? ` — ${nFactures} reçue${nFactures > 1 ? 's' : ''}` : ''}</span>
           <span style={{ display: 'block', fontSize: 12, color: C.muted, marginTop: 1 }}>Tes reçus Vinted arrivés par email, et tes factures à émettre pour tes clients.</span>
         </span>
         <span style={{ fontSize: 20, color: C.muted }}>›</span>
       </button>
 
-      {/* BANQUE & FACTURATION ÉLECTRONIQUE — un geste qui t'appartient (comptes,
-          identifiants). On ne fait semblant de rien connecter (§ panneau de
-          sécurité : le vocabulaire technique assumé ne se cache pas). */}
-      <div style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 10, padding: '14px 16px' }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 6 }}>Banque & facturation électronique</div>
+      {/* BANQUE & FACTURATION ÉLECTRONIQUE — un geste qui t'appartient. */}
+      <Card style={{ padding: '14px 16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 11, marginBottom: 8 }}>
+          {chip('wallet')}
+          <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Banque & facturation électronique</div>
+        </div>
         <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.6 }}>
           La loi impose la <b>facturation électronique</b> aux entreprises à partir de 2026, via une plateforme agréée (PDP). Connecter ta banque ou une plateforme pour émettre et recevoir ces factures demande <b>tes identifiants</b> : c'est un geste qui n'appartient qu'à toi, l'app ne peut pas le faire à ta place.
           <br />Quand tu auras choisi ta plateforme, dis-le-moi : je câble la réception des factures ici (comme les reçus Vinted arrivent déjà par email). D'ici là, <b>rien n'est connecté</b> — je ne fais pas semblant.
         </div>
-      </div>
+      </Card>
     </div>
   );
 }
