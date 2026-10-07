@@ -24800,10 +24800,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div style={{marginTop:7}}>
                     <a href={`https://www.vinted.fr/member/transactions/${encodeURIComponent(o.transaction_id)}`} target="_blank" rel="noreferrer"
                       style={{display:'inline-flex',alignItems:'center',gap:6,border:`1.5px solid ${C.warn}`,background:`${C.warn}14`,color:C.warn,borderRadius:8,padding:'7px 12px',fontSize:12.5,fontWeight:700,textDecoration:'none'}}>
-                      ↩ Générer le bordereau de retour sur Vinted
+                      ↩ Bordereau de retour sur Vinted
                     </a>
                     <div style={{fontSize:11,color:C.muted,marginTop:4,lineHeight:1.4}}>
-                      Litige : la paire doit repartir. Vinted crée l'étiquette de retour dans cette commande — ouvre-la, choisis le point de dépôt et imprime le bordereau. VRM ne la génère pas tout seul (un retour engage l'envoi, et c'est un compte en litige).
+                      Litige : la paire doit repartir. Ouvre la commande sur Vinted pour générer l'étiquette de retour, la réimprimer ou suivre le colis. VRM ne la génère pas tout seul (un retour engage l'envoi, et c'est un compte en litige).
                     </div>
                   </div>
                 )}
