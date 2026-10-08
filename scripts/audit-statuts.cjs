@@ -79,7 +79,7 @@ const VENTES = [
 const ACHAT_RELAIS = { status: "La livraison n'a pas encore eu lieu - colis déposé en bureau de Poste ou point relais", transaction_user_status: 'needs_action' };
 
 const C = { warn: '#a', danger: '#b', muted: '#c', blue: '#d', accent: '#e' };
-const APP_NOMS = ['classifyOrderStatus', 'isAtRelayStatus', 'isAwaitingShipStatus', 'needsBordereau', 'PAS_UN_ENVOI', 'tusDe', 'aExpedier', 'joursAvantLimiteFr', 'DELAI_EXPEDITION_J'];
+const APP_NOMS = ['classifyOrderStatus', 'isAtRelayStatus', 'isAwaitingShipStatus', 'needsBordereau', 'PAS_UN_ENVOI', 'tusDe', 'aExpedier', 'joursAvantLimiteFr', 'DELAI_EXPEDITION_J', 'limiteExpedition'];
 const app = charge('src/App.jsx', APP_NOMS);
 // Les étiquettes vivent dans un composant : on les charge avec leurs voisins.
 const appComp = charge('src/App.jsx', ['venteStage', 'achatStage', 'purchasePhase', 'bordShipped'], Object.assign({}, app, {
@@ -198,7 +198,14 @@ essaie('(g) délai', () => {
   const src = fs.readFileSync(path.join(R, 'src/App.jsx'), 'utf8');
   const i = src.indexOf('const toShip = useMemo(');
   const corps = i >= 0 ? src.slice(i, src.indexOf('\n  }, [', i)) : '';
-  dit(/joursAvantLimiteFr\(\s*b\.dateLimite\s*\)/.test(corps), 'le rappel de Ma journée prend la date limite écrite dans l\'email du bordereau quand il l\'a');
+  // ⚠️ 6 octobre : la date limite vit dans `limiteExpedition` (partagée avec
+  //    l'alerte « coché posté, jamais vu partir », §11). L'audit suit la RÈGLE
+  //    jusqu'à sa définition — et l'EXÉCUTE — au lieu d'exiger une orthographe.
+  const d2 = new Date(); d2.setDate(d2.getDate() + 2);
+  const fr2 = `${String(d2.getDate()).padStart(2, '0')}/${String(d2.getMonth() + 1).padStart(2, '0')}/${d2.getFullYear()}`;
+  const viaHelper = /limiteExpedition\(\s*o\s*,\s*b\s*\)/.test(corps) && typeof app.limiteExpedition === 'function'
+    && (() => { const r = app.limiteExpedition({ date: new Date(Date.now() - 20 * 86400000).toISOString() }, { dateLimite: fr2 }); return r && r.daysLeft === 2 && r.limite === 'email'; })();
+  dit(/joursAvantLimiteFr\(\s*b\.dateLimite\s*\)/.test(corps) || viaHelper, 'le rappel de Ma journée prend la date limite écrite dans l\'email du bordereau quand il l\'a');
   dit(/aExpedier\(o\)/.test(corps) && /isBordDone\(b\)/.test(corps), 'Ma journée applique la même règle et les mêmes sorties que Colis (bordereau marqué expédié, suivi transporteur)');
   const d = new Date(); d.setDate(d.getDate() + 2);
   const fr = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;

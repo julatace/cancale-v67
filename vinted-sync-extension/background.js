@@ -868,6 +868,62 @@ async function listePlusRiche(rowId, parsed, cle) {
   } catch (_) { return true; }
 }
 
+// ══ LA BOÎTE DE RÉCEPTION SE FUSIONNE, ELLE NE SE COMPTE PAS (5.162) ═══════
+// MESURÉ le 6 octobre sur sa base : deux comptes avaient leur boîte figée sur
+// une page ANCIENNE — `24602614` sur la page 5 (dernière conversation captée le
+// 27 juillet, dernière vente le 2 octobre), `3156028798` sur la page 3
+// (25 août / 5 octobre). Cause : `listePlusRiche` ne compare que des NOMBRES.
+// Quand il fait défiler sa messagerie, la page charge les pages 2…6 (50
+// conversations chacune) et la plus profonde est rangée ; la page 1 fraîche
+// (30 conversations, moisson active) est ensuite refusée comme « plus
+// pauvre ». La boîte ne bougeait plus — et la messagerie de l'app non plus.
+// ⇒ Pour la boîte, on FUSIONNE par identifiant de conversation :
+//   · une réponse `current_page === 1` met à jour le HAUT de la liste (ses
+//     conversations remplacent celles qu'on avait, non lues comprises) ;
+//   · une page plus profonde ne fait que COMPLÉTER (une conversation absente
+//     s'ajoute ; une présente n'est remplacée que si elle est plus récente) ;
+//   · triée par `updated_at`, bornée aux 300 plus récentes ;
+//   · même forme rangée `{ pagination, conversations }` pour tous les lecteurs.
+// ⚠️ « Rien lu ne vaut pas rien » : si la ligne en base n'a pas pu être lue, on
+//    n'écrit PAS (une page 1 seule écraserait les 300 conversations gardées —
+//    la famille lire-fusionner-réécrire, `audit-fusion`). Et une réponse VIDE
+//    n'est jamais une réponse (§4.1) : rien n'est écrit.
+const INBOX_MAX = 300;
+function pageDeInbox(p) {
+  const pg = p && p.pagination;
+  const n = Number(pg && (pg.current_page != null ? pg.current_page : pg.page));
+  return isFinite(n) && n > 0 ? n : null;
+}
+const tsConversation = (c) => { const t = Date.parse((c && c.updated_at) || ''); return isNaN(t) ? 0 : t; };
+function fusionnerInbox(avant, neuf) {
+  const convsN = (neuf && Array.isArray(neuf.conversations)) ? neuf.conversations : [];
+  const convsA = (avant && Array.isArray(avant.conversations)) ? avant.conversations : [];
+  const haut = pageDeInbox(neuf) === 1;
+  const par = new Map();
+  for (const c of convsA) if (c && c.id != null) par.set(String(c.id), c);
+  for (const c of convsN) {
+    if (!c || c.id == null) continue;
+    const k = String(c.id), a = par.get(k);
+    if (haut || !a || tsConversation(c) > tsConversation(a)) par.set(k, c);
+  }
+  const conversations = [...par.values()].sort((x, y) => tsConversation(y) - tsConversation(x)).slice(0, INBOX_MAX);
+  // La pagination dit d'où vient le HAUT de la liste : celle de la page 1 quand
+  // elle arrive, sinon on garde celle qu'on avait (une page 5 ne la remplace pas).
+  const pagination = (haut || !convsA.length || !(avant && avant.pagination))
+    ? ((neuf && neuf.pagination) || (avant && avant.pagination) || null)
+    : avant.pagination;
+  return { pagination, conversations };
+}
+// Lit la boîte rangée et rend la fusion — `null` si la lecture a échoué
+// (« pas su » : l'appelant n'écrit pas).
+async function inboxFusionnee(rowId, neuf) {
+  const rows = await sbGet(`app_data?id=eq.${encodeURIComponent(rowId)}&select=pg:data->payload->pagination,cv:data->payload->conversations`);
+  if (rows === null) return null;
+  const r0 = rows[0] || null;
+  const avant = r0 ? { pagination: r0.pg || null, conversations: Array.isArray(r0.cv) ? r0.cv : [] } : null;
+  return fusionnerInbox(avant, neuf);
+}
+
 async function dressingPlusRiche(rowId, parsed) {
   const n = ((parsed && parsed.items) || []).length;
   const total = Number(parsed && parsed.pagination && parsed.pagination.total_entries);
@@ -1055,7 +1111,15 @@ async function storeHarvest(domain, type, id, body) {
   // Règle : une réponse COMPLÈTE (items ≥ total annoncé par Vinted) fait
   // toujours foi ; sinon on n'écrase que si on apporte AU MOINS autant
   // d'articles qu'avant.
-  if (CLE_LISTE[type] && !(await listePlusRiche(rowId, parsed, CLE_LISTE[type]))) {
+  // ⚠️ SAUF LA BOÎTE DE RÉCEPTION (5.162) : elle se FUSIONNE par identifiant de
+  // conversation (`fusionnerInbox`) — comparer des nombres la figeait sur une
+  // page ancienne.
+  if (type === 'inbox') {
+    if (!((parsed && parsed.conversations) || []).length) { noterDiag('ignore_inbox_vide'); return; }
+    const f = await inboxFusionnee(rowId, parsed);
+    if (f === null) { noterDiag('inbox_lecture_ratee'); return; }   // pas su : on n'écrase rien
+    parsed = f;
+  } else if (CLE_LISTE[type] && !(await listePlusRiche(rowId, parsed, CLE_LISTE[type]))) {
     noterDiag(`ignore_partiel_${type}`);
     return;
   }
@@ -1501,6 +1565,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     storeWriteReq(domain, msg.method, msg.url, msg.body);
   } else if (msg.kind === 'seen_urls' && Array.isArray(msg.paths)) {
     storeSeenUrls(domain, msg.paths, msg.reponses);
+  } else if (msg.kind === 'vintedFrein' && freinVinted(Number(msg.statut))) {
+    // 5.162 : la moisson faite DANS la page (`inject.js`) a reçu un 429/403 sur
+    // SA propre requête. Même pause que pour les requêtes du fond. (Un message
+    // forgé par la page ne peut que nous FAIRE ralentir — jamais l'inverse.)
+    poserPauseVinted(Number(msg.statut), 'navigateur');
   }
 });
 
@@ -1774,25 +1843,112 @@ async function storeReceipt(domain, url, b64) {
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// ══════════════════════════════════════════════════════════════════════════
+// UNE SEULE FILE POUR CHAQUE REQUÊTE VINTED, ET L'ARRÊT NET SUR 429 / 403
+// (5.162, 6 octobre)
+// ══════════════════════════════════════════════════════════════════════════
+// MESURÉ dans ce fichier avant de coder :
+//   · `avecVinted` ne couvrait QUE la génération de bordereaux, les réponses et
+//     les commandes de l'app. La moisson (`runActive` : jusqu'à ~33 requêtes),
+//     les codes de retrait, les dates de versement, les relevés et les photos
+//     partaient HORS file — la capture photo tourne même toute seule chaque
+//     minute (`tickPhotos`, jusqu'à 20 pages). Deux sources pouvaient donc
+//     avoir une requête en vol en même temps (§3 : « une par une »).
+//   · Quand Vinted répondait 429 (« ralentis ») ou 403 (« non »), RIEN ne
+//     s'arrêtait : chaque boucle cassait la sienne puis la suivante repartait —
+//     jusqu'à une trentaine de requêtes enchaînées dans la même visite, dans
+//     l'empreinte d'un compte que Vinted venait justement de freiner. C'est la
+//     forme exacte de ce qui a fait bloquer `vanessa5723`.
+// ⇒ TOUTE requête Vinted passe par `requeteVinted` (les primitives
+//   `vintedGet`, `vintedSend`, `vintedGetHtml`, `vintedGetCookie`, le
+//   renouvellement de session et la moisson faite dans la page) : UNE en vol,
+//   quelle que soit la source. `avecVinted` reste au-dessus, pour l'ORDRE des
+//   gestes (deux générations du même bordereau ne s'entrelacent pas) — les deux
+//   chaînes sont distinctes, donc aucune ne peut attendre l'autre.
+// ⇒ Un 429 ou un 403 venu de Vinted ouvre une PAUSE rangée dans
+//   `chrome.storage.local` (§4.9 : le service worker meurt, une variable de
+//   module ne retiendrait rien) : 15 min, puis 30, 1 h, 2 h, 4 h si Vinted
+//   recommence dans les 6 h qui suivent la pause précédente. Pendant la pause,
+//   AUCUNE requête ne part — pas même un clic : la commande de l'app est refusée
+//   avec la raison (« Vinted demande de ralentir — réessaie dans X min »).
+//   Le diagnostic la note (`vinted_frein_*`, `vinted_pause_palier_*`,
+//   `rates.vinted_pause`). Aucun plafond n'est monté, aucune requête ajoutée.
+const PAUSE_VINTED = 'vrmPauseVinted';          // { jusqua, niveau, statut, depuis, quoi }
+const PAUSE_PALIERS_MIN = [15, 30, 60, 120, 240];
+const PAUSE_OUBLI_MS = 6 * 3600000;             // au-delà, on repart du premier palier
+const freinVinted = (s) => s === 429 || s === 403;
+async function lirePauseVinted() {
+  try { return (await chrome.storage.local.get(PAUSE_VINTED))[PAUSE_VINTED] || {}; } catch (_) { return {}; }
+}
+// La pause EN COURS, ou `null`. (« Pas lu » le stockage local ⇒ pas de pause :
+// le stockage local ne tombe pas en panne comme une base distante.)
+async function pauseVinted() {
+  const p = await lirePauseVinted();
+  const reste = Number(p.jusqua || 0) - Date.now();
+  return reste > 0 ? Object.assign({}, p, { resteMs: reste }) : null;
+}
+function raisonPauseVinted(p) {
+  const min = Math.max(1, Math.ceil(Number((p && p.resteMs) || 0) / 60000));
+  return `Vinted demande de ralentir — réessaie dans ${min} min`;
+}
+// Sérialisé : deux réponses 429 arrivées l'une derrière l'autre ne montent pas
+// de deux paliers (la seconde trouve la pause déjà posée).
+let _pauseChaine = Promise.resolve();
+function poserPauseVinted(statut, quoi) {
+  _pauseChaine = _pauseChaine.then(async () => {
+    const t = Date.now();
+    const cur = await lirePauseVinted();
+    if (Number(cur.jusqua || 0) > t) return;                  // déjà en pause : rien ne monte
+    const recent = cur.jusqua && (t - Number(cur.jusqua)) < PAUSE_OUBLI_MS;
+    const niveau = recent ? Math.min(Number(cur.niveau || 0) + 1, PAUSE_PALIERS_MIN.length) : 1;
+    const minutes = PAUSE_PALIERS_MIN[niveau - 1];
+    const famille = String(quoi || 'api').replace(/[^a-z]/gi, '').slice(0, 20) || 'api';
+    try { await chrome.storage.local.set({ [PAUSE_VINTED]: { jusqua: t + minutes * 60000, niveau, statut: Number(statut) || 0, depuis: t, quoi: famille } }); } catch (_) {}
+    noterDiag(`vinted_frein_${Number(statut) || 0}`);
+    noterDiag(`vinted_pause_palier_${niveau}`);
+    majTampon((buf) => { buf.rates.vinted_pause = { statut: Number(statut) || 0, niveau, minutes, quoi: famille, at: new Date(t).toISOString() }; });
+    logActivity(`⏸ Vinted demande de ralentir (${statut}) — plus aucune requête pendant ${minutes} min`);
+  }).catch(() => {});
+  return _pauseChaine;
+}
+// LA FILE : une requête Vinted à la fois, quelle que soit la source. `fn` ne
+// fait QUE la requête (jamais une autre primitive : elle attendrait sa propre
+// place dans la file). Pendant une pause, rien ne part.
+let _fileRequetes = Promise.resolve();
+function requeteVinted(quoi, fn) {
+  const tour = async () => {
+    const p = await pauseVinted();
+    if (p) { noterDiag('vinted_pause_refus'); return { status: 0, ok: false, json: null, text: '', pause: true, raison: raisonPauseVinted(p) }; }
+    const r = await fn();
+    if (r && freinVinted(r.status)) await poserPauseVinted(r.status, quoi);
+    return r;
+  };
+  const suite = _fileRequetes.then(tour, tour);
+  _fileRequetes = suite.then(() => {}, () => {});
+  return suite;
+}
+
 // Un GET Vinted authentifie pour un compte donne (depuis le navigateur).
 async function vintedGet(acc, endpoint) {
-  try {
-    const res = await fetch(`https://${acc.domain || 'www.vinted.fr'}${endpoint}`, {
-      method: 'GET',
-      credentials: 'omit',
-      headers: {
-        'Authorization': `Bearer ${acc.access_token}`,
-        'x-anon-id': acc.anon_id || '',
-        'x-csrf-token': acc.csrf_token || '',
-        'Accept': 'application/json, text/plain, */*',
-        'Accept-Language': 'fr-FR,fr;q=0.9',
-        'locale': 'fr-FR',
-      },
-    });
-    let json = null;
-    try { json = await res.json(); } catch (_) {}
-    return { status: res.status, ok: res.ok, json };
-  } catch (_) { return { status: 0, ok: false, json: null }; }
+  return requeteVinted('api', async () => {
+    try {
+      const res = await fetch(`https://${acc.domain || 'www.vinted.fr'}${endpoint}`, {
+        method: 'GET',
+        credentials: 'omit',
+        headers: {
+          'Authorization': `Bearer ${acc.access_token}`,
+          'x-anon-id': acc.anon_id || '',
+          'x-csrf-token': acc.csrf_token || '',
+          'Accept': 'application/json, text/plain, */*',
+          'Accept-Language': 'fr-FR,fr;q=0.9',
+          'locale': 'fr-FR',
+        },
+      });
+      let json = null;
+      try { json = await res.json(); } catch (_) {}
+      return { status: res.status, ok: res.ok, json };
+    } catch (_) { return { status: 0, ok: false, json: null }; }
+  });
 }
 
 // Renouvelle le token d'un compte — MAIS uniquement s'il est celui actuellement
@@ -1811,21 +1967,25 @@ async function refreshIfActive(acc) {
   const cookieUid = p && p.account_id ? String(p.account_id) : null;
   // Garde-fou : on ne rafraichit QUE le compte actuellement actif dans le navigateur.
   if (!cookieUid || cookieUid !== String(acc.vinted_user_id)) return null;
-  try {
-    const res = await fetch(`https://${domain}/web/api/auth/refresh`, {
-      method: 'POST',
-      credentials: 'include', // laisse le navigateur envoyer les cookies du compte actif
-      headers: {
-        'x-anon-id': acc.anon_id || '',
-        'x-csrf-token': acc.csrf_token || lastCsrfByDomain[domain] || '',
-        'Content-Type': 'application/json',
-        'Accept': 'application/json, text/plain, */*',
-        'Accept-Language': 'fr-FR,fr;q=0.9',
-      },
-      body: '{}',
-    });
-    if (!res.ok) return null;
-  } catch (_) { return null; }
+  // Une requête Vinted comme une autre : dans la file, et jamais pendant une pause.
+  const rf = await requeteVinted('auth', async () => {
+    try {
+      const res = await fetch(`https://${domain}/web/api/auth/refresh`, {
+        method: 'POST',
+        credentials: 'include', // laisse le navigateur envoyer les cookies du compte actif
+        headers: {
+          'x-anon-id': acc.anon_id || '',
+          'x-csrf-token': acc.csrf_token || lastCsrfByDomain[domain] || '',
+          'Content-Type': 'application/json',
+          'Accept': 'application/json, text/plain, */*',
+          'Accept-Language': 'fr-FR,fr;q=0.9',
+        },
+        body: '{}',
+      });
+      return { status: res.status, ok: res.ok };
+    } catch (_) { return { status: 0, ok: false }; }
+  });
+  if (!rf || !rf.ok) return null;
   await wait(400);
   // Vinted a pose les nouveaux cookies (Set-Cookie applique par le navigateur) :
   // on relit les tokens frais et on les persiste pour l'app + les prochains cycles.
@@ -1852,24 +2012,33 @@ async function vintedSend(acc, method, endpoint, body) {
   const domain = acc.domain || 'www.vinted.fr';
   const payload = (body != null && String(method).toUpperCase() !== 'GET')
     ? (typeof body === 'string' ? body : JSON.stringify(body)) : undefined;
-  const doCall = () => fetch(`https://${domain}${endpoint}`, {
-    method: method || 'POST',
-    credentials: 'omit',
-    headers: {
-      'Authorization': `Bearer ${acc.access_token}`,
-      'x-anon-id': acc.anon_id || '',
-      'x-csrf-token': acc.csrf_token || lastCsrfByDomain[domain] || '',
-      'Content-Type': 'application/json',
-      'Accept': 'application/json, text/plain, */*',
-      'Accept-Language': 'fr-FR,fr;q=0.9',
-    },
-    body: payload,
+  // Chaque appel prend SA place dans la file (`requeteVinted`) ; le
+  // renouvellement de session sur un 401 en prend une autre, entre les deux —
+  // jamais une requête appelée de l'intérieur d'une autre (elle attendrait sa
+  // propre place pour toujours).
+  const doCall = () => requeteVinted('api', async () => {
+    try {
+      const res = await fetch(`https://${domain}${endpoint}`, {
+        method: method || 'POST',
+        credentials: 'omit',
+        headers: {
+          'Authorization': `Bearer ${acc.access_token}`,
+          'x-anon-id': acc.anon_id || '',
+          'x-csrf-token': acc.csrf_token || lastCsrfByDomain[domain] || '',
+          'Content-Type': 'application/json',
+          'Accept': 'application/json, text/plain, */*',
+          'Accept-Language': 'fr-FR,fr;q=0.9',
+        },
+        body: payload,
+      });
+      let json = null;
+      try { json = await res.json(); } catch (_) {}
+      return { status: res.status, ok: res.ok, json };
+    } catch (_) { return { status: 0, ok: false, json: null }; }
   });
-  let res = await doCall();
-  if (res.status === 401) { const r = await refreshIfActive(acc); if (r) res = await doCall(); }
-  let json = null;
-  try { json = await res.json(); } catch (_) {}
-  return { status: res.status, ok: res.ok, json };
+  let rep = await doCall();
+  if (rep.status === 401) { const r = await refreshIfActive(acc); if (r) rep = await doCall(); }
+  return rep;
 }
 
 // Range une reponse Vinted dans une ligne harvest_{uid}_{type} (meme format que
@@ -2137,14 +2306,17 @@ async function capterReleves(uid) {
     const acc = accts.find(a => String(a.vinted_user_id) === String(uid));
     if (!acc) return 0;
     const muet = (await chrome.storage.local.get('vrmReleveMuet')).vrmReleveMuet || {};
-    if (muet[String(uid)]) return 0;                    // ce compte a déjà prouvé que le paramètre ne passe pas
+    if (muet[String(uid)]) { await noterLecturesDues(uid, 'releve', 0); return 0; }  // ce compte a déjà prouvé que le paramètre ne passe pas
     // Ce qu'on a déjà (une seule lecture, deux scalaires — jamais le payload).
     let cur = [];
     try { cur = await sbGet(`app_data?id=like.harvest_${uid}_releve_*&select=m:meta->>mois`); } catch (_) {}
     const dejaMois = new Set((cur || []).map(r => r && r.m).filter(Boolean));
     const bill = await sbGet(`app_data?id=eq.harvest_${uid}_billing&select=h:data->payload->history`);
+    // « Pas su » (une des deux lectures ratée) : on ne dit rien de ce qui reste
+    // à lire — la réserve de l'argent reste entière (`reserveLectures`).
+    const su = cur !== null && bill !== null;
     const hist = (bill && bill[0] && bill[0].h) || [];
-    if (!Array.isArray(hist) || !hist.length) return 0;
+    if (!Array.isArray(hist) || !hist.length) { if (su) await noterLecturesDues(uid, 'releve', 0); return 0; }
     // ⚠️ LE DRESSING ET LE PORTE-MONNAIE UTILISENT L'ID DE PROFIL, PAS
     // L'IDENTIFIANT DE COMPTE (§7 : sans ça, 0 annonce — et ici, 0 relevé).
     // `vinted_accounts` ne porte PAS ce champ : il vit dans la réponse
@@ -2167,11 +2339,14 @@ async function capterReleves(uid) {
       if (n >= RELEVE_MAX_PAR_VISITE) break;
       const k = `${uid}_${v.cle}`;
       if (memo[k] && Date.now() - Number(memo[k]) < RELEVE_RETRY_MS) continue;
-      const refus = await garde(uid, acc);
-      if (refus) { logActivity(`⚠️ Relevé non lu : ${refus.error}`); break; }
+      // Sans l'id de profil, aucune requête ne partirait : on ne consomme pas
+      // une place du budget pour rien.
+      if (!pid) { noterDiag('releve_sans_profil'); break; }
+      // 5.162 : une LECTURE de son propre relevé — budget de lecture, priorité argent.
+      const refus = await gardeLecture(uid, acc, 'argent');
+      if (refus) { if (refus.code !== 'vinted-pause') logActivity(`⚠️ Relevé non lu : ${refus.error}`); break; }
       memo[k] = Date.now();
       n++;
-      if (!pid) { noterDiag('releve_sans_profil'); break; }
       const rep = await vintedGet(acc, `/api/v2/users/${encodeURIComponent(pid)}/payouts?year=${v.y}&month=${v.m}`);
       if (!rep.ok || !rep.json) { noterDiag(`releve_refuse_${rep.status}`); continue; }
       const recu = moisDuReleve(rep.json);
@@ -2186,6 +2361,13 @@ async function capterReleves(uid) {
       await storeReleve(uid, rep.json, 'www.vinted.fr');
     }
     await chrome.storage.local.set({ vrmReleveFaits: memo });
+    // Ce qu'il RESTE à lire maintenant (hors mois en attente de 24 h) — c'est
+    // ce que les photos laissent de côté pour l'argent.
+    if (su) {
+      const plusMuet = !!(((await chrome.storage.local.get('vrmReleveMuet')).vrmReleveMuet || {})[String(uid)]);
+      const reste = (plusMuet || !pid) ? 0 : voulus.filter(v => { const k = `${uid}_${v.cle}`; return !(memo[k] && Date.now() - Number(memo[k]) < RELEVE_RETRY_MS); }).length;
+      await noterLecturesDues(uid, 'releve', reste);
+    }
     return n;
   } catch (_) { return 0; }
 }
@@ -2238,15 +2420,17 @@ function urlsPhotosDeItem(json) {
 // même déconnecté) et on l'analyse. `credentials:'omit'` : on ne touche pas à la
 // session, c'est une page publique.
 async function vintedGetHtml(acc, endpoint) {
-  try {
-    const res = await fetch(`https://${acc.domain || 'www.vinted.fr'}${endpoint}`, {
-      method: 'GET',
-      credentials: 'omit',
-      headers: { 'Accept': 'text/html,application/xhtml+xml', 'Accept-Language': 'fr-FR,fr;q=0.9' },
-    });
-    const text = await res.text();
-    return { status: res.status, ok: res.ok, text };
-  } catch (_) { return { status: 0, ok: false, text: '' }; }
+  return requeteVinted('page', async () => {
+    try {
+      const res = await fetch(`https://${acc.domain || 'www.vinted.fr'}${endpoint}`, {
+        method: 'GET',
+        credentials: 'omit',
+        headers: { 'Accept': 'text/html,application/xhtml+xml', 'Accept-Language': 'fr-FR,fr;q=0.9' },
+      });
+      const text = await res.text();
+      return { status: res.status, ok: res.ok, text };
+    } catch (_) { return { status: 0, ok: false, text: '' }; }
+  });
 }
 // Extrait { photos, description } de la PAGE d'une annonce. Priorité au bloc
 // `__NEXT_DATA__` (rendu serveur) où vit l'objet de l'annonce avec TOUTES ses
@@ -2345,8 +2529,8 @@ async function capterPhotosAnnonces(uid) {
       if (n >= PHOTOS_MAX_PAR_VISITE) break;
       const k = `${uid}_${it.id}`;
       if (memo[k] && Date.now() - Number(memo[k]) < PHOTOS_RETRY_MS) continue;
-      const refus = await gardeLecture(uid, acc);
-      if (refus) { logActivity(`⚠️ Photos non captées : ${refus.error}`); break; }
+      const refus = await gardeLecture(uid, acc, 'photos');   // s'arrête avant la réserve argent/colis
+      if (refus) { if (refus.code !== 'lectures-reservees' && refus.code !== 'vinted-pause') logActivity(`⚠️ Photos non captées : ${refus.error}`); break; }
       memo[k] = Date.now();
       n++;
       const rep = await vintedGetHtml(acc, `/items/${encodeURIComponent(it.id)}`);
@@ -2400,7 +2584,7 @@ async function completerPhotos(uid, id) {
     const accts = await getStoredAccounts();
     const acc = accts.find(a => String(a.vinted_user_id) === String(uid));
     if (!acc) return false;
-    const refus = await gardeLecture(uid, acc);
+    const refus = await gardeLecture(uid, acc, 'clic');      // SON clic : pas de réserve à respecter
     if (refus) { logActivity(`⚠️ Photos non captées : ${refus.error}`); return false; }
     const rep = await vintedGetHtml(acc, `/items/${encodeURIComponent(id)}`);
     if (!rep.ok || !rep.text) { noterDiag(`photos_page_refuse_${rep.status}`); return false; }
@@ -2439,6 +2623,7 @@ async function tickPhotos() {
     if (!tabs || !tabs.length) return;                 // pas d'onglet Vinted : on ne touche à rien
     const uid = await activeUidForDomain('www.vinted.fr');
     if (!uid) return;                                  // pas connecté : rien à capter
+    if (await pauseVinted()) return;                   // 5.162 : Vinted a demandé de ralentir
     const cd = (await chrome.storage.local.get('vrmPhotosCooldown')).vrmPhotosCooldown || {};
     if (Date.now() - Number(cd[uid] || 0) < PHOTOS_TICK_COOLDOWN_MS) return; // fini récemment : on ne relit pas la base
     const n = await capterPhotosAnnonces(uid);
@@ -2685,7 +2870,16 @@ async function storeHarvestRow(uid, type, payload, domain) {
   // dressing complet. La moisson ACTIVE pagine (fetchAllWardrobe) donc elle
   // passe toujours — mais si un jour une page échoue en cours de route, on ne
   // veut pas que le résultat tronqué remplace la bonne capture.
-  if (CLE_LISTE[type]) {
+  // La boîte se FUSIONNE (5.162, voir `fusionnerInbox`) : jamais refusée parce
+  // qu'une page ancienne portait plus de conversations que la page 1 fraîche.
+  if (type === 'inbox') {
+    if (!((payload && payload.conversations) || []).length) { noterDiag('ignore_inbox_vide'); return 'plus-pauvre'; }
+    const f = await inboxFusionnee(`harvest_${uid}_inbox`, payload);
+    if (f === null) { noterDiag('inbox_lecture_ratee'); return 'ecriture-ratee'; }   // pas su : on n'écrase rien
+    payload = f;
+    data.payload = payload;
+    data.nItems = payload.conversations.length;
+  } else if (CLE_LISTE[type]) {
     data.nItems = ((payload && payload[CLE_LISTE[type]]) || []).length;
     // ⚠️ UN REFUS SE COMPTE, COMME SUR LA VOIE PASSIVE (`ignore_partiel_<type>`).
     //    Ici il se taisait : une lecture active tronquée (une page qui échoue en
@@ -2784,6 +2978,8 @@ async function activeFetchAccount(acc) {
       } catch (_) {}
     }
   }
+  // 5.162 : Vinted vient de freiner (ou une pause court) ⇒ on n'enchaîne pas.
+  if (prof.pause || freinVinted(prof.status)) return;
   await wait(1500);
 
   // 2) Annonces en ligne (dressing) via l'ID DE PROFIL.
@@ -2795,16 +2991,19 @@ async function activeFetchAccount(acc) {
   }
 
   // 3) Ventes (TOUTES les pages, pour une compta complete).
+  if (await pauseVinted()) return;
   const sold = await fetchAllOrders(acc, 'sold');
   if (sold && sold.my_orders.length) await storeHarvestRow(uid, 'orders_sold', sold, domain);
   await wait(1500);
 
   // 4) Achats (toutes les pages).
+  if (await pauseVinted()) return;
   const bought = await fetchAllOrders(acc, 'purchased');
   if (bought && bought.my_orders.length) await storeHarvestRow(uid, 'orders_purchased', bought, domain);
   await wait(1500);
 
   // 5) Messages (inbox).
+  if (await pauseVinted()) return;
   const inbox = await vintedGet(acc, '/api/v2/inbox?page=1&per_page=30');
   if (inbox.ok && inbox.json) await storeHarvestRow(uid, 'inbox', inbox.json, domain);
 }
@@ -2828,6 +3027,7 @@ async function activeFetchAll() {
   try {
     const accts = await getStoredAccounts();
     for (const acc of accts) {
+      if (await pauseVinted()) break;             // Vinted a demandé de ralentir : on s'arrête là
       await activeFetchAccount(acc);
       await wait(4000); // pause entre comptes (rythme humain, discret)
     }
@@ -2863,19 +3063,21 @@ async function lastProfileId(uid) {
   } catch (_) { return null; }
 }
 async function vintedGetCookie(domain, endpoint) {
-  try {
-    const res = await fetch(`https://${domain}${endpoint}`, {
-      method: 'GET',
-      credentials: 'include', // ← cookies du compte actif (host permission accordee)
-      headers: {
-        'x-csrf-token': lastCsrfByDomain[domain] || '',
-        'Accept': 'application/json, text/plain, */*',
-        'Accept-Language': 'fr-FR,fr;q=0.9',
-      },
-    });
-    let json = null; try { json = await res.json(); } catch (_) {}
-    return { status: res.status, ok: res.ok, json };
-  } catch (_) { return { status: 0, ok: false, json: null }; }
+  return requeteVinted('cookie', async () => {
+    try {
+      const res = await fetch(`https://${domain}${endpoint}`, {
+        method: 'GET',
+        credentials: 'include', // ← cookies du compte actif (host permission accordee)
+        headers: {
+          'x-csrf-token': lastCsrfByDomain[domain] || '',
+          'Accept': 'application/json, text/plain, */*',
+          'Accept-Language': 'fr-FR,fr;q=0.9',
+        },
+      });
+      let json = null; try { json = await res.json(); } catch (_) {}
+      return { status: res.status, ok: res.ok, json };
+    } catch (_) { return { status: 0, ok: false, json: null }; }
+  });
 }
 async function fetchAllOrdersCookie(domain, type, maxPages = 8) {
   let all = []; let pagination = null;
@@ -2908,18 +3110,26 @@ async function pageActiveFetch() {
   const activeUid0 = await activeUidForDomain(domain);
   let knownPid = null;
   if (activeUid0) { try { knownPid = await lastProfileId(activeUid0); } catch (_) {} }
-  let out = null;
-  try {
+  // ⚠️ 5.162 : toute la série faite dans la page occupe UNE place de la file
+  // Vinted (aucune autre requête de l'extension ne part pendant ce temps), et
+  // un 429/403 reçu dans la page ARRÊTE la série sur place (`frein`) — avant,
+  // la boucle en cours cassait et la suivante repartait : ventes, achats,
+  // boîte, porte-monnaie, une trentaine de requêtes après le refus.
+  const rep = await requeteVinted('page', async () => {
+   try {
     const res = await chrome.scripting.executeScript({
       target: { tabId: tab.id },
       world: 'MAIN',
       args: [csrf, knownPid],
       func: async (csrfTok, knownPidArg) => {
+        let frein = 0;                        // Vinted a dit « ralentis » : plus rien ne part
         const get = async (p) => {
+          if (frein) return null;
           try {
             const h = { accept: 'application/json' };
             if (csrfTok) h['x-csrf-token'] = csrfTok;
             const r = await fetch(p, { credentials: 'include', headers: h });
+            if (r && (r.status === 429 || r.status === 403)) { frein = r.status; return null; }
             if (!r || !r.ok) return null;
             return await r.json();
           } catch (_) { return null; }
@@ -2974,11 +3184,15 @@ async function pageActiveFetch() {
         // solde. Un appel de plus, depuis SON navigateur, sur une page ou il
         // est deja connecte — c'est le meme profil de trafic qu'une visite.
         const wallet = pid ? await get('/api/v2/users/' + pid + '/payouts') : null;
-        return { who: who || null, listings: listings || null, sold: sold || null, bought: bought || null, inbox: inbox || null, wallet: wallet || null };
+        return { who: who || null, listings: listings || null, sold: sold || null, bought: bought || null, inbox: inbox || null, wallet: wallet || null, frein };
       },
     });
-    out = res && res[0] && res[0].result;
-  } catch (_) { return false; }
+    const o = res && res[0] && res[0].result;
+    // Le statut que la file regarde : le frein reçu dans la page, sinon « lu ».
+    return { status: (o && o.frein) || (o ? 200 : 0), ok: !!o, out: o || null };
+   } catch (_) { return { status: 0, ok: false, out: null }; }
+  });
+  const out = rep && rep.out;
   if (!out) return false;
   // On range sous l'uid du COMPTE ACTIF (decode du cookie de session).
   const uid = await activeUidForDomain(domain);
@@ -3012,7 +3226,7 @@ async function activeFetchActiveAccount() {
     const uid = await activeUidForDomain(domain);
     if (!uid) return false; // aucun compte connecte dans le navigateur
     const prof = await vintedGetCookie(domain, '/api/v2/users/current');
-    if (!prof.ok || !prof.json) return false; // pas connecte / endpoint change
+    if (!prof.ok || !prof.json) return false; // pas connecte / endpoint change (ou pause Vinted)
     await storeHarvestRow(uid, 'profile', prof.json, domain);
     const profileId = prof.json.user && prof.json.user.id;
     await wait(1200);
@@ -3021,12 +3235,15 @@ async function activeFetchActiveAccount() {
       if (w && Array.isArray(w.items) && w.items.length) await storeHarvestRow(uid, 'listings', w, domain);
       await wait(1200);
     }
+    if (await pauseVinted()) return true;   // 5.162 : Vinted a freiné en route — on s'arrête là
     const sold = await fetchAllOrdersCookie(domain, 'sold');
     if (sold && sold.my_orders.length) await storeHarvestRow(uid, 'orders_sold', sold, domain);
     await wait(1200);
+    if (await pauseVinted()) return true;
     const bought = await fetchAllOrdersCookie(domain, 'purchased');
     if (bought && bought.my_orders.length) await storeHarvestRow(uid, 'orders_purchased', bought, domain);
     await wait(1200);
+    if (await pauseVinted()) return true;
     const inbox = await vintedGetCookie(domain, '/api/v2/inbox?page=1&per_page=30');
     if (inbox.ok && inbox.json) await storeHarvestRow(uid, 'inbox', inbox.json, domain);
     try { chrome.storage.local.set({ lastActiveFetch: Date.now(), activeUid: uid }); } catch (_) {}
@@ -3042,8 +3259,14 @@ async function activeFetchActiveAccount() {
 // Rend VRAI si quelque chose a été rangé — la visite peut alors le dire dans
 // le journal au lieu d'annoncer un rafraîchissement qui n'a rien capté.
 async function runActive() {
+  // ⚠️ 5.162 : pendant une pause demandée par Vinted, on ne tente RIEN — et un
+  // frein reçu en route n'est pas suivi des deux chemins de secours (qui
+  // auraient refait toute la moisson, et `activeFetchAll` sur TOUS les comptes).
+  if (await pauseVinted()) return false;
   if (await pageActiveFetch()) return true;
+  if (await pauseVinted()) return false;
   if (await activeFetchActiveAccount()) return true;
+  if (await pauseVinted()) return false;
   await activeFetchAll();
   return false;
 }
@@ -3215,6 +3438,11 @@ async function visiteVinted() {
   try {
     const uid = await activeUidForDomain('www.vinted.fr');
     if (!uid) return;                                   // pas connecté : rien à capter
+    // ⚠️ 5.162 : Vinted a demandé de ralentir (429/403) — la visite ne lui
+    // envoie RIEN tant que la pause court, et chaque étape revérifie (un frein
+    // reçu en route arrête la suite). Le ménage des PDF ne touche que NOTRE
+    // base : il passe quand même.
+    if (await pauseVinted()) { noterDiag('visite_en_pause'); await purgeBordereaux(); return; }
 
     // ═══ 1. CE QU'IL ATTEND, TOUT DE SUITE ═══════════════════════════════
     // ⚠️ ORDRE INVERSÉ (Julien, 3 septembre : « quand je me connecte, que ça me
@@ -3233,12 +3461,14 @@ async function visiteVinted() {
     // — la vente est faite, le colis doit partir. Tous les garde-fous restent :
     // compte connecté uniquement, 20 actions/h, plafond par visite, pas de
     // nouvel essai avant 6 h.
+    if (await pauseVinted()) { await purgeBordereaux(); return; }
     const genes = await avecVinted(() => genererBordereauxEnAttente(uid));
     // Ce qui vient de partir : l'APP l'annonce (5.130 — plus de fenêtre sur
     // Vinted). Elle relit ses bordereaux quand on la prévient.
     if (Number(genes) > 0) notifierApp({ type: 'maj', quoi: 'label', uid: String(uid) });
     // ⚠️ ET LES MESSAGES, sur sa décision du 19 septembre (« tout, elle répond à
     //    tout »). Éteint par défaut : c'est lui qui allume depuis l'app.
+    if (await pauseVinted()) { await purgeBordereaux(); return; }
     try { await avecVinted(() => repondreAuxMessages(uid)); } catch (_) {}
 
     // ═══ 2. LE RESTE, ENSUITE ════════════════════════════════════════════
@@ -3254,6 +3484,8 @@ async function visiteVinted() {
     // ⚠️ APRÈS la moisson elle aussi : la liste des colis « déposés en point
     // relais » vient des achats qu'on vient de capter. Sans ça, on lirait la
     // photo d'hier et on redemanderait des conversations pour rien.
+    // (Chaque lecteur passe par `gardeLecture`, qui refuse pendant une pause :
+    //  un frein reçu par l'un arrête les suivants sans requête.)
     await capterRetraits(uid);
     // ⚠️ APRÈS la moisson : les ventes « finalisées » viennent d'être captées.
     // On relit le détail de celles dont on n'a pas encore la date de versement
@@ -3265,8 +3497,9 @@ async function visiteVinted() {
     await capterReleves(uid);
     // ⚠️ APRÈS la moisson : la liste du dressing (id + nPhotos) vient d'être
     // captée. On complète EN PASSIF les photos manquantes de ses annonces en
-    // ligne — 3 par visite, une par une, compte connecté (§3). Sans ouvrir
-    // l'annonce : c'est l'extension qui lit le détail (Julien, 20 sept.).
+    // ligne — une par une, compte connecté (§3). Sans ouvrir l'annonce : c'est
+    // l'extension qui lit le détail (Julien, 20 sept.). EN DERNIER : l'argent
+    // et les colis passent avant (5.162, `reserveLectures`).
     await capterPhotosAnnonces(uid);
     // ⚠️ MÉNAGE : les PDF des bordereaux de ventes FINALISÉES (livrées depuis
     // longtemps) sont retirés — métadonnée gardée, seul le poids part. Global,
@@ -3420,30 +3653,84 @@ async function compterAction(uid) {
 // l'empêche d'affamer les actions. Monter ce chiffre = deviner le seuil de
 // Vinted (refusé, §3).
 const LECTURES_MAX_HEURE = 20;
-async function compterLecture(uid) {
+// `plafond` : la part du budget que CETTE lecture a le droit d'atteindre (les
+// photos s'arrêtent avant la réserve de l'argent et des colis, voir plus bas).
+async function compterLecture(uid, plafond = LECTURES_MAX_HEURE) {
   try {
     const cle = 'vrmLectures';
     const cur = (await chrome.storage.local.get(cle))[cle] || {};
     const t = Date.now(), ilYaUneHeure = t - 3600000;
     const list = (cur[uid] || []).filter(x => x > ilYaUneHeure);
-    if (list.length >= LECTURES_MAX_HEURE) return { ok: false, n: list.length };
+    if (list.length >= Math.min(LECTURES_MAX_HEURE, plafond)) return { ok: false, n: list.length };
     list.push(t); cur[uid] = list;
     await chrome.storage.local.set({ [cle]: cur });
     return { ok: true, n: list.length };
   } catch (_) { return { ok: true, n: 0 }; }
 }
+// ══ L'ARGENT ET LES COLIS PASSENT AVANT LES PHOTOS (5.162, 6 octobre) ══════
+// MESURÉ avant de coder : `capterRetraits`, `capterDatesVersement` et
+// `capterReleves` passaient par `garde` → `compterAction`, le budget de 20
+// ACTIONS/heure partagé avec « Générer le bordereau » et les réponses. Une
+// visite pouvait en manger 10 (3 codes + 5 versements + 2 relevés) — pour de
+// simples LECTURES de ses propres données. Elles passent sur le budget de
+// LECTURE (`gardeLecture`), comme les photos depuis la 5.144.
+// ⚠️ Mais ce budget-là, les PHOTOS le vidaient : `tickPhotos` tourne chaque
+// minute (jusqu'à 20 pages par tour). Mesuré le 6 octobre : 238 ventes
+// finalisées sans date de versement sur ses comptes actifs — c'est le CA qu'il
+// déclare. Les lectures d'argent et de colis ont donc la PRIORITÉ : les photos
+// s'arrêtent avant une RÉSERVE égale à ce qu'une visite peut encore lire pour
+// elles (au plus 5 versements + 2 relevés + 3 codes), et seulement tant
+// qu'elles ont quelque chose à lire. Chaque lecteur prioritaire note ce qu'il
+// lui RESTE (`vrmLecturesDues`) ; « pas su » (jamais noté, ou noté il y a plus
+// d'une heure) garde la réserve entière. Le plafond total ne bouge pas (20/h).
+const LECTURES_DUES = 'vrmLecturesDues';          // { [uid]: { versement:{reste,at}, releve:{…}, retrait:{…} } }
+const LECTURES_DUES_VALIDITE_MS = 60 * 60 * 1000;
+// Les lecteurs prioritaires et ce qu'une visite peut lire pour chacun. Lu à
+// l'appel (les constantes vivent plus bas dans le fichier).
+const lecteursPrioritaires = () => ({ versement: VERSEMENT_MAX_PAR_VISITE, releve: RELEVE_MAX_PAR_VISITE, retrait: RETRAIT_MAX_PAR_VISITE });
+async function noterLecturesDues(uid, quoi, reste) {
+  try {
+    const cur = (await chrome.storage.local.get(LECTURES_DUES))[LECTURES_DUES] || {};
+    const u = cur[String(uid)] || {};
+    u[quoi] = { reste: Math.max(0, Number(reste) || 0), at: Date.now() };
+    cur[String(uid)] = u;
+    await chrome.storage.local.set({ [LECTURES_DUES]: cur });
+  } catch (_) {}
+}
+async function reserveLectures(uid) {
+  const max = lecteursPrioritaires();
+  let dues = {};
+  try { dues = ((await chrome.storage.local.get(LECTURES_DUES))[LECTURES_DUES] || {})[String(uid)] || {}; } catch (_) {}
+  let r = 0;
+  for (const k of Object.keys(max)) {
+    const d = dues[k];
+    const connu = d && Date.now() - Number(d.at || 0) < LECTURES_DUES_VALIDITE_MS;
+    r += connu ? Math.min(Number(d.reste) || 0, max[k]) : max[k];   // pas su ⇒ réserve entière
+  }
+  return r;
+}
 // Garde d'une LECTURE : même exigence de compte connecté que `garde` (on ne lit
 // JAMAIS au nom d'un autre compte que celui du cookie — §3), mais sur le budget
 // de lecture, pas celui des actions.
-async function gardeLecture(uid, acc) {
+// `classe` : 'argent' (versements, relevés) et 'colis' (codes de retrait) ont
+// tout le budget ; 'clic' (une lecture déclenchée par SON clic) aussi ;
+// 'photos' (le défaut) s'arrête avant la réserve.
+async function gardeLecture(uid, acc, classe = 'photos') {
+  const p = await pauseVinted();
+  if (p) return { ok: false, code: 'vinted-pause', error: raisonPauseVinted(p) };
   const actif = await compteConnecte(acc && acc.domain);
   if (actif && String(actif) !== String(uid)) {
     return { ok: false, code: 'autre-compte',
              error: "ton navigateur est connecté à un autre compte — bascule sur celui-ci sur Vinted" };
   }
-  const c = await compterLecture(String(uid));
-  if (!c.ok) return { ok: false, code: 'trop-de-lectures',
-             error: `${LECTURES_MAX_HEURE} lectures sur ce compte dans l'heure — on s'arrête pour ne pas attirer l'attention. La suite au prochain passage.` };
+  const prioritaire = classe === 'argent' || classe === 'colis' || classe === 'clic';
+  const plafond = prioritaire ? LECTURES_MAX_HEURE : LECTURES_MAX_HEURE - (await reserveLectures(uid));
+  const c = await compterLecture(String(uid), plafond);
+  if (!c.ok) return prioritaire
+    ? { ok: false, code: 'trop-de-lectures',
+        error: `${LECTURES_MAX_HEURE} lectures sur ce compte dans l'heure — on s'arrête pour ne pas attirer l'attention. La suite au prochain passage.` }
+    : { ok: false, code: 'lectures-reservees',
+        error: "le reste des lectures de l'heure est gardé pour l'argent et les colis — les photos continuent au prochain passage" };
   return null;
 }
 
@@ -3483,6 +3770,9 @@ function execPermis(methode, endpoint) {
   return EXEC_PERMIS.find((p) => p.methode === methode && p.chemin.test(e)) || null;
 }
 async function gardeStricte(uid, acc, opts = {}) {
+  // Vinted a demandé de ralentir : même un clic attend (5.162). On le DIT.
+  const pause = await pauseVinted();
+  if (pause) return { ok: false, code: 'vinted-pause', error: raisonPauseVinted(pause) };
   const actif = await compteConnecte(acc && acc.domain);
   if (!actif) {
     return { ok: false, code: 'vinted-absent',
@@ -3770,6 +4060,9 @@ async function executerCommande(msg) {
   if (msg && msg.cmd === 'ventes') {
     const uid = await compteConnecte('www.vinted.fr');
     if (!uid) return { accepte: false, code: 'vinted-absent', raison: "aucun compte Vinted connecté dans ce Chrome" };
+    // 5.162 : Vinted a demandé de ralentir — on ne relit rien, et on le dit.
+    const pause = await pauseVinted();
+    if (pause) return { accepte: false, code: 'vinted-pause', raison: raisonPauseVinted(pause) };
     const jobId = `ventes:${uid}`;
     const marque = await prendreGardeVentes(uid);
     if (marque === null) return { accepte: true, jobId, etape: 'recent' };
@@ -3799,6 +4092,14 @@ async function executerCommande(msg) {
   await majCmd(jobId, { etape: 'file', uid, tx, code: null, raison: null });
   // L'exécution part dans la file ; l'app reçoit l'accusé TOUT DE SUITE.
   avecVinted(async () => {
+    // 5.162 : un 429/403 reçu EN ROUTE arrête la commande sur place, avec la
+    // raison — pas une génération ni une insistance de plus.
+    const arretSiPause = async () => {
+      const p = await pauseVinted();
+      if (!p) return false;
+      await majCmd(jobId, { etape: 'echec', code: 'vinted-pause', raison: raisonPauseVinted(p) });
+      return true;
+    };
     try {
       await noterDiag('commande_bordereau');
       // 1. Le bordereau existe peut-être déjà chez Vinted (commandé à la main,
@@ -3807,13 +4108,18 @@ async function executerCommande(msg) {
       const connu = { t: null, vus: new Set() };
       let r = await recupererLabel(acc, uid, tx, connu);
       if (!r.ok) {
+        if (await arretSiPause()) return;
         if (!connu.t) {
           await majCmd(jobId, { etape: 'generation' });
           const g = await genererBordereau(uid, tx, { gardeFaite: true });
-          if (!g.ok && !g.deja) { await majCmd(jobId, { etape: 'echec', code: 'vinted-' + (g.status || '?'), raison: g.error || 'Vinted a refusé' }); return; }
+          if (!g.ok && !g.deja) {
+            if (await arretSiPause()) return;
+            await majCmd(jobId, { etape: 'echec', code: 'vinted-' + (g.status || '?'), raison: g.error || 'Vinted a refusé' }); return;
+          }
         }
         await majCmd(jobId, { etape: 'pdf' });
         r = await recupererLabelInsiste(acc, uid, tx);
+        if (!r.ok && await arretSiPause()) return;
       }
       if (r.ok) {
         await majCmd(jobId, { etape: 'fait' });
@@ -3835,6 +4141,8 @@ async function executerCommande(msg) {
 
 // Renvoie null si l'action peut partir, sinon l'objet d'erreur à renvoyer tel quel.
 async function garde(uid, acc) {
+  const pause = await pauseVinted();
+  if (pause) return { ok: false, code: 'vinted-pause', error: raisonPauseVinted(pause) };
   const actif = await compteConnecte(acc && acc.domain);
   if (actif && String(actif) !== String(uid)) {
     return { ok: false, code: 'autre-compte',
@@ -4483,24 +4791,34 @@ async function capterRetraits(uid) {
     const rows = await sbGet(`app_data?id=eq.harvest_${uid}_orders_purchased&select=data`);
     const achats = (rows && rows[0] && rows[0].data && rows[0].data.payload && rows[0].data.payload.my_orders) || [];
     const attend = achats.filter(o => o && AT_RELAY(o.status) && o.conversation_id != null);
-    if (!attend.length) return 0;
+    if (!attend.length) { if (rows !== null) await noterLecturesDues(uid, 'retrait', 0); return 0; }
     // Ce qu'on a déjà : inutile de redemander une conversation dont le code est
     // en base (lecture d'une seule ligne, quelques Ko).
-    let deja = {};
+    let deja = {}, dejaSu = true;
     try {
       const r = await sbGet('app_data?id=eq.panel_colis_relais&select=data');
+      if (r === null) dejaSu = false;
       deja = (r && r[0] && r[0].data) || {};
-    } catch (_) {}
+    } catch (_) { dejaSu = false; }
     const memo = (await chrome.storage.local.get('vrmRetraitFaits')).vrmRetraitFaits || {};
+    // Une conversation ENCORE à lire maintenant : pas de code en base, pas
+    // d'essai dans les 6 dernières heures.
+    const aLire = (o) => {
+      const tx = String(o.transaction_id || '');
+      if (tx && deja[tx] && deja[tx].code) return false;          // on a déjà le code
+      const cid = String(o.conversation_id);
+      return !(memo[cid] && Date.now() - Number(memo[cid]) < BORD_RETRY_MS);
+    };
     let n = 0;
     for (const o of attend) {
       if (n >= RETRAIT_MAX_PAR_VISITE) break;
+      if (!aLire(o)) continue;
       const tx = String(o.transaction_id || '');
-      if (tx && deja[tx] && deja[tx].code) continue;             // on a déjà le code
       const cid = String(o.conversation_id);
-      if (memo[cid] && Date.now() - Number(memo[cid]) < BORD_RETRY_MS) continue;
-      const refus = await garde(uid, acc);
-      if (refus) { logActivity(`⚠️ Code de retrait non lu : ${refus.error}`); break; }
+      // 5.162 : lire SA conversation est une LECTURE — budget de lecture,
+      // priorité colis (un code manqué, c'est un colis qui repart).
+      const refus = await gardeLecture(uid, acc, 'colis');
+      if (refus) { if (refus.code !== 'vinted-pause') logActivity(`⚠️ Code de retrait non lu : ${refus.error}`); break; }
       memo[cid] = Date.now();
       n++;
       const rep = await vintedGet(acc, `/api/v2/conversations/${encodeURIComponent(cid)}`);
@@ -4512,6 +4830,8 @@ async function capterRetraits(uid) {
       if (ecrit) logActivity(`📦 Code de retrait récupéré — ${(r.code || r.lieu || '').slice(0, 40)}`);
     }
     await chrome.storage.local.set({ vrmRetraitFaits: memo });
+    // « Pas su » ce qui est déjà en base ⇒ on ne dit rien (la réserve reste).
+    if (dejaSu) await noterLecturesDues(uid, 'retrait', attend.filter(aLire).length);
     return n;
   } catch (_) { return 0; }
 }
@@ -4542,7 +4862,7 @@ async function capterDatesVersement(uid) {
     const ventes = (rows[0] && Array.isArray(rows[0].v)) ? rows[0].v : [];
     const finalisees = ventes.filter(o => o && o.transaction_id != null
       && /finalis/i.test(String(o.status || '')) && !/annul|cancel|refus|rembours|retour|suspend/i.test(String(o.status || '')));
-    if (!finalisees.length) return 0;
+    if (!finalisees.length) { await noterLecturesDues(uid, 'versement', 0); return 0; }
     const det = await sbGetTout(`app_data?id=like.harvest_${uid}_txn_*&select=id,s:meta->>status,su:meta->>status_updated_at`);
     if (det === null) return 0;                                           // pas su
     const datees = new Set();
@@ -4551,14 +4871,22 @@ async function capterDatesVersement(uid) {
       if (tx && String(r.s) === '450' && r.su && !isNaN(Date.parse(r.su))) datees.add(tx);
     }
     const memo = (await chrome.storage.local.get('vrmVersementFaits')).vrmVersementFaits || {};
+    // Une vente dont la date reste à lire MAINTENANT (pas datée, pas d'essai
+    // dans les 24 dernières heures).
+    const aLire = (o) => {
+      const tx = String(o.transaction_id);
+      if (!/^\d+$/.test(tx) || datees.has(tx)) return false;
+      return !(memo[tx] && Date.now() - Number(memo[tx]) < VERSEMENT_RETRY_MS);
+    };
     let n = 0, ecrites = 0;
     for (const o of finalisees) {
       if (n >= VERSEMENT_MAX_PAR_VISITE) break;
+      if (!aLire(o)) continue;
       const tx = String(o.transaction_id);
-      if (!/^\d+$/.test(tx) || datees.has(tx)) continue;
-      if (memo[tx] && Date.now() - Number(memo[tx]) < VERSEMENT_RETRY_MS) continue;
-      const refus = await garde(uid, acc);
-      if (refus) { logActivity(`⚠️ Dates de versement non lues : ${refus.error}`); break; }
+      // 5.162 : lire le détail de SA vente est une LECTURE — budget de lecture,
+      // priorité argent (c'est le CA qu'il déclare).
+      const refus = await gardeLecture(uid, acc, 'argent');
+      if (refus) { if (refus.code !== 'vinted-pause') logActivity(`⚠️ Dates de versement non lues : ${refus.error}`); break; }
       memo[tx] = Date.now();
       n++;
       const rep = await vintedGet(acc, `/api/v2/transactions/${encodeURIComponent(tx)}`);
@@ -4573,6 +4901,7 @@ async function capterDatesVersement(uid) {
       else noterDiag(`versement_statut_${String(t.status).slice(0, 8)}`);
     }
     await chrome.storage.local.set({ vrmVersementFaits: memo });
+    await noterLecturesDues(uid, 'versement', finalisees.filter(aLire).length);
     if (ecrites) {
       logActivity(`💶 ${ecrites} date${ecrites > 1 ? 's' : ''} de versement récupérée${ecrites > 1 ? 's' : ''}`);
       notifierApp({ type: 'maj', quoi: 'versements', uid: String(uid) });
@@ -4758,6 +5087,7 @@ const urlDeLabel = (o, prof = 0) => {
 async function recupererLabel(acc, uid, tx, connu) {
   try {
     const t = (connu && connu.t) || await vintedGet(acc, `/api/v2/transactions/${tx}`);
+    if (t && (t.pause || freinVinted(t.status))) return { ok: false, pause: true, raison: t.raison || 'Vinted demande de ralentir' };   // 5.162
     const shipId = t && t.json && (t.json.transaction?.shipment?.id ?? t.json.shipment?.id);
     // ⚠️⚠️ ON NE GARDE LA TRANSACTION QUE SI ELLE A RÉPONDU CE QU'ON LUI
     //    DEMANDAIT. « Vinted n'expose pas encore l'expédition » est justement le
@@ -4787,6 +5117,7 @@ async function recupererLabel(acc, uid, tx, connu) {
     const statuts = [];
     for (const chemin of [`/api/v2/shipments/${shipId}/label_url`, `/api/v2/shipments/${shipId}`, `/api/v2/shipments/${shipId}/label_options`]) {
       const l = await vintedGet(acc, chemin);
+      if (l && (l.pause || freinVinted(l.status))) return { ok: false, pause: true, raison: l.raison || 'Vinted demande de ralentir' };   // 5.162
       const brut = l && l.json ? JSON.stringify(l.json) : '';
       // ⚠️ L'ÉCHANTILLON EST UN DIAGNOSTIC, PAS UNE MESURE PAR ESSAI. Il passe
       //    par `majTampon`, donc une lecture + une écriture de
@@ -4884,6 +5215,7 @@ async function recupererLabelInsiste(acc, uid, tx) {
   for (let i = 0; i <= LABEL_ATTENTES_MS.length; i++) {
     dernier = await recupererLabel(acc, uid, tx, connu);
     if (dernier.ok) { if (i) await noterDiag('label_ok_apres_' + i + '_essai'); return dernier; }
+    if (dernier.pause) return dernier;                       // 5.162 : Vinted freine, on n'insiste pas
     // On n'insiste que sur les échecs TRANSITOIRES (le PDF n'est pas encore là).
     // Un refus dur (permissions, PDF vide, 4xx) ne s'arrangera pas en attendant.
     const transitoire = /pas donné l'URL|n'expose pas encore|pas encore le PDF/i.test(dernier.raison || '');
@@ -4946,6 +5278,7 @@ async function genererBordereauxEnAttente(uid, opts = {}) {
     let faits = 0;
     for (const o of (opts.lectureSeule ? [] : candidates)) {
       if (faits >= BORD_MAX_PAR_VISITE) break;
+      if (await pauseVinted()) break;                            // 5.162 : Vinted a freiné
       const tx = String(o.transaction_id);
       if (dejaMail.has(tx)) continue;
       if (memo[tx] && Date.now() - Number(memo[tx].t || 0) < BORD_RETRY_MS) continue;
@@ -4965,7 +5298,7 @@ async function genererBordereauxEnAttente(uid, opts = {}) {
         logActivity(`⚠️ Bordereau non généré : ${r.error || 'refus Vinted'}`);
         // Compte connecté ailleurs / plafond atteint : inutile d'insister sur
         // les suivantes, elles échoueront pareil.
-        if (r.code === 'autre-compte' || r.code === 'trop-d-actions') {
+        if (r.code === 'autre-compte' || r.code === 'trop-d-actions' || r.code === 'vinted-pause') {
           dernierBlocage[String(uid)] = { code: r.code, error: r.error || '', at: Date.now() };
           break;
         }
@@ -5019,6 +5352,7 @@ async function genererBordereauxEnAttente(uid, opts = {}) {
     let recup = 0;
     for (const o of aRecuperer) {
       if (recup >= BORD_MAX_PAR_VISITE) break;
+      if (await pauseVinted()) break;                            // 5.162 : rien ne part, aucun mémo posé pour rien
       const tx = String(o.transaction_id);
       memo['get' + tx] = { t: Date.now() };
       // ⚠️ ON N'INSISTE QUE QUAND ÇA A UN SENS. L'insistance (§5.48) sert à

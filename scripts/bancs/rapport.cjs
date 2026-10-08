@@ -34,9 +34,30 @@ const VENTES = [
 // le mois dernier mais versée ce mois-ci → elle compte CE mois.
 VENTES.push({ transaction_id: 9006, title: 'Puma Suede vendue le mois dernier', price: { amount: '30', currency_code: 'EUR' }, status: 'Commande finalisée', date: new Date(auj.getFullYear(), auj.getMonth() - 1, 15, 12).toISOString() });
 const VERS = { 9001: jour(Math.max(1, J - 1)), 9002: jour(J), 9006: jour(1) };
+// « J'AI DÉCLARÉ CE MOIS » (6 octobre) — à dates FIXES, août et septembre 2026
+// (les mois de l'ancienne règle) : 9101 vendue fin août et versée en septembre,
+// 9102 vendue et versée en août, 9103 vendue et versée en septembre.
+VENTES.push(
+  { transaction_id: 9101, title: 'Vendue fin aout versee en septembre', price: { amount: '90', currency_code: 'EUR' }, status: 'Commande finalisée', date: '2026-08-28T12:00:00+02:00' },
+  { transaction_id: 9102, title: 'Vendue et versee en aout', price: { amount: '30', currency_code: 'EUR' }, status: 'Commande finalisée', date: '2026-08-10T12:00:00+02:00' },
+  { transaction_id: 9103, title: 'Vendue et versee en septembre', price: { amount: '40', currency_code: 'EUR' }, status: 'Commande finalisée', date: '2026-09-02T12:00:00+02:00' },
+);
+Object.assign(VERS, { 9101: '2026-09-05T08:00:00+02:00', 9102: '2026-08-20T08:00:00+02:00', 9103: '2026-09-12T08:00:00+02:00' });
 const ACHATS = [
   { transaction_id: 7001, title: 'Lot Nike Air Max', price: { amount: '35', currency_code: 'EUR' }, status: 'Commande finalisée', date: jour(1), seller: 'vendeur_test' },
 ];
+// REPÈRE PAR MODÈLE (6 octobre) — en juillet 2026, loin des mois jugés plus
+// haut : trois Samba revendues 60 € (dont une annulée à 999 € qui ne compte
+// pas), trois achetées 40 € ⇒ +20 €/paire ; une seule Gazelle revendue et une
+// seule achetée ⇒ pas de ligne (une moyenne sur une paire est un hasard).
+const JUIL = (d) => `2026-07-${String(d).padStart(2, '0')}T12:00:00+02:00`;
+for (const [id, t, p, st] of [[9201, 'Adidas Samba OG blanc taille 42', 60, 'Commande finalisée'], [9202, 'adidas samba noir 41', 60, 'Commande finalisée'], [9203, 'Samba OG taille 40', 60, 'Commande finalisée'], [9204, 'Adidas Samba taille 43', 999, 'Commande annulée'], [9205, 'Adidas Gazelle bleu 42', 70, 'Commande finalisée']]) {
+  VENTES.push({ transaction_id: id, title: t, price: { amount: String(p), currency_code: 'EUR' }, status: st, date: JUIL(id % 20 + 1) });
+  if (st === 'Commande finalisée') VERS[id] = JUIL(id % 20 + 5);
+}
+for (const [id, t, p] of [[7101, 'Adidas Samba OG 42', 40], [7102, 'samba noir 41', 40], [7103, 'Adidas Samba 40', 40], [7104, 'Gazelle bleu 42', 30]]) {
+  ACHATS.push({ transaction_id: id, title: t, price: { amount: String(p), currency_code: 'EUR' }, status: 'Commande finalisée', date: JUIL(id % 20 + 1), seller: 'vendeur_test' });
+}
 const ACCOUNTS = [{ id: 1, vinted_user_id: '111', login: 'compte_test', domain: 'www.vinted.fr', updated_at: auj.toISOString() }];
 // TOUTES PLATEFORMES (3 octobre) : une vente Leboncoin PROUVÉE, finalisée et
 // datée (75 € en centimes) ; une autre SANS date (« à dater », hors du mois) ;
@@ -70,6 +91,43 @@ const srv = http.createServer((q, r) => {
 srv.on('error', (e) => { console.log('KO  le port ' + PORT + ' est pris (' + e.code + ') — relance le banc seul'); process.exit(1); });
 srv.listen(PORT);
 
+// La fausse base. `etat` (mutable) sert les pannes : `txnKO` = la lecture des
+// dates de versement échoue (la vraie forme : 522 + HTML), `txnLent` = elle
+// met N ms à répondre (le chargement), `declare` = son registre « J'ai déclaré
+// ce mois » déjà posé sur l'appareil.
+const brancher = async (pg, etat = {}) => {
+  if (etat.declare) await pg.addInitScript((d) => { try { localStorage.setItem('vrm_urssaf_declare', JSON.stringify(d)); } catch (_) {} }, etat.declare);
+  await pg.route('**/rest/v1/**', async (route) => {
+    const u = decodeURIComponent(metaVersData(route.request().url()));
+    const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) }).catch(() => {});
+    if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
+    if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCOUNTS);
+    if (/_txn_/.test(u) && /like\./.test(u)) {
+      if (etat.txnLent) await new Promise((ok) => setTimeout(ok, etat.txnLent));
+      if (etat.txnKO) return route.fulfill({ status: 522, contentType: 'text/html', headers: { 'access-control-allow-origin': '*' }, body: '<html>522</html>' }).catch(() => {});
+    }
+    // L'app lit les ventes par MOTIF (`id=like.harvest_111_orders_%`) : un
+    // banc qui ne sert que `id=eq.` mesure un écran vide (§6.3).
+    // §6.3 : une requête PROJETÉE (`orders:data->orders`) reçoit la projection.
+    const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || '';
+    const forme = (r) => {
+      if (/^[a-z]+:data->[a-z]+$/i.test(sel)) { const [al, src] = sel.split(':'); return { [al]: (r.data || {})[src.split('->')[1]] }; }
+      if (/^[a-z]+:data->/i.test(sel)) {   // projection en chaîne (`tx:data->payload->transaction->>id,…`)
+        const o = {};
+        for (const champ of sel.split(',')) { const m = /^([a-z]+):data->(.+)$/i.exec(champ); if (!m) continue; let v = r.data; for (const p of m[2].split(/->>?/)) v = v == null ? v : v[p]; o[m[1]] = (v != null && /->>/.test(m[2])) ? String(v) : v; }
+        return o;
+      }
+      return { ...r, updated_at: auj.toISOString(), cap: r.data.capturedAt };
+    };
+    const eq = /id=eq\.([^&]*)/.exec(u);
+    if (eq) return j(rows.filter((r) => r.id === eq[1]).map(forme));
+    const lk = /id=like\.([^&]*)/.exec(u);
+    if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(rows.filter((r) => re.test(r.id)).map(forme)); }
+    return j([]);
+  });
+  await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
+};
+
 (async () => {
   let b;
   try {
@@ -83,31 +141,7 @@ srv.listen(PORT);
       const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
       await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
       await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
-      await pg.route('**/rest/v1/**', (route) => {
-        const u = decodeURIComponent(metaVersData(route.request().url()));
-        const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
-        if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
-        if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCOUNTS);
-        // L'app lit les ventes par MOTIF (`id=like.harvest_111_orders_%`) : un
-        // banc qui ne sert que `id=eq.` mesure un écran vide (§6.3).
-        // §6.3 : une requête PROJETÉE (`orders:data->orders`) reçoit la projection.
-        const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || '';
-        const forme = (r) => {
-          if (/^[a-z]+:data->[a-z]+$/i.test(sel)) { const [al, src] = sel.split(':'); return { [al]: (r.data || {})[src.split('->')[1]] }; }
-          if (/^[a-z]+:data->/i.test(sel)) {   // projection en chaîne (`tx:data->payload->transaction->>id,…`)
-            const o = {};
-            for (const champ of sel.split(',')) { const m = /^([a-z]+):data->(.+)$/i.exec(champ); if (!m) continue; let v = r.data; for (const p of m[2].split(/->>?/)) v = v == null ? v : v[p]; o[m[1]] = (v != null && /->>/.test(m[2])) ? String(v) : v; }
-            return o;
-          }
-          return { ...r, updated_at: auj.toISOString(), cap: r.data.capturedAt };
-        };
-        const eq = /id=eq\.([^&]*)/.exec(u);
-        if (eq) return j(rows.filter((r) => r.id === eq[1]).map(forme));
-        const lk = /id=like\.([^&]*)/.exec(u);
-        if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(rows.filter((r) => re.test(r.id)).map(forme)); }
-        return j([]);
-      });
-      await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
+      await brancher(pg);
       await pg.goto(`http://localhost:${PORT}/?tab=cat_ventes`, { waitUntil: 'domcontentloaded' });
       await pg.waitForTimeout(3000);
       try {
@@ -147,11 +181,253 @@ srv.listen(PORT);
         pdfTxt = buf.toString('latin1');
         dit(buf.slice(0, 4).toString() === '%PDF', 'le PDF se génère malgré un emoji dans un titre', `${buf.length} octets`);
       } catch (e) { dit(false, 'le PDF se génère malgré un emoji dans un titre', String(e.message).slice(0, 100)); }
+      // ── « J'ai déclaré ce mois » : il déclare AOÛT à la date de VENTE (ancienne
+      //    règle), puis septembre ne doit plus recompter la vente déjà déclarée.
+      try {
+        const lireMois = async () => pg.evaluate(() => {
+          const reg = document.querySelector('[data-registre="ventes"]');
+          const L = reg ? [...reg.children].map((c) => c.innerText) : [];
+          const modale = reg ? reg.closest('div[style*="max-height"]') : null;
+          const d = document.querySelector('[data-declaration]');
+          return { L, modale: modale ? modale.innerText : '', decl: d ? d.getAttribute('data-declaration') : null, declTxt: d ? d.innerText : '',
+            ailleurs: (document.querySelector('[data-decl="ailleurs"]') || {}).innerText || '' };
+        });
+        const choisirMois = async (re) => {
+          await pg.evaluate(() => { const b = [...document.querySelectorAll('button')].find((x) => /▾/.test(x.innerText) && x.closest('div[style*="max-height"]')); if (b) b.click(); });
+          await pg.waitForTimeout(300);
+          for (let i = 0; i < 3; i++) {
+            const an = await pg.evaluate(() => { const m = [...document.querySelectorAll('div')].find((x) => /^\d{4}$/.test(x.innerText.trim()) && x.closest('div[style*="max-height"]')); return m ? Number(m.innerText.trim()) : null; });
+            if (an === 2026 || an == null) break;
+            await pg.click(an > 2026 ? '[aria-label="Année précédente"]' : '[aria-label="Année suivante"]');
+          }
+          const ok = await pg.evaluate((src) => { const re = new RegExp(src, 'i'); const b = [...document.querySelectorAll('button')].find((x) => re.test(x.innerText.trim()) && x.closest('div[style*="max-height"]')); if (b) { b.click(); return true; } return false; }, re);
+          await pg.waitForTimeout(500);
+          return ok;
+        };
+        dit(await choisirMois('^ao[uû]t'), 'le mois d’août 2026 s’ouvre depuis la grille');
+        let a = await lireMois();
+        const caDe = (t) => nombre((/CA des ventes finalisées\s*\n?\s*([^\n]+)/i.exec(t) || [])[1] || '');
+        dit(a.decl === 'libre' && caDe(a.modale) === 30, 'août, pas encore déclaré : le geste est proposé, et le CA au versement est 30 €', `${a.decl} · CA ${caDe(a.modale)}`);
+        await pg.click('[data-decl-ouvrir]');
+        await pg.waitForTimeout(300);
+        const radios = await pg.evaluate(() => [...document.querySelectorAll('[data-decl-form] label')].map((l) => l.innerText));
+        dit(radios.some((t) => /date de versement/.test(t) && /30,00/.test(t)) && radios.some((t) => /date de vente/.test(t) && /120,00/.test(t)),
+          'les DEUX totaux sont écrits côte à côte (versement 30 € · vente 120 €), c’est lui qui choisit', radios.join(' | ').slice(0, 200));
+        await pg.evaluate(() => { const l = [...document.querySelectorAll('[data-decl-form] label')].find((x) => /date de vente/.test(x.innerText)); if (l) l.querySelector('input').click(); });
+        await pg.fill('[data-decl-form] input[inputmode="decimal"]', '120');
+        await pg.click('[data-decl-enregistrer]');
+        await pg.waitForTimeout(600);
+        a = await lireMois();
+        const reg = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_urssaf_declare') || 'null'); } catch (_) { return null; } });
+        const aout = reg && reg['2026-08'];
+        dit(aout && aout.regle === 'vente' && [...(aout.ids || [])].sort().join(',') === 'vinted:9101,vinted:9102' && aout.montant === 120,
+          'la déclaration retient l’IDENTITÉ des ventes déclarées (9101, 9102), la règle choisie et le montant tapé', JSON.stringify(aout).slice(0, 160));
+        dit(a.decl === 'declare' && /120,00/.test(a.declTxt) && /C'est le montant de ta déclaration/.test(a.declTxt), 'août dit qu’il est déclaré, et que le montant tapé est celui qu’il retrouve', a.declTxt.slice(0, 160));
+        dit(caDe(a.modale) === 120 && a.L.length === 2, 'août compte maintenant les deux ventes déclarées (120 €)', `CA ${caDe(a.modale)} · ${a.L.length} ligne(s)`);
+        dit(await choisirMois('^septembre'), 'septembre s’ouvre');
+        const sp = await lireMois();
+        const sSomme = sp.L.reduce((t, x) => t + nombre(x.split('\n').pop()), 0);
+        dit(caDe(sp.modale) === 40 && sp.L.length === 1 && !sp.L.some((t) => /fin aout/.test(t)), 'septembre ne recompte PAS la vente déjà déclarée en août (40 €, pas 130 €)', `CA ${caDe(sp.modale)} · ${sp.L.length} ligne(s)`);
+        dit(Math.abs(sSomme - caDe(sp.modale)) < 0.005, 'la somme des lignes reste le CA affiché', `${sSomme} · ${caDe(sp.modale)}`);
+        dit(/1 vente versée ce mois-ci \(90,00/.test(sp.ailleurs) && /août 2026/.test(sp.ailleurs), 'septembre DIT qu’une vente versée chez lui est déjà déclarée en août (90 €)', sp.ailleurs.slice(0, 160));
+      } catch (e) { dit(false, '« J’ai déclaré ce mois » se déroule jusqu’au bout', String(e.message).slice(0, 160)); }
+      // ── Repère d'achat par modèle (proposition 10) : sous la modale, sur l'écran.
+      try {
+        await pg.keyboard.press('Escape').catch(() => {});
+        await pg.evaluate(() => { const x = [...document.querySelectorAll('button[aria-label="Fermer"]')].pop(); if (x) x.click(); });
+        await pg.waitForTimeout(400);
+        // Il vit sous « Analyse de tes ventes » (replié par défaut).
+        if (!(await pg.$('[data-repere-modeles]'))) await pg.getByText('Analyse de tes ventes', { exact: true }).click({ timeout: 4000 });
+        await pg.waitForTimeout(400);
+        await pg.click('[data-repere-modeles] summary');
+        await pg.waitForTimeout(1500);
+        const rp = await pg.evaluate(() => ({
+          ok: !!document.querySelector('[data-repere-modeles]'),
+          samba: (document.querySelector('[data-repere-modele="samba"]') || {}).innerText || '',
+          gazelle: !!document.querySelector('[data-repere-modele="gazelle"]'),
+          txt: (document.querySelector('[data-repere-modeles]') || {}).innerText || '',
+        }));
+        dit(rp.ok, 'le repère par modèle est sur l’écran Ventes');
+        dit(/revendue 60,00 € \(3\)/.test(rp.samba) && /achetée 40,00 € \(3\)/.test(rp.samba) && /\+20,00 €/.test(rp.samba),
+          'Samba : revendue 60 € (3, l’annulée à 999 € ne compte pas), achetée 40 € (3) ⇒ +20 €/paire', rp.samba.replace(/\n/g, ' '));
+        dit(!rp.gazelle, 'une seule Gazelle revendue et achetée : pas de ligne (une moyenne sur une paire est un hasard)');
+        dit(/n'entre dans aucun total, rapport ni export/.test(rp.txt), 'il dit que ce n’est PAS de la compta');
+      } catch (e) { dit(false, 'le repère par modèle s’ouvre', String(e.message).slice(0, 120)); }
       dit(errs.length === 0, 'aucune erreur d’app', errs.join(' | ').slice(0, 160));
             await pg.screenshot({ path: path.join(require('os').tmpdir(), 'rapport-'+vp.width+'.png') });
       await ctx.close();
       void pdfTxt;
     }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // LE REGISTRE « J'AI DÉCLARÉ CE MOIS », REVU LE 6 OCTOBRE — cinq scénarios,
+    // chacun sur un contexte NEUF (l'état du navigateur ne passe pas de l'un à
+    // l'autre). On juge des NOMBRES rendus et des `data-*`, jamais un libellé.
+    // ════════════════════════════════════════════════════════════════════════
+    const ouvrirPage = async (vp, etat = {}) => {
+      const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
+      const pg = await ctx.newPage();
+      const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
+      await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
+      await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+      await brancher(pg, etat);
+      await pg.goto(`http://localhost:${PORT}/?tab=cat_ventes`, { waitUntil: 'domcontentloaded' });
+      await pg.waitForTimeout(3000);
+      return { ctx, pg, errs };
+    };
+    const outil = async (pg, nom) => {
+      await pg.getByText('Outils', { exact: false }).first().click({ timeout: 5000 });
+      await pg.getByText(nom, { exact: true }).first().click({ timeout: 5000 });
+      await pg.waitForTimeout(1200);
+    };
+    const fermer = async (pg) => { await pg.evaluate(() => { const x = [...document.querySelectorAll('button[aria-label="Fermer"]')].pop(); if (x) x.click(); }); await pg.waitForTimeout(400); };
+    const choisir = async (pg, re) => {
+      await pg.evaluate(() => { const bt = [...document.querySelectorAll('button')].find((x) => /▾/.test(x.innerText) && x.closest('div[style*="max-height"]')); if (bt) bt.click(); });
+      await pg.waitForTimeout(300);
+      for (let i = 0; i < 3; i++) {
+        const an = await pg.evaluate(() => { const m = [...document.querySelectorAll('div')].find((x) => /^\d{4}$/.test(x.innerText.trim()) && x.closest('div[style*="max-height"]')); return m ? Number(m.innerText.trim()) : null; });
+        if (an === 2026 || an == null) break;
+        await pg.click(an > 2026 ? '[aria-label="Année précédente"]' : '[aria-label="Année suivante"]');
+      }
+      const ok = await pg.evaluate((src) => { const r = new RegExp(src, 'i'); const bt = [...document.querySelectorAll('button')].find((x) => r.test(x.innerText.trim()) && x.closest('div[style*="max-height"]')); if (bt) { bt.click(); return true; } return false; }, re);
+      await pg.waitForTimeout(600);
+      return ok;
+    };
+    // Ce que la modale RAPPORT rend : lignes du registre, CA et cotisations lus
+    // comme des NOMBRES (NaN = pas un nombre : « — » ou « … »), et les `data-*`.
+    const lireR = (pg) => pg.evaluate(() => {
+      const reg = document.querySelector('[data-registre="ventes"]');
+      const L = reg ? [...reg.children].map((c) => c.innerText) : [];
+      const modale = reg ? reg.closest('div[style*="max-height"]') : null;
+      const at = (sel, a) => { const e = document.querySelector(sel); return e ? e.getAttribute(a) : null; };
+      const ouvrir = document.querySelector('[data-decl-ouvrir]');
+      const decl = {};
+      for (const e of document.querySelectorAll('[data-decl]')) decl[e.getAttribute('data-decl')] = { cents: e.getAttribute('data-decl-cents'), n: e.getAttribute('data-decl-n'), txt: e.innerText };
+      return { L, modale: modale ? modale.innerText : '', vinted: at('[data-rapport-vinted]', 'data-rapport-vinted'), vide: at('[data-registre-vide]', 'data-registre-vide'),
+        ouvrir: ouvrir ? { disabled: ouvrir.disabled } : null, bloque: !!document.querySelector('[data-decl-bloque]'), refus: !!document.querySelector('[data-decl-refus]'), decl };
+    });
+    const lireA = (pg) => pg.evaluate(() => {
+      const e = document.querySelector('[data-annuel-vinted]');
+      const modale = [...document.querySelectorAll('div[style*="max-height"]')].find((x) => /Registre comptable/.test(x.innerText));
+      return { vinted: e ? e.getAttribute('data-annuel-vinted') : null, txt: modale ? modale.innerText : '' };
+    });
+    const valeurApres = (txt, lab) => nombre((new RegExp(lab + '\\s*\\n?\\s*([^\\n]+)', 'i').exec(txt) || [])[1] || '');
+    const registre = async (pg) => pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_urssaf_declare') || 'null'); } catch (_) { return null; } });
+
+    // ── 1. Septembre déclaré « à la date de vente » (constat 1) ──────────────
+    // 9101 est VENDUE fin août et versée le 5 septembre. Avec la règle de vente,
+    // elle relève de la déclaration d'AOÛT : la dire « arrivée après ta
+    // déclaration — à régulariser » fait payer ses cotisations deux fois.
+    console.log('── Septembre déclaré à la date de vente');
+    try {
+      const { ctx, pg, errs } = await ouvrirPage({ width: 1512, height: 950 });
+      await outil(pg, 'Rapport comptable');
+      dit(await choisir(pg, '^septembre'), 'septembre 2026 s’ouvre');
+      await pg.click('[data-decl-ouvrir]');
+      await pg.waitForTimeout(300);
+      await pg.evaluate(() => { const l = [...document.querySelectorAll('[data-decl-form] label')].find((x) => /date de vente/.test(x.innerText)); if (l) l.querySelector('input').click(); });
+      await pg.click('[data-decl-enregistrer]');
+      await pg.waitForTimeout(700);
+      const reg = await registre(pg);
+      dit(reg && reg['2026-09'] && reg['2026-09'].regle === 'vente', 'septembre est noté avec la règle « vente »', JSON.stringify(reg && reg['2026-09']).slice(0, 120));
+      const sp = await lireR(pg);
+      if (process.env.CAPTURES) await pg.screenshot({ path: path.join(process.env.CAPTURES, 'rapport-sept-vente.png') });
+      dit(!sp.decl.apres, 'une vente VENDUE en août (versée en septembre) n’est PAS « à régulariser » dans septembre déclaré à la date de vente', JSON.stringify(sp.decl.apres || null));
+      dit(sp.decl.venteavant && sp.decl.venteavant.cents === '9000' && sp.decl.venteavant.n === '1', 'elle est dite à part : 1 vente (90 €) qui relève de son mois de VENTE', JSON.stringify(sp.decl.venteavant || null));
+      const caS = valeurApres(sp.modale, 'CA des ventes finalisées');
+      dit(Math.abs(sp.L.reduce((t, x) => t + nombre(x.split('\n').pop()), 0) - caS) < 0.005, 'la somme des lignes reste le CA affiché', `CA ${caS}`);
+      // L'autre sens : août noté « au versement » ne la contient pas (versée en
+      // septembre) — elle n'est alors dans AUCUNE déclaration : là, elle est
+      // vraiment à régulariser, et ça doit rester dit.
+      dit(await choisir(pg, '^ao[uû]t'), 'août 2026 s’ouvre');
+      await pg.click('[data-decl-ouvrir]');
+      await pg.waitForTimeout(300);
+      await pg.click('[data-decl-enregistrer]');
+      await pg.waitForTimeout(700);
+      dit(await choisir(pg, '^septembre'), 'septembre se rouvre');
+      const sp2 = await lireR(pg);
+      dit(sp2.decl.apres && nombre(sp2.decl.apres.txt) === 90 && !sp2.decl.venteavant, 'l’autre sens : déclarée NULLE PART (août au versement, septembre à la vente), elle reste « à régulariser »', JSON.stringify(sp2.decl));
+      dit(errs.length === 0, 'aucune erreur d’app', errs.join(' | ').slice(0, 160));
+      await ctx.close();
+    } catch (e) { dit(false, 'le scénario « septembre à la date de vente » se déroule', String(e.message).slice(0, 160)); }
+
+    // ── 2. Dates de versement illisibles (constats 2 et 3) ───────────────────
+    console.log('── Dates de versement illisibles (522)');
+    try {
+      const { ctx, pg, errs } = await ouvrirPage({ width: 390, height: 844 }, { txnKO: true });
+      await outil(pg, 'Rapport comptable');
+      const m = await lireR(pg);
+      if (process.env.CAPTURES) await pg.screenshot({ path: path.join(process.env.CAPTURES, 'rapport-passu-mois.png') });
+      const caM = valeurApres(m.modale, 'CA des ventes finalisées');
+      const somme = m.L.reduce((t, x) => t + nombre(x.split('\n').pop()), 0);
+      dit(m.L.length === 2 && m.L.some((t) => /Leboncoin/.test(t) && /75,00/.test(t)) && m.L.some((t) => /eBay/.test(t) && /60,00/.test(t)),
+        'Leboncoin et eBay, lus correctement, restent dans le registre du mois', `${m.L.length} ligne(s)`);
+      dit(caM === 135 && Math.abs(somme - caM) < 0.005, 'le CA rendu est celui qu’on connaît (75 + 60), la somme des lignes', `CA ${caM} · lignes ${somme}`);
+      dit(m.vinted === 'passu', 'et l’écran DIT que Vinted manque (dates de versement illisibles)', `vinted=${m.vinted}`);
+      dit(isNaN(valeurApres(m.modale, 'Cotisations est\\.')), 'aucune cotisation chiffrée sur un CA sans Vinted (« — », jamais un montant présenté comme complet)', (/Cotisations est\.\s*\n?\s*([^\n]+)/i.exec(m.modale) || [])[1]);
+      dit(await choisir(pg, '^ao[uû]t'), 'août 2026 s’ouvre');
+      const a = await lireR(pg);
+      if (process.env.CAPTURES) await pg.screenshot({ path: path.join(process.env.CAPTURES, 'rapport-passu-aout.png') });
+      dit(isNaN(valeurApres(a.modale, 'CA des ventes finalisées')), 'un mois sans rien de lisible : « — », jamais « 0,00 € »', (/CA des ventes finalisées\s*\n?\s*([^\n]+)/i.exec(a.modale) || [])[1]);
+      dit(a.vide === 'passu', 'le registre vide dit qu’il n’a pas pu lire Vinted — jamais « aucune vente »', `vide=${a.vide}`);
+      dit(a.ouvrir && a.ouvrir.disabled === true && a.bloque, '« J’ai déclaré ce mois » est grisé, avec la raison', JSON.stringify(a.ouvrir) + ' bloque=' + a.bloque);
+      await pg.click('[data-decl-ouvrir]', { force: true, timeout: 2000 }).catch(() => {});
+      await pg.waitForTimeout(300);
+      const enr = await pg.$('[data-decl-enregistrer]');
+      if (enr) { await enr.click().catch(() => {}); await pg.waitForTimeout(500); }
+      const reg = await registre(pg);
+      dit(!(reg && reg['2026-08']), 'rien n’est noté pour août sur une lecture ratée', JSON.stringify(reg && reg['2026-08']).slice(0, 120));
+      await fermer(pg);
+      await outil(pg, 'Registre annuel');
+      const an = await lireA(pg);
+      if (process.env.CAPTURES) await pg.screenshot({ path: path.join(process.env.CAPTURES, 'annuel-passu.png') });
+      const caA = valeurApres(an.txt, 'CA des ventes finalisées');
+      dit(caA === 135 && an.vinted === 'passu', 'le bilan annuel garde Leboncoin et eBay (135 €) et dit que Vinted manque', `CA ${caA} · vinted=${an.vinted}`);
+      dit(isNaN(valeurApres(an.txt, 'Cotisations est\\.')), 'bilan annuel : aucune cotisation chiffrée sans Vinted', (/Cotisations est\.\s*\n?\s*([^\n]+)/i.exec(an.txt) || [])[1]);
+      dit(errs.length === 0, 'aucune erreur d’app', errs.join(' | ').slice(0, 160));
+      await ctx.close();
+    } catch (e) { dit(false, 'le scénario « dates illisibles » se déroule', String(e.message).slice(0, 160)); }
+
+    // ── 3. Le chargement se dit comme tel (constat 2) ────────────────────────
+    console.log('── Dates de versement en cours de lecture');
+    try {
+      const { ctx, pg, errs } = await ouvrirPage({ width: 1512, height: 950 }, { txnLent: 16000 });
+      await outil(pg, 'Registre annuel');
+      const an = await lireA(pg);
+      dit(isNaN(valeurApres(an.txt, 'CA des ventes finalisées')) && an.vinted === 'encours', 'bilan annuel pendant la lecture : ni « 0 € », ni un chiffre — « en cours »', `${(/CA des ventes finalisées\s*\n?\s*([^\n]+)/i.exec(an.txt) || [])[1]} · vinted=${an.vinted}`);
+      await fermer(pg);
+      await outil(pg, 'Rapport comptable');
+      const m = await lireR(pg);
+      dit(isNaN(valeurApres(m.modale, 'CA des ventes finalisées')) && m.vide === 'encours', 'rapport mensuel pendant la lecture : ni « 0,00 € », ni « aucune vente »', `${(/CA des ventes finalisées\s*\n?\s*([^\n]+)/i.exec(m.modale) || [])[1]} · vide=${m.vide}`);
+      dit(errs.length === 0, 'aucune erreur d’app', errs.join(' | ').slice(0, 160));
+      await ctx.close();
+    } catch (e) { dit(false, 'le scénario « en cours de lecture » se déroule', String(e.message).slice(0, 160)); }
+
+    // ── 4. Le GESTE refuse lui-même (constat 3) ──────────────────────────────
+    // Le formulaire est ouvert sur une lecture complète ; la relecture des dates
+    // échoue PENDANT qu'il est ouvert ; « Enregistrer » ne doit rien écrire.
+    console.log('── La lecture tombe pendant que le formulaire est ouvert');
+    try {
+      const etat = {};
+      const { ctx, pg, errs } = await ouvrirPage({ width: 1512, height: 950 }, etat);
+      await outil(pg, 'Rapport comptable');
+      dit(await choisir(pg, '^ao[uû]t'), 'août 2026 s’ouvre');
+      const a0 = await lireR(pg);
+      dit(a0.ouvrir && a0.ouvrir.disabled === false, 'lecture complète : le geste est proposé (l’autre sens)', JSON.stringify(a0.ouvrir));
+      await pg.click('[data-decl-ouvrir]');
+      await pg.waitForTimeout(300);
+      etat.txnKO = true;
+      await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:ext', { detail: { type: 'maj', quoi: 'versements' } })));
+      await pg.waitForTimeout(1500);
+      await pg.click('[data-decl-enregistrer]', { timeout: 3000 }).catch(() => {});
+      await pg.waitForTimeout(700);
+      const reg = await registre(pg);
+      const a1 = await lireR(pg);
+      dit(!(reg && reg['2026-08']), '« Enregistrer » sur une lecture devenue incomplète n’écrit RIEN', JSON.stringify(reg && reg['2026-08']).slice(0, 120));
+      dit(a1.refus || a1.bloque, 'et il dit pourquoi', `refus=${a1.refus} bloque=${a1.bloque}`);
+      dit(errs.length === 0, 'aucune erreur d’app', errs.join(' | ').slice(0, 160));
+      await ctx.close();
+    } catch (e) { dit(false, 'le scénario « lecture tombée formulaire ouvert » se déroule', String(e.message).slice(0, 160)); }
   } catch (e) { dit(false, 'le banc a tourné jusqu’au bout', String(e && e.message).slice(0, 160)); }
   finally { if (b) await b.close(); srv.close(); }
   console.log(ko ? `\n❌ rapport : ${ko} rouge(s)` : '\n✅ rapport : tout est vert');

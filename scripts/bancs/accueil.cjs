@@ -97,6 +97,18 @@ async function page(nav, { largeur = 1512, hauteur = 900, mobile = false, sessio
         const liens = await pg.evaluate(() => [...document.querySelectorAll('[data-accueil] a[href^="/legal/"]')].map((a) => a.getAttribute('href')));
         const manquants = liens.filter((h) => !fs.existsSync(path.join(DIST, h)));
         dit(liens.length >= 5 && manquants.length === 0, `${nom} : les ${liens.length} liens légaux mènent à une vraie page`, manquants.join(', ') || `${liens.length} lien(s)`);
+        // CONTACT (5 octobre) : une ligne, lue dans src/contact.js. Tant que
+        // l'adresse n'existe pas, la page le DIT — jamais une adresse inventée
+        // qui ne recevrait rien. La donnée décide : on lit la constante, on ne
+        // suppose pas qu'elle est vide.
+        // (un banc ne meurt pas : sans src/contact.js — le code d'avant — la ligne
+        //  Contact est simplement absente, et le contrôle le dit en rouge)
+        let constante = ''; try { constante = ((/CONTACT_EMAIL\s*=\s*'([^']*)'/.exec(fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'contact.js'), 'utf8')) || [])[1] || '').trim(); } catch (_) { constante = ''; }
+        const contact = await pg.evaluate(() => { const e = document.querySelector('[data-accueil] [data-contact]'); return e ? { texte: e.innerText, absent: e.hasAttribute('data-contact-absent'), href: e.getAttribute('href') || '' } : null; });
+        dit(!!contact && (constante
+          ? contact.href === `mailto:${constante}`
+          : contact.absent && /à venir/.test(contact.texte) && !contact.href),
+          `${nom} : une ligne Contact — ${constante ? 'l’adresse de src/contact.js' : '« adresse de contact à venir », aucune adresse inventée'}`, contact ? `${contact.texte} ${contact.href}` : 'absente');
         // Le bouton « Commencer » reste à portée en faisant défiler : la barre du
         // haut est collante. Un `overflow-x:hidden` sur la racine en fait un
         // conteneur de défilement et la barre partait avec la page (vu au rendu).

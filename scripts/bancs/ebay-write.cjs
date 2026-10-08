@@ -23,8 +23,24 @@ global.fetch = async (url, opts = {}) => {
   }
   if (u.includes('/ws/api.dll')) {
     lastCall = h['X-EBAY-API-CALL-NAME'] || ''; lastBody = String(opts.body || '');
+    if (tradingMode === 'deuxErreurs') return new Response('<?xml version="1.0"?><r xmlns="urn:ebay:apis:eBLBaseComponents"><Ack>Failure</Ack>'
+      + '<Errors><ShortMessage>Titre</ShortMessage><LongMessage>Le titre est long, il sera peut-être coupé.</LongMessage><ErrorCode>21917091</ErrorCode><SeverityCode>Warning</SeverityCode></Errors>'
+      + '<Errors><ShortMessage>Photo</ShortMessage><LongMessage>La photo est trop petite (500 px minimum).</LongMessage><ErrorCode>21916672</ErrorCode><SeverityCode>Error</SeverityCode></Errors></r>', { status: 200 });
     if (tradingMode === 'fail') return new Response('<?xml version="1.0"?><r xmlns="urn:ebay:apis:eBLBaseComponents"><Ack>Failure</Ack><Errors><ShortMessage>Missing required aspect</ShortMessage><LongMessage>L\'attribut Pointure EU est obligatoire.</LongMessage></Errors></r>', { status: 200 });
-    if (/VerifyAddFixedPriceItem/.test(lastCall)) return new Response('<?xml version="1.0"?><r xmlns="urn:ebay:apis:eBLBaseComponents"><Ack>Success</Ack><Fees><Fee><Name>ListingFee</Name><Fee currencyID="EUR">0.35</Fee></Fee><Fee><Name>InsertionFee</Name><Fee currencyID="EUR">0.00</Fee></Fee></Fees></r>', { status: 200 });
+    // ⚠️ LA FORME RÉALISTE (5 octobre, §6.3). L'ancienne fixture servait
+    //    « ListingFee 0,35 + InsertionFee 0,00 » : additionner tout (le défaut)
+    //    et lire ListingFee donnaient le MÊME 0,35 — le banc était vert sur le
+    //    double comptage. Le guide Trading « Fees » : eBay renvoie TOUS les
+    //    types de frais (la plupart à 0.0), et `ListingFee` EST leur total.
+    //    Ici : mise en vente 0,35 + programmation 0,20 = ListingFee 0,55. Tout
+    //    additionner donnerait 1,10.
+    if (/VerifyAddFixedPriceItem/.test(lastCall)) {
+      const fee = (n, v) => `<Fee><Name>${n}</Name><Fee currencyID="EUR">${v}</Fee></Fee>`;
+      const frais = tradingMode === 'sansTotal'
+        ? fee('InsertionFee', '0.35') + fee('SchedulingFee', '0.2')
+        : fee('AuctionLengthFee', '0.0') + fee('BoldFee', '0.0') + fee('FeaturedFee', '0.0') + fee('GalleryFee', '0.0') + fee('InsertionFee', '0.35') + fee('ListingDesignerFee', '0.0') + fee('ListingFee', '0.55') + fee('SchedulingFee', '0.2') + fee('SubtitleFee', '0.0');
+      return new Response('<?xml version="1.0"?><r xmlns="urn:ebay:apis:eBLBaseComponents"><Ack>Success</Ack><Fees>' + frais + '</Fees></r>', { status: 200 });
+    }
     if (/AddFixedPriceItem/.test(lastCall)) return new Response('<?xml version="1.0"?><r xmlns="urn:ebay:apis:eBLBaseComponents"><Ack>Success</Ack><ItemID>110555000111</ItemID></r>', { status: 200 });
     return new Response('<?xml version="1.0"?><r xmlns="urn:ebay:apis:eBLBaseComponents"><Ack>Success</Ack></r>', { status: 200 });
   }
@@ -71,7 +87,10 @@ const item = { title: 'Nike Air Max 1 Aquatone Bleu T44', categoryId: '15709', p
   { const res = faireRes(); await handler({ method: 'POST', query: {}, body: { action: 'pubverify', item } }, res);
     dit(res.code === 200 && res.corps && res.corps.ok === true, 'pubverify → 200 ok:true (annonce acceptée)', `HTTP ${res.code}`);
     dit(/VerifyAddFixedPriceItem/.test(lastCall), 'l\'appel est bien VerifyAddFixedPriceItem (rien n\'est publié)');
-    dit(res.corps && res.corps.fees === 0.35, 'les frais eBay estimés remontent (0,35 €)', 'fees=' + (res.corps && res.corps.fees));
+    dit(res.corps && res.corps.fees === 0.55, 'le total des frais est ListingFee (0,55 €) — pas la somme de tous les <Fee> (1,10 €)', 'fees=' + (res.corps && res.corps.fees));
+    const f = (res.corps && res.corps.frais) || {};
+    dit(f.total === 0.55 && f.insertion === 0.35 && f.programmation === 0.2, 'les frais sont lus PAR NOM : mise en vente 0,35 · programmation 0,20 · total 0,55', JSON.stringify({ total: f.total, insertion: f.insertion, programmation: f.programmation }));
+    dit(Array.isArray(f.lignes) && f.lignes.length === 2 && !f.lignes.some((l) => /ListingFee/.test(l.nom)), 'le détail ne liste que les frais non nuls, sans recompter le total', JSON.stringify(f.lignes));
     dit(res.corps && res.corps.itemId == null, 'aucun itemId : la vérif ne crée AUCUNE annonce'); }
 
   // 7. Vérif : eBay refuserait → remonte l'info SANS échec serveur (200 ok:false), rien créé
@@ -79,6 +98,20 @@ const item = { title: 'Nike Air Max 1 Aquatone Bleu T44', categoryId: '15709', p
   { const res = faireRes(); await handler({ method: 'POST', query: {}, body: { action: 'pubverify', item } }, res);
     dit(res.code === 200 && res.corps && res.corps.ok === false && /Pointure EU|obligatoire/i.test(res.corps.error || ''), 'un refus à la VÉRIF remonte l\'exact message eBay, sans rien publier', `HTTP ${res.code} : ${res.corps && res.corps.error}`);
     dit(/VerifyAddFixedPriceItem/.test(lastCall), 'toujours une VÉRIF, jamais une publication'); }
+
+  // 8. ListingFee ABSENT ⇒ total « pas su » (null), jamais une somme ni 0.
+  tradingMode = 'sansTotal';
+  { const res = faireRes(); await handler({ method: 'POST', query: {}, body: { action: 'pubverify', item } }, res);
+    const f = (res.corps && res.corps.frais) || {};
+    dit(res.code === 200 && res.corps && res.corps.fees === null && f.total === null && f.insertion === 0.35,
+      'sans ListingFee, le total vaut « pas su » (null) — jamais 0, jamais une addition', `fees=${res.corps && res.corps.fees} total=${f.total}`); }
+
+  // 9. PLUSIEURS <Errors> : un avertissement PUIS le vrai refus — c'est le
+  //    refus qui est rendu, et l'avertissement n'est pas pris pour la raison.
+  tradingMode = 'deuxErreurs';
+  { const res = faireRes(); await handler({ method: 'POST', query: {}, body: { action: 'publish', item } }, res);
+    dit(res.code >= 400 && res.corps && /photo est trop petite/.test(res.corps.error || '') && !/titre est long/.test(res.corps.error || ''),
+      'deux <Errors> (Warning puis Error) : le message rendu est celui de l\'ERREUR', `HTTP ${res.code} : ${res.corps && res.corps.error}`); }
 
   console.log(ko ? ('\n' + ko + ' controle(s) non conforme(s).') : '\nPublier, VÉRIFIER À BLANC et modifier passent par l\'API Trading, envoient les bons champs, et un refus eBay ne devient jamais un faux succès ni une annonce fantôme.');
   process.exit(ko ? 1 : 0);

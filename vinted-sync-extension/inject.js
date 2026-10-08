@@ -357,12 +357,36 @@
   // connecté dans cet onglet). Se rabat en silence si un endpoint a disparu.
   const ACTIVE_TTL = 30 * 60 * 1000;
   const jitter = (min, max) => min + Math.random() * (max - min);
+  // ⚠️ 5.162 — L'ARRÊT NET SUR 429 / 403. Cette moisson part DE LA PAGE, hors
+  // de la file du fond : quand Vinted répondait « ralentis » (429) ou « non »
+  // (403), chaque boucle cassait la sienne et la suivante repartait (ventes,
+  // achats, boîte : des dizaines de requêtes après le refus). Désormais le
+  // premier frein ARRÊTE tout ce qui reste de cette moisson, et le fond en est
+  // prévenu (`vintedFrein`) : il pose la même pause que pour ses propres
+  // requêtes. Et une moisson ne DÉMARRE pas pendant une pause : `content.js`
+  // nous transmet sa fin (`CANCALE_VINTED_PAUSE`).
+  let freinVinted = 0;
+  let pauseJusqua = 0;
+  try {
+    window.addEventListener('message', (e) => {
+      try {
+        if (e.source !== window || !e.data || e.data.__tag !== 'CANCALE_VINTED_PAUSE') return;
+        pauseJusqua = Number(e.data.jusqua) || 0;
+      } catch (_) {}
+    }, false);
+  } catch (_) {}
   const apiGet = async (path) => {
+    if (freinVinted) return null;                         // Vinted a freiné : plus rien ne part
     try {
       const h = { accept: 'application/json' };
       if (lastCsrf) h['x-csrf-token'] = lastCsrf;
       if (lastAnon) h['x-anon-id'] = lastAnon;
       const r = await fetch(path, { credentials: 'include', headers: h });
+      if (r && (r.status === 429 || r.status === 403)) {
+        freinVinted = r.status;
+        post({ kind: 'vintedFrein', statut: r.status });
+        return null;
+      }
       if (!r || !r.ok) return null;
       return await r.text();
     } catch (_) { return null; }
@@ -371,6 +395,8 @@
     try {
       if (!/(^|\.)vinted\./i.test(location.host)) return; // uniquement sur Vinted
       if (document.hidden) return;                        // onglet au premier plan seulement
+      if (Date.now() < pauseJusqua) return;               // Vinted a demandé de ralentir (5.162)
+      freinVinted = 0;                                    // nouvelle moisson, hors pause
       const KEY = '__cancale_active_ts';
       let last = 0; try { last = +(localStorage.getItem(KEY) || 0); } catch (_) {}
       if (Date.now() - last < ACTIVE_TTL) return;
