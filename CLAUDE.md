@@ -5822,46 +5822,84 @@ ventes OU plus de 2 000 €** dans l'année civile (directive européenne DAC7).
 `tomj606` **33 · 1 433,50 €** (30 ventes), puis 27 · 20 · 16 · 0, sous les seuils.
 - **Où** : Ventes → Outils → **Registre annuel**, UNE carte (`CarteSeuilsVinted`),
   pour l'année choisie. Ton informatif : aucun rouge ni ambre (§7), un seuil
-  atteint se dit par le mot, en gras ; la phrase « pour qu'il n'y ait jamais
-  d'écart avec ce que tu déclares » est dite une fois.
-- **Une seule règle de vente** (§11) : `seuilsVintedParCompte` appelle
-  `ventesDeclarables` — finalisée, datée du **versement** — et **pas**
-  `ventesFaites` : la directive compte la contrepartie « versée ou créditée » au
-  vendeur ; une vente en cours ne l'est pas encore, une remboursée jamais. C'est
-  aussi la règle du CA déclaré, d'où « aucun écart ».
-- ⚠️ **« À dater » n'est pas « hors de l'année »** : seules **42 des 101** ventes du
-  plus gros compte ont leur date de versement. Le versement tombe après la vente
-  (mesuré : **0 sur 173** avant elle) et au plus **25 jours** après (médiane
-  7,8 j) ; la borne haute est donc `min(aujourd'hui, vente + 45 j)`
-  (`VERSEMENT_MAX_J`). Deux bornes dans la même année ⇒ comptée ; à cheval ⇒
-  **« incertaine », comptée à part** et le verdict devient « ça dépend ».
-  Sans la borne des 45 jours, ses **41 ventes 2023-2025 non datées** rendaient
-  `llloollllaa` « incertain » pour 2026 — une fausse alerte. ⚠️ Ces 45 jours
-  sont une **borne mesurée, pas une certitude** : à revoir si un versement de
-  plus de 25 jours apparaît.
-- **Trois états** : ventes pas encore lues · **lecture ratée de CE compte ⇒ « — »
-  et la raison, jamais « 0 vente »** · lu. Un compte **exclu** n'y entre pas
-  (décision du 3 octobre) ; une ligne neutre dit que les exclus ne sont pas
-  comptés, **sans les nommer**. « Plus de 2 000 € » se compare en centimes :
-  2 000,00 € pile ne l'atteint pas.
-- **Preuves** : `audit-seuils-vinted.cjs` exécute la vraie règle (extraite par
-  Babel avec TOUT ce qu'elle appelle, de proche en proche — `--deps` les liste :
-  la `ventesDeclarables` du registre URSSAF tire `indexDeclarations`, une liste
-  recopiée à la main aurait cassé), `vm`, ventes inventées — **21 contrôles** ; rouge sur le code d'avant
-  (fonction absente), et **chacune des 8 mutations** le refait passer au rouge
-  (`exclus` 3 · `passu` 1 · `seuil2000` 1 · `adater` 3 · `strict` 2 · `sansdater` 10
-  · `datevente` 2 · `encours` 2). Banc `bancs/seuils-vinted.cjs` (port 4802,
-  aucune fixture, 390 et 1512 px) : jugé sur les `data-*` ET le texte rendu —
-  **30 rouges** sur le build d'avant, **10** sur un build réaffaibli (exclusion
-  retirée, panne lue comme 0, rouge sur « atteint »).
+  atteint se dit par le mot, en gras.
+- ⚠️ Le premier jet (2c85fe1) disait « pour qu'il n'y ait jamais d'écart avec ce
+  que tu déclares » et comptait comme SÛRES des ventes sans date de versement :
+  **c'était faux** — voir la revue juste en dessous. Ne pas le remettre.
+- **Trois états** : registre pas encore calculé · **lecture ratée ⇒ « — » et la
+  raison, jamais « 0 vente »** · lu. Un compte **exclu** n'y entre pas (décision
+  du 3 octobre) ; une ligne neutre dit que les exclus ne sont pas comptés, **sans
+  les nommer**. « Plus de 2 000 € » se compare en centimes : 2 000,00 € pile ne
+  l'atteint pas.
 - **Pas mesuré / pas affirmé** : les sources primaires (impots.gouv.fr,
   economie.gouv.fr, Légifrance, EUR-Lex, BOFiP) sont **bloquées par le proxy du
   conteneur** — les seuils sont écrits tels quels, recoupés sur des sources
   secondaires, et **rien d'autre n'est affirmé** (ni date de début, ni ce que
-  Vinted envoie au vendeur). Non mesuré : si Vinted juge chaque compte à part ou
+  Vinted envoie au vendeur, ni la date que Vinted retient pour rattacher une
+  vente à l'année). Non mesuré : si Vinted juge chaque compte à part ou
   regroupe les comptes d'une même personne ; le montant exact qu'il retient (VRM
   prend le prix de l'article, comme le CA déclaré) ; Leboncoin et eBay, soumis
   aussi à DAC7, ne sont pas dans cette carte.
+
+#### Revue contradictoire du 6 octobre — six défauts, corrigés le 8 octobre
+Un relecteur les a REPRODUITS au rendu ; la première correction (d9bac7e) a été
+interrompue, reprise et finie.
+- ⚠️⚠️ **Le cache des ventes changeait un compte en panne en « 0 vente · sous les
+  seuils »** au passage suivant (rechargement ou retour sur l'écran dans les
+  3 min) — et le bandeau « compte non chargé » de l'écran Ventes disparaissait
+  aussi. `putCache` gardait la liste partielle **sans** dire quels comptes
+  avaient raté. Une entrée de cache porte maintenant `failedUids` (version
+  `_CACHE_V` : une entrée d'avant, qui ne sait rien de ses échecs, est ignorée),
+  et `loadOrders` les rend avec la liste. Une relecture discrète ratée garde ce
+  qu'on montrait **du seul compte raté** (elle gardait toute l'ancienne liste
+  avec la nouvelle liste d'échecs : un compte raté avant et revenu passait à
+  « 0 vente »). Le cache des annonces et des conversations garde aussi ses
+  comptes ratés. « Rouvre l'écran Ventes » est devenu un vrai bouton
+  **« Relire mes ventes »** (`relireVentes` : vide le cache, relit notre base —
+  jamais Vinted — et les dates de versement si elles étaient illisibles).
+- **Un échec se juge par l'IDENTITÉ** (`failedUids`), plus par le nom affiché :
+  un libellé arrivé du nuage après la lecture faisait passer le compte en panne
+  pour lu. Vaut pour la carte, le bandeau de l'écran Ventes, le rapport mensuel
+  et le geste « J'ai déclaré ce mois » (`nomsVentesKO`, nommé au rendu).
+- ⚠️⚠️ **La partie sûre de la carte EST le chiffre du registre** — mesuré sur la
+  copie de sa base du 5 octobre : carte 245 ventes · 9 361 € contre registre
+  141 · 5 226 €. Le registre calcule, par compte, ses ventes Vinted de l'année
+  (`vintedParUid`, mêmes lignes que son total : mois de la déclaration s'il l'a
+  notée, sinon du versement) et sa liste « pas encore datées » ; la carte LIT les
+  deux (`seuilsVintedParCompte` ne rappelle plus `ventesDeclarables`, §11).
+  Mesuré après sur la même copie : **carte 141 · 5 226,30 € = registre**, plus
+  **104 ventes · 4 134,80 € « pas encore datées »**, dites à part comme une
+  **estimation** (rattachées à l'année par la date de vente et la borne de
+  45 jours : le versement suit la vente — **0 sur 173** avant elle — et au plus
+  **25 jours** après, médiane 7,8 j ; une borne mesurée, pas une certitude).
+  Un seuil atteint seulement avec elles se dit « **atteint si** … ».
+  ⚠️ Le premier correctif recalculait ces ventes **sans** le registre des
+  déclarations : une vente déclarée sans date comptait deux fois.
+- **VRM ne sait pas si Vinted juge chaque compte à part** : la carte le dit, et
+  ajoute une ligne « **Tous tes comptes ensemble** » (« au moins » et « sans X »
+  quand un compte manque — jamais « sous les seuils » sur un total partiel).
+  Année en cours : « **à ce jour** » et « encore N ventes ou X € avant le seuil »
+  (sur la partie sûre ; « plus de 2 000 € » ⇒ il faut 2 000,01 €).
+- §7 : la panne et « Lecture des ventes… » se disent **une fois** au-dessus des
+  lignes ; la ligne d'un compte pas lu ne porte qu'un « — ».
+- **Constaté, laissé tel quel** : l'année suit le fuseau de l'APPAREIL
+  (`getFullYear`), comme `ventesDeclarables` et le registre — une vente versée
+  le 1er janvier à 00 h 20 (Paris) compte l'année d'avant sur un téléphone réglé
+  à Londres. Changer la carte seule la ferait diverger du registre.
+- **Preuves** : `audit-seuils-vinted.cjs` (vraie règle dans un `vm`, ventes
+  inventées) **39 contrôles**, **34 rouges** sur 2c85fe1, et chacune des **11
+  mutations** le refait passer au rouge (`exclus` 4 · `passu` 5 · `versnull` 2 ·
+  `encours` 4 · `seuil2000` 3 · `adater` 13 · `recalcule` 17 · `strict` 2 ·
+  `totalsous` 1 · `reste` 2 · `acejour` 1). Banc `bancs/seuils-vinted.cjs`
+  (port 4802, aucune fixture, 390 et 1512 px, cinq scénarios : comptes,
+  cache, libellé tardif, panne totale, année passée) **99 contrôles, tout vert**, **70 rouges**
+  sur le build de 2c85fe1, et rouge sur trois builds réaffaiblis du code
+  d'après : cache rendu sans ses échecs (**4**), échecs reconnus par le nom
+  (**2**), « pas encore datées » recalculées sans les déclarations (**2**).
+  `rapport.cjs` et `vendu-recu.cjs` restent verts.
+- **Pas mesuré** : la carte n'a pas été vue sur sa vraie base dans l'app (bancs
+  sur données inventées ; les chiffres ci-dessus viennent de la règle exécutée
+  sur la copie locale du 5 octobre).
 
 ### La page d'accueil publique (n° 22, 4 octobre)
 Julien : « une vraie page d'accueil… qui donne envie… avant d'arriver sur la
@@ -6658,8 +6696,8 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | outil | quoi |
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
-| `node scripts/audit-*.cjs` | **81 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
-| `scripts/bancs/*.cjs` | les **71 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
+| `node scripts/audit-*.cjs` | **82 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `scripts/bancs/*.cjs` | les **72 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
 **Trois règles de preuve :**
@@ -6951,8 +6989,8 @@ script-là me fait croire à une catastrophe.
 src/App.jsx                     l'app (grep avant de lire — le fichier est énorme)
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
-scripts/audit-*.cjs             les 81 audits
-scripts/bancs/                  les 71 bancs (leur README dit comment les lancer)
+scripts/audit-*.cjs             les 82 audits
+scripts/bancs/                  les 72 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 ```
