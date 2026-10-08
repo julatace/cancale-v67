@@ -32,13 +32,21 @@ const ITEMS = [
   ann(9102, { title: 'Salomon XT-6 blanc taille 40', brand_title: 'Salomon', nPhotos: 6, created_at_ts: ilYa(3) }),
   ann(9103, { title: 'Adidas Spezial noir taille 38', brand_title: 'Adidas', nPhotos: 6, created_at_ts: ilYa(5) }),
   ann(9104, { title: 'Adidas Spezial noir taille 38', brand_title: 'Adidas', nPhotos: 6, created_at_ts: ilYa(6) }),   // même titre que 9103
+  // (revue du 6 octobre) N°45 : porté par DEUX fiches (9105 en ligne, qui dort ;
+  // 9106, une AUTRE paire). L'annonce eBay VRM-45 est peut-être l'autre.
+  ann(9105, { title: 'Nike Zoom Fly 5 vert taille 44', nPhotos: 6, created_at_ts: ilYa(50) }),
+  // N°47 : achat 15 € saisi PAR NUMÉRO seulement (`vinted_buyprice_by_num`).
+  ann(9107, { title: 'Puma Suede gris taille 41', brand_title: 'Puma', price: { amount: '20.0', currency_code: 'EUR' }, nPhotos: 6, created_at_ts: ilYa(45) }),
 ];
 const MAIN = { vinted_annonce_numeros: {
   '9101': { numero: '41', buyPrice: '25', fees: '1.95' },
   '9102': { numero: '42' },
   '9103': { numero: '43' },
   '9104': { numero: '44' },
-} };
+  '9105': { numero: '45' },
+  '9106': { numero: '45', title: 'Adidas Spezial noir et argenté taille 38' },
+  '9107': { numero: '47' },
+}, vinted_buyprice_by_num: { 47: '15' } };
 const DETAILS = { '9101': { photos: ['a', 'b', 'c', 'd', 'e', 'f'], description: 'Très bon état.' }, '9102': { photos: ['a', 'b'] } };
 const rows = [
   { id: 'main', data: MAIN },
@@ -54,6 +62,8 @@ const rows = [
   { id: 'ebay_listings', data: { items: [
     { itemId: '5550001', sku: 'VRM-41', price: '60.00', title: 'Nike Air Max 1 obsidian lilac 42' },
     { itemId: '5550002', sku: '', price: '49.00', title: 'Salomon XT-6 blanc taille 40' },
+    { itemId: '5550045', sku: 'VRM-45', price: '90.00', title: 'Adidas Spezial noir et argenté 38' },
+    { itemId: '5550047', sku: 'VRM-47', price: '16.00', title: 'Puma Suede gris 41' },
   ] } },
 ];
 const ACCS = [{ id: 1, vinted_user_id: '111', login: 'compte_test', domain: 'www.vinted.fr', updated_at: auj.toISOString() }];
@@ -87,6 +97,7 @@ const projette = (row, sel) => {
     b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
     for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }]) {
       console.log(`── ${vp.width} px`);
+      rows.find((x) => x.id === 'ebay_listings').data.items[0].price = '60.00';   // la synchro simulée plus bas ne passe pas d'une taille à l'autre
       const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
       const pg = await ctx.newPage();
       const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
@@ -109,7 +120,14 @@ const projette = (row, sel) => {
       await pg.route('**/api/**', (r) => {
         if (/\/api\/ebay/.test(r.request().url()) && r.request().method() === 'POST') {
           let b = {}; try { b = JSON.parse(r.request().postData() || '{}'); } catch (_) {}
-          if (b.action === 'revise') { envoisEbay.push(b); return r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"ack":"Success"}' }); }
+          if (b.action === 'revise') {
+            envoisEbay.push(b);
+            // (revue du 6 octobre) La PREMIÈRE baisse tombe sur la page d'erreur
+            // de la passerelle (504, en HTML : la vraie forme, §6.3) — le prix a
+            // PU changer. La seconde passe.
+            if (envoisEbay.length === 1) return r.fulfill({ status: 504, contentType: 'text/html', body: '<html><body>504: GATEWAY_TIMEOUT</body></html>' });
+            return r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"ack":"Success"}' });
+          }
         }
         return r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' });
       });
@@ -174,16 +192,44 @@ const projette = (row, sel) => {
         }));
         dit(/Aussi sur eBay à 60 €/.test(av.a) && /Baisser sur eBay à 53 €/.test(av.btn),
           'la paire qui dort est aussi sur eBay (SKU VRM-41) : même baisse en proportion (49 → 43 ⇒ 60 → 53 €)', `${av.a.slice(0, 120)} | ${av.btn}`);
-        dit(av.autres.length === 1 && !av.autres.includes('5550002'), 'une annonce eBay sans SKU de paire, même au même titre, ne déclenche rien (§5)', JSON.stringify(av.autres));
+        dit(!av.autres.includes('5550002'), 'une annonce eBay sans SKU de paire, même au même titre, ne déclenche rien (§5)', JSON.stringify(av.autres));
+        // (revue du 6 octobre) Un N° porté par DEUX fiches : l'annonce eBay est
+        // peut-être l'autre paire — rien n'est proposé, et c'est dit.
+        const n45 = await pg.evaluate(() => ({ btn: !!document.querySelector('[data-reprice-ebay="5550045"]'), dit: (document.querySelector('[data-reprice-ailleurs="9105"] [data-reprice-ebay-ambigu]') || { getAttribute: () => null }).getAttribute('data-reprice-ebay-ambigu') }));
+        dit(!n45.btn && n45.dit === 'numero', 'N°45 porté par deux fiches : aucune baisse proposée sur l’annonce eBay VRM-45 (elle est peut-être l’AUTRE paire), et c’est dit', JSON.stringify(n45));
+        // Le plancher lit le prix d'achat comme la carte (fiche, sinon par N°).
+        const b47 = await pg.evaluate(() => (document.querySelector('[data-reprice-ebay="5550047"]') || {}).innerText || '');
+        dit(/à 15 €/.test(b47), 'jamais sous le prix d’achat saisi PAR NUMÉRO (15 €) : 16 € → 15 €, pas 14 €', b47);
         await pg.click('[data-reprice-ebay="5550001"]');
         await pg.waitForTimeout(300);
         dit(envoisEbay.length === 0, 'rien ne part avant la confirmation', `${envoisEbay.length} envoi(s)`);
+        const conf = await pg.evaluate(() => document.body.innerText);
+        dit(/« Nike Air Max 1 obsidian lilac 42 »/.test(conf), 'la confirmation nomme l’annonce EBAY qui va changer (son titre à elle), pas la paire Vinted', ((/Baisser le prix sur eBay[^\n]*\n[^\n]*/.exec(conf) || [''])[0]).replace(/\s+/g, ' ').slice(0, 200));
         await pg.getByRole('button', { name: 'Baisser sur eBay', exact: true }).click({ timeout: 4000 });
-        await pg.waitForTimeout(600);
-        const e = envoisEbay[0] || {};
-        dit(envoisEbay.length === 1 && e.itemId === '5550001' && Number(e.price) === 53, 'confirmée, UNE baisse part vers eBay, sur la bonne annonce et au bon prix', JSON.stringify(envoisEbay));
+        await pg.waitForTimeout(700);
+        const inc = await pg.evaluate(() => { const e = document.querySelector('[data-reprice-ailleurs="9101"]'); const i = e && e.querySelector('[data-reprice-ebay-issue]'); return { etat: i ? i.getAttribute('data-reprice-ebay-issue') : null, txt: e ? e.innerText : '' }; });
+        dit(inc.etat === 'incertain' && /je ne sais pas si le prix a changé/.test(inc.txt) && !/rien n.a changé/.test(inc.txt),
+          'une réponse illisible de la passerelle (504 HTML) : « je ne sais pas si le prix a changé », jamais « rien n’a changé »', inc.txt.replace(/\s+/g, ' ').slice(0, 160));
+        await pg.click('[data-reprice-ebay="5550001"]');
+        await pg.getByRole('button', { name: 'Baisser sur eBay', exact: true }).click({ timeout: 4000 });
+        await pg.waitForTimeout(700);
+        const e = envoisEbay[1] || {};
+        dit(envoisEbay.length === 2 && e.itemId === '5550001' && Number(e.price) === 53, 'confirmée, la baisse part vers eBay, sur la bonne annonce et au bon prix (le même prix cible : rejouer ne baisse pas deux fois)', JSON.stringify(envoisEbay));
         const fait = await pg.evaluate(() => (document.querySelector('[data-reprice-ebay="fait"]') || {}).innerText || '');
         dit(/baissé à 53 €/.test(fait), 'et l’écran le dit (« baissé à 53 € »)', fait);
+        // (revue du 6 octobre) La synchro relit eBay au NOUVEAU prix (53 €), le
+        // prix Vinted n'a pas bougé : la même proportion n'est PAS reproposée
+        // (60 → 53 → 47 → 41…).
+        await pg.waitForTimeout(900);   // l'écriture locale est différée (`save`)
+        rows.find((x) => x.id === 'ebay_listings').data.items[0].price = '53.00';
+        // L'app réécrit l'adresse en changeant d'onglet : on y RETOURNE.
+        await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
+        await pg.waitForTimeout(4000);
+        if (!(await pg.$('[data-reprice-ailleurs]'))) await pg.getByText('Conseils & signalements', { exact: true }).click({ timeout: 4000 });
+        await pg.waitForTimeout(800);
+        const re = await pg.evaluate(() => ({ btn: (document.querySelector('[data-reprice-ebay="5550001"]') || {}).innerText || '', memo: !!document.querySelector('[data-reprice-ailleurs="9101"] [data-reprice-ebay-memo]') }));
+        dit(!re.btn && re.memo, 'après la synchro, prix Vinted inchangé : aucune nouvelle baisse proposée, l’écran dit qu’elle est déjà faite', JSON.stringify(re));
+
       } catch (e) { dit(false, 'la baisse eBay se déroule jusqu’au bout', String(e.message).slice(0, 120)); }
       await pg.screenshot({ path: path.join(require('os').tmpdir(), 'annonces-' + vp.width + '.png') });
       await ctx.close();

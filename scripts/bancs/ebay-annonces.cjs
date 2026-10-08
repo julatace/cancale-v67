@@ -60,8 +60,12 @@ const TXN = [
   txn(9002, 7005, 1, ''),                       // N°25 : une conversation, pas une vente
   txn(9003, 7003, 300, 'Commande annulée'),     // N°23 : la paire est revenue
 ];
+// (revue du 6 octobre) Le retrait AUTOMATIQUE exige que l'annonce eBay ait été
+// mise en ligne AVANT la vente Vinted (`depuis`, le StartTime d'eBay) et que la
+// liste des ventes (`orders_sold`) confirme la vente.
+const ilYaJ = (j) => new Date(Date.now() - j * 86400000).toISOString();
 const EBAY_ANNONCES = () => [
-  { itemId: '110000000001', title: 'Adidas Gazelle bleu taille 40', price: '80.0', sku: 'VRM-22', observateurs: 1, photo: 'https://img.test/e1.jpg', url: 'https://www.ebay.fr/itm/110000000001' },
+  { itemId: '110000000001', title: 'Adidas Gazelle bleu taille 40', price: '80.0', sku: 'VRM-22', observateurs: 1, photo: 'https://img.test/e1.jpg', url: 'https://www.ebay.fr/itm/110000000001', depuis: ilYaJ(10) },
   // Pas de SKU, et SA photo est exactement celle de la paire N°21 (une identité).
   { itemId: '110000000002', title: 'Nike Dunk Low panda taille 42', price: '100.0', sku: '', observateurs: 3, photo: 'https://img.test/v7001.jpg', url: 'https://www.ebay.fr/itm/110000000002' },
   { itemId: '110000000003', title: 'Salomon XT-6 noir taille 41', price: '120.0', sku: 'VRM-23', observateurs: null, photo: 'https://img.test/e3.jpg' },
@@ -73,13 +77,33 @@ const EBAY_COMMANDES = [
   // Sans SKU, au titre IDENTIQUE à la paire N°23 encore en ligne : ne désigne rien.
   { orderId: '01-003', orderPaymentStatus: 'PAID', lineItems: [{ sku: '', title: 'Salomon XT-6 noir taille 41' }], pricingSummary: { total: { value: '120.00', currency: 'EUR' } } },
 ];
+// La liste des ventes du compte (la forme de `orders_sold`) : la vente N°22
+// (transaction 9001) y est FINALISÉE — l'état le plus frais.
+const vente = (tx, titre, statut, j) => ({ transaction_id: tx, title: titre, price: { amount: '80.0', currency_code: 'EUR' }, status: statut, date: ilYaJ(j) });
+const VENTES = [vente(9001, 'Adidas Gazelle bleu taille 40', 'Commande finalisée', 2)];
+// (revue du 6 octobre) Le retrait automatique, trois paires qu'il ne doit PAS
+// toucher (et qui, sauf la remboursée, restent dans l'alerte avec le bouton) :
+//   · N°26 : la transaction dit encore « Le paiement a été validé », la liste
+//     de ses ventes dit « Remboursement effectué » — la paire est revenue ;
+//   · N°27 : l'annonce eBay a été mise en ligne APRÈS la vente (remise en vente) ;
+//   · N°28 : le N° est porté par DEUX fiches (héritage d'août).
+const AUTO_FICHES = { '7006': fiche('26', 'Puma Suede gris taille 42', 7006), '7007': fiche('27', 'Vans Old Skool noir taille 41', 7007), '7008': fiche('28', 'Asics Gel Lyte III taille 42', 7008), '8028': fiche('28', 'New Balance 990 gris taille 43', 8028) };
+const AUTO_TXN = [txn(9006, 7006, 400, 'Le paiement a été validé'), txn(9007, 7007, 450, 'Commande finalisée'), txn(9008, 7008, 450, 'Commande finalisée')];
+const AUTO_VENTES = [vente(9006, 'Puma Suede gris taille 42', 'Remboursement effectué', 4), vente(9007, 'Vans Old Skool noir taille 41', 'Commande finalisée', 5), vente(9008, 'Asics Gel Lyte III taille 42', 'Commande finalisée', 3)];
+const AUTO_ANNONCES = [
+  { itemId: '110000000006', title: 'Puma Suede gris 42', price: '60.0', sku: 'VRM-26', observateurs: 0, depuis: ilYaJ(10) },
+  { itemId: '110000000007', title: 'Vans Old Skool noir 41', price: '50.0', sku: 'VRM-27', observateurs: 0, depuis: ilYaJ(1) },
+  { itemId: '110000000008', title: 'Asics Gel Lyte III 42', price: '70.0', sku: 'VRM-28', observateurs: 0, depuis: ilYaJ(10) },
+];
 let rows = [];
-const remettre = () => {
+const remettre = (auto) => {
   rows = [
-    { id: 'main', data: JSON.parse(JSON.stringify(MAIN)) },
+    { id: 'harvest_111_orders_sold', data: { capturedAt: auj.toISOString(), payload: { my_orders: auto ? [...VENTES, ...AUTO_VENTES] : VENTES } } },
+    ...(auto ? AUTO_TXN : []),
+    { id: 'main', data: auto ? { ...JSON.parse(JSON.stringify(MAIN)), vinted_annonce_numeros: { ...MAIN.vinted_annonce_numeros, ...AUTO_FICHES } } : JSON.parse(JSON.stringify(MAIN)) },
     { id: 'harvest_111_listings', data: LISTINGS },
     ...TXN,
-    { id: 'ebay_listings', data: { items: EBAY_ANNONCES(), capturedAt: Date.now() } },
+    { id: 'ebay_listings', data: { items: auto ? [...EBAY_ANNONCES(), ...AUTO_ANNONCES] : EBAY_ANNONCES(), capturedAt: Date.now() } },
     { id: 'ebay_orders', data: { orders: EBAY_COMMANDES, capturedAt: Date.now() } },
     // (5 octobre) Deux annonces PROGRAMMÉES : la N°22, prouvée vendue sur
     // Vinted ⇒ « programmée sur eBay — à annuler » ; la N°25 (une simple
@@ -395,7 +419,7 @@ const deborde = (pg) => pg.evaluate(() => ({ sw: document.documentElement.scroll
     //    sur la preuve ⇒ rien.
     console.log('── retrait automatique (1512 px)');
     {
-      remettre();
+      remettre(true);
       const o = await ouvrir(b, { width: 1512, height: 950 }, false);
       await essaie('retrait automatique', async () => {
         const auto = () => o.envois.filter((x) => x.action === 'retirer' && x.auto === true);
@@ -418,9 +442,18 @@ const deborde = (pg) => pg.evaluate(() => ({ sw: document.documentElement.scroll
         dit(a.length === 1 && a[0].itemId === '110000000001' && a[0].sku === 'VRM-22' && a[0].confirme === true,
           'allumé : la paire N°22, PROUVÉE vendue sur Vinted, est retirée d’eBay — elle seule, avec son SKU', JSON.stringify(a));
         dit(!o.envois.some((x) => x.action === 'retirer' && /11000000000[35]/.test(x.itemId)), 'ni la N°23 (vente annulée), ni la N°25 (une conversation)');
+        dit(!o.envois.some((x) => x.action === 'retirer' && x.itemId === '110000000006'), 'ni la N°26 : sa vente a été REMBOURSÉE (la liste de ses ventes le dit, la transaction était périmée)');
+        dit(!o.envois.some((x) => x.action === 'retirer' && x.itemId === '110000000007'), 'ni la N°27 : son annonce eBay a été mise en ligne APRÈS la vente (une remise en vente voulue)');
+        dit(!o.envois.some((x) => x.action === 'retirer' && x.itemId === '110000000008'), 'ni la N°28 : son N° est porté par DEUX fiches (il désignerait peut-être l’autre paire)');
         await o.pg.reload({ waitUntil: 'domcontentloaded' });
         await o.pg.waitForTimeout(5000);
         dit(auto().length === 1, 'une annonce retirée ne repart pas (la synchro l’a sortie de la liste)', `${auto().length} envoi(s)`);
+        // Ce que le retrait automatique n'a pas fait reste À LUI, avec le bouton —
+        // sauf la paire remboursée, qui n'est plus vendue du tout.
+        await versAnnoncesEbay(o.pg);
+        const reste = await lire(o.pg);
+        dit(JSON.stringify([...reste.retirer].sort()) === '["110000000007","110000000008"]',
+          'l’alerte « à retirer d’eBay » garde la N°27 et la N°28 (son clic), et plus la N°26 remboursée', JSON.stringify(reste.retirer));
       });
       await o.ctx.close();
       remettre();

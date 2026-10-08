@@ -5579,6 +5579,71 @@ est traité à part — l'app AFFICHE `j.error` de ces réponses telle quelle.
   entre l'horloge de l'appareil et `capturedAt` (serveur) est une précaution,
   pas une mesure du décalage réel.
 
+### ⚠️⚠️ Revue des propositions 6, 8, 9, 10, côté app : une vente REMBOURSÉE comptait « vendue » (6 octobre)
+Les douze défauts de la revue, RE-VÉRIFIÉS sur le code du jour avant d'y toucher
+(le planificateur avait été corrigé entre-temps) : **tous reproduisaient encore**.
+- ⚠️⚠️ **La preuve de vente Vinted lisait un état PÉRIMÉ.** La ligne
+  `harvest_*_txn_*` n'est recaptée que si la transaction est rouverte. Mesuré sur
+  la copie de sa base : 3 preuves sur 229 disaient « Le paiement a été validé »
+  quand la liste de ses ventes (`orders_sold`) disait « Remboursement effectué »
+  (N°198, 277, 382). ⇒ `preuvesVentesVinted` : l'état d'une transaction est
+  celui de `orders_sold` quand il la porte, sinon celui de la transaction.
+  Résultat mesuré : 229 → 230 (les 3 remboursées sortent, 4 vraies ventes
+  captées en conversation entrent). ⚠️ **On n'écarte PAS une annonce « dès qu'une
+  transaction est annulée »** : 25 annonces portent une « Commande annulée —
+  article indisponible » (l'acheteur qui a perdu la course) À CÔTÉ de la vraie
+  vente. `lireVentesVintedProuvees(comptes)` lit `orders_sold` de TOUS ses
+  comptes liés (écartés compris) et porte le détail (`.preuves`).
+- ⚠️⚠️ **Le retrait AUTOMATIQUE est maintenant le plus strict**
+  (`retraitsEbayAutoPermis`, lancé par `passageRetraitEbayAuto`) : vente
+  CONFIRMÉE par `orders_sold` (ni remboursée, ni annulée), N° porté par **une
+  seule** fiche (13 N° hérités d'août en portent plusieurs), annonce eBay mise en
+  ligne **AVANT** la vente (`depuis`, le StartTime d'eBay — publiée après, c'est
+  une remise en vente voulue ; date inconnue ⇒ rien), toutes ses annonces Vinted
+  lues, eBay ne la disant pas déjà terminée. Ce qui ne passe pas RESTE dans
+  l'alerte « à retirer », avec le bouton.
+- **Une lecture « en vente », deux lecteurs** (`lireAnnoncesVintedEnLigne`) :
+  l'écran eBay et la coque lisent TOUS ses comptes, écartés compris (masquer un
+  compte règle l'affichage, pas ce qui est en vente), et la coque ne retire plus
+  des « en vente » ce qu'un titre disait vendu (`soldIdsN`, pas une identité).
+- **Le passage** : `nuageAuDepart` est noté AVANT toute lecture (on le regardait
+  à la fin) ; l'annulation du passage et l'interrupteur sont relus avant CHAQUE
+  appel ; les fiches N° sont relues juste avant ; une annonce qu'eBay dit déjà
+  close (erreur 1047) ne prend plus une des 5 places ; un retrait fait mais pas
+  noté dans l'historique (`journal:false`) est dit.
+- **Proposition 9** : un N° porté par plusieurs fiches ⇒ aucune baisse eBay (et
+  c'est dit) ; la confirmation nomme l'annonce **eBay** qui change ; une baisse
+  faite pour un prix Vinted n'est plus reproposée après la synchro
+  (`vrm_ebay_baisses`, synchronisé : 60 → 53 → 47 → 41… sans que Vinted bouge) ;
+  le plancher lit le prix d'achat comme la carte (`prixAchatDe`, §11 — la N°385
+  et ses 15 € saisis par numéro).
+- **Changer un prix eBay a trois issues** (`resultatReviseEbay`, pour les deux
+  endroits qui le font) : un 504 « incertain », une page d'erreur HTML ou une
+  coupure ⇒ « je ne sais pas si le prix a changé », jamais « rien n'a changé ».
+- **Une moyenne par modèle** (`moyennesParModele`, §11) pour l'écran Ventes et le
+  repère d'une offre sur Messages (qui comptait les comptes exclus : 75 € sur 4
+  au lieu de 50 € sur 3). Messages n'affiche plus les offres d'un compte exclu,
+  et dit « toutes réglées par une vente » au lieu de se taire ; le repère par
+  modèle nomme un compte dont les ventes ou achats n'ont pas pu être lus.
+- Preuves (données inventées) : `audit-ebay-retrait-auto.cjs` (les vraies
+  fonctions dans un `vm`) **18 rouges** sur b063f42 — dont la vente remboursée et
+  les 5 places prises par des annonces closes, sur une fonction qui existait déjà
+  — et **10 réaffaiblissements sur 10** attrapés (`--prouve`) ; bancs
+  `ebay-annonces.cjs` **6 rouges** sur le build d'avant (le retrait automatique
+  partait sur 4 annonces au lieu d'une), `annonces-carte.cjs` **10**,
+  `messagerie.cjs` **10**, `rapport.cjs` **1**.
+- ⚠️ `audit-abonnement.cjs` était rouge depuis b063f42 (la route exige la case CGV,
+  ses requêtes ne l'envoyaient pas) : elles envoient `cgv: true`.
+- ⚠️ **Côté serveur, non fait (hors de cette passe)** : le journal
+  `ebay_retraits_auto` reste un lire-ajouter-réécrire (deux retraits simultanés
+  peuvent perdre une ligne) ; la route pourrait elle-même refuser une annonce
+  dont le `StartTime` (lu par `GetItem`) est postérieur à la vente. Et l'extension
+  garde sa propre preuve (`lireVentesProuvees`, sans `orders_sold`) : elle y
+  sur-exclut une paire remboursée de ses files (le sens sûr).
+- ⚠️ **Non mesuré** : que `GetMyeBaySelling` rende bien `StartTime` pour une
+  annonce en ligne (`depuis`). S'il ne le rend pas, AUCUN retrait automatique ne
+  part (date inconnue) — l'alerte, elle, reste.
+
 ### Mise en production du 5 octobre
 PR #442 mergée à 10:24 UTC (80 déploiements sur 24 h : sous la limite), déploiement
 de production READY sur le commit de merge, `/api/sante` répond, le zip servi
@@ -6467,7 +6532,7 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | outil | quoi |
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
-| `node scripts/audit-*.cjs` | **81 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `node scripts/audit-*.cjs` | **82 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
 | `scripts/bancs/*.cjs` | les **71 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
@@ -6760,7 +6825,7 @@ script-là me fait croire à une catastrophe.
 src/App.jsx                     l'app (grep avant de lire — le fichier est énorme)
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
-scripts/audit-*.cjs             les 81 audits
+scripts/audit-*.cjs             les 82 audits
 scripts/bancs/                  les 71 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt

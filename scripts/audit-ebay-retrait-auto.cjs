@@ -1,0 +1,289 @@
+// ⚠️⚠️ CONTRÔLE PERMANENT — LE RETRAIT AUTOMATIQUE D'eBAY EST LE PLUS STRICT
+// (revue contradictoire des propositions 6, 8, 9, 10 — 6 octobre).
+//
+// Une annonce eBay terminée ne revient pas. L'alerte « à retirer d'eBay » peut
+// se tromper sans dégât (c'est lui qui clique) ; le retrait AUTOMATIQUE, non.
+// La revue l'a prouvé sur sa base, en exécutant le vrai code :
+//   · une vente REMBOURSÉE comptait « prouvée vendue » : la ligne de
+//     transaction gardait « Le paiement a été validé », la liste de ses ventes
+//     (`orders_sold`) disait « Remboursement effectué » — 3 preuves sur 229
+//     (N°198, 277, 382) ;
+//   · un N° porté par DEUX fiches (13 N° hérités d'août) désignait la mauvaise
+//     paire : l'annonce eBay de la paire NON vendue était retirée ;
+//   · la coque ne lisait pas les annonces des comptes qu'il a écartés, et
+//     retirait des « en vente » celles qu'un titre disait vendues ;
+//   · la garde « nuage prêt » était regardée APRÈS les lectures, et
+//     l'annulation du passage APRÈS l'appel à eBay ;
+//   · cinq annonces déjà terminées prenaient les cinq places du passage, à
+//     chaque ouverture : une vraie vente n'était jamais retirée.
+//
+// Ce contrôle EXÉCUTE les vraies fonctions extraites d'`App.jsx` dans un `vm`
+// (les lectures de la base et l'appel à eBay sont simulés) et juge ce qu'elles
+// RENDENT et ce qui PART vers `/api/ebay` (§6.5). Il complète le banc rendu
+// `bancs/ebay-annonces.cjs`.
+//
+// `--prouve` réaffaiblit chaque garde tour à tour : chaque fois, au moins un
+// contrôle doit passer au ROUGE. « La fonction n'existait pas avant » n'est pas
+// une preuve (§6.1) — la partie « preuve de vente » s'exécute aussi sur le code
+// d'avant, où la fonction existait déjà.
+const fs = require('fs'), vm = require('vm'), path = require('path');
+const R = path.join(__dirname, '..');
+const APP0 = fs.readFileSync(path.join(R, 'src', 'App.jsx'), 'utf8');
+let parser = null;
+try { parser = require(path.join(R, 'node_modules', '@babel', 'parser')); } catch (_) {}
+
+// Les déclarations de PREMIER NIVEAU portant ces noms, dans l'ordre du fichier.
+function decls(APP, noms) {
+  const want = new Set(noms), trouve = new Set(), out = [];
+  const ast = parser.parse(APP, { sourceType: 'module', plugins: ['jsx'], errorRecovery: true });
+  for (const n of ast.program.body) {
+    let names = [];
+    if (n.type === 'FunctionDeclaration' && n.id) names = [n.id.name];
+    else if (n.type === 'VariableDeclaration') names = n.declarations.map((d) => d.id && d.id.name).filter(Boolean);
+    if (names.some((x) => want.has(x))) { out.push(APP.slice(n.start, n.end)); names.forEach((x) => trouve.add(x)); }
+  }
+  return { src: out.join('\n'), manquants: noms.filter((x) => !trouve.has(x)) };
+}
+const NOMS = ['cleNum', 'NUM_OK', 'numDeSkuEbay', 'commandeEbayEngagee', 'doublesVenteEbay', 'PAS_UNE_VENTE',
+  'etatsVentesFrais', 'preuvesVentesVinted', 'lireVentesVintedProuvees', 'isOnlineListing', 'lireAnnoncesVintedEnLigne',
+  'retraitsEbayAutoPermis', 'passageRetraitEbayAuto', 'EBAY_DEJA_TERMINEE', '__retraitEbayAutoEnVol', '__retraitEbayAutoTentes',
+  'retirerEbayAuto', 'resultatReviseEbay', 'prixAchatDe'];
+
+// Un contexte NEUF par scénario : `retirerEbayAuto` garde en mémoire, par
+// ouverture de l'app, les annonces déjà tentées.
+function charger(APP, env, dit) {
+  const { src, manquants } = decls(APP, NOMS);
+  const ctx = { console, Promise, Date, Math, JSON, Set, Map, Object, String, Number, Array, ...env };
+  vm.createContext(ctx);
+  try { vm.runInContext(src, ctx); } catch (e) { dit(false, 'les règles se chargent', String(e && e.message).slice(0, 140)); return null; }
+  const R2 = {};
+  for (const n of NOMS) { try { R2[n] = vm.runInContext(`typeof ${n} === 'undefined' ? undefined : ${n}`, ctx); } catch (_) { R2[n] = undefined; } }
+  R2.manquants = manquants;
+  return R2;
+}
+
+// ── LES DONNÉES (inventées, la FORME mesurée : §6.3) ───────────────────────
+// Les lignes de transaction telles que la projection les rend
+// (`tx:meta->>id, it:meta->>item_id, ti:meta->>status_title, at:…`).
+const TXN = [
+  { tx: '501', it: 'I1', ti: 'Le paiement a été validé', at: '2026-09-20T10:00:00+02:00' },            // REMBOURSÉE selon orders_sold
+  { tx: '502', it: 'I2', ti: 'Commande annulée - article indisponible ', at: '2026-09-21T10:00:00+02:00' }, // l'acheteur qui a perdu la course…
+  { tx: '503', it: 'I2', ti: 'Commande finalisée - l\'acheteur a validé la commande', at: '2026-09-22T10:00:00+02:00' }, // …et la vraie vente
+  { tx: '504', it: 'I3', ti: '', at: null },                                                            // une conversation
+  { tx: '505', it: 'I4', ti: 'Le paiement a été validé', at: '2026-09-23T10:00:00+02:00' },            // compte illisible : pas confirmée
+  { tx: '506', it: 'I5', ti: '', at: null },                                                            // captée en conversation, VENDUE depuis
+];
+const VENTES_A = [
+  { transaction_id: 501, status: 'Remboursement effectué', date: '2026-09-20T09:00:00+02:00' },
+  { transaction_id: 503, status: 'Commande finalisée - l\'acheteur a validé la commande', date: '2026-09-21T12:00:00+02:00' },
+  { transaction_id: 506, status: 'Commande finalisée - l\'acheteur a validé la commande', date: '2026-09-24T12:00:00+02:00' },
+];
+
+async function controles(APP, journal) {
+  let ko = 0;
+  const dit = (ok, nom, det) => { if (!ok) ko++; if (journal) console.log(`${ok ? '✅' : '❌'} ${nom}${det ? ' — ' + det : ''}`); };
+  const essaie = async (quoi, fn) => { try { return await fn(); } catch (e) { dit(false, quoi, 'a levé : ' + String((e && e.message) || e).slice(0, 160)); return null; } };
+  if (!parser) { dit(false, '@babel/parser est disponible (node_modules)'); return ko; }
+
+  // ── 1. LA PREUVE DE VENTE LIT L'ÉTAT LE PLUS FRAIS ─────────────────────────
+  // Sur le code d'avant aussi : `lireVentesVintedProuvees` existait.
+  await essaie('preuve de vente', async () => {
+    const lus = [];
+    const env = {
+      lireTout: async (q) => { lus.push(q); return TXN.map((r) => ({ ...r })); },
+      fetchHarvestOrders: async (uid) => (uid === 'A' ? { my_orders: VENTES_A } : undefined),   // B : la base n'a pas répondu
+    };
+    const F = charger(APP, env, dit); if (!F) return;
+    const v = await F.lireVentesVintedProuvees([{ vinted_user_id: 'A' }, { vinted_user_id: 'B' }]);
+    const has = (x) => !!(v && typeof v.has === 'function' && v.has(x));
+    dit(v && !has('I1'), 'une vente REMBOURSÉE selon la liste de ses ventes n\'est PAS « prouvée vendue » (la ligne de transaction était périmée)', JSON.stringify(v && [...v]));
+    dit(has('I2'), '« annulée — article indisponible » à côté d\'une vente finalisée : la paire EST vendue (l\'acheteur qui a perdu la course)');
+    dit(!has('I3'), 'une conversation (état vide) n\'est pas une vente');
+    dit(has('I4'), 'un compte dont la liste des ventes n\'a pas pu être lue : sa transaction garde son état (rien n\'est retiré de la preuve sur un « pas su »)');
+    dit(has('I5'), 'une transaction captée en conversation puis VENDUE (la liste des ventes le dit) compte');
+    const p = v && v.preuves;
+    dit(!!(p && typeof p.get === 'function'), 'la preuve porte son détail (`.preuves`) — le retrait automatique en a besoin');
+    if (p && typeof p.get === 'function') {
+      dit((p.get('I4') || []).every((x) => !x.frais) && (p.get('I2') || []).some((x) => x.frais),
+        'et dit d\'où vient chaque état : confirmé par la liste des ventes, ou de la seule transaction', JSON.stringify({ I2: p.get('I2'), I4: p.get('I4') }).slice(0, 200));
+    }
+    dit(lus.some((q) => /tx:meta->>id/.test(q)), 'la lecture projette le n° de transaction (§4.4 : des scalaires, jamais `data`)', lus[0]);
+    const F2 = charger(APP, { lireTout: async () => null, fetchHarvestOrders: async () => ({ my_orders: VENTES_A }) }, dit);
+    if (F2) dit((await F2.lireVentesVintedProuvees([{ vinted_user_id: 'A' }])) === null, 'transactions illisibles ⇒ `null` (« pas su »), jamais un ensemble vide');
+  });
+
+  // ── 2. LES ANNONCES EN VENTE : TOUS SES COMPTES, ÉCARTÉS COMPRIS ──────────
+  await essaie('annonces en vente', async () => {
+    const LIST = {
+      A: { items: [{ id: 101, is_closed: false }, { id: 102, is_closed: true }] },
+      X: { items: [{ id: 901, is_closed: false }] },   // un compte qu'il a EXCLU : la paire y est en vente
+    };
+    const F = charger(APP, { fetchHarvest: async (uid) => LIST[uid] || null }, dit); if (!F || !F.lireAnnoncesVintedEnLigne) { dit(false, '`lireAnnoncesVintedEnLigne` existe (une lecture partagée par l\'écran eBay et la coque, §11)'); return; }
+    const r = await F.lireAnnoncesVintedEnLigne([{ vinted_user_id: 'A' }, { vinted_user_id: 'X' }]);
+    dit(r && r.enLigne && r.enLigne.has('101') && r.enLigne.has('901') && !r.enLigne.has('102') && r.toutesLues === true,
+      'une paire en vente sur un compte EXCLU est en vente (l\'exclusion règle l\'affichage) ; une fermée ne l\'est pas', JSON.stringify(r && { e: [...(r.enLigne || [])], t: r.toutesLues }));
+    const r2 = await F.lireAnnoncesVintedEnLigne([{ vinted_user_id: 'A' }, { vinted_user_id: 'Y' }]);
+    dit(r2 && r2.enLigne && r2.enLigne.has('101') && r2.toutesLues === false, 'un compte illisible ⇒ `toutesLues` faux (le retrait automatique ne partira pas)', JSON.stringify(r2 && { t: r2.toutesLues }));
+  });
+
+  // ── 3. LA RÈGLE LA PLUS STRICTE, ET LE PASSAGE ─────────────────────────────
+  const D_VENTE = '2026-10-01T12:00:00+02:00';
+  const numeros = {
+    '7022': { numero: '22' },                          // vendue, confirmée, eBay mis en ligne AVANT ⇒ part
+    '7026': { numero: '26' },                          // vente REMBOURSÉE
+    '7027': { numero: '27' },                          // eBay mis en ligne APRÈS la vente
+    '7028': { numero: '28' }, '8028': { numero: '28' }, // N° porté par DEUX fiches
+    '7029': { numero: '29' },                          // vente pas confirmée par la liste des ventes
+    '7030': { numero: '30' },                          // date de mise en ligne eBay inconnue
+    '7031': { numero: '31' },                          // eBay la dit déjà terminée
+    '7032': { numero: '32' },                          // une seconde vente sûre (passage annulé en cours)
+  };
+  const txn = [
+    { tx: '622', it: '7022', ti: 'Commande finalisée', at: D_VENTE },
+    { tx: '626', it: '7026', ti: 'Le paiement a été validé', at: D_VENTE },
+    { tx: '627', it: '7027', ti: 'Commande finalisée', at: D_VENTE },
+    { tx: '628', it: '7028', ti: 'Commande finalisée', at: D_VENTE },
+    { tx: '629', it: '7029', ti: 'Le paiement a été validé', at: D_VENTE },
+    { tx: '630', it: '7030', ti: 'Commande finalisée', at: D_VENTE },
+    { tx: '631', it: '7031', ti: 'Commande finalisée', at: D_VENTE },
+    { tx: '632', it: '7032', ti: 'Commande finalisée', at: D_VENTE },
+  ];
+  const fini = { status: 'Commande finalisée', date: D_VENTE };
+  const ventes = [622, 627, 628, 630, 631, 632].map((t) => ({ transaction_id: t, ...fini })).concat([{ transaction_id: 626, status: 'Remboursement effectué', date: D_VENTE }]);
+  const avant = '2026-09-15T10:00:00.000Z', apres = '2026-10-02T10:00:00.000Z';
+  const annonce = (n, depuis, fin) => ({ itemId: '1100000000' + n, sku: 'VRM-' + n, title: 'Paire ' + n, depuis, ...(fin ? { fin } : {}) });
+  const ANNONCES = [annonce(22, avant), annonce(26, avant), annonce(27, apres), annonce(28, avant), annonce(29, avant), annonce(30, ''), annonce(31, avant, '2026-10-03T00:00:00.000Z'), annonce(32, avant)];
+  const MAINTENANT = Date.parse('2026-10-06T12:00:00Z');
+  const scenario = async (quoi, opts) => {
+    const appels = [], toasts = [];
+    const env = {
+      lireTout: async () => txn.map((r) => ({ ...r })),
+      fetchHarvestOrders: async () => ({ my_orders: ventes }),
+      enTeteSession: () => ({}), toast: (m) => toasts.push(String(m)),
+      fetch: async (u, o) => { const b = JSON.parse(o.body); appels.push(b); if (opts.apresAppel) opts.apresAppel(appels); return { json: async () => (opts.reponse ? opts.reponse(b) : { ok: true }) }; },
+    };
+    const F = charger(APP, env, dit); if (!F) return null;
+    if (!F.passageRetraitEbayAuto) { dit(false, `${quoi} : \`passageRetraitEbayAuto\` existe (le passage de la coque, exécutable)`); return null; }
+    const vendus = await F.lireVentesVintedProuvees([{ vinted_user_id: 'A' }]);
+    const res = await F.passageRetraitEbayAuto({
+      nuageAuDepart: opts.nuage !== false, continuer: opts.continuer || (() => true),
+      annonces: opts.annonces || ANNONCES, commandes: [], enLigne: new Set(), toutesLues: opts.toutesLues !== false,
+      vendusVinted: vendus, lireNumeros: () => opts.numeros || numeros, maintenant: MAINTENANT,
+    });
+    return { res, appels, toasts };
+  };
+  await essaie('passage normal', async () => {
+    const s = await scenario('passage normal', {});
+    if (!s) return;
+    const ids = s.appels.map((b) => b.itemId);
+    dit(JSON.stringify(ids) === '["110000000022","110000000032"]',
+      'ne partent QUE les paires sûres : vendue, confirmée par la liste des ventes, N° porté par une seule fiche, annonce eBay mise en ligne AVANT la vente', JSON.stringify(ids));
+    dit(!ids.includes('110000000026'), 'une vente REMBOURSÉE ne retire rien');
+    dit(!ids.includes('110000000028'), 'un N° porté par DEUX fiches ne retire rien (il désignerait peut-être l\'autre paire)');
+    dit(!ids.includes('110000000027'), 'une annonce eBay mise en ligne APRÈS la vente (remise en vente voulue) ne se retire pas toute seule');
+    dit(!ids.includes('110000000029'), 'une vente que la liste des ventes ne confirme pas ne retire rien');
+    dit(!ids.includes('110000000030'), 'une date de mise en ligne eBay inconnue ne retire rien');
+    dit(!ids.includes('110000000031'), 'une annonce qu\'eBay dit déjà terminée ne prend pas de place');
+    dit(s.appels.every((b) => b.action === 'retirer' && b.auto === true && b.confirme === true && /^VRM-\d+$/.test(b.sku)), 'chaque envoi : {action:retirer, auto:true, confirme:true, sku VRM-n°}', JSON.stringify(s.appels[0]));
+    const raisons = (s.res && s.res.ecartes || []).map((e) => `${e.numero}:${e.raison}`).sort().join(',');
+    dit(/27:ebay-apres-vente/.test(raisons) && /28:numero-partage/.test(raisons) && /29:vente-non-confirmee/.test(raisons) && /30:date-pas-sue/.test(raisons) && /31:deja-terminee/.test(raisons),
+      'chaque paire écartée l\'est pour SA raison', raisons);
+  });
+  await essaie('nuage pas prêt', async () => {
+    const s = await scenario('nuage pas prêt', { nuage: false }); if (!s) return;
+    dit(s.appels.length === 0, 'le nuage n\'était pas là au DÉPART du passage ⇒ rien ne part', `${s.appels.length} envoi(s)`);
+  });
+  await essaie('passage annulé', async () => {
+    const s = await scenario('passage annulé', { continuer: () => false }); if (!s) return;
+    dit(s.appels.length === 0, 'passage annulé (ou interrupteur éteint) avant le premier appel ⇒ rien ne part', `${s.appels.length} envoi(s)`);
+    let arret = false;
+    const s2 = await scenario('passage annulé en cours', { continuer: () => !arret, apresAppel: () => { arret = true; } }); if (!s2) return;
+    dit(s2.appels.length === 1, 'annulé APRÈS le premier appel ⇒ le second ne part pas (relu avant CHAQUE appel)', `${s2.appels.length} envoi(s)`);
+  });
+  await essaie('annonces pas toutes lues', async () => {
+    const s = await scenario('annonces pas toutes lues', { toutesLues: false }); if (!s) return;
+    dit(s.appels.length === 0, 'une annonce Vinted illisible (un compte n\'a pas répondu) ⇒ rien ne part', `${s.appels.length} envoi(s)`);
+  });
+  await essaie('fiches relues', async () => {
+    const s = await scenario('fiches relues', { numeros: { ...numeros, '9022': { numero: '22' }, '9032': { numero: '32' } } }); if (!s) return;
+    dit(s.appels.length === 0, 'les fiches RELUES juste avant (un N° donné à une seconde paire pendant le passage) ⇒ rien ne part', `${s.appels.length} envoi(s)`);
+  });
+  await essaie('déjà terminées', async () => {
+    // Six paires sûres ; eBay dit les cinq premières déjà closes (la synchro ne
+    // les a pas encore sorties). La sixième, une vraie vente, doit partir.
+    const nums = {}, tx = [], vts = [], ann = [];
+    for (let k = 41; k <= 46; k++) { nums['70' + k] = { numero: String(k) }; tx.push({ tx: '6' + k, it: '70' + k, ti: 'Commande finalisée', at: D_VENTE }); vts.push({ transaction_id: Number('6' + k), ...fini }); ann.push(annonce(k, avant)); }
+    const appels = [], toasts = [];
+    const F = charger(APP, {
+      lireTout: async () => tx, fetchHarvestOrders: async () => ({ my_orders: vts }), enTeteSession: () => ({}), toast: (m) => toasts.push(String(m)),
+      fetch: async (u, o) => { const b = JSON.parse(o.body); appels.push(b.itemId); const k = Number(String(b.itemId).slice(-2)); return { json: async () => (k <= 45 ? { ok: false, error: 'eBay : The auction has already been closed.' } : { ok: true, journal: false }) }; },
+    }, dit);
+    if (!F || !F.retirerEbayAuto) return;
+    const liste = ann.map((a) => ({ annonce: a, numero: numDe(a.sku) }));
+    await F.retirerEbayAuto(liste, () => true);
+    dit(appels.includes('110000000046'), 'cinq annonces qu\'eBay dit déjà terminées ne prennent pas les cinq places : la vraie vente part', JSON.stringify(appels));
+    dit(toasts.some((t) => /historique/.test(t)), 'un retrait fait mais pas noté dans l\'historique (journal:false) : c\'est dit', JSON.stringify(toasts));
+  });
+
+  // ── 4. CHANGER UN PRIX SUR eBAY : TROIS ISSUES (proposition 9) ─────────────
+  await essaie('changer un prix', async () => {
+    const F = charger(APP, {}, dit); if (!F || !F.resultatReviseEbay) { dit(false, '`resultatReviseEbay` existe (une règle pour les deux endroits qui changent un prix)'); return; }
+    const a = F.resultatReviseEbay({ code: 504, j: { ok: false, reason: 'incertain', error: 'eBay n\'a pas répondu clairement — je ne sais pas si le prix a changé.' } });
+    const b = F.resultatReviseEbay({ code: 504, j: null });   // la page d'erreur de Vercel, en HTML
+    const c = F.resultatReviseEbay({ code: 0, j: null });     // réseau coupé : la requête a pu arriver
+    const d = F.resultatReviseEbay({ code: 422, j: { ok: false, error: 'Prix refusé par eBay' } });
+    dit(a.etat === 'incertain' && b.etat === 'incertain' && c.etat === 'incertain', 'une réponse « incertain », illisible ou coupée ⇒ « je ne sais pas si le prix a changé », jamais « rien n\'a changé »', JSON.stringify([a.etat, b.etat, c.etat]));
+    dit(!/rien n.a chang/.test(a.msg + b.msg + c.msg) && /je ne sais pas/.test(b.msg), 'et le message ne promet rien', b.msg);
+    dit(d.etat === 'ko' && /Prix refusé/.test(d.msg), 'un VRAI refus d\'eBay reste un refus, avec la raison d\'eBay', JSON.stringify(d));
+    dit(F.prixAchatDe({ numero: '385' }, { 385: '15' }) === 15 && F.prixAchatDe({ numero: '385', buyPrice: '12,5' }, { 385: '15' }) === 12.5 && F.prixAchatDe({ numero: '9' }, {}) === null,
+      'le prix d\'achat : celui de la fiche, sinon celui saisi par N° (la lecture de la carte, §11) ; inconnu ⇒ rien d\'inventé');
+  });
+
+  // ── 5. LE BRANCHEMENT DANS LA COQUE ET L'ÉCRAN eBAY (§11) ──────────────────
+  // Le comportement est jugé au-dessus ; ici, que les deux appelants passent
+  // bien par ces règles, avec TOUS ses comptes.
+  const sansCommentaires = APP.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' ')).replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1');
+  const iCoque = sansCommentaires.indexOf('const nuageAuDepart = isCloudReady();');
+  const iEffet = sansCommentaires.lastIndexOf('let cancelled=false;', iCoque);
+  const premierAwait = iEffet >= 0 ? sansCommentaires.indexOf('await ', iEffet) : -1;
+  dit(iCoque > 0 && iEffet > 0 && iCoque < premierAwait, 'la coque note si le nuage était là AVANT toute lecture du passage (`nuageAuDepart`, avant le premier `await`)');
+  dit(/passageRetraitEbayAuto\(\{\s*nuageAuDepart,\s*continuer:\(\)=>!cancelled && load\('vrm_ebay_retrait_auto',false\)===true/.test(sansCommentaires),
+    'la coque lance LE passage, avec l\'annulation du passage et l\'interrupteur relus avant chaque appel');
+  dit(/lireAnnoncesVintedEnLigne\(vintedAccounts\)/.test(sansCommentaires) && /lireVentesVintedProuvees\(vintedAccounts\)/.test(sansCommentaires),
+    'la coque lit les annonces en vente et la preuve sur TOUS ses comptes (écartés compris), comme l\'écran eBay');
+  dit(/lireVentesVintedProuvees\(comptes\)/.test(sansCommentaires) && /await lireAnnoncesVintedEnLigne\(comptes\)/.test(sansCommentaires),
+    'l\'écran eBay lit avec les MÊMES fonctions (une règle, deux lecteurs)');
+  dit(!/retirerEbayAuto\(dvE\./.test(sansCommentaires), 'plus aucun retrait automatique lancé directement sur la liste de l\'alerte (sans la règle stricte)');
+  return ko;
+}
+const numDe = (sku) => (/^VRM-(\d+)$/.exec(sku) || [])[1] || '';
+
+const PROUVE = process.argv.includes('--prouve');
+(async () => {
+  if (!PROUVE) {
+    const ko = await controles(APP0, true);
+    console.log(ko ? `\n❌ retrait automatique d'eBay : ${ko} rouge(s)` : '\n✅ retrait automatique d\'eBay : seulement les paires sûres — vente confirmée et pas remboursée, N° d\'une seule fiche, annonce eBay antérieure, tout lu, nuage là au départ, passage pas annulé');
+    process.exit(ko ? 1 : 0);
+  }
+  const MUTATIONS = [
+    ['la preuve sans la liste des ventes (état périmé)', 'frais = etatsVentesFrais(', 'frais = null && etatsVentesFrais('],
+    ['N° porté par plusieurs fiches accepté', "if (ids.length !== 1) { ecarte('numero-partage'); continue; }", ''],
+    ['vente non confirmée acceptée', '.filter((v) => v && v.frais);', '.filter((v) => v);'],
+    ['annonce eBay postérieure à la vente acceptée', "if (!(tEbay < tVente)) { ecarte('ebay-apres-vente'); continue; }", ''],
+    ['date inconnue acceptée', "if (!Number.isFinite(tVente) || !Number.isFinite(tEbay)) { ecarte('date-pas-sue'); continue; }", ''],
+    ['nuage pas prêt ignoré', "if (!nuageAuDepart) return { lance: false, raison: 'nuage'", "if (false) return { lance: false, raison: 'nuage'"],
+    ['annulation relue seulement au départ', "if (typeof continuer === 'function' && !continuer()) break;", ''],
+    ['un compte illisible compté « lu »', 'toutesLues: okAny && toutes', 'toutesLues: okAny'],
+    ['« déjà terminée » prend une place', "else if (!(j && EBAY_DEJA_TERMINEE.test(String(j.error || '')))) n += 1;", 'else n += 1;'],
+    ['« incertain » lu comme un refus', "if (code === 0 || !j || code === 504 || (j && j.reason === 'incertain')) {", 'if (false) {'],
+  ];
+  let nonPris = 0;
+  for (const [nom, de, vers] of MUTATIONS) {
+    if (APP0.indexOf(de) < 0) { console.log(`❌ mutation « ${nom} » : texte introuvable`); nonPris++; continue; }
+    const ko = await controles(APP0.replace(de, vers), false);
+    console.log(`${ko ? '✅' : '❌'} mutation « ${nom} » ⇒ ${ko} contrôle(s) rouge(s)`);
+    if (!ko) nonPris++;
+  }
+  console.log(nonPris ? `\n❌ ${nonPris} réaffaiblissement(s) que l'audit ne voit pas` : '\n✅ chaque réaffaiblissement est attrapé');
+  process.exit(nonPris ? 1 : 0);
+})();

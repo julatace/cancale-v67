@@ -31,6 +31,9 @@ const iso = (h) => new Date(auj - h * 3600e3).toISOString();
 const ACCS = [
   { id: 1, vinted_user_id: '111', login: 'compte_a', domain: 'www.vinted.fr', updated_at: iso(0) },
   { id: 2, vinted_user_id: '222', login: 'compte_b', domain: 'www.vinted.fr', updated_at: iso(0) },
+  // (6 octobre) Un compte qu'il a EXCLU de l'app : ni son offre, ni sa vente ne
+  // comptent (la même règle que ses conversations).
+  { id: 3, vinted_user_id: '333', login: 'compte_c', domain: 'www.vinted.fr', updated_at: iso(0) },
 ];
 const conv = (id, login, desc, unread, h) => ({ id, unread, updated_at: iso(h), description: desc, opposite_user: { id: 5000 + id, login } });
 const FIL_OFFRE = { id: 301, opposite_user: { id: 5301, login: 'acheteuse_1' }, transaction: { id: 9001, item_id: 444 }, description: 'Nike Air Max 1',
@@ -44,6 +47,7 @@ const FIL_EXT = { id: 402, opposite_user: { id: 5402, login: 'acheteur_2' }, tra
 // à part) disent si sa boîte est figée.
 const vente = (tx, h) => ({ transaction_id: tx, title: 'Vente ' + tx, price: { amount: '40.0', currency_code: 'EUR' }, status: 'Bordereau envoyé au vendeur', transaction_user_status: 'needs_action', date: iso(h) });
 const rowsDe = ({ venteA = 3 } = {}) => [
+  { id: 'main', data: { vinted_accounts_hidden: ['333'] } },
   { id: 'harvest_111_inbox', data: { capturedAt: iso(0), payload: { conversations: [conv(301, 'acheteuse_1', 'Vous feriez 45 € ?', true, 30), conv(303, 'curieux', 'Merci !', false, 26)] } } },
   { id: 'harvest_222_inbox', data: { capturedAt: iso(0), payload: { conversations: [conv(402, 'acheteur_2', 'Toujours dispo ?', true, 1)] } } },
   { id: 'harvest_111_conv_301', data: { capturedAt: iso(0), payload: { conversation: FIL_OFFRE } } },
@@ -55,6 +59,13 @@ const rowsDe = ({ venteA = 3 } = {}) => [
   { id: 'email_offer_o1', data: { type: 'offre', receivedAt: iso(2), article: 'Adidas Samba OG blanc 42', montant: '45,00', qui: 'acheteuse_9', uid: '111', account: 'compte_a' } },
   { id: 'email_offer_o2', data: { type: 'offre', receivedAt: iso(24 * 20), article: 'Vieille offre', montant: '10,00', qui: 'ancien', uid: '111', account: 'compte_a' } },
   { id: 'email_offer_o3', data: { type: 'offre', receivedAt: iso(5), article: 'Nike Dunk Low panda 43', montant: '60,00', qui: 'acheteur_3', uid: '222', account: 'compte_b' } },
+  //  · O4 : récente, mais sur compte_c, qu'il a EXCLU ⇒ ni montrée, ni comptée.
+  { id: 'email_offer_o4', data: { type: 'offre', receivedAt: iso(3), article: 'Asics Gel 1130 argent 39', montant: '30,00', qui: 'acheteur_4', uid: '333', account: 'compte_c' } },
+  // Une Samba vendue 150 € sur le compte EXCLU : elle ne doit pas entrer dans le
+  // repère du modèle (l'écran Ventes l'écartait, Messages non — revue du 6 oct.).
+  { id: 'harvest_333_orders_sold', data: { capturedAt: iso(0), payload: { my_orders: [
+    { transaction_id: 8901, title: 'Adidas Samba OG taille 39', price: { amount: '150.0', currency_code: 'EUR' }, status: 'Commande finalisée', date: iso(200) },
+  ] } } },
   { id: 'harvest_222_orders_sold', data: { capturedAt: iso(0), payload: { my_orders: [
     { transaction_id: 8801, title: 'Nike Dunk Low panda 43', price: { amount: '62.0', currency_code: 'EUR' }, status: 'Commande finalisée', date: iso(3) },
   ] } } },
@@ -163,7 +174,7 @@ async function rendre(b, { version, tel = false, lignes = rows }) {
       // 1 bis. Les offres reçues par email, en tête (proposition 6).
       await r.pg.waitForTimeout(800);
       const ofs = await r.pg.evaluate(() => { const b = document.querySelector('[data-offres-messages]'); return b ? { n: b.getAttribute('data-offres-messages'), txt: b.innerText, ids: [...b.querySelectorAll('[data-offre-email]')].map((x) => x.getAttribute('data-offre-email')) } : null; });
-      dit(ofs && ofs.n === '1' && JSON.stringify(ofs.ids) === '["email_offer_o1"]', 'en tête de Messages : l’offre récente, ni la vieille, ni celle réglée par une vente', JSON.stringify(ofs && ofs.ids));
+      dit(ofs && ofs.n === '1' && JSON.stringify(ofs.ids) === '["email_offer_o1"]', 'en tête de Messages : l’offre récente, ni la vieille, ni celle réglée par une vente, ni celle d’un compte EXCLU', JSON.stringify(ofs && ofs.ids));
       dit(ofs && /45,00 €/.test(ofs.txt) && /acheteuse_9/.test(ofs.txt) && /toutes sur compte_a/.test(ofs.txt), 'le montant, qui la propose, et le compte où répondre', ofs && ofs.txt.slice(0, 200));
       dit(ofs && /1 autre déjà réglée/.test(ofs.txt), 'celle réglée par une vente est mise de côté, et c’est DIT', ofs && ofs.txt.slice(0, 260));
       dit(ofs && /tes Samba se revendent 55,00 € en moyenne \(3 ventes\)/.test(ofs.txt), 'le repère est celui du MODÈLE, dit comme tel (jamais « ton prix » deviné par le titre)', ofs && ofs.txt.slice(0, 300));
@@ -174,6 +185,10 @@ async function rendre(b, { version, tel = false, lignes = rows }) {
         await r.pg.waitForTimeout(900);   // l'écriture locale est différée de 500 ms (`save`)
         const apres = await r.pg.evaluate(() => ({ bloc: !!document.querySelector('[data-offres-messages]'), memo: (() => { try { return JSON.parse(localStorage.getItem('vinted_offers_done') || '[]'); } catch (_) { return []; } })() }));
         dit(!apres.bloc && apres.memo.some((k) => /Adidas Samba OG blanc 42/.test(k)), '« c’est fait » la range, et le choix est gardé', JSON.stringify(apres));
+        // (6 octobre) Il ne reste que celle réglée par une vente : la liste ne
+        // disparaît pas sans un mot (une liste qui rétrécit se lit comme une perte).
+        const reste = await r.pg.evaluate(() => { const e = document.querySelector('[data-offres-toutes-reglees]'); return e ? { n: e.getAttribute('data-offres-toutes-reglees'), txt: e.innerText } : null; });
+        dit(reste && reste.n === '1' && /déjà réglée/.test(reste.txt), 'toutes réglées : l’écran DIT combien ont été mises de côté (pas un silence)', JSON.stringify(reste));
       }
       // 2. l'offre en attente
       await r.pg.click('[data-conv="301"]');
