@@ -9415,6 +9415,10 @@ const lireAnnoncesVintedEnLigne = async (comptes) => {
 function useEbayPaires(comptes) {
   const [paires, setPaires] = React.useState([]);
   const [enLigne, setEnLigne] = React.useState(undefined);
+  // (revue du 8 octobre) TOUS ses comptes ont-ils répondu ? Le retrait
+  // automatique en dépend, et l'écran eBay dit pourquoi une paire n'est pas
+  // partie toute seule : la même lecture que la coque (§11).
+  const [toutesLues, setToutesLues] = React.useState(undefined);
   // Les fiches N° sont un réglage SYNCHRONISÉ lu au montage : sur le premier
   // écran d'un appareil neuf, le nuage arrive après (§5.49) — on recalcule.
   const [nuage, setNuage] = React.useState(0);
@@ -9430,6 +9434,7 @@ function useEbayPaires(comptes) {
       const lu = Array.isArray(comptes) && comptes.length ? await lireAnnoncesVintedEnLigne(comptes) : { enLigne: null, nPhotos: {} };
       const online = lu.enLigne; const nPhotosMap = lu.nPhotos || {};
       if (!stop) setEnLigne(Array.isArray(comptes) && !comptes.length ? new Set() : online);
+      if (!stop) setToutesLues(Array.isArray(comptes) && !comptes.length ? true : lu.toutesLues === true);
       const PUB = /une communaut[ée].{0,60}marques|pour chaque achat effectu|thousands of brands|politique de rembours/i;
       let details = {};
       try {
@@ -9453,9 +9458,9 @@ function useEbayPaires(comptes) {
       }
       out.sort((a, b) => (parseInt(b.num, 10) || 0) - (parseInt(a.num, 10) || 0));
       if (!stop) setPaires(out);
-    } catch (_) { if (!stop) { setPaires([]); setEnLigne(null); } }
+    } catch (_) { if (!stop) { setPaires([]); setEnLigne(null); setToutesLues(false); } }
   })(); return () => { stop = true; }; }, [comptes, nuage]);
-  return { paires, enLigne };
+  return { paires, enLigne, toutesLues };
 }
 
 function EbayConnexion({ onAnnonces }) {
@@ -10606,7 +10611,7 @@ function EbayAnnonces({ baseKO, comptes = [] }) {
   const E = EBAY_SKIN;
   const [items, setItems] = React.useState(undefined); // undefined=en cours · null=pas su · []=lu
   const [connected, setConnected] = React.useState(undefined); // true/false/null(pas su)/undefined(en cours)
-  const { paires, enLigne } = useEbayPaires(comptes);  // source partagée avec l'onglet Compte (§11)
+  const { paires, enLigne, toutesLues } = useEbayPaires(comptes);  // source partagée avec l'onglet Compte (§11)
   const [commandes, setCommandes] = React.useState(undefined);       // ebay_orders : undefined · null · []
   const [vendusVinted, setVendusVinted] = React.useState(undefined); // prouvées vendues : undefined · null · Set
   const [eligibles, setEligibles] = React.useState(undefined);       // offre : undefined · null · { ids:Set, complet }
@@ -10629,7 +10634,7 @@ function EbayAnnonces({ baseKO, comptes = [] }) {
     if (retraitAuto) { setRetraitAuto(false); save('vrm_ebay_retrait_auto', false); return; }
     const ok = await askConfirm({
       title: 'Retirer d\'eBay, sans te demander, une paire vendue sur Vinted ?',
-      desc: 'Seulement quand tout est sûr : la vente Vinted est PROUVÉE et ta liste de ventes la confirme (ni remboursée, ni annulée, jamais revenue chez toi), l\'annonce eBay porte le N° de la paire (SKU VRM-n°), ce N° n\'est porté que par une seule paire, et l\'annonce eBay a été mise en ligne AVANT la vente. Sinon, rien ne part : elle reste dans « à retirer », avec le bouton. Ça se fait quand VRM est ouvert. Une annonce eBay terminée ne revient pas : il faudrait la republier.',
+      desc: `Seulement quand tout est sûr : ${CONDITIONS_RETRAIT_AUTO}. Sinon, rien ne part : elle reste dans « à retirer », avec le bouton, et VRM te dit pourquoi. Ça se fait quand VRM est ouvert. Une annonce eBay terminée ne revient pas : il faudrait la republier.`,
       ok: 'Allumer', cancel: 'Annuler',
     });
     if (!ok) return;
@@ -10773,6 +10778,23 @@ function EbayAnnonces({ baseKO, comptes = [] }) {
     programmees: listeProgrammees,
     ventes: ventesConnues,
   }), [items, commandes, fiches, enLigne, vendusVinted, listeProgrammees, ventesConnues]);
+  // (revue du 8 octobre) Retrait automatique allumé : POURQUOI chaque paire
+  // « à retirer » n'est pas partie toute seule — la MÊME règle que le passage de
+  // la coque (`retraitsEbayAutoPermis`, §11), sur ce que l'écran a lu. Trois
+  // états : `null` éteint / rien à retirer · `undefined` lectures en cours ·
+  // Map(itemId → raison | 'permis').
+  const autoJuge = React.useMemo(() => {
+    if (!retraitAuto || !dv.aRetirerEbay.length) return null;
+    if (vendusVinted === undefined || toutesLues === undefined) return undefined;
+    const { permis, ecartes } = retraitsEbayAutoPermis({ aRetirerEbay: dv.aRetirerEbay, numeros: fiches, vendusVinted, toutesLues: toutesLues === true, comptesBloques: comptesBloquesVinted() });
+    const m = new Map();
+    for (const e of ecartes) if (e && e.itemId != null) m.set(String(e.itemId), e.raison);
+    for (const d of permis) m.set(String(d.annonce.itemId), 'permis');
+    return m;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [retraitAuto, dv, fiches, vendusVinted, toutesLues, nuage]);
+  // Les retraits automatiques dont eBay n'a pas dit l'issue (note de l'appareil).
+  const autoIncertains = React.useMemo(() => load('vrm_ebay_auto_incertains', {}) || {}, [retraits, nuage, dv]);
   const numsConnus = React.useMemo(() => new Set(Object.values(fiches).map((f) => cleNum(f && f.numero)).filter(Boolean)), [fiches]);
   const titreDeNum = React.useMemo(() => { const m = new Map(); for (const f of Object.values(fiches)) { const k = cleNum(f && f.numero); if (k && !m.has(k)) m.set(k, (f && f.title) || ''); } return m; }, [fiches]);
   const pris = React.useMemo(() => { const m = new Map(); for (const a of (Array.isArray(items) ? items : [])) { const k = numDeSkuEbay(a && a.sku); if (k && !m.has(k)) m.set(k, String(a.itemId)); } return m; }, [items]);
@@ -10908,14 +10930,28 @@ function EbayAnnonces({ baseKO, comptes = [] }) {
       <div data-ebay-a-retirer={dv.aRetirerEbay.length} style={bloc(E.warn)}>
         <div style={{ fontSize: 14, fontWeight: 800, color: E.text }}>{dv.aRetirerEbay.length} paire{dv.aRetirerEbay.length > 1 ? 's' : ''} vendue{dv.aRetirerEbay.length > 1 ? 's' : ''} sur Vinted — encore en vente sur eBay</div>
         <div style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, margin: '3px 0 4px' }}>Retire-{dv.aRetirerEbay.length > 1 ? 'les' : 'la'} d'eBay, sinon quelqu'un peut l'acheter une deuxième fois. VRM te demande de confirmer : une annonce eBay terminée ne revient pas.</div>
-        {dv.aRetirerEbay.map((d) => {
+        {(() => {
+          // Retrait automatique allumé : la raison commune à TOUTES les lignes se
+          // dit une fois (§7) ; une raison qui distingue se dit sur sa ligne.
+          if (!(autoJuge instanceof Map)) return null;
+          const rs = dv.aRetirerEbay.map((d) => autoJuge.get(String(d.annonce.itemId)) || '');
+          const r0 = rs[0];
+          if (!(rs.length > 1 && r0 && r0 !== 'permis' && rs.every((x) => x === r0) && RAISON_RETRAIT_AUTO[r0])) return null;
+          return <div data-ebay-auto-raison-commune={r0} style={{ fontSize: 11.5, color: E.muted, lineHeight: 1.45, margin: '0 0 4px' }}>Le retrait automatique ne {rs.length > 1 ? 'les' : 'la'} retire pas : {RAISON_RETRAIT_AUTO[r0]}.</div>;
+        })()}
+        {dv.aRetirerEbay.map((d, _i, tous) => {
           const id = String(d.annonce.itemId); const etat = retraits[id];
+          const raison = autoJuge instanceof Map ? (autoJuge.get(id) || '') : null;
+          const commune = autoJuge instanceof Map && tous.length > 1 && tous.every((x) => (autoJuge.get(String(x.annonce.itemId)) || '') === raison);
+          const inc = autoIncertains && autoIncertains[id];
           return (
-            <div key={id} data-ebay-doublon={d.numero} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 0', borderTop: `1px solid ${E.border}`, flexWrap: 'wrap' }}>
+            <div key={id} data-ebay-doublon={d.numero} {...(raison != null ? { 'data-ebay-auto-raison': raison } : {})} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 0', borderTop: `1px solid ${E.border}`, flexWrap: 'wrap' }}>
               <PhotoVente src={d.annonce.photo} size={44} />
               <div style={{ flex: '1 1 150px', minWidth: 0 }}>
                 <div style={{ fontSize: 12.5, fontWeight: 700, color: E.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>N°{d.numero} · {d.annonce.title || id}</div>
                 <div style={{ fontSize: 11, color: E.muted }}>Vinted : vendue · eBay : encore en vente{d.annonce.price ? ` à ${euroE(d.annonce.price)}` : ''}</div>
+                {raison && raison !== 'permis' && !commune && RAISON_RETRAIT_AUTO[raison] && <div data-ebay-auto-raison-texte={raison} style={{ fontSize: 11, color: E.muted, marginTop: 2 }}>Pas retirée toute seule : {RAISON_RETRAIT_AUTO[raison]}.</div>}
+                {inc && <div data-ebay-auto-incertain={id} style={{ fontSize: 11, color: E.warn, marginTop: 2 }}>Le retrait automatique du {new Date(inc.at).toLocaleDateString('fr-FR')} n'a pas eu de réponse claire d'eBay : regarde sur eBay avant de cliquer.</div>}
                 {etat && etat !== '…' && <div data-ebay-retrait-erreur={id} style={{ fontSize: 11, color: E.warn, marginTop: 2 }}>{etat}</div>}
               </div>
               <button type="button" data-retirer-ebay={id} disabled={etat === '…'} onClick={() => retirer(d)} style={{ ...lienE, opacity: etat === '…' ? 0.6 : 1 }}>{etat === '…' ? 'Retrait…' : 'Retirer d\'eBay'}</button>
@@ -10947,7 +10983,7 @@ function EbayAnnonces({ baseKO, comptes = [] }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <div style={{ flex: '1 1 200px', minWidth: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: E.text }}>Retrait automatique d'eBay</div>
-          <div style={{ fontSize: 11.5, color: E.muted, lineHeight: 1.45 }}>{retraitAuto ? 'Allumé : une paire prouvée vendue sur Vinted est retirée d\'eBay quand VRM est ouvert, si son annonce porte son N°.' : 'Éteint : VRM te montre les paires à retirer, c\'est toi qui cliques.'}</div>
+          <div data-ebay-retrait-auto-regle style={{ fontSize: 11.5, color: E.muted, lineHeight: 1.45 }}>{retraitAuto ? `Allumé, quand VRM est ouvert, seulement pour les paires sûres : ${CONDITIONS_RETRAIT_AUTO}. Les autres restent dans « à retirer », avec le bouton.` : 'Éteint : VRM te montre les paires à retirer, c\'est toi qui cliques.'}</div>
         </div>
         <button type="button" data-ebay-retrait-auto-bouton onClick={basculerRetraitAuto} style={lienE}>{retraitAuto ? 'Éteindre' : 'Allumer'}</button>
       </div>
@@ -17741,12 +17777,14 @@ const PAS_UNE_VENTE = /annul|cancel|refus|rembours|retour|suspend|[ée]chou/i;
 // (hors l'acheteur qui a perdu la course et le paiement qui a échoué) — la paire
 // est revenue au moins une fois. Le retrait AUTOMATIQUE s'abstient sur elles
 // (mesuré : 1 vente confirmée sur 215 aujourd'hui) ; l'alerte, elle, reste.
-const etatsVentesFrais = (commandes, cap = null) => {
+// `uid` : le compte dont c'est la liste (le retrait automatique écarte un
+// compte que Vinted a bloqué — sa liste ne sera plus jamais relue).
+const etatsVentesFrais = (commandes, cap = null, uid = null) => {
   const m = new Map();
   for (const o of (Array.isArray(commandes) ? commandes : [])) {
     if (!o || o.transaction_id == null) continue;
     const etat = String(o.status || '').trim();
-    if (etat) m.set(String(o.transaction_id), { etat, date: o.date || null, cap: Number.isFinite(cap) ? cap : null });
+    if (etat) m.set(String(o.transaction_id), { etat, date: o.date || null, cap: Number.isFinite(cap) ? cap : null, uid: uid != null && String(uid) ? String(uid) : null });
   }
   return m;
 };
@@ -17773,7 +17811,9 @@ function preuvesVentesVinted(rows, frais) {
     if (!etat) continue;                          // une conversation n'est pas une vente
     if (PAS_UNE_VENTE.test(etat)) continue;       // annulée, remboursée, retour… : elle revient
     if (!preuves.has(it)) preuves.set(it, []);
-    preuves.get(it).push({ tx, etat, frais: parListe, date: (f && f.date) || r.at || null });
+    // `cap` : quand la liste qui confirme a été captée (le retrait automatique
+    // exige qu'elle soit récente) ; `compte` : de quel compte elle vient.
+    preuves.get(it).push({ tx, etat, frais: parListe, date: (f && f.date) || r.at || null, cap: parListe ? f.cap : null, compte: parListe ? (f.uid || null) : null });
   }
   return { vendus: new Set(preuves.keys()), preuves, revenues };
 }
@@ -17797,7 +17837,7 @@ const lireVentesVintedProuvees = async (comptes) => {
       const lus = await Promise.all(comptes.map(async (a) => {
         const uid = a && a.vinted_user_id;
         const p = await fetchHarvestOrders(uid, 'sold').catch(() => undefined);
-        return etatsVentesFrais(p && Array.isArray(p.my_orders) ? p.my_orders : [], capListeVentes(uid));
+        return etatsVentesFrais(p && Array.isArray(p.my_orders) ? p.my_orders : [], capListeVentes(uid), uid);
       }));
       frais = new Map();
       for (const m of lus) for (const [k, v] of m) frais.set(k, v);
@@ -17872,11 +17912,12 @@ const offresAtraiter = (offers, ventes, dejaFaites, cle) => {
   }
   const limite = Date.now() - OFFRE_FENETRE_J * 86400000;
   const gardees = [], reglees = [];
+  let rangees = 0;                                         // dans la fenêtre, rangées par lui (« c'est fait »)
   for (const of of (offers || [])) {
     if (!of) continue;
     const recue = of.receivedAt ? new Date(of.receivedAt).getTime() : 0;
     if (!(recue > limite)) continue;                       // trop vieille : hors sujet
-    if (dejaFaites && dejaFaites.has(cle(of))) continue;   // il l'a marquée traitée
+    if (dejaFaites && dejaFaites.has(cle(of))) { rangees += 1; continue; }   // il l'a marquée traitée
     const memes = parTitre.get(normTitle(of.article || '')) || [];
     // Un titre porté par PLUSIEURS transactions ne désigne aucune paire (§5).
     const txs = new Set(memes.map((o) => String(o.transaction_id)));
@@ -17888,7 +17929,7 @@ const offresAtraiter = (offers, ventes, dejaFaites, cle) => {
     });
     (reglee ? reglees : gardees).push(of);
   }
-  return { gardees, reglees };
+  return { gardees, reglees, rangees };
 };
 // ── LE REPÈRE PAR MODÈLE : UNE RÈGLE, DEUX ÉCRANS (§11, revue du 6 octobre) ──
 // « Tes Samba se revendent X € en moyenne » se calculait DEUX fois : l'écran
@@ -21441,11 +21482,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     let stop = false;
     (async () => {
       try {
-        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.ebay_listings&select=items:data->items`, { headers: sbAuth() });
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.ebay_listings&select=items:data->items,cap:data->>capturedAt`, { headers: sbAuth() });
         if (!r.ok) { if (!stop) setEbayVivantes(null); return; }
         const rows = await r.json();
         if (!Array.isArray(rows)) { if (!stop) setEbayVivantes(null); return; }
         const m = new Map();
+        // Quand la liste a été relue chez eBay (nombre ou date ISO ; inconnue ⇒ NaN).
+        const capL = rows[0] ? (Number.isFinite(Number(rows[0].cap)) ? Number(rows[0].cap) : Date.parse(rows[0].cap || '')) : NaN;
+        m.cap = capL;
         for (const x of ((rows[0] && Array.isArray(rows[0].items)) ? rows[0].items : [])) {
           const c = numDeSkuEbay(x && x.sku); const prix = parseFloat(String((x && x.price) || '').replace(',', '.'));
           if (!c || !x.itemId || !(prix > 0)) continue;
@@ -21468,13 +21512,24 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // Déjà baissée pour CE prix Vinted (mémo synchronisé) : rien de neuf à proposer.
     const memo = baissesEbay && baissesEbay[e.itemId];
     const memoValable = !!(memo && Number(memo.vinted) === Number(r.price));
-    const fait = ebayBaisse[e.itemId] || (memoValable ? { etat: 'ok', prix: e.prix, memo: true } : undefined);
-    const prixActuel = fait && fait.etat === 'ok' && !fait.memo ? fait.prix : e.prix;
+    // ⚠️⚠️ (revue du 8 octobre) LE PRIX eBAY D'AUJOURD'HUI. Changer un prix
+    //    (`revise`) ne réécrit pas `ebay_listings` : tant qu'eBay n'a pas été
+    //    relu, la liste garde le prix d'AVANT la baisse. L'écran affichait
+    //    « 60 € aujourd'hui » pour une annonce à 53 €, et — Vinted baissé
+    //    ensuite — proposait de « baisser » de 53 à 56 €, une HAUSSE. Le mémo
+    //    porte le prix posé par VRM : il fait foi tant que la liste n'a pas été
+    //    relue APRÈS lui (date de la liste inconnue ⇒ le mémo, que VRM a posé).
+    const memoEbay = memo && Number(memo.ebay) > 0 ? Number(memo.ebay) : null;
+    const capL = Number.isFinite(ebayVivantes.cap) ? ebayVivantes.cap : NaN;
+    const prixConnu = memoEbay != null && !(Number.isFinite(capL) && Number.isFinite(Number(memo.at)) && capL > Number(memo.at)) ? memoEbay : e.prix;
+    const fait = ebayBaisse[e.itemId] || (memoValable ? { etat: 'ok', prix: prixConnu, memo: true } : undefined);
+    const prixActuel = fait && fait.etat === 'ok' && !fait.memo ? fait.prix : prixConnu;
     let sugg = Math.round(prixActuel * (r.sugg / r.price));
     const buy = prixAchatDe(numeros[r.it.id], buyByNum);
     if (buy != null && sugg < buy) sugg = Math.ceil(buy);
     sugg = Math.max(1, sugg);
-    return { ...e, prixActuel, sugg, utile: !memoValable && sugg < prixActuel, fait };
+    // Jamais « baisser » à un prix supérieur ou égal au prix eBay connu.
+    return { ...e, prix: prixConnu, prixActuel, sugg, utile: !memoValable && sugg < prixActuel, fait };
   };
   const baisserSurEbay = async (e, rp) => {
     if (!e || !e.itemId || !(e.sugg > 0)) return;
@@ -22621,6 +22676,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Les achats ne sont lus qu'à l'ouverture du bloc (`buys` se charge à la demande).
   // Trois états : `null` bloc fermé · `undefined` lecture en cours · objet.
   const [repereOuvert, setRepereOuvert] = useState(false);
+  // (revue du 8 octobre) Les comptes dont les VENTES n'ont pas pu être lues,
+  // hors ceux qu'il a exclus (ils ne comptent nulle part) — UNE liste pour les
+  // DEUX lecteurs du repère par modèle, l'écran Ventes et l'offre sur Messages
+  // (§11) : une moyenne qui les omet le dit, sur les deux écrans.
+  const nomEcarte = (nomC) => accounts.some((a) => accNameOf(a) === nomC && acctOff(a.vinted_user_id));
+  const ventesNonLues = useMemo(() => (sales.failed || []).filter((nomC) => !nomEcarte(nomC)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [sales.failed, accounts, hiddenAccts, panelAcctOff]);
   const margeModeles = useMemo(() => {
     if (!repereOuvert) return null;
     if (buys.error) return { pasSu: true };
@@ -22642,11 +22705,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // être lus était omis SANS LE DIRE : la moyenne se présentait comme complète
     // (§5 : un total partiel présenté comme complet est pire qu'absent). On les
     // nomme — sauf ceux qu'il a exclus, qui ne comptent nulle part.
-    const nonLus = [...new Set([...(sales.failed || []), ...(buys.failed || [])])]
-      .filter((nomC) => !accounts.some((a) => accNameOf(a) === nomC && acctOff(a.vinted_user_id)));
-    return { lignes, tropPeu, nonLus };
+    // ⚠️ (revue du 8 octobre) Un compte dont les VENTES manquent est déjà nommé,
+    // avec le geste, par le bandeau « compte non chargé » du même écran : ici on
+    // ne redit que ce qui distingue (§7, une cause une phrase). Le geste ne
+    // revient que pour un compte dont seuls les ACHATS manquent (`achatsSeuls`),
+    // que le bandeau ne nomme pas.
+    const achatsNonLus = (buys.failed || []).filter((nomC) => !nomEcarte(nomC));
+    const nonLus = [...new Set([...ventesNonLues, ...achatsNonLus])];
+    const achatsSeuls = achatsNonLus.filter((nomC) => !(sales.failed || []).includes(nomC));
+    return { lignes, tropPeu, nonLus, achatsSeuls };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [repereOuvert, buys.items, buys.error, buys.failed, buysBase, sales.items, sales.failed, accounts, hiddenAccts, panelAcctOff]);
+  }, [repereOuvert, buys.items, buys.error, buys.failed, buysBase, sales.items, sales.failed, ventesNonLues, accounts, hiddenAccts, panelAcctOff]);
 
   // Pour le taux d'écoulement, on s'assure que les annonces en ligne sont
   // chargées même en étant sur l'onglet Ventes (harvest-first, donc gratuit).
@@ -24996,7 +25065,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               if (r === null) return null;
               if (r === undefined) return <div style={{fontSize:12,color:C.muted,marginTop:8}}>Lecture de tes achats…</div>;
               if (r.pasSu) return <div style={{fontSize:12,color:C.muted,marginTop:8}}>Tes achats n'ont pas pu être lus : je ne calcule rien pour l'instant. Referme et rouvre ce bloc dans un moment.</div>;
-              const nonLus = (r.nonLus || []).length ? <div data-repere-non-lus={r.nonLus.join(',')} style={{fontSize:11.5,color:C.warn,marginTop:8,lineHeight:1.45}}>Sans {r.nonLus.length>1?'les comptes':'le compte'} {r.nonLus.join(', ')} : {r.nonLus.length>1?'leurs':'ses'} ventes ou achats n'ont pas pu être lus — ces moyennes ne les comptent pas. Ouvre {r.nonLus.length>1?'ces comptes':'ce compte'} sur vinted.fr puis « Synchroniser ».</div> : null;
+              const seuls = r.achatsSeuls || [];
+              const nonLus = (r.nonLus || []).length ? <div data-repere-non-lus={r.nonLus.join(',')} style={{fontSize:11.5,color:C.warn,marginTop:8,lineHeight:1.45}}>Ces moyennes ne comptent pas {r.nonLus.length>1?'les comptes':'le compte'} {r.nonLus.join(', ')}.{seuls.length>0?<span data-repere-achats-seuls={seuls.join(',')}> {seuls.length>1?'Leurs':'Ses'} achats n'ont pas pu être lus : ouvre {seuls.length>1?'ces comptes':'ce compte'} sur vinted.fr puis « Synchroniser ».</span>:null}</div> : null;
               if (!r.lignes.length) return <>{nonLus}<div style={{fontSize:12,color:C.muted,marginTop:8}}>Pas encore assez de ventes et d'achats d'un même modèle : il en faut au moins 3 de chaque pour qu'une moyenne veuille dire quelque chose.</div></>;
               return (
                 <div style={{marginTop:8,display:'flex',flexDirection:'column',gap:4}}>
@@ -27119,10 +27189,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // (revue du 6 octobre) Une offre reçue sur un compte qu'il a EXCLU ne
           // se montre ni ne se compte — comme ses conversations, juste en dessous.
           const offresVues = offresEmail.filter((of) => !(of && of.uid != null && String(of.uid) && acctOff(String(of.uid))));
-          const { gardees, reglees } = offresAtraiter(offresVues, sales.items, offresFaites, cleOffre);
+          const { gardees, reglees, rangees } = offresAtraiter(offresVues, sales.items, offresFaites, cleOffre);
           // Toutes réglées par une vente : la liste qui disparaît sans un mot se
           // lit comme une perte (leçon de l'écran Leboncoin) — on dit combien.
-          if (!gardees.length) return reglees.length ? <div data-offres-toutes-reglees={reglees.length} style={{fontSize:12,color:C.muted,marginBottom:10,lineHeight:1.45}}>Aucune offre à trancher : {reglees.length===1?'celle reçue':`les ${reglees.length} reçues`} ces {OFFRE_FENETRE_J} derniers jours {reglees.length===1?'est déjà réglée':'sont déjà réglées'} par une vente.</div> : null;
+          // ⚠️ (revue du 8 octobre) Ce nombre est celui des offres RÉGLÉES, pas
+          // celui des offres REÇUES (celles qu'il a rangées lui-même n'y sont
+          // pas) : la phrase ne dit rien du total reçu.
+          if (!gardees.length) return reglees.length ? <div data-offres-toutes-reglees={reglees.length} data-offres-rangees={rangees} style={{fontSize:12,color:C.muted,marginBottom:10,lineHeight:1.45}}>Aucune offre à trancher — {reglees.length} réglée{reglees.length>1?'s':''} par une vente ces {OFFRE_FENETRE_J} derniers jours, mise{reglees.length>1?'s':''} de côté{rangees>0?` · ${rangees} que tu as rangée${rangees>1?'s':''}`:''}.</div> : null;
           // Le repère du MODÈLE (jamais le prix de LA paire : l'email ne dit pas
           // laquelle) — LA règle de l'écran Ventes (`moyennesParModele`, §11).
           const repere = moyennesParModele(sales.items, acctOffOf);
@@ -27131,11 +27204,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const euros = (m) => { const n = parseFloat(String(m||'').replace(/\s/g,'').replace(',','.')); return n > 0 ? n : null; };
           const tri = [...gardees].sort((a,b)=> (Date.parse(b.receivedAt||0)||0) - (Date.parse(a.receivedAt||0)||0));
           const comptes = new Set(tri.map((o)=>String(o.uid||o.account||'')));
+          // (revue du 8 octobre) Un repère montré alors qu'un compte n'a pas pu
+          // être lu est une moyenne PARTIELLE : on le dit, une fois (§5, §7) —
+          // la même liste que l'écran Ventes (`ventesNonLues`, §11).
+          const avecRepere = tri.some((of)=>{ const k = extractModel(of.article); return !!(k && repere[k] && repere[k].n >= REPERE_MIN); });
           return (
             <div data-offres-messages={tri.length} style={{border:`1px solid ${C.border}`,borderRadius:10,background:C.card,marginBottom:12,overflow:'hidden'}}>
               <div style={{padding:'10px 12px 6px'}}>
                 <div style={{fontSize:14,fontWeight:700,color:C.text}}><span style={{color:C.accent}}>{tri.length}</span> offre{tri.length>1?'s':''} à trancher</div>
                 <div style={{fontSize:11.5,color:C.muted,marginTop:2,lineHeight:1.4}}>Reçues par email ces {OFFRE_FENETRE_J} derniers jours{comptes.size===1&&tri[0].account?` · toutes sur ${tri[0].account}`:''}. On y répond sur Vinted, sur le compte nommé.{reglees.length>0?` ${reglees.length} autre${reglees.length>1?'s':''} déjà réglée${reglees.length>1?'s':''} par une vente, mise${reglees.length>1?'s':''} de côté.`:''}</div>
+                {avecRepere && ventesNonLues.length>0 && <div data-offres-repere-non-lus={ventesNonLues.join(',')} style={{fontSize:11.5,color:C.warn,marginTop:4,lineHeight:1.4}}>Les repères ne comptent pas {ventesNonLues.length>1?'les comptes':'le compte'} {ventesNonLues.join(', ')} : {ventesNonLues.length>1?'leurs':'ses'} ventes n'ont pas pu être lues (l'onglet Ventes dit comment {ventesNonLues.length>1?'les':'le'} recharger).</div>}
               </div>
               {tri.map((of,i)=>{
                 const m = euros(of.montant); const k = extractModel(of.article); const r = k && repere[k] && repere[k].n >= REPERE_MIN ? repere[k] : null;
@@ -29866,15 +29944,25 @@ const commandeEbayEngagee = (o) => !!o
 //   4. toutes ses annonces Vinted ont été lues, comptes exclus compris
 //      (`lireAnnoncesVintedEnLigne`) ;
 //   5. eBay ne la dit pas déjà terminée (`fin` passée : la place sert à une
-//      vraie vente, pas à une annonce que la synchro n'a pas encore sortie).
-// Ce qui ne passe pas RESTE dans l'alerte « à retirer », avec le bouton.
+//      vraie vente, pas à une annonce que la synchro n'a pas encore sortie) ;
+//   6. (revue du 8 octobre) la liste de ses ventes qui CONFIRME a été captée il
+//      y a moins de 48 h (`LISTE_VENTES_FRAICHE_MS`) : une liste vieille de deux
+//      mois qui dit « payée » ne sait pas si la vente a été remboursée depuis ;
+//   7. et elle ne vient pas d'un compte que Vinted a BLOQUÉ
+//      (`vinted_accounts_blocked`) : sa capture est figée pour toujours.
+//      `comptesBloques` absent ⇒ « pas su » ⇒ rien ne part.
+// Ce qui ne passe pas RESTE dans l'alerte « à retirer », avec le bouton — et
+// l'écran eBay dit, ligne par ligne, pourquoi elle n'est pas partie toute seule
+// (`RAISON_RETRAIT_AUTO`).
 // Rend `{ permis, ecartes: [{ numero, itemId, raison }] }`.
-function retraitsEbayAutoPermis({ aRetirerEbay, numeros, vendusVinted, toutesLues, maintenant = Date.now() }) {
+const LISTE_VENTES_FRAICHE_MS = 48 * 3600000;
+function retraitsEbayAutoPermis({ aRetirerEbay, numeros, vendusVinted, toutesLues, comptesBloques, maintenant = Date.now() }) {
   const permis = [], ecartes = [];
   const liste = Array.isArray(aRetirerEbay) ? aRetirerEbay : [];
   const preuves = vendusVinted && vendusVinted.preuves && typeof vendusVinted.preuves.get === 'function' ? vendusVinted.preuves : null;
   const revenues = vendusVinted && vendusVinted.revenues && typeof vendusVinted.revenues.has === 'function' ? vendusVinted.revenues : null;
-  if (!toutesLues || !preuves || !revenues) { for (const d of liste) ecartes.push({ numero: d && d.numero, itemId: d && d.annonce && d.annonce.itemId, raison: 'pas-su' }); return { permis, ecartes }; }
+  const bloques = comptesBloques && typeof comptesBloques.has === 'function' ? comptesBloques : null;
+  if (!toutesLues || !preuves || !revenues || !bloques) { for (const d of liste) ecartes.push({ numero: d && d.numero, itemId: d && d.annonce && d.annonce.itemId, raison: 'pas-su' }); return { permis, ecartes }; }
   const parNum = new Map();
   for (const id in (numeros || {})) { const k = cleNum((numeros[id] || {}).numero); if (!k) continue; if (!parNum.has(k)) parNum.set(k, []); parNum.get(k).push(String(id)); }
   for (const d of liste) {
@@ -29887,7 +29975,10 @@ function retraitsEbayAutoPermis({ aRetirerEbay, numeros, vendusVinted, toutesLue
     if (revenues.has(ids[0])) { ecarte('revenue-une-fois'); continue; }
     const confirmees = (preuves.get(ids[0]) || []).filter((v) => v && v.frais);
     if (!confirmees.length) { ecarte('vente-non-confirmee'); continue; }
-    const tVente = Math.max(...confirmees.map((v) => Date.parse(v.date || '')).filter(Number.isFinite), -Infinity);
+    if (confirmees.some((v) => v.compte && bloques.has(String(v.compte)))) { ecarte('compte-bloque'); continue; }
+    const fraiches = confirmees.filter((v) => Number.isFinite(v.cap) && maintenant - v.cap <= LISTE_VENTES_FRAICHE_MS);
+    if (!fraiches.length) { ecarte('liste-perimee'); continue; }
+    const tVente = Math.max(...fraiches.map((v) => Date.parse(v.date || '')).filter(Number.isFinite), -Infinity);
     const tEbay = Date.parse(a.depuis || '');
     if (!Number.isFinite(tVente) || !Number.isFinite(tEbay)) { ecarte('date-pas-sue'); continue; }
     if (!(tEbay < tVente)) { ecarte('ebay-apres-vente'); continue; }
@@ -29897,6 +29988,28 @@ function retraitsEbayAutoPermis({ aRetirerEbay, numeros, vendusVinted, toutesLue
   }
   return { permis, ecartes };
 }
+// Les comptes que Vinted a BLOQUÉS (liste LOCALE à l'appareil, §5.31). Lecture
+// impossible ⇒ `null` ⇒ « pas su » ⇒ aucun retrait automatique.
+const comptesBloquesVinted = () => { try { const l = load('vinted_accounts_blocked', []); return new Set((Array.isArray(l) ? l : []).map(String)); } catch (_) { return null; } };
+// Pourquoi une paire « à retirer d'eBay » n'est PAS partie toute seule — dit
+// sur sa ligne quand le retrait automatique est allumé (revue du 8 octobre :
+// sans ça il lisait « allumé » au-dessus de deux paires qui restaient, et
+// concluait que la fonction était cassée). En français, sans jargon (§2.7).
+// Les conditions, dites avec les MÊMES bornes que la règle (§5 : la phrase qui
+// explique vient de la même source) — pour la confirmation ET la ligne d'état.
+const CONDITIONS_RETRAIT_AUTO = `la vente Vinted est confirmée par ta liste de ventes relue depuis moins de ${LISTE_VENTES_FRAICHE_MS / 3600000} h (ni remboursée, ni annulée, jamais revenue chez toi, et pas sur un compte que Vinted a bloqué), l'annonce eBay porte le N° de la paire (SKU VRM-n°), ce N° n'est porté que par une seule paire, et l'annonce eBay a été mise en ligne AVANT la vente`;
+const RAISON_RETRAIT_AUTO = {
+  'pas-su': 'je n\'ai pas pu tout vérifier (une annonce ou une vente Vinted pas lue)',
+  'sku': 'le N° de son annonce eBay ne correspond pas à la paire',
+  'numero-partage': 'ce N° est porté par plusieurs paires dans VRM',
+  'revenue-une-fois': 'cette paire est déjà revenue une fois (remboursée ou retournée)',
+  'vente-non-confirmee': 'la vente n\'est pas encore confirmée par ta liste de ventes Vinted',
+  'compte-bloque': 'la vente est sur un compte que Vinted a bloqué',
+  'liste-perimee': 'ta liste de ventes de ce compte n\'a pas été relue depuis plus de 48 h',
+  'date-pas-sue': 'je ne connais pas la date de mise en ligne de l\'annonce eBay',
+  'ebay-apres-vente': 'l\'annonce eBay a été mise en ligne après la vente',
+  'deja-terminee': 'eBay la dit déjà terminée',
+};
 // ── LE PASSAGE, TEL QUE LA COQUE LE LANCE (revue du 6 octobre) ──────────────
 // Les gardes d'un passage, dans l'ordre, et TOUTES avant le premier appel :
 //   · `nuageAuDepart` : le nuage était là quand le passage a COMMENCÉ — sinon
@@ -29910,18 +30023,29 @@ function retraitsEbayAutoPermis({ aRetirerEbay, numeros, vendusVinted, toutesLue
 //     pendant le passage compte ;
 //   · puis la règle la plus stricte (`retraitsEbayAutoPermis`).
 // Rend `{ lance, raison, permis, ecartes }` (pour l'audit ; la coque n'attend pas).
-async function passageRetraitEbayAuto({ nuageAuDepart, continuer, annonces, commandes, enLigne, toutesLues, vendusVinted, lireNumeros, maintenant }) {
+async function passageRetraitEbayAuto({ nuageAuDepart, continuer, annonces, commandes, enLigne, toutesLues, vendusVinted, lireNumeros, comptesBloques, maintenant }) {
   const peut = () => (typeof continuer === 'function' ? !!continuer() : false);
   if (!nuageAuDepart) return { lance: false, raison: 'nuage', permis: [], ecartes: [] };
   if (!peut()) return { lance: false, raison: 'arrete', permis: [], ecartes: [] };
   if (!vendusVinted || !toutesLues) return { lance: false, raison: 'pas-su', permis: [], ecartes: [] };
   const numeros = (typeof lireNumeros === 'function' ? lireNumeros() : null) || {};
   const dv = doublesVenteEbay({ annonces, commandes, numeros, enLigne: enLigne || null, vendusVinted, programmees: [], ventes: null });
-  const { permis, ecartes } = retraitsEbayAutoPermis({ aRetirerEbay: dv.aRetirerEbay, numeros, vendusVinted, toutesLues, ...(maintenant ? { maintenant } : {}) });
+  const { permis, ecartes } = retraitsEbayAutoPermis({ aRetirerEbay: dv.aRetirerEbay, numeros, vendusVinted, toutesLues, comptesBloques, ...(maintenant ? { maintenant } : {}) });
   if (!permis.length || !peut()) return { lance: false, raison: permis.length ? 'arrete' : 'rien', permis, ecartes };
   await retirerEbayAuto(permis, peut);
   return { lance: true, raison: '', permis, ecartes };
 }
+// Les retraits automatiques dont eBay n'a pas dit l'issue, gardés sur CET
+// appareil (une note, pas une donnée : l'annonce elle-même se relit sur eBay).
+// itemId → { numero, at } ; les 50 plus récents.
+const noterRetraitAutoIncertain = (itemId, numero) => {
+  try {
+    const m = load('vrm_ebay_auto_incertains', {}) || {};
+    m[String(itemId)] = { numero: String(numero || ''), at: Date.now() };
+    const garde = Object.entries(m).sort((a, b) => ((b[1] && b[1].at) || 0) - ((a[1] && a[1].at) || 0)).slice(0, 50);
+    localStorage.setItem('vrm_ebay_auto_incertains', JSON.stringify(Object.fromEntries(garde)));
+  } catch (_) { /* pas de stockage : le message, lui, est parti */ }
+};
 // eBay dit qu'une annonce est déjà close (EndFixedPriceItem, erreur 1047) :
 // elle ne prend pas la place d'une vraie vente dans les 5 du passage.
 const EBAY_DEJA_TERMINEE = /(already|has)\s+(been\s+)?(closed|ended)|d[ée]j[àa]\s+(été\s+)?(termin|clos|ferm)/i;
@@ -29940,17 +30064,30 @@ const retirerEbayAuto = async (liste, continuer) => {
       const a = (d && d.annonce) || {}; const id = String(a.itemId || '');
       if (!id || !a.sku || __retraitEbayAutoTentes.has(id)) continue;
       __retraitEbayAutoTentes.add(id);
+      // (revue du 8 octobre) Un retrait PEUT-ÊTRE fait en son nom se dit, comme
+      // un retrait fait : eBay n'a pas répondu clairement (504 « incertain »,
+      // page d'erreur, coupure) ⇒ l'annonce a pu être terminée. Avant, rien
+      // n'était dit ni noté : la ligne restait dans « à retirer », et son clic
+      // tombait sur « déjà close » sans qu'il sache pourquoi.
+      const incertain = () => {
+        noterRetraitAutoIncertain(id, d.numero);
+        toast(`N°${d.numero} : je ne sais pas si l'annonce eBay a été retirée (eBay n'a pas répondu clairement) — regarde sur eBay avant de cliquer « Retirer ».`, 'err');
+      };
       try {
         const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() },
           body: JSON.stringify({ action: 'retirer', itemId: id, confirme: true, auto: true, sku: a.sku, titre: a.title || '' }) });
+        const code = r && Number.isFinite(r.status) ? r.status : 0;
         const j = await r.json().catch(() => null);
         if (j && j.ok) {
           n += 1;
           // Le journal est ce qui lui permet de RELIRE ce qui est parti en son
           // nom : s'il n'a pas pu être écrit, on le dit.
           toast(`N°${d.numero} retirée d'eBay automatiquement : elle est vendue sur Vinted.${j.journal === false ? ' (Pas notée dans l’historique des retraits — la base n’a pas répondu.)' : ''}`, 'ok');
-        } else if (!(j && EBAY_DEJA_TERMINEE.test(String(j.error || '')))) n += 1;
-      } catch (_) { n += 1; /* il la verra dans « à retirer », avec le bouton */ }
+        } else if (j && EBAY_DEJA_TERMINEE.test(String(j.error || ''))) {
+          /* déjà close : ne prend pas une des 5 places */
+        } else if (!j || code === 504 || (j && j.reason === 'incertain')) { n += 1; incertain(); }
+        else { n += 1; toast(`N°${d.numero} : eBay a refusé le retrait automatique${j.error ? ` (« ${String(j.error).slice(0, 160)} »)` : ''} — elle reste dans « à retirer d'eBay », avec le bouton.`, 'err'); }
+      } catch (_) { n += 1; incertain(); }
     }
   } finally { __retraitEbayAutoEnVol = false; }
 };
@@ -34704,6 +34841,7 @@ function AppCoeur() {
           annonces:annE||[], commandes:ords||[], enLigne:enLigneE,
           toutesLues:!!(lusE && lusE.toutesLues), vendusVinted:vendusE,
           lireNumeros:()=>load('vinted_annonce_numeros',{})||{},
+          comptesBloques:comptesBloquesVinted(),
         }).catch(()=>{});   // un passage qui tombe ne retire rien (il reste « à retirer »)
       }catch(_){}
       if(cancelled) return;

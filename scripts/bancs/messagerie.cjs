@@ -122,7 +122,7 @@ const PONT = ({ version, filExt }) => {
   post({ __vmr: 'ready', version });
 };
 
-async function rendre(b, { version, tel = false, lignes = rows }) {
+async function rendre(b, { version, tel = false, lignes = rows, ko522 = null }) {
   const vp = tel ? { width: 390, height: 844 } : { width: 1512, height: 950 };
   const ctx = await b.newContext({ viewport: vp, ...(tel ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
@@ -137,6 +137,8 @@ async function rendre(b, { version, tel = false, lignes = rows }) {
     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
     if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCS);
+    // (8 octobre) Une lecture qui tombe : la vraie forme (522 + HTML).
+    if (ko522 && ko522.test(u)) return route.fulfill({ status: 522, contentType: 'text/html', headers: { 'access-control-allow-origin': '*' }, body: '<html>522</html>' }).catch(() => {});
     const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
     const forme = (r) => (sel && !/^id,data|^data,updated_at/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: iso(0), cap: r.data.capturedAt });
     const eq = /id=eq\.([^&]*)/.exec(u);
@@ -187,8 +189,15 @@ async function rendre(b, { version, tel = false, lignes = rows }) {
         dit(!apres.bloc && apres.memo.some((k) => /Adidas Samba OG blanc 42/.test(k)), '« c’est fait » la range, et le choix est gardé', JSON.stringify(apres));
         // (6 octobre) Il ne reste que celle réglée par une vente : la liste ne
         // disparaît pas sans un mot (une liste qui rétrécit se lit comme une perte).
-        const reste = await r.pg.evaluate(() => { const e = document.querySelector('[data-offres-toutes-reglees]'); return e ? { n: e.getAttribute('data-offres-toutes-reglees'), txt: e.innerText } : null; });
-        dit(reste && reste.n === '1' && /déjà réglée/.test(reste.txt), 'toutes réglées : l’écran DIT combien ont été mises de côté (pas un silence)', JSON.stringify(reste));
+        const reste = await r.pg.evaluate(() => { const e = document.querySelector('[data-offres-toutes-reglees]'); return e ? { n: e.getAttribute('data-offres-toutes-reglees'), rangees: e.getAttribute('data-offres-rangees'), txt: e.innerText } : null; });
+        dit(reste && reste.n === '1', 'toutes réglées : l’écran DIT combien ont été mises de côté (pas un silence)', JSON.stringify(reste));
+        // (revue du 8 octobre) Deux offres reçues dans la fenêtre sur des comptes
+        // non exclus (o1, rangée par lui ; o3, réglée par une vente). Le nombre
+        // RENDU à côté de « reçue(s) », s'il y en a un, doit être 2 — jamais
+        // « celle reçue » (1). Et celle qu'il a rangée est comptée À PART.
+        const recues = reste ? [...reste.txt.matchAll(/(?:\b(\d+)\s+reçues?|celle reçue)/g)].map((m) => (m[1] ? Number(m[1]) : 1)) : [];
+        dit(reste && recues.every((x) => x === 2), 'il n’affirme pas un faux total d’offres REÇUES (2 reçues : une rangée, une réglée)', JSON.stringify({ recues, txt: reste && reste.txt }));
+        dit(reste && reste.rangees === '1', 'celle qu’il a rangée lui-même est comptée à part (« 1 que tu as rangée »), pas dans les réglées', JSON.stringify(reste && reste.rangees));
       }
       // 2. l'offre en attente
       await r.pg.click('[data-conv="301"]');
@@ -225,6 +234,27 @@ async function rendre(b, { version, tel = false, lignes = rows }) {
       dit(sw.sw <= sw.cw + 1, 'aucun débordement horizontal', `${sw.sw} > ${sw.cw}`);
       dit(r.errs.length === 0, 'aucune erreur d’app', r.errs.join(' | ').slice(0, 160));
       await r.pg.screenshot({ path: path.join(require('os').tmpdir(), 'messagerie-' + (tel ? 390 : 1512) + '.png') });
+      await r.ctx.close();
+    }
+    // ── (revue du 8 octobre) LE REPÈRE D'UNE OFFRE AVEC UN COMPTE ILLISIBLE ──
+    // Les ventes de compte_b ne se lisent pas (522) : le repère « tes Samba se
+    // revendent… » est une moyenne PARTIELLE. Messages doit le dire, une fois,
+    // comme l'écran Ventes (la même liste, §11). Aux deux tailles.
+    for (const tel of [false, true]) {
+      console.log(`── repère d’offre, compte_b illisible · ${tel ? '390 px' : '1512 px'}`);
+      const r = await rendre(b, { version: '5.135.0', tel, ko522: /harvest_222_orders/ });
+      await r.pg.waitForTimeout(800);
+      const v = await r.pg.evaluate(() => { const b = document.querySelector('[data-offres-messages]'); const e = document.querySelectorAll('[data-offres-repere-non-lus]'); return { bloc: !!b, repere: b ? /se revendent/.test(b.innerText) : false, n: e.length, qui: e[0] ? e[0].getAttribute('data-offres-repere-non-lus') : null, txt: e[0] ? e[0].innerText : '' }; });
+      dit(v.bloc && v.repere, 'une offre montre son repère par modèle', JSON.stringify(v));
+      dit(v.n === 1 && v.qui === 'compte_b' && /compte_b/.test(v.txt), 'et l’écran dit, UNE fois, que ce repère ne compte pas compte_b (ses ventes n’ont pas pu être lues)', JSON.stringify(v));
+      dit(r.errs.length === 0, 'aucune erreur d’app', r.errs.join(' | ').slice(0, 160));
+      await r.ctx.close();
+    }
+    {
+      const r = await rendre(b, { version: '5.135.0' });
+      await r.pg.waitForTimeout(800);
+      const n = await r.pg.evaluate(() => document.querySelectorAll('[data-offres-repere-non-lus]').length);
+      dit(n === 0, 'l’autre sens : tout lu ⇒ aucune ligne « ne compte pas »', String(n));
       await r.ctx.close();
     }
     console.log('── boîtes à jour (l’autre sens)');

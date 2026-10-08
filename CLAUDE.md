@@ -5794,13 +5794,62 @@ vérifié) : relu, complété, puis prouvé.
   l'app (`PAS_UNE_VENTE` sur `harvest_*_txn_*`) et l'extension
   (`lireVentesProuvees`) — ils sur-excluent une paire remboursée de leurs files
   (le sens sûr), mais c'est encore trois lecteurs pour une notion (§11) ;
-  (3) une liste de ventes captée il y a longtemps et qui dit « payée » confirme
-  la vente sans savoir si elle a été remboursée depuis — chez lui les comptes
-  actifs sont relus chaque jour.
+  (3) ~~une liste de ventes captée il y a longtemps confirme la vente~~ —
+  corrigé le 8 octobre, voir ci-dessous.
 - ⚠️ **Non mesuré** : que `GetMyeBaySelling` rende `StartTime` pour une annonce
   EN LIGNE (`depuis`). S'il ne le rend pas, AUCUN retrait automatique ne part
   (date inconnue) — l'alerte, elle, reste. Et le texte exact d'eBay pour une
   annonce déjà close (`EBAY_DEJA_TERMINEE` suit l'erreur 1047 documentée).
+
+#### Seconde relecture (8 octobre) : huit défauts reproduits, tous corrigés
+Chacun reproduit sur 12c6f26, corrigé, et prouvé rouge sur le build d'avant
+(arbre archivé, scripts copiés dedans, build refait là-bas, §6.1).
+- ⚠️⚠️ **Après une baisse eBay faite par VRM, l'écran repartait du prix
+  PÉRIMÉ.** `revise` ne réécrit pas `ebay_listings` : la liste garde 60 € tant
+  qu'eBay n'est pas relu. L'écran disait « 60 € aujourd'hui » pour une annonce à
+  53 €, et — Vinted baissé ensuite — proposait de « baisser » de 53 à **56 €**,
+  une hausse. ⇒ Le mémo `vrm_ebay_baisses` (le prix posé par VRM) fait foi tant
+  que la liste n'a pas été relue APRÈS lui (`ebay_listings.capturedAt`, lu en
+  scalaire) ; date inconnue ⇒ le mémo. Jamais une « baisse » vers un prix ≥ au
+  prix connu. Banc `annonces-carte.cjs` (sans simuler la synchro) : **3 rouges**
+  sur l'avant, et l'autre sens (eBay relu après, 58 € ⇒ la liste gagne).
+- ⚠️⚠️ **Une liste de ventes ANCIENNE, ou un compte BLOQUÉ, « confirmait » la
+  vente.** Reproduit : liste captée il y a 60 jours sur un compte que Vinted a
+  bloqué (capture figée) ⇒ l'annonce eBay était terminée. ⇒ La preuve porte la
+  date de la liste qui confirme (`cap`) et son compte ; le retrait automatique
+  exige une liste relue depuis moins de **48 h** (`LISTE_VENTES_FRAICHE_MS`,
+  raison `liste-perimee`) et refuse un compte de `vinted_accounts_blocked`
+  (`compte-bloque`, `comptesBloquesVinted()`) ; liste des comptes bloqués pas
+  fournie ⇒ « pas su » ⇒ rien. Un compte masqué n'est pas exclu en soi : la
+  fraîcheur de sa liste suffit (s'il ne le relit plus, rien ne part).
+- **La ligne d'état de l'interrupteur décrivait l'ANCIENNE règle**, au-dessus de
+  deux paires prouvées vendues qui restaient sans un mot. ⇒ `CONDITIONS_RETRAIT_AUTO`
+  (une phrase, la même pour la confirmation et la ligne d'état, bornes tirées de
+  la règle) ; allumé, chaque ligne « à retirer » porte `data-ebay-auto-raison` —
+  `retraitsEbayAutoPermis` jugé par l'écran sur ce qu'il a lu (`toutesLues`
+  remonte de `useEbayPaires`) — et dit sa raison (`RAISON_RETRAIT_AUTO`) ; une
+  raison commune à toutes les lignes se dit une fois (§7). Banc
+  `ebay-annonces.cjs` : **4 rouges** sur l'avant (dont « 21 caractères communs »
+  entre la ligne d'état et la confirmation).
+- **Un retrait automatique au résultat incertain (504, page d'erreur, coupure)
+  ne laissait aucune trace.** Il se dit (« je ne sais pas si l'annonce eBay a été
+  retirée — regarde sur eBay ») et se note sur l'appareil
+  (`vrm_ebay_auto_incertains`, relu sur la ligne de l'écran eBay) ; un vrai refus
+  d'eBay se dit aussi, avec sa raison.
+- **Messages** : « toutes réglées » disait « celle reçue » en ne comptant que les
+  réglées (une offre rangée à la main n'y était pas) — la phrase ne dit plus rien
+  du total reçu, et les rangées sont comptées à part (`offresAtraiter` rend
+  `rangees`). Et le repère d'une offre ne disait pas qu'un compte manquait :
+  `ventesNonLues` (une liste, comptes exclus retirés) est lue par le repère de
+  l'écran Ventes ET par Messages (§11). Banc `messagerie.cjs` : **6 rouges**.
+- **Écran Ventes : un compte illisible était signalé deux fois avec le même
+  geste** (bandeau « compte non chargé » + ligne du repère). Le repère ne redit
+  que ce qui distingue ; le geste n'y revient que pour un compte dont seuls les
+  ACHATS manquent (`achatsSeuls`). Banc `rapport.cjs` : **1 rouge** (« 2 fois »).
+- `audit-ebay-retrait-auto.cjs` : **13 rouges** sur 12c6f26, et **18
+  réaffaiblissements sur 18** attrapés (`--prouve`, dont « une liste ancienne
+  confirme », « un compte bloqué accepté », « comptes bloqués inconnus lus
+  aucun », « un retrait incertain tu »).
 
 ### Mise en production du 5 octobre
 PR #442 mergée à 10:24 UTC (80 déploiements sur 24 h : sous la limite), déploiement

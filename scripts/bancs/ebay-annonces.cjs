@@ -431,6 +431,7 @@ const deborde = (pg) => pg.evaluate(() => ({ sw: document.documentElement.scroll
         await o.pg.click('[data-ebay-retrait-auto-bouton]');
         await o.pg.waitForTimeout(300);
         dit((await o.pg.getAttribute('[data-ebay-retrait-auto]', 'data-ebay-retrait-auto')) === 'eteint', 'allumer DEMANDE d’abord (une annonce terminée ne revient pas)');
+        const confTxt = await feuille(o.pg).innerText().catch(() => '');
         await feuille(o.pg).locator('button', { hasText: 'Allumer' }).click();
         await o.pg.waitForTimeout(900);
         const memo = await o.pg.evaluate(() => localStorage.getItem('vrm_ebay_retrait_auto'));
@@ -454,6 +455,25 @@ const deborde = (pg) => pg.evaluate(() => ({ sw: document.documentElement.scroll
         const reste = await lire(o.pg);
         dit(JSON.stringify([...reste.retirer].sort()) === '["110000000007","110000000008"]',
           'l’alerte « à retirer d’eBay » garde la N°27 et la N°28 (son clic), et plus la N°26 remboursée', JSON.stringify(reste.retirer));
+        // (revue du 8 octobre) Allumé, l'écran dit POURQUOI chacune n'est pas
+        // partie toute seule — la même règle que le passage (sinon il lit
+        // « allumé » au-dessus de deux paires qui restent, et croit la
+        // fonction cassée). L'état est porté par la ligne ; le texte, libre.
+        const rz = await o.pg.evaluate(() => {
+          const commune = (document.querySelector('[data-ebay-auto-raison-commune]') || {}).innerText || '';
+          return Object.fromEntries([...document.querySelectorAll('[data-ebay-doublon]')].map((e) => [e.getAttribute('data-ebay-doublon'),
+            { r: e.getAttribute('data-ebay-auto-raison'), txt: ((e.querySelector('[data-ebay-auto-raison-texte]') || {}).innerText || '') || commune }]));
+        });
+        dit(rz['27'] && rz['27'].r === 'ebay-apres-vente' && rz['27'].txt.length > 20, 'N°27 : sa ligne dit pourquoi elle n’est pas partie toute seule (annonce eBay mise en ligne après la vente)', JSON.stringify(rz['27']));
+        dit(rz['28'] && rz['28'].r === 'numero-partage' && rz['28'].txt.length > 20, 'N°28 : sa ligne dit pourquoi (N° porté par deux paires)', JSON.stringify(rz['28']));
+        dit(rz['27'] && rz['28'] && rz['27'].txt !== rz['28'].txt, 'deux raisons différentes, deux phrases différentes (une raison commune se dirait une fois)');
+        // La ligne d'état de l'interrupteur décrit LA règle — la même source que
+        // la confirmation (plus long morceau commun ≥ 120 caractères), pas une
+        // ancienne description restée en arrière.
+        const regle = await o.pg.evaluate(() => (document.querySelector('[data-ebay-retrait-auto]') || {}).innerText || '');
+        const commun = (a, b) => { let best = 0; for (let i = 0; i < a.length; i++) for (let j = 0; j < b.length; j++) { let k = 0; while (a[i + k] && a[i + k] === b[j + k]) k++; if (k > best) best = k; } return best; };
+        const lc = commun(regle.replace(/\s+/g, ' '), confTxt.replace(/\s+/g, ' '));
+        dit(lc >= 120, 'la ligne d’état « allumé » dit les MÊMES conditions que la confirmation (une source) — pas l’ancienne règle', `${lc} caractères communs · « ${regle.replace(/\s+/g, ' ').slice(0, 160)} »`);
       });
       await o.ctx.close();
       remettre();

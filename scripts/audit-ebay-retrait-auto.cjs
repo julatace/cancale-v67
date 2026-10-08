@@ -47,7 +47,7 @@ function decls(APP, noms) {
 const NOMS = ['cleNum', 'NUM_OK', 'numDeSkuEbay', 'commandeEbayEngagee', 'doublesVenteEbay', 'PAS_UNE_VENTE',
   'etatsVentesFrais', 'etatRevient', 'preuvesVentesVinted', 'capListeVentes', 'lireVentesVintedProuvees', 'isOnlineListing', 'lireAnnoncesVintedEnLigne',
   'retraitsEbayAutoPermis', 'passageRetraitEbayAuto', 'EBAY_DEJA_TERMINEE', '__retraitEbayAutoEnVol', '__retraitEbayAutoTentes',
-  'retirerEbayAuto', 'resultatReviseEbay', 'prixAchatDe'];
+  'retirerEbayAuto', 'resultatReviseEbay', 'prixAchatDe', 'LISTE_VENTES_FRAICHE_MS', 'noterRetraitAutoIncertain'];
 
 // Un contexte NEUF par scénario : `retirerEbayAuto` garde en mémoire, par
 // ouverture de l'app, les annonces déjà tentées.
@@ -176,6 +176,9 @@ async function controles(APP, journal) {
     const env = {
       lireTout: async () => txn.map((r) => ({ ...r })),
       fetchHarvestOrders: async () => ({ my_orders: ventes }),
+      // (revue du 8 octobre) La liste des ventes du compte A a été captée il y
+      // a 2 h — sauf scénario « liste ancienne ».
+      _harvestSeen: { A_orders_sold: opts.capListe != null ? opts.capListe : MAINTENANT - 2 * 3600000 },
       enTeteSession: () => ({}), toast: (m) => toasts.push(String(m)),
       fetch: async (u, o) => { const b = JSON.parse(o.body); appels.push(b); if (opts.apresAppel) opts.apresAppel(appels); return { json: async () => (opts.reponse ? opts.reponse(b) : { ok: true }) }; },
     };
@@ -186,6 +189,7 @@ async function controles(APP, journal) {
       nuageAuDepart: opts.nuage !== false, continuer: opts.continuer || (() => true),
       annonces: opts.annonces || ANNONCES, commandes: [], enLigne: new Set(), toutesLues: opts.toutesLues !== false,
       vendusVinted: vendus, lireNumeros: () => opts.numeros || numeros, maintenant: MAINTENANT,
+      ...('bloques' in opts ? (opts.bloques === undefined ? {} : { comptesBloques: opts.bloques }) : { comptesBloques: new Set() }),
     });
     return { res, appels, toasts };
   };
@@ -206,6 +210,28 @@ async function controles(APP, journal) {
     const raisons = (s.res && s.res.ecartes || []).map((e) => `${e.numero}:${e.raison}`).sort().join(',');
     dit(/27:ebay-apres-vente/.test(raisons) && /28:numero-partage/.test(raisons) && /29:vente-non-confirmee/.test(raisons) && /30:date-pas-sue/.test(raisons) && /31:deja-terminee/.test(raisons) && /33:revenue-une-fois/.test(raisons),
       'chaque paire écartée l\'est pour SA raison', raisons);
+  });
+  // ── 3 bis. (revue du 8 octobre) UNE LISTE DE VENTES ANCIENNE, UN COMPTE
+  //    BLOQUÉ : la « confirmation » ne confirme plus rien. Reproduit par la
+  //    revue : une liste captée il y a 60 jours sur un compte que Vinted a
+  //    bloqué (capture figée) terminait l'annonce eBay. ─────────────────────
+  await essaie('liste des ventes ancienne', async () => {
+    const s = await scenario('liste ancienne', { capListe: MAINTENANT - 60 * 86400000 }); if (!s) return;
+    dit(s.appels.length === 0, 'une liste de ventes captée il y a 60 jours ne confirme rien : rien ne part (elle ne sait pas si la vente a été remboursée depuis)', JSON.stringify(s.appels.map((b) => b.itemId)));
+    const r = (s.res && s.res.ecartes || []).filter((e) => e.numero === '22' || e.numero === '32').map((e) => e.raison);
+    dit(r.length === 2 && r.every((x) => x === 'liste-perimee'), 'et la raison est dite : « liste-perimee »', JSON.stringify(r));
+    const s2 = await scenario('liste de 47 h', { capListe: MAINTENANT - 47 * 3600000 }); if (!s2) return;
+    dit(s2.appels.length === 2, 'l\'autre sens : une liste relue il y a 47 h confirme (la borne est 48 h)', `${s2.appels.length} envoi(s)`);
+  });
+  await essaie('compte bloqué par Vinted', async () => {
+    const s = await scenario('compte bloqué', { bloques: new Set(['A']) }); if (!s) return;
+    dit(s.appels.length === 0, 'une vente sur un compte que Vinted a BLOQUÉ (capture figée pour toujours) ne retire rien', JSON.stringify(s.appels.map((b) => b.itemId)));
+    const r = (s.res && s.res.ecartes || []).filter((e) => e.numero === '22').map((e) => e.raison);
+    dit(r[0] === 'compte-bloque', 'et la raison est dite : « compte-bloque »', JSON.stringify(r));
+    const s2 = await scenario('comptes bloqués inconnus', { bloques: undefined }); if (!s2) return;
+    dit(s2.appels.length === 0, 'la liste des comptes bloqués pas fournie (pas su) ⇒ rien ne part', `${s2.appels.length} envoi(s)`);
+    const s3 = await scenario('un AUTRE compte bloqué', { bloques: new Set(['Z']) }); if (!s3) return;
+    dit(s3.appels.length === 2, 'l\'autre sens : un autre compte bloqué n\'empêche rien ici', `${s3.appels.length} envoi(s)`);
   });
   await essaie('nuage pas prêt', async () => {
     const s = await scenario('nuage pas prêt', { nuage: false }); if (!s) return;
@@ -242,6 +268,35 @@ async function controles(APP, journal) {
     dit(appels.includes('110000000046'), 'cinq annonces qu\'eBay dit déjà terminées ne prennent pas les cinq places : la vraie vente part', JSON.stringify(appels));
     dit(toasts.some((t) => /historique/.test(t)), 'un retrait fait mais pas noté dans l\'historique (journal:false) : c\'est dit', JSON.stringify(toasts));
   });
+  // ── 3 ter. (revue du 8 octobre) UN RETRAIT PEUT-ÊTRE FAIT EN SON NOM SE DIT.
+  //    eBay répond 504 « incertain » (ou la connexion coupe) : l'annonce a pu
+  //    être terminée. Avant : aucune trace, ni message ni note. ───────────────
+  await essaie('retrait incertain', async () => {
+    const issues = [
+      ['504 « incertain »', async () => ({ status: 504, json: async () => ({ ok: false, reason: 'incertain', error: 'eBay n\'a pas répondu — je ne sais pas si l\'annonce a été retirée.' }) })],
+      ['page d\'erreur (HTML)', async () => ({ status: 504, json: async () => { throw new Error('pas du JSON'); } })],
+      ['coupure', async () => { throw new Error('Failed to fetch'); }],
+    ];
+    for (const [quoi, rep] of issues) {
+      const toasts = [], store = {};
+      const F = charger(APP, {
+        enTeteSession: () => ({}), toast: (m) => toasts.push(String(m)),
+        load: (k, d) => (k in store ? store[k] : d), localStorage: { setItem: (k, v) => { store[k] = JSON.parse(v); }, getItem: (k) => (k in store ? JSON.stringify(store[k]) : null) },
+        fetch: rep,
+      }, dit);
+      if (!F || !F.retirerEbayAuto) return;
+      await F.retirerEbayAuto([{ annonce: annonce(22, avant), numero: '22' }], () => true);
+      dit(toasts.some((t) => /N°22/.test(t) && /je ne sais pas/.test(t) && /regarde sur eBay/.test(t)), `${quoi} : un message dit qu'on ne sait pas si l'annonce a été retirée, et quoi faire`, JSON.stringify(toasts));
+      const note = store.vrm_ebay_auto_incertains && store.vrm_ebay_auto_incertains['110000000022'];
+      dit(!!(note && note.numero === '22' && Number.isFinite(note.at)), `${quoi} : et c'est noté sur l'appareil (l'écran eBay le redit sur sa ligne)`, JSON.stringify(store));
+    }
+    const toasts = [];
+    const F = charger(APP, { enTeteSession: () => ({}), toast: (m) => toasts.push(String(m)), load: (k, d) => d, localStorage: { setItem: () => {} },
+      fetch: async () => ({ status: 409, json: async () => ({ ok: false, reason: 'sku-change', error: 'Le SKU de cette annonce a changé chez eBay.' }) }) }, dit);
+    if (!F || !F.retirerEbayAuto) return;
+    await F.retirerEbayAuto([{ annonce: annonce(22, avant), numero: '22' }], () => true);
+    dit(toasts.some((t) => /N°22/.test(t) && /refusé/.test(t) && /SKU/.test(t)), 'un VRAI refus d\'eBay se dit aussi, avec sa raison (elle reste dans « à retirer »)', JSON.stringify(toasts));
+  });
 
   // ── 4. CHANGER UN PRIX SUR eBAY : TROIS ISSUES (proposition 9) ─────────────
   await essaie('changer un prix', async () => {
@@ -272,6 +327,7 @@ async function controles(APP, journal) {
   dit(/lireVentesVintedProuvees\(comptes\)/.test(sansCommentaires) && /await lireAnnoncesVintedEnLigne\(comptes\)/.test(sansCommentaires),
     'l\'écran eBay lit avec les MÊMES fonctions (une règle, deux lecteurs)');
   dit(!/retirerEbayAuto\(dvE\./.test(sansCommentaires), 'plus aucun retrait automatique lancé directement sur la liste de l\'alerte (sans la règle stricte)');
+  dit(/comptesBloques:comptesBloquesVinted\(\)/.test(sansCommentaires), 'la coque passe les comptes que Vinted a bloqués (`vinted_accounts_blocked`) au passage');
   return ko;
 }
 const numDe = (sku) => (/^VRM-(\d+)$/.exec(sku) || [])[1] || '';
@@ -292,11 +348,17 @@ const PROUVE = process.argv.includes('--prouve');
     ['nuage pas prêt ignoré', "if (!nuageAuDepart) return { lance: false, raison: 'nuage'", "if (false) return { lance: false, raison: 'nuage'"],
     ['annulation relue seulement au départ', "if (typeof continuer === 'function' && !continuer()) break;", ''],
     ['un compte illisible compté « lu »', 'toutesLues: okAny && toutes', 'toutesLues: okAny'],
-    ['« déjà terminée » prend une place', "else if (!(j && EBAY_DEJA_TERMINEE.test(String(j.error || '')))) n += 1;", 'else n += 1;'],
+    ['« déjà terminée » prend une place', '/* déjà close : ne prend pas une des 5 places */', 'n += 1;'],
     ['la transaction plus fraîche ignorée (la liste gagne toujours)', '!(Number.isFinite(capTx) && Number.isFinite(f.cap) && capTx > f.cap)', 'true'],
     ['une paire revenue une fois acceptée', "if (revenues.has(ids[0])) { ecarte('revenue-une-fois'); continue; }", ''],
     ['« article indisponible » compté comme un retour', "!/indisponible|[ée]chou/i.test(s)", 'true'],
     ['« incertain » lu comme un refus', "if (code === 0 || !j || code === 504 || (j && j.reason === 'incertain')) {", 'if (false) {'],
+    // (revue du 8 octobre)
+    ['une liste de ventes ancienne confirme', 'const fraiches = confirmees.filter((v) => Number.isFinite(v.cap) && maintenant - v.cap <= LISTE_VENTES_FRAICHE_MS);', 'const fraiches = confirmees;'],
+    ['un compte bloqué accepté', "if (confirmees.some((v) => v.compte && bloques.has(String(v.compte)))) { ecarte('compte-bloque'); continue; }", ''],
+    ['comptes bloqués inconnus lus « aucun »', "const bloques = comptesBloques && typeof comptesBloques.has === 'function' ? comptesBloques : null;", 'const bloques = comptesBloques && typeof comptesBloques.has === \'function\' ? comptesBloques : new Set();'],
+    ['un retrait incertain tu', 'const incertain = () => {', 'const incertain = () => { return;'],
+    ['la preuve sans la date de sa liste', 'cap: parListe ? f.cap : null, compte:', 'cap: null, compte:'],
   ];
   let nonPris = 0;
   for (const [nom, de, vers] of MUTATIONS) {

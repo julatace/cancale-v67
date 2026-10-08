@@ -446,6 +446,11 @@ const brancher = async (pg, etat = {}) => {
         samba: (document.querySelector('[data-repere-modele="samba"]') || {}).innerText || '',
       }));
       dit(rp.nonLus === 'compte_b', 'un compte dont les ventes ou achats n’ont pas pu être lus est NOMMÉ sous le repère (jamais une moyenne qui se dit complète)', String(rp.nonLus));
+      // (revue du 8 octobre) §7 : une cause, une phrase. Le bandeau « compte non
+      // chargé » du même écran nomme déjà compte_b AVEC le geste ; le repère ne
+      // redit que ce qui distingue. On compte le geste rendu, pas un libellé.
+      const gestes = await pg.evaluate(() => (document.body.innerText.match(/Ouvre (?:ce|ces) comptes? sur vinted\.fr/g) || []).length);
+      dit(gestes === 1, 'le geste « ouvre ce compte sur vinted.fr » n’est dit qu’UNE fois pour un compte illisible (pas une seconde fois sous le repère)', `${gestes} fois`);
       dit(/revendue 60,00 € \(3\)/.test(rp.samba), 'et ce qui EST lu reste dit (Samba du compte lisible)', rp.samba.replace(/\n/g, ' '));
       dit(errs.length === 0, 'aucune erreur d’app', errs.join(' | ').slice(0, 160));
       await ctx.close();
