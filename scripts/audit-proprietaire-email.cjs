@@ -128,10 +128,10 @@ const B = '22222222-2222-2222-2222-222222222222';   // un second vendeur
     const u = decodeURIComponent(String(url));
     if (!u.includes('/rest/v1/')) return rep({});
     if ((opts.method || 'GET') === 'POST') {
-      try { JSON.parse(opts.body || '[]').forEach((x) => ecrites.push({ id: x.id, owner: x.owner || '' })); } catch (_) {}
+      try { JSON.parse(opts.body || '[]').forEach((x) => ecrites.push({ id: x.id, owner: x.owner || '', data: x.data, url: u })); } catch (_) {}
       return rep('', 201);
     }
-    if (/select=owner&limit=1/.test(u)) return etat.sondeKO ? rep('<html>502</html>', 502) : rep([{ owner: J }]);
+    if (/select=owner&limit=1/.test(u)) return etat.sondeKO ? rep('<html>502</html>', 502) : etat.sansColonne ? rep({ code: '42703' }, 400) : rep([{ owner: J }]);
     if (/id=eq\.vrm_email_owners/.test(u)) return etat.registreKO ? rep('<html>522</html>', 522) : rep(etat.lignes || []);
     return rep([]);
   };
@@ -186,6 +186,95 @@ const B = '22222222-2222-2222-2222-222222222222';   // un second vendeur
     dit(metier(b.ecrites).filter((x) => x.owner === J).length === 0 && quar(b.ecrites).length === 1,
       'route : un échec de sonde n’est pas mémorisé — l’email suivant (adresse inconnue, deux vendeurs) est mis de côté',
       `HTTP ${b.code} · ${JSON.stringify(b.ecrites)}`);
+  });
+  // ════════════════════════════════════════════════════════════════════════
+  // ⚠️⚠️ LA QUARANTAINE N'EST À PERSONNE (6 octobre). Rangée sous le
+  // propriétaire de l'installation, l'email non attribué d'un AUTRE vendeur
+  // (sa vente, son bordereau, son acheteur) atterrissait chez Julien.
+  // ════════════════════════════════════════════════════════════════════════
+  const NEUTRE = '00000000-0000-0000-0000-000000000000';
+  const C = '33333333-3333-3333-3333-333333333333';
+  await essaie('qui peut réclamer', () => {
+    const p = mod.peutReclamer;
+    dit(typeof p === 'function' && mod.PROPRIETAIRE_NEUTRE === NEUTRE,
+      'le propriétaire NEUTRE et la règle de réclamation existent', `${typeof p} · ${mod.PROPRIETAIRE_NEUTRE}`);
+    if (typeof p !== 'function') return;
+    const reg = { 'sophie@vrm.center': B, 'recu@vrm.center': J };
+    dit(p(['sophie@vrm.center'], reg, [], B) === true, 'réclamer : B reprend un email arrivé sur SON adresse déclarée');
+    dit(p(['sophie@vrm.center'], reg, [], C) === false && p(['sophie@vrm.center'], reg, [], J) === false,
+      'réclamer : ni un troisième vendeur, ni Julien ne prennent l’email arrivé chez B');
+    // ⚠️ Le cas qui coûte : l'autre vendeur est PARTI (registre réduit à
+    // Julien, ou vide). À l'arrivée, le repli « installation » se rallumerait —
+    // mais sur le TAS, il donnerait à Julien les emails mis de côté de l'autre.
+    dit(p(['inconnue@vrm.center'], reg, [], J) === false
+      && p(['inconnue@vrm.center'], { 'recu@vrm.center': J }, [], J) === false
+      && p(['inconnue@vrm.center'], {}, [], J) === false,
+      'réclamer : une adresse à personne ne revient pas au propriétaire de l’installation — même quand il est redevenu seul (pas de repli sur le tas)');
+    dit(p(['disputee@vrm.center'], reg, ['disputee@vrm.center'], B) === false,
+      'réclamer : une adresse déclarée par deux vendeurs ne se réclame par personne');
+    dit(p(['sophie@vrm.center', 'recu@vrm.center'], reg, [], B) === false && p(['sophie@vrm.center', 'recu@vrm.center'], reg, [], J) === false,
+      'réclamer : deux vendeurs destinataires — personne ne tranche à leur place');
+    dit(p(['sophie+vinted@vrm.center'], reg, [], B) === true, 'réclamer : la même règle qu’à l’arrivée (l’étiquette « + »)');
+    dit(p([], reg, [], B) === false && p(undefined, reg, [], B) === false, 'réclamer : aucune adresse lisible → personne');
+    dit(p(['x@vrm.center'], { 'x@vrm.center': NEUTRE }, [], NEUTRE) === false, 'réclamer : le propriétaire neutre ne réclame rien');
+  });
+  await essaie('route : quarantaine sous le neutre', async () => {
+    const route = await nouvelle('neutre');
+    const o = await envoyer(route, 'inconnue@vrm.center', { lignes: [LIGNE_J, LIGNE_B] });
+    const q = quar(o.ecrites);
+    dit(o.code === 200 && q.length === 1 && q[0].owner === NEUTRE,
+      'route : base cloisonnée, l’email mis de côté est rangé sous le propriétaire NEUTRE — jamais chez Julien',
+      `HTTP ${o.code} · ${q.map((x) => x.id + '@' + (x.owner === J ? 'J (Julien)' : x.owner || '(aucun)')).join(', ')}`);
+    dit(q.length === 1 && /on_conflict=owner,id/.test(q[0].url || ''),
+      'route : et il s’écrit sur la clé (owner, id) de la base cloisonnée', q[0] && q[0].url);
+    dit(q.length === 1 && q[0].data && Array.isArray(q[0].data.adresses) && q[0].data.destinataires === JSON.stringify(q[0].data.adresses),
+      'route : ses adresses d’arrivée sont gardées — en liste, et en une chaîne (JSON, la même liste) que la base copie dans `meta`',
+      q[0] && JSON.stringify({ adresses: q[0].data.adresses, destinataires: q[0].data.destinataires }));
+    // ⚠️ Une adresse de livraison peut contenir une espace (un To mal formé) :
+    //    jointe par des espaces, la chaîne se relisait en DEUX adresses, et la
+    //    liste proposait ce que la réclamation refusait. Elle doit se relire à
+    //    l'identique de `data.adresses` (§11).
+    const route2 = await nouvelle('espace');
+    const o2 = await envoyer(route2, 'x@inconnu.fr b@vrm.center', { lignes: [LIGNE_J, LIGNE_B] });
+    const q2 = quar(o2.ecrites);
+    let relue = null; try { relue = JSON.parse(q2[0].data.destinataires); } catch (_) {}
+    dit(q2.length === 1 && Array.isArray(relue) && JSON.stringify(relue) === JSON.stringify(q2[0].data.adresses),
+      'route : la chaîne des destinataires se relit EXACTEMENT comme `data.adresses` — une adresse avec une espace reste une adresse',
+      q2[0] && JSON.stringify({ adresses: q2[0].data.adresses, destinataires: q2[0].data.destinataires }));
+  });
+  // ── Pourquoi PERSONNE ne peut réclamer, et le repli qui s'éteint ─────────
+  await essaie('pourquoi personne', () => {
+    const pp = mod.pourquoiPersonne, ri = mod.repliInstallation;
+    dit(typeof pp === 'function' && typeof ri === 'function', 'la cause d’un email que personne ne peut réclamer, et l’état du repli, se calculent', `${typeof pp} · ${typeof ri}`);
+    if (typeof pp !== 'function' || typeof ri !== 'function') return;
+    const reg = { 'sophie@vrm.center': B, 'recu@vrm.center': J };
+    // §11 : `pourquoiPersonne` est l'envers EXACT de `peutReclamer` — sur une
+    // grille de cas, jamais l'un sans l'autre.
+    const cas = [['sophie@vrm.center'], ['inconnue@vrm.center'], ['disputee@vrm.center'], ['sophie@vrm.center', 'recu@vrm.center'],
+      ['sophie+vinted@vrm.center'], [], ['x@inconnu.fr sophie@vrm.center'], ['b+y@autre.fr sophie@vrm.center']];
+    const ecarts = cas.filter((a) => {
+      const quelquun = [B, J, C].some((v) => mod.peutReclamer(a, reg, ['disputee@vrm.center'], v));
+      return quelquun === !!pp(a, reg, ['disputee@vrm.center']);
+    });
+    dit(ecarts.length === 0, '« personne ne peut réclamer » est exactement l’envers de la réclamation (§11)', ecarts.map((a) => JSON.stringify(a)).join(' · '));
+    dit(pp(['inconnue@vrm.center'], reg, []) === 'inconnue' && pp(['disputee@vrm.center'], reg, ['disputee@vrm.center']) === 'disputee'
+      && pp(['sophie@vrm.center', 'recu@vrm.center'], reg, []) === 'plusieurs' && pp([], reg, []) === 'aucune',
+      'et la cause est nommée : adresse non déclarée · disputée · deux vendeurs · aucune adresse',
+      [pp(['inconnue@vrm.center'], reg, []), pp(['disputee@vrm.center'], reg, ['disputee@vrm.center']), pp(['sophie@vrm.center', 'recu@vrm.center'], reg, []), pp([], reg, [])].join(','));
+    // Le repli : allumé tant que personne d'autre n'a déclaré, éteint dès qu'un
+    // autre compte déclare UNE adresse — exactement ce que fait l'arrivée.
+    dit(ri({}, J) === true && ri({ 'recu@vrm.center': J }, J) === true && ri({ 'essai@vrm.center': { owner: B } }, J) === false && ri({}, '') === false,
+      'le repli « installation » : allumé seul, éteint dès qu’un autre compte déclare, jamais sans propriétaire réglé');
+    const arrivee = (regX) => r(['inconnue@vrm.center'], regX, J).via === 'installation';
+    dit([{}, { 'recu@vrm.center': J }, { 'essai@vrm.center': B }].every((regX) => arrivee(regX) === ri(regX, J)),
+      'et c’est LA règle de l’arrivée (§11) — l’écran ne peut pas dire autre chose que ce qui se passe');
+  });
+  await essaie('route : base non cloisonnée', async () => {
+    const route = await nouvelle('sansColonne');
+    const o = await envoyer(route, 'inconnue@vrm.center', { sansColonne: true, lignes: [{ data: { adresses: { 'sophie@vrm.center': { owner: B } } } }] });
+    dit(o.code === 200 && quar(o.ecrites).length === 0 && !o.ecrites.some((x) => x.owner === NEUTRE) && metier(o.ecrites).length > 0,
+      'l’autre sens : base non cloisonnée (une seule boutique) — pas de quarantaine, rien sous le neutre, l’email est traité comme avant',
+      `HTTP ${o.code} · ${JSON.stringify(o.ecrites.map((x) => x.id + '@' + (x.owner === J ? 'J' : x.owner || '-')))}`);
   });
   await essaie('route : seul vendeur', async () => {
     const route = await nouvelle('seul');
