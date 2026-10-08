@@ -5720,70 +5720,87 @@ est traité à part — l'app AFFICHE `j.error` de ces réponses telle quelle.
   entre l'horloge de l'appareil et `capturedAt` (serveur) est une précaution,
   pas une mesure du décalage réel.
 
-### ⚠️⚠️ Revue des propositions 6, 8, 9, 10, côté app : une vente REMBOURSÉE comptait « vendue » (6 octobre)
+### ⚠️⚠️ Revue des propositions 6, 8, 9, 10, côté app : une vente REMBOURSÉE comptait « vendue » (6-8 octobre)
 Les douze défauts de la revue, RE-VÉRIFIÉS sur le code du jour avant d'y toucher
 (le planificateur avait été corrigé entre-temps) : **tous reproduisaient encore**.
+Repris le 8 octobre après une coupure (le premier jet n'était ni fini ni
+vérifié) : relu, complété, puis prouvé.
 - ⚠️⚠️ **La preuve de vente Vinted lisait un état PÉRIMÉ.** La ligne
-  `harvest_*_txn_*` n'est recaptée que si la transaction est rouverte. Mesuré sur
-  la copie de sa base : 3 preuves sur 229 disaient « Le paiement a été validé »
-  quand la liste de ses ventes (`orders_sold`) disait « Remboursement effectué »
-  (N°198, 277, 382). ⇒ `preuvesVentesVinted` : l'état d'une transaction est
-  celui de `orders_sold` quand il la porte, sinon celui de la transaction.
-  Résultat mesuré : 229 → 230 (les 3 remboursées sortent, 4 vraies ventes
-  captées en conversation entrent). ⚠️ **On n'écarte PAS une annonce « dès qu'une
-  transaction est annulée »** : 25 annonces portent une « Commande annulée —
+  `harvest_*_txn_*` n'est recaptée que si la transaction est rouverte. Mesuré :
+  19 transactions « Remboursement effectué » selon la liste de ses ventes
+  (`orders_sold`), dont 3 que leur ligne disait encore « Le paiement a été
+  validé » (N°198, 277, 382) — trois paires revenues chez lui, « vendues » pour
+  l'app. ⇒ `preuvesVentesVinted` : l'état d'une transaction est **le plus frais
+  des deux** — la liste quand elle la porte et qu'elle a été relue après la
+  ligne de transaction (`_harvestSeen` contre `meta->>capturedAt`), sinon la
+  transaction. Aucun cas « transaction plus fraîche et en désaccord » chez lui
+  aujourd'hui : c'est préventif. ⚠️ **On n'écarte PAS une annonce « dès qu'une
+  transaction est annulée »** : 22 annonces portent une « Commande annulée —
   article indisponible » (l'acheteur qui a perdu la course) À CÔTÉ de la vraie
-  vente. `lireVentesVintedProuvees(comptes)` lit `orders_sold` de TOUS ses
-  comptes liés (écartés compris) et porte le détail (`.preuves`).
-- ⚠️⚠️ **Le retrait AUTOMATIQUE est maintenant le plus strict**
-  (`retraitsEbayAutoPermis`, lancé par `passageRetraitEbayAuto`) : vente
-  CONFIRMÉE par `orders_sold` (ni remboursée, ni annulée), N° porté par **une
-  seule** fiche (13 N° hérités d'août en portent plusieurs), annonce eBay mise en
-  ligne **AVANT** la vente (`depuis`, le StartTime d'eBay — publiée après, c'est
-  une remise en vente voulue ; date inconnue ⇒ rien), toutes ses annonces Vinted
-  lues, eBay ne la disant pas déjà terminée. Ce qui ne passe pas RESTE dans
-  l'alerte « à retirer », avec le bouton.
+  vente. Mesuré aussi : la `date` de `orders_sold` est la date de VENTE (178 sur
+  178 antérieures à la finalisation, 8 jours d'écart en moyenne).
+- ⚠️⚠️ **Le retrait AUTOMATIQUE est le plus strict** (`retraitsEbayAutoPermis`,
+  lancé par `passageRetraitEbayAuto`) : vente CONFIRMÉE par `orders_sold`, N°
+  porté par **une seule** fiche (13 N° hérités d'août en portent plusieurs),
+  **jamais revenue** (`revenues` : une transaction remboursée, retournée,
+  suspendue ou annulée d'après l'une OU l'autre source — hors « article
+  indisponible » et paiement échoué ; mesuré, 1 vente confirmée sur 215),
+  annonce eBay mise en ligne **AVANT** la vente (`depuis`, le StartTime d'eBay ;
+  date inconnue ⇒ rien), toutes ses annonces Vinted lues, eBay ne la disant pas
+  déjà terminée. Ce qui ne passe pas RESTE dans l'alerte « à retirer », avec le
+  bouton.
 - **Une lecture « en vente », deux lecteurs** (`lireAnnoncesVintedEnLigne`) :
-  l'écran eBay et la coque lisent TOUS ses comptes, écartés compris (masquer un
-  compte règle l'affichage, pas ce qui est en vente), et la coque ne retire plus
-  des « en vente » ce qu'un titre disait vendu (`soldIdsN`, pas une identité).
-- **Le passage** : `nuageAuDepart` est noté AVANT toute lecture (on le regardait
-  à la fin) ; l'annulation du passage et l'interrupteur sont relus avant CHAQUE
-  appel ; les fiches N° sont relues juste avant ; une annonce qu'eBay dit déjà
-  close (erreur 1047) ne prend plus une des 5 places ; un retrait fait mais pas
-  noté dans l'historique (`journal:false`) est dit.
+  l'écran eBay et la coque lisent TOUS ses comptes liés, écartés compris
+  (masquer un compte règle l'affichage, pas ce qui est en vente), et la coque ne
+  retire plus des « en vente » ce qu'un titre disait vendu (`soldIdsN`, pas une
+  identité). Les lectures sont celles que la coque fait déjà (`cachedRow`,
+  60 s) : seuls les comptes écartés coûtent une lecture de plus, et seulement
+  quand une annonce eBay porte un SKU VRM.
+- **Le passage** : `nuageAuDepart` est noté AVANT toute lecture ; l'annulation du
+  passage et l'interrupteur sont relus avant CHAQUE appel ; les fiches N° sont
+  relues juste avant ; une annonce qu'eBay dit déjà close ne prend plus une des
+  5 places ; un retrait fait mais pas noté dans l'historique (`journal:false`)
+  est dit ; un passage qui lève ne retire rien (`.catch`).
 - **Proposition 9** : un N° porté par plusieurs fiches ⇒ aucune baisse eBay (et
   c'est dit) ; la confirmation nomme l'annonce **eBay** qui change ; une baisse
   faite pour un prix Vinted n'est plus reproposée après la synchro
-  (`vrm_ebay_baisses`, synchronisé : 60 → 53 → 47 → 41… sans que Vinted bouge) ;
-  le plancher lit le prix d'achat comme la carte (`prixAchatDe`, §11 — la N°385
-  et ses 15 € saisis par numéro).
-- **Changer un prix eBay a trois issues** (`resultatReviseEbay`, pour les deux
+  (`vrm_ebay_baisses`, synchronisé, rattrapé par `onCloudReady`) ; le plancher
+  lit le prix d'achat comme la carte (`prixAchatDe`, §11 — la N°385 et ses
+  15 € saisis par numéro).
+- **Changer un prix eBay a trois issues** (`resultatReviseEbay`, les deux
   endroits qui le font) : un 504 « incertain », une page d'erreur HTML ou une
   coupure ⇒ « je ne sais pas si le prix a changé », jamais « rien n'a changé ».
 - **Une moyenne par modèle** (`moyennesParModele`, §11) pour l'écran Ventes et le
-  repère d'une offre sur Messages (qui comptait les comptes exclus : 75 € sur 4
-  au lieu de 50 € sur 3). Messages n'affiche plus les offres d'un compte exclu,
-  et dit « toutes réglées par une vente » au lieu de se taire ; le repère par
-  modèle nomme un compte dont les ventes ou achats n'ont pas pu être lus.
-- Preuves (données inventées) : `audit-ebay-retrait-auto.cjs` (les vraies
-  fonctions dans un `vm`) **18 rouges** sur b063f42 — dont la vente remboursée et
-  les 5 places prises par des annonces closes, sur une fonction qui existait déjà
-  — et **10 réaffaiblissements sur 10** attrapés (`--prouve`) ; bancs
-  `ebay-annonces.cjs` **6 rouges** sur le build d'avant (le retrait automatique
-  partait sur 4 annonces au lieu d'une), `annonces-carte.cjs` **10**,
-  `messagerie.cjs` **10**, `rapport.cjs` **1**.
-- ⚠️ `audit-abonnement.cjs` était rouge depuis b063f42 (la route exige la case CGV,
-  ses requêtes ne l'envoyaient pas) : elles envoient `cgv: true`.
-- ⚠️ **Côté serveur, non fait (hors de cette passe)** : le journal
-  `ebay_retraits_auto` reste un lire-ajouter-réécrire (deux retraits simultanés
-  peuvent perdre une ligne) ; la route pourrait elle-même refuser une annonce
-  dont le `StartTime` (lu par `GetItem`) est postérieur à la vente. Et l'extension
-  garde sa propre preuve (`lireVentesProuvees`, sans `orders_sold`) : elle y
-  sur-exclut une paire remboursée de ses files (le sens sûr).
-- ⚠️ **Non mesuré** : que `GetMyeBaySelling` rende bien `StartTime` pour une
-  annonce en ligne (`depuis`). S'il ne le rend pas, AUCUN retrait automatique ne
-  part (date inconnue) — l'alerte, elle, reste.
+  repère d'une offre sur Messages (qui comptait les comptes exclus). Les achats
+  d'un compte exclu sortent aussi du repère (ils ne comptent nulle part).
+  Messages n'affiche plus les offres d'un compte exclu, et dit « toutes réglées
+  par une vente » au lieu de se taire ; le repère par modèle nomme un compte
+  dont les ventes ou achats n'ont pas pu être lus.
+- **Preuves** (données inventées ; « avant » = 66580a5, arbre archivé, scripts
+  copiés dedans, build refait là-bas) : `audit-ebay-retrait-auto.cjs` (les vraies
+  fonctions dans un `vm`) **20 rouges** sur l'avant — dont la vente remboursée,
+  sur une fonction qui existait déjà, et les 5 places prises par des annonces
+  closes — et **13 réaffaiblissements sur 13** attrapés (`--prouve`, dont « la
+  liste gagne toujours », « une paire revenue acceptée », « article
+  indisponible compté comme un retour ») ; bancs `ebay-annonces.cjs` **6
+  rouges** (le retrait automatique partait sur 4 annonces au lieu d'une),
+  `annonces-carte.cjs` **10**, `messagerie.cjs` **10**, `rapport.cjs` **1** —
+  tous verts après.
+- ⚠️ **Pas fait, à savoir** : (1) côté serveur, le journal `ebay_retraits_auto`
+  reste un lire-ajouter-réécrire (deux retraits simultanés peuvent perdre une
+  ligne), et la route pourrait elle-même refuser une annonce dont le `StartTime`
+  (lu par `GetItem`) est postérieur à la vente ; (2) **deux autres lecteurs de
+  la preuve** gardent la règle « transaction seule » : l'écran Leboncoin de
+  l'app (`PAS_UNE_VENTE` sur `harvest_*_txn_*`) et l'extension
+  (`lireVentesProuvees`) — ils sur-excluent une paire remboursée de leurs files
+  (le sens sûr), mais c'est encore trois lecteurs pour une notion (§11) ;
+  (3) une liste de ventes captée il y a longtemps et qui dit « payée » confirme
+  la vente sans savoir si elle a été remboursée depuis — chez lui les comptes
+  actifs sont relus chaque jour.
+- ⚠️ **Non mesuré** : que `GetMyeBaySelling` rende `StartTime` pour une annonce
+  EN LIGNE (`depuis`). S'il ne le rend pas, AUCUN retrait automatique ne part
+  (date inconnue) — l'alerte, elle, reste. Et le texte exact d'eBay pour une
+  annonce déjà close (`EBAY_DEJA_TERMINEE` suit l'erreur 1047 documentée).
 
 ### Mise en production du 5 octobre
 PR #442 mergée à 10:24 UTC (80 déploiements sur 24 h : sous la limite), déploiement

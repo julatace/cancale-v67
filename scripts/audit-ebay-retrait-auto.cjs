@@ -45,7 +45,7 @@ function decls(APP, noms) {
   return { src: out.join('\n'), manquants: noms.filter((x) => !trouve.has(x)) };
 }
 const NOMS = ['cleNum', 'NUM_OK', 'numDeSkuEbay', 'commandeEbayEngagee', 'doublesVenteEbay', 'PAS_UNE_VENTE',
-  'etatsVentesFrais', 'preuvesVentesVinted', 'lireVentesVintedProuvees', 'isOnlineListing', 'lireAnnoncesVintedEnLigne',
+  'etatsVentesFrais', 'etatRevient', 'preuvesVentesVinted', 'capListeVentes', 'lireVentesVintedProuvees', 'isOnlineListing', 'lireAnnoncesVintedEnLigne',
   'retraitsEbayAutoPermis', 'passageRetraitEbayAuto', 'EBAY_DEJA_TERMINEE', '__retraitEbayAutoEnVol', '__retraitEbayAutoTentes',
   'retirerEbayAuto', 'resultatReviseEbay', 'prixAchatDe'];
 
@@ -72,12 +72,21 @@ const TXN = [
   { tx: '504', it: 'I3', ti: '', at: null },                                                            // une conversation
   { tx: '505', it: 'I4', ti: 'Le paiement a été validé', at: '2026-09-23T10:00:00+02:00' },            // compte illisible : pas confirmée
   { tx: '506', it: 'I5', ti: '', at: null },                                                            // captée en conversation, VENDUE depuis
+  // La transaction relue APRÈS la liste des ventes (une conversation rouverte) :
+  // c'est elle qui fait foi — elle dit « Remboursement effectué ».
+  { tx: '507', it: 'I6', ti: 'Remboursement effectué', at: '2026-09-25T10:00:00+02:00', cap: '2026-10-05T10:00:00.000Z' },
+  // L'inverse : la liste relue après la transaction dit la vente finalisée.
+  { tx: '508', it: 'I7', ti: 'Retour initié', at: '2026-09-26T10:00:00+02:00', cap: '2026-09-27T10:00:00.000Z' },
 ];
 const VENTES_A = [
   { transaction_id: 501, status: 'Remboursement effectué', date: '2026-09-20T09:00:00+02:00' },
   { transaction_id: 503, status: 'Commande finalisée - l\'acheteur a validé la commande', date: '2026-09-21T12:00:00+02:00' },
   { transaction_id: 506, status: 'Commande finalisée - l\'acheteur a validé la commande', date: '2026-09-24T12:00:00+02:00' },
+  { transaction_id: 507, status: 'Le paiement a été validé', date: '2026-09-25T10:00:00+02:00' },
+  { transaction_id: 508, status: 'Commande finalisée - l\'acheteur a validé la commande', date: '2026-09-26T10:00:00+02:00' },
 ];
+// La liste des ventes du compte A a été captée le 1er octobre (`_harvestSeen`).
+const CAP_A = Date.parse('2026-10-01T10:00:00.000Z');
 
 async function controles(APP, journal) {
   let ko = 0;
@@ -92,6 +101,7 @@ async function controles(APP, journal) {
     const env = {
       lireTout: async (q) => { lus.push(q); return TXN.map((r) => ({ ...r })); },
       fetchHarvestOrders: async (uid) => (uid === 'A' ? { my_orders: VENTES_A } : undefined),   // B : la base n'a pas répondu
+      _harvestSeen: { A_orders_sold: CAP_A },
     };
     const F = charger(APP, env, dit); if (!F) return;
     const v = await F.lireVentesVintedProuvees([{ vinted_user_id: 'A' }, { vinted_user_id: 'B' }]);
@@ -101,13 +111,18 @@ async function controles(APP, journal) {
     dit(!has('I3'), 'une conversation (état vide) n\'est pas une vente');
     dit(has('I4'), 'un compte dont la liste des ventes n\'a pas pu être lue : sa transaction garde son état (rien n\'est retiré de la preuve sur un « pas su »)');
     dit(has('I5'), 'une transaction captée en conversation puis VENDUE (la liste des ventes le dit) compte');
+    dit(v && !has('I6'), 'la transaction relue APRÈS la liste des ventes fait foi : elle dit « remboursée », la paire n\'est pas vendue (l\'état le plus frais, pas toujours celui de la liste)', JSON.stringify(v && [...v]));
+    dit(has('I7'), 'et l\'inverse : la liste relue après une transaction « retour initié » dit la vente finalisée — vendue');
+    const rv = v && v.revenues;
+    dit(!!(rv && typeof rv.has === 'function') && rv.has('I1') && rv.has('I7') && !rv.has('I2') && !rv.has('I5'),
+      'la preuve dit quelles annonces sont revenues AU MOINS UNE FOIS, d\'après l\'une ou l\'autre source (remboursée, retour) — pas l\'acheteur qui a perdu la course', JSON.stringify(rv && [...rv]));
     const p = v && v.preuves;
     dit(!!(p && typeof p.get === 'function'), 'la preuve porte son détail (`.preuves`) — le retrait automatique en a besoin');
     if (p && typeof p.get === 'function') {
       dit((p.get('I4') || []).every((x) => !x.frais) && (p.get('I2') || []).some((x) => x.frais),
         'et dit d\'où vient chaque état : confirmé par la liste des ventes, ou de la seule transaction', JSON.stringify({ I2: p.get('I2'), I4: p.get('I4') }).slice(0, 200));
     }
-    dit(lus.some((q) => /tx:meta->>id/.test(q)), 'la lecture projette le n° de transaction (§4.4 : des scalaires, jamais `data`)', lus[0]);
+    dit(lus.some((q) => /tx:meta->>id/.test(q) && /cap:meta->>capturedAt/.test(q) && !/select=[^&]*\bdata\b(?!->)/.test(q)), 'la lecture projette le n° de transaction et sa date de capture (§4.4 : des scalaires, jamais `data`)', lus[0]);
     const F2 = charger(APP, { lireTout: async () => null, fetchHarvestOrders: async () => ({ my_orders: VENTES_A }) }, dit);
     if (F2) dit((await F2.lireVentesVintedProuvees([{ vinted_user_id: 'A' }])) === null, 'transactions illisibles ⇒ `null` (« pas su »), jamais un ensemble vide');
   });
@@ -137,6 +152,7 @@ async function controles(APP, journal) {
     '7030': { numero: '30' },                          // date de mise en ligne eBay inconnue
     '7031': { numero: '31' },                          // eBay la dit déjà terminée
     '7032': { numero: '32' },                          // une seconde vente sûre (passage annulé en cours)
+    '7033': { numero: '33' },                          // revenue une fois (retour), revendue : les sources se contredisent
   };
   const txn = [
     { tx: '622', it: '7022', ti: 'Commande finalisée', at: D_VENTE },
@@ -147,12 +163,13 @@ async function controles(APP, journal) {
     { tx: '630', it: '7030', ti: 'Commande finalisée', at: D_VENTE },
     { tx: '631', it: '7031', ti: 'Commande finalisée', at: D_VENTE },
     { tx: '632', it: '7032', ti: 'Commande finalisée', at: D_VENTE },
+    { tx: '633', it: '7033', ti: 'Retour initié', at: D_VENTE },
   ];
   const fini = { status: 'Commande finalisée', date: D_VENTE };
-  const ventes = [622, 627, 628, 630, 631, 632].map((t) => ({ transaction_id: t, ...fini })).concat([{ transaction_id: 626, status: 'Remboursement effectué', date: D_VENTE }]);
+  const ventes = [622, 627, 628, 630, 631, 632, 633].map((t) => ({ transaction_id: t, ...fini })).concat([{ transaction_id: 626, status: 'Remboursement effectué', date: D_VENTE }]);
   const avant = '2026-09-15T10:00:00.000Z', apres = '2026-10-02T10:00:00.000Z';
   const annonce = (n, depuis, fin) => ({ itemId: '1100000000' + n, sku: 'VRM-' + n, title: 'Paire ' + n, depuis, ...(fin ? { fin } : {}) });
-  const ANNONCES = [annonce(22, avant), annonce(26, avant), annonce(27, apres), annonce(28, avant), annonce(29, avant), annonce(30, ''), annonce(31, avant, '2026-10-03T00:00:00.000Z'), annonce(32, avant)];
+  const ANNONCES = [annonce(22, avant), annonce(26, avant), annonce(27, apres), annonce(28, avant), annonce(29, avant), annonce(30, ''), annonce(31, avant, '2026-10-03T00:00:00.000Z'), annonce(32, avant), annonce(33, avant)];
   const MAINTENANT = Date.parse('2026-10-06T12:00:00Z');
   const scenario = async (quoi, opts) => {
     const appels = [], toasts = [];
@@ -184,9 +201,10 @@ async function controles(APP, journal) {
     dit(!ids.includes('110000000029'), 'une vente que la liste des ventes ne confirme pas ne retire rien');
     dit(!ids.includes('110000000030'), 'une date de mise en ligne eBay inconnue ne retire rien');
     dit(!ids.includes('110000000031'), 'une annonce qu\'eBay dit déjà terminée ne prend pas de place');
+    dit(!ids.includes('110000000033'), 'une paire revenue au moins une fois (la transaction dit « retour initié », la liste « finalisée ») ne se retire pas toute seule');
     dit(s.appels.every((b) => b.action === 'retirer' && b.auto === true && b.confirme === true && /^VRM-\d+$/.test(b.sku)), 'chaque envoi : {action:retirer, auto:true, confirme:true, sku VRM-n°}', JSON.stringify(s.appels[0]));
     const raisons = (s.res && s.res.ecartes || []).map((e) => `${e.numero}:${e.raison}`).sort().join(',');
-    dit(/27:ebay-apres-vente/.test(raisons) && /28:numero-partage/.test(raisons) && /29:vente-non-confirmee/.test(raisons) && /30:date-pas-sue/.test(raisons) && /31:deja-terminee/.test(raisons),
+    dit(/27:ebay-apres-vente/.test(raisons) && /28:numero-partage/.test(raisons) && /29:vente-non-confirmee/.test(raisons) && /30:date-pas-sue/.test(raisons) && /31:deja-terminee/.test(raisons) && /33:revenue-une-fois/.test(raisons),
       'chaque paire écartée l\'est pour SA raison', raisons);
   });
   await essaie('nuage pas prêt', async () => {
@@ -266,7 +284,7 @@ const PROUVE = process.argv.includes('--prouve');
     process.exit(ko ? 1 : 0);
   }
   const MUTATIONS = [
-    ['la preuve sans la liste des ventes (état périmé)', 'frais = etatsVentesFrais(', 'frais = null && etatsVentesFrais('],
+    ['la preuve sans la liste des ventes (état périmé)', 'const f = (lit && tx) ? frais.get(tx) : null;', 'const f = null;'],
     ['N° porté par plusieurs fiches accepté', "if (ids.length !== 1) { ecarte('numero-partage'); continue; }", ''],
     ['vente non confirmée acceptée', '.filter((v) => v && v.frais);', '.filter((v) => v);'],
     ['annonce eBay postérieure à la vente acceptée', "if (!(tEbay < tVente)) { ecarte('ebay-apres-vente'); continue; }", ''],
@@ -275,6 +293,9 @@ const PROUVE = process.argv.includes('--prouve');
     ['annulation relue seulement au départ', "if (typeof continuer === 'function' && !continuer()) break;", ''],
     ['un compte illisible compté « lu »', 'toutesLues: okAny && toutes', 'toutesLues: okAny'],
     ['« déjà terminée » prend une place', "else if (!(j && EBAY_DEJA_TERMINEE.test(String(j.error || '')))) n += 1;", 'else n += 1;'],
+    ['la transaction plus fraîche ignorée (la liste gagne toujours)', '!(Number.isFinite(capTx) && Number.isFinite(f.cap) && capTx > f.cap)', 'true'],
+    ['une paire revenue une fois acceptée', "if (revenues.has(ids[0])) { ecarte('revenue-une-fois'); continue; }", ''],
+    ['« article indisponible » compté comme un retour', "!/indisponible|[ée]chou/i.test(s)", 'true'],
     ['« incertain » lu comme un refus', "if (code === 0 || !j || code === 504 || (j && j.reason === 'incertain')) {", 'if (false) {'],
   ];
   let nonPris = 0;

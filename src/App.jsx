@@ -10629,7 +10629,7 @@ function EbayAnnonces({ baseKO, comptes = [] }) {
     if (retraitAuto) { setRetraitAuto(false); save('vrm_ebay_retrait_auto', false); return; }
     const ok = await askConfirm({
       title: 'Retirer d\'eBay, sans te demander, une paire vendue sur Vinted ?',
-      desc: 'Seulement quand tout est sûr : la vente Vinted est PROUVÉE et ta liste de ventes la confirme (ni remboursée, ni annulée), l\'annonce eBay porte le N° de la paire (SKU VRM-n°), ce N° n\'est porté que par une seule paire, et l\'annonce eBay a été mise en ligne AVANT la vente. Sinon, rien ne part : elle reste dans « à retirer », avec le bouton. Ça se fait quand VRM est ouvert. Une annonce eBay terminée ne revient pas : il faudrait la republier.',
+      desc: 'Seulement quand tout est sûr : la vente Vinted est PROUVÉE et ta liste de ventes la confirme (ni remboursée, ni annulée, jamais revenue chez toi), l\'annonce eBay porte le N° de la paire (SKU VRM-n°), ce N° n\'est porté que par une seule paire, et l\'annonce eBay a été mise en ligne AVANT la vente. Sinon, rien ne part : elle reste dans « à retirer », avec le bouton. Ça se fait quand VRM est ouvert. Une annonce eBay terminée ne revient pas : il faudrait la republier.',
       ok: 'Allumer', cancel: 'Annuler',
     });
     if (!ok) return;
@@ -17719,58 +17719,92 @@ const PAS_UNE_VENTE = /annul|cancel|refus|rembours|retour|suspend|[ée]chou/i;
 // chaque visite) disait « Remboursement effectué » (N°198, 277, 382). Une paire
 // REMBOURSÉE, donc revenue chez lui, passait « prouvée vendue » : l'alerte
 // « à retirer d'eBay » et le retrait automatique visaient une paire qu'il a.
-// ⇒ L'état d'une transaction est celui de la liste de ses ventes quand elle la
-//   porte, sinon celui de la transaction. Une annonce est vendue quand UNE de
-//   ses transactions est dans un état de vente — PAS « dès qu'une est
-//   annulée » : mesuré, 25 annonces portent une « Commande annulée - article
-//   indisponible » (l'acheteur qui a perdu la course) À CÔTÉ de la vente qui a
-//   eu lieu. Les écarter toutes aurait reproposé 24 paires vendues.
-// `frais` : Map(tx → { etat, date }) tirée de `orders_sold` (`etatsVentesFrais`).
-// Rend `{ vendus: Set(item), preuves: Map(item → [{ tx, etat, frais, date }]) }` ;
-// `frais: true` = l'état vient de la liste des ventes (confirmé ce jour-là),
-// `false` = de la seule transaction (peut-être périmé).
-const etatsVentesFrais = (commandes) => {
+// ⇒ L'état d'une transaction est le plus FRAIS des deux qu'on connaît : celui
+//   de la liste de ses ventes quand elle la porte et qu'elle a été relue après
+//   la ligne de transaction (mesuré : 19 transactions remboursées selon la
+//   liste, dont 3 que leur ligne disait encore « payées »), sinon celui de la
+//   transaction. Mesuré le 8 octobre : aucune
+//   transaction n'est aujourd'hui plus fraîche que sa liste et en désaccord
+//   avec elle — la règle est préventive (un compte dont la liste n'est plus
+//   relue, une conversation rouverte depuis).
+//   Une annonce est vendue quand UNE de ses transactions est dans un état de
+//   vente — PAS « dès qu'une est annulée » : mesuré le 8 octobre, 22 annonces
+//   portent une « Commande annulée - article indisponible » (l'acheteur qui a
+//   perdu la course) À CÔTÉ de la vente qui a eu lieu. Les écarter aurait
+//   reproposé 22 paires vendues.
+// `frais` : Map(tx → { etat, date, cap }) tirée de `orders_sold` (`etatsVentesFrais`).
+// Rend `{ vendus: Set(item), preuves: Map(item → [{ tx, etat, frais, date }]),
+// revenues: Set(item) }` ; `frais: true` = l'état retenu vient de la liste des
+// ventes (confirmé ce jour-là), `false` = de la seule transaction (peut-être
+// périmé). `revenues` : les annonces dont UNE transaction a, à un moment connu
+// de l'une ou l'autre source, été remboursée, retournée, suspendue ou annulée
+// (hors l'acheteur qui a perdu la course et le paiement qui a échoué) — la paire
+// est revenue au moins une fois. Le retrait AUTOMATIQUE s'abstient sur elles
+// (mesuré : 1 vente confirmée sur 215 aujourd'hui) ; l'alerte, elle, reste.
+const etatsVentesFrais = (commandes, cap = null) => {
   const m = new Map();
   for (const o of (Array.isArray(commandes) ? commandes : [])) {
     if (!o || o.transaction_id == null) continue;
     const etat = String(o.status || '').trim();
-    if (etat) m.set(String(o.transaction_id), { etat, date: o.date || null });
+    if (etat) m.set(String(o.transaction_id), { etat, date: o.date || null, cap: Number.isFinite(cap) ? cap : null });
   }
   return m;
 };
+// Un état qui fait REVENIR la paire pour de bon. L'acheteur qui a perdu la
+// course (« article indisponible » : la paire est partie chez un autre) et un
+// paiement qui a échoué (elle n'est jamais partie) ne disent pas qu'elle est
+// revenue après une vente.
+const etatRevient = (s) => !!s && PAS_UNE_VENTE.test(s) && !/indisponible|[ée]chou/i.test(s);
 function preuvesVentesVinted(rows, frais) {
-  const preuves = new Map();
+  const preuves = new Map(), revenues = new Set();
   const lit = frais && typeof frais.get === 'function';
   for (const r of (Array.isArray(rows) ? rows : [])) {
     if (!r || !r.it) continue;
+    const it = String(r.it);
     const tx = r.tx != null ? String(r.tx) : '';
     const f = (lit && tx) ? frais.get(tx) : null;
-    const etat = String((f && f.etat) || r.ti || '').trim();
+    const etatTx = String(r.ti || '').trim();
+    // La transaction relue APRÈS la liste fait foi ; date inconnue d'un côté ⇒
+    // la liste (relue à chaque visite).
+    const capTx = Date.parse(r.cap || '');
+    const parListe = !!f && !(Number.isFinite(capTx) && Number.isFinite(f.cap) && capTx > f.cap);
+    if (etatRevient(etatTx) || (f && etatRevient(f.etat))) revenues.add(it);
+    const etat = parListe ? f.etat : etatTx;
     if (!etat) continue;                          // une conversation n'est pas une vente
     if (PAS_UNE_VENTE.test(etat)) continue;       // annulée, remboursée, retour… : elle revient
-    const it = String(r.it);
     if (!preuves.has(it)) preuves.set(it, []);
-    preuves.get(it).push({ tx, etat, frais: !!f, date: (f && f.date) || r.at || null });
+    preuves.get(it).push({ tx, etat, frais: parListe, date: (f && f.date) || r.at || null });
   }
-  return { vendus: new Set(preuves.keys()), preuves };
+  return { vendus: new Set(preuves.keys()), preuves, revenues };
 }
+// La date (ms) à laquelle la liste des ventes d'un compte a été captée — posée
+// par `fetchHarvestOrders` dans `_harvestSeen`. Inconnue ⇒ null.
+const capListeVentes = (uid) => {
+  try { const v = _harvestSeen[`${uid}_orders_sold`]; return Number.isFinite(v) ? v : null; } catch (_) { return null; }
+};
 // `comptes` : ses comptes Vinted liés — TOUS, ceux qu'il a écartés compris (une
 // vente faite sur un compte exclu reste une vente). Leur liste de ventes est lue
 // par `fetchHarvestOrders` (partagée en vol avec les écrans, §4.4) ; un compte
 // illisible laisse ses transactions à leur état d'origine, sans confirmation.
 // Rend le Set des annonces vendues (ce que lisent tous les appelants), qui porte
-// aussi `.preuves` (le détail, pour le retrait automatique).
+// aussi `.preuves` et `.revenues` (le détail, pour le retrait automatique).
 const lireVentesVintedProuvees = async (comptes) => {
   try {
-    const rows = await lireTout('id=like.harvest_%25_txn_%25&select=tx:meta->>id,it:meta->>item_id,ti:meta->>status_title,at:meta->>status_updated_at', { strict: true });
+    const rows = await lireTout('id=like.harvest_%25_txn_%25&select=tx:meta->>id,it:meta->>item_id,ti:meta->>status_title,at:meta->>status_updated_at,cap:meta->>capturedAt', { strict: true });
     if (rows === null) return null;
     let frais = null;
     if (Array.isArray(comptes) && comptes.length) {
-      const lus = await Promise.all(comptes.map((a) => fetchHarvestOrders(a && a.vinted_user_id, 'sold').catch(() => undefined)));
-      frais = etatsVentesFrais(lus.flatMap((p) => (p && Array.isArray(p.my_orders)) ? p.my_orders : []));
+      const lus = await Promise.all(comptes.map(async (a) => {
+        const uid = a && a.vinted_user_id;
+        const p = await fetchHarvestOrders(uid, 'sold').catch(() => undefined);
+        return etatsVentesFrais(p && Array.isArray(p.my_orders) ? p.my_orders : [], capListeVentes(uid));
+      }));
+      frais = new Map();
+      for (const m of lus) for (const [k, v] of m) frais.set(k, v);
     }
-    const { vendus, preuves } = preuvesVentesVinted(rows, frais);
+    const { vendus, preuves, revenues } = preuvesVentesVinted(rows, frais);
     vendus.preuves = preuves;
+    vendus.revenues = revenues;
     return vendus;
   } catch (_) { return null; }
 };
@@ -29822,6 +29856,10 @@ const commandeEbayEngagee = (o) => !!o
 //      l'état le plus frais) le CONFIRME — ni remboursée, ni annulée. Une
 //      transaction que la liste ne porte pas (compte illisible, vente trop
 //      ancienne) n'est pas une confirmation ;
+//   2 bis. aucune de ses transactions n'a JAMAIS été remboursée, retournée,
+//      suspendue ou annulée, d'après l'une OU l'autre source (`revenues`) : la
+//      paire est revenue au moins une fois, et deux sources qui se contredisent
+//      ne font pas une certitude (mesuré : 1 vente confirmée sur 215) ;
 //   3. l'annonce eBay a été mise en ligne AVANT cette vente : publiée APRÈS,
 //      c'est une remise en vente voulue (la paire est revenue). Date inconnue
 //      d'un côté ou de l'autre ⇒ rien ;
@@ -29835,7 +29873,8 @@ function retraitsEbayAutoPermis({ aRetirerEbay, numeros, vendusVinted, toutesLue
   const permis = [], ecartes = [];
   const liste = Array.isArray(aRetirerEbay) ? aRetirerEbay : [];
   const preuves = vendusVinted && vendusVinted.preuves && typeof vendusVinted.preuves.get === 'function' ? vendusVinted.preuves : null;
-  if (!toutesLues || !preuves) { for (const d of liste) ecartes.push({ numero: d && d.numero, itemId: d && d.annonce && d.annonce.itemId, raison: 'pas-su' }); return { permis, ecartes }; }
+  const revenues = vendusVinted && vendusVinted.revenues && typeof vendusVinted.revenues.has === 'function' ? vendusVinted.revenues : null;
+  if (!toutesLues || !preuves || !revenues) { for (const d of liste) ecartes.push({ numero: d && d.numero, itemId: d && d.annonce && d.annonce.itemId, raison: 'pas-su' }); return { permis, ecartes }; }
   const parNum = new Map();
   for (const id in (numeros || {})) { const k = cleNum((numeros[id] || {}).numero); if (!k) continue; if (!parNum.has(k)) parNum.set(k, []); parNum.get(k).push(String(id)); }
   for (const d of liste) {
@@ -29845,6 +29884,7 @@ function retraitsEbayAutoPermis({ aRetirerEbay, numeros, vendusVinted, toutesLue
     if (!a.itemId || !n || n !== (d && d.numero)) { ecarte('sku'); continue; }
     const ids = parNum.get(n) || [];
     if (ids.length !== 1) { ecarte('numero-partage'); continue; }
+    if (revenues.has(ids[0])) { ecarte('revenue-une-fois'); continue; }
     const confirmees = (preuves.get(ids[0]) || []).filter((v) => v && v.frais);
     if (!confirmees.length) { ecarte('vente-non-confirmee'); continue; }
     const tVente = Math.max(...confirmees.map((v) => Date.parse(v.date || '')).filter(Number.isFinite), -Infinity);
@@ -34664,7 +34704,7 @@ function AppCoeur() {
           annonces:annE||[], commandes:ords||[], enLigne:enLigneE,
           toutesLues:!!(lusE && lusE.toutesLues), vendusVinted:vendusE,
           lireNumeros:()=>load('vinted_annonce_numeros',{})||{},
-        });
+        }).catch(()=>{});   // un passage qui tombe ne retire rien (il reste « à retirer »)
       }catch(_){}
       if(cancelled) return;
       // ── Centre de notifications : ce qui demande une action, ici et maintenant.
