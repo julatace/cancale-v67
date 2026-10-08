@@ -317,7 +317,7 @@ for (const [nom, txt] of [['mensuel', mensuel], ['annuel', annuel]]) {
 // pour une partie des ventes). Un rapport destiné à l'URSSAF qui annonce un
 // « CA encaissé » alors qu'il somme par DATE DE VENTE ment sur un document
 // officiel — et l'écart peut faire basculer une fin de mois.
-const carteCA = /<StatBox label="CA[^"]*" value=\{fmtE\((report|annual)\.ca\)\}/g;
+const carteCA = /<StatBox label="CA[^"]*" value=\{[^\n]*?fmtE\((report|annual)\.ca\)\}/g;
 const libelles = [...SRC.matchAll(carteCA)].map(m => m[0]);
 libelles.length === 2
   ? (libelles.some(l => /encaiss/i.test(l))

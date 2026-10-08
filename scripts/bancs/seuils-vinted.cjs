@@ -1,18 +1,29 @@
-// Banc : « Ce que Vinted transmet aux impôts », compte par compte (6 octobre).
+// Banc : « Ce que Vinted transmet aux impôts », compte par compte (6 octobre,
+// revu le même jour après une relecture contradictoire).
 //
 // Chaque année, Vinted transmet aux impôts les vendeurs qui atteignent 30 ventes
 // ou dépassent 2 000 € dans l'année (directive DAC7). La carte vit UNE fois, dans
 // Ventes → Outils → Registre annuel. Ce banc l'ouvre sur des ventes INVENTÉES
 // (aucune donnée réelle : il vit dans le dépôt, qui est public), à 390 et
-// 1512 px, et juge les NOMBRES rendus (`data-*`), jamais un libellé :
-//   1. un compte exclu de l'app n'apparaît PAS (ni ligne, ni nom) ;
-//   2. ventes finalisées seulement — l'annulée de 999 € ne compte pas ;
-//   3. 30 ventes ⇒ atteint · 2 000,01 € ⇒ atteint · 2 000,00 € pile ⇒ sous ;
-//   4. un compte dont la lecture a échoué ⇒ un tiret et la raison, JAMAIS 0 ;
-//   5. une vente vendue fin décembre, versement pas daté ⇒ « incertaine », à part ;
-//   6. le texte rendu porte les MÊMES nombres que les `data-*` ;
-//   7. aucun rouge, aucun ambre (§7), aucun débordement, aucune erreur d'app.
-// Port 4802.
+// 1512 px, et juge les NOMBRES rendus (`data-*`), jamais un libellé seul :
+//   A. la partie SÛRE de chaque compte (ventes datées du versement) est
+//      EXACTEMENT la partie Vinted du registre affiché juste au-dessus, compte
+//      par compte ET au total ; les ventes pas encore datées sont à part, jamais
+//      dans la partie sûre ; un seuil atteint seulement avec elles se dit
+//      « atteint si… » ; une ligne TOTAL de tous les comptes, « au moins » quand
+//      un compte manque ; « à ce jour » et ce qu'il reste avant le seuil ;
+//      aucune phrase « jamais d'écart », aucun « Vinted transmet ce compte » ;
+//   B. CACHE : un compte en panne au premier passage reste « pas su » après un
+//      rechargement (le cache gardait la liste sans son échec ⇒ « 0 vente ») ;
+//      le bandeau de l'écran Ventes le dit encore ; « Relire mes ventes » relit
+//      vraiment et le compte apparaît ;
+//   C. un libellé de compte arrivé du nuage APRÈS la lecture : le compte en
+//      panne reste « pas su » (jugé par son identité, pas par son nom) ;
+//   D. panne totale et lecture en cours : la phrase dite UNE fois au-dessus des
+//      lignes, « — » sur chaque ligne, aucun « 0 € » au registre ;
+//   E. une année passée : pas de « à ce jour », pas de reste avant le seuil.
+// Et toujours : un compte exclu n'apparaît pas, aucun rouge ni ambre (§7),
+// aucun débordement, aucune erreur d'app. Port 4802.
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
@@ -26,12 +37,13 @@ const debutAn = new Date(AN, 0, 1, 12).getTime();
 const ilYa = (k) => new Date(Math.max(debutAn, maintenant - (k + 1) * 3600e3)).toISOString();
 const FIN = 'Commande finalisée - l\'acheteur a validé la commande';
 const COMPTES = {
-  '9101': 'compte_alpha',   // 31 ventes de 10 € → 30 ventes atteintes
-  '9102': 'compte_beta',    // 29 ventes, 2 000,00 € PILE → sous les seuils
-  '9103': 'compte_gamma',   // 3 ventes, 2 000,01 € → plus de 2 000 €
+  '9101': 'compte_alpha',   // 31 ventes de 10 € : 10 datées du versement, 21 pas encore → « atteint si »
+  '9102': 'compte_beta',    // 15 datées (1 089,90 €) + 14 pas encore (910,10 €) = 2 000,00 € pile → sous
+  '9103': 'compte_gamma',   // 2 datées (1 200,01 €) + 1 pas encore (800 €) = 2 000,01 € → « atteint si »
   '9104': 'compte_exclu',   // exclu de l'app : 40 ventes qui ne doivent apparaître nulle part
-  '9105': 'compte_panne',   // sa lecture échoue (500) : « pas su »
-  '9106': 'compte_delta',   // 29 ventes + 1 vendue fin décembre, versement pas daté
+  '9105': 'compte_panne',   // 35 ventes datées (700 €) — c'est sa LECTURE qui échoue
+  '9106': 'compte_delta',   // 0 datée, 29 pas encore + 1 vendue fin décembre dernier → « atteint si »
+  '9107': 'compte_epsilon', // 32 ventes datées de 20 € → seuil atteint, sûr
 };
 const ACCOUNTS = Object.entries(COMPTES).map(([uid, login], i) => ({ id: i + 1, vinted_user_id: uid, login, domain: 'www.vinted.fr', updated_at: new Date().toISOString() }));
 let tx = 70000;
@@ -48,17 +60,22 @@ vente('9102', 109.9, FIN, ilYa(30), true);
 vente('9102', 0.1, FIN, ilYa(31), false);
 vente('9103', 900, FIN, ilYa(2), true); vente('9103', 800, FIN, ilYa(3), false); vente('9103', 300.01, FIN, ilYa(4), true);
 for (let i = 0; i < 40; i++) vente('9104', 60, FIN, ilYa(i), false);
+for (let i = 0; i < 35; i++) vente('9105', 20, FIN, ilYa(i), true);
 for (let i = 0; i < 29; i++) vente('9106', 15, FIN, ilYa(i), false);
 vente('9106', 15, FIN, new Date(AN - 1, 11, 20, 12).toISOString(), false);
+for (let i = 0; i < 32; i++) vente('9107', 20, FIN, ilYa(i), true);
+// La partie SÛRE (datée du versement) et la partie pas encore datée, compte par compte.
 const ATTENDU = {
-  '9101': { n: 31, eur: '310.00', verdict: 'atteint', inc: 0 },
-  '9102': { n: 29, eur: '2000.00', verdict: 'sous', inc: 0 },
-  '9103': { n: 3, eur: '2000.01', verdict: 'atteint', inc: 0 },
-  '9106': { n: 29, eur: '435.00', verdict: 'peutEtre', inc: 1 },
+  '9101': { n: 10, eur: '100.00', ad: 21, verdict: 'atteintSi' },
+  '9102': { n: 15, eur: '1089.90', ad: 14, verdict: 'sous', resteN: 15, resteEur: '910.11' },
+  '9103': { n: 2, eur: '1200.01', ad: 1, verdict: 'atteintSi' },
+  '9106': { n: 0, eur: '0.00', ad: 30, verdict: 'atteintSi' },
+  '9107': { n: 32, eur: '640.00', ad: 0, verdict: 'atteint' },
 };
+const PANNE_LU = { n: 35, eur: '700.00', ad: 0, verdict: 'atteint' };
 
-const rows = [
-  { id: 'main', data: { vinted_accounts_hidden: ['9104'] } },
+const rowsDe = (main) => [
+  { id: 'main', data: main },
   ...Object.entries(VENTES).map(([uid, l]) => ({ id: `harvest_${uid}_orders_sold`, data: { capturedAt: new Date().toISOString(), payload: { my_orders: l } } })),
   ...Object.entries(VERS).map(([t, v]) => ({ id: `harvest_${v.uid}_txn_${t}`, data: { capturedAt: new Date().toISOString(), payload: { transaction: { id: Number(t), status: 450, status_updated_at: new Date(Date.parse(v.date) + 3600e3).toISOString() } } } })),
 ];
@@ -92,80 +109,263 @@ const projette = (r, sel) => {
   return vu ? o : { ...r };
 };
 
+// Une page de l'app servie par une base FAUSSE dont la panne se règle en direct.
+//   etat.panne9105  : la lecture des ventes de compte_panne échoue
+//   etat.panne9101  : la lecture des ventes de compte_alpha échoue
+//   etat.panneTout  : la lecture de TOUTES les ventes échoue
+//   etat.delaiOrders: les ventes répondent avec ce retard (ms)
+//   etat.delaiMain  : la ligne `main` (le nuage) répond avec ce retard (ms)
+const page = async (b, vp, etat, main) => {
+  const rows = rowsDe(main);
+  const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
+  const pg = await ctx.newPage();
+  const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
+  await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_accounts_hidden', JSON.stringify(['9104'])); } catch (_) {} });
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  await pg.route('**/rest/v1/**', async (route) => {
+    const u = decodeURIComponent(metaVersData(route.request().url()));
+    const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
+    // La forme réelle d'une panne : pas de JSON.
+    const panne = () => route.fulfill({ status: 500, contentType: 'text/html', headers: { 'access-control-allow-origin': '*' }, body: '<html>erreur</html>' });
+    if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
+    if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCOUNTS);
+    if (/_orders_/.test(u)) {
+      if (etat.delaiOrders) await new Promise((r) => setTimeout(r, etat.delaiOrders));
+      if (etat.panneTout) return panne();
+      if (etat.panne9105 && /harvest_9105_/.test(u)) return panne();
+      if (etat.panne9101 && /harvest_9101_/.test(u)) return panne();
+    }
+    if (route.request().method() !== 'GET') return route.fulfill({ status: 201, headers: { 'access-control-allow-origin': '*' }, body: '' });
+    if (etat.delaiMain && /id=eq\.main/.test(u)) await new Promise((r) => setTimeout(r, etat.delaiMain));
+    const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || '';
+    const eq = /[?&]id=eq\.([^&]*)/.exec(u);
+    if (eq) return j(rows.filter((r) => r.id === eq[1]).map((r) => projette(r, sel)));
+    const lk = /[?&]id=like\.([^&]*)/.exec(u);
+    if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(rows.filter((r) => re.test(r.id)).map((r) => projette(r, sel))); }
+    return j([]);
+  });
+  await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
+  return { ctx, pg, errs };
+};
+const ouvreRegistre = async (pg) => {
+  await pg.getByText('Outils', { exact: false }).first().click({ timeout: 8000 });
+  await pg.getByText('Registre annuel', { exact: true }).first().click({ timeout: 8000 });
+  await pg.waitForTimeout(1500);
+};
+const fermeRegistre = async (pg) => { await pg.locator('button[aria-label="Fermer"]').first().click({ timeout: 4000 }).catch(() => {}); await pg.waitForTimeout(400); };
+// Ce que la carte et le registre RENDENT — nombres portés en data-*, texte rendu.
+const lit = (pg) => pg.evaluate(() => {
+  const carte = document.querySelector('[data-seuils-vinted]');
+  const ligne = (l) => ({ uid: l.dataset.seuilCompte, etat: l.dataset.etat, n: l.dataset.n, eur: l.dataset.eur, verdict: l.dataset.verdict, ad: l.dataset.adater, eurAd: l.dataset.eurAdater, resteN: l.dataset.resteN, resteEur: l.dataset.resteEur, partiel: l.dataset.partiel, txt: l.innerText });
+  const lignes = carte ? [...carte.querySelectorAll('[data-seuil-compte]')].map(ligne) : null;
+  const tot = carte && carte.querySelector('[data-seuils-total]');
+  const reg = document.querySelector('[data-registre-vinted]');
+  let regParUid = null; try { regParUid = reg ? JSON.parse(reg.dataset.registreVinted) : null; } catch (_) {}
+  // §7 : aucune couleur d'ALERTE (rouge, ambre) dans la carte.
+  const alertes = [];
+  if (carte) for (const el of [carte, ...carte.querySelectorAll('*')]) {
+    const cs = getComputedStyle(el);
+    for (const prop of ['color', 'borderTopColor', 'borderLeftColor', 'backgroundColor']) {
+      const m = /rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?/.exec(cs[prop]); if (!m) continue;
+      if (m[4] != null && Number(m[4]) < 0.05) continue;
+      const [R, G, B] = [m[1], m[2], m[3]].map(Number);
+      if (R - Math.max(G, B) > 70) alertes.push(prop + ' ' + cs[prop]);
+    }
+  }
+  const bt = document.body.innerText;
+  const iCA = bt.search(/CA des ventes finalis/i);
+  return {
+    annee: carte ? carte.dataset.seuilsVinted : null, aCeJour: carte ? carte.dataset.aCeJour : null, txt: carte ? carte.innerText : '', lignes,
+    total: tot ? ligne(tot) : null,
+    reg: regParUid, regN: reg ? reg.dataset.registreVintedN : null, regEur: reg ? reg.dataset.registreVintedEur : null,
+    caRegistre: iCA >= 0 ? bt.slice(iCA, iCA + 110).replace(/\n/g, ' | ') : '',
+    nPanne: carte ? carte.querySelectorAll('[data-seuils-panne]').length : 0,
+    relire: !!(carte && carte.querySelector('[data-relire-ventes]')),
+    alertes, mort: /n'a pas pu s'afficher|Cannot access|is not defined/.test(bt), sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth,
+  };
+});
+const compte = (txt, s) => txt.split(s).length - 1;
+const par = (r) => Object.fromEntries((r.lignes || []).map((l) => [l.uid, l]));
+// La partie SÛRE de chaque ligne == la partie Vinted du registre (absent du registre ⇒ 0).
+const egalRegistre = (r, uids, quoi) => {
+  const p = par(r);
+  for (const uid of uids) {
+    const l = p[uid], g = r.reg ? (r.reg[uid] || { n: 0, eur: '0.00' }) : null;
+    dit(!!(l && g && l.etat === 'lu' && Number(l.n) === Number(g.n) && l.eur === g.eur),
+      `${quoi} ${COMPTES[uid]} : la partie sûre de la carte est EXACTEMENT celle du registre`, l ? `carte ${l.n} · ${l.eur} € (${l.etat}) — registre ${g ? g.n + ' · ' + g.eur + ' €' : 'ABSENT'}` : 'ligne absente');
+  }
+  const lus = (r.lignes || []).filter((l) => l.etat === 'lu');
+  const sn = lus.reduce((s, l) => s + Number(l.n), 0), se = lus.reduce((s, l) => s + Number(l.eur), 0);
+  dit(!!(r.total && r.regN != null && Number(r.total.n) === Number(r.regN) && Number(r.total.eur).toFixed(2) === Number(r.regEur).toFixed(2) && Number(r.total.n) === sn && Math.abs(Number(r.total.eur) - se) < 0.005),
+    `${quoi} au TOTAL : la ligne « tous tes comptes » == la partie Vinted du registre == la somme des lignes`,
+    `total carte ${r.total ? r.total.n + ' · ' + r.total.eur : 'ABSENT'} — registre ${r.regN} · ${r.regEur} — somme des lignes ${sn} · ${se.toFixed(2)}`);
+};
+const communs = (r, errs, quoi) => {
+  dit(!r.mort, `${quoi} l'écran n'est pas tombé sur le garde-fou`);
+  dit(r.alertes.length === 0, `${quoi} aucune couleur d'alerte (rouge, ambre) dans la carte (§7)`, r.alertes.slice(0, 3).join(' · '));
+  dit(r.sw <= r.cw + 1, `${quoi} aucun débordement horizontal`, `${r.sw} > ${r.cw}`);
+  dit(errs.length === 0, `${quoi} aucune erreur d'app`, errs.join(' | ').slice(0, 160));
+};
+
 (async () => {
   let b;
   try {
     b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+    const mainNormal = { vinted_accounts_hidden: ['9104'] };
+
+    // ── A. Le cas courant, aux deux tailles : compte_panne ne répond pas.
     for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }]) {
-      console.log(`── ${vp.width} px`);
-      const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
-      const pg = await ctx.newPage();
-      const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
-      await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_accounts_hidden', JSON.stringify(['9104'])); } catch (_) {} });
-      await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
-      await pg.route('**/rest/v1/**', (route) => {
-        const u = decodeURIComponent(metaVersData(route.request().url()));
-        const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
-        if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
-        if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCOUNTS);
-        // La lecture des ventes de « compte_panne » ÉCHOUE (la forme réelle d'une panne : pas de JSON).
-        if (/harvest_9105_/.test(u)) return route.fulfill({ status: 500, contentType: 'text/html', headers: { 'access-control-allow-origin': '*' }, body: '<html>erreur</html>' });
-        if (route.request().method() !== 'GET') return route.fulfill({ status: 201, headers: { 'access-control-allow-origin': '*' }, body: '' });
-        const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || '';
-        const eq = /[?&]id=eq\.([^&]*)/.exec(u);
-        if (eq) return j(rows.filter((r) => r.id === eq[1]).map((r) => projette(r, sel)));
-        const lk = /[?&]id=like\.([^&]*)/.exec(u);
-        if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(rows.filter((r) => re.test(r.id)).map((r) => projette(r, sel))); }
-        return j([]);
-      });
-      await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
-      await pg.goto(`http://localhost:${PORT}/?tab=cat_ventes`, { waitUntil: 'domcontentloaded' });
-      await pg.waitForTimeout(3000);
+      const q = `[A ${vp.width}]`;
+      console.log(`── A · ${vp.width} px`);
+      const etat = { panne9105: true };
+      const { ctx, pg, errs } = await page(b, vp, etat, mainNormal);
       try {
-        await pg.getByText('Outils', { exact: false }).first().click({ timeout: 5000 });
-        await pg.getByText('Registre annuel', { exact: true }).first().click({ timeout: 5000 });
-      } catch (e) { dit(false, 'le registre annuel s’ouvre depuis « Outils »', String(e.message).slice(0, 100)); await ctx.close(); continue; }
-      await pg.waitForTimeout(1500);
-      const r = await pg.evaluate(() => {
-        const carte = document.querySelector('[data-seuils-vinted]');
-        const lignes = carte ? [...carte.querySelectorAll('[data-seuil-compte]')].map((l) => ({ uid: l.dataset.seuilCompte, etat: l.dataset.etat, n: l.dataset.n, eur: l.dataset.eur, verdict: l.dataset.verdict, inc: l.dataset.incertaines, txt: l.innerText })) : null;
-        // §7 : aucune couleur d'ALERTE (rouge, ambre) dans la carte.
-        const alertes = [];
-        if (carte) for (const el of [carte, ...carte.querySelectorAll('*')]) {
-          const cs = getComputedStyle(el);
-          for (const prop of ['color', 'borderTopColor', 'borderLeftColor', 'backgroundColor']) {
-            const m = /rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?/.exec(cs[prop]); if (!m) continue;
-            if (m[4] != null && Number(m[4]) < 0.05) continue;
-            const [R, G, B] = [m[1], m[2], m[3]].map(Number);
-            if (R - Math.max(G, B) > 70) alertes.push(prop + ' ' + cs[prop]);
-          }
+        await pg.goto(`http://localhost:${PORT}/?tab=cat_ventes`, { waitUntil: 'domcontentloaded' });
+        await pg.waitForTimeout(3000);
+        await ouvreRegistre(pg);
+        const r = await lit(pg);
+        const p = par(r);
+        dit(r.annee === String(AN), `${q} la carte est dans le registre annuel, pour l'année affichée`, `année ${r.annee}`);
+        dit(!p['9104'] && !/compte_exclu/.test(r.txt), `${q} un compte EXCLU de l'app n'apparaît pas — ni sa ligne, ni son nom`);
+        dit((r.lignes || []).length === 6, `${q} les six autres comptes sont là, aucun perdu`, `${(r.lignes || []).length} ligne(s)`);
+        // La partie sûre, et la partie pas encore datée À PART.
+        for (const [uid, a] of Object.entries(ATTENDU)) {
+          const l = p[uid];
+          dit(!!(l && l.etat === 'lu' && Number(l.n) === a.n && l.eur === a.eur && Number(l.ad) === a.ad && l.verdict === a.verdict),
+            `${q} ${COMPTES[uid]} : ${a.n} datées · ${a.eur} € · ${a.ad} pas encore datées · ${a.verdict}`, l ? `rendu ${l.n} · ${l.eur} € · ${l.ad} · ${l.verdict} · ${l.etat}` : 'absent');
         }
-        return { annee: carte ? carte.dataset.seuilsVinted : null, txt: carte ? carte.innerText : '', lignes, alertes, mort: /n'a pas pu s'afficher|Cannot access|is not defined/.test(document.body.innerText), sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth };
-      });
-      dit(!r.mort, 'l’écran n’est pas tombé sur le garde-fou');
-      dit(r.annee === String(AN), 'la carte « Ce que Vinted transmet aux impôts » est dans le registre annuel, pour l’année affichée', `année ${r.annee}`);
-      const L = r.lignes || [];
-      const par = Object.fromEntries(L.map((l) => [l.uid, l]));
-      dit(!par['9104'] && !/compte_exclu/.test(r.txt), 'un compte EXCLU de l’app n’apparaît pas — ni sa ligne, ni son nom', par['9104'] ? JSON.stringify(par['9104']) : '');
-      dit(L.length === 5, 'les cinq autres comptes sont là, aucun perdu', `${L.length} ligne(s)`);
-      for (const [uid, a] of Object.entries(ATTENDU)) {
-        const l = par[uid];
-        dit(l && l.etat === 'lu' && Number(l.n) === a.n && l.eur === a.eur && l.verdict === a.verdict && Number(l.inc) === a.inc,
-          `${COMPTES[uid]} : ${a.n} ventes · ${a.eur} € · ${a.verdict}${a.inc ? ' · ' + a.inc + ' incertaine' : ''}`, l ? `rendu n=${l.n} · ${l.eur} € · ${l.verdict} · inc ${l.inc} · ${l.etat}` : 'absent');
-        // Le TEXTE porte les mêmes nombres que les data-* (sinon l'attribut ment).
-        const eurFr = a.eur.replace('.', ',');
-        dit(l && new RegExp('\\b' + a.n + ' ventes?\\b').test(l.txt) && l.txt.includes(eurFr + ' €'), `${COMPTES[uid]} : le texte rendu dit ${a.n} ventes et ${eurFr} €`, l ? l.txt.replace(/\n/g, ' | ').slice(0, 160) : '');
-      }
-      const p = par['9105'];
-      dit(p && p.etat === 'pasSu' && p.n === '' && p.verdict === '', 'compte_panne : lecture ratée ⇒ « pas su », aucun nombre, aucun verdict', p ? `etat ${p.etat} · n «${p.n}» · verdict «${p.verdict}»` : 'absent');
-      dit(p && /—/.test(p.txt) && !/\b0 vente/.test(p.txt) && !/sous les seuils/i.test(p.txt), 'compte_panne : un tiret et la raison, JAMAIS « 0 vente · sous les seuils »', p ? p.txt.replace(/\n/g, ' | ').slice(0, 160) : '');
-      dit(/exclus de l'app/.test(r.txt), 'la carte dit, une fois et sans les nommer, que les comptes exclus ne sont pas comptés');
-      dit(/30 ventes/.test(r.txt) && /2[\s\u00a0\u202f]?000[\s\u00a0\u202f]€/.test(r.txt) && /DAC7/.test(r.txt), 'la carte dit les deux seuils et leur source, une fois');
-      dit((r.txt.match(/pour qu'il n'y ait jamais d'écart/g) || []).length === 1, 'la phrase « pourquoi c’est utile » est dite une seule fois');
-      dit(r.alertes.length === 0, 'aucune couleur d’alerte (rouge, ambre) dans la carte (§7)', r.alertes.slice(0, 3).join(' · '));
-      dit(r.sw <= r.cw + 1, 'aucun débordement horizontal', `${r.sw} > ${r.cw}`);
-      dit(errs.length === 0, 'aucune erreur d’app', errs.join(' | ').slice(0, 160));
-      try { await pg.locator('[data-seuils-vinted]').first().screenshot({ path: path.join(require('os').tmpdir(), 'seuils-vinted-' + vp.width + '.png') }); } catch (_) {}
+        egalRegistre(r, Object.keys(ATTENDU), q);
+        // « Atteint si… » : le texte dit la condition — jamais « atteint » tout court.
+        const al = p['9101'];
+        dit(!!(al && /atteint si/i.test(al.txt) && /21 ventes pas encore datées/.test(al.txt)), `${q} compte_alpha : le seuil n'est atteint QU'AVEC les pas encore datées — la ligne le dit (« atteint si… »)`, al ? al.txt.replace(/\n/g, ' | ') : '');
+        const ep = p['9107'];
+        dit(!!(ep && /seuil atteint/i.test(ep.txt) && !/ si /i.test(ep.txt.split('\n')[1] || '')), `${q} compte_epsilon : seuil atteint sur la partie datée, dit sans condition`, ep ? ep.txt.replace(/\n/g, ' | ') : '');
+        // L'année en cours : « à ce jour » et ce qu'il reste avant le seuil (sur la partie sûre).
+        const be = p['9102'];
+        dit(r.aCeJour === '1' && /à ce jour/.test(r.txt), `${q} l'année en cours se dit « à ce jour »`, `data-a-ce-jour=${r.aCeJour}`);
+        dit(!!(be && Number(be.resteN) === 15 && be.resteEur === '910.11' && /encore 15 ventes ou 910,11\s€ avant le seuil/.test(be.txt)), `${q} compte_beta : « encore 15 ventes ou 910,11 € avant le seuil »`, be ? `reste ${be.resteN} · ${be.resteEur} — ${be.txt.replace(/\n/g, ' | ')}` : '');
+        // La ligne TOTAL, dite comme telle, « au moins » puisqu'un compte manque.
+        dit(!!(r.total && r.total.etat === 'lu' && r.total.partiel === '9105' && /au moins/.test(r.total.txt) && /compte_panne/.test(r.total.txt) && r.total.verdict === 'atteint'),
+          `${q} la ligne « tous tes comptes » existe, sans compte_panne, « au moins » — atteint sur ce qu'on sait`, r.total ? `${r.total.etat} · partiel ${r.total.partiel} · ${r.total.verdict} — ${r.total.txt.replace(/\n/g, ' | ')}` : 'absente');
+        dit(/ne sait pas si Vinted juge chaque compte/.test(r.txt), `${q} la carte dit qu'on ne sait pas si Vinted juge les comptes à part ou ensemble`);
+        dit(!/Vinted transmet ce compte/.test(r.txt) && !/jamais d'écart/.test(r.txt), `${q} ni « Vinted transmet ce compte », ni « jamais d'écart »`);
+        dit(compte(r.txt, 'estimation') === 1 && /pas un chiffre du registre/.test(r.txt), `${q} les « pas encore datées » sont dites UNE fois comme une estimation`, `${compte(r.txt, 'estimation')} fois`);
+        // La panne : UNE phrase au-dessus des lignes, « — » sur la ligne.
+        const pa = p['9105'];
+        dit(!!(pa && pa.etat === 'pasSu' && pa.n === '' && pa.verdict === '' && /—/.test(pa.txt) && !/\b0 vente/.test(pa.txt) && !/sous les seuils/i.test(pa.txt) && pa.txt.length < 40),
+          `${q} compte_panne : « — » sur la ligne, aucun nombre, aucun verdict`, pa ? `${pa.etat} · «${pa.txt.replace(/\n/g, ' | ')}»` : 'absent');
+        dit(r.nPanne === 1 && compte(r.txt, "n'ont pas pu être lues") === 1 && r.relire, `${q} la panne dite UNE fois au-dessus des lignes, avec « Relire mes ventes »`, `${r.nPanne} bloc · ${compte(r.txt, "n'ont pas pu être lues")} phrase · bouton ${r.relire}`);
+        dit(/ventes de compte_panne pas lues/.test(r.caRegistre), `${q} le CA du registre dit que les ventes de compte_panne n'ont pas été lues`, r.caRegistre);
+        dit(/exclus de l'app/.test(r.txt), `${q} la carte dit, une fois et sans les nommer, que les comptes exclus ne sont pas comptés`);
+        communs(r, errs, q);
+        try { await pg.locator('[data-seuils-vinted]').first().screenshot({ path: path.join(require('os').tmpdir(), 'seuils-vinted-' + vp.width + '.png') }); } catch (_) {}
+        // E. Une année passée : ni « à ce jour », ni reste avant le seuil.
+        if (vp.width > 600) {
+          await pg.locator('select').filter({ has: pg.locator(`option[value="${AN - 1}"]`) }).first().selectOption(String(AN - 1), { timeout: 4000 });
+          await pg.waitForTimeout(800);
+          const e = await lit(pg);
+          dit(e.annee === String(AN - 1) && e.aCeJour === '0' && !/à ce jour/.test(e.txt) && !/avant le seuil/.test(e.txt), `[E] année ${AN - 1} : ni « à ce jour », ni reste avant le seuil`, `${e.annee} · data-a-ce-jour=${e.aCeJour}`);
+          const d = par(e)['9106'];
+          dit(!!(d && d.n === '0' && d.ad === '1'), `[E] la vente de décembre sans date : « pas encore datée » de ${AN - 1} aussi, jamais sûre`, d ? `${d.n} · ${d.ad}` : 'absent');
+        }
+      } catch (e) { dit(false, `${q} le scénario a tourné jusqu'au bout`, String(e && e.message).slice(0, 160)); }
+      await ctx.close();
+    }
+
+    // ── B. Le CACHE : compte_panne rate le premier passage, la base répond au suivant.
+    {
+      const q = '[B cache 390]';
+      console.log('── B · cache, 390 px');
+      const etat = { panne9105: true };
+      const { ctx, pg, errs } = await page(b, { width: 390, height: 844 }, etat, mainNormal);
+      try {
+        await pg.goto(`http://localhost:${PORT}/?tab=cat_ventes`, { waitUntil: 'domcontentloaded' });
+        await pg.waitForTimeout(3000);
+        etat.panne9105 = false;                                    // la base répond de nouveau
+        await pg.goto(`http://localhost:${PORT}/?tab=cat_ventes`, { waitUntil: 'domcontentloaded' });   // rechargement < 3 min
+        await pg.waitForTimeout(3500);
+        const bandeau = await pg.evaluate(() => { const t = document.body.innerText; const m = /\d+ comptes? non chargés?[^\n]*/.exec(t); return m ? m[0] : ''; });
+        dit(/compte_panne/.test(bandeau), `${q} écran Ventes, après rechargement : le bandeau « compte non chargé » nomme encore compte_panne`, bandeau.slice(0, 100) || '(aucun bandeau)');
+        await ouvreRegistre(pg);
+        const r = await lit(pg);
+        const pa = par(r)['9105'];
+        dit(!!(pa && pa.etat === 'pasSu' && pa.n === ''), `${q} après rechargement, compte_panne est TOUJOURS « pas su » — jamais « 0 vente »`, pa ? `${pa.etat} · n «${pa.n}» · ${pa.txt.replace(/\n/g, ' | ')}` : 'absent');
+        dit(/ventes de compte_panne pas lues/.test(r.caRegistre), `${q} le CA du registre le dit encore`, r.caRegistre);
+        dit(r.relire, `${q} un bouton « Relire mes ventes » est là`);
+        // Relecture DISCRÈTE (l'extension prévient « ventes rangées ») : compte_panne
+        // répond, mais compte_alpha tombe à son tour.
+        // ⚠️ L'ancienne relecture discrète gardait TOUTE la liste d'avant avec la
+        //    NOUVELLE liste d'échecs : compte_panne (absent de la liste d'avant,
+        //    plus en échec) passait pour « 0 vente ».
+        etat.panne9105 = false; etat.panne9101 = true;
+        await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:ext', { detail: { type: 'maj', quoi: 'ventes' } })));
+        for (let i = 0; i < 20; i++) { await pg.waitForTimeout(400); const x = par(await lit(pg)); if (x['9101'] && x['9101'].etat !== 'lu') break; }
+        const r1 = await lit(pg);
+        const a1 = par(r1)['9105'], b1 = par(r1)['9101'];
+        dit(!!(a1 && a1.etat === 'lu' && Number(a1.n) === PANNE_LU.n && a1.eur === PANNE_LU.eur), `${q} relecture discrète où un AUTRE compte tombe : compte_panne a sa lecture fraîche (35 ventes), jamais « 0 vente »`, a1 ? `${a1.etat} · ${a1.n} · ${a1.eur}` : 'absent');
+        dit(!!(b1 && b1.etat === 'pasSu' && b1.n === ''), `${q} …et compte_alpha, qui n'a pas répondu cette fois, est « pas su »`, b1 ? `${b1.etat} · n «${b1.n}»` : 'absent');
+        dit(r1.nPanne === 1 && /compte_alpha/.test(r1.txt) && r1.relire, `${q} …la phrase de panne nomme compte_alpha, une fois, avec le bouton`, `${r1.nPanne} bloc · bouton ${r1.relire}`);
+        // « Relire mes ventes » : compte_alpha répond de nouveau.
+        etat.panne9101 = false;
+        if (r1.relire) {
+          await pg.locator('[data-relire-ventes]').first().click({ timeout: 4000 });
+          for (let i = 0; i < 20; i++) { await pg.waitForTimeout(400); const x = par(await lit(pg)); if (x['9101'] && x['9101'].etat === 'lu') break; }
+        }
+        const r2 = await lit(pg);
+        const p2 = par(r2)['9105'];
+        dit(!!(p2 && p2.etat === 'lu' && Number(p2.n) === PANNE_LU.n && p2.eur === PANNE_LU.eur && p2.verdict === PANNE_LU.verdict), `${q} « Relire mes ventes » relit pour de vrai : tout est lu, compte_panne à 35 ventes · 700 € · atteint`, p2 ? `${p2.etat} · ${p2.n} · ${p2.eur} · ${p2.verdict}` : 'absent');
+        dit(r2.nPanne === 0 && !!r2.total && r2.total.partiel === '' && (r2.lignes || []).every((l) => l.etat === 'lu'), `${q} après « Relire mes ventes », tout est lu : plus de phrase de panne, le total n'est plus partiel`, `${r2.nPanne} · partiel «${r2.total && r2.total.partiel}» · ${(r2.lignes || []).map((l) => l.etat).join(',')}`);
+        egalRegistre(r2, [...Object.keys(ATTENDU), '9105'], q + ' après relecture,');
+        await fermeRegistre(pg);
+        const bandeau2 = await pg.evaluate(() => /comptes? non chargés?/.test(document.body.innerText));
+        dit(!bandeau2, `${q} le bandeau de l'écran Ventes est parti`);
+        communs(r2, errs, q);
+      } catch (e) { dit(false, `${q} le scénario a tourné jusqu'au bout`, String(e && e.message).slice(0, 160)); }
+      await ctx.close();
+    }
+
+    // ── C. Un libellé arrivé du nuage APRÈS la lecture des ventes.
+    {
+      const q = '[C libellé 1512]';
+      console.log('── C · libellé tardif, 1512 px');
+      const etat = { panne9105: true, delaiMain: 4000 };
+      const { ctx, pg, errs } = await page(b, { width: 1512, height: 950 }, etat, { ...mainNormal, vinted_account_labels: { '9105': 'Boutique Panne' } });
+      try {
+        await pg.goto(`http://localhost:${PORT}/?tab=cat_ventes`, { waitUntil: 'domcontentloaded' });
+        await pg.waitForTimeout(7000);
+        const bandeau = await pg.evaluate(() => { const t = document.body.innerText; const m = /\d+ comptes? non chargés?[^\n]*/.exec(t); return m ? m[0] : ''; });
+        dit(/Boutique Panne/.test(bandeau), `${q} le bandeau nomme le compte par son libellé du moment (jugé par l'identité)`, bandeau.slice(0, 100) || '(aucun bandeau)');
+        await ouvreRegistre(pg);
+        const r = await lit(pg);
+        const pa = par(r)['9105'];
+        dit(!!(pa && pa.etat === 'pasSu' && pa.n === '' && /Boutique Panne/.test(pa.txt)), `${q} renommé après la lecture, le compte en panne reste « pas su » — jamais « 0 vente · sous les seuils »`, pa ? `${pa.etat} · n «${pa.n}» · ${pa.txt.replace(/\n/g, ' | ')}` : 'absent');
+        dit(/Boutique Panne/.test(r.total ? r.total.txt : '') && r.total && r.total.partiel === '9105', `${q} le total dit « sans Boutique Panne »`, r.total ? r.total.txt.replace(/\n/g, ' | ') : 'absent');
+        communs(r, errs, q);
+      } catch (e) { dit(false, `${q} le scénario a tourné jusqu'au bout`, String(e && e.message).slice(0, 160)); }
+      await ctx.close();
+    }
+
+    // ── D. Lecture en cours, puis panne TOTALE.
+    {
+      const q = '[D panne 390]';
+      console.log('── D · lecture en cours puis panne totale, 390 px');
+      const etat = { panneTout: true, delaiOrders: 7000 };
+      const { ctx, pg, errs } = await page(b, { width: 390, height: 844 }, etat, mainNormal);
+      try {
+        await pg.goto(`http://localhost:${PORT}/?tab=cat_ventes`, { waitUntil: 'domcontentloaded' });
+        await pg.waitForTimeout(2500);
+        await ouvreRegistre(pg);
+        const c = await lit(pg);
+        dit(c.lignes && c.lignes.length === 6 && compte(c.txt, 'Lecture des ventes') <= 1 && c.lignes.every((l) => l.etat === 'enCours' && !/Lecture/.test(l.txt)),
+          `${q} pendant la lecture : « Lecture des ventes… » UNE fois au plus, « — » sur les lignes`, `${compte(c.txt, 'Lecture des ventes')} fois · ${(c.lignes || []).map((l) => l.etat).join(',')}`);
+        await pg.waitForTimeout(8000);
+        const r = await lit(pg);
+        dit(r.lignes && r.lignes.length === 6 && r.lignes.every((l) => l.etat === 'pasSu' && l.n === '' && l.txt.length < 40), `${q} panne totale : chaque ligne « — », aucun nombre`, (r.lignes || []).map((l) => `${l.etat}:${l.txt.replace(/\n/g, '|')}`).join(' · ').slice(0, 200));
+        dit(r.nPanne === 1 && compte(r.txt, "n'ont pas pu être lues") === 1, `${q} la phrase de panne UNE fois (pas une par compte)`, `${r.nPanne} bloc · ${compte(r.txt, "n'ont pas pu être lues")} phrase(s)`);
+        dit(!!(r.total && r.total.etat === 'pasSu' && r.total.n === ''), `${q} le total : « — », jamais 0`, r.total ? `${r.total.etat} · «${r.total.txt.replace(/\n/g, ' | ')}»` : 'absent');
+        dit(!/0,00\s€/.test(r.caRegistre.split('|').slice(0, 2).join('|')), `${q} le CA du registre ne dit pas « 0,00 € » sur une lecture ratée`, r.caRegistre);
+        communs(r, errs, q);
+      } catch (e) { dit(false, `${q} le scénario a tourné jusqu'au bout`, String(e && e.message).slice(0, 160)); }
       await ctx.close();
     }
   } catch (e) { dit(false, 'le banc a tourné jusqu’au bout', String(e && e.message).slice(0, 160)); }

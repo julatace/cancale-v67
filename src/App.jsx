@@ -3102,67 +3102,97 @@ const compteEcarte = (uid, masques, panneau) => {
 // OU dépassent 2 000 € dans l'année civile (directive européenne DAC7). Mesuré le
 // 6 octobre : trois de ses comptes y sont déjà (101 · 49 · 33 ventes finalisées
 // en 2026, l'un à 3 721,10 €), et l'app n'en disait rien.
-// ⚠️ UNE SEULE RÈGLE DE « VENTE » (§11) : celle du CA déclaré,
-//    `ventesDeclarables` — finalisée (annulée, remboursée, en cours : jamais),
-//    datée du VERSEMENT. La directive compte la contrepartie « versée ou
-//    créditée » au vendeur dans l'année : une vente en cours ne l'est pas
-//    encore, une remboursée ne le sera jamais. C'est aussi ce qui garantit
-//    qu'il n'y a pas d'écart avec ce qu'il déclare.
-// ⚠️ « À DATER » NE VEUT PAS DIRE « HORS DE L'ANNÉE » : mesuré, seules 42 des
-//    101 ventes de son plus gros compte ont leur date de versement. Mais le
-//    versement tombe APRÈS la vente (mesuré : 0 sur 173 avant elle) et AVANT
-//    aujourd'hui (elle est déjà finalisée) — et jamais plus de 25 jours après
-//    elle sur les 173 mesurés (médiane 7,8 j). La borne haute est donc
-//    aujourd'hui, ou la vente + `VERSEMENT_MAX_J` (presque deux fois le plus
-//    long mesuré). Si les deux bornes tombent dans la même année, l'année est
-//    sûre ; sinon la vente est « incertaine » et COMPTÉE À PART, jamais devinée
-//    (§5). Sans la seconde borne, ses 41 ventes de 2023-2025 pas encore datées
-//    devenaient « incertaines » pour 2026 — une fausse alerte (§7).
-// ⚠️ TROIS ÉTATS : `enCours` (ventes pas encore lues) · `pasSu` (la lecture de
-//    CE compte a échoué : un tiret, jamais 0) · `lu`. Un compte exclu de l'app
-//    n'y entre pas (décision du 3 octobre).
+// ⚠️⚠️ LA PARTIE SÛRE EST LE CHIFFRE DU REGISTRE, ET RIEN D'AUTRE (revue du
+//    6 octobre). Le premier jet rattachait à l'année, COMME SÛRES, des ventes
+//    sans date de versement (deux bornes dans la même année) — et la carte
+//    disait « pour qu'il n'y ait jamais d'écart avec ce que tu déclares ».
+//    Mesuré sur sa base : carte 245 ventes · 9 361 € contre registre 141 ·
+//    5 226 € ; julatace35260 101 contre 42. Une phrase vraie sur un chiffre
+//    faux (§5). Désormais, par compte :
+//      · `n`/`cts` = ses ventes DATÉES DU VERSEMENT dans l'année — `datees`,
+//        calculé PAR LE REGISTRE annuel lui-même et passé tel quel (§11 : une
+//        notion, un propriétaire ; la carte ne le recalcule jamais) ;
+//      · `nAd`/`ctsAd` = ses ventes finalisées PAS ENCORE DATÉES, rattachées à
+//        l'année par une ESTIMATION (le versement suit la vente — 0 sur 173
+//        avant elle — et la suit de près : au plus 25 jours mesurés, d'où
+//        `VERSEMENT_MAX_J`). Elles ne rejoignent JAMAIS la partie sûre ;
+//      · le verdict n'est « atteint » que sur la partie datée ; « atteintSi »
+//        quand il ne l'est qu'en ajoutant les pas encore datées.
+// ⚠️ TROIS ÉTATS : `enCours` (ventes, dates de versement ou registre pas encore
+//    lus) · `pasSu` (la lecture des ventes de CE compte — par son IDENTITÉ,
+//    jamais par son nom affiché — ou celle des dates de versement a échoué :
+//    un tiret, jamais 0) · `lu`. Un compte exclu de l'app n'y entre pas
+//    (décision du 3 octobre).
+// ⚠️ VRM NE SAIT PAS si Vinted juge chaque compte à part ou additionne ceux
+//    d'une même personne : `total` additionne les comptes sélectionnés, dit
+//    comme tel. Un compte pas lu ⇒ total « au moins », et jamais « sous les
+//    seuils » (les ventes qui manquent pourraient l'y faire passer).
 // ⚠️ « Plus de 2 000 € » : 2 000,00 € pile ne l'atteint pas. Comparé en
 //    centimes entiers, jamais en flottants.
+// ⚠️ L'ANNÉE suit le fuseau de l'appareil (`getFullYear`), comme le registre et
+//    `ventesDeclarables` : une vente versée le 1er janvier à 00 h 20 (Paris)
+//    compte dans l'année d'avant sur un téléphone réglé à Londres. Constaté,
+//    laissé tel quel : changer ici seul ferait diverger la carte du registre.
 const SEUIL_VINTED_VENTES = 30;
 const SEUIL_VINTED_EUR = 2000;
 const VERSEMENT_MAX_J = 45;
-const seuilsVintedParCompte = ({ comptes, ventes, ecarte, echoues, versements, annee, maintenant = Date.now() } = {}) => {
+const seuilVintedAtteint = (n, cts) => n >= SEUIL_VINTED_VENTES || cts > SEUIL_VINTED_EUR * 100;
+const seuilsVintedParCompte = ({ comptes, ventes, ecarte, echoues, datees, versements, annee, maintenant = Date.now() } = {}) => {
   const anneeDe = (t) => new Date(t).getFullYear();
   const uidDe = (o) => String((o && o._acc && o._acc.vinted_user_id) ?? '');
-  const lu = Array.isArray(ventes);
+  // Tout ce qu'il faut pour affirmer un chiffre : les ventes, les dates de
+  // versement (lues ou ratées, mais plus en cours) et le chiffre du registre.
+  const pret = Array.isArray(ventes) && versements !== undefined && !!datees && typeof datees === 'object';
+  const ko = (uid) => !!(echoues && echoues.has(uid));
   const parUid = {}, liste = [];
   for (const c of (comptes || [])) {
     const uid = String((c && c.uid) ?? '');
     if (!uid || parUid[uid] || (ecarte && ecarte(uid))) continue;
-    const etat = !lu ? 'enCours' : ((echoues && echoues.has(uid)) ? 'pasSu' : 'lu');
-    const r = { uid, nom: (c && c.nom) || uid, etat, n: 0, cts: 0, nInc: 0, ctsInc: 0 };
+    const etat = !pret ? 'enCours' : (ko(uid) || versements === null) ? 'pasSu' : 'lu';
+    const raison = etat !== 'pasSu' ? null : ko(uid) ? 'ventes' : 'versements';
+    const q = (etat === 'lu' && datees[uid]) || {};
+    const n = etat === 'lu' ? (Number(q.n) || 0) : 0;
+    const cts = etat === 'lu' ? Math.round(Number(q.cts) || 0) : 0;
+    const r = { uid, nom: (c && c.nom) || uid, etat, raison, n, cts, nAd: 0, ctsAd: 0 };
     parUid[uid] = r; liste.push(r);
   }
-  if (lu) {
-    const d = ventesDeclarables({ vinted: ventes, exclu: (o) => !!(ecarte && ecarte(uidDe(o))), versements: versements || {} });
-    const ajoute = (o, eur, certaine) => {
-      const r = parUid[uidDe(o)]; if (!r || r.etat !== 'lu') return;
-      const c = Math.round(Number(eur) * 100); if (!isFinite(c)) return;
-      if (certaine) { r.n += 1; r.cts += c; } else { r.nInc += 1; r.ctsInc += c; }
-    };
-    for (const l of d.lignes) if (l.plateforme === 'Vinted' && anneeDe(l.ts) === annee) ajoute(l.o, l.eur, true);
+  if (pret && versements !== null) {
+    const d = ventesDeclarables({ vinted: ventes, exclu: (o) => !!(ecarte && ecarte(uidDe(o))), versements });
     for (const l of d.aDater) {
       if (l.plateforme !== 'Vinted') continue;
+      const r = parUid[uidDe(l.o)]; if (!r || r.etat !== 'lu') continue;
       const t = tsCommande(l.o);
       const yMin = t ? anneeDe(t) : -Infinity;                                       // le versement suit la vente…
-      const yMax = anneeDe(t ? Math.min(maintenant, t + VERSEMENT_MAX_J * 86400e3) : maintenant);   // …et la suit de près
+      const yMax = anneeDe(t ? Math.min(maintenant, t + VERSEMENT_MAX_J * 86400e3) : maintenant);   // …et la suit de près (estimation)
       if (annee < yMin || annee > yMax) continue;
-      ajoute(l.o, l.eur, yMin === yMax);
+      const c = Math.round(Number(l.eur) * 100); if (!isFinite(c)) continue;
+      r.nAd += 1; r.ctsAd += c;
     }
   }
-  const atteint = (n, cts) => n >= SEUIL_VINTED_VENTES || cts > SEUIL_VINTED_EUR * 100;
-  for (const r of liste) {
-    r.eur = r.cts / 100; r.eurInc = r.ctsInc / 100;
+  const aCeJour = anneeDe(maintenant) === annee;     // l'année n'est pas finie : « à ce jour »
+  const juge = (r, jugeable = true) => {
+    r.eur = r.cts / 100; r.eurAd = r.ctsAd / 100;
     r.verdict = r.etat !== 'lu' ? null
-      : atteint(r.n, r.cts) ? 'atteint'
-      : atteint(r.n + r.nInc, r.cts + r.ctsInc) ? 'peutEtre' : 'sous';
-  }
-  return liste;
+      : seuilVintedAtteint(r.n, r.cts) ? 'atteint'
+      : seuilVintedAtteint(r.n + r.nAd, r.cts + r.ctsAd) ? 'atteintSi'
+      : jugeable ? 'sous' : null;
+    // Ce qu'il reste avant le seuil, sur la partie SÛRE (datée) : 30 ventes, ou
+    // un centime de plus que 2 000 €.
+    r.reste = (r.verdict === 'sous' || r.verdict === 'atteintSi')
+      ? { n: Math.max(0, SEUIL_VINTED_VENTES - r.n), cts: Math.max(0, SEUIL_VINTED_EUR * 100 + 1 - r.cts) } : null;
+  };
+  for (const r of liste) juge(r);
+  const lus = liste.filter(r => r.etat === 'lu');
+  const manquants = liste.filter(r => r.etat !== 'lu').map(r => r.uid);
+  const total = {
+    etat: lus.length ? 'lu' : (liste.some(r => r.etat === 'enCours') ? 'enCours' : 'pasSu'),
+    manquants, partiel: lus.length > 0 && manquants.length > 0,
+    n: lus.reduce((s, r) => s + r.n, 0), cts: lus.reduce((s, r) => s + r.cts, 0),
+    nAd: lus.reduce((s, r) => s + r.nAd, 0), ctsAd: lus.reduce((s, r) => s + r.ctsAd, 0),
+  };
+  juge(total, !total.partiel);
+  if (total.partiel) total.reste = null;
+  return { comptes: liste, total, aCeJour };
 };
 // Clé de jour LOCALE : toISOString() est en UTC et mettrait une vente de 23 h
 // sur le lendemain.
@@ -5308,56 +5338,102 @@ function StatBox({label,value,color=C.text,sub=null,subColor=null,onClick=null,t
 
 // ── CE QUE VINTED TRANSMET AUX IMPÔTS, compte par compte (6 octobre) ─────────
 // La carte du registre annuel. Elle ne calcule RIEN : elle rend
-// `seuilsVintedParCompte` (§11). Ton informatif : aucun rouge, aucun ambre (§7 —
+// `seuilsVintedParCompte` (§11), et sa partie sûre est le chiffre du REGISTRE
+// (`datees`, calculé par lui). Ton informatif : aucun rouge, aucun ambre (§7 —
 // le rouge est pour deux paires sous un même numéro) ; un seuil atteint se dit
 // par le MOT, en gras. Les nombres sont portés en `data-*` pour le banc.
-function CarteSeuilsVinted({ annee, ventes, echecs, comptes, ecarte, nomDe, versements }) {
+// ⚠️ §7 : une cause, une phrase. La panne, la lecture en cours et l'estimation
+//    des ventes pas encore datées se disent UNE fois au-dessus des lignes ; la
+//    ligne d'un compte pas lu ne porte qu'un « — ».
+// ⚠️ « Relire mes ventes » RELIT pour de vrai (`onRelire` vide le cache et
+//    relance la lecture) : « rouvre l'écran Ventes » rouvrait le CACHE, qui
+//    gardait l'échec — ou, avant la revue, le transformait en « 0 vente ».
+function CarteSeuilsVinted({ annee, ventes, echoues, comptes, ecarte, nomDe, versements, datees, onRelire }) {
+  const [relit, setRelit] = useState(false);
   const tous = Array.isArray(comptes) ? comptes : [];
-  const nomsKO = new Set(Array.isArray(echecs) ? echecs : []);
-  const echoues = new Set(tous.filter(a => nomsKO.has(nomDe(a))).map(a => String(a.vinted_user_id)));
-  const lignes = seuilsVintedParCompte({ comptes: tous.map(a => ({ uid: a.vinted_user_id, nom: nomDe(a) })), ventes, ecarte, echoues, versements, annee });
+  const ko = new Set((Array.isArray(echoues) ? echoues : []).map(String));
+  const R = seuilsVintedParCompte({ comptes: tous.map(a => ({ uid: a.vinted_user_id, nom: nomDe(a) })), ventes, ecarte, echoues: ko, datees, versements, annee });
+  const lignes = R.comptes;
   if (!lignes.length) return null;
   const nExclus = tous.filter(a => ecarte && ecarte(String(a.vinted_user_id))).length;
-  const eur = (v) => Number(v).toFixed(2).replace('.', ',') + ' €';
+  const eur = (v) => Number(v).toFixed(2).replace('.', ',') + ' €';
   const pl = (n, mot) => `${n} ${mot}${n > 1 ? 's' : ''}`;
-  const seuilEur = String(SEUIL_VINTED_EUR).replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0') + '\u00a0€';
-  const verdictTxt = (r) => {
+  const seuilEur = String(SEUIL_VINTED_EUR).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' €';
+  const nomsDe = (uids) => uids.map(u => (lignes.find(r => r.uid === u) || {}).nom || u).join(', ');
+  const avecTotal = lignes.length > 1;
+  const verdictTxt = (r, ses) => {
     if (r.verdict === 'atteint') {
       const parN = r.n >= SEUIL_VINTED_VENTES, parE = r.cts > SEUIL_VINTED_EUR * 100;
-      return `${parN && parE ? 'Les deux seuils sont atteints' : parN ? `${SEUIL_VINTED_VENTES} ventes atteintes` : `Plus de ${seuilEur}`} : Vinted transmet ce compte.`;
+      return `Seuil atteint : ${parN && parE ? `${SEUIL_VINTED_VENTES} ventes et plus de ${seuilEur}` : parN ? `${SEUIL_VINTED_VENTES} ventes` : `plus de ${seuilEur}`}.`;
     }
-    if (r.verdict === 'peutEtre') return `Ça dépend de ${pl(r.nInc, 'vente')} (${eur(r.eurInc)}) dont le versement n'est pas encore daté : l'année n'est pas sûre.`;
-    return 'Sous les seuils.';
+    if (r.verdict === 'atteintSi') return `Seuil atteint si ${r.nAd > 1 ? `${ses} ${r.nAd} ventes pas encore datées comptent` : `${ses === 'ses' ? 'sa' : 'la'} vente pas encore datée compte`} en ${annee} (${eur(r.eurAd)}).`;
+    if (r.verdict === 'sous') return R.aCeJour ? `Sous les seuils à ce jour : encore ${pl(r.reste.n, 'vente')} ou ${eur(r.reste.cts / 100)} avant le seuil.` : 'Sous les seuils.';
+    return '';
+  };
+  const aDaterTxt = (r) => (r.etat === 'lu' && r.nAd > 0 && r.verdict !== 'atteintSi') ? `+ ${pl(r.nAd, 'vente')} pas encore datée${r.nAd > 1 ? 's' : ''} (${eur(r.eurAd)})` : '';
+  const pasLus = lignes.filter(r => r.etat === 'pasSu');
+  const parVersements = pasLus.some(r => r.raison === 'versements');
+  const ventesKO = pasLus.filter(r => r.raison === 'ventes');
+  const enCours = lignes.every(r => r.etat === 'enCours');
+  const estimation = lignes.some(r => r.etat === 'lu' && r.nAd > 0);
+  const relire = async () => { if (relit || !onRelire) return; setRelit(true); try { await onRelire(); } catch (_) {} setRelit(false); };
+  const ligne = (r, { total } = {}) => {
+    const lu = r.etat === 'lu';
+    const sous = lu ? verdictTxt(r, total ? 'les' : 'ses') : '';
+    const plus = aDaterTxt(r);
+    const attrs = total
+      ? { 'data-seuils-total': annee, 'data-partiel': r.partiel ? r.manquants.join(',') : '' }
+      : { 'data-seuil-compte': r.uid };
+    return (
+      <div key={total ? '_total' : r.uid} {...attrs} data-etat={r.etat} data-n={lu ? r.n : ''} data-eur={lu ? r.eur.toFixed(2) : ''} data-verdict={r.verdict || ''}
+        data-adater={lu ? r.nAd : ''} data-eur-adater={lu ? r.eurAd.toFixed(2) : ''} data-reste-n={r.reste ? r.reste.n : ''} data-reste-eur={r.reste ? (r.reste.cts / 100).toFixed(2) : ''}
+        style={{display:'flex',alignItems:'flex-start',gap:10,padding:'8px 0',borderTop:`${total ? 2 : 1}px solid ${C.border}`}}>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontSize:12.5,fontWeight:total?700:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:total?'normal':'nowrap'}}>
+            {total ? `Tous tes comptes ensemble${r.partiel ? ` · sans ${nomsDe(r.manquants)}` : ''}` : r.nom}
+          </div>
+          {sous && <div style={{fontSize:11.5,lineHeight:1.4,marginTop:2,color:r.verdict==='atteint'?C.text:C.muted,fontWeight:r.verdict==='atteint'?700:400}}>{sous}</div>}
+          {plus && <div style={{fontSize:11,color:C.muted,lineHeight:1.4,marginTop:2}}>{plus}</div>}
+        </div>
+        <div style={{flexShrink:0,textAlign:'right',whiteSpace:'nowrap'}}>
+          <div style={{fontSize:13,fontWeight:700,color:C.text}}>{lu ? `${r.partiel ? 'au moins ' : ''}${pl(r.n, 'vente')}` : '—'}</div>
+          {lu && <div style={{fontSize:11.5,color:C.muted,marginTop:2}}>{eur(r.eur)}</div>}
+        </div>
+      </div>
+    );
   };
   return (
-    <div data-seuils-vinted={annee} style={{border:`1px solid ${C.border}`,borderRadius:10,background:C.card,padding:'10px 12px',marginBottom:12}}>
-      <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:3}}>Ce que Vinted transmet aux impôts pour {annee}</div>
+    <div data-seuils-vinted={annee} data-a-ce-jour={R.aCeJour ? '1' : '0'} style={{border:`1px solid ${C.border}`,borderRadius:10,background:C.card,padding:'10px 12px',marginBottom:12}}>
+      <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:3}}>Ce que Vinted transmet aux impôts pour {annee}{R.aCeJour ? ' — à ce jour' : ''}</div>
       <div style={{fontSize:11.5,color:C.muted,lineHeight:1.45,marginBottom:8}}>
         Chaque année, Vinted transmet aux impôts les vendeurs qui font au moins {SEUIL_VINTED_VENTES} ventes ou plus de {seuilEur} dans l'année (directive européenne DAC7).
-        VRM les compte comme ton CA déclaré — ventes finalisées, datées du versement — pour qu'il n'y ait jamais d'écart avec ce que tu déclares.
+        {' '}Ici, tes ventes finalisées datées du versement — les mêmes que ce registre{avecTotal ? <>, compte par compte puis tous ensemble : VRM ne sait pas si Vinted juge chaque compte à part ou additionne ceux d'une même personne.</> : '.'}
       </div>
-      {lignes.map(r => {
-        const lu = r.etat === 'lu';
-        return (
-          <div key={r.uid} data-seuil-compte={r.uid} data-etat={r.etat} data-n={lu ? r.n : ''} data-eur={lu ? r.eur.toFixed(2) : ''} data-verdict={r.verdict || ''} data-incertaines={lu ? r.nInc : ''}
-            style={{display:'flex',alignItems:'flex-start',gap:10,padding:'8px 0',borderTop:`1px solid ${C.border}`}}>
-            <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:12.5,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.nom}</div>
-              <div style={{fontSize:11.5,lineHeight:1.4,marginTop:2,color:r.verdict==='atteint'?C.text:C.muted,fontWeight:r.verdict==='atteint'?700:400}}>
-                {r.etat === 'pasSu' ? "Ses ventes n'ont pas pu être lues : impossible de dire où en est ce compte. Rouvre l'écran Ventes dans un instant."
-                  : r.etat === 'enCours' ? 'Lecture des ventes…' : verdictTxt(r)}
-              </div>
-              {lu && r.nInc > 0 && r.verdict !== 'peutEtre' && (
-                <div style={{fontSize:11,color:C.muted,lineHeight:1.4,marginTop:2}}>+ {pl(r.nInc, 'vente')} ({eur(r.eurInc)}) dont le versement n'est pas encore daté : l'année n'est pas sûre.</div>
-              )}
-            </div>
-            <div style={{flexShrink:0,textAlign:'right',whiteSpace:'nowrap'}}>
-              <div style={{fontSize:13,fontWeight:700,color:C.text}}>{lu ? pl(r.n, 'vente') : '—'}</div>
-              {lu && <div style={{fontSize:11.5,color:C.muted,marginTop:2}}>{eur(r.eur)}</div>}
-            </div>
+      {estimation && (
+        <div data-seuils-estimation style={{fontSize:11,color:C.muted,lineHeight:1.45,marginBottom:8}}>
+          « Pas encore datées » : des ventes finalisées dont VRM n'a pas encore la date de versement. Elles sont rattachées à {annee} d'après leur date de vente — une estimation (Vinted verse en général dans les jours qui suivent), pas un chiffre du registre.
+        </div>
+      )}
+      {enCours && <div data-seuils-encours style={{fontSize:11.5,color:C.muted,lineHeight:1.45,marginBottom:8}}>Lecture des ventes…</div>}
+      {pasLus.length > 0 && (
+        <div data-seuils-panne style={{display:'flex',alignItems:'flex-start',gap:10,flexWrap:'wrap',fontSize:11.5,color:C.text,lineHeight:1.45,marginBottom:8}}>
+          <div style={{flex:'1 1 220px',minWidth:0}}>
+            {parVersements
+              ? "Les dates de versement de tes ventes Vinted n'ont pas pu être lues : impossible de dire où en sont tes comptes."
+              : ventesKO.length === 1
+                ? `Les ventes de ${ventesKO[0].nom} n'ont pas pu être lues : impossible de dire où en est ce compte.`
+                : `Les ventes de ${ventesKO.length} comptes (${ventesKO.map(r => r.nom).join(', ')}) n'ont pas pu être lues : impossible de dire où ils en sont.`}
           </div>
-        );
-      })}
+          {onRelire && (
+            <button type="button" data-relire-ventes onClick={relire} disabled={relit}
+              style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:relit?'default':'pointer',fontSize:12,fontWeight:600,padding:'5px 11px',maxWidth:200,opacity:relit?0.6:1}}>
+              {relit ? 'Lecture…' : 'Relire mes ventes'}
+            </button>
+          )}
+        </div>
+      )}
+      {lignes.map(r => ligne(r))}
+      {avecTotal && ligne(R.total, { total: true })}
       {nExclus > 0 && <div style={{fontSize:11,color:C.muted,lineHeight:1.4,marginTop:4}}>Les comptes que tu as exclus de l'app ne sont pas comptés ici.</div>}
     </div>
   );
@@ -17137,6 +17213,15 @@ const QUICK_REPLIES = [
 // Cache partagé entre les onglets (évite de recharger à chaque changement
 // d'onglet) : moins de requêtes, navigation instantanée. TTL court.
 const _CACHE_TTL = 180000; // 3 min
+// ⚠️⚠️ UNE LECTURE PARTIELLE GARDE SON ÉCHEC DANS LE CACHE (revue du 6 octobre).
+//    Le cache rendait `items` SANS dire quels comptes n'avaient pas répondu :
+//    un compte en panne au premier passage devenait, au rechargement suivant
+//    (moins de 3 min), « 0 vente · sous les seuils » — et le bandeau « compte
+//    non chargé » de l'écran Ventes disparaissait. Une entrée porte donc
+//    `failedUids` (l'IDENTITÉ des comptes ratés) et la version `_CACHE_V` : une
+//    entrée écrite avant cette règle, qui ne sait rien de ses échecs, est
+//    ignorée (« rien lu » ne vaut pas « rien »).
+const _CACHE_V = 2;
 // Cache des données Vinted (annonces/ventes/achats/messages). Persisté en
 // sessionStorage : il survit aux rechargements fréquents (auto-mise à jour,
 // réouverture de l'app), donc les listes s'affichent INSTANTANÉMENT après un
@@ -17194,9 +17279,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Les dates de VERSEMENT des ventes Vinted — trois états (undefined en
   // cours · null pas su · map lue). Relues quand l'extension annonce des ventes.
   const [versements, setVersements] = useState(undefined);
+  const relireVersements = useRef(null);            // « Relire mes ventes » relit aussi des dates illisibles
   useEffect(() => {
     let mort = false;
     const lire = () => fetchVersementsVinted().then((m) => { if (!mort) setVersements(m); });
+    relireVersements.current = lire;
     lire();
     const f = (e) => { const d = e && e.detail; if (d && d.type === 'maj' && (d.quoi === 'ventes' || d.quoi === 'versements')) lire(); };
     window.addEventListener('vrm:ext', f);
@@ -19950,8 +20037,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   //  son onglet — voir le commentaire au niveau du rendu. Le panneau de
   //  l'extension fait ce travail, là où le geste est possible.)
 
-  const fromCache = (key) => { const c=_acctCache[key]; return (c && Date.now()-c.ts<_CACHE_TTL) ? c.items : null; };
-  const putCache = (key, items) => { _acctCache[key] = { ts:Date.now(), items }; _persistAcctCache(); };
+  const entreeCache = (key) => { const c=_acctCache[key]; return (c && c.v===_CACHE_V && Array.isArray(c.items) && Date.now()-c.ts<_CACHE_TTL) ? c : null; };
+  const fromCache = (key) => { const c=entreeCache(key); return c ? c.items : null; };
+  const putCache = (key, items, echecs) => { _acctCache[key] = { ts:Date.now(), v:_CACHE_V, items, failed:(echecs&&echecs.failed)||[], failedUids:(echecs&&echecs.failedUids)||[] }; _persistAcctCache(); };
 
   // ── RELIRE SANS FAIRE CLIGNOTER (4 octobre) ──────────────────────────────
   // Chaque signal de l'extension (« ventes rangées », toutes les 90 s quand il
@@ -19968,8 +20056,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const loadOrders = async (type, setter, force, opts) => {
     const silencieux = !!(opts && opts.silencieux);
     const n = (lectureOrders.current[type] = (lectureOrders.current[type] || 0) + 1);
-    const cached = !force && fromCache(type);
-    if (cached) { setter({ loading:false, items:cached }); return; }
+    // Le cache rend AUSSI ses échecs : un compte pas lu reste « pas su » (§4).
+    const cached = !force && entreeCache(type);
+    if (cached) { setter({ loading:false, items:cached.items, failed:cached.failed, failedUids:cached.failedUids }); return; }
     if (!silencieux) setter({ loading:true, items:null, error:false });
     // PARALLÈLE : on interroge tous les comptes en même temps (avant : un par un
     // en série → très lent avec 9 comptes). La lecture se fait d'abord sur la
@@ -19990,7 +20079,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       : null;
     const porteMonNumero = (t) => /\bn\s?\d{3,4}\b/i.test(String(t || ''));
     const masquesA = type === 'purchased' ? achatsMasques() : new Set();
-    const seen = new Set(); const out = []; let anyOk=false, anyErr=false; const failed=[];
+    // `failedUids` : l'IDENTITÉ des comptes qui n'ont pas répondu — c'est elle
+    // qu'un lecteur juge. `failed` (les noms) ne sert qu'à l'affichage d'avant :
+    // un libellé arrivé du nuage après la lecture, ou un renommage, ne
+    // correspondait plus, et un compte en panne passait pour « 0 vente ».
+    const seen = new Set(); const out = []; let anyOk=false, anyErr=false; const failed=[]; const failedUids=[];
     for (const { acc, res } of results) {
       if (res.ok) { anyOk=true; for (const o of res.items) {
         const id = String(o.transaction_id);
@@ -19999,7 +20092,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if (type === 'purchased' && masquesA.has(id)) continue; // masqué à la main → Réglages « Achats masqués »
         seen.add(id); out.push({ ...o, _acc: acc });
       } }
-      else { anyErr=true; failed.push(accNameOf(acc)); }
+      else { anyErr=true; failed.push(accNameOf(acc)); failedUids.push(String(acc.vinted_user_id)); }
     }
     // ⚠️ SOURCE UNIQUE = VINTED VIA L'EXTENSION (choix de Julien, août 2026).
     // On NE reconstruit PLUS les ventes/achats à partir des emails
@@ -20014,15 +20107,49 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // Erreur seulement si RIEN n'a pu être chargé et qu'au moins un appel a échoué.
     const error = out.length===0 && anyErr && !anyOk;
     if (n !== lectureOrders.current[type]) return;          // une lecture plus récente est partie après celle-ci
-    if (!error) putCache(type, out);
+    // Une lecture partielle se met en cache AVEC ses échecs (jamais comme une
+    // liste complète) ; un échec total, pas du tout.
+    if (!error) putCache(type, out, { failed, failedUids });
     if (silencieux && (error || anyErr)) {
-      // Relecture discrète ratée (tout ou partie) : on garde l'affichage — une
-      // vente déjà vue ne disparaît pas parce qu'un compte n'a pas répondu.
-      setter(prev => (prev && Array.isArray(prev.items)) ? { ...prev, loading:false, failed } : { loading:false, items: out, error, failed });
+      // Relecture discrète ratée (tout ou partie) : une vente déjà vue ne
+      // disparaît pas parce qu'un compte n'a pas répondu — on garde CE QU'ON
+      // MONTRAIT de ce compte-là, et lui seul. ⚠️ On gardait toute l'ancienne
+      // liste avec la NOUVELLE liste d'échecs : un compte raté au passage
+      // d'avant (donc absent de l'ancienne liste) qui répondait cette fois
+      // n'était plus « en échec » et s'affichait à « 0 vente ». Les comptes qui
+      // ont répondu prennent leur lecture fraîche ; ceux qui n'ont pas répondu
+      // restent « pas su », même si on montre encore leurs ventes d'avant.
+      const ko = new Set(failedUids);
+      setter(prev => {
+        if (!(prev && Array.isArray(prev.items))) return { loading:false, items: out, error, failed, failedUids };
+        const dejaLa = new Set(out.map(o => String(o.transaction_id)));
+        const garde = prev.items.filter(o => ko.has(String(o && o._acc && o._acc.vinted_user_id)) && !dejaLa.has(String(o.transaction_id)));
+        const items = garde.length ? [...out, ...garde].sort((a,b) => new Date(b.date||0) - new Date(a.date||0)) : out;
+        return { ...prev, loading:false, items, error: items.length===0 && !anyOk, failed, failedUids };
+      });
       return;
     }
-    setter({ loading:false, items: out, error, failed });
+    setter({ loading:false, items: out, error, failed, failedUids });
   };
+  // « Relire mes ventes » : une VRAIE relecture — le cache des ventes (qui garde
+  // l'échec) et les lignes des comptes ratés sont vidés, puis on relit NOTRE
+  // base (jamais `force` : ça partirait chez Vinted pour tous les comptes). Les
+  // dates de versement illisibles sont relues aussi. Rend la promesse : le
+  // bouton reste « Lecture… » jusqu'au bout.
+  const relireVentes = async () => {
+    try { delete _acctCache.sold; _persistAcctCache(); } catch (_) {}
+    for (const u of (Array.isArray(sales.failedUids) ? sales.failedUids : [])) _rowCache.delete(`o:${u}`);
+    await Promise.all([
+      loadOrders('sold', setSales, false, { silencieux: true }),
+      versements === null && relireVersements.current ? relireVersements.current() : null,
+    ]);
+  };
+  // Les comptes dont les ventes n'ont pas pu être lues, NOMMÉS au rendu à
+  // partir de leur identité (un libellé arrivé du nuage après la lecture est
+  // pris en compte) — hors comptes exclus de l'app, qui ne comptent nulle part.
+  const nomsVentesKO = (Array.isArray(sales.failedUids) ? sales.failedUids : [])
+    .filter(u => !acctOff(u))
+    .map(u => { const a = (accounts || []).find(x => String(x.vinted_user_id) === String(u)); return a ? accNameOf(a) : `#${u}`; });
   useEffect(() => { if (accounts.length) loadOrders('sold', setSales); /* eslint-disable-next-line */ }, [accounts.length]);
   useEffect(() => { buysCharges.current = Array.isArray(buys.items); }, [buys.items]);
   useEffect(() => { if ((curSub==='achats'||curSub==='journee') && accounts.length && buys.items===null) loadOrders('purchased', setBuys); /* eslint-disable-next-line */ }, [sub, accounts.length]);
@@ -21824,6 +21951,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     let ca=0, cout=0, frais=0, nb=0, nbCout=0, margeKnown=0, fraisConnu=0;
     let nMasq=0, caMasq=0;
     const saleLines=[]; // registre des ventes, ligne par ligne (pour l'expert-comptable)
+    // Les ventes Vinted du registre, PAR COMPTE (en centimes) : c'est la partie
+    // sûre de la carte « Ce que Vinted transmet aux impôts » — elle la LIT ici,
+    // elle ne la recalcule pas (§11 : sinon deux règles, deux chiffres).
+    const vintedParUid = {};
     for (const o of (sales.items||[])) {
       // ⚠️ MÊME RÈGLE QUE LE RAPPORT MENSUEL : une vente masquée à l'écran
       // reste du chiffre d'affaires. On la compte, et on dit combien elle pèse.
@@ -21843,6 +21974,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       ca+=sell; nb+=1; frais+=fee; mo.ca+=sell; mo.nb+=1; mo.frais+=fee;
       if (buy!=null && !isNaN(buy)) { cout+=buy; nbCout+=1; margeKnown+=(sell-buy); fraisConnu+=fee; mo.cout+=buy; mo.nbCout+=1; }
       saleLines.push({ date:vers, dateVente:o.date, num:(e&&e.numero)||'', title:o.title||'', account:accName(o._acc), plateforme:'Vinted', sell, buy:(buy!=null&&!isNaN(buy))?buy:null, fee, marge:(buy!=null&&!isNaN(buy))?(sell-buy-fee):null });
+      const uV = String(o?._acc?.vinted_user_id ?? ''); const qV = vintedParUid[uV] || (vintedParUid[uV] = { n: 0, cts: 0 });
+      qV.n += 1; qV.cts += Math.round(sell * 100);
     }
     // ⚠️ TOUTES PLATEFORMES, comme le rapport mensuel et le tableau de bord
     //    (§11 : une notion, une règle). Le bilan annuel ne comptait que Vinted :
@@ -21878,7 +22011,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const margeHT = marge - tvaMarge;
     const taux = tauxUrssaf();
     const urssaf = aPayerUrssaf(ca, taux);
-    return { regime, tvaRate, year:reportYear, months, ca, cout, frais, nb, nbCout, benefNet, marge, tvaMarge, margeHT, taux, urssaf, nMasq, caMasq, achatsTotal, achatsNb, buyLines, saleLines, parPlateforme };
+    return { regime, tvaRate, year:reportYear, months, ca, cout, frais, nb, nbCout, benefNet, marge, tvaMarge, margeHT, taux, urssaf, nMasq, caMasq, achatsTotal, achatsNb, buyLines, saleLines, parPlateforme, vintedParUid };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, buysBase, reportYear, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements]);
   const [capturedReceipts, setCapturedReceipts] = useState([]); // reçus officiels Vinted captés (compta pro)
@@ -23329,9 +23462,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           </div>
         ); })()}
         </>)}
-        {sales.failed?.length>0 && (
-          <div style={{fontSize:12,fontWeight:500,color:C.danger,background:`${C.danger}14`,border:`1px solid ${C.danger}55`,borderRadius:8,padding:'8px 12px',marginBottom:12,lineHeight:1.4}}>
-            ⚠️ {sales.failed.length} compte{sales.failed.length>1?'s':''} non chargé{sales.failed.length>1?'s':''} ({sales.failed.join(', ')}) — session expirée. Ouvre ce compte sur vinted.fr (l'extension le recapte) ou reconnecte-le, puis « Synchroniser ».
+        {/* Les comptes non chargés, jugés par leur IDENTITÉ (`failedUids`) et
+            nommés au rendu — y compris quand la liste vient du cache. */}
+        {nomsVentesKO.length>0 && (
+          <div data-ventes-ko={nomsVentesKO.length} style={{fontSize:12,fontWeight:500,color:C.danger,background:`${C.danger}14`,border:`1px solid ${C.danger}55`,borderRadius:8,padding:'8px 12px',marginBottom:12,lineHeight:1.4}}>
+            ⚠️ {nomsVentesKO.length} compte{nomsVentesKO.length>1?'s':''} non chargé{nomsVentesKO.length>1?'s':''} ({nomsVentesKO.join(', ')}) — session expirée. Ouvre ce compte sur vinted.fr (l'extension le recapte) ou reconnecte-le, puis « Synchroniser ».
           </div>
         )}
         <div className="vrm-rangee" style={{display:'flex',gap:6,marginBottom:12,alignItems:'center',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',paddingBottom:2}}>
@@ -26051,8 +26186,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 </select>
               </div>
               {buys.loading && <div style={{fontSize:12,color:C.muted,marginBottom:10}}>Chargement du registre d'achats…</div>}
-              <div style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:14}}>
-                <StatBox label="CA des ventes finalisées" value={fmtE(annual.ca)} sub={`${annual.nb} vente${annual.nb>1?'s':''}`+Object.entries(annual.parPlateforme||{}).filter(([k,v])=>k!=='Vinted'&&v.n>0).map(([k,v])=>` · dont ${k} ${fmtE(v.ca)}`).join('')}/>
+              {/* `data-registre-vinted` : la partie Vinted du registre, compte par
+                  compte — le banc la compare à la carte des seuils. Un compte pas
+                  lu se DIT à côté du total (§5 : la couverture à côté du chiffre). */}
+              <div data-registre-vinted={JSON.stringify(Object.fromEntries(Object.entries(annual.vintedParUid||{}).map(([u,q])=>[u,{ n:q.n, eur:(q.cts/100).toFixed(2) }])))}
+                data-registre-vinted-n={annual.parPlateforme?.Vinted?.n ?? ''} data-registre-vinted-eur={annual.parPlateforme?.Vinted ? annual.parPlateforme.Vinted.ca.toFixed(2) : ''} data-registre-sans={nomsVentesKO.join(',')}
+                style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:14}}>
+                <StatBox label="CA des ventes finalisées" value={(annual.nb===0 && nomsVentesKO.length) ? '—' : fmtE(annual.ca)} sub={`${annual.nb} vente${annual.nb>1?'s':''}`+Object.entries(annual.parPlateforme||{}).filter(([k,v])=>k!=='Vinted'&&v.n>0).map(([k,v])=>` · dont ${k} ${fmtE(v.ca)}`).join('')+(nomsVentesKO.length?` · ventes de ${nomsVentesKO.join(', ')} pas lues`:'')}/>
                 {annual.regime==='marge' ? (<>
                   <StatBox label="Marge TTC" value={fmtE(annual.marge)} color={annual.marge>=0?INV_STATUS.online.color:C.danger}/>
                   <StatBox label={`TVA marge ${annual.tvaRate}%`} value={fmtE(annual.tvaMarge)} color={C.warn}/>
@@ -26100,7 +26240,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </tbody>
                 </table>
               </div>
-              <CarteSeuilsVinted annee={annual.year} ventes={sales.items} echecs={sales.failed} comptes={accounts} ecarte={acctOff} nomDe={accNameOf} versements={versements}/>
+              <CarteSeuilsVinted annee={annual.year} ventes={sales.items} echoues={sales.failedUids} comptes={accounts} ecarte={acctOff} nomDe={accNameOf} versements={versements} datees={annual.vintedParUid} onRelire={relireVentes}/>
               <div style={{fontSize:12,fontWeight:600,color:C.text,margin:'6px 0 8px'}}>Registre d'achats — {fmtE(annual.achatsTotal)} ({annual.buyLines.length})</div>
               {buys.items===null && <div style={{fontSize:12,color:C.muted,marginBottom:8}}>Registre en cours de chargement…</div>}
               {buys.items!==null && annual.buyLines.length===0 && <div style={{fontSize:12,color:C.muted,padding:'6px 0 12px'}}>Aucun achat cette année.</div>}
@@ -26641,7 +26781,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {buys.loading && <div style={{fontSize:12,color:C.muted,marginBottom:10}}>Chargement du registre d'achats…</div>}
               {/* Chiffres clés selon le régime */}
               <div style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:14}}>
-                <StatBox label="CA des ventes finalisées" value={fmtE(report.ca)} sub={`${report.nb} vente${report.nb>1?'s':''}`}/>
+                <StatBox label="CA des ventes finalisées" value={(report.nb===0 && nomsVentesKO.length) ? '—' : fmtE(report.ca)} sub={`${report.nb} vente${report.nb>1?'s':''}`+(nomsVentesKO.length?` · ventes de ${nomsVentesKO.join(', ')} pas lues`:'')}/>
                 {report.regime==='marge' ? (<>
                   <StatBox label="Marge TTC" value={fmtE(report.marge)} color={report.marge>=0?INV_STATUS.online.color:C.danger}/>
                   <StatBox label={`TVA marge ${report.tvaRate}%`} value={fmtE(report.tvaMarge)} color={C.warn}/>
