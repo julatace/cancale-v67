@@ -73,6 +73,22 @@ for (const f of fichiers) {
           ReferencedIdentifier(ref) {
             const b = ref.scope.getBinding(ref.node.name);
             if (!b || b.scope !== portee || (b.kind !== 'const' && b.kind !== 'let')) return;
+            // ⚠️ AUTO-RÉFÉRENCE : « X » lu DANS son propre initialiseur, évalué
+            //    tout de suite (les fonctions différées sont déjà ignorées plus
+            //    haut par `inner.skip()`) → TDZ « Cannot access X before
+            //    initialization ». Attrapé le 8 octobre : un `replace_all` avait
+            //    transformé `const selEff = … : String(…)` en
+            //    `const selEff = … : selEff;` — écran blanc en prod sur tous les
+            //    écrans Vinted/Leboncoin/eBay, `npm run build` vert, et CET audit
+            //    passait car la déclaration est sur la MÊME ligne que l'usage
+            //    (`j <= i`, donc ignoré). `b.path` est le VariableDeclarator : si
+            //    la référence est un descendant de SON déclarateur, elle vit dans
+            //    l'init, donc elle se lit avant d'exister. `const a=1,b=a` n'est
+            //    PAS concerné (la ref vit dans le déclarateur de `b`, pas de `a`).
+            if (b.path.isVariableDeclarator() && ref.findParent((p) => p.node === b.path.node)) {
+              defauts.push(`${f}:${ref.node.loc.start.line} « ${ref.node.name} » est lu dans son propre initialiseur (auto-référence → TDZ au rendu)`);
+              return;
+            }
             const decl = b.path.parentPath;              // VariableDeclaration
             const j = decl ? rang.get(decl.node) : undefined;
             if (j == null || j <= i) return;
