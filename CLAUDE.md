@@ -5834,8 +5834,14 @@ Chacun reproduit sur 12c6f26, corrigé, et prouvé rouge sur le build d'avant
 - **Un retrait automatique au résultat incertain (504, page d'erreur, coupure)
   ne laissait aucune trace.** Il se dit (« je ne sais pas si l'annonce eBay a été
   retirée — regarde sur eBay ») et se note sur l'appareil
-  (`vrm_ebay_auto_incertains`, relu sur la ligne de l'écran eBay) ; un vrai refus
-  d'eBay se dit aussi, avec sa raison.
+  (`vrm_ebay_auto_incertains`, relu sur la ligne de l'écran eBay) ; un refus
+  certain se dit aussi, avec sa raison. ⚠️ **Et il ne s'attribue pas à eBay** :
+  le premier jet écrivait « eBay a refusé le retrait automatique (« … rien n'a
+  été envoyé à eBay ») » — la plupart des refus viennent de VRM (réglage éteint
+  ou illisible côté serveur, SKU changé). « N°X n'a pas été retirée
+  automatiquement : « raison du serveur » ». `audit-ebay-retrait-auto.cjs` :
+  **2 rouges** sur 5cfa12e, et la mutation qui remet l'attribution repasse au
+  rouge.
 - **Messages** : « toutes réglées » disait « celle reçue » en ne comptant que les
   réglées (une offre rangée à la main n'y était pas) — la phrase ne dit plus rien
   du total reçu, et les rangées sont comptées à part (`offresAtraiter` rend
@@ -5846,10 +5852,10 @@ Chacun reproduit sur 12c6f26, corrigé, et prouvé rouge sur le build d'avant
   geste** (bandeau « compte non chargé » + ligne du repère). Le repère ne redit
   que ce qui distingue ; le geste n'y revient que pour un compte dont seuls les
   ACHATS manquent (`achatsSeuls`). Banc `rapport.cjs` : **1 rouge** (« 2 fois »).
-- `audit-ebay-retrait-auto.cjs` : **13 rouges** sur 12c6f26, et **18
-  réaffaiblissements sur 18** attrapés (`--prouve`, dont « une liste ancienne
+- `audit-ebay-retrait-auto.cjs` : **13 rouges** sur 12c6f26, et **19
+  réaffaiblissements sur 19** attrapés (`--prouve`, dont « une liste ancienne
   confirme », « un compte bloqué accepté », « comptes bloqués inconnus lus
-  aucun », « un retrait incertain tu »).
+  aucun », « un retrait incertain tu », « un refus de VRM attribué à eBay »).
 
 ### Mise en production du 5 octobre
 PR #442 mergée à 10:24 UTC (80 déploiements sur 24 h : sous la limite), déploiement

@@ -295,7 +295,18 @@ async function controles(APP, journal) {
       fetch: async () => ({ status: 409, json: async () => ({ ok: false, reason: 'sku-change', error: 'Le SKU de cette annonce a changé chez eBay.' }) }) }, dit);
     if (!F || !F.retirerEbayAuto) return;
     await F.retirerEbayAuto([{ annonce: annonce(22, avant), numero: '22' }], () => true);
-    dit(toasts.some((t) => /N°22/.test(t) && /refusé/.test(t) && /SKU/.test(t)), 'un VRAI refus d\'eBay se dit aussi, avec sa raison (elle reste dans « à retirer »)', JSON.stringify(toasts));
+    dit(toasts.some((t) => /N°22/.test(t) && /pas été retirée/.test(t) && /SKU/.test(t) && /à retirer/.test(t)), 'un refus CERTAIN se dit aussi, avec sa raison (elle reste dans « à retirer »)', JSON.stringify(toasts));
+    // (8 octobre, vérification de la reprise) Un refus qui vient de VRM et pas
+    // d'eBay — réglage éteint côté serveur, « rien n'a été envoyé à eBay » —
+    // ne s'attribue pas à eBay : le message se contredisait (« eBay a refusé
+    // (… rien n'a été envoyé à eBay) »).
+    const t2 = [];
+    const F2 = charger(APP, { enTeteSession: () => ({}), toast: (m) => t2.push(String(m)), load: (k, d) => d, localStorage: { setItem: () => {} },
+      fetch: async () => ({ status: 403, json: async () => ({ ok: false, reason: 'auto-eteint', error: 'Le retrait automatique est éteint — rien n\'a été envoyé à eBay.' }) }) }, dit);
+    if (!F2 || !F2.retirerEbayAuto) return;
+    await F2.retirerEbayAuto([{ annonce: annonce(22, avant), numero: '22' }], () => true);
+    dit(t2.some((t) => /N°22/.test(t) && /éteint/.test(t)) && !t2.some((t) => /eBay a refusé/i.test(t)),
+      'un refus venu de VRM (réglage éteint, rien envoyé à eBay) dit SA raison, sans l\'attribuer à eBay', JSON.stringify(t2));
   });
 
   // ── 4. CHANGER UN PRIX SUR eBAY : TROIS ISSUES (proposition 9) ─────────────
@@ -358,6 +369,7 @@ const PROUVE = process.argv.includes('--prouve');
     ['un compte bloqué accepté', "if (confirmees.some((v) => v.compte && bloques.has(String(v.compte)))) { ecarte('compte-bloque'); continue; }", ''],
     ['comptes bloqués inconnus lus « aucun »', "const bloques = comptesBloques && typeof comptesBloques.has === 'function' ? comptesBloques : null;", 'const bloques = comptesBloques && typeof comptesBloques.has === \'function\' ? comptesBloques : new Set();'],
     ['un retrait incertain tu', 'const incertain = () => {', 'const incertain = () => { return;'],
+    ['un refus de VRM attribué à eBay', "toast(`N°${d.numero} n'a pas été retirée automatiquement${", "toast(`N°${d.numero} : eBay a refusé le retrait automatique, pas été retirée${"],
     ['la preuve sans la date de sa liste', 'cap: parListe ? f.cap : null, compte:', 'cap: null, compte:'],
   ];
   let nonPris = 0;

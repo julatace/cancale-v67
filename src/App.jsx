@@ -30086,7 +30086,10 @@ const retirerEbayAuto = async (liste, continuer) => {
         } else if (j && EBAY_DEJA_TERMINEE.test(String(j.error || ''))) {
           /* déjà close : ne prend pas une des 5 places */
         } else if (!j || code === 504 || (j && j.reason === 'incertain')) { n += 1; incertain(); }
-        else { n += 1; toast(`N°${d.numero} : eBay a refusé le retrait automatique${j.error ? ` (« ${String(j.error).slice(0, 160)} »)` : ''} — elle reste dans « à retirer d'eBay », avec le bouton.`, 'err'); }
+        // Un refus CERTAIN : souvent VRM lui-même (réglage éteint ou illisible,
+        // SKU changé chez eBay — « rien n'a été envoyé à eBay »), parfois eBay.
+        // On ne l'attribue donc à personne : la raison du serveur le dit.
+        else { n += 1; toast(`N°${d.numero} n'a pas été retirée automatiquement${j.error ? ` : « ${String(j.error).slice(0, 160)} »` : ''} — elle reste dans « à retirer d'eBay », avec le bouton.`, 'err'); }
       } catch (_) { n += 1; incertain(); }
     }
   } finally { __retraitEbayAutoEnVol = false; }
