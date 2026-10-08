@@ -43,7 +43,7 @@ const COMPTES = {
   '9104': 'compte_exclu',   // exclu de l'app : 40 ventes qui ne doivent apparaître nulle part
   '9105': 'compte_panne',   // 35 ventes datées (700 €) — c'est sa LECTURE qui échoue
   '9106': 'compte_delta',   // 0 datée, 29 pas encore + 1 vendue fin décembre dernier → « atteint si »
-  '9107': 'compte_epsilon', // 32 ventes datées de 20 € → seuil atteint, sûr
+  '9107': 'compte_epsilon', // 32 ventes datées de 20 € + 1 PAS datée mais DÉCLARÉE → 33 sûres, atteint
 };
 const ACCOUNTS = Object.entries(COMPTES).map(([uid, login], i) => ({ id: i + 1, vinted_user_id: uid, login, domain: 'www.vinted.fr', updated_at: new Date().toISOString() }));
 let tx = 70000;
@@ -64,13 +64,21 @@ for (let i = 0; i < 35; i++) vente('9105', 20, FIN, ilYa(i), true);
 for (let i = 0; i < 29; i++) vente('9106', 15, FIN, ilYa(i), false);
 vente('9106', 15, FIN, new Date(AN - 1, 11, 20, 12).toISOString(), false);
 for (let i = 0; i < 32; i++) vente('9107', 20, FIN, ilYa(i), true);
+// Une vente sans date de versement, mais qu'il a DÉCLARÉE (« J'ai déclaré ce
+// mois ») : le registre la compte au mois de sa déclaration — elle est donc
+// dans la partie sûre, et jamais EN PLUS dans les « pas encore datées » (le
+// premier correctif rappelait la règle sans les déclarations : comptée deux fois).
+vente('9107', 20, FIN, ilYa(5), false);
+const TX_DECLAREE = tx, DATE_DECLAREE = VENTES['9107'][VENTES['9107'].length - 1].date;
+const ymDe = (iso) => { const d = new Date(iso); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
+const DECLARATIONS = { [ymDe(DATE_DECLAREE)]: { ids: ['vinted:' + TX_DECLAREE], n: 1, ca: 20, regle: 'versement', at: maintenant } };
 // La partie SÛRE (datée du versement) et la partie pas encore datée, compte par compte.
 const ATTENDU = {
   '9101': { n: 10, eur: '100.00', ad: 21, verdict: 'atteintSi' },
   '9102': { n: 15, eur: '1089.90', ad: 14, verdict: 'sous', resteN: 15, resteEur: '910.11' },
   '9103': { n: 2, eur: '1200.01', ad: 1, verdict: 'atteintSi' },
   '9106': { n: 0, eur: '0.00', ad: 30, verdict: 'atteintSi' },
-  '9107': { n: 32, eur: '640.00', ad: 0, verdict: 'atteint' },
+  '9107': { n: 33, eur: '660.00', ad: 0, verdict: 'atteint' },
 };
 const PANNE_LU = { n: 35, eur: '700.00', ad: 0, verdict: 'atteint' };
 
@@ -211,7 +219,7 @@ const communs = (r, errs, quoi) => {
   let b;
   try {
     b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
-    const mainNormal = { vinted_accounts_hidden: ['9104'] };
+    const mainNormal = { vinted_accounts_hidden: ['9104'], vrm_urssaf_declare: DECLARATIONS };
 
     // ── A. Le cas courant, aux deux tailles : compte_panne ne répond pas.
     for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }]) {

@@ -11,17 +11,21 @@
  * `classifyOrderStatus`, `montantCommande`…) dans un `vm`, sur des ventes
  * INVENTÉES (le dépôt est public). Il juge ce qu'elle REND, jamais un libellé.
  *
- * ⚠️ La partie SÛRE d'un compte est le chiffre du REGISTRE annuel (`datees`,
- *    calculé par le registre et passé tel quel). Le registre vit dans un écran ;
- *    ici, `datees` est bâti avec la VRAIE `ventesDeclarables` (finalisée, datée
- *    du versement dans l'année — la règle du registre) — et un compte reçoit
- *    exprès un `datees` qui ne se déduit PAS de ses ventes : la carte doit le
- *    rendre tel quel, sans le recalculer (§11).
+ * ⚠️ Les DEUX parties d'un compte viennent du REGISTRE annuel (§11) : la
+ *    partie sûre (`datees`, ses ventes Vinted comptées dans l'année — mois de la
+ *    déclaration s'il l'a notée, sinon du versement) et les ventes pas encore
+ *    datées (`aDater`). Le registre vit dans un écran ; ici les deux sont bâtis
+ *    avec la VRAIE `ventesDeclarables`, registre des déclarations compris, comme
+ *    le fait le registre — et un compte reçoit exprès un `datees` qui ne se
+ *    déduit PAS de ses ventes : la carte doit le rendre tel quel, sans le
+ *    recalculer. Une vente pas datée mais DÉCLARÉE compte dans la partie sûre et
+ *    jamais en plus dans les « pas encore datées » (le premier correctif
+ *    rappelait `ventesDeclarables` SANS les déclarations : comptée deux fois).
  *
  *   node scripts/audit-seuils-vinted.cjs                 → la règle d'App.jsx
  *   node scripts/audit-seuils-vinted.cjs --mutation X    → la règle RÉAFFAIBLIE
- *        (exclus · passu · versnull · seuil2000 · adater · recalcule · strict ·
- *         totalsous · reste · acejour) — chacune doit faire passer au moins un
+ *        (exclus · passu · versnull · encours · seuil2000 · adater · recalcule ·
+ *         strict · totalsous · reste · acejour) — chacune doit faire passer au moins un
  *        contrôle au ROUGE (§6.1 : « la fonction n'existait pas avant » n'est
  *        pas une preuve).
  */
@@ -67,17 +71,19 @@ const tire = (nom, pile) => {
   for (const autre of NOMS) if (autre !== nom && txt.includes(autre) && new RegExp('(^|[^\\w$.])' + autre.replace(/\$/g, '\\$') + '(?![\\w$])').test(txt)) tire(autre, pile);
   ordre.push(nom);
 };
-tire('seuilsVintedParCompte', new Set());
+// La règle des seuils ET celle du registre (qui lui fournit ses deux parties).
+for (const r of ['seuilsVintedParCompte', 'ventesDeclarables']) tire(r, new Set());
 if (process.argv.includes('--deps')) console.log('dépendances :', ordre.join(', '));
 
 // ── Les mutations : la règle RÉAFFAIBLIE, pour prouver que les contrôles mordent.
 const MUTATIONS = {
-  exclus: [['(ecarte && ecarte(uid))', 'false'], ['!!(ecarte && ecarte(uidDe(o)))', 'false']],   // un compte exclu compte
-  passu: [["(ko(uid) || versements === null) ? 'pasSu' : 'lu'", "'lu'"]],                       // lecture ratée = 0
-  versnull: [['(ko(uid) || versements === null)', 'ko(uid)']],                                    // dates illisibles = 0 daté
+  exclus: [['(ecarte && ecarte(uid))', 'false']],                                                // un compte exclu compte
+  passu: [["ko(uid) ? 'pasSu' : lu ? 'lu'", "lu ? 'lu'"]],                                        // lecture ratée = 0 vente
+  versnull: [["datees === null ? 'pasSu' : 'enCours'", "'enCours'"]],                            // registre illisible = « en cours » pour toujours
+  encours: [["const lu = !!datees && typeof datees === 'object';", 'const lu = datees !== null;']], // registre pas encore calculé = 0 vente
   seuil2000: [['cts > SEUIL_VINTED_EUR * 100', 'cts >= SEUIL_VINTED_EUR * 100']],               // 2 000,00 € pile = atteint
   adater: [['r.nAd += 1; r.ctsAd += c;', 'r.n += 1; r.cts += c;']],                              // le défaut de la revue : pas encore datée comptée comme sûre
-  recalcule: [['(etat === \'lu\' && datees[uid]) || {}', '{}']],                                // la carte ignore le chiffre du registre
+  recalcule: [['(etat === \'lu\' && datees[uid]) || {}', '{}']],                               // la carte ignore le chiffre du registre
   strict: [['Math.min(maintenant, t + VERSEMENT_MAX_J * 86400e3)', 'maintenant']],                // sans borne haute : 2024 « pas encore datée » en 2026
   totalsous: [['juge(total, !total.partiel)', 'juge(total, true)']],                              // un total partiel jugé « sous »
   reste: [['SEUIL_VINTED_EUR * 100 + 1 - r.cts', 'SEUIL_VINTED_EUR * 100 - r.cts']],              // « encore 0,10 € » alors qu'il faut 0,11 €
@@ -141,25 +147,36 @@ vente('777', 15, FIN, jour(AN - 1, 11, 20), null);
 for (let i = 0; i < 3; i++) vente('888', 25, FIN, jour(AN - 2, 2, 3 + i), null);
 // 999 : 32 ventes datées de 20 € → seuil atteint, SÛR
 for (let i = 0; i < 32; i++) vente('999', 20, FIN, jour(AN, 4, 1 + (i % 28)), jour(AN, 4, 2 + (i % 28)));
+// 123 : 29 ventes datées + 1 vente PAS DATÉE mais DÉCLARÉE en septembre (« J'ai
+//       déclaré ce mois ») : le registre la compte en septembre, elle est donc
+//       dans la partie SÛRE (30 → atteint) — et jamais EN PLUS dans les « pas
+//       encore datées ». Le premier correctif rappelait `ventesDeclarables` sans
+//       les déclarations : il la comptait deux fois.
+for (let i = 0; i < 29; i++) vente('123', 10, FIN, jour(AN, 6, 1 + (i % 28)), jour(AN, 6, 2 + (i % 28)));
+const txDeclaree = vente('123', 10, FIN, jour(AN, 8, 10), null);
+const DECL = { [`${AN}-09`]: { ids: ['vinted:' + txDeclaree], n: 1, ca: 10, regle: 'versement', at: MAINTENANT } };
 
-const COMPTES = ['111', '222', '333', '444', '555', '666', '777', '888', '999'].map(u => ({ uid: u, nom: 'compte_' + u }));
+const COMPTES = ['111', '222', '333', '444', '555', '666', '777', '888', '999', '123'].map(u => ({ uid: u, nom: 'compte_' + u }));
 const ecarte = (uid) => String(uid) === '444';
 const echoues = new Set(['555']);
-// Le chiffre du REGISTRE : finalisée, compte non exclu, versée dans l'année — la
-// vraie `ventesDeclarables`, ventes regroupées par compte, en centimes.
-const registre = (annee, versements = VERS) => {
-  const out = {};
-  const d = ctx.ventesDeclarables({ vinted: V, exclu: (o) => ecarte(o._acc.vinted_user_id), versements });
+// LE REGISTRE ANNUEL, comme l'écran le calcule : la VRAIE `ventesDeclarables`
+// (comptes exclus écartés, registre des déclarations compris), puis ses lignes
+// Vinted de l'année (`ym` : mois de la déclaration, sinon du versement) regroupées
+// par compte, en centimes — et sa liste `aDater`, telle quelle.
+const registre = (annee, versements = VERS, declare = DECL) => {
+  const d = ctx.ventesDeclarables({ vinted: V, exclu: (o) => ecarte(o._acc.vinted_user_id), versements, declare });
+  const datees = {};
   for (const l of d.lignes) {
-    if (l.plateforme !== 'Vinted' || new Date(l.ts).getFullYear() !== annee) continue;
-    const u = String(l.o._acc.vinted_user_id); const q = out[u] || (out[u] = { n: 0, cts: 0 });
+    if (l.plateforme !== 'Vinted' || Number(String(l.ym || '').split('-')[0]) !== annee) continue;
+    const u = String(l.o._acc.vinted_user_id); const q = datees[u] || (datees[u] = { n: 0, cts: 0 });
     q.n += 1; q.cts += Math.round(l.eur * 100);
   }
-  return out;
+  return { datees, aDater: d.aDater.filter(l => l.plateforme === 'Vinted') };
 };
 const appel = (extra) => {
-  const a = { comptes: COMPTES, ventes: V, ecarte, echoues, versements: VERS, annee: AN, maintenant: MAINTENANT, ...(extra || {}) };
-  if (!('datees' in (extra || {}))) a.datees = registre(a.annee, a.versements || {});
+  const x = extra || {};
+  const a = { comptes: COMPTES, ecarte, echoues, annee: AN, maintenant: MAINTENANT, ...x };
+  if (!('datees' in x)) { const g = registre(a.annee); a.datees = g.datees; if (!('aDater' in x)) a.aDater = g.aDater; }
   return ctx.seuilsVintedParCompte(a);
 };
 // La forme rendue : `{ comptes, total, aCeJour }` (une liste seule, c'était avant la revue).
@@ -170,19 +187,19 @@ const vu = (r) => r ? `n=${r.n} · ${r.cts} cts · pas encore datées ${r.nAd} (
 const R = essaie('la règle rend un résultat', () => appel());
 const L = lignesDe(R);
 const par = indexe(R);
-const REG = registre(AN);
+const REG = registre(AN).datees;
 
 // 1. Le compte EXCLU n'y entre pas.
 dit(!par['444'], 'un compte exclu de l’app n’apparaît pas (décision du 3 octobre)', vu(par['444']));
-dit(L.length === 8, 'les huit autres comptes sont tous là — aucun n’est perdu', L.length + ' compte(s)');
+dit(L.length === 9, 'les neuf autres comptes sont tous là — aucun n’est perdu', L.length + ' compte(s)');
 
 // 2. LA PARTIE SÛRE EST LE CHIFFRE DU REGISTRE, compte par compte — jamais plus.
-for (const u of ['111', '222', '333', '666', '777', '888', '999']) {
+for (const u of ['111', '222', '333', '666', '777', '888', '999', '123']) {
   const r = par[u], g = REG[u] || { n: 0, cts: 0 };
   dit(!!(r && r.etat === 'lu' && r.n === g.n && r.cts === g.cts), `compte_${u} : la partie sûre == le registre (${g.n} vente(s), ${g.cts} cts)`, vu(r));
 }
 // …et elle est LUE, pas recalculée : un registre qui dit autre chose est rendu tel quel.
-const D = essaie('la règle rend le chiffre du registre tel quel', () => appel({ datees: { ...REG, '999': { n: 7, cts: 12345 } } }));
+const D = essaie('la règle rend le chiffre du registre tel quel', () => appel({ datees: { ...REG, '999': { n: 7, cts: 12345 } }, aDater: registre(AN).aDater }));
 const d9 = indexe(D)['999'];
 dit(!!(d9 && d9.n === 7 && d9.cts === 12345), 'la carte LIT le chiffre du registre, elle ne le recalcule pas (§11)', vu(d9));
 
@@ -234,17 +251,28 @@ const TC = essaie('la règle rend un total complet', () => appel({ comptes: COMP
 const tc = TC && TC.total;
 dit(!!(tc && !tc.partiel && tc.n === 28 && tc.cts === 199990 && tc.verdict === 'sous' && tc.reste && tc.reste.n === 2 && tc.reste.cts === 11), 'un total complet sous les seuils le dit, avec ce qu’il reste', tc ? `n=${tc.n} · ${tc.cts} · ${tc.verdict} · ${JSON.stringify(tc.reste)}` : 'absent');
 
-// 11. Dates de versement ILLISIBLES (null) : « pas su », jamais « 0 daté ».
-const NV = essaie('la règle rend un résultat sans dates de versement', () => appel({ versements: null, datees: {} }));
+// 11. Le registre n'a pas pu dater les ventes Vinted (dates de versement
+//     illisibles : `datees` vaut null) — « pas su », jamais « 0 daté ».
+const NV = essaie('la règle rend un résultat sans registre lisible', () => appel({ datees: null, aDater: [] }));
 const lnv = lignesDe(NV);
-dit(lnv.length === 8 && lnv.every(r => r.etat === 'pasSu' && r.verdict === null && r.n === 0), 'dates de versement illisibles : chaque compte est « pas su » — aucun verdict sur une partie sûre qu’on n’a pas pu lire', lnv.map(r => r.uid + ':' + r.etat + ':' + r.raison).join(','));
-dit(NV && NV.total && NV.total.etat === 'pasSu' && NV.total.verdict === null, 'dates de versement illisibles : le total est « pas su »', NV && NV.total ? NV.total.etat : 'absent');
+dit(lnv.length === 9 && lnv.every(r => r.etat === 'pasSu' && r.verdict === null && r.n === 0) && lnv.filter(r => r.raison === 'versements').length === 8,
+  'registre illisible : chaque compte est « pas su » — aucun verdict sur une partie sûre qu’on n’a pas pu lire', lnv.map(r => r.uid + ':' + r.etat + ':' + r.raison).join(','));
+dit(NV && NV.total && NV.total.etat === 'pasSu' && NV.total.verdict === null, 'registre illisible : le total est « pas su »', NV && NV.total ? NV.total.etat : 'absent');
 
-// 12. Pas encore lu (ventes, dates de versement ou registre) : « en cours », aucun chiffre.
-for (const [quoi, extra] of [['ventes pas encore lues', { ventes: null }], ['dates de versement pas encore lues', { versements: undefined }], ['registre pas encore calculé', { datees: null }]]) {
-  const E = essaie(`la règle rend un résultat (${quoi})`, () => appel(extra));
-  const le = lignesDe(E);
-  dit(le.length === 8 && le.every(r => r.etat === 'enCours' && r.verdict === null), `${quoi} : chaque compte est « en cours », aucun verdict`, le.map(r => r.etat).join(','));
-}
+// 12. Registre pas encore calculé (ventes, dates de versement, Leboncoin ou eBay
+//     encore en lecture : `datees` vaut undefined) — « en cours », aucun chiffre ;
+//     mais un compte dont la lecture a DÉJÀ échoué se dit « pas su » tout de suite.
+const E = essaie('la règle rend un résultat (registre pas encore calculé)', () => appel({ datees: undefined, aDater: undefined }));
+const le = lignesDe(E);
+const le8 = le.filter(r => r.uid !== '555');
+dit(le.length === 9 && le8.every(r => r.etat === 'enCours' && r.verdict === null && r.n === 0), 'registre pas encore calculé : chaque compte est « en cours », aucun verdict — jamais « 0 vente »', le.map(r => r.uid + ':' + r.etat).join(','));
+dit(!!(indexe(E)['555'] && indexe(E)['555'].etat === 'pasSu'), '…et le compte dont la lecture a échoué est déjà « pas su »', vu(indexe(E)['555']));
+dit(E && E.total && E.total.etat === 'enCours' && E.total.verdict === null, 'registre pas encore calculé : le total est « en cours »', E && E.total ? E.total.etat : 'absent');
+
+// 13. Une vente PAS DATÉE mais DÉCLARÉE : dans la partie sûre (le registre la
+//     compte au mois de sa déclaration), jamais en plus dans les « pas encore datées ».
+const c123 = par['123'];
+dit(!!(c123 && c123.n === 30 && c123.cts === 30000 && c123.nAd === 0 && c123.verdict === 'atteint'),
+  'compte_123 : 29 datées + 1 déclarée sans date = 30 sûres (atteint), et 0 « pas encore datée » — jamais comptée deux fois', vu(c123));
 
 fin();
