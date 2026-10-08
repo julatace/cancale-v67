@@ -10,10 +10,32 @@
   // Injecte inject.js dans le MAIN world (via un <script> pointant sur la
   // ressource web-accessible de l'extension). C'est la seule facon d'observer
   // les vraies requetes fetch/XHR du site.
+  // ⚠️ 5.162 — LA PAUSE DEMANDÉE PAR VINTED (429/403) VAUT AUSSI POUR LA
+  // MOISSON FAITE DANS LA PAGE. Elle est rangée par le fond dans
+  // `chrome.storage.local` (`vrmPauseVinted`) ; `inject.js` (monde MAIN) n'y a
+  // pas accès : on lui transmet la fin de la pause — un nombre, rien d'autre —
+  // une fois qu'il est chargé, puis à chaque changement.
+  let injecte = false, pauseFin = null;
+  const direPause = () => {
+    if (!injecte || pauseFin == null) return;
+    try { window.postMessage({ __tag: 'CANCALE_VINTED_PAUSE', jusqua: pauseFin }, '*'); } catch (_) {}
+  };
+  try {
+    chrome.storage.local.get('vrmPauseVinted', (o) => {
+      try { pauseFin = Number(((o && o.vrmPauseVinted) || {}).jusqua) || 0; direPause(); } catch (_) {}
+    });
+    chrome.storage.onChanged.addListener((ch, zone) => {
+      try {
+        if (zone !== 'local' || !ch || !ch.vrmPauseVinted) return;
+        pauseFin = Number((ch.vrmPauseVinted.newValue || {}).jusqua) || 0; direPause();
+      } catch (_) {}
+    });
+  } catch (_) {}
+
   try {
     const s = document.createElement('script');
     s.src = chrome.runtime.getURL('inject.js');
-    s.onload = function () { this.remove(); };
+    s.onload = function () { this.remove(); injecte = true; direPause(); };
     (document.head || document.documentElement).appendChild(s);
   } catch (_) {}
 

@@ -67,7 +67,8 @@ const srv = http.createServer((q, r) => {
 // `abo` : la réponse de /api/compte?mode=abonnement — un objet, ou 'panne' (503).
 // `fx` : la réponse de ?mode=factures — un objet, ou 'panne' (502).
 // `compte` : cliquer l'onglet « Mon compte » après le chargement.
-async function ouvrir(nav, { abo, tab = 'settings', checkoutUrl = 'https://checkout.stripe.com/c/pay/cs_banc', fx = FACTURES, compte = true, extra = '' }) {
+// `fermer` : la réponse de ?mode=fermer — `{ status, body }`.
+async function ouvrir(nav, { abo, tab = 'settings', checkoutUrl = 'https://checkout.stripe.com/c/pay/cs_banc', fx = FACTURES, compte = true, extra = '', fermer = null }) {
   const ctx = await nav.newContext({ viewport: { width: 1512, height: 950 } });
   const pg = await ctx.newPage();
   const erreurs = []; pg.on('pageerror', (e) => erreurs.push(e.message));
@@ -102,8 +103,13 @@ async function ouvrir(nav, { abo, tab = 'settings', checkoutUrl = 'https://check
       appels.push({ mode, methode: r.request().method(), auth: r.request().headers().authorization || '' });
       return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, annuleFinPeriode: mode === 'resilier', finPeriode: '2026-11-04T10:00:00.000Z' }) });
     }
+    if (/\/api\/compte\?mode=fermer/.test(u)) {
+      appels.push({ mode: 'fermer', methode: r.request().method(), auth: r.request().headers().authorization || '', corps: r.request().postData() || '' });
+      const f = fermer || { status: 200, body: { ok: true, message: 'Ton compte VRM est fermé : 3 données effacées.' } };
+      return r.fulfill({ status: f.status, contentType: 'application/json', body: JSON.stringify(f.body) });
+    }
     if (/\/api\/compte\?mode=(checkout|portail)/.test(u)) {
-      appels.push({ mode: /checkout/.test(u) ? 'checkout' : 'portail', auth: r.request().headers().authorization || '' });
+      appels.push({ mode: /checkout/.test(u) ? 'checkout' : 'portail', auth: r.request().headers().authorization || '', corps: r.request().postData() || '' });
       return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ url: checkoutUrl }) });
     }
     return r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' });
@@ -151,14 +157,24 @@ const boutons = (pg) => pg.evaluate(() => { const e = document.querySelector('[d
     console.log('\n── « S’abonner » mène à Stripe, avec la session');
     await essaie('clic', async () => {
       const { ctx, pg, appels } = await ouvrir(nav, { abo: ETATS.sans });
-      await pg.locator('[data-abonnement] button', { hasText: /abonner/i }).first().click();
+      // Les CGV s'acceptent DANS VRM (6 octobre) : tant que la case n'est pas
+      // cochée, le bouton est grisé et rien ne part.
+      const bouton = pg.locator('[data-abonnement] button', { hasText: /abonner/i }).first();
+      const grise = await bouton.isDisabled().catch(() => false);
+      await bouton.click({ force: true, timeout: 2000 }).catch(() => {});
+      await pg.waitForTimeout(400);
+      dit(grise && !appels.some((a) => a.mode === 'checkout'), 'case des CGV non cochée : « S’abonner » est grisé et aucune demande de paiement ne part', JSON.stringify(appels));
+      await pg.locator('[data-abonnement] [data-case-cgv] input').first().check();
+      await bouton.click();
       await pg.waitForURL(/checkout\.stripe\.com/, { timeout: 6000 }).catch(() => {});
+      dit(appels.some((a) => a.mode === 'checkout' && /"cgv":true/.test(a.corps)), 'case cochée : la demande dit au serveur que les CGV sont acceptées (cgv:true)', JSON.stringify(appels));
       dit(appels.some((a) => a.mode === 'checkout' && a.auth === 'Bearer jeton-de-banc'), 'le serveur reçoit la demande AVEC le jeton de session (c’est lui qui sait qui paie)', JSON.stringify(appels));
       dit(/checkout\.stripe\.com/.test(pg.url()), 'la page s’ouvre chez Stripe', pg.url());
       await ctx.close();
     });
     await essaie('url hostile', async () => {
       const { ctx, pg } = await ouvrir(nav, { abo: ETATS.sans, checkoutUrl: 'https://site-pirate.example/payer' });
+      await pg.locator('[data-abonnement] [data-case-cgv] input').first().check();
       await pg.locator('[data-abonnement] button', { hasText: /abonner/i }).first().click();
       await pg.waitForTimeout(1200);
       dit(!/site-pirate/.test(pg.url()), 'une adresse de paiement qui n’est pas Stripe n’est jamais suivie', pg.url());
@@ -279,6 +295,64 @@ const boutons = (pg) => pg.evaluate(() => { const e = document.querySelector('[d
         await ctx.close();
       });
     }
+    // ── FERMER MON COMPTE + CONTACT (5 octobre) ──────────────────────────────
+    // La politique de confidentialité promet l'effacement ; le bouton manquait.
+    // Le serveur décide et dit ce qu'il a fait (audit-fermer-compte.cjs) ; ici
+    // on vérifie que l'écran dit CE QUE LE SERVEUR DIT, rien de plus.
+    console.log('\n── « Fermer mon compte » et le contact (onglet Mon compte)');
+    const ouvrirFermer = async (pg) => { const b = pg.locator('[data-fermer-compte] button[aria-expanded]'); if (await b.count()) { await b.first().click(); await pg.waitForTimeout(900); } };
+    const etatFermer = (pg) => pg.evaluate(() => { const e = document.querySelector('[data-fermer-compte] [data-fermer-etat]'); return e ? e.getAttribute('data-fermer-etat') : null; });
+    await essaie('contact', async () => {
+      const { ctx, pg } = await ouvrir(nav, { abo: ETATS.actif });
+      // (un banc ne meurt pas : sans src/contact.js — le code d'avant — la ligne
+      //  Contact est simplement absente, et le contrôle le dit en rouge)
+      let constante = ''; try { constante = ((/CONTACT_EMAIL\s*=\s*'([^']*)'/.exec(fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'contact.js'), 'utf8')) || [])[1] || '').trim(); } catch (_) { constante = ''; }
+      const c = await pg.evaluate(() => { const e = document.querySelector('[data-contact]'); return e ? { t: e.innerText, absent: !!e.querySelector('[data-contact-absent]'), mail: (e.querySelector('a[href^="mailto:"]') || {}).href || '' } : null; });
+      dit(!!c && (constante ? c.mail === `mailto:${constante}` : (c.absent && /à venir/.test(c.t) && !c.mail)), `une ligne Contact dans « Mon compte » — ${constante ? 'l’adresse de src/contact.js' : '« à venir », aucune adresse inventée'}`, c ? c.t : 'absente');
+      await ctx.close();
+    });
+    await essaie('fermer : vendeur', async () => {
+      const { ctx, pg, appels } = await ouvrir(nav, { abo: ETATS.actif });
+      dit(await pg.evaluate(() => !!document.querySelector('[data-fermer-compte]')), '« Fermer mon compte » existe dans Mon compte');
+      await ouvrirFermer(pg);
+      dit((await etatFermer(pg)) === 'possible', 'un vendeur abonné peut fermer son compte');
+      const btn = pg.locator('[data-fermer-bouton]');
+      dit(await btn.isDisabled(), 'le bouton reste désactivé tant que l’adresse n’est pas recopiée');
+      await pg.fill('[data-fermer-confirmation]', 'autre@exemple.test'); await pg.waitForTimeout(200);
+      dit(await btn.isDisabled(), '… et avec une AUTRE adresse aussi');
+      await pg.fill('[data-fermer-confirmation]', 'Vendeuse@Exemple.test'); await pg.waitForTimeout(200);
+      dit(!(await btn.isDisabled()), '… et s’active avec SA propre adresse (majuscules indifférentes)');
+      await btn.click(); await pg.waitForTimeout(1200);
+      const a = appels.find((x) => x.mode === 'fermer');
+      dit(!!a && a.methode === 'POST' && /^Bearer jeton-de-banc$/.test(a.auth) && /"confirmation":"Vendeuse@Exemple.test"/.test(a.corps), 'la demande part en POST, AVEC la session et l’adresse recopiée (le serveur la revérifie)', a ? `${a.methode} ${a.corps}` : 'aucune demande');
+      const res = await pg.evaluate(() => { const e = document.querySelector('[data-fermer-resultat]'); return e ? { etat: e.getAttribute('data-fermer-resultat'), t: e.innerText } : null; });
+      dit(!!res && res.etat === 'ferme' && /fermé/.test(res.t), 'le serveur dit « fermé » ⇒ l’écran le dit, avec ce que le serveur a fait', res && res.t.slice(0, 90));
+      await ctx.close();
+    });
+    await essaie('fermer : incomplet', async () => {
+      const message = 'Fermeture INCOMPLÈTE. Fait : 3 données effacées. Pas encore effacé : tes comptes Vinted, ton compte de connexion.';
+      const { ctx, pg } = await ouvrir(nav, { abo: ETATS.sans, fermer: { status: 502, body: { ok: false, message } } });
+      await ouvrirFermer(pg);
+      await pg.fill('[data-fermer-confirmation]', 'vendeuse@exemple.test'); await pg.waitForTimeout(200);
+      await pg.locator('[data-fermer-bouton]').click(); await pg.waitForTimeout(1200);
+      const res = await pg.evaluate(() => { const e = document.querySelector('[data-fermer-resultat]'); return e ? { etat: e.getAttribute('data-fermer-resultat'), t: e.innerText } : null; });
+      dit(!!res && res.etat === 'incomplet' && res.t.includes('comptes Vinted') && !/Retour à l'accueil/.test(res.t), 'un échec à mi-chemin : l’écran dit ce qui reste, jamais « fermé »', res && res.t.slice(0, 120));
+      await ctx.close();
+    });
+    await essaie('fermer : propriétaire', async () => {
+      const { ctx, pg } = await ouvrir(nav, { abo: ETATS.proprietaire });
+      await ouvrirFermer(pg);
+      const b = await pg.evaluate(() => !!document.querySelector('[data-fermer-bouton]'));
+      dit((await etatFermer(pg)) === 'proprietaire' && !b, 'le propriétaire de l’installation : expliqué, AUCUN bouton (sa boutique ne s’efface pas d’un clic)');
+      await ctx.close();
+    });
+    await essaie('fermer : pas su', async () => {
+      const { ctx, pg } = await ouvrir(nav, { abo: 'panne' });
+      await ouvrirFermer(pg);
+      const b = await pg.evaluate(() => !!document.querySelector('[data-fermer-bouton]'));
+      dit((await etatFermer(pg)) === 'pas-su' && !b, 'compte illisible : aucun bouton tant qu’on ne sait pas s’il est le propriétaire');
+      await ctx.close();
+    });
   } catch (e) { dit(false, 'le banc s’exécute', String(e && e.message || e).slice(0, 160)); }
   finally {
     await nav.close(); srv.close();

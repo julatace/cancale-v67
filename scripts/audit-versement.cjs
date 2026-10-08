@@ -97,7 +97,11 @@ function faireCtx({ ventes = VENTES, txn = TXN, gardeStop = null, srcOverride = 
   vm.createContext(ctx);
   vm.runInContext(srcOverride || SRC, ctx, { filename: 'background.js' });
   ctx.getStoredAccounts = async () => [{ vinted_user_id: UID, login: 'julatace3535', domain: 'www.vinted.fr' }];
+  // 5.162 : la lecture des versements passe par `gardeLecture` (budget de
+  // LECTURE) — on stubbe les deux gardes, la règle testée est la même : un
+  // refus de la garde ⇒ zéro requête.
   ctx.garde = async () => gardeStop;
+  ctx.gardeLecture = async () => gardeStop;
   ctx.logActivity = async () => {};
   ctx.noterDiag = async () => {};
   ctx.echantillonRate = async () => {};
@@ -164,7 +168,9 @@ const lignesTxn = (j) => j.ecrits.flat().filter((r) => r && /_txn_/.test(r.id));
 
   // §6.1 — la règle RÉAFFAIBLIE : sans le test « déjà datée », la 101 est relue.
   await essaie('§6.1', async () => {
-    const faible = SRC.replace("if (!/^\\d+$/.test(tx) || datees.has(tx)) continue;", "if (!/^\\d+$/.test(tx)) continue;");
+    // (5.162 : le test vit dans `aLire`, qui rend `false` au lieu de `continue`.)
+    let faible = SRC.replace("if (!/^\\d+$/.test(tx) || datees.has(tx)) continue;", "if (!/^\\d+$/.test(tx)) continue;");
+    if (faible === SRC) faible = SRC.replace("if (!/^\\d+$/.test(tx) || datees.has(tx)) return false;", "if (!/^\\d+$/.test(tx)) return false;");
     if (faible === SRC) { dit(false, 'la ligne « déjà datée » est introuvable — l\'audit ne prouve rien'); return; }
     const ctx = faireCtx({ srcOverride: faible });
     await ctx.capterDatesVersement(UID);
