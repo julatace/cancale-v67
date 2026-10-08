@@ -219,8 +219,8 @@ const SUB = (owner, status = 'active', extra = {}) => ({ id: 'sub_' + owner.slic
   await essaie('checkout A', async () => {
     reset();
     const r = faireRes();
-    const q = req({ method: 'POST', mode: 'checkout', headers: { authorization: 'Bearer aa.bb.A', origin: 'https://site-pirate.example' }, corps: JSON.stringify({ owner: B, client_reference_id: B, cgv: true }) });
-    q.body = { owner: B, client_reference_id: B, cgv: true };
+    const q = req({ method: 'POST', mode: 'checkout', headers: { authorization: 'Bearer aa.bb.A', origin: 'https://site-pirate.example' }, corps: JSON.stringify({ cgv: true, owner: B, client_reference_id: B }) });
+    q.body = { cgv: true, owner: B, client_reference_id: B };
     await compte(q, r);
     const s = appelsStripe.find((x) => x.chemin === 'checkout/sessions');
     const corps = decodeURIComponent((s && s.corps) || '');
@@ -237,13 +237,13 @@ const SUB = (owner, status = 'active', extra = {}) => ({ id: 'sub_' + owner.slic
   });
   await essaie('checkout propriétaire', async () => {
     reset(); const r = faireRes();
-    await compte(req({ method: 'POST', mode: 'checkout', headers: { authorization: 'Bearer aa.bb.P' }, corps: JSON.stringify({ cgv: true }) }), r);
+    await compte(req({ method: 'POST', mode: 'checkout', headers: { authorization: 'Bearer aa.bb.P' } }), r);
     dit(r.code === 409 && !appelsStripe.some((x) => x.chemin === 'checkout/sessions'), 'le propriétaire de VRM ne paie pas (aucune page de paiement)', `HTTP ${r.code}`);
   });
   await essaie('checkout déjà abonné', async () => {
     reset(); base[A] = { owner: A, statut: 'active', client_stripe: 'cus_A' };
     const r = faireRes();
-    await compte(req({ method: 'POST', mode: 'checkout', headers: { authorization: 'Bearer aa.bb.A' }, corps: JSON.stringify({ cgv: true }) }), r);
+    await compte(req({ method: 'POST', mode: 'checkout', headers: { authorization: 'Bearer aa.bb.A' } }), r);
     dit(r.code === 409 && !appelsStripe.some((x) => x.chemin === 'checkout/sessions'), 'déjà abonné : pas de second abonnement', `HTTP ${r.code}`);
   });
 
