@@ -238,15 +238,18 @@ async function checkout(req, res) {
   //    cochée dans l'app, `cgv: true`), datée et rangée dans les métadonnées de
   //    l'abonnement — c'est elle qui rend les CGV opposables. La case de Stripe
   //    reste demandée en plus quand il sait l'afficher.
+  //    La case est jugée APRÈS « propriétaire » et « déjà abonné » (on ne
+  //    demande pas de cocher une case pour un paiement qui n'aura pas lieu) et
+  //    AVANT tout appel à Stripe (`lirePrix` compris) : sans elle, rien ne part.
   const corps = await lireCorpsJson(req);
-  if (!corps || corps.cgv !== true) return repondre(res, 400, { erreur: 'cgv', message: "Coche « J'accepte les conditions générales de vente » avant de payer." });
-  const accepteLe = new Date().toISOString();
   if (!stripePret()) return repondre(res, 503, { erreur: 'stripe', message: "Le paiement n'est pas encore branché." });
   const [acc, ligne] = await Promise.all([accesDe(req), ligneDe(req)]);
   if (acc === undefined || ligne === undefined) return repondre(res, 503, { erreur: 'base-injoignable', message: "Je n'ai pas pu vérifier ton abonnement. Réessaie dans un instant." });
   if (acc.proprietaire) return repondre(res, 409, { erreur: 'proprietaire', message: 'Ton compte est gratuit : rien à payer.' });
   // Jamais deux abonnements pour un vendeur : déjà actif ⇒ on l'envoie gérer.
   if (ligne && abonnementActif(ligne.statut)) return repondre(res, 409, { erreur: 'deja', message: 'Tu es déjà abonné.' });
+  if (!corps || corps.cgv !== true) return repondre(res, 400, { erreur: 'cgv', message: "Coche « J'accepte les conditions générales de vente » avant de payer." });
+  const accepteLe = new Date().toISOString();
   const prix = await lirePrix();
   if (!prix) return repondre(res, 503, { erreur: 'prix', message: "Le prix de l'abonnement est introuvable chez Stripe." });
   const params = {

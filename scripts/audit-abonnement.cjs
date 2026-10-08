@@ -219,8 +219,8 @@ const SUB = (owner, status = 'active', extra = {}) => ({ id: 'sub_' + owner.slic
   await essaie('checkout A', async () => {
     reset();
     const r = faireRes();
-    const q = req({ method: 'POST', mode: 'checkout', headers: { authorization: 'Bearer aa.bb.A', origin: 'https://site-pirate.example' }, corps: JSON.stringify({ owner: B, client_reference_id: B }) });
-    q.body = { owner: B, client_reference_id: B };
+    const q = req({ method: 'POST', mode: 'checkout', headers: { authorization: 'Bearer aa.bb.A', origin: 'https://site-pirate.example' }, corps: JSON.stringify({ cgv: true, owner: B, client_reference_id: B }) });
+    q.body = { cgv: true, owner: B, client_reference_id: B };
     await compte(q, r);
     const s = appelsStripe.find((x) => x.chemin === 'checkout/sessions');
     const corps = decodeURIComponent((s && s.corps) || '');
