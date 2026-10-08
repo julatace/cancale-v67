@@ -19497,7 +19497,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   useEffect(() => { setVentesMax(60); }, [vFilter, ordSearchDiff, periode, showHidden]);
   // Un seul compte dans la liste ⇒ le nommer sur chaque carte ne distingue rien
   // (§7 : « compte julatace3535 » ×5). Il ne reste que s'il y en a plusieurs.
-  const ventesUnCompte = useMemo(() => new Set(ventesAffichees.map(x => String(x._acc || ''))).size <= 1, [ventesAffichees]);
+  // ⚠️ `_acc` est un OBJET, pas une chaîne (§ le fix #449) : `String(obj)` donne
+  //    « [object Object] » pour toutes les ventes → Set de taille 1 → le compte
+  //    n'était JAMAIS nommé sur une carte de vente, même avec neuf comptes. On
+  //    lit l'identifiant, comme `annUnCompte` juste en dessous (§11).
+  const ventesUnCompte = useMemo(() => new Set(ventesAffichees.map(x => String((x._acc && x._acc.vinted_user_id) || x._uid || ''))).size <= 1, [ventesAffichees]);
 
   // Annonces filtrées (recherche titre/marque/N°) + triées. Sert à retrouver vite
   // une paire quand il y en a beaucoup, comme dans les outils pros de revente.
