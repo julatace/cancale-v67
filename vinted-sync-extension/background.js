@@ -4622,7 +4622,13 @@ async function purgeBordereaux() {
       const tx = (/^email_bord_(\d+)$/.exec(String(r.id || '')) || [])[1];
       if (!tx || !finalisees.has(tx)) return false;              // pas (encore) finalisée
       const t = Date.parse(r.rc || '');
-      if (!isNaN(t) && t > limite) return false;                 // ceinture : trop récent
+      // ⚠️ SANS DATE LISIBLE, ON GARDE (même règle que la branche `label_*` juste
+      //    en dessous, et principe du dossier : pour un effacement IRRÉVERSIBLE,
+      //    au moindre doute on sous-purge). Avant, une date absente/illisible
+      //    (`!isNaN(t)` faux) sautait la ceinture et le PDF partait sans contrôle
+      //    d'âge — l'asymétrie avec `label_*` sur la MÊME fonction. 0 ligne
+      //    concernée aujourd'hui (toutes datées), c'est un verrou pour plus tard.
+      if (isNaN(t) || t > limite) return false;                  // ceinture : sans date OU trop récent → on garde
       return true;
     });
     let n = 0;
