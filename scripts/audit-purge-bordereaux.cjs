@@ -28,7 +28,7 @@ const recent = new Date(Date.now() - 2 * JOUR).toISOString();   // 2 j → ceint
 
 // Les ventes FINALISÉES (statut 450) que le serveur renverrait (filtre
 // `meta->>status=eq.450`). 222 n'y est PAS (statut 20).
-const FINALISEES = ['111', '333', '444', '555'];
+const FINALISEES = ['111', '333', '444', '555', '666'];
 
 // Les lignes `email_bord_{tx}` et leur contenu complet.
 const PDF = 'JVBERi0xLjQK' + 'A'.repeat(400);   // un vrai poids
@@ -39,6 +39,10 @@ const BORDS = {
   email_bord_333: { transaction: '333', numero: '300', suivi: 'VGS333', pdfB64: PDF, filename: 'label-333.pdf', receivedAt: recent }, // trop récente → garder
   email_bord_444: { transaction: '444', numero: '400', suivi: 'VGS444', pdfB64: null, pdfTamponneB64: null, filename: '', pdfPurged: true, receivedAt: vieux }, // déjà purgée
   email_bord_555: { transaction: '555', numero: '500', suivi: 'VGS555', pdfB64: null, filename: null, receivedAt: vieux }, // jamais eu de PDF
+  // ⚠️ Finalisée + PDF, mais SANS date lisible (pas de receivedAt) → GARDER :
+  //    pour un effacement irréversible, au moindre doute on sous-purge. Avant le
+  //    correctif du 8 oct, cette branche purgeait (asymétrie avec `label_*`).
+  email_bord_666: { transaction: '666', numero: '600', suivi: 'VGS666', pdfB64: PDF, filename: 'label-666.pdf' }, // sans date → garder
 };
 const metaFn = (b) => (b.filename == null ? null : b.filename);
 
@@ -146,6 +150,7 @@ const ecritPour = (j, id) => j.ecrits.filter(e => e && e.id === id).map(e => e.d
     dit(ecritPour(j, 'email_bord_333').length === 0, 'bordereau trop récent (< 7 j) → pas touché (333, ceinture)');
     dit(ecritPour(j, 'email_bord_444').length === 0, 'déjà purgé → pas re-touché (444)');
     dit(ecritPour(j, 'email_bord_555').length === 0, 'jamais eu de PDF → pas touché (555)');
+    dit(ecritPour(j, 'email_bord_666').length === 0, 'email_bord finalisé SANS date lisible → gardé (ceinture, § au moindre doute on sous-purge)');
     const nb = j.ecrits.filter(e => /^email_bord_/.test(e.id)).length;
     dit(nb === 1, 'une seule écriture d\'email_bord au total (le seul vrai candidat)', `${nb} écriture(s)`);
   }
