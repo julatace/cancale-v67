@@ -138,6 +138,12 @@ async function rendre(b, { version, tel = false, lignes = rows }) {
   await pg.route('**/api/**', (r) => { proxy.push(r.request().url()); r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }); });
   await pg.goto(`http://localhost:${PORT}/?tab=cat_msg`, { waitUntil: 'domcontentloaded' });
   await pg.waitForTimeout(3500);
+  // ⚠️ Depuis le 9 octobre, le compte ouvert dans Chrome (ici compte_a) est
+  //    choisi D'OFFICE et les autres sont estompés, inertes — la demande de
+  //    Julien du 7 octobre, qui ne s'allumait jamais (`filtre-compte.cjs`).
+  //    Ce banc juge la messagerie de TOUS les comptes : il fait le geste de
+  //    Julien pour tout voir, « Tous les comptes ».
+  if (await pg.$('#vrm-sel-compte')) { await pg.selectOption('#vrm-sel-compte', '*'); await pg.waitForTimeout(400); }
   return { ctx, pg, errs, execs, proxy };
 }
 

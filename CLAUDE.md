@@ -6461,6 +6461,34 @@ Aucune requête Vinted de plus ; tous les garde-fous du §3 inchangés.
 - Extension **5.155.0**, zip régénéré, `EXT_ATTENDUE` suivie. Aucune entrée
   d'`EXT_CAPACITES` : rien de neuf n'est promis.
 
+### ⚠️⚠️ « LE COMPTE DE L'EXTENSION EST SÉLECTIONNÉ » NE S'ÉTAIT JAMAIS ALLUMÉ (9 octobre)
+Demande de Julien du 7 octobre (#462-#464, une autre session) : la liste
+« Compte » choisit d'office le compte ouvert dans Chrome, les autres sont
+estompés et inertes. Revue du 8 octobre, quatre défauts reproduits au rendu :
+- ⚠️⚠️ **Le compte était lu dans `authEtat`, qui ne le porte pas** (session VRM
+  seule, de la 5.116 à la 5.163). `compteConnecte` valait toujours `''`. La
+  seule réponse qui le porte est `etat` : `vintedDeChrome()` (trois états), la
+  même lecture que la pastille « Actions possibles · {compte} » (§11). Aucune
+  extension à changer.
+- **Messages disait « Tout est lu » au-dessus de non-lus** d'un compte estompé
+  (le compte ne gardait que le compte choisi) et sur une boîte illisible.
+  Il compte la liste AFFICHÉE ; ceux d'un compte estompé sont dits à côté avec
+  le geste ; une boîte qui n'a pas pu être lue est nommée (`convs.ko`) et une
+  liste partielle n'est plus mise en cache.
+- **« N offres à trancher » listait un compte exclu ou retiré** (5 offres de
+  julienf765, mesuré). Écartées comme la conversation ; « retiré » ne se juge
+  que sur une liste de comptes LUE ; une offre sans compte reste.
+- **La liste proposait les comptes exclus**, et en choisir un floutait tout
+  l'écran. `compteEffectif` (une règle pour la liste et le flou) ne retient
+  qu'un compte qu'on peut montrer ; Chrome sur un compte exclu ⇒ « Tous ».
+  Les ventes d'un compte masqué restent visibles par « les voir », sous
+  « Tous les comptes ».
+- Une fois allumé, le flou d'office touche Ventes/Achats/Annonces/Messages (pas
+  Colis) : la note sous la liste le dit UNE fois, avec « Tous les comptes ».
+- Banc `filtre-compte.cjs` (données inventées) : **17 rouges** sur e6bda5c,
+  chaque règle réaffaiblie seule repasse au rouge. `messagerie.cjs` choisit
+  désormais « Tous les comptes » (son pont est sur compte_a).
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
@@ -6630,7 +6658,7 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
 | `node scripts/audit-*.cjs` | **81 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
-| `scripts/bancs/*.cjs` | les **71 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
+| `scripts/bancs/*.cjs` | les **72 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
 **Trois règles de preuve :**
@@ -6923,7 +6951,7 @@ src/App.jsx                     l'app (grep avant de lire — le fichier est én
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
 scripts/audit-*.cjs             les 81 audits
-scripts/bancs/                  les 71 bancs (leur README dit comment les lancer)
+scripts/bancs/                  les 72 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 ```
