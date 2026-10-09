@@ -6716,7 +6716,7 @@ la racine** ; ce que l'autre session a apporté (charges, packs, exports) reste.
 - Preuves : `audit-compta-resultat.cjs` (les vraies règles dans un `vm`) **14
   rouges** sur cdc9c1d, et rouge sous chacune de ses 6 mutations (`couts`,
   `adater`, `manque`, `debut`, `utc`, `froid`) ; banc `bancs/compta-resultat.cjs`
-  (port 4371, données inventées) **21 rouges** sur le build de cdc9c1d, vert
+  (port 4371, données inventées, dont les gestes « Arrêter » et « depuis quand ? » à 390 px) **25 rouges** sur le build de cdc9c1d, vert
   après ; `audit-seuils-vinted.cjs` vert avec ses 13 mutations après
   l'extraction de `aDaterPeutTomberEn` ; `rapport.cjs` et `seuils-vinted.cjs`
   verts. `audit-chiffres.cjs` exigeait l'orthographe `…connu)`:'')` de la

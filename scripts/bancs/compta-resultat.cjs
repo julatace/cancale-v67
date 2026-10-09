@@ -345,6 +345,18 @@ const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom
     dit(m.sans && m.arreter === 1, '[390 px] le coût fixe sans début demande « depuis quand ? », et seul celui qui court se propose à l’arrêt', JSON.stringify(m));
     const h = await lireHero(pg);
     dit(!!h && h.valeur === '—' && /pas encore datée/.test(h.suite) && /1 vente sur 3/.test(h.suite), '[390 px] le héro dit « — » et les DEUX causes, d’une phrase', h ? h.suite : '');
+    // Les gestes : « Arrêter » garde le poste (et son mois en cours), « depuis
+    // quand ? » le fait compter. Jugé sur la ligne rangée ET sur le total rendu.
+    const total = () => pg.evaluate(() => { const l = document.body.innerText.split('\n').map((x) => x.trim()).filter(Boolean); const i = l.findIndex((x) => /^total charges 2026$/i.test(x)); return i < 0 ? null : l[i + 1]; });
+    dit(nombre(await total()) === 82, '[390 px] avant les gestes : 30 + 2 × 20 + 12 = 82 € (le poste sans début n’est pas compté)', await total());
+    await pg.click('[data-fixe-arreter]');
+    await pg.waitForTimeout(900);
+    const apres = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_compta')); } catch (_) { return null; } });
+    const f1 = apres && apres.fixes && apres.fixes.find((x) => x.id === 'f1');
+    dit(!!f1 && f1.fin === '2026-10' && f1.debut === '2026-10' && nombre(await total()) === 82, '[390 px] « Arrêter » garde le poste et le compte jusqu’au mois en cours inclus (rien ne disparaît des mois passés)', JSON.stringify(f1) + ' · ' + (await total()));
+    await pg.fill('[data-fixe-sans-debut]', '2026-09');
+    await pg.waitForTimeout(900);
+    dit(nombre(await total()) === 112, '[390 px] « depuis quand ? » posé à septembre : le poste compte 2 mois (82 + 2 × 15 = 112 €)', await total());
     await ctx.close();
   });
 
