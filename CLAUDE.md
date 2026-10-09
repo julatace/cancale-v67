@@ -4108,6 +4108,20 @@ montait, et la migration **repartait** sur ses vraies données.
   entrées (1…16), l'héritage connu d'août ; la détection de doublons de l'app
   (`conflitsNum`) les juge sur les paires PRÉSENTES.
 
+- ⚠️⚠️ **ET ÇA S'EST PRODUIT — MESURÉ LE 8 OCTOBRE** (lecture seule, sauvegardes
+  `sauvegarde.app_data_20260930` et `_20261002`) : **8 paires numérotées
+  automatiquement le 29 septembre ont changé de numéro entre le 30 septembre et
+  le 2 octobre**, `numberedAt` inchangé — la signature de la migration de
+  compactage, avant son retrait du 3 octobre :
+  543→266 · 544→267 · 545→268 (`3179807757`), 548→269 (`3170801262`),
+  549→270 · 550→271 (`3171228253`), 551→276 · 552→285 (`24602614`).
+  **266 à 285 étaient déjà dans le pool** : des numéros déjà écrits sur des
+  cartons de paires passées. 6 des 8 sont encore en ligne ; aucune n'a de vente
+  prouvée. **Rien n'a changé depuis le 2 octobre** (0 écart avec la base du
+  8 octobre). ⇒ **Geste de Julien** : regarder le carton de ces 6 paires ; s'il
+  porte 543…552, remettre ce numéro dans le champ N° (l'app demande une
+  confirmation, le numéro étant déjà au pool). **Ne pas corriger sa base à sa
+  place** : seul le carton dit quel numéro est le vrai.
 ### Leboncoin et eBay rangés comme Vinted : résumé, puis Ventes / Achats / Annonces (3 octobre)
 Demande du 2 octobre : « plus d'écran Aperçu intermédiaire ». Les deux onglets
 ouvrent sur **Ventes**, avec un résumé compact au-dessus (`PlatResume`, même forme
@@ -5080,8 +5094,9 @@ mesurées, et aucune n'était « l'extension est éteinte »** :
   l'orthographe `member/transactions/` près de `genere_sans_pdf` ; le lien passe
   maintenant par une variable. Il suit la variable jusqu'à sa définition — et
   repasse au rouge quand on y retire l'adresse Vinted (prouvé).
-- ⚠️ **Le chantier PDF→stockage avait réservé la 5.160** : il passera en **5.163**
-  (5.161 = suite de la revue ci-dessous, 5.162 = défauts d'extension mesurés).
+- ⚠️ **Le chantier PDF→stockage avait réservé la 5.160** : il passera en **5.164**
+  (5.161 = suite de la revue ci-dessous, 5.162 = défauts d'extension mesurés,
+  5.163 = la fusion du 8 octobre, voir plus bas).
 - **Revue contradictoire (26 constats, 5 octobre au soir)** — corrigé en 5.161 et
   dans l'app, chacun prouvé rouge sur e50cd28 :
   - ⚠️⚠️ **Une extension < 5.129 passait « muette » au bout de 15 s** (elle ne
@@ -5499,6 +5514,12 @@ Quatre défauts d'une revue appuyée sur sa base, **remesurés avant de coder**.
 - Extension **5.162.0**, zip régénéré, `EXT_ATTENDUE` suivie. **Aucune entrée
   d'`EXT_CAPACITES`** : l'app ne promet rien de neuf (la ligne de Messages dit
   le geste, pas ce que l'extension fera).
+- ⚠️ **Fusion du 8 octobre : DEUX extensions différentes s'appelaient « 5.162 ».**
+  `main` (une autre session) avait la sienne : la purge des `email_bord_*` sans
+  date lisible GARDE (#468). Ici, la file et le frein ci-dessus. Le code
+  fusionné porte les deux, et passe en **5.163.0** : sinon une extension
+  installée depuis l'un ou l'autre côté se dirait « à jour » sans l'être. Deux
+  contenus ne portent jamais le même numéro.
 - ⚠️ **Hors périmètre, constaté** : `inject.js` fait sa PROPRE moisson complète
   (jusqu'à ~66 requêtes, 1 fois / 30 min / onglet) en plus de `runActive` — et
   avec des délais **aléatoires** (`jitter`). Elle respecte désormais la pause et

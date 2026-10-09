@@ -41,7 +41,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.162.0';
+const EXT_ATTENDUE = '5.163.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -165,7 +165,17 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 //   releve  `capterReleves`       5.52.0  (5 sept.)   le relevé daté du porte-monnaie
 // `audit-coherence.cjs` vérifie que ces trois fonctions existent toujours dans
 // l'extension : une capacité annoncée mais retirée serait le même mensonge.
-const EXT_CAPACITES = { codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', repond: '5.77.0', commande: '5.129.0', publication: '5.130.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', detourage: '5.156.0' };
+// ⚠️⚠️ LE SEUIL EST LA VERSION OÙ LA CHOSE MARCHE DE BOUT EN BOUT, PAS OÙ LE
+// BOUTON EST APPARU. `publierDepuisApp` est arrivé en 5.130, mais le relais de
+// `content.js` recopiait alors `cmd, uid, tx, jobId` et JETAIT `id, etat, limit,
+// plan` : « Publier sur Leboncoin » depuis l'app partait, et le service worker
+// répondait « annonce inconnue » (CLAUDE.md §5.160 — « REFUSÉ DEPUIS LA 5.130 »,
+// réparé en 5.160). Mettre le seuil à 5.130 faisait donc afficher un bouton qui
+// ÉCHOUE EN SILENCE sur toute 5.130–5.159 — le défaut le plus coûteux du projet,
+// exactement. Le seuil est 5.160 : en deçà, l'app dit « mets à jour », elle ne
+// laisse pas le bouton se casser. (Mesuré le 7 octobre : son extension installée
+// est en 5.143 — c'est pour ça que « publier depuis VRM ne marche pas ».)
+const EXT_CAPACITES = { codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', repond: '5.77.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', detourage: '5.156.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -902,6 +912,10 @@ const SYNC_KEYS = [
   // propriétaire, §11), CONSOMMÉ par le bilan de la semaine du serveur
   // (api/_lib/bilan-semaine.js) — qui ne le recalcule jamais.
   'vrm_paires_dorment',
+  // Comptabilité d'entreprise (onglet Comptabilité) : dépenses ponctuelles,
+  // coûts fixes mensuels, packs de photos payants. OWNED par l'app (§11),
+  // synchronisé entre appareils, jamais écrit par l'extension.
+  'vrm_compta',
 ];
 // Réponses rapides par défaut aux messages Vinted (copiables en 1 clic, éditables).
 const DEFAULT_QUICK_REPLIES = [
@@ -6162,6 +6176,7 @@ const PLUS_TABS=[
   /* ⚠️ `plat_vinted`, `plat_leboncoin`, `plat_vestiaire` ET `plat_ebay` sont
      tous dans la BARRE DU BAS — retirés d'ici pour ne pas les montrer deux fois. */
   {id:'dashboard',    icon:'chart',   emoji:'📊',label:'Statistiques',  desc:'Chiffre d\'affaires, bénéfices, cotisations'},
+  {id:'compta',       icon:'euro',    emoji:'🧮',label:'Comptabilité',   desc:'Dépenses, coûts fixes, packs photos, factures'},
   {id:'prixmarche',   icon:'spark',   emoji:'💡',label:'Prix qui marche',desc:'À quel prix tes modèles se vendent, par taille'},
   /* ⚠️ « À publier » RETIRÉ du menu (4 octobre) : c'était une seconde porte —
      avec un autre nom — vers l'écran Leboncoin → Annonces. Les liens qui
@@ -7654,6 +7669,64 @@ function BoutonBordereau({ uid, tx, conv, login, aGenerer, pdf, onImprimer, onFa
     </span>
   );
 }
+// ── « TOUT GÉNÉRER » : commander tous les bordereaux manquants, SUR SON CLIC ──
+// Julien, 7 oct. : « ça ne doit pas être automatique, il doit y avoir un bouton
+// générer ET tout générer ». Le « Générer » par colis existe (BoutonBordereau) ;
+// ceci est le bouton d'ensemble. ⚠️ §3 : la génération part chez VINTED — on
+// envoie les commandes UNE PAR UNE (await séquentiel), jamais en rafale ; et
+// seulement pour le compte ouvert dans Chrome (garde stricte côté extension),
+// les autres sont comptés et il bascule. Rien ne part sans ce clic.
+function BoutonToutGenerer({ items }) {
+  const { etat } = useExtVivante();
+  const sansSouris = useSansSouris();
+  const [busy, setBusy] = React.useState(false);
+  const [prog, setProg] = React.useState(null);
+  const [resume, setResume] = React.useState(null);
+  const list = (items || []).filter(x => x && x.uid && x.tx);
+  if (list.length < 1) return null;
+  const glob = raisonExtGlobale(sansSouris);
+  const co = etat && etat.vinted ? String(etat.vinted.uid) : '';
+  const mine = co ? list.filter(x => String(x.uid) === co) : [];
+  const autres = list.length - mine.length;
+  const lancer = async () => {
+    if (glob || busy) return;
+    setResume(null);
+    if (!co) { setResume("Aucun compte Vinted ouvert dans ce Chrome — ouvre vinted.fr sur le compte des colis, puis réessaie."); return; }
+    if (!mine.length) { setResume(`Ces colis sont sur un autre compte — bascule sur vinted.fr pour les générer (${autres}).`); return; }
+    setBusy(true);
+    let ok = 0, ko = 0;
+    for (let i = 0; i < mine.length; i++) {
+      setProg({ k: i + 1, n: mine.length });
+      const x = mine[i];
+      // Une commande, on attend sa réponse avant la suivante ; l'extension les
+      // exécute en file (une requête Vinted à la fois, §3) sous son plafond 20/h.
+      const r = await vmrCmd({ cmd: 'bordereau', uid: String(x.uid), tx: String(x.tx) });
+      if (r && r.accepte) { ok++; if (r.jobId) { __vmrJobs[r.jobId] = { etape: r.etape, at: Date.now() }; __vmrNotifier(); } }
+      else ko++;
+    }
+    setBusy(false); setProg(null);
+    setResume(`${ok} bordereau${ok > 1 ? 'x' : ''} lancé${ok > 1 ? 's' : ''}${ko ? ` · ${ko} refusé${ko > 1 ? 's' : ''}` : ''}${autres ? ` · ${autres} sur un autre compte (bascule pour les générer)` : ''}. Chaque colis montre sa progression ci-dessous.`);
+  };
+  const grise = !!glob;
+  // ⚠️ LE CHIFFRE NE PROMET QUE CE QUI SERA GÉNÉRÉ (§7). Si un compte est ouvert
+  //    dans Chrome, seuls SES colis partent → on compte `mine`, jamais le total
+  //    (sinon « Tout générer (7) » pour 0 colis générable, revue du 8 oct.).
+  const n = co ? mine.length : list.length;
+  const libelle = busy && prog ? `Génération… ${prog.k}/${prog.n}`
+    : (co && n === 0) ? 'Tout générer — change de compte Vinted'
+    : `Tout générer (${n})`;
+  return (
+    <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3, maxWidth: '100%' }}>
+      <button type="button" data-tout-generer={grise ? 'grise' : 'pret'} onClick={lancer} disabled={busy} aria-disabled={grise ? 'true' : undefined}
+        title={glob ? glob.texte : "L'extension génère chaque bordereau sur Vinted, un par un (jamais en rafale)"}
+        style={{ flexShrink: 0, border: `1px solid ${grise ? C.border : C.accent}`, borderRadius: 10, background: grise ? 'transparent' : `${C.accent}14`, color: grise ? C.muted : C.accent,
+          padding: '11px 15px', cursor: grise || busy ? 'default' : 'pointer', fontSize: 13, fontWeight: 700, fontFamily: 'inherit', opacity: grise ? 0.55 : (busy ? 0.7 : 1), filter: grise ? 'grayscale(1)' : 'none', whiteSpace: 'nowrap' }}>
+        <Icon name="doc" size={14}/> {libelle}
+      </button>
+      {(resume || glob) && <span style={{ fontSize: 11, color: C.muted, lineHeight: 1.35, whiteSpace: 'normal' }}>{resume || glob.texte}</span>}
+    </span>
+  );
+}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // PUBLIER DEPUIS L'APP (5.130) — « c'est l'application qui contrôle l'extension »
@@ -7898,7 +7971,10 @@ function EtatActions({ onNav, ordi, sombre }) {
             {derniere === undefined ? 'Dernière capture reçue : je regarde…'
               : derniere === null ? 'Dernière capture reçue : pas su (la base n’a pas répondu).'
               : derniere === 'aucune' ? 'Aucune capture reçue de ton extension pour l’instant.'
-              : <>Dernière capture reçue de ton extension : <b style={{ color: C.text }}>{derniere.at ? ilYaCourt(derniere.at) : 'date inconnue'}</b>{derniere.v ? ` (version ${derniere.v})` : ''}. Elle écrit quand tu passes sur Vinted.</>}
+              : (() => { const retard = extEnRetard(derniere.v); return (
+                <>Dernière capture reçue de ton extension : <b style={{ color: C.text }}>{derniere.at ? ilYaCourt(derniere.at) : 'date inconnue'}</b>{derniere.v ? ` (version ${derniere.v})` : ''}. Elle écrit quand tu passes sur Vinted.
+                {retard ? <> <span style={{ color: C.warn, fontWeight: 600 }}>À mettre à jour en {EXT_ATTENDUE}</span> sur l'ordinateur où elle est installée (Réglages → Extension) : c'est la version à jour qui lit les codes de retrait <b style={{ color: C.text }}>Vinted&nbsp;Go</b>, rafraîchit tes ventes <b style={{ color: C.text }}>Leboncoin</b> et publie une annonce sur Leboncoin depuis VRM.</> : null}</>
+              ); })()}
           </div>
           {geste && <div style={{ marginTop: 10 }}>{geste}</div>}
         </div>
@@ -18512,6 +18588,304 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
   );
 }
 
+/* ── COMPTABILITÉ D'ENTREPRISE (onglet dédié) ─────────────────────────────
+   Demande de Julien, 6 octobre : « on va pouvoir connecter une banque qui fait
+   la facturation électronique, je veux que l'on puisse renseigner et recevoir
+   des factures électroniques, pouvoir renseigner les dépenses, les coûts fixes,
+   toutes les choses dont une entreprise a besoin doit être groupée. »
+
+   Ce que le reste de l'app NE faisait PAS encore : les CHARGES (dépenses
+   ponctuelles, coûts fixes mensuels, packs de photos payants). C'est ce que cet
+   écran POSSÈDE (§11). Il ne RECALCULE pas le CA ni le bénéfice — ceux-là vivent
+   dans Statistiques (un seul propriétaire) ; cet écran y renvoie et, à terme,
+   ses charges y seront déduites du bénéfice (§ packs photos « pris en compte du
+   bénéfice »). Les factures REÇUES (reçus Vinted par email) vivent déjà dans
+   Factures : on y renvoie plutôt que de dupliquer (§7).
+
+   Stockage : `vrm_compta`, une ligne APP (synchronisée via SYNC_KEYS), jamais
+   l'extension. Rattrapée par `onCloudReady` et seulement si restée VIDE (§5.49),
+   sinon une saisie faite pendant le chargement serait écrasée. */
+const COMPTA_DEFAUT = { depenses: [], fixes: [], packs: [] };
+const COMPTA_CATS = ['Emballage', 'Fournitures', 'Abonnement', 'Frais plateforme', 'Transport', 'Matériel', 'Autre'];
+const rCompId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const comptaVide = (d) => !((d.depenses || []).length || (d.fixes || []).length || (d.packs || []).length);
+// Montant saisi « 12,50 » ou « 12.50 » → nombre. Jamais NaN silencieux : on
+// renvoie null, et l'appelant refuse d'ajouter (mieux vaut un blanc qu'un faux).
+const parseMontant = (s) => { const n = parseFloat(String(s == null ? '' : s).replace(',', '.').replace(/[^0-9.]/g, '')); return isFinite(n) && n > 0 ? n : null; };
+// Charges d'entreprise d'une ANNÉE, UNE seule règle (§11) : l'onglet Comptabilité
+// ET le rapport annuel la consomment. `data` = ligne `vrm_compta`. Les coûts
+// fixes sont au tarif ACTUEL × nombre de mois de l'année (12 pour une année
+// passée, le mois courant pour l'année en cours) — on le DIT au libellé, on ne
+// prétend pas connaître leur historique mois par mois.
+const comptaChargesAnnee = (data, annee) => {
+  const d = (data && typeof data === 'object') ? data : {};
+  const depenses = d.depenses || [], fixes = d.fixes || [], packs = d.packs || [];
+  const now = new Date(), thisY = now.getFullYear();
+  const mois = annee < thisY ? 12 : (annee > thisY ? 0 : now.getMonth() + 1);
+  const estAnnee = (x) => String(x || '').slice(0, 4) === String(annee);
+  const sum = (arr, f) => arr.reduce((s, x) => s + (Number(f(x)) || 0), 0);
+  const fixesParMois = sum(fixes, x => x.montant);
+  const depTotal = sum(depenses.filter(x => estAnnee(x.date)), x => x.montant);
+  const packTotal = sum(packs.filter(x => estAnnee(x.date)), x => x.montant);
+  const fixesTotal = fixesParMois * mois;
+  return {
+    fixesParMois, moisComptes: mois, fixesTotal, depTotal, packTotal,
+    total: fixesTotal + depTotal + packTotal,
+    depLignes: depenses.filter(x => estAnnee(x.date)),
+    packLignes: packs.filter(x => estAnnee(x.date)),
+    fixes,
+  };
+};
+
+function ComptaPro({ liveStats, onNav }) {
+  const [data, setData] = React.useState(() => {
+    try { const d = load('vrm_compta', null); return d && typeof d === 'object' ? { ...COMPTA_DEFAUT, ...d } : { ...COMPTA_DEFAUT }; }
+    catch (_) { return { ...COMPTA_DEFAUT }; }
+  });
+  // Rattrapage nuage : on ne remplace QUE si rien n'a encore été saisi (§5.49).
+  React.useEffect(() => onCloudReady(() => {
+    try { const d = load('vrm_compta', null); if (d && typeof d === 'object') setData(cur => comptaVide(cur) ? { ...COMPTA_DEFAUT, ...d } : cur); } catch (_) {}
+  }), []);
+  const maj = (next) => { setData(next); try { save('vrm_compta', next); } catch (_) {} };
+  const depenses = data.depenses || [], fixes = data.fixes || [], packs = data.packs || [];
+
+  // ── Totaux, tous OWNED (aucun CA recalculé ici) ───────────────────────────
+  const annee = new Date().getFullYear();
+  const moisEcoules = new Date().getMonth() + 1;          // janvier = 1
+  const moisCle = `${annee}-${String(moisEcoules).padStart(2, '0')}`;
+  const cetteAnnee = (d) => String(d || '').slice(0, 4) === String(annee);
+  const ceMois = (d) => String(d || '').slice(0, 7) === moisCle;
+  const somme = (arr, f) => arr.reduce((s, x) => s + (Number(f(x)) || 0), 0);
+  const fixesParMois = somme(fixes, x => x.montant);
+  // Total annuel : UNE seule règle, partagée avec le rapport annuel (§11).
+  const chargesAnnee = comptaChargesAnnee(data, annee).total;
+  const depMois = somme(depenses.filter(d => ceMois(d.date)), x => x.montant);
+  const chargesMois = fixesParMois + depMois + somme(packs.filter(p => ceMois(p.date)), x => x.montant);
+
+  // ── RÉSULTAT = recettes déclarées − charges ───────────────────────────────
+  // Les charges (packs, dépenses, coûts fixes) sont « prises en compte » ICI,
+  // au niveau qui est réellement calculable. On CONSOMME la ligne publiée par
+  // l'écran Ventes (`vinted_urssaf_mois`, le CA déclaré, toutes plateformes,
+  // §11) — on ne recalcule aucun CA. Ligne absente/pas encore publiée ⇒ `null`
+  // (on n'invente pas de recettes). ⚠️ Ce n'est PAS le bénéfice : le coût
+  // d'achat des paires n'est pas déduit ici (il n'est pas saisi, §2.5, et il
+  // vit dans Statistiques) — le libellé et la note le disent.
+  const recettesAnnee = (() => {
+    try {
+      const v = load('vinted_urssaf_mois', null);
+      if (!v || !Array.isArray(v.mois)) return null;
+      return v.mois.filter(m => String(m.ym || '').slice(0, 4) === String(annee))
+        .reduce((s, m) => s + (Number(m.ca) || 0), 0);
+    } catch (_) { return null; }
+  })();
+  const resultatAnnee = recettesAnnee == null ? null : recettesAnnee - chargesAnnee;
+
+  // ── Formulaires d'ajout (états locaux) ────────────────────────────────────
+  const auj = new Date().toISOString().slice(0, 10);
+  const [dDate, setDDate] = React.useState(auj);
+  const [dLib, setDLib] = React.useState('');
+  const [dCat, setDCat] = React.useState(COMPTA_CATS[0]);
+  const [dMnt, setDMnt] = React.useState('');
+  const [fLib, setFLib] = React.useState('');
+  const [fMnt, setFMnt] = React.useState('');
+  const [pPlat, setPPlat] = React.useState('Leboncoin');
+  const [pCpt, setPCpt] = React.useState('');
+  const [pMnt, setPMnt] = React.useState('');
+  const [pDate, setPDate] = React.useState(auj);
+
+  const ajouterDepense = () => {
+    const m = parseMontant(dMnt); if (!m || !dLib.trim()) return;
+    maj({ ...data, depenses: [{ id: rCompId(), date: dDate || auj, libelle: dLib.trim(), cat: dCat, montant: m }, ...depenses] });
+    setDLib(''); setDMnt(''); setDCat(COMPTA_CATS[0]); setDDate(auj);
+  };
+  const ajouterFixe = () => {
+    const m = parseMontant(fMnt); if (!m || !fLib.trim()) return;
+    maj({ ...data, fixes: [{ id: rCompId(), libelle: fLib.trim(), montant: m }, ...fixes] });
+    setFLib(''); setFMnt('');
+  };
+  const ajouterPack = () => {
+    const m = parseMontant(pMnt); if (!m) return;
+    maj({ ...data, packs: [{ id: rCompId(), plateforme: pPlat, compte: pCpt.trim(), montant: m, date: pDate || auj }, ...packs] });
+    setPCpt(''); setPMnt(''); setPDate(auj);
+  };
+  const retirer = (cle, id) => maj({ ...data, [cle]: (data[cle] || []).filter(x => x.id !== id) });
+  // Export CSV des charges pour le comptable (date · type · libellé · montant).
+  const exporterCharges = () => {
+    const e = (v) => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
+    const L = [[`Charges ${annee}`], [], ['Date', 'Type', 'Libelle', 'Montant']];
+    depenses.filter(d => cetteAnnee(d.date)).forEach(d => L.push([d.date ? d.date.split('-').reverse().join('/') : '', 'Depense' + (d.cat ? ' (' + d.cat + ')' : ''), d.libelle || '', (Number(d.montant) || 0).toFixed(2)]));
+    packs.filter(p => cetteAnnee(p.date)).forEach(p => L.push([p.date ? p.date.split('-').reverse().join('/') : '', 'Pack photos', `${p.plateforme || ''}${p.compte ? ' ' + p.compte : ''}`, (Number(p.montant) || 0).toFixed(2)]));
+    fixes.forEach(f => L.push(['', `Cout fixe x${moisEcoules} mois`, f.libelle || '', ((Number(f.montant) || 0) * moisEcoules).toFixed(2)]));
+    L.push(['', '', 'TOTAL', chargesAnnee.toFixed(2)]);
+    const csv = L.map(r => r.map(e).join(';')).join('\n');
+    try {
+      const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob); const a = document.createElement('a');
+      a.href = url; a.download = `charges-${annee}.csv`; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 3000);
+    } catch (_) {}
+  };
+
+  // Factures reçues (reçus Vinted par email) : on consomme juste le NOMBRE pour
+  // renvoyer vers l'écran Factures, on ne duplique pas la liste (§7/§11).
+  const [nFactures, setNFactures] = React.useState(null);
+  React.useEffect(() => { let stop = false; fetchProInvoices().then(r => { if (!stop) setNFactures(Array.isArray(r) ? r.length : null); }).catch(() => {}); return () => { stop = true; }; }, []);
+
+  // ── Palette d'écran (§7 : neutre partout, UN accent rare) ──────────────────
+  const inp = { border: `1px solid ${C.border}`, background: C.bg, color: C.text, borderRadius: 8, padding: '9px 11px', fontSize: 13, fontFamily: 'inherit', minWidth: 0, outline: 'none', boxSizing: 'border-box' };
+  const btnAdd = { border: 'none', background: C.accent, color: '#fff', borderRadius: 8, padding: '9px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 };
+  const chip = (icon) => (
+    <span aria-hidden="true" style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 8, background: `${C.accent}14`, color: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name={icon} size={16} /></span>
+  );
+  const Ligne = ({ gauche, droite, onDel }) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', borderTop: `1px solid ${C.border}` }}>
+      <span style={{ flex: 1, minWidth: 0 }}>{gauche}</span>
+      <span className="vrm-display" style={{ fontSize: 14, fontWeight: 700, color: C.text, whiteSpace: 'nowrap' }}>{droite}</span>
+      <button type="button" onClick={onDel} title="Supprimer" aria-label="Supprimer" style={{ border: 'none', background: 'transparent', color: C.muted, fontSize: 18, cursor: 'pointer', flexShrink: 0, lineHeight: 1, padding: '0 2px' }}>×</button>
+    </div>
+  );
+  // Carte de section : chip + titre + total à droite, corps (formulaire + liste).
+  const Section = ({ icon, titre, note, total, children }) => (
+    <Card style={{ padding: 0, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '13px 16px', borderBottom: `1px solid ${C.border}` }}>
+        {chip(icon)}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{titre}</div>
+          {note && <div style={{ fontSize: 11.5, color: C.muted, marginTop: 1 }}>{note}</div>}
+        </div>
+        {total != null && <div className="vrm-display" style={{ fontSize: 15, fontWeight: 700, color: C.text, whiteSpace: 'nowrap' }}>{fmt(total)}</div>}
+      </div>
+      <div style={{ padding: 14 }}>{children}</div>
+    </Card>
+  );
+  const vide = (txt) => <div style={{ fontSize: 12.5, color: C.muted, padding: '2px 2px 0', lineHeight: 1.5 }}>{txt}</div>;
+  const listeBox = (items) => <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden', marginTop: 10 }}>{items}</div>;
+
+  return (
+    <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <ScreenHead icon="euro" title="Comptabilité" desc="Note tes charges au fil de l'eau — chaque euro compte dans ton résultat. Le chiffre d'affaires et le bénéfice vivent dans Statistiques." />
+
+      {/* ── HÉRO : LE RÉSULTAT ─────────────────────────────────────────────────
+          Recettes déclarées (ligne publiée par Ventes, §11) − charges. Le seul
+          endroit où l'accent est permis (§7 : rare) : le filet du haut. */}
+      <Card style={{ padding: 0, overflow: 'hidden' }}>
+        <div style={{ height: 3, background: C.accent }} />
+        <div style={{ padding: '16px 18px' }}>
+          <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, marginBottom: 10 }}>Résultat {annee} · après tes charges</div>
+          {recettesAnnee == null ? (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, flexWrap: 'wrap' }}>
+                <div className="vrm-display" style={{ fontSize: 34, fontWeight: 800, color: C.muted, letterSpacing: -1 }}>—</div>
+                <div style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>Tes charges {annee} : <span className="vrm-display">{fmt(chargesAnnee)}</span></div>
+              </div>
+              <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.6, marginTop: 8 }}>
+                Ton résultat s'affiche dès que ton CA déclaré arrive sur cet appareil — ouvre <button type="button" onClick={() => onNav && onNav('cat_ventes')} style={{ border: 'none', background: 'transparent', color: C.accent, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0, fontSize: 12.5 }}>Ventes</button> une fois, et tes charges y seront déduites.
+              </div>
+            </div>
+          ) : (
+            <div>
+              <div className="vrm-display" style={{ fontSize: 40, fontWeight: 800, color: resultatAnnee < 0 ? C.warn : C.text, letterSpacing: -1.5, lineHeight: 1 }}>{fmt(resultatAnnee)}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 12, fontSize: 12.5, color: C.muted }}>
+                <span className="vrm-display" style={{ color: C.text, fontWeight: 600 }}>{fmt(recettesAnnee)}</span>
+                <span>CA déclaré</span>
+                <span style={{ color: C.border }}>—</span>
+                <span className="vrm-display" style={{ color: C.text, fontWeight: 600 }}>{fmt(chargesAnnee)}</span>
+                <span>de charges</span>
+              </div>
+              <div style={{ fontSize: 11.5, color: C.muted, marginTop: 10, lineHeight: 1.5, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
+                Le <b>coût d'achat de tes paires</b> n'est pas déduit ici (il se saisit par paire, dans <button type="button" onClick={() => onNav && onNav('dashboard')} style={{ border: 'none', background: 'transparent', color: C.accent, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0, fontSize: 11.5 }}>Statistiques</button>) — ce n'est donc pas encore ton bénéfice net.
+              </div>
+            </div>
+          )}
+        </div>
+      </Card>
+
+      {/* Trois repères de charges — même carte, hiérarchie claire. */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
+        {[
+          { l: 'Coûts fixes / mois', v: fmt(fixesParMois), s: fixes.length ? `${fixes.length} poste${fixes.length > 1 ? 's' : ''}` : 'rien de saisi' },
+          { l: 'Charges ce mois', v: fmt(chargesMois), s: 'fixes + dépenses + packs' },
+          { l: `Total charges ${annee}`, v: fmt(chargesAnnee), s: `depuis janvier` },
+        ].map((x, i) => (
+          <Card key={i} style={{ padding: '13px 15px' }}>
+            <div style={{ fontSize: 10.5, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.8, fontWeight: 600 }}>{x.l}</div>
+            <div className="vrm-display" style={{ fontSize: 22, fontWeight: 700, color: C.text, marginTop: 3 }}>{x.v}</div>
+            <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{x.s}</div>
+          </Card>
+        ))}
+      </div>
+      {chargesAnnee > 0 && (
+        <button type="button" onClick={exporterCharges} style={{ alignSelf: 'flex-start', border: `1px solid ${C.border}`, background: C.card, color: C.text, borderRadius: 8, padding: '8px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: -4 }}>
+          <Icon name="save" size={14} />Exporter mes charges {annee} (CSV)
+        </button>
+      )}
+
+      {/* DÉPENSES PONCTUELLES */}
+      <Section icon="bag" titre="Dépenses" note="Emballage, fournitures, frais… tout ce que tu paies pour ton activité." total={depenses.length ? somme(depenses.filter(d => cetteAnnee(d.date)), x => x.montant) : null}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <input type="date" value={dDate} onChange={e => setDDate(e.target.value)} style={{ ...inp, width: 150 }} />
+          <input type="text" placeholder="Ex. rouleau de scotch" value={dLib} onChange={e => setDLib(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterDepense(); }} style={{ ...inp, flex: '2 1 160px' }} />
+          <select value={dCat} onChange={e => setDCat(e.target.value)} style={{ ...inp }}>{COMPTA_CATS.map(c => <option key={c} value={c}>{c}</option>)}</select>
+          <input type="text" inputMode="decimal" placeholder="€" value={dMnt} onChange={e => setDMnt(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterDepense(); }} style={{ ...inp, width: 90 }} />
+          <button type="button" onClick={ajouterDepense} style={btnAdd}>Ajouter</button>
+        </div>
+        {depenses.length === 0
+          ? vide('Note ta première dépense — ça prend cinq secondes, et ça allège ton résultat.')
+          : listeBox(depenses.map((d, i) => <div key={d.id} style={{ borderTop: i ? `1px solid ${C.border}` : 'none' }}><Ligne gauche={<><span style={{ fontSize: 13, color: C.text }}>{d.libelle}</span> <span style={{ fontSize: 11, color: C.muted }}>· {d.cat} · {String(d.date || '').split('-').reverse().join('/')}</span></>} droite={fmt(d.montant)} onDel={() => retirer('depenses', d.id)} /></div>))}
+      </Section>
+
+      {/* COÛTS FIXES MENSUELS */}
+      <Section icon="clock" titre="Coûts fixes" note="Chaque mois : abonnement, logiciel, local…" total={fixesParMois ? fixesParMois : null}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <input type="text" placeholder="Ex. abonnement boost" value={fLib} onChange={e => setFLib(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterFixe(); }} style={{ ...inp, flex: '2 1 180px' }} />
+          <input type="text" inputMode="decimal" placeholder="€ / mois" value={fMnt} onChange={e => setFMnt(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterFixe(); }} style={{ ...inp, width: 120 }} />
+          <button type="button" onClick={ajouterFixe} style={btnAdd}>Ajouter</button>
+        </div>
+        {fixes.length === 0
+          ? vide('Un abonnement, un logiciel ? Ajoute-le une fois — il sera compté chaque mois.')
+          : listeBox(fixes.map((f, i) => <div key={f.id} style={{ borderTop: i ? `1px solid ${C.border}` : 'none' }}><Ligne gauche={<span style={{ fontSize: 13, color: C.text }}>{f.libelle}</span>} droite={fmt(f.montant) + ' /mois'} onDel={() => retirer('fixes', f.id)} /></div>))}
+      </Section>
+
+      {/* PACKS DE PHOTOS (Leboncoin / eBay pro) — § Julien « packs de photos pris
+          en compte du bénéfice ». */}
+      <Section icon="camera" titre="Packs de photos" note="Au-delà des photos gratuites, un compte pro achète un pack : c'est une charge." total={packs.length ? somme(packs.filter(p => cetteAnnee(p.date)), x => x.montant) : null}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <select value={pPlat} onChange={e => setPPlat(e.target.value)} style={{ ...inp }}>{['Leboncoin', 'eBay', 'Vinted', 'Vestiaire', 'Autre'].map(p => <option key={p} value={p}>{p}</option>)}</select>
+          <input type="text" placeholder="Compte (ex. pro Cancale)" value={pCpt} onChange={e => setPCpt(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterPack(); }} style={{ ...inp, flex: '1 1 150px' }} />
+          <input type="date" value={pDate} onChange={e => setPDate(e.target.value)} style={{ ...inp, width: 150 }} />
+          <input type="text" inputMode="decimal" placeholder="€" value={pMnt} onChange={e => setPMnt(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterPack(); }} style={{ ...inp, width: 90 }} />
+          <button type="button" onClick={ajouterPack} style={btnAdd}>Ajouter</button>
+        </div>
+        {packs.length === 0
+          ? vide('Tu as acheté un pack de photos sur un compte pro ? Note-le ici.')
+          : listeBox(packs.map((p, i) => <div key={p.id} style={{ borderTop: i ? `1px solid ${C.border}` : 'none' }}><Ligne gauche={<><span style={{ fontSize: 13, color: C.text }}>{p.plateforme}</span>{p.compte ? <span style={{ fontSize: 11, color: C.muted }}> · {p.compte}</span> : null} <span style={{ fontSize: 11, color: C.muted }}>· {String(p.date || '').split('-').reverse().join('/')}</span></>} droite={fmt(p.montant)} onDel={() => retirer('packs', p.id)} /></div>))}
+      </Section>
+
+      {/* FACTURES — reçues (reçus Vinted par email) + le reste vit dans Factures */}
+      <button type="button" onClick={() => onNav && onNav('invoices')} style={{ textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12, border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, padding: '13px 15px', cursor: 'pointer', fontFamily: 'inherit', boxShadow: C.shadow || 'none' }}>
+        {chip('receipt')}
+        <span style={{ flex: 1 }}>
+          <span style={{ display: 'block', fontSize: 14, fontWeight: 700, color: C.text }}>Factures{nFactures != null && nFactures > 0 ? ` — ${nFactures} reçue${nFactures > 1 ? 's' : ''}` : ''}</span>
+          <span style={{ display: 'block', fontSize: 12, color: C.muted, marginTop: 1 }}>Tes reçus Vinted arrivés par email, et tes factures à émettre pour tes clients.</span>
+        </span>
+        <span style={{ fontSize: 20, color: C.muted }}>›</span>
+      </button>
+
+      {/* BANQUE & FACTURATION ÉLECTRONIQUE — un geste qui t'appartient. */}
+      <Card style={{ padding: '14px 16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 11, marginBottom: 8 }}>
+          {chip('wallet')}
+          <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Banque & facturation électronique</div>
+        </div>
+        <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.6 }}>
+          La loi impose la <b>facturation électronique</b> aux entreprises à partir de 2026, via une plateforme agréée (PDP). Connecter ta banque ou une plateforme pour émettre et recevoir ces factures demande <b>tes identifiants</b> : c'est un geste qui n'appartient qu'à toi, l'app ne peut pas le faire à ta place.
+          <br />Quand tu auras choisi ta plateforme, dis-le-moi : je câble la réception des factures ici (comme les reçus Vinted arrivent déjà par email). D'ici là, <b>rien n'est connecté</b> — je ne fais pas semblant.
+        </div>
+      </Card>
+    </div>
+  );
+}
+
 /* ── Comptabilité (onglet dédié, tous comptes agrégés) ──────────────────── */
 // Couleur stable par compte (pour l'étiquette "d'où vient" chaque ligne).
 const ACCT_COLORS = ['#2f80ed','#9b51e0','#eb5757','#27ae60','#f2994a','#00b8a9','#e056fd','#f39c12'];
@@ -18652,7 +19026,46 @@ const _CACHE_V = 2;
 // reload au lieu de re-solliciter Supabase. Purge auto par TTL (3 min).
 const _acctCache = (()=>{ try{ const raw=sessionStorage.getItem('vrm_acct_cache'); if(raw){ const o=JSON.parse(raw); const now=Date.now(); Object.keys(o).forEach(k=>{ if(!o[k]||now-o[k].ts>=_CACHE_TTL) delete o[k]; }); return o; } }catch(_){} return {}; })();
 const _persistAcctCache = ()=>{ try{ sessionStorage.setItem('vrm_acct_cache', JSON.stringify(_acctCache)); }catch(_){} };
-function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp }) {
+// ── SÉLECTEUR DE COMPTE (onglets d'une plateforme) ───────────────────────────
+// Julien, 6 oct. : « si on sélectionne un compte et qu'on est dans l'onglet
+// annonce, il n'y a que les annonces de ce compte qui apparaissent ; par défaut
+// tous les comptes ; et le compte sur lequel l'extension est connectée mis en
+// avant d'abord ». Une rangée de puces : « Tous » + un compte par puce, le
+// compte connecté en TÊTE avec 📍. Un seul compte ⇒ rien à filtrer, on n'affiche
+// pas la rangée (§7, pas de bruit).
+function SelecteurCompte({ accounts, sel, setSel, connecte }) {
+  const labels = (typeof load === 'function' ? (load('vinted_account_labels', {}) || {}) : {});
+  const nom = (a) => labels[a.vinted_user_id] || a.login || `#${a.vinted_user_id}`;
+  const list = (accounts || []).filter(a => a && a.vinted_user_id != null);
+  if (list.length < 2) return null;
+  const co = String(connecte || '');
+  const tri = [...list].sort((a, b) => {
+    const ac = String(a.vinted_user_id) === co, bc = String(b.vinted_user_id) === co;
+    if (ac !== bc) return ac ? -1 : 1;
+    return nom(a).localeCompare(nom(b));
+  });
+  // ⚠️ UNE LISTE DÉROULANTE (Julien, 7 oct.) : « en haut, une liste où on
+  //    sélectionne les données d'un compte OU de tous les comptes ».
+  //    Valeur affichée = son choix, sinon le compte CONNECTÉ dans Chrome
+  //    (l'extension — 📍), sinon « Tous les comptes ». Cohérent avec `selEff`
+  //    (Comptabilite) : '*' ⇒ tout visible, aucun flou ; sur ordi sans compte
+  //    connecté → « Tous » par défaut, donc rien n'est flouté.
+  const val = String(sel) === '*' ? '*' : (String(sel) || co || '*');
+  return (
+    <div style={{ display: 'flex', gap: 8, padding: '10px 16px 0', alignItems: 'center', flexWrap: 'wrap' }}>
+      <label htmlFor="vrm-sel-compte" style={{ fontSize: 12, color: C.muted, fontWeight: 600 }}>Compte</label>
+      <select id="vrm-sel-compte" value={val} onChange={(e) => setSel(e.target.value)}
+        style={{ flex: '0 1 280px', maxWidth: '100%', padding: '8px 11px', borderRadius: 8, border: `1px solid ${C.border}`,
+          background: C.card, color: C.text, fontSize: 13, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer' }}>
+        <option value="*">Tous les comptes</option>
+        {tri.map(a => { const uid = String(a.vinted_user_id);
+          return <option key={uid} value={uid}>{uid === co ? '📍 ' : ''}{nom(a)}</option>; })}
+      </select>
+      {co && val === co && <span style={{ fontSize: 11.5, color: C.muted }}>compte de l'extension</span>}
+    </div>
+  );
+}
+function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', compteConnecte = '' }) {
   const [numeros, setNumeros] = useState(() => load('vinted_annonce_numeros', {}));
   // Dates de mise en ligne réelles, lues sur la page de l'annonce par l'extension
   // (ligne Supabase vinted_listing_dates = { idAnnonce: {ts, text} }). Seule
@@ -20690,7 +21103,24 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // La chaîne de filtres vivait en plein milieu du JSX : impossible de savoir
   // combien de ventes elle rendait sans la recopier. Elle vit ici, et l'écran
   // n'en dessine qu'une tranche.
-  const ventesAffichees = useMemo(() => (sales.items || [])
+  // ── FLOU PAR COMPTE (demande de Julien) ───────────────────────────────────
+  // Un compte sélectionné dans la barre ⇒ les lignes des AUTRES comptes restent
+  // VISIBLES mais estompées (flou + gris + non cliquables), pour mettre en
+  // valeur le compte choisi sans rien cacher. `uidLigne` lit l'OBJET `_acc`
+  // (repli `_uid`), comme partout (§11). Rien sélectionné ⇒ aucun flou.
+  const uidLigne = o => String((o && o._acc && o._acc.vinted_user_id) || (o && o._uid) || '');
+  // ⚠️ COMPTE EFFECTIF (Julien, 7 oct.) : tant qu'il n'a rien choisi (`compteSel`
+  //    vide), c'est le compte CONNECTÉ dans Chrome qui est mis en valeur et les
+  //    autres sont floutés — « d'office celui de l'extension ». « Tous » est un
+  //    choix explicite (sentinelle '*') qui éteint le flou. Sans extension
+  //    (téléphone), `compteConnecte` est vide ⇒ aucun flou. Une seule définition,
+  //    lue par le flou, les tris et la messagerie (§11).
+  const selEff = String(compteSel) === '*' ? '' : String(compteSel || compteConnecte || '');
+  const estFloute = (o) => !!(selEff && uidLigne(o) !== selEff);
+  const STYLE_FLOU = { filter: 'blur(2px) grayscale(0.55)', opacity: 0.4, pointerEvents: 'none', transition: 'filter 160ms ease-out, opacity 160ms ease-out' };
+  const ventesAffichees = useMemo(() => {
+    const uidV = o => String((o && o._acc && o._acc.vinted_user_id) || (o && o._uid) || '');
+    let arr = (sales.items || [])
     .filter(o => showHidden ? true : !isHidden(o))
     .filter(o => { const st = classifyOrderStatus(o.status);
       // ⚠️ « Commande non réclamée - Retournée à l'expéditeur » : le colis
@@ -20720,9 +21150,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // dans le CA (§5), c'est cohérent.
       return st !== 'cancelled' || revient; })
     .filter(o => matchOrd(o))
-    .sort(parDateDesc),
+    // ── FILTRE PAR COMPTE (sélecteur de l'onglet) ────────────────────────────
+    // ⚠️ `_acc` d'une vente est l'OBJET compte (son uid vit dans
+    //    `_acc.vinted_user_id`, repli `_uid`) — comme les annonces, PAS une
+    //    chaîne. Compte choisi ⇒ ses ventes seules ; « Tous » ⇒ celles du compte
+    //    connecté d'abord (tri STABLE, l'ordre par date ci-dessous conservé dans
+    //    chaque groupe).
+    .sort(parDateDesc);
+    // Compte sélectionné (ou connecté) EN TÊTE ; les autres restent (ils seront
+    // FLOUTÉS à l'affichage, pas masqués — demande de Julien). Tri stable.
+    { const c = selEff;
+      if (c) arr = [...arr].sort((a,b) => { const ac = uidV(a)===c, bc = uidV(b)===c; return ac===bc ? 0 : (ac ? -1 : 1); }); }
+    return arr;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [sales.items, showHidden, hiddenSales, hiddenAccts, blockedAccts, vFilter, ordSearchDiff, periode, numeros, saleOv, shipDone]);
+    }, [sales.items, showHidden, hiddenSales, hiddenAccts, blockedAccts, vFilter, ordSearchDiff, periode, numeros, saleOv, shipDone, compteSel, compteConnecte]);
   // Combien on en DESSINE. Le reste s'ouvre d'un bouton : rien n'est perdu, et
   // le compte total est écrit dessus.
   const [ventesMax, setVentesMax] = useState(60);
@@ -20731,7 +21172,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   useEffect(() => { setVentesMax(60); }, [vFilter, ordSearchDiff, periode, showHidden]);
   // Un seul compte dans la liste ⇒ le nommer sur chaque carte ne distingue rien
   // (§7 : « compte julatace3535 » ×5). Il ne reste que s'il y en a plusieurs.
-  const ventesUnCompte = useMemo(() => new Set(ventesAffichees.map(x => String(x._acc || ''))).size <= 1, [ventesAffichees]);
+  // ⚠️ `_acc` est un OBJET, pas une chaîne (§ le fix #449) : `String(obj)` donne
+  //    « [object Object] » pour toutes les ventes → Set de taille 1 → le compte
+  //    n'était JAMAIS nommé sur une carte de vente, même avec neuf comptes. On
+  //    lit l'identifiant, comme `annUnCompte` juste en dessous (§11).
+  const ventesUnCompte = useMemo(() => new Set(ventesAffichees.map(x => String((x._acc && x._acc.vinted_user_id) || x._uid || ''))).size <= 1, [ventesAffichees]);
 
   // Annonces filtrées (recherche titre/marque/N°) + triées. Sert à retrouver vite
   // une paire quand il y en a beaucoup, comme dans les outils pros de revente.
@@ -21028,9 +21473,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       arr = arr.map(it=>({it,age:listedAgeDays(it)})).filter(x=>x.age!=null&&x.age>=SLEEP_DAYS)
                .sort((a,b)=>b.age-a.age).map(x=>x.it);
     }
+    // ── FILTRE PAR COMPTE (sélecteur de l'onglet) + mise en avant du connecté ──
+    // Un compte choisi ⇒ seulement SES annonces. « Tous » ⇒ celles du compte
+    // connecté dans l'extension d'abord (tri STABLE : l'ordre choisi ci-dessus
+    // est conservé à l'intérieur de chaque groupe). `_acc` d'une annonce est
+    // l'OBJET compte ; son uid vit dans `_acc.vinted_user_id`.
+    const uidAnn = it => String((it && it._acc && it._acc.vinted_user_id) || '');
+    // Compte choisi (ou connecté) EN TÊTE ; les autres restent (floutés à
+    // l'affichage, pas masqués — demande de Julien).
+    const c = selEff;
+    if (c) arr = [...arr].sort((a,b) => { const ac = uidAnn(a)===c, bc = uidAnn(b)===c; return ac===bc ? 0 : (ac ? -1 : 1); });
     return arr;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [annBase, annSearch, annSort, numeros]);
+  }, [annBase, annSearch, annSort, numeros, compteSel, compteConnecte]);
   // Un seul compte à l'écran ⇒ le nommer sur chaque carte ne distingue rien (§7).
   const annUnCompte = useMemo(() => new Set(annShown.map(x => String(x._acc && x._acc.vinted_user_id || ''))).size <= 1, [annShown]);
   // Comptes bloqués actuellement présents (pour le bandeau d'alerte).
@@ -22197,6 +22652,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // ne l'avait jamais reprise.
   const achatStage = (o, tk) => {
     const s = o.status || '';
+    // ⚠️ « Retour initié » sur un ACHAT = litige, tu dois RENVOYER la paire.
+    //    Testé AVANT « annulé/remboursé » : ce n'est pas une commande morte,
+    //    c'est une action à faire (générer le bordereau de retour sur Vinted).
+    //    Motif précis (comme venteStage) pour ne pas attraper « Retournée à
+    //    l'expéditeur », qui est autre chose.
+    if (/retour\s*initi|retour\s+en\s+cours|retour\s+demand/i.test(s)) return { label: 'À renvoyer', step: 1, color: C.warn, retour: true };
     if (/annul|rembours|refus/i.test(s)) return { label: 'Annulé', step: 0, color: C.danger };
     if (/finalis/i.test(s) || tusDe(o) === 'completed') return { label: 'Reçu', step: 4, color: INV_STATUS.online.color };
     if (isAtRelayStatus(s) || (tk && tk.status === 'available')) return { label: 'À retirer', step: 3, color: C.warn };
@@ -22236,7 +22697,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (_acctCache['purchased']) { _acctCache['purchased'].items = (_acctCache['purchased'].items || []).filter(x => String(x.transaction_id) !== String(o.transaction_id)); _persistAcctCache(); }
     toast('Achat masqué — Réglages → Achats masqués pour le réafficher.');
   };
-  const achatsAffiches = useMemo(() => buysBase
+  const achatsAffiches = useMemo(() => { const uidA = o => String((o && o._acc && o._acc.vinted_user_id) || (o && o._uid) || '');
+    let arr = buysBase
     .filter(o => { const p = phaseReception(o);
       if (aFilter === 'attente') return false;
       if (aFilter === 'route') return p === 'route';
@@ -22250,9 +22712,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // traîne depuis trois semaines. Partout ailleurs le plus récent d'abord.
     .sort((a, b) => { const pr = x => x.st.step===3?0 : x.st.step===2?1 : x.st.step===1?2 : x.st.step===4?3 : 4;
       const d = pr(a) - pr(b); if (d !== 0) return d;
-      return aFilter === 'route' ? ((tsCommande(a.o)||0) - (tsCommande(b.o)||0)) : (new Date(b.o.date||0) - new Date(a.o.date||0)); }),
+      return aFilter === 'route' ? ((tsCommande(a.o)||0) - (tsCommande(b.o)||0)) : (new Date(b.o.date||0) - new Date(a.o.date||0)); });
+    // Compte choisi (ou connecté) EN TÊTE ; les autres restent (floutés, pas
+    // masqués — demande de Julien). Tri STABLE.
+    { const c = selEff;
+      if (c) arr = [...arr].sort((a,b)=>{ const ac=uidA(a.o)===c, bc=uidA(b.o)===c; return ac===bc?0:(ac?-1:1); }); }
+    return arr; },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [buysBase, aFilter, ordSearchDiff, periode, tracking, colisRelais, numeros]);
+    [buysBase, aFilter, ordSearchDiff, periode, tracking, colisRelais, numeros, compteSel, compteConnecte]);
   const [achatsMax, setAchatsMax] = useState(60);
   // ── ACHATS · ACTIONS RAPIDES (note interne + menu « … ») ──────────────────
   // Note interne par achat (synchronisée, clé = transaction_id) + menu groupant
@@ -23708,7 +24175,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       buyLines.push({ o, date:o.date, seller:o.seller||o.user_login||o.opposite_user?.login||'', title:o.title, montant });
     }
     buyLines.sort((a,b)=> new Date(b.date)-new Date(a.date));
+    // Charges d'entreprise de l'année (packs, dépenses, coûts fixes) — même
+    // règle que l'onglet Comptabilité (§11). Déductibles : elles entrent dans le
+    // résultat APRÈS charges, pas dans la base URSSAF (micro = sur le CA).
+    const charges = comptaChargesAnnee(load('vrm_compta', null), reportYear);
     const benefNet = margeKnown - fraisConnu;   // ⚠️ ventes au coût connu uniquement (cf. rapport mensuel)
+    const resultatCharges = benefNet - charges.total;
     // ⚠️ `marge` retranchait `frais` (les boosts de TOUTES les ventes) d'un
     // `margeKnown` qui ne porte que les ventes au coût connu — deux ensembles
     // différents dans la même soustraction. §5.84 l'avait corrigé sur le
@@ -23719,7 +24191,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const margeHT = marge - tvaMarge;
     const taux = tauxUrssaf();
     const urssaf = aPayerUrssaf(ca, taux);
-    return { regime, tvaRate, year:reportYear, months, ca, cout, frais, nb, nbCout, benefNet, marge, tvaMarge, margeHT, taux, urssaf, nMasq, caMasq, achatsTotal, achatsNb, buyLines, saleLines, parPlateforme,
+    return { regime, tvaRate, year:reportYear, months, ca, cout, frais, nb, nbCout, benefNet, marge, tvaMarge, margeHT, taux, urssaf, nMasq, caMasq, achatsTotal, achatsNb, buyLines, saleLines, parPlateforme, charges, resultatCharges,
       enCours: declRapport.vinted === 'encours', vinted: declRapport.vinted,
       // La partie Vinted du registre, par compte, en TROIS états : `undefined`
       // tant qu'elle se lit, `null` quand les dates de versement sont
@@ -23767,8 +24239,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     R.buyLines.forEach(b=>L.push([b.date?new Date(b.date).toLocaleDateString('fr-FR'):'',b.seller,b.title,b.montant.toFixed(2)]));
     L.push(['','','TOTAL',R.achatsTotal.toFixed(2)]);
     L.push([]);
+    // CHARGES d'entreprise (déductibles) : dépenses, packs photos, coûts fixes.
+    L.push(['CHARGES (registre)']); L.push(['Date','Type','Libelle','Montant']);
+    R.charges.depLignes.forEach(d=>L.push([d.date?new Date(d.date).toLocaleDateString('fr-FR'):'','Depense',`${d.libelle||''}${d.cat?' ('+d.cat+')':''}`,(Number(d.montant)||0).toFixed(2)]));
+    R.charges.packLignes.forEach(p=>L.push([p.date?new Date(p.date).toLocaleDateString('fr-FR'):'','Pack photos',`${p.plateforme||''}${p.compte?' '+p.compte:''}`,(Number(p.montant)||0).toFixed(2)]));
+    R.charges.fixes.forEach(f=>L.push(['',`Cout fixe x${R.charges.moisComptes} mois`,f.libelle||'',((Number(f.montant)||0)*R.charges.moisComptes).toFixed(2)]));
+    L.push(['','','TOTAL charges',R.charges.total.toFixed(2)]);
+    L.push([]);
     if (R.regime==='marge') { L.push(['Marge TTC',R.marge.toFixed(2)]); L.push([`TVA sur marge (${R.tvaRate}%)`,R.tvaMarge.toFixed(2)]); L.push(['Marge HT',R.margeHT.toFixed(2)]); }
     else { L.push([`Estimation cotisations (${String(R.taux).replace('.',',')}%)`,R.urssaf.toFixed(2)]); }
+    L.push([`Resultat apres charges (benefice net - charges)`,R.resultatCharges.toFixed(2)]);
+    if (R.nbCout<R.nb) L.push([`  benefice net sur ${R.nbCout}/${R.nb} ventes au cout d'achat connu`]);
+    if (R.charges.total>0) L.push([`  couts fixes au tarif actuel x ${R.charges.moisComptes} mois`]);
     if (R.nMasq>0) L.push([`dont ${R.nMasq} vente(s) masquée(s) dans l'app, comptées dans le CA`,R.caMasq.toFixed(2)]);
     // Ce qui manque part AVEC le document (§5) : il va chez un comptable.
     if (R.vinted==='passu') L.push([`ATTENTION : dates de versement Vinted illisibles - ventes Vinted absentes de ce bilan`]);
@@ -23795,6 +24277,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (R.vinted==='passu') kv('ATTENTION', 'dates de versement Vinted illisibles : ventes Vinted absentes');
     if (R.regime==='marge') { kv('Marge TTC', R.marge.toFixed(2)+' EUR'); kv('TVA sur la marge ('+R.tvaRate+'%)', R.tvaMarge.toFixed(2)+' EUR'); kv('Marge HT', R.margeHT.toFixed(2)+' EUR'); }
     else { kv('Bénéfice net', R.benefNet.toFixed(2)+' EUR'+(R.nbCout<R.nb?` (sur ${R.nbCout}/${R.nb} ventes au coût connu)`:'')); kv('Estimation cotisations ('+String(R.taux).replace('.',',')+'%)', R.urssaf.toFixed(2)+' EUR'); }
+    if (R.charges.total>0) { kv('Charges entreprise (packs, depenses, fixes)', R.charges.total.toFixed(2)+' EUR'); kv('Resultat apres charges', R.resultatCharges.toFixed(2)+' EUR'+(R.charges.moisComptes?` (fixes x${R.charges.moisComptes} mois)`:'')); }
     for (const [k,v] of Object.entries(R.parPlateforme||{})) if (k!=='Vinted' && v.n>0) kv('dont '+k, v.ca.toFixed(2)+' EUR ('+v.n+')');
     if (R.nMasq>0) kv('dont ventes masquees dans l\'app (comptees)', R.nMasq+' — '+R.caMasq.toFixed(2)+' EUR');
     y-=6; T('Document indicatif genere par l\'app. Ne remplace pas un conseil comptable.',40,y,8,reg,rgb(0.55,0.55,0.55));
@@ -24272,7 +24755,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                      // depuis le mauvais compte ne montre rien.
                      if (e === 'retard') return `Mets d'abord ton extension à jour (celle installée ne sait pas encore lire les codes), puis passe sur Vinted connecté ${qui}`;
                      if (e === 'absente') return cs.length ? `Ouvre la conversation Vinted du colis, connecté ${qui} : le code y est` : `Ouvre la conversation Vinted du colis : le code y est`;
-                     return `Passe sur Vinted connecté ${qui} : l'extension va chercher les codes toute seule`; })();
+                     // Chemin sûr d'abord (le code est dans la conversation, bouton
+                     // dans Achats) ; l'auto-capture ne couvre les casiers Vinted Go
+                     // qu'avec une version récente — ne pas la promettre seule.
+                     return `Ouvre la conversation Vinted de chaque colis (bouton dans Achats) : le code y est. L'extension la lit aussi toute seule quand tu passes sur Vinted connecté ${qui}`; })();
           jobs.push({icon:'box',color:hd>0?C.danger:(pr>0?(C.blue||C.accent):C.muted),urgent:hd>0,title:`Retirer ${pickupCount} colis`,sub,tab:'cat_achats',prio:hd>0?0.5:(pr>0?2:6)});
         }
         if(unread) jobs.push({icon:'chat',color:C.warn,title:`Répondre à ${unread} message${unread>1?'s':''}`,sub:'Un acheteur attend — réponds vite pour vendre',tab:'cat_msg',prio:3});
@@ -25368,7 +25854,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             return (
               // Ligne de vente dans la liste groupée (filet fin entre les lignes,
               // pas de carte encadrée séparée — style démo, comme Achats).
-              <div key={o.transaction_id} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10}}>
+              <div key={o.transaction_id} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10,...(estFloute(o)?STYLE_FLOU:null)}}>
                {/* ── Haut : photo · titre + méta · prix ─────────────────────── */}
                <div style={{display:'flex',gap:12,alignItems:'flex-start'}}>
                 <div style={{width:72,height:72,borderRadius:10,background:C.card2||C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
@@ -25961,7 +26447,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         : (()=>{ const e = extSaitLireCodes();
                             if (e === 'retard') return "Ton extension est en retard : cette version-là ne sait pas encore aller lire les codes. Mets-la à jour (Réglages), puis passe sur Vinted avec le compte indiqué. En attendant, ouvre la conversation : le code y est.";
                             if (e === 'absente') return "Sur téléphone il n'y a pas d'extension : ouvre la conversation Vinted du colis, le code et le QR y sont.";
-                            return `L'extension va chercher le code toute seule : passe sur Vinted connecté ${memeCompte ? `sur ${memeCompte}` : 'avec le compte indiqué sur chaque ligne'} (elle en fait 3 par visite). Ouvrir la conversation le fait venir tout de suite.`; })()}
+                            // ⚠️ Le chemin SÛR en premier : le code est dans la
+                            //    conversation (bouton sous chaque colis), et il y
+                            //    est tout de suite. L'extension la lit aussi toute
+                            //    seule, mais pour les casiers Vinted Go il faut une
+                            //    version récente — ne pas en faire la promesse
+                            //    principale, sinon « j'ai attendu et rien n'est venu ».
+                            return `Le code (et le QR) est dans la conversation Vinted de chaque colis — ouvre-la avec le bouton sous le colis, il y est tout de suite. L'extension la lit aussi toute seule quand tu passes sur Vinted connecté ${memeCompte ? `sur ${memeCompte}` : 'avec le compte indiqué sur chaque ligne'}.`; })()}
                       {memeCompte && !avecCode && extSaitLireCodes() !== 'ok' && <> Ils sont tous sur <b style={{color:C.text,fontWeight:600}}>{memeCompte}</b>.</>}
                     </span>
                   </div>
@@ -26393,7 +26885,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const rc = receiptFor(o);
             const numA = buyNumByTxn[String(o.transaction_id)];
             return (
-            <div key={o.transaction_id} style={{padding:'12px 14px',borderTop:i>0?`1px solid ${C.border}`:'none',opacity:cancelled?0.55:1,display:'flex',alignItems:'center',gap:12}}>
+            <div key={o.transaction_id} style={{padding:'12px 14px',borderTop:i>0?`1px solid ${C.border}`:'none',opacity:cancelled?0.55:1,display:'flex',alignItems:'center',gap:12,...(estFloute(o)?STYLE_FLOU:null)}}>
               <div style={{width:46,height:46,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
                 {orderPhoto(o)?<img src={orderPhoto(o)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={18} style={{color:C.muted,opacity:.55}}/>}
               </div>
@@ -26405,11 +26897,30 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <span>{o.date?new Date(o.date).toLocaleDateString('fr-FR'):''}</span>
                   {/* DEPUIS COMBIEN DE TEMPS : « dois-je m'inquiéter ? ». Au-delà de
                       trois semaines, en rouge — le moment de relancer le vendeur. */}
-                  {!cancelled && st.step>=1 && st.step<4 && (()=>{ const t=tsCommande(o); if(!t) return null; const j=Math.floor((Date.now()-t)/86400000); if(j<2) return null; const tard=j>ACHAT_RETARD_J; return <span style={{fontWeight:tard?700:600,color:tard?C.danger:C.muted}}>· depuis {j} j{tard?' — relance le vendeur':''}</span>; })()}
+                  {!cancelled && !st.retour && st.step>=1 && st.step<4 && (()=>{ const t=tsCommande(o); if(!t) return null; const j=Math.floor((Date.now()-t)/86400000); if(j<2) return null; const tard=j>ACHAT_RETARD_J; return <span style={{fontWeight:tard?700:600,color:tard?C.danger:C.muted}}>· depuis {j} j{tard?' — relance le vendeur':''}</span>; })()}
                   {tk && tk.lieu && st.step===3 && <span style={{color:C.text}}>· {tk.lieu}</span>}
                   {numA!=null && <span title="Numéro de la paire (lien avec l'annonce / la vente)" style={{fontSize:11,fontWeight:700,color:C.accent,background:`${C.accent}18`,borderRadius:5,padding:'0 6px'}}>N°{numA}</span>}
                   {o._fromEmail && <span title="Reconstituée depuis l'email — pas encore confirmée par Vinted" style={{fontSize:10,fontWeight:600,color:C.muted,border:`1px solid ${C.border}`,borderRadius:8,padding:'0 6px'}}>email</span>}
                 </div>
+                {/* ⚠️ LITIGE / RETOUR : il doit RENVOYER la paire, et générer le
+                    bordereau de retour. VRM ne le crée PAS à sa place : la route
+                    qui GÉNÈRE un retour n'a jamais été observée (§4.10), et agir
+                    tout seul sur un compte en litige est le pire endroit (§3 —
+                    un trafic inhabituel rend un blocage définitif). On l'amène en
+                    UN tap sur la commande Vinted, où Vinted fabrique l'étiquette,
+                    et on dit clairement ce que VRM fait et ne fait pas. Le lien
+                    de commande est celui déjà utilisé par le bouton bordereau. */}
+                {st.retour && (
+                  <div style={{marginTop:7}}>
+                    <a href={`https://www.vinted.fr/member/transactions/${encodeURIComponent(o.transaction_id)}`} target="_blank" rel="noreferrer"
+                      style={{display:'inline-flex',alignItems:'center',gap:6,border:`1.5px solid ${C.warn}`,background:`${C.warn}14`,color:C.warn,borderRadius:8,padding:'7px 12px',fontSize:12.5,fontWeight:700,textDecoration:'none'}}>
+                      ↩ Bordereau de retour sur Vinted
+                    </a>
+                    <div style={{fontSize:11,color:C.muted,marginTop:4,lineHeight:1.4}}>
+                      Litige : la paire doit repartir. Ouvre la commande sur Vinted pour générer l'étiquette de retour, la réimprimer ou suivre le colis. VRM ne la génère pas tout seul (un retour engage l'envoi, et c'est un compte en litige).
+                    </div>
+                  </div>
+                )}
               </div>
               {/* Prix à deux décimales et une virgule (jamais « 21.0 € » brut). */}
               <div style={{fontSize:16,fontWeight:700,color:C.text,letterSpacing:-0.3,flexShrink:0}}>{montantCommande(o).toFixed(2).replace('.',',')} {cur(o.price?.currency_code)}</div>
@@ -27061,7 +27572,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const lab = { fontSize:11, color:C.muted };
             const val = { fontSize:12, fontWeight:600, color:C.text };
             return (
-              <div key={it._acc.vinted_user_id+'_'+it.id} data-carte-annonce={it.id} style={{borderRadius:10,background:C.card,border:`1px solid ${soldBord?C.warn:C.border}`,boxShadow:C.shadow||'none',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+              <div key={it._acc.vinted_user_id+'_'+it.id} data-carte-annonce={it.id} style={{borderRadius:10,background:C.card,border:`1px solid ${soldBord?C.warn:C.border}`,boxShadow:C.shadow||'none',display:'flex',flexDirection:'column',overflow:'hidden',...(estFloute(it)?STYLE_FLOU:null)}}>
                 <div style={{display:'flex',gap:10,padding:10}}>
                   <a href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted" style={{flexShrink:0,width:88,height:118,borderRadius:8,overflow:'hidden',background:C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',position:'relative'}}>
                     {it.photo?<img src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/>}
@@ -27245,10 +27756,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             chaque ligne (la liste mélange ses comptes). Un clic ouvre le fil :
             répondre et trancher une offre se font là, par l'extension. */}
         {convs.items && !convs.error && (()=>{
+          // Filtre par compte (sélecteur de l'onglet) : `_acc` d'une conversation
+          // est l'OBJET compte. Choisi ⇒ ses conversations seules.
+          const uidC = c => String((c._acc&&c._acc.vinted_user_id)||'');
+          // Compte choisi ⇒ les AUTRES restent (floutés, pas masqués — Julien).
           const liste = (convs.items||[]).filter(c=>!acctOffOf(c));
-          const nonLus = liste.filter(c=>c.unread).length;
-          const tri = [...liste].sort((a,b)=> (b.unread?1:0)-(a.unread?1:0) || (new Date(b.updated_at||0)-new Date(a.updated_at||0)));
-          const plusieurs = new Set(liste.map(c=>String((c._acc&&c._acc.vinted_user_id)||''))).size > 1;
+          const nonLus = liste.filter(c=>c.unread && (!selEff || uidC(c)===selEff)).length;
+          // Compte choisi (ou connecté) d'abord, puis non lus, puis les récents.
+          const coMsg = selEff;
+          const tri = [...liste].sort((a,b)=>
+            (coMsg ? ((uidC(b)===coMsg?1:0)-(uidC(a)===coMsg?1:0)) : 0)
+            || (b.unread?1:0)-(a.unread?1:0)
+            || (new Date(b.updated_at||0)-new Date(a.updated_at||0)));
+          const plusieurs = new Set(liste.map(c=>uidC(c))).size > 1;
           const quand = (d)=>{ const t=Date.parse(d||''); if(!t) return ''; const h=(Date.now()-t)/3600000; return h<1?"à l'instant":h<24?`${Math.round(h)} h`:h<24*7?`${Math.round(h/24)} j`:new Date(t).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}); };
           const affiches = tri.slice(0, convMax);
           // ⚠️ UNE BOÎTE FIGÉE SE DIT (6 octobre). Mesuré : deux comptes avaient
@@ -27301,7 +27821,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   const photo = (c.opposite_user&&c.opposite_user.photo&&c.opposite_user.photo.url) || (c.item_photos&&c.item_photos[0]&&c.item_photos[0].url) || null;
                   return (
                     <button key={(c._acc?c._acc.vinted_user_id:'')+'_'+c.id} type="button" data-conv={c.id} onClick={()=>openConversation(c)}
-                      style={{display:'flex',gap:10,alignItems:'center',width:'100%',textAlign:'left',padding:'10px 12px',border:'none',borderTop:i?`1px solid ${C.border}`:'none',background:'transparent',color:C.text,cursor:'pointer',fontFamily:'inherit'}}>
+                      style={{display:'flex',gap:10,alignItems:'center',width:'100%',textAlign:'left',padding:'10px 12px',border:'none',borderTop:i?`1px solid ${C.border}`:'none',background:'transparent',color:C.text,cursor:'pointer',fontFamily:'inherit',...(selEff&&uidC(c)!==selEff?STYLE_FLOU:null)}}>
                       {photo ? <img src={photo} alt="" loading="lazy" style={{width:40,height:40,borderRadius:8,objectFit:'cover',flexShrink:0}}/> : <span style={{width:40,height:40,borderRadius:8,background:C.card2||C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',color:C.muted,flexShrink:0}}><Icon name="chat" size={17}/></span>}
                       <span style={{flex:1,minWidth:0}}>
                         <span style={{display:'flex',alignItems:'baseline',gap:6}}>
@@ -27365,6 +27885,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const aPoster = ex.filter(e=>!(e.o && isShipDone(e.o)));
           const avecPdf = ex.filter(e=>((e.b && e.b.hasPdf) || (e.txn && labelsCaptes[e.txn])) && !(e.o && isShipDone(e.o)));
           const proNb = avecPdf.filter(e=>e.b && invForBord(e.b)).length;   // comptes pro : facture jointe
+          // « À générer » = colis à poster SANS bordereau (ni PDF capté, ni email).
+          // Chacun a son bouton « Générer » ; le bouton d'ensemble les commande
+          // sur son clic (§3). Offert seulement si la lecture est complète, pour
+          // ne pas « générer » un bordereau déjà là mais pas encore lu.
+          const aGenItems = (!labelsPrets || emailBords===null) ? [] : aPoster
+            .filter(e=>!(((e.b && e.b.hasPdf) || (e.txn && labelsCaptes[e.txn]))))
+            .map(e=>({ uid: e.o && e.o._acc && e.o._acc.vinted_user_id, tx: e.o && String(e.o.transaction_id), login: accNameOf(e.o && e.o._acc) }))
+            .filter(x=>x.uid && x.tx);
           // ⚠️ « PAS ENCORE LU » N'EST PAS « AUCUN » (§5 Colis). Pendant que les
           // bordereaux captés et les emails se lisent, l'en-tête écrivait « 0
           // bordereau prêt à imprimer · 3 en attente de bordereau », puis « 2 · 1 »,
@@ -27406,6 +27934,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {batchBusy?'Préparation…':avecPdf.length===1?'🖨 Imprimer':`🖨 Tout imprimer (${avecPdf.length})`}
                   </button>
                 )}
+                {aGenItems.length>0 && <BoutonToutGenerer items={aGenItems}/>}
               </div>
               {/* Retiré le 30 septembre (Julien) : « 1 imprime, colle, dépose et
                   clique sur fait, ça sert à rien, tu peux enlever ». */}
@@ -28144,6 +28673,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     subColor={annual.nbCout<annual.nb?C.warn:undefined}
                     sub={inc ? undefined : annual.nbCout<annual.nb?`sur ${annual.nbCout} vente${annual.nbCout>1?'s':''} sur ${annual.nb} — prix d'achat manquants`:(annual.frais>0?`boosts ${fmtE(annual.frais)}`:undefined)}/>
                   <StatBox label="Cotisations est." value={inc ?? fmtE(annual.urssaf)} color={inc ? C.muted : C.warn} sub={inc === '—' ? 'attend tes ventes Vinted' : `${String(annual.taux).replace('.',',')} % du CA · réglable`}/>
+                </>)}
+                {annual.charges && annual.charges.total>0 && (<>
+                  <StatBox label="Charges d'entreprise" value={fmtE(annual.charges.total)} sub={`packs + dépenses + fixes × ${annual.charges.moisComptes} mois`}/>
+                  {/* Le résultat dérive du bénéfice net : tant que celui-ci n'est
+                      pas su (lecture en cours, dates Vinted illisibles), lui non
+                      plus — jamais un nombre calculé sur un CA partiel. */}
+                  <StatBox label="Résultat après charges" value={inc ?? fmtE(annual.resultatCharges)} color={inc ? C.muted : annual.resultatCharges>=0?INV_STATUS.online.color:C.danger} sub={inc ? undefined : "bénéfice net − tes charges (hors coût d'achat manquant)"}/>
                 </>)}
               </div>); })()}
               {annual.vinted === 'passu' && !annual.enCours && <div data-annuel-sans-vinted style={{fontSize:12,color:C.warn,lineHeight:1.45,marginBottom:12}}>Les dates de versement de tes ventes Vinted n'ont pas pu être lues : elles ne sont dans aucun mois ci-dessous — ce n'est pas zéro. Rouvre le registre dans un moment.</div>}
@@ -33552,6 +34088,31 @@ function AppCoeur() {
   // la porte le temps du changement d'onglet.
   const subVoulue=React.useRef(null);
   React.useEffect(()=>{ setPlatSub(subVoulue.current||'ventes'); subVoulue.current=null; },[tab]);   // plus d'« Aperçu » nulle part : la liste d'abord, le résumé au-dessus
+  // ── FILTRE PAR COMPTE sur les onglets d'une plateforme (Julien, 6 oct.) ──────
+  // « Tous les comptes » par défaut. En choisir un ne montre QUE ses annonces /
+  // ventes / messages, sur l'onglet où on est — pas ailleurs. `''` = tous.
+  // Remis à « tous » quand on change d'onglet-plateforme (une sélection ne doit
+  // pas suivre en douce sur une autre plateforme) ; conservé d'un sous-onglet à
+  // l'autre d'une même plateforme (choisir le compte une fois, le voir sur
+  // Annonces PUIS Ventes PUIS Messages).
+  const [compteSel,setCompteSel]=useState('');
+  React.useEffect(()=>{ setCompteSel(''); },[tab]);
+  // Le compte sur lequel l'EXTENSION est connectée (pont `authEtat`) : c'est
+  // celui qu'on est en train de traiter, on le met en avant (puce d'abord + 📍,
+  // et ses lignes remontent quand « Tous » est choisi). « pas su » ⇒ '' (on ne
+  // met rien en avant à tort). Même source que la carte des premiers pas (§11).
+  const [compteConnecte,setCompteConnecte]=useState('');
+  React.useEffect(()=>{ let stop=false;
+    const relire=async()=>{ try{ const e=await vmrAuthEtat(); const uid=String((e&&e.vinted&&e.vinted.uid)||''); if(!stop) setCompteConnecte(uid); }catch(_){} };
+    relire();
+    // ⚠️ Re-lu quand il REVIENT sur l'onglet de l'app (après un tour sur Vinted,
+    //    où il a pu changer de compte, ou brancher l'extension) : sinon le
+    //    compte mis en avant d'office reste figé sur celui du chargement. C'est
+    //    une lecture du PONT (zéro requête Vinted), et ça ne touche QUE le défaut
+    //    — son choix explicite (`compteSel`) gagne toujours.
+    const relirePont=()=>{ if(!document.hidden) relire(); };
+    window.addEventListener('focus',relire); document.addEventListener('visibilitychange',relirePont);
+    return ()=>{ stop=true; window.removeEventListener('focus',relire); document.removeEventListener('visibilitychange',relirePont); }; },[]);
   // L'ancien onglet « Messages » (cloche, bandeau, « à faire ») mène désormais
   // aux messages DANS Vinted : une seule porte pour un seul écran.
   React.useEffect(()=>{ if(tab==='cat_msg'){ subVoulue.current='messages'; setTab('plat_vinted'); } },[tab]);
@@ -33588,7 +34149,7 @@ function AppCoeur() {
     // banc, qui navigue par `?tab=`, croyait rendre Leboncoin alors qu'il
     // mesurait l'accueil (un faux vert dans ma propre couverture d'hier).
     // `journee` manquait aussi : invisible parce que c'est l'état de départ.
-    const TABS_OK=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','invoices','masques','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces'];
+    const TABS_OK=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','invoices','masques','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces'];
     const goto=(search)=>{ try{ const p=new URLSearchParams(search); const t=p.get('tab'); if(p.get('print')==='bord') _pendingBordPrint=true; if(t&&TABS_OK.includes(t)){ setTab(t); window.history.replaceState({},'',window.location.pathname); } }catch(_){}};
     goto(window.location.search);
     const onMsg=(e)=>{ if(e.data&&e.data.type==='open-url'&&e.data.url){ try{ goto(new URL(e.data.url,window.location.origin).search); }catch(_){}} };
@@ -33926,8 +34487,13 @@ function AppCoeur() {
       const inc = arr.filter(o => o && o.isSeller == null && !lbcAnnulee(o));
       // ACHATS = `isSeller === false` (jamais déduit, §5) — mêmes champs que les
       // ventes (photo, titre, prix, statut). Avant, ils étaient simplement jetés.
+      // `maj` = la dernière fois qu'une transaction Leboncoin a été captée.
+      // L'extension ne rafraîchit les ventes QUE sur « Mes transactions » :
+      // visiter Leboncoin en général ne suffit pas. On montre donc l'âge des
+      // montants (§7 : un chiffre qu'on ne peut pas dater n'est pas fiable).
+      const maj = arr.reduce((m, o) => { const t = Date.parse((o && o.at) || '') || 0; return t > m ? t : m; }, 0);
       setLbcVentes({ ventes: arr.filter(o => o && o.isSeller === true), achats: arr.filter(o => o && o.isSeller === false), inconnues: inc.length,
-        inconnuesListe: inc.slice().sort((a,b)=>String(b.at||'').localeCompare(String(a.at||''))) });
+        maj, inconnuesListe: inc.slice().sort((a,b)=>String(b.at||'').localeCompare(String(a.at||''))) });
       setLbcCoqueLu(true);
     } catch (_) { setLbcCoqueLu(null); /* pas su ⇒ rien : jamais un faux « vendu » */ }
   })(); }, []);
@@ -35385,7 +35951,11 @@ function AppCoeur() {
               L'écran complet existait (liste tous comptes, fil, réponse, offres)
               mais n'avait plus AUCUNE porte dans Vinted : seulement la cloche. */}
           <PlatSubNav sub={platSub} setSub={setPlatSub} sections={[['ventes','Ventes'],['achats','Achats'],['annonces','Annonces'],['messages','Messages', !!(liveStats && liveStats.unread > 0)]]}/>
-          <Comptabilite key={'pv_'+platSub} accounts={vintedAccounts} only={platSub==='apercu'?'ventes':platSub} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}/>
+          {/* Filtre par compte (Julien, 6 oct.) — Ventes / Annonces / Achats /
+              Messages. Les Colis ne sont pas filtrés (« pour les colis pas
+              forcément »). Un seul compte ⇒ la rangée ne s'affiche pas. */}
+          {(platSub==='ventes'||platSub==='annonces'||platSub==='achats'||platSub==='messages') && <SelecteurCompte accounts={vintedAccounts} sel={compteSel} setSel={setCompteSel} connecte={compteConnecte}/>}
+          <Comptabilite key={'pv_'+platSub} accounts={vintedAccounts} only={platSub==='apercu'?'ventes':platSub} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum} compteSel={compteSel} compteConnecte={compteConnecte}/>
         </>)}
         {tab==='plat_leboncoin'&&(<>
           {/* Julien : « Leboncoin, la même mise en page que Vinted ». Vinted a
@@ -35394,8 +35964,12 @@ function AppCoeur() {
               VentesLeboncoin/AchatsLeboncoin), les Colis, et « À publier ».
               L'onglet Achats n'apparaît que si des achats sont captés — sinon il
               ne mentirait pas, il resterait vide (mieux vaut un blanc, §5). */}
-          {(() => { const ar = lbcArgent(lbcVentes); const e2 = (n) => n.toFixed(2).replace('.', ',') + ' €'; return (
-            <PlatResume baseKO={baseKO} cases={[[`CA finalisé${ar.nRecu ? ' · ' + ar.nRecu : ''}`, ar.actives ? e2(ar.recu) : null], [`En attente${ar.nAttente ? ' · ' + ar.nAttente : ''}`, ar.actives ? e2(ar.attente) : null, true]]}/>
+          {(() => { const ar = lbcArgent(lbcVentes); const e2 = (n) => n.toFixed(2).replace('.', ',') + ' €';
+            const note = (ar.actives && lbcVentes.maj)
+              ? `Montants à jour de ta dernière lecture Leboncoin (${ilYaCourt(lbcVentes.maj)}). Pour les rafraîchir, ouvre « Mes transactions » sur leboncoin.fr avec l'extension à jour.`
+              : null;
+            return (
+            <PlatResume baseKO={baseKO} note={note} cases={[[`CA finalisé${ar.nRecu ? ' · ' + ar.nRecu : ''}`, ar.actives ? e2(ar.recu) : null], [`En attente${ar.nAttente ? ' · ' + ar.nAttente : ''}`, ar.actives ? e2(ar.attente) : null, true]]}/>
           ); })()}
           <PlatSubNav sub={platSub} setSub={setPlatSub} sections={[['ventes','Ventes'],...(((lbcVentes.achats||[]).length>0)?[['achats','Achats']]:[]),['annonces','Annonces'],['messages','Messages'],['colis','Colis']]}/>
           {platSub==='messages'&&<div style={{padding:16}}>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:<MessagesLeboncoin/>}</div>}
@@ -35437,6 +36011,7 @@ function AppCoeur() {
         {tab==='stockvinted'&&<StockVinted stockVinted={stockVinted} setStockVinted={setStockVinted} garageGrid={garageGrid} invoices={invoices}/>}
         {tab==='garage'   &&<Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} locate={garageLocate} onLocateConsumed={()=>setGarageLocate(null)} placeNum={garagePlace} onPlaced={()=>setGaragePlace(null)}/>}
         {tab==='comptabilite'&&<Comptabilite accounts={vintedAccounts} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}
+        {tab==='compta'&&<ComptaPro liveStats={liveStatsVus} onNav={setTab}/>}
         {(()=>{ const map={cat_annonces:'annonces',cat_ventes:'ventes',cat_achats:'achats',cat_bord:'bordereaux',cat_expedition:'bordereaux'}; return map[tab] ? <Comptabilite key={tab} accounts={vintedAccounts} only={map[tab]} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}/> : null; })()}
         {tab==='vintedaccounts'&&<VintedAccounts accounts={vintedAccounts} setAccounts={setVintedAccounts} baseKO={baseKO}/>}
         </EcranGardeFou>
