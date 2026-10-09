@@ -8900,7 +8900,25 @@ function itemDeBrouillon(d) {
   // `VRM-{n°}` (§5). Un numéro illisible ne part pas : mieux vaut pas de lien
   // qu'un faux.
   const numero = d.numero && skuEbayDe(d.numero) ? cleNum(d.numero) : '';
-  return { item: { title: d.titre, categoryId: cat.id, price: String(d.prix).replace(',', '.'), quantity: d.quantite || '1', conditionId: d.etat || '3000', description: d.description || d.titre, photos: urls, aspects: asp, ebayGere: true, ...(numero ? { numero } : {}) } };
+  // (9 octobre) LA RÈGLE D'OFFRE de la nouvelle annonce : c'est eBay qui
+  // acceptera, au montant fixé. Validée ici (la même règle que la carte et la
+  // route, `valideRegleOffre`) ; sans règle, l'`item` est EXACTEMENT celui
+  // d'avant (même clé de vérification, mêmes corps envoyés).
+  const offreA = String(d.offreAccepte == null ? '' : d.offreAccepte).trim();
+  const offreR = String(d.offreRefuse == null ? '' : d.offreRefuse).trim();
+  let offre;
+  if (offreA || offreR) {
+    const a = montantSaisi(offreA), r = montantSaisi(offreR);      // null (vide) · nombre · NaN (illisible ⇒ refusé par valideRegleOffre)
+    const prix = Number(String(d.prix).replace(',', '.'));
+    const v = valideRegleOffre({ accepte: a, refuse: r, prix });
+    if (!v.ok) return { err: 'Règle d\'offre : ' + v.err };
+    if (v.accepte != null) {
+      const bas = seuilTropBas(v.accepte, prix);
+      if (bas && d.offreSousMoitie !== true) return { err: 'Règle d\'offre : moins de la moitié du prix — coche « je fixe volontairement » dans le brouillon.' };
+      offre = { accepte: v.accepte, refuse: v.refuse == null ? null : v.refuse, ...(bas ? { sousMoitie: true } : {}) };
+    }
+  }
+  return { item: { title: d.titre, categoryId: cat.id, price: String(d.prix).replace(',', '.'), quantity: d.quantite || '1', conditionId: d.etat || '3000', description: d.description || d.titre, photos: urls, aspects: asp, ebayGere: true, ...(numero ? { numero } : {}), ...(offre ? { offre } : {}) } };
 }
 // Ce qui rend une vérification caduque : l'annonce OU l'heure ont changé.
 const cleVerifEbay = (item, utc) => { try { return JSON.stringify([item, utc || '']); } catch (_) { return ''; } };
@@ -9183,6 +9201,15 @@ function resultatRegleOffre({ code, j }) {
   if (code === 0 || !j || code === 504 || j.reason === 'incertain') return { issue: 'incertain', lecture, msg: (j && j.error) || 'eBay n\'a pas répondu clairement — je ne sais pas si la règle est posée. « Relire chez eBay » avant de recommencer.' };
   return { issue: 'ko', lecture, reason: j.reason || '', msg: j.error || 'eBay a refusé la règle — rien n\'a changé.' };
 }
+// La règle d'offre qu'un brouillon a ENVOYÉE avec sa programmation (eBay ne la
+// relit pas avant le départ) — la liste des programmées ET l'alerte « à
+// annuler » la lisent ici (§11). Un nombre, ou null.
+function offreEnvoyeeProgrammee(brouillons, itemId) {
+  for (const d of Object.values(brouillons && typeof brouillons === 'object' ? brouillons : {})) {
+    if (d && d.programme && String(d.programme.itemId) === String(itemId)) { const a = montantSaisi(d.offreAccepte); return Number.isFinite(a) && a > 0 ? a : null; }
+  }
+  return null;
+}
 // L'état LOCAL qu'une issue laisse sur la carte (la carte ET le geste groupé,
 // §11) : la lecture rendue par la route quand il y en a une ; sinon « posée
 // mais pas relue » ou « incertaine » ; un refus SANS lecture ne change rien.
@@ -9290,6 +9317,17 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
   const [aiBusy, setAiBusy] = React.useState(false);
   const [aiWhy, setAiWhy] = React.useState('');
   const [plusAttr, setPlusAttr] = React.useState(false);  // afficher les caractéristiques facultatives
+  // (9 octobre) LA RÈGLE D'OFFRE de la nouvelle annonce (facultative) : eBay
+  // acceptera toute offre à partir de ce montant. Validée en direct contre le
+  // prix tapé (la même règle que la carte et la route, §11).
+  const [offreA, setOffreA] = React.useState('');
+  const [offreR, setOffreR] = React.useState('');
+  const [offreBasOk, setOffreBasOk] = React.useState(false);
+  const prixTapeN = Number(String(prix).replace(',', '.'));
+  const prixOffre = Number.isFinite(prixTapeN) && prixTapeN > 0 ? prixTapeN : null;
+  const offreAN = montantSaisi(offreA), offreRN = montantSaisi(offreR);
+  const vOffre = (offreA.trim() || offreR.trim()) ? valideRegleOffre({ accepte: offreAN, refuse: offreRN, prix: prixOffre }) : null;
+  const offreTropBas = !!(vOffre && vOffre.ok && vOffre.accepte != null && seuilTropBas(vOffre.accepte, prixOffre));
   const pairSel = paires.find(p => p.id === pairId) || null;
   // Un champ de caractéristique rendu comme eBay : liste déroulante quand eBay
   // fournit ses valeurs, texte libre sinon. On ne propose QUE les valeurs d'eBay.
@@ -9407,6 +9445,12 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
     // Le compte eBay choisi (seulement s'il y a un choix) : le brouillon rouvert
     // le retrouve, et la vue d'un compte ne montre que les siens.
     ...(plusieursPub ? { compte: comptePub } : {}),
+    // ⚠️ `undefined`, jamais '' : `{ ...avant, ...brouillonCourant() }` doit
+    // EFFACER une ancienne valeur, et JSON jette `undefined` — un brouillon sans
+    // règle garde exactement la forme d'avant.
+    offreAccepte: offreA.trim() || undefined,
+    offreRefuse: offreR.trim() || undefined,
+    offreSousMoitie: (offreTropBas && offreBasOk) || undefined,
   });
   // Construit le payload OU dit ce qui manque — une seule règle pour vérifier
   // ET publier (§11) : impossible de vérifier autre chose que ce qu'on publie.
@@ -9446,6 +9490,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
     setCond(String(d.etat || '3000')); setDesc(String(d.description || '')); setPhotos((d.photos || []).join('\n'));
     setAsp(d.aspects || {}); setRes(null); setCheck(null); setBrouillonMsg('');
     setCompteChoisi(d.compte ? String(d.compte) : null);
+    setOffreA(String(d.offreAccepte || '')); setOffreR(String(d.offreRefuse || '')); setOffreBasOk(d.offreSousMoitie === true);
     const c0 = d.categorie && d.categorie.id ? d.categorie : null;
     if (c0) {
       const requis = c0.requis || [];
@@ -9472,7 +9517,9 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
       const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'pubverify', item: b.item, ...corpsCompteEbay(comptePub) }) });
       const j = await r.json();
       // Les frais LUS PAR NOM (le total est `ListingFee`, jamais une somme).
-      if (j && j.ok) setCheck({ ok: true, fees: j.fees, frais: j.frais || null });
+      // (9 octobre) Les avertissements d'eBay se VOIENT (la route les rendait,
+      // l'écran les jetait) — une catégorie qui n'accepte pas les offres le dit ici.
+      if (j && j.ok) setCheck({ ok: true, fees: j.fees, frais: j.frais || null, avertissements: Array.isArray(j.avertissements) ? j.avertissements.filter(Boolean).map(String) : [] });
       else setCheck({ err: (j && j.error) || 'eBay refuserait cette annonce.' });
     } catch (_) { setCheck({ err: 'Vérification impossible (réseau).' }); }
     setVerif(false);
@@ -9511,8 +9558,26 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
   const publier = async () => {
     const b = buildItem(); if (b.err) { setRes({ err: b.err }); return; }
     const g = gardePublier(); if (g) { setRes({ err: g.t }); return; }
-    // Plusieurs comptes : la confirmation NOMME le compte où elle part.
-    if (plusieursPub) {
+    // (9 octobre) Une RÈGLE D'OFFRE part avec l'annonce : eBay vendra la paire
+    // sans lui demander. TOUJOURS une confirmation qui le dit (même avec un
+    // seul compte) — le compte y est nommé s'il y en a plusieurs.
+    const offre = b.item.offre || null;
+    if (offre) {
+      const prixP = Number(String(b.item.price).replace(',', '.'));
+      let achatP;
+      try { if (pairSel) achatP = prixAchatDe((load('vinted_annonce_numeros', {}) || {})[pairSel.id], load('vinted_buyprice_by_num', {}) || {}); } catch (_) { achatP = undefined; }
+      const lignes = [
+        `« ${titre || 'cette paire'} » sera mise en vente à ${eurEbay(prixP)}${plusieursPub ? ` sur le compte eBay « ${nomComptePub} »` : ''}. Toute offre de ${eurEbay(offre.accepte)} ou plus sera acceptée par eBay sans te demander : la paire sera vendue à ce prix.`,
+        offre.refuse != null && `Toute offre sous ${eurEbay(offre.refuse)} sera refusée par eBay.`,
+        !b.item.numero && 'Cette annonce n\'est reliée à aucune paire : si eBay la vend, VRM ne saura pas quelle paire retirer de Vinted. Choisis la paire d\'abord.',
+        typeof achatP === 'number' && offre.accepte < achatP && `C'est sous ton prix d'achat (${eurEbay(achatP)}), avant frais eBay.`,
+        offre.sousMoitie && `C'est ${Math.round(offre.accepte / prixP * 100)} % du prix de l'annonce — tu l'as confirmé.`,
+        b.item.numero && plusieursPub && `VRM vérifie avant que la paire N°${b.item.numero} n'est en vente sur AUCUN de tes comptes eBay.`,
+      ].filter(Boolean);
+      const ok = await askConfirm({ title: `Publier, et laisser eBay accepter les offres dès ${eurEbay(offre.accepte)} ?`, desc: lignes.join('\n\n'), ok: 'Oui, publier', cancel: 'Annuler' });
+      if (!ok) return;
+    } else if (plusieursPub) {
+      // Plusieurs comptes : la confirmation NOMME le compte où elle part.
       const ok = await askConfirm({
         title: `Publier sur ton compte eBay « ${nomComptePub} » ?`,
         desc: `« ${titre || 'cette paire'} » sera mise en vente sur le compte eBay « ${nomComptePub} », tout de suite.${b.item.numero ? ` VRM vérifie avant que la paire N°${b.item.numero} n'est en vente sur AUCUN de tes comptes eBay.` : ''}`,
@@ -9526,7 +9591,11 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
     const { code, j } = await appelEbay({ action: 'publish', item: b.item, ...corpsCompteEbay(comptePub) });
     if (j && j.ok) {
       if (plusieursPub && onCompte) onCompte(comptePub);
-      setRes({ ok: true, url: j.url, itemId: j.itemId, sku: j.sku || null, compte: plusieursPub ? nomComptePub : '' }); if (onPublie) onPublie(comptePub);
+      // Ce qu'eBay a fait de la règle (relue après l'ajout), et ce qu'il signale.
+      const vo = offre && j.offre ? j.offre.verifie : undefined;
+      const offreMsg = !offre ? '' : (vo === true ? `Règle d'offre : eBay accepte dès ${eurEbay(offre.accepte)}.` : (vo === false ? 'eBay n\'a pas gardé la règle d\'offre — définis-la sur la carte de l\'annonce.' : 'Règle d\'offre pas encore relue.'));
+      const avert = Array.isArray(j.avertissements) ? j.avertissements.filter(Boolean).map(String) : [];
+      setRes({ ok: true, url: j.url, itemId: j.itemId, sku: j.sku || null, compte: plusieursPub ? nomComptePub : '', offreMsg, offreOk: vo === true, avertissements: avert }); if (onPublie) onPublie(comptePub);
       // Publiée depuis un brouillon : il sort de la liste des brouillons.
       if (brouillonId) { const id = brouillonId; modifierBrouillonsEbay((items) => { if (items[id]) items[id] = { ...items[id], etatBrouillon: 'en-ligne', programme: { itemId: j.itemId, debut: null, demande: null, at: Date.now() } }; return items; }).then((w) => { if (w.ok && onBrouillon) onBrouillon(w.items); }); }
     }
@@ -9542,7 +9611,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
   // eyebrow numéroté + carte. §7 : une seule teinte d'accent, rayons 10/12.
   const urls = photos.split(/\s+/).map(s => s.trim()).filter(s => /^https?:\/\//.test(s));
   const setUrls = (arr) => { setPhotos(arr.join('\n')); setCheck(null); };
-  const reset = () => { setOuvert(false); setRes(null); setCheck(null); setTitre(''); setPrix(''); setCat(null); setAsp({}); setPhotos(''); setDesc(''); setPairId(null); setBrouillonId(null); setNumeroBrouillon(''); setBrouillonMsg(''); };
+  const reset = () => { setOuvert(false); setRes(null); setCheck(null); setTitre(''); setPrix(''); setCat(null); setAsp({}); setPhotos(''); setDesc(''); setPairId(null); setBrouillonId(null); setNumeroBrouillon(''); setBrouillonMsg(''); setOffreA(''); setOffreR(''); setOffreBasOk(false); };
   const listePaires = paires.filter(p => { const q = pairQ.trim().toLowerCase(); return !q || p.num.includes(q) || (p.title || '').toLowerCase().includes(q) || String(p.taille).toLowerCase().includes(q); });
   const eur = (n) => (Math.round(n * 100) / 100).toFixed(2).replace('.', ',') + ' €';
   const condLabel = (EBAY_CONDITIONS.find(([v]) => v === cond) || [, 'Occasion'])[1];
@@ -9573,6 +9642,8 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
           <div data-publie-sku={res.sku || ''} style={{ fontSize: 12, color: C.muted, marginBottom: 14, lineHeight: 1.5 }}>{res.sku
             ? <>Reliée à la paire par la référence <b style={{ color: C.text }}>{res.sku}</b> : si elle se vend sur Vinted, VRM te proposera de la retirer d'eBay.</>
             : <>Pas reliée à une paire : relie-la depuis sa carte dans Annonces.</>}</div>
+          {res.offreMsg && <div data-publie-offre={res.offreOk ? 'ok' : 'warn'} style={{ fontSize: 12.5, color: res.offreOk ? C.text : C.warn, marginBottom: 10, lineHeight: 1.5 }}>{res.offreMsg}</div>}
+          {Array.isArray(res.avertissements) && res.avertissements.length > 0 && <div data-publie-avertissements={res.avertissements.length} style={{ fontSize: 12, color: C.warn, marginBottom: 12, lineHeight: 1.5 }}>eBay signale : {res.avertissements.map((a) => `« ${a} »`).join(' · ')}</div>}
           <a href={res.url} target="_blank" rel="noreferrer" style={{ display: 'inline-block', border: 'none', background: C.accent, color: '#fff', borderRadius: 999, padding: '12px 20px', fontSize: 14, fontWeight: 700, textDecoration: 'none' }}>Voir l'annonce sur eBay ↗</a>
           <div style={{ marginTop: 12 }}><button type="button" onClick={reset} style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 10, padding: '9px 16px', fontSize: 13.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Terminé</button></div>
         </div>
@@ -9728,9 +9799,23 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
                 confirme qu'il est accepté avant toute publication. */}
             <BlocEbay n="4" titre="Prix & livraison">
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(148px,1fr))', gap: 10 }}>
-                <div><label style={lab}>Prix (€)</label><input value={prix} onChange={e => { setPrix(e.target.value); setCheck(null); }} inputMode="decimal" placeholder="ex. 74" style={inp} /></div>
+                <div><label style={lab}>Prix (€)</label><input value={prix} onChange={e => { setPrix(e.target.value); setCheck(null); setOffreBasOk(false); }} inputMode="decimal" placeholder="ex. 74" style={inp} /></div>
                 <div><label style={lab}>Quantité</label><input value={qty} onChange={e => setQty(e.target.value)} inputMode="numeric" style={inp} /></div>
               </div>
+              {/* (9 octobre) LA RÈGLE D'OFFRE, facultative : c'est eBay qui
+                  acceptera, au montant fixé ici. Validée contre le prix tapé. */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(148px,1fr))', gap: 10, marginTop: 10 }}>
+                <div><label style={lab}>Accepter les offres dès (€) — facultatif</label><input value={offreA} onChange={e => { setOffreA(e.target.value); setCheck(null); setOffreBasOk(false); }} inputMode="decimal" placeholder="montant en €" data-publier-offre-accepte="1" style={inp} /></div>
+                <div><label style={lab}>Refuser les offres sous (€) — facultatif</label><input value={offreR} onChange={e => { setOffreR(e.target.value); setCheck(null); }} inputMode="decimal" placeholder="montant en €" data-publier-offre-refuse="1" style={inp} /></div>
+              </div>
+              {offreA.trim() && vOffre && vOffre.ok && <div style={{ fontSize: 12, color: C.muted, marginTop: 6, lineHeight: 1.45 }}>eBay acceptera seul toute offre de ce montant ou plus : la paire sera vendue à ce prix.</div>}
+              {vOffre && !vOffre.ok && <div data-publier-offre-erreur="1" style={{ fontSize: 12, color: C.warn, marginTop: 6, lineHeight: 1.45 }}>{vOffre.err}</div>}
+              {offreTropBas && (
+                <label data-publier-offre-sous-moitie="1" style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12.5, color: C.warn, marginTop: 8, lineHeight: 1.4, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={offreBasOk} onChange={(e) => { setOffreBasOk(e.target.checked); setCheck(null); }} style={{ marginTop: 2 }} />
+                  <span>Je fixe volontairement {eurEbay(vOffre.accepte)} — {Math.round(vOffre.accepte / prixOffre * 100)} % du prix.</span>
+                </label>
+              )}
               {/* ── LIVRAISON GÉRÉE PAR eBay (Julien, 27 sept. : « c'est MOI qui
                   choisis le transporteur, mais c'est eBay qui fixe le montant »).
                   MESURÉ 3 fois à blanc : eBay REFUSE tout <ShippingDetails> envoyé
@@ -9755,6 +9840,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
             {/* Les frais LUS PAR NOM (5 octobre) : le total est `ListingFee`,
                 jamais la somme de tous les frais (elle doublait). Absent ⇒ « — ». */}
             {check && check.ok && <div data-publier-frais={check.fees == null ? 'pas-su' : String(check.fees)} style={{ fontSize: 12.5, color: C.text, background: `${C.accent}10`, border: `1px solid ${C.accent}`, borderRadius: 10, padding: '10px 12px', lineHeight: 1.5 }}>✓ <b>eBay accepterait cette annonce.</b> Frais annoncés par eBay : {lignesFraisEbay(check.frais, false).map((l) => `${l.nom} ${l.montant == null ? '—' : eurEbay(l.montant)}`).join(' · ')} · <b>total {check.fees == null ? '— (eBay ne l\'a pas annoncé)' : eurEbay(check.fees)}</b>. Tu peux publier.</div>}
+            {check && check.ok && Array.isArray(check.avertissements) && check.avertissements.length > 0 && <div data-publier-avertissements={check.avertissements.length} style={{ fontSize: 12.5, color: C.warn, lineHeight: 1.5 }}>eBay signale : {check.avertissements.map((a) => `« ${a} »`).join(' · ')}</div>}
             {check && check.err && <div style={{ fontSize: 12.5, color: C.warn, background: `${C.warn}12`, border: `1px solid ${C.warn}`, borderRadius: 10, padding: '10px 12px', lineHeight: 1.5 }}>⚠️ eBay signale : {check.err}<br /><span style={{ color: C.muted }}>Rien n'a été publié — corrige et revérifie.</span></div>}
 
             {garde && <div data-publier-garde={garde.k} style={{ fontSize: 12.5, color: garde.k === 'en-cours' ? C.muted : C.warn, lineHeight: 1.5 }}>{garde.t}</div>}
@@ -9943,9 +10029,15 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
   const deconnecter = async (c) => {
     const ref = c.principal ? 'principal' : c.cle;
     const nom = nomCompteEbay(c);
+    // (9 octobre) Ses RÈGLES D'OFFRE restent posées chez eBay : eBay continuera
+    // d'accepter — et VRM ne verra plus ces ventes. On le dit, avec le nombre.
+    const nRegles = await compterReglesEbay(comptesEbay, ref);
+    const texteRegles = nRegles == null
+      ? '\n\nJe n\'ai pas pu vérifier si des annonces de ce compte ont une règle d\'offre : regarde eBay → Annonces avant.'
+      : (nRegles > 0 ? `\n\n${nRegles} annonce${nRegles > 1 ? 's' : ''} de ce compte ${nRegles > 1 ? 'ont' : 'a'} une règle d'offre : eBay continuera d'accepter les offres dès le montant fixé, et VRM ne verra plus ces ventes. Retire les règles d'abord (eBay → Annonces) si tu ne veux plus vendre ainsi.` : '');
     const ok = await askConfirm({
       title: `Déconnecter le compte eBay « ${nom} » ?`,
-      desc: `Tes autres comptes eBay ne sont pas touchés.\n\nVRM ne lira plus les annonces ni les ventes de « ${nom} », et ne publiera plus rien dessus ; ses ventes sortent aussi des totaux de VRM (chiffre d'affaires compris). Ses annonces restent en ligne sur eBay. Tu pourras le reconnecter : tu retrouveras tout.`,
+      desc: `Tes autres comptes eBay ne sont pas touchés.\n\nVRM ne lira plus les annonces ni les ventes de « ${nom} », et ne publiera plus rien dessus ; ses ventes sortent aussi des totaux de VRM (chiffre d'affaires compris). Ses annonces restent en ligne sur eBay. Tu pourras le reconnecter : tu retrouveras tout.${texteRegles}`,
       ok: 'Oui, déconnecter', cancel: 'Annuler', danger: true,
     });
     if (!ok) return;
@@ -10780,7 +10872,7 @@ function EbayBrouillons({ brouillons, connected, paires = [], onModifier, onPlan
             <PhotoVente src={couverture(d)} size={48} />
             <div style={{ flex: '1 1 auto', minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: E.text, lineHeight: 1.3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{d.numero ? <b>N°{cleNum(d.numero)} · </b> : null}{d.titre || '(sans titre)'}</div>
-              <div style={{ fontSize: 11.5, color: E.muted, marginTop: 2 }}>{d.prix ? eurEbay(Number(String(d.prix).replace(',', '.')) || 0) : 'prix —'}{d.categorie && d.categorie.nom ? ` · ${String(d.categorie.nom).split(':').pop()}` : ''}{plusieurs && vue === '*' && d.compte ? <span data-brouillon-compte={d.compte}>{` · ${nomCompteEbay(comptesPub.find((c) => c.ref === d.compte) || { principal: d.compte === 'principal' })}`}</span> : null}{!d.numero ? <span style={{ color: E.warn }}> · pas de N°</span> : null}</div>
+              <div style={{ fontSize: 11.5, color: E.muted, marginTop: 2 }}>{d.prix ? eurEbay(Number(String(d.prix).replace(',', '.')) || 0) : 'prix —'}{d.categorie && d.categorie.nom ? ` · ${String(d.categorie.nom).split(':').pop()}` : ''}{plusieurs && vue === '*' && d.compte ? <span data-brouillon-compte={d.compte}>{` · ${nomCompteEbay(comptesPub.find((c) => c.ref === d.compte) || { principal: d.compte === 'principal' })}`}</span> : null}{!d.numero ? <span style={{ color: E.warn }}> · pas de N°</span> : null}{(() => { const a = montantSaisi(d.offreAccepte); return Number.isFinite(a) && a > 0 ? <span data-brouillon-offre={a.toFixed(2)}>{` · offres dès ${eurEbay(a)}`}</span> : null; })()}</div>
               {d.envoi && d.envoi.ok === false && <div data-brouillon-echec={d.id} style={{ fontSize: 11.5, color: E.warn, marginTop: 3, lineHeight: 1.45 }}>Échec de la programmation : {d.envoi.err}</div>}
               {b.err ? <div style={{ fontSize: 11.5, color: E.warn, marginTop: 3, lineHeight: 1.45 }}>{b.err}</div>
                 : etat === 'verif-en-cours' ? <div style={{ fontSize: 11.5, color: E.muted, marginTop: 3 }}>eBay vérifie…</div>
@@ -10954,12 +11046,22 @@ function EbayPlanificateur({ brouillons = [], annoncesEbay, programmees, ventes,
     const lot = pretes.map(({ l, v }) => ({ l, v }));
     const premiere = lot[0].l.h, derniere = lot[lot.length - 1].l.h;
     const quand = (h) => h.immediat ? 'tout de suite' : `${jourParisTexte(h.date)} à ${h.heure}`;
+    // (9 octobre) Les annonces qui partent avec une RÈGLE D'OFFRE : chaque
+    // montant est écrit — eBay vendra à ce prix sans lui demander.
+    const avecOffre = lot.filter(({ l }) => l.item && l.item.offre);
+    const texteOffres = avecOffre.length
+      ? `\n${avecOffre.length} avec une règle d'offre — eBay acceptera seul les offres dès :` + avecOffre.map(({ l }) => {
+        const p = Number(String(l.item.price).replace(',', '.')); const o = l.item.offre;
+        return `\n« ${l.item.title || ''} » ${eurEbay(p)} → dès ${eurEbay(o.accepte)} (${p > 0 ? Math.round(o.accepte / p * 100) : '—'} %)${o.sousMoitie ? ' — moins de la moitié, confirmé dans le brouillon' : ''}`;
+      }).join('')
+      : '';
     const ok = await askConfirm({
       title: `Programmer ${lot.length} annonce${lot.length > 1 ? 's' : ''} sur eBay${plusieursPub ? ` (compte « ${nomCompteLot} »)` : ''} ?`,
       desc: `De ${quand(premiere)} à ${quand(derniere)} (heure de Paris, ± 15 min : c'est eBay qui arrondit).`
         + `\nFrais annoncés par eBay : ${eurEbay(lot.reduce((s, x) => s + x.v.fees, 0))}${progConnues.length ? ` (dont programmation ${eurEbay(totalProg)})` : ''}${progPayante ? ' — facturés à la création, non remboursés si tu annules.' : '.'}`
         + (progPasSu ? `\nFrais de programmation pas annoncés par eBay pour ${progPasSu} annonce${progPasSu > 1 ? 's' : ''}.` : '')
-        + `\nC'est eBay qui les mettra en ligne à ces heures, même si VRM est fermé. Si une paire se vend ailleurs avant son heure, VRM te le dira — mais l'annulation peut devoir se faire sur eBay.`,
+        + `\nC'est eBay qui les mettra en ligne à ces heures, même si VRM est fermé. Si une paire se vend ailleurs avant son heure, VRM te le dira — mais l'annulation peut devoir se faire sur eBay.`
+        + texteOffres,
       ok: 'Oui, programmer', cancel: 'Annuler',
     });
     if (!ok) return;
@@ -11327,6 +11429,9 @@ function EbayProgrammees({ programmees, brouillons, onRelire, onAnnule, vue = '*
                     <div style={{ fontSize: 11.5, color: s === 'pas-partie' ? E.warn : E.muted, marginTop: 2 }}>
                       {s === 'en-ligne' ? 'En ligne ✓' : s === 'pas-partie' ? `Pas partie à l'heure — prévue à ${Number.isFinite(t) ? partsParis(t).heure : '?'}. Relis chez eBay ; si elle n'apparaît toujours pas, regarde dans le Seller Hub.` : s === 'a-relire' ? `devrait être en ligne depuis ${Number.isFinite(t) ? partsParis(t).heure : '?'} — je relis chez eBay` : `Programmée · ${Number.isFinite(t) ? partsParis(t).heure : 'heure inconnue'}`}
                       {l.price ? ` · ${eurEbay(Number(String(l.price).replace(',', '.')) || 0)}` : ''}
+                      {/* (9 octobre) La règle d'offre ENVOYÉE avec la programmation
+                          (eBay ne la relit pas avant le départ) — dite comme telle. */}
+                      {(() => { const a = offreEnvoyeeProgrammee(brouillons, l.itemId); return a != null ? <span data-programmee-offre={a.toFixed(2)}>{` · offres dès ${eurEbay(a)}`}</span> : null; })()}
                       {melangeProg ? ` · ${nomCompteEbay((comptesEbay || []).find((c) => c.ref === l._compte) || { pseudo: l._pseudo })}` : ''}
                     </div>
                   </div>
@@ -11910,12 +12015,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   };
   // La règle qu'un brouillon a ENVOYÉE avec sa programmation (eBay ne la relit
   // pas avant le départ) — dite comme telle.
-  const offreDeProgrammee = (itemId) => {
-    for (const d of Object.values(brouillons && typeof brouillons === 'object' ? brouillons : {})) {
-      if (d && d.programme && String(d.programme.itemId) === String(itemId)) { const a = montantSaisi(d.offreAccepte); return Number.isFinite(a) && a > 0 ? a : null; }
-    }
-    return null;
-  };
+  const offreDeProgrammee = (itemId) => offreEnvoyeeProgrammee(brouillons, itemId);
   // Le nom d'un compte eBay, pour les messages (son pseudo, sinon « compte principal »).
   const nomRef = (ref) => nomCompteEbay((Array.isArray(comptesEbay) ? comptesEbay : []).find((c) => c.ref === ref) || comptesRelies.find((c) => c.ref === ref) || {});
   // « Relire chez eBay » (la ligne « pas su » ET le geste groupé, §11) : seules
@@ -23217,9 +23317,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // la baisse part sur le compte de l'annonce ; une même paire sur deux
         // comptes est ambiguë (rien n'est proposé). Un compte illisible ⇒ « pas
         // su » : on ne propose pas une baisse sur une liste incomplète.
-        const lu = await lireEbayTous('ebay_listings', 'items:data->items,cap:data->>capturedAt', 'items');
+        const [lu, regles] = await Promise.all([
+          lireEbayTous('ebay_listings', 'items:data->items,cap:data->>capturedAt', 'items'),
+          // (9 octobre) La RÈGLE D'OFFRE de chaque annonce (la même lecture que
+          // l'écran eBay, §11) : une baisse à ou sous le seuil connu n'est pas
+          // proposée. Illisible ⇒ « pas su » : rien ne bloque (la route relit après).
+          lireReglesEbay(),
+        ]);
         if (!lu || lu.illisibles.length) { if (!stop) setEbayVivantes(null); return; }
         const m = new Map();
+        m.regles = regles;
         // Quand la liste a été relue chez eBay (nombre ou date ISO ; inconnue ⇒
         // NaN) — la plus ANCIENNE des lignes lues (prudent).
         const caps = lu.lignes.filter((x) => x.ligne).map((x) => (Number.isFinite(Number(x.ligne.cap)) ? Number(x.ligne.cap) : Date.parse(x.ligne.cap || '')));
@@ -23262,20 +23369,28 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const buy = prixAchatDe(numeros[r.it.id], buyByNum);
     if (buy != null && sugg < buy) sugg = Math.ceil(buy);
     sugg = Math.max(1, sugg);
+    // (9 octobre) La règle d'offre de l'annonce eBay : la MÊME garde que la
+    // carte (`prixCompatibleRegle`, §11) — un prix à ou sous le seuil connu
+    // n'est pas proposé (eBay le refuserait).
+    const regle = ebayVivantes.regles ? etatRegleOffre({ itemId: e.itemId, price: prixActuel, _compte: e.compte }, ebayVivantes.regles.map, ebayVivantes.regles.illisibles) : null;
+    const garde = prixCompatibleRegle(sugg, regle);
     // Jamais « baisser » à un prix supérieur ou égal au prix eBay connu.
-    return { ...e, prix: prixConnu, prixActuel, sugg, utile: !memoValable && sugg < prixActuel, fait };
+    return { ...e, prix: prixConnu, prixActuel, sugg, utile: !memoValable && sugg < prixActuel && garde.ok, fait, regle, bloqueRegle: !memoValable && sugg < prixActuel && !garde.ok ? regle : null };
   };
   const baisserSurEbay = async (e, rp) => {
     if (!e || !e.itemId || !(e.sugg > 0)) return;
     const prix = (n) => Number(n).toFixed(2).replace('.', ',') + ' €';
     const num = rp && numeros[rp.it.id] ? numeros[rp.it.id].numero : '';
+    const g = prixCompatibleRegle(e.sugg, e.regle); if (!g.ok) return;
     const okc = await askConfirm({ title: `Baisser le prix sur eBay : ${prix(e.prixActuel)} → ${prix(e.sugg)} ?`,
-      desc: `L'annonce eBay « ${e.titre || e.itemId} »${num ? ` (N°${num})` : ''} change tout de suite. Sur Vinted, c'est toi qui le fais (bouton « Baisser »).`, ok: 'Baisser sur eBay' });
+      desc: `L'annonce eBay « ${e.titre || e.itemId} »${num ? ` (N°${num})` : ''} change tout de suite. Sur Vinted, c'est toi qui le fais (bouton « Baisser »).`
+        + (e.regle && e.regle.etat === 'connue' ? `\n\nTa règle d'offre (dès ${prix(e.regle.accepte)}) peut tomber avec le changement de prix : VRM la relit après et te le dit.` : ''), ok: 'Baisser sur eBay' });
     if (!okc) return;
     setEbayBaisse((m) => ({ ...m, [e.itemId]: { etat: 'envoi', prix: e.sugg } }));
     const res = resultatReviseEbay(await appelEbay({ action: 'revise', itemId: e.itemId, price: e.sugg, ...corpsCompteEbay(e.compte) }));
     if (res.etat === 'ok') {
-      setEbayBaisse((m) => ({ ...m, [e.itemId]: { etat: 'ok', prix: e.sugg } }));
+      // Ce que le changement de prix a fait à la règle d'offre (relue par la route).
+      setEbayBaisse((m) => ({ ...m, [e.itemId]: { etat: 'ok', prix: e.sugg, regleMsg: res.msg || '', regleTon: res.ton || 'ok' } }));
       // Le prix Vinted de référence de CETTE baisse : pas de nouvelle proposition
       // tant qu'il n'a pas bougé (gardé aux 200 dernières annonces).
       setBaissesEbay((m) => {
@@ -28625,7 +28740,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           {eb && !eb.ambigu && (eb.fait && eb.fait.etat === 'ok'
                             ? (eb.fait.memo
                               ? <span data-reprice-ebay="fait" data-reprice-ebay-memo="1">eBay : déjà baissé pour ce prix Vinted — <b style={{color:C.text}}>{eb.prixActuel} €</b> aujourd'hui ✓</span>
-                              : <span data-reprice-ebay="fait">eBay : baissé à <b style={{color:C.text}}>{eb.fait.prix} €</b> ✓</span>)
+                              : (eb.fait.regleMsg
+                                ? <span data-reprice-ebay="fait" data-reprice-ebay-regle-msg={eb.fait.regleTon === 'ok' && /^✓/.test(eb.fait.regleMsg) ? 'ok' : 'warn'} style={{color: eb.fait.regleTon === 'ok' && /^✓/.test(eb.fait.regleMsg) ? C.text : C.warn}}>eBay : baissé à <b>{eb.fait.prix} €</b> — {eb.fait.regleMsg}</span>
+                                : <span data-reprice-ebay="fait">eBay : baissé à <b style={{color:C.text}}>{eb.fait.prix} €</b> ✓</span>))
+                            : eb.bloqueRegle
+                              ? <span data-reprice-ebay-regle={eb.itemId} style={{color:C.warn}}>Aussi sur eBay à <b style={{color:C.text}}>{eb.prixActuel} €</b> — ta règle d'offre accepte dès {Number(eb.bloqueRegle.accepte).toFixed(2).replace('.', ',')} € : baisse-la ou retire-la d'abord (eBay → Annonces).</span>
                             : eb.utile
                               ? <>
                                   <span>Aussi sur eBay à <b style={{color:C.text}}>{eb.prixActuel} €</b></span>
@@ -33502,10 +33621,15 @@ function FermerCompte() {
   const [tape, setTape] = React.useState('');
   const [occupe, setOccupe] = React.useState(false);
   const [fin, setFin] = React.useState(null);
+  // (9 octobre) Ses RÈGLES D'OFFRE eBay restent posées chez eBay après la
+  // fermeture : eBay continuera d'accepter. Compté sur tous ses comptes eBay ;
+  // `undefined` en cours · `null` pas su · nombre.
+  const [reglesEbayN, setReglesEbayN] = React.useState(undefined);
   React.useEffect(() => {
     if (!ouvert || info !== undefined) return;
     let mort = false;
     lireAbonnement().then((x) => { if (!mort) setInfo(x); });
+    compterReglesEbay().then((n) => { if (!mort) setReglesEbayN(n); }).catch(() => { if (!mort) setReglesEbayN(null); });
     return () => { mort = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ouvert]);
@@ -33553,6 +33677,8 @@ function FermerCompte() {
                 {(info.peutGerer && info.actif) ? ' Ton abonnement est résilié en même temps : aucun nouveau prélèvement ne part.' : ''}
                 {' '}C'est <b style={{ color: C.text }}>définitif</b> : pour garder une copie, fais d'abord une « Sauvegarde complète » (onglet Réglages). Ensuite, retire l'extension VRM de Chrome.
               </div>
+              {reglesEbayN === null && <div data-fermer-regles-ebay="pas-su" style={{ ...txt, marginTop: 8, color: C.warn }}>Je n'ai pas pu vérifier si tes annonces eBay ont une règle d'offre : regarde eBay → Annonces avant de fermer.</div>}
+              {typeof reglesEbayN === 'number' && reglesEbayN > 0 && <div data-fermer-regles-ebay={reglesEbayN} style={{ ...txt, marginTop: 8, color: C.warn }}>Tes règles d'offre eBay ({reglesEbayN} annonce{reglesEbayN > 1 ? 's' : ''}) restent posées sur eBay après la fermeture : eBay continuera d'accepter les offres dès le montant fixé, et VRM ne verra plus ces ventes. Retire-les d'abord (eBay → Annonces) si tu ne veux plus vendre ainsi.</div>}
               <label style={{ display: 'block', ...txt, marginTop: 10 }}>
                 Pour confirmer, recopie ton adresse : <b style={{ color: C.text }}>{email}</b>
                 <input type="email" autoComplete="off" autoCapitalize="none" value={tape} onChange={(e) => setTape(e.target.value)} placeholder={email}
