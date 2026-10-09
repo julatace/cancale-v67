@@ -3296,6 +3296,18 @@ const SEUIL_VINTED_VENTES = 30;
 const SEUIL_VINTED_EUR = 2000;
 const VERSEMENT_MAX_J = 45;
 const seuilVintedAtteint = (n, cts) => n >= SEUIL_VINTED_VENTES || cts > SEUIL_VINTED_EUR * 100;
+// Une vente finalisée PAS ENCORE DATÉE (aucune date de versement) peut-elle
+// tomber dans l'année `annee` ? Le versement suit la vente, et la suit de près
+// (`VERSEMENT_MAX_J`, une estimation) : entre l'année de la vente et celle de
+// « vente + 45 j », jamais au-delà d'aujourd'hui. Sans date de vente : toute
+// année jusqu'à aujourd'hui. UNE règle (§11) : la carte des seuils ET le bilan
+// annuel (qui dit, à côté de son CA, ce qui peut encore y manquer).
+const aDaterPeutTomberEn = (t, annee, maintenant = Date.now()) => {
+  const anneeDe = (x) => new Date(x).getFullYear();
+  const yMin = t ? anneeDe(t) : -Infinity;                                       // le versement suit la vente…
+  const yMax = anneeDe(t ? Math.min(maintenant, t + VERSEMENT_MAX_J * 86400e3) : maintenant);   // …et la suit de près (estimation)
+  return !(annee < yMin || annee > yMax);
+};
 const seuilsVintedParCompte = ({ comptes, ecarte, echoues, datees, aDater, annee, maintenant = Date.now() } = {}) => {
   const anneeDe = (t) => new Date(t).getFullYear();
   const uidDe = (o) => String((o && o._acc && o._acc.vinted_user_id) ?? '');
@@ -3319,10 +3331,7 @@ const seuilsVintedParCompte = ({ comptes, ecarte, echoues, datees, aDater, annee
     for (const l of (Array.isArray(aDater) ? aDater : [])) {
       if (!l || l.plateforme !== 'Vinted') continue;
       const r = parUid[uidDe(l.o)]; if (!r || r.etat !== 'lu') continue;
-      const t = tsCommande(l.o);
-      const yMin = t ? anneeDe(t) : -Infinity;                                       // le versement suit la vente…
-      const yMax = anneeDe(t ? Math.min(maintenant, t + VERSEMENT_MAX_J * 86400e3) : maintenant);   // …et la suit de près (estimation)
-      if (annee < yMin || annee > yMax) continue;
+      if (!aDaterPeutTomberEn(tsCommande(l.o), annee, maintenant)) continue;
       const c = Math.round(Number(l.eur) * 100); if (!isFinite(c)) continue;
       r.nAd += 1; r.ctsAd += c;
     }
@@ -18765,82 +18774,196 @@ const comptaVide = (d) => !((d.depenses || []).length || (d.fixes || []).length 
 // Montant saisi « 12,50 » ou « 12.50 » → nombre. Jamais NaN silencieux : on
 // renvoie null, et l'appelant refuse d'ajouter (mieux vaut un blanc qu'un faux).
 const parseMontant = (s) => { const n = parseFloat(String(s == null ? '' : s).replace(',', '.').replace(/[^0-9.]/g, '')); return isFinite(n) && n > 0 ? n : null; };
+// ── LE JOUR ET LE MOIS DE PARIS (revue du 9 octobre) ─────────────────────────
+// La date proposée d'une dépense s'écrivait `new Date().toISOString()` : c'est
+// l'UTC. Entre minuit et 1-2 h (heure de Paris) elle tombait la VEILLE — le
+// 1er janvier à 00:30, une dépense validée sans regarder partait dans l'année
+// close, et chaque début de mois la sortait de « Charges ce mois ». Tout ce que
+// la comptabilité date passe par le calendrier de Paris (`partsParis`).
+const aujourdhuiParis = (ms = Date.now()) => { const p = partsParis(ms); return { y: p.y, mo: p.mo, date: p.date, ym: p.date.slice(0, 7) }; };
+const YM_COMPTA = /^\d{4}-(0[1-9]|1[0-2])$/;
+// Un coût fixe court du mois `debut` au mois `fin` (inclus, absent = toujours
+// en cours). ⚠️ (revue du 9 octobre) Il n'avait qu'un libellé et un montant :
+// un abonnement saisi aujourd'hui comptait 12 mois dans les bilans 2023, 2024
+// et 2025 (années où il n'existait pas), et le supprimer parce qu'il était
+// résilié retirait ce coût de toutes les années passées — un bilan clos changé
+// après coup. Sans début connu (saisi avant ce correctif), il n'est compté
+// NULLE PART, et l'écran le dit : on ne devine pas depuis quand il court.
+const fixeActifEn = (f, ym) => !!f && YM_COMPTA.test(String(f.debut || '')) && f.debut <= ym && (!YM_COMPTA.test(String(f.fin || '')) || ym <= f.fin);
+const moisFixeAnnee = (f, annee, ymCourant) => {
+  if (!f || !YM_COMPTA.test(String(f.debut || ''))) return null;
+  let n = 0;
+  for (let m = 1; m <= 12; m++) { const k = `${annee}-${String(m).padStart(2, '0')}`; if (k <= ymCourant && fixeActifEn(f, k)) n += 1; }
+  return n;
+};
 // Charges d'entreprise d'une ANNÉE, UNE seule règle (§11) : l'onglet Comptabilité
-// ET le rapport annuel la consomment. `data` = ligne `vrm_compta`. Les coûts
-// fixes sont au tarif ACTUEL × nombre de mois de l'année (12 pour une année
-// passée, le mois courant pour l'année en cours) — on le DIT au libellé, on ne
-// prétend pas connaître leur historique mois par mois.
-const comptaChargesAnnee = (data, annee) => {
+// ET le rapport annuel la consomment. `data` = ligne `vrm_compta`. Un coût fixe
+// compte les mois de l'année où il a couru (jamais au-delà du mois en cours, à
+// Paris), au tarif saisi.
+const comptaChargesAnnee = (data, annee, maintenant = Date.now()) => {
   const d = (data && typeof data === 'object') ? data : {};
   const depenses = d.depenses || [], fixes = d.fixes || [], packs = d.packs || [];
-  const now = new Date(), thisY = now.getFullYear();
-  const mois = annee < thisY ? 12 : (annee > thisY ? 0 : now.getMonth() + 1);
+  const ymCourant = aujourdhuiParis(maintenant).ym;
   const estAnnee = (x) => String(x || '').slice(0, 4) === String(annee);
   const sum = (arr, f) => arr.reduce((s, x) => s + (Number(f(x)) || 0), 0);
-  const fixesParMois = sum(fixes, x => x.montant);
-  const depTotal = sum(depenses.filter(x => estAnnee(x.date)), x => x.montant);
-  const packTotal = sum(packs.filter(x => estAnnee(x.date)), x => x.montant);
-  const fixesTotal = fixesParMois * mois;
+  const fixesLignes = fixes.map(f => {
+    const mois = moisFixeAnnee(f, annee, ymCourant), montant = Number(f && f.montant) || 0;
+    return { id: f && f.id, libelle: (f && f.libelle) || '', montant, debut: (f && f.debut) || null, fin: (f && f.fin) || null, mois, total: mois ? montant * mois : 0 };
+  });
+  const depLignes = depenses.filter(x => estAnnee(x.date)), packLignes = packs.filter(x => estAnnee(x.date));
+  const fixesTotal = sum(fixesLignes, x => x.total), depTotal = sum(depLignes, x => x.montant), packTotal = sum(packLignes, x => x.montant);
   return {
-    fixesParMois, moisComptes: mois, fixesTotal, depTotal, packTotal,
-    total: fixesTotal + depTotal + packTotal,
-    depLignes: depenses.filter(x => estAnnee(x.date)),
-    packLignes: packs.filter(x => estAnnee(x.date)),
-    fixes,
+    // Le tarif mensuel EN COURS : les postes qui courent ce mois-ci.
+    fixesParMois: sum(fixes.filter(f => fixeActifEn(f, ymCourant)), x => x.montant),
+    fixesTotal, depTotal, packTotal, total: fixesTotal + depTotal + packTotal,
+    depLignes, packLignes,
+    fixesLignes: fixesLignes.filter(x => x.mois > 0),
+    fixesSansDebut: fixesLignes.filter(x => x.mois == null).length,
   };
 };
+// ── LA FENÊTRE FROIDE (revue du 9 octobre, §5.49) ────────────────────────────
+// Ouvert avant l'arrivée du nuage, l'onglet partait d'une copie vide (ou
+// périmée). Le rattrapage « seulement si vide » gardait alors la saisie froide
+// SEULE : l'écran ne montrait que la nouvelle dépense, et la saisie suivante
+// renvoyait au nuage une liste qui EFFAÇAIT les charges saisies ailleurs.
+// ⇒ Tant que le nuage n'est pas arrivé, chaque geste est NOTÉ (ajout, retrait,
+// modification, par identifiant) ; à son arrivée on repart de la copie du
+// nuage et on y REJOUE ces gestes. Rien de saisi n'est perdu, rien de supprimé
+// ailleurs ne ressuscite depuis une vieille copie de l'appareil.
+const rejouerCompta = (base, journal) => {
+  const d = (base && typeof base === 'object') ? base : {};
+  const out = { ...COMPTA_DEFAUT, ...d };
+  for (const k of ['depenses', 'fixes', 'packs']) out[k] = Array.isArray(out[k]) ? out[k].slice() : [];
+  for (const g of (Array.isArray(journal) ? journal : [])) {
+    if (!g || !out[g.cle]) continue;
+    if (g.op === 'ajout' && g.item) { if (!out[g.cle].some(x => x && x.id === g.item.id)) out[g.cle].unshift(g.item); }
+    else if (g.op === 'retrait') out[g.cle] = out[g.cle].filter(x => !x || x.id !== g.id);
+    else if (g.op === 'modif') out[g.cle] = out[g.cle].map(x => (x && x.id === g.id) ? { ...x, ...(g.champs || {}) } : x);
+  }
+  return out;
+};
+// ── LE RÉSULTAT APRÈS CHARGES, UNE SEULE RÈGLE (revue du 9 octobre, §11) ────
+// L'onglet Comptabilité écrivait « CA déclaré − charges » (+260 €) et le bilan
+// annuel, la même année, « bénéfice des SEULES ventes au coût connu − charges
+// de TOUTE l'année » (−180 €, en rouge) : deux définitions, deux nombres, et la
+// seconde soustrayait deux ensembles différents — sur le document qui part
+// chez le comptable. Le résultat est le BÉNÉFICE NET (ventes − coût d'achat −
+// boosts) moins les charges, et il ne se CHIFFRE que si tout ce qu'il
+// additionne est connu (§5 : un total partiel présenté comme complet est pire
+// qu'un total absent) :
+//   · les ventes de l'année sont LUES (ni « en cours », ni dates de versement
+//     illisibles), aucune source ne manque, et aucune vente finalisée pas
+//     encore datée ne peut tomber dans l'année ;
+//   · chaque vente a son coût d'achat.
+// Sinon `valeur: null`, et `causes` dit pourquoi : l'écran, le CSV et le PDF
+// écrivent « … » / « — » et la raison. Le bilan annuel calcule, l'écran Ventes
+// publie (`vrm_resultat_annee`), l'onglet Comptabilité consomme — et tous deux
+// passent par ICI.
+const resultatApresCharges = ({ etat, manque, nb, nbCout, benefNet, aDater, charges } = {}) => {
+  if (etat !== 'lu' && etat !== 'passu') return { valeur: null, etat: 'encours', causes: [] };
+  const causes = [];
+  if (etat === 'passu') causes.push({ code: 'passu' });
+  const noms = (Array.isArray(manque) ? manque : []).filter(Boolean);
+  if (noms.length) causes.push({ code: 'manque', noms });
+  const nAd = aDater && Number(aDater.n) > 0 ? Number(aDater.n) : 0;
+  if (nAd) causes.push({ code: 'adater', n: nAd, eur: Number(aDater.eur) || 0 });
+  const n = Number(nb) || 0, nc = Number(nbCout) || 0;
+  if (etat === 'lu' && nc < n) causes.push({ code: 'couts', nbCout: nc, nb: n });
+  if (causes.length) return { valeur: null, etat: 'pasSu', causes };
+  return { valeur: Math.round(((Number(benefNet) || 0) - (Number(charges) || 0)) * 100) / 100, etat: 'chiffre', causes: [] };
+};
+// La raison, écrite depuis le MÊME objet que le chiffre (§5). `court` : sous
+// une case du bilan (le montant des ventes pas encore datées est déjà écrit à
+// côté du CA, juste avant — on ne le répète pas, §7).
+const raisonResultat = (R, court = false) => {
+  if (!R) return '';
+  if (R.etat === 'encours') return 'lecture des ventes en cours';
+  const pl = (n, m) => `${n} ${m}${n > 1 ? 's' : ''}`;
+  return (R.causes || []).map(c =>
+    c.code === 'passu' ? 'dates de versement Vinted illisibles'
+    : c.code === 'manque' ? `pas pu lire : ${c.noms.join(', ')}`
+    : c.code === 'adater' ? (court ? `${pl(c.n, 'vente')} pas encore datée${c.n > 1 ? 's' : ''}` : `${pl(c.n, 'vente')} finalisée${c.n > 1 ? 's' : ''} pas encore datée${c.n > 1 ? 's' : ''} (${fmt(c.eur)}) — dans aucun mois pour l'instant`)
+    : c.code === 'couts' ? `coût d'achat connu sur ${c.nbCout} vente${c.nbCout > 1 ? 's' : ''} sur ${c.nb}`
+    : '').filter(Boolean).join(' · ');
+};
+// Une seule couleur pour un résultat, sur les deux écrans (§7 : jamais le rouge,
+// réservé à deux paires sous un même numéro ; l'ambre s'il est négatif).
+const couleurResultat = (R) => (!R || R.valeur == null) ? C.muted : R.valeur < 0 ? C.warn : C.text;
+// Le CA d'un bilan annuel n'est pas « 0 » quand rien de son année n'est lu ou
+// daté (ventes Vinted illisibles, une source muette, ou des ventes toutes
+// « pas encore datées ») : c'est « — », pour l'écran ET les exports (§7).
+const caAnnuelInconnu = (R) => !!R && !R.enCours && !R.nb && (R.vinted === 'passu' || (R.manque || []).length > 0 || !!(R.aDaterAnnee && R.aDaterAnnee.n));
 
 function ComptaPro({ liveStats, onNav }) {
   const [data, setData] = React.useState(() => {
     try { const d = load('vrm_compta', null); return d && typeof d === 'object' ? { ...COMPTA_DEFAUT, ...d } : { ...COMPTA_DEFAUT }; }
     catch (_) { return { ...COMPTA_DEFAUT }; }
   });
-  // Rattrapage nuage : on ne remplace QUE si rien n'a encore été saisi (§5.49).
+  // ⚠️ (revue du 9 octobre) Fenêtre froide : tant que le nuage n'est pas
+  // arrivé, chaque geste est noté, puis REJOUÉ sur la copie du nuage à son
+  // arrivée (`rejouerCompta`). Avant : « remplacer seulement si vide » gardait
+  // la saisie froide seule, et la saisie suivante effaçait les charges du nuage.
+  const froid = React.useRef(!isCloudReady());
+  const journal = React.useRef([]);
   React.useEffect(() => onCloudReady(() => {
-    try { const d = load('vrm_compta', null); if (d && typeof d === 'object') setData(cur => comptaVide(cur) ? { ...COMPTA_DEFAUT, ...d } : cur); } catch (_) {}
+    if (!froid.current) return;
+    froid.current = false;
+    const gestes = journal.current; journal.current = [];
+    let nuage = null;
+    try { nuage = load('vrm_compta', null); } catch (_) {}
+    const fus = rejouerCompta(nuage && typeof nuage === 'object' ? nuage : COMPTA_DEFAUT, gestes);
+    setData(fus);
+    // Les gestes faits avant l'arrivée du nuage repartent avec lui (sinon ils
+    // ne vivraient que sur cet écran, et disparaîtraient au rechargement).
+    if (gestes.length) { try { save('vrm_compta', fus); } catch (_) {} }
   }), []);
-  const maj = (next) => { setData(next); try { save('vrm_compta', next); } catch (_) {} };
+  // Un geste : l'état suivant, et (fenêtre froide) sa trace dans le journal.
+  const maj = (next, geste) => {
+    if (froid.current && geste) journal.current.push(geste);
+    setData(next); try { save('vrm_compta', next); } catch (_) {}
+  };
   const depenses = data.depenses || [], fixes = data.fixes || [], packs = data.packs || [];
 
   // ── Totaux, tous OWNED (aucun CA recalculé ici) ───────────────────────────
-  const annee = new Date().getFullYear();
-  const moisEcoules = new Date().getMonth() + 1;          // janvier = 1
-  const moisCle = `${annee}-${String(moisEcoules).padStart(2, '0')}`;
+  // Le calendrier de PARIS (revue du 9 octobre) : jamais l'UTC de `toISOString`.
+  const ajd = aujourdhuiParis();
+  const annee = ajd.y;
+  const moisCle = ajd.ym;
   const cetteAnnee = (d) => String(d || '').slice(0, 4) === String(annee);
   const ceMois = (d) => String(d || '').slice(0, 7) === moisCle;
   const somme = (arr, f) => arr.reduce((s, x) => s + (Number(f(x)) || 0), 0);
-  const fixesParMois = somme(fixes, x => x.montant);
-  // Total annuel : UNE seule règle, partagée avec le rapport annuel (§11).
-  const chargesAnnee = comptaChargesAnnee(data, annee).total;
+  // Total annuel ET tarif mensuel en cours : UNE seule règle, partagée avec le
+  // rapport annuel (§11).
+  const charges = comptaChargesAnnee(data, annee);
+  const chargesAnnee = charges.total;
+  const fixesParMois = charges.fixesParMois;
   const depMois = somme(depenses.filter(d => ceMois(d.date)), x => x.montant);
   const chargesMois = fixesParMois + depMois + somme(packs.filter(p => ceMois(p.date)), x => x.montant);
 
-  // ── RÉSULTAT = recettes déclarées − charges ───────────────────────────────
-  // Les charges (packs, dépenses, coûts fixes) sont « prises en compte » ICI,
-  // au niveau qui est réellement calculable. On CONSOMME la ligne publiée par
-  // l'écran Ventes (`vinted_urssaf_mois`, le CA déclaré, toutes plateformes,
-  // §11) — on ne recalcule aucun CA. Ligne absente/pas encore publiée ⇒ `null`
-  // (on n'invente pas de recettes). ⚠️ Ce n'est PAS le bénéfice : le coût
-  // d'achat des paires n'est pas déduit ici (il n'est pas saisi, §2.5, et il
-  // vit dans Statistiques) — le libellé et la note le disent.
-  const recettesAnnee = (() => {
+  // ── LE RÉSULTAT : celui du bilan annuel, par la MÊME règle (§11) ──────────
+  // L'écran Ventes publie le registre de l'année (`vrm_resultat_annee` : CA des
+  // ventes finalisées, couverture du coût d'achat, bénéfice des ventes au coût
+  // connu, ventes pas encore datées, sources pas lues) ; cet écran y applique
+  // SES charges par `resultatApresCharges`. Aucun CA recalculé ici. Absente,
+  // ou d'une autre année ⇒ `null` (on n'invente pas de recettes).
+  const pubAnnee = (() => {
     try {
-      const v = load('vinted_urssaf_mois', null);
-      if (!v || !Array.isArray(v.mois)) return null;
-      return v.mois.filter(m => String(m.ym || '').slice(0, 4) === String(annee))
-        .reduce((s, m) => s + (Number(m.ca) || 0), 0);
+      const v = load('vrm_resultat_annee', null);
+      return (v && typeof v === 'object' && Number(v.annee) === annee && isFinite(Number(v.ca))) ? v : null;
     } catch (_) { return null; }
   })();
-  const resultatAnnee = recettesAnnee == null ? null : recettesAnnee - chargesAnnee;
+  const resultat = pubAnnee ? resultatApresCharges({ etat: 'lu', manque: pubAnnee.manque, nb: pubAnnee.nb, nbCout: pubAnnee.nbCout, benefNet: pubAnnee.benefNet, aDater: pubAnnee.aDater, charges: chargesAnnee }) : null;
+  const coutsManquent = !!(resultat && resultat.causes.some(c => c.code === 'couts'));
 
   // ── Formulaires d'ajout (états locaux) ────────────────────────────────────
-  const auj = new Date().toISOString().slice(0, 10);
+  const auj = ajd.date;
   const [dDate, setDDate] = React.useState(auj);
   const [dLib, setDLib] = React.useState('');
   const [dCat, setDCat] = React.useState(COMPTA_CATS[0]);
   const [dMnt, setDMnt] = React.useState('');
   const [fLib, setFLib] = React.useState('');
   const [fMnt, setFMnt] = React.useState('');
+  const [fDebut, setFDebut] = React.useState(moisCle);
   const [pPlat, setPPlat] = React.useState('Leboncoin');
   const [pCpt, setPCpt] = React.useState('');
   const [pMnt, setPMnt] = React.useState('');
@@ -18848,27 +18971,38 @@ function ComptaPro({ liveStats, onNav }) {
 
   const ajouterDepense = () => {
     const m = parseMontant(dMnt); if (!m || !dLib.trim()) return;
-    maj({ ...data, depenses: [{ id: rCompId(), date: dDate || auj, libelle: dLib.trim(), cat: dCat, montant: m }, ...depenses] });
+    const item = { id: rCompId(), date: dDate || auj, libelle: dLib.trim(), cat: dCat, montant: m };
+    maj({ ...data, depenses: [item, ...depenses] }, { op: 'ajout', cle: 'depenses', item });
     setDLib(''); setDMnt(''); setDCat(COMPTA_CATS[0]); setDDate(auj);
   };
   const ajouterFixe = () => {
     const m = parseMontant(fMnt); if (!m || !fLib.trim()) return;
-    maj({ ...data, fixes: [{ id: rCompId(), libelle: fLib.trim(), montant: m }, ...fixes] });
-    setFLib(''); setFMnt('');
+    const debut = YM_COMPTA.test(fDebut) ? fDebut : moisCle;
+    const item = { id: rCompId(), libelle: fLib.trim(), montant: m, debut };
+    maj({ ...data, fixes: [item, ...fixes] }, { op: 'ajout', cle: 'fixes', item });
+    setFLib(''); setFMnt(''); setFDebut(moisCle);
   };
   const ajouterPack = () => {
     const m = parseMontant(pMnt); if (!m) return;
-    maj({ ...data, packs: [{ id: rCompId(), plateforme: pPlat, compte: pCpt.trim(), montant: m, date: pDate || auj }, ...packs] });
+    const item = { id: rCompId(), plateforme: pPlat, compte: pCpt.trim(), montant: m, date: pDate || auj };
+    maj({ ...data, packs: [item, ...packs] }, { op: 'ajout', cle: 'packs', item });
     setPCpt(''); setPMnt(''); setPDate(auj);
   };
-  const retirer = (cle, id) => maj({ ...data, [cle]: (data[cle] || []).filter(x => x.id !== id) });
+  const retirer = (cle, id) => maj({ ...data, [cle]: (data[cle] || []).filter(x => x.id !== id) }, { op: 'retrait', cle, id });
+  // Un coût fixe se MODIFIE (arrêt, date de début posée après coup) : jamais
+  // le supprimer pour dire « résilié » — les années où il a couru le perdraient.
+  const modifierFixe = (id, champs) => maj({ ...data, fixes: fixes.map(f => f.id === id ? { ...f, ...champs } : f) }, { op: 'modif', cle: 'fixes', id, champs });
+  const moisTexte = (ym) => { const [y, m] = String(ym || '').split('-').map(Number); return (y && m) ? `${MOIS_COURTS[m - 1]} ${y}` : ''; };
   // Export CSV des charges pour le comptable (date · type · libellé · montant).
   const exporterCharges = () => {
     const e = (v) => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
     const L = [[`Charges ${annee}`], [], ['Date', 'Type', 'Libelle', 'Montant']];
     depenses.filter(d => cetteAnnee(d.date)).forEach(d => L.push([d.date ? d.date.split('-').reverse().join('/') : '', 'Depense' + (d.cat ? ' (' + d.cat + ')' : ''), d.libelle || '', (Number(d.montant) || 0).toFixed(2)]));
     packs.filter(p => cetteAnnee(p.date)).forEach(p => L.push([p.date ? p.date.split('-').reverse().join('/') : '', 'Pack photos', `${p.plateforme || ''}${p.compte ? ' ' + p.compte : ''}`, (Number(p.montant) || 0).toFixed(2)]));
-    fixes.forEach(f => L.push(['', `Cout fixe x${moisEcoules} mois`, f.libelle || '', ((Number(f.montant) || 0) * moisEcoules).toFixed(2)]));
+    // Chaque coût fixe avec les mois où il a couru cette année (même règle que
+    // le bilan annuel) — plus « × mois écoulés » pour tous, depuis janvier.
+    charges.fixesLignes.forEach(f => L.push(['', `Cout fixe x${f.mois} mois (depuis ${f.debut}${f.fin ? ' jusqu\'a ' + f.fin : ''})`, f.libelle || '', f.total.toFixed(2)]));
+    if (charges.fixesSansDebut) L.push(['', `${charges.fixesSansDebut} cout(s) fixe(s) sans date de debut : non compte(s)`, '', '']);
     L.push(['', '', 'TOTAL', chargesAnnee.toFixed(2)]);
     const csv = L.map(r => r.map(e).join(';')).join('\n');
     try {
@@ -18919,34 +19053,43 @@ function ComptaPro({ liveStats, onNav }) {
       <ScreenHead icon="euro" title="Comptabilité" desc="Note tes charges au fil de l'eau — chaque euro compte dans ton résultat. Le chiffre d'affaires et le bénéfice vivent dans Statistiques." />
 
       {/* ── HÉRO : LE RÉSULTAT ─────────────────────────────────────────────────
-          Recettes déclarées (ligne publiée par Ventes, §11) − charges. Le seul
-          endroit où l'accent est permis (§7 : rare) : le filet du haut. */}
+          Le registre de l'année (publié par Ventes, §11) passé par la MÊME règle
+          que le bilan annuel (`resultatApresCharges`). Pas chiffrable ⇒ « — » et
+          la raison, une fois. Le seul endroit où l'accent est permis (§7 : rare) :
+          le filet du haut. */}
       <Card style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{ height: 3, background: C.accent }} />
-        <div style={{ padding: '16px 18px' }}>
+        <div data-resultat-compta={!pubAnnee ? 'absent' : resultat.etat} data-resultat-valeur={resultat && resultat.valeur != null ? resultat.valeur.toFixed(2) : ''}
+          data-resultat-causes={resultat ? resultat.causes.map(c => c.code).join(',') : ''} style={{ padding: '16px 18px' }}>
           <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, marginBottom: 10 }}>Résultat {annee} · après tes charges</div>
-          {recettesAnnee == null ? (
+          {!pubAnnee ? (
             <div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, flexWrap: 'wrap' }}>
                 <div className="vrm-display" style={{ fontSize: 34, fontWeight: 800, color: C.muted, letterSpacing: -1 }}>—</div>
                 <div style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>Tes charges {annee} : <span className="vrm-display">{fmt(chargesAnnee)}</span></div>
               </div>
               <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.6, marginTop: 8 }}>
-                Ton résultat s'affiche dès que ton CA déclaré arrive sur cet appareil — ouvre <button type="button" onClick={() => onNav && onNav('cat_ventes')} style={{ border: 'none', background: 'transparent', color: C.accent, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0, fontSize: 12.5 }}>Ventes</button> une fois, et tes charges y seront déduites.
+                Ton résultat s'affiche dès que tes ventes de l'année arrivent sur cet appareil — ouvre <button type="button" onClick={() => onNav && onNav('cat_ventes')} style={{ border: 'none', background: 'transparent', color: C.accent, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0, fontSize: 12.5 }}>Ventes</button> une fois, et tes charges y seront déduites.
               </div>
             </div>
           ) : (
             <div>
-              <div className="vrm-display" style={{ fontSize: 40, fontWeight: 800, color: resultatAnnee < 0 ? C.warn : C.text, letterSpacing: -1.5, lineHeight: 1 }}>{fmt(resultatAnnee)}</div>
+              <div className="vrm-display" style={{ fontSize: 40, fontWeight: 800, color: couleurResultat(resultat), letterSpacing: -1.5, lineHeight: 1 }}>{resultat.valeur != null ? fmt(resultat.valeur) : '—'}</div>
+              {resultat.valeur == null && (
+                <div data-resultat-raison style={{ fontSize: 12.5, color: C.text, lineHeight: 1.55, marginTop: 10 }}>
+                  Pas encore chiffrable : {raisonResultat(resultat)}.
+                  {coutsManquent && <> <button type="button" onClick={() => { DEMANDE_SAISIE_PRIX.on = true; if (onNav) onNav('cat_annonces'); }} style={{ border: 'none', background: 'transparent', color: C.accent, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0, fontSize: 12.5 }}>Saisir mes prix d'achat →</button></>}
+                </div>
+              )}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 12, fontSize: 12.5, color: C.muted }}>
-                <span className="vrm-display" style={{ color: C.text, fontWeight: 600 }}>{fmt(recettesAnnee)}</span>
-                <span>CA déclaré</span>
+                <span className="vrm-display" style={{ color: C.text, fontWeight: 600 }}>{fmt(pubAnnee.ca)}</span>
+                <span>de ventes finalisées ({pubAnnee.nb})</span>
                 <span style={{ color: C.border }}>—</span>
                 <span className="vrm-display" style={{ color: C.text, fontWeight: 600 }}>{fmt(chargesAnnee)}</span>
                 <span>de charges</span>
               </div>
               <div style={{ fontSize: 11.5, color: C.muted, marginTop: 10, lineHeight: 1.5, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
-                Le <b>coût d'achat de tes paires</b> n'est pas déduit ici (il se saisit par paire, dans <button type="button" onClick={() => onNav && onNav('dashboard')} style={{ border: 'none', background: 'transparent', color: C.accent, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0, fontSize: 11.5 }}>Statistiques</button>) — ce n'est donc pas encore ton bénéfice net.
+                Résultat = tes ventes − le coût d'achat de tes paires − tes boosts − tes charges, comme dans le bilan annuel (Ventes → Outils). Ventes datées au versement de l'argent{pubAnnee.at ? ` · calculé à ta dernière ouverture de Ventes, ${ilYaCourt(pubAnnee.at)}` : ''}.
               </div>
             </div>
           )}
@@ -18956,7 +19099,7 @@ function ComptaPro({ liveStats, onNav }) {
       {/* Trois repères de charges — même carte, hiérarchie claire. */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
         {[
-          { l: 'Coûts fixes / mois', v: fmt(fixesParMois), s: fixes.length ? `${fixes.length} poste${fixes.length > 1 ? 's' : ''}` : 'rien de saisi' },
+          { l: 'Coûts fixes / mois', v: fmt(fixesParMois), s: (() => { const n = fixes.filter(f => fixeActifEn(f, moisCle)).length; return n ? `${n} poste${n > 1 ? 's' : ''} en cours` : fixes.length ? 'aucun en cours ce mois-ci' : 'rien de saisi'; })() },
           { l: 'Charges ce mois', v: fmt(chargesMois), s: 'fixes + dépenses + packs' },
           { l: `Total charges ${annee}`, v: fmt(chargesAnnee), s: `depuis janvier` },
         ].map((x, i) => (
@@ -18987,16 +19130,38 @@ function ComptaPro({ liveStats, onNav }) {
           : listeBox(depenses.map((d, i) => <div key={d.id} style={{ borderTop: i ? `1px solid ${C.border}` : 'none' }}><Ligne gauche={<><span style={{ fontSize: 13, color: C.text }}>{d.libelle}</span> <span style={{ fontSize: 11, color: C.muted }}>· {d.cat} · {String(d.date || '').split('-').reverse().join('/')}</span></>} droite={fmt(d.montant)} onDel={() => retirer('depenses', d.id)} /></div>))}
       </Section>
 
-      {/* COÛTS FIXES MENSUELS */}
+      {/* COÛTS FIXES MENSUELS — chacun court de son mois de début à son mois
+          d'arrêt (revue du 9 octobre) : un abonnement saisi aujourd'hui ne compte
+          plus dans les années où il n'existait pas, et l'arrêter ne le retire pas
+          des mois où il a couru. */}
       <Section icon="clock" titre="Coûts fixes" note="Chaque mois : abonnement, logiciel, local…" total={fixesParMois ? fixesParMois : null}>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           <input type="text" placeholder="Ex. abonnement boost" value={fLib} onChange={e => setFLib(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterFixe(); }} style={{ ...inp, flex: '2 1 180px' }} />
           <input type="text" inputMode="decimal" placeholder="€ / mois" value={fMnt} onChange={e => setFMnt(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ajouterFixe(); }} style={{ ...inp, width: 120 }} />
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: C.muted }}>depuis
+            <input type="month" aria-label="Mois de début" data-fixe-debut value={fDebut} max={moisCle} onChange={e => setFDebut(e.target.value)} style={{ ...inp, width: 150 }} />
+          </label>
           <button type="button" onClick={ajouterFixe} style={btnAdd}>Ajouter</button>
         </div>
         {fixes.length === 0
-          ? vide('Un abonnement, un logiciel ? Ajoute-le une fois — il sera compté chaque mois.')
-          : listeBox(fixes.map((f, i) => <div key={f.id} style={{ borderTop: i ? `1px solid ${C.border}` : 'none' }}><Ligne gauche={<span style={{ fontSize: 13, color: C.text }}>{f.libelle}</span>} droite={fmt(f.montant) + ' /mois'} onDel={() => retirer('fixes', f.id)} /></div>))}
+          ? vide('Un abonnement, un logiciel ? Ajoute-le une fois, avec le mois où il a commencé — il sera compté chaque mois.')
+          : listeBox(fixes.map((f, i) => {
+              const aDebut = YM_COMPTA.test(String(f.debut || '')), fini = YM_COMPTA.test(String(f.fin || ''));
+              const enCours = aDebut && !fini && f.debut <= moisCle;
+              const supprimer = () => {
+                // Supprimer, c'est « saisi par erreur » : il disparaît de TOUTES
+                // les années. Résilié, il s'ARRÊTE (ses mois passés restent).
+                if (aDebut && f.debut < moisCle && !window.confirm(`Supprimer « ${f.libelle} » de toutes les années ? S'il est résilié, utilise plutôt « Arrêter » : les mois où il a couru restent comptés.`)) return;
+                retirer('fixes', f.id);
+              };
+              return <div key={f.id} data-fixe={f.id} style={{ borderTop: i ? `1px solid ${C.border}` : 'none' }}><Ligne gauche={<>
+                <span style={{ fontSize: 13, color: fini ? C.muted : C.text }}>{f.libelle}</span>
+                {aDebut
+                  ? <span style={{ fontSize: 11, color: C.muted }}> · depuis {moisTexte(f.debut)}{fini ? ` · arrêté fin ${moisTexte(f.fin)}` : ''}</span>
+                  : <span style={{ fontSize: 11, color: C.muted }}> · depuis quand ? <input type="month" aria-label={`Mois de début de ${f.libelle}`} data-fixe-sans-debut max={moisCle} onChange={e => { if (YM_COMPTA.test(e.target.value)) modifierFixe(f.id, { debut: e.target.value }); }} style={{ ...inp, width: 140, padding: '3px 6px', fontSize: 11.5 }} /> — pas compté tant que ce mois n'est pas posé</span>}
+                {enCours && <> <button type="button" data-fixe-arreter onClick={() => modifierFixe(f.id, { fin: moisCle })} title={`Il reste compté jusqu'en ${moisTexte(moisCle)} inclus`} style={{ border: 'none', background: 'transparent', color: C.accent, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', padding: '0 2px', fontSize: 11.5 }}>Arrêter</button></>}
+              </>} droite={fmt(f.montant) + ' /mois'} onDel={supprimer} /></div>;
+            }))}
       </Section>
 
       {/* PACKS DE PHOTOS (Leboncoin / eBay pro) — § Julien « packs de photos pris
@@ -24348,7 +24513,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const annual = useMemo(() => {
     const regime = load('vinted_regime','micro');
     const tvaRate = Number(load('vinted_tva',20))||20;
-    const months = Array.from({length:12},(_,i)=>({ m:i, label:new Date(reportYear,i,1).toLocaleDateString('fr-FR',{month:'short'}).replace('.',''), ca:0, cout:0, frais:0, nb:0, nbCout:0 }));
+    // `benef` = bénéfice des SEULES ventes au coût connu du mois (vente − achat −
+    // boost) : le tableau ne l'écrit que si TOUTES les ventes du mois ont leur
+    // coût (`ca − cout − frais` soustrayait les coûts connus du CA de TOUTES les
+    // ventes : un bénéfice gonflé, revue du 9 octobre).
+    const months = Array.from({length:12},(_,i)=>({ m:i, label:new Date(reportYear,i,1).toLocaleDateString('fr-FR',{month:'short'}).replace('.',''), ca:0, cout:0, frais:0, nb:0, nbCout:0, benef:0 }));
     let ca=0, cout=0, frais=0, nb=0, nbCout=0, margeKnown=0, fraisConnu=0;
     let nMasq=0, caMasq=0;
     const saleLines=[]; // registre des ventes, ligne par ligne (pour l'expert-comptable)
@@ -24382,7 +24551,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       }
       if (l.masquee) { nMasq+=1; caMasq+=sell; }
       ca+=sell; nb+=1; frais+=fee; mo.ca+=sell; mo.nb+=1; mo.frais+=fee;
-      if (buy!=null) { cout+=buy; nbCout+=1; margeKnown+=(sell-buy); fraisConnu+=fee; mo.cout+=buy; mo.nbCout+=1; }
+      if (buy!=null) { cout+=buy; nbCout+=1; margeKnown+=(sell-buy); fraisConnu+=fee; mo.cout+=buy; mo.nbCout+=1; mo.benef+=(sell-buy-fee); }
       const pp = parPlateforme[l.plateforme] || (parPlateforme[l.plateforme] = { n: 0, ca: 0 });
       pp.n += 1; pp.ca += sell;
       saleLines.push({ date: l.ts ? new Date(l.ts).toISOString() : null, dateVente: l.dateVente, num, title: l.titre || '', account, plateforme: l.plateforme,
@@ -24404,7 +24573,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // résultat APRÈS charges, pas dans la base URSSAF (micro = sur le CA).
     const charges = comptaChargesAnnee(load('vrm_compta', null), reportYear);
     const benefNet = margeKnown - fraisConnu;   // ⚠️ ventes au coût connu uniquement (cf. rapport mensuel)
-    const resultatCharges = benefNet - charges.total;
+    // ⚠️⚠️ CE QUI PEUT ENCORE MANQUER À CE CA (revue du 9 octobre, §5).
+    //    · Les ventes finalisées PAS ENCORE DATÉES (aucune date de versement) :
+    //      dans aucun mois, donc dans aucune année — le bilan ne les disait
+    //      jamais (101 ventes, 3 994,80 € chez lui en 2026). On les DIT à côté
+    //      du total, jamais à la place : celles qui peuvent tomber dans cette
+    //      année (`aDaterPeutTomberEn`, la règle de la carte des seuils).
+    //    · Les sources qui n'ont pas répondu : un compte Vinted, Leboncoin, eBay.
+    //    Le résultat après charges passe par LA règle (`resultatApresCharges`),
+    //    la même que l'onglet Comptabilité (§11) : rien de chiffré sur un CA
+    //    partiel, « pas su », ou des coûts d'achat incomplets.
+    const adLignes = (declRapport.aDater || []).filter(l => aDaterPeutTomberEn(l.o ? tsCommande(l.o) : (Date.parse(l.dateVente || '') || 0), reportYear));
+    const aDaterAnnee = { n: adLignes.length, eur: Math.round(adLignes.reduce((t, l) => t + (Number(l.eur) || 0), 0) * 100) / 100,
+      par: adLignes.reduce((o, l) => { const q = o[l.plateforme] || (o[l.plateforme] = { n: 0, eur: 0 }); q.n += 1; q.eur += Number(l.eur) || 0; return o; }, {}) };
+    const manque = [nomsVentesKO.length ? `ventes de ${nomsVentesKO.join(', ')}` : null, lbcLu === null ? 'Leboncoin' : null, ebayCmd === null ? 'eBay' : null].filter(Boolean);
+    const resultat = resultatApresCharges({ etat: declRapport.vinted, manque, nb, nbCout, benefNet, aDater: aDaterAnnee, charges: charges.total });
+    const resultatCharges = resultat.valeur;
     // ⚠️ `marge` retranchait `frais` (les boosts de TOUTES les ventes) d'un
     // `margeKnown` qui ne porte que les ventes au coût connu — deux ensembles
     // différents dans la même soustraction. §5.84 l'avait corrigé sur le
@@ -24415,7 +24599,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const margeHT = marge - tvaMarge;
     const taux = tauxUrssaf();
     const urssaf = aPayerUrssaf(ca, taux);
-    return { regime, tvaRate, year:reportYear, months, ca, cout, frais, nb, nbCout, benefNet, marge, tvaMarge, margeHT, taux, urssaf, nMasq, caMasq, achatsTotal, achatsNb, buyLines, saleLines, parPlateforme, charges, resultatCharges,
+    return { regime, tvaRate, year:reportYear, months, ca, cout, frais, nb, nbCout, benefNet, marge, tvaMarge, margeHT, taux, urssaf, nMasq, caMasq, achatsTotal, achatsNb, buyLines, saleLines, parPlateforme, charges, resultat, resultatCharges, aDaterAnnee, manque,
       enCours: declRapport.vinted === 'encours', vinted: declRapport.vinted,
       // La partie Vinted du registre, par compte, en TROIS états : `undefined`
       // tant qu'elle se lit, `null` quand les dates de versement sont
@@ -24426,7 +24610,30 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       vintedParUid: declRapport.vinted === 'lu' ? vintedParUid : declRapport.vinted === 'passu' ? null : undefined,
       vintedADater: declRapport.vinted === 'lu' ? (declRapport.aDater || []).filter(l => l.plateforme === 'Vinted') : [] };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, buysBase, reportYear, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements, declarables, declRapport]);
+  }, [sales.items, sales.failedUids, accounts, buysBase, reportYear, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements, declarables, declRapport, showAnnual]);
+  // ── L'ONGLET COMPTABILITÉ CONSOMME CE REGISTRE (revue du 9 octobre, §11) ──
+  // Un écran publie, les autres consomment : le résumé de l'ANNÉE EN COURS (à
+  // Paris) part dans `vrm_resultat_annee`, et l'onglet Comptabilité y applique
+  // ses charges par la même règle (`resultatApresCharges`). Ventes pas encore
+  // lues, dates de versement illisibles ou un compte Vinted en panne : on ne
+  // publie RIEN — l'onglet garde la dernière publication complète, avec son âge
+  // (« rien lu » ne vaut pas « rien »). Leboncoin ou eBay pas lus : publié, et
+  // DIT (`manque`) — le résultat y vaut alors « — ».
+  useEffect(() => {
+    try {
+      if (annual.year !== aujourdhuiParis().y || declRapport.vinted !== 'lu' || nomsVentesKO.length) return;
+      const r2 = (x) => Math.round(x * 100) / 100;
+      const charge = { annee: annual.year, ca: r2(annual.ca), nb: annual.nb, nbCout: annual.nbCout, benefNet: r2(annual.benefNet),
+        aDater: { n: annual.aDaterAnnee.n, eur: annual.aDaterAnnee.eur }, manque: annual.manque };
+      const avant = load('vrm_resultat_annee', null);
+      const memeChose = avant && JSON.stringify({ annee: avant.annee, ca: avant.ca, nb: avant.nb, nbCout: avant.nbCout, benefNet: avant.benefNet, aDater: avant.aDater, manque: avant.manque }) === JSON.stringify(charge);
+      // `at` dit QUAND ce registre a été vu pour la dernière fois (l'onglet
+      // l'écrit : « calculé il y a 3 h ») — remis à l'heure au plus toutes les
+      // 10 minutes, même inchangé.
+      if (!memeChose || !(Date.now() - (Number(avant && avant.at) || 0) < 10 * 60e3)) save('vrm_resultat_annee', { ...charge, at: Date.now() });
+    } catch (_) {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [annual]);
   const [capturedReceipts, setCapturedReceipts] = useState([]); // reçus officiels Vinted captés (compta pro)
   const [recusPasLus, setRecusPasLus] = useState(0); // comptes dont la lecture du reçu a échoué (pas su ≠ aucun)
   const openAnnual = async () => {
@@ -24444,64 +24651,96 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (!lu || !lu.octets) { toast(lu === null ? "La base n'a pas répondu — réessaie dans un instant." : "Ce reçu n'a plus son PDF."); return; }
     try { const buf=lu.octets; const blob=new Blob([buf],{type:'application/pdf'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`recu-vinted-${(rec.name||'compte').replace(/[^a-z0-9]/gi,'_')}.pdf`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),3000); } catch(_){ toast('Impossible d\'ouvrir ce reçu.'); }
   };
+  // ⚠️⚠️ LES EXPORTS DISENT CE QUE DIT L'ÉCRAN (revue du 9 octobre, §5).
+  //    Ils chiffraient ce que l'écran refusait de chiffrer : « TOTAL 0.00 » et
+  //    un résultat égal à −charges pendant la lecture, des cotisations sur un
+  //    CA sans Vinted, un « Résultat après charges » fait du bénéfice de 2
+  //    ventes sur 6 — et la mention de ce qui manquait arrivait en DERNIÈRE
+  //    ligne. Le document part chez un comptable : les mêmes « — » que l'écran,
+  //    et ce qui manque EN TÊTE. Pendant la lecture, pas d'export du tout.
+  const manquesAnnuel = (R) => [
+    R.vinted === 'passu' ? 'dates de versement Vinted illisibles : ventes Vinted absentes de ce bilan' : null,
+    (R.manque || []).length ? `pas pu lire : ${R.manque.join(', ')} - absents de ce bilan` : null,
+    R.aDaterAnnee && R.aDaterAnnee.n ? `${R.aDaterAnnee.n} vente(s) finalisee(s) pas encore datee(s) (${R.aDaterAnnee.eur.toFixed(2)} EUR) : dans aucun mois de ce bilan pour l'instant` : null,
+  ].filter(Boolean);
   const exportAnnualCsv = () => {
-    const R=annual; const e=(v)=>`"${String(v==null?'':v).replace(/"/g,'""')}"`;
+    const R=annual; if (R.enCours) return;
+    const e=(v)=>`"${String(v==null?'':v).replace(/"/g,'""')}"`;
+    const passu = R.vinted === 'passu', complet = R.nb > 0 && R.nbCout === R.nb;
+    const caTxt = caAnnuelInconnu(R) ? '—' : R.ca.toFixed(2);
     const L=[];
     L.push([`Bilan annuel ${R.year}`]);
     L.push([`Régime`, R.regime==='marge'?'Société (marge)':'Micro-entrepreneur']);
+    manquesAnnuel(R).forEach(t => L.push([`ATTENTION : ${t}`]));
     L.push([]);
-    L.push(['Mois','CA des ventes finalisees','Cout achat','Boosts','Benefice net','Ventes']);
-    R.months.forEach(m=>L.push([m.label, m.ca.toFixed(2), m.cout.toFixed(2), m.frais.toFixed(2), (m.ca-m.cout-m.frais).toFixed(2), String(m.nb)]));
-    L.push(['TOTAL', R.ca.toFixed(2), R.cout.toFixed(2), R.frais.toFixed(2), R.benefNet.toFixed(2), String(R.nb)]);
+    // Le bénéfice d'un mois n'est écrit que si TOUTES ses ventes ont leur coût
+    // d'achat ; la couverture est dans sa propre colonne.
+    L.push(['Mois','CA des ventes finalisees','Cout achat','Boosts','Benefice net','Ventes','Ventes au cout connu']);
+    R.months.forEach(m=>L.push([m.label, m.ca.toFixed(2), m.cout.toFixed(2), m.frais.toFixed(2), (m.nb && m.nbCout===m.nb) ? m.benef.toFixed(2) : '', String(m.nb), `${m.nbCout}/${m.nb}`]));
+    L.push(['TOTAL', caTxt, R.cout.toFixed(2), R.frais.toFixed(2), complet ? R.benefNet.toFixed(2) : '', String(R.nb), `${R.nbCout}/${R.nb}`]);
     L.push([]);
     // Registre des ventes ligne par ligne (ce que l'expert-comptable attend).
     L.push(['VENTES (registre)']); L.push(['Date','Plateforme','N°','Article','Compte','Prix vente','Prix achat','Boost','Marge']);
     R.saleLines.forEach(s=>L.push([s.date?new Date(s.date).toLocaleDateString('fr-FR'):'', s.plateforme||'Vinted', s.num, s.title, s.account, s.sell.toFixed(2), s.buy==null?'':s.buy.toFixed(2), s.fee?s.fee.toFixed(2):'', s.marge==null?'':s.marge.toFixed(2)]));
-    L.push(['','','','','TOTAL', R.ca.toFixed(2), R.cout.toFixed(2), R.frais.toFixed(2), R.benefNet.toFixed(2)]);
+    L.push(['','','','','TOTAL', caTxt, R.cout.toFixed(2), R.frais.toFixed(2), complet ? R.benefNet.toFixed(2) : '']);
     L.push([]);
     L.push(['ACHATS (registre)']); L.push(['Date','Vendeur','Article','Montant']);
     R.buyLines.forEach(b=>L.push([b.date?new Date(b.date).toLocaleDateString('fr-FR'):'',b.seller,b.title,b.montant.toFixed(2)]));
     L.push(['','','TOTAL',R.achatsTotal.toFixed(2)]);
     L.push([]);
-    // CHARGES d'entreprise (déductibles) : dépenses, packs photos, coûts fixes.
+    // CHARGES d'entreprise (déductibles) : dépenses, packs photos, coûts fixes
+    // (chacun pour les mois où il a couru — même règle que l'onglet).
     L.push(['CHARGES (registre)']); L.push(['Date','Type','Libelle','Montant']);
     R.charges.depLignes.forEach(d=>L.push([d.date?new Date(d.date).toLocaleDateString('fr-FR'):'','Depense',`${d.libelle||''}${d.cat?' ('+d.cat+')':''}`,(Number(d.montant)||0).toFixed(2)]));
     R.charges.packLignes.forEach(p=>L.push([p.date?new Date(p.date).toLocaleDateString('fr-FR'):'','Pack photos',`${p.plateforme||''}${p.compte?' '+p.compte:''}`,(Number(p.montant)||0).toFixed(2)]));
-    R.charges.fixes.forEach(f=>L.push(['',`Cout fixe x${R.charges.moisComptes} mois`,f.libelle||'',((Number(f.montant)||0)*R.charges.moisComptes).toFixed(2)]));
+    R.charges.fixesLignes.forEach(f=>L.push(['',`Cout fixe x${f.mois} mois (depuis ${f.debut}${f.fin?' jusqu\'a '+f.fin:''})`,f.libelle||'',f.total.toFixed(2)]));
+    if (R.charges.fixesSansDebut) L.push(['',`${R.charges.fixesSansDebut} cout(s) fixe(s) sans date de debut : non compte(s)`,'','']);
     L.push(['','','TOTAL charges',R.charges.total.toFixed(2)]);
     L.push([]);
-    if (R.regime==='marge') { L.push(['Marge TTC',R.marge.toFixed(2)]); L.push([`TVA sur marge (${R.tvaRate}%)`,R.tvaMarge.toFixed(2)]); L.push(['Marge HT',R.margeHT.toFixed(2)]); }
-    else { L.push([`Estimation cotisations (${String(R.taux).replace('.',',')}%)`,R.urssaf.toFixed(2)]); }
-    L.push([`Resultat apres charges (benefice net - charges)`,R.resultatCharges.toFixed(2)]);
-    if (R.nbCout<R.nb) L.push([`  benefice net sur ${R.nbCout}/${R.nb} ventes au cout d'achat connu`]);
-    if (R.charges.total>0) L.push([`  couts fixes au tarif actuel x ${R.charges.moisComptes} mois`]);
+    if (R.regime==='marge') { L.push(['Marge TTC',passu?'—':R.marge.toFixed(2)]); L.push([`TVA sur marge (${R.tvaRate}%)`,passu?'—':R.tvaMarge.toFixed(2)]); L.push(['Marge HT',passu?'—':R.margeHT.toFixed(2)]); }
+    else {
+      if (!complet && R.nbCout > 0 && !passu) L.push([`Benefice net des ventes au cout d'achat connu (${R.nbCout}/${R.nb})`, R.benefNet.toFixed(2)]);
+      L.push([`Estimation cotisations (${String(R.taux).replace('.',',')}%)`, passu ? '— (attend tes ventes Vinted)' : R.urssaf.toFixed(2)]);
+    }
+    // LA règle du résultat (la même que l'onglet Comptabilité) : un nombre, ou
+    // « — » et sa raison.
+    L.push([`Resultat apres charges (benefice net - charges)`, R.resultat.valeur != null ? R.resultat.valeur.toFixed(2) : '—']);
+    if (R.resultat.valeur == null) L.push([`  pas encore chiffrable : ${raisonResultat(R.resultat)}`]);
     if (R.nMasq>0) L.push([`dont ${R.nMasq} vente(s) masquée(s) dans l'app, comptées dans le CA`,R.caMasq.toFixed(2)]);
-    // Ce qui manque part AVEC le document (§5) : il va chez un comptable.
-    if (R.vinted==='passu') L.push([`ATTENTION : dates de versement Vinted illisibles - ventes Vinted absentes de ce bilan`]);
     const csv = L.map(r=>r.map(e).join(';')).join('\n');
     const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'}); const url=URL.createObjectURL(blob);
     const a=document.createElement('a'); a.href=url; a.download=`bilan-${R.year}.csv`; document.body.appendChild(a); a.click(); a.remove();
     setTimeout(()=>URL.revokeObjectURL(url),3000);
   };
   const exportAnnualPdf = async () => {
-    const R=annual;
+    const R=annual; if (R.enCours) return;
+    const passu = R.vinted === 'passu', complet = R.nb > 0 && R.nbCout === R.nb;
     const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib');
     const pdf = await PDFDocument.create(); const page = pdf.addPage([595,842]);
     const bold = await pdf.embedFont(StandardFonts.HelveticaBold); const reg = await pdf.embedFont(StandardFonts.Helvetica);
     let y=800; const T=(t,x,yy,s,f,c)=>page.drawText(String(t),{x,y:yy,size:s,font:f||reg,color:c||rgb(0.1,0.1,0.1)});
-    T('Bilan annuel '+R.year,40,y,22,bold,rgb(0,0.47,0.51)); y-=20; T(R.regime==='marge'?'Société (régime de la marge)':'Micro-entrepreneur',40,y,11,reg,rgb(0.4,0.4,0.4)); y-=26;
+    T('Bilan annuel '+R.year,40,y,22,bold,rgb(0,0.47,0.51)); y-=20; T(R.regime==='marge'?'Société (régime de la marge)':'Micro-entrepreneur',40,y,11,reg,rgb(0.4,0.4,0.4)); y-=22;
+    // Ce qui manque, EN TÊTE (§5) : le comptable le lit avant les chiffres.
+    for (const t of manquesAnnuel(R)) { T('ATTENTION : '+t,40,y,8.5,bold,rgb(0.55,0.35,0)); y-=13; }
+    y-=6;
     // Tableau mensuel
     const cols=[[40,'Mois'],[150,'CA'],[240,'Coût'],[330,'Boosts'],[420,'Bénéf.'],[510,'Ventes']];
     cols.forEach(([x,h])=>T(h,x,y,9,bold,rgb(0.3,0.3,0.3))); y-=4; page.drawLine({start:{x:40,y},end:{x:555,y},thickness:0.5,color:rgb(0.8,0.8,0.8)}); y-=14;
-    R.months.forEach(m=>{ T(m.label,40,y,9,reg); T(m.ca.toFixed(0),150,y,9,reg); T(m.cout.toFixed(0),240,y,9,reg); T(m.frais.toFixed(0),330,y,9,reg); T((m.ca-m.cout-m.frais).toFixed(0),420,y,9,reg); T(String(m.nb),510,y,9,reg); y-=15; });
+    R.months.forEach(m=>{ T(m.label,40,y,9,reg); T(m.ca.toFixed(0),150,y,9,reg); T(m.cout.toFixed(0),240,y,9,reg); T(m.frais.toFixed(0),330,y,9,reg); T((m.nb&&m.nbCout===m.nb)?m.benef.toFixed(0):'—',420,y,9,reg); T(String(m.nb),510,y,9,reg); y-=15; });
     page.drawLine({start:{x:40,y:y+4},end:{x:555,y:y+4},thickness:0.5,color:rgb(0.8,0.8,0.8)});
-    T('TOTAL',40,y-8,10,bold); T(R.ca.toFixed(0),150,y-8,10,bold); T(R.cout.toFixed(0),240,y-8,10,bold); T(R.frais.toFixed(0),330,y-8,10,bold); T(R.benefNet.toFixed(0),420,y-8,10,bold); T(String(R.nb),510,y-8,10,bold); y-=34;
+    T('TOTAL',40,y-8,10,bold); T(caAnnuelInconnu(R)?'—':R.ca.toFixed(0),150,y-8,10,bold); T(R.cout.toFixed(0),240,y-8,10,bold); T(R.frais.toFixed(0),330,y-8,10,bold); T(complet?R.benefNet.toFixed(0):'—',420,y-8,10,bold); T(String(R.nb),510,y-8,10,bold); y-=34;
     const kv=(k,v)=>{ T(k,40,y,10,reg,rgb(0.4,0.4,0.4)); T(v,300,y,11,bold); y-=20; };
     kv('Achats (registre)', R.achatsTotal.toFixed(2)+' EUR ('+R.achatsNb+')');
-    if (R.vinted==='passu') kv('ATTENTION', 'dates de versement Vinted illisibles : ventes Vinted absentes');
-    if (R.regime==='marge') { kv('Marge TTC', R.marge.toFixed(2)+' EUR'); kv('TVA sur la marge ('+R.tvaRate+'%)', R.tvaMarge.toFixed(2)+' EUR'); kv('Marge HT', R.margeHT.toFixed(2)+' EUR'); }
-    else { kv('Bénéfice net', R.benefNet.toFixed(2)+' EUR'+(R.nbCout<R.nb?` (sur ${R.nbCout}/${R.nb} ventes au coût connu)`:'')); kv('Estimation cotisations ('+String(R.taux).replace('.',',')+'%)', R.urssaf.toFixed(2)+' EUR'); }
-    if (R.charges.total>0) { kv('Charges entreprise (packs, depenses, fixes)', R.charges.total.toFixed(2)+' EUR'); kv('Resultat apres charges', R.resultatCharges.toFixed(2)+' EUR'+(R.charges.moisComptes?` (fixes x${R.charges.moisComptes} mois)`:'')); }
+    if (R.regime==='marge') { kv('Marge TTC', passu?'—':R.marge.toFixed(2)+' EUR'); kv('TVA sur la marge ('+R.tvaRate+'%)', passu?'—':R.tvaMarge.toFixed(2)+' EUR'); kv('Marge HT', passu?'—':R.margeHT.toFixed(2)+' EUR'); }
+    else {
+      kv('Bénéfice net', passu ? '—' : complet ? R.benefNet.toFixed(2)+' EUR' : R.nbCout ? R.benefNet.toFixed(2)+` EUR (sur ${R.nbCout}/${R.nb} ventes au coût connu)` : `— (aucun prix d'achat saisi, 0/${R.nb})`);
+      kv('Estimation cotisations ('+String(R.taux).replace('.',',')+'%)', passu ? '— (attend tes ventes Vinted)' : R.urssaf.toFixed(2)+' EUR');
+    }
+    if (R.charges.total>0) {
+      kv('Charges entreprise (packs, depenses, fixes)', R.charges.total.toFixed(2)+' EUR');
+      kv('Resultat apres charges', R.resultat.valeur != null ? R.resultat.valeur.toFixed(2)+' EUR' : '—');
+      if (R.resultat.valeur == null) { T('pas encore chiffrable : '+raisonResultat(R.resultat),40,y+6,8,reg,rgb(0.45,0.45,0.45)); y-=12; }
+    }
     for (const [k,v] of Object.entries(R.parPlateforme||{})) if (k!=='Vinted' && v.n>0) kv('dont '+k, v.ca.toFixed(2)+' EUR ('+v.n+')');
     if (R.nMasq>0) kv('dont ventes masquees dans l\'app (comptees)', R.nMasq+' — '+R.caMasq.toFixed(2)+' EUR');
     y-=6; T('Document indicatif genere par l\'app. Ne remplace pas un conseil comptable.',40,y,8,reg,rgb(0.55,0.55,0.55));
@@ -28973,25 +29212,44 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 data-registre-vinted={annual.vintedParUid ? JSON.stringify(Object.fromEntries(Object.entries(annual.vintedParUid).map(([u,q])=>[u,{ n:q.n, eur:(q.cts/100).toFixed(2) }]))) : ''}
                 data-registre-vinted-n={annual.vintedParUid ? (annual.parPlateforme?.Vinted?.n ?? 0) : ''} data-registre-vinted-eur={annual.vintedParUid && annual.parPlateforme?.Vinted ? annual.parPlateforme.Vinted.ca.toFixed(2) : ''} data-registre-sans={nomsVentesKO.join(',')}
                 style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:14}}>
-                <StatBox label="CA des ventes finalisées" value={annual.enCours ? '…' : ((annual.vinted === 'passu' || nomsVentesKO.length) && !annual.nb) ? '—' : fmtE(annual.ca)}
-                  subColor={(annual.vinted === 'passu' || nomsVentesKO.length) ? C.warn : undefined}
-                  sub={(annual.enCours ? 'lecture des ventes en cours' : (annual.vinted === 'passu' ? 'sans Vinted' + (annual.nb ? ` · ${annual.nb} vente${annual.nb>1?'s':''}` : '') : `${annual.nb} vente${annual.nb>1?'s':''}`)+Object.entries(annual.parPlateforme||{}).filter(([k,v])=>k!=='Vinted'&&v.n>0).map(([k,v])=>` · dont ${k} ${fmtE(v.ca)}`).join(''))+(!annual.enCours && annual.vinted !== 'passu' && nomsVentesKO.length ? ` · ventes de ${nomsVentesKO.join(', ')} pas lues` : '')}/>
+                {/* ⚠️ (revue du 9 octobre) Ce qui peut encore manquer à ce CA est
+                    écrit À CÔTÉ de lui, jamais à sa place (§5) : les ventes
+                    finalisées pas encore datées qui peuvent tomber dans l'année,
+                    et Leboncoin/eBay quand ils n'ont pas répondu. Une année dont
+                    les ventes sont TOUTES pas encore datées n'est pas « 0 € » :
+                    c'est « — » et la raison (§7). */}
+                <StatBox label="CA des ventes finalisées" value={annual.enCours ? '…' : caAnnuelInconnu(annual) ? '—' : fmtE(annual.ca)}
+                  subColor={(annual.vinted === 'passu' || annual.manque.length || annual.aDaterAnnee.n) ? C.warn : undefined}
+                  sub={annual.enCours ? 'lecture des ventes en cours' : [
+                    (annual.vinted === 'passu' ? 'sans Vinted' + (annual.nb ? ` · ${annual.nb} vente${annual.nb>1?'s':''}` : '') : `${annual.nb} vente${annual.nb>1?'s':''}`) + Object.entries(annual.parPlateforme||{}).filter(([k,v])=>k!=='Vinted'&&v.n>0).map(([k,v])=>` · dont ${k} ${fmtE(v.ca)}`).join(''),
+                    annual.vinted !== 'passu' && nomsVentesKO.length ? `ventes de ${nomsVentesKO.join(', ')} pas lues` : null,
+                    lbcLu === null ? 'Leboncoin pas lu' : null, ebayCmd === null ? 'eBay pas lu' : null,
+                    annual.aDaterAnnee.n ? `+ ${annual.aDaterAnnee.n} vente${annual.aDaterAnnee.n>1?'s':''} finalisée${annual.aDaterAnnee.n>1?'s':''} pas encore datée${annual.aDaterAnnee.n>1?'s':''} (${fmtE(annual.aDaterAnnee.eur)}), dans aucun mois pour l'instant` : null,
+                  ].filter(Boolean).join(' · ')}/>
                 {annual.regime==='marge' ? (<>
-                  <StatBox label="Marge TTC" value={inc ?? fmtE(annual.marge)} color={inc ? C.muted : annual.marge>=0?INV_STATUS.online.color:C.danger}/>
+                  <StatBox label="Marge TTC" value={inc ?? fmtE(annual.marge)} color={inc ? C.muted : annual.marge<0?C.warn:C.text}/>
                   <StatBox label={`TVA marge ${annual.tvaRate}%`} value={inc ?? fmtE(annual.tvaMarge)} color={inc ? C.muted : C.warn}/>
                   <StatBox label="Marge HT" value={inc ?? fmtE(annual.margeHT)}/>
                 </>) : (<>
-                  <StatBox label="Bénéfice net" value={inc ?? fmtE(annual.benefNet)} color={inc ? C.muted : annual.benefNet>=0?INV_STATUS.online.color:C.danger}
+                  {/* Aucun prix d'achat saisi : le bénéfice n'est pas « 0,00 € »,
+                      il n'est pas connu (§7). Plus de rouge sur un bénéfice (§7 :
+                      le rouge est pour deux paires sous un même numéro). */}
+                  <StatBox label="Bénéfice net" value={inc ?? ((annual.nb && !annual.nbCout) ? '—' : fmtE(annual.benefNet))} color={inc ? C.muted : annual.benefNet<0?C.warn:C.text}
                     subColor={annual.nbCout<annual.nb?C.warn:undefined}
-                    sub={inc ? undefined : annual.nbCout<annual.nb?`sur ${annual.nbCout} vente${annual.nbCout>1?'s':''} sur ${annual.nb} — prix d'achat manquants`:(annual.frais>0?`boosts ${fmtE(annual.frais)}`:undefined)}/>
+                    sub={inc ? undefined : annual.nbCout<annual.nb?(annual.nbCout ? `sur ${annual.nbCout} vente${annual.nbCout>1?'s':''} sur ${annual.nb} — prix d'achat manquants` : `aucun prix d'achat saisi (0 vente sur ${annual.nb})`):(annual.frais>0?`boosts ${fmtE(annual.frais)}`:undefined)}/>
                   <StatBox label="Cotisations est." value={inc ?? fmtE(annual.urssaf)} color={inc ? C.muted : C.warn} sub={inc === '—' ? 'attend tes ventes Vinted' : `${String(annual.taux).replace('.',',')} % du CA · réglable`}/>
                 </>)}
                 {annual.charges && annual.charges.total>0 && (<>
-                  <StatBox label="Charges d'entreprise" value={fmtE(annual.charges.total)} sub={`packs + dépenses + fixes × ${annual.charges.moisComptes} mois`}/>
-                  {/* Le résultat dérive du bénéfice net : tant que celui-ci n'est
-                      pas su (lecture en cours, dates Vinted illisibles), lui non
-                      plus — jamais un nombre calculé sur un CA partiel. */}
-                  <StatBox label="Résultat après charges" value={inc ?? fmtE(annual.resultatCharges)} color={inc ? C.muted : annual.resultatCharges>=0?INV_STATUS.online.color:C.danger} sub={inc ? undefined : "bénéfice net − tes charges (hors coût d'achat manquant)"}/>
+                  <StatBox label="Charges d'entreprise" value={fmtE(annual.charges.total)} sub={'packs + dépenses + coûts fixes (les mois où ils ont couru)' + (annual.charges.fixesSansDebut ? ` · ${annual.charges.fixesSansDebut} coût${annual.charges.fixesSansDebut>1?'s':''} fixe${annual.charges.fixesSansDebut>1?'s':''} sans date de début, pas compté${annual.charges.fixesSansDebut>1?'s':''}` : '')}/>
+                  {/* LA règle du résultat (`resultatApresCharges`), la même que
+                      l'onglet Comptabilité (§11) : bénéfice net − charges, chiffré
+                      seulement si TOUT est connu — sinon « … » / « — » et la
+                      raison, jamais un nombre fait d'un sous-ensemble. */}
+                  <div data-resultat-annuel={annual.resultat.etat} data-resultat-valeur={annual.resultat.valeur != null ? annual.resultat.valeur.toFixed(2) : ''} data-resultat-causes={annual.resultat.causes.map(c=>c.code).join(',')} style={{display:'contents'}}>
+                    <StatBox label="Résultat après charges" value={annual.resultat.valeur != null ? fmtE(annual.resultat.valeur) : annual.resultat.etat === 'encours' ? '…' : '—'} color={couleurResultat(annual.resultat)}
+                      subColor={annual.resultat.valeur == null && annual.resultat.etat !== 'encours' ? C.warn : undefined}
+                      sub={annual.resultat.valeur != null ? 'bénéfice net − tes charges' : annual.resultat.etat === 'encours' ? undefined : raisonResultat(annual.resultat, true)}/>
+                  </div>
                 </>)}
               </div>); })()}
               {annual.vinted === 'passu' && !annual.enCours && <div data-annuel-sans-vinted style={{fontSize:12,color:C.warn,lineHeight:1.45,marginBottom:12}}>Les dates de versement de tes ventes Vinted n'ont pas pu être lues : elles ne sont dans aucun mois ci-dessous — ce n'est pas zéro. Rouvre le registre dans un moment.</div>}
@@ -29012,20 +29270,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <th style={{padding:'4px 6px',fontWeight:500}}>Ventes</th>
                   </tr></thead>
                   <tbody>
-                    {annual.months.map((m,i)=>{ const b=m.ca-m.cout-m.frais; return (
+                    {annual.months.map((m,i)=>{ const b=m.benef, connu=m.nb>0&&m.nbCout===m.nb; return (
                       <tr key={i} style={{borderTop:`1px solid ${C.border}`,color:C.text,textAlign:'right'}}>
                         <td style={{textAlign:'left',padding:'5px 6px',textTransform:'capitalize'}}>{m.label}</td>
                         <td style={{padding:'5px 6px'}}>{m.ca?m.ca.toFixed(0)+' €':'—'}</td>
                         <td style={{padding:'5px 6px',color:C.muted}}>{m.cout?m.cout.toFixed(0)+' €':'—'}</td>
-                        <td style={{padding:'5px 6px',fontWeight:500,color:m.nbCout?(b>=0?INV_STATUS.online.color:C.danger):C.muted}}>{m.nbCout?(b>=0?'+':'')+b.toFixed(0)+' €':'—'}</td>
+                        <td style={{padding:'5px 6px',fontWeight:500,color:connu?(b<0?C.warn:C.text):C.muted}} title={m.nb&&!connu?`coût d'achat connu sur ${m.nbCout} vente${m.nbCout>1?'s':''} sur ${m.nb}`:undefined}>{connu?(b>=0?'+':'')+b.toFixed(0)+' €':'—'}</td>
                         <td style={{padding:'5px 6px',color:C.muted}}>{m.nb||'—'}</td>
                       </tr>
                     );})}
                     <tr style={{borderTop:`2px solid ${C.border}`,color:C.text,textAlign:'right',fontWeight:700}}>
                       <td style={{textAlign:'left',padding:'6px'}}>TOTAL</td>
-                      <td style={{padding:'6px'}}>{annual.enCours ? '…' : (annual.vinted === 'passu' && !annual.nb) ? '—' : `${annual.ca.toFixed(0)} €`}</td>
+                      <td style={{padding:'6px'}}>{annual.enCours ? '…' : caAnnuelInconnu(annual) ? '—' : `${annual.ca.toFixed(0)} €`}</td>
                       <td style={{padding:'6px'}}>{annual.cout.toFixed(0)} €</td>
-                      <td style={{padding:'6px',color:annual.benefNet>=0?INV_STATUS.online.color:C.danger}}>{(annual.benefNet>=0?'+':'')+annual.benefNet.toFixed(0)} €</td>
+                      <td style={{padding:'6px',color:(annual.nb&&annual.nbCout===annual.nb)?(annual.benefNet<0?C.warn:C.text):C.muted}}>{(annual.nb&&annual.nbCout===annual.nb)?(annual.benefNet>=0?'+':'')+annual.benefNet.toFixed(0)+' €':'—'}</td>
                       <td style={{padding:'6px'}}>{annual.nb}</td>
                     </tr>
                   </tbody>
@@ -29070,11 +29328,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div style={{fontSize:11,color:C.muted,lineHeight:1.5}}>Aucun reçu capté pour l'instant. Ouvre/télécharge un reçu ou une facture officielle sur Vinted (avec l'extension active) → il apparaîtra ici, prêt pour ta compta.</div>
                 )}
               </div>
-              <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-                <button onClick={exportAnnualCsv} style={{flex:1,minWidth:120,padding:'9px 12px',borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:13,fontWeight:500,cursor:'pointer'}}>⬇️ CSV (registre détaillé)</button>
-                <button onClick={exportAnnualPdf} style={{flex:1,minWidth:120,padding:'9px 12px',borderRadius:8,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,fontSize:13,fontWeight:600,cursor:'pointer'}}>📄 PDF</button>
+              {/* ⚠️ (revue du 9 octobre) Pendant la lecture, l'écran écrit « … »
+                  mais le CSV sortait « TOTAL 0.00 » et un résultat négatif égal
+                  aux charges, sans un mot : un document pour le comptable qui dit
+                  zéro alors que rien n'a été lu. Les exports ATTENDENT la fin de
+                  la lecture — grisés, la raison dite une fois. */}
+              <div data-exports-annuel={annual.enCours ? 'attente' : 'pret'} style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                <button onClick={exportAnnualCsv} disabled={annual.enCours} style={{flex:1,minWidth:120,padding:'9px 12px',borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:13,fontWeight:500,cursor:annual.enCours?'not-allowed':'pointer',opacity:annual.enCours?0.5:1}}>⬇️ CSV (registre détaillé)</button>
+                <button onClick={exportAnnualPdf} disabled={annual.enCours} style={{flex:1,minWidth:120,padding:'9px 12px',borderRadius:8,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,fontSize:13,fontWeight:600,cursor:annual.enCours?'not-allowed':'pointer',opacity:annual.enCours?0.5:1}}>📄 PDF</button>
               </div>
-              <div style={{fontSize:11,color:C.muted,lineHeight:1.5,marginTop:12}}>Document indicatif. Ne remplace pas un conseil comptable. Les mois sans prix d'achat renseigné affichent un bénéfice incomplet.</div>
+              {annual.enCours && <div style={{fontSize:11.5,color:C.muted,marginTop:6}}>Les exports attendent la fin de la lecture des ventes.</div>}
+              <div style={{fontSize:11,color:C.muted,lineHeight:1.5,marginTop:12}}>Document indicatif. Ne remplace pas un conseil comptable. Un mois dont une vente n'a pas son prix d'achat affiche « — » : son bénéfice n'est pas connu.</div>
             </div>
           </div>
         </div>
