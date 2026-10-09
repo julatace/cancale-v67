@@ -11171,6 +11171,15 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     programmees: listeProgrammees,
     ventes: ventesConnues,
   }), [items, commandes, fiches, enLigne, vendusVinted, listeProgrammees, ventesConnues]);
+  // ⚠️ (9 octobre) LA MÊME PAIRE EN VENTE SUR DEUX DE SES COMPTES eBAY (une
+  // annonce publiée avant la garde, ou à la main sur eBay) : deux acheteurs
+  // possibles pour une seule paire. Identité par SKU (§5) ; VRM ne choisit pas
+  // laquelle retirer — il le dit, avec les deux annonces.
+  const surDeuxComptes = React.useMemo(() => {
+    const m = new Map();
+    for (const a of (Array.isArray(items) ? items : [])) { const n = numDeSkuEbay(a && a.sku); if (!n) continue; const l = m.get(n) || []; l.push(a); m.set(n, l); }
+    return [...m.entries()].filter(([, l]) => new Set(l.map((a) => a._compte)).size > 1).map(([numero, annonces]) => ({ numero, annonces }));
+  }, [items]);
   // (revue du 8 octobre) Retrait automatique allumé : POURQUOI chaque paire
   // « à retirer » n'est pas partie toute seule — la MÊME règle que le passage de
   // la coque (`retraitsEbayAutoPermis`, §11), sur ce que l'écran a lu. Trois
@@ -11321,7 +11330,8 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     aRetirerVinted: dv.aRetirerVinted.filter((d) => dansVue(d.commande)),
     nonReliees: dv.nonReliees.filter((a) => dansVue(a)),
   };
-  const alertesAilleurs = (dv.aAnnulerEbay.length - dvVue.aAnnulerEbay.length) + (dv.aRetirerEbay.length - dvVue.aRetirerEbay.length) + (dv.aRetirerVinted.length - dvVue.aRetirerVinted.length);
+  const deuxComptesVue = surDeuxComptes.filter((d) => d.annonces.some((a) => dansVue(a)));
+  const alertesAilleurs = (dv.aAnnulerEbay.length - dvVue.aAnnulerEbay.length) + (dv.aRetirerEbay.length - dvVue.aRetirerEbay.length) + (dv.aRetirerVinted.length - dvVue.aRetirerVinted.length) + (surDeuxComptes.length - deuxComptesVue.length);
   // Le compte d'une ligne, dit seulement quand la vue en MÉLANGE plusieurs (§7).
   const surCompte = (x) => (plusieursComptes && !vueSeule && x && x._compte) ? ` · ${nomCompteEbay(comptesEbay.find((c) => c.ref === x._compte) || { pseudo: x._pseudo })}` : '';
   // ── 1. ANTI DOUBLE VENTE — EN PREMIER, c'est le seul geste urgent ─────────
@@ -11329,6 +11339,20 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     {vueSeule && alertesAilleurs > 0 && (
       <div data-ebay-alertes-ailleurs={alertesAilleurs} style={{ ...bloc(E.warn), fontSize: 12.5, color: E.text, lineHeight: 1.5 }}>
         ⚠️ {alertesAilleurs} paire{alertesAilleurs > 1 ? 's' : ''} à régler sur tes autres comptes eBay (vendue{alertesAilleurs > 1 ? 's' : ''} ailleurs, encore en vente ou programmée{alertesAilleurs > 1 ? 's' : ''}) — choisis « Tous les comptes » en haut pour {alertesAilleurs > 1 ? 'les' : 'la'} voir.
+      </div>
+    )}
+    {deuxComptesVue.length > 0 && (
+      <div data-ebay-deux-comptes={deuxComptesVue.length} style={bloc(E.warn)}>
+        <div style={{ fontSize: 14, fontWeight: 800, color: E.text }}>{deuxComptesVue.length} paire{deuxComptesVue.length > 1 ? 's' : ''} en vente sur deux de tes comptes eBay en même temps</div>
+        <div style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, margin: '3px 0 4px' }}>Deux personnes pourraient l'acheter, et tu n'en as qu'une. Retire l'une des deux annonces — VRM ne choisit pas laquelle à ta place.</div>
+        {deuxComptesVue.map((d) => (
+          <div key={d.numero} data-ebay-deux-comptes-paire={d.numero} style={{ padding: '8px 0', borderTop: `1px solid ${E.border}` }}>
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: E.text }}>N°{d.numero} · {d.annonces[0].title || d.annonces[0].itemId}</div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 5 }}>
+              {d.annonces.map((a) => <a key={a._compte + a.itemId} href={a.url || `https://www.ebay.fr/itm/${a.itemId}`} target="_blank" rel="noreferrer" data-ebay-deux-comptes-annonce={a._compte} style={lienE}>{nomCompteEbay((comptesEbay || []).find((c) => c.ref === a._compte) || { pseudo: a._pseudo })} ↗</a>)}
+            </div>
+          </div>
+        ))}
       </div>
     )}
     {/* (5 octobre) PROGRAMMÉE sur eBay, VENDUE sur Vinted : eBay la mettra en

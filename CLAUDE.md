@@ -5878,6 +5878,97 @@ Chacun reproduit sur 12c6f26, corrigé, et prouvé rouge sur le build d'avant
   confirme », « un compte bloqué accepté », « comptes bloqués inconnus lus
   aucun », « un retrait incertain tu », « un refus de VRM attribué à eBay »).
 
+### Plusieurs comptes eBay par vendeur, reliés par la seule connexion (9 octobre)
+Julien (6 octobre) : « donne la possibilité d'avoir plusieurs comptes eBay
+connectés, si c'est possible uniquement avec la connexion », puis « je veux que
+l'on puisse sélectionner le compte dans l'onglet eBay, ou alors les deux comptes
+en même temps, tous les trois s'il y en a trois ; les données doivent être bien
+séparées ». Il a un compte particulier ET un compte pro.
+- **L'identité d'un compte eBay** : au retour du consentement, la route demande
+  à eBay QUI s'est connecté (Trading `GetUser` sans UserID : `<EIASToken>`
+  stable, `<UserID>` = le pseudo). La clé = EIASToken haché (16 hexa) ; le pseudo
+  ne sert qu'à l'affichage. Une identité, jamais une ressemblance (§5).
+- **Chaque compte a SES lignes** : le premier (« principal ») garde les ids
+  d'avant (`ebay_tokens`, `ebay_listings`, `ebay_orders`, `ebay_finances`,
+  `ebay_programmees`, `ebay_inventory`, `ebay_retraits_auto`) — la ligne de
+  Julien reste la sienne sans rien refaire, et son identité est apprise à la
+  prochaine ouverture de l'onglet ou synchro. Les suivants : `…_{clé}`. Le
+  registre `ebay_comptes` (pseudo, clé, dates — **aucun jeton**, aucun EIASToken
+  brut) dit lesquels existent. On ne fusionne JAMAIS deux comptes dans une
+  ligne : l'union n'existe qu'à l'affichage, chaque ligne marquée `_compte`.
+  La règle du suffixe est la MÊME des deux côtés (`suffixeCompte` /
+  `suffixeCompteEbay`, l'audit compare leurs sorties, §11).
+- **Au retour** : même identité ⇒ ses jetons sont rafraîchis (aucun doublon) ;
+  nouvelle ⇒ ajoutée ; ⚠️ identité illisible ⇒ seul le TOUT PREMIER compte garde
+  le comportement d'avant, sinon refus, rien n'est rangé (« je n'ai pas pu savoir
+  quel compte eBay vient de se connecter »). Identité du principal inconnue et
+  impossible à apprendre ⇒ pas d'ajout. Registre illisible ⇒ refus AVANT même
+  d'échanger le code. ⚠️ Sur le code d'avant, connecter un 2e compte ÉCRASAIT les
+  jetons du premier (`A1=rt-A2` au banc) : c'est le mélange que ça empêche.
+- **« Connecter un autre compte eBay »** (Compte eBay) : `prompt=login`, et
+  l'intention (`.a`) est SIGNÉE dans le state (la retirer ⇒ refusé). Le nonce en
+  cookie reste exigé.
+- **Chaque action** prend `compte` (absent ⇒ principal), validé contre le
+  registre de CE vendeur avant tout appel à eBay : inconnu ⇒ 404, mal formé ⇒
+  400, déconnecté ⇒ 409, registre illisible ⇒ 503, celui d'un autre vendeur ne
+  désigne rien. `deconnecter` (confirmé par la route aussi) vide SES jetons et le
+  marque déconnecté ; ses lignes restent en base, il sort du sélecteur, de
+  l'affichage, du CA et des sécurités ; le reconnecter le retrouve tel quel.
+- **Anti double vente sur TOUS les comptes** : `dejaChezEbay` relit chaque
+  compte actif chez eBay avec SON jeton ; « pas su » sur UN seul ⇒ rien ne part,
+  le compte qui manque est nommé. Côté app, `dejaSurEbay`, `numerosDejaVendus`,
+  `doublesVenteEbay`, le retrait automatique (qui part sur le compte de
+  l'annonce), la baisse de prix et le centre de notifications lisent l'union.
+  Une même paire en vente sur deux comptes est signalée (les deux annonces
+  nommées, VRM ne choisit pas laquelle retirer).
+- **L'onglet eBay** : la liste « Compte : Tous les comptes / un compte »
+  (`ListeComptes`, la MÊME forme que celle des comptes Vinted, §11), seulement à
+  partir de deux comptes ; réglage synchronisé `vrm_ebay_vue` (rattrapé par
+  `onCloudReady` s'il est resté au défaut ; compte déconnecté ⇒ « Tous »). Un
+  compte : TOUT (résumé, ventes, annonces, programmées, brouillons rattachés,
+  soldes, alertes) ne porte que sur lui ; une alerte d'un AUTRE compte est
+  COMPTÉE en une ligne, jamais disparue. « Tous » : l'union, le compte nommé sur
+  la ligne seulement quand la liste en mélange plusieurs (§7), le résumé dit
+  « · N comptes » ; un compte illisible est NOMMÉ, jamais un total partiel
+  présenté comme complet. Publier / programmer : le compte est pré-choisi sur la
+  vue (sinon le dernier utilisé, `vrm_ebay_compte_pub`) et la confirmation le
+  NOMME. Le sélecteur ne change que ce qu'on VOIT.
+- **L'argent** : le CA déclaré (`ventesDeclarables`, branche eBay), la coque et
+  le bilan de la semaine (`api/ship-reminders.js` → `lireCommandesEbay`, une
+  lecture `id=like.ebay_orders%` filtrée par le registre) comptent TOUS les
+  comptes actifs ; un seul illisible ⇒ eBay « pas su ». La règle du miroir
+  (`ventes-regle.js`) n'a pas bougé.
+- La sauvegarde exclut `ebay_tokens*` (tous les comptes). Base PAS encore
+  cloisonnée : inchangé (un seul compte ; « autre compte » refusé ; pas de
+  GetUser).
+- Preuves : `audit-ebay-route.cjs` **230 contrôles**, **36 rouges** sur le code
+  d'avant ; trois mutations rouges (garde relisant le seul compte courant ⇒ 5 ;
+  identité illisible rangée quand même ⇒ 1 ; compte non validé contre le
+  registre ⇒ 7). `bancs/bilan-semaine.cjs` : + 2 contrôles (deux comptes ⇒ 942 €,
+  pas le déconnecté), **2 rouges** sur l'avant. Banc `bancs/ebay-comptes.cjs`
+  (port 4812, données inventées, 390 et 1512 px, trois comptes puis un seul) :
+  **21 rouges** sur le build d'avant ; deux mutations de l'app, chacune rouge —
+  filtre de vue retiré (`dansVueEbay` toujours vrai) ⇒ **12** (le compte 2
+  voyait les ventes et annonces des trois, le résumé disait 623 € au lieu de
+  210 €) ; garde de publication filtrée par la vue (`pris` limité au compte
+  affiché) ⇒ la N°30, en vente sur le compte 1, **partait** sur le compte 2
+  (2 rouges directs, 8 en cascade). ⚠️ Le bloc « un seul compte ⇒ aucun
+  sélecteur » juge une ABSENCE : sur l'avant il tombe faute de l'attribut
+  `data-ebay-vente`, pas du défaut — il ne prouve rien seul, c'est l'autre sens
+  (le sélecteur EXISTE à deux comptes) qui porte.
+  ⚠️ Deux bancs servaient une forme que le code ne lit pas (§6.3) :
+  `ebay-callback.cjs` rendait `''` à une LECTURE (le retour relit maintenant le
+  registre) ; `bilan-semaine.cjs` traduisait `like.ebay_orders%` en « au moins un
+  caractère » (`%` puis `*` convertis deux fois) et ne rendait pas `ebay_orders`
+  lui-même. `audit-ebay-retrait-auto.cjs` charge `corpsCompteEbay`.
+- ⚠️ **NON MESURÉ — le premier essai réel se fera chez Julien** : `GetUser` n'a
+  jamais été appelé pour de vrai (les noms `<UserID>`/`<EIASToken>` viennent de la
+  doc d'eBay) ; `prompt=login` non plus (sans lui eBay reconnecterait en silence
+  le compte ouvert — c'est la doc qui le dit). Si l'identité ne revient pas,
+  l'ajout est refusé et l'écran le dit : rien n'est mélangé. Le geste de Julien :
+  ouvrir eBay → Compte eBay (son pseudo doit apparaître), puis « Connecter un
+  autre compte eBay » et se connecter avec l'autre compte.
+
 ### Mise en production du 5 octobre
 PR #442 mergée à 10:24 UTC (80 déploiements sur 24 h : sous la limite), déploiement
 de production READY sur le commit de merge, `/api/sante` répond, le zip servi
@@ -6767,7 +6858,7 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
 | `node scripts/audit-*.cjs` | **82 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
-| `scripts/bancs/*.cjs` | les **71 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
+| `scripts/bancs/*.cjs` | les **72 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
 **Trois règles de preuve :**
@@ -7060,7 +7151,7 @@ src/App.jsx                     l'app (grep avant de lire — le fichier est én
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
 scripts/audit-*.cjs             les 82 audits
-scripts/bancs/                  les 71 bancs (leur README dit comment les lancer)
+scripts/bancs/                  les 72 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 ```
