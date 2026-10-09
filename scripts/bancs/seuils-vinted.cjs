@@ -21,7 +21,18 @@
 //      panne reste « pas su » (jugé par son identité, pas par son nom) ;
 //   D. panne totale et lecture en cours : la phrase dite UNE fois au-dessus des
 //      lignes, « — » sur chaque ligne, aucun « 0 € » au registre ;
-//   E. une année passée : pas de « à ce jour », pas de reste avant le seuil.
+//   E. une année passée : pas de « à ce jour », pas de reste avant le seuil ;
+//   F. (revue du 9 octobre) le cache des ventes ne savait pas QUELS comptes il
+//      couvrait : un compte lié depuis la dernière lecture (liste de comptes du
+//      navigateur périmée, ou rechargement dans les 3 min) s'affichait « 0 vente
+//      · sous les seuils », le total se disait complet ; un compte RETIRÉ restait
+//      compté au registre (registre ≠ carte) ;
+//   G. relecture DISCRÈTE ratée pour un compte déjà lu : le registre comptait ses
+//      ventes d'avant tout en écrivant « ventes de X pas lues », et la carte
+//      (« sans X ») donnait un autre total. Une même panne, un même chiffre :
+//      registre == carte, et la phrase dit ce que le chiffre contient ;
+//   H. même panne sur Ma journée : « Reçu en {mois} » ne compte plus ce compte
+//      et le DIT à côté du chiffre.
 // Et toujours : un compte exclu n'apparaît pas, aucun rouge ni ambre (§7),
 // aucun débordement, aucune erreur d'app. Port 4802.
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
@@ -123,12 +134,15 @@ const projette = (r, sel) => {
 //   etat.panneTout  : la lecture de TOUTES les ventes échoue
 //   etat.delaiOrders: les ventes répondent avec ce retard (ms)
 //   etat.delaiMain  : la ligne `main` (le nuage) répond avec ce retard (ms)
+//   etat.lsComptes  : la liste de comptes que le NAVIGATEUR connaît déjà (visite d'avant)
+//   etat.delaiComptes: la liste de comptes de la base répond avec ce retard (ms)
+//   etat.sansUid    : la base ne connaît pas (encore / plus) ce compte
 const page = async (b, vp, etat, main) => {
   const rows = rowsDe(main);
   const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
-  await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_accounts_hidden', JSON.stringify(['9104'])); } catch (_) {} });
+  await pg.addInitScript((ls) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_accounts_hidden', JSON.stringify(['9104'])); if (ls && !localStorage.getItem('vinted_accounts')) localStorage.setItem('vinted_accounts', JSON.stringify(ls)); } catch (_) {} }, etat.lsComptes || null);
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', async (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
@@ -136,7 +150,10 @@ const page = async (b, vp, etat, main) => {
     // La forme réelle d'une panne : pas de JSON.
     const panne = () => route.fulfill({ status: 500, contentType: 'text/html', headers: { 'access-control-allow-origin': '*' }, body: '<html>erreur</html>' });
     if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
-    if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCOUNTS);
+    if (/\/rest\/v1\/vinted_accounts/.test(u)) {
+      if (etat.delaiComptes) await new Promise((r) => setTimeout(r, etat.delaiComptes));
+      return j(etat.sansUid ? ACCOUNTS.filter((a) => a.vinted_user_id !== etat.sansUid) : ACCOUNTS);
+    }
     if (/_orders_/.test(u)) {
       if (etat.delaiOrders) await new Promise((r) => setTimeout(r, etat.delaiOrders));
       if (etat.panneTout) return panne();
@@ -313,6 +330,11 @@ const communs = (r, errs, quoi) => {
         dit(!!(a1 && a1.etat === 'lu' && Number(a1.n) === PANNE_LU.n && a1.eur === PANNE_LU.eur), `${q} relecture discrète où un AUTRE compte tombe : compte_panne a sa lecture fraîche (35 ventes), jamais « 0 vente »`, a1 ? `${a1.etat} · ${a1.n} · ${a1.eur}` : 'absent');
         dit(!!(b1 && b1.etat === 'pasSu' && b1.n === ''), `${q} …et compte_alpha, qui n'a pas répondu cette fois, est « pas su »`, b1 ? `${b1.etat} · n «${b1.n}»` : 'absent');
         dit(r1.nPanne === 1 && /compte_alpha/.test(r1.txt) && r1.relire, `${q} …la phrase de panne nomme compte_alpha, une fois, avec le bouton`, `${r1.nPanne} bloc · bouton ${r1.relire}`);
+        // Revue du 9 octobre : après cette relecture ratée, la liste montre encore
+        // les ventes d'avant de compte_alpha — le registre ne les compte pas pour
+        // autant (il dit « pas lues »), et la carte vaut le registre.
+        egalRegistre(r1, Object.keys(ATTENDU).filter((u) => u !== '9101').concat('9105'), q + ' relecture discrète ratée,');
+        dit(!!(r1.reg && !r1.reg['9101'] && /ventes de compte_alpha pas lues/.test(r1.caRegistre)), `${q} …le registre ne compte PAS compte_alpha dans son CA, et le dit (« ventes de compte_alpha pas lues »)`, `registre alpha ${JSON.stringify(r1.reg && r1.reg['9101'])} · «${r1.caRegistre}»`);
         // « Relire mes ventes » : compte_alpha répond de nouveau.
         etat.panne9101 = false;
         if (r1.relire) {
@@ -373,6 +395,123 @@ const communs = (r, errs, quoi) => {
         dit(!!(r.total && r.total.etat === 'pasSu' && r.total.n === ''), `${q} le total : « — », jamais 0`, r.total ? `${r.total.etat} · «${r.total.txt.replace(/\n/g, ' | ')}»` : 'absent');
         dit(!/0,00\s€/.test(r.caRegistre.split('|').slice(0, 2).join('|')), `${q} le CA du registre ne dit pas « 0,00 € » sur une lecture ratée`, r.caRegistre);
         communs(r, errs, q);
+      } catch (e) { dit(false, `${q} le scénario a tourné jusqu'au bout`, String(e && e.message).slice(0, 160)); }
+      await ctx.close();
+    }
+
+    // ── F. Les comptes CHANGENT : le cache ne doit couvrir que ceux d'aujourd'hui.
+    const TOUS = Object.keys(ATTENDU).concat('9105');
+    // F1 : le navigateur connaît 6 comptes (visite d'avant) ; la base en a 7 —
+    //      compte_epsilon vient d'être lié — et répond après 4 s.
+    {
+      const q = '[F1 compte lié, liste en retard 1512]';
+      console.log('── F1 · un compte lié depuis la dernière visite, 1512 px');
+      const etat = { lsComptes: ACCOUNTS.filter((a) => a.vinted_user_id !== '9107'), delaiComptes: 4000 };
+      const { ctx, pg, errs } = await page(b, { width: 1512, height: 950 }, etat, mainNormal);
+      try {
+        await pg.goto(`http://localhost:${PORT}/?tab=cat_ventes`, { waitUntil: 'domcontentloaded' });
+        await pg.waitForTimeout(9000);
+        await ouvreRegistre(pg);
+        const r = await lit(pg);
+        const ep = par(r)['9107'];
+        dit(!!(ep && ep.etat === 'lu' && ep.n === '33' && ep.eur === '660.00' && ep.verdict === 'atteint'), `${q} compte_epsilon, lié depuis, est LU : 33 ventes · 660 € · atteint — jamais « 0 vente · sous les seuils »`, ep ? `${ep.etat} · ${ep.n} · ${ep.eur} · ${ep.verdict}` : 'absent');
+        egalRegistre(r, TOUS, q);
+        dit(!!(r.total && r.total.partiel === '' && Number(r.total.n) === 95), `${q} le total couvre les SEPT comptes (95 ventes), sans « au moins »`, r.total ? `${r.total.n} · partiel «${r.total.partiel}»` : 'absent');
+        communs(r, errs, q);
+      } catch (e) { dit(false, `${q} le scénario a tourné jusqu'au bout`, String(e && e.message).slice(0, 160)); }
+      await ctx.close();
+    }
+    // F2 : rechargement dans les 3 min après la liaison d'un compte (cache de session).
+    {
+      const q = '[F2 compte lié, rechargement 390]';
+      console.log('── F2 · rechargement juste après la liaison d\'un compte, 390 px');
+      const etat = { sansUid: '9107' };
+      const { ctx, pg, errs } = await page(b, { width: 390, height: 844 }, etat, mainNormal);
+      try {
+        await pg.goto(`http://localhost:${PORT}/?tab=cat_ventes`, { waitUntil: 'domcontentloaded' });
+        await pg.waitForTimeout(3500);
+        etat.sansUid = null;                                        // l'extension vient de lier compte_epsilon
+        await pg.goto(`http://localhost:${PORT}/?tab=cat_ventes`, { waitUntil: 'domcontentloaded' });   // < 3 min
+        await pg.waitForTimeout(4500);
+        await ouvreRegistre(pg);
+        const r = await lit(pg);
+        const ep = par(r)['9107'];
+        dit(!!(ep && ep.etat === 'lu' && ep.n === '33' && ep.verdict === 'atteint'), `${q} après rechargement, compte_epsilon est LU (33 ventes) — le cache des six autres ne le cache pas`, ep ? `${ep.etat} · ${ep.n} · ${ep.verdict} · ${ep.txt.replace(/\n/g, ' | ')}` : 'absent');
+        egalRegistre(r, TOUS, q);
+        communs(r, errs, q);
+      } catch (e) { dit(false, `${q} le scénario a tourné jusqu'au bout`, String(e && e.message).slice(0, 160)); }
+      await ctx.close();
+    }
+    // F3 : l'inverse — compte_epsilon RETIRÉ, rechargement dans les 3 min.
+    {
+      const q = '[F3 compte retiré, rechargement 1512]';
+      console.log('── F3 · un compte retiré, rechargement, 1512 px');
+      const etat = {};
+      const { ctx, pg, errs } = await page(b, { width: 1512, height: 950 }, etat, mainNormal);
+      try {
+        await pg.goto(`http://localhost:${PORT}/?tab=cat_ventes`, { waitUntil: 'domcontentloaded' });
+        await pg.waitForTimeout(3500);
+        etat.sansUid = '9107';
+        await pg.goto(`http://localhost:${PORT}/?tab=cat_ventes`, { waitUntil: 'domcontentloaded' });
+        await pg.waitForTimeout(4500);
+        await ouvreRegistre(pg);
+        const r = await lit(pg);
+        dit(!par(r)['9107'] && !!(r.reg && !r.reg['9107']) && Number(r.regN) === 62, `${q} le compte retiré n'est ni sur la carte, ni dans le registre (62 ventes, plus 95)`, `ligne ${!!par(r)['9107']} · registre epsilon ${JSON.stringify(r.reg && r.reg['9107'])} · regN ${r.regN}`);
+        egalRegistre(r, TOUS.filter((u) => u !== '9107'), q);
+        communs(r, errs, q);
+      } catch (e) { dit(false, `${q} le scénario a tourné jusqu'au bout`, String(e && e.message).slice(0, 160)); }
+      await ctx.close();
+    }
+
+    // ── G. Relecture DISCRÈTE ratée pour un compte déjà lu (tout était lu avant).
+    {
+      const q = '[G relecture discrète 1512]';
+      console.log('── G · relecture discrète ratée, 1512 px');
+      const etat = {};
+      const { ctx, pg, errs } = await page(b, { width: 1512, height: 950 }, etat, mainNormal);
+      try {
+        await pg.goto(`http://localhost:${PORT}/?tab=cat_ventes`, { waitUntil: 'domcontentloaded' });
+        await pg.waitForTimeout(3500);
+        await ouvreRegistre(pg);
+        const r0 = await lit(pg);
+        egalRegistre(r0, TOUS, q + ' avant le signal,');
+        etat.panne9101 = true;
+        await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:ext', { detail: { type: 'maj', quoi: 'ventes' } })));
+        for (let i = 0; i < 20; i++) { await pg.waitForTimeout(400); const x = par(await lit(pg)); if (x['9101'] && x['9101'].etat !== 'lu') break; }
+        const r = await lit(pg);
+        const al = par(r)['9101'];
+        dit(!!(al && al.etat === 'pasSu'), `${q} compte_alpha, qui n'a pas répondu, est « pas su » sur la carte`, al ? al.etat : 'absent');
+        dit(!!(r.reg && !r.reg['9101'] && /ventes de compte_alpha pas lues/.test(r.caRegistre)), `${q} le registre ne compte PAS les ventes d'avant de compte_alpha, et dit qu'elles ne sont pas lues — la phrase vient du même calcul que le chiffre`, `registre alpha ${JSON.stringify(r.reg && r.reg['9101'])} · «${r.caRegistre}»`);
+        egalRegistre(r, TOUS.filter((u) => u !== '9101'), q + ' après le signal,');
+        const listeGarde = await pg.evaluate(() => /Paire inventée/.test(document.body.innerText));
+        dit(listeGarde, `${q} la liste des ventes reste affichée derrière (rien ne disparaît sur un hoquet)`);
+        communs(r, errs, q);
+      } catch (e) { dit(false, `${q} le scénario a tourné jusqu'au bout`, String(e && e.message).slice(0, 160)); }
+      await ctx.close();
+    }
+
+    // ── H. La même panne sur Ma journée : « Reçu en {mois} ».
+    {
+      const q = '[H Ma journée 390]';
+      console.log('── H · Ma journée, relecture discrète ratée, 390 px');
+      const etat = {};
+      const { ctx, pg, errs } = await page(b, { width: 390, height: 844 }, etat, mainNormal);
+      try {
+        const ymIci = ymDe(new Date().toISOString());
+        // Ce que compte_alpha a reçu CE mois (datées du versement : vente + 1 h).
+        const alphaMois = Object.entries(VERS).filter(([t, v]) => v.uid === '9101' && ymDe(new Date(Date.parse(v.date) + 3600e3).toISOString()) === ymIci)
+          .reduce((a, [t]) => a + Number((VENTES['9101'].find((o) => String(o.transaction_id) === t) || {}).price.amount) * 100, 0);
+        await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
+        await pg.waitForTimeout(4000);
+        const recu = () => pg.evaluate(() => { const e = document.querySelector('[data-recu-mois]'); return e ? { c: e.dataset.recuMois, sans: e.dataset.recuSans, txt: e.innerText } : null; });
+        const a = await recu();
+        etat.panne9101 = true;
+        await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:ext', { detail: { type: 'maj', quoi: 'ventes' } })));
+        let z = null;
+        for (let i = 0; i < 20; i++) { await pg.waitForTimeout(400); z = await recu(); if (z && z.c !== (a && a.c)) break; }
+        dit(!!(a && z && a.c !== '' && Number(a.c) - Number(z.c) === alphaMois && alphaMois > 0), `${q} « Reçu » ne compte plus compte_alpha une fois sa lecture ratée (−${(alphaMois / 100).toFixed(2)} €)`, `${a && a.c} → ${z && z.c} (attendu −${alphaMois})`);
+        dit(!!(z && /compte_alpha/.test(z.sans || '') && /sans compte_alpha/.test(z.txt)), `${q} …et le dit à côté du chiffre (« sans compte_alpha »)`, z ? `sans «${z.sans}» · ${z.txt.replace(/\n/g, ' | ')}` : 'absent');
+        dit(errs.length === 0, `${q} aucune erreur d'app`, errs.join(' | ').slice(0, 160));
       } catch (e) { dit(false, `${q} le scénario a tourné jusqu'au bout`, String(e && e.message).slice(0, 160)); }
       await ctx.close();
     }

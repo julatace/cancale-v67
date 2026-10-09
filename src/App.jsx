@@ -19019,7 +19019,18 @@ const _CACHE_TTL = 180000; // 3 min
 //    `failedUids` (l'IDENTITÉ des comptes ratés) et la version `_CACHE_V` : une
 //    entrée écrite avant cette règle, qui ne sait rien de ses échecs, est
 //    ignorée (« rien lu » ne vaut pas « rien »).
-const _CACHE_V = 2;
+// ⚠️⚠️ ET UNE ENTRÉE DIT QUELS COMPTES ELLE COUVRE (revue du 9 octobre). Elle ne
+//    savait que ses ÉCHECS : un compte lié depuis (l'extension en a capté un de
+//    plus, puis rechargement dans les 3 min) n'était ni lu, ni en échec — la
+//    carte des seuils l'affichait « 0 vente · sous les seuils » et le total se
+//    disait complet ; un compte RETIRÉ restait compté au registre. `comptes` =
+//    la clé des comptes DEMANDÉS (`cleComptesVinted`) : une entrée qui ne couvre
+//    pas exactement les comptes d'aujourd'hui n'est pas servie, on relit.
+const _CACHE_V = 3;
+// La clé d'un ensemble de comptes Vinted : leurs IDENTITÉS, triées — jamais un
+// nom affiché, jamais un nombre (deux listes de même longueur ne sont pas la
+// même liste).
+const cleComptesVinted = (accs) => [...new Set((accs || []).map(a => String((a && a.vinted_user_id) ?? '')).filter(Boolean))].sort().join(',');
 // Cache des données Vinted (annonces/ventes/achats/messages). Persisté en
 // sessionStorage : il survit aux rechargements fréquents (auto-mise à jour,
 // réouverture de l'app), donc les listes s'affichent INSTANTANÉMENT après un
@@ -19066,6 +19077,10 @@ function SelecteurCompte({ accounts, sel, setSel, connecte }) {
   );
 }
 function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', compteConnecte = '' }) {
+  // L'IDENTITÉ de l'ensemble des comptes liés (triée) : c'est elle que suivent
+  // les relectures et le cache — jamais `accounts.length` (un compte retiré et
+  // un autre ajouté gardent la même longueur).
+  const cleComptes = cleComptesVinted(accounts);
   const [numeros, setNumeros] = useState(() => load('vinted_annonce_numeros', {}));
   // Dates de mise en ligne réelles, lues sur la page de l'annonce par l'extension
   // (ligne Supabase vinted_listing_dates = { idAnnonce: {ts, text} }). Seule
@@ -20771,15 +20786,33 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // ET la carte « Vendu / reçu » de Ma journée lisent le MÊME calcul.
   // Trois états : `undefined` on attend de savoir · `null` dates de versement
   // illisibles (« rien lu » ≠ « rien ») · l'objet de `ventesDeclarables`.
+  // ⚠️⚠️ LES VENTES VINTED QUI ENTRENT DANS LE CA DÉCLARÉ (revue du 9 octobre).
+  //    · La lecture doit COUVRIR les comptes d'aujourd'hui (`sales.comptes`,
+  //      la clé des comptes qu'elle a interrogés) : sinon un compte lié depuis
+  //      la dernière lecture compte pour 0, et un compte retiré reste compté.
+  //      Tant que ce n'est pas le cas : `null` — « on lit encore », jamais un
+  //      total.
+  //    · Un compte qui n'a PAS répondu (`failedUids`) n'entre dans AUCUN total,
+  //      même quand la liste montre encore ses ventes d'une lecture précédente
+  //      (relecture discrète ratée, `garde`). Le registre écrivait « ventes de X
+  //      pas lues » à côté d'un CA qui les CONTENAIT, et la carte des seuils
+  //      (« sans X ») donnait un autre total : la phrase ne venait pas de la
+  //      même source que le chiffre (§5), deux totaux pour une notion (§11).
+  //      Une même panne, un même chiffre — qu'on ait vu ses ventes avant ou non.
+  const ventesComptees = useMemo(() => {
+    if (!Array.isArray(sales.items) || sales.comptes !== cleComptes) return null;
+    const ko = new Set((Array.isArray(sales.failedUids) ? sales.failedUids : []).map(String));
+    return ko.size ? sales.items.filter(o => !ko.has(String((o && o._acc && o._acc.vinted_user_id) ?? ''))) : sales.items;
+  }, [sales.items, sales.comptes, sales.failedUids, cleComptes]);
   const declarables = useMemo(() => {
-    if (!sales.items) return undefined;
+    if (!ventesComptees) return undefined;
     if (lbcLu === undefined || ebayCmd === undefined || versements === undefined) return undefined;
     if (versements === null) return null;
     try {
-      return ventesDeclarables({ vinted: sales.items, lbc: lbcLu ? lbcVentes.ventes : [], ebay: ebayCmd || [], masquee: (o) => hiddenSales.has(String(o.transaction_id)), exclu: acctOffOf, versements, declare: declUrssaf });
+      return ventesDeclarables({ vinted: ventesComptees, lbc: lbcLu ? lbcVentes.ventes : [], ebay: ebayCmd || [], masquee: (o) => hiddenSales.has(String(o.transaction_id)), exclu: acctOffOf, versements, declare: declUrssaf });
     } catch (_) { return null; }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements, declUrssaf]);
+  }, [ventesComptees, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements, declUrssaf]);
   // ⚠️⚠️ CE QUE LISENT LES DEUX RAPPORTS (mensuel, annuel) — revue du 6 octobre.
   // Dates de versement illisibles ⇒ `declarables` vaut `null`, et c'est juste
   // pour Ma journée et la publication (elles ne disent rien de « reçu »). Mais
@@ -20821,6 +20854,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // On attend de savoir ; et les dates de versement illisibles : on ne publie
     // RIEN plutôt qu'un mois où toutes les ventes Vinted seraient « à dater ».
     if (!declarables) return;
+    // Un compte dont les ventes n'ont pas pu être lues (hors comptes exclus) :
+    // le CA serait PARTIEL et la ligne publiée le dirait complet (« Vinted :
+    // lu »). Sans publication, le tableau de bord garde la dernière, complète.
+    if ((Array.isArray(sales.failedUids) ? sales.failedUids : []).some(u => !acctOff(u))) return;
     try {
       const { lignes, aDater, ecartees } = declarables;
       const r2 = (x) => Math.round(x * 100) / 100;
@@ -20846,7 +20883,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const memeChose = avant && JSON.stringify({ mois: avant.mois, aDater: avant.aDater, ecartees: avant.ecartees, sources: avant.sources, declare: avant.declare }) === JSON.stringify(charge);
       if (!memeChose) save('vinted_urssaf_mois', { ...charge, at: Date.now() });
     } catch (_) {}
-  }, [sales.items, declarables, lbcLu, ebayCmd, declUrssaf]);
+  }, [sales.items, sales.failedUids, declarables, lbcLu, ebayCmd, declUrssaf]);
 
   // Filet prix d'achat : si l'entrée a un N° mais pas de prix d'achat, on va le
   // chercher dans le miroir PAR NUMÉRO (buyByNum) — c'est ce qui fait remonter
@@ -22032,9 +22069,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   //  son onglet — voir le commentaire au niveau du rendu. Le panneau de
   //  l'extension fait ce travail, là où le geste est possible.)
 
-  const entreeCache = (key) => { const c=_acctCache[key]; return (c && c.v===_CACHE_V && Array.isArray(c.items) && Date.now()-c.ts<_CACHE_TTL) ? c : null; };
-  const fromCache = (key) => { const c=entreeCache(key); return c ? c.items : null; };
-  const putCache = (key, items, echecs) => { _acctCache[key] = { ts:Date.now(), v:_CACHE_V, items, failed:(echecs&&echecs.failed)||[], failedUids:(echecs&&echecs.failedUids)||[] }; _persistAcctCache(); };
+  // Une entrée n'est servie que si elle couvre EXACTEMENT les comptes
+  // d'aujourd'hui (`comptes`) : un compte ajouté depuis serait « lu · 0 », un
+  // compte retiré resterait compté.
+  const entreeCache = (key) => { const c=_acctCache[key]; return (c && c.v===_CACHE_V && Array.isArray(c.items) && Date.now()-c.ts<_CACHE_TTL && c.comptes===cleComptes) ? c : null; };
+  const putCache = (key, items, echecs, comptes) => { _acctCache[key] = { ts:Date.now(), v:_CACHE_V, comptes, items, failed:(echecs&&echecs.failed)||[], failedUids:(echecs&&echecs.failedUids)||[] }; _persistAcctCache(); };
 
   // ── RELIRE SANS FAIRE CLIGNOTER (4 octobre) ──────────────────────────────
   // Chaque signal de l'extension (« ventes rangées », toutes les 90 s quand il
@@ -22052,8 +22091,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const silencieux = !!(opts && opts.silencieux);
     const n = (lectureOrders.current[type] = (lectureOrders.current[type] || 0) + 1);
     // Le cache rend AUSSI ses échecs : un compte pas lu reste « pas su » (§4).
+    // `demandes` : les comptes que CETTE lecture interroge — rangés avec le
+    // résultat (état ET cache), pour qu'un lecteur sache ce qu'elle couvre.
+    const demandes = cleComptesVinted(accounts);
     const cached = !force && entreeCache(type);
-    if (cached) { setter({ loading:false, items:cached.items, failed:cached.failed, failedUids:cached.failedUids }); return; }
+    if (cached) { setter({ loading:false, items:cached.items, failed:cached.failed, failedUids:cached.failedUids, comptes:cached.comptes }); return; }
     if (!silencieux) setter({ loading:true, items:null, error:false });
     // PARALLÈLE : on interroge tous les comptes en même temps (avant : un par un
     // en série → très lent avec 9 comptes). La lecture se fait d'abord sur la
@@ -22104,7 +22146,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (n !== lectureOrders.current[type]) return;          // une lecture plus récente est partie après celle-ci
     // Une lecture partielle se met en cache AVEC ses échecs (jamais comme une
     // liste complète) ; un échec total, pas du tout.
-    if (!error) putCache(type, out, { failed, failedUids });
+    if (!error) putCache(type, out, { failed, failedUids }, demandes);
     if (silencieux && (error || anyErr)) {
       // Relecture discrète ratée (tout ou partie) : une vente déjà vue ne
       // disparaît pas parce qu'un compte n'a pas répondu — on garde CE QU'ON
@@ -22116,15 +22158,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // restent « pas su », même si on montre encore leurs ventes d'avant.
       const ko = new Set(failedUids);
       setter(prev => {
-        if (!(prev && Array.isArray(prev.items))) return { loading:false, items: out, error, failed, failedUids };
+        if (!(prev && Array.isArray(prev.items))) return { loading:false, items: out, error, failed, failedUids, comptes: demandes };
         const dejaLa = new Set(out.map(o => String(o.transaction_id)));
         const garde = prev.items.filter(o => ko.has(String(o && o._acc && o._acc.vinted_user_id)) && !dejaLa.has(String(o.transaction_id)));
         const items = garde.length ? [...out, ...garde].sort((a,b) => new Date(b.date||0) - new Date(a.date||0)) : out;
-        return { ...prev, loading:false, items, error: items.length===0 && !anyOk, failed, failedUids };
+        return { ...prev, loading:false, items, error: items.length===0 && !anyOk, failed, failedUids, comptes: demandes };
       });
       return;
     }
-    setter({ loading:false, items: out, error, failed, failedUids });
+    setter({ loading:false, items: out, error, failed, failedUids, comptes: demandes });
   };
   // « Relire mes ventes » : une VRAIE relecture — le cache des ventes (qui garde
   // l'échec) et les lignes des comptes ratés sont vidés, puis on relit NOTRE
@@ -22145,9 +22187,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const nomsVentesKO = (Array.isArray(sales.failedUids) ? sales.failedUids : [])
     .filter(u => !acctOff(u))
     .map(u => { const a = (accounts || []).find(x => String(x.vinted_user_id) === String(u)); return a ? accNameOf(a) : `#${u}`; });
-  useEffect(() => { if (accounts.length) loadOrders('sold', setSales); /* eslint-disable-next-line */ }, [accounts.length]);
+  // Suit l'ENSEMBLE des comptes (`cleComptes`), pas leur nombre : un compte lié
+  // ou retiré relit (le cache ne sert plus une liste qui ne le couvre pas).
+  useEffect(() => { if (accounts.length) loadOrders('sold', setSales); /* eslint-disable-next-line */ }, [cleComptes]);
   useEffect(() => { buysCharges.current = Array.isArray(buys.items); }, [buys.items]);
-  useEffect(() => { if ((curSub==='achats'||curSub==='journee') && accounts.length && buys.items===null) loadOrders('purchased', setBuys); /* eslint-disable-next-line */ }, [sub, accounts.length]);
+  useEffect(() => { if ((curSub==='achats'||curSub==='journee') && accounts.length && (buys.items===null || (buys.comptes && buys.comptes!==cleComptes))) loadOrders('purchased', setBuys); /* eslint-disable-next-line */ }, [sub, cleComptes]);
 
   // AUTO-LOCK : dès qu'une vente finalisée correspond à UNE SEULE annonce
   // numérotée (titre non ambigu), on verrouille le lien vente↔paire par n° de
@@ -22287,8 +22331,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // une liste partielle reste `incomplet` (jamais présentée comme complète).
     // Complète, elle ne dit pas `false` : la publication des paires qui dorment
     // n'accepte qu'une lecture FRAÎCHE (voir plus haut).
+    const demandes = cleComptesVinted(accounts);
     const cached = !force && entreeCache('listings');
-    if (cached) { setListings({ loading:false, items:cached.items, ...(cached.failedUids.length ? { incomplet: true } : {}) }); return; }
+    if (cached) { setListings({ loading:false, items:cached.items, comptes:cached.comptes, ...(cached.failedUids.length ? { incomplet: true } : {}) }); return; }
     setListings({ loading:true, items:null, error:false });
     const out = []; let anyOk=false, anyErr=false; const failedUids=[];
     // PARALLÈLE (voir loadOrders) : tous les comptes en même temps.
@@ -22311,16 +22356,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if (info.ph) it.captPhotos = info.ph;
       }
     } catch (_) { /* sans ce complément, le critère reste simplement inconnu */ }
-    if (!error) putCache('listings', out, { failedUids });
+    if (!error) putCache('listings', out, { failedUids }, demandes);
     // Annonces que VINTED a marquées vendues (identité, jamais un titre).
     if (vendues.size) setVenduesVinted(vendues);
     // `incomplet` : au moins un compte n'a pas répondu. Les chiffres tirés de
     // cette liste sont alors des minorants (le bilan de la semaine le dit).
-    setListings({ loading:false, items: out, error, incomplet: anyErr });
+    setListings({ loading:false, items: out, error, incomplet: anyErr, comptes: demandes });
   };
   const loadConvs = async (force) => {
-    const cached = !force && fromCache('convs');
-    if (cached) { setConvs({ loading:false, items:cached }); return; }
+    const demandes = cleComptesVinted(accounts);
+    const cached = !force && entreeCache('convs');
+    if (cached) { setConvs({ loading:false, items:cached.items, comptes:cached.comptes }); return; }
     setConvs({ loading:true, items:null, error:false });
     const out = []; let anyOk=false, anyErr=false;
     // PARALLÈLE (voir loadOrders) : tous les comptes en même temps.
@@ -22329,16 +22375,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     for (const { acc, r } of results) { if (r.ok) { anyOk=true; r.items.forEach(c => out.push({ ...c, _acc:acc })); } else { anyErr=true; failedUids.push(String(acc.vinted_user_id)); } }
     out.sort((a,b) => new Date(b.updated_at||0) - new Date(a.updated_at||0));
     const error = out.length===0 && anyErr && !anyOk;
-    if (!error) putCache('convs', out, { failedUids });
-    setConvs({ loading:false, items: out, error });
+    if (!error) putCache('convs', out, { failedUids }, demandes);
+    setConvs({ loading:false, items: out, error, comptes: demandes });
   };
   // ⚠️ `bordereaux` EN FAIT PARTIE : c'est l'écran où on imprime l'étiquette,
   // donc le seul endroit où un numéro en double coûte vraiment cher. Sans les
   // annonces en ligne, on ne peut pas savoir qu'un numéro est déjà porté par une
   // paire du stock — le détecteur de conflit serait aveugle là où il sert.
-  useEffect(() => { if ((curSub==='annonces'||curSub==='journee'||curSub==='bordereaux') && accounts.length && listings.items===null) loadListings(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
+  useEffect(() => { if ((curSub==='annonces'||curSub==='journee'||curSub==='bordereaux') && accounts.length && (listings.items===null || (listings.comptes && listings.comptes!==cleComptes))) loadListings(); /* eslint-disable-next-line */ }, [sub, cleComptes]);
   useEffect(() => { if ((curSub==='annonces'||curSub==='journee') && emailSales===null) fetchEmailSales().then(setEmailSales); /* eslint-disable-next-line */ }, [sub]);
-  useEffect(() => { if ((curSub==='messages'||curSub==='journee') && accounts.length && convs.items===null) loadConvs(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
+  useEffect(() => { if ((curSub==='messages'||curSub==='journee') && accounts.length && (convs.items===null || (convs.comptes && convs.comptes!==cleComptes))) loadConvs(); /* eslint-disable-next-line */ }, [sub, cleComptes]);
   // ── LES OFFRES REÇUES, EN TÊTE DE MESSAGES (proposition 6, 6 octobre) ─────
   // Mesuré : 37 offres en 14 jours, toutes connues par EMAIL (`email_offer_*`),
   // et seulement 3 conversations captées portent une offre en attente — vieilles.
@@ -22395,7 +22441,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // Tous les bordereaux captés, indexés par transaction (une ligne par colis).
     // Même chose ici : neuf lectures indépendantes, donc neuf en même temps.
     await rechargerLabels();
-  })(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
+  })(); /* eslint-disable-next-line */ }, [sub, cleComptes]);
   // ── COLIS PUBLIE « PRÊTS À IMPRIMER », LES AUTRES CONSOMMENT (§11) ────────
   // Même motif que `vrm_colis_retirer` et `vinted_urssaf_mois` : l'écran qui a
   // TOUTES les sources publie, les autres lisent. Ma journée ne demande jamais
@@ -22523,7 +22569,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   }), []);
   // Un colis est à retirer → on charge les achats (harvest, gratuit) pour
   // retrouver la photo de l'article correspondant.
-  useEffect(() => { if ((tracking||[]).some(t=>t.status==='available') && accounts.length && buys.items===null) loadOrders('purchased', setBuys); /* eslint-disable-next-line */ }, [tracking, accounts.length]);
+  useEffect(() => { if ((tracking||[]).some(t=>t.status==='available') && accounts.length && buys.items===null) loadOrders('purchased', setBuys); /* eslint-disable-next-line */ }, [tracking, cleComptes]);
   // #9 — RAFRAÎCHISSEMENT AUTO EN REVENANT SUR L'APP. Tu navigues sur Vinted
   // (l'extension moissonne pendant ce temps), tu reviens sur l'app → l'onglet
   // courant RELIT la dernière moisson tout seul, sans « Synchroniser ». On relit
@@ -22545,7 +22591,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     };
     document.addEventListener('visibilitychange', onVis);
     return () => document.removeEventListener('visibilitychange', onVis);
-  /* eslint-disable-next-line */ }, [curSub, accounts.length]);
+  /* eslint-disable-next-line */ }, [curSub, cleComptes]);
   // ── LES VENTES ARRIVENT TOUTES SEULES (2 octobre) ─────────────────────────
   // « Ça doit être presque instantanément mis à jour dès que je fais une
   // vente. » Mesuré : l'app ne relisait la moisson qu'au montage et au retour
@@ -22613,7 +22659,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     sonde();
     const t = setInterval(sonde, 60000);
     return () => { window.removeEventListener('vrm:ext', ecoute); document.removeEventListener('visibilitychange', onVis); clearInterval(t); };
-  /* eslint-disable-next-line */ }, [curSub, accounts.length]);
+  /* eslint-disable-next-line */ }, [curSub, cleComptes]);
   // ── COLIS ↔ ACHAT : rapprochement UNIQUE ou RIEN ──────────────────────────
   // Un email de suivi ne porte que le titre de l'article : il n'y a pas d'autre
   // lien avec l'achat Vinted (vérifié — aucun n° de suivi côté Vinted, §5.37).
@@ -23184,7 +23230,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
   // Pour le taux d'écoulement, on s'assure que les annonces en ligne sont
   // chargées même en étant sur l'onglet Ventes (harvest-first, donc gratuit).
-  useEffect(() => { if (curSub==='ventes' && accounts.length && listings.items===null) loadListings(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
+  useEffect(() => { if (curSub==='ventes' && accounts.length && (listings.items===null || (listings.comptes && listings.comptes!==cleComptes))) loadListings(); /* eslint-disable-next-line */ }, [sub, cleComptes]);
 
   // Tendance sur 6 mois (CA finalisé + bénéfice net) pour le mini-graphique.
   const monthlyChart = useMemo(() => {
@@ -23919,7 +23965,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // ⚠️ Dates de versement ILLISIBLES : ses ventes Vinted ne sont pas « sans
     //    date » (on n'a pas pu les lire) — seules Leboncoin et eBay comptent ici.
     const tousADater = versements === null ? (declRapport.aDater || [])
-      : ventesDeclarables({ vinted: sales.items, lbc: lbcLu ? lbcVentes.ventes : [], ebay: ebayCmd || [], exclu: acctOffOf, versements: versements || {}, declare: declUrssaf }).aDater;
+      : ventesDeclarables({ vinted: ventesComptees || [], lbc: lbcLu ? lbcVentes.ventes : [], ebay: ebayCmd || [], exclu: acctOffOf, versements: versements || {}, declare: declUrssaf }).aDater;
     const aDater = { n: tousADater.length, ca: tousADater.reduce((t, l) => t + l.eur, 0) };
     // Les comptes dont les ventes n'ont pas pu être lues — sauf ceux qu'il a
     // EXCLUS (leurs ventes ne comptent jamais : leur absence ne manque à rien).
@@ -23956,12 +24002,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const declaration = moisDeclare(declUrssaf, reportMonth) ? declUrssaf[reportMonth] : null;
     const enCours = declRapport.vinted === 'encours';
     // Peut-on noter « J'ai déclaré ce mois » ? Seulement sur une lecture complète.
-    const incomplet = lectureIncomplete({ registre: declUrssaf, ventes: sales.items, ventesErreur: !!sales.error, comptesEchec, versements, lbc: lbcLu, ebay: ebayCmd });
+    // `ventesComptees` : `null` tant que la lecture ne couvre pas les comptes
+    // d'aujourd'hui (un compte lié depuis) ⇒ « lecture en cours », jamais noté.
+    const incomplet = lectureIncomplete({ registre: declUrssaf, ventes: ventesComptees, ventesErreur: !!sales.error, comptesEchec, versements, lbc: lbcLu, ebay: ebayCmd });
     return { regime, tvaRate, monthLabel, ca, cout, frais, nb, nbCout, benefNet, marge, tvaMarge, margeHT, taux, urssaf, nMasq, caMasq, nAttente, caAttente, saleLines, buyLines, achatsTotal, parPlateforme, aDater, sourcesKO,
       nApres, caApres, nDouble, caDouble, doubles: [...doubles].sort(), nAilleurs, caAilleurs, ailleurs, nVenteAvant, caVenteAvant, venteAvant, declaration, declarePasSu: declUrssaf == null, enCours,
       vinted: declRapport.vinted, incomplet };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, sales.failedUids, sales.error, accounts, buysBase, reportMonth, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements, declarables, declRapport, declUrssaf]);
+  }, [sales.items, sales.failedUids, sales.error, ventesComptees, accounts, buysBase, reportMonth, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements, declarables, declRapport, declUrssaf]);
 
   // ── « J'AI DÉCLARÉ CE MOIS » (6 octobre) ──────────────────────────────────
   // Il note, SUR SON CLIC, ce qu'il a déclaré à l'URSSAF pour un mois : l'app
@@ -23979,8 +24027,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (!moisAncienneRegle) return null;
     // L'ancienne règle : ventes Vinted FINALISÉES, au mois de la VENTE, ventes
     // masquées comprises, comptes exclus non (Leboncoin et eBay n'y étaient pas).
+    // Les MÊMES ventes que le registre (`ventesComptees` : comptes lus cette
+    // fois, et couvrant les comptes d'aujourd'hui) — les deux totaux sont écrits
+    // côte à côte, ils ne parlent pas de deux listes différentes (§11).
     const ids = []; let ca = 0;
-    for (const o of (sales.items || [])) {
+    for (const o of (ventesComptees || [])) {
       if (!o || acctOffOf(o) || !venteFinalisee(o)) continue;
       if (ymOf(o.date) !== reportMonth) continue;
       const tx = o.transaction_id != null ? o.transaction_id : o.id; if (tx == null) continue;
@@ -23988,7 +24039,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     }
     return { ids, ca: Math.round(ca * 100) / 100 };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [moisAncienneRegle, sales.items, reportMonth, hiddenAccts, panelAcctOff]);
+  }, [moisAncienneRegle, ventesComptees, reportMonth, hiddenAccts, panelAcctOff]);
   const declarerMois = (regle, montantTxt) => {
     // ⚠️ LA GARDE EST DANS LE GESTE, pas seulement sur le bouton (revue du
     //    6 octobre) : une lecture peut tomber PENDANT que le formulaire est
@@ -23996,7 +24047,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     //    incomplète notée comme sa déclaration (tout ce qui manque passerait
     //    ensuite « à régulariser » : payé deux fois).
     const comptesEchec = nomsVentesKO;                // identité, pas libellé (voir le rapport)
-    const manque = lectureIncomplete({ registre: declUrssaf, ventes: sales.items, ventesErreur: !!sales.error, comptesEchec, versements, lbc: lbcLu, ebay: ebayCmd });
+    const manque = lectureIncomplete({ registre: declUrssaf, ventes: ventesComptees, ventesErreur: !!sales.error, comptesEchec, versements, lbc: lbcLu, ebay: ebayCmd });
     if (manque || !declarables) { setDeclForm(f => f ? { ...f, refus: manque || { enCours: [], rates: ['les dates de versement Vinted'] } } : f); return; }
     const ids = regle === 'vente' && ancienneRegle ? ancienneRegle.ids : report.saleLines.map(l => l.id).filter(Boolean);
     const ca = regle === 'vente' && ancienneRegle ? ancienneRegle.ca : Math.round(report.ca * 100) / 100;
@@ -24797,6 +24848,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // de l'argent reçu, ce n'est pas le CA déclaré de ce mois. La phrase sous
         // le chiffre le dit, des MÊMES lignes (§5).
         const recuDeclareAilleurs = declarables ? declarables.lignes.filter(l => l.ts && ymDeTs(l.ts) === ymIci && l.ym !== ymIci) : [];
+        // Un compte dont les ventes n'ont pas pu être lues n'est pas dans ce
+        // reçu (`ventesComptees`) : on le dit à côté du chiffre — un total
+        // partiel ne se présente pas comme complet (§5).
+        const recuSans = declarables && nomsVentesKO.length ? `sans ${nomsVentesKO.join(', ')} (ventes pas lues) · ` : '';
         const caDeclareAilleurs = recuDeclareAilleurs.reduce((a, l) => a + l.eur, 0);
         const moisDeclAilleurs = [...new Set(recuDeclareAilleurs.map(l => l.ym))].sort().map(ym => { const [y, m] = ym.split('-'); return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString('fr-FR', { month: 'long' }); }).join(', ');
         const joursActifs = jours14.some(j => j.vendu.eur > 0 || (j.recu && j.recu.eur > 0));
@@ -24879,10 +24934,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <span style={{opacity:.55}}>·</span>
                     <span style={{opacity:.9,fontWeight:600}}>voir mes ventes ›</span>
                   </div>
-                  <div data-recu-mois={recuMois==null?'':Math.round(recuMois*100)} style={{marginTop:16,paddingTop:13,borderTop:'1px solid rgba(255,255,255,.13)',display:'flex',alignItems:'baseline',gap:10,flexWrap:'wrap'}}>
+                  <div data-recu-mois={recuMois==null?'':Math.round(recuMois*100)} data-recu-sans={recuSans ? nomsVentesKO.join(',') : ''} style={{marginTop:16,paddingTop:13,borderTop:'1px solid rgba(255,255,255,.13)',display:'flex',alignItems:'baseline',gap:10,flexWrap:'wrap'}}>
                     <span style={{fontSize:11,fontWeight:600,letterSpacing:0.7,textTransform:'uppercase',opacity:.72}}>Reçu en {moisNom}</span>
                     <span className="vrm-display" style={{fontSize:22,fontWeight:700,fontVariantNumeric:'tabular-nums'}}>{declarables === undefined ? '…' : recuMois == null ? '—' : `${Math.round(recuMois).toLocaleString('fr-FR')} €`}</span>
-                    <span style={{fontSize:12,opacity:.72}}>{declarables === null ? 'dates de versement illisibles pour l\'instant' : caDeclareAilleurs > 0 ? `ventes finalisées, argent versé · dont ${Math.round(caDeclareAilleurs).toLocaleString('fr-FR')} € déjà dans ta déclaration de ${moisDeclAilleurs}` : 'ventes finalisées, argent versé · ton CA déclaré'}</span>
+                    <span style={{fontSize:12,opacity:.72}}>{declarables === null ? 'dates de versement illisibles pour l\'instant' : recuSans + (caDeclareAilleurs > 0 ? `ventes finalisées, argent versé · dont ${Math.round(caDeclareAilleurs).toLocaleString('fr-FR')} € déjà dans ta déclaration de ${moisDeclAilleurs}` : 'ventes finalisées, argent versé · ton CA déclaré')}</span>
                   </div>
                 </div>
               </button>
