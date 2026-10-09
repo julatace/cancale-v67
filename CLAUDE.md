@@ -6461,6 +6461,58 @@ Aucune requête Vinted de plus ; tous les garde-fous du §3 inchangés.
 - Extension **5.155.0**, zip régénéré, `EXT_ATTENDUE` suivie. Aucune entrée
   d'`EXT_CAPACITES` : rien de neuf n'est promis.
 
+### ⚠️⚠️ « TOUT GÉNÉRER » CONTOURNAIT LE PLAFOND PAR VISITE (revue du 9 octobre)
+Revue de « Tout générer » (#462), du bordereau de retour (#460) et de l'état de
+l'extension (#457) après la fusion du 8 octobre. Chaque défaut REPRODUIT d'abord
+(vrai `background.js` dans un `vm`, rendu du build de e6bda5c) :
+- ⚠️⚠️ **Un clic « Tout générer (20) » = 20 PUT chez Vinted et les 20 actions de
+  l'heure** (jusqu'à 300 requêtes quand les PDF tardent) ; une réponse à un
+  acheteur était ensuite refusée une heure. Une visite s'arrête à 6 (§3).
+  ⇒ **L'extension juge** : au plus `BORD_MAX_PAR_VISITE` (6) bordereaux commandés
+  par l'app par compte et par 5 min (`vrmBordCmds`, refus `lot` avec l'heure de
+  la suite), et ces commandes s'arrêtent à 15 actions/h (`RESERVE_GESTES` = 5
+  gardées pour répondre/trancher, refus `plafond-bordereaux`). L'admission est
+  sérialisée. **L'app** ne lance que ce qu'elle annonce : `BORD_LOT_MAX` = 6 par
+  clic (« Générer 6 bordereaux (sur 8) »), égal à la borne de l'extension (§11,
+  vérifié). Le total reste 20/h — ne pas le monter.
+- **Le refus était jeté** (« 0 lancé · 3 refusés. Chaque colis montre sa
+  progression » — rien ne la montrait). Le bilan garde chaque raison, la dit UNE
+  fois, s'arrête au premier refus qui vaut pour tout le lot (pause, plafond,
+  `lot`, autre compte…), et « chaque ligne suit le sien » n'est écrit que si un
+  bordereau est parti.
+- **La pause demandée par Vinted se voit avant le clic** : l'état du pont porte
+  `pause.jusqua` ; `raisonExtGlobale` rend `pause` (sauf pour publier, qui ne va
+  pas chez Vinted) — pastille « Lecture seule », bouton grisé, sans couleur
+  (rien à faire). Une extension plus ancienne ne la dit pas : le refus au clic,
+  lui, la dit.
+- **Base lente ⇒ « refusé » pour un bordereau généré** : la liste des comptes et
+  « PDF déjà rangé ? » retenaient l'accusé sans délai. Bornées (4 s / 1,5 s) ;
+  comptes illisibles ⇒ refus `lecture` dit (`getStoredAccounts({ouNull:true})`),
+  plus « compte introuvable ». Côté app, **pas de réponse ≠ refus** : « je ne
+  sais pas, regarde sa ligne », et le bilan passe à « lancé » dès qu'un
+  évènement de CE colis arrive (bouton par colis compris).
+- **File longue** : un colis en file depuis 120 s était réaccepté (7 actions pour
+  4 colis). La file en mémoire fait foi (`BORD_EN_COURS`) ; l'état dit `vivant`
+  pour ce qui y est réellement, l'app garde « En file… » tant que c'est vrai
+  (`jobEnCours`), et « Tout générer » saute ces colis. Un service worker
+  redémarré : plus `vivant`, le clic relance pour de vrai.
+- **§7** : la raison d'un « Tout générer » grisé n'est plus écrite sous le bouton
+  (le bandeau `RaisonBordereauxGrises` la dit) ; « À mettre à jour en X » n'est
+  plus dit là où le pont a mesuré CE navigateur, et ne nomme que ce qui manque à
+  la version vue (`capacitesManquantes`, tiré d'`EXT_CAPACITES`) ; « publier sur
+  Leboncoin reste possible » seulement si `extSait('publication') === 'ok'`.
+- **Achat en litige à renvoyer** (`ACHAT_A_RENVOYER`, une règle) : bloc en tête
+  d'Achats sur les onglets du quotidien (lien de retour une fois) et ligne de Ma
+  journée qui nomme le compte. Il ne revient pas dans « En route ».
+- Preuves : `audit-tout-generer.cjs` (20 contrôles, **11 rouges** sur e6bda5c ;
+  la borne app = extension, rouge sous mutation) ; banc `tout-generer.cjs`
+  (port 5710, données inventées, deux tailles : **30 rouges** sur le build de
+  e6bda5c, 0 après). `audit-statuts.cjs` charge `ACHAT_A_RENVOYER`.
+- ⚠️ **Extension modifiée SANS changer de version** (consigne de la passe) : la
+  prochaine livraison doit monter le manifeste, régénérer le zip et suivre
+  `EXT_ATTENDUE`. Aucune entrée d'`EXT_CAPACITES` : l'app détecte `pause` et
+  `vivant` à leur présence, et ne promet rien à une extension qui ne les a pas.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
@@ -6629,8 +6681,8 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | outil | quoi |
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
-| `node scripts/audit-*.cjs` | **81 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
-| `scripts/bancs/*.cjs` | les **71 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
+| `node scripts/audit-*.cjs` | **82 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `scripts/bancs/*.cjs` | les **72 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
 **Trois règles de preuve :**
@@ -6922,8 +6974,8 @@ script-là me fait croire à une catastrophe.
 src/App.jsx                     l'app (grep avant de lire — le fichier est énorme)
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
-scripts/audit-*.cjs             les 81 audits
-scripts/bancs/                  les 71 bancs (leur README dit comment les lancer)
+scripts/audit-*.cjs             les 82 audits
+scripts/bancs/                  les 72 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 ```

@@ -187,6 +187,21 @@ const extSait = (quoi) => {
   return cmpVersion(v, EXT_CAPACITES[quoi] || EXT_ATTENDUE) < 0 ? 'retard' : 'ok';
 };
 const extSaitLireCodes = () => extSait('codes');
+// Ce qu'une version VUE (la dernière capture, d'un autre appareil) ne sait pas
+// encore faire, en mots — tiré de la MÊME table (§11), jamais une liste écrite à
+// la main qui dérive dès qu'EXT_ATTENDUE avance (revue du 9 octobre : « c'est
+// la version à jour qui… » citait trois choses que la 5.161 faisait déjà). Une
+// capacité sans mots ici n'est simplement pas citée : on ne promet pas plus.
+const CAPACITES_DITES = [
+  ['commande', 'générer un bordereau depuis VRM'],
+  ['messagerie', 'répondre et faire une offre depuis VRM'],
+  ['publication', 'publier une annonce sur Leboncoin depuis VRM'],
+  ['versement', 'relever la date de versement de tes ventes'],
+  ['lbcmsg', 'relever tes messages Leboncoin'],
+  ['detourage', 'détourer tes photos'],
+];
+const capacitesManquantes = (v) => (v ? CAPACITES_DITES.filter(([k]) => cmpVersion(v, EXT_CAPACITES[k]) < 0).map(([, t]) => t) : []);
+const listeFr = (l) => (l.length <= 1 ? (l[0] || '') : `${l.slice(0, -1).join(', ')} ni ${l[l.length - 1]}`);
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -2914,6 +2929,11 @@ const classifyOrderStatus = (status) => {
 // l'intérieur d'un composant, donc invisibles pour `needsBordereau` juste
 // en dessous — d'où le désaccord corrigé ci-après.
 const isAtRelayStatus = (s) => !!(s) && !/livr[ée]\s+(?:chez|à\s+(?:ton|votre|son)\s+domicile|à\s+domicile)/i.test(s) && !/finalis|termin|annul|rembours|retour/i.test(s) && ((/d[ée]pos[ée]|arriv[ée]/i.test(s) && /point\s+relais|bureau\s+de\s+poste|casier|consigne|locker|vinted\s*go|point\s+de\s+retrait/i.test(s)) || /pr[êe]t\s+à\s+[êe]tre\s+retir/i.test(s) || (/disponible|à\s+retirer|au\s+point\s+de\s+retrait/i.test(s) && /relais|bureau\s+de\s+poste|casier|consigne|point|retrait|locker|vinted\s*go/i.test(s)));
+// Un ACHAT en « Retour initié » : litige, la paire doit REPARTIR (bordereau de
+// retour sur Vinted). Une règle (§11) : l'étiquette de la carte (`achatStage`),
+// le bloc en tête d'Achats et la ligne de Ma journée la lisent. Motif précis,
+// pour ne pas attraper « Retournée à l'expéditeur », qui est autre chose.
+const ACHAT_A_RENVOYER = /retour\s*initi|retour\s+en\s+cours|retour\s+demand/i;
 // Fenêtre pendant laquelle une vente mérite encore un numéro de boîte : la paire
 // est passée par le garage récemment, donc le numéro a un sens pour l'historique.
 // ⚠️ C'est CETTE borne qui empêche de renuméroter tout l'historique (140 ventes
@@ -3992,6 +4012,18 @@ function raisonExtGlobale(sansSouris, opt) {
   if (autre) return { code: 'autre-vrm', texte: __sessExtEnVol
     ? `L'extension écrivait dans le compte VRM ${sonMail || 'd’un autre'} — je la reconnecte au tien…`
     : `L'extension est connectée au compte VRM ${sonMail || 'd’un autre'}, pas au tien (${monMail}) — je la reconnecte au tien ; si ça persiste, recharge cette page.` };
+  // ⚠️⚠️ VINTED A DEMANDÉ DE RALENTIR (revue du 9 octobre). Pendant la pause de
+  //    l'extension (5.162), l'en-tête disait « Actions possibles » et « Tout
+  //    générer » restait actif : seul le clic révélait le refus. L'extension
+  //    dit maintenant sa pause dans son état (`pause.jusqua`) ; une plus
+  //    ancienne ne la dit pas — alors on ne l'invente pas, c'est le refus au
+  //    clic qui la dira (avec sa raison). Publier sur Leboncoin ne va pas chez
+  //    Vinted : la pause ne le bloque pas.
+  const pauseMs = Number((__vmrEtat.pause && __vmrEtat.pause.jusqua) || 0) - Date.now();
+  if (cap !== 'publication' && pauseMs > 0) {
+    const min = Math.max(1, Math.ceil(pauseMs / 60000));
+    return { code: 'pause', texte: `Vinted a demandé de ralentir : l'extension n'envoie rien chez Vinted pendant encore ${min} min (c'est elle qui protège tes comptes). Rien à faire de ton côté.` };
+  }
   return null;
 }
 
@@ -7352,6 +7384,13 @@ function useExtVivante() {
   return { present: vmrExtPresent(), etat: __vmrEtat, jobs: __vmrJobs };
 }
 const CMD_ACTIVE = ['file', 'generation', 'pdf'];
+// Une demande est EN COURS tant que l'extension la dit réellement dans sa file
+// (`vivant`, depuis la version qui le dit) ; sinon, comme avant, 3 minutes après
+// son dernier évènement. ⚠️ L'âge seul ne suffisait pas (revue du 9 octobre) :
+// un colis qui attendait son tour derrière cinq autres (16,5 s chacun quand le
+// PDF tarde) redevenait « Générer le bordereau » au bout de 3 min, et un second
+// clic le recommandait.
+const jobEnCours = (job) => !!(job && CMD_ACTIVE.includes(job.etape) && (job.vivant || Date.now() - Number(job.at || 0) < 180000));
 // La raison COMMUNE pour laquelle les bordereaux ne peuvent pas être générés
 // depuis l'app (extension absente, muette, en retard, mal connectée). Rien à
 // générer, ou rien qui bloque → rien du tout (pas de bandeau permanent).
@@ -7387,6 +7426,7 @@ function BoutonBordereau({ uid, tx, conv, login, aGenerer, pdf, onImprimer, onFa
   const { etat, jobs } = useExtVivante();
   const sansSouris = useSansSouris();
   const [refus, setRefus] = React.useState(null);
+  const [refusAt, setRefusAt] = React.useState(0);
   const [envoi, setEnvoi] = React.useState(false);
   const jobId = `bord:${uid}:${tx}`;
   const job = jobs[jobId] || null;
@@ -7408,23 +7448,30 @@ function BoutonBordereau({ uid, tx, conv, login, aGenerer, pdf, onImprimer, onFa
     if (!etat.vinted) { raison = `Connecte-toi sur vinted.fr avec ${login || 'ce compte'} dans ce Chrome.`; distingue = raison; }
     else if (String(etat.vinted.uid) !== String(uid)) { raison = `Chrome est connecté sur ${etat.vinted.login || 'un autre compte'} — bascule sur ${login || 'ce compte'} sur vinted.fr.`; distingue = raison; }
   }
-  const enCours = job && CMD_ACTIVE.includes(job.etape) && (Date.now() - Number(job.at || 0) < 180000);
+  const enCours = jobEnCours(job);
   const ko = job && (job.etape === 'echec' || job.etape === 'genere_sans_pdf');
   const lancer = async () => {
     if (raison || enCours || envoi) return;
     setRefus(null); setEnvoi(true);
     const r = await vmrCmd({ cmd: 'bordereau', uid: String(uid), tx: String(tx) });
-    setEnvoi(false);
-    if (!r) { setRefus("L'extension n'a pas répondu — recharge cette page et réessaie, ou génère-le sur Vinted (lien ci-dessous)."); __vmrRates = 1; battementExt(); return; }
+    setEnvoi(false); setRefusAt(Date.now());
+    // ⚠️ PAS DE RÉPONSE N'EST PAS UN REFUS (revue du 9 octobre) : l'extension a
+    //    pu accepter après nos 9 s et générer le bordereau chez Vinted. On dit
+    //    qu'on ne sait pas, et la ligne reprend la main dès qu'un évènement de
+    //    CE colis arrive (voir `refusVu`).
+    if (!r) { setRefus("L'extension n'a pas répondu à temps — je ne sais pas s'il est parti : si cette ligne n'avance pas d'ici une minute, recharge la page avant de réessayer, ou génère-le sur Vinted (lien ci-dessous)."); __vmrRates = 1; battementExt(); return; }
     if (!r.accepte) {
       setRefus(r.code === 'vinted-autre' ? `Chrome est connecté sur ${r.actifLogin || 'un autre compte'} — bascule sur ${login || 'ce compte'} sur vinted.fr.`
         : r.code === 'vinted-absent' ? `Connecte-toi sur vinted.fr avec ${login || 'ce compte'} dans ce Chrome.`
         : (r.raison || 'Refusé par l\'extension.'));
       return;
     }
-    __vmrJobs[r.jobId] = { etape: r.etape, at: Date.now() };
+    __vmrJobs[r.jobId] = { etape: r.etape, at: Date.now(), vivant: !!r.vivant };
     __vmrNotifier();
   };
+  // Un évènement de ce colis arrivé APRÈS le refus affiché le rend caduc : la
+  // ligne dit ce que l'extension fait vraiment.
+  const refusVu = refus && !(job && Number(job.at || 0) >= refusAt - 1000) ? refus : null;
   const libelle = envoi ? 'Envoi…'
     : enCours ? (job.etape === 'pdf' ? 'Récupération du PDF…' : job.etape === 'generation' ? 'Génération chez Vinted…' : 'En file…')
     : ko ? 'Réessayer'
@@ -7436,7 +7483,7 @@ function BoutonBordereau({ uid, tx, conv, login, aGenerer, pdf, onImprimer, onFa
   // Le repli sur Vinted, propre à CETTE vente (son adresse distingue la ligne,
   // §7) : la conversation de la vente porte le bouton « Imprimer le bordereau ».
   const surVinted = conv ? `https://www.vinted.fr/inbox/${encodeURIComponent(conv)}` : `https://www.vinted.fr/member/transactions/${encodeURIComponent(tx)}`;
-  const repliVinted = (grise && glob && glob.code !== 'verif') || !!refus;
+  const repliVinted = (grise && glob && glob.code !== 'verif') || !!refusVu;
   return (
     <span data-bouton-bord={grise ? 'grise' : enCours ? 'encours' : ko ? 'echec' : 'pret'} data-tx={tx} style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3, maxWidth: '100%' }}>
       <button type="button" onClick={lancer} aria-disabled={grise || enCours ? 'true' : undefined}
@@ -7445,9 +7492,9 @@ function BoutonBordereau({ uid, tx, conv, login, aGenerer, pdf, onImprimer, onFa
           color: grise ? C.muted : C.accent, opacity: grise ? 0.55 : 1, cursor: grise || enCours ? 'not-allowed' : 'pointer', filter: grise ? 'grayscale(1)' : 'none' }}>
         <Icon name="doc" size={grand ? 16 : 14}/>{libelle}
       </button>
-      {(distingue || refus || (ko && job.raison)) && (
-        <span style={{ fontSize: 11, color: refus || ko ? C.warn : C.muted, lineHeight: 1.35, whiteSpace: 'normal' }}>
-          {refus || (ko ? (job.etape === 'genere_sans_pdf' ? `Généré chez Vinted, mais le PDF n'est pas encore prêt (${job.raison}).` : job.raison) : distingue)}
+      {(distingue || refusVu || (ko && job.raison)) && (
+        <span style={{ fontSize: 11, color: refusVu || ko ? C.warn : C.muted, lineHeight: 1.35, whiteSpace: 'normal' }}>
+          {refusVu || (ko ? (job.etape === 'genere_sans_pdf' ? `Généré chez Vinted, mais le PDF n'est pas encore prêt (${job.raison}).` : job.raison) : distingue)}
         </span>
       )}
       {/* Le repli à la main : l'extension a posé un rendez-vous de 15 min, le PDF
@@ -7472,54 +7519,112 @@ function BoutonBordereau({ uid, tx, conv, login, aGenerer, pdf, onImprimer, onFa
 // envoie les commandes UNE PAR UNE (await séquentiel), jamais en rafale ; et
 // seulement pour le compte ouvert dans Chrome (garde stricte côté extension),
 // les autres sont comptés et il bascule. Rien ne part sans ce clic.
+// ⚠️⚠️ AU PLUS 6 PAR CLIC, ET L'EXTENSION RESTE LE JUGE (revue du 9 octobre).
+//    Un clic sur « Tout générer (20) » envoyait 20 commandes : 20 PUT chez
+//    Vinted d'affilée (jusqu'à 300 requêtes quand les PDF tardent) et les
+//    20 actions de l'heure — une réponse à un acheteur était ensuite refusée
+//    une heure. Une visite sur Vinted, elle, s'arrête à 6 (§3, « plafond par
+//    visite »). La même borne ici (`BORD_MAX_PAR_VISITE` de l'extension,
+//    vérifiée égale par `audit-tout-generer.cjs`, §11), et l'extension garde la
+//    sienne (6 par 5 min et par compte, une réserve d'actions pour les gestes
+//    sur clic) : l'app ne lance que ce qu'elle peut annoncer.
+const BORD_LOT_MAX = 6;
+// Les refus qui vaudront pour TOUTE la suite du lot : on s'arrête au premier
+// (les suivants seraient refusés pareil, et chaque essai coûte une demande).
+const REFUS_DU_LOT = ['vinted-pause', 'plafond', 'plafond-bordereaux', 'trop-d-actions', 'lot', 'vinted-absent', 'vinted-autre', 'lecture', 'origine'];
+// Le bilan d'un clic, une phrase par cause (§7). Une demande restée SANS
+// RÉPONSE n'est pas un refus : si l'extension a prévenu depuis qu'elle
+// travaille dessus (un évènement de CE colis), elle compte comme lancée ;
+// sinon on dit qu'on ne sait pas — jamais « refusé » pour un bordereau qui a
+// pu être généré chez Vinted.
+function bilanToutGenerer(b, jobs) {
+  if (!b) return null;
+  if (b.message) return b.message;
+  const arrive = (id) => { const j = jobs[id]; return !!(j && Number(j.at || 0) >= b.at - 1000); };
+  const partisApres = b.muets.filter(arrive);
+  const inconnus = b.muets.length - partisApres.length;
+  const n = b.lances.length + partisApres.length;
+  const s = (k) => (k > 1 ? 's' : '');
+  const out = [];
+  if (n) out.push(`${n} bordereau${n > 1 ? 'x' : ''} lancé${s(n)} — chaque ligne suit le sien.`);
+  if (b.dejaPrets) out.push(`${b.dejaPrets} déjà prêt${s(b.dejaPrets)} (le PDF était là).`);
+  if (inconnus) out.push(`L'extension n'a pas répondu à temps pour ${inconnus} colis : je ne sais pas ${inconnus > 1 ? "s'ils sont partis — regarde leur ligne" : "s'il est parti — regarde sa ligne"} avant de relancer.`);
+  if (b.refus.length) {
+    const raisons = [...new Set(b.refus.map((r) => String(r.raison || '').replace(/[.\s]+$/, '')))];
+    out.push(`${b.refus.length > 1 ? `${b.refus.length} refusés` : 'Refusé'} par l'extension : ${raisons.join(' · ')}.`);
+  }
+  if (b.attendent) out.push(b.arret === 'refus' ? `${b.attendent} autre${s(b.attendent)} pas demandé${s(b.attendent)}, pour la même raison.`
+    : b.arret === 'muet' ? `${b.attendent} autre${s(b.attendent)} pas demandé${s(b.attendent)} : relance « Tout générer » quand cette ligne avance.`
+    : `${b.attendent} autre${s(b.attendent)} au prochain clic : jamais plus de ${BORD_LOT_MAX} d'affilée chez Vinted.`);
+  if (b.autres) out.push(`${b.autres} sur un autre compte (bascule sur vinted.fr pour les générer).`);
+  return out.join(' ');
+}
 function BoutonToutGenerer({ items }) {
-  const { etat } = useExtVivante();
+  const { etat, jobs } = useExtVivante();
   const sansSouris = useSansSouris();
   const [busy, setBusy] = React.useState(false);
   const [prog, setProg] = React.useState(null);
-  const [resume, setResume] = React.useState(null);
+  const [bilan, setBilan] = React.useState(null);
   const list = (items || []).filter(x => x && x.uid && x.tx);
   if (list.length < 1) return null;
   const glob = raisonExtGlobale(sansSouris);
   const co = etat && etat.vinted ? String(etat.vinted.uid) : '';
-  const mine = co ? list.filter(x => String(x.uid) === co) : [];
-  const autres = list.length - mine.length;
+  // Un colis dont la demande est déjà en file, en cours ou faite ne repart pas :
+  // un second clic ne le recommande pas (revue du 9 octobre).
+  const occupe = (x) => { const j = jobs[`bord:${x.uid}:${x.tx}`]; return jobEnCours(j) || !!(j && j.etape === 'fait'); };
+  const mine = co ? list.filter(x => String(x.uid) === co && !occupe(x)) : [];
+  const autres = co ? list.filter(x => String(x.uid) !== co).length : 0;
+  const lot = mine.slice(0, BORD_LOT_MAX);
   const lancer = async () => {
     if (glob || busy) return;
-    setResume(null);
-    if (!co) { setResume("Aucun compte Vinted ouvert dans ce Chrome — ouvre vinted.fr sur le compte des colis, puis réessaie."); return; }
-    if (!mine.length) { setResume(`Ces colis sont sur un autre compte — bascule sur vinted.fr pour les générer (${autres}).`); return; }
+    setBilan(null);
+    if (!co) { setBilan({ message: etat && etat.vintedPasSu ? "Je regarde quel compte Vinted est ouvert dans Chrome — réessaie dans un instant." : "Aucun compte Vinted ouvert dans ce Chrome — ouvre vinted.fr sur le compte des colis, puis réessaie." }); return; }
+    if (!lot.length) { setBilan({ message: autres ? `Ces colis sont sur un autre compte — bascule sur vinted.fr pour les générer (${autres}).` : "Leurs bordereaux sont déjà en file ou en cours — chaque ligne suit le sien." }); return; }
     setBusy(true);
-    let ok = 0, ko = 0;
-    for (let i = 0; i < mine.length; i++) {
-      setProg({ k: i + 1, n: mine.length });
-      const x = mine[i];
+    const b = { at: Date.now(), lances: [], dejaPrets: 0, muets: [], refus: [], attendent: mine.length - lot.length, arret: '', autres };
+    for (let i = 0; i < lot.length; i++) {
+      setProg({ k: i + 1, n: lot.length });
+      const x = lot[i];
+      const jobId = `bord:${x.uid}:${x.tx}`;
       // Une commande, on attend sa réponse avant la suivante ; l'extension les
-      // exécute en file (une requête Vinted à la fois, §3) sous son plafond 20/h.
+      // exécute en file (une requête Vinted à la fois, §3) sous ses plafonds.
       const r = await vmrCmd({ cmd: 'bordereau', uid: String(x.uid), tx: String(x.tx) });
-      if (r && r.accepte) { ok++; if (r.jobId) { __vmrJobs[r.jobId] = { etape: r.etape, at: Date.now() }; __vmrNotifier(); } }
-      else ko++;
+      if (r && r.accepte) {
+        if (r.etape === 'fait') b.dejaPrets++; else b.lances.push(r.jobId || jobId);
+        __vmrJobs[r.jobId || jobId] = { etape: r.etape, at: Date.now(), vivant: !!r.vivant }; __vmrNotifier();
+        continue;
+      }
+      if (!r) { b.muets.push(jobId); b.attendent += lot.length - i - 1; b.arret = 'muet'; __vmrRates = 1; battementExt(); break; }
+      b.refus.push({ code: r.code || '', raison: r.code === 'vinted-autre' ? `Chrome est connecté sur ${r.actifLogin || 'un autre compte'} — bascule sur vinted.fr` : (r.raison || 'raison non donnée') });
+      if (REFUS_DU_LOT.includes(r.code)) { b.attendent += lot.length - i - 1; b.arret = 'refus'; break; }
     }
-    setBusy(false); setProg(null);
-    setResume(`${ok} bordereau${ok > 1 ? 'x' : ''} lancé${ok > 1 ? 's' : ''}${ko ? ` · ${ko} refusé${ko > 1 ? 's' : ''}` : ''}${autres ? ` · ${autres} sur un autre compte (bascule pour les générer)` : ''}. Chaque colis montre sa progression ci-dessous.`);
+    setBusy(false); setProg(null); setBilan(b);
   };
   const grise = !!glob;
   // ⚠️ LE CHIFFRE NE PROMET QUE CE QUI SERA GÉNÉRÉ (§7). Si un compte est ouvert
   //    dans Chrome, seuls SES colis partent → on compte `mine`, jamais le total
-  //    (sinon « Tout générer (7) » pour 0 colis générable, revue du 8 oct.).
+  //    (sinon « Tout générer (7) » pour 0 colis générable, revue du 8 oct.) ; et
+  //    au-delà de 6, le bouton dit les 6 qui partent (revue du 9 octobre).
   const n = co ? mine.length : list.length;
   const libelle = busy && prog ? `Génération… ${prog.k}/${prog.n}`
-    : (co && n === 0) ? 'Tout générer — change de compte Vinted'
+    : (co && n === 0) ? (autres ? 'Tout générer — change de compte Vinted' : 'Bordereaux en cours…')
+    : n > BORD_LOT_MAX ? `Générer ${BORD_LOT_MAX} bordereaux (sur ${n})`
     : `Tout générer (${n})`;
+  // ⚠️ SOUS LE BOUTON, SEULEMENT LE BILAN D'UN CLIC (revue du 9 octobre). La
+  //    raison commune d'un bouton grisé (extension absente, téléphone…) est dite
+  //    UNE fois par `RaisonBordereauxGrises`, juste en dessous : la répéter ici
+  //    l'écrivait deux fois sur l'écran (§7). Elle reste dans l'infobulle.
+  const resume = bilanToutGenerer(bilan, jobs);
   return (
     <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3, maxWidth: '100%' }}>
-      <button type="button" data-tout-generer={grise ? 'grise' : 'pret'} onClick={lancer} disabled={busy} aria-disabled={grise ? 'true' : undefined}
-        title={glob ? glob.texte : "L'extension génère chaque bordereau sur Vinted, un par un (jamais en rafale)"}
+      <button type="button" data-tout-generer={grise ? 'grise' : 'pret'} data-lot={lot.length} onClick={lancer} disabled={busy} aria-disabled={grise ? 'true' : undefined}
+        title={glob ? glob.texte : `L'extension génère chaque bordereau sur Vinted, un par un — jamais plus de ${BORD_LOT_MAX} d'affilée`}
         style={{ flexShrink: 0, border: `1px solid ${grise ? C.border : C.accent}`, borderRadius: 10, background: grise ? 'transparent' : `${C.accent}14`, color: grise ? C.muted : C.accent,
           padding: '11px 15px', cursor: grise || busy ? 'default' : 'pointer', fontSize: 13, fontWeight: 700, fontFamily: 'inherit', opacity: grise ? 0.55 : (busy ? 0.7 : 1), filter: grise ? 'grayscale(1)' : 'none', whiteSpace: 'nowrap' }}>
         <Icon name="doc" size={14}/> {libelle}
       </button>
-      {(resume || glob) && <span style={{ fontSize: 11, color: C.muted, lineHeight: 1.35, whiteSpace: 'normal' }}>{resume || glob.texte}</span>}
+      {resume && <span data-tg-bilan={bilan && !bilan.message ? `lances:${bilan.lances.length},muets:${bilan.muets.length},refus:${bilan.refus.map(r => r.code).join('|')},attendent:${bilan.attendent},arret:${bilan.arret}` : 'message'}
+        style={{ fontSize: 11, color: C.muted, lineHeight: 1.35, whiteSpace: 'normal' }}>{resume}</span>}
     </span>
   );
 }
@@ -7610,13 +7715,20 @@ function etatActionsExt(sansSouris) {
   const glob = raisonExtGlobale(sansSouris);
   // Passager (on lui demande, elle renouvelle sa connexion) : ni oui ni non.
   if (glob && (glob.code === 'verif' || glob.code === 'vrm-encours')) return { niveau: 'verif', glob, vinted: null };
-  if (glob) return { niveau: 'lecture', glob, vinted: null };
   const e = __vmrEtat && __vmrEtat.ok ? __vmrEtat : null;
+  // Vinted a demandé de ralentir : la lecture seule est passagère, et le compte
+  // ouvert dans Chrome l'est toujours — on ne le dit pas « absent ».
+  if (glob && glob.code === 'pause') return { niveau: 'lecture', glob, vinted: e && e.vinted && e.vinted.uid ? e.vinted : null };
+  if (glob) return { niveau: 'lecture', glob, vinted: null };
   // Le cookie Vinted pas lu à temps (5.161 : `vintedPasSu`) n'est pas « aucun
   // compte ouvert » (revue du 5 octobre).
   if (e && e.vintedPasSu) return { niveau: 'verif', glob: { code: 'vinted-passu', texte: "Je regarde quel compte Vinted est ouvert dans Chrome…" }, vinted: null };
   const vinted = e && e.vinted && e.vinted.uid ? e.vinted : null;
-  if (!vinted) return { niveau: 'lecture', glob: { code: 'vinted', texte: "Aucun compte Vinted n'est ouvert dans ce Chrome — les actions SUR VINTED (bordereau, répondre) attendent ; publier sur Leboncoin reste possible." }, vinted: null };
+  // ⚠️ « Publier sur Leboncoin reste possible » ne se dit que si l'extension
+  //    installée sait publier depuis l'app (revue du 9 octobre) : avec une 5.143,
+  //    la pastille l'affirmait à côté d'un bouton Publier grisé « mets
+  //    l'extension à jour » — deux voix sur la même action (§11).
+  if (!vinted) return { niveau: 'lecture', glob: { code: 'vinted', texte: `Aucun compte Vinted n'est ouvert dans ce Chrome — les actions SUR VINTED (bordereau, répondre) attendent ; ${extSait('publication') === 'ok' ? 'publier sur Leboncoin reste possible.' : `publier sur Leboncoin demande une extension à jour (${EXT_ATTENDUE}).`}` }, vinted: null };
   return { niveau: 'ok', glob: null, vinted };
 }
 // La DERNIÈRE capture reçue d'une extension (où qu'elle tourne) : l'extension
@@ -7671,7 +7783,8 @@ function EtatActions({ onNav, ordi, sombre }) {
   const loginVinted = st.vinted ? (st.vinted.login || ('compte ' + st.vinted.uid)) : '';
   // Une couleur seulement s'il y a un geste à faire ICI (§7) : sur un téléphone
   // il n'y en a pas, la lecture seule y est normale.
-  const aRattraper = st.niveau === 'lecture' && code !== 'telephone';
+  // Vinted qui demande de ralentir : rien à faire non plus, ça repart seul.
+  const aRattraper = st.niveau === 'lecture' && code !== 'telephone' && code !== 'pause';
   const point = st.niveau === 'ok' ? C.accent : aRattraper ? C.warn : C.muted;
   const libelle = st.niveau === 'ok' ? 'Actions possibles' : st.niveau === 'verif' ? 'Vérification…' : 'Lecture seule';
   const court = !ordi;                       // en-tête de téléphone : peu de place
@@ -7684,7 +7797,9 @@ function EtatActions({ onNav, ordi, sombre }) {
   const ligneExt = code === 'telephone' ? { s: '—', t: "s'utilise sur l'ordinateur où elle est installée" }
     : code === 'absente' ? { s: 'non', t: 'pas détectée dans ce navigateur' }
     : code === 'muette' ? { s: 'non', t: 'ne répond pas' }
-    : code === 'retard' ? { s: 'non', t: `version ${version || '?'} — trop ancienne pour recevoir des commandes (passe à la ${EXT_ATTENDUE})` }
+    // La version à installer est dite UNE fois, sur le bouton juste dessous
+    // (revue du 9 octobre : « 5.163.0 » écrit trois fois dans le panneau).
+    : code === 'retard' ? { s: 'non', t: `version ${version || '?'} — trop ancienne pour recevoir des commandes de VRM` }
     : st.niveau === 'verif' ? { s: '…', t: 'je lui demande…' }
     : { s: 'oui', t: `allumée${version ? ' · ' + version : ''}${majDispo ? ` (la ${EXT_ATTENDUE} existe)` : ''}` };
   const ligneVrm = ligneVrmVerif ? { s: '…', t: 'renouvellement de sa connexion…' }
@@ -7712,6 +7827,7 @@ function EtatActions({ onNav, ordi, sombre }) {
   else if (code === 'autre-vrm' || code === 'vrm-passu') geste = __sessExtEnVol ? <span>Un instant…</span>
     : <button type="button" data-etat-geste="recharger" style={btn} onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button>;
   else if (code === 'vinted') geste = <a data-etat-geste="vinted" href="https://www.vinted.fr" target="_blank" rel="noreferrer" style={btn}>Ouvrir vinted.fr et me connecter</a>;
+  // 'pause' : aucun geste — la phrase du panneau dit que ça repart seul.
 
   const Ligne = ({ nom, l }) => (
     <div style={{ display: 'flex', gap: 8, alignItems: 'baseline', padding: '5px 0', borderTop: `1px solid ${C.border}` }}>
@@ -7750,7 +7866,8 @@ function EtatActions({ onNav, ordi, sombre }) {
           ) : (
             <div style={{ color: C.muted, marginBottom: 8 }}>
               Tout ce qui est déjà dans VRM marche : tes ventes, achats, annonces et messages, les colis à retirer et leurs codes, l'impression des bordereaux déjà reçus.
-              {' '}Générer un bordereau ou répondre demande l'extension allumée, connectée à ton compte VRM, avec un compte Vinted ouvert dans Chrome ; publier sur Leboncoin demande l'extension allumée.
+              {' '}{code === 'pause' ? st.glob.texte
+                : <>Générer un bordereau ou répondre demande l'extension allumée, connectée à ton compte VRM, avec un compte Vinted ouvert dans Chrome ; publier sur Leboncoin demande {extSait('publication') === 'retard' ? 'une extension à jour' : "l'extension allumée"}.</>}
             </div>
           )}
           <Ligne nom="Extension" l={ligneExt}/>
@@ -7767,9 +7884,18 @@ function EtatActions({ onNav, ordi, sombre }) {
             {derniere === undefined ? 'Dernière capture reçue : je regarde…'
               : derniere === null ? 'Dernière capture reçue : pas su (la base n’a pas répondu).'
               : derniere === 'aucune' ? 'Aucune capture reçue de ton extension pour l’instant.'
-              : (() => { const retard = extEnRetard(derniere.v); return (
+              // ⚠️⚠️ LA MISE À JOUR N'EST DITE ICI QUE LÀ OÙ LE PONT NE PARLE PAS
+              //    (revue du 9 octobre). Sur l'ordinateur, la ligne « Extension »
+              //    juste au-dessus vient du pont, qui a mesuré CE navigateur : la
+              //    phrase d'ici, tirée de la dernière capture, la contredisait
+              //    (« ✓ allumée · 5.163.0 » puis « à mettre à jour en 5.163.0 »
+              //    tant que la nouvelle n'avait rien capté). Et elle promettait
+              //    trois choses écrites en dur que la 5.161 savait déjà faire. On
+              //    ne nomme que ce qui manque VRAIMENT à la version vue
+              //    (`capacitesManquantes`, tirée d'EXT_CAPACITES, §11).
+              : (() => { const retard = !vmrExtPresent() && extEnRetard(derniere.v); const manque = retard ? capacitesManquantes(derniere.v) : []; return (
                 <>Dernière capture reçue de ton extension : <b style={{ color: C.text }}>{derniere.at ? ilYaCourt(derniere.at) : 'date inconnue'}</b>{derniere.v ? ` (version ${derniere.v})` : ''}. Elle écrit quand tu passes sur Vinted.
-                {retard ? <> <span style={{ color: C.warn, fontWeight: 600 }}>À mettre à jour en {EXT_ATTENDUE}</span> sur l'ordinateur où elle est installée (Réglages → Extension) : c'est la version à jour qui lit les codes de retrait <b style={{ color: C.text }}>Vinted&nbsp;Go</b>, rafraîchit tes ventes <b style={{ color: C.text }}>Leboncoin</b> et publie une annonce sur Leboncoin depuis VRM.</> : null}</>
+                {retard ? <> <span style={{ color: C.warn, fontWeight: 600 }}>À mettre à jour en {EXT_ATTENDUE}</span> sur l'ordinateur où elle est installée (Réglages → Extension){manque.length ? <> : celle-ci ne sait pas encore {listeFr(manque)}.</> : '.'}</> : null}</>
               ); })()}
           </div>
           {geste && <div style={{ marginTop: 10 }}>{geste}</div>}
@@ -22397,7 +22523,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     //    c'est une action à faire (générer le bordereau de retour sur Vinted).
     //    Motif précis (comme venteStage) pour ne pas attraper « Retournée à
     //    l'expéditeur », qui est autre chose.
-    if (/retour\s*initi|retour\s+en\s+cours|retour\s+demand/i.test(s)) return { label: 'À renvoyer', step: 1, color: C.warn, retour: true };
+    if (ACHAT_A_RENVOYER.test(s)) return { label: 'À renvoyer', step: 1, color: C.warn, retour: true };
     if (/annul|rembours|refus/i.test(s)) return { label: 'Annulé', step: 0, color: C.danger };
     if (/finalis/i.test(s) || tusDe(o) === 'completed') return { label: 'Reçu', step: 4, color: INV_STATUS.online.color };
     if (isAtRelayStatus(s) || (tk && tk.status === 'available')) return { label: 'À retirer', step: 3, color: C.warn };
@@ -24482,6 +24608,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                      return `Ouvre la conversation Vinted de chaque colis (bouton dans Achats) : le code y est. L'extension la lit aussi toute seule quand tu passes sur Vinted connecté ${qui}`; })();
           jobs.push({icon:'box',color:hd>0?C.danger:(pr>0?(C.blue||C.accent):C.muted),urgent:hd>0,title:`Retirer ${pickupCount} colis`,sub,tab:'cat_achats',prio:hd>0?0.5:(pr>0?2:6)});
         }
+        // ⚠️ UN ACHAT EN LITIGE À RENVOYER (revue du 9 octobre) : il ne
+        //    s'affichait que sous Achats → « Tous ». Même règle que la carte et
+        //    le bloc d'Achats (`ACHAT_A_RENVOYER`, §11) ; le compte est nommé
+        //    (le bordereau de retour se fait sur CELUI-LÀ).
+        { const ar = (buysBase||[]).filter(o=>ACHAT_A_RENVOYER.test(String(o.status||'')));
+          if (ar.length) { const cs=[...new Set(ar.map(o=>o._acc?accNameOf(o._acc):'').filter(Boolean))];
+            jobs.push({id:'a-renvoyer',n:ar.length,icon:'box',color:C.warn,title:`Renvoyer ${ar.length} paire${ar.length>1?'s':''} (litige)`,
+              sub:`Génère l'étiquette de retour sur Vinted${cs.length===1?` — compte ${cs[0]}`:cs.length>1?` — comptes ${cs.slice(0,3).join(', ')}`:''}`,tab:'cat_achats',prio:0.8}); } }
         if(unread) jobs.push({icon:'chat',color:C.warn,title:`Répondre à ${unread} message${unread>1?'s':''}`,sub:'Un acheteur attend — réponds vite pour vendre',tab:'cat_msg',prio:3});
         if(repriceList.length) jobs.push({icon:'tag',color:C.warn,title:`Baisser ${repriceList.length} prix`,sub:'Des paires vues mais qui ne partent pas',tab:'cat_annonces',prio:5});
         // ⚠️⚠️ SES EMAILS MIS DE CÔTÉ QUE PERSONNE NE PEUT RÉCUPÉRER. Au seul
@@ -25744,6 +25878,38 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <button key={id} onClick={()=>setAFilter(id)} style={{flexShrink:0,whiteSpace:'nowrap',padding:'7px 14px',borderRadius:8,border:`1px solid ${aFilter===id?C.accent:C.border}`,background:aFilter===id?C.accent:'transparent',color:aFilter===id?'#fff':C.muted,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',boxShadow:aFilter===id?`0 2px 8px ${C.accent}44`:'none',transition:'all .18s ease'}}>{label}{cnt?` ${cnt}`:''}</button>
           )); })()}
         </div>
+        {/* ⚠️⚠️ UN ACHAT EN LITIGE NE SE CACHE PAS DERRIÈRE « TOUS » (revue du
+            9 octobre). « Retour initié » range l'achat en « annulé » pour
+            l'argent (aucune livraison à attendre) : il sortait donc de « En
+            route », l'onglet par défaut n'affiche aucune liste, et le lien du
+            bordereau de retour ne se voyait QUE sous « Tous », parmi des
+            centaines d'achats. Une action de litige cachée est un colis oublié.
+            Il a sa place en tête des onglets du quotidien — sans revenir dans
+            le compte « En route » (il n'arrive pas, il repart). Sous « Tous »,
+            sa carte porte déjà le lien : pas deux fois. */}
+        {aFilter!=='all' && (()=>{
+          const l = buysBase.filter(o=>ACHAT_A_RENVOYER.test(String(o.status||'')));
+          if (!l.length) return null;
+          const comptes = [...new Set(l.map(o=>o._acc?accNameOf(o._acc):"").filter(Boolean))];
+          const unSeul = comptes.length===1;
+          return (
+            <div data-a-renvoyer={l.length} style={{background:C.card,border:`1px solid ${C.border}`,borderLeft:`3px solid ${C.warn}`,borderRadius:10,padding:'10px 13px',marginBottom:12}}>
+              <div style={{fontSize:13.5,fontWeight:700,color:C.text}}>↩ {l.length} paire{l.length>1?'s':''} à renvoyer (litige){unSeul?<span style={{fontWeight:500,color:C.muted}}> · compte {comptes[0]}</span>:null}</div>
+              <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.45}}>Ouvre la commande sur Vinted pour générer l'étiquette de retour, la réimprimer ou suivre le colis. VRM ne la génère pas tout seul (un retour engage l'envoi, et c'est un compte en litige).</div>
+              {l.map(o=>{ const ph=orderPhoto(o); return (
+                <div key={o.transaction_id} style={{display:'flex',alignItems:'center',gap:10,marginTop:9,flexWrap:'wrap'}}>
+                  {ph && !imgMortes.has(ph) ? <img src={ph} alt="" loading="lazy" onError={()=>noterImgMorte(ph)} style={{width:38,height:38,borderRadius:8,objectFit:'cover',flexShrink:0,border:`1px solid ${C.border}`}}/> : null}
+                  <div style={{flex:'1 1 160px',minWidth:0}}>
+                    <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={o.title}>{o.title}</div>
+                    {!unSeul && o._acc && <div style={{fontSize:11.5,color:C.muted}}>compte {accNameOf(o._acc)}</div>}
+                  </div>
+                  <a data-retour-tx={o.transaction_id} href={`https://www.vinted.fr/member/transactions/${encodeURIComponent(o.transaction_id)}`} target="_blank" rel="noreferrer"
+                    style={{display:'inline-flex',alignItems:'center',gap:6,border:`1.5px solid ${C.warn}`,background:`${C.warn}14`,color:C.warn,borderRadius:8,padding:'7px 12px',fontSize:12.5,fontWeight:700,textDecoration:'none',flexShrink:0}}>↩ Bordereau de retour sur Vinted</a>
+                </div>
+              ); })}
+            </div>
+          );
+        })()}
         {/* ⚠️ SUR « À RETIRER », CES TROIS COMMANDES N'AGISSENT SUR RIEN.
             Cet onglet n'affiche AUCUNE liste de commandes (`aFilter==='attente'`
             renvoie faux dans le filtre plus bas) : il montre les colis groupés
