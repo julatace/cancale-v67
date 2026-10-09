@@ -331,8 +331,8 @@ const RA = {};
     const ctx = {}; vm.createContext(ctx);
     try { vm.runInContext(srcs.join('\n') + '\n;this.R = { cleNum, NUM_OK, numDeSkuEbay, skuEbayDe };', ctx); Object.assign(RA, ctx.R || {}); } catch (_) {}
   }
-  const suf = extraire(APP, 'suffixeCompteEbay');
-  if (suf) { const c2 = {}; vm.createContext(c2); try { vm.runInContext(suf + '\n;this.f = suffixeCompteEbay;', c2); RA.suffixeCompteEbay = c2.f; } catch (_) {} }
+  const suf = extraire(APP, 'suffixeCompteEbay'), cle = extraire(APP, 'CLE_COMPTE_EBAY');
+  if (suf && cle) { const c2 = {}; vm.createContext(c2); try { vm.runInContext(cle + '\n' + suf + '\n;this.f = suffixeCompteEbay;', c2); RA.suffixeCompteEbay = c2.f; } catch (_) {} }
 }
 
 (async () => {

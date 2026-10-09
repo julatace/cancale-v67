@@ -44,7 +44,7 @@ function decls(APP, noms) {
   }
   return { src: out.join('\n'), manquants: noms.filter((x) => !trouve.has(x)) };
 }
-const NOMS = ['cleNum', 'NUM_OK', 'numDeSkuEbay', 'commandeEbayEngagee', 'doublesVenteEbay', 'PAS_UNE_VENTE',
+const NOMS = ['cleNum', 'NUM_OK', 'numDeSkuEbay', 'CLE_COMPTE_EBAY', 'corpsCompteEbay', 'commandeEbayEngagee', 'doublesVenteEbay', 'PAS_UNE_VENTE',
   'etatsVentesFrais', 'etatRevient', 'preuvesVentesVinted', 'capListeVentes', 'lireVentesVintedProuvees', 'isOnlineListing', 'lireAnnoncesVintedEnLigne',
   'retraitsEbayAutoPermis', 'passageRetraitEbayAuto', 'EBAY_DEJA_TERMINEE', '__retraitEbayAutoEnVol', '__retraitEbayAutoTentes',
   'retirerEbayAuto', 'resultatReviseEbay', 'prixAchatDe', 'LISTE_VENTES_FRAICHE_MS', 'noterRetraitAutoIncertain'];
