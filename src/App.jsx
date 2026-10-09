@@ -3955,6 +3955,33 @@ if (typeof window !== 'undefined') {
     document.addEventListener('visibilitychange', () => { if (!document.hidden) battementExt(); });
   } catch (_) {}
 }
+// LE COMPTE VINTED OUVERT DANS CE CHROME, tel que l'extension le lit dans son
+// cookie — réponse `etat` du pont, relue toutes les 20 s et au retour sur
+// l'onglet. ⚠️ C'est la SEULE réponse du pont qui le porte : `authEtat` ne parle
+// que de la session VRM de l'extension (mesuré le 9 octobre dans background.js,
+// de la 5.116 à la 5.163). Une seule lecture pour la pastille « Actions
+// possibles · {compte} » et le compte mis en avant d'office (§11).
+// TROIS états : `{uid, login}` · `null` aucun compte ouvert · `undefined` pas su
+// (extension pas encore interrogée, muette, ou cookie pas lu à temps).
+function vintedDeChrome() {
+  const e = __vmrEtat;
+  if (!e || !e.ok || e.vintedPasSu) return undefined;
+  return e.vinted && e.vinted.uid ? { uid: String(e.vinted.uid), login: String(e.vinted.login || '') } : null;
+}
+// Le compte EFFECTIF des onglets d'une plateforme : son choix, sinon le compte
+// ouvert dans Chrome, sinon « tous » (''). '*' = « Tous les comptes » choisi
+// exprès. ⚠️ Un compte qu'on ne peut pas montrer (exclu par son choix, retiré
+// de l'app) n'est JAMAIS retenu : choisi, il floutait toutes les lignes, ses
+// propres lignes étant déjà retirées — un écran entièrement flou, sans un mot.
+// `estChoisissable(uid)` dit lesquels le sont. Une règle pour la liste
+// déroulante (coque) et le flou des écrans (Comptabilite) — §11.
+const compteEffectif = (sel, connecte, estChoisissable) => {
+  const s = String(sel || '');
+  if (s === '*') return '';
+  if (s && estChoisissable(s)) return s;
+  const c = String(connecte || '');
+  return c && estChoisissable(c) ? c : '';
+};
 // Ce qui empêche l'app de faire agir l'extension, au niveau de l'EXTENSION (pas
 // du compte) : la même raison pour toutes les ventes, donc dite UNE fois au
 // lieu d'être répétée sur chaque ligne (§7). `null` = rien ne bloque ici.
@@ -7615,7 +7642,7 @@ function etatActionsExt(sansSouris) {
   // Le cookie Vinted pas lu à temps (5.161 : `vintedPasSu`) n'est pas « aucun
   // compte ouvert » (revue du 5 octobre).
   if (e && e.vintedPasSu) return { niveau: 'verif', glob: { code: 'vinted-passu', texte: "Je regarde quel compte Vinted est ouvert dans Chrome…" }, vinted: null };
-  const vinted = e && e.vinted && e.vinted.uid ? e.vinted : null;
+  const vinted = vintedDeChrome() || null;
   if (!vinted) return { niveau: 'lecture', glob: { code: 'vinted', texte: "Aucun compte Vinted n'est ouvert dans ce Chrome — les actions SUR VINTED (bordereau, répondre) attendent ; publier sur Leboncoin reste possible." }, vinted: null };
   return { niveau: 'ok', glob: null, vinted };
 }
@@ -18837,7 +18864,12 @@ function SelecteurCompte({ accounts, sel, setSel, connecte }) {
   //    (l'extension — 📍), sinon « Tous les comptes ». Cohérent avec `selEff`
   //    (Comptabilite) : '*' ⇒ tout visible, aucun flou ; sur ordi sans compte
   //    connecté → « Tous » par défaut, donc rien n'est flouté.
-  const val = String(sel) === '*' ? '*' : (String(sel) || co || '*');
+  // ⚠️ La même règle que le flou des écrans (`compteEffectif`, §11) : un choix
+  //    ou un compte de l'extension hors de cette liste vaut « Tous les
+  //    comptes » — la liste ne montre jamais un compte qu'elle ne propose pas.
+  const dansListe = (u) => list.some(a => String(a.vinted_user_id) === u);
+  const val = String(sel) === '*' ? '*' : (compteEffectif(sel, co, dansListe) || '*');
+  const coVu = co && dansListe(co) ? co : '';
   return (
     <div style={{ display: 'flex', gap: 8, padding: '10px 16px 0', alignItems: 'center', flexWrap: 'wrap' }}>
       <label htmlFor="vrm-sel-compte" style={{ fontSize: 12, color: C.muted, fontWeight: 600 }}>Compte</label>
@@ -18848,7 +18880,12 @@ function SelecteurCompte({ accounts, sel, setSel, connecte }) {
         {tri.map(a => { const uid = String(a.vinted_user_id);
           return <option key={uid} value={uid}>{uid === co ? '📍 ' : ''}{nom(a)}</option>; })}
       </select>
-      {co && val === co && <span style={{ fontSize: 11.5, color: C.muted }}>compte de l'extension</span>}
+      {/* Un compte choisi (par lui ou d'office) estompe les autres : on le dit
+          UNE fois, ici, avec le geste — sinon des lignes floues et inertes
+          apparaissent sans raison dès que l'extension est allumée (§7). */}
+      {val !== '*' && <span data-sel-compte-note={val === coVu ? 'extension' : 'choix'} style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.35 }}>
+        {val === coVu ? "compte de l'extension · " : ''}les autres comptes sont estompés — {'«\u00a0Tous les comptes\u00a0»'} pour tout voir
+      </span>}
     </div>
   );
 }
@@ -20900,7 +20937,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   //    choix explicite (sentinelle '*') qui éteint le flou. Sans extension
   //    (téléphone), `compteConnecte` est vide ⇒ aucun flou. Une seule définition,
   //    lue par le flou, les tris et la messagerie (§11).
-  const selEff = String(compteSel) === '*' ? '' : String(compteSel || compteConnecte || '');
+  // ⚠️ Seulement un compte qu'on peut MONTRER (revue du 8 octobre) : un compte
+  //    exclu ou retiré de l'app a ses lignes déjà retirées, et le retenir
+  //    floutait TOUT l'écran. Même règle que la liste déroulante (§11).
+  const selEff = compteEffectif(compteSel, compteConnecte, (u) => accountUids.has(u) && !acctOff(u));
   const estFloute = (o) => !!(selEff && uidLigne(o) !== selEff);
   const STYLE_FLOU = { filter: 'blur(2px) grayscale(0.55)', opacity: 0.4, pointerEvents: 'none', transition: 'filter 160ms ease-out, opacity 160ms ease-out' };
   const ventesAffichees = useMemo(() => {
@@ -20948,7 +20988,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (c) arr = [...arr].sort((a,b) => { const ac = uidV(a)===c, bc = uidV(b)===c; return ac===bc ? 0 : (ac ? -1 : 1); }); }
     return arr;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [sales.items, showHidden, hiddenSales, hiddenAccts, blockedAccts, vFilter, ordSearchDiff, periode, numeros, saleOv, shipDone, compteSel, compteConnecte]);
+    }, [sales.items, showHidden, hiddenSales, hiddenAccts, blockedAccts, vFilter, ordSearchDiff, periode, numeros, saleOv, shipDone, compteSel, compteConnecte, selEff]);
   // Combien on en DESSINE. Le reste s'ouvre d'un bouton : rien n'est perdu, et
   // le compte total est écrit dessus.
   const [ventesMax, setVentesMax] = useState(60);
@@ -21270,7 +21310,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (c) arr = [...arr].sort((a,b) => { const ac = uidAnn(a)===c, bc = uidAnn(b)===c; return ac===bc ? 0 : (ac ? -1 : 1); });
     return arr;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [annBase, annSearch, annSort, numeros, compteSel, compteConnecte]);
+  }, [annBase, annSearch, annSort, numeros, compteSel, compteConnecte, selEff]);
   // Un seul compte à l'écran ⇒ le nommer sur chaque carte ne distingue rien (§7).
   const annUnCompte = useMemo(() => new Set(annShown.map(x => String(x._acc && x._acc.vinted_user_id || ''))).size <= 1, [annShown]);
   // Comptes bloqués actuellement présents (pour le bandeau d'alerte).
@@ -22066,11 +22106,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const out = []; let anyOk=false, anyErr=false;
     // PARALLÈLE (voir loadOrders) : tous les comptes en même temps.
     const results = await Promise.all(accounts.map(async acc => { const r = await fetchVintedConversations(acc, 1, { force }); return { acc, r }; }));
-    for (const { acc, r } of results) { if (r.ok) { anyOk=true; r.items.forEach(c => out.push({ ...c, _acc:acc })); } else anyErr=true; }
+    // ⚠️ RIEN LU NE VAUT PAS RIEN (revue du 8 octobre) : une boîte qui n'a pas
+    //    pu être lue disparaissait sans un mot dès qu'une autre l'était, et
+    //    l'en-tête pouvait dire « Tout est lu » sur un compte dont on n'avait
+    //    rien lu. On garde QUELS comptes n'ont pas répondu (`ko`) ; une liste
+    //    partielle n'est pas mise en cache (elle passerait pour complète).
+    const ko = [];
+    for (const { acc, r } of results) { if (r.ok) { anyOk=true; r.items.forEach(c => out.push({ ...c, _acc:acc })); } else { anyErr=true; ko.push(acc); } }
     out.sort((a,b) => new Date(b.updated_at||0) - new Date(a.updated_at||0));
     const error = out.length===0 && anyErr && !anyOk;
-    if (!error) putCache('convs', out);
-    setConvs({ loading:false, items: out, error });
+    if (!anyErr) putCache('convs', out);
+    setConvs({ loading:false, items: out, error, ko });
   };
   // ⚠️ `bordereaux` EN FAIT PARTIE : c'est l'écran où on imprime l'étiquette,
   // donc le seul endroit où un numéro en double coûte vraiment cher. Sans les
@@ -22459,7 +22505,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (c) arr = [...arr].sort((a,b)=>{ const ac=uidA(a.o)===c, bc=uidA(b.o)===c; return ac===bc?0:(ac?-1:1); }); }
     return arr; },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [buysBase, aFilter, ordSearchDiff, periode, tracking, colisRelais, numeros, compteSel, compteConnecte]);
+    [buysBase, aFilter, ordSearchDiff, periode, tracking, colisRelais, numeros, compteSel, compteConnecte, selEff]);
   const [achatsMax, setAchatsMax] = useState(60);
   // ── ACHATS · ACTIONS RAPIDES (note interne + menu « … ») ──────────────────
   // Note interne par achat (synchronisée, clé = transaction_id) + menu groupant
@@ -27429,7 +27475,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {(()=>{
           if (offresEmail === undefined || !sales.items) return null;   // on attend de savoir lesquelles sont déjà réglées
           if (offresEmail === null) return <div data-offres-messages="passu" style={{fontSize:12,color:C.muted,marginBottom:10}}>Les offres reçues par email n'ont pas pu être lues pour l'instant — rouvre cet écran dans un moment.</div>;
-          const { gardees, reglees } = offresAtraiter(offresEmail, sales.items, offresFaites, cleOffre);
+          // ⚠️ Un compte qu'il a ÉCARTÉ (exclu par son choix) ou RETIRÉ de l'app
+          //    n'a plus rien à lui dire (revue du 8 octobre — mesuré : 5 offres
+          //    de julienf765, exclu puis retiré, « à trancher » et nommées sur
+          //    chaque ligne). La conversation juste en dessous les écartait
+          //    déjà : même règle ici (§11). « Retiré » ne se juge que sur une
+          //    liste de comptes LUE (rien lu ne vaut pas rien) ; une offre sans
+          //    compte connu reste affichée (pas su ≠ autre compte).
+          const comptesLus = accountsReady && !baseKO;
+          const offresDesComptes = offresEmail.filter((of) => { const u = String((of && of.uid) || ''); if (!u) return true;
+            if (acctOff(u)) return false;
+            return !(comptesLus && !accountUids.has(u)); });
+          const { gardees, reglees } = offresAtraiter(offresDesComptes, sales.items, offresFaites, cleOffre);
           if (!gardees.length) return null;
           // Le repère du MODÈLE (jamais le prix de LA paire : l'email ne dit pas laquelle).
           const repere = {};
@@ -27480,7 +27537,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const uidC = c => String((c._acc&&c._acc.vinted_user_id)||'');
           // Compte choisi ⇒ les AUTRES restent (floutés, pas masqués — Julien).
           const liste = (convs.items||[]).filter(c=>!acctOffOf(c));
-          const nonLus = liste.filter(c=>c.unread && (!selEff || uidC(c)===selEff)).length;
+          // ⚠️⚠️ LE NOMBRE VIENT DE LA LISTE AFFICHÉE (§5, §11 — revue du
+          //    8 octobre). Depuis que les autres comptes sont estompés au lieu
+          //    d'être retirés, `liste` les contient tous ; or ce compte ne
+          //    gardait que le compte choisi. Résultat : « Tout est lu » écrit
+          //    au-dessus de deux messages non lus d'un autre compte — floutés et
+          //    inertes, et le point « nouveau » de l'onglet disait l'inverse. Un
+          //    acheteur qui attend était annoncé comme « rien à faire ».
+          //    ⇒ on compte TOUTE la liste ; ceux d'un compte estompé sont dits à
+          //    côté, avec le geste, jamais à la place.
+          const nonLus = liste.filter(c=>c.unread).length;
+          const nonLusAilleurs = selEff ? liste.filter(c=>c.unread && uidC(c)!==selEff).length : 0;
+          // Les boîtes qui n'ont pas pu être lues (comptes qu'il n'a pas
+          // écartés) : tant qu'il y en a une, « Tout est lu » serait un total
+          // partiel présenté comme complet (§5).
+          const boitesKO = (convs.ko||[]).filter(a=>a && !acctOff(a.vinted_user_id));
           // Compte choisi (ou connecté) d'abord, puis non lus, puis les récents.
           const coMsg = selEff;
           const tri = [...liste].sort((a,b)=>
@@ -27518,12 +27589,31 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           return (
             <div data-messagerie style={{marginBottom:12}}>
               <div style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:8,flexWrap:'wrap'}}>
-                <div style={{fontSize:14,fontWeight:700,color:C.text}}>
-                  {nonLus>0 ? <><span style={{color:C.accent}}>{nonLus}</span> non lu{nonLus>1?'s':''}</> : 'Tout est lu'}
-                  <span style={{fontWeight:500,color:C.muted}}> · {liste.length} conversation{liste.length>1?'s':''}</span>
+                <div data-messagerie-tete={nonLus>0 ? 'nonlus' : boitesKO.length ? 'passu' : liste.length ? 'toutlu' : 'vide'} data-nonlus={nonLus} style={{fontSize:14,fontWeight:700,color:C.text}}>
+                  {/* « Tout est lu » ne s'écrit que si AUCUNE conversation
+                      affichée n'est non lue ET que chaque boîte a été lue. */}
+                  {nonLus>0 ? <><span style={{color:C.accent}}>{nonLus}</span> non lu{nonLus>1?'s':''}</>
+                    : boitesKO.length ? 'Aucun non lu dans les boîtes lues'
+                    : liste.length ? 'Tout est lu' : null /* vide : la ligne d'en dessous le dit, une fois (§7) */}
+                  {liste.length>0 && <span style={{fontWeight:500,color:C.muted}}> · {liste.length} conversation{liste.length>1?'s':''}</span>}
                 </div>
                 <button type="button" onClick={()=>loadConvs(true)} style={{marginLeft:'auto',border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'5px 11px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>↻ Actualiser</button>
               </div>
+              {nonLusAilleurs>0 && (
+                <div data-nonlus-ailleurs={nonLusAilleurs} style={{fontSize:12.5,color:C.text,lineHeight:1.45,marginBottom:8}}>
+                  Dont <b>{nonLusAilleurs}</b> sur {nonLusAilleurs>1?'tes autres comptes':'un autre compte'} (estompé{nonLusAilleurs>1?'s':''}) — {'«\u00a0Tous les comptes\u00a0»'} pour {nonLusAilleurs>1?'y':'lui'} répondre.
+                </div>
+              )}
+              {boitesKO.length>0 && (
+                <div data-boites-ko={boitesKO.map(a=>String(a.vinted_user_id)).join(',')} style={{display:'flex',gap:8,alignItems:'flex-start',fontSize:12.5,color:C.text,lineHeight:1.45,border:`1px solid ${C.warn}55`,background:`${C.warn}0e`,borderRadius:8,padding:'8px 11px',marginBottom:10}}>
+                  <span aria-hidden="true" style={{color:C.warn,flexShrink:0,marginTop:1}}><Icon name="chat" size={15}/></span>
+                  <span>
+                    {boitesKO.length===1 ? <>La boîte de <b>{accName(boitesKO[0])}</b> n'a pas pu être lue</>
+                      : <>Les boîtes de {boitesKO.map((a,i)=><React.Fragment key={String(a.vinted_user_id)}>{i?(i===boitesKO.length-1?' et ':', '):''}<b>{accName(a)}</b></React.Fragment>)} n'ont pas pu être lues</>}
+                    {' '}— {boitesKO.length===1?'ses':'leurs'} messages ne sont ni listés ni comptés ici. Réessaie avec « ↻ Actualiser » ; si ça dure, ouvre ta messagerie Vinted sur {boitesKO.length===1?'ce compte':'ces comptes'}.
+                  </span>
+                </div>
+              )}
               {boitesPerimees.length>0 && (
                 <div data-boites-perimees={boitesPerimees.map(b=>String(b.acc.vinted_user_id)).join(',')} style={{display:'flex',gap:8,alignItems:'flex-start',fontSize:12.5,color:C.text,lineHeight:1.45,border:`1px solid ${C.warn}55`,background:`${C.warn}0e`,borderRadius:8,padding:'8px 11px',marginBottom:10}}>
                   <span aria-hidden="true" style={{color:C.warn,flexShrink:0,marginTop:1}}><Icon name="chat" size={15}/></span>
@@ -27534,7 +27624,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </span>
                 </div>
               )}
-              {liste.length===0 && <div style={{fontSize:13,color:C.muted,padding:'14px 0'}}>Aucune conversation captée pour l'instant — elles arrivent quand l'extension passe sur la messagerie Vinted de chaque compte.</div>}
+              {liste.length===0 && !boitesKO.length && <div style={{fontSize:13,color:C.muted,padding:'14px 0'}}>Aucune conversation captée pour l'instant — elles arrivent quand l'extension passe sur la messagerie Vinted de chaque compte.</div>}
               <div style={{border:liste.length?`1px solid ${C.border}`:'none',borderRadius:10,background:C.card,overflow:'hidden'}}>
                 {affiches.map((c,i)=>{
                   const photo = (c.opposite_user&&c.opposite_user.photo&&c.opposite_user.photo.url) || (c.item_photos&&c.item_photos[0]&&c.item_photos[0].url) || null;
@@ -33807,22 +33897,21 @@ function AppCoeur() {
   // Annonces PUIS Ventes PUIS Messages).
   const [compteSel,setCompteSel]=useState('');
   React.useEffect(()=>{ setCompteSel(''); },[tab]);
-  // Le compte sur lequel l'EXTENSION est connectée (pont `authEtat`) : c'est
-  // celui qu'on est en train de traiter, on le met en avant (puce d'abord + 📍,
-  // et ses lignes remontent quand « Tous » est choisi). « pas su » ⇒ '' (on ne
-  // met rien en avant à tort). Même source que la carte des premiers pas (§11).
-  const [compteConnecte,setCompteConnecte]=useState('');
-  React.useEffect(()=>{ let stop=false;
-    const relire=async()=>{ try{ const e=await vmrAuthEtat(); const uid=String((e&&e.vinted&&e.vinted.uid)||''); if(!stop) setCompteConnecte(uid); }catch(_){} };
-    relire();
-    // ⚠️ Re-lu quand il REVIENT sur l'onglet de l'app (après un tour sur Vinted,
-    //    où il a pu changer de compte, ou brancher l'extension) : sinon le
-    //    compte mis en avant d'office reste figé sur celui du chargement. C'est
-    //    une lecture du PONT (zéro requête Vinted), et ça ne touche QUE le défaut
-    //    — son choix explicite (`compteSel`) gagne toujours.
-    const relirePont=()=>{ if(!document.hidden) relire(); };
-    window.addEventListener('focus',relire); document.addEventListener('visibilitychange',relirePont);
-    return ()=>{ stop=true; window.removeEventListener('focus',relire); document.removeEventListener('visibilitychange',relirePont); }; },[]);
+  // Le compte Vinted ouvert dans CE Chrome (l'extension le lit dans son cookie) :
+  // c'est celui qu'il est en train de traiter, il est choisi d'office (📍, ses
+  // lignes nettes et en tête, les autres estompées — Julien, 7 octobre).
+  // ⚠️⚠️ IL ÉTAIT LU DANS `authEtat`, QUI NE LE PORTE PAS (revue du 8 octobre) :
+  //    cette réponse ne parle que de la session VRM de l'extension — aucune
+  //    version n'y a jamais mis le compte Vinted. `compteConnecte` valait donc
+  //    TOUJOURS '' et la demande ne s'est jamais allumée, en silence. La seule
+  //    réponse qui le porte est `etat` (`vintedDeChrome`), celle que lisent déjà
+  //    la pastille « Actions possibles · {compte} », « Tout générer » et le
+  //    bouton Bordereau (§11). Elle est relue toutes les 20 s et au retour sur
+  //    l'onglet (`battementExt`), qui prévient ses abonnés : rien à relire ici.
+  //    « Pas su » ⇒ '' : on ne met rien en avant à tort. Le filtre des comptes
+  //    qu'on peut montrer est appliqué plus bas (`compteConnecte`).
+  const [compteChrome,setCompteChrome]=useState('');
+  React.useEffect(()=>{ const lire=()=>{ const v=vintedDeChrome(); setCompteChrome(v?v.uid:''); }; lire(); return onVmrExt(lire); },[]);
   // L'ancien onglet « Messages » (cloche, bandeau, « à faire ») mène désormais
   // aux messages DANS Vinted : une seule porte pour un seul écran.
   React.useEffect(()=>{ if(tab==='cat_msg'){ subVoulue.current='messages'; setTab('plat_vinted'); } },[tab]);
@@ -34686,6 +34775,20 @@ function AppCoeur() {
     window.addEventListener('vrm:save', f);
     return () => window.removeEventListener('vrm:save', f);
   }, []);
+  // ── LES COMPTES QU'ON PEUT CHOISIR dans la liste « Compte » (§11) ──────────
+  // Les comptes liés, moins ceux qu'il a écartés lui-même (`compteEcarte` : la
+  // règle de « vendu » et de l'écran Ventes). ⚠️ Un compte exclu n'est jamais
+  // proposé : choisi, il floutait TOUTES les lignes (les siennes sont déjà
+  // retirées) — revue du 8 octobre. Suit le nuage (`nuagePret`, §5.49) et un
+  // « Masquer » fait dans Réglages (`masquesTick`).
+  const comptesChoisissables = useMemo(() => {
+    const h = new Set((load('vinted_accounts_hidden', []) || []).map(String));
+    return (vintedAccounts || []).filter(a => a && a.vinted_user_id != null && !compteEcarte(a.vinted_user_id, h, panelOffCoque));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vintedAccounts, panelOffCoque, masquesTick, nuagePret]);
+  // Le compte ouvert dans Chrome n'est mis en avant QUE s'il fait partie de
+  // ces comptes : exclu, retiré, ou un compte d'achat hors de l'app ⇒ rien.
+  const compteConnecte = comptesChoisissables.some(a => String(a.vinted_user_id) === compteChrome) ? compteChrome : '';
   const [jourCle, setJourCle] = useState(() => new Date().toDateString());
   useEffect(() => {
     const t = setInterval(() => { const k = new Date().toDateString(); setJourCle(p => (p === k ? p : k)); }, 60000);
@@ -35664,7 +35767,7 @@ function AppCoeur() {
           {/* Filtre par compte (Julien, 6 oct.) — Ventes / Annonces / Achats /
               Messages. Les Colis ne sont pas filtrés (« pour les colis pas
               forcément »). Un seul compte ⇒ la rangée ne s'affiche pas. */}
-          {(platSub==='ventes'||platSub==='annonces'||platSub==='achats'||platSub==='messages') && <SelecteurCompte accounts={vintedAccounts} sel={compteSel} setSel={setCompteSel} connecte={compteConnecte}/>}
+          {(platSub==='ventes'||platSub==='annonces'||platSub==='achats'||platSub==='messages') && <SelecteurCompte accounts={comptesChoisissables} sel={compteSel} setSel={setCompteSel} connecte={compteConnecte}/>}
           <Comptabilite key={'pv_'+platSub} accounts={vintedAccounts} only={platSub==='apercu'?'ventes':platSub} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum} compteSel={compteSel} compteConnecte={compteConnecte}/>
         </>)}
         {tab==='plat_leboncoin'&&(<>
