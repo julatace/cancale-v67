@@ -5094,9 +5094,9 @@ mesurées, et aucune n'était « l'extension est éteinte »** :
   l'orthographe `member/transactions/` près de `genere_sans_pdf` ; le lien passe
   maintenant par une variable. Il suit la variable jusqu'à sa définition — et
   repasse au rouge quand on y retire l'adresse Vinted (prouvé).
-- ⚠️ **Le chantier PDF→stockage avait réservé la 5.160** : il passera en **5.164**
+- ⚠️ **Le chantier PDF→stockage avait réservé la 5.160** : il passera en **5.165**
   (5.161 = suite de la revue ci-dessous, 5.162 = défauts d'extension mesurés,
-  5.163 = la fusion du 8 octobre, voir plus bas).
+  5.163 = la fusion du 8 octobre, 5.164 = « Tout générer » borné, 9 octobre).
 - **Revue contradictoire (26 constats, 5 octobre au soir)** — corrigé en 5.161 et
   dans l'app, chacun prouvé rouge sur e50cd28 :
   - ⚠️⚠️ **Une extension < 5.129 passait « muette » au bout de 15 s** (elle ne
@@ -6665,10 +6665,9 @@ l'extension (#457) après la fusion du 8 octobre. Chaque défaut REPRODUIT d'abo
   la borne app = extension, rouge sous mutation) ; banc `tout-generer.cjs`
   (port 5710, données inventées, deux tailles : **30 rouges** sur le build de
   e6bda5c, 0 après). `audit-statuts.cjs` charge `ACHAT_A_RENVOYER`.
-- ⚠️ **Extension modifiée SANS changer de version** (consigne de la passe) : la
-  prochaine livraison doit monter le manifeste, régénérer le zip et suivre
-  `EXT_ATTENDUE`. Aucune entrée d'`EXT_CAPACITES` : l'app détecte `pause` et
-  `vivant` à leur présence, et ne promet rien à une extension qui ne les a pas.
+- Extension **5.164.0** (montée à la fusion du 9 octobre), zip régénéré,
+  `EXT_ATTENDUE` suivie. Aucune entrée d'`EXT_CAPACITES` : l'app détecte `pause`
+  et `vivant` à leur présence, et ne promet rien à une extension qui ne les a pas.
 
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
