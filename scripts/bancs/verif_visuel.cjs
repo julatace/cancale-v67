@@ -12,7 +12,16 @@ const fs=require('fs'), http=require('http'), path=require('path');
 const DIST=require('path').join(__dirname,'..','..','dist'), SC=__dirname;
 const FX=f=>JSON.parse(fs.readFileSync(path.join(SC,'fx',f+'.json'),'utf8'));
 const main=FX('main'), accounts=FX('accounts');
-const rows=[...FX('sold'),...FX('purch'),...FX('listings'),...FX('inbox'),...FX('track'),...FX('bord'),...FX('label'),...FX('billing'),...LBCV(),...EBAYO()]; const txn=FX('txn');
+// ⚠️ ANNONCES — donnée SYNTHÉTIQUE (aucune vraie photo/acheteur : vit DANS le
+// banc, comme EBAYO/LBCV). Les fixtures `listings`/`sold`/`inbox` exportées sont
+// VIDES ; sans au moins une annonce captée, l'effet `liveStats` de la coque ne
+// pose jamais `ok=true` → `liveStats` reste null → la carte « Argent à virer »
+// du Collectif (qui lit `liveStats.walletDispo`) ne peut JAMAIS s'afficher, et
+// son contrôle était rouge pour toujours (un contrôle qui ne peut pas réussir
+// est pire qu'absent, §6). Une annonce par compte suffit à peupler liveStats ;
+// le solde, lui, vient des fixtures `billing`.
+function LISTV(){ return accounts.map((a,i)=>({ id:`harvest_${a.vinted_user_id}_listings`, data:{ payload:{ items:[{ id:`syn_${a.vinted_user_id}_${i}`, title:'Paire test '+(i+1), brand_title:'Nike', size_title:'42', price:{amount:'40',currency_code:'EUR'}, is_closed:false, is_hidden:false, is_draft:false, photo:{url:''} }], pagination:null } } })); }
+const rows=[...FX('sold'),...FX('purch'),...FX('listings'),...LISTV(),...FX('inbox'),...FX('track'),...FX('bord'),...FX('label'),...FX('billing'),...LBCV(),...EBAYO()]; const txn=FX('txn');
 // ⚠️ VENTES LEBONCOIN — donnée SYNTHÉTIQUE (aucun acheteur, aucune adresse : elle
 // peut donc vivre DANS le banc, dépôt public). Sans elle, l'écran Ventes rend le
 // bloc « Ventes Leboncoin » VIDE, et un piège §4.6 (TDZ) ou un mensonge §5 (un
@@ -85,7 +94,7 @@ srv.listen(4322);
 // `ScreenHead` : il atterrissait PILE SOUS l'ile d'actions, donc invisible.
 // Le controle existait, l'ecran n'y passait jamais. `catalog` et `sales`
 // (l'ancienne appli) etaient dans le meme angle mort.
-const TABS=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','garage','invoices','masques','settings','vintedaccounts','catalog','sales','leboncoin','stockvinted'];
+const TABS=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','garage','invoices','masques','settings','vintedaccounts','catalog','sales','leboncoin','stockvinted'];
 (async()=>{
   let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'✅ ':'❌ ')+m+(d?' — '+d:''));};
   const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
