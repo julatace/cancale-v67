@@ -176,6 +176,7 @@ const compte = (t, s) => String(t || '').split(s).length - 1;
       const v2 = await r.lire();
       dit(v2.cmds.length === 6, 'le pont reçoit 6 commandes, pas 8', `${v2.cmds.length} commande(s)`);
       dit(/\b6 bordereaux lancés/.test(v2.sousTg) && /\b2 autres\b/.test(v2.sousTg), 'le bilan dit 6 lancés et 2 qui attendent le prochain clic', JSON.stringify(v2.sousTg));
+      await r.pg.screenshot({ path: path.join(require('os').tmpdir(), 'tout-generer-colis.png') });
       // Un second clic : les 6 déjà en file ne repartent pas.
       await r.cliquerTG(); await r.pg.waitForTimeout(2500);
       const v3 = await r.lire();
@@ -255,6 +256,7 @@ const compte = (t, s) => String(t || '').split(s).length - 1;
       const v = await r.pg.evaluate(() => ({ bloc: !!document.querySelector('[data-a-renvoyer]'), liens: document.querySelectorAll('a[href*="member/transactions/8101"]').length, sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
       dit(v.bloc && v.liens === 1, `${tel ? '390' : '1512'} px · Achats, onglet par défaut : la paire à renvoyer et son lien de retour (une fois)`, JSON.stringify(v));
       dit(v.sw <= v.cw + 1, 'aucun débordement horizontal', `${v.sw} > ${v.cw}`);
+      await r.pg.screenshot({ path: path.join(require('os').tmpdir(), `tout-generer-achats-${tel ? 390 : 1512}.png`) });
       // « Tous » : la carte porte le lien ; le bloc ne le répète pas.
       try { await r.pg.getByRole('button', { name: /^Tous/ }).last().click({ timeout: 3000 }); await r.pg.waitForTimeout(1200); } catch (_) {}
       const t = await r.pg.evaluate(() => ({ bloc: !!document.querySelector('[data-a-renvoyer]'), liens: document.querySelectorAll('a[href*="member/transactions/8101"]').length }));
