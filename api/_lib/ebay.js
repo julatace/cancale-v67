@@ -462,5 +462,42 @@ async function lireDonnee(id, owner) {
   } catch (_) { return undefined; }
 }
 
+// ── LA RÈGLE D'OFFRE eBAY (9 octobre) ─────────────────────────────────────────
+// Julien : « je veux juste définir une règle sur chaque annonce et à chaque
+// offre au-dessus ça accepte ». C'est le réglage NATIF d'eBay (Offre directe) :
+// c'est eBay qui accepte, au seuil qu'il fixe, annonce par annonce, sur SON
+// clic. VRM n'appelle jamais une route d'acceptation (Vinted n'est pas touché,
+// §3 du dossier). Deux règles PARTAGÉES avec l'app (§11) : `valideRegleOffre`
+// et `seuilTropBas` y ont des copies IDENTIQUES — `audit-ebay-route.cjs`
+// compare leurs sorties.
+// accepte : number | null (null = pas de règle d'acceptation)
+// refuse  : number | null | undefined (undefined = « ne touche pas au refus »)
+// prix    : number | null (null = pas encore connu : la route le relit chez eBay)
+// Rend { ok:true, accepte, refuse } (montants arrondis au centime) ou
+//      { ok:false, code, err }.
+const MONTANT_MAX = 99999.99;
+function montantOk(v) {
+  return typeof v === 'number' && Number.isFinite(v) && v > 0 && v <= MONTANT_MAX
+    && Math.abs(v * 100 - Math.round(v * 100)) < 1e-6;
+}
+function valideRegleOffre({ accepte, refuse, prix }) {
+  if (accepte !== null && !montantOk(accepte)) return { ok: false, code: 'montant', err: 'Un montant en euros, par exemple 72 ou 72,50.' };
+  if (refuse !== undefined && refuse !== null && !montantOk(refuse)) return { ok: false, code: 'refuse-montant', err: 'Le refus : un montant en euros, par exemple 50.' };
+  const A = accepte === null ? null : Math.round(accepte * 100);
+  const R = (refuse === undefined || refuse === null) ? refuse : Math.round(refuse * 100);
+  if (A === null && R != null) return { ok: false, code: 'refuse-seul', err: 'Le refus va avec un montant d\'acceptation.' };
+  if (A !== null && R != null && R >= A) return { ok: false, code: 'refuse', err: 'Le refus doit être sous le montant d\'acceptation.' };
+  if (A !== null && prix != null && Number.isFinite(prix) && A >= Math.round(prix * 100)) return { ok: false, code: 'seuil-prix', err: `Ce montant doit rester sous le prix de l'annonce (${(prix).toFixed(2).replace('.', ',')} €) : eBay refuse une règle égale ou supérieure au prix.` };
+  return { ok: true, accepte: A === null ? null : A / 100, refuse: R === undefined ? undefined : (R === null ? null : R / 100) };
+}
+// Un seuil sous la MOITIÉ du prix : la faute de frappe « 7 » au lieu de « 72 ».
+// Il n'est accepté que confirmé explicitement (`sousMoitie: true`). En centimes
+// entiers : 50 % pile n'est PAS « trop bas ».
+function seuilTropBas(accepte, prix) {
+  if (typeof accepte !== 'number' || !Number.isFinite(accepte) || typeof prix !== 'number' || !Number.isFinite(prix) || !(prix > 0)) return false;
+  return 2 * Math.round(accepte * 100) < Math.round(prix * 100);
+}
+
 export { SCOPES, appId, certId, ruName, keysReady, canConsent, authUrl, appToken, exchangeCode, hasRefresh, readRefresh, lireRefresh, accessToken, storeData, portee, lireReglageVendeur, lireDonnee,
-  COMPTES_ID, CLE_COMPTE, suffixeCompte, cleCompteDe, identiteEbay, lireComptes, normaliserRegistre, modifierComptes, comptesActifs, rangerConnexion, apprendrePrincipal, resoudreCompte, deconnecterCompte };
+  COMPTES_ID, CLE_COMPTE, suffixeCompte, cleCompteDe, identiteEbay, lireComptes, normaliserRegistre, modifierComptes, comptesActifs, rangerConnexion, apprendrePrincipal, resoudreCompte, deconnecterCompte,
+  MONTANT_MAX, montantOk, valideRegleOffre, seuilTropBas };
