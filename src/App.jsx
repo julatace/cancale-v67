@@ -18765,8 +18765,9 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
    Factures : on y renvoie plutôt que de dupliquer (§7).
 
    Stockage : `vrm_compta`, une ligne APP (synchronisée via SYNC_KEYS), jamais
-   l'extension. Rattrapée par `onCloudReady` et seulement si restée VIDE (§5.49),
-   sinon une saisie faite pendant le chargement serait écrasée. */
+   l'extension. Rattrapée par `onCloudReady` (§5.49) : les gestes faits avant
+   l'arrivée du nuage sont REJOUÉS sur sa copie (`rejouerCompta`) — ni la saisie
+   froide écrasée, ni les charges du nuage effacées (revue du 9 octobre). */
 const COMPTA_DEFAUT = { depenses: [], fixes: [], packs: [] };
 const COMPTA_CATS = ['Emballage', 'Fournitures', 'Abonnement', 'Frais plateforme', 'Transport', 'Matériel', 'Autre'];
 const rCompId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);

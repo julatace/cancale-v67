@@ -38,7 +38,10 @@ const OV_PARTIEL = { 9001: { buyPrice: '40' } };
 // Bénéfice complet : (100−40) + (80−30) + (60−20) = 150 ; charges 100 ⇒ 50.
 const COMPTA = { depenses: [{ id: 'd1', date: `${Y}-01-07`, libelle: 'Scotch', cat: 'Emballage', montant: 100 }], fixes: [], packs: [] };
 const ACCOUNTS = [{ id: 1, vinted_user_id: '111', login: 'compte_test', domain: 'www.vinted.fr', updated_at: auj.toISOString() }];
-const ROUGE = 'rgb(192, 57, 43)';     // C.danger (thème clair) — interdit sur un résultat (§7)
+// C.danger, dans les DEUX thèmes (clair, sombre) — interdit sur un résultat (§7).
+// ⚠️ Le premier jet ne connaissait que le clair : le banc rend en sombre, et le
+//    contrôle était vert sur le rouge sombre du code d'avant.
+const ROUGES = ['rgb(192, 57, 43)', 'rgb(255, 107, 107)'];
 
 const lignes = (ventes) => [
   { id: 'lbc_ventes', data: { ventes: {} } },
@@ -111,7 +114,7 @@ const LOCAL = (cles) => (c) => { try { localStorage.setItem('vrm_acces_direct', 
 
 // Ce que dit la case « Résultat après charges » du registre annuel : son texte
 // et la couleur du nombre (lus dans le conteneur des cases, qui existait avant).
-const lireBilan = (pg) => pg.evaluate((ROUGE) => {
+const lireBilan = (pg) => pg.evaluate((ROUGES) => {
   const e = document.querySelector('[data-annuel-vinted]');
   if (!e) return null;
   const t = e.innerText;
@@ -124,8 +127,8 @@ const lireBilan = (pg) => pg.evaluate((ROUGE) => {
     const feuille = [...e.querySelectorAll('*')].find((x) => x.children.length === 0 && x.innerText && x.innerText.trim() === v);
     couleur = feuille ? getComputedStyle(feuille).color : '';
   }
-  return { tout: t, resultat: iR >= 0 ? lignesT[iR + 1] : null, sousResultat: iR >= 0 ? (lignesT[iR + 2] || '') : '', ca: iC >= 0 ? lignesT[iC + 1] : null, sousCa: iC >= 0 ? (lignesT[iC + 2] || '') : '', couleur, rouge: couleur === ROUGE };
-}, ROUGE);
+  return { tout: t, resultat: iR >= 0 ? lignesT[iR + 1] : null, sousResultat: iR >= 0 ? (lignesT[iR + 2] || '') : '', ca: iC >= 0 ? lignesT[iC + 1] : null, sousCa: iC >= 0 ? (lignesT[iC + 2] || '') : '', couleur, rouge: ROUGES.includes(couleur) };
+}, ROUGES);
 // Le héro de l'onglet Comptabilité : la valeur qui suit « Résultat {année} ».
 const lireHero = (pg) => pg.evaluate((Y) => {
   const t = document.body.innerText;
@@ -227,6 +230,7 @@ const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom
     await pg.waitForTimeout(3500);
     await ouvrirBilan(pg);
     const bi = await lireBilan(pg);
+    await pg.screenshot({ path: path.join(__dirname, 'compta-registre-adater.png') });   // §6.2 : on REGARDE le rendu
     dit(!!bi && nombre(bi.ca) === 240, '[à dater] le CA reste celui des ventes datées (240 €) — la vente pas encore datée n’est pas ajoutée en douce', bi ? `« ${bi.ca} »` : '');
     dit(!!bi && /1 vente finalisée pas encore datée \(50,00 €\)/.test(bi.sousCa), '[à dater] à côté du CA : « + 1 vente finalisée pas encore datée (50,00 €) » (avant : rien)', bi ? `« ${bi.sousCa} »` : '');
     dit(!!bi && bi.resultat === '—', '[à dater] le résultat après charges n’est pas chiffré sur un CA qui peut être incomplet', bi ? `« ${bi.resultat} »` : '');
@@ -238,6 +242,7 @@ const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom
     await pg.goto(`http://localhost:${PORT}/?tab=compta`, { waitUntil: 'domcontentloaded' });
     await pg.waitForTimeout(2500);
     const h = await lireHero(pg);
+    await pg.screenshot({ path: path.join(__dirname, 'compta-onglet-adater.png') });
     dit(!!h && h.valeur === '—' && /1 vente finalisée pas encore datée \(50,00 €\)/.test(h.suite), '[à dater] onglet Comptabilité : « — », et la vente pas encore datée y est dite avec son montant', h ? h.suite : 'héro introuvable');
     await ctx.close();
   });
@@ -319,6 +324,29 @@ const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom
       await ctx.close();
     });
   }
+
+  // ── 9. SUR TÉLÉPHONE : RIEN NE DÉBORDE (390 px, tactile) ──────────────────
+  await essaie('mobile', async () => {
+    const { ctx, pg } = await contexte({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, timezoneId: 'Europe/Paris' });
+    await pg.clock.setFixedTime(new Date('2026-10-15T12:00:00+02:00'));
+    const c = { depenses: [{ id: 'd1', date: '2026-10-02', libelle: 'Scotch', cat: 'Emballage', montant: 12 }], packs: [], fixes: [
+      { id: 'f1', libelle: 'Abonnement', montant: 30, debut: '2026-10' },
+      { id: 'f2', libelle: 'Logiciel', montant: 20, debut: '2026-08', fin: '2026-09' },
+      { id: 'f3', libelle: 'Ancien poste', montant: 15 },
+    ] };
+    const pub = { annee: 2026, ca: 240, nb: 3, nbCout: 1, benefNet: 60, aDater: { n: 1, eur: 50 }, manque: [], at: Date.parse('2026-10-15T10:00:00+02:00') };
+    await pg.addInitScript(LOCAL(), { vrm_compta: c, vrm_resultat_annee: pub });
+    await brancher(pg, { rows: [] });
+    await pg.goto(`http://localhost:${PORT}/?tab=compta`, { waitUntil: 'domcontentloaded' });
+    await pg.waitForTimeout(3000);
+    const m = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth, sans: !!document.querySelector('[data-fixe-sans-debut]'), arreter: document.querySelectorAll('[data-fixe-arreter]').length }));
+    await pg.screenshot({ path: path.join(__dirname, 'compta-onglet-390.png'), fullPage: true });
+    dit(m.sw <= m.cw + 1, '[390 px] l’onglet Comptabilité ne déborde pas', `${m.sw} / ${m.cw}`);
+    dit(m.sans && m.arreter === 1, '[390 px] le coût fixe sans début demande « depuis quand ? », et seul celui qui court se propose à l’arrêt', JSON.stringify(m));
+    const h = await lireHero(pg);
+    dit(!!h && h.valeur === '—' && /pas encore datée/.test(h.suite) && /1 vente sur 3/.test(h.suite), '[390 px] le héro dit « — » et les DEUX causes, d’une phrase', h ? h.suite : '');
+    await ctx.close();
+  });
 
   // ── 8. LA FENÊTRE FROIDE : UNE SAISIE AVANT LE NUAGE N'EFFACE RIEN ─────────
   await essaie('froid', async () => {
