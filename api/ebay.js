@@ -22,7 +22,16 @@
 import crypto from 'crypto';
 import { vendeurExige, baseCloisonnee } from './_lib/session.js';
 import { accesVendeur } from './_lib/abonnement.js';
-import { keysReady, canConsent, ruName, authUrl, appToken, exchangeCode, hasRefresh, accessToken, storeData, lireReglageVendeur, lireDonnee } from './_lib/ebay.js';
+import { keysReady, canConsent, ruName, authUrl, appToken, hasRefresh, accessToken, storeData, lireReglageVendeur, lireDonnee,
+  lireComptes, comptesActifs, rangerConnexion, apprendrePrincipal, resoudreCompte, deconnecterCompte, suffixeCompte } from './_lib/ebay.js';
+
+// ── LE CONTEXTE D'UNE ACTION : QUI (le vendeur de la session) ET SUR QUEL
+// COMPTE eBAY (9 octobre, plusieurs comptes par vendeur). `ctx.compte.suffixe`
+// désigne SES lignes : '' pour le principal, `_{cle}` pour les suivants. Les
+// jetons et les lignes de données sont ceux de CE compte, jamais d'un autre.
+const jetonDe = (ctx) => accessToken(ctx.owner, ctx.compte.suffixe);
+const ligneDe = (base, ctx) => base + (ctx.compte.suffixe || '');
+const nomCompte = (c) => (c && c.pseudo) ? `« ${c.pseudo} »` : (c && c.principal ? 'principal' : '');
 
 // ── LECTURE des données eBay du vendeur (centraliser dans VRM) ───────────────
 // Julien : « capte absolument tout d'eBay ». C'est une LECTURE (comme la moisson
@@ -231,11 +240,11 @@ async function tradingReviseInventoryStatus(token, itemId, price, qty) {
   return tradingCall(token, 'ReviseInventoryStatus', `<InventoryStatus>${inv}</InventoryStatus>`);
 }
 
-async function handleRevise(b, owner) {
+async function handleRevise(b, ctx) {
   const itemId = String(b.itemId || '').trim();
   if (!/^\d+$/.test(itemId)) return { status: 400, body: { ok: false, error: 'itemId invalide' } };
   if ((b.price == null || b.price === '') && (b.quantity == null || b.quantity === '')) return { status: 400, body: { ok: false, error: 'rien à modifier' } };
-  const at = await accessToken(owner);
+  const at = await jetonDe(ctx);
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
   const r = await tradingReviseInventoryStatus(at.token, itemId, b.price, b.quantity);
   // Sans <Ack> (réseau coupé, passerelle 5xx), eBay n'a rien dit : le prix a pu
@@ -378,30 +387,62 @@ function avecSku(it) {
 // La paire (son SKU) est-elle DÉJÀ sur eBay, en ligne ou programmée ? Rend la
 // réponse de refus à renvoyer, ou null si elle n'y est pas. Liste illisible ou
 // incomplète ⇒ refus « pas su » : une absence non prouvée ne laisse rien partir.
-async function dejaChezEbay(token, sku, verbe) {
-  const L = await listeVendeur(token);
-  if (!L.ok) return { status: 503, body: { ok: false, reason: 'pas-su', error: PAS_SU_LISTE } };
-  if (!L.complet) return { status: 503, body: { ok: false, reason: 'pas-su', error: 'Tu as plus de 1 000 annonces sur eBay : je n\'ai pas pu toutes les relire pour vérifier que cette paire n\'y est pas déjà — rien n\'a été envoyé.' } };
-  const prog = L.programmees.find((x) => memePaire(x.sku, sku));
-  if (prog) return { status: 409, body: { ok: false, reason: 'deja-programmee', itemId: prog.itemId, debut: prog.depuis || null, error: `La paire ${sku} est déjà programmée sur eBay${prog.depuis ? ' (' + prog.depuis + ')' : ''} — rien n'a été ${verbe}.` } };
-  const act = L.actives.find((x) => memePaire(x.sku, sku));
-  if (act) return { status: 409, body: { ok: false, reason: 'deja-en-ligne', itemId: act.itemId, error: `La paire ${sku} est déjà en vente sur eBay — rien n'a été ${verbe}.` } };
+// ⚠️⚠️ SUR TOUS SES COMPTES eBAY (9 octobre) : une paire en vente — ou
+// programmée — sur N'IMPORTE lequel de ses comptes ne part pas sur un autre.
+// Chaque compte actif est relu CHEZ eBAY, avec SON jeton ; « pas su » sur UN
+// seul (jeton mort, eBay muet, registre illisible) ⇒ rien ne part, et la
+// réponse nomme le compte qui manque.
+async function comptesAVerifier(ctx, tokenCourant) {
+  const cloison = await baseCloisonnee();
+  if (!cloison) return { ok: true, liste: [{ compte: ctx.compte, token: tokenCourant }] };
+  const reg = await lireComptes(ctx.owner);
+  if (reg === undefined) return { ok: false, err: { status: 503, body: { ok: false, reason: 'pas-su', error: 'Je n\'ai pas pu relire la liste de tes comptes eBay pour vérifier que cette paire n\'y est pas déjà — rien n\'a été envoyé.' } } };
+  const liste = [];
+  for (const c of comptesActifs(reg)) {
+    const memeQueCourant = c.suffixe === (ctx.compte.suffixe || '');
+    if (memeQueCourant) { liste.push({ compte: { ...ctx.compte, pseudo: ctx.compte.pseudo || c.pseudo }, token: tokenCourant }); continue; }
+    // Le principal sous-entendu n'est un compte que s'il est relié.
+    if (c.implicite) {
+      const has = await hasRefresh(ctx.owner, '');
+      if (has === null) return { ok: false, err: { status: 503, body: { ok: false, reason: 'pas-su', error: PAS_SU_LISTE } } };
+      if (!has) continue;
+    }
+    const at = await accessToken(ctx.owner, c.suffixe);
+    if (!at.ok) return { ok: false, err: { status: 503, body: { ok: false, reason: 'pas-su', compte: c.pseudo || '', error: `Je n'ai pas pu relire ton compte eBay ${nomCompte(c) || 'principal'} pour vérifier que cette paire n'y est pas déjà — rien n'a été envoyé. Reconnecte-le, ou déconnecte-le s'il n'est plus à toi.` } } };
+    liste.push({ compte: c, token: at.token });
+  }
+  return { ok: true, liste };
+}
+async function dejaChezEbay(ctx, tokenCourant, sku, verbe) {
+  const v = await comptesAVerifier(ctx, tokenCourant);
+  if (!v.ok) return v.err;
+  const plusieurs = v.liste.length > 1;
+  for (const { compte, token } of v.liste) {
+    const ou = plusieurs && nomCompte(compte) ? ` (compte eBay ${nomCompte(compte)})` : '';
+    const L = await listeVendeur(token);
+    if (!L.ok) return { status: 503, body: { ok: false, reason: 'pas-su', compte: compte.pseudo || '', error: plusieurs ? `Je n'ai pas pu relire tes annonces du compte eBay ${nomCompte(compte) || 'principal'} pour vérifier que cette paire n'y est pas déjà — rien n'a été envoyé.` : PAS_SU_LISTE } };
+    if (!L.complet) return { status: 503, body: { ok: false, reason: 'pas-su', compte: compte.pseudo || '', error: `Tu as plus de 1 000 annonces sur eBay${ou} : je n'ai pas pu toutes les relire pour vérifier que cette paire n'y est pas déjà — rien n'a été envoyé.` } };
+    const prog = L.programmees.find((x) => memePaire(x.sku, sku));
+    if (prog) return { status: 409, body: { ok: false, reason: 'deja-programmee', itemId: prog.itemId, compte: compte.pseudo || '', autreCompte: compte.suffixe !== (ctx.compte.suffixe || ''), debut: prog.depuis || null, error: `La paire ${sku} est déjà programmée sur eBay${ou}${prog.depuis ? ' (' + prog.depuis + ')' : ''} — rien n'a été ${verbe}.` } };
+    const act = L.actives.find((x) => memePaire(x.sku, sku));
+    if (act) return { status: 409, body: { ok: false, reason: 'deja-en-ligne', itemId: act.itemId, compte: compte.pseudo || '', autreCompte: compte.suffixe !== (ctx.compte.suffixe || ''), error: `La paire ${sku} est déjà en vente sur eBay${ou} — rien n'a été ${verbe}.` } };
+  }
   return null;
 }
-async function handlePublish(b, owner) {
+async function handlePublish(b, ctx) {
   const it0 = b.item || {};
   if (!it0.title || !it0.categoryId || it0.price == null || it0.price === '') return { status: 400, body: { ok: false, error: 'titre, catégorie et prix requis' } };
   const s = avecSku(it0);
   if (s.err) return { status: 400, body: { ok: false, reason: 'numero', error: s.err } };
   const it = s.item;
-  const at = await accessToken(owner);
+  const at = await jetonDe(ctx);
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
   // ── UNE PAIRE, UNE ANNONCE (la règle de `programmer`, 6 octobre). Publier
   // n'avait AUCUNE garde : une paire déjà en vente, ou programmée pour ce
   // soir, repartait en seconde annonce (prouvé : deux annonces VRM-30). Relue
   // chez eBay, en ligne ET programmées ; sans SKU, rien à comparer.
   if (it.sku) {
-    const deja = await dejaChezEbay(at.token, it.sku, 'publié');
+    const deja = await dejaChezEbay(ctx, at.token, it.sku, 'publié');
     if (deja) return deja;
   }
   const r = await tradingAddFixedPriceItem(at.token, it);
@@ -409,7 +450,7 @@ async function handlePublish(b, owner) {
   // ⚠️ L'API Trading renvoie HTTP 200 même sur un refus (l'erreur est dans le
   // corps, Ack=Failure). On répond donc un vrai code d'échec (422) dans ce cas.
   if (!r.ok || !r.itemId) return { status: r.status >= 400 ? r.status : 422, body: { ok: false, error: r.err || 'eBay a refusé la publication', ack: r.ack } };
-  return { status: 200, body: { ok: true, itemId: r.itemId, url: `https://www.ebay.fr/itm/${r.itemId}`, sku: it.sku || null, avertissements: r.avertissements } };
+  return { status: 200, body: { ok: true, itemId: r.itemId, url: `https://www.ebay.fr/itm/${r.itemId}`, sku: it.sku || null, compte: ctx.compte.pseudo || '', avertissements: r.avertissements } };
 }
 
 // ── L'HEURE DE PROGRAMMATION, VALIDÉE PAR LE SERVEUR ─────────────────────────
@@ -441,7 +482,7 @@ const ETAT_OK = /^\d{3,5}$/;
 // une information à corriger, pas une panne. Réseau/jeton KO → vrai code
 // d'échec. Avec `scheduleTime` : la même validation que `programmer`, et eBay
 // annonce alors le frais de programmation.
-async function handleVerify(b, owner) {
+async function handleVerify(b, ctx) {
   const it0 = b.item || {};
   if (!it0.title || !it0.categoryId || it0.price == null || it0.price === '') return { status: 400, body: { ok: false, error: 'titre, catégorie et prix requis' } };
   // Le MÊME payload que la publication (§11) : SKU compris.
@@ -453,7 +494,7 @@ async function handleVerify(b, owner) {
     if (!quand) return { status: 400, body: { ok: false, reason: 'heure', error: 'Heure de mise en ligne refusée : entre 15 minutes et 3 semaines à l\'avance.' } };
   }
   const it = { ...s.item, scheduleTime: quand };
-  const at = await accessToken(owner);
+  const at = await jetonDe(ctx);
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
   const r = await tradingVerifyAddFixedPriceItem(at.token, it);
   if (r.status === 0) return { status: 503, body: { ok: false, error: r.error || 'eBay injoignable' } };
@@ -479,7 +520,7 @@ async function handleVerify(b, owner) {
 // est LA vérité qu'on rend — jamais l'heure qu'on a demandée.
 const UUID_EBAY = /^[0-9A-F]{32}$/;
 const PAS_SU_LISTE = 'Je n\'ai pas pu relire tes annonces eBay pour vérifier que cette paire n\'y est pas déjà — rien n\'a été envoyé.';
-async function handleProgrammer(b, owner) {
+async function handleProgrammer(b, ctx) {
   if (b.confirme !== true) return { status: 400, body: { ok: false, reason: 'confirmation', error: 'Confirme la programmation : rien n\'a été envoyé à eBay.' } };
   const it0 = b.item || {};
   if (!it0.title || !it0.categoryId || it0.price == null || it0.price === '' || !ETAT_OK.test(String(it0.conditionId || ''))) {
@@ -497,11 +538,11 @@ async function handleProgrammer(b, owner) {
   const fraisVus = typeof b.fraisVus === 'number' ? b.fraisVus : NaN;
   if (!(Number.isFinite(fraisVus) && fraisVus >= 0)) return { status: 400, body: { ok: false, reason: 'frais-vus', error: 'Vérifie d\'abord les frais : rien n\'a été envoyé.' } };
   const it = { ...s.item, scheduleTime: quand };
-  const at = await accessToken(owner);
+  const at = await jetonDe(ctx);
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
-  // ── UNE PAIRE, UNE ANNONCE : relue chez eBay, maintenant (une liste
-  // INCOMPLÈTE ne prouve pas l'absence d'une paire : on ne programme pas).
-  const deja = await dejaChezEbay(at.token, it.sku, 'envoyé');
+  // ── UNE PAIRE, UNE ANNONCE : relue chez eBay, maintenant, sur TOUS ses
+  // comptes (une liste INCOMPLÈTE ne prouve pas l'absence : on ne programme pas).
+  const deja = await dejaChezEbay(ctx, at.token, it.sku, 'envoyé');
   if (deja) return deja;
   // ── LES FRAIS, revérifiés juste avant (sans UUID). ──
   const v = await tradingVerifyAddFixedPriceItem(at.token, it);
@@ -517,7 +558,7 @@ async function handleProgrammer(b, owner) {
     return { status: 422, body: { ok: false, error: a.err || 'eBay a refusé l\'annonce.', erreurs: a.erreurs } };
   }
   if (!ID_EBAY.test(a.itemId)) return { status: 502, body: { ok: false, reason: 'incertain', uuid, error: 'eBay a répondu sans numéro d\'annonce — je ne sais pas si elle est programmée. Rafraîchis depuis eBay avant de recommencer.' } };
-  return { status: 200, body: resultatProgramme(a.itemId, it, quand, a.debut, a.fin, { frais: v.frais, avertissements: a.avertissements }) };
+  return { status: 200, body: resultatProgramme(a.itemId, it, quand, a.debut, a.fin, { frais: v.frais, compte: ctx.compte.pseudo || '', avertissements: a.avertissements }) };
 }
 // La réponse commune d'une annonce programmée (ou mise en ligne).
 // ⚠️ eBay PEUT ignorer l'heure : si le StartTime qu'il rend est antérieur de
@@ -554,14 +595,14 @@ async function confirmerDoublon(token, a, it, quand) {
 // réponse rend aussi les identités EN LIGNE (ItemID + SKU) : c'est ce qui dit
 // qu'une programmée est bien partie à l'heure.
 const resumeProgrammee = (x) => ({ itemId: x.itemId, sku: x.sku, title: x.title, price: x.price, debut: x.depuis || null, fin: x.fin || null, photo: x.photo, url: x.url || (x.itemId ? `https://www.ebay.fr/itm/${x.itemId}` : '') });
-async function handleProgrammees(owner) {
-  const at = await accessToken(owner);
+async function handleProgrammees(ctx) {
+  const at = await jetonDe(ctx);
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
   const L = await listeVendeur(at.token);
   if (!L.ok) return { status: L.status || 502, body: { ok: false, error: L.error || 'eBay n\'a pas rendu tes annonces programmées.' } };
   const items = L.programmees.map(resumeProgrammee);
   const enLigne = L.actives.map((x) => ({ itemId: x.itemId, sku: x.sku }));
-  const range = await storeData('ebay_programmees', { items, enLigne, complet: L.complet, capturedAt: Date.now() }, owner);
+  const range = await storeData(ligneDe('ebay_programmees', ctx), { items, enLigne, complet: L.complet, capturedAt: Date.now() }, ctx.owner);
   return { status: 200, body: { ok: true, items, enLigne, complet: L.complet, range } };
 }
 
@@ -571,11 +612,11 @@ async function handleProgrammees(owner) {
 // TELLE QUELLE — sur un refus, l'écran envoie l'annuler dans le Seller Hub.
 // Elle n'agit QUE sur une annonce présente dans la liste des programmées
 // relue à l'instant : une annonce déjà en ligne va à « Retirer d'eBay ».
-async function handleDeprogrammer(b, owner) {
+async function handleDeprogrammer(b, ctx) {
   if (b.confirme !== true) return { status: 400, body: { ok: false, reason: 'confirmation', error: 'Confirme l\'annulation : rien n\'a été envoyé à eBay.' } };
   const itemId = String(b.itemId || '').trim();
   if (!ID_EBAY.test(itemId)) return { status: 400, body: { ok: false, error: 'annonce eBay invalide' } };
-  const at = await accessToken(owner);
+  const at = await jetonDe(ctx);
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
   const L = await listeVendeur(at.token);
   if (!L.ok) return { status: 503, body: { ok: false, reason: 'pas-su', error: 'Je n\'ai pas pu relire tes annonces programmées — rien n\'a été envoyé.' } };
@@ -598,13 +639,13 @@ async function handleDeprogrammer(b, owner) {
 // le Seller Hub verrouille la DERNIÈRE HEURE : on refuse donc à moins d'1 h du
 // départ (relu chez eBay, pas d'après l'écran). L'heure retenue est relue.
 const DERNIERE_HEURE_MS = 60 * 60 * 1000;
-async function handleReprogrammer(b, owner) {
+async function handleReprogrammer(b, ctx) {
   if (b.confirme !== true) return { status: 400, body: { ok: false, reason: 'confirmation', error: 'Confirme le changement d\'heure : rien n\'a été envoyé à eBay.' } };
   const itemId = String(b.itemId || '').trim();
   if (!ID_EBAY.test(itemId)) return { status: 400, body: { ok: false, error: 'annonce eBay invalide' } };
   const quand = heureProgrammation(b.scheduleTime);
   if (!quand) return { status: 400, body: { ok: false, reason: 'heure', error: 'Nouvelle heure refusée : entre 15 minutes et 3 semaines à l\'avance.' } };
-  const at = await accessToken(owner);
+  const at = await jetonDe(ctx);
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
   const L = await listeVendeur(at.token);
   if (!L.ok) return { status: 503, body: { ok: false, reason: 'pas-su', error: 'Je n\'ai pas pu relire tes annonces programmées — rien n\'a été envoyé.' } };
@@ -626,8 +667,8 @@ async function handleReprogrammer(b, owner) {
 // Un lot peut buter dessus : on lit la limite AVANT de proposer un lot. Ce que
 // la réponse dit est une LIMITE, pas ce qu'il reste ce mois-ci (non exposé
 // ici) : l'écran le dit comme tel. Absent ⇒ null, jamais 0.
-async function handleLimites(owner) {
-  const at = await accessToken(owner);
+async function handleLimites(ctx) {
+  const at = await jetonDe(ctx);
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
   const r = await ebayJson(`${EBAY_API}/sell/account/v1/privilege`, at.token);
   if (r.status === 403) return { status: 200, body: { ok: false, reason: 'scope', error: 'eBay n\'a pas autorisé VRM à lire tes limites de vente.' } };
@@ -648,12 +689,12 @@ async function handleLimites(owner) {
 // Pour les annonces publiées AVANT le SKU (ses 2 annonces actives, mesuré le
 // 5 octobre). C'est SON clic qui choisit le numéro, jamais une suggestion
 // appliquée toute seule (§5). Réversible : il peut la relier à un autre numéro.
-async function handleSku(b, owner) {
+async function handleSku(b, ctx) {
   const itemId = String(b.itemId || '').trim();
   if (!ID_EBAY.test(itemId)) return { status: 400, body: { ok: false, error: 'annonce eBay invalide' } };
   const sku = skuDe(b.numero);
   if (!sku) return { status: 400, body: { ok: false, reason: 'numero', error: 'Numéro de paire illisible (125, ou B125) : rien n\'a été envoyé à eBay.' } };
-  const at = await accessToken(owner);
+  const at = await jetonDe(ctx);
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
   const r = await tradingCall(at.token, 'ReviseFixedPriceItem', `<Item><ItemID>${itemId}</ItemID><SKU>${esc(sku)}</SKU></Item>`);
   if (r.status === 0) return { status: 503, body: { ok: false, error: 'eBay injoignable — la référence n\'a pas été posée, réessaie.' } };
@@ -687,8 +728,8 @@ async function eligiblesOffre(token) {
   }
   return { ok: true, ids, complet: !url };
 }
-async function handleOffreInfo(owner) {
-  const at = await accessToken(owner);
+async function handleOffreInfo(ctx) {
+  const at = await jetonDe(ctx);
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
   const e = await eligiblesOffre(at.token);
   if (!e.ok) return { status: e.status || 502, body: { ok: false, reason: e.reason, error: e.error } };
@@ -700,7 +741,7 @@ function texteOffre(m) {
   const t = String(m == null ? '' : m).replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, ' ').trim();
   return t.length > 2000 ? null : t;
 }
-async function handleOffre(b, owner) {
+async function handleOffre(b, ctx) {
   // ⚠️ Une offre acceptée VEND la paire : sans confirmation explicite, rien ne
   //    part — pas même la vérification chez eBay.
   if (b.confirme !== true) return { status: 400, body: { ok: false, reason: 'confirmation', error: 'Confirme l\'envoi de l\'offre : rien n\'a été envoyé.' } };
@@ -710,7 +751,7 @@ async function handleOffre(b, owner) {
   if (!Number.isInteger(remise) || remise < 5 || remise > 50) return { status: 400, body: { ok: false, reason: 'remise', error: 'La remise doit être un nombre entier entre 5 et 50 %.' } };
   const message = texteOffre(b.message);
   if (message === null) return { status: 400, body: { ok: false, reason: 'message', error: 'Message trop long (2 000 caractères au plus).' } };
-  const at = await accessToken(owner);
+  const at = await jetonDe(ctx);
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
   // On REVÉRIFIE chez eBay, au moment d'envoyer : l'écran a pu être ouvert il y
   // a une heure. « Pas su » ⇒ on n'envoie pas.
@@ -757,13 +798,14 @@ const SKU_PAIRE = /^VRM[-\s]?[A-Z]{0,3}\d{1,6}$/i;
 // Retire une annonce de la liste rangée `ebay_listings`. Trois issues : true
 // (retirée), false (l'écriture a échoué), null (pas su : lecture ratée, ou
 // aucune liste rangée) — on n'écrit jamais depuis une lecture ratée.
-async function sortirDesAnnonces(itemId, owner) {
-  const d = await lireDonnee('ebay_listings', owner);
+async function sortirDesAnnonces(itemId, ctx) {
+  const id = ligneDe('ebay_listings', ctx);
+  const d = await lireDonnee(id, ctx.owner);
   if (d === undefined || !d || !Array.isArray(d.items)) return null;
   if (!d.items.some((x) => x && String(x.itemId) === itemId)) return true;
-  return storeData('ebay_listings', { ...d, items: d.items.filter((x) => !(x && String(x.itemId) === itemId)) }, owner);
+  return storeData(id, { ...d, items: d.items.filter((x) => !(x && String(x.itemId) === itemId)) }, ctx.owner);
 }
-async function handleRetirer(b, owner) {
+async function handleRetirer(b, ctx) {
   if (b.confirme !== true) return { status: 400, body: { ok: false, reason: 'confirmation', error: 'Confirme le retrait : rien n\'a été envoyé à eBay.' } };
   const itemId = String(b.itemId || '').trim();
   if (!ID_EBAY.test(itemId)) return { status: 400, body: { ok: false, error: 'annonce eBay invalide' } };
@@ -771,11 +813,11 @@ async function handleRetirer(b, owner) {
   const skuAttendu = String(b.sku || '').trim();
   if (auto) {
     if (!SKU_PAIRE.test(skuAttendu)) return { status: 400, body: { ok: false, reason: 'sku', error: 'Retrait automatique : la paire n\'est pas identifiée par son SKU (VRM-n°) — rien n\'a été envoyé à eBay.' } };
-    const v = await lireReglageVendeur('vrm_ebay_retrait_auto', owner);
+    const v = await lireReglageVendeur('vrm_ebay_retrait_auto', ctx.owner);
     if (v === undefined) return { status: 503, body: { ok: false, reason: 'reglage-pas-su', error: 'Je n\'ai pas pu relire ton réglage de retrait automatique — rien n\'a été envoyé à eBay.' } };
     if (v !== 'true') return { status: 403, body: { ok: false, reason: 'auto-eteint', error: 'Le retrait automatique est éteint — rien n\'a été envoyé à eBay.' } };
   }
-  const at = await accessToken(owner);
+  const at = await jetonDe(ctx);
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
   if (auto) {
     const g = await tradingCall(at.token, 'GetItem', `<ItemID>${itemId}</ItemID>`);
@@ -792,16 +834,16 @@ async function handleRetirer(b, owner) {
   // affichée et le retrait automatique reprenait la même annonce à chaque
   // ouverture — en occupant les places d'une vraie vente (revue du 6 octobre).
   // Lire-fusionner-réécrire GARDÉ : une lecture ratée n'écrit rien.
-  const listes = await sortirDesAnnonces(itemId, owner);
+  const listes = await sortirDesAnnonces(itemId, ctx);
   let journal = null;
   if (auto) {
     // Le journal ne se réécrit QUE sur une lecture réussie (« rien lu » ne vaut
     // pas « rien », sinon un hoquet effacerait l'historique de ses retraits).
-    const j = await lireDonnee('ebay_retraits_auto', owner);
+    const j = await lireDonnee(ligneDe('ebay_retraits_auto', ctx), ctx.owner);
     journal = false;
     if (j !== undefined) {
       const l = (j && Array.isArray(j.items)) ? j.items : [];
-      journal = await storeData('ebay_retraits_auto', { items: [{ itemId, sku: skuAttendu, titre: String(b.titre || '').slice(0, 140), at: Date.now() }, ...l].slice(0, 50) }, owner);
+      journal = await storeData(ligneDe('ebay_retraits_auto', ctx), { items: [{ itemId, sku: skuAttendu, titre: String(b.titre || '').slice(0, 140), at: Date.now() }, ...l].slice(0, 50) }, ctx.owner);
     }
   }
   return { status: 200, body: { ok: true, fin, listes, ...(auto ? { auto: true, journal } : {}) } };
@@ -814,8 +856,8 @@ async function handleRetirer(b, owner) {
 // part. Absent ⇒ `null` (l'app écrit « — »), jamais 0. Nécessite le droit
 // `sell.finances` : un jeton accordé avant que ce droit existe répond 403 →
 // on dit « reconnecte-toi », on n'invente rien.
-async function handleFinances(owner) {
-  const at = await accessToken(owner);
+async function handleFinances(ctx) {
+  const at = await jetonDe(ctx);
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
   const r = await ebayJson(`${EBAY_API}/sell/finances/v1/seller_funds_summary`, at.token, { 'Accept-Language': 'fr-FR' });
   if (r.status === 403) return { status: 200, body: { ok: false, reason: 'scope', error: 'Reconnecte-toi à eBay pour voir ton solde à virer (l\'accès « paiements » n\'a pas encore été autorisé).' } };
@@ -824,15 +866,15 @@ async function handleFinances(owner) {
   const amt = (o) => (o && o.value != null && isFinite(Number(o.value))) ? Number(o.value) : null;
   const d = r.data;
   const out = { ok: true, dispo: amt(d.availableFunds), enAttente: amt(d.processingFunds), retenu: amt(d.fundsOnHold), total: amt(d.totalFunds), devise: (d.totalFunds && d.totalFunds.currency) || (d.availableFunds && d.availableFunds.currency) || 'EUR', capturedAt: Date.now() };
-  await storeData('ebay_finances', out, owner);
+  await storeData(ligneDe('ebay_finances', ctx), out, ctx.owner);
   return { status: 200, body: out };
 }
 
 // ── MESURE pour la PUBLICATION (lecture seule) : ce qu'eBay EXIGE pour créer
 //    une annonce — la catégorie, ses attributs obligatoires, et les règles/
 //    emplacements du compte. On mesure AVANT d'écrire le publieur (§6).
-async function handlePubInfo(b, owner) {
-  const at = await accessToken(owner);
+async function handlePubInfo(b, ctx) {
+  const at = await jetonDe(ctx);
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
   const token = at.token;
   const MKT = 'EBAY_FR';
@@ -902,8 +944,8 @@ async function handlePubInfo(b, owner) {
   } };
 }
 
-async function handleSync(owner) {
-  const at = await accessToken(owner);
+async function handleSync(ctx) {
+  const at = await jetonDe(ctx);
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error, detail: at.detail || '' } };
   const token = at.token;
   // On appelle chaque source séparément : un échec n'empêche pas les autres.
@@ -937,11 +979,15 @@ async function handleSync(owner) {
   //    capture.
   const at2 = Date.now();
   if (liste.ok) {
-    await storeData('ebay_listings', { items: lst, ack: liste.ack, status: liste.status, complet: liste.complet, capturedAt: at2 }, owner);
-    await storeData('ebay_programmees', { items: liste.programmees.map(resumeProgrammee), enLigne: lst.map((x) => ({ itemId: x.itemId, sku: x.sku })), complet: liste.complet, capturedAt: at2 }, owner);
+    await storeData(ligneDe('ebay_listings', ctx), { items: lst, ack: liste.ack, status: liste.status, complet: liste.complet, capturedAt: at2 }, ctx.owner);
+    await storeData(ligneDe('ebay_programmees', ctx), { items: liste.programmees.map(resumeProgrammee), enLigne: lst.map((x) => ({ itemId: x.itemId, sku: x.sku })), complet: liste.complet, capturedAt: at2 }, ctx.owner);
   }
-  if (orders.ok && orders.data) await storeData('ebay_orders', { orders: orders.data.orders || [], status: orders.status, capturedAt: at2 }, owner);
-  if (inv.ok && inv.data) await storeData('ebay_inventory', { items: inv.data.inventoryItems || [], status: inv.status, capturedAt: at2 }, owner);
+  if (orders.ok && orders.data) await storeData(ligneDe('ebay_orders', ctx), { orders: orders.data.orders || [], status: orders.status, capturedAt: at2 }, ctx.owner);
+  if (inv.ok && inv.data) await storeData(ligneDe('ebay_inventory', ctx), { items: inv.data.inventoryItems || [], status: inv.status, capturedAt: at2 }, ctx.owner);
+  // Le principal dont l'identité n'est pas encore apprise : on la demande à
+  // eBay maintenant (on a déjà un jeton frais) — c'est ce qui donne son pseudo
+  // au sélecteur, et ce qui permet d'ajouter un second compte sans mélange.
+  if (ctx.compte.principal) await apprendrePrincipal(ctx.owner, token).catch(() => null);
   // Résumé de MESURE : comptes + statuts + petits échantillons (pour voir la forme).
   return { status: 200, body: {
     ok: true,
@@ -976,8 +1022,10 @@ async function handleDeletion(req, res) {
 }
 
 // ── RETOUR DE CONSENTEMENT (eBay renvoie le navigateur ici) ─────────────────
-function retour(res, statut, reason) {
-  const q = 'ebay=' + statut + (reason ? '&raison=' + encodeURIComponent(reason) : '');
+function retour(res, statut, reason, plus) {
+  const q = 'ebay=' + statut + (reason ? '&raison=' + encodeURIComponent(reason) : '')
+    + (plus && plus.compte ? '&compte=' + encodeURIComponent(String(plus.compte).slice(0, 64)) : '')
+    + (plus && plus.nouveau ? '&nouveau=1' : '');
   res.setHeader('Location', '/?' + q);
   res.status(302).end();
 }
@@ -1014,19 +1062,24 @@ const lireCookieEtat = (req) => {
   const v = m ? m[1].trim() : '';
   return NONCE_ETAT.test(v) ? v : '';
 };
-const macEtat = (owner, ts, nonce) => crypto.createHmac('sha256', 'vrm-ebay-consentement|' + (process.env.EBAY_CERT_ID || ''))
-  .update(String(owner) + '|' + String(ts) + '|' + String(nonce)).digest('hex').slice(0, 40);
-function signerEtat(owner, nonce) { const o = String(owner).toLowerCase(); const ts = Date.now().toString(36); return ts + '.' + o + '.' + macEtat(o, ts, nonce); }
-// Le vendeur porté par un `state` valide POUR CE NAVIGATEUR (son nonce), ou ''
-// (nonce absent, forme, âge ou signature faux).
-function vendeurDeEtat(state, nonce) {
-  if (!NONCE_ETAT.test(String(nonce || ''))) return '';
-  const m = /^([0-9a-z]{6,12})\.([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.([0-9a-f]{40})$/.exec(String(state || ''));
-  if (!m || !process.env.EBAY_CERT_ID) return '';
+// (9 octobre) Le state porte aussi l'INTENTION : « Connecter un AUTRE compte »
+// (`.a` en fin de state). Elle entre dans la signature — on ne la change pas
+// en route ; un state sans elle est exactement celui d'avant.
+const macEtat = (owner, ts, nonce, ajout) => crypto.createHmac('sha256', 'vrm-ebay-consentement|' + (process.env.EBAY_CERT_ID || ''))
+  .update(String(owner) + '|' + String(ts) + '|' + String(nonce) + (ajout ? '|ajout' : '')).digest('hex').slice(0, 40);
+function signerEtat(owner, nonce, ajout) { const o = String(owner).toLowerCase(); const ts = Date.now().toString(36); return ts + '.' + o + '.' + macEtat(o, ts, nonce, !!ajout) + (ajout ? '.a' : ''); }
+// Le vendeur porté par un `state` valide POUR CE NAVIGATEUR (son nonce), et son
+// intention — `{ vendeur, ajout }`, ou null (nonce absent, forme, âge ou
+// signature faux).
+function lireEtat(state, nonce) {
+  if (!NONCE_ETAT.test(String(nonce || ''))) return null;
+  const m = /^([0-9a-z]{6,12})\.([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.([0-9a-f]{40})(\.a)?$/.exec(String(state || ''));
+  if (!m || !process.env.EBAY_CERT_ID) return null;
   const age = Date.now() - parseInt(m[1], 36);
-  if (!(age >= -60000 && age <= ETAT_VALIDITE_MS)) return '';
-  const attendu = Buffer.from(macEtat(m[2], m[1], nonce)), recu = Buffer.from(m[3]);
-  return (attendu.length === recu.length && crypto.timingSafeEqual(attendu, recu)) ? m[2] : '';
+  if (!(age >= -60000 && age <= ETAT_VALIDITE_MS)) return null;
+  const ajout = !!m[4];
+  const attendu = Buffer.from(macEtat(m[2], m[1], nonce, ajout)), recu = Buffer.from(m[3]);
+  return (attendu.length === recu.length && crypto.timingSafeEqual(attendu, recu)) ? { vendeur: m[2], ajout } : null;
 }
 // Le propriétaire de l'INSTALLATION. Ne sert plus qu'à une base PAS ENCORE
 // cloisonnée : il n'y a alors qu'un jeu de données (les jetons eBay de
@@ -1042,11 +1095,15 @@ async function handleCallback(req, res) {
   // Le nonce est consommé QUOI QU'IL ARRIVE : un retour, un seul.
   const nonce = lireCookieEtat(req);
   res.setHeader('Set-Cookie', cookieEtat('', 0));
-  const vendeur = vendeurDeEtat(q.state, nonce);
-  if (!vendeur) { retour(res, 'erreur', 'demande expirée ou faite dans un autre navigateur — relance la connexion eBay depuis VRM, dans ce navigateur'); return; }
+  const etat = lireEtat(q.state, nonce);
+  if (!etat) { retour(res, 'erreur', 'demande expirée ou faite dans un autre navigateur — relance la connexion eBay depuis VRM, dans ce navigateur'); return; }
   try {
-    const r = await exchangeCode(code, vendeur);
-    retour(res, r.ok ? 'connecte' : 'erreur', r.ok ? '' : (r.reason || (r.error || '').slice(0, 60)));
+    // (9 octobre) QUEL compte eBay vient de se connecter : même identité ⇒ ses
+    // jetons sont rafraîchis ; nouvelle ⇒ ajoutée ; illisible ⇒ refus (sauf le
+    // tout premier compte). Voir `rangerConnexion`.
+    const r = await rangerConnexion(code, etat.vendeur, { ajout: etat.ajout });
+    if (r.ok) retour(res, 'connecte', '', { compte: r.compte && r.compte.pseudo, nouveau: r.nouveau && !(r.compte && r.compte.principal) });
+    else retour(res, 'erreur', r.reason || (r.error || '').slice(0, 60));
   } catch (_) { retour(res, 'erreur', 'echange impossible'); }
 }
 
@@ -1084,9 +1141,15 @@ async function handleApp(req, res) {
   try {
     if (action === 'authurl') {
       if (!ruName()) { res.status(503).json({ ok: false, reason: 'no-runame', error: 'Le RuName (EBAY_RUNAME) n\'est pas configuré.' }); return; }
+      // « Connecter un AUTRE compte eBay » : `prompt=login` (sinon eBay
+      // reconnecterait en silence le compte déjà ouvert dans ce navigateur), et
+      // l'intention signée dans le state. Base pas encore cloisonnée : un seul
+      // compte, comme avant.
+      const ajout = b.ajout === true;
+      if (ajout && !cloison) { res.status(409).json({ ok: false, reason: 'un-seul-compte', error: 'Un seul compte eBay tant que la base n\'est pas cloisonnée.' }); return; }
       const nonce = crypto.randomBytes(16).toString('hex');
       res.setHeader('Set-Cookie', cookieEtat(nonce, Math.round(ETAT_VALIDITE_MS / 1000)));
-      res.status(200).json({ ok: true, url: authUrl(signerEtat(owner, nonce)) });
+      res.status(200).json({ ok: true, url: authUrl(signerEtat(owner, nonce, ajout), { ajout }) });
       return;
     }
     if (action === 'apptoken') {
@@ -1095,38 +1158,68 @@ async function handleApp(req, res) {
       return;
     }
     if (action === 'exchange') {
-      const r = await exchangeCode(String(b.code || '').trim(), owner);
-      res.status(r.status).json(r.ok ? { ok: true, connected: true } : { ok: false, reason: r.reason, error: r.error, detail: r.detail || '' });
+      const r = await rangerConnexion(String(b.code || '').trim(), owner, { ajout: b.ajout === true });
+      res.status(r.status).json(r.ok ? { ok: true, connected: true, compte: r.compte || null, nouveau: !!r.nouveau } : { ok: false, reason: r.reason, error: r.error, detail: r.detail || '' });
       return;
     }
     if (action === 'status') {
-      const has = await hasRefresh(owner);
+      const has = await hasRefresh(owner, '');
       if (has === null) { res.status(503).json({ ok: false, reason: 'store-unreachable', error: 'Impossible de lire l\'état (base injoignable).' }); return; }
-      res.status(200).json({ ok: true, connected: !!has });
+      if (!cloison) { res.status(200).json({ ok: true, connected: !!has }); return; }
+      // (9 octobre) Ses comptes eBay, chacun avec son état — jamais un jeton.
+      // Le principal relié dont l'identité n'est pas encore apprise : on la
+      // demande à eBay maintenant (une fois ; ensuite elle est rangée).
+      let reg = await lireComptes(owner);
+      if (reg && has && !reg.comptes.some((x) => x.principal)) {
+        if ((await apprendrePrincipal(owner).catch(() => null)) === true) reg = await lireComptes(owner);
+      }
+      if (reg === undefined) { res.status(503).json({ ok: false, reason: 'store-unreachable', error: 'Impossible de lire tes comptes eBay (base injoignable).' }); return; }
+      const comptes = [];
+      for (const c of comptesActifs(reg)) {
+        const relie = c.suffixe ? await hasRefresh(owner, c.suffixe) : has;
+        if (c.implicite && !relie) continue;
+        comptes.push({ cle: c.principal ? (c.cle || '') : c.cle, pseudo: c.pseudo || '', principal: !!c.principal, relie, ajouteLe: c.ajouteLe || null });
+      }
+      res.status(200).json({ ok: true, connected: comptes.some((c) => c.relie === true), comptes });
       return;
     }
-    // Toutes les autres actions agissent sur le compte eBay de CE vendeur. Ce
-    // qui engage (offre, retrait, programmation, annulation, déplacement) exige
-    // en plus `confirme:true` — vérifié AVANT tout appel à eBay.
+    if (action === 'deconnecter') {
+      // ⚠️ Ses jetons partent : confirmation exigée ICI (pas seulement à
+      // l'écran). Les autres comptes ne sont pas touchés.
+      if (b.confirme !== true) { res.status(400).json({ ok: false, reason: 'confirmation', error: 'Confirme la déconnexion : rien n\'a changé.' }); return; }
+      if (!cloison) { res.status(409).json({ ok: false, reason: 'un-seul-compte', error: 'Un seul compte eBay tant que la base n\'est pas cloisonnée.' }); return; }
+      const rc = await resoudreCompte(b.compte, owner);
+      if (!rc.ok) { res.status(rc.status).json(rc.body); return; }
+      const r = await deconnecterCompte(rc.compte, owner);
+      res.status(r.status).json(r.ok ? { ok: true, compte: rc.compte.pseudo || '', registre: r.registre } : { ok: false, reason: r.reason, error: r.error });
+      return;
+    }
+    // Toutes les autres actions agissent sur UN compte eBay de CE vendeur —
+    // `compte` (absent ⇒ le principal), VALIDÉ contre SON registre AVANT tout
+    // appel à eBay : un compte inconnu, déconnecté ou d'un autre vendeur ne
+    // désigne rien. Ce qui engage (offre, retrait, programmation, annulation,
+    // déplacement) exige en plus `confirme:true` — vérifié AVANT eBay aussi.
     const ACTIONS = {
-      sync: () => handleSync(owner),
-      revise: () => handleRevise(b, owner),
-      pubinfo: () => handlePubInfo(b, owner),
-      pubverify: () => handleVerify(b, owner),
-      finances: () => handleFinances(owner),
-      publish: () => handlePublish(b, owner),
-      sku: () => handleSku(b, owner),
-      offreinfo: () => handleOffreInfo(owner),
-      offre: () => handleOffre(b, owner),
-      retirer: () => handleRetirer(b, owner),
-      programmer: () => handleProgrammer(b, owner),
-      programmees: () => handleProgrammees(owner),
-      deprogrammer: () => handleDeprogrammer(b, owner),
-      reprogrammer: () => handleReprogrammer(b, owner),
-      limites: () => handleLimites(owner),
+      sync: (ctx) => handleSync(ctx),
+      revise: (ctx) => handleRevise(b, ctx),
+      pubinfo: (ctx) => handlePubInfo(b, ctx),
+      pubverify: (ctx) => handleVerify(b, ctx),
+      finances: (ctx) => handleFinances(ctx),
+      publish: (ctx) => handlePublish(b, ctx),
+      sku: (ctx) => handleSku(b, ctx),
+      offreinfo: (ctx) => handleOffreInfo(ctx),
+      offre: (ctx) => handleOffre(b, ctx),
+      retirer: (ctx) => handleRetirer(b, ctx),
+      programmer: (ctx) => handleProgrammer(b, ctx),
+      programmees: (ctx) => handleProgrammees(ctx),
+      deprogrammer: (ctx) => handleDeprogrammer(b, ctx),
+      reprogrammer: (ctx) => handleReprogrammer(b, ctx),
+      limites: (ctx) => handleLimites(ctx),
     };
     if (!Object.prototype.hasOwnProperty.call(ACTIONS, action)) { res.status(400).json({ ok: false, error: 'action inconnue' }); return; }
-    const r = await ACTIONS[action]();
+    const rc = await resoudreCompte(b.compte, owner);
+    if (!rc.ok) { res.status(rc.status).json(rc.body); return; }
+    const r = await ACTIONS[action]({ owner, compte: rc.compte });
     res.status(r.status).json(r.body);
   } catch (e) {
     res.status(502).json({ ok: false, error: 'eBay injoignable', detail: String((e && e.message) || '').slice(0, 200) });

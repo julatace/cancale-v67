@@ -108,7 +108,12 @@ const ANNONCES_J = () => [
   annonce('110000000002', 'Nike Dunk Low panda taille 42', '', '100.0', '2026-09-21T10:00:00.000Z', { variantes: '<Variations><Variation><SKU>VAR-42</SKU></Variation></Variations>' }),
 ];
 let ebay = {};
-const remettreEbay = () => { ebay = { 'at-J': { actives: ANNONCES_J(), programmees: [], pagesProg: 1 }, 'at-B': { actives: [], programmees: [], pagesProg: 1 } }; };
+const remettreEbay = () => { ebay = { 'at-J': { actives: ANNONCES_J(), programmees: [], pagesProg: 1 }, 'at-B': { actives: [], programmees: [], pagesProg: 1 }, 'at-A2': { actives: [], programmees: [], pagesProg: 1 }, 'at-A3': { actives: [], programmees: [], pagesProg: 1 } }; };
+// ── QUI EST DERRIÈRE CHAQUE JETON (9 octobre, plusieurs comptes eBay) ────────
+// GetUser rend le compte APPELANT : son pseudo et son identifiant stable
+// (EIASToken). Julien a DEUX comptes eBay (particulier `at-J`, pro `at-A2`) ;
+// B a le sien. Données INVENTÉES.
+const IDENTITES = { 'at-J': ['julien_part', 'EIAS-JULIEN-PART-000000001'], 'at-A2': ['julien_pro', 'EIAS-JULIEN-PRO-000000002'], 'at-A3': ['julien_trois', 'EIAS-JULIEN-TROIS-00000003'], 'at-B': ['vendeur_b', 'EIAS-VENDEUR-B-0000000004'] };
 remettreEbay();
 let prochainId = 110000000777;
 const itemFake = (a) => `<Item><ItemID>${a.itemId}</ItemID><Title>${a.title}</Title>${a.sku ? `<SKU>${a.sku}</SKU>` : ''}${a.watch != null ? `<WatchCount>${a.watch}</WatchCount>` : ''}<QuantityAvailable>1</QuantityAvailable>${a.variantes || ''}<SellingStatus><CurrentPrice currencyID="EUR">${a.prix}</CurrentPrice><QuantitySold>0</QuantitySold></SellingStatus><ListingDetails><StartTime>${a.debut}</StartTime>${a.fin ? `<EndTime>${a.fin}</EndTime>` : ''}<ViewItemURL>https://www.ebay.fr/itm/${a.itemId}</ViewItemURL></ListingDetails></Item>`;
@@ -134,7 +139,7 @@ const fee = (n, v) => `<Fee><Name>${n}</Name><Fee currencyID="EUR">${v}</Fee></F
 const ELIGIBLE = '110000000002';
 let mode = {};
 const uuidsVus = new Map();       // UUID déjà utilisé → ItemID (comme eBay : 488)
-const remettre = () => { mode = { liste: 'ok', commandes: 'ok', eligibles: 'ok', envoi: 'ok', trading: 'ok', verif: 'ok', add: 'ok', end: 'ok', revise: 'ok', priv: 'ok', getitem: 'ok', mainKo: false, journalKo: false, listingsKo: false }; remettreEbay(); uuidsVus.clear(); };
+const remettre = () => { mode = { liste: 'ok', commandes: 'ok', eligibles: 'ok', envoi: 'ok', trading: 'ok', verif: 'ok', add: 'ok', end: 'ok', revise: 'ok', priv: 'ok', getitem: 'ok', mainKo: false, journalKo: false, listingsKo: false, getuser: 'ok', listeKoPour: '', comptesKo: false }; remettreEbay(); uuidsVus.clear(); };
 remettre();
 
 const journal = [];       // ce qui part chez eBay, ce qui s'écrit en base, avec quel jeton
@@ -162,15 +167,27 @@ global.fetch = async (url, opts = {}) => {
       // compte eBay sert chaque appel.
       const rt = decodeURIComponent((/refresh_token=([^&]*)/.exec(corps) || [])[1] || '');
       const code = decodeURIComponent((/code=([^&]*)/.exec(corps) || [])[1] || '');
-      if (/grant_type=authorization_code/.test(corps)) return rep({ access_token: 'at-neuf', expires_in: 7200, refresh_token: code === 'code-de-B' ? 'rt-de-B' : 'rt-neuf-de-J', refresh_token_expires_in: 47304000 });
+      if (/grant_type=authorization_code/.test(corps)) {
+        // Chaque code dit QUEL compte eBay vient de consentir (son jeton d'accès).
+        const PAR_CODE = { 'code-de-B': ['rt-de-B', 'at-B'], 'code-A2': ['rt-A2', 'at-A2'], 'code-A3': ['rt-A3', 'at-A3'], 'code-J-part': ['rt-neuf-de-J', 'at-J'] };
+        const [rtn, atn] = PAR_CODE[code] || ['rt-neuf-de-J', 'at-neuf'];
+        return rep({ access_token: atn, expires_in: 7200, refresh_token: rtn, refresh_token_expires_in: 47304000 });
+      }
       if (rt === 'rt-de-J' || rt === 'rt-neuf-de-J') return rep({ access_token: 'at-J', expires_in: 7200 });
       if (rt === 'rt-de-B') return rep({ access_token: 'at-B', expires_in: 7200 });
+      if (rt === 'rt-A2') return rep({ access_token: 'at-A2', expires_in: 7200 });
+      if (rt === 'rt-A3') return rep({ access_token: 'at-A3', expires_in: 7200 });
       return rep({ error: 'invalid_grant' }, 400);
     }
     if (u.includes('/ws/api.dll')) {
       const compte = ebay[jeton] || { actives: [], programmees: [], pagesProg: 1 };
+      if (appel === 'GetUser') {
+        const idn = IDENTITES[jeton];
+        if (mode.getuser === 'ko' || !idn) return xml(mode.getuser === 'ko' ? XML_REFUS : XML_OK(''));
+        return xml(XML_OK(`<User><UserID>${idn[0]}</UserID><EIASToken>${idn[1]}</EIASToken><Status>Confirmed</Status></User>`));
+      }
       if (appel === 'GetMyeBaySelling') {
-        if (mode.liste === 'ko') return xml(XML_REFUS);
+        if (mode.liste === 'ko' || (mode.listeKoPour && mode.listeKoPour === jeton)) return xml(XML_REFUS);
         if (mode.liste === 'reseau') throw new Error('ECONNRESET');
         return xml(repListe(compte, corps));
       }
@@ -276,6 +293,7 @@ global.fetch = async (url, opts = {}) => {
     if (id === 'main' && mode.mainKo) return rep({ message: 'boom' }, 500);
     if (id === 'ebay_retraits_auto' && mode.journalKo) return rep({ message: 'boom' }, 500);
     if (id === 'ebay_listings' && mode.listingsKo) return rep({ message: 'boom' }, 500);
+    if (id === 'ebay_comptes' && mode.comptesKo) return rep({ message: 'boom' }, 500);
     const out = lignes.filter((r) => (!id || r.id === id) && (!owner || r.owner === owner));
     return rep(out.map((r) => projette(r, sel)));
   }
@@ -313,6 +331,8 @@ const RA = {};
     const ctx = {}; vm.createContext(ctx);
     try { vm.runInContext(srcs.join('\n') + '\n;this.R = { cleNum, NUM_OK, numDeSkuEbay, skuEbayDe };', ctx); Object.assign(RA, ctx.R || {}); } catch (_) {}
   }
+  const suf = extraire(APP, 'suffixeCompteEbay');
+  if (suf) { const c2 = {}; vm.createContext(c2); try { vm.runInContext(suf + '\n;this.f = suffixeCompteEbay;', c2); RA.suffixeCompteEbay = c2.f; } catch (_) {} }
 }
 
 (async () => {
@@ -363,6 +383,19 @@ const RA = {};
         dit(o.code === 403 && chezEbay(o.journal).length === 0,
           `base non cloisonnée : un autre vendeur ne pilote pas « ${action} » (un seul jeu de données, celui de l'installation)`, `HTTP ${o.code} · ${chezEbay(o.journal).length} appel(s) eBay`);
       }
+    });
+    await essaie('np plusieurs comptes', async () => {
+      const a = await app(JWT_J, { action: 'authurl', ajout: true });
+      const s = await app(JWT_J, { action: 'sync', compte: 'a'.repeat(16) });
+      dit(a.code === 409 && s.code === 404 && chezEbay(s.journal).length === 0,
+        "base non cloisonnée : un seul compte eBay, comme avant (« connecter un autre compte » refusé, un `compte` ne désigne rien)", `${a.code}/${s.code}`);
+      const d = await app(JWT_J, { action: 'authurl' });
+      const etat = decodeURIComponent((/[?&]state=([^&]+)/.exec((d.corps && d.corps.url) || '') || [])[1] || '');
+      const r = await retourEbay({ code: 'code-A2', state: etat }, cookieDe(d));
+      const getUser = chezEbay(r.journal).some((x) => x.appel === 'GetUser');
+      const w = r.journal.find((x) => x.ou === 'base' && /ebay_tokens/.test(x.corps));
+      dit(/ebay=connecte/.test(r.loc) && !getUser && w && /"id":"ebay_tokens"/.test(w.corps) && !r.journal.some((x) => x.ou === 'base' && /ebay_comptes/.test(x.corps)),
+        'base non cloisonnée : le retour range dans ebay_tokens comme avant — ni GetUser, ni registre', `${r.loc} · GetUser=${getUser}`);
     });
     await essaie('np écriture', async () => {
       const o = await app(JWT_J, { action: 'sync' });
@@ -1049,6 +1082,198 @@ const RA = {};
     mode.priv = '500';
     const o4 = await app(JWT_J, { action: 'limites' });
     dit(o4.code >= 500 && o4.corps.ok === false && !('quantite' in o4.corps), 'eBay en panne ⇒ échec dit, aucun nombre inventé', `HTTP ${o4.code}`);
+  });
+
+  // ── 12. PLUSIEURS COMPTES eBAY PAR VENDEUR (9 octobre) ─────────────────────
+  //    Julien : « donne la possibilité d'avoir plusieurs comptes eBay connectés,
+  //    si c'est possible uniquement avec la connexion ». Deux comptes chez lui
+  //    (julien_part = le principal d'aujourd'hui, julien_pro = A2), un chez B.
+  const crypto = require('crypto');
+  const cleDe = (eias) => crypto.createHash('sha256').update('vrm-ebay-compte|' + eias).digest('hex').slice(0, 16);
+  const CLE_A1 = cleDe(IDENTITES['at-J'][1]), CLE_A2 = cleDe(IDENTITES['at-A2'][1]), CLE_A3 = cleDe(IDENTITES['at-A3'][1]);
+  const registre = (owner) => { const l = lignes.find((x) => x.owner === owner && x.id === 'ebay_comptes'); return l && l.data && Array.isArray(l.data.comptes) ? l.data.comptes : null; };
+  const jetons = (owner, id) => { const l = lignes.find((x) => x.owner === owner && x.id === id); return l && l.data ? l.data.refresh_token : undefined; };
+  const etatDe = (d) => decodeURIComponent((/[?&]state=([^&]+)/.exec((d.corps && d.corps.url) || '') || [])[1] || '');
+  // Le vrai parcours : l'app demande l'adresse, eBay renvoie le navigateur
+  // (avec son cookie) et un code — le code dit QUEL compte eBay a consenti.
+  const connecter = async (jwt, code, ajout) => {
+    const d = await app(jwt, { action: 'authurl', ...(ajout ? { ajout: true } : {}) });
+    return retourEbay({ code, state: etatDe(d) }, cookieDe(d));
+  };
+  const avecDeuxComptes = async () => {
+    remettre(); remettreBase();
+    await app(JWT_J, { action: 'status' });                 // apprend le principal
+    return connecter(JWT_J, 'code-A2', true);               // ajoute julien_pro
+  };
+  await essaie('multi : le principal apprend son identité', async () => {
+    remettre(); remettreBase();
+    const o = await app(JWT_J, { action: 'status' });
+    const reg = registre(J);
+    dit(o.code === 200 && reg && reg.length === 1 && reg[0].principal === true && reg[0].pseudo === 'julien_part' && reg[0].cle === CLE_A1,
+      "la ligne d'avant de Julien reste son PREMIER compte : à l'ouverture, eBay dit qui il est (GetUser) et c'est rangé — pseudo julien_part, clé tirée de l'identifiant stable",
+      reg ? JSON.stringify(reg.map((x) => [x.pseudo, x.principal])) : `aucun registre · HTTP ${o.code}`);
+    dit(o.corps && Array.isArray(o.corps.comptes) && o.corps.comptes.length === 1 && o.corps.comptes[0].pseudo === 'julien_part' && o.corps.comptes[0].relie === true,
+      "« status » rend ses comptes (pseudo, relié) — un seul compte, rien ne change pour lui", JSON.stringify(o.corps && o.corps.comptes));
+    const l = lignes.find((x) => x.owner === J && x.id === 'ebay_comptes');
+    dit(l && !/rt-|at-|refresh|access|EIAS/i.test(JSON.stringify(l.data)) && sansJeton(o),
+      'le registre (lisible par l\'app) ne porte AUCUN jeton ni l\'identifiant brut d\'eBay — pseudo, clé hachée, dates', l ? Object.keys(l.data.comptes[0]).join(',') : 'absent');
+    dit(jetons(J, 'ebay_tokens') === 'rt-de-J', 'et ses jetons d\'avant n\'ont pas bougé (mêmes lignes, mêmes ids)');
+  });
+  await essaie('multi : « connecter un autre compte »', async () => {
+    remettre(); remettreBase();
+    const d = await app(JWT_J, { action: 'authurl', ajout: true });
+    const d0 = await app(JWT_J, { action: 'authurl' });
+    dit(d.code === 200 && /[?&]prompt=login(&|$)/.test(d.corps.url) && /\.a$/.test(etatDe(d)),
+      "« Connecter un AUTRE compte eBay » ⇒ prompt=login (sinon eBay reconnecte en silence le compte déjà ouvert), et l'intention est signée dans le state", (d.corps && d.corps.url || '').replace(/^.*\?/, '').slice(0, 120));
+    dit(d0.code === 200 && !/prompt=login/.test(d0.corps.url) && !/\.a$/.test(etatDe(d0)), "l'autre sens : la connexion d'avant ne change pas (pas de prompt, state d'avant)");
+    // L'intention ne se retourne pas en route : le state d'un ajout privé de son « .a » est refusé.
+    const avant = JSON.stringify(lignes);
+    const r = await retourEbay({ code: 'code-A2', state: etatDe(d).replace(/\.a$/, '') }, cookieDe(d));
+    dit(/ebay=erreur/.test(r.loc) && JSON.stringify(lignes) === avant && chezEbay(r.journal).length === 0, "et l'intention fait partie de ce qui est signé : la retirer du state ⇒ refusé, rien rangé", r.loc);
+  });
+  await essaie('multi : un 2e compte est AJOUTÉ', async () => {
+    const r = await avecDeuxComptes();
+    const reg = registre(J) || [];
+    const a2 = reg.find((x) => x.cle === CLE_A2);
+    dit(/ebay=connecte/.test(r.loc) && /compte=julien_pro/.test(r.loc) && /nouveau=1/.test(r.loc) && reg.length === 2 && a2 && a2.principal === false && a2.pseudo === 'julien_pro',
+      'au retour, eBay dit que c\'est un AUTRE compte (julien_pro) ⇒ il est ajouté au registre, à côté du premier', `${r.loc} · ${reg.map((x) => x.pseudo).join(',')}`);
+    dit(jetons(J, 'ebay_tokens_' + CLE_A2) === 'rt-A2' && jetons(J, 'ebay_tokens') === 'rt-de-J',
+      'ses jetons sont rangés dans SA ligne (ebay_tokens_{clé}) — ceux du premier compte ne sont pas touchés', `A2=${jetons(J, 'ebay_tokens_' + CLE_A2)} · A1=${jetons(J, 'ebay_tokens')}`);
+    const s = await app(JWT_J, { action: 'status' });
+    dit(s.corps && s.corps.comptes && s.corps.comptes.length === 2 && s.corps.comptes.every((c) => c.relie === true) && sansJeton(s),
+      '« status » rend les deux comptes, chacun relié, sans jeton', JSON.stringify(s.corps && s.corps.comptes && s.corps.comptes.map((c) => c.pseudo)));
+  });
+  await essaie('multi : même compte reconnecté ⇒ pas de doublon', async () => {
+    await avecDeuxComptes();
+    const r = await connecter(JWT_J, 'code-A2', true);
+    const reg = registre(J) || [];
+    dit(/ebay=connecte/.test(r.loc) && !/nouveau=1/.test(r.loc) && reg.length === 2 && reg.filter((x) => x.cle === CLE_A2).length === 1,
+      'julien_pro reconnecté ⇒ SES jetons sont rafraîchis, aucun doublon au registre', `${r.loc} · ${reg.length} compte(s)`);
+    const r2 = await connecter(JWT_J, 'code-J-part', true);
+    const reg2 = registre(J) || [];
+    dit(/ebay=connecte/.test(r2.loc) && reg2.length === 2 && jetons(J, 'ebay_tokens') === 'rt-neuf-de-J' && jetons(J, 'ebay_tokens_' + CLE_A2) === 'rt-A2',
+      'le premier compte (julien_part), même par « connecter un autre compte », retrouve SA ligne — pas de doublon, A2 intact', `${reg2.length} compte(s) · A1=${jetons(J, 'ebay_tokens')}`);
+  });
+  await essaie('multi : identité illisible ⇒ refus, rien rangé', async () => {
+    await avecDeuxComptes();
+    mode.getuser = 'ko';
+    const avant = JSON.stringify(lignes);
+    const r = await connecter(JWT_J, 'code-A3', true);
+    const r2 = await connecter(JWT_J, 'code-A3', false);
+    dit(/ebay=erreur/.test(r.loc) && /identite-illisible/.test(r.loc) && /ebay=erreur/.test(r2.loc) && JSON.stringify(lignes) === avant && !ecritJetons(r.journal) && !ecritJetons(r2.journal),
+      'GetUser en échec pour un compte SUPPLÉMENTAIRE (ajout, ou reconnexion avec deux comptes) ⇒ refus, AUCUNE écriture : jamais un jeton qui écrase celui d\'un autre compte', `${r.loc} · ${r2.loc}`);
+    remettre(); lignes = []; mode.getuser = 'ko';
+    const r3 = await connecter(JWT_B, 'code-de-B', false);
+    dit(/ebay=connecte/.test(r3.loc) && jetons(B, 'ebay_tokens') === 'rt-de-B',
+      "l'autre sens : le TOUT PREMIER compte d'un vendeur garde le comportement d'avant (principal), même sans identité", r3.loc);
+  });
+  await essaie('multi : principal illisible ⇒ on n\'ajoute pas', async () => {
+    remettre(); remettreBase();
+    lignes.find((x) => x.owner === J && x.id === 'ebay_tokens').data.refresh_token = 'rt-mort';
+    const avant = JSON.stringify(lignes);
+    const r = await connecter(JWT_J, 'code-A2', true);
+    dit(/ebay=erreur/.test(r.loc) && /principal-inconnu/.test(r.loc) && JSON.stringify(lignes) === avant,
+      "l'identité du premier compte est inconnue et ne peut pas être apprise (jeton mort) ⇒ on n'ajoute pas un second compte (on ne saurait pas si c'est le même)", r.loc);
+    remettre(); remettreBase(); mode.comptesKo = true;
+    const avant2 = JSON.stringify(lignes);
+    const r2 = await connecter(JWT_J, 'code-A2', true);
+    dit(/ebay=erreur/.test(r2.loc) && JSON.stringify(lignes) === avant2 && !chezEbay(r2.journal).some((x) => /oauth2\/token/.test(x.u)),
+      'registre illisible ⇒ refus AVANT même d\'échanger le code (« pas su » ne range rien)', r2.loc);
+  });
+  await essaie('multi : chaque action part sur SON compte', async () => {
+    await avecDeuxComptes();
+    const o = await app(JWT_J, { action: 'sync', compte: CLE_A2 });
+    const parti = auCompte(o.journal);
+    const L = ecrit(o.journal, 'ebay_listings_' + CLE_A2);
+    dit(o.code === 200 && parti.length > 0 && parti.every((x) => x.jeton === 'at-A2') && L && L.owner === J && ecrit(o.journal, 'ebay_listings') === null,
+      'la synchro du compte julien_pro part avec SON jeton et range dans SES lignes (ebay_listings_{clé}) — jamais dans celles du premier', `${parti.map((x) => x.jeton).join(',')} · ${L ? 'ebay_listings_' + CLE_A2 : 'rien'}`);
+    const o2 = await app(JWT_J, { action: 'sync' });
+    dit(auCompte(o2.journal).every((x) => x.jeton === 'at-J') && ecrit(o2.journal, 'ebay_listings') && ecrit(o2.journal, 'ebay_listings_' + CLE_A2) === null,
+      'sans `compte` ⇒ le principal, avec ses lignes d\'avant (rétrocompatible)');
+    for (const action of ['finances', 'programmees', 'limites', 'offreinfo']) {
+      const x = await app(JWT_J, { action, compte: CLE_A2 });
+      const ps = auCompte(x.journal);
+      dit(ps.length > 0 && ps.every((y) => y.jeton === 'at-A2'), `« ${action} » sur julien_pro part avec SON jeton`, ps.map((y) => y.jeton).join(','));
+    }
+  });
+  await essaie('multi : le compte d\'un autre vendeur ne désigne rien', async () => {
+    await avecDeuxComptes();
+    for (const action of ['sync', 'publish', 'retirer', 'programmer', 'finances', 'deconnecter']) {
+      const o = await app(JWT_B, { action, compte: CLE_A2, confirme: true, itemId: '110000000001', item: { ...item, numero: '30' }, uuid: 'C'.repeat(32), fraisVus: 0.2 });
+      dit((o.code === 404 || o.code === 403) && chezEbay(o.journal).length === 0 && !auCompte(o.journal).some((x) => x.jeton === 'at-A2'),
+        `B désigne le compte eBay de Julien (« ${action} ») ⇒ ${o.code}, zéro appel eBay`, `HTTP ${o.code} · ${chezEbay(o.journal).length} appel(s)`);
+    }
+    const inc = await app(JWT_J, { action: 'sync', compte: 'f'.repeat(16) });
+    const mal = await app(JWT_J, { action: 'sync', compte: '../ebay_tokens' });
+    dit(inc.code === 404 && mal.code === 400 && chezEbay(inc.journal).length === 0 && chezEbay(mal.journal).length === 0,
+      'une clé inconnue ⇒ 404, une clé mal formée ⇒ 400 — zéro appel eBay', `${inc.code}/${mal.code}`);
+    mode.comptesKo = true;
+    const pk = await app(JWT_J, { action: 'sync', compte: CLE_A2 });
+    dit(pk.code === 503 && chezEbay(pk.journal).length === 0, 'registre illisible ⇒ 503, zéro appel (« pas su » ne désigne aucun compte)', `HTTP ${pk.code}`);
+  });
+  const VRM30 = () => annonce('110000000930', 'Salomon XT-6 noir T43', 'VRM-30', '120.0', '2026-09-01T10:00:00.000Z');
+  await essaie('multi : une paire en vente sur A1 ne part pas sur A2', async () => {
+    await avecDeuxComptes();
+    ebay['at-J'].actives.push(VRM30());
+    const o = await app(JWT_J, { action: 'publish', compte: CLE_A2, item: { ...item, numero: '30' } });
+    dit(o.code === 409 && o.corps.reason === 'deja-en-ligne' && o.corps.autreCompte === true && /julien_part/.test(o.corps.error || '') && !auCompte(o.journal).some((x) => x.appel === 'AddFixedPriceItem'),
+      'publier VRM-30 sur julien_pro alors qu\'elle est en vente sur julien_part ⇒ 409, le compte est nommé, aucune annonce créée', `HTTP ${o.code} · ${o.corps && o.corps.error}`);
+    const lus = auCompte(o.journal).filter((x) => x.appel === 'GetMyeBaySelling').map((x) => x.jeton);
+    dit(lus.includes('at-J'), "c'est l'AUTRE compte (julien_part) qui a été relu chez eBay, avec SON jeton", lus.join(','));
+    const p = await app(JWT_J, { action: 'programmer', compte: CLE_A2, confirme: true, uuid: 'D'.repeat(32), fraisVus: 0.2, scheduleTime: iso(Date.now() + 2 * JOUR), item: { ...item, numero: '30' } });
+    dit(p.code === 409 && !auCompte(p.journal).some((x) => /Verify|AddFixed/.test(x.appel)), 'programmer VRM-30 sur julien_pro ⇒ 409 aussi, ni vérification ni ajout', `HTTP ${p.code}`);
+    ebay['at-J'].actives = ebay['at-J'].actives.filter((x) => x.sku !== 'VRM-30');
+    ebay['at-A2'].programmees.push(annonce('110000000931', 'Salomon XT-6 noir T43', 'VRM-30', '120.0', iso(Date.now() + 3 * JOUR)));
+    const o2 = await app(JWT_J, { action: 'publish', item: { ...item, numero: '30' } });
+    dit(o2.code === 409 && o2.corps.reason === 'deja-programmee' && !auCompte(o2.journal).some((x) => x.appel === 'AddFixedPriceItem'),
+      'et dans l\'autre sens : programmée sur julien_pro ⇒ elle ne part pas sur le premier compte', `HTTP ${o2.code}`);
+    remettre(); await avecDeuxComptes();
+    const o3 = await app(JWT_J, { action: 'publish', compte: CLE_A2, item: { ...item, numero: '31' } });
+    const add = auCompte(o3.journal).find((x) => x.appel === 'AddFixedPriceItem');
+    dit(o3.code === 200 && add && add.jeton === 'at-A2' && o3.corps.compte === 'julien_pro', "l'autre sens : une paire libre partout part sur julien_pro, avec SON jeton", `HTTP ${o3.code}`);
+  });
+  await essaie('multi : un compte illisible ⇒ rien ne part', async () => {
+    await avecDeuxComptes();
+    mode.listeKoPour = 'at-J';
+    const o = await app(JWT_J, { action: 'publish', compte: CLE_A2, item: { ...item, numero: '32' } });
+    dit(o.code === 503 && o.corps.reason === 'pas-su' && /julien_part/.test(o.corps.error || '') && !auCompte(o.journal).some((x) => x.appel === 'AddFixedPriceItem'),
+      'la liste de julien_part illisible ⇒ publier sur julien_pro est refusé « pas su », en nommant le compte qui manque', `HTTP ${o.code} · ${o.corps && o.corps.error}`);
+    mode.listeKoPour = '';
+    lignes.find((x) => x.owner === J && x.id === 'ebay_tokens').data.refresh_token = 'rt-mort';
+    const o2 = await app(JWT_J, { action: 'publish', compte: CLE_A2, item: { ...item, numero: '32' } });
+    dit(o2.code === 503 && !auCompte(o2.journal).some((x) => x.appel === 'AddFixedPriceItem'), 'le jeton de julien_part mort ⇒ pareil, rien ne part sur julien_pro', `HTTP ${o2.code}`);
+  });
+  await essaie('multi : déconnecter UN compte', async () => {
+    await avecDeuxComptes();
+    const sans = await app(JWT_J, { action: 'deconnecter', compte: CLE_A2 });
+    dit(sans.code === 400 && jetons(J, 'ebay_tokens_' + CLE_A2) === 'rt-A2', 'déconnecter sans confirmation ⇒ 400, rien ne change');
+    const o = await app(JWT_J, { action: 'deconnecter', compte: CLE_A2, confirme: true });
+    const a2 = (registre(J) || []).find((x) => x.cle === CLE_A2);
+    dit(o.code === 200 && jetons(J, 'ebay_tokens_' + CLE_A2) === '' && a2 && a2.deconnecteLe > 0 && jetons(J, 'ebay_tokens') === 'rt-de-J' && chezEbay(o.journal).length === 0,
+      'déconnecter julien_pro (confirmé) ⇒ SES jetons sont vidés, il est marqué déconnecté — le premier compte n\'est pas touché', `HTTP ${o.code}`);
+    const x = await app(JWT_J, { action: 'sync', compte: CLE_A2 });
+    dit(x.code === 409 && chezEbay(x.journal).length === 0, 'une action sur le compte déconnecté ⇒ 409, zéro appel eBay', `HTTP ${x.code}`);
+    const s = await app(JWT_J, { action: 'status' });
+    dit(s.corps && s.corps.comptes && s.corps.comptes.length === 1 && s.corps.comptes[0].pseudo === 'julien_part', '« status » ne le rend plus (il sort du sélecteur)', JSON.stringify(s.corps && s.corps.comptes && s.corps.comptes.map((c) => c.pseudo)));
+    ebay['at-A2'].actives.push(VRM30());
+    const p = await app(JWT_J, { action: 'publish', item: { ...item, numero: '30' } });
+    dit(p.code === 200 && !auCompte(p.journal).some((x) => x.jeton === 'at-A2'), 'un compte déconnecté n\'est plus relu (aucun appel avec son jeton)', `HTTP ${p.code}`);
+    const r = await connecter(JWT_J, 'code-A2', true);
+    const a2b = (registre(J) || []).find((x) => x.cle === CLE_A2);
+    dit(/ebay=connecte/.test(r.loc) && a2b && !a2b.deconnecteLe && (registre(J) || []).length === 2 && jetons(J, 'ebay_tokens_' + CLE_A2) === 'rt-A2',
+      'le reconnecter le retrouve TEL QUEL (même clé, mêmes lignes), sans doublon', r.loc);
+  });
+  await essaie('multi : B n\'a jamais les comptes de Julien', async () => {
+    await avecDeuxComptes();
+    const s = await app(JWT_B, { action: 'status' });
+    dit(s.code === 200 && s.corps.connected === false && (!s.corps.comptes || s.corps.comptes.length === 0), 'B ne voit aucun des comptes eBay de Julien', JSON.stringify(s.corps));
+  });
+  await essaie('multi : la règle du suffixe, app = serveur', async () => {
+    const lib = await import('file://' + path.join(RACINE, 'api', '_lib', 'ebay.js'));
+    const cas = [{ cle: CLE_A2, principal: false }, { cle: CLE_A1, principal: true }, { cle: '', principal: true }, { cle: 'ZZ', principal: false }, { cle: CLE_A3 }, null];
+    const app2 = RA.suffixeCompteEbay;
+    const ecarts = cas.filter((c) => !app2 || app2(c) !== lib.suffixeCompte(c));
+    dit(typeof app2 === 'function' && ecarts.length === 0, "le suffixe des lignes d'un compte se calcule PAR LA MÊME RÈGLE dans l'app et sur le serveur (§11)", ecarts.map((c) => JSON.stringify(c)).join(' · ') || (app2 ? '' : 'absente de l\'app'));
   });
 
   // ── 11. BASE PAS ENCORE CLOISONNÉE : rejouée dans un processus neuf ─────────

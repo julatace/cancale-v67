@@ -99,6 +99,7 @@ const lignesDe = (o) => {
   for (const t of v.txn) L.push({ id: `harvest_${v.comptes[0].vinted_user_id}_txn_${t.tx}`, meta: { id: t.tx, status: t.s, status_updated_at: t.su }, data: {} });
   L.push({ id: 'lbc_ventes', data: { ventes: v.lbc } });
   L.push({ id: 'ebay_orders', data: { orders: v.ebay } });
+  for (const x of (v.extra || [])) L.push(x);
   L.push({ id: 'push_subs', data: { subs: v.subs } });
   if (v.prefs) L.push({ id: 'push_prefs', data: v.prefs });
   for (const [id, data] of Object.entries(memos[o] || {})) L.push({ id, data });
@@ -108,7 +109,10 @@ const filtreId = (id, q) => {
   const eq = /(?:^|&)id=eq\.([^&]+)/.exec(q), like = /(?:^|&)id=like\.([^&]+)/.exec(q);
   // (l'adresse est DÉJÀ décodée : `%` y est le joker de LIKE, ne pas redécoder)
   if (eq) return id === eq[1];
-  if (like) { const re = new RegExp('^' + like[1].replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/%/g, '.*').replace(/\*/g, '.*').replace(/_/g, '.') + '$'); return re.test(id); }
+  // ⚠️ `%` et `*` en UNE passe : convertir `%` en `.*` PUIS `*` en `.*` faisait
+  // `..*` (« au moins un caractère »), et `ebay_orders%` ne rendait pas la
+  // ligne `ebay_orders` elle-même — ce que PostgREST rend (§6.3).
+  if (like) { const re = new RegExp('^' + like[1].replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/[%*]/g, '\u0000').replace(/_/g, '.').replace(/\u0000/g, '.*') + '$'); return re.test(id); }
   return true;
 };
 global.fetch = async (url, opts = {}) => {
@@ -192,6 +196,27 @@ const res = () => ({ code: null, corps: null, status(n) { this.code = n; return 
     const memA = (memos.A || {}).bilan_semaine_dedup, memB = (memos.B || {}).bilan_semaine_dedup;
     dit(memA && memA.semaine === '2026-09-28' && memB && memB.semaine === '2026-09-28', 'le mémo de la semaine est écrit POUR CHAQUE vendeur (lundi 28 septembre)');
     dit(a[0] && a[0].url === '/?tab=journee' && /28 sept/.test(a[0].title || '') && /4 oct/.test(a[0].title || ''), 'titre : la semaine nommée (28 sept. → 4 oct.), et le clic ouvre Ma journée', a[0] && a[0].title);
+  });
+
+  // (9 octobre) PLUSIEURS COMPTES eBAY : chaque compte a SA ligne de commandes
+  // (`ebay_orders_{clé}`), le registre `ebay_comptes` dit lesquels sont actifs.
+  // Le bilan les compte TOUS — sauf un compte déconnecté (il est sorti de VRM,
+  // CA compris : la règle de l'app et de la route, §11).
+  await essaie('deux comptes eBay', async () => {
+    reset();
+    const k2 = 'aaaaaaaaaaaaaaa2', k3 = 'aaaaaaaaaaaaaaa3';
+    const cmd = (id, eur) => ({ orderId: id, orderPaymentStatus: 'PAID', creationDate: new Date(DANS).toISOString(), pricingSummary: { total: { value: String(eur), currency: 'EUR' } } });
+    V.B.extra = [
+      { id: 'ebay_comptes', data: { comptes: [{ cle: 'aaaaaaaaaaaaaaa1', pseudo: 'b_part', principal: true }, { cle: k2, pseudo: 'b_pro', principal: false }, { cle: k3, pseudo: 'b_vieux', principal: false, deconnecteLe: 5 }] } },
+      { id: 'ebay_orders_' + k2, data: { orders: [cmd('E10', 77)] } },
+      { id: 'ebay_orders_' + k3, data: { orders: [cmd('E11', 66)] } },
+    ];
+    await lancer(LUNDI);
+    const cb = (bilansDe('B')[0] || {}).body || '';
+    dit(cb.includes('3 ventes') && cb.includes(euros(777 + 88 + 77)) && !cb.includes(euros(777 + 88 + 77 + 66)),
+      'B a deux comptes eBay actifs : leurs ventes entrent TOUTES au bilan (777 + 88 + 77 €) — pas celle du compte déconnecté (66 €)', cb.split('\n')[0]);
+    const lecture = lus.find((u) => /id=like\.ebay_orders/.test(u) && /owner=eq\.B/.test(u));
+    dit(!!lecture, 'les commandes eBay de B sont lues en une fois (tous ses comptes), filtrées sur B', lecture || 'aucune');
   });
 
   console.log('\n── « À expédier » : le nombre du widget');
