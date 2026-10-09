@@ -5922,6 +5922,47 @@ interrompue, reprise et finie.
   sur données inventées ; les chiffres ci-dessus viennent de la règle exécutée
   sur la copie locale du 5 octobre).
 
+#### Deuxième revue (9 octobre) — le cache ne savait pas QUELS comptes il couvrait
+Deux défauts, reproduits chacun par deux relecteurs au rendu, corrigés.
+- ⚠️⚠️ **Un compte lié depuis la dernière lecture s'affichait « 0 vente · sous
+  les seuils »**, et le total « tous tes comptes » se disait complet. L'entrée de
+  cache des ventes ne retenait que ses ÉCHECS : liste de comptes du navigateur
+  en retard sur la base, ou rechargement dans les 3 min après une liaison ⇒
+  `loadOrders` resservait le cache des anciens comptes ; le nouveau n'était ni lu
+  ni en échec. Dans l'autre sens, un compte **retiré** restait compté au
+  registre (95 ventes contre 62 sur la carte).
+  ⇒ L'entrée de cache ET l'état des ventes portent `comptes`, la clé des comptes
+  interrogés (`cleComptesVinted` : les identités triées — jamais un nombre, jamais
+  un nom). `entreeCache` ne sert qu'une entrée qui couvre **exactement** les
+  comptes d'aujourd'hui (`_CACHE_V` = 3), et les relectures suivent `cleComptes`
+  au lieu de `accounts.length` (un compte retiré + un lié = même longueur). Même
+  règle pour les annonces, les achats et les conversations. Et tant que la
+  lecture ne couvre pas les comptes d'aujourd'hui, le registre dit « lecture en
+  cours » (`ventesComptees` vaut `null`) et « J'ai déclaré ce mois » attend.
+- ⚠️ **Relecture discrète ratée** (signal de l'extension, un compte déjà lu ne
+  répond pas) : la liste garde ses ventes d'avant ; le registre les COMPTAIT tout
+  en écrivant « ventes de X pas lues », et la carte (« sans X ») donnait un autre
+  total. ⇒ **Un compte en échec n'entre dans AUCUN total** (`ventesComptees`
+  écarte `failedUids`), qu'on ait déjà vu ses ventes ou non — la liste, elle,
+  continue de les montrer. Carte == registre, et la phrase dit ce que le chiffre
+  contient. Par ricochet : la ligne publiée au tableau de bord
+  (`vinted_urssaf_mois`) ne part plus pendant qu'un compte non exclu est en échec
+  (le tableau de bord garde la dernière, complète) ; Ma journée écrit « Reçu en
+  {mois} · **sans X (ventes pas lues)** » ; le total « à la date de vente » du
+  formulaire de déclaration lit la même liste.
+- **Preuves** : banc `seuils-vinted.cjs` **165 contrôles** (scénarios F1 compte
+  lié · F2 rechargement · F3 compte retiré · G relecture discrète · H Ma journée,
+  plus l'égalité registre == carte après la relecture ratée de B) — **11 rouges**
+  sur le build d'avant (e719d0f), et **5 rouges** sur un build où le cache « se
+  croit » (entrée sans clé de comptes). `audit-seuils-vinted.cjs` **45 contrôles**
+  (+6 sur la clé) ; mutations `clelongueur` 3 rouges, `clenom` 2.
+  `audit-urssaf.cjs` exigeait l'orthographe `vinted: sales.items` : il suit la
+  règle (Leboncoin et eBay passés à la même fonction).
+- **Constaté, laissé tel quel** : les totaux de l'écran Ventes et « Vendu »
+  (`ventesFaites`) comptent encore les ventes d'avant d'un compte en échec — de
+  l'affichage, pas le CA déclaré ; le bandeau « compte non chargé » le dit.
+  **Pas mesuré** : rien n'a été vu sur sa vraie base (données inventées).
+
 ### La page d'accueil publique (n° 22, 4 octobre)
 Julien : « une vraie page d'accueil… qui donne envie… avant d'arriver sur la
 connexion », avec une vidéo en motion design, inspirée de Vinteer.

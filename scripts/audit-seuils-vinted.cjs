@@ -25,7 +25,7 @@
  *   node scripts/audit-seuils-vinted.cjs                 → la règle d'App.jsx
  *   node scripts/audit-seuils-vinted.cjs --mutation X    → la règle RÉAFFAIBLIE
  *        (exclus · passu · versnull · encours · seuil2000 · adater · recalcule ·
- *         strict · totalsous · reste · acejour) — chacune doit faire passer au moins un
+ *         strict · totalsous · reste · acejour · clelongueur · clenom) — chacune doit faire passer au moins un
  *        contrôle au ROUGE (§6.1 : « la fonction n'existait pas avant » n'est
  *        pas une preuve).
  */
@@ -90,9 +90,18 @@ const MUTATIONS = {
   acejour: [['anneeDe(maintenant) === annee', 'false']],                                          // l'année en cours présentée comme finie
 };
 let code = ordre.map(n => decl[n]).join('\n');
-if (MUTATION) {
+// La clé de l'ENSEMBLE des comptes qu'une lecture couvre (revue du 9 octobre) :
+// elle vit à part (la règle des seuils ne l'appelle pas) — c'est elle que le
+// cache des ventes et le registre comparent aux comptes d'aujourd'hui.
+let cleCode = decl.cleComptesVinted || '';
+const MUTATIONS_CLE = {
+  clelongueur: 'const cleComptesVinted = (accs) => String((accs || []).length);',          // un nombre : un compte retiré + un ajouté passent inaperçus
+  clenom: "const cleComptesVinted = (accs) => (accs || []).map(a => a && a.login).sort().join(',');",   // un renommage invalide tout ; un homonyme, rien
+};
+if (MUTATION && MUTATIONS_CLE[MUTATION]) { cleCode = MUTATIONS_CLE[MUTATION]; console.log(`(clé réaffaiblie : ${MUTATION})\n`); }
+else if (MUTATION) {
   const m = MUTATIONS[MUTATION];
-  if (!m) { dit(false, 'mutation connue', MUTATION + ' — attendu : ' + Object.keys(MUTATIONS).join(' · ')); fin(); }
+  if (!m) { dit(false, 'mutation connue', MUTATION + ' — attendu : ' + Object.keys(MUTATIONS).concat(Object.keys(MUTATIONS_CLE)).join(' · ')); fin(); }
   for (const [a, b] of m) {
     if (!code.includes(a)) { dit(false, `mutation « ${MUTATION} » applicable`, 'motif absent : ' + a); fin(); }
     code = code.split(a).join(b);
@@ -274,5 +283,27 @@ dit(E && E.total && E.total.etat === 'enCours' && E.total.verdict === null, 'reg
 const c123 = par['123'];
 dit(!!(c123 && c123.n === 30 && c123.cts === 30000 && c123.nAd === 0 && c123.verdict === 'atteint'),
   'compte_123 : 29 datées + 1 déclarée sans date = 30 sûres (atteint), et 0 « pas encore datée » — jamais comptée deux fois', vu(c123));
+
+// 14. QUELS comptes une lecture couvre (revue du 9 octobre). Le cache des ventes
+//     ne savait que ses échecs : un compte lié depuis la dernière lecture n'était
+//     ni lu ni en échec, donc « 0 vente · sous les seuils » ; un compte retiré
+//     restait compté au registre. La clé est l'IDENTITÉ de l'ensemble : l'ordre
+//     et les noms n'y changent rien, un compte de plus ou de moins la change —
+//     même à nombre égal.
+dit(!!cleCode, 'la clé des comptes couverts par une lecture est une fonction de module', cleCode ? '' : 'cleComptesVinted introuvable');
+if (cleCode && essaie('la clé des comptes se charge', () => { vm.runInContext(cleCode + '\n;this.cleComptesVinted = cleComptesVinted;', ctx); return true; }) === true) {
+  const K = ctx.cleComptesVinted;
+  const ac = (uid, login) => ({ vinted_user_id: uid, login: login || 'compte_' + uid });
+  const six = ['9101', '9102', '9103', '9105', '9106', '9104'].map(u => ac(u));
+  const sept = six.concat(ac('9107'));
+  const k1 = essaie('la clé se calcule', () => K(six)), k2 = essaie('la clé se calcule (ordre inverse)', () => K([...six].reverse()));
+  dit(k1 != null && k1 === k2, 'l’ordre des comptes ne change pas la clé', `${k1} · ${k2}`);
+  dit(essaie('la clé se calcule (un compte de plus)', () => K(sept)) !== k1, 'un compte LIÉ depuis change la clé — le cache des six ne sert plus', '');
+  const echange = six.slice(0, 5).concat(ac('9107'));             // même nombre, un retiré, un ajouté
+  dit(essaie('la clé se calcule (un échangé)', () => K(echange)) !== k1, 'un compte retiré et un autre lié (même NOMBRE de comptes) change la clé', `${K(echange)} · ${k1}`);
+  const renomme = six.map(a => a.vinted_user_id === '9101' ? ac('9101', 'Boutique renommée') : a);
+  dit(essaie('la clé se calcule (renommé)', () => K(renomme)) === k1, 'un compte RENOMMÉ garde la même clé — jugée par l’identité, jamais par le nom', '');
+  dit(essaie('la clé se calcule (vide)', () => K([])) === '' && essaie('la clé se calcule (null)', () => K(null)) === '', 'aucun compte ⇒ clé vide (aucune lecture ne la couvre par hasard)', '');
+}
 
 fin();
