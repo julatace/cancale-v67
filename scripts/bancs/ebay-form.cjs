@@ -24,6 +24,8 @@ const ACCOUNTS = [{ vinted_user_id:'u1', login:'moi' }];
 // Annonces captées : 111 active (is_closed=false), 222 fermée (vendue).
 const LISTINGS = { data:{ payload:{ items:[ { id:'111', is_closed:false, nPhotos:9 }, { id:'222', is_closed:true } ] } } };
 let ko = 0; const dit = (c,m,d)=>{ if(!c)ko++; console.log((c?'✅ ':'❌ ')+m+(d?' — '+d:'')); };
+// Ce qui part vers /api/ebay (le corps exact), et l'avertissement servi à la demande.
+const envoisEbay = []; let avertir = false;
 (async()=>{
   const b = await chromium.launch({ executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server'] });
   const pg = await b.newPage({ viewport:{ width:390, height:1500 } });
@@ -45,7 +47,12 @@ let ko = 0; const dit = (c,m,d)=>{ if(!c)ko++; console.log((c?'✅ ':'❌ ')+m+(
   await pg.route('**/api/ebay**', route=>{ const req=route.request(); const j=d=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(d)});
     if(req.method()!=='POST') return j({ ready:true, canConsent:true });
     let body={}; try{ body=JSON.parse(req.postData()||'{}'); }catch(_){}
+    envoisEbay.push(body);
     if(body.action==='status') return j({ ok:true, connected:true });
+    // (9 octobre) La vérification à blanc rend les frais par nom, et — quand le
+    // banc le demande — un avertissement d'eBay (une catégorie sans offres).
+    if(body.action==='pubverify') return j({ ok:true, fees:'0.35', frais:{ total:0.35, parNom:{ ListingFee:0.35 } }, avertissements: avertir ? ['Les offres ne sont pas disponibles dans cette catégorie (message inventé).'] : [] });
+    if(body.action==='publish') return j({ ok:true, itemId:'110000000001', url:'https://www.ebay.fr/itm/110000000001', sku:'VRM-401' });
     if(body.action==='pubinfo'){ const cid = body.categoryId || '15709';
       return j({ ok:true, categorie:{ categoryId:cid, suggeree:{ categoryId:'15709', categoryName:'Baskets' } },
       categories:[{categoryId:'15709',categoryName:'Baskets'},{categoryId:'93427',categoryName:'Chaussures de sport'},{categoryId:'3034',categoryName:'Chaussures ville'}],
@@ -181,6 +188,51 @@ let ko = 0; const dit = (c,m,d)=>{ if(!c)ko++; console.log((c?'✅ ':'❌ ')+m+(
   txt = await T();
   dit(/74,00 €/.test(txt), 'l\'aperçu montre le prix formaté (74,00 €)');
   dit(/Vérifier sans publier/.test(txt) && /Publier sur eBay/.test(txt), 'les deux gestes sont là (vérifier à blanc + publier)');
+  // ── (9 octobre) LA RÈGLE D'OFFRE À LA CRÉATION ────────────────────────────
+  // « Accepter les offres dès » : c'est eBay qui acceptera, au montant fixé.
+  // On juge le CORPS EXACT de ce qui part (`item.offre`), jamais un libellé.
+  // Les caractéristiques obligatoires laissées vides (Couleur, Département) :
+  // on les remplit, sinon rien ne peut partir.
+  await pg.evaluate(()=>{ const labs=[...document.querySelectorAll('label')];
+    const set=(re,v)=>{ const l=labs.find(x=>re.test(x.textContent)); const box=l&&l.parentElement; const el=box&&(box.querySelector('select')||box.querySelector('input')); if(!el)return; const proto=el.tagName==='SELECT'?HTMLSelectElement.prototype:HTMLInputElement.prototype; Object.getOwnPropertyDescriptor(proto,'value').set.call(el,v); el.dispatchEvent(new Event(el.tagName==='SELECT'?'change':'input',{bubbles:true})); el.dispatchEvent(new Event('change',{bubbles:true})); };
+    set(/^couleur/i,'Bleu'); set(/^département/i,'Homme'); });
+  await pg.waitForTimeout(300);
+  const champOffre = await pg.$('[data-publier-offre-accepte]');
+  dit(!!champOffre, 'le champ « Accepter les offres dès » est dans « Prix & livraison »');
+  const verifs = () => envoisEbay.filter((x) => x.action === 'pubverify');
+  const verifier = async () => { const n = verifs().length; await (await pg.$('text=Vérifier sans publier')).click(); await pg.waitForTimeout(700); return verifs().length > n ? verifs()[verifs().length - 1] : null; };
+  let v = await verifier();
+  dit(!!v && v.item && !('offre' in v.item), 'sans règle : le corps « pubverify » n\'a AUCUNE clé `offre` (l\'annonce part comme avant)', v ? Object.keys(v.item || {}).join(',') : 'aucun envoi');
+  await pg.fill('[data-publier-offre-accepte]', '66'); await pg.waitForTimeout(250);
+  v = await verifier();
+  dit(!!v && JSON.stringify(v.item.offre) === '{"accepte":66,"refuse":null}', '66 € sur 74 € : `item.offre` = {"accepte":66,"refuse":null}', v ? JSON.stringify(v.item.offre) : 'aucun envoi');
+  await pg.fill('[data-publier-offre-accepte]', '80'); await pg.waitForTimeout(250);
+  const errOffre = await pg.locator('[data-publier-offre-erreur]').count();
+  v = await verifier();
+  dit(errOffre === 1 && !v, '80 € (au-dessus du prix) : l\'erreur est dite, et RIEN n\'est envoyé', `erreur ×${errOffre} · ${v ? 'envoyé' : 'rien'}`);
+  await pg.fill('[data-publier-offre-accepte]', '30'); await pg.waitForTimeout(250);
+  const caseBas = await pg.locator('[data-publier-offre-sous-moitie]').count();
+  v = await verifier();
+  dit(caseBas === 1 && !v, '30 € (moins de la moitié) : la case « je fixe volontairement » apparaît, rien ne part tant qu\'elle n\'est pas cochée', `case ×${caseBas} · ${v ? 'envoyé' : 'rien'}`);
+  await pg.click('[data-publier-offre-sous-moitie] input'); await pg.waitForTimeout(250);
+  v = await verifier();
+  dit(!!v && JSON.stringify(v.item.offre) === '{"accepte":30,"refuse":null,"sousMoitie":true}', 'case cochée : `"sousMoitie":true` part avec la règle', v ? JSON.stringify(v.item.offre) : 'aucun envoi');
+  avertir = true;
+  await pg.fill('[data-publier-offre-accepte]', '66'); await pg.waitForTimeout(250);
+  v = await verifier();
+  dit(await pg.locator('[data-publier-avertissements]').count() === 1, 'un avertissement d\'eBay à la vérification se VOIT (`data-publier-avertissements`)');
+  avertir = false;
+  // « Publier » avec une règle : une feuille de confirmation, même avec UN seul
+  // compte eBay — et « Annuler » n'envoie RIEN.
+  const nPub = envoisEbay.filter((x) => x.action === 'publish').length;
+  const pubBtn = pg.getByRole('button', { name: /^Publier sur eBay/ }).last();
+  const pubActif = await pubBtn.isEnabled().catch(() => false);
+  if (pubActif) await pubBtn.click();
+  const feuilleV = await pg.locator('div[style*="z-index: 2000"]').waitFor({ timeout: 4000 }).then(() => true).catch(() => false);
+  const feuilleT = feuilleV ? await pg.locator('div[style*="z-index: 2000"]').innerText() : '';
+  if (feuilleV) { await pg.locator('div[style*="z-index: 2000"]').getByRole('button', { name: 'Annuler' }).click(); await pg.waitForTimeout(600); }
+  dit(pubActif && feuilleV && /66,00\s*€/.test(feuilleT), '« Publier » avec une règle : une feuille, même avec un seul compte, qui dit le montant (66,00 €)', `bouton ${pubActif ? 'actif' : 'grisé'} · feuille ${feuilleV}`);
+  dit(envoisEbay.filter((x) => x.action === 'publish').length === nPub, '« Annuler » : AUCUN `publish` envoyé');
   dit(errs.length === 0, 'aucune erreur d\'app', errs.slice(0,1).join(''));
 
   console.log(ko ? ('\n'+ko+' contrôle(s) non conforme(s).') : '\nOn publie en CHOISISSANT une paire (photos auto, aucun lien) ; eBay gère la livraison (il propose le prix), comme dans l\'appli eBay.');

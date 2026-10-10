@@ -303,6 +303,8 @@ global.fetch = async (url, opts = {}) => {
             case 'refus-prix': return xml(XML_ECHEC(ERR('23004', 'Error', 'Invalid AutoAccept price. The Best Offer Auto Accept Price must be less than the Buy It Now price. Bearer at-J v^1.1#SECRET-QUI-FUIRAIT', [], 'RequestError')));
             case 'warning-21992': appliquer(); return xml(XML_WARN(ERR('21992', 'Warning', 'AutoDecline has been disabled or is no longer available.')));
             case 'warning-partiel': appliquer(true); return xml(XML_WARN(ERR('21920000', 'Warning', 'Best Offer auto accept is not supported in this category (message inventé).')));
+            // eBay garde les MONTANTS mais coupe les offres : le seuil ne joue pas.
+            case 'montant-sans-offres': appliquer(); r0.actives = false; return xml(XML_WARN(ERR('21920001', 'Warning', 'Best Offer is not available for this item (message inventé).')));
             case '503-apres': appliquer(); return html503();
             case '503-avant': return html503();
             case 'reseau-apres': appliquer(); throw new Error('ECONNRESET');
@@ -1591,6 +1593,14 @@ const RA = {};
     const o = await app(JWT_J, POSE('110000000301', 72, 80, NUL));
     const it = (offresDe(J) || {})['110000000301'];
     dit(o.code === 200 && o.corps.verifie === false && it && it.offresActives === true && it.accepte === null, '[R-partiel] eBay active les offres mais ignore le montant ⇒ « pas vérifiée », rangé tel qu\'eBay le montre', JSON.stringify(it));
+  });
+  // L'autre moitié : les MONTANTS sont là, mais les offres sont COUPÉES — le
+  // seuil ne joue pas. Des montants conformes ne suffisent pas à « vérifiée ».
+  await essaie('[R-partiel] offres coupées', async () => {
+    avecR(); mode.regle = 'montant-sans-offres';
+    const o = await app(JWT_J, POSE('110000000301', 72, 80, NUL));
+    const it = (offresDe(J) || {})['110000000301'];
+    dit(o.code === 200 && o.corps.verifie === false && it && it.offresActives === false && it.accepte === 72, '[R-partiel] eBay garde le montant mais coupe les offres ⇒ « pas vérifiée » (le seuil ne joue pas), rangé tel qu\'eBay le montre', `verifie=${o.corps && o.corps.verifie} · ${JSON.stringify(it)}`);
   });
   await essaie('[R-ecart]', async () => {
     avecR(); mode.regle = 'ignore';

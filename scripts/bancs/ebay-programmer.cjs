@@ -129,6 +129,15 @@ const SC_PUBLIER = {
   lignes: [txnV(1, 7026, 'Commande finalisée')],
 };
 
+// ── E. (9 octobre) LA RÈGLE D'OFFRE part avec la programmation. N°22 : « offres
+//    dès 70 € » (prix 80) ; N°23 : « dès 30 € » (prix 120, moins de la moitié)
+//    SANS la case « je fixe volontairement » ⇒ écartée avec sa raison ; N°24 :
+//    sans règle ⇒ son corps est celui d'avant (aucune clé `offre`).
+const SC_REGLE = {
+  annonces: [],
+  brouillons: () => { const o = brouillonsDe([['b-22', 22, 7022, 3], ['b-23', 23, 7023, 2], ['b-24', 24, 7024, 1]])(); o['b-22'].offreAccepte = '70'; o['b-23'].offreAccepte = '30'; return o; },
+};
+
 let rows = [], progEbay = [], envois = [], ecritures = [], lectures = [], essais = {}, prochainId = 110000000801;
 // La ligne des brouillons ne répond plus (la base debout par ailleurs) : le cas
 // « lecture KO, écriture OK », celui qui EFFACE si on repart de vide (§5).
@@ -641,6 +650,51 @@ const lignesPlan = (pg) => pg.$$eval('[data-planif-ligne]', (els) => els.map((e)
         await pg.waitForTimeout(500);
         dit(r.g.k === null && r.dis === false && publies().length === 1 && String(publies()[0].item.numero) === '25', 'l\'autre sens : la N°25, libre, se publie (on ne bloque pas tout)', `${r.g.k} · ${publies().map((x) => x.item && x.item.numero).join(',')}`);
         await photo(pg, '[data-poster], [data-publier-brouillon-id]', 'ebay-publier-gardes-390');
+        dit(errs.length === 0, 'aucune erreur de page', errs.join(' | ').slice(0, 160));
+      });
+      await ctx.close();
+    }
+    // ── E. La règle d'offre des brouillons part avec la programmation ─────────
+    console.log('── E. règle d\'offre dans les brouillons programmés (1512 px)');
+    {
+      remettre(SC_REGLE);
+      const { ctx, pg, errs } = await ouvrir(b, { width: 1512, height: 950 });
+      await essaie('E', async () => {
+        await versAnnonces(pg);
+        const offres = await pg.$$eval('[data-brouillon-offre]', (els) => els.map((e) => e.getAttribute('data-brouillon-offre')).sort());
+        dit(JSON.stringify(offres) === '["30.00","70.00"]', 'la ligne du brouillon dit sa règle d\'offre (`data-brouillon-offre="70.00"`) ; sans règle, rien', JSON.stringify(offres));
+        await pg.click('[data-brouillons-tout]');
+        await pg.click('[data-brouillons-programmer]');
+        await pg.waitForSelector('[data-planif]', { timeout: 5000 });
+        await pg.waitForFunction(() => !document.querySelector('[data-planif-ventes-en-cours]'), null, { timeout: 10000 }).catch(() => {});
+        await pg.click('[data-planif-libre]');
+        await pg.fill('[data-planif-depart-date]', '2026-10-23');
+        await pg.fill('[data-planif-depart-heure]', '19:00');
+        await pg.waitForTimeout(300);
+        const exclues = await pg.$eval('[data-planif-exclues]', (e) => e.textContent).catch(() => '');
+        const lignes = await pg.$$eval('[data-planif-ligne]', (els) => els.map((e) => e.getAttribute('data-planif-ligne')).sort());
+        dit(/N°23 \(Règle d'offre : moins de la moitié/.test(exclues) && JSON.stringify(lignes) === '["b-22","b-24"]', 'N°23 (dès 30 € pour 120 €) SANS la case : écartée, avec sa raison ; N°22 et N°24 partent', `${JSON.stringify(lignes)} · ${exclues.replace(/\s+/g, ' ').slice(0, 160)}`);
+        await pg.click('[data-planif-verifier]');
+        await pg.waitForFunction(() => document.querySelectorAll('[data-planif-frais]').length === 2, null, { timeout: 15000 });
+        const v = envois.filter((e) => e.action === 'pubverify');
+        const v22 = v.find((e) => String(e.item && e.item.numero) === '22'), v24 = v.find((e) => String(e.item && e.item.numero) === '24');
+        dit(!!v22 && JSON.stringify(v22.item.offre) === '{"accepte":70,"refuse":null}' && !!v24 && !('offre' in v24.item), '« Vérifier » : la N°22 porte `item.offre` {"accepte":70,"refuse":null}, la N°24 AUCUNE clé `offre`', `${v22 && JSON.stringify(v22.item.offre)} · ${v24 && Object.keys(v24.item).join(',')}`);
+        await pg.locator('[data-planif-compris]').evaluate((e) => e.scrollIntoView({ block: 'center' }));
+        await pg.check('[data-planif-compris]');
+        await pg.click('[data-planif-confirmer]');
+        await feuille(pg).getByRole('button', { name: 'Oui, programmer' }).waitFor({ timeout: 5000 });
+        const texte = await feuille(pg).innerText();
+        dit(/70,00\s*€/.test(texte) && /1 avec une règle d'offre/.test(texte), 'la feuille du lot écrit le montant de la règle (70,00 €) et combien en portent une', texte.replace(/\s+/g, ' ').slice(-160));
+        await feuille(pg).getByRole('button', { name: 'Oui, programmer' }).click();
+        await pg.waitForSelector('[data-planif-bilan]', { timeout: 20000 });
+        const p = envois.filter((e) => e.action === 'programmer');
+        const p22 = p.find((e) => String(e.item && e.item.numero) === '22'), p24 = p.find((e) => String(e.item && e.item.numero) === '24');
+        dit(p.length === 2 && !!p22 && JSON.stringify(p22.item.offre) === '{"accepte":70,"refuse":null}' && !!p24 && !('offre' in p24.item), '`programmer` : la règle part avec la N°22 (la même que vérifiée), la N°24 part comme avant', p.map((e) => `${e.item && e.item.numero}:${JSON.stringify((e.item || {}).offre || null)}`).join(' '));
+        await pg.getByRole('button', { name: 'Terminé' }).click().catch(() => {});
+        await pg.waitForSelector('[data-programmee-offre]', { timeout: 10000 }).catch(() => {});
+        const po = await pg.$$eval('[data-programmee-offre]', (els) => els.map((e) => e.getAttribute('data-programmee-offre')));
+        dit(JSON.stringify(po) === '["70.00"]', 'la programmée issue du brouillon dit la règle envoyée (`data-programmee-offre="70.00"`)', JSON.stringify(po));
+        await photo(pg, '[data-ebay-programmees]', 'ebay-programmees-regle-1512');
         dit(errs.length === 0, 'aucune erreur de page', errs.join(' | ').slice(0, 160));
       });
       await ctx.close();

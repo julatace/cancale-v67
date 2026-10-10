@@ -292,6 +292,68 @@ const projette = (row, sel) => {
       const C = await casBaisse('C', { prixVinted: 43, achat: '40', capL: Date.now() - 3600000, prixEbay: '58.00' });
       dit(/Aussi sur eBay à 58 €/.test(C.ligne) && /à 54 €/.test(C.btn), 'l’autre sens : eBay relu APRÈS la baisse (58 €) — la liste fraîche fait foi (58 → 54 €)', JSON.stringify(C));
     } catch (e) { dit(false, 'les cas « prix eBay après une baisse » se déroulent', String(e.message).slice(0, 160)); }
+    // ── (9 octobre) LA RÈGLE D'OFFRE DE L'ANNONCE eBAY ─────────────────────
+    // Une règle connue (« eBay accepte dès X ») : baisser le prix à X ou en
+    // dessous, eBay le refuserait (23004) — la baisse n'est PAS proposée, et
+    // c'est dit. Sous la règle, elle l'est ; la feuille rappelle la règle, et
+    // si eBay la fait tomber avec le prix, l'écran le dit à la place du « ✓ ».
+    const casRegle = async (quoi, { accepte, reponse }) => {
+      rows.length = 0; for (const r of JSON.parse(JSON.stringify(avantBaisse))) rows.push(r);
+      const L = rows.find((x) => x.id === 'ebay_listings').data;
+      L.items[0].price = '60.00'; L.capturedAt = Date.now() - 3600000;
+      rows.push({ id: 'ebay_offres', data: { items: { '5550001': { lu: true, offresActives: true, accepte, refuse: null, prix: 60, devise: 'EUR', lueA: Date.now() - 3600000, offresFaites: null } }, capturedAt: Date.now() } });
+      const ctx = await b.newContext({ viewport: { width: 1512, height: 950 } });
+      const pg = await ctx.newPage(); const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
+      await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
+      await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+      await pg.route('**/rest/v1/**', (route) => {
+        const u = decodeURIComponent(metaVersData(route.request().url()));
+        const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
+        if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
+        if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCS);
+        if (route.request().method() !== 'GET') return j([]);
+        const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
+        const forme = (r) => (sel && !/^id,data|^data$|^data,/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: auj.toISOString(), cap: r.data.capturedAt });
+        const eq = /id=eq\.([^&]*)/.exec(u);
+        if (eq) return j(rows.filter((r) => r.id === eq[1]).map(forme));
+        const lk = /id=like\.([^&]*)/.exec(u);
+        if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(rows.filter((r) => re.test(r.id)).map(forme)); }
+        return j([]);
+      });
+      const envois = [];
+      await pg.route('**/api/**', (r) => {
+        if (/\/api\/ebay/.test(r.request().url()) && r.request().method() === 'POST') {
+          let bd = {}; try { bd = JSON.parse(r.request().postData() || '{}'); } catch (_) {}
+          if (bd.action === 'revise') { envois.push(bd); return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(reponse || { ok: true, ack: 'Success' }) }); }
+        }
+        return r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' });
+      });
+      await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
+      await pg.waitForTimeout(4500);
+      if (!(await pg.$('[data-reprice-ailleurs]'))) await pg.getByText('Conseils & signalements', { exact: true }).click({ timeout: 4000 }).catch(() => {});
+      await pg.waitForTimeout(1200);
+      const avant = await pg.evaluate(() => ({ bloque: !!document.querySelector('[data-reprice-ebay-regle="5550001"]'), btn: (document.querySelector('[data-reprice-ebay="5550001"]') || {}).innerText || '' }));
+      let conf = '', fait = null;
+      if (avant.btn) {
+        await pg.click('[data-reprice-ebay="5550001"]');
+        await pg.waitForTimeout(400);
+        conf = await pg.evaluate(() => { const f = document.querySelector('div[style*="z-index: 2000"]'); return f ? f.innerText : ''; });
+        await pg.getByRole('button', { name: 'Baisser sur eBay', exact: true }).click({ timeout: 4000 });
+        await pg.waitForTimeout(900);
+        fait = await pg.evaluate(() => { const e = document.querySelector('[data-reprice-ebay="fait"]'); return e ? { ton: e.getAttribute('data-reprice-ebay-regle-msg'), t: e.innerText, couleur: getComputedStyle(e).color } : null; });
+      }
+      await ctx.close();
+      if (errs.length) dit(false, `${quoi} : aucune erreur`, errs[0]);
+      return { ...avant, conf, fait, envois };
+    };
+    try {
+      const D = await casRegle('règle 58', { accepte: 58 });
+      dit(D.bloque && !D.btn && D.envois.length === 0, 'règle d’offre à 58 € sur l’annonce eBay : la baisse à 53 € n’est PAS proposée (eBay la refuserait), et c’est dit (`data-reprice-ebay-regle`)', JSON.stringify({ bloque: D.bloque, btn: D.btn }));
+      const E = await casRegle('règle 40', { accepte: 40, reponse: { ok: true, ack: 'Success', regle: { tombee: true, avant: { accepte: 40, refuse: null }, lecture: { lu: true, offresActives: true, accepte: null, refuse: null, prix: 53, devise: 'EUR', lueA: Date.now() } } } });
+      dit(!E.bloque && /à 53 €/.test(E.btn) && /règle d.offre \(dès 40,00 €\)/.test(E.conf), 'règle à 40 € : la baisse à 53 € est proposée, et la feuille rappelle la règle (dès 40,00 €)', `${E.btn} | ${E.conf.replace(/\s+/g, ' ').slice(0, 200)}`);
+      dit(E.envois.length === 1 && Number(E.envois[0].price) === 53 && !!E.fait && E.fait.ton === 'warn' && /n'est plus sur l'annonce/.test(E.fait.t) && !/✓/.test(E.fait.t),
+        'eBay fait tomber la règle avec le prix : l’écran le dit, en ambre, à la place du « ✓ »', JSON.stringify(E.fait));
+    } catch (e) { dit(false, 'les cas « règle d’offre » se déroulent', String(e.message).slice(0, 160)); }
   } catch (e) { dit(false, 'le banc a tourné jusqu’au bout', String(e.message).slice(0, 160)); }
   if (b) await b.close(); srv.close();
   console.log(`\n${ko ? '❌' : '✅'} carte d'annonce : ${ko ? ko + ' rouge(s)' : 'tout est vert'}`);

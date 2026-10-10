@@ -1,0 +1,131 @@
+// ════════════════════════════════════════════════════════════════════════════
+//  LA RÈGLE D'OFFRE eBAY — PREUVE PAR MUTATION (9 octobre)
+//        node scripts/prouve-regle-offre.cjs [--avant dossier] [--seule nom]
+//
+//  « La fonction n'existait pas avant » ne prouve rien (CLAUDE.md §6) : il faut
+//  montrer que les contrôles attrapent la RÈGLE fautive. Pour chaque mutation :
+//    1. copie de l'arbre COURANT (api/, src/, scripts/ — fichiers non commités
+//       compris ; jamais les fixtures `scripts/bancs/fx`) dans
+//       os.tmpdir()/mut-regle-{nom} — le dépôt n'est JAMAIS touché ;
+//    2. UN remplacement de texte (ancre exacte ; ancre introuvable ⇒ ROUGE
+//       « mutation non appliquée » : une mutation qui ne mord rien ne prouve
+//       rien) ;
+//    3. `audit-ebay-route.cjs --src <copie>` doit sortir ≠ 0 ET montrer en
+//       rouge les contrôles nommés.
+//  Puis « le même XML qu'avant » (D7) : `_xml-publication.cjs` lancé sur la
+//  base d'avant (`--avant`, sinon /tmp/avant-regle) et sur l'arbre courant —
+//  sorties identiques au caractère près (et avec `offre: null` aussi).
+//  Et `audit-offres-auto.cjs` doit passer au rouge sur une route qui appelle
+//  `RespondToBestOffer` (c'est eBay qui accepte, jamais VRM).
+// ════════════════════════════════════════════════════════════════════════════
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+const cp = require('child_process');
+const RACINE = path.join(__dirname, '..');
+const iAv = process.argv.indexOf('--avant');
+const AVANT = iAv > 0 ? path.resolve(process.argv[iAv + 1]) : path.join(os.tmpdir(), 'avant-regle');
+const iSeule = process.argv.indexOf('--seule');
+const SEULE = iSeule > 0 ? process.argv[iSeule + 1] : null;
+
+let ko = 0, ok = 0;
+const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '✅ ' : '❌ ') + m + (d ? ' — ' + d : '')); };
+
+// Les mutations : [nom, fichier, ancre, remplacement, contrôles qui doivent rougir]
+const API = 'api/ebay.js';
+const MUTATIONS = [
+  ['seuil-prix', API, "  if (!v2.ok) return { status: 409, body: { ok: false, reason: v2.code, prix: pre.annonce.prix, error: v2.err } };", '', ['R-prix']],
+  ['confirme', API, "  if (b.confirme !== true) return { status: 400, body: { ok: false, reason: 'confirmation', error: 'Confirme la règle d\\'offre", "  if (false) return { status: 400, body: { ok: false, reason: 'confirmation', error: 'Confirme la règle d\\'offre", ['R-conf']],
+  ['prix-vu', API, '  if (pose && cents(prixVu) !== cents(pre.annonce.prix)) {', '  if (false) {', ['R-prixvu']],
+  ['sous-moitie', API, [
+    ['    if (seuilTropBas(accepte, prixVu) && b.sousMoitie !== true) return', '    if (false) return'],
+    ['  if (v.accepte != null && seuilTropBas(v.accepte, prix) && o.sousMoitie !== true) return', '  if (false) return'],
+  ], null, ['R-sous-moitie', 'R-crea']],
+  ['attendu', API, [
+    ["    if (a && typeof a === 'object' && (cents(a.accepte) !== cents(P.accepte) || cents(a.refuse) !== cents(P.refuse))) {", '    if (false) {'],
+    ["    if (a === 'inconnu' && (P.accepte != null || P.refuse != null)) {", '    if (false) {'],
+  ], null, ['R-attendu']],
+  ['sans-marque', API, "  const m = await rangerReglesOffre(ctx, { [itemId]: { lu: false, raison: 'en-cours', lueA: Date.now(), par: 'regle', _force: true } });", '  const m = true;', ['R-marque', 'R-range']],
+  ['sans-ack', API, "  if (sansAck(r) || classeEchec(r) === 'incertain') {", '  if (r.status === 0) {', ['R-ack']],
+  ['systeme-refus', API, "  return errs.length && errs.every((e) => e.classe === 'RequestError') ? 'refus' : 'incertain';", "  return 'refus';", ['R-systeme']],
+  ['offres-actives', API, [
+    ['  if (lu.offresActives === true) return true;\n  return lu.offresActives === false ? false : null;', '  return true;'],
+    ['    ? (P.offresActives === true && cents(P.accepte) === cents(accepte)', '    ? (cents(P.accepte) === cents(accepte)'],
+  ], null, ['R-partiel', 'R-idem', 'R-offres-inconnues']],
+  ['refus-non-renvoye', API, '    const yRefus = refuse != null ? refuse : (refuse === undefined && P.refuse != null ? P.refuse : null);', '    const yRefus = refuse != null ? refuse : null;', ['R-garde-refus']],
+  ['ordre-luea', API, '    if (!_force && avant && (Number(avant.lueA) || 0) > (Number(v.lueA) || 0)) continue;\n', '', ['R-ordre']],
+  ['compte', API, '  if (!L.actives.some((x) => x.itemId === itemId)) {\n    if (L.complet) return { status: 409, body: { ok: false, reason: \'pas-sur-ce-compte\'', '  if (false) {\n    if (L.complet) return { status: 409, body: { ok: false, reason: \'pas-sur-ce-compte\'', ['R-compte']],
+  ['rangement', API, "  const d = await lireDonnee(id, ctx.owner);\n  if (d === undefined) return null;\n  const items = { ...((d && d.items", "  const d0 = await lireDonnee(id, ctx.owner); const d = d0 === undefined ? {} : d0;\n  const items = { ...((d && d.items", ['R-marque']],
+  ['relu-aucune', API, ": { lu: false, raison: raisonKo, lueA: Date.now(), par: 'regle', _force: true } });", ": { lu: true, offresActives: null, accepte: null, refuse: null, lueA: Date.now(), par: 'regle', _force: true } });", ['R-relu-ko']],
+  ['tombee-pas-su', API, '      tombee: aRegle ? (post.ok ? post.lecture.accepte == null : null) : ((avant && avant.lu === true) ? false : null),', '      tombee: aRegle ? (post.ok ? post.lecture.accepte == null : null) : false,', ['R-prix-change']],
+  ['sync-detail', API, '      const { _regle, ...detail } = d;', '      const detail = d; const _regle = d._regle;', ['R-sync']],
+];
+
+// Copie de l'arbre courant (api/, src/, scripts/ sans fixtures), node_modules en lien.
+function copier(nom) {
+  const dest = path.join(os.tmpdir(), 'mut-regle-' + nom);
+  fs.rmSync(dest, { recursive: true, force: true });
+  fs.mkdirSync(dest, { recursive: true });
+  for (const d of ['api', 'src', 'scripts']) {
+    fs.cpSync(path.join(RACINE, d), path.join(dest, d), { recursive: true, filter: (s) => !/[\\/]scripts[\\/]bancs[\\/]fx([\\/]|$)/.test(s) });
+  }
+  for (const f of ['package.json', 'vite.config.js']) { try { fs.copyFileSync(path.join(RACINE, f), path.join(dest, f)); } catch (_) {} }
+  try { fs.symlinkSync(path.join(RACINE, 'node_modules'), path.join(dest, 'node_modules')); } catch (_) {}
+  return dest;
+}
+function appliquer(dest, fichier, rempl) {
+  const p = path.join(dest, fichier);
+  let s = fs.readFileSync(p, 'utf8');
+  for (const [a, b] of rempl) {
+    const n = s.split(a).length - 1;
+    if (n !== 1) return `ancre trouvée ${n} fois : ${a.slice(0, 70)}`;
+    s = s.replace(a, () => b);
+  }
+  fs.writeFileSync(p, s);
+  return '';
+}
+const lancer = (script, args, cwd) => cp.spawnSync(process.execPath, [script, ...args], { cwd: cwd || RACINE, encoding: 'utf8', timeout: 900000, maxBuffer: 64 * 1024 * 1024 });
+
+// ── 1. LES MUTATIONS DE LA ROUTE ─────────────────────────────────────────────
+for (const [nom, fichier, ancre, rempl, attendus] of MUTATIONS) {
+  if (SEULE && SEULE !== nom) continue;
+  const dest = copier(nom);
+  const err = appliquer(dest, fichier, Array.isArray(ancre) ? ancre : [[ancre, rempl]]);
+  if (err) { dit(false, `mutation « ${nom} » non appliquée`, err); continue; }
+  const r = lancer(path.join(RACINE, 'scripts', 'audit-ebay-route.cjs'), ['--src', dest]);
+  const sortie = (r.stdout || '') + (r.stderr || '');
+  const rouges = attendus.map((c) => [c, (sortie.match(new RegExp('^\\s*❌ \\[' + c.replace(/[.*+?^${}()|[\]\\§]/g, '\\$&') + '\\]', 'gm')) || []).length]);
+  const tous = rouges.every(([, n]) => n > 0);
+  dit(r.status !== 0 && tous, `mutation « ${nom} » : l'audit de la route passe au ROUGE`, `sortie ${r.status} · ${rouges.map(([c, n]) => `${c} ×${n}`).join(', ')}`);
+  fs.rmSync(dest, { recursive: true, force: true });
+}
+
+if (!SEULE) {
+  // ── 2. LE MÊME XML QU'AVANT, SANS RÈGLE (D7) ──────────────────────────────
+  const xml = path.join(RACINE, 'scripts', '_xml-publication.cjs');
+  if (!fs.existsSync(path.join(AVANT, 'api', 'ebay.js'))) dit(false, 'la base d\'avant est introuvable', AVANT + ' — git archive worktree-wf_d62e1db4-b5c-1 | tar -x -C ' + AVANT);
+  else {
+    const av = lancer(xml, ['--src', AVANT]);
+    const ap = lancer(xml, []);
+    const apNull = lancer(xml, ['--offre-null']);
+    const nCorps = ((ap.stdout || '').match(/^(Verify)?AddFixedPriceItem$/gm) || []).length;
+    dit(av.status === 0 && ap.status === 0 && nCorps >= 6, 'les deux arbres publient (pubverify, publish, programmer sur 3 annonces)', `avant ${av.status} · après ${ap.status} · ${nCorps} corps envoyés`);
+    dit(av.stdout === ap.stdout, 'SANS règle, le XML envoyé à eBay est identique à celui d\'avant, caractère pour caractère', `${(av.stdout || '').length} / ${(ap.stdout || '').length} caractères`);
+    dit(ap.stdout === apNull.stdout, 'avec `offre: null`, toujours le même XML', `${(apNull.stdout || '').length} caractères`);
+  }
+  // ── 3. AUDIT-OFFRES-AUTO : une route qui accepte une offre est attrapée ────
+  const dest = copier('respond');
+  const err = appliquer(dest, API, [["async function handleRegleOffreLire(b, ctx) {", "async function accepterOffreEbay(token, itemId) { return tradingCall(token, 'RespondToBestOffer', `<ItemID>${itemId}</ItemID><Action>Accept</Action>`); }\nasync function handleRegleOffreLire(b, ctx) {"]]);
+  if (err) dit(false, 'mutation « respond » non appliquée', err);
+  else {
+    const r = lancer(path.join(RACINE, 'scripts', 'audit-offres-auto.cjs'), ['--src', dest]);
+    const s = (r.stdout || '') + (r.stderr || '');
+    dit(r.status !== 0 && /❌[^\n]*aucune route n'appelle une acceptation/.test(s), 'une route qui appelle RespondToBestOffer fait passer audit-offres-auto au ROUGE', `sortie ${r.status}`);
+    const r0 = lancer(path.join(RACINE, 'scripts', 'audit-offres-auto.cjs'), []);
+    dit(r0.status === 0, 'et l\'arbre courant le laisse vert', `sortie ${r0.status}`);
+  }
+  fs.rmSync(dest, { recursive: true, force: true });
+}
+
+console.log(`\n${ko ? '❌' : '✅'} prouve-regle-offre : ${ok} vert(s), ${ko} rouge(s)${ko ? '' : ' — chaque garde de la règle d\'offre est attrapée quand on la réaffaiblit, et le XML sans règle est celui d\'avant'}`);
+process.exit(ko ? 1 : 0);
