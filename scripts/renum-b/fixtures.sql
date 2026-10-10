@@ -75,3 +75,26 @@ insert into public.app_data (owner, id, data, updated_at) values
   (:'J', 'coffre_1000_9000000001', '{"title":"x","photos":[]}', now()),
   (:'T', 'main', '{"vrm_prenom":"essai","vinted_dark":true,"vinted_used_numeros":[1,2,3]}', now()),
   (:'T', 'vrm_room', '{"rooms":[{"id":"r1","items":[{"id":"x","type":"pile","nums":["1","2"]}]}],"active":"r1"}', now());
+
+-- Les DATES DE MISE EN LIGNE, à la forme mesurée le 10 octobre : le dressing capté
+-- (`harvest_{uid}_listings`, `payload.items[].photo.high_resolution.timestamp`,
+-- en SECONDES — Vinted n'envoie pas `created_at_ts`) pour 270 fiches,
+-- `vinted_listing_dates` ({id: {ts en ms, text, readAt}}) pour 19 autres, et rien
+-- pour le reste (repli : `numberedAt`). Toutes AVANT la coupure. Un dressing
+-- capté porte aussi des annonces sans fiche (jamais numérotées).
+insert into public.app_data (owner, id, data, updated_at)
+select :'J', 'harvest_1001_listings', jsonb_build_object('capturedAt', '2026-10-08T22:29:22.465Z', 'payload', jsonb_build_object('code', 0, 'pagination', '{}'::jsonb,
+  'items', (select jsonb_agg(jsonb_build_object('id', (9000000000 + g), 'title', 'Paire inventée ' || g, 'is_closed', g % 3 = 0,
+             'photo', jsonb_build_object('url', 'https://images1.vinted.net/t/x.jpeg', 'high_resolution', jsonb_build_object('timestamp',
+               extract(epoch from timestamp '2026-07-22 20:20:36' + (g * interval '4 hours'))::bigint))) order by g)
+            from generate_series(1, 270) g)
+         || '[{"id":7000000001,"title":"jamais numérotée","photo":{"url":"x","high_resolution":{"timestamp":1780000000}}}]'::jsonb)), now();
+insert into public.app_data (owner, id, data, updated_at)
+select :'J', 'vinted_listing_dates', (select jsonb_object_agg((9000000000 + g)::text, jsonb_build_object('ts',
+  (extract(epoch from timestamp '2026-07-22 20:20:36' + (g * interval '4 hours')) * 1000)::bigint, 'text', 'il y a longtemps', 'readAt', 1790000000000))
+  from generate_series(271, 289) g), now();
+-- Des transactions captées (la transaction → son annonce, par identité).
+insert into public.app_data (owner, id, data, updated_at)
+select :'J', 'harvest_1001_txn_' || (22000000000 + g), jsonb_build_object('payload', jsonb_build_object('transaction',
+  jsonb_build_object('id', 22000000000 + g, 'item_id', 9000000000 + g, 'status', 450, 'status_title', 'Commande finalisée'))), now()
+from generate_series(1, 20) g;
