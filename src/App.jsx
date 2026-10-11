@@ -34481,6 +34481,17 @@ function NumerosSetting() {
 //    promettrait « elle répond à tes messages » à une extension qui ne sait pas
 //    le faire — pour la septième fois. Trois états, jamais deux.
 const CLES_RESERVEES_REPONDUS = ['bilan', 'demandes'];
+// Les causes d'une IA qui n'a rien rendu, tirées du bilan de l'extension (une
+// cause à zéro n'est pas écrite).
+const causesIaKO = (c) => {
+  const m = (c && typeof c === 'object') ? c : {};
+  const l = [
+    m.pasBranchee ? 'pas branchée sur le serveur' : '',
+    m.injoignable ? 'injoignable' : '',
+    m.illisible ? 'réponse inutilisable, elle ne sera pas redemandée' : '',
+  ].filter(Boolean);
+  return l.length ? ` (${l.join(' · ')})` : '';
+};
 function RepondreSetting() {
   const [on, setOn] = React.useState(() => !!load('vinted_repond_auto', false));
   const [envois, setEnvois] = React.useState(undefined);   // undefined = en cours · null = pas su
@@ -34525,6 +34536,10 @@ function RepondreSetting() {
     bilan.sansMessage ? `${bilan.sansMessage} sans message de l’acheteur à cette heure` : '',
     bilan.replyRefuse ? `${bilan.replyRefuse} où Vinted n’autorise pas de réponse` : '',
     bilan.pasSure ? `${bilan.pasSure} où elle n’était pas sûre — elle n’a rien envoyé` : '',
+    // ⚠️ Revue du 11 octobre : quand c'est l'IA qui n'a rien rendu d'utilisable
+    //    (pas branchée, injoignable, sortie illisible), ce n'est PAS « elle
+    //    n'était pas sûre ». L'extension ≥ 5.173 le compte à part, avec la cause.
+    bilan.iaKO ? `${bilan.iaKO} où l’IA n’a pas répondu${causesIaKO(bilan.iaKOcauses)} — rien n’est parti` : '',
   ].filter(Boolean) : [];
   return (
     <div style={{padding:'13px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>

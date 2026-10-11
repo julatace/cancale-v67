@@ -365,9 +365,73 @@ const nonLue = (cid, desc) => ({ id: Number(cid), unread: true, description: des
     const d = (r.memo && r.memo.data && r.memo.data.demandes) || {};
     dit(d['8801:881'] && !d['8801:881'].texte, 'l’hésitation est rangée sous la clé du MESSAGE (conversation:message), sans texte à envoyer', JSON.stringify(d['8801:881']));
   });
-  await essaie('la réponse vide mémorisée', async () => {
-    const r = await passages({ lignes: uneConv('…'), n: 6, ia: () => ({ ok: true, confidence: 99, suggestions: [{ text: '  ' }] }) });
-    dit(r.appelsIA === 1 && r.envois === 0, 'une réponse VIDE (facturée aussi) n’est demandée qu’une fois', `${r.appelsIA} appel(s) sur 6`);
+  // ⚠️⚠️ REVUE DU 11 OCTOBRE : CE CONTRÔLE SERVAIT UNE FORME QUE LE SERVEUR NE
+  //    REND JAMAIS (§6.3). `{ok:true, suggestions:[{text:'  '}]}` — or
+  //    `api/ai.js` FILTRE une suggestion vide et répond `{ok:false, reason:'parse'}`,
+  //    APRÈS avoir payé l'appel à Anthropic. L'extension prenait ça pour « IA
+  //    injoignable » et redemandait à chaque page : la fuite n'était pas fermée.
+  //    On sert donc la SORTIE RÉELLE de la vraie route (`api/ai.js` exécuté,
+  //    Anthropic simulé), et on compte : chaque appel de l'extension est un appel
+  //    facturé dès qu'Anthropic a répondu 2xx.
+  const sortieServeur = async ({ anthropic = null, statut = 200, sansCle = false }) => {
+    delete process.env.AI_API_KEY; delete process.env.ANTHROPIC_API_KEY;
+    const ai = await import('file://' + path.join(racine, 'api', 'ai.js'));
+    const avant = global.fetch; let factures = 0;
+    global.fetch = async (url) => {
+      if (/api\.anthropic\.com/.test(String(url))) {
+        if (statut < 300) factures++;
+        return new Response(JSON.stringify(anthropic), { status: statut, headers: { 'content-type': 'application/json' } });
+      }
+      return new Response('[]', { status: 200, headers: { 'content-type': 'application/json' } });
+    };
+    const res = { code: null, corps: null };
+    res.status = (n) => { res.code = n; return res; }; res.json = (o) => { res.corps = o; return res; };
+    res.setHeader = () => {}; res.end = () => res;
+    try {
+      await ai.default({ method: 'POST', query: {}, headers: {},
+        body: Object.assign({ mode: 'reply', message: 'Toujours dispo ?', article: 'salomon XT-6', price: 40 }, sansCle ? {} : { key: 'cle-banc' }) }, res);
+    } finally { global.fetch = avant; }
+    return { sortie: res.corps, factures };
+  };
+  const texteAnthropic = (text, stop = 'end_turn') => ({ content: [{ type: 'text', text }], stop_reason: stop });
+  const formes = [
+    ['la VRAIE réponse vide', texteAnthropic('{"intent":"question","confidence":90,"suggestions":[{"tone":"court","text":""}]}')],
+    ['un JSON tronqué (max_tokens)', texteAnthropic('{"intent":"question","confidence":90,"suggestions":[{"tone":"court","text":"Oui, toujours dis', 'max_tokens')],
+    ['un texte libre', texteAnthropic('Bien sûr ! Voici trois réponses possibles pour cet acheteur.')],
+  ];
+  for (const [nom, anthropic] of formes) {
+    await essaie(`facturée et illisible : ${nom}`, async () => {
+      const { sortie, factures } = await sortieServeur({ anthropic });
+      dit(factures === 1 && sortie && sortie.ok === false && sortie.facture === true,
+        `${nom} : le serveur a PAYÉ l’appel et le DIT (\`facture: true\`)`, JSON.stringify(sortie));
+      const r = await passages({ lignes: uneConv('Toujours dispo ?'), n: 10, ia: () => sortie });
+      dit(r.appelsIA === 1 && r.envois === 0, `${nom} : 10 pages Vinted, l’IA n’est payée qu’UNE fois et rien ne part`,
+        `${r.appelsIA} appel(s) payé(s) sur 10 passages, envois=${r.envois}`);
+      const d = (r.memo && r.memo.data && r.memo.data.demandes) || {};
+      dit(d['8801:881'] && !d['8801:881'].texte && d['8801:881'].raison === 'illisible',
+        `${nom} : rangé comme une réponse illisible, jamais redemandée`, JSON.stringify(d['8801:881']));
+      const b = r.bilans[r.bilans.length - 1] || {};
+      dit(b.iaKO === 1 && !b.pasSure && b.iaKOcauses && b.iaKOcauses.illisible === 1,
+        `${nom} : l’app ne dira pas « elle n’était pas sûre » — c’est l’IA qui n’a rien rendu d’utilisable`, JSON.stringify({ pasSure: b.pasSure, iaKO: b.iaKO, causes: b.iaKOcauses }));
+    });
+  }
+  // L'AUTRE SENS : ce qui n'est PAS facturé reste retenté (sinon une panne
+  // d'Anthropic rendrait ce message muet pour toujours).
+  await essaie('Anthropic surchargé (529)', async () => {
+    const { sortie, factures } = await sortieServeur({ anthropic: { type: 'error', error: { type: 'overloaded_error', message: 'Overloaded' } }, statut: 529 });
+    dit(factures === 0 && sortie && sortie.ok === false && !sortie.facture, 'Anthropic surchargé : rien de facturé, et le serveur ne dit pas le contraire', JSON.stringify(sortie));
+    const r = await passages({ lignes: uneConv('Toujours dispo ?'), n: 3, ia: () => sortie });
+    dit(r.appelsIA === 3, 'Anthropic surchargé : on RETENTE au passage suivant', `${r.appelsIA} appel(s) sur 3`);
+    const b = r.bilans[r.bilans.length - 1] || {};
+    dit(b.iaKO === 1 && !b.pasSure && b.iaKOcauses && b.iaKOcauses.injoignable === 1, 'et l’app dira que l’IA n’a pas répondu, pas qu’elle hésitait', JSON.stringify({ pasSure: b.pasSure, iaKO: b.iaKO, causes: b.iaKOcauses }));
+  });
+  await essaie('IA pas branchée (no-key)', async () => {
+    const { sortie } = await sortieServeur({ sansCle: true });
+    dit(sortie && sortie.reason === 'no-key' && !sortie.facture, 'sans clé : le serveur répond « no-key », rien de facturé', JSON.stringify(sortie));
+    const r = await passages({ lignes: uneConv('Toujours dispo ?'), n: 2, ia: () => sortie });
+    const b = r.bilans[r.bilans.length - 1] || {};
+    dit(b.iaKO === 1 && !b.pasSure && b.iaKOcauses && b.iaKOcauses.pasBranchee === 1,
+      'IA pas branchée : comptée à part (« pas branchée sur le serveur »), jamais « pas sûre »', JSON.stringify({ pasSure: b.pasSure, iaKO: b.iaKO, causes: b.iaKOcauses }));
   });
   await essaie('l’IA injoignable', async () => {
     const r = await passages({ lignes: uneConv('Dispo ?'), n: 3, ia: () => ({ ok: false, reason: 'network' }) });

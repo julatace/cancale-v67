@@ -66,12 +66,19 @@ const DEMANDES = {
   '600000000001:70000000001': { at: '2026-10-11T09:00:00Z', confiance: 30, raison: 'peu-sur' },
   '600000000002:70000000002': { at: '2026-10-11T09:05:00Z', confiance: 91, intention: 'question', texte: PAS_PARTIE },
 };
+// ⚠️ REVUE DU 11 OCTOBRE (5.173) : quand c'est l'IA qui n'a rien rendu
+//    d'utilisable (pas branchée sur le serveur, injoignable, sortie illisible),
+//    l'écran écrivait « elle n'était pas sûre — elle n'a rien envoyé ». Ce n'est
+//    pas une hésitation : l'extension le compte à part (`iaKO`, `iaKOcauses`).
+const BILAN_IA_KO = Object.assign({}, BILAN_REEL, { nonLues: 5, envoyes: 0, pasCaptee: 0, sansMessage: 0, pasVendeur: 0, replyRefuse: 0,
+  pasSure: 0, iaKO: 3, iaKOcauses: { pasBranchee: 2, illisible: 1 } });
 const ETATS = {
   pasSu: null,                                                   // 522 : la lecture a échoué
   rien: [],                                                      // la ligne n'existe pas encore
   reel: [{ data: Object.assign({}, ENVOI, { bilan: BILAN_REEL }) }],
   autre: [{ data: Object.assign({}, ENVOI, { bilan: BILAN_AUTRE }) }],
   demandes: [{ data: Object.assign({}, ENVOI, { bilan: BILAN_REEL, demandes: DEMANDES }) }],
+  iaKO: [{ data: Object.assign({}, ENVOI, { bilan: BILAN_IA_KO }) }],
 };
 
 async function rendre(nav, etat) {
@@ -178,6 +185,13 @@ async function rendre(nav, etat) {
   const nEnvois = (b) => { const i = b.indexOf('Ce qui est parti en ton nom'); return i < 0 ? -1 : (b.slice(i).match(/«/g) || []).length; };
   dit(nEnvois(bd) === nEnvois(vus.reel.bloc) && nEnvois(bd) > 0 && !/«\s*(undefined|\[object)/i.test(bd),
     'les questions mémorisées ne sont pas listées comme des envois', `${nEnvois(bd)} envoi(s) listé(s) avec « demandes », ${nEnvois(vus.reel.bloc)} sans`);
+
+  console.log('\n── L\'IA QUI N\'A RIEN RENDU N\'EST PAS UNE IA QUI HÉSITE (revue du 11 octobre)');
+  const bk = vus.iaKO.bloc;
+  dit(new RegExp(`\\b${BILAN_IA_KO.iaKO}\\b[^·]*IA n[’']a pas r[ée]pondu`).test(bk), `les ${BILAN_IA_KO.iaKO} messages où l'IA n'a rien rendu sont dits « l'IA n'a pas répondu »`, bk.slice(0, 400));
+  dit(/pas branch[ée]e sur le serveur/i.test(bk) && /inutilisable/i.test(bk), 'avec leurs causes, tirées de la donnée (pas branchée · réponse inutilisable)', bk.slice(0, 400));
+  dit(!a("n'[ée]tait pas s[uû]re").test(bk), 'et jamais « elle n\'était pas sûre » quand personne n\'a hésité', bk.slice(0, 400));
+  dit(!/IA n[’']a pas r[ée]pondu/i.test(vus.reel.bloc), 'l\'autre sens : sans panne de l\'IA, la phrase n\'est pas écrite');
 
   await nav.close(); srv.close();
   console.log(`\n${ko ? '❌ ' + ko + ' contrôle(s) au rouge.' : '✅ Ce qui part en son nom est relisible, et les nombres sont les vrais.'}`);

@@ -5675,8 +5675,13 @@ async function repondreAuxMessages(uid) {
     //    message de l'acheteur dedans, 1 est refusée à la réponse par Vinted,
     //    1 est un échange où il achète — il en reste **3**. L'app écrit ces
     //    nombres ; un total partiel présenté comme complet est pire qu'absent.
+    // ⚠️ `iaKO` (revue du 11 octobre) : quand c'est l'IA qui n'a rien rendu
+    //    d'utilisable (pas branchée, injoignable, sortie illisible), ce n'est PAS
+    //    une hésitation — l'app l'écrivait « elle n'était pas sûre ». Compté à
+    //    part, avec sa cause (`iaKOcauses` : pasBranchee · injoignable · illisible).
     const bilan = { nonLues: nonLues.length, pasCaptee: 0, sansMessage: 0, pasVendeur: 0,
-      replyRefuse: 0, dejaRepondu: 0, pasSure: 0, envoyes: 0, refusees: 0, at: new Date().toISOString() };
+      replyRefuse: 0, dejaRepondu: 0, pasSure: 0, iaKO: 0, iaKOcauses: {}, envoyes: 0, refusees: 0, at: new Date().toISOString() };
+    const iaKO = (cause) => { bilan.iaKO++; bilan.iaKOcauses[cause] = (bilan.iaKOcauses[cause] || 0) + 1; };
     for (const c of nonLues) {
       const cid = String(c.id);
       const det = await convDernierMessageId(uid, cid);
@@ -5689,7 +5694,11 @@ async function repondreAuxMessages(uid) {
       if (deja[cle] || neufs[cle]) { bilan.dejaRepondu++; continue; }    // déjà répondu à CE message
       // Déjà demandé à l'IA pour CE message, et elle a hésité : on ne la repaie pas.
       const dejaDemande = demandesNeuves[cle] || demandes[cle] || null;
-      if (dejaDemande && !dejaDemande.texte) { bilan.pasSure++; noterDiag('repond_hesitation_memorisee'); continue; }
+      if (dejaDemande && !dejaDemande.texte) {
+        if (dejaDemande.raison === 'illisible') { iaKO('illisible'); noterDiag('repond_illisible_memorisee'); }
+        else { bilan.pasSure++; noterDiag('repond_hesitation_memorisee'); }
+        continue;
+      }
       if (envoyes >= MSG_MAX_PAR_VISITE) continue;                       // le reste attend la prochaine visite
       let texte = '', sugg = null;
       if (dejaDemande && dejaDemande.texte) {
@@ -5700,9 +5709,22 @@ async function repondreAuxMessages(uid) {
         noterDiag('repond_reponse_reutilisee');
       } else {
         sugg = await aiReply(det.body, det.article || c.description || '', det.price);
-        // IA injoignable, clé absente, refus du serveur : RIEN n'a été facturé —
-        // on ne mémorise rien, la visite suivante retentera.
-        if (!(sugg && sugg.ok)) { bilan.pasSure++; noterDiag('repond_ia_injoignable'); continue; }
+        if (!(sugg && sugg.ok)) {
+          // ⚠️⚠️ REVUE DU 11 OCTOBRE : une réponse PAYÉE mais illisible (JSON
+          //    tronqué, texte libre, réponse vide — le serveur dit `facture: true`,
+          //    et `reason: 'parse'` pour un serveur d'avant) se range comme une
+          //    hésitation : on ne la repaie pas à chaque page Vinted. Seuls les
+          //    refus d'AVANT l'appel payé (clé absente, session, abonnement,
+          //    réseau, Anthropic en panne) ne sont pas mémorisés : on retentera.
+          if (sugg && (sugg.facture === true || sugg.reason === 'parse')) {
+            demandesNeuves[cle] = { at: new Date().toISOString(), confiance: 0, raison: 'illisible' };
+            iaKO('illisible'); noterDiag('repond_illisible');
+            continue;
+          }
+          iaKO(sugg && sugg.reason === 'no-key' ? 'pasBranchee' : 'injoignable');
+          noterDiag(sugg && sugg.reason === 'no-key' ? 'repond_ia_pas_branchee' : 'repond_ia_injoignable');
+          continue;
+        }
         texte = (Array.isArray(sugg.suggestions) && sugg.suggestions[0]
           && String(sugg.suggestions[0].text || '').trim()) || '';
         const conf = Number(sugg.confidence || 0);
