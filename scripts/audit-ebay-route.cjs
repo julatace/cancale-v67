@@ -95,6 +95,9 @@ const projette = (r, sel) => {
     if (src === 'id' || src === 'owner') { out[alias] = r[src]; continue; }
     if (src === 'data') { out[alias] = r.data; continue; }
     let v = r.data; for (const seg of src.replace(/^data(->>|->)/, '').split(/->>|->/)) v = v == null ? null : v[seg];
+    // `->>` rend du TEXTE chez PostgREST (un objet arrive en JSON, un booléen
+    // en « true ») — la forme que lit la route (§6.3).
+    if (v != null && /->>[^>]*$/.test(src) && typeof v !== 'string') v = typeof v === 'object' ? JSON.stringify(v) : String(v);
     out[alias] = v == null ? null : v;
   }
   return out;
@@ -708,6 +711,25 @@ const RA = {};
     remettre(); remettreBase();
     o = await app(JWT_B, AUTO);
     dit(!fin(o), 'un AUTRE vendeur ne retire rien chez Julien, même en « automatique »', `HTTP ${o.code}`);
+    // ── La remise à zéro des numéros (migration 013, 10 octobre) : l'annonce qui
+    //    portait « VRM-22 » à la coupure est l'ANCIENNE paire (B22). La vente de
+    //    la NOUVELLE 22 sur Vinted ne doit pas la retirer.
+    const MK = { version: 2, archive: 'B', coupure: '2026-10-09T00:00:00.000Z', ebayAnnonces: ['110000000001'], renum: {} };
+    remettre(); remettreBase(); lignes.push({ owner: J, id: 'main', data: { vrm_ebay_retrait_auto: true, vrm_numerotation: MK } });
+    o = await app(JWT_J, AUTO);
+    dit(o.code === 409 && o.corps.reason === 'sku-change' && !fin(o), 'remise à zéro : « VRM-22 » d\'une annonce d\'avant la coupure est la B22 — la vente de la NOUVELLE 22 ne la retire pas', `HTTP ${o.code} · ${appels(o.journal)}`);
+    remettre(); remettreBase(); lignes.push({ owner: J, id: 'main', data: { vrm_ebay_retrait_auto: true, vrm_numerotation: MK } });
+    o = await app(JWT_J, { ...AUTO, sku: 'VRM-B22' });
+    dit(o.code === 200 && fin(o), 'et l\'autre sens : l\'ANCIENNE paire (B22) prouvée vendue la retire bien', `HTTP ${o.code} · ${appels(o.journal)}`);
+    remettre(); remettreBase(); lignes.push({ owner: J, id: 'main', data: { vrm_ebay_retrait_auto: true, vrm_numerotation: { ...MK, ebayAnnonces: ['110000000999'] } } });
+    o = await app(JWT_J, AUTO);
+    dit(o.code === 200 && fin(o), 'une annonce mise en ligne APRÈS la coupure (absente de la liste) : « VRM-22 » est bien la nouvelle 22', `HTTP ${o.code}`);
+    remettre(); remettreBase(); lignes.push({ owner: J, id: 'main', data: { vrm_ebay_retrait_auto: true, vrm_numerotation: { ...MK, annule: true } } });
+    o = await app(JWT_J, AUTO);
+    dit(o.code === 200 && fin(o), 'remise à zéro ANNULÉE (retour arrière) : les SKU se relisent comme avant', `HTTP ${o.code}`);
+    remettre(); remettreBase(); lignes.push({ owner: J, id: 'main', data: { vrm_ebay_retrait_auto: true, vrm_numerotation: 'illisible{' } });
+    o = await app(JWT_J, AUTO);
+    dit(o.code === 503 && o.corps.reason === 'numerotation-pas-su' && !fin(o), 'marqueur illisible ⇒ « pas su » ne vaut pas « aucune coupure » : rien n\'est retiré', `HTTP ${o.code}`);
   });
 
   // ── 6. LES FRAIS, PAR NOM ; LES ERREURS, TOUTES ────────────────────────────

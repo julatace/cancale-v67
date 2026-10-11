@@ -45,7 +45,11 @@ function extraire(src, nom, dit) {
   }
   dit(false, `fin de \`${nom}\` introuvable`); return '';
 }
-const NOMS = ['cleNum', 'refVRMDe', 'NUM_OK', 'lbcAnnulee', 'numDeTitreLbc', 'clesAnnonceLbc', 'numDeSkuEbay', 'skuEbayDe',
+// (10 octobre) la lecture d'un N° chez eBay/Leboncoin passe par le marqueur de
+// la remise à zéro (migration 013) : ses lecteurs sont chargés AUSSI (§6.3 — un
+// changement d'API se répercute dans chaque vm), sans marqueur ici (`load` rend
+// le défaut) : la règle jugée est celle d'avant toute coupure.
+const NOMS = ['cleNum', 'refVRMDe', 'NUM_OK', 'marqueurNumerotation', 'archiveNumeros', 'coupureNumerotation', 'numeroExterne', 'lbcAnnulee', 'numDeTitreLbc', 'clesAnnonceLbc', 'numDeSkuEbay', 'skuEbayDe', 'numEbayLu', 'numLigneEbay',
   'commandeEbayEngagee', 'numerosDejaVendus', 'ouVenduesTexte', 'doublesVenteEbay', 'BROUILLON_RELU_MARGE_MS', 'brouillonEncoreAttendu', 'programmeesConnues'];
 
 // ── LES DONNÉES (inventées, la FORME mesurée : §6.3) ─────────────────────────
@@ -81,7 +85,7 @@ function lancer(APP, dit) {
   const ctx = {};
   vm.createContext(ctx);
   const src = NOMS.map((n) => extraire(APP, n, dit)).join('\n');
-  try { vm.runInContext(src + '\n;this.R = { numerosDejaVendus, doublesVenteEbay, brouillonEncoreAttendu, programmeesConnues, ouVenduesTexte };', ctx); }
+  try { vm.runInContext('const load = (k, d) => d;\n' + src + '\n;this.R = { numerosDejaVendus, doublesVenteEbay, brouillonEncoreAttendu, programmeesConnues, ouVenduesTexte };', ctx); }
   catch (e) { dit(false, 'les règles se chargent', String(e && e.message)); return null; }
   return ctx.R;
 }
@@ -160,7 +164,7 @@ if (!PROUVE) {
   const MUTATIONS = [
     ['sans « la paire est revenue »', "if (estSet(enLigne) && ids.some((id) => enLigne.has(id) && !vendusVinted.has(id))) continue;   // revenue", ''],
     ['Leboncoin ignoré', "for (const k of connus) pose(k, 'Leboncoin');", ''],
-    ['eBay ignoré', "pose(numDeSkuEbay(li && li.sku), 'eBay')", "void 0"],
+    ['eBay ignoré', "pose(numLigneEbay(o, li), 'eBay')", "void 0"],
     ['les brouillons (`autres`) ignorés', 'for (const a of (Array.isArray(autres) ? autres : [])) if (a) ajoute(a.numero, a.id);', ''],
     ['une source illisible lue comme « rien de vendu »', "else if (!ventesLbc || typeof ventesLbc !== 'object') pasSu.push('tes ventes Leboncoin');", "else if (!ventesLbc || typeof ventesLbc !== 'object') {}"],
     ['l\'alerte sans verdict (Vinted seul)', 'const verdict = ventes && ventes.vendus', 'const verdict = false && ventes && ventes.vendus'],

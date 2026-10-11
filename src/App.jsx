@@ -41,7 +41,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.163.0';
+const EXT_ATTENDUE = '5.167.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -175,7 +175,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // exactement. Le seuil est 5.160 : en deçà, l'app dit « mets à jour », elle ne
 // laisse pas le bouton se casser. (Mesuré le 7 octobre : son extension installée
 // est en 5.143 — c'est pour ça que « publier depuis VRM ne marche pas ».)
-const EXT_CAPACITES = { codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', repond: '5.77.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', detourage: '5.156.0' };
+const EXT_CAPACITES = { supprimees: '5.165.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', repond: '5.77.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', detourage: '5.156.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -187,6 +187,21 @@ const extSait = (quoi) => {
   return cmpVersion(v, EXT_CAPACITES[quoi] || EXT_ATTENDUE) < 0 ? 'retard' : 'ok';
 };
 const extSaitLireCodes = () => extSait('codes');
+// Ce qu'une version VUE (la dernière capture, d'un autre appareil) ne sait pas
+// encore faire, en mots — tiré de la MÊME table (§11), jamais une liste écrite à
+// la main qui dérive dès qu'EXT_ATTENDUE avance (revue du 9 octobre : « c'est
+// la version à jour qui… » citait trois choses que la 5.161 faisait déjà). Une
+// capacité sans mots ici n'est simplement pas citée : on ne promet pas plus.
+const CAPACITES_DITES = [
+  ['commande', 'générer un bordereau depuis VRM'],
+  ['messagerie', 'répondre et faire une offre depuis VRM'],
+  ['publication', 'publier une annonce sur Leboncoin depuis VRM'],
+  ['versement', 'relever la date de versement de tes ventes'],
+  ['lbcmsg', 'relever tes messages Leboncoin'],
+  ['detourage', 'détourer tes photos'],
+];
+const capacitesManquantes = (v) => (v ? CAPACITES_DITES.filter(([k]) => cmpVersion(v, EXT_CAPACITES[k]) < 0).map(([, t]) => t) : []);
+const listeFr = (l) => (l.length <= 1 ? (l[0] || '') : `${l.slice(0, -1).join(', ')} ni ${l[l.length - 1]}`);
 // PALETTE — passe « premium » : neutres plus propres, texte mieux contrasté,
 // bordures plus discrètes, et des jetons d'ÉLÉVATION (ombres) pour donner de la
 // profondeur aux cartes au lieu du rendu plat d'avant. Les clés existantes sont
@@ -818,7 +833,16 @@ if (MULTI_USER && typeof window !== 'undefined') {
 //      quand elle en a BESOIN (pas de session, session morte, autre compte),
 //      jamais à chaque rafraîchissement. Voir `assurerSessionExtension`.
 // À la déconnexion on envoie toujours null : elle oublie tout.
+// ⚠️⚠️ DEUX EXTENSIONS VRM DANS LE MÊME CHROME (mesuré le 9 octobre, 5.165) :
+//    `null` = une seule répond (ou pas su) · `['5.77.0','5.165.0']` = PLUSIEURS.
+//    Décidé par `sonderPonts` (plus bas), lu par `raisonExtGlobale`, `vmrExec`,
+//    `vmrDemande` et ici. Une session postée ici est relayée par CHAQUE pont
+//    vivant de la page : deux extensions adopteraient la MÊME famille de jetons
+//    et se la tueraient en la renouvelant (`refresh_token_already_used`,
+//    « Possible abuse attempt », relevé à 18:37:02 le 9 octobre).
+let __vmrPlusieurs = null;
 const posterSessionExtension = (session) => {
+  if (session && __vmrPlusieurs) return;   // « oublie tout » (null) part toujours
   try { window.postMessage({ __vmr: 'session', session: session || null }, window.location.origin); } catch (_) {}
 };
 // Le repli d'AVANT (notre propre session) ne sert plus qu'à amorcer une
@@ -874,7 +898,11 @@ const SYNC_KEYS = [
   'vinted_invoice_settings','vinted_custom_logo','vinted_dark','vinted_stock_vinted',
   'vinted_accounts','vinted_account_labels','vinted_account_emails','vinted_account_phones',
   'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros','vinted_annonces_vendues','vinted_bords_shipped',
-  'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats','vinted_bords_printed','vrm_imprimante','vrm_prenom','vrm_num_prefixe', 'vinted_repond_auto','vinted_offres_auto','vrm_detourage','vrm_points_relais','vrm_ville','vrm_colis_collected','vrm_colis_collected_at',
+  'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats','vinted_bords_printed','vrm_imprimante','vrm_prenom','vrm_num_prefixe',
+  // Le marqueur de la remise à zéro (migration 013) : ÉCRIT PAR LE SERVEUR SEUL
+  // (le garde-fou de la base le recopie depuis la ligne d'avant, quoi que le
+  // navigateur envoie). Synchronisé pour être LU : série d'archive, version.
+  'vrm_numerotation', 'vinted_repond_auto','vinted_offres_auto','vrm_detourage','vrm_points_relais','vrm_ville','vrm_colis_collected','vrm_colis_collected_at',
   'vinted_txn_link','vinted_sales_hidden','vinted_purchases_hidden','vinted_accounts_hidden','vinted_autonum','vinted_urssaf_freq','vinted_urssaf_taux',
   // « J'ai déclaré ce mois » : quelles ventes il a déclarées, et dans quel mois
   // (`ventesDeclarables`). Écrit sur SON clic uniquement.
@@ -1192,8 +1220,19 @@ const ALLEGER_AVANT_CLOUD = {
     : v,
 };
 
+// ⚠️ LA BASE PEUT REFUSER UNE ÉCRITURE (migration 013, garde-fou des numéros) :
+// l'écran a été chargé avant une remise à zéro, ou un autre appareil a donné des
+// numéros depuis. Avant, un refus ne donnait qu'un point « erreur de synchro »,
+// avec l'infobulle « Hors ligne (sauvegarde locale) » — faux deux fois : la base
+// répondait, et rien n'était gardé (le chargement suivant réécrit le navigateur
+// depuis le nuage). On dit la vraie cause (`signalerNumerosPerimes` → le bloc de
+// la coque) et on N'ENVOIE PLUS RIEN : chaque envoi serait refusé de même. Les
+// saisies restent dans le navigateur, et le bloc les rejoue après rechargement.
+let _pushBloque = false;
+let _prefixeRetente = false;
 const cloudPush = () => {
   if (!isCloudReady()) { _pushPending = true; return; } // verrou 1 : cloud pas encore chargé
+  if (_pushBloque) { _emitSync('refus'); return; }
   if (_cloudTimer) clearTimeout(_cloudTimer);
   _emitSync('saving');
   _cloudTimer = setTimeout(async () => {
@@ -1210,6 +1249,22 @@ const cloudPush = () => {
         headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }),
         body: JSON.stringify([withOwner({ id: SUPABASE_ROW, data: payload, updated_at: new Date().toISOString() })]),
       });
+      if (!res.ok) {
+        let txt = ''; try { txt = await res.text(); } catch (_) {}
+        const code = codeRefusNumeros(txt);
+        if (code === 'vrm_prefixe_archive') {
+          // La lettre des nouveaux numéros ne peut pas être celle des anciens.
+          try { localStorage.setItem('vrm_num_prefixe', JSON.stringify('')); } catch (_) {}
+          try { window.dispatchEvent(new Event('vrm-prefixe')); } catch (_) {}
+          toast(`La lettre « ${archiveNumeros() || 'B'} » est celle de tes anciens numéros : tes nouvelles paires restent en chiffres.`);
+          _emitSync('error'); _cloudTimer = null;
+          // Le reste de cet envoi a été refusé avec lui : on le renvoie UNE fois,
+          // sans la lettre (jamais en boucle).
+          if (!_prefixeRetente) { _prefixeRetente = true; setTimeout(() => cloudPush(), 50); }
+          return;
+        }
+        if (code) { _pushBloque = true; _emitSync('refus'); signalerNumerosPerimes(code); _cloudTimer = null; return; }
+      }
       _emitSync(res.ok ? 'synced' : 'error');
     } catch (_) { _emitSync('error'); }
     _cloudTimer = null;
@@ -1473,6 +1528,229 @@ const harvestTs = (row) => {
 // données dans l'UI (« données du 7 juil. ») au lieu de laisser croire au direct.
 const _harvestSeen = {};
 const harvestAgeMs = (uid, type) => { const t = _harvestSeen[`${uid}_${type}`]; return t ? (Date.now() - t) : null; };
+// ══════════════════════════════════════════════════════════════════════════════
+// UNE ANNONCE SUPPRIMÉE SUR VINTED SORT DE VRM TOUT DE SUITE (10 octobre, 5.165)
+// ══════════════════════════════════════════════════════════════════════════════
+// Julien, 9 octobre 18:40 : « je viens de supprimer beaucoup de paires et elles
+// sont encore marquées dans les annonces ». Le dressing de cinq comptes datait
+// du 8 au soir : ~41 annonces affichées « en ligne » qu'il venait de supprimer.
+// L'extension (≥ 5.165) voit maintenant, dans son navigateur, la RÉPONSE de
+// `POST /api/v2/items/{id}/delete` et ne retient qu'un 2xx, par l'IDENTIFIANT de
+// l'annonce (§5) : `harvest_{uid}_supprimees = { ids: { [id]: atISO } }`.
+// ⇒ UNE règle (`supprimeeApres`), appliquée au dressing LÀ OÙ IL EST LU
+//   (`fetchHarvestBrut`, et `retirerSupprimeesLignes` pour les lecteurs qui
+//   balaient tous les comptes) : tous les écrans qui en dérivent — Annonces, ses
+//   chiffres, la file Leboncoin, le tableau de bord, la recherche — la suivent
+//   sans la recalculer (§11). La MÊME règle vit dans l'extension
+//   (`buildLbcData`, `buildEbayData`) : `audit-supprimees.cjs` compare les sorties.
+// ⚠️ Le dressing RELU après la suppression fait foi (une annonce supprimée en
+//    disparaît : mesuré, 10010415608 d'angeled92). ⚠️ « Pas su » ne cache rien :
+//    ligne illisible ⇒ aucune annonce écartée. ⚠️ Supprimée n'est PAS vendue :
+//    rien ici n'entre dans une preuve de vente, un CA, ni « à retirer ailleurs ».
+// <supprimees-regle> — LA MÊME RÈGLE QUE L'EXTENSION (background.js), §11.
+// `capturedAt` est l'heure du RANGEMENT, pas de la lecture : une moisson partie
+// avant la suppression et rangée après la ressusciterait — d'où la marge. Une
+// annonce supprimée ne revient jamais légitimement (republiée, elle a un NOUVEL
+// identifiant) : la marge ne fait que retarder une résurrection qui n'a pas lieu.
+const SUPPR_MARGE_MS = 5 * 60 * 1000;
+function supprimeeApres(ids, id, capTs) {
+  if (!ids || typeof ids !== 'object') return false;          // pas su : on n'écarte rien
+  const at = Date.parse(ids[String(id)] || '');
+  if (isNaN(at)) return false;
+  return !(Number(capTs) >= at + SUPPR_MARGE_MS);             // lecture d'avant, ou sans date : écartée
+}
+// La date de LECTURE d'un dressing — UNE fonction pour les quatre lecteurs
+// (écran Annonces, file Leboncoin de l'app, files LBC/eBay et photos de
+// l'extension, §11) : `capturedAt` écrit par l'extension (la colonne `cap`
+// d'une projection, ou `data.capturedAt` d'une ligne entière). JAMAIS
+// `updated_at`, qui ment (§4.3) — l'écran Annonces y retombait, les autres non :
+// la même ligne rendait deux listes (revue de la 5.165). Sans date : `NaN`.
+function dateLectureDressing(ligne) {
+  const c = ligne && (ligne.cap != null ? ligne.cap : (ligne.data && ligne.data.capturedAt));
+  return Date.parse(c || '');
+}
+// </supprimees-regle>
+// Ce que la dernière lecture a écarté, par compte (pour le DIRE, une fois, §7).
+const _supprRetirees = {};
+// La ligne d'un compte : `ids` · `{}` (aucune) · `null` (la base n'a pas répondu).
+const lireSupprimees = (uid) => cachedRow(`s:${uid}`, async () => {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.harvest_${uid}_supprimees&select=ids:data->ids`, { headers: sbAuth() });
+    if (!res.ok) return null;
+    const rows = await res.json();
+    if (!Array.isArray(rows)) return null;
+    const ids = rows[0] && rows[0].ids;
+    return (ids && typeof ids === 'object' && !Array.isArray(ids)) ? ids : {};
+  } catch (_) { return null; }
+});
+// Toutes les lignes (une par compte : famille bornée) → Map uid → ids, ou `null`.
+const lireSupprimeesTous = () => cachedRow('s:*', async () => {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_supprimees&select=id,ids:data->ids`, { headers: sbAuth() });
+    if (!res.ok) return null;
+    const rows = await res.json();
+    if (!Array.isArray(rows)) return null;
+    const m = new Map();
+    for (const r of rows) {
+      const k = /^harvest_(\d+)_supprimees$/.exec(String((r && r.id) || ''));
+      if (k && r.ids && typeof r.ids === 'object') m.set(k[1], r.ids);
+    }
+    return m;
+  } catch (_) { return null; }
+});
+// Un dressing (payload) sans les annonces supprimées APRÈS sa lecture.
+// `_vrmRetirees` garde les annonces retirées elles-mêmes : l'écran ne COMPTE que
+// celles qui étaient affichées en ligne (revue 5.165 — « 3 supprimées » quand une
+// seule carte était partie, les deux autres étaient en pause ou en brouillon).
+const retirerSupprimees = (payload, ids, capTs) => {
+  if (!ids || !payload || !Array.isArray(payload.items)) return payload;
+  const items = [], retirees = [], retireesItems = [];
+  for (const it of payload.items) { if (it && supprimeeApres(ids, it.id, capTs)) { retirees.push(String(it.id)); retireesItems.push(it); } else items.push(it); }
+  return retirees.length ? { ...payload, items, _vrmSupprimees: retirees, _vrmRetirees: retireesItems } : payload;
+};
+// Des lignes `harvest_{uid}_listings` lues en entier (`id,data` ou `data`).
+const retirerSupprimeesLignes = (lignes, supp) => {
+  if (!supp || !Array.isArray(lignes)) return lignes;
+  return lignes.map((r) => {
+    const d = r && r.data; if (!d) return r;
+    const k = /^harvest_(\d+)_listings$/.exec(String((r && r.id) || ''));
+    const uid = k ? k[1] : (d.uid != null ? String(d.uid) : '');
+    const ids = uid && supp.get(uid);
+    if (!ids || !d.payload) return r;
+    const p2 = retirerSupprimees(d.payload, ids, dateLectureDressing(r));
+    return p2 === d.payload ? r : { ...r, data: { ...d, payload: p2 } };
+  });
+};
+// ── DE QUAND DATE LA LECTURE DU DRESSING, COMPTE PAR COMPTE (5.165) ─────────
+// L'écran Annonces n'en disait RIEN : la lecture du 8 au soir de cinq comptes
+// s'affichait comme l'état du 9 (§4.3, §5 : un chiffre qu'on ne peut pas
+// vérifier est invendable). Il ne prévenait qu'au-delà de 7 JOURS, et seulement
+// avec au moins deux comptes. ⇒ Au-delà de 30 min, on le DIT — une fois, au-
+// dessus de la grille (§7), en nommant les comptes et l'heure, avec le geste
+// vrai. Sans couleur : rien n'est cassé, c'est une date. Heure inconnue ⇒ on ne
+// dit rien de ce compte (« pas su » ne vaut ni « à jour » ni « vieux »).
+// ⚠️ REVUE DE LA 5.165 — 30 MIN ÉTAIT DU BRUIT PERMANENT. L'extension ne relit
+//    que le compte ouvert dans Chrome : avec sept comptes, au bout d'une demi-
+//    heure TOUS étaient « anciens », à chaque ouverture — une consigne qu'on ne
+//    peut ni suivre ni faire disparaître (§7). Un compte est nommé quand :
+//      · sa lecture a plus de 12 h (une suppression faite ailleurs — téléphone,
+//        autre navigateur — n'y est peut-être pas ; mesuré : celle du 8 au soir
+//        affichée le 9 à 18 h 40) ;
+//      · OU l'extension l'a vu actif APRÈS cette lecture (ses ventes rangées plus
+//        de 10 min après son dressing) : il est passé dessus, et le dressing n'a
+//        pas été relu — c'est l'échec qu'il faut voir.
+const DRESSING_FRAIS_MS = 12 * 3600 * 1000;
+const DRESSING_ACTIVITE_MARGE_MS = 10 * 60 * 1000;
+const MOIS_COURT_FR = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+const quandFr = (ts, maintenant = Date.now()) => {
+  const d = new Date(Number(ts)); if (isNaN(d)) return '';
+  const min = Math.round((maintenant - d.getTime()) / 60000);
+  if (min < 60) return `il y a ${Math.max(1, min)} min`;
+  const hm = `${d.getHours()} h ${String(d.getMinutes()).padStart(2, '0')}`;
+  const j0 = new Date(maintenant); j0.setHours(0, 0, 0, 0);
+  const t0 = new Date(d.getTime()); t0.setHours(0, 0, 0, 0);
+  const dj = Math.round((j0 - t0) / 86400000);
+  if (dj === 0) return `aujourd'hui à ${hm}`;
+  if (dj === 1) return `hier à ${hm}`;
+  return `le ${d.getDate()} ${MOIS_COURT_FR[d.getMonth()]} à ${hm}`;
+};
+// Les comptes AFFICHÉS (au moins une annonce en ligne à l'écran) dont le dressing
+// est ANCIEN (règle ci-dessus) — du plus ancien au plus récent. `activite` :
+// uid → heure de la dernière capture de ses ventes (absente ⇒ la règle des 12 h).
+const dressingsAnciens = (lues, enLigne, maintenant = Date.now(), activite = null) =>
+  Object.keys(enLigne || {})
+    .filter((u) => {
+      if (!((enLigne[u] || 0) > 0 && lues && Number(lues[u]) > 0)) return false;
+      const lu = Number(lues[u]);
+      if (maintenant - lu > DRESSING_FRAIS_MS) return true;
+      const act = activite && Number(activite[u]);
+      return !!(act > 0 && act - lu > DRESSING_ACTIVITE_MARGE_MS);
+    })
+    .sort((a, b) => Number(lues[a]) - Number(lues[b]));
+// UNE phrase pour l'écran Annonces ET le tableau de bord (§11).
+// ⚠️ Revue de la 5.165 :
+//    · TOUS les comptes sont nommés, chacun avec son heure (« a, b, c et 3
+//      autres » cachait sur quel compte repasser — il en a neuf, §5) ;
+//    · sans extension ICI (téléphone, autre navigateur), le geste dit OÙ il se
+//      fait : ouvrir vinted.fr sur ce téléphone ne relit rien ;
+//    · « sort d'ici tout de suite » ne se promet que si l'extension de CE Chrome
+//      le sait (≥ 5.165) ET qu'elle est seule (deux extensions : l'ancienne patche
+//      la page à sa place), avec le geste qui rend la promesse vraie : un onglet
+//      Vinted ouvert AVANT la mise à jour garde l'ancien code jusqu'au rechargement
+//      (mesuré dans Chromium : 0 suppression vue avant, toutes après).
+function FraicheurAnnonces({ lues, enLigne, noms, supprimees, activite, attr = 'data-ann-fraicheur', style }) {
+  const sansSouris = useSansSouris();
+  const [, majExt] = React.useReducer((x) => x + 1, 0);
+  React.useEffect(() => onVmrExt(majExt), []);
+  const vieux = dressingsAnciens(lues, enLigne, Date.now(), activite);
+  const nSuppr = Object.keys(supprimees || {}).filter((u) => enLigne && u in enLigne).reduce((t, u) => t + (Number(supprimees[u]) || 0), 0);
+  if (!vieux.length && !nSuppr) return null;
+  const nom = (u) => (noms && noms[u]) || `#${u}`;
+  const cap = extSait('supprimees');
+  const plusieurs = !!__vmrPlusieurs;
+  const ailleurs = cap === 'absente' || sansSouris;          // le geste ne se fait pas sur CET appareil
+  const promet = cap === 'ok' && !plusieurs && !sansSouris;
+  const s = nSuppr > 1 ? 's' : '';
+  const ceux = vieux.length > 1 ? 'chacun de ces comptes' : 'ce compte';
+  return (
+    <div {...{ [attr]: '' }} data-vieux={vieux.join(',')} data-supprimees={nSuppr} data-cap={cap} data-promesse={promet ? '1' : '0'} data-ailleurs={ailleurs ? '1' : '0'}
+      style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, marginBottom: 12, ...(style || {}) }}>
+      {nSuppr > 0 && <span data-suppr-dit>{nSuppr} annonce{s} supprimée{s} sur Vinted depuis la dernière lecture : déjà retirée{s} d'ici. </span>}
+      {vieux.length > 0 && <span data-vieux-dit>
+        {vieux.length === 1
+          ? <><b style={{ color: C.text }}>{nom(vieux[0])}</b> : annonces lues {quandFr(Number(lues[vieux[0]]))}</>
+          : <>Annonces lues : {vieux.map((u, i) => <React.Fragment key={u}>{i ? ', ' : ''}<b style={{ color: C.text }}>{nom(u)}</b> {quandFr(Number(lues[u]))}</React.Fragment>)}</>}
+        {' '}— ce que tu as supprimé ou mis en ligne depuis n'y est pas{nSuppr > 0 ? ' (hors les suppressions ci-dessus)' : ''}.
+        {' '}{ailleurs
+          ? <>Sur l'ordinateur où l'extension VRM est installée, ouvre <b style={{ color: C.text }}>vinted.fr</b> connecté sur {ceux} : elle relit son dressing.</>
+          : <>Ouvre <b style={{ color: C.text }}>vinted.fr</b> connecté sur {ceux} dans Chrome : l'extension relit son dressing.</>}
+        {promet && ' Une suppression faite sur vinted.fr dans ce Chrome sort d’ici tout de suite — recharge d’abord les onglets Vinted ouverts avant la dernière mise à jour de l’extension.'}
+        {cap === 'retard' && !plusieurs && ` Mets l'extension à jour (${EXT_CAPACITES.supprimees}) : une suppression faite sur vinted.fr en sortira tout de suite.`}
+        {plusieurs && ' Deux extensions VRM répondent dans ce Chrome : tant qu’il en reste deux, une suppression peut ne pas être vue.'}
+      </span>}
+    </div>
+  );
+}
+// ⚠️⚠️ REVUE DE LA 5.165 — UN SIGNAL DE L'EXTENSION NE FAIT JAMAIS PARTIR LE
+//    RELAIS SERVEUR. Chaque « maj · annonces » (une par suppression rangée, une
+//    par dressing rangé) relançait les lectures de l'app — et pour un compte lié
+//    SANS ligne moissonnée, ces lectures retombaient sur `/api/vinted-proxy` :
+//    le serveur lisait Vinted (dressing, ventes, boîte) depuis l'IP de Vercel,
+//    au nom d'un AUTRE compte, ~4 fois par suppression. Prouvé au rendu : 0
+//    appel avant la 5.165, 24 après 6 suppressions. C'est le motif « multi-
+//    comptes piloté par un robot depuis l'IP du serveur » (§3).
+//    ⇒ Une relecture sur signal ne lit QUE la moisson (`moissonSeule`) ; un
+//      compte sans ligne garde ce qu'on montrait ; et les signaux rapprochés se
+//      REGROUPENT : la première relecture part vite (une rafale de suppressions
+//      en une seule), les suivantes au plus une par `SIGNAL_MIN_MS`, et la
+//      dernière n'est jamais perdue (sinon la dernière suppression resterait à
+//      l'écran).
+const SIGNAL_MIN_MS = 5000;
+function regrouperSignaux(relire, minMs = SIGNAL_MIN_MS, rafaleMs = 300) {
+  let uids = null, tous = false, minuterie = null, derniere = 0, enCours = false;
+  const lancer = async () => {
+    minuterie = null;
+    if (enCours) { planifier(); return; }
+    const cible = tous ? null : uids;
+    uids = null; tous = false; enCours = true; derniere = Date.now();
+    try { await relire(cible); } catch (_) {} finally { enCours = false; }
+  };
+  const planifier = () => {
+    if (minuterie) return;
+    minuterie = setTimeout(lancer, Math.max(rafaleMs, derniere + minMs - Date.now()));
+  };
+  const signal = (uid) => {
+    if (uid) (uids = uids || new Set()).add(String(uid)); else tous = true;
+    planifier();
+  };
+  signal.arreter = () => { if (minuterie) clearTimeout(minuterie); minuterie = null; };
+  return signal;
+}
+// L'extension vient de ranger une suppression : on oublie ce qu'on avait lu.
+const oublierDressing = (uid) => {
+  if (uid) { _rowCache.delete(`h:${uid}:listings`); _rowCache.delete(`s:${uid}`); }
+  _rowCache.delete('s:*');
+};
 // ── ACTIVITÉ RÉSEAU (barre de chargement en haut) ───────────────────────────
 // Tous les chargements de données passent par fetchHarvest (moisson) ou
 // vintedApiCall (Vinted). On compte les requêtes en cours à cet endroit unique,
@@ -1630,7 +1908,10 @@ const fetchHarvestBrut = async (uid, type, opts = {}) => {
     const rows = await res.json();
     const row = rows[0];
     if (!row) return null;
-    const ts = harvestTs(row);
+    // Un dressing se date par `dateLectureDressing` (capturedAt seul), comme chez
+    // tous ses autres lecteurs (§11) : la date dite à l'écran et celle qui écarte
+    // les annonces supprimées sont la MÊME.
+    const ts = type === 'listings' ? dateLectureDressing(row) : harvestTs(row);
     if (!isNaN(ts)) _harvestSeen[`${uid}_${type}`] = ts;
     // ⚠️ ON NE JETTE PLUS une moisson « trop vieille » par défaut. Ça faisait
     // afficher « Impossible de charger » (Messages, Annonces…) dès que Julien
@@ -1642,7 +1923,15 @@ const fetchHarvestBrut = async (uid, type, opts = {}) => {
     // Un appelant qui exige de la fraîcheur peut encore passer opts.maxAgeMs.
     const maxAge = opts.maxAgeMs != null ? opts.maxAgeMs : 0;
     if (maxAge > 0 && !isNaN(ts) && (Date.now() - ts) > maxAge) return null;
-    return row.data?.payload || null;
+    const payload = row.data?.payload || null;
+    // 5.165 : le dressing, LÀ OÙ IL EST LU, sans les annonces supprimées depuis
+    // (tous les écrans qui en dérivent suivent la même règle, §11).
+    if (type === 'listings' && payload) {
+      const p2 = retirerSupprimees(payload, await lireSupprimees(uid), ts);
+      _supprRetirees[uid] = (p2 && p2._vrmSupprimees) || [];
+      return p2;
+    }
+    return payload;
   } catch (_) { return null; }
   finally { busyEnd(); }  // finally : le compteur redescend quel que soit le chemin de sortie
 };
@@ -2914,6 +3203,11 @@ const classifyOrderStatus = (status) => {
 // l'intérieur d'un composant, donc invisibles pour `needsBordereau` juste
 // en dessous — d'où le désaccord corrigé ci-après.
 const isAtRelayStatus = (s) => !!(s) && !/livr[ée]\s+(?:chez|à\s+(?:ton|votre|son)\s+domicile|à\s+domicile)/i.test(s) && !/finalis|termin|annul|rembours|retour/i.test(s) && ((/d[ée]pos[ée]|arriv[ée]/i.test(s) && /point\s+relais|bureau\s+de\s+poste|casier|consigne|locker|vinted\s*go|point\s+de\s+retrait/i.test(s)) || /pr[êe]t\s+à\s+[êe]tre\s+retir/i.test(s) || (/disponible|à\s+retirer|au\s+point\s+de\s+retrait/i.test(s) && /relais|bureau\s+de\s+poste|casier|consigne|point|retrait|locker|vinted\s*go/i.test(s)));
+// Un ACHAT en « Retour initié » : litige, la paire doit REPARTIR (bordereau de
+// retour sur Vinted). Une règle (§11) : l'étiquette de la carte (`achatStage`),
+// le bloc en tête d'Achats et la ligne de Ma journée la lisent. Motif précis,
+// pour ne pas attraper « Retournée à l'expéditeur », qui est autre chose.
+const ACHAT_A_RENVOYER = /retour\s*initi|retour\s+en\s+cours|retour\s+demand/i;
 // Fenêtre pendant laquelle une vente mérite encore un numéro de boîte : la paire
 // est passée par le garage récemment, donc le numéro a un sens pour l'historique.
 // ⚠️ C'est CETTE borne qui empêche de renuméroter tout l'historique (140 ventes
@@ -3231,6 +3525,107 @@ const compteEcarte = (uid, masques, panneau) => {
   if (pa[k] === false) return false;
   return (masques && masques.has(k)) || pa[k] === true;
 };
+// ══════════════════════════════════════════════════════════════════════════════
+// CE QUE VINTED TRANSMET AUX IMPÔTS — LES SEUILS, COMPTE PAR COMPTE (6 octobre)
+// ══════════════════════════════════════════════════════════════════════════════
+// Chaque année, Vinted transmet aux impôts les vendeurs qui atteignent 30 ventes
+// OU dépassent 2 000 € dans l'année civile (directive européenne DAC7). Mesuré le
+// 6 octobre : trois de ses comptes y sont déjà (101 · 49 · 33 ventes finalisées
+// en 2026, l'un à 3 721,10 €), et l'app n'en disait rien.
+// ⚠️⚠️ LA PARTIE SÛRE EST LE CHIFFRE DU REGISTRE, ET RIEN D'AUTRE (revue du
+//    6 octobre). Le premier jet rattachait à l'année, COMME SÛRES, des ventes
+//    sans date de versement (deux bornes dans la même année) — et la carte
+//    disait « pour qu'il n'y ait jamais d'écart avec ce que tu déclares ».
+//    Mesuré sur sa base : carte 245 ventes · 9 361 € contre registre 141 ·
+//    5 226 € ; julatace35260 101 contre 42. Une phrase vraie sur un chiffre
+//    faux (§5). Désormais, par compte, et les DEUX parties viennent du registre
+//    annuel lui-même (`declRapport`, §11 : une notion, un propriétaire — la
+//    carte ne rappelle jamais `ventesDeclarables` de son côté) :
+//      · `n`/`cts` = ses ventes Vinted COMPTÉES par le registre dans l'année
+//        (`datees` : le mois de sa déclaration s'il l'a notée, sinon celui du
+//        versement) — exactement le chiffre du registre, passé tel quel ;
+//      · `nAd`/`ctsAd` = ses ventes finalisées PAS ENCORE DATÉES (`aDater`, la
+//        liste du registre), rattachées à l'année par une ESTIMATION (le
+//        versement suit la vente — 0 sur 173 avant elle — et la suit de près :
+//        au plus 25 jours mesurés, d'où `VERSEMENT_MAX_J`). Elles ne rejoignent
+//        JAMAIS la partie sûre ;
+//      · le verdict n'est « atteint » que sur la partie sûre ; « atteintSi »
+//        quand il ne l'est qu'en ajoutant les pas encore datées.
+// ⚠️ TROIS ÉTATS : `enCours` (le registre n'est pas encore calculé : `datees`
+//    vaut `undefined`) · `pasSu` (la lecture des ventes de CE compte a échoué —
+//    jugée par son IDENTITÉ, jamais par son nom affiché — ou le registre n'a pas
+//    pu dater les ventes Vinted : `datees` vaut `null` ; un tiret, jamais 0) ·
+//    `lu`. Un compte exclu de l'app n'y entre pas (décision du 3 octobre).
+// ⚠️ VRM NE SAIT PAS si Vinted juge chaque compte à part ou additionne ceux
+//    d'une même personne : `total` additionne les comptes sélectionnés, dit
+//    comme tel. Un compte pas lu ⇒ total « au moins », et jamais « sous les
+//    seuils » (les ventes qui manquent pourraient l'y faire passer).
+// ⚠️ « Plus de 2 000 € » : 2 000,00 € pile ne l'atteint pas. Comparé en
+//    centimes entiers, jamais en flottants.
+// ⚠️ L'ANNÉE suit le fuseau de l'appareil (`getFullYear`), comme le registre et
+//    `ventesDeclarables` : une vente versée le 1er janvier à 00 h 20 (Paris)
+//    compte dans l'année d'avant sur un téléphone réglé à Londres. Constaté,
+//    laissé tel quel : changer ici seul ferait diverger la carte du registre.
+const SEUIL_VINTED_VENTES = 30;
+const SEUIL_VINTED_EUR = 2000;
+const VERSEMENT_MAX_J = 45;
+const seuilVintedAtteint = (n, cts) => n >= SEUIL_VINTED_VENTES || cts > SEUIL_VINTED_EUR * 100;
+const seuilsVintedParCompte = ({ comptes, ecarte, echoues, datees, aDater, annee, maintenant = Date.now() } = {}) => {
+  const anneeDe = (t) => new Date(t).getFullYear();
+  const uidDe = (o) => String((o && o._acc && o._acc.vinted_user_id) ?? '');
+  // Le registre : `undefined` pas encore calculé · `null` pas su · un objet lu.
+  const lu = !!datees && typeof datees === 'object';
+  const ko = (uid) => !!(echoues && echoues.has(uid));
+  const parUid = {}, liste = [];
+  for (const c of (comptes || [])) {
+    const uid = String((c && c.uid) ?? '');
+    if (!uid || parUid[uid] || (ecarte && ecarte(uid))) continue;
+    // Une lecture ratée de CE compte se sait tout de suite, même registre en cours.
+    const etat = ko(uid) ? 'pasSu' : lu ? 'lu' : datees === null ? 'pasSu' : 'enCours';
+    const raison = etat !== 'pasSu' ? null : ko(uid) ? 'ventes' : 'versements';
+    const q = (etat === 'lu' && datees[uid]) || {};
+    const n = etat === 'lu' ? (Number(q.n) || 0) : 0;
+    const cts = etat === 'lu' ? Math.round(Number(q.cts) || 0) : 0;
+    const r = { uid, nom: (c && c.nom) || uid, etat, raison, n, cts, nAd: 0, ctsAd: 0 };
+    parUid[uid] = r; liste.push(r);
+  }
+  if (lu) {
+    for (const l of (Array.isArray(aDater) ? aDater : [])) {
+      if (!l || l.plateforme !== 'Vinted') continue;
+      const r = parUid[uidDe(l.o)]; if (!r || r.etat !== 'lu') continue;
+      const t = tsCommande(l.o);
+      const yMin = t ? anneeDe(t) : -Infinity;                                       // le versement suit la vente…
+      const yMax = anneeDe(t ? Math.min(maintenant, t + VERSEMENT_MAX_J * 86400e3) : maintenant);   // …et la suit de près (estimation)
+      if (annee < yMin || annee > yMax) continue;
+      const c = Math.round(Number(l.eur) * 100); if (!isFinite(c)) continue;
+      r.nAd += 1; r.ctsAd += c;
+    }
+  }
+  const aCeJour = anneeDe(maintenant) === annee;     // l'année n'est pas finie : « à ce jour »
+  const juge = (r, jugeable = true) => {
+    r.eur = r.cts / 100; r.eurAd = r.ctsAd / 100;
+    r.verdict = r.etat !== 'lu' ? null
+      : seuilVintedAtteint(r.n, r.cts) ? 'atteint'
+      : seuilVintedAtteint(r.n + r.nAd, r.cts + r.ctsAd) ? 'atteintSi'
+      : jugeable ? 'sous' : null;
+    // Ce qu'il reste avant le seuil, sur la partie SÛRE (datée) : 30 ventes, ou
+    // un centime de plus que 2 000 €.
+    r.reste = (r.verdict === 'sous' || r.verdict === 'atteintSi')
+      ? { n: Math.max(0, SEUIL_VINTED_VENTES - r.n), cts: Math.max(0, SEUIL_VINTED_EUR * 100 + 1 - r.cts) } : null;
+  };
+  for (const r of liste) juge(r);
+  const lus = liste.filter(r => r.etat === 'lu');
+  const manquants = liste.filter(r => r.etat !== 'lu').map(r => r.uid);
+  const total = {
+    etat: lus.length ? 'lu' : (liste.some(r => r.etat === 'enCours') ? 'enCours' : 'pasSu'),
+    manquants, partiel: lus.length > 0 && manquants.length > 0,
+    n: lus.reduce((s, r) => s + r.n, 0), cts: lus.reduce((s, r) => s + r.cts, 0),
+    nAd: lus.reduce((s, r) => s + r.nAd, 0), ctsAd: lus.reduce((s, r) => s + r.ctsAd, 0),
+  };
+  juge(total, !total.partiel);
+  if (total.partiel) total.reste = null;
+  return { comptes: liste, total, aCeJour };
+};
 // Clé de jour LOCALE : toISOString() est en UTC et mettrait une vente de 23 h
 // sur le lendemain.
 const cleJourLocal = (t) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
@@ -3476,6 +3871,10 @@ const fetchVintedOrders = async (account, type, page = 1, statusFilter = 'comple
   // Mode "moisson seulement" : on n'interroge PAS Vinted, on renvoie du vide si
   // la page n'a pas encore été ouverte dans le navigateur.
   if (opts.harvestOnly) return { ok: true, items: [], pagination: null, source: 'harvest' };
+  // `moissonSeule` (revue 5.165) : une relecture déclenchée par un SIGNAL de
+  // l'extension. Pas de ligne ⇒ « rien de neuf à dire » (l'appelant garde ce
+  // qu'il montrait) — jamais le relais serveur, jamais un faux « 0 ».
+  if (opts.moissonSeule) return { ok: false, error: 'moisson-absente', items: [], pagination: null, source: 'moisson-absente' };
   // 2) Repli : proxy — on récupère TOUTES les pages. ⚠️ Avant, on ne prenait
   //    que la 1re page de 20 commandes/compte → CA, « en attente » et coûts
   //    d'achat étaient largement sous-comptés (ex. 71 ventes lues comme 20).
@@ -3524,6 +3923,7 @@ const fetchVintedConversations = async (account, page = 1, opts = {}) => {
   }
   // Mode "moisson seulement" : aucun appel Vinted.
   if (opts.harvestOnly) return { ok: true, items: [], pagination: null, raw: null, source: 'harvest' };
+  if (opts.moissonSeule) return { ok: false, error: 'moisson-absente', items: [], pagination: null, raw: null, source: 'moisson-absente' };
   // 2) Repli : proxy (si l'inbox n'a pas encore été ouverte dans le navigateur).
   const res = await vintedApiCall(account, `/api/v2/inbox?page=${page}&per_page=20`);
   if (!res.ok) return { ok: false, error: res.status || res.error, items: [], pagination: null, raw: res };
@@ -3667,13 +4067,77 @@ let __vmrExtReady = false, __vmrExtVersion = '';
 // la détection est asynchrone, un composant déjà affiché doit se redessiner.
 const __vmrExtSubs = new Set();
 const onVmrExt = (fn) => { __vmrExtSubs.add(fn); return () => __vmrExtSubs.delete(fn); };
+// ══ COMBIEN D'EXTENSIONS VRM RÉPONDENT DANS CETTE PAGE ? (5.165) ═══════════
+// Mesuré le 9 octobre (Chromium réel, vraies extensions) : avec une 5.143 ou une
+// 5.77 restée installée À CÔTÉ de la 5.164, CHAQUE commande et CHAQUE envoi de
+// l'app étaient exécutés par LES DEUX (« cmd:bordereau ×2 », « exec …/replies
+// ×2 ») — deux files « une requête à la fois », deux budgets de 20 actions/h,
+// une réponse à un acheteur envoyée deux fois (§3). Et l'app affichait la
+// version du DERNIER « ready » reçu : « mets l'extension à jour » à quelqu'un
+// qui venait de le faire. Rien ne le disait.
+// ⇒ On le MESURE, sans deviner : on pose la question (« ping ») et on compte les
+//   ponts VIVANTS qui répondent à CETTE question. Un pont orphelin depuis la
+//   5.129 se tait ; un pont plus ancien encore orphelin répond aussi — d'où le
+//   geste « recharge cette page » dans la phrase. Deux réponses de la même
+//   extension (même identifiant, ou même version sans identifiant) ne comptent
+//   qu'une fois : jamais deux pour une. Depuis la 5.165 le pont joint
+//   l'IDENTIFIANT de son extension (deux copies de la même version se
+//   distinguent alors aussi).
+// La version retenue est la plus HAUTE vue au dernier tour — jamais « la
+// dernière arrivée », qui changeait d'un rechargement à l'autre.
+const cleDuPont = (d) => (d && d.id ? 'id:' + String(d.id) : 'v:' + String((d && d.version) || ''));
+let __vmrTour = null, __vmrToursFaits = 0;
+const __vmrAttenteTour = [];
+// Avant le PREMIER compte, on ne sait pas s'il y en a une ou deux : une commande,
+// un envoi ou une session attendent ce premier compte (au plus 2,5 s) — sinon
+// la relecture des ventes partait vers les deux avant même qu'on ait compté
+// (vu au banc). Ensuite on décide sur le dernier compte, sans attendre.
+function sondageConnu(maxMs = 2500) {
+  if (typeof window === 'undefined' || !__vmrExtReady || __vmrToursFaits > 0) return Promise.resolve();
+  return new Promise((res) => {
+    const t = setTimeout(res, maxMs);
+    __vmrAttenteTour.push(() => { clearTimeout(t); res(); });
+    sonderPonts();
+  });
+}
+// La phrase (une seule, §11) : ce qui se passe, ce que l'app fait, le geste.
+// Les versions sont celles qui ONT RÉPONDU — jamais devinées.
+function textePlusieurs() {
+  const v = (__vmrPlusieurs || []).filter((x) => x && x !== '?');
+  const geste = v.length >= 2
+    ? `supprime l'ancienne et garde la ${v[v.length - 1]}`
+    : "n'en garde qu'une (la plus récente)";
+  return `Deux extensions VRM répondent dans ce Chrome${v.length >= 2 ? ` (${v.slice(0, -1).join(', ')} et ${v[v.length - 1]})` : ''} : chaque commande partirait deux fois, alors je n'en envoie aucune. Dans chrome://extensions, ${geste}, puis recharge cette page (si tu viens de la retirer, recharger suffit).`;
+}
+function sonderPonts(dureeMs = 1500) {
+  if (typeof window === 'undefined' || !__vmrExtReady || __vmrTour) return;
+  const tour = { t0: Date.now(), ponts: new Map() };
+  __vmrTour = tour;
+  try { window.postMessage({ __vmr: 'ping' }, '*'); } catch (_) {}
+  setTimeout(() => {
+    if (__vmrTour === tour) __vmrTour = null;
+    __vmrToursFaits++;
+    __vmrAttenteTour.splice(0).forEach((f) => { try { f(); } catch (_) {} });
+    if (!tour.ponts.size) return;                       // personne n'a répondu : pas de conclusion
+    const versions = [...new Set([...tour.ponts.values()].filter(Boolean))].sort(cmpVersion);
+    if (versions.length) __vmrExtVersion = versions[versions.length - 1];
+    const avant = JSON.stringify(__vmrPlusieurs);
+    __vmrPlusieurs = tour.ponts.size >= 2 ? (versions.length ? versions : ['?']) : null;
+    if (JSON.stringify(__vmrPlusieurs) !== avant) __vmrExtSubs.forEach(fn => { try { fn(); } catch (_) {} });
+  }, dureeMs);
+}
 if (typeof window !== 'undefined') {
   try {
     window.addEventListener('message', (e) => {
       if (e.source !== window || !e.data || e.data.__vmr !== 'ready') return;
+      const premier = !__vmrExtReady;
       __vmrExtReady = true;
-      if (e.data.version) __vmrExtVersion = String(e.data.version);
+      if (__vmrTour) __vmrTour.ponts.set(cleDuPont(e.data), e.data.version ? String(e.data.version) : '');
+      else if (e.data.version && (!__vmrExtVersion || cmpVersion(String(e.data.version), __vmrExtVersion) > 0 || !__vmrPlusieurs)) __vmrExtVersion = String(e.data.version);
       __vmrExtSubs.forEach(fn => { try { fn(); } catch (_) {} });
+      // Le premier « ready » : on compte tout de suite (un second pont répond
+      // à la même question dans la seconde).
+      if (premier) setTimeout(() => sonderPonts(), 50);
     });
     window.postMessage({ __vmr: 'ping' }, '*');
     // ⚠️ L'extension injecte bridge.js à `document_idle` : un seul ping au
@@ -3757,9 +4221,13 @@ function vmrPdfLbc(url, timeoutMs = 15000) {
   });
 }
 
-function vmrExec({ uid, method, endpoint, body }, timeoutMs = 15000) {
+function vmrExec(q, timeoutMs = 15000) { return sondageConnu().then(() => vmrExecUn(q, timeoutMs)); }
+function vmrExecUn({ uid, method, endpoint, body }, timeoutMs = 15000) {
   return new Promise((resolve) => {
     if (typeof window === 'undefined') { resolve({ ok: false, error: 'no window' }); return; }
+    // 5.165 : deux extensions répondent ⇒ une réponse à un acheteur partirait
+    //    DEUX fois (mesuré : « exec …/replies ×2 »). Rien ne part.
+    if (__vmrPlusieurs) { resolve({ ok: false, error: textePlusieurs(), code: 'plusieurs' }); return; }
     const reqId = 'r' + Date.now() + '_' + Math.random().toString(36).slice(2);
     let dernier = null;
     const cleanup = () => { clearTimeout(to); window.removeEventListener('message', onMsg); };
@@ -3811,11 +4279,17 @@ const VMR_GRACE_VIDE_MS = 1500;
 //    vivant la lance ferait réessayer — un bordereau demandé deux fois. Pour
 //    elle, une réponse vide attend l'échéance (revue du 5 octobre).
 function vmrDemande(type, payload, timeoutMs) {
+  return (type === 'cmd' ? sondageConnu() : Promise.resolve()).then(() => vmrDemandeUn(type, payload, timeoutMs));
+}
+function vmrDemandeUn(type, payload, timeoutMs) {
   return new Promise((resolve) => {
     if (typeof window === 'undefined' || !__vmrExtReady) { resolve(null); return; }
     const reqId = 'q' + Date.now() + '_' + Math.random().toString(36).slice(2);
     let done = false, grace = null, to = null;
     const agit = type === 'cmd';
+    // 5.165 : deux extensions répondent ⇒ une commande serait exécutée DEUX fois
+    //    (mesuré : « cmd:bordereau ×2 »). On n'en envoie aucune, et on le dit.
+    if (agit && __vmrPlusieurs) { resolve({ accepte: false, code: 'plusieurs', raison: textePlusieurs() }); return; }
     const fin = (v) => { if (done) return; done = true; clearTimeout(grace); clearTimeout(to); window.removeEventListener('message', onMsg); resolve(v); };
     const onMsg = (e) => {
       if (e.source !== window || !e.data || e.data.__vmr !== type + ':result' || e.data.reqId !== reqId) return;
@@ -3843,7 +4317,9 @@ let __vmrBattementEnVol = false, __vmrRelance = null;
 const pontSaitRepondreEtat = () => { const v = vmrExtVersion(); return !!v && cmpVersion(v, EXT_CAPACITES.commande) >= 0; };
 async function battementExt() {
   if (typeof document !== 'undefined' && document.hidden) return;
-  if (!__vmrExtReady || __vmrBattementEnVol) return;
+  if (!__vmrExtReady) return;
+  sonderPonts();                         // 5.165 : combien d'extensions répondent (voir plus haut)
+  if (__vmrBattementEnVol) return;
   if (!pontSaitRepondreEtat()) { legacySessionExtension(); return; }
   __vmrBattementEnVol = true;
   let r = null;
@@ -3876,6 +4352,9 @@ const enVolSession = (v) => { __sessExtEnVol = v; __vmrNotifier(); };   // l'ind
 const cleSeparee = (uid) => 'vrm_ext_separee_' + uid;
 async function assurerSessionExtension() {
   if (!MULTI_USER || typeof window === 'undefined') return;
+  // 5.165 : deux extensions adopteraient la MÊME session et se la tueraient.
+  await sondageConnu();
+  if (__vmrPlusieurs) return;
   const s = AUTH.session, u = AUTH.user;
   if (!s || !s.access_token || !u || !u.id) return;
   const e = __vmrEtat;
@@ -3932,6 +4411,7 @@ async function assurerSessionExtension() {
 let __legacyPoste = 0;
 function legacySessionExtension() {
   if (!MULTI_USER || !AUTH.session || !AUTH.user) return;
+  if (!__vmrToursFaits || __vmrPlusieurs) return;   // 5.165 : pas avant d'avoir compté, jamais à deux
   if (Date.now() - __legacyPoste < 30 * 60000) return;
   __legacyPoste = Date.now();
   posterSessionExtension(sessionAppPourExtension());
@@ -3943,7 +4423,11 @@ if (typeof window !== 'undefined') {
       // Un pont qui (ré)apparaît — premier chargement, ou remis à neuf après une
       // mise à jour de l'extension : on lui redemande son état tout de suite,
       // y compris si on l'avait cru muette.
-      if (e.data.__vmr === 'ready') { if (__vmrEtat === undefined || __vmrEtat === null) { __vmrRates = 0; setTimeout(battementExt, 30); } return; }
+      // ⚠️ 5.165 : un « ready » qui RÉPOND à notre propre compte des ponts
+      //    (`sonderPonts`, à chaque battement) n'est pas un pont qui apparaît —
+      //    sinon chaque battement remettait les ratés à zéro, et une extension
+      //    muette n'était plus jamais dite muette (vu au banc `pont.cjs`).
+      if (e.data.__vmr === 'ready') { if (!__vmrTour && (__vmrEtat === undefined || __vmrEtat === null)) { __vmrRates = 0; setTimeout(battementExt, 30); } return; }
       if (e.data.__vmr !== 'evt' || !e.data.evt) return;
       const ev = e.data.evt;
       if (ev.type === 'cmd' && ev.jobId) { __vmrJobs[ev.jobId] = ev; __vmrNotifier(); }
@@ -3955,6 +4439,33 @@ if (typeof window !== 'undefined') {
     document.addEventListener('visibilitychange', () => { if (!document.hidden) battementExt(); });
   } catch (_) {}
 }
+// LE COMPTE VINTED OUVERT DANS CE CHROME, tel que l'extension le lit dans son
+// cookie — réponse `etat` du pont, relue toutes les 20 s et au retour sur
+// l'onglet. ⚠️ C'est la SEULE réponse du pont qui le porte : `authEtat` ne parle
+// que de la session VRM de l'extension (mesuré le 9 octobre dans background.js,
+// de la 5.116 à la 5.163). Une seule lecture pour la pastille « Actions
+// possibles · {compte} » et le compte mis en avant d'office (§11).
+// TROIS états : `{uid, login}` · `null` aucun compte ouvert · `undefined` pas su
+// (extension pas encore interrogée, muette, ou cookie pas lu à temps).
+function vintedDeChrome() {
+  const e = __vmrEtat;
+  if (!e || !e.ok || e.vintedPasSu) return undefined;
+  return e.vinted && e.vinted.uid ? { uid: String(e.vinted.uid), login: String(e.vinted.login || '') } : null;
+}
+// Le compte EFFECTIF des onglets d'une plateforme : son choix, sinon le compte
+// ouvert dans Chrome, sinon « tous » (''). '*' = « Tous les comptes » choisi
+// exprès. ⚠️ Un compte qu'on ne peut pas montrer (exclu par son choix, retiré
+// de l'app) n'est JAMAIS retenu : choisi, il floutait toutes les lignes, ses
+// propres lignes étant déjà retirées — un écran entièrement flou, sans un mot.
+// `estChoisissable(uid)` dit lesquels le sont. Une règle pour la liste
+// déroulante (coque) et le flou des écrans (Comptabilite) — §11.
+const compteEffectif = (sel, connecte, estChoisissable) => {
+  const s = String(sel || '');
+  if (s === '*') return '';
+  if (s && estChoisissable(s)) return s;
+  const c = String(connecte || '');
+  return c && estChoisissable(c) ? c : '';
+};
 // Ce qui empêche l'app de faire agir l'extension, au niveau de l'EXTENSION (pas
 // du compte) : la même raison pour toutes les ventes, donc dite UNE fois au
 // lieu d'être répétée sur chaque ligne (§7). `null` = rien ne bloque ici.
@@ -3965,6 +4476,9 @@ function raisonExtGlobale(sansSouris, opt) {
   const role = (opt && opt.role) || 'génère les bordereaux';
   if (sansSouris) return { code: 'telephone', texte: `Depuis ton ordinateur : c'est là que tourne l'extension qui ${role}.` };
   if (!vmrExtPresent()) return { code: 'absente', texte: `Extension VRM pas détectée dans ce navigateur — c'est elle qui ${role}.` };
+  // ⚠️⚠️ PLUSIEURS AVANT TOUT LE RESTE (5.165) : « mets à jour » ou « recharge »
+  //    seraient faux — il vient de mettre à jour, et l'ancienne répond encore.
+  if (__vmrPlusieurs) return { code: 'plusieurs', geste: 'extensions', texte: textePlusieurs() };
   // ⚠️ « En retard » AVANT « muette » : un pont trop ancien ne sait pas
   //    répondre, et lui dire « recharge la page » ne change rien (revue).
   if (extSait(cap) === 'retard') return { code: 'retard', texte: `Mets l'extension à jour (${EXT_ATTENDUE}) : celle installée ne sait pas encore recevoir cette commande de l'app.` };
@@ -3992,6 +4506,18 @@ function raisonExtGlobale(sansSouris, opt) {
   if (autre) return { code: 'autre-vrm', texte: __sessExtEnVol
     ? `L'extension écrivait dans le compte VRM ${sonMail || 'd’un autre'} — je la reconnecte au tien…`
     : `L'extension est connectée au compte VRM ${sonMail || 'd’un autre'}, pas au tien (${monMail}) — je la reconnecte au tien ; si ça persiste, recharge cette page.` };
+  // ⚠️⚠️ VINTED A DEMANDÉ DE RALENTIR (revue du 9 octobre). Pendant la pause de
+  //    l'extension (5.162), l'en-tête disait « Actions possibles » et « Tout
+  //    générer » restait actif : seul le clic révélait le refus. L'extension
+  //    dit maintenant sa pause dans son état (`pause.jusqua`) ; une plus
+  //    ancienne ne la dit pas — alors on ne l'invente pas, c'est le refus au
+  //    clic qui la dira (avec sa raison). Publier sur Leboncoin ne va pas chez
+  //    Vinted : la pause ne le bloque pas.
+  const pauseMs = Number((__vmrEtat.pause && __vmrEtat.pause.jusqua) || 0) - Date.now();
+  if (cap !== 'publication' && pauseMs > 0) {
+    const min = Math.max(1, Math.ceil(pauseMs / 60000));
+    return { code: 'pause', texte: `Vinted a demandé de ralentir : l'extension n'envoie rien chez Vinted pendant encore ${min} min (c'est elle qui protège tes comptes). Rien à faire de ton côté.` };
+  }
   return null;
 }
 
@@ -4117,18 +4643,30 @@ const fetchVintedListings = async (account, page = 1, opts = {}) => {
     // dire « rien capté », pas « plus rien en ligne » — et l'app le prenait pour
     // argent comptant : d'où les bandeaux « compte muet » et « annonces
     // disparues » alors que les annonces étaient bien en ligne.
-    if (h && Array.isArray(h.items) && h.items.length > 0) {
+    // ⚠️ 5.165 — SAUF un dressing VIDÉ pour de vrai : supprimées depuis (la règle
+    //    ci-dessus les a retirées), ou lu en entier par l'extension et vide
+    //    (`total_entries: 0`). Ce vide-là EST une réponse ; sans ça, l'app
+    //    repartait demander le dressing au relais du serveur.
+    const videDit = !!(h && Array.isArray(h.items) && ((h._vrmSupprimees || []).length
+      || (h.pagination && h.pagination.total_entries !== '' && h.pagination.total_entries != null && Number(h.pagination.total_entries) === 0)));
+    if (h && Array.isArray(h.items) && (h.items.length > 0 || videDit)) {
       // ⚠️ On remonte AUSSI les annonces que Vinted a fermées en disant « vendue ».
       //    Elles sortent des « en ligne » (c'est leur place), mais leur IDENTIFIANT
       //    est la seule preuve sans ressemblance qu'une paire numérotée est bien
       //    partie. Calculé sur des données déjà en mémoire : 0 requête, 0 octet.
       return { ok: true, items: h.items.filter(isOnlineListing).map(mapWardrobeItem),
                soldIds: h.items.filter(venduChezVinted).map(x => String(x.id)),
+               // Les cartes RETIRÉES de l'écran — pas les annonces en pause ou en
+               // brouillon qu'il a supprimées aussi (elles n'étaient pas affichées).
+               supprimees: (h._vrmRetirees || []).filter(isOnlineListing).length,
                pagination: h.pagination || null, source: 'harvest' };
     }
   }
   // Mode "moisson seulement" : aucun appel Vinted.
   if (opts.harvestOnly) return { ok: true, items: [], pagination: null, source: 'harvest' };
+  // `moissonSeule` (revue 5.165) : relecture sur SIGNAL de l'extension — voir
+  // `fetchVintedOrders`. Ligne absente ou illisible ⇒ on garde ce qu'on montrait.
+  if (opts.moissonSeule) return { ok: false, error: 'moisson-absente', items: [], pagination: null, source: 'moisson-absente' };
   // 2) Repli : proxy. La penderie utilise l'ID DE PROFIL (celui du /member/…),
   //    différent du vinted_user_id (account_id du token) — sinon 0 annonce.
   let profileId = account._vintedProfileId;
@@ -4230,6 +4768,226 @@ const numsPresents = () => {
   const l = Array.isArray(p) ? p : (p && Array.isArray(p.nums) ? p.nums : null);
   return l && l.length ? new Set(l.map(cleNum)) : null;
 };
+
+// ── LA REMISE À ZÉRO DU 9 OCTOBRE : LES ANCIENS NUMÉROS SONT EN « B » ─────────
+// Julien : « tous les anciens numéros, tu les fais commencer par B1, B2… ; on
+// commence à partir de zéro à partir du moment où je recommence à reposter ».
+// La conversion est faite UNE fois par le serveur (migration 013), qui pose dans
+// `main` un MARQUEUR `vrm_numerotation` = { version, coupure, archive: 'B', … }.
+// Le marqueur appartient au SERVEUR : un navigateur ne peut ni le poser ni le
+// changer (le garde-fou de la base le recopie). L'app le LIT, c'est tout (§11 :
+// la série d'archive vient de là, jamais d'un « B » écrit en dur).
+//   • `archive` : la lettre des anciens numéros, '' tant qu'aucune coupure (ou
+//     après un retour arrière, `annule`) ;
+//   • `version` : monte à chaque coupure ou retour arrière. Un écran qui a lu une
+//     autre version que celle de la base affiche des numéros FAUX : il se recharge.
+const marqueurNumerotation = () => { const m = load('vrm_numerotation', null); return m && typeof m === 'object' && !Array.isArray(m) ? m : null; };
+const archiveNumeros = () => { const m = marqueurNumerotation(); const a = m && !m.annule ? String(m.archive || '') : ''; return /^[A-Z]{1,3}$/.test(a) ? a : ''; };
+const coupureNumerotation = () => { const m = marqueurNumerotation(); const t = m && !m.annule ? Date.parse(m.coupure || '') : NaN; return isNaN(t) ? null : t; };
+const versionNumerotation = () => { const m = marqueurNumerotation(); const v = m ? Number(m.version) : NaN; return isFinite(v) ? v : null; };
+// Un ancien numéro (« B230 », ou un lot « B12+B13 ») : de la série d'archive.
+const estArchive = (num, arch = archiveNumeros()) => !!arch && new RegExp('^' + arch + '\\d+(\\+' + arch + '\\d+)*$').test(cleNum(num));
+// Une vente faite APRÈS la coupure (date illisible ⇒ « après » : c'est le sens
+// sûr, une nouvelle paire ne reçoit jamais un ancien numéro par une photo).
+const venteApresCoupure = (o) => { const c = coupureNumerotation(); if (c == null) return false; const t = Date.parse((o && o.date) || ''); return !(t > 0) || t >= c; };
+// Julien, 10 octobre : « les anciens, c'est que les paires vendues : je vais
+// tout republier, c'est pour ça que je veux de nouveaux numéros ». Donc :
+//   • une annonce reçoit un numéro AUTOMATIQUEMENT seulement si Vinted la date
+//     d'après la coupure (`createdTs` : la date que l'app affiche déjà, lue par
+//     IDENTITÉ de l'annonce). Plus ancienne, ou sans date : pas de numéro tout
+//     seul — c'est une annonce d'avant qu'il n'a pas republiée ;
+//   • un numéro d'ARCHIVE (B230) ne se redonne JAMAIS automatiquement : ni par
+//     une vente, ni par une photo, ni par un dossier de photo, ni par la
+//     bannière ♻️. Une paire republiée prend un numéro NEUF, même si c'est
+//     physiquement la paire qui avait le 230 : il réétiquette le carton.
+// La date de mise en ligne, par les MÊMES sources que la migration 013, dans le
+// même ordre (§11) : la date Vinted de l'annonce (`createdTs` : `created_at_ts`,
+// sinon l'heure de dépôt de sa photo), puis la date « Ajouté il y a… » lue sur
+// la page (`vinted_listing_dates`). Sinon `null` : on ne sait pas.
+const dateMiseEnLigneMs = (it, dates) => {
+  const ms = (v) => { const n = Number(v); return v != null && isFinite(n) && n > 0 ? (n < 1e12 ? n * 1000 : n) : null; };
+  const t = ms(it && it.createdTs); if (t != null) return t;
+  const d = dates && it ? dates[String(it.id)] : null;
+  return d ? ms(d.ts) : null;
+};
+// Avant toute remise à zéro (aucune coupure) : tout se numérote, comme avant.
+// Après : seulement une annonce DATÉE d'après la coupure. Sans date lisible, pas
+// de numéro tout seul — elle reste comptée « sans N° » sur l'écran Annonces.
+const annonceNumerotable = (it, dates, coupure = coupureNumerotation()) => { if (coupure == null) return true; const t = dateMiseEnLigneMs(it, dates); return t != null && t >= coupure; };
+const numeroReprenable = (num, arch = archiveNumeros()) => { const n = String(num == null ? '' : num).trim(); return n && !estArchive(n, arch) ? n : null; };
+// Le N° lu dans un EMAIL de bordereau (le serveur le tire du « nXXX » du titre,
+// ou d'une fiche au même titre) : après la remise à zéro, ce n'est qu'une
+// ressemblance qui peut porter l'ANCIEN numéro (une paire republiée sous le
+// même titre « … n230 »). Pour un email arrivé APRÈS la conversion, on ne
+// l'admet que s'il désigne une fiche ACTUELLE de la nouvelle série portant le
+// MÊME titre ; un numéro d'archive, jamais. La même règle que le serveur
+// (`numeroDuTitreApresCoupure`, api/email-inbound.js). Avant toute remise à
+// zéro, ou pour un email d'avant la conversion (l'histoire) : admis, comme avant.
+const numeroEmailAdmis = (b, fiches) => {
+  const m = marqueurNumerotation(); const arch = archiveNumeros();
+  if (!m || !arch) return true;
+  const depuis = Date.parse(m.appliqueLe || m.coupure || '');
+  const t = Date.parse((b && b.receivedAt) || '');
+  if (isFinite(depuis) && isFinite(t) && t < depuis) return true;
+  const k = cleNum(b && b.numero);
+  if (!k || !numeroReprenable(k, arch)) return false;
+  const titre = normTitle((b && (b.article || b.modele)) || '');
+  if (!titre) return false;
+  return Object.values(fiches || {}).some((e) => e && cleNum(e.numero) === k && normTitle(e.title) === titre);
+};
+
+// La VERSION de la base est relue (une lecture scalaire, §4.4) toutes les 60 s,
+// au retour au premier plan, et avant de numéroter ou d'imprimer. Trois états,
+// jamais deux : 'ok' (relue, identique) · 'perime' (la base a changé de version
+// depuis le chargement de cet écran) · 'passu' (la base n'a pas répondu).
+let _verNum = { etat: 'attente', at: 0, nuage: null };
+let _verNumListeners = [];
+const onVersionNumerotation = (fn) => { _verNumListeners.push(fn); return () => { _verNumListeners = _verNumListeners.filter(f => f !== fn); }; };
+const _emitVerNum = (patch) => { _verNum = { ..._verNum, ...patch }; _verNumListeners.forEach(fn => { try { fn(_verNum); } catch (_) {} }); };
+const etatVersionNumerotation = () => _verNum;
+// Lue en même temps que la ligne entière au chargement : c'est une vraie lecture.
+const noterVersionChargee = () => _emitVerNum({ etat: 'ok', at: Date.now(), nuage: versionNumerotation() });
+let _verNumEnVol = null;
+const verifierVersionNumerotation = () => {
+  if (_verNumEnVol) return _verNumEnVol;
+  _verNumEnVol = (async () => {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${SUPABASE_ROW}&select=v:data->vrm_numerotation->>version`, { headers: sbAuth() });
+      if (!r.ok) throw new Error('http ' + r.status);
+      const rows = await r.json();
+      if (!Array.isArray(rows)) throw new Error('forme');
+      const v = rows[0] && rows[0].v != null && String(rows[0].v) !== '' ? Number(rows[0].v) : null;
+      // « Périmé » est définitif pour cet écran : seul un rechargement le lève.
+      if (_verNum.etat === 'perime') _emitVerNum({ at: Date.now(), nuage: v });
+      else _emitVerNum({ etat: v === versionNumerotation() ? 'ok' : 'perime', at: Date.now(), nuage: v });
+    } catch (_) {
+      if (_verNum.etat !== 'perime') _emitVerNum({ etat: 'passu' });
+    }
+    _verNumEnVol = null;
+    return _verNum;
+  })();
+  return _verNumEnVol;
+};
+// Peut-on NUMÉROTER maintenant ? Seulement sur une version relue il y a moins
+// de 3 minutes et identique. Sinon on relit (l'effet repassera tout seul).
+const VERSION_FRAICHE_MS = 3 * 60 * 1000;
+const numerotationPermise = () => {
+  if (!isCloudReady()) return false;
+  const e = _verNum;
+  if (e.etat === 'ok' && Date.now() - e.at < VERSION_FRAICHE_MS) return true;
+  if (e.etat !== 'perime') verifierVersionNumerotation();
+  return false;
+};
+// Avant d'IMPRIMER (le N° est tamponné sur le bordereau) : on relit si la
+// dernière lecture date de plus d'une minute. Rend true si on peut imprimer.
+// ⚠️ Un écran chargé AVANT la remise à zéro n'a pas de marqueur du tout : la
+// vérification ne dépend donc pas du marqueur local, c'est la VERSION de la base
+// qui tranche. Périmée ⇒ on ne tamponne pas (le bloc « Recharger » s'ouvre).
+// Pas su (la base n'a pas répondu) ⇒ on tamponne : les octets du PDF viennent de
+// la même base, et le bloc s'ouvrira dès qu'elle répondra.
+const assurerVersionNumerotation = async () => {
+  if (_verNum.etat !== 'ok' || Date.now() - _verNum.at > 60 * 1000) await verifierVersionNumerotation();
+  if (_verNum.etat === 'perime') { signalerNumerosPerimes('version'); return false; }
+  return true;
+};
+const NUMEROS_PERIMES_IMPRESSION = "Cet écran a été ouvert avant la remise à zéro de tes numéros : recharge-le avant d'imprimer (aucun N° n'a été tamponné).";
+onVersionNumerotation((e) => { if (e.etat === 'ok') _verNum.okAt = e.at; });
+
+// Un REFUS de la base (garde-fou de la migration 013) : l'écran a été chargé
+// avant une remise à zéro, ou un autre appareil a donné des numéros depuis.
+// Le code du refus voyage jusqu'au bloc de la coque (`BlocNumerosPerimes`).
+let _numPerimes = null;
+let _numPerimesListeners = [];
+const onNumerosPerimes = (fn) => { _numPerimesListeners.push(fn); return () => { _numPerimesListeners = _numPerimesListeners.filter(f => f !== fn); }; };
+const etatNumerosPerimes = () => _numPerimes;
+const signalerNumerosPerimes = (code) => {
+  if (_numPerimes) return;
+  _numPerimes = { code: String(code || 'version'), at: Date.now() };
+  if (_verNum.etat !== 'perime' && code !== 'vrm_prefixe_archive') _emitVerNum({ etat: 'perime' });
+  _numPerimesListeners.forEach(fn => { try { fn(_numPerimes); } catch (_) {} });
+};
+const codeRefusNumeros = (txt) => { const m = /vrm_(pool_retreci|numeros_perimes|fiche_perdue|garage_perime|prefixe_archive)/.exec(String(txt || '')); return m ? m[0] : null; };
+
+// LES SAISIES D'UN ÉCRAN PÉRIMÉ NE SE PERDENT PAS. Quand la base refuse un écran
+// chargé avant (ou qu'un autre appareil a numéroté depuis), on recharge — mais
+// ce qu'il a tapé ici (un prix d'achat, un colis coché…) est d'abord mis de
+// côté, par IDENTIFIANT d'annonce ou de vente (jamais par numéro), puis rejoué
+// sur la ligne fraîche. Les NUMÉROS, eux, ne sont jamais rejoués : ceux de cet
+// écran étaient faux.
+let _instantaneCharge = null;
+const noterInstantaneCharge = (cloud) => { try { _instantaneCharge = JSON.parse(JSON.stringify(cloud || {})); } catch (_) { _instantaneCharge = null; } };
+const CHAMPS_NUMERO_FICHE = ['numero', 'auto', 'numberedAt', 'manuelAt', 'repriseAt', 'repriseDe', 'title', 'photo', 'photoK', 'price', 'accountId', 'etiquetteAt'];
+const CHAMPS_NUMERO_VENTE = ['numero', 'autoAssigned', 'autoShip', 'manuelAt'];
+// Les clés « gestes » rejouées telles quelles (objets fusionnés, listes unies).
+const CLES_GESTES = ['vinted_ship_done', 'vinted_bords_printed', 'vinted_bords_hidden', 'vinted_bords_shipped', 'vinted_pickup_done',
+  'vinted_offers_done', 'vinted_sales_hidden', 'vinted_purchases_hidden', 'vinted_annonces_vendues', 'vinted_retours_recus',
+  'vinted_retours_dismissed', 'vrm_colis_collected', 'vrm_colis_collected_at', 'vinted_achat_notes', 'vrm_urssaf_declare', 'vrm_lbc_colis_done'];
+const SAISIES_A_REJOUER = 'vrm_saisies_a_rejouer';
+const memoriserSaisies = () => {
+  const avant = _instantaneCharge; if (!avant) return 0;
+  const egal = (a, b) => JSON.stringify(a == null ? null : a) === JSON.stringify(b == null ? null : b);
+  const out = { fiches: {}, ventes: {}, gestes: {}, at: Date.now() };
+  let n = 0;
+  const diffCarte = (cle, exclus, dest) => {
+    const loc = load(cle, {}) || {}, av = (avant[cle] && typeof avant[cle] === 'object') ? avant[cle] : {};
+    for (const id in loc) {
+      const e = loc[id]; if (!e || typeof e !== 'object') continue;
+      const p = {};
+      for (const k in e) { if (exclus.includes(k)) continue; if (!egal(e[k], (av[id] || {})[k])) p[k] = e[k]; }
+      if (Object.keys(p).length) { dest[id] = p; n++; }
+    }
+  };
+  diffCarte('vinted_annonce_numeros', CHAMPS_NUMERO_FICHE, out.fiches);
+  diffCarte('vinted_sale_overrides', CHAMPS_NUMERO_VENTE, out.ventes);
+  for (const k of CLES_GESTES) {
+    const loc = load(k, null); if (loc == null || egal(loc, avant[k])) continue;
+    out.gestes[k] = loc; n++;
+  }
+  if (n) { try { localStorage.setItem(SAISIES_A_REJOUER, JSON.stringify(out)); } catch (_) {} }
+  return n;
+};
+// Au chargement suivant (après que le nuage a rempli le navigateur, AVANT que
+// les écrans le relisent) : on rejoue. Rend { n, prix } ou null.
+const rejouerSaisies = () => {
+  let s = null; try { s = JSON.parse(localStorage.getItem(SAISIES_A_REJOUER) || 'null'); } catch (_) { s = null; }
+  try { localStorage.removeItem(SAISIES_A_REJOUER); } catch (_) {}
+  if (!s || typeof s !== 'object' || !(Date.now() - (s.at || 0) < 24 * 3600 * 1000)) return null;
+  let n = 0, prix = 0, nonRejoue = 0;
+  const appliquer = (cle, src) => {
+    const cur = load(cle, {}) || {};
+    for (const id in (src || {})) {
+      if (!cur[id]) {
+        // Une fiche que la base ne connaît pas : on ne la recrée que SANS numéro.
+        const p = { ...src[id] }; delete p.numero;
+        if (cle === 'vinted_annonce_numeros' && Object.keys(p).length) { cur[id] = p; n++; if (p.buyPrice != null) prix++; } else nonRejoue++;
+        continue;
+      }
+      cur[id] = { ...cur[id], ...src[id] }; n++;
+      if (src[id].buyPrice != null) prix++;
+    }
+    try { localStorage.setItem(cle, JSON.stringify(cur)); } catch (_) {}
+  };
+  appliquer('vinted_annonce_numeros', s.fiches);
+  appliquer('vinted_sale_overrides', s.ventes);
+  for (const k in (s.gestes || {})) {
+    if (!CLES_GESTES.includes(k)) continue;
+    const loc = s.gestes[k], cur = load(k, null);
+    let v = loc;
+    if (Array.isArray(loc) && Array.isArray(cur)) v = [...cur, ...loc.filter(x => !cur.some(y => JSON.stringify(y) === JSON.stringify(x)))];
+    else if (loc && cur && typeof loc === 'object' && typeof cur === 'object' && !Array.isArray(loc) && !Array.isArray(cur)) v = { ...cur, ...loc };
+    try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {}
+    n++;
+  }
+  return { n, prix, nonRejoue };
+};
+const rechargerEnGardantLesSaisies = () => {
+  memoriserSaisies();
+  try { const v = _verNum.nuage; if (v != null) sessionStorage.setItem('vrm_recharge_numerotation', String(v)); } catch (_) {}
+  try { window.location.reload(); } catch (_) {}
+};
+// Les copies d'APPAREIL qui portent des numéros (jamais synchronisées) : à
+// jeter quand la version change, sinon elles parlent de l'ancienne série.
+const purgerCopiesNumeros = () => { ['vinted_nums_physiques', 'vrm_room_plan', 'vrm_local_plan'].forEach(k => { try { localStorage.removeItem(k); } catch (_) {} }); };
 // Annote un bordereau (PDF) en imprimant le NUMERO de la paire (en gros) et le
 // TITRE en bas de la premiere page, sur un bandeau blanc, puis declenche le
 // telechargement. But : ne pas se tromper de paire quand on prepare un envoi.
@@ -4603,6 +5361,7 @@ const ouvrirPdfOnglet = (url) => {
   } catch (_) { return false; }
 };
 const annotateAndDownloadBordereau = async (numero, title, pdfArrayBuffer, pos) => {
+  if (numero && !(await assurerVersionNumerotation())) throw new Error(NUMEROS_PERIMES_IMPRESSION);
   const PL = await import('pdf-lib');
   const { PDFDocument, rgb, StandardFonts } = PL;
   const pdf = await PDFDocument.load(pdfArrayBuffer);
@@ -4624,6 +5383,7 @@ const annotateAndDownloadBordereau = async (numero, title, pdfArrayBuffer, pos) 
 // [{ numero, title, pdfBuf }]. `resolvePos(w,h)` donne la position mémorisée du
 // tampon pour chaque format → le N° tombe au MÊME endroit sur tous.
 const mergeAndDownloadBordereaux = async (items, resolvePos, opts = {}) => {
+  if ((items || []).some((it) => it && it.numero) && !(await assurerVersionNumerotation())) throw new Error(NUMEROS_PERIMES_IMPRESSION);
   const PL = await import('pdf-lib');
   const { PDFDocument, rgb, StandardFonts } = PL;
   const out = await PDFDocument.create();
@@ -5457,6 +6217,109 @@ function StatBox({label,value,color=C.text,sub=null,subColor=null,onClick=null,t
       <div className="vrm-display" style={{fontSize:compact?'clamp(17px,5vw,22px)':fs,fontWeight:700,color,lineHeight:1.05,marginTop:compact?4:2,whiteSpace:'nowrap'}}>{value}</div>
       {sub && <div style={{fontSize:11.5,color:subColor||C.muted,fontWeight:subColor?600:400,marginTop:4,lineHeight:1.35}}>{sub}</div>}
     </Balise>
+  );
+}
+
+// ── CE QUE VINTED TRANSMET AUX IMPÔTS, compte par compte (6 octobre) ─────────
+// La carte du registre annuel. Elle ne calcule RIEN : elle rend
+// `seuilsVintedParCompte` (§11), et ses deux parties viennent du REGISTRE
+// (`datees` et `aDater`, calculés par lui). Ton informatif : aucun rouge, aucun ambre (§7 —
+// le rouge est pour deux paires sous un même numéro) ; un seuil atteint se dit
+// par le MOT, en gras. Les nombres sont portés en `data-*` pour le banc.
+// ⚠️ §7 : une cause, une phrase. La panne, la lecture en cours et l'estimation
+//    des ventes pas encore datées se disent UNE fois au-dessus des lignes ; la
+//    ligne d'un compte pas lu ne porte qu'un « — ».
+// ⚠️ « Relire mes ventes » RELIT pour de vrai (`onRelire` vide le cache et
+//    relance la lecture) : « rouvre l'écran Ventes » rouvrait le CACHE, qui
+//    gardait l'échec — ou, avant la revue, le transformait en « 0 vente ».
+function CarteSeuilsVinted({ annee, echoues, comptes, ecarte, nomDe, datees, aDater, onRelire }) {
+  const [relit, setRelit] = useState(false);
+  const tous = Array.isArray(comptes) ? comptes : [];
+  const ko = new Set((Array.isArray(echoues) ? echoues : []).map(String));
+  const R = seuilsVintedParCompte({ comptes: tous.map(a => ({ uid: a.vinted_user_id, nom: nomDe(a) })), ecarte, echoues: ko, datees, aDater, annee });
+  const lignes = R.comptes;
+  if (!lignes.length) return null;
+  const nExclus = tous.filter(a => ecarte && ecarte(String(a.vinted_user_id))).length;
+  const eur = (v) => Number(v).toFixed(2).replace('.', ',') + ' €';
+  const pl = (n, mot) => `${n} ${mot}${n > 1 ? 's' : ''}`;
+  const seuilEur = String(SEUIL_VINTED_EUR).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' €';
+  const nomsDe = (uids) => uids.map(u => (lignes.find(r => r.uid === u) || {}).nom || u).join(', ');
+  const avecTotal = lignes.length > 1;
+  const verdictTxt = (r, ses) => {
+    if (r.verdict === 'atteint') {
+      const parN = r.n >= SEUIL_VINTED_VENTES, parE = r.cts > SEUIL_VINTED_EUR * 100;
+      return `Seuil atteint : ${parN && parE ? `${SEUIL_VINTED_VENTES} ventes et plus de ${seuilEur}` : parN ? `${SEUIL_VINTED_VENTES} ventes` : `plus de ${seuilEur}`}.`;
+    }
+    if (r.verdict === 'atteintSi') return `Seuil atteint si ${r.nAd > 1 ? `${ses} ${r.nAd} ventes pas encore datées comptent` : `${ses === 'ses' ? 'sa' : 'la'} vente pas encore datée compte`} en ${annee} (${eur(r.eurAd)}).`;
+    if (r.verdict === 'sous') return R.aCeJour ? `Sous les seuils à ce jour : encore ${pl(r.reste.n, 'vente')} ou ${eur(r.reste.cts / 100)} avant le seuil.` : 'Sous les seuils.';
+    return '';
+  };
+  const aDaterTxt = (r) => (r.etat === 'lu' && r.nAd > 0 && r.verdict !== 'atteintSi') ? `+ ${pl(r.nAd, 'vente')} pas encore datée${r.nAd > 1 ? 's' : ''} (${eur(r.eurAd)})` : '';
+  const pasLus = lignes.filter(r => r.etat === 'pasSu');
+  const parVersements = pasLus.some(r => r.raison === 'versements');
+  const ventesKO = pasLus.filter(r => r.raison === 'ventes');
+  const enCours = lignes.some(r => r.etat === 'enCours');
+  const estimation = lignes.some(r => r.etat === 'lu' && r.nAd > 0);
+  const relire = async () => { if (relit || !onRelire) return; setRelit(true); try { await onRelire(); } catch (_) {} setRelit(false); };
+  const ligne = (r, { total } = {}) => {
+    const lu = r.etat === 'lu';
+    const sous = lu ? verdictTxt(r, total ? 'les' : 'ses') : '';
+    const plus = aDaterTxt(r);
+    const attrs = total
+      ? { 'data-seuils-total': annee, 'data-partiel': r.partiel ? r.manquants.join(',') : '' }
+      : { 'data-seuil-compte': r.uid };
+    return (
+      <div key={total ? '_total' : r.uid} {...attrs} data-etat={r.etat} data-n={lu ? r.n : ''} data-eur={lu ? r.eur.toFixed(2) : ''} data-verdict={r.verdict || ''}
+        data-adater={lu ? r.nAd : ''} data-eur-adater={lu ? r.eurAd.toFixed(2) : ''} data-reste-n={r.reste ? r.reste.n : ''} data-reste-eur={r.reste ? (r.reste.cts / 100).toFixed(2) : ''}
+        style={{display:'flex',alignItems:'flex-start',gap:10,padding:'8px 0',borderTop:`${total ? 2 : 1}px solid ${C.border}`}}>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontSize:12.5,fontWeight:total?700:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:total?'normal':'nowrap'}}>
+            {total ? `Tous tes comptes ensemble${r.partiel ? ` · sans ${nomsDe(r.manquants)}` : ''}` : r.nom}
+          </div>
+          {sous && <div style={{fontSize:11.5,lineHeight:1.4,marginTop:2,color:r.verdict==='atteint'?C.text:C.muted,fontWeight:r.verdict==='atteint'?700:400}}>{sous}</div>}
+          {plus && <div style={{fontSize:11,color:C.muted,lineHeight:1.4,marginTop:2}}>{plus}</div>}
+        </div>
+        <div style={{flexShrink:0,textAlign:'right',whiteSpace:'nowrap'}}>
+          <div style={{fontSize:13,fontWeight:700,color:C.text}}>{lu ? `${r.partiel ? 'au moins ' : ''}${pl(r.n, 'vente')}` : '—'}</div>
+          {lu && <div style={{fontSize:11.5,color:C.muted,marginTop:2}}>{eur(r.eur)}</div>}
+        </div>
+      </div>
+    );
+  };
+  return (
+    <div data-seuils-vinted={annee} data-a-ce-jour={R.aCeJour ? '1' : '0'} style={{border:`1px solid ${C.border}`,borderRadius:10,background:C.card,padding:'10px 12px',marginBottom:12}}>
+      <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:3}}>Ce que Vinted transmet aux impôts pour {annee}{R.aCeJour ? ' — à ce jour' : ''}</div>
+      <div style={{fontSize:11.5,color:C.muted,lineHeight:1.45,marginBottom:8}}>
+        Chaque année, Vinted transmet aux impôts les vendeurs qui font au moins {SEUIL_VINTED_VENTES} ventes ou plus de {seuilEur} dans l'année (directive européenne DAC7).
+        {' '}Ici, tes ventes Vinted comptées dans ce registre{avecTotal ? <>, compte par compte puis tous ensemble : VRM ne sait pas si Vinted juge chaque compte à part ou additionne ceux d'une même personne.</> : '.'}
+      </div>
+      {estimation && (
+        <div data-seuils-estimation style={{fontSize:11,color:C.muted,lineHeight:1.45,marginBottom:8}}>
+          « Pas encore datées » : des ventes finalisées dont VRM n'a pas encore la date de versement. Elles sont rattachées à {annee} d'après leur date de vente — une estimation (Vinted verse en général dans les jours qui suivent), pas un chiffre du registre.
+        </div>
+      )}
+      {enCours && <div data-seuils-encours style={{fontSize:11.5,color:C.muted,lineHeight:1.45,marginBottom:8}}>Lecture des ventes…</div>}
+      {pasLus.length > 0 && (
+        <div data-seuils-panne style={{display:'flex',alignItems:'flex-start',gap:10,flexWrap:'wrap',fontSize:11.5,color:C.text,lineHeight:1.45,marginBottom:8}}>
+          <div style={{flex:'1 1 220px',minWidth:0}}>
+            {parVersements
+              ? "Les dates de versement de tes ventes Vinted n'ont pas pu être lues : impossible de dire où en sont tes comptes."
+              : ventesKO.length === 1
+                ? `Les ventes de ${ventesKO[0].nom} n'ont pas pu être lues : impossible de dire où en est ce compte.`
+                : `Les ventes de ${ventesKO.length} comptes (${ventesKO.map(r => r.nom).join(', ')}) n'ont pas pu être lues : impossible de dire où ils en sont.`}
+          </div>
+          {onRelire && (
+            <button type="button" data-relire-ventes onClick={relire} disabled={relit}
+              style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:relit?'default':'pointer',fontSize:12,fontWeight:600,padding:'5px 11px',maxWidth:200,opacity:relit?0.6:1}}>
+              {relit ? 'Lecture…' : 'Relire mes ventes'}
+            </button>
+          )}
+        </div>
+      )}
+      {lignes.map(r => ligne(r))}
+      {avecTotal && ligne(R.total, { total: true })}
+      {nExclus > 0 && <div style={{fontSize:11,color:C.muted,lineHeight:1.4,marginTop:4}}>Les comptes que tu as exclus de l'app ne sont pas comptés ici.</div>}
+    </div>
   );
 }
 
@@ -7170,6 +8033,43 @@ const dureePanne = () => {
   } catch (_) { return null; }
 };
 
+// ── UN ÉCRAN PÉRIMÉ NE MONTRE PLUS DE NUMÉROS (migration 013) ────────────────
+// Un écran chargé AVANT la remise à zéro (ou avant qu'un autre appareil donne
+// des numéros) affiche des numéros FAUX — « N°553 » pour une paire devenue 1 —
+// et il pourrait les tamponner sur un bordereau sans rien écrire en base. Dès
+// que la base refuse une de ses écritures, ou que sa version relue diffère de
+// celle chargée, un bloc couvre TOUT l'écran : rien ne se lit ni ne s'imprime
+// d'ici, et le seul geste est de recharger. Ce qu'il a tapé ici (prix d'achat,
+// colis cochés…) est mis de côté et rejoué après le rechargement.
+function BlocNumerosPerimes() {
+  const [refus, setRefus] = useState(() => etatNumerosPerimes());
+  const [ver, setVer] = useState(() => etatVersionNumerotation());
+  useEffect(() => onNumerosPerimes(setRefus), []);
+  useEffect(() => onVersionNumerotation((e) => setVer({ ...e })), []);
+  const perime = !!refus || ver.etat === 'perime';
+  if (!perime) return null;
+  const remise = ver.nuage != null && ver.nuage !== versionNumerotation();
+  return (
+    <div data-numeros-perimes={refus ? refus.code : 'version'} role="alertdialog" aria-modal="true"
+      style={{ position: 'fixed', inset: 0, zIndex: 100000, background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div style={{ maxWidth: 460, borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, padding: '22px 20px' }}>
+        <div style={{ fontSize: 17, fontWeight: 700, color: C.text, marginBottom: 8 }}>
+          {remise ? 'Cet écran a été ouvert avant la remise à zéro de tes numéros' : 'Un autre appareil vient de donner des numéros'}
+        </div>
+        <div style={{ fontSize: 13.5, color: C.text, lineHeight: 1.55 }}>
+          Les numéros affichés ici peuvent être <b>faux</b> : n'en écris aucun sur un carton et n'imprime rien depuis cet écran.
+          <br/><br/>
+          Recharge-le. Ce que tu as tapé ici (prix d'achat, colis cochés…) est <b>gardé</b> et remis après le rechargement.
+        </div>
+        <button type="button" onClick={rechargerEnGardantLesSaisies}
+          style={{ marginTop: 16, width: '100%', border: 'none', background: C.accent, color: '#fff', borderRadius: 10, padding: '12px', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+          Recharger
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function BaseInjoignable() {
   // ⚠️⚠️ « ÇA REVIENT TOUT SEUL » ÉTAIT FAUX LE TROISIÈME JOUR.
   // La phrase promettait une panne passagère. Le 9 septembre la base est
@@ -7352,6 +8252,13 @@ function useExtVivante() {
   return { present: vmrExtPresent(), etat: __vmrEtat, jobs: __vmrJobs };
 }
 const CMD_ACTIVE = ['file', 'generation', 'pdf'];
+// Une demande est EN COURS tant que l'extension la dit réellement dans sa file
+// (`vivant`, depuis la version qui le dit) ; sinon, comme avant, 3 minutes après
+// son dernier évènement. ⚠️ L'âge seul ne suffisait pas (revue du 9 octobre) :
+// un colis qui attendait son tour derrière cinq autres (16,5 s chacun quand le
+// PDF tarde) redevenait « Générer le bordereau » au bout de 3 min, et un second
+// clic le recommandait.
+const jobEnCours = (job) => !!(job && CMD_ACTIVE.includes(job.etape) && (job.vivant || Date.now() - Number(job.at || 0) < 180000));
 // La raison COMMUNE pour laquelle les bordereaux ne peuvent pas être générés
 // depuis l'app (extension absente, muette, en retard, mal connectée). Rien à
 // générer, ou rien qui bloque → rien du tout (pas de bandeau permanent).
@@ -7368,7 +8275,7 @@ function RaisonBordereauxGrises({ ventes }) {
       <Icon name="doc" size={15} style={{ color: C.warn, flexShrink: 0, marginTop: 2 }}/>
       <span style={{ minWidth: 0 }}>
         <b>{n} bordereau{n > 1 ? 'x' : ''} à générer</b> — {r.texte}
-        {r.geste === 'recharger' && (
+        {(r.geste === 'recharger' || r.geste === 'extensions') && (
           <> <button type="button" data-recharger="1" onClick={() => { try { window.location.reload(); } catch (_) {} }}
             style={{ marginLeft: 4, border: `1px solid ${C.accent}`, background: 'transparent', color: C.accent, borderRadius: 8, padding: '3px 9px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Recharger la page</button></>
         )}
@@ -7387,6 +8294,7 @@ function BoutonBordereau({ uid, tx, conv, login, aGenerer, pdf, onImprimer, onFa
   const { etat, jobs } = useExtVivante();
   const sansSouris = useSansSouris();
   const [refus, setRefus] = React.useState(null);
+  const [refusAt, setRefusAt] = React.useState(0);
   const [envoi, setEnvoi] = React.useState(false);
   const jobId = `bord:${uid}:${tx}`;
   const job = jobs[jobId] || null;
@@ -7408,23 +8316,30 @@ function BoutonBordereau({ uid, tx, conv, login, aGenerer, pdf, onImprimer, onFa
     if (!etat.vinted) { raison = `Connecte-toi sur vinted.fr avec ${login || 'ce compte'} dans ce Chrome.`; distingue = raison; }
     else if (String(etat.vinted.uid) !== String(uid)) { raison = `Chrome est connecté sur ${etat.vinted.login || 'un autre compte'} — bascule sur ${login || 'ce compte'} sur vinted.fr.`; distingue = raison; }
   }
-  const enCours = job && CMD_ACTIVE.includes(job.etape) && (Date.now() - Number(job.at || 0) < 180000);
+  const enCours = jobEnCours(job);
   const ko = job && (job.etape === 'echec' || job.etape === 'genere_sans_pdf');
   const lancer = async () => {
     if (raison || enCours || envoi) return;
     setRefus(null); setEnvoi(true);
     const r = await vmrCmd({ cmd: 'bordereau', uid: String(uid), tx: String(tx) });
-    setEnvoi(false);
-    if (!r) { setRefus("L'extension n'a pas répondu — recharge cette page et réessaie, ou génère-le sur Vinted (lien ci-dessous)."); __vmrRates = 1; battementExt(); return; }
+    setEnvoi(false); setRefusAt(Date.now());
+    // ⚠️ PAS DE RÉPONSE N'EST PAS UN REFUS (revue du 9 octobre) : l'extension a
+    //    pu accepter après nos 9 s et générer le bordereau chez Vinted. On dit
+    //    qu'on ne sait pas, et la ligne reprend la main dès qu'un évènement de
+    //    CE colis arrive (voir `refusVu`).
+    if (!r) { setRefus("L'extension n'a pas répondu à temps — je ne sais pas s'il est parti : si cette ligne n'avance pas d'ici une minute, recharge la page avant de réessayer, ou génère-le sur Vinted (lien ci-dessous)."); __vmrRates = 1; battementExt(); return; }
     if (!r.accepte) {
       setRefus(r.code === 'vinted-autre' ? `Chrome est connecté sur ${r.actifLogin || 'un autre compte'} — bascule sur ${login || 'ce compte'} sur vinted.fr.`
         : r.code === 'vinted-absent' ? `Connecte-toi sur vinted.fr avec ${login || 'ce compte'} dans ce Chrome.`
         : (r.raison || 'Refusé par l\'extension.'));
       return;
     }
-    __vmrJobs[r.jobId] = { etape: r.etape, at: Date.now() };
+    __vmrJobs[r.jobId] = { etape: r.etape, at: Date.now(), vivant: !!r.vivant };
     __vmrNotifier();
   };
+  // Un évènement de ce colis arrivé APRÈS le refus affiché le rend caduc : la
+  // ligne dit ce que l'extension fait vraiment.
+  const refusVu = refus && !(job && Number(job.at || 0) >= refusAt - 1000) ? refus : null;
   const libelle = envoi ? 'Envoi…'
     : enCours ? (job.etape === 'pdf' ? 'Récupération du PDF…' : job.etape === 'generation' ? 'Génération chez Vinted…' : 'En file…')
     : ko ? 'Réessayer'
@@ -7436,7 +8351,7 @@ function BoutonBordereau({ uid, tx, conv, login, aGenerer, pdf, onImprimer, onFa
   // Le repli sur Vinted, propre à CETTE vente (son adresse distingue la ligne,
   // §7) : la conversation de la vente porte le bouton « Imprimer le bordereau ».
   const surVinted = conv ? `https://www.vinted.fr/inbox/${encodeURIComponent(conv)}` : `https://www.vinted.fr/member/transactions/${encodeURIComponent(tx)}`;
-  const repliVinted = (grise && glob && glob.code !== 'verif') || !!refus;
+  const repliVinted = (grise && glob && glob.code !== 'verif') || !!refusVu;
   return (
     <span data-bouton-bord={grise ? 'grise' : enCours ? 'encours' : ko ? 'echec' : 'pret'} data-tx={tx} style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3, maxWidth: '100%' }}>
       <button type="button" onClick={lancer} aria-disabled={grise || enCours ? 'true' : undefined}
@@ -7445,9 +8360,9 @@ function BoutonBordereau({ uid, tx, conv, login, aGenerer, pdf, onImprimer, onFa
           color: grise ? C.muted : C.accent, opacity: grise ? 0.55 : 1, cursor: grise || enCours ? 'not-allowed' : 'pointer', filter: grise ? 'grayscale(1)' : 'none' }}>
         <Icon name="doc" size={grand ? 16 : 14}/>{libelle}
       </button>
-      {(distingue || refus || (ko && job.raison)) && (
-        <span style={{ fontSize: 11, color: refus || ko ? C.warn : C.muted, lineHeight: 1.35, whiteSpace: 'normal' }}>
-          {refus || (ko ? (job.etape === 'genere_sans_pdf' ? `Généré chez Vinted, mais le PDF n'est pas encore prêt (${job.raison}).` : job.raison) : distingue)}
+      {(distingue || refusVu || (ko && job.raison)) && (
+        <span style={{ fontSize: 11, color: refusVu || ko ? C.warn : C.muted, lineHeight: 1.35, whiteSpace: 'normal' }}>
+          {refusVu || (ko ? (job.etape === 'genere_sans_pdf' ? `Généré chez Vinted, mais le PDF n'est pas encore prêt (${job.raison}).` : job.raison) : distingue)}
         </span>
       )}
       {/* Le repli à la main : l'extension a posé un rendez-vous de 15 min, le PDF
@@ -7472,54 +8387,112 @@ function BoutonBordereau({ uid, tx, conv, login, aGenerer, pdf, onImprimer, onFa
 // envoie les commandes UNE PAR UNE (await séquentiel), jamais en rafale ; et
 // seulement pour le compte ouvert dans Chrome (garde stricte côté extension),
 // les autres sont comptés et il bascule. Rien ne part sans ce clic.
+// ⚠️⚠️ AU PLUS 6 PAR CLIC, ET L'EXTENSION RESTE LE JUGE (revue du 9 octobre).
+//    Un clic sur « Tout générer (20) » envoyait 20 commandes : 20 PUT chez
+//    Vinted d'affilée (jusqu'à 300 requêtes quand les PDF tardent) et les
+//    20 actions de l'heure — une réponse à un acheteur était ensuite refusée
+//    une heure. Une visite sur Vinted, elle, s'arrête à 6 (§3, « plafond par
+//    visite »). La même borne ici (`BORD_MAX_PAR_VISITE` de l'extension,
+//    vérifiée égale par `audit-tout-generer.cjs`, §11), et l'extension garde la
+//    sienne (6 par 5 min et par compte, une réserve d'actions pour les gestes
+//    sur clic) : l'app ne lance que ce qu'elle peut annoncer.
+const BORD_LOT_MAX = 6;
+// Les refus qui vaudront pour TOUTE la suite du lot : on s'arrête au premier
+// (les suivants seraient refusés pareil, et chaque essai coûte une demande).
+const REFUS_DU_LOT = ['vinted-pause', 'plafond', 'plafond-bordereaux', 'trop-d-actions', 'lot', 'vinted-absent', 'vinted-autre', 'lecture', 'origine'];
+// Le bilan d'un clic, une phrase par cause (§7). Une demande restée SANS
+// RÉPONSE n'est pas un refus : si l'extension a prévenu depuis qu'elle
+// travaille dessus (un évènement de CE colis), elle compte comme lancée ;
+// sinon on dit qu'on ne sait pas — jamais « refusé » pour un bordereau qui a
+// pu être généré chez Vinted.
+function bilanToutGenerer(b, jobs) {
+  if (!b) return null;
+  if (b.message) return b.message;
+  const arrive = (id) => { const j = jobs[id]; return !!(j && Number(j.at || 0) >= b.at - 1000); };
+  const partisApres = b.muets.filter(arrive);
+  const inconnus = b.muets.length - partisApres.length;
+  const n = b.lances.length + partisApres.length;
+  const s = (k) => (k > 1 ? 's' : '');
+  const out = [];
+  if (n) out.push(`${n} bordereau${n > 1 ? 'x' : ''} lancé${s(n)} — chaque ligne suit le sien.`);
+  if (b.dejaPrets) out.push(`${b.dejaPrets} déjà prêt${s(b.dejaPrets)} (le PDF était là).`);
+  if (inconnus) out.push(`L'extension n'a pas répondu à temps pour ${inconnus} colis : je ne sais pas ${inconnus > 1 ? "s'ils sont partis — regarde leur ligne" : "s'il est parti — regarde sa ligne"} avant de relancer.`);
+  if (b.refus.length) {
+    const raisons = [...new Set(b.refus.map((r) => String(r.raison || '').replace(/[.\s]+$/, '')))];
+    out.push(`${b.refus.length > 1 ? `${b.refus.length} refusés` : 'Refusé'} par l'extension : ${raisons.join(' · ')}.`);
+  }
+  if (b.attendent) out.push(b.arret === 'refus' ? `${b.attendent} autre${s(b.attendent)} pas demandé${s(b.attendent)}, pour la même raison.`
+    : b.arret === 'muet' ? `${b.attendent} autre${s(b.attendent)} pas demandé${s(b.attendent)} : relance « Tout générer » quand cette ligne avance.`
+    : `${b.attendent} autre${s(b.attendent)} au prochain clic : jamais plus de ${BORD_LOT_MAX} d'affilée chez Vinted.`);
+  if (b.autres) out.push(`${b.autres} sur un autre compte (bascule sur vinted.fr pour les générer).`);
+  return out.join(' ');
+}
 function BoutonToutGenerer({ items }) {
-  const { etat } = useExtVivante();
+  const { etat, jobs } = useExtVivante();
   const sansSouris = useSansSouris();
   const [busy, setBusy] = React.useState(false);
   const [prog, setProg] = React.useState(null);
-  const [resume, setResume] = React.useState(null);
+  const [bilan, setBilan] = React.useState(null);
   const list = (items || []).filter(x => x && x.uid && x.tx);
   if (list.length < 1) return null;
   const glob = raisonExtGlobale(sansSouris);
   const co = etat && etat.vinted ? String(etat.vinted.uid) : '';
-  const mine = co ? list.filter(x => String(x.uid) === co) : [];
-  const autres = list.length - mine.length;
+  // Un colis dont la demande est déjà en file, en cours ou faite ne repart pas :
+  // un second clic ne le recommande pas (revue du 9 octobre).
+  const occupe = (x) => { const j = jobs[`bord:${x.uid}:${x.tx}`]; return jobEnCours(j) || !!(j && j.etape === 'fait'); };
+  const mine = co ? list.filter(x => String(x.uid) === co && !occupe(x)) : [];
+  const autres = co ? list.filter(x => String(x.uid) !== co).length : 0;
+  const lot = mine.slice(0, BORD_LOT_MAX);
   const lancer = async () => {
     if (glob || busy) return;
-    setResume(null);
-    if (!co) { setResume("Aucun compte Vinted ouvert dans ce Chrome — ouvre vinted.fr sur le compte des colis, puis réessaie."); return; }
-    if (!mine.length) { setResume(`Ces colis sont sur un autre compte — bascule sur vinted.fr pour les générer (${autres}).`); return; }
+    setBilan(null);
+    if (!co) { setBilan({ message: etat && etat.vintedPasSu ? "Je regarde quel compte Vinted est ouvert dans Chrome — réessaie dans un instant." : "Aucun compte Vinted ouvert dans ce Chrome — ouvre vinted.fr sur le compte des colis, puis réessaie." }); return; }
+    if (!lot.length) { setBilan({ message: autres ? `Ces colis sont sur un autre compte — bascule sur vinted.fr pour les générer (${autres}).` : "Leurs bordereaux sont déjà en file ou en cours — chaque ligne suit le sien." }); return; }
     setBusy(true);
-    let ok = 0, ko = 0;
-    for (let i = 0; i < mine.length; i++) {
-      setProg({ k: i + 1, n: mine.length });
-      const x = mine[i];
+    const b = { at: Date.now(), lances: [], dejaPrets: 0, muets: [], refus: [], attendent: mine.length - lot.length, arret: '', autres };
+    for (let i = 0; i < lot.length; i++) {
+      setProg({ k: i + 1, n: lot.length });
+      const x = lot[i];
+      const jobId = `bord:${x.uid}:${x.tx}`;
       // Une commande, on attend sa réponse avant la suivante ; l'extension les
-      // exécute en file (une requête Vinted à la fois, §3) sous son plafond 20/h.
+      // exécute en file (une requête Vinted à la fois, §3) sous ses plafonds.
       const r = await vmrCmd({ cmd: 'bordereau', uid: String(x.uid), tx: String(x.tx) });
-      if (r && r.accepte) { ok++; if (r.jobId) { __vmrJobs[r.jobId] = { etape: r.etape, at: Date.now() }; __vmrNotifier(); } }
-      else ko++;
+      if (r && r.accepte) {
+        if (r.etape === 'fait') b.dejaPrets++; else b.lances.push(r.jobId || jobId);
+        __vmrJobs[r.jobId || jobId] = { etape: r.etape, at: Date.now(), vivant: !!r.vivant }; __vmrNotifier();
+        continue;
+      }
+      if (!r) { b.muets.push(jobId); b.attendent += lot.length - i - 1; b.arret = 'muet'; __vmrRates = 1; battementExt(); break; }
+      b.refus.push({ code: r.code || '', raison: r.code === 'vinted-autre' ? `Chrome est connecté sur ${r.actifLogin || 'un autre compte'} — bascule sur vinted.fr` : (r.raison || 'raison non donnée') });
+      if (REFUS_DU_LOT.includes(r.code)) { b.attendent += lot.length - i - 1; b.arret = 'refus'; break; }
     }
-    setBusy(false); setProg(null);
-    setResume(`${ok} bordereau${ok > 1 ? 'x' : ''} lancé${ok > 1 ? 's' : ''}${ko ? ` · ${ko} refusé${ko > 1 ? 's' : ''}` : ''}${autres ? ` · ${autres} sur un autre compte (bascule pour les générer)` : ''}. Chaque colis montre sa progression ci-dessous.`);
+    setBusy(false); setProg(null); setBilan(b);
   };
   const grise = !!glob;
   // ⚠️ LE CHIFFRE NE PROMET QUE CE QUI SERA GÉNÉRÉ (§7). Si un compte est ouvert
   //    dans Chrome, seuls SES colis partent → on compte `mine`, jamais le total
-  //    (sinon « Tout générer (7) » pour 0 colis générable, revue du 8 oct.).
+  //    (sinon « Tout générer (7) » pour 0 colis générable, revue du 8 oct.) ; et
+  //    au-delà de 6, le bouton dit les 6 qui partent (revue du 9 octobre).
   const n = co ? mine.length : list.length;
   const libelle = busy && prog ? `Génération… ${prog.k}/${prog.n}`
-    : (co && n === 0) ? 'Tout générer — change de compte Vinted'
+    : (co && n === 0) ? (autres ? 'Tout générer — change de compte Vinted' : 'Bordereaux en cours…')
+    : n > BORD_LOT_MAX ? `Générer ${BORD_LOT_MAX} bordereaux (sur ${n})`
     : `Tout générer (${n})`;
+  // ⚠️ SOUS LE BOUTON, SEULEMENT LE BILAN D'UN CLIC (revue du 9 octobre). La
+  //    raison commune d'un bouton grisé (extension absente, téléphone…) est dite
+  //    UNE fois par `RaisonBordereauxGrises`, juste en dessous : la répéter ici
+  //    l'écrivait deux fois sur l'écran (§7). Elle reste dans l'infobulle.
+  const resume = bilanToutGenerer(bilan, jobs);
   return (
     <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3, maxWidth: '100%' }}>
-      <button type="button" data-tout-generer={grise ? 'grise' : 'pret'} onClick={lancer} disabled={busy} aria-disabled={grise ? 'true' : undefined}
-        title={glob ? glob.texte : "L'extension génère chaque bordereau sur Vinted, un par un (jamais en rafale)"}
+      <button type="button" data-tout-generer={grise ? 'grise' : 'pret'} data-lot={lot.length} onClick={lancer} disabled={busy} aria-disabled={grise ? 'true' : undefined}
+        title={glob ? glob.texte : `L'extension génère chaque bordereau sur Vinted, un par un — jamais plus de ${BORD_LOT_MAX} d'affilée`}
         style={{ flexShrink: 0, border: `1px solid ${grise ? C.border : C.accent}`, borderRadius: 10, background: grise ? 'transparent' : `${C.accent}14`, color: grise ? C.muted : C.accent,
           padding: '11px 15px', cursor: grise || busy ? 'default' : 'pointer', fontSize: 13, fontWeight: 700, fontFamily: 'inherit', opacity: grise ? 0.55 : (busy ? 0.7 : 1), filter: grise ? 'grayscale(1)' : 'none', whiteSpace: 'nowrap' }}>
         <Icon name="doc" size={14}/> {libelle}
       </button>
-      {(resume || glob) && <span style={{ fontSize: 11, color: C.muted, lineHeight: 1.35, whiteSpace: 'normal' }}>{resume || glob.texte}</span>}
+      {resume && <span data-tg-bilan={bilan && !bilan.message ? `lances:${bilan.lances.length},muets:${bilan.muets.length},refus:${bilan.refus.map(r => r.code).join('|')},attendent:${bilan.attendent},arret:${bilan.arret}` : 'message'}
+        style={{ fontSize: 11, color: C.muted, lineHeight: 1.35, whiteSpace: 'normal' }}>{resume}</span>}
     </span>
   );
 }
@@ -7610,13 +8583,20 @@ function etatActionsExt(sansSouris) {
   const glob = raisonExtGlobale(sansSouris);
   // Passager (on lui demande, elle renouvelle sa connexion) : ni oui ni non.
   if (glob && (glob.code === 'verif' || glob.code === 'vrm-encours')) return { niveau: 'verif', glob, vinted: null };
-  if (glob) return { niveau: 'lecture', glob, vinted: null };
   const e = __vmrEtat && __vmrEtat.ok ? __vmrEtat : null;
+  // Vinted a demandé de ralentir : la lecture seule est passagère, et le compte
+  // ouvert dans Chrome l'est toujours — on ne le dit pas « absent ».
+  if (glob && glob.code === 'pause') return { niveau: 'lecture', glob, vinted: e && e.vinted && e.vinted.uid ? e.vinted : null };
+  if (glob) return { niveau: 'lecture', glob, vinted: null };
   // Le cookie Vinted pas lu à temps (5.161 : `vintedPasSu`) n'est pas « aucun
   // compte ouvert » (revue du 5 octobre).
   if (e && e.vintedPasSu) return { niveau: 'verif', glob: { code: 'vinted-passu', texte: "Je regarde quel compte Vinted est ouvert dans Chrome…" }, vinted: null };
-  const vinted = e && e.vinted && e.vinted.uid ? e.vinted : null;
-  if (!vinted) return { niveau: 'lecture', glob: { code: 'vinted', texte: "Aucun compte Vinted n'est ouvert dans ce Chrome — les actions SUR VINTED (bordereau, répondre) attendent ; publier sur Leboncoin reste possible." }, vinted: null };
+  const vinted = vintedDeChrome() || null;
+  // ⚠️ « Publier sur Leboncoin reste possible » ne se dit que si l'extension
+  //    installée sait publier depuis l'app (revue du 9 octobre) : avec une 5.143,
+  //    la pastille l'affirmait à côté d'un bouton Publier grisé « mets
+  //    l'extension à jour » — deux voix sur la même action (§11).
+  if (!vinted) return { niveau: 'lecture', glob: { code: 'vinted', texte: `Aucun compte Vinted n'est ouvert dans ce Chrome — les actions SUR VINTED (bordereau, répondre) attendent ; ${extSait('publication') === 'ok' ? 'publier sur Leboncoin reste possible.' : `publier sur Leboncoin demande une extension à jour (${EXT_ATTENDUE}).`}` }, vinted: null };
   return { niveau: 'ok', glob: null, vinted };
 }
 // La DERNIÈRE capture reçue d'une extension (où qu'elle tourne) : l'extension
@@ -7671,20 +8651,24 @@ function EtatActions({ onNav, ordi, sombre }) {
   const loginVinted = st.vinted ? (st.vinted.login || ('compte ' + st.vinted.uid)) : '';
   // Une couleur seulement s'il y a un geste à faire ICI (§7) : sur un téléphone
   // il n'y en a pas, la lecture seule y est normale.
-  const aRattraper = st.niveau === 'lecture' && code !== 'telephone';
+  // Vinted qui demande de ralentir : rien à faire non plus, ça repart seul.
+  const aRattraper = st.niveau === 'lecture' && code !== 'telephone' && code !== 'pause';
   const point = st.niveau === 'ok' ? C.accent : aRattraper ? C.warn : C.muted;
   const libelle = st.niveau === 'ok' ? 'Actions possibles' : st.niveau === 'verif' ? 'Vérification…' : 'Lecture seule';
   const court = !ordi;                       // en-tête de téléphone : peu de place
   const ink = sombre ? '#fff' : C.text, bd = sombre ? '#3A3A3C' : C.border;
 
   // ── Les trois lignes : extension · compte VRM · compte Vinted ──────────────
-  const extKo = ['telephone', 'absente', 'muette', 'retard'].includes(code);
+  const extKo = ['telephone', 'absente', 'muette', 'retard', 'plusieurs'].includes(code);
   const ligneVrmVerif = code === 'vrm-encours';
   const majDispo = !extKo && extSait('_maj') === 'retard';
   const ligneExt = code === 'telephone' ? { s: '—', t: "s'utilise sur l'ordinateur où elle est installée" }
     : code === 'absente' ? { s: 'non', t: 'pas détectée dans ce navigateur' }
     : code === 'muette' ? { s: 'non', t: 'ne répond pas' }
-    : code === 'retard' ? { s: 'non', t: `version ${version || '?'} — trop ancienne pour recevoir des commandes (passe à la ${EXT_ATTENDUE})` }
+    : code === 'plusieurs' ? { s: 'non', t: `deux extensions VRM répondent${(__vmrPlusieurs || []).filter((x) => x && x !== '?').length >= 2 ? ' (' + __vmrPlusieurs.join(' et ') + ')' : ''}` }
+    // La version à installer est dite UNE fois, sur le bouton juste dessous
+    // (revue du 9 octobre : « 5.163.0 » écrit trois fois dans le panneau).
+    : code === 'retard' ? { s: 'non', t: `version ${version || '?'} — trop ancienne pour recevoir des commandes de VRM` }
     : st.niveau === 'verif' ? { s: '…', t: 'je lui demande…' }
     : { s: 'oui', t: `allumée${version ? ' · ' + version : ''}${majDispo ? ` (la ${EXT_ATTENDUE} existe)` : ''}` };
   const ligneVrm = ligneVrmVerif ? { s: '…', t: 'renouvellement de sa connexion…' }
@@ -7705,6 +8689,9 @@ function EtatActions({ onNav, ordi, sombre }) {
   if (code === 'telephone') geste = <span>Ouvre VRM sur l'ordinateur où l'extension est installée pour générer un bordereau, répondre ou publier.</span>;
   else if (code === 'absente' || code === 'retard') geste = <button type="button" data-etat-geste="maj" style={btn} onClick={() => { setOuvert(false); onNav && onNav('settings'); }}>{code === 'absente' ? "Installer l'extension (Réglages)" : `Mettre à jour en ${EXT_ATTENDUE} (Réglages)`}</button>;
   else if (code === 'muette') geste = <button type="button" data-etat-geste="recharger" style={btn} onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button>;
+  // Deux extensions : le geste se fait dans Chrome (une page web ne peut pas
+  // ouvrir chrome://extensions) — on le DIT, puis on recharge.
+  else if (code === 'plusieurs') geste = <span data-etat-geste="extensions">Tape <b>chrome://extensions</b> dans la barre d'adresse, supprime l'ancienne VRM, puis <button type="button" data-etat-geste-recharger="1" style={{ ...btn, padding: '4px 9px', fontSize: 12 }} onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button></span>;
   // Non connectée : son icône ouvre SA fenêtre de connexion (une extension
   // connectée, elle, ouvre VRM) — c'est le repli si la reconnexion automatique
   // n'aboutit pas.
@@ -7712,6 +8699,7 @@ function EtatActions({ onNav, ordi, sombre }) {
   else if (code === 'autre-vrm' || code === 'vrm-passu') geste = __sessExtEnVol ? <span>Un instant…</span>
     : <button type="button" data-etat-geste="recharger" style={btn} onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button>;
   else if (code === 'vinted') geste = <a data-etat-geste="vinted" href="https://www.vinted.fr" target="_blank" rel="noreferrer" style={btn}>Ouvrir vinted.fr et me connecter</a>;
+  // 'pause' : aucun geste — la phrase du panneau dit que ça repart seul.
 
   const Ligne = ({ nom, l }) => (
     <div style={{ display: 'flex', gap: 8, alignItems: 'baseline', padding: '5px 0', borderTop: `1px solid ${C.border}` }}>
@@ -7750,7 +8738,8 @@ function EtatActions({ onNav, ordi, sombre }) {
           ) : (
             <div style={{ color: C.muted, marginBottom: 8 }}>
               Tout ce qui est déjà dans VRM marche : tes ventes, achats, annonces et messages, les colis à retirer et leurs codes, l'impression des bordereaux déjà reçus.
-              {' '}Générer un bordereau ou répondre demande l'extension allumée, connectée à ton compte VRM, avec un compte Vinted ouvert dans Chrome ; publier sur Leboncoin demande l'extension allumée.
+              {' '}{code === 'pause' || code === 'plusieurs' ? st.glob.texte
+                : <>Générer un bordereau ou répondre demande l'extension allumée, connectée à ton compte VRM, avec un compte Vinted ouvert dans Chrome ; publier sur Leboncoin demande {extSait('publication') === 'retard' ? 'une extension à jour' : "l'extension allumée"}.</>}
             </div>
           )}
           <Ligne nom="Extension" l={ligneExt}/>
@@ -7767,9 +8756,18 @@ function EtatActions({ onNav, ordi, sombre }) {
             {derniere === undefined ? 'Dernière capture reçue : je regarde…'
               : derniere === null ? 'Dernière capture reçue : pas su (la base n’a pas répondu).'
               : derniere === 'aucune' ? 'Aucune capture reçue de ton extension pour l’instant.'
-              : (() => { const retard = extEnRetard(derniere.v); return (
+              // ⚠️⚠️ LA MISE À JOUR N'EST DITE ICI QUE LÀ OÙ LE PONT NE PARLE PAS
+              //    (revue du 9 octobre). Sur l'ordinateur, la ligne « Extension »
+              //    juste au-dessus vient du pont, qui a mesuré CE navigateur : la
+              //    phrase d'ici, tirée de la dernière capture, la contredisait
+              //    (« ✓ allumée · 5.163.0 » puis « à mettre à jour en 5.163.0 »
+              //    tant que la nouvelle n'avait rien capté). Et elle promettait
+              //    trois choses écrites en dur que la 5.161 savait déjà faire. On
+              //    ne nomme que ce qui manque VRAIMENT à la version vue
+              //    (`capacitesManquantes`, tirée d'EXT_CAPACITES, §11).
+              : (() => { const retard = !vmrExtPresent() && extEnRetard(derniere.v); const manque = retard ? capacitesManquantes(derniere.v) : []; return (
                 <>Dernière capture reçue de ton extension : <b style={{ color: C.text }}>{derniere.at ? ilYaCourt(derniere.at) : 'date inconnue'}</b>{derniere.v ? ` (version ${derniere.v})` : ''}. Elle écrit quand tu passes sur Vinted.
-                {retard ? <> <span style={{ color: C.warn, fontWeight: 600 }}>À mettre à jour en {EXT_ATTENDUE}</span> sur l'ordinateur où elle est installée (Réglages → Extension) : c'est la version à jour qui lit les codes de retrait <b style={{ color: C.text }}>Vinted&nbsp;Go</b>, rafraîchit tes ventes <b style={{ color: C.text }}>Leboncoin</b> et publie une annonce sur Leboncoin depuis VRM.</> : null}</>
+                {retard ? <> <span style={{ color: C.warn, fontWeight: 600 }}>À mettre à jour en {EXT_ATTENDUE}</span> sur l'ordinateur où elle est installée (Réglages → Extension){manque.length ? <> : celle-ci ne sait pas encore {listeFr(manque)}.</> : '.'}</> : null}</>
               ); })()}
           </div>
           {geste && <div style={{ marginTop: 10 }}>{geste}</div>}
@@ -8109,12 +9107,17 @@ function PrixMarche({ data, baseKO }) {
 // les chiffres sont figés (un colis déjà expédié peut encore apparaître) : on le
 // DIT plutôt que de laisser croire à un défaut. Le geste, jamais la promesse
 // (§7). `jours == null` (âge inconnu / lecture ratée) ⇒ rien : jamais un faux.
+// ⚠️ Revue de la 5.165 (§5 : la phrase qui explique vient de la MÊME source) :
+//    l'âge vient des VENTES captées (`harvest_*_orders_sold`) — la coche le dit
+//    (« Ventes Vinted à jour »), et elle ne s'affiche pas au-dessus de la section
+//    Annonces, où le dressing a sa propre date (`FraicheurAnnonces`) : on y lisait
+//    « ✓ à jour » et, trois lignes plus bas, « annonces lues hier ».
 function FraicheurDonnees({ jours, compte, siAJour = true }) {
   if (jours == null) return null;
   // L'accueil ne dit rien quand tout va bien (« trop de texte », 30 sept.) :
   // seule l'alerte d'une capture ancienne y a sa place.
   if (jours <= 1 && !siAJour) return null;
-  if (jours <= 1) return <div style={{fontSize:11.5,color:C.muted}}>✓ Données Vinted à jour (capturées {jours<1?"aujourd'hui":'hier'}).</div>;
+  if (jours <= 1) return <div data-fraicheur-ventes="" style={{fontSize:11.5,color:C.muted}}>✓ Ventes Vinted à jour (captées {jours<1?"aujourd'hui":'hier'}).</div>;
   return (
     <div style={{fontSize:12,color:C.warn,background:`${C.warn}12`,border:`1px solid ${C.warn}55`,borderRadius:10,padding:'9px 12px',lineHeight:1.5}}>
       {compte
@@ -8149,7 +9152,7 @@ function PlatSubNav({ sub, setSub, sections, dark }) {
 // « il n'y a pas direct les ventes et les achats »). Plus d'écran « Aperçu » à
 // traverser : les chiffres qui comptent (CA, argent) restent sous les yeux, et
 // la liste (ventes par défaut) est juste en dessous. Consomme liveStats (§11).
-function VintedResume({ liveStats, baseKO }) {
+function VintedResume({ liveStats, baseKO, siAJour = true }) {
   // ⚠️ §7 : pendant une panne, le résumé NE répète PAS la ligne « Je n'ai pas pu
   //    lire » — le bloc de la coque la dit déjà, et la liste en dessous
   //    (Comptabilite) porte la sienne. Deux lignes ici = « la panne dite trois
@@ -8169,7 +9172,7 @@ function VintedResume({ liveStats, baseKO }) {
         <div style={box}><div style={eti}>Disponible</div><div className="vrm-display" style={{fontSize:20,fontWeight:700,color:C.text}}>{dispo==null?'—':fmt(dispo)}</div></div>
         <div style={box}><div style={eti}>En attente</div><div className="vrm-display" style={{fontSize:20,fontWeight:700,color:C.muted}}>{att==null?'—':fmt(att)}</div></div>
       </div>
-      <FraicheurDonnees jours={dAge} compte={liveStats && liveStats.dataAgeCompte}/>
+      <FraicheurDonnees jours={dAge} compte={liveStats && liveStats.dataAgeCompte} siAJour={siAJour}/>
     </div>
   );
 }
@@ -10567,7 +11570,7 @@ function EbayProgrammees({ programmees, brouillons, onRelire, onAnnule }) {
             const s = statut(l);
             const t = Date.parse(l.debut || '');
             const derniereHeure = Number.isFinite(t) && t - maintenant < 60 * 60000;
-            const n = numDeSkuEbay(l.sku);
+            const n = numEbayLu(l.sku, l.itemId);
             const info = infos[l.itemId];
             return (
               <div key={l.itemId} data-prog={l.itemId} data-prog-statut={s} style={{ padding: '8px 0', borderTop: `1px solid ${E.border}` }}>
@@ -10797,7 +11800,7 @@ function EbayAnnonces({ baseKO, comptes = [] }) {
   }), [items, commandes, fiches, enLigne, vendusVinted, listeProgrammees, ventesConnues]);
   const numsConnus = React.useMemo(() => new Set(Object.values(fiches).map((f) => cleNum(f && f.numero)).filter(Boolean)), [fiches]);
   const titreDeNum = React.useMemo(() => { const m = new Map(); for (const f of Object.values(fiches)) { const k = cleNum(f && f.numero); if (k && !m.has(k)) m.set(k, (f && f.title) || ''); } return m; }, [fiches]);
-  const pris = React.useMemo(() => { const m = new Map(); for (const a of (Array.isArray(items) ? items : [])) { const k = numDeSkuEbay(a && a.sku); if (k && !m.has(k)) m.set(k, String(a.itemId)); } return m; }, [items]);
+  const pris = React.useMemo(() => { const m = new Map(); for (const a of (Array.isArray(items) ? items : [])) { const k = numEbayLu(a && a.sku, a && a.itemId); if (k && !m.has(k)) m.set(k, String(a.itemId)); } return m; }, [items]);
   // (6 octobre) Ce que le formulaire de mise en vente doit savoir : la paire est
   // déjà EN VENTE sur eBay, ou déjà PROGRAMMÉE (elle n'était pas vue — une
   // publication immédiate créait une seconde annonce, et la programmée
@@ -10805,8 +11808,8 @@ function EbayAnnonces({ baseKO, comptes = [] }) {
   const dejaSurEbay = React.useMemo(() => {
     const m = new Map();
     for (const k of pris.keys()) m.set(k, { etat: 'en-vente' });
-    for (const x of ((programmees && typeof programmees === 'object' && Array.isArray(programmees.enLigne)) ? programmees.enLigne : [])) { const k = numDeSkuEbay(x && x.sku); if (k && !m.has(k)) m.set(k, { etat: 'en-vente' }); }
-    for (const p of listeProgrammees) { const k = numDeSkuEbay(p && p.sku); if (k && !m.has(k)) m.set(k, { etat: 'programmee', debut: p.debut || null }); }
+    for (const x of ((programmees && typeof programmees === 'object' && Array.isArray(programmees.enLigne)) ? programmees.enLigne : [])) { const k = numEbayLu(x && x.sku, x && x.itemId); if (k && !m.has(k)) m.set(k, { etat: 'en-vente' }); }
+    for (const p of listeProgrammees) { const k = numEbayLu(p && p.sku, p && p.itemId); if (k && !m.has(k)) m.set(k, { etat: 'programmee', debut: p.debut || null }); }
     return m;
   }, [pris, programmees, listeProgrammees]);
   const surSku = React.useCallback((itemId, sku) => {
@@ -11040,7 +12043,7 @@ function EbayAnnonces({ baseKO, comptes = [] }) {
       {items.map((it, i) => (
         <div key={it.itemId || i} data-ebay-annonce={it.itemId || ''}>
           <EbayAnnonceCard it={it} first={i === 0} onSaved={resync}
-            numero={numDeSkuEbay(it.sku)}
+            numero={numEbayLu(it.sku, it.itemId)}
             eligible={elig ? (elig.has(String(it.itemId)) ? true : (eligibles.complet ? false : undefined)) : undefined}
             paires={paires} numsConnus={numsConnus} titreDeNum={titreDeNum} pris={pris}
             onSku={(id, sku) => { surSku(id, sku); resync(); }}
@@ -11952,6 +12955,9 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
               </button>
             ))}
           </div>
+          {/* 5.165 : « Annonces en ligne » dit de quand date sa lecture — la même
+              phrase que l'écran Annonces (`FraicheurAnnonces`, §11). */}
+          <FraicheurAnnonces attr="data-dash-fraicheur" lues={liveStats.annLues} enLigne={liveStats.annEnLigne} noms={liveStats.annNoms} supprimees={liveStats.annSuppr} activite={liveStats.annActivite} style={{marginTop:8,marginBottom:0}}/>
         </div>
       )}
 
@@ -14205,8 +15211,17 @@ function LocalPhoto({ locate, onLocateConsumed }) {
 const loadRoomPlan = async () => {
   try { const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_room&select=data`, { headers: sbAuth() }); if (!res.ok) return null; const rows = await res.json(); return rows[0]?.data || null; } catch (_) { return null; }
 };
+// ⚠️ Le garage porte la VERSION de la numérotation (migration 013) : la base
+//    refuse un garage qui ne la porte pas (un écran d'avant la remise à zéro
+//    remettrait les cartons en chiffres). On l'estampille à chaque envoi, et un
+//    refus ne passe plus en silence : c'est l'écran qui est périmé.
 const saveRoomPlan = async (data) => {
-  try { await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, { method: 'POST', headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }), body: JSON.stringify(withOwner({ id: 'vrm_room', data })) }); } catch (_) {}
+  try {
+    const v = versionNumerotation();
+    const corps = v != null ? { ...data, numerotation: v } : data;
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, { method: 'POST', headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }), body: JSON.stringify(withOwner({ id: 'vrm_room', data: corps })) });
+    if (!r.ok) { let t = ''; try { t = await r.text(); } catch (_) {} const code = codeRefusNumeros(t); if (code) signalerNumerosPerimes(code); }
+  } catch (_) {}
 };
 // Catalogue de rangements — volontairement large pour convenir à TOUTE méthode.
 // `build` = quel constructeur 3D utiliser (plusieurs types partagent une forme).
@@ -15536,7 +16551,9 @@ function normalizePlan(p) {
   if (p && Array.isArray(p.rooms) && p.rooms.length) {
     const rooms = p.rooms.map(mk);
     const active = p.active && rooms.some(r => r.id === p.active) ? p.active : rooms[0].id;
-    return { rooms, active };
+    // `numerotation` (la version, migration 013) est GARDÉE : la jeter faisait
+    // refuser chaque sauvegarde du garage par la base.
+    return p.numerotation != null ? { rooms, active, numerotation: p.numerotation } : { rooms, active };
   }
   // ancien format (une seule pièce) → on l'enveloppe
   const only = mk({ id: 'r1', name: 'Ma pièce', room: (p && p.room) || ROOM_DEFAULT, items: (p && p.items) || [] });
@@ -18807,6 +19824,26 @@ const QUICK_REPLIES = [
 // Cache partagé entre les onglets (évite de recharger à chaque changement
 // d'onglet) : moins de requêtes, navigation instantanée. TTL court.
 const _CACHE_TTL = 180000; // 3 min
+// ⚠️⚠️ UNE LECTURE PARTIELLE GARDE SON ÉCHEC DANS LE CACHE (revue du 6 octobre).
+//    Le cache rendait `items` SANS dire quels comptes n'avaient pas répondu :
+//    un compte en panne au premier passage devenait, au rechargement suivant
+//    (moins de 3 min), « 0 vente · sous les seuils » — et le bandeau « compte
+//    non chargé » de l'écran Ventes disparaissait. Une entrée porte donc
+//    `failedUids` (l'IDENTITÉ des comptes ratés) et la version `_CACHE_V` : une
+//    entrée écrite avant cette règle, qui ne sait rien de ses échecs, est
+//    ignorée (« rien lu » ne vaut pas « rien »).
+// ⚠️⚠️ ET UNE ENTRÉE DIT QUELS COMPTES ELLE COUVRE (revue du 9 octobre). Elle ne
+//    savait que ses ÉCHECS : un compte lié depuis (l'extension en a capté un de
+//    plus, puis rechargement dans les 3 min) n'était ni lu, ni en échec — la
+//    carte des seuils l'affichait « 0 vente · sous les seuils » et le total se
+//    disait complet ; un compte RETIRÉ restait compté au registre. `comptes` =
+//    la clé des comptes DEMANDÉS (`cleComptesVinted`) : une entrée qui ne couvre
+//    pas exactement les comptes d'aujourd'hui n'est pas servie, on relit.
+const _CACHE_V = 3;
+// La clé d'un ensemble de comptes Vinted : leurs IDENTITÉS, triées — jamais un
+// nom affiché, jamais un nombre (deux listes de même longueur ne sont pas la
+// même liste).
+const cleComptesVinted = (accs) => [...new Set((accs || []).map(a => String((a && a.vinted_user_id) ?? '')).filter(Boolean))].sort().join(',');
 // Cache des données Vinted (annonces/ventes/achats/messages). Persisté en
 // sessionStorage : il survit aux rechargements fréquents (auto-mise à jour,
 // réouverture de l'app), donc les listes s'affichent INSTANTANÉMENT après un
@@ -18837,7 +19874,12 @@ function SelecteurCompte({ accounts, sel, setSel, connecte }) {
   //    (l'extension — 📍), sinon « Tous les comptes ». Cohérent avec `selEff`
   //    (Comptabilite) : '*' ⇒ tout visible, aucun flou ; sur ordi sans compte
   //    connecté → « Tous » par défaut, donc rien n'est flouté.
-  const val = String(sel) === '*' ? '*' : (String(sel) || co || '*');
+  // ⚠️ La même règle que le flou des écrans (`compteEffectif`, §11) : un choix
+  //    ou un compte de l'extension hors de cette liste vaut « Tous les
+  //    comptes » — la liste ne montre jamais un compte qu'elle ne propose pas.
+  const dansListe = (u) => list.some(a => String(a.vinted_user_id) === u);
+  const val = String(sel) === '*' ? '*' : (compteEffectif(sel, co, dansListe) || '*');
+  const coVu = co && dansListe(co) ? co : '';
   return (
     <div style={{ display: 'flex', gap: 8, padding: '10px 16px 0', alignItems: 'center', flexWrap: 'wrap' }}>
       <label htmlFor="vrm-sel-compte" style={{ fontSize: 12, color: C.muted, fontWeight: 600 }}>Compte</label>
@@ -18848,11 +19890,20 @@ function SelecteurCompte({ accounts, sel, setSel, connecte }) {
         {tri.map(a => { const uid = String(a.vinted_user_id);
           return <option key={uid} value={uid}>{uid === co ? '📍 ' : ''}{nom(a)}</option>; })}
       </select>
-      {co && val === co && <span style={{ fontSize: 11.5, color: C.muted }}>compte de l'extension</span>}
+      {/* Un compte choisi (par lui ou d'office) estompe les autres : on le dit
+          UNE fois, ici, avec le geste — sinon des lignes floues et inertes
+          apparaissent sans raison dès que l'extension est allumée (§7). */}
+      {val !== '*' && <span data-sel-compte-note={val === coVu ? 'extension' : 'choix'} style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.35 }}>
+        {val === coVu ? "compte de l'extension · " : ''}les autres comptes sont estompés — {'«\u00a0Tous les comptes\u00a0»'} pour tout voir
+      </span>}
     </div>
   );
 }
 function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', compteConnecte = '' }) {
+  // L'IDENTITÉ de l'ensemble des comptes liés (triée) : c'est elle que suivent
+  // les relectures et le cache — jamais `accounts.length` (un compte retiré et
+  // un autre ajouté gardent la même longueur).
+  const cleComptes = cleComptesVinted(accounts);
   const [numeros, setNumeros] = useState(() => load('vinted_annonce_numeros', {}));
   // Dates de mise en ligne réelles, lues sur la page de l'annonce par l'extension
   // (ligne Supabase vinted_listing_dates = { idAnnonce: {ts, text} }). Seule
@@ -18908,6 +19959,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Les dates de VERSEMENT des ventes Vinted — trois états (undefined en
   // cours · null pas su · map lue). Relues quand l'extension annonce des ventes.
   const [versements, setVersements] = useState(undefined);
+  const relireVersements = useRef(null);            // « Relire mes ventes » relit aussi des dates illisibles
   // Le registre de ses déclarations URSSAF (« J'ai déclaré ce mois »). Réglage
   // synchronisé lu au montage : `null` tant que le nuage n'est pas arrivé
   // (« pas su » — rien n'est déplacé d'un mois à l'autre), puis l'objet.
@@ -18917,6 +19969,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   useEffect(() => {
     let mort = false;
     const lire = () => fetchVersementsVinted().then((m) => { if (!mort) setVersements(m); });
+    relireVersements.current = lire;
     lire();
     const f = (e) => { const d = e && e.detail; if (d && d.type === 'maj' && (d.quoi === 'ventes' || d.quoi === 'versements')) lire(); };
     window.addEventListener('vrm:ext', f);
@@ -18974,6 +20027,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // écrase les numéros du cloud). Dès qu'il l'est, on RECHARGE les numéros depuis
   // le localStorage (que le cloud vient de remplir) → les numéros restent stables.
   const [cloudReady, setCloudReady] = useState(() => isCloudReady());
+  // La numérotation attend une version RELUE (migration 013) : chaque relecture
+  // relance les deux effets qui numérotent.
+  const [verNumTick, setVerNumTick] = useState(0);
+  useEffect(() => onVersionNumerotation(() => setVerNumTick(t => t + 1)), []);
   // ⚠️⚠️ CET EFFET RELIT CE QUE LE CLOUD VIENT D'ÉCRIRE DANS LE LOCALSTORAGE.
   // Tout état initialisé par `load(...)` et RÉÉCRIT ENSUITE PAR UN EFFET
   // AUTOMATIQUE doit être ici — sinon, sur un appareil neuf (localStorage vide
@@ -19169,7 +20226,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // et 177 des 178 bordereaux portent leur transaction. Sans identité : rien.
   const bordForItem = (itemId, numero) => {
     const list = emailBords || [];
-    if (numero) { const hit = list.find(bb => bb.numero && String(bb.numero) === String(numero)); if (hit) return hit; }
+    if (numero) { const hit = list.find(bb => bb.numero && String(bb.numero) === String(numero) && numeroEmailAdmis(bb, numeros)); if (hit) return hit; }
     if (!itemId) return null;
     return list.find(bb => bb.transaction && String(txnItem[String(bb.transaction)] || '') === String(itemId)) || null;
   };
@@ -19188,7 +20245,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const so = (sales.items || []).find(o => String(o.transaction_id) === String(b.transaction));
       if (so && orderPhoto(so)) return orderPhoto(so);
     }
-    if (b.numero) {
+    if (b.numero && numeroEmailAdmis(b, numeros)) {
       for (const k in numeros) {
         const e = numeros[k];
         if (e && String(e.numero) === String(b.numero) && e.photo) return e.photo;
@@ -20298,6 +21355,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return tout;
   };
   const [listings, setListings] = useState({ loading:false, items:null });
+  // La liste AFFICHÉE, lue par une relecture sur signal (`loadListings`) : la
+  // fermeture de l'écouteur ne voit que l'état de son montage.
+  const listingsRef = useRef(listings); listingsRef.current = listings;
+  const signalPendantLecture = useRef(false);
   const [convs, setConvs] = useState({ loading:false, items:null });
   const [openConv, setOpenConv] = useState(null);
   const [replyText, setReplyText] = useState('');
@@ -20402,9 +21463,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const entryKeyByPhoto = (o) => {
     const url = o ? orderPhoto(o) : null;
     const pk = photoKey(url);
-    if (pk && numerosByPhoto[pk]) return numerosByPhoto[pk];   // même fichier = certain
-    const d = photoDir(url);                                    // même image re-téléversée
-    return (d && numerosByPhotoDir[d]) || null;
+    let k = (pk && numerosByPhoto[pk]) || null;                  // même fichier = certain
+    if (!k) { const d = photoDir(url); k = (d && numerosByPhotoDir[d]) || null; }   // même image re-téléversée
+    // Julien, 10 octobre : une paire republiée prend un NOUVEAU numéro. Une vente
+    // faite après la remise à zéro n'est jamais reliée par sa photo à une fiche
+    // d'archive (elle lui donnerait « B230 »). Une vente d'avant, oui : c'est
+    // l'histoire.
+    if (k && venteApresCoupure(o) && !numeroReprenable((numeros[k] || {}).numero)) return null;
+    return k;
   };
   // Ids des annonces ENCORE EN LIGNE (wardrobe actif). Une paire en ligne ne peut
   // pas être vendue → on ne lui attribue jamais une vente (sinon un exemplaire
@@ -20556,15 +21622,33 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // ET la carte « Vendu / reçu » de Ma journée lisent le MÊME calcul.
   // Trois états : `undefined` on attend de savoir · `null` dates de versement
   // illisibles (« rien lu » ≠ « rien ») · l'objet de `ventesDeclarables`.
+  // ⚠️⚠️ LES VENTES VINTED QUI ENTRENT DANS LE CA DÉCLARÉ (revue du 9 octobre).
+  //    · La lecture doit COUVRIR les comptes d'aujourd'hui (`sales.comptes`,
+  //      la clé des comptes qu'elle a interrogés) : sinon un compte lié depuis
+  //      la dernière lecture compte pour 0, et un compte retiré reste compté.
+  //      Tant que ce n'est pas le cas : `null` — « on lit encore », jamais un
+  //      total.
+  //    · Un compte qui n'a PAS répondu (`failedUids`) n'entre dans AUCUN total,
+  //      même quand la liste montre encore ses ventes d'une lecture précédente
+  //      (relecture discrète ratée, `garde`). Le registre écrivait « ventes de X
+  //      pas lues » à côté d'un CA qui les CONTENAIT, et la carte des seuils
+  //      (« sans X ») donnait un autre total : la phrase ne venait pas de la
+  //      même source que le chiffre (§5), deux totaux pour une notion (§11).
+  //      Une même panne, un même chiffre — qu'on ait vu ses ventes avant ou non.
+  const ventesComptees = useMemo(() => {
+    if (!Array.isArray(sales.items) || sales.comptes !== cleComptes) return null;
+    const ko = new Set((Array.isArray(sales.failedUids) ? sales.failedUids : []).map(String));
+    return ko.size ? sales.items.filter(o => !ko.has(String((o && o._acc && o._acc.vinted_user_id) ?? ''))) : sales.items;
+  }, [sales.items, sales.comptes, sales.failedUids, cleComptes]);
   const declarables = useMemo(() => {
-    if (!sales.items) return undefined;
+    if (!ventesComptees) return undefined;
     if (lbcLu === undefined || ebayCmd === undefined || versements === undefined) return undefined;
     if (versements === null) return null;
     try {
-      return ventesDeclarables({ vinted: sales.items, lbc: lbcLu ? lbcVentes.ventes : [], ebay: ebayCmd || [], masquee: (o) => hiddenSales.has(String(o.transaction_id)), exclu: acctOffOf, versements, declare: declUrssaf });
+      return ventesDeclarables({ vinted: ventesComptees, lbc: lbcLu ? lbcVentes.ventes : [], ebay: ebayCmd || [], masquee: (o) => hiddenSales.has(String(o.transaction_id)), exclu: acctOffOf, versements, declare: declUrssaf });
     } catch (_) { return null; }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements, declUrssaf]);
+  }, [ventesComptees, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements, declUrssaf]);
   // ⚠️⚠️ CE QUE LISENT LES DEUX RAPPORTS (mensuel, annuel) — revue du 6 octobre.
   // Dates de versement illisibles ⇒ `declarables` vaut `null`, et c'est juste
   // pour Ma journée et la publication (elles ne disent rien de « reçu »). Mais
@@ -20606,6 +21690,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // On attend de savoir ; et les dates de versement illisibles : on ne publie
     // RIEN plutôt qu'un mois où toutes les ventes Vinted seraient « à dater ».
     if (!declarables) return;
+    // Un compte dont les ventes n'ont pas pu être lues (hors comptes exclus) :
+    // le CA serait PARTIEL et la ligne publiée le dirait complet (« Vinted :
+    // lu »). Sans publication, le tableau de bord garde la dernière, complète.
+    if ((Array.isArray(sales.failedUids) ? sales.failedUids : []).some(u => !acctOff(u))) return;
     try {
       const { lignes, aDater, ecartees } = declarables;
       const r2 = (x) => Math.round(x * 100) / 100;
@@ -20631,7 +21719,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const memeChose = avant && JSON.stringify({ mois: avant.mois, aDater: avant.aDater, ecartees: avant.ecartees, sources: avant.sources, declare: avant.declare }) === JSON.stringify(charge);
       if (!memeChose) save('vinted_urssaf_mois', { ...charge, at: Date.now() });
     } catch (_) {}
-  }, [sales.items, declarables, lbcLu, ebayCmd, declUrssaf]);
+  }, [sales.items, sales.failedUids, declarables, lbcLu, ebayCmd, declUrssaf]);
 
   // Filet prix d'achat : si l'entrée a un N° mais pas de prix d'achat, on va le
   // chercher dans le miroir PAR NUMÉRO (buyByNum) — c'est ce qui fait remonter
@@ -20774,8 +21862,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       toast('Un numéro, ce sont des chiffres (125) ou 1 à 3 lettres suivies de chiffres (B125).');
       return;
     }
+    // Un numéro d'ARCHIVE (« B230 ») ne se redonne pas à une annonce : la paire
+    // republiée a un numéro neuf (Julien, 10 octobre).
+    if (!numeroReprenable(cle)) {
+      updatePair(item, { numero: avant });
+      toast(`« ${cle} » est un ancien numéro : il ne se redonne pas. Ta paire republiée garde un numéro neuf — écris celui-là sur le carton.`);
+      return;
+    }
     // Ce qu'on écrit : tel quel pour des chiffres, la clé (majuscules) sinon.
     const n = /^\d+$/.test(brut) ? brut : cle;
+    // Un numéro posé À LA MAIN porte sa date : la base sait que c'est un geste.
+    const manuelAt = new Date().toISOString();
     const autres = Object.keys(numeros).filter(k => k !== moi && cleNum((numeros[k] || {}).numero) === cle);
     // ⚠️ Un numéro BRÛLÉ sans fiche (une vente passée, un numéro posé sur une
     //    vente) a déjà été écrit sur un carton : avant, on le reprenait sans un
@@ -20787,11 +21884,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         ok: 'Oui, la même paire', cancel: `Non — N°${nextNumero}`,
       });
       const v = meme ? n : String(nextNumero);
-      updatePair(item, { numero: v }); recordUsed(v); return;
+      updatePair(item, { numero: v, manuelAt }); recordUsed(v); return;
     }
     // ⚠️ C'EST ICI qu'on écrit le numéro (le champ ne valide qu'à la sortie,
     //    cf. `ChampSaisie` — il n'écrit plus à chaque frappe).
-    if (!autres.length) { updatePair(item, { numero: n }); recordUsed(n); return; }
+    if (!autres.length) { updatePair(item, { numero: n, manuelAt }); recordUsed(n); return; }
     const presents = (porteursNum[cle] || []).filter(p => String(p.id) !== moi);
     if (presents.length) {
       const qui = presents.map(p => p.type === 'annonce' ? `📦 en ligne « ${p.titre} »`
@@ -20803,7 +21900,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         desc: `Une paire le porte encore :\n${qui}\n\nDeux paires avec le même numéro, c'est la mauvaise chaussure au moment d'expédier.`,
         ok: `Prendre le N°${nextNumero}`, cancel: 'Annuler',
       });
-      updatePair(item, { numero: prendre ? String(nextNumero) : avant });
+      updatePair(item, prendre ? { numero: String(nextNumero), manuelAt } : { numero: avant });
       if (prendre) recordUsed(nextNumero);
       return;
     }
@@ -20813,7 +21910,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       desc: `Il était sur « ${anc.title || 'une autre paire'} », qui n'est plus en ligne.\n\nEst-ce bien la MÊME paire qui te revient (litige, retour, annulation) ?\n\nSi oui, elle reprend son prix d'achat et ses infos. Si c'est une autre paire, prends le N°${nextNumero} : un numéro ne se réattribue jamais.`,
       ok: 'Oui, la même paire revient', cancel: `Non — N°${nextNumero}`,
     });
-    if (!meme) { updatePair(item, { numero: String(nextNumero) }); recordUsed(nextNumero); return; }
+    if (!meme) { updatePair(item, { numero: String(nextNumero), manuelAt }); recordUsed(nextNumero); return; }
     setNumeros(prev => {
       const u = { ...prev }; const a = u[autres[0]] || {};
       u[moi] = { ...(u[moi] || {}),
@@ -20821,8 +21918,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         fees: a.fees, size: (u[moi] || {}).size ?? a.size ?? null,
         numero: n, title: item.title, photo: item.photo || null, photoK: photoKey(item.photo) || null,
         price: item.price ?? null, accountId: item._acc?.vinted_user_id,
-        auto: false, repriseAt: new Date().toISOString() };
-      delete u[autres[0]];                       // l'ancienne fiche devient celle-ci
+        auto: false, repriseAt: new Date().toISOString(), manuelAt, repriseDe: String(autres[0]) };
+      delete u[autres[0]];                       // l'ancienne fiche devient celle-ci (`repriseDe` le dit à la base)
       save('vinted_annonce_numeros', u); return u;
     });
     recordUsed(n);
@@ -20900,7 +21997,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   //    choix explicite (sentinelle '*') qui éteint le flou. Sans extension
   //    (téléphone), `compteConnecte` est vide ⇒ aucun flou. Une seule définition,
   //    lue par le flou, les tris et la messagerie (§11).
-  const selEff = String(compteSel) === '*' ? '' : String(compteSel || compteConnecte || '');
+  // ⚠️ Seulement un compte qu'on peut MONTRER (revue du 8 octobre) : un compte
+  //    exclu ou retiré de l'app a ses lignes déjà retirées, et le retenir
+  //    floutait TOUT l'écran. Même règle que la liste déroulante (§11).
+  const selEff = compteEffectif(compteSel, compteConnecte, (u) => accountUids.has(u) && !acctOff(u));
   const estFloute = (o) => !!(selEff && uidLigne(o) !== selEff);
   const STYLE_FLOU = { filter: 'blur(2px) grayscale(0.55)', opacity: 0.4, pointerEvents: 'none', transition: 'filter 160ms ease-out, opacity 160ms ease-out' };
   const ventesAffichees = useMemo(() => {
@@ -20948,7 +22048,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (c) arr = [...arr].sort((a,b) => { const ac = uidV(a)===c, bc = uidV(b)===c; return ac===bc ? 0 : (ac ? -1 : 1); }); }
     return arr;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [sales.items, showHidden, hiddenSales, hiddenAccts, blockedAccts, vFilter, ordSearchDiff, periode, numeros, saleOv, shipDone, compteSel, compteConnecte]);
+    }, [sales.items, showHidden, hiddenSales, hiddenAccts, blockedAccts, vFilter, ordSearchDiff, periode, numeros, saleOv, shipDone, compteSel, compteConnecte, selEff]);
   // Combien on en DESSINE. Le reste s'ouvre d'un bouton : rien n'est perdu, et
   // le compte total est écrit dessus.
   const [ventesMax, setVentesMax] = useState(60);
@@ -21270,7 +22370,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (c) arr = [...arr].sort((a,b) => { const ac = uidAnn(a)===c, bc = uidAnn(b)===c; return ac===bc ? 0 : (ac ? -1 : 1); });
     return arr;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [annBase, annSearch, annSort, numeros, compteSel, compteConnecte]);
+  }, [annBase, annSearch, annSort, numeros, compteSel, compteConnecte, selEff]);
   // Un seul compte à l'écran ⇒ le nommer sur chaque carte ne distingue rien (§7).
   const annUnCompte = useMemo(() => new Set(annShown.map(x => String(x._acc && x._acc.vinted_user_id || ''))).size <= 1, [annShown]);
   // Comptes bloqués actuellement présents (pour le bandeau d'alerte).
@@ -21416,6 +22516,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     for (const k in numeros) {
       const e = numeros[k];
       if (!e || !String(e.numero || '').trim()) continue;
+      // Un numéro d'ARCHIVE ne se reprend jamais : la paire republiée garde son
+      // nouveau numéro (Julien, 10 octobre — sa décision, pas une option).
+      if (!numeroReprenable(e.numero)) continue;
       if (onlineAnnonceIds.has(String(k))) continue;
       if (pairsLost[String(e.numero)]) continue;
       orphans.push({ key: k, e, vendue: pairesVendues.has(String(k)) });
@@ -21465,11 +22568,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const oldNum = String(r.orphan.e.numero), autoNum2 = String(r.current.numero);
     const q = r.vendue
       ? `Cette paire t'est REVENUE (litige, retour, annulation) ?\n\n« ${r.item.title} »\n\nElle a été vendue sous le N°${oldNum}. Si tu l'as remise dans SA boîte, elle peut le reprendre — sinon garde le N°${autoNum2}, qui est neuf.`
-      : `Cette annonce est bien ta paire N°${oldNum} ?\n\n« ${r.item.title} »\n\nElle reprendra le N°${oldNum} (celui écrit sur sa boîte).\nLe N°${autoNum2}, créé automatiquement, sera rendu.`;
+      : `Cette annonce est bien ta paire N°${oldNum} ?\n\n« ${r.item.title} »\n\nElle reprendra le N°${oldNum} (celui écrit sur sa boîte).\nLe N°${autoNum2}, créé automatiquement, reste brûlé : il ne sera donné à aucune autre paire.`;
     if (!await askConfirm(q)) return;
     setNumeros(prev => {
       const u = { ...prev };
-      u[r.item.id] = { ...(u[r.item.id] || {}), ...r.orphan.e, numero: oldNum, title: r.item.title, photo: r.item.photo || null, photoK: photoKey(r.item.photo) || null, price: r.item.price ?? null, accountId: r.item._acc?.vinted_user_id, auto: false, repriseAt: new Date().toISOString() };
+      u[r.item.id] = { ...(u[r.item.id] || {}), ...r.orphan.e, numero: oldNum, title: r.item.title, photo: r.item.photo || null, photoK: photoKey(r.item.photo) || null, price: r.item.price ?? null, accountId: r.item._acc?.vinted_user_id, auto: false, repriseAt: new Date().toISOString(), manuelAt: new Date().toISOString(), repriseDe: String(r.orphan.key) };
       delete u[r.orphan.key]; // l'ancienne fiche devient l'annonce actuelle
       save('vinted_annonce_numeros', u);
       return u;
@@ -21726,7 +22829,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if (!Array.isArray(rows)) { if (!stop) setEbayVivantes(null); return; }
         const m = new Map();
         for (const x of ((rows[0] && Array.isArray(rows[0].items)) ? rows[0].items : [])) {
-          const c = numDeSkuEbay(x && x.sku); const prix = parseFloat(String((x && x.price) || '').replace(',', '.'));
+          const c = numEbayLu(x && x.sku, x && x.itemId); const prix = parseFloat(String((x && x.price) || '').replace(',', '.'));
           if (!c || !x.itemId || !(prix > 0)) continue;
           if (m.has(c)) { m.set(c, { ambigu: true }); continue; }
           m.set(c, { itemId: String(x.itemId), prix, url: x.url || `https://www.ebay.fr/itm/${x.itemId}` });
@@ -21817,8 +22920,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   //  son onglet — voir le commentaire au niveau du rendu. Le panneau de
   //  l'extension fait ce travail, là où le geste est possible.)
 
-  const fromCache = (key) => { const c=_acctCache[key]; return (c && Date.now()-c.ts<_CACHE_TTL) ? c.items : null; };
-  const putCache = (key, items) => { _acctCache[key] = { ts:Date.now(), items }; _persistAcctCache(); };
+  // Une entrée n'est servie que si elle couvre EXACTEMENT les comptes
+  // d'aujourd'hui (`comptes`) : un compte ajouté depuis serait « lu · 0 », un
+  // compte retiré resterait compté.
+  const entreeCache = (key) => { const c=_acctCache[key]; return (c && c.v===_CACHE_V && Array.isArray(c.items) && Date.now()-c.ts<_CACHE_TTL && c.comptes===cleComptes) ? c : null; };
+  const putCache = (key, items, echecs, comptes, extra) => { _acctCache[key] = { ...(extra||{}), ts:Date.now(), v:_CACHE_V, comptes, items, failed:(echecs&&echecs.failed)||[], failedUids:(echecs&&echecs.failedUids)||[] }; _persistAcctCache(); };
 
   // ── RELIRE SANS FAIRE CLIGNOTER (4 octobre) ──────────────────────────────
   // Chaque signal de l'extension (« ventes rangées », toutes les 90 s quand il
@@ -21835,8 +22941,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const loadOrders = async (type, setter, force, opts) => {
     const silencieux = !!(opts && opts.silencieux);
     const n = (lectureOrders.current[type] = (lectureOrders.current[type] || 0) + 1);
-    const cached = !force && fromCache(type);
-    if (cached) { setter({ loading:false, items:cached }); return; }
+    // Le cache rend AUSSI ses échecs : un compte pas lu reste « pas su » (§4).
+    // `demandes` : les comptes que CETTE lecture interroge — rangés avec le
+    // résultat (état ET cache), pour qu'un lecteur sache ce qu'elle couvre.
+    const demandes = cleComptesVinted(accounts);
+    const cached = !force && entreeCache(type);
+    if (cached) { setter({ loading:false, items:cached.items, failed:cached.failed, failedUids:cached.failedUids, comptes:cached.comptes }); return; }
     if (!silencieux) setter({ loading:true, items:null, error:false });
     // PARALLÈLE : on interroge tous les comptes en même temps (avant : un par un
     // en série → très lent avec 9 comptes). La lecture se fait d'abord sur la
@@ -21857,7 +22967,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       : null;
     const porteMonNumero = (t) => /\bn\s?\d{3,4}\b/i.test(String(t || ''));
     const masquesA = type === 'purchased' ? achatsMasques() : new Set();
-    const seen = new Set(); const out = []; let anyOk=false, anyErr=false; const failed=[];
+    // `failedUids` : l'IDENTITÉ des comptes qui n'ont pas répondu — c'est elle
+    // qu'un lecteur juge. `failed` (les noms) ne sert qu'à l'affichage d'avant :
+    // un libellé arrivé du nuage après la lecture, ou un renommage, ne
+    // correspondait plus, et un compte en panne passait pour « 0 vente ».
+    const seen = new Set(); const out = []; let anyOk=false, anyErr=false; const failed=[]; const failedUids=[];
     for (const { acc, res } of results) {
       if (res.ok) { anyOk=true; for (const o of res.items) {
         const id = String(o.transaction_id);
@@ -21866,7 +22980,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if (type === 'purchased' && masquesA.has(id)) continue; // masqué à la main → Réglages « Achats masqués »
         seen.add(id); out.push({ ...o, _acc: acc });
       } }
-      else { anyErr=true; failed.push(accNameOf(acc)); }
+      else { anyErr=true; failed.push(accNameOf(acc)); failedUids.push(String(acc.vinted_user_id)); }
     }
     // ⚠️ SOURCE UNIQUE = VINTED VIA L'EXTENSION (choix de Julien, août 2026).
     // On NE reconstruit PLUS les ventes/achats à partir des emails
@@ -21881,18 +22995,54 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // Erreur seulement si RIEN n'a pu être chargé et qu'au moins un appel a échoué.
     const error = out.length===0 && anyErr && !anyOk;
     if (n !== lectureOrders.current[type]) return;          // une lecture plus récente est partie après celle-ci
-    if (!error) putCache(type, out);
+    // Une lecture partielle se met en cache AVEC ses échecs (jamais comme une
+    // liste complète) ; un échec total, pas du tout.
+    if (!error) putCache(type, out, { failed, failedUids }, demandes);
     if (silencieux && (error || anyErr)) {
-      // Relecture discrète ratée (tout ou partie) : on garde l'affichage — une
-      // vente déjà vue ne disparaît pas parce qu'un compte n'a pas répondu.
-      setter(prev => (prev && Array.isArray(prev.items)) ? { ...prev, loading:false, failed } : { loading:false, items: out, error, failed });
+      // Relecture discrète ratée (tout ou partie) : une vente déjà vue ne
+      // disparaît pas parce qu'un compte n'a pas répondu — on garde CE QU'ON
+      // MONTRAIT de ce compte-là, et lui seul. ⚠️ On gardait toute l'ancienne
+      // liste avec la NOUVELLE liste d'échecs : un compte raté au passage
+      // d'avant (donc absent de l'ancienne liste) qui répondait cette fois
+      // n'était plus « en échec » et s'affichait à « 0 vente ». Les comptes qui
+      // ont répondu prennent leur lecture fraîche ; ceux qui n'ont pas répondu
+      // restent « pas su », même si on montre encore leurs ventes d'avant.
+      const ko = new Set(failedUids);
+      setter(prev => {
+        if (!(prev && Array.isArray(prev.items))) return { loading:false, items: out, error, failed, failedUids, comptes: demandes };
+        const dejaLa = new Set(out.map(o => String(o.transaction_id)));
+        const garde = prev.items.filter(o => ko.has(String(o && o._acc && o._acc.vinted_user_id)) && !dejaLa.has(String(o.transaction_id)));
+        const items = garde.length ? [...out, ...garde].sort((a,b) => new Date(b.date||0) - new Date(a.date||0)) : out;
+        return { ...prev, loading:false, items, error: items.length===0 && !anyOk, failed, failedUids, comptes: demandes };
+      });
       return;
     }
-    setter({ loading:false, items: out, error, failed });
+    setter({ loading:false, items: out, error, failed, failedUids, comptes: demandes });
   };
-  useEffect(() => { if (accounts.length) loadOrders('sold', setSales); /* eslint-disable-next-line */ }, [accounts.length]);
+  // « Relire mes ventes » : une VRAIE relecture — le cache des ventes (qui garde
+  // l'échec) et les lignes des comptes ratés sont vidés, puis on relit NOTRE
+  // base (jamais `force` : ça partirait chez Vinted pour tous les comptes). Les
+  // dates de versement illisibles sont relues aussi. Rend la promesse : le
+  // bouton reste « Lecture… » jusqu'au bout.
+  const relireVentes = async () => {
+    try { delete _acctCache.sold; _persistAcctCache(); } catch (_) {}
+    for (const u of (Array.isArray(sales.failedUids) ? sales.failedUids : [])) _rowCache.delete(`o:${u}`);
+    await Promise.all([
+      loadOrders('sold', setSales, false, { silencieux: true }),
+      versements === null && relireVersements.current ? relireVersements.current() : null,
+    ]);
+  };
+  // Les comptes dont les ventes n'ont pas pu être lues, NOMMÉS au rendu à
+  // partir de leur identité (un libellé arrivé du nuage après la lecture est
+  // pris en compte) — hors comptes exclus de l'app, qui ne comptent nulle part.
+  const nomsVentesKO = (Array.isArray(sales.failedUids) ? sales.failedUids : [])
+    .filter(u => !acctOff(u))
+    .map(u => { const a = (accounts || []).find(x => String(x.vinted_user_id) === String(u)); return a ? accNameOf(a) : `#${u}`; });
+  // Suit l'ENSEMBLE des comptes (`cleComptes`), pas leur nombre : un compte lié
+  // ou retiré relit (le cache ne sert plus une liste qui ne le couvre pas).
+  useEffect(() => { if (accounts.length) loadOrders('sold', setSales); /* eslint-disable-next-line */ }, [cleComptes]);
   useEffect(() => { buysCharges.current = Array.isArray(buys.items); }, [buys.items]);
-  useEffect(() => { if ((curSub==='achats'||curSub==='journee') && accounts.length && buys.items===null) loadOrders('purchased', setBuys); /* eslint-disable-next-line */ }, [sub, accounts.length]);
+  useEffect(() => { if ((curSub==='achats'||curSub==='journee') && accounts.length && (buys.items===null || (buys.comptes && buys.comptes!==cleComptes))) loadOrders('purchased', setBuys); /* eslint-disable-next-line */ }, [sub, cleComptes]);
 
   // AUTO-LOCK : dès qu'une vente finalisée correspond à UNE SEULE annonce
   // numérotée (titre non ambigu), on verrouille le lien vente↔paire par n° de
@@ -21942,6 +23092,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // ÉCRASE les numéros saisis à la main (et leur prix d'achat). C'est ce qui
     // a brûlé les numéros 43→74 et remplacé le N°56 par le N°87.
     if (!cloudReady) return;
+    if (!numerotationPermise()) return;   // version de la numérotation relue (migration 013)
     if (!sales.items || !sales.items.length) return;
     // Deuxième filet : si l'app ne connaît AUCUNE paire numérotée, c'est que les
     // données ne sont pas (encore) là — on ne mint rien plutôt que de tout renuméroter.
@@ -21973,7 +23124,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // Numéro SAISI À LA MAIN (pas autoAssigned) : on n'y touche jamais.
       if (cur && cur.numero != null && String(cur.numero).trim() !== '' && !cur.autoAssigned) continue;
       const broadKey = identiteAnnonce(o);
-      const reuse = (broadKey && numeros[broadKey] && numeros[broadKey].numero) ? String(numeros[broadKey].numero) : null;
+      let reuse = (broadKey && numeros[broadKey] && numeros[broadKey].numero) ? String(numeros[broadKey].numero) : null;
+      // Une vente faite APRÈS la remise à zéro ne reprend jamais un numéro d'archive.
+      if (reuse && venteApresCoupure(o) && !numeroReprenable(reuse)) reuse = null;
       if (reuse) {
         if (!cur || String(cur.numero||'') !== reuse) { ovNext[tid] = { ...(cur||{}), numero: reuse, autoAssigned: false }; changed = true; }
       } else if ((needsBordereau(o.status) || venteRecente(o)) && !isHidden(o) && classifyOrderStatus(o.status) !== 'cancelled') {
@@ -22015,7 +23168,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       setSaleOv(ovNext); save('vinted_sale_overrides', ovNext);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, numeros, autoNum, cloudReady]);
+  }, [sales.items, numeros, autoNum, cloudReady, verNumTick]);
 
   // ⚠️⚠️ ICI VIVAIENT TROIS MIGRATIONS « UNE SEULE FOIS » SUR LES NUMÉROS
   //    (nettoyage du pool, compactage des numéros auto > 42, purge des numéros
@@ -22027,19 +23180,61 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   //    Un numéro ne change JAMAIS tout seul (§5). Ne pas les remettre.
 
 
-  const loadListings = async (force) => {
-    const cached = !force && fromCache('listings');
-    if (cached) { setListings({ loading:false, items:cached }); return; }
-    setListings({ loading:true, items:null, error:false });
-    const out = []; let anyOk=false, anyErr=false;
+  // `surSignal` (revue 5.165) : relecture déclenchée par l'EXTENSION (« maj ·
+  // annonces ») — `Set` des comptes signalés, ou `null` pour tous. On ne lit QUE
+  // la moisson (`moissonSeule`, jamais le relais serveur), seulement les comptes
+  // signalés, et un compte sans ligne garde ce qu'on montrait. Rien d'affiché
+  // encore : rien à relire (l'ouverture de l'écran lira la moisson fraîche).
+  const loadListings = async (force, silencieux, surSignal) => {
+    // Le cache garde aussi les comptes qui n'ont pas répondu : relue du cache,
+    // une liste partielle reste `incomplet` (jamais présentée comme complète).
+    // Complète, elle ne dit pas `false` : la publication des paires qui dorment
+    // n'accepte qu'une lecture FRAÎCHE (voir plus haut).
+    const demandes = cleComptesVinted(accounts);
+    const parSignal = surSignal !== undefined;
+    const avant = listingsRef.current;
+    if (parSignal && !(avant && Array.isArray(avant.items) && avant.comptes === demandes)) {
+      // Une lecture d'ouverture est EN COURS : elle a pu lire le dressing avant
+      // la suppression — on relira juste après elle.
+      if (avant && avant.loading) signalPendantLecture.current = true;
+      return;
+    }
+    const cached = !force && !parSignal && entreeCache('listings');
+    if (cached) { setListings({ loading:false, items:cached.items, comptes:cached.comptes, lues:cached.lues||{}, supprimees:cached.supprimees||{}, ko:cached.failedUids, ...(cached.failedUids.length ? { incomplet: true } : {}) }); return; }
+    // `silencieux` (5.165, relecture sur signal de l'extension) : on garde ce qui
+    // est affiché pendant la lecture, et un échec ne remplace rien.
+    if (!silencieux && !parSignal) setListings({ loading:true, items:null, error:false });
+    const out = []; let anyOk=false, anyErr=false; const failedUids=[];
     // PARALLÈLE (voir loadOrders) : tous les comptes en même temps.
-    const results = await Promise.all(accounts.map(async acc => { const r = await fetchVintedListings(acc, 1, { force }); noteAcctLive(acc.vinted_user_id, r, force); return { acc, r }; }));
+    const results = await Promise.all(accounts.map(async acc => {
+      const uid = String(acc.vinted_user_id);
+      if (parSignal && surSignal && !surSignal.has(uid)) return { acc, r: null };      // pas signalé : on garde
+      const r = await fetchVintedListings(acc, 1, parSignal ? { moissonSeule: true } : { force });
+      if (parSignal && !r.ok) return { acc, r: null };                                   // pas de ligne : on garde
+      noteAcctLive(acc.vinted_user_id, r, force); return { acc, r };
+    }));
     const vendues = new Set();
+    // 5.165 : DE QUAND date la lecture du dressing de chaque compte, et combien
+    // d'annonces supprimées depuis en ont été retirées — pour le DIRE (une fois,
+    // au-dessus de la grille). Gardés dans le cache : un rechargement ne doit pas
+    // faire passer une lecture d'hier pour celle d'aujourd'hui.
+    const lues = {}, supprimees = {};
     for (const { acc, r } of results) {
-      if (r.ok) { anyOk=true; r.items.forEach(it => out.push({ ...it, _acc:acc })); (r.soldIds || []).forEach(id => vendues.add(String(id))); }
-      else anyErr=true;
+      const uid = String(acc.vinted_user_id);
+      if (r === null) {                                    // relecture sur signal : ce compte garde ce qu'on montrait
+        (avant.items || []).forEach(it => { if (String(it._acc && it._acc.vinted_user_id) === uid) { out.push(it); anyOk = true; } });
+        if (avant.lues && avant.lues[uid]) lues[uid] = avant.lues[uid];
+        if (avant.supprimees && avant.supprimees[uid]) supprimees[uid] = avant.supprimees[uid];
+        if ((avant.ko || []).includes(uid)) { anyErr = true; failedUids.push(uid); }
+        continue;
+      }
+      if (r.ok) { anyOk=true; r.items.forEach(it => out.push({ ...it, _acc:acc })); (r.soldIds || []).forEach(id => vendues.add(String(id)));
+        if (r.source === 'harvest' && _harvestSeen[`${uid}_listings`]) lues[uid] = _harvestSeen[`${uid}_listings`];
+        if (r.supprimees) supprimees[uid] = r.supprimees; }
+      else { anyErr=true; failedUids.push(uid); }
     }
     const error = out.length===0 && anyErr && !anyOk;
+    if (silencieux && !parSignal && (error || anyErr)) return;          // relecture ratée : on garde l'affichage
     // Complète la longueur de description pour les annonces captées AVANT que
     // l'extension ne la pose (elle ne coûte qu'une lecture, mise en cache).
     try {
@@ -22052,33 +23247,44 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if (info.ph) it.captPhotos = info.ph;
       }
     } catch (_) { /* sans ce complément, le critère reste simplement inconnu */ }
-    if (!error) putCache('listings', out);
-    // Annonces que VINTED a marquées vendues (identité, jamais un titre).
-    if (vendues.size) setVenduesVinted(vendues);
+    if (!error) putCache('listings', out, { failedUids }, demandes, { lues, supprimees });
+    // Annonces que VINTED a marquées vendues (identité, jamais un titre). Sur
+    // signal, seuls quelques comptes sont relus : on AJOUTE, on n'efface rien.
+    if (vendues.size) setVenduesVinted(parSignal ? (p) => new Set([...p, ...vendues]) : vendues);
     // `incomplet` : au moins un compte n'a pas répondu. Les chiffres tirés de
     // cette liste sont alors des minorants (le bilan de la semaine le dit).
-    setListings({ loading:false, items: out, error, incomplet: anyErr });
+    setListings({ loading:false, items: out, error, incomplet: anyErr, comptes: demandes, lues, supprimees, ko: failedUids });
+    if (!parSignal && signalPendantLecture.current) { signalPendantLecture.current = false; setTimeout(() => loadListings(false, true, null), 200); }
   };
   const loadConvs = async (force) => {
-    const cached = !force && fromCache('convs');
-    if (cached) { setConvs({ loading:false, items:cached }); return; }
+    const demandes = cleComptesVinted(accounts);
+    const cached = !force && entreeCache('convs');
+    if (cached) { setConvs({ loading:false, items:cached.items, comptes:cached.comptes }); return; }
     setConvs({ loading:true, items:null, error:false });
     const out = []; let anyOk=false, anyErr=false;
     // PARALLÈLE (voir loadOrders) : tous les comptes en même temps.
     const results = await Promise.all(accounts.map(async acc => { const r = await fetchVintedConversations(acc, 1, { force }); return { acc, r }; }));
-    for (const { acc, r } of results) { if (r.ok) { anyOk=true; r.items.forEach(c => out.push({ ...c, _acc:acc })); } else anyErr=true; }
+    // ⚠️ RIEN LU NE VAUT PAS RIEN (revue du 8 octobre) : une boîte qui n'a pas
+    //    pu être lue disparaissait sans un mot dès qu'une autre l'était, et
+    //    l'en-tête pouvait dire « Tout est lu » sur un compte dont on n'avait
+    //    rien lu. On garde QUELS comptes n'ont pas répondu (`ko`) ; une liste
+    //    partielle n'est pas mise en cache (elle passerait pour complète).
+    //    L'entrée de cache dit QUELS comptes elle couvre (`demandes`, revue DAC7
+    //    du 9 octobre) : un compte lié depuis n'est pas servi par l'ancienne.
+    const ko = []; const failedUids = [];
+    for (const { acc, r } of results) { if (r.ok) { anyOk=true; r.items.forEach(c => out.push({ ...c, _acc:acc })); } else { anyErr=true; ko.push(acc); failedUids.push(String(acc.vinted_user_id)); } }
     out.sort((a,b) => new Date(b.updated_at||0) - new Date(a.updated_at||0));
     const error = out.length===0 && anyErr && !anyOk;
-    if (!error) putCache('convs', out);
-    setConvs({ loading:false, items: out, error });
+    if (!anyErr) putCache('convs', out, { failedUids }, demandes);
+    setConvs({ loading:false, items: out, error, ko, comptes: demandes });
   };
   // ⚠️ `bordereaux` EN FAIT PARTIE : c'est l'écran où on imprime l'étiquette,
   // donc le seul endroit où un numéro en double coûte vraiment cher. Sans les
   // annonces en ligne, on ne peut pas savoir qu'un numéro est déjà porté par une
   // paire du stock — le détecteur de conflit serait aveugle là où il sert.
-  useEffect(() => { if ((curSub==='annonces'||curSub==='journee'||curSub==='bordereaux') && accounts.length && listings.items===null) loadListings(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
+  useEffect(() => { if ((curSub==='annonces'||curSub==='journee'||curSub==='bordereaux') && accounts.length && (listings.items===null || (listings.comptes && listings.comptes!==cleComptes))) loadListings(); /* eslint-disable-next-line */ }, [sub, cleComptes]);
   useEffect(() => { if ((curSub==='annonces'||curSub==='journee') && emailSales===null) fetchEmailSales().then(setEmailSales); /* eslint-disable-next-line */ }, [sub]);
-  useEffect(() => { if ((curSub==='messages'||curSub==='journee') && accounts.length && convs.items===null) loadConvs(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
+  useEffect(() => { if ((curSub==='messages'||curSub==='journee') && accounts.length && (convs.items===null || (convs.comptes && convs.comptes!==cleComptes))) loadConvs(); /* eslint-disable-next-line */ }, [sub, cleComptes]);
   // ── LES OFFRES REÇUES, EN TÊTE DE MESSAGES (proposition 6, 6 octobre) ─────
   // Mesuré : 37 offres en 14 jours, toutes connues par EMAIL (`email_offer_*`),
   // et seulement 3 conversations captées portent une offre en attente — vieilles.
@@ -22135,7 +23341,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // Tous les bordereaux captés, indexés par transaction (une ligne par colis).
     // Même chose ici : neuf lectures indépendantes, donc neuf en même temps.
     await rechargerLabels();
-  })(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
+  })(); /* eslint-disable-next-line */ }, [sub, cleComptes]);
   // ── COLIS PUBLIE « PRÊTS À IMPRIMER », LES AUTRES CONSOMMENT (§11) ────────
   // Même motif que `vrm_colis_retirer` et `vinted_urssaf_mois` : l'écran qui a
   // TOUTES les sources publie, les autres lisent. Ma journée ne demande jamais
@@ -22263,7 +23469,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   }), []);
   // Un colis est à retirer → on charge les achats (harvest, gratuit) pour
   // retrouver la photo de l'article correspondant.
-  useEffect(() => { if ((tracking||[]).some(t=>t.status==='available') && accounts.length && buys.items===null) loadOrders('purchased', setBuys); /* eslint-disable-next-line */ }, [tracking, accounts.length]);
+  useEffect(() => { if ((tracking||[]).some(t=>t.status==='available') && accounts.length && buys.items===null) loadOrders('purchased', setBuys); /* eslint-disable-next-line */ }, [tracking, cleComptes]);
   // #9 — RAFRAÎCHISSEMENT AUTO EN REVENANT SUR L'APP. Tu navigues sur Vinted
   // (l'extension moissonne pendant ce temps), tu reviens sur l'app → l'onglet
   // courant RELIT la dernière moisson tout seul, sans « Synchroniser ». On relit
@@ -22285,7 +23491,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     };
     document.addEventListener('visibilitychange', onVis);
     return () => document.removeEventListener('visibilitychange', onVis);
-  /* eslint-disable-next-line */ }, [curSub, accounts.length]);
+  /* eslint-disable-next-line */ }, [curSub, cleComptes]);
   // ── LES VENTES ARRIVENT TOUTES SEULES (2 octobre) ─────────────────────────
   // « Ça doit être presque instantanément mis à jour dès que je fais une
   // vente. » Mesuré : l'app ne relisait la moisson qu'au montage et au retour
@@ -22325,7 +23531,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       }
       // Un code de retrait lu dans une conversation (5.155) : on relit la ligne.
       else if (ev.quoi === 'retrait') relireColisRelais();
+      // 5.165 : une annonce SUPPRIMÉE sur Vinted (ou le dressing relu) — on
+      // oublie la lecture d'avant et l'écran qui les montre se relit, sans squelette.
+      // ⚠️ Revue 5.165 : la MOISSON seulement, regroupée (`signalAnnonces`) —
+      //    jamais le relais serveur sur un signal.
+      else if (ev.quoi === 'annonces') {
+        oublierDressing(ev.uid);
+        try { delete _acctCache.listings; _persistAcctCache(); } catch (_) {}
+        if (['annonces', 'journee', 'bordereaux'].includes(curSub)) signalAnnonces(ev.uid);
+      }
     };
+    const signalAnnonces = regrouperSignaux((uids) => loadListings(false, true, uids));
     window.addEventListener('vrm:ext', ecoute);
     if (ecrans.includes(curSub) && ventesPerimees.current) relire();
     const vus = vusSonde.current;
@@ -22352,8 +23568,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     demander();
     sonde();
     const t = setInterval(sonde, 60000);
-    return () => { window.removeEventListener('vrm:ext', ecoute); document.removeEventListener('visibilitychange', onVis); clearInterval(t); };
-  /* eslint-disable-next-line */ }, [curSub, accounts.length]);
+    return () => { window.removeEventListener('vrm:ext', ecoute); document.removeEventListener('visibilitychange', onVis); clearInterval(t); signalAnnonces.arreter(); };
+  /* eslint-disable-next-line */ }, [curSub, cleComptes]);
   // ── COLIS ↔ ACHAT : rapprochement UNIQUE ou RIEN ──────────────────────────
   // Un email de suivi ne porte que le titre de l'article : il n'y a pas d'autre
   // lien avec l'achat Vinted (vérifié — aucun n° de suivi côté Vinted, §5.37).
@@ -22397,7 +23613,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     //    c'est une action à faire (générer le bordereau de retour sur Vinted).
     //    Motif précis (comme venteStage) pour ne pas attraper « Retournée à
     //    l'expéditeur », qui est autre chose.
-    if (/retour\s*initi|retour\s+en\s+cours|retour\s+demand/i.test(s)) return { label: 'À renvoyer', step: 1, color: C.warn, retour: true };
+    if (ACHAT_A_RENVOYER.test(s)) return { label: 'À renvoyer', step: 1, color: C.warn, retour: true };
     if (/annul|rembours|refus/i.test(s)) return { label: 'Annulé', step: 0, color: C.danger };
     if (/finalis/i.test(s) || tusDe(o) === 'completed') return { label: 'Reçu', step: 4, color: INV_STATUS.online.color };
     if (isAtRelayStatus(s) || (tk && tk.status === 'available')) return { label: 'À retirer', step: 3, color: C.warn };
@@ -22459,7 +23675,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (c) arr = [...arr].sort((a,b)=>{ const ac=uidA(a.o)===c, bc=uidA(b.o)===c; return ac===bc?0:(ac?-1:1); }); }
     return arr; },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [buysBase, aFilter, ordSearchDiff, periode, tracking, colisRelais, numeros, compteSel, compteConnecte]);
+    [buysBase, aFilter, ordSearchDiff, periode, tracking, colisRelais, numeros, compteSel, compteConnecte, selEff]);
   const [achatsMax, setAchatsMax] = useState(60);
   // ── ACHATS · ACTIONS RAPIDES (note interne + menu « … ») ──────────────────
   // Note interne par achat (synchronisée, clé = transaction_id) + menu groupant
@@ -22562,6 +23778,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Modifiable à la main ensuite (le champ N° reste éditable), et désactivable.
   useEffect(() => {
     if (!cloudReady) return; // ⛔ pas de numérotation avant que le cloud soit chargé
+    // ⛔ Ni sur une version de la numérotation qu'on n'a pas relue récemment :
+    //    un écran chargé avant la remise à zéro donnerait « 553 » (migration 013).
+    if (!numerotationPermise()) return;
     // ⚠️ TOUTE ANNONCE EN LIGNE DOIT AVOIR UN NUMÉRO — Julien : « je veux
     //    forcément qu'elle ait un numéro, peu importe : dès qu'elle est postée,
     //    elle doit avoir un numéro ». Donc `listings.items` (toutes les annonces
@@ -22597,6 +23816,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const byPhoto = {};
     for (const k in numeros) {
       const e = numeros[k]; if (!e || !String(e.numero || '').trim()) continue;
+      // Un numéro d'archive ne se redonne jamais par une photo (Julien, 10 octobre).
+      if (!numeroReprenable(e.numero)) continue;
       const pk = entryPhotoKey(e); if (pk && !byPhoto[pk]) byPhoto[pk] = String(e.numero);
     }
     const nextNum = { ...numeros };
@@ -22605,7 +23826,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const nextUsed = new Set(usedNumeros.map(entreePool).filter(x => x != null));
     const takenK = new Set(takenCles);
     let changed = false;
-    const sorted = [...items].sort((a, b) => (a.createdTs || 0) - (b.createdTs || 0));
+    // Dans l'ORDRE DE MISE EN LIGNE (1, 2, 3… comme il les reposte), par la même
+    // date que celle qui décide si l'annonce se numérote.
+    const sorted = [...items].sort((a, b) => (dateMiseEnLigneMs(a, listingDates) || 0) - (dateMiseEnLigneMs(b, listingDates) || 0));
     for (const it of sorted) {
       const cur = nextNum[it.id];
       const pk = photoKey(it.photo);
@@ -22617,10 +23840,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // paire (voir `numVentesParIdentite` juste au-dessus) : sans ça, une
       // annonce postée depuis le téléphone puis vendue avant d'être captée
       // repartirait sur un numéro neuf alors que sa boîte en porte déjà un.
-      let num = numVentesParIdentite.parItem[String(it.id)]
-             || (pk && numVentesParIdentite.parPhoto[pk])
+      // Après la remise à zéro : une annonce d'AVANT la coupure (ou sans date)
+      // n'est pas numérotée toute seule — seules les annonces republiées le sont.
+      if (!annonceNumerotable(it, listingDates)) continue;
+      let num = numeroReprenable(numVentesParIdentite.parItem[String(it.id)])
+             || numeroReprenable(pk && numVentesParIdentite.parPhoto[pk])
              || null;
-      if (!num) num = (pk && byPhoto[pk]) || null; // réutilisation par PHOTO (retour/republication du MÊME article)
+      if (!num) num = numeroReprenable(pk && byPhoto[pk]); // réutilisation par PHOTO (jamais un numéro d'archive)
       // Prochain numéro = le premier JAMAIS UTILISÉ. `taken` contient tous les
       // numéros déjà donnés (à vie, §5.40) : la séquence monte et ne redescend
       // pas. C'est voulu — elle compte les paires passées, pas le stock.
@@ -22645,7 +23871,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // arrivent souvent APRÈS les annonces. Sans elle, une annonce déjà rendue
   // garderait le numéro neuf qu'on vient justement d'éviter.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listings.items, cloudReady, numVentesParIdentite, sales.items, txnPret]);
+  }, [listings.items, cloudReady, numVentesParIdentite, sales.items, txnPret, verNumTick, listingDates]);
 
   const openConversation = async (conv) => {
     setReplyText(''); setReplyErr(null); setReplyBusy(false);
@@ -22924,7 +24150,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
   // Pour le taux d'écoulement, on s'assure que les annonces en ligne sont
   // chargées même en étant sur l'onglet Ventes (harvest-first, donc gratuit).
-  useEffect(() => { if (curSub==='ventes' && accounts.length && listings.items===null) loadListings(); /* eslint-disable-next-line */ }, [sub, accounts.length]);
+  useEffect(() => { if (curSub==='ventes' && accounts.length && (listings.items===null || (listings.comptes && listings.comptes!==cleComptes))) loadListings(); /* eslint-disable-next-line */ }, [sub, cleComptes]);
 
   // Tendance sur 6 mois (CA finalisé + bénéfice net) pour le mini-graphique.
   const monthlyChart = useMemo(() => {
@@ -23659,11 +24885,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // ⚠️ Dates de versement ILLISIBLES : ses ventes Vinted ne sont pas « sans
     //    date » (on n'a pas pu les lire) — seules Leboncoin et eBay comptent ici.
     const tousADater = versements === null ? (declRapport.aDater || [])
-      : ventesDeclarables({ vinted: sales.items, lbc: lbcLu ? lbcVentes.ventes : [], ebay: ebayCmd || [], exclu: acctOffOf, versements: versements || {}, declare: declUrssaf }).aDater;
+      : ventesDeclarables({ vinted: ventesComptees || [], lbc: lbcLu ? lbcVentes.ventes : [], ebay: ebayCmd || [], exclu: acctOffOf, versements: versements || {}, declare: declUrssaf }).aDater;
     const aDater = { n: tousADater.length, ca: tousADater.reduce((t, l) => t + l.eur, 0) };
     // Les comptes dont les ventes n'ont pas pu être lues — sauf ceux qu'il a
     // EXCLUS (leurs ventes ne comptent jamais : leur absence ne manque à rien).
-    const comptesEchec = (sales.failed || []).filter(nom => !accounts.some(a => accNameOf(a) === nom && acctOff(a.vinted_user_id)));
+    // Les comptes dont les ventes n'ont pas pu être lues, jugés par leur
+    // IDENTITÉ (`failedUids`, hors comptes exclus) puis nommés : un libellé
+    // arrivé du nuage après la lecture ne fait plus passer un compte en panne
+    // pour un compte lu (revue du 6 octobre).
+    const comptesEchec = nomsVentesKO;
     const sourcesKO = [versements === null ? 'Vinted (dates de versement)' : null, comptesEchec.length ? `Vinted (${comptesEchec.join(', ')})` : null, lbcLu === null ? 'Leboncoin' : null, ebayCmd === null ? 'eBay' : null].filter(Boolean);
     // Registre des ventes : dans l'ordre du mois, comme le relevé d'un comptable.
     saleLines.sort((a,b)=> new Date(a.date)-new Date(b.date));
@@ -23692,12 +24922,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const declaration = moisDeclare(declUrssaf, reportMonth) ? declUrssaf[reportMonth] : null;
     const enCours = declRapport.vinted === 'encours';
     // Peut-on noter « J'ai déclaré ce mois » ? Seulement sur une lecture complète.
-    const incomplet = lectureIncomplete({ registre: declUrssaf, ventes: sales.items, ventesErreur: !!sales.error, comptesEchec, versements, lbc: lbcLu, ebay: ebayCmd });
+    // `ventesComptees` : `null` tant que la lecture ne couvre pas les comptes
+    // d'aujourd'hui (un compte lié depuis) ⇒ « lecture en cours », jamais noté.
+    const incomplet = lectureIncomplete({ registre: declUrssaf, ventes: ventesComptees, ventesErreur: !!sales.error, comptesEchec, versements, lbc: lbcLu, ebay: ebayCmd });
     return { regime, tvaRate, monthLabel, ca, cout, frais, nb, nbCout, benefNet, marge, tvaMarge, margeHT, taux, urssaf, nMasq, caMasq, nAttente, caAttente, saleLines, buyLines, achatsTotal, parPlateforme, aDater, sourcesKO,
       nApres, caApres, nDouble, caDouble, doubles: [...doubles].sort(), nAilleurs, caAilleurs, ailleurs, nVenteAvant, caVenteAvant, venteAvant, declaration, declarePasSu: declUrssaf == null, enCours,
       vinted: declRapport.vinted, incomplet };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, sales.failed, sales.error, accounts, buysBase, reportMonth, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements, declarables, declRapport, declUrssaf]);
+  }, [sales.items, sales.failedUids, sales.error, ventesComptees, accounts, buysBase, reportMonth, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements, declarables, declRapport, declUrssaf]);
 
   // ── « J'AI DÉCLARÉ CE MOIS » (6 octobre) ──────────────────────────────────
   // Il note, SUR SON CLIC, ce qu'il a déclaré à l'URSSAF pour un mois : l'app
@@ -23715,8 +24947,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (!moisAncienneRegle) return null;
     // L'ancienne règle : ventes Vinted FINALISÉES, au mois de la VENTE, ventes
     // masquées comprises, comptes exclus non (Leboncoin et eBay n'y étaient pas).
+    // Les MÊMES ventes que le registre (`ventesComptees` : comptes lus cette
+    // fois, et couvrant les comptes d'aujourd'hui) — les deux totaux sont écrits
+    // côte à côte, ils ne parlent pas de deux listes différentes (§11).
     const ids = []; let ca = 0;
-    for (const o of (sales.items || [])) {
+    for (const o of (ventesComptees || [])) {
       if (!o || acctOffOf(o) || !venteFinalisee(o)) continue;
       if (ymOf(o.date) !== reportMonth) continue;
       const tx = o.transaction_id != null ? o.transaction_id : o.id; if (tx == null) continue;
@@ -23724,15 +24959,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     }
     return { ids, ca: Math.round(ca * 100) / 100 };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [moisAncienneRegle, sales.items, reportMonth, hiddenAccts, panelAcctOff]);
+  }, [moisAncienneRegle, ventesComptees, reportMonth, hiddenAccts, panelAcctOff]);
   const declarerMois = (regle, montantTxt) => {
     // ⚠️ LA GARDE EST DANS LE GESTE, pas seulement sur le bouton (revue du
     //    6 octobre) : une lecture peut tomber PENDANT que le formulaire est
     //    ouvert. Recalculée ici, sur l'état du moment — jamais une liste
     //    incomplète notée comme sa déclaration (tout ce qui manque passerait
     //    ensuite « à régulariser » : payé deux fois).
-    const comptesEchec = (sales.failed || []).filter(nom => !accounts.some(a => accNameOf(a) === nom && acctOff(a.vinted_user_id)));
-    const manque = lectureIncomplete({ registre: declUrssaf, ventes: sales.items, ventesErreur: !!sales.error, comptesEchec, versements, lbc: lbcLu, ebay: ebayCmd });
+    const comptesEchec = nomsVentesKO;                // identité, pas libellé (voir le rapport)
+    const manque = lectureIncomplete({ registre: declUrssaf, ventes: ventesComptees, ventesErreur: !!sales.error, comptesEchec, versements, lbc: lbcLu, ebay: ebayCmd });
     if (manque || !declarables) { setDeclForm(f => f ? { ...f, refus: manque || { enCours: [], rates: ['les dates de versement Vinted'] } } : f); return; }
     const ids = regle === 'vente' && ancienneRegle ? ancienneRegle.ids : report.saleLines.map(l => l.id).filter(Boolean);
     const ca = regle === 'vente' && ancienneRegle ? ancienneRegle.ca : Math.round(report.ca * 100) / 100;
@@ -23870,6 +25105,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     //    compte dans le mois où il l'a DÉCLARÉE, sinon celui du versement. Le
     //    total de l'année est donc, par construction, la somme des mois.
     const parPlateforme = { Vinted: { n: 0, ca: 0 } };
+    // Les ventes Vinted du registre, PAR COMPTE (en centimes) : c'est la partie
+    // sûre de la carte « Ce que Vinted transmet aux impôts » — elle la LIT ici,
+    // elle ne la recalcule pas (§11 : sinon deux règles, deux chiffres). Mêmes
+    // lignes, même mois (celui de la déclaration, sinon du versement).
+    const vintedParUid = {};
     // ⚠️ (revue du 6 octobre) Via `declRapport` : dates de versement illisibles,
     //    Leboncoin et eBay restent comptés et Vinted est DIT absent (`vinted`) ;
     //    pendant la lecture, `vinted: 'encours'` — jamais « 0 € ».
@@ -23884,6 +25124,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const b = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? parseFloat(String(e.buyPrice).replace(',','.')) : null;
         if (b!=null && !isNaN(b)) buy = b;
         num = (e && e.numero) || ''; account = l.o._acc ? accName(l.o._acc) : '';
+        const uV = String(l.o._acc?.vinted_user_id ?? ''); const qV = vintedParUid[uV] || (vintedParUid[uV] = { n: 0, cts: 0 });
+        qV.n += 1; qV.cts += Math.round(sell * 100);
       }
       if (l.masquee) { nMasq+=1; caMasq+=sell; }
       ca+=sell; nb+=1; frais+=fee; mo.ca+=sell; mo.nb+=1; mo.frais+=fee;
@@ -23921,7 +25163,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const taux = tauxUrssaf();
     const urssaf = aPayerUrssaf(ca, taux);
     return { regime, tvaRate, year:reportYear, months, ca, cout, frais, nb, nbCout, benefNet, marge, tvaMarge, margeHT, taux, urssaf, nMasq, caMasq, achatsTotal, achatsNb, buyLines, saleLines, parPlateforme, charges, resultatCharges,
-      enCours: declRapport.vinted === 'encours', vinted: declRapport.vinted };
+      enCours: declRapport.vinted === 'encours', vinted: declRapport.vinted,
+      // La partie Vinted du registre, par compte, en TROIS états : `undefined`
+      // tant qu'elle se lit, `null` quand les dates de versement sont
+      // illisibles, l'objet quand elle est complète. La carte des seuils ne
+      // lit donc jamais un `{}` vide comme « 0 vente » (« rien lu » ne vaut
+      // pas « rien »). Les ventes PAS ENCORE DATÉES viennent de la même liste
+      // (`declRapport.aDater`, §11) — jamais d'un second calcul.
+      vintedParUid: declRapport.vinted === 'lu' ? vintedParUid : declRapport.vinted === 'passu' ? null : undefined,
+      vintedADater: declRapport.vinted === 'lu' ? (declRapport.aDater || []).filter(l => l.plateforme === 'Vinted') : [] };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, buysBase, reportYear, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements, declarables, declRapport]);
   const [capturedReceipts, setCapturedReceipts] = useState([]); // reçus officiels Vinted captés (compta pro)
@@ -24085,6 +25335,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const buf = lu && lu.octets ? lu.octets : null;
       if (!buf) { libererOngletPdf(); toast(messagePdfManquant(lu)); return; }
       const numero = numForBord(b), title = b.modele || b.article || '';
+      if (numero && !(await assurerVersionNumerotation())) { libererOngletPdf(); toast(NUMEROS_PERIMES_IMPRESSION); return; }
       const { width, height } = await readPdfFirstPageSize(buf);
       const pos = posForFormat(width, height);
       const inv = invForBord(b);
@@ -24176,7 +25427,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const man = manualEntry(b); if (man && man.numero) return String(man.numero);
     const parItem = numFromLabelItem(b); if (parItem) return parItem;   // identité Vinted, zéro déduction
     const parTxn = numFromTxn(b); if (parTxn) return parTxn;
-    if (b.numero) return String(b.numero);
+    if (b.numero && numeroEmailAdmis(b, numeros)) return String(b.numero);
     return '';
   };
   // Le numéro de l'email contredit-il celui de la transaction ? On le signale au
@@ -24185,7 +25436,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // On compare au plus sûr des deux chemins certains : l'identité d'annonce si
     // l'extension l'a jointe au bordereau, sinon la transaction.
     const parTxn = numFromLabelItem(b) || numFromTxn(b);
-    const parMail = String((b && b.numero) || '').trim();
+    const parMail = numeroEmailAdmis(b, numeros) ? String((b && b.numero) || '').trim() : '';
     return parTxn && parMail && parTxn !== parMail ? { txn: parTxn, mail: parMail } : null;
   };
   // Date limite d'expédition d'un bordereau (Vinted pénalise les retards) : on la
@@ -24482,6 +25733,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                      return `Ouvre la conversation Vinted de chaque colis (bouton dans Achats) : le code y est. L'extension la lit aussi toute seule quand tu passes sur Vinted connecté ${qui}`; })();
           jobs.push({icon:'box',color:hd>0?C.danger:(pr>0?(C.blue||C.accent):C.muted),urgent:hd>0,title:`Retirer ${pickupCount} colis`,sub,tab:'cat_achats',prio:hd>0?0.5:(pr>0?2:6)});
         }
+        // ⚠️ UN ACHAT EN LITIGE À RENVOYER (revue du 9 octobre) : il ne
+        //    s'affichait que sous Achats → « Tous ». Même règle que la carte et
+        //    le bloc d'Achats (`ACHAT_A_RENVOYER`, §11) ; le compte est nommé
+        //    (le bordereau de retour se fait sur CELUI-LÀ).
+        { const ar = (buysBase||[]).filter(o=>ACHAT_A_RENVOYER.test(String(o.status||'')));
+          if (ar.length) { const cs=[...new Set(ar.map(o=>o._acc?accNameOf(o._acc):'').filter(Boolean))];
+            jobs.push({id:'a-renvoyer',n:ar.length,icon:'box',color:C.warn,title:`Renvoyer ${ar.length} paire${ar.length>1?'s':''} (litige)`,
+              sub:`Génère l'étiquette de retour sur Vinted${cs.length===1?` — compte ${cs[0]}`:cs.length>1?` — comptes ${cs.slice(0,3).join(', ')}`:''}`,tab:'cat_achats',prio:0.8}); } }
         if(unread) jobs.push({icon:'chat',color:C.warn,title:`Répondre à ${unread} message${unread>1?'s':''}`,sub:'Un acheteur attend — réponds vite pour vendre',tab:'cat_msg',prio:3});
         if(repriceList.length) jobs.push({icon:'tag',color:C.warn,title:`Baisser ${repriceList.length} prix`,sub:'Des paires vues mais qui ne partent pas',tab:'cat_annonces',prio:5});
         // ⚠️⚠️ SES EMAILS MIS DE CÔTÉ QUE PERSONNE NE PEUT RÉCUPÉRER. Au seul
@@ -24518,6 +25777,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // de l'argent reçu, ce n'est pas le CA déclaré de ce mois. La phrase sous
         // le chiffre le dit, des MÊMES lignes (§5).
         const recuDeclareAilleurs = declarables ? declarables.lignes.filter(l => l.ts && ymDeTs(l.ts) === ymIci && l.ym !== ymIci) : [];
+        // Un compte dont les ventes n'ont pas pu être lues n'est pas dans ce
+        // reçu (`ventesComptees`) : on le dit à côté du chiffre — un total
+        // partiel ne se présente pas comme complet (§5).
+        const recuSans = declarables && nomsVentesKO.length ? `sans ${nomsVentesKO.join(', ')} (ventes pas lues) · ` : '';
         const caDeclareAilleurs = recuDeclareAilleurs.reduce((a, l) => a + l.eur, 0);
         const moisDeclAilleurs = [...new Set(recuDeclareAilleurs.map(l => l.ym))].sort().map(ym => { const [y, m] = ym.split('-'); return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString('fr-FR', { month: 'long' }); }).join(', ');
         const joursActifs = jours14.some(j => j.vendu.eur > 0 || (j.recu && j.recu.eur > 0));
@@ -24600,10 +25863,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <span style={{opacity:.55}}>·</span>
                     <span style={{opacity:.9,fontWeight:600}}>voir mes ventes ›</span>
                   </div>
-                  <div data-recu-mois={recuMois==null?'':Math.round(recuMois*100)} style={{marginTop:16,paddingTop:13,borderTop:'1px solid rgba(255,255,255,.13)',display:'flex',alignItems:'baseline',gap:10,flexWrap:'wrap'}}>
+                  <div data-recu-mois={recuMois==null?'':Math.round(recuMois*100)} data-recu-sans={recuSans ? nomsVentesKO.join(',') : ''} style={{marginTop:16,paddingTop:13,borderTop:'1px solid rgba(255,255,255,.13)',display:'flex',alignItems:'baseline',gap:10,flexWrap:'wrap'}}>
                     <span style={{fontSize:11,fontWeight:600,letterSpacing:0.7,textTransform:'uppercase',opacity:.72}}>Reçu en {moisNom}</span>
                     <span className="vrm-display" style={{fontSize:22,fontWeight:700,fontVariantNumeric:'tabular-nums'}}>{declarables === undefined ? '…' : recuMois == null ? '—' : `${Math.round(recuMois).toLocaleString('fr-FR')} €`}</span>
-                    <span style={{fontSize:12,opacity:.72}}>{declarables === null ? 'dates de versement illisibles pour l\'instant' : caDeclareAilleurs > 0 ? `ventes finalisées, argent versé · dont ${Math.round(caDeclareAilleurs).toLocaleString('fr-FR')} € déjà dans ta déclaration de ${moisDeclAilleurs}` : 'ventes finalisées, argent versé · ton CA déclaré'}</span>
+                    <span style={{fontSize:12,opacity:.72}}>{declarables === null ? 'dates de versement illisibles pour l\'instant' : recuSans + (caDeclareAilleurs > 0 ? `ventes finalisées, argent versé · dont ${Math.round(caDeclareAilleurs).toLocaleString('fr-FR')} € déjà dans ta déclaration de ${moisDeclAilleurs}` : 'ventes finalisées, argent versé · ton CA déclaré')}</span>
                   </div>
                 </div>
               </button>
@@ -25218,7 +26481,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <Notice tone="warn" icon="box"
               value={pending.length}
               title={`vente${pending.length>1?'s':''} repérée${pending.length>1?'s':''} via bordereau, pas encore synchronisée${pending.length>1?'s':''}`}
-              desc={pending.map(b=>(b.numero?`N°${b.numero} · `:'')+(b.modele||b.article||'?')).join(' — ')}
+              desc={pending.map(b=>(b.numero&&numeroEmailAdmis(b,numeros)?`N°${b.numero} · `:'')+(b.modele||b.article||'?')).join(' — ')}
               detail="Elles apparaîtront dans la liste (et dans la comptabilité) après ta prochaine navigation sur Vinted : c'est l'extension qui recapte les ventes."/>
           );
         })()}
@@ -25447,9 +26710,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           </div>
         ); })()}
         </>)}
-        {sales.failed?.length>0 && (
-          <div style={{fontSize:12,fontWeight:500,color:C.danger,background:`${C.danger}14`,border:`1px solid ${C.danger}55`,borderRadius:8,padding:'8px 12px',marginBottom:12,lineHeight:1.4}}>
-            ⚠️ {sales.failed.length} compte{sales.failed.length>1?'s':''} non chargé{sales.failed.length>1?'s':''} ({sales.failed.join(', ')}) — session expirée. Ouvre ce compte sur vinted.fr (l'extension le recapte) ou reconnecte-le, puis « Synchroniser ».
+        {/* Les comptes non chargés, jugés par leur IDENTITÉ (`failedUids`) et
+            nommés au rendu — y compris quand la liste vient du cache. */}
+        {nomsVentesKO.length>0 && (
+          <div data-ventes-ko={nomsVentesKO.length} style={{fontSize:12,fontWeight:500,color:C.danger,background:`${C.danger}14`,border:`1px solid ${C.danger}55`,borderRadius:8,padding:'8px 12px',marginBottom:12,lineHeight:1.4}}>
+            ⚠️ {nomsVentesKO.length} compte{nomsVentesKO.length>1?'s':''} non chargé{nomsVentesKO.length>1?'s':''} ({nomsVentesKO.join(', ')}) — session expirée. Ouvre ce compte sur vinted.fr (l'extension le recapte) ou reconnecte-le, puis « Synchroniser ».
           </div>
         )}
         <div className="vrm-rangee" style={{display:'flex',gap:6,marginBottom:12,alignItems:'center',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',paddingBottom:2}}>
@@ -25744,6 +27009,38 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <button key={id} onClick={()=>setAFilter(id)} style={{flexShrink:0,whiteSpace:'nowrap',padding:'7px 14px',borderRadius:8,border:`1px solid ${aFilter===id?C.accent:C.border}`,background:aFilter===id?C.accent:'transparent',color:aFilter===id?'#fff':C.muted,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',boxShadow:aFilter===id?`0 2px 8px ${C.accent}44`:'none',transition:'all .18s ease'}}>{label}{cnt?` ${cnt}`:''}</button>
           )); })()}
         </div>
+        {/* ⚠️⚠️ UN ACHAT EN LITIGE NE SE CACHE PAS DERRIÈRE « TOUS » (revue du
+            9 octobre). « Retour initié » range l'achat en « annulé » pour
+            l'argent (aucune livraison à attendre) : il sortait donc de « En
+            route », l'onglet par défaut n'affiche aucune liste, et le lien du
+            bordereau de retour ne se voyait QUE sous « Tous », parmi des
+            centaines d'achats. Une action de litige cachée est un colis oublié.
+            Il a sa place en tête des onglets du quotidien — sans revenir dans
+            le compte « En route » (il n'arrive pas, il repart). Sous « Tous »,
+            sa carte porte déjà le lien : pas deux fois. */}
+        {aFilter!=='all' && (()=>{
+          const l = buysBase.filter(o=>ACHAT_A_RENVOYER.test(String(o.status||'')));
+          if (!l.length) return null;
+          const comptes = [...new Set(l.map(o=>o._acc?accNameOf(o._acc):"").filter(Boolean))];
+          const unSeul = comptes.length===1;
+          return (
+            <div data-a-renvoyer={l.length} style={{background:C.card,border:`1px solid ${C.border}`,borderLeft:`3px solid ${C.warn}`,borderRadius:10,padding:'10px 13px',marginBottom:12}}>
+              <div style={{fontSize:13.5,fontWeight:700,color:C.text}}>↩ {l.length} paire{l.length>1?'s':''} à renvoyer (litige){unSeul?<span style={{fontWeight:500,color:C.muted}}> · compte {comptes[0]}</span>:null}</div>
+              <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.45}}>Ouvre la commande sur Vinted pour générer l'étiquette de retour, la réimprimer ou suivre le colis. VRM ne la génère pas tout seul (un retour engage l'envoi, et c'est un compte en litige).</div>
+              {l.map(o=>{ const ph=orderPhoto(o); return (
+                <div key={o.transaction_id} style={{display:'flex',alignItems:'center',gap:10,marginTop:9,flexWrap:'wrap'}}>
+                  {ph && !imgMortes.has(ph) ? <img src={ph} alt="" loading="lazy" onError={()=>noterImgMorte(ph)} style={{width:38,height:38,borderRadius:8,objectFit:'cover',flexShrink:0,border:`1px solid ${C.border}`}}/> : null}
+                  <div style={{flex:'1 1 160px',minWidth:0}}>
+                    <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={o.title}>{o.title}</div>
+                    {!unSeul && o._acc && <div style={{fontSize:11.5,color:C.muted}}>compte {accNameOf(o._acc)}</div>}
+                  </div>
+                  <a data-retour-tx={o.transaction_id} href={`https://www.vinted.fr/member/transactions/${encodeURIComponent(o.transaction_id)}`} target="_blank" rel="noreferrer"
+                    style={{display:'inline-flex',alignItems:'center',gap:6,border:`1.5px solid ${C.warn}`,background:`${C.warn}14`,color:C.warn,borderRadius:8,padding:'7px 12px',fontSize:12.5,fontWeight:700,textDecoration:'none',flexShrink:0}}>↩ Bordereau de retour sur Vinted</a>
+                </div>
+              ); })}
+            </div>
+          );
+        })()}
         {/* ⚠️ SUR « À RETIRER », CES TROIS COMMANDES N'AGISSENT SUR RIEN.
             Cet onglet n'affiche AUCUNE liste de commandes (`aFilter==='attente'`
             renvoie faux dans le filtre plus bas) : il montre les colis groupés
@@ -26745,7 +28042,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <button type="button" onClick={async ()=>{
                       const libre = String(nextNumero);
                       if (!await askConfirm({ title:`Donner le N°${libre} à cette paire ?`, desc:`« ${it.title} »\n\nElle quitte le N°${g.numero}, qui reste à l'autre paire. Pense à changer l'étiquette de la boîte.`, ok:`Passer au N°${libre}` })) return;
-                      setNumeros(prev => { const u={...prev}; u[it.id]={...(u[it.id]||{}), numero:libre}; save('vinted_annonce_numeros',u); return u; });
+                      setNumeros(prev => { const u={...prev}; u[it.id]={...(u[it.id]||{}), numero:libre, manuelAt:new Date().toISOString()}; save('vinted_annonce_numeros',u); return u; });
                       recordUsed(libre);   // le numéro est pris à vie (§5.40)
                       toast(`✓ Cette paire est maintenant le N°${libre}.`);
                     }} style={{flexShrink:0,border:`1px solid ${C.accent}`,background:'transparent',color:C.accent,borderRadius:8,padding:'5px 10px',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
@@ -26787,8 +28084,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           if (uids.length < 2 && !uids.some(u=>hiddenAccts.has(u))) return null; // un seul compte : rien à dire
           const nOff = uids.filter(u => acctOff(u)).length;
           const refuses = uids.filter(u => blockedAccts.has(u) && !acctOff(u));
-          const vieux = uids.filter(u => { const ms = harvestAgeMs(u, 'listings'); return ms != null && ms >= 7*86400000 && !hiddenAccts.has(u) && !blockedAccts.has(u); });
-          const nVieux = vieux.reduce((t,u)=>t+(visibles[u]||0), 0);
           const accByUid = {}; accounts.forEach(a=>{ accByUid[String(a.vinted_user_id)] = a; });
           const nom = (u) => { const a = accByUid[u]; return a ? accNameOf(a) : `#${u}`; };
           return (
@@ -26797,7 +28092,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 Annonces de <b style={{color:C.text}}>{uids.length - nOff} compte{uids.length - nOff>1?'s':''}</b>
                 {nOff>0 && <> · {nOff} masqué{nOff>1?'s':''}</>}
                 {refuses.length>0 && <> · <b style={{color:C.warn}}>connexion refusée : {refuses.map(nom).join(', ')}</b></>}
-                {nVieux>0 && <> · <b style={{color:C.warn}}>{nVieux} annonce{nVieux>1?'s':''}</b> de {vieux.length>1?`${vieux.length} comptes`:nom(vieux[0])} pas rafraîchie{nVieux>1?'s':''} depuis une semaine — connecte-toi dessus sur vinted.fr et ouvre ton dressing</>}
               </span>
               <button type="button" onClick={()=>onNav && onNav('vintedaccounts')}
                 style={{border:'none',background:'transparent',padding:0,color:C.accent,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
@@ -26805,6 +28099,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </button>
             </div>
           );
+        })()}
+        {/* 5.165 — DE QUAND DATE CE QU'ON VOIT, et les annonces SUPPRIMÉES depuis.
+            Une fois, au-dessus de la grille (§7) ; la règle et la phrase sont
+            celles du tableau de bord (`FraicheurAnnonces`, §11). Remplace le
+            « pas rafraîchie depuis une semaine » de la ligne des comptes. */}
+        {listings.items && (()=>{
+          const enLigne = {};
+          for (const it of annBase) { const u = String(it._acc?.vinted_user_id || ''); if (u) enLigne[u] = (enLigne[u]||0)+1; }
+          for (const u of Object.keys(listings.supprimees || {})) if (!acctOff(u) && !(u in enLigne)) enLigne[u] = 0;
+          const noms = {}; accounts.forEach(a => { noms[String(a.vinted_user_id)] = accNameOf(a); });
+          return <FraicheurAnnonces lues={listings.lues} enLigne={enLigne} noms={noms} supprimees={listings.supprimees} activite={liveStats && liveStats.annActivite}/>;
         })()}
         {listings.loading && <Skeleton variant="card" count={6}/>}
         {listings.error && <LoadError onRetry={()=>loadListings(true)}/>}
@@ -27429,7 +28734,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {(()=>{
           if (offresEmail === undefined || !sales.items) return null;   // on attend de savoir lesquelles sont déjà réglées
           if (offresEmail === null) return <div data-offres-messages="passu" style={{fontSize:12,color:C.muted,marginBottom:10}}>Les offres reçues par email n'ont pas pu être lues pour l'instant — rouvre cet écran dans un moment.</div>;
-          const { gardees, reglees } = offresAtraiter(offresEmail, sales.items, offresFaites, cleOffre);
+          // ⚠️ Un compte qu'il a ÉCARTÉ (exclu par son choix) ou RETIRÉ de l'app
+          //    n'a plus rien à lui dire (revue du 8 octobre — mesuré : 5 offres
+          //    de julienf765, exclu puis retiré, « à trancher » et nommées sur
+          //    chaque ligne). La conversation juste en dessous les écartait
+          //    déjà : même règle ici (§11). « Retiré » ne se juge que sur une
+          //    liste de comptes LUE (rien lu ne vaut pas rien) ; une offre sans
+          //    compte connu reste affichée (pas su ≠ autre compte).
+          const comptesLus = accountsReady && !baseKO;
+          const offresDesComptes = offresEmail.filter((of) => { const u = String((of && of.uid) || ''); if (!u) return true;
+            if (acctOff(u)) return false;
+            return !(comptesLus && !accountUids.has(u)); });
+          const { gardees, reglees } = offresAtraiter(offresDesComptes, sales.items, offresFaites, cleOffre);
           if (!gardees.length) return null;
           // Le repère du MODÈLE (jamais le prix de LA paire : l'email ne dit pas laquelle).
           const repere = {};
@@ -27480,7 +28796,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const uidC = c => String((c._acc&&c._acc.vinted_user_id)||'');
           // Compte choisi ⇒ les AUTRES restent (floutés, pas masqués — Julien).
           const liste = (convs.items||[]).filter(c=>!acctOffOf(c));
-          const nonLus = liste.filter(c=>c.unread && (!selEff || uidC(c)===selEff)).length;
+          // ⚠️⚠️ LE NOMBRE VIENT DE LA LISTE AFFICHÉE (§5, §11 — revue du
+          //    8 octobre). Depuis que les autres comptes sont estompés au lieu
+          //    d'être retirés, `liste` les contient tous ; or ce compte ne
+          //    gardait que le compte choisi. Résultat : « Tout est lu » écrit
+          //    au-dessus de deux messages non lus d'un autre compte — floutés et
+          //    inertes, et le point « nouveau » de l'onglet disait l'inverse. Un
+          //    acheteur qui attend était annoncé comme « rien à faire ».
+          //    ⇒ on compte TOUTE la liste ; ceux d'un compte estompé sont dits à
+          //    côté, avec le geste, jamais à la place.
+          const nonLus = liste.filter(c=>c.unread).length;
+          const nonLusAilleurs = selEff ? liste.filter(c=>c.unread && uidC(c)!==selEff).length : 0;
+          // Les boîtes qui n'ont pas pu être lues (comptes qu'il n'a pas
+          // écartés) : tant qu'il y en a une, « Tout est lu » serait un total
+          // partiel présenté comme complet (§5).
+          const boitesKO = (convs.ko||[]).filter(a=>a && !acctOff(a.vinted_user_id));
           // Compte choisi (ou connecté) d'abord, puis non lus, puis les récents.
           const coMsg = selEff;
           const tri = [...liste].sort((a,b)=>
@@ -27518,12 +28848,31 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           return (
             <div data-messagerie style={{marginBottom:12}}>
               <div style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:8,flexWrap:'wrap'}}>
-                <div style={{fontSize:14,fontWeight:700,color:C.text}}>
-                  {nonLus>0 ? <><span style={{color:C.accent}}>{nonLus}</span> non lu{nonLus>1?'s':''}</> : 'Tout est lu'}
-                  <span style={{fontWeight:500,color:C.muted}}> · {liste.length} conversation{liste.length>1?'s':''}</span>
+                <div data-messagerie-tete={nonLus>0 ? 'nonlus' : boitesKO.length ? 'passu' : liste.length ? 'toutlu' : 'vide'} data-nonlus={nonLus} style={{fontSize:14,fontWeight:700,color:C.text}}>
+                  {/* « Tout est lu » ne s'écrit que si AUCUNE conversation
+                      affichée n'est non lue ET que chaque boîte a été lue. */}
+                  {nonLus>0 ? <><span style={{color:C.accent}}>{nonLus}</span> non lu{nonLus>1?'s':''}</>
+                    : boitesKO.length ? 'Aucun non lu dans les boîtes lues'
+                    : liste.length ? 'Tout est lu' : null /* vide : la ligne d'en dessous le dit, une fois (§7) */}
+                  {liste.length>0 && <span style={{fontWeight:500,color:C.muted}}> · {liste.length} conversation{liste.length>1?'s':''}</span>}
                 </div>
                 <button type="button" onClick={()=>loadConvs(true)} style={{marginLeft:'auto',border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'5px 11px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>↻ Actualiser</button>
               </div>
+              {nonLusAilleurs>0 && (
+                <div data-nonlus-ailleurs={nonLusAilleurs} style={{fontSize:12.5,color:C.text,lineHeight:1.45,marginBottom:8}}>
+                  Dont <b>{nonLusAilleurs}</b> sur {nonLusAilleurs>1?'tes autres comptes':'un autre compte'} (estompé{nonLusAilleurs>1?'s':''}) — {'«\u00a0Tous les comptes\u00a0»'} pour {nonLusAilleurs>1?'y':'lui'} répondre.
+                </div>
+              )}
+              {boitesKO.length>0 && (
+                <div data-boites-ko={boitesKO.map(a=>String(a.vinted_user_id)).join(',')} style={{display:'flex',gap:8,alignItems:'flex-start',fontSize:12.5,color:C.text,lineHeight:1.45,border:`1px solid ${C.warn}55`,background:`${C.warn}0e`,borderRadius:8,padding:'8px 11px',marginBottom:10}}>
+                  <span aria-hidden="true" style={{color:C.warn,flexShrink:0,marginTop:1}}><Icon name="chat" size={15}/></span>
+                  <span>
+                    {boitesKO.length===1 ? <>La boîte de <b>{accName(boitesKO[0])}</b> n'a pas pu être lue</>
+                      : <>Les boîtes de {boitesKO.map((a,i)=><React.Fragment key={String(a.vinted_user_id)}>{i?(i===boitesKO.length-1?' et ':', '):''}<b>{accName(a)}</b></React.Fragment>)} n'ont pas pu être lues</>}
+                    {' '}— {boitesKO.length===1?'ses':'leurs'} messages ne sont ni listés ni comptés ici. Réessaie avec « ↻ Actualiser » ; si ça dure, ouvre ta messagerie Vinted sur {boitesKO.length===1?'ce compte':'ces comptes'}.
+                  </span>
+                </div>
+              )}
               {boitesPerimees.length>0 && (
                 <div data-boites-perimees={boitesPerimees.map(b=>String(b.acc.vinted_user_id)).join(',')} style={{display:'flex',gap:8,alignItems:'flex-start',fontSize:12.5,color:C.text,lineHeight:1.45,border:`1px solid ${C.warn}55`,background:`${C.warn}0e`,borderRadius:8,padding:'8px 11px',marginBottom:10}}>
                   <span aria-hidden="true" style={{color:C.warn,flexShrink:0,marginTop:1}}><Icon name="chat" size={15}/></span>
@@ -27534,7 +28883,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </span>
                 </div>
               )}
-              {liste.length===0 && <div style={{fontSize:13,color:C.muted,padding:'14px 0'}}>Aucune conversation captée pour l'instant — elles arrivent quand l'extension passe sur la messagerie Vinted de chaque compte.</div>}
+              {liste.length===0 && !boitesKO.length && <div style={{fontSize:13,color:C.muted,padding:'14px 0'}}>Aucune conversation captée pour l'instant — elles arrivent quand l'extension passe sur la messagerie Vinted de chaque compte.</div>}
               <div style={{border:liste.length?`1px solid ${C.border}`:'none',borderRadius:10,background:C.card,overflow:'hidden'}}>
                 {affiches.map((c,i)=>{
                   const photo = (c.opposite_user&&c.opposite_user.photo&&c.opposite_user.photo.url) || (c.item_photos&&c.item_photos[0]&&c.item_photos[0].url) || null;
@@ -28369,12 +29718,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   quand les dates de versement Vinted étaient illisibles — en
                   perdant Leboncoin et eBay au passage. Pendant la lecture : « … ».
                   Vinted illisible : le CA connu (Leboncoin, eBay) avec la mention
-                  « sans Vinted », et aucune cotisation chiffrée dessus. */}
+                  « sans Vinted », et aucune cotisation chiffrée dessus.
+                  `data-registre-vinted` : la partie Vinted du registre, compte par
+                  compte — le banc la compare à la carte des seuils. Un compte dont
+                  les ventes n'ont pas été lues se DIT à côté du total (§5 : la
+                  couverture à côté du chiffre, jamais un total partiel présenté
+                  comme complet). */}
               {(() => { const inc = annual.enCours ? '…' : annual.vinted === 'passu' ? '—' : null; return (
-              <div data-annuel-vinted={annual.enCours ? 'encours' : annual.vinted} style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:14}}>
-                <StatBox label="CA des ventes finalisées" value={annual.enCours ? '…' : (annual.vinted === 'passu' && !annual.nb) ? '—' : fmtE(annual.ca)}
-                  subColor={annual.vinted === 'passu' ? C.warn : undefined}
-                  sub={annual.enCours ? 'lecture des ventes en cours' : (annual.vinted === 'passu' ? 'sans Vinted' + (annual.nb ? ` · ${annual.nb} vente${annual.nb>1?'s':''}` : '') : `${annual.nb} vente${annual.nb>1?'s':''}`)+Object.entries(annual.parPlateforme||{}).filter(([k,v])=>k!=='Vinted'&&v.n>0).map(([k,v])=>` · dont ${k} ${fmtE(v.ca)}`).join('')}/>
+              <div data-annuel-vinted={annual.enCours ? 'encours' : annual.vinted}
+                data-registre-vinted={annual.vintedParUid ? JSON.stringify(Object.fromEntries(Object.entries(annual.vintedParUid).map(([u,q])=>[u,{ n:q.n, eur:(q.cts/100).toFixed(2) }]))) : ''}
+                data-registre-vinted-n={annual.vintedParUid ? (annual.parPlateforme?.Vinted?.n ?? 0) : ''} data-registre-vinted-eur={annual.vintedParUid && annual.parPlateforme?.Vinted ? annual.parPlateforme.Vinted.ca.toFixed(2) : ''} data-registre-sans={nomsVentesKO.join(',')}
+                style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:14}}>
+                <StatBox label="CA des ventes finalisées" value={annual.enCours ? '…' : ((annual.vinted === 'passu' || nomsVentesKO.length) && !annual.nb) ? '—' : fmtE(annual.ca)}
+                  subColor={(annual.vinted === 'passu' || nomsVentesKO.length) ? C.warn : undefined}
+                  sub={(annual.enCours ? 'lecture des ventes en cours' : (annual.vinted === 'passu' ? 'sans Vinted' + (annual.nb ? ` · ${annual.nb} vente${annual.nb>1?'s':''}` : '') : `${annual.nb} vente${annual.nb>1?'s':''}`)+Object.entries(annual.parPlateforme||{}).filter(([k,v])=>k!=='Vinted'&&v.n>0).map(([k,v])=>` · dont ${k} ${fmtE(v.ca)}`).join(''))+(!annual.enCours && annual.vinted !== 'passu' && nomsVentesKO.length ? ` · ventes de ${nomsVentesKO.join(', ')} pas lues` : '')}/>
                 {annual.regime==='marge' ? (<>
                   <StatBox label="Marge TTC" value={inc ?? fmtE(annual.marge)} color={inc ? C.muted : annual.marge>=0?INV_STATUS.online.color:C.danger}/>
                   <StatBox label={`TVA marge ${annual.tvaRate}%`} value={inc ?? fmtE(annual.tvaMarge)} color={inc ? C.muted : C.warn}/>
@@ -28430,6 +29787,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </tbody>
                 </table>
               </div>
+              <CarteSeuilsVinted annee={annual.year} echoues={sales.failedUids} comptes={accounts} ecarte={acctOff} nomDe={accNameOf} datees={annual.vintedParUid} aDater={annual.vintedADater} onRelire={relireVentes}/>
               <div style={{fontSize:12,fontWeight:600,color:C.text,margin:'6px 0 8px'}}>Registre d'achats — {fmtE(annual.achatsTotal)} ({annual.buyLines.length})</div>
               {buys.items===null && <div style={{fontSize:12,color:C.muted,marginBottom:8}}>Registre en cours de chargement…</div>}
               {buys.items!==null && annual.buyLines.length===0 && <div style={{fontSize:12,color:C.muted,padding:'6px 0 12px'}}>Aucun achat cette année.</div>}
@@ -29236,10 +30594,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   const tx = openConv.conversation && openConv.conversation.transaction && openConv.conversation.transaction.id;
                   if (!off && !tx) return null;
                   const etat = extSait('messagerie');
-                  if (etat !== 'ok') return (
+                  if (etat !== 'ok' || __vmrPlusieurs) return (
                     <div data-offre="indisponible" style={{fontSize:11.5,color:C.muted,marginBottom:8,lineHeight:1.4}}>
                       {off ? <><b style={{color:C.text}}>Offre de {fmtE(off.prix)}</b> en attente — </> : null}
-                      {etat==='retard' ? `mets l'extension à jour (${EXT_CAPACITES.messagerie}) pour trancher ou faire une offre d'ici.` : "les offres se font depuis le Chrome où l'extension est installée."}
+                      {__vmrPlusieurs ? textePlusieurs() : etat==='retard' ? `mets l'extension à jour (${EXT_CAPACITES.messagerie}) pour trancher ou faire une offre d'ici.` : "les offres se font depuis le Chrome où l'extension est installée."}
                       {' '}<a href={`https://www.vinted.fr/inbox/${openConv.convId}`} target="_blank" rel="noreferrer" style={{color:C.accent,fontWeight:600}}>Ouvrir sur Vinted</a>
                     </div>
                   );
@@ -30045,11 +31403,16 @@ function clesAnnonceLbc(ad, liens) {
   const ks = [];
   if (!ad) return ks;
   const push = (v) => { const k = cleNum(v); if (k && !ks.includes(k)) ks.push(k); };
+  // Le lien posé À LA MAIN est pris tel quel (déjà converti par la migration,
+  // ou posé après elle) ; la référence et le « nXXX » d'une annonce qui portait
+  // un ancien numéro à la remise à zéro (`lbcAnnonces`) désignent l'ANCIENNE
+  // paire (B…), jamais la nouvelle du même chiffre.
+  const ext = (v) => { const k = cleNum(v); if (k) push(numeroExterne(k, ad.id, 'lbcAnnonces')); };
   const lien = ad.id != null && liens ? liens[String(ad.id)] : null;
   if (lien != null && String(lien).trim()) push(lien);
-  push(refVRMDe(ad.customRef));
-  if (ad.ref) push(ad.ref);
-  const mt = numDeTitreLbc(ad.subject || ad.title); if (mt) push(mt);
+  ext(refVRMDe(ad.customRef));
+  if (ad.ref) ext(ad.ref);
+  const mt = numDeTitreLbc(ad.subject || ad.title); if (mt) ext(mt);
   return ks;
 }
 
@@ -30159,6 +31522,27 @@ const numDeSkuEbay = (sku) => {
   return c && NUM_OK.test(c) ? c : '';
 };
 const skuEbayDe = (numero) => { const c = cleNum(numero); return c && NUM_OK.test(c) ? 'VRM-' + c : ''; };
+// ⚠️ APRÈS LA REMISE À ZÉRO (migration 013), un numéro écrit chez eBay ou sur
+// Leboncoin AVANT elle désigne l'ANCIENNE paire : le SKU « VRM-230 » d'une
+// vieille annonce eBay est la B230, pas la nouvelle 230 (une autre paire). Le
+// serveur ne peut pas réécrire ce qui est chez eBay ; le marqueur garde donc
+// les IDENTIFIANTS des annonces qui portaient un ancien numéro à la coupure
+// (`ebayAnnonces`, `lbcAnnonces`), et une commande eBay passée AVANT la
+// coupure parle aussi de l'ancienne série. Sans ça, la vente Vinted de la
+// nouvelle 230 faisait retirer d'eBay l'annonce de l'ancienne 230.
+// Par l'identifiant ou la date, jamais par le titre (§5).
+const numeroExterne = (k, id, liste, dateMs) => {
+  const arch = archiveNumeros();
+  if (!k || !arch || !/^\d+$/.test(k)) return k;
+  const m = marqueurNumerotation();
+  const ids = m && !m.annule && Array.isArray(m[liste]) ? m[liste] : [];
+  const coupure = coupureNumerotation();
+  const avant = dateMs != null && isFinite(dateMs) && coupure != null && dateMs < coupure;
+  return (id != null && ids.some((x) => String(x) === String(id))) || avant ? cleNum(arch + k) : k;
+};
+// Le N° d'une annonce / ligne de commande eBay, lu avec son identifiant.
+const numEbayLu = (sku, itemId, dateMs) => numeroExterne(numDeSkuEbay(sku), itemId, 'ebayAnnonces', dateMs);
+const numLigneEbay = (o, li) => numEbayLu(li && li.sku, li && (li.legacyItemId || li.itemId), Date.parse((o && o.creationDate) || ''));
 // Une commande eBay qui ENGAGE la paire : ni annulée, ni remboursée, ni en
 // paiement échoué. Un paiement en attente engage déjà : l'acheteur s'est engagé.
 const commandeEbayEngagee = (o) => !!o
@@ -30192,7 +31576,10 @@ const retirerEbayAuto = async (liste) => {
       __retraitEbayAutoTentes.add(id); n += 1;
       try {
         const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() },
-          body: JSON.stringify({ action: 'retirer', itemId: id, confirme: true, auto: true, sku: a.sku, titre: a.title || '' }) });
+          // Le SKU de la paire que la règle a JUGÉE vendue (« VRM-B230 » pour une
+          // ancienne annonce), pas la chaîne lue chez eBay : le serveur relit
+          // l'annonce et la traduit par le même marqueur avant de la terminer.
+          body: JSON.stringify({ action: 'retirer', itemId: id, confirme: true, auto: true, sku: skuEbayDe(d.numero) || a.sku, titre: a.title || '' }) });
         const j = await r.json().catch(() => null);
         if (j && j.ok) toast(`N°${d.numero} retirée d'eBay automatiquement : elle est vendue sur Vinted.`, 'ok');
       } catch (_) { /* il la verra dans « à retirer », avec le bouton */ }
@@ -30248,7 +31635,7 @@ function numerosDejaVendus({ numeros, autres, enLigne, vendusVinted, commandes, 
   else if (!Array.isArray(commandes)) pasSu.push('tes ventes eBay');
   else for (const o of commandes) {
     if (!commandeEbayEngagee(o)) continue;
-    for (const li of (Array.isArray(o.lineItems) ? o.lineItems : [])) pose(numDeSkuEbay(li && li.sku), 'eBay');
+    for (const li of (Array.isArray(o.lineItems) ? o.lineItems : [])) pose(numLigneEbay(o, li), 'eBay');
   }
   if (ventesLbc === undefined) enCours = true;
   else if (!ventesLbc || typeof ventesLbc !== 'object') pasSu.push('tes ventes Leboncoin');
@@ -30286,7 +31673,7 @@ function doublesVenteEbay({ annonces, commandes, numeros, enLigne, vendusVinted,
   const verdict = ventes && ventes.vendus && typeof ventes.vendus.get === 'function' ? ventes.vendus : null;
   if (verdict || vendusVinted) for (const p of (Array.isArray(programmees) ? programmees : [])) {
     if (!p || !p.itemId) continue;
-    const n = numDeSkuEbay(p.sku);
+    const n = numEbayLu(p.sku, p.itemId);
     if (!n) continue;                                             // pas de SKU : rien n'est rapproché (§5)
     const ids = parNum.get(n) || [];
     if (verdict) {
@@ -30301,7 +31688,7 @@ function doublesVenteEbay({ annonces, commandes, numeros, enLigne, vendusVinted,
   }
   for (const a of (Array.isArray(annonces) ? annonces : [])) {
     if (!a || !a.itemId) continue;
-    const n = numDeSkuEbay(a.sku);
+    const n = numEbayLu(a.sku, a.itemId);
     if (!n) { nonReliees.push(a); continue; }
     if (!vendusVinted) continue;                                  // pas su : on n'affirme rien
     const ids = parNum.get(n) || [];
@@ -30315,7 +31702,7 @@ function doublesVenteEbay({ annonces, commandes, numeros, enLigne, vendusVinted,
   if (enLigne) for (const o of (Array.isArray(commandes) ? commandes : [])) {
     if (!commandeEbayEngagee(o)) continue;
     for (const li of (Array.isArray(o.lineItems) ? o.lineItems : [])) {
-      const n = numDeSkuEbay(li && li.sku);
+      const n = numLigneEbay(o, li);
       if (!n) continue;
       const ids = parNum.get(n) || [];
       const vendueVinted = vendusVinted ? ids.filter((id) => vendusVinted.has(id)) : [];
@@ -30537,7 +31924,9 @@ function LeboncoinScreen() {
     ((blkRows && blkRows[0] && blkRows[0].data && blkRows[0].data.uids) || []).forEach((u) => offAcc.add(String(u)));
     const lost = main.vinted_pairs_lost || {};
     const listRowsBrut = await sbGet('app_data?id=like.harvest_*_listings&select=id,data');
-    const listRows = listRowsBrut || [];
+    // 5.165 : sans les annonces qu'il vient de SUPPRIMER sur Vinted — la même
+    // règle que l'écran Annonces et que la file de l'extension (§11).
+    const listRows = retirerSupprimeesLignes(listRowsBrut || [], await lireSupprimeesTous());
     // Les photos HD et la description ne viennent QUE de la page de l'annonce :
     // mesuré le 12 septembre, l'API Vinted ne renvoie aucune photo (0 sur 57
     // lignes `harvest_*_item_*`, captures jusqu'au 9 septembre). Sans cette
@@ -32141,19 +33530,25 @@ function NumerosSetting() {
     if (touche.current) return;                            // §5.49 : ne remplacer que le vide
     const v = prefixeNumeros(); if (v) { setP(v); setMode('lettre'); }
   }), []);
+  // La lettre des ANCIENS numéros (remise à zéro, migration 013) ne peut pas
+  // être celle des nouveaux : « B12 » désignerait deux paires. La base le
+  // refuse ; l'écran le dit avant, et n'enregistre rien.
+  const arch = archiveNumeros();
   const poser = (v) => {
     touche.current = true;
     const n = String(v || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3);
     setP(n);
+    if (n && arch && n === arch) return;
     // La copie locale tout de suite (`save` écrit 500 ms plus tard) : les champs
     // N° et la numérotation automatique la lisent dès le prochain rendu.
     try { localStorage.setItem('vrm_num_prefixe', JSON.stringify(n)); } catch (_) {}
     save('vrm_num_prefixe', n);
     try { window.dispatchEvent(new Event('vrm-prefixe')); } catch (_) {}
   };
-  const choix = (m) => { setMode(m); poser(m === 'chiffres' ? '' : (p || 'B')); };
+  const defaut = arch === 'B' ? 'C' : 'B';
+  const choix = (m) => { setMode(m); poser(m === 'chiffres' ? '' : (p && p !== arch ? p : defaut)); };
   const pill = (on) => ({ border: `1px solid ${on ? C.accent : C.border}`, background: on ? C.accent : C.card, color: on ? (C.onAccent || '#fff') : C.text, borderRadius: 999, padding: '7px 14px', fontSize: 13, fontWeight: on ? 700 : 600, cursor: 'pointer', fontFamily: 'inherit' });
-  const ex = p || 'B';
+  const ex = p && p !== arch ? p : defaut;
   return (
     <div data-numeros-reglage={mode} style={{padding:'13px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
       <div style={{fontSize:13,fontWeight:600,color:C.text}}>Tes numéros de rangement</div>
@@ -32170,6 +33565,11 @@ function NumerosSetting() {
           <input value={p} onChange={(e) => poser(e.target.value)} placeholder="B" autoCapitalize="characters" aria-label="Lettres de la série"
             style={{width:70,padding:'8px 10px',borderRadius:8,border:`1px solid ${C.border}`,background:C.bg,color:C.text,fontSize:14,fontFamily:'inherit',textTransform:'uppercase'}}/>
         </label>
+      )}
+      {mode === 'lettre' && arch && p === arch && (
+        <div data-numeros-lettre-archive style={{fontSize:12,color:C.text,marginTop:8,lineHeight:1.5}}>
+          « {arch} » est la lettre de tes <b>anciens</b> numéros ({arch}1, {arch}2…) : rien n'est enregistré. Choisis une autre lettre.
+        </div>
       )}
       <div style={{fontSize:11.5,color:C.muted,marginTop:8,lineHeight:1.5}}>
         Tu peux toujours taper un numéro à la main, dans n'importe quelle forme : 125, B125, C40. « b125 » et « B125 » sont le même carton.
@@ -33807,22 +35207,21 @@ function AppCoeur() {
   // Annonces PUIS Ventes PUIS Messages).
   const [compteSel,setCompteSel]=useState('');
   React.useEffect(()=>{ setCompteSel(''); },[tab]);
-  // Le compte sur lequel l'EXTENSION est connectée (pont `authEtat`) : c'est
-  // celui qu'on est en train de traiter, on le met en avant (puce d'abord + 📍,
-  // et ses lignes remontent quand « Tous » est choisi). « pas su » ⇒ '' (on ne
-  // met rien en avant à tort). Même source que la carte des premiers pas (§11).
-  const [compteConnecte,setCompteConnecte]=useState('');
-  React.useEffect(()=>{ let stop=false;
-    const relire=async()=>{ try{ const e=await vmrAuthEtat(); const uid=String((e&&e.vinted&&e.vinted.uid)||''); if(!stop) setCompteConnecte(uid); }catch(_){} };
-    relire();
-    // ⚠️ Re-lu quand il REVIENT sur l'onglet de l'app (après un tour sur Vinted,
-    //    où il a pu changer de compte, ou brancher l'extension) : sinon le
-    //    compte mis en avant d'office reste figé sur celui du chargement. C'est
-    //    une lecture du PONT (zéro requête Vinted), et ça ne touche QUE le défaut
-    //    — son choix explicite (`compteSel`) gagne toujours.
-    const relirePont=()=>{ if(!document.hidden) relire(); };
-    window.addEventListener('focus',relire); document.addEventListener('visibilitychange',relirePont);
-    return ()=>{ stop=true; window.removeEventListener('focus',relire); document.removeEventListener('visibilitychange',relirePont); }; },[]);
+  // Le compte Vinted ouvert dans CE Chrome (l'extension le lit dans son cookie) :
+  // c'est celui qu'il est en train de traiter, il est choisi d'office (📍, ses
+  // lignes nettes et en tête, les autres estompées — Julien, 7 octobre).
+  // ⚠️⚠️ IL ÉTAIT LU DANS `authEtat`, QUI NE LE PORTE PAS (revue du 8 octobre) :
+  //    cette réponse ne parle que de la session VRM de l'extension — aucune
+  //    version n'y a jamais mis le compte Vinted. `compteConnecte` valait donc
+  //    TOUJOURS '' et la demande ne s'est jamais allumée, en silence. La seule
+  //    réponse qui le porte est `etat` (`vintedDeChrome`), celle que lisent déjà
+  //    la pastille « Actions possibles · {compte} », « Tout générer » et le
+  //    bouton Bordereau (§11). Elle est relue toutes les 20 s et au retour sur
+  //    l'onglet (`battementExt`), qui prévient ses abonnés : rien à relire ici.
+  //    « Pas su » ⇒ '' : on ne met rien en avant à tort. Le filtre des comptes
+  //    qu'on peut montrer est appliqué plus bas (`compteConnecte`).
+  const [compteChrome,setCompteChrome]=useState('');
+  React.useEffect(()=>{ const lire=()=>{ const v=vintedDeChrome(); setCompteChrome(v?v.uid:''); }; lire(); return onVmrExt(lire); },[]);
   // L'ancien onglet « Messages » (cloche, bandeau, « à faire ») mène désormais
   // aux messages DANS Vinted : une seule porte pour un seul écran.
   React.useEffect(()=>{ if(tab==='cat_msg'){ subVoulue.current='messages'; setTab('plat_vinted'); } },[tab]);
@@ -33957,7 +35356,7 @@ function AppCoeur() {
   useEffect(()=>{ if(!gsOpen || gsData) return; (async()=>{
     const sb=async(q)=>{ try{ const r=await fetch(`${SUPABASE_URL}/rest/v1/${q}`,{headers:sbAuth()}); return r.ok?await r.json():null; }catch(_){ return null; } };
     const online=new Set(); const sold=[]; const bought=[]; const lbc=new Set();
-    const lst=await sb('app_data?id=like.harvest_*_listings&select=data')||[];
+    const lst=retirerSupprimeesLignes(await sb('app_data?id=like.harvest_*_listings&select=data')||[], await lireSupprimeesTous());   // 5.165 : sans les supprimées
     for(const r of lst){ const p=(r.data&&r.data.payload)||{}; for(const it of (p.items||[])){ if(!it.is_closed&&!it.is_hidden&&!it.is_draft) online.add(String(it.id)); } }
     const so=await sb('app_data?id=like.harvest_*_orders_sold&select=data')||[];
     const seenS=new Set(); for(const r of so){ const p=(r.data&&r.data.payload)||{}; for(const o of (p.my_orders||[])){ const t=String(o.transaction_id||o.id||''); if(t&&!seenS.has(t)){ seenS.add(t); sold.push(o); } } }
@@ -34170,7 +35569,7 @@ function AppCoeur() {
     for(const r of so){ const p=(r.data&&r.data.payload)||{}; for(const o of (p.my_orders||[])){
       const t=String(o.transaction_id||o.id||''); if(t&&seen.has(t)) continue; if(t) seen.add(t);
       if(/finalis/i.test(o.status||'')) sold.push(o); } }
-    const lst=await sb('app_data?id=like.harvest_*_listings&select=data')||[];
+    const lst=retirerSupprimeesLignes(await sb('app_data?id=like.harvest_*_listings&select=data')||[], await lireSupprimeesTous());   // 5.165 : sans les supprimées
     const online=[]; for(const r of lst){ const p=(r.data&&r.data.payload)||{};
       for(const it of (p.items||[])){ if(!it.is_closed&&!it.is_hidden&&!it.is_draft) online.push(it); } }
     const g = grouperPrixMarche(sold, online);
@@ -34292,7 +35691,21 @@ function AppCoeur() {
         // ⚠️ `vinted_accounts` est EXCLU : la copie du nuage est volontairement
         // sans jetons (cf. ALLEGER_AVANT_CLOUD), l'écrire ici retirerait les
         // jetons de cet appareil jusqu'à ce que la table réponde.
+        // ⚠️ LA REMISE À ZÉRO DES NUMÉROS (migration 013). La version du marqueur
+        //    que CET appareil connaissait, avant de restaurer : si celle du nuage
+        //    diffère, les copies d'APPAREIL qui portent des numéros (le garage
+        //    3D, « Mon local », les numéros présents) parlent de l'ancienne série
+        //    — on les jette, l'écran concerné les relira.
+        const verLocale = versionNumerotation();
+        const verNuage = cloud.vrm_numerotation && isFinite(Number(cloud.vrm_numerotation.version)) ? Number(cloud.vrm_numerotation.version) : null;
         SYNC_KEYS.forEach(k => { if (k === 'vinted_accounts') return; if (cloud[k] !== undefined && cloud[k] !== null) { try { localStorage.setItem(k, JSON.stringify(cloud[k])); } catch (_) {} } });
+        if (verNuage !== verLocale) purgerCopiesNumeros();
+        noterInstantaneCharge(cloud);
+        noterVersionChargee();
+        // Les saisies d'un écran rechargé parce qu'il était périmé (un prix
+        // d'achat, un colis coché…) : rejouées sur la ligne fraîche, par
+        // IDENTIFIANT, jamais les numéros. Puis envoyées.
+        { const rj = rejouerSaisies(); if (rj && rj.n) { cloudPush(); setTimeout(() => toast(`${rj.n} saisie${rj.n > 1 ? 's' : ''} faite${rj.n > 1 ? 's' : ''} sur l'écran rechargé ${rj.n > 1 ? 'ont été gardées' : 'a été gardée'}${rj.prix ? ` (dont ${rj.prix} prix d'achat)` : ''}.`), 800); } }
         // 2) Puis on met à jour les états React des données gérées à la racine.
         const apply = (key, setter) => {
           if (cloud[key] !== undefined && cloud[key] !== null) { setter(cloud[key]); }
@@ -34318,6 +35731,17 @@ function AppCoeur() {
     })();
     return () => { stop = true; off(); };
   }, []);
+
+  // La VERSION de la numérotation est relue (une lecture scalaire) toutes les
+  // 60 s et au retour au premier plan : un onglet resté VISIBLE sur un second
+  // écran ne reçoit jamais `visibilitychange`, d'où l'horloge aussi.
+  useEffect(() => {
+    if (!synced) return;
+    const t = setInterval(() => { verifierVersionNumerotation(); }, 60 * 1000);
+    const vis = () => { if (document.visibilityState === 'visible') verifierVersionNumerotation(); };
+    document.addEventListener('visibilitychange', vis);
+    return () => { clearInterval(t); document.removeEventListener('visibilitychange', vis); };
+  }, [synced]);
 
   // ── Automatismes Stock Vinted ──────────────────────────
   // On n'active ces effets qu'APRÈS le chargement initial (synced),
@@ -34469,6 +35893,31 @@ function AppCoeur() {
   // réglages SYNCHRONISÉS, pas des réglages d'appareil (§5.49).
   const [nuagePret, setNuagePret] = useState(() => isCloudReady());
   useEffect(() => onCloudReady(() => setNuagePret(true)), []);
+  // 5.165 : une annonce SUPPRIMÉE sur Vinted (ou un dressing relu) — le tableau
+  // de bord recompte, comme l'écran Annonces (la même règle, §11).
+  // ⚠️⚠️ Revue de la 5.165 : ce signal relançait TOUT le calcul — ventes, annonces
+  //    et boîte de TOUS les comptes — et, pour un compte lié sans ligne moissonnée,
+  //    chaque lecture partait au relais serveur (Vinted lu depuis l'IP de Vercel,
+  //    ~4 fois par suppression). Maintenant : les signaux se regroupent
+  //    (`regrouperSignaux`), on ne relit que les ANNONCES des comptes signalés,
+  //    dans la moisson seulement ; les ventes et la boîte de la dernière lecture
+  //    complète sont reprises telles quelles. Un compte sans ligne garde ce qu'on
+  //    montrait. Aucune requête Vinted sur un signal.
+  const [annoncesTick, setAnnoncesTick] = useState(0);
+  const perAccRef = useRef(null);            // { cle, perAcc } : la dernière lecture complète
+  const comptesSignales = useRef(null);      // Set des comptes signalés, 'tous', ou null
+  useEffect(() => {
+    const relire = (uids) => {
+      const cur = comptesSignales.current;
+      comptesSignales.current = (!uids || cur === 'tous') ? 'tous' : new Set([...(cur || []), ...uids]);
+      // Le premier calcul n'est pas fini : il relancera lui-même à sa fin.
+      if (perAccRef.current) setAnnoncesTick((t) => t + 1);
+    };
+    const signal = regrouperSignaux(relire);
+    const f = (e) => { const d = e && e.detail; if (d && d.type === 'maj' && d.quoi === 'annonces') { oublierDressing(d.uid); signal(d.uid); } };
+    window.addEventListener('vrm:ext', f);
+    return () => { window.removeEventListener('vrm:ext', f); signal.arreter(); };
+  }, []);
   useEffect(()=>{
     if(!accountsLoaded || !vintedAccounts || vintedAccounts.length===0) return;
     if(!nuagePret) return;              // sinon on compte des comptes qu'il a exclus
@@ -34537,7 +35986,19 @@ function AppCoeur() {
       //    dans « vendu » (`ventesFaites`, la règle de Ma journée) : un compte que
       //    Vinted a refusé a quand même vendu. Seuls les comptes que Julien a
       //    écartés (`compteEcarte`) en sortent — comme sur l'écran Ventes.
-      const perAcc=await Promise.all(vintedAccounts.map(async a=>{
+      // Revue 5.165 : sur un SIGNAL de l'extension (voir `comptesSignales`), on ne
+      // relit que les annonces des comptes signalés, dans la moisson.
+      const cleCalc=cleComptesVinted(vintedAccounts)+'|'+[...blockedS].sort().join(',')+'|'+[...hiddenS].sort().join(',');
+      const sig=comptesSignales.current; comptesSignales.current=null;
+      const prec=perAccRef.current;
+      const perAcc=(sig && prec && prec.cle===cleCalc)
+        ? await Promise.all(prec.perAcc.map(async p=>{
+            if(!p.actif) return p;
+            if(sig!=='tous' && !sig.has(String(p.a.vinted_user_id))) return p;
+            const list=await fetchVintedListings(p.a,1,{ moissonSeule:true });
+            return list.ok ? { ...p, list } : p;
+          }))
+        : await Promise.all(vintedAccounts.map(async a=>{
         const actif=!skipAcc(a.vinted_user_id);
         const [sold,list,conv]=await Promise.all([
           fetchVintedOrders(a,'sold',1,'all'),
@@ -34546,6 +36007,11 @@ function AppCoeur() {
         ]);
         return { a, sold, list, conv, actif };
       }));
+      if(stop) { if(sig) comptesSignales.current = sig === 'tous' || comptesSignales.current === 'tous' ? 'tous' : new Set([...sig, ...(comptesSignales.current || [])]); return; }
+      perAccRef.current={ cle:cleCalc, perAcc };
+      // Un signal arrivé PENDANT ce calcul : il a pu lire avant la suppression.
+      if(comptesSignales.current) setAnnoncesTick(t=>t+1);
+      const annLues={}, annEnLigne={}, annSuppr={}, annNoms={}, annActivite={};
       const ventesToutes=[]; let ventesLues=false; const vusTx=new Set();
       for(const { a, sold } of perAcc){
         if(!sold.ok) continue; ventesLues=true;
@@ -34583,12 +36049,23 @@ function AppCoeur() {
         // arrivaient APRÈS le premier rendu, et les deux écrans annonçaient
         // deux nombres (64 et 63, mesuré).
         if(list.ok){ ok=true;
+          const uidL=String(a.vinted_user_id); let nL=0;
           for(const it of list.items){
             const id=String(it.id);
             if(soldIds.has(id)) continue;
-            online++;
+            online++; nL++;
             const bp=numeros[it.id]?.buyPrice; if(bp!=null&&bp!=='') stockValue+=Number(bp)||0;
-          } }
+          }
+          // 5.165 : de quand date ce qu'on compte, et ce qui a été retiré parce
+          // que supprimé depuis — la MÊME phrase que l'écran Annonces (§11).
+          annEnLigne[uidL]=nL;
+          if(list.source==='harvest' && _harvestSeen[`${uidL}_listings`]) annLues[uidL]=_harvestSeen[`${uidL}_listings`];
+          // Revue 5.165 : l'heure de ses VENTES captées — vu actif après la lecture
+          // du dressing, le compte est nommé (`dressingsAnciens`).
+          if(_harvestSeen[`${uidL}_orders_sold`]) annActivite[uidL]=_harvestSeen[`${uidL}_orders_sold`];
+          if(list.supprimees) annSuppr[uidL]=list.supprimees;
+          annNoms[uidL]=(load('vinted_account_labels',{})||{})[uidL]||a.login||`#${uidL}`;
+        }
         if(conv.ok){ ok=true; unread+=conv.items.filter(c=>c.unread).length; }
       }
       // Paires en stock = nb de numéros réellement étiquetés dans le garage (3D).
@@ -34652,6 +36129,7 @@ function AppCoeur() {
       }catch(_){/* pas su ⇒ null ⇒ rien d'affiché */}
       if(!stop && ok){
       setLiveStats({caMois,caEncaisse,enCours,online,unread,stockValue,pairesStock,ventesJour,caJour,ventesMois,soldTotal,joursVente:joursVenteSet.size,caParCompte,caParMois,ventesParMois,dataAgeJours,dataAgeCompte,
+        annLues,annEnLigne,annSuppr,annNoms,annActivite,
         walletDispo:(walletEsc&&walletEsc.accounts>0)?walletEsc.dispo:null,
         walletAttente:(walletEsc&&walletEsc.accounts>0)?walletEsc.total:null,
         walletComptes:(walletEsc&&walletEsc.accounts)||0,
@@ -34665,7 +36143,7 @@ function AppCoeur() {
     })();
     return ()=>{stop=true;};
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[accountsLoaded, vintedAccounts, nuagePret]);
+  },[accountsLoaded, vintedAccounts, nuagePret, annoncesTick]);
 
   // ── « VENDU » : UNE RÈGLE, CELLE DE MA JOURNÉE (§11, 4 octobre) ────────────
   // L'accueil (« Aujourd'hui »), Statistiques (« Vendu ce mois », la courbe) et
@@ -34686,6 +36164,20 @@ function AppCoeur() {
     window.addEventListener('vrm:save', f);
     return () => window.removeEventListener('vrm:save', f);
   }, []);
+  // ── LES COMPTES QU'ON PEUT CHOISIR dans la liste « Compte » (§11) ──────────
+  // Les comptes liés, moins ceux qu'il a écartés lui-même (`compteEcarte` : la
+  // règle de « vendu » et de l'écran Ventes). ⚠️ Un compte exclu n'est jamais
+  // proposé : choisi, il floutait TOUTES les lignes (les siennes sont déjà
+  // retirées) — revue du 8 octobre. Suit le nuage (`nuagePret`, §5.49) et un
+  // « Masquer » fait dans Réglages (`masquesTick`).
+  const comptesChoisissables = useMemo(() => {
+    const h = new Set((load('vinted_accounts_hidden', []) || []).map(String));
+    return (vintedAccounts || []).filter(a => a && a.vinted_user_id != null && !compteEcarte(a.vinted_user_id, h, panelOffCoque));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vintedAccounts, panelOffCoque, masquesTick, nuagePret]);
+  // Le compte ouvert dans Chrome n'est mis en avant QUE s'il fait partie de
+  // ces comptes : exclu, retiré, ou un compte d'achat hors de l'app ⇒ rien.
+  const compteConnecte = comptesChoisissables.some(a => String(a.vinted_user_id) === compteChrome) ? compteChrome : '';
   const [jourCle, setJourCle] = useState(() => new Date().toDateString());
   useEffect(() => {
     const t = setInterval(() => { const k = new Date().toDateString(); setJourCle(p => (p === k ? p : k)); }, 60000);
@@ -35245,13 +36737,14 @@ function AppCoeur() {
               syncStatus==='synced'?'Synchronisé avec le cloud':
               syncStatus==='saving'?'Sauvegarde en cours...':
               syncStatus==='loading'?'Chargement...':
-              syncStatus==='error'?'Hors ligne (sauvegarde locale)':'En attente'
+              syncStatus==='refus'?'Refusé par la base : cet écran est périmé, recharge-le':
+              syncStatus==='error'?'La base n\u2019a pas répondu — la sauvegarde sera retentée':'En attente'
             } style={{fontSize:13,opacity:0.9,display:'flex',alignItems:'center',gap:4}}>
               {/* Icône au trait plutôt qu'emoji : elle prend la couleur de l'état
                   (vert synchronisé, orange en cours, rouge hors ligne), ce qu'un
                   emoji ne sait pas faire. */}
-              <span style={{display:'flex',color:syncStatus==='error'?C.danger:syncStatus==='synced'?C.accent:C.warn}}>
-                <Icon name={syncStatus==='error'?'cloudOff':syncStatus==='synced'?'cloud':'sync'} size={16}/>
+              <span style={{display:'flex',color:(syncStatus==='error'||syncStatus==='refus')?C.danger:syncStatus==='synced'?C.accent:C.warn}}>
+                <Icon name={(syncStatus==='error'||syncStatus==='refus')?'cloudOff':syncStatus==='synced'?'cloud':'sync'} size={16}/>
               </span>
               {/* ⚠️ L'HEURE DE SYNCHRO EST RETIRÉE. Sur un iPhone, l'en-tête
                   portait : retour, icône VRM, mot « VRM », nuage, heure, loupe,
@@ -35472,6 +36965,7 @@ function AppCoeur() {
             LIGNE de panne (`LignePanne`) là où leur propre liste vide
             mentirait — le bloc, lui, ne s'affiche qu'une fois. */}
         {baseKO && <BaseInjoignable/>}
+        <BlocNumerosPerimes/>
         {tab==='settings'&&<SettingsScreen setTab={setTab} comptes={vintedAccounts}
           customLogo={customLogo} onPickLogo={()=>logoInputRef.current&&logoInputRef.current.click()} onResetLogo={resetLogo}
           notifEnabled={notifEnabled}
@@ -35656,7 +37150,7 @@ function AppCoeur() {
           {/* Résumé CA/argent TOUJOURS visible en haut, puis la liste (ventes par
               défaut) directement — plus d'écran « Aperçu » intermédiaire. Les
               sections restent les mêmes écrans (§11), juste à un tap. */}
-          <VintedResume liveStats={liveStatsVus} baseKO={baseKO}/>
+          <VintedResume liveStats={liveStatsVus} baseKO={baseKO} siAJour={platSub!=='annonces'}/>
           {/* ⚠️ 4 octobre — Julien : « dans Vinted […] il y ait les messages ».
               L'écran complet existait (liste tous comptes, fil, réponse, offres)
               mais n'avait plus AUCUNE porte dans Vinted : seulement la cloche. */}
@@ -35664,7 +37158,7 @@ function AppCoeur() {
           {/* Filtre par compte (Julien, 6 oct.) — Ventes / Annonces / Achats /
               Messages. Les Colis ne sont pas filtrés (« pour les colis pas
               forcément »). Un seul compte ⇒ la rangée ne s'affiche pas. */}
-          {(platSub==='ventes'||platSub==='annonces'||platSub==='achats'||platSub==='messages') && <SelecteurCompte accounts={vintedAccounts} sel={compteSel} setSel={setCompteSel} connecte={compteConnecte}/>}
+          {(platSub==='ventes'||platSub==='annonces'||platSub==='achats'||platSub==='messages') && <SelecteurCompte accounts={comptesChoisissables} sel={compteSel} setSel={setCompteSel} connecte={compteConnecte}/>}
           <Comptabilite key={'pv_'+platSub} accounts={vintedAccounts} only={platSub==='apercu'?'ventes':platSub} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum} compteSel={compteSel} compteConnecte={compteConnecte}/>
         </>)}
         {tab==='plat_leboncoin'&&(<>

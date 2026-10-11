@@ -56,6 +56,7 @@ const projette = (row, sel) => {
   }
   return out;
 };
+const SEUIL_PUBLIER = (/publication:\s*'([^']+)'/.exec(fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'App.jsx'), 'utf8')) || [])[1] || '5.160.0';
 // Le pont simulé : `version` annoncée, et ce que répond la commande.
 const PONT = ({ mode, version }) => {
   window.__cmds = [];
@@ -79,7 +80,11 @@ const PONT = ({ mode, version }) => {
   let b;
   try {
     b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
-    for (const cas of [{ mode: 'ok', version: '5.130.0' }, { mode: 'ok', version: '5.129.0' }, { mode: 'absente' }]) {
+    // ⚠️ « À jour » = le seuil de `EXT_CAPACITES.publication`, lu dans l'app :
+    //    il est passé de 5.130 à 5.160 (le relais des commandes ne transportait
+    //    pas l'identifiant avant), et ce banc servait encore 5.130 — rouge sur
+    //    une app intacte depuis (§6.3 : servir la forme que le code attend).
+    for (const cas of [{ mode: 'ok', version: SEUIL_PUBLIER }, { mode: 'ok', version: '5.129.0' }, { mode: 'absente' }]) {
       const nom = cas.mode === 'absente' ? 'extension absente' : 'extension ' + cas.version;
       console.log('── ' + nom);
       const ctx = await b.newContext({ viewport: { width: 1512, height: 950 } });
@@ -113,7 +118,7 @@ const PONT = ({ mode, version }) => {
       dit(!errs.length, 'aucune erreur', errs[0]);
       dit(v.boutons.length === 1 && v.boutons[0].id === '7001', 'la paire avec photos a SON bouton, la paire sans photo n\'en a pas', JSON.stringify(v.boutons.map((x) => x.id)));
       dit(!v.orange, 'plus de lien orange « Déposer une annonce » au bas de l\'écran');
-      if (cas.version === '5.130.0') {
+      if (cas.version === SEUIL_PUBLIER) {
         dit(v.boutons[0] && v.boutons[0].etat === 'pret', 'extension à jour : le bouton est actif', v.boutons[0] && v.boutons[0].etat);
         dit(v.raisons === 0, 'et aucune raison de blocage affichée');
         await pg.click('[data-bouton-publier="pret"] button');

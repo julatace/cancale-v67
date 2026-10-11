@@ -23,6 +23,7 @@ import crypto from 'crypto';
 import { vendeurExige, baseCloisonnee } from './_lib/session.js';
 import { accesVendeur } from './_lib/abonnement.js';
 import { keysReady, canConsent, ruName, authUrl, appToken, exchangeCode, hasRefresh, accessToken, storeData, lireReglageVendeur, lireDonnee } from './_lib/ebay.js';
+import { numeroExterne } from './_lib/numerotation.js';
 
 // ── LECTURE des données eBay du vendeur (centraliser dans VRM) ───────────────
 // Julien : « capte absolument tout d'eBay ». C'est une LECTURE (comme la moisson
@@ -769,11 +770,20 @@ async function handleRetirer(b, owner) {
   if (!ID_EBAY.test(itemId)) return { status: 400, body: { ok: false, error: 'annonce eBay invalide' } };
   const auto = b.auto === true;
   const skuAttendu = String(b.sku || '').trim();
+  let marqueur = null;
   if (auto) {
     if (!SKU_PAIRE.test(skuAttendu)) return { status: 400, body: { ok: false, reason: 'sku', error: 'Retrait automatique : la paire n\'est pas identifiée par son SKU (VRM-n°) — rien n\'a été envoyé à eBay.' } };
     const v = await lireReglageVendeur('vrm_ebay_retrait_auto', owner);
     if (v === undefined) return { status: 503, body: { ok: false, reason: 'reglage-pas-su', error: 'Je n\'ai pas pu relire ton réglage de retrait automatique — rien n\'a été envoyé à eBay.' } };
     if (v !== 'true') return { status: 403, body: { ok: false, reason: 'auto-eteint', error: 'Le retrait automatique est éteint — rien n\'a été envoyé à eBay.' } };
+    // La remise à zéro des numéros (migration 013) : l'annonce qui portait un
+    // ancien numéro à la coupure parle de l'ANCIENNE paire. Le marqueur est relu
+    // chez CE vendeur ; illisible ⇒ rien n'est retiré (pas su ne vaut pas
+    // « aucune coupure » : la vente de la nouvelle 230 retirerait l'annonce de
+    // l'ancienne 230).
+    const mkTxt = await lireReglageVendeur('vrm_numerotation', owner);
+    if (mkTxt === undefined) return { status: 503, body: { ok: false, reason: 'numerotation-pas-su', error: 'Je n\'ai pas pu relire ta numérotation — rien n\'a été envoyé à eBay.' } };
+    if (mkTxt) { try { marqueur = JSON.parse(mkTxt); } catch (_) { return { status: 503, body: { ok: false, reason: 'numerotation-pas-su', error: 'Ta numérotation est illisible — rien n\'a été envoyé à eBay.' } }; } }
   }
   const at = await accessToken(owner);
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
@@ -781,7 +791,8 @@ async function handleRetirer(b, owner) {
     const g = await tradingCall(at.token, 'GetItem', `<ItemID>${itemId}</ItemID>`);
     if (g.status === 0 || !g.ok) return { status: 503, body: { ok: false, reason: 'sku-pas-su', error: 'eBay n\'a pas dit quelle paire porte cette annonce — rien n\'a été retiré.' } };
     const skuEbay = lireBalise(String(g.xml || '').replace(/<Variations>[\s\S]*?<\/Variations>/g, ''), 'SKU');
-    if (!memePaire(skuEbay, skuAttendu)) return { status: 409, body: { ok: false, reason: 'sku-change', error: `L'annonce eBay ne porte plus ${skuAttendu} — rien n'a été retiré.` } };
+    const lu = numeroExterne(numDeSku(skuEbay), itemId, 'ebayAnnonces', null, marqueur);
+    if (!lu || lu !== numDeSku(skuAttendu)) return { status: 409, body: { ok: false, reason: 'sku-change', error: `L'annonce eBay ne porte plus ${skuAttendu} — rien n'a été retiré.` } };
   }
   const r = await tradingCall(at.token, 'EndFixedPriceItem', `<ItemID>${itemId}</ItemID><EndingReason>NotAvailable</EndingReason>`);
   if (sansAck(r)) return { status: 504, body: { ok: false, reason: 'incertain', error: 'eBay n\'a pas répondu — je ne sais pas si l\'annonce a été retirée. Regarde sur eBay avant de recommencer.' } };

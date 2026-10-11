@@ -49,7 +49,7 @@ Ce ne sont pas des positions de principe : chacune a une raison technique.
 | demande | pourquoi non |
 |---|---|
 | republication automatique en file, avec délais aléatoires | un délai « faussement humain » n'a qu'un usage : tromper la détection bot. C'est ce qui a fait bloquer `vanessa5723`. |
-| **accepter une offre automatiquement** — ⛔ **RETIRÉ, sa décision** | coupée le 4 octobre (« je ne veux pas que ça accepte tout seul les offres »), **retirée** le 5 octobre (« enlève l'acceptation de l'offre ») : le moteur de l'extension, ses planchers, le champ « Min. accepté », l'interrupteur de Réglages. Accepter engage une vente ferme, et un programme qui accepte ressemble à un robot (le compte bloqué). **Ne jamais le reproposer** — je l'ai fait par erreur le 5 octobre en lisant l'ancienne version de cette ligne. Reste permis : accepter UNE offre depuis la messagerie, sur son clic, avec confirmation (`executerPourApp`). `audit-offres-auto.cjs` refuse tout autre chemin vers `/accept`. |
+| **accepter une offre automatiquement** — ⛔ **RETIRÉ, sa décision** | coupée le 4 octobre (« je ne veux pas que ça accepte tout seul les offres »), **retirée** le 5 octobre (« enlève l'acceptation de l'offre ») : le moteur de l'extension, ses planchers, le champ « Min. accepté », l'interrupteur de Réglages. Accepter engage une vente ferme, et un programme qui accepte ressemble à un robot (le compte bloqué). **Ne jamais le reproposer** — je l'ai fait par erreur le 5 octobre en lisant l'ancienne version de cette ligne. Reste permis : accepter UNE offre depuis la messagerie, sur son clic, avec confirmation (`executerPourApp`). `audit-offres-auto.cjs` refuse tout autre chemin vers `/accept`. ⚠️ **Tout ce qui précède vaut pour VINTED. Sur eBay, Julien l'a demandé le 9 octobre**, en ses mots : « Je veux juste définir une règle sur chaque annonce et à chaque offre au-dessus ça accepte », puis, à la question « aussi sur Vinted ? » : « **eBay seulement** », et « J'accepte » sur le plan. Sur eBay c'est donc permis, sous UNE seule forme : le **seuil natif d'eBay** (`BestOfferAutoAcceptPrice`), posé annonce par annonce **sur son clic**, avec une confirmation qui dit qu'une offre acceptée vend la paire. C'est eBay qui accepte : VRM n'appelle aucune route d'acceptation et ne décide rien. Sur Vinted, rien ne change. |
 | piloter la souris / le clavier | Vinted reçoit la **même requête** ; en plus un événement synthétique porte `isTrusted:false`, donc ça **ajoute** une preuve d'automatisation. Et un clic aveugle agit à côté quand la page bouge. |
 | modifier les photos pour republier / passer sur un autre compte | Vinted relie les comptes par **appareil, navigateur, adresse, moyen de paiement** — pas par les images. Tourner une photo ne protège de rien. |
 | supprimer une annonce automatiquement | irréversible et sans confirmation côté Vinted. |
@@ -4122,6 +4122,77 @@ montait, et la migration **repartait** sur ses vraies données.
   porte 543…552, remettre ce numéro dans le champ N° (l'app demande une
   confirmation, le numéro étant déjà au pool). **Ne pas corriger sa base à sa
   place** : seul le carton dit quel numéro est le vrai.
+### ⚠️⚠️⚠️ Anciens numéros en B — la remise à zéro (migration 013, 9-11 octobre)
+Julien, 9 octobre : « tous les anciens numéros, tu les fais commencer par B1,
+B2… on commence à partir de zéro à partir du moment où je recommence à
+reposter ». 10 octobre : « j'ai tout supprimé et je reposte, regarde par
+rapport à la DATE DE MISE EN LIGNE », puis : « les anciens c'est que les paires
+vendues, car je vais tout republier — c'est pour ça que je veux de nouveaux
+numéros ». **Ce sont SES décisions, pas des options à reproposer.**
+- **La règle** : une annonce mise en ligne APRÈS la coupure T est NOUVELLE et
+  reçoit 1, 2, 3… dans l'ordre de mise en ligne — même si c'est physiquement une
+  paire qui avait un numéro (il réétiquette le carton). Tout le reste passe en
+  « B + l'ancien » et ne sert plus qu'à l'HISTOIRE (ventes, compta, bordereaux,
+  fiches des paires supprimées). **Un ancien numéro ne se redonne JAMAIS** — ni
+  « B230 », ni « 230 » : ni par une vente, ni par une photo ou un dossier de
+  photo, ni par la bannière ♻️, ni à la main.
+- **La date de mise en ligne**, dans l'ordre (la migration ET l'app,
+  `dateMiseEnLigneMs`, §11) : `created_at_ts` du dressing, l'heure de dépôt de
+  la photo (`photo.high_resolution.timestamp`), `vinted_listing_dates`, puis
+  (migration seulement) `numberedAt`. Une fiche numérotée avant T ne devient
+  jamais nouvelle sur une date contraire (`contradictions`, compté).
+- **La migration** (`supabase/migrations/013-anciens-numeros-en-b.sql`) ne
+  convertit RIEN à l'installation. L'appel est à part : MESURE
+  (`vrm_numerotation_mesurer`) → ESSAI ANNULÉ (`node
+  scripts/renum-b/essai-annule.cjs --coupure=… > essai.sql`, qui rend le plan :
+  chaque annonce jugée nouvelle avec sa date, sa source et si une capture la
+  montre en ligne) → APPLICATION (`vrm_numerotation_archiver`, avec la mesure)
+  → `vrm_numerotation_rattraper`. Retour arrière ciblé :
+  `vrm_numerotation_annuler`, refusé dès qu'un numéro a bougé depuis.
+  ⚠️ **Le choix de T** : une annonce mise en ligne après T puis supprimée
+  prendrait quand même un numéro neuf — le plan le signale
+  (`nouvellesPasEnLigne`). À regarder avant d'appliquer.
+- **Le marqueur** `main.vrm_numerotation` = `{version, coupure, appliqueLe,
+  archive, renum, lbcAnnonces, ebayAnnonces, annule?}` n'est écrit QUE par le
+  serveur : le garde-fou de la base le recopie depuis la ligne d'avant, quoi
+  qu'envoie un navigateur. `renum` = {numéro provisoire → nouveau} (les 553+
+  donnés avant la migration) : un appareil qui réécrirait « 553 » sur une fiche
+  devenue « 1 » est refusé (`vrm_numeros_perimes`).
+- **Les garde-fous de la base** (écritures `authenticated`/`anon` seulement) :
+  `vrm_pool_retreci` (le pool ne rétrécit jamais, même avant la coupure),
+  `vrm_numeros_perimes` (B230 qui redevient 230, une clé B385 qui redevient
+  385, le numéro provisoire qui revient), `vrm_fiche_perdue` (une fiche
+  numérotée qui disparaît sans `repriseDe`), `vrm_garage_perime` (garage sans la
+  version), `vrm_prefixe_archive` (« B » comme lettre des nouveaux numéros).
+  Une saisie à la main datée d'après la conversion (`manuelAt`) passe.
+- **L'app** lit le marqueur (`archiveNumeros`, `coupureNumerotation`,
+  `versionNumerotation`) : la version est relue toutes les 60 s et au retour au
+  premier plan ; la numérotation automatique n'agit que sur une version relue
+  depuis moins de 3 min (`numerotationPermise`). Un refus nommé de la base, ou
+  une version qui a changé, couvre l'écran (`BlocNumerosPerimes`) : « Recharger »
+  met de côté ce qui a été tapé (prix d'achat, colis cochés…) et le rejoue par
+  IDENTIFIANT après le rechargement — jamais les numéros.
+- **Un « 230 » écrit AVANT la coupure désigne l'ANCIENNE paire** : le SKU d'une
+  annonce eBay ou la référence d'une annonce Leboncoin qui le portaient à la
+  coupure (leurs identifiants sont dans le marqueur), une commande eBay passée
+  avant T. Sans ça, la vente Vinted de la NOUVELLE 230 faisait retirer d'eBay
+  l'annonce de l'ancienne (`numeroExterne`, la même règle dans l'app,
+  `api/_lib/numerotation.js` et l'extension 5.165 pour Leboncoin). Le retrait
+  eBay automatique relit le marqueur chez le serveur ; illisible ⇒ rien.
+- **Les emails** : après la conversion, le « nXXX » d'un TITRE n'est retenu que
+  s'il désigne une fiche actuelle de la nouvelle série AU MÊME TITRE ; sinon il
+  part dans `numeroTitre` (jamais tamponné). Le repli par titre ne rend jamais
+  un numéro d'archive (`numeroDEmail`, serveur ; `numeroEmailAdmis`, app).
+- Preuves : `audit-renum-b.cjs` (la migration EXÉCUTÉE sur un Postgres jetable,
+  ~5 min, et l'essai annulé qui ne laisse rien) ; `audit-numerotation-lecteurs.cjs`
+  (les règles de l'app, du serveur et de l'extension exécutées, 18 mutations) ;
+  `audit-ebay-route.cjs` (le retrait automatique : 3 rouges sur le code d'avant).
+- ⚠️ **Non mesuré** : la migration n'a JAMAIS tourné sur sa vraie base (données
+  inventées à la forme des siennes). Une annonce republiée SANS date lisible ne
+  se numérote pas toute seule (elle reste « sans N° »). Le « nXXX » d'un titre
+  Vinted republié reste lu tel quel par la file Leboncoin de l'extension
+  (`vintedKeys`) : ancien ou nouveau numéro, VRM ne peut pas le savoir.
+
 ### Leboncoin et eBay rangés comme Vinted : résumé, puis Ventes / Achats / Annonces (3 octobre)
 Demande du 2 octobre : « plus d'écran Aperçu intermédiaire ». Les deux onglets
 ouvrent sur **Ventes**, avec un résumé compact au-dessus (`PlatResume`, même forme
@@ -5094,9 +5165,9 @@ mesurées, et aucune n'était « l'extension est éteinte »** :
   l'orthographe `member/transactions/` près de `genere_sans_pdf` ; le lien passe
   maintenant par une variable. Il suit la variable jusqu'à sa définition — et
   repasse au rouge quand on y retire l'adresse Vinted (prouvé).
-- ⚠️ **Le chantier PDF→stockage avait réservé la 5.160** : il passera en **5.164**
+- ⚠️ **Le chantier PDF→stockage avait réservé la 5.160** : il passera en **5.165**
   (5.161 = suite de la revue ci-dessous, 5.162 = défauts d'extension mesurés,
-  5.163 = la fusion du 8 octobre, voir plus bas).
+  5.163 = la fusion du 8 octobre, 5.164 = « Tout générer » borné, 9 octobre).
 - **Revue contradictoire (26 constats, 5 octobre au soir)** — corrigé en 5.161 et
   dans l'app, chacun prouvé rouge sur e50cd28 :
   - ⚠️⚠️ **Une extension < 5.129 passait « muette » au bout de 15 s** (elle ne
@@ -5834,6 +5905,135 @@ déclaré, qui est l'argent reçu.
   sur le code d'avant **instrumenté des mêmes attributs** (« la fonction
   n'existait pas » n'aurait rien prouvé).
 
+### « Ce que Vinted transmet aux impôts » — les seuils DAC7, compte par compte (6 octobre)
+Chaque année, Vinted transmet aux impôts les vendeurs qui font **au moins 30
+ventes OU plus de 2 000 €** dans l'année civile (directive européenne DAC7).
+**Mesuré avant de coder** (lecture seule, sa base) : `grep DAC7` = 0 dans l'app ;
+7 comptes liés, aucun exclu ; ventes **finalisées** de 2026 — `julatace35260`
+**101 · 3 721,10 €** (les deux seuils), `llloollllaa` **49 · 1 775,70 €**,
+`tomj606` **33 · 1 433,50 €** (30 ventes), puis 27 · 20 · 16 · 0, sous les seuils.
+- **Où** : Ventes → Outils → **Registre annuel**, UNE carte (`CarteSeuilsVinted`),
+  pour l'année choisie. Ton informatif : aucun rouge ni ambre (§7), un seuil
+  atteint se dit par le mot, en gras.
+- ⚠️ Le premier jet (2c85fe1) disait « pour qu'il n'y ait jamais d'écart avec ce
+  que tu déclares » et comptait comme SÛRES des ventes sans date de versement :
+  **c'était faux** — voir la revue juste en dessous. Ne pas le remettre.
+- **Trois états** : registre pas encore calculé · **lecture ratée ⇒ « — » et la
+  raison, jamais « 0 vente »** · lu. Un compte **exclu** n'y entre pas (décision
+  du 3 octobre) ; une ligne neutre dit que les exclus ne sont pas comptés, **sans
+  les nommer**. « Plus de 2 000 € » se compare en centimes : 2 000,00 € pile ne
+  l'atteint pas.
+- **Pas mesuré / pas affirmé** : les sources primaires (impots.gouv.fr,
+  economie.gouv.fr, Légifrance, EUR-Lex, BOFiP) sont **bloquées par le proxy du
+  conteneur** — les seuils sont écrits tels quels, recoupés sur des sources
+  secondaires, et **rien d'autre n'est affirmé** (ni date de début, ni ce que
+  Vinted envoie au vendeur, ni la date que Vinted retient pour rattacher une
+  vente à l'année). Non mesuré : si Vinted juge chaque compte à part ou
+  regroupe les comptes d'une même personne ; le montant exact qu'il retient (VRM
+  prend le prix de l'article, comme le CA déclaré) ; Leboncoin et eBay, soumis
+  aussi à DAC7, ne sont pas dans cette carte.
+
+#### Revue contradictoire du 6 octobre — six défauts, corrigés le 8 octobre
+Un relecteur les a REPRODUITS au rendu ; la première correction (d9bac7e) a été
+interrompue, reprise et finie.
+- ⚠️⚠️ **Le cache des ventes changeait un compte en panne en « 0 vente · sous les
+  seuils »** au passage suivant (rechargement ou retour sur l'écran dans les
+  3 min) — et le bandeau « compte non chargé » de l'écran Ventes disparaissait
+  aussi. `putCache` gardait la liste partielle **sans** dire quels comptes
+  avaient raté. Une entrée de cache porte maintenant `failedUids` (version
+  `_CACHE_V` : une entrée d'avant, qui ne sait rien de ses échecs, est ignorée),
+  et `loadOrders` les rend avec la liste. Une relecture discrète ratée garde ce
+  qu'on montrait **du seul compte raté** (elle gardait toute l'ancienne liste
+  avec la nouvelle liste d'échecs : un compte raté avant et revenu passait à
+  « 0 vente »). Le cache des annonces et des conversations garde aussi ses
+  comptes ratés. « Rouvre l'écran Ventes » est devenu un vrai bouton
+  **« Relire mes ventes »** (`relireVentes` : vide le cache, relit notre base —
+  jamais Vinted — et les dates de versement si elles étaient illisibles).
+- **Un échec se juge par l'IDENTITÉ** (`failedUids`), plus par le nom affiché :
+  un libellé arrivé du nuage après la lecture faisait passer le compte en panne
+  pour lu. Vaut pour la carte, le bandeau de l'écran Ventes, le rapport mensuel
+  et le geste « J'ai déclaré ce mois » (`nomsVentesKO`, nommé au rendu).
+- ⚠️⚠️ **La partie sûre de la carte EST le chiffre du registre** — mesuré sur la
+  copie de sa base du 5 octobre : carte 245 ventes · 9 361 € contre registre
+  141 · 5 226 €. Le registre calcule, par compte, ses ventes Vinted de l'année
+  (`vintedParUid`, mêmes lignes que son total : mois de la déclaration s'il l'a
+  notée, sinon du versement) et sa liste « pas encore datées » ; la carte LIT les
+  deux (`seuilsVintedParCompte` ne rappelle plus `ventesDeclarables`, §11).
+  Mesuré après sur la même copie : **carte 141 · 5 226,30 € = registre**, plus
+  **104 ventes · 4 134,80 € « pas encore datées »**, dites à part comme une
+  **estimation** (rattachées à l'année par la date de vente et la borne de
+  45 jours : le versement suit la vente — **0 sur 173** avant elle — et au plus
+  **25 jours** après, médiane 7,8 j ; une borne mesurée, pas une certitude).
+  Un seuil atteint seulement avec elles se dit « **atteint si** … ».
+  ⚠️ Le premier correctif recalculait ces ventes **sans** le registre des
+  déclarations : une vente déclarée sans date comptait deux fois.
+- **VRM ne sait pas si Vinted juge chaque compte à part** : la carte le dit, et
+  ajoute une ligne « **Tous tes comptes ensemble** » (« au moins » et « sans X »
+  quand un compte manque — jamais « sous les seuils » sur un total partiel).
+  Année en cours : « **à ce jour** » et « encore N ventes ou X € avant le seuil »
+  (sur la partie sûre ; « plus de 2 000 € » ⇒ il faut 2 000,01 €).
+- §7 : la panne et « Lecture des ventes… » se disent **une fois** au-dessus des
+  lignes ; la ligne d'un compte pas lu ne porte qu'un « — ».
+- **Constaté, laissé tel quel** : l'année suit le fuseau de l'APPAREIL
+  (`getFullYear`), comme `ventesDeclarables` et le registre — une vente versée
+  le 1er janvier à 00 h 20 (Paris) compte l'année d'avant sur un téléphone réglé
+  à Londres. Changer la carte seule la ferait diverger du registre.
+- **Preuves** : `audit-seuils-vinted.cjs` (vraie règle dans un `vm`, ventes
+  inventées) **39 contrôles**, **34 rouges** sur 2c85fe1, et chacune des **11
+  mutations** le refait passer au rouge (`exclus` 4 · `passu` 5 · `versnull` 2 ·
+  `encours` 4 · `seuil2000` 3 · `adater` 13 · `recalcule` 17 · `strict` 2 ·
+  `totalsous` 1 · `reste` 2 · `acejour` 1). Banc `bancs/seuils-vinted.cjs`
+  (port 4802, aucune fixture, 390 et 1512 px, cinq scénarios : comptes,
+  cache, libellé tardif, panne totale, année passée) **99 contrôles, tout vert**, **70 rouges**
+  sur le build de 2c85fe1, et rouge sur trois builds réaffaiblis du code
+  d'après : cache rendu sans ses échecs (**4**), échecs reconnus par le nom
+  (**2**), « pas encore datées » recalculées sans les déclarations (**2**).
+  `rapport.cjs` et `vendu-recu.cjs` restent verts.
+- **Pas mesuré** : la carte n'a pas été vue sur sa vraie base dans l'app (bancs
+  sur données inventées ; les chiffres ci-dessus viennent de la règle exécutée
+  sur la copie locale du 5 octobre).
+
+#### Deuxième revue (9 octobre) — le cache ne savait pas QUELS comptes il couvrait
+Deux défauts, reproduits chacun par deux relecteurs au rendu, corrigés.
+- ⚠️⚠️ **Un compte lié depuis la dernière lecture s'affichait « 0 vente · sous
+  les seuils »**, et le total « tous tes comptes » se disait complet. L'entrée de
+  cache des ventes ne retenait que ses ÉCHECS : liste de comptes du navigateur
+  en retard sur la base, ou rechargement dans les 3 min après une liaison ⇒
+  `loadOrders` resservait le cache des anciens comptes ; le nouveau n'était ni lu
+  ni en échec. Dans l'autre sens, un compte **retiré** restait compté au
+  registre (95 ventes contre 62 sur la carte).
+  ⇒ L'entrée de cache ET l'état des ventes portent `comptes`, la clé des comptes
+  interrogés (`cleComptesVinted` : les identités triées — jamais un nombre, jamais
+  un nom). `entreeCache` ne sert qu'une entrée qui couvre **exactement** les
+  comptes d'aujourd'hui (`_CACHE_V` = 3), et les relectures suivent `cleComptes`
+  au lieu de `accounts.length` (un compte retiré + un lié = même longueur). Même
+  règle pour les annonces, les achats et les conversations. Et tant que la
+  lecture ne couvre pas les comptes d'aujourd'hui, le registre dit « lecture en
+  cours » (`ventesComptees` vaut `null`) et « J'ai déclaré ce mois » attend.
+- ⚠️ **Relecture discrète ratée** (signal de l'extension, un compte déjà lu ne
+  répond pas) : la liste garde ses ventes d'avant ; le registre les COMPTAIT tout
+  en écrivant « ventes de X pas lues », et la carte (« sans X ») donnait un autre
+  total. ⇒ **Un compte en échec n'entre dans AUCUN total** (`ventesComptees`
+  écarte `failedUids`), qu'on ait déjà vu ses ventes ou non — la liste, elle,
+  continue de les montrer. Carte == registre, et la phrase dit ce que le chiffre
+  contient. Par ricochet : la ligne publiée au tableau de bord
+  (`vinted_urssaf_mois`) ne part plus pendant qu'un compte non exclu est en échec
+  (le tableau de bord garde la dernière, complète) ; Ma journée écrit « Reçu en
+  {mois} · **sans X (ventes pas lues)** » ; le total « à la date de vente » du
+  formulaire de déclaration lit la même liste.
+- **Preuves** : banc `seuils-vinted.cjs` **165 contrôles** (scénarios F1 compte
+  lié · F2 rechargement · F3 compte retiré · G relecture discrète · H Ma journée,
+  plus l'égalité registre == carte après la relecture ratée de B) — **11 rouges**
+  sur le build d'avant (e719d0f), et **5 rouges** sur un build où le cache « se
+  croit » (entrée sans clé de comptes). `audit-seuils-vinted.cjs` **45 contrôles**
+  (+6 sur la clé) ; mutations `clelongueur` 3 rouges, `clenom` 2.
+  `audit-urssaf.cjs` exigeait l'orthographe `vinted: sales.items` : il suit la
+  règle (Leboncoin et eBay passés à la même fonction).
+- **Constaté, laissé tel quel** : les totaux de l'écran Ventes et « Vendu »
+  (`ventesFaites`) comptent encore les ventes d'avant d'un compte en échec — de
+  l'affichage, pas le CA déclaré ; le bandeau « compte non chargé » le dit.
+  **Pas mesuré** : rien n'a été vu sur sa vraie base (données inventées).
+
 ### La page d'accueil publique (n° 22, 4 octobre)
 Julien : « une vraie page d'accueil… qui donne envie… avant d'arriver sur la
 connexion », avec une vidéo en motion design, inspirée de Vinteer.
@@ -6461,6 +6661,294 @@ Aucune requête Vinted de plus ; tous les garde-fous du §3 inchangés.
 - Extension **5.155.0**, zip régénéré, `EXT_ATTENDUE` suivie. Aucune entrée
   d'`EXT_CAPACITES` : rien de neuf n'est promis.
 
+### ⚠️⚠️ « LE COMPTE DE L'EXTENSION EST SÉLECTIONNÉ » NE S'ÉTAIT JAMAIS ALLUMÉ (9 octobre)
+Demande de Julien du 7 octobre (#462-#464, une autre session) : la liste
+« Compte » choisit d'office le compte ouvert dans Chrome, les autres sont
+estompés et inertes. Revue du 8 octobre, quatre défauts reproduits au rendu :
+- ⚠️⚠️ **Le compte était lu dans `authEtat`, qui ne le porte pas** (session VRM
+  seule, de la 5.116 à la 5.163). `compteConnecte` valait toujours `''`. La
+  seule réponse qui le porte est `etat` : `vintedDeChrome()` (trois états), la
+  même lecture que la pastille « Actions possibles · {compte} » (§11). Aucune
+  extension à changer.
+- **Messages disait « Tout est lu » au-dessus de non-lus** d'un compte estompé
+  (le compte ne gardait que le compte choisi) et sur une boîte illisible.
+  Il compte la liste AFFICHÉE ; ceux d'un compte estompé sont dits à côté avec
+  le geste ; une boîte qui n'a pas pu être lue est nommée (`convs.ko`) et une
+  liste partielle n'est plus mise en cache.
+- **« N offres à trancher » listait un compte exclu ou retiré** (5 offres de
+  julienf765, mesuré). Écartées comme la conversation ; « retiré » ne se juge
+  que sur une liste de comptes LUE ; une offre sans compte reste.
+- **La liste proposait les comptes exclus**, et en choisir un floutait tout
+  l'écran. `compteEffectif` (une règle pour la liste et le flou) ne retient
+  qu'un compte qu'on peut montrer ; Chrome sur un compte exclu ⇒ « Tous ».
+  Les ventes d'un compte masqué restent visibles par « les voir », sous
+  « Tous les comptes ».
+- Une fois allumé, le flou d'office touche Ventes/Achats/Annonces/Messages (pas
+  Colis) : la note sous la liste le dit UNE fois, avec « Tous les comptes ».
+- Banc `filtre-compte.cjs` (données inventées) : **17 rouges** sur e6bda5c,
+  chaque règle réaffaiblie seule repasse au rouge. `messagerie.cjs` choisit
+  désormais « Tous les comptes » (son pont est sur compte_a).
+
+### ⚠️⚠️ « TOUT GÉNÉRER » CONTOURNAIT LE PLAFOND PAR VISITE (revue du 9 octobre)
+Revue de « Tout générer » (#462), du bordereau de retour (#460) et de l'état de
+l'extension (#457) après la fusion du 8 octobre. Chaque défaut REPRODUIT d'abord
+(vrai `background.js` dans un `vm`, rendu du build de e6bda5c) :
+- ⚠️⚠️ **Un clic « Tout générer (20) » = 20 PUT chez Vinted et les 20 actions de
+  l'heure** (jusqu'à 300 requêtes quand les PDF tardent) ; une réponse à un
+  acheteur était ensuite refusée une heure. Une visite s'arrête à 6 (§3).
+  ⇒ **L'extension juge** : au plus `BORD_MAX_PAR_VISITE` (6) bordereaux commandés
+  par l'app par compte et par 5 min (`vrmBordCmds`, refus `lot` avec l'heure de
+  la suite), et ces commandes s'arrêtent à 15 actions/h (`RESERVE_GESTES` = 5
+  gardées pour répondre/trancher, refus `plafond-bordereaux`). L'admission est
+  sérialisée. **L'app** ne lance que ce qu'elle annonce : `BORD_LOT_MAX` = 6 par
+  clic (« Générer 6 bordereaux (sur 8) »), égal à la borne de l'extension (§11,
+  vérifié). Le total reste 20/h — ne pas le monter.
+- **Le refus était jeté** (« 0 lancé · 3 refusés. Chaque colis montre sa
+  progression » — rien ne la montrait). Le bilan garde chaque raison, la dit UNE
+  fois, s'arrête au premier refus qui vaut pour tout le lot (pause, plafond,
+  `lot`, autre compte…), et « chaque ligne suit le sien » n'est écrit que si un
+  bordereau est parti.
+- **La pause demandée par Vinted se voit avant le clic** : l'état du pont porte
+  `pause.jusqua` ; `raisonExtGlobale` rend `pause` (sauf pour publier, qui ne va
+  pas chez Vinted) — pastille « Lecture seule », bouton grisé, sans couleur
+  (rien à faire). Une extension plus ancienne ne la dit pas : le refus au clic,
+  lui, la dit.
+- **Base lente ⇒ « refusé » pour un bordereau généré** : la liste des comptes et
+  « PDF déjà rangé ? » retenaient l'accusé sans délai. Bornées (4 s / 1,5 s) ;
+  comptes illisibles ⇒ refus `lecture` dit (`getStoredAccounts({ouNull:true})`),
+  plus « compte introuvable ». Côté app, **pas de réponse ≠ refus** : « je ne
+  sais pas, regarde sa ligne », et le bilan passe à « lancé » dès qu'un
+  évènement de CE colis arrive (bouton par colis compris).
+- **File longue** : un colis en file depuis 120 s était réaccepté (7 actions pour
+  4 colis). La file en mémoire fait foi (`BORD_EN_COURS`) ; l'état dit `vivant`
+  pour ce qui y est réellement, l'app garde « En file… » tant que c'est vrai
+  (`jobEnCours`), et « Tout générer » saute ces colis. Un service worker
+  redémarré : plus `vivant`, le clic relance pour de vrai.
+- **§7** : la raison d'un « Tout générer » grisé n'est plus écrite sous le bouton
+  (le bandeau `RaisonBordereauxGrises` la dit) ; « À mettre à jour en X » n'est
+  plus dit là où le pont a mesuré CE navigateur, et ne nomme que ce qui manque à
+  la version vue (`capacitesManquantes`, tiré d'`EXT_CAPACITES`) ; « publier sur
+  Leboncoin reste possible » seulement si `extSait('publication') === 'ok'`.
+- **Achat en litige à renvoyer** (`ACHAT_A_RENVOYER`, une règle) : bloc en tête
+  d'Achats sur les onglets du quotidien (lien de retour une fois) et ligne de Ma
+  journée qui nomme le compte. Il ne revient pas dans « En route ».
+- Preuves : `audit-tout-generer.cjs` (20 contrôles, **11 rouges** sur e6bda5c ;
+  la borne app = extension, rouge sous mutation) ; banc `tout-generer.cjs`
+  (port 5710, données inventées, deux tailles : **30 rouges** sur le build de
+  e6bda5c, 0 après). `audit-statuts.cjs` charge `ACHAT_A_RENVOYER`.
+- Extension **5.164.0** (montée à la fusion du 9 octobre), zip régénéré,
+  `EXT_ATTENDUE` suivie. Aucune entrée d'`EXT_CAPACITES` : l'app détecte `pause`
+  et `vivant` à leur présence, et ne promet rien à une extension qui ne les a pas.
+
+### ⚠️⚠️ « J'AI SUPPRIMÉ BEAUCOUP DE PAIRES, ELLES SONT ENCORE DANS LES ANNONCES » + « L'EXTENSION NE RÉPOND PAS » (9-11 octobre, 5.165)
+Il supprimait toutes ses annonces pour tout reposter, juste après avoir installé
+la 5.164. **Mesuré** (base en lecture seule, journaux de la base, Chromium réel
+avec les vraies extensions — détail dans le passage du 10 octobre) :
+- le dressing de cinq comptes datait du 8 au soir (~41 annonces « en ligne »
+  supprimées depuis), et l'écran Annonces ne disait NULLE PART de quand datait
+  sa lecture (il ne prévenait qu'au-delà de 7 jours) ;
+- la moisson de llloollllaa a bien été lue chez Vinted (18:38), puis **refusée
+  en bloc par la base** (400 : partie sans session VRM) ; la garde des 5 min,
+  posée avant, a interdit tout nouvel essai une fois la session revenue ;
+- une copie plus ancienne de VRM tournait **à côté** (une ≤ 5.77 vivante à
+  18:37) : chaque commande et chaque `exec` de l'app partaient vers LES DEUX
+  (mesuré : « cmd:bordereau ×2 », « exec …/replies ×2 »), la session tendue par
+  l'app était adoptée par les deux (`refresh_token_already_used`), et l'app
+  affichait la version du DERNIER `ready` — « mets à jour » juste après la mise
+  à jour ;
+- la seule trace d'une suppression était `writereq`, posée AVANT la requête
+  (donc aussi pour une suppression refusée), sans statut, une ligne par compte
+  écrasée à chaque fois.
+**Remesuré le 11 octobre** : llloollllaa, julatace35260, tomj606 relus le 10 au
+soir, angeled92 le 11 ; **tomj683 et arthuror2 toujours au 8 octobre 22:30**
+(16 annonces « en ligne »). `panel_diag_capture.ver` = 5.164.0 ; aucune ligne
+`harvest_*_supprimees` (la 5.165 n'est pas installée).
+
+**Corrigé** :
+1. **La moisson** (`background.js`) : sans session VRM sur base cloisonnée, rien
+   ne part chez Vinted (`visite_sans_session`, `moisson_sans_session`) ; la garde
+   des 5 min est RENDUE sur échec (nouvel essai à 60 s, entière pendant une
+   pause Vinted) ; une moisson ne compte que ce qui est RANGÉ (tout refusé ⇒
+   `abandon`, pas de seconde moisson) ; un dressing lu EN ENTIER par la moisson
+   (toutes les pages, `complet`) fait foi même vide ou plus court
+   (`dressingCompletFaitFoi`) — une page partielle n'écrase toujours pas (§4.2) ;
+   compte changé pendant la moisson ⇒ rien rangé ; la capture passive ne range
+   que SON dressing (jamais celui d'un autre membre) ; plus de balayage de tous
+   les comptes (`activeFetchAll`) en repli.
+2. **La suppression vue sort l'annonce de VRM, par identité** : `inject.js`
+   poste `{suppression, itemId, status}` dans le rappel de la RÉPONSE, seulement
+   pour un `POST /api/v*/items/{id}/delete` en **2xx** sur Vinted ; le fond
+   (`noterSuppression`) revérifie, met en file dans `chrome.storage.local`
+   (§4.9), range `harvest_{uid}_supprimees = {ids:{[id]: atISO}}` (500 au plus)
+   en lire-fusionner-réécrire gardé, sur UNE chaîne (dix suppressions à la suite
+   ne se perdent pas), et prévient l'app (`maj · annonces`). Un dressing rangé la
+   prévient aussi. **Une règle des deux côtés** (`supprimeeApres`, bloc
+   `<supprimees-regle>`) : écartée si supprimée APRÈS la lecture du dressing
+   (`capturedAt` + marge de 5 min : c'est l'heure du rangement) ; le dressing
+   relu après fait foi ; ligne illisible ⇒ rien n'est écarté. Appliquée LÀ où
+   le dressing est lu (`fetchHarvestBrut` ; `retirerSupprimeesLignes` pour les
+   balayages : file Leboncoin de l'app, recherche, prix du marché), donc Annonces,
+   ses chiffres et le tableau de bord la suivent ; côté extension `buildLbcData`,
+   `buildEbayData` et `capterPhotosAnnonces` (plus de 404 sur une annonce
+   supprimée). ⚠️ Supprimée n'est PAS vendue : rien n'entre dans une preuve de
+   vente, un CA ni « à retirer ailleurs », et le numéro n'est pas touché.
+3. **La fraîcheur, une fois** (`FraicheurAnnonces`, Annonces ET tableau de bord,
+   §11) : au-delà de 30 min (⚠️ 12 h, ou vu actif depuis, après la revue — section
+   suivante), nomme les comptes et l'heure (« annonces lues hier
+   à 22 h 30 — ce que tu as supprimé ou mis en ligne depuis n'y est pas ») et le
+   geste (ouvrir vinted.fr connecté sur ce compte) ; sans couleur ; rien quand
+   tout est frais. Remplace le « pas rafraîchie depuis une semaine ».
+4. **Deux extensions** : le pont (5.165) joint l'identifiant de l'extension à
+   `ready` ; l'app compte les ponts qui répondent à UN même `ping`
+   (`sonderPonts`, au premier `ready` puis à chaque battement). Deux ⇒ code
+   `plusieurs` AVANT `retard`/`muette` (« supprime l'ancienne dans
+   chrome://extensions, puis recharge »), et **ni commande, ni `exec`, ni
+   session** ne partent (une commande attend le premier compte, ≤ 2,5 s). La
+   version retenue est la plus HAUTE. Un orphelin depuis la 5.129 se tait : il
+   ne compte pas ; un orphelin plus ancien répond encore — d'où « si tu viens de
+   la retirer, recharger suffit ». ⚠️ Un `ready` qui répond à notre propre
+   compte ne remet pas les ratés à zéro (sinon une extension muette n'était plus
+   jamais dite muette — c'est `pont.cjs` qui l'a vu).
+5. `CODE_VERSION` (en tête de `background.js`) part avec `ver` dans
+   `panel_diag_capture` : copie partielle (manifeste neuf, code ancien) et deux
+   extensions se distingueront enfin. `audit-extension-zip` l'exige égale au
+   manifeste.
+- **Preuves** (rouge sur cdc9c1d, vert après, mutations) :
+  `audit-moisson-dressing.cjs` 20 contrôles, **12 rouges**, 7 mutations rouges
+  (page partielle, total ignoré, garde, session, écritures, compte, autre
+  membre) · `audit-supprimees.cjs` 36 contrôles (le vrai `inject.js` →
+  `content.js` → `background.js`), **17 rouges**, 6 mutations rouges (statut
+  page/fond, pas su, marge, divergence app/extension, file Leboncoin) ·
+  `audit-fusion` porte `harvest_{uid}_supprimees` (lecture KO, écriture OK) ·
+  bancs `supprimees.cjs` (**16 rouges**, 4 mutations rouges) et
+  `deux-extensions.cjs` (**19 rouges**, 5 mutations rouges), données inventées,
+  390 et 1512 px. Bancs voisins verts un par un : annonces-carte, filtre-compte,
+  pont, capacites, premierjour, double-vente, messagerie, comptes, tout-generer,
+  publier, verif_visuel. ⚠️ `publier.cjs` était déjà rouge sur cdc9c1d (il
+  servait 5.130 comme « à jour », le seuil est 5.160) : il lit maintenant le
+  seuil dans l'app.
+- `EXT_CAPACITES.supprimees = '5.165.0'` (`noterSuppression`) : la phrase « une
+  suppression faite sur vinted.fr dans ce Chrome sort d'ici tout de suite » ne
+  s'écrit que si `extSait('supprimees') === 'ok'`.
+- ⚠️ **Non mesuré** : la forme réelle de la réponse de Vinted à une suppression
+  (on ne lit que le statut) ; le délai réel entre le 200 et la navigation sur le
+  vrai réseau (mesuré en local seulement) ; ce que fait un onglet Vinted ouvert
+  AVANT la mise à jour (son `inject.js` est l'ancien : ses suppressions ne
+  partent qu'après rechargement — rien n'est réinjecté) ; combien de copies de
+  VRM tournent chez lui (seul `chrome://extensions` le dit). Une page Vinted
+  pourrait forger un message `suppression` : au pire une annonce est cachée
+  jusqu'à la relecture suivante de son dressing.
+- **Geste de Julien** : installer la 5.165 dans UN seul dossier (supprimer toute
+  autre entrée VRM dans `chrome://extensions`), recharger ses onglets Vinted,
+  puis passer une fois sur **tomj683** et **arthuror2**. (⚠️ La 5.165 n'est
+  jamais partie : c'est la **5.166** de la section suivante qu'il installe.)
+
+### ⚠️⚠️ REVUE DE LA 5.165 : DIX DÉFAUTS REPRODUITS, DONT UN RELAIS SERVEUR QUE LES SUPPRESSIONS RÉVEILLAIENT (11 octobre, 5.166)
+Revue contradictoire de 4a29202 : chaque défaut REPRODUIT d'abord (vrai
+`background.js` dans un `vm` à horloge pilotée, app rendue sur données
+inventées), corrigé, puis rouge sur 4a29202 et sous mutation.
+**Remesuré le 11 octobre** (lecture seule) : `panel_diag_capture.ver` = 5.164.0 ;
+**tomj683 et arthuror2 toujours lus le 8 octobre 22:30** (16 annonces « en
+ligne ») ; aucune ligne `harvest_*_supprimees` (la 5.165 n'a jamais été
+installée) ; `visite_en_pause` 30, `vinted_frein_403` 1, des `ecriture_ratee_*`
+qui arrivent pour de vrai (`orders_sold` 18, `inbox` 17, `profile` 12).
+1. ⚠️⚠️ **Chaque « maj · annonces » faisait lire Vinted PAR LE SERVEUR.** L'écran
+   Annonces et le calcul de la coque relisaient tout à chaque signal (une par
+   suppression rangée) ; pour un compte lié SANS ligne moissonnée, ces lectures
+   retombaient sur `/api/vinted-proxy` — Vinted lu depuis l'IP de Vercel, au nom
+   d'un AUTRE compte : **0 appel avant la 5.165, 24 après 6 suppressions (48
+   quand ventes et boîte manquent)**. ⇒ Une relecture sur signal ne lit QUE la
+   moisson (`moissonSeule` : pas de ligne ⇒ on garde ce qu'on montrait, jamais
+   un faux « 0 »), seulement les comptes signalés ; les signaux se regroupent
+   (`regrouperSignaux` : 300 ms pour cueillir une rafale, puis au plus une
+   relecture / 5 s, la dernière jamais perdue) ; la coque ne recompte que les
+   annonces (ventes et boîte reprises de la dernière lecture complète). Une
+   lecture d'ouverture en cours au moment du signal est suivie d'une relecture.
+   Banc `signal-annonces.cjs` : **9 rouges** sur 4a29202, 2 mutations rouges.
+   ⚠️ Les 7 appels du relais **au chargement** (compte jamais visité) existaient
+   avant la 5.165 et restent : seul le signal est corrigé.
+2. ⚠️⚠️ **La garde des 5 min était rendue à 60 s sur CHAQUE échec**, durable
+   compris : base en panne (522) ou écritures refusées (RLS 403/42501) ⇒ une
+   moisson complète par minute de navigation, toutes jetées — **30 moissons
+   (240 requêtes Vinted) en 30 min, contre 6 avant la 5.165**. Et l'alarme des
+   20 min et le changement de cookie appellent `runActive` SANS la garde.
+   ⇒ **Recul de la base** (`vrmReculBase`, `chrome.storage.local`) : une moisson
+   ou des ventes dont TOUTES les écritures sont refusées le posent — 1, 5, 10,
+   20, 40, 60 min — et il vaut pour `runActive` (toutes les voies) et la visite
+   (ventes, moisson, lecteurs). Il tombe dès qu'une ligne de CAPTURE
+   (`harvest_{uid}_profile|listings|orders_*|inbox|billing`) est écrite —
+   jamais une ligne de diagnostic. Le premier palier (1 min) garde le hoquet.
+   ⇒ **Échec passager** (Vinted 401, page qui navigue) : la garde n'est rendue
+   qu'UNE fois (`vrmVisiteEchecs`), ensuite les 5 min entières. Mesuré après :
+   **0 moisson et 4 requêtes Vinted en 30 min** de panne ou de RLS.
+3. ⚠️⚠️ **Le repli par cookie (`activeFetchActiveAccount`) rangeait B sous A** —
+   profil, dressing, ventes — s'il changeait de compte en route ; et, B venant
+   d'être VIDÉ, le dressing complet et vide de B **effaçait les 61 annonces de
+   A** (`dressingCompletFaitFoi`, 5.165), puis la garde passive, trompée par le
+   profil de B rangé sous A, refusait le dressing de A. ⇒ Le compte du cookie
+   est relu avant CHAQUE rangement (écart ⇒ plus rien, `moisson_compte_change`) ;
+   le profil rendu doit être celui qu'on a rangé (`profilIdRange` : connu et
+   différent ⇒ rien ; pas su ⇒ `base`, rien) ; même contrôle de profil dans la
+   moisson de la page.
+4. **§4.2 : un compteur `nItems` illisible valait « on écrit »** — la page 1 du
+   dressing (20 sur 61) écrasait la liste complète, avec un `capturedAt`
+   rajeuni. `listePlusRiche` a trois états (`null` = pas su ⇒ on n'écrit pas,
+   `ignore_partiel_lecture_ratee`) ; la moisson le compte comme un ÉCHEC
+   (`lecture-ratee`), pas comme « lu, plus pauvre ».
+   ⇒ `audit-moisson-dressing.cjs` : **33 contrôles, 10 rouges** sur 4a29202
+   (§9 à §11 : RLS, panne, alarme, 401 répété, trois bascules, compteur
+   illisible), et 5 mutations nouvelles rouges (`durable`, `recul`, `cookie`,
+   `lecturepassu`, `garde` réécrite). ⚠️ Le banc PILOTE l'horloge du service
+   worker (`m.avance(ms)`) : reculer la seule marque de garde ne simulait plus
+   le temps dès qu'il existe un recul. §2 juge la MOISSON seule (les ventes
+   rapides ont leur propre garde, pré-posée).
+5. **§11 : l'écran Annonces datait le dressing par `harvestTs` (repli sur
+   `updated_at`, qui ment), les trois autres lecteurs par `capturedAt`** — la
+   même ligne rendait deux listes. ⇒ `dateLectureDressing` dans le bloc
+   `<supprimees-regle>` des DEUX côtés, utilisée par `fetchHarvestBrut` (filtre
+   ET date dite à l'écran), `retirerSupprimeesLignes` (app, extension) et
+   `capterPhotosAnnonces`. `audit-supprimees` §7 exécute le VRAI
+   `fetchHarvestBrut` et compare la SORTIE des quatre lecteurs sur une ligne
+   sans `capturedAt` : 2 rouges sur 4a29202, mutation `datepropre` rouge.
+6. **« ✓ Données Vinted à jour » au-dessus de « annonces lues hier »**, sur
+   Vinted → Annonces : deux sources, une notion. La coche (âge des VENTES
+   captées) dit désormais « Ventes Vinted à jour » et ne s'affiche pas au-dessus
+   de la section Annonces ; elle reste sur Ventes (l'autre sens est vérifié).
+7. **« a, b, c et 3 autres »** cachait sur quel compte repasser, et 30 min
+   nommait ses 7 comptes à chaque ouverture (bruit permanent, §7). ⇒ Tous
+   nommés, chacun avec son heure ; seuil **12 h**, ou **vu actif après la
+   lecture** (ses ventes rangées plus de 10 min après son dressing : il est
+   passé dessus et le dressing n'a pas été relu).
+8. **Sur iPhone**, la phrase disait « ouvre vinted.fr … dans Chrome » : sans
+   extension ici (`absente` ou `useSansSouris`), elle dit « sur l'ordinateur où
+   l'extension VRM est installée ».
+9. **« 3 annonces supprimées » pour une carte partie** : les pauses et les
+   brouillons supprimés comptaient. `retirerSupprimees` garde les annonces
+   retirées (`_vrmRetirees`) ; le compteur ne prend que `isOnlineListing`.
+10. **« Une suppression … sort d'ici tout de suite » était fausse** dans un
+   onglet Vinted ouvert AVANT la mise à jour (l'ancien `inject.js` y reste :
+   mesuré par un relecteur dans Chromium, 0 suppression vue avant le
+   rechargement) et à DEUX extensions (l'ancienne patche la page). ⇒ Promise
+   seulement si l'extension de ce Chrome le sait ET est seule, avec le geste :
+   « recharge d'abord les onglets Vinted ouverts avant la dernière mise à
+   jour ». À deux : « tant qu'il en reste deux, une suppression peut ne pas
+   être vue ».
+   ⇒ Banc `supprimees.cjs` §8 à §13 : **12 rouges** sur le build de 4a29202 ;
+   6 mutations (compteur, seuil, promesse, ailleurs, coche, activité).
+- `audit-extension-zip` vérifie maintenant le CONTENU : chaque fichier du zip
+  octet pour octet celui de la source (le zip de la 5.166 a porté la bonne
+  version et un `background.js` périmé entre deux commits — rouge, il le nomme).
+- Extension **5.166.0**, zip régénéré, `EXT_ATTENDUE` suivie. Aucune entrée
+  d'`EXT_CAPACITES` : corrections, rien de neuf n'est promis.
+- ⚠️ **Non fait, à savoir** : l'extension ne prévient pas les onglets Vinted
+  déjà ouverts à l'installation (réinjecter `inject.js` dans une page qui a
+  déjà l'ancien patcherait deux fois) — la phrase de l'app porte le geste.
+  **Non mesuré** : la durée réelle d'une panne de RLS chez lui (le recul plafonne
+  à 60 min) ; le comportement du recul sur sa vraie base (aucune extension
+  ≥ 5.165 n'y a jamais tourné).
+- **Geste de Julien** : installer la **5.166** dans UN seul dossier, recharger
+  ses onglets Vinted, puis passer une fois sur **tomj683** et **arthuror2**.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
@@ -6486,6 +6974,7 @@ arrivée** — vérifiée commit par commit sur `manifest.json`, pas devinée.
 | `lbcmsg` | `storeLbcMessages` | **5.153.0** (4 oct.) | Leboncoin → Messages : « l'extension relève tes non-lus, compte par compte » |
 | `vestiaire` | `storeVcRecon` | **5.154.0** (4 oct.) | Vestiaire : « ouvre Vestiaire dans ce Chrome, l'extension apprend à le lire » |
 | `detourage` | `detourerPhotos` | **5.156.0** (4 oct.) | « tes photos sont détourées (fond blanc) avant d'être attachées à Leboncoin » |
+| `supprimees` | `noterSuppression` | **5.165.0** (11 oct.) | « une suppression faite sur vinted.fr dans ce Chrome sort d'ici tout de suite » |
 
 ⚠️ **DEUX SEUILS POUR UNE MÊME NOTION, EXPRÈS.** Les photos s'attachent côté
 Leboncoin depuis la 5.58 et côté eBay depuis la 5.59 : un seul seuil aurait
@@ -6629,8 +7118,8 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | outil | quoi |
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
-| `node scripts/audit-*.cjs` | **81 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
-| `scripts/bancs/*.cjs` | les **71 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
+| `node scripts/audit-*.cjs` | **85 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `scripts/bancs/*.cjs` | les **77 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
 **Trois règles de preuve :**
@@ -6922,8 +7411,8 @@ script-là me fait croire à une catastrophe.
 src/App.jsx                     l'app (grep avant de lire — le fichier est énorme)
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
-scripts/audit-*.cjs             les 81 audits
-scripts/bancs/                  les 71 bancs (leur README dit comment les lancer)
+scripts/audit-*.cjs             les 85 audits
+scripts/bancs/                  les 77 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 ```
