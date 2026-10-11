@@ -20,7 +20,13 @@
 //   E. (relecture du 11 octobre) une ANCIENNE annonce encore en ligne (B7),
 //      vendue APRÈS la coupure : Vinted dit quelle annonce elle vend
 //      (transaction → item_id), c'est l'identité de la paire — la vente garde
-//      « B7 », aucun numéro neuf n'est pris dans la suite 1, 2, 3.
+//      « B7 », aucun numéro neuf n'est pris dans la suite 1, 2, 3 ;
+//   F. un écran chargé AVANT la conversion, refusé à sa première écriture : le
+//      bloc dit la vraie cause (la remise à zéro), jamais « un autre appareil »
+//      — il relit la version au refus au lieu de deviner ;
+//   G. Réglages → « Tes numéros » : « Avec une lettre » n'enregistre RIEN tout
+//      seul, « B » (la lettre des anciens) est refusé sans rien changer, et les
+//      exemples ne proposent pas « B125 ».
 //  Aucune fixture : tout est inventé.
 // ════════════════════════════════════════════════════════════════════════════
 const { chromium } = require('playwright');
@@ -89,7 +95,10 @@ async function page(ctx, etat) {
       const m = rows.find((x) => x && x.id === 'main' && x.data);
       if (m) {
         etat.tentatives.push(Date.now());
-        if (etat.refuse) return json({ code: 'P0001', message: 'vrm_numeros_perimes', details: 'banc', hint: 'Recharge l\'app.' }, 400);
+        // (F) La conversion passe entre le chargement et la première écriture :
+        //     la base est désormais convertie, et le garde-fou refuse le pool d'avant.
+        if (etat.convertirALaPremiereEcriture) { etat.convertirALaPremiereEcriture = false; etat.main = mainDe(); etat.refuse = 'vrm_pool_retreci'; }
+        if (etat.refuse) return json({ code: 'P0001', message: typeof etat.refuse === 'string' ? etat.refuse : 'vrm_numeros_perimes', details: 'banc', hint: 'Recharge l\'app.' }, 400);
         // Le marqueur appartient au serveur : il est recopié (comme le garde-fou).
         etat.main = { ...m.data, vrm_numerotation: etat.main.vrm_numerotation };
         etat.ecrits.push(m.data);
@@ -240,6 +249,62 @@ const bloc = (pg) => pg.evaluate(() => { const b = document.querySelector('[data
       dit(pool.length === 1 && pool[0] === '1', 'aucun numéro neuf n\'est pris dans la suite 1, 2, 3 pour elle', JSON.stringify(pool));
       const neuf = etat.ecrits.some((d) => d.vinted_sale_overrides && d.vinted_sale_overrides['5001'] && /^\d+$/.test(String(d.vinted_sale_overrides['5001'].numero)));
       dit(!neuf, 'et rien ne repart au nuage avec un numéro neuf sur cette vente', `${etat.ecrits.length} écriture(s)`);
+      dit(!pg.__erreurs.length, 'aucune erreur d\'app', pg.__erreurs.join(' | '));
+      await ctx.close();
+    }
+
+    console.log('\n── F. Écran chargé AVANT la conversion, refusé à sa première écriture : le bloc dit la vraie cause');
+    {
+      // La ligne d'AVANT : aucun marqueur, les anciens numéros en chiffres.
+      const avant = { vrm_num_prefixe: '', vinted_accounts_hidden: [],
+        vinted_used_numeros: Array.from({ length: 60 }, (_, i) => i + 1),
+        vinted_annonce_numeros: { 1001: { numero: '7', title: 'Ancienne 7', auto: true }, 3000: { numero: '30', title: 'Ancienne 30', photo: PHOTO30, auto: true } } };
+      const etat = { main: avant, ecrits: [], tentatives: [], convertirALaPremiereEcriture: true };
+      const ctx = await contexte(); const pg = await page(ctx, etat);
+      await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
+      await pg.waitForTimeout(9000);
+      if (!(await bloc(pg)) && !etat.tentatives.length) {
+        const sel = '[data-carte-annonce] [data-edition="achat"]';
+        if (await pg.locator(sel).count()) { await pg.locator(sel).first().click(); const c = pg.locator(':focus'); await c.fill('25'); await c.press('Enter'); }
+      }
+      const titres = [];
+      for (let i = 0; i < 10; i++) {
+        const t = await pg.evaluate(() => { const b = document.querySelector('[data-numeros-perimes]'); return b ? b.innerText.split('\n')[0] : null; });
+        if (t && !titres.includes(t)) titres.push(t);
+        await pg.waitForTimeout(400);
+      }
+      dit(etat.tentatives.length >= 1 && (await bloc(pg)) === 'vrm_pool_retreci', 'la base refuse l\'écran d\'avant (`vrm_pool_retreci`) ⇒ le bloc s\'ouvre', `${etat.tentatives.length} envoi(s) · ${await bloc(pg)}`);
+      dit(titres.length > 0 && !titres.some((t) => /autre appareil/i.test(t)), 'il ne dit JAMAIS « un autre appareil » (il était seul : c\'est la remise à zéro)', JSON.stringify(titres));
+      dit(/remise à zéro/i.test(titres[titres.length - 1] || ''), 'et il dit la vraie cause en moins de 4 s : la remise à zéro', JSON.stringify(titres));
+      dit(!pg.__erreurs.length, 'aucune erreur d\'app', pg.__erreurs.join(' | '));
+      await ctx.close();
+    }
+
+    console.log('\n── G. Réglages → « Tes numéros de rangement » après la remise à zéro');
+    {
+      const etat = { main: mainDe(), ecrits: [], tentatives: [] };
+      const ctx = await contexte(); const pg = await page(ctx, etat);
+      await pg.goto(`http://localhost:${PORT}/?tab=settings`, { waitUntil: 'domcontentloaded' });
+      await pg.waitForTimeout(6000);
+      const R = pg.locator('[data-numeros-reglage]');
+      await R.scrollIntoViewIfNeeded();
+      const t0 = await R.innerText();
+      dit(!/B125/.test(t0), 'les exemples ne proposent pas « B125 » (la lettre des anciens, que l\'app refuse)', (t0.match(/[^\n]*à la main[^\n]*/) || [''])[0]);
+      const prefixe = () => pg.evaluate(() => localStorage.getItem('vrm_num_prefixe'));
+      await R.getByRole('button', { name: /lettre/i }).first().click();
+      await pg.waitForTimeout(1200);
+      const p1 = await prefixe();
+      dit(p1 == null || p1 === '""', '« Avec une lettre » n\'enregistre RIEN tout seul (la série change à la lettre tapée)', `vrm_num_prefixe = ${p1}`);
+      await R.locator('input').fill('B');
+      await pg.waitForTimeout(1200);
+      const p2 = await prefixe(), t2 = await R.innerText();
+      dit((p2 == null || p2 === '""') && /lettre de tes anciens/.test(t2) && /chiffres/.test(t2), '« B » refusé : rien n\'est enregistré, et l\'écran dit que les prochains restent en chiffres', `vrm_num_prefixe = ${p2}`);
+      await pg.waitForTimeout(1500);
+      const parti = etat.ecrits.some((d) => d && typeof d.vrm_num_prefixe === 'string' && d.vrm_num_prefixe !== '');
+      dit(!parti, 'et aucune lettre n\'est partie au nuage', `${etat.ecrits.length} écriture(s)`);
+      await R.locator('input').fill('C');
+      await pg.waitForTimeout(1200);
+      dit((await prefixe()) === '"C"', 'une AUTRE lettre (C), tapée, est bien enregistrée (l\'autre sens)', String(await prefixe()));
       dit(!pg.__erreurs.length, 'aucune erreur d\'app', pg.__erreurs.join(' | '));
       await ctx.close();
     }
