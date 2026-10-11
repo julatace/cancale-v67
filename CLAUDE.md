@@ -1,5 +1,12 @@
 # VRM — dossier de passation
 
+> ⚠️⚠️ **PASSATION DU 11 OCTOBRE (SOIR) — LIS D'ABORD `docs/passation/README.md`.**
+> Ce qui est en production, ce qui attend sur la branche d'intégration (extension
+> 5.174), le travail sauvé dans un paquet git (`docs/passation/*.bundle`, 21
+> branches qui n'existaient que sur une machine), et la répartition entre les
+> deux sessions (Session 1 : mise en ligne, eBay, agent ; Session 2 :
+> fonctionnalités, accueil, revue).
+
 **Lis ce fichier en entier avant de coder. Il est court exprès.**
 L'historique détaillé (chaque session, chaque mesure, chaque erreur et sa cause)
 vit dans **`docs/journal-2026.md`** — 7 700 lignes, à ouvrir seulement si tu
