@@ -4299,7 +4299,11 @@ if (typeof window !== 'undefined') {
       // Un pont qui (ré)apparaît — premier chargement, ou remis à neuf après une
       // mise à jour de l'extension : on lui redemande son état tout de suite,
       // y compris si on l'avait cru muette.
-      if (e.data.__vmr === 'ready') { if (__vmrEtat === undefined || __vmrEtat === null) { __vmrRates = 0; setTimeout(battementExt, 30); } return; }
+      // ⚠️ 5.165 : un « ready » qui RÉPOND à notre propre compte des ponts
+      //    (`sonderPonts`, à chaque battement) n'est pas un pont qui apparaît —
+      //    sinon chaque battement remettait les ratés à zéro, et une extension
+      //    muette n'était plus jamais dite muette (vu au banc `pont.cjs`).
+      if (e.data.__vmr === 'ready') { if (!__vmrTour && (__vmrEtat === undefined || __vmrEtat === null)) { __vmrRates = 0; setTimeout(battementExt, 30); } return; }
       if (e.data.__vmr !== 'evt' || !e.data.evt) return;
       const ev = e.data.evt;
       if (ev.type === 'cmd' && ev.jobId) { __vmrJobs[ev.jobId] = ev; __vmrNotifier(); }
