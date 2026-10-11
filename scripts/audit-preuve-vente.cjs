@@ -25,7 +25,14 @@
 //      requête Vinted de plus, une seule écriture par appel, jamais sous un
 //      autre numéro ;
 //   6. extension : `capterPreuvesVente` — seulement les ventes en cours sans
-//      preuve, 3 par visite, compte connecté, pause, 6 h, « pas su ».
+//      preuve, 3 par visite, compte connecté, pause, 6 h, « pas su » ;
+//   7. (revue du 11 octobre) la transaction rangée est un INSTANTANÉ : une
+//      vente remboursée ensuite ne reste pas « prouvée vendue » (label + txn
+//      « Le paiement a été validé » + vente « Remboursement effectué/failed »,
+//      la forme que la 5.167 écrit, mesurée 5 fois en production), des deux
+//      côtés, jusqu'à `doublesVenteEbay` ;
+//   8. (revue du 11 octobre) la lecture des ventes des AUTRES comptes (ligne
+//      « pas reliées ») ne fait jamais tomber la preuve.
 //  ⚠️ Un audit ne meurt pas, il rapporte : chaque bloc passe par `essaie`.
 // ════════════════════════════════════════════════════════════════════════════
 const fs = require('fs'), path = require('path'), vm = require('vm'), os = require('os');
@@ -45,17 +52,25 @@ const essaie = async (nom, f) => { try { return await f(); } catch (e) { dit(fal
 // `regle` s'applique au bloc partagé, des DEUX côtés (il doit rester identique).
 const remplace = (s, avant, apres, nom) => { if (!s.includes(avant)) throw new Error('mutation ' + nom + ' : ancre introuvable'); return s.split(avant).join(apres); };
 const MUTATIONS = {
-  'sans-bordereau-app': { app: (s) => remplace(s, '    for (const it of parBord.items) vendus.add(it);\n', '', 'sans-bordereau-app') },
-  'sans-bordereau-ext': { ext: (s) => remplace(s, '    for (const it of preuvesParBordereau(bords, ventesParCompteDe(lignes, uids)).items) vendus.add(it);\n', '', 'sans-bordereau-ext') },
+  'sans-bordereau-app': { app: (s) => remplace(s, '    for (const it of preuvesParBordereau(bords, parCompte).items) vendus.add(it);\n', '', 'sans-bordereau-app') },
+  'sans-bordereau-ext': { ext: (s) => remplace(s, '  for (const it of preuvesParBordereau(bords, parCompte).items) vendus.add(it);\n  return { echec: false, vendus };', '  return { echec: false, vendus };', 'sans-bordereau-ext') },
   'vente-non-lue': { regle: (s) => remplace(s, '    if (!o || !venteVivante(o)) continue;', '    if (o && !venteVivante(o)) continue;', 'vente-non-lue') },
   'revenue-acceptee': { regle: (s) => remplace(s, "  if (PAS_UNE_VENTE.test(String(o.status || ''))) return false;\n  return String(o.transaction_user_status || '') !== 'failed';", '  return true;', 'revenue-acceptee') },
   'autre-compte': { regle: (s) => remplace(s, '    const ventes = ventesParCompte ? ventesParCompte[m[1]] : null;', '    const ventes = ventesParCompte ? [].concat(...Object.values(ventesParCompte)) : null;', 'autre-compte') },
   'tx-contredit': { regle: (s) => remplace(s, "    if (b.tx != null && String(b.tx).trim() !== '' && String(b.tx).trim() !== t) continue;\n", '', 'tx-contredit') },
   'latest-lu': { regle: (s) => remplace(s, "    const m = /^harvest_(\\d+)_label_(\\d+)$/.exec(String((b && b.id) || ''));\n    if (!m) continue;\n    const t = m[2];", "    const m = /^harvest_(\\d+)_label_(\\w+)$/.exec(String((b && b.id) || ''));\n    if (!m) continue;\n    const t = m[2] === 'latest' ? String(b.tx || '') : m[2];", 'latest-lu') },
-  'pas-su-avale-app': { app: (s) => remplace(s, '    if (bords === null) return null;\n', '    if (bords === null) return { vendus, sansPreuve: null };\n', 'pas-su-avale-app') },
+  'pas-su-avale-app': { app: (s) => remplace(s, '    if (bords === null) return null;\n', '    if (bords === null) return { vendus: preuvesParTransaction(rows).items, sansPreuve: null };\n', 'pas-su-avale-app') },
   'pas-su-avale-ext': { ext: (s) => remplace(s, '  if (bords === null) return { echec: true, vendus: new Set() };', '  if (bords === null) return { echec: false, vendus };', 'pas-su-avale-ext') },
-  'ventes-toujours-lues': { app: (s) => remplace(s, '    if (uids.length) {\n      const lignes = await lireTout(', '    if (true) {\n      const lignes = await lireTout(', 'ventes-toujours-lues') },
-  'sans-preuve-compte-tout': { app: (s) => remplace(s, '        if (vus.has(tx) || parTx.tx.has(tx) || parBord.tx.has(tx)) continue;', '        if (vus.has(tx)) continue;', 'sans-preuve-compte-tout') },
+  'ventes-toujours-lues': { app: (s) => remplace(s, '    if (juger.length) {\n      const lignes = await ordres(juger);', '    if (true) {\n      const lignes = await ordres([...new Set([...juger, ...(comptes || [])])]);', 'ventes-toujours-lues') },
+  'sans-preuve-compte-tout': { app: (s) => remplace(s, '          if (vus.has(tx) || parTx.tx.has(tx) || bordTx.has(tx)) continue;', '          if (vus.has(tx)) continue;', 'sans-preuve-compte-tout') },
+  // (revue du 11 octobre) L'instantané de la transaction ignore la vente relue.
+  'instantane-prime': { regle: (s) => remplace(s, '      if (o && !venteVivante(o)) continue;\n    }\n    items.add(String(r.it));', '    }\n    items.add(String(r.it));', 'instantane-prime') },
+  // Les comptes dont une transaction ne prouve qu'un instantané ne sont pas lus.
+  'txn-pas-a-juger': { regle: (s) => remplace(s, "    if (m && r.it && etat && !PAS_UNE_VENTE.test(etat) && !ETAT_TXN_TERMINAL.test(etat) && !out.includes(m[1])) out.push(m[1]);", "    if (false) out.push(m[1]);", 'txn-pas-a-juger') },
+  // Toute transaction relue, même finalisée (la règle « terminal » oubliée) : les ventes de tous les comptes sont lues.
+  'terminal-oublie': { regle: (s) => remplace(s, "    if (m && r.it && etat && !PAS_UNE_VENTE.test(etat) && !ETAT_TXN_TERMINAL.test(etat) && !out.includes(m[1])) out.push(m[1]);", "    if (m && r.it && etat && !PAS_UNE_VENTE.test(etat) && !out.includes(m[1])) out.push(m[1]);", 'terminal-oublie') },
+  // (revue du 11 octobre) La lecture des autres comptes (ligne « pas reliées ») fait tomber la preuve.
+  'autres-comptes-stricts': { app: (s) => remplace(s, '      if (l2 !== null) {', '      if (l2 === null) return null;\n      if (l2 !== null) {', 'autres-comptes-stricts') },
   'txn-jetee': { ext: (s) => remplace(s, "      const range = await rangerTransaction(uid, acc, tx, t.json, 'label');", '      const range = false;', 'txn-jetee') },
   'txn-chaque-essai': { ext: (s) => remplace(s, 'if (t && t.ok && t.json && t.json.transaction && !(connu && connu.txnRangee)) {', 'if (t && t.ok && t.json && t.json.transaction) {', 'txn-chaque-essai') },
   'txn-autre-rangee': { ext: (s) => remplace(s, '    if (t.id != null && String(t.id) !== String(tx)) { await noterDiag(`${quoi}_txn_autre`); return false; }\n', '', 'txn-autre-rangee') },
@@ -249,14 +264,99 @@ function chargeExt({ lignes, vinted, ko, connecte = A, store = {} } = {}) {
       const p = await lire({ comptes: [A] });
       dit(p === null, `${quoi} illisibles ⇒ null (« pas su »), jamais une demi-preuve`, p ? JSON.stringify(trie(p.vendus)) : '');
     }
-    // Tout est déjà prouvé par une transaction : les ventes ne sont PAS lues.
+    // Tout est déjà prouvé par une transaction FINALISÉE (un état terminal) :
+    // les ventes ne sont PAS lues.
     const l = base();
-    for (const k of Object.keys(l)) if (/_label_/.test(k)) delete l[k];
-    l[`harvest_${A}_label_7000000560`] = { tx: '7000000560', item: '9000000560', capturedAt: iso(0) };
+    for (const k of Object.keys(l)) if (/_label_|_txn_/.test(k)) delete l[k];
+    l[`harvest_${A}_txn_7000000558`] = { type: 'transaction', uid: A, capturedAt: iso(0), payload: { transaction: { id: 7000000558, item_id: 9000000558, status: 450, status_title: "Commande finalisée - l'acheteur a validé la commande" } } };
+    l[`harvest_${A}_label_7000000558`] = { tx: '7000000558', item: '9000000558', capturedAt: iso(0) };
     const { lire, lus } = chargeApp(l, (u) => /orders_sold/.test(u));
     const p = await lire();
-    dit(!!p && p.vendus.has('9000000560') && !lus.some((u) => /orders_sold/.test(u)), 'aucun bordereau à juger ⇒ les ventes ne sont pas lues (et leur panne ne compte pas)', lus.filter((u) => /orders_sold/.test(u)).join(' · '));
+    dit(!!p && p.vendus.has('9000000558') && !lus.some((u) => /orders_sold/.test(u)), 'tout prouvé par une transaction FINALISÉE, aucun bordereau à juger ⇒ les ventes ne sont pas lues (et leur panne ne compte pas)', lus.filter((u) => /orders_sold/.test(u)).join(' · '));
     dit(lus.length === 2, 'deux lectures en tout (transactions, bordereaux) — pas une de plus', `${lus.length} : ${lus.map((u) => (/id=([^&]*)/.exec(u) || [])[1]).join(' · ')}`);
+    // Une transaction à un état NON terminal ne prouve qu'un instantané : sa
+    // vente est lue, et si elle ne se lit pas, c'est « pas su ».
+    const l3 = base();
+    for (const k of Object.keys(l3)) if (/_label_/.test(k)) delete l3[k];
+    const r3 = chargeApp(l3, (u) => /orders_sold/.test(u));
+    const p3 = await r3.lire();
+    dit(p3 === null && r3.lus.some((u) => /orders_sold/.test(u)), 'une transaction « Bordereau envoyé au vendeur » (instantané) ⇒ sa vente EST lue, et sa panne vaut « pas su »', p3 ? JSON.stringify(trie(p3.vendus)) : '');
+  });
+
+  console.log('\n3 bis. LA TRANSACTION RANGÉE EST UN INSTANTANÉ : UNE VENTE REMBOURSÉE ENSUITE N\'EST PAS VENDUE (revue du 11 octobre)');
+  // La forme EXACTE que la 5.167 écrit (mesurée 5 fois en production) : le
+  // bordereau + la transaction « Le paiement a été validé », puis la vente
+  // passe « Remboursement effectué » (failed). L'annonce revient en ligne.
+  const instantane = () => {
+    const l = base();
+    const va = l[`harvest_${A}_orders_sold`].payload.my_orders;
+    va.push(vente(7000000572, 'Remboursement effectué', 'failed'),             // txn + bordereau ⇒ la paire est REVENUE
+      vente(7000000573, 'Le paiement a été validé', 'needs_action'),           // txn « payée », vente vivante ⇒ PROUVÉE
+      vente(7000000575, 'Commande annulée', 'failed'));                        // txn seule (pas de bordereau) ⇒ REVENUE
+    const tx = (t, it, titre) => ({ type: 'transaction', uid: A, capturedAt: iso(-2), payload: { transaction: { id: t, item_id: it, status: 230, status_title: titre } } });
+    l[`harvest_${A}_txn_7000000572`] = tx(7000000572, 9000000572, 'Le paiement a été validé');
+    l[`harvest_${A}_label_7000000572`] = { uid: A, tx: '7000000572', item: '9000000572', capturedAt: iso(-2) };
+    l[`harvest_${A}_txn_7000000573`] = tx(7000000573, 9000000573, 'Le paiement a été validé');
+    l[`harvest_${A}_txn_7000000574`] = tx(7000000574, 9000000574, 'Le paiement a été validé'); // vente plus dans la liste captée ⇒ l'instantané tient
+    l[`harvest_${A}_txn_7000000575`] = tx(7000000575, 9000000575, 'Bordereau envoyé au vendeur');
+    return l;
+  };
+  await essaie('instantané app', async () => {
+    const { lire } = chargeApp(instantane());
+    const p = await lire({ comptes: [A, B] });
+    const v = p ? trie(p.vendus) : null;
+    dit(!!p && !p.vendus.has('9000000572'), 'bordereau + transaction « Le paiement a été validé » + vente « Remboursement effectué » ⇒ PAS vendue (la vente relue prime sur l\'instantané)', JSON.stringify(v));
+    dit(!!p && !p.vendus.has('9000000575'), 'transaction seule « Bordereau envoyé au vendeur » + vente « Commande annulée » ⇒ PAS vendue', JSON.stringify(v));
+    dit(!!p && p.vendus.has('9000000573'), 'l\'autre sens : transaction « payée » + vente vivante ⇒ PROUVÉE', JSON.stringify(v));
+    dit(!!p && p.vendus.has('9000000574'), 'et une vente qu\'on ne retrouve pas dans les ventes lues : l\'instantané est la seule information, il tient', JSON.stringify(v));
+    dit(!!p && p.vendus.has('9000000553') && p.vendus.has('9000000560'), 'les preuves d\'avant tiennent (bordereau seul, transaction + vente vivante)', JSON.stringify(v));
+  });
+  await essaie('instantané extension', async () => {
+    const e = chargeExt({ lignes: instantane() });
+    const r = await e.ctx.lireVentesProuvees();
+    const v = trie(r && r.vendus);
+    const { lire } = chargeApp(instantane());
+    const p = await lire();
+    dit(!!r && r.echec === false && !r.vendus.has('9000000572') && !r.vendus.has('9000000575') && r.vendus.has('9000000573') && r.vendus.has('9000000574'), 'la MÊME règle dans les files Leboncoin et eBay de l\'extension', JSON.stringify(v));
+    dit(!!p && JSON.stringify(v) === JSON.stringify(trie(p.vendus)), 'app et extension rendent la MÊME sortie (§11)', `app=${JSON.stringify(p && trie(p.vendus))} · ext=${JSON.stringify(v)}`);
+  });
+  await essaie('instantané rejoué de bout en bout', async () => {
+    // Le geste réel : « Générer le bordereau » (le vrai `recupererLabel`), puis la vente est remboursée.
+    const vinted = (r) => {
+      if (/\/api\/v2\/transactions\/7000000700$/.test(r.chemin)) return { status: 200, body: { transaction: { id: 7000000700, item_id: 9000000700, status: 200, status_title: 'Bordereau envoyé au vendeur', shipment: { id: 55501 } } } };
+      if (/\/api\/v2\/shipments\/55501\/label_url$/.test(r.chemin)) return { status: 200, body: { url: 'https://svc-shipping-labels.s3.eu-central-1.amazonaws.com/l.pdf' } };
+      return { status: 404, body: {} };
+    };
+    const e = chargeExt({ lignes: { [`harvest_${A}_orders_sold`]: { capturedAt: iso(0), payload: { my_orders: [vente(7000000700, 'Le paiement a été validé', 'needs_action')] } } }, vinted });
+    const r = await e.ctx.recupererLabel(ACC(A), A, '7000000700');
+    dit(!!r && r.ok && !!e.lignes[`harvest_${A}_txn_7000000700`], 'le bordereau part et range sa transaction (la forme de la 5.167)');
+    e.lignes[`harvest_${A}_orders_sold`] = { capturedAt: iso(0), payload: { my_orders: [vente(7000000700, 'Commande annulée', 'failed', -3)] } };
+    const x = await e.ctx.lireVentesProuvees();
+    const { lire } = chargeApp(e.lignes);
+    const p = await lire();
+    dit(!!x && !x.vendus.has('9000000700') && !!p && !p.vendus.has('9000000700'), 'vente annulée ensuite ⇒ la paire n\'est plus « vendue », ni pour l\'extension ni pour l\'app', `ext=${JSON.stringify(trie(x && x.vendus))} · app=${JSON.stringify(trie(p && p.vendus))}`);
+    const noms = ['cleNum', 'NUM_OK', 'marqueurNumerotation', 'archiveNumeros', 'coupureNumerotation', 'numDeSkuEbay', 'skuEbayDe', 'traductionAnnonce', 'numeroExterne', 'numEbayLu', 'numLigneEbay', 'commandeEbayEngagee', 'doublesVenteEbay'];
+    const ctx = { console }; vm.createContext(ctx);
+    vm.runInContext('const load = (k, d) => d;\n' + noms.map((n) => { try { return extraire(APP, n); } catch (_) { return ''; } }).join('\n') + '\n;this.D = doublesVenteEbay;', ctx);
+    const d = ctx.D({ annonces: [{ itemId: '128000000040', sku: 'VRM-40', title: 'paire 40' }], commandes: [], numeros: { 9000000700: { numero: '40' } }, enLigne: new Set(['9000000700']), vendusVinted: p ? p.vendus : null, programmees: [] });
+    dit(d.aRetirerEbay.length === 0, 'et RIEN n\'est proposé au retrait d\'eBay (ni retiré tout seul) : la paire est revenue en ligne', JSON.stringify(d.aRetirerEbay.map((y) => y.numero)));
+  });
+
+  console.log('\n3 ter. LA LECTURE DES AUTRES COMPTES NE FAIT PAS TOMBER LA PREUVE (revue du 11 octobre)');
+  await essaie('autres comptes', async () => {
+    // Le compte A n'a rien à juger (transaction finalisée) ; l'écran eBay demande A et B
+    // pour la ligne « pas reliées », et les ventes ne répondent pas.
+    const l = base();
+    for (const k of Object.keys(l)) if (/_label_|_txn_/.test(k)) delete l[k];
+    l[`harvest_${A}_txn_7000000558`] = { type: 'transaction', uid: A, capturedAt: iso(0), payload: { transaction: { id: 7000000558, item_id: 9000000558, status: 450, status_title: 'Commande finalisée' } } };
+    const { lire } = chargeApp(l, (u) => /orders_sold/.test(u));
+    const p = await lire({ comptes: [A, B] });
+    dit(!!p && p.vendus.has('9000000558'), 'ventes des comptes demandés illisibles ⇒ la vente prouvée par sa transaction reste « vendue » (pas « pas su »)', p ? JSON.stringify(trie(p.vendus)) : 'null');
+    dit(!!p && p.sansPreuve === null, 'et c\'est la ligne « pas reliées » qui vaut null (pas su), jamais []', p ? JSON.stringify(p.sansPreuve) : 'null');
+    const ok = chargeApp(l);
+    const q = await ok.lire({ comptes: [A, B] });
+    dit(!!q && Array.isArray(q.sansPreuve) && q.sansPreuve.length > 0, 'l\'autre sens : quand elles se lisent, la ligne est calculée', q ? JSON.stringify((q.sansPreuve || []).map((x) => x.tx)) : 'null');
+    dit(!!q && (q.sansPreuve || []).every((x) => typeof x.titre === 'string' && x.titre), 'et chaque vente porte son TITRE (l\'écran la nomme)', q ? JSON.stringify((q.sansPreuve || []).map((x) => x.titre)) : '');
   });
 
   console.log('\n4. LA VENTE D\'HIER, REJOUÉE JUSQU\'À L\'ALERTE (app)');

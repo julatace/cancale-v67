@@ -5485,7 +5485,7 @@ async function capterPreuvesVente(uid) {
     if (det === null) return 0;                                           // pas su
     const bords = await sbGetTout(`app_data?id=like.harvest_${uid}_label_*&select=id,tx:meta->>tx,it:meta->>item`);
     if (bords === null) return 0;                                         // pas su
-    const prouvees = preuvesParTransaction(det).tx;
+    const prouvees = preuvesParTransaction(det, { [String(uid)]: ventes }).tx;
     const parBord = preuvesParBordereau(bords, { [String(uid)]: ventes }).tx;
     const memo = (await chrome.storage.local.get('vrmPreuveFaits')).vrmPreuveFaits || {};
     for (const k of Object.keys(memo)) if (maintenant - Number(memo[k]) > 2 * 86400000) delete memo[k];
@@ -6485,15 +6485,33 @@ function venteEnCoursPreuve(o, maintenant) {
 // La preuve par la TRANSACTION (ce qui existait) : l'annonce (`item_id`) et un
 // état de commande qui ne la fait pas revenir. Une conversation (état vide)
 // n'est pas une vente. Rend { items, tx } (annonces, transactions prouvées).
-function preuvesParTransaction(lignes) {
+// ⚠️⚠️ (revue du 11 octobre) LA LIGNE `harvest_{uid}_txn_{tx}` EST UN
+// INSTANTANÉ, JAMAIS RELU : celle que range le bordereau (5.167) dit « Bordereau
+// envoyé au vendeur » pour toujours, même quand la vente finit remboursée — la
+// paire, revenue chez lui, restait « vendue » (retrait d'eBay, file Leboncoin).
+// Mesuré en production : 46 preuves à un état NON terminal, 5 contredites par
+// leur vente (« Le paiement a été validé » / « Remboursement effectué », failed).
+// ⇒ Un état non terminal ne prouve que si la vente `tx`, lue dans les ventes du
+//   MÊME compte (relues à chaque visite), n'est pas revenue. Vente pas trouvée
+//   dans les ventes lues : l'instantané est la seule information, il tient.
+//   « Commande finalisée » est terminal : rien ne la fait revenir.
+const ETAT_TXN_TERMINAL = /finalis/i;
+function preuvesParTransaction(lignes, ventesParCompte) {
   const items = new Set(), tx = new Set();
   for (const r of (Array.isArray(lignes) ? lignes : [])) {
     if (!r || !r.it) continue;
     const etat = String(r.ti || '').trim();
     if (!etat || PAS_UNE_VENTE.test(etat)) continue;
+    const id = String(r.id || '');
+    const t = (/_txn_(\d+)$/.exec(id) || [])[1];
+    const u = (/^harvest_(\d+)_txn_\d+$/.exec(id) || [])[1];
+    if (u && t && ventesParCompte && !ETAT_TXN_TERMINAL.test(etat)) {
+      const ventes = ventesParCompte[u];
+      const o = Array.isArray(ventes) ? ventes.find((v) => v && String(v.transaction_id) === t) : null;
+      if (o && !venteVivante(o)) continue;
+    }
     items.add(String(r.it));
-    const m = /_txn_(\d+)$/.exec(String(r.id || ''));
-    if (m) tx.add(m[1]);
+    if (t) tx.add(t);
   }
   return { items, tx };
 }
@@ -6522,9 +6540,16 @@ function preuvesParBordereau(bordereaux, ventesParCompte) {
   return { items, tx };
 }
 // Les comptes dont il faut LIRE les ventes : ceux qui portent un bordereau dont
-// l'annonce n'est pas déjà prouvée par une transaction (le reste ne coûte rien).
-function comptesAJuger(bordereaux, dejaProuves) {
+// l'annonce n'est pas déjà prouvée par une transaction, et ceux dont une
+// transaction ne prouve qu'un instantané (état non terminal, ci-dessus) — sa
+// vente peut l'avoir dépassé. Le reste ne coûte rien.
+function comptesAJuger(bordereaux, dejaProuves, transactions) {
   const out = [];
+  for (const r of (Array.isArray(transactions) ? transactions : [])) {
+    const m = /^harvest_(\d+)_txn_\d+$/.exec(String((r && r.id) || ''));
+    const etat = String((r && r.ti) || '').trim();
+    if (m && r.it && etat && !PAS_UNE_VENTE.test(etat) && !ETAT_TXN_TERMINAL.test(etat) && !out.includes(m[1])) out.push(m[1]);
+  }
   for (const b of (Array.isArray(bordereaux) ? bordereaux : [])) {
     const m = /^harvest_(\d+)_label_(\d+)$/.exec(String((b && b.id) || ''));
     const it = String((b && b.it) == null ? '' : b.it).trim();
@@ -6547,17 +6572,22 @@ function ventesParCompteDe(lignes, uids) {
 async function lireVentesProuvees() {
   const rows = await sbGetTout('app_data?id=like.harvest_*_txn_*&select=id,it:meta->>item_id,ti:meta->>status_title');
   if (rows === null) return { echec: true, vendus: new Set() };
-  const vendus = new Set(preuvesParTransaction(rows).items);
   // 5.167 : + le bordereau. Paginé (une ligne par vente, tous comptes) et
   // strict : une lecture ratée vaut « pas su », jamais une demi-preuve.
   const bords = await sbGetTout('app_data?id=like.harvest_*_label_*&select=id,tx:meta->>tx,it:meta->>item');
   if (bords === null) return { echec: true, vendus: new Set() };
-  const uids = comptesAJuger(bords, vendus);
+  // (revue du 11 octobre) + les ventes des comptes dont une transaction ne
+  // prouve qu'un instantané (état non terminal) : la vente, relue à chaque
+  // visite, prime — une vente remboursée ne garde pas sa paire « vendue ».
+  const uids = comptesAJuger(bords, preuvesParTransaction(rows).items, rows);
+  let parCompte = {};
   if (uids.length) {
     const lignes = await sbGet(`app_data?id=in.(${uids.map((u) => `harvest_${u}_orders_sold`).join(',')})&select=id,v:data->payload->my_orders`);
     if (!Array.isArray(lignes)) return { echec: true, vendus: new Set() };
-    for (const it of preuvesParBordereau(bords, ventesParCompteDe(lignes, uids)).items) vendus.add(it);
+    parCompte = ventesParCompteDe(lignes, uids);
   }
+  const vendus = new Set(preuvesParTransaction(rows, parCompte).items);
+  for (const it of preuvesParBordereau(bords, parCompte).items) vendus.add(it);
   return { echec: false, vendus };
 }
 

@@ -18892,15 +18892,33 @@ function venteEnCoursPreuve(o, maintenant) {
 // La preuve par la TRANSACTION (ce qui existait) : l'annonce (`item_id`) et un
 // état de commande qui ne la fait pas revenir. Une conversation (état vide)
 // n'est pas une vente. Rend { items, tx } (annonces, transactions prouvées).
-function preuvesParTransaction(lignes) {
+// ⚠️⚠️ (revue du 11 octobre) LA LIGNE `harvest_{uid}_txn_{tx}` EST UN
+// INSTANTANÉ, JAMAIS RELU : celle que range le bordereau (5.167) dit « Bordereau
+// envoyé au vendeur » pour toujours, même quand la vente finit remboursée — la
+// paire, revenue chez lui, restait « vendue » (retrait d'eBay, file Leboncoin).
+// Mesuré en production : 46 preuves à un état NON terminal, 5 contredites par
+// leur vente (« Le paiement a été validé » / « Remboursement effectué », failed).
+// ⇒ Un état non terminal ne prouve que si la vente `tx`, lue dans les ventes du
+//   MÊME compte (relues à chaque visite), n'est pas revenue. Vente pas trouvée
+//   dans les ventes lues : l'instantané est la seule information, il tient.
+//   « Commande finalisée » est terminal : rien ne la fait revenir.
+const ETAT_TXN_TERMINAL = /finalis/i;
+function preuvesParTransaction(lignes, ventesParCompte) {
   const items = new Set(), tx = new Set();
   for (const r of (Array.isArray(lignes) ? lignes : [])) {
     if (!r || !r.it) continue;
     const etat = String(r.ti || '').trim();
     if (!etat || PAS_UNE_VENTE.test(etat)) continue;
+    const id = String(r.id || '');
+    const t = (/_txn_(\d+)$/.exec(id) || [])[1];
+    const u = (/^harvest_(\d+)_txn_\d+$/.exec(id) || [])[1];
+    if (u && t && ventesParCompte && !ETAT_TXN_TERMINAL.test(etat)) {
+      const ventes = ventesParCompte[u];
+      const o = Array.isArray(ventes) ? ventes.find((v) => v && String(v.transaction_id) === t) : null;
+      if (o && !venteVivante(o)) continue;
+    }
     items.add(String(r.it));
-    const m = /_txn_(\d+)$/.exec(String(r.id || ''));
-    if (m) tx.add(m[1]);
+    if (t) tx.add(t);
   }
   return { items, tx };
 }
@@ -18929,9 +18947,16 @@ function preuvesParBordereau(bordereaux, ventesParCompte) {
   return { items, tx };
 }
 // Les comptes dont il faut LIRE les ventes : ceux qui portent un bordereau dont
-// l'annonce n'est pas déjà prouvée par une transaction (le reste ne coûte rien).
-function comptesAJuger(bordereaux, dejaProuves) {
+// l'annonce n'est pas déjà prouvée par une transaction, et ceux dont une
+// transaction ne prouve qu'un instantané (état non terminal, ci-dessus) — sa
+// vente peut l'avoir dépassé. Le reste ne coûte rien.
+function comptesAJuger(bordereaux, dejaProuves, transactions) {
   const out = [];
+  for (const r of (Array.isArray(transactions) ? transactions : [])) {
+    const m = /^harvest_(\d+)_txn_\d+$/.exec(String((r && r.id) || ''));
+    const etat = String((r && r.ti) || '').trim();
+    if (m && r.it && etat && !PAS_UNE_VENTE.test(etat) && !ETAT_TXN_TERMINAL.test(etat) && !out.includes(m[1])) out.push(m[1]);
+  }
   for (const b of (Array.isArray(bordereaux) ? bordereaux : [])) {
     const m = /^harvest_(\d+)_label_(\d+)$/.exec(String((b && b.id) || ''));
     const it = String((b && b.it) == null ? '' : b.it).trim();
@@ -18965,34 +18990,45 @@ const lirePreuvesVenteVinted = async (opts = {}) => {
   try {
     const rows = await lireTout('id=like.harvest_%25_txn_%25&select=id,it:meta->>item_id,ti:meta->>status_title', { strict: true });
     if (rows === null) return null;
-    const parTx = preuvesParTransaction(rows);
-    const vendus = new Set(parTx.items);
     // Les bordereaux (une ligne par vente, tous comptes, `_latest` écarté par
     // la règle) : deux scalaires de `meta`, jamais le PDF (§4.4).
     const bords = await lireTout('id=like.harvest_%25_label_%25&select=id,tx:meta->>tx,it:meta->>item', { strict: true });
     if (bords === null) return null;
     const comptes = Array.isArray(opts.comptes) ? [...new Set(opts.comptes.map(String).filter((u) => /^\d+$/.test(u)))] : null;
-    // Les ventes ne sont lues que pour les comptes qui en ont besoin (bordereau
-    // pas encore prouvé, ou comptes demandés) — la liste des commandes, rien d'autre.
-    const uids = [...new Set([...comptesAJuger(bords, vendus), ...(comptes || [])])];
-    let parCompte = {};
-    if (uids.length) {
-      const lignes = await lireTout(`id=in.(${uids.map((u) => `harvest_${u}_orders_sold`).join(',')})&select=id,v:data->payload->my_orders`, { strict: true });
+    const ordres = (uids) => lireTout(`id=in.(${uids.map((u) => `harvest_${u}_orders_sold`).join(',')})&select=id,v:data->payload->my_orders`, { strict: true });
+    // Les ventes dont une PREUVE dépend (bordereau à juger, transaction à un état
+    // non terminal) : leur panne vaut « pas su » — jamais une demi-preuve.
+    const juger = comptesAJuger(bords, preuvesParTransaction(rows).items, rows);
+    const parCompte = {};
+    if (juger.length) {
+      const lignes = await ordres(juger);
       if (lignes === null) return null;
-      parCompte = ventesParCompteDe(lignes, uids);
+      Object.assign(parCompte, ventesParCompteDe(lignes, juger));
     }
-    const parBord = preuvesParBordereau(bords, parCompte);
-    for (const it of parBord.items) vendus.add(it);
+    const parTx = preuvesParTransaction(rows, parCompte);
+    const vendus = new Set(parTx.items);
+    for (const it of preuvesParBordereau(bords, parCompte).items) vendus.add(it);
+    // (revue du 11 octobre) Les ventes des AUTRES comptes demandés ne servent
+    // qu'à la ligne « pas reliées » (une information) : leur panne la rend
+    // `null`, elle n'efface JAMAIS la preuve — une vente prouvée par sa
+    // transaction reste « à retirer » même quand cette lecture (la plus lourde)
+    // ne répond pas.
     let sansPreuve = null;
     if (comptes) {
-      sansPreuve = [];
-      const vus = new Set(), maintenant = Date.now();
-      for (const u of comptes) for (const o of (parCompte[u] || [])) {
-        if (!venteEnCoursPreuve(o, maintenant)) continue;
-        const tx = String(o.transaction_id);
-        if (vus.has(tx) || parTx.tx.has(tx) || parBord.tx.has(tx)) continue;
-        vus.add(tx);
-        sansPreuve.push({ uid: u, tx });
+      const autres = comptes.filter((u) => !juger.includes(u));
+      const l2 = autres.length ? await ordres(autres) : [];
+      if (l2 !== null) {
+        Object.assign(parCompte, ventesParCompteDe(l2, autres));
+        const bordTx = preuvesParBordereau(bords, parCompte).tx;
+        sansPreuve = [];
+        const vus = new Set(), maintenant = Date.now();
+        for (const u of comptes) for (const o of (parCompte[u] || [])) {
+          if (!venteEnCoursPreuve(o, maintenant)) continue;
+          const tx = String(o.transaction_id);
+          if (vus.has(tx) || parTx.tx.has(tx) || bordTx.has(tx)) continue;
+          vus.add(tx);
+          sansPreuve.push({ uid: u, tx, titre: String(o.title || '').trim() });
+        }
       }
     }
     return { vendus, sansPreuve };
