@@ -57,6 +57,7 @@ const rep = (status, corps) => {
   const body = typeof corps === 'string' ? corps : JSON.stringify(corps == null ? {} : corps);
   return { ok: status >= 200 && status < 300, status, json: async () => JSON.parse(body), text: async () => body, headers: { get: () => 'application/json' } };
 };
+const VENDEUR = '11111111-2222-3333-4444-555555555555', AUTRE_VENDEUR = '99999999-8888-7777-6666-555555555555';
 const JETON_NEUF = { access_token: jwt({ sub: 'vendeur-1', email: 'essai@exemple.invalid', n: 2 }), refresh_token: 'r2', expires_in: 3600, user: { id: 'vendeur-1', email: 'essai@exemple.invalid' } };
 
 // ── Le service worker dans un `vm` ─────────────────────────────────────────
@@ -64,9 +65,9 @@ const JETON_NEUF = { access_token: jwt({ sub: 'vendeur-1', email: 'essai@exemple
 // ne répond JAMAIS (base injoignable). `store` peut être partagé entre deux
 // contextes : c'est un service worker qui redémarre (§4.9 — seul
 // `chrome.storage.local` survit).
-function faireBg({ store = {}, jeton = () => rep(200, JETON_NEUF), sonde = () => rep(200, '[]'), autre = () => rep(200, '[]'), cookieUid = UID, cookieMuet = false } = {}) {
-  const j = { jetons: 0, sondes: 0 };
-  let ecouteur = null;
+function faireBg({ store = {}, jeton = () => rep(200, JETON_NEUF), sonde = () => rep(200, '[]'), autre = () => rep(200, '[]'), cookieUid = UID, cookieMuet = false, manifeste = 'essai', alarmes = {}, stockageKO = false } = {}) {
+  const j = { jetons: 0, sondes: 0, rechargements: 0, alarmesCreees: [], notifs: [] };
+  let ecouteur = null, externe = null;
   const ctx = {
     console: { log() {}, warn() {}, error() {} },
     setTimeout, clearTimeout, setInterval: () => 0, clearInterval,
@@ -74,8 +75,10 @@ function faireBg({ store = {}, jeton = () => rep(200, JETON_NEUF), sonde = () =>
     btoa: (s) => Buffer.from(s, 'binary').toString('base64'), atob: (s) => Buffer.from(s, 'base64').toString('binary'),
     crypto: require('crypto').webcrypto,
     chrome: {
-      runtime: { onInstalled: { addListener() {} }, onStartup: { addListener() {} }, onMessage: { addListener(fn) { ecouteur = fn; } }, getManifest: () => ({ version: 'essai' }), lastError: null, id: 'x' },
-      alarms: { create() {}, onAlarm: { addListener() {} }, clear() {} },
+      runtime: { onInstalled: { addListener() {} }, onStartup: { addListener() {} }, onMessage: { addListener(fn) { ecouteur = fn; } },
+        onMessageExternal: { addListener(fn) { externe = fn; } }, reload() { j.rechargements++; },
+        getManifest: () => ({ version: manifeste }), lastError: null, id: 'abcdefghijklmnopabcdefghijklmnop' },
+      alarms: { create(nom) { j.alarmesCreees.push(nom); }, get(nom, cb) { cb(alarmes[nom] || undefined); }, onAlarm: { addListener() {} }, clear() {} },
       cookies: {
         get: (q, cb) => { if (cookieMuet) return typeof cb === 'function' ? undefined : JAMAIS(); const v = q && q.name === 'access_token_web' && cookieUid ? { value: jwt({ account_id: Number(cookieUid) }) } : null; if (typeof cb === 'function') { cb(v); return; } return Promise.resolve(v); },
         getAll: (q, cb) => { if (typeof cb === 'function') { cb([]); return; } return Promise.resolve([]); },
@@ -83,10 +86,10 @@ function faireBg({ store = {}, jeton = () => rep(200, JETON_NEUF), sonde = () =>
       },
       downloads: { onCreated: { addListener() {} } },
       action: { setBadgeText() {}, setBadgeBackgroundColor() {}, setTitle() {}, onClicked: { addListener() {} }, setPopup() {}, openPopup: async () => {} },
-      tabs: { onUpdated: { addListener() {} }, onActivated: { addListener() {} }, query: async () => [], sendMessage: (id, m, cb) => { if (typeof cb === 'function') cb(); }, create: async () => ({}) },
+      tabs: { onUpdated: { addListener() {} }, onActivated: { addListener() {} }, onRemoved: { addListener() {} }, query: async () => [], sendMessage: (id, m, cb) => { if (typeof cb === 'function') cb(); }, create: async () => ({}), update: async () => ({}) },
       windows: { update() {} },
       storage: { local: {
-        get(k, cb) { const cles = Array.isArray(k) ? k : (typeof k === 'string' ? [k] : Object.keys(k || {})); const out = {}; for (const c of cles) if (store[c] !== undefined) out[c] = JSON.parse(JSON.stringify(store[c])); if (typeof cb === 'function') { cb(out); return; } return Promise.resolve(out); },
+        get(k, cb) { if (stockageKO) return Promise.reject(new Error('stockage illisible')); const cles = Array.isArray(k) ? k : (typeof k === 'string' ? [k] : Object.keys(k || {})); const out = {}; for (const c of cles) if (store[c] !== undefined) out[c] = JSON.parse(JSON.stringify(store[c])); if (typeof cb === 'function') { cb(out); return; } return Promise.resolve(out); },
         set(o, cb) { Object.assign(store, JSON.parse(JSON.stringify(o))); if (typeof cb === 'function') { cb(); return; } return Promise.resolve(); },
         remove(k, cb) { for (const c of [].concat(k)) delete store[c]; if (typeof cb === 'function') { cb(); return; } return Promise.resolve(); },
       }, onChanged: { addListener() {} } },
@@ -110,7 +113,15 @@ function faireBg({ store = {}, jeton = () => rep(200, JETON_NEUF), sonde = () =>
     const r = ecouteur(Object.assign({ from: 'vmr-bridge' }, msg), { origin: APP, url: APP + '/' }, res);
     if (r !== true) setTimeout(() => res(undefined), 5);
   });
-  return { ctx, j, store, pont };
+  // Le canal ADRESSÉ (11 octobre) : Chrome pose lui-même l'origine.
+  const ext = (msg, origine = APP) => new Promise((res) => {
+    if (!externe) { res({ __pasDEcouteur: true }); return; }
+    const r = externe(msg, { origin: origine, url: origine + '/' }, res);
+    if (r !== true) setTimeout(() => res(undefined), 5);
+  });
+  const espion = (evt) => { j.notifs.push(JSON.parse(JSON.stringify(evt))); };
+  try { ctx.notifierApp = async (evt) => espion(evt); } catch (_) {}
+  return { ctx, j, store, pont, ext };
 }
 
 // ── Le pont dans de vrais mondes isolés ────────────────────────────────────
@@ -219,11 +230,19 @@ const quiRepond = (r, t) => (t.vivante(r) ? String(t.vivante(r)) : 'vide/erreur'
     await b.pont({ action: 'session', session: session(-1000) });
     await b.ctx.authToken();
     dit(b.j.jetons === avant, "b · l'app renvoie la MÊME session (même jeton mort) : toujours aucun appel", `${b.j.jetons - avant} POST de plus`);
-    const neuve = session(3600e3, { access_token: jwt({ sub: 'vendeur-1', n: 9 }), refresh_token: 'r9' });
-    await b.pont({ action: 'session', session: neuve });
+    // ⚠️ 11 octobre : une session ne s'adopte plus par la page (toute extension
+    //    de la page l'entendait) — elle arrive ADRESSÉE, avec un nonce.
+    const neuve = session(3600e3, { access_token: jwt({ sub: VENDEUR, n: 9 }), refresh_token: 'r9', user_id: VENDEUR });
+    const parPage = await b.pont({ action: 'session', session: neuve });
+    const s1 = await b.ctx.loadSession();
+    dit(!(parPage && parPage.ok) && s1 && s1.mort === true, "b · une session postée par la PAGE n'est pas adoptée (même neuve)", JSON.stringify(parPage));
+    b.store.vrmSession = Object.assign({}, b.store.vrmSession, { user_id: VENDEUR });
+    const q = await b.ext({ type: 'liaison', pour: VENDEUR });
+    dit(q && q.ok && q.besoin === true && /^[0-9a-f]{32}$/.test(String(q.nonce || '')) && q.raison === 'morte', 'b · session morte : l\'extension DEMANDE une session et émet un nonce (128 bits)', JSON.stringify(q));
+    const a = await b.ext({ type: 'session', nonce: q && q.nonce, session: neuve });
     const avant2 = b.j.jetons;
     const r2 = await b.ctx.authToken();
-    dit(r2 && r2.access_token === neuve.access_token && b.j.jetons === avant2, "b · autre sens : une NOUVELLE session arrive par le pont, authToken() remarche (sans réseau)", `rendu ${r2 ? 'une session' : r2} · ${b.j.jetons - avant2} POST`);
+    dit(a && a.ok && r2 && r2.access_token === neuve.access_token && b.j.jetons === avant2, "b · autre sens : la NOUVELLE session arrive par le canal adressé, authToken() remarche (sans réseau)", `${JSON.stringify(a)} · rendu ${r2 ? 'une session' : r2} · ${b.j.jetons - avant2} POST`);
   });
 
   // ══ c. UN REFUS PASSAGER OUVRE UNE PAUSE ══════════════════════════════════
@@ -343,6 +362,112 @@ const quiRepond = (r, t) => (t.vivante(r) ? String(t.vivante(r)) : 'vide/erreur'
     dit(!(autre && autre.code === 'en-cours'), 'h · autre sens : une AUTRE paire reste publiable', JSON.stringify(autre));
   });
 
+  // ══ i. LE CODE PÉRIMÉ SE RECHARGE, UNE FOIS (11 octobre) ══════════════════
+  //    Mesuré : sous un manifeste neuf, le service worker exécutait encore
+  //    l'ancien code (⟳ jamais cliqué dans ce Chrome). Au démarrage, le code
+  //    qui ne correspond pas au manifeste se recharge — UNE fois par paire.
+  const CODE = (/const CODE_VERSION = '([^']+)'/.exec(SRC_BG) || [])[1] || '';
+  await essaie('i · code périmé', async () => {
+    const store = {};
+    const b = faireBg({ store, manifeste: '9.99.9' });
+    await attendre(30);
+    dit(b.j.rechargements === 1, 'i · manifeste 9.99.9, code ' + (CODE || '?') + ' : le service worker se RECHARGE (le ⟳ que personne n\'avait cliqué)', `${b.j.rechargements} rechargement(s)`);
+    const b2 = faireBg({ store, manifeste: '9.99.9' });
+    await attendre(30);
+    dit(b2.j.rechargements === 0, 'i · même code, même manifeste au démarrage suivant : PAS de second rechargement (aucune boucle possible)', `${b2.j.rechargements} rechargement(s)`);
+    const b3 = faireBg({ manifeste: '9.99.9', stockageKO: true });
+    await attendre(30);
+    dit(b3.j.rechargements === 0, 'i · stockage illisible : on ne recharge PAS (« pas su » ne vaut pas « vas-y » — sans garde, une boucle est possible)', `${b3.j.rechargements} rechargement(s)`);
+    const b4 = faireBg({ manifeste: CODE || '0.0.0' });
+    await attendre(30);
+    dit(!!CODE && b4.j.rechargements === 0, 'i · autre sens : code = manifeste, aucun rechargement', `${b4.j.rechargements} rechargement(s)`);
+    const e = await borne(b4.ctx.etatPourApp(), 3000);
+    dit(e !== 'pend' && e && e.code === CODE && /^[a-p]{32}$/.test(String(e.ext || '')), "i · l'état dit la version du CODE et l'identifiant de l'extension (l'app juge sur le code, et s'adresse à CETTE extension)", JSON.stringify(e && e !== 'pend' ? { code: e.code, ext: e.ext } : e));
+  });
+
+  // ══ j. UNE RÉPONSE PERDUE NE TUE PLUS LA SESSION (11 octobre) ═════════════
+  //    Le serveur a fait tourner le jeton, la réponse s'est perdue : avant, 30 s
+  //    de pause sans rien écrire. On rejoue le MÊME jeton, vite (+1,5 s, +4 s),
+  //    dans la fenêtre où GoTrue rend le jeton courant au parent.
+  await essaie('j · 503 puis succès', async () => {
+    const b = faireBg({ store: { vrmSession: session(-1000) }, jeton: (n) => (n === 1 ? rep(503, '<html>503</html>') : rep(200, JETON_NEUF)) });
+    const t0 = Date.now();
+    const r = await b.ctx.authToken();
+    const dt = Date.now() - t0;
+    dit(r && r.access_token === JETON_NEUF.access_token && b.j.jetons === 2 && dt < 4000, 'j · 503 (la passerelle) : le MÊME jeton est rejoué 1,5 s après, et la session revient sans pause', `${b.j.jetons} POST · ${dt} ms · ${r ? 'session' : r}`);
+    dit(!(b.store.vrmRenouv && b.store.vrmRenouv.prochainAt), 'j · et aucune pause n\'est rangée', JSON.stringify(b.store.vrmRenouv));
+  });
+  await essaie('j · réponse perdue', async () => {
+    const b = faireBg({ store: { vrmSession: session(-1000) }, jeton: (n) => (n === 1 ? JAMAIS() : rep(200, JETON_NEUF)) });
+    const t0 = Date.now();
+    const r = await borne(b.ctx.authToken(), 9000);
+    const dt = Date.now() - t0;
+    dit(r !== 'pend' && r && r.access_token === JETON_NEUF.access_token && dt < 7000, 'j · réponse perdue (le serveur ne répond pas) : rejoué au bout de ~5,5 s, la session revient — avant : 30 s de pause, rien d\'écrit', `${b.j.jetons} POST · ${dt} ms`);
+  });
+  await essaie('j · 429 jamais rejoué', async () => {
+    const b = faireBg({ store: { vrmSession: session(-1000) }, jeton: () => rep(429, { message: 'Request rate limit reached' }) });
+    await b.ctx.authToken();
+    dit(b.j.jetons === 1, 'j · autre sens : un 429 (« ralentis ») n\'est PAS rejoué', `${b.j.jetons} POST`);
+  });
+
+  // ══ k. UNE SESSION MORTE PRÉVIENT L'APP TOUT DE SUITE (11 octobre) ═══════
+  await essaie('k · mort annoncée', async () => {
+    const b = faireBg({ store: { vrmSession: session(-1000) }, jeton: () => rep(400, { error_code: 'refresh_token_already_used', msg: 'Invalid Refresh Token: Already Used' }) });
+    await b.ctx.authToken();
+    await attendre(20);
+    dit(b.j.notifs.some((n) => n.type === 'session' && n.etat === 'morte'), "k · refus définitif : l'app ouverte est prévenue TOUT DE SUITE (elle redonne une session adressée), pas au battement suivant", JSON.stringify(b.j.notifs));
+  });
+
+  // ══ l. LA LIAISON ADRESSÉE : NONCE, COMPTE, UNE SEULE FOIS ═══════════════
+  await essaie('l · liaison', async () => {
+    const b = faireBg({ store: { vrmSession: session(3600e3, { user_id: VENDEUR }) } });
+    const deja = await b.ext({ type: 'liaison', pour: VENDEUR });
+    dit(deja && deja.ok && deja.besoin === false && !deja.nonce, "l · déjà connectée au bon compte : PAS besoin, aucun nonce (on ne remplace pas une session saine)", JSON.stringify(deja));
+    const pourAutre = await b.ext({ type: 'liaison', pour: AUTRE_VENDEUR });
+    dit(pourAutre && pourAutre.ok && pourAutre.besoin === false, "l · une page d'un AUTRE compte, sans demande : rien (deux onglets ne se renvoient pas l'extension)", JSON.stringify(pourAutre));
+    // « Se connecter » cliqué dans l'extension : la demande vaut 15 min.
+    await b.ctx.lierAvecVRM('https://www.vinted.fr/');
+    const dem = await b.ext({ type: 'liaison', pour: VENDEUR });
+    dit(dem && dem.besoin === true && dem.raison === 'demande' && dem.nonce, "l · « Se connecter avec VRM » cliqué : l'app peut la (re)connecter", JSON.stringify(dem));
+    const faux = await b.ext({ type: 'session', nonce: '0'.repeat(32), session: session(3600e3, { user_id: VENDEUR, refresh_token: 'rX' }) });
+    dit(faux && faux.ok === false && faux.code === 'nonce', 'l · une session sans LE nonce émis : refusée', JSON.stringify(faux));
+    const mauvais = await b.ext({ type: 'session', nonce: dem.nonce, session: session(3600e3, { user_id: AUTRE_VENDEUR, access_token: jwt({ sub: AUTRE_VENDEUR }), refresh_token: 'rY' }) });
+    dit(mauvais && mauvais.ok === false && mauvais.code === 'compte', "l · le bon nonce mais la session d'un AUTRE compte que celui annoncé : refusée", JSON.stringify(mauvais));
+    const bonne = session(3600e3, { user_id: VENDEUR, access_token: jwt({ sub: VENDEUR, n: 5 }), refresh_token: 'rZ' });
+    const ok1 = await b.ext({ type: 'session', nonce: dem.nonce, session: bonne });
+    const s = await b.ctx.loadSession();
+    dit(ok1 && ok1.ok && s && s.refresh_token === 'rZ', "l · le bon nonce, le bon compte : adoptée", JSON.stringify(ok1));
+    const rejeu = await b.ext({ type: 'session', nonce: dem.nonce, session: session(3600e3, { user_id: VENDEUR, refresh_token: 'rW' }) });
+    dit(rejeu && rejeu.ok === false && (await b.ctx.loadSession()).refresh_token === 'rZ', 'l · le même nonce une seconde fois : refusé (une seule fois)', JSON.stringify(rejeu));
+    const apres = await b.ext({ type: 'liaison', pour: VENDEUR });
+    dit(apres && apres.besoin === false, 'l · la demande est consommée : plus rien à donner ensuite', JSON.stringify(apres));
+    // Un nonce qui a plus de 2 min ne sert plus.
+    const b2 = faireBg({});
+    const q = await b2.ext({ type: 'liaison', pour: VENDEUR });
+    b2.ctx.__decalage = 3 * 60000;
+    const vieux = await b2.ext({ type: 'session', nonce: q.nonce, session: bonne });
+    dit(q && q.besoin && vieux && vieux.ok === false && vieux.code === 'nonce-perime', 'l · un nonce de plus de 2 min : refusé', JSON.stringify(vieux));
+    // Déconnexion : seulement si elle écrit sous CE compte.
+    const d1 = await b.ext({ type: 'deconnexion', pour: AUTRE_VENDEUR });
+    dit(d1 && d1.ok === false && !!(await b.ctx.loadSession()), "l · « Se déconnecter » dans VRM sous un AUTRE compte : l'extension garde sa session", JSON.stringify(d1));
+    const d2 = await b.ext({ type: 'deconnexion', pour: VENDEUR });
+    dit(d2 && d2.ok && !(await b.ctx.loadSession()), 'l · autre sens : sous SON compte, elle se déconnecte', JSON.stringify(d2));
+    const ailleurs = await b.ext({ type: 'liaison', pour: VENDEUR }, 'https://cancale-v67.vercel.app');
+    dit(ailleurs && ailleurs.ok === false && ailleurs.code === 'origine', "l · depuis une adresse qui n'est pas au projet : refusé", JSON.stringify(ailleurs));
+  });
+
+  // ══ m. LES ALARMES NE SONT PLUS REMISES À ZÉRO À CHAQUE RÉVEIL ═══════════
+  //    Mesuré : `vrm-photos` réveille le service worker chaque minute, et chaque
+  //    réveil RECRÉAIT `vrm-session` (40 min) — qui ne partait donc jamais.
+  await essaie('m · alarmes', async () => {
+    const b = faireBg({ alarmes: { 'vrm-session': { name: 'vrm-session' }, 'cancale-sync': { name: 'cancale-sync' }, 'cancale-active': { name: 'cancale-active' }, 'vrm-photos': { name: 'vrm-photos' } } });
+    await attendre(20);
+    dit(b.j.alarmesCreees.length === 0, 'm · les alarmes existent déjà : AUCUNE n\'est recréée (elles partent enfin)', JSON.stringify(b.j.alarmesCreees));
+    const b2 = faireBg({});
+    await attendre(20);
+    dit(b2.j.alarmesCreees.includes('vrm-session'), 'm · autre sens : absentes, elles sont créées', JSON.stringify(b2.j.alarmesCreees));
+  });
+
   // ══ f. LE PONT : UN ORPHELIN SE TAIT, UN DOUBLON NE RELAIE PAS DEUX FOIS ══
   const pw = chargerPlaywright();
   if (!pw) { dit(false, 'f · Playwright introuvable — le contrôle du pont ne peut pas tourner'); }
@@ -431,6 +556,55 @@ const quiRepond = (r, t) => (t.vivante(r) ? String(t.vivante(r)) : 'vide/erreur'
         const ret = await P.demander({ __vmr: 'etat' });
         const ex = await P.demander(TYPES[6].msg);
         dit(ret.length === 1 && ret[0].resp && ret[0].resp.vivant === 'neuf' && ex.length === 1, "f · si Chrome réutilise le même monde : le pont neuf prend la place, l'ancien se tait", `état : ${ret.length} réponse(s) [${ret.map((x) => (x.resp ? x.resp.vivant : 'null')).join(', ')}] · exec : ${ex.length}`);
+        await P.ctx.close();
+      });
+      // ══ 11 octobre : LE PONT (lu depuis le disque) JUGE LE CODE QUI RÉPOND ══
+      //    Un faux service worker qui répond à « état » SANS `code` (un code
+      //    d'avant la 5.167 sous un manifeste 5.167), ou dont le port se ferme
+      //    (≤ 5.128, il ne connaît pas « état »).
+      const FAUX_SW = (version, mode) => `(() => {
+        const rt = { id: 'abcdefghijklmnopabcdefghijklmnop', lastError: null,
+          getManifest: () => ({ version: ${JSON.stringify(version)} }),
+          getURL: (p) => 'chrome-extension://abcdefghijklmnopabcdefghijklmnop/' + p,
+          sendMessage(msg, cb) {
+            (globalThis.__messages = globalThis.__messages || []).push(JSON.parse(JSON.stringify(msg)));
+            setTimeout(() => {
+              if (${JSON.stringify(mode)} === 'port') { rt.lastError = { message: 'The message port closed before a response was received.' }; cb(undefined); rt.lastError = null; return; }
+              const r = { ok: true, version: ${JSON.stringify(version)}, vrm: { connecte: true } };
+              if (${JSON.stringify(mode)} === 'bon-code') r.code = ${JSON.stringify(version)};
+              if (${JSON.stringify(mode)} === 'autre-code') r.code = '5.129.0';
+              cb(r);
+            }, 10);
+          },
+          onMessage: { addListener() {} } };
+        globalThis.chrome = { runtime: rt };
+      })();`;
+      await essaie('f · le pont juge le code', async () => {
+        const verdicts = {};
+        for (const mode of ['sans-code', 'autre-code', 'port', 'bon-code']) {
+          const P = await nouvellePage(nav);
+          const w = await P.monde('pont-code-' + mode);
+          await P.dans(w, FAUX_SW('5.167.0', mode) + SRC_PONT);
+          await attendre(40);
+          const r = await P.demander({ __vmr: 'etat' }, 300);
+          const cadres = await P.pg.evaluate(() => [...document.querySelectorAll('iframe')].map((f) => f.getAttribute('src')));
+          verdicts[mode] = { perime: r[0] && r[0].perime ? r[0].perime.raison : null, cadre: cadres.some((u) => /popup\.html\?mode=reparer/.test(u || '')) };
+          await P.ctx.close();
+        }
+        dit(verdicts['sans-code'].perime === 'sans-code' && verdicts['autre-code'].perime === 'autre-code' && verdicts.port.perime === 'sans-etat',
+          'f · un état SANS code, un AUTRE code, ou un service worker qui ne connaît pas « état » : le pont joint « périmé » à sa réponse', JSON.stringify(verdicts));
+        dit(verdicts['sans-code'].cadre && verdicts.port.cadre, 'f · et il pose UNE page de réparation (popup.html?mode=reparer), qui vérifiera elle-même avant ⟳', JSON.stringify(verdicts));
+        dit(verdicts['bon-code'].perime === null && !verdicts['bon-code'].cadre, 'f · autre sens : le code du manifeste répond — ni « périmé », ni réparation', JSON.stringify(verdicts['bon-code']));
+      });
+      await essaie('f · plus de session par la page', async () => {
+        const P = await nouvellePage(nav);
+        const w = await P.monde('pont-session');
+        await P.dans(w, FAUX_CHROME('5.167.0') + SRC_PONT);
+        await attendre(40);
+        await P.pg.evaluate(() => { window.postMessage({ __vmr: 'session', session: { access_token: 'a', refresh_token: 'r' } }, '*'); window.postMessage({ __vmr: 'session', session: null }, '*'); });
+        await attendre(150);
+        const m = (await P.dans(w, 'globalThis.__messages || []')).filter((x) => x.action === 'session');
+        dit(m.length === 0, "f · une session (ou un « oublie tout ») postée dans la page n'est plus relayée au service worker — par aucun pont", `${m.length} relais`);
         await P.ctx.close();
       });
       try { await nav.close(); } catch (_) {}

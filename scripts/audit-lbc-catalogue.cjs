@@ -278,7 +278,11 @@ const VENTE_BODY = JSON.stringify({ pageProps: {
         downloads: { onCreated: { addListener() {} } },
         action: { setBadgeText() {}, setBadgeBackgroundColor() {}, setTitle() {} },
         tabs: { onUpdated: { addListener() {} }, query: dual([]), sendMessage: dual(undefined) },
-        storage: { local: { get: dual({}), set: dual(undefined), remove: dual(undefined) } },
+        storage: { local: (() => { const m = {}; const rend = (v, cb) => { if (typeof cb === 'function') { cb(v); return; } return Promise.resolve(v); }; return {
+        get(k, cb) { const cles = k == null ? Object.keys(m) : Array.isArray(k) ? k : (typeof k === 'string' ? [k] : Object.keys(k)); const out = {}; for (const c of cles) if (m[c] !== undefined) out[c] = JSON.parse(JSON.stringify(m[c])); return rend(out, cb); },
+        set(o, cb) { for (const c of Object.keys(o || {})) m[c] = JSON.parse(JSON.stringify(o[c])); return rend(undefined, cb); },
+        remove(k, cb) { for (const c of [].concat(k)) delete m[c]; return rend(undefined, cb); },
+      }; })(), onChanged: { addListener() {} } },
       },
       fetch: async (url, opts = {}) => {
         const u = metaVersData(String(url));
@@ -314,9 +318,15 @@ const VENTE_BODY = JSON.stringify({ pageProps: {
     c = faireCtx();
     await c.storeLbcCatalogue('https://api.leboncoin.fr/api/frontend/v1/data/v5/fforms', FFORMS, false);
     w = ecrits.find((r) => r.id === 'lbc_catalogue');
-    const places = w ? Object.keys(w.data).filter((k) => k !== 'updatedAt') : [];
+    // `index` (11 octobre) est le RÉSUMÉ de la ligne (taille, coupé, date par
+    // endpoint) : ce que le panneau lit en projection au lieu de rapatrier
+    // 2,6 Mo (§4.4). Ce n'est pas une place d'endpoint.
+    const places = w ? Object.keys(w.data).filter((k) => k !== 'updatedAt' && k !== 'index') : [];
     dit(places.length === 2, 'le second endpoint s\'AJOUTE, il n\'écrase pas le premier',
       `${places.length} place(s) : ${places.join(', ')}`);
+    const idx = w && w.data.index ? Object.keys(w.data.index) : [];
+    dit(idx.length === 2 && places.every((k) => idx.includes(k)), 'et le résumé (`index`) nomme les deux endpoints, sans leur corps',
+      JSON.stringify(w && w.data.index));
   });
 
   // 1bis. La carte complète : chaque schéma d'endpoint est RANGÉ, et fusionné.
@@ -433,6 +443,48 @@ const VENTE_BODY = JSON.stringify({ pageProps: {
     const lit = /id=eq\.lbc_recon&select=([^'"`]+)/.exec(corps);
     dit(!!lit && lit[1] !== 'data', 'le quota est PROJETÉ — on ne rapatrie plus les 67 Ko d\'échantillons',
       lit ? `select=${lit[1]}` : 'lecture introuvable');
+  });
+
+  // 6. ⚠️⚠️ LE POIDS (11 octobre) : 40 Mo PAR VISITE SUR LEBONCOIN. Mesuré
+  //    dans les journaux de la base le 10 octobre : 89 écritures en une minute,
+  //    `lbc_recon` (462 Ko) relue EN ENTIER 77 fois puis réécrite à chaque
+  //    réponse relayée, et `lbc_catalogue` (2,6 Mo) relu pour savoir s'il avait
+  //    changé. Ce qui doit rester vrai : une rafale ⇒ AU PLUS une écriture par
+  //    30 s ; rien de neuf ⇒ AUCUNE écriture ; un catalogue identique ⇒ ni
+  //    lecture ni écriture ; et rien n'est perdu entre deux vidages.
+  await essaie('le poids des écritures Leboncoin', async () => {
+    ligne = { lbc_recon: { paths: ['a'], samples: [], form: { fields: [{ name: 'subject' }] } } }; lectureKO = false;
+    const c = faireCtx();
+    for (let i = 0; i < 30; i++) await c.storeLbcRecon({ paths: ['p' + i], schemaOne: { endpoint: 'api.leboncoin.fr/e' + (i % 5), cles: ['x:string'] } });
+    const lectures = requetes.filter((u) => /id=eq\.lbc_recon/.test(u)).length;
+    const nEcr = ecrits.filter((r) => r.id === 'lbc_recon').length;
+    dit(nEcr <= 1, 'une rafale de 30 réponses relayées : AU PLUS UNE écriture de `lbc_recon` (avant : une par réponse)', `${nEcr} écriture(s)`);
+    dit(lectures <= 1, 'et AU PLUS UNE relecture de la ligne entière (avant : une par réponse)', `${lectures} lecture(s)`);
+    // Le vidage suivant (30 s plus tard) emporte TOUT ce qui s'est accumulé.
+    const t = (await c.chrome.storage.local.get('vrmLbcReconTampon')).vrmLbcReconTampon || {};
+    await c.chrome.storage.local.set({ vrmLbcReconTampon: Object.assign({}, t, { dernier: Date.now() - 31000 }) });
+    ligne.lbc_recon = (ecrits.filter((r) => r.id === 'lbc_recon').pop() || { data: ligne.lbc_recon }).data;
+    ecrits.length = 0;
+    await c.viderLbcRecon();
+    const w = ecrits.find((r) => r.id === 'lbc_recon');
+    const d = (w && w.data) || ligne.lbc_recon || {};
+    const manquent = Array.from({ length: 30 }, (_, i) => 'p' + i).filter((x) => !(d.paths || []).includes(x));
+    dit(manquent.length === 0 && d.form && (d.paths || []).includes('a'), 'trente secondes plus tard, rien n\'est perdu : les 30 chemins sont rangés, la carte du formulaire aussi', manquent.length ? `manquent : ${manquent.join(', ')}` : '');
+    // Rien de neuf : aucune écriture.
+    ligne.lbc_recon = d; ecrits.length = 0;
+    await c.storeLbcRecon({ paths: ['p3', 'a'] });
+    const t2 = (await c.chrome.storage.local.get('vrmLbcReconTampon')).vrmLbcReconTampon || {};
+    await c.chrome.storage.local.set({ vrmLbcReconTampon: Object.assign({}, t2, { dernier: Date.now() - 31000 }) });
+    await c.viderLbcRecon();
+    dit(ecrits.filter((r) => r.id === 'lbc_recon').length === 0, 'rien de neuf (des chemins déjà connus) : AUCUNE écriture', `${ecrits.length} écriture(s)`);
+    // Le catalogue identique : ni lecture, ni écriture.
+    const c2 = faireCtx(); ligne = {};
+    await c2.storeLbcCatalogue('https://api.leboncoin.fr/api/frontend/v1/data/v7/fdata', CATALOGUE, false);
+    ligne.lbc_catalogue = (ecrits.find((r) => r.id === 'lbc_catalogue') || {}).data;
+    const avantR = requetes.filter((u) => /lbc_catalogue/.test(u)).length; ecrits.length = 0;
+    await c2.storeLbcCatalogue('https://api.leboncoin.fr/api/frontend/v1/data/v7/fdata', CATALOGUE, false);
+    const apresR = requetes.filter((u) => /lbc_catalogue/.test(u)).length;
+    dit(!!ligne.lbc_catalogue && ecrits.length === 0 && apresR === avantR, 'le MÊME catalogue revu : ni relecture des 2,6 Mo, ni réécriture', `${apresR - avantR} lecture(s) · ${ecrits.length} écriture(s)`);
   });
 
   console.log(ko ? `\n❌ catalogue Leboncoin : ${ko} rouge(s)` : '\n✅ catalogue Leboncoin : tout est vert');

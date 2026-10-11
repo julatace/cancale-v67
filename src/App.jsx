@@ -4418,7 +4418,7 @@ const cleSeparee = (uid) => 'vrm_ext_separee_' + uid;
 // que si une extension installée déclare `externally_connectable` pour elle
 // (la 5.167 et suivantes). `null` = pas de réponse (absente, trop ancienne,
 // code périmé) — jamais une réponse devinée.
-const canalExt = () => { try { return (typeof chrome !== 'undefined' && chrome && chrome.runtime && typeof chrome.runtime.sendMessage === 'function') ? chrome.runtime : null; } catch (_) { return null; } };
+const canalExt = () => { try { const c = typeof window !== 'undefined' ? window.chrome : null; return (c && c.runtime && typeof c.runtime.sendMessage === 'function') ? c.runtime : null; } catch (_) { return null; } };
 function versExtension(id, msg, timeoutMs = 5000) {
   return new Promise((res) => {
     const rt = canalExt();

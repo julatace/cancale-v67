@@ -10,6 +10,12 @@
 //  trompe de compte, ses captures partent dans la boutique d'un autre — et si
 //  la fenêtre ne dit pas QUEL mot de passe elle attend, on arrive de Vinted et
 //  on tape celui de Vinted.
+//
+//  11 octobre (Julien) : « quand j'appuie sur se connecter, ça doit envoyer
+//  directement dans l'application VRM ». Le bouton principal OUVRE VRM (qui
+//  connecte l'extension par une session adressée) ; le mot de passe VRM ne se
+//  tape plus ici que si on le demande. Et `?mode=reparer` : la page posée par le
+//  pont quand le code qui tourne n'est pas celui du manifeste.
 // ════════════════════════════════════════════════════════════════════════════
 const { chromium } = require('playwright');
 const path = require('path');
@@ -22,10 +28,12 @@ const dit = (bon, quoi, detail) => {
   if (bon) { ok++; console.log(`  ✅ ${quoi}`); }
   else { ko++; console.log(`  ❌ ${quoi}${detail ? ' — ' + detail : ''}`); }
 };
+const essaie = async (quoi, fn) => { try { return await fn(); } catch (e) { ko++; console.log(`  ❌ ${quoi} — a levé : ${e && e.message}`); return null; } };
 
 // Rend la vraie popup dans une page, avec un faux `chrome` qui répond ce qu'on
 // lui dit. `etat` est ce que `authEtat` renvoie côté service worker.
-async function rendre(nav, etat, { carte = false } = {}) {
+// `geste(pg)` : ce qu'on fait dans la fenêtre avant de relever.
+async function rendre(nav, etat, { carte = false, mode = '', geste = null, faux = {} } = {}) {
   // La carte (2 octobre) : la même page, dans un iframe de 300 × 380 posé par
   // vrm-badge.js sur le site — `?mode=carte`.
   const ctx = await nav.newContext({ viewport: carte ? { width: 300, height: 380 } : { width: 360, height: 900 } });
@@ -39,21 +47,34 @@ async function rendre(nav, etat, { carte = false } = {}) {
   await pg.route('**/*', (r) => /logo-vrm-96\.png/.test(r.request().url())
     ? r.fulfill({ status: 200, contentType: 'image/png', body: fs.readFileSync(path.join(EXT, 'logo-vrm-96.png')) })
     : r.fulfill({ status: 200, contentType: 'text/html', body: html }));
-  await pg.goto('https://ext.test/popup.html' + (carte ? '?mode=carte' : ''));
+  await pg.goto('https://ext.test/popup.html' + (carte ? '?mode=carte' : mode ? '?mode=' + mode : ''));
   // Le faux `chrome` : même forme que le vrai (callbacks), rien de plus.
-  await pg.evaluate((e) => {
+  await pg.evaluate(({ e, faux }) => {
     window.__envoyes = [];
+    window.__recharges = 0;
+    const mem = Object.assign({}, faux.stock || {});
+    window.__mem = mem;
     window.chrome = {
       runtime: {
         sendMessage: (msg, cb) => {
           window.__envoyes.push(msg);
           const r = msg.action === 'authEtat' ? e
             : msg.action === 'freshness' ? { ok: true, fresh: [] }
+            : msg.action === 'codeVersion' ? (faux.codeMuet ? undefined : { ok: true, code: faux.code || null })
+            // Une connexion qui met 300 ms : de quoi cliquer plusieurs fois.
+            : msg.action === 'authLogin' ? { ok: true, __lent: 300 }
             : { ok: true };
-          setTimeout(() => cb && cb(r), 0);
+          if (faux.codeMuet && msg.action === 'codeVersion') return;   // ne répond jamais
+          setTimeout(() => cb && cb(r), (r && r.__lent) || 0);
         },
+        lastError: null,
+        getManifest: () => ({ version: faux.manifeste || '5.167.0' }),
+        reload: () => { window.__recharges++; },
       },
-      storage: { local: { get: (k, cb) => setTimeout(() => cb && cb({}), 0) } },
+      storage: { local: {
+        get: (k, cb) => { if (faux.stockKO) return Promise.reject(new Error('stockage illisible')); const out = {}; for (const c of [].concat(k)) if (mem[c] !== undefined) out[c] = mem[c]; if (cb) { setTimeout(() => cb(out), 0); return; } return Promise.resolve(out); },
+        set: (o, cb) => { Object.assign(mem, o); if (cb) { setTimeout(cb, 0); return; } return Promise.resolve(); },
+      } },
       // 30 sept. : connecté, l'icône OUVRE VRM (onglet réutilisé ou créé).
       tabs: {
         query: (q, cb) => setTimeout(() => cb(q && q.active ? [{ id: 1, url: e.__url || 'https://www.vinted.fr/items/1' }] : []), 0),
@@ -63,26 +84,32 @@ async function rendre(nav, etat, { carte = false } = {}) {
       windows: { update: () => {} },
     };
     window.close = () => { window.__ferme = true; };
-  }, etat);
+  }, { e: etat, faux });
   await pg.addScriptTag({ content: js });
   await pg.waitForTimeout(400);
+  if (geste) { await geste(pg); await pg.waitForTimeout(500); }
 
   const txt = await pg.evaluate(() => document.body.innerText);
   const champs = await pg.evaluate(() => Array.from(document.querySelectorAll('input'))
-    .map((i) => ({ id: i.id, ph: i.placeholder, type: i.type })));
+    .map((i) => ({ id: i.id, ph: i.placeholder, type: i.type, visible: !!(i.offsetParent), valeur: i.value })));
   const liens = await pg.evaluate(() => Array.from(document.querySelectorAll('a[href]')).map((a) => a.href));
   const ouvert = await pg.evaluate(() => window.__ouvert || null);
   const ferme = await pg.evaluate(() => !!window.__ferme);
-  const envoyes = await pg.evaluate(() => window.__envoyes.map((m) => m.action));
-  const boutons = await pg.evaluate(() => Array.from(document.querySelectorAll('button')).map((b) => b.id));
+  const messages = await pg.evaluate(() => window.__envoyes);
+  const envoyes = messages.map((m) => m.action);
+  const boutons = await pg.evaluate(() => Array.from(document.querySelectorAll('button')).filter((b) => b.offsetParent).map((b) => b.id));
+  const recharges = await pg.evaluate(() => window.__recharges);
+  const reparation = await pg.evaluate(() => document.body.getAttribute('data-reparation'));
+  const mem = await pg.evaluate(() => window.__mem);
   // Tout doit tenir dans la carte, sans défilement horizontal ni coupe.
   const deborde = await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth || document.documentElement.scrollHeight > window.innerHeight + 1);
   // Rien de l'ancienne palette (or, menthe) : la famille « VRM Noir » (§7).
   const anciens = await pg.evaluate(() => /#4aa87d|#E0B972|#F7E3B6/i.test(document.documentElement.outerHTML));
   if (carte && process.env.BANC_CAPTURES) await pg.screenshot({ path: path.join(process.env.BANC_CAPTURES, `popup-carte-${etat.connecte ? 'co' : 'deco'}.png`) });
   await ctx.close();
-  return { txt, champs, liens, erreurs, pg, ouvert, ferme, envoyes, boutons, deborde, anciens };
+  return { txt, champs, liens, erreurs, ouvert, ferme, envoyes, messages, boutons, deborde, anciens, recharges, reparation, mem };
 }
+const ouvrirMdp = async (pg) => { const a = await pg.$('#mdpLien'); if (a) { await a.click(); await pg.waitForTimeout(120); } };
 
 (async () => {
   const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
@@ -90,58 +117,103 @@ async function rendre(nav, etat, { carte = false } = {}) {
 
   // ── 1. PAS CONNECTÉ — l'état d'un nouveau venu ───────────────────────────
   console.log('\n── Fenêtre de l’extension, personne n’est connecté');
-  const neuf = await rendre(nav, { ok: true, connecte: false, cloisonne: false });
-  dit(!neuf.erreurs.length, 'la popup s’exécute sans erreur', neuf.erreurs[0]);
-  dit(neuf.champs.some((c) => c.id === 'mail') && neuf.champs.some((c) => c.id === 'pw'),
-    'les deux champs sont là', JSON.stringify(neuf.champs));
-
-  // ⚠️⚠️ LE DÉFAUT QUI COÛTE : on arrive de Vinted, on lit « Mot de passe », et
-  //    on tape celui de Vinted. La fenêtre doit dire DE QUEL compte il s'agit.
-  dit(/VRM/.test(neuf.txt), 'elle dit de quel compte il s’agit (VRM)',
-    neuf.txt.replace(/\n/g, ' · ').slice(0, 180));
-  dit(/pas ton mot de passe Vinted|jamais besoin/i.test(neuf.txt),
-    'et elle dit explicitement que ce n’est PAS le mot de passe Vinted',
-    neuf.txt.replace(/\n/g, ' · ').slice(0, 220));
-  // Le placeholder compte autant que la phrase : c'est lui qu'on lit en tapant.
-  dit(neuf.champs.every((c) => !/^Mot de passe$/.test(c.ph || '')),
-    'le champ lui-même ne dit plus « Mot de passe » tout court',
-    JSON.stringify(neuf.champs.map((c) => c.ph)));
-  dit(neuf.liens.some((h) => /vrm\.center/.test(h)),
-    'et on peut aller créer son compte depuis ici');
+  await essaie('pas connecté', async () => {
+    const neuf = await rendre(nav, { ok: true, connecte: false, cloisonne: false });
+    dit(!neuf.erreurs.length, 'la popup s’exécute sans erreur', neuf.erreurs[0]);
+    // 11 octobre : le geste principal OUVRE VRM — aucun mot de passe à taper.
+    dit(neuf.boutons.includes('lierBtn') && /Se connecter avec VRM/.test(neuf.txt), 'le bouton principal est « Se connecter avec VRM »', JSON.stringify(neuf.boutons));
+    dit(!neuf.champs.some((c) => c.visible), 'aucun champ à remplir au premier regard (VRM s’ouvre et connecte l’extension)', JSON.stringify(neuf.champs.filter((c) => c.visible)));
+    dit(neuf.liens.some((h) => /vrm\.center/.test(h)), 'et on peut aller créer son compte depuis ici');
+    dit(!neuf.ouvert, 'pas connecté : rien ne s’ouvre tout seul', neuf.ouvert);
+    dit(!neuf.envoyes.includes('freshness') && !neuf.envoyes.includes('syncNow'), 'la fenêtre ne lit plus de données (tout est dans l’app)', JSON.stringify(neuf.envoyes));
+    dit(!neuf.anciens, 'plus rien de l’ancien logo doré ni de la menthe');
+  });
+  await essaie('« Se connecter avec VRM »', async () => {
+    const r = await rendre(nav, { ok: true, connecte: false }, { geste: (pg) => pg.click('#lierBtn') });
+    const m = r.messages.find((x) => x.action === 'lierAvecVRM');
+    dit(!!m && /vinted\.fr/.test(m.urlActive || ''), 'un clic : le service worker OUVRE VRM (avec l’identifiant de cette extension) — rien à taper', JSON.stringify(r.messages));
+    dit(!r.envoyes.includes('authLogin'), 'et aucun mot de passe n’est envoyé', JSON.stringify(r.envoyes));
+    dit(r.ferme, 'la petite fenêtre se referme (VRM est devant)');
+  });
+  // Le mot de passe VRM reste possible — sur demande, avec la mise en garde.
+  await essaie('mot de passe sur demande', async () => {
+    const r = await rendre(nav, { ok: true, connecte: false }, { geste: ouvrirMdp });
+    dit(r.champs.some((c) => c.id === 'mail' && c.visible) && r.champs.some((c) => c.id === 'pw' && c.visible), '« avec mon mot de passe VRM » : les deux champs apparaissent', JSON.stringify(r.champs));
+    // ⚠️⚠️ LE DÉFAUT QUI COÛTE : on arrive de Vinted, on lit « Mot de passe », et
+    //    on tape celui de Vinted. La fenêtre doit dire DE QUEL compte il s'agit.
+    dit(/VRM/.test(r.txt) && /pas ton mot de passe Vinted|jamais besoin/i.test(r.txt), 'et elle dit que c’est le compte VRM, PAS le mot de passe Vinted', r.txt.replace(/\n/g, ' · ').slice(0, 220));
+    dit(r.champs.every((c) => !/^Mot de passe$/.test(c.ph || '')) && r.champs.some((c) => /VRM/.test(c.ph || '')), 'les placeholders disent VRM (c’est eux qu’on lit en tapant)', JSON.stringify(r.champs.map((c) => c.ph)));
+  });
+  // Une connexion à la fois : un double clic + Entrée ouvrait plusieurs sessions.
+  await essaie('une connexion à la fois', async () => {
+    const r = await rendre(nav, { ok: true, connecte: false }, { geste: async (pg) => {
+      await ouvrirMdp(pg);
+      await pg.fill('#mail', 'sophie@exemple.fr'); await pg.fill('#pw', 'motdepasse-vrm');
+      await pg.click('#inBtn'); await pg.press('#pw', 'Enter'); await pg.press('#pw', 'Enter');
+    } });
+    const n = r.envoyes.filter((a) => a === 'authLogin').length;
+    dit(n === 1, 'un clic et deux Entrée pendant la connexion : UNE seule connexion envoyée', `${n} envois`);
+  });
 
   // ── 2. CONNECTÉ — on ne redemande rien ───────────────────────────────────
   console.log('\n── Connecté : la fenêtre ne redemande pas de mot de passe');
-  const co = await rendre(nav, { ok: true, connecte: true, email: 'sophie@exemple.fr', cloisonne: true });
-  dit(!co.erreurs.length, 'toujours aucune erreur', co.erreurs[0]);
-  // 30 sept. (Julien) : « quand on ouvre l'extension, je veux que ça ouvre VRM ».
-  dit(/^https:\/\/vrm\.center\/\?tab=plat_vinted$/.test(co.ouvert || ''), 'connecté, depuis Vinted : l’icône ouvre VRM sur l’onglet Vinted', co.ouvert);
-  dit(co.ferme, 'et la petite fenêtre se referme');
-  dit(!co.champs.some((c) => c.id === 'pw'), 'et aucun champ mot de passe');
-  const lbc = await rendre(nav, { ok: true, connecte: true, cloisonne: true, __url: 'https://www.leboncoin.fr/compte/part/transaction/1' });
-  dit(/tab=plat_leboncoin$/.test(lbc.ouvert || ''), 'depuis Leboncoin : l’onglet Leboncoin de VRM', lbc.ouvert);
-  dit(!neuf.ouvert, 'pas connecté : rien ne s’ouvre, on montre la connexion', neuf.ouvert);
+  await essaie('connecté', async () => {
+    const co = await rendre(nav, { ok: true, connecte: true, email: 'sophie@exemple.fr', cloisonne: true });
+    dit(!co.erreurs.length, 'toujours aucune erreur', co.erreurs[0]);
+    // 30 sept. (Julien) : « quand on ouvre l'extension, je veux que ça ouvre VRM ».
+    dit(/^https:\/\/vrm\.center\/\?tab=plat_vinted$/.test(co.ouvert || ''), 'connecté, depuis Vinted : l’icône ouvre VRM sur l’onglet Vinted', co.ouvert);
+    dit(co.ferme, 'et la petite fenêtre se referme');
+    dit(!co.champs.some((c) => c.id === 'pw'), 'et aucun champ mot de passe');
+    const lbc = await rendre(nav, { ok: true, connecte: true, cloisonne: true, __url: 'https://www.leboncoin.fr/compte/part/transaction/1' });
+    dit(/tab=plat_leboncoin$/.test(lbc.ouvert || ''), 'depuis Leboncoin : l’onglet Leboncoin de VRM', lbc.ouvert);
+  });
 
   // ── 3. SESSION EXPIRÉE — un troisième état, pas « non connecté » ─────────
   // ⚠️ « pas su » ne vaut pas « non » : une session expirée n'est pas une
   //    absence de compte, et la consigne n'est pas la même.
   console.log('\n── Session expirée : c’est un état à part');
-  const exp = await rendre(nav, { ok: true, connecte: false, expiree: true, email: 'sophie@exemple.fr', cloisonne: true });
-  dit(/expir/i.test(exp.txt), 'elle dit que la session a expiré', exp.txt.replace(/\n/g, ' · ').slice(0, 140));
-  dit(exp.champs.some((c) => c.id === 'pw'), 'et elle redemande le mot de passe');
+  await essaie('expirée', async () => {
+    const exp = await rendre(nav, { ok: true, connecte: false, expiree: true, email: 'sophie@exemple.fr', cloisonne: true }, { geste: ouvrirMdp });
+    dit(/expir/i.test(exp.txt), 'elle dit que la session a expiré', exp.txt.replace(/\n/g, ' · ').slice(0, 140));
+    dit(/VRM/.test(exp.txt) && exp.champs.some((c) => c.id === 'mail' && c.valeur === 'sophie@exemple.fr'), 'le geste est le même (VRM la reconnecte) ; au mot de passe, l’email est déjà rempli', JSON.stringify(exp.champs));
+  });
 
   // ── 4. LA CARTE (iframe sur le site, 2 octobre) ──────────────────────────
   console.log('\n── La même connexion, dans la petite carte en bas à droite');
-  const cd = await rendre(nav, { ok: true, connecte: false, cloisonne: true }, { carte: true });
-  dit(!cd.erreurs.length, 'elle s’exécute sans erreur', cd.erreurs[0]);
-  dit(cd.champs.some((c) => c.id === 'pw') && /pas ton mot de passe Vinted/i.test(cd.txt), 'pas connecté : la connexion VRM, avec la même mise en garde', cd.txt.slice(0, 160));
-  dit(!cd.deborde, 'tout tient dans la carte (300 × 380), sans défilement');
-  dit(!cd.anciens && !neuf.anciens, 'plus rien de l’ancien logo doré ni de la menthe');
-  const cc = await rendre(nav, { ok: true, connecte: true, email: 'sophie@exemple.fr', cloisonne: true }, { carte: true });
-  dit(!cc.ouvert && !cc.ferme, 'connectée, la carte ne s’ouvre pas toute seule sur VRM (elle est dans le site)', cc.ouvert);
-  dit(/sophie@exemple\.fr/.test(cc.txt), 'elle nomme le compte VRM', cc.txt.slice(0, 120));
-  dit(cc.boutons.includes('vrmBtn') && cc.boutons.includes('outBtn'), 'et propose « Ouvrir VRM » et « Se déconnecter »', JSON.stringify(cc.boutons));
-  dit(!cc.champs.some((c) => c.id === 'pw'), 'sans champ mot de passe');
-  dit(!neuf.envoyes.includes('freshness') && !neuf.envoyes.includes('syncNow'), 'la fenêtre ne lit plus de données (tout est dans l’app)', JSON.stringify(neuf.envoyes));
+  await essaie('carte', async () => {
+    const cd = await rendre(nav, { ok: true, connecte: false, cloisonne: true }, { carte: true });
+    dit(!cd.erreurs.length, 'elle s’exécute sans erreur', cd.erreurs[0]);
+    dit(cd.boutons.includes('lierBtn') && !cd.champs.some((c) => c.visible), 'pas connecté : « Se connecter avec VRM », sans champ visible', JSON.stringify(cd.boutons));
+    dit(!cd.deborde, 'tout tient dans la carte (300 × 380), sans défilement');
+    const cl = await rendre(nav, { ok: true, connecte: false }, { carte: true, geste: (pg) => pg.click('#lierBtn') });
+    dit(cl.envoyes.includes('lierAvecVRM') && !cl.ferme, 'dans la carte : le clic demande au service worker d’ouvrir VRM (la carte, elle, reste dans le site)', JSON.stringify(cl.envoyes));
+    const cm = await rendre(nav, { ok: true, connecte: false }, { carte: true, geste: async (pg) => { await ouvrirMdp(pg); await pg.fill('#mail', 'a@b.fr'); await pg.fill('#pw', 'x'); await pg.click('#inBtn'); } });
+    const login = cm.messages.find((m) => m.action === 'authLogin');
+    dit(!!login && login.ouvrir === true, 'au mot de passe, dans la carte : c’est le service worker qui ouvrira VRM après la connexion', JSON.stringify(login));
+    const cc = await rendre(nav, { ok: true, connecte: true, email: 'sophie@exemple.fr', cloisonne: true }, { carte: true });
+    dit(!cc.ouvert && !cc.ferme, 'connectée, la carte ne s’ouvre pas toute seule sur VRM (elle est dans le site)', cc.ouvert);
+    dit(/sophie@exemple\.fr/.test(cc.txt), 'elle nomme le compte VRM', cc.txt.slice(0, 120));
+    dit(cc.boutons.includes('vrmBtn') && cc.boutons.includes('outBtn'), 'et propose « Ouvrir VRM » et « Se déconnecter »', JSON.stringify(cc.boutons));
+    dit(!cc.champs.some((c) => c.id === 'pw'), 'sans champ mot de passe');
+  });
+
+  // ── 5. LA RÉPARATION D'UN CODE PÉRIMÉ (`?mode=reparer`, 11 octobre) ───────
+  // ⚠️⚠️ Mesuré : sous un manifeste neuf, le service worker exécutait encore
+  //    l'ancien code tant que ⟳ n'avait pas été cliqué dans CE Chrome. Le pont
+  //    pose cette page ; elle ne le croit pas sur parole.
+  console.log('\n── La page de réparation');
+  await essaie('réparation', async () => {
+    const a = await rendre(nav, {}, { mode: 'reparer', faux: { manifeste: '5.167.0', code: '5.129.0' } });
+    dit(a.recharges === 1 && a.reparation === 'recharge', 'le code qui répond (5.129.0) n’est pas celui du manifeste (5.167.0) : ⟳ (chrome.runtime.reload), UNE fois', `${a.recharges} · ${a.reparation}`);
+    dit(a.mem.vrmReparation && a.mem.vrmReparation.cle === '5.167.0', 'et la garde est rangée (chrome.storage.local)', JSON.stringify(a.mem.vrmReparation));
+    const b = await rendre(nav, {}, { mode: 'reparer', faux: { manifeste: '5.167.0', code: '5.129.0', stock: { vrmReparation: a.mem.vrmReparation } } });
+    dit(b.recharges === 0 && b.reparation === 'deja', 'déjà rechargé pour cette version : pas une seconde fois (aucune boucle)', `${b.recharges} · ${b.reparation}`);
+    const c = await rendre(nav, {}, { mode: 'reparer', faux: { manifeste: '5.167.0', code: '5.167.0' } });
+    dit(c.recharges === 0 && c.reparation === 'a-jour', 'autre sens : le code est celui du manifeste — rien (un service worker lent n’est pas rechargé)', `${c.recharges} · ${c.reparation}`);
+    const d = await rendre(nav, {}, { mode: 'reparer', faux: { manifeste: '5.167.0', code: '5.129.0', stockKO: true } });
+    dit(d.recharges === 0, 'stockage illisible : PAS de ⟳ (sans garde, une boucle de rechargements est possible)', `${d.recharges} · ${d.reparation}`);
+    dit(!a.champs.some((x) => x.visible) && !a.envoyes.includes('authEtat'), 'la page de réparation ne montre rien et ne demande rien d’autre', JSON.stringify(a.envoyes));
+  });
 
   await nav.close();
   console.log(`\n${ko ? '❌' : '✅'} popup : ${ok} vert${ok > 1 ? 's' : ''}, ${ko} rouge${ko > 1 ? 's' : ''}`);

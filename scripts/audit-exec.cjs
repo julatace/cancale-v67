@@ -28,14 +28,14 @@ const UID = '3175765377';
 const APP = 'https://vrm.center';
 
 function faireCtx({ connecte = UID } = {}) {
-  const store = {}; const envois = []; let ecouteur = null;
+  const store = {}; const envois = []; let ecouteur = null, externe = null;
   const ctx = {
     console: { log() {}, warn() {}, error() {} },
     setTimeout: (fn, ms) => setTimeout(fn, Math.min(ms || 0, 1)), clearTimeout, setInterval: () => 0, clearInterval,
-    URL, TextDecoder, TextEncoder,
+    URL, TextDecoder, TextEncoder, crypto: require('crypto').webcrypto,
     btoa: (s) => Buffer.from(s, 'binary').toString('base64'), atob: (s) => Buffer.from(s, 'base64').toString('binary'),
     chrome: {
-      runtime: { onInstalled: { addListener() {} }, onStartup: { addListener() {} }, onMessage: { addListener(fn) { ecouteur = fn; } }, getManifest: () => ({ version: '9.9.9' }), lastError: null, id: 'x' },
+      runtime: { onInstalled: { addListener() {} }, onStartup: { addListener() {} }, onMessage: { addListener(fn) { ecouteur = fn; } }, onMessageExternal: { addListener(fn) { externe = fn; } }, getManifest: () => ({ version: '9.9.9' }), lastError: null, id: 'x' },
       alarms: { create() {}, onAlarm: { addListener() {} } },
       cookies: { get: dual(null), getAll: dual([]), onChanged: { addListener() {} } },
       downloads: { onCreated: { addListener() {} } },
@@ -63,7 +63,15 @@ function faireCtx({ connecte = UID } = {}) {
     const r = ecouteur(Object.assign({ from: 'vmr-bridge', action: 'exec' }, msg), { origin: origine, url: origine + '/' }, res);
     if (r !== true) setTimeout(() => res(undefined), 5);
   });
-  return { ctx, envois, envoyer };
+  // 11 octobre : la session de l'extension n'arrive plus que par le canal
+  // ADRESSÉ (`onMessageExternal`, `externally_connectable`). Chrome y pose
+  // lui-même `sender.origin`.
+  const versExt = (msg, origine = APP) => new Promise((res) => {
+    if (!externe) { res({ __pasDEcouteur: true }); return; }
+    const r = externe(msg, { origin: origine, url: origine + '/' }, res);
+    if (r !== true) setTimeout(() => res(undefined), 5);
+  });
+  return { ctx, envois, envoyer, versExt };
 }
 
 const REPONSE = { uid: UID, method: 'POST', endpoint: '/api/v2/conversations/123/replies', body: { reply: { body: 'Oui !' } } };
@@ -160,23 +168,36 @@ const REPONSE = { uid: UID, method: 'POST', endpoint: '/api/v2/conversations/123
   await essaie('imposteurs', async () => {
     const acceptes = [];
     for (const o of IMPOSTEURS) {
-      const { envois, envoyer } = faireCtx();
+      const { envois, envoyer, versExt } = faireCtx();
       const s1 = await envoyer({ action: 'session', session: { access_token: 'a.b.c', user_id: 'pirate' } }, o);
       const e1 = await envoyer(REPONSE, o);
       const a1 = await envoyer({ action: 'authEtat' }, o);
-      if ((s1 && s1.ok) || (e1 && e1.ok) || envois.length || (a1 && a1.ok !== false)) acceptes.push(o);
+      // Le canal adressé : une liaison demandée depuis une autre adresse ne
+      // rend ni nonce, ni session acceptée.
+      const l1 = await versExt({ type: 'liaison', pour: '11111111-2222-3333-4444-555555555555', force: true }, o);
+      const x1 = await versExt({ type: 'session', nonce: (l1 && l1.nonce) || 'x', session: { access_token: 'a.b.c', refresh_token: 'r', user_id: '11111111-2222-3333-4444-555555555555' } }, o);
+      if ((s1 && s1.ok) || (e1 && e1.ok) || envois.length || (a1 && a1.ok !== false) || (l1 && l1.ok) || (x1 && x1.ok)) acceptes.push(o);
     }
     dit(acceptes.length === 0, 'une adresse qui n\'est pas au projet (cancale-v67.vercel.app, www.vrm.center, vrm.center.autre…) ne transmet ni session, ni action, ni question', acceptes.join(', '));
   });
   await essaie('autre sens : les adresses du projet', async () => {
     const refuses = [];
     for (const o of POSSEDEES) {
-      const { envois, envoyer } = faireCtx();
-      const s1 = await envoyer({ action: 'session', session: null }, o);
+      const { envois, envoyer, versExt } = faireCtx();
+      const l1 = await versExt({ type: 'liaison', pour: '11111111-2222-3333-4444-555555555555' }, o);
       const e1 = await envoyer(REPONSE, o);
-      if (!(s1 && s1.ok) || !(e1 && e1.ok) || envois.length !== 1) refuses.push(o);
+      if (!(l1 && l1.ok === true) || !(e1 && e1.ok) || envois.length !== 1) refuses.push(o);
     }
-    dit(refuses.length === 0, 'autre sens : vrm.center et l\'adresse Vercel du projet restent l\'app', refuses.join(', '));
+    dit(refuses.length === 0, 'autre sens : vrm.center et l\'adresse Vercel du projet restent l\'app (liaison adressée et exec acceptés)', refuses.join(', '));
+  });
+  // ⚠️⚠️ 11 octobre : une session postée PAR LA PAGE (`window.postMessage`) est
+  //    entendue par TOUTE extension de la page — une copie ancienne l'adoptait
+  //    (même famille de jetons, révoquée). Même depuis l'app : refusée.
+  await essaie('session par la page', async () => {
+    const { envoyer, ctx } = faireCtx();
+    const s1 = await envoyer({ action: 'session', session: { access_token: 'a.b.c', refresh_token: 'r', user_id: '11111111-2222-3333-4444-555555555555' } }, APP);
+    const sess = await ctx.loadSession();
+    dit(!(s1 && s1.ok) && !sess, "une session postée par la page, même depuis vrm.center, n'est PAS adoptée (seul le canal adressé, avec nonce, en donne une)", JSON.stringify(s1) + ' · ' + JSON.stringify(sess));
   });
   await essaie('manifeste', async () => {
     const m = JSON.parse(fs.readFileSync(path.join(racine, 'vinted-sync-extension', 'manifest.json'), 'utf8'));
@@ -184,6 +205,11 @@ const REPONSE = { uid: UID, method: 'POST', endpoint: '/api/v2/conversations/123
     const appLike = (u) => /vrm\.center|vercel\.app/.test(u);
     const hors = [...pont, ...(m.host_permissions || []).filter(appLike)].filter((u) => !POSSEDEES.some((o) => u === o + '/*'));
     dit(pont.length > 0 && hors.length === 0, 'le pont n\'est injecté, et l\'app n\'est autorisée, QUE sur les adresses du projet', hors.join(', '));
+    // Le canal adressé et la page de réparation : mêmes adresses, aucune autre.
+    const ext = ((m.externally_connectable || {}).matches || []);
+    const war = (m.web_accessible_resources || []).filter((w) => (w.resources || []).includes('popup.html')).flatMap((w) => w.matches || []).filter(appLike);
+    const hors2 = [...ext, ...war].filter((u) => !POSSEDEES.some((o) => u === o + '/*'));
+    dit(ext.length > 0 && hors2.length === 0, '`externally_connectable` (la session adressée) ne s\'ouvre QU\'aux adresses du projet', hors2.join(', ') || JSON.stringify(ext));
   });
   console.log(`\n${ok} ✅ · ${ko} ❌`);
   process.exit(ko ? 1 : 0);
