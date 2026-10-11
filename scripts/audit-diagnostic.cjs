@@ -49,6 +49,10 @@ function demarrerWorker(bloc, magasin, journal) {
   };
   const ctx = {
     chrome, console, Date, JSON, Promise, Object, Math, setTimeout,
+    // 5.165 : `viderTampon` écrit aussi la version tenue DANS le code — une
+    // constante d'en-tête du fichier, hors du bloc extrait : on la sert telle
+    // qu'elle est dans la source (§6.3, le vm doit servir ce que le code lit).
+    CODE_VERSION: (/const CODE_VERSION\s*=\s*'([^']+)'/.exec(SRC) || [])[1] || '',
     sbGet: async () => [{ data: JSON.parse(JSON.stringify(journal.base)) }],
     supabaseUpsert: async (_t, rows) => {
       if (journal.casse) throw new Error('réseau coupé');
