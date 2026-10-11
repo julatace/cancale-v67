@@ -23,7 +23,7 @@ const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
-const PORT = 4338;
+const PORT = Number(process.env.PORT) || 4338;
 const auj = new Date();
 const ilYa = (j) => Math.floor((Date.now() - j * 86400000) / 1000);
 const ann = (id, o) => Object.assign({ id, price: { amount: '49.0', currency_code: 'EUR' }, is_closed: false, is_draft: false, photo: null, brand_title: 'Nike', size_title: '42', status: 'Très bon état', view_count: 40, favourite_count: 2 }, o);

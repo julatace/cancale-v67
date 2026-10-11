@@ -36,7 +36,7 @@ const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
 const DIST = path.join(__dirname, '..', '..', 'dist');
-const PORT = 4721;
+const PORT = Number(process.env.PORT) || 4721;
 const MAINTENANT = Date.parse('2026-10-20T08:00:00.000Z');   // mardi 20 octobre, 10:00 à Paris
 
 const ACCS = [{ id: 1, vinted_user_id: '111', login: 'compte_test', domain: 'www.vinted.fr', updated_at: new Date(MAINTENANT).toISOString() }];

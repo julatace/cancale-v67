@@ -590,6 +590,7 @@ async function finPage(pg, errs, quoi) {
         const info = await pg.$eval(`[data-ebay-info="${A.A2}"]`, (x) => x.innerText).catch(() => '');
         const lien = await pg.locator(`[data-ebay-info="${A.A2}"] a[href*="ebay.fr/itm/${A.A2}"]`).count();
         const e = await etats(pg);
+        await carte(pg, A.A2).screenshot({ path: path.join(CAPTURES, `carte-offres-inconnues-${vp.width}.png`) }).catch(() => {});
         dit(/81,00\s*€/.test(info) && !/pas pu le relire/.test(info) && !/✓/.test(info) && lien === 1 && e[A.A2].etat === 'pas-su' && e[A.A2].raison === 'offres-inconnues',
           `[8] ${T} relu avec le bon montant, offres pas montrées : le message dit le seuil RELU (81,00 €) et « regarde sur eBay » (lien), jamais « pas pu le relire », aucun ✓ ; la carte « pas su » (offres inconnues)`, `${info} · ${e[A.A2].etat}/${e[A.A2].raison}`);
         await ctx.close();
@@ -836,6 +837,7 @@ async function finPage(pg, errs, quoi) {
         const { ctx, pg, errs } = await ouvrir(b, vp, { retenir: 1 });
         await allerAnnonces(pg); await lancerLot4(pg);
         const grisee = await desactive(pg, '[data-regles-toutes-ouvrir]');
+        await pg.screenshot({ path: path.join(CAPTURES, `lot-porte-${vp.width}.png`) }).catch(() => {});
         dit(grisee === true, `[14] ${T} pendant un lot, la porte « Fermer « Une règle pour toutes » » est grisée (on arrête par « Arrêter », qui fait un bilan)`, String(grisee));
         // Une app où elle ne l'est pas (build d'avant, ou porte réaffaiblie) : on
         // ferme pour de vrai, et on juge ce qui suit.

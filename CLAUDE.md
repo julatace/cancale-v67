@@ -6049,6 +6049,95 @@ au-dessus ça accepte ». Fait SUR eBAY seulement, avec le réglage natif d'eBay
   montant ») ; la retirer ; changer le prix d'une annonce à règle et lire ce que
   VRM a relu.
 
+#### Revue du 11 octobre — neuf défauts signalés, neuf reproduits, neuf corrigés
+Chaque défaut a été REPRODUIT d'abord (la vraie route dans le harnais
+d'`audit-ebay-route`, l'app rendue sur données inventées), puis corrigé à la
+racine, rouge sur 2a34c1c et vert après.
+- ⚠️⚠️ **Deux gestes sur deux cartes du même compte s'effaçaient dans
+  `ebay_offres`** (pose sur la Nike, retrait sur la Samba, à 0-100 ms) : la base
+  disait « aucune » sur une annonce qu'eBay vendait dès 72 €, et les DEUX
+  réponses disaient `range:true`. Conséquences mesurées : carte « aucune », bloc
+  « ce que ça engage » qui ne la compte plus, ventes eBay plus relues à
+  l'ouverture pour ce compte. Cause : lire-fusionner-réécrire la ligne ENTIÈRE
+  (upsert), sans verrou ni version — la règle `lueA` ne protégeait que contre
+  une lecture plus ancienne fournie DANS l'appel, pas contre la copie périmée
+  des AUTRES annonces qu'un écrivain concurrent réécrit.
+  ⇒ `modifierDonnee` (`api/_lib/ebay.js`) **compare-et-échange** sur
+  `data.rev` : PATCH filtré `data->>rev=eq.N` (Postgres réévalue le filtre
+  après avoir pris le verrou de la ligne : un écrivain devancé reçoit 0 ligne,
+  relit et refait SA fusion sur ce que l'autre a écrit) ; ligne absente ⇒
+  INSERT sans fusion (409 ⇒ on relit). Lecture ratée ⇒ rien n'est écrit,
+  toujours. `[R-concurrence]` : **3 rouges sur 2a34c1c** (pose + retrait, deux
+  poses, deux premières poses sur une ligne absente), 0 après ; mutation
+  `sans-cas` (l'écriture sans la version) ⇒ rouge.
+  ⚠️ **Le même motif vit encore ailleurs, et n'est PAS touché** (hors de cette
+  revue) : `modifierComptes` (registre `ebay_comptes`), `sortirDesAnnonces`
+  (`ebay_listings`), les brouillons. `modifierDonnee` est prêt à servir — un
+  geste concurrent y est rare, mais c'est la même famille.
+- ⚠️⚠️ **Fermer « Une règle pour toutes » pendant un lot arrêtait le lot en
+  silence** — la réponse EN VOL n'était jamais appliquée (la carte disait
+  « aucune règle » quand eBay en tenait une), les cartes du lot restaient
+  grisées pour toujours, et le bandeau « lot interrompu » n'apparaissait qu'au
+  montage SUIVANT de l'écran. ⇒ La porte est **grisée pendant un lot** (on
+  arrête par « Arrêter », qui fait un bilan) ; et si le panneau disparaît quand
+  même (une sonde de connexion qui hoquette le démonte), la réponse en vol
+  s'applique à la carte, les cartes sont rendues, l'écran relit la base et
+  **dit** l'arrêt tout de suite (`onInterrompu`). Banc bloc 14 : 4 rouges par
+  taille sur 2a34c1c ; mutation `porte-lot` ⇒ SEUL le contrôle de la porte
+  rougit (fermer pour de vrai ne casse plus rien d'autre — c'est ce qui prouve
+  le démontage), `porte-et-demontage` ⇒ les trois conséquences rougissent.
+- **`verifie: null` voulait dire deux choses, l'écran n'en connaissait
+  qu'une** : sans lecture, la route n'a pas pu relire ; AVEC une lecture, elle a
+  relu le BON montant et seul l'état des offres manque (eBay ne montre pas
+  `BestOfferEnabled`). La carte disait « je n'ai pas pu le relire — Relire chez
+  eBay » — une phrase qui ne venait pas de la donnée (§5), et un geste qui
+  rendrait la même chose. ⇒ Septième issue, `offres-inconnues` : le seuil RELU
+  est dit, avec « regarde l'annonce sur eBay » et le lien ; le lot la compte à
+  part (`data-regles-offres-inconnues`).
+- **L'aperçu « Une règle pour toutes » calculait sur l'ancien prix** (celui de
+  la liste) pendant que la carte affichait le prix relu chez eBay : 85,50 € «
+  dès » sur une annonce à 80 €. ⇒ `prixDe(it)`, UNE source pour la carte,
+  `etatDe` et l'aperçu (§11) ; ce qui part porte `prixVu` 80.
+- **Après un lot, changer le pourcentage laissait « ✓ réglée » sous « dès
+  72,00 € »**. ⇒ Une issue porte le montant ENVOYÉ (`seuilEnvoye`) et ne se
+  montre que sous une ligne qui propose ce montant-là.
+- **« Dont 1 lue il y a plus de 7 jours » sans qu'aucune carte ne le dise**
+  (lecture de 7 j ½ : `> 7 × 24 h` en haut, jours arrondis `> 7` sur la carte).
+  ⇒ `ageRegleJ` / `regleVieille`, une règle pour les deux.
+- **✏️ Modifier le prix : « 72 € » ou « 0 » n'étaient pas envoyés et l'écran
+  disait « ✓ Modifié sur eBay »** (régression de `prixChange` : illisible valait
+  « inchangé »). ⇒ Le prix tapé se lit par `montantSaisi` (§11) ; non vide et
+  illisible ⇒ « Un prix en euros… — rien n'a été envoyé à eBay », aucun envoi.
+- **Banc `ebay-regle-offre` : deux attentes fixes** (900 ms après « Oui »,
+  1 200 ms après l'ouverture) — rouge sur une app intacte dès que la machine
+  rame ou que les ventes Vinted mettent du temps à arriver (l'app grise alors
+  « Définir / Modifier », à raison). ⇒ Le banc attend que le faux eBay ait
+  RÉPONDU puis que la carte ne soit plus en envoi (`data-regle-envoi`), et le
+  VERDICT des ventes rendu (`data-regle-bloquee` ≠ « en-cours »). Reproduit à
+  coup sûr avec deux leviers ajoutés au banc : `BANC_EBAY_DELAI=1500` (faux eBay
+  lent) ⇒ l'ancien banc **8 rouges sur 8** au bloc 8 sur l'app intacte, le neuf
+  0 ; `BANC_TXN_DELAI=7000` (ventes lentes) ⇒ l'ancien **2 rouges**
+  (`locator.click: Timeout 5000ms`), le neuf 0. `PORT` se règle par
+  l'environnement (aussi pour `ebay-annonces`, `ebay-programmer`, `ebay-form`,
+  `ebay-comptes`, `annonces-carte` : lancés un par un sur 4781-4786, tous verts). *Un geste se juge sur sa réponse appliquée, jamais sur un
+  délai* — la leçon de « retenir », appliquée aux poses une par une.
+- **Preuves** : `audit-ebay-route.cjs` **357 contrôles** (3 rouges sur
+  2a34c1c) ; `prouve-regle-offre.cjs` **22 sur 22** (17 mutations de la route,
+  dont `sans-cas` et `rangement` réancrée sur `modifierDonnee` ; XML sans règle
+  identique à celui d'avant) ; banc `ebay-regle-offre.cjs` **234 contrôles, 0
+  rouge** (blocs 8, 11, 14 : **20 rouges** sur le build de 2a34c1c, exactement
+  les dix contrôles visés par taille, les autres contrôles de ces blocs verts) ;
+  `prouve-banc-regle-offre.cjs` **26 sur 26** (18 mutations de l'écran, dont 7
+  nouvelles ; `porte-lot` et `porte-et-demontage` vérifient QUELS contrôles
+  rougissent, pas seulement le bloc). Tous les audits verts (84).
+- **Non mesuré** : les deux formes du compare-et-échange contre la VRAIE
+  PostgREST (`PATCH …&data->>rev=eq.N&select=id` avec `return=representation`,
+  `data->>rev=is.null` pour une ligne d'avant, 409 sur un INSERT en doublon) —
+  servies par le faux de l'audit, jamais envoyées à la base (aucune écriture en
+  production) ; le chemin « panneau démonté, écran encore là » n'a été joué
+  qu'en réaffaiblissant la porte (la sonde de connexion qui le déclencherait ne
+  se pilote pas au banc).
+
 ### Mise en production du 5 octobre
 PR #442 mergée à 10:24 UTC (80 déploiements sur 24 h : sous la limite), déploiement
 de production READY sur le commit de merge, `/api/sante` répond, le zip servi

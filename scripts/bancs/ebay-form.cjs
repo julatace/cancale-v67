@@ -10,7 +10,8 @@ const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const MIME = { '.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json','.png':'image/png','.svg':'image/svg+xml','.webmanifest':'application/manifest+json' };
 const srv = http.createServer((q,r)=>{ let f=q.url.split('?')[0]; if(f==='/'||!path.extname(f))f='/index.html'; const p=path.join(DIST,f); if(!fs.existsSync(p)){r.writeHead(404);return r.end();} r.writeHead(200,{'content-type':MIME[path.extname(p)]||'application/octet-stream'}); r.end(fs.readFileSync(p)); });
-srv.listen(4331);
+const PORT = Number(process.env.PORT) || 4331;
+srv.listen(PORT);
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEklEQVR4nGNk+M+ADzCOKgAAV7wDA8mm/lgAAAAASUVORK5CYII=','base64');
 // La paire à vendre : sa fiche numéro (localStorage) + ses photos captées (base).
 // Deux paires numérotées : la 401 est EN LIGNE, la 402 est VENDUE (annonce
@@ -70,7 +71,7 @@ const envoisEbay = []; let avertir = false;
       attributsObligatoires:['Marque','Pointure EU','Couleur','Département'] }); }
     if(body.action==='finances') return j({ ok:false, reason:'scope', error:'x' });
     return j({ ok:true }); });
-  await pg.goto('http://localhost:4331/?tab=plat_ebay',{waitUntil:'domcontentloaded'});
+  await pg.goto(`http://localhost:${PORT}/?tab=plat_ebay`,{waitUntil:'domcontentloaded'});
   await pg.waitForTimeout(2500);
   // ⚠️ 4 octobre — Julien : « il y a deux fois le bouton pour poster les
   //    paires ». Le publieur était monté dans « Annonces » ET dans « Compte
