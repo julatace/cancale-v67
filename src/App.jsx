@@ -4448,9 +4448,41 @@ const venteApresCoupure = (o) => { const c = coupureNumerotation(); if (c == nul
 //     une vente, ni par une photo, ni par un dossier de photo, ni par la
 //     bannière ♻️. Une paire republiée prend un numéro NEUF, même si c'est
 //     physiquement la paire qui avait le 230 : il réétiquette le carton.
-const dateMiseEnLigneMs = (it) => { const t = it && it.createdTs; if (t == null || !isFinite(Number(t)) || Number(t) <= 0) return null; return Number(t) < 1e12 ? Number(t) * 1000 : Number(t); };
-const annonceNumerotable = (it, coupure = coupureNumerotation()) => { if (coupure == null) return true; const t = dateMiseEnLigneMs(it); return t != null && t >= coupure; };
+// La date de mise en ligne, par les MÊMES sources que la migration 013, dans le
+// même ordre (§11) : la date Vinted de l'annonce (`createdTs` : `created_at_ts`,
+// sinon l'heure de dépôt de sa photo), puis la date « Ajouté il y a… » lue sur
+// la page (`vinted_listing_dates`). Sinon `null` : on ne sait pas.
+const dateMiseEnLigneMs = (it, dates) => {
+  const ms = (v) => { const n = Number(v); return v != null && isFinite(n) && n > 0 ? (n < 1e12 ? n * 1000 : n) : null; };
+  const t = ms(it && it.createdTs); if (t != null) return t;
+  const d = dates && it ? dates[String(it.id)] : null;
+  return d ? ms(d.ts) : null;
+};
+// Avant toute remise à zéro (aucune coupure) : tout se numérote, comme avant.
+// Après : seulement une annonce DATÉE d'après la coupure. Sans date lisible, pas
+// de numéro tout seul — elle reste comptée « sans N° » sur l'écran Annonces.
+const annonceNumerotable = (it, dates, coupure = coupureNumerotation()) => { if (coupure == null) return true; const t = dateMiseEnLigneMs(it, dates); return t != null && t >= coupure; };
 const numeroReprenable = (num, arch = archiveNumeros()) => { const n = String(num == null ? '' : num).trim(); return n && !estArchive(n, arch) ? n : null; };
+// Le N° lu dans un EMAIL de bordereau (le serveur le tire du « nXXX » du titre,
+// ou d'une fiche au même titre) : après la remise à zéro, ce n'est qu'une
+// ressemblance qui peut porter l'ANCIEN numéro (une paire republiée sous le
+// même titre « … n230 »). Pour un email arrivé APRÈS la conversion, on ne
+// l'admet que s'il désigne une fiche ACTUELLE de la nouvelle série portant le
+// MÊME titre ; un numéro d'archive, jamais. La même règle que le serveur
+// (`numeroDuTitreApresCoupure`, api/email-inbound.js). Avant toute remise à
+// zéro, ou pour un email d'avant la conversion (l'histoire) : admis, comme avant.
+const numeroEmailAdmis = (b, fiches) => {
+  const m = marqueurNumerotation(); const arch = archiveNumeros();
+  if (!m || !arch) return true;
+  const depuis = Date.parse(m.appliqueLe || m.coupure || '');
+  const t = Date.parse((b && b.receivedAt) || '');
+  if (isFinite(depuis) && isFinite(t) && t < depuis) return true;
+  const k = cleNum(b && b.numero);
+  if (!k || !numeroReprenable(k, arch)) return false;
+  const titre = normTitle((b && (b.article || b.modele)) || '');
+  if (!titre) return false;
+  return Object.values(fiches || {}).some((e) => e && cleNum(e.numero) === k && normTitle(e.title) === titre);
+};
 
 // La VERSION de la base est relue (une lecture scalaire, §4.4) toutes les 60 s,
 // au retour au premier plan, et avant de numéroter ou d'imprimer. Trois états,
@@ -11173,7 +11205,7 @@ function EbayProgrammees({ programmees, brouillons, onRelire, onAnnule }) {
             const s = statut(l);
             const t = Date.parse(l.debut || '');
             const derniereHeure = Number.isFinite(t) && t - maintenant < 60 * 60000;
-            const n = numDeSkuEbay(l.sku);
+            const n = numEbayLu(l.sku, l.itemId);
             const info = infos[l.itemId];
             return (
               <div key={l.itemId} data-prog={l.itemId} data-prog-statut={s} style={{ padding: '8px 0', borderTop: `1px solid ${E.border}` }}>
@@ -11403,7 +11435,7 @@ function EbayAnnonces({ baseKO, comptes = [] }) {
   }), [items, commandes, fiches, enLigne, vendusVinted, listeProgrammees, ventesConnues]);
   const numsConnus = React.useMemo(() => new Set(Object.values(fiches).map((f) => cleNum(f && f.numero)).filter(Boolean)), [fiches]);
   const titreDeNum = React.useMemo(() => { const m = new Map(); for (const f of Object.values(fiches)) { const k = cleNum(f && f.numero); if (k && !m.has(k)) m.set(k, (f && f.title) || ''); } return m; }, [fiches]);
-  const pris = React.useMemo(() => { const m = new Map(); for (const a of (Array.isArray(items) ? items : [])) { const k = numDeSkuEbay(a && a.sku); if (k && !m.has(k)) m.set(k, String(a.itemId)); } return m; }, [items]);
+  const pris = React.useMemo(() => { const m = new Map(); for (const a of (Array.isArray(items) ? items : [])) { const k = numEbayLu(a && a.sku, a && a.itemId); if (k && !m.has(k)) m.set(k, String(a.itemId)); } return m; }, [items]);
   // (6 octobre) Ce que le formulaire de mise en vente doit savoir : la paire est
   // déjà EN VENTE sur eBay, ou déjà PROGRAMMÉE (elle n'était pas vue — une
   // publication immédiate créait une seconde annonce, et la programmée
@@ -11411,8 +11443,8 @@ function EbayAnnonces({ baseKO, comptes = [] }) {
   const dejaSurEbay = React.useMemo(() => {
     const m = new Map();
     for (const k of pris.keys()) m.set(k, { etat: 'en-vente' });
-    for (const x of ((programmees && typeof programmees === 'object' && Array.isArray(programmees.enLigne)) ? programmees.enLigne : [])) { const k = numDeSkuEbay(x && x.sku); if (k && !m.has(k)) m.set(k, { etat: 'en-vente' }); }
-    for (const p of listeProgrammees) { const k = numDeSkuEbay(p && p.sku); if (k && !m.has(k)) m.set(k, { etat: 'programmee', debut: p.debut || null }); }
+    for (const x of ((programmees && typeof programmees === 'object' && Array.isArray(programmees.enLigne)) ? programmees.enLigne : [])) { const k = numEbayLu(x && x.sku, x && x.itemId); if (k && !m.has(k)) m.set(k, { etat: 'en-vente' }); }
+    for (const p of listeProgrammees) { const k = numEbayLu(p && p.sku, p && p.itemId); if (k && !m.has(k)) m.set(k, { etat: 'programmee', debut: p.debut || null }); }
     return m;
   }, [pris, programmees, listeProgrammees]);
   const surSku = React.useCallback((itemId, sku) => {
@@ -11646,7 +11678,7 @@ function EbayAnnonces({ baseKO, comptes = [] }) {
       {items.map((it, i) => (
         <div key={it.itemId || i} data-ebay-annonce={it.itemId || ''}>
           <EbayAnnonceCard it={it} first={i === 0} onSaved={resync}
-            numero={numDeSkuEbay(it.sku)}
+            numero={numEbayLu(it.sku, it.itemId)}
             eligible={elig ? (elig.has(String(it.itemId)) ? true : (eligibles.complet ? false : undefined)) : undefined}
             paires={paires} numsConnus={numsConnus} titreDeNum={titreDeNum} pris={pris}
             onSku={(id, sku) => { surSku(id, sku); resync(); }}
@@ -19826,7 +19858,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // et 177 des 178 bordereaux portent leur transaction. Sans identité : rien.
   const bordForItem = (itemId, numero) => {
     const list = emailBords || [];
-    if (numero) { const hit = list.find(bb => bb.numero && String(bb.numero) === String(numero)); if (hit) return hit; }
+    if (numero) { const hit = list.find(bb => bb.numero && String(bb.numero) === String(numero) && numeroEmailAdmis(bb, numeros)); if (hit) return hit; }
     if (!itemId) return null;
     return list.find(bb => bb.transaction && String(txnItem[String(bb.transaction)] || '') === String(itemId)) || null;
   };
@@ -19845,7 +19877,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const so = (sales.items || []).find(o => String(o.transaction_id) === String(b.transaction));
       if (so && orderPhoto(so)) return orderPhoto(so);
     }
-    if (b.numero) {
+    if (b.numero && numeroEmailAdmis(b, numeros)) {
       for (const k in numeros) {
         const e = numeros[k];
         if (e && String(e.numero) === String(b.numero) && e.photo) return e.photo;
@@ -22425,7 +22457,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if (!Array.isArray(rows)) { if (!stop) setEbayVivantes(null); return; }
         const m = new Map();
         for (const x of ((rows[0] && Array.isArray(rows[0].items)) ? rows[0].items : [])) {
-          const c = numDeSkuEbay(x && x.sku); const prix = parseFloat(String((x && x.price) || '').replace(',', '.'));
+          const c = numEbayLu(x && x.sku, x && x.itemId); const prix = parseFloat(String((x && x.price) || '').replace(',', '.'));
           if (!c || !x.itemId || !(prix > 0)) continue;
           if (m.has(c)) { m.set(c, { ambigu: true }); continue; }
           m.set(c, { itemId: String(x.itemId), prix, url: x.url || `https://www.ebay.fr/itm/${x.itemId}` });
@@ -23373,7 +23405,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const nextUsed = new Set(usedNumeros.map(entreePool).filter(x => x != null));
     const takenK = new Set(takenCles);
     let changed = false;
-    const sorted = [...items].sort((a, b) => (a.createdTs || 0) - (b.createdTs || 0));
+    // Dans l'ORDRE DE MISE EN LIGNE (1, 2, 3… comme il les reposte), par la même
+    // date que celle qui décide si l'annonce se numérote.
+    const sorted = [...items].sort((a, b) => (dateMiseEnLigneMs(a, listingDates) || 0) - (dateMiseEnLigneMs(b, listingDates) || 0));
     for (const it of sorted) {
       const cur = nextNum[it.id];
       const pk = photoKey(it.photo);
@@ -23387,7 +23421,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // repartirait sur un numéro neuf alors que sa boîte en porte déjà un.
       // Après la remise à zéro : une annonce d'AVANT la coupure (ou sans date)
       // n'est pas numérotée toute seule — seules les annonces republiées le sont.
-      if (!annonceNumerotable(it)) continue;
+      if (!annonceNumerotable(it, listingDates)) continue;
       let num = numeroReprenable(numVentesParIdentite.parItem[String(it.id)])
              || numeroReprenable(pk && numVentesParIdentite.parPhoto[pk])
              || null;
@@ -23416,7 +23450,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // arrivent souvent APRÈS les annonces. Sans elle, une annonce déjà rendue
   // garderait le numéro neuf qu'on vient justement d'éviter.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listings.items, cloudReady, numVentesParIdentite, sales.items, txnPret, verNumTick]);
+  }, [listings.items, cloudReady, numVentesParIdentite, sales.items, txnPret, verNumTick, listingDates]);
 
   const openConversation = async (conv) => {
     setReplyText(''); setReplyErr(null); setReplyBusy(false);
@@ -24971,7 +25005,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const man = manualEntry(b); if (man && man.numero) return String(man.numero);
     const parItem = numFromLabelItem(b); if (parItem) return parItem;   // identité Vinted, zéro déduction
     const parTxn = numFromTxn(b); if (parTxn) return parTxn;
-    if (b.numero) return String(b.numero);
+    if (b.numero && numeroEmailAdmis(b, numeros)) return String(b.numero);
     return '';
   };
   // Le numéro de l'email contredit-il celui de la transaction ? On le signale au
@@ -24980,7 +25014,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // On compare au plus sûr des deux chemins certains : l'identité d'annonce si
     // l'extension l'a jointe au bordereau, sinon la transaction.
     const parTxn = numFromLabelItem(b) || numFromTxn(b);
-    const parMail = String((b && b.numero) || '').trim();
+    const parMail = numeroEmailAdmis(b, numeros) ? String((b && b.numero) || '').trim() : '';
     return parTxn && parMail && parTxn !== parMail ? { txn: parTxn, mail: parMail } : null;
   };
   // Date limite d'expédition d'un bordereau (Vinted pénalise les retards) : on la
@@ -26025,7 +26059,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <Notice tone="warn" icon="box"
               value={pending.length}
               title={`vente${pending.length>1?'s':''} repérée${pending.length>1?'s':''} via bordereau, pas encore synchronisée${pending.length>1?'s':''}`}
-              desc={pending.map(b=>(b.numero?`N°${b.numero} · `:'')+(b.modele||b.article||'?')).join(' — ')}
+              desc={pending.map(b=>(b.numero&&numeroEmailAdmis(b,numeros)?`N°${b.numero} · `:'')+(b.modele||b.article||'?')).join(' — ')}
               detail="Elles apparaîtront dans la liste (et dans la comptabilité) après ta prochaine navigation sur Vinted : c'est l'extension qui recapte les ventes."/>
           );
         })()}
@@ -30939,11 +30973,16 @@ function clesAnnonceLbc(ad, liens) {
   const ks = [];
   if (!ad) return ks;
   const push = (v) => { const k = cleNum(v); if (k && !ks.includes(k)) ks.push(k); };
+  // Le lien posé À LA MAIN est pris tel quel (déjà converti par la migration,
+  // ou posé après elle) ; la référence et le « nXXX » d'une annonce qui portait
+  // un ancien numéro à la remise à zéro (`lbcAnnonces`) désignent l'ANCIENNE
+  // paire (B…), jamais la nouvelle du même chiffre.
+  const ext = (v) => { const k = cleNum(v); if (k) push(numeroExterne(k, ad.id, 'lbcAnnonces')); };
   const lien = ad.id != null && liens ? liens[String(ad.id)] : null;
   if (lien != null && String(lien).trim()) push(lien);
-  push(refVRMDe(ad.customRef));
-  if (ad.ref) push(ad.ref);
-  const mt = numDeTitreLbc(ad.subject || ad.title); if (mt) push(mt);
+  ext(refVRMDe(ad.customRef));
+  if (ad.ref) ext(ad.ref);
+  const mt = numDeTitreLbc(ad.subject || ad.title); if (mt) ext(mt);
   return ks;
 }
 
@@ -31053,6 +31092,27 @@ const numDeSkuEbay = (sku) => {
   return c && NUM_OK.test(c) ? c : '';
 };
 const skuEbayDe = (numero) => { const c = cleNum(numero); return c && NUM_OK.test(c) ? 'VRM-' + c : ''; };
+// ⚠️ APRÈS LA REMISE À ZÉRO (migration 013), un numéro écrit chez eBay ou sur
+// Leboncoin AVANT elle désigne l'ANCIENNE paire : le SKU « VRM-230 » d'une
+// vieille annonce eBay est la B230, pas la nouvelle 230 (une autre paire). Le
+// serveur ne peut pas réécrire ce qui est chez eBay ; le marqueur garde donc
+// les IDENTIFIANTS des annonces qui portaient un ancien numéro à la coupure
+// (`ebayAnnonces`, `lbcAnnonces`), et une commande eBay passée AVANT la
+// coupure parle aussi de l'ancienne série. Sans ça, la vente Vinted de la
+// nouvelle 230 faisait retirer d'eBay l'annonce de l'ancienne 230.
+// Par l'identifiant ou la date, jamais par le titre (§5).
+const numeroExterne = (k, id, liste, dateMs) => {
+  const arch = archiveNumeros();
+  if (!k || !arch || !/^\d+$/.test(k)) return k;
+  const m = marqueurNumerotation();
+  const ids = m && !m.annule && Array.isArray(m[liste]) ? m[liste] : [];
+  const coupure = coupureNumerotation();
+  const avant = dateMs != null && isFinite(dateMs) && coupure != null && dateMs < coupure;
+  return (id != null && ids.some((x) => String(x) === String(id))) || avant ? cleNum(arch + k) : k;
+};
+// Le N° d'une annonce / ligne de commande eBay, lu avec son identifiant.
+const numEbayLu = (sku, itemId, dateMs) => numeroExterne(numDeSkuEbay(sku), itemId, 'ebayAnnonces', dateMs);
+const numLigneEbay = (o, li) => numEbayLu(li && li.sku, li && (li.legacyItemId || li.itemId), Date.parse((o && o.creationDate) || ''));
 // Une commande eBay qui ENGAGE la paire : ni annulée, ni remboursée, ni en
 // paiement échoué. Un paiement en attente engage déjà : l'acheteur s'est engagé.
 const commandeEbayEngagee = (o) => !!o
@@ -31086,7 +31146,10 @@ const retirerEbayAuto = async (liste) => {
       __retraitEbayAutoTentes.add(id); n += 1;
       try {
         const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() },
-          body: JSON.stringify({ action: 'retirer', itemId: id, confirme: true, auto: true, sku: a.sku, titre: a.title || '' }) });
+          // Le SKU de la paire que la règle a JUGÉE vendue (« VRM-B230 » pour une
+          // ancienne annonce), pas la chaîne lue chez eBay : le serveur relit
+          // l'annonce et la traduit par le même marqueur avant de la terminer.
+          body: JSON.stringify({ action: 'retirer', itemId: id, confirme: true, auto: true, sku: skuEbayDe(d.numero) || a.sku, titre: a.title || '' }) });
         const j = await r.json().catch(() => null);
         if (j && j.ok) toast(`N°${d.numero} retirée d'eBay automatiquement : elle est vendue sur Vinted.`, 'ok');
       } catch (_) { /* il la verra dans « à retirer », avec le bouton */ }
@@ -31142,7 +31205,7 @@ function numerosDejaVendus({ numeros, autres, enLigne, vendusVinted, commandes, 
   else if (!Array.isArray(commandes)) pasSu.push('tes ventes eBay');
   else for (const o of commandes) {
     if (!commandeEbayEngagee(o)) continue;
-    for (const li of (Array.isArray(o.lineItems) ? o.lineItems : [])) pose(numDeSkuEbay(li && li.sku), 'eBay');
+    for (const li of (Array.isArray(o.lineItems) ? o.lineItems : [])) pose(numLigneEbay(o, li), 'eBay');
   }
   if (ventesLbc === undefined) enCours = true;
   else if (!ventesLbc || typeof ventesLbc !== 'object') pasSu.push('tes ventes Leboncoin');
@@ -31180,7 +31243,7 @@ function doublesVenteEbay({ annonces, commandes, numeros, enLigne, vendusVinted,
   const verdict = ventes && ventes.vendus && typeof ventes.vendus.get === 'function' ? ventes.vendus : null;
   if (verdict || vendusVinted) for (const p of (Array.isArray(programmees) ? programmees : [])) {
     if (!p || !p.itemId) continue;
-    const n = numDeSkuEbay(p.sku);
+    const n = numEbayLu(p.sku, p.itemId);
     if (!n) continue;                                             // pas de SKU : rien n'est rapproché (§5)
     const ids = parNum.get(n) || [];
     if (verdict) {
@@ -31195,7 +31258,7 @@ function doublesVenteEbay({ annonces, commandes, numeros, enLigne, vendusVinted,
   }
   for (const a of (Array.isArray(annonces) ? annonces : [])) {
     if (!a || !a.itemId) continue;
-    const n = numDeSkuEbay(a.sku);
+    const n = numEbayLu(a.sku, a.itemId);
     if (!n) { nonReliees.push(a); continue; }
     if (!vendusVinted) continue;                                  // pas su : on n'affirme rien
     const ids = parNum.get(n) || [];
@@ -31209,7 +31272,7 @@ function doublesVenteEbay({ annonces, commandes, numeros, enLigne, vendusVinted,
   if (enLigne) for (const o of (Array.isArray(commandes) ? commandes : [])) {
     if (!commandeEbayEngagee(o)) continue;
     for (const li of (Array.isArray(o.lineItems) ? o.lineItems : [])) {
-      const n = numDeSkuEbay(li && li.sku);
+      const n = numLigneEbay(o, li);
       if (!n) continue;
       const ids = parNum.get(n) || [];
       const vendueVinted = vendusVinted ? ids.filter((id) => vendusVinted.has(id)) : [];
