@@ -58,8 +58,11 @@ const PONT = (o) => {
   window.addEventListener('message', (e) => {
     const d = e.data; if (e.source !== window || !d || typeof d !== 'object') return;
     if (d.__vmr === 'ping') post({ __vmr: 'ready', version: o.version });
-    if (d.__vmr === 'etat') post({ __vmr: 'etat:result', reqId: d.reqId, resp: { ok: true, version: o.version, vrm: { ok: true, connecte: true, email: '' }, vinted: { uid: '111', login: 'compte_test' }, cmds: {} } });
+    if (d.__vmr === 'etat') post({ __vmr: 'etat:result', reqId: d.reqId, resp: { ok: true, version: o.version, vrm: o.vrm || { ok: true, connecte: true, email: '' }, vinted: { uid: '111', login: 'compte_test' }, cmds: {} } });
     if (d.__vmr === 'cmd' && d.cmd === 'ventes') post({ __vmr: 'cmd:result', reqId: d.reqId, resp: { accepte: true, etape: 'recent' } });
+    // Comme le VRAI background.js quand le PDF est déjà rangé (mesuré dans le vm) :
+    // « fait », sans rien demander à Vinted — et sans relier la vente.
+    if (d.__vmr === 'cmd' && d.cmd === 'bordereau') { (window.__cmds = window.__cmds || []).push(d.cmd + ':' + (d.tx || '')); post({ __vmr: 'cmd:result', reqId: d.reqId, resp: { accepte: true, jobId: `bord:${d.uid}:${d.tx}`, etape: 'fait', deja: true } }); }
   });
   post({ __vmr: 'ready', version: o.version });
 };
@@ -69,6 +72,8 @@ let ventesEnPlus = 0;
 
 const auj = new Date();
 const ACCS = [{ id: 1, vinted_user_id: '111', login: 'compte_test', domain: 'www.vinted.fr', updated_at: auj.toISOString() }];
+const SESSION = { access_token: 'jeton-de-l-app', refresh_token: 'jeton-de-renouvellement-de-l-app', expires_at: Date.now() + 3600e3,
+  user: { id: '11111111-2222-3333-4444-555555555555', email: 'vendeur@exemple.test' } };
 const annonce = (id, titre, prix, ferme) => ({ id, title: titre, price: { amount: String(prix), currency_code: 'EUR' }, brand_title: titre.split(' ')[0], size_title: (/taille (\d+)/.exec(titre) || [])[1] || '', is_closed: !!ferme, is_hidden: false, is_draft: false, photo: { url: 'https://img.test/v' + id + '.jpg' } });
 const LISTINGS = { capturedAt: auj.toISOString(), payload: { items: [
   annonce(7001, 'Nike Dunk Low panda taille 42', 95),
@@ -192,7 +197,11 @@ async function ouvrir(b, vp, panne, opts = {}) {
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   const envois = [];
-  await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
+  // `opts.session` : une vraie session VRM (le compte de l'app est alors CONNU —
+  // sans elle, « l'extension écrit dans un autre compte » ne peut pas se juger).
+  if (opts.session) await pg.addInitScript((sess) => { try { localStorage.setItem('vrm_session', JSON.stringify(sess)); } catch (_) {} }, SESSION);
+  else await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
+  if (opts.session) await pg.route('**/auth/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ...SESSION, expires_in: 3600 }) }));
   if (opts.pont) await pg.addInitScript(PONT, opts.pont);
   if (opts.local) await pg.addInitScript((l) => { try { for (const [k, v] of Object.entries(l)) localStorage.setItem(k, v); } catch (_) {} }, opts.local);
   await pg.addInitScript(() => {
@@ -204,6 +213,8 @@ async function ouvrir(b, vp, panne, opts = {}) {
     const u = decodeURIComponent(metaVersData(route.request().url()));
     if (opts.mainLent && /id=eq\.main(&|$)/.test(u) && route.request().method() === 'GET') await new Promise((r) => setTimeout(r, opts.mainLent));
     const j = (d, st) => route.fulfill({ status: st || 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
+    // `opts.casse(u)` : cette lecture ne répond pas (522, du HTML — la vraie forme d'une panne).
+    if (opts.casse && route.request().method() === 'GET' && opts.casse(u)) return route.fulfill({ status: 522, contentType: 'text/html', headers: { 'access-control-allow-origin': '*' }, body: '<html>522</html>' });
     if (route.request().method() !== 'GET') {
       // Toute écriture est GARDÉE (§6.3) : `main`, et les brouillons eBay que
       // l'écran remet en état après une annulation.
@@ -284,6 +295,8 @@ const lire = (pg) => pg.evaluate(() => {
     pasSu: [...document.querySelectorAll('[data-ebay-pas-su]')].map((e) => e.textContent),
     pasReliee: (txt.match(/pas reliée/g) || []).length,
     sansPreuve: [...document.querySelectorAll('[data-ebay-ventes-sans-preuve]')].map((e) => ({ n: e.getAttribute('data-ebay-ventes-sans-preuve'), geste: e.getAttribute('data-ebay-sans-preuve-geste'), t: e.textContent,
+      promesse: e.getAttribute('data-ebay-sans-preuve-promesse'), blocage: e.getAttribute('data-ebay-sans-preuve-blocage'),
+      captes: [...e.querySelectorAll('[data-ebay-sans-preuve-bord-capte]')].map((x) => x.getAttribute('data-ebay-sans-preuve-bord-capte')),
       ventes: [...e.querySelectorAll('[data-ebay-sans-preuve-vente]')].map((v) => ({ tx: v.getAttribute('data-ebay-sans-preuve-vente'), t: v.textContent, liens: [...v.querySelectorAll('a[href]')].map((a) => a.href), bord: !!v.querySelector('[data-bouton-bord][data-tx="' + v.getAttribute('data-ebay-sans-preuve-vente') + '"]') })) })),
     autoEtat: (document.querySelector('[data-ebay-retrait-etat]') || {}).textContent || null,
   };
@@ -329,7 +342,11 @@ const deborde = (pg) => pg.evaluate(() => ({ sw: document.documentElement.scroll
           '(revue du 11 octobre) la vente est NOMMÉE (son titre) — on sait laquelle ouvrir', JSON.stringify(vv.map((x) => x.t)));
         dit(vv.length === 1 && vv[0].liens.length === 1 && /vinted\.fr\/inbox\/88010$/.test(vv[0].liens[0]),
           'avec le lien vers SA conversation sur vinted.fr — une fois (le bouton du bordereau ne le répète pas, §7)', JSON.stringify(vv[0] && vv[0].liens));
-        dit(vv.length === 1 && vv[0].bord, 'et, à poster, son bouton « Générer le bordereau » (un bordereau capté relie la vente)', JSON.stringify(vv[0] && vv[0].bord));
+        if (vp.width > 600) dit(vv.length === 1 && vv[0].bord, 'et, à poster, son bouton « Générer le bordereau » (un bordereau généré par VRM relie la vente)', JSON.stringify(vv[0] && vv[0].bord));
+        // (revue du 11 octobre, défaut 13) Au doigt, un bouton grisé n'explique
+        // rien (sa raison n'est que dans l'infobulle) : pas de bouton ici — le
+        // texte dit déjà « sur l'ordinateur où l'extension est installée ».
+        else dit(vv.length === 1 && !vv[0].bord, 'au doigt (téléphone) : PAS de bouton « Bordereau » grisé et muet dans cette ligne', JSON.stringify(vv[0] && vv[0].bord));
         dit(v.autoEtat === 'ÉTEINT', 'le retrait automatique dit son état en un mot : ÉTEINT', String(v.autoEtat));
         dit(v.vendues.length === 1 && v.vendues[0].num === '24' && /vinted\.fr\/items\/7004$/.test(v.vendues[0].href),
           'vendue sur eBay ⇒ l\'alerte pour la N°24 mène à SON annonce Vinted (pas la commande annulée N°21, pas la commande sans SKU au titre identique)', JSON.stringify(v.vendues));
@@ -553,7 +570,7 @@ const deborde = (pg) => pg.evaluate(() => ({ sw: document.documentElement.scroll
     }
     // ── (revue du 11 octobre) LE GESTE SUIT LA VERSION DU PONT, ET DIT LE CHIFFRE
     console.log('── ventes pas reliées · version du pont et rythme (1512 px)');
-    for (const [version, enPlus, attendu] of [['5.168.0', 0, 'retard'], ['5.167.0', 0, 'retard'], [EXT_ATTENDUE, 0, 'ok'], [EXT_ATTENDUE, 4, 'ok']]) {
+    for (const [version, enPlus, attendu] of [['5.170.0', 0, 'retard'], ['5.168.0', 0, 'retard'], ['5.167.0', 0, 'retard'], [EXT_ATTENDUE, 0, 'ok'], [EXT_ATTENDUE, 4, 'ok']]) {
       remettre(); ventesEnPlus = enPlus; remettre();
       const o = await ouvrir(b, { width: 1512, height: 950 }, false, { pont: { version } });
       await essaie('pont ' + version, async () => {
@@ -563,6 +580,7 @@ const deborde = (pg) => pg.evaluate(() => ({ sw: document.documentElement.scroll
         const l = v.sansPreuve[0] || {};
         dit(l.geste === attendu, `pont ${version} : le geste est « ${attendu} »${version !== EXT_ATTENDUE ? ' (version PUBLIÉE sans la lecture des transactions : aucune promesse)' : ''}`, `${l.geste} · ${String(l.t || '').slice(0, 200)}`);
         if (attendu === 'retard') dit(!/toute seule sur vinted\.fr/.test(l.t || '') && new RegExp('mets-la à jour \\(' + EXT_ATTENDUE.replace(/\./g, '\\.') + '\\)').test(l.t || ''), `pont ${version} : « mets-la à jour (${EXT_ATTENDUE}) », jamais « elle lit toute seule »`, String(l.t || '').slice(0, 220));
+        dit(attendu === 'ok' ? l.promesse === '1' : l.promesse === '0', `pont ${version} : la promesse « elle lit toute seule » ${attendu === 'ok' ? 'est faite (connectée à ce compte VRM)' : 'n\'est PAS faite'}`, String(l.promesse));
         if (attendu === 'ok') {
           const n = Number(l.n);
           dit(/3 par visite/.test(l.t || ''), `pont à jour, ${n} vente(s) : le CHIFFRE est dit (3 par visite)`, String(l.t || '').slice(0, 220));
@@ -573,6 +591,110 @@ const deborde = (pg) => pg.evaluate(() => ({ sw: document.documentElement.scroll
       });
       await o.ctx.close();
       ventesEnPlus = 0;
+    }
+    // ── (revue du 11 octobre, défauts 7 et 9) « ELLE LIT TOUTE SEULE » N'EST
+    //    PROMIS QU'À UNE EXTENSION CONNECTÉE À CE COMPTE VRM. Sans session, sa
+    //    visite s'arrête avant de lire (`visite_sans_session`) ; connectée à un
+    //    AUTRE compte, elle écrit ailleurs. La phrase dit alors ce qui bloque
+    //    (la phrase de l'indicateur, §11), jamais la promesse.
+    console.log('── ventes pas reliées · extension à jour mais pas connectée à ce compte VRM (1512 px)');
+    for (const [nom, vrm, session, code] of [
+      ['pas connectée', { ok: true, connecte: false, email: '' }, false, 'vrm'],
+      ['autre compte VRM', { ok: true, connecte: true, email: 'quelquun@ailleurs.test', user_id: '99999999-8888-7777-6666-555555555555' }, true, 'autre-vrm'],
+    ]) {
+      remettre();
+      const o = await ouvrir(b, { width: 1512, height: 950 }, false, { pont: { version: EXT_ATTENDUE, vrm }, session });
+      await essaie('connexion ' + nom, async () => {
+        await versAnnoncesEbay(o.pg);
+        await o.pg.waitForFunction(() => { const e = document.querySelector('[data-ebay-ventes-sans-preuve]'); return e && e.getAttribute('data-ebay-sans-preuve-geste') === 'ok' && e.getAttribute('data-ebay-sans-preuve-blocage') !== ''; }, null, { timeout: 15000 }).catch(() => {});
+        await o.pg.waitForTimeout(1500);
+        const l = (await lire(o.pg)).sansPreuve[0] || {};
+        dit(l.geste === 'ok' && l.promesse === '0' && !/toute seule/.test(l.t || ''), `${nom} : extension à jour, mais AUCUNE promesse « elle lit toute seule »`, `${l.geste} · ${l.promesse} · ${String(l.t || '').slice(0, 220)}`);
+        dit(l.blocage === code, `${nom} : la ligne dit ce qui bloque (« ${code} », la raison de l'indicateur)`, String(l.blocage));
+        if (code === 'autre-vrm') dit(/quelquun@ailleurs\.test/.test(l.t || ''), 'autre compte : la ligne nomme l\'adresse sous laquelle l\'extension écrit', String(l.t || '').slice(0, 260));
+        dit(/ouvre la vente sur vinted\.fr/.test(l.t || ''), `${nom} : et le geste qui marche quand même (ouvrir la vente)`, String(l.t || '').slice(0, 260));
+        dit(o.errs.length === 0, 'aucune erreur de page', o.errs.join(' | ').slice(0, 160));
+      });
+      await o.ctx.close();
+    }
+    // ── (revue du 11 octobre, défaut 10) LES VENTES D'UN AUTRE COMPTE NE SE
+    //    LISENT PAS : la ligne « pas encore reliées » ne peut pas être écrite —
+    //    l'écran le DIT (les comptes nommés), au lieu d'être celui où tout est
+    //    relié. La preuve, elle, tient (N°22 toujours « à retirer »).
+    console.log('── ventes d\'un autre compte illisibles (1512 px)');
+    for (const casse of [false, true]) {
+      remettre();
+      ACCS.push({ id: 2, vinted_user_id: '222', login: 'compte_deux', domain: 'www.vinted.fr', updated_at: auj.toISOString() });
+      const v111 = rows.find((r) => r.id === 'harvest_111_orders_sold'); v111.data = { ...v111.data, payload: { my_orders: v111.data.payload.my_orders.filter((o) => o.transaction_id !== 9010) } };
+      rows.push({ id: 'harvest_222_orders_sold', data: { capturedAt: auj.toISOString(), payload: { my_orders: [{ transaction_id: 9020, conversation_id: 88020, title: 'Jordan 4 noir taille 44', status: 'Le paiement a été validé', transaction_user_status: 'needs_action', date: recent(1) }] } } });
+      rows.push({ id: 'harvest_222_listings', data: { capturedAt: auj.toISOString(), payload: { items: [] } } });
+      const o = await ouvrir(b, { width: 1512, height: 950 }, false, { casse: casse ? (u) => /id=in\./.test(u) && /harvest_222_orders_sold/.test(u) : null });
+      await essaie('autre compte ' + (casse ? 'illisible' : 'lu'), async () => {
+        await versAnnoncesEbay(o.pg);
+        await o.pg.waitForTimeout(2500);
+        const v = await lire(o.pg);
+        if (!casse) {
+          dit(v.sansPreuve.length === 1 && v.sansPreuve[0].n === '1' && /compte_deux/.test(v.sansPreuve[0].t), 'lu : la vente pas reliée de compte_deux est dite (l\'autre sens)', JSON.stringify(v.sansPreuve.map((x) => x.n)));
+          dit(v.pasSu.length === 0, 'lu : aucune ligne « pas pu lire »', JSON.stringify(v.pasSu));
+        } else {
+          dit(v.sansPreuve.length === 0, 'illisible : pas de « ventes pas reliées » inventé', JSON.stringify(v.sansPreuve.map((x) => x.n)));
+          dit(v.pasSu.length === 1 && /compte_deux/.test(v.pasSu[0]) && /pas encore reliées/.test(v.pasSu[0]), 'illisible : UNE ligne « pas pu lire » qui NOMME compte_deux et dit ce que ça empêche (rien lu ne vaut pas tout relié)', JSON.stringify(v.pasSu).slice(0, 300));
+          dit(JSON.stringify(v.doublons) === '["22"]', 'et la preuve tient : la N°22 reste « à retirer d\'eBay »', JSON.stringify(v.doublons));
+        }
+        dit(o.errs.length === 0, 'aucune erreur de page', o.errs.join(' | ').slice(0, 160));
+      });
+      await o.ctx.close();
+      ACCS.splice(1);
+    }
+    // ── (revue du 11 octobre, défaut 11) UN BORDEREAU DÉJÀ CAPTÉ (au
+    //    téléchargement, sans l'annonce) : « Générer » répondrait « déjà fait »
+    //    sans rien relier. Pas de bouton sur cette vente, et on ne promet pas
+    //    qu'un bordereau capté la relie.
+    console.log('── vente au bordereau déjà capté, sans annonce (1512 px)');
+    for (const version of ['5.164.0', EXT_ATTENDUE]) {
+      remettre();
+      rows.push({ id: 'harvest_111_label_9010', data: { uid: '111', url: 'https://s3.test/l.pdf', tx: '9010', capturedAt: auj.toISOString(), pdfB64: 'JVBERi0xLjQK' } });
+      const o = await ouvrir(b, { width: 1512, height: 950 }, false, { pont: { version } });
+      await essaie('bordereau capté ' + version, async () => {
+        await versAnnoncesEbay(o.pg);
+        await o.pg.waitForFunction(() => { const e = document.querySelector('[data-ebay-ventes-sans-preuve]'); return e && e.getAttribute('data-ebay-sans-preuve-geste') !== 'absente'; }, null, { timeout: 15000 }).catch(() => {});
+        await o.pg.waitForTimeout(1200);
+        const l = (await lire(o.pg)).sansPreuve[0] || {};
+        const vv = l.ventes || [];
+        dit(vv.length === 1 && vv[0].tx === '9010' && !vv[0].bord, `pont ${version} : la vente 9010 (bordereau déjà capté) n'a PAS de bouton « Générer le bordereau »`, JSON.stringify(vv.map((x) => x.bord)));
+        dit(JSON.stringify(l.captes) === '["9010"]', `pont ${version} : la ligne dit que son bordereau est déjà là`, JSON.stringify(l.captes));
+        dit(!/bordereau capté relie/.test(l.t || '') && !/génère (son|leur) bordereau/.test(l.t || ''), `pont ${version} : on ne lui dit ni de générer un bordereau, ni qu'un bordereau capté relie la vente`, String(l.t || '').slice(0, 260));
+        dit(o.errs.length === 0, 'aucune erreur de page', o.errs.join(' | ').slice(0, 160));
+      });
+      await o.ctx.close();
+    }
+    // ── (revue du 11 octobre, défaut 4) LA PREUVE ARRIVE PENDANT QUE VRM EST
+    //    OUVERT. Retrait automatique allumé ; la vente de la N°22 n'a pas encore
+    //    son bordereau ; l'extension le range, prévient l'app (maj label /
+    //    preuves / ventes) : l'annonce eBay part SANS rechargement — une fois.
+    console.log('── retrait automatique : la preuve arrive en cours de session (1512 px)');
+    {
+      remettre();
+      rows[0].data.vrm_ebay_retrait_auto = true;
+      const bord9001 = rows.find((r) => r.id === 'harvest_111_label_9001');
+      rows = rows.filter((r) => r.id !== 'harvest_111_label_9001');
+      const o = await ouvrir(b, { width: 1512, height: 950 }, false, { local: { vrm_ebay_retrait_auto: 'true' } });
+      await essaie('preuve en cours de session', async () => {
+        const auto = () => o.envois.filter((x) => x.action === 'retirer' && x.auto === true);
+        await o.pg.goto(`http://localhost:${PORT}/?tab=dashboard`, { waitUntil: 'domcontentloaded' });
+        await o.pg.waitForTimeout(8000);
+        dit(auto().length === 0, 'à l\'ouverture, pas encore de preuve ⇒ rien ne part (sinon ce contrôle ne mesure rien)', JSON.stringify(auto()));
+        rows.push(bord9001);
+        for (const quoi of ['label', 'preuves', 'ventes']) await o.pg.evaluate((q) => window.postMessage({ __vmr: 'evt', evt: { type: 'maj', quoi: q, uid: '111', tx: '9001' } }, '*'), quoi);
+        for (let i = 0; i < 30 && !auto().length; i++) await o.pg.waitForTimeout(500);
+        const a = auto();
+        dit(a.length === 1 && a[0].itemId === '110000000001' && a[0].sku === 'VRM-22', 'la preuve rangée en cours de session ⇒ la N°22 est retirée d\'eBay SANS rechargement', JSON.stringify(a));
+        for (const quoi of ['label', 'preuves', 'ventes']) await o.pg.evaluate((q) => window.postMessage({ __vmr: 'evt', evt: { type: 'maj', quoi: q, uid: '111' } }, '*'), quoi);
+        await o.pg.waitForTimeout(8000);
+        dit(auto().length === 1, 'd\'autres signaux ensuite ne la retirent pas une seconde fois', `${auto().length} envoi(s)`);
+        dit(o.errs.length === 0, 'aucune erreur de page', o.errs.join(' | ').slice(0, 160));
+      });
+      await o.ctx.close();
     }
   } catch (e) { dit(false, 'le banc a tourné jusqu’au bout', String(e && e.message).slice(0, 160)); }
   finally { if (b) await b.close(); srv.close(); }
