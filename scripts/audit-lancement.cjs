@@ -95,7 +95,7 @@ const ast = parser.parse(app, { sourceType: 'module', plugins: ['jsx'], errorRec
       if (u.startsWith('https://api.stripe.com/v1/')) {
         const chemin = u.slice('https://api.stripe.com/v1/'.length).split('?')[0];
         appelsStripe.push({ chemin, corps: decodeURIComponent(String(o.body || '')) });
-        if (chemin === 'prices') return rep({ data: [{ id: 'price_banc', unit_amount: 999, currency: 'eur', recurring: { interval: 'month' } }] });
+        if (chemin === 'prices') return rep({ data: [{ id: 'price_banc', unit_amount: 1299, currency: 'eur', recurring: { interval: 'month' } }] });
         if (chemin === 'checkout/sessions') return (refusCgv && /consent_collection/.test(decodeURIComponent(String(o.body || ''))))
           ? rep({ error: { message: 'You cannot collect consent to your terms of service unless a URL is set in the Stripe Dashboard.' } }, 400)
           : rep({ id: 'cs_banc', url: 'https://checkout.stripe.com/c/pay/cs_banc' });
@@ -130,6 +130,32 @@ const ast = parser.parse(app, { sourceType: 'module', plugins: ['jsx'], errorRec
     // reste plus refusé (le banc ne refuse que ce qui demande la case).
     dit(r2.code === 200 && r2.corps && /checkout\.stripe\.com/.test(r2.corps.url || '') && re.length === 2 && /required/.test(re[0].corps) && !/consent_collection/.test(re[1].corps) && /cgv_acceptees_le/.test(re[1].corps),
       'Stripe ne sait pas encore afficher sa case (adresse des CGV absente) : le paiement s’ouvre quand même, les CGV ayant été acceptées dans VRM', `${re.length} appel(s)`);
+  });
+  // ⚠️ LE PRIX DES CGV, UNE SEULE VALEUR (11 octobre : 12,99 €). Le serveur
+  //    n'ouvre le paiement que si Stripe dit `PRIX_CGV` (api/compte.js) ; l'app
+  //    dit `PRIX_CGV_LISIBLE` quand Stripe ne donne pas de prix ; la page
+  //    d'accueil l'écrit en clair. Si l'une change sans les autres, le serveur
+  //    comparerait Stripe à un prix qui n'est plus celui des CGV acceptées.
+  await essaie('prix des CGV', async () => {
+    const cgv = lire('public/legal/cgv.html') || '';
+    const prixCgv = [...cgv.matchAll(/(\d+,\d{2}) € par mois/g)].map((m) => m[1]);
+    const uniques = [...new Set(prixCgv)];
+    dit(prixCgv.length >= 2 && uniques.length === 1, 'les CGV annoncent UN prix mensuel (encadré et article « Offres et prix »)', `${prixCgv.join(' · ') || 'aucun'}`);
+    const cgvCentimes = uniques.length === 1 ? Math.round(Number(uniques[0].replace(',', '.')) * 100) : NaN;
+    const cpt = lire('api/compte.js') || '';
+    const serveur = /PRIX_CGV\s*=\s*\{\s*centimes:\s*(\d+),\s*devise:\s*'(\w+)',\s*intervalle:\s*'(\w+)'/.exec(cpt);
+    dit(!!serveur && Number(serveur[1]) === cgvCentimes && serveur[2] === 'eur' && serveur[3] === 'month',
+      'le serveur compare Stripe au prix des CGV (PRIX_CGV : mêmes centimes, en euros, par mois)', serveur ? `serveur ${serveur[1]} c · CGV ${cgvCentimes} c` : 'PRIX_CGV introuvable');
+    const appPrix = (/const PRIX_CGV_LISIBLE\s*=\s*'(\d+,\d{2}) € \/ mois'/.exec(app) || [])[1];
+    dit(appPrix && uniques.length === 1 && appPrix === uniques[0], 'l’app dit le prix des CGV quand Stripe n’en donne pas (PRIX_CGV_LISIBLE)', `app ${appPrix || '?'} · CGV ${uniques.join('/')}`);
+    const acc = (lire('src/Accueil.jsx') || '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+    // Un PRIX D'ABONNEMENT : « X € par mois », « X € / mois », ou le gros chiffre
+    // de la section Prix. Les montants de la démonstration (« 52,00 € » d'une
+    // vente inventée) ne sont pas des prix d'abonnement.
+    const montantsAcc = [...acc.matchAll(/(\d+,\d{2}) €(?=\s*(?:par mois|\/\s*mois))|className="gros[^"]*">(\d+,\d{2}) €/g)].map((m) => m[1] || m[2]);
+    dit(montantsAcc.length >= 3 && montantsAcc.every((m) => uniques.length === 1 && m === uniques[0]), 'la page d’accueil n’écrit que ce prix-là (FAQ, section Prix, gros chiffre)', montantsAcc.join(' · '));
+    const fb = /const prixLisible = \(p\) => [^\n]*: (PRIX_CGV_LISIBLE|'[^']*');/.exec(app);
+    dit(fb && fb[1] === 'PRIX_CGV_LISIBLE', '… et `prixLisible` retombe sur cette constante, jamais une seconde valeur écrite à côté', fb ? fb[1] : 'prixLisible introuvable');
   });
   await essaie('écrans CGV', async () => {
     const n = (app.match(/<CaseCgv /g) || []).length;

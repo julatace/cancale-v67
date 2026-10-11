@@ -16,9 +16,10 @@
 //                                 efface ses données, puis son compte (refusé au
 //                                 propriétaire de l'installation)
 //
-// L'abonnement (Julien, 4 octobre) : 9,99 € par mois, prélevé chaque mois à la
-// date où la personne s'abonne, pour TOUT LE MONDE SAUF LUI (le propriétaire
-// déclaré dans la base, `vrm_reglages`).
+// L'abonnement (Julien, 4 octobre) : 12,99 € par mois depuis le 11 octobre
+// (9,99 € avant — décision de Julien après l'étude des coûts), prélevé chaque
+// mois à la date où la personne s'abonne, pour TOUT LE MONDE SAUF LUI (le
+// propriétaire déclaré dans la base, `vrm_reglages`).
 // ⚠️ Qui est qui : le serveur ne croit jamais un identifiant envoyé par le
 //    navigateur — il prend le jeton de session et demande à Supabase (session.js).
 // ⚠️ Le statut ne s'écrit QUE sur un événement Stripe dont la signature est
@@ -85,8 +86,43 @@ async function ligneDe(req) {
 async function lirePrix() {
   const r = await stripeApi('GET', 'prices', { 'lookup_keys[]': PRIX_CLE, active: 'true', limit: 1 });
   const p = r.ok && r.data && Array.isArray(r.data.data) ? r.data.data[0] : null;
-  return p && p.id ? { id: p.id, montant: (p.unit_amount || 0) / 100, devise: p.currency, intervalle: p.recurring && p.recurring.interval } : null;
+  return p && p.id ? {
+    id: p.id, montant: (p.unit_amount || 0) / 100, devise: p.currency, intervalle: p.recurring && p.recurring.interval,
+    // Les CENTIMES tels que Stripe les donne (un entier) : on compare des
+    // entiers, jamais 12.99 à 12.990000001.
+    centimes: Number.isInteger(p.unit_amount) ? p.unit_amount : null,
+    nIntervalles: p.recurring && p.recurring.interval_count != null ? Number(p.recurring.interval_count) : null,
+  } : null;
 }
+
+// ⚠️⚠️ LE PRIX DES CGV, ET CELUI QUE STRIPE FACTURERAIT (11 octobre).
+//    Julien : « on va passer à 12,99 par mois ». Les CGV le disent
+//    (public/legal/cgv.html) — mais le montant PRÉLEVÉ est celui du prix rangé
+//    chez Stripe sous la clé `vrm_mensuel`, un réglage de SON tableau de bord
+//    qu'aucun code ne change (et un prix Stripe ne se modifie pas : il se
+//    recrée). Tant qu'il ne l'a pas recréé, Stripe facturerait encore 9,99 €
+//    à quelqu'un qui vient d'accepter des CGV à 12,99 € — un prix qui n'est
+//    pas celui des conditions acceptées.
+//    ⇒ Le paiement ne s'ouvre QUE si Stripe dit exactement le prix des CGV :
+//    même montant en centimes, en euros, une fois par mois. Sinon il reste
+//    FERMÉ, et on le dit (au vendeur : « rien n'a été prélevé » ; au
+//    propriétaire : le geste). Un prix illisible chez Stripe n'ouvre rien non
+//    plus (`lirePrix` rend null ⇒ refus existant).
+//    audit-lancement.cjs exige que cette valeur soit celle écrite dans les CGV
+//    (et dans le repli de l'app) : une seule valeur (§11).
+export const PRIX_CGV = { centimes: 1299, devise: 'eur', intervalle: 'month' };
+export const prixConforme = (p) => !!(p
+  && p.centimes === PRIX_CGV.centimes
+  && String(p.devise || '').toLowerCase() === PRIX_CGV.devise
+  && p.intervalle === PRIX_CGV.intervalle
+  && (p.nIntervalles == null || p.nIntervalles === 1));
+const eurosLisibles = (c) => (Number.isInteger(c) ? (c / 100).toFixed(2).replace('.', ',') + ' €' : '? €');
+const prixTexte = (p) => {
+  const devise = p && p.devise && String(p.devise).toLowerCase() !== 'eur' ? ' (' + String(p.devise).toUpperCase() + ')' : '';
+  const unite = p && p.intervalle === 'year' ? 'an' : p && p.intervalle === 'month' ? 'mois' : String((p && p.intervalle) || '?');
+  const n = p && Number.isInteger(p.nIntervalles) && p.nIntervalles > 1 ? p.nIntervalles + ' ' : '';
+  return `${eurosLisibles(p && p.centimes)}${devise} / ${n}${unite}`;
+};
 
 // ── Corps BRUT (la signature Stripe porte sur l'octet près) ─────────────────
 async function corpsBrut(req) {
@@ -207,13 +243,23 @@ async function abonnement(req, res) {
   const [acc, ligne] = await Promise.all([accesDe(req), ligneDe(req)]);
   if (acc === undefined || ligne === undefined) return repondre(res, 503, { erreur: 'base-injoignable', message: "Je n'ai pas pu lire ton abonnement. Réessaie dans un instant." });
   const prix = stripePret() ? await lirePrix() : null;
+  // Trois états : `true` le prix de Stripe est celui des CGV · `false` il en
+  // diffère (le paiement est fermé) · `null` pas su (Stripe muet ou pas branché).
+  const conforme = prix ? prixConforme(prix) : null;
   return repondre(res, 200, {
     ok: true,
     proprietaire: acc.proprietaire,
     configure: stripePret(),
     modeTest: stripePret() ? stripeModeTest() : null,
     obligatoire: acc.obligatoire,
-    prix: prix ? { montant: prix.montant, devise: prix.devise, intervalle: prix.intervalle } : null,
+    // ⚠️ Un prix qui n'est pas celui des CGV n'est JAMAIS relayé comme « le
+    //    prix » : l'app dirait 9,99 € à côté de CGV à 12,99 €. Elle dit alors
+    //    le prix des CGV et ne propose pas de payer (`prixConforme: false`).
+    prix: prix && conforme ? { montant: prix.montant, devise: prix.devise, intervalle: prix.intervalle } : null,
+    prixConforme: conforme,
+    // Le montant réglé chez Stripe, au SEUL propriétaire, quand il diffère :
+    // c'est lui qui le corrige dans son tableau de bord.
+    prixStripe: acc.proprietaire && prix && conforme === false ? { montant: prix.montant, devise: prix.devise, intervalle: prix.intervalle } : null,
     statut: ligne ? ligne.statut : null,
     finPeriode: ligne ? ligne.fin_periode : null,
     annuleFinPeriode: ligne ? !!ligne.annule_fin_periode : false,
@@ -227,7 +273,8 @@ async function abonnement(req, res) {
 
 // La version des CGV acceptées : la date de « Dernière mise à jour » de
 // public/legal/cgv.html (audit-lancement vérifie qu'elles concordent).
-const CGV_VERSION = '2026-10-04';
+// 11 octobre : prix passé à 12,99 € (version précédente : 2026-10-04, 9,99 €).
+const CGV_VERSION = '2026-10-11';
 async function checkout(req, res) {
   const u = await utilisateurDe(req);
   if (!u) return repondre(res, 401, { erreur: 'session' });
@@ -252,6 +299,13 @@ async function checkout(req, res) {
   const accepteLe = new Date().toISOString();
   const prix = await lirePrix();
   if (!prix) return repondre(res, 503, { erreur: 'prix', message: "Le prix de l'abonnement est introuvable chez Stripe." });
+  // Le prix que Stripe facturerait n'est pas celui des CGV qu'il vient
+  // d'accepter : on n'ouvre RIEN (voir `PRIX_CGV`). Le propriétaire le lit dans
+  // les journaux et sur sa carte « Mon compte », avec le geste.
+  if (!prixConforme(prix)) {
+    console.warn('[stripe] prix « ' + PRIX_CLE + ' » =', prixTexte(prix), '≠ CGV', prixTexte(PRIX_CGV), '— paiement refusé. Geste : Stripe → Produits → ajouter un prix de', eurosLisibles(PRIX_CGV.centimes), 'par mois, clé de recherche « ' + PRIX_CLE + ' », « transférer la clé ».');
+    return repondre(res, 503, { erreur: 'prix-cgv', message: `Le paiement est fermé pour l'instant : le prix réglé chez Stripe (${prixTexte(prix)}) n'est pas celui des conditions de vente (${prixTexte(PRIX_CGV)}). Rien n'a été prélevé. Réessaie plus tard.` });
+  }
   const params = {
     mode: 'subscription',
     line_items: [{ price: prix.id, quantity: 1 }],

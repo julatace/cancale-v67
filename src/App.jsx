@@ -31706,7 +31706,8 @@ const applyZoom = (z) => {
 // défaut, et alors l'accueil dit « Bonjour » tout court. On ne le déduit PAS de
 // l'email : un prénom inventé est un faux, et un blanc vaut mieux (§5).
 // ══════════════════════════════════════════════════════════════════════════
-// L'ABONNEMENT (4 octobre) — 9,99 €/mois, pour tout le monde sauf le propriétaire
+// L'ABONNEMENT (4 octobre) — 12,99 €/mois depuis le 11 octobre (9,99 € avant),
+// pour tout le monde sauf le propriétaire
 // ══════════════════════════════════════════════════════════════════════════
 // Le serveur décide (api/compte.js) : qui est propriétaire (VRM_OWNER_UID), si
 // Stripe est branché, si l'abonnement est obligatoire, et le statut — lu dans
@@ -31736,7 +31737,13 @@ async function ouvrirStripe(mode, extra) {
     return (j && j.message) || "Stripe n'a pas répondu. Réessaie dans un instant.";
   } catch (_) { return "Pas de connexion. Réessaie dans un instant."; }
 }
-const prixLisible = (p) => p ? `${Number(p.montant).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € / ${p.intervalle === 'year' ? 'an' : 'mois'}` : '9,99 € / mois';
+// Le prix des CGV (public/legal/cgv.html), écrit UNE fois côté app : c'est ce
+// qu'on dit quand Stripe ne donne pas de prix — ou en donne un AUTRE que celui
+// des CGV (le serveur ne le relaie alors pas, api/compte.js `prixConforme`).
+// audit-lancement.cjs exige que ce soit la même valeur que les CGV et que le
+// serveur (`PRIX_CGV`) : 12,99 € depuis le 11 octobre (décision de Julien).
+const PRIX_CGV_LISIBLE = '12,99 € / mois';
+const prixLisible = (p) => p ? `${Number(p.montant).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € / ${p.intervalle === 'year' ? 'an' : 'mois'}` : PRIX_CGV_LISIBLE;
 const dateLisible = (iso) => { try { return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }); } catch (_) { return ''; } };
 
 // MES FACTURES ET MA CARTE — trois états : `undefined` en cours · `null` pas su
@@ -31935,7 +31942,21 @@ function MonAbonnement() {
   const titre = <div style={{ fontSize: 15, fontWeight: 600, color: C.text }}>Ton abonnement</div>;
   if (e === undefined) return <div style={carte} data-abonnement="chargement">{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3 }}>Je regarde…</div></div>;
   if (e === null) return <div style={carte} data-abonnement="pas-su">{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3, lineHeight: 1.5 }}>Je n'ai pas pu lire ton abonnement. Rouvre cet écran dans un instant — rien n'a changé de ton côté.</div></div>;
-  if (e.proprietaire) return <div style={carte} data-abonnement="proprietaire">{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3, lineHeight: 1.5 }}>Compte propriétaire de VRM : gratuit, aucun abonnement.</div></div>;
+  // ⚠️ LE PRIX CHEZ STRIPE ≠ CELUI DES CGV (11 octobre : 12,99 €, et le prix
+  //    rangé chez Stripe sous `vrm_mensuel` est un réglage de SON tableau de
+  //    bord). Le serveur refuse alors d'ouvrir le paiement ; c'est au
+  //    propriétaire — le seul qui peut le corriger — qu'on le dit, avec le geste.
+  //    « Pas su » (Stripe muet : `prixConforme` null) ne dit rien.
+  const prixAcorriger = e.proprietaire && e.prixConforme === false && e.prixStripe;
+  if (e.proprietaire) return (
+    <div style={carte} data-abonnement="proprietaire">{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3, lineHeight: 1.5 }}>Compte propriétaire de VRM : gratuit, aucun abonnement.</div>
+      {prixAcorriger && (
+        <div data-prix-stripe="different" style={{ fontSize: 12.5, color: C.text, marginTop: 8, lineHeight: 1.5 }}>
+          Le prix réglé chez Stripe (<b>{prixLisible(e.prixStripe)}</b>) n'est pas celui des conditions de vente (<b>{PRIX_CGV_LISIBLE}</b>). Le paiement reste <b>fermé</b> : personne ne peut s'abonner tant que ce n'est pas corrigé. Dans Stripe → Produits, ajoute au produit VRM un prix de {PRIX_CGV_LISIBLE.replace(' / ', ' par ')} avec la clé de recherche « vrm_mensuel » (coche « transférer la clé »).
+        </div>
+      )}
+    </div>
+  );
   if (!e.configure) return <div style={carte} data-abonnement="non-branche">{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3, lineHeight: 1.5 }}>Le paiement n'est pas encore ouvert : VRM reste gratuit pour l'instant.</div></div>;
   const test = e.modeTest ? <div data-mode-test="" style={{ fontSize: 11.5, color: C.muted, marginTop: 6, lineHeight: 1.5 }}>Paiement en <b style={{ color: C.text }}>mode test</b> : aucune vraie carte n'est débitée (carte d'essai 4242 4242 4242 4242).</div> : null;
   const cb = fx && fx.carte;
@@ -31985,6 +32006,9 @@ function MonAbonnement() {
       {listeFactures}
     </>);
   }
+  // Le prix de Stripe n'est pas celui des CGV : le serveur n'ouvrira pas le
+  // paiement (api/compte.js) — aucun bouton qui mènerait à un refus.
+  if (e.prixConforme === false) return <div style={carte} data-abonnement="non-branche" data-raison="prix">{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3, lineHeight: 1.5 }}>Le paiement n'est pas encore ouvert : VRM reste gratuit pour l'instant.</div></div>;
   return (<>
     <div style={carte} data-abonnement="sans">
       {titre}

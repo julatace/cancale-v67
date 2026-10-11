@@ -5858,11 +5858,48 @@ connexion », avec une vidéo en motion design, inspirée de Vinteer.
   Les MP4 ne montent pas dans le dépôt : ils se régénèrent après chaque
   changement de la démo (`npm run build` puis le script).
 
-### ⚠️⚠️ L'ABONNEMENT : 9,99 €/MOIS, ET QUI NE PAIE PLUS NE VOIT PLUS RIEN (4 octobre)
+### ⚠️⚠️ L'ABONNEMENT : 12,99 €/MOIS (9,99 € JUSQU'AU 11 OCTOBRE), ET QUI NE PAIE PLUS NE VOIT PLUS RIEN (4 octobre)
 Julien : « un abonnement à 10 € par mois » puis « **9,99** », « pour tout le monde
 sauf moi », « prélevé chaque mois à partir du moment où la personne s'abonne »,
 puis « la personne ne doit plus recevoir de notifications, voir ses données,
 etc. lorsqu'elle ne paye plus ».
+- ⚠️⚠️ **11 OCTOBRE : LE PRIX PASSE À 12,99 € PAR MOIS** — décision de Julien
+  après l'étude du coût par abonné (« on va passer à 12,99 par mois » : 12,99 €
+  TTC, la TVA arrivant tôt pour lui). Ce qui le dit : les CGV (encadré et
+  article 2, « Dernière mise à jour : 11 octobre 2026 » ⇒ `CGV_VERSION =
+  '2026-10-11'`, rangée dans les métadonnées Stripe), la page d'accueil (FAQ,
+  section Prix), le repli de l'app (`PRIX_CGV_LISIBLE`) et le serveur
+  (`PRIX_CGV`, en centimes). Mesuré : **0 ligne dans `abonnements`** — personne
+  ne payait 9,99 €, aucun abonné à basculer.
+  ⚠️⚠️ **LE GESTE DE JULIEN — ET TANT QU'IL N'EST PAS FAIT, LE PAIEMENT EST
+  FERMÉ.** Le montant PRÉLEVÉ est celui du prix rangé chez Stripe sous la clé
+  `vrm_mensuel` (encore 9,99 €), et un prix Stripe ne se modifie pas, il se
+  recrée : **Stripe → Produits → le produit VRM → « Ajouter un prix » : 12,99 €,
+  récurrent, mensuel, clé de recherche `vrm_mensuel`, cocher « transférer la clé
+  de recherche »** (l'ancien prix la perd ; l'archiver ensuite). Le connecteur
+  Stripe n'était pas autorisé dans la session du 11 octobre : **ce n'est pas
+  fait**, et ça ne se simule pas. À refaire en mode réel le jour du passage.
+  ⇒ **L'app le détecte, côté serveur** : `checkout` compare le prix lu chez
+  Stripe à `PRIX_CGV` (`prixConforme` : mêmes centimes, en euros, une fois par
+  mois) et, s'il diffère, **n'ouvre PAS le paiement** — 503 `prix-cgv`, « le
+  prix réglé chez Stripe (9,99 € / mois) n'est pas celui des conditions de vente
+  (12,99 € / mois). Rien n'a été prélevé. » Jamais 9,99 € prélevés sur des CGV
+  acceptées à 12,99 €. La carte « Mon compte » ne relaie pas un prix non
+  conforme (`prix: null`, `prixConforme: false` ⇒ « le paiement n'est pas
+  encore ouvert », aucun bouton) ; seul le PROPRIÉTAIRE reçoit le montant de
+  Stripe (`prixStripe`) et sa carte dit les deux prix et le geste. Stripe muet ⇒
+  `prixConforme: null` (« pas su »), jamais « différent ». Les journaux Vercel
+  le disent aussi (`[stripe] prix « vrm_mensuel » = … ≠ CGV …`).
+  ⚠️ Ce contrôle ne porte que sur les NOUVEAUX paiements : un abonnement déjà
+  souscrit garde son prix chez Stripe (aucun aujourd'hui).
+  - Preuves : `audit-abonnement.cjs` **74 contrôles**, **11 rouges** sur le code
+    d'avant ; trois mutations, chacune rouge : contrôle retiré (7), prix relayé
+    quand il diffère (1), intervalle oublié (2). `audit-lancement.cjs` **30** —
+    UNE valeur : CGV ×2 = `PRIX_CGV` = `PRIX_CGV_LISIBLE` = page d'accueil ;
+    3 rouges sur l'avant, serveur resté à 999 ⇒ rouge, seconde valeur écrite à
+    côté de la constante ⇒ rouge. Banc `abonnement.cjs` **60** — 3 rouges sur le
+    build d'avant (il affichait « 9,99 € / mois » et « S'abonner » quand Stripe
+    différait des CGV).
 - **Stripe en MODE TEST seulement**, sans bibliothèque (`api/_lib/stripe.js`) :
   Checkout (abonnement), portail de gestion, webhook signé (HMAC sur le corps
   BRUT, comparaison en temps constant, 5 min de tolérance), version d'API
@@ -5941,7 +5978,8 @@ le bon onglet.
   portail ; l'abonnement doit appartenir à CE client, sinon 403 ; la ligne est
   réécrite tout de suite depuis la réponse de Stripe). Résilier en ligne est une
   obligation en France (art. L215-1-1).
-- **CGV et page d'accueil disent 9,99 € par mois, sans engagement.** Tant que
+- **CGV et page d'accueil disent 12,99 € par mois (9,99 € jusqu'au 11 octobre),
+  sans engagement.** Tant que
   `abonnement_obligatoire` vaut '0', elles disent aussi que l'accès est offert —
   ⚠️ **le jour où Julien passe le réglage à '1', retirer cette phrase** de
   `src/Accueil.jsx` (FAQ « Combien ça coûte ? » et section Prix) et de l'encadré

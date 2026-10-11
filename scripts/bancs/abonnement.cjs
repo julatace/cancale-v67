@@ -2,7 +2,7 @@
 //  BANC « ABONNEMENT » — la carte de Réglages et la porte, RENDUES.
 //
 //  Demande de Julien (4 octobre) : 9,99 € par mois, pour tout le monde sauf
-//  lui. Le serveur décide (api/compte.js, vérifié par audit-abonnement.cjs) ;
+//  lui — 12,99 € depuis le 11 octobre (sa décision, après l'étude des coûts). Le serveur décide (api/compte.js, vérifié par audit-abonnement.cjs) ;
 //  ce banc vérifie que l'app DIT ce que le serveur sait, et rien de plus :
 //    · chaque état du serveur donne SA carte (`data-abonnement`) — et un état
 //      illisible n'affirme rien (« pas su » ≠ « pas abonné ») ;
@@ -36,13 +36,13 @@ const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css
 
 const SESSION = { access_token: 'jeton-de-banc', refresh_token: 'r', expires_at: Date.now() + 3600e3,
   user: { id: '11111111-2222-3333-4444-555555555555', email: 'vendeuse@exemple.test' } };
-const PRIX = { montant: 9.99, devise: 'eur', intervalle: 'month' };
-const base = { ok: true, proprietaire: false, configure: true, modeTest: true, obligatoire: false, prix: PRIX, statut: null, finPeriode: null, annuleFinPeriode: false, peutGerer: false, actif: false, acces: true };
+const PRIX = { montant: 12.99, devise: 'eur', intervalle: 'month' };
+const base = { ok: true, proprietaire: false, configure: true, modeTest: true, obligatoire: false, prix: PRIX, prixConforme: true, prixStripe: null, statut: null, finPeriode: null, annuleFinPeriode: false, peutGerer: false, actif: false, acces: true };
 const FACTURES = { ok: true,
   carte: { marque: 'visa', fin: '4242', mois: 12, annee: 2027 },
   factures: [
-    { id: 'in_2', numero: 'VRM-0002', date: '2026-10-04T10:00:00.000Z', montant: 9.99, devise: 'eur', statut: 'paid', pdf: 'https://pay.stripe.com/invoice/acct_x/in_2/pdf', page: 'https://invoice.stripe.com/i/acct_x/in_2' },
-    { id: 'in_1', numero: 'VRM-0001', date: '2026-09-04T10:00:00.000Z', montant: 9.99, devise: 'eur', statut: 'paid', pdf: 'https://site-pirate.example/facture.pdf', page: null },
+    { id: 'in_2', numero: 'VRM-0002', date: '2026-10-04T10:00:00.000Z', montant: 12.99, devise: 'eur', statut: 'paid', pdf: 'https://pay.stripe.com/invoice/acct_x/in_2/pdf', page: 'https://invoice.stripe.com/i/acct_x/in_2' },
+    { id: 'in_1', numero: 'VRM-0001', date: '2026-09-04T10:00:00.000Z', montant: 12.99, devise: 'eur', statut: 'paid', pdf: 'https://site-pirate.example/facture.pdf', page: null },
   ] };
 const ETATS = {
   sans: { ...base },
@@ -50,7 +50,13 @@ const ETATS = {
   resilie: { ...base, statut: 'active', finPeriode: '2026-11-04T10:00:00.000Z', annuleFinPeriode: true, peutGerer: true, actif: true },
   impaye: { ...base, statut: 'past_due', peutGerer: true, actif: true },
   proprietaire: { ...base, proprietaire: true, actif: true },
-  nonBranche: { ...base, configure: false, modeTest: null, prix: null },
+  nonBranche: { ...base, configure: false, modeTest: null, prix: null, prixConforme: null },
+  // 11 octobre : Stripe facture encore l'ancien prix (9,99 €) alors que les CGV
+  // disent 12,99 € — le serveur n'ouvre pas le paiement et ne relaie pas ce
+  // prix (`prix: null`, `prixConforme: false`) ; seul le propriétaire reçoit le
+  // montant de Stripe, pour le corriger.
+  prixDifferent: { ...base, prix: null, prixConforme: false },
+  proprietairePrixDifferent: { ...base, proprietaire: true, actif: true, prix: null, prixConforme: false, prixStripe: { montant: 9.99, devise: 'eur', intervalle: 'month' } },
 };
 
 let ko = 0, ok = 0;
@@ -131,13 +137,22 @@ const boutons = (pg) => pg.evaluate(() => { const e = document.querySelector('[d
   const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   try {
     console.log('\n── La carte suit ce que le serveur sait');
-    const attendus = { sans: 'sans', actif: 'actif', resilie: 'actif', impaye: 'impaye', proprietaire: 'proprietaire', nonBranche: 'non-branche' };
+    const attendus = { sans: 'sans', actif: 'actif', resilie: 'actif', impaye: 'impaye', proprietaire: 'proprietaire', nonBranche: 'non-branche', prixDifferent: 'non-branche', proprietairePrixDifferent: 'proprietaire' };
     for (const [nom, rendu] of Object.entries(attendus)) {
       await essaie(nom, async () => {
         const { ctx, pg, erreurs } = await ouvrir(nav, { abo: ETATS[nom] });
         const e = await etatCarte(pg), b = await boutons(pg), t = await texteCarte(pg);
         dit(e === rendu && erreurs.length === 0, `serveur « ${nom} » → carte « ${rendu} »`, `rendu ${e} ${erreurs.join(' | ')}`);
-        if (nom === 'sans') dit(b.some((x) => /abonner/i.test(x)) && /9,99/.test(t), '  sans abonnement : le prix et le bouton pour s’abonner', b.join(' · '));
+        if (nom === 'sans') dit(b.some((x) => /abonner/i.test(x)) && /12,99/.test(t), '  sans abonnement : le prix et le bouton pour s’abonner', b.join(' · '));
+        // Le prix de Stripe n'est pas celui des CGV : aucun bouton qui mènerait
+        // à un refus du serveur, et aucun montant affiché (ni 9,99, ni 12,99 à
+        // payer) — « le paiement n'est pas encore ouvert ».
+        if (nom === 'prixDifferent') dit(b.length === 0 && !/9,99/.test(t) && /pas encore ouvert/i.test(t), '  prix Stripe ≠ CGV : le paiement est dit fermé, aucun bouton pour payer', b.join(' · ') + ' / ' + t.replace(/\n/g, ' ').slice(0, 120));
+        if (nom === 'proprietairePrixDifferent') {
+          const w = await pg.evaluate(() => { const e = document.querySelector('[data-prix-stripe="different"]'); return e ? e.innerText : ''; });
+          dit(b.length === 0 && /9,99/.test(w) && /12,99/.test(w) && /vrm_mensuel/.test(w), '  propriétaire : le prix réglé chez Stripe et celui des CGV, et le geste (clé « vrm_mensuel »)', w.replace(/\n/g, ' ').slice(0, 200));
+        }
+        if (nom === 'proprietaire') dit(!(await pg.evaluate(() => !!document.querySelector('[data-prix-stripe]'))), '  propriétaire, prix conforme : aucune alerte de prix');
         if (nom === 'actif') dit(b.some((x) => /^résilier$/i.test(x)) && b.some((x) => /carte/i.test(x)) && !b.some((x) => /abonner/i.test(x)) && /prochain prélèvement le 4 novembre 2026/i.test(t), '  abonné : la date du prochain prélèvement, « changer de carte » et « résilier », jamais un second « s’abonner »', b.join(' · ') + ' / ' + t.replace(/\n/g, ' ').slice(0, 120));
         if (nom === 'actif') dit(/Visa •••• 4242/.test(t) && /12\/27/.test(t), '  abonné : la carte est dite (marque, 4 derniers chiffres, expiration)', t.replace(/\n/g, ' ').slice(0, 160));
         if (nom === 'resilie') dit(/jusqu'au 4 novembre 2026/.test(t) && b.some((x) => /reprendre/i.test(x)) && !b.some((x) => /^résilier$/i.test(x)), '  résilié : jusqu’à quand l’accès reste, et « reprendre »', b.join(' · ') + ' / ' + t.replace(/\n/g, ' ').slice(0, 120));
@@ -205,7 +220,7 @@ const boutons = (pg) => pg.evaluate(() => { const e = document.querySelector('[d
     await essaie('liste', async () => {
       const { ctx, pg, appels } = await ouvrir(nav, { abo: ETATS.actif });
       const f = await pg.evaluate(() => { const e = document.querySelector('[data-factures]'); return e ? { etat: e.getAttribute('data-factures'), t: e.innerText, liens: [...e.querySelectorAll('a')].map((a) => a.href) } : null; });
-      dit(f && f.etat === '2' && (f.t.match(/9,99/g) || []).length === 2 && /Payée/.test(f.t) && /4 octobre 2026/.test(f.t), 'deux factures : date, montant, statut', f ? f.t.replace(/\n/g, ' ').slice(0, 160) : 'aucune liste');
+      dit(f && f.etat === '2' && (f.t.match(/12,99/g) || []).length === 2 && /Payée/.test(f.t) && /4 octobre 2026/.test(f.t), 'deux factures : date, montant, statut', f ? f.t.replace(/\n/g, ' ').slice(0, 160) : 'aucune liste');
       dit(f && f.liens.length === 1 && /^https:\/\/pay\.stripe\.com\//.test(f.liens[0]), '  seul le PDF hébergé chez Stripe est un lien — une adresse étrangère ne l’est pas', f ? f.liens.join(' · ') : '');
       dit(appels.some((a) => a.mode === 'factures' && a.auth === 'Bearer jeton-de-banc'), '  demandées AVEC la session (le serveur sait de qui il s’agit)', JSON.stringify(appels.filter((a) => a.mode === 'factures')));
       await ctx.close();
@@ -262,7 +277,7 @@ const boutons = (pg) => pg.evaluate(() => { const e = document.querySelector('[d
       const appVisible = await pg.evaluate(() => /Bonjour|Bonsoir|Bon après-midi/.test(document.body.innerText));
       dit(porte && !appVisible, 'obligatoire + pas abonné → l’écran d’abonnement, pas l’app');
       const t = await pg.evaluate(() => (document.querySelector('[data-abonnement-requis]') || {}).innerText || '');
-      dit(/9,99/.test(t) && /déconnecter/i.test(t), '  il dit le prix et laisse se déconnecter', t.replace(/\n/g, ' ').slice(0, 120));
+      dit(/12,99/.test(t) && /déconnecter/i.test(t), '  il dit le prix et laisse se déconnecter', t.replace(/\n/g, ' ').slice(0, 120));
       await ctx.close();
     });
     await essaie('impayé 14 jours', async () => {
