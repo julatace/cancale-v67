@@ -66,6 +66,15 @@ const MUTATIONS = [
   ['relu-aucune', API, ": { lu: false, raison: raisonKo, lueA: Date.now(), par: 'regle', _force: true } });", ": { lu: true, offresActives: null, accepte: null, refuse: null, lueA: Date.now(), par: 'regle', _force: true } });", ['R-relu-ko']],
   ['tombee-pas-su', API, '      tombee: aRegle ? (post.ok ? post.lecture.accepte == null : null) : ((avant && avant.lu === true) ? false : null),', '      tombee: aRegle ? (post.ok ? post.lecture.accepte == null : null) : false,', ['R-prix-change']],
   ['sync-detail', API, '      const { _regle, ...detail } = d;', '      const detail = d; const _regle = d._regle;', ['R-sync']],
+  // ── (11 octobre, revue — tour 2) ──
+  // une lecture RATÉE remplace de nouveau une règle connue (ou une écriture incertaine).
+  ['lecture-ratee-remplace', API, "      if (!_force && avant && v.lu !== true && v.raison === 'lecture-ratee') continue;\n", '', ['R-lecture-ratee']],
+  // la lecture datée à l'ARRIVÉE de la réponse (et non au départ de la question).
+  ['luea-arrivee', API, '    lecture: { lu: true, offresActives: en, accepte: a.v, refuse: r.v, devise: a.dev || r.dev || deviseAnnonce, prix: p.v, offresFaites: nb == null ? null : Number(nb), lueA: Number.isFinite(t0) ? t0 : Date.now() },', '    lecture: { lu: true, offresActives: en, accepte: a.v, refuse: r.v, devise: a.dev || r.dev || deviseAnnonce, prix: p.v, offresFaites: nb == null ? null : Number(nb), lueA: Date.now() },', ['R-course']],
+  // la liste d'une synchro efface une entrée sans regarder si elle est plus récente qu'elle.
+  ['garder-sans-age', API, ' && (Number(items[k] && items[k].lueA) || 0) < garder.a) delete items[k];', ') delete items[k];', ['R-course']],
+  // un montant qui s'arrondit à 0 redevient « valable » (« > 0 »).
+  ['montant-zero', LIB, '  return typeof v === \'number\' && Number.isFinite(v) && v <= MONTANT_MAX && Math.round(v * 100) >= 1', '  return typeof v === \'number\' && Number.isFinite(v) && v <= MONTANT_MAX && v > 0', ['R-mont', 'R-crea']],
 ];
 
 // Copie de l'arbre courant (api/, src/, scripts/ sans fixtures), node_modules en lien.

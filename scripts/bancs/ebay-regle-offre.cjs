@@ -32,6 +32,12 @@
 //      reste que sous le montant envoyé ; l'aperçu calcule sur le prix que la
 //      carte affiche ; « dont N lues il y a plus de 7 jours » = les cartes qui
 //      le disent ;
+//   15. (11 octobre, revue — tour 2) ✏️ part du prix que la CARTE affiche et
+//      « stock seul » n'envoie aucun prix ; « seuil relu, offres activées ou
+//      non pas montré » se dit d'UNE voix (ni « pas encore lue », ni « relis-la
+//      d'abord », et reposer le seuil porte la règle lue) ; un lot dit « à
+//      revoir » sur la ligne concernée ; une relecture ratée ne remplace pas ce
+//      que VRM savait ;
 //   et partout : aucun débordement, aucune erreur de page, aucun écran mort.
 //        node scripts/bancs/ebay-regle-offre.cjs [--blocs 1,5,9] [--taille 1512]
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
@@ -212,6 +218,9 @@ async function ouvrir(b, vp, c) {
       for (const id of body.itemIds || []) {
         const s = ebay[id];
         if (!s || s.compte !== compteDe(body)) { lectures[id] = { lu: false, raison: 'pas-sur-ce-compte' }; continue; }
+        // `relireRate` : eBay ne rend pas CETTE annonce. La route ne range une
+        // lecture ratée que sur une place vide (11 octobre, revue) : ici, rien.
+        if (Array.isArray(cfg.relireRate) && cfg.relireRate.includes(id)) { lectures[id] = { lu: false, raison: 'lecture-ratee', lueA: Date.now(), par: 'relire' }; continue; }
         lectures[id] = { ...lecture(id), par: 'relire' }; ranger(s.compte, id, lectures[id]);
       }
       return j({ ok: true, lectures, range: true });
@@ -904,6 +913,108 @@ async function finPage(pg, errs, quoi) {
           dit(nBloc === ages.length, `[14] ${T} lue il y a ${String(jours).replace('.', ',')} j : le bloc compte ${nBloc}, les cartes qui disent leur âge ${ages.length} — la même règle`, JSON.stringify(ages));
           await ctx.close();
         }
+      });
+
+      // ── 15. REVUE DU 11 OCTOBRE, TOUR 2 ───────────────────────────────
+      // Attend la fin d'une relecture « Relire chez eBay » : l'envoi est PARTI,
+      // puis le bouton n'est plus « Lecture… » (la base relue est appliquée).
+      const finRelire = async (pg, n0) => {
+        for (let i = 0; i < 400 && bruts.filter((x) => /regleoffrelire/.test(x)).length === n0; i++) await pg.waitForTimeout(25);
+        await pg.waitForFunction(() => { const x = document.querySelector('[data-regles-relire]'); return !x || !x.disabled; }, null, { timeout: 15000 });
+        await pg.waitForTimeout(250);
+      };
+      if (bloc(15)) await essaie(`[15] ${T} ✏️ suit le prix de la carte`, async () => {
+        // eBay tient A2 à un autre prix que la liste (90 €) : la pose rend 409
+        // « prix-change », la carte apprend le prix d'eBay. ✏️ doit partir de
+        // CE prix, et « stock seul » n'en envoyer aucun (les deux sens : plus
+        // haut et plus bas que la liste).
+        for (const [prixEbay, seuil] of [[95, '81'], [80, '70']]) {
+          const { ctx, pg, errs } = await ouvrir(b, vp, { ebay: (st) => { st[A.A2].prix = prixEbay; } });
+          await allerAnnonces(pg); await ouvrirPanneau(pg, A.A2);
+          await saisir(pg, A.A2, 'accepte', seuil); await poser(pg, A.A2);
+          const prixCarte = await carte(pg, A.A2).locator('[data-ebay-prix]').getAttribute('data-ebay-prix').catch(() => '');
+          await pg.click(`[data-ebay-carte-ouvrir="${A.A2}"]`); await pg.waitForSelector(`[data-ebay-revise-ouvrir="${A.A2}"]`, { timeout: 5000 });
+          await pg.click(`[data-ebay-revise-ouvrir="${A.A2}"]`); await pg.waitForSelector(`[data-ebay-revise-prix="${A.A2}"]`, { timeout: 5000 });
+          const champ = await pg.inputValue(`[data-ebay-revise-prix="${A.A2}"]`);
+          const champN = Number(String(champ).trim().replace(',', '.'));
+          dit(prixCarte === prixEbay.toFixed(2) && Math.round(champN * 100) === prixEbay * 100, `[15] ${T} eBay à ${prixEbay} € (la liste dit 90) : la carte ET le champ Prix de ✏️ disent ${prixEbay} €`, `carte ${prixCarte} · champ « ${champ} »`);
+          const n0 = bruts.filter((x) => /"action":"revise"/.test(x)).length;
+          await pg.fill(`[data-ebay-revise-stock="${A.A2}"]`, '2'); await pg.click(`[data-ebay-revise-enregistrer="${A.A2}"]`);
+          for (let i = 0; i < 400 && bruts.filter((x) => /"action":"revise"/.test(x)).length === n0; i++) await pg.waitForTimeout(25);
+          await pg.waitForSelector(`[data-ebay-revise-msg="${A.A2}"]`, { timeout: 8000 }).catch(() => {});
+          const rv = bruts.filter((x) => /"action":"revise"/.test(x)).slice(n0);
+          dit(rv.length === 1 && !/"price"/.test(rv[0]) && /"quantity":"2"/.test(rv[0]) && ebay[A.A2].prix === prixEbay, `[15] ${T} eBay à ${prixEbay} € : changer le STOCK seul n'envoie AUCUN prix — eBay reste à ${prixEbay} €`, `${rv.join(' ')} · eBay ${ebay[A.A2].prix}`);
+          await finPage(pg, errs, `[15] ${T} ✏️ ${prixEbay} €`);
+          await ctx.close();
+        }
+      });
+      if (bloc(15)) await essaie(`[15] ${T} offres activées ou non : une voix, un geste`, async () => {
+        // La route a RELU le seuil (81 €) mais eBay ne montre pas si les offres
+        // sont activées. La carte le dit ; la ligne du haut, l'aperçu du lot et
+        // le panneau doivent dire la même chose — et ne pas renvoyer relire.
+        const L0 = (o) => ({ lu: true, devise: 'EUR', lueA: Date.now(), offresFaites: null, ...o });
+        const { ctx, pg, errs } = await ouvrir(b, vp, { scen: { [A.A2]: [{ body: { ok: true, verifie: null, lecture: L0({ offresActives: null, accepte: 81, refuse: null, prix: 90 }), avertissements: [], range: true } }] } });
+        await allerAnnonces(pg);
+        await ouvrirPanneau(pg, A.A2); await saisir(pg, A.A2, 'accepte', '81'); await poser(pg, A.A2);
+        // eBay (le faux) tient ce que la route vient de relire, et la base le range.
+        ebay[A.A2].regle = { offresActives: null, accepte: 81, refuse: null, offresFaites: null };
+        ranger('principal', A.A2, lecture(A.A2));
+        const n0 = bruts.filter((x) => /regleoffrelire/.test(x)).length;
+        await pg.click('[data-regles-relire]'); await finRelire(pg, n0);
+        const r = bruts.filter((x) => /regleoffrelire/.test(x)).slice(n0);
+        dit(r.length >= 1 && !r.some((x) => x.includes(A.A2)), `[15] ${T} « Relire chez eBay » ne renvoie PAS relire l'annonce dont eBay a relu le seuil (offres activées ou non pas montré) : la relecture rendrait la même chose`, JSON.stringify(r));
+        const relire = await pg.locator('[data-regles-relire]').count();
+        const lien = await pg.locator(`[data-regles-pas-su] a[href*="ebay.fr/itm/${A.A2}"]`).count();
+        const e = await etats(pg);
+        dit(e[A.A2] && e[A.A2].etat === 'pas-su' && e[A.A2].raison === 'offres-inconnues' && relire === 0 && lien === 1, `[15] ${T} quand il ne reste qu'elle : la ligne du haut ne propose plus « Relire chez eBay » (rien à relire) et donne SON geste — le lien vers son annonce eBay`, `relire=${relire} · lien=${lien} · ${e[A.A2] && e[A.A2].etat}/${e[A.A2] && e[A.A2].raison}`);
+        await ouvrirToutes(pg, 90);
+        const l = await lignesApercu(pg);
+        const relireLot = await pg.locator('[data-regles-toutes-relire]').count();
+        dit(!!l[A.A2] && l[A.A2].s !== 'a-relire' && l[A.A2].coche === null && relireLot === 0, `[15] ${T} « Une règle pour toutes » : elle n'est ni « à relire d'abord », ni comptée dans « Relire ces annonces » ; pas cochable (le geste est sur eBay)`, `${JSON.stringify(l[A.A2])} · « Relire ces » ×${relireLot}`);
+        await pg.click('[data-regles-toutes-ouvrir]'); await pg.waitForTimeout(300);
+        await ouvrirPanneau(pg, A.A2);
+        const nPan = await pg.locator(`[data-regle-panneau-offres-inconnues="${A.A2}"]`).count();
+        const val = await pg.inputValue(`[data-regle-saisie-accepte="${A.A2}"]`).catch(() => '');
+        const n1 = regleoffres().length;
+        await saisir(pg, A.A2, 'accepte', '81'); await poser(pg, A.A2);
+        const env = regleoffres().slice(n1);
+        const e2 = await etats(pg);
+        dit(nPan === 1 && val.replace(',', '.') === '81' && env.length === 1 && /"attendu":\{"accepte":81,"refuse":null\}/.test(env[0]) && e2[A.A2] && e2[A.A2].etat === 'connue',
+          `[15] ${T} le panneau montre le seuil LU (81 €), et le reposer envoie cette règle comme garde — jamais « inconnu », qui rendait « eBay a déjà une règle » sans fin — : eBay active les offres, la carte passe « connue »`, `panneau ×${nPan} · saisie « ${val} » · ${env[0]} · ${e2[A.A2] && e2[A.A2].etat}`);
+        await finPage(pg, errs, `[15] ${T} offres activées ou non`);
+        await ctx.close();
+      });
+      if (bloc(15)) await essaie(`[15] ${T} lot : « à revoir » sur SA ligne`, async () => {
+        // eBay tient A2 à 95 € (la liste dit 90) : dans un lot, A2 rend 409
+        // « prix-change ». Le bilan le compte ; SA ligne doit le dire.
+        const { ctx, pg, errs } = await ouvrir(b, vp, { ebay: (st) => { st[A.A2].prix = 95; } });
+        await allerAnnonces(pg); await ouvrirToutes(pg, 90);
+        await pg.click(`[data-regles-ligne="${A.A6}"] [data-regles-choix]`); await pg.click(`[data-regles-ligne="${A.A7}"] [data-regles-choix]`); await pg.waitForTimeout(200);
+        await pg.click('[data-regles-appliquer]'); await feuille(pg).waitFor({ timeout: 5000 });
+        await feuille(pg).getByRole('button', { name: /Oui, (la )?régler/ }).click();
+        await pg.waitForSelector('[data-regles-bilan]', { timeout: 15000 }); await pg.waitForTimeout(400);
+        const nBilan = Number(await pg.$eval('[data-regles-bilan]', (x) => x.getAttribute('data-regles-a-revoir')).catch(() => -1));
+        const lignesARevoir = await pg.$$eval('[data-regles-ligne]', (x) => x.filter((e) => { const i = e.querySelector('[data-regles-issue]'); return i && i.getAttribute('data-regles-issue') === 'a-revoir'; }).map((e) => e.getAttribute('data-regles-ligne')));
+        dit(nBilan === 1 && lignesARevoir.length === 1 && lignesARevoir[0] === A.A2, `[15] ${T} le bilan dit « 1 à revoir » ET la ligne de cette annonce (A2, prix changé chez eBay) le dit — chaque ligne affiche son issue`, `bilan ${nBilan} · lignes ${JSON.stringify(lignesARevoir)}`);
+        await finPage(pg, errs, `[15] ${T} lot à revoir`);
+        await ctx.close();
+      });
+      if (bloc(15)) await essaie(`[15] ${T} relecture ratée`, async () => {
+        // eBay ne rend pas A4 (règle à 65 €, prix changé : « pas su » AVEC
+        // risque). Rien lu ne vaut pas rien : la carte garde ce que VRM en
+        // savait — jamais « lecture ratée » (gris, sans risque) par-dessus.
+        const { ctx, pg, errs } = await ouvrir(b, vp, { relireRate: [A.A4] });
+        await allerAnnonces(pg);
+        const avant = (await etats(pg))[A.A4];
+        const n0 = bruts.filter((x) => /regleoffrelire/.test(x)).length;
+        await pg.click('[data-regles-relire]'); await finRelire(pg, n0);
+        const e = await etats(pg);
+        const note = await pg.$eval('[data-regles-relecture]', (x) => x.innerText).catch(() => '');
+        const coul = await couleur(pg, '[data-regles-pas-su]');
+        dit(avant && avant.raison === 'prix-change' && e[A.A4] && e[A.A4].etat === 'pas-su' && e[A.A4].raison === 'prix-change' && coul === C_WARN && note.trim().length > 0,
+          `[15] ${T} la relecture de A4 rate chez eBay : la carte garde « prix changé » (risque dit en ambre), jamais « lecture ratée » par-dessus — et l'écran dit que la relecture a raté`, `${avant && avant.raison} → ${e[A.A4] && e[A.A4].raison} · ${coul} · « ${note} »`);
+        await finPage(pg, errs, `[15] ${T} relecture ratée`);
+        await ctx.close();
       });
     }
   } catch (e) { dit(false, 'le banc', String((e && e.message) || e).split('\n')[0]); }

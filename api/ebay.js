@@ -227,6 +227,10 @@ async function listeVendeur(token) {
 // Détail COMPLET d'une annonce (description, catégorie, état, photos,
 // caractéristiques). Pour capter « tout ».
 async function tradingGetItem(token, itemId) {
+  // (11 octobre, revue) L'heure de la lecture est celle où la question PART
+  // chez eBay, jamais celle où la réponse arrive : une réponse lente ne doit pas
+  // se croire plus fraîche qu'une pose faite pendant qu'elle voyageait.
+  const t0 = Date.now();
   const res = await tradingCall(token, 'GetItem', `<ItemID>${itemId}</ItemID><DetailLevel>ReturnAll</DetailLevel><IncludeItemSpecifics>true</IncludeItemSpecifics>`);
   if (!res.ok) return { _err: res.err || res.ack || res.error || ('status ' + res.status) };
   const xml = res.xml;
@@ -245,7 +249,7 @@ async function tradingGetItem(token, itemId) {
     // (9 octobre) La règle d'offre lue dans LA MÊME réponse (zéro appel de
     // plus). ⚠️ Elle ne va JAMAIS dans `ebay_listings` : la synchro la retire
     // du détail et la range dans `ebay_offres` (une ligne, un propriétaire).
-    _regle: lectureRegleDe(xml, itemId),
+    _regle: lectureRegleDe(xml, itemId, t0),
   };
 }
 
@@ -282,13 +286,19 @@ function etatEnClair(l) {
 // Rend null quand la réponse ne prouve pas qu'on a lu L'annonce entière (pas
 // d'<Item>, autre ItemID, pas de prix, montant illisible) : « pas su », jamais
 // « aucune ».
+// ⚠️⚠️ (11 octobre, revue) `lueA` = l'heure où la question est PARTIE chez eBay
+// (`t0`), jamais celle de la réponse. Datée à l'arrivée, une lecture partie
+// AVANT une pose et revenue APRÈS se croyait plus récente que la relecture de
+// la pose, et la réécrivait : la base disait « aucune » sur une annonce qu'eBay
+// vendait dès 72 € (reproduit sur la synchro ET « Relire chez eBay »). Ce
+// qu'elle dit d'eBay date du départ de la question, pas de son retour.
 function montantXmlLu(src, t) {
   const m = new RegExp('<' + t + '(\\s[^>]*)?>([^<]*)</' + t + '>').exec(String(src || ''));
   if (!m) return { v: null, dev: '' };
   const n = Number(String(m[2]).trim());
   return { v: Number.isFinite(n) ? Math.round(n * 100) / 100 : NaN, dev: ((/currencyID="([A-Z]{3})"/.exec(m[1] || '') || [])[1]) || '' };
 }
-function lectureRegleDe(xml, itemId) {
+function lectureRegleDe(xml, itemId, t0) {
   const b0 = (/<Item>([\s\S]*)<\/Item>/.exec(String(xml || '')) || [])[1];
   if (b0 == null) return null;
   const blk = b0.replace(/<Variations>[\s\S]*?<\/Variations>/g, '');
@@ -306,7 +316,7 @@ function lectureRegleDe(xml, itemId) {
   const nb = bo == null ? null : (/<BestOfferCount>\s*(\d+)\s*<\/BestOfferCount>/.exec(bo) || [])[1];
   const deviseAnnonce = p.dev || lireBalise(blk, 'Currency') || '';
   return {
-    lecture: { lu: true, offresActives: en, accepte: a.v, refuse: r.v, devise: a.dev || r.dev || deviseAnnonce, prix: p.v, offresFaites: nb == null ? null : Number(nb), lueA: Date.now() },
+    lecture: { lu: true, offresActives: en, accepte: a.v, refuse: r.v, devise: a.dev || r.dev || deviseAnnonce, prix: p.v, offresFaites: nb == null ? null : Number(nb), lueA: Number.isFinite(t0) ? t0 : Date.now() },
     annonce: { prix: p.v, devise: deviseAnnonce, type: lireBalise(blk, 'ListingType'), statut: lireBalise(ss, 'ListingStatus'), sku: lireBalise(blk, 'SKU') },
   };
 }
@@ -314,9 +324,10 @@ function lectureRegleDe(xml, itemId) {
 // rendus dès « DetailLevel none » ; un OutputSelector mal écrit rendrait une
 // annonce tronquée qu'on lirait « aucune règle » — on ne prend pas ce risque.
 async function lireRegleOffre(token, itemId) {
+  const t0 = Date.now();
   const r = await tradingCall(token, 'GetItem', `<ItemID>${itemId}</ItemID>`);
   if (sansAck(r) || !r.ok) return { ok: false };
-  const l = lectureRegleDe(r.xml, itemId);
+  const l = lectureRegleDe(r.xml, itemId, t0);
   return l ? { ok: true, ...l } : { ok: false };
 }
 // La relecture APRÈS une écriture : eBay peut mettre un instant à montrer la
@@ -350,9 +361,24 @@ async function relireApres(token, itemId, demande, pre) {
 // la ligne a échoué ⇒ RIEN n'est écrit : repartir d'un objet vide effacerait
 // les règles lues des autres annonces — la famille « lecture KO, écriture OK »).
 // ⚠️ Une entrée n'en remplace une autre que si elle est au moins aussi RÉCENTE
-// (`lueA`) : une synchro lancée avant une pose ne réécrit pas, après elle, la
-// lecture d'avant. Seule exception : `_force: true` (jamais rangé), posé par
-// la requête qui a écrit le marqueur « en-cours » pour le remplacer.
+// (`lueA` = l'heure où la question est PARTIE chez eBay, `lectureRegleDe`) :
+// une synchro lancée avant une pose ne réécrit pas, après elle, la lecture
+// d'avant. Seule exception : `_force: true` (jamais rangé), posé par la requête
+// qui a écrit le marqueur « en-cours » pour le remplacer.
+// ⚠️⚠️ (11 octobre, revue) UNE LECTURE RATÉE NE REMPLACE RIEN. Un GetItem qui
+// hoquette pendant la synchro ou « Relire chez eBay » rangeait « pas lue » par
+// -dessus une règle CONNUE (plus récente, donc gagnante) : VRM oubliait une
+// règle qu'eBay appliquait toujours — la ligne « pas su » passait en gris,
+// l'annonce sortait de « ce que ça engage », et les ventes eBay n'étaient plus
+// relues à l'ouverture pour ce compte, pendant qu'eBay vendait au seuil. Rien
+// lu ne vaut pas rien : « lecture ratée » ne remplit qu'une place VIDE.
+// (Une écriture incertaine — « en-cours », « incertain », « apres-ecriture » —
+// n'est PAS une lecture ratée : elle dit qu'eBay a peut-être changé.)
+// ⚠️ `garder` = { ids, a } : les annonces d'une liste COMPLÈTE, lue à l'heure
+// `a`. Une entrée absente de la liste n'en sort que si elle est PLUS ANCIENNE
+// que la liste : une annonce publiée (ou une règle posée) pendant que la
+// synchro relisait n'était pas dans une liste lue avant elle, et sa règle
+// était effacée — l'annonce redevenait « jamais lue ».
 // ⚠️⚠️ (11 octobre) Et l'écriture ne réécrit plus une copie PÉRIMÉE des autres
 // annonces : deux gestes sur deux cartes du même compte (poser sur la Nike,
 // retirer sur la Samba, à 50 ms) relisaient la même version, et le second
@@ -368,10 +394,13 @@ async function rangerReglesOffre(ctx, lectures, garder) {
       if (!ID_EBAY.test(k) || !v0 || typeof v0 !== 'object') continue;
       const { _force, ...v } = v0;
       const avant = items[k];
+      if (!_force && avant && v.lu !== true && v.raison === 'lecture-ratee') continue;
       if (!_force && avant && (Number(avant.lueA) || 0) > (Number(v.lueA) || 0)) continue;
       items[k] = v;
     }
-    if (garder instanceof Set) for (const k of Object.keys(items)) if (!garder.has(k) && !(lectures && lectures[k])) delete items[k];
+    if (garder && garder.ids instanceof Set && Number.isFinite(garder.a)) {
+      for (const k of Object.keys(items)) if (!garder.ids.has(k) && !(lectures && lectures[k]) && (Number(items[k] && items[k].lueA) || 0) < garder.a) delete items[k];
+    }
     const cles = Object.keys(items).sort((x, y) => (Number(items[y].lueA) || 0) - (Number(items[x].lueA) || 0)).slice(0, REGLES_MAX);
     return { items: Object.fromEntries(cles.map((k) => [k, items[k]])), capturedAt: Date.now() };
   });
@@ -1326,6 +1355,7 @@ async function handleSync(ctx) {
   // Les annonces EN LIGNE et PROGRAMMÉES viennent d'UN SEUL GetMyeBaySelling,
   // découpé par conteneur (`listeVendeur`) : une programmée n'est jamais
   // comptée « en ligne ».
+  const tListe = Date.now();   // la liste parle d'eBay À CETTE HEURE (`garder`)
   const [orders, inv, liste] = await Promise.all([
     ebayJson(`${EBAY_API}/sell/fulfillment/v1/order?limit=50`, token),
     // L'Inventory API exige un Accept-Language (sinon 400 « Invalid value for
@@ -1369,7 +1399,7 @@ async function handleSync(ctx) {
     // Les règles : lire-fusionner-réécrire GARDÉ (une lecture ratée de la ligne
     // n'écrit rien). Une liste COMPLÈTE dit quelles annonces n'existent plus :
     // leurs règles sortent ; une liste incomplète ne prouve aucune absence.
-    const garder = liste.complet ? new Set([...lst, ...liste.programmees].map((x) => String(x.itemId))) : null;
+    const garder = liste.complet ? { ids: new Set([...lst, ...liste.programmees].map((x) => String(x.itemId))), a: tListe } : null;
     rangeRegles = (Object.keys(lecturesRegle).length || garder) ? await rangerReglesOffre(ctx, lecturesRegle, garder) : true;
   }
   if (orders.ok && orders.data) await storeData(ligneDe('ebay_orders', ctx), { orders: orders.data.orders || [], status: orders.status, capturedAt: at2 }, ctx.owner);

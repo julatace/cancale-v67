@@ -6138,6 +6138,99 @@ racine, rouge sur 2a34c1c et vert après.
   qu'en réaffaiblissant la porte (la sonde de connexion qui le déclencherait ne
   se pilote pas au banc).
 
+#### Revue du 11 octobre, tour 2 — sept défauts signalés, sept reproduits, corrigés
+Chaque défaut REPRODUIT d'abord avec la sonde du relecteur sur bac8da1 (la vraie
+route dans le harnais d'`audit-ebay-route`, l'app rendue sur données inventées),
+corrigé à la racine, puis : rouge sur bac8da1 (copie `git archive`, contrôle lancé
+DEPUIS elle, §6.1), vert après, rouge sous une mutation qui réaffaiblit le correctif.
+- ⚠️⚠️ **Une lecture RATÉE effaçait une règle ACTIVE connue.** Un GetItem qui
+  hoquette pendant la synchro ou « Relire chez eBay » rangeait `{lu:false,
+  raison:'lecture-ratee'}` — plus récent, donc gagnant — par-dessus « eBay accepte
+  dès 72 € ». Conséquences reproduites : ligne « pas su » en gris (sans risque),
+  annonce sortie de « ce que ça engage », et plus de relecture des ventes eBay à
+  l'ouverture pour ce compte (le filtre « règle active » ne la voyait plus),
+  pendant qu'eBay vendait au seuil. Et c'est justement quand une règle est active
+  que cette synchro tourne. ⇒ `rangerReglesOffre` : une lecture ratée ne remplit
+  qu'une place VIDE — jamais par-dessus une règle connue, ni par-dessus une
+  écriture incertaine (`en-cours`, `incertain`, `apres-ecriture` restent : elles
+  disent un risque). L'écran ne la pose plus localement non plus, et DIT combien
+  de relectures ont raté (« eBay n'a pas rendu N annonces : VRM garde ce qu'il en
+  savait »). *Rien lu ne vaut pas rien, y compris quand « rien lu » est plus
+  récent.*
+- ⚠️ **Course : `lueA` était l'heure de la RÉPONSE.** Une lecture partie AVANT une
+  pose et revenue APRÈS se croyait plus fraîche que la relecture de la pose et la
+  réécrivait (« aucune » sur une annonce qu'eBay vend dès 72 €, synchro ET
+  « Relire »). ⇒ `lueA` = l'heure où la question PART chez eBay (`t0`, dans
+  `lectureRegleDe`, une lecture pour la synchro, la relecture, la pose, le prix et
+  la publication). Et `garder` (la liste complète d'une synchro) effaçait la
+  règle d'une annonce publiée PENDANT la synchro (liste lue avant elle) : il
+  porte maintenant l'heure de la liste (`{ids, a}`) et n'efface qu'une entrée
+  PLUS ANCIENNE qu'elle. L'autre sens est gardé : une annonce terminée, rangée
+  avant la liste, en sort toujours.
+- **Montants qui s'arrondissent à 0** : `montantOk` acceptait 1e-9 (« > 0 » et
+  1e-7 de tolérance) ; la création envoyait `BestOfferAutoAcceptPrice 0.00` (et
+  `MinimumBestOfferPrice 0.00` SANS aucune confirmation). ⇒ au moins un centime
+  APRÈS arrondi, dans la route et dans l'app (la même copie, `[R-§11]` compare
+  leurs sorties, cas 1e-9 / 5e-324 / 0,004 / 0,01 compris). Ce qu'eBay fait d'un
+  seuil à 0,00 n'est pas mesuré — il ne part plus.
+- ⚠️⚠️ **✏️ « Modifier le prix / le stock » gardait le prix de la LISTE** (n° 4 et
+  n° 7, une cause). Après une 409 « prix-change », la carte affichait le prix relu
+  chez eBay (95 €, ou 80 €) et le champ Prix restait « 90,0 » (initialisé une
+  fois sur `it.price`) : changer le STOCK seul renvoyait 90 € à eBay, avec
+  « ✓ Modifié sur eBay » — et, sous une règle, se faisait refuser par la garde de
+  la règle. ⇒ le champ part du prix de la CARTE (`prixCarte`, la même source que
+  l'en-tête, §11) et `price` vaut `null` tant qu'il n'est pas tapé : le prix ne
+  part que TAPÉ et différent.
+- **« Seuil relu, offres activées ou non pas montré » parlait de trois voix** : la
+  carte « regarde l'annonce sur eBay », la ligne du haut « pas encore lue —
+  Relire chez eBay » (une relecture en boucle, qui rendait la même chose),
+  l'aperçu du lot « relis-la d'abord ». ⇒ UNE règle, `PAS_SU_SANS_RELECTURE` /
+  `seRelitChezEbay` (illisible · devise · offres-inconnues), lue par la ligne du
+  haut, « Relire chez eBay » et le lot : la ligne du haut la dit à part avec son
+  geste (le lien vers l'annonce) et ne propose « Relire » que s'il reste une
+  annonce vraiment pas lue ; le lot lui donne un statut propre (`a-voir-ebay`,
+  pas cochable) ; le panneau montre le seuil lu. ⚠️ **Trouvé en reproduisant** :
+  « Définir une règle » sur cette annonce envoyait `attendu:'inconnu'` ⇒ 409
+  « eBay a déjà une règle » ⇒ même état ⇒ même 409, **sans fin**. L'état porte
+  maintenant `lu`, la garde l'envoie (ce que le panneau montre), et la pose
+  active les offres (`BestOfferEnabled`).
+- **Lot : « 1 à revoir » et plus aucune ligne pour dire laquelle** (régression
+  des correctifs #4 et #5 du premier tour : le montant de la ligne est recalculé
+  sur le prix relu, et l'issue ne s'affichait que sous le montant envoyé). ⇒
+  « à revoir » s'affiche toujours sur SA ligne — rien n'a été posé, la condition
+  du montant ne s'y applique pas — et dit le prix relu (« le prix sur eBay est
+  maintenant de 95,00 € — rien n'a été envoyé, le montant est recalculé »).
+- **Preuves** : `audit-ebay-route.cjs` **377 contrôles** (`[R-lecture-ratee]`,
+  `[R-course]` — lectures TENUES, jamais un délai —, `[R-mont]` et `[R-crea]`
+  étendus) : **16 rouges sur bac8da1**, 0 après ; `prouve-regle-offre.cjs` **26
+  sur 26** (21 mutations de la route, dont 4 nouvelles : `lecture-ratee-remplace`,
+  `luea-arrivee`, `garder-sans-age`, `montant-zero` ; XML sans règle toujours
+  identique, 12 048 caractères). Banc `ebay-regle-offre.cjs` bloc **15** (50
+  contrôles, deux tailles) : **20 rouges sur le build de bac8da1** — exactement
+  les dix contrôles visés par taille, les `finPage` verts — et **284 contrôles, 0
+  rouge** en entier ; `prouve-banc-regle-offre.cjs` : 7 mutations nouvelles
+  (`champ-prix-fige`, `offres-inconnues-relire`, `offres-inconnues-ligne`,
+  `offres-inconnues-lot`, `attendu-inconnu`, `issue-a-revoir`,
+  `relire-ratee-locale`), chacune rouge sur SON contrôle et verte sur ceux
+  qu'elle ne vise pas ; l'ancre d'`issue-montant` suit la nouvelle condition ;
+  les **25 mutations** relancées une par une sur ce code : **25 rouges sur 25**
+  (aucun contrôle précis de `porte-lot` / `porte-et-demontage` déplacé).
+  Les 84 audits verts. Bancs eBay lancés un par un (ports 4792-4798) :
+  `ebay-annonces`, `ebay-programmer`, `ebay-form`, `ebay-api`, `ebay-write`,
+  `ebay-callback`, `ebay-deletion` verts.
+  ⚠️ **Deux bancs rouges, et ils l'étaient AVANT** (mesuré sur le build de
+  bac8da1, lancés seuls) : `ebay-comptes` « publier une paire libre » tombe une
+  fois sur deux ou trois sur les deux builds (« element is outside of the
+  viewport » puis « not stable » sur « Oui, publier » à 1512 px — la feuille
+  bouge pendant le clic ; 2 rouges sur 3 passes sur bac8da1, 1 sur 2 après), et
+  `annonces-carte` « la baisse eBay se déroule jusqu'au bout » (1 rouge, le même
+  sur bac8da1). Une course d'horloge du banc, pas l'écran de la règle — à
+  rejouer sur une requête TENUE, comme `retenir`.
+- **Non mesuré** : un `GetItem` réel d'eBay qui échoue au milieu d'une synchro
+  (servi par le faux de l'audit) ; l'heure de départ d'une lecture n'a de sens que
+  sur l'horloge d'UNE instance Vercel — deux instances aux horloges décalées de
+  plus que la durée d'une pose pourraient encore se croiser.
+
 ### Mise en production du 5 octobre
 PR #442 mergée à 10:24 UTC (80 déploiements sur 24 h : sous la limite), déploiement
 de production READY sur le commit de merge, `/api/sante` répond, le zip servi

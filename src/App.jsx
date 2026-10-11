@@ -9438,8 +9438,10 @@ const resultatReviseEbay = ({ code, j }) => {
 // refuse  : number | null | undefined (undefined = « ne touche pas au refus »)
 // prix    : number | null (null = pas encore connu : la route le relit chez eBay)
 const MONTANT_MAX = 99999.99;
+// ⚠️ (11 octobre, revue) Au moins UN centime une fois arrondi (1e-9 passait
+// « > 0 » et partait à eBay en 0.00) — la copie de la route, au caractère près.
 function montantOk(v) {
-  return typeof v === 'number' && Number.isFinite(v) && v > 0 && v <= MONTANT_MAX
+  return typeof v === 'number' && Number.isFinite(v) && v <= MONTANT_MAX && Math.round(v * 100) >= 1
     && Math.abs(v * 100 - Math.round(v * 100)) < 1e-6;
 }
 function valideRegleOffre({ accepte, refuse, prix }) {
@@ -9525,12 +9527,28 @@ function etatRegleOffre(it, regles, illisibles, maintenant) {
   const offresFaites = Number.isFinite(e.offresFaites) ? e.offresFaites : null;
   const lu = { accepte: e.accepte == null ? null : Number(e.accepte), refuse: e.refuse == null ? null : Number(e.refuse) };
   if (avaitRegle && e.offresActives === true) return { etat: 'connue', accepte: Number(e.accepte), refuse: e.refuse == null ? null : Number(e.refuse), offresActives: true, offresFaites, lueA, lu };
-  if (avaitRegle && e.offresActives == null) return { etat: 'pas-su', raison: 'offres-inconnues', risque: true };
+  // (11 octobre, revue) Le seuil a été RELU : il voyage avec l'état (`lu`), pour
+  // que le panneau le dise et que la garde `attendu` porte ce que Julien voit —
+  // sinon « Définir une règle » y envoyait « inconnu », la route répondait
+  // « eBay a déjà une règle » (409), et le même geste revenait sans fin.
+  if (avaitRegle && e.offresActives == null) return { etat: 'pas-su', raison: 'offres-inconnues', risque: true, lu };
   return { etat: 'aucune', refuse: e.refuse == null ? null : Number(e.refuse), offresActives: e.offresActives, offresFaites, lueA, lu };
 }
+// ⚠️⚠️ (11 octobre, revue) Les « pas su » qu'une relecture chez eBay NE LÈVE PAS
+// — UNE règle pour la ligne du haut, « Relire chez eBay » et « Une règle pour
+// toutes » (§11) : notre propre lecture ratée (« illisible » : rouvrir
+// l'écran), une autre devise, et « offres-inconnues » — eBay a RELU le seuil
+// mais ne montre pas si les offres y sont activées : relire rend la même
+// chose, le geste est de regarder l'annonce sur eBay. La carte le disait ; la
+// ligne du haut et l'aperçu du lot disaient « pas encore lue — relis-la », et
+// la relecture tournait en boucle sur la même annonce.
+const PAS_SU_SANS_RELECTURE = ['illisible', 'devise', 'offres-inconnues'];
+const seRelitChezEbay = (e) => !!e && e.etat === 'pas-su' && !PAS_SU_SANS_RELECTURE.includes(e.raison);
 // La règle que l'écran MONTRE, envoyée à la route comme garde (`attendu`) :
-// connue/aucune ⇒ ce qu'eBay tenait à la dernière lecture ; « pas su » ⇒ 'inconnu'.
-const attenduDe = (et) => (et && (et.etat === 'connue' || et.etat === 'aucune') && et.lu) ? { accepte: et.lu.accepte, refuse: et.lu.refuse } : 'inconnu';
+// connue/aucune ⇒ ce qu'eBay tenait à la dernière lecture ; « pas su » ⇒
+// 'inconnu' — sauf « offres-inconnues », dont le seuil a été relu et que le
+// panneau montre (11 octobre, revue).
+const attenduDe = (et) => (et && (et.etat === 'connue' || et.etat === 'aucune' || (et.etat === 'pas-su' && et.raison === 'offres-inconnues')) && et.lu) ? { accepte: et.lu.accepte, refuse: et.lu.refuse } : 'inconnu';
 const centsR = (v) => (v == null ? null : Math.round(Number(v) * 100));
 // UNE garde pour la carte (✏️ prix) ET la baisse des paires qui dorment (§11) :
 // un nouveau prix à ou sous le seuil d'acceptation connu ⇒ refusé avant l'envoi
@@ -10843,7 +10861,10 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
   const cleRegle = ((it && it._compte) || 'principal') + ':' + String(it.itemId);
   const et = regle;
   const prixVuN = Number.isFinite(prixBase) && prixBase > 0 ? Math.round(prixBase * 100) / 100 : null;
-  const refuseLu = et && (et.etat === 'connue' || et.etat === 'aucune') && et.lu ? et.lu.refuse : null;
+  // Le seuil RELU (connue, aucune, ou « offres-inconnues » : seuil lu, offres
+  // activées ou non pas montré) — ce que le panneau montre et la garde porte.
+  const seuilLu = !!(et && et.lu && (et.etat === 'connue' || et.etat === 'aucune' || (et.etat === 'pas-su' && et.raison === 'offres-inconnues')));
+  const refuseLu = seuilLu ? et.lu.refuse : null;
   const aN = montantSaisi(saisieA), rN = montantSaisi(saisieR);
   const vSaisie = aN == null ? null : valideRegleOffre({ accepte: aN, refuse: rN == null ? undefined : rN, prix: prixVuN });
   const errSaisie = vSaisie && !vSaisie.ok ? vSaisie.err : '';
@@ -10857,7 +10878,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
     const ouvrir = !regleOuverte;
     setRegleOuverte(ouvrir); setRelierOuvert(false); setOffreOuverte(false); dire(''); setRegleSignal('');
     if (ouvrir) {
-      setSaisieA(et && et.etat === 'connue' ? fmtMontant(et.accepte) : '');
+      setSaisieA(et && et.etat === 'connue' ? fmtMontant(et.accepte) : (seuilLu && et.lu.accepte != null ? fmtMontant(et.lu.accepte) : ''));
       setSaisieR(refuseLu != null ? fmtMontant(refuseLu) : '');
       setSousMoitieOk(false);
     }
@@ -10966,14 +10987,22 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
   // l'action serveur `revise` (Trading ReviseInventoryStatus) : ça change la
   // VRAIE annonce eBay. Geste explicite (✏️ → Enregistrer), jamais automatique.
   const [edit, setEdit] = React.useState(false);
-  const [price, setPrice] = React.useState(String(it.price || '').replace('.', ','));
+  // ⚠️⚠️ (11 octobre, revue) Le champ Prix part du prix que la CARTE affiche
+  // (`prixCarte` : relu chez eBay après une 409 « prix-change » ou un
+  // changement de prix), jamais d'une copie figée de la liste. Il était
+  // initialisé UNE fois sur `it.price` (90 €) : la carte disait 95 €, le champ
+  // 90 — et changer le STOCK seul renvoyait 90 € à eBay, avec « ✓ Modifié sur
+  // eBay ». `price` vaut `null` tant qu'il n'est pas TAPÉ : le champ montre
+  // alors le prix de la carte, et le prix ne part pas (§11 : une source).
+  const [price, setPrice] = React.useState(null);
+  const champPrix = price != null ? price : (prixCarte == null || prixCarte === '' ? '' : String(prixCarte).replace('.', ','));
   const [qty, setQty] = React.useState(String(it.qty || ''));
   const [saving, setSaving] = React.useState(false);
   const [msg, setMsg] = React.useState('');
   const [msgTon, setMsgTon] = React.useState('ok');
   // Le prix TAPÉ, lu par la règle de toute saisie de montant (`montantSaisi`,
   // §11) : '' ⇒ null (on n'y touche pas) · un nombre · NaN (illisible).
-  const prixTape = montantSaisi(price);
+  const prixTape = montantSaisi(price == null ? '' : price);
   // (11 octobre) Une saisie non vide qu'on ne sait pas lire (« 72 € », « 0 »)
   // ne vaut PAS « prix inchangé » : avant, rien ne partait et l'écran disait
   // « ✓ Modifié sur eBay » sur un prix qui n'avait pas bougé.
@@ -10990,7 +11019,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
     const res = resultatReviseEbay(await appelEbay({ action: 'revise', itemId: it.itemId, ...(prixChange ? { price: String(price).trim().replace(',', '.') } : {}), quantity: qty, ...corpsCompteEbay(it._compte) }));
     if (res.etat === 'ok') {
       if (res.regleLecture !== undefined && onRegle) onRegle(cleRegle, res.regleLecture, prixChange ? prixTape : undefined);
-      setMsg(res.msg || '✓ Modifié sur eBay'); setMsgTon(res.msg ? res.ton : 'ok'); setEdit(false); if (onSaved) onSaved();
+      setMsg(res.msg || '✓ Modifié sur eBay'); setMsgTon(res.msg ? res.ton : 'ok'); setEdit(false); setPrice(null); if (onSaved) onSaved();
     }
     else { setMsg(res.msg); setMsgTon('warn'); }
     setSaving(false);
@@ -11065,7 +11094,9 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
           style={{ margin: '0 14px 12px', background: E.card2, borderRadius: 12, padding: '11px 12px' }}>
           <div style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, marginBottom: 8 }}>
             {prixVuN ? <>Prix de l'annonce : <b style={{ color: E.text }}>{eurEbay(prixVuN)}</b>. </> : null}Une offre égale ou supérieure au montant ci-dessous est acceptée par eBay sans te demander : la paire est vendue à ce prix. En dessous, l'offre t'arrive sur eBay.
-            {et.etat === 'pas-su' ? ' Règle actuelle : pas encore lue chez eBay — si elle existe, rien ne sera remplacé sans te le redemander.' : ''}
+            {et.etat === 'pas-su' && et.raison === 'offres-inconnues' && et.lu
+              ? <span data-regle-panneau-offres-inconnues={it.itemId}>{` Règle actuelle : eBay montre un seuil${et.lu.accepte != null ? ` dès ${eurEbay(et.lu.accepte)}` : ''}${et.lu.refuse != null ? ` (refus sous ${eurEbay(et.lu.refuse)})` : ''}, mais pas si les offres y sont activées. En enregistrant, VRM les active.`}</span>
+              : (et.etat === 'pas-su' ? ' Règle actuelle : pas encore lue chez eBay — si elle existe, rien ne sera remplacé sans te le redemander.' : '')}
           </div>
           {!prixVuN && <div style={{ fontSize: 12, color: E.warn, marginBottom: 8 }}>Prix de l'annonce pas lu — rouvre l'écran.</div>}
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
@@ -11151,7 +11182,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
           {/* ── Modifier prix / stock ── */}
           {!edit ? (
             <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-              <button type="button" data-ebay-revise-ouvrir={it.itemId} onClick={() => { setEdit(true); setMsg(''); }} style={{ border: `1px solid ${E.border}`, background: 'transparent', color: E.text, borderRadius: 8, padding: '8px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>✏️ Modifier le prix / le stock</button>
+              <button type="button" data-ebay-revise-ouvrir={it.itemId} onClick={() => { setEdit(true); setMsg(''); setPrice(null); }} style={{ border: `1px solid ${E.border}`, background: 'transparent', color: E.text, borderRadius: 8, padding: '8px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>✏️ Modifier le prix / le stock</button>
               {/* Le lien se change ici (la confirmation dit « tu pourras la
                   changer ») ; il ne s'affiche en façade que quand il MANQUE. */}
               {numero && <button type="button" data-relier-changer={it.itemId} onClick={() => { setRelierOuvert((o) => !o); setOffreOuverte(false); setRegleOuverte(false); dire(''); }} style={btnE}>Changer la paire reliée</button>}
@@ -11159,7 +11190,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
             </div>
           ) : (
             <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-              <label style={{ fontSize: 11.5, color: E.muted }}>Prix €<br /><input value={price} onChange={e => setPrice(e.target.value)} inputMode="decimal" data-ebay-revise-prix={it.itemId} style={inpE} /></label>
+              <label style={{ fontSize: 11.5, color: E.muted }}>Prix €<br /><input value={champPrix} onChange={e => setPrice(e.target.value)} inputMode="decimal" data-ebay-revise-prix={it.itemId} style={inpE} /></label>
               <label style={{ fontSize: 11.5, color: E.muted }}>Stock<br /><input value={qty} onChange={e => setQty(e.target.value)} inputMode="numeric" data-ebay-revise-stock={it.itemId} style={{ ...inpE, width: 72 }} /></label>
               <button type="button" data-ebay-revise-enregistrer={it.itemId} onClick={enregistrer} disabled={saving} style={{ border: 'none', background: E.accent, color: '#fff', borderRadius: 8, padding: '10px 14px', fontSize: 13, fontWeight: 700, cursor: saving ? 'default' : 'pointer', fontFamily: 'inherit', opacity: saving ? 0.6 : 1 }}>{saving ? 'Envoi…' : 'Enregistrer'}</button>
               <button type="button" onClick={() => { setEdit(false); setMsg(''); }} style={{ border: `1px solid ${E.border}`, background: 'transparent', color: E.muted, borderRadius: 8, padding: '10px 12px', fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit' }}>Annuler</button>
@@ -11938,6 +11969,10 @@ function EbayReglesToutes({ items = [], etatDe, prixDe, regleBloquee, achats, no
     const base = { cle, it, etat: e, prix: Number.isFinite(prix) ? Math.round(prix * 100) / 100 : null, seuil, numero, achat, cochable: false, defaut: false, plusBas: false };
     if (b) return { ...base, statut: 'exclue', note: b.k === 'vendue' ? 'vendue — retire-la d\'eBay' : (b.k === 'deux-comptes' ? 'en vente sur deux de tes comptes' : 'vente pas vérifiée') };
     if (e && e.etat === 'pas-su' && e.raison === 'devise') return { ...base, statut: 'exclue', note: 'autre devise que l\'euro' };
+    // (11 octobre, revue) Seuil RELU, offres activées ou non pas montré : une
+    // relecture rendrait la même chose (`seRelitChezEbay`) — le geste est de
+    // regarder l'annonce sur eBay, pas de « la relire d'abord ».
+    if (e && e.etat === 'pas-su' && e.raison === 'offres-inconnues') return { ...base, statut: 'a-voir-ebay', note: 'seuil lu ; offres activées ou non : eBay ne le montre pas — regarde-la sur eBay' };
     if (!e || e.etat === 'pas-su') return { ...base, statut: 'a-relire', note: 'règle actuelle pas lue — relis-la d\'abord' };
     if (seuil == null) return { ...base, statut: 'exclue', note: 'prix trop bas' };
     if (e.refuse != null && cents(e.refuse) >= cents(seuil)) return { ...base, statut: 'exclue', note: `eBay refuse déjà sous ${eurEbay(e.refuse)} : baisse d'abord ce refus` };
@@ -12026,8 +12061,17 @@ function EbayReglesToutes({ items = [], etatDe, prixDe, regleBloquee, achats, no
     if (onLot) onLot([]);
     if (onFini) await onFini();
   };
-  const TEXTE_ISSUE = { ok: '✓ réglée', ecart: 'pas confirmée par eBay', 'offres-inconnues': 'seuil posé ; offres activées ou non : eBay ne le montre pas', 'non-relu': 'posée par eBay, pas relue', 'a-revoir': 'à revoir : la règle ou le prix a changé sur eBay', incertain: 'sans réponse claire d\'eBay', ko: 'refusée' };
-  const texteIssue = (r) => r ? (r.issue === 'ko' ? `refusée : « ${r.msg} »` : (r.issue === 'ecart' && r.lecture ? `pas confirmée par eBay (l'annonce montre : ${etatEnClair(r.lecture)})` : TEXTE_ISSUE[r.issue])) : '';
+  const TEXTE_ISSUE = { ok: '✓ réglée', ecart: 'pas confirmée par eBay', 'offres-inconnues': 'seuil posé ; offres activées ou non : eBay ne le montre pas — regarde-la sur eBay', 'non-relu': 'posée par eBay, pas relue', 'a-revoir': 'à revoir : la règle ou le prix a changé sur eBay', incertain: 'sans réponse claire d\'eBay', ko: 'refusée' };
+  const texteIssue = (r) => {
+    if (!r) return '';
+    if (r.issue === 'ko') return `refusée : « ${r.msg} »`;
+    if (r.issue === 'ecart' && r.lecture) return `pas confirmée par eBay (l'annonce montre : ${etatEnClair(r.lecture)})`;
+    // (11 octobre, revue) « À revoir » dit CE qui a changé : le prix relu chez
+    // eBay (le montant au-dessus est déjà recalculé dessus), ou la règle lue.
+    if (r.issue === 'a-revoir' && r.reason === 'prix-change' && r.prix != null && Number.isFinite(Number(r.prix))) return `à revoir : le prix sur eBay est maintenant de ${eurEbay(Number(r.prix))} — rien n'a été envoyé, le montant est recalculé sur ce prix`;
+    if (r.issue === 'a-revoir' && r.lecture) return `à revoir : eBay a déjà une règle (${etatEnClair(r.lecture)}) — rien n'a été envoyé`;
+    return TEXTE_ISSUE[r.issue];
+  };
   const bilanTexte = (b) => {
     const pl = (k, s, p) => (k > 1 ? p : s);
     const morceaux = [`${b.ok} sur ${b.total} réglée${pl(b.ok, '', 's')}`];
@@ -12046,7 +12090,11 @@ function EbayReglesToutes({ items = [], etatDe, prixDe, regleBloquee, achats, no
     // (11 octobre) Une issue n'est montrée que sous une ligne qui propose le
     // montant qui a été ENVOYÉ : changer le pourcentage après un lot laissait
     // « ✓ réglée » sous « dès 72,00 € », comme si 72 € était posé.
-    const r = r0 && l.seuil != null && cents(r0.seuilEnvoye) === cents(l.seuil) ? r0 : null;
+    // ⚠️⚠️ (11 octobre, revue) SAUF « à revoir » : RIEN n'a été posé, et le
+    // montant de la ligne a changé justement PARCE QUE le prix relu chez eBay
+    // l'a recalculé (`prixDe`). Le bilan disait « 1 à revoir » et plus aucune
+    // ligne ne disait laquelle. Chaque ligne affiche son issue.
+    const r = r0 && (r0.issue === 'a-revoir' || (l.seuil != null && cents(r0.seuilEnvoye) === cents(l.seuil))) ? r0 : null;
     const statutAttr = { 'data-regles-ligne': String(l.it.itemId), 'data-regles-statut': l.statut, 'data-regles-seuil': l.seuil != null && (l.cochable || l.statut === 'inchange') ? l.seuil.toFixed(2) : '' };
     return (
       <div key={l.cle} {...statutAttr} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '7px 0', borderTop: `1px solid ${E.border}`, flexWrap: 'wrap' }}>
@@ -12057,8 +12105,9 @@ function EbayReglesToutes({ items = [], etatDe, prixDe, regleBloquee, achats, no
         <div style={{ flex: '1 1 160px', minWidth: 0 }}>
           <div style={{ fontSize: 12.5, fontWeight: 700, color: E.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.it.title || l.it.itemId}</div>
           <div style={{ fontSize: 11.5, color: E.muted, lineHeight: 1.45 }}>
-            {l.prix != null ? eurEbay(l.prix) : '—'}{l.seuil != null && l.statut !== 'exclue' && l.statut !== 'a-relire' ? <> → dès <b style={{ color: E.text }}>{eurEbay(l.seuil)}</b> ({pctReel(l)} %)</> : null}
-            {l.note ? ` · ${l.note}` : ''}
+            {l.prix != null ? eurEbay(l.prix) : '—'}{l.seuil != null && l.statut !== 'exclue' && l.statut !== 'a-relire' && l.statut !== 'a-voir-ebay' ? <> → dès <b style={{ color: E.text }}>{eurEbay(l.seuil)}</b> ({pctReel(l)} %)</> : null}
+            {/* Une cause, une phrase (§7) : l'issue « offres-inconnues » dit déjà ce que la note dirait. */}
+            {l.note && !(r && r.issue === 'offres-inconnues' && l.statut === 'a-voir-ebay') ? ` · ${l.note}` : ''}
             {plusieursComptes ? ` · ${nomRef(l.it._compte || 'principal')}` : ''}
           </div>
           {l.cochable && sousAchat(l) && <div data-regles-sous-achat={String(l.it.itemId)} style={{ fontSize: 11.5, color: E.warn }}>sous ton prix d'achat ({eurEbay(l.achat)})</div>}
@@ -12454,7 +12503,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   const relireRegles = async (cibles) => {
     if (relireReglesEnCours.current || comptesStatut === undefined) return;
     if (comptesStatut === null) { setRelectureRegles('Je n\'ai pas pu vérifier tes connexions eBay — rouvre l\'écran.'); return; }
-    const aRelire = (cibles || []).filter((it) => { const e = etatDe(it); return e && e.etat === 'pas-su' && e.raison !== 'illisible' && e.raison !== 'devise'; });
+    const aRelire = (cibles || []).filter((it) => seRelitChezEbay(etatDe(it)));
     if (!aRelire.length) { setRelectureRegles('Rien à relire chez eBay : rouvre l\'écran pour relire ce que VRM en sait.'); return; }
     relireReglesEnCours.current = true; setRelitRegles(true); setRelectureRegles('');
     const lot = aRelire.slice(0, 50);
@@ -12462,6 +12511,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     const parCompte = new Map();
     for (const it of lot) { const ref = it._compte || 'principal'; if (!parCompte.has(ref)) parCompte.set(ref, []); parCompte.get(ref).push(it); }
     const notes = [];
+    let ratees = 0;
     try {
       for (const [ref, liste] of parCompte) {
         if (!relies.has(ref)) { notes.push(`Le compte eBay ${nomRef(ref)} n'est plus connecté à VRM : ses annonces n'ont pas été relues.`); continue; }
@@ -12469,11 +12519,17 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
           const paquet = liste.slice(i, i + 20);
           const { j } = await appelEbay({ action: 'regleoffrelire', itemIds: paquet.map((it) => String(it.itemId)), ...corpsCompteEbay(ref) });
           if (!(j && j.ok && j.lectures && typeof j.lectures === 'object')) { notes.push(`eBay n'a pas répondu pour le compte ${nomRef(ref)} — réessaie dans un moment.`); break; }
+          // ⚠️⚠️ (11 octobre, revue) Une lecture RATÉE ne remplace pas ce qu'on
+          // savait : la route ne la range que sur une place vide, l'écran ne la
+          // pose pas non plus par-dessus une règle connue (rien lu ne vaut pas
+          // rien). On relit la base juste après, et on DIT combien ont raté.
           for (const [id, l] of Object.entries(j.lectures)) {
-            if (l && typeof l === 'object' && (l.lu === true || (l.raison && l.raison !== 'pas-sur-ce-compte' && l.raison !== 'pas-su'))) surRegle(ref + ':' + id, l);
+            if (l && typeof l === 'object' && l.lu === true) surRegle(ref + ':' + id, l);
+            else if (l && typeof l === 'object' && l.raison === 'lecture-ratee') ratees++;
           }
         }
       }
+      if (ratees) notes.push(`eBay n'a pas rendu ${ratees} annonce${ratees > 1 ? 's' : ''} : VRM garde ce qu'il en savait — réessaie dans un moment.`);
       if (aRelire.length > lot.length) notes.push(`${lot.length} relues sur ${aRelire.length} — relance pour les suivantes.`);
       // Ce que la base en garde (la route vient de le ranger) ; l'état local,
       // posé à l'instant, prime jusqu'au prochain chargement.
@@ -12827,12 +12883,18 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
       n('jamais') && `${n('jamais')} jamais lue${n('jamais') > 1 ? 's' : ''}`,
       n('prix-change') && `${n('prix-change')} au prix changé depuis la dernière lecture : la règle a pu tomber ou rester`,
       n('ancienne') && `${n('ancienne')} dont la dernière lecture a plus d'un mois`,
-      n('offres-inconnues') && `${n('offres-inconnues')} : offres activées ou non, pas lu`,
       pasClaire && `${pasClaire} dont la dernière lecture n'est pas claire`,
       n('devise') && `${n('devise')} dans une autre devise que l'euro`,
     ].filter(Boolean).join(' · ');
   })();
   const risqueRegle = pasSuRegle.some((it) => etatVue(it).risque === true);
+  // (11 octobre, revue) « Seuil relu, offres activées ou non pas montré » n'est
+  // PAS « pas encore lue » : elle se dit à part, avec SON geste (regarder
+  // l'annonce sur eBay), et « Relire chez eBay » ne s'affiche que s'il reste
+  // une annonce vraiment pas lue (§11 : `PAS_SU_SANS_RELECTURE`).
+  const offresInconnuesRegle = pasSuRegle.filter((it) => etatVue(it).raison === 'offres-inconnues');
+  const nPasLueRegle = pasSuRegle.length - offresInconnuesRegle.length;
+  const lienOffresInconnues = offresInconnuesRegle.length === 1 ? (offresInconnuesRegle[0].url || `https://www.ebay.fr/itm/${offresInconnuesRegle[0].itemId}`) : '';
   // Une paire dont la vente n'a pas pu être vérifiée : pas de règle d'offre
   // (dit UNE fois pour toutes les cartes reliées ; une paire vendue ou en
   // vente sur deux comptes se dit sur SA carte, parce que ça distingue).
@@ -12873,9 +12935,12 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   const lignePasSuRegle = pasSuRegle.length > 0 && (
     <div data-regles-pas-su={pasSuRegle.length} data-regles-causes={ORDRE_CAUSES_REGLE.filter((k) => causesRegle.get(k)).map((k) => `${k}:${causesRegle.get(k)}`).join(',')}
       style={{ fontSize: 12, color: risqueRegle ? E.warn : E.muted, lineHeight: 1.5, margin: '0 2px 10px', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-      <span style={{ flex: '1 1 220px', minWidth: 0 }}>Règle d'offre pas encore lue pour {pasSuRegle.length} annonce{pasSuRegle.length > 1 ? 's' : ''} ({causesTexte}).</span>
-      <button type="button" data-regles-relire disabled={relitRegles || comptesStatut === undefined} onClick={() => relireRegles(pasSuRegle)}
-        style={{ ...lienE, padding: '5px 9px', fontSize: 12, opacity: (relitRegles || comptesStatut === undefined) ? 0.55 : 1 }}>{relitRegles ? 'Lecture…' : 'Relire chez eBay'}</button>
+      <span style={{ flex: '1 1 220px', minWidth: 0 }}>
+        {nPasLueRegle > 0 && `Règle d'offre pas encore lue pour ${nPasLueRegle} annonce${nPasLueRegle > 1 ? 's' : ''} (${causesTexte}).`}
+        {offresInconnuesRegle.length > 0 && <span data-regles-offres-inconnues-ligne={offresInconnuesRegle.length}>{nPasLueRegle > 0 ? ' ' : ''}{offresInconnuesRegle.length === 1 ? '1 annonce' : `${offresInconnuesRegle.length} annonces`} où eBay montre ton seuil mais pas si les offres y sont activées : regarde-{offresInconnuesRegle.length > 1 ? 'les' : 'la'} sur eBay{lienOffresInconnues ? <> — <a href={lienOffresInconnues} target="_blank" rel="noreferrer" style={{ color: E.accentSoft, fontWeight: 700, textDecoration: 'none' }}>Voir sur eBay ↗</a></> : '.'}</span>}
+      </span>
+      {nPasLueRegle > 0 && <button type="button" data-regles-relire disabled={relitRegles || comptesStatut === undefined} onClick={() => relireRegles(pasSuRegle)}
+        style={{ ...lienE, padding: '5px 9px', fontSize: 12, opacity: (relitRegles || comptesStatut === undefined) ? 0.55 : 1 }}>{relitRegles ? 'Lecture…' : 'Relire chez eBay'}</button>}
       {porteToutes}
     </div>
   );

@@ -542,8 +542,12 @@ async function modifierDonnee(id, owner, modifier, essais = 6) {
 // Rend { ok:true, accepte, refuse } (montants arrondis au centime) ou
 //      { ok:false, code, err }.
 const MONTANT_MAX = 99999.99;
+// ⚠️ (11 octobre, revue) « > 0 » ne suffisait pas : 1e-9 passait (1e-7 de
+// tolérance sur les centimes), s'arrondissait à 0 et partait chez eBay en
+// « BestOfferAutoAcceptPrice 0.00 » — par la création, sans aucune
+// confirmation. Un montant vaut au moins UN centime UNE FOIS ARRONDI.
 function montantOk(v) {
-  return typeof v === 'number' && Number.isFinite(v) && v > 0 && v <= MONTANT_MAX
+  return typeof v === 'number' && Number.isFinite(v) && v <= MONTANT_MAX && Math.round(v * 100) >= 1
     && Math.abs(v * 100 - Math.round(v * 100)) < 1e-6;
 }
 function valideRegleOffre({ accepte, refuse, prix }) {

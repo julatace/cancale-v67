@@ -65,7 +65,7 @@ const MUTATIONS = [
   // un prix tapé illisible repasse pour « inchangé ».
   ['prix-illisible', [['    if (prixIllisible) {', '    if (false) {']], [11]],
   // l'issue d'un lot reste sous une ligne qui propose un autre montant.
-  ['issue-montant', [['    const r = r0 && l.seuil != null && cents(r0.seuilEnvoye) === cents(l.seuil) ? r0 : null;', '    const r = r0;']], [14]],
+  ['issue-montant', [["    const r = r0 && (r0.issue === 'a-revoir' || (l.seuil != null && cents(r0.seuilEnvoye) === cents(l.seuil))) ? r0 : null;", '    const r = r0;']], [14]],
   // l'aperçu calcule sur le prix de la liste, pas celui que la carte affiche.
   ['apercu-prix', [['    const p0 = prixDe ? prixDe(it) : it.price;', '    const p0 = it.price;']], [14]],
   // deux seuils pour « lue il y a plus de 7 jours ».
@@ -83,6 +83,24 @@ const MUTATIONS = [
     ['      if (onLot) onLot([]);\n      if (onFini) await onFini();\n      return;\n', '      return;\n'],
     ['        if (n > 0 && rappels.current.onInterrompu) rappels.current.onInterrompu({ n, at: Date.now() });\n', ''],
   ], [14], { exiges: [/ne dit jamais « aucune »/, /ne restent pas grisées/, /est DIT tout de suite/] }],
+  // ── Revue du 11 octobre, tour 2 ──
+  // ✏️ : le champ Prix repart de la LISTE (une copie figée) et c'est lui qui part.
+  ['champ-prix-fige', [
+    ["  const champPrix = price != null ? price : (prixCarte == null || prixCarte === '' ? '' : String(prixCarte).replace('.', ','));", "  const champPrix = price != null ? price : String(it.price || '').replace('.', ',');"],
+    ["  const prixTape = montantSaisi(price == null ? '' : price);", '  const prixTape = montantSaisi(champPrix);'],
+  ], [15], { exiges: [/la carte ET le champ Prix de ✏️/, /changer le STOCK seul n'envoie AUCUN prix/], interdits: [/chaque ligne affiche son issue/, /la relecture de A4 rate/] }],
+  // « offres-inconnues » redevient une raison qu'on relit chez eBay.
+  ['offres-inconnues-relire', [["const PAS_SU_SANS_RELECTURE = ['illisible', 'devise', 'offres-inconnues'];", "const PAS_SU_SANS_RELECTURE = ['illisible', 'devise'];"]], [15], { exiges: [/ne renvoie PAS relire/] }],
+  // la ligne du haut la compte de nouveau parmi les « pas encore lues » (et propose « Relire »).
+  ['offres-inconnues-ligne', [['  const nPasLueRegle = pasSuRegle.length - offresInconnuesRegle.length;', '  const nPasLueRegle = pasSuRegle.length;']], [15], { exiges: [/ne propose plus « Relire chez eBay »/], interdits: [/ne renvoie PAS relire/] }],
+  // « Une règle pour toutes » la remet « à relire d'abord ».
+  ['offres-inconnues-lot', [["    if (e && e.etat === 'pas-su' && e.raison === 'offres-inconnues') return { ...base, statut: 'a-voir-ebay', note: 'seuil lu ; offres activées ou non : eBay ne le montre pas — regarde-la sur eBay' };\n", '']], [15], { exiges: [/elle n'est ni « à relire d'abord »/] }],
+  // la garde repart à « inconnu » sur un seuil relu (le 409 « eBay a déjà une règle » sans fin).
+  ['attendu-inconnu', [["const attenduDe = (et) => (et && (et.etat === 'connue' || et.etat === 'aucune' || (et.etat === 'pas-su' && et.raison === 'offres-inconnues')) && et.lu)", "const attenduDe = (et) => (et && (et.etat === 'connue' || et.etat === 'aucune') && et.lu)"]], [15], { exiges: [/le panneau montre le seuil LU/] }],
+  // une issue « à revoir » de nouveau cachée dès que le montant de la ligne change.
+  ['issue-a-revoir', [["    const r = r0 && (r0.issue === 'a-revoir' || (l.seuil != null && cents(r0.seuilEnvoye) === cents(l.seuil))) ? r0 : null;", '    const r = r0 && l.seuil != null && cents(r0.seuilEnvoye) === cents(l.seuil) ? r0 : null;']], [15], { exiges: [/chaque ligne affiche son issue/], interdits: [/la carte ET le champ Prix de ✏️/] }],
+  // une relecture RATÉE reposée localement par-dessus ce que VRM savait.
+  ['relire-ratee-locale', [["            if (l && typeof l === 'object' && l.lu === true) surRegle(ref + ':' + id, l);", "            if (l && typeof l === 'object' && (l.lu === true || (l.raison && l.raison !== 'pas-sur-ce-compte' && l.raison !== 'pas-su'))) surRegle(ref + ':' + id, l);"]], [15], { exiges: [/la relecture de A4 rate/] }],
 ];
 
 function copier(dest) {

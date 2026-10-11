@@ -1444,7 +1444,10 @@ const RA = {};
   });
   await essaie('[R-mont]', async () => {
     const cas = [[{ accepte: 0 }, 'montant'], [{ accepte: -5 }, 'montant'], [{ accepte: '72' }, 'montant'], [{ accepte: 72.555 }, 'montant'], [{ accepte: 1e9 }, 'montant'], [{ accepte: undefined }, 'montant'],
-      [{ accepte: null, refuse: 60 }, 'refuse-seul'], [{ accepte: 60, refuse: 60 }, 'refuse'], [{ accepte: 60, refuse: 70 }, 'refuse'], [{ accepte: 72, refuse: 0 }, 'refuse-montant']];
+      [{ accepte: null, refuse: 60 }, 'refuse-seul'], [{ accepte: 60, refuse: 60 }, 'refuse'], [{ accepte: 60, refuse: 70 }, 'refuse'], [{ accepte: 72, refuse: 0 }, 'refuse-montant'],
+      // (11 octobre, revue — tour 2) des montants qui s'arrondissent à 0 : « > 0 »
+      // les laissait passer, et eBay recevait « 0.00 ».
+      [{ accepte: 1e-9, sousMoitie: true }, 'montant'], [{ accepte: 5e-324, sousMoitie: true }, 'montant'], [{ accepte: 0.004 }, 'montant'], [{ accepte: 72, refuse: 1e-9 }, 'refuse-montant'], [{ accepte: 72, refuse: 5e-324 }, 'refuse-montant']];
     for (const [m, code] of cas) {
       avecR();
       const corps = { action: 'regleoffre', itemId: '110000000301', prixVu: 80, attendu: NUL, confirme: true, ...m };
@@ -1850,6 +1853,98 @@ const RA = {};
       if (relecture0 === undefined) delete process.env.EBAY_RELECTURE_MS; else process.env.EBAY_RELECTURE_MS = relecture0;
     }
   });
+  // ── [R-lecture-ratee] (11 octobre, revue — tour 2) UNE LECTURE RATÉE NE
+  // REMPLACE RIEN. Un GetItem qui hoquette (synchro ou « Relire chez eBay »)
+  // rangeait « pas lue » PAR-DESSUS une règle connue (plus récente, donc
+  // gagnante) : VRM oubliait une règle qu'eBay appliquait toujours — plus
+  // comptée active, plus de relecture des ventes eBay pour ce compte.
+  await essaie('[R-lecture-ratee]', async () => {
+    const poser1 = (e) => lignes.push({ owner: J, id: 'ebay_offres', data: { rev: 4, items: { '110000000301': e } } });
+    for (const action of ['sync', 'regleoffrelire']) {
+      avecR();
+      RA_('110000000301').regle = { actives: true, accepte: '72.00', refuse: null, offresFaites: null };
+      poser1({ lu: true, offresActives: true, accepte: 72, refuse: null, devise: 'EUR', prix: 80, offresFaites: null, lueA: Date.now() - JOUR, par: 'sync' });
+      mode.getitemKoPour = '110000000301';
+      const o = await app(JWT_J, action === 'sync' ? { action: 'sync' } : { action: 'regleoffrelire', itemIds: ['110000000301'] });
+      mode.getitemKoPour = '';
+      const e = (offresDe(J) || {})['110000000301'];
+      dit(o.code === 200 && !!e && e.lu === true && e.accepte === 72 && e.offresActives === true, `[R-lecture-ratee] ${action} : le GetItem de l'annonce rate ⇒ la règle CONNUE (72 €, offres actives) reste dans la base, jamais remplacée par « pas lue »`, JSON.stringify(e));
+      if (action === 'regleoffrelire') dit(!!(o.corps.lectures && o.corps.lectures['110000000301']) && o.corps.lectures['110000000301'].raison === 'lecture-ratee', '[R-lecture-ratee] la réponse, elle, dit que la relecture a raté', JSON.stringify(o.corps.lectures));
+    }
+    // Une écriture INCERTAINE (le risque qu'une règle soit active) n'est pas
+    // effacée non plus par une lecture ratée.
+    avecR();
+    poser1({ lu: false, raison: 'incertain', lueA: Date.now() - H, par: 'regle' });
+    mode.getitemKoPour = '110000000301';
+    await app(JWT_J, { action: 'sync' });
+    mode.getitemKoPour = '';
+    const e2 = (offresDe(J) || {})['110000000301'];
+    dit(!!e2 && e2.lu === false && e2.raison === 'incertain', '[R-lecture-ratee] une écriture incertaine n\'est pas effacée par une lecture ratée (le risque reste dit)', JSON.stringify(e2));
+    // Sur une place VIDE, la lecture ratée se range : « pas lue », jamais « aucune ».
+    avecR(); mode.getitemKoPour = '110000000301';
+    await app(JWT_J, { action: 'sync' });
+    mode.getitemKoPour = '';
+    const e3 = (offresDe(J) || {})['110000000301'];
+    dit(!!e3 && e3.lu === false && e3.raison === 'lecture-ratee', '[R-lecture-ratee] sur une place vide, la lecture ratée est rangée « pas lue »', JSON.stringify(e3));
+  });
+  // ── [R-course] (11 octobre, revue — tour 2) UNE LECTURE PARTIE AVANT UNE
+  // POSE ET RANGÉE APRÈS. `lueA` était l'heure de la RÉPONSE : une lecture lente
+  // se croyait plus fraîche que la relecture de la pose et la réécrivait
+  // (« aucune » sur une annonce qu'eBay vend dès 72 €) ; et `garder` (la liste
+  // d'une synchro) effaçait la règle d'une annonce publiée APRÈS que la liste
+  // avait été lue. La lecture part sur une requête TENUE, jamais un délai.
+  await essaie('[R-course]', async () => {
+    const f0 = global.fetch;
+    try {
+      for (const variante of ['sync', 'relire']) {
+        avecR();
+        lignes.push({ owner: J, id: 'ebay_offres', data: { items: { '110000000301': { lu: true, offresActives: false, accepte: null, refuse: null, devise: 'EUR', prix: 80, lueA: Date.now() - 60000, par: 'sync' } } } });
+        let lancer, fini; const pret = new Promise((r) => { lancer = r; }); const fin = new Promise((r) => { fini = r; });
+        let tenu = false;
+        global.fetch = async (url, opts = {}) => {
+          const h = opts.headers || {}; const corps = String(opts.body || '');
+          if (!tenu && /ebay\.com\/ws/.test(String(url)) && h['X-EBAY-API-CALL-NAME'] === 'GetItem' && /110000000301/.test(corps) && (variante === 'sync' ? /ReturnAll/.test(corps) : true)) {
+            tenu = true;
+            const rep0 = await f0(url, opts); const txt = await rep0.text();   // eBay lit l'annonce MAINTENANT (avant la pose)
+            lancer(); await fin;                                               // la réponse arrive APRÈS la pose
+            return new Response(txt, { status: rep0.status, headers: { 'content-type': 'text/xml' } });
+          }
+          return f0(url, opts);
+        };
+        const pL = variante === 'sync' ? app(JWT_J, { action: 'sync' }) : app(JWT_J, { action: 'regleoffrelire', itemIds: ['110000000301'] });
+        await pret;
+        const res = faireRes();
+        await route.default({ method: 'POST', query: {}, headers: { authorization: 'Bearer ' + JWT_J }, body: POSE('110000000301', 72, 80, NUL) }, res);
+        fini(); await pL; global.fetch = f0;
+        const e = (offresDe(J) || {})['110000000301'], eb = RA_('110000000301').regle;
+        dit(res.code === 200 && eb.accepte != null && !!e && e.lu === true && e.accepte === 72, `[R-course] ${variante} : sa lecture de la Nike part AVANT une pose et revient APRÈS ⇒ la base garde la règle posée (eBay accepte dès ${eb.accepte}), jamais « aucune »`, JSON.stringify(e));
+      }
+      // Une publication avec règle pendant une synchro dont la LISTE a été lue avant elle.
+      avecR();
+      let lancer2, fini2; const pret2 = new Promise((r) => { lancer2 = r; }); const fin2 = new Promise((r) => { fini2 = r; });
+      let tenu2 = false;
+      global.fetch = async (url, opts = {}) => {
+        const h = opts.headers || {}; const corps = String(opts.body || '');
+        if (!tenu2 && /ebay\.com\/ws/.test(String(url)) && h['X-EBAY-API-CALL-NAME'] === 'GetItem' && /ReturnAll/.test(corps)) { tenu2 = true; lancer2(); await fin2; }
+        return f0(url, opts);
+      };
+      const pS = app(JWT_J, { action: 'sync' });
+      await pret2;
+      const res2 = faireRes();
+      const itemP = { title: 'Nike Air Max 1 bleu taille 44', categoryId: '15709', price: '74', conditionId: '3000', photos: ['https://img.test/1.jpg'], aspects: { Marque: 'Nike' }, ebayGere: true, numero: '77', offre: { accepte: 66 } };
+      await route.default({ method: 'POST', query: {}, headers: { authorization: 'Bearer ' + JWT_J }, body: { action: 'publish', item: itemP } }, res2);
+      const id = res2.corps && res2.corps.itemId;
+      fini2(); const sy = await pS; global.fetch = f0;
+      const e2 = id ? (offresDe(J) || {})[String(id)] : null;
+      dit(res2.code === 200 && sy.code === 200 && !!e2 && e2.lu === true && e2.accepte === 66, '[R-course] une annonce publiée avec règle (66 €) PENDANT une synchro dont la liste a été lue avant elle : sa règle reste dans la base (une liste plus ancienne ne prouve pas son absence)', `HTTP ${res2.code}/${sy.code} · ${JSON.stringify(e2)}`);
+      // …et l'AUTRE sens : une annonce terminée dont l'entrée est plus ancienne
+      // que la liste en sort bien (sinon on garderait les règles d'annonces mortes).
+      avecR();
+      lignes.push({ owner: J, id: 'ebay_offres', data: { items: { '110000000999': { lu: true, offresActives: true, accepte: 40, refuse: null, devise: 'EUR', prix: 50, lueA: Date.now() - JOUR, par: 'sync' } } } });
+      await app(JWT_J, { action: 'sync' });
+      dit(!(offresDe(J) || {})['110000000999'], '[R-course] une annonce absente d\'une liste COMPLÈTE, rangée avant elle, en sort toujours');
+    } finally { global.fetch = f0; }
+  });
   const BLOC66 = '<BestOfferDetails><BestOfferEnabled>true</BestOfferEnabled></BestOfferDetails><ListingDetails><BestOfferAutoAcceptPrice currencyID="EUR">66.00</BestOfferAutoAcceptPrice></ListingDetails>';
   const itemC = { title: 'Nike Air Max 1 bleu taille 44', categoryId: '15709', price: '74', conditionId: '3000', photos: ['https://img.test/1.jpg'], aspects: { Marque: 'Nike' }, ebayGere: true };
   await essaie('[R-crea]', async () => {
@@ -1861,6 +1956,17 @@ const RA = {};
       avecR();
       const x = await app(JWT_J, { action: 'pubverify', item: it });
       dit(x.code === 400 && x.corps.reason === reason && zero(x), `[R-crea] ${nom} ⇒ 400 « ${reason} », zéro appel eBay`, `HTTP ${x.code} · ${x.corps && x.corps.reason}`);
+    }
+    // (11 octobre, revue — tour 2) Un montant qui s'arrondit à 0 ne part JAMAIS
+    // (« BestOfferAutoAcceptPrice 0.00 » / « MinimumBestOfferPrice 0.00 ») —
+    // ni à la vérification, ni à la publication, confirmé ou non.
+    for (const action of ['pubverify', 'publish']) {
+      for (const [nom, offre] of [['seuil 1e-9 confirmé', { accepte: 1e-9, sousMoitie: true }], ['seuil 5e-324 confirmé', { accepte: 5e-324, sousMoitie: true }], ['refus 1e-9', { accepte: 66, refuse: 1e-9 }]]) {
+        avecR();
+        const x = await app(JWT_J, { action, item: { ...itemC, offre } });
+        const parti = auCompte(x.journal).find((y) => /AddFixed|VerifyAdd/.test(y.appel));
+        dit(x.code === 400 && x.corps.reason === 'offre' && zero(x), `[R-crea] ${action} ${nom} ⇒ 400 « offre », zéro appel eBay (jamais « 0.00 » chez eBay)`, `HTTP ${x.code} · ${parti ? (parti.corps.match(/<(?:BestOfferAutoAcceptPrice|MinimumBestOfferPrice)[^>]*>[^<]*</g) || []).join(' ') : 'rien parti'}`);
+      }
     }
     avecR();
     const o2 = await app(JWT_J, { action: 'pubverify', item: { ...itemC, offre: { accepte: 7, sousMoitie: true } } });
@@ -1902,7 +2008,8 @@ const RA = {};
     let A = null;
     if (srcs.every(Boolean)) { const c3 = {}; vm.createContext(c3); try { vm.runInContext(srcs.join('\n') + '\n;this.R = { valideRegleOffre, seuilTropBas };', c3); A = c3.R; } catch (_) {} }
     dit(!!A && typeof A.valideRegleOffre === 'function', '[R-§11] la règle d\'offre existe dans l\'app (`valideRegleOffre`, `seuilTropBas`) et se charge', srcs.map((s, i) => s ? '' : noms[i]).filter(Boolean).join(','));
-    const cas = [{ accepte: 72, prix: 80 }, { accepte: 80, prix: 80 }, { accepte: 79.995, prix: 80 }, { accepte: 0 }, { accepte: -1 }, { accepte: '72' }, { accepte: 72.5, refuse: 72.5 }, { accepte: 72, refuse: 60 }, { accepte: null, refuse: 60 }, { accepte: null, refuse: null }, { accepte: 72, refuse: undefined }, { accepte: 1e6 }, { accepte: NaN }, { accepte: 72.555 }];
+    const cas = [{ accepte: 72, prix: 80 }, { accepte: 80, prix: 80 }, { accepte: 79.995, prix: 80 }, { accepte: 0 }, { accepte: -1 }, { accepte: '72' }, { accepte: 72.5, refuse: 72.5 }, { accepte: 72, refuse: 60 }, { accepte: null, refuse: 60 }, { accepte: null, refuse: null }, { accepte: 72, refuse: undefined }, { accepte: 1e6 }, { accepte: NaN }, { accepte: 72.555 },
+      { accepte: 1e-9 }, { accepte: 5e-324 }, { accepte: 0.004 }, { accepte: 0.01 }, { accepte: 72, refuse: 1e-9 }];
     const ecarts = A ? cas.filter((c) => JSON.stringify(A.valideRegleOffre({ prix: null, ...c })) !== JSON.stringify(lib.valideRegleOffre({ prix: null, ...c }))) : cas;
     dit(ecarts.length === 0, '[R-§11] `valideRegleOffre` rend la MÊME chose dans l\'app et sur le serveur', ecarts.map((c) => JSON.stringify(c)).join(' · '));
     const cs = [[7, 80], [40, 80], [39.99, 80], [0.03, 0.05], [72, null], [NaN, 80]];
