@@ -7124,7 +7124,7 @@ qui arrivent pour de vrai (`orders_sold` 18, `inbox` 17, `profile` 12).
 - **Geste de Julien** : installer la **5.166** dans UN seul dossier, recharger
   ses onglets Vinted, puis passer une fois sur **tomj683** et **arthuror2**.
 
-### ⚠️⚠️ « VENDUE HIER, RELIÉE, NI RETIRÉE D'eBAY NI PROPOSÉE » — LA PREUVE DE VENTE MANQUAIT (11 octobre, 5.167)
+### ⚠️⚠️ « VENDUE HIER, RELIÉE, NI RETIRÉE D'eBAY NI PROPOSÉE » — LA PREUVE DE VENTE MANQUAIT (11 octobre, 5.169)
 **Mesuré (lecture seule)** : la N°553 (tx 23052006117, angeled92) n'avait
 **aucune** ligne `harvest_*_txn_*` — elle n'arrive que quand la conversation
 est ouverte sur vinted.fr, geste que « Générer le bordereau » depuis l'app rend
@@ -7140,13 +7140,15 @@ prouvées ; la règle a tourné 36 fois sans rien voir. Le retrait automatique e
   `item_closing_action: 'sold'` seul (mesuré : 10 « sold » n'ont que des
   transactions revenues). Les ventes ne sont lues que s'il reste un bordereau à
   juger ; toute lecture ratée ⇒ `null` / `echec` (« pas su »).
-- **Extension 5.167** : `recupererLabel` range la transaction qu'il lit
+- **Extension 5.169** (⚠️ pas 5.167 : la 5.167.0 et la 5.168.0 PUBLIÉES par
+  #471 et #472 n'ont pas ce code — voir la revue juste en dessous) :
+  `recupererLabel` range la transaction qu'il lit
   (`rangerTransaction`, forme de `capterDatesVersement`, **zéro** requête de plus,
   une écriture par appel, jamais sous un autre numéro) ; `capterPreuvesVente`,
   après la moisson, lit la transaction des ventes en cours sans preuve
   (`gardeLecture` colis, file Vinted, 3 par visite, 6 h, compte du cookie,
   pause) et entre dans la réserve des lectures prioritaires (13 au lieu de 10 :
-  `audit-budget-lectures` suit). `EXT_CAPACITES.preuves = '5.167.0'`.
+  `audit-budget-lectures` suit). `EXT_CAPACITES.preuves = '5.169.0'`.
 - **Écran eBay → Annonces** : « N ventes Vinted en cours pas encore reliées à
   leur annonce » dit **une** fois, comptes nommés, le geste selon `extSait`
   (absente · retard · ok), seulement s'il y a une annonce reliée ; il se relit
@@ -7155,15 +7157,16 @@ prouvées ; la règle a tourné 36 fois sans rien voir. Le retrait automatique e
   nuage (il affichait « éteint » sur un appareil neuf). Son choix n'est pas
   touché.
 - ⚠️⚠️ **Le SKU passe par la numérotation — et un numéro PROVISOIRE n'est pas un
-  ancien** : la 553 fait partie des « 553+ » renumérotés par la 013 (`renum`).
-  `numeroExterne` (app, `api/_lib/numerotation.js`) et `numeroLbcLu` (extension)
-  lisaient « VRM-553 » d'une annonce listée au marqueur comme **B553** — qui ne
-  désigne rien — au lieu du nouveau numéro : plus aucune alerte, et la future
-  553 de la nouvelle série l'aurait fait retirer à tort. `renum` d'abord (chiffres
-  seulement), sinon la lettre d'archive.
+  ancien** : la 553 fait partie des « 553+ » renumérotés par la 013. ⚠️ Le premier
+  correctif de ce chantier lisait `renum` sur un marqueur à l'ANCIENNE forme
+  (liste d'identifiants) : sur la production convertie à 14:58 (carte PAR
+  ANNONCE, `ebayAnnonces = { "128127336988": { "553": "1" } }`), « VRM-553 »
+  restait « 553 » et la N°1 vendue ne déclenchait rien. **Abandonné à la fusion**
+  au profit de `traductionAnnonce` d'integ-11oct (app, serveur, extension) —
+  mesuré : « VRM-553 » → **1**, la paire 1 vendue ⇒ « à retirer ».
 - **Preuves** : `audit-preuve-vente.cjs` (app + vrai `background.js`, même base
   inventée) **54 contrôles, 23 rouges** sur ef03dc8, **20/20 mutations**
-  attrapées ; `audit-numerotation-lecteurs` +3 mutations `renum` (22/22) ; banc
+  attrapées (74 contrôles et 26 mutations après la revue ci-dessous) ; banc
   `ebay-annonces.cjs` sert la vente par son **seul bordereau** (il servait une
   ligne txn : vert sur le défaut, §6.3), plus vente annulée et paire revenue :
   **23 rouges** sur le build d'ef03dc8, **16 rouges** sur un build réaffaibli
@@ -7174,12 +7177,61 @@ prouvées ; la règle a tourné 36 fois sans rien voir. Le retrait automatique e
 - ⚠️ **Non mesuré** : le délai réel entre la vente et la moisson (la preuve
   n'arrive qu'avec la visite suivante sur le bon compte) ; un LOT ne prouve que
   son `item` (les `items` d'un lot ne sont pas dans `meta`) ; rien n'a été
-  envoyé à Vinted ni à eBay ; la 013 n'est pas appliquée (le `renum` réel est
-  inconnu). Aucune notification « vendue ailleurs » n'existe (le contrôle ne
-  tourne qu'app ouverte).
+  envoyé à Vinted ni à eBay. Aucune notification « vendue ailleurs » n'existe (le
+  contrôle ne tourne qu'app ouverte).
 - **Geste de Julien** : terminer l'annonce eBay de l'Autry dans le Seller Hub si
   elle est encore en ligne ; décider s'il garde le retrait automatique ALLUMÉ ;
-  installer la 5.167.
+  installer la **5.169**.
+
+### ⚠️⚠️ REVUE DU CHANTIER eBAY : L'INSTANTANÉ DE LA TRANSACTION, DEUX CONTENUS POUR UN NUMÉRO (11 octobre, 5.169)
+Onze défauts reproduits par la revue (vm + Chromium, données inventées), corrigés
+après une **vraie** fusion d'integ-11oct (aee8e5c : la 013 appliquée à 14:58).
+- ⚠️⚠️ **LA TRANSACTION RANGÉE EST UN INSTANTANÉ, JAMAIS RELU.** Celle que le
+  bordereau range dit « Bordereau envoyé au vendeur » pour toujours : une vente
+  annulée ou **remboursée** ensuite restait « prouvée vendue » — la paire,
+  revenue, sortait des files Leboncoin/eBay et partait au **retrait automatique**
+  d'eBay (ALLUMÉ chez lui). Mesuré en production (lecture seule) : **46 preuves à
+  un état non terminal sur 7 comptes, 5 contredites** par leur vente
+  (« Le paiement a été validé » / « Remboursement effectué », failed).
+  ⇒ Bloc partagé (§11) : un état **non terminal** ne prouve que si la vente du
+  même `tx`, lue dans les ventes **du même compte** (relues à chaque visite),
+  n'est pas revenue ; vente introuvable dans la liste lue ⇒ l'instantané tient ;
+  « Commande finalisée » est terminal. Les comptes qui portent un tel instantané
+  sont lus (`comptesAJuger(…, transactions)`), leur panne vaut « pas su ».
+  ⚠️ Coût : les ventes de ces ~7 comptes (~190 Ko) sont lues à chaque
+  construction de file — la correction avant l'égress.
+- ⚠️⚠️ **DEUX CONTENUS SOUS LE MÊME NUMÉRO.** La 5.167.0 et la 5.168.0 sont
+  **publiées** (#471, #472) **sans** `capterPreuvesVente` ; le chantier promettait
+  à ces versions « l'extension va lire la transaction toute seule ». Extension
+  **5.169.0**, `EXT_CAPACITES.preuves = '5.169.0'` ; l'audit exige « retard »
+  pour 5.164/5.167.0/5.168.0. ⚠️ **À l'intégration : si un autre chantier a déjà
+  pris 5.169, monter encore** — jamais deux contenus sous un numéro.
+- **§11 : l'écran Leboncoin de l'app** gardait sa boucle sur les seules
+  transactions ; il lit maintenant `lireVentesVintedProuvees` (même preuve que
+  `buildLbcData` et l'écran eBay). Banc `lbc-preuve.cjs` (port 4913).
+- **La ligne « pas reliées » d'eBay** ne fait plus tomber la preuve quand les
+  ventes des AUTRES comptes ne se lisent pas (elle vaut `null`, la preuve reste) ;
+  elle **nomme** chaque vente (titre), avec le lien vers **sa** conversation et,
+  à poster, son bouton « Générer le bordereau » (un bordereau capté relie déjà
+  la vente, même en 5.164) ; elle dit le **chiffre** (« 3 par visite », « au fil
+  de tes visites » au-delà — `PREUVE_PAR_VISITE` = `PREUVE_MAX_PAR_VISITE`,
+  comparé par l'audit). Le panneau d'état d'une 5.164 dit ce qui lui manque
+  vraiment (« la preuve des ventes qui n'ont pas encore de bordereau »).
+- **L'interrupteur du retrait automatique** suit le nuage à son arrivée
+  (`v || …` ne pouvait jamais repasser à faux : éteint ailleurs, il affichait
+  ALLUMÉ pendant que le retrait, lui, ne faisait rien).
+- **Preuves** (rouge sur 6729407, vert après, rouge sous mutation) :
+  `audit-preuve-vente.cjs` **74 contrôles, 9 rouges** sur l'avant, **26/26
+  mutations** ; banc `ebay-annonces.cjs` (port `BANC_PORT`) **16 rouges** sur
+  l'avant, 4 builds réaffaiblis rouges (interrupteur, capacité 5.167, rythme,
+  nom de la vente) ; `lbc-preuve.cjs` **4 rouges**, 3 sur un build réaffaibli ;
+  `tout-generer.cjs` **3 rouges**, 1 sur un build réaffaibli ;
+  `audit-numerotation-lecteurs` (integ) + le serveur lit « 553 » → « 1 » sur la
+  forme de la 013 appliquée (`repro` : « 553 » sur l'avant).
+- ⚠️ **Non mesuré** : rien n'est parti chez Vinted ni eBay ; le DOM réel d'une
+  conversation Vinted (`inbox/{conversation_id}`) n'est pas vérifié ici ; une
+  vente remboursée APRÈS sa finalisation (état terminal) resterait prouvée — pas
+  vu dans sa base.
 
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
@@ -7207,7 +7259,7 @@ arrivée** — vérifiée commit par commit sur `manifest.json`, pas devinée.
 | `vestiaire` | `storeVcRecon` | **5.154.0** (4 oct.) | Vestiaire : « ouvre Vestiaire dans ce Chrome, l'extension apprend à le lire » |
 | `detourage` | `detourerPhotos` | **5.156.0** (4 oct.) | « tes photos sont détourées (fond blanc) avant d'être attachées à Leboncoin » |
 | `supprimees` | `noterSuppression` | **5.165.0** (11 oct.) | « une suppression faite sur vinted.fr dans ce Chrome sort d'ici tout de suite » |
-| `preuves` | `capterPreuvesVente` | **5.167.0** (11 oct.) | « l'extension lit toute seule la transaction des ventes en cours pas encore reliées (anti double vente) » |
+| `preuves` | `capterPreuvesVente` | **5.169.0** (11 oct.) | « l'extension lit toute seule la transaction des ventes en cours pas encore reliées (anti double vente) » — ⚠️ pas 5.167 : la 5.167.0 et la 5.168.0 publiées ne l'ont pas |
 
 ⚠️ **DEUX SEUILS POUR UNE MÊME NOTION, EXPRÈS.** Les photos s'attachent côté
 Leboncoin depuis la 5.58 et côté eBay depuis la 5.59 : un seul seuil aurait
@@ -7352,7 +7404,7 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
 | `node scripts/audit-*.cjs` | **85 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
-| `scripts/bancs/*.cjs` | les **77 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
+| `scripts/bancs/*.cjs` | les **78 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
 **Trois règles de preuve :**
@@ -7645,7 +7697,7 @@ src/App.jsx                     l'app (grep avant de lire — le fichier est én
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
 scripts/audit-*.cjs             les 85 audits
-scripts/bancs/                  les 77 bancs (leur README dit comment les lancer)
+scripts/bancs/                  les 78 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 ```
