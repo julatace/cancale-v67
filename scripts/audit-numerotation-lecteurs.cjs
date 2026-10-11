@@ -72,6 +72,8 @@ const MUTATIONS = {
   'extension-lbc': { ext: (s) => remplace(s, "return ad && ad.id != null && ids.some((x) => String(x) === String(ad.id)) ? cleNum(arch + k) : k;", "return k;", 'extension-lbc') },
   // L'extension ne projette plus le marqueur (la clé vaudrait `undefined`, en silence).
   'extension-projection': { ext: (s) => remplace(s, "'vinted_pairs_lost', 'vrm_lbc_liens', 'vrm_numerotation'];", "'vinted_pairs_lost', 'vrm_lbc_liens'];", 'extension-projection') },
+  // Réglages laisse choisir « B » (la lettre des anciens) pour les nouveaux numéros.
+  'reglage-lettre-archive': { app: (s) => remplace(s, "    if (n && arch && n === arch) return;\n", "", 'reglage-lettre-archive') },
   // L'écran ne relit plus la version avant de numéroter.
   'sans-version': { app: (s) => remplace(s, "    if (!numerotationPermise()) return;\n    // ⚠️ TOUTE ANNONCE EN LIGNE DOIT AVOIR UN NUMÉRO", "    // ⚠️ TOUTE ANNONCE EN LIGNE DOIT AVOIR UN NUMÉRO", 'sans-version') },
   // Un refus de la base n'arrête plus les envois.
@@ -303,6 +305,8 @@ const MK = { version: 2, coupure: T, appliqueLe: '2026-10-10T08:00:00.000Z', arc
     dit(/<BlocNumerosPerimes\/>/.test(A) && /function BlocNumerosPerimes\(/.test(A), 'le bloc « écran périmé » est monté sur la coque (tous les écrans)');
     dit(/numerotation: v \}/.test(corps('const saveRoomPlan = async (data) => {', '\n};')), 'le garage 3D estampille la version de la numérotation');
     dit(/'vrm_numerotation'/.test(corps('const SYNC_KEYS = [', '];')), 'le marqueur est synchronisé (lu par l\'app, écrit par le serveur seul)');
+    const reglage = corps('function NumerosSetting() {', 'const pill = ');
+    dit(/if \(n && arch && n === arch\) return;/.test(reglage) && /arch === 'B' \? 'C' : 'B'/.test(reglage), 'Réglages n\'enregistre jamais la lettre des anciens numéros pour les nouveaux (et ne la propose pas par défaut)');
   });
 
   console.log(`\n${ok} vert(s), ${ko} rouge(s).`);

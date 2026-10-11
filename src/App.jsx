@@ -1220,6 +1220,7 @@ const ALLEGER_AVANT_CLOUD = {
 // la coque) et on N'ENVOIE PLUS RIEN : chaque envoi serait refusé de même. Les
 // saisies restent dans le navigateur, et le bloc les rejoue après rechargement.
 let _pushBloque = false;
+let _prefixeRetente = false;
 const cloudPush = () => {
   if (!isCloudReady()) { _pushPending = true; return; } // verrou 1 : cloud pas encore chargé
   if (_pushBloque) { _emitSync('refus'); return; }
@@ -1247,7 +1248,11 @@ const cloudPush = () => {
           try { localStorage.setItem('vrm_num_prefixe', JSON.stringify('')); } catch (_) {}
           try { window.dispatchEvent(new Event('vrm-prefixe')); } catch (_) {}
           toast(`La lettre « ${archiveNumeros() || 'B'} » est celle de tes anciens numéros : tes nouvelles paires restent en chiffres.`);
-          _emitSync('error'); _cloudTimer = null; return;
+          _emitSync('error'); _cloudTimer = null;
+          // Le reste de cet envoi a été refusé avec lui : on le renvoie UNE fois,
+          // sans la lettre (jamais en boucle).
+          if (!_prefixeRetente) { _prefixeRetente = true; setTimeout(() => cloudPush(), 50); }
+          return;
         }
         if (code) { _pushBloque = true; _emitSync('refus'); signalerNumerosPerimes(code); _cloudTimer = null; return; }
       }
@@ -4528,13 +4533,17 @@ const numerotationPermise = () => {
 };
 // Avant d'IMPRIMER (le N° est tamponné sur le bordereau) : on relit si la
 // dernière lecture date de plus d'une minute. Rend true si on peut imprimer.
+// ⚠️ Un écran chargé AVANT la remise à zéro n'a pas de marqueur du tout : la
+// vérification ne dépend donc pas du marqueur local, c'est la VERSION de la base
+// qui tranche. Périmée ⇒ on ne tamponne pas (le bloc « Recharger » s'ouvre).
+// Pas su (la base n'a pas répondu) ⇒ on tamponne : les octets du PDF viennent de
+// la même base, et le bloc s'ouvrira dès qu'elle répondra.
 const assurerVersionNumerotation = async () => {
   if (_verNum.etat !== 'ok' || Date.now() - _verNum.at > 60 * 1000) await verifierVersionNumerotation();
   if (_verNum.etat === 'perime') { signalerNumerosPerimes('version'); return false; }
-  if (_verNum.etat === 'ok') return true;
-  // Pas su : on n'imprime pas sur une version qu'on n'a pas pu vérifier depuis 10 min.
-  return Date.now() - (_verNum.okAt || _verNum.at || 0) < 10 * 60 * 1000 && _verNum.okAt != null;
+  return true;
 };
+const NUMEROS_PERIMES_IMPRESSION = "Cet écran a été ouvert avant la remise à zéro de tes numéros : recharge-le avant d'imprimer (aucun N° n'a été tamponné).";
 onVersionNumerotation((e) => { if (e.etat === 'ok') _verNum.okAt = e.at; });
 
 // Un REFUS de la base (garde-fou de la migration 013) : l'écran a été chargé
@@ -4550,8 +4559,6 @@ const signalerNumerosPerimes = (code) => {
   if (_verNum.etat !== 'perime' && code !== 'vrm_prefixe_archive') _emitVerNum({ etat: 'perime' });
   _numPerimesListeners.forEach(fn => { try { fn(_numPerimes); } catch (_) {} });
 };
-// Les refus que le garde-fou peut rendre (migration 013).
-const REFUS_NUMEROS = ['vrm_pool_retreci', 'vrm_numeros_perimes', 'vrm_fiche_perdue', 'vrm_garage_perime'];
 const codeRefusNumeros = (txt) => { const m = /vrm_(pool_retreci|numeros_perimes|fiche_perdue|garage_perime|prefixe_archive)/.exec(String(txt || '')); return m ? m[0] : null; };
 
 // LES SAISIES D'UN ÉCRAN PÉRIMÉ NE SE PERDENT PAS. Quand la base refuse un écran
@@ -5007,6 +5014,7 @@ const ouvrirPdfOnglet = (url) => {
   } catch (_) { return false; }
 };
 const annotateAndDownloadBordereau = async (numero, title, pdfArrayBuffer, pos) => {
+  if (numero && !(await assurerVersionNumerotation())) throw new Error(NUMEROS_PERIMES_IMPRESSION);
   const PL = await import('pdf-lib');
   const { PDFDocument, rgb, StandardFonts } = PL;
   const pdf = await PDFDocument.load(pdfArrayBuffer);
@@ -5028,6 +5036,7 @@ const annotateAndDownloadBordereau = async (numero, title, pdfArrayBuffer, pos) 
 // [{ numero, title, pdfBuf }]. `resolvePos(w,h)` donne la position mémorisée du
 // tampon pour chaque format → le N° tombe au MÊME endroit sur tous.
 const mergeAndDownloadBordereaux = async (items, resolvePos, opts = {}) => {
+  if ((items || []).some((it) => it && it.numero) && !(await assurerVersionNumerotation())) throw new Error(NUMEROS_PERIMES_IMPRESSION);
   const PL = await import('pdf-lib');
   const { PDFDocument, rgb, StandardFonts } = PL;
   const out = await PDFDocument.create();
@@ -24914,6 +24923,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const buf = lu && lu.octets ? lu.octets : null;
       if (!buf) { libererOngletPdf(); toast(messagePdfManquant(lu)); return; }
       const numero = numForBord(b), title = b.modele || b.article || '';
+      if (numero && !(await assurerVersionNumerotation())) { libererOngletPdf(); toast(NUMEROS_PERIMES_IMPRESSION); return; }
       const { width, height } = await readPdfFirstPageSize(buf);
       const pos = posForFormat(width, height);
       const inv = invForBord(b);
@@ -33098,19 +33108,25 @@ function NumerosSetting() {
     if (touche.current) return;                            // §5.49 : ne remplacer que le vide
     const v = prefixeNumeros(); if (v) { setP(v); setMode('lettre'); }
   }), []);
+  // La lettre des ANCIENS numéros (remise à zéro, migration 013) ne peut pas
+  // être celle des nouveaux : « B12 » désignerait deux paires. La base le
+  // refuse ; l'écran le dit avant, et n'enregistre rien.
+  const arch = archiveNumeros();
   const poser = (v) => {
     touche.current = true;
     const n = String(v || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3);
     setP(n);
+    if (n && arch && n === arch) return;
     // La copie locale tout de suite (`save` écrit 500 ms plus tard) : les champs
     // N° et la numérotation automatique la lisent dès le prochain rendu.
     try { localStorage.setItem('vrm_num_prefixe', JSON.stringify(n)); } catch (_) {}
     save('vrm_num_prefixe', n);
     try { window.dispatchEvent(new Event('vrm-prefixe')); } catch (_) {}
   };
-  const choix = (m) => { setMode(m); poser(m === 'chiffres' ? '' : (p || 'B')); };
+  const defaut = arch === 'B' ? 'C' : 'B';
+  const choix = (m) => { setMode(m); poser(m === 'chiffres' ? '' : (p && p !== arch ? p : defaut)); };
   const pill = (on) => ({ border: `1px solid ${on ? C.accent : C.border}`, background: on ? C.accent : C.card, color: on ? (C.onAccent || '#fff') : C.text, borderRadius: 999, padding: '7px 14px', fontSize: 13, fontWeight: on ? 700 : 600, cursor: 'pointer', fontFamily: 'inherit' });
-  const ex = p || 'B';
+  const ex = p && p !== arch ? p : defaut;
   return (
     <div data-numeros-reglage={mode} style={{padding:'13px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
       <div style={{fontSize:13,fontWeight:600,color:C.text}}>Tes numéros de rangement</div>
@@ -33127,6 +33143,11 @@ function NumerosSetting() {
           <input value={p} onChange={(e) => poser(e.target.value)} placeholder="B" autoCapitalize="characters" aria-label="Lettres de la série"
             style={{width:70,padding:'8px 10px',borderRadius:8,border:`1px solid ${C.border}`,background:C.bg,color:C.text,fontSize:14,fontFamily:'inherit',textTransform:'uppercase'}}/>
         </label>
+      )}
+      {mode === 'lettre' && arch && p === arch && (
+        <div data-numeros-lettre-archive style={{fontSize:12,color:C.text,marginTop:8,lineHeight:1.5}}>
+          « {arch} » est la lettre de tes <b>anciens</b> numéros ({arch}1, {arch}2…) : rien n'est enregistré. Choisis une autre lettre.
+        </div>
       )}
       <div style={{fontSize:11.5,color:C.muted,marginTop:8,lineHeight:1.5}}>
         Tu peux toujours taper un numéro à la main, dans n'importe quelle forme : 125, B125, C40. « b125 » et « B125 » sont le même carton.
