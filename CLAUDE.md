@@ -46,6 +46,13 @@ comptabilité. Il n'est **pas développeur** et pilote tout par des sessions Cla
    son argent, ne pose **jamais** « livraison gratuite », et le port n'est ni une
    recette ni une charge dans sa compta. L'achat d'étiquettes chez un agrégateur
    (chantier K14 de l'agent eBay) est **gelé** pour lui.
+9. **Aucune fonction payante à l'usage ne tourne sur SA clé pour les autres**
+   (11 octobre : « trouve une solution sans IA ou avec leur clé API mais pas la
+   mienne »). Traduction, détourage, IA, lecture d'image : d'abord **sans IA**
+   (ce que le navigateur fait seul : reconnaissance vocale, traducteur intégré à
+   Chrome, modèle local dans la page) ; sinon **la clé du vendeur**, collée par
+   lui, rangée côté serveur, jamais relue par le navigateur. Une fonction qui
+   n'a ni l'un ni l'autre se tait et dit pourquoi — jamais un repli sur sa clé.
 
 ---
 
@@ -73,6 +80,20 @@ en ligne (calculé sur ses ventes passées) ; l'alerte « achat jamais arrivé �
 l'alerte « argent bloqué » ; le rappel des messages sans réponse depuis 24 h ; le
 rappel des évaluations à laisser ; la sauvegarde hebdomadaire envoyée chez lui ;
 le widget iPhone enrichi.
+Et, le même jour, parmi les nouveautés proposées : le badge « bonne affaire »
+sur Vinted, la saisonnalité, la photo d'étiquette → fiche, les acheteurs fidèles.
+
+**Retenu par Julien le 11 octobre (à construire, en plus du reste)** : prix
+d'achat au numérotage · double vente app fermée · rappel URSSAF · fiche
+« republier » · app plus rapide · page « tout va bien ? » · codes de retrait hors
+ligne · rappel la veille au soir · fiche prête à l'arrivée d'un achat · plan des
+paires qui dorment · bénéfice réel · récap comptable · réponses rapides · double
+vérification de connexion · achats à vérifier avant la date limite · retour →
+stock · favoris sans vente (remise native) · boost rentable ? · compte qui vend
+le mieux · ce qui part vite · studio photo + détourage · saisie vocale ·
+traduction des messages · mode équipe — les fonctions payantes selon la règle
+§2.9.
+
 
 **Garde-fous de l'extension, à ne jamais retirer** : agir uniquement au nom du
 **compte connecté dans l'onglet** (`garde`), plafond de **20 actions/heure par
