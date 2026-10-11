@@ -1528,6 +1528,16 @@ function supprimeeApres(ids, id, capTs) {
   if (isNaN(at)) return false;
   return !(Number(capTs) >= at + SUPPR_MARGE_MS);             // lecture d'avant, ou sans date : écartée
 }
+// La date de LECTURE d'un dressing — UNE fonction pour les quatre lecteurs
+// (écran Annonces, file Leboncoin de l'app, files LBC/eBay et photos de
+// l'extension, §11) : `capturedAt` écrit par l'extension (la colonne `cap`
+// d'une projection, ou `data.capturedAt` d'une ligne entière). JAMAIS
+// `updated_at`, qui ment (§4.3) — l'écran Annonces y retombait, les autres non :
+// la même ligne rendait deux listes (revue de la 5.165). Sans date : `NaN`.
+function dateLectureDressing(ligne) {
+  const c = ligne && (ligne.cap != null ? ligne.cap : (ligne.data && ligne.data.capturedAt));
+  return Date.parse(c || '');
+}
 // </supprimees-regle>
 // Ce que la dernière lecture a écarté, par compte (pour le DIRE, une fois, §7).
 const _supprRetirees = {};
@@ -1573,7 +1583,7 @@ const retirerSupprimeesLignes = (lignes, supp) => {
     const uid = k ? k[1] : (d.uid != null ? String(d.uid) : '');
     const ids = uid && supp.get(uid);
     if (!ids || !d.payload) return r;
-    const p2 = retirerSupprimees(d.payload, ids, Date.parse(d.capturedAt || ''));
+    const p2 = retirerSupprimees(d.payload, ids, dateLectureDressing(r));
     return p2 === d.payload ? r : { ...r, data: { ...d, payload: p2 } };
   });
 };
@@ -1827,7 +1837,10 @@ const fetchHarvestBrut = async (uid, type, opts = {}) => {
     const rows = await res.json();
     const row = rows[0];
     if (!row) return null;
-    const ts = harvestTs(row);
+    // Un dressing se date par `dateLectureDressing` (capturedAt seul), comme chez
+    // tous ses autres lecteurs (§11) : la date dite à l'écran et celle qui écarte
+    // les annonces supprimées sont la MÊME.
+    const ts = type === 'listings' ? dateLectureDressing(row) : harvestTs(row);
     if (!isNaN(ts)) _harvestSeen[`${uid}_${type}`] = ts;
     // ⚠️ ON NE JETTE PLUS une moisson « trop vieille » par défaut. Ça faisait
     // afficher « Impossible de charger » (Messages, Annonces…) dès que Julien

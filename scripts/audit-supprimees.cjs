@@ -44,6 +44,8 @@ const MUTATIONS = {
   // plus de marge : une moisson partie avant la suppression la ressusciterait
   marge: [['bg', `return !(Number(capTs) >= at + SUPPR_MARGE_MS);`, `return !(Number(capTs) >= at);`],
           ['app', `return !(Number(capTs) >= at + SUPPR_MARGE_MS);`, `return !(Number(capTs) >= at);`]],
+  // l'écran Annonces daterait de nouveau le dressing par `updated_at` (revue 5.165, §11)
+  datepropre: [['app', `const ts = type === 'listings' ? dateLectureDressing(row) : harvestTs(row);`, `const ts = harvestTs(row);`]],
   // l'app seule change la règle : les deux écrans divergent
   divergence: [['app', `return !(Number(capTs) >= at + SUPPR_MARGE_MS);`, `return !(Number(capTs) >= at + 60 * 60 * 1000);`]],
   // la file Leboncoin de l'extension ne lirait plus les suppressions
@@ -140,12 +142,33 @@ function lignesApp() {
   return ctx.f;
 }
 
+// Le VRAI `fetchHarvestBrut` d'App.jsx (le lecteur de l'écran Annonces et du
+// tableau de bord), dans un vm, contre une ligne servie telle que PostgREST la
+// rendrait à SA projection (`select=data,updated_at,cap:data->>capturedAt`).
+function lecteurAnnoncesApp(ligne, ids) {
+  const morceau = (re, quoi) => { const m = re.exec(F.app); if (!m) throw new Error(quoi + ' introuvable dans App.jsx'); return m[1] || m[0]; };
+  const harvestTs = morceau(/const harvestTs = \(row\) => \{[\s\S]*?\n\};/, 'harvestTs');
+  const regle = morceau(/\/\/ <supprimees-regle>[^\n]*\n([\s\S]*?)\/\/ <\/supprimees-regle>/, 'supprimees-regle');
+  const retirer = morceau(/(const retirerSupprimees = [\s\S]*?)\/\/ Des lignes `harvest_\{uid\}_listings`/, 'retirerSupprimees');
+  const brut = morceau(/const fetchHarvestBrut = async[\s\S]*?\n\};/, 'fetchHarvestBrut');
+  const ctx = { console, Date, JSON, Number, isNaN, Array, Object, String, SUPABASE_URL: 'https://base.test', sbAuth: () => ({}),
+    busyStart() {}, busyEnd() {}, _harvestSeen: {}, _supprRetirees: {}, lireSupprimees: async () => ids,
+    fetch: async (url) => {
+      const u = decodeURIComponent(String(url));
+      const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || '';
+      return { ok: true, json: async () => projette([ligne], u) };
+    } };
+  vm.createContext(ctx);
+  vm.runInContext(`${harvestTs}\n${regle}\n${retirer}\n${brut}\n;this.lire = fetchHarvestBrut;`, ctx);
+  return ctx.lire;
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 // 5. Les files de l'extension (buildLbcData / buildEbayData) dans un vm
 // ════════════════════════════════════════════════════════════════════════════
 const T0 = Date.parse('2026-10-08T22:29:00.000Z');           // la lecture du dressing (inventée)
 const NUMEROS = { '101': { numero: '101', title: 'Paire A', mp: { lbc: true, ebay: true } }, '202': { numero: '202', title: 'Paire B', mp: { lbc: true, ebay: true } } };
-const dressing = (cap) => [{ id: 'harvest_9001_listings', data: { uid: '9001', capturedAt: new Date(cap).toISOString(), payload: { items: [
+const dressing = (cap) => [{ id: 'harvest_9001_listings', updated_at: new Date(Date.now() - 60e3).toISOString(), data: { uid: '9001', ...(cap == null ? {} : { capturedAt: new Date(cap).toISOString() }), payload: { items: [
   { id: 101, title: 'Paire A', price: { amount: '40' }, is_closed: false }, { id: 202, title: 'Paire B', price: { amount: '50' }, is_closed: false }] } } }];
 const dual = (v) => function (...a) { const cb = a[a.length - 1]; if (typeof cb === 'function') { cb(v); return; } return Promise.resolve(v); };
 function projette(rows, url) {
@@ -158,6 +181,7 @@ function projette(rows, url) {
       const src = m[2]; const alias = m[1] || src.split('->').pop().replace(/^>/, '');
       if (src === 'id') { out[alias] = row.id; continue; }
       if (src === 'data') { out[alias] = row.data; continue; }
+      if (src === 'updated_at') { out[alias] = row.updated_at || null; continue; }
       if (/^data(->|->>)/.test(src)) { let v = row.data; for (const seg of src.replace(/^data(->>|->)/, '').split(/->>|->/)) v = (v == null ? null : v[seg]); out[alias] = v == null ? null : v; continue; }
       out[alias] = row[src];
     }
@@ -332,6 +356,31 @@ const numsDe = (r) => ((r && r.queue) || []).map((a) => String(a.numero)).sort()
     const lus = f.j.vinted.map((x) => x.chemin).filter((c) => /5000000001|5000000002/.test(c));
     dit(!lus.some((c) => /5000000001/.test(c)), 'aucune lecture /items/{id} pour l’annonce qu’il vient de supprimer (c’était un 404 assuré)', lus.join(' · '));
     dit(lus.some((c) => /5000000002/.test(c)), 'l’autre est toujours complétée', lus.join(' · '));
+  });
+
+  console.log('── 7. §11 : une ligne de dressing SANS capturedAt rend la même liste chez les quatre lecteurs');
+  await essaie('date du dressing', async () => {
+    // Revue de la 5.165 : l'écran Annonces datait le dressing par `harvestTs`
+    // (repli sur `updated_at`, qui ment — §4.3), les autres par `capturedAt` seul.
+    // Une ligne sans `capturedAt`, `updated_at` d'il y a 1 min, et 101 supprimée
+    // il y a 60 min : la même ligne, deux listes. On compare les SORTIES.
+    const supp = { '101': new Date(Date.now() - 3600e3).toISOString() };
+    const ligne = dressing(null)[0];
+    const idsItems = (p) => JSON.stringify(((p && p.items) || []).map((it) => it.id));
+    const ecran = idsItems(await lecteurAnnoncesApp(ligne, supp)('9001', 'listings'));
+    const fApp = lignesApp();
+    const fileApp = JSON.stringify(((fApp([ligne], new Map([['9001', supp]]))[0].data.payload.items) || []).map((it) => it.id));
+    const ctx = fileExt({ cap: null, supp });
+    const fileExtL = JSON.stringify(((ctx.retirerSupprimeesLignes([ligne], new Map([['9001', supp]]))[0].data.payload.items) || []).map((it) => it.id));
+    const lbc = numsDe(await ctx.buildLbcData());
+    const lbcIds = JSON.stringify(lbc.map((n) => Number(n === '101' ? 101 : n === '202' ? 202 : n)));
+    console.log(`  ·  écran Annonces ${ecran} · file Leboncoin de l’app ${fileApp} · lignes de l’extension ${fileExtL} · file Leboncoin de l’extension ${lbcIds}`);
+    dit(ecran === fileApp && fileApp === fileExtL && fileExtL === lbcIds, 'les quatre lecteurs rendent la MÊME liste (une seule date de lecture : capturedAt)', `écran ${ecran} · app ${fileApp} · ext ${fileExtL} · lbc ${lbcIds}`);
+    dit(ecran === '[202]', 'et c’est la règle : lecture sans date ⇒ la suppression l’écarte', ecran);
+    // L'autre sens : avec capturedAt (relue APRÈS la suppression), elle reste partout.
+    const ligne2 = dressing(Date.now())[0];
+    const ecran2 = idsItems(await lecteurAnnoncesApp(ligne2, supp)('9001', 'listings'));
+    dit(ecran2 === '[101,202]', 'l’autre sens : relue après la suppression (capturedAt), elle reste à l’écran', ecran2);
   });
 
   try { fs.unlinkSync(BG_MUT); } catch (_) {}

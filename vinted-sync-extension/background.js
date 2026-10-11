@@ -1841,6 +1841,16 @@ function supprimeeApres(ids, id, capTs) {
   if (isNaN(at)) return false;
   return !(Number(capTs) >= at + SUPPR_MARGE_MS);             // lecture d'avant, ou sans date : écartée
 }
+// La date de LECTURE d'un dressing — UNE fonction pour les quatre lecteurs
+// (écran Annonces, file Leboncoin de l'app, files LBC/eBay et photos de
+// l'extension, §11) : `capturedAt` écrit par l'extension (la colonne `cap`
+// d'une projection, ou `data.capturedAt` d'une ligne entière). JAMAIS
+// `updated_at`, qui ment (§4.3) — l'écran Annonces y retombait, les autres non :
+// la même ligne rendait deux listes (revue de la 5.165). Sans date : `NaN`.
+function dateLectureDressing(ligne) {
+  const c = ligne && (ligne.cap != null ? ligne.cap : (ligne.data && ligne.data.capturedAt));
+  return Date.parse(c || '');
+}
 // </supprimees-regle>
 // Applique la règle à des lignes `harvest_{uid}_listings` lues en entier
 // (`select=id,data`) : rend des lignes dont les annonces supprimées APRÈS la
@@ -1852,7 +1862,7 @@ function retirerSupprimeesLignes(lignes, supp) {
     const d = r && r.data; const p = d && d.payload;
     const ids = k && supp.get(k[1]);
     if (!ids || !p || !Array.isArray(p.items)) return r;
-    const cap = Date.parse(d.capturedAt || '');
+    const cap = dateLectureDressing(r);
     const items = p.items.filter((it) => !(it && supprimeeApres(ids, it.id, cap)));
     if (items.length === p.items.length) return r;
     return Object.assign({}, r, { data: Object.assign({}, d, { payload: Object.assign({}, p, { items }) }) });
@@ -2709,7 +2719,7 @@ async function capterPhotosAnnonces(uid) {
     try {
       const rows = await sbGet(`app_data?id=eq.harvest_${uid}_listings&select=items:data->payload->items,cap:data->>capturedAt`);
       items = (rows && rows[0] && Array.isArray(rows[0].items)) ? rows[0].items : [];
-      capListe = Date.parse((rows && rows[0] && rows[0].cap) || '');
+      capListe = dateLectureDressing(rows && rows[0]);
     } catch (_) {}
     if (!items.length) return 0;
     // 5.165 : une annonce qu'il vient de SUPPRIMER n'est plus en ligne — la lire
