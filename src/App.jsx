@@ -4181,23 +4181,32 @@ function vmrAuthEtat(timeoutMs = 4000) {
 // en-tête CORS : la page peut afficher l'image, pas en lire les octets (et un
 // canvas nourri d'une image cross-origin devient inexportable, §4.93). Sans
 // extension → null, et le document se génère simplement sans photo.
-function vmrPhoto(url, timeoutMs = 8000) {
+// ⚠️ REFUS ≠ DÉLAI (revue du 11 octobre). `vmrPhotoIssue` dit lequel des deux :
+//    `refus` = l'extension a RÉPONDU sans octets (le CDN la refuse aussi, lien
+//    mort) ; `delai` = aucune réponse avant l'échéance (service worker qui se
+//    réveille, réseau lent) — « pas su », pas « non ». Les photos à l'écran
+//    (src/photosVinted.js) en ont besoin : un délai se réessaie, un refus ne
+//    se réclame pas en boucle, et « recharge cette page » ne se dit pas sur un
+//    refus (le geste ne pourrait pas marcher). `vmrPhoto` garde son contrat
+//    (les octets ou `null`) pour le reçu d'achat.
+function vmrPhotoIssue(url, timeoutMs = 8000) {
   return new Promise((resolve) => {
-    if (typeof window === 'undefined' || !__vmrExtReady || !url) { resolve(null); return; }
+    if (typeof window === 'undefined' || !__vmrExtReady || !url) { resolve({ dataUrl: null, issue: 'absente' }); return; }
     const reqId = 'p' + Date.now() + '_' + Math.random().toString(36).slice(2);
     let done = false, grace = null;
     const fin = (v) => { if (done) return; done = true; clearTimeout(grace); window.removeEventListener('message', onMsg); resolve(v); };
     // Réponse vide : peut-être un pont orphelin (voir `vmrDemande`) — on attend encore un peu.
     const onMsg = (e) => {
       if (!(e.source === window && e.data && e.data.__vmr === 'photo:result' && e.data.reqId === reqId)) return;
-      if (e.data.dataUrl) { fin(e.data.dataUrl); return; }
-      if (!grace) grace = setTimeout(() => fin(null), VMR_GRACE_VIDE_MS);
+      if (e.data.dataUrl) { fin({ dataUrl: e.data.dataUrl, issue: 'ok' }); return; }
+      if (!grace) grace = setTimeout(() => fin({ dataUrl: null, issue: 'refus' }), VMR_GRACE_VIDE_MS);
     };
     window.addEventListener('message', onMsg);
-    setTimeout(() => fin(null), timeoutMs);
-    try { window.postMessage({ __vmr: 'photo', reqId, url }, '*'); } catch (_) { fin(null); }
+    setTimeout(() => fin({ dataUrl: null, issue: 'delai' }), timeoutMs);
+    try { window.postMessage({ __vmr: 'photo', reqId, url }, '*'); } catch (_) { fin({ dataUrl: null, issue: 'delai' }); }
   });
 }
+function vmrPhoto(url, timeoutMs = 8000) { return vmrPhotoIssue(url, timeoutMs).then((r) => (r && r.dataUrl) || null); }
 
 // Le PDF d'un bordereau Leboncoin, lu par l'extension (5.136) : il est derrière
 // SA session Leboncoin, la page ne peut pas le lire. `{dataUrl}` ou `{error}`.
@@ -4458,7 +4467,9 @@ const secoursPhotos = () => {
   return Date.now() - __photosDebut < PHOTOS_GRACE_EXT_MS ? 'attente' : 'non';
 };
 photosVinted.configurer({
-  demander: (u) => vmrPhoto(u),
+  // Le plafond DUR (30 s) : la place reste prise jusqu'à la vraie réponse, et
+  // un délai se dit « délai », jamais « refus » (revue du 11 octobre).
+  demander: (u) => vmrPhotoIssue(u, photosVinted.DELAI_SECOURS_MS),
   secours: secoursPhotos,
   ext: () => (__vmrExtReady ? (__vmrEtat === null ? 'muette' : 'presente') : 'absente'),
 });
@@ -4489,8 +4500,13 @@ const taillePicto = (style) => {
 //     (en attente du secours, ou définitivement) — `null` = rien du tout ;
 //     absent = le pictogramme « image ».
 //   · `onError()` : appelé UNE fois, sans argument, quand la photo est
-//     DÉFINITIVEMENT perdue ici (le secours a échoué ou n'existe pas) — c'est ce
-//     que lisent les écrans qui la retirent de leur liste (`noterImgMorte`).
+//     DÉFINITIVEMENT perdue (l'extension a répondu, et pas avec une image) —
+//     c'est ce que lisent les écrans qui la retirent de leur liste
+//     (`noterImgMorte`). ⚠️ JAMAIS sur « pas d'extension ici, pour l'instant » :
+//     c'est réversible (elle arrive, elle revient), et une photo retirée d'une
+//     liste n'y revient pas — mesuré : Ma journée gardait 6 icônes de repli
+//     après l'arrivée de l'extension, sans lui avoir rien demandé. Pour cet
+//     état-là, ce composant dessine déjà son pictogramme.
 function PhotoVinted({ src, repli, onError, onLoad, style, loading, ...reste }) {
   const vinted = photosVinted.estPhotoVinted(src);
   const [, maj] = React.useReducer((x) => x + 1, 0);
@@ -4513,12 +4529,13 @@ function PhotoVinted({ src, repli, onError, onLoad, style, loading, ...reste }) 
     if (!attend || !el.current) return undefined;
     return photosVinted.observer(el.current, (v) => photosVinted.voir(src, qui.current, v));
   }, [attend, src]);
+  const definitive = vinted && photosVinted.estDefinitive(src);
   const signale = React.useRef(null);
   React.useEffect(() => {
-    if (!mort || signale.current === src) return;
+    if (!definitive || signale.current === src) return;
     signale.current = src;
     if (onError) { try { onError(); } catch (_) {} }
-  }, [mort, src]);
+  }, [definitive, src]);
   if (!vinted) {
     return <img src={src} loading={loading} style={style} {...reste} onLoad={onLoad}
       onError={onError ? () => { try { onError(); } catch (_) {} } : undefined}/>;
@@ -4539,39 +4556,80 @@ function PhotoVinted({ src, repli, onError, onLoad, style, loading, ...reste }) 
     </span>
   );
 }
-// UNE phrase, UNE fois, sur la coque (§7) — seulement quand des photos Vinted
-// ne s'affichent PAS ICI et que rien ne peut aller les chercher (ou que le
-// secours a échoué). Rien quand tout s'affiche, rien pendant qu'on attend
-// encore l'extension, rien pour un lien mort isolé (d'autres photos s'affichent
-// — c'est une photo expirée, pas un blocage). Pas de couleur d'alerte : il n'y
-// a rien d'irréversible, la donnée est intacte.
-// La CAUSE suit la sonde (trois états, trois phrases — on n'affirme pas que
-// c'est Vinted quand on ne l'a pas mesuré) ; le GESTE suit ce qui est possible
-// ici (pas d'extension sur ce téléphone / dans ce navigateur, extension muette,
-// secours refusé).
+// ── QUI DIT DÉJÀ, SUR CET ÉCRAN, CE QUI BLOQUE L'EXTENSION ? (§7) ────────────
+// Les raisons « au niveau de l'extension » (`raisonExtGlobale`) se disent sous
+// les boutons qu'elles grisent (bordereaux, publication). Quand l'extension est
+// muette, la phrase des photos le redisait — « ne répond pas » ×2 et
+// « recharge » ×3 sur l'écran Ventes (revue du 11 octobre). Chaque bandeau qui
+// la DIT s'inscrit ici tant qu'il est affiché ; la phrase des photos laisse
+// alors le geste à ce bandeau-là.
+const __voixExt = new Map();
+const __voixExtSubs = new Set();
+const __voixExtNotifier = () => __voixExtSubs.forEach((f) => { try { f(); } catch (_) {} });
+function useVoixExt(code) {
+  React.useEffect(() => {
+    if (!code) return undefined;
+    const k = {};
+    __voixExt.set(k, code); __voixExtNotifier();
+    return () => { __voixExt.delete(k); __voixExtNotifier(); };
+  }, [code]);
+}
+const voixExtDit = (code) => { for (const c of __voixExt.values()) if (c === code) return true; return false; };
+const ecouterVoixExt = (fn) => { __voixExtSubs.add(fn); return () => __voixExtSubs.delete(fn); };
+// UNE phrase, UNE fois, sur la coque (§7) — la règle de QUAND parler vit dans
+// `photosVinted.decision()` (src/photosVinted.js), jugée sur ce qui est MONTÉ
+// maintenant : au moins trois photos perdues à l'écran, aucune récupérée par
+// l'extension, et rien qui montre que le CDN sert ce navigateur. Rien pendant
+// qu'on mesure encore la cause, rien pour des liens morts isolés. Pas de
+// couleur d'alerte : il n'y a rien d'irréversible, la donnée est intacte.
+// La CAUSE dit ce qui est MESURÉ, rien de plus :
+//   · deux échecs réseau espacés, et l'extension les a récupérées ⇒ c'est la
+//     PAGE qui est refusée (« dans VRM ») ;
+//   · deux échecs réseau, sans plus ⇒ « n'arrive pas à les charger ici » (une
+//     coupure, un filtre ou CORP donnent la même erreur : on ne tranche pas) ;
+//   · le serveur répond ⇒ il répond, mais l'image ne s'affiche pas ;
+//   · sinon ⇒ on n'a pas pu mesurer.
+// Le GESTE suit ce qui est possible ici : rien à régler quand l'extension a
+// répondu sans image (« recharge » ne pourrait pas marcher), recharger quand
+// elle est muette — sauf si un bandeau de l'écran le dit déjà —, l'ordinateur
+// sur un téléphone, le bon Chrome ailleurs.
 function PhotosBloquees() {
   const sansSouris = useSansSouris();
   const [, maj] = React.useReducer((x) => x + 1, 0);
   React.useEffect(() => photosVinted.ecouter(maj), []);
   React.useEffect(() => onVmrExt(maj), []);
-  const g = photosVinted.etatGlobal();
-  if (!(g.koNatif > 0 && g.okNatif === 0 && g.morts > 0)) return null;
-  const cause = g.sonde === 'bloquee'
-    ? "Ce navigateur bloque les photos de Vinted dès qu'elles s'affichent en dehors de vinted.fr."
-    : g.sonde === 'reponse'
-      ? "Le serveur de photos de Vinted répond, mais ses images ne s'affichent pas dans VRM."
-      : "Les photos de Vinted ne s'affichent pas dans VRM, et je n'ai pas pu mesurer pourquoi.";
-  const ext = __vmrExtReady ? (__vmrEtat === null ? 'muette' : 'presente') : 'absente';
-  const geste = ext === 'presente'
-    ? <>L'extension VRM n'a pas pu les récupérer non plus : <b>recharge cette page</b>. Tes annonces et tes ventes ne sont pas touchées.</>
-    : ext === 'muette'
-      ? <>L'extension VRM, qui sait aller les chercher, ne répond pas : <b>recharge cette page</b>.</>
-      : sansSouris
-        ? <>Ici, rien ne peut aller les chercher : sur l'<b>ordinateur où l'extension VRM est installée</b>, c'est elle qui les récupère. Tes annonces et tes ventes ne sont pas touchées.</>
-        : <><b>Ouvre VRM dans le Chrome où l'extension VRM est installée</b> : c'est elle qui va les chercher. Tes annonces et tes ventes ne sont pas touchées.</>;
+  React.useEffect(() => ecouterVoixExt(maj), []);
+  const d = photosVinted.decision();
+  if (!d || !d.parle) return null;
+  const extPresente = d.ext === 'presente';
+  const cause = d.cause === 'navigateur' && !extPresente
+    ? "Ce navigateur refuse d'afficher les photos de Vinted dans VRM — l'extension VRM, elle, sait les récupérer."
+    : d.cause === 'navigateur' || d.cause === 'injoignable'
+      ? "Ce navigateur n'arrive pas à charger les photos de Vinted ici."
+      : d.cause === 'reponse'
+        ? "Le serveur de photos de Vinted répond, mais ses images ne s'affichent pas dans VRM."
+        : "Les photos de Vinted ne s'affichent pas ici, et je n'ai pas pu mesurer pourquoi.";
+  const intactes = " Tes annonces et tes ventes ne sont pas touchées.";
+  const codeGeste = extPresente ? 'refus'
+    : d.ext === 'muette' ? (voixExtDit('muette') ? 'muette-ailleurs' : 'muette')
+      : sansSouris ? 'telephone' : 'chrome';
+  const geste = codeGeste === 'refus'
+    ? <>L'extension VRM n'a pas pu les récupérer non plus : rien à régler ici, je réessaie de temps en temps.{intactes}</>
+    : codeGeste === 'muette-ailleurs'
+      ? <>C'est l'extension VRM qui va les chercher : le message sur l'extension, plus bas, dit quoi faire.</>
+      : codeGeste === 'muette'
+        ? <>L'extension VRM, qui sait aller les chercher, ne répond pas : <b>recharge cette page</b>.</>
+        : codeGeste === 'telephone'
+          ? <>Ici, rien ne peut aller les chercher : sur l'<b>ordinateur où l'extension VRM est installée</b>, c'est elle qui les récupère.{intactes}</>
+          : <><b>Ouvre VRM dans le Chrome où l'extension VRM est installée</b> : c'est elle qui va les chercher.{intactes}</>;
+  // ⚠️ `vrm-sous-ile` (index.html) : sur ordinateur, l'île d'actions flotte en
+  //    haut à droite et le GESTE de cette phrase passait dessous (mesuré mot par
+  //    mot, revue du 11 octobre). Le côté droit lui laisse sa place — c'est
+  //    pourquoi le style en ligne ne pose AUCUN padding à droite (il gagnerait
+  //    sur la classe).
   return (
-    <div style={{ padding: '12px 16px 4px' }}>
-      <div data-photos-bloquees={g.sonde || 'passu'} data-photos-geste={ext === 'absente' ? (sansSouris ? 'telephone' : 'chrome') : ext}
+    <div className="vrm-sous-ile" style={{ paddingTop: 12, paddingLeft: 16, paddingBottom: 4 }}>
+      <div data-photos-bloquees={d.cause} data-photos-geste={codeGeste} data-photos-perdues={d.morts}
         style={{ display: 'flex', gap: 10, alignItems: 'flex-start', border: `1px solid ${C.border}`, background: C.card, borderRadius: 10, padding: '11px 13px', fontSize: 13, lineHeight: 1.5, color: C.text }}>
         <span style={{ flexShrink: 0, marginTop: 1, color: C.muted }}><Icon name="image" size={18}/></span>
         <span>{cause} {geste}</span>
@@ -8406,9 +8464,12 @@ function RaisonBordereauxGrises({ ventes }) {
   useExtVivante();
   const sansSouris = useSansSouris();
   const n = (ventes || []).length;
-  if (!n) return null;
-  const r = raisonExtGlobale(sansSouris);
-  if (!r || r.code === 'verif') return null;
+  const r = n ? raisonExtGlobale(sansSouris) : null;
+  const montre = !!(r && r.code !== 'verif');
+  // Ce bandeau DIT la raison de l'extension sur cet écran : la phrase des photos
+  // ne la répète pas (§7, `useVoixExt`).
+  useVoixExt(montre ? r.code : null);
+  if (!montre) return null;
   return (
     <div data-raison-bord={r.code} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12.5, color: C.text, background: C.card,
       border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.warn}`, borderRadius: 10, padding: '9px 12px', marginBottom: 10, lineHeight: 1.45 }}>
@@ -8693,6 +8754,7 @@ function RaisonPublication({ n, place }) {
   const sansSouris = useSansSouris();
   useExtVivante();
   const r = raisonExtGlobale(sansSouris, { cap: 'publication', role: 'publie tes annonces' });
+  useVoixExt(r && n ? r.code : null);
   if (!r || !n) return null;
   return (
     <div data-raison-publier={r.code} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12.5, color: C.text, background: C.card,

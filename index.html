@@ -200,6 +200,10 @@
     /* Sa largeur RÉELLE est publiée par l'app (`--vrm-ile`) : elle change
        avec la pastille « Actions possibles · compte ». 208 px en repli. */
     @media (min-width: 1024px){ .vrm-tete-row{ padding-right: var(--vrm-ile, 208px); } }
+    /* La phrase des photos Vinted, posée en tête de page sur la coque : même
+       réserve (son geste passait sous l'île — revue du 11 octobre). */
+    .vrm-sous-ile{ padding-right: 16px; }
+    @media (min-width: 1024px){ .vrm-sous-ile{ padding-right: var(--vrm-ile, 208px); } }
     .vrm-rangee{ flex-wrap:nowrap; overflow-x:auto; }
     @media (min-width: 1024px){ .vrm-rangee{ flex-wrap:wrap; overflow-x:visible; } }
     /* Carrousel photo (dernières ventes) : on fait défiler au doigt sur

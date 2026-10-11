@@ -35,9 +35,33 @@
 //      (`no-referrer`), aucune phrase ;
 //   E. CDN qui répond une erreur (la sonde reçoit une réponse) : une AUTRE
 //      phrase que « bloquée » — on n'affirme pas ce qu'on n'a pas mesuré.
+// ── REVUE DU 11 OCTOBRE (deux relecteurs, défauts reproduits) ──
+//   A (suite). Ma journée et Achats aussi (le banc ne rendait que trois écrans).
+//   G. des liens morts, l'extension rend les autres : aucune phrase (elle
+//      disait « l'extension n'a pas pu les récupérer non plus : recharge ») ;
+//   H. le CDN est INJOIGNABLE (connexion coupée), puis revient : la phrase
+//      n'affirme pas un refus « dans VRM » qu'elle n'a pas mesuré, et APRÈS le
+//      retour les photos s'affichent sans recharger (un échec passager était
+//      figé pour la session) ;
+//   M. les photos de Ventes passent (cache), celles d'Annonces sont bloquées :
+//      la phrase sur Annonces (une photo vue ailleurs la faisait taire) ;
+//   R. Vinted refuse tout, à l'extension aussi : la phrase ne dit pas
+//      « recharge » (le geste ne peut pas marcher) ;
+//   L. l'extension répond en 9 s : les photos s'affichent, aucune phrase, et
+//      jamais plus de 3 demandes chez elle (un délai de 8 s libérait la place) ;
+//   J. l'extension arrive APRÈS l'ouverture, sur Ma journée : les photos
+//      reviennent sans changer d'écran (elles étaient retirées pour de bon) ;
+//   U. l'extension est MUETTE et un bandeau le dit déjà : « ne répond pas » une
+//      seule fois sur l'écran — et sans autre bandeau, la phrase porte le geste.
+//      Mesurée 5,5 s après le changement d'écran : la cause s'y remesure, et la
+//      phrase ne doit pas DISPARAÎTRE pendant ce temps (le premier jet de la
+//      correction l'effaçait 8 s à chaque écran) ;
+//   S. des liens morts sur Ventes, puis Annonces bloquée : la cause est
+//      remesurée sur l'écran qui échoue (elle restait « le serveur répond ») ;
+//   K. à 1512 px, aucun mot de la phrase sous l'île d'actions.
 // On juge les ÉLÉMENTS rendus (naturalWidth, `data-photo-vinted`,
-// `data-photos-bloquees`), les demandes reçues par le pont et le corps envoyé à
-// la base — pas une formulation.
+// `data-photos-bloquees` = la cause affichée, `data-photos-geste`), les
+// demandes reçues par le pont et le corps envoyé à la base — pas une formulation.
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), https = require('https'), path = require('path'), os = require('os'), cp = require('child_process');
@@ -65,13 +89,20 @@ const VENTES = [
   { tx: 9305, titre: 'Banc Vente Echo', status: "Commande finalisée - l'acheteur a validé la commande", tus: 'completed', j: 4 },
 ].map((v, i) => ({ transaction_id: v.tx, title: v.titre, price: { amount: String(50 + i), currency_code: 'EUR' }, status: v.status,
   transaction_user_status: v.tus, date: ilYa(v.j), photo: { url: photoUrl(900 + i) } }));
-const TITRES = [...ANNONCES.map((a) => a.title), ...VENTES.map((v) => v.title)];
+const ACHATS = ['Banc Achat Un', 'Banc Achat Deux', 'Banc Achat Trois', 'Banc Achat Quatre'].map((t, i) => ({ transaction_id: 9401 + i, title: t,
+  price: { amount: String(30 + i), currency_code: 'EUR' }, status: "Commande expédiée et en cours d'acheminement ! ", transaction_user_status: 'waiting',
+  date: ilYa(1 + i), photo: { url: photoUrl(700 + i) } }));
+const TITRES = [...ANNONCES.map((a) => a.title), ...VENTES.map((v) => v.title), ...ACHATS.map((v) => v.title)];
+// Les familles de photos, par leur jeton (pour un CDN qui ne sert QUE certaines).
+const JETONS_ANNONCES = ANNONCES.map((_, i) => hex(100 + i, 46));
+const JETONS_VENTES = VENTES.map((_, i) => hex(900 + i, 46));
 const ACCOUNTS = [{ id: 1, vinted_user_id: '111', login: 'compte_banc', domain: 'www.vinted.fr', updated_at: new Date(MAINTENANT).toISOString() }];
 const PDF_B64 = fs.readFileSync(path.join(__dirname, 'bordereau-test.b64'), 'utf8').trim();
 const ROWS = [
   { id: 'main', data: {} },
   { id: 'harvest_111_listings', data: { uid: '111', capturedAt: new Date(MAINTENANT).toISOString(), nItems: N_ANN, payload: { items: ANNONCES, pagination: { total_entries: N_ANN, total_pages: 1 } } } },
   { id: 'harvest_111_orders_sold', data: { uid: '111', capturedAt: new Date(MAINTENANT).toISOString(), payload: { my_orders: VENTES } } },
+  { id: 'harvest_111_orders_purchased', data: { uid: '111', capturedAt: new Date(MAINTENANT).toISOString(), payload: { my_orders: ACHATS } } },
   { id: 'email_bord_banc_bravo', data: { transaction: '9302', filename: 'bordereau-bravo.pdf', modele: 'Banc Vente Bravo', article: 'Banc Vente Bravo', receivedAt: ilYa(0.2), dateLimite: dansJ(6), pdfB64: PDF_B64 } },
 ];
 
@@ -102,14 +133,20 @@ const PNG_PONT = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAMAAAADCAIAAADZ
 const dirCert = fs.mkdtempSync(path.join(os.tmpdir(), 'banc-cdn-'));
 cp.execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', path.join(dirCert, 'k.pem'), '-out', path.join(dirCert, 'c.pem'),
   '-days', '1', '-subj', '/CN=images1.vinted.net', '-addext', 'subjectAltName=DNS:images1.vinted.net'], { stdio: 'ignore' });
+// Modes : ok · corp · referent · erreur (404) · coupe (connexion coupée = CDN
+// injoignable, comme une panne ou un filtre) · tout403 (refuse TOUT, à
+// l'extension aussi) · un-ok (les photos d'annonces en CORP, les autres servies).
 const cdnEtat = { mode: 'corp', vues: [] };
 const cdn = https.createServer({ key: fs.readFileSync(path.join(dirCert, 'k.pem')), cert: fs.readFileSync(path.join(dirCert, 'c.pem')) }, (q, r) => {
   cdnEtat.vues.push({ url: q.url, ref: q.headers.referer || '', dest: q.headers['sec-fetch-dest'] || '' });
   const m = cdnEtat.mode;
-  if (m === 'erreur') { r.writeHead(404, { 'content-type': 'text/html' }); return r.end('<html>introuvable</html>'); }
+  if (m === 'coupe') { q.socket.destroy(); return; }
+  if (m === 'tout403') { r.writeHead(403, { 'content-type': 'text/plain' }); return r.end('hotlink'); }
+  if (m === 'erreur' || (m === 'v404-a-corp' && JETONS_VENTES.some((x) => q.url.includes(x)))) { r.writeHead(404, { 'content-type': 'text/html' }); return r.end('<html>introuvable</html>'); }
   if (m === 'referent' && q.headers.referer) { r.writeHead(403, { 'content-type': 'text/plain' }); return r.end('hotlink'); }
   const h = { 'content-type': 'image/png', 'cache-control': 'no-store' };
   if (m === 'corp') h['cross-origin-resource-policy'] = 'same-site';
+  if ((m === 'un-ok' || m === 'v404-a-corp') && JETONS_ANNONCES.some((x) => q.url.includes(x))) h['cross-origin-resource-policy'] = 'same-site';
   r.writeHead(200, h); r.end(PNG_CDN);
 });
 cdn.on('error', (e) => { console.log('KO  le port ' + PORT_CDN + ' est pris (' + e.code + ') — relance le banc seul'); process.exit(1); });
@@ -130,30 +167,55 @@ const projette = (row, sel) => {
 };
 
 // ── Le pont de l'extension : le VRAI dialogue de vmrPhoto, et ses compteurs ──
-const PONT = ({ dataUrl, delai }) => {
-  window.__pont = { enVol: 0, max: 0, total: 0, parUrl: {} };
+// Options : `refuse` (des morceaux d'adresse que l'extension NE rend PAS — un
+// lien mort), `lentPremiers`/`lentMs` (les N premières réponses tardent),
+// `retard` (le pont n'existe pas avant ce délai : extension installée ou
+// réactivée pendant que VRM est ouvert), `muet` (il annonce sa présence, puis
+// ne répond plus à rien : service worker mort).
+const PONT = ({ dataUrl, delai, refuse, refusePremieres, lentPremieres, lentMs, retard, muet }) => {
+  window.__pont = { enVol: 0, max: 0, total: 0, rendues: 0, refusees: 0, parUrl: {} };
   const version = '5.164.0';
+  const t0 = Date.now();
   const post = (m) => window.postMessage(m, '*');
   window.addEventListener('message', (e) => {
     const d = e.data; if (e.source !== window || !d || typeof d !== 'object') return;
+    if (retard && Date.now() - t0 < retard) return;
     if (d.__vmr === 'ping') post({ __vmr: 'ready', version, id: 'banc' });
+    if (muet) return;
     if (d.__vmr === 'etat') post({ __vmr: 'etat:result', reqId: d.reqId, resp: { ok: true, version, vrm: { ok: true, connecte: true, email: 'vendeur@exemple.test', user_id: 'u1' }, vinted: null, cmds: {} } });
     if (d.__vmr === 'photo') {
       const p = window.__pont;
       p.enVol++; p.total++; p.max = Math.max(p.max, p.enVol); p.parUrl[d.url] = (p.parUrl[d.url] || 0) + 1;
-      setTimeout(() => { p.enVol--; post({ __vmr: 'photo:result', reqId: d.reqId, dataUrl }); }, delai);
+      // `refusePremieres` : {cles, n} — les n PREMIÈRES photos demandées parmi
+      // ces familles sont introuvables (un lien mort, à l'écran par construction).
+      let nul = !!(refuse && refuse.some((x) => String(d.url).includes(x)));
+      if (refusePremieres && refusePremieres.cles.some((x) => String(d.url).includes(x))) {
+        p.refusPris = p.refusPris || [];
+        if (p.refusPris.includes(d.url)) nul = true;
+        else if (p.refusPris.length < refusePremieres.n) { p.refusPris.push(d.url); nul = true; }
+      }
+      // `lentPremieres` : {cles, n} — les n PREMIÈRES photos demandées parmi ces
+      // familles tardent (à l'écran par construction) ; leurs redemandes, non.
+      let lente = false;
+      if (lentPremieres && lentPremieres.cles.some((x) => String(d.url).includes(x))) {
+        p.lentesPrises = p.lentesPrises || [];
+        if (!p.lentesPrises.includes(d.url) && p.lentesPrises.length < lentPremieres.n) { p.lentesPrises.push(d.url); lente = true; }
+      }
+      const ms = lente ? lentMs : delai;
+      setTimeout(() => { p.enVol--; if (nul || !dataUrl) p.refusees++; else p.rendues++; post({ __vmr: 'photo:result', reqId: d.reqId, dataUrl: nul ? null : dataUrl }); }, ms);
     }
   });
-  post({ __vmr: 'ready', version, id: 'banc' });
+  if (retard) setTimeout(() => post({ __vmr: 'ready', version, id: 'banc' }), retard);
+  else post({ __vmr: 'ready', version, id: 'banc' });
 };
 
-async function preparer(b, vp, { pont = false, diagKO = false } = {}) {
+async function preparer(b, vp, { pont = false, diagKO = false, pontOpts = {} } = {}) {
   const ctx = await b.newContext({ viewport: vp, ignoreHTTPSErrors: true, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   const ecrits = [];
   await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
-  if (pont) await pg.addInitScript(PONT, { dataUrl: PNG_PONT, delai: 700 });
+  if (pont) await pg.addInitScript(PONT, Object.assign({ dataUrl: PNG_PONT, delai: 700 }, pontOpts));
   // Tout le reste d'Internet est coupé (déterminisme) — sauf le faux CDN, qui
   // passe par le VRAI réseau de Chromium (c'est là que CORP s'applique).
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1|images1\.vinted\.net)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
@@ -220,6 +282,7 @@ const mesurer = (pg) => pg.evaluate(() => {
   out.sonde = ph[0] ? ph[0].getAttribute('data-photos-bloquees') : null;
   out.geste = ph[0] ? ph[0].getAttribute('data-photos-geste') : null;
   out.texte = ph[0] ? ph[0].innerText : '';
+  out.perdues = document.querySelectorAll('[data-photo-vinted="perdue"]').length;
   const t = document.body.innerText;
   out.garde = (/n'a pas pu s'afficher|n’a pas pu s’afficher|Cannot access|is not defined/.exec(t) || [null])[0];
   out.sw = document.documentElement.scrollWidth; out.cw = document.documentElement.clientWidth;
@@ -227,7 +290,11 @@ const mesurer = (pg) => pg.evaluate(() => {
 });
 const pont = (pg) => pg.evaluate(() => window.__pont ? { ...window.__pont, parUrl: { ...window.__pont.parUrl } } : null);
 const ouvrir = async (pg, onglet, ms = 6000) => { await pg.goto(`http://localhost:${PORT}/?tab=${onglet}`, { waitUntil: 'domcontentloaded' }); await pg.waitForTimeout(ms); };
-const section = async (pg, id, ms = 4000) => { await pg.click(`[data-section="${id}"]`, { timeout: 5000 }); await pg.waitForTimeout(ms); };
+const section = async (pg, id, ms = 4000) => {
+  try { await pg.click(`[data-section="${id}"]`, { timeout: 8000 }); }
+  catch (e) { await capture(pg, 'echec-section-' + id); throw e; }
+  await pg.waitForTimeout(ms);
+};
 // Amène la première photo en haut de la zone qui défile (sur téléphone, le
 // résumé du haut occupe presque tout l'écran), puis laisse le secours arriver.
 const versPhotos = async (pg, ms = 4500) => {
@@ -245,6 +312,40 @@ const sain = (m, nom) => {
   dit(m.sw <= m.cw + 1, `${nom} : aucun débordement horizontal`, `${m.sw} > ${m.cw}`);
 };
 const capture = (pg, nom) => pg.screenshot({ path: path.join(os.tmpdir(), `photos-vinted-${nom}.png`), fullPage: false }).catch(() => {});
+// K. Les mots de la phrase qui passent SOUS l'île d'actions (`header` flottant,
+// ordinateur) — mesurés mot par mot (un rectangle de bloc ne dit pas quels mots
+// sont cachés : c'était le GESTE).
+// ⚠️ Mesuré EN HAUT de la page : une phrase défilée hors de l'écran ne passe
+//    sous rien, et le contrôle serait vert par vacuité.
+const motsSousIle = async (pg) => { await defiler(pg, 0); await pg.waitForTimeout(400); return pg.evaluate(() => {
+  const ph = document.querySelector('[data-photos-bloquees]'); const h = document.querySelector('header');
+  if (!ph || !h) return { phrase: !!ph, ile: !!h, mots: '' };
+  const hb = h.getBoundingClientRect();
+  const caches = [];
+  const w = document.createTreeWalker(ph, NodeFilter.SHOW_TEXT);
+  for (let n = w.nextNode(); n; n = w.nextNode()) {
+    const re = /\S+/g; let m;
+    while ((m = re.exec(n.data))) {
+      const rg = document.createRange(); rg.setStart(n, m.index); rg.setEnd(n, m.index + m[0].length);
+      for (const c of rg.getClientRects()) if (c.right > hb.left && c.left < hb.right && c.bottom > hb.top && c.top < hb.bottom) { caches.push(m[0]); break; }
+    }
+  }
+  const pb = ph.getBoundingClientRect();
+  return { phrase: true, ile: true, mots: caches.join(' '), boite: [Math.round(hb.left), Math.round(hb.top), Math.round(hb.right), Math.round(hb.bottom)],
+    phraseBoite: [Math.round(pb.left), Math.round(pb.top), Math.round(pb.right), Math.round(pb.bottom)] };
+}); };
+// Ma journée · « Dernières ventes » : les vignettes, et l'icône que l'écran met
+// À LA PLACE d'une photo qu'il a retirée de sa liste (`imgMortes`).
+const carrousel = (pg) => pg.evaluate(() => {
+  const c = document.querySelector('.vrm-carrousel'); if (!c) return null;
+  const cartes = [...c.children];
+  const imgs = [...c.querySelectorAll('img')];
+  return { cartes: cartes.length, affichees: imgs.filter((i) => i.complete && i.naturalWidth > 0).length,
+    secours: imgs.filter((i) => /^blob:/.test(i.src) && i.naturalWidth > 0).length,
+    composant: c.querySelectorAll('[data-photo-vinted]').length,
+    retirees: cartes.filter((b) => !b.querySelector('img,[data-photo-vinted]')).length };
+});
+const pageTexte = (pg) => pg.evaluate(() => document.body.innerText);
 
 (async () => {
   let b;
@@ -315,6 +416,26 @@ const capture = (pg, nom) => pg.screenshot({ path: path.join(os.tmpdir(), `photo
         dit(m.ecran >= 1 && m.affichees === m.ecran && m.cassesEcran === 0,
           `A ${L} Colis : les photos des bordereaux s'affichent (par le secours)`, detail(m));
         sain(m, `A ${L} Colis`);
+        // Ma journée (l'écran d'ouverture) : « Dernières ventes ».
+        await ouvrir(pg, 'journee', 7000);
+        await pg.evaluate(() => { const c = document.querySelector('.vrm-carrousel'); const mn = document.querySelector('main[data-defile]'); if (c && mn) { mn.scrollTop += c.getBoundingClientRect().top - mn.getBoundingClientRect().top - 60; } });
+        await pg.waitForTimeout(4500);
+        const cj = await carrousel(pg);
+        await capture(pg, `A-journee-${L}`);
+        dit(!!cj && cj.cartes >= 3 && cj.secours >= 2 && cj.retirees === 0,
+          `A ${L} Ma journée : les photos des dernières ventes s'affichent (par le secours)`, JSON.stringify(cj));
+        sain(await mesurer(pg), `A ${L} Ma journée`);
+        // Achats.
+        await ouvrir(pg, 'plat_vinted', 3000);
+        await section(pg, 'achats', 4000);
+        await pg.click('button:has-text("En route")', { timeout: 8000 });
+        await pg.waitForTimeout(3000);
+        await versPhotos(pg);
+        m = await mesurer(pg);
+        await capture(pg, `A-achats-${L}`);
+        dit(m.ecran >= 2 && m.affichees === m.ecran && m.cassesEcran === 0 && m.pictoEcran === 0,
+          `A ${L} Achats : les photos des achats s'affichent (par le secours)`, detail(m));
+        sain(m, `A ${L} Achats`);
         dit(errs.length === 0, `A ${L} : aucune erreur d'app`, errs.join(' | ').slice(0, 160));
         await ctx.close();
       });
@@ -333,7 +454,13 @@ const capture = (pg, nom) => pg.screenshot({ path: path.join(os.tmpdir(), `photo
         dit(m.cassees === 0, `B ${L} Annonces : aucune image cassée — le pictogramme à la place`, `${m.cassees} cassée(s), ${m.picto} pictogramme(s)`);
         dit(m.pictoEcran >= 2, `B ${L} Annonces : les photos qui ne s'affichent pas gardent leur place (pictogramme)`, `${m.pictoEcran} à l'écran`);
         dit(m.phrases === 1, `B ${L} : la phrase est dite UNE fois`, `${m.phrases} phrase(s)`);
-        dit(m.sonde === 'bloquee', `B ${L} : la sonde a mesuré « bloquée par le navigateur »`, String(m.sonde));
+        // Deux échecs réseau espacés, et rien n'a récupéré les photos ici : la
+        // phrase dit « n'arrive pas à les charger », pas « refusées dans VRM ».
+        dit(m.sonde === 'injoignable', `B ${L} : la cause affichée est celle mesurée (deux échecs réseau, sans extension pour départager)`, String(m.sonde));
+        if (L > 1000) {
+          const k = await motsSousIle(pg);
+          dit(k.phrase && k.ile && k.phraseBoite[1] < k.boite[3] && !k.mots, `K ${L} (sans extension) : la phrase est à hauteur de l'île, et aucun de ses mots ne passe dessous`, k.mots || JSON.stringify(k));
+        }
         dit(m.geste === (L < 600 ? 'telephone' : 'chrome'), `B ${L} : le geste suit l'appareil (${L < 600 ? 'sur le téléphone : l’ordinateur' : 'le Chrome où l’extension est installée'})`, String(m.geste) + ' · ' + m.texte.slice(0, 140));
         sain(m, `B ${L} Annonces`);
         await section(pg, 'ventes', 3000);
@@ -386,7 +513,181 @@ const capture = (pg, nom) => pg.screenshot({ path: path.join(os.tmpdir(), `photo
         dit(errs.length === 0, `D ${L} : aucune erreur d'app`, errs.join(' | ').slice(0, 160));
         await ctx.close();
       });
+
+      // ── H. Le CDN est INJOIGNABLE (connexion coupée), puis revient ─────────
+      // Un réseau qui hoquette (PWA qui se réveille, filtre, panne) donne la
+      // MÊME erreur que CORP. Sur c02ffcf : « Ce navigateur bloque les photos de
+      // Vinted dès qu'elles s'affichent en dehors de vinted.fr », puis 36
+      // pictogrammes jusqu'au rechargement, le CDN revenu.
+      console.log('── H. le CDN est injoignable, puis revient (aucune extension)');
+      cdnEtat.mode = 'coupe';
+      await essaie(`H ${L}`, async () => {
+        const { ctx, pg, errs } = await preparer(b, vp, { pont: false });
+        await ouvrir(pg, 'plat_vinted', 3000);
+        await section(pg, 'annonces', 10500);
+        await versPhotos(pg, 1500);
+        let m = await mesurer(pg);
+        await capture(pg, `H-coupe-${L}`);
+        dit(m.pictoEcran >= 2 && m.cassees === 0, `H ${L} pendant la coupure : le pictogramme, aucune image cassée`, detail(m));
+        dit(m.phrases <= 1 && (m.phrases === 0 || ['injoignable', 'passu'].includes(m.sonde)),
+          `H ${L} pendant la coupure : la phrase n'affirme pas un refus « dans VRM » qu'elle n'a pas mesuré`, `${m.phrases} phrase(s), cause ${m.sonde} · ${m.texte.slice(0, 140)}`);
+        cdnEtat.mode = 'ok';
+        // Sans rien toucher : le témoin réessaie (20 s après le premier constat).
+        await pg.waitForTimeout(19000);
+        m = await mesurer(pg);
+        await capture(pg, `H-retour-${L}`);
+        dit(m.ecran >= 2 && m.affichees === m.ecran && m.pictoEcran === 0, `H ${L} le CDN revenu : les photos d'Annonces s'affichent, sans recharger ni changer d'écran`, detail(m));
+        dit(m.phrases === 0, `H ${L} le CDN revenu : plus de phrase`, `${m.phrases} : ${m.texte.slice(0, 120)}`);
+        await section(pg, 'ventes', 4000);
+        await versPhotos(pg, 1500);
+        m = await mesurer(pg);
+        dit(m.ecran >= 2 && m.affichees === m.ecran && m.pictoEcran === 0, `H ${L} le CDN revenu : celles de Ventes (échouées plus tôt) aussi`, detail(m));
+        dit(errs.length === 0, `H ${L} : aucune erreur d'app`, errs.join(' | ').slice(0, 160));
+        await ctx.close();
+      });
+
+      // ── M. Ventes passent, Annonces bloquées (aucune extension) ────────────
+      // Une photo déjà en cache s'affiche encore quand le CDN se met à refuser
+      // les autres (mesuré dans Chromium par la relecture). Sur c02ffcf, une
+      // seule photo affichée DANS LA SESSION faisait taire la phrase partout.
+      console.log('── M. les photos de Ventes passent, celles d’Annonces sont bloquées');
+      cdnEtat.mode = 'un-ok';
+      await essaie(`M ${L}`, async () => {
+        const { ctx, pg, errs } = await preparer(b, vp, { pont: false });
+        await ouvrir(pg, 'plat_vinted', 4000);
+        await versPhotos(pg, 2000);
+        let m = await mesurer(pg);
+        dit(m.affichees >= 2 && m.phrases === 0, `M ${L} Ventes : les photos passent (le banc sert bien ce mélange), aucune phrase`, detail(m));
+        await section(pg, 'annonces', 13500);
+        await versPhotos(pg, 2500);
+        m = await mesurer(pg);
+        await capture(pg, `M-annonces-${L}`);
+        dit(m.pictoEcran >= 2 && m.phrases === 1, `M ${L} Annonces : toutes bloquées ⇒ la phrase, une fois (une photo vue sur Ventes ne la fait plus taire)`, `${m.phrases} phrase(s), ${m.pictoEcran} pictogramme(s) à l'écran`);
+        dit(errs.length === 0, `M ${L} : aucune erreur d'app`, errs.join(' | ').slice(0, 160));
+        await ctx.close();
+      });
     }
+
+    const V1512 = { width: 1512, height: 950 };
+    // ── G. Des liens morts, l'extension rend les autres ───────────────────────
+    // TROIS refusées (le seuil de la phrase) : c'est la photo récupérée par
+    // l'extension À L'ÉCRAN qui doit la faire taire, pas le nombre.
+    console.log('\n── G. le CDN refuse (CORP), l’extension rend toutes les photos sauf TROIS — 1512 px');
+    cdnEtat.mode = 'corp';
+    await essaie('G', async () => {
+      const { ctx, pg, errs } = await preparer(b, V1512, { pont: true, pontOpts: { refusePremieres: { cles: JETONS_ANNONCES, n: 3 } } });
+      await ouvrir(pg, 'plat_vinted', 3000);
+      await section(pg, 'annonces', 9000);
+      const m = await mesurer(pg); const p = await pont(pg);
+      await capture(pg, 'G-annonces');
+      dit(!!p && p.refusees >= 3 && m.secours >= 2, 'G : le scénario est réel (l’extension en refuse trois, en rend d’autres)', JSON.stringify({ refusees: p && p.refusees, secours: m.secours }));
+      dit(m.phrases === 0, 'G : des liens morts à côté de photos que l’extension a récupérées ⇒ aucune phrase (« l’extension n’a pas pu les récupérer non plus » serait faux)', `${m.phrases} phrase(s) : ${m.texte.slice(0, 160)}`);
+      dit(m.perdues >= 3 && m.cassees === 0, 'G : les photos introuvables gardent leur place (pictogramme), aucune image cassée', `${m.perdues} perdue(s), ${m.cassees} cassée(s)`);
+      dit(errs.length === 0, 'G : aucune erreur d’app', errs.join(' | ').slice(0, 160));
+      await ctx.close();
+    });
+
+    // ── R. Vinted refuse TOUT, à l'extension aussi ─────────────────────────
+    console.log('\n── R. le CDN refuse tout (403), l’extension n’obtient rien non plus — 1512 px');
+    cdnEtat.mode = 'tout403';
+    await essaie('R', async () => {
+      const { ctx, pg, errs } = await preparer(b, V1512, { pont: true, pontOpts: { dataUrl: null, delai: 300 } });
+      await ouvrir(pg, 'plat_vinted', 3000);
+      await section(pg, 'annonces', 9000);
+      await versPhotos(pg, 2500);
+      let m = await mesurer(pg);
+      await capture(pg, 'R-annonces');
+      dit(m.phrases === 1 && m.sonde === 'reponse', 'R : la phrase, une fois, avec la cause mesurée (le serveur répond)', `${m.phrases} phrase(s), cause ${m.sonde}`);
+      dit(m.geste === 'refus' && !/recharge/i.test(m.texte), 'R : l’extension a répondu sans image ⇒ aucun « recharge cette page » (le geste ne pourrait pas marcher)', `${m.geste} · ${m.texte.slice(0, 200)}`);
+      const k = await motsSousIle(pg);
+      await capture(pg, 'R-haut');
+      dit(k.phrase && k.ile && k.phraseBoite[1] < k.boite[3] && !k.mots, 'K 1512 (avec extension) : la phrase est à hauteur de l’île, et aucun de ses mots ne passe dessous', k.mots || JSON.stringify(k));
+      await ouvrir(pg, 'plat_vinted', 3000);
+      await section(pg, 'annonces', 9000);
+      m = await mesurer(pg);
+      dit(m.phrases === 1 && m.geste === 'refus', 'R : rouverte, la page dit la même chose (aucune promesse de retour)', `${m.phrases} · ${m.geste}`);
+      dit(errs.length === 0, 'R : aucune erreur d’app', errs.join(' | ').slice(0, 160));
+      await ctx.close();
+    });
+
+    // ── L. L'extension répond en 9 s ───────────────────────────────────────
+    console.log('\n── L. le CDN refuse (CORP), l’extension met 9 s à rendre les premières photos d’Annonces — 1512 px');
+    cdnEtat.mode = 'corp';
+    await essaie('L', async () => {
+      const { ctx, pg, errs } = await preparer(b, V1512, { pont: true, pontOpts: { lentPremieres: { cles: JETONS_ANNONCES, n: 3 }, lentMs: 9000 } });
+      await ouvrir(pg, 'plat_vinted', 3000);
+      await section(pg, 'annonces', 2000);
+      await pg.waitForTimeout(16000);
+      const m = await mesurer(pg); const p = await pont(pg);
+      await capture(pg, 'L-annonces');
+      dit(m.ecran >= 2 && m.affichees === m.ecran && m.pictoEcran === 0, 'L : une extension lente (9 s) ⇒ les photos arrivent, aucune perdue', detail(m));
+      dit(m.phrases === 0, 'L : aucune phrase « l’extension n’a pas pu les récupérer »', `${m.phrases} : ${m.texte.slice(0, 120)}`);
+      dit(!!p && (p.lentesPrises || []).length === 3, 'L : le scénario est réel (trois photos d’Annonces ont tardé 9 s)', p ? String((p.lentesPrises || []).length) : 'pont muet');
+      dit(!!p && p.max >= 1 && p.max <= 3, 'L : jamais plus de 3 demandes chez l’extension (la place reste prise jusqu’à la réponse)', p ? `max ${p.max} · ${p.total} demande(s) · ${p.rendues} rendue(s)` : 'pont muet');
+      dit(errs.length === 0, 'L : aucune erreur d’app', errs.join(' | ').slice(0, 160));
+      await ctx.close();
+    });
+
+    // ── J. L'extension arrive APRÈS l'ouverture, sur Ma journée ───────────────
+    console.log('\n── J. l’extension arrive 15 s après l’ouverture (Ma journée) — 1512 px');
+    cdnEtat.mode = 'corp';
+    await essaie('J', async () => {
+      const { ctx, pg, errs } = await preparer(b, V1512, { pont: true, pontOpts: { retard: 15000, delai: 300 } });
+      await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
+      await pg.waitForTimeout(12000);
+      const c1 = await carrousel(pg);
+      await capture(pg, 'J-journee-12s');
+      dit(!!c1 && c1.cartes >= 3 && c1.retirees === 0, 'J à 12 s (pas encore d’extension) : aucune photo RETIRÉE de la liste (elle attend, pictogramme)', JSON.stringify(c1));
+      await pg.waitForTimeout(13000);
+      const c2 = await carrousel(pg); const p = await pont(pg);
+      await capture(pg, 'J-journee-25s');
+      dit(!!c2 && c2.secours >= 2 && c2.retirees === 0, 'J à 25 s (extension arrivée à 15 s) : les photos reviennent, sans changer d’écran', JSON.stringify(c2) + ` · ${p ? p.total : 0} demande(s) au pont`);
+      dit(errs.length === 0, 'J : aucune erreur d’app', errs.join(' | ').slice(0, 160));
+      await ctx.close();
+    });
+
+    // ── U. L'extension est MUETTE, et un bandeau le dit déjà ─────────────────
+    console.log('\n── U. l’extension est présente mais muette, une vente à expédier — 1512 px');
+    cdnEtat.mode = 'corp';
+    await essaie('U', async () => {
+      const { ctx, pg, errs } = await preparer(b, V1512, { pont: true, pontOpts: { muet: true } });
+      await ouvrir(pg, 'plat_vinted', 42000);
+      await versPhotos(pg, 1500);
+      let m = await mesurer(pg);
+      await capture(pg, 'U-ventes');
+      const bandeau = await pg.evaluate(() => !!document.querySelector('[data-raison-bord="muette"]'));
+      const texte = await pageTexte(pg);
+      const nNeRepondPas = (texte.match(/ne répond pas/gi) || []).length;
+      dit(bandeau, 'U Ventes : le scénario est réel (le bandeau des bordereaux dit que l’extension est muette)', String(bandeau));
+      dit(m.phrases === 1, 'U Ventes : la phrase des photos est là (une fois)', `${m.phrases}`);
+      dit(nNeRepondPas === 1 && !/recharge/i.test(m.texte), 'U Ventes : « ne répond pas » dit UNE fois sur l’écran, et la phrase des photos ne redit pas le geste', `« ne répond pas » ×${nNeRepondPas} · phrase : ${m.geste} · ${m.texte.slice(0, 160)}`);
+      // L'autre sens : là où aucun bandeau ne le dit, la phrase porte le geste.
+      await section(pg, 'annonces', 4000);
+      await versPhotos(pg, 1500);
+      m = await mesurer(pg);
+      const autreVoix = await pg.evaluate(() => !!document.querySelector('[data-raison-bord="muette"],[data-raison-publier="muette"]'));
+      dit(autreVoix || (m.phrases === 1 && m.geste === 'muette' && /recharge/i.test(m.texte)), 'U Annonces : sans autre bandeau, la phrase dit le geste (recharger)', `${autreVoix ? 'un bandeau le dit' : ''} ${m.phrases} · ${m.geste} · ${m.texte.slice(0, 160)}`);
+      dit(errs.length === 0, 'U : aucune erreur d’app', errs.join(' | ').slice(0, 160));
+      await ctx.close();
+    });
+
+    // ── S. La cause se mesure sur l'écran qui échoue ─────────────────────────
+    // Des liens morts (404) sur Ventes, puis Annonces bloquée par CORP. Sur
+    // c02ffcf, la sonde ne tournait qu'au PREMIER échec : « le serveur répond »
+    // pour toute la session, Annonces comprise.
+    console.log('\n── S. liens morts sur Ventes, puis Annonces bloquée — 1512 px');
+    cdnEtat.mode = 'v404-a-corp';
+    await essaie('S', async () => {
+      const { ctx, pg, errs } = await preparer(b, V1512, { pont: false });
+      await ouvrir(pg, 'plat_vinted', 12000);
+      let m = await mesurer(pg);
+      dit(m.phrases === 1 && m.sonde === 'reponse', 'S Ventes : liens morts ⇒ cause « le serveur répond » (le scénario est réel)', `${m.phrases} · ${m.sonde}`);
+      await section(pg, 'annonces', 13000);
+      m = await mesurer(pg);
+      dit(m.phrases === 1 && m.sonde === 'injoignable', 'S Annonces : la cause est REMESURÉE sur l’écran qui échoue (pas celle des liens morts de Ventes)', `${m.phrases} · ${m.sonde} · ${m.texte.slice(0, 120)}`);
+      dit(errs.length === 0, 'S : aucune erreur d’app', errs.join(' | ').slice(0, 160));
+      await ctx.close();
+    });
 
     // ── E. Le serveur RÉPOND (une erreur) : une autre phrase que « bloquée » ──
     console.log('\n── E. le CDN répond une erreur (la sonde reçoit une réponse) — 1512 px');
