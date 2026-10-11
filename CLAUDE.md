@@ -7544,8 +7544,70 @@ Les « 4 messages sans email » du premier rapport étaient des réponses de Jul
 - **Le geste de Julien** : sur `angeled92`, `tomj606`, `arthuror2`, vérifier les
   notifications e-mail dans Vinted puis le « Transférer à » d'Apple ; remplacer
   le script Gmail par celui du dépôt (il en tourne un d'avant le 4 octobre).
-- Extension : `background.js` touché, **version inchangée** (celle de
-  l'intégration), zip régénéré.
+- ~~Extension : `background.js` touché, version inchangée~~ — **FAUX, corrigé
+  par la revue ci-dessous** : ce contenu portait le numéro 5.168.0, déjà publié
+  par `main` (PR #472) avec un AUTRE `background.js`. Extension **5.173.0**.
+
+#### Revue du chantier notifications (11 octobre, 5.173) — 17 constats, tous reproduits puis corrigés
+Chacun ROUGE sur le code d'avant (9af5943 / 0ae270e / 6f305b3), vert après,
+ROUGE sous mutation.
+- ⚠️⚠️ **Version** : ce chantier modifiait `background.js` SOUS le numéro 5.168.0
+  déjà servi par la production, puis la production est passée en 5.170 sans le
+  correctif de l'IA — une extension installée depuis l'une ou l'autre se serait
+  dite « à jour ». Fusion d'integ-11oct (vrai merge) et **5.173.0** (5.169/5.171 :
+  chantier extension, 5.172 : chantier eBay). `audit-extension-zip` refuse
+  désormais qu'une version DÉJÀ servie par `main` change de contenu (il lit
+  l'historique de main : rouge sur f3cbac2 et sur ce contenu sous 5.170).
+- ⚠️⚠️ **L'ancienne clé anti-doublon AVALAIT les nouveaux messages** d'une paire
+  déjà notifiée par l'ancien code (même d'un autre acheteur) : elle n'est un alias
+  que si elle couvrait tout le corps (≤ 200 caractères). Au-delà, un fil renvoyé
+  le jour du déploiement re-sonne UNE fois — une notification de trop se répare.
+- **Une identité PAR EMAIL** : le Message-ID (script Gmail : `getHeader('Message-ID')`,
+  repli `getId()` ; Worker : `message.headers.get('Message-ID')`), lu par
+  `normaliserEntrant` (`messageId`). Deux messages d'une même conversation au
+  corps identique (la forme mesurée) sonnent tous les deux. ⚠️ **Le script Gmail
+  et le Worker doivent être recollés** : sans eux, l'empreinte du texte reste le
+  repli (et deux corps identiques n'en font qu'un).
+- **Préférences illisibles** : relues une fois, puis la dernière lue (instance),
+  puis la copie gardée AVEC LES APPAREILS (`push_subs.prefs`, écrite par le
+  serveur seulement quand elle change, jamais au détriment de la liste), sinon le
+  DÉFAUT. Plus de `SONNE_SI_PAS_SU` : des messages coupés ne sonnent plus sur une
+  instance froide. ⚠️ Un vendeur dont les préférences n'ont jamais été lues ET
+  sont illisibles ne reçoit pas ses messages (défaut « non ») — « pas su » ne
+  vaut pas « oui ».
+- `paireDuSujetMessage` : « à propos de » seulement (« concernant » donnait
+  « 💬 ta commande »).
+- ⚠️⚠️ **La fuite de l'IA n'était pas fermée** : une réponse PAYÉE mais illisible
+  (`reason:'parse'` — JSON tronqué, texte libre, vraie réponse vide) était prise
+  pour « IA injoignable » et redemandée à chaque page (10 sur 10). `api/ai.js` dit
+  `facture: true` après tout 2xx d'Anthropic ; l'extension la range (« illisible »,
+  jamais redemandée). L'audit servait une forme que le serveur ne rend pas
+  (`{ok:true, suggestions:[{text:'  '}]}`) : il exécute maintenant le VRAI
+  `api/ai.js` (§6.3). IA pas branchée / injoignable / illisible : comptée à part
+  (`bilan.iaKO` + causes), l'app écrit « l'IA n'a pas répondu (cause) — rien n'est
+  parti », plus « elle n'était pas sûre ».
+- **Comptes sans email** : on ne juge que les ventes POSTÉRIEURES au début de la
+  réception (le plus ancien email lu, tous comptes ; inconnu ⇒ personne n'est
+  muet) — un compte dormant ou une nouvelle vendeuse n'est plus accusé.
+  « Calme » = aucune vente depuis ce début ; une vente sans email sous le seuil =
+  « à surveiller » avec sa phrase ; exclu = « exclu — non vérifié ». Le bloc dit
+  l'effet PROUVÉ (« pas de rappel du matin pour leurs colis à poster » :
+  `ship-reminders` ne compte que les `email_bord_*`), plus « leurs codes de
+  retrait » ; singulier pour un compte ; Réglages déplié ne redit pas le
+  résumé ; la table ne redit pas un compte nommé au-dessus ; Achats : une ligne
+  repliée (44 px à 390), APRÈS les colis jamais retirés.
+- Preuves : `notif-messages.cjs` 37 (10 rouges, 5 mutations) · `audit-repondre`
+  65 (14 rouges, 3 mutations) · `repondre.cjs` (2 rouges) ·
+  `audit-comptes-sans-email` 26 (10 rouges ; `--prouve=ancienne|debut|calme`
+  20/3/6) · `comptes-sans-email.cjs` (29 rouges, 2 mutations d'écran) ·
+  `audit-extension-zip` (rouge sur 5.168 et sous mutation 5.170).
+- **Non mesurable ici** : le vrai corps d'un email de message (deux messages
+  d'une même conversation) — l'identité par Message-ID le contourne, mais ne
+  marche qu'une fois le script Gmail / le Worker recollés ; ce que `ship-reminders`
+  devrait compter pour les comptes muets (les colis attendus d'après la moisson)
+  — dit, pas codé ; la forme réelle d'un 4xx d'Anthropic facturé (aucun appel réel).
+- **Gestes de Julien** : installer la **5.173**, recoller `scripts/gmail-forwarder.gs`
+  et le Worker de `docs/email-pipeline.md`.
 
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
@@ -7717,8 +7779,8 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | outil | quoi |
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
-| `node scripts/audit-*.cjs` | **89 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
-| `scripts/bancs/*.cjs` | les **80 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
+| `node scripts/audit-*.cjs` | **90 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `scripts/bancs/*.cjs` | les **82 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
 **Trois règles de preuve :**
@@ -8010,8 +8072,8 @@ script-là me fait croire à une catastrophe.
 src/App.jsx                     l'app (grep avant de lire — le fichier est énorme)
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
-scripts/audit-*.cjs             les 89 audits
-scripts/bancs/                  les 80 bancs (leur README dit comment les lancer)
+scripts/audit-*.cjs             les 90 audits
+scripts/bancs/                  les 82 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 ```

@@ -7771,10 +7771,12 @@ function ReceptionEmails({ tracking, comptes, colisParTransporteur }) {
   if (probleme) {
     if (muets.length > 0) {
       // ⚠️ REVUE DU 11 OCTOBRE : déplié d'office, ce bloc faisait 312 px à
-      //    390 px (125 avant) et repoussait les colis jamais retirés — de
-      //    l'argent perdu — sous une information de configuration qu'on règle
-      //    une fois. Dans Achats : UNE ligne, qui s'ouvre sur le bloc complet
-      //    (Réglages → Notifications le garde en entier).
+      //    390 px (125 avant) et repoussait les colis que personne n'est venu
+      //    chercher — de l'argent perdu — sous une information de configuration
+      //    qu'on règle une fois. Dans Achats : UNE ligne, qui s'ouvre sur le bloc
+      //    complet (Réglages → Notifications le garde en entier).
+      // (Ne pas écrire ici le titre exact de ce bloc-là : `audit-retrait` le
+      //  trouve par sa première occurrence dans le fichier.)
       return <MuetsCompact muets={muets} detail={detail}/>;
     }
     return (
