@@ -5946,6 +5946,7 @@ const BORD_RATTRAPAGE_J = 21;
 //    est un colis perdu » appliqué à ce qu'on dit à ses acheteurs.
 const MSG_MAX_PAR_VISITE = 8;
 const MSG_MIN_CONFIANCE = 55;    // en dessous, l'IA hésite : on ne parle pas à sa place
+const MSG_DEMANDES_MAX = 300;    // questions à l'IA mémorisées (une par message, voir `demandes`)
 
 // ══════════════════════════════════════════════════════════════════════════════
 // ⚠️⚠️ QUI VEND ? C'EST UNE IDENTITÉ, ET ELLE M'A ÉVITÉ D'ÉCRIRE N'IMPORTE QUOI
@@ -6006,6 +6007,24 @@ async function repondreAuxMessages(uid) {
     const rows = await sbGet('app_data?id=eq.panel_msg_repondus&select=data');
     if (rows === null) return 0;                   // on ne risque pas de répondre deux fois
     const deja = (rows[0] && rows[0].data) || {};
+    // ⚠️⚠️ LA FUITE DE L'IA (11 octobre). Cette fonction tourne à CHAQUE page
+    //    Vinted chargée — mesuré : ~255 passages par jour chez Julien. Un message
+    //    où l'IA HÉSITE (confiance sous le seuil) ou rend une réponse vide n'était
+    //    mémorisé nulle part : il repartait chez l'IA au passage suivant, tant
+    //    qu'il restait non lu. Un seul message hésitant ≈ 255 appels payés par
+    //    jour (≈ 15 à 18 $ par mois, plus que l'abonnement). Même chose pour une
+    //    réponse sûre que `garde` a empêchée de partir (plafond horaire atteint) :
+    //    redemandée à chaque page.
+    // ⇒ UNE question à l'IA par message, jamais deux. L'identité est la même que
+    //    pour les envois (`conversation:message`, jamais le texte ni la date) et
+    //    elle vit dans la MÊME ligne, sous une clé réservée (`demandes`) — lue et
+    //    réécrite avec la même garde (lecture ratée ⇒ rien ne part, plus haut).
+    //    · réponse sûre pas encore partie ⇒ on garde son texte et on le RÉUTILISE ;
+    //    · hésitation ou réponse vide ⇒ on ne la redemande plus (un NOUVEAU
+    //      message de l'acheteur a un autre id : lui, il est redemandé) ;
+    //    · IA injoignable (rien de facturé) ⇒ rien n'est mémorisé, on retentera.
+    const demandes = (deja.demandes && typeof deja.demandes === 'object' && !Array.isArray(deja.demandes)) ? deja.demandes : {};
+    const demandesNeuves = {};
 
     let envoyes = 0;
     const neufs = {};
@@ -6014,8 +6033,13 @@ async function repondreAuxMessages(uid) {
     //    message de l'acheteur dedans, 1 est refusée à la réponse par Vinted,
     //    1 est un échange où il achète — il en reste **3**. L'app écrit ces
     //    nombres ; un total partiel présenté comme complet est pire qu'absent.
+    // ⚠️ `iaKO` (revue du 11 octobre) : quand c'est l'IA qui n'a rien rendu
+    //    d'utilisable (pas branchée, injoignable, sortie illisible), ce n'est PAS
+    //    une hésitation — l'app l'écrivait « elle n'était pas sûre ». Compté à
+    //    part, avec sa cause (`iaKOcauses` : pasBranchee · injoignable · illisible).
     const bilan = { nonLues: nonLues.length, pasCaptee: 0, sansMessage: 0, pasVendeur: 0,
-      replyRefuse: 0, dejaRepondu: 0, pasSure: 0, envoyes: 0, refusees: 0, at: new Date().toISOString() };
+      replyRefuse: 0, dejaRepondu: 0, pasSure: 0, iaKO: 0, iaKOcauses: {}, envoyes: 0, refusees: 0, at: new Date().toISOString() };
+    const iaKO = (cause) => { bilan.iaKO++; bilan.iaKOcauses[cause] = (bilan.iaKOcauses[cause] || 0) + 1; };
     for (const c of nonLues) {
       const cid = String(c.id);
       const det = await convDernierMessageId(uid, cid);
@@ -6026,15 +6050,52 @@ async function repondreAuxMessages(uid) {
       if (!(det.itemId && miennes.has(String(det.itemId)))) { bilan.pasVendeur++; continue; }
       const cle = cid + ':' + det.id;
       if (deja[cle] || neufs[cle]) { bilan.dejaRepondu++; continue; }    // déjà répondu à CE message
-      if (envoyes >= MSG_MAX_PAR_VISITE) continue;                       // le reste attend la prochaine visite
-      const sugg = await aiReply(det.body, det.article || c.description || '', det.price);
-      const texte = (sugg && sugg.ok && Array.isArray(sugg.suggestions) && sugg.suggestions[0]
-        && String(sugg.suggestions[0].text || '').trim()) || '';
-      // Mieux vaut un blanc qu'un faux : rien à dire ⇒ on se tait et on le note.
-      if (!texte || Number(sugg.confidence || 0) < MSG_MIN_CONFIANCE) {
-        bilan.pasSure++;
-        noterDiag(!texte ? 'repond_sans_reponse' : 'repond_peu_sur');
+      // Déjà demandé à l'IA pour CE message, et elle a hésité : on ne la repaie pas.
+      const dejaDemande = demandesNeuves[cle] || demandes[cle] || null;
+      if (dejaDemande && !dejaDemande.texte) {
+        if (dejaDemande.raison === 'illisible') { iaKO('illisible'); noterDiag('repond_illisible_memorisee'); }
+        else { bilan.pasSure++; noterDiag('repond_hesitation_memorisee'); }
         continue;
+      }
+      if (envoyes >= MSG_MAX_PAR_VISITE) continue;                       // le reste attend la prochaine visite
+      let texte = '', sugg = null;
+      if (dejaDemande && dejaDemande.texte) {
+        // Une réponse SÛRE déjà obtenue pour ce message, qui n'a pas pu partir :
+        // on la renvoie telle quelle, sans redemander (ni repayer) l'IA.
+        texte = String(dejaDemande.texte);
+        sugg = { intent: dejaDemande.intention || '', confidence: Number(dejaDemande.confiance || 0) };
+        noterDiag('repond_reponse_reutilisee');
+      } else {
+        sugg = await aiReply(det.body, det.article || c.description || '', det.price);
+        if (!(sugg && sugg.ok)) {
+          // ⚠️⚠️ REVUE DU 11 OCTOBRE : une réponse PAYÉE mais illisible (JSON
+          //    tronqué, texte libre, réponse vide — le serveur dit `facture: true`,
+          //    et `reason: 'parse'` pour un serveur d'avant) se range comme une
+          //    hésitation : on ne la repaie pas à chaque page Vinted. Seuls les
+          //    refus d'AVANT l'appel payé (clé absente, session, abonnement,
+          //    réseau, Anthropic en panne) ne sont pas mémorisés : on retentera.
+          if (sugg && (sugg.facture === true || sugg.reason === 'parse')) {
+            demandesNeuves[cle] = { at: new Date().toISOString(), confiance: 0, raison: 'illisible' };
+            iaKO('illisible'); noterDiag('repond_illisible');
+            continue;
+          }
+          iaKO(sugg && sugg.reason === 'no-key' ? 'pasBranchee' : 'injoignable');
+          noterDiag(sugg && sugg.reason === 'no-key' ? 'repond_ia_pas_branchee' : 'repond_ia_injoignable');
+          continue;
+        }
+        texte = (Array.isArray(sugg.suggestions) && sugg.suggestions[0]
+          && String(sugg.suggestions[0].text || '').trim()) || '';
+        const conf = Number(sugg.confidence || 0);
+        const sure = !!texte && conf >= MSG_MIN_CONFIANCE;
+        demandesNeuves[cle] = sure
+          ? { at: new Date().toISOString(), confiance: conf, intention: String(sugg.intent || ''), texte: texte.slice(0, 1000) }
+          : { at: new Date().toISOString(), confiance: conf, raison: texte ? 'peu-sur' : 'vide' };
+        // Mieux vaut un blanc qu'un faux : rien à dire ⇒ on se tait et on le note.
+        if (!sure) {
+          bilan.pasSure++;
+          noterDiag(!texte ? 'repond_sans_reponse' : 'repond_peu_sur');
+          continue;
+        }
       }
       // ⚠️ LE PLAFOND HORAIRE SE CONSOMME AU MOMENT DE L'ENVOI, JAMAIS AVANT.
       //    `garde` → `compterAction` POUSSE un créneau du budget 20/h à chaque
@@ -6068,8 +6129,18 @@ async function repondreAuxMessages(uid) {
     // Lire-fusionner-réécrire, avec la garde du dossier : on ne fusionne que si
     // on a lu (la lecture plus haut a déjà refusé le cas `null`). Le bilan vit
     // sous une clé réservée, jamais confondue avec un envoi (`conv:message`).
+    // Les questions à l'IA : les anciennes + celles de ce passage, sans celles
+    // dont la réponse est partie (l'envoi les remplace), bornées aux 300 plus
+    // récentes (une ligne lue à chaque visite ne grossit pas sans fin, §4.4).
+    const toutesDemandes = Object.assign({}, demandes, demandesNeuves);
+    const gardees = Object.keys(toutesDemandes)
+      .filter((k) => !deja[k] && !neufs[k] && toutesDemandes[k] && typeof toutesDemandes[k] === 'object')
+      .sort((a, b) => String(toutesDemandes[b].at || '').localeCompare(String(toutesDemandes[a].at || '')))
+      .slice(0, MSG_DEMANDES_MAX);
+    const demandesEcrites = {};
+    for (const k of gardees) demandesEcrites[k] = toutesDemandes[k];
     await supabaseUpsert('app_data', [{ id: 'panel_msg_repondus',
-      data: Object.assign({}, deja, neufs, { bilan: Object.assign({}, bilan, { uid: String(uid), ver: EXT_VERSION }) }) }], 'id');
+      data: Object.assign({}, deja, neufs, { demandes: demandesEcrites, bilan: Object.assign({}, bilan, { uid: String(uid), ver: EXT_VERSION }) }) }], 'id');
     return envoyes;
   } catch (_) { return 0; }
 }

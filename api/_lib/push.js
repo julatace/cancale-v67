@@ -12,6 +12,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 import webpush from 'web-push';
+import crypto from 'node:crypto';
 
 import { withOwnerAll, conflictTarget, proprietaireCourant } from './owner.js';
 import { sbCle } from './cle.js';
@@ -111,21 +112,79 @@ export const PUSH_DEFAUT = {
 };
 // Réglage du vendeur (Réglages → Notifications), lu depuis la base.
 // Absent ⟹ on prend le défaut ci-dessus.
-export async function pushCategorieActive(cat) {
-  if (!cat) return true;
+//
+// ⚠️⚠️ « PAS SU » RETOMBAIT SUR LE DÉFAUT, ET LE DÉFAUT DE « MESSAGE » EST NON
+//    (11 octobre, reproduit sur la vraie route — banc `notif-messages.cjs`).
+//    Julien a activé les messages ; un simple hoquet de lecture de `push_prefs`
+//    (522, la base debout par ailleurs) les rendait muets. Trois états, jamais
+//    deux : la préférence est LUE (elle décide), ABSENTE (le défaut décide), ou
+//    PAS SUE — et alors, dans l'ordre :
+//      1. on RELIT une fois (un hoquet) ;
+//      2. la dernière préférence lue pour CE vendeur par cette instance ;
+//      3. la dernière préférence lue, GARDÉE AVEC SES APPAREILS (`push_subs.prefs`,
+//         une copie écrite par le serveur quand il la lit — cette ligne-là est lue
+//         de toute façon avant d'envoyer) : elle survit à une instance froide ;
+//      4. à défaut, le DÉFAUT de la catégorie.
+// ⚠️⚠️ REVUE DU 11 OCTOBRE : la première version sonnait pour les messages sur
+//    TOUTE instance froide qui ne lisait pas les préférences (`SONNE_SI_PAS_SU`),
+//    y compris chez un vendeur qui ne les a jamais activés ou qui les a COUPÉS à
+//    la main — Vercel démarre des instances froides sans cesse. « Pas su » ne
+//    vaut pas « oui » pour une catégorie coupée par défaut : seule une trace de
+//    SA préférence (2 ou 3) peut la faire sonner.
+const _prefsVues = new Map();                       // vendeur → dernières préférences LUES
+const _copieVue = new Map();                        // vendeur → la copie déjà rangée avec ses appareils (JSON)
+export const oublierPrefsVues = () => { _prefsVues.clear(); _copieVue.clear(); };   // bancs : instance froide
+const decider = (prefs, cat) => {
+  const v = prefs[cat];
+  return typeof v === 'boolean' ? v : (PUSH_DEFAUT[cat] !== false);
+};
+// Rend les préférences lues (`{}` si la ligne n'existe pas), ou `null` = pas su.
+async function lirePrefs() {
   try {
     // ⚠️ On passait ici `await cloisonnee()` — un BOOLÉEN — là où l'aide attend
     //    la fonction : dès qu'un vendeur était connu, l'appel levait, et ses
     //    préférences de notification étaient ignorées (le défaut s'appliquait).
     const url = await pourCeVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.push_prefs&select=data`);
-    if (!url) return PUSH_DEFAUT[cat] !== false;
+    if (!url) return null;
     const res = await fetch(url, { headers: HEADERS });
-    if (!res.ok) return PUSH_DEFAUT[cat] !== false;
+    if (!res.ok) return null;
     const rows = await res.json();
-    const prefs = (rows && rows[0] && rows[0].data) || {};
-    const v = prefs[cat];
-    return typeof v === 'boolean' ? v : (PUSH_DEFAUT[cat] !== false);
-  } catch (_) { return PUSH_DEFAUT[cat] !== false; }
+    if (!Array.isArray(rows)) return null;          // 522 : c'est du HTML, pas du JSON
+    const d = rows[0] && rows[0].data;
+    return (d && typeof d === 'object') ? d : {};
+  } catch (_) { return null; }
+}
+// La copie des préférences gardée avec les appareils. On ne l'écrit que si elle
+// a CHANGÉ (une fois par instance, ou quand il bascule un réglage), par la même
+// écriture conditionnelle que la liste — qui n'est jamais touchée ici. Pas de
+// ligne d'appareils ⇒ rien à protéger, on ne la crée pas.
+async function copierPrefs(qui, prefs) {
+  const json = JSON.stringify(prefs || {});
+  if (_copieVue.get(qui) === json) return;
+  for (let i = 0; i < 3; i++) {
+    const lu = await lireSubsVersion();
+    if (!lu || !lu.existe) return;
+    if (JSON.stringify(lu.prefs || null) === json) { _copieVue.set(qui, json); return; }
+    const e = await ecrireSubsSi(lu, lu.subs, prefs || {});
+    if (e === 'ok') { _copieVue.set(qui, json); return; }
+    if (e === 'ko') return;
+  }
+}
+export async function pushCategorieActive(cat) {
+  if (!cat) return true;
+  const qui = vendeurDuPush() || '';
+  let lues = await lirePrefs();
+  if (!lues) lues = await lirePrefs();              // un hoquet : on relit une fois
+  if (lues) {
+    _prefsVues.set(qui, lues);
+    try { await copierPrefs(qui, lues); } catch (_) {}
+    return decider(lues, cat);
+  }
+  const vues = _prefsVues.get(qui);
+  if (vues) return decider(vues, cat);
+  const lu = await lireSubsVersion();
+  if (lu && lu.prefs) return decider(lu.prefs, cat);
+  return PUSH_DEFAUT[cat] !== false;
 }
 
 export async function loadSubs() {
@@ -148,29 +207,96 @@ export async function loadSubs() {
   } catch (_) { return null; }
 }
 
-// Rend VRAI seulement si la base a confirmé l'écriture. Avaler l'échec faisait
-// répondre « ✅ Activé sur cet appareil » à l'app alors que rien n'était rangé.
-// ⚠️ Sur une base cloisonnée, la ligne porte le vendeur DE LA REQUÊTE — pas
-//    celui de l'installation : l'appareil d'un second vendeur s'ajoutait sinon
-//    à la liste de Julien, et recevait ses ventes.
-export async function saveSubs(subs) {
+// ⚠️ `saveSubs` (réécriture INCONDITIONNELLE de la liste) est retirée le
+//    11 octobre : c'est elle qui faisait perdre un appareil quand deux écrivaient
+//    en même temps. Toute écriture de `push_subs` passe par `modifierSubs`
+//    ci-dessous — qui garde les deux leçons d'avant : on ne dit « activé » que
+//    si la base a CONFIRMÉ l'écriture, et sur une base cloisonnée la ligne porte
+//    le vendeur DE LA REQUÊTE (jamais celui de l'installation : l'appareil d'un
+//    second vendeur aurait reçu les ventes de Julien).
+
+// ── MODIFIER LA LISTE DES APPAREILS SANS EN PERDRE UN ─────────────────────
+// ⚠️⚠️ LIRE-AJOUTER-RÉÉCRIRE SANS VERROU (11 octobre, reproduit sur la vraie
+//    route). L'iPhone et Chrome qui s'abonnent en même temps lisent tous deux
+//    la même liste, ajoutent chacun le sien et réécrivent : le second efface le
+//    premier — et l'app avait répondu « activé » aux deux. Même chose quand un
+//    envoi purge un appareil disparu pendant qu'un autre s'abonne. (Et chaque
+//    ouverture de l'app réécrivait la liste deux fois, même sans rien changer.)
+// ⇒ Une écriture CONDITIONNELLE, sans migration : la liste porte une marque de
+//   version (`rev`, tirée au hasard à chaque écriture). On ne réécrit QUE si la
+//   ligne porte encore la marque qu'on a lue (`PATCH … &data->>rev=eq.<lue>`,
+//   que Postgres réévalue au moment d'écrire) ; sinon quelqu'un a écrit entre-
+//   temps : on relit et on recommence. Une ligne qui n'existe pas encore se crée
+//   SANS écraser (`ignore-duplicates`) : si un autre l'a créée à la même
+//   milliseconde, on relit et on ajoute. Une ligne d'avant (sans `rev`) se
+//   modifie par `data->>rev=is.null` — la première écriture lui en donne une.
+// `fn(liste)` rend la nouvelle liste, ou `null` = rien à changer (on n'écrit pas).
+// Rend `{ ok:true, subs, ecrit }` ou `{ ok:false, raison:'lecture'|'ecriture'|'conflit' }`.
+const nouvelleRev = () => {
+  try { return crypto.randomUUID(); } catch (_) { return `${Date.now()}-${Math.random().toString(36).slice(2)}`; }
+};
+async function lireSubsVersion() {
   try {
-    const data = { subs, updatedAt: new Date().toISOString() };
+    const url = await pourCeVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.push_subs&select=data`);
+    if (!url) return null;
+    const res = await fetch(url, { headers: HEADERS });
+    if (!res.ok) return null;
+    const rows = await res.json();
+    if (!Array.isArray(rows)) return null;
+    const d = rows[0] && rows[0].data;
+    if (!rows[0]) return { existe: false, subs: [], rev: null, prefs: null };
+    return { existe: true, subs: (d && Array.isArray(d.subs)) ? d.subs : [], rev: (d && d.rev != null) ? String(d.rev) : null,
+      prefs: (d && d.prefs && typeof d.prefs === 'object' && !Array.isArray(d.prefs)) ? d.prefs : null };
+  } catch (_) { return null; }
+}
+// `prefs` (facultatif) remplace la copie des préférences ; sinon celle qu'on a
+// LUE est gardée telle quelle — une modification de la liste ne la perd jamais.
+async function ecrireSubsSi(lu, subs, prefs) {
+  try {
+    const copie = prefs !== undefined ? prefs : lu.prefs;
+    const data = { subs, updatedAt: new Date().toISOString(), rev: nouvelleRev(), ...(copie ? { prefs: copie } : {}) };
+    const enTetes = { ...HEADERS, Prefer: 'return=representation' };
+    if (lu.existe) {
+      const filtre = lu.rev == null ? 'data->>rev=is.null' : `data->>rev=eq.${encodeURIComponent(lu.rev)}`;
+      const url = await pourCeVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.push_subs&${filtre}`);
+      if (!url) return 'ko';
+      const r = await fetch(url, { method: 'PATCH', headers: enTetes, body: JSON.stringify({ data }) });
+      if (!r || !r.ok) return 'ko';
+      const j = await r.json().catch(() => null);
+      if (!Array.isArray(j)) return 'ko';
+      return j.length ? 'ok' : 'conflit';
+    }
     let row, conflit;
     if (await cloisonnee()) {
       const o = vendeurDuPush();
-      if (!o) return false;                             // à qui serait cette ligne ? personne
+      if (!o) return 'ko';
       row = { owner: o, id: 'push_subs', data }; conflit = 'owner,id';
     } else {
       row = withOwnerAll([{ id: 'push_subs', data }])[0]; conflit = conflictTarget('id');
     }
     const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${conflit}`, {
       method: 'POST',
-      headers: { ...HEADERS, Prefer: 'resolution=merge-duplicates,return=minimal' },
+      headers: { ...HEADERS, Prefer: 'resolution=ignore-duplicates,return=representation' },
       body: JSON.stringify([row]),
     });
-    return !!(r && r.ok);
-  } catch (_) { return false; }
+    if (!r || !r.ok) return 'ko';
+    const j = await r.json().catch(() => null);
+    if (!Array.isArray(j)) return 'ko';
+    return j.length ? 'ok' : 'conflit';
+  } catch (_) { return 'ko'; }
+}
+export async function modifierSubs(fn, essais = 6) {
+  for (let i = 0; i < essais; i++) {
+    const lu = await lireSubsVersion();
+    if (lu === null) return { ok: false, raison: 'lecture' };   // « pas su » : on n'écrit rien
+    const suivante = fn(lu.subs.slice());
+    if (!Array.isArray(suivante)) return { ok: true, subs: lu.subs, ecrit: false };
+    const e = await ecrireSubsSi(lu, suivante);
+    if (e === 'ok') return { ok: true, subs: suivante, ecrit: true };
+    if (e === 'ko') return { ok: false, raison: 'ecriture' };
+    // 'conflit' : quelqu'un a écrit entre notre lecture et la nôtre — on relit.
+  }
+  return { ok: false, raison: 'conflit' };
 }
 
 // ⚠️ UN ABONNEMENT SCELLÉ SUR UNE ANCIENNE CLÉ EST MORT POUR TOUJOURS.
@@ -240,7 +366,17 @@ export async function sendPushToAll(payload) {
       if (!mort && !perime) alive.push(s);            // erreur passagère : on garde
     }
   }
-  if (alive.length !== subs.length) await saveSubs(alive);
+  // ⚠️ On ne retire QUE les appareils morts, de la liste TELLE QU'ELLE EST
+  //    MAINTENANT (écriture conditionnelle) : réécrire `alive` effaçait un
+  //    appareil qui venait de s'abonner pendant l'envoi.
+  if (alive.length !== subs.length) {
+    const vivants = new Set(alive.map((s) => s.endpoint));
+    const retires = new Set(subs.filter((s) => !vivants.has(s.endpoint)).map((s) => s.endpoint));
+    await modifierSubs((cur) => {
+      const reste = cur.filter((s) => !(s && retires.has(s.endpoint)));
+      return reste.length === cur.length ? null : reste;
+    });
+  }
   // `perimes` remonte jusqu'à l'écran : « 0 envoyé sur 2 » ne dit pas POURQUOI,
   // « 2 appareils scellés sur une ancienne clé » dit quoi faire (rouvrir l'app).
   return { sent, total: subs.length, ...(perimes ? { perimes } : {}) };

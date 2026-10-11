@@ -2358,39 +2358,159 @@ const reclassifyTrack = (d) => {
 // introuvables : la boîte de ce compte ne transfère pas.
 // Lecture SCALAIRE uniquement (compte + date), jamais le corps (§34).
 // ⚠️ UNE NOTIFICATION DE VENTE NAÎT D'UN EMAIL DE VENTE, PAS DE LA MOISSON.
-// Mesuré le 31 août : 6 ventes dans la journée, **3 emails de vente seulement**.
-// Les comptes `tomj606`, `angeled92`, `arthuror2`, `liliand653` et
-// `julatace3535` n'ont JAMAIS envoyé un seul email de vente à l'app — leurs
-// ventes ne peuvent donc déclencher aucune notification, quoi qu'on fasse dans
-// le code. Ce n'est pas réparable côté app : il faut que ces boîtes fassent
-// suivre vers l'adresse de réception. Autant le DIRE, à l'endroit où il règle
-// ses notifications, plutôt que de le laisser découvrir un lundi matin.
-// Lecture SCALAIRE (une colonne, §34) et une seule requête.
-const fetchComptesSansEmailVente = async (comptes) => {
+// Mesuré le 31 août : 6 ventes dans la journée, **3 emails de vente seulement** —
+// et le 11 octobre, sur les MESSAGES : `angeled92` et `tomj606` n'ont JAMAIS
+// envoyé un email à VRM (ni vente, ni bordereau, ni message), `arthuror2` plus
+// aucun depuis le 23 septembre. Leurs ventes et leurs messages ne peuvent donc
+// déclencher aucune notification, quoi qu'on fasse dans le code : c'est en
+// amont (réglages de notification de Vinted pour ce compte, ou une boîte qui
+// ne fait pas suivre). Autant le DIRE, avec le geste, à l'endroit où il règle
+// ses notifications et là où il regarde ses comptes.
+//
+// ⚠️⚠️ ET L'ANCIEN COMPTE SE TROMPAIT DANS LES DEUX SENS (11 octobre) :
+//   · il ne lisait que 6 familles de lignes, pas le JOURNAL : `jujuf38`, dont
+//     9 messages sont bien arrivés, était annoncé « aucun email », en ROUGE ;
+//   · « aucun email » ne prouve rien pour un compte qui n'a rien vendu : rien
+//     n'avait à arriver. On ne parle de compte muet que sur une PREUVE — des
+//     ventes captées (identité : le compte qui les a moissonnées) qui auraient
+//     dû produire un email de bordereau (identité : `email_bord_{transaction}`),
+//     et n'en ont produit aucun depuis le dernier signe de vie du compte ;
+//   · `limit=1000` coupait en silence (§4.5), et une famille illisible rendait
+//     une demi-liste — donc des comptes « sans email » sur une simple panne.
+// Trois états, jamais deux : `undefined` en cours · `null` pas su · un objet lu.
+// Lecture SCALAIRE (compte + date), jamais le corps (§34).
+// <comptes-sans-email> — une règle pour Réglages → Notifications ET Achats (§11)
+const CSE_DELAI_MS = 3 * 86400000;     // une vente de moins de 3 jours n'a peut-être pas encore eu son email
+const CSE_MIN_VENTES = 2;              // il faut au moins 2 ventes sans email après le dernier signe de vie…
+const CSE_MIN_JOURS = 7;               // … dont la plus ancienne a au moins 7 jours (un motif, pas un retard)
+const estRelaisApple = (adr) => /@privaterelay\.appleid\.com\s*$/i.test(String(adr || ''));
+// `reception` : `{ parCompte: { login: { n, last } }, bordTx: Set, debut }` · `null` pas su · `undefined` en cours.
+//               `debut` = le plus ancien email que VRM ait reçu (toutes familles, journal, tous comptes) :
+//               le DÉBUT DE LA RÉCEPTION. Absent ⇒ inconnu ⇒ aucun compte n'est jugé muet.
+// `ventes`    : les ventes de tous les comptes liés (`_acc` posé, celles de la coque) · `null` · `undefined`.
+// `ventesKO`  : comptes dont la lecture des ventes a échoué (uid) — rien ne s'y juge.
+// ⚠️⚠️ REVUE DU 11 OCTOBRE — DEUX DÉFAUTS DE LA PREMIÈRE RÈGLE, REPRODUITS :
+//   · une vente ANTÉRIEURE à toute réception d'email suffisait à accuser un
+//     compte : un compte dormant (ventes d'il y a 4 mois, avant le premier email
+//     que VRM ait reçu) ou une nouvelle vendeuse dès son premier jour (son
+//     historique) étaient « muets, jamais ». VRM ne recevait AUCUN email à ces
+//     dates : ce n'est pas une preuve. On ne juge que les ventes postérieures au
+//     début de la réception ; sans début connu, on ne juge personne ;
+//   · « calme » (« ces comptes n'ont pas encore vendu ») s'affichait sous des
+//     comptes qui AVAIENT vendu — une vente sans email il y a 20 jours, trois
+//     ventes d'hier : la phrase rassurait là où la boîte est peut-être muette.
+//     « calme » = AUCUNE vente depuis le début de la réception ; des ventes sans
+//     email sous le seuil = « surveiller », avec leur propre phrase.
+function etatEmailsComptes({ comptes, reception, ventes, ventesKO, adresses, exclus, maintenant, annulee }) {
+  if (reception === undefined) return { etat: 'encours', lignes: [], muets: [], debut: null };
+  if (reception === null) return { etat: 'pasSu', lignes: [], muets: [], debut: null };
+  const now = Number.isFinite(maintenant) ? maintenant : Date.now();
+  const debut = reception.debut ? Date.parse(reception.debut) : NaN;
+  const debutConnu = Number.isFinite(debut);
+  const estAnnulee = typeof annulee === 'function' ? annulee
+    : (o) => (typeof classifyOrderStatus === 'function' ? classifyOrderStatus(o && o.status) === 'cancelled' : false);
+  const ko = new Set((ventesKO || []).map(String));
+  const horsJeu = new Set((exclus || []).map(String));
+  const bordTx = reception.bordTx instanceof Set ? reception.bordTx : new Set(reception.bordTx || []);
+  const txDe = (o) => String(o && (o.transaction_id != null ? o.transaction_id : (o.id != null ? o.id : '')));
+  const lignes = [];
+  for (const a of (comptes || [])) {
+    const uid = String((a && a.vinted_user_id) || '');
+    const login = String((a && a.login) || '').trim();
+    const e = (login && reception.parCompte && reception.parCompte[login]) || null;
+    const n = e ? (e.n || 0) : 0;
+    const dernierEmail = e && e.last ? Date.parse(e.last) : NaN;
+    const ventesLues = Array.isArray(ventes) && !ko.has(uid);
+    const ventesEnCours = ventes === undefined;
+    const sesVentes = ventesLues
+      ? ventes.filter((o) => o && o._acc && String(o._acc.vinted_user_id) === uid && !estAnnulee(o) && Number.isFinite(Date.parse(o.date)))
+      : [];
+    let derniereAvecEmail = -Infinity;
+    for (const o of sesVentes) { const t = Date.parse(o.date); if (bordTx.has(txDe(o)) && t > derniereAvecEmail) derniereAvecEmail = t; }
+    const signe = Math.max(Number.isFinite(dernierEmail) ? dernierEmail : -Infinity, derniereAvecEmail);
+    // Les ventes qui AURAIENT DÛ produire un email : après le début de la réception
+    // ET après le dernier signe de vie du compte, sans email de bordereau.
+    const aJuger = sesVentes.filter((o) => { const t = Date.parse(o.date); return debutConnu && t >= debut && t > signe && !bordTx.has(txDe(o)); });
+    const sansEmail = aJuger
+      .filter((o) => Date.parse(o.date) < now - CSE_DELAI_MS)
+      .sort((x, y) => Date.parse(x.date) - Date.parse(y.date));
+    const recentes = aJuger.length - sansEmail.length;           // trop récentes : leur email peut encore arriver
+    const depuisDebut = debutConnu ? sesVentes.filter((o) => Date.parse(o.date) >= debut).length : sesVentes.length;
+    const plusAncienne = sansEmail.length ? Date.parse(sansEmail[0].date) : NaN;
+    const muet = debutConnu && ventesLues && !horsJeu.has(uid) && sansEmail.length >= CSE_MIN_VENTES
+      && Number.isFinite(plusAncienne) && now - plusAncienne >= CSE_MIN_JOURS * 86400000;
+    const statut = muet ? 'muet'
+      : (n > 0 || Number.isFinite(derniereAvecEmail)) ? 'recoit'
+      : !ventesLues ? (ventesEnCours ? 'encours' : 'pasSu')
+      : horsJeu.has(uid) ? 'exclu'
+      : depuisDebut > 0 ? 'surveiller'
+      : 'calme';
+    lignes.push({
+      uid, login: login || uid, n, last: Number.isFinite(dernierEmail) ? new Date(dernierEmail).toISOString() : '',
+      statut, jamais: muet && !Number.isFinite(signe),
+      depuis: muet && Number.isFinite(signe) ? new Date(signe).toISOString() : null,
+      nSansEmail: (muet || statut === 'surveiller') ? sansEmail.length : 0,
+      premiereSansEmail: (muet || statut === 'surveiller') && Number.isFinite(plusAncienne) ? new Date(plusAncienne).toISOString() : null,
+      // « surveiller » : pourquoi on ne conclut pas — rien reçu du tout (début
+      // inconnu), ventes trop récentes, ou trop peu de ventes sans email.
+      nRecentes: statut === 'surveiller' ? recentes : 0,
+      raisonSurveiller: statut !== 'surveiller' ? null : !debutConnu ? 'aucunDebut' : sansEmail.length ? 'peu' : 'recentes',
+      relaisApple: estRelaisApple(adresses && adresses[uid]),
+    });
+  }
+  return { etat: 'lu', lignes, muets: lignes.filter((l) => l.statut === 'muet'), debut: debutConnu ? new Date(debut).toISOString() : null };
+}
+// </comptes-sans-email>
+const FAMILLES_EMAILS_COMPTE = ['email_track_', 'email_sale_', 'email_bord_', 'email_achat_', 'email_final_', 'email_offer_'];
+const fetchEmailsParCompte = async () => {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_sale_*&select=acc:meta->>account&limit=1000`, { headers: sbAuth() });
+    const parCompte = {};
+    // Le DÉBUT de la réception : le plus ancien email lu, quel que soit son compte
+    // (une ligne sans compte reconnu prouve quand même que VRM recevait).
+    let debut = '';
+    const ajoute = (acc, at) => {
+      const d = String(at || '');
+      if (d && Number.isFinite(Date.parse(d)) && (!debut || d < debut)) debut = d;
+      const a = String(acc || '').trim(); if (!a) return;
+      const e = (parCompte[a] = parCompte[a] || { n: 0, last: '' });
+      e.n += 1; if (d > e.last) e.last = d;
+    };
+    for (const f of FAMILLES_EMAILS_COMPTE) {
+      const rows = await lireTout(`id=like.${f}*&select=acc:meta->>account,at:meta->>receivedAt`, { strict: true });
+      if (rows === null) return null;                 // une famille illisible : on n'accuse personne
+      for (const row of rows) ajoute(row.acc, row.at);
+    }
+    // Le JOURNAL porte les messages et les favoris (aucune ligne à eux) : sans
+    // lui, un compte dont les messages arrivent était dit « aucun email ».
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.email_journal&select=entries:data->entries`, { headers: sbAuth() });
     if (!r.ok) return null;
-    const vus = new Set();
-    for (const row of await r.json()) { const a = String(row.acc || '').trim(); if (a) vus.add(a); }
-    if (!vus.size) return null;                       // rien lu : on n'accuse personne
-    return (comptes || []).filter(a => { const l = String(a.login || '').trim(); return l && !vus.has(l); });
+    const j = await r.json();
+    if (!Array.isArray(j)) return null;
+    for (const e of ((j[0] && j[0].entries) || [])) if (e) ajoute(e.account, e.at);
+    // Les bordereaux reçus par email, par TRANSACTION (identité, jamais le compte deviné).
+    const bords = await lireTout('id=like.email_bord_*&select=id', { strict: true });
+    if (bords === null) return null;
+    const bordTx = new Set(bords.map((b) => String(b.id || '').replace(/^email_bord_/, '')).filter(Boolean));
+    return { parCompte, bordTx, debut: debut || null };
   } catch (_) { return null; }
 };
-const fetchEmailsParCompte = async () => {
-  const out = {};
-  try {
-    for (const f of ['email_track_', 'email_sale_', 'email_bord_', 'email_achat_', 'email_final_', 'email_offer_']) {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.${f}*&select=acc:meta->>account,at:meta->>receivedAt&limit=1000`, { headers: sbAuth() });
-      if (!r.ok) continue;
-      for (const row of await r.json()) {
-        const a = String(row.acc || '').trim(); if (!a) continue;
-        const e = (out[a] = out[a] || { n: 0, last: '' });
-        e.n += 1; if (String(row.at || '') > e.last) e.last = String(row.at || '');
-      }
-    }
-  } catch (_) { /* réseau : on rend ce qu'on a */ }
-  return out;
+// Les ventes de la COQUE (tous les comptes liés), publiées pour les écrans qui
+// en ont besoin sans les relire (§11 : la coque les lit, les autres consomment).
+// `ventes` : `undefined` pas encore lu · `null` aucune lecture n'a abouti · un tableau.
+const _ventesCoquePub = { ventes: undefined, ko: [] };
+const publierVentesCoque = (ventes, ko) => {
+  _ventesCoquePub.ventes = ventes; _ventesCoquePub.ko = Array.isArray(ko) ? ko : [];
+  try { window.dispatchEvent(new Event('vrm:ventes-coque')); } catch (_) {}
 };
+function useVentesCoque() {
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const f = () => setTick((t) => t + 1);
+    window.addEventListener('vrm:ventes-coque', f);
+    return () => window.removeEventListener('vrm:ventes-coque', f);
+  }, []);
+  return { ventes: _ventesCoquePub.ventes, ko: _ventesCoquePub.ko };
+}
 // ⚠️ LA MÊME RÈGLE À LA LECTURE (leçon §5.37).
 // Les emails déjà en base n'ont pas de champ `famille` — ils ne seront jamais
 // réécrits. Sans cette copie côté app, le compteur continuerait d'annoncer
@@ -7681,13 +7801,101 @@ const libellePeriode = (p) => {
    affichés même à zéro : « aucun email reçu » est l'information utile.
    Aucune requête pour les dates des colis (elles viennent des suivis déjà
    chargés) ; deux lectures scalaires pour le reste (§34). */
+// ── « QUELS COMPTES N'ENVOIENT AUCUN EMAIL À VRM, ET DEPUIS QUAND » (11 oct.) ──
+// Une règle (`etatEmailsComptes`), un bloc, deux endroits : Réglages →
+// Notifications et Achats → En attente (§11 — deux écrans, une phrase).
+function useEtatEmailsComptes(comptes) {
+  const [reception, setReception] = useState(undefined);   // undefined en cours · null pas su · objet lu
+  const { ventes, ko } = useVentesCoque();
+  useEffect(() => {
+    let mort = false;
+    fetchEmailsParCompte().then((r) => { if (!mort) setReception(r); });
+    return () => { mort = true; };
+  }, []);
+  return useMemo(() => etatEmailsComptes({
+    comptes: comptes || [], reception, ventes, ventesKO: ko,
+    adresses: load('vinted_account_emails', {}) || {},
+    exclus: load('vinted_accounts_hidden', []) || [],
+  }), [comptes, reception, ventes, ko]);
+}
+const dateCourteFr = (iso) => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }); };
+// Ce que dit un compte muet, sur sa ligne : la PREUVE (ses ventes sans email),
+// jamais une supposition sur la cause.
+const phraseCompteMuet = (l) => l.jamais
+  ? `aucun email de Vinted n’est jamais arrivé — ${l.nSansEmail} vente${l.nSansEmail > 1 ? 's' : ''} depuis le ${dateCourteFr(l.premiereSansEmail)}, aucune n’a eu son email`
+  : `plus aucun email depuis le ${dateCourteFr(l.depuis)} — ${l.nSansEmail} vente${l.nSansEmail > 1 ? 's' : ''} depuis, sans leur email`;
+// Un compte qui a vendu SANS email, mais pas assez pour conclure : sa phrase à
+// lui, tirée de la donnée (jamais « n'a pas encore vendu » — revue du 11 oct.).
+const phraseCompteSurveille = (l) => {
+  const s = (k) => (k > 1 ? 's' : '');
+  if (l.raisonSurveiller === 'aucunDebut') return 'VRM n’a encore reçu aucun email — rien à conclure';
+  if (l.raisonSurveiller === 'peu') return `${l.nSansEmail} vente${s(l.nSansEmail)} sans email depuis le ${dateCourteFr(l.premiereSansEmail)}${l.nRecentes ? ` (+ ${l.nRecentes} récente${s(l.nRecentes)})` : ''} — pas encore de quoi conclure`;
+  return `${l.nRecentes} vente${s(l.nRecentes)} de moins de 3 jours — ${l.nRecentes > 1 ? 'leur' : 'son'} email peut encore arriver`;
+};
+// Le bloc : qui, depuis quand, ce que ça coûte (une fois), et LE geste (une fois).
+// ⚠️ « Masquer mon adresse » n'est PAS la cause prouvée (deux comptes à adresse
+//    Apple recevaient très bien leurs emails, relecture du 11 octobre) : c'est
+//    UNE vérification de plus, dite seulement pour les comptes concernés. La
+//    première vérification est celle des notifications email de Vinted.
+function BlocComptesMuets({ muets }) {
+  if (!muets || !muets.length) return null;
+  const n = muets.length;
+  const apple = muets.filter((l) => l.relaisApple);
+  const tousApple = apple.length === n;
+  return (
+    <div data-comptes-muets={n} style={{border:`1px solid ${C.warn}`,borderLeft:`3px solid ${C.warn}`,background:`${C.warn}10`,borderRadius:8,padding:'9px 11px'}}>
+      <div style={{fontSize:12.5,fontWeight:700,color:C.text}}>
+        {n} compte{n>1?'s':''} Vinted n’envoie{n>1?'nt':''} aucun email à VRM
+      </div>
+      <div style={{display:'flex',flexDirection:'column',gap:3,marginTop:5}}>
+        {muets.map((l) => (
+          <div key={l.uid} data-compte-muet={l.login} style={{fontSize:11.5,color:C.muted,lineHeight:1.45}}>
+            <b style={{color:C.text}}>{l.login}</b> — {phraseCompteMuet(l)}{l.relaisApple && !tousApple ? ' (adresse « Masquer mon adresse » d’Apple)' : ''}.
+          </div>
+        ))}
+      </div>
+      {/* ⚠️ REVUE DU 11 OCTOBRE : ce qui est PROUVÉ, pas plus. La règle mesure
+          des ventes sans email de BORDEREAU : le rappel du matin (« 📮 Colis à
+          poster », api/ship-reminders.js) ne compte que ces emails-là — leurs
+          colis n'y sont donc jamais. « Leurs codes de retrait n'arrivent pas »
+          n'était pas prouvé (ils viennent des transporteurs, côté achats), et la
+          phrase parlait au pluriel pour un seul compte. */}
+      <div style={{fontSize:11.5,color:C.muted,marginTop:6,lineHeight:1.45}} data-effet-muets>
+        {n>1?'Leurs':'Ses'} ventes s’affichent bien (l’extension les capte), mais {n>1?'leurs':'ses'} bordereaux n’arrivent pas par email&nbsp;: <b style={{color:C.text}}>pas de rappel du matin pour {n>1?'leurs':'ses'} colis à poster</b>, et ton téléphone ne sonne ni pour {n>1?'leurs':'ses'} ventes ni pour {n>1?'leurs':'ses'} messages.
+      </div>
+      <div style={{fontSize:11.5,color:C.text,marginTop:6,lineHeight:1.5}} data-geste-muets>
+        <b>Pour {n>1?'chacun':'ce compte'}&nbsp;:</b> 1. sur Vinted, connecté sur {n>1?'ce compte':muets[0].login}&nbsp;: <b>Paramètres → Notifications</b>, active les e-mails (messages, offres, ventes).
+        {' '}2. {tousApple
+          ? <>{n>1?'Leur':'Son'} adresse est une adresse « Masquer mon adresse » d’Apple&nbsp;: sur l’iPhone, <b>Réglages → ton nom → Connexion et sécurité → Se connecter avec Apple → Vinted → Transférer à</b>, choisis la boîte reliée à VRM.</>
+          : <>Vérifie que sa boîte fait suivre les emails de Vinted vers celle reliée à VRM{apple.length ? <> — pour {apple.map((l) => l.login).join(', ')} (adresse « Masquer mon adresse » d’Apple)&nbsp;: sur l’iPhone, <b>Réglages → ton nom → Connexion et sécurité → Se connecter avec Apple → Vinted → Transférer à</b></> : null}.</>}
+      </div>
+    </div>
+  );
+}
+function MuetsCompact({ muets, detail }) {
+  const [ouvert, setOuvert] = useState(false);
+  const n = muets.length;
+  return (
+    <details data-muets-compact={n} style={{marginBottom:10}} onToggle={(e) => setOuvert(e.currentTarget.open)}>
+      <summary style={{cursor:'pointer',listStyle:'none',display:'flex',alignItems:'center',gap:7,fontSize:12,fontWeight:600,color:C.text,padding:'6px 10px',border:`1px solid ${C.warn}`,borderLeft:`3px solid ${C.warn}`,background:`${C.warn}10`,borderRadius:8}}>
+        <span aria-hidden="true" style={{color:C.warn,display:'flex'}}><Icon name="alert" size={14}/></span>
+        <span style={{flex:1,minWidth:0}}>{ouvert ? 'Masquer' : <>{n} compte{n>1?'s':''} n’envoie{n>1?'nt':''} aucun email à VRM — voir {n>1?'lesquels':'lequel'} et le geste</>}</span>
+        <span aria-hidden="true" style={{color:C.muted}}>{ouvert ? '▴' : '▾'}</span>
+      </summary>
+      <div style={{marginTop:6}}><BlocComptesMuets muets={muets}/></div>
+      <details style={{marginTop:6}}>
+        <summary style={{cursor:'pointer',fontSize:11.5,color:C.muted}}>Le détail : transporteurs et comptes</summary>
+        <div style={{marginTop:8,border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'10px 12px'}}>{detail}</div>
+      </details>
+    </details>
+  );
+}
 function ReceptionEmails({ tracking, comptes, colisParTransporteur }) {
   const [incompris, setIncompris] = useState(null);
-  const [parCompte, setParCompte] = useState(null);
+  const etatComptes = useEtatEmailsComptes(comptes);
   useEffect(() => {
     let mort = false;
     fetchEmailsIncompris().then(r => { if (!mort) setIncompris(r); });
-    fetchEmailsParCompte().then(r => { if (!mort) setParCompte(r); });
     return () => { mort = true; };
   }, []);
   const lignes = useMemo(() => {
@@ -7714,11 +7922,10 @@ function ReceptionEmails({ tracking, comptes, colisParTransporteur }) {
   const vraimentInconnus = useMemo(() => (incompris || []).filter(e => !String(e.famille || '').trim() && !familleEmail(e.subject, e.from)), [incompris]);
   const nInc = vraimentInconnus.length;
   const nConnus = (incompris ? incompris.length : 0) - nInc;
-  // Un compte sans le moindre email : sa boîte ne transfère pas vers l'app.
-  const muets = useMemo(() => {
-    if (!parCompte || !comptes || !comptes.length) return [];
-    return comptes.filter(a => { const l = String(a.login || '').trim(); return l && !parCompte[l]; });
-  }, [parCompte, comptes]);
+  // Un compte MUET, sur preuve : des ventes captées qui n'ont eu aucun email
+  // depuis son dernier signe de vie (`etatEmailsComptes`). « Aucun email » seul
+  // ne prouve rien — un compte qui n'a rien vendu n'avait rien à recevoir.
+  const muets = etatComptes.muets;
   // ⚠️⚠️ « ON LES ATTEND » N'EST PAS VRAI LE PREMIER JOUR. Vu au rendu le
   //    16 septembre sur une installation neuve : « Réception des emails ·
   //    3 transporteurs silencieux », en ambre, avec trois « aucun email reçu »
@@ -7757,22 +7964,40 @@ function ReceptionEmails({ tracking, comptes, colisParTransporteur }) {
       {comptes && comptes.length > 0 && (
         <div style={{marginTop:9,paddingTop:8,borderTop:`1px solid ${C.border}`}}>
           <div style={{fontSize:11.5,fontWeight:600,color:C.text,marginBottom:5}}>Tes comptes Vinted et leurs emails</div>
-          {parCompte === null && <div style={{fontSize:11,color:C.muted}}>lecture en cours…</div>}
-          {parCompte !== null && (
+          {etatComptes.etat === 'encours' && <div style={{fontSize:11,color:C.muted}}>lecture en cours…</div>}
+          {etatComptes.etat === 'pasSu' && <div style={{fontSize:11,color:C.muted}}>Je n’ai pas pu lire les emails reçus : je ne dis rien des comptes plutôt que d’en accuser un à tort. Rouvre cet écran dans un moment.</div>}
+          {etatComptes.etat === 'lu' && (
             <div style={{display:'flex',flexDirection:'column',gap:4}}>
-              {comptes.map(a => {
-                const l = String(a.login || '').trim() || String(a.vinted_user_id || '');
-                const e = parCompte[String(a.login || '').trim()] || null;
-                const ts = e && e.last ? Date.parse(e.last) : NaN;
+              {/* ⚠️ §7 (revue du 11 oct.) : un compte déjà nommé dans le bloc
+                  au-dessus n'est pas redit ici. */}
+              {etatComptes.lignes.filter(l => !(muets.length && l.statut === 'muet')).map(l => {
+                const ts = l.last ? Date.parse(l.last) : NaN;
+                // ⚠️ Plus de rouge (§7 : le rouge est pour deux paires sous un
+                //    même numéro). Ambre seulement pour un compte PROUVÉ muet.
+                const coul = l.statut === 'muet' ? C.warn
+                  : l.statut === 'recoit' ? (!isNaN(ts) && Date.now()-ts<7*86400000 ? (C.ok||C.accent) : C.muted)
+                  : C.muted;
+                const txt = l.statut === 'muet' ? (l.jamais ? 'aucun email, jamais' : `plus rien depuis le ${dateCourteFr(l.depuis)}`)
+                  : l.statut === 'recoit' ? `${l.n} email${l.n>1?'s':''}${isNaN(ts)?'':' · '+age(ts)}`
+                  : l.statut === 'surveiller' ? phraseCompteSurveille(l)
+                  : l.statut === 'exclu' ? 'exclu de l’app — non vérifié'
+                  : l.statut === 'calme' ? 'aucun email pour l’instant'
+                  : l.statut === 'encours' ? '…' : '—';
                 return (
-                  <div key={String(a.vinted_user_id)} style={{...ligne,fontSize:11.5}}>
-                    <div style={{flex:1,minWidth:0,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{l}</div>
-                    <div style={{flexShrink:0,fontWeight:600,color:e?(isNaN(ts)?C.muted:(Date.now()-ts<7*86400000?(C.ok||C.accent):C.warn)):C.danger}}>
-                      {e ? `${e.n} email${e.n>1?'s':''}${isNaN(ts)?'':' · '+age(ts)}` : 'aucun email'}
-                    </div>
+                  <div key={l.uid} data-compte-email={l.login} data-statut={l.statut} style={{...ligne,fontSize:11.5,flexWrap:'wrap'}}>
+                    <div style={{flex:'1 1 110px',minWidth:0,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{l.login}</div>
+                    <div style={{flex:'0 1 auto',minWidth:0,fontWeight:600,color:coul,textAlign:'right'}}>{txt}</div>
                   </div>
                 );
               })}
+              {muets.length > 0 && (
+                <div style={{fontSize:10.5,color:C.muted}}>+ {muets.length} compte{muets.length>1?'s':''} nommé{muets.length>1?'s':''} au-dessus.</div>
+              )}
+              {/* La phrase vient de la MÊME source que le statut (§5) : « calme »
+                  = aucune vente depuis le début de la réception. */}
+              {etatComptes.lignes.some(l => l.statut === 'calme') && (
+                <div style={{fontSize:10.5,color:C.muted,marginTop:2}} data-note-calme>« Aucun email pour l’instant » n’est pas une panne : {etatComptes.lignes.filter(l => l.statut === 'calme').length > 1 ? 'ces comptes n’ont rien vendu' : 'ce compte n’a rien vendu'}{etatComptes.debut ? ` depuis le ${dateCourteFr(etatComptes.debut)}, premier email reçu par VRM` : ''} — rien n’avait à arriver.</div>
+              )}
             </div>
           )}
         </div>
@@ -7800,16 +8025,21 @@ function ReceptionEmails({ tracking, comptes, colisParTransporteur }) {
   // ── QUAND QUELQUE CHOSE CLOCHE : on le NOMME, avec le geste à faire.
   //    Un compte muet est le cas grave : ses codes de retrait n'arrivent jamais.
   if (probleme) {
-    const quoi = muets.length > 0
-      ? `compte${muets.length>1?'s':''} Vinted ne reçoi${muets.length>1?'vent':'t'} aucun email`
-      : `email${nInc>1?'s':''} reçu${nInc>1?'s':''} que l'app n'a pas su classer`;
+    if (muets.length > 0) {
+      // ⚠️ REVUE DU 11 OCTOBRE : déplié d'office, ce bloc faisait 312 px à
+      //    390 px (125 avant) et repoussait les colis que personne n'est venu
+      //    chercher — de l'argent perdu — sous une information de configuration
+      //    qu'on règle une fois. Dans Achats : UNE ligne, qui s'ouvre sur le bloc
+      //    complet (Réglages → Notifications le garde en entier).
+      // (Ne pas écrire ici le titre exact de ce bloc-là : `audit-retrait` le
+      //  trouve par sa première occurrence dans le fichier.)
+      return <MuetsCompact muets={muets} detail={detail}/>;
+    }
     return (
       <Notice tone="warn" icon="alert"
-        value={muets.length > 0 ? muets.length : nInc}
-        title={quoi}
-        desc={muets.length > 0
-          ? `${muets.map(a=>a.login||a.vinted_user_id).join(', ')} — leurs codes de retrait n'arrivent donc jamais ici. Il faut faire suivre ces boîtes vers l'adresse de l'app.`
-          : "Ils sont conservés entiers, rien n'est perdu — mais aucune action n'en a été tirée."}
+        value={nInc}
+        title={`email${nInc>1?'s':''} reçu${nInc>1?'s':''} que l'app n'a pas su classer`}
+        desc="Ils sont conservés entiers, rien n'est perdu — mais aucune action n'en a été tirée."
         detail={detail}/>
     );
   }
@@ -29035,15 +29265,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
           );
         })()}
-        {/* ⚠️ SOUS LES COLIS, PAS AU-DESSUS. Ce panneau dit quelles boîtes mail
-            ne transfèrent pas — une information de configuration, vraie pendant
-            des semaines, qu'on règle une fois. Placé en tête, il repoussait
-            chaque jour les colis, leurs codes et leurs QR d'une centaine de
-            pixels : ce qu'on vient chercher passait après ce qu'on ne peut pas
-            régler d'ici. Il reste sur cet onglet (c'est bien là que les codes
-            manquent), simplement après. */}
-        {aFilter==='attente' && <ReceptionEmails tracking={tracking} comptes={accounts}
-          colisParTransporteur={(()=>{ const m={}; for(const t of (pickupUnion.emailList||[])){ const k=carrierKey(t&&t.carrier)||'autre'; m[k]=(m[k]||0)+1; } return m; })()}/>}
         {/* ── ⚠️ LES COLIS JAMAIS RETIRÉS ────────────────────────────────────────
             « Je dois passer à côté de rien. » Ces colis-là sortaient de l'écran
             SANS RIEN DIRE dès qu'ils dépassaient 14 jours (mesuré : 4 colis de
@@ -29104,6 +29325,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
           </div>
         )}
+        {/* ⚠️ SOUS LES COLIS, PAS AU-DESSUS. Ce panneau dit quelles boîtes mail
+            ne transfèrent pas — une information de configuration, vraie pendant
+            des semaines, qu'on règle une fois. Placé en tête, il repoussait
+            chaque jour les colis, leurs codes et leurs QR d'une centaine de
+            pixels : ce qu'on vient chercher passait après ce qu'on ne peut pas
+            régler d'ici. Il reste sur cet onglet (c'est bien là que les codes
+            manquent), simplement après — ET APRÈS LES COLIS JAMAIS RETIRÉS
+            (revue du 11 octobre : déplié, il faisait 312 px et repoussait de
+            l'argent perdu). Avec des comptes muets : une ligne (`MuetsCompact`). */}
+        {aFilter==='attente' && <ReceptionEmails tracking={tracking} comptes={accounts}
+          colisParTransporteur={(()=>{ const m={}; for(const t of (pickupUnion.emailList||[])){ const k=carrierKey(t&&t.carrier)||'autre'; m[k]=(m[k]||0)+1; } return m; })()}/>}
         {/* ── LES COLIS QUI SONT REPARTIS CHEZ LE VENDEUR ────────────────────
             ⚠️ MESURÉ SUR LA VRAIE BASE (6 septembre) : trois achats portent
             « Commande non réclamée - Retournée à l'expéditeur.rice », pour
@@ -34059,7 +34291,7 @@ const PUSH_CATS = [
   { id:'bilan',    def:true,  titre:'📊 Bilan de la semaine', desc:"Le lundi matin : vendu, reçu, colis à poster, paires qui dorment." },
   { id:'suivi',   def:false, titre:'🚚 Suivi du colis',    desc:'« En transit », « livré ». Rien à faire.' },
   { id:'achat',    def:false, titre:'🛍 Achat confirmé',    desc:"Tu viens de l'acheter, tu le sais déjà." },
-  { id:'message',  def:false, titre:'💬 Message',           desc:"Le badge de l'app suffit." },
+  { id:'message',  def:false, titre:'💬 Message',           desc:"Nouveau message d’un acheteur, avec la paire. Arrive ~15 min après le message (c’est le délai de l’email de Vinted)." },
   { id:'favori',   def:false, titre:'❤️ Nouveau favori',    desc:'Vinted en envoie beaucoup.' },
   { id:'facture',  def:false, titre:'🧾 Facture',           desc:'Facture préparée ou envoyée.' },
 ];
@@ -34069,14 +34301,12 @@ function PushPrefsSetting({ comptes }) {
   //    « Chargement… » pour toujours à un panneau qui a ÉCHOUÉ.
   const [prefs, setPrefs] = useState(undefined);
   const [busy, setBusy] = useState(false);
-  // Comptes dont aucune vente ne peut déclencher de notification (voir
-  // `fetchComptesSansEmailVente`). `null` tant qu'on ne sait pas : on
-  // n'affiche jamais une accusation sur une lecture ratée.
-  const [muets, setMuets] = useState(null);
-  useEffect(() => { let mort = false;
-    if (comptes && comptes.length) fetchComptesSansEmailVente(comptes).then(r => { if (!mort) setMuets(r); });
-    return () => { mort = true; };
-  }, [comptes]);
+  const [ouvert, setOuvert] = useState(false);
+  // Comptes dont ni les ventes ni les messages ne peuvent déclencher de
+  // notification : la MÊME règle que l'écran Achats (`etatEmailsComptes`, §11).
+  // Rien tant qu'on ne sait pas : jamais une accusation sur une lecture ratée.
+  const etatComptes = useEtatEmailsComptes(comptes);
+  const muets = etatComptes.etat === 'lu' ? etatComptes.muets : null;
   useEffect(() => { let mort = false;
     (async () => {
       try {
@@ -34106,7 +34336,7 @@ function PushPrefsSetting({ comptes }) {
   };
   const n = prefs ? PUSH_CATS.filter(actif).length : 0;
   return (
-    <details style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'10px 14px'}}>
+    <details style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'10px 14px'}} onToggle={(e) => setOuvert(e.currentTarget.open)}>
       <summary style={{cursor:'pointer',listStyle:'none',display:'flex',alignItems:'center',gap:8}}>
         <div style={{flex:1,minWidth:0}}>
           <div style={{fontSize:13,fontWeight:600,color:C.text}}>🔔 Ce que tu reçois sur ton téléphone</div>
@@ -34114,9 +34344,10 @@ function PushPrefsSetting({ comptes }) {
             {enCours ? 'Chargement…'
               : pasLu ? <span style={{display:'inline-block',fontSize:11,fontWeight:600,color:C.muted,background:C.bg,border:`1px solid ${C.border}`,borderRadius:999,padding:'2px 9px'}}>{REGLAGE_PAS_LU}</span>
               : `${n} type${n>1?'s':''} de notification sur ${PUSH_CATS.length}. Par défaut, on ne sonne que pour l'argent et ce qu'il y a à faire.`}
-            {muets && muets.length > 0 && (
-              <div style={{color:C.warn,fontWeight:600,marginTop:3}}>
-                ⚠ {muets.length} compte{muets.length>1?'s':''} ne te préviendra{muets.length>1?'ient':''} d'aucune vente — déplie pour savoir lesquels.
+            {/* §7 (revue du 11 oct.) : déplié, le bloc dessous dit tout — le résumé se tait. */}
+            {muets && muets.length > 0 && !ouvert && (
+              <div style={{color:C.warn,fontWeight:600,marginTop:3}} data-resume-muets={muets.length}>
+                ⚠ {muets.length} compte{muets.length>1?'s':''} n’envoie{muets.length>1?'nt':''} aucun email à VRM&nbsp;: ni {muets.length>1?'leurs':'ses'} ventes ni {muets.length>1?'leurs':'ses'} messages ne te préviendront — déplie pour savoir lesquels.
               </div>
             )}
           </div>
@@ -34124,17 +34355,7 @@ function PushPrefsSetting({ comptes }) {
         <span style={{color:C.muted,fontSize:13,flexShrink:0}}>▾</span>
       </summary>
       {muets && muets.length > 0 && (
-        <div style={{marginTop:10,border:`1px solid ${C.warn}`,borderLeft:`3px solid ${C.warn}`,background:`${C.warn}10`,borderRadius:8,padding:'9px 11px'}}>
-          <div style={{fontSize:12.5,fontWeight:700,color:C.text}}>
-            {muets.length} compte{muets.length>1?'s':''} ne te préviendra{muets.length>1?'ient':''} d'aucune vente
-          </div>
-          <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.45}}>
-            <b style={{color:C.text}}>{muets.map(a=>a.login).join(', ')}</b> — une notification de vente part d'un
-            email Vinted, et ces boîtes n'en font suivre aucun vers l'app. Leurs ventes s'afficheront bien
-            dans l'onglet Ventes (elles viennent de l'extension), mais ton téléphone ne sonnera pas.
-            Fais suivre ces boîtes vers l'adresse de réception de l'app pour les activer.
-          </div>
-        </div>
+        <div style={{marginTop:10}}><BlocComptesMuets muets={muets}/></div>
       )}
       <div style={{marginTop:10,display:'flex',flexDirection:'column',gap:2}}>
         {PUSH_CATS.map(c => {
@@ -35108,6 +35329,18 @@ function NumerosSetting() {
 //    l'EXTENSION qui répond, avec SA version. Sans `extSait('repond')`, l'app
 //    promettrait « elle répond à tes messages » à une extension qui ne sait pas
 //    le faire — pour la septième fois. Trois états, jamais deux.
+const CLES_RESERVEES_REPONDUS = ['bilan', 'demandes'];
+// Les causes d'une IA qui n'a rien rendu, tirées du bilan de l'extension (une
+// cause à zéro n'est pas écrite).
+const causesIaKO = (c) => {
+  const m = (c && typeof c === 'object') ? c : {};
+  const l = [
+    m.pasBranchee ? 'pas branchée sur le serveur' : '',
+    m.injoignable ? 'injoignable' : '',
+    m.illisible ? 'réponse inutilisable, elle ne sera pas redemandée' : '',
+  ].filter(Boolean);
+  return l.length ? ` (${l.join(' · ')})` : '';
+};
 function RepondreSetting() {
   const [on, setOn] = React.useState(() => !!load('vinted_repond_auto', false));
   const [envois, setEnvois] = React.useState(undefined);   // undefined = en cours · null = pas su
@@ -35127,9 +35360,11 @@ function RepondreSetting() {
         if (!r.ok) { setEnvois(null); setBilan(null); return; }
         const j = await r.json();
         const d = (j && j[0] && j[0].data) || {};
-        // `bilan` est une clé réservée : ce n'est pas un envoi, on ne le liste pas.
+        // `bilan` et `demandes` sont des clés réservées : ce ne sont pas des
+        // envois, on ne les liste pas. (`demandes` = ce que l'extension a déjà
+        // demandé à l'IA, une fois par message — 5.168, la « fuite » du 11 oct.)
         setBilan(d.bilan || null);
-        setEnvois(Object.keys(d).filter((k) => k !== 'bilan').map((k) => d[k]).filter(Boolean)
+        setEnvois(Object.keys(d).filter((k) => !CLES_RESERVEES_REPONDUS.includes(k)).map((k) => d[k]).filter(Boolean)
           .sort((a, b) => String(b.at || '').localeCompare(String(a.at || ''))));
       } catch (_) { if (vivant) { setEnvois(null); setBilan(null); } }
     })();
@@ -35150,6 +35385,10 @@ function RepondreSetting() {
     bilan.sansMessage ? `${bilan.sansMessage} sans message de l’acheteur à cette heure` : '',
     bilan.replyRefuse ? `${bilan.replyRefuse} où Vinted n’autorise pas de réponse` : '',
     bilan.pasSure ? `${bilan.pasSure} où elle n’était pas sûre — elle n’a rien envoyé` : '',
+    // ⚠️ Revue du 11 octobre : quand c'est l'IA qui n'a rien rendu d'utilisable
+    //    (pas branchée, injoignable, sortie illisible), ce n'est PAS « elle
+    //    n'était pas sûre ». L'extension ≥ 5.173 le compte à part, avec la cause.
+    bilan.iaKO ? `${bilan.iaKO} où l’IA n’a pas répondu${causesIaKO(bilan.iaKOcauses)} — rien n’est parti` : '',
   ].filter(Boolean) : [];
   return (
     <div style={{padding:'13px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
@@ -37100,6 +37339,10 @@ function AppCoeur() {
   // Les comptes dont la lecture des ventes a ÉCHOUÉ (uid) : sans eux, « vendu »
   // est un total PARTIEL — dit comme tel, jamais publié au widget (§5).
   const [ventesKO,setVentesKO]=useState([]);
+  // Publiées pour Réglages → Notifications et Achats (« quels comptes n'envoient
+  // aucun email ») : une lecture, ici ; les autres consomment (§11).
+  useEffect(()=>{ publierVentesCoque(ventesCoque, ventesKO); },[ventesCoque, ventesKO]);
+  useEffect(()=>()=>publierVentesCoque(undefined, []),[]);
   // Ce que le widget publie hors « vendu » (attente, encaissé, stock, messages).
   const [widgetBase,setWidgetBase]=useState(null);
   // ── « Le prix qui marche » : chargé À LA DEMANDE (onglet ouvert), une fois ──

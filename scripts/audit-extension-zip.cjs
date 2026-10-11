@@ -19,7 +19,12 @@
 //   2. il porte la version du manifeste — donc `EXT_ATTENDUE` aussi ;
 //   3. il se dézippe en UN SEUL dossier (règle de Julien) ;
 //   4. il contient tous les fichiers de l'extension, et ce sont CEUX de la source ;
-//   5. aucun zip périmé ne traîne à côté.
+//   5. aucun zip périmé ne traîne à côté ;
+//   6. UNE VERSION PUBLIÉE NE CHANGE JAMAIS DE CONTENU (revue du 11 octobre) :
+//      la 5.168.0 a été publiée par `main` (PR #472) pendant qu'un chantier
+//      modifiait `background.js` SOUS LE MÊME NUMÉRO. Une 5.168 installée depuis
+//      la production se serait dite « à jour » sans le correctif. Le numéro de la
+//      source, s'il a déjà été servi par `main`, doit l'avoir été avec CE contenu.
 //
 // Lecture seule.
 const fs = require('fs'), path = require('path'), zlib = require('zlib');
@@ -143,6 +148,55 @@ dit((APP.match(/VRM-extension\.zip/g) || []).length >= 2,
   const k = APP.indexOf('Le zip se dézippe en un seul dossier');
   const R = k < 0 ? '' : APP.slice(k, APP.indexOf('\n', k));
   juge(R, 'Réglages');
+}
+
+// 6) UNE VERSION PUBLIÉE NE CHANGE JAMAIS DE CONTENU
+//    On lit l'historique de `main` (première lignée, celle qui se déploie) : le
+//    contenu publié sous `vSrc` est celui du DERNIER commit de main dont le
+//    manifeste porte `vSrc`. Chaque fichier de la source doit être, octet pour
+//    octet, celui de ce commit — sinon c'est un autre contenu sous un numéro
+//    déjà servi : monter la version (jamais un numéro réservé par un autre
+//    chantier). Historique illisible ⇒ on le DIT, on ne conclut rien.
+{
+  const { execFileSync } = require('child_process');
+  const crypto = require('crypto');
+  const git = (...a) => execFileSync('git', a, { cwd: RACINE, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 64 << 20 });
+  const versionA = (rev) => { try { return JSON.parse(git('show', `${rev}:vinted-sync-extension/manifest.json`)).version || null; } catch (_) { return null; } };
+  const cmp = (a, b) => { const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number); for (let i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) - (y[i] || 0); } return 0; };
+  let ref = process.env.VRM_REF_MAIN || null;
+  if (!ref) for (const r of ['origin/main', 'main']) { try { git('rev-parse', '--verify', '-q', `${r}^{commit}`); ref = r; break; } catch (_) {} }
+  let publie = null;                                   // le commit de main qui a servi vSrc en dernier
+  let lisible = !!ref;
+  if (ref) {
+    try {
+      if (versionA(ref) === vSrc) publie = ref;
+      else {
+        const chg = git('log', '--first-parent', '--format=%H', ref, '--', 'vinted-sync-extension/manifest.json').split('\n').filter(Boolean);
+        for (const c of chg) {
+          const avant = versionA(`${c}^1`);
+          if (avant === vSrc) { publie = `${c}^1`; break; }
+          if (avant && cmp(avant, vSrc) < 0) break;     // plus ancien que vSrc : jamais servi
+        }
+      }
+    } catch (_) { lisible = false; }
+  }
+  if (!lisible) {
+    console.log('⚠️  historique de main illisible — impossible de dire si la version ' + vSrc + ' a déjà été servie (aucune conclusion)');
+  } else if (!publie) {
+    dit(true, `la version ${vSrc} n'a jamais été servie par ${ref}`, 'numéro neuf');
+  } else {
+    const blob = (buf) => crypto.createHash('sha1').update(Buffer.concat([Buffer.from(`blob ${buf.length}\0`), buf])).digest('hex');
+    const arbre = {};
+    for (const l of git('ls-tree', '-r', publie, '--', 'vinted-sync-extension/').split('\n').filter(Boolean)) {
+      const m = /^\d+ blob ([0-9a-f]+)\t(.+)$/.exec(l);
+      if (m) arbre[m[2].replace(/^vinted-sync-extension\//, '')] = m[1];
+    }
+    const differents = [];
+    for (const f of attendus) if (arbre[f] !== blob(fs.readFileSync(path.join(SRC, f)))) differents.push(f);
+    for (const f of Object.keys(arbre)) if (!f.includes('/') && !attendus.includes(f)) differents.push(f + ' (retiré)');
+    dit(differents.length === 0, `la version ${vSrc}, déjà servie par ${ref}, n'a pas changé de contenu`,
+      differents.length ? `${vSrc} publiée avec un AUTRE contenu (${differents.join(', ')}) — monte la version (un numéro jamais servi ni réservé)` : '');
+  }
 }
 
 // 5) AUCUN ZIP PÉRIMÉ À CÔTÉ

@@ -181,6 +181,21 @@ async function detectAccount(raw) {
   return { uid: '', login: '' };
 }
 
+// La paire d'un email de message, lue dans son SUJET (forme mesurée sur 59 emails :
+// « Nouveau message à propos de salomon XT-6 gris taille 40 »). Rien d'autre :
+// un sujet sans « à propos de » ne donne pas de paire (mieux vaut un blanc).
+// ⚠️ Revue du 11 octobre : la règle acceptait aussi « concernant » et « au sujet
+//    de » — jamais mesurés sur un email de message, et portés par des sujets
+//    SYSTÈME (« Action requise concernant ta commande ») : la notification
+//    disait « 💬 ta commande ». Seule la forme mesurée désigne une paire.
+export function paireDuSujetMessage(sujet) {
+  const s = String(sujet || '').replace(/^\s*(?:(?:re|tr|fwd?|fw)\s*:\s*)+/i, '');
+  const m = s.match(/[àa]\s+propos\s+(?:de\s+|d['’]\s*)(.+)$/i);
+  const p = m ? m[1].replace(/^[«"“'\s]+|[»"”'\s.]+$/g, '').trim() : '';
+  return p.length >= 2 ? p : '';
+}
+const court = (t, n) => { const x = String(t || ''); return x.length > n ? x.slice(0, n - 1).trimEnd() + '…' : x; };
+
 function shortHash(s) {
   let h = 0; const str = String(s || '');
   for (let i = 0; i < str.length; i++) { h = ((h << 5) - h + str.charCodeAt(i)) | 0; }
@@ -299,6 +314,22 @@ async function supabaseGetRow(id) {
     return (rows[0] && rows[0].data) || null;
   } catch (_) { return null; }
 }
+// La même lecture, avec TROIS états — `supabaseGetRow` rend `null` aussi bien
+// pour « la ligne n'existe pas » que pour « la base n'a pas répondu ». Pour une
+// ligne qu'on RÉÉCRIT ensuite (mémo des notifications, journal), confondre les
+// deux effaçait la ligne sur un simple hoquet (« rien lu » ne vaut pas « rien »).
+// Rend `{ lu: true, data }` (data `null` si absente) ou `{ lu: false }`.
+async function supabaseLireRow(id) {
+  try {
+    const res = await fetch(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(id)}&select=data`), {
+      headers: { ...sbCle(SUPABASE_KEY) },
+    });
+    if (!res.ok) return { lu: false };
+    const rows = await res.json();
+    if (!Array.isArray(rows)) return { lu: false };   // 522 : du HTML, pas du JSON
+    return { lu: true, data: (rows[0] && rows[0].data) || null };
+  } catch (_) { return { lu: false }; }
+}
 
 function buildInvoiceHtml(cfg, sale, number, dateStr) {
   // ⚠️ Le nom, l'adresse, l'email de l'ACHETEUR et la désignation viennent de
@@ -361,14 +392,52 @@ async function createProInvoice(sale, acc, cfg, now) {
 // Supabase push_dedup, 300 dernières). Renvoie true si c'est un NOUVEL envoi
 // (à faire), false si déjà notifié (à ignorer). Évite les notifs en double
 // quand un même email arrive deux fois (transféré via plusieurs boîtes…).
+//
+// ⚠️⚠️ UNE LECTURE RATÉE EFFAÇAIT LE MÉMO (11 octobre, reproduit sur la vraie
+//    route — banc `notif-messages.cjs`). `(await supabaseGetRow(…)) || {keys:[]}`
+//    prenait un hoquet pour « aucune clé », puis RÉÉCRIVAIT le mémo avec la
+//    seule clé du moment : les 300 autres partaient. Au renvoi suivant du fil
+//    (le script Gmail renvoie tout le fil à chaque nouveau message), TOUS les
+//    anciens messages re-sonnaient. Trois états, jamais deux :
+//      · lu      ⇒ comme avant ;
+//      · pas su  ⇒ on relit une fois (un hoquet), puis on n'ÉCRIT RIEN et on
+//                  ENVOIE (un message manqué ne se rattrape pas ; une
+//                  notification de trop si) — et la clé est retenue par cette
+//                  instance (`_memoEnAttente`) : elle est versée au mémo à la
+//                  prochaine lecture réussie, et un renvoi du même email pendant
+//                  le hoquet ne re-sonne pas.
+//    La mémoire d'instance est un REPLI, par vendeur, jamais une vérité : une
+//    instance froide ne l'a pas (au pire, le message du hoquet sonne une seconde
+//    fois au renvoi suivant — jamais les anciens).
+// `key` peut être une liste : la première clé est celle qu'on range, les
+// suivantes sont des ALIAS reconnus mais jamais écrits (l'ancien format d'une
+// clé : sans eux, le jour du déploiement, chaque fil renvoyé re-sonnerait).
+const _memoEnAttente = new Map();                   // vendeur → Set des clés envoyées sans avoir pu les ranger
+export const oublierMemoEnAttente = () => _memoEnAttente.clear();   // bancs : instance froide
+const enAttente = () => {
+  const qui = proprietaireCourant() || process.env.VRM_OWNER_UID || '';
+  if (!_memoEnAttente.has(qui)) _memoEnAttente.set(qui, new Set());
+  return _memoEnAttente.get(qui);
+};
 async function shouldNotify(key) {
-  if (!key) return true;
+  const cles = (Array.isArray(key) ? key : [key]).filter(Boolean);
+  if (!cles.length) return true;
+  const attente = enAttente();
   try {
-    const cur = (await supabaseGetRow('push_dedup')) || { keys: [] };
-    const keys = Array.isArray(cur.keys) ? cur.keys : [];
-    if (keys.includes(key)) return false;
-    const next = [key, ...keys].slice(0, 300);
-    await supabaseUpsert([{ id: 'push_dedup', data: { keys: next } }]);
+    let lu = await supabaseLireRow('push_dedup');
+    if (!lu.lu) lu = await supabaseLireRow('push_dedup');
+    if (!lu.lu) {
+      if (cles.some((k) => attente.has(k))) return false;
+      attente.add(cles[0]);
+      while (attente.size > 300) attente.delete(attente.values().next().value);
+      return true;
+    }
+    const keys = (lu.data && Array.isArray(lu.data.keys)) ? lu.data.keys : [];
+    if (cles.some((k) => keys.includes(k) || attente.has(k))) return false;
+    const enPlus = [...attente].filter((k) => !keys.includes(k));
+    const next = [cles[0], ...enPlus, ...keys].slice(0, 300);
+    if (await supabaseUpsert([{ id: 'push_dedup', data: { keys: next } }])) attente.clear();
+    else attente.add(cles[0]);                      // pas rangé : l'instance s'en souvient (la route répondra 503)
     return true;
   } catch (_) { return true; }
 }
@@ -383,7 +452,7 @@ async function shouldNotify(key) {
 // consulte dans l'app, où le badge suffit.
 // Envoie une notification UNE seule fois (clé = son tag, déjà unique), et
 // seulement si cette catégorie est active.
-async function pushOnce(payload, categorie) {
+async function pushOnce(payload, categorie, alias = []) {
   try {
     // ⚠️ REJEU EN LOT : on rattrape des emails vieux de plusieurs jours. Sonner
     //    pour chacun, c'est des centaines de notifications d'un coup pour des
@@ -395,7 +464,7 @@ async function pushOnce(payload, categorie) {
     if (!(await pushCategorieActive(cat))) return;
     // `_cat` est un marqueur interne : il ne part pas dans la notification.
     const { _cat, ...notif } = payload || {};
-    if (await shouldNotify(notif.tag)) await sendPushToAll(notif);
+    if (await shouldNotify(notif.tag ? [notif.tag, ...alias] : null)) await sendPushToAll(notif);
   } catch (_) {}
 }
 
@@ -462,7 +531,12 @@ async function garderInconnu(corpsBrut, mail, raison, famille) {
 
 async function logEmail(entry) {
   try {
-    const cur = (await supabaseGetRow('email_journal')) || { entries: [] };
+    // ⚠️ Lire-fusionner-réécrire : une lecture RATÉE repartait d'un journal vide
+    //    et le réécrivait avec la seule ligne du moment — les 199 autres, celles
+    //    qui expliquent un colis manquant, partaient. Pas su ⇒ on n'écrit pas.
+    const lu = await supabaseLireRow('email_journal');
+    if (!lu.lu) return;
+    const cur = lu.data || { entries: [] };
     // 200 et non 30 : le 23 août, une rafale d'emails « offre » avait chassé du
     // journal la seule ligne qui expliquait un colis manquant.
     const entries = [{ ...entry, at: new Date().toISOString() }, ...(cur.entries || [])].slice(0, 200);
@@ -1602,7 +1676,7 @@ export async function traiterEmail(req, res) {
         extrait: (!montant || !qui) ? corpsTexte.replace(/\s+/g, ' ').slice(0, 300) : undefined,
         account: acc.login || '', uid: acc.uid || '', receivedAt: now,
       } }]); } catch (_) {}
-      await logEmail({ type: 'offre', subject, from: mail.from, montant, de: qui, article, net });
+      await logEmail({ type: 'offre', subject, from: mail.from, montant, de: qui, article, net, account: acc.login || '' });
       repondre(res, 200, { ok: true, type: 'offre', montant, de: qui, article, net });
       return;
     }
@@ -1611,15 +1685,46 @@ export async function traiterEmail(req, res) {
     if (/nouveau message|message de|t['']a envoyé un message|vous avez re[çc]u un message/i.test(textAll)) {
       const qui = (textAll.match(/(?:message de|de la part de)\s+(\S+)/i) || textAll.match(/(\S+)\s+t['']a envoyé/i) || [])[1] || '';
       const extrait = extractAfter(/envoy[ée] un message|nouveau message|message de/i);
-      const key = shortHash(subject + corpsTexte.slice(0, 200));
+      // ⚠️ LA PAIRE EST DANS LE SUJET, ET LA NOTIFICATION NE LA DISAIT PAS
+      //    (11 octobre, mesuré : 59 emails de message sur 59, le téléphone
+      //    affichait « 💬 Message Vinted → compte · Nouveau message — ouvre
+      //    Vinted pour répondre. », identique pour toutes les paires). Le sujet
+      //    est « Nouveau message à propos de {titre de la paire} » : on le lit,
+      //    on ne devine rien d'autre (sans sujet lisible, « Message Vinted »).
+      const paire = paireDuSujetMessage(subject);
+      // ⚠️ L'ANTI-DOUBLON AVALAIT UN SECOND MESSAGE. La clé était « sujet + 200
+      //    premiers caractères » : deux messages sur la même paire dont le début
+      //    est identique n'en faisaient qu'un, et le second ne sonnait jamais.
+      //    Un renvoi du MÊME email (le script Gmail renvoie tout le fil) est
+      //    identique octet pour octet : l'empreinte du texte ENTIER le reconnaît,
+      //    et elle sépare deux messages qui ne diffèrent qu'à la fin. L'ancienne
+      //    clé reste reconnue (jamais réécrite) : sans elle, le jour du
+      //    déploiement, chaque fil renvoyé re-sonnerait en entier.
+      // ⚠️⚠️ REVUE DU 11 OCTOBRE — DEUX DÉFAUTS DE CE CORRECTIF, REPRODUITS :
+      //    1. l'ancienne clé (« sujet + 200 caractères ») reconnue comme ALIAS
+      //       avalait tout NOUVEAU message d'une paire déjà notifiée par l'ancien
+      //       code — y compris celui d'un AUTRE acheteur — tant qu'elle restait au
+      //       mémo. Elle ne désigne le MÊME email que si elle couvrait tout le texte
+      //       (corps ≤ 200 caractères) : seulement là, elle est un alias. Au-delà,
+      //       un fil renvoyé le jour du déploiement re-sonne UNE fois — une
+      //       notification de trop se répare, un message avalé non.
+      //    2. deux messages d'une même conversation dont le corps ne porte pas le
+      //       texte (la forme mesurée : l'analyse n'en tire ni l'acheteur ni le
+      //       texte, 59 emails sur 59) ont la MÊME empreinte. Seule une identité
+      //       PAR EMAIL les sépare : le Message-ID (envoyé par le script Gmail et
+      //       le Worker, `normaliserEntrant`). Avec lui, c'est LUI la clé ; sans
+      //       lui (un script d'avant), l'empreinte du texte entier reste le repli.
+      const cleEntiere = crypto.createHash('sha256').update(`${subject}\n${corpsTexte}`).digest('hex').slice(0, 20);
+      const cleEmail = mail.messageId ? `msg-id-${crypto.createHash('sha256').update(String(mail.messageId)).digest('hex').slice(0, 20)}` : '';
+      const aliasAncien = corpsTexte.length <= 200 ? [`msg-${shortHash(subject + corpsTexte.slice(0, 200))}`] : [];
       try { await pushOnce({
-        title: `💬 ${qui || 'Message Vinted'}${acc.login ? ` → ${acc.login}` : ''}`,
-        body: extrait ? `« ${extrait} »` : 'Nouveau message — ouvre Vinted pour répondre.',
-        tag: `msg-${key}`, url: '/?tab=cat_msg',
+        title: `💬 ${paire ? court(paire, 70) : (qui || 'Message Vinted')}`,
+        body: `${qui && paire ? `${qui} · ` : ''}Nouveau message${acc.login ? ` sur ${acc.login}` : ''}${extrait ? ` : « ${extrait} »` : ' — ouvre Vinted pour répondre.'}`,
+        tag: cleEmail || `msg-${cleEntiere}`, url: '/?tab=cat_msg',
         _cat: 'message',
-      }); } catch (_) {}
-      await logEmail({ type: 'message', subject, from: mail.from, de: qui, extrait, account: acc.login || '' });
-      repondre(res, 200, { ok: true, type: 'message', de: qui, extrait });
+      }, null, aliasAncien); } catch (_) {}
+      await logEmail({ type: 'message', subject, from: mail.from, de: qui, extrait, paire, account: acc.login || '' });
+      repondre(res, 200, { ok: true, type: 'message', de: qui, extrait, paire });
       return;
     }
 

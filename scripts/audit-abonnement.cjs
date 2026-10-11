@@ -73,8 +73,18 @@ global.fetch = async (url, opts = {}) => {
   if (u.includes('/rest/v1/app_data')) {
     const own = /owner=eq\.([^&]+)/.exec(u), id = /id=eq\.([^&]+)/.exec(u);
     if (m === 'POST') {
-      for (const l of JSON.parse(opts.body)) { ecrituresData.push({ url: u, ...l }); appData[`${l.owner || ''}|${l.id}`] = l; }
-      return rep('', 201);
+      // §6.3 : servir la FORME que PostgREST rend. Avec `return=representation`
+      // il rend les lignes réellement écrites (et `ignore-duplicates` n'écrase
+      // pas une ligne existante : rien n'est rendu pour elle). `push_subs`
+      // s'écrit ainsi depuis le 11 octobre (écriture conditionnelle).
+      const prefer = String(h.Prefer || h.prefer || '');
+      const rendus = [];
+      for (const l of JSON.parse(opts.body)) {
+        const cle = `${l.owner || ''}|${l.id}`;
+        if (/ignore-duplicates/.test(prefer) && appData[cle]) continue;
+        ecrituresData.push({ url: u, ...l }); appData[cle] = l; rendus.push(l);
+      }
+      return /return=representation/.test(prefer) ? rep(rendus, 201) : rep('', 201);
     }
     if (/select=owner&limit=1/.test(u)) return rep([]);                      // base cloisonnée
     if (id && id[1] === 'main') return rep(mains);

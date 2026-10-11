@@ -114,6 +114,7 @@ function lireMime(raw) {
   out.from = decodeEnTete(h.from || h.sender || h['return-path'] || '');
   out.to = decodeEnTete(h.to || h['delivered-to'] || h['x-original-to'] || '');
   out.subject = decodeEnTete(h.subject || '');
+  out.messageId = String(h['message-id'] || '').trim();
   parcourir(head, body, out, 0);
   return out;
 }
@@ -131,7 +132,8 @@ function depuisEnTetes(h) {
 }
 
 /**
- * Rend TOUJOURS { from, to, subject, text, html, attachments } — et `forme`,
+ * Rend TOUJOURS { from, to, subject, text, html, attachments } (et `messageId`
+ * quand la forme le porte) — et `forme`,
  * le nom de la forme reconnue (pour le journal : savoir CE QU'ON A REÇU).
  */
 function normaliserEntrant(body, prof = 0) {
@@ -165,6 +167,7 @@ function normaliserEntrant(body, prof = 0) {
       to: (b.ToFull && b.ToFull[0] && b.ToFull[0].Email) || b.To || '',
       subject: b.Subject || '',
       text: b.TextBody || '', html: b.HtmlBody || '',
+      messageId: String(depuisEnTetes(b.Headers)['message-id'] || '').trim(),
       attachments: (b.Attachments || []).map(a => ({ filename: a.Name, contentType: a.ContentType, contentB64: a.Content })),
       forme: 'postmark',
     };
@@ -177,6 +180,10 @@ function normaliserEntrant(body, prof = 0) {
     from: b.from || b.sender || b.From || b.Sender || heads.from || env.from || '',
     to: b.to || b.recipient || b.To || b.Recipient || heads.to || (Array.isArray(env.to) ? env.to[0] : env.to) || '',
     subject: b.subject || b.Subject || b.title || heads.subject || '',
+    // L'IDENTITÉ de l'email (Message-ID), envoyée par le script Gmail et le
+    // Worker : c'est elle qui sépare deux messages d'une même conversation dont
+    // le corps est identique (anti-doublon des notifications).
+    messageId: String(b.messageId || b.message_id || b['message-id'] || b.MessageId || heads['message-id'] || '').trim(),
     text: b.text || b['body-plain'] || b.plain || b.textBody || b.TextBody || b['stripped-text'] || '',
     html: b.html || b['body-html'] || b.htmlBody || b.HtmlBody || b['stripped-html'] || '',
   };

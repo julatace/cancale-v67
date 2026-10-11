@@ -43,10 +43,10 @@ const ecouter = () => new Promise((res, rej) => {
 });
 
 const ETATS = {
-  pret:    { attendu: 'pret',    rep: { ok: true, ready: true,  mois: '2026-10', n: 12, plafond: 150, autorise: true } },
+  pret:    { attendu: 'pret',    rep: { ok: true, ready: true,  mois: '2026-10', n: 12, plafond: 100, autorise: true } },
   autre:   { attendu: 'pret',    rep: { ok: true, ready: true,  mois: '2026-10', n: 47, plafond: 300, autorise: true } },
-  sanscle: { attendu: 'sanscle', rep: { ok: true, ready: false, mois: '2026-10', n: 0,  plafond: 150, autorise: true } },
-  reserve: { attendu: 'reserve', rep: { ok: true, ready: true,  mois: '2026-10', n: 0,  plafond: 150, autorise: false } },
+  sanscle: { attendu: 'sanscle', rep: { ok: true, ready: false, mois: '2026-10', n: 0,  plafond: 100, autorise: true } },
+  reserve: { attendu: 'reserve', rep: { ok: true, ready: true,  mois: '2026-10', n: 0,  plafond: 100, autorise: false } },
   pasSu:   { attendu: 'pasSu',   rep: null },   // 503 HTML : la vraie forme d'une panne
   // 503 JSON « compteur » : le serveur SAIT que son compteur est illisible — et
   // tant que ça dure, aucune photo ne sera détourée. Ce n'est pas un « pas su ».

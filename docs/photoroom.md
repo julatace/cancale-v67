@@ -36,7 +36,7 @@ Deux réglages facultatifs, au même endroit :
 
 | variable | ce qu'elle décide | sans elle |
 |---|---|---|
-| `PHOTOROOM_PLAFOND_MOIS` | combien de photos **un vendeur** peut faire détourer par mois | **150** (≈ 3 $) |
+| `PHOTOROOM_PLAFOND_MOIS` | combien de photos **un vendeur** peut faire détourer par mois | **100** (≈ 2 $ ; 150 jusqu’au 11 octobre) |
 | `PHOTOROOM_POUR` | `tous` = les abonnés qui **paient vraiment** (Stripe actif, ou impayé de moins de 14 jours) y ont droit, à tes frais — un compte gratuit, jamais | **toi seul** (`VRM_OWNER_UID`) |
 
 ⚠️ Avant de mettre `PHOTOROOM_POUR=tous` : un abonné qui publie beaucoup peut te
