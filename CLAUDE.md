@@ -6770,6 +6770,68 @@ soir, angeled92 le 11 ; **tomj683 et arthuror2 toujours au 8 octobre 22:30**
   autre entrée VRM dans `chrome://extensions`), recharger ses onglets Vinted,
   puis passer une fois sur **tomj683** et **arthuror2**.
 
+### ⚠️⚠️ « ANNONCES = LES PAIRES EN LIGNE MAINTENANT » — LA RELECTURE PUBLIQUE DE SES AUTRES COMPTES (11 octobre, 5.166)
+Julien : « j'avais supprimé mes annonces sur Vinted… il y avait encore toutes mes
+annonces sur VRM… trois fois la même paire alors qu'il n'y a qu'une seule
+annonce. Il faut que ce soit les paires qui sont en ligne actuellement. »
+**Mesuré (lecture seule)** : le dressing d'un compte n'est relu que quand Chrome
+est CONNECTÉ dessus (un seul jeton vivant à la fois). `arthuror2` (10 annonces
+« en ligne ») et `tomj683` (6) n'avaient pas été relus depuis le 8 octobre
+22 h 30 : tout ce qu'il y avait supprimé ou republié depuis restait affiché.
+- **L'extension relit ses AUTRES comptes à chaque visite** — la vue PUBLIQUE de
+  leur dressing (`GET /api/v2/wardrobe/{profil}/items`, ce que voit n'importe
+  quel visiteur), avec les cookies de l'onglet, **jamais** le jeton d'un autre
+  compte (`activeFetchAll` reste retiré). `relireAnnoncesAutresComptes` :
+  uniquement des comptes À LUI (`vinted_accounts`), jamais un exclu ni un
+  supprimé (`vrm_blocked_accounts`, `hidden`, `blocked` — une de ces listes
+  illisible ⇒ personne) ; 3 comptes par visite, pas un compte relu depuis
+  moins de 30 min ; une requête à la fois dans `requeteVinted`, pause/frein
+  respectés ; budget de LECTURE (`gardeLecture`, classe ordinaire : les
+  priorités argent/colis/clic gardent leur réserve) ; toutes les pages jusqu'à
+  `total_entries`, et un article d'un AUTRE membre ⇒ lecture rejetée.
+  Incomplète ⇒ **rien n'est écrit**, nouvel essai dans 5 min. Complète ⇒
+  `harvest_{uid}_enligne` `{ids, n, items, complet:true, capturedAt, source:'public'}`
+  — une ligne À PART, jamais par-dessus `harvest_{uid}_listings` — puis
+  `maj · annonces` à l'app.
+- **UNE règle, la même texte pour texte dans l'app et l'extension**
+  (`<enligne-regle>` : `enLigneDuCompte`, `enLigneDesLignes`) : la lecture
+  COMPLÈTE la plus récente fait foi (son dressing ou la vue publique) ; une
+  annonce absente de la vue publique plus récente **sort toute seule** (ce
+  n'est pas une preuve de VENTE : elle ne devient pas « vendue ») ; une annonce
+  republiée (seulement dans la vue publique) apparaît ; une suppression vue
+  après la lecture la retire (`supprimeeApres`). Lecteurs : écran Annonces
+  (`annBase`), tableau de bord, file et alertes Leboncoin, recherche, prix du
+  marché, et côté extension `buildLbcData` / `buildEbayData`.
+- **Une lecture de plus de 24 h ne compte plus « en ligne »** : ses annonces
+  sont « à confirmer » — hors de la grille et des totaux, **rien n'est
+  supprimé**, son numéro reste. UNE ligne repliée au-dessus de la grille
+  (`FraicheurAnnonces`, la même que les supprimées, §7) : « ▸ N annonces de X à
+  confirmer — dernière lecture il y a 3 j », qui s'ouvre au clic, et UN geste
+  selon `extSait('enligne')` (à jour · en retard · absente, téléphone compris).
+  Pendant ce temps la file Leboncoin ne propose pas de les retirer (pas su) et
+  l'anti double vente les compte encore. Lecture des lignes `enligne` ratée ⇒
+  on retombe sur le dressing seul : rien ne disparaît en silence.
+- **Preuves** : `audit-enligne.cjs` (le VRAI `background.js` dans un `vm`, la
+  vraie règle des deux fichiers, mêmes sorties) **59 contrôles, 15 rouges sur
+  4a29202**, et **15 mutations sur 15** rouges (lecture la plus récente,
+  « à confirmer » retiré, divergence app/extension, vendue, exclus, pas su, 3
+  par visite, 30 min, total, page ratée, budget, file, écrasement de
+  `listings`, autre membre, retrait sur une lecture partielle). Banc
+  `enligne.cjs` (données inventées, 390 et 1512 px : 3 annonces d'une paire
+  dont 2 supprimées ⇒ 1 seule ; compte figé ⇒ « à confirmer » ; republiée ⇒
+  affichée ; lecture ratée ⇒ rien ne disparaît ; téléphone) **25 rouges** sur le
+  build de 4a29202 et rouge sous 3 mutations. `audit-places` et
+  `audit-supprimees` servent des dressings DATÉS (sans date ⇒ « à confirmer »,
+  §6.3) ; le banc `supprimees` lit le nouveau geste.
+- `EXT_CAPACITES.enligne = '5.166.0'` (`relireAnnoncesAutresComptes`).
+- ⚠️ **Non mesuré** (aucun appel à Vinted d'ici) : la forme réelle de la vue
+  publique (une annonce vendue y figure-t-elle, `total_entries` y est-il
+  cohérent ?) ; la réaction de Vinted à 3 lectures publiques par visite ; le
+  premier tour réel chez lui.
+- **Geste de Julien** : installer la 5.166 (un seul dossier), puis ouvrir
+  vinted.fr sur n'importe lequel de ses comptes — trois autres comptes sont
+  relus à chaque visite.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
@@ -6796,6 +6858,7 @@ arrivée** — vérifiée commit par commit sur `manifest.json`, pas devinée.
 | `vestiaire` | `storeVcRecon` | **5.154.0** (4 oct.) | Vestiaire : « ouvre Vestiaire dans ce Chrome, l'extension apprend à le lire » |
 | `detourage` | `detourerPhotos` | **5.156.0** (4 oct.) | « tes photos sont détourées (fond blanc) avant d'être attachées à Leboncoin » |
 | `supprimees` | `noterSuppression` | **5.165.0** (11 oct.) | « une suppression faite sur vinted.fr dans ce Chrome sort d'ici tout de suite » |
+| `enligne` | `relireAnnoncesAutresComptes` | **5.166.0** (11 oct.) | « tes autres comptes sont relus à ta prochaine visite sur Vinted, sur n'importe lequel de tes comptes » |
 
 ⚠️ **DEUX SEUILS POUR UNE MÊME NOTION, EXPRÈS.** Les photos s'attachent côté
 Leboncoin depuis la 5.58 et côté eBay depuis la 5.59 : un seul seuil aurait
@@ -6939,8 +7002,8 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | outil | quoi |
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
-| `node scripts/audit-*.cjs` | **85 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
-| `scripts/bancs/*.cjs` | les **76 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
+| `node scripts/audit-*.cjs` | **86 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `scripts/bancs/*.cjs` | les **77 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
 **Trois règles de preuve :**
@@ -7232,8 +7295,8 @@ script-là me fait croire à une catastrophe.
 src/App.jsx                     l'app (grep avant de lire — le fichier est énorme)
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
-scripts/audit-*.cjs             les 85 audits
-scripts/bancs/                  les 76 bancs (leur README dit comment les lancer)
+scripts/audit-*.cjs             les 86 audits
+scripts/bancs/                  les 77 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 ```

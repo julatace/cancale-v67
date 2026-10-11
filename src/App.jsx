@@ -175,7 +175,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // exactement. Le seuil est 5.160 : en deçà, l'app dit « mets à jour », elle ne
 // laisse pas le bouton se casser. (Mesuré le 7 octobre : son extension installée
 // est en 5.143 — c'est pour ça que « publier depuis VRM ne marche pas ».)
-const EXT_CAPACITES = { supprimees: '5.165.0', enligne: '5.165.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', repond: '5.77.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', detourage: '5.156.0' };
+const EXT_CAPACITES = { supprimees: '5.165.0', enligne: '5.166.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', repond: '5.77.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', detourage: '5.156.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -1539,7 +1539,7 @@ function supprimeeApres(ids, id, capTs) {
 //   · la lecture COMPLÈTE la plus récente de son compte la contient ouverte —
 //     son propre dressing (`harvest_{uid}_listings`, quand il est connecté) ou
 //     son dressing PUBLIC relu depuis un autre de ses comptes
-//     (`harvest_{uid}_enligne`, 5.165) : la plus récente des deux fait foi ;
+//     (`harvest_{uid}_enligne`, 5.166) : la plus récente des deux fait foi ;
 //   · aucune suppression vue APRÈS cette lecture ne la retire ;
 //   · et cette lecture a moins de 24 h. Au-delà (ou jamais lue) on ne SAIT pas :
 //     ses annonces ne sont ni « en ligne » ni « disparues » — « à confirmer »,
@@ -1656,7 +1656,7 @@ const lireSupprimeesTous = () => cachedRow('s:*', async () => {
     return m;
   } catch (_) { return null; }
 });
-// ── LA LECTURE PUBLIQUE DES AUTRES COMPTES (5.165, 11 octobre) ──────────────
+// ── LA LECTURE PUBLIQUE DES AUTRES COMPTES (5.166, 11 octobre) ──────────────
 // L'extension relit, à chaque visite sur Vinted, le dressing PUBLIC de ses autres
 // comptes et le range dans `harvest_{uid}_enligne` (une ligne par compte). La
 // règle `enLigneDuCompte` (bloc <enligne-regle>, la même que l'extension) dit
@@ -1716,7 +1716,7 @@ const listeEtFr = (noms) => noms.length <= 1 ? (noms[0] || '') : `${noms.slice(0
 // fois au-dessus de la grille (§7) :
 //   · combien d'annonces sont sorties parce qu'elles ne sont plus en ligne
 //     (supprimées, ou absentes d'une lecture plus récente) ;
-//   · 5.165 (11 octobre) — les annonces « À CONFIRMER » : celles d'un compte dont
+//   · 5.166 (11 octobre) — les annonces « À CONFIRMER » : celles d'un compte dont
 //     la dernière lecture a plus de 24 h. Elles ne sont ni comptées en ligne ni
 //     dans la grille, et rien n'est supprimé : une ligne repliée qui s'ouvre au
 //     clic (« rien lu ne vaut pas rien » : ni « en ligne », ni « disparue ») ;
@@ -1949,7 +1949,7 @@ const fetchHarvestBrut = async (uid, type, opts = {}) => {
     if (!res.ok) return null;
     const rows = await res.json();
     const row = rows[0];
-    // 5.165 (11 octobre) : le dressing d'un compte, LÀ OÙ IL EST LU, passe par la
+    // 5.166 (11 octobre) : le dressing d'un compte, LÀ OÙ IL EST LU, passe par la
     // règle « en ligne » — la lecture complète la plus récente (son dressing ou
     // sa lecture publique), sans les supprimées, et « à confirmer » au-delà de
     // 24 h. Tous les écrans qui en dérivent la suivent sans la recalculer (§11).
@@ -4705,7 +4705,7 @@ const fetchVintedListings = async (account, page = 1, opts = {}) => {
     //    ci-dessus les a retirées), ou lu en entier par l'extension et vide
     //    (`total_entries: 0`). Ce vide-là EST une réponse ; sans ça, l'app
     //    repartait demander le dressing au relais du serveur.
-    // ⚠️ 5.165 (11 octobre) — ET un vide que la RÈGLE « en ligne » a produit :
+    // ⚠️ 5.166 (11 octobre) — ET un vide que la RÈGLE « en ligne » a produit :
     //    une lecture publique plus récente qui ne montre plus rien, des annonces
     //    « à confirmer » (compte pas relu depuis 24 h). Ce vide-là se DIT au-dessus
     //    de la grille ; aller le redemander au relais serait le contredire.
@@ -22973,7 +22973,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // d'annonces supprimées depuis en ont été retirées — pour le DIRE (une fois,
     // au-dessus de la grille). Gardés dans le cache : un rechargement ne doit pas
     // faire passer une lecture d'hier pour celle d'aujourd'hui.
-    // 5.165 (11 octobre) : `lu` est l'heure de la lecture qui FAIT FOI (son
+    // 5.166 (11 octobre) : `lu` est l'heure de la lecture qui FAIT FOI (son
     // dressing, ou sa lecture publique relue depuis un autre compte) ; les
     // annonces « à confirmer » (compte pas relu depuis 24 h) vivent à part —
     // jamais dans `items`, donc jamais comptées en ligne.
@@ -31635,7 +31635,7 @@ function LeboncoinScreen() {
     ((blkRows && blkRows[0] && blkRows[0].data && blkRows[0].data.uids) || []).forEach((u) => offAcc.add(String(u)));
     const lost = main.vinted_pairs_lost || {};
     const listRowsBrut = await sbGet('app_data?id=like.harvest_*_listings&select=id,data');
-    // 5.165 (11 octobre) : seulement ce qui est EN LIGNE d'après la lecture la
+    // 5.166 (11 octobre) : seulement ce qui est EN LIGNE d'après la lecture la
     // plus récente de chaque compte — la même règle que l'écran Annonces et que
     // la file de l'extension (`enLigneDesLignes`, §11). Celles « à confirmer »
     // (compte pas relu depuis 24 h) ne sont ni dans la file, ni « à retirer de

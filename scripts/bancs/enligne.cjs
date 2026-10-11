@@ -1,5 +1,5 @@
 // Banc : « IL FAUT VRAIMENT QUE CE SOIT LES PAIRES QUI SONT EN LIGNE ACTUELLEMENT,
-// QUI SONT DANS ANNONCES » (Julien, 11 octobre — extension 5.165).
+// QUI SONT DANS ANNONCES » (Julien, 11 octobre — extension 5.166).
 //
 // MESURÉ le 11 octobre : l'écran Annonces montrait 27 annonces « en ligne », dont
 // 16 d'une lecture du 8 octobre (deux comptes où il ne repassait pas). Il venait
@@ -84,9 +84,13 @@ const projette = (row, sel) => {
   }
   return out;
 };
-// Un pont d'extension À JOUR (5.165), dans la vraie forme ; `sansPont` : un téléphone.
-const PONT = () => {
-  const version = '5.165.0';
+// Un pont d'extension À JOUR, dans la vraie forme ; `sansPont` : un téléphone.
+// « À jour » = la version que l'app ATTEND (EXT_ATTENDUE, lue dans la source) :
+// une version écrite ici en dur passerait « en retard » au prochain bump, et le
+// banc mesurerait le bump, pas la règle (même leçon que le banc `publier`).
+const VERSION_A_JOUR = (fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'App.jsx'), 'utf8').match(/const EXT_ATTENDUE = '([\d.]+)'/) || [])[1];
+if (!VERSION_A_JOUR) { console.log('KO EXT_ATTENDUE introuvable dans src/App.jsx'); process.exit(1); }
+const PONT = (version) => {
   const post = (m) => window.postMessage(m, '*');
   window.addEventListener('message', (e) => {
     const d = e.data; if (e.source !== window || !d || typeof d !== 'object') return;
@@ -102,7 +106,7 @@ async function rendre(b, { lignes, tel = false, onglet = 'cat_annonces', enligne
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
-  if (!sansPont) await pg.addInitScript(PONT);
+  if (!sansPont) await pg.addInitScript(PONT, VERSION_A_JOUR);
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));

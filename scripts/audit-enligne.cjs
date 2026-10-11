@@ -1,6 +1,6 @@
 // ════════════════════════════════════════════════════════════════════════════
 //  « QUAND LES ANNONCES NE SONT PLUS EN LIGNE, ELLES DOIVENT ÊTRE ENLEVÉES.
-//  AUTOMATIQUEMENT. » (Julien, 11 octobre — extension 5.165)
+//  AUTOMATIQUEMENT. » (Julien, 11 octobre — extension 5.166)
 //
 //  MESURÉ le 11 octobre (base en lecture seule) : l'écran Annonces montrait 27
 //  annonces « en ligne », dont 16 d'une lecture du 8 octobre (arthuror2,

@@ -1852,7 +1852,7 @@ function supprimeeApres(ids, id, capTs) {
 //   · la lecture COMPLÈTE la plus récente de son compte la contient ouverte —
 //     son propre dressing (`harvest_{uid}_listings`, quand il est connecté) ou
 //     son dressing PUBLIC relu depuis un autre de ses comptes
-//     (`harvest_{uid}_enligne`, 5.165) : la plus récente des deux fait foi ;
+//     (`harvest_{uid}_enligne`, 5.166) : la plus récente des deux fait foi ;
 //   · aucune suppression vue APRÈS cette lecture ne la retire ;
 //   · et cette lecture a moins de 24 h. Au-delà (ou jamais lue) on ne SAIT pas :
 //     ses annonces ne sont ni « en ligne » ni « disparues » — « à confirmer »,
@@ -4159,7 +4159,7 @@ async function visiteVinted() {
     // `/payouts` (aucune requête ajoutée) ; ici on ne va chercher que les mois
     // PASSÉS encore absents, deux par visite au plus.
     await capterReleves(uid);
-    // ⚠️ 5.165 (11 octobre) — CE QUI EST EN LIGNE SUR SES AUTRES COMPTES : leur
+    // ⚠️ 5.166 (11 octobre) — CE QUI EST EN LIGNE SUR SES AUTRES COMPTES : leur
     // dressing PUBLIC, relu avec la session du compte connecté (au plus 3 comptes
     // par visite, aucun relu depuis moins de 30 min, budget de lecture ordinaire).
     // Sans ça, un compte où il ne repasse pas restait figé sur sa dernière
@@ -6675,7 +6675,7 @@ async function buildEbayData() {
   const lost = main.vinted_pairs_lost || {};
   const pos = await readEbayPosted();
   const posted = new Set(pos.ids);
-  // 5.165 (11 octobre) : seulement ce qui est EN LIGNE d'après la lecture la plus
+  // 5.166 (11 octobre) : seulement ce qui est EN LIGNE d'après la lecture la plus
   // récente de chaque compte — sans les supprimées, sans celles qu'une lecture
   // publique plus récente ne montre plus, et sans celles « à confirmer ».
   const enl = await lireDressingsEnLigne();
