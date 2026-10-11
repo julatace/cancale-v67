@@ -69,7 +69,10 @@ toute **lecture** sur ses propres données.
 **Refusé par Julien le 11 octobre (son choix, pas une limite technique) — ne pas
 reproposer** : « imprimer la journée » avec une liste de préparation triée par
 emplacement ; les étiquettes de carton avec QR code ; le prix conseillé à la mise
-en ligne (calculé sur ses ventes passées).
+en ligne (calculé sur ses ventes passées) ; l'alerte « achat jamais arrivé » ;
+l'alerte « argent bloqué » ; le rappel des messages sans réponse depuis 24 h ; le
+rappel des évaluations à laisser ; la sauvegarde hebdomadaire envoyée chez lui ;
+le widget iPhone enrichi.
 
 **Garde-fous de l'extension, à ne jamais retirer** : agir uniquement au nom du
 **compte connecté dans l'onglet** (`garde`), plafond de **20 actions/heure par
