@@ -39,11 +39,33 @@
 //     ligne qui le dit, AUCUNE alerte, AUCUN bouton d'offre, aucun « pas
 //     d'observateur » inventé ;
 //   · aucun débordement horizontal, aucune erreur de page.
+//   · (revue du 11 octobre) la vente « pas encore reliée » est NOMMÉE (son
+//     titre), avec le lien vers SA conversation et, à poster, son bouton
+//     « Générer le bordereau » ; le geste suit la version du pont : une 5.168.0
+//     PUBLIÉE (sans `capterPreuvesVente`) rend « retard », jamais la promesse ;
+//     une extension à jour dit le CHIFFRE (3 par visite, « au fil de tes
+//     visites » au-delà) ; et l'interrupteur éteint dans le nuage n'affiche
+//     jamais ALLUMÉ parce que l'appareil gardait « true ».
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || 4711;
+const EXT_ATTENDUE = (/const EXT_ATTENDUE = '([^']+)'/.exec(fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'App.jsx'), 'utf8')) || [])[1] || '?';
+// Le pont simulé (le VRAI dialogue `ready` / `etat`), injecté AVANT l'app.
+const PONT = (o) => {
+  const post = (m) => window.postMessage(m, '*');
+  window.addEventListener('message', (e) => {
+    const d = e.data; if (e.source !== window || !d || typeof d !== 'object') return;
+    if (d.__vmr === 'ping') post({ __vmr: 'ready', version: o.version });
+    if (d.__vmr === 'etat') post({ __vmr: 'etat:result', reqId: d.reqId, resp: { ok: true, version: o.version, vrm: { ok: true, connecte: true, email: '' }, vinted: { uid: '111', login: 'compte_test' }, cmds: {} } });
+    if (d.__vmr === 'cmd' && d.cmd === 'ventes') post({ __vmr: 'cmd:result', reqId: d.reqId, resp: { accepte: true, etape: 'recent' } });
+  });
+  post({ __vmr: 'ready', version: o.version });
+};
+// Des ventes en cours SANS preuve de plus (sur le même compte), pour juger le
+// rythme dit par l'écran (« 3 par visite »).
+let ventesEnPlus = 0;
 
 const auj = new Date();
 const ACCS = [{ id: 1, vinted_user_id: '111', login: 'compte_test', domain: 'www.vinted.fr', updated_at: auj.toISOString() }];
@@ -79,7 +101,7 @@ const VENTES = { capturedAt: auj.toISOString(), payload: { my_orders: [
   { transaction_id: 9001, title: 'Adidas Gazelle bleu taille 40', status: 'Bordereau envoyé au vendeur', transaction_user_status: 'needs_action', date: recent(20) },   // N°22 : bordereau seul ⇒ PROUVÉE
   { transaction_id: 9003, title: 'Salomon XT-6 noir taille 41', status: 'Commande annulée', transaction_user_status: 'failed', date: recent(30) },                    // N°23 : bordereau, vente annulée ⇒ rien
   { transaction_id: 9006, title: 'Puma Suede rouge taille 42', status: 'Le paiement a été validé', transaction_user_status: 'needs_action', date: recent(10) },       // N°26 : bordereau, mais revenue ⇒ rien
-  { transaction_id: 9010, title: 'Vans Old Skool noir taille 41', status: 'Le paiement a été validé', transaction_user_status: 'needs_action', date: recent(2) },     // aucune preuve ⇒ « pas encore reliée »
+  { transaction_id: 9010, conversation_id: 88010, title: 'Vans Old Skool noir taille 41', status: 'Le paiement a été validé', transaction_user_status: 'needs_action', date: recent(2) },     // aucune preuve ⇒ « pas encore reliée »
 ] } };
 const bordereau = (tx, item) => ({ id: `harvest_111_label_${tx}`, data: { uid: '111', url: 'https://s3.test/l.pdf', tx: String(tx), item: String(item), items: [String(item)], capturedAt: auj.toISOString(), pdfB64: 'JVBERi0x' } });
 const BORDEREAUX = [bordereau(9001, 7002), bordereau(9003, 7003), bordereau(9006, 7006)];
@@ -102,7 +124,7 @@ const remettre = () => {
   rows = [
     { id: 'main', data: JSON.parse(JSON.stringify(MAIN)) },
     { id: 'harvest_111_listings', data: LISTINGS },
-    { id: 'harvest_111_orders_sold', data: VENTES },
+    { id: 'harvest_111_orders_sold', data: { ...VENTES, payload: { my_orders: [...VENTES.payload.my_orders, ...Array.from({ length: ventesEnPlus }, (_, i) => ({ transaction_id: 9100 + i, title: 'Paire en plus ' + (i + 1), status: 'Le paiement a été validé', transaction_user_status: 'needs_action', date: recent(3) }))] } } },
     ...TXN,
     ...BORDEREAUX,
     { id: 'ebay_listings', data: { items: EBAY_ANNONCES(), capturedAt: Date.now() } },
@@ -171,6 +193,8 @@ async function ouvrir(b, vp, panne, opts = {}) {
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   const envois = [];
   await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
+  if (opts.pont) await pg.addInitScript(PONT, opts.pont);
+  if (opts.local) await pg.addInitScript((l) => { try { for (const [k, v] of Object.entries(l)) localStorage.setItem(k, v); } catch (_) {} }, opts.local);
   await pg.addInitScript(() => {
     window.__etatsAuto = [];
     setInterval(() => { const e = document.querySelector('[data-ebay-retrait-auto]'); const v = e && e.getAttribute('data-ebay-retrait-auto'); if (v && window.__etatsAuto[window.__etatsAuto.length - 1] !== v) window.__etatsAuto.push(v); }, 25);
@@ -259,7 +283,8 @@ const lire = (pg) => pg.evaluate(() => {
     sansObsTxt: (txt.match(/pas d.observateur à qui l.envoyer/g) || []).length,
     pasSu: [...document.querySelectorAll('[data-ebay-pas-su]')].map((e) => e.textContent),
     pasReliee: (txt.match(/pas reliée/g) || []).length,
-    sansPreuve: [...document.querySelectorAll('[data-ebay-ventes-sans-preuve]')].map((e) => ({ n: e.getAttribute('data-ebay-ventes-sans-preuve'), geste: e.getAttribute('data-ebay-sans-preuve-geste'), t: e.textContent })),
+    sansPreuve: [...document.querySelectorAll('[data-ebay-ventes-sans-preuve]')].map((e) => ({ n: e.getAttribute('data-ebay-ventes-sans-preuve'), geste: e.getAttribute('data-ebay-sans-preuve-geste'), t: e.textContent,
+      ventes: [...e.querySelectorAll('[data-ebay-sans-preuve-vente]')].map((v) => ({ tx: v.getAttribute('data-ebay-sans-preuve-vente'), t: v.textContent, liens: [...v.querySelectorAll('a[href]')].map((a) => a.href), bord: !!v.querySelector('[data-bouton-bord][data-tx="' + v.getAttribute('data-ebay-sans-preuve-vente') + '"]') })) })),
     autoEtat: (document.querySelector('[data-ebay-retrait-etat]') || {}).textContent || null,
   };
 });
@@ -299,6 +324,12 @@ const deborde = (pg) => pg.evaluate(() => ({ sw: document.documentElement.scroll
           'la vente en cours qu\'aucune preuve ne relie est dite UNE fois : « 1 vente Vinted en cours pas encore reliée » (les ventes prouvées, annulée et revenue n\'y sont pas)', JSON.stringify(v.sansPreuve.map((x) => x.n)));
         dit(v.sansPreuve.length === 1 && /compte_test/.test(v.sansPreuve[0].t) && v.sansPreuve[0].geste === 'absente' && /ordinateur où l.extension/.test(v.sansPreuve[0].t),
           'elle nomme le compte, et le geste suit l\'extension de CE navigateur (absente ici : « sur l\'ordinateur où l\'extension est installée », aucune promesse)', v.sansPreuve[0] ? v.sansPreuve[0].geste + ' · ' + v.sansPreuve[0].t.slice(0, 160) : 'absente');
+        const vv = (v.sansPreuve[0] && v.sansPreuve[0].ventes) || [];
+        dit(vv.length === 1 && vv[0].tx === '9010' && /Vans Old Skool noir taille 41/.test(vv[0].t),
+          '(revue du 11 octobre) la vente est NOMMÉE (son titre) — on sait laquelle ouvrir', JSON.stringify(vv.map((x) => x.t)));
+        dit(vv.length === 1 && vv[0].liens.length === 1 && /vinted\.fr\/inbox\/88010$/.test(vv[0].liens[0]),
+          'avec le lien vers SA conversation sur vinted.fr — une fois (le bouton du bordereau ne le répète pas, §7)', JSON.stringify(vv[0] && vv[0].liens));
+        dit(vv.length === 1 && vv[0].bord, 'et, à poster, son bouton « Générer le bordereau » (un bordereau capté relie la vente)', JSON.stringify(vv[0] && vv[0].bord));
         dit(v.autoEtat === 'ÉTEINT', 'le retrait automatique dit son état en un mot : ÉTEINT', String(v.autoEtat));
         dit(v.vendues.length === 1 && v.vendues[0].num === '24' && /vinted\.fr\/items\/7004$/.test(v.vendues[0].href),
           'vendue sur eBay ⇒ l\'alerte pour la N°24 mène à SON annonce Vinted (pas la commande annulée N°21, pas la commande sans SKU au titre identique)', JSON.stringify(v.vendues));
@@ -502,6 +533,46 @@ const deborde = (pg) => pg.evaluate(() => ({ sw: document.documentElement.scroll
         dit(etats[0] === 'pas-lu', 'l\'écran s\'est bien monté AVANT le réglage (sinon ce contrôle ne mesure rien)', JSON.stringify(etats));
       });
       await p3.ctx.close();
+      // ── (revue du 11 octobre) ÉTEINT dans le nuage, mais l'appareil gardait
+      //    « true » : l'écran ne doit JAMAIS finir sur ALLUMÉ (le retrait
+      //    automatique, lui, lit le réglage du nuage et ne fait rien).
+      remettre();
+      rows[0].data.vrm_ebay_retrait_auto = false;
+      const p4 = await ouvrir(b, { width: 390, height: 844 }, false, { mainLent: 3000, local: { vrm_ebay_retrait_auto: 'true' } });
+      await essaie('retrait automatique éteint dans le nuage', async () => {
+        await p4.pg.goto(`http://localhost:${PORT}/?tab=plat_ebay`, { waitUntil: 'domcontentloaded' });
+        await p4.pg.waitForTimeout(1200);
+        await p4.pg.getByRole('button', { name: 'Annonces', exact: true }).first().click({ timeout: 8000 }).catch(() => {});
+        await p4.pg.waitForFunction(() => { const e = document.querySelector('[data-ebay-retrait-auto]'); return e && e.getAttribute('data-ebay-retrait-auto') !== 'pas-lu'; }, null, { timeout: 15000 }).catch(() => {});
+        await p4.pg.waitForTimeout(1500);
+        const fin = await p4.pg.getAttribute('[data-ebay-retrait-auto]', 'data-ebay-retrait-auto').catch(() => null);
+        const mot = await p4.pg.textContent('[data-ebay-retrait-etat]').catch(() => null);
+        dit(fin === 'eteint' && mot === 'ÉTEINT', 'éteint dans le nuage, « true » sur l\'appareil ⇒ l\'écran dit ÉTEINT (le réglage du nuage, celui qu\'applique le retrait automatique)', `${fin} · ${mot}`);
+      });
+      await p4.ctx.close();
+    }
+    // ── (revue du 11 octobre) LE GESTE SUIT LA VERSION DU PONT, ET DIT LE CHIFFRE
+    console.log('── ventes pas reliées · version du pont et rythme (1512 px)');
+    for (const [version, enPlus, attendu] of [['5.168.0', 0, 'retard'], ['5.167.0', 0, 'retard'], [EXT_ATTENDUE, 0, 'ok'], [EXT_ATTENDUE, 4, 'ok']]) {
+      remettre(); ventesEnPlus = enPlus; remettre();
+      const o = await ouvrir(b, { width: 1512, height: 950 }, false, { pont: { version } });
+      await essaie('pont ' + version, async () => {
+        await versAnnoncesEbay(o.pg);
+        await o.pg.waitForFunction(() => { const e = document.querySelector('[data-ebay-ventes-sans-preuve]'); return e && e.getAttribute('data-ebay-sans-preuve-geste') !== 'absente'; }, null, { timeout: 15000 }).catch(() => {});
+        const v = await lire(o.pg);
+        const l = v.sansPreuve[0] || {};
+        dit(l.geste === attendu, `pont ${version} : le geste est « ${attendu} »${version !== EXT_ATTENDUE ? ' (version PUBLIÉE sans la lecture des transactions : aucune promesse)' : ''}`, `${l.geste} · ${String(l.t || '').slice(0, 200)}`);
+        if (attendu === 'retard') dit(!/toute seule sur vinted\.fr/.test(l.t || '') && new RegExp('mets-la à jour \\(' + EXT_ATTENDUE.replace(/\./g, '\\.') + '\\)').test(l.t || ''), `pont ${version} : « mets-la à jour (${EXT_ATTENDUE}) », jamais « elle lit toute seule »`, String(l.t || '').slice(0, 220));
+        if (attendu === 'ok') {
+          const n = Number(l.n);
+          dit(/3 par visite/.test(l.t || ''), `pont à jour, ${n} vente(s) : le CHIFFRE est dit (3 par visite)`, String(l.t || '').slice(0, 220));
+          dit(n > 3 ? /au fil de tes visites/.test(l.t || '') && !/prochaine visite/.test(l.t || '') : /prochaine visite/.test(l.t || ''), `pont à jour, ${n} vente(s) sur un compte : ${n > 3 ? '« au fil de tes visites », pas « à ta prochaine visite »' : '« à ta prochaine visite »'}`, String(l.t || '').slice(0, 220));
+          dit((l.ventes || []).length === n, 'chaque vente est nommée, une ligne chacune', `${(l.ventes || []).length} ligne(s) pour ${n}`);
+        }
+        dit(o.errs.length === 0, 'aucune erreur de page', o.errs.join(' | ').slice(0, 160));
+      });
+      await o.ctx.close();
+      ventesEnPlus = 0;
     }
   } catch (e) { dit(false, 'le banc a tourné jusqu’au bout', String(e && e.message).slice(0, 160)); }
   finally { if (b) await b.close(); srv.close(); }

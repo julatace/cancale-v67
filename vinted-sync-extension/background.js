@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.168.0';
+const CODE_VERSION = '5.169.0';
 const SUPABASE_URL = 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ';
 
@@ -3886,7 +3886,7 @@ async function visiteVinted() {
     // photo d'hier et on redemanderait des conversations pour rien.
     // (Chaque lecteur passe par `gardeLecture`, qui refuse pendant une pause :
     //  un frein reçu par l'un arrête les suivants sans requête.)
-    // ⚠️ 5.167 — EN PREMIER : la preuve des ventes en cours qui n'en ont pas.
+    // ⚠️ 5.169 — EN PREMIER : la preuve des ventes en cours qui n'en ont pas.
     //    Les ventes viennent d'être captées ; sans leur transaction, l'anti
     //    double vente ne les voit pas (la N°553 du 10 octobre, restée en vente
     //    sur eBay). La moisson de 20:34 l'aurait prouvée dans la minute.
@@ -5435,7 +5435,7 @@ async function capterDatesVersement(uid) {
   } catch (_) { return 0; }
 }
 
-// ═══ LA PREUVE DE VENTE, RANGÉE (5.167, 11 octobre) ════════════════════════
+// ═══ LA PREUVE DE VENTE, RANGÉE (5.169, 11 octobre) ════════════════════════
 // Une transaction LUE (par le bordereau ou par `capterPreuvesVente`) est rangée
 // sous `harvest_{uid}_txn_{tx}`, la forme EXACTE de `capterDatesVersement` : la
 // base en tire `meta->>item_id` et `meta->>status_title`, ce que lit la preuve
@@ -5457,7 +5457,7 @@ async function rangerTransaction(uid, acc, tx, json, quoi) {
   } catch (_) { return false; }
 }
 
-// ═══ LA PREUVE DES VENTES EN COURS (5.167, 11 octobre) ═════════════════════
+// ═══ LA PREUVE DES VENTES EN COURS (5.169, 11 octobre) ═════════════════════
 // Une vente à poster ou en route dont aucune preuve n'existe (ni transaction
 // rangée, ni bordereau qui porte son annonce) est INVISIBLE pour l'anti double
 // vente : sa paire peut rester en vente sur eBay. Mesuré le 11 octobre : 4 des
@@ -5695,7 +5695,7 @@ async function recupererLabel(acc, uid, tx, connu) {
   try {
     const t = (connu && connu.t) || await vintedGet(acc, `/api/v2/transactions/${tx}`);
     if (t && (t.pause || freinVinted(t.status))) return { ok: false, pause: true, raison: t.raison || 'Vinted demande de ralentir' };   // 5.162
-    // ⚠️⚠️ 5.167 — LA TRANSACTION LUE ICI ÉTAIT JETÉE. C'est pourtant la PREUVE
+    // ⚠️⚠️ 5.169 — LA TRANSACTION LUE ICI ÉTAIT JETÉE. C'est pourtant la PREUVE
     //    de vente que lit l'anti double vente (`harvest_{uid}_txn_{tx}` →
     //    `item_id` + état de commande) : la N°553 vendue le 10 octobre a eu son
     //    bordereau à 21:55, et aucune ligne de transaction — l'annonce eBay est
@@ -6449,7 +6449,7 @@ function mpChoisi(e, place) {
 //   comme une vente, pas disparaître — c'est le même sens que
 //   `classifyOrderStatus` côté app.
 const PAS_UNE_VENTE = /annul|cancel|refus|rembours|retour|suspend|[ée]chou/i;
-// ⚠️⚠️ 5.167 (11 octobre) — LA PREUVE QUI MANQUAIT À L'ANTI DOUBLE VENTE.
+// ⚠️⚠️ 5.169 (11 octobre) — LA PREUVE QUI MANQUAIT À L'ANTI DOUBLE VENTE.
 // Plainte de Julien : « J'ai fait une vente hier, j'avais relié les deux paires,
 // ça n'a pas retiré la paire sur eBay, ça ne m'a même pas proposé ». Mesuré en
 // lecture seule : la N°553 (tx 23052006117, angeled92) n'avait AUCUNE ligne
@@ -6486,7 +6486,7 @@ function venteEnCoursPreuve(o, maintenant) {
 // état de commande qui ne la fait pas revenir. Une conversation (état vide)
 // n'est pas une vente. Rend { items, tx } (annonces, transactions prouvées).
 // ⚠️⚠️ (revue du 11 octobre) LA LIGNE `harvest_{uid}_txn_{tx}` EST UN
-// INSTANTANÉ, JAMAIS RELU : celle que range le bordereau (5.167) dit « Bordereau
+// INSTANTANÉ, JAMAIS RELU : celle que range le bordereau (5.169) dit « Bordereau
 // envoyé au vendeur » pour toujours, même quand la vente finit remboursée — la
 // paire, revenue chez lui, restait « vendue » (retrait d'eBay, file Leboncoin).
 // Mesuré en production : 46 preuves à un état NON terminal, 5 contredites par
@@ -6572,7 +6572,7 @@ function ventesParCompteDe(lignes, uids) {
 async function lireVentesProuvees() {
   const rows = await sbGetTout('app_data?id=like.harvest_*_txn_*&select=id,it:meta->>item_id,ti:meta->>status_title');
   if (rows === null) return { echec: true, vendus: new Set() };
-  // 5.167 : + le bordereau. Paginé (une ligne par vente, tous comptes) et
+  // 5.169 : + le bordereau. Paginé (une ligne par vente, tous comptes) et
   // strict : une lecture ratée vaut « pas su », jamais une demi-preuve.
   const bords = await sbGetTout('app_data?id=like.harvest_*_label_*&select=id,tx:meta->>tx,it:meta->>item');
   if (bords === null) return { echec: true, vendus: new Set() };

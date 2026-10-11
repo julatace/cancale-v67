@@ -32,7 +32,11 @@
 //      la forme que la 5.167 écrit, mesurée 5 fois en production), des deux
 //      côtés, jusqu'à `doublesVenteEbay` ;
 //   8. (revue du 11 octobre) la lecture des ventes des AUTRES comptes (ligne
-//      « pas reliées ») ne fait jamais tomber la preuve.
+//      « pas reliées ») ne fait jamais tomber la preuve ;
+//   9. (revue du 11 octobre) la capacité `preuves` n'est promise qu'à une
+//      extension qui A `capterPreuvesVente` : la 5.167.0 et la 5.168.0 PUBLIÉES
+//      (PR #471, #472) ne l'ont pas — elles rendent « retard » ; et le rythme
+//      que l'écran annonce (« 3 par visite ») est celui de l'extension.
 //  ⚠️ Un audit ne meurt pas, il rapporte : chaque bloc passe par `essaie`.
 // ════════════════════════════════════════════════════════════════════════════
 const fs = require('fs'), path = require('path'), vm = require('vm'), os = require('os');
@@ -80,6 +84,10 @@ const MUTATIONS = {
   'preuve-relit-prouvees': { ext: (s) => remplace(s, '      if (prouvees.has(tx) || parBord.has(tx)) return false;\n', '', 'preuve-relit-prouvees') },
   'preuve-pas-su-lue': { ext: (s) => remplace(s, '    if (det === null) return 0;                                           // pas su\n    const bords', '    const bords', 'preuve-pas-su-lue') },
   'regle-divergente': { ext: (s) => remplace(s, 'const PREUVE_RECENTE_MS = 30 * 86400000;', 'const PREUVE_RECENTE_MS = 31 * 86400000;', 'regle-divergente') },
+  // (revue du 11 octobre) La capacité promise à une version PUBLIÉE qui ne l'a pas.
+  'capacite-publiee': { app: (s) => remplace(s, "preuves: '5.169.0' };", "preuves: '5.167.0' };", 'capacite-publiee') },
+  // L'écran annonce un autre rythme que celui de l'extension.
+  'rythme-different': { app: (s) => remplace(s, 'const PREUVE_PAR_VISITE = 3;', 'const PREUVE_PAR_VISITE = 5;', 'rythme-different') },
 };
 if (PROUVE) {
   let rouges = 0; const noms = Object.keys(MUTATIONS);
@@ -220,8 +228,27 @@ function chargeExt({ lignes, vinted, ko, connecte = A, store = {} } = {}) {
   return { ...f, lus };
 }
 
+// Les versions PUBLIÉES sans `capterPreuvesVente` (vérifié sur origin/main le
+// 11 octobre : 61ef35a = 5.167.0, 93e9e0e = 5.168.0, `grep -c` = 0 chacune).
+const PUBLIEES_SANS_PREUVE = ['5.164.0', '5.167.0', '5.168.0'];
 (async () => {
-  console.log('1. UNE RÈGLE, DEUX CÔTÉS (§11)');
+  console.log('0. LA CAPACITÉ N\'EST PROMISE QU\'À UNE EXTENSION QUI L\'A (revue du 11 octobre)');
+  await essaie('capacité', () => {
+    const pick = (re) => { const m = re.exec(APP); if (!m) throw new Error('introuvable ' + re); return m[0]; };
+    const src = [pick(/^const cmpVersion = [\s\S]*?\n};\n/m), pick(/^const EXT_ATTENDUE = .*$/m), pick(/^const EXT_CAPACITES = .*$/m), pick(/^const extSait = [\s\S]*?\n};\n/m)].join('\n');
+    const sait = (v) => { const ctx = { vmrExtPresent: () => true, vmrExtVersion: () => v }; vm.createContext(ctx); vm.runInContext(src + '\n;this.r = extSait("preuves");', ctx); return ctx.r; };
+    const att = (/const EXT_ATTENDUE = '([^']+)'/.exec(APP) || [])[1];
+    const vManif = JSON.parse(fs.readFileSync(path.join(RACINE, 'vinted-sync-extension/manifest.json'), 'utf8')).version;
+    const r = PUBLIEES_SANS_PREUVE.map((v) => `${v}→${sait(v)}`);
+    dit(PUBLIEES_SANS_PREUVE.every((v) => sait(v) === 'retard'), 'les versions PUBLIÉES sans `capterPreuvesVente` (5.164, 5.167.0, 5.168.0) rendent « retard » — l\'app ne leur promet pas « elle va lire la transaction toute seule »', r.join(' · '));
+    dit(sait(att) === 'ok' && sait(vManif) === 'ok', `et l'extension livrée (${vManif}, EXT_ATTENDUE ${att}) rend « ok »`, `${att}→${sait(att)} · ${vManif}→${sait(vManif)}`);
+    dit(/async function capterPreuvesVente\(/.test(EXT), 'et elle a bien `capterPreuvesVente`');
+    dit(!PUBLIEES_SANS_PREUVE.includes(vManif), 'et elle ne porte pas le numéro d\'une version déjà publiée avec un autre contenu', vManif);
+    const pApp = (/const PREUVE_PAR_VISITE = (\d+);/.exec(APP) || [])[1], pExt = (/const PREUVE_MAX_PAR_VISITE = (\d+);/.exec(EXT) || [])[1];
+    dit(!!pApp && pApp === pExt, 'le rythme dit par l\'écran eBay (« N par visite ») est celui de l\'extension', `app ${pApp} · extension ${pExt}`);
+  });
+
+  console.log('\n1. UNE RÈGLE, DEUX CÔTÉS (§11)');
   await essaie('bloc partagé', () => {
     const a = BLOC_RE.exec(APP), e = BLOC_RE.exec(EXT);
     dit(!!a && !!e, 'le bloc <preuve-vente-regle> existe dans l\'app ET dans l\'extension');

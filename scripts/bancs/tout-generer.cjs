@@ -241,7 +241,17 @@ const compte = (t, s) => String(t || '').split(s).length - 1;
       // (la liste est tirée d'EXT_CAPACITES, §11). Le contrôle suit la règle.
       const DEJA_5161 = /générer un bordereau depuis VRM|répondre et faire une offre|publier une annonce sur Leboncoin|relever la date de versement|relever tes messages Leboncoin|détourer tes photos|Vinted\s*Go|rafraîchit|publie une annonce/;
       dit(p && /mettre à jour/i.test(p) && !DEJA_5161.test(p), 'téléphone + capture en 5.161 : la version est dite, AUCUNE capacité promise qu\'elle aurait déjà', JSON.stringify(p).slice(0, 400));
-      dit(p && /relier tes ventes à leur annonce/.test(p), 'et ce qui lui manque VRAIMENT (arrivé après elle) est nommé', JSON.stringify(p).slice(0, 400));
+      dit(p && /preuve des ventes qui n.ont pas encore de bordereau/.test(p), 'et ce qui lui manque VRAIMENT (arrivé après elle) est nommé', JSON.stringify(p).slice(0, 400));
+      await r.ctx.close(); }
+    { const r = await rendre(b, { tab: 'cat_ventes', tel: true, diagVer: '5.164.0' }); const p = await r.panneau();
+      // (revue du 11 octobre) Une 5.164 relie DÉJÀ une vente par son bordereau
+      // (`recupererLabel` y écrit l'annonce) : le panneau ne doit pas dire qu'elle
+      // « ne sait pas relier tes ventes à leur annonce » — seulement ce qui lui
+      // manque : aller chercher la preuve des ventes SANS bordereau.
+      dit(p && /preuve des ventes qui n.ont pas encore de bordereau/.test(p) && !/relier tes ventes à leur annonce/.test(p), 'téléphone + capture en 5.164 : le panneau nomme ce qui lui manque vraiment (la preuve des ventes SANS bordereau), pas « relier tes ventes »', JSON.stringify(p).slice(0, 400));
+      await r.ctx.close(); }
+    { const r = await rendre(b, { tab: 'cat_ventes', tel: true, diagVer: '5.168.0' }); const p = await r.panneau();
+      dit(p && /mettre à jour/i.test(p) && /preuve des ventes qui n.ont pas encore de bordereau/.test(p), 'téléphone + capture en 5.168.0 (PUBLIÉE sans la lecture des transactions) : la mise à jour est dite, avec ce qui manque', JSON.stringify(p).slice(0, 400));
       await r.ctx.close(); }
     { const r = await rendre(b, { tab: 'cat_ventes', pont: { version: '5.128.0', connecte: '111' }, diagVer: '5.143.0', attente: 6000 }); const p = await r.panneau();
       dit(p && compte(p, EXT_ATTENDUE) === 1, `extension 5.128 : « ${EXT_ATTENDUE} » écrite une fois dans le panneau (le bouton)`, `${compte(p, EXT_ATTENDUE)} fois`);
