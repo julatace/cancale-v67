@@ -30,6 +30,7 @@
 // est INVENTÉE et embarquée (aucune fixture `relais-cancale.json` n'existe).
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
 const { metaVersData } = require('./_meta.cjs');
+const { dressingsDuJour } = require('./_instantane.cjs'); // fx/ est une photo datée : la lecture du dressing la plus récente = « il y a 1 min » (règle « en ligne » ≤ 24 h)
 const fs=require('fs'), http=require('http'), path=require('path');
 // ⚠️⚠️ JAMAIS UN CHEMIN ABSOLU ICI. La méthode de preuve du dossier (§6.1)
 // extrait le code d'AVANT dans /tmp/avN, y copie le banc et le lance DEPUIS
@@ -45,7 +46,7 @@ const purchFx=FX('purch');
 // §6.3 : TOUTES les familles qu'Achats lit — sans les emails de suivi
 // (`email_track_*`) ni les bordereaux (`email_bord_*`), l'écran affichait
 // « 7 comptes ne reçoivent aucun email » : un artefact du banc, pas la base.
-const autres=[...FX('sold'),...FX('listings'),...FX('inbox'),...FX('track'),...FX('bord')];
+const autres=[...FX('sold'),...dressingsDuJour(FX('listings')),...FX('inbox'),...FX('track'),...FX('bord')];
 // Réponse de /api/relais INVENTÉE (même forme que api/relais.js :
 // { city, center, points:[{nom,rue,type,carrier,locker,lat,lon}] }). Elle ne
 // sert que si un appel repart — et dans ce cas il est compté (contrôle 1).
