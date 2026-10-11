@@ -49,12 +49,11 @@ const MUTATIONS = {
   // Le repli `vinted_listing_dates` oublié.
   'sans-dates-captees': { app: (s) => remplace(s, "  const d = dates && it ? dates[String(it.id)] : null;\n  return d ? ms(d.ts) : null;", "  return null;", 'sans-dates-captees') },
   // Le SKU d'une vieille annonce eBay lu comme la nouvelle série.
-  'sku-sans-marqueur': { app: (s) => remplace(s, "return (id != null && ids.some((x) => String(x) === String(id))) || avant ? (renum || cleNum(arch + k)) : k;", "return k;", 'sku-sans-marqueur') },
-  // (11 octobre) Un numéro PROVISOIRE (renuméroté par la conversion) lu comme
-  // un ancien numéro : « VRM-553 » deviendrait « B553 », qui ne désigne rien.
-  'renum-oublie': { app: (s) => remplace(s, "? (renum || cleNum(arch + k)) : k;", "? cleNum(arch + k) : k;", 'renum-oublie') },
-  'serveur-renum-oublie': { lib: (s) => remplace(s, "? (renum || cleNum(arch + c)) : c;", "? cleNum(arch + c) : c;", 'serveur-renum-oublie') },
-  'extension-renum-oublie': { ext: (s) => remplace(s, "? (renum || cleNum(arch + k)) : k;\n}\nfunction adRefKeys", "? cleNum(arch + k) : k;\n}\nfunction adRefKeys", 'extension-renum-oublie') },
+  'sku-sans-marqueur': { app: (s) => remplace(s, "  const t = traductionAnnonce(m && !m.annule ? m[liste] : null, id, k);\n", "  const t = undefined;\n", 'sku-sans-marqueur') },
+  // (relecture du 11 octobre) Une annonce RELIÉE après la coupure (SKU réécrit) serait encore traduite en B.
+  'traduction-ignore-reecriture': { app: (s) => remplace(s, "  if (!e || typeof e !== 'object' || Array.isArray(e) || !Object.prototype.hasOwnProperty.call(e, k)) return undefined;\n  return typeof e[k] === 'string' ? cleNum(e[k]) : '';\n};", "  if (!e || typeof e !== 'object' || Array.isArray(e)) return undefined;\n  if (!Object.prototype.hasOwnProperty.call(e, k)) return cleNum(archiveNumeros() + k);\n  return typeof e[k] === 'string' ? cleNum(e[k]) : '';\n};", 'traduction-ignore-reecriture') },
+  // Un numéro PROVISOIRE (553, devenu 1) lu en B, comme un ancien.
+  'provisoire-en-b': { app: (s) => remplace(s, "  return typeof e[k] === 'string' ? cleNum(e[k]) : '';\n};\nconst numeroExterne", "  return cleNum(archiveNumeros() + k);\n};\nconst numeroExterne", 'provisoire-en-b') },
   // Une commande eBay d'avant la coupure lue comme la nouvelle série.
   'commande-sans-date': { app: (s) => remplace(s, "Date.parse((o && o.creationDate) || ''));", "null);", 'commande-sans-date') },
   // Le N° d'un email admis sans vérifier la fiche.
@@ -74,11 +73,47 @@ const MUTATIONS = {
   // La pose à la main accepte « B230 ».
   'main-archive': { app: (s) => remplace(s, "    if (!numeroReprenable(cle)) {\n      updatePair(item, { numero: avant });", "    if (false) {\n      updatePair(item, { numero: avant });", 'main-archive') },
   // L'extension lit la référence d'une vieille annonce Leboncoin comme la nouvelle série.
-  'extension-lbc': { ext: (s) => remplace(s, "return ad && ad.id != null && ids.some((x) => String(x) === String(ad.id)) ? (renum || cleNum(arch + k)) : k;", "return k;", 'extension-lbc') },
+  'extension-lbc': { ext: (s) => remplace(s, "  if (!ad || ad.id == null || !carte || typeof carte !== 'object' || Array.isArray(carte)) return k;", "  return k;", 'extension-lbc') },
   // L'extension ne projette plus le marqueur (la clé vaudrait `undefined`, en silence).
   'extension-projection': { ext: (s) => remplace(s, "'vinted_pairs_lost', 'vrm_lbc_liens', 'vrm_numerotation'];", "'vinted_pairs_lost', 'vrm_lbc_liens'];", 'extension-projection') },
   // Réglages laisse choisir « B » (la lettre des anciens) pour les nouveaux numéros.
-  'reglage-lettre-archive': { app: (s) => remplace(s, "    if (n && arch && n === arch) return;\n", "", 'reglage-lettre-archive') },
+  'reglage-lettre-archive': { app: (s) => remplace(s, "    if (n && arch && n === arch) { setRefusee(n); setP(prefixeNumeros()); return; }\n", "", 'reglage-lettre-archive') },
+  // Cliquer « Avec une lettre » enregistre une lettre par défaut (C), en silence.
+  'reglage-pastille-enregistre': { app: (s) => remplace(s, "const choix = (m) => { setMode(m); setRefusee(''); if (m === 'chiffres') poser(''); };", "const choix = (m) => { setMode(m); setRefusee(''); poser(m === 'chiffres' ? '' : defaut); };", 'reglage-pastille-enregistre') },
+  // Les exemples de Réglages citent la lettre des anciens (« B125 ») alors que l'app la refuse.
+  'reglage-exemple-archive': { app: (s) => remplace(s, "const lettreEx = arch ? (arch === 'C' ? 'D' : 'C') : 'B';", "const lettreEx = 'B';", 'reglage-exemple-archive') },
+  // (relecture du 11 octobre, mutations du relecteur) La version relue ne compte plus.
+  'version-toujours-ok': { app: (s) => remplace(s, "else _emitVerNum({ etat: v === versionNumerotation() ? 'ok' : 'perime', at: Date.now(), nuage: v });", "else _emitVerNum({ etat: 'ok', at: Date.now(), nuage: v });", 'version-toujours-ok') },
+  // On imprime le N° sur un écran périmé.
+  'impression-perimee': { app: (s) => remplace(s, "if (_verNum.etat === 'perime') { signalerNumerosPerimes('version'); return false; }", "", 'impression-perimee') },
+  // Le tampon d'un bordereau reprend le N° d'un email sans le juger.
+  'tampon-email-sans-garde': { app: (s) => remplace(s, "if (b.numero && numeroEmailAdmis(b, numeros)) return String(b.numero);", "if (b.numero) return String(b.numero);", 'tampon-email-sans-garde') },
+  // La carte « via bordereau » affiche le N° d'un email sans le juger.
+  'carte-bordereau-sans-garde': { app: (s) => remplace(s, "desc={pending.map(b=>(b.numero&&numeroEmailAdmis(b,numeros)?", "desc={pending.map(b=>(b.numero?", 'carte-bordereau-sans-garde') },
+  // Le serveur range le N° d'un bordereau sans `numeroDEmail`.
+  'serveur-bordereau-sans-numeroDEmail': { route: (s) => remplace(s, "{ const jn = await numeroDEmail(data.numero, data.article, { title: data.modele || data.article, size: data.taille });\n        data.numero = jn.numero; if (jn.numeroTitre) data.numeroTitre = jn.numeroTitre; }", "if (!data.numero) data.numero = await findNumeroByTitle(data.modele || data.article, data.taille);", 'serveur-bordereau-sans-numeroDEmail') },
+  // Le serveur range le N° d'une vente sans `numeroDEmail`.
+  'serveur-vente-sans-numeroDEmail': { route: (s) => remplace(s, "{ const jn = await numeroDEmail(data.numero, data.designation);\n        data.numero = jn.numero; if (jn.numeroTitre) data.numeroTitre = jn.numeroTitre; }", "", 'serveur-vente-sans-numeroDEmail') },
+  // Les copies d'appareil qui portent des numéros ne sont plus jetées au changement de version.
+  'sans-purge-copies': { app: (s) => remplace(s, "if (verNuage !== verLocale) purgerCopiesNumeros();", "", 'sans-purge-copies') },
+  // Le retrait automatique envoie le SKU lu chez eBay, pas celui de la paire jugée vendue.
+  'retrait-auto-sku-brut': { app: (s) => remplace(s, "sku: skuEbayDe(d.numero) || a.sku,", "sku: a.sku,", 'retrait-auto-sku-brut') },
+  // (relecture du 11 octobre) Une ANCIENNE annonce vendue après la coupure perd son N° d'identité.
+  'vieille-vendue-renumerotee': { app: (s) => remplace(s, "if (reuse && !parIdentite && venteApresCoupure(o) && !numeroReprenable(reuse)) reuse = null;", "if (reuse && venteApresCoupure(o) && !numeroReprenable(reuse)) reuse = null;", 'vieille-vendue-renumerotee') },
+  // Effacer un N° à la main supprime la fiche (refusée par la base après la coupure).
+  'fiche-videe-supprimee': { app: (s) => remplace(s, "if (emptyNum && emptyBuy && emptyMp && !(etaitNumerotee && archiveNumeros())) delete u[item.id];", "if (emptyNum && emptyBuy && emptyMp) delete u[item.id];", 'fiche-videe-supprimee') },
+  // L'écran rechargé rejoue des CARTES entières de gestes.
+  'rejouer-carte-entiere': { app: (s) => remplace(s, "    out.gestes[k] = g; n++;\n", "    out.gestes[k] = loc; n++;\n", 'rejouer-carte-entiere') },
+  // Le bloc choisit sa phrase sans relire la version.
+  'bloc-sans-relecture': { app: (s) => remplace(s, "  if (String(code || '') !== 'version') { try { verifierVersionNumerotation(); } catch (_) {} }\n", "", 'bloc-sans-relecture') },
+  // Les paires qui reviennent : « garde le N°B198 » (que l'app refuse ensuite).
+  'retours-archive-retape': { app: (s) => remplace(s, "const arch = !numeroReprenable(num);", "const arch = false;", 'retours-archive-retape') },
+  // Les paires qui reviennent ne sortent jamais de la liste (B… jamais porté par une annonce en ligne).
+  'retours-jamais-republiees': { app: (s) => remplace(s, "      if (num && !numeroReprenable(num) && republiee(o)) continue;", "", 'retours-jamais-republiees') },
+  // L'app ne dit plus au serveur quelle version de numérotation elle a lue (publier / programmer sur eBay).
+  'ebay-sans-version': { app: (s) => remplace(s, "const avecVersion = corps && (corps.action === 'publish' || corps.action === 'programmer');", "const avecVersion = false;", 'ebay-sans-version') },
+  // Restaurer une sauvegarde d'avant la remise à zéro : pas de contrôle de version.
+  'restaure-sans-version': { app: (s) => remplace(s, "if(vF!==vIci){ toast(SAUVEGARDE_AVANT_REMISE); return; }", "", 'restaure-sans-version') },
   // L'écran ne relit plus la version avant de numéroter.
   'sans-version': { app: (s) => remplace(s, "    if (!numerotationPermise()) return;\n    // ⚠️ TOUTE ANNONCE EN LIGNE DOIT AVOIR UN NUMÉRO", "    // ⚠️ TOUTE ANNONCE EN LIGNE DOIT AVOIR UN NUMÉRO", 'sans-version') },
   // Un refus de la base n'arrête plus les envois.
@@ -128,7 +163,7 @@ function extraire(src, nom) {
 }
 const NOMS = ['cleNum', 'NUM_OK', 'normTitle', 'refVRMDe', 'marqueurNumerotation', 'archiveNumeros', 'coupureNumerotation', 'versionNumerotation',
   'estArchive', 'venteApresCoupure', 'dateMiseEnLigneMs', 'annonceNumerotable', 'numeroReprenable', 'numeroEmailAdmis',
-  'numDeSkuEbay', 'skuEbayDe', 'numeroExterne', 'numEbayLu', 'numLigneEbay', 'numDeTitreLbc', 'clesAnnonceLbc', 'commandeEbayEngagee', 'doublesVenteEbay'];
+  'numDeSkuEbay', 'skuEbayDe', 'traductionAnnonce', 'numeroExterne', 'numEbayLu', 'numLigneEbay', 'numDeTitreLbc', 'clesAnnonceLbc', 'commandeEbayEngagee', 'doublesVenteEbay'];
 let MARQUEUR = null;
 const charge = () => {
   const ctx = { console };
@@ -143,8 +178,12 @@ const charge = () => {
 
 // ── LES DONNÉES (inventées, la forme mesurée) ─────────────────────────────────
 const T = '2026-10-09T00:00:00.000Z', TMS = Date.parse(T);
+// Le marqueur, à la forme que la migration écrit : PAR ANNONCE, chaque numéro
+// qu'elle portait à la coupure et ce qu'il devient. Sa forme réelle (mesurée le
+// 11 octobre) : ses deux annonces eBay portaient un numéro PROVISOIRE (553).
 const MK = { version: 2, coupure: T, appliqueLe: '2026-10-10T08:00:00.000Z', archive: 'B', renum: { 553: '1' },
-  ebayAnnonces: ['110000000001'], lbcAnnonces: ['2900000001'] };
+  ebayAnnonces: { 110000000001: { 22: 'B22' }, 128127336988: { 553: '1' } },
+  lbcAnnonces: { 2900000001: { 230: 'B230' }, 2900000553: { 553: '1' } } };
 
 (async () => {
   let R = null;
@@ -198,6 +237,12 @@ const MK = { version: 2, coupure: T, appliqueLe: '2026-10-10T08:00:00.000Z', arc
     dit(JSON.stringify(R.clesAnnonceLbc(ad, {})) === '["B230"]', 'Leboncoin : la réf. et le « n230 » d\'une annonce d\'avant ⇒ B230', JSON.stringify(R.clesAnnonceLbc(ad, {})));
     dit(JSON.stringify(R.clesAnnonceLbc(ad, { 2900000001: '7' })) === '["7","B230"]', 'un lien posé À LA MAIN (après la coupure) reste ce qu\'il dit', JSON.stringify(R.clesAnnonceLbc(ad, { 2900000001: '7' })));
     dit(JSON.stringify(R.clesAnnonceLbc({ id: '2900000099', ref: '230', subject: 'Nike n230' }, {})) === '["230"]', 'une annonce Leboncoin d\'après ⇒ la nouvelle 230');
+    // (relecture du 11 octobre) SA forme : « VRM-553 », numéro PROVISOIRE donné après
+    // la coupure à une paire devenue 1 — lu « B553 », une paire qui n'existe pas.
+    dit(R.numEbayLu('VRM-553', '128127336988') === '1', 'SKU « VRM-553 » (numéro provisoire, devenu 1) ⇒ la paire 1, jamais « B553 »', R.numEbayLu('VRM-553', '128127336988'));
+    dit(R.numEbayLu('VRM-3', '128127336988') === '3', 'la même annonce RELIÉE après la coupure (SKU réécrit « VRM-3 ») ⇒ la 3, telle quelle', R.numEbayLu('VRM-3', '128127336988'));
+    dit(R.numEbayLu('VRM-3', '110000000001') === '3', 'une annonce d\'avant reliée à une autre paire ⇒ ce que dit son SKU d\'aujourd\'hui', R.numEbayLu('VRM-3', '110000000001'));
+    dit(JSON.stringify(R.clesAnnonceLbc({ id: '2900000553', ref: '553', subject: 'Autry n553' }, {})) === '["1"]', 'Leboncoin « réf 553 » d\'une annonce publiée sous le numéro provisoire ⇒ la paire 1', JSON.stringify(R.clesAnnonceLbc({ id: '2900000553', ref: '553', subject: 'Autry n553' }, {})));
     // L'EXTENSION (la file Leboncoin) lit la même chose (§11).
     const ctxE = {}; vm.createContext(ctxE);
     vm.runInContext(['cleNum', 'RE_VRM', 'refVRMDe', 'numeroLbcLu', 'adRefKeys'].map((n) => extraire(EXT, n)).join('\n') + '\n;this.E = { adRefKeys };', ctxE);
@@ -205,6 +250,9 @@ const MK = { version: 2, coupure: T, appliqueLe: '2026-10-10T08:00:00.000Z', arc
     const ecarts = cas.filter(([a, l]) => JSON.stringify(ctxE.E.adRefKeys(a, l, MK)) !== JSON.stringify(R.clesAnnonceLbc(a, l)));
     dit(!ecarts.length, 'l\'extension (file Leboncoin) lit les mêmes clés que l\'app, marqueur compris (§11)', ecarts.map(([a, l]) => JSON.stringify(ctxE.E.adRefKeys(a, l, MK)) + ' ≠ ' + JSON.stringify(R.clesAnnonceLbc(a, l))).join(' · '));
     dit(/'vrm_lbc_liens', 'vrm_numerotation'\];/.test(EXT) && /adRefKeys\(ad, liens, main\.vrm_numerotation\)/.test(EXT), 'et la file Leboncoin de l\'extension projette le marqueur et le passe à ses deux lecteurs');
+    cas.push([{ id: '2900000553', ref: '553', subject: 'Autry n553' }, {}], [{ id: '2900000553', ref: '7', subject: 'Autry' }, {}]);
+    const ecarts2 = cas.filter(([a, l]) => JSON.stringify(ctxE.E.adRefKeys(a, l, MK)) !== JSON.stringify(R.clesAnnonceLbc(a, l)));
+    dit(!ecarts2.length, 'et l\'extension lit pareil le numéro provisoire et la référence réécrite (§11)', ecarts2.map(([a, l]) => JSON.stringify(ctxE.E.adRefKeys(a, l, MK)) + ' ≠ ' + JSON.stringify(R.clesAnnonceLbc(a, l))).join(' · '));
   });
 
   console.log('\n5. LA VENTE DE LA NOUVELLE 22 NE FAIT PAS RETIRER L\'ANCIENNE D\'eBAY');
@@ -222,33 +270,22 @@ const MK = { version: 2, coupure: T, appliqueLe: '2026-10-10T08:00:00.000Z', arc
     const cmd = [{ orderId: 'o1', orderPaymentStatus: 'PAID', creationDate: '2026-09-20T10:00:00.000Z', lineItems: [{ sku: 'VRM-22', legacyItemId: '110000000001' }] }];
     const r4 = R.doublesVenteEbay({ annonces: [], commandes: cmd, numeros, enLigne: new Set(['8100000022']), vendusVinted: new Set(), programmees: [] });
     dit(r4.aRetirerVinted.length === 0, 'une vieille commande eBay « VRM-22 » ne dit pas de retirer la NOUVELLE 22 de Vinted', JSON.stringify(r4.aRetirerVinted.map((d) => d.numero)));
-  });
-
-  console.log('\n5 bis. UN NUMÉRO PROVISOIRE (« les 553+ ») DÉSIGNE SA PAIRE RENUMÉROTÉE (11 octobre)');
-  await essaie('renum', () => {
-    // La N°553 du 10 octobre : numérotée APRÈS la coupure (provisoire), publiée
-    // sur eBay « VRM-553 » le soir même, renumérotée « 1 » par la conversion.
-    const MK2 = { ...MK, ebayAnnonces: [...MK.ebayAnnonces, '110000000553'], lbcAnnonces: [...MK.lbcAnnonces, '2900000553'] };
-    MARQUEUR = MK2;
-    dit(R.numEbayLu('VRM-553', '110000000553') === '1', 'SKU « VRM-553 » (provisoire, renuméroté 553 → 1) ⇒ la paire 1, pas « B553 »', R.numEbayLu('VRM-553', '110000000553'));
-    dit(R.numEbayLu('VRM-22', '110000000001') === 'B22', 'un ANCIEN numéro (absent de la carte) reste B22');
-    dit(R.numEbayLu('VRM-553', '110000000999') === '553', 'une annonce publiée APRÈS la conversion suit la nouvelle série');
-    const numeros = { 8100000001: { numero: '1' }, 8100000553: { numero: '553' } };
-    const annonces = [{ itemId: '110000000553', sku: 'VRM-553', title: 'Autry reelwind beige 36' }];
-    const r1 = R.doublesVenteEbay({ annonces, commandes: [], numeros, enLigne: new Set(), vendusVinted: new Set(['8100000001']), programmees: [] });
-    dit(r1.aRetirerEbay.length === 1 && r1.aRetirerEbay[0].numero === '1', 'la paire renumérotée 1, prouvée vendue ⇒ son annonce eBay « VRM-553 » est à retirer', JSON.stringify(r1.aRetirerEbay.map((d) => d.numero)));
-    dit(R.skuEbayDe(r1.aRetirerEbay[0] && r1.aRetirerEbay[0].numero) === 'VRM-1', 'et le retrait automatique envoie « VRM-1 » (le serveur relit « VRM-553 » et le traduit pareil)');
-    const r2 = R.doublesVenteEbay({ annonces, commandes: [], numeros, enLigne: new Set(), vendusVinted: new Set(['8100000553']), programmees: [] });
-    dit(r2.aRetirerEbay.length === 0, 'l\'autre sens : la FUTURE 553 de la nouvelle série vendue ne fait PAS retirer l\'annonce de la paire 1', JSON.stringify(r2.aRetirerEbay.map((d) => d.numero)));
-    const ad = { id: '2900000553', ref: '553', subject: 'Autry n553' };
-    dit(JSON.stringify(R.clesAnnonceLbc(ad, {})) === '["1"]', 'Leboncoin : la réf. « 553 » d\'une annonce d\'avant la conversion ⇒ 1', JSON.stringify(R.clesAnnonceLbc(ad, {})));
-    const ctxE = {}; vm.createContext(ctxE);
-    vm.runInContext(['cleNum', 'RE_VRM', 'refVRMDe', 'numeroLbcLu', 'adRefKeys'].map((n) => extraire(EXT, n)).join('\n') + '\n;this.E = { adRefKeys };', ctxE);
-    const e = JSON.stringify(ctxE.E.adRefKeys(ad, {}, MK2)), a = JSON.stringify(R.clesAnnonceLbc(ad, {}));
-    dit(e === a, 'l\'extension (file Leboncoin) lit la même chose que l\'app (§11)', e === a ? '' : `${e} ≠ ${a}`);
-    MARQUEUR = { ...MK2, renum: { 553: '<script>' } };
-    dit(R.numEbayLu('VRM-553', '110000000553') === 'B553', 'une valeur de carte de forme inconnue ne se lit pas (la nouvelle série est en chiffres)', R.numEbayLu('VRM-553', '110000000553'));
-    MARQUEUR = MK;
+    // (relecture du 11 octobre) Ses deux vraies annonces : « VRM-553 » (devenu 1).
+    const fiches1 = { 10312412617: { numero: '1' }, 7000000001: { numero: 'B1' } };
+    const a553 = [{ itemId: '128127336988', sku: 'VRM-553', title: 'autry reelwind beige 36' }];
+    const r5 = R.doublesVenteEbay({ annonces: a553, commandes: [], numeros: fiches1, enLigne: new Set(), vendusVinted: new Set(['10312412617']), programmees: [] });
+    dit(r5.aRetirerEbay.length === 1 && r5.aRetirerEbay[0].numero === '1' && R.skuEbayDe(r5.aRetirerEbay[0].numero) === 'VRM-1', 'la paire 1 vendue sur Vinted ⇒ son annonce eBay « VRM-553 » est à retirer (avant : rien, « B553 » ne désignait personne)', JSON.stringify(r5.aRetirerEbay.map((d) => d.numero)));
+    const c553 = [{ orderId: 'o2', orderPaymentStatus: 'PAID', creationDate: '2026-10-12T10:00:00.000Z', lineItems: [{ sku: 'VRM-553', legacyItemId: '128127336988' }] }];
+    const r6 = R.doublesVenteEbay({ annonces: [], commandes: c553, numeros: fiches1, enLigne: new Set(['10312412617']), vendusVinted: new Set(), programmees: [] });
+    dit(r6.aRetirerVinted.length === 1 && r6.aRetirerVinted[0].numero === '1', 'et l\'autre sens : vendue sur eBay ⇒ la paire 1 est à retirer de Vinted', JSON.stringify(r6.aRetirerVinted.map((d) => d.numero)));
+    // (relecture du 11 octobre) « Relier à une paire » APRÈS la coupure (SKU réécrit « VRM-3 ») : la
+    // vente de l'ANCIENNE B3 ne la fait pas retirer — celle de la NOUVELLE 3, si.
+    const fiches3 = { 10312412617: { numero: '3' }, 7000000003: { numero: 'B3' } };
+    const a3 = [{ itemId: '128127336988', sku: 'VRM-3', title: 'autry reelwind beige 36' }];
+    const r7 = R.doublesVenteEbay({ annonces: a3, commandes: [], numeros: fiches3, enLigne: new Set(['10312412617']), vendusVinted: new Set(['7000000003']), programmees: [] });
+    dit(r7.aRetirerEbay.length === 0, 'annonce reliée à la NOUVELLE 3 : la vente de l\'ancienne B3 ne la retire pas', JSON.stringify(r7.aRetirerEbay.map((d) => d.numero)));
+    const r8 = R.doublesVenteEbay({ annonces: a3, commandes: [], numeros: fiches3, enLigne: new Set(), vendusVinted: new Set(['10312412617']), programmees: [] });
+    dit(r8.aRetirerEbay.length === 1 && r8.aRetirerEbay[0].numero === '3', 'et la vente de la nouvelle 3 la retire', JSON.stringify(r8.aRetirerEbay.map((d) => d.numero)));
   });
 
   console.log('\n6. LE N° LU DANS UN EMAIL (app)');
@@ -277,16 +314,17 @@ const MK = { version: 2, coupure: T, appliqueLe: '2026-10-10T08:00:00.000Z', arc
     dit(j('230', 'Nike Air n230', undefined, f) === '{"numero":"","numeroTitre":"230"}', 'marqueur illisible ⇒ « pas su » : aucun numéro tamponné');
     dit(j('230', 'x', MK, undefined) === '{"numero":"","numeroTitre":"230"}', 'fiches illisibles ⇒ aucun numéro tamponné');
     dit(j('230', 'Nike Air n230', { ...MK, annule: true }, f) === '{"numero":"230","numeroTitre":""}', 'remise à zéro annulée ⇒ comme avant');
-    for (const [k, id, d] of [['22', '110000000001', null], ['22', '110000000777', null], ['22', '9', Date.parse('2026-10-01T00:00:00Z')], ['B22', '110000000001', null]]) {
+    for (const [k, id, d] of [['22', '110000000001', null], ['22', '110000000777', null], ['22', '9', Date.parse('2026-10-01T00:00:00Z')], ['B22', '110000000001', null],
+      ['553', '128127336988', null], ['3', '128127336988', null], ['3', '110000000001', null]]) {
       if (L.numeroExterne(k, id, 'ebayAnnonces', d, MK) !== R.numeroExterne(k, id, 'ebayAnnonces', d)) { dit(false, 'numeroExterne : serveur et app divergent', `${k}/${id}`); return; }
     }
     dit(true, 'numeroExterne : serveur et app rendent la même lecture (§11)');
     // (11 octobre) Le numéro PROVISOIRE : le serveur relit « VRM-553 » chez eBay
     // avant un retrait automatique — il doit le lire comme l'app (« 1 »), sinon
     // 409 sku-change et le retrait n'a jamais lieu.
-    const MK2 = { ...MK, ebayAnnonces: [...MK.ebayAnnonces, '110000000553'] };
-    MARQUEUR = MK2;
-    const s553 = L.numeroExterne('553', '110000000553', 'ebayAnnonces', null, MK2), a553 = R.numeroExterne('553', '110000000553', 'ebayAnnonces', null);
+    // Sur la FORME écrite par la 013 appliquée (carte par annonce, objet) : 128127336988 → { 553: '1' }.
+    MARQUEUR = MK;
+    const s553 = L.numeroExterne('553', '128127336988', 'ebayAnnonces', null, MK), a553 = R.numeroExterne('553', '128127336988', 'ebayAnnonces', null);
     dit(s553 === '1' && s553 === a553, 'numeroExterne : un numéro provisoire se lit « 1 » au serveur ET dans l\'app', `serveur=${s553} · app=${a553}`);
     MARQUEUR = MK;
   });
@@ -345,8 +383,99 @@ const MK = { version: 2, coupure: T, appliqueLe: '2026-10-10T08:00:00.000Z', arc
     dit(/<BlocNumerosPerimes\/>/.test(A) && /function BlocNumerosPerimes\(/.test(A), 'le bloc « écran périmé » est monté sur la coque (tous les écrans)');
     dit(/numerotation: v \}/.test(corps('const saveRoomPlan = async (data) => {', '\n};')), 'le garage 3D estampille la version de la numérotation');
     dit(/'vrm_numerotation'/.test(corps('const SYNC_KEYS = [', '];')), 'le marqueur est synchronisé (lu par l\'app, écrit par le serveur seul)');
-    const reglage = corps('function NumerosSetting() {', 'const pill = ');
-    dit(/if \(n && arch && n === arch\) return;/.test(reglage) && /arch === 'B' \? 'C' : 'B'/.test(reglage), 'Réglages n\'enregistre jamais la lettre des anciens numéros pour les nouveaux (et ne la propose pas par défaut)');
+    const reglage = corps('function NumerosSetting() {', '\n}\n');
+    dit(/if \(n && arch && n === arch\) \{ setRefusee\(n\);[^}]*return; \}/.test(reglage) && /arch === 'B' \? 'C' : 'B'/.test(reglage), 'Réglages n\'enregistre jamais la lettre des anciens numéros pour les nouveaux (et ne la propose pas par défaut)');
+    dit(/const choix = \(m\) => \{ setMode\(m\); setRefusee\(''\); if \(m === 'chiffres'\) poser\(''\); \};/.test(reglage), '« Avec une lettre » n\'enregistre RIEN tout seul : la série ne change qu\'à la lettre tapée et acceptée');
+    dit(/const lettreEx = arch \? \(arch === 'C' \? 'D' : 'C'\) : 'B';/.test(reglage) && /Les anciens numéros/.test(reglage), 'ses exemples ne citent pas la lettre des anciens (et disent qu\'ils ne se redonnent pas)');
+    // (relecture du 11 octobre, mutations du relecteur) Ce qui était prouvé par RIEN :
+    const numForBord = corps('const numForBord = (b) => {', '\n  };');
+    dit(/if \(b\.numero && numeroEmailAdmis\(b, numeros\)\) return String\(b\.numero\);/.test(numForBord) && !/if \(b\.numero\) return/.test(numForBord), 'le N° TAMPONNÉ sur un bordereau ne reprend celui d\'un email qu\'après `numeroEmailAdmis`');
+    dit(/desc=\{pending\.map\(b=>\(b\.numero&&numeroEmailAdmis\(b,numeros\)\?/.test(A), 'la carte « repérée via bordereau » ne montre le N° d\'un email qu\'après `numeroEmailAdmis`');
+    const tE = ROUTE.slice(ROUTE.indexOf('export async function traiterEmail'));
+    dit(/\{ const jn = await numeroDEmail\(data\.numero, data\.article, \{[^}]*\}\);\s*data\.numero = jn\.numero;/.test(tE), 'serveur : le N° d\'un BORDEREAU passe par `numeroDEmail` avant d\'être rangé (et tamponné)');
+    dit(/\{ const jn = await numeroDEmail\(data\.numero, data\.designation\);\s*data\.numero = jn\.numero;/.test(tE), 'serveur : le N° d\'une VENTE passe par `numeroDEmail` avant d\'être rangé');
+    dit(/const jn = await numeroDEmail\(\(article\.match\(/.test(tE) && /const numero = jn\.numero;/.test(tE), 'serveur : le N° d\'une FINALISATION aussi');
+    dit(/if \(verNuage !== verLocale\) purgerCopiesNumeros\(\);/.test(A), 'au démarrage, une version de numérotation qui change fait JETER les copies d\'appareil (garage, local, numéros présents)');
+    const ventes = corps('const broadKey = identiteAnnonce(o);', 'if (reuse) {');
+    dit(/const parIdentite = o\.transaction_id != null && txnItem\[String\(o\.transaction_id\)\] != null;/.test(ventes) && /if \(reuse && !parIdentite && venteApresCoupure\(o\)/.test(ventes),
+      'une ANCIENNE annonce vendue après la coupure garde son N° d\'identité (B7) : seule la PHOTO est écartée, jamais ce que dit Vinted');
+    dit(/if \(emptyNum && emptyBuy && emptyMp && !\(etaitNumerotee && archiveNumeros\(\)\)\) delete u\[item\.id\];/.test(A), 'effacer un N° à la main GARDE la fiche (la base refuse qu\'une fiche numérotée disparaisse)');
+    dit(/const arch = !numeroReprenable\(num\);/.test(A) && /↩️ revient → numéro neuf/.test(A) && /🔁 renvoi → numéro neuf/.test(A), 'une vente revenue qui portait un ancien N° (B…) dit « numéro neuf », jamais « garde le N°B… »');
+    dit(/\{r\.num && numeroReprenable\(r\.num\) && <button/.test(A) && /retoursAttendus\.some\(r=>r\.num&&numeroReprenable\(r\.num\)\) && <> <b>Retape son numéro<\/b>/.test(A), '« Retape son numéro » et le bouton ⧉ seulement pour un numéro qui se redonne');
+    dit(/if \(num && !numeroReprenable\(num\) && republiee\(o\)\) continue;/.test(A), 'une paire revenue à l\'ancien N° sort de la liste quand elle est republiée (identité ou photo), pas par le numéro');
+    { const ae = corps('async function appelEbay(corps) {', '\n}\n');
+      dit(/const avecVersion = corps && \(corps\.action === 'publish' \|\| corps\.action === 'programmer'\);/.test(ae) && /avecVersion \? \{ \.\.\.corps, numerotation: versionNumerotation\(\) \}/.test(ae),
+        'publier / programmer sur eBay disent au serveur la version de numérotation lue par CET écran (il refuse un écran d\'avant la remise à zéro)'); }
+    dit(/if\(vF!==vIci\)\{ toast\(SAUVEGARDE_AVANT_REMISE\); return; \}/.test(A) && /refus=codeRefusNumeros\(t\)\|\|\(r\.status>=400&&r\.status<500\?'refus':null\)/.test(A), 'restaurer une sauvegarde d\'avant la remise à zéro : refusé AVANT d\'écrire, et la vraie cause dite (jamais « la base n\'a pas répondu »)');
+  });
+
+  console.log('\n9. L\'ÉCRAN PÉRIMÉ, EXÉCUTÉ (version relue, impression, refus, saisies rejouées, retrait automatique)');
+  await essaie('module de la version', async () => {
+    // Le VRAI bloc d'App.jsx (de `_verNum` aux copies d'appareil), avec une fausse base.
+    const i = APP.indexOf("let _verNum = { etat: 'attente'"), j = APP.indexOf('const purgerCopiesNumeros');
+    const k = APP.indexOf('\n', j);
+    if (i < 0 || j < 0) throw new Error('bloc de version introuvable');
+    const store = {}, lus = [];
+    let versionBase = 2;
+    const ctx = { console, JSON, Date, Object, Array, Number, String, Set, Map, isFinite, Promise, Error,
+      localStorage: { getItem: (x) => (x in store ? store[x] : null), setItem: (x, v) => { store[x] = String(v); }, removeItem: (x) => { delete store[x]; } },
+      sessionStorage: { setItem: () => {} }, window: { location: { reload: () => {} } },
+      SUPABASE_URL: 'https://base.test', SUPABASE_ROW: 'main', sbAuth: () => ({}), isCloudReady: () => true,
+      fetch: async (u) => { lus.push(String(u)); return { ok: true, json: async () => [{ v: versionBase == null ? null : String(versionBase) }] }; } };
+    vm.createContext(ctx);
+    vm.runInContext('const load = (k, d) => { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); };\n'
+      + ['marqueurNumerotation', 'versionNumerotation'].map((n) => extraire(APP, n)).join('\n') + '\n'
+      + APP.slice(i, k) + '\n;this.V = { verifierVersionNumerotation, etatVersionNumerotation, noterVersionChargee, assurerVersionNumerotation, signalerNumerosPerimes, etatNumerosPerimes, noterInstantaneCharge, memoriserSaisies, rejouerSaisies, purgerCopiesNumeros };', ctx);
+    const V = ctx.V;
+    store.vrm_numerotation = JSON.stringify(MK);
+    V.noterVersionChargee();
+    await V.verifierVersionNumerotation();
+    dit(V.etatVersionNumerotation().etat === 'ok', 'version relue identique (2) ⇒ « ok »');
+    dit(await V.assurerVersionNumerotation() === true, 'et l\'impression peut tamponner le N°');
+    versionBase = 3;
+    await V.verifierVersionNumerotation();
+    dit(V.etatVersionNumerotation().etat === 'perime', 'la base passe en version 3 (une remise à zéro ou un retour arrière) ⇒ « périmé »', V.etatVersionNumerotation().etat);
+    dit(await V.assurerVersionNumerotation() === false && (V.etatNumerosPerimes() || {}).code === 'version', 'avant d\'IMPRIMER sur cet écran : refusé (aucun N° tamponné), le bloc « Recharger » s\'ouvre');
+    // Le refus d'une écriture fait RELIRE la version (le bloc ne devine pas sa cause).
+    const ctx2 = { ...ctx, fetch: async (u) => { lus.push('2:' + u); return { ok: true, json: async () => [{ v: '3' }] }; } };
+    vm.createContext(ctx2);
+    vm.runInContext('const load = (k, d) => { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); };\n'
+      + ['marqueurNumerotation', 'versionNumerotation'].map((n) => extraire(APP, n)).join('\n') + '\n'
+      + APP.slice(i, k) + '\n;this.V = { signalerNumerosPerimes, etatVersionNumerotation };', ctx2);
+    const avantLus = lus.filter((x) => x.startsWith('2:')).length;
+    ctx2.V.signalerNumerosPerimes('vrm_pool_retreci');
+    await new Promise((r) => setTimeout(r, 20));
+    dit(lus.filter((x) => x.startsWith('2:')).length > avantLus && ctx2.V.etatVersionNumerotation().nuage === 3, 'un REFUS de la base fait relire la version tout de suite (le bloc dit la vraie cause, pas « un autre appareil » au hasard)');
+    // Les copies d'appareil.
+    store.vinted_nums_physiques = '{}'; store.vrm_room_plan = '{}'; store.vrm_local_plan = '{}'; store.garde = '1';
+    V.purgerCopiesNumeros();
+    dit(!('vinted_nums_physiques' in store) && !('vrm_room_plan' in store) && !('vrm_local_plan' in store) && store.garde === '1', 'les copies d\'appareil qui portent des numéros sont jetées (et rien d\'autre)');
+    // (relecture du 11 octobre) Les gestes rejoués : la DIFFÉRENCE, jamais la carte entière.
+    V.noterInstantaneCharge({ vinted_ship_done: { 111: 1, 222: 1 }, vinted_offers_done: ['a', 'b'] });
+    store.vinted_ship_done = JSON.stringify({ 111: 1, 222: 1, 333: 1 });
+    store.vinted_offers_done = JSON.stringify(['a', 'b', 'c']);
+    V.memoriserSaisies();
+    store.vinted_ship_done = JSON.stringify({ 111: 1 });                 // l'AUTRE appareil a décoché 222
+    store.vinted_offers_done = JSON.stringify(['a']);                    // … et rouvert l'offre b
+    V.rejouerSaisies();
+    dit(store.vinted_ship_done === JSON.stringify({ 111: 1, 333: 1 }), 'colis : 333 coché ici est rejoué, 222 décoché AILLEURS ne ressuscite pas', store.vinted_ship_done);
+    dit(store.vinted_offers_done === JSON.stringify(['a', 'c']), 'listes : seul ce qui a été ajouté ici revient', store.vinted_offers_done);
+    V.noterInstantaneCharge({ vinted_ship_done: { 111: 1, 222: 1 } });
+    store.vinted_ship_done = JSON.stringify({ 111: 1 });                 // décoché ICI
+    V.memoriserSaisies();
+    store.vinted_ship_done = JSON.stringify({ 111: 1, 222: 1, 444: 1 }); // l'autre a coché 444
+    V.rejouerSaisies();
+    dit(store.vinted_ship_done === JSON.stringify({ 111: 1, 444: 1 }), 'un colis DÉCOCHÉ ici reste décoché, et ce que l\'autre a coché reste', store.vinted_ship_done);
+  });
+  await essaie('retrait automatique (corps envoyé)', async () => {
+    const envoyes = [];
+    const ctx = { console, JSON, Set, String, Array,
+      fetch: async (u, o) => { envoyes.push(JSON.parse(o.body)); return { json: async () => ({ ok: true }) }; }, enTeteSession: () => ({}), toast: () => {} };
+    vm.createContext(ctx);
+    vm.runInContext('let __retraitEbayAutoEnVol = false; const __retraitEbayAutoTentes = new Set();\n'
+      + ['cleNum', 'NUM_OK', 'skuEbayDe', 'retirerEbayAuto'].map((n) => extraire(APP, n)).join('\n') + '\n;this.F = retirerEbayAuto;', ctx);
+    await ctx.F([{ numero: 'B22', annonce: { itemId: '110000000001', sku: 'VRM-22', title: 'x' } }, { numero: '1', annonce: { itemId: '128127336988', sku: 'VRM-553', title: 'y' } }]);
+    dit(envoyes.length === 2 && envoyes[0].sku === 'VRM-B22' && envoyes[1].sku === 'VRM-1', 'le retrait automatique envoie le SKU de la paire JUGÉE vendue (« VRM-B22 », « VRM-1 »), jamais la chaîne lue chez eBay', envoyes.map((x) => x.sku).join(', '));
   });
 
   console.log(`\n${ok} vert(s), ${ko} rouge(s).`);

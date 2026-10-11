@@ -89,6 +89,24 @@ const MUTATIONS = {
   'programmees-oubliees': { sql: (s) => remplace(s, "a.id in ('ebay_listings', 'ebay_programmees')", "a.id = 'ebay_listings'", 'programmees-oubliees') },
   // Un numéro donné à PLUSIEURS paires nouvelles serait attribué « à la première ».
   'ambigu-devine': { sql: (s) => remplace(s, "case when count(*) = 1 then to_jsonb(min(rang)::text) else 'null'::jsonb end val", "to_jsonb(min(rang)::text) val", 'ambigu-devine') },
+  // (relecture du 11 octobre) Le garde-fou ne regarde plus les VENTES (B12 → 12 passe).
+  'ventes-non-gardees': { sql: (s) => remplace(s, "  foreach carte in array array['vinted_annonce_numeros', 'vinted_sale_overrides'] loop\n    select count(*), min(o.k) into n, ex\n      from jsonb_each(case when jsonb_typeof(old.data -> carte) = 'object' then old.data -> carte else '{}' end) o(k, ov)\n      join jsonb_each(case when jsonb_typeof(new.data -> carte) = 'object' then new.data -> carte else '{}' end) w(k2, nv) on w.k2 = o.k\n     where jsonb_typeof(ov) = 'object' and jsonb_typeof(nv) = 'object'\n       and public.vrm_cle_num(ov -> 'numero') ~", "  foreach carte in array array['vinted_annonce_numeros'] loop\n    select count(*), min(o.k) into n, ex\n      from jsonb_each(case when jsonb_typeof(old.data -> carte) = 'object' then old.data -> carte else '{}' end) o(k, ov)\n      join jsonb_each(case when jsonb_typeof(new.data -> carte) = 'object' then new.data -> carte else '{}' end) w(k2, nv) on w.k2 = o.k\n     where jsonb_typeof(ov) = 'object' and jsonb_typeof(nv) = 'object'\n       and public.vrm_cle_num(ov -> 'numero') ~", 'ventes-non-gardees') },
+  // Les liens Leboncoin « B233 » → « 233 » passent.
+  'liens-non-gardes': { sql: (s) => remplace(s, "   where public.vrm_cle_num(ov) ~ ('^' || arch || '[0-9]+$') and public.vrm_cle_num(nv) ~ '^[0-9]+$';", "   where false;", 'liens-non-gardes') },
+  // N'importe quel `manuelAt` (même d'avant la conversion) ferait repasser B230 → 230.
+  'manuel-ancien': { sql: (s) => remplace(s, "and not (coalesce(nv ->> 'manuelAt', '') > coup and coalesce(nv ->> 'manuelAt', '') is distinct from coalesce(ov ->> 'manuelAt', ''));", "and not (coalesce(nv ->> 'manuelAt', '') <> '');", 'manuel-ancien') },
+  // Une ligne ABSENTE (pas de brouillon eBay, sa forme réelle) comparée à un `null` JSON : retour arrière refusé.
+  'absente-vs-null': { sql: (s) => remplace(s, "create or replace function sauvegarde.vrm_proj_aucun(j jsonb)\nreturns jsonb\nlanguage sql\nimmutable\nset search_path = ''\nas $$\n  select case when j is null or jsonb_typeof(j) = 'null' or j = '[]'::jsonb then null else j end\n$$;", "create or replace function sauvegarde.vrm_proj_aucun(j jsonb)\nreturns jsonb\nlanguage sql\nimmutable\nset search_path = ''\nas $$ select j $$;", 'absente-vs-null') },
+  // Toute annonce eBay / Leboncoin « VRM-n » lue en B, même un numéro donné après la coupure (VRM-553 → « B553 »).
+  'externe-toujours-b': { sql: (s) => remplace(s, "              when carte is not null and carte ? c then case when jsonb_typeof(carte -> c) = 'string' then carte ->> c else '' end\n", "", 'externe-toujours-b') },
+  // Le bordereau capté (tx → annonce) ignoré : une vente d'après la coupure sans transaction captée passe en « B564 ».
+  'bordereaux-ignores': { sql: (s) => remplace(s, "     where a.owner = p_owner and a.id ~ '^harvest_[0-9]+_label_[0-9]+$' and coalesce(a.meta ->> 'item', '') <> ''", "     where false", 'bordereaux-ignores') },
+  // Le rattrapage prend pour ancien un numéro de la NOUVELLE série reçu dans la fenêtre.
+  'rattrape-nouvelle-serie': { sql: (s) => remplace(s, "              and not (sauvegarde.vrm_num_genre(a.data -> 'numero') = 'nu'\n                       and exists", "              and not (false\n                       and exists", 'rattrape-nouvelle-serie') },
+  // Le plan recalculé pour le recompte (deux fois par conversion, `main` verrouillée plus longtemps).
+  'plan-deux-fois': { sql: (s) => remplace(s, "  apres := sauvegarde.vrm_numerotation_bilan(p_owner, p_prefixe);", "  apres := sauvegarde.vrm_numerotation_mesurer(p_owner, p_prefixe, p_coupure);", 'plan-deux-fois') },
+  // Les dressings figés avant la coupure ne sont plus signalés.
+  'dressings-muets': { sql: (s) => remplace(s, "                               'dressings', sauvegarde.vrm_numerotation_dressings(p_owner, p_coupure))", "                               'dressings', null)", 'dressings-muets') },
 };
 
 if (PROUVE) {
@@ -139,7 +157,7 @@ process.on('SIGINT', () => { arreter(); process.exit(1); });
 {
   const r = serveur('initdb', ['-D', DIR + '/data', '-U', 'postgres', '--auth=trust', '-E', 'UTF8', '--locale=C', '--no-sync']);
   if (r.status !== 0) { console.log('❌ initdb a échoué — audit NON exécuté : ' + (r.stderr || r.stdout).slice(0, 300)); process.exit(1); }
-  const s = serveur('pg_ctl', ['-D', DIR + '/data', '-o', `-p ${PORT} -k ${DIR} -c listen_addresses='' -c fsync=off`, '-l', DIR + '/journal', '-w', 'start']);
+  const s = serveur('pg_ctl', ['-D', DIR + '/data', '-o', `-p ${PORT} -k ${DIR} -c listen_addresses='' -c fsync=off -c track_functions=all`, '-l', DIR + '/journal', '-w', 'start']);
   if (s.status !== 0) { console.log('❌ Postgres ne démarre pas — audit NON exécuté : ' + (s.stderr || s.stdout).slice(0, 300)); process.exit(1); }
   demarre = true;
 }
@@ -261,6 +279,12 @@ essaie('mesure', () => {
     'la mesure dit par quelle source chaque fiche est datée (dressing 270 · dates captées 19 · numberedAt 113)', JSON.stringify(a.plan.sources));
   dit(a.vinted_annonce_numeros.nu === 401 && a.vinted_sale_overrides.nu === 500 && a.vinted_sale_overrides.lot === 1 && a.emails.nus === 121 && a.garage3d.nu === 33,
     'fiches 401 · ventes 500 + 1 lot · 121 emails · 33 cartons au garage (dont la pile sans liste)', `${a.vinted_annonce_numeros.nu}/${a.vinted_sale_overrides.nu}/${a.emails.nus}/${a.garage3d.nu}`);
+  // (relecture du 11 octobre) Deux de ses comptes avaient un dressing figé au
+  // 8 octobre : le plan n'y voyait aucune annonce republiée, sans le dire.
+  const dr = a.dressings || {};
+  dit(JSON.stringify(dr.avantCoupure) === '["compte_un (2026-10-08T22:29:22.465Z)","compte_jamais (jamais capté)"]'
+      && (dr.comptes || []).length === 2 && !(dr.comptes || []).some((c) => c.login === 'compte_autre_vendeur'),
+    'la mesure NOMME les comptes dont le dressing a été capté avant la coupure (ou jamais) — ses comptes seulement', JSON.stringify(dr.avantCoupure));
 });
 essaie('essai annulé', () => {
   const r = psql(DB, `begin; select sauvegarde.vrm_numerotation_archiver('${J}', 'B', '${COUPURE}', '${ATTENDU.replace(/'/g, "''")}'::jsonb); rollback;`);
@@ -292,7 +316,12 @@ essaie('forme inconnue', () => {
 console.log('\n3. L\'APPLICATION');
 let RAP = null;
 essaie('appliquer', () => {
+  Q(DB, 'select pg_stat_reset()');
   const r = archiver(DB, ATTENDU);
+  // `main` reste verrouillée pendant toute la conversion : le plan (le plus cher)
+  // n'y est calculé qu'UNE fois (relecture du 11 octobre : il l'était deux fois).
+  const plans2 = Q(DB, "select coalesce((select calls from pg_stat_user_functions where funcname = 'vrm_numerotation_plan'), 0)");
+  dit(r.ok && plans2 === '1', 'le plan n\'est calculé qu\'UNE fois pendant la conversion (`main` verrouillée)', `${plans2} appel(s)`);
   dit(r.ok, 'la conversion passe', r.ok ? '' : r.err.slice(0, 400));
   RAP = r.ok ? JSON.parse(r.out) : null;
   dit(RAP && RAP.deja === false && RAP.version === 2 && RAP.nouvelles.length === 0 && RAP.contradictions === 0, 'rapport : version 2, aucune nouvelle, aucune contradiction');
@@ -319,8 +348,9 @@ essaie('main convertie', () => {
   const mk = d.vrm_numerotation || {};
   dit(mk.version === 2 && mk.archive === 'B' && mk.coupure === '2026-10-09T00:00:00.000Z' && mk.renum && Object.keys(mk.renum).length === 0 && mk.nouvelles === 0 && !!mk.appliqueLe,
     'marqueur : { version 2, coupure T, appliqueLe, archive B, renum {} }', JSON.stringify(mk).slice(0, 200));
-  dit(JSON.stringify(mk.lbcAnnonces) === '["2900000001","2900000002","2900000003"]' && JSON.stringify(mk.ebayAnnonces) === '["3","7","9"]',
-    'marqueur : les annonces Leboncoin et eBay (en ligne ET programmées) qui portaient un ancien N°, par leur IDENTIFIANT', JSON.stringify(mk.ebayAnnonces));
+  dit(JSON.stringify(mk.lbcAnnonces) === '{"2900000001": {"233": "B233", "266": "B266"}, "2900000002": {"250": "B250"}, "2900000003": {"271": "B271"}}'.replace(/: /g, ':').replace(/, /g, ',')
+      && JSON.stringify(mk.ebayAnnonces) === '{"3":{"12":"B12"},"7":{"40":"B40"},"9":{"41":"B41"}}',
+    'marqueur : les annonces Leboncoin et eBay (en ligne ET programmées) qui portaient un N°, par leur IDENTIFIANT, avec ce que devient CE numéro', JSON.stringify(mk.ebayAnnonces) + ' ' + JSON.stringify(mk.lbcAnnonces));
   dit(Q(DB, `select md5((data -> 'vinted_stock_vinted')::text) from public.app_data where owner = '${J}' and id = 'main'`) === AVANT.stock, 'l\'ancien catalogue (stock_vinted) n\'est pas touché');
   dit(prochain(d) === '1', 'le VRAI `prochainLibre` d\'App.jsx sur la ligne convertie rend « 1 »', prochain(d));
 });
@@ -402,6 +432,15 @@ essaie('deux appareils', () => {
   const r4 = navigateur(DB, 'main', `jsonb_set(data, '{vinted_annonce_numeros,9000000001}', (data -> 'vinted_annonce_numeros' -> '9000000001') || jsonb_build_object('numero', '700', 'manuelAt', to_char(clock_timestamp() at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')))
        || jsonb_build_object('vinted_used_numeros', (data -> 'vinted_used_numeros') || '[700]'::jsonb)`);
   dit(r4.ok, 'une saisie À LA MAIN après la conversion (`manuelAt`) passe : c\'est son geste', r4.ok ? '' : r4.err.slice(0, 160));
+  // (relecture du 11 octobre) Ces trois règles n'étaient prouvées par rien :
+  const tx = Object.keys(mainJ(DB).vinted_sale_overrides).find((k) => /^B\d+$/.test(String(mainJ(DB).vinted_sale_overrides[k].numero)));
+  const vb = mainJ(DB).vinted_sale_overrides[tx].numero;
+  const r6 = navigateur(DB, 'main', `jsonb_set(data, '{vinted_sale_overrides,${tx},numero}', '"${vb.slice(1)}"')`);
+  dit(!r6.ok && refus(r6) === 'vrm_numeros_perimes', `une VENTE « ${vb} » qui repasse à « ${vb.slice(1)} » (écran d'avant) : refusée`, refus(r6) || 'accepté');
+  const r7 = navigateur(DB, 'main', `jsonb_set(data, '{vrm_lbc_liens,2900000001}', '"233"')`);
+  dit(!r7.ok && refus(r7) === 'vrm_numeros_perimes', 'un LIEN Leboncoin « B233 » qui repasse à « 233 » : refusé', refus(r7) || 'accepté');
+  const r8 = navigateur(DB, 'main', `jsonb_set(data, '{vinted_annonce_numeros,9000000002}', (data -> 'vinted_annonce_numeros' -> '9000000002') || jsonb_build_object('numero', substr(data -> 'vinted_annonce_numeros' -> '9000000002' ->> 'numero', 2), 'manuelAt', '2026-10-09T01:00:00.000Z'))`);
+  dit(!r8.ok && refus(r8) === 'vrm_numeros_perimes', 'une saisie « à la main » datée d\'APRÈS la coupure mais d\'AVANT la conversion (un appareil périmé) ne fait pas repasser B→chiffres', refus(r8) || 'accepté');
   const r5 = psql(DB, `set role service_role; update public.app_data set data = jsonb_set(data, '{vinted_used_numeros}', '[]') where owner = '${T}' and id = 'main';`);
   dit(r5.ok, 'le serveur (service_role) n\'est pas bridé', r5.ok ? '' : r5.err.slice(0, 120));
 });
@@ -424,13 +463,19 @@ essaie('refusé après un numéro neuf', () => {
 const DB2 = 'renum_r';
 essaie('retour ciblé', () => {
   nouvelleBase(DB2);
+  // SA forme réelle (mesurée le 11 octobre) : AUCUNE ligne `ebay_brouillons`.
+  // Une ligne absente valait « des numéros ont bougé » et le retour arrière
+  // était refusé (relecture du 11 octobre).
+  Q(DB2, `delete from public.app_data where owner = '${J}' and id = 'ebay_brouillons'`);
   dit(installer(DB2).ok, 'installation');
   const avant = Q(DB2, `select sauvegarde.vrm_projection(data)::text from public.app_data where owner = '${J}' and id = 'main'`);
   const room = md5(DB2, 'vrm_room');
   const r = archiver(DB2, MESURE(DB2));
   dit(r.ok, 'conversion', r.ok ? '' : r.err.slice(0, 200));
-  // Un geste SANS numéro fait après : un colis coché « posté ».
+  // Un geste SANS numéro fait après : un colis coché « posté ». Et un brouillon
+  // eBay SANS numéro créé après (une ligne `[]` vaut une ligne absente).
   Q(DB2, `update public.app_data set data = jsonb_set(data, '{vinted_ship_done,22000000011}', 'true') where owner = '${J}' and id = 'main'`);
+  Q(DB2, `insert into public.app_data (owner, id, data) values ('${J}', 'ebay_brouillons', '{"items":{"b-9":{"titre":"brouillon sans numéro"}}}')`);
   const a = psql(DB2, `select sauvegarde.vrm_numerotation_annuler('${J}')::text`);
   dit(a.ok, 'retour arrière', a.ok ? '' : a.err.slice(0, 300));
   const d = mainJ(DB2);
@@ -448,7 +493,15 @@ essaie('retour ciblé', () => {
 // ════════════════════════════════════════════════════════════════════════════
 console.log('\nB. TROIS ANNONCES REPUBLIÉES AVANT LA MIGRATION, NUMÉROTÉES 553-555');
 const DBB = 'renum_b';
-essaie('base', () => { nouvelleBase(DBB, 1); dit(installer(DBB).ok, 'installation'); });
+essaie('base', () => {
+  nouvelleBase(DBB, 1);
+  // SA forme (mesurée le 11 octobre) : ses DEUX annonces eBay portent le numéro
+  // PROVISOIRE donné après la coupure (« VRM-553 », « VRM-559 »). Ici : l'annonce
+  // eBay et une annonce Leboncoin de la paire A (553 → 3).
+  Q(DBB, `update public.app_data set data = jsonb_set(data, '{items}', (data -> 'items') || '[{"itemId":"128127336988","sku":"VRM-553"}]'::jsonb) where owner = '${J}' and id = 'ebay_listings';
+          update public.app_data set data = jsonb_set(data, '{items,2900000553}', '{"id":"2900000553","ref":"553","subject":"Nouvelle inventée A n553"}'::jsonb) where owner = '${J}' and id = 'lbc_listings'`);
+  dit(installer(DBB).ok, 'installation');
+});
 essaie('plan', () => {
   const a = JSON.parse(MESURE(DBB));
   const n = a.plan.nouvelles.map(x => `${x.id}:${x.avant}→${x.apres}`).join(',');
@@ -465,6 +518,23 @@ essaie('plan', () => {
     'pool : B1…B552 + 1, 2, 3 — les numéros provisoires 553-555 en sont SORTIS (jamais écrits sur un carton)');
   dit(JSON.stringify(d.vrm_numerotation.renum) === '{"553":"3","554":"1","555":"2"}', 'marqueur : renum { 553→3, 554→1, 555→2 }', JSON.stringify(d.vrm_numerotation.renum));
   dit(prochain(d) === '4', 'le VRAI `prochainLibre` d\'App.jsx donne « 4 » à la paire suivante', prochain(d));
+  // (relecture du 11 octobre) « VRM-553 » était lu « B553 » — une paire qui
+  // n'existe pas : l'anti double vente eBay perdait ses deux vraies annonces.
+  const mk = d.vrm_numerotation || {};
+  dit(JSON.stringify((mk.ebayAnnonces || {})['128127336988']) === '{"553":"3"}' && JSON.stringify((mk.ebayAnnonces || {})['3']) === '{"12":"B12"}',
+    'marqueur : l\'annonce eBay « VRM-553 » (numéro donné après la coupure) désigne la paire 3 ; « VRM-12 » (ancien) la B12', JSON.stringify(mk.ebayAnnonces));
+  dit(JSON.stringify((mk.lbcAnnonces || {})['2900000553']) === '{"553":"3"}', 'marqueur : l\'annonce Leboncoin « ref 553 / n553 » désigne la paire 3', JSON.stringify((mk.lbcAnnonces || {})['2900000553']));
+});
+essaie('rattraper après des nouvelles paires', () => {
+  // Rangés dans la fenêtre : un email de la NOUVELLE paire 1 (même titre que sa
+  // fiche) et un email de l'ancienne paire 2 (lu sur la ligne d'avant).
+  Q(DBB, `insert into public.app_data (owner, id, data) values
+    ('${J}', 'email_bord_nv1', jsonb_build_object('numero', '1', 'article', 'Nouvelle  inventée B', 'transaction', '22000009001', 'receivedAt', to_char(clock_timestamp() at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'))),
+    ('${J}', 'email_bord_anc2', jsonb_build_object('numero', '2', 'article', 'Paire inventée 2', 'transaction', '22000009002', 'receivedAt', to_char(clock_timestamp() at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')))`);
+  const r = psql(DBB, `select sauvegarde.vrm_numerotation_rattraper('${J}', 60)::text`);
+  dit(r.ok && JSON.stringify(JSON.parse(r.out).ids) === '["email_bord_anc2"]', 'seul l\'email de l\'ANCIENNE paire 2 est rattrapé', r.ok ? r.out : r.err.slice(0, 200));
+  dit(Q(DBB, `select string_agg(id || '=' || (data ->> 'numero'), ',' order by id) from public.app_data where owner = '${J}' and id in ('email_bord_nv1', 'email_bord_anc2')`)
+      === 'email_bord_anc2=B2,email_bord_nv1=1', 'la NOUVELLE paire 1 (même titre que sa fiche) garde « 1 » ; l\'ancienne 2 devient « B2 »');
 });
 essaie('appareil chargé avant', () => {
   const r = navigateur(DBB, 'main', `jsonb_set(data, '{vinted_annonce_numeros,8000000001,numero}', '"553"')`);
@@ -476,7 +546,22 @@ essaie('appareil chargé avant', () => {
 // ════════════════════════════════════════════════════════════════════════════
 console.log('\nC. LES CAS DE BORD');
 const DBC = 'renum_c';
-essaie('base', () => { nouvelleBase(DBC, 2); dit(installer(DBC).ok, 'installation'); });
+essaie('base', () => {
+  nouvelleBase(DBC, 2);
+  // (relecture du 11 octobre) Trois ventes d'après la coupure n'ont, chez lui,
+  // QUE leur bordereau capté (`harvest_{uid}_label_{tx}` : tx → annonce). Ici :
+  // 781 — le bordereau relie la vente à la paire C (555 → 2) ; 782 — seule la
+  // COPIE `label_latest` le dit (écartée) ; 783 — `meta.tx` contredit
+  // l'identifiant de la ligne (doute : écartée).
+  Q(DBC, `update public.app_data set data = jsonb_set(jsonb_set(data, '{vinted_used_numeros}', (data -> 'vinted_used_numeros') || '[560, 561, 562]'::jsonb),
+      '{vinted_sale_overrides}', (data -> 'vinted_sale_overrides') || '{"22000000781":{"numero":"560","autoAssigned":true,"autoShip":true},"22000000782":{"numero":"561","autoAssigned":true,"autoShip":true},"22000000783":{"numero":"562","autoAssigned":true,"autoShip":true}}'::jsonb)
+     where owner = '${J}' and id = 'main';
+    insert into public.app_data (owner, id, data) values
+      ('${J}', 'harvest_1002_label_22000000781', '{"tx":"22000000781","item":"8000000003","uid":"1002","capturedAt":"2026-10-10T21:55:24.680Z","pdfB64":"JVBERi0xLjQK"}'),
+      ('${J}', 'harvest_1002_label_latest', '{"tx":"22000000782","item":"8000000002","uid":"1002","capturedAt":"2026-10-10T21:56:24.680Z","pdfB64":"JVBERi0xLjQK"}'),
+      ('${J}', 'harvest_1002_label_22000000783', '{"tx":"22000000999","item":"8000000002","uid":"1002","capturedAt":"2026-10-10T21:57:24.680Z","pdfB64":"JVBERi0xLjQK"}')`);
+  dit(installer(DBC).ok, 'installation');
+});
 essaie('plan et conversion', () => {
   const a = JSON.parse(MESURE(DBC));
   const n = a.plan.nouvelles.map(x => `${x.id}→${x.apres}(${x.source})`).join(',');
@@ -496,6 +581,9 @@ essaie('plan et conversion', () => {
   dit(vente(d, '22000000777') === '3', 'une vente rattachée par sa TRANSACTION à la paire A suit son nouveau numéro (553 → 3)', vente(d, '22000000777'));
   dit(vente(d, '22000000780') === '4', 'une vente rattachée par transaction à la paire reprise (« 230 ») suit la paire, pas la valeur (→ 4, pas B230)', vente(d, '22000000780'));
   dit(vente(d, '22000000778') === '1', 'une vente SANS rattachement qui porte 554 (donné à une seule paire nouvelle) suit cette paire (→ 1)', vente(d, '22000000778'));
+  dit(vente(d, '22000000781') === '2', 'une vente reliée par son BORDEREAU capté (tx → annonce C) suit sa paire (560 → 2), comme ses voisines reliées par la transaction', vente(d, '22000000781'));
+  dit(vente(d, '22000000782') === 'B561' && vente(d, '22000000783') === 'B562',
+    'la copie `label_latest`, et un bordereau dont `meta.tx` contredit sa ligne, ne relient rien (→ B)', `${vente(d, '22000000782')} · ${vente(d, '22000000783')}`);
   dit(d.vinted_buyprice_by_num['3'] === '40' && d.vinted_buyprice_by_num['B385'] === '30' && !('553' in d.vinted_buyprice_by_num), 'prix d\'achat : « 553 » → « 3 », « 385 » → « B385 »');
   dit(Q(DBC, `select string_agg(id || '=' || (data ->> 'numero'), ',' order by id) from public.app_data where owner = '${J}' and id in ('email_bord_22000000777', 'email_bord_22000000779')`)
       === 'email_bord_22000000777=3,email_bord_22000000779=2', 'bordereaux : par transaction (→ 3), par numéro provisoire (555 → 2)');
@@ -541,6 +629,8 @@ essaie('essai annulé', () => {
     'il rend UN rapport : le vendeur trouvé, la conversion (version 2), le marqueur', JSON.stringify(e.rapport || {}).slice(0, 160));
   dit(e.plan && e.plan.nouvellesPasEnLigne === 1 && Array.isArray(e.plan.nouvelles) && e.plan.nouvelles.length === 5,
     'et le plan à relire AVANT d\'appliquer : les 5 nouvelles, dont 1 qu\'aucune capture ne montre en ligne');
+  dit(e.attention && JSON.stringify(e.attention.dressingsAvantCoupure) === '["compte_un (2026-10-08T22:29:22.465Z)","compte_jamais (jamais capté)"]',
+    'et, À LIRE AVANT D\'APPLIQUER, les comptes dont le dressing date d\'avant la coupure (le plan n\'y voit aucune annonce republiée)', JSON.stringify(e.attention));
   dit(e.poolApres && e.poolApres.enChiffres === 5 && JSON.stringify(e.poolApres.chiffres) === '[1,2,3,4,5]' && e.fichesApres.enChiffres === 5,
     'le pool après : seuls 1 à 5 restent en chiffres', JSON.stringify(e.poolApres));
   dit(tout() === avant, 'après le ROLLBACK, AUCUNE ligne n\'a bougé');
