@@ -149,18 +149,18 @@ const cliquer = async (pg) => { await pg.mouse.click(1512 - 16 - 22, 900 - 16 - 
   });
 
   // ── 1bis. CODE PÉRIMÉ (11 octobre) ───────────────────────────────────────
-  // Le manifeste dit 5.169, le service worker exécute un code d'avant (⟳ jamais
+  // Le manifeste dit 5.171, le service worker exécute un code d'avant (⟳ jamais
   // cliqué) : la carte disait « recharge la page » — ce qui ne change RIEN.
   console.log('\n── Code périmé : le manifeste neuf, le service worker d’avant');
   await essaie('périmé', async () => {
-    const { ctx, pg } = await rendre(nav, Object.assign({}, ETATS.connecte, { __manif: '5.169.0', version: '5.169.0' }));
+    const { ctx, pg } = await rendre(nav, Object.assign({}, ETATS.connecte, { __manif: '5.171.0', version: '5.171.0' }));
     await survoler(pg); await pg.waitForTimeout(200);
     const l = await lire(pg);
     const cadres = await pg.evaluate(() => [...document.querySelectorAll('iframe')].map((f) => f.getAttribute('src')));
     dit(/ancienne version/.test(l.carte) && /⟳/.test(l.carte) && l.point, 'la carte le dit (« elle tourne encore sur son ancienne version… ⟳ »), pastille allumée', l.carte.replace(/\n/g, ' · ').slice(0, 220));
     dit(cadres.some((u) => /popup\.html\?mode=reparer$/.test(u || '')), 'et elle pose la page de réparation de l’extension (qui vérifie avant ⟳)', JSON.stringify(cadres));
     await ctx.close();
-    const ok2 = await rendre(nav, Object.assign({}, ETATS.connecte, { __manif: '5.169.0', version: '5.169.0', code: '5.169.0' }));
+    const ok2 = await rendre(nav, Object.assign({}, ETATS.connecte, { __manif: '5.171.0', version: '5.171.0', code: '5.171.0' }));
     await survoler(ok2.pg); await ok2.pg.waitForTimeout(200);
     const l2 = await lire(ok2.pg);
     const c2 = await ok2.pg.evaluate(() => [...document.querySelectorAll('iframe')].map((f) => f.getAttribute('src')));

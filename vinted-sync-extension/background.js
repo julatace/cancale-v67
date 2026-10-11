@@ -1580,7 +1580,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     //    session arrive maintenant ADRESSÉE, avec un nonce (`onMessageExternal`,
     //    plus haut). Ce relais-ci est refusé, et le dit.
     if (msg && msg.from === 'vmr-bridge' && msg.action === 'session') {
-      sendResponse({ ok: false, code: 'canal', error: 'la session passe par le canal adressé (5.169)' });
+      sendResponse({ ok: false, code: 'canal', error: 'la session passe par le canal adressé (5.171)' });
       return true;
     }
 
@@ -5090,7 +5090,7 @@ async function etatPourApp() {
   //    et le bouton d'ensemble le jetait. `pause.jusqua` laisse l'app griser
   //    et DIRE « Vinted demande de ralentir — X min ». « Pas su » (stockage
   //    lent) ⇒ rien n'est affirmé, ni pause ni absence de pause.
-  // 5.169 : `code` = la version du CODE qui répond (le manifeste peut être plus
+  // 5.171 : `code` = la version du CODE qui répond (le manifeste peut être plus
   //    récent que lui, voir `rechargerSiCodePerime`) ; `ext` = l'identifiant de
   //    CETTE extension, à qui l'app adresse sa session (jamais à toutes).
   let ext = ''; try { ext = String(chrome.runtime.id || ''); } catch (_) {}
@@ -5154,7 +5154,7 @@ async function publierDepuisApp(msg) {
     //        relancé : Leboncoin publierait deux fois), et on DIT pourquoi ;
     //        arrêté ⇒ on lui demande de reprendre, dans CET onglet ;
     //      · fermé ⇒ le dépôt est abandonné : on relance.
-    //    Sans onglet connu (dépôt d'avant la 5.169), l'ancienne règle des 15 min.
+    //    Sans onglet connu (dépôt d'avant la 5.171), l'ancienne règle des 15 min.
     let etapeDeja = jobDeja ? jobDeja.etape : '';
     if (jobDeja && (jobDeja.etape === 'depot' || jobDeja.etape === 'abandonne')) {
       let onglet = jobDeja.tabId != null ? await ongletOuvert(jobDeja.tabId) : undefined;

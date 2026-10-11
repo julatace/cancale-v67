@@ -96,7 +96,7 @@ async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lectureP
   //   pont = null              → aucune extension ici (téléphone, autre navigateur)
   //   pont = 'muette'          → elle est là mais ne répond pas (« pas su »)
   //   pont = {connecte, email} → elle répond
-  // `version` : celle que le pont annonce. Avant la 5.169 l'extension n'entend
+  // `version` : celle que le pont annonce. Avant la 5.171 l'extension n'entend
   // pas le canal adressé : l'app ne peut PAS la connecter elle-même (revue du
   // 11 octobre). `__posts` note ce que l'app poste dans la page ; une ancienne
   // extension comprend `session: null` (elle oublie sa session).
@@ -283,7 +283,7 @@ async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lectureP
   // ⚠️⚠️ Revue du 11 octobre : à une 5.164 (celle qu'il a installée), la carte
   //    promettait « je la connecte d'ici, sans rien à taper » et « je la
   //    reconnecte… rien à taper » — l'app ne lui envoie plus RIEN (canal
-  //    adressé : 5.169), et « Se connecter avec VRM » nommait un bouton que sa
+  //    adressé : 5.171), et « Se connecter avec VRM » nommait un bouton que sa
   //    fenêtre n'a pas. On juge l'état décidé (`data-voie`) et ses gestes.
   console.log('\n── Extension 5.164 (pas de canal adressé) : aucune promesse, le vrai geste');
   const vieillePas = await rendre(nav, { comptes: [], pont: { connecte: false }, version: '5.164.0' });
@@ -301,9 +301,15 @@ async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lectureP
   const deco = await rendre(nav, { comptes: [], pont: { connecte: true, email: 'quelqu-un-dautre@exemple.fr' }, version: '5.164.0', clic: '[data-premiers-geste="deconnecter"]' });
   dit(deco.clique && deco.posts.length === 1 && deco.posts[0] === 'null', 'son clic « Déconnecter l’extension de ce Chrome » lui fait oublier sa session (l’ancien message, session: null) — une fois', JSON.stringify({ clique: deco.clique, posts: deco.posts }));
   dit(deco.etat === 'pasconnectee', 'et la carte passe à l’étape suivante (la connecter au mot de passe VRM)', `état rendu = ${deco.etat}`);
-  // L'autre sens : une 5.169 (canal adressé) garde la promesse — l'app LA tient.
-  const neuve = await rendre(nav, { comptes: [], pont: { connecte: false }, version: '5.169.0' });
-  dit(neuve.etat === 'pasconnectee' && neuve.voie === 'app' && /sans rien à taper/i.test(neuve.carte), 'autre sens : une 5.169 garde « je la connecte d’ici, sans rien à taper »', `${neuve.etat} · voie ${neuve.voie}`);
+  // ⚠️⚠️ Collision de numéros (11 octobre) : `main` a publié une 5.170 SANS le
+  //    canal adressé. Avec une frontière à 5.169, la carte lui promettait « je la
+  //    connecte d'ici, sans rien à taper » — l'app ne pouvait rien lui envoyer.
+  const prod = await rendre(nav, { comptes: [], pont: { connecte: false }, version: '5.170.0' });
+  dit(prod.etat === 'pasconnectee' && prod.voie === 'retard', 'pas connectée, 5.170 de production : l’app sait qu’elle ne peut PAS la connecter', `${prod.etat} · voie ${prod.voie}`);
+  dit(!/rien à taper|Je la connecte|je la reconnecte/i.test(prod.carte), '5.170 : aucune promesse « je la connecte… rien à taper »', prod.carte.slice(0, 300).replace(/\n/g, ' · '));
+  // L'autre sens : une 5.171 (canal adressé) garde la promesse — l'app LA tient.
+  const neuve = await rendre(nav, { comptes: [], pont: { connecte: false }, version: '5.171.0' });
+  dit(neuve.etat === 'pasconnectee' && neuve.voie === 'app' && /sans rien à taper/i.test(neuve.carte), 'autre sens : une 5.171 garde « je la connecte d’ici, sans rien à taper »', `${neuve.etat} · voie ${neuve.voie}`);
 
   // ── 4 ter. LES DEUX ÉCRANS D'ACCUEIL DISENT LA MÊME CHOSE (§11) ───────────
   // Il y avait DEUX onboardings : le tableau de bord récitait « 3 étapes »

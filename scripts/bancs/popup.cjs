@@ -75,7 +75,7 @@ async function rendre(nav, etat, { carte = false, mode = '', geste = null, faux 
         },
         lastError: null,
         id: 'abcdefghijklmnopabcdefghijklmnop',
-        getManifest: () => ({ version: faux.manifeste || '5.169.0' }),
+        getManifest: () => ({ version: faux.manifeste || '5.171.0' }),
         reload: () => { window.__recharges++; },
       },
       storage: { local: {
@@ -147,10 +147,10 @@ const ouvrirMdp = async (pg) => { const a = await pg.$('#mdpLien'); if (a) { awa
   //    pas `lierAvecVRM`. Le clic fermait la fenêtre et RIEN ne se passait
   //    (mesuré dans un vrai Chromium, sur 5 de ses 6 Chrome).
   await essaie('« Se connecter avec VRM » sur un code périmé', async () => {
-    const r = await rendre(nav, { ok: true, connecte: false }, { geste: async (pg) => { await pg.click('#lierBtn'); await pg.waitForTimeout(400); }, faux: { lierFerme: true, codeFerme: true, manifeste: '5.169.0' } });
+    const r = await rendre(nav, { ok: true, connecte: false }, { geste: async (pg) => { await pg.click('#lierBtn'); await pg.waitForTimeout(400); }, faux: { lierFerme: true, codeFerme: true, manifeste: '5.171.0' } });
     dit(/lier-extension=abcdefghijklmnopabcdefghijklmnop/.test(r.ouvert || ''), 'le service worker ne répond pas : la fenêtre OUVRE VRM elle-même, avec l’identifiant de cette extension', String(r.ouvert));
     dit(r.recharges === 1 && r.secours === 'recharge', 'et répare le code (⟳ = `chrome.runtime.reload`, une fois)', JSON.stringify({ recharges: r.recharges, secours: r.secours }));
-    const d = await rendre(nav, { ok: true, connecte: false }, { geste: async (pg) => { await pg.click('#lierBtn'); await pg.waitForTimeout(400); }, faux: { lierFerme: true, codeFerme: true, manifeste: '5.169.0', stock: { vrmReparation: { cle: '5.169.0', at: Date.now() } } } });
+    const d = await rendre(nav, { ok: true, connecte: false }, { geste: async (pg) => { await pg.click('#lierBtn'); await pg.waitForTimeout(400); }, faux: { lierFerme: true, codeFerme: true, manifeste: '5.171.0', stock: { vrmReparation: { cle: '5.171.0', at: Date.now() } } } });
     dit(d.recharges === 0 && d.champs.some((c) => c.id === 'pw' && c.visible) && /⟳/.test(d.txt) && /mot de passe VRM/.test(d.txt) && !d.ferme, 'réparation déjà tentée : le mot de passe VRM se déplie, et la fenêtre dit le geste (⟳) — elle ne se ferme pas sur rien', JSON.stringify({ recharges: d.recharges, champs: d.champs.filter((c) => c.visible).map((c) => c.id), ferme: d.ferme }));
     const ok = await rendre(nav, { ok: true, connecte: false }, { geste: (pg) => pg.click('#lierBtn') });
     dit(ok.recharges === 0 && !/lier-extension/.test(ok.ouvert || '') && ok.ferme, 'autre sens : un service worker à jour répond — rien d’autre (ni rechargement, ni second onglet)', JSON.stringify({ recharges: ok.recharges, ouvert: ok.ouvert, ferme: ok.ferme }));
@@ -223,14 +223,14 @@ const ouvrirMdp = async (pg) => { const a = await pg.$('#mdpLien'); if (a) { awa
   //    pose cette page ; elle ne le croit pas sur parole.
   console.log('\n── La page de réparation');
   await essaie('réparation', async () => {
-    const a = await rendre(nav, {}, { mode: 'reparer', faux: { manifeste: '5.169.0', code: '5.129.0' } });
-    dit(a.recharges === 1 && a.reparation === 'recharge', 'le code qui répond (5.129.0) n’est pas celui du manifeste (5.169.0) : ⟳ (chrome.runtime.reload), UNE fois', `${a.recharges} · ${a.reparation}`);
-    dit(a.mem.vrmReparation && a.mem.vrmReparation.cle === '5.169.0', 'et la garde est rangée (chrome.storage.local)', JSON.stringify(a.mem.vrmReparation));
-    const b = await rendre(nav, {}, { mode: 'reparer', faux: { manifeste: '5.169.0', code: '5.129.0', stock: { vrmReparation: a.mem.vrmReparation } } });
+    const a = await rendre(nav, {}, { mode: 'reparer', faux: { manifeste: '5.171.0', code: '5.129.0' } });
+    dit(a.recharges === 1 && a.reparation === 'recharge', 'le code qui répond (5.129.0) n’est pas celui du manifeste (5.171.0) : ⟳ (chrome.runtime.reload), UNE fois', `${a.recharges} · ${a.reparation}`);
+    dit(a.mem.vrmReparation && a.mem.vrmReparation.cle === '5.171.0', 'et la garde est rangée (chrome.storage.local)', JSON.stringify(a.mem.vrmReparation));
+    const b = await rendre(nav, {}, { mode: 'reparer', faux: { manifeste: '5.171.0', code: '5.129.0', stock: { vrmReparation: a.mem.vrmReparation } } });
     dit(b.recharges === 0 && b.reparation === 'deja', 'déjà rechargé pour cette version : pas une seconde fois (aucune boucle)', `${b.recharges} · ${b.reparation}`);
-    const c = await rendre(nav, {}, { mode: 'reparer', faux: { manifeste: '5.169.0', code: '5.169.0' } });
+    const c = await rendre(nav, {}, { mode: 'reparer', faux: { manifeste: '5.171.0', code: '5.171.0' } });
     dit(c.recharges === 0 && c.reparation === 'a-jour', 'autre sens : le code est celui du manifeste — rien (un service worker lent n’est pas rechargé)', `${c.recharges} · ${c.reparation}`);
-    const d = await rendre(nav, {}, { mode: 'reparer', faux: { manifeste: '5.169.0', code: '5.129.0', stockKO: true } });
+    const d = await rendre(nav, {}, { mode: 'reparer', faux: { manifeste: '5.171.0', code: '5.129.0', stockKO: true } });
     dit(d.recharges === 0, 'stockage illisible : PAS de ⟳ (sans garde, une boucle de rechargements est possible)', `${d.recharges} · ${d.reparation}`);
     dit(!a.champs.some((x) => x.visible) && !a.envoyes.includes('authEtat'), 'la page de réparation ne montre rien et ne demande rien d’autre', JSON.stringify(a.envoyes));
   });

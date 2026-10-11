@@ -73,15 +73,15 @@
   // ⚠️⚠️ MESURÉ chez lui : 5 Chrome sur 6 exécutaient une 5.95–5.129 sous un
   //    manifeste « 5.164 » (dossier remplacé, ⟳ jamais cliqué dans ce Chrome).
   //    Ce pont, lui, est TOUJOURS lu depuis le disque : il est donc de la
-  //    version du manifeste, et il peut juger le service worker. Depuis la 5.169
+  //    version du manifeste, et il peut juger le service worker. Depuis la 5.171
   //    l'état porte `code` (la version du code qui répond). Un état sans `code`,
   //    un `code` différent, ou un service worker qui ne connaît même pas
   //    « état » (≤ 5.128 : le port se ferme sans réponse) ⇒ code PÉRIMÉ.
-  //    On ne juge que si NOTRE version est une vraie version ≥ 5.169 (sinon ce
+  //    On ne juge que si NOTRE version est une vraie version ≥ 5.171 (sinon ce
   //    pont ne saurait pas que `code` existe).
   const vNum = (v) => String(v || '').split('.').map((x) => parseInt(x, 10) || 0);
   const auMoins = (v, ref) => { const a = vNum(v), b = vNum(ref); for (let i = 0; i < 3; i++) { if ((a[i] || 0) !== (b[i] || 0)) return (a[i] || 0) > (b[i] || 0); } return true; };
-  const jugeable = /^\d+\.\d+\.\d+$/.test(version) && auMoins(version, '5.169.0');
+  const jugeable = /^\d+\.\d+\.\d+$/.test(version) && auMoins(version, '5.171.0');
   function jugerCode(resp, err) {
     if (!jugeable) return null;
     if (err) {

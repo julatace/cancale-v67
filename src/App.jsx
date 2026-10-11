@@ -181,7 +181,10 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 //    `relireAnnoncesAutresComptes` (ce chantier-ci s'appelait « 5.167 » sur sa
 //    branche). Un seuil plus bas promettrait la relecture à SON extension de
 //    production — le défaut le plus coûteux du projet (revue de la 5.167).
-const EXT_CAPACITES = { liaison: '5.169.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', repond: '5.77.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', detourage: '5.156.0' };
+// ⚠️ `liaison` (session adressée) : 5.171, PAS 5.169 — la 5.170 publiée par
+//    `main` ne l'a pas (pas de `demanderLiaison`, pas de canal adressé). La même
+//    frontière que `CODE_DANS_ETAT` : les deux arrivent ensemble.
+const EXT_CAPACITES = { liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', repond: '5.77.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', detourage: '5.156.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -759,7 +762,7 @@ const authSetPassword = async (password) => {
 const authSignOut = () => {
   const uid = AUTH.user && AUTH.user.id;
   try { if (uid) deconnecterExtension(String(uid)); } catch (_) {}
-  // ⚠️ Revue du 11 octobre : une extension d'avant la 5.169 n'entend pas le
+  // ⚠️ Revue du 11 octobre : une extension d'avant la 5.171 n'entend pas le
   //    canal adressé — après « Se déconnecter », elle continuait d'écrire sous
   //    ce compte (mesuré : aucun message envoyé ; la modale promet pourtant
   //    qu'« une autre personne qui se connecte derrière toi n'hérite pas de tes
@@ -4562,11 +4565,11 @@ let __vmrEtat = undefined, __vmrRates = 0;
 //    est à jour ». Seul ⟳ (chrome://extensions) recharge le code, et seulement
 //    dans le Chrome où on le clique.
 // ⇒ Trois signes, tous MESURÉS, jamais devinés :
-//    · le pont (≥ 5.169, toujours lu depuis le disque) juge le code et joint son
+//    · le pont (≥ 5.171, toujours lu depuis le disque) juge le code et joint son
 //      verdict (`perime`) — y compris quand le code est si vieux qu'il ne répond
 //      rien à « état » ;
-//    · l'état porte `code` depuis la 5.169 : absent alors que la version annoncée
-//      est ≥ 5.169, ou différent d'elle ⇒ périmé ;
+//    · l'état porte `code` depuis la 5.171 : absent alors que la version annoncée
+//      est ≥ 5.171, ou différent d'elle ⇒ périmé ;
 //    · la clé `offresAutoLocal` n'a existé dans l'état que de la 5.130 à la 5.158
 //      (retirée avec l'acceptation automatique) : une version ≥ 5.159 qui la
 //      porte encore exécute un code d'avant.
@@ -4585,7 +4588,15 @@ function codePerime() {
   return null;
 }
 // La version où l'état porte `code` (la constante `CODE_VERSION` de background.js).
-const CODE_DANS_ETAT = '5.169.0';
+// ⚠️⚠️ COLLISION DE NUMÉROS (11 octobre) : ce chantier s'appelait « 5.169 » sur
+//    sa branche, et `main` a publié une 5.170 SANS lui — son état n'a pas
+//    `code`. Une frontière à 5.169 disait cette 5.170 « périmée » : « Lecture
+//    seule », plus aucune commande ni session, et « clique ⟳ » — qui recharge la
+//    même 5.170, toujours sans `code`. La frontière (ici, `EXT_CAPACITES.liaison`,
+//    `jugeable` du pont et du logo) reste STRICTEMENT au-dessus de toute version
+//    publiée sans le champ : `scripts/audit-planchers-code.cjs` le vérifie, sur
+//    ce que `codePerime` REND.
+const CODE_DANS_ETAT = '5.171.0';
 function textePerime() {
   const p = codePerime() || {};
   const v = String((__vmrEtat && __vmrEtat.version) || vmrExtVersion() || '');
@@ -4628,7 +4639,7 @@ function vmrDemandeUn(type, payload, timeoutMs) {
     const fin = (v) => { if (done) return; done = true; clearTimeout(grace); clearTimeout(to); window.removeEventListener('message', onMsg); resolve(v); };
     const onMsg = (e) => {
       if (e.source !== window || !e.data || e.data.__vmr !== type + ':result' || e.data.reqId !== reqId) return;
-      // 11 octobre : le pont (≥ 5.169, toujours lu depuis le disque) juge le
+      // 11 octobre : le pont (≥ 5.171, toujours lu depuis le disque) juge le
       // CODE qui répond et joint son verdict — y compris quand ce code est si
       // ancien qu'il ne répond rien à « état » (`resp: null`).
       if (type === 'etat') __vmrPerimePont = e.data.perime && typeof e.data.perime === 'object' ? Object.assign({}, e.data.perime, { at: Date.now() }) : (e.data.resp ? null : __vmrPerimePont);
@@ -4698,7 +4709,7 @@ let __sessExtErreur = null;     // ce que le serveur a répondu quand il n'a pas
 const enVolSession = (v) => { __sessExtEnVol = v; __vmrNotifier(); };   // l'indicateur le dit pendant que ça se fait
 // ⚠️⚠️ QUI PEUT CONNECTER L'EXTENSION DE CE CHROME, ET COMMENT (revue du
 //    11 octobre). « Je la (re)connecte » n'est vrai que si l'APP peut le faire :
-//    une extension qui ne sait pas recevoir la session adressée (avant la 5.169
+//    une extension qui ne sait pas recevoir la session adressée (avant la 5.171
 //    — dont la 5.164 installée chez lui) ne reçoit plus RIEN de l'app, et un
 //    serveur qui a refusé de fabriquer sa session ne la fabriquera pas avant
 //    `__sessExtPasAvant`. La garde avait été posée sur « pas connectée »
@@ -4718,11 +4729,11 @@ function voieConnexionExt() {
 }
 const minutesAvantReessai = () => Math.max(1, Math.ceil((__sessExtPasAvant - Date.now()) / 60000));
 // « Déconnecter l'extension de ce Chrome » pour une extension qui ne connaît
-// pas le canal adressé (avant la 5.169) : l'ancien message de la page, qu'elle
+// pas le canal adressé (avant la 5.171) : l'ancien message de la page, qu'elle
 // comprend (`session: null` = elle oublie sa session). UNIQUEMENT sur un GESTE
 // (ce bouton, ou « Se déconnecter » de VRM) — jamais tout seul : c'est ce qui
 // faisait oublier sa session à l'extension au démarrage d'une app morte (B9).
-// Un pont 5.169 l'ignore (il répond `canal`) : la sienne passe par l'adressé.
+// Un pont 5.171 l'ignore (il répond `canal`) : la sienne passe par l'adressé.
 function deconnecterExtensionAncienne() {
   if (typeof window === 'undefined' || !vmrExtPresent()) return false;
   try { window.postMessage({ __vmr: 'session', session: null }, '*'); } catch (_) { return false; }
@@ -4737,7 +4748,7 @@ function deconnecterExtensionAncienne() {
 const cleSeparee = (uid) => 'vrm_ext_separee_' + uid;
 // Le canal ADRESSÉ vers une extension : `chrome.runtime` n'existe dans la page
 // que si une extension installée déclare `externally_connectable` pour elle
-// (la 5.169 et suivantes). `null` = pas de réponse (absente, trop ancienne,
+// (la 5.171 et suivantes). `null` = pas de réponse (absente, trop ancienne,
 // code périmé) — jamais une réponse devinée.
 const canalExt = () => { try { const c = typeof window !== 'undefined' ? window.chrome : null; return (c && c.runtime && typeof c.runtime.sendMessage === 'function') ? c.runtime : null; } catch (_) { return null; } };
 function versExtension(id, msg, timeoutMs = 5000) {
@@ -5156,7 +5167,7 @@ function raisonExtGlobale(sansSouris, opt) {
   if (!v || typeof v !== 'object') return { code: 'vrm-passu', texte: "Je n'ai pas pu savoir sous quel compte VRM l'extension écrit — recharge cette page." };
   // L'app lui transmet d'elle-même sa connexion quand elle n'en a pas
   // (`assurerSessionExtension`) : on le dit pendant que ça se fait.
-  // ⚠️ 11 octobre : une extension plus ancienne que la 5.169 n'écoute pas le
+  // ⚠️ 11 octobre : une extension plus ancienne que la 5.171 n'écoute pas le
   //    canal adressé — l'app ne lui prête plus JAMAIS sa propre session. On le
   //    dit, avec les deux vrais gestes, au lieu de promettre un « je réessaie ».
   if (v.connecte === false) return { code: 'vrm', texte: __sessExtEnVol
@@ -9554,7 +9565,7 @@ function EtatActions({ onNav, ordi, sombre }) {
   // connectée, elle, ouvre VRM) — c'est le repli si la reconnexion automatique
   // n'aboutit pas.
   // 11 octobre : « je réessaie » n'est vrai que si l'extension sait RECEVOIR la
-  // connexion de VRM (5.169, session adressée). Une plus ancienne ne reçoit
+  // connexion de VRM (5.171, session adressée). Une plus ancienne ne reçoit
   // plus rien de l'app — promettre « je réessaie » serait le défaut le plus
   // coûteux du projet ; on dit les deux vrais gestes.
   // ⚠️ Revue du 11 octobre : après un REFUS du serveur (429, 503), « Se
@@ -9569,7 +9580,7 @@ function EtatActions({ onNav, ordi, sombre }) {
         : <>Je la connecte à <b>{monMail || 'ton compte VRM'}</b>. Si ça ne vient pas : clique l'icône VRM en haut de Chrome, puis « Se connecter avec VRM ».</>}</span>; }
   // Autre compte : une extension CONNECTÉE ouvre VRM quand on clique son icône
   // (sa fenêtre n'apparaît plus) — « clique l'icône, Se déconnecter » serait
-  // impossible à suivre. Avant la 5.169 elle n'entend pas le canal adressé : le
+  // impossible à suivre. Avant la 5.171 elle n'entend pas le canal adressé : le
   // seul geste d'ici est de la déconnecter (l'ancien message), puis le mot de
   // passe VRM dans sa fenêtre — ou la mettre à jour.
   else if (code === 'autre-vrm') { const voie = voieConnexionExt(); geste = __sessExtEnVol ? <span>Un instant…</span>

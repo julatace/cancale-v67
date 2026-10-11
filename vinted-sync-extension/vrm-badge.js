@@ -102,13 +102,13 @@
   //    « L'extension ne répond pas — recharge la page » : recharger ne change
   //    RIEN. Ce script, lui, est lu depuis le disque : il sait quelle version le
   //    manifeste annonce, et il compare avec le `code` que l'état renvoie
-  //    (depuis la 5.169). Périmé ⇒ on pose UNE fois la page de réparation
+  //    (depuis la 5.171). Périmé ⇒ on pose UNE fois la page de réparation
   //    (`popup.html?mode=reparer`, qui vérifie elle-même avant de recharger), et
   //    on dit le geste exact s'il faut le faire à la main.
   const versionManif = (() => { try { return String(chrome.runtime.getManifest().version || ''); } catch (_) { return ''; } })();
   const vNum = (v) => String(v || '').split('.').map((x) => parseInt(x, 10) || 0);
   const auMoins = (v, ref) => { const a = vNum(v), b = vNum(ref); for (let i = 0; i < 3; i++) { if ((a[i] || 0) !== (b[i] || 0)) return (a[i] || 0) > (b[i] || 0); } return true; };
-  const jugeable = /^\d+\.\d+\.\d+$/.test(versionManif) && auMoins(versionManif, '5.169.0');
+  const jugeable = /^\d+\.\d+\.\d+$/.test(versionManif) && auMoins(versionManif, '5.171.0');
   let reparationPosee = false;
   function reparer() {
     if (reparationPosee) return;
