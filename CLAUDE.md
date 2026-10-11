@@ -7233,6 +7233,58 @@ après une **vraie** fusion d'integ-11oct (aee8e5c : la 013 appliquée à 14:58)
   vente remboursée APRÈS sa finalisation (état terminal) resterait prouvée — pas
   vu dans sa base.
 
+### ⚠️⚠️ REVUE DU CHANTIER eBAY (11 octobre, 5.172) — LE NUMÉRO 5.169 ÉTAIT DÉJÀ PRIS, ET LA 5.170 DE PRODUCTION N'A PAS LA PREUVE
+Treize constats d'une revue adverse, chacun **reproduit** (vm, Chromium, données
+inventées) avant d'être corrigé. Fusion de `integ-11oct` (c7efee0, 5.170 servie
+en production) dans le chantier.
+- ⚠️⚠️ **Extension 5.172.0, `EXT_CAPACITES.preuves = '5.172.0'`.** La 5.170.0
+  servie par main (PR #473) n'a **pas** `capterPreuvesVente` : avec le seuil à
+  5.169, l'app lui promettait « l'extension lit sa transaction toute seule ».
+  Et « 5.169 » désignait déjà le chantier extension (e7b-1, qui prend aussi la
+  5.171). ⇒ `scripts/_versions-publiees.cjs` **lit l'historique** de main (sa
+  première lignée, + la 5.164 installée hors main) ; `audit-coherence` refuse
+  tout seuil ≤ une version servie sans la fonction (rouge sur 5e74f92 :
+  « preuves 5.169.0 ≤ 5.170.0 ») ; `audit-preuve-vente` dérive de là ses
+  versions publiées (la liste recopiée oubliait la 5.170) et refuse un numéro
+  réservé (`RESERVEES`) ou déjà servi avec un autre contenu. Depuis une copie
+  (§6.1) : `VRM_GIT=<dépôt>`, sinon « pas su » est **rouge**.
+  ⚠️ **À la fusion avec e7b-1 : monter encore** (aucun des deux ne porte le code
+  de l'autre).
+- **La promesse « elle lit toute seule »** n'est faite qu'à une extension à jour
+  **et connectée à CE compte VRM** (`connexionExtensionVrm`) : sans session, la
+  visite s'arrête avant de lire (`visite_sans_session`). Sinon la ligne dit ce
+  qui bloque avec **la phrase de l'indicateur** (`raisonExtGlobale`, §11 — les
+  deux adresses quand c'est un autre compte) et le geste qui marche (ouvrir la
+  vente).
+- **La cloche relance l'anti double vente** sur `maj · label | preuves | ventes`
+  (regroupé, au plus un recalcul / 5 s) : retrait automatique allumé, une preuve
+  rangée pendant que VRM est ouvert retirait **rien** avant un rechargement — le
+  flux même de la N°553.
+- **Les ventes d'un AUTRE compte illisibles** sont nommées dans la ligne « pas
+  pu lire » (avant : la ligne « pas reliées » disparaissait, l'écran d'une panne
+  était celui où tout est relié) ; la preuve, elle, tient.
+- **Pas de « Générer le bordereau »** sur une vente dont le bordereau est déjà
+  capté sans l'annonce (le clic répondait « déjà fait » sans rien relier, et
+  Ventes disait « prêt à imprimer ») ; ni **au doigt** (un bouton grisé muet).
+- **Leboncoin** : une paire REVENUE (vente remboursée après une transaction
+  figée) est « à publier » pour VRM mais « vendue » pour une extension
+  antérieure à la règle de l'instantané — son « Publier » est **grisé** avec la
+  raison, dite une fois (`LbcCroitVendue`), au lieu d'un refus au clic.
+- Déjà corrigé avant la revue et **gardé** (preuves ajoutées) : transaction
+  figée + vente remboursée ⇒ pas vendue (8239c6f) ; l'écran Leboncoin lit la
+  même preuve (`audit-preuve-vente` §1 bis refuse désormais tout troisième
+  lecteur de `status_title`) ; l'interrupteur suit le nuage ; la carte par
+  annonce de la 013 (objet) — trois mutations « lue comme une liste ».
+- **Preuves** : `audit-preuve-vente` 77 contrôles, **27/27 mutations** (12 rouges
+  sur 6729407) ; `audit-coherence` (rouge sur 5e74f92 et sous mutation) ;
+  `audit-numerotation-lecteurs` **42/42** (l'ancre `banniere-archive` suivait
+  encore `onlineAnnonceIds`) ; banc `ebay-annonces` **153 contrôles**, 23 rouges
+  sur le build de 5e74f92, 38 sur 6729407, rouge sous six mutations ; banc
+  `lbc-preuve` cas D, 3 rouges sur 5e74f92, rouge sous mutation ;
+  `audit-budget-lectures` recompté (réserve 13 = argent + colis + preuves).
+- ⚠️ **Non mesuré** : la réponse réelle de Vinted et d'eBay (aucun appel) ; si
+  Julien a d'autres extensions installées hors main que la 5.164.
+
 ### ⚠️⚠️ « ANNONCES = LES PAIRES EN LIGNE MAINTENANT » — LA RELECTURE PUBLIQUE DE SES AUTRES COMPTES (11 octobre, 5.167)
 Julien : « j'avais supprimé mes annonces sur Vinted… il y avait encore toutes mes
 annonces sur VRM… trois fois la même paire alors qu'il n'y a qu'une seule
