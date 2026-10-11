@@ -708,7 +708,10 @@ const lignesPlan = (pg) => pg.$$eval('[data-planif-ligne]', (els) => els.map((e)
         await pg.goto(`http://localhost:${PORT}/?tab=plat_ebay`, { waitUntil: 'domcontentloaded' });
         await pg.waitForTimeout(1500);
         await pg.getByRole('button', { name: 'Annonces', exact: true }).first().click({ timeout: 8000 });
-        await pg.waitForSelector('[data-ebay-brouillons]', { timeout: 15000 });
+        // ⚠️ On attend que la lecture soit FINIE (« charge » est l'état d'avant la
+        //    réponse) : juger pendant le chargement mesurait la vitesse de la
+        //    machine, pas la règle — rouge sur une app intacte quand le CPU traîne.
+        await pg.waitForSelector('[data-ebay-brouillons]:not([data-ebay-brouillons="charge"])', { timeout: 15000 });
         const e = await pg.$eval('[data-ebay-brouillons]', (x) => ({ etat: x.getAttribute('data-ebay-brouillons'), t: x.textContent }));
         dit(e.etat === 'pas-su' && /pas pu lire tes brouillons/.test(e.t), 'brouillons illisibles ⇒ « je n\'ai pas pu lire », jamais « aucun brouillon »', e.etat);
         // Il prépare une annonce et l'enregistre pendant la panne.
