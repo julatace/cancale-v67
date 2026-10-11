@@ -1906,7 +1906,12 @@ function FraicheurAnnonces({ lues, enLigne, noms, supprimees, aConfirmer, numero
   const plusieurs = !!__vmrPlusieurs;
   const ailleurs = cap === 'absente' || sansSouris;          // le geste ne se fait pas sur CET appareil
   const connexion = ailleurs ? 'ailleurs' : connexionExtensionVrm();
-  const relit = connexion === 'ok';                            // la relecture aura vraiment lieu
+  // ⚠️⚠️ Fusion du 11 octobre (deux chantiers) : un code PÉRIMÉ (manifeste neuf,
+  //    service worker d'avant, ⟳ jamais cliqué) ne fait pas ce que la version
+  //    annoncée sait faire. La pastille dit « Lecture seule — clique ⟳ » ; on ne
+  //    promet donc ici aucune relecture (§11, une voix) : on dit le même geste.
+  const perime = !ailleurs && !!codePerime();
+  const relit = connexion === 'ok' && !perime;                 // la relecture aura vraiment lieu
   const promet = capS === 'ok' && !plusieurs && !sansSouris && relit;
   const s = nSuppr > 1 ? 's' : '';
   const nAC = ac.length, sAC = nAC > 1 ? 's' : '';
@@ -1918,6 +1923,7 @@ function FraicheurAnnonces({ lues, enLigne, noms, supprimees, aConfirmer, numero
   const visite = `à ta prochaine visite sur Vinted, sur n'importe lequel de tes comptes${aRelire.length > 3 ? ' (trois comptes par visite)' : ''}`;
   const geste = !aRelire.length ? null
     : ailleurs ? `Avec l'extension VRM à jour (${EXT_CAPACITES.enligne}), sur l'ordinateur où elle est installée, ${elles} ${visite} ; plus ancienne, ouvre vinted.fr connecté sur ${ceux}.`
+    : perime ? `L'extension de ce Chrome tourne encore sur son ancien code : rien ne sera relu tant qu'elle n'est pas rechargée — ouvre chrome://extensions et clique ⟳ sur VRM.`
     : cap === 'ok' && relit ? `${elles.charAt(0).toUpperCase() + elles.slice(1)} ${visite}.`
     : cap === 'ok' && (connexion === 'non' || connexion === 'autre') ? `L'extension de ce Chrome n'est pas connectée à ton compte VRM${connexion === 'autre' ? ' (elle écrit dans un autre)' : ''} : tant qu'elle ne l'est pas, rien ne sera relu. VRM la reconnecte de lui-même ; sinon, recharge cette page.`
     : cap === 'ok' ? `Dès que l'extension de ce Chrome aura répondu, ${elles} ${visite}.`
@@ -1925,7 +1931,7 @@ function FraicheurAnnonces({ lues, enLigne, noms, supprimees, aConfirmer, numero
   const num = (it) => { if (!numeros) return ''; const n = numeros[it.id] && numeros[it.id].numero; return n != null && String(n).trim() !== '' ? `N°${n}` : 'sans N°'; };
   return (
     <div {...{ [attr]: '' }} data-vieux={vieux.join(',')} data-supprimees={nSuppr} data-cap={cap} data-cap-suppr={capS}
-      data-promesse={promet ? '1' : '0'} data-ailleurs={ailleurs ? '1' : '0'} data-relit={relit ? '1' : '0'} data-pub-ko={pubKO ? '1' : '0'}
+      data-promesse={promet ? '1' : '0'} data-ailleurs={ailleurs ? '1' : '0'} data-relit={relit ? '1' : '0'} data-perime={perime ? '1' : '0'} data-pub-ko={pubKO ? '1' : '0'}
       data-a-confirmer={nAC} data-a-confirmer-comptes={uidsAC.join(',')}
       style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, marginBottom: 12, ...(style || {}) }}>
       {pubKO && <span data-pub-ko-dit>{lecturesPubliquesKO() === 'cache'
