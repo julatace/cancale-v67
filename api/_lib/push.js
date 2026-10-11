@@ -12,6 +12,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 import webpush from 'web-push';
+import crypto from 'node:crypto';
 
 import { withOwnerAll, conflictTarget, proprietaireCourant } from './owner.js';
 import { sbCle } from './cle.js';
@@ -111,21 +112,53 @@ export const PUSH_DEFAUT = {
 };
 // Réglage du vendeur (Réglages → Notifications), lu depuis la base.
 // Absent ⟹ on prend le défaut ci-dessus.
-export async function pushCategorieActive(cat) {
-  if (!cat) return true;
+//
+// ⚠️⚠️ « PAS SU » RETOMBAIT SUR LE DÉFAUT, ET LE DÉFAUT DE « MESSAGE » EST NON
+//    (11 octobre, reproduit sur la vraie route — banc `notif-messages.cjs`).
+//    Julien a activé les messages ; un simple hoquet de lecture de `push_prefs`
+//    (522, la base debout par ailleurs) les rendait muets. Trois états, jamais
+//    deux : la préférence est LUE (elle décide), ABSENTE (le défaut décide), ou
+//    PAS SUE — et alors :
+//      1. la dernière préférence lue pour CE vendeur par cette instance décide
+//         (une préférence « non » lue il y a une minute tient pendant le hoquet) ;
+//      2. à défaut, on SONNE pour ce qui appelle un geste ou de l'argent
+//         (`SONNE_SI_PAS_SU` : les défauts « oui », plus les messages — un
+//         acheteur attend une réponse) : une notification de trop se répare, un
+//         message manqué non. Le reste (suivi, achat, favori, facture : rien à
+//         faire) garde son défaut — on ne réveille pas pour rien.
+//    La mémoire est par vendeur et ne sert QUE de repli : ce n'est pas un état
+//    à garder (une instance froide n'a rien, et c'est le cas 2).
+const SONNE_SI_PAS_SU = new Set([...Object.keys(PUSH_DEFAUT).filter((k) => PUSH_DEFAUT[k]), 'message']);
+const _prefsVues = new Map();                       // vendeur → dernières préférences LUES
+export const oublierPrefsVues = () => _prefsVues.clear();   // bancs : repartir d'une instance froide
+const decider = (prefs, cat) => {
+  const v = prefs[cat];
+  return typeof v === 'boolean' ? v : (PUSH_DEFAUT[cat] !== false);
+};
+// Rend les préférences lues (`{}` si la ligne n'existe pas), ou `null` = pas su.
+async function lirePrefs() {
   try {
     // ⚠️ On passait ici `await cloisonnee()` — un BOOLÉEN — là où l'aide attend
     //    la fonction : dès qu'un vendeur était connu, l'appel levait, et ses
     //    préférences de notification étaient ignorées (le défaut s'appliquait).
     const url = await pourCeVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.push_prefs&select=data`);
-    if (!url) return PUSH_DEFAUT[cat] !== false;
+    if (!url) return null;
     const res = await fetch(url, { headers: HEADERS });
-    if (!res.ok) return PUSH_DEFAUT[cat] !== false;
+    if (!res.ok) return null;
     const rows = await res.json();
-    const prefs = (rows && rows[0] && rows[0].data) || {};
-    const v = prefs[cat];
-    return typeof v === 'boolean' ? v : (PUSH_DEFAUT[cat] !== false);
-  } catch (_) { return PUSH_DEFAUT[cat] !== false; }
+    if (!Array.isArray(rows)) return null;          // 522 : c'est du HTML, pas du JSON
+    const d = rows[0] && rows[0].data;
+    return (d && typeof d === 'object') ? d : {};
+  } catch (_) { return null; }
+}
+export async function pushCategorieActive(cat) {
+  if (!cat) return true;
+  const qui = vendeurDuPush() || '';
+  const lues = await lirePrefs();
+  if (lues) { _prefsVues.set(qui, lues); return decider(lues, cat); }
+  const vues = _prefsVues.get(qui);
+  if (vues) return decider(vues, cat);
+  return SONNE_SI_PAS_SU.has(cat) ? true : (PUSH_DEFAUT[cat] !== false);
 }
 
 export async function loadSubs() {
@@ -171,6 +204,86 @@ export async function saveSubs(subs) {
     });
     return !!(r && r.ok);
   } catch (_) { return false; }
+}
+
+// ── MODIFIER LA LISTE DES APPAREILS SANS EN PERDRE UN ─────────────────────
+// ⚠️⚠️ LIRE-AJOUTER-RÉÉCRIRE SANS VERROU (11 octobre, reproduit sur la vraie
+//    route). L'iPhone et Chrome qui s'abonnent en même temps lisent tous deux
+//    la même liste, ajoutent chacun le sien et réécrivent : le second efface le
+//    premier — et l'app avait répondu « activé » aux deux. Même chose quand un
+//    envoi purge un appareil disparu pendant qu'un autre s'abonne. (Et chaque
+//    ouverture de l'app réécrivait la liste deux fois, même sans rien changer.)
+// ⇒ Une écriture CONDITIONNELLE, sans migration : la liste porte une marque de
+//   version (`rev`, tirée au hasard à chaque écriture). On ne réécrit QUE si la
+//   ligne porte encore la marque qu'on a lue (`PATCH … &data->>rev=eq.<lue>`,
+//   que Postgres réévalue au moment d'écrire) ; sinon quelqu'un a écrit entre-
+//   temps : on relit et on recommence. Une ligne qui n'existe pas encore se crée
+//   SANS écraser (`ignore-duplicates`) : si un autre l'a créée à la même
+//   milliseconde, on relit et on ajoute. Une ligne d'avant (sans `rev`) se
+//   modifie par `data->>rev=is.null` — la première écriture lui en donne une.
+// `fn(liste)` rend la nouvelle liste, ou `null` = rien à changer (on n'écrit pas).
+// Rend `{ ok:true, subs, ecrit }` ou `{ ok:false, raison:'lecture'|'ecriture'|'conflit' }`.
+const nouvelleRev = () => {
+  try { return crypto.randomUUID(); } catch (_) { return `${Date.now()}-${Math.random().toString(36).slice(2)}`; }
+};
+async function lireSubsVersion() {
+  try {
+    const url = await pourCeVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.push_subs&select=data`);
+    if (!url) return null;
+    const res = await fetch(url, { headers: HEADERS });
+    if (!res.ok) return null;
+    const rows = await res.json();
+    if (!Array.isArray(rows)) return null;
+    const d = rows[0] && rows[0].data;
+    if (!rows[0]) return { existe: false, subs: [], rev: null };
+    return { existe: true, subs: (d && Array.isArray(d.subs)) ? d.subs : [], rev: (d && d.rev != null) ? String(d.rev) : null };
+  } catch (_) { return null; }
+}
+async function ecrireSubsSi(lu, subs) {
+  try {
+    const data = { subs, updatedAt: new Date().toISOString(), rev: nouvelleRev() };
+    const enTetes = { ...HEADERS, Prefer: 'return=representation' };
+    if (lu.existe) {
+      const filtre = lu.rev == null ? 'data->>rev=is.null' : `data->>rev=eq.${encodeURIComponent(lu.rev)}`;
+      const url = await pourCeVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.push_subs&${filtre}`);
+      if (!url) return 'ko';
+      const r = await fetch(url, { method: 'PATCH', headers: enTetes, body: JSON.stringify({ data }) });
+      if (!r || !r.ok) return 'ko';
+      const j = await r.json().catch(() => null);
+      if (!Array.isArray(j)) return 'ko';
+      return j.length ? 'ok' : 'conflit';
+    }
+    let row, conflit;
+    if (await cloisonnee()) {
+      const o = vendeurDuPush();
+      if (!o) return 'ko';
+      row = { owner: o, id: 'push_subs', data }; conflit = 'owner,id';
+    } else {
+      row = withOwnerAll([{ id: 'push_subs', data }])[0]; conflit = conflictTarget('id');
+    }
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${conflit}`, {
+      method: 'POST',
+      headers: { ...HEADERS, Prefer: 'resolution=ignore-duplicates,return=representation' },
+      body: JSON.stringify([row]),
+    });
+    if (!r || !r.ok) return 'ko';
+    const j = await r.json().catch(() => null);
+    if (!Array.isArray(j)) return 'ko';
+    return j.length ? 'ok' : 'conflit';
+  } catch (_) { return 'ko'; }
+}
+export async function modifierSubs(fn, essais = 6) {
+  for (let i = 0; i < essais; i++) {
+    const lu = await lireSubsVersion();
+    if (lu === null) return { ok: false, raison: 'lecture' };   // « pas su » : on n'écrit rien
+    const suivante = fn(lu.subs.slice());
+    if (!Array.isArray(suivante)) return { ok: true, subs: lu.subs, ecrit: false };
+    const e = await ecrireSubsSi(lu, suivante);
+    if (e === 'ok') return { ok: true, subs: suivante, ecrit: true };
+    if (e === 'ko') return { ok: false, raison: 'ecriture' };
+    // 'conflit' : quelqu'un a écrit entre notre lecture et la nôtre — on relit.
+  }
+  return { ok: false, raison: 'conflit' };
 }
 
 // ⚠️ UN ABONNEMENT SCELLÉ SUR UNE ANCIENNE CLÉ EST MORT POUR TOUJOURS.
@@ -240,7 +353,17 @@ export async function sendPushToAll(payload) {
       if (!mort && !perime) alive.push(s);            // erreur passagère : on garde
     }
   }
-  if (alive.length !== subs.length) await saveSubs(alive);
+  // ⚠️ On ne retire QUE les appareils morts, de la liste TELLE QU'ELLE EST
+  //    MAINTENANT (écriture conditionnelle) : réécrire `alive` effaçait un
+  //    appareil qui venait de s'abonner pendant l'envoi.
+  if (alive.length !== subs.length) {
+    const vivants = new Set(alive.map((s) => s.endpoint));
+    const retires = new Set(subs.filter((s) => !vivants.has(s.endpoint)).map((s) => s.endpoint));
+    await modifierSubs((cur) => {
+      const reste = cur.filter((s) => !(s && retires.has(s.endpoint)));
+      return reste.length === cur.length ? null : reste;
+    });
+  }
   // `perimes` remonte jusqu'à l'écran : « 0 envoyé sur 2 » ne dit pas POURQUOI,
   // « 2 appareils scellés sur une ancienne clé » dit quoi faire (rouvrir l'app).
   return { sent, total: subs.length, ...(perimes ? { perimes } : {}) };

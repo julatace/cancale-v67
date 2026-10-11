@@ -6,7 +6,7 @@
 //   POST { action:'test' }                   → envoie une notification d'essai
 // ────────────────────────────────────────────────────────────────────────────
 
-import { loadSubs, saveSubs, sendPushToAll, pushConfigure, cloisonnee } from './_lib/push.js';
+import { loadSubs, modifierSubs, sendPushToAll, pushConfigure, cloisonnee } from './_lib/push.js';
 import { contexteVendeur } from './_lib/owner.js';
 import { utilisateurDe } from './_lib/session.js';
 
@@ -62,23 +62,31 @@ async function traiter(req, res) {
     //      sont effacés — une perte réelle, pas un affichage faux. Et tant
     //      qu'on n'a pas la confirmation d'écriture, on ne dit pas « activé » :
     //      l'app affiche déjà « Impossible d'activer » sur une réponse ≠ 2xx.
+    // ⚠️⚠️ ET DEUX APPAREILS EN MÊME TEMPS EN PERDAIENT UN (11 octobre, banc
+    //      `notif-messages.cjs`) : l'iPhone et Chrome lisaient la même liste,
+    //      ajoutaient chacun le sien et réécrivaient — le second effaçait le
+    //      premier, et l'app avait répondu « activé » aux deux. `modifierSubs`
+    //      n'écrit que si personne n'a écrit entre sa lecture et la sienne,
+    //      sinon il relit et recommence (voir `_lib/push.js`). Et un appareil
+    //      déjà inscrit ne réécrit plus la liste à chaque ouverture de l'app.
+    const PAS_CONCLU = { erreur: 'base-occupee', message: "Je n'ai pas pu enregistrer cet appareil : la liste de tes appareils changeait au même moment. Rien n'est perdu — réessaie." };
+    const echec = (raison) => (raison === 'lecture' ? PAS_LU : raison === 'conflit' ? PAS_CONCLU : PAS_ECRIT);
     if (body.action === 'subscribe') {
       const sub = body.sub;
       if (!sub || !sub.endpoint) { res.status(400).json({ error: 'abonnement invalide' }); return; }
-      const subs = await loadSubs();
-      if (subs === null) { res.status(503).json(PAS_LU); return; }
-      if (!subs.some(s => s.endpoint === sub.endpoint)) subs.push(sub);
-      if (!await saveSubs(subs)) { res.status(503).json(PAS_ECRIT); return; }
-      res.status(200).json({ ok: true, devices: subs.length });
+      const r = await modifierSubs((cur) => (cur.some((s) => s && s.endpoint === sub.endpoint) ? null : [...cur, sub]));
+      if (!r.ok) { res.status(503).json(echec(r.raison)); return; }
+      res.status(200).json({ ok: true, devices: r.subs.length });
       return;
     }
 
     if (body.action === 'unsubscribe') {
-      const lus = await loadSubs();
-      if (lus === null) { res.status(503).json(PAS_LU); return; }
-      const subs = lus.filter(s => s.endpoint !== body.endpoint);
-      if (!await saveSubs(subs)) { res.status(503).json(PAS_ECRIT); return; }
-      res.status(200).json({ ok: true, devices: subs.length });
+      const r = await modifierSubs((cur) => {
+        const reste = cur.filter((s) => !(s && s.endpoint === body.endpoint));
+        return reste.length === cur.length ? null : reste;
+      });
+      if (!r.ok) { res.status(503).json(echec(r.raison)); return; }
+      res.status(200).json({ ok: true, devices: r.subs.length });
       return;
     }
 
