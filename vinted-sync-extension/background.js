@@ -3070,10 +3070,12 @@ async function relireAnnoncesAutresComptes(uidConnecte) {
       const lu = await lireDressingPublic(lire, pid, () => gardeLecture(uidConnecte, acc, 'enligne'));
       if (!lu.complet) {
         noterDiag(`enligne_incomplet_${lu.raison}`);
-        // Vinted freine, ou le budget est vide : on s'arrête là (rien de rangé).
-        if (lu.raison === 'vinted-pause' || lu.raison === 'lectures-reservees' || lu.raison === 'trop-de-lectures' || lu.raison === 'autre-compte') break;
-        essais[uid] = Date.now() - ENLIGNE_DELAI_MS + ENLIGNE_REESSAI_MS;      // nouvel essai dans 5 min, jamais en rafale
+        // Rien de rangé : ce compte réessaie dans 5 min (jamais en rafale) —
+        // pas dans 30, sa lecture n'a pas eu lieu.
+        essais[uid] = Date.now() - ENLIGNE_DELAI_MS + ENLIGNE_REESSAI_MS;
         try { await chrome.storage.local.set({ [ENLIGNE_ESSAIS]: essais }); } catch (_) {}
+        // Vinted freine, le budget est vide ou le compte a changé : on s'arrête là.
+        if (lu.raison === 'vinted-pause' || lu.raison === 'lectures-reservees' || lu.raison === 'trop-de-lectures' || lu.raison === 'autre-compte') break;
         continue;
       }
       const ouvertes = lu.items.filter((it) => ouverteSurVinted(it) && !venduePourSonVendeur(it)).map(articleMaigre);

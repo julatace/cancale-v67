@@ -1661,18 +1661,9 @@ const lireSupprimeesTous = () => cachedRow('s:*', async () => {
 // comptes et le range dans `harvest_{uid}_enligne` (une ligne par compte). La
 // règle `enLigneDuCompte` (bloc <enligne-regle>, la même que l'extension) dit
 // alors quelle lecture fait foi. Projetée (§4.4) : rien d'autre n'est lu.
-// Trois états : la ligne · `{}` (aucune lecture publique) · `null` (pas su — la
+// Trois états : les lignes · `[]` (aucune lecture publique) · `null` (pas su — la
 // règle retombe alors sur le seul dressing, sans rien affirmer de plus).
 const SELECT_ENLIGNE = 'id,cap:data->>capturedAt,complet:data->complet,ids:data->ids,items:data->items';
-const lireEnLigne = (uid) => cachedRow(`e:${uid}`, async () => {
-  try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.harvest_${uid}_enligne&select=${SELECT_ENLIGNE}`, { headers: sbAuth() });
-    if (!res.ok) return null;
-    const rows = await res.json();
-    if (!Array.isArray(rows)) return null;
-    return rows[0] || {};
-  } catch (_) { return null; }
-});
 const lireEnLigneTous = () => cachedRow('e:*', async () => {
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_enligne&select=${SELECT_ENLIGNE}`, { headers: sbAuth() });
@@ -1799,7 +1790,7 @@ function FraicheurAnnonces({ lues, enLigne, noms, supprimees, aConfirmer, numero
 }
 // L'extension vient de ranger une suppression : on oublie ce qu'on avait lu.
 const oublierDressing = (uid) => {
-  if (uid) { _rowCache.delete(`h:${uid}:listings`); _rowCache.delete(`s:${uid}`); _rowCache.delete(`e:${uid}`); }
+  if (uid) { _rowCache.delete(`h:${uid}:listings`); _rowCache.delete(`s:${uid}`); }
   _rowCache.delete('s:*'); _rowCache.delete('e:*');
 };
 // ── ACTIVITÉ RÉSEAU (barre de chargement en haut) ───────────────────────────
@@ -1989,7 +1980,10 @@ const fetchHarvestBrut = async (uid, type, opts = {}) => {
 // `_vrmLu` = l'heure de la lecture qui fait foi. `null` = rien à lire du tout.
 const dressingEnLigne = async (uid, row, opts = {}) => {
   const payload = (row && row.data && row.data.payload) || null;
-  const q = await lireEnLigne(uid);
+  // Toutes les lectures publiques en UNE requête partagée (une ligne par compte :
+  // famille bornée) — l'écran lit tous ses comptes en même temps.
+  const tous = await lireEnLigneTous();
+  const q = Array.isArray(tous) ? tous.find((r) => r && r.id === `harvest_${uid}_enligne`) : null;
   const pub = q && q.id ? { complet: q.complet, ids: q.ids, items: q.items, cap: Date.parse(q.cap || '') } : null;
   if (!payload && !pub) return null;
   const ts = row ? harvestTs(row) : NaN;
