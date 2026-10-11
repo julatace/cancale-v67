@@ -306,6 +306,9 @@ async function finPage(pg, errs, quoi) {
         dit(e[A.A6] && e[A.A6].etat === 'connue' && e[A.A6].age === '10', `[1] ${T} A6 : connue, lue il y a 10 jours (dit sur la ligne)`, JSON.stringify(e[A.A6]));
         dit(Object.values(e).filter((x) => x.etat === 'pas-su').every((x) => !/aucune/i.test(x.txt)), `[1] ${T} aucune ligne « pas su » ne dit « aucune »`);
         await pg.screenshot({ path: path.join(CAPTURES, `etats-${vp.width}.png`), fullPage: true }).catch(() => {});
+        // L'écran défile DANS l'app : la page entière s'arrête au premier écran.
+        // Les cartes se photographient une par une (§6.2 : on regarde le rendu).
+        for (const k of ['A1', 'A3', 'A4', 'A5']) await carte(pg, A[k]).screenshot({ path: path.join(CAPTURES, `carte-${k}-${vp.width}.png`) }).catch(() => {});
         await finPage(pg, errs, `[1] ${T}`);
         await ctx.close();
       });
@@ -424,6 +427,7 @@ async function finPage(pg, errs, quoi) {
         dit(d1 === true && d2 === false, `[5] ${T} 40 € (moins de la moitié) : grisé tant que la case n'est pas cochée`, `${d1} → ${d2}`);
         await saisir(pg, A.A2, 'accepte', '81');
         dit(await pg.locator(`[data-regle-sous-achat="${A.A2}"]`).count() === 1, `[5] ${T} 81 € : signalé sous le prix d'achat (85 €)`);
+        await pg.locator(`[data-regle-panneau="${A.A2}"]`).screenshot({ path: path.join(CAPTURES, `panneau-A2-${vp.width}.png`) }).catch(() => {});
         await pg.click(`[data-regle-enregistrer="${A.A2}"]`); await feuille(pg).waitFor({ timeout: 5000 });
         const tf = await feuille(pg).innerText();
         await feuille(pg).getByRole('button', { name: 'Annuler' }).click(); await pg.waitForTimeout(500);
@@ -555,7 +559,8 @@ async function finPage(pg, errs, quoi) {
       const lignesApercu = (pg) => pg.$$eval('[data-regles-ligne]', (l) => Object.fromEntries(l.map((e) => { const c = e.querySelector('[data-regles-choix]'); return [e.getAttribute('data-regles-ligne'), { s: e.getAttribute('data-regles-statut'), seuil: e.getAttribute('data-regles-seuil'), coche: c ? c.checked : null, achat: !!e.querySelector('[data-regles-sous-achat]') }]; })));
       if (bloc(9)) await essaie(`[9] ${T} une règle pour toutes`, async () => {
         const L0 = (o) => ({ lu: true, devise: 'EUR', lueA: Date.now(), offresFaites: null, ...o });
-        const { ctx, pg, errs } = await ouvrir(b, vp, { scen: {
+        // Le 1er envoi est RETENU : « pendant le lot » se juge à coup sûr.
+        const { ctx, pg, errs } = await ouvrir(b, vp, { retenir: 1, scen: {
           [A.A6]: [{ body: { ok: true, verifie: null, lecture: null, avertissements: [], range: true } }],
           [A.A7]: [{ status: 422, body: { ok: false, reason: 'refus', error: 'La catégorie de cette annonce n\'accepte pas les offres.' } }],
           [A.B1]: [{ body: { ok: true, verifie: false, lecture: L0({ offresActives: true, accepte: null, refuse: null, prix: 100 }), avertissements: [], range: true } }],
@@ -578,8 +583,10 @@ async function finPage(pg, errs, quoi) {
         dit(regleoffres().length === 0, `[9] ${T} Annuler n'envoie RIEN`);
         await pg.click('[data-regles-appliquer]'); await feuille(pg).waitFor({ timeout: 5000 });
         await feuille(pg).getByRole('button', { name: 'Oui, régler les 4' }).click();
-        await pg.waitForTimeout(120);
+        await pg.waitForSelector('[data-regles-progres="1/4"]', { timeout: 5000 }).catch(() => {});
         const pendant = await desactive(pg, `[data-ebay-annonce="${A.A2}"] [data-regle-ouvrir]`);
+        await pg.locator('[data-regles-toutes]').screenshot({ path: path.join(CAPTURES, `lot-en-cours-${vp.width}.png`) }).catch(() => {});
+        lacher();
         await pg.waitForSelector('[data-regles-bilan]', { timeout: 10000 }); await pg.waitForTimeout(600);
         dit(pendant === true, `[9] ${T} pendant le lot, les gestes de règle des cartes du lot sont grisés`);
         const r = regleoffres();
@@ -593,7 +600,7 @@ async function finPage(pg, errs, quoi) {
         dit(bil.total === 4 && bil.ok === 1 && bil['non-relu'] === 1 && bil.ko === 1 && bil.ecart === 1 && bil.incertain === 0 && bil['a-revoir'] === 0 && bil['non-envoyees'] === 0 && somme === bil.total, `[9] ${T} le bilan est COMPLET (1 réglée · 1 écart · 1 non relue · 1 refusée), sa somme vaut le total`, JSON.stringify(bil));
         const e = await etats(pg);
         dit(e[A.B1].etat !== 'connue' && e[A.A6].etat !== 'connue' && e[A.A2].etat === 'connue', `[9] ${T} ni B1 (écart) ni A6 (non relue) ne passent « connue » ; A2 oui`, JSON.stringify([e[A.A2].etat, e[A.A6].etat, e[A.B1].etat]));
-        await pg.screenshot({ path: path.join(CAPTURES, `toutes-${vp.width}.png`), fullPage: true }).catch(() => {});
+        await pg.locator('[data-regles-toutes]').screenshot({ path: path.join(CAPTURES, `toutes-${vp.width}.png`) }).catch(() => {});
         await finPage(pg, errs, `[9] ${T}`);
         await ctx.close();
       });
