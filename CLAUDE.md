@@ -4281,6 +4281,75 @@ numéros ». **Ce sont SES décisions, pas des options à reproposer.**
   l'outil). Retour arrière : `sauvegarde.vrm_numerotation_annuler(owner)` (125
   copies prises), refusé dès qu'un numéro a bougé.
 
+### La mémoire de l'agent eBay : migration 014 (chantier K3, 11 octobre) — PAS ENCORE APPLIQUÉE
+Premier morceau de l'agent eBay « VRM fermé » (spécification `spec-finale.md`
+§5.1-5.2, K3). Julien ne voit rien. **Aucune horloge** (ni `pg_cron` ni `pg_net` :
+c'est la 015, sur son oui), **aucun DROP**, rien qui tourne : des tables vides et
+`vrm_reglages.agent_ebay = '0'`. Fichier : `supabase/migrations/014-agent.sql`.
+- **Les garanties vivent dans la base, pas dans le code qui l'appelle** : 14 tables,
+  21 fonctions (`SECURITY DEFINER`, `search_path` vide, temps en paramètre
+  `p_maintenant`, exécutables par `service_role` SEULEMENT). Même la clé de service
+  n'écrit la file, les commandes, le journal, les compteurs, les mémos, les
+  titulaires, l'index, les preuves et l'horloge **que par leurs fonctions** (un
+  droit de table ne se contourne pas comme RLS). Elle écrit directement :
+  `vrm_agent_vendeurs` (réglages versionnés, pouls), `vrm_agent_vus` (insertion),
+  `vrm_agent_routes`, `vrm_ebay_cles_publiques`, `vrm_coffre`.
+- **Le navigateur** lit SES lignes de `vrm_agent_vendeurs`, `_commandes`,
+  `_journal` (avec la restrictive `abonnement_requis` : qui ne paie plus ne voit
+  plus rien), n'écrit RIEN, ne lit rien d'autre ; `anon` ne lit rien du tout.
+  ⚠️ Mesuré le 11 octobre : les droits par défaut du schéma public ouvrent toute
+  table neuve en entier à anon et authenticated — la migration les retire tous.
+- `vrm_agent_prendre` : ≤ 2 tâches par vendeur, ≤ 1 par compte eBay, **jamais un
+  compte qui a déjà une tâche en vol dans un autre battement** [S24, D15] (bail
+  vivant + verrou consultatif par groupe) ; seule la ligne prise est verrouillée,
+  `skip locked` : un battement n'attend jamais. `vrm_agent_prendre_cle` (le clic)
+  refuse une tâche tenue (⇒ 409). `vrm_agent_rendre` ne rend qu'avec SON jeton ;
+  une sonnette arrivée pendant le bail (`reveil`) n'est jamais perdue.
+  `vrm_agent_ecrire_commande` : version ET bail (FOR SHARE), sinon 0 ligne.
+  `vrm_agent_premiere_fois` : les clés `achat:`, `msg:`, `eval:`, `offre:` sont
+  GLOBALES (propriétaire neutre, quel que soit l'appelant) [S5], mémos ≥ 100 jours
+  [S25]. `vrm_agent_reserver` : `ceil(TTC × 1,15)`, jour de Paris, plafond NULL ⇒
+  refusé ; `vrm_agent_rendre_reservation` une seule fois. `vrm_agent_quota` :
+  confort 60 %, détection 80 %, obligations 100 %, 1 % par compte. Titulaires (un
+  compte eBay, un vendeur), index des annonces (jamais celle d'un autre), preuve
+  vue (heure jamais déplacée), horloge à `-infinity` [D14].
+- **Le journal** : une seule réécriture possible, `vrm_agent_anonymiser_journal`
+  (R19) — un déclencheur refuse toute autre modification, suppression ou
+  vidage, même au propriétaire de la table. ⚠️ Donc **« Fermer mon compte » devra
+  appeler `vrm_agent_effacer_vendeur(owner)`** (aucune suppression directe ne
+  passe) — à brancher dans `api/compte.js` par le premier chantier qui écrit dans
+  ces tables. La purge (`vrm_agent_purger`, par la 015) : vus 14 j, mémos à
+  échéance, journal 13 mois, commandes closes compactées à 90 j.
+- **La garde `ebay_tokens*`** sur `app_data` : un navigateur (`auth.role()` ou rôle
+  courant) ne peut ni créer, ni réécrire, ni effacer, ni renommer une ligne de
+  jeton eBay (`vrm_ebay_tokens_serveur`). Mesuré : seule la route serveur l'écrit (aucun
+  écrivain dans l'app ni l'extension ; en base, une ligne, celle du propriétaire).
+  ⚠️ Sur la base d'aujourd'hui, un vendeur connecté PEUT réécrire sa ligne
+  `ebay_tokens` (prouvé au banc sur l'avant).
+- **Preuves** : `scripts/audit-agent-sql.cjs` — la migration EXÉCUTÉE sur un
+  Postgres jetable qui imite la production (`postgres` NON superutilisateur,
+  droits par défaut, 005-007 appliquées telles quelles,
+  `scripts/agent-sql/supabase-min.sql`) : **134 contrôles** ; **44 rouges sur 50**
+  sur l'arbre d'avant (§6.1 ; les 6 verts y sont des contrôles d'ABSENCE, vacants
+  sans tables — les mutations « droits par défaut » et « fonctions ouvertes » les
+  prouvent) ; `--prouve` : **27/27 mutations** au rouge (les six de
+  la spec — `skip locked`, version, bail, groupe en vol, écriture du navigateur,
+  ligne d'horloge — plus verrou consultatif, bail dans `prendre`, deux par
+  vendeur, clic qui vole, rendre sans jeton, réveil perdu, clé par vendeur,
+  mémos à 14 j, sans marge, rendue deux fois, réservation sans verrou (50
+  simultanées : 11 sur 10), quota sans seuil, titulaire libre, index volé,
+  preuve déplacée, journal réécrit, garde des jetons retirée ou aveugle au
+  jeton, abonnement ignoré, droits par défaut, fonctions ouvertes).
+- **Application (session principale)** : `node scripts/agent-sql/essai-annule.cjs >
+  essai.sql` (44 Ko, ROLLBACK, ne laisse rien — vérifié), puis la migration, puis
+  `--verifier` (lecture seule : `ok` et chaque corps de fonction comparé au
+  fichier par md5). Si l'outil SQL refuse le bloc : `--morceaux --dossier=…`
+  (trois transactions dans l'ordre, chaque objet né fermé — vérifié).
+- **Non mesuré** : jamais appliquée sur sa vraie base ; que l'outil SQL accepte
+  44 Ko d'un bloc (la 013 à 92 Ko ne passait pas) ; la durée du verrou posé sur
+  `app_data` par les déclencheurs en production (`lock_timeout` 3 s).
+- **Julien** : rien.
+
 ### Leboncoin et eBay rangés comme Vinted : résumé, puis Ventes / Achats / Annonces (3 octobre)
 Demande du 2 octobre : « plus d'écran Aperçu intermédiaire ». Les deux onglets
 ouvrent sur **Ventes**, avec un résumé compact au-dessus (`PlatResume`, même forme
