@@ -11773,11 +11773,15 @@ function EbayAnnonces({ baseKO, comptes = [] }) {
     const masques = new Set((load('vinted_accounts_hidden', []) || []).map(String));
     return (Array.isArray(comptes) ? comptes : []).map((a) => String((a && a.vinted_user_id) || '')).filter((u) => /^\d+$/.test(u) && !masques.has(u));
   }, [comptes, nuage]);
-  const clePreuve = comptesPreuve.join(',');
+  // Les ventes de tous ses comptes (~190 Ko mesurés, la liste des commandes) ne
+  // sont lues pour « pas encore reliées » que s'il y a ici une annonce reliée
+  // (en ligne ou programmée) qu'une double vente pourrait toucher (§4.4).
+  const avecSku = (Array.isArray(items) && items.some((a) => a && numDeSkuEbay(a.sku))) || listeProgrammees.some((p) => p && numDeSkuEbay(p.sku));
+  const clePreuve = avecSku ? comptesPreuve.join(',') : '';
   React.useEffect(() => {
     if (!aVerifier) return;
     let stop = false;
-    lirePreuvesVenteVinted({ comptes: comptesPreuve }).then((p) => { if (!stop) { setVendusVinted(p ? p.vendus : null); setSansPreuve(p ? p.sansPreuve : null); } });
+    lirePreuvesVenteVinted({ comptes: avecSku ? comptesPreuve : null }).then((p) => { if (!stop) { setVendusVinted(p ? p.vendus : null); setSansPreuve(p ? p.sansPreuve : null); } });
     (async () => {
       try {
         const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=ventes:data->ventes`, { headers: sbAuth() });

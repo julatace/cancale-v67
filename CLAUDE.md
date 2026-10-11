@@ -6949,6 +6949,63 @@ qui arrivent pour de vrai (`orders_sold` 18, `inbox` 17, `profile` 12).
 - **Geste de Julien** : installer la **5.166** dans UN seul dossier, recharger
   ses onglets Vinted, puis passer une fois sur **tomj683** et **arthuror2**.
 
+### ⚠️⚠️ « VENDUE HIER, RELIÉE, NI RETIRÉE D'eBAY NI PROPOSÉE » — LA PREUVE DE VENTE MANQUAIT (11 octobre, 5.167)
+**Mesuré (lecture seule)** : la N°553 (tx 23052006117, angeled92) n'avait
+**aucune** ligne `harvest_*_txn_*` — elle n'arrive que quand la conversation
+est ouverte sur vinted.fr, geste que « Générer le bordereau » depuis l'app rend
+inutile. Son bordereau (21:55) portait pourtant l'annonce, lue dans la
+transaction puis **jetée**. Sur 18 ventes en cours, 6 seulement étaient
+prouvées ; la règle a tourné 36 fois sans rien voir. Le retrait automatique est
+**ALLUMÉ** dans sa base (il le croyait éteint).
+- **Une règle, deux côtés** (`<preuve-vente-regle>`, identique dans l'app et
+  l'extension, §11) : vente prouvée = transaction avec un état de commande qui ne
+  la fait pas revenir, **ou** bordereau `harvest_{uid}_label_{tx}` (méta `tx`,
+  `item` ; jamais `_latest`, méta contredite = doute) dont la vente est LUE dans
+  les ventes du **même** compte, ni annulée, ni retour, ni `failed`. ⚠️ Jamais
+  `item_closing_action: 'sold'` seul (mesuré : 10 « sold » n'ont que des
+  transactions revenues). Les ventes ne sont lues que s'il reste un bordereau à
+  juger ; toute lecture ratée ⇒ `null` / `echec` (« pas su »).
+- **Extension 5.167** : `recupererLabel` range la transaction qu'il lit
+  (`rangerTransaction`, forme de `capterDatesVersement`, **zéro** requête de plus,
+  une écriture par appel, jamais sous un autre numéro) ; `capterPreuvesVente`,
+  après la moisson, lit la transaction des ventes en cours sans preuve
+  (`gardeLecture` colis, file Vinted, 3 par visite, 6 h, compte du cookie,
+  pause) et entre dans la réserve des lectures prioritaires (13 au lieu de 10 :
+  `audit-budget-lectures` suit). `EXT_CAPACITES.preuves = '5.167.0'`.
+- **Écran eBay → Annonces** : « N ventes Vinted en cours pas encore reliées à
+  leur annonce » dit **une** fois, comptes nommés, le geste selon `extSait`
+  (absente · retard · ok), seulement s'il y a une annonce reliée ; il se relit
+  sur `maj preuves|label|ventes`. L'interrupteur dit **ALLUMÉ / ÉTEINT** en un
+  mot, ce qu'il fait en son nom, et « … » tant que le réglage n'est pas relu du
+  nuage (il affichait « éteint » sur un appareil neuf). Son choix n'est pas
+  touché.
+- ⚠️⚠️ **Le SKU passe par la numérotation — et un numéro PROVISOIRE n'est pas un
+  ancien** : la 553 fait partie des « 553+ » renumérotés par la 013 (`renum`).
+  `numeroExterne` (app, `api/_lib/numerotation.js`) et `numeroLbcLu` (extension)
+  lisaient « VRM-553 » d'une annonce listée au marqueur comme **B553** — qui ne
+  désigne rien — au lieu du nouveau numéro : plus aucune alerte, et la future
+  553 de la nouvelle série l'aurait fait retirer à tort. `renum` d'abord (chiffres
+  seulement), sinon la lettre d'archive.
+- **Preuves** : `audit-preuve-vente.cjs` (app + vrai `background.js`, même base
+  inventée) **54 contrôles, 23 rouges** sur ef03dc8, **20/20 mutations**
+  attrapées ; `audit-numerotation-lecteurs` +3 mutations `renum` (22/22) ; banc
+  `ebay-annonces.cjs` sert la vente par son **seul bordereau** (il servait une
+  ligne txn : vert sur le défaut, §6.3), plus vente annulée et paire revenue :
+  **23 rouges** sur le build d'ef03dc8, **16 rouges** sur un build réaffaibli
+  (preuve par bordereau retirée + interrupteur sans « pas lu »), 0 après. Ses
+  feuilles de confirmation attendent 20 s (en rendu logiciel à 1512 px, le voile
+  flouté rend Playwright lent à juger un bouton « stable » — déjà rouge à 1512 px
+  sur ef03dc8, ce n'était pas l'app). `BANC_PORT` choisit le port.
+- ⚠️ **Non mesuré** : le délai réel entre la vente et la moisson (la preuve
+  n'arrive qu'avec la visite suivante sur le bon compte) ; un LOT ne prouve que
+  son `item` (les `items` d'un lot ne sont pas dans `meta`) ; rien n'a été
+  envoyé à Vinted ni à eBay ; la 013 n'est pas appliquée (le `renum` réel est
+  inconnu). Aucune notification « vendue ailleurs » n'existe (le contrôle ne
+  tourne qu'app ouverte).
+- **Geste de Julien** : terminer l'annonce eBay de l'Autry dans le Seller Hub si
+  elle est encore en ligne ; décider s'il garde le retrait automatique ALLUMÉ ;
+  installer la 5.167.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
@@ -6975,6 +7032,7 @@ arrivée** — vérifiée commit par commit sur `manifest.json`, pas devinée.
 | `vestiaire` | `storeVcRecon` | **5.154.0** (4 oct.) | Vestiaire : « ouvre Vestiaire dans ce Chrome, l'extension apprend à le lire » |
 | `detourage` | `detourerPhotos` | **5.156.0** (4 oct.) | « tes photos sont détourées (fond blanc) avant d'être attachées à Leboncoin » |
 | `supprimees` | `noterSuppression` | **5.165.0** (11 oct.) | « une suppression faite sur vinted.fr dans ce Chrome sort d'ici tout de suite » |
+| `preuves` | `capterPreuvesVente` | **5.167.0** (11 oct.) | « l'extension lit toute seule la transaction des ventes en cours pas encore reliées (anti double vente) » |
 
 ⚠️ **DEUX SEUILS POUR UNE MÊME NOTION, EXPRÈS.** Les photos s'attachent côté
 Leboncoin depuis la 5.58 et côté eBay depuis la 5.59 : un seul seuil aurait
