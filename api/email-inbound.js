@@ -1672,7 +1672,7 @@ export async function traiterEmail(req, res) {
         extrait: (!montant || !qui) ? corpsTexte.replace(/\s+/g, ' ').slice(0, 300) : undefined,
         account: acc.login || '', uid: acc.uid || '', receivedAt: now,
       } }]); } catch (_) {}
-      await logEmail({ type: 'offre', subject, from: mail.from, montant, de: qui, article, net });
+      await logEmail({ type: 'offre', subject, from: mail.from, montant, de: qui, article, net, account: acc.login || '' });
       repondre(res, 200, { ok: true, type: 'offre', montant, de: qui, article, net });
       return;
     }
