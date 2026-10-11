@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.165.0';
+const CODE_VERSION = '5.166.0';
 const SUPABASE_URL = 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ';
 
@@ -542,7 +542,13 @@ async function supabaseUpsert(table, rows, onConflict) {
       const s2 = await renouvelerUneFois();
       if (s2 && s2.access_token) res = await envoyer();
     }
-    if (res.ok) return true;
+    if (res.ok) {
+      // La base a pris une ligne de CAPTURE : elle répond — le recul tombe
+      // (`effacerReculBase`). Jamais sur une ligne de diagnostic ou de réglage,
+      // qui peut passer quand les captures, elles, sont refusées.
+      if (table === 'app_data' && list.some((r) => r && RE_LIGNE_CAPTURE.test(String(r.id || '')))) await effacerReculBase();
+      return true;
+    }
     statut = String(res.status || 'inconnu');
   } catch (_) { statut = 'reseau'; }
   // ⚠️ JAMAIS `await` ici : `viderTampon` écrit lui-même par `supabaseUpsert`
@@ -891,18 +897,31 @@ function dressingCompletFaitFoi(parsed, opts) {
   if (pg.total_entries != null && pg.total_entries !== '' && isFinite(total)) return items.length >= total;
   return items.length > 0;
 }
+// ⚠️⚠️ REVUE DE LA 5.165 — « PAS SU » NE VAUT PAS « ON ÉCRIT » (§4.1, §4.2).
+//    La lecture du compteur ratée (522, réseau, une réponse qui n'est pas un
+//    tableau) rendait `true` : « on ne sait pas → on écrit ». Prouvé au banc
+//    (lecture KO, écriture OK — le cas qui détruit) : la page 1 du dressing,
+//    20 annonces sur 61, ÉCRASAIT la liste complète, et depuis la 5.165 avec un
+//    `capturedAt` rajeuni — la liste tronquée se présentait comme fraîche et
+//    complète. Trois états désormais : `true` on écrit · `false` plus pauvre ·
+//    `null` PAS SU (on n'écrit pas ; l'appelant le compte à part). On n'écrit
+//    sans comparer que sur une capture complète, ou quand la base dit qu'il n'y
+//    a pas encore de ligne (ou une ligne sans compteur).
 async function listePlusRiche(rowId, parsed, cle) {
   const n = ((parsed && parsed[cle]) || []).length;
   const total = Number(parsed && parsed.pagination && parsed.pagination.total_entries);
   if (isFinite(total) && total > 0 && n >= total) return true;   // capture complète : fait foi
+  const passu = () => { noterDiag('ignore_partiel_lecture_ratee'); return null; };
   try {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${rowId}&select=n:data->>nItems`, { headers: await sbHeaders() });
-    if (!r.ok) return true;                       // on ne sait pas → on écrit
+    if (!r.ok) return passu();                    // pas su : on n'écrase rien
     const j = await r.json();
+    if (!Array.isArray(j)) return passu();        // un 522 Cloudflare rend du HTML
+    if (!j.length) return true;                   // aucune ligne encore : on écrit
     const avant = Number(j[0] && j[0].n);
-    if (!isFinite(avant)) return true;            // ancienne ligne sans compteur → on écrit
+    if (j[0].n == null || !isFinite(avant)) return true;   // ancienne ligne sans compteur → on écrit
     return n >= avant;                            // jamais plus pauvre qu'avant
-  } catch (_) { return true; }
+  } catch (_) { return passu(); }
 }
 
 // ══ LA BOÎTE DE RÉCEPTION SE FUSIONNE, ELLE NE SE COMPTE PAS (5.162) ═══════
@@ -1170,9 +1189,10 @@ async function storeHarvest(domain, type, id, body) {
     const f = await inboxFusionnee(rowId, parsed);
     if (f === null) { noterDiag('inbox_lecture_ratee'); return; }   // pas su : on n'écrase rien
     parsed = f;
-  } else if (CLE_LISTE[type] && !(await listePlusRiche(rowId, parsed, CLE_LISTE[type]))) {
-    noterDiag(`ignore_partiel_${type}`);
-    return;
+  } else if (CLE_LISTE[type]) {
+    const riche = await listePlusRiche(rowId, parsed, CLE_LISTE[type]);
+    if (riche === null) return;                   // compteur illisible : pas su, on n'écrase rien (déjà noté)
+    if (!riche) { noterDiag(`ignore_partiel_${type}`); return; }
   }
   // ⚠️ MÊME PIÈGE QUE LE DRESSING, SUR LE PORTE-MONNAIE. Le motif « billing » de
   // `inject.js` attrape aussi des réponses de tarification : l'une d'elles
@@ -3359,7 +3379,11 @@ async function storeHarvestRow(uid, type, payload, domain, opts) {
     //    affichait un aperçu ».
     const completFaitFoi = type === 'listings' && dressingCompletFaitFoi(payload, opts);
     if (completFaitFoi) noterDiag('dressing_complet_range');
-    if (!completFaitFoi && !(await listePlusRiche(`harvest_${uid}_${type}`, payload, CLE_LISTE[type]))) {
+    const riche = completFaitFoi || await listePlusRiche(`harvest_${uid}_${type}`, payload, CLE_LISTE[type]);
+    // Compteur illisible : ce n'est pas « lu, plus pauvre » (qui vaut « rangé »
+    // pour la moisson), c'est la base qui n'a pas répondu — compté comme un échec.
+    if (riche === null) return 'lecture-ratee';
+    if (!riche) {
       noterDiag(`ignore_partiel_actif_${type}`);
       return 'plus-pauvre';
     }
@@ -3625,6 +3649,9 @@ async function pageActiveFetch() {
   //    annonces, et les annonces de A partaient sous B (prouvé au banc :
   //    48 annonces de A dans `harvest_B_listings`). Mieux vaut un blanc qu'un faux.
   if (String(uid) !== String(activeUid0)) { noterDiag('moisson_compte_change'); return 'abandon'; }
+  // Revue 5.165 : le profil que la page a rendu doit être celui qu'on a rangé
+  // pour CE compte (quand on le connaît) — sinon la page parlait pour un autre.
+  if (knownPid && out.who && out.who.user && out.who.user.id != null && String(out.who.user.id) !== String(knownPid)) { noterDiag('moisson_compte_change'); return 'abandon'; }
   // ⚠️⚠️ 5.165 — ON NE COMPTE QUE CE QUI EST RANGÉ. `stored = true` se posait
   //    AVANT de savoir ce que la base avait répondu : une moisson dont TOUTES les
   //    écritures étaient refusées (400, sans session, 9 octobre) se disait
@@ -3658,8 +3685,9 @@ async function pageActiveFetch() {
   if (estPorteMonnaie(out.wallet)) await range('billing', out.wallet);
   if (stored) { try { chrome.storage.local.set({ lastActiveFetch: Date.now(), activeUid: uid, via: 'page' }); } catch (_) {} }
   noterDiag(stored ? 'moisson_page_rangee' : (ratees ? 'moisson_page_ecriture_ratee' : 'moisson_page_vide'));
-  // Lu chez Vinted, refusé par la BASE : ni « rafraîchi », ni repli (§3).
-  if (!stored && ratees) return 'abandon';
+  // Lu chez Vinted, refusé par la BASE : ni « rafraîchi », ni repli (§3) — et
+  // `runActive` pose le recul (revue 5.165 : relire Vinted ne rangerait rien).
+  if (!stored && ratees) return 'base';
   return stored;
 }
 
@@ -3671,38 +3699,64 @@ async function activeFetchActiveAccount() {
     const domain = 'www.vinted.fr';
     const uid = await activeUidForDomain(domain);
     if (!uid) return false; // aucun compte connecte dans le navigateur
+    // ⚠️⚠️ REVUE DE LA 5.165 — CE REPLI N'AVAIT PAS LA GARDE DE LA PAGE. `uid`
+    //    était lu UNE fois au départ, puis tout partait avec le cookie du moment.
+    //    Or c'est justement le chemin qui tourne quand la page navigue — à chaque
+    //    suppression, à chaque bascule de compte. Prouvé au banc : il passe de A
+    //    à B en route ⇒ le profil, le dressing et les ventes de B rangés sous A ;
+    //    et, B venant d'être VIDÉ, son dressing complet et vide effaçait les
+    //    61 annonces de A (`dressingCompletFaitFoi`). Puis la garde passive,
+    //    trompée par le profil de B rangé sous A, refusait le dressing de A.
+    //    ⇒ Le compte du cookie est RELU avant chaque rangement ; au moindre
+    //      écart, rien de plus n'est rangé (`moisson_compte_change`). Et le profil
+    //      rendu doit être celui qu'on a rangé pour ce compte : connu et
+    //      différent ⇒ rien ; pas su (la base n'a pas répondu) ⇒ rien non plus.
+    const pidRange = await profilIdRange(uid);    // id · '' (jamais rangé) · null (pas su)
+    if (pidRange === null) { noterDiag('moisson_profil_pas_lu'); return 'base'; }
     const prof = await vintedGetCookie(domain, '/api/v2/users/current');
     if (!prof.ok || !prof.json) return false; // pas connecte / endpoint change (ou pause Vinted)
+    const profileId = prof.json.user && prof.json.user.id;
+    let change = false;
+    const memeCompte = async () => {
+      if (change) return false;
+      if (String((await activeUidForDomain(domain)) || '') === String(uid)) return true;
+      change = true; noterDiag('moisson_compte_change'); return false;
+    };
+    if (pidRange && profileId != null && String(profileId) !== pidRange) { noterDiag('moisson_compte_change'); return 'abandon'; }
+    if (!(await memeCompte())) return 'abandon';
     // 5.165 : comme `pageActiveFetch` — on ne compte que ce qui est RANGÉ.
-    let stored = false;
+    let stored = false, ratees = 0;
     const range = async (type, data, opts) => {
+      if (!(await memeCompte())) return 'abandon';
       const r = await storeHarvestRow(uid, type, data, domain, opts);
-      if (r === 'ecrit' || r === 'plus-pauvre' || r === 'hors-sujet') stored = true;
+      if (r === 'ecrit' || r === 'plus-pauvre' || r === 'hors-sujet') stored = true; else ratees++;
       return r;
     };
     const fin = () => {
       if (stored) { try { chrome.storage.local.set({ lastActiveFetch: Date.now(), activeUid: uid }); } catch (_) {} }
+      if (change) return 'abandon';
+      // Lu chez Vinted, TOUT refusé par la base : `runActive` pose le recul.
+      if (!stored && ratees) return 'base';
       return stored;
     };
     await range('profile', prof.json);
-    const profileId = prof.json.user && prof.json.user.id;
     await wait(1200);
-    if (profileId) {
+    if (profileId && !change) {
       const suivi = {};
       const w = await fetchAllWardrobe((path) => vintedGetCookie(domain, path), profileId, undefined, suivi);
       // Lu en entier par son propriétaire (5.165) : vide ou plus court fait foi.
       if (w && Array.isArray(w.items) && (w.items.length || suivi.complet)) await range('listings', w, suivi.complet ? { complet: true } : undefined);
       await wait(1200);
     }
-    if (await pauseVinted()) return fin();   // 5.162 : Vinted a freiné en route — on s'arrête là
+    if (change || await pauseVinted()) return fin();   // 5.162 : Vinted a freiné en route — on s'arrête là
     const sold = await fetchAllOrdersCookie(domain, 'sold');
     if (sold && sold.my_orders.length) await range('orders_sold', sold);
     await wait(1200);
-    if (await pauseVinted()) return fin();
+    if (change || await pauseVinted()) return fin();
     const bought = await fetchAllOrdersCookie(domain, 'purchased');
     if (bought && bought.my_orders.length) await range('orders_purchased', bought);
     await wait(1200);
-    if (await pauseVinted()) return fin();
+    if (change || await pauseVinted()) return fin();
     const inbox = await vintedGetCookie(domain, '/api/v2/inbox?page=1&per_page=30');
     if (inbox.ok && inbox.json) await range('inbox', inbox.json);
     return fin();
@@ -3727,14 +3781,23 @@ async function runActive() {
   //    propriétaire ne passe pas RLS). Vingt requêtes Vinted pour rien (§3 :
   //    aucune requête sans raison), et une garde de 5 min consommée.
   if (await sansSessionPourEcrire()) { noterDiag('moisson_sans_session'); return false; }
+  // Revue 5.165 : NOTRE base refuse tout depuis peu (panne, RLS) — rien ne part
+  // chez Vinted pour une lecture qu'on ne pourrait pas ranger. Ici, et pas
+  // seulement dans la visite : l'alarme des 20 min et le changement de cookie
+  // appellent `runActive` sans la garde de la visite.
+  if (await reculBase()) { noterDiag('moisson_base_en_recul'); return 'recul'; }
   const p = await pageActiveFetch();
   if (p === true) return true;
-  // La BASE a tout refusé (ou le compte a changé en route) : refaire la même
-  // moisson par le service worker ne rangerait rien de plus — pas de repli.
+  // La BASE a tout refusé : refaire la même moisson par le service worker ne
+  // rangerait rien de plus — pas de repli, et le recul est posé.
+  if (p === 'base') { await poserReculBase(); return 'base'; }
+  // Le compte a changé en route : rien rangé, pas de repli.
   if (p === 'abandon') return false;
   if (await pauseVinted()) return false;
   // (5.165 : plus de `activeFetchAll` — jamais tous les comptes d'un coup, §3.)
-  return (await activeFetchActiveAccount()) === true;
+  const c = await activeFetchActiveAccount();
+  if (c === 'base') { await poserReculBase(); return 'base'; }
+  return c === true;
 }
 // ⚠️ 5.165 — base cloisonnée et AUCUNE session VRM utilisable : toute écriture
 //    serait refusée. Même règle que `withOwner` (un `owner` n'est posé que si la
@@ -3745,6 +3808,65 @@ async function sansSessionPourEcrire() {
     const s = await authToken();
     return !(s && s.access_token && s.user_id);
   } catch (_) { return true; }
+}
+// ══ NOTRE BASE REFUSE TOUT : ON NE RELIT PAS VINTED POUR RIEN (revue 5.165) ═══
+// Mesuré au banc (le vrai background.js, horloge pilotée) : la garde des 5 min
+// était RENDUE à 60 s sur CHAQUE échec — y compris quand c'est NOTRE base qui
+// refuse toutes les écritures (RLS 403/42501, abonnement coupé) ou qui ne
+// répond plus (522, du 9 au 12 septembre). La moisson complète (profil,
+// dressing, ventes, achats, boîte, porte-monnaie) repartait chez Vinted à
+// chaque minute de navigation : 30 moissons en 30 min (6 avant la 5.165),
+// toutes jetées. Le code le disait pourtant : « lu chez Vinted, refusé par la
+// BASE : ni rafraîchi, ni repli (§3) ».
+// ⇒ Une moisson (ou les ventes) dont TOUTES les écritures sont refusées pose un
+//   RECUL rangé dans `chrome.storage.local` (§4.9) : 1 min, puis 5, 10, 20, 40,
+//   60. Pendant le recul, rien ne part chez Vinted pour une lecture qu'on ne
+//   pourrait pas ranger. Il tombe dès qu'une ligne de CAPTURE est écrite (la
+//   capture passive continue d'essayer : c'est elle qui dit que la base est
+//   revenue) — jamais sur une ligne de diagnostic, qui peut passer quand les
+//   captures sont refusées.
+// ⚠️ Le premier palier (1 min) garde le simple hoquet : la page suivante, une
+//    minute plus tard, range (`audit-moisson-dressing` §2).
+const RECUL_BASE = 'vrmReculBase';                 // { jusqua, niveau, depuis }
+const RECUL_BASE_PALIERS_MIN = [1, 5, 10, 20, 40, 60];
+const RECUL_BASE_OUBLI_MS = 6 * 3600000;            // au-delà, on repart du premier palier
+const RE_LIGNE_CAPTURE = /^harvest_[^_]+_(profile|listings|orders_sold|orders_purchased|inbox|billing)$/;
+async function reculBase() {
+  try {
+    const r = (await chrome.storage.local.get(RECUL_BASE))[RECUL_BASE];
+    const reste = Number((r && r.jusqua) || 0) - Date.now();
+    return reste > 0 ? Object.assign({}, r, { resteMs: reste }) : null;
+  } catch (_) { return null; }
+}
+// Économie d'écritures seulement : la vérité vit dans le stockage (§4.9).
+let _reculPeutExister;
+let _reculChaine = Promise.resolve();
+function poserReculBase() {
+  _reculChaine = _reculChaine.then(async () => {
+    const t = Date.now();
+    let cur = {};
+    try { cur = (await chrome.storage.local.get(RECUL_BASE))[RECUL_BASE] || {}; } catch (_) {}
+    if (Number(cur.jusqua || 0) > t) return;          // déjà en recul : rien ne monte
+    const recent = cur.jusqua && (t - Number(cur.jusqua)) < RECUL_BASE_OUBLI_MS;
+    const niveau = recent ? Math.min(Number(cur.niveau || 0) + 1, RECUL_BASE_PALIERS_MIN.length) : 1;
+    const minutes = RECUL_BASE_PALIERS_MIN[niveau - 1];
+    _reculPeutExister = true;
+    try { await chrome.storage.local.set({ [RECUL_BASE]: { jusqua: t + minutes * 60000, niveau, depuis: Number(cur.depuis) && recent ? Number(cur.depuis) : t } }); } catch (_) {}
+    noterDiag(`moisson_base_recul_${niveau}`);
+    logActivity(`⏸ Ta base VRM n'a rien pris — Vinted n'est pas relu avant ${minutes} min`);
+  }).catch(() => {});
+  return _reculChaine;
+}
+function effacerReculBase() {
+  if (_reculPeutExister === false) return Promise.resolve();
+  _reculChaine = _reculChaine.then(async () => {
+    try {
+      const cur = (await chrome.storage.local.get(RECUL_BASE))[RECUL_BASE];
+      if (cur) { await chrome.storage.local.remove(RECUL_BASE); noterDiag('moisson_base_revenue'); }
+      _reculPeutExister = false;
+    } catch (_) {}
+  }).catch(() => {});
+  return _reculChaine;
 }
 function fullSync() { captureAllAccounts().then(() => runActive()); }
 
@@ -3865,7 +3987,7 @@ async function rafraichirVentes(uid) {
   if (!sold.my_orders.length) return { ok: true, ecrit: false, raison: 'aucune' };
   const issue = await storeHarvestRow(uid, 'orders_sold', sold, acc.domain || 'www.vinted.fr');
   if (issue === 'plus-pauvre') return { ok: true, ecrit: false, raison: 'plus-pauvre' };
-  if (issue !== 'ecrit') return { ok: false, ecrit: false, raison: 'ecriture' };
+  if (issue !== 'ecrit') { await poserReculBase(); return { ok: false, ecrit: false, raison: 'ecriture' }; }
   // ⚠️ On vient d'écrire des ventes FRAÎCHES : tout ce que le mémo de visite
   // garde sur ce compte est périmé à la milliseconde près. On le vide.
   viderMemoVisite(uid);
@@ -3922,15 +4044,40 @@ async function rafraichirVentesGarde(uid, marque) {
 //    `VISITE_REESSAI_MS` (60 s), jamais en rafale ; on ne relâche que SA marque ;
 //    et pendant une pause demandée par Vinted, la garde reste ENTIÈRE.
 const VISITE_REESSAI_MS = 60 * 1000;
-async function rendreGardeVisite(uid, marque) {
+async function rendreGardeVisite(uid, marque, reessaiMs = VISITE_REESSAI_MS) {
   try {
     if (await pauseVinted()) return;
     const st = (await chrome.storage.local.get('vrmDerniereVisite')).vrmDerniereVisite || {};
     if (Number(st[uid]) !== Number(marque)) return;
-    st[uid] = Date.now() - VISITE_DELAI_MS + VISITE_REESSAI_MS;
+    st[uid] = Date.now() - VISITE_DELAI_MS + reessaiMs;
     await chrome.storage.local.set({ vrmDerniereVisite: st });
     noterDiag('visite_garde_rendue');
   } catch (_) {}
+}
+// ⚠️⚠️ REVUE DE LA 5.165 — RENDUE UNE FOIS, PAS À CHAQUE ÉCHEC. La garde
+//    repartait à 60 s sur n'importe quel échec, sans les compter : un échec qui
+//    DURE (session Vinted cassée, base qui refuse) faisait une moisson complète
+//    par minute de navigation — 5× plus qu'avant la 5.165, et pour rien.
+//    · `true`            : rangé — le compteur repart de zéro ;
+//    · `base` / `recul`  : c'est NOTRE base — le recul (`reculBase`) décide
+//      quand réessayer, la garde de la visite ne l'allonge pas ;
+//    · autre échec       : le PREMIER rend la garde (nouvel essai à 60 s : une
+//      page qui naviguait), les suivants gardent les 5 min entières.
+//    Les échecs consécutifs vivent dans `chrome.storage.local` (§4.9).
+const ECHECS_VISITE = 'vrmVisiteEchecs';            // { [uid]: n }
+async function issueVisite(uid, marque, r) {
+  let ech = {};
+  try { ech = (await chrome.storage.local.get(ECHECS_VISITE))[ECHECS_VISITE] || {}; } catch (_) {}
+  const avant = Number(ech[uid] || 0);
+  if (r === true) {
+    if (avant) { delete ech[uid]; try { await chrome.storage.local.set({ [ECHECS_VISITE]: ech }); } catch (_) {} }
+    return;
+  }
+  if (r === 'base' || r === 'recul') { await rendreGardeVisite(uid, marque, 0); return; }
+  ech[uid] = avant + 1;
+  try { await chrome.storage.local.set({ [ECHECS_VISITE]: ech }); } catch (_) {}
+  if (avant === 0) await rendreGardeVisite(uid, marque);
+  else noterDiag('visite_echec_repete');
 }
 async function visiteVinted() {
   try {
@@ -3958,7 +4105,9 @@ async function visiteVinted() {
     // alors que la vente ne demande QU'UNE requête (`my_orders?type=sold`).
     // Ce bloc ne coûte rien de plus : ce sont les mêmes appels, simplement
     // placés avant le lourd. Rien à voir avec un « rythme humain » (§32).
-    const marqueVentes = await prendreGardeVentes(uid);
+    // (Revue 5.165 : pendant un recul de NOTRE base, les ventes non plus ne sont
+    //  pas relues — elles ne pourraient pas être rangées.)
+    const marqueVentes = (await reculBase()) ? null : await prendreGardeVentes(uid);
     if (marqueVentes !== null) await rafraichirVentesGarde(uid, marqueVentes);
     // ⚠️ LA VISITE GÉNÈRE, TOUTE SEULE (Julien, 27 août puis 3 septembre :
     // « que ça envoie direct dans l'app sans me demander »). Cohérent avec
@@ -3980,16 +4129,22 @@ async function visiteVinted() {
     // Le garde de 5 min ne protège plus que la moisson COMPLÈTE — c'est elle
     // qui est lourde, et refaire dix fois la même en naviguant de page en page
     // n'apporte rien (§5.19).
+    // Revue 5.165 : NOTRE base refuse tout depuis peu — ni moisson, ni lecteurs
+    // (ils liraient Vinted pour rien) ; la garde n'est pas consommée.
+    if (await reculBase()) { noterDiag('visite_base_en_recul'); return; }
     const st = (await chrome.storage.local.get('vrmDerniereVisite')).vrmDerniereVisite || {};
     if (Date.now() - Number(st[uid] || 0) < VISITE_DELAI_MS) return;
     const marqueVisite = Date.now();
     st[uid] = marqueVisite;
     await chrome.storage.local.set({ vrmDerniereVisite: st });
-    const ok = await runActive();
-    // ⚠️ 5.165 : une moisson qui n'a RIEN rangé rend sa garde (nouvel essai
-    //    dans 60 s, jamais en rafale — `rendreGardeVisite`).
-    if (!ok) await rendreGardeVisite(uid, marqueVisite);
-    logActivity(ok ? '🔄 Données rafraîchies en arrivant sur Vinted' : '🔄 Rien n\'a pu être rangé — nouvel essai à la page suivante');
+    const r = await runActive();
+    const ok = r === true;
+    // ⚠️ 5.165 : une moisson qui n'a RIEN rangé rend sa garde — UNE fois pour un
+    //    échec passager, jamais pour un refus de notre base (`issueVisite`).
+    await issueVisite(uid, marqueVisite, r);
+    logActivity(ok ? '🔄 Données rafraîchies en arrivant sur Vinted'
+      : (r === 'base' || r === 'recul') ? '🔄 Ta base VRM n\'a rien pris — Vinted ne sera relu qu\'après une pause'
+      : '🔄 Rien n\'a pu être rangé — nouvel essai plus tard');
     // ⚠️ APRÈS la moisson elle aussi : la liste des colis « déposés en point
     // relais » vient des achats qu'on vient de capter. Sans ça, on lirait la
     // photo d'hier et on redemanderait des conversations pour rien.
