@@ -366,13 +366,41 @@ global.fetch = async (url, opts = {}) => {
     if (/select=owner&limit=1/.test(q)) return NON_CLOISONNEE ? rep({ message: 'column app_data.owner does not exist' }, 400) : rep([]);
     if (m !== 'GET') {
       let rows = []; try { rows = [].concat(JSON.parse(opts.body || '[]')); } catch (_) {}
+      // Un PATCH porte `{data}` sans identifiant (il est dans l'adresse) : on le
+      // journalise sous la forme d'une écriture `[{id, owner, data}]`, pour que
+      // les contrôles qui cherchent « ce qui a été écrit dans ebay_offres »
+      // lisent la même chose quelle que soit la forme (POST ou PATCH).
+      if (m === 'PATCH') {
+        const pid0 = (/[?&]id=eq\.([^&]*)/.exec(q) || [])[1], pown0 = (/[?&]owner=eq\.([^&]*)/.exec(q) || [])[1];
+        rows = rows.map((r) => ({ id: pid0, ...(pown0 ? { owner: pown0 } : {}), ...r }));
+      }
       // (9 octobre) Une ÉCRITURE de `ebay_offres*` qui échoue (toujours, ou
       // après la première) : la base debout par ailleurs.
-      if (rows.some((r) => /^ebay_offres/.test(String(r.id || '')))) {
+      if (rows.some((r) => /^ebay_offres/.test(String(r.id || ''))) || /[?&]id=eq\.ebay_offres/.test(q)) {
         ecrituresOffres++;
-        if (mode.offresEcritureKo || (mode.offresEcritureKoApres && ecrituresOffres > 1)) { journal.push({ ou: 'base-ko', m, u: q, corps: String(opts.body || ''), seq: ++seq }); return rep({ message: 'boom' }, 500); }
+        if (mode.offresEcritureKo || (mode.offresEcritureKoApres && ecrituresOffres > 1)) { journal.push({ ou: 'base-ko', m, u: q, corps: m === 'PATCH' ? JSON.stringify(rows) : String(opts.body || ''), seq: ++seq }); return rep({ message: 'boom' }, 500); }
       }
-      journal.push({ ou: 'base', m, u: q, corps: String(opts.body || ''), seq: ++seq });
+      journal.push({ ou: 'base', m, u: q, corps: m === 'PATCH' ? JSON.stringify(rows) : String(opts.body || ''), seq: ++seq });
+      // (11 octobre) LES DEUX FORMES DU COMPARER-ET-ÉCHANGER (§6.3 : servir la
+      // forme que le code envoie). PATCH filtré (id, owner, `data->>rev`) : ne
+      // touche que la ligne dont la version est celle LUE, rend les lignes
+      // modifiées. POST SANS `on_conflict` : insertion seule, 409 si la ligne
+      // existe déjà (la vraie base répond 23505).
+      if (m === 'PATCH') {
+        const pid = (/[?&]id=eq\.([^&]*)/.exec(q) || [])[1];
+        const pown = (/[?&]owner=eq\.([^&]*)/.exec(q) || [])[1];
+        const revEq = (/[?&]data->>rev=eq\.([^&]*)/.exec(q) || [])[1];
+        const revNul = /[?&]data->>rev=is\.null/.test(q);
+        const corps = { data: rows[0] && rows[0].data };
+        const touche = lignes.filter((x) => x.id === pid && (!pown || x.owner === pown)
+          && (revNul ? (x.data == null || x.data.rev == null) : (revEq === undefined || (x.data && x.data.rev != null && String(x.data.rev) === revEq))));
+        for (const x of touche) Object.assign(x, corps);
+        return rep(touche.map((x) => ({ id: x.id })));
+      }
+      if (m === 'POST' && !/on_conflict=/.test(q)) {
+        const doublon = rows.some((r) => lignes.some((x) => x.id === r.id && (NON_CLOISONNEE || x.owner === r.owner)));
+        if (doublon) return rep({ code: '23505', message: 'duplicate key value violates unique constraint' }, 409);
+      }
       for (const r of rows) {
         const cle = NON_CLOISONNEE ? (x) => x.id === r.id : (x) => x.id === r.id && x.owner === r.owner;
         const i = lignes.findIndex(cle);
@@ -1756,6 +1784,71 @@ const RA = {};
     avecR(); regleR2();
     const o9 = await app(JWT_J, { action: 'revise', itemId: '110000000302', quantity: '2' });
     dit(o9.code === 200 && !auCompte(o9.journal).some((x) => x.appel === 'GetItem') && !o9.journal.some((x) => x.ou === 'base' && /ebay_offres/.test(x.corps)), '[R-prix-change] le stock seul ⇒ aucun GetItem, rien n\'est écrit dans ebay_offres');
+  });
+  // ── [R-concurrence] (11 octobre, revue) DEUX GESTES SUR DEUX CARTES DU MÊME
+  // COMPTE qui se croisent. `rangerReglesOffre` lisait la ligne, fusionnait et
+  // la réécrivait ENTIÈRE : le second écrit remettait la copie périmée de
+  // l'autre annonce — la base disait « aucune » sur une annonce qu'eBay vendait
+  // dès 72 €, les deux réponses disant « rangé ». Latences simulées (eBay
+  // 150 ms, base 120 ms sur `ebay_offres`) pour que les requêtes se
+  // chevauchent comme en vrai ; on juge la BASE contre ce qu'eBay tient.
+  await essaie('[R-concurrence]', async () => {
+    const f0 = global.fetch, relecture0 = process.env.EBAY_RELECTURE_MS;
+    global.fetch = async (url, opts = {}) => {
+      const q = decodeURIComponent(String(url));
+      if (/app_data/.test(q) && /ebay_offres/.test(q + String(opts.body || ''))) await new Promise((r) => setTimeout(r, 120));
+      if (/ebay\.com\/ws/.test(q)) await new Promise((r) => setTimeout(r, 150));
+      return f0(url, opts);
+    };
+    process.env.EBAY_RELECTURE_MS = '20';
+    const ecartBase = (id) => {
+      const e = (offresDe(J) || {})[id], r = RA_(id).regle, eb = r && r.accepte != null ? Number(r.accepte) : null;
+      return (e && e.lu === true && (e.accepte == null ? null : Number(e.accepte)) === eb) ? '' : `${id} eBay ${eb == null ? 'aucune' : 'dès ' + eb} · base ${e ? JSON.stringify({ lu: e.lu, accepte: e.accepte, raison: e.raison }) : 'absente'}`;
+    };
+    try {
+      const t0 = Date.now() - 60000;
+      const ligne = (r2) => ({ owner: J, id: 'ebay_offres', data: { items: {
+        '110000000301': { lu: true, offresActives: false, accepte: null, refuse: null, devise: 'EUR', prix: 80, lueA: t0, par: 'sync' },
+        '110000000302': r2 } } });
+      const fautes = [], reponses = [];
+      for (const ecart of [0, 50, 100, 200]) {
+        avecR(); lignes.push(ligne({ lu: true, offresActives: true, accepte: 70, refuse: 50, devise: 'EUR', prix: 90, lueA: t0, par: 'sync' }));
+        const [a, b] = await Promise.all([
+          app(JWT_J, POSE('110000000301', 72, 80, NUL)),
+          new Promise((r) => setTimeout(r, ecart)).then(() => app(JWT_J, { action: 'regleoffre', itemId: '110000000302', accepte: null, refuse: null, confirme: true })),
+        ]);
+        reponses.push(`${a.code}/${b.code} range ${a.corps.range}/${b.corps.range}`);
+        for (const id of ['110000000301', '110000000302']) { const f = ecartBase(id); if (f) fautes.push(`pose+retrait à ${ecart} ms : ${f}`); }
+      }
+      dit(fautes.length === 0, '[R-concurrence] « poser » sur une carte et « retirer » sur une autre du même compte, à 0-200 ms : la base garde LES DEUX (ce qu\'eBay tient)', fautes.join(' ; ') || reponses.join(' · '));
+      const fautes2 = [];
+      for (const ecart of [0, 100, 250, 400]) {
+        avecR(); RA_('110000000302').regle = { actives: false, accepte: null, refuse: null, offresFaites: null };
+        lignes.push(ligne({ lu: true, offresActives: false, accepte: null, refuse: null, devise: 'EUR', prix: 90, lueA: t0, par: 'sync' }));
+        await Promise.all([
+          app(JWT_J, POSE('110000000301', 72, 80, NUL)),
+          new Promise((r) => setTimeout(r, ecart)).then(() => app(JWT_J, POSE('110000000302', 80, 90, NUL))),
+        ]);
+        for (const id of ['110000000301', '110000000302']) { const f = ecartBase(id); if (f) fautes2.push(`deux poses à ${ecart} ms : ${f}`); }
+      }
+      dit(fautes2.length === 0, '[R-concurrence] deux poses sur deux cartes du même compte, à 0-400 ms : aucune n\'efface l\'autre, ni ne laisse un « en cours » périmé', fautes2.join(' ; '));
+      // La ligne n'existe pas encore (premier geste du compte) : deux créations
+      // concurrentes — l'une crée, l'autre reçoit 409, relit et fusionne.
+      const fautes3 = [];
+      for (const ecart of [0, 60]) {
+        avecR(); RA_('110000000302').regle = { actives: false, accepte: null, refuse: null, offresFaites: null };
+        await Promise.all([
+          app(JWT_J, POSE('110000000301', 72, 80, 'inconnu')),
+          new Promise((r) => setTimeout(r, ecart)).then(() => app(JWT_J, POSE('110000000302', 80, 90, 'inconnu'))),
+        ]);
+        for (const id of ['110000000301', '110000000302']) { const f = ecartBase(id); if (f) fautes3.push(`ligne absente, deux poses à ${ecart} ms : ${f}`); }
+        if (lignes.filter((x) => x.owner === J && x.id === 'ebay_offres').length !== 1) fautes3.push(`ligne absente : ${lignes.filter((x) => x.owner === J && x.id === 'ebay_offres').length} lignes ebay_offres`);
+      }
+      dit(fautes3.length === 0, '[R-concurrence] la ligne n\'existe pas encore : deux premières poses concurrentes donnent UNE ligne qui porte les deux', fautes3.join(' ; '));
+    } finally {
+      global.fetch = f0;
+      if (relecture0 === undefined) delete process.env.EBAY_RELECTURE_MS; else process.env.EBAY_RELECTURE_MS = relecture0;
+    }
   });
   const BLOC66 = '<BestOfferDetails><BestOfferEnabled>true</BestOfferEnabled></BestOfferDetails><ListingDetails><BestOfferAutoAcceptPrice currencyID="EUR">66.00</BestOfferAutoAcceptPrice></ListingDetails>';
   const itemC = { title: 'Nike Air Max 1 bleu taille 44', categoryId: '15709', price: '74', conditionId: '3000', photos: ['https://img.test/1.jpg'], aspects: { Marque: 'Nike' }, ebayGere: true };

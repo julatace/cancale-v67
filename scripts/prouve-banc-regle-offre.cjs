@@ -12,7 +12,7 @@
 //  dépôt). Il doit sortir ≠ 0, avec un rouge dans chacun des blocs nommés.
 //  `--avant dossier` : le même banc sur le build de la base d'avant (aucune
 //  règle d'offre) doit sortir ROUGE lui aussi.
-//  Le banc écoute le port 4761 : lancer ce script SEUL.
+//  Le banc écoute le port 4761 (ou $PORT) : lancer ce script SEUL.
 // ════════════════════════════════════════════════════════════════════════════
 const fs = require('fs');
 const path = require('path');
@@ -59,6 +59,30 @@ const MUTATIONS = [
   ], [5, 11]],
   // la fenêtre « Vinted → eBay » cachée quand le retrait automatique est allumé.
   ['fenetre-masquee', [["      <div data-regles-fenetre style={{ marginTop: 6, color: E.muted, fontSize: 12 }}>", "      <div {...(retraitAuto ? { hidden: true } : { 'data-regles-fenetre': '' })} style={{ marginTop: 6, color: E.muted, fontSize: 12 }}>"]], [2]],
+  // ── Revue du 11 octobre ──
+  // la relecture qui montre le seuil (offres pas montrées) redevient « pas relu ».
+  ['relu-non-relu', [["  if (j && j.ok && lecture) return { issue: 'offres-inconnues', lecture, nonNote, avertissements: j.avertissements || [], erreurs: j.erreurs || [] };\n", '']], [8]],
+  // un prix tapé illisible repasse pour « inchangé ».
+  ['prix-illisible', [['    if (prixIllisible) {', '    if (false) {']], [11]],
+  // l'issue d'un lot reste sous une ligne qui propose un autre montant.
+  ['issue-montant', [['    const r = r0 && l.seuil != null && cents(r0.seuilEnvoye) === cents(l.seuil) ? r0 : null;', '    const r = r0;']], [14]],
+  // l'aperçu calcule sur le prix de la liste, pas celui que la carte affiche.
+  ['apercu-prix', [['    const p0 = prixDe ? prixDe(it) : it.price;', '    const p0 = it.price;']], [14]],
+  // deux seuils pour « lue il y a plus de 7 jours ».
+  ['age-seuils', [['  const vieillesRegles = connues.filter((it) => regleVieille(etatVue(it))).length;', '  const vieillesRegles = connues.filter((it) => Date.now() - (Number(etatVue(it).lueA) || 0) > 7 * 86400000).length;']], [14]],
+  // la porte n'est plus grisée pendant un lot : SEUL le contrôle de la porte
+  // doit rougir — fermer le panneau pour de vrai ne doit RIEN casser d'autre
+  // (la réponse en vol s'applique, les cartes sont rendues, l'arrêt est dit).
+  ['porte-lot', [['  const porteGrisee = regles === undefined || lotEnCours;', '  const porteGrisee = regles === undefined;']], [14],
+    { exiges: [/porte « Fermer « Une règle pour toutes » » est grisée/], interdits: [/ne dit jamais « aucune »/, /ne restent pas grisées/, /est DIT tout de suite/] }],
+  // …et si, en plus, le démontage jette la réponse en vol, ne rend pas les
+  // cartes et ne prévient pas l'écran : les trois conséquences rougissent.
+  ['porte-et-demontage', [
+    ['  const porteGrisee = regles === undefined || lotEnCours;', '  const porteGrisee = regles === undefined;'],
+    ['      const loc = localApresRegle(r0);\n      if (onRegle && (loc.entree !== undefined || loc.prix !== undefined)) onRegle(x.cle, loc.entree, loc.prix);\n      if (!vivant.current) break;\n', '      if (!vivant.current) break;\n      const loc = localApresRegle(r0);\n      if (onRegle && (loc.entree !== undefined || loc.prix !== undefined)) onRegle(x.cle, loc.entree, loc.prix);\n'],
+    ['      if (onLot) onLot([]);\n      if (onFini) await onFini();\n      return;\n', '      return;\n'],
+    ['        if (n > 0 && rappels.current.onInterrompu) rappels.current.onInterrompu({ n, at: Date.now() });\n', ''],
+  ], [14], { exiges: [/ne dit jamais « aucune »/, /ne restent pas grisées/, /est DIT tout de suite/] }],
 ];
 
 function copier(dest) {
@@ -84,7 +108,7 @@ function appliquer(dest, rempl) {
 const construire = (dest) => cp.spawnSync(process.execPath, [VITE, 'build', '--logLevel', 'error'], { cwd: dest, encoding: 'utf8', timeout: 600000, maxBuffer: 64 * 1024 * 1024 });
 const banc = (dest, args) => cp.spawnSync(process.execPath, [path.join(dest, 'scripts', 'bancs', 'ebay-regle-offre.cjs'), ...args], { cwd: dest, encoding: 'utf8', timeout: 900000, maxBuffer: 64 * 1024 * 1024 });
 
-for (const [nom, rempl, blocs] of MUTATIONS) {
+for (const [nom, rempl, blocs, precis] of MUTATIONS) {
   if (SEULE && SEULE !== nom) continue;
   const dest = path.join(os.tmpdir(), 'mut-banc-' + nom);
   copier(dest);
@@ -97,6 +121,13 @@ for (const [nom, rempl, blocs] of MUTATIONS) {
   const rouges = blocs.map((n) => [n, (s.match(new RegExp('^KO  \\[' + n + '\\]', 'gm')) || []).length]);
   const premier = (s.match(/^KO  .*$/m) || [''])[0].slice(4, 150);
   dit(r.status !== 0 && rouges.every(([, k]) => k > 0), `mutation « ${nom} » : le banc passe au ROUGE`, `sortie ${r.status} · ${rouges.map(([n, k]) => `[${n}] ×${k}`).join(', ')} · ${premier}`);
+  // Ce qui DOIT rougir, et ce qui doit rester vert (on prouve un contrôle
+  // précis, pas « le bloc tombe »).
+  if (precis) {
+    const kos = (s.match(/^KO  .*$/gm) || []);
+    for (const re of precis.exiges || []) dit(kos.some((l) => re.test(l)), `mutation « ${nom} » : ROUGE sur ${re.source.slice(0, 60)}`);
+    for (const re of precis.interdits || []) dit(!kos.some((l) => re.test(l)), `mutation « ${nom} » : reste VERT sur ${re.source.slice(0, 60)}`, kos.filter((l) => re.test(l)).join(' | ').slice(0, 200));
+  }
   fs.rmSync(dest, { recursive: true, force: true });
 }
 

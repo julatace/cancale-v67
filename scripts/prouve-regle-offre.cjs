@@ -33,6 +33,7 @@ const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '✅ ' : '�
 
 // Les mutations : [nom, fichier, ancre, remplacement, contrôles qui doivent rougir]
 const API = 'api/ebay.js';
+const LIB = 'api/_lib/ebay.js';
 const MUTATIONS = [
   ['seuil-prix', API, "  if (!v2.ok) return { status: 409, body: { ok: false, reason: v2.code, prix: pre.annonce.prix, error: v2.err } };", '', ['R-prix']],
   ['confirme', API, "  if (b.confirme !== true) return { status: 400, body: { ok: false, reason: 'confirmation', error: 'Confirme la règle d\\'offre", "  if (false) return { status: 400, body: { ok: false, reason: 'confirmation', error: 'Confirme la règle d\\'offre", ['R-conf']],
@@ -55,7 +56,13 @@ const MUTATIONS = [
   ['refus-non-renvoye', API, '    const yRefus = refuse != null ? refuse : (refuse === undefined && P.refuse != null ? P.refuse : null);', '    const yRefus = refuse != null ? refuse : null;', ['R-garde-refus']],
   ['ordre-luea', API, '    if (!_force && avant && (Number(avant.lueA) || 0) > (Number(v.lueA) || 0)) continue;\n', '', ['R-ordre']],
   ['compte', API, '  if (!L.actives.some((x) => x.itemId === itemId)) {\n    if (L.complet) return { status: 409, body: { ok: false, reason: \'pas-sur-ce-compte\'', '  if (false) {\n    if (L.complet) return { status: 409, body: { ok: false, reason: \'pas-sur-ce-compte\'', ['R-compte']],
-  ['rangement', API, "  const d = await lireDonnee(id, ctx.owner);\n  if (d === undefined) return null;\n  const items = { ...((d && d.items", "  const d0 = await lireDonnee(id, ctx.owner); const d = d0 === undefined ? {} : d0;\n  const items = { ...((d && d.items", ['R-marque']],
+  // La lecture de la ligne ratée ⇒ on n'écrit RIEN (repartir de vide effacerait
+  // les autres annonces). Depuis le 11 octobre, cette lecture vit dans
+  // `modifierDonnee` (compare-et-échange) : c'est là qu'on la réaffaiblit.
+  ['rangement', LIB, "      if (!r.ok) return null;\n      rows = await r.json();\n    } catch (_) { return null; }\n    if (!Array.isArray(rows)) return null;\n    const present", "      rows = r.ok ? await r.json() : [{ data: {} }];\n    } catch (_) { return null; }\n    if (!Array.isArray(rows)) return null;\n    const present", ['R-marque']],
+  // (11 octobre) L'écriture SANS comparer la version (l'upsert d'avant) : deux
+  // gestes sur deux cartes du même compte s'effacent.
+  ['sans-cas', LIB, "      const w = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}${p.filtre}&${cond}&select=id`, {", "      const w = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}${p.filtre}&select=id`, {", ['R-concurrence']],
   ['relu-aucune', API, ": { lu: false, raison: raisonKo, lueA: Date.now(), par: 'regle', _force: true } });", ": { lu: true, offresActives: null, accepte: null, refuse: null, lueA: Date.now(), par: 'regle', _force: true } });", ['R-relu-ko']],
   ['tombee-pas-su', API, '      tombee: aRegle ? (post.ok ? post.lecture.accepte == null : null) : ((avant && avant.lu === true) ? false : null),', '      tombee: aRegle ? (post.ok ? post.lecture.accepte == null : null) : false,', ['R-prix-change']],
   ['sync-detail', API, '      const { _regle, ...detail } = d;', '      const detail = d; const _regle = d._regle;', ['R-sync']],

@@ -22,7 +22,7 @@
 import crypto from 'crypto';
 import { vendeurExige, baseCloisonnee } from './_lib/session.js';
 import { accesVendeur } from './_lib/abonnement.js';
-import { keysReady, canConsent, ruName, authUrl, appToken, hasRefresh, accessToken, storeData, lireReglageVendeur, lireDonnee,
+import { keysReady, canConsent, ruName, authUrl, appToken, hasRefresh, accessToken, storeData, lireReglageVendeur, lireDonnee, modifierDonnee,
   lireComptes, comptesActifs, rangerConnexion, apprendrePrincipal, resoudreCompte, deconnecterCompte, suffixeCompte,
   montantOk, valideRegleOffre, seuilTropBas } from './_lib/ebay.js';
 
@@ -353,22 +353,28 @@ async function relireApres(token, itemId, demande, pre) {
 // (`lueA`) : une synchro lancée avant une pose ne réécrit pas, après elle, la
 // lecture d'avant. Seule exception : `_force: true` (jamais rangé), posé par
 // la requête qui a écrit le marqueur « en-cours » pour le remplacer.
+// ⚠️⚠️ (11 octobre) Et l'écriture ne réécrit plus une copie PÉRIMÉE des autres
+// annonces : deux gestes sur deux cartes du même compte (poser sur la Nike,
+// retirer sur la Samba, à 50 ms) relisaient la même version, et le second
+// écrit remettait la Nike à « aucune » — eBay la vendait dès 72 €, VRM ne la
+// comptait plus dans « ce que ça engage » ni dans la relecture des ventes.
+// `modifierDonnee` compare-et-échange : une écriture concurrente fait relire
+// et refaire la fusion sur ce que l'autre a écrit.
 const REGLES_MAX = 300;
 async function rangerReglesOffre(ctx, lectures, garder) {
-  const id = ligneDe('ebay_offres', ctx);
-  const d = await lireDonnee(id, ctx.owner);
-  if (d === undefined) return null;
-  const items = { ...((d && d.items && typeof d.items === 'object' && !Array.isArray(d.items)) ? d.items : {}) };
-  for (const [k, v0] of Object.entries(lectures || {})) {
-    if (!ID_EBAY.test(k) || !v0 || typeof v0 !== 'object') continue;
-    const { _force, ...v } = v0;
-    const avant = items[k];
-    if (!_force && avant && (Number(avant.lueA) || 0) > (Number(v.lueA) || 0)) continue;
-    items[k] = v;
-  }
-  if (garder instanceof Set) for (const k of Object.keys(items)) if (!garder.has(k) && !(lectures && lectures[k])) delete items[k];
-  const cles = Object.keys(items).sort((x, y) => (Number(items[y].lueA) || 0) - (Number(items[x].lueA) || 0)).slice(0, REGLES_MAX);
-  return storeData(id, { items: Object.fromEntries(cles.map((k) => [k, items[k]])), capturedAt: Date.now() }, ctx.owner);
+  return modifierDonnee(ligneDe('ebay_offres', ctx), ctx.owner, (d) => {
+    const items = { ...((d && d.items && typeof d.items === 'object' && !Array.isArray(d.items)) ? d.items : {}) };
+    for (const [k, v0] of Object.entries(lectures || {})) {
+      if (!ID_EBAY.test(k) || !v0 || typeof v0 !== 'object') continue;
+      const { _force, ...v } = v0;
+      const avant = items[k];
+      if (!_force && avant && (Number(avant.lueA) || 0) > (Number(v.lueA) || 0)) continue;
+      items[k] = v;
+    }
+    if (garder instanceof Set) for (const k of Object.keys(items)) if (!garder.has(k) && !(lectures && lectures[k])) delete items[k];
+    const cles = Object.keys(items).sort((x, y) => (Number(items[y].lueA) || 0) - (Number(items[x].lueA) || 0)).slice(0, REGLES_MAX);
+    return { items: Object.fromEntries(cles.map((k) => [k, items[k]])), capturedAt: Date.now() };
+  });
 }
 // Une règle « attendue » envoyée par l'écran (ce que Julien VOYAIT) :
 // 'inconnu' (état « pas su »), ou { accepte: null|montant, refuse: null|montant }.

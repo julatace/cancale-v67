@@ -26,13 +26,23 @@
 //   11. le changement de prix dit ce qu'il advient de la règle ;
 //   12. l'offre aux observateurs sous la règle ;
 //   13. panne de la lecture des règles : « pas su » partout, rien n'est relu ;
+//   14. (11 octobre, revue) le lot ne se ferme pas en silence (porte grisée
+//      pendant le lot ; si le panneau disparaît quand même, la réponse en vol
+//      s'applique, les cartes sont rendues, l'arrêt est dit) ; une issue ne
+//      reste que sous le montant envoyé ; l'aperçu calcule sur le prix que la
+//      carte affiche ; « dont N lues il y a plus de 7 jours » = les cartes qui
+//      le disent ;
 //   et partout : aucun débordement, aucune erreur de page, aucun écran mort.
 //        node scripts/bancs/ebay-regle-offre.cjs [--blocs 1,5,9] [--taille 1512]
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
 const DIST = path.join(__dirname, '..', '..', 'dist');
-const PORT = 4761;
+const PORT = Number(process.env.PORT) || 4761;
+const RETARD_TXN = Number(process.env.BANC_TXN_DELAI) || 0;
+// `BANC_EBAY_DELAI=1500` : un faux eBay LENT à répondre une règle (machine chargée) — le banc
+// attend la réponse appliquée, jamais un délai fixe.
+const DELAI_EBAY = Number(process.env.BANC_EBAY_DELAI) || 0;
 const iB = process.argv.indexOf('--blocs');
 const BLOCS = iB > 0 ? new Set(process.argv[iB + 1].split(',').map(Number)) : null;
 const iT = process.argv.indexOf('--taille');
@@ -73,7 +83,7 @@ const OFFRES_K2 = () => ({
   [A.B3]: entree({ offresActives: true, accepte: null, refuse: null, prix: 85 }),
 });
 
-let rows = [], cfg = {}, ebay = {}, envois = [], bruts = [], scen = {}, enVol = 0, maxEnVol = 0, ecrituresMain = 0, apiEbay = 0;
+let rows = [], cfg = {}, ebay = {}, envois = [], bruts = [], scen = {}, enVol = 0, maxEnVol = 0, ecrituresMain = 0, apiEbay = 0, repondus = 0;
 // `cfg.retenir = n` : la n-ième requête `regleoffre` est RETENUE jusqu'à `lacher()`
 // — un geste « pendant l'envoi » se joue alors à coup sûr, pas sur une course
 // d'horloge (une machine chargée faisait tomber « Arrêter » APRÈS le 1er envoi).
@@ -161,6 +171,10 @@ async function ouvrir(b, vp, c) {
     if (cfg.offres500 && /id=eq\.ebay_offres/.test(u)) return j({ message: 'panne' }, 500);
     if (cfg.offresDelai && /id=eq\.ebay_offres/.test(u)) await attendre(cfg.offresDelai);
     if (cfg.txn500 && /_txn_/.test(u)) return j({ message: 'panne' }, 500);
+    // `BANC_TXN_DELAI=7000` : une base LENTE sur les ventes Vinted (machine
+    // chargée) — le banc doit rester vert sur une app intacte (il attend le
+    // verdict rendu, jamais un délai fixe).
+    if (RETARD_TXN && /_txn_/.test(u)) await attendre(RETARD_TXN);
     const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
     const forme = (r) => (sel && sel !== 'data,updated_at,cap:data->>capturedAt' && !/^id,data/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: new Date().toISOString(), cap: r.data && r.data.capturedAt });
     const eq = /id=eq\.([^&]*)/.exec(u);
@@ -219,7 +233,7 @@ async function ouvrir(b, vp, c) {
       try {
         const rang = bruts.filter((x) => /"action":"regleoffre"/.test(x)).length;
         if (cfg.retenir === rang) await new Promise((ok) => { lacher = ok; setTimeout(ok, 20000); });
-        else await attendre(cfg.regleDelai || 250);
+        else await attendre(cfg.regleDelai || DELAI_EBAY || 250);
         const id = String(body.itemId); const s = ebay[id];
         const sc = scen[id] && scen[id].shift();
         if (sc) return j(sc.body, sc.status || 200);
@@ -233,7 +247,7 @@ async function ouvrir(b, vp, c) {
         } else s.regle = { ...s.regle, accepte: null, refuse: null };
         const l = lecture(id); ranger(s.compte, id, l);
         return j({ ok: true, verifie: true, lecture: l, avertissements: [], range: true });
-      } finally { enVol--; }
+      } finally { enVol--; repondus++; }
     }
     if (body.action === 'finances') return j({ ok: true, dispo: 10, enAttente: 0, retenu: 0, total: 10, devise: 'EUR' });
     if (body.action === 'limites') return j({ ok: true, quantite: 10, montant: 500, devise: 'EUR', inscrit: true });
@@ -248,7 +262,12 @@ async function allerAnnonces(pg) {
   await pg.waitForSelector('#vrm-sel-compte-ebay', { timeout: 15000 });
   await sousOnglet(pg, 'Annonces');
   await pg.waitForSelector('[data-ebay-annonce]', { timeout: 12000 });
-  await pg.waitForTimeout(1200);
+  // (11 octobre) Le VERDICT des ventes, rendu — jamais un délai : tant que les
+  // ventes ne sont pas vérifiées, l'app grise « Définir / Modifier » (à raison).
+  // Une attente fixe de 1,2 s faisait cliquer un bouton encore grisé quand la
+  // lecture des ventes était lente (machine chargée) : rouge sur une app intacte.
+  await pg.waitForFunction(() => !!document.querySelector('[data-regle-offre-ligne]') && !document.querySelector('[data-regle-bloquee="en-cours"]'), null, { timeout: 30000 });
+  await pg.waitForTimeout(300);
 }
 const carte = (pg, id) => pg.locator(`[data-ebay-annonce="${id}"]`);
 const etats = (pg) => pg.$$eval('[data-regle-offre-ligne]', (l) => Object.fromEntries(l.map((e) => [e.getAttribute('data-regle-offre-ligne'), {
@@ -261,17 +280,27 @@ const regleoffres = () => bruts.filter((b) => /"action":"regleoffre"/.test(b));
 async function ouvrirPanneau(pg, id) {
   const c = carte(pg, id);
   const b = c.locator('[data-regle-ouvrir], [data-regle-modifier]').first();
-  await b.click({ timeout: 5000 });
+  await b.click({ timeout: 15000 });
   await pg.waitForSelector(`[data-regle-panneau="${id}"]`, { timeout: 5000 });
 }
 const saisir = async (pg, id, quoi, v) => { await pg.fill(`[data-regle-saisie-${quoi}="${id}"]`, v); await pg.waitForTimeout(150); };
 const desactive = (pg, sel) => pg.$eval(sel, (e) => e.disabled).catch(() => null);
+// (11 octobre) Attend que la réponse d'un geste de règle soit APPLIQUÉE à la
+// carte : le faux eBay a RÉPONDU, puis la carte n'est plus « en envoi »
+// (`data-regle-envoi`). Jamais un délai fixe : sous charge, le message
+// était lu avant d'arriver (rouge sur une app intacte).
+async function finEnvoi(pg, id, r0) {
+  for (let i = 0; i < 600 && repondus <= r0; i++) await pg.waitForTimeout(25);
+  await pg.waitForFunction((x) => { const c = document.querySelector(`[data-ebay-annonce="${x}"]`); return !!c && !c.querySelector('[data-regle-envoi]'); }, id, { timeout: 20000 });
+  await pg.waitForTimeout(80);
+}
 async function poser(pg, id) {
+  const n0 = repondus;
   await pg.click(`[data-regle-enregistrer="${id}"]`);
   await feuille(pg).waitFor({ timeout: 5000 });
   const t = await feuille(pg).innerText();
   await feuille(pg).getByRole('button', { name: 'Oui, poser la règle' }).click();
-  await pg.waitForTimeout(900);
+  await finEnvoi(pg, id, n0);
   return t;
 }
 async function finPage(pg, errs, quoi) {
@@ -436,8 +465,8 @@ async function finPage(pg, errs, quoi) {
         // Double clic à la souris (1512 px). Au téléphone, la feuille de confirmation
         // (commune à toute l'app) est en bas : le 2ᵉ toucher passe à la barre
         // d'onglets dessous — constaté, hors de cette règle ; on touche une fois.
-        { const oui = feuille(pg).getByRole('button', { name: 'Oui, poser la règle' }); await (vp.width < 600 ? oui.click() : oui.dblclick()).catch(() => {}); }
-        await pg.waitForTimeout(1200);
+        { const r0 = repondus; const oui = feuille(pg).getByRole('button', { name: 'Oui, poser la règle' }); await (vp.width < 600 ? oui.click() : oui.dblclick()).catch(() => {}); await finEnvoi(pg, A.A2, r0); }
+        await pg.waitForTimeout(600);
         const r = regleoffres();
         dit(r.length === 1 && r[0] === '{"action":"regleoffre","itemId":"130000000002","accepte":81,"prixVu":90,"attendu":{"accepte":null,"refuse":null},"confirme":true}', `[5] ${T} Oui${vp.width < 600 ? '' : ' (double clic)'} : UN seul envoi, le corps exact`, JSON.stringify(r));
         const e = await etats(pg);
@@ -470,7 +499,7 @@ async function finPage(pg, errs, quoi) {
         const r = regleoffres();
         dit(/Le refus sous 60,00\s*€ sera retiré/.test(tf) && r[0] === '{"action":"regleoffre","itemId":"130000000001","accepte":74,"refuse":null,"prixVu":80,"attendu":{"accepte":72,"refuse":60},"confirme":true}', `[6] ${T} refus effacé : la feuille le dit, le corps porte "refuse":null et la règle VUE`, r[0]);
         await ouvrirPanneau(pg, A.A1);
-        await pg.click(`[data-regle-retirer="${A.A1}"]`); await pg.waitForTimeout(1000);
+        { const n0 = repondus; await pg.click(`[data-regle-retirer="${A.A1}"]`); await finEnvoi(pg, A.A1, n0); }
         const feuilleOuverte = await feuille(pg).count();
         const r2 = regleoffres();
         dit(feuilleOuverte === 0 && r2[1] === '{"action":"regleoffre","itemId":"130000000001","accepte":null,"refuse":null,"confirme":true}', `[6] ${T} « Retirer la règle » : un clic, AUCUNE feuille, le corps exact`, r2[1]);
@@ -550,6 +579,21 @@ async function finPage(pg, errs, quoi) {
         dit(e[A.A2].etat === 'connue' && /VRM n'a pas pu le noter/.test(info), `[8] ${T} posée mais pas notée : « connue » ET la note « VRM n'a pas pu le noter »`, info);
         await ctx.close();
       });
+      if (bloc(8)) await essaie(`[8] ${T} relu, offres activées ou non pas montré`, async () => {
+        // (11 octobre) La route a RELU : le montant est le bon, eBay ne montre pas
+        // `BestOfferEnabled` (`verifie:null` AVEC une lecture). La phrase vient de
+        // la lecture : jamais « je n'ai pas pu le relire » (§5).
+        const L0 = (o) => ({ lu: true, devise: 'EUR', lueA: Date.now(), offresFaites: null, ...o });
+        const { ctx, pg } = await ouvrir(b, vp, { scen: { [A.A2]: [{ body: { ok: true, verifie: null, lecture: L0({ offresActives: null, accepte: 81, refuse: null, prix: 90 }), avertissements: [], range: true } }] } });
+        await allerAnnonces(pg);
+        await ouvrirPanneau(pg, A.A2); await saisir(pg, A.A2, 'accepte', '81'); await poser(pg, A.A2);
+        const info = await pg.$eval(`[data-ebay-info="${A.A2}"]`, (x) => x.innerText).catch(() => '');
+        const lien = await pg.locator(`[data-ebay-info="${A.A2}"] a[href*="ebay.fr/itm/${A.A2}"]`).count();
+        const e = await etats(pg);
+        dit(/81,00\s*€/.test(info) && !/pas pu le relire/.test(info) && !/✓/.test(info) && lien === 1 && e[A.A2].etat === 'pas-su' && e[A.A2].raison === 'offres-inconnues',
+          `[8] ${T} relu avec le bon montant, offres pas montrées : le message dit le seuil RELU (81,00 €) et « regarde sur eBay » (lien), jamais « pas pu le relire », aucun ✓ ; la carte « pas su » (offres inconnues)`, `${info} · ${e[A.A2].etat}/${e[A.A2].raison}`);
+        await ctx.close();
+      });
 
       // ── 9. UNE RÈGLE POUR TOUTES ────────────────────────────────────────
       const ouvrirToutes = async (pg, pct) => {
@@ -595,9 +639,9 @@ async function finPage(pg, errs, quoi) {
           '{"action":"regleoffre","itemId":"130000000007","accepte":45,"prixVu":50,"attendu":{"accepte":null,"refuse":null},"confirme":true}',
           '{"action":"regleoffre","itemId":"130000000101","accepte":90,"prixVu":100,"attendu":{"accepte":null,"refuse":null},"confirme":true,"compte":"bbbbbbbbbbbbbbb2"}'];
         dit(JSON.stringify(r) === JSON.stringify(att2) && maxEnVol === 1, `[9] ${T} 4 envois dans l'ordre de l'aperçu, sans refus ni « sous la moitié », chacun avec la règle vue et SON compte ; jamais deux en vol`, `maxEnVol=${maxEnVol} · ${r.length} envois`);
-        const bil = await pg.$eval('[data-regles-bilan]', (e) => Object.fromEntries(['total', 'ok', 'ecart', 'non-relu', 'a-revoir', 'incertain', 'ko', 'non-envoyees'].map((k) => [k, Number(e.getAttribute('data-regles-' + k))])));
-        const somme = bil.ok + bil.ecart + bil['non-relu'] + bil['a-revoir'] + bil.incertain + bil.ko + bil['non-envoyees'];
-        dit(bil.total === 4 && bil.ok === 1 && bil['non-relu'] === 1 && bil.ko === 1 && bil.ecart === 1 && bil.incertain === 0 && bil['a-revoir'] === 0 && bil['non-envoyees'] === 0 && somme === bil.total, `[9] ${T} le bilan est COMPLET (1 réglée · 1 écart · 1 non relue · 1 refusée), sa somme vaut le total`, JSON.stringify(bil));
+        const bil = await pg.$eval('[data-regles-bilan]', (e) => Object.fromEntries(['total', 'ok', 'ecart', 'offres-inconnues', 'non-relu', 'a-revoir', 'incertain', 'ko', 'non-envoyees'].map((k) => [k, Number(e.getAttribute('data-regles-' + k) || 0)])));
+        const somme = bil.ok + bil.ecart + bil['offres-inconnues'] + bil['non-relu'] + bil['a-revoir'] + bil.incertain + bil.ko + bil['non-envoyees'];
+        dit(bil.total === 4 && bil.ok === 1 && bil['non-relu'] === 1 && bil.ko === 1 && bil.ecart === 1 && bil['offres-inconnues'] === 0 && bil.incertain === 0 && bil['a-revoir'] === 0 && bil['non-envoyees'] === 0 && somme === bil.total, `[9] ${T} le bilan est COMPLET (1 réglée · 1 écart · 1 non relue · 1 refusée), sa somme vaut le total`, JSON.stringify(bil));
         const e = await etats(pg);
         dit(e[A.B1].etat !== 'connue' && e[A.A6].etat !== 'connue' && e[A.A2].etat === 'connue', `[9] ${T} ni B1 (écart) ni A6 (non relue) ne passent « connue » ; A2 oui`, JSON.stringify([e[A.A2].etat, e[A.A6].etat, e[A.B1].etat]));
         await pg.locator('[data-regles-toutes]').screenshot({ path: path.join(CAPTURES, `toutes-${vp.width}.png`) }).catch(() => {});
@@ -731,6 +775,26 @@ async function finPage(pg, errs, quoi) {
         await ctx.close();
       });
 
+      if (bloc(11)) await essaie(`[11] ${T} prix illisible`, async () => {
+        // (11 octobre) Une saisie non vide qu'on ne sait pas lire n'est PAS « prix
+        // inchangé » : rien ne part, et c'est dit — jamais « ✓ Modifié sur eBay ».
+        const { ctx, pg } = await ouvrir(b, vp);
+        await allerAnnonces(pg);
+        await pg.click(`[data-ebay-carte-ouvrir="${A.A2}"]`); await pg.waitForSelector(`[data-ebay-revise-ouvrir="${A.A2}"]`, { timeout: 5000 });
+        await pg.click(`[data-ebay-revise-ouvrir="${A.A2}"]`); await pg.waitForSelector(`[data-ebay-revise-prix="${A.A2}"]`, { timeout: 5000 });
+        const vus = [];
+        for (const tape of ['72 €', '0', 'abc']) {
+          await pg.fill(`[data-ebay-revise-prix="${A.A2}"]`, tape); await pg.click(`[data-ebay-revise-enregistrer="${A.A2}"]`); await pg.waitForTimeout(400);
+          vus.push([tape, await pg.$eval(`[data-ebay-revise-msg="${A.A2}"]`, (e) => e.innerText).catch(() => '')]);
+        }
+        const rv = bruts.filter((x) => /"action":"revise"/.test(x));
+        dit(rv.length === 0 && vus.every(([, m]) => /rien n'a été envoyé/.test(m) && !/✓/.test(m)), `[11] ${T} un prix tapé illisible (« 72 € », « 0 », « abc ») : rien n'est envoyé, c'est dit, aucun ✓`, `${rv.length} envoi(s) · ${JSON.stringify(vus)}`);
+        await pg.fill(`[data-ebay-revise-prix="${A.A2}"]`, '88'); await pg.click(`[data-ebay-revise-enregistrer="${A.A2}"]`); await pg.waitForTimeout(900);
+        const rv2 = bruts.filter((x) => /"action":"revise"/.test(x));
+        dit(rv2.length === 1 && /"price":"88"/.test(rv2[0]), `[11] ${T} et un prix lisible part, lui (« 88 »)`, rv2[0]);
+        await ctx.close();
+      });
+
       // ── 12. OFFRE AUX OBSERVATEURS ──────────────────────────────────────
       if (bloc(12)) await essaie(`[12] ${T} offre sous la règle`, async () => {
         const { ctx, pg } = await ouvrir(b, vp, { eligibles: [A.A1] });
@@ -756,6 +820,88 @@ async function finPage(pg, errs, quoi) {
         dit(!bruts.some((x) => /regleoffrelire/.test(x)), `[13] ${T} « Relire chez eBay » n'envoie RIEN (c'est notre lecture qui a raté : rouvrir l'écran)`);
         await finPage(pg, errs, `[13] ${T}`);
         await ctx.close();
+      });
+
+      // ── 14. LE LOT, REVUE DU 11 OCTOBRE ────────────────────────────────
+      const lancerLot4 = async (pg) => {
+        await ouvrirToutes(pg, 90);
+        await pg.click(`[data-regles-ligne="${A.A6}"] [data-regles-choix]`); await pg.click(`[data-regles-ligne="${A.A7}"] [data-regles-choix]`); await pg.waitForTimeout(200);
+        await pg.click('[data-regles-appliquer]'); await feuille(pg).waitFor({ timeout: 5000 });
+        await feuille(pg).getByRole('button', { name: 'Oui, régler les 4' }).click();
+        await pg.waitForSelector('[data-regles-arreter]', { timeout: 5000 });
+      };
+      const gesteActif = (pg, id) => pg.$eval(`[data-ebay-annonce="${id}"]`, (c) => { const x = c.querySelector('[data-regle-ouvrir],[data-regle-modifier]'); return x ? !x.disabled : null; }).catch(() => null);
+      if (bloc(14)) await essaie(`[14] ${T} fermer pendant un lot`, async () => {
+        // Le 1er envoi (A2) est RETENU : on tente de fermer le panneau PENDANT.
+        const { ctx, pg, errs } = await ouvrir(b, vp, { retenir: 1 });
+        await allerAnnonces(pg); await lancerLot4(pg);
+        const grisee = await desactive(pg, '[data-regles-toutes-ouvrir]');
+        dit(grisee === true, `[14] ${T} pendant un lot, la porte « Fermer « Une règle pour toutes » » est grisée (on arrête par « Arrêter », qui fait un bilan)`, String(grisee));
+        // Une app où elle ne l'est pas (build d'avant, ou porte réaffaiblie) : on
+        // ferme pour de vrai, et on juge ce qui suit.
+        if (grisee === false) { await pg.click('[data-regles-toutes-ouvrir]'); await pg.waitForTimeout(300); }
+        lacher();
+        await pg.waitForFunction(() => !!document.querySelector('[data-regles-bilan]') || !document.querySelector('[data-regles-toutes]'), null, { timeout: 15000 });
+        for (let i = 0; i < 80 && (await Promise.all([A.A2, A.A6, A.A7, A.B1].map((id) => gesteActif(pg, id)))).some((x) => x === false); i++) await pg.waitForTimeout(50);
+        const ferme = (await pg.locator('[data-regles-toutes]').count()) === 0;
+        const n = regleoffres().length;
+        const e = await etats(pg);
+        const a2 = ebay[A.A2].regle;
+        dit(!(e[A.A2] && e[A.A2].etat === 'aucune' && a2.accepte != null), `[14] ${T} la carte A2 ne dit jamais « aucune » quand eBay tient la règle que le lot vient d'y poser`, JSON.stringify({ ecran: e[A.A2] && e[A.A2].etat, ebay: a2.accepte }));
+        const actifs = await Promise.all([A.A2, A.A6, A.A7, A.B1].map((id) => gesteActif(pg, id)));
+        dit(actifs.every((x) => x === true), `[14] ${T} une fois le lot fini ou arrêté, ses cartes ne restent pas grisées`, JSON.stringify(actifs));
+        const li = await pg.$eval('[data-regles-lot-interrompu]', (x) => x.getAttribute('data-regles-lot-interrompu')).catch(() => null);
+        dit(!ferme || n === 4 || li === String(4 - n), `[14] ${T} un lot arrêté par la fermeture du panneau est DIT tout de suite (« N non envoyées »)`, `fermé=${ferme} · envois=${n} · bandeau=${li}`);
+        await finPage(pg, errs, `[14] ${T}`);
+        await ctx.close();
+      });
+      if (bloc(14)) await essaie(`[14] ${T} une issue suit son montant`, async () => {
+        const { ctx, pg } = await ouvrir(b, vp);
+        await allerAnnonces(pg); await ouvrirToutes(pg, 90);
+        await pg.click('[data-regles-appliquer]'); await feuille(pg).waitFor({ timeout: 5000 });
+        await feuille(pg).getByRole('button', { name: /Oui, (la )?régler/ }).click();
+        await pg.waitForSelector('[data-regles-bilan]', { timeout: 15000 }); await pg.waitForTimeout(400);
+        const lire = () => pg.$$eval('[data-regles-ligne]', (x) => x.map((e) => [e.getAttribute('data-regles-ligne'), e.getAttribute('data-regles-statut'), e.getAttribute('data-regles-seuil'), (e.querySelector('[data-regles-issue]') || { getAttribute: () => '' }).getAttribute('data-regles-issue')]));
+        await pg.fill('[data-regles-pct]', '80'); await pg.waitForTimeout(400);
+        const l80 = await lire();
+        const perimes = l80.filter((r) => r[3] && (r[1] === 'remplace' || r[1] === 'nouvelle'));
+        dit(!perimes.length, `[14] ${T} après un lot à 90 %, passer à 80 % ne laisse aucune issue sous une ligne qui propose un AUTRE montant`, JSON.stringify(perimes));
+        await pg.fill('[data-regles-pct]', '90'); await pg.waitForTimeout(400);
+        const a2 = (await lire()).find((r) => r[0] === A.A2);
+        dit(a2 && a2[1] === 'inchange' && a2[2] === '81.00' && a2[3] === 'ok', `[14] ${T} revenir à 90 % : A2 « déjà 81,00 € » et son « ✓ réglée » (le montant envoyé)`, JSON.stringify(a2));
+        await ctx.close();
+      });
+      if (bloc(14)) await essaie(`[14] ${T} l'aperçu sur le prix relu`, async () => {
+        // eBay tient A2 à 80 € ; la liste dit 90 €. La carte apprend 80 € (409).
+        const { ctx, pg } = await ouvrir(b, vp, { ebay: (s) => { s[A.A2].prix = 80; } });
+        await allerAnnonces(pg); await ouvrirPanneau(pg, A.A2);
+        await saisir(pg, A.A2, 'accepte', '70'); await poser(pg, A.A2);
+        const prixCarte = await carte(pg, A.A2).locator('[data-ebay-prix]').getAttribute('data-ebay-prix').catch(() => '');
+        await ouvrirToutes(pg, 95);
+        const l = await lignesApercu(pg);
+        dit(prixCarte === '80.00' && l[A.A2] && l[A.A2].seuil === '76.00', `[14] ${T} la carte dit 80,00 € ⇒ l'aperçu propose 76,00 € (95 % de 80), jamais un seuil calculé sur l'ancien prix`, `${prixCarte} · ${JSON.stringify(l[A.A2])}`);
+        for (const [id, v] of Object.entries(l)) if (v.coche && id !== A.A2) await pg.click(`[data-regles-ligne="${id}"] [data-regles-choix]`);
+        if (l[A.A2] && !l[A.A2].coche) await pg.click(`[data-regles-ligne="${A.A2}"] [data-regles-choix]`);
+        await pg.waitForTimeout(200);
+        const n0 = regleoffres().length;
+        await pg.click('[data-regles-appliquer]'); await feuille(pg).waitFor({ timeout: 5000 });
+        await feuille(pg).getByRole('button', { name: /Oui, (la )?régler/ }).click();
+        await pg.waitForSelector('[data-regles-bilan]', { timeout: 15000 }); await pg.waitForTimeout(300);
+        const r = regleoffres().slice(n0);
+        const ok = await pg.$eval('[data-regles-bilan]', (e) => e.getAttribute('data-regles-ok')).catch(() => '');
+        dit(r.length === 1 && /"accepte":76,"prixVu":80,/.test(r[0]) && ok === '1', `[14] ${T} ce qui part porte le prix relu (« prixVu »: 80) et le seuil de l'aperçu (76) — réglée`, `${r[0]} · ok=${ok}`);
+        await ctx.close();
+      });
+      if (bloc(14)) await essaie(`[14] ${T} « lues il y a plus de 7 jours » = les cartes`, async () => {
+        for (const jours of [7.5, 10]) {
+          const { ctx, pg } = await ouvrir(b, vp, { offresP: (o) => { o[A.A6].lueA = Date.now() - jours * JOUR; } });
+          await allerAnnonces(pg);
+          const eng = await pg.$eval('[data-regles-engagement]', (x) => x.innerText).catch(() => '');
+          const nBloc = Number(((/Dont (\d+) lue/.exec(eng)) || [])[1] || 0);
+          const ages = Object.entries(await etats(pg)).filter(([, v]) => v.age).map(([k, v]) => [k, v.age]);
+          dit(nBloc === ages.length, `[14] ${T} lue il y a ${String(jours).replace('.', ',')} j : le bloc compte ${nBloc}, les cartes qui disent leur âge ${ages.length} — la même règle`, JSON.stringify(ages));
+          await ctx.close();
+        }
       });
     }
   } catch (e) { dit(false, 'le banc', String((e && e.message) || e).split('\n')[0]); }

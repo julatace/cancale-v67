@@ -462,6 +462,72 @@ async function lireDonnee(id, owner) {
   } catch (_) { return undefined; }
 }
 
+// ── LIRE-MODIFIER-ÉCRIRE UNE PETITE LIGNE SANS PERDRE CELLE D'À CÔTÉ ──────────
+// (11 octobre, revue de la règle d'offre.) `lireDonnee` puis `storeData`, c'est
+// une fusion qui réécrit la ligne ENTIÈRE : deux requêtes du même vendeur qui
+// se croisent (deux cartes eBay, une pose et un retrait à 50 ms) relisent la
+// même version, et la seconde écrite remplace la première — la base disait
+// « aucune règle » sur une annonce qu'eBay vendait dès 72 €, les deux réponses
+// disant « rangé ». Aucun verrou, aucune version : rien ne pouvait le voir.
+// ⇒ COMPARER-ET-ÉCHANGER sur une version portée par la ligne (`data.rev`) :
+//   · ligne absente ⇒ INSERT SANS fusion (un autre l'a créée entre-temps :
+//     409, on relit) ;
+//   · ligne présente ⇒ PATCH filtré sur la version LUE
+//     (`data->>rev=eq.N`, ou `is.null` pour une ligne d'avant) : Postgres
+//     réévalue ce filtre APRÈS avoir pris le verrou de la ligne, donc une
+//     écriture concurrente fait rendre 0 ligne ⇒ on relit et on refait la
+//     fusion sur ce que l'AUTRE a écrit.
+// `modifier(d)` reçoit `null` (ligne absente) ou l'objet lu, et rend l'objet à
+// écrire (sans `rev` : posé ici) ou `undefined` (rien à écrire). Il peut être
+// appelé PLUSIEURS fois : il ne doit dépendre que de ce qu'il reçoit.
+// Trois issues, comme `storeData` + `lireDonnee` : true écrit · false écriture
+// ratée (ou toujours devancée) · null pas su (la LECTURE a échoué ⇒ rien
+// n'est écrit — repartir de vide effacerait la ligne).
+async function modifierDonnee(id, owner, modifier, essais = 6) {
+  if (!sbKey() || !/^[a-z0-9_]+$/i.test(String(id || ''))) return null;
+  const p = await portee(owner);
+  if (!p) return null;
+  const json = { ...sbCle(sbKey()), 'content-type': 'application/json' };
+  for (let n = 0; n < essais; n++) {
+    let rows;
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}${p.filtre}&select=data`, { headers: { ...sbCle(sbKey()) } });
+      if (!r.ok) return null;
+      rows = await r.json();
+    } catch (_) { return null; }
+    if (!Array.isArray(rows)) return null;
+    const present = !!rows[0];
+    const d = present ? (rows[0].data || {}) : null;
+    const nouveau = modifier(d);
+    if (nouveau === undefined) return true;
+    const rev0 = (d && d.rev != null) ? d.rev : null;
+    const data = { ...nouveau, rev: (Number.isSafeInteger(rev0) && rev0 >= 0 ? rev0 : 0) + 1 };
+    try {
+      if (!present) {
+        const w = await fetch(`${SUPABASE_URL}/rest/v1/app_data`, {
+          method: 'POST', headers: { ...json, Prefer: 'return=minimal' }, body: JSON.stringify(p.lignes([{ id, data }])),
+        });
+        if (w.ok) return true;
+        if (w.status === 409) continue;          // créée entre-temps : on relit
+        return false;
+      }
+      const cond = rev0 == null ? 'data->>rev=is.null' : `data->>rev=eq.${encodeURIComponent(typeof rev0 === 'object' ? JSON.stringify(rev0) : String(rev0))}`;
+      const w = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}${p.filtre}&${cond}&select=id`, {
+        method: 'PATCH', headers: { ...json, Prefer: 'return=representation' }, body: JSON.stringify({ data }),
+      });
+      if (!w.ok) return false;
+      const out = await w.json().catch(() => null);
+      if (!Array.isArray(out)) return false;
+      if (out.length >= 1) return true;
+      // 0 ligne : un autre a écrit (ou supprimé) entre la lecture et l'écriture.
+      // Une attente FIXE et courte (nos propres lectures, pas Vinted — §3 ne
+      // s'applique pas) laisse l'autre finir.
+      await new Promise((ok) => setTimeout(ok, 30 * (n + 1)));
+    } catch (_) { return false; }
+  }
+  return false;
+}
+
 // ── LA RÈGLE D'OFFRE eBAY (9 octobre) ─────────────────────────────────────────
 // Julien : « je veux juste définir une règle sur chaque annonce et à chaque
 // offre au-dessus ça accepte ». C'est le réglage NATIF d'eBay (Offre directe) :
@@ -498,6 +564,6 @@ function seuilTropBas(accepte, prix) {
   return 2 * Math.round(accepte * 100) < Math.round(prix * 100);
 }
 
-export { SCOPES, appId, certId, ruName, keysReady, canConsent, authUrl, appToken, exchangeCode, hasRefresh, readRefresh, lireRefresh, accessToken, storeData, portee, lireReglageVendeur, lireDonnee,
+export { SCOPES, appId, certId, ruName, keysReady, canConsent, authUrl, appToken, exchangeCode, hasRefresh, readRefresh, lireRefresh, accessToken, storeData, portee, lireReglageVendeur, lireDonnee, modifierDonnee,
   COMPTES_ID, CLE_COMPTE, suffixeCompte, cleCompteDe, identiteEbay, lireComptes, normaliserRegistre, modifierComptes, comptesActifs, rangerConnexion, apprendrePrincipal, resoudreCompte, deconnecterCompte,
   MONTANT_MAX, montantOk, valideRegleOffre, seuilTropBas };
