@@ -19,6 +19,9 @@
 -- un pointage du stock, une pile sans liste (numérotée depuis `start`), une
 -- boîte seule, un repère de « Mon local », un brouillon eBay, un SKU eBay.
 insert into public.vrm_reglages values ('proprietaire', :'J'), ('abonnement_obligatoire', '0');
+-- Ses comptes liés : le dressing du premier a été capté le 8 octobre, AVANT la
+-- coupure (le plan doit le dire) ; le second n'a jamais été capté.
+insert into public.vinted_accounts (vinted_user_id, login, owner) values (1001, 'compte_un', :'J'), (1004, 'compte_jamais', :'J'), (1009, 'compte_autre_vendeur', :'T');
 with
 pool as (select jsonb_agg(to_jsonb(g) order by g) || '["C3"]'::jsonb p from generate_series(1, 552) g),
 nums as (select g, case when g <= 388 then ((g * 7) % 540) + 1 else (((g - 388) * 7) % 540) + 1 end n from generate_series(1, 401) g),

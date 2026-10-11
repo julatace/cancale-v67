@@ -28,6 +28,10 @@ create policy anon_lit on public.app_data for select to anon using (false);
 grant select, insert, update, delete on public.app_data to authenticated, service_role;
 grant select on public.app_data to anon;
 create table public.vrm_reglages (cle text primary key, valeur text);
+-- Les comptes Vinted liés (colonnes lues par la migration : identifiant, login,
+-- propriétaire — jamais les jetons, qui n'existent pas ici).
+create table public.vinted_accounts (vinted_user_id bigint, login text, owner uuid not null default auth.uid());
+alter table public.vinted_accounts enable row level security;
 alter table public.vrm_reglages enable row level security;
 
 -- Les deux déclencheurs de la vraie base (définitions recopiées de 004 / 007).

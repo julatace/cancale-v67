@@ -44,14 +44,26 @@ export const estArchive = (num, arch) => !!arch && new RegExp('^' + arch + '\\d+
 // Leboncoin) : celle qui le portait à la coupure (son IDENTIFIANT est dans la
 // liste du marqueur), ou une commande passée avant la coupure, parle de
 // l'ANCIENNE série. Jamais par le titre (§5).
+// Le marqueur garde, PAR ANNONCE, chaque numéro qu'elle portait à la coupure et
+// ce qu'il devient ({ "<id>": { "553": "1", "12": "B12" } }) : un numéro donné
+// après la coupure suit sa nouvelle paire, et une annonce dont le numéro a été
+// réécrit APRÈS (reliée à une nouvelle paire) se lit telle quelle. La même règle
+// que `traductionAnnonce` / `numeroExterne` dans l'app (§11).
+export function traductionAnnonce(carte, id, k) {
+  if (id == null || !carte || typeof carte !== 'object' || Array.isArray(carte)) return undefined;
+  const e = carte[String(id)];
+  if (!e || typeof e !== 'object' || Array.isArray(e) || !Object.prototype.hasOwnProperty.call(e, k)) return undefined;
+  return typeof e[k] === 'string' ? cleNum(e[k]) : '';
+}
 export function numeroExterne(k, id, liste, dateMs, mk) {
   const arch = archiveDe(mk);
   const c = cleNum(k);
   if (!c || !arch || !/^\d+$/.test(c)) return c;
-  const ids = Array.isArray(mk[liste]) ? mk[liste] : [];
+  const t = traductionAnnonce(mk[liste], id, c);
+  if (t !== undefined) return t;
   const coupure = Date.parse(mk.coupure || '');
   const avant = dateMs != null && isFinite(dateMs) && isFinite(coupure) && dateMs < coupure;
-  return (id != null && ids.some((x) => String(x) === String(id))) || avant ? cleNum(arch + c) : c;
+  return avant ? cleNum(arch + c) : c;
 }
 
 // Le N° tiré du TITRE d'un email (bordereau, vente, finalisation), jugé.

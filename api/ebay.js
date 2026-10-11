@@ -63,7 +63,8 @@ const skuDe = (numero) => { const c = cleNum(numero); return (c && NUM_OK.test(c
 // N°30 (il a pu le retaper dans le Seller Hub). Comparer la chaîne brute
 // laissait programmer — ou publier — une seconde annonce pour la même paire.
 const numDeSku = (sku) => { const m = /^\s*VRM[-\s]?((?:[A-Z]{1,3})?\d{1,6})\s*$/i.exec(String(sku == null ? '' : sku)); const c = m ? cleNum(m[1]) : ''; return c && NUM_OK.test(c) ? c : ''; };
-const memePaire = (skuLu, sku) => { const n = numDeSku(skuLu); return !!n && n === numDeSku(sku); };
+// (`memePaire` est retiré : deux SKU se comparent par le N° QU'ILS DÉSIGNENT,
+// lu avec le marqueur de la remise à zéro — `numeroExterne`, dans `dejaChezEbay`.)
 // Une écriture chez eBay SANS <Ack> (réseau coupé, passerelle 5xx en HTML) :
 // eBay n'a rien dit de ce qu'il a fait ⇒ « incertain », jamais « refusé ».
 // Mesuré (revue du 6 octobre) : un 503 HTML APRÈS création de l'annonce était
@@ -379,14 +380,40 @@ function avecSku(it) {
 // La paire (son SKU) est-elle DÉJÀ sur eBay, en ligne ou programmée ? Rend la
 // réponse de refus à renvoyer, ou null si elle n'y est pas. Liste illisible ou
 // incomplète ⇒ refus « pas su » : une absence non prouvée ne laisse rien partir.
-async function dejaChezEbay(token, sku, verbe) {
+// ⚠️ (relecture du 11 octobre) Après la remise à zéro des numéros (migration
+// 013), le SKU d'une annonce se LIT avec le marqueur : « VRM-22 » posé AVANT la
+// coupure désigne l'ancienne B22, pas la nouvelle 22 (la refuser bloquait la
+// nouvelle paire) ; « VRM-553 », numéro provisoire devenu 3, désigne la 3 (le
+// laisser passer créait une seconde annonce eBay de la même paire).
+async function dejaChezEbay(token, sku, verbe, mk) {
   const L = await listeVendeur(token);
   if (!L.ok) return { status: 503, body: { ok: false, reason: 'pas-su', error: PAS_SU_LISTE } };
   if (!L.complet) return { status: 503, body: { ok: false, reason: 'pas-su', error: 'Tu as plus de 1 000 annonces sur eBay : je n\'ai pas pu toutes les relire pour vérifier que cette paire n\'y est pas déjà — rien n\'a été envoyé.' } };
-  const prog = L.programmees.find((x) => memePaire(x.sku, sku));
+  const voulu = numDeSku(sku);
+  const meme = (x) => !!voulu && numeroExterne(numDeSku(x.sku), x.itemId, 'ebayAnnonces', null, mk) === voulu;
+  const prog = L.programmees.find(meme);
   if (prog) return { status: 409, body: { ok: false, reason: 'deja-programmee', itemId: prog.itemId, debut: prog.depuis || null, error: `La paire ${sku} est déjà programmée sur eBay${prog.depuis ? ' (' + prog.depuis + ')' : ''} — rien n'a été ${verbe}.` } };
-  const act = L.actives.find((x) => memePaire(x.sku, sku));
+  const act = L.actives.find(meme);
   if (act) return { status: 409, body: { ok: false, reason: 'deja-en-ligne', itemId: act.itemId, error: `La paire ${sku} est déjà en vente sur eBay — rien n'a été ${verbe}.` } };
+  return null;
+}
+// LA NUMÉROTATION DE CE VENDEUR (migration 013), relue au moment d'écrire chez
+// eBay. Trois états : `{ok:true, mk:null}` aucune remise à zéro · `{ok:true, mk}`
+// · `{ok:false}` pas su (on n'écrit rien : la paire « 22 » n'a pas le même sens
+// avant et après la coupure).
+async function numerotationVendeur(owner) {
+  const t = await lireReglageVendeur('vrm_numerotation', owner);
+  if (t === undefined) return { ok: false };
+  if (!t) return { ok: true, mk: null };
+  try { const o = JSON.parse(t); return o && typeof o === 'object' && !Array.isArray(o) ? { ok: true, mk: o } : { ok: false }; } catch (_) { return { ok: false }; }
+}
+// Un écran ouvert AVANT la remise à zéro publie sous ses numéros d'avant
+// (« 553 », devenu 3) : le SKU désignerait une AUTRE paire. L'app envoie la
+// version de numérotation qu'elle a lue ; celle de la base fait foi.
+function numerotationRefus(b, num) {
+  if (!num.ok) return { status: 503, body: { ok: false, reason: 'numerotation-pas-su', error: 'Je n\'ai pas pu relire ta numérotation — rien n\'a été envoyé à eBay.' } };
+  const v = num.mk && Number.isFinite(Number(num.mk.version)) ? Number(num.mk.version) : null;
+  if (v != null && Number(b.numerotation) !== v) return { status: 409, body: { ok: false, reason: 'numerotation-perimee', error: 'Cet écran a été ouvert avant la remise à zéro de tes numéros : recharge-le — rien n\'a été envoyé à eBay.' } };
   return null;
 }
 async function handlePublish(b, owner) {
@@ -395,6 +422,8 @@ async function handlePublish(b, owner) {
   const s = avecSku(it0);
   if (s.err) return { status: 400, body: { ok: false, reason: 'numero', error: s.err } };
   const it = s.item;
+  let num = { ok: true, mk: null };
+  if (it.sku) { num = await numerotationVendeur(owner); const ref = numerotationRefus(b, num); if (ref) return ref; }
   const at = await accessToken(owner);
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
   // ── UNE PAIRE, UNE ANNONCE (la règle de `programmer`, 6 octobre). Publier
@@ -402,7 +431,7 @@ async function handlePublish(b, owner) {
   // soir, repartait en seconde annonce (prouvé : deux annonces VRM-30). Relue
   // chez eBay, en ligne ET programmées ; sans SKU, rien à comparer.
   if (it.sku) {
-    const deja = await dejaChezEbay(at.token, it.sku, 'publié');
+    const deja = await dejaChezEbay(at.token, it.sku, 'publié', num.mk);
     if (deja) return deja;
   }
   const r = await tradingAddFixedPriceItem(at.token, it);
@@ -498,11 +527,13 @@ async function handleProgrammer(b, owner) {
   const fraisVus = typeof b.fraisVus === 'number' ? b.fraisVus : NaN;
   if (!(Number.isFinite(fraisVus) && fraisVus >= 0)) return { status: 400, body: { ok: false, reason: 'frais-vus', error: 'Vérifie d\'abord les frais : rien n\'a été envoyé.' } };
   const it = { ...s.item, scheduleTime: quand };
+  const num = await numerotationVendeur(owner);
+  { const ref = numerotationRefus(b, num); if (ref) return ref; }
   const at = await accessToken(owner);
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
   // ── UNE PAIRE, UNE ANNONCE : relue chez eBay, maintenant (une liste
   // INCOMPLÈTE ne prouve pas l'absence d'une paire : on ne programme pas).
-  const deja = await dejaChezEbay(at.token, it.sku, 'envoyé');
+  const deja = await dejaChezEbay(at.token, it.sku, 'envoyé', num.mk);
   if (deja) return deja;
   // ── LES FRAIS, revérifiés juste avant (sans UUID). ──
   const v = await tradingVerifyAddFixedPriceItem(at.token, it);
@@ -654,6 +685,17 @@ async function handleSku(b, owner) {
   if (!ID_EBAY.test(itemId)) return { status: 400, body: { ok: false, error: 'annonce eBay invalide' } };
   const sku = skuDe(b.numero);
   if (!sku) return { status: 400, body: { ok: false, reason: 'numero', error: 'Numéro de paire illisible (125, ou B125) : rien n\'a été envoyé à eBay.' } };
+  // (relecture du 11 octobre) Une annonce qui portait « VRM-12 » à la remise à
+  // zéro désigne l'ANCIENNE paire B12 tant qu'elle porte ce SKU. La relier à la
+  // NOUVELLE 12 réécrirait le MÊME texte : rien ne permettrait plus de les
+  // distinguer, et le retrait automatique terminerait l'annonce d'une paire
+  // qu'il a encore (ou celle d'une autre). On refuse, et on dit pourquoi.
+  { const num = await numerotationVendeur(owner);
+    if (!num.ok) return { status: 503, body: { ok: false, reason: 'numerotation-pas-su', error: 'Je n\'ai pas pu relire ta numérotation — rien n\'a été envoyé à eBay.' } };
+    const voulu = numDeSku(sku);
+    if (num.mk && /^\d+$/.test(voulu) && numeroExterne(voulu, itemId, 'ebayAnnonces', null, num.mk) !== voulu) {
+      return { status: 409, body: { ok: false, reason: 'numero-ambigu', error: `Cette annonce eBay portait déjà « ${sku} » à la remise à zéro de tes numéros : elle désigne l'ANCIENNE paire. Pour la nouvelle ${voulu}, termine cette annonce et republie la paire — rien n'a été envoyé à eBay.` } };
+    } }
   const at = await accessToken(owner);
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
   const r = await tradingCall(at.token, 'ReviseFixedPriceItem', `<Item><ItemID>${itemId}</ItemID><SKU>${esc(sku)}</SKU></Item>`);

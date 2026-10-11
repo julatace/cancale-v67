@@ -4543,6 +4543,7 @@ const assurerVersionNumerotation = async () => {
   if (_verNum.etat === 'perime') { signalerNumerosPerimes('version'); return false; }
   return true;
 };
+const SAUVEGARDE_AVANT_REMISE = "⚠ Cette sauvegarde date d'avant la remise à zéro de tes numéros : elle ne peut pas être restaurée telle quelle (ses anciens numéros reviendraient en chiffres). Rien n'a changé.";
 const NUMEROS_PERIMES_IMPRESSION = "Cet écran a été ouvert avant la remise à zéro de tes numéros : recharge-le avant d'imprimer (aucun N° n'a été tamponné).";
 onVersionNumerotation((e) => { if (e.etat === 'ok') _verNum.okAt = e.at; });
 
@@ -4558,6 +4559,12 @@ const signalerNumerosPerimes = (code) => {
   _numPerimes = { code: String(code || 'version'), at: Date.now() };
   if (_verNum.etat !== 'perime' && code !== 'vrm_prefixe_archive') _emitVerNum({ etat: 'perime' });
   _numPerimesListeners.forEach(fn => { try { fn(_numPerimes); } catch (_) {} });
+  // ⚠️ (relecture du 11 octobre) Un refus de la base ne dit pas SA cause : un
+  //    autre appareil a donné des numéros, OU la remise à zéro a eu lieu depuis
+  //    le chargement de cet écran. Le bloc choisissait sa phrase avant d'avoir
+  //    relu la version (« Un autre appareil… », faux pendant ~1 min, alors qu'il
+  //    était seul). On relit TOUT DE SUITE ; d'ici là, le bloc reste neutre.
+  if (String(code || '') !== 'version') { try { verifierVersionNumerotation(); } catch (_) {} }
 };
 const codeRefusNumeros = (txt) => { const m = /vrm_(pool_retreci|numeros_perimes|fiche_perdue|garage_perime|prefixe_archive)/.exec(String(txt || '')); return m ? m[0] : null; };
 
@@ -4592,9 +4599,27 @@ const memoriserSaisies = () => {
   };
   diffCarte('vinted_annonce_numeros', CHAMPS_NUMERO_FICHE, out.fiches);
   diffCarte('vinted_sale_overrides', CHAMPS_NUMERO_VENTE, out.ventes);
+  // ⚠️ (relecture du 11 octobre) Les gestes se gardent en DIFFÉRENCE (ajouté,
+  //    changé, retiré ICI), jamais la carte entière : rejouer toute la carte
+  //    ressuscitait ce qu'un AUTRE appareil avait défait entre-temps (un colis
+  //    que l'autre avait remis « à envoyer » redevenait « posté »).
   for (const k of CLES_GESTES) {
     const loc = load(k, null); if (loc == null || egal(loc, avant[k])) continue;
-    out.gestes[k] = loc; n++;
+    const av = avant[k];
+    let g;
+    if (Array.isArray(loc)) {
+      const a = Array.isArray(av) ? av : [], cle = (x) => JSON.stringify(x);
+      const sa = new Set(a.map(cle)), sl = new Set(loc.map(cle));
+      g = { __diff: 1, liste: true, ajout: loc.filter((x) => !sa.has(cle(x))), retrait: a.filter((x) => !sl.has(cle(x))) };
+      if (!g.ajout.length && !g.retrait.length) continue;
+    } else if (loc && typeof loc === 'object') {
+      const a = av && typeof av === 'object' && !Array.isArray(av) ? av : {};
+      g = { __diff: 1, ajout: {}, retrait: [] };
+      for (const i in loc) if (!egal(loc[i], a[i])) g.ajout[i] = loc[i];
+      for (const i in a) if (!(i in loc)) g.retrait.push(i);
+      if (!Object.keys(g.ajout).length && !g.retrait.length) continue;
+    } else g = { __diff: 1, valeur: loc };
+    out.gestes[k] = g; n++;
   }
   if (n) { try { localStorage.setItem(SAISIES_A_REJOUER, JSON.stringify(out)); } catch (_) {} }
   return n;
@@ -4624,10 +4649,27 @@ const rejouerSaisies = () => {
   appliquer('vinted_sale_overrides', s.ventes);
   for (const k in (s.gestes || {})) {
     if (!CLES_GESTES.includes(k)) continue;
-    const loc = s.gestes[k], cur = load(k, null);
-    let v = loc;
-    if (Array.isArray(loc) && Array.isArray(cur)) v = [...cur, ...loc.filter(x => !cur.some(y => JSON.stringify(y) === JSON.stringify(x)))];
-    else if (loc && cur && typeof loc === 'object' && typeof cur === 'object' && !Array.isArray(loc) && !Array.isArray(cur)) v = { ...cur, ...loc };
+    const g = s.gestes[k], cur = load(k, null);
+    let v;
+    if (g && typeof g === 'object' && g.__diff === 1) {
+      // La DIFFÉRENCE faite sur l'écran rechargé, appliquée à la ligne fraîche :
+      // ce que l'autre appareil a changé ailleurs reste tel quel.
+      if (g.liste) {
+        const cle = (x) => JSON.stringify(x), ret = new Set((g.retrait || []).map(cle));
+        const base = (Array.isArray(cur) ? cur : []).filter((x) => !ret.has(cle(x)));
+        const deja = new Set(base.map(cle));
+        v = [...base, ...(g.ajout || []).filter((x) => !deja.has(cle(x)))];
+      } else if ('valeur' in g) v = g.valeur;
+      else {
+        v = { ...(cur && typeof cur === 'object' && !Array.isArray(cur) ? cur : {}), ...(g.ajout || {}) };
+        for (const i of (g.retrait || [])) delete v[i];
+      }
+    } else {
+      // Mis de côté par une version d'avant (la carte entière) : comme avant.
+      const loc = g; v = loc;
+      if (Array.isArray(loc) && Array.isArray(cur)) v = [...cur, ...loc.filter(x => !cur.some(y => JSON.stringify(y) === JSON.stringify(x)))];
+      else if (loc && cur && typeof loc === 'object' && typeof cur === 'object' && !Array.isArray(loc) && !Array.isArray(cur)) v = { ...cur, ...loc };
+    }
     try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {}
     n++;
   }
@@ -7701,13 +7743,16 @@ function BlocNumerosPerimes() {
   useEffect(() => onVersionNumerotation((e) => setVer({ ...e })), []);
   const perime = !!refus || ver.etat === 'perime';
   if (!perime) return null;
+  // La version a-t-elle été RELUE depuis le refus ? Sinon on ne sait pas encore
+  // pourquoi la base a refusé : titre neutre (jamais « un autre appareil » au hasard).
+  const relue = !refus || refus.code === 'version' || (ver.at || 0) >= refus.at;
   const remise = ver.nuage != null && ver.nuage !== versionNumerotation();
   return (
     <div data-numeros-perimes={refus ? refus.code : 'version'} role="alertdialog" aria-modal="true"
       style={{ position: 'fixed', inset: 0, zIndex: 100000, background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ maxWidth: 460, borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, padding: '22px 20px' }}>
         <div style={{ fontSize: 17, fontWeight: 700, color: C.text, marginBottom: 8 }}>
-          {remise ? 'Cet écran a été ouvert avant la remise à zéro de tes numéros' : 'Un autre appareil vient de donner des numéros'}
+          {!relue ? 'Cet écran n\'est plus à jour' : remise ? 'Cet écran a été ouvert avant la remise à zéro de tes numéros' : 'Un autre appareil vient de donner des numéros'}
         </div>
         <div style={{ fontSize: 13.5, color: C.text, lineHeight: 1.55 }}>
           Les numéros affichés ici peuvent être <b>faux</b> : n'en écris aucun sur un carton et n'imprime rien depuis cet écran.
@@ -9551,7 +9596,9 @@ const cleVerifEbay = (item, utc) => { try { return JSON.stringify([item, utc || 
 // page d'erreur de Vercel n'est pas du JSON).
 async function appelEbay(corps) {
   try {
-    const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify(corps) });
+    // La version de numérotation qu'a lue CET écran (migration 013) : le serveur
+    // refuse de publier ou programmer sous un numéro d'avant la remise à zéro.
+    const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ ...corps, numerotation: versionNumerotation() }) });
     let j = null; try { j = await r.json(); } catch (_) {}
     return { code: r.status, j };
   } catch (_) { return { code: 0, j: null }; }
@@ -20346,7 +20393,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       //    sur une annonce sans numéro ni prix d'achat effaçait l'entrée entière
       //    — donc le choix — à la ligne suivante, sans un mot.
       const emptyMp = !next.mp || Object.keys(next.mp).length === 0;
-      if (emptyNum && emptyBuy && emptyMp) delete u[item.id]; else u[item.id] = next;
+      // ⚠️ (relecture du 11 octobre) Après une remise à zéro, la base REFUSE
+      //    qu'une fiche numérotée disparaisse (`vrm_fiche_perdue` : c'est la
+      //    signature d'un appareil chargé avant qu'un autre ne numérote). Effacer
+      //    son N° à la main la supprimait : refus, faux diagnostic (« un autre
+      //    appareil… »), et plus rien ne se synchronisait. On garde la fiche,
+      //    son N° vide — elle compte exactement comme une fiche absente partout.
+      const etaitNumerotee = !!String(c.numero || '').trim();
+      if (emptyNum && emptyBuy && emptyMp && !(etaitNumerotee && archiveNumeros())) delete u[item.id]; else u[item.id] = next;
       save('vinted_annonce_numeros', u); return u;
     });
     // Miroir DURABLE du prix d'achat par NUMÉRO (survit à la vente/republication).
@@ -22088,6 +22142,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // de retour en vente, on ne la liste plus comme « attendue ».
     const onlineNums = new Set();
     for (const it of (listings.items || [])) { const e = numeros[it.id]; if (e && e.numero) onlineNums.add(String(e.numero)); }
+    // ⚠️ (relecture du 11 octobre) Un numéro d'ARCHIVE (B198) n'est JAMAIS porté
+    //    par une annonce republiée (elle prend un numéro neuf) : le test par
+    //    numéro ne pouvait plus vider la liste. La paire est republiée quand une
+    //    annonce EN LIGNE est la sienne par IDENTITÉ (l'annonce de la vente,
+    //    rouverte) ou par sa PHOTO (même fichier).
+    const enLigneIds = new Set(), enLignePk = new Set();
+    for (const it of (listings.items || [])) {
+      if (!onlineAnnonceIds.has(String(it.id))) continue;
+      enLigneIds.add(String(it.id)); const pk = photoKey(it.photo); if (pk) enLignePk.add(pk);
+    }
+    const republiee = (o) => {
+      const id = o && o.transaction_id != null ? txnItem[String(o.transaction_id)] : null;
+      if (id != null && enLigneIds.has(String(id))) return true;
+      const pk = photoKey(orderPhoto(o)); return !!pk && enLignePk.has(pk);
+    };
     const out = [];
     for (const o of (sales.items || [])) {
       if (isHidden(o)) continue;
@@ -22097,6 +22166,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const num = e && e.numero ? String(e.numero) : null;
       if (num && pairsLost[num]) continue;         // déjà déclarée perdue
       if (num && onlineNums.has(num)) continue; // ce numéro est déjà porté par une annonce en ligne → déjà republiée
+      if (num && !numeroReprenable(num) && republiee(o)) continue; // ancien numéro : republiée sous un numéro neuf
       if (o.transaction_id != null && retoursDismissed[String(o.transaction_id)]) continue; // masquée à la main
       out.push({ o, kind, num, title: o.title || '', cell: num ? garageCellOf(garageGrid, num) : null });
     }
@@ -22104,7 +22174,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     out.sort((a, b) => (rank[a.kind] - rank[b.kind]) || (new Date(b.o.date || 0) - new Date(a.o.date || 0)));
     return out;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, numeros, saleOv, pairsLost, garageGrid, listings.items, retoursDismissed]);
+  }, [sales.items, numeros, saleOv, pairsLost, garageGrid, listings.items, retoursDismissed, txnItem, onlineAnnonceIds]);
 
   const RETOUR_LABEL = { retour: { txt: '↩️ Retour en cours', col: () => INV_STATUS.online.color }, rembourse: { txt: '💸 Remboursé', col: () => C.warn }, suspendue: { txt: '⏸ Suspendue', col: () => C.muted } };
 
@@ -22762,8 +22832,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (cur && cur.numero != null && String(cur.numero).trim() !== '' && !cur.autoAssigned) continue;
       const broadKey = identiteAnnonce(o);
       let reuse = (broadKey && numeros[broadKey] && numeros[broadKey].numero) ? String(numeros[broadKey].numero) : null;
-      // Une vente faite APRÈS la remise à zéro ne reprend jamais un numéro d'archive.
-      if (reuse && venteApresCoupure(o) && !numeroReprenable(reuse)) reuse = null;
+      // Une vente faite APRÈS la remise à zéro ne reprend pas un numéro d'archive
+      // par une RESSEMBLANCE (la photo : `entryKeyByPhoto` le refuse déjà). Mais
+      // quand VINTED dit quelle annonce elle vend (transaction → item_id), c'est
+      // l'IDENTITÉ de la paire : une ancienne annonce encore en ligne, vendue
+      // après la coupure, garde son « B7 » — c'est son carton. (Relecture du
+      // 11 octobre : elle recevait un numéro NEUF, tamponné sur son bordereau,
+      // pris dans la suite 1, 2, 3 des paires republiées.)
+      const parIdentite = o.transaction_id != null && txnItem[String(o.transaction_id)] != null;
+      if (reuse && !parIdentite && venteApresCoupure(o) && !numeroReprenable(reuse)) reuse = null;
       if (reuse) {
         if (!cur || String(cur.numero||'') !== reuse) { ovNext[tid] = { ...(cur||{}), numero: reuse, autoAssigned: false }; changed = true; }
       } else if ((needsBordereau(o.status) || venteRecente(o)) && !isHidden(o) && classifyOrderStatus(o.status) !== 'cancelled') {
@@ -26444,9 +26521,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {st==='cancelled' && num && (()=>{
                       const out = saleOutcome(o);
                       if (isPairLost(num)) return <span style={{color:C.danger,fontWeight:600,background:`${C.danger}18`,border:`1px solid ${C.danger}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title="Paire déclarée perdue : son numéro est libéré et sa case au garage vidée.">❌ N°{num} perdue</span>;
-                      if (out === 'retour') return <span style={{color:INV_STATUS.online.color,fontWeight:600,background:`${INV_STATUS.online.color}18`,border:`1px solid ${INV_STATUS.online.color}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title="Retour initié : la paire te revient. Elle garde son numéro — republie-la avec le même.">↩️ revient → garde le N°{num}</span>;
+                      // ⚠️ (relecture du 11 octobre) Un numéro d'ARCHIVE (« B198 ») ne
+                      //    se redonne jamais : l'app le refuse dans le champ N°. Dire
+                      //    « garde le N°B198 » envoyait faire le geste qu'elle refuse.
+                      const arch = !numeroReprenable(num);
+                      if (out === 'retour') return arch
+                        ? <span data-retour-archive="retour" style={{color:INV_STATUS.online.color,fontWeight:600,background:`${INV_STATUS.online.color}18`,border:`1px solid ${INV_STATUS.online.color}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title={`Retour initié : la paire te revient. Le N°${num} est un ancien numéro — elle prendra un numéro NEUF à sa republication : écris-le sur le carton.`}>↩️ revient → numéro neuf</span>
+                        : <span style={{color:INV_STATUS.online.color,fontWeight:600,background:`${INV_STATUS.online.color}18`,border:`1px solid ${INV_STATUS.online.color}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title="Retour initié : la paire te revient. Elle garde son numéro — republie-la avec le même.">↩️ revient → garde le N°{num}</span>;
                       if (out === 'suspendue') return <span style={{color:C.muted,fontWeight:600,background:`${C.muted}18`,border:`1px solid ${C.muted}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title="Transaction suspendue par Vinted : rien n'est tranché, on ne touche pas au numéro.">⏸ en attente → N°{num} conservé</span>;
-                      return <span style={{color:C.warn,fontWeight:600,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title="Vente annulée : si la paire t'est renvoyée, republie-la avec CE numéro (l'app le réutilise automatiquement).">🔁 renvoi → garde le N°{num}</span>;
+                      return arch
+                        ? <span data-retour-archive="renvoi" style={{color:C.warn,fontWeight:600,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title={`Vente annulée : si la paire t'est renvoyée, elle prendra un numéro NEUF à sa republication (le N°${num} est un ancien numéro) — écris-le sur le carton.`}>🔁 renvoi → numéro neuf</span>
+                        : <span style={{color:C.warn,fontWeight:600,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title="Vente annulée : si la paire t'est renvoyée, republie-la avec CE numéro (l'app le réutilise automatiquement).">🔁 renvoi → garde le N°{num}</span>;
                     })()}
                     {/* « ⚠️ à identifier » RETIRÉ (30 sept.) : écrit en orange sur
                         chaque vente sans N°, c'était la même alerte ×N (§7). Le
@@ -27796,7 +27881,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 </button>
               ); })()}
               {retoursOpen && (
-              <div style={{fontSize:11,color:C.muted,margin:'6px 0 8px',lineHeight:1.45}}>Retours et litiges en cours. Coche <b>« ✓ Reçue »</b> quand tu as la paire en main : elle passera en tête, prête à republier. <b>Retape son numéro</b> dans le champ N° de la nouvelle annonce — celui écrit sur sa boîte.</div>)}
+              <div style={{fontSize:11,color:C.muted,margin:'6px 0 8px',lineHeight:1.45}}>Retours et litiges en cours. Coche <b>« ✓ Reçue »</b> quand tu as la paire en main : elle passera en tête, prête à republier.
+                {/* (relecture du 11 octobre) « Retape son numéro » s'affichait à côté
+                    de numéros d'ARCHIVE (B…), que l'app refuse ensuite : la consigne
+                    suit le numéro, une phrase par cas présent (§7). */}
+                {retoursAttendus.some(r=>r.num&&numeroReprenable(r.num)) && <> <b>Retape son numéro</b> dans le champ N° de la nouvelle annonce — celui écrit sur sa boîte.</>}
+                {retoursAttendus.some(r=>r.num&&!numeroReprenable(r.num)) && <span data-retour-archive-consigne> Un <b>ancien numéro</b> (B…) ne se redonne pas : la paire republiée prendra un <b>numéro neuf</b> — écris-le sur le carton. Elle sortira de cette liste toute seule.</span>}
+              </div>)}
               {retoursOpen && (<div style={{display:'flex',flexDirection:'column',gap:6}}>
                 {[...retoursAttendus].sort((a,b)=>(isRetourRecu(b.o)?1:0)-(isRetourRecu(a.o)?1:0)).map((r,i)=>{
                   const lab = RETOUR_LABEL[r.kind] || RETOUR_LABEL.suspendue;
@@ -27817,7 +27908,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           {!r.num && <span style={{color:C.danger}}>numéro inconnu</span>}
                         </div>
                       </div>
-                      {r.num && <button type="button" onClick={()=>{ try{navigator.clipboard.writeText(r.num);}catch(_){}}} title={`Copier ${r.num}`} aria-label="Copier le numéro" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.muted,cursor:'pointer',fontSize:12,padding:'6px 8px'}}>⧉</button>}
+                      {r.num && numeroReprenable(r.num) && <button type="button" onClick={()=>{ try{navigator.clipboard.writeText(r.num);}catch(_){}}} title={`Copier ${r.num}`} aria-label="Copier le numéro" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.muted,cursor:'pointer',fontSize:12,padding:'6px 8px'}}>⧉</button>}
                       <button type="button" onClick={()=>toggleRetourRecu(r.o)} title={recu?'Annuler : je ne l\'ai pas encore reçue':'J\'ai récupéré cette paire'} aria-label={recu?'Annuler reçue':'Marquer reçue'} style={{flexShrink:0,border:`1px solid ${recu?INV_STATUS.online.color:C.border}`,borderRadius:8,background:recu?INV_STATUS.online.color:'transparent',color:recu?'#fff':C.muted,cursor:'pointer',fontSize:11,fontWeight:600,padding:'6px 9px',fontFamily:'inherit'}}>{recu?'✓ Reçue':'✓ Reçue ?'}</button>
                       <button type="button" onClick={()=>dismissRetour(r.o)} title="Déjà republiée / masquer cette ligne" aria-label="Masquer" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.muted,cursor:'pointer',fontSize:13,fontWeight:600,padding:'6px 8px',fontFamily:'inherit'}}><Icon name="close" size={15}/></button>
                     </div>
@@ -31111,14 +31202,32 @@ const skuEbayDe = (numero) => { const c = cleNum(numero); return c && NUM_OK.tes
 // coupure parle aussi de l'ancienne série. Sans ça, la vente Vinted de la
 // nouvelle 230 faisait retirer d'eBay l'annonce de l'ancienne 230.
 // Par l'identifiant ou la date, jamais par le titre (§5).
+// ⚠️ (relecture du 11 octobre) Le marqueur garde, PAR ANNONCE, chaque numéro
+// qu'elle portait à la coupure ET ce qu'il devient : { "<id>": { "553": "1",
+// "12": "B12" } }. Deux défauts de la liste d'identifiants d'avant :
+//   • ses deux annonces eBay portaient « VRM-553 » et « VRM-559 », numéros
+//     PROVISOIRES donnés après la coupure à des paires devenues 1 et 7 : elles
+//     étaient lues « B553 », une paire qui n'existe pas ;
+//   • une annonce RELIÉE après la coupure à une nouvelle paire (SKU réécrit en
+//     « VRM-3 ») était lue « B3 », l'ancienne paire — et le retrait automatique
+//     terminait l'annonce d'une paire qu'il a encore.
+// On ne traduit donc que si l'annonce porte ENCORE le numéro d'avant. La même
+// règle dans le serveur (`api/_lib/numerotation.js`) et l'extension (§11).
+const traductionAnnonce = (carte, id, k) => {
+  if (id == null || !carte || typeof carte !== 'object' || Array.isArray(carte)) return undefined;
+  const e = carte[String(id)];
+  if (!e || typeof e !== 'object' || Array.isArray(e) || !Object.prototype.hasOwnProperty.call(e, k)) return undefined;
+  return typeof e[k] === 'string' ? cleNum(e[k]) : '';
+};
 const numeroExterne = (k, id, liste, dateMs) => {
   const arch = archiveNumeros();
   if (!k || !arch || !/^\d+$/.test(k)) return k;
   const m = marqueurNumerotation();
-  const ids = m && !m.annule && Array.isArray(m[liste]) ? m[liste] : [];
+  const t = traductionAnnonce(m && !m.annule ? m[liste] : null, id, k);
+  if (t !== undefined) return t;
   const coupure = coupureNumerotation();
   const avant = dateMs != null && isFinite(dateMs) && coupure != null && dateMs < coupure;
-  return (id != null && ids.some((x) => String(x) === String(id))) || avant ? cleNum(arch + k) : k;
+  return avant ? cleNum(arch + k) : k;
 };
 // Le N° d'une annonce / ligne de commande eBay, lu avec son identifiant.
 const numEbayLu = (sku, itemId, dateMs) => numeroExterne(numDeSkuEbay(sku), itemId, 'ebayAnnonces', dateMs);
@@ -33111,12 +33220,19 @@ function NumerosSetting() {
   // La lettre des ANCIENS numéros (remise à zéro, migration 013) ne peut pas
   // être celle des nouveaux : « B12 » désignerait deux paires. La base le
   // refuse ; l'écran le dit avant, et n'enregistre rien.
+  // ⚠️ (relecture du 11 octobre) Cliquer « Avec une lettre » ENREGISTRAIT déjà
+  //    une lettre par défaut (« C »), puis taper « B » affichait « rien n'est
+  //    enregistré » — il repartait en croyant n'avoir rien changé, et ses paires
+  //    republiées partaient en C1, C2… La série ne s'enregistre plus qu'à la
+  //    lettre TAPÉE et acceptée, et l'écran dit ce qui est réellement enregistré.
   const arch = archiveNumeros();
+  const [refusee, setRefusee] = React.useState('');
   const poser = (v) => {
     touche.current = true;
     const n = String(v || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3);
+    if (n && arch && n === arch) { setRefusee(n); setP(prefixeNumeros()); return; }
+    setRefusee('');
     setP(n);
-    if (n && arch && n === arch) return;
     // La copie locale tout de suite (`save` écrit 500 ms plus tard) : les champs
     // N° et la numérotation automatique la lisent dès le prochain rendu.
     try { localStorage.setItem('vrm_num_prefixe', JSON.stringify(n)); } catch (_) {}
@@ -33124,9 +33240,14 @@ function NumerosSetting() {
     try { window.dispatchEvent(new Event('vrm-prefixe')); } catch (_) {}
   };
   const defaut = arch === 'B' ? 'C' : 'B';
-  const choix = (m) => { setMode(m); poser(m === 'chiffres' ? '' : (p && p !== arch ? p : defaut)); };
+  // « Avec une lettre » n'enregistre rien tout seul : la lettre se TAPE.
+  const choix = (m) => { setMode(m); setRefusee(''); if (m === 'chiffres') poser(''); };
   const pill = (on) => ({ border: `1px solid ${on ? C.accent : C.border}`, background: on ? C.accent : C.card, color: on ? (C.onAccent || '#fff') : C.text, borderRadius: 999, padding: '7px 14px', fontSize: 13, fontWeight: on ? 700 : 600, cursor: 'pointer', fontFamily: 'inherit' });
   const ex = p && p !== arch ? p : defaut;
+  const enregistree = prefixeNumeros();
+  // Les exemples ne citent JAMAIS la lettre des anciens numéros (l'app la refuse).
+  const lettreEx = arch ? (arch === 'C' ? 'D' : 'C') : 'B';
+  const lettreEx2 = ['C', 'D', 'E'].find((x) => x !== arch && x !== lettreEx);
   return (
     <div data-numeros-reglage={mode} style={{padding:'13px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
       <div style={{fontSize:13,fontWeight:600,color:C.text}}>Tes numéros de rangement</div>
@@ -33140,17 +33261,23 @@ function NumerosSetting() {
       {mode === 'lettre' && (
         <label style={{display:'flex',alignItems:'center',gap:8,marginTop:10,fontSize:12.5,color:C.text}}>
           Lettre(s) de ta série
-          <input value={p} onChange={(e) => poser(e.target.value)} placeholder="B" autoCapitalize="characters" aria-label="Lettres de la série"
+          <input value={p} onChange={(e) => poser(e.target.value)} placeholder={defaut} autoCapitalize="characters" aria-label="Lettres de la série"
             style={{width:70,padding:'8px 10px',borderRadius:8,border:`1px solid ${C.border}`,background:C.bg,color:C.text,fontSize:14,fontFamily:'inherit',textTransform:'uppercase'}}/>
         </label>
       )}
-      {mode === 'lettre' && arch && p === arch && (
+      {mode === 'lettre' && !refusee && !enregistree && (
+        <div data-numeros-lettre-a-taper style={{fontSize:12,color:C.muted,marginTop:8,lineHeight:1.5}}>
+          Tape la lettre de ta série : tant qu'aucune n'est tapée, tes prochains numéros restent en <b>chiffres</b> (1, 2, 3…).
+        </div>
+      )}
+      {mode === 'lettre' && arch && refusee && (
         <div data-numeros-lettre-archive style={{fontSize:12,color:C.text,marginTop:8,lineHeight:1.5}}>
-          « {arch} » est la lettre de tes <b>anciens</b> numéros ({arch}1, {arch}2…) : rien n'est enregistré. Choisis une autre lettre.
+          « {refusee} » est la lettre de tes <b>anciens</b> numéros ({arch}1, {arch}2…) : elle n'est pas enregistrée. Tes prochains numéros restent {enregistree ? <>en <b>{enregistree}</b> ({enregistree}1, {enregistree}2…)</> : <>en <b>chiffres</b> (1, 2, 3…)</>}. Choisis une autre lettre.
         </div>
       )}
       <div style={{fontSize:11.5,color:C.muted,marginTop:8,lineHeight:1.5}}>
-        Tu peux toujours taper un numéro à la main, dans n'importe quelle forme : 125, B125, C40. « b125 » et « B125 » sont le même carton.
+        Tu peux toujours taper un numéro à la main, dans n'importe quelle forme : 125, {lettreEx}125, {lettreEx2}40. « {lettreEx.toLowerCase()}125 » et « {lettreEx}125 » sont le même carton.
+        {arch && <> Les anciens numéros (<b>{arch}…</b>) ne se redonnent pas.</>}
       </div>
     </div>
   );
@@ -36600,6 +36727,21 @@ function AppCoeur() {
             const NUMEROS_FUSION = ['vinted_annonce_numeros','vinted_sale_overrides'];
             const applyAndReload=async(entriesBrutes)=>{
               const lireLocal=(k)=>{ const raw=localStorage.getItem(k); if(raw==null) return undefined; try{ return JSON.parse(raw); }catch{ return raw; } };
+              // ⚠️ (relecture du 11 octobre) Une sauvegarde d'AVANT la remise à
+              // zéro des numéros (migration 013) porte les anciens numéros en
+              // chiffres : la base la refusait (« vrm_numeros_perimes ») et l'écran
+              // disait « la base n'a pas répondu, réessaie » — faux, et réessayer
+              // échouait toujours. Et une sauvegarde sans clé « B… » serait PASSÉE :
+              // l'union du pool remettait 1…552 en chiffres, et les paires
+              // republiées seraient reparties à 553. On compare la VERSION de
+              // numérotation du fichier à celle de l'app, avant d'écrire quoi que ce soit.
+              const vIci=versionNumerotation();
+              if(vIci!=null){
+                const brut=(entriesBrutes.find(([k])=>k==='vrm_numerotation')||[])[1];
+                let mkF=brut; if(typeof brut==='string'){ try{ mkF=JSON.parse(brut); }catch{ mkF=null; } }
+                const vF=mkF&&typeof mkF==='object'?Number(mkF.version):NaN;
+                if(vF!==vIci){ toast(SAUVEGARDE_AVANT_REMISE); return; }
+              }
               const entries=entriesBrutes.filter(([k])=>k!=='vinted_accounts' && k!=='vrm_widget_token').map(([k,v])=>{
                 const cur=lireLocal(k);
                 if(k==='vinted_used_numeros' && Array.isArray(v)){
@@ -36612,17 +36754,21 @@ function AppCoeur() {
               });
               const avant=entries.map(([k])=>[k,localStorage.getItem(k)]);
               entries.forEach(([k,v])=>{ try{ localStorage.setItem(k, typeof v==='string'?v:JSON.stringify(v)); }catch(_){} });
-              let enregistre=false;
+              let enregistre=false, refus=null;
               try{
                 const payload={}; SYNC_KEYS.forEach(k=>{ const raw=localStorage.getItem(k); if(raw!=null){ let val; try{ val=JSON.parse(raw); }catch{ val=raw; } const f=ALLEGER_AVANT_CLOUD[k]; payload[k]=f?f(val):val; } });
                 if(Object.keys(payload).length){
                   const r=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${SUPABASE_ROW}`, { method:'PATCH', headers:sbAuth({ 'Content-Type':'application/json', Prefer:'return=minimal' }), body: JSON.stringify({ data:payload, updated_at:new Date().toISOString() }) });
                   enregistre=r.ok;
+                  if(!r.ok){ let t=''; try{ t=await r.text(); }catch(_){} refus=codeRefusNumeros(t)||'refus'; }
                 }
               }catch(_){ enregistre=false; }
               if(!enregistre){
                 avant.forEach(([k,raw])=>{ try{ if(raw==null) localStorage.removeItem(k); else localStorage.setItem(k,raw); }catch(_){} });
-                toast('⚠ La restauration n\'a pas pu être enregistrée dans ton compte (la base n\'a pas répondu). Rien n\'a changé — réessaie dans un instant.');
+                // La base a REFUSÉ (elle a répondu) ≠ la base n'a pas répondu.
+                toast(refus && refus!=='refus' ? SAUVEGARDE_AVANT_REMISE
+                  : refus ? '⚠ La base a refusé cette restauration. Rien n\'a changé.'
+                  : '⚠ La restauration n\'a pas pu être enregistrée dans ton compte (la base n\'a pas répondu). Rien n\'a changé — réessaie dans un instant.');
                 return;
               }
               toast('✓ Sauvegarde restaurée ! L\'app va se recharger.');

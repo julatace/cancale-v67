@@ -231,6 +231,30 @@ begin
 end
 $$;
 
+-- CE QUE DEVIENT UN NUMÉRO lu sur une annonce d'une autre plateforme (SKU eBay,
+-- référence Leboncoin) : la règle de `vrm_val`, sans jamais lever — un numéro
+-- donné après la coupure à PLUSIEURS paires nouvelles rend '' (aucune paire :
+-- mieux vaut un blanc qu'un faux), sans arrêter la conversion pour une annonce.
+create or replace function sauvegarde.vrm_traduire(c text, prefixe text, carte jsonb)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select case when c is null or c !~ '^[0-9]+$' then null
+              when carte is not null and carte ? c then case when jsonb_typeof(carte -> c) = 'string' then carte ->> c else '' end
+              else prefixe || c end
+$$;
+
+-- Un TITRE comparé comme le fait le serveur (`normTitre`, api/_lib/numerotation.js) :
+-- minuscules, espaces resserrés.
+create or replace function sauvegarde.vrm_norm_titre(t text)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$ select lower(btrim(regexp_replace(coalesce(t, ''), '\s+', ' ', 'g'))) $$;
+
 -- Une date en millisecondes : un nombre (secondes ou millisecondes), ou un texte ISO.
 create or replace function sauvegarde.vrm_ms(v jsonb)
 returns numeric
@@ -343,11 +367,15 @@ as $$
     'total', count(*) filter (where g <> 'vide'),
     'nu', count(*) filter (where g = 'nu'),
     'lot', count(*) filter (where g = 'lot'),
-    'archive', count(*) filter (where g = 'lettres' and sauvegarde.vrm_num_est_archive(v, prefixe)),
-    'lettres', count(*) filter (where g = 'lettres' and not sauvegarde.vrm_num_est_archive(v, prefixe)),
+    'archive', count(*) filter (where g = 'lettres' and arc),
+    'lettres', count(*) filter (where g = 'lettres' and not arc),
     'autre', count(*) filter (where g = 'autre'),
-    'neufMax', max((select max(x) from sauvegarde.vrm_num_elements(v) x)))
-  from (select v, sauvegarde.vrm_num_genre(v) g from sauvegarde.vrm_valeurs(d, quoi) v) z
+    -- (Les éléments ne sont découpés que pour un LOT : un numéro seul se lit
+    -- directement — l'appel par valeur coûtait 1,5 s de verrou sur `main`.)
+    'neufMax', max(case when g = 'nu' then (btrim(v #>> '{}'))::bigint
+                        when g = 'lot' then (select max(x) from sauvegarde.vrm_num_elements(v) x) end))
+  from (select v, g, g = 'lettres' and sauvegarde.vrm_num_est_archive(v, prefixe) arc
+          from (select v, sauvegarde.vrm_num_genre(v) g from sauvegarde.vrm_valeurs(d, quoi) v) y) z
 $$;
 
 -- CONVERTIR un endroit. `parcle` : {clé: "nouveau numéro"} — une entrée rattachée
@@ -523,6 +551,18 @@ as $$
   select coalesce(jsonb_agg(v order by v::text), '[]') from sauvegarde.vrm_valeurs(d, quoi) v where sauvegarde.vrm_num_genre(v) <> 'vide'
 $$;
 
+-- « Aucun numéro » a trois formes : une ligne absente (NULL SQL), le `null` JSON
+-- rangé dans le rapport pour cette ligne absente, et une liste vide `[]`. Le
+-- retour arrière compare les projections : les trois doivent être égales.
+create or replace function sauvegarde.vrm_proj_aucun(j jsonb)
+returns jsonb
+language sql
+immutable
+set search_path = ''
+as $$
+  select case when j is null or jsonb_typeof(j) = 'null' or j = '[]'::jsonb then null else j end
+$$;
+
 -- ── 3. LE PLAN ET LA MESURE (lecture seule) ───────────────────────────────────
 -- Le PLAN : quelles fiches sont nouvelles, jugées par quelle source de date, et
 -- leur nouveau numéro. Par IDENTITÉ de l'annonce (son id Vinted), jamais par
@@ -593,13 +633,28 @@ begin
       from public.app_data a
      where a.owner = p_owner and a.id ~ '^harvest_[0-9]+_txn_[0-9]+$' and coalesce(a.meta ->> 'item_id', '') <> ''
     union all
+    -- Le BORDEREAU capté par l'extension porte lui aussi l'annonce de sa vente
+    -- (`harvest_{uid}_label_{tx}` : `meta.tx` → `meta.item`, l'identité que l'app
+    -- lit déjà, `labelsCaptes[tx].item`). Mesuré chez lui le 11 octobre : 3 ventes
+    -- d'après la coupure n'ont QUE lui (aucune transaction captée) — sans cette
+    -- source elles passaient en « B564 » pendant que leurs voisines, captées par la
+    -- transaction, suivaient leur paire. La transaction se lit dans l'IDENTIFIANT
+    -- de la ligne ; si `meta.tx` en dit une autre, doute ⇒ on ne relie pas.
+    -- (`label_latest` est une COPIE : écartée par la forme de l'identifiant.)
+    select substring(a.id from '_label_([0-9]+)$'), a.meta ->> 'item', 1
+      from public.app_data a
+     where a.owner = p_owner and a.id ~ '^harvest_[0-9]+_label_[0-9]+$' and coalesce(a.meta ->> 'item', '') <> ''
+       and coalesce(a.meta ->> 'tx', substring(a.id from '_label_([0-9]+)$')) = substring(a.id from '_label_([0-9]+)$')
+    union all
     select k, v #>> '{}', 2 from jsonb_each(case when jsonb_typeof(d -> 'vinted_txn_link') = 'object' then d -> 'vinted_txn_link' else '{}' end) e(k, v)
      where jsonb_typeof(v) in ('string', 'number')),
   txi as (
-    -- La transaction → son annonce. Ce que Vinted dit (la transaction captée)
-    -- passe avant ce que l'app a déduit ; deux annonces différentes ⇒ on ne relie pas.
-    select tx, min(iid) iid from txi0 t
-     where prio = (select min(prio) from txi0 t2 where t2.tx = t.tx)
+    -- La transaction → son annonce. Ce que Vinted dit (la transaction ou le
+    -- bordereau captés) passe avant ce que l'app a déduit ; deux annonces
+    -- différentes ⇒ on ne relie pas. (Une fenêtre, pas une sous-requête
+    -- corrélée : 1 000 transactions × 1 000 relectures, mesuré 1,7 s.)
+    select tx, min(iid) iid from (select tx, iid, prio, min(prio) over (partition by tx) pmin from txi0) t
+     where prio = pmin
      group by tx having count(distinct iid) = 1),
   partx as (select txi.tx, nv.rang from txi join nv on nv.id = txi.iid)
   select jsonb_build_object(
@@ -622,10 +677,11 @@ begin
 end
 $$;
 
--- La MESURE : ce que la session lit juste avant d'appliquer, et passe telle quelle
--- à l'appel. Si la base ne porte plus exactement ça à l'instant de la conversion
--- (une paire numérotée, une annonce recaptée…), rien n'est fait.
-create or replace function sauvegarde.vrm_numerotation_mesurer(p_owner uuid, p_prefixe text, p_coupure timestamptz)
+-- Le BILAN des numéros (tout ce que la mesure compte, SANS le plan) : la
+-- conversion le recalcule APRÈS avoir écrit, pour recompter. Le plan, lui, n'est
+-- calculé qu'UNE fois par conversion (mesuré sur sa copie : 1,7 s sur les 6 s de
+-- l'archivage, pendant lesquelles `main` est verrouillée).
+create or replace function sauvegarde.vrm_numerotation_bilan(p_owner uuid, p_prefixe text)
 returns jsonb
 language plpgsql
 stable
@@ -637,11 +693,9 @@ declare
   res jsonb := '{}'::jsonb;
   en record;
   pool_cles text[];
-  plan jsonb;
 begin
   select data into d from public.app_data where owner = p_owner and id = 'main';
   if d is null then return null; end if;
-  plan := sauvegarde.vrm_numerotation_plan(p_owner, p_coupure);
   for en in select * from sauvegarde.vrm_endroits_main() loop
     res := res || jsonb_build_object(en.cle, sauvegarde.vrm_bilan(d -> en.cle, en.quoi, p_prefixe)
                    || jsonb_build_object('entrees', case jsonb_typeof(d -> en.cle)
@@ -664,14 +718,61 @@ begin
         'archive', count(*) filter (where g = 'lettres' and sauvegarde.vrm_num_est_archive(n, p_prefixe)),
         'lettres', count(*) filter (where g = 'lettres' and not sauvegarde.vrm_num_est_archive(n, p_prefixe)),
         'autre', count(*) filter (where g = 'autre'),
-        'neufMax', max((select max(x) from sauvegarde.vrm_num_elements(n) x)))
+        'neufMax', max(case when g = 'nu' then (btrim(n #>> '{}'))::bigint
+                            when g = 'lot' then (select max(x) from sauvegarde.vrm_num_elements(n) x) end))
       from (select a.data -> 'numero' n, sauvegarde.vrm_num_genre(a.data -> 'numero') g
               from public.app_data a
              where a.owner = p_owner and a.id ~ '^email_(bord|sale|final)_') z),
-    'plan', plan,
     'marqueur', d -> 'vrm_numerotation');
   return res;
 end
+$$;
+
+
+-- LES DRESSINGS DE SES COMPTES : la date de la dernière capture de chaque
+-- compte lié. Un dressing capté AVANT la coupure ne montre AUCUNE annonce
+-- republiée : sur ce compte, le plan ne voit rien (mesuré le 11 octobre : deux
+-- comptes figés au 8 octobre, dont un avec trois ventes après la coupure). À
+-- regarder AVANT d'appliquer ; ce n'est pas comparé à l'application (une
+-- capture de plus entre la mesure et l'application ne change rien au plan).
+create or replace function sauvegarde.vrm_numerotation_dressings(p_owner uuid, p_coupure timestamptz)
+returns jsonb
+language sql
+stable
+security invoker
+set search_path = ''
+as $$
+  with comptes as (
+    select distinct va.vinted_user_id::text uid, va.login
+      from public.vinted_accounts va where va.owner = p_owner and va.vinted_user_id is not null),
+  caches as (
+    select coalesce((select d.data -> 'vinted_accounts_hidden' from public.app_data d where d.owner = p_owner and d.id = 'main'), '[]'::jsonb) h),
+  l as (
+    select c.uid, c.login, sauvegarde.vrm_ms(to_jsonb(a.meta ->> 'capturedAt')) ms,
+           (jsonb_typeof(caches.h) = 'array' and caches.h ? c.uid) exclu
+      from comptes c cross join caches
+      left join public.app_data a on a.owner = p_owner and a.id = 'harvest_' || c.uid || '_listings')
+  select jsonb_build_object(
+    'comptes', coalesce((select jsonb_agg(jsonb_build_object('uid', uid, 'login', login, 'capte', sauvegarde.vrm_iso(ms), 'exclu', exclu,
+                                                             'avantCoupure', ms is null or ms < extract(epoch from p_coupure) * 1000) order by uid) from l), '[]'::jsonb),
+    'avantCoupure', coalesce((select jsonb_agg(coalesce(login, uid) || ' (' || coalesce(sauvegarde.vrm_iso(ms), 'jamais capté') || ')' order by uid)
+                                from l where not exclu and (ms is null or ms < extract(epoch from p_coupure) * 1000)), '[]'::jsonb))
+$$;
+
+-- La MESURE : ce que la session lit juste avant d'appliquer, et passe telle quelle
+-- à l'appel. Si la base ne porte plus exactement ça à l'instant de la conversion
+-- (une paire numérotée, une annonce recaptée…), rien n'est fait. (`dressings` est
+-- une information pour celui qui applique : jamais comparée.)
+create or replace function sauvegarde.vrm_numerotation_mesurer(p_owner uuid, p_prefixe text, p_coupure timestamptz)
+returns jsonb
+language sql
+stable
+security invoker
+set search_path = ''
+as $$
+  select sauvegarde.vrm_numerotation_bilan(p_owner, p_prefixe)
+         || jsonb_build_object('plan', sauvegarde.vrm_numerotation_plan(p_owner, p_coupure),
+                               'dressings', sauvegarde.vrm_numerotation_dressings(p_owner, p_coupure))
 $$;
 
 -- Combien de valeurs « autre » (forme inconnue), tous endroits confondus.
@@ -747,6 +848,7 @@ begin
   avant := sauvegarde.vrm_numerotation_mesurer(p_owner, p_prefixe, p_coupure);
   -- La mesure de la session tient-elle encore ? (rien de numéroté, rien de recapté entre-temps)
   for k in select jsonb_object_keys(avant) union select jsonb_object_keys(attendu) loop
+    if k = 'dressings' then continue; end if;   -- une information, pas une mesure
     if (avant -> k) is distinct from (attendu -> k) then
       raise exception 'vrm_numerotation : la base a changé depuis la mesure (% : attendu %, trouvé %) — rien n''est fait',
         k, left(coalesce((attendu -> k)::text, 'absent'), 300), left(coalesce((avant -> k)::text, 'absent'), 300);
@@ -770,24 +872,53 @@ begin
   select array_agg(distinct public.vrm_cle_num(x)) into pool_cles
     from jsonb_array_elements(case when jsonb_typeof(d -> 'vinted_used_numeros') = 'array' then d -> 'vinted_used_numeros' else '[]' end) x;
 
-  -- Les annonces Leboncoin / eBay qui portaient un ancien numéro À LA COUPURE,
-  -- par leur IDENTIFIANT (jamais par leur titre) : les lecteurs les liront en B.
-  select coalesce(jsonb_agg(distinct to_jsonb(x)), '[]'::jsonb) into lbc_ids from (
-      select k2 x from public.app_data a, jsonb_each(case when jsonb_typeof(a.data -> 'items') = 'object' then a.data -> 'items' else '{}' end) e2(k2, v)
-       where a.owner = p_owner and a.id = 'lbc_listings'
-         and (sauvegarde.vrm_num_genre(v -> 'ref') = 'nu' or coalesce(v ->> 'ref', '') ~* 'VRM[-\s]?0*[0-9]{1,6}([^0-9]|$)')
-      union
-      select k2 from jsonb_each(case when jsonb_typeof(d -> 'vrm_lbc_liens') = 'object' then d -> 'vrm_lbc_liens' else '{}' end) e2(k2, v)
-       where sauvegarde.vrm_num_genre(v) = 'nu') z;
+  -- Les annonces Leboncoin / eBay qui portaient un numéro À LA COUPURE, par leur
+  -- IDENTIFIANT (jamais par leur titre), avec, pour CHAQUE numéro qu'elles
+  -- portaient, ce qu'il devient : { "<id d'annonce>": { "553": "1", "12": "B12" } }.
+  --   • un numéro donné APRÈS la coupure à une annonce republiée (la carte :
+  --     « VRM-553 » d'une annonce eBay publiée le 10 octobre, mesuré chez lui)
+  --     suit SA paire (553 → 1) — avant, toute annonce « VRM-n » était lue
+  --     « B553 », une paire qui n'existe pas, et l'anti double vente eBay perdait
+  --     ses deux vraies annonces ;
+  --   • un numéro donné à PLUSIEURS paires nouvelles : '' (on ne devine pas) ;
+  --   • tout autre numéro est un ANCIEN numéro : « B… ».
+  -- Les lecteurs ne traduisent que si l'annonce porte ENCORE ce numéro : une
+  -- annonce reliée APRÈS la coupure à une nouvelle paire (son SKU réécrit) se lit
+  -- telle quelle. C'est pourquoi le numéro d'avant est gardé, pas seulement l'id.
+  -- Leboncoin : la référence (`ref`, chiffres ou « VRM-n »), la référence
+  -- personnalisée (`customRef`), le « VRM-n » ou le « nXXX » du titre — les
+  -- mêmes sources que `clesAnnonceLbc` (app) et `adRefKeys` (extension) — et le
+  -- lien posé à la main (`vrm_lbc_liens`).
+  select coalesce(jsonb_object_agg(aid, tr), '{}'::jsonb) into lbc_ids from (
+    select aid, jsonb_object_agg(c, sauvegarde.vrm_traduire(c, p_prefixe, carte)) tr from (
+      select distinct z.aid, z.c from (
+        select e2.k2 aid, public.vrm_cle_num(to_jsonb(x.c)) c
+          from public.app_data a, jsonb_each(case when jsonb_typeof(a.data -> 'items') = 'object' then a.data -> 'items' else '{}' end) e2(k2, v),
+               lateral (
+                 select v ->> 'ref' c where sauvegarde.vrm_num_genre(v -> 'ref') = 'nu'
+                 union all select (regexp_match(coalesce(v ->> 'ref', ''), 'VRM[-\s]?([0-9]{1,6})(?![0-9])', 'i'))[1]
+                 union all select coalesce((regexp_match(coalesce(v ->> 'customRef', ''), 'VRM[-\s]?((?:[A-Z]{1,3})?[0-9]{1,6})(?![0-9])', 'i'))[1],
+                                           (regexp_match(coalesce(v ->> 'customRef', ''), '([0-9]{1,5})'))[1])
+                 union all select (regexp_match(coalesce(v ->> 'subject', ''), 'VRM[-\s]?([0-9]{1,6})(?![0-9])', 'i'))[1]
+                 union all select (regexp_match(coalesce(v ->> 'subject', ''), '\mn\s*°?\s*([0-9]{1,5})\M', 'i'))[1]) x
+         where a.owner = p_owner and a.id = 'lbc_listings'
+        union all
+        select k2, public.vrm_cle_num(v) from jsonb_each(case when jsonb_typeof(d -> 'vrm_lbc_liens') = 'object' then d -> 'vrm_lbc_liens' else '{}' end) e2(k2, v)
+         where sauvegarde.vrm_num_genre(v) = 'nu') z
+       where z.c ~ '^[0-9]+$') y
+    group by aid) w;
   -- eBay : les annonces EN LIGNE (`ebay_listings`) et les PROGRAMMÉES
   -- (`ebay_programmees` : à venir, et déjà parties) qui portaient « VRM-n ».
-  select coalesce(jsonb_agg(distinct to_jsonb(v ->> 'itemId')), '[]'::jsonb) into ebay_ids
-    from public.app_data a,
-         jsonb_array_elements(case when jsonb_typeof(a.data -> 'items') = 'array' then a.data -> 'items' else '[]' end
-                              || case when jsonb_typeof(a.data -> 'enLigne') = 'array' then a.data -> 'enLigne' else '[]' end) v
-   where a.owner = p_owner and a.id in ('ebay_listings', 'ebay_programmees')
-     and coalesce(v ->> 'itemId', '') <> ''
-     and coalesce(v ->> 'sku', '') ~* '^\s*VRM[-\s]?0*[0-9]{1,6}\s*$';
+  select coalesce(jsonb_object_agg(iid, tr), '{}'::jsonb) into ebay_ids from (
+    select iid, jsonb_object_agg(c, sauvegarde.vrm_traduire(c, p_prefixe, carte)) tr from (
+      select distinct v ->> 'itemId' iid, public.vrm_cle_num(to_jsonb((regexp_match(v ->> 'sku', '^\s*VRM[-\s]?([0-9]{1,6})\s*$', 'i'))[1])) c
+        from public.app_data a,
+             jsonb_array_elements(case when jsonb_typeof(a.data -> 'items') = 'array' then a.data -> 'items' else '[]' end
+                                  || case when jsonb_typeof(a.data -> 'enLigne') = 'array' then a.data -> 'enLigne' else '[]' end) v
+       where a.owner = p_owner and a.id in ('ebay_listings', 'ebay_programmees')
+         and jsonb_typeof(v) = 'object' and coalesce(v ->> 'itemId', '') <> ''
+         and coalesce(v ->> 'sku', '') ~* '^\s*VRM[-\s]?0*[0-9]{1,6}\s*$') y
+    group by iid) w;
 
   -- SAUVEGARDE : `main`, le garage, « Mon local », les brouillons eBay en entier ;
   -- pour les emails, le numéro seul (les PDF ne bougent pas).
@@ -868,7 +999,8 @@ begin
 
   -- RECOMPTE. Chaque ancien numéro est devenu UN « B… », chaque fiche nouvelle
   -- porte un numéro de 1 à N, et aucun numéro en chiffres ne sort de 1…N.
-  apres := sauvegarde.vrm_numerotation_mesurer(p_owner, p_prefixe, p_coupure);
+  -- Le bilan SANS le plan : le plan est celui d'avant (`avant`), calculé une fois.
+  apres := sauvegarde.vrm_numerotation_bilan(p_owner, p_prefixe);
   if sauvegarde.vrm_mesure_somme(apres, 'autre') <> 0 then
     raise exception 'vrm_numerotation : une valeur de forme inconnue après conversion — tout est annulé (%)', apres;
   end if;
@@ -920,7 +1052,7 @@ begin
                             'nouvelles', plan -> 'nouvelles', 'sources', plan -> 'sources', 'sourcesNouvelles', plan -> 'sourcesNouvelles',
                             'contradictions', plan -> 'contradictions', 'numerosSortisDuPool', (select coalesce(jsonb_agg(k2 order by k2::int), '[]') from jsonb_object_keys(carte) k2),
                             'emailsSuivis', n_suivis, 'emailsConvertis', n_convertis, 'emailsDeplacesEnTitre', n_deplaces,
-                            'lbcAnnonces', jsonb_array_length(lbc_ids), 'ebayAnnonces', jsonb_array_length(ebay_ids),
+                            'lbcAnnonces', (select count(*) from jsonb_object_keys(lbc_ids)), 'ebayAnnonces', (select count(*) from jsonb_object_keys(ebay_ids)),
                             'apres', apres - 'plan');
 end
 $$;
@@ -946,6 +1078,7 @@ declare
   partx jsonb;
   fin timestamptz;
   ids jsonb;
+  dm jsonb;
   n int;
 begin
   select * into fait from sauvegarde.numerotation_faite where owner = p_owner and annule_le is null order by version desc limit 1;
@@ -957,6 +1090,7 @@ begin
   carte := coalesce(fait.rapport -> 'avant' -> 'plan' -> 'carte', '{}'::jsonb);
   partx := coalesce(fait.rapport -> 'avant' -> 'plan' -> 'parTx', '{}'::jsonb);
   fin := (fait.rapport ->> 'finLe')::timestamptz;
+  select data into dm from public.app_data where owner = p_owner and id = 'main';
   select coalesce(jsonb_agg(a.id), '[]'::jsonb) into ids
     from public.app_data a
    where a.owner = p_owner and a.id ~ '^email_(bord|sale|final)_'
@@ -966,8 +1100,20 @@ begin
      and sauvegarde.vrm_ms(a.data -> 'receivedAt') is not null
      and sauvegarde.vrm_ms(a.data -> 'receivedAt') <= extract(epoch from fin) * 1000 + p_secondes * 1000
      and (partx ? coalesce(a.data ->> 'transaction', '')
-          or not exists (select 1 from sauvegarde.vrm_num_elements(a.data -> 'numero') el
-                          where not (el::text = any (coalesce(pool_cles, '{}'::text[])) or carte ? el::text)));
+          or (not exists (select 1 from sauvegarde.vrm_num_elements(a.data -> 'numero') el
+                           where not (el::text = any (coalesce(pool_cles, '{}'::text[])) or carte ? el::text))
+              -- ⚠️ Le pool d'AVANT contient aussi 1…N : un « 5 » rangé dans la
+              -- fenêtre peut être celui de la NOUVELLE paire 5 (l'email a lu la
+              -- ligne convertie). Prouvé le 11 octobre : il devenait « B5 ». Un
+              -- numéro que porte une fiche ACTUELLE au MÊME titre que l'email est
+              -- de la nouvelle série (la règle `numeroDuTitreApresCoupure` du
+              -- serveur, §11) : on n'y touche pas.
+              and not (sauvegarde.vrm_num_genre(a.data -> 'numero') = 'nu'
+                       and exists (select 1 from jsonb_each(case when jsonb_typeof(dm -> 'vinted_annonce_numeros') = 'object' then dm -> 'vinted_annonce_numeros' else '{}' end) f(fk, fv)
+                                    where jsonb_typeof(fv) = 'object'
+                                      and public.vrm_cle_num(fv -> 'numero') = public.vrm_cle_num(a.data -> 'numero')
+                                      and sauvegarde.vrm_norm_titre(fv ->> 'title') <> ''
+                                      and sauvegarde.vrm_norm_titre(fv ->> 'title') = sauvegarde.vrm_norm_titre(coalesce(a.data ->> 'article', a.data ->> 'designation', a.data ->> 'modele'))))));
   insert into sauvegarde.numerotation_013 (owner, id, passage, data)
   select a.owner, a.id, fait.passage, jsonb_build_object('numero', a.data -> 'numero', 'aNumeroTitre', a.data ? 'numeroTitre', 'numeroTitre', a.data -> 'numeroTitre', 'rattrape', true)
     from public.app_data a where a.owner = p_owner and a.id in (select jsonb_array_elements_text(ids))
@@ -1033,9 +1179,17 @@ begin
   for k in select jsonb_object_keys(fait.rapport -> 'projApres') loop
     if (sauvegarde.vrm_projection(d) -> k) is distinct from (fait.rapport -> 'projApres' -> k) then bouge := bouge || k || ' '; end if;
   end loop;
-  if (select sauvegarde.vrm_proj_liste(data, 'garage') from public.app_data where owner = p_owner and id = 'vrm_room') is distinct from (fait.rapport -> 'garageApres') then bouge := bouge || 'vrm_room '; end if;
-  if (select sauvegarde.vrm_proj_liste(data, 'pins') from public.app_data where owner = p_owner and id = 'vrm_local') is distinct from (fait.rapport -> 'pinsApres') then bouge := bouge || 'vrm_local '; end if;
-  if (select sauvegarde.vrm_proj_liste(data -> 'items', 'champ') from public.app_data where owner = p_owner and id = 'ebay_brouillons') is distinct from (fait.rapport -> 'brouillonsApres') then bouge := bouge || 'ebay_brouillons '; end if;
+  -- ⚠️ Une ligne ABSENTE (aucun garage, aucun brouillon eBay — mesuré chez lui :
+  -- pas de `ebay_brouillons`) vaut une ligne sans numéro : la sous-requête rend
+  -- un NULL SQL, la conversion avait rangé un `null` JSON, et `is distinct from`
+  -- les disait différents — le retour arrière était REFUSÉ sans qu'aucun numéro
+  -- ait bougé. `vrm_proj_aucun` ramène les trois formes du vide à une seule.
+  if sauvegarde.vrm_proj_aucun((select sauvegarde.vrm_proj_liste(data, 'garage') from public.app_data where owner = p_owner and id = 'vrm_room'))
+     is distinct from sauvegarde.vrm_proj_aucun(fait.rapport -> 'garageApres') then bouge := bouge || 'vrm_room '; end if;
+  if sauvegarde.vrm_proj_aucun((select sauvegarde.vrm_proj_liste(data, 'pins') from public.app_data where owner = p_owner and id = 'vrm_local'))
+     is distinct from sauvegarde.vrm_proj_aucun(fait.rapport -> 'pinsApres') then bouge := bouge || 'vrm_local '; end if;
+  if sauvegarde.vrm_proj_aucun((select sauvegarde.vrm_proj_liste(data -> 'items', 'champ') from public.app_data where owner = p_owner and id = 'ebay_brouillons'))
+     is distinct from sauvegarde.vrm_proj_aucun(fait.rapport -> 'brouillonsApres') then bouge := bouge || 'ebay_brouillons '; end if;
   select coalesce(jsonb_object_agg(a.id, a.data -> 'numero'), '{}'::jsonb) into emails_maint
     from public.app_data a where a.owner = p_owner and a.id ~ '^email_(bord|sale|final)_' and sauvegarde.vrm_num_genre(a.data -> 'numero') <> 'vide';
   if emails_maint is distinct from coalesce(fait.rapport -> 'emailsApres', '{}'::jsonb) then bouge := bouge || 'emails '; end if;
@@ -1135,6 +1289,8 @@ $$;
 
 revoke all on function sauvegarde.vrm_numerotation_plan(uuid, timestamptz) from public;
 revoke all on function sauvegarde.vrm_numerotation_mesurer(uuid, text, timestamptz) from public;
+revoke all on function sauvegarde.vrm_numerotation_bilan(uuid, text) from public;
+revoke all on function sauvegarde.vrm_numerotation_dressings(uuid, timestamptz) from public;
 revoke all on function sauvegarde.vrm_numerotation_archiver(uuid, text, timestamptz, jsonb) from public;
 revoke all on function sauvegarde.vrm_numerotation_rattraper(uuid, int) from public;
 revoke all on function sauvegarde.vrm_numerotation_annuler(uuid) from public;

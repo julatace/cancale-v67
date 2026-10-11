@@ -64,6 +64,14 @@ select jsonb_build_object(
   'coupure', '${COUPURE}',
   'proprietaireTrouve', ${OWNER} is not null,
   'plan', (select mesure -> 'plan' from _essai_013),
+  -- ⚠️ À LIRE AVANT D'APPLIQUER : un compte dont le dressing a été capté avant la
+  -- coupure (ou jamais) ne montre aucune annonce republiée — le plan ne voit rien
+  -- sur lui. Le faire recapter (passer sur Vinted connecté sur ce compte), puis
+  -- refaire l'essai.
+  'attention', (select jsonb_build_object(
+      'dressingsAvantCoupure', mesure -> 'dressings' -> 'avantCoupure',
+      'nouvellesPasEnLigne', mesure -> 'plan' -> 'nouvellesPasEnLigne') from _essai_013),
+  'dressings', (select mesure -> 'dressings' -> 'comptes' from _essai_013),
   'rapport', (select rapport - 'apres' - 'nouvelles' from _essai_013),
   'marqueur', (select data -> 'vrm_numerotation' from public.app_data where owner = ${OWNER} and id = 'main'),
   'poolApres', (select jsonb_build_object(

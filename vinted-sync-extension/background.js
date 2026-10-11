@@ -5883,11 +5883,18 @@ async function readLbcItems() {
 // paire — sa référence « 230 » est la B230, jamais la nouvelle 230. La MÊME
 // règle que `clesAnnonceLbc` / `numeroExterne` dans l'app (§11) ; le lien posé
 // À LA MAIN reste ce qu'il dit. Marqueur absent ou annulé : comme avant.
+// Le marqueur garde, PAR ANNONCE, chaque numéro qu'elle portait à la coupure et
+// ce qu'il devient ({ "<id>": { "553": "1", "266": "B266" } }) : un numéro donné
+// après la coupure suit sa nouvelle paire, un numéro réécrit APRÈS se lit tel
+// quel. La même règle que `traductionAnnonce` dans l'app et le serveur (§11).
 function numeroLbcLu(k, ad, mk) {
   const arch = mk && typeof mk === 'object' && !mk.annule && /^[A-Z]{1,3}$/.test(String(mk.archive || '')) ? String(mk.archive) : '';
   if (!k || !arch || !/^\d+$/.test(k)) return k;
-  const ids = Array.isArray(mk.lbcAnnonces) ? mk.lbcAnnonces : [];
-  return ad && ad.id != null && ids.some((x) => String(x) === String(ad.id)) ? cleNum(arch + k) : k;
+  const carte = mk.lbcAnnonces;
+  if (!ad || ad.id == null || !carte || typeof carte !== 'object' || Array.isArray(carte)) return k;
+  const e = carte[String(ad.id)];
+  if (!e || typeof e !== 'object' || Array.isArray(e) || !Object.prototype.hasOwnProperty.call(e, k)) return k;
+  return typeof e[k] === 'string' ? cleNum(e[k]) : '';
 }
 function adRefKeys(ad, liens, mk) {
   const keys = [];
