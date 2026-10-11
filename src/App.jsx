@@ -2071,10 +2071,9 @@ const fetchHarvestBrut = async (uid, type, opts = {}) => {
     // 24 h. Tous les écrans qui en dérivent la suivent sans la recalculer (§11).
     if (type === 'listings') return await dressingEnLigne(uid, row || null, opts);
     if (!row) return null;
-    // Un dressing se date par `dateLectureDressing` (capturedAt seul), comme chez
-    // tous ses autres lecteurs (§11) : la date dite à l'écran et celle qui écarte
-    // les annonces supprimées sont la MÊME.
-    const ts = type === 'listings' ? dateLectureDressing(row) : harvestTs(row);
+    // (Un dressing ne passe pas ici : il se date par `dateLectureDressing` dans
+    // `dressingEnLigne`, comme chez tous ses autres lecteurs — §11.)
+    const ts = harvestTs(row);
     if (!isNaN(ts)) _harvestSeen[`${uid}_${type}`] = ts;
     // ⚠️ ON NE JETTE PLUS une moisson « trop vieille » par défaut. Ça faisait
     // afficher « Impossible de charger » (Messages, Annonces…) dès que Julien

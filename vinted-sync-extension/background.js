@@ -3044,6 +3044,10 @@ async function lireDressingPublic(lire, pid, avantPage) {
     await wait(1200);
   }
   if (complet && total != null && items.length < total) return { complet: false, raison: 'total', total, n: items.length };
+  // Sans total annoncé (forme inattendue, page vide sans pagination), on ne peut
+  // pas prouver qu'on a TOUT lu : une réponse vide déciderait sinon que toutes
+  // ses annonces sont parties. « Rien lu » ne vaut pas « rien » (§4.1).
+  if (complet && total == null) return { complet: false, raison: 'sans-total', n: items.length };
   return complet ? { complet: true, items, total } : { complet: false, raison, statut };
 }
 // La dernière lecture de chaque compte (son dressing ou sa lecture publique),

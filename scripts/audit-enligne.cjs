@@ -68,6 +68,8 @@ const MUTATIONS = {
   // la lecture publique écraserait le dressing du compte
   ecrase: [['bg', "const ok = await supabaseUpsert('app_data', [{ id: `harvest_${uid}_enligne`, data, updated_at: data.capturedAt }], 'id');", "const ok = await supabaseUpsert('app_data', [{ id: `harvest_${uid}_listings`, data, updated_at: data.capturedAt }], 'id');"]],
   // un article d'un autre membre serait rangé
+  // une réponse sans total (page vide, forme inattendue) passerait pour « tout est parti »
+  senstotal: [['bg', `  if (complet && total == null) return { complet: false, raison: 'sans-total', n: items.length };\n`, ``]],
   autremembre: [['bg', `      if (proprio != null && String(proprio) !== String(pid)) return { complet: false, raison: 'autre-membre' };\n`, ``]],
   // la file Leboncoin alerterait « à retirer » sur une paire à confirmer
   retirer: [['bg', `    if (aConfirmerIds.has(pid)) continue;              // à confirmer : on ne sait pas, on n'alerte pas\n`, ``]],
@@ -277,6 +279,18 @@ console.log('── A. La règle « en ligne » : la même dans l\'app et dans l
     const f = monter({ repondre: (pid, page) => (pid === String(PID['333']) ? { status: 200, body: { items: [art(1), art(2)].map((it) => Object.assign({ user_id: PID['333'] }, it)), pagination: { current_page: 1, total_pages: 1, total_entries: 5 } } } : null) });
     await f.ctx.relireAnnoncesAutresComptes('111');
     dit(!f.lignes.harvest_333_enligne, 'un total annoncé (5) que les pages n\'atteignent pas (2) : rien n\'est rangé', JSON.stringify(f.lignes.harvest_333_enligne || null).slice(0, 80));
+  });
+
+  await essaie('B6b sans total', async () => {
+    // Une forme inattendue — page vide, aucune pagination — ne prouve pas que le
+    // dressing est vide : rangée, elle ferait « disparaître » toutes ses annonces.
+    const f = monter({ repondre: (pid) => (pid === String(PID['333']) ? { status: 200, body: { items: [] } } : null) });
+    await f.ctx.relireAnnoncesAutresComptes('111');
+    dit(!f.lignes.harvest_333_enligne, 'une réponse vide SANS total annoncé : rien n\'est rangé (aucune annonce ne disparaît sur une forme inattendue)', JSON.stringify(f.lignes.harvest_333_enligne || null).slice(0, 80));
+    // L'autre sens : un dressing VIDE annoncé comme tel (total 0) est une réponse.
+    const g = monter({ repondre: (pid) => (pid === String(PID['333']) ? { status: 200, body: { items: [], pagination: { current_page: 1, total_pages: 0, total_entries: 0 } } } : null) });
+    await g.ctx.relireAnnoncesAutresComptes('111');
+    dit(!!g.lignes.harvest_333_enligne && g.lignes.harvest_333_enligne.n === 0 && g.lignes.harvest_333_enligne.complet === true, 'l\'autre sens : un dressing vide annoncé (total 0) est rangé, complet', JSON.stringify(g.lignes.harvest_333_enligne || null).slice(0, 80));
   });
 
   await essaie('B7 autre membre', async () => {
