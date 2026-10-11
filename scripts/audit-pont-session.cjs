@@ -529,9 +529,10 @@ const quiRepond = (r, t) => (t.vivante(r) ? String(t.vivante(r)) : 'vide/erreur'
     //    Reproduit : job de 20 h, onglet sur vinted.fr — « je te le remets
     //    devant » trois fois de suite, la paire bloquée pour toujours.
     pages.get(tab2).url = 'https://www.vinted.fr/member/1';
-    await b.ctx.majCmd('lbc:7700112233', { etape: 'depot', at: Date.now() - 20 * 3600e3 });
+    const vieillir = (h) => { b.store.vrmCmds['lbc:7700112233'].at = Date.now() - h * 3600e3; };   // `majCmd` date à l'instant
+    await b.ctx.majCmd('lbc:7700112233', { etape: 'depot' }); vieillir(20);
     const r5 = [];
-    for (let k = 0; k < 3; k++) r5.push(await b.ctx.publierDepuisApp({ cmd: 'lbcPublier', id: '7700112233' }));
+    for (let k = 0; k < 3; k++) { r5.push(await b.ctx.publierDepuisApp({ cmd: 'lbcPublier', id: '7700112233' })); if (b.store.vrmCmds['lbc:7700112233'].etape === 'depot') vieillir(20); }
     dit(r5.every((r) => !(r && r.ouvert)) && r5.every((r) => r && r.code === 'confirmer'), "h2 · onglet parti sur une autre page : plus jamais « je te le remets devant » — le dépôt est abandonné, et il décide (confirmer)", JSON.stringify(r5.map((r) => r && (r.code || (r.accepte ? 'accepte' : '?')))));
     const r6 = await b.ctx.publierDepuisApp({ cmd: 'lbcPublier', id: '7700112233', confirme: true });
     dit(r6 && r6.accepte && crees.length === 3, 'h2 · et une fois confirmé, la paire repart (elle n’est plus immobilisée)', JSON.stringify({ r6, crees: crees.length }));
@@ -539,9 +540,13 @@ const quiRepond = (r, t) => (t.vivante(r) ? String(t.vivante(r)) : 'vide/erreur'
     // l'existence de l'onglet ne suffit pas.
     const tab3 = (await cmds()).tabId;
     pages.get(tab3).muet = true;
-    await b.ctx.majCmd('lbc:7700112233', { etape: 'depot', at: Date.now() - 20 * 3600e3 });
+    // L'autre sens : un double clic pendant que la page CHARGE (lbc.js pas
+    // encore là) n'est pas un dépôt abandonné — sinon un second dépôt partirait.
+    const r7a = await b.ctx.publierDepuisApp({ cmd: 'lbcPublier', id: '7700112233' });
+    dit(r7a && r7a.ouvert === true && (await cmds()).etape === 'depot' && crees.length === 3 && b.store.vrmPendingAd, "h2 · autre sens : re-cliquer pendant que la page du dépôt charge (lbc.js pas encore là) — remis devant, rien d'abandonné, aucun second dépôt", JSON.stringify({ r7a, etape: (await cmds()).etape, crees: crees.length }));
+    vieillir(20);
     const r7 = await b.ctx.publierDepuisApp({ cmd: 'lbcPublier', id: '7700112233' });
-    dit(r7 && !r7.ouvert && r7.code === 'confirmer', "h2 · onglet sur le dépôt mais lbc.js muet : pas « remis devant » non plus", JSON.stringify(r7));
+    dit(r7 && !r7.ouvert && r7.code === 'confirmer' && !b.store.vrmPendingAd, "h2 · onglet sur le dépôt mais lbc.js muet : pas « remis devant » non plus — et la paire n'y attend plus (cette page ne la reprendra pas toute seule)", JSON.stringify({ r7, pending: !!b.store.vrmPendingAd }));
   });
 
   // ══ f. LE PONT : UN ORPHELIN SE TAIT, UN DOUBLON NE RELAIE PAS DEUX FOIS ══

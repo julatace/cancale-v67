@@ -4718,7 +4718,11 @@ async function publierDepuisApp(msg) {
       //    paire. Sinon, le dépôt est abandonné — on ne sait pas comment il a
       //    fini (voir plus bas).
       if (onglet) {
-        const vivant = await ongletDepotVivant(onglet, id, lbc, jobDeja.etape === 'abandonne');
+        // Un dépôt ouvert il y a moins de 30 s : sa page charge encore, lbc.js
+        // ne peut pas encore répondre — un double clic ne doit pas le déclarer
+        // abandonné (ni en ouvrir un second).
+        const recent = jobDeja.etape === 'depot' && Date.now() - Number(jobDeja.at || 0) < 30000;
+        const vivant = await ongletDepotVivant(onglet, id, lbc, jobDeja.etape === 'abandonne', recent);
         if (vivant) {
           try { await chrome.tabs.update(onglet.id, { active: true }); if (onglet.windowId != null) chrome.windows.update(onglet.windowId, { focused: true }); } catch (_) {}
           if (jobDeja.etape === 'abandonne') {
@@ -4727,7 +4731,14 @@ async function publierDepuisApp(msg) {
           }
           return { accepte: false, code: 'en-cours', ouvert: true, raison: lbc ? 'son dépôt est encore ouvert dans un onglet Leboncoin — je te le remets devant' : 'sa préparation eBay est encore ouverte — je te la remets devant' };
         }
-        if (jobDeja.etape === 'depot' || jobDeja.raison !== 'onglet-quitte') await majCmd(cleJob, { etape: 'abandonne', raison: 'onglet-quitte', tabId: null });
+        await majCmd(cleJob, { etape: 'abandonne', raison: 'onglet-quitte', tabId: null });
+        // Comme un onglet fermé : la paire n'attend plus dans une page de dépôt
+        // (une page restée sur le dépôt la reprendrait toute seule).
+        try {
+          const cle = lbc ? 'vrmPendingAd' : 'vrmPendingEbay';
+          const pend = (await chrome.storage.local.get(cle))[cle];
+          if (pend && pend.ad && String(pend.ad.id) === String(id)) await chrome.storage.local.set({ [cle]: null });
+        } catch (_) {}
         etapeDeja = 'abandonne';
         onglet = null;
       }
@@ -4755,10 +4766,13 @@ async function publierDepuisApp(msg) {
 //    remplissage (dépôt arrêté) ; vivant = il a repris. Pas de réponse (lbc.js
 //    absent, page partie ailleurs, ancienne version) ⇒ pas vivant.
 //    eBay : ebay.js ne répond pas à ce message — l'adresse seule juge.
-async function ongletDepotVivant(onglet, id, lbc, reprendre) {
+async function ongletDepotVivant(onglet, id, lbc, reprendre, recent) {
   const url = String((onglet && (onglet.url || onglet.pendingUrl)) || '');
   if (!lbc) return !url || /^https:\/\/([a-z0-9-]+\.)*ebay\.(fr|com)\//i.test(url);
   if (url && (!/^https:\/\/([a-z0-9-]+\.)*leboncoin\.fr\/deposer-une-annonce/i.test(url) || /\/confirmation/i.test(url))) return false;
+  // Page qui charge (ou dépôt ouvert à l'instant) : lbc.js ne répond pas
+  // ENCORE — elle reprendra d'elle-même la paire en chargeant (`getPending`).
+  if ((onglet && onglet.status === 'loading') || recent) return true;
   const rep = await new Promise((res) => {
     let fini = false;
     const t = setTimeout(() => { if (!fini) { fini = true; res(null); } }, 2500);
