@@ -96,7 +96,12 @@ const PONTS = (ponts) => {
     ready();
   });
 };
-const UN_PONT = [{ version: '5.166.0', id: 'ext1' }];
+// « À jour » = la version que l'app ATTEND (EXT_ATTENDUE, lue dans la source) :
+// une version écrite ici vieillirait au prochain numéro et ferait passer l'état
+// « ok » pour « en retard » (la relecture des autres comptes arrive en 5.167).
+const VERSION_A_JOUR = (fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'App.jsx'), 'utf8').match(/const EXT_ATTENDUE = '([\d.]+)'/) || [])[1];
+if (!VERSION_A_JOUR) { console.log('KO EXT_ATTENDUE introuvable dans src/App.jsx'); process.exit(1); }
+const UN_PONT = [{ version: VERSION_A_JOUR, id: 'ext1' }];
 
 async function rendre(b, { lignes, suppKO = false, tel = false, mobile, onglet = 'cat_annonces', etat = {}, ponts = UN_PONT, accs, section }) {
   const vp = tel ? { width: 390, height: 844 } : { width: 1512, height: 950 };
@@ -129,7 +134,14 @@ async function rendre(b, { lignes, suppKO = false, tel = false, mobile, onglet =
     ? r.fulfill({ status: 503, contentType: 'application/json', body: '{"erreur":"pas-su"}' })
     : r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' })));
   await pg.goto(`http://localhost:${PORT}/?tab=${onglet}`, { waitUntil: 'domcontentloaded' });
-  await pg.waitForTimeout(4500);
+  // Sous charge (plusieurs bancs à la fois), le premier rendu peut dépasser
+  // 4,5 s : on attend que l'écran ait DIT quelque chose (une carte, le chiffre du
+  // tableau de bord, la file) — au plus 25 s. Un écran qui ne rend jamais reste
+  // rouge : l'attente ne cache rien, elle évite de mesurer la charge du banc.
+  await pg.waitForFunction(() => document.querySelector('[data-carte-annonce]')
+    || (document.querySelector('[data-dash-stat="online"]') && /\d/.test(document.querySelector('[data-dash-stat="online"]').innerText))
+    || /Zeta/.test(document.body.innerText), null, { timeout: 25000 }).catch(() => {});
+  await pg.waitForTimeout(2000);
   if (section) { await pg.click(`[data-section="${section}"]`); await pg.waitForTimeout(2500); }
   return { ctx, pg, errs };
 }

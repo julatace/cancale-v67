@@ -129,7 +129,14 @@ async function rendre(b, { lignes, tel = false, onglet = 'cat_annonces', enligne
     ? r.fulfill({ status: 503, contentType: 'application/json', body: '{"erreur":"pas-su"}' })
     : r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' })));
   await pg.goto(`http://localhost:${PORT}/?tab=${onglet}`, { waitUntil: 'domcontentloaded' });
-  await pg.waitForTimeout(4500);
+  // Sous charge (plusieurs bancs à la fois), le premier rendu peut dépasser
+  // 4,5 s : on attend que l'écran ait DIT quelque chose (une carte, le chiffre du
+  // tableau de bord, la file) — au plus 25 s. Un écran qui ne rend jamais reste
+  // rouge : l'attente ne cache rien, elle évite de mesurer la charge du banc.
+  await pg.waitForFunction(() => document.querySelector('[data-carte-annonce]')
+    || (document.querySelector('[data-dash-stat="online"]') && /\d/.test(document.querySelector('[data-dash-stat="online"]').innerText))
+    || /Zeta/.test(document.body.innerText), null, { timeout: 25000 }).catch(() => {});
+  await pg.waitForTimeout(2000);
   return { ctx, pg, errs };
 }
 const lireAnnonces = (pg) => pg.evaluate((PAIRE) => {
