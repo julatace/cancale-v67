@@ -1604,6 +1604,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     storeWriteReq(domain, msg.method, msg.url, msg.body);
   } else if (msg.kind === 'seen_urls' && Array.isArray(msg.paths)) {
     storeSeenUrls(domain, msg.paths, msg.reponses);
+  } else if (msg.kind === 'suppression' && msg.itemId) {
+    noterSuppression(domain, msg.itemId, msg.status, msg.at);
   } else if (msg.kind === 'vintedFrein' && freinVinted(Number(msg.statut))) {
     // 5.162 : la moisson faite DANS la page (`inject.js`) a reçu un 429/403 sur
     // SA propre requête. Même pause que pour les requêtes du fond. (Un message
@@ -1703,6 +1705,137 @@ async function storeWriteReq(domain, method, url, body) {
   const key = (path.replace(/\/\d+/g, '/_id').replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '').slice(0, 60)) || 'root';
   const data = { uid, method, url: WREQ_SENSIBLE.test(path) ? path : url, path, body: body || '', capturedAt: new Date().toISOString() };
   await supabaseUpsert('app_data', [{ id: `harvest_${uid}_wreq_${key}`, data }], 'id');
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// UNE ANNONCE SUPPRIMÉE SUR VINTED SORT DE VRM TOUT DE SUITE (5.165)
+// ══════════════════════════════════════════════════════════════════════════════
+// Julien, 9 octobre 18:40 : « je viens de supprimer beaucoup de paires et elles
+// sont encore marquées dans les annonces ». Il supprime tout pour reposter ; le
+// dressing de cinq comptes datait du 8 au soir (~41 annonces affichées « en
+// ligne »). La seule trace d'une suppression était `writereq` — posée AVANT la
+// requête (donc aussi pour une suppression refusée), sans statut, une ligne par
+// compte écrasée à chaque fois.
+// ⇒ `inject.js` voit la RÉPONSE de `POST /api/v2/items/{id}/delete` et ne poste
+//   qu'un 2xx, avec l'IDENTIFIANT de l'annonce (§5). On le range ici dans UNE
+//   ligne par compte, `harvest_{uid}_supprimees = { uid, ids: { [id]: atISO } }`,
+//   bornée aux 500 plus récentes.
+// ⚠️ Il en supprime des dizaines à la suite : deux lire-fusionner-réécrire en
+//    même temps sur la MÊME ligne se perdraient l'un l'autre. Une seule chaîne,
+//    et la file d'attente vit dans `chrome.storage.local` (§4.9 : le service
+//    worker meurt, la suppression vue ne doit pas mourir avec lui).
+// ⚠️ « Rien lu ne vaut pas rien » : lecture de la ligne ratée ⇒ on n'écrit PAS
+//    (on écraserait les suppressions déjà rangées) ; l'entrée reste en file et
+//    repart au tour suivant (alarme, visite). `audit-fusion` porte le cas.
+// ⚠️ Supprimée n'est PAS vendue : rien de tout ça n'entre dans une preuve de
+//    vente, un CA, ni « à retirer de Leboncoin ». Le numéro n'est pas touché.
+const SUPPR_FILE = 'vrmSupprAttente';
+const SUPPR_MAX = 500;
+let _chaineSuppr = Promise.resolve();
+async function noterSuppression(domain, itemId, status, at) {
+  const id = String(itemId || '');
+  const st = Number(status);
+  if (!/^\d{4,15}$/.test(id) || !(st >= 200 && st < 300)) { noterDiag('suppression_refusee_forme'); return; }
+  const uid = await activeAccountId(domain);
+  if (!uid) { noterDiag('suppression_sans_compte'); return; }   // on ne devine pas le compte
+  let t = Date.parse(String(at || ''));
+  if (isNaN(t) || t > Date.now() + 5 * 60000) t = Date.now();   // l'heure de la page ne dicte rien de futur
+  // ⚠️ L'ENFILAGE PASSE AUSSI PAR LA CHAÎNE. Dix suppressions reçues en même
+  //    temps faisaient dix lire-ajouter-réécrire de la file dans
+  //    `chrome.storage` : la dernière écriture gagnait, neuf se perdaient
+  //    (prouvé au banc, `audit-supprimees` : 1/10).
+  const entree = { uid: String(uid), id, at: new Date(t).toISOString() };
+  const enfiler = async () => {
+    try {
+      const enAttente = (await chrome.storage.local.get(SUPPR_FILE))[SUPPR_FILE] || [];
+      enAttente.push(entree);
+      await chrome.storage.local.set({ [SUPPR_FILE]: enAttente.slice(-SUPPR_MAX) });
+      noterDiag('suppression_vue');
+    } catch (_) {}
+  };
+  _chaineSuppr = _chaineSuppr.then(enfiler, enfiler);
+  await viderSuppressions();
+}
+function viderSuppressions() {
+  _chaineSuppr = _chaineSuppr.then(rangerSuppressions, rangerSuppressions);
+  return _chaineSuppr;
+}
+async function rangerSuppressions() {
+  let file = [];
+  try { file = (await chrome.storage.local.get(SUPPR_FILE))[SUPPR_FILE] || []; } catch (_) { return; }
+  if (!file.length) return;
+  const parCompte = {};
+  for (const e of file) if (e && e.uid && e.id) (parCompte[e.uid] = parCompte[e.uid] || []).push(e);
+  const ranges = new Set();
+  for (const uid of Object.keys(parCompte)) {
+    const rows = await sbGet(`app_data?id=eq.harvest_${uid}_supprimees&select=data`);
+    if (rows === null) { noterDiag('suppression_lecture_ratee'); continue; }   // pas su : on n'écrase rien
+    const cur = (rows[0] && rows[0].data) || {};
+    const ids = Object.assign({}, (cur.ids && typeof cur.ids === 'object') ? cur.ids : {});
+    for (const e of parCompte[uid]) {
+      const av = Date.parse(ids[e.id] || '');
+      if (isNaN(av) || Date.parse(e.at) < av) ids[e.id] = e.at;      // la PREMIÈRE suppression vue fait foi
+    }
+    const garde = Object.entries(ids).sort((a, b) => Date.parse(b[1]) - Date.parse(a[1])).slice(0, SUPPR_MAX);
+    const data = { uid: String(uid), ids: Object.fromEntries(garde), capturedAt: new Date().toISOString(), ver: EXT_VERSION };
+    const ok = await supabaseUpsert('app_data', [{ id: `harvest_${uid}_supprimees`, data }], 'id');
+    if (ok === false) { noterDiag('suppression_ecriture_ratee'); continue; }
+    for (const e of parCompte[uid]) ranges.add(e);
+    noterDiag('suppression_rangee');
+    notifierApp({ type: 'maj', quoi: 'annonces', uid: String(uid) });
+  }
+  if (!ranges.size) return;
+  // On ne retire de la file que ce qui est RANGÉ — relu au dernier moment : une
+  // suppression vue pendant l'écriture ne doit pas disparaître avec les autres.
+  try {
+    const now = (await chrome.storage.local.get(SUPPR_FILE))[SUPPR_FILE] || [];
+    const cle = (e) => `${e.uid}|${e.id}|${e.at}`;
+    const faits = new Set([...ranges].map(cle));
+    await chrome.storage.local.set({ [SUPPR_FILE]: now.filter((e) => !faits.has(cle(e))) });
+  } catch (_) {}
+}
+// <supprimees-regle> — LA MÊME RÈGLE QUE L'APP (src/App.jsx), §11 ; comparées par
+// `audit-supprimees.cjs`. Une annonce `id` lue dans un dressing capturé à `capTs`
+// est cachée si elle a été supprimée APRÈS cette lecture. `capturedAt` est l'heure
+// du RANGEMENT, pas de la lecture : une moisson partie avant la suppression et
+// rangée après la ressusciterait — d'où la marge. Une annonce supprimée ne revient
+// jamais légitimement (republiée, elle a un NOUVEL identifiant) : la marge ne fait
+// que retarder une résurrection qui ne doit pas avoir lieu.
+const SUPPR_MARGE_MS = 5 * 60 * 1000;
+function supprimeeApres(ids, id, capTs) {
+  if (!ids || typeof ids !== 'object') return false;          // pas su : on n'écarte rien
+  const at = Date.parse(ids[String(id)] || '');
+  if (isNaN(at)) return false;
+  return !(Number(capTs) >= at + SUPPR_MARGE_MS);             // lecture d'avant, ou sans date : écartée
+}
+// </supprimees-regle>
+// Applique la règle à des lignes `harvest_{uid}_listings` lues en entier
+// (`select=id,data`) : rend des lignes dont les annonces supprimées APRÈS la
+// lecture sont retirées. `supp === null` (pas su) ⇒ les lignes telles quelles.
+function retirerSupprimeesLignes(lignes, supp) {
+  if (!supp || !Array.isArray(lignes)) return lignes;
+  return lignes.map((r) => {
+    const k = /^harvest_(\d+)_listings$/.exec(String(r && r.id || ''));
+    const d = r && r.data; const p = d && d.payload;
+    const ids = k && supp.get(k[1]);
+    if (!ids || !p || !Array.isArray(p.items)) return r;
+    const cap = Date.parse(d.capturedAt || '');
+    const items = p.items.filter((it) => !(it && supprimeeApres(ids, it.id, cap)));
+    if (items.length === p.items.length) return r;
+    return Object.assign({}, r, { data: Object.assign({}, d, { payload: Object.assign({}, p, { items }) }) });
+  });
+}
+// Toutes les suppressions rangées, par compte. `null` = la base n'a pas répondu
+// (« pas su » : l'appelant n'écarte rien). Une ligne par compte : famille bornée.
+async function lireSupprimeesTous() {
+  const rows = await sbGet('app_data?id=like.harvest_*_supprimees&select=id,ids:data->ids');
+  if (rows === null || !Array.isArray(rows)) return null;
+  const m = new Map();
+  for (const r of rows) {
+    const k = /^harvest_(\d+)_supprimees$/.exec(String(r && r.id || ''));
+    if (k && r.ids && typeof r.ids === 'object') m.set(k[1], r.ids);
+  }
+  return m;
 }
 
 // ⚠️ LE TÉLÉCHARGEMENT MANUEL NE POUVAIT PAS ÊTRE RELIÉ QUAND IL Y EN A DEUX.
@@ -2539,11 +2672,18 @@ async function capterPhotosAnnonces(uid) {
     if (!acc) return 0;
     // La liste du dressing : id + nPhotos + état. C'est SA donnée (ligne du compte).
     let items = [];
+    let capListe = NaN;
     try {
-      const rows = await sbGet(`app_data?id=eq.harvest_${uid}_listings&select=items:data->payload->items`);
+      const rows = await sbGet(`app_data?id=eq.harvest_${uid}_listings&select=items:data->payload->items,cap:data->>capturedAt`);
       items = (rows && rows[0] && Array.isArray(rows[0].items)) ? rows[0].items : [];
+      capListe = Date.parse((rows && rows[0] && rows[0].cap) || '');
     } catch (_) {}
     if (!items.length) return 0;
+    // 5.165 : une annonce qu'il vient de SUPPRIMER n'est plus en ligne — la lire
+    // coûtait une requête Vinted pour un 404 (mesuré : `photos_annonce_refuse_404`
+    // = 96). Même règle que l'app ; suppressions illisibles ⇒ on n'écarte rien.
+    { const supp = await lireSupprimeesTous(); const ids = supp && supp.get(String(uid));
+      if (ids) items = items.filter((it) => !(it && supprimeeApres(ids, it.id, capListe))); }
     // Ce qu'on a DÉJÀ capté (photos par id) — une lecture, la carte complète.
     let dej = {};
     try {
@@ -3369,6 +3509,9 @@ try {
     // faut-il qu'il PARTE un jour. Sans ce réveil, un tampon posé juste avant
     // une longue période calme attendrait la prochaine capture pour être écrit.
     majTampon(() => {});
+    // 5.165 : une suppression vue mais pas encore rangée (base muette, pas de
+    // session) repart ici — la file vit dans `chrome.storage.local`.
+    viderSuppressions();
   });
 } catch (_) {}
 
@@ -6082,7 +6225,7 @@ async function buildEbayData() {
   const lost = main.vinted_pairs_lost || {};
   const pos = await readEbayPosted();
   const posted = new Set(pos.ids);
-  const listRows = (await sbGet('app_data?id=like.harvest_*_listings&select=id,data')) || [];
+  const listRows = retirerSupprimeesLignes((await sbGet('app_data?id=like.harvest_*_listings&select=id,data')) || [], await lireSupprimeesTous());
   const itemRows = (await sbGetTout('app_data?id=like.harvest_*_item_*&select=id,data')) || []; // §4.5 : une ligne par annonce, tous comptes → dépasse 1000 chez un vendeur actif, sbGet tronquait
   const details = {};
   for (const r of itemRows) { const p = (r.data || {}).payload || {}; const it = (p && p.item) || p; if (it && it.id) details[String(it.id)] = it; }
@@ -6167,8 +6310,8 @@ async function buildLbcData() {
   const posted = new Set(postedData.ids);
   const lbcLimit = postedData.limit;
   const lbcPlan = postedData.plan;
-  // Annonces EN LIGNE (harvest listings).
-  const listRows = (await sbGet('app_data?id=like.harvest_*_listings&select=id,data')) || [];
+  // Annonces EN LIGNE (harvest listings) — sans celles qu'il vient de supprimer (5.165).
+  const listRows = retirerSupprimeesLignes((await sbGet('app_data?id=like.harvest_*_listings&select=id,data')) || [], await lireSupprimeesTous());
   const online = []; const onlineIds = new Set(); const seen = new Set();
   let exclues = 0;
   for (const r of listRows) {
