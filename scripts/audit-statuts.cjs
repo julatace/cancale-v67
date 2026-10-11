@@ -79,7 +79,7 @@ const VENTES = [
 const ACHAT_RELAIS = { status: "La livraison n'a pas encore eu lieu - colis déposé en bureau de Poste ou point relais", transaction_user_status: 'needs_action' };
 
 const C = { warn: '#a', danger: '#b', muted: '#c', blue: '#d', accent: '#e' };
-const APP_NOMS = ['classifyOrderStatus', 'isAtRelayStatus', 'isAwaitingShipStatus', 'needsBordereau', 'PAS_UN_ENVOI', 'tusDe', 'aExpedier', 'joursAvantLimiteFr', 'DELAI_EXPEDITION_J', 'limiteExpedition'];
+const APP_NOMS = ['classifyOrderStatus', 'isAtRelayStatus', 'ACHAT_A_RENVOYER', 'isAwaitingShipStatus', 'needsBordereau', 'PAS_UN_ENVOI', 'tusDe', 'aExpedier', 'joursAvantLimiteFr', 'DELAI_EXPEDITION_J', 'limiteExpedition'];
 const app = charge('src/App.jsx', APP_NOMS);
 // Les étiquettes vivent dans un composant : on les charge avec leurs voisins.
 const appComp = charge('src/App.jsx', ['venteStage', 'achatStage', 'purchasePhase', 'bordShipped'], Object.assign({}, app, {

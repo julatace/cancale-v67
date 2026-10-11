@@ -170,7 +170,10 @@ if (!bloc || !/caUrssafParMois/.test(bloc)) {
       : nok('sans Leboncoin ni eBay, rien ne change', `${seul.ca} contre ${avant.ca}`);
   } catch (e) { nok('la règle toutes plateformes s\'exécute', e.message); }
   // L'écran Ventes publie la répartition ET ce qu'il ne sait pas.
-  /ventesDeclarables\(\{ vinted: sales\.items, lbc: [^}]*ebay: [^}]*\}\)/.test(SRC) && /sources = \{ Vinted: 'lu', Leboncoin: lbcLu \? 'lu' : 'pasSu'/.test(SRC)
+  // ⚠️ La règle, pas son orthographe (9 octobre) : la liste Vinted passée est
+  //    désormais `ventesComptees` (les comptes LUS, couvrant ceux d'aujourd'hui) ;
+  //    ce qui compte ici, c'est que Leboncoin ET eBay soient passés aussi.
+  /ventesDeclarables\(\{ vinted: [\w.]+(?: \|\| \[\])?, lbc: [^}]*ebay: [^}]*\}\)/.test(SRC) && /sources = \{ Vinted: 'lu', Leboncoin: lbcLu \? 'lu' : 'pasSu'/.test(SRC)
     ? ok('l\'écran Ventes publie toutes plateformes, avec ce qui n\'a pas pu être lu')
     : nok('l\'écran Ventes publie toutes plateformes', 'publication encore Vinted seule');
 }

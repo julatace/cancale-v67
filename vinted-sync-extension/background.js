@@ -3009,14 +3009,18 @@ async function activeFetchAccount(acc) {
 }
 
 // Recupere la liste des comptes lies depuis Supabase.
-async function getStoredAccounts() {
+// `{ ouNull: true }` : `null` quand la base n'a pas répondu, au lieu de `[]`
+// (« pas su » ≠ « aucun compte ») — pour un appelant qui doit le DIRE.
+async function getStoredAccounts(opts) {
+  const ko = opts && opts.ouNull ? null : [];
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=*`, {
       headers: await sbHeaders(),
     });
-    if (!res.ok) return [];
-    return await res.json();
-  } catch (_) { return []; }
+    if (!res.ok) return ko;
+    const j = await res.json();
+    return opts && opts.ouNull && !Array.isArray(j) ? null : j;
+  } catch (_) { return ko; }
 }
 
 // Rafraichit TOUS les comptes, un par un, en douceur (pauses entre comptes).
@@ -3627,18 +3631,32 @@ async function compteConnecte(domain) {
   try { return await activeAccountId(domain || 'www.vinted.fr'); } catch (_) { return null; }
 }
 
-async function compterAction(uid) {
+// `plafond` : la part des 20 actions que CE geste a le droit d'atteindre (les
+// bordereaux commandés par l'app s'arrêtent avant la réserve des gestes sur
+// clic, voir `RESERVE_GESTES`). `resteMs` dit quand une place se libère : la
+// raison d'un refus donne une heure, pas « plus tard ».
+async function compterAction(uid, plafond = ACTIONS_MAX_HEURE) {
   try {
     const cle = 'vrmActions';
     const cur = (await chrome.storage.local.get(cle))[cle] || {};
     const t = Date.now(), ilYaUneHeure = t - 3600000;
-    const list = (cur[uid] || []).filter(x => x > ilYaUneHeure);
-    if (list.length >= ACTIONS_MAX_HEURE) return { ok: false, n: list.length };
+    const list = (cur[uid] || []).filter(x => x > ilYaUneHeure).sort((a, b) => a - b);
+    const max = Math.min(ACTIONS_MAX_HEURE, plafond);
+    if (list.length >= max) return { ok: false, n: list.length, resteMs: Math.max(0, list[list.length - max] + 3600000 - t) };
     list.push(t); cur[uid] = list;
     await chrome.storage.local.set({ [cle]: cur });
     return { ok: true, n: list.length };
   } catch (_) { return { ok: true, n: 0 }; }
 }
+// ⚠️⚠️ UNE RÉSERVE POUR LES GESTES SUR CLIC (revue du 9 octobre). Un seul clic
+//    « Tout générer (20) » commandait 20 bordereaux et prenait les 20 actions de
+//    l'heure : une réponse à un acheteur depuis la messagerie de l'app était
+//    ensuite refusée pendant une heure (mesuré dans un vm, chaîne réelle). Les
+//    bordereaux COMMANDÉS PAR L'APP s'arrêtent donc à 20 − 5 : les 5 dernières
+//    actions de l'heure restent à ce qui part sur SON clic un par un (répondre,
+//    trancher une offre). Le total ne bouge pas (20/h) — monter ce chiffre
+//    serait deviner le seuil de Vinted (§3).
+const RESERVE_GESTES = 5;
 
 // ⚠️ BUDGET DE *LECTURE*, SÉPARÉ DU BUDGET D'ACTIONS (Julien, 3 octobre :
 // « capte toutes mes photos »). Lire la PAGE de ses propres annonces (photos,
@@ -3783,10 +3801,16 @@ async function gardeStricte(uid, acc, opts = {}) {
              error: "ton navigateur est connecté à un autre compte Vinted — bascule sur celui-ci sur vinted.fr d'abord" };
   }
   if (opts.lecture) return null;            // lire n'engage rien : pas de plafond
-  const c = await compterAction(String(uid));
+  const reserve = Math.max(0, Number(opts.reserve) || 0);
+  const c = await compterAction(String(uid), ACTIONS_MAX_HEURE - reserve);
   if (!c.ok) {
+    const min = Math.max(1, Math.ceil(Number(c.resteMs || 0) / 60000));
+    if (reserve && c.n < ACTIONS_MAX_HEURE) {
+      return { ok: false, code: 'plafond-bordereaux',
+               error: `${ACTIONS_MAX_HEURE - reserve} actions sur ce compte dans l'heure — les ${reserve} dernières sont gardées pour répondre à tes acheteurs. La suite dans ${min} min.` };
+    }
     return { ok: false, code: 'plafond',
-             error: `${ACTIONS_MAX_HEURE} actions sur ce compte dans l'heure — on s'arrête là pour ne pas attirer l'attention. Réessaie plus tard.` };
+             error: `${ACTIONS_MAX_HEURE} actions sur ce compte dans l'heure — on s'arrête là pour ne pas attirer l'attention. Réessaie dans ${min} min.` };
   }
   return null;
 }
@@ -3843,9 +3867,14 @@ async function majCmd(jobId, patch) {
   for (const k of Object.keys(cmds)) if (t - Number((cmds[k] && cmds[k].at) || 0) > 86400000) delete cmds[k];
   cmds[jobId] = Object.assign({}, cmds[jobId] || {}, patch, { at: t });
   try { await chrome.storage.local.set({ vrmCmds: cmds }); } catch (_) {}
-  notifierApp(Object.assign({ type: 'cmd', jobId }, cmds[jobId]));
+  notifierApp(Object.assign({ type: 'cmd', jobId }, cmds[jobId], avecVivant(jobId)));
   return cmds[jobId];
 }
+// `vivant: true` = cette demande est RÉELLEMENT dans la file de ce service
+// worker (pas seulement notée « file » dans le stockage). L'app s'y fie pour
+// garder « En file… » tant qu'elle attend son tour, sans délai arbitraire ;
+// une demande orpheline (service worker redémarré) ne le porte plus.
+const avecVivant = (jobId) => (/^bord:/.test(String(jobId)) && BORD_EN_COURS.has(String(jobId)) ? { vivant: true } : {});
 // ── « LES INFORMATIONS CIRCULENT-ELLES BIEN ? » ─────────────────────────────
 // Le petit écran de l'extension le dit, plateforme par plateforme : dernier
 // envoi réussi, dernier envoi refusé. MESURÉ aux points d'écriture, jamais
@@ -3962,15 +3991,27 @@ async function etatPourApp() {
   const PAS_SU = {};
   const uid = await avecDelai(compteConnecte('www.vinted.fr'), 1000, PAS_SU).catch(() => PAS_SU);
   const vintedPasSu = uid === PAS_SU;
-  const [e, cmds, login] = await Promise.all([
+  const PAUSE_PAS_SUE = {};
+  const [e, cmds, login, pause] = await Promise.all([
     authEtatRapide(1500).catch(() => null),
     avecDelai(lireCmds(), 300, {}).catch(() => ({})),
     uid && !vintedPasSu ? avecDelai(loginDe(String(uid), { attendreMs: 250 }), 300, '').catch(() => '') : Promise.resolve(''),
+    avecDelai(pauseVinted(), 300, PAUSE_PAS_SUE).catch(() => PAUSE_PAS_SUE),
   ]);
   const vrm = e ? Object.assign({ ok: true, connecte: e.connecte, expiree: e.expiree, email: e.email || '', user_id: e.user_id || null, cloisonne: e.cloisonne === undefined ? null : e.cloisonne },
     e.mort ? { mort: true } : {}, e.renouvellement ? { renouvellement: e.renouvellement } : {}) : null;
-  return Object.assign({ ok: true, version, vrm, vinted: uid && !vintedPasSu ? { uid: String(uid), login: login || '' } : null, cmds },
-    vintedPasSu ? { vintedPasSu: true } : {});
+  // Les demandes réellement dans la file portent `vivant` (voir `avecVivant`).
+  const cmdsVus = {};
+  for (const k of Object.keys(cmds || {})) cmdsVus[k] = Object.assign({}, cmds[k], avecVivant(k));
+  // ⚠️⚠️ LA PAUSE DEMANDÉE PAR VINTED SE DIT AVANT LE CLIC (revue du 9 octobre).
+  //    Pendant les 15 min de pause, l'en-tête disait « Actions possibles » et
+  //    « Tout générer (3) » était actif : le clic seul révélait le refus —
+  //    et le bouton d'ensemble le jetait. `pause.jusqua` laisse l'app griser
+  //    et DIRE « Vinted demande de ralentir — X min ». « Pas su » (stockage
+  //    lent) ⇒ rien n'est affirmé, ni pause ni absence de pause.
+  return Object.assign({ ok: true, version, vrm, vinted: uid && !vintedPasSu ? { uid: String(uid), login: login || '' } : null, cmds: cmdsVus },
+    vintedPasSu ? { vintedPasSu: true } : {},
+    pause && pause !== PAUSE_PAS_SUE ? { pause: { jusqua: Number(pause.jusqua) || 0 } } : {});
 }
 // Le bordereau de CETTE vente est-il déjà rangé (avec son PDF) ? Une lecture
 // scalaire (§4.4) — `null` = la base n'a pas répondu (« pas su » ≠ « non »).
@@ -4079,17 +4120,68 @@ async function executerCommande(msg) {
   const uid = String(msg.uid || ''), tx = String(msg.tx || '');
   if (!/^\d+$/.test(uid) || !/^\d+$/.test(tx)) return { accepte: false, code: 'invalide', raison: 'vente incomplète' };
   const jobId = `bord:${uid}:${tx}`;
-  const cur = (await lireCmds())[jobId];
-  // Déjà en cours (deux clics, deux onglets) : on renvoie la même demande.
-  if (cur && CMD_EN_COURS.includes(cur.etape) && Date.now() - Number(cur.at || 0) < 120000) return { accepte: true, jobId, etape: cur.etape, deja: true };
-  const accts = await getStoredAccounts();
-  const acc = (accts || []).find((a) => String(a.vinted_user_id) === uid);
-  if (!acc) return { accepte: false, code: 'compte', raison: 'compte introuvable dans VRM' };
-  // Idempotence : le PDF est déjà rangé → rien à demander à Vinted.
-  if (await labelDejaRange(uid, tx)) { await majCmd(jobId, { etape: 'fait', uid, tx, deja: true }); return { accepte: true, jobId, etape: 'fait', deja: true }; }
-  const stop = await gardeStricte(uid, acc);
-  if (stop) return { accepte: false, code: stop.code, raison: stop.error, actif: stop.actif || null, actifLogin: stop.actif ? await loginDe(stop.actif) : '' };
-  await majCmd(jobId, { etape: 'file', uid, tx, code: null, raison: null });
+  // ⚠️⚠️ DÉJÀ EN FILE OU EN COURS : LA MÉMOIRE DE LA FILE FAIT FOI, PAS L'ÂGE
+  //    DE L'ACCUSÉ (revue du 9 octobre). Avant, une demande « en file » depuis
+  //    plus de 120 s était réacceptée : un colis qui attendait son tour derrière
+  //    d'autres (16,5 s chacun quand le PDF tarde) repartait en second job et
+  //    brûlait une action de plus (mesuré : 7 actions pour 4 colis). La file
+  //    vit en mémoire (une chaîne de promesses) : si le service worker meurt,
+  //    elle meurt avec lui — et ce Set aussi, donc une demande orpheline est
+  //    bien réacceptée. Vérifié AVANT toute attente : deux clics simultanés ne
+  //    passent pas tous les deux.
+  if (BORD_EN_COURS.has(jobId)) {
+    const cur = (await lireCmds())[jobId];
+    return { accepte: true, jobId, etape: (cur && CMD_EN_COURS.includes(cur.etape)) ? cur.etape : 'file', deja: true, vivant: true };
+  }
+  BORD_EN_COURS.add(jobId);
+  let parti = false;                              // vrai dès que la file a pris le relais
+  let acc = null;
+  try {
+    // ⚠️⚠️ L'ACCUSÉ NE DÉPEND PLUS D'UNE BASE LENTE (revue du 9 octobre). La liste
+    //    des comptes et « ce PDF est-il déjà rangé ? » se lisaient SANS délai
+    //    maximum, AVANT l'accusé : base qui traîne (522 au bout de 20 s, mesuré
+    //    en septembre) ⇒ l'app abandonnait à 9 s et comptait le colis « refusé »
+    //    pendant que l'extension, elle, le générait chez Vinted. Les deux
+    //    lectures sont bornées ; « pas su » pour le PDF ⇒ on continue
+    //    (`recupererLabel` regarde chez Vinted d'abord, aucun PUT en double).
+    const accts = await avecDelai(getStoredAccounts({ ouNull: true }), 4000, null);
+    if (!Array.isArray(accts)) return { accepte: false, code: 'lecture', raison: "la base VRM n'a pas répondu — rien n'est parti chez Vinted, réessaie dans un moment" };
+    acc = accts.find((a) => String(a.vinted_user_id) === uid) || null;
+    if (!acc) return { accepte: false, code: 'compte', raison: 'compte introuvable dans VRM' };
+    // Idempotence : le PDF est déjà rangé → rien à demander à Vinted.
+    if (await avecDelai(labelDejaRange(uid, tx), 1500, null)) { await majCmd(jobId, { etape: 'fait', uid, tx, deja: true }); return { accepte: true, jobId, etape: 'fait', deja: true }; }
+    // L'admission (fenêtre du lot + plafond horaire) est SÉRIALISÉE : deux
+    // commandes simultanées (deux onglets) ne lisent pas toutes les deux une
+    // fenêtre à 5 et ne passent pas toutes les deux.
+    const refusDe = async (stop) => ({ accepte: false, code: stop.code, raison: stop.error, actif: stop.actif || null, actifLogin: stop.actif ? await loginDe(stop.actif) : '' });
+    const refus = await sousAdmission(async () => {
+      // La pause demandée par Vinted et le compte du cookie passent AVANT la
+      // fenêtre : sur un autre compte, « 6 bordereaux ces 5 min » serait la
+      // mauvaise raison (et le mauvais geste).
+      const pre = await gardeStricte(uid, acc, { lecture: true });
+      if (pre) return await refusDe(pre);
+      // ⚠️⚠️ « TOUT GÉNÉRER » NE CONTOURNE PLUS LE PLAFOND PAR VISITE (§3, revue
+      //    du 9 octobre). Un clic envoyait autant de commandes que de colis :
+      //    20 colis ⇒ 20 PUT chez Vinted d'affilée (jusqu'à 300 requêtes quand
+      //    les PDF tardent), là où une visite s'arrête à BORD_MAX_PAR_VISITE.
+      //    Les commandes de l'app suivent la même borne, sur une fenêtre de
+      //    5 minutes par compte — quelle que soit leur origine (un clic par
+      //    colis ou « Tout générer ») : c'est l'extension qui juge, pas l'app.
+      const lot = await fenetreBordereaux(uid);
+      if (lot.n >= BORD_MAX_PAR_VISITE) {
+        const min = Math.max(1, Math.ceil(lot.resteMs / 60000));
+        return { accepte: false, code: 'lot',
+                 raison: `${BORD_MAX_PAR_VISITE} bordereaux demandés ces ${Math.round(BORD_CMD_FENETRE_MS / 60000)} dernières minutes sur ce compte — jamais plus d'affilée chez Vinted. La suite dans ${min} min.` };
+      }
+      const stop = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES });
+      if (stop) return await refusDe(stop);
+      await noterBordereauCommande(uid);
+      return null;
+    });
+    if (refus) return refus;
+    await majCmd(jobId, { etape: 'file', uid, tx, code: null, raison: null });
+    parti = true;
+  } finally { if (!parti) BORD_EN_COURS.delete(jobId); }
   // L'exécution part dans la file ; l'app reçoit l'accusé TOUT DE SUITE.
   avecVinted(async () => {
     // 5.162 : un 429/403 reçu EN ROUTE arrête la commande sur place, avec la
@@ -4134,10 +4226,42 @@ async function executerCommande(msg) {
       }
     } catch (e) {
       await majCmd(jobId, { etape: 'echec', code: 'erreur', raison: String(e && e.message || e).slice(0, 120) });
-    }
+    } finally { BORD_EN_COURS.delete(jobId); }
   });
-  return { accepte: true, jobId, etape: 'file' };
+  return { accepte: true, jobId, etape: 'file', vivant: true };
 }
+// Les bordereaux de l'app EN FILE ou EN COURS dans CE service worker (voir plus
+// haut). En mémoire exprès : c'est l'état de la file, qui vit en mémoire.
+const BORD_EN_COURS = new Set();
+// La fenêtre des bordereaux commandés par l'app, par compte (§4.9 : dans
+// `chrome.storage.local`, elle doit survivre au service worker — 5 min).
+const BORD_CMD_FENETRE_MS = 5 * 60 * 1000;
+async function fenetreBordereaux(uid) {
+  try {
+    const cur = (await chrome.storage.local.get('vrmBordCmds')).vrmBordCmds || {};
+    const t = Date.now();
+    const list = (cur[String(uid)] || []).filter((x) => t - x < BORD_CMD_FENETRE_MS).sort((a, b) => a - b);
+    const n = list.length;
+    const resteMs = n >= BORD_MAX_PAR_VISITE ? Math.max(0, list[n - BORD_MAX_PAR_VISITE] + BORD_CMD_FENETRE_MS - t) : 0;
+    return { n, resteMs };
+  } catch (_) { return { n: 0, resteMs: 0 }; }
+}
+async function noterBordereauCommande(uid) {
+  try {
+    const cur = (await chrome.storage.local.get('vrmBordCmds')).vrmBordCmds || {};
+    const t = Date.now();
+    for (const k of Object.keys(cur)) { cur[k] = (cur[k] || []).filter((x) => t - x < BORD_CMD_FENETRE_MS); if (!cur[k].length) delete cur[k]; }
+    cur[String(uid)] = (cur[String(uid)] || []).concat(t);
+    await chrome.storage.local.set({ vrmBordCmds: cur });
+  } catch (_) {}
+}
+let _admission = Promise.resolve();
+function sousAdmission(fn) {
+  const suite = _admission.then(() => fn(), () => fn());
+  _admission = suite.then(() => {}, () => {});
+  return suite;
+}
+
 
 // Renvoie null si l'action peut partir, sinon l'objet d'erreur à renvoyer tel quel.
 async function garde(uid, acc) {

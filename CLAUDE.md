@@ -49,7 +49,7 @@ Ce ne sont pas des positions de principe : chacune a une raison technique.
 | demande | pourquoi non |
 |---|---|
 | republication automatique en file, avec délais aléatoires | un délai « faussement humain » n'a qu'un usage : tromper la détection bot. C'est ce qui a fait bloquer `vanessa5723`. |
-| **accepter une offre automatiquement** — ⛔ **RETIRÉ, sa décision** | coupée le 4 octobre (« je ne veux pas que ça accepte tout seul les offres »), **retirée** le 5 octobre (« enlève l'acceptation de l'offre ») : le moteur de l'extension, ses planchers, le champ « Min. accepté », l'interrupteur de Réglages. Accepter engage une vente ferme, et un programme qui accepte ressemble à un robot (le compte bloqué). **Ne jamais le reproposer** — je l'ai fait par erreur le 5 octobre en lisant l'ancienne version de cette ligne. Reste permis : accepter UNE offre depuis la messagerie, sur son clic, avec confirmation (`executerPourApp`). `audit-offres-auto.cjs` refuse tout autre chemin vers `/accept`. |
+| **accepter une offre automatiquement** — ⛔ **RETIRÉ, sa décision** | coupée le 4 octobre (« je ne veux pas que ça accepte tout seul les offres »), **retirée** le 5 octobre (« enlève l'acceptation de l'offre ») : le moteur de l'extension, ses planchers, le champ « Min. accepté », l'interrupteur de Réglages. Accepter engage une vente ferme, et un programme qui accepte ressemble à un robot (le compte bloqué). **Ne jamais le reproposer** — je l'ai fait par erreur le 5 octobre en lisant l'ancienne version de cette ligne. Reste permis : accepter UNE offre depuis la messagerie, sur son clic, avec confirmation (`executerPourApp`). `audit-offres-auto.cjs` refuse tout autre chemin vers `/accept`. ⚠️ **Tout ce qui précède vaut pour VINTED. Sur eBay, Julien l'a demandé le 9 octobre**, en ses mots : « Je veux juste définir une règle sur chaque annonce et à chaque offre au-dessus ça accepte », puis, à la question « aussi sur Vinted ? » : « **eBay seulement** », et « J'accepte » sur le plan. Sur eBay c'est donc permis, sous UNE seule forme : le **seuil natif d'eBay** (`BestOfferAutoAcceptPrice`), posé annonce par annonce **sur son clic**, avec une confirmation qui dit qu'une offre acceptée vend la paire. C'est eBay qui accepte : VRM n'appelle aucune route d'acceptation et ne décide rien. Sur Vinted, rien ne change. |
 | piloter la souris / le clavier | Vinted reçoit la **même requête** ; en plus un événement synthétique porte `isTrusted:false`, donc ça **ajoute** une preuve d'automatisation. Et un clic aveugle agit à côté quand la page bouge. |
 | modifier les photos pour republier / passer sur un autre compte | Vinted relie les comptes par **appareil, navigateur, adresse, moyen de paiement** — pas par les images. Tourner une photo ne protège de rien. |
 | supprimer une annonce automatiquement | irréversible et sans confirmation côté Vinted. |
@@ -5094,9 +5094,9 @@ mesurées, et aucune n'était « l'extension est éteinte »** :
   l'orthographe `member/transactions/` près de `genere_sans_pdf` ; le lien passe
   maintenant par une variable. Il suit la variable jusqu'à sa définition — et
   repasse au rouge quand on y retire l'adresse Vinted (prouvé).
-- ⚠️ **Le chantier PDF→stockage avait réservé la 5.160** : il passera en **5.164**
+- ⚠️ **Le chantier PDF→stockage avait réservé la 5.160** : il passera en **5.165**
   (5.161 = suite de la revue ci-dessous, 5.162 = défauts d'extension mesurés,
-  5.163 = la fusion du 8 octobre, voir plus bas).
+  5.163 = la fusion du 8 octobre, 5.164 = « Tout générer » borné, 9 octobre).
 - **Revue contradictoire (26 constats, 5 octobre au soir)** — corrigé en 5.161 et
   dans l'app, chacun prouvé rouge sur e50cd28 :
   - ⚠️⚠️ **Une extension < 5.129 passait « muette » au bout de 15 s** (elle ne
@@ -6062,6 +6062,135 @@ déclaré, qui est l'argent reçu.
   sur le code d'avant **instrumenté des mêmes attributs** (« la fonction
   n'existait pas » n'aurait rien prouvé).
 
+### « Ce que Vinted transmet aux impôts » — les seuils DAC7, compte par compte (6 octobre)
+Chaque année, Vinted transmet aux impôts les vendeurs qui font **au moins 30
+ventes OU plus de 2 000 €** dans l'année civile (directive européenne DAC7).
+**Mesuré avant de coder** (lecture seule, sa base) : `grep DAC7` = 0 dans l'app ;
+7 comptes liés, aucun exclu ; ventes **finalisées** de 2026 — `julatace35260`
+**101 · 3 721,10 €** (les deux seuils), `llloollllaa` **49 · 1 775,70 €**,
+`tomj606` **33 · 1 433,50 €** (30 ventes), puis 27 · 20 · 16 · 0, sous les seuils.
+- **Où** : Ventes → Outils → **Registre annuel**, UNE carte (`CarteSeuilsVinted`),
+  pour l'année choisie. Ton informatif : aucun rouge ni ambre (§7), un seuil
+  atteint se dit par le mot, en gras.
+- ⚠️ Le premier jet (2c85fe1) disait « pour qu'il n'y ait jamais d'écart avec ce
+  que tu déclares » et comptait comme SÛRES des ventes sans date de versement :
+  **c'était faux** — voir la revue juste en dessous. Ne pas le remettre.
+- **Trois états** : registre pas encore calculé · **lecture ratée ⇒ « — » et la
+  raison, jamais « 0 vente »** · lu. Un compte **exclu** n'y entre pas (décision
+  du 3 octobre) ; une ligne neutre dit que les exclus ne sont pas comptés, **sans
+  les nommer**. « Plus de 2 000 € » se compare en centimes : 2 000,00 € pile ne
+  l'atteint pas.
+- **Pas mesuré / pas affirmé** : les sources primaires (impots.gouv.fr,
+  economie.gouv.fr, Légifrance, EUR-Lex, BOFiP) sont **bloquées par le proxy du
+  conteneur** — les seuils sont écrits tels quels, recoupés sur des sources
+  secondaires, et **rien d'autre n'est affirmé** (ni date de début, ni ce que
+  Vinted envoie au vendeur, ni la date que Vinted retient pour rattacher une
+  vente à l'année). Non mesuré : si Vinted juge chaque compte à part ou
+  regroupe les comptes d'une même personne ; le montant exact qu'il retient (VRM
+  prend le prix de l'article, comme le CA déclaré) ; Leboncoin et eBay, soumis
+  aussi à DAC7, ne sont pas dans cette carte.
+
+#### Revue contradictoire du 6 octobre — six défauts, corrigés le 8 octobre
+Un relecteur les a REPRODUITS au rendu ; la première correction (d9bac7e) a été
+interrompue, reprise et finie.
+- ⚠️⚠️ **Le cache des ventes changeait un compte en panne en « 0 vente · sous les
+  seuils »** au passage suivant (rechargement ou retour sur l'écran dans les
+  3 min) — et le bandeau « compte non chargé » de l'écran Ventes disparaissait
+  aussi. `putCache` gardait la liste partielle **sans** dire quels comptes
+  avaient raté. Une entrée de cache porte maintenant `failedUids` (version
+  `_CACHE_V` : une entrée d'avant, qui ne sait rien de ses échecs, est ignorée),
+  et `loadOrders` les rend avec la liste. Une relecture discrète ratée garde ce
+  qu'on montrait **du seul compte raté** (elle gardait toute l'ancienne liste
+  avec la nouvelle liste d'échecs : un compte raté avant et revenu passait à
+  « 0 vente »). Le cache des annonces et des conversations garde aussi ses
+  comptes ratés. « Rouvre l'écran Ventes » est devenu un vrai bouton
+  **« Relire mes ventes »** (`relireVentes` : vide le cache, relit notre base —
+  jamais Vinted — et les dates de versement si elles étaient illisibles).
+- **Un échec se juge par l'IDENTITÉ** (`failedUids`), plus par le nom affiché :
+  un libellé arrivé du nuage après la lecture faisait passer le compte en panne
+  pour lu. Vaut pour la carte, le bandeau de l'écran Ventes, le rapport mensuel
+  et le geste « J'ai déclaré ce mois » (`nomsVentesKO`, nommé au rendu).
+- ⚠️⚠️ **La partie sûre de la carte EST le chiffre du registre** — mesuré sur la
+  copie de sa base du 5 octobre : carte 245 ventes · 9 361 € contre registre
+  141 · 5 226 €. Le registre calcule, par compte, ses ventes Vinted de l'année
+  (`vintedParUid`, mêmes lignes que son total : mois de la déclaration s'il l'a
+  notée, sinon du versement) et sa liste « pas encore datées » ; la carte LIT les
+  deux (`seuilsVintedParCompte` ne rappelle plus `ventesDeclarables`, §11).
+  Mesuré après sur la même copie : **carte 141 · 5 226,30 € = registre**, plus
+  **104 ventes · 4 134,80 € « pas encore datées »**, dites à part comme une
+  **estimation** (rattachées à l'année par la date de vente et la borne de
+  45 jours : le versement suit la vente — **0 sur 173** avant elle — et au plus
+  **25 jours** après, médiane 7,8 j ; une borne mesurée, pas une certitude).
+  Un seuil atteint seulement avec elles se dit « **atteint si** … ».
+  ⚠️ Le premier correctif recalculait ces ventes **sans** le registre des
+  déclarations : une vente déclarée sans date comptait deux fois.
+- **VRM ne sait pas si Vinted juge chaque compte à part** : la carte le dit, et
+  ajoute une ligne « **Tous tes comptes ensemble** » (« au moins » et « sans X »
+  quand un compte manque — jamais « sous les seuils » sur un total partiel).
+  Année en cours : « **à ce jour** » et « encore N ventes ou X € avant le seuil »
+  (sur la partie sûre ; « plus de 2 000 € » ⇒ il faut 2 000,01 €).
+- §7 : la panne et « Lecture des ventes… » se disent **une fois** au-dessus des
+  lignes ; la ligne d'un compte pas lu ne porte qu'un « — ».
+- **Constaté, laissé tel quel** : l'année suit le fuseau de l'APPAREIL
+  (`getFullYear`), comme `ventesDeclarables` et le registre — une vente versée
+  le 1er janvier à 00 h 20 (Paris) compte l'année d'avant sur un téléphone réglé
+  à Londres. Changer la carte seule la ferait diverger du registre.
+- **Preuves** : `audit-seuils-vinted.cjs` (vraie règle dans un `vm`, ventes
+  inventées) **39 contrôles**, **34 rouges** sur 2c85fe1, et chacune des **11
+  mutations** le refait passer au rouge (`exclus` 4 · `passu` 5 · `versnull` 2 ·
+  `encours` 4 · `seuil2000` 3 · `adater` 13 · `recalcule` 17 · `strict` 2 ·
+  `totalsous` 1 · `reste` 2 · `acejour` 1). Banc `bancs/seuils-vinted.cjs`
+  (port 4802, aucune fixture, 390 et 1512 px, cinq scénarios : comptes,
+  cache, libellé tardif, panne totale, année passée) **99 contrôles, tout vert**, **70 rouges**
+  sur le build de 2c85fe1, et rouge sur trois builds réaffaiblis du code
+  d'après : cache rendu sans ses échecs (**4**), échecs reconnus par le nom
+  (**2**), « pas encore datées » recalculées sans les déclarations (**2**).
+  `rapport.cjs` et `vendu-recu.cjs` restent verts.
+- **Pas mesuré** : la carte n'a pas été vue sur sa vraie base dans l'app (bancs
+  sur données inventées ; les chiffres ci-dessus viennent de la règle exécutée
+  sur la copie locale du 5 octobre).
+
+#### Deuxième revue (9 octobre) — le cache ne savait pas QUELS comptes il couvrait
+Deux défauts, reproduits chacun par deux relecteurs au rendu, corrigés.
+- ⚠️⚠️ **Un compte lié depuis la dernière lecture s'affichait « 0 vente · sous
+  les seuils »**, et le total « tous tes comptes » se disait complet. L'entrée de
+  cache des ventes ne retenait que ses ÉCHECS : liste de comptes du navigateur
+  en retard sur la base, ou rechargement dans les 3 min après une liaison ⇒
+  `loadOrders` resservait le cache des anciens comptes ; le nouveau n'était ni lu
+  ni en échec. Dans l'autre sens, un compte **retiré** restait compté au
+  registre (95 ventes contre 62 sur la carte).
+  ⇒ L'entrée de cache ET l'état des ventes portent `comptes`, la clé des comptes
+  interrogés (`cleComptesVinted` : les identités triées — jamais un nombre, jamais
+  un nom). `entreeCache` ne sert qu'une entrée qui couvre **exactement** les
+  comptes d'aujourd'hui (`_CACHE_V` = 3), et les relectures suivent `cleComptes`
+  au lieu de `accounts.length` (un compte retiré + un lié = même longueur). Même
+  règle pour les annonces, les achats et les conversations. Et tant que la
+  lecture ne couvre pas les comptes d'aujourd'hui, le registre dit « lecture en
+  cours » (`ventesComptees` vaut `null`) et « J'ai déclaré ce mois » attend.
+- ⚠️ **Relecture discrète ratée** (signal de l'extension, un compte déjà lu ne
+  répond pas) : la liste garde ses ventes d'avant ; le registre les COMPTAIT tout
+  en écrivant « ventes de X pas lues », et la carte (« sans X ») donnait un autre
+  total. ⇒ **Un compte en échec n'entre dans AUCUN total** (`ventesComptees`
+  écarte `failedUids`), qu'on ait déjà vu ses ventes ou non — la liste, elle,
+  continue de les montrer. Carte == registre, et la phrase dit ce que le chiffre
+  contient. Par ricochet : la ligne publiée au tableau de bord
+  (`vinted_urssaf_mois`) ne part plus pendant qu'un compte non exclu est en échec
+  (le tableau de bord garde la dernière, complète) ; Ma journée écrit « Reçu en
+  {mois} · **sans X (ventes pas lues)** » ; le total « à la date de vente » du
+  formulaire de déclaration lit la même liste.
+- **Preuves** : banc `seuils-vinted.cjs` **165 contrôles** (scénarios F1 compte
+  lié · F2 rechargement · F3 compte retiré · G relecture discrète · H Ma journée,
+  plus l'égalité registre == carte après la relecture ratée de B) — **11 rouges**
+  sur le build d'avant (e719d0f), et **5 rouges** sur un build où le cache « se
+  croit » (entrée sans clé de comptes). `audit-seuils-vinted.cjs` **45 contrôles**
+  (+6 sur la clé) ; mutations `clelongueur` 3 rouges, `clenom` 2.
+  `audit-urssaf.cjs` exigeait l'orthographe `vinted: sales.items` : il suit la
+  règle (Leboncoin et eBay passés à la même fonction).
+- **Constaté, laissé tel quel** : les totaux de l'écran Ventes et « Vendu »
+  (`ventesFaites`) comptent encore les ventes d'avant d'un compte en échec — de
+  l'affichage, pas le CA déclaré ; le bandeau « compte non chargé » le dit.
+  **Pas mesuré** : rien n'a été vu sur sa vraie base (données inventées).
+
 ### La page d'accueil publique (n° 22, 4 octobre)
 Julien : « une vraie page d'accueil… qui donne envie… avant d'arriver sur la
 connexion », avec une vidéo en motion design, inspirée de Vinteer.
@@ -6688,6 +6817,85 @@ Aucune requête Vinted de plus ; tous les garde-fous du §3 inchangés.
   compte…). `--src chemin` lance l'audit sur une copie mutée.
 - Extension **5.155.0**, zip régénéré, `EXT_ATTENDUE` suivie. Aucune entrée
   d'`EXT_CAPACITES` : rien de neuf n'est promis.
+
+### ⚠️⚠️ « LE COMPTE DE L'EXTENSION EST SÉLECTIONNÉ » NE S'ÉTAIT JAMAIS ALLUMÉ (9 octobre)
+Demande de Julien du 7 octobre (#462-#464, une autre session) : la liste
+« Compte » choisit d'office le compte ouvert dans Chrome, les autres sont
+estompés et inertes. Revue du 8 octobre, quatre défauts reproduits au rendu :
+- ⚠️⚠️ **Le compte était lu dans `authEtat`, qui ne le porte pas** (session VRM
+  seule, de la 5.116 à la 5.163). `compteConnecte` valait toujours `''`. La
+  seule réponse qui le porte est `etat` : `vintedDeChrome()` (trois états), la
+  même lecture que la pastille « Actions possibles · {compte} » (§11). Aucune
+  extension à changer.
+- **Messages disait « Tout est lu » au-dessus de non-lus** d'un compte estompé
+  (le compte ne gardait que le compte choisi) et sur une boîte illisible.
+  Il compte la liste AFFICHÉE ; ceux d'un compte estompé sont dits à côté avec
+  le geste ; une boîte qui n'a pas pu être lue est nommée (`convs.ko`) et une
+  liste partielle n'est plus mise en cache.
+- **« N offres à trancher » listait un compte exclu ou retiré** (5 offres de
+  julienf765, mesuré). Écartées comme la conversation ; « retiré » ne se juge
+  que sur une liste de comptes LUE ; une offre sans compte reste.
+- **La liste proposait les comptes exclus**, et en choisir un floutait tout
+  l'écran. `compteEffectif` (une règle pour la liste et le flou) ne retient
+  qu'un compte qu'on peut montrer ; Chrome sur un compte exclu ⇒ « Tous ».
+  Les ventes d'un compte masqué restent visibles par « les voir », sous
+  « Tous les comptes ».
+- Une fois allumé, le flou d'office touche Ventes/Achats/Annonces/Messages (pas
+  Colis) : la note sous la liste le dit UNE fois, avec « Tous les comptes ».
+- Banc `filtre-compte.cjs` (données inventées) : **17 rouges** sur e6bda5c,
+  chaque règle réaffaiblie seule repasse au rouge. `messagerie.cjs` choisit
+  désormais « Tous les comptes » (son pont est sur compte_a).
+
+### ⚠️⚠️ « TOUT GÉNÉRER » CONTOURNAIT LE PLAFOND PAR VISITE (revue du 9 octobre)
+Revue de « Tout générer » (#462), du bordereau de retour (#460) et de l'état de
+l'extension (#457) après la fusion du 8 octobre. Chaque défaut REPRODUIT d'abord
+(vrai `background.js` dans un `vm`, rendu du build de e6bda5c) :
+- ⚠️⚠️ **Un clic « Tout générer (20) » = 20 PUT chez Vinted et les 20 actions de
+  l'heure** (jusqu'à 300 requêtes quand les PDF tardent) ; une réponse à un
+  acheteur était ensuite refusée une heure. Une visite s'arrête à 6 (§3).
+  ⇒ **L'extension juge** : au plus `BORD_MAX_PAR_VISITE` (6) bordereaux commandés
+  par l'app par compte et par 5 min (`vrmBordCmds`, refus `lot` avec l'heure de
+  la suite), et ces commandes s'arrêtent à 15 actions/h (`RESERVE_GESTES` = 5
+  gardées pour répondre/trancher, refus `plafond-bordereaux`). L'admission est
+  sérialisée. **L'app** ne lance que ce qu'elle annonce : `BORD_LOT_MAX` = 6 par
+  clic (« Générer 6 bordereaux (sur 8) »), égal à la borne de l'extension (§11,
+  vérifié). Le total reste 20/h — ne pas le monter.
+- **Le refus était jeté** (« 0 lancé · 3 refusés. Chaque colis montre sa
+  progression » — rien ne la montrait). Le bilan garde chaque raison, la dit UNE
+  fois, s'arrête au premier refus qui vaut pour tout le lot (pause, plafond,
+  `lot`, autre compte…), et « chaque ligne suit le sien » n'est écrit que si un
+  bordereau est parti.
+- **La pause demandée par Vinted se voit avant le clic** : l'état du pont porte
+  `pause.jusqua` ; `raisonExtGlobale` rend `pause` (sauf pour publier, qui ne va
+  pas chez Vinted) — pastille « Lecture seule », bouton grisé, sans couleur
+  (rien à faire). Une extension plus ancienne ne la dit pas : le refus au clic,
+  lui, la dit.
+- **Base lente ⇒ « refusé » pour un bordereau généré** : la liste des comptes et
+  « PDF déjà rangé ? » retenaient l'accusé sans délai. Bornées (4 s / 1,5 s) ;
+  comptes illisibles ⇒ refus `lecture` dit (`getStoredAccounts({ouNull:true})`),
+  plus « compte introuvable ». Côté app, **pas de réponse ≠ refus** : « je ne
+  sais pas, regarde sa ligne », et le bilan passe à « lancé » dès qu'un
+  évènement de CE colis arrive (bouton par colis compris).
+- **File longue** : un colis en file depuis 120 s était réaccepté (7 actions pour
+  4 colis). La file en mémoire fait foi (`BORD_EN_COURS`) ; l'état dit `vivant`
+  pour ce qui y est réellement, l'app garde « En file… » tant que c'est vrai
+  (`jobEnCours`), et « Tout générer » saute ces colis. Un service worker
+  redémarré : plus `vivant`, le clic relance pour de vrai.
+- **§7** : la raison d'un « Tout générer » grisé n'est plus écrite sous le bouton
+  (le bandeau `RaisonBordereauxGrises` la dit) ; « À mettre à jour en X » n'est
+  plus dit là où le pont a mesuré CE navigateur, et ne nomme que ce qui manque à
+  la version vue (`capacitesManquantes`, tiré d'`EXT_CAPACITES`) ; « publier sur
+  Leboncoin reste possible » seulement si `extSait('publication') === 'ok'`.
+- **Achat en litige à renvoyer** (`ACHAT_A_RENVOYER`, une règle) : bloc en tête
+  d'Achats sur les onglets du quotidien (lien de retour une fois) et ligne de Ma
+  journée qui nomme le compte. Il ne revient pas dans « En route ».
+- Preuves : `audit-tout-generer.cjs` (20 contrôles, **11 rouges** sur e6bda5c ;
+  la borne app = extension, rouge sous mutation) ; banc `tout-generer.cjs`
+  (port 5710, données inventées, deux tailles : **30 rouges** sur le build de
+  e6bda5c, 0 après). `audit-statuts.cjs` charge `ACHAT_A_RENVOYER`.
+- Extension **5.164.0** (montée à la fusion du 9 octobre), zip régénéré,
+  `EXT_ATTENDUE` suivie. Aucune entrée d'`EXT_CAPACITES` : l'app détecte `pause`
+  et `vivant` à leur présence, et ne promet rien à une extension qui ne les a pas.
 
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
