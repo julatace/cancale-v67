@@ -8840,6 +8840,14 @@ function BlocNumerosPerimes() {
 function BandeauLiaison() {
   const [, force] = React.useReducer((n) => n + 1, 0);
   React.useEffect(() => { __lierSubs.add(force); return () => { __lierSubs.delete(force); }; }, []);
+  // ⚠️⚠️ Seconde revue du 11 octobre : « connectée ✓ — elle capte maintenant
+  //    pour toi. Rien d'autre à faire. » s'affichait AU-DESSUS de la pastille
+  //    « Lecture seule » quand une copie ancienne répondait encore (la session
+  //    part adressée, les commandes restent coupées). Deux voix contraires, et
+  //    « rien d'autre à faire » était faux. Le bandeau écoute donc l'état de
+  //    l'extension (la même règle que la pastille, `raisonExtGlobale`, §11).
+  useExtVivante();
+  const sansSouris = useSansSouris();
   const l = __lier;
   // ⚠️ Revue du 11 octobre : pendant l'attente, AUCUNE croix — un bandeau
   //    bloqué (copie ancienne à côté, code périmé) restait là pour toujours.
@@ -8851,10 +8859,23 @@ function BandeauLiaison() {
   const encours = l.etat === 'attente' || l.etat === 'encours';
   const bon = l.etat === 'ok' || l.etat === 'deja';
   const fermable = !encours || l.bloque || vieux === cle;
+  // Connectée, mais l'EXTENSION ne peut encore rien faire (une copie ancienne
+  // répond aussi, code périmé, muette, absente, trop ancienne) : on dit ce qui
+  // reste, jamais « rien d'autre à faire ». Seuls les blocages de l'extension
+  // elle-même comptent — la session VRM, elle vient d'être posée (le battement
+  // suivant la relit), et une pause de Vinted n'appelle aucun geste.
+  const glob = bon ? raisonExtGlobale(sansSouris) : null;
+  const reste = glob && ['plusieurs', 'perime', 'muette', 'absente', 'retard'].includes(glob.code) ? glob : null;
+  const connectee = l.etat === 'ok' ? <>Extension connectée à <b>{l.email || 'ton compte VRM'}</b> ✓</> : <>L'extension de ce Chrome était déjà connectée à ton compte VRM ✓</>;
+  const resteTexte = !reste ? null
+    : reste.code === 'plusieurs' ? <> — mais une autre extension VRM répond encore dans ce Chrome : tant qu'elles sont deux, rien ne part (en haut : lecture seule). Dans chrome://extensions, supprime l'ancienne, puis recharge cette page.</>
+    : reste.code === 'perime' ? <> — mais ce Chrome exécute encore son ancien code : rien ne part tant qu'elle n'est pas rechargée (en haut : lecture seule). Ouvre chrome://extensions et clique ⟳ sur VRM.</>
+    : <> — mais elle ne peut pas encore agir (en haut : lecture seule) : {reste.texte}</>;
   // Une liaison qui ne PEUT pas partir le dit, avec le geste — jamais
   // « Je connecte… » sans rien envoyer.
   const texte = encours && l.bloque === 'perime' ? <>L'extension de ce Chrome tourne encore sur son ancien code : je la connecte dès qu'elle est rechargée. Si rien ne bouge : ouvre chrome://extensions, clique ⟳ sur VRM, puis recharge cette page.</>
     : encours ? "Je connecte l'extension de ce Chrome à ton compte VRM… Rien à taper."
+    : bon && reste ? <>{connectee}{resteTexte}</>
     : l.etat === 'ok' ? <>Extension connectée à <b>{l.email || 'ton compte VRM'}</b> ✓ — elle capte maintenant pour toi dans ce Chrome. Rien d'autre à faire.</>
     : l.etat === 'deja' ? <>L'extension de ce Chrome était déjà connectée à ton compte VRM ✓ — rien à faire.</>
     : l.etat === 'absente' ? <>L'extension n'a pas répondu dans ce Chrome. Ouvre VRM dans le Chrome où tu as cliqué « Se connecter » ; si c'est celui-ci, ouvre chrome://extensions, clique ⟳ sur VRM, puis recharge cette page.</>
@@ -8866,8 +8887,8 @@ function BandeauLiaison() {
   //    de titre des écrans (`vrm-tete-row` lit `--vrm-ile`).
   return (
     <div className="vrm-tete-row">
-    <div data-liaison={l.etat} data-liaison-bloque={encours && l.bloque ? l.bloque : undefined} role="status" style={{ display: 'flex', gap: 10, alignItems: 'flex-start', margin: '0 0 12px', padding: '10px 12px', borderRadius: 10,
-      background: C.card, border: `1px solid ${C.border}`, borderLeft: `3px solid ${bon ? C.accent : (encours && !l.bloque) ? C.border : C.warn}`, fontSize: 12.5, lineHeight: 1.45, color: C.text }}>
+    <div data-liaison={l.etat} data-liaison-bloque={encours && l.bloque ? l.bloque : undefined} data-liaison-reste={reste ? reste.code : undefined} role="status" style={{ display: 'flex', gap: 10, alignItems: 'flex-start', margin: '0 0 12px', padding: '10px 12px', borderRadius: 10,
+      background: C.card, border: `1px solid ${C.border}`, borderLeft: `3px solid ${bon && !reste ? C.accent : (encours && !l.bloque) ? C.border : C.warn}`, fontSize: 12.5, lineHeight: 1.45, color: C.text }}>
       <span style={{ flex: 1, minWidth: 0 }}>{texte}</span>
       {fermable && <button type="button" aria-label="Fermer" onClick={() => poserLier(null)} style={{ border: 'none', background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: '0 2px', minHeight: 0 }}>×</button>}
     </div>
