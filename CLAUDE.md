@@ -4174,11 +4174,17 @@ numéros ». **Ce sont SES décisions, pas des options à reproposer.**
   IDENTIFIANT après le rechargement — jamais les numéros.
 - **Un « 230 » écrit AVANT la coupure désigne l'ANCIENNE paire** : le SKU d'une
   annonce eBay ou la référence d'une annonce Leboncoin qui le portaient à la
-  coupure (leurs identifiants sont dans le marqueur), une commande eBay passée
-  avant T. Sans ça, la vente Vinted de la NOUVELLE 230 faisait retirer d'eBay
-  l'annonce de l'ancienne (`numeroExterne`, la même règle dans l'app,
-  `api/_lib/numerotation.js` et l'extension 5.165 pour Leboncoin). Le retrait
-  eBay automatique relit le marqueur chez le serveur ; illisible ⇒ rien.
+  coupure, une commande eBay passée avant T. Sans ça, la vente Vinted de la
+  NOUVELLE 230 faisait retirer d'eBay l'annonce de l'ancienne (`numeroExterne`,
+  la même règle dans l'app, `api/_lib/numerotation.js` et l'extension pour
+  Leboncoin, `numeroLbcLu`). Le retrait eBay automatique relit le marqueur chez
+  le serveur ; illisible ⇒ rien.
+  ⚠️ Le marqueur garde, PAR ANNONCE, chaque numéro qu'elle portait à la coupure
+  ET ce qu'il devient : `ebayAnnonces = { "<itemId>": { "553": "1", "12": "B12" } }`
+  (même forme pour `lbcAnnonces`). Un numéro donné APRÈS T (provisoire, dans
+  `renum`) suit SA paire ; un numéro donné à plusieurs paires nouvelles rend
+  `''` (personne). Et on ne traduit que si l'annonce porte ENCORE ce numéro :
+  un SKU réécrit après T (« Relier à une paire ») se lit tel quel.
 - **Les emails** : après la conversion, le « nXXX » d'un TITRE n'est retenu que
   s'il désigne une fiche actuelle de la nouvelle série AU MÊME TITRE ; sinon il
   part dans `numeroTitre` (jamais tamponné). Le repli par titre ne rend jamais
@@ -4187,11 +4193,93 @@ numéros ». **Ce sont SES décisions, pas des options à reproposer.**
   ~5 min, et l'essai annulé qui ne laisse rien) ; `audit-numerotation-lecteurs.cjs`
   (les règles de l'app, du serveur et de l'extension exécutées, 18 mutations) ;
   `audit-ebay-route.cjs` (le retrait automatique : 3 rouges sur le code d'avant).
+- **Relecture du 11 octobre — seize défauts reproduits, corrigés** (chacun rouge
+  sur d8c688b, vert après, rouge sous mutation) :
+  - ⚠️⚠️ **le RETOUR ARRIÈRE était refusé sur SA forme réelle** : il n'a pas de
+    ligne `ebay_brouillons` ; une ligne absente (NULL SQL) comparée au `null`
+    JSON rangé par la conversion valait « des numéros ont bougé ».
+    `vrm_proj_aucun` ramène absent / `null` / `[]` à une seule forme. Rejoué sur
+    la PROJECTION de sa base (lecture seule du 11 octobre, Postgres 16 jetable) :
+    avant « REFUSÉ (ebay_brouillons) », après il passe et `main`, emails et
+    garage reviennent exactement.
+  - ⚠️⚠️ **ses DEUX annonces eBay étaient lues « B553 » et « B559 »** (numéros
+    provisoires du 10 octobre, devenus 1 et 7) : plus aucune paire, l'anti
+    double vente coupé. Le marqueur par annonce (ci-dessus) les rend à 1 et 7,
+    sur sa projection. « Relier » une annonce d'avant au MÊME chiffre est
+    refusé (409 `numero-ambigu` : rien ne distinguerait plus la B22 de la 22) ;
+    `publish`/`programmer` lisent le marqueur et refusent un écran d'une autre
+    version de numérotation (409 `numerotation-perimee`, l'app envoie la sienne).
+  - **3 ventes d'après T (564/565/568) n'avaient que leur BORDEREAU capté** :
+    `harvest_{uid}_label_{tx}` (`meta.tx` → `meta.item`, la copie `label_latest`
+    écartée, un `meta.tx` qui contredit sa ligne aussi) relie maintenant comme la
+    transaction : sur sa projection 564/565/568 → **1/12/13**, comme leurs
+    voisines. ⚠️ **À faire confirmer par Julien** : ces trois numéros étaient
+    `autoShip` (tamponnés sur le bordereau expédié). Toutes les ventes d'après T
+    suivent désormais leur paire — pas un mélange selon ce qui a été capté.
+  - **Une ANCIENNE annonce encore en ligne vendue après T** recevait un numéro
+    NEUF (la photo ET l'identité étaient jetées) : seule la photo l'est, Vinted
+    (transaction → annonce) dit la paire, la vente garde « B7 ».
+  - La mesure nomme les **comptes dont le dressing date d'avant T** (`dressings`,
+    et `attention` dans l'essai) : le plan n'y voit aucune annonce republiée.
+    Mesuré le 11 octobre à 12:15 : les 7 comptes recaptés, tomj683 et arthuror2
+    compris.
+  - Le rattrapage épargne un chiffre porté par une fiche ACTUELLE au même titre
+    (la règle `numeroDuTitreApresCoupure`) ; le plan n'est calculé qu'UNE fois
+    (`main` verrouillée ~6 s sur sa projection : **l'essai et l'application se
+    lancent VRM fermé partout**).
+  - App : « Retape son numéro » / « garde le N°B… » / ⧉ ne s'affichent plus à
+    côté d'un numéro d'archive (« numéro neuf »), et la paire revenue sort de la
+    liste quand elle est republiée (identité ou photo) ; Réglages n'enregistre
+    plus de lettre au clic sur « Avec une lettre » et ne propose plus « B125 » ;
+    le bloc relit la version au refus (« remise à zéro », jamais « un autre
+    appareil » au hasard) ; une sauvegarde d'avant la remise à zéro est refusée
+    AVANT d'écrire, avec la vraie cause ; effacer un N° garde la fiche ; les
+    gestes d'un écran périmé se rejouent en DIFFÉRENCE (un colis décoché ailleurs
+    ne redevient pas « posté »).
+  - Preuves : `audit-renum-b.cjs` (126) et ses mutations ; `audit-numerotation-
+    lecteurs.cjs` (38/38 mutations) ; `audit-ebay-route.cjs` (10 rouges sur
+    d8c688b) ; banc `numeros-remise-a-zero.cjs` sections E-F-G (9 rouges sur le
+    build de d8c688b) ; et un banc de rendu sur la projection de sa base convertie
+    par la vraie migration (hors dépôt : vraies données), 18 rouges avant, 0 après.
 - ⚠️ **Non mesuré** : la migration n'a JAMAIS tourné sur sa vraie base (données
   inventées à la forme des siennes). Une annonce republiée SANS date lisible ne
   se numérote pas toute seule (elle reste « sans N° »). Le « nXXX » d'un titre
   Vinted republié reste lu tel quel par la file Leboncoin de l'extension
   (`vintedKeys`) : ancien ou nouveau numéro, VRM ne peut pas le savoir.
+
+- **Fusion du 11 octobre (après-midi)** : la numérotation corrigée (99fd0a7 : retour
+  arrière sans `ebay_brouillons`, annonces eBay/LBC publiées après T sous un N°
+  provisoire traduites par annonce, ventes d'après T reliées par leur bordereau
+  capté, dressings figés signalés, rattrapage, fiche vidée gardée, plan calculé une
+  fois, ancienne annonce vendue après T qui garde son B, `api/ebay` qui lit le
+  marqueur) arrive sur une production où la **5.167.0** est déjà publiée : son code
+  d'extension change (`numeroLbcLu`), donc **5.168.0**, zip régénéré,
+  `EXT_ATTENDUE` suivie. Une version publiée ne change jamais de contenu.
+  **Tranché à la place de Julien (il ne veut plus de questions)** : les ventes
+  d'après T suivent leur paire (564/565/568 → 1/12/13, B564/B565/B568 restent au
+  pool) ; relier une ancienne annonce eBay au nouveau numéro du même chiffre reste
+  refusé (409 `numero-ambigu` : terminer et republier) ; une sauvegarde faite avant
+  la remise à zéro ne se restaure plus.
+
+- ✅ **APPLIQUÉE EN PRODUCTION LE 11 OCTOBRE À 14:58:07 UTC** (T = 2026-10-09T00:00:00Z,
+  marqueur version 2). Ordre suivi : déploiement du serveur et de l'app qui
+  lisent le marqueur (PR #472) → mesure (7 dressings relus le jour même, aucun
+  avant T ; 24 nouvelles, toutes datées par la photo ; 0 contradiction ; les 6
+  « pas en ligne » = 6 ventes) → essai ANNULÉ sur sa vraie base (7,2 s, rien
+  restant, vérifié) → application en UNE transaction : mesure refaite, refus si
+  l'empreinte md5 du plan diffère de celle de l'essai, conversion, garde-fous
+  posés dans la même transaction → rattrapage (0 email). Résultat : pool
+  558 B + 1…24 ; fiches 401 B + 24 ; ventes 503 B + 6 (1, 7, 9, 14, 16, 17 :
+  nouvelles déjà vendues) ; eBay 128127336988 {553→1}, 128086452103 {559→10} ;
+  ventes 571/572/573 sans identité → B571/B572/B573 (vendues, historique).
+  ⚠️ **Comment c'est passé** : l'outil SQL ne prend pas de fichier, et 92 Ko d'un
+  bloc ne passent pas. Les fonctions (sections 1 à 6, sans effet tant qu'on ne les
+  appelle pas) ont été installées en 6 morceaux d'instructions entières
+  (commentaires hors corps retirés), puis **chaque corps comparé par md5(prosrc)**
+  à celui du fichier : 28/28 identiques. Les deux `drop trigger if exists` ont été
+  retirés (déclencheurs absents, et un DROP attend une confirmation humaine dans
+  l'outil). Retour arrière : `sauvegarde.vrm_numerotation_annuler(owner)` (125
+  copies prises), refusé dès qu'un numéro a bougé.
 
 ### Leboncoin et eBay rangés comme Vinted : résumé, puis Ventes / Achats / Annonces (3 octobre)
 Demande du 2 octobre : « plus d'écran Aperçu intermédiaire ». Les deux onglets
@@ -6058,11 +6146,97 @@ connexion », avec une vidéo en motion design, inspirée de Vinteer.
   Les MP4 ne montent pas dans le dépôt : ils se régénèrent après chaque
   changement de la démo (`npm run build` puis le script).
 
-### ⚠️⚠️ L'ABONNEMENT : 9,99 €/MOIS, ET QUI NE PAIE PLUS NE VOIT PLUS RIEN (4 octobre)
+### ⚠️⚠️ L'ABONNEMENT : 12,99 €/MOIS (9,99 € JUSQU'AU 11 OCTOBRE), ET QUI NE PAIE PLUS NE VOIT PLUS RIEN (4 octobre)
 Julien : « un abonnement à 10 € par mois » puis « **9,99** », « pour tout le monde
 sauf moi », « prélevé chaque mois à partir du moment où la personne s'abonne »,
 puis « la personne ne doit plus recevoir de notifications, voir ses données,
 etc. lorsqu'elle ne paye plus ».
+- ⚠️⚠️ **11 OCTOBRE : LE PRIX PASSE À 12,99 € PAR MOIS** — décision de Julien
+  après l'étude du coût par abonné (« on va passer à 12,99 par mois » : 12,99 €
+  TTC, la TVA arrivant tôt pour lui). Ce qui le dit : les CGV (encadré et
+  article 2, « Dernière mise à jour : 11 octobre 2026 » ⇒ `CGV_VERSION =
+  '2026-10-11'`, rangée dans les métadonnées Stripe), la page d'accueil (FAQ,
+  section Prix), le repli de l'app (`PRIX_CGV_LISIBLE`) et le serveur
+  (`PRIX_CGV`, en centimes). Mesuré : **0 ligne dans `abonnements`** — personne
+  ne payait 9,99 €, aucun abonné à basculer.
+  ⚠️⚠️ **LE GESTE DE JULIEN — ET TANT QU'IL N'EST PAS FAIT, LE PAIEMENT EST
+  FERMÉ.** Le montant PRÉLEVÉ est celui du prix rangé chez Stripe sous la clé
+  `vrm_mensuel` (encore 9,99 €), et un prix Stripe ne se modifie pas, il se
+  recrée : **Stripe → Produits → le produit VRM → « Ajouter un prix » : 12,99 €,
+  récurrent, mensuel, clé de recherche `vrm_mensuel`, cocher « transférer la clé
+  de recherche »** (l'ancien prix la perd ; l'archiver ensuite). Le connecteur
+  Stripe n'était pas autorisé dans la session du 11 octobre : **ce n'est pas
+  fait**, et ça ne se simule pas. À refaire en mode réel le jour du passage.
+  ⇒ **L'app le détecte, côté serveur** : `checkout` compare le prix lu chez
+  Stripe à `PRIX_CGV` (`prixConforme` : mêmes centimes, en euros, une fois par
+  mois) et, s'il diffère, **n'ouvre PAS le paiement** — 503 `prix-cgv`, « Le
+  paiement n'est pas encore ouvert : rien n'a été prélevé » (au vendeur, SANS
+  le montant de Stripe — revue ci-dessous). Jamais 9,99 € prélevés sur des CGV
+  acceptées à 12,99 €. La carte « Mon compte » ne relaie pas un prix non
+  conforme (`prix: null`, `prixConforme: false` ⇒ « le paiement n'est pas
+  encore ouvert », aucun bouton) ; seul le PROPRIÉTAIRE reçoit le montant de
+  Stripe (`prixStripe`) et sa carte dit les deux prix et le geste. Stripe muet ⇒
+  `prixConforme: null` (« pas su »), jamais « différent ». Les journaux Vercel
+  le disent aussi (`[stripe] prix « vrm_mensuel » = … ≠ CGV …`).
+  ⚠️ Ce contrôle ne porte que sur les NOUVEAUX paiements : un abonnement déjà
+  souscrit garde son prix chez Stripe (aucun aujourd'hui).
+  - Preuves : `audit-abonnement.cjs` **74 contrôles**, **11 rouges** sur le code
+    d'avant ; trois mutations, chacune rouge : contrôle retiré (7), prix relayé
+    quand il diffère (1), intervalle oublié (2). `audit-lancement.cjs` **30** —
+    UNE valeur : CGV ×2 = `PRIX_CGV` = `PRIX_CGV_LISIBLE` = page d'accueil ;
+    3 rouges sur l'avant, serveur resté à 999 ⇒ rouge, seconde valeur écrite à
+    côté de la constante ⇒ rouge. Banc `abonnement.cjs` **60** — 3 rouges sur le
+    build d'avant (il affichait « 9,99 € / mois » et « S'abonner » quand Stripe
+    différait des CGV).
+  ⚠️⚠️ **REVUE DU 11 OCTOBRE — QUATRE DÉFAUTS DE CE CHANGEMENT DE PRIX, REPRODUITS
+  AU RENDU (1512 et 390 px) ET EN EXÉCUTANT `api/compte.js`, TOUS CORRIGÉS.**
+  Latents aujourd'hui (abonnement facultatif, 0 abonné), réels le jour où il
+  passe `abonnement_obligatoire` à '1' sans avoir recréé le prix — et en mode
+  réel, il devra le refaire.
+  1. ⚠️⚠️ **La PORTE (second écran qui vend l'abonnement, §11) proposait
+     « S'abonner » quand le paiement est fermé** : « 12,99 € / mois », la case
+     des CGV, un bouton actif — et le clic menait au refus 503, dont le message
+     nommait par-dessus **le prix réglé chez Stripe (9,99 €) à un vendeur**. La
+     carte « Mon compte » évitait ce bouton, la porte non. ⇒ `paiementFerme`
+     (`prixConforme === false`, ou Stripe pas branché, et pas un impayé) : ni
+     case, ni bouton, aucun prix — « le paiement n'est pas encore ouvert, rien
+     n'a été prélevé, tes données t'attendent » — et « Se déconnecter » reste.
+     Un impayé garde « Mettre à jour ma carte ». Le refus 503 ne part jamais au
+     propriétaire (409 avant) : il est **générique** pour tout le monde, le
+     détail (les deux prix, le geste) reste dans `console.warn` et sur la carte
+     du propriétaire.
+  2. **Un ANCIEN abonné perdait la liste de ses factures** (sa compta) : la
+     branche `prixConforme === false` de la carte rendait la carte seule — les
+     factures étaient demandées puis jamais affichées. Elle rend `listeFactures`
+     comme la branche d'en dessous.
+  3. ⚠️ **L'alerte du propriétaire pouvait écrire deux prix IDENTIQUES** —
+     « le prix réglé chez Stripe (12,99 € / mois) n'est pas celui des CGV
+     (12,99 € / mois) » pour un prix en dollars, tous les 3 mois ou par semaine
+     — **ou « 0,00 € »** pour un prix sans montant fixe : `prixLisible` ignorait
+     la devise et le rythme, et `lirePrix` changeait `unit_amount: null` en 0.
+     C'est justement quand il se trompe de devise ou de récurrence dans Stripe
+     qu'elle doit le lui montrer. ⇒ Le serveur écrit le texte (`prixTexte` :
+     montant, **devise** — « 12,99 USD » —, **rythme** — « / semaine »,
+     « tous les 3 mois », « en une fois » —, « sans montant fixe » jamais 0) et
+     le rend dans `prixStripe.texte` ; la carte l'affiche **tel quel**.
+     `prixTexte(PRIX_CGV)` vaut exactement `PRIX_CGV_LISIBLE` (vérifié).
+  4. **Un abonné actif lisait « Abonné · 12,99 € / mois » en payant 9,99 €** :
+     la carte retombait sur le prix de l'offre (ou des CGV quand le serveur ne
+     le relayait pas), juste au-dessus de factures à 9,99 €. Or un abonnement
+     Stripe garde le prix auquel il a été souscrit (les CGV le disent). ⇒ le
+     serveur lit le prix de **SON** abonnement (`prixAbonnement` : l'article de
+     l'abonnement chez Stripe, vérifié sur son client, un seul article) ; pas
+     su ⇒ la carte écrit « Abonné » **sans montant**, jamais un prix deviné.
+     ⚠️ Ça coûte une lecture Stripe de plus à l'ouverture de « Mon compte »,
+     pour un abonné seulement.
+  - Preuves : `audit-abonnement.cjs` **91 contrôles**, **17 rouges** sur
+    2851ef4 ; quatre mutations, chacune rouge : l'ancien formateur (6), le
+    refus qui renomme le prix Stripe au vendeur (1), le prix de l'abonnement lu
+    sans vérifier le client (1), `prixAbonnement` = prix de l'offre (5). Banc
+    `abonnement.cjs` **82** (la porte aux deux tailles, Stripe ≠ CGV et Stripe
+    pas branché) — **13 rouges** sur le build de 2851ef4, et **13 rouges** sur
+    un build réaffaibli des quatre correctifs à la fois (chaque groupe de
+    contrôles tombe sur SA mutation).
 - **Stripe en MODE TEST seulement**, sans bibliothèque (`api/_lib/stripe.js`) :
   Checkout (abonnement), portail de gestion, webhook signé (HMAC sur le corps
   BRUT, comparaison en temps constant, 5 min de tolérance), version d'API
@@ -6141,7 +6315,8 @@ le bon onglet.
   portail ; l'abonnement doit appartenir à CE client, sinon 403 ; la ligne est
   réécrite tout de suite depuis la réponse de Stripe). Résilier en ligne est une
   obligation en France (art. L215-1-1).
-- **CGV et page d'accueil disent 9,99 € par mois, sans engagement.** Tant que
+- **CGV et page d'accueil disent 12,99 € par mois (9,99 € jusqu'au 11 octobre),
+  sans engagement.** Tant que
   `abonnement_obligatoire` vaut '0', elles disent aussi que l'accès est offert —
   ⚠️ **le jour où Julien passe le réglage à '1', retirer cette phrase** de
   `src/Accueil.jsx` (FAQ « Combien ça coûte ? » et section Prix) et de l'encadré
@@ -6949,7 +7124,7 @@ qui arrivent pour de vrai (`orders_sold` 18, `inbox` 17, `profile` 12).
 - **Geste de Julien** : installer la **5.166** dans UN seul dossier, recharger
   ses onglets Vinted, puis passer une fois sur **tomj683** et **arthuror2**.
 
-### ⚠️⚠️ « SE CONNECTER » OUVRE VRM, LA SESSION TIENT, LE CODE PÉRIMÉ SE RÉPARE (11 octobre, 5.167)
+### ⚠️⚠️ « SE CONNECTER » OUVRE VRM, LA SESSION TIENT, LE CODE PÉRIMÉ SE RÉPARE (11 octobre, 5.169)
 Plaintes de Julien : « se connecter doit envoyer dans VRM », « elle ne garde pas
 les connexions », « l'extension n'est pas allumée », « je ne peux pas poster sur
 Leboncoin ». Causes MESURÉES (journaux d'auth, vrai GoTrue, vrai Chromium) :
@@ -6990,7 +7165,7 @@ Leboncoin ». Causes MESURÉES (journaux d'auth, vrai GoTrue, vrai Chromium) :
 - ⚠️ **Non mesuré** : la vraie page de dépôt Leboncoin fermée/arrêtée ; la
   réparation sur SES Chrome (prouvée sur un profil reproduit, pas chez lui) ;
   le catalogue Leboncoin attend en mémoire du service worker (renvoyé à chaque
-  visite, rien de perdu). Extension toujours **5.167.0**, zip régénéré.
+  visite, rien de perdu). Extension **5.169.0** (écrite comme « 5.167 en cours », mais les 5.167 et 5.168 sont parties en production SANS ce code : deux contenus ne portent jamais le même numéro), zip régénéré.
 
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
@@ -7018,7 +7193,7 @@ arrivée** — vérifiée commit par commit sur `manifest.json`, pas devinée.
 | `vestiaire` | `storeVcRecon` | **5.154.0** (4 oct.) | Vestiaire : « ouvre Vestiaire dans ce Chrome, l'extension apprend à le lire » |
 | `detourage` | `detourerPhotos` | **5.156.0** (4 oct.) | « tes photos sont détourées (fond blanc) avant d'être attachées à Leboncoin » |
 | `supprimees` | `noterSuppression` | **5.165.0** (11 oct.) | « une suppression faite sur vinted.fr dans ce Chrome sort d'ici tout de suite » |
-| `liaison` | `demanderLiaison` | **5.167.0** (11 oct.) | « je connecte l'extension à ton compte VRM — rien à taper » (session adressée) |
+| `liaison` | `demanderLiaison` | **5.169.0** (11 oct.) | « je connecte l'extension à ton compte VRM — rien à taper » (session adressée) |
 
 ⚠️ **DEUX SEUILS POUR UNE MÊME NOTION, EXPRÈS.** Les photos s'attachent côté
 Leboncoin depuis la 5.58 et côté eBay depuis la 5.59 : un seul seuil aurait

@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.167.0';
+const CODE_VERSION = '5.169.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -1580,7 +1580,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     //    session arrive maintenant ADRESSÉE, avec un nonce (`onMessageExternal`,
     //    plus haut). Ce relais-ci est refusé, et le dit.
     if (msg && msg.from === 'vmr-bridge' && msg.action === 'session') {
-      sendResponse({ ok: false, code: 'canal', error: 'la session passe par le canal adressé (5.167)' });
+      sendResponse({ ok: false, code: 'canal', error: 'la session passe par le canal adressé (5.169)' });
       return true;
     }
 
@@ -4631,7 +4631,7 @@ async function etatPourApp() {
   //    et le bouton d'ensemble le jetait. `pause.jusqua` laisse l'app griser
   //    et DIRE « Vinted demande de ralentir — X min ». « Pas su » (stockage
   //    lent) ⇒ rien n'est affirmé, ni pause ni absence de pause.
-  // 5.167 : `code` = la version du CODE qui répond (le manifeste peut être plus
+  // 5.169 : `code` = la version du CODE qui répond (le manifeste peut être plus
   //    récent que lui, voir `rechargerSiCodePerime`) ; `ext` = l'identifiant de
   //    CETTE extension, à qui l'app adresse sa session (jamais à toutes).
   let ext = ''; try { ext = String(chrome.runtime.id || ''); } catch (_) {}
@@ -4695,7 +4695,7 @@ async function publierDepuisApp(msg) {
     //        relancé : Leboncoin publierait deux fois), et on DIT pourquoi ;
     //        arrêté ⇒ on lui demande de reprendre, dans CET onglet ;
     //      · fermé ⇒ le dépôt est abandonné : on relance.
-    //    Sans onglet connu (dépôt d'avant la 5.167), l'ancienne règle des 15 min.
+    //    Sans onglet connu (dépôt d'avant la 5.169), l'ancienne règle des 15 min.
     if (jobDeja && (jobDeja.etape === 'depot' || jobDeja.etape === 'abandonne')) {
       const onglet = jobDeja.tabId != null ? await ongletOuvert(jobDeja.tabId) : undefined;
       if (onglet) {
@@ -6559,11 +6559,18 @@ async function readLbcItems() {
 // paire — sa référence « 230 » est la B230, jamais la nouvelle 230. La MÊME
 // règle que `clesAnnonceLbc` / `numeroExterne` dans l'app (§11) ; le lien posé
 // À LA MAIN reste ce qu'il dit. Marqueur absent ou annulé : comme avant.
+// Le marqueur garde, PAR ANNONCE, chaque numéro qu'elle portait à la coupure et
+// ce qu'il devient ({ "<id>": { "553": "1", "266": "B266" } }) : un numéro donné
+// après la coupure suit sa nouvelle paire, un numéro réécrit APRÈS se lit tel
+// quel. La même règle que `traductionAnnonce` dans l'app et le serveur (§11).
 function numeroLbcLu(k, ad, mk) {
   const arch = mk && typeof mk === 'object' && !mk.annule && /^[A-Z]{1,3}$/.test(String(mk.archive || '')) ? String(mk.archive) : '';
   if (!k || !arch || !/^\d+$/.test(k)) return k;
-  const ids = Array.isArray(mk.lbcAnnonces) ? mk.lbcAnnonces : [];
-  return ad && ad.id != null && ids.some((x) => String(x) === String(ad.id)) ? cleNum(arch + k) : k;
+  const carte = mk.lbcAnnonces;
+  if (!ad || ad.id == null || !carte || typeof carte !== 'object' || Array.isArray(carte)) return k;
+  const e = carte[String(ad.id)];
+  if (!e || typeof e !== 'object' || Array.isArray(e) || !Object.prototype.hasOwnProperty.call(e, k)) return k;
+  return typeof e[k] === 'string' ? cleNum(e[k]) : '';
 }
 function adRefKeys(ad, liens, mk) {
   const keys = [];

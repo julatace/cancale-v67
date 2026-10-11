@@ -603,7 +603,7 @@ const quiRepond = (r, t) => (t.vivante(r) ? String(t.vivante(r)) : 'vide/erreur'
       });
       // ══ 11 octobre : LE PONT (lu depuis le disque) JUGE LE CODE QUI RÉPOND ══
       //    Un faux service worker qui répond à « état » SANS `code` (un code
-      //    d'avant la 5.167 sous un manifeste 5.167), ou dont le port se ferme
+      //    d'avant la 5.169 sous un manifeste 5.169), ou dont le port se ferme
       //    (≤ 5.128, il ne connaît pas « état »).
       const FAUX_SW = (version, mode) => `(() => {
         const rt = { id: 'abcdefghijklmnopabcdefghijklmnop', lastError: null,
@@ -627,7 +627,7 @@ const quiRepond = (r, t) => (t.vivante(r) ? String(t.vivante(r)) : 'vide/erreur'
         for (const mode of ['sans-code', 'autre-code', 'port', 'bon-code']) {
           const P = await nouvellePage(nav);
           const w = await P.monde('pont-code-' + mode);
-          await P.dans(w, FAUX_SW('5.167.0', mode) + SRC_PONT);
+          await P.dans(w, FAUX_SW('5.169.0', mode) + SRC_PONT);
           await attendre(40);
           const r = await P.demander({ __vmr: 'etat' }, 300);
           const cadres = await P.pg.evaluate(() => [...document.querySelectorAll('iframe')].map((f) => f.getAttribute('src')));
@@ -642,7 +642,7 @@ const quiRepond = (r, t) => (t.vivante(r) ? String(t.vivante(r)) : 'vide/erreur'
       await essaie('f · plus de session par la page', async () => {
         const P = await nouvellePage(nav);
         const w = await P.monde('pont-session');
-        await P.dans(w, FAUX_CHROME('5.167.0') + SRC_PONT);
+        await P.dans(w, FAUX_CHROME('5.169.0') + SRC_PONT);
         await attendre(40);
         await P.pg.evaluate(() => { window.postMessage({ __vmr: 'session', session: { access_token: 'a', refresh_token: 'r' } }, '*'); window.postMessage({ __vmr: 'session', session: null }, '*'); });
         await attendre(150);

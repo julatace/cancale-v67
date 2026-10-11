@@ -41,7 +41,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.167.0';
+const EXT_ATTENDUE = '5.169.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -175,7 +175,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // exactement. Le seuil est 5.160 : en deçà, l'app dit « mets à jour », elle ne
 // laisse pas le bouton se casser. (Mesuré le 7 octobre : son extension installée
 // est en 5.143 — c'est pour ça que « publier depuis VRM ne marche pas ».)
-const EXT_CAPACITES = { liaison: '5.167.0', supprimees: '5.165.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', repond: '5.77.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', detourage: '5.156.0' };
+const EXT_CAPACITES = { liaison: '5.169.0', supprimees: '5.165.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', repond: '5.77.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', detourage: '5.156.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -4275,11 +4275,11 @@ let __vmrEtat = undefined, __vmrRates = 0;
 //    est à jour ». Seul ⟳ (chrome://extensions) recharge le code, et seulement
 //    dans le Chrome où on le clique.
 // ⇒ Trois signes, tous MESURÉS, jamais devinés :
-//    · le pont (≥ 5.167, toujours lu depuis le disque) juge le code et joint son
+//    · le pont (≥ 5.169, toujours lu depuis le disque) juge le code et joint son
 //      verdict (`perime`) — y compris quand le code est si vieux qu'il ne répond
 //      rien à « état » ;
-//    · l'état porte `code` depuis la 5.167 : absent alors que la version annoncée
-//      est ≥ 5.167, ou différent d'elle ⇒ périmé ;
+//    · l'état porte `code` depuis la 5.169 : absent alors que la version annoncée
+//      est ≥ 5.169, ou différent d'elle ⇒ périmé ;
 //    · la clé `offresAutoLocal` n'a existé dans l'état que de la 5.130 à la 5.158
 //      (retirée avec l'acceptation automatique) : une version ≥ 5.159 qui la
 //      porte encore exécute un code d'avant.
@@ -4298,7 +4298,7 @@ function codePerime() {
   return null;
 }
 // La version où l'état porte `code` (la constante `CODE_VERSION` de background.js).
-const CODE_DANS_ETAT = '5.167.0';
+const CODE_DANS_ETAT = '5.169.0';
 function textePerime() {
   const p = codePerime() || {};
   const v = String((__vmrEtat && __vmrEtat.version) || vmrExtVersion() || '');
@@ -4341,7 +4341,7 @@ function vmrDemandeUn(type, payload, timeoutMs) {
     const fin = (v) => { if (done) return; done = true; clearTimeout(grace); clearTimeout(to); window.removeEventListener('message', onMsg); resolve(v); };
     const onMsg = (e) => {
       if (e.source !== window || !e.data || e.data.__vmr !== type + ':result' || e.data.reqId !== reqId) return;
-      // 11 octobre : le pont (≥ 5.167, toujours lu depuis le disque) juge le
+      // 11 octobre : le pont (≥ 5.169, toujours lu depuis le disque) juge le
       // CODE qui répond et joint son verdict — y compris quand ce code est si
       // ancien qu'il ne répond rien à « état » (`resp: null`).
       if (type === 'etat') __vmrPerimePont = e.data.perime && typeof e.data.perime === 'object' ? Object.assign({}, e.data.perime, { at: Date.now() }) : (e.data.resp ? null : __vmrPerimePont);
@@ -4416,7 +4416,7 @@ const enVolSession = (v) => { __sessExtEnVol = v; __vmrNotifier(); };   // l'ind
 const cleSeparee = (uid) => 'vrm_ext_separee_' + uid;
 // Le canal ADRESSÉ vers une extension : `chrome.runtime` n'existe dans la page
 // que si une extension installée déclare `externally_connectable` pour elle
-// (la 5.167 et suivantes). `null` = pas de réponse (absente, trop ancienne,
+// (la 5.169 et suivantes). `null` = pas de réponse (absente, trop ancienne,
 // code périmé) — jamais une réponse devinée.
 const canalExt = () => { try { const c = typeof window !== 'undefined' ? window.chrome : null; return (c && c.runtime && typeof c.runtime.sendMessage === 'function') ? c.runtime : null; } catch (_) { return null; } };
 function versExtension(id, msg, timeoutMs = 5000) {
@@ -4630,7 +4630,7 @@ function raisonExtGlobale(sansSouris, opt) {
   if (!v || typeof v !== 'object') return { code: 'vrm-passu', texte: "Je n'ai pas pu savoir sous quel compte VRM l'extension écrit — recharge cette page." };
   // L'app lui transmet d'elle-même sa connexion quand elle n'en a pas
   // (`assurerSessionExtension`) : on le dit pendant que ça se fait.
-  // ⚠️ 11 octobre : une extension plus ancienne que la 5.167 n'écoute pas le
+  // ⚠️ 11 octobre : une extension plus ancienne que la 5.169 n'écoute pas le
   //    canal adressé — l'app ne lui prête plus JAMAIS sa propre session. On le
   //    dit, avec les deux vrais gestes, au lieu de promettre un « je réessaie ».
   if (v.connecte === false) return { code: 'vrm', texte: __sessExtEnVol
@@ -5037,6 +5037,7 @@ const assurerVersionNumerotation = async () => {
   if (_verNum.etat === 'perime') { signalerNumerosPerimes('version'); return false; }
   return true;
 };
+const SAUVEGARDE_AVANT_REMISE = "⚠ Cette sauvegarde date d'avant la remise à zéro de tes numéros : elle ne peut pas être restaurée telle quelle (ses anciens numéros reviendraient en chiffres). Rien n'a changé.";
 const NUMEROS_PERIMES_IMPRESSION = "Cet écran a été ouvert avant la remise à zéro de tes numéros : recharge-le avant d'imprimer (aucun N° n'a été tamponné).";
 onVersionNumerotation((e) => { if (e.etat === 'ok') _verNum.okAt = e.at; });
 
@@ -5052,6 +5053,12 @@ const signalerNumerosPerimes = (code) => {
   _numPerimes = { code: String(code || 'version'), at: Date.now() };
   if (_verNum.etat !== 'perime' && code !== 'vrm_prefixe_archive') _emitVerNum({ etat: 'perime' });
   _numPerimesListeners.forEach(fn => { try { fn(_numPerimes); } catch (_) {} });
+  // ⚠️ (relecture du 11 octobre) Un refus de la base ne dit pas SA cause : un
+  //    autre appareil a donné des numéros, OU la remise à zéro a eu lieu depuis
+  //    le chargement de cet écran. Le bloc choisissait sa phrase avant d'avoir
+  //    relu la version (« Un autre appareil… », faux pendant ~1 min, alors qu'il
+  //    était seul). On relit TOUT DE SUITE ; d'ici là, le bloc reste neutre.
+  if (String(code || '') !== 'version') { try { verifierVersionNumerotation(); } catch (_) {} }
 };
 const codeRefusNumeros = (txt) => { const m = /vrm_(pool_retreci|numeros_perimes|fiche_perdue|garage_perime|prefixe_archive)/.exec(String(txt || '')); return m ? m[0] : null; };
 
@@ -5086,9 +5093,27 @@ const memoriserSaisies = () => {
   };
   diffCarte('vinted_annonce_numeros', CHAMPS_NUMERO_FICHE, out.fiches);
   diffCarte('vinted_sale_overrides', CHAMPS_NUMERO_VENTE, out.ventes);
+  // ⚠️ (relecture du 11 octobre) Les gestes se gardent en DIFFÉRENCE (ajouté,
+  //    changé, retiré ICI), jamais la carte entière : rejouer toute la carte
+  //    ressuscitait ce qu'un AUTRE appareil avait défait entre-temps (un colis
+  //    que l'autre avait remis « à envoyer » redevenait « posté »).
   for (const k of CLES_GESTES) {
     const loc = load(k, null); if (loc == null || egal(loc, avant[k])) continue;
-    out.gestes[k] = loc; n++;
+    const av = avant[k];
+    let g;
+    if (Array.isArray(loc)) {
+      const a = Array.isArray(av) ? av : [], cle = (x) => JSON.stringify(x);
+      const sa = new Set(a.map(cle)), sl = new Set(loc.map(cle));
+      g = { __diff: 1, liste: true, ajout: loc.filter((x) => !sa.has(cle(x))), retrait: a.filter((x) => !sl.has(cle(x))) };
+      if (!g.ajout.length && !g.retrait.length) continue;
+    } else if (loc && typeof loc === 'object') {
+      const a = av && typeof av === 'object' && !Array.isArray(av) ? av : {};
+      g = { __diff: 1, ajout: {}, retrait: [] };
+      for (const i in loc) if (!egal(loc[i], a[i])) g.ajout[i] = loc[i];
+      for (const i in a) if (!(i in loc)) g.retrait.push(i);
+      if (!Object.keys(g.ajout).length && !g.retrait.length) continue;
+    } else g = { __diff: 1, valeur: loc };
+    out.gestes[k] = g; n++;
   }
   if (n) { try { localStorage.setItem(SAISIES_A_REJOUER, JSON.stringify(out)); } catch (_) {} }
   return n;
@@ -5118,10 +5143,27 @@ const rejouerSaisies = () => {
   appliquer('vinted_sale_overrides', s.ventes);
   for (const k in (s.gestes || {})) {
     if (!CLES_GESTES.includes(k)) continue;
-    const loc = s.gestes[k], cur = load(k, null);
-    let v = loc;
-    if (Array.isArray(loc) && Array.isArray(cur)) v = [...cur, ...loc.filter(x => !cur.some(y => JSON.stringify(y) === JSON.stringify(x)))];
-    else if (loc && cur && typeof loc === 'object' && typeof cur === 'object' && !Array.isArray(loc) && !Array.isArray(cur)) v = { ...cur, ...loc };
+    const g = s.gestes[k], cur = load(k, null);
+    let v;
+    if (g && typeof g === 'object' && g.__diff === 1) {
+      // La DIFFÉRENCE faite sur l'écran rechargé, appliquée à la ligne fraîche :
+      // ce que l'autre appareil a changé ailleurs reste tel quel.
+      if (g.liste) {
+        const cle = (x) => JSON.stringify(x), ret = new Set((g.retrait || []).map(cle));
+        const base = (Array.isArray(cur) ? cur : []).filter((x) => !ret.has(cle(x)));
+        const deja = new Set(base.map(cle));
+        v = [...base, ...(g.ajout || []).filter((x) => !deja.has(cle(x)))];
+      } else if ('valeur' in g) v = g.valeur;
+      else {
+        v = { ...(cur && typeof cur === 'object' && !Array.isArray(cur) ? cur : {}), ...(g.ajout || {}) };
+        for (const i of (g.retrait || [])) delete v[i];
+      }
+    } else {
+      // Mis de côté par une version d'avant (la carte entière) : comme avant.
+      const loc = g; v = loc;
+      if (Array.isArray(loc) && Array.isArray(cur)) v = [...cur, ...loc.filter(x => !cur.some(y => JSON.stringify(y) === JSON.stringify(x)))];
+      else if (loc && cur && typeof loc === 'object' && typeof cur === 'object' && !Array.isArray(loc) && !Array.isArray(cur)) v = { ...cur, ...loc };
+    }
     try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {}
     n++;
   }
@@ -8206,13 +8248,16 @@ function BlocNumerosPerimes() {
   useEffect(() => onVersionNumerotation((e) => setVer({ ...e })), []);
   const perime = !!refus || ver.etat === 'perime';
   if (!perime) return null;
+  // La version a-t-elle été RELUE depuis le refus ? Sinon on ne sait pas encore
+  // pourquoi la base a refusé : titre neutre (jamais « un autre appareil » au hasard).
+  const relue = !refus || refus.code === 'version' || (ver.at || 0) >= refus.at;
   const remise = ver.nuage != null && ver.nuage !== versionNumerotation();
   return (
     <div data-numeros-perimes={refus ? refus.code : 'version'} role="alertdialog" aria-modal="true"
       style={{ position: 'fixed', inset: 0, zIndex: 100000, background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ maxWidth: 460, borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, padding: '22px 20px' }}>
         <div style={{ fontSize: 17, fontWeight: 700, color: C.text, marginBottom: 8 }}>
-          {remise ? 'Cet écran a été ouvert avant la remise à zéro de tes numéros' : 'Un autre appareil vient de donner des numéros'}
+          {!relue ? 'Cet écran n\'est plus à jour' : remise ? 'Cet écran a été ouvert avant la remise à zéro de tes numéros' : 'Un autre appareil vient de donner des numéros'}
         </div>
         <div style={{ fontSize: 13.5, color: C.text, lineHeight: 1.55 }}>
           Les numéros affichés ici peuvent être <b>faux</b> : n'en écris aucun sur un carton et n'imprime rien depuis cet écran.
@@ -8914,7 +8959,7 @@ function EtatActions({ onNav, ordi, sombre }) {
   // connectée, elle, ouvre VRM) — c'est le repli si la reconnexion automatique
   // n'aboutit pas.
   // 11 octobre : « je réessaie » n'est vrai que si l'extension sait RECEVOIR la
-  // connexion de VRM (5.167, session adressée). Une plus ancienne ne reçoit
+  // connexion de VRM (5.169, session adressée). Une plus ancienne ne reçoit
   // plus rien de l'app — promettre « je réessaie » serait le défaut le plus
   // coûteux du projet ; on dit les deux vrais gestes.
   else if (code === 'vrm') geste = <span data-etat-geste={extSait('liaison') === 'retard' ? 'maj-ou-mdp' : 'liaison'}>{__sessExtEnVol ? 'Un instant…'
@@ -10133,7 +10178,12 @@ const cleVerifEbay = (item, utc) => { try { return JSON.stringify([item, utc || 
 // page d'erreur de Vercel n'est pas du JSON).
 async function appelEbay(corps) {
   try {
-    const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify(corps) });
+    // La version de numérotation qu'a lue CET écran (migration 013) : le serveur
+    // refuse de publier ou programmer sous un numéro d'avant la remise à zéro.
+    // (Seulement pour ces deux gestes : les autres corps restent exactement ce
+    // qu'ils étaient — ils ne posent aucun numéro.)
+    const avecVersion = corps && (corps.action === 'publish' || corps.action === 'programmer');
+    const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify(avecVersion ? { ...corps, numerotation: versionNumerotation() } : corps) });
     let j = null; try { j = await r.json(); } catch (_) {}
     return { code: r.status, j };
   } catch (_) { return { code: 0, j: null }; }
@@ -20931,7 +20981,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       //    sur une annonce sans numéro ni prix d'achat effaçait l'entrée entière
       //    — donc le choix — à la ligne suivante, sans un mot.
       const emptyMp = !next.mp || Object.keys(next.mp).length === 0;
-      if (emptyNum && emptyBuy && emptyMp) delete u[item.id]; else u[item.id] = next;
+      // ⚠️ (relecture du 11 octobre) Après une remise à zéro, la base REFUSE
+      //    qu'une fiche numérotée disparaisse (`vrm_fiche_perdue` : c'est la
+      //    signature d'un appareil chargé avant qu'un autre ne numérote). Effacer
+      //    son N° à la main la supprimait : refus, faux diagnostic (« un autre
+      //    appareil… »), et plus rien ne se synchronisait. On garde la fiche,
+      //    son N° vide — elle compte exactement comme une fiche absente partout.
+      const etaitNumerotee = !!String(c.numero || '').trim();
+      if (emptyNum && emptyBuy && emptyMp && !(etaitNumerotee && archiveNumeros())) delete u[item.id]; else u[item.id] = next;
       save('vinted_annonce_numeros', u); return u;
     });
     // Miroir DURABLE du prix d'achat par NUMÉRO (survit à la vente/republication).
@@ -22677,6 +22734,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // de retour en vente, on ne la liste plus comme « attendue ».
     const onlineNums = new Set();
     for (const it of (listings.items || [])) { const e = numeros[it.id]; if (e && e.numero) onlineNums.add(String(e.numero)); }
+    // ⚠️ (relecture du 11 octobre) Un numéro d'ARCHIVE (B198) n'est JAMAIS porté
+    //    par une annonce republiée (elle prend un numéro neuf) : le test par
+    //    numéro ne pouvait plus vider la liste. La paire est republiée quand une
+    //    annonce EN LIGNE est la sienne par IDENTITÉ (l'annonce de la vente,
+    //    rouverte) ou par sa PHOTO (même fichier).
+    const enLigneIds = new Set(), enLignePk = new Set();
+    for (const it of (listings.items || [])) {
+      if (!onlineAnnonceIds.has(String(it.id))) continue;
+      enLigneIds.add(String(it.id)); const pk = photoKey(it.photo); if (pk) enLignePk.add(pk);
+    }
+    const republiee = (o) => {
+      const id = o && o.transaction_id != null ? txnItem[String(o.transaction_id)] : null;
+      if (id != null && enLigneIds.has(String(id))) return true;
+      const pk = photoKey(orderPhoto(o)); return !!pk && enLignePk.has(pk);
+    };
     const out = [];
     for (const o of (sales.items || [])) {
       if (isHidden(o)) continue;
@@ -22686,6 +22758,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const num = e && e.numero ? String(e.numero) : null;
       if (num && pairsLost[num]) continue;         // déjà déclarée perdue
       if (num && onlineNums.has(num)) continue; // ce numéro est déjà porté par une annonce en ligne → déjà republiée
+      if (num && !numeroReprenable(num) && republiee(o)) continue; // ancien numéro : republiée sous un numéro neuf
       if (o.transaction_id != null && retoursDismissed[String(o.transaction_id)]) continue; // masquée à la main
       out.push({ o, kind, num, title: o.title || '', cell: num ? garageCellOf(garageGrid, num) : null });
     }
@@ -22693,7 +22766,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     out.sort((a, b) => (rank[a.kind] - rank[b.kind]) || (new Date(b.o.date || 0) - new Date(a.o.date || 0)));
     return out;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, numeros, saleOv, pairsLost, garageGrid, listings.items, retoursDismissed]);
+  }, [sales.items, numeros, saleOv, pairsLost, garageGrid, listings.items, retoursDismissed, txnItem, onlineAnnonceIds]);
 
   const RETOUR_LABEL = { retour: { txt: '↩️ Retour en cours', col: () => INV_STATUS.online.color }, rembourse: { txt: '💸 Remboursé', col: () => C.warn }, suspendue: { txt: '⏸ Suspendue', col: () => C.muted } };
 
@@ -23351,8 +23424,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (cur && cur.numero != null && String(cur.numero).trim() !== '' && !cur.autoAssigned) continue;
       const broadKey = identiteAnnonce(o);
       let reuse = (broadKey && numeros[broadKey] && numeros[broadKey].numero) ? String(numeros[broadKey].numero) : null;
-      // Une vente faite APRÈS la remise à zéro ne reprend jamais un numéro d'archive.
-      if (reuse && venteApresCoupure(o) && !numeroReprenable(reuse)) reuse = null;
+      // Une vente faite APRÈS la remise à zéro ne reprend pas un numéro d'archive
+      // par une RESSEMBLANCE (la photo : `entryKeyByPhoto` le refuse déjà). Mais
+      // quand VINTED dit quelle annonce elle vend (transaction → item_id), c'est
+      // l'IDENTITÉ de la paire : une ancienne annonce encore en ligne, vendue
+      // après la coupure, garde son « B7 » — c'est son carton. (Relecture du
+      // 11 octobre : elle recevait un numéro NEUF, tamponné sur son bordereau,
+      // pris dans la suite 1, 2, 3 des paires republiées.)
+      const parIdentite = o.transaction_id != null && txnItem[String(o.transaction_id)] != null;
+      if (reuse && !parIdentite && venteApresCoupure(o) && !numeroReprenable(reuse)) reuse = null;
       if (reuse) {
         if (!cur || String(cur.numero||'') !== reuse) { ovNext[tid] = { ...(cur||{}), numero: reuse, autoAssigned: false }; changed = true; }
       } else if ((needsBordereau(o.status) || venteRecente(o)) && !isHidden(o) && classifyOrderStatus(o.status) !== 'cancelled') {
@@ -27082,9 +27162,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {st==='cancelled' && num && (()=>{
                       const out = saleOutcome(o);
                       if (isPairLost(num)) return <span style={{color:C.danger,fontWeight:600,background:`${C.danger}18`,border:`1px solid ${C.danger}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title="Paire déclarée perdue : son numéro est libéré et sa case au garage vidée.">❌ N°{num} perdue</span>;
-                      if (out === 'retour') return <span style={{color:INV_STATUS.online.color,fontWeight:600,background:`${INV_STATUS.online.color}18`,border:`1px solid ${INV_STATUS.online.color}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title="Retour initié : la paire te revient. Elle garde son numéro — republie-la avec le même.">↩️ revient → garde le N°{num}</span>;
+                      // ⚠️ (relecture du 11 octobre) Un numéro d'ARCHIVE (« B198 ») ne
+                      //    se redonne jamais : l'app le refuse dans le champ N°. Dire
+                      //    « garde le N°B198 » envoyait faire le geste qu'elle refuse.
+                      const arch = !numeroReprenable(num);
+                      if (out === 'retour') return arch
+                        ? <span data-retour-archive="retour" style={{color:INV_STATUS.online.color,fontWeight:600,background:`${INV_STATUS.online.color}18`,border:`1px solid ${INV_STATUS.online.color}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title={`Retour initié : la paire te revient. Le N°${num} est un ancien numéro — elle prendra un numéro NEUF à sa republication : écris-le sur le carton.`}>↩️ revient → numéro neuf</span>
+                        : <span style={{color:INV_STATUS.online.color,fontWeight:600,background:`${INV_STATUS.online.color}18`,border:`1px solid ${INV_STATUS.online.color}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title="Retour initié : la paire te revient. Elle garde son numéro — republie-la avec le même.">↩️ revient → garde le N°{num}</span>;
                       if (out === 'suspendue') return <span style={{color:C.muted,fontWeight:600,background:`${C.muted}18`,border:`1px solid ${C.muted}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title="Transaction suspendue par Vinted : rien n'est tranché, on ne touche pas au numéro.">⏸ en attente → N°{num} conservé</span>;
-                      return <span style={{color:C.warn,fontWeight:600,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title="Vente annulée : si la paire t'est renvoyée, republie-la avec CE numéro (l'app le réutilise automatiquement).">🔁 renvoi → garde le N°{num}</span>;
+                      return arch
+                        ? <span data-retour-archive="renvoi" style={{color:C.warn,fontWeight:600,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title={`Vente annulée : si la paire t'est renvoyée, elle prendra un numéro NEUF à sa republication (le N°${num} est un ancien numéro) — écris-le sur le carton.`}>🔁 renvoi → numéro neuf</span>
+                        : <span style={{color:C.warn,fontWeight:600,background:`${C.warn}18`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title="Vente annulée : si la paire t'est renvoyée, republie-la avec CE numéro (l'app le réutilise automatiquement).">🔁 renvoi → garde le N°{num}</span>;
                     })()}
                     {/* « ⚠️ à identifier » RETIRÉ (30 sept.) : écrit en orange sur
                         chaque vente sans N°, c'était la même alerte ×N (§7). Le
@@ -28442,7 +28530,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 </button>
               ); })()}
               {retoursOpen && (
-              <div style={{fontSize:11,color:C.muted,margin:'6px 0 8px',lineHeight:1.45}}>Retours et litiges en cours. Coche <b>« ✓ Reçue »</b> quand tu as la paire en main : elle passera en tête, prête à republier. <b>Retape son numéro</b> dans le champ N° de la nouvelle annonce — celui écrit sur sa boîte.</div>)}
+              <div style={{fontSize:11,color:C.muted,margin:'6px 0 8px',lineHeight:1.45}}>Retours et litiges en cours. Coche <b>« ✓ Reçue »</b> quand tu as la paire en main : elle passera en tête, prête à republier.
+                {/* (relecture du 11 octobre) « Retape son numéro » s'affichait à côté
+                    de numéros d'ARCHIVE (B…), que l'app refuse ensuite : la consigne
+                    suit le numéro, une phrase par cas présent (§7). */}
+                {retoursAttendus.some(r=>r.num&&numeroReprenable(r.num)) && <> <b>Retape son numéro</b> dans le champ N° de la nouvelle annonce — celui écrit sur sa boîte.</>}
+                {retoursAttendus.some(r=>r.num&&!numeroReprenable(r.num)) && <span data-retour-archive-consigne> Un <b>ancien numéro</b> (B…) ne se redonne pas : la paire republiée prendra un <b>numéro neuf</b> — écris-le sur le carton. Elle sortira de cette liste toute seule.</span>}
+              </div>)}
               {retoursOpen && (<div style={{display:'flex',flexDirection:'column',gap:6}}>
                 {[...retoursAttendus].sort((a,b)=>(isRetourRecu(b.o)?1:0)-(isRetourRecu(a.o)?1:0)).map((r,i)=>{
                   const lab = RETOUR_LABEL[r.kind] || RETOUR_LABEL.suspendue;
@@ -28463,7 +28557,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           {!r.num && <span style={{color:C.danger}}>numéro inconnu</span>}
                         </div>
                       </div>
-                      {r.num && <button type="button" onClick={()=>{ try{navigator.clipboard.writeText(r.num);}catch(_){}}} title={`Copier ${r.num}`} aria-label="Copier le numéro" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.muted,cursor:'pointer',fontSize:12,padding:'6px 8px'}}>⧉</button>}
+                      {r.num && numeroReprenable(r.num) && <button type="button" onClick={()=>{ try{navigator.clipboard.writeText(r.num);}catch(_){}}} title={`Copier ${r.num}`} aria-label="Copier le numéro" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.muted,cursor:'pointer',fontSize:12,padding:'6px 8px'}}>⧉</button>}
                       <button type="button" onClick={()=>toggleRetourRecu(r.o)} title={recu?'Annuler : je ne l\'ai pas encore reçue':'J\'ai récupéré cette paire'} aria-label={recu?'Annuler reçue':'Marquer reçue'} style={{flexShrink:0,border:`1px solid ${recu?INV_STATUS.online.color:C.border}`,borderRadius:8,background:recu?INV_STATUS.online.color:'transparent',color:recu?'#fff':C.muted,cursor:'pointer',fontSize:11,fontWeight:600,padding:'6px 9px',fontFamily:'inherit'}}>{recu?'✓ Reçue':'✓ Reçue ?'}</button>
                       <button type="button" onClick={()=>dismissRetour(r.o)} title="Déjà republiée / masquer cette ligne" aria-label="Masquer" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.muted,cursor:'pointer',fontSize:13,fontWeight:600,padding:'6px 8px',fontFamily:'inherit'}}><Icon name="close" size={15}/></button>
                     </div>
@@ -31757,14 +31851,32 @@ const skuEbayDe = (numero) => { const c = cleNum(numero); return c && NUM_OK.tes
 // coupure parle aussi de l'ancienne série. Sans ça, la vente Vinted de la
 // nouvelle 230 faisait retirer d'eBay l'annonce de l'ancienne 230.
 // Par l'identifiant ou la date, jamais par le titre (§5).
+// ⚠️ (relecture du 11 octobre) Le marqueur garde, PAR ANNONCE, chaque numéro
+// qu'elle portait à la coupure ET ce qu'il devient : { "<id>": { "553": "1",
+// "12": "B12" } }. Deux défauts de la liste d'identifiants d'avant :
+//   • ses deux annonces eBay portaient « VRM-553 » et « VRM-559 », numéros
+//     PROVISOIRES donnés après la coupure à des paires devenues 1 et 7 : elles
+//     étaient lues « B553 », une paire qui n'existe pas ;
+//   • une annonce RELIÉE après la coupure à une nouvelle paire (SKU réécrit en
+//     « VRM-3 ») était lue « B3 », l'ancienne paire — et le retrait automatique
+//     terminait l'annonce d'une paire qu'il a encore.
+// On ne traduit donc que si l'annonce porte ENCORE le numéro d'avant. La même
+// règle dans le serveur (`api/_lib/numerotation.js`) et l'extension (§11).
+const traductionAnnonce = (carte, id, k) => {
+  if (id == null || !carte || typeof carte !== 'object' || Array.isArray(carte)) return undefined;
+  const e = carte[String(id)];
+  if (!e || typeof e !== 'object' || Array.isArray(e) || !Object.prototype.hasOwnProperty.call(e, k)) return undefined;
+  return typeof e[k] === 'string' ? cleNum(e[k]) : '';
+};
 const numeroExterne = (k, id, liste, dateMs) => {
   const arch = archiveNumeros();
   if (!k || !arch || !/^\d+$/.test(k)) return k;
   const m = marqueurNumerotation();
-  const ids = m && !m.annule && Array.isArray(m[liste]) ? m[liste] : [];
+  const t = traductionAnnonce(m && !m.annule ? m[liste] : null, id, k);
+  if (t !== undefined) return t;
   const coupure = coupureNumerotation();
   const avant = dateMs != null && isFinite(dateMs) && coupure != null && dateMs < coupure;
-  return (id != null && ids.some((x) => String(x) === String(id))) || avant ? cleNum(arch + k) : k;
+  return avant ? cleNum(arch + k) : k;
 };
 // Le N° d'une annonce / ligne de commande eBay, lu avec son identifiant.
 const numEbayLu = (sku, itemId, dateMs) => numeroExterne(numDeSkuEbay(sku), itemId, 'ebayAnnonces', dateMs);
@@ -33323,7 +33435,8 @@ const applyZoom = (z) => {
 // défaut, et alors l'accueil dit « Bonjour » tout court. On ne le déduit PAS de
 // l'email : un prénom inventé est un faux, et un blanc vaut mieux (§5).
 // ══════════════════════════════════════════════════════════════════════════
-// L'ABONNEMENT (4 octobre) — 9,99 €/mois, pour tout le monde sauf le propriétaire
+// L'ABONNEMENT (4 octobre) — 12,99 €/mois depuis le 11 octobre (9,99 € avant),
+// pour tout le monde sauf le propriétaire
 // ══════════════════════════════════════════════════════════════════════════
 // Le serveur décide (api/compte.js) : qui est propriétaire (VRM_OWNER_UID), si
 // Stripe est branché, si l'abonnement est obligatoire, et le statut — lu dans
@@ -33353,7 +33466,13 @@ async function ouvrirStripe(mode, extra) {
     return (j && j.message) || "Stripe n'a pas répondu. Réessaie dans un instant.";
   } catch (_) { return "Pas de connexion. Réessaie dans un instant."; }
 }
-const prixLisible = (p) => p ? `${Number(p.montant).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € / ${p.intervalle === 'year' ? 'an' : 'mois'}` : '9,99 € / mois';
+// Le prix des CGV (public/legal/cgv.html), écrit UNE fois côté app : c'est ce
+// qu'on dit quand Stripe ne donne pas de prix — ou en donne un AUTRE que celui
+// des CGV (le serveur ne le relaie alors pas, api/compte.js `prixConforme`).
+// audit-lancement.cjs exige que ce soit la même valeur que les CGV et que le
+// serveur (`PRIX_CGV`) : 12,99 € depuis le 11 octobre (décision de Julien).
+const PRIX_CGV_LISIBLE = '12,99 € / mois';
+const prixLisible = (p) => p ? `${Number(p.montant).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € / ${p.intervalle === 'year' ? 'an' : 'mois'}` : PRIX_CGV_LISIBLE;
 const dateLisible = (iso) => { try { return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }); } catch (_) { return ''; } };
 
 // MES FACTURES ET MA CARTE — trois états : `undefined` en cours · `null` pas su
@@ -33552,7 +33671,28 @@ function MonAbonnement() {
   const titre = <div style={{ fontSize: 15, fontWeight: 600, color: C.text }}>Ton abonnement</div>;
   if (e === undefined) return <div style={carte} data-abonnement="chargement">{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3 }}>Je regarde…</div></div>;
   if (e === null) return <div style={carte} data-abonnement="pas-su">{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3, lineHeight: 1.5 }}>Je n'ai pas pu lire ton abonnement. Rouvre cet écran dans un instant — rien n'a changé de ton côté.</div></div>;
-  if (e.proprietaire) return <div style={carte} data-abonnement="proprietaire">{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3, lineHeight: 1.5 }}>Compte propriétaire de VRM : gratuit, aucun abonnement.</div></div>;
+  // ⚠️ LE PRIX CHEZ STRIPE ≠ CELUI DES CGV (11 octobre : 12,99 €, et le prix
+  //    rangé chez Stripe sous `vrm_mensuel` est un réglage de SON tableau de
+  //    bord). Le serveur refuse alors d'ouvrir le paiement ; c'est au
+  //    propriétaire — le seul qui peut le corriger — qu'on le dit, avec le geste.
+  //    « Pas su » (Stripe muet : `prixConforme` null) ne dit rien.
+  //    ⚠️ Le prix de Stripe s'écrit avec le TEXTE DU SERVEUR (`prixStripe.texte`,
+  //    montant + devise + rythme), jamais reformaté ici : `prixLisible` ignore la
+  //    devise et le rythme, et faisait dire « 12,99 € / mois n'est pas
+  //    12,99 € / mois » pour un prix en dollars ou tous les 3 mois — ou
+  //    « 0,00 € » pour un prix sans montant fixe — juste quand il doit voir son
+  //    erreur dans Stripe (revue du 11 octobre).
+  const prixAcorriger = e.proprietaire && e.prixConforme === false && e.prixStripe;
+  const texteStripe = prixAcorriger && typeof e.prixStripe.texte === 'string' && e.prixStripe.texte.trim() ? e.prixStripe.texte : 'un prix différent';
+  if (e.proprietaire) return (
+    <div style={carte} data-abonnement="proprietaire">{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3, lineHeight: 1.5 }}>Compte propriétaire de VRM : gratuit, aucun abonnement.</div>
+      {prixAcorriger && (
+        <div data-prix-stripe="different" style={{ fontSize: 12.5, color: C.text, marginTop: 8, lineHeight: 1.5 }}>
+          Le prix réglé chez Stripe (<b data-prix-stripe-texte="">{texteStripe}</b>) n'est pas celui des conditions de vente (<b>{PRIX_CGV_LISIBLE}</b>). Le paiement reste <b>fermé</b> : personne ne peut s'abonner tant que ce n'est pas corrigé. Dans Stripe → Produits, ajoute au produit VRM un prix de {PRIX_CGV_LISIBLE.replace(' / ', ' par ')} avec la clé de recherche « vrm_mensuel » (coche « transférer la clé »).
+        </div>
+      )}
+    </div>
+  );
   if (!e.configure) return <div style={carte} data-abonnement="non-branche">{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3, lineHeight: 1.5 }}>Le paiement n'est pas encore ouvert : VRM reste gratuit pour l'instant.</div></div>;
   const test = e.modeTest ? <div data-mode-test="" style={{ fontSize: 11.5, color: C.muted, marginTop: 6, lineHeight: 1.5 }}>Paiement en <b style={{ color: C.text }}>mode test</b> : aucune vraie carte n'est débitée (carte d'essai 4242 4242 4242 4242).</div> : null;
   const cb = fx && fx.carte;
@@ -33568,7 +33708,11 @@ function MonAbonnement() {
     return (<>
       <div style={carte} data-abonnement="actif" data-resilie={annule ? '' : undefined}>
         {titre}
-        <div style={{ fontSize: 12.5, color: C.text, marginTop: 4, lineHeight: 1.5 }}>Abonné · {prixLisible(e.prix)}</div>
+        {/* ⚠️ Le prix de SON abonnement (`prixAbonnement`, lu sur l'article de
+            l'abonnement chez Stripe), jamais celui de l'offre (`prix`) ni celui
+            des CGV : un abonnement garde le prix auquel il a été souscrit
+            (9,99 € avant le 11 octobre). Pas su ⇒ « Abonné » sans montant. */}
+        <div data-prix-abonnement={e.prixAbonnement && e.prixAbonnement.texte ? '' : undefined} style={{ fontSize: 12.5, color: C.text, marginTop: 4, lineHeight: 1.5 }}>Abonné{e.prixAbonnement && typeof e.prixAbonnement.texte === 'string' && e.prixAbonnement.texte.trim() ? ` · ${e.prixAbonnement.texte}` : ''}</div>
         {e.finPeriode && (
           <div style={{ fontSize: 12.5, color: C.muted, marginTop: 2, lineHeight: 1.5 }}>
             {annule ? `Résilié : VRM reste ouvert jusqu'au ${dateLisible(e.finPeriode)}, aucun autre prélèvement.` : `Prochain prélèvement le ${dateLisible(e.finPeriode)}.`}
@@ -33602,6 +33746,14 @@ function MonAbonnement() {
       {listeFactures}
     </>);
   }
+  // Le prix de Stripe n'est pas celui des CGV : le serveur n'ouvrira pas le
+  // paiement (api/compte.js) — aucun bouton qui mènerait à un refus.
+  // ⚠️ Un ANCIEN abonné garde ses factures (sa compta) : cette branche les rend
+  //    comme celle du dessous — elle les perdait (revue du 11 octobre).
+  if (e.prixConforme === false) return (<>
+    <div style={carte} data-abonnement="non-branche" data-raison="prix">{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3, lineHeight: 1.5 }}>Le paiement n'est pas encore ouvert : VRM reste gratuit pour l'instant.</div></div>
+    {listeFactures}
+  </>);
   return (<>
     <div style={carte} data-abonnement="sans">
       {titre}
@@ -33688,8 +33840,19 @@ function AbonnementRequis({ info }) {
   // encore chez Stripe, on ne lui en vend pas un second — on l'envoie mettre
   // sa carte à jour (sinon « S'abonner » répondrait « tu es déjà abonné »).
   const impaye = !!(info && info.peutGerer && (info.statut === 'past_due' || info.statut === 'unpaid'));
+  // ⚠️ LE PAIEMENT EST FERMÉ (revue du 11 octobre) : le prix réglé chez Stripe
+  //    n'est pas celui des CGV (`prixConforme: false`), ou Stripe n'est pas
+  //    branché. Le serveur refuserait le paiement (api/compte.js, 503
+  //    `prix-cgv`) : la porte — second écran qui vend l'abonnement, comme la
+  //    carte « Mon compte » (§11) — ne propose donc NI la case des CGV NI
+  //    « S'abonner », et ne dit aucun prix. Elle disait « 12,99 € / mois » et
+  //    menait au refus. Un impayé, lui, garde « Mettre à jour ma carte » (son
+  //    abonnement existe : rien à voir avec le prix de l'offre).
+  //    « Pas su » (`info` pas encore lu, `prixConforme: null`) ne ferme rien.
+  const paiementFerme = !impaye && !!info && (info.prixConforme === false || info.configure === false);
   const [cgv, setCgv] = React.useState(false);
   const agir = async () => {
+    if (paiementFerme) return;
     if (!impaye && !cgv) { setMsg("Coche « J'accepte les conditions générales de vente » avant de payer."); return; }
     setOccupe(true); setMsg('');
     const m = await ouvrirStripe(impaye ? 'portail' : 'checkout', impaye ? null : { cgv: true });
@@ -33700,17 +33863,21 @@ function AbonnementRequis({ info }) {
       <div style={{ width: '100%', maxWidth: 420, background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: '26px 22px', boxShadow: C.shadowLg || 'none' }}>
         <img src="/logo-vrm-96.png" alt="VRM" width="44" height="44" style={{ borderRadius: 10, display: 'block' }}/>
         <div style={{ fontSize: 22, fontWeight: 700, color: C.text, marginTop: 16, letterSpacing: -0.4 }}>Ton abonnement VRM</div>
-        <div style={{ fontSize: 14, color: C.muted, marginTop: 8, lineHeight: 1.55 }} data-impaye={impaye ? '' : undefined}>
+        <div style={{ fontSize: 14, color: C.muted, marginTop: 8, lineHeight: 1.55 }} data-impaye={impaye ? '' : undefined} data-paiement-ferme={paiementFerme ? '' : undefined}>
           {impaye
             ? "Ton prélèvement n'est pas passé depuis plus de 14 jours : VRM est en pause. Mets ta carte à jour et tout revient tel quel — tes données sont intactes."
-            : `${prixLisible(info && info.prix)}, sans engagement, résiliable à tout moment. Tes données sont intactes : elles t'attendent dès que l'abonnement est actif.`}
+            : paiementFerme
+              ? "Le paiement de l'abonnement n'est pas encore ouvert : rien n'a été prélevé. Tes données sont intactes : elles t'attendent. Réessaie un peu plus tard."
+              : `${prixLisible(info && info.prix)}, sans engagement, résiliable à tout moment. Tes données sont intactes : elles t'attendent dès que l'abonnement est actif.`}
         </div>
-        {info && info.modeTest && <div style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>Mode test : aucune vraie carte n'est débitée.</div>}
-        {!impaye && <CaseCgv coche={cgv} onChange={setCgv}/>}
-        <button type="button" disabled={occupe || (!impaye && !cgv)} data-sabonner="" onClick={agir} style={{ marginTop: 18, width: '100%', border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '13px 16px', fontSize: 15, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', opacity: (!impaye && !cgv) ? 0.5 : 1 }}>
-          {occupe ? 'Ouverture du paiement…' : (impaye ? 'Mettre à jour ma carte' : "S'abonner")}
-        </button>
-        {msg && <div style={{ fontSize: 12.5, color: C.warn, marginTop: 8 }}>{msg}</div>}
+        {!paiementFerme && info && info.modeTest && <div style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>Mode test : aucune vraie carte n'est débitée.</div>}
+        {!impaye && !paiementFerme && <CaseCgv coche={cgv} onChange={setCgv}/>}
+        {!paiementFerme && (
+          <button type="button" disabled={occupe || (!impaye && !cgv)} data-sabonner="" onClick={agir} style={{ marginTop: 18, width: '100%', border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '13px 16px', fontSize: 15, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', opacity: (!impaye && !cgv) ? 0.5 : 1 }}>
+            {occupe ? 'Ouverture du paiement…' : (impaye ? 'Mettre à jour ma carte' : "S'abonner")}
+          </button>
+        )}
+        {msg && !paiementFerme && <div style={{ fontSize: 12.5, color: C.warn, marginTop: 8 }}>{msg}</div>}
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 14, fontSize: 12.5 }}>
           <a href="/legal/cgv.html" target="_blank" rel="noopener noreferrer" style={{ color: C.muted }}>Conditions de vente</a>
           <button type="button" onClick={() => { authSignOut(); }} style={{ border: 'none', background: 'transparent', color: C.muted, cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5, padding: 0, minHeight: 0 }}>Se déconnecter</button>
@@ -33761,12 +33928,19 @@ function NumerosSetting() {
   // La lettre des ANCIENS numéros (remise à zéro, migration 013) ne peut pas
   // être celle des nouveaux : « B12 » désignerait deux paires. La base le
   // refuse ; l'écran le dit avant, et n'enregistre rien.
+  // ⚠️ (relecture du 11 octobre) Cliquer « Avec une lettre » ENREGISTRAIT déjà
+  //    une lettre par défaut (« C »), puis taper « B » affichait « rien n'est
+  //    enregistré » — il repartait en croyant n'avoir rien changé, et ses paires
+  //    republiées partaient en C1, C2… La série ne s'enregistre plus qu'à la
+  //    lettre TAPÉE et acceptée, et l'écran dit ce qui est réellement enregistré.
   const arch = archiveNumeros();
+  const [refusee, setRefusee] = React.useState('');
   const poser = (v) => {
     touche.current = true;
     const n = String(v || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3);
+    if (n && arch && n === arch) { setRefusee(n); setP(prefixeNumeros()); return; }
+    setRefusee('');
     setP(n);
-    if (n && arch && n === arch) return;
     // La copie locale tout de suite (`save` écrit 500 ms plus tard) : les champs
     // N° et la numérotation automatique la lisent dès le prochain rendu.
     try { localStorage.setItem('vrm_num_prefixe', JSON.stringify(n)); } catch (_) {}
@@ -33774,9 +33948,14 @@ function NumerosSetting() {
     try { window.dispatchEvent(new Event('vrm-prefixe')); } catch (_) {}
   };
   const defaut = arch === 'B' ? 'C' : 'B';
-  const choix = (m) => { setMode(m); poser(m === 'chiffres' ? '' : (p && p !== arch ? p : defaut)); };
+  // « Avec une lettre » n'enregistre rien tout seul : la lettre se TAPE.
+  const choix = (m) => { setMode(m); setRefusee(''); if (m === 'chiffres') poser(''); };
   const pill = (on) => ({ border: `1px solid ${on ? C.accent : C.border}`, background: on ? C.accent : C.card, color: on ? (C.onAccent || '#fff') : C.text, borderRadius: 999, padding: '7px 14px', fontSize: 13, fontWeight: on ? 700 : 600, cursor: 'pointer', fontFamily: 'inherit' });
   const ex = p && p !== arch ? p : defaut;
+  const enregistree = prefixeNumeros();
+  // Les exemples ne citent JAMAIS la lettre des anciens numéros (l'app la refuse).
+  const lettreEx = arch ? (arch === 'C' ? 'D' : 'C') : 'B';
+  const lettreEx2 = ['C', 'D', 'E'].find((x) => x !== arch && x !== lettreEx);
   return (
     <div data-numeros-reglage={mode} style={{padding:'13px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
       <div style={{fontSize:13,fontWeight:600,color:C.text}}>Tes numéros de rangement</div>
@@ -33790,17 +33969,23 @@ function NumerosSetting() {
       {mode === 'lettre' && (
         <label style={{display:'flex',alignItems:'center',gap:8,marginTop:10,fontSize:12.5,color:C.text}}>
           Lettre(s) de ta série
-          <input value={p} onChange={(e) => poser(e.target.value)} placeholder="B" autoCapitalize="characters" aria-label="Lettres de la série"
+          <input value={p} onChange={(e) => poser(e.target.value)} placeholder={defaut} autoCapitalize="characters" aria-label="Lettres de la série"
             style={{width:70,padding:'8px 10px',borderRadius:8,border:`1px solid ${C.border}`,background:C.bg,color:C.text,fontSize:14,fontFamily:'inherit',textTransform:'uppercase'}}/>
         </label>
       )}
-      {mode === 'lettre' && arch && p === arch && (
+      {mode === 'lettre' && !refusee && !enregistree && (
+        <div data-numeros-lettre-a-taper style={{fontSize:12,color:C.muted,marginTop:8,lineHeight:1.5}}>
+          Tape la lettre de ta série : tant qu'aucune n'est tapée, tes prochains numéros restent en <b>chiffres</b> (1, 2, 3…).
+        </div>
+      )}
+      {mode === 'lettre' && arch && refusee && (
         <div data-numeros-lettre-archive style={{fontSize:12,color:C.text,marginTop:8,lineHeight:1.5}}>
-          « {arch} » est la lettre de tes <b>anciens</b> numéros ({arch}1, {arch}2…) : rien n'est enregistré. Choisis une autre lettre.
+          « {refusee} » est la lettre de tes <b>anciens</b> numéros ({arch}1, {arch}2…) : elle n'est pas enregistrée. Tes prochains numéros restent {enregistree ? <>en <b>{enregistree}</b> ({enregistree}1, {enregistree}2…)</> : <>en <b>chiffres</b> (1, 2, 3…)</>}. Choisis une autre lettre.
         </div>
       )}
       <div style={{fontSize:11.5,color:C.muted,marginTop:8,lineHeight:1.5}}>
-        Tu peux toujours taper un numéro à la main, dans n'importe quelle forme : 125, B125, C40. « b125 » et « B125 » sont le même carton.
+        Tu peux toujours taper un numéro à la main, dans n'importe quelle forme : 125, {lettreEx}125, {lettreEx2}40. « {lettreEx.toLowerCase()}125 » et « {lettreEx}125 » sont le même carton.
+        {arch && <> Les anciens numéros (<b>{arch}…</b>) ne se redonnent pas.</>}
       </div>
     </div>
   );
@@ -37306,6 +37491,21 @@ function AppCoeur() {
             const NUMEROS_FUSION = ['vinted_annonce_numeros','vinted_sale_overrides'];
             const applyAndReload=async(entriesBrutes)=>{
               const lireLocal=(k)=>{ const raw=localStorage.getItem(k); if(raw==null) return undefined; try{ return JSON.parse(raw); }catch{ return raw; } };
+              // ⚠️ (relecture du 11 octobre) Une sauvegarde d'AVANT la remise à
+              // zéro des numéros (migration 013) porte les anciens numéros en
+              // chiffres : la base la refusait (« vrm_numeros_perimes ») et l'écran
+              // disait « la base n'a pas répondu, réessaie » — faux, et réessayer
+              // échouait toujours. Et une sauvegarde sans clé « B… » serait PASSÉE :
+              // l'union du pool remettait 1…552 en chiffres, et les paires
+              // republiées seraient reparties à 553. On compare la VERSION de
+              // numérotation du fichier à celle de l'app, avant d'écrire quoi que ce soit.
+              const vIci=versionNumerotation();
+              if(vIci!=null){
+                const brut=(entriesBrutes.find(([k])=>k==='vrm_numerotation')||[])[1];
+                let mkF=brut; if(typeof brut==='string'){ try{ mkF=JSON.parse(brut); }catch{ mkF=null; } }
+                const vF=mkF&&typeof mkF==='object'?Number(mkF.version):NaN;
+                if(vF!==vIci){ toast(SAUVEGARDE_AVANT_REMISE); return; }
+              }
               const entries=entriesBrutes.filter(([k])=>k!=='vinted_accounts' && k!=='vrm_widget_token').map(([k,v])=>{
                 const cur=lireLocal(k);
                 if(k==='vinted_used_numeros' && Array.isArray(v)){
@@ -37318,17 +37518,21 @@ function AppCoeur() {
               });
               const avant=entries.map(([k])=>[k,localStorage.getItem(k)]);
               entries.forEach(([k,v])=>{ try{ localStorage.setItem(k, typeof v==='string'?v:JSON.stringify(v)); }catch(_){} });
-              let enregistre=false;
+              let enregistre=false, refus=null;
               try{
                 const payload={}; SYNC_KEYS.forEach(k=>{ const raw=localStorage.getItem(k); if(raw!=null){ let val; try{ val=JSON.parse(raw); }catch{ val=raw; } const f=ALLEGER_AVANT_CLOUD[k]; payload[k]=f?f(val):val; } });
                 if(Object.keys(payload).length){
                   const r=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${SUPABASE_ROW}`, { method:'PATCH', headers:sbAuth({ 'Content-Type':'application/json', Prefer:'return=minimal' }), body: JSON.stringify({ data:payload, updated_at:new Date().toISOString() }) });
                   enregistre=r.ok;
+                  if(!r.ok){ let t=''; try{ t=await r.text(); }catch(_){} refus=codeRefusNumeros(t)||(r.status>=400&&r.status<500?'refus':null); } // un 5xx (522 de Cloudflare…) : la base n'a PAS répondu, ce n'est pas un refus
                 }
               }catch(_){ enregistre=false; }
               if(!enregistre){
                 avant.forEach(([k,raw])=>{ try{ if(raw==null) localStorage.removeItem(k); else localStorage.setItem(k,raw); }catch(_){} });
-                toast('⚠ La restauration n\'a pas pu être enregistrée dans ton compte (la base n\'a pas répondu). Rien n\'a changé — réessaie dans un instant.');
+                // La base a REFUSÉ (elle a répondu) ≠ la base n'a pas répondu.
+                toast(refus && refus!=='refus' ? SAUVEGARDE_AVANT_REMISE
+                  : refus ? '⚠ La base a refusé cette restauration. Rien n\'a changé.'
+                  : '⚠ La restauration n\'a pas pu être enregistrée dans ton compte (la base n\'a pas répondu). Rien n\'a changé — réessaie dans un instant.');
                 return;
               }
               toast('✓ Sauvegarde restaurée ! L\'app va se recharger.');

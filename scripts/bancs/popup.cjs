@@ -68,7 +68,7 @@ async function rendre(nav, etat, { carte = false, mode = '', geste = null, faux 
           setTimeout(() => cb && cb(r), (r && r.__lent) || 0);
         },
         lastError: null,
-        getManifest: () => ({ version: faux.manifeste || '5.167.0' }),
+        getManifest: () => ({ version: faux.manifeste || '5.169.0' }),
         reload: () => { window.__recharges++; },
       },
       storage: { local: {
@@ -203,14 +203,14 @@ const ouvrirMdp = async (pg) => { const a = await pg.$('#mdpLien'); if (a) { awa
   //    pose cette page ; elle ne le croit pas sur parole.
   console.log('\n── La page de réparation');
   await essaie('réparation', async () => {
-    const a = await rendre(nav, {}, { mode: 'reparer', faux: { manifeste: '5.167.0', code: '5.129.0' } });
-    dit(a.recharges === 1 && a.reparation === 'recharge', 'le code qui répond (5.129.0) n’est pas celui du manifeste (5.167.0) : ⟳ (chrome.runtime.reload), UNE fois', `${a.recharges} · ${a.reparation}`);
-    dit(a.mem.vrmReparation && a.mem.vrmReparation.cle === '5.167.0', 'et la garde est rangée (chrome.storage.local)', JSON.stringify(a.mem.vrmReparation));
-    const b = await rendre(nav, {}, { mode: 'reparer', faux: { manifeste: '5.167.0', code: '5.129.0', stock: { vrmReparation: a.mem.vrmReparation } } });
+    const a = await rendre(nav, {}, { mode: 'reparer', faux: { manifeste: '5.169.0', code: '5.129.0' } });
+    dit(a.recharges === 1 && a.reparation === 'recharge', 'le code qui répond (5.129.0) n’est pas celui du manifeste (5.169.0) : ⟳ (chrome.runtime.reload), UNE fois', `${a.recharges} · ${a.reparation}`);
+    dit(a.mem.vrmReparation && a.mem.vrmReparation.cle === '5.169.0', 'et la garde est rangée (chrome.storage.local)', JSON.stringify(a.mem.vrmReparation));
+    const b = await rendre(nav, {}, { mode: 'reparer', faux: { manifeste: '5.169.0', code: '5.129.0', stock: { vrmReparation: a.mem.vrmReparation } } });
     dit(b.recharges === 0 && b.reparation === 'deja', 'déjà rechargé pour cette version : pas une seconde fois (aucune boucle)', `${b.recharges} · ${b.reparation}`);
-    const c = await rendre(nav, {}, { mode: 'reparer', faux: { manifeste: '5.167.0', code: '5.167.0' } });
+    const c = await rendre(nav, {}, { mode: 'reparer', faux: { manifeste: '5.169.0', code: '5.169.0' } });
     dit(c.recharges === 0 && c.reparation === 'a-jour', 'autre sens : le code est celui du manifeste — rien (un service worker lent n’est pas rechargé)', `${c.recharges} · ${c.reparation}`);
-    const d = await rendre(nav, {}, { mode: 'reparer', faux: { manifeste: '5.167.0', code: '5.129.0', stockKO: true } });
+    const d = await rendre(nav, {}, { mode: 'reparer', faux: { manifeste: '5.169.0', code: '5.129.0', stockKO: true } });
     dit(d.recharges === 0, 'stockage illisible : PAS de ⟳ (sans garde, une boucle de rechargements est possible)', `${d.recharges} · ${d.reparation}`);
     dit(!a.champs.some((x) => x.visible) && !a.envoyes.includes('authEtat'), 'la page de réparation ne montre rien et ne demande rien d’autre', JSON.stringify(a.envoyes));
   });

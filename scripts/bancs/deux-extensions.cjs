@@ -83,7 +83,7 @@ const PONTS = ({ ponts, connecte, vrm }) => {
   window.__recus = [];
   window.__sessions = [];
   window.__externes = [];
-  // `externally_connectable` (5.167) : la page peut ADRESSER un message à une
+  // `externally_connectable` (5.169) : la page peut ADRESSER un message à une
   // extension par son identifiant ; seule celle-là le reçoit.
   const adressables = ponts.filter((p) => p.adresse && p.id);
   if (adressables.length) {
@@ -254,10 +254,10 @@ async function rendre(b, { ponts, onglet = 'cat_ventes', tel = false, vrm = null
       dit(v.etat && v.etat.code !== 'plusieurs' && v.raisons.length === 0 && v.boutons[0] && v.boutons[0].etat === 'pret', 'un pont muet ne compte pas : une extension, actions possibles', JSON.stringify({ e: v.etat, r: v.raisons, b: v.boutons }));
       await r.ctx.close();
     });
-    console.log('── 7. (11 octobre) Une 5.167 + une copie ancienne muette : la session va à LA BONNE, adressée');
+    console.log('── 7. (11 octobre) Une 5.169 + une copie ancienne muette : la session va à LA BONNE, adressée');
     await essaie('7', async () => {
       const A = 'abcdefghijklmnopabcdefghijklmnop';
-      const r = await rendre(b, { session: true, vrm: { ok: true, connecte: false, email: '' }, ponts: [{ version: '5.143.0', tu: true }, { version: '5.167.0', id: A, adresse: true }] });
+      const r = await rendre(b, { session: true, vrm: { ok: true, connecte: false, email: '' }, ponts: [{ version: '5.143.0', tu: true }, { version: '5.169.0', id: A, adresse: true }] });
       await r.pg.waitForTimeout(1500);
       const v = await r.lire();
       const env = v.externes.filter((x) => x.type === 'session');

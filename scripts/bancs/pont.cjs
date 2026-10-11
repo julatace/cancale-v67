@@ -33,7 +33,7 @@
 //     chaque situation, avec le geste qui débloque.
 // Ajouté le 11 octobre (« l'extension est censée être allumée, elle n'est pas
 // allumée », « elle ne garde pas les connexions ») :
-//   · CODE PÉRIMÉ : le manifeste dit 5.167, le service worker exécute un code
+//   · CODE PÉRIMÉ : le manifeste dit 5.169, le service worker exécute un code
 //     d'avant (⟳ jamais cliqué) — l'état sans `code`, une clé qui n'existe plus
 //     depuis la 5.159, ou le verdict du pont → « périmé », commandes coupées, le
 //     geste ⟳ ; et l'AUTRE SENS : le bon code n'est jamais dit périmé ;
@@ -101,8 +101,8 @@ const PONT = ({ mode, connecte, vrm, version = '5.143.0', cmdLente = 0, code = u
   if (mode === 'absente') return;
   const vn = (v) => String(v || '').split('.').map((x) => parseInt(x, 10) || 0);
   const auMoins = (v, r) => { const a = vn(v), b = vn(r); for (let i = 0; i < 3; i++) if (a[i] !== b[i]) return a[i] > b[i]; return true; };
-  const neuf = auMoins(version, '5.167.0');
-  // `externally_connectable` : seule une extension ≥ 5.167 l'ouvre à la page.
+  const neuf = auMoins(version, '5.169.0');
+  // `externally_connectable` : seule une extension ≥ 5.169 l'ouvre à la page.
   if (neuf) {
     window.chrome = { runtime: { lastError: null, sendMessage(id, msg, cb) {
       window.__externes.push({ id, type: msg && msg.type, nonce: msg && msg.nonce, refresh: msg && msg.session ? msg.session.refresh_token : null, raison: msg && msg.raison, force: !!(msg && msg.force) });
@@ -123,7 +123,7 @@ const PONT = ({ mode, connecte, vrm, version = '5.143.0', cmdLente = 0, code = u
     if (d.__vmr === 'ping') post({ __vmr: 'ready', version, id: neuf ? extId : undefined });
     // L'ancien bridge.js (5.159 et avant) quand il est orphelin : `repondre(null)`.
     if (orphelin && (d.__vmr === 'etat' || d.__vmr === 'cmd') && d.reqId) post({ __vmr: d.__vmr + ':result', reqId: d.reqId, resp: null });
-    // Un pont ≥ 5.167 (lu depuis le disque) devant un service worker qui ne
+    // Un pont ≥ 5.169 (lu depuis le disque) devant un service worker qui ne
     // connaît même pas « état » : il le dit (`perime`), réponse vide.
     if (verdict && d.__vmr === 'etat' && d.reqId) { post({ __vmr: 'etat:result', reqId: d.reqId, resp: null, perime: verdict }); return; }
     if (mode === 'muette' || mode === 'orphelin') return;  // plus rien derrière
@@ -132,7 +132,7 @@ const PONT = ({ mode, connecte, vrm, version = '5.143.0', cmdLente = 0, code = u
     const delai = mode === 'lent' ? 4000 : mode === 'orphelin+ok' ? 300 : 0;
     if (d.__vmr === 'etat') setTimeout(() => post({ __vmr: 'etat:result', reqId: d.reqId, resp: Object.assign({ ok: true, version, vrm: vrm || { ok: true, connecte: true, email: '' },
       vinted: connecte ? { uid: connecte, login: connecte === '111' ? 'compte_a' : 'compte_b' } : null, cmds: {} },
-      // Depuis la 5.167, l'état porte la version du CODE et l'identifiant de
+      // Depuis la 5.169, l'état porte la version du CODE et l'identifiant de
       // l'extension. `code: null` simule un code d'avant sous un manifeste neuf.
       neuf && code !== null ? { code: code || version, ext: extId } : {},
       offresAutoLocal ? { offresAutoLocal: false } : {}) }), delai);
@@ -306,23 +306,23 @@ async function rendre(b, { mode, connecte, tel = false, vrm = null, session = fa
       await r.ctx.close(); }
 
     console.log('── SESSION (11 octobre) : ADRESSÉE à UNE extension, plus rien dans la page');
-    { const r = await rendre(b, { mode: 'ok', connecte: '111', session: true, version: '5.167.0', vrm: { ok: true, connecte: false, email: '' }, attente: 5000 }); const v = await r.lire();
+    { const r = await rendre(b, { mode: 'ok', connecte: '111', session: true, version: '5.169.0', vrm: { ok: true, connecte: false, email: '' }, attente: 5000 }); const v = await r.lire();
       const liaisons = v.externes.filter((x) => x.type === 'liaison'), envois = v.externes.filter((x) => x.type === 'session');
       dit(liaisons.length >= 1 && liaisons.every((x) => x.id === EXT_ID), 'l’app DEMANDE d’abord à CETTE extension (son identifiant) si elle a besoin d’une session', JSON.stringify(v.externes));
       dit(r.fourches.length === 1 && r.fourches.every((f) => f.methode === 'POST' && /jeton-de-l-app/.test(f.auth)), 'puis fait fabriquer SA session par le serveur (POST, avec la connexion de l’app)', JSON.stringify(r.fourches));
       dit(envois.length === 1 && envois[0].id === EXT_ID && envois[0].nonce === 'n'.repeat(32) && envois[0].refresh === FOURCHE.refresh_token, 'la session part à CETTE extension, avec le nonce qu’elle a émis — la sienne, jamais celle de l’app', JSON.stringify(envois));
       dit(v.sessions.length === 0, 'et RIEN n’est posté dans la page (une copie ancienne à côté l’adoptait : même famille de jetons, révoquée)', JSON.stringify(v.sessions.map((x) => x && x.refresh_token)));
       await r.ctx.close(); }
-    { const r = await rendre(b, { mode: 'ok', connecte: '111', session: true, separee: true, version: '5.167.0', vrm: { ok: true, connecte: true, email: SESSION.user.email, user_id: SESSION.user.id }, attente: 5000 }); const v = await r.lire();
+    { const r = await rendre(b, { mode: 'ok', connecte: '111', session: true, separee: true, version: '5.169.0', vrm: { ok: true, connecte: true, email: SESSION.user.email, user_id: SESSION.user.id }, attente: 5000 }); const v = await r.lire();
       dit(r.fourches.length === 0 && v.externes.filter((x) => x.type === 'session').length === 0 && v.sessions.length === 0, 'autre sens : une extension déjà connectée au bon compte (et déjà séparée) ne reçoit RIEN', `demandes : ${r.fourches.length} · envois : ${JSON.stringify(v.externes)} · page : ${v.sessions.length}`);
       await r.ctx.close(); }
     // Une extension qui a encore la session donnée par l'app avant le 6 octobre
     // partage sa famille de jetons : on la sépare UNE fois, d'avance.
-    { const r = await rendre(b, { mode: 'ok', connecte: '111', session: true, version: '5.167.0', vrm: { ok: true, connecte: true, email: SESSION.user.email, user_id: SESSION.user.id }, attente: 5000 }); const v = await r.lire();
+    { const r = await rendre(b, { mode: 'ok', connecte: '111', session: true, version: '5.169.0', vrm: { ok: true, connecte: true, email: SESSION.user.email, user_id: SESSION.user.id }, attente: 5000 }); const v = await r.lire();
       const envois = v.externes.filter((x) => x.type === 'session');
       dit(v.externes.some((x) => x.type === 'liaison' && x.raison === 'separer') && envois.length === 1 && envois[0].refresh === FOURCHE.refresh_token && v.sessions.length === 0, 'jamais séparée : elle reçoit UNE session à elle (séparation d’avance), adressée', JSON.stringify(v.externes));
       await r.ctx.close(); }
-    { const r = await rendre(b, { mode: 'ok', connecte: '111', session: true, routeFourche: 404, version: '5.167.0', vrm: { ok: true, connecte: false, expiree: true, email: SESSION.user.email }, attente: 5000 }); const v = await r.lire();
+    { const r = await rendre(b, { mode: 'ok', connecte: '111', session: true, routeFourche: 404, version: '5.169.0', vrm: { ok: true, connecte: false, expiree: true, email: SESSION.user.email }, attente: 5000 }); const v = await r.lire();
       dit(v.sessions.length === 0 && v.externes.filter((x) => x.type === 'session').length === 0, 'serveur muet + session MORTE : on ne lui redonne JAMAIS la nôtre, ni par la page, ni adressée', JSON.stringify({ page: v.sessions.map((x) => x && x.refresh_token), adressees: v.externes }));
       const p = await r.panneau();
       dit(p && /mot de passe VRM|Se connecter avec VRM/.test(p.txt) && !/réessaie/.test(p.txt), 'et le panneau dit le vrai geste (pas « je réessaie » sans fin)', JSON.stringify(p && p.txt).slice(0, 260));
@@ -336,8 +336,8 @@ async function rendre(b, { mode, connecte, tel = false, vrm = null, session = fa
       dit(v.sessions.length === 0, 'une extension < 5.129 : l’app ne lui prête plus SA session (même famille → l’app perdait la sienne 12 s plus tard)', JSON.stringify(v.sessions.map((x) => x && x.refresh_token)));
       await r.ctx.close(); }
 
-    console.log('── CODE PÉRIMÉ (manifeste 5.167, service worker d’avant)');
-    for (const [nom, opts] of [['état SANS code', { version: '5.167.0', code: null }], ['clé disparue depuis la 5.159 (offresAutoLocal)', { version: '5.164.0', offresAutoLocal: true }], ['verdict du pont', { version: '5.167.0', verdict: { code: null, attendu: '5.167.0', raison: 'sans-etat' } }]]) {
+    console.log('── CODE PÉRIMÉ (manifeste 5.169, service worker d’avant)');
+    for (const [nom, opts] of [['état SANS code', { version: '5.169.0', code: null }], ['clé disparue depuis la 5.159 (offresAutoLocal)', { version: '5.164.0', offresAutoLocal: true }], ['verdict du pont', { version: '5.169.0', verdict: { code: null, attendu: '5.169.0', raison: 'sans-etat' } }]]) {
       const r = await rendre(b, Object.assign({ mode: 'ok', connecte: '111', attente: 4500 }, opts)); const v = await r.lire();
       dit(v.etat && v.etat.code === 'perime' && v.etat.niveau === 'lecture', `${nom} : l’en-tête dit « périmé » (lecture seule), jamais « Actions possibles »`, JSON.stringify(v.etat));
       dit(v.boutons.length && v.boutons.every((x) => x.etat === 'grise') && v.raisons.length === 1 && /^perime/.test(v.raisons[0]) && /⟳/.test(v.raisons[0]), `${nom} : les boutons sont grisés, la raison dite UNE fois, avec ⟳`, JSON.stringify(v.raisons));
@@ -349,7 +349,7 @@ async function rendre(b, { mode, connecte, tel = false, vrm = null, session = fa
       dit(!apres.cmdsEnvoyees.includes('bordereau'), `${nom} : un clic n’envoie AUCUNE commande au code périmé (il n’a pas les garde-fous d’aujourd’hui)`, JSON.stringify(apres.cmdsEnvoyees));
       await r.ctx.close();
     }
-    { const r = await rendre(b, { mode: 'ok', connecte: '111', version: '5.167.0', code: '5.167.0', attente: 4500 }); const v = await r.lire();
+    { const r = await rendre(b, { mode: 'ok', connecte: '111', version: '5.169.0', code: '5.169.0', attente: 4500 }); const v = await r.lire();
       dit(v.etat && v.etat.code !== 'perime' && v.etat.niveau === 'ok', 'autre sens : le code du manifeste n’est jamais dit périmé', JSON.stringify(v.etat));
       dit(!v.exception, 'et une extension à jour n’a pas d’exception « sauf publier »', JSON.stringify(v.exception));
       await r.ctx.close(); }
