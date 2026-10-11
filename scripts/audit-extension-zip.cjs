@@ -112,12 +112,37 @@ dit(mAtt && mAtt[1] === vSrc, '`EXT_ATTENDUE` suit la même version',
 dit(/VRM-extension\.zip/.test(APP), 'l\'app offre le téléchargement');
 dit((APP.match(/VRM-extension\.zip/g) || []).length >= 2,
   'il est proposé là où le retard est annoncé ET dans Réglages');
-// ⚠️ « ⟳ » seul recharge le dossier du disque : la même vieille version.
+// ⚠️ LES DEUX GESTES, DANS CET ORDRE (11 octobre) :
+//   · « ⟳ » seul recharge le dossier du disque : la même vieille version ;
+//   · remplacer le dossier SEUL ne suffit pas non plus — mesuré chez lui, 5
+//     Chrome sur 6 exécutaient une 5.95–5.129 sous un manifeste « 5.164 » :
+//     Chrome garde l'ancien code tant qu'on n'a pas cliqué ⟳, et seulement
+//     dans le Chrome (le profil) où on le clique.
+// L'ancien contrôle n'exigeait que « Dézippe » — vert sur une consigne qui ne
+// dit jamais ⟳ : la moitié du geste. On juge la PHRASE affichée (la chaîne de
+// `detail=`), pas une fenêtre de texte qui déborderait sur un commentaire.
 {
-  const i = APP.indexOf('Ton extension VRM est en retard');
-  const F = i < 0 ? '' : APP.slice(i, i + 2000);
-  dit(/Dézippe|dézippe/.test(F), 'la consigne dit de REMPLACER le dossier, pas seulement de cliquer sur ⟳',
-    '⟳ recharge le dossier du disque — donc la même version');
+  const chaineApres = (repere, champ) => {
+    const i = APP.indexOf(repere);
+    if (i < 0) return '';
+    const j = APP.indexOf(champ, i);
+    if (j < 0 || j - i > 4000) return '';
+    const m = /^\s*\{?\s*"([^"]*)"|^\s*\{?\s*`([^`]*)`/.exec(APP.slice(j + champ.length));
+    return m ? (m[1] || m[2] || '') : '';
+  };
+  const juge = (F, ou) => {
+    dit(/Dézippe|dézippe/.test(F) && /remplace|à la place/i.test(F), `${ou} : la consigne dit de REMPLACER le dossier`,
+      '⟳ seul recharge le dossier du disque — donc la même version');
+    dit(/⟳/.test(F) && /chaque Chrome|CHAQUE Chrome/.test(F), `${ou} : PUIS ⟳ dans chaque Chrome où elle est installée`,
+      'sans ⟳, Chrome garde l\'ancien code — et seulement dans le Chrome où on le clique');
+    const iRemp = F.search(/remplace|à la place/i), iRech = F.indexOf('⟳');
+    dit(iRemp >= 0 && iRech > iRemp, `${ou} : dans cet ordre (remplacer, PUIS ⟳)`, `remplacer@${iRemp} · ⟳@${iRech}`);
+  };
+  juge(chaineApres('Ton extension VRM est en retard', 'detail='), 'bandeau « en retard »');
+  // Réglages : la phrase sous le bouton de téléchargement.
+  const k = APP.indexOf('Le zip se dézippe en un seul dossier');
+  const R = k < 0 ? '' : APP.slice(k, APP.indexOf('\n', k));
+  juge(R, 'Réglages');
 }
 
 // 5) AUCUN ZIP PÉRIMÉ À CÔTÉ

@@ -23,13 +23,20 @@
 //   4. l'AUTRE SENS : une seule extension dont le pont répond deux fois (même
 //      identifiant) ⇒ PAS « plusieurs », le bouton est actif et la commande part
 //      UNE fois ; un ancien pont qui s'est tu (orphelin) ⇒ pas « plusieurs » ;
-//   5. la version retenue est la plus HAUTE, pas la dernière arrivée.
+//   5. la version retenue est la plus HAUTE, pas la dernière arrivée ;
+//   6. (11 octobre) la session ne passe plus par la page : adressée à UNE
+//      extension (son identifiant, son nonce) — une copie ancienne qui écoute
+//      la page n'entend rien, et l'app ne lui prête jamais la sienne.
+//   7. (seconde revue du 11 octobre) la liaison aboutit À CÔTÉ d'une copie
+//      ancienne vivante : le bandeau ne dit pas « rien d'autre à faire »
+//      au-dessus de « Lecture seule » — il porte le même blocage que la pastille
+//      (`data-liaison-reste`) et le geste ; seule, il ne l'invente pas.
 // Ce qui est jugé : des `data-*` et ce que les ponts ont REÇU — pas une formulation.
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
 const DIST = path.join(__dirname, '..', '..', 'dist');
-const PORT = 5732;
+const PORT = 4793;
 
 const auj = Date.now();
 const iso = (h) => new Date(auj - h * 3600e3).toISOString();
@@ -79,6 +86,23 @@ const projette = (row, sel) => {
 const PONTS = ({ ponts, connecte, vrm }) => {
   window.__recus = [];
   window.__sessions = [];
+  window.__externes = [];
+  // `externally_connectable` (5.171) : la page peut ADRESSER un message à une
+  // extension par son identifiant ; seule celle-là le reçoit.
+  const adressables = ponts.filter((p) => p.adresse && p.id);
+  if (adressables.length) {
+    window.chrome = { runtime: { lastError: null, sendMessage(id, msg, cb) {
+      const p = adressables.find((x) => x.id === id);
+      window.__externes.push({ id, type: msg && msg.type, nonce: msg && msg.nonce || null, recu: !!p });
+      let r;
+      if (!p) r = undefined;
+      else if (msg.type === 'liaison') r = { ok: true, besoin: true, nonce: 'n'.repeat(32), raison: 'aucune' };
+      else if (msg.type === 'session') r = msg.nonce === 'n'.repeat(32) ? { ok: true, email: 'vendeur@exemple.test' } : { ok: false, code: 'nonce' };
+      // Elle a reçu SA session : son état le dit ensuite (comme le vrai fond).
+      if (r && r.ok && msg.type === 'session') window.__vrmApres = { ok: true, connecte: true, email: 'vendeur@exemple.test', user_id: '11111111-2222-3333-4444-555555555555' };
+      setTimeout(() => cb && cb(r), 5);
+    } } };
+  }
   window.addEventListener('message', (e) => { const d = e.data; if (e.source === window && d && d.__vmr === 'session' && d.session) window.__sessions.push(1); });
   const post = (m) => window.postMessage(m, '*');
   ponts.forEach((p, i) => {
@@ -93,7 +117,7 @@ const PONTS = ({ ponts, connecte, vrm }) => {
       for (let k = 0; k < n; k++) {
         if (d.__vmr === 'ping') ready();
         if (k) continue;                     // le second pont d'une même extension relaie au MÊME service worker
-        if (d.__vmr === 'etat') post({ __vmr: 'etat:result', reqId: d.reqId, resp: { ok: true, version: p.version, vrm: vrm || { ok: true, connecte: true, email: '' }, vinted: { uid: connecte, login: 'compte_a' }, cmds: {} } });
+        if (d.__vmr === 'etat') post({ __vmr: 'etat:result', reqId: d.reqId, resp: Object.assign({ ok: true, version: p.version, vrm: window.__vrmApres || vrm || { ok: true, connecte: true, email: '' }, vinted: { uid: connecte, login: 'compte_a' }, cmds: {} }, p.adresse ? { code: p.version, ext: p.id } : {}) });
         if (d.__vmr === 'cmd') { window.__recus.push(nom + ' cmd:' + d.cmd); post({ __vmr: 'cmd:result', reqId: d.reqId, resp: d.cmd === 'bordereau' ? { accepte: true, jobId: `bord:${d.uid}:${d.tx}`, etape: 'file' } : { accepte: true, etape: 'recent' } }); }
         if (d.__vmr === 'exec') { window.__recus.push(nom + ' exec:' + d.method + ' ' + d.endpoint); post({ __vmr: 'result', reqId: d.reqId, ok: true, status: 200, data: { conversation: { id: 402, messages: [] } } }); }
         if (d.__vmr === 'session' && d.session) window.__recus.push(nom + ' session');
@@ -140,7 +164,7 @@ async function rendre(b, { ponts, onglet = 'cat_ventes', tel = false, vrm = null
     raisons: [...document.querySelectorAll('[data-raison-bord]')].map((x) => ({ code: x.getAttribute('data-raison-bord'), txt: x.innerText })),
     recharger: document.querySelectorAll('[data-raison-bord] [data-recharger]').length,
     etat: (() => { const x = document.querySelector('[data-etat-actions]'); return x ? { niveau: x.getAttribute('data-etat-actions'), code: x.getAttribute('data-etat-code') } : null; })(),
-    recus: window.__recus || [], sessions: (window.__sessions || []).length,
+    recus: window.__recus || [], sessions: (window.__sessions || []).length, externes: window.__externes || [],
     sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth,
   }));
   const panneau = async () => {
@@ -234,6 +258,67 @@ async function rendre(b, { ponts, onglet = 'cat_ventes', tel = false, vrm = null
       const r = await rendre(b, { ponts: [{ version: '5.143.0', tu: true }, { version: '5.165.0', id: 'idA' }] });
       const v = await r.lire();
       dit(v.etat && v.etat.code !== 'plusieurs' && v.raisons.length === 0 && v.boutons[0] && v.boutons[0].etat === 'pret', 'un pont muet ne compte pas : une extension, actions possibles', JSON.stringify({ e: v.etat, r: v.raisons, b: v.boutons }));
+      await r.ctx.close();
+    });
+    console.log('── 7. (11 octobre) Une 5.171 + une copie ancienne muette : la session va à LA BONNE, adressée');
+    await essaie('7', async () => {
+      const A = 'abcdefghijklmnopabcdefghijklmnop';
+      const r = await rendre(b, { session: true, vrm: { ok: true, connecte: false, email: '' }, ponts: [{ version: '5.143.0', tu: true }, { version: '5.171.0', id: A, adresse: true }] });
+      await r.pg.waitForTimeout(1500);
+      const v = await r.lire();
+      const env = v.externes.filter((x) => x.type === 'session');
+      dit(v.etat && v.etat.code !== 'plusieurs', 'une copie muette ne compte pas : une seule extension', JSON.stringify(v.etat));
+      dit(env.length === 1 && env[0].id === A && env[0].recu && env[0].nonce === 'n'.repeat(32), 'la session part À CETTE extension (son identifiant, le nonce qu’elle a émis)', JSON.stringify(v.externes));
+      dit(v.externes.every((x) => x.id === A), 'et à aucune autre', JSON.stringify(v.externes));
+      dit(v.sessions === 0 && !v.recus.some((x) => / session/.test(x)), 'RIEN dans la page : la copie ancienne qui écoute la page n’entend rien (avant : elle adoptait la même famille de jetons)', JSON.stringify({ sessions: v.sessions, recus: v.recus }));
+      await r.ctx.close();
+    });
+    // ⚠️ Revue du 11 octobre : « Se connecter avec VRM » cliqué dans la NEUVE
+    //    pendant qu'une copie ancienne répond encore au ping. Le bandeau restait
+    //    « Je connecte… Rien à taper » pour toujours, sans croix, sous une
+    //    pastille « supprime l'ancienne » — et rien ne partait.
+    // ⚠️⚠️ Seconde revue du 11 octobre : une fois la session partie, le bandeau
+    //    disait « Extension connectée ✓ — elle capte maintenant pour toi. Rien
+    //    d'autre à faire. » AU-DESSUS de la pastille « Lecture seule » (deux
+    //    extensions : aucune commande ne part). Deux voix contraires sur le même
+    //    écran — et « rien d'autre à faire » était faux (il reste à supprimer
+    //    l'ancienne). Le cas a deux moitiés, et le banc juge le rendu COMBINÉ :
+    //    l'état que porte le bandeau (`data-liaison-reste`) est celui de la
+    //    pastille, et sa phrase ne promet rien que la pastille dément.
+    for (const tel of [false, true]) {
+      const t = tel ? '390 px' : '1512 px';
+      console.log(`── 8. ${t} (11 octobre) « Se connecter avec VRM » avec une copie ancienne VIVANTE à côté — Ma journée`);
+      await essaie('8 ' + t, async () => {
+        const A = 'abcdefghijklmnopabcdefghijklmnop';
+        const r = await rendre(b, { tel, session: true, onglet: 'journee&lier-extension=' + A, vrm: { ok: true, connecte: false, email: '' }, ponts: [{ version: '5.77.0' }, { version: '5.171.0', id: A, adresse: true }] });
+        await r.pg.waitForTimeout(3000);
+        const v = await r.lire();
+        const band = await r.pg.evaluate(() => { const x = document.querySelector('[data-liaison]'); return x ? { etat: x.getAttribute('data-liaison'), reste: x.getAttribute('data-liaison-reste'), fermer: !!x.querySelector('button[aria-label="Fermer"]'), txt: x.innerText } : null; });
+        const env = v.externes.filter((x) => x.type === 'session');
+        dit(v.etat && v.etat.niveau === 'lecture' && v.etat.code === 'plusieurs', `${t} : deux extensions répondent : la pastille dit « Lecture seule » (plusieurs)`, JSON.stringify(v.etat));
+        dit(env.length === 1 && env[0].id === A && env[0].recu, `${t} : la session part quand même, ADRESSÉE à celle qui a demandé`, JSON.stringify(v.externes));
+        dit(v.sessions === 0 && !v.recus.some((x) => / session/.test(x)) && !v.recus.some((x) => /cmd:|exec:/.test(x)), `${t} : rien dans la page, et aucune commande n’est relayée (les commandes restent coupées)`, JSON.stringify(v.recus));
+        dit(band && band.etat === 'ok' && band.fermer, `${t} : le bandeau dit le résultat, et se ferme — plus de « Je connecte… » éternel`, JSON.stringify(band && { etat: band.etat, fermer: band.fermer }));
+        dit(band && v.etat && band.reste === v.etat.code, `${t} : le bandeau porte ce qui bloque encore, et c’est ce que dit la pastille (une notion, une voix)`, JSON.stringify({ bandeau: band && band.reste, pastille: v.etat && v.etat.code }));
+        dit(band && !/rien d.autre à faire|rien à faire|capte maintenant/i.test(band.txt), `${t} : il n’affirme pas « rien d’autre à faire » au-dessus de « Lecture seule »`, band && band.txt.replace(/\n/g, ' · '));
+        dit(band && /chrome:\/\/extensions/.test(band.txt), `${t} : il dit le geste qui reste (chrome://extensions)`, band && band.txt.replace(/\n/g, ' · '));
+        dit(v.sw <= v.cw + 1, `${t} : aucun débordement`, `${v.sw} > ${v.cw}`);
+        dit(r.errs.length === 0, `${t} : aucune erreur d’app`, r.errs.join(' | ').slice(0, 160));
+        await r.pg.screenshot({ path: path.join(os.tmpdir(), `deux-extensions-liaison-${tel ? 390 : 1512}.png`) });
+        await r.ctx.close();
+      });
+    }
+    // L'AUTRE SENS : une seule extension, la liaison aboutit — le bandeau
+    //    n'invente aucun blocage (une fausse alerte fait cesser de lire les vraies).
+    console.log('── 9. L’AUTRE SENS : une seule extension, « Se connecter avec VRM » aboutit');
+    await essaie('9', async () => {
+      const A = 'abcdefghijklmnopabcdefghijklmnop';
+      const r = await rendre(b, { session: true, onglet: 'journee&lier-extension=' + A, vrm: { ok: true, connecte: false, email: '' }, ponts: [{ version: '5.171.0', id: A, adresse: true }] });
+      await r.pg.waitForTimeout(3000);
+      const v = await r.lire();
+      const band = await r.pg.evaluate(() => { const x = document.querySelector('[data-liaison]'); return x ? { etat: x.getAttribute('data-liaison'), reste: x.getAttribute('data-liaison-reste'), txt: x.innerText } : null; });
+      dit(v.etat && v.etat.code !== 'plusieurs', 'une seule extension : pas « plusieurs »', JSON.stringify(v.etat));
+      dit(band && band.etat === 'ok' && !band.reste, 'le bandeau dit « connectée ✓ » sans aucun blocage inventé', JSON.stringify(band));
       await r.ctx.close();
     });
   } catch (e) { dit(false, 'le banc a tourné jusqu’au bout', String(e && e.message).slice(0, 200)); }

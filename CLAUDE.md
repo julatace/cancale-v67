@@ -7803,6 +7803,157 @@ extension pour la mesure du service worker), puis corrigé :
   qui ne sont PAS à l'écran (tri par date) : vert sur c02ffcf, par vacuité. Il
   ralentit maintenant les trois PREMIÈRES demandées, et vérifie qu'elles l'ont été.
 
+### ⚠️⚠️ « SE CONNECTER » OUVRE VRM, LA SESSION TIENT, LE CODE PÉRIMÉ SE RÉPARE (11 octobre, 5.169)
+Plaintes de Julien : « se connecter doit envoyer dans VRM », « elle ne garde pas
+les connexions », « l'extension n'est pas allumée », « je ne peux pas poster sur
+Leboncoin ». Causes MESURÉES (journaux d'auth, vrai GoTrue, vrai Chromium) :
+- ⚠️⚠️ **5 Chrome sur 6 exécutaient une 5.95–5.129 sous un manifeste « 5.164 »** :
+  remplacer le dossier ne recharge PAS le service worker ; seul ⟳ le fait, et
+  seulement dans le Chrome où on le clique. ⇒ au démarrage, un code ≠ manifeste se
+  recharge UNE fois (garde `vrmRechargeCode`) ; le pont (toujours lu depuis le
+  disque) juge le code qui répond (`perime`) et pose `popup.html?mode=reparer`, qui
+  vérifie AVANT ⟳ ; l'état porte `code` et `ext` ; l'app dit « périmé » (pastille
+  ambre, commandes coupées, geste ⟳). La consigne de mise à jour dit les DEUX
+  gestes : remplacer le dossier, PUIS ⟳ dans CHAQUE Chrome (`audit-extension-zip`).
+- ⚠️⚠️ **La session ne passe plus JAMAIS par la page** : `window.postMessage` était
+  entendu par toute extension (une copie ancienne adoptait la même famille de
+  jetons → révoquée), un `session: null` au démarrage d'une app morte faisait
+  oublier la sienne à l'extension (B9), et l'app prêtait SA famille aux < 5.129.
+  ⇒ `externally_connectable` : l'app demande à UNE extension (son identifiant)
+  si elle a besoin d'une session (`liaison` → nonce 128 bits, 2 min, une fois),
+  fait fabriquer la sienne par le serveur, la lui remet avec le nonce. Seul
+  « Se déconnecter » (un geste) la déconnecte, et sous CE compte seulement.
+- **Renouvellement** : une réponse perdue est rejouée (+1,5 s, +4 s) — le vrai
+  GoTrue rend le jeton actif au parent ; une session morte prévient l'app tout de
+  suite (`evt session morte`) ; les alarmes ne sont plus remises à zéro à chaque
+  réveil (`vrm-session` ne partait jamais).
+- **« Se connecter avec VRM »** (fenêtre, et le logo des sites à chaque clic) ouvre
+  `vrm.center/?lier-extension=<id>` ; connectée, l'app connecte l'extension ;
+  sinon une connexion dans VRM suffit. Le mot de passe VRM reste derrière un lien.
+- **Leboncoin** : un dépôt fermé ou arrêté passe à « abandonné » (onglet retenu,
+  `depotArrete`) — « Le dépôt n'a pas abouti — Réessayer » ; un clic refusé dit
+  pourquoi ; « Actions possibles · sauf publier » ; le bouton dit « 2 photos sur
+  5 ». Écritures `lbc_recon`/`lbc_catalogue` : morceaux dans
+  `chrome.storage.local`, au plus une écriture par 30 s et seulement si ça change
+  (40 Mo par visite mesurés le 10 octobre).
+- Preuves (rouges sur ef03dc8, verts après) : banc `session.cjs` (vrai Chromium,
+  vraie extension, faux GoTrue à la rotation RÉELLE, port 4794) **18 rouges** ;
+  `pont.cjs` 20 ; `publier.cjs` 5 ; `deux-extensions.cjs` 2 ;
+  `audit-pont-session.cjs` 19 ; `audit-lbc-catalogue` 4 ; mutations (rejeu
+  retiré, mort non annoncée, pont qui ne juge plus) ⇒ rouges.
+- ⚠️ **Non mesuré** : la vraie page de dépôt Leboncoin fermée/arrêtée ; la
+  réparation sur SES Chrome (prouvée sur un profil reproduit, pas chez lui) ;
+  le catalogue Leboncoin attend en mémoire du service worker (renvoyé à chaque
+  visite, rien de perdu). Extension **5.169.0** (écrite comme « 5.167 en cours », mais les 5.167 et 5.168 sont parties en production SANS ce code : deux contenus ne portent jamais le même numéro), zip régénéré.
+
+### ⚠️⚠️ REVUE DE LA SESSION ADRESSÉE : « JE LA (RE)CONNECTE » SANS RIEN ENVOYER (11 octobre, 5.169)
+Revue contradictoire du chantier ci-dessus, chaque constat REPRODUIT (rendu sur
+données inventées, vrai `background.js` dans un `vm`, vrai Chromium + vraie
+extension), corrigé, rouge sur 24bec0d et sous mutation.
+- ⚠️⚠️ **La version** : ce code était écrit « 5.167 en cours », mais la 5.167 et
+  la 5.168 sont parties en production SANS lui. Il passe en **5.169.0** — et les
+  seuils qui datent ses nouveautés aussi (`EXT_CAPACITES.liaison`,
+  `CODE_DANS_ETAT`, le jugement du code par `bridge.js` et `vrm-badge.js`) :
+  à 5.167, une 5.168 publiée aurait été déclarée « périmée » à tort.
+- ⚠️⚠️ **« Je la (re)connecte — rien à taper » à une extension qui ne reçoit plus
+  rien.** La garde (« elle ne sait pas recevoir la session adressée ») n'était
+  posée que sur « pas connectée » : « autre compte VRM » et les premiers pas le
+  promettaient encore à une 5.164 (mesuré : 0 envoi en 25 s), et « Se connecter
+  avec VRM » nommait un bouton que sa fenêtre n'a pas. ⇒ **`voieConnexionExt()`**,
+  une règle pour l'en-tête, la liste des ventes, le panneau et les premiers pas :
+  `app` (5.169, le serveur n'a rien refusé) · `retard` (la mettre à jour, ou le
+  mot de passe VRM) · `serveur` (refus 429/503 : le mot de passe ; l'app
+  réessaie après `__sessExtPasAvant`). Le panneau lisait « Se connecter avec
+  VRM » pendant que la liste disait le mot de passe : c'est fini (§11).
+- **Autre compte + extension d'avant la 5.169** : son icône, connectée, ouvre
+  VRM (pas sa fenêtre) — « clique l'icône, Se déconnecter » était impossible.
+  Le seul geste d'ici : **« Déconnecter l'extension de ce Chrome »**, l'ANCIEN
+  message (`session: null`), sur ce clic seulement ; puis le mot de passe VRM
+  dans sa fenêtre. Même message sur le geste « Se déconnecter » de VRM (une
+  5.164 continuait d'écrire sous ce compte) — jamais quand on SAIT qu'elle écrit
+  sous un autre compte ; une 5.169 l'ignore (elle passe par l'adressé).
+- **« Se connecter avec VRM » bloqué** : avec une copie ancienne à côté, la
+  session part quand même, ADRESSÉE à celle qui a demandé (les commandes restent
+  coupées) ; sur un code périmé, le bandeau le dit (⟳) et repart après la
+  réparation ; la croix apparaît toujours au bout de 6 s. Le bandeau laisse la
+  place de l'île (`vrm-tete-row`) : sa croix ne se cliquait pas à 1512/1280 px.
+- **Périmé réparé, page ouverte** : le pont remis à neuf annonce `ready` ; l'app
+  relit l'état tout de suite (avant : « périmé — clique ⟳ » ~20 s, commandes
+  coupées).
+- **La fenêtre de l'icône sur un code périmé** (5 de ses 6 Chrome) : l'ancien
+  service worker ne connaît pas `lierAvecVRM`, le clic ne faisait RIEN. Sans
+  réponse, `popup.js` (lu depuis le disque) ouvre VRM avec l'identifiant de
+  l'extension, répare le code (⟳), sinon déplie le mot de passe VRM et dit ⟳.
+- **Dépôt Leboncoin** : un onglet ouvert n'est pas un dépôt vivant (navigué sur
+  vinted.fr, il bloquait la paire pour toujours) — vivant = adresse de dépôt ET
+  réponse de `lbc.js` pour CETTE paire (grâce de 30 s / page qui charge : un
+  double clic n'abandonne rien). Un arrêt à 90 s ou un onglet fermé, c'est « pas
+  su » : il a pu FINIR À LA MAIN (champ obligatoire non devinable) — l'app ne dit
+  plus « n'a pas abouti », nomme « Déjà publiée », et **relancer exige sa
+  confirmation** (l'extension refuse `confirmer` sans elle). La paire en dépôt
+  n'est rendue (`getPending`) qu'à l'onglet ouvert pour elle.
+- Laissé tel quel, décision assumée : une extension d'avant la 5.169 ne reçoit
+  plus de session de l'app (le mot de passe VRM dans sa fenêtre marche toujours).
+- Preuves : `pont.cjs` **18 rouges** sur 24bec0d · `premierjour.cjs` 10 ·
+  `deux-extensions.cjs` 2 · `publier.cjs` 6 · `popup.cjs` 3 · `leboncoin.cjs` 1 ·
+  `audit-pont-session.cjs` 7 · `session.cjs` (vrai Chromium, cas G/P/S) 5 ;
+  7 mutations de l'app, 4 de l'extension, 2 de la fenêtre ⇒ toutes rouges.
+- ⚠️ **Non mesuré** : la vraie page de dépôt Leboncoin (réponse de `lbc.js` sur
+  leboncoin.fr) ; le délai réel entre ⟳ et le `ready` du pont réinjecté chez lui.
+- **Geste de Julien** : installer la **5.169** dans UN seul dossier, puis ⟳ dans
+  CHAQUE Chrome (ou ouvrir VRM : le pont répare un code périmé tout seul).
+
+### ⚠️⚠️ LA 5.170 DE PRODUCTION DITE « PÉRIMÉE », ET « RIEN D'AUTRE À FAIRE » SOUS « LECTURE SEULE » (11 octobre, 5.171)
+Deux défauts de la revue du chantier ci-dessus, reproduits après la fusion
+d'`integ-11oct` (annonces en ligne, photos) dans ce chantier.
+- **Extension 5.171.0** : `main` a publié une **5.170** (PR #473) SANS ce
+  chantier. Deux contenus ne portent jamais le même numéro.
+- ⚠️⚠️ **Collision de numéros.** `CODE_DANS_ETAT`, `EXT_CAPACITES.liaison` et
+  `jugeable` (pont, logo) étaient à 5.169 — en dessous de la 5.170 publiée, dont
+  l'état n'a PAS `code` : sa 5.170 était dite « périmée » (« Lecture seule »,
+  aucune commande ni session, « clique ⟳ » — faux : ⟳ recharge la même 5.170) et
+  l'app lui promettait « je la connecte » sur un canal qu'elle n'ouvre pas.
+  Les quatre frontières passent à **5.171.0**. **Invariant** : chaque frontière
+  reste STRICTEMENT au-dessus de toute version publiée sans le champ.
+  `scripts/audit-planchers-code.cjs` exécute `codePerime` et `extSait('liaison')`
+  sur 5.168, 5.170 et ce que dit `origin/main` (sa version, `code:` dans son état,
+  `demanderLiaison`) ⇒ **après un `git fetch`, il passe au rouge tout seul** si
+  `main` publie encore une version sans ce code au niveau de la frontière : monter
+  alors les quatre ensemble.
+- **Le bandeau de liaison** disait « connectée ✓ — elle capte maintenant pour
+  toi. Rien d'autre à faire. » AU-DESSUS de « Lecture seule » (une copie ancienne
+  vivante : la session part adressée, les commandes restent coupées). Il lit
+  l'état de l'extension (`raisonExtGlobale`, §11) et dit ce qui reste, avec le
+  geste (`data-liaison-reste` : plusieurs · périmé · muette · absente · trop
+  ancienne). La session VRM, elle, vient d'être posée : pas jugée ; une pause de
+  Vinted n'appelle aucun geste.
+- ⚠️⚠️ **TROUVÉ EN FUSIONNANT les deux chantiers** : l'écran Annonces
+  (`FraicheurAnnonces`, chantier « en ligne ») promettait « elles seront
+  vérifiées à ta prochaine visite » et « une suppression sort d'ici tout de
+  suite » à une extension dont le CODE est périmé, pendant que la pastille disait
+  « Lecture seule — clique ⟳ ». Un code d'avant ne fait pas ce que la version
+  annoncée sait faire : périmé ⇒ aucune promesse, le même geste ⟳
+  (`data-perime`). Et les bancs `enligne` et `supprimees` servaient un état
+  « à jour » SANS `code` — une fiction depuis la frontière (§6.3) : ils servent
+  la vraie forme (`code` à partir de `CODE_DANS_ETAT`, lu dans la source).
+  `enligne.cjs` 13b : **2 rouges** sur le build de b4a7bc8, mutation rouge.
+- Preuves : `audit-planchers-code.cjs` **6 rouges** sur 7187f88 et sur la fusion
+  (7899211), 5 mutations rouges · `pont.cjs` (5.170 de production) **3 rouges**
+  et `premierjour.cjs` **2** sur le build de 7899211 · `deux-extensions.cjs`
+  (rendu COMBINÉ bandeau + pastille, Ma journée, 390 et 1512 px ; l'autre sens)
+  **6 rouges** sur le build de 7899211, 3 mutations rouges.
+- Vérifié après : 90 audits verts ; bancs rejoués un par un sur le build final —
+  pont, premierjour, deux-extensions, badge, popup, publier, signal-annonces,
+  tout-generer, filtre-compte, session, capacites, enligne, supprimees : verts.
+  ⚠️ `publier` (3) et `signal-annonces` (1) sont sortis rouges UNE fois, sous une
+  charge de 16 à 20 (d'autres sessions sur la machine) ; verts relancés seuls, et
+  verts sur le build de la fusion : instables sous charge, pas un défaut.
+- ⚠️ **Non mesuré** : la 5.170 réellement installée chez lui (les bancs simulent
+  sa FORME : version sans `code`, pas de canal adressé — lue dans le code de
+  `main`, jamais vue répondre).
+- **Geste de Julien** : installer la **5.171** (pas la 5.169, jamais livrée) dans
+  UN seul dossier, puis ⟳ dans CHAQUE Chrome.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
@@ -7831,6 +7982,7 @@ arrivée** — vérifiée commit par commit sur `manifest.json`, pas devinée.
 | `supprimees` | `noterSuppression` | **5.165.0** (11 oct.) | « une suppression faite sur vinted.fr dans ce Chrome sort d'ici tout de suite » |
 | `enligne` | `relireAnnoncesAutresComptes` | **5.170.0** (11 oct. — les 5.167/5.168 de production ne la portent pas) | « tes autres comptes sont relus à ta prochaine visite sur Vinted, sur n'importe lequel de tes comptes » — et seulement si l'extension est connectée à CE compte VRM (revue, 5.170) |
 | `preuves` | `capterPreuvesVente` | **5.172.0** (11 oct. — ni la 5.167, ni la 5.168, ni la 5.170 publiées ne l'ont ; la 5.169 et la 5.171 sont prises par d'autres chantiers) | « l'extension lit toute seule la transaction des ventes en cours pas encore reliées (anti double vente) » |
+| `liaison` | `demanderLiaison` | **5.171.0** (11 oct. — la 5.170 de production ne la porte pas) | « je connecte l'extension à ton compte VRM — rien à taper » (session adressée) |
 
 ⚠️ **DEUX SEUILS POUR UNE MÊME NOTION, EXPRÈS.** Les photos s'attachent côté
 Leboncoin depuis la 5.58 et côté eBay depuis la 5.59 : un seul seuil aurait

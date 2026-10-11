@@ -46,7 +46,11 @@ function faireCtx() {
       downloads: { onCreated: { addListener() {} } },
       action: { setBadgeText() {}, setBadgeBackgroundColor() {}, setTitle() {} },
       tabs: { onUpdated: { addListener() {} }, query: dual([]), sendMessage: dual(undefined) },
-      storage: { local: { get: dual({}), set: dual(undefined), remove: dual(undefined) } },
+      storage: { local: (() => { const m = {}; const rend = (v, cb) => { if (typeof cb === 'function') { cb(v); return; } return Promise.resolve(v); }; return {
+        get(k, cb) { const cles = k == null ? Object.keys(m) : Array.isArray(k) ? k : (typeof k === 'string' ? [k] : Object.keys(k)); const out = {}; for (const c of cles) if (m[c] !== undefined) out[c] = JSON.parse(JSON.stringify(m[c])); return rend(out, cb); },
+        set(o, cb) { for (const c of Object.keys(o || {})) m[c] = JSON.parse(JSON.stringify(o[c])); return rend(undefined, cb); },
+        remove(k, cb) { for (const c of [].concat(k)) delete m[c]; return rend(undefined, cb); },
+      }; })(), onChanged: { addListener() {} } },
     },
     fetch: async (url, opts = {}) => {
       const u = metaVersData(String(url));
