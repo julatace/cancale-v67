@@ -1580,7 +1580,7 @@ function dateLectureDressing(ligne) {
 //   · la lecture COMPLÈTE la plus récente de son compte la contient ouverte —
 //     son propre dressing (`harvest_{uid}_listings`, quand il est connecté) ou
 //     son dressing PUBLIC relu depuis un autre de ses comptes
-//     (`harvest_{uid}_enligne`, 5.166) : la plus récente des deux fait foi ;
+//     (`harvest_{uid}_enligne`, 5.167) : la plus récente des deux fait foi ;
 //   · aucune suppression vue APRÈS cette lecture ne la retire ;
 //   · et cette lecture a moins de 24 h. Au-delà (ou jamais lue) on ne SAIT pas :
 //     ses annonces ne sont ni « en ligne » ni « disparues » — « à confirmer »,
@@ -1697,7 +1697,7 @@ const lireSupprimeesTous = () => cachedRow('s:*', async () => {
     return m;
   } catch (_) { return null; }
 });
-// ── LA LECTURE PUBLIQUE DES AUTRES COMPTES (5.166, 11 octobre) ──────────────
+// ── LA LECTURE PUBLIQUE DES AUTRES COMPTES (5.167, 11 octobre) ──────────────
 // L'extension relit, à chaque visite sur Vinted, le dressing PUBLIC de ses autres
 // comptes et le range dans `harvest_{uid}_enligne` (une ligne par compte). La
 // règle `enLigneDuCompte` (bloc <enligne-regle>, la même que l'extension) dit
@@ -2065,7 +2065,7 @@ const fetchHarvestBrut = async (uid, type, opts = {}) => {
     if (!res.ok) return null;
     const rows = await res.json();
     const row = rows[0];
-    // 5.166 (11 octobre) : le dressing d'un compte, LÀ OÙ IL EST LU, passe par la
+    // 5.167 (11 octobre) : le dressing d'un compte, LÀ OÙ IL EST LU, passe par la
     // règle « en ligne » — la lecture complète la plus récente (son dressing ou
     // sa lecture publique), sans les supprimées, et « à confirmer » au-delà de
     // 24 h. Tous les écrans qui en dérivent la suivent sans la recalculer (§11).
@@ -4830,7 +4830,7 @@ const fetchVintedListings = async (account, page = 1, opts = {}) => {
     //    ci-dessus les a retirées), ou lu en entier par l'extension et vide
     //    (`total_entries: 0`). Ce vide-là EST une réponse ; sans ça, l'app
     //    repartait demander le dressing au relais du serveur.
-    // ⚠️ 5.166 (11 octobre) — ET un vide que la RÈGLE « en ligne » a produit :
+    // ⚠️ 5.167 (11 octobre) — ET un vide que la RÈGLE « en ligne » a produit :
     //    une lecture publique plus récente qui ne montre plus rien, des annonces
     //    « à confirmer » (compte pas relu depuis 24 h). Ce vide-là se DIT au-dessus
     //    de la grille ; aller le redemander au relais serait le contredire.
@@ -4842,7 +4842,7 @@ const fetchVintedListings = async (account, page = 1, opts = {}) => {
       //    Elles sortent des « en ligne » (c'est leur place), mais leur IDENTIFIANT
       //    est la seule preuve sans ressemblance qu'une paire numérotée est bien
       //    partie. Calculé sur des données déjà en mémoire : 0 requête, 0 octet.
-      // 5.165 : `lu` = l'heure de la lecture qui FAIT FOI (son dressing ou sa
+      // 5.167 : `lu` = l'heure de la lecture qui FAIT FOI (son dressing ou sa
       // lecture publique) ; `aConfirmer` = ses annonces qu'on ne peut pas dater
       // (jamais comptées en ligne) ; `supprimees` = celles retirées parce que
       // supprimées ou absentes d'une lecture plus récente.
@@ -22391,7 +22391,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     for (const u in attendus) {
       if (parAcc[u]) continue;                       // il répond → rien à signaler
       if (acctOff(u)) continue;                      // déjà masqué à la main / bloqué
-      // 5.165 : on ne juge « muet » que sur une lecture de MOINS de 24 h — une
+      // 5.167 : on ne juge « muet » que sur une lecture de MOINS de 24 h — une
       // lecture plus vieille ne dit rien (ses annonces sont « à confirmer »).
       const lu = Number(listings.lues && listings.lues[u]);
       if (!(lu > 0 && Date.now() - lu <= ENLIGNE_FRAIS_MS)) continue;
@@ -22440,7 +22440,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, txnItem, numeros]);
   // Le tri des comptes et des ventes, le MÊME pour la grille et pour les annonces
-  // « à confirmer » (5.165) : une annonce d'un compte exclu, ou prouvée vendue,
+  // « à confirmer » (5.167) : une annonce d'un compte exclu, ou prouvée vendue,
   // n'est ni dans l'une ni dans l'autre.
   const garderAnnonce = (it) => {
       // ⚠️ UNE ANNONCE DOIT VENIR D'UN COMPTE QUI EXISTE ENCORE. `acctOffOf`
@@ -22500,7 +22500,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   //    Deux paires au même numéro = la mauvaise chose part dans le carton.
   const numDoublons = useMemo(() => {
     const par = new Map();
-    // 5.165 : une paire « à confirmer » est peut-être encore sur l'étagère — un
+    // 5.167 : une paire « à confirmer » est peut-être encore sur l'étagère — un
     // numéro en double avec elle reste un risque (le seul irréversible, §5).
     for (const it of [...(listings.items || []), ...(listings.aConfirmer || [])]) {
       const n = cleNum((numeros[it.id] || {}).numero);
@@ -23423,7 +23423,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // d'annonces supprimées depuis en ont été retirées — pour le DIRE (une fois,
     // au-dessus de la grille). Gardés dans le cache : un rechargement ne doit pas
     // faire passer une lecture d'hier pour celle d'aujourd'hui.
-    // 5.166 (11 octobre) : `lu` est l'heure de la lecture qui FAIT FOI (son
+    // 5.167 (11 octobre) : `lu` est l'heure de la lecture qui FAIT FOI (son
     // dressing, ou sa lecture publique relue depuis un autre compte) ; les
     // annonces « à confirmer » (compte pas relu depuis 24 h) vivent à part —
     // jamais dans `items`, donc jamais comptées en ligne.
@@ -32138,7 +32138,7 @@ function LeboncoinScreen() {
     ((blkRows && blkRows[0] && blkRows[0].data && blkRows[0].data.uids) || []).forEach((u) => offAcc.add(String(u)));
     const lost = main.vinted_pairs_lost || {};
     const listRowsBrut = await sbGet('app_data?id=like.harvest_*_listings&select=id,data');
-    // 5.166 (11 octobre) : seulement ce qui est EN LIGNE d'après la lecture la
+    // 5.167 (11 octobre) : seulement ce qui est EN LIGNE d'après la lecture la
     // plus récente de chaque compte — la même règle que l'écran Annonces et que
     // la file de l'extension (`enLigneDesLignes`, §11). Celles « à confirmer »
     // (compte pas relu depuis 24 h) ne sont ni dans la file, ni « à retirer de
@@ -35581,7 +35581,7 @@ function AppCoeur() {
   useEffect(()=>{ if(!gsOpen || gsData) return; (async()=>{
     const sb=async(q)=>{ try{ const r=await fetch(`${SUPABASE_URL}/rest/v1/${q}`,{headers:sbAuth()}); return r.ok?await r.json():null; }catch(_){ return null; } };
     const online=new Set(); const sold=[]; const bought=[]; const lbc=new Set();
-    const lst=(await lireLignesEnLigne(await sb('app_data?id=like.harvest_*_listings&select=data')||[])).lignes;   // 5.165 : la règle « en ligne » (§11)
+    const lst=(await lireLignesEnLigne(await sb('app_data?id=like.harvest_*_listings&select=data')||[])).lignes;   // 5.167 : la règle « en ligne » (§11)
     for(const r of lst){ const p=(r.data&&r.data.payload)||{}; for(const it of (p.items||[])){ if(!it.is_closed&&!it.is_hidden&&!it.is_draft) online.add(String(it.id)); } }
     const so=await sb('app_data?id=like.harvest_*_orders_sold&select=data')||[];
     const seenS=new Set(); for(const r of so){ const p=(r.data&&r.data.payload)||{}; for(const o of (p.my_orders||[])){ const t=String(o.transaction_id||o.id||''); if(t&&!seenS.has(t)){ seenS.add(t); sold.push(o); } } }
@@ -35794,7 +35794,7 @@ function AppCoeur() {
     for(const r of so){ const p=(r.data&&r.data.payload)||{}; for(const o of (p.my_orders||[])){
       const t=String(o.transaction_id||o.id||''); if(t&&seen.has(t)) continue; if(t) seen.add(t);
       if(/finalis/i.test(o.status||'')) sold.push(o); } }
-    const lst=(await lireLignesEnLigne(await sb('app_data?id=like.harvest_*_listings&select=data')||[])).lignes;   // 5.165 : la règle « en ligne » (§11)
+    const lst=(await lireLignesEnLigne(await sb('app_data?id=like.harvest_*_listings&select=data')||[])).lignes;   // 5.167 : la règle « en ligne » (§11)
     const online=[]; for(const r of lst){ const p=(r.data&&r.data.payload)||{};
       for(const it of (p.items||[])){ if(!it.is_closed&&!it.is_hidden&&!it.is_draft) online.push(it); } }
     const g = grouperPrixMarche(sold, online);
@@ -36290,7 +36290,7 @@ function AppCoeur() {
           // du dressing, le compte est nommé (`dressingsAnciens`).
           if(_harvestSeen[`${uidL}_orders_sold`]) annActivite[uidL]=_harvestSeen[`${uidL}_orders_sold`];
           if(list.supprimees) annSuppr[uidL]=list.supprimees;
-          // 5.165 : « à confirmer » (compte pas relu depuis 24 h) — jamais compté en
+          // 5.167 : « à confirmer » (compte pas relu depuis 24 h) — jamais compté en
           // ligne, dit à part, comme sur l'écran Annonces (§11).
           for(const it of (list.aConfirmer||[])){ if(!soldIds.has(String(it.id))) annAConfirmer.push({ ...it, _acc:a }); }
           annNoms[uidL]=(load('vinted_account_labels',{})||{})[uidL]||a.login||`#${uidL}`;
