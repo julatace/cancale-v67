@@ -75,6 +75,20 @@ let vZip = null;
 try { vZip = JSON.parse(mZip.contenu.toString('utf8')).version; } catch (_) {}
 dit(vZip === vSrc, 'le zip livré porte la version du manifeste',
   `zip ${vZip || '?'} · source ${vSrc}`);
+// 2b) LA VERSION ÉCRITE DANS LE CODE (5.165). Mesuré le 9 octobre : des
+//     sessions qui disaient `ver = 5.164.0` envoyaient des requêtes que seul un
+//     `background.js` d'avant la 5.134 sait former — on n'a pas pu savoir si
+//     c'était une copie partielle. `CODE_VERSION` voyage avec `ver` dans
+//     `panel_diag_capture` : il doit être égal au manifeste, dans la source ET
+//     dans le zip, sinon la mesure mentirait elle-même.
+{
+  const cv = (t) => { const m = /const CODE_VERSION\s*=\s*'([^']+)'/.exec(t || ''); return m ? m[1] : null; };
+  const cSrc = cv(fs.readFileSync(path.join(SRC, 'background.js'), 'utf8'));
+  const bZip = entrees[`${racines[0]}/background.js`];
+  const cZip = cv(bZip && bZip.contenu ? bZip.contenu.toString('utf8') : '');
+  dit(cSrc === vSrc && cZip === vSrc, '`CODE_VERSION` (background.js) suit le manifeste, dans la source et dans le zip',
+    `source ${cSrc || '?'} · zip ${cZip || '?'} · manifeste ${vSrc}`);
+}
 const mAtt = /EXT_ATTENDUE\s*=\s*'([^']+)'/.exec(APP);
 dit(mAtt && mAtt[1] === vSrc, '`EXT_ATTENDUE` suit la même version',
   `app ${mAtt ? mAtt[1] : '?'} · source ${vSrc}`);

@@ -13,6 +13,9 @@
 //
 // Rien n'est envoye a Vinted par l'extension : elle ne parle qu'a Supabase.
 
+// La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
+// dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
+const CODE_VERSION = '5.165.0';
 const SUPABASE_URL = 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ';
 
@@ -782,9 +785,16 @@ async function viderTampon(buf) {
   // iPhone ce qu'un Chrome sait faire, c'est-à-dire le défaut le plus coûteux
   // du projet. `audit-coherence.cjs` l'interdit.
   const ver = (() => { try { return String(chrome.runtime.getManifest().version || ''); } catch (_) { return ''; } })();
+  // ⚠️ 5.165 : la version ÉCRITE DANS LE CODE, à côté de celle du manifeste.
+  //    Mesuré le 9 octobre : des sessions qui écrivaient `ver = 5.164.0`
+  //    envoyaient des requêtes que seul un `background.js` d'avant la 5.134
+  //    sait former. Copie partielle (manifeste neuf, code ancien) ou deux
+  //    extensions sous la même session ? On n'a pas pu trancher. Les deux
+  //    nombres côte à côte le diront la prochaine fois (`audit-extension-zip`
+  //    exige qu'ils soient égaux dans le zip livré).
   const okDiag = await supabaseUpsert('app_data', [{ id: 'panel_diag_capture', data: {
     ...tout, n, rates: { ...(tout.rates || {}), ...(buf.rates || {}) }, majAt: new Date().toISOString(),
-    ...(ver ? { ver, verAt: new Date().toISOString() } : {}),
+    ...(ver ? { ver, verAt: new Date().toISOString() } : {}), verCode: CODE_VERSION,
   } }], 'id');
   // ⚠️ LE TITRE DE CETTE FONCTION LE DISAIT, LE CODE NE LE FAISAIT PAS : le
   //    tampon était vidé même quand l'écriture avait échoué — les compteurs d'un
