@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.169.0';
+const CODE_VERSION = '5.170.0';
 const SUPABASE_URL = 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ';
 
@@ -3245,9 +3245,12 @@ async function relireAnnoncesAutresComptes(uidConnecte) {
           break;
         }
         // Rien de rangé : ce compte réessaie dans 5 min (jamais en rafale) —
-        // pas dans 30, sa lecture n'a pas eu lieu — mais APRÈS les autres.
+        // pas dans 30, sa lecture n'a pas eu lieu. Un échec qui vient de CE
+        // dressing (lecture, total, liste qui bouge, autre membre) le fait passer
+        // après les autres ; une pause, un budget vide ou un compte changé ne
+        // sont pas de son fait.
         essais[uid] = Date.now() - ENLIGNE_DELAI_MS + ENLIGNE_REESSAI_MS;
-        echecs[uid] = Date.now();
+        if (['lecture', 'total', 'sans-total', 'mouvant', 'autre-membre'].includes(lu.raison)) echecs[uid] = Date.now();
         await ranger();
         // Vinted freine, le budget est vide ou le compte a changé : on s'arrête là.
         if (lu.raison === 'vinted-pause' || lu.raison === 'lectures-reservees' || lu.raison === 'trop-de-lectures' || lu.raison === 'autre-compte') break;
@@ -3261,7 +3264,6 @@ async function relireAnnoncesAutresComptes(uidConnecte) {
       if (ok === false) {
         noterDiag('enligne_ecriture_ratee');
         essais[uid] = Date.now() - ENLIGNE_DELAI_MS + ENLIGNE_REESSAI_MS;
-        echecs[uid] = Date.now();
         await ranger();
         continue;
       }

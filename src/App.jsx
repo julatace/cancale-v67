@@ -41,7 +41,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.169.0';
+const EXT_ATTENDUE = '5.170.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -175,7 +175,12 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // exactement. Le seuil est 5.160 : en deçà, l'app dit « mets à jour », elle ne
 // laisse pas le bouton se casser. (Mesuré le 7 octobre : son extension installée
 // est en 5.143 — c'est pour ça que « publier depuis VRM ne marche pas ».)
-const EXT_CAPACITES = { supprimees: '5.165.0', enligne: '5.167.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', repond: '5.77.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', detourage: '5.156.0' };
+// ⚠️ `enligne` (relecture publique des autres comptes) : 5.170, PAS 5.167 — les
+//    5.167 et 5.168 parties en production (`main`) ne portent pas
+//    `relireAnnoncesAutresComptes` (ce chantier-ci s'appelait « 5.167 » sur sa
+//    branche). Un seuil plus bas promettrait la relecture à SON extension de
+//    production — le défaut le plus coûteux du projet (revue de la 5.167).
+const EXT_CAPACITES = { supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', repond: '5.77.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', detourage: '5.156.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -1870,7 +1875,7 @@ function FraicheurAnnonces({ lues, enLigne, noms, supprimees, aConfirmer, numero
   const pubKO = !!lecturesPubliquesKO() && (Object.keys(enLigne || {}).length > 0 || ac.length > 0);
   if (!vieux.length && !nSuppr && !ac.length && !pubKO) return null;
   const nom = (u) => (noms && noms[u]) || `#${u}`;
-  const cap = extSait('enligne');                 // relit le dressing public des autres comptes (5.167)
+  const cap = extSait('enligne');                 // relit le dressing public des autres comptes (5.170)
   const capS = extSait('supprimees');             // voit une suppression faite dans ce Chrome (5.165)
   const plusieurs = !!__vmrPlusieurs;
   const ailleurs = cap === 'absente' || sansSouris;          // le geste ne se fait pas sur CET appareil
