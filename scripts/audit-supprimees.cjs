@@ -47,7 +47,8 @@ const MUTATIONS = {
   // l'app seule change la règle : les deux écrans divergent
   divergence: [['app', `return !(Number(capTs) >= at + SUPPR_MARGE_MS);`, `return !(Number(capTs) >= at + 60 * 60 * 1000);`]],
   // la file Leboncoin de l'extension ne lirait plus les suppressions
-  filelbc: [['bg', `  const listRows = retirerSupprimeesLignes((await sbGet('app_data?id=like.harvest_*_listings&select=id,data')) || [], await lireSupprimeesTous());\n  const online = []`, `  const listRows = (await sbGet('app_data?id=like.harvest_*_listings&select=id,data')) || [];\n  const online = []`]],
+  // (5.165, 11 octobre : les files lisent les dressings par `lireDressingsEnLigne`.)
+  filelbc: [['bg', `  return enLigneDesLignes(lignesL, lignesP || [], await lireSupprimeesTous(), Date.now());`, `  return enLigneDesLignes(lignesL, lignesP || [], null, Date.now());`]],
 };
 const iM = process.argv.indexOf('--mutation');
 const MUT = iM > 0 ? process.argv[iM + 1] : '';
@@ -131,19 +132,24 @@ function regleDe(texte, quoi) {
   vm.runInContext(m[1] + '\n;this.supprimeeApres = supprimeeApres;', ctx);
   return ctx.supprimeeApres;
 }
-function lignesApp() {
-  const m = /(const retirerSupprimees = [\s\S]*?)\/\/ ── DE QUAND DATE LA LECTURE DU DRESSING/.exec(F.app);
-  if (!m) throw new Error('retirerSupprimees / retirerSupprimeesLignes introuvables dans App.jsx');
-  const r = /\/\/ <supprimees-regle>[^\n]*\n([\s\S]*?)\/\/ <\/supprimees-regle>/.exec(F.app);
+// 5.165 (11 octobre) : appliquée à des LIGNES, la règle passe par `enLigneDesLignes`
+// (bloc <enligne-regle>, le même des deux côtés) — `retirerSupprimeesLignes` est retirée.
+function lignesDe(texte, quoi) {
+  const r = /\/\/ <supprimees-regle>[^\n]*\n([\s\S]*?)\/\/ <\/supprimees-regle>/.exec(texte);
+  const m = /\/\/ <enligne-regle>[^\n]*\n([\s\S]*?)\/\/ <\/enligne-regle>/.exec(texte);
+  if (!r || !m) throw new Error(`blocs <supprimees-regle> / <enligne-regle> introuvables dans ${quoi}`);
   const ctx = {}; vm.createContext(ctx);
-  vm.runInContext(r[1] + '\n' + m[1] + '\n;this.f = retirerSupprimeesLignes;', ctx);
+  vm.runInContext(r[1] + '\n' + m[1] + '\n;this.f = enLigneDesLignes;', ctx);
   return ctx.f;
 }
 
 // ════════════════════════════════════════════════════════════════════════════
 // 5. Les files de l'extension (buildLbcData / buildEbayData) dans un vm
 // ════════════════════════════════════════════════════════════════════════════
-const T0 = Date.parse('2026-10-08T22:29:00.000Z');           // la lecture du dressing (inventée)
+// La lecture du dressing (inventée), il y a 22 h : depuis la 5.165 une lecture de
+// plus de 24 h est « à confirmer » et n'alimente aucune file — une date FIXE
+// ferait mesurer au banc un dressing périmé (§6.3).
+const T0 = Date.now() - 22 * 3600e3;
 const NUMEROS = { '101': { numero: '101', title: 'Paire A', mp: { lbc: true, ebay: true } }, '202': { numero: '202', title: 'Paire B', mp: { lbc: true, ebay: true } } };
 const dressing = (cap) => [{ id: 'harvest_9001_listings', data: { uid: '9001', capturedAt: new Date(cap).toISOString(), payload: { items: [
   { id: 101, title: 'Paire A', price: { amount: '40' }, is_closed: false }, { id: 202, title: 'Paire B', price: { amount: '50' }, is_closed: false }] } } }];
@@ -298,13 +304,13 @@ const numsDe = (r) => ((r && r.queue) || []).map((a) => String(a.numero)).sort()
       dit(a === attendu && e === attendu, `${nom} → ${attendu ? 'écartée' : 'gardée'}`, `app ${a} · extension ${e}`);
     }
     dit(!diverge.length, 'l’app et l’extension rendent la MÊME sortie sur tous les cas', diverge.join(' · '));
-    const fApp = lignesApp();
-    const ctx = fileExt({ cap: T0 }); const fExt = ctx.retirerSupprimeesLignes;
+    const fApp = lignesDe(F.app, 'App.jsx'), fExt = lignesDe(F.bg, 'background.js');
     const lignes = dressing(T0), supp = new Map([['9001', { '101': new Date(T0 + 3600e3).toISOString() }]]);
-    const idsDe = (ls) => JSON.stringify((ls || []).map((r) => ((r.data && r.data.payload && r.data.payload.items) || []).map((it) => it.id)));
-    const sA = idsDe(fApp(lignes, supp)), sE = idsDe(fExt(lignes, supp));
+    const idsDe = (res) => JSON.stringify(((res && res.lignes) || []).map((r) => ((r.data && r.data.payload && r.data.payload.items) || []).map((it) => it.id)));
+    const sA = idsDe(fApp(lignes, [], supp, T0 + 2 * 3600e3)), sE = idsDe(fExt(lignes, [], supp, T0 + 2 * 3600e3));
     dit(sA === sE && sA === '[[202]]', 'appliquée à des lignes de dressing : même résultat, l’annonce 101 retirée', `app ${sA} · ext ${sE}`);
-    dit(JSON.stringify(fApp(lignes, null)) === JSON.stringify(lignes), 'suppressions pas lues : les lignes repartent telles quelles');
+    const sN = idsDe(fApp(lignes, [], null, T0 + 2 * 3600e3));
+    dit(sN === '[[101,202]]', 'suppressions pas lues : rien n’est retiré', sN);
   });
 
   console.log('── 5. Les files Leboncoin et eBay de l’extension');
