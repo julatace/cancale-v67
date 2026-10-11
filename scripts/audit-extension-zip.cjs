@@ -18,7 +18,7 @@
 //   1. un zip est livré, et l'app le propose ;
 //   2. il porte la version du manifeste — donc `EXT_ATTENDUE` aussi ;
 //   3. il se dézippe en UN SEUL dossier (règle de Julien) ;
-//   4. il contient tous les fichiers de l'extension ;
+//   4. il contient tous les fichiers de l'extension, et ce sont CEUX de la source ;
 //   5. aucun zip périmé ne traîne à côté.
 //
 // Lecture seule.
@@ -67,6 +67,21 @@ const attendus = fs.readdirSync(SRC).filter(f => fs.statSync(path.join(SRC, f)).
 const manquants = attendus.filter(f => !noms.includes(`${racines[0]}/${f}`));
 dit(manquants.length === 0, 'il contient tous les fichiers de l\'extension',
   manquants.length ? 'manque : ' + manquants.join(', ') : attendus.length + ' fichiers');
+
+// 4b) LE CONTENU — revue de la 5.165 (11 octobre). Le zip pouvait porter la
+//     BONNE version et un `background.js` d'avant : une correction faite après
+//     le bump (ici `dateLectureDressing`) partait sans être livrée, et le
+//     contrôle de version restait vert. Chaque fichier du zip doit être,
+//     octet pour octet, celui de la source.
+{
+  const differents = attendus.filter((f) => {
+    const e = entrees[`${racines[0]}/${f}`];
+    if (!e || !e.contenu) return false;              // déjà dit plus haut
+    return !Buffer.from(e.contenu).equals(fs.readFileSync(path.join(SRC, f)));
+  });
+  dit(differents.length === 0, 'chaque fichier du zip est celui de la source (octet pour octet)',
+    differents.length ? 'périmé dans le zip : ' + differents.join(', ') + ' — régénère le zip' : '');
+}
 
 // 2) LA VERSION — le contrôle qui aurait évité des semaines de blocage.
 const vSrc = JSON.parse(fs.readFileSync(path.join(SRC, 'manifest.json'), 'utf8')).version;
