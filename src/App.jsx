@@ -33775,6 +33775,7 @@ function NumerosSetting() {
 //    l'EXTENSION qui répond, avec SA version. Sans `extSait('repond')`, l'app
 //    promettrait « elle répond à tes messages » à une extension qui ne sait pas
 //    le faire — pour la septième fois. Trois états, jamais deux.
+const CLES_RESERVEES_REPONDUS = ['bilan', 'demandes'];
 function RepondreSetting() {
   const [on, setOn] = React.useState(() => !!load('vinted_repond_auto', false));
   const [envois, setEnvois] = React.useState(undefined);   // undefined = en cours · null = pas su
@@ -33794,9 +33795,11 @@ function RepondreSetting() {
         if (!r.ok) { setEnvois(null); setBilan(null); return; }
         const j = await r.json();
         const d = (j && j[0] && j[0].data) || {};
-        // `bilan` est une clé réservée : ce n'est pas un envoi, on ne le liste pas.
+        // `bilan` et `demandes` sont des clés réservées : ce ne sont pas des
+        // envois, on ne les liste pas. (`demandes` = ce que l'extension a déjà
+        // demandé à l'IA, une fois par message — 5.168, la « fuite » du 11 oct.)
         setBilan(d.bilan || null);
-        setEnvois(Object.keys(d).filter((k) => k !== 'bilan').map((k) => d[k]).filter(Boolean)
+        setEnvois(Object.keys(d).filter((k) => !CLES_RESERVEES_REPONDUS.includes(k)).map((k) => d[k]).filter(Boolean)
           .sort((a, b) => String(b.at || '').localeCompare(String(a.at || ''))));
       } catch (_) { if (vivant) { setEnvois(null); setBilan(null); } }
     })();

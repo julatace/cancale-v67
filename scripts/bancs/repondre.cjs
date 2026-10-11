@@ -22,7 +22,7 @@ const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 
 const DIST = path.join(__dirname, '..', '..', 'dist');   // ⚠️ JAMAIS un chemin absolu (§6.1)
-const PORT = 4509;
+const PORT = Number(process.env.BANC_PORT) || 4509;
 const MIME = { '.html':'text/html', '.js':'text/javascript', '.css':'text/css', '.json':'application/json', '.png':'image/png', '.svg':'image/svg+xml', '.zip':'application/zip', '.webmanifest':'application/manifest+json' };
 const SESSION = { access_token: 'jeton-de-banc', refresh_token: 'r', expires_at: Date.now() + 3600e3,
   user: { id: '11111111-2222-3333-4444-555555555555', email: 'sophie@exemple.fr' } };
@@ -56,11 +56,22 @@ const BILAN_REEL = { nonLues: 32, pasCaptee: 17, sansMessage: 9, pasVendeur: 1, 
 // et ne récite pas un texte figé (la leçon du prénom, `premierjour.cjs`).
 const BILAN_AUTRE = Object.assign({}, BILAN_REEL, { nonLues: 4, envoyes: 1, pasCaptee: 0, sansMessage: 2, pasVendeur: 1, replyRefuse: 0 });
 
+// ⚠️ 5.168 (la « fuite » de l'IA, 11 octobre) : la MÊME ligne porte aussi
+//    `demandes` — ce que l'extension a déjà demandé à l'IA, une fois par
+//    message. Une hésitation n'a pas de texte ; une réponse sûre retenue par le
+//    plafond horaire en a un, et elle N'EST PAS PARTIE : elle ne doit jamais
+//    s'afficher comme « parti en ton nom ».
+const PAS_PARTIE = 'Réponse préparée mais retenue par le plafond horaire, pas encore envoyée.';
+const DEMANDES = {
+  '600000000001:70000000001': { at: '2026-10-11T09:00:00Z', confiance: 30, raison: 'peu-sur' },
+  '600000000002:70000000002': { at: '2026-10-11T09:05:00Z', confiance: 91, intention: 'question', texte: PAS_PARTIE },
+};
 const ETATS = {
   pasSu: null,                                                   // 522 : la lecture a échoué
   rien: [],                                                      // la ligne n'existe pas encore
   reel: [{ data: Object.assign({}, ENVOI, { bilan: BILAN_REEL }) }],
   autre: [{ data: Object.assign({}, ENVOI, { bilan: BILAN_AUTRE }) }],
+  demandes: [{ data: Object.assign({}, ENVOI, { bilan: BILAN_REEL, demandes: DEMANDES }) }],
 };
 
 async function rendre(nav, etat) {
@@ -157,6 +168,12 @@ async function rendre(nav, etat) {
   // ⚠️ `bilan` vit dans la MÊME ligne que les envois : il ne doit pas être
   //    listé comme si c'était un message parti.
   dit(!/«\s*(undefined|\[object)/i.test(vus.reel.bloc), 'le bilan n\'est pas listé comme un envoi', vus.reel.bloc.slice(0, 200));
+
+  console.log('\n── CE QUI A ÉTÉ DEMANDÉ À L\'IA N\'EST PAS CE QUI EST PARTI (5.168)');
+  const bd = vus.demandes.bloc;
+  dit(bd.includes(e.texte.slice(0, 40)) && bd.includes(e.login), 'l\'envoi réel reste affiché, avec la personne', bd.slice(0, 200));
+  dit(!bd.includes(PAS_PARTIE.slice(0, 30)), 'une réponse préparée mais PAS envoyée n\'apparaît pas dans « ce qui est parti en ton nom »', bd.slice(0, 300));
+  dit(!/«\s*(undefined|\[object)/i.test(bd) && !/\bet \d+ autres?\./.test(bd), 'les questions mémorisées ne sont pas listées comme des envois', bd.slice(0, 300));
 
   await nav.close(); srv.close();
   console.log(`\n${ko ? '❌ ' + ko + ' contrôle(s) au rouge.' : '✅ Ce qui part en son nom est relisible, et les nombres sont les vrais.'}`);

@@ -22,7 +22,10 @@
 const fs = require('fs'), vm = require('vm'), path = require('path');
 const { metaVersData } = require('./bancs/_meta.cjs');
 const racine = path.join(__dirname, '..');
-const src = fs.readFileSync(path.join(racine, 'vinted-sync-extension', 'background.js'), 'utf8');
+// `--src chemin` : lancer l'audit sur une autre version de background.js (le code
+// d'avant, ou une copie RÉAFFAIBLIE) — c'est comme ça qu'on prouve qu'il mord (§6.1).
+const iSrc = process.argv.indexOf('--src');
+const src = fs.readFileSync(iSrc > 0 ? path.resolve(process.argv[iSrc + 1]) : path.join(racine, 'vinted-sync-extension', 'background.js'), 'utf8');
 const dual = (v) => function (...a) { const cb = a[a.length - 1]; if (typeof cb === 'function') { cb(v); return; } return Promise.resolve(v); };
 
 let ko = 0, ok = 0;
@@ -151,7 +154,7 @@ const nonLue = (cid, desc) => ({ id: Number(cid), unread: true, description: des
     // ⚠️ IL DOIT POUVOIR RELIRE CE QUI EST PARTI EN SON NOM.
     const ecrit = (j.ecrits[0] || [])[0] || {};
     const garde = ecrit.data || {};
-    const envoi = Object.keys(garde).filter((k) => k !== 'bilan').map((k) => garde[k])[0];
+    const envoi = Object.keys(garde).filter((k) => k !== 'bilan' && k !== 'demandes').map((k) => garde[k])[0];
     dit(ecrit.id === 'panel_msg_repondus' && envoi && envoi.texte && envoi.texte === (rep0 && rep0.body),
       'le texte exact est gardé pour qu’il le relise', JSON.stringify(envoi && envoi.texte));
     dit(envoi && String(envoi.login || '') !== '', 'et la personne est nommée', JSON.stringify(envoi && envoi.login));
@@ -323,6 +326,96 @@ const nonLue = (cid, desc) => ({ id: Number(cid), unread: true, description: des
     });
     dit((await ctx.repondreAuxMessages(UID)) === 0 && ctx.__journal.replies.length === 0,
       'un autre compte dans l’onglet : rien ne part', `envois=${ctx.__journal.replies.length}`);
+  });
+
+  // ══ 9. LA FUITE DE L'IA : UNE QUESTION PAR MESSAGE, JAMAIS DEUX ══════════
+  // Mesuré le 11 octobre (cout-vendeur/usage.md §4.2) : `repondreAuxMessages`
+  // tourne à CHAQUE page Vinted chargée (~255 par jour chez Julien). Un message
+  // où l'IA hésite n'était mémorisé nulle part : il repartait chez l'IA à
+  // chaque page, tant qu'il restait non lu — ≈ 255 appels PAYÉS par jour pour
+  // un seul message. On rejoue N passages en CHAÎNANT la ligne écrite par l'un
+  // comme lecture du suivant (la base garde ce qu'on y écrit), et on COMPTE les
+  // appels à l'IA.
+  console.log('\n── La fuite de l’IA : un message où elle a hésité n’est demandé qu’UNE fois');
+  const passages = async ({ lignes, ia, n, gardeStop = () => null }) => {
+    let memo = lignes.panel_msg_repondus;
+    let appelsIA = 0, envois = 0, ecrits = [], bilans = [];
+    for (let i = 0; i < n; i++) {
+      const ctx = faireCtx({ lignes: Object.assign({}, lignes, { panel_msg_repondus: memo }), ia, gardeStop: gardeStop(i) });
+      envois += await ctx.repondreAuxMessages(UID);
+      appelsIA += ctx.__journal.ia;
+      const ligne = ((ctx.__journal.ecrits[0] || [])[0]) || null;
+      if (ligne && ligne.id === 'panel_msg_repondus') { memo = { data: ligne.data }; ecrits.push(ligne.data); bilans.push(ligne.data.bilan || {}); }
+    }
+    return { appelsIA, envois, memo, ecrits, bilans };
+  };
+  const seuil9 = Number((/const MSG_MIN_CONFIANCE = (\d+)/.exec(src) || [])[1]) || 55;
+  const uneConv = (body, msgId = 881) => base(Object.assign(inbox([nonLue(8801)]), {
+    [`harvest_${UID}_conv_8801`]: convRow({ cid: 8801, msgId, body, itemId: MON_ITEM }),
+  }));
+  await essaie('l’hésitation mémorisée', async () => {
+    const r = await passages({ lignes: uneConv('Vous me la faites à 20 € et vous me l’envoyez au Japon ?'), n: 10,
+      ia: () => ({ ok: true, intent: 'negociation', confidence: seuil9 - 1, suggestions: [{ text: 'Peut-être.' }] }) });
+    dit(r.appelsIA === 1, '10 pages Vinted chargées, un message où elle hésite : l’IA n’est appelée QU’UNE fois',
+      `${r.appelsIA} appel(s) payé(s) sur 10 passages`);
+    dit(r.envois === 0, 'et rien ne part (mieux vaut un blanc qu’un faux)', `envois=${r.envois}`);
+    dit(r.bilans.length === 10 && r.bilans.every((b) => b.pasSure === 1),
+      'chaque passage compte toujours ce message parmi « pas sûre » (le bilan de l’app ne change pas de sens)',
+      JSON.stringify(r.bilans.map((b) => b.pasSure)));
+    const d = (r.memo && r.memo.data && r.memo.data.demandes) || {};
+    dit(d['8801:881'] && !d['8801:881'].texte, 'l’hésitation est rangée sous la clé du MESSAGE (conversation:message), sans texte à envoyer', JSON.stringify(d['8801:881']));
+  });
+  await essaie('la réponse vide mémorisée', async () => {
+    const r = await passages({ lignes: uneConv('…'), n: 6, ia: () => ({ ok: true, confidence: 99, suggestions: [{ text: '  ' }] }) });
+    dit(r.appelsIA === 1 && r.envois === 0, 'une réponse VIDE (facturée aussi) n’est demandée qu’une fois', `${r.appelsIA} appel(s) sur 6`);
+  });
+  await essaie('l’IA injoignable', async () => {
+    const r = await passages({ lignes: uneConv('Dispo ?'), n: 3, ia: () => ({ ok: false, reason: 'network' }) });
+    // L'AUTRE SENS : rien n'a été facturé, donc rien n'est mémorisé — sinon une
+    // coupure de réseau rendrait ce message muet pour toujours.
+    dit(r.appelsIA === 3, 'IA injoignable (rien de facturé) : on RETENTE au passage suivant', `${r.appelsIA} appel(s) sur 3`);
+    const d = (r.memo && r.memo.data && r.memo.data.demandes) || {};
+    dit(!d['8801:881'], 'et rien n’est mémorisé pour ce message', JSON.stringify(d));
+  });
+  await essaie('la réponse sûre bloquée par le plafond horaire', async () => {
+    // Passage 1 : l'IA est sûre, mais `garde` refuse (plafond de 20/h atteint).
+    // Passage 2 : `garde` accepte. La réponse doit partir SANS redemander l'IA.
+    let n = 0;
+    const r = await passages({ lignes: uneConv('Toujours dispo ?'), n: 3,
+      gardeStop: (i) => (i === 0 ? { ok: false, code: 'plafond' } : null),
+      ia: () => { n++; return { ok: true, intent: 'question', confidence: 90, suggestions: [{ text: 'Oui, toujours dispo, je poste demain !' }] }; } });
+    dit(r.appelsIA === 1, 'une réponse sûre que le plafond horaire a retenue n’est PAS redemandée à l’IA', `${r.appelsIA} appel(s) sur 3 passages`);
+    dit(r.envois === 1, 'elle part au passage suivant, une seule fois', `envois=${r.envois}`);
+    const envoi = r.memo && r.memo.data && r.memo.data['8801:881'];
+    dit(envoi && envoi.texte === 'Oui, toujours dispo, je poste demain !', 'c’est le texte obtenu la première fois qui part', JSON.stringify(envoi && envoi.texte));
+    const d = (r.memo && r.memo.data && r.memo.data.demandes) || {};
+    dit(!d['8801:881'], 'une fois partie, la réponse quitte la liste des questions (l’envoi la remplace)', JSON.stringify(Object.keys(d)));
+  });
+  await essaie('un nouveau message après une hésitation', async () => {
+    const l1 = uneConv('Vous faites 20 € ?', 881);
+    const r1 = await passages({ lignes: l1, n: 2, ia: () => ({ ok: true, confidence: seuil9 - 10, suggestions: [{ text: 'Hmm.' }] }) });
+    // L'acheteur écrit à nouveau : AUTRE id de message ⇒ une nouvelle question.
+    const l2 = Object.assign(uneConv('Et 25 € alors ?', 882), { panel_msg_repondus: r1.memo });
+    let appels = 0;
+    const ctx = faireCtx({ lignes: l2, ia: () => { appels++; return { ok: true, intent: 'negociation', confidence: 90, suggestions: [{ text: 'Je peux faire 25 € !' }] }; } });
+    const env = await ctx.repondreAuxMessages(UID);
+    dit(r1.appelsIA === 1 && appels === 1 && env === 1,
+      'un NOUVEAU message de l’acheteur (autre id) est bien redemandé, et la réponse part', `1er message : ${r1.appelsIA} appel(s) · nouveau : ${appels} appel(s), ${env} envoi`);
+  });
+  await essaie('la liste des questions est bornée', async () => {
+    const max = Number((/const MSG_DEMANDES_MAX = (\d+)/.exec(src) || [])[1]);
+    dit(max > 0, 'la borne est lue dans le code', `MSG_DEMANDES_MAX=${max}`);
+    const vieilles = {};
+    for (let i = 0; i < (max || 300) + 25; i++) vieilles[`1:${i}`] = { at: new Date(Date.UTC(2026, 8, 1, 0, i)).toISOString(), confiance: 10, raison: 'peu-sur' };
+    const l = Object.assign(uneConv('Dispo ?'), { panel_msg_repondus: { data: { demandes: vieilles } } });
+    const r = await passages({ lignes: l, n: 1, ia: () => ({ ok: true, confidence: 5, suggestions: [{ text: '?' }] }) });
+    const d = (r.memo && r.memo.data && r.memo.data.demandes) || {};
+    dit(Object.keys(d).length === max && d['8801:881'], `au plus ${max} questions gardées, la plus récente comprise (la ligne ne grossit pas sans fin)`, `${Object.keys(d).length} gardées`);
+  });
+  await essaie('le mémo non lu', async () => {
+    const ctx = faireCtx({ lignes: Object.assign(uneConv('Dispo ?'), { __ko: ['panel_msg_repondus'] }) });
+    await ctx.repondreAuxMessages(UID);
+    dit(ctx.__journal.ia === 0, 'mémo illisible : l’IA n’est même pas appelée (on ne sait pas si on l’a déjà payée)', `appels IA=${ctx.__journal.ia}`);
   });
 
   console.log(`\n${ko ? '❌' : '✅'} ${ok} contrôle(s) au vert, ${ko} au rouge.`);
