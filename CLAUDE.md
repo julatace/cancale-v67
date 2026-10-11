@@ -4286,40 +4286,92 @@ Premier morceau de l'agent eBay « VRM fermé » (spécification `spec-finale.md
 §5.1-5.2, K3). Julien ne voit rien. **Aucune horloge** (ni `pg_cron` ni `pg_net` :
 c'est la 015, sur son oui), **aucun DROP**, rien qui tourne : des tables vides et
 `vrm_reglages.agent_ebay = '0'`. Fichier : `supabase/migrations/014-agent.sql`.
-- **Les garanties vivent dans la base, pas dans le code qui l'appelle** : 14 tables,
-  21 fonctions (`SECURITY DEFINER`, `search_path` vide, temps en paramètre
-  `p_maintenant`, exécutables par `service_role` SEULEMENT). Même la clé de service
-  n'écrit la file, les commandes, le journal, les compteurs, les mémos, les
-  titulaires, l'index, les preuves et l'horloge **que par leurs fonctions** (un
-  droit de table ne se contourne pas comme RLS). Elle écrit directement :
-  `vrm_agent_vendeurs` (réglages versionnés, pouls), `vrm_agent_vus` (insertion),
-  `vrm_agent_routes`, `vrm_ebay_cles_publiques`, `vrm_coffre`.
+- **Les garanties vivent dans la base, face à tout appelant de l'API** (navigateur,
+  clé de service, route boguée) : 16 tables, 21 fonctions (`SECURITY DEFINER`,
+  `search_path` vide, exécutables par `service_role` SEULEMENT) et 3 aides
+  internes exécutables par PERSONNE (`vrm_agent_heure`, `vrm_agent_efface`,
+  `vrm_agent_sans_acheteur`). Même la clé de service n'écrit la file, les
+  commandes, le journal, les compteurs, les mémos, les titulaires, l'index, les
+  preuves, l'horloge, les pierres tombales et les marques **que par leurs
+  fonctions** (ni INSERT, ni UPDATE, ni DELETE, ni TRUNCATE direct). Elle écrit
+  directement : `vrm_agent_vendeurs` (réglages versionnés, pouls), `vrm_agent_vus`
+  (insertion), `vrm_agent_routes`, `vrm_ebay_cles_publiques`, `vrm_coffre`.
+  ⚠️ **Le propriétaire des tables** (`postgres`, celui de l'outil SQL) garde, par
+  construction, le moyen de défaire n'importe quelle garde (désactiver un
+  déclencheur, accorder un droit) : aucune garde en base ne tient face à lui.
+  C'est `--verifier` qui voit qu'une garde a été touchée.
 - **Le navigateur** lit SES lignes de `vrm_agent_vendeurs`, `_commandes`,
   `_journal` (avec la restrictive `abonnement_requis` : qui ne paie plus ne voit
-  plus rien), n'écrit RIEN, ne lit rien d'autre ; `anon` ne lit rien du tout.
-  ⚠️ Mesuré le 11 octobre : les droits par défaut du schéma public ouvrent toute
-  table neuve en entier à anon et authenticated — la migration les retire tous.
-- `vrm_agent_prendre` : ≤ 2 tâches par vendeur, ≤ 1 par compte eBay, **jamais un
-  compte qui a déjà une tâche en vol dans un autre battement** [S24, D15] (bail
-  vivant + verrou consultatif par groupe) ; seule la ligne prise est verrouillée,
-  `skip locked` : un battement n'attend jamais. `vrm_agent_prendre_cle` (le clic)
-  refuse une tâche tenue (⇒ 409). `vrm_agent_rendre` ne rend qu'avec SON jeton ;
-  une sonnette arrivée pendant le bail (`reveil`) n'est jamais perdue.
-  `vrm_agent_ecrire_commande` : version ET bail (FOR SHARE), sinon 0 ligne.
-  `vrm_agent_premiere_fois` : les clés `achat:`, `msg:`, `eval:`, `offre:` sont
+  plus rien), n'écrit RIEN (TRUNCATE compris), ne lit rien d'autre ; `anon` ne lit
+  rien du tout. ⚠️ Mesuré le 11 octobre : les droits par défaut du schéma public
+  ouvrent toute table neuve en entier à anon et authenticated — la migration les
+  retire tous.
+- **L'heure** : le temps est un paramètre (`p_maintenant`) pour le banc de vie sur
+  horloge simulée (K5) — et pour lui SEUL. Sans la variable de session
+  `vrm.horloge_simulee = '1'` (que l'API ne sait pas poser ; un banc la pose par
+  `set`, ou `PGOPTIONS='-c vrm.horloge_simulee=1'`), c'est `now()` du serveur
+  qui compte, quoi que dise l'appelant. ⚠️ **Le banc de vie de K5 DOIT poser cette
+  variable**, sinon ses heures simulées sont ignorées.
+- **La file** : `vrm_agent_prendre` choisit ses candidats EN SQL (une tâche par
+  compte libre, quatre par vendeur, la plus en retard d'abord) puis en prend ≤ 2
+  par vendeur et ≤ 1 par compte eBay : un arriéré de 250 tâches sur un compte
+  n'affame plus personne. **Un compte eBay n'a jamais deux tâches en vol,
+  battements ET clics confondus** : `vrm_agent_prendre_cle` (le clic, ⇒ 409)
+  refuse une tâche tenue ET un compte dont une autre tâche est en vol, sous le
+  même verrou consultatif que `prendre`. `vrm_agent_rendre` ne rend qu'avec SON
+  jeton, ne RETIRE la tâche que sur un « fini » explicite (`p_fini`) sans échec ;
+  « pas de prochaine fois » sans « fini », ou un échec, la garde 15 min (« pas
+  su » ne détruit jamais une tâche) ; la raison est un CODE (sinon
+  `raison-illisible`). Une sonnette arrivée pendant le bail — même EXPIRÉ mais pas
+  encore repris (un appel lent) — n'est jamais perdue (`reveil`).
+- **Une commande** : `vrm_agent_ecrire_commande(owner, jeton, compte, commande,
+  version_lue, colonnes, plateforme, maintenant)` — la tâche qui la tient est
+  DÉRIVÉE (`{plateforme}:{compte}:cmd:{commande}`), jamais reçue. Modifier exige
+  le bail de CETTE tâche (la veille d'un compte ne réécrit plus une commande
+  qu'un clic achète) ; créer, le bail d'une tâche de ce vendeur et de CE compte
+  eBay. Version ET bail (FOR SHARE), sinon 0 ligne ; le rang ne descend jamais
+  (`vrm_rang_descend`, dit).
+- **R18 en base, sur ce qui a une FORME** : des codes (`etape`, `voie`,
+  `transporteur`, `suivi`, `numero`, `raison`, `ref`, `source`…), des NOMS de clés
+  `shipTo` d'eBay seulement dans `cles_shipto` (liste blanche : « Dupont »,
+  « Cancale » sont refusés), aucune clé d'acheteur ni d'adresse à aucune
+  profondeur, et aucune adresse email, dans `data`, `en_cours` et `defaire`
+  (`vrm_agent_sans_acheteur`) ; la ville d'un devis reste permise (effacée avec
+  lui). ⚠️ Le TEXTE d'un message (journal, `texte`) est libre : son contrôle (R13)
+  reste au code (K13).
+- `vrm_agent_premiere_fois` : les clés `achat:`, `msg:`, `eval:`, `offre:` sont
   GLOBALES (propriétaire neutre, quel que soit l'appelant) [S5], mémos ≥ 100 jours
   [S25]. `vrm_agent_reserver` : `ceil(TTC × 1,15)`, jour de Paris, plafond NULL ⇒
-  refusé ; `vrm_agent_rendre_reservation` une seule fois. `vrm_agent_quota` :
-  confort 60 %, détection 80 %, obligations 100 %, 1 % par compte. Titulaires (un
-  compte eBay, un vendeur), index des annonces (jamais celle d'un autre), preuve
-  vue (heure jamais déplacée), horloge à `-infinity` [D14].
-- **Le journal** : une seule réécriture possible, `vrm_agent_anonymiser_journal`
-  (R19) — un déclencheur refuse toute autre modification, suppression ou
-  vidage, même au propriétaire de la table. ⚠️ Donc **« Fermer mon compte » devra
-  appeler `vrm_agent_effacer_vendeur(owner)`** (aucune suppression directe ne
-  passe) — à brancher dans `api/compte.js` par le premier chantier qui écrit dans
-  ces tables. La purge (`vrm_agent_purger`, par la 015) : vus 14 j, mémos à
-  échéance, journal 13 mois, commandes closes compactées à 90 j.
+  refusé ; `vrm_agent_rendre_reservation` une seule fois ; la purge ne touche
+  JAMAIS un compteur du mois en cours ni du mois précédent (ce sont des plafonds
+  d'argent). `vrm_agent_quota` : confort 60 %, détection 80 %, obligations 100 %,
+  1 % par compte — et un vendeur inconnu (NULL) est refusé hors obligation.
+- **Titulaires et index** : un compte eBay, un vendeur ; un libellé de compte est
+  unique chez un vendeur (il nomme ses tâches) ; quand il change, l'index des
+  annonces le SUIT ; libérer retire TOUT l'index de ce compte ; seul le titulaire
+  indexe, et une ligne laissée par un vendeur qui ne l'est plus est reprise.
+  Preuve vue (heure jamais déplacée), horloge à `-infinity` [D14].
+- **Le journal** : une seule réécriture, `vrm_agent_anonymiser_journal` (R19), qui
+  retire le texte, la référence ET le « défaire » d'une entrée. Toute autre
+  modification, suppression ou vidage est refusé (même au propriétaire de la
+  table, par une écriture ordinaire) ; la purge et l'effacement d'un vendeur
+  passent par une MARQUE de transaction (`vrm_agent_marques`, clé
+  `txid_current()`) — une variable de session ne l'ouvre plus.
+- **« Fermer mon compte »** : `vrm_agent_effacer_vendeur(owner)` efface les 12
+  tables qui portent son nom (coffre, commandes, preuves, index compris) et les
+  quotas par compte qui le nomment sous le neutre, et pose d'ABORD une **pierre
+  tombale** (`vrm_agent_effaces`) : plus aucune ligne ne s'écrit à son nom, ni par
+  une fonction (un battement en vol), ni par une écriture directe du serveur
+  (déclencheur `vrm_agent_pierre_tombale`, `vrm_vendeur_efface`). ⚠️ **À brancher
+  dans `api/compte.js`** par le premier chantier qui écrit dans ces tables
+  (aucune suppression directe ne passe). La purge (`vrm_agent_purger`, par la
+  015) : vus 14 j, mémos à échéance, compteurs 400 j hors mois courant et
+  précédent, journal 13 mois, commandes closes compactées à 90 j, et
+  `cron.job_run_details` > 7 j **sans jamais faire échouer le reste**.
+- **La forme** : `create table if not exists` sautait en silence une table d'une
+  version plus ancienne ; une EMPREINTE (colonnes, types, NOT NULL, noms des
+  contraintes) dans le fichier fait tout refuser (`vrm_agent_forme`), rien n'est
+  installé.
 - **La garde `ebay_tokens*`** sur `app_data` : un navigateur (`auth.role()` ou rôle
   courant) ne peut ni créer, ni réécrire, ni effacer, ni renommer une ligne de
   jeton eBay (`vrm_ebay_tokens_serveur`). Mesuré : seule la route serveur l'écrit (aucun
@@ -4328,26 +4380,60 @@ c'est la 015, sur son oui), **aucun DROP**, rien qui tourne : des tables vides e
   `ebay_tokens` (prouvé au banc sur l'avant).
 - **Preuves** : `scripts/audit-agent-sql.cjs` — la migration EXÉCUTÉE sur un
   Postgres jetable qui imite la production (`postgres` NON superutilisateur,
-  droits par défaut, 005-007 appliquées telles quelles,
-  `scripts/agent-sql/supabase-min.sql`) : **134 contrôles** ; **44 rouges sur 50**
-  sur l'arbre d'avant (§6.1 ; les 6 verts y sont des contrôles d'ABSENCE, vacants
-  sans tables — les mutations « droits par défaut » et « fonctions ouvertes » les
-  prouvent) ; `--prouve` : **27/27 mutations** au rouge (les six de
-  la spec — `skip locked`, version, bail, groupe en vol, écriture du navigateur,
-  ligne d'horloge — plus verrou consultatif, bail dans `prendre`, deux par
-  vendeur, clic qui vole, rendre sans jeton, réveil perdu, clé par vendeur,
-  mémos à 14 j, sans marge, rendue deux fois, réservation sans verrou (50
-  simultanées : 11 sur 10), quota sans seuil, titulaire libre, index volé,
-  preuve déplacée, journal réécrit, garde des jetons retirée ou aveugle au
-  jeton, abonnement ignoré, droits par défaut, fonctions ouvertes).
+  droits par défaut, 005-007 ET 013 appliquées telles quelles,
+  `scripts/agent-sql/supabase-min.sql`) : **193 contrôles**. Sur l'arbre de
+  59edcdd (l'audit copié dedans, lancé depuis lui, §6.1) : **48 rouges sur
+  172**. `--prouve` : **66/66 mutations** au rouge — les 27 d'avant et 39 pour la
+  revue du 11 octobre au soir (24 constats, deux relecteurs) : bail de commande
+  quelconque, création sous un autre compte, rang qui descend, sans FOR SHARE,
+  heure reçue, « at » reçu au journal, sans pierre tombale, quotas, coffre,
+  commandes, preuves ou index oubliés à l'effacement, vérification aveugle aux
+  déclencheurs, aux droits ou aux fonctions, forme ignorée, R18 (noms de clés,
+  data, codes, référence du journal), anonymisation du seul texte, raison
+  brute, « pas su » qui efface, réveil sous bail expiré, clic qui ignore le
+  compte en vol, fenêtre brute, quota sans vendeur, index sous l'ancien libellé
+  ou gardé à la libération, indexation sans être titulaire, ligne périmée
+  jamais reprise, journal ouvert par une variable, compteurs à 1 jour, mois en
+  cours purgé, purge de pg_cron sans filet, TRUNCATE au navigateur, INSERT et
+  TRUNCATE au serveur, garde des jetons aveugle au rôle courant.
+  ⚠️ Les relectures avaient trouvé **dix mutations VERTES** sur l'audit de
+  59edcdd (TRUNCATE et INSERT jamais essayés, 5 tables sur 12 vérifiées à
+  l'effacement, purge des compteurs et FOR SHARE jamais exercés…) et un contrôle
+  R18 vert sur une forme qui arrangeait (deux valeurs à espace) : un contrôle de
+  refus exige désormais le refus PAR LA CONTRAINTE — une erreur d'appel n'en est
+  pas un (vacant sinon sur le code d'avant, §6.3).
 - **Application (session principale)** : `node scripts/agent-sql/essai-annule.cjs >
-  essai.sql` (44 Ko, ROLLBACK, ne laisse rien — vérifié), puis la migration, puis
-  `--verifier` (lecture seule : `ok` et chaque corps de fonction comparé au
-  fichier par md5). Si l'outil SQL refuse le bloc : `--morceaux --dossier=…`
-  (trois transactions dans l'ordre, chaque objet né fermé — vérifié).
+  essai.sql` (~63 Ko, indentation et commentaires retirés, ROLLBACK, ne laisse
+  rien — vérifié), puis la migration, puis `--verifier` : lecture seule, `ok`
+  et `ecarts` ; elle regarde la forme de chaque table, RLS activé ET forcé, les
+  droits EXACTS d'anon, authenticated et service_role (dont TRUNCATE, et MAINTAIN
+  en Postgres 17), la séquence, les règles et leur texte, chaque fonction (une
+  seule version, SECURITY DEFINER et search_path du fichier, corps md5, qui
+  l'exécute), chaque déclencheur présent ET actif, l'horloge, le réglage, aucune
+  marque qui traîne, aucune horloge simulée posée sur la base ou un rôle. ⚠️ Celle
+  de 59edcdd rendait `ok = true` avec les gardes suspendues, une restrictive
+  retirée, une fonction en SECURITY INVOKER, FORCE RLS retiré, le coffre lisible
+  par le navigateur (reproduit) : l'audit en sert maintenant **19 dénaturations**
+  et exige `ok = false` et la bonne partie nommée. Si l'outil SQL refuse le bloc :
+  `--morceaux --dossier=…` (17,6 · 34 · 7,2 Ko, trois transactions dans l'ordre,
+  chaque objet né fermé — vérifié), puis `--verifier`.
+- **Mesuré en production le 11 octobre au soir** (lecture seule du catalogue) :
+  Postgres 17.6, 0 table et 0 fonction de l'agent, aucun réglage `vrm.*` posé sur
+  la base ou un rôle, ni `pg_cron` ni `pg_net`, déclencheurs d'`app_data` =
+  ceux du socle du banc (`vrm_garde_garage`, `vrm_garde_numeros`, `vrm_meta_maj`,
+  `vrm_noter_ecriture`).
 - **Non mesuré** : jamais appliquée sur sa vraie base ; que l'outil SQL accepte
-  44 Ko d'un bloc (la 013 à 92 Ko ne passait pas) ; la durée du verrou posé sur
-  `app_data` par les déclencheurs en production (`lock_timeout` 3 s).
+  ~63 Ko d'un bloc (la 013 à 92 Ko ne passait pas) ; la durée du verrou posé sur
+  `app_data` par les déclencheurs en production (`lock_timeout` 3 s). **Le banc
+  n'est pas la production** : Postgres 16 au banc contre 17.6 en production (le
+  droit MAINTAIN des droits par défaut mesurés n'existe pas en 16 ; `--verifier`
+  le contrôle en 17, sans l'avoir jamais vu tourner sur 17) ; la forme
+  normalisée du texte des règles (`pg_policies`) n'a été vue qu'en 16 — un écart
+  de mise en forme en 17 rendrait `ok = false` (le sens sûr : une alerte, jamais
+  un feu vert) ; la purge de `cron.job_run_details` n'a tourné que sur une table
+  À LA FORME de Supabase (droits de `postgres` supposés : pg_cron n'est pas
+  installé en production) ; les contraintes ne sont comparées que par leur NOM
+  (une définition changée sous le même nom ne se voit pas).
 - **Julien** : rien.
 
 ### Leboncoin et eBay rangés comme Vinted : résumé, puis Ventes / Achats / Annonces (3 octobre)
@@ -7362,7 +7448,7 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | outil | quoi |
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
-| `node scripts/audit-*.cjs` | **85 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `node scripts/audit-*.cjs` | **88 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
 | `scripts/bancs/*.cjs` | les **77 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
@@ -7655,7 +7741,7 @@ script-là me fait croire à une catastrophe.
 src/App.jsx                     l'app (grep avant de lire — le fichier est énorme)
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
-scripts/audit-*.cjs             les 85 audits
+scripts/audit-*.cjs             les 88 audits
 scripts/bancs/                  les 77 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt

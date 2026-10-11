@@ -10,23 +10,28 @@
 //  sur un Postgres JETABLE lancé par cet audit, qui imite la production (forme
 //  mesurée le 11 octobre, scripts/agent-sql/supabase-min.sql) : `postgres` n'y
 //  est PAS superutilisateur, les droits par défaut ouvrent toute table neuve à
-//  anon et authenticated, et les migrations 005, 006, 007 du dépôt y sont
-//  appliquées telles quelles. Aucune donnée réelle, aucune connexion à la vraie
-//  base. Les rôles sont joués comme PostgREST les joue (`set role` + les
-//  revendications du jeton dans `request.jwt.claims`).
+//  anon et authenticated, et les migrations 005, 006, 007 et 013 du dépôt y
+//  sont appliquées telles quelles. Aucune donnée réelle, aucune connexion à la
+//  vraie base. Les rôles sont joués comme PostgREST les joue (`set role` + les
+//  revendications du jeton dans `request.jwt.claims`). Le serveur joue sur
+//  HORLOGE SIMULÉE (`vrm.horloge_simulee = '1'`, comme le banc de vie de K5),
+//  sauf dans la section qui prouve que, sans elle, l'heure reçue ne compte pas.
 //
-//  Ce qu'il prouve (spec-finale §5.1-5.2, K3, synthèse §15.2-1) : deux
-//  battements ne prennent jamais la même tâche ni deux tâches d'un même compte
-//  eBay, y compris quand l'une est EN VOL dans un autre battement [S24, D15] ;
-//  un battement ne bloque pas derrière un autre ; le bail expiré se reprend ;
-//  une écriture de commande périmée (version, bail) rend 0 ligne ; le chemin
-//  « clic » refuse une tâche tenue [S15] ; une clé de geste GLOBALE appelée par
-//  deux vendeurs ne dit « première fois » qu'une fois [S5] ; un compte eBay
-//  n'a qu'un titulaire [S5] ; une réservation compte 115 % et 50 réservations
-//  simultanées ne dépassent jamais un plafond [S9] ; l'anti-rafale rend une
-//  ligne sur une horloge neuve [D14] ; le journal n'a qu'une réécriture
-//  possible [S26] ; un navigateur ne lit QUE ses lignes, n'écrit RIEN, et ne
-//  touche jamais `ebay_tokens*` ; qui ne paie plus ne voit plus rien.
+//  Ce qu'il prouve (spec-finale §5.1-5.2, K3, synthèse §15.2-1, et la revue du
+//  11 octobre au soir) : deux preneurs ne prennent jamais la même tâche ni deux
+//  tâches d'un même compte eBay — battements ET clics — ; un arriéré n'affame
+//  personne ; un battement ne bloque pas derrière un autre ; le bail expiré se
+//  reprend ; une écriture de commande hors du bail de CETTE commande, ou
+//  périmée, rend 0 ligne, et le rang ne descend jamais ; « pas su » ne détruit
+//  jamais une tâche ; une sonnette n'est jamais perdue ; une clé de geste
+//  GLOBALE ne dit « première fois » qu'une fois ; un compte eBay n'a qu'un
+//  titulaire et son index le suit ; une réservation compte 115 % et 50
+//  réservations simultanées ne dépassent jamais un plafond, que la purge ne
+//  rouvre pas ; l'heure reçue ne compte que sur horloge simulée ; « Fermer mon
+//  compte » efface TOUT et ferme la porte ; le journal n'a qu'une réécriture ;
+//  R18 tient sur ce qui a une forme ; un navigateur ne lit QUE ses lignes,
+//  n'écrit RIEN (TRUNCATE compris), ne touche jamais `ebay_tokens*` ; qui ne
+//  paie plus ne voit plus rien ; et `--verifier` voit chaque garde touchée.
 //
 //  ⚠️ S'il ne trouve pas Postgres, il le DIT et sort en 1 : un audit qui ne
 //     peut pas tourner n'est jamais vert par défaut.
@@ -37,25 +42,28 @@ const { spawnSync, spawn, execFileSync } = require('child_process');
 const RACINE = path.join(__dirname, '..');
 const MIG = path.join(RACINE, 'supabase/migrations/014-agent.sql');
 const MIN = path.join(__dirname, 'agent-sql/supabase-min.sql');
-const SOCLE = ['005-abonnements.sql', '006-acces-abonnement.sql', '007-droits-minimaux.sql']
+const OUTIL_SRC = path.join(__dirname, 'agent-sql/essai-annule.cjs');
+const SOCLE = ['005-abonnements.sql', '006-acces-abonnement.sql', '007-droits-minimaux.sql', '013-anciens-numeros-en-b.sql']
   .map((f) => path.join(RACINE, 'supabase/migrations', f));
 const J = '11111111-1111-1111-1111-111111111111';   // un vendeur (inventé)
 const V = '22222222-2222-2222-2222-222222222222';   // un autre vendeur (inventé)
 const N = '00000000-0000-0000-0000-000000000000';   // le propriétaire neutre
 const T0 = '2026-10-12T08:00:00Z';                  // l'heure simulée
 const t = (s) => `'${new Date(Date.parse(T0) + s * 1000).toISOString()}'::timestamptz`;
+const JOUR = 86400;
 
 const args = process.argv.slice(2);
 const MUTATION = (args.find((a) => a.startsWith('--mutation=')) || '').slice('--mutation='.length);
 const PROUVE = args.includes('--prouve');
 
 let ko = 0, ok = 0;
-const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '✅ ' : '❌ ') + m + (d ? ' — ' + d : '')); };
+const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '✅ ' : '❌ ') + m + (d ? ' — ' + String(d).replace(/\s*\n\s*/g, ' ') : '')); };
 const essaie = async (nom, f) => { try { return await f(); } catch (e) { dit(false, nom, 'a levé : ' + String(e && e.message || e).slice(0, 300)); return undefined; } };
 
 // ── LES MUTATIONS : chacune réaffaiblit UNE règle. `--prouve` exige que
 //    l'audit sorte en ROUGE pour chacune (« la fonction n'existait pas avant »
-//    n'est pas une preuve). ─────────────────────────────────────────────────
+//    n'est pas une preuve). `sql` change la migration, `apres` défait une garde
+//    après l'installation, `outil` change la vérification. ──────────────────
 const remplace = (s, avant, apres, nom) => {
   const n = s.split(avant).length - 1;
   if (n !== 1) throw new Error('mutation ' + nom + ' : ancre introuvable (' + n + ' occurrence(s))');
@@ -63,89 +71,184 @@ const remplace = (s, avant, apres, nom) => {
 };
 const MUTATIONS = {
   // ── les six de la spécification (K3) ──
-  // Un battement attend derrière un autre au lieu de sauter ses lignes.
   'skip-locked': { sql: (s) => remplace(s, '       for update of f skip locked;\n    continue when not found;', '       for update of f;\n    continue when not found;', 'skip-locked') },
-  // Une écriture de commande sur une version périmée passe.
-  'version': { sql: (s) => remplace(s, '     and c.version = p_version_lue\n', '', 'version') },
-  // Une écriture de commande sans le bail (mauvais jeton, bail expiré) passe.
-  'bail-ecrire': { sql: (s) => remplace(s, '     for share of f;\n  if not found then return null; end if;\n', '     for share of f;\n', 'bail-ecrire') },
-  // Une tâche d'un compte eBay en vol dans un AUTRE battement est reprise [S24, D15].
-  'groupe-en-vol': { sql: (s) => remplace(s, `    continue when exists (select 1 from public.vrm_agent_file g
+  // (la version est exigée DEUX fois, à la lecture verrouillée et à l'écriture : la mutation retire les deux)
+  'version': { sql: (s) => remplace(remplace(s, '     and c.version = p_version_lue\n     for update of c;', '     for update of c;', 'version'),
+    '     and c.version = p_version_lue\n  returning c.version into v;', '  returning c.version into v;', 'version') },
+  'bail-ecrire': { sql: (s) => remplace(s, "   where f.owner = p_owner and f.cle = k_cle and f.bail_jeton = p_jeton and f.bail_jusqua > maintenant\n     for share of f;\n  if not found then return null; end if;\n",
+    "   where f.owner = p_owner and f.cle = k_cle\n     for share of f;\n", 'bail-ecrire') },
+  'groupe-en-vol': { sql: (s) => remplace(remplace(s, `         and not exists (select 1 from public.vrm_agent_file g
+                          where g.owner = f.owner and g.groupe = f.groupe and g.bail_jusqua >= maintenant)
+`, '', 'groupe-en-vol'), `    continue when exists (select 1 from public.vrm_agent_file g
                            where g.owner = c.owner and g.groupe = c.groupe and g.cle <> c.cle
-                             and g.bail_jusqua >= p_maintenant);
+                             and g.bail_jusqua >= maintenant);
 `, '', 'groupe-en-vol') },
-  // Une règle d'écriture pour `authenticated` (le navigateur écrirait ses commandes).
   'ecriture-navigateur': { apres: `create policy ecrit_soi on public.vrm_agent_commandes for insert to authenticated with check (owner = (select auth.uid()));
 grant insert on public.vrm_agent_commandes to authenticated;` },
-  // La ligne d'horloge n'est pas insérée : chaque battement serait ignoré [D14].
   'horloge-absente': { sql: (s) => remplace(s, `insert into public.vrm_agent_horloge (id, dernier_tic, dernier_battement, dernier_succes)
 values (1, '-infinity', '-infinity', '-infinity')
 on conflict (id) do nothing;`, '', 'horloge-absente') },
   // ── les règles ajoutées par K3 ──
-  // Sans verrou consultatif, deux battements simultanés prennent deux tâches d'un même compte.
   'verrou-groupe': { sql: (s) => remplace(s, "    continue when not pg_catalog.pg_try_advisory_xact_lock(pg_catalog.hashtext('vrm_agent_groupe'), pg_catalog.hashtext(k));\n", '', 'verrou-groupe') },
-  // Un bail vivant ne protège plus la tâche dans `prendre`.
-  'bail-prendre': { sql: (s) => remplace(remplace(s, "       and coalesce(f.bail_jusqua, '-infinity'::timestamptz) < p_maintenant\n     order by", "     order by", 'bail-prendre'),
-    "       and coalesce(f.bail_jusqua, '-infinity'::timestamptz) < p_maintenant\n       for update of f skip locked;", "       for update of f skip locked;", 'bail-prendre') },
-  // Plus de « deux tâches par vendeur et par battement ».
-  'deux-par-vendeur': { sql: (s) => remplace(s, "    continue when coalesce((par_vendeur ->> c.owner::text)::integer, 0) >= 2;\n", '', 'deux-par-vendeur') },
-  // Le chemin « clic » vole une tâche tenue par un battement [S15].
+  // (le bail de la tâche elle-même est honoré à TROIS endroits — candidats, exclusion du groupe qui la compte,
+  //  revérification de la ligne : la mutation les retire tous les trois)
+  'bail-prendre': { sql: (s) => remplace(remplace(remplace(s, "         and coalesce(f.bail_jusqua, '-infinity'::timestamptz) < maintenant\n         and not exists", "         and not exists", 'bail-prendre'),
+    "                          where g.owner = f.owner and g.groupe = f.groupe and g.bail_jusqua >= maintenant)", "                          where g.owner = f.owner and g.groupe = f.groupe and g.cle <> f.cle and g.bail_jusqua >= maintenant)", 'bail-prendre'),
+    "       and coalesce(f.bail_jusqua, '-infinity'::timestamptz) < maintenant\n       for update of f skip locked;", "       for update of f skip locked;", 'bail-prendre') },
+  'deux-par-vendeur': { sql: (s) => remplace(remplace(s, "    continue when coalesce((par_vendeur ->> c.owner::text)::integer, 0) >= 2;\n", '', 'deux-par-vendeur'), '     where x.rang_vendeur <= 4\n', '', 'deux-par-vendeur') },
   'clic-vole': { sql: (s) => remplace(s, `   where f.owner = p_owner and f.cle = p_cle
-     and coalesce(f.bail_jusqua, '-infinity'::timestamptz) < p_maintenant;
+     and coalesce(f.bail_jusqua, '-infinity'::timestamptz) < maintenant;
   if found then return true; end if;`, `   where f.owner = p_owner and f.cle = p_cle;
   if found then return true; end if;`, 'clic-vole') },
-  // `rendre` libère une tâche sans regarder le jeton.
   'rendre-sans-jeton': { sql: (s) => remplace(s, `  select * into r from public.vrm_agent_file f
    where f.owner = p_owner and f.cle = p_cle and f.bail_jeton = p_jeton
      for update;`, `  select * into r from public.vrm_agent_file f
    where f.owner = p_owner and f.cle = p_cle
      for update;`, 'rendre-sans-jeton').split("   where f.owner = p_owner and f.cle = p_cle and f.bail_jeton = p_jeton;\n  return true;").join("   where f.owner = p_owner and f.cle = p_cle;\n  return true;") },
-  // Une sonnette arrivée pendant le bail est perdue au `rendre`.
-  'reveil-perdu': { sql: (s) => remplace(s, "prochain = least(coalesce(p_prochain, 'infinity'::timestamptz), coalesce(r.reveil, 'infinity'::timestamptz)),", "prochain = coalesce(p_prochain, r.reveil),", 'reveil-perdu') },
-  // Les clés de gestes qui engagent rangées PAR vendeur [S5].
+  'reveil-perdu': { sql: (s) => remplace(s, "else least(coalesce(p_prochain, maintenant + interval '15 minutes'), coalesce(r.reveil, 'infinity'::timestamptz)) end,", "else coalesce(p_prochain, maintenant + interval '15 minutes') end,", 'reveil-perdu') },
   'cle-par-vendeur': { sql: (s) => remplace(s, "  if p_cle ~ '^(achat|msg|eval|offre):' then o := '00000000-0000-0000-0000-000000000000'; end if;\n", '', 'cle-par-vendeur') },
-  // Les mémos de gestes purgés à 14 jours comme les notifications [S25].
-  'memos-14-jours': { sql: (s) => remplace(s, "  delete from public.vrm_agent_memos x where x.expire < p_maintenant;", "  delete from public.vrm_agent_memos x where x.expire < p_maintenant or x.at < p_maintenant - interval '14 days';", 'memos-14-jours') },
-  // La réservation au prix du devis, sans marge [S9].
+  'memos-14-jours': { sql: (s) => remplace(s, "  delete from public.vrm_agent_memos x where x.expire < maintenant;", "  delete from public.vrm_agent_memos x where x.expire < maintenant or x.at < maintenant - interval '14 days';", 'memos-14-jours') },
   'sans-marge': { sql: (s) => remplace(s, '  montant := (p_centimes_ttc::bigint * 115 + 99) / 100;', '  montant := p_centimes_ttc;', 'sans-marge') },
-  // Une réservation rendue deux fois.
   'rendue-deux-fois': { sql: (s) => remplace(s, `  delete from public.vrm_agent_compteurs x
    where x.owner = p_owner and x.cle like 'resa:' || p_reservation::text || '|%'
   returning x.cle, x.centimes into k, c;`, `  select x.cle, x.centimes into k, c from public.vrm_agent_compteurs x
    where x.owner = p_owner and x.cle like 'resa:' || p_reservation::text || '|%';`, 'rendue-deux-fois') },
-  // Les deux compteurs lus SANS verrou : des réservations simultanées dépassent le plafond.
   'reservation-sans-verrou': { sql: (s) => remplace(s, '  perform 1 from public.vrm_agent_compteurs k where k.owner = p_owner and k.cle in (cj, cm) order by k.cle for update;\n', '  perform pg_sleep(0.02);\n', 'reservation-sans-verrou') },
-  // Le confort mange tout le quota (plus de 20 % gardés aux obligations).
   'quota-sans-seuil': { sql: (s) => remplace(s, "when 'confort' then 0.6", "when 'confort' then 1.0", 'quota-sans-seuil') },
-  // Un second vendeur prend un compte eBay déjà relié [S5].
-  'titulaire-libre': { sql: (s) => remplace(s, `  on conflict (cle_ebay) do nothing
-  returning true into ok;`, `  on conflict (cle_ebay) do update set owner = excluded.owner
-  returning true into ok;`, 'titulaire-libre') },
-  // L'index route vers un autre vendeur une annonce qui n'est pas à lui.
-  'index-vole': { sql: (s) => remplace(s, `  on conflict (listing_id) do update set compte = excluded.compte, maj = excluded.maj
-   where i.owner = excluded.owner;`, `  on conflict (listing_id) do update set owner = excluded.owner, compte = excluded.compte, maj = excluded.maj;`, 'index-vole') },
-  // L'heure de la première preuve est déplacée par une relecture.
+  'titulaire-libre': { sql: (s) => remplace(s, `    on conflict (cle_ebay) do nothing
+    returning true into ok;`, `    on conflict (cle_ebay) do update set owner = excluded.owner
+    returning true into ok;`, 'titulaire-libre') },
+  'index-vole': { sql: (s) => remplace(s, `
+   where i.owner = excluded.owner
+      or not exists (select 1 from public.vrm_ebay_titulaires t where t.owner = i.owner and t.compte = i.compte);`, ';', 'index-vole') },
   'preuve-deplacee': { sql: (s) => remplace(s, `  on conflict (owner, numero_cle, source, ref) do nothing;`, `  on conflict (owner, numero_cle, source, ref) do update set vue_le = excluded.vue_le;`, 'preuve-deplacee') },
-  // Le journal réécrit librement.
   'journal-reecrit': { apres: 'alter table public.vrm_agent_journal disable trigger vrm_agent_journal_garde;' },
-  // La garde de `ebay_tokens` retirée.
   'ebay-tokens-libre': { apres: 'alter table public.app_data disable trigger vrm_garde_ebay_tokens_ajout; alter table public.app_data disable trigger vrm_garde_ebay_tokens_maj; alter table public.app_data disable trigger vrm_garde_ebay_tokens_retrait;' },
-  // La garde de `ebay_tokens` qui ne regarde que le rôle courant (pas le jeton).
   'ebay-tokens-role-seul': { sql: (s) => remplace(s, "  if coalesce(auth.role(), '') in ('authenticated', 'anon') or current_user in ('authenticated', 'anon') then", "  if current_user in ('authenticated', 'anon') then", 'ebay-tokens-role-seul') },
-  // Qui ne paie plus voit encore ses commandes.
   'abonnement-ignore': { sql: (s) => remplace(s, `    if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = t and policyname = 'abonnement_requis') then
       execute format('create policy abonnement_requis on public.%I as restrictive for all to authenticated '
                      'using ((select public.vrm_acces_ok())) with check ((select public.vrm_acces_ok()))', t);
     end if;
 `, '', 'abonnement-ignore') },
-  // Les droits par défaut laissés en place (toute table ouverte à anon et authenticated).
   'droits-par-defaut': { sql: (s) => remplace(s, "    execute format('revoke all on public.%I from public, anon, authenticated, service_role', t);\n", '', 'droits-par-defaut') },
-  // Les fonctions exécutables par le navigateur.
   'fonctions-ouvertes': { sql: (s) => remplace(s, "    execute format('revoke all on function %s from public, anon, authenticated', f);\n", '', 'fonctions-ouvertes') },
+  // ── la revue du 11 octobre au soir ──
+  // [1] La commande sous le bail de N'IMPORTE QUELLE tâche du vendeur.
+  'commande-bail-quelconque': { sql: (s) => remplace(s, '   where f.owner = p_owner and f.cle = k_cle and f.bail_jeton = p_jeton and f.bail_jusqua > maintenant\n',
+    '   where f.owner = p_owner and f.bail_jeton = p_jeton and f.bail_jusqua > maintenant\n', 'commande-bail-quelconque') },
+  // [1] Une création sous le bail d'un AUTRE compte eBay du vendeur.
+  'creation-autre-compte': { sql: (s) => remplace(s, '     where f.owner = p_owner and f.groupe = p_compte and f.bail_jeton = p_jeton and f.bail_jusqua > maintenant\n',
+    '     where f.owner = p_owner and f.bail_jeton = p_jeton and f.bail_jusqua > maintenant\n', 'creation-autre-compte') },
+  // [1] Le rang qui descend.
+  'rang-descend': { sql: (s) => remplace(s, '  if neuf.rang < ligne.rang then\n', '  if false then\n', 'rang-descend') },
+  // [R1-18] Le bail lu sans verrou pendant l'écriture : un preneur le reprend.
+  'sans-share': { sql: (s) => remplace(s, "   where f.owner = p_owner and f.cle = k_cle and f.bail_jeton = p_jeton and f.bail_jusqua > maintenant\n     for share of f;",
+    "   where f.owner = p_owner and f.cle = k_cle and f.bail_jeton = p_jeton and f.bail_jusqua > maintenant;", 'sans-share') },
+  // [2] L'heure de l'appelant crue sans horloge simulée.
+  'heure-recue': { sql: (s) => remplace(s, "  select case when pg_catalog.current_setting('vrm.horloge_simulee', true) = '1'\n              then coalesce(p, pg_catalog.now()) else pg_catalog.now() end",
+    '  select coalesce(p, pg_catalog.now())', 'heure-recue') },
+  // [R1-23] L'heure d'une ligne de journal prise dans l'entrée.
+  'noter-heure-recue': { sql: (s) => remplace(s, '  select p_owner, x.compte, maintenant, x.geste,', '  select p_owner, x.compte, coalesce(x.at, maintenant), x.geste,', 'noter-heure-recue') },
+  // [3] Pas de pierre tombale : un battement en vol réécrit au nom du vendeur effacé.
+  'sans-pierre-tombale': { sql: (s) => remplace(s, "  insert into public.vrm_agent_effaces (owner, le) values (p_owner, pg_catalog.now()) on conflict (owner) do nothing;\n", '', 'sans-pierre-tombale') },
+  // [3] Les quotas par compte qui le nomment, gardés.
+  'effacer-quotas': { sql: (s) => remplace(s, "   where x.owner = '00000000-0000-0000-0000-000000000000' and x.cle like '%|' || p_owner::text || '|%';", "   where false;", 'effacer-quotas') },
+  // [R1-16] Une table oubliée par « Fermer mon compte ».
+  'effacer-coffre': { sql: (s) => remplace(s, "  delete from public.vrm_coffre x where x.owner = p_owner;", "  delete from public.vrm_coffre x where false;", 'effacer-coffre') },
+  'effacer-commandes': { sql: (s) => remplace(s, "  delete from public.vrm_agent_commandes x where x.owner = p_owner;", "  delete from public.vrm_agent_commandes x where false;", 'effacer-commandes') },
+  'effacer-preuves': { sql: (s) => remplace(s, "  delete from public.vrm_agent_preuves x where x.owner = p_owner;", "  delete from public.vrm_agent_preuves x where false;", 'effacer-preuves') },
+  'effacer-index': { sql: (s) => remplace(s, "  delete from public.vrm_ebay_annonces_index x where x.owner = p_owner;", "  delete from public.vrm_ebay_annonces_index x where false;", 'effacer-index') },
+  // [4] La vérification aveugle aux déclencheurs suspendus, aux droits, à la forme.
+  'verifier-declencheurs': { outil: (s) => remplace(s, "where not tg.tgisinternal and tg.tgenabled = 'O'", 'where not tg.tgisinternal', 'verifier-declencheurs') },
+  'verifier-droits': { outil: (s) => remplace(s, "    droits: `(e.j -> 'droits')::jsonb = ${lit(JSON.stringify([...DROITS].sort()))}::jsonb`,\n", '', 'verifier-droits') },
+  'verifier-fonctions': { outil: (s) => remplace(s, "    fonctions: `(e.j -> 'fonctions')::jsonb = ${lit(JSON.stringify(FONCTIONS_ATTENDUES))}::jsonb`,\n", '', 'verifier-fonctions') },
+  // [4] Une table d'une forme ancienne réutilisée en silence.
+  'forme-ignoree': { sql: (s) => remplace(s, "    if v is distinct from a then\n      raise exception using errcode = 'P0001', message = 'vrm_agent_forme',", "    if false then\n      raise exception using errcode = 'P0001', message = 'vrm_agent_forme',", 'forme-ignoree') },
+  // [5] R18 : la forme ancienne des noms de clés, data sans garde, codes libres, anonymisation du seul texte, raison brute.
+  'r18-shipto': { sql: (s) => remplace(s, "    and array_to_string(cles_shipto, '|', '?') ~ '^((contactAddress[.]|primaryPhone[.])?(fullName|companyName|email|contactAddress|primaryPhone|addressLine1|addressLine2|city|stateOrProvince|postalCode|countryCode|county|phoneNumber)([|]|$))*$')));",
+    "    and array_to_string(cles_shipto, '|') ~ '^[A-Za-z][A-Za-z0-9_.]{0,63}(\\|[A-Za-z][A-Za-z0-9_.]{0,63})*$')));", 'r18-shipto') },
+  'r18-data': { sql: (s) => remplace(s, "  constraint vrm_agent_commandes_data check (jsonb_typeof(data) = 'object' and octet_length(data::text) <= 4096\n    and public.vrm_agent_sans_acheteur(data)),",
+    "  constraint vrm_agent_commandes_data check (jsonb_typeof(data) = 'object' and octet_length(data::text) <= 4096),", 'r18-data') },
+  'r18-codes': { sql: (s) => remplace(s, "    and (voie is null or voie ~ '^[a-z0-9_.:-]{1,64}$') and (transporteur is null or transporteur ~ '^[a-z0-9_.:-]{1,64}$')\n", '', 'r18-codes') },
+  'r18-journal': { sql: (s) => remplace(s, " and (ref is null or ref ~ '^[A-Za-z0-9_.:/#-]{1,120}$')),", '),', 'r18-journal') },
+  'anonymiser-texte-seul': { sql: (s) => remplace(s, '  update public.vrm_agent_journal j set texte = null, ref = null, defaire = null, texte_retire_le = maintenant', '  update public.vrm_agent_journal j set texte = null, texte_retire_le = maintenant', 'anonymiser-texte-seul') },
+  'raison-brute': { sql: (s) => remplace(s, "                       else 'raison-illisible' end", "                       else left(p_raison, 64) end", 'raison-brute') },
+  // [6] « Pas de prochaine fois » retire la tâche, même en échec.
+  'rendre-null-efface': { sql: (s) => remplace(s, "  fini boolean := coalesce(p_fini, false) and p_prochain is null and not coalesce(p_echec, false);", '  fini boolean := p_prochain is null;', 'rendre-null-efface') },
+  // [7] Une sonnette sous un bail EXPIRÉ pas encore repris est perdue.
+  'reveil-bail-vivant': { sql: (s) => remplace(s, '         reveil = case when f.bail_jeton is not null\n', '         reveil = case when f.bail_jeton is not null and f.bail_jusqua >= p_maintenant\n', 'reveil-bail-vivant') },
+  // [8] Le clic ignore le compte eBay déjà en vol.
+  'clic-sans-groupe': { sql: (s) => remplace(s, `  if exists (select 1 from public.vrm_agent_file f
+              where f.owner = p_owner and f.groupe = grp and f.cle <> p_cle and f.bail_jusqua >= maintenant) then
+    return false;
+  end if;
+`, '', 'clic-sans-groupe') },
+  // [9] La fenêtre brute triée par échéance (un arriéré affame les autres).
+  'fenetre-brute': { sql: (s) => remplace(s, `    with dues as (
+      select f.owner, f.cle, f.groupe, f.prochain
+        from public.vrm_agent_file f
+       where f.prochain <= maintenant
+         and coalesce(f.bail_jusqua, '-infinity'::timestamptz) < maintenant
+         and not exists (select 1 from public.vrm_agent_file g
+                          where g.owner = f.owner and g.groupe = f.groupe and g.bail_jusqua >= maintenant)
+    ), une_par_groupe as (
+      select distinct on (d.owner, d.groupe) d.owner, d.cle, d.groupe, d.prochain
+        from dues d
+       order by d.owner, d.groupe, d.prochain, d.cle
+    ), classees as (
+      select u.owner, u.cle, u.groupe, u.prochain,
+             row_number() over (partition by u.owner order by u.prochain, u.cle) as rang_vendeur
+        from une_par_groupe u
+    )
+    select x.owner, x.cle, x.groupe
+      from classees x
+     where x.rang_vendeur <= 4
+     order by x.prochain, x.owner, x.cle
+     limit least(p_lim, 100) * 4`, `    select f.owner, f.cle, f.groupe
+      from public.vrm_agent_file f
+     where f.prochain <= maintenant
+       and coalesce(f.bail_jusqua, '-infinity'::timestamptz) < maintenant
+     order by f.prochain, f.owner, f.cle
+     limit least(p_lim, 100) * 25`, 'fenetre-brute') },
+  // [10] Quota : un vendeur inconnu passe hors obligation.
+  'quota-owner-null': { sql: (s) => remplace(s, "  if p_priorite <> 'obligation' and p_owner is null then return false; end if;\n", '', 'quota-owner-null').split("  if p_priorite <> 'obligation' then\n    cc :=").join("  if p_priorite <> 'obligation' and p_owner is not null then\n    cc :=") },
+  // [11] L'index reste sous l'ancien libellé ; libérer le garde ; indexer sans être titulaire ; une ligne périmée jamais reprise.
+  'titulaire-index-reste': { sql: (s) => remplace(s, '    update public.vrm_ebay_annonces_index i set compte = p_compte where i.owner = p_owner and i.compte = ancien;\n', '', 'titulaire-index-reste') },
+  'liberer-garde-index': { sql: (s) => remplace(s, '  delete from public.vrm_ebay_annonces_index i where i.owner = p_owner and i.compte = c;\n', '', 'liberer-garde-index') },
+  'index-sans-titulaire': { sql: (s) => remplace(s, `  if not exists (select 1 from public.vrm_ebay_titulaires t where t.owner = p_owner and t.compte = p_compte) then
+    return jsonb_build_object('indexees', 0, 'retirees', 0, 'refusees', n_brut, 'raison', 'pas-titulaire');
+  end if;
+`, '', 'index-sans-titulaire') },
+  'index-perime-garde': { sql: (s) => remplace(s, `   where i.owner = excluded.owner
+      or not exists (select 1 from public.vrm_ebay_titulaires t where t.owner = i.owner and t.compte = i.compte);`, '   where i.owner = excluded.owner;', 'index-perime-garde') },
+  // [12] La garde du journal ouverte par une variable de session.
+  'journal-variable': { sql: (s) => remplace(s, `    if exists (select 1 from public.vrm_agent_marques m
+                where m.xid = pg_catalog.txid_current() and m.quoi = 'purger' and old.at < m.avant) then
+      return old;
+    end if;`, `    if coalesce(current_setting('vrm.agent_purger_avant', true), '') <> '' and old.at < current_setting('vrm.agent_purger_avant', true)::timestamptz then
+      return old;
+    end if;`, 'journal-variable') },
+  // [R1-17] La durée de vie des compteurs, et la garde du mois en cours.
+  'compteurs-1-jour': { sql: (s) => remplace(s, "   where x.maj < maintenant - interval '400 days'", "   where x.maj < maintenant - interval '1 day'", 'compteurs-1-jour') },
+  'compteurs-mois-courant': { sql: (s) => remplace(s, "     and x.cle !~ ('(' || mois_gardes || ')');", '     and true;', 'compteurs-mois-courant') },
+  // [25] La purge de l'historique de pg_cron sans filet : un droit qui manque fait échouer toute la purge.
+  'cron-sans-filet': { sql: (s) => remplace(s, `    begin
+      execute 'delete from cron.job_run_details where end_time < $1' using maintenant - interval '7 days';
+      get diagnostics n = row_count; r := r || jsonb_build_object('cron', n);
+    exception when others then
+      r := r || jsonb_build_object('cron', null);
+    end;`, `    execute 'delete from cron.job_run_details where end_time < $1' using maintenant - interval '7 days';
+    get diagnostics n = row_count; r := r || jsonb_build_object('cron', n);`, 'cron-sans-filet') },
+  // [R1-13] Des droits de plus : TRUNCATE au navigateur, écriture et TRUNCATE au serveur.
+  'truncate-nav': { apres: 'grant truncate on public.vrm_agent_commandes, public.vrm_agent_file, public.vrm_agent_journal to authenticated;' },
+  'insert-serveur': { apres: 'grant insert on public.vrm_agent_journal, public.vrm_agent_memos, public.vrm_agent_file to service_role;' },
+  'truncate-serveur': { apres: 'grant truncate on public.vrm_agent_commandes, public.vrm_agent_file, public.vrm_agent_memos to service_role;' },
+  // [R1-23] La garde des jetons qui ne regarde que le jeton (pas le rôle courant).
+  'garde-tokens-sans-role-courant': { sql: (s) => remplace(s, "  if coalesce(auth.role(), '') in ('authenticated', 'anon') or current_user in ('authenticated', 'anon') then", "  if coalesce(auth.role(), '') in ('authenticated', 'anon') then", 'garde-tokens-sans-role-courant') },
 };
 
 if (PROUVE) {
-  // Trois mutations à la fois (chacune a SON Postgres jetable), le bilan dans l'ordre.
+  // Quatre mutations à la fois (chacune a SON Postgres jetable), le bilan dans l'ordre.
   const noms = Object.keys(MUTATIONS);
   const une = (nom) => new Promise((fin) => {
     const p = spawn(process.execPath, [__filename, '--mutation=' + nom]);
@@ -155,7 +258,7 @@ if (PROUVE) {
   });
   (async () => {
     const res = {}; let i = 0;
-    await Promise.all(Array.from({ length: 3 }, async () => { while (i < noms.length) { const nom = noms[i++]; res[nom] = await une(nom); } }));
+    await Promise.all(Array.from({ length: 4 }, async () => { while (i < noms.length) { const nom = noms[i++]; res[nom] = await une(nom); } }));
     let rouges = 0;
     for (const nom of noms) {
       const r = res[nom];
@@ -227,33 +330,49 @@ const runAsync = (sql, o = {}) => new Promise((ok) => {
   p.stdin.end(sql);
 });
 const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
-// Les rôles, joués comme PostgREST les joue.
+// Les rôles, joués comme PostgREST les joue. Le serveur tourne sur HORLOGE
+// SIMULÉE (le banc de vie de K5 fera de même) ; `serveurReel` sans elle.
 const COMME = {
-  serveur: `set role service_role; set "request.jwt.claims" = '{"role":"service_role"}';\n`,
+  serveur: `set role service_role; set "request.jwt.claims" = '{"role":"service_role"}'; set vrm.horloge_simulee = '1';\n`,
+  serveurReel: `set role service_role; set "request.jwt.claims" = '{"role":"service_role"}';\n`,
   vendeur: (u) => `set role authenticated; set "request.jwt.claims" = '{"sub":"${u}","role":"authenticated"}';\n`,
   anon: `set role anon; set "request.jwt.claims" = '{"role":"anon"}';\n`,
 };
 let DB = 'gabarit';
 const Q = (sql, o = {}) => { const r = run(sql, { db: DB, ...o }); if (!r.ok) throw new Error(r.err.slice(0, 400)); return r.out; };
 const QJ = (sql, o) => JSON.parse(Q(sql, o) || 'null');
-const S = (sql) => Q(COMME.serveur + sql);              // le serveur (clé de service)
+const S = (sql) => Q(COMME.serveur + sql);              // le serveur (clé de service), horloge simulée
+const SR = (sql) => Q(COMME.serveurReel + sql);         // le serveur, à l'heure réelle
+const A = (sql) => Q(sql, { role: 'supabase_admin' });  // le banc (superutilisateur)
 const refuse = (r, motif) => !r.ok && motif.test(r.err);
-const fraiche = (nom) => { Q(`drop database if exists ${nom}`, { db: 'postgres', role: 'supabase_admin' }); Q(`create database ${nom} template gabarit owner postgres`, { db: 'postgres', role: 'supabase_admin' }); DB = nom; };
+const fraiche = (nom, modele = 'gabarit') => { Q(`drop database if exists ${nom}`, { db: 'postgres', role: 'supabase_admin' }); Q(`create database ${nom} template ${modele} owner postgres`, { db: 'postgres', role: 'supabase_admin' }); DB = nom; };
 // Une tâche à la main (le banc seulement : le superutilisateur passe outre les droits).
-const tache = (owner, cle, groupe, prochainS = -60, bail = null) => Q(
-  `insert into public.vrm_agent_file (owner, cle, groupe, prochain, bail_jeton, bail_jusqua) values ('${owner}', '${cle}', '${groupe}', ${t(prochainS)}, ${bail ? `'${bail.jeton}'` : 'null'}, ${bail ? t(bail.jusqua) : 'null'})`,
-  { role: 'supabase_admin' });
+const tache = (owner, cle, groupe, prochainS = -60, bail = null) => A(
+  `insert into public.vrm_agent_file (owner, cle, groupe, prochain, bail_jeton, bail_jusqua) values ('${owner}', '${cle}', '${groupe}', ${t(prochainS)}, ${bail ? `'${bail.jeton}'` : 'null'}, ${bail ? t(bail.jusqua) : 'null'})`);
 const prendre = (lim, jeton, s = 0, bail = 120) => QJ(COMME.serveur + `select coalesce(json_agg(x order by x.owner, x.cle), '[]') from public.vrm_agent_prendre(${lim}, '${jeton}', ${bail}, ${t(s)}) x;`);
 const uuid = (i) => `aaaaaaaa-0000-4000-8000-${String(i).padStart(12, '0')}`;
 const groupesDe = (l) => l.map((x) => x.owner + '|' + x.groupe);
+const js = (o) => `'${JSON.stringify(o).replace(/'/g, "''")}'`;
+const ecrire = (o, jeton, compte, cmd, version, cols, s = 1) => run(COMME.serveur + `select public.vrm_agent_ecrire_commande('${o}', '${jeton}', '${compte}', '${cmd}', ${version === null ? 'null' : version}, ${js(cols)}, 'ebay', ${t(s)});`, { db: DB });
+const ecrit = (o, jeton, compte, cmd, version, cols, s = 1) => { const r = ecrire(o, jeton, compte, cmd, version, cols, s); if (!r.ok) throw new Error(r.err.slice(0, 300)); return r.out; };
+
+// La vérification : l'outil (ou sa mutation) écrit le SQL, on le lance.
+let OUTIL = OUTIL_SRC;
+const verifier = (FMIG, db) => {
+  const ver = spawnSync(process.execPath, [OUTIL, '--verifier', '--migration=' + FMIG], { encoding: 'utf8' });
+  if (ver.status !== 0) throw new Error('verifier : ' + ver.stderr.slice(0, 200));
+  const r = run(ver.stdout, { db });
+  if (!r.ok) throw new Error('verifier (SQL) : ' + r.err.slice(0, 200));
+  return JSON.parse(r.out.split('\n').filter(Boolean).pop());
+};
 
 // ════════════════════════════════════════════════════════════════════════════
 (async () => {
   console.log(`(Postgres jetable dans ${DIR}${MUTATION ? ' · MUTATION « ' + MUTATION + ' »' : ''})\n`);
 
-  // ── LE SOCLE : la forme de la production, puis 005-007 TELLES QUELLES ──────
+  // ── LE SOCLE : la forme de la production, puis 005-007 et 013 TELLES QUELLES ──
   let SQL = null;
-  await essaie('préparer le socle (rôles, droits par défaut, 005-007)', () => {
+  await essaie('préparer le socle (rôles, droits par défaut, 005-007, 013)', () => {
     let r = run(`do $$ begin if not exists (select 1 from pg_roles where rolname = 'postgres') then create role postgres login nosuperuser bypassrls inherit; end if; end $$;\ncreate database socle owner postgres;`, { role: 'supabase_admin' });
     if (!r.ok) throw new Error('rôle/base : ' + r.err);
     r = run(fs.readFileSync(MIN, 'utf8'), { role: 'supabase_admin', db: 'socle' });
@@ -262,6 +381,7 @@ const groupesDe = (l) => l.map((x) => x.owner + '|' + x.groupe);
     r = run('create database gabarit template socle owner postgres;', { role: 'supabase_admin' });
     if (!r.ok) throw new Error('gabarit : ' + r.err);
     dit(Q("select rolsuper from pg_roles where rolname = 'postgres'") === 'f', 'le socle imite la production : `postgres` n\'est PAS superutilisateur (la migration tourne avec ses vrais droits)');
+    dit(Q("select count(*) from pg_trigger where tgrelid = 'public.app_data'::regclass and tgname in ('vrm_garde_numeros', 'vrm_garde_garage')") === '2', 'les gardes de la 013 sont sur app_data, comme en production (la 014 s\'y ajoute)');
   });
 
   console.log('\n1. L\'INSTALLATION');
@@ -269,8 +389,11 @@ const groupesDe = (l) => l.map((x) => x.owner + '|' + x.groupe);
   const m = MUTATION ? MUTATIONS[MUTATION] : null;
   if (MUTATION && !m) { console.log('❌ mutation inconnue : ' + MUTATION); process.exit(1); }
   if (SQL && m && m.sql) SQL = m.sql(SQL);   // une ancre introuvable lève ici : « ancre introuvable », jamais vert
+  if (m && m.outil) { OUTIL = path.join(DIR, 'essai-annule.cjs'); fs.writeFileSync(OUTIL, m.outil(fs.readFileSync(OUTIL_SRC, 'utf8'))); }
+  const FMIG = path.join(DIR, 'migration.sql');
   await essaie('appliquer la migration', () => {
     if (!SQL) throw new Error('migration absente');
+    fs.writeFileSync(FMIG, SQL);
     const r = run(SQL, { db: 'gabarit' });
     dit(r.ok, 'la migration s\'applique, en tant que `postgres` (non superutilisateur), en une transaction', r.ok ? '' : r.err.slice(0, 300));
     const r2 = run(SQL, { db: 'gabarit' });
@@ -285,51 +408,94 @@ const groupesDe = (l) => l.map((x) => x.owner + '|' + x.groupe);
     dit(Q("select valeur from public.vrm_reglages where cle = 'agent_ebay'") === '0', 'vrm_reglages.agent_ebay vaut \'0\' (rien ne tourne)');
     const h = Q("select id || '|' || dernier_tic || '|' || dernier_battement || '|' || dernier_succes from public.vrm_agent_horloge");
     dit(h === '1|-infinity|-infinity|-infinity', 'la ligne d\'horloge existe, à « -infinity » partout [D14]', h || '(aucune ligne)');
-    Q("update public.vrm_reglages set valeur = 'proprietaire' where cle = 'agent_ebay'", { role: 'supabase_admin' });
+    A("update public.vrm_reglages set valeur = 'proprietaire' where cle = 'agent_ebay'");
     const r = run(SQL, { db: 'gabarit' });
     dit(r.ok && Q("select valeur from public.vrm_reglages where cle = 'agent_ebay'") === 'proprietaire', 'un réglage déjà posé n\'est jamais écrasé par une réinstallation');
-    Q("update public.vrm_reglages set valeur = '0' where cle = 'agent_ebay'", { role: 'supabase_admin' });
+    A("update public.vrm_reglages set valeur = '0' where cle = 'agent_ebay'");
+  });
+  await essaie('une table d\'une forme ANCIENNE n\'est jamais réutilisée en silence', () => {
+    if (!SQL) throw new Error('migration absente');
+    fraiche('ancienne', 'socle');
+    // La file d'une version plus ancienne (sans `reveil`), comme le rapporte la revue.
+    Q(`create table public.vrm_agent_file (owner uuid not null, cle text not null, groupe text not null, prochain timestamptz not null,
+         bail_jeton uuid, bail_jusqua timestamptz, essais integer not null default 0, raison text, primary key (owner, cle));`);
+    const r = run(SQL, { db: 'ancienne' });
+    dit(refuse(r, /vrm_agent_forme/) && /vrm_agent_file/.test(r.err), 'la migration REFUSE de s\'installer sur une table d\'une autre forme, et la nomme (« vrm_agent_forme »)', r.ok ? 'installée' : r.err.slice(0, 160));
+    dit(Q("select count(*) from pg_class where relname in ('vrm_agent_journal', 'vrm_agent_commandes')") === '0' && Q("select count(*) from pg_proc where proname like 'vrm\\_agent\\_%'") === '0',
+      'et elle n\'a RIEN installé (une transaction)');
+    DB = 'gabarit';
   });
   // La mutation posée APRÈS l'installation (une réinstallation la défait : `create or replace trigger`).
   if (m && m.apres) await essaie('poser la mutation', () => Q(m.apres));
-  await essaie('l\'essai annulé (la méthode de la 013) puis la vérification', () => {
+  await essaie('l\'essai annulé (la méthode de la 013), la vérification, les morceaux', () => {
     if (!SQL) throw new Error('migration absente');
-    const FMIG = path.join(DIR, 'migration.sql'); fs.writeFileSync(FMIG, SQL);
-    const OUTIL = path.join(__dirname, 'agent-sql/essai-annule.cjs');
     const essai = spawnSync(process.execPath, [OUTIL, '--migration=' + FMIG], { encoding: 'utf8' });
     if (essai.status !== 0) throw new Error('essai-annule : ' + essai.stderr.slice(0, 200));
-    dit(Buffer.byteLength(essai.stdout) < 46000, `l'essai fait moins de la moitié des 92 Ko que l'outil SQL a refusés d'un bloc pour la 013 (${Buffer.byteLength(essai.stdout)} octets, commentaires hors corps retirés ; NON mesuré que l'outil l'accepte — sinon, les morceaux)`);
+    dit(Buffer.byteLength(essai.stdout) < 92000, `l'essai tient sous les 92 Ko que l'outil SQL a refusés d'un bloc pour la 013 (${Buffer.byteLength(essai.stdout)} octets, indentation et commentaires retirés ; NON mesuré que l'outil l'accepte — sinon, les morceaux)`);
     Q('create database essai template socle owner postgres;', { db: 'postgres', role: 'supabase_admin' });
     const r = run(essai.stdout, { db: 'essai' });
     const j = r.ok ? JSON.parse(r.out.split('\n').filter(Boolean).pop()) : null;
-    dit(!!j && j.tables === 14 && j.agent_ebay === '0' && Array.isArray(j.horloge) && j.horloge.length === 1 && j.navigateur_ecrit === null && j.fonctions_ouvertes === null,
-      'l\'essai installe tout et rend son rapport (14 tables, horloge, réglage, aucun droit de navigateur)', r.ok ? JSON.stringify(j).slice(0, 240) : r.err.slice(0, 200));
+    dit(!!j && j.tables === 16 && j.rls_force === 16 && j.agent_ebay === '0' && j.horloge === 1 && j.marques === 0 && j.navigateur_ecrit === null && j.fonctions_ouvertes === null,
+      'l\'essai installe tout et rend son rapport (16 tables à RLS forcé, horloge, réglage, aucun droit de navigateur)', r.ok ? JSON.stringify(j).slice(0, 240) : r.err.slice(0, 200));
     const reste = run(`select (select count(*) from pg_class where relname like 'vrm\\_agent\\_%' or relname like 'vrm\\_ebay\\_%' or relname = 'vrm_coffre') || '|' || (select count(*) from pg_trigger where tgname like 'vrm\\_garde\\_ebay%') || '|' || (select count(*) from public.vrm_reglages where cle = 'agent_ebay') || '|' || (select count(*) from pg_proc where proname like 'vrm\\_agent\\_%')`, { db: 'essai' });
     dit(reste.ok && reste.out === '0|0|0|0', 'l\'essai ne laisse RIEN derrière lui (ROLLBACK)', reste.ok ? reste.out : reste.err.slice(0, 160));
-    const ver = spawnSync(process.execPath, [OUTIL, '--verifier', '--migration=' + FMIG], { encoding: 'utf8' });
-    const rv = run(ver.stdout, { db: 'gabarit' });
-    const v = rv.ok ? JSON.parse(rv.out.split('\n').filter(Boolean).pop()) : null;
-    dit(!!v && v.ok === true, 'la vérification (lecture seule) rend ok sur la base installée : chaque corps de fonction est celui du fichier (md5)', rv.ok ? JSON.stringify(v && (v.ok ? v.corps_differents : v)).slice(0, 300) : rv.err.slice(0, 200));
+    const v = verifier(FMIG, 'gabarit');
+    dit(v.ok === true, 'la vérification (lecture seule) rend ok sur la base installée : forme, RLS forcé, droits exacts, règles, fonctions (md5, SECURITY DEFINER, une seule version), déclencheurs actifs', JSON.stringify(v.ok ? v.ecarts : { e: v.ecarts, f: v.fonctions_differentes, fo: v.formes_differentes, d: v.declencheurs_absents, dr: v.etat && v.etat.droits }).slice(0, 400));
     // Le repli si l'outil SQL refuse le bloc entier : trois transactions, chaque objet né FERMÉ.
     const DM = path.join(DIR, 'morceaux');
     const mo = spawnSync(process.execPath, [OUTIL, '--morceaux', '--dossier=' + DM, '--migration=' + FMIG], { encoding: 'utf8' });
     if (mo.status !== 0) throw new Error('morceaux : ' + mo.stderr.slice(0, 200));
     Q('create database morceaux template socle owner postgres;', { db: 'postgres', role: 'supabase_admin' });
-    const ouverts = [];
+    const ouverts = [], tailles = [];
+    const verMorceaux = spawnSync(process.execPath, [OUTIL, '--verifier', '--migration=' + FMIG], { encoding: 'utf8' }).stdout;
     for (let i = 1; i <= 3; i++) {
       const f = fs.readFileSync(path.join(DM, `014-morceau-${i}.sql`), 'utf8');
+      tailles.push(Buffer.byteLength(f));
       const a = run(f, { db: 'morceaux' }), b = run(f, { db: 'morceaux' });
       if (!a.ok || !b.ok) { ouverts.push(`morceau ${i} : ${(a.err || b.err).slice(0, 120)}`); continue; }
-      const e = run(ver.stdout, { db: 'morceaux' });
+      const e = run(verMorceaux, { db: 'morceaux' });
       const je = e.ok ? JSON.parse(e.out.split('\n').filter(Boolean).pop()) : null;
       if (!je || je.etat.navigateur_ecrit !== null || je.etat.fonctions_ouvertes !== null) ouverts.push(`après le morceau ${i} : ${e.ok ? JSON.stringify({ n: je.etat.navigateur_ecrit, f: je.etat.fonctions_ouvertes }) : e.err.slice(0, 120)}`);
-      if (i === 3) dit(!!je && je.ok === true, 'appliquée en trois morceaux, la vérification rend ok', je ? JSON.stringify(je.corps_differents) : '');
+      if (i === 3) dit(!!je && je.ok === true, 'appliquée en trois morceaux, la vérification rend ok', je ? JSON.stringify(je.ecarts) : '');
     }
     dit(ouverts.length === 0, 'en morceaux, aucun objet n\'est jamais ouvert au navigateur entre deux transactions, et chaque morceau se réapplique sans lever', ouverts.join(' · ').slice(0, 300));
+    dit(tailles.length === 3 && tailles.every((x) => x < 46000), `chaque morceau fait moins de 46 Ko (${tailles.join(' · ')} octets)`);
+  });
+  await essaie('la vérification voit CHAQUE garde touchée [revue : « ok » sur une installation dénaturée]', () => {
+    const cas = [
+      ['la garde des jetons suspendue (le retour arrière documenté)', 'alter table public.app_data disable trigger vrm_garde_ebay_tokens_maj;', 'declencheurs'],
+      ['la garde du journal suspendue', 'alter table public.vrm_agent_journal disable trigger vrm_agent_journal_garde;', 'declencheurs'],
+      ['la pierre tombale suspendue sur le coffre', 'alter table public.vrm_coffre disable trigger vrm_agent_pierre_tombale;', 'declencheurs'],
+      ['la trace des écritures suspendue', 'alter table public.vrm_agent_commandes disable trigger vrm_noter_ecriture;', 'declencheurs'],
+      ['abonnement_requis retirée des commandes', 'drop policy abonnement_requis on public.vrm_agent_commandes;', 'regles'],
+      ['la lecture de soi élargie à tous', 'alter policy agent_lecture_soi on public.vrm_agent_journal using (true);', 'regles'],
+      ['reserver passée en SECURITY INVOKER', 'alter function public.vrm_agent_reserver(uuid, text, integer, integer, integer, integer, integer, timestamptz) security invoker;', 'fonctions'],
+      ['prendre sans search_path figé', 'alter function public.vrm_agent_prendre(integer, uuid, integer, timestamptz) reset search_path;', 'fonctions'],
+      ['une seconde version de noter', 'create function public.vrm_agent_noter(p uuid) returns bigint language sql as $$ select 1::bigint $$;', 'fonctions'],
+      ['l\'aide « heure » exécutable par le serveur', 'grant execute on function public.vrm_agent_heure(timestamptz) to service_role;', 'fonctions'],
+      ['la file sans FORCE RLS', 'alter table public.vrm_agent_file no force row level security;', 'rls'],
+      ['le coffre lisible par un navigateur', 'grant select on public.vrm_coffre to authenticated;', 'droits'],
+      ['le journal écrit directement par le serveur', 'grant insert on public.vrm_agent_journal to service_role;', 'droits'],
+      ['les commandes vidées par un navigateur (TRUNCATE)', 'grant truncate on public.vrm_agent_commandes to authenticated;', 'droits'],
+      ['la séquence du journal au serveur', 'grant usage on sequence public.vrm_agent_journal_id_seq to service_role;', 'sequence'],
+      ['une colonne de plus dans la file', 'alter table public.vrm_agent_file add column z integer;', 'formes'],
+      ['les codes R18 retirés des commandes', 'alter table public.vrm_agent_commandes drop constraint vrm_agent_commandes_codes;', 'formes'],
+      ['une marque de transaction laissée', "insert into public.vrm_agent_marques (xid, quoi, avant) values (1, 'purger', 'infinity');", 'marques'],
+      ['l\'horloge simulée posée sur la base', 'alter database {db} set vrm.horloge_simulee = \'1\';', 'simulee'],
+    ];
+    const vus = [];
+    cas.forEach(([nom, sql, partie], i) => {
+      fraiche('denat' + i);
+      Q(sql.replace('{db}', DB), { role: 'supabase_admin' });
+      const v = verifier(FMIG, DB);
+      if (v.ok !== false || !(v.ecarts || []).includes(partie)) vus.push(`${nom} → ok=${v.ok} ${JSON.stringify(v.ecarts)}`);
+    });
+    dit(vus.length === 0, `la vérification rend ok = false, en nommant ce qui diffère, pour chacune des ${cas.length} dénaturations (déclencheurs suspendus, règles, fonctions, RLS, droits, séquence, forme, marque, horloge simulée)`, vus.join(' · ').slice(0, 500));
+    DB = 'gabarit';
   });
   const TABLES = ['vrm_agent_vendeurs', 'vrm_agent_commandes', 'vrm_agent_journal', 'vrm_agent_file', 'vrm_agent_compteurs', 'vrm_agent_vus',
     'vrm_agent_memos', 'vrm_agent_routes', 'vrm_agent_horloge', 'vrm_ebay_cles_publiques', 'vrm_coffre', 'vrm_ebay_titulaires',
-    'vrm_ebay_annonces_index', 'vrm_agent_preuves'];
+    'vrm_ebay_annonces_index', 'vrm_agent_preuves', 'vrm_agent_effaces', 'vrm_agent_marques'];
   const LISIBLES = ['vrm_agent_vendeurs', 'vrm_agent_commandes', 'vrm_agent_journal'];
   const SERVEUR = TABLES.filter((x) => !LISIBLES.includes(x));
   const FONCTIONS = ['vrm_agent_prendre', 'vrm_agent_prendre_cle', 'vrm_agent_rendre', 'vrm_agent_planifier', 'vrm_agent_ecrire_commande',
@@ -338,26 +504,29 @@ const groupesDe = (l) => l.map((x) => x.owner + '|' + x.groupe);
     'vrm_agent_titulaire', 'vrm_agent_titulaire_liberer', 'vrm_ebay_indexer_annonces', 'vrm_agent_preuve_vue', 'vrm_agent_effacer_vendeur',
     'vrm_agent_purger'];
   await essaie('le catalogue', () => {
-    const rls = Q(`select string_agg(relname, ',' order by relname) from pg_class where relnamespace = 'public'::regnamespace and relname = any(array[${TABLES.map((x) => `'${x}'`).join(',')}]) and relrowsecurity`);
-    dit(rls.split(',').filter(Boolean).length === TABLES.length, `RLS activé sur les ${TABLES.length} tables de l'agent`, rls);
+    const rls = Q(`select string_agg(relname, ',' order by relname) from pg_class where relnamespace = 'public'::regnamespace and relname = any(array[${TABLES.map((x) => `'${x}'`).join(',')}]) and relrowsecurity and relforcerowsecurity`);
+    dit(rls.split(',').filter(Boolean).length === TABLES.length, `RLS activé ET forcé sur les ${TABLES.length} tables de l'agent`, rls);
     const pol = Q(`select coalesce(string_agg(tablename || ':' || policyname || ':' || permissive || ':' || cmd, ' ' order by tablename, policyname), '') from pg_policies where schemaname = 'public' and tablename = any(array[${TABLES.map((x) => `'${x}'`).join(',')}])`);
     const attendu = LISIBLES.slice().sort().map((x) => `${x}:abonnement_requis:RESTRICTIVE:ALL ${x}:agent_lecture_soi:PERMISSIVE:SELECT`).join(' ');
     dit(pol === attendu, 'les tables lisibles n\'ont QUE la lecture de soi et la restrictive abonnement_requis ; les tables du serveur n\'ont AUCUNE règle', pol.slice(0, 300));
     const f = QJ(`select json_agg(json_build_object('n', p.proname, 'def', p.prosecdef, 'cfg', p.proconfig, 'acl', coalesce(p.proacl::text, ''))) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.proname = any(array[${FONCTIONS.map((x) => `'${x}'`).join(',')}])`) || [];
     const noms = new Set(f.map((x) => x.n));
-    dit(FONCTIONS.every((x) => noms.has(x)), `les ${FONCTIONS.length} fonctions existent`, FONCTIONS.filter((x) => !noms.has(x)).join(', '));
+    dit(FONCTIONS.every((x) => noms.has(x)) && f.length === FONCTIONS.length, `les ${FONCTIONS.length} fonctions existent, une version chacune`, FONCTIONS.filter((x) => !noms.has(x)).join(', ') + ' ' + f.length);
     const fautives = f.filter((x) => !x.def || !(x.cfg || []).includes('search_path=""') || /(^|[{,])(=|anon=|authenticated=)X/.test(x.acl) || !/service_role=X/.test(x.acl));
     dit(f.length > 0 && fautives.length === 0, 'chacune : SECURITY DEFINER, search_path vide, exécutable par service_role SEULEMENT', fautives.map((x) => x.n + ' ' + x.acl).join(' · '));
+    const aides = QJ(`select json_agg(p.proname) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.proname in ('vrm_agent_heure', 'vrm_agent_efface', 'vrm_agent_sans_acheteur', 'vrm_agent_refuser_efface', 'vrm_agent_journal_garde', 'vrm_garde_ebay_tokens')
+                        and (has_function_privilege('service_role', p.oid, 'execute') or has_function_privilege('authenticated', p.oid, 'execute') or has_function_privilege('anon', p.oid, 'execute'))`);
+    dit(aides === null, 'les aides internes (heure, pierre tombale, R18, gardes) ne sont exécutables par PERSONNE', JSON.stringify(aides));
   });
 
   // ── 2. QUI LIT, QUI ÉCRIT ─────────────────────────────────────────────────
   console.log('\n2. QUI LIT, QUI ÉCRIT (RLS, droits, abonnement)');
   await essaie('préparer', () => {
     fraiche('droits');
-    Q(`insert into public.vrm_agent_vendeurs (owner, actif) values ('${J}', true), ('${V}', true);
+    A(`insert into public.vrm_agent_vendeurs (owner, actif) values ('${J}', true), ('${V}', true);
        insert into public.vrm_agent_commandes (owner, compte, commande, etape, rang) values ('${J}', 's1', 'O-J1', 'payee', 1), ('${J}', 's1', 'O-J2', 'payee', 1), ('${V}', 's9', 'O-V1', 'payee', 1);
        insert into public.vrm_agent_file (owner, cle, groupe, prochain) values ('${J}', 'ebay:s1:veille', 's1', now());
-       insert into public.vrm_coffre (owner, compte, fournisseur, v, nonce, chiffre, tag) values ('${J}', 's1', 'ebay', 1, '\\x000102030405060708090a0b', '\\x00', '\\x000102030405060708090a0b0c0d0e0f');`, { role: 'supabase_admin' });
+       insert into public.vrm_coffre (owner, compte, fournisseur, v, nonce, chiffre, tag) values ('${J}', 's1', 'ebay', 1, '\\x000102030405060708090a0b', '\\x00', '\\x000102030405060708090a0b0c0d0e0f');`);
     S(`select public.vrm_agent_noter('${J}', '{"geste":"retrait","resultat":"fait","cible":"O-J1","texte":"retirée d''eBay"}', ${t(0)}); select public.vrm_agent_noter('${V}', '{"geste":"retrait","resultat":"fait","cible":"O-V1"}', ${t(0)});`);
   });
   await essaie('le vendeur lit SES lignes, jamais celles d\'un autre', () => {
@@ -367,58 +536,75 @@ const groupesDe = (l) => l.map((x) => x.owner + '|' + x.groupe);
   });
   await essaie('le vendeur ne lit RIEN de ce qui est au serveur', () => {
     const lues = SERVEUR.filter((x) => run(COMME.vendeur(J) + `select count(*) from public.${x};`, { db: DB }).ok);
-    dit(lues.length === 0, 'file, compteurs, mémos, vus, routes, horloge, clés, coffre, titulaires, index, preuves : « permission refusée » pour le navigateur', lues.join(', '));
+    dit(lues.length === 0, 'file, compteurs, mémos, vus, routes, horloge, clés, coffre, titulaires, index, preuves, pierres tombales, marques : « permission refusée » pour le navigateur', lues.join(', '));
     const anon = TABLES.filter((x) => run(COMME.anon + `select count(*) from public.${x};`, { db: DB }).ok);
     dit(anon.length === 0, 'la clé publique (anon) ne lit RIEN, pas même les tables lisibles', anon.join(', '));
   });
-  await essaie('le navigateur n\'écrit RIEN', () => {
+  await essaie('le navigateur n\'écrit RIEN — TRUNCATE compris', () => {
     const ecrit = [];
     for (const x of TABLES) {
-      const col = x === 'vrm_agent_horloge' ? 'id' : x === 'vrm_ebay_cles_publiques' ? 'kid' : 'owner';
-      const essais = [`insert into public.${x} default values;`, `update public.${x} set ${col} = ${col};`, `delete from public.${x};`];
+      const col = x === 'vrm_agent_horloge' ? 'id' : x === 'vrm_ebay_cles_publiques' ? 'kid' : x === 'vrm_agent_marques' ? 'xid' : 'owner';
+      const essais = [`insert into public.${x} default values;`, `update public.${x} set ${col} = ${col};`, `delete from public.${x};`, `truncate public.${x};`];
       if (x === 'vrm_agent_commandes') essais.unshift(`insert into public.vrm_agent_commandes (owner, compte, commande, etape, rang) values ('${J}', 's1', 'O-FAUX', 'payee', 1);`);
       if (x === 'vrm_agent_vendeurs') essais.unshift(`update public.vrm_agent_vendeurs set actif = false where owner = '${J}';`);
-      for (const sql of essais) {
-        const r = run(COMME.vendeur(J) + sql, { db: DB });
-        if (r.ok || !/permission denied|row-level security|violates|null value|not-null/.test(r.err)) ecrit.push(x + ' ← ' + sql.slice(0, 40) + (r.ok ? ' (passé)' : ' (' + r.err.slice(0, 60) + ')'));
+      for (const qui of [COMME.vendeur(J), COMME.anon]) {
+        for (const sql of essais) {
+          const r = run(qui + sql, { db: DB });
+          if (r.ok || !/permission denied|row-level security|violates|null value|not-null/.test(r.err)) ecrit.push(x + ' ← ' + sql.slice(0, 40) + (r.ok ? ' (passé)' : ' (' + r.err.slice(0, 60) + ')'));
+        }
       }
     }
     // L'issue qui compte : la base n'a pas bougé.
-    const apres = Q(`select (select count(*) from public.vrm_agent_commandes where commande = 'O-FAUX') || '|' || (select count(*) from public.vrm_agent_vendeurs where actif)`, { role: 'supabase_admin' });
-    dit(ecrit.length === 0 && apres === '0|2', 'un vendeur connecté ne peut ni créer, ni modifier, ni effacer une ligne d\'aucune table de l\'agent (pas même SES commandes)', (ecrit.join(' · ') + ' ' + apres).slice(0, 400));
+    const apres = A(`select (select count(*) from public.vrm_agent_commandes where commande = 'O-FAUX') || '|' || (select count(*) from public.vrm_agent_vendeurs where actif) || '|' || (select count(*) from public.vrm_agent_commandes) || '|' || (select count(*) from public.vrm_agent_journal)`);
+    dit(ecrit.length === 0 && apres === '0|2|3|2', 'ni un vendeur connecté ni la clé publique ne peuvent créer, modifier, effacer ou VIDER (TRUNCATE) une ligne d\'aucune table de l\'agent (pas même SES commandes)', (ecrit.join(' · ') + ' ' + apres).slice(0, 400));
   });
   await essaie('le navigateur n\'appelle aucune fonction', () => {
     const appels = [`select public.vrm_agent_prendre(8, '${uuid(1)}', 120);`, `select public.vrm_agent_premiere_fois('${J}', 'msg:O1:x');`,
       `select public.vrm_agent_titulaire('0123456789abcdef', '${J}', 's1');`, `select public.vrm_agent_reserver('${J}', 's1', 100, 9999, 9, 9999, 9999);`,
-      `select public.vrm_agent_effacer_vendeur('${V}');`, `select public.vrm_agent_horloge_battre();`];
+      `select public.vrm_agent_effacer_vendeur('${V}');`, `select public.vrm_agent_horloge_battre();`, `select public.vrm_agent_heure(now());`];
     const passes = appels.filter((sql) => run(COMME.vendeur(J) + sql, { db: DB }).ok || run(COMME.anon + sql, { db: DB }).ok);
     dit(passes.length === 0, 'aucune fonction de l\'agent n\'est exécutable par un navigateur (connecté ou non)', passes.join(' · '));
   });
-  await essaie('le serveur n\'écrit les tables à garantie QUE par leurs fonctions', () => {
+  await essaie('le serveur n\'écrit les tables à garantie QUE par leurs fonctions — ni INSERT, ni TRUNCATE', () => {
+    const lignes = {
+      vrm_agent_file: `(owner, cle, groupe, prochain) values ('${J}', 'zz', 'g', now())`,
+      vrm_agent_commandes: `(owner, compte, commande, etape, rang) values ('${J}', 's1', 'OZ', 'payee', 1)`,
+      vrm_agent_journal: `(owner, geste, resultat, at) values ('${J}', 'x', 'fait', '2020-01-01')`,
+      vrm_agent_compteurs: `(owner, cle) values ('${J}', 'zz')`,
+      vrm_agent_memos: `(owner, cle, at, expire) values ('${N}', 'achat:OZ', '2020-01-01', '2020-06-01')`,
+      vrm_ebay_titulaires: `(cle_ebay, owner, compte) values ('ffffffffffffffff', '${J}', 'zz')`,
+      vrm_ebay_annonces_index: `(listing_id, owner, compte) values ('123456789', '${J}', 's1')`,
+      vrm_agent_preuves: `(owner, numero_cle, source, ref) values ('${J}', '1', 'v', 'r')`,
+      vrm_agent_horloge: `(id) values (1)`,
+      vrm_agent_effaces: `(owner) values ('${V}')`,
+      vrm_agent_marques: `(xid, quoi, avant) values (1, 'purger', 'infinity')`,
+    };
     const passe = [];
-    for (const x of ['vrm_agent_file', 'vrm_agent_commandes', 'vrm_agent_journal', 'vrm_agent_compteurs', 'vrm_agent_memos', 'vrm_ebay_titulaires', 'vrm_ebay_annonces_index', 'vrm_agent_preuves', 'vrm_agent_horloge']) {
-      for (const sql of [`update public.${x} set owner = owner;`, `delete from public.${x};`]) {
-        const r = run(COMME.serveur + sql.replace('set owner = owner', x === 'vrm_agent_horloge' ? 'set id = id' : 'set owner = owner'), { db: DB });
-        if (r.ok) passe.push(x + ' ← ' + sql.slice(0, 20));
+    for (const [x, ligne] of Object.entries(lignes)) {
+      const col = x === 'vrm_agent_horloge' ? 'id' : x === 'vrm_agent_marques' ? 'xid' : 'owner';
+      for (const sql of [`insert into public.${x} ${ligne};`, `update public.${x} set ${col} = ${col};`, `delete from public.${x};`, `truncate public.${x};`]) {
+        const r = run(COMME.serveur + sql, { db: DB });
+        if (r.ok || !/permission denied/.test(r.err)) passe.push(x + ' ← ' + sql.slice(0, 24) + (r.ok ? ' (passé)' : ' (' + r.err.slice(0, 50) + ')'));
       }
     }
-    dit(passe.length === 0, 'même la clé de service ne peut ni réécrire ni effacer la file, les commandes, le journal, les compteurs, les mémos, les titulaires, l\'index, les preuves, l\'horloge sans passer par leurs fonctions', passe.join(' · '));
+    dit(passe.length === 0, 'même la clé de service ne peut ni insérer, ni réécrire, ni effacer, ni vider la file, les commandes, le journal, les compteurs, les mémos, les titulaires, l\'index, les preuves, l\'horloge, les pierres tombales, les marques sans passer par leurs fonctions', passe.join(' · ').slice(0, 400));
+    dit(!run(COMME.serveur + 'select count(*) from public.vrm_agent_marques;', { db: DB }).ok, 'les marques de transaction ne se lisent pas, même par le serveur');
     const r = run(COMME.serveur + `update public.vrm_agent_vendeurs set pouls = '{"vu":1}' where owner = '${J}'; select count(*) from public.vrm_agent_file;`, { db: DB });
     dit(r.ok && r.out === '1', 'l\'autre sens : le serveur LIT tout, et écrit les réglages et le pouls d\'un vendeur', r.ok ? r.out : r.err.slice(0, 120));
   });
   await essaie('qui ne paie plus ne voit plus rien (abonnement_requis)', () => {
-    Q(`update public.vrm_reglages set valeur = '1' where cle = 'abonnement_obligatoire'; update public.vrm_reglages set valeur = '${J}' where cle = 'proprietaire';`, { role: 'supabase_admin' });
+    A(`update public.vrm_reglages set valeur = '1' where cle = 'abonnement_obligatoire'; update public.vrm_reglages set valeur = '${J}' where cle = 'proprietaire';`);
     const lu = (u) => Q(COMME.vendeur(u) + `select (select count(*) from public.vrm_agent_vendeurs) || '|' || (select count(*) from public.vrm_agent_commandes) || '|' || (select count(*) from public.vrm_agent_journal);`);
     dit(lu(V) === '0|0|0', 'abonnement obligatoire, V sans abonnement : il ne voit ni son pouls, ni ses commandes, ni son journal', lu(V));
     dit(lu(J) === '1|2|1', 'l\'autre sens : le propriétaire de l\'installation voit toujours les siennes', lu(J));
-    Q(`insert into auth.users (id) values ('${V}') on conflict do nothing; insert into public.abonnements (owner, statut) values ('${V}', 'active');`, { role: 'supabase_admin' });
+    A(`insert into auth.users (id) values ('${V}') on conflict do nothing; insert into public.abonnements (owner, statut) values ('${V}', 'active');`);
     dit(lu(V) === '1|1|1', 'et V voit les siennes dès qu\'il paie', lu(V));
-    Q(`update public.vrm_reglages set valeur = '0' where cle = 'abonnement_obligatoire';`, { role: 'supabase_admin' });
+    A(`update public.vrm_reglages set valeur = '0' where cle = 'abonnement_obligatoire';`);
   });
   await essaie('la trace des écritures (le jumeau de noter_ecriture)', () => {
-    const n = Q(`select string_agg(distinct tbl, ',' order by tbl) from sauvegarde.journal_ecritures where tbl like 'vrm_agent_%'`, { role: 'supabase_admin' });
+    const n = A(`select string_agg(distinct tbl, ',' order by tbl) from sauvegarde.journal_ecritures where tbl like 'vrm_agent_%'`);
     dit(n === 'vrm_agent_commandes,vrm_agent_journal,vrm_agent_vendeurs', 'chaque écriture des trois tables lisibles laisse sa trace dans sauvegarde.journal_ecritures', n);
-    const id = Q(`select count(*) from sauvegarde.journal_ecritures where tbl = 'vrm_agent_commandes' and row_id = '${J}|ebay:s1:O-J1'`, { role: 'supabase_admin' });
+    const id = A(`select count(*) from sauvegarde.journal_ecritures where tbl = 'vrm_agent_commandes' and row_id = '${J}|ebay:s1:O-J1'`);
     dit(id === '1', 'la trace nomme la ligne (vendeur|plateforme:compte:commande)', id);
   });
 
@@ -436,11 +622,15 @@ const groupesDe = (l) => l.map((x) => x.owner + '|' + x.groupe);
     };
     const passes = Object.entries(essais).filter(([, sql]) => !refuse(run(COMME.vendeur(J) + sql, { db: DB }), /vrm_ebay_tokens_serveur/)).map(([k]) => k);
     dit(passes.length === 0, 'un vendeur connecté ne peut ni créer, ni réécrire, ni effacer, ni renommer une ligne ebay_tokens* (refus nommé « vrm_ebay_tokens_serveur »)', passes.join(' · '));
-    dit(Q(`select data->>'refresh_token' from public.app_data where owner = '${J}' and id = 'ebay_tokens'`, { role: 'supabase_admin' }) === 'VIEUX'
-      && Q(`select count(*) from public.app_data where id like 'ebay\\_tokens%'`, { role: 'supabase_admin' }) === '1', 'le jeton rangé n\'a pas bougé');
+    dit(A(`select data->>'refresh_token' from public.app_data where owner = '${J}' and id = 'ebay_tokens'`) === 'VIEUX'
+      && A(`select count(*) from public.app_data where id like 'ebay\\_tokens%'`) === '1', 'le jeton rangé n\'a pas bougé');
     // Le jeton dit « authenticated » même quand le rôle courant est un autre (fonction SECURITY DEFINER) :
     const r = run(`set "request.jwt.claims" = '{"sub":"${J}","role":"authenticated"}'; update public.app_data set data = '{"refresh_token":"VOLE"}' where owner = '${J}' and id = 'ebay_tokens';`, { db: DB });
     dit(refuse(r, /vrm_ebay_tokens_serveur/), 'une écriture qui porte un jeton de navigateur est refusée même sous un autre rôle (auth.role())', r.ok ? 'passée' : r.err.slice(0, 80));
+    // Et l'autre moitié : le RÔLE courant, quand le jeton ne dit pas son rôle.
+    const r2 = run(`set role authenticated; set "request.jwt.claims" = '{"sub":"${J}"}'; update public.app_data set data = '{"refresh_token":"VOLE"}' where owner = '${J}' and id = 'ebay_tokens';`, { db: DB });
+    dit(refuse(r2, /vrm_ebay_tokens_serveur/) && A(`select data->>'refresh_token' from public.app_data where owner = '${J}' and id = 'ebay_tokens'`) === 'VIEUX',
+      'une écriture sous le rôle « authenticated » dont le jeton ne dit pas son rôle est refusée aussi (rôle courant)', r2.ok ? 'passée' : r2.err.slice(0, 80));
   });
   await essaie('l\'autre sens', () => {
     const r1 = run(COMME.vendeur(J) + `update public.app_data set data = '{"a":1}' where owner = '${J}' and id = 'main'; insert into public.app_data (owner, id, data) values ('${J}', 'ebay_listings', '{}');`, { db: DB });
@@ -448,7 +638,7 @@ const groupesDe = (l) => l.map((x) => x.owner + '|' + x.groupe);
     const r2 = run(COMME.serveur + `update public.app_data set data = '{"refresh_token":"NEUF"}' where owner = '${J}' and id = 'ebay_tokens';
       insert into public.app_data (owner, id, data) values ('${J}', 'ebay_tokens_0123456789abcdef', '{"refresh_token":"AUTRE"}');
       delete from public.app_data where owner = '${J}' and id = 'ebay_tokens_0123456789abcdef';`, { db: DB });
-    dit(r2.ok && Q(`select data->>'refresh_token' from public.app_data where owner = '${J}' and id = 'ebay_tokens'`, { role: 'supabase_admin' }) === 'NEUF', 'le serveur (clé de service) crée, réécrit et efface les jetons', r2.ok ? '' : r2.err.slice(0, 120));
+    dit(r2.ok && A(`select data->>'refresh_token' from public.app_data where owner = '${J}' and id = 'ebay_tokens'`) === 'NEUF', 'le serveur (clé de service) crée, réécrit et efface les jetons', r2.ok ? '' : r2.err.slice(0, 120));
   });
 
   // ── 4. LA FILE : PRENDRE, BAIL, GROUPE ────────────────────────────────────
@@ -463,10 +653,23 @@ const groupesDe = (l) => l.map((x) => x.owner + '|' + x.groupe);
     dit(l.some((x) => x.owner === V), 'le second vendeur est servi dans le même battement');
   });
   await essaie('une tâche EN VOL dans un autre battement exclut son groupe [S24, D15]', () => {
-    // a1 vient d'être prise par le battement 1 (bail vivant, déjà validé).
     const l2 = prendre(8, uuid(2), 5);
     dit(!l2.some((x) => x.owner === J && x.groupe === 'g1') && !l2.some((x) => x.owner === V && x.groupe === 'g1'), 'le battement 2 ne prend AUCUNE tâche d\'un compte qui a déjà une tâche en vol', JSON.stringify(l2.map((x) => x.cle)));
     dit(l2.some((x) => x.cle === 'c1'), 'l\'autre sens : il prend la tâche d\'un compte libre', JSON.stringify(l2.map((x) => x.cle)));
+  });
+  await essaie('un arriéré n\'affame personne [revue : la fenêtre de candidats]', () => {
+    fraiche('famine');
+    A(`insert into public.vrm_agent_file (owner, cle, groupe, prochain) select '${J}', 'ebay:g1:cmd:O' || i, 'g1', ${t(-7200)} + i * interval '1 second' from generate_series(1, 250) i;
+       insert into public.vrm_agent_file (owner, cle, groupe, prochain) values ('${V}', 'ebay:v1:veille', 'v1', ${t(-30)}), ('${J}', 'ebay:g2:veille', 'g2', ${t(-20)});`);
+    const l = prendre(8, uuid(60));
+    dit(l.some((x) => x.owner === V) && l.some((x) => x.groupe === 'g2') && l.filter((x) => x.groupe === 'g1').length === 1,
+      'avec 250 tâches en retard sur UN compte, le même battement sert aussi l\'autre vendeur et l\'autre compte du vendeur', JSON.stringify(l.map((x) => x.cle)));
+    fraiche('famine2');
+    A(`insert into public.vrm_agent_file (owner, cle, groupe, prochain) select '${J}', 'ebay:g1:cmd:O' || i, 'g1', ${t(-7200)} + i * interval '1 second' from generate_series(1, 200) i;
+       insert into public.vrm_agent_file (owner, cle, groupe, prochain, bail_jeton, bail_jusqua) values ('${J}', 'ebay:g1:cmd:CLIC', 'g1', ${t(-7300)}, '${uuid(61)}', ${t(60)});
+       insert into public.vrm_agent_file (owner, cle, groupe, prochain) values ('${V}', 'ebay:v1:cmd:VENTE', 'v1', ${t(-60)});`);
+    const l2 = prendre(8, uuid(62));
+    dit(l2.length === 1 && l2[0].owner === V, 'un compte tenu par un clic, avec 200 tâches dues derrière lui : la tâche due de l\'autre vendeur est prise quand même', JSON.stringify(l2.map((x) => x.cle)));
   });
   await essaie('un bail expiré se reprend, un bail vivant non', () => {
     fraiche('file2');
@@ -475,17 +678,17 @@ const groupesDe = (l) => l.map((x) => x.owner + '|' + x.groupe);
     const l = prendre(8, uuid(9));
     dit(l.some((x) => x.cle === 'morte'), 'une tâche au bail EXPIRÉ (battement coupé) est reprise');
     dit(!l.some((x) => x.cle === 'vive'), 'une tâche au bail VIVANT n\'est jamais reprise', JSON.stringify(l.map((x) => x.cle)));
-    dit(Q(`select bail_jeton from public.vrm_agent_file where cle = 'morte'`, { role: 'supabase_admin' }) === uuid(9), 'le bail porte le jeton du battement qui l\'a prise');
+    dit(A(`select bail_jeton from public.vrm_agent_file where cle = 'morte'`) === uuid(9), 'le bail porte le jeton du battement qui l\'a prise');
   });
   await essaie('deux battements SIMULTANÉS', async () => {
     fraiche('file3');
     tache(J, 'a1', 'g1', -50); tache(J, 'a2', 'g1', -49); tache(J, 'b1', 'g2', -48); tache(J, 'b2', 'g2', -47); tache(J, 'c1', 'g3', -46); tache(J, 'd1', 'g4', -45);
     tache(V, 'v1', 'g1', -44); tache(V, 'v2', 'g1', -43);
     const sel = (jeton) => `select 'R:' || coalesce(jsonb_agg(x)::text, '[]') from public.vrm_agent_prendre(8, '${jeton}', 120, ${t(0)}) x;\n`;
-    const A = runAsync(COMME.serveur + 'begin;\n' + sel(uuid(11)) + 'select pg_sleep(2.5);\ncommit;\n', { db: DB });
+    const Ap = runAsync(COMME.serveur + 'begin;\n' + sel(uuid(11)) + 'select pg_sleep(2.5);\ncommit;\n', { db: DB });
     await attendre(700);
     const B = await runAsync(COMME.serveur + sel(uuid(12)), { db: DB });
-    const a = await A;
+    const a = await Ap;
     const lit = (r) => { const l = r.out.split('\n').find((x) => x.startsWith('R:')); try { return JSON.parse(l ? l.slice(2) : '[]'); } catch (e) { throw new Error('sortie illisible : ' + JSON.stringify(r).slice(0, 400)); } };
     const la = lit(a), lb = lit(B);
     dit(a.ok && B.ok, 'les deux battements répondent', (a.err + ' ' + B.err).slice(0, 200));
@@ -498,10 +701,10 @@ const groupesDe = (l) => l.map((x) => x.owner + '|' + x.groupe);
   await essaie('un battement pendant qu\'un CLIC tient sa tâche', async () => {
     fraiche('file4');
     tache(J, 'x1', 'g5', -50); tache(J, 'y1', 'g6', -40);
-    const A = runAsync(COMME.serveur + `begin;\nselect 'R:' || public.vrm_agent_prendre_cle('${J}', 'x1', '${uuid(13)}', 120, ${t(0)});\nselect pg_sleep(2.5);\ncommit;\n`, { db: DB });
+    const Ap = runAsync(COMME.serveur + `begin;\nselect 'R:' || public.vrm_agent_prendre_cle('${J}', 'x1', '${uuid(13)}', 120, ${t(0)});\nselect pg_sleep(2.5);\ncommit;\n`, { db: DB });
     await attendre(700);
     const B = await runAsync(COMME.serveur + `select 'R:' || coalesce(jsonb_agg(x)::text, '[]') from public.vrm_agent_prendre(8, '${uuid(14)}', 120, ${t(0)}) x;\n`, { db: DB });
-    const a = await A;
+    const a = await Ap;
     const lb = JSON.parse(((B.out.split('\n').find((l) => l.startsWith('R:')) || 'R:[]').slice(2)));
     dit(a.ok && B.ok && /R:t/.test(a.out), 'le clic tient sa tâche, le battement répond', (a.out + ' ' + a.err + ' ' + B.err).slice(0, 200));
     dit(B.ms < 1500, `le battement n'attend pas derrière la ligne tenue par le clic (skip locked) : ${B.ms} ms`);
@@ -510,67 +713,173 @@ const groupesDe = (l) => l.map((x) => x.owner + '|' + x.groupe);
   await essaie('le chemin « clic » prend le même bail [S15, R8]', () => {
     fraiche('clic');
     tache(J, 'ebay:s1:cmd:O1', 's1', -60, { jeton: uuid(20), jusqua: 60 });   // tenue par un battement
-    tache(J, 'ebay:s1:cmd:O2', 's1', 3600);                                   // libre, pas encore due
+    tache(J, 'ebay:s2:cmd:O2', 's2', 3600);                                   // libre, pas encore due
     const pc = (cle, jeton, groupe) => S(`select public.vrm_agent_prendre_cle('${J}', '${cle}', '${jeton}', 120, ${t(0)}${groupe ? `, '${groupe}'` : ''});`);
     dit(pc('ebay:s1:cmd:O1', uuid(21)) === 'f', 'une tâche tenue par un battement est REFUSÉE au clic (la route répond 409)');
-    dit(Q(`select bail_jeton from public.vrm_agent_file where cle = 'ebay:s1:cmd:O1'`, { role: 'supabase_admin' }) === uuid(20), 'et le bail du battement est intact');
-    dit(pc('ebay:s1:cmd:O2', uuid(22)) === 't', 'une tâche libre est prise par le clic');
-    dit(pc('ebay:s1:cmd:O2', uuid(23)) === 'f', 'un double clic : le second est refusé');
-    dit(pc('ebay:s1:cmd:O3', uuid(24), 's1') === 't' && pc('ebay:s1:cmd:O4', uuid(25)) === 'f', 'une tâche absente est créée tenue si le groupe est donné, refusée sinon');
+    dit(A(`select bail_jeton from public.vrm_agent_file where cle = 'ebay:s1:cmd:O1'`) === uuid(20), 'et le bail du battement est intact');
+    dit(pc('ebay:s2:cmd:O2', uuid(22)) === 't', 'une tâche libre est prise par le clic');
+    dit(pc('ebay:s2:cmd:O2', uuid(23)) === 'f', 'un double clic : le second est refusé');
+    dit(pc('ebay:s3:cmd:O3', uuid(24), 's3') === 't' && pc('ebay:s4:cmd:O4', uuid(25)) === 'f', 'une tâche absente est créée tenue si le groupe est donné, refusée sinon');
     const l = prendre(8, uuid(26), 0);
-    dit(!l.some((x) => x.cle.startsWith('ebay:s1:cmd:O')), 'un battement ne reprend pas une tâche tenue par un clic', JSON.stringify(l.map((x) => x.cle)));
+    dit(!l.some((x) => x.cle.startsWith('ebay:s')), 'un battement ne reprend pas une tâche tenue par un clic', JSON.stringify(l.map((x) => x.cle)));
+  });
+  await essaie('le clic respecte le compte eBay EN VOL [revue : « jamais deux appels en vol »]', async () => {
+    fraiche('clicgroupe');
+    tache(J, 'ebay:s1:veille', 's1', -60); tache(J, 'ebay:s1:cmd:O1', 's1', 3600);
+    const l = prendre(8, uuid(70));
+    dit(l.length === 1 && l[0].cle === 'ebay:s1:veille', 'un battement tient la veille du compte s1');
+    const pc = (cle, jeton, groupe) => S(`select public.vrm_agent_prendre_cle('${J}', '${cle}', '${jeton}', 120, ${t(1)}${groupe ? `, '${groupe}'` : ''});`);
+    const r1 = pc('ebay:s1:cmd:O1', uuid(71)), r2 = pc('ebay:s1:cmd:O2', uuid(72), 's1'), r3 = pc('ebay:s2:cmd:O9', uuid(73), 's2');
+    const enVol = A(`select count(*) from public.vrm_agent_file where owner = '${J}' and groupe = 's1' and bail_jusqua >= ${t(1)}`);
+    dit(r1 === 'f' && r2 === 'f' && enVol === '1', 'le clic ne prend NI une commande existante NI une nouvelle commande d\'un compte dont la veille est en vol : un appel en vol par compte', `O1=${r1} O2=${r2} en vol=${enVol}`);
+    dit(r3 === 't', 'l\'autre sens : un autre compte eBay du même vendeur reste libre');
+    S(`select public.vrm_agent_rendre('${J}', 'ebay:s1:veille', '${uuid(70)}', ${t(3600)}, p_maintenant => ${t(2)});`);
+    dit(pc('ebay:s1:cmd:O1', uuid(74)) === 't', 'la veille rendue, le clic prend sa commande');
+    // La course : un preneur qui n'a pas encore validé tient le verrou du compte.
+    fraiche('clicgroupe2');
+    tache(J, 'ebay:s1:veille', 's1', -60);
+    const Ap = runAsync(COMME.serveur + `begin;\nselect count(*) from public.vrm_agent_prendre(8, '${uuid(75)}', 120, ${t(0)});\nselect pg_sleep(2.5);\ncommit;\n`, { db: DB });
+    await attendre(700);
+    const B = await runAsync(COMME.serveur + `select 'R:' || public.vrm_agent_prendre_cle('${J}', 'ebay:s1:cmd:O5', '${uuid(76)}', 120, ${t(0)}, 's1');`, { db: DB });
+    await Ap;
+    dit(B.ok && /R:f/.test(B.out) && B.ms < 1500, `pendant qu'un battement prend la veille (pas encore validé), le clic sur le même compte est refusé sans attendre (verrou consultatif) : ${B.ms} ms`, B.out + ' ' + B.err.slice(0, 100));
   });
   await essaie('rendre une tâche', () => {
     fraiche('rendre');
     tache(J, 'k', 'g1', -60, { jeton: uuid(30), jusqua: 60 });
-    const r = (jeton, prochain, echec = false) => S(`select public.vrm_agent_rendre('${J}', 'k', '${jeton}', ${prochain === null ? 'null' : t(prochain)}, ${echec}, 'raison', ${t(1)});`);
-    dit(r(uuid(31), 600) === 'f' && Q(`select bail_jeton from public.vrm_agent_file where cle = 'k'`, { role: 'supabase_admin' }) === uuid(30), 'un autre jeton ne rend pas la tâche (le bail reste)');
+    const r = (jeton, prochain, echec = false) => S(`select public.vrm_agent_rendre('${J}', 'k', '${jeton}', ${prochain === null ? 'null' : t(prochain)}, ${echec}, 'raison', p_maintenant => ${t(1)});`);
+    dit(r(uuid(31), 600) === 'f' && A(`select bail_jeton from public.vrm_agent_file where cle = 'k'`) === uuid(30), 'un autre jeton ne rend pas la tâche (le bail reste)');
     dit(r(uuid(30), 600, true) === 't', 'le bon jeton la rend');
-    dit(Q(`select (bail_jeton is null) || '|' || essais || '|' || (prochain = ${t(600)}) from public.vrm_agent_file where cle = 'k'`, { role: 'supabase_admin' }) === 'true|1|true', 'bail libéré, prochaine fois fixée, échec compté');
+    dit(A(`select (bail_jeton is null) || '|' || essais || '|' || (prochain = ${t(600)}) from public.vrm_agent_file where cle = 'k'`) === 'true|1|true', 'bail libéré, prochaine fois fixée, échec compté');
+  });
+  await essaie('« pas su » ne détruit jamais une tâche [revue : rendre(NULL) en échec]', () => {
+    fraiche('rendrenull');
+    const rd = (cle, jeton, extra) => S(`select public.vrm_agent_rendre('${J}', '${cle}', '${jeton}', null, ${extra}, p_maintenant => ${t(10)});`);
+    tache(J, 'ebay:s1:cmd:O5', 's1', -60, { jeton: uuid(80), jusqua: 60 });
+    rd('ebay:s1:cmd:O5', uuid(80), `p_echec => true, p_raison => 'ebay-503'`);
+    dit(A(`select (prochain = ${t(10)} + interval '15 minutes') || '|' || essais || '|' || raison from public.vrm_agent_file where cle = 'ebay:s1:cmd:O5'`) === 'true|1|ebay-503',
+      'un ÉCHEC sans prochaine fois garde la tâche (dans 15 min), avec son code : les rappels et le suivi de la commande ne disparaissent pas');
+    tache(J, 'ebay:s1:cmd:O6', 's1', -60, { jeton: uuid(81), jusqua: 60 });
+    rd('ebay:s1:cmd:O6', uuid(81), 'p_echec => false');
+    dit(A(`select count(*) from public.vrm_agent_file where cle = 'ebay:s1:cmd:O6'`) === '1', 'pas de prochaine fois SANS « fini » explicite : la tâche reste');
+    tache(J, 'ebay:s1:cmd:O7', 's1', -60, { jeton: uuid(82), jusqua: 60 });
+    rd('ebay:s1:cmd:O7', uuid(82), 'p_fini => true');
+    dit(A(`select count(*) from public.vrm_agent_file where cle = 'ebay:s1:cmd:O7'`) === '0', 'l\'autre sens : « fini » explicite, sans échec, retire la tâche');
+    tache(J, 'ebay:s1:cmd:O8', 's1', -60, { jeton: uuid(83), jusqua: 60 });
+    rd('ebay:s1:cmd:O8', uuid(83), `p_echec => true, p_fini => true`);
+    dit(A(`select count(*) from public.vrm_agent_file where cle = 'ebay:s1:cmd:O8'`) === '1', '« fini » ET échec : la tâche reste (l\'échec gagne)');
+    tache(J, 'ebay:s1:cmd:O9', 's1', -60, { jeton: uuid(84), jusqua: 60 });
+    S(`select public.vrm_agent_rendre('${J}', 'ebay:s1:cmd:O9', '${uuid(84)}', ${t(600)}, true, 'Réponse brute : Jean Dupont, 12 rue des Lilas 35260 Cancale', p_maintenant => ${t(10)});`);
+    dit(A(`select raison from public.vrm_agent_file where cle = 'ebay:s1:cmd:O9'`) === 'raison-illisible', 'une raison qui n\'est pas un CODE (une réponse brute, adresse comprise) n\'est jamais gardée (R18)');
   });
   await essaie('une sonnette pendant le bail n\'est jamais perdue', () => {
     fraiche('reveil');
     tache(J, 'k', 'g1', -60, { jeton: uuid(40), jusqua: 60 });
     S(`select public.vrm_agent_planifier('${J}', 'k', 'g1', ${t(5)}, ${t(2)});`);
-    S(`select public.vrm_agent_rendre('${J}', 'k', '${uuid(40)}', ${t(3600)}, false, null, ${t(10)});`);
-    dit(Q(`select prochain = ${t(5)} from public.vrm_agent_file where cle = 'k'`, { role: 'supabase_admin' }) === 't', 'la tâche rendue « dans 1 h » repasse à l\'heure de la sonnette arrivée pendant son bail');
+    S(`select public.vrm_agent_rendre('${J}', 'k', '${uuid(40)}', ${t(3600)}, false, null, p_maintenant => ${t(10)});`);
+    dit(A(`select prochain = ${t(5)} from public.vrm_agent_file where cle = 'k'`) === 't', 'la tâche rendue « dans 1 h » repasse à l\'heure de la sonnette arrivée pendant son bail');
     tache(J, 'k2', 'g1', -60, { jeton: uuid(41), jusqua: 60 });
     S(`select public.vrm_agent_planifier('${J}', 'k2', 'g1', ${t(5)}, ${t(2)});`);
-    S(`select public.vrm_agent_rendre('${J}', 'k2', '${uuid(41)}', null, false, null, ${t(10)});`);
-    dit(Q(`select count(*) from public.vrm_agent_file where cle = 'k2'`, { role: 'supabase_admin' }) === '1', 'une tâche « finie » avec une sonnette en attente n\'est pas retirée');
+    S(`select public.vrm_agent_rendre('${J}', 'k2', '${uuid(41)}', null, false, null, true, ${t(10)});`);
+    dit(A(`select count(*) from public.vrm_agent_file where cle = 'k2'`) === '1', 'une tâche « finie » avec une sonnette en attente n\'est pas retirée');
     tache(J, 'k3', 'g1', -60, { jeton: uuid(42), jusqua: 60 });
-    S(`select public.vrm_agent_rendre('${J}', 'k3', '${uuid(42)}', null, false, null, ${t(10)});`);
-    dit(Q(`select count(*) from public.vrm_agent_file where cle = 'k3'`, { role: 'supabase_admin' }) === '0', 'l\'autre sens : une tâche finie sans sonnette est retirée');
+    S(`select public.vrm_agent_rendre('${J}', 'k3', '${uuid(42)}', null, false, null, true, ${t(10)});`);
+    dit(A(`select count(*) from public.vrm_agent_file where cle = 'k3'`) === '0', 'l\'autre sens : une tâche finie sans sonnette est retirée');
     S(`select public.vrm_agent_planifier('${J}', 'p', 'g9', ${t(100)}, ${t(0)}); select public.vrm_agent_planifier('${J}', 'p', 'g9', ${t(5000)}, ${t(0)});`);
-    dit(Q(`select prochain = ${t(100)} from public.vrm_agent_file where cle = 'p'`, { role: 'supabase_admin' }) === 't', 'planifier ne recule jamais une échéance (« au plus tard à »)');
+    dit(A(`select prochain = ${t(100)} from public.vrm_agent_file where cle = 'p'`) === 't', 'planifier ne recule jamais une échéance (« au plus tard à »)');
+  });
+  await essaie('une sonnette sous un bail EXPIRÉ mais pas encore repris (appel lent, S15) n\'est pas perdue', () => {
+    fraiche('reveil2');
+    S(`select public.vrm_agent_planifier('${J}', 'ebay:s1:cmd:O3', 's1', ${t(-3600)}, ${t(-3600)});`);
+    const l = prendre(8, uuid(43), 0);
+    dit(l.length === 1, 'prise à 08:00:00, bail de 120 s');
+    S(`select public.vrm_agent_planifier('${J}', 'ebay:s1:cmd:O3', 's1', ${t(150)}, ${t(150)});`);   // 08:02:30 : l'annulation sonne
+    S(`select public.vrm_agent_rendre('${J}', 'ebay:s1:cmd:O3', '${uuid(43)}', ${t(160 + 6 * 3600)}, false, null, p_maintenant => ${t(160)});`);   // 08:02:40 : « dans 6 h »
+    dit(A(`select prochain = ${t(150)} from public.vrm_agent_file where cle = 'ebay:s1:cmd:O3'`) === 't', 'le travailleur lent qui rend « dans 6 h » ne perd pas la sonnette de 08:02:30', A(`select prochain from public.vrm_agent_file where cle = 'ebay:s1:cmd:O3'`));
   });
 
   // ── 5. LES COMMANDES : VERSION ET BAIL ────────────────────────────────────
-  console.log('\n5. L\'ÉTAT D\'UNE COMMANDE (version et bail)');
+  console.log('\n5. L\'ÉTAT D\'UNE COMMANDE (le bail de CETTE commande, la version, le rang)');
   await essaie('écrire sous version et sous bail', () => {
     fraiche('cmd');
     const JE = uuid(50);
     S(`select public.vrm_agent_prendre_cle('${J}', 'ebay:s1:cmd:O1', '${JE}', 120, ${t(0)}, 's1');`);
-    const ec = (jeton, version, cols, s = 1) => S(`select public.vrm_agent_ecrire_commande('${J}', 'ebay:s1:cmd:O1', '${jeton}', 's1', 'O1', ${version === null ? 'null' : version}, '${JSON.stringify(cols).replace(/'/g, "''")}', 'ebay', ${t(s)});`);
-    dit(ec(JE, null, { etape: 'payee', rang: 1, numero: '1', pays: 'FR' }) === '1', 'création : version 1');
-    dit(ec(JE, null, { etape: 'payee', rang: 1 }) === '', 'une seconde création rend 0 ligne (elle existe déjà)');
-    dit(ec(JE, 1, { etape: 'a_expedier', rang: 2, voie: 'ebay' }) === '2', 'écriture sur la version lue : version 2');
-    dit(ec(JE, 1, { etape: 'historique', rang: 0 }) === '', 'écriture sur une version PÉRIMÉE : 0 ligne, on relit, on n\'écrase jamais');
-    dit(Q(`select etape || '|' || rang || '|' || numero || '|' || pays || '|' || version from public.vrm_agent_commandes where commande = 'O1'`, { role: 'supabase_admin' }) === 'a_expedier|2|1|FR|2', 'l\'état est celui de la bonne écriture, et les colonnes non envoyées sont gardées');
-    dit(ec(uuid(51), 2, { etape: 'historique', rang: 0 }) === '', 'un autre jeton (le bail n\'est pas à lui) : 0 ligne');
-    dit(ec(JE, 2, { etape: 'historique', rang: 0 }, 500) === '', 'le bail EXPIRÉ (coupé en plein geste) : 0 ligne');
-    dit(Q(`select version from public.vrm_agent_commandes where commande = 'O1'`, { role: 'supabase_admin' }) === '2', 'la commande n\'a pas bougé');
+    dit(ecrit(J, JE, 's1', 'O1', null, { etape: 'payee', rang: 1, numero: '1', pays: 'FR' }) === '1', 'création : version 1');
+    dit(ecrit(J, JE, 's1', 'O1', null, { etape: 'payee', rang: 1 }) === '', 'une seconde création rend 0 ligne (elle existe déjà)');
+    dit(ecrit(J, JE, 's1', 'O1', 1, { etape: 'a_expedier', rang: 2, voie: 'ebay' }) === '2', 'écriture sur la version lue : version 2');
+    dit(ecrit(J, JE, 's1', 'O1', 1, { etape: 'historique', rang: 2 }) === '', 'écriture sur une version PÉRIMÉE : 0 ligne, on relit, on n\'écrase jamais');
+    dit(A(`select etape || '|' || rang || '|' || numero || '|' || pays || '|' || version from public.vrm_agent_commandes where commande = 'O1'`) === 'a_expedier|2|1|FR|2', 'l\'état est celui de la bonne écriture, et les colonnes non envoyées sont gardées');
+    dit(ecrit(J, uuid(51), 's1', 'O1', 2, { etape: 'historique', rang: 2 }) === '', 'un autre jeton (le bail n\'est pas à lui) : 0 ligne');
+    dit(ecrit(J, JE, 's1', 'O1', 2, { etape: 'historique', rang: 2 }, 500) === '', 'le bail EXPIRÉ (coupé en plein geste) : 0 ligne');
+    dit(A(`select version from public.vrm_agent_commandes where commande = 'O1'`) === '2', 'la commande n\'a pas bougé');
   });
-  await essaie('ce que la commande ne garde jamais (R18)', () => {
+  await essaie('le bail de CETTE commande, et d\'elle seule [revue : n\'importe quel bail du vendeur passait]', () => {
+    fraiche('cmdbail');
+    const VEILLE = uuid(90), CLIC = uuid(91);
+    // Posées à la main (défense en profondeur : même si la règle « un appel en vol par compte » était contournée).
+    tache(J, 'ebay:s1:veille', 's1', -60, { jeton: VEILLE, jusqua: 120 });
+    tache(J, 'ebay:s1:cmd:O1', 's1', -60, { jeton: CLIC, jusqua: 120 });
+    ecrit(J, CLIC, 's1', 'O1', null, { etape: 'a_expedier', rang: 2 });
+    ecrit(J, CLIC, 's1', 'O1', 1, { etape: 'etiquette_en_cours', rang: 3, en_cours: { geste: 'acheter', cle: 'achat:O1' } });
+    // Même rang (la règle du rang n'y est pour rien) : c'est le bail qui doit refuser.
+    const r = ecrit(J, VEILLE, 's1', 'O1', 2, { etape: 'a_expedier', rang: 3, en_cours: null }, 4);
+    const etat = A(`select etape || '|' || rang || '|' || coalesce(en_cours->>'geste', 'EFFACÉ') || '|' || version from public.vrm_agent_commandes where commande = 'O1'`);
+    dit(r === '' && etat === 'etiquette_en_cours|3|acheter|2', 'la veille du compte ne réécrit PAS une commande qu\'un clic est en train d\'acheter (en_cours et rang intacts)', `${r} · ${etat}`);
+    dit(ecrit(J, VEILLE, 's1', 'O3', null, { etape: 'payee', rang: 1 }) === '1', 'la veille CRÉE une commande de son compte');
+    dit(ecrit(J, VEILLE, 's2', 'O9', null, { etape: 'payee', rang: 1 }) === '' && A(`select count(*) from public.vrm_agent_commandes where commande = 'O9'`) === '0', 'mais jamais une commande d\'un AUTRE compte eBay');
+    const desc = ecrire(J, CLIC, 's1', 'O1', 2, { etape: 'a_expedier', rang: 2 }, 5);
+    dit(refuse(desc, /vrm_rang_descend/) && A(`select rang || '|' || version from public.vrm_agent_commandes where commande = 'O1'`) === '3|2', 'le rang ne descend jamais : l\'écriture est refusée et DITE (« vrm_rang_descend »)', desc.ok ? 'passée' : desc.err.slice(0, 100));
+    dit(ecrit(J, CLIC, 's1', 'O1', 2, { etape: 'etiquette_incertaine', rang: 3 }, 6) === '3', 'l\'autre sens : même rang, autre étape : écrite');
+  });
+  await essaie('le bail reste tenu PENDANT l\'écriture (FOR SHARE) [revue : non prouvé]', async () => {
+    fraiche('cmdshare');
+    const E = uuid(95);
+    S(`select public.vrm_agent_prendre_cle('${J}', 'ebay:s1:cmd:O1', '${E}', 120, ${t(0)}, 's1');`);
+    ecrit(J, E, 's1', 'O1', null, { etape: 'payee', rang: 1 }, 1);
+    const Ap = runAsync(COMME.serveur + `begin;\nselect 'W:' || public.vrm_agent_ecrire_commande('${J}', '${E}', 's1', 'O1', 1, '{"etape":"a_expedier","rang":2}', 'ebay', ${t(119)});\nselect pg_sleep(2.5);\ncommit;\n`, { db: DB });
+    await attendre(700);
+    const B = await runAsync(COMME.serveur + `select 'R:' || coalesce(jsonb_agg(x.cle)::text, '[]') from public.vrm_agent_prendre(8, '${uuid(96)}', 120, ${t(121)}) x;`, { db: DB });
+    const a = await Ap;
+    dit(a.ok && /W:2/.test(a.out), 'l\'écriture à t+119 s passe (bail encore tenu)', (a.out + a.err).slice(0, 120));
+    dit(B.ok && /R:\[\]/.test(B.out) && B.ms < 1500, `un battement à t+121 s ne reprend PAS la tâche pendant que l'écriture n'est pas validée (et n'attend pas) : ${B.ms} ms`, B.out + ' ' + B.err.slice(0, 100));
+  });
+  await essaie('ce que la commande ne garde jamais (R18) [revue : vert sur une forme qui arrange]', () => {
+    fraiche('r18');
     const JE = uuid(52);
     S(`select public.vrm_agent_prendre_cle('${J}', 'ebay:s1:cmd:O9', '${JE}', 120, ${t(0)}, 's1');`);
-    const cree = (cols) => run(COMME.serveur + `select public.vrm_agent_ecrire_commande('${J}', 'ebay:s1:cmd:O9', '${JE}', 's1', 'O9', null, '${JSON.stringify(cols).replace(/'/g, "''")}', 'ebay', ${t(1)});`, { db: DB });
-    dit(!cree({ etape: 'payee', rang: 1, pays: 'France' }).ok, 'un pays qui n\'est pas un code ISO 2 est refusé');
-    dit(!cree({ etape: 'payee', rang: 1, cles_shipto: ['Jean Dupont', '12 rue des Lilas'] }).ok, 'des VALEURS d\'adresse à la place des noms de clés sont refusées');
-    dit(!cree({ etape: 'payee', rang: 1, data: { commande: 'x'.repeat(5000) } }).ok, 'une commande recopiée entière (plus de 4 Ko) est refusée');
-    dit(!cree({ etape: 'payee', rang: 1, politique_etiquette: 'EBAY' }).ok, 'une politique d\'étiquette inconnue est refusée (EBAY_ONLY · aucune · pas lue)');
-    const r = cree({ etape: 'payee', rang: 1, pays: 'FR', cles_shipto: ['contactAddress', 'fullName'], politique_etiquette: 'aucune', data: { transitions: [] } });
-    dit(r.ok && r.out === '1', 'l\'autre sens : ISO 2, des noms de clés et une politique lue passent', r.ok ? r.out : r.err.slice(0, 120));
+    const cree = (cols) => ecrire(J, JE, 's1', 'O9', null, cols);
+    const refuses = {
+      'un pays qui n\'est pas un code ISO 2': { pays: 'France' },
+      'des valeurs à la place des noms de clés (avec espace)': { cles_shipto: ['Jean Dupont', '12 rue des Lilas'] },
+      'des valeurs d\'UN mot à la place des noms de clés': { cles_shipto: ['Dupont', 'Cancale', 'Rennes'] },
+      'l\'acheteur recopié dans data': { data: { acheteur: { nom: 'Dupont', rue: '12 rue des Lilas', cp: '35260', ville: 'Cancale', tel: '0612345678', email: 'jean@exemple.fr' } } },
+      'le shipTo d\'eBay recopié dans data': { data: { shipTo: { fullName: 'Jean Dupont', contactAddress: { city: 'Cancale' } } } },
+      'une adresse email en valeur dans data': { data: { note: 'jean.dupont@exemple.fr' } },
+      'un nom et un téléphone comme transporteur': { transporteur: 'Jean Dupont 06 12 34 56 78' },
+      'une phrase comme voie': { voie: 'Mondial Relay chez Paul' },
+      'l\'acheteur dans en_cours': { en_cours: { geste: 'acheter', destinataire: 'Jean Dupont' } },
+      'une commande recopiée entière (plus de 4 Ko)': { data: { commande: 'x'.repeat(5000) } },
+      'une politique d\'étiquette inconnue': { politique_etiquette: 'EBAY' },
+    };
+    // Refusée PAR UNE CONTRAINTE : une erreur d'appel (fonction absente) ne compte pas comme un refus.
+    const passes = Object.entries(refuses).filter(([, c]) => !refuse(cree({ etape: 'payee', rang: 1, ...c }), /violates check constraint/)).map(([k]) => k);
+    dit(passes.length === 0, `la base refuse chacune des ${Object.keys(refuses).length} formes d'une donnée d'acheteur (noms de clés d'un mot, clés d'adresse à toute profondeur, email, téléphone, phrases)`, passes.join(' · '));
+    const r = cree({ etape: 'payee', rang: 1, pays: 'FR', cles_shipto: ['fullName', 'contactAddress.city', 'primaryPhone.phoneNumber', 'email'], politique_etiquette: 'aucune', transporteur: 'mondial_relay', voie: 'ebay',
+      data: { transitions: [], devis: { ville: 'Rennes', prixCentimes: 840 } } });
+    dit(r.ok && r.out === '1', 'l\'autre sens : un code ISO 2, des NOMS de clés eBay, des codes, et la ville d\'un devis (effacée avec lui) passent', r.ok ? r.out : r.err.slice(0, 160));
+  });
+  await essaie('ce que le journal ne garde jamais (R18)', () => {
+    const n = (e) => run(COMME.serveur + `select public.vrm_agent_noter('${J}', ${js(e)}, ${t(0)});`, { db: DB });
+    const refuses = {
+      'une adresse comme référence': { geste: 'bordereau', resultat: 'fait', ref: 'Jean Dupont, 12 rue des Lilas 35260 Cancale' },
+      'un « défaire » de 200 Ko': { geste: 'prix', resultat: 'fait', defaire: { x: 'y'.repeat(200000) } },
+      'l\'acheteur dans « défaire »': { geste: 'prix', resultat: 'fait', defaire: { acheteur: { nom: 'Dupont' } } },
+      'une phrase comme source': { geste: 'prix', resultat: 'fait', source: 'réponse de Boxtal pour Jean' },
+    };
+    const passes = Object.entries(refuses).filter(([, e]) => !refuse(n(e), /violates check constraint/)).map(([k]) => k);
+    dit(passes.length === 0, 'le journal refuse une adresse en référence, un « défaire » trop gros ou qui nomme l\'acheteur, une phrase en source', passes.join(' · '));
+    const r = n({ geste: 'bordereau', resultat: 'fait', ref: 'vrm-12-12345-12345', source: 'boxtal', defaire: { prixAvantCentimes: 5000 } });
+    dit(r.ok && /^\d+$/.test(r.out), 'l\'autre sens : une référence d\'envoi, un code de source et un « défaire » sobre passent', r.ok ? r.out : r.err.slice(0, 120));
   });
 
   // ── 6. MÉMOS ET VUS ───────────────────────────────────────────────────────
@@ -581,26 +890,26 @@ const groupesDe = (l) => l.map((x) => x.owner + '|' + x.groupe);
     dit(pf(J, 'msg:O1:merci') === 't' && pf(J, 'msg:O1:merci') === 'f', 'true UNE fois, puis false');
     dit(pf(V, 'msg:O1:merci') === 'f', 'une clé de geste GLOBALE appelée par un SECOND vendeur : false (un seul « merci » pour une commande eBay) [S5]');
     dit(pf(J, 'achat:O2') === 't' && pf(V, 'achat:O2') === 'f' && pf(V, 'eval:L1') === 't' && pf(J, 'eval:L1') === 'f', 'achat, évaluation : globaux aussi');
-    dit(Q(`select owner from public.vrm_agent_memos where cle = 'msg:O1:merci'`, { role: 'supabase_admin' }) === N, 'rangés sous le propriétaire neutre');
+    dit(A(`select owner from public.vrm_agent_memos where cle = 'msg:O1:merci'`) === N, 'rangés sous le propriétaire neutre');
     dit(pf(J, 'push:vente:O3') === 't' && pf(V, 'push:vente:O3') === 't', 'l\'autre sens : une notification de vente reste PAR vendeur (chacun ses appareils)');
     const res = await Promise.all(Array.from({ length: 50 }, () => runAsync(COMME.serveur + `select public.vrm_agent_premiere_fois('${J}', 'msg:O5:relais', null, ${t(0)});`, { db: DB })));
     const vrais = res.filter((r) => r.ok && r.out === 't').length;
     dit(vrais === 1 && res.every((r) => r.ok), `50 appels simultanés : ${vrais} « première fois » (attendu : 1)`);
     pf(J, 'offre:I1', 0, 86400);
-    dit(Q(`select expire >= ${t(0)} + interval '100 days' from public.vrm_agent_memos where cle = 'offre:I1'`, { role: 'supabase_admin' }) === 't', 'un mémo demandé pour 1 jour est gardé au moins 100 jours [S25, R12]');
+    dit(A(`select expire >= ${t(0)} + interval '100 days' from public.vrm_agent_memos where cle = 'offre:I1'`) === 't', 'un mémo demandé pour 1 jour est gardé au moins 100 jours [S25, R12]');
   });
   await essaie('les vus et la purge', () => {
     S(`select public.vrm_agent_vu('${J}', 'notif:N1', ${t(0)});`);
     dit(S(`select public.vrm_agent_vu('${J}', 'notif:N1', ${t(1)});`) === 'f', 'une notification déjà vue : false');
-    S(`select public.vrm_agent_purger(${t(15 * 86400)});`);
-    dit(Q(`select count(*) from public.vrm_agent_vus`, { role: 'supabase_admin' }) === '0', 'les vus partent à 14 jours');
-    dit(Q(`select count(*) from public.vrm_agent_memos where cle = 'msg:O1:merci'`, { role: 'supabase_admin' }) === '1', 'les mémos de GESTES restent à 14 jours (un message est permis 90 jours)');
-    S(`select public.vrm_agent_purger(${t(101 * 86400)});`);
-    dit(Q(`select count(*) from public.vrm_agent_memos where cle = 'msg:O1:merci'`, { role: 'supabase_admin' }) === '0', 'et partent passé leur échéance (100 jours)');
+    S(`select public.vrm_agent_purger(${t(15 * JOUR)});`);
+    dit(A(`select count(*) from public.vrm_agent_vus`) === '0', 'les vus partent à 14 jours');
+    dit(A(`select count(*) from public.vrm_agent_memos where cle = 'msg:O1:merci'`) === '1', 'les mémos de GESTES restent à 14 jours (un message est permis 90 jours)');
+    S(`select public.vrm_agent_purger(${t(101 * JOUR)});`);
+    dit(A(`select count(*) from public.vrm_agent_memos where cle = 'msg:O1:merci'`) === '0', 'et partent passé leur échéance (100 jours)');
   });
 
   // ── 7. L'ARGENT ───────────────────────────────────────────────────────────
-  console.log('\n7. RÉSERVER DE L\'ARGENT (115 %, plafonds, une fois)');
+  console.log('\n7. RÉSERVER DE L\'ARGENT (115 %, plafonds, une fois, et la purge ne les rouvre pas)');
   const resa = (o, ttc, pl = {}, s = 0, compte = 's1') => QJ(COMME.serveur + `select public.vrm_agent_reserver('${o}', '${compte}', ${ttc}, ${pl.geste ?? 2500}, ${pl.n ?? 10}, ${pl.jour ?? 8000}, ${pl.mois ?? 30000}, ${t(s)});`);
   await essaie('la marge et les plafonds', () => {
     fraiche('argent');
@@ -608,11 +917,11 @@ const groupesDe = (l) => l.map((x) => x.owner + '|' + x.groupe);
     dit(r && r.ok === true && r.centimes === 1150, 'un devis de 10,00 € TTC réserve 11,50 € (+15 %) [S9, R15]', JSON.stringify(r));
     dit(resa(J, 2200).raison === 'geste', 'un devis dont la réservation passe le plafond du geste est refusé (« à confirmer »)');
     dit(QJ(COMME.serveur + `select public.vrm_agent_reserver('${J}', 's1', 1000, null, 10, 8000, 30000, ${t(0)});`).raison === 'pas-su', 'un plafond inconnu : refusé (« pas su » n\'agit jamais)');
-    const k = Q(`select n || '|' || centimes from public.vrm_agent_compteurs where owner = '${J}' and cle = 'argent:jour:s1:2026-10-12'`, { role: 'supabase_admin' });
+    const k = A(`select n || '|' || centimes from public.vrm_agent_compteurs where owner = '${J}' and cle = 'argent:jour:s1:2026-10-12'`);
     dit(k === '1|1150', 'le compteur du jour porte ce qui est réservé', k);
     dit(S(`select public.vrm_agent_rendre_reservation('${J}', '${r.reservation}', ${t(10)});`) === 't', 'une réservation se rend (refus prouvé)');
     dit(S(`select public.vrm_agent_rendre_reservation('${J}', '${r.reservation}', ${t(11)});`) === 'f', 'mais une seule fois');
-    const k2 = Q(`select n || '|' || centimes from public.vrm_agent_compteurs where owner = '${J}' and cle = 'argent:jour:s1:2026-10-12'`, { role: 'supabase_admin' });
+    const k2 = A(`select n || '|' || centimes from public.vrm_agent_compteurs where owner = '${J}' and cle = 'argent:jour:s1:2026-10-12'`);
     dit(k2 === '0|0', 'le compteur revient à zéro, pas en dessous', k2);
     const nuit = resa(J, 100, {}, 15 * 3600);   // 23:00 UTC = 01:00 à Paris le 13
     dit(nuit && nuit.jour === '2026-10-13', 'le jour est celui de PARIS', JSON.stringify(nuit));
@@ -621,18 +930,34 @@ const groupesDe = (l) => l.map((x) => x.owner + '|' + x.groupe);
     fraiche('argent2');
     const lot = await Promise.all(Array.from({ length: 50 }, () => runAsync(COMME.serveur + `select (public.vrm_agent_reserver('${J}', 's1', 1000, 2500, 10, 1000000, 1000000, ${t(0)}) ->> 'ok');`, { db: DB })));
     const pris = lot.filter((r) => r.ok && r.out === 'true').length;
-    const k = Q(`select n || '|' || centimes from public.vrm_agent_compteurs where owner = '${J}' and cle = 'argent:jour:s1:2026-10-12'`, { role: 'supabase_admin' });
+    const k = A(`select n || '|' || centimes from public.vrm_agent_compteurs where owner = '${J}' and cle = 'argent:jour:s1:2026-10-12'`);
     dit(pris === 10 && k === '10|11500' && lot.every((r) => r.ok), `plafond de 10 bordereaux par jour : ${pris} réservés sur 50 demandes simultanées, compteur ${k}`);
     const lot2 = await Promise.all(Array.from({ length: 50 }, () => runAsync(COMME.serveur + `select (public.vrm_agent_reserver('${J}', 's2', 1000, 2500, 1000, 1000000, 30000, ${t(0)}) ->> 'ok');`, { db: DB })));
-    const mois = Q(`select centimes from public.vrm_agent_compteurs where owner = '${J}' and cle = 'argent:mois:2026-10'`, { role: 'supabase_admin' });
+    const mois = A(`select centimes from public.vrm_agent_compteurs where owner = '${J}' and cle = 'argent:mois:2026-10'`);
     dit(Number(mois) <= 30000 && lot2.every((r) => r.ok), `plafond du mois (300 €) : ${mois} centimes réservés au total, jamais plus`);
+  });
+  await essaie('la purge ne rouvre jamais un plafond [revue : « 400 jours » jamais testé]', () => {
+    fraiche('argent3');
+    const r1 = resa(J, 20000, { geste: 30000, jour: 1000000, mois: 30000 }, 0);
+    S(`select public.vrm_agent_purger(${t(2 * JOUR)});`);
+    const r2 = resa(J, 20000, { geste: 30000, jour: 1000000, mois: 30000 }, 2 * JOUR);
+    dit(r1 && r1.ok === true && r2 && r2.ok === false && r2.raison === 'mois', 'plafond du mois à 300 € : 230 € réservés, la purge passe, 230 € de plus dans le même mois sont REFUSÉS', JSON.stringify([r1 && r1.ok, r2]));
+    // Les deux règles, chacune prouvée seule.
+    A(`insert into public.vrm_agent_compteurs (owner, cle, n, centimes, maj) values
+         ('${V}', 'argent:mois:2026-10', 1, 999, ${t(-500 * JOUR)}), ('${V}', 'argent:mois:2026-09', 1, 999, ${t(-500 * JOUR)}),
+         ('${V}', 'argent:mois:2025-01', 1, 999, ${t(-100 * JOUR)}), ('${V}', 'argent:mois:2024-01', 1, 999, ${t(-500 * JOUR)})`);
+    S(`select public.vrm_agent_purger(${t(0)});`);
+    const reste = A(`select string_agg(cle, ',' order by cle) from public.vrm_agent_compteurs where owner = '${V}'`);
+    dit(/2026-10/.test(reste) && /2026-09/.test(reste), 'un compteur du mois en cours ou du mois précédent n\'est JAMAIS purgé, même intouché depuis 500 jours', reste);
+    dit(/2025-01/.test(reste), 'un compteur intouché depuis 100 jours reste (400 jours de garde)', reste);
+    dit(!/2024-01/.test(reste), 'l\'autre sens : un vieux compteur d\'un mois révolu, intouché depuis 500 jours, part', reste);
   });
   await essaie('le quota d\'appels', () => {
     fraiche('quota');
     const q = (prio, o = null, c = null) => S(`select public.vrm_agent_quota('trading:2026-10-12', '${prio}', 1, 100, ${o ? `'${o}'` : 'null'}, ${c ? `'${c}'` : 'null'}, ${t(0)});`);
-    let n = 0; while (n < 200 && q('confort') === 't') n++;
+    let n = 0; while (n < 200 && q('confort', J, 'c' + n) === 't') n++;
     dit(n === 60, `le confort s'arrête à 60 % du quota (${n} appels sur 100)`);
-    n = 0; while (n < 200 && q('detection') === 't') n++;
+    n = 0; while (n < 200 && q('detection', J, 'd' + n) === 't') n++;
     dit(n === 20, `la détection va jusqu'à 80 % (${n} de plus)`);
     n = 0; while (n < 200 && q('obligation') === 't') n++;
     dit(n === 20, `les obligations gardent les 20 % restants (${n} de plus)`);
@@ -640,35 +965,55 @@ const groupesDe = (l) => l.map((x) => x.owner + '|' + x.groupe);
     fraiche('quota2');
     const r1 = q('confort', J, 's1'), r2 = q('confort', J, 's1'), r3 = q('confort', J, 's2'), r4 = q('obligation', J, 's1');
     dit(r1 === 't' && r2 === 'f' && r3 === 't' && r4 === 't', 'hors obligation, au plus 1 % par compte et par jour ; une obligation passe quand même', [r1, r2, r3, r4].join(''));
+    dit(q('confort') === 'f' && q('detection') === 'f' && q('obligation') === 't', 'un vendeur INCONNU (pas su) n\'est jamais plus permissif : refusé hors obligation [revue]');
     S(`select public.vrm_agent_quota_recaler('trading:2026-10-12', 99, ${t(0)}); select public.vrm_agent_quota_recaler('trading:2026-10-12', 5, ${t(1)});`);
-    dit(Q(`select n from public.vrm_agent_compteurs where cle = 'trading:2026-10-12'`, { role: 'supabase_admin' }) === '99', 'le recalage sur eBay ne fait que monter');
+    dit(A(`select n from public.vrm_agent_compteurs where cle = 'trading:2026-10-12'`) === '99', 'le recalage sur eBay ne fait que monter');
   });
 
   // ── 8. LES TITULAIRES ET L'INDEX ──────────────────────────────────────────
   console.log('\n8. UN COMPTE eBAY, UN VENDEUR ; L\'INDEX DES ANNONCES');
+  const ti = (cle, o, c = 's1') => S(`select public.vrm_agent_titulaire('${cle}', '${o}', '${c}', ${t(0)});`);
+  const ix = (o, c, l) => QJ(COMME.serveur + `select public.vrm_ebay_indexer_annonces('${o}', '${c}', ${l === null ? 'null' : `array[${l.map((x) => `'${x}'`).join(',')}]::text[]`}, ${t(0)});`);
   await essaie('les titulaires [S5, R10]', async () => {
     fraiche('titulaires');
-    const ti = (cle, o, c = 's1') => S(`select public.vrm_agent_titulaire('${cle}', '${o}', '${c}', ${t(0)});`);
     dit(ti('0123456789abcdef', J) === 't' && ti('0123456789abcdef', J) === 't', 'le premier vendeur devient titulaire (et le reste)');
     dit(ti('0123456789abcdef', V) === 'f', 'un SECOND vendeur VRM qui relie le même compte eBay est refusé');
-    dit(Q(`select owner from public.vrm_ebay_titulaires where cle_ebay = '0123456789abcdef'`, { role: 'supabase_admin' }) === J, 'le titulaire n\'a pas changé');
+    dit(A(`select owner from public.vrm_ebay_titulaires where cle_ebay = '0123456789abcdef'`) === J, 'le titulaire n\'a pas changé');
     dit(ti('PAS-UNE-CLE', J) === 'f' && ti('fedcba9876543210', N) === 'f', 'une clé qui n\'est pas une identité eBay, ou le propriétaire neutre : refusés');
+    dit(ti('1111111111111111', J, 's1') === 'f', 'un second compte eBay sous le MÊME libellé chez le même vendeur est refusé (le libellé nomme ses tâches)');
     const lot = await Promise.all([J, V, J, V, V, J].map((o) => runAsync(COMME.serveur + `select '${o}:' || public.vrm_agent_titulaire('aaaaaaaaaaaaaaaa', '${o}', 's2', ${t(0)});`, { db: DB })));
     const gagnants = new Set(lot.filter((r) => r.out.endsWith(':true')).map((r) => r.out.split(':')[0]));
     dit(gagnants.size === 1, 'deux vendeurs qui relient le même compte au même instant : un seul gagne', [...gagnants].join(','));
     dit(S(`select public.vrm_agent_titulaire_liberer('0123456789abcdef', '${V}');`) === 'f', 'seul le titulaire libère son compte');
-    dit(S(`select public.vrm_agent_titulaire_liberer('0123456789abcdef', '${J}');`) === 't' && ti('0123456789abcdef', V) === 't', 'libéré, il peut être relié ailleurs');
+    dit(S(`select public.vrm_agent_titulaire_liberer('0123456789abcdef', '${J}');`) === 't' && ti('0123456789abcdef', V, 's7') === 't', 'libéré, il peut être relié ailleurs');
   });
   await essaie('l\'index des annonces [D13]', () => {
     fraiche('index');
-    const ix = (o, c, l) => QJ(COMME.serveur + `select public.vrm_ebay_indexer_annonces('${o}', '${c}', ${l === null ? 'null' : `array[${l.map((x) => `'${x}'`).join(',')}]::text[]`}, ${t(0)});`);
+    ti('0123456789abcdef', J, 's1'); ti('fedcba9876543210', V, 's9');
     const r1 = ix(J, 's1', ['128086452103', '128127336988']);
-    dit(r1 && r1.indexees === 2, 'les annonces d\'un compte sont indexées', JSON.stringify(r1));
+    dit(r1 && r1.indexees === 2, 'les annonces d\'un compte sont indexées par son titulaire', JSON.stringify(r1));
     const r2 = ix(V, 's9', ['128086452103', '199999999999']);
-    dit(r2 && r2.refusees === 1 && Q(`select owner from public.vrm_ebay_annonces_index where listing_id = '128086452103'`, { role: 'supabase_admin' }) === J, 'une annonce déjà à un AUTRE vendeur n\'est jamais prise', JSON.stringify(r2));
+    dit(r2 && r2.refusees === 1 && A(`select owner from public.vrm_ebay_annonces_index where listing_id = '128086452103'`) === J, 'une annonce déjà à un AUTRE vendeur encore titulaire n\'est jamais prise', JSON.stringify(r2));
     const r3 = ix(J, 's1', ['128127336988', 'pas-un-id']);
     dit(r3 && r3.retirees === 1 && r3.refusees === 1, 'relecture complète : l\'annonce disparue sort de l\'index, un identifiant malformé est refusé', JSON.stringify(r3));
-    dit(ix(J, 's1', null) === null && Q(`select count(*) from public.vrm_ebay_annonces_index where owner = '${J}'`, { role: 'supabase_admin' }) === '1', 'une lecture ratée (NULL) ne touche à rien');
+    dit(ix(J, 's1', null) === null && A(`select count(*) from public.vrm_ebay_annonces_index where owner = '${J}'`) === '1', 'une lecture ratée (NULL) ne touche à rien');
+    const r4 = ix(J, 'pas-a-lui', ['128000000077']);
+    dit(r4 && r4.indexees === 0 && r4.raison === 'pas-titulaire' && A(`select count(*) from public.vrm_ebay_annonces_index where listing_id = '128000000077'`) === '0', 'un vendeur qui n\'est pas titulaire de ce compte n\'indexe rien [revue]', JSON.stringify(r4));
+  });
+  await essaie('l\'index suit le compte : changement de libellé, libération, ligne périmée [revue]', () => {
+    fraiche('index2');
+    const A1 = '88888888-8888-8888-8888-888888888888', B1 = '99999999-9999-9999-9999-999999999999';
+    dit(ti('abcdefabcdef0123', A1, '') === 't', 'A devient titulaire du compte X (libellé vide, le compte d\'avant les plusieurs comptes)');
+    dit((ix(A1, '', ['128000000001', '128000000002']) || {}).indexees === 2, 'A indexe ses 2 annonces');
+    dit(ti('abcdefabcdef0123', A1, 'abcdefabcdef0123') === 't', 'le libellé du compte X change');
+    dit(A(`select string_agg(distinct compte, ',') from public.vrm_ebay_annonces_index where owner = '${A1}'`) === 'abcdefabcdef0123', 'l\'index SUIT le nouveau libellé', A(`select string_agg(compte, ',') from public.vrm_ebay_annonces_index where owner = '${A1}'`));
+    S(`select public.vrm_agent_titulaire_liberer('abcdefabcdef0123', '${A1}');`);
+    dit(A(`select count(*) from public.vrm_ebay_annonces_index where owner = '${A1}'`) === '0', 'libéré, TOUT son index d\'annonces part avec lui');
+    dit(ti('abcdefabcdef0123', B1, 'x1') === 't' && (ix(B1, 'x1', ['128000000001', '128000000002']) || {}).indexees === 2, 'B, nouveau titulaire, indexe les annonces du compte');
+    dit(A(`select string_agg(distinct owner::text, ',') from public.vrm_ebay_annonces_index where listing_id in ('128000000001', '128000000002')`) === B1, 'et les sonnettes vont chez B, pas chez l\'ancien titulaire');
+    A(`insert into public.vrm_ebay_annonces_index (listing_id, owner, compte, maj) values ('128000000009', '${A1}', 'vieux', now())`);
+    const r = ix(B1, 'x1', ['128000000001', '128000000002', '128000000009']);
+    dit(r && r.indexees === 3 && A(`select owner from public.vrm_ebay_annonces_index where listing_id = '128000000009'`) === B1, 'une ligne laissée par un vendeur qui n\'est PLUS titulaire est reprise', JSON.stringify(r));
   });
   await essaie('les preuves de vente : la première fois ne bouge pas', () => {
     const p = (s) => S(`select public.vrm_agent_preuve_vue('${J}', '1', 'vinted', 'tx-1', ${t(s)}) = ${t(0)};`);
@@ -679,63 +1024,155 @@ const groupesDe = (l) => l.map((x) => x.owner + '|' + x.groupe);
   console.log('\n9. LE JOURNAL (une seule réécriture possible) [S26, R19]');
   await essaie('le journal', () => {
     fraiche('journal');
-    const id = S(`select public.vrm_agent_noter('${J}', '{"geste":"message","resultat":"fait","cible":"O1","numero":"1","texte":"Bonjour Paul, ton colis est au relais."}', ${t(0)});`);
+    const id = S(`select public.vrm_agent_noter('${J}', '{"geste":"message","resultat":"fait","cible":"O1","numero":"1","texte":"Bonjour Paul, ton colis est au relais.","ref":"vrm-O1","defaire":{"prixAvantCentimes":5000}}', ${t(0)});`);
     S(`select public.vrm_agent_noter('${J}', '{"geste":"message","resultat":"fait","cible":"O2","texte":"Autre acheteur"}', ${t(0)});`);
     dit(/^\d+$/.test(id), 'une ligne s\'ajoute');
     dit(!run(COMME.serveur + `select public.vrm_agent_noter('${J}', '{"geste":"x","resultat":"peut-etre"}', ${t(0)});`, { db: DB }).ok, 'un résultat hors liste est refusé');
     const tente = {
       'réécrire le texte': `update public.vrm_agent_journal set texte = 'autre chose' where id = ${id};`,
       'changer le résultat': `update public.vrm_agent_journal set resultat = 'refuse' where id = ${id};`,
-      'effacer le texte ET changer la cible': `update public.vrm_agent_journal set texte = null, texte_retire_le = now(), cible = 'O9' where id = ${id};`,
+      'effacer le texte ET changer la cible': `update public.vrm_agent_journal set texte = null, ref = null, defaire = null, texte_retire_le = now(), cible = 'O9' where id = ${id};`,
       'supprimer une ligne': `delete from public.vrm_agent_journal where id = ${id};`,
       'vider la table': `truncate public.vrm_agent_journal;`,
     };
     const passes = Object.entries(tente).filter(([, sql]) => run(sql, { db: DB }).ok).map(([k]) => k);
-    dit(passes.length === 0, 'même le propriétaire de la table ne peut ni réécrire, ni supprimer, ni vider le journal', passes.join(' · '));
+    dit(passes.length === 0, 'le propriétaire de la table lui-même ne peut ni réécrire, ni supprimer, ni vider le journal par une écriture ordinaire', passes.join(' · '));
+    const variables = {
+      'la variable de la purge': `set vrm.agent_purger_avant = 'infinity'; delete from public.vrm_agent_journal;`,
+      'la variable de l\'effacement': `set vrm.agent_effacer = '${J}'; delete from public.vrm_agent_journal where owner = '${J}';`,
+    };
+    const ouvertes = Object.entries(variables).filter(([, sql]) => run(sql, { db: DB }).ok).map(([k]) => k);
+    dit(ouvertes.length === 0 && A(`select count(*) from public.vrm_agent_journal`) === '2', 'une variable de SESSION n\'ouvre plus le journal (seule une marque de transaction posée par la purge ou l\'effacement le fait) [revue]', ouvertes.join(' · '));
     dit(!run(COMME.serveur + `update public.vrm_agent_journal set texte = null where id = ${id};`, { db: DB }).ok, 'le serveur non plus (aucun droit d\'écriture directe)');
-    dit(S(`select public.vrm_agent_anonymiser_journal('${J}', 'O1', ${t(60)});`) === '1', 'l\'effacement du texte à la demande d\'eBay passe');
-    dit(Q(`select (texte is null) || '|' || (texte_retire_le is not null) || '|' || geste || '|' || numero from public.vrm_agent_journal where id = ${id}`, { role: 'supabase_admin' }) === 'true|true|message|1', 'le texte est retiré, la trace du geste reste');
-    dit(Q(`select texte from public.vrm_agent_journal where cible = 'O2'`, { role: 'supabase_admin' }) === 'Autre acheteur', 'les autres entrées ne bougent pas');
-    S(`select public.vrm_agent_purger(${t(14 * 31 * 86400)});`);
-    dit(Q(`select count(*) from public.vrm_agent_journal`, { role: 'supabase_admin' }) === '0', 'la purge retire le journal de plus de 13 mois');
+    const an = run(COMME.serveur + `select public.vrm_agent_anonymiser_journal('${J}', 'O1', ${t(60)});`, { db: DB });
+    dit(an.ok && an.out === '1', 'l\'effacement à la demande d\'eBay passe', an.ok ? an.out : an.err.slice(0, 120));
+    dit(A(`select (texte is null) || '|' || (ref is null) || '|' || (defaire is null) || '|' || (texte_retire_le is not null) || '|' || geste || '|' || numero from public.vrm_agent_journal where id = ${id}`) === 'true|true|true|true|message|1',
+      'le texte, la référence et le « défaire » sont retirés, la trace du geste reste [revue : la référence restait]');
+    dit(A(`select texte from public.vrm_agent_journal where cible = 'O2'`) === 'Autre acheteur', 'les autres entrées ne bougent pas');
+    const idAt = S(`select public.vrm_agent_noter('${J}', '{"geste":"message","resultat":"fait","at":"2020-01-01T00:00:00Z"}', ${t(0)});`);
+    const at = A(`select at = ${t(0)} from public.vrm_agent_journal where id = ${Number(idAt) || 0}`);
+    dit(at === 't', 'l\'heure d\'une ligne est celle du serveur : un « at » glissé dans l\'entrée est ignoré');
+    S(`select public.vrm_agent_purger(${t(14 * 31 * JOUR)});`);
+    dit(A(`select count(*) from public.vrm_agent_journal`) === '0', 'la purge retire le journal de plus de 13 mois');
   });
 
-  // ── 10. L'HORLOGE ─────────────────────────────────────────────────────────
-  console.log('\n10. L\'HORLOGE (l\'anti-rafale sur une ligne neuve) [D14, D4]');
+  // ── 10. L'HORLOGE ET L'HEURE ──────────────────────────────────────────────
+  console.log('\n10. L\'HORLOGE (l\'anti-rafale sur une ligne neuve) [D14, D4] ET L\'HEURE REÇUE');
   await essaie('l\'horloge', () => {
     fraiche('horloge');
     dit(S(`select public.vrm_agent_horloge_battre(${t(0)});`) === 't', 'sur une horloge NEUVE, le premier battement travaille (la ligne rend une ligne)');
     dit(S(`select public.vrm_agent_horloge_battre(${t(5)});`) === 'f', '5 s plus tard : ignoré (anti-rafale)');
     dit(S(`select public.vrm_agent_horloge_battre(${t(21)});`) === 't', '21 s plus tard : il travaille');
     S(`select public.vrm_agent_horloge_succes(${t(30)}); select public.vrm_agent_horloge_succes(${t(10)});`);
-    dit(Q(`select dernier_succes = ${t(30)} from public.vrm_agent_horloge`, { role: 'supabase_admin' }) === 't', 'le dernier succès ne recule jamais');
+    dit(A(`select dernier_succes = ${t(30)} from public.vrm_agent_horloge`) === 't', 'le dernier succès ne recule jamais');
+  });
+  await essaie('sans horloge simulée, l\'heure de l\'appelant ne compte pas [revue : une heure fausse arrêtait l\'agent et purgeait tout]', () => {
+    fraiche('heure');
+    SR(`select public.vrm_agent_noter('${J}', '{"geste":"bordereau","resultat":"fait","cible":"O1","centimes":840}', now());
+        select public.vrm_agent_noter('${V}', '{"geste":"retrait","resultat":"fait","cible":"I9"}', now());
+        select public.vrm_agent_premiere_fois('${J}', 'achat:O1', null, now());`);
+    SR(`select public.vrm_agent_purger(now() + interval '2 years');`);
+    dit(A(`select count(*) from public.vrm_agent_journal`) === '2' && SR(`select public.vrm_agent_premiere_fois('${J}', 'achat:O1', null, now());`) === 'f',
+      'purger(+2 ans) n\'efface ni le journal ni les mémos : un second achat reste impossible');
+    SR(`select public.vrm_agent_horloge_battre(now() + interval '1 year'); select public.vrm_agent_horloge_succes(now() + interval '1 year');`);
+    dit(A(`select (dernier_battement <= now() + interval '1 minute') || '|' || (dernier_succes <= now() + interval '1 minute') from public.vrm_agent_horloge`) === 'true|true',
+      'une heure à +1 an n\'arrête pas l\'horloge et ne rend pas l\'alarme « 30 min sans succès » muette', A(`select dernier_battement || ' ' || dernier_succes from public.vrm_agent_horloge`));
+    A(`insert into public.vrm_agent_file (owner, cle, groupe, prochain, bail_jeton, bail_jusqua) values ('${J}', 'ebay:s1:veille', 's1', now() - interval '1 minute', '${uuid(97)}', now() + interval '120 seconds')`);
+    const vole = SR(`select count(*) from public.vrm_agent_prendre(8, '${uuid(98)}', 120, now() + interval '200 seconds');`);
+    dit(vole === '0' && A(`select bail_jeton from public.vrm_agent_file where cle = 'ebay:s1:veille'`) === uuid(97), 'prendre(+200 s) ne vole pas un bail vivant', vole);
+    const idAt = SR(`select public.vrm_agent_noter('${J}', '{"geste":"message","resultat":"fait"}', now() + interval '1 year');`);
+    const at = A(`select at <= now() + interval '1 minute' from public.vrm_agent_journal where id = ${Number(idAt) || 0}`);
+    dit(at === 't', 'noter(+1 an) écrit l\'heure du serveur');
+    const simule = S(`select count(*) from public.vrm_agent_prendre(8, '${uuid(99)}', 120, now() + interval '200 seconds');`);
+    dit(simule === '1', 'l\'autre sens : sur horloge SIMULÉE (le banc), l\'heure reçue compte — c\'est elle qui fait le banc de vie', simule);
   });
 
   // ── 11. EFFACER UN VENDEUR, COMPACTER ─────────────────────────────────────
-  console.log('\n11. « FERMER MON COMPTE » ET LA PURGE');
-  await essaie('effacer un vendeur', () => {
+  console.log('\n11. « FERMER MON COMPTE » (tout part, et la porte se ferme) ET LA PURGE');
+  await essaie('effacer un vendeur : les 12 tables, et les quotas qui le nomment', () => {
     fraiche('effacer');
-    S(`select public.vrm_agent_planifier('${J}', 'k', 'g1', ${t(0)}, ${t(0)}); select public.vrm_agent_planifier('${V}', 'k', 'g1', ${t(0)}, ${t(0)});
-       select public.vrm_agent_noter('${J}', '{"geste":"retrait","resultat":"fait"}', ${t(0)}); select public.vrm_agent_noter('${V}', '{"geste":"retrait","resultat":"fait"}', ${t(0)});
-       select public.vrm_agent_titulaire('0123456789abcdef', '${J}', 's1', ${t(0)}); select public.vrm_agent_premiere_fois('${J}', 'msg:O1:x', null, ${t(0)});
-       select public.vrm_agent_premiere_fois('${J}', 'push:vente:O1', null, ${t(0)});`);
-    Q(`insert into public.vrm_agent_vendeurs (owner) values ('${J}'), ('${V}');`, { role: 'supabase_admin' });
+    const peupler = (o, cleEbay, jeton) => {
+      A(`insert into public.vrm_agent_vendeurs (owner) values ('${o}');
+         insert into public.vrm_agent_routes (k, owner, compte, fournisseur) values ('${o.replace(/-/g, '')}zzzzzzzzzz', '${o}', 's1', 'boxtal');
+         insert into public.vrm_coffre (owner, compte, fournisseur, v, nonce, chiffre, tag) values ('${o}', 's1', 'boxtal', 1, '\\x000102030405060708090a0b', '\\x00', '\\x000102030405060708090a0b0c0d0e0f');`);
+      S(`select public.vrm_agent_prendre_cle('${o}', 'ebay:s1:cmd:O1', '${jeton}', 120, ${t(0)}, 's1');
+         select public.vrm_agent_ecrire_commande('${o}', '${jeton}', 's1', 'O1', null, '{"etape":"payee","rang":1}', 'ebay', ${t(1)});
+         select public.vrm_agent_noter('${o}', '{"geste":"retrait","resultat":"fait","texte":"Bonjour Paul Martin"}', ${t(0)});
+         select public.vrm_agent_reserver('${o}', 's1', 1000, 2500, 10, 8000, 30000, ${t(0)});
+         select public.vrm_agent_quota('trading:2026-10-12', 'confort', 1, 5000, '${o}', 's1', ${t(0)});
+         select public.vrm_agent_vu('${o}', 'notif:N1', ${t(0)});
+         select public.vrm_agent_premiere_fois('${o}', 'push:vente:O1', null, ${t(0)});
+         select public.vrm_agent_premiere_fois('${o}', 'msg:${o.slice(0, 4)}:merci', null, ${t(0)});
+         select public.vrm_agent_titulaire('${cleEbay}', '${o}', 's1', ${t(0)});
+         select public.vrm_ebay_indexer_annonces('${o}', 's1', array['12800000${o.slice(0, 4)}'], ${t(0)});
+         select public.vrm_agent_preuve_vue('${o}', '1', 'vinted', 'tx-1', ${t(0)});`);
+    };
+    peupler(J, '0123456789abcdef', uuid(100)); peupler(V, 'fedcba9876543210', uuid(101));
+    const TABLES_OWNER = ['vrm_agent_vendeurs', 'vrm_agent_commandes', 'vrm_agent_journal', 'vrm_agent_file', 'vrm_agent_compteurs', 'vrm_agent_vus',
+      'vrm_agent_memos', 'vrm_agent_routes', 'vrm_coffre', 'vrm_ebay_titulaires', 'vrm_ebay_annonces_index', 'vrm_agent_preuves'];
+    const compte = (o) => TABLES_OWNER.map((x) => x.replace(/^vrm_(agent_|ebay_)?/, '') + ':' + A(`select count(*) from public.${x} where owner = '${o}'`));
+    const avant = compte(J);
+    dit(avant.every((x) => !x.endsWith(':0')), 'avant : le vendeur a une ligne dans CHACUNE des 12 tables de l\'agent', avant.join(' '));
     const r = QJ(COMME.serveur + `select public.vrm_agent_effacer_vendeur('${J}');`);
-    const reste = Q(`select (select count(*) from public.vrm_agent_file where owner = '${J}') + (select count(*) from public.vrm_agent_journal where owner = '${J}') + (select count(*) from public.vrm_agent_vendeurs where owner = '${J}') + (select count(*) from public.vrm_ebay_titulaires where owner = '${J}') + (select count(*) from public.vrm_agent_memos where owner = '${J}')`, { role: 'supabase_admin' });
-    dit(r && r.journal === 1 && reste === '0', 'tout ce que l\'agent garde du vendeur part, journal compris', JSON.stringify(r));
-    const autre = Q(`select (select count(*) from public.vrm_agent_file where owner = '${V}') || '|' || (select count(*) from public.vrm_agent_journal where owner = '${V}') || '|' || (select count(*) from public.vrm_agent_memos where owner = '${N}')`, { role: 'supabase_admin' });
-    dit(autre === '1|1|1', 'rien de l\'autre vendeur ; les mémos GLOBAUX restent', autre);
+    const apres = compte(J);
+    dit(apres.every((x) => x.endsWith(':0')), 'après : plus RIEN dans aucune des 12 tables, coffre (ses clés de prestataire), commandes, preuves et index compris [revue : 5 tables sur 12 étaient vérifiées]', apres.filter((x) => !x.endsWith(':0')).join(' ') + ' ' + JSON.stringify(r));
+    dit(A(`select count(*) from public.vrm_agent_compteurs where owner = '${N}' and cle like '%${J}%'`) === '0', 'les quotas par compte qui le NOMMENT, rangés sous le neutre, partent aussi');
+    const autre = compte(V);
+    dit(autre.every((x) => !x.endsWith(':0')) && A(`select count(*) from public.vrm_agent_compteurs where owner = '${N}' and cle like '%${V}%'`) === '1', 'rien de l\'autre vendeur ne bouge', autre.join(' '));
+    dit(A(`select count(*) from public.vrm_agent_memos where owner = '${N}'`) === '2', 'les mémos GLOBAUX restent (ils ne disent que « ce geste a été fait pour cette commande eBay »)');
     dit(S(`select public.vrm_agent_effacer_vendeur('${N}') is null;`) === 't', 'le propriétaire neutre ne s\'efface pas');
+  });
+  await essaie('« Fermer mon compte » FERME LA PORTE : un battement en vol n\'écrit plus rien à son nom [revue]', () => {
+    // Suite de la base « effacer » : J est effacé, V ne l'est pas.
+    const tente = {
+      'noter (R5 : sans bail)': [`select public.vrm_agent_noter('${J}', '{"geste":"message","resultat":"fait","cible":"O7","texte":"Bonjour Paul Martin, ton colis part demain"}', ${t(30)}) is null;`, 't'],
+      'planifier': [`select public.vrm_agent_planifier('${J}', 'ebay:s1:veille', 's1', ${t(60)}, ${t(40)}) is null;`, 't'],
+      'prendre_cle': [`select public.vrm_agent_prendre_cle('${J}', 'ebay:s1:cmd:O8', '${uuid(102)}', 120, ${t(42)}, 's1');`, 'f'],
+      'premiere_fois (par vendeur)': [`select public.vrm_agent_premiere_fois('${J}', 'push:vente:O7', null, ${t(43)});`, 'f'],
+      'premiere_fois (globale)': [`select public.vrm_agent_premiere_fois('${J}', 'msg:O9:merci', null, ${t(43)});`, 'f'],
+      'vu': [`select public.vrm_agent_vu('${J}', 'notif:N9', ${t(44)});`, 'f'],
+      'ecrire_commande': [`select public.vrm_agent_ecrire_commande('${J}', '${uuid(100)}', 's1', 'O8', null, '{"etape":"payee","rang":1}', 'ebay', ${t(45)}) is null;`, 't'],
+      'reserver': [`select public.vrm_agent_reserver('${J}', 's1', 100, 2500, 10, 8000, 30000, ${t(46)}) ->> 'raison';`, 'efface'],
+      'quota (confort)': [`select public.vrm_agent_quota('trading:2026-10-12', 'confort', 1, 5000, '${J}', 's1', ${t(47)});`, 'f'],
+      'quota (obligation)': [`select public.vrm_agent_quota('trading:2026-10-12', 'obligation', 1, 5000, '${J}', 's1', ${t(47)});`, 'f'],
+      'titulaire': [`select public.vrm_agent_titulaire('0123456789abcdef', '${J}', 's1', ${t(48)});`, 'f'],
+      'indexer': [`select public.vrm_ebay_indexer_annonces('${J}', 's1', array['128000099999'], ${t(49)}) is null;`, 't'],
+      'preuve_vue': [`select public.vrm_agent_preuve_vue('${J}', '2', 'vinted', 'tx-2', ${t(50)}) is null;`, 't'],
+    };
+    const ouverts = Object.entries(tente).filter(([, [sql, attendu]]) => { const r = run(COMME.serveur + sql, { db: DB }); return !r.ok || r.out !== attendu; }).map(([k]) => k);
+    dit(ouverts.length === 0, 'noter, planifier, prendre_cle, premiere_fois, vu, ecrire_commande, reserver, quota, titulaire, indexer, preuve_vue : tous refusent un vendeur effacé', ouverts.join(' · '));
+    const directs = {
+      vrm_agent_vendeurs: `(owner, actif) values ('${J}', true)`,
+      vrm_coffre: `(owner, compte, fournisseur, v, nonce, chiffre, tag) values ('${J}', 's1', 'ebay', 1, '\\x000102030405060708090a0b', '\\x00', '\\x000102030405060708090a0b0c0d0e0f')`,
+      vrm_agent_vus: `(owner, cle) values ('${J}', 'notif:N10')`,
+      vrm_agent_routes: `(k, owner, fournisseur) values ('${'z'.repeat(40)}', '${J}', 'boxtal')`,
+    };
+    const passes = Object.entries(directs).filter(([x, ligne]) => !refuse(run(COMME.serveur + `insert into public.${x} ${ligne};`, { db: DB }), /vrm_vendeur_efface/)).map(([x]) => x);
+    dit(passes.length === 0, 'les écritures DIRECTES du serveur (pouls, coffre, vus, routes) sont refusées aussi (« vrm_vendeur_efface »)', passes.join(' · '));
+    const reste = ['vrm_agent_journal', 'vrm_agent_file', 'vrm_agent_memos', 'vrm_agent_vendeurs', 'vrm_coffre', 'vrm_agent_commandes'].map((x) => A(`select count(*) from public.${x} where owner = '${J}'`)).join('');
+    dit(reste === '000000' && A(`select count(*) from public.vrm_agent_compteurs where cle like '%${J}%' or owner = '${J}'`) === '0', 'et rien ne renaît : ni journal (texte de l\'acheteur compris), ni tâche, ni mémo, ni compteur', reste);
+    dit(S(`select public.vrm_agent_noter('${V}', '{"geste":"retrait","resultat":"fait"}', ${t(51)}) is not null;`) === 't', 'l\'autre sens : l\'autre vendeur écrit toujours');
   });
   await essaie('compacter les commandes closes depuis 90 jours', () => {
     fraiche('compacter');
-    Q(`insert into public.vrm_agent_commandes (owner, compte, commande, etape, rang, maj, data) values
-         ('${J}', 's1', 'VIEILLE', 'close', 10, ${t(-100 * 86400)}, '{"transitions":[1,2,3],"bordereau":{"prixCentimes":840},"preuve":{"suivi":"X1"},"devis":{"ville":"Rennes"}}'),
-         ('${J}', 's1', 'EN-COURS', 'a_expedier', 2, ${t(-100 * 86400)}, '{"transitions":[1]}');`, { role: 'supabase_admin' });
+    A(`insert into public.vrm_agent_commandes (owner, compte, commande, etape, rang, maj, data) values
+         ('${J}', 's1', 'VIEILLE', 'close', 10, ${t(-100 * JOUR)}, '{"transitions":[1,2,3],"bordereau":{"prixCentimes":840},"preuve":{"suivi":"X1"},"devis":{"ville":"Rennes"}}'),
+         ('${J}', 's1', 'EN-COURS', 'a_expedier', 2, ${t(-100 * JOUR)}, '{"transitions":[1]}');`);
     S(`select public.vrm_agent_purger(${t(0)});`);
     const d = QJ(`select json_object_agg(commande, data) from public.vrm_agent_commandes`, { role: 'supabase_admin' });
     dit(d && d.VIEILLE && d.VIEILLE.bordereau && d.VIEILLE.preuve && !d.VIEILLE.transitions && !d.VIEILLE.devis, 'une commande close depuis 90 jours ne garde que son bordereau et sa preuve (jamais supprimée)', JSON.stringify(d && d.VIEILLE));
     dit(d && d['EN-COURS'] && d['EN-COURS'].transitions, 'une commande en cours n\'est pas touchée');
+  });
+  await essaie('l\'historique de pg_cron (à la forme Supabase) : purgé, et sans jamais faire échouer le reste', () => {
+    fraiche('cron');
+    A(`create schema cron; create table cron.job_run_details (runid bigint primary key, end_time timestamptz);
+       grant usage on schema cron to postgres; grant all on all tables in schema cron to postgres;
+       insert into cron.job_run_details values (1, ${t(-10 * JOUR)}), (2, ${t(-1 * JOUR)});`);
+    const r = QJ(COMME.serveur + `select public.vrm_agent_purger(${t(0)});`);
+    dit(r && r.cron === 1 && A('select count(*) from cron.job_run_details') === '1', 'les exécutions de plus de 7 jours partent', JSON.stringify(r));
+    A(`revoke delete on cron.job_run_details from postgres; insert into public.vrm_agent_vus (owner, cle, at) values ('${J}', 'notif:vieille', ${t(-30 * JOUR)});`);
+    const r2 = run(COMME.serveur + `select public.vrm_agent_purger(${t(0)});`, { db: DB });
+    dit(r2.ok && A(`select count(*) from public.vrm_agent_vus`) === '0', 'un droit qui manque sur l\'historique ne fait pas échouer la purge des vus, mémos, journal (« cron » : pas su)', r2.ok ? r2.out : r2.err.slice(0, 120));
   });
 
   console.log(`\n${ok + ko} contrôles, ${ko} au rouge.`);
