@@ -7104,6 +7104,74 @@ qui arrivent pour de vrai (`orders_sold` 18, `inbox` 17, `profile` 12).
 - **Geste de Julien** : installer la **5.166** dans UN seul dossier, recharger
   ses onglets Vinted, puis passer une fois sur **tomj683** et **arthuror2**.
 
+### « Les notifications des messages ne sont pas toujours envoyées » — le serveur, l'app, la fuite de l'IA (11 octobre)
+**Mesuré d'abord** (base en lecture seule, journaux de la base ; rapport et deux
+relectures dans le scratchpad `plaintes-11oct/notifications*.md`) : **le serveur
+n'a perdu aucune notification les 9 et 10 octobre** (22 emails de message, 22
+envois, 0 purge). Ce qui manque est en amont : **3 comptes n'envoient aucun
+email à VRM** (`angeled92` et `tomj606` jamais, `arthuror2` plus rien depuis le
+23 septembre — prouvé par transaction : leurs ventes n'ont aucun
+`email_bord_{tx}`), Vinted envoie l'email **~15 min 30 s** après le message, et
+pas quand il a déjà répondu dans l'app Vinted (3 sur 3). ⚠️ **« Masquer mon
+adresse » d'Apple n'est PAS la cause prouvée** : deux comptes retirés à adresse
+Apple recevaient très bien leurs emails, et le relais d'`arthuror2` transfère.
+Les « 4 messages sans email » du premier rapport étaient des réponses de Julien.
+- **La notification nomme la paire** (`paireDuSujetMessage`, lue dans le sujet
+  « Nouveau message à propos de … », rien d'autre) : « 💬 {paire} » /
+  « Nouveau message sur {compte} — ouvre Vinted pour répondre. »
+- **Quatre faiblesses de la route, reproduites puis fermées** (banc
+  `notif-messages.cjs`, la vraie route, base à état) :
+  · préférences illisibles ⇒ la dernière lue par l'instance, sinon on SONNE pour
+    ce qui appelle un geste ou de l'argent **et les messages** (`SONNE_SI_PAS_SU`)
+    — suivi, achat, favori, facture gardent leur défaut ;
+  · mémo anti-doublon lu en **trois états** (`supabaseLireRow`) : une lecture
+    ratée ne le réécrit plus à vide ; on envoie, et la clé est retenue par
+    l'instance (`_memoEnAttente`, un REPLI) puis versée au mémo à la lecture
+    suivante. Même garde sur le journal des emails (il se vidait aussi) ;
+  · clé = **empreinte du texte entier** (sha256) — l'ancienne clé « sujet + 200
+    caractères » reste reconnue comme ALIAS, jamais réécrite : sans elle, le jour
+    du déploiement, chaque fil renvoyé re-sonnerait en entier ;
+  · `push_subs` se modifie par **écriture conditionnelle** (`modifierSubs` :
+    `PATCH …&data->>rev=eq.<lue>`, insertion `ignore-duplicates`, relire et
+    recommencer sur conflit) — abonnements simultanés, désinscription, purge
+    d'un appareil mort : plus aucun appareil perdu ; un appareil déjà inscrit ne
+    réécrit plus la liste. Aucune migration : la première écriture pose `rev`.
+  ⚠️ `PATCH` filtré sur `data->>rev` est la grammaire PostgREST documentée,
+  **jamais appelée sur la vraie base** (lecture seule).
+- **L'app dit quels comptes n'envoient aucun email, depuis quand, avec le
+  geste** — UNE règle (`etatEmailsComptes`, bloc `<comptes-sans-email>`) pour
+  Réglages → Notifications ET Achats → En attente (§11). « Muet » seulement sur
+  **preuve** : ≥ 2 ventes captées (de plus de 3 jours, la plus ancienne de plus
+  de 7) sans email de bordereau depuis le dernier signe de vie du compte. Le
+  journal compte (`jujuf38` n'est plus « aucun email »), un compte qui n'a rien
+  vendu est « calme » (gris), plus aucun rouge (§7), lecture ratée ⇒ personne
+  n'est accusé et c'est dit. Le geste : 1) Vinted → Paramètres → Notifications
+  (e-mails), 2) la boîte fait suivre — pour une adresse Apple : Réglages → ton
+  nom → Connexion et sécurité → Se connecter avec Apple → Vinted → Transférer à.
+  Les ventes viennent de la coque (`publierVentesCoque`/`useVentesCoque`).
+- **La fuite de l'IA** (`repondreAuxMessages`, à chaque page Vinted, ~255/jour) :
+  une hésitation ou une réponse vide n'était mémorisée nulle part et repartait
+  chez l'IA à chaque page. **Une question par message** (`panel_msg_repondus.demandes`,
+  clé `conversation:message`, 300 au plus) ; une réponse sûre retenue par le
+  plafond horaire est **réutilisée** sans repayer ; IA injoignable (rien de
+  facturé) ⇒ rien n'est mémorisé. L'app ne liste pas `demandes` comme un envoi.
+- **Détourage** : plafond par défaut **100** photos par vendeur et par mois (150 avant).
+- Preuves : `notif-messages.cjs` **23 contrôles, 14 rouges** sur 1465387, 5
+  mutations rouges ; `audit-repondre.cjs` **49, 7 rouges** sur 1465387, 3
+  mutations rouges ; `audit-comptes-sans-email.cjs` **16** (`--prouve` : 11
+  rouges) ; banc `comptes-sans-email.cjs` **24 rouges** sur le build de
+  1465387, 8 sur un build réaffaibli ; `repondre.cjs` 1 rouge sur l'avant.
+  `audit-abonnement.cjs` sert maintenant la forme `return=representation`.
+- **Pas fait, à savoir** : les emails d'ACTION de Vinted (« L'acheteur souhaite
+  annuler », « Action requise », « Demande de remboursement ») ne sonnent
+  toujours pas (relecture n° 1, N2) ; le journal par appareil (qui a reçu) ; la
+  notification `new Notification` de l'app (refusée sur iPhone, N4).
+- **Le geste de Julien** : sur `angeled92`, `tomj606`, `arthuror2`, vérifier les
+  notifications e-mail dans Vinted puis le « Transférer à » d'Apple ; remplacer
+  le script Gmail par celui du dépôt (il en tourne un d'avant le 4 octobre).
+- Extension : `background.js` touché, **version inchangée** (celle de
+  l'intégration), zip régénéré.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par

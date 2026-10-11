@@ -181,30 +181,13 @@ export async function loadSubs() {
   } catch (_) { return null; }
 }
 
-// Rend VRAI seulement si la base a confirmé l'écriture. Avaler l'échec faisait
-// répondre « ✅ Activé sur cet appareil » à l'app alors que rien n'était rangé.
-// ⚠️ Sur une base cloisonnée, la ligne porte le vendeur DE LA REQUÊTE — pas
-//    celui de l'installation : l'appareil d'un second vendeur s'ajoutait sinon
-//    à la liste de Julien, et recevait ses ventes.
-export async function saveSubs(subs) {
-  try {
-    const data = { subs, updatedAt: new Date().toISOString() };
-    let row, conflit;
-    if (await cloisonnee()) {
-      const o = vendeurDuPush();
-      if (!o) return false;                             // à qui serait cette ligne ? personne
-      row = { owner: o, id: 'push_subs', data }; conflit = 'owner,id';
-    } else {
-      row = withOwnerAll([{ id: 'push_subs', data }])[0]; conflit = conflictTarget('id');
-    }
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${conflit}`, {
-      method: 'POST',
-      headers: { ...HEADERS, Prefer: 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify([row]),
-    });
-    return !!(r && r.ok);
-  } catch (_) { return false; }
-}
+// ⚠️ `saveSubs` (réécriture INCONDITIONNELLE de la liste) est retirée le
+//    11 octobre : c'est elle qui faisait perdre un appareil quand deux écrivaient
+//    en même temps. Toute écriture de `push_subs` passe par `modifierSubs`
+//    ci-dessous — qui garde les deux leçons d'avant : on ne dit « activé » que
+//    si la base a CONFIRMÉ l'écriture, et sur une base cloisonnée la ligne porte
+//    le vendeur DE LA REQUÊTE (jamais celui de l'installation : l'appareil d'un
+//    second vendeur aurait reçu les ventes de Julien).
 
 // ── MODIFIER LA LISTE DES APPAREILS SANS EN PERDRE UN ─────────────────────
 // ⚠️⚠️ LIRE-AJOUTER-RÉÉCRIRE SANS VERROU (11 octobre, reproduit sur la vraie
