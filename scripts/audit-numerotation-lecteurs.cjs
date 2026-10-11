@@ -74,7 +74,7 @@ const MUTATIONS = {
   // La photo relie une vente d'après la coupure à une fiche d'archive.
   'photo-archive': { app: (s) => remplace(s, "    if (k && venteApresCoupure(o) && !numeroReprenable((numeros[k] || {}).numero)) return null;\n", "", 'photo-archive') },
   // La bannière ♻️ propose un numéro d'archive.
-  'banniere-archive': { app: (s) => remplace(s, "      if (!numeroReprenable(e.numero)) continue;\n      if (onlineAnnonceIds.has(String(k))) continue;", "      if (onlineAnnonceIds.has(String(k))) continue;", 'banniere-archive') },
+  'banniere-archive': { app: (s) => remplace(s, "      if (!numeroReprenable(e.numero)) continue;\n      if (presentesAnnonceIds.has(String(k))) continue;", "      if (presentesAnnonceIds.has(String(k))) continue;", 'banniere-archive') },
   // La réutilisation par photo de la numérotation automatique reprend l'archive.
   'auto-photo-archive': { app: (s) => remplace(s, "      if (!numeroReprenable(e.numero)) continue;\n      const pk = entryPhotoKey(e);", "      const pk = entryPhotoKey(e);", 'auto-photo-archive') },
   // La pose à la main accepte « B230 ».
