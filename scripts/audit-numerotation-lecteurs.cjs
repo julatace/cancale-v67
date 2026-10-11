@@ -52,6 +52,13 @@ const MUTATIONS = {
   'sku-sans-marqueur': { app: (s) => remplace(s, "  const t = traductionAnnonce(m && !m.annule ? m[liste] : null, id, k);\n", "  const t = undefined;\n", 'sku-sans-marqueur') },
   // (relecture du 11 octobre) Une annonce RELIÉE après la coupure (SKU réécrit) serait encore traduite en B.
   'traduction-ignore-reecriture': { app: (s) => remplace(s, "  if (!e || typeof e !== 'object' || Array.isArray(e) || !Object.prototype.hasOwnProperty.call(e, k)) return undefined;\n  return typeof e[k] === 'string' ? cleNum(e[k]) : '';\n};", "  if (!e || typeof e !== 'object' || Array.isArray(e)) return undefined;\n  if (!Object.prototype.hasOwnProperty.call(e, k)) return cleNum(archiveNumeros() + k);\n  return typeof e[k] === 'string' ? cleNum(e[k]) : '';\n};", 'traduction-ignore-reecriture') },
+  // (revue du 11 octobre, défaut 5) La carte par annonce lue comme une LISTE (la
+  // lecture `Array.isArray(mk.ebayAnnonces)` de d92613f) : sur la forme que la 013
+  // a VRAIMENT écrite (un objet), « VRM-553 » ne se traduit plus en « 1 » — la
+  // N°553 vendue (#78) ne lève aucune alerte eBay. App, serveur, extension.
+  'app-marqueur-liste': { app: (s) => remplace(s, "  if (id == null || !carte || typeof carte !== 'object' || Array.isArray(carte)) return undefined;\n  const e = carte[String(id)];", "  if (id == null || !Array.isArray(carte)) return undefined;\n  const e = carte[String(id)];", 'app-marqueur-liste') },
+  'serveur-marqueur-liste': { lib: (s) => remplace(s, "  if (id == null || !carte || typeof carte !== 'object' || Array.isArray(carte)) return undefined;", "  if (id == null || !Array.isArray(carte)) return undefined;", 'serveur-marqueur-liste') },
+  'extension-marqueur-liste': { ext: (s) => remplace(s, "  if (!ad || ad.id == null || !carte || typeof carte !== 'object' || Array.isArray(carte)) return k;", "  if (!ad || ad.id == null || !Array.isArray(carte)) return k;", 'extension-marqueur-liste') },
   // Un numéro PROVISOIRE (553, devenu 1) lu en B, comme un ancien.
   'provisoire-en-b': { app: (s) => remplace(s, "  return typeof e[k] === 'string' ? cleNum(e[k]) : '';\n};\nconst numeroExterne", "  return cleNum(archiveNumeros() + k);\n};\nconst numeroExterne", 'provisoire-en-b') },
   // Une commande eBay d'avant la coupure lue comme la nouvelle série.
