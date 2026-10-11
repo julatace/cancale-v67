@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.169.0';
+const CODE_VERSION = '5.171.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -2072,22 +2072,126 @@ function dateLectureDressing(ligne) {
   return Date.parse(c || '');
 }
 // </supprimees-regle>
-// Applique la règle à des lignes `harvest_{uid}_listings` lues en entier
-// (`select=id,data`) : rend des lignes dont les annonces supprimées APRÈS la
-// lecture sont retirées. `supp === null` (pas su) ⇒ les lignes telles quelles.
-function retirerSupprimeesLignes(lignes, supp) {
-  if (!supp || !Array.isArray(lignes)) return lignes;
-  return lignes.map((r) => {
-    const k = /^harvest_(\d+)_listings$/.exec(String(r && r.id || ''));
-    const d = r && r.data; const p = d && d.payload;
-    const ids = k && supp.get(k[1]);
-    if (!ids || !p || !Array.isArray(p.items)) return r;
-    const cap = dateLectureDressing(r);
-    const items = p.items.filter((it) => !(it && supprimeeApres(ids, it.id, cap)));
-    if (items.length === p.items.length) return r;
-    return Object.assign({}, r, { data: Object.assign({}, d, { payload: Object.assign({}, p, { items }) }) });
-  });
+// <enligne-regle> — LA MÊME RÈGLE DANS L'APP (src/App.jsx) ET DANS L'EXTENSION
+// (background.js), §11. `audit-enligne.cjs` exige que les deux blocs soient
+// IDENTIQUES et compare leurs sorties sur les mêmes entrées. Il dépend de
+// `supprimeeApres` (bloc <supprimees-regle>, juste au-dessus dans les deux).
+// Julien, 11 octobre : « quand les annonces ne sont plus en ligne, elles doivent
+// être enlevées, automatiquement — je me retrouve avec trois fois la même paire
+// alors qu'il n'y a qu'une seule annonce ». Une annonce est EN LIGNE si :
+//   · la lecture COMPLÈTE la plus récente de son compte la contient ouverte —
+//     son propre dressing (`harvest_{uid}_listings`, quand il est connecté) ou
+//     son dressing PUBLIC relu depuis un autre de ses comptes
+//     (`harvest_{uid}_enligne`, 5.167) : la plus récente des deux fait foi ;
+//   · aucune suppression vue APRÈS cette lecture ne la retire ;
+//   · et cette lecture a moins de 24 h. Au-delà (ou jamais lue) on ne SAIT pas :
+//     ses annonces ne sont ni « en ligne » ni « disparues » — « à confirmer »,
+//     dites à part, jamais comptées (« rien lu ne vaut pas rien », §4.1).
+// Une annonce présente dans la lecture publique mais pas dans le dressing (elle
+// vient d'être republiée) est en ligne, avec ce que la lecture publique en sait.
+// Une annonce ouverte dans un dressing plus ancien et ABSENTE de la lecture
+// publique plus récente n'est plus en ligne (supprimée, vendue ou masquée) : elle
+// est rendue FERMÉE (`_vrmAbsente`), jamais « vendue » (rien ne le prouve).
+// ⚠️ Une annonce que son vendeur voit VENDUE ne se rouvre pas d'un coup d'œil
+//    public (la vue publique n'est pas mesurée sur les ventes) : la vente fait foi
+//    — et elle RESTE parmi les fermées (revue de la 5.167 : elle disparaissait de
+//    toutes les sorties, et avec elle la seule preuve sans ressemblance qu'une
+//    paire numérotée est partie).
+// ⚠️ Une suppression vue en 2xx ne se « rattrape » pas par une lecture PUBLIQUE
+//    qui la montre encore (revue de la 5.167) : Vinted ne réutilise jamais un
+//    identifiant, et la vue publique n'est pas mesurée (index, cache en retard ?).
+//    Le dressing de son vendeur, lui, reste la mesure qui fait foi (5.165).
+// ⚠️⚠️ « PAS SU » LES LECTURES PUBLIQUES (`pub = { passu: true }`, revue de la
+//    5.167) : sur un hoquet, les annonces qu'une lecture plus récente savait
+//    PARTIES revenaient « en ligne » — la triple paire de sa plainte, sans un mot.
+//    Sans les lectures publiques, un dressing ne décide QUE s'il a moins de
+//    `ENLIGNE_SUR_MS` : l'extension ne relit jamais en public un compte lu depuis
+//    moins de 30 min (`ENLIGNE_DELAI_MS`), donc aucune lecture plus récente ne
+//    peut exister. Au-delà, ses annonces sont « à confirmer ».
+const ENLIGNE_FRAIS_MS = 24 * 60 * 60 * 1000;
+const ENLIGNE_SUR_MS = 30 * 60 * 1000;
+function ouverteSurVinted(it) { return !!(it && !it.is_closed && !it.is_hidden && !it.is_draft); }
+function venduePourSonVendeur(it) { return !!(it && it.is_closed && /sold/i.test(String(it.item_closing_action || ''))); }
+function enLigneDuCompte(liste, pub, suppIds, maintenant) {
+  const itemsL = (liste && Array.isArray(liste.items)) ? liste.items : null;
+  const capL = itemsL && liste.cap != null && liste.cap !== '' ? Number(liste.cap) : NaN;
+  const pubPasSu = !!(pub && pub.passu === true);
+  const pubLisible = !pubPasSu && !!(pub && (pub.complet === true || pub.complet === 'true') && Array.isArray(pub.ids));
+  const capP = pubLisible && pub.cap != null && pub.cap !== '' ? Number(pub.cap) : NaN;
+  const r = { enLigne: [], aConfirmer: [], fermees: [], absentes: [], supprimees: [], lu: NaN, source: '', pubPasSu };
+  const cand = [];
+  if (isFinite(capP) && !(isFinite(capL) && capL >= capP)) {
+    r.source = 'public'; r.lu = capP;
+    const parL = new Map(), parP = new Map(), vus = new Set();
+    for (const it of itemsL || []) if (it && it.id != null) parL.set(String(it.id), it);
+    for (const it of (Array.isArray(pub.items) ? pub.items : [])) if (it && it.id != null) parP.set(String(it.id), it);
+    for (const x of pub.ids) {
+      const id = String(x == null ? '' : x);
+      if (!id || vus.has(id)) continue;
+      vus.add(id);
+      const l = parL.get(id) || null, p = parP.get(id) || null;
+      if (!l && !p) continue;
+      if (l && venduePourSonVendeur(l)) { r.fermees.push(l); continue; }
+      cand.push(Object.assign({}, l || {}, p || {}, { id: (l || p).id, is_closed: false, is_hidden: false, is_draft: false }));
+    }
+    for (const it of itemsL || []) {
+      if (!it || it.id == null || vus.has(String(it.id))) continue;
+      if (ouverteSurVinted(it)) r.absentes.push(it); else r.fermees.push(it);
+    }
+  } else if (isFinite(capL)) {
+    r.source = 'dressing'; r.lu = capL;
+    for (const it of itemsL) { if (!it) continue; if (ouverteSurVinted(it)) cand.push(it); else r.fermees.push(it); }
+  } else if (itemsL) {
+    for (const it of itemsL) { if (!it) continue; if (ouverteSurVinted(it)) cand.push(it); else r.fermees.push(it); }
+  }
+  const garde = [];
+  for (const it of cand) { if (supprimeeApres(suppIds, it.id, r.source === 'public' ? -Infinity : r.lu)) r.supprimees.push(it); else garde.push(it); }
+  const age = Number(maintenant) - r.lu;
+  const sur = !pubPasSu || age < ENLIGNE_SUR_MS;
+  if (isFinite(r.lu) && age <= ENLIGNE_FRAIS_MS && sur) r.enLigne = garde; else r.aConfirmer = garde;
+  return r;
 }
+// Les lignes de tous les comptes, telles que les balayages les lisent :
+// `lignesL` = `harvest_{uid}_listings` (`select=id,data` ou `data`), `lignesP` =
+// `harvest_{uid}_enligne` projetées (`id, cap, complet, ids, items`) — `null` =
+// la base n'a pas répondu (« pas su » : chaque compte reçoit `{ passu: true }`) —,
+// `supp` = Map uid → suppressions (`null` = pas su). Chaque compte rend UNE ligne au
+// format d'un dressing : ses annonces fermées, les absentes rendues fermées, et
+// celles qui sont en ligne — jamais celles « à confirmer », rendues à part.
+function enLigneDesLignes(lignesL, lignesP, supp, maintenant) {
+  const parL = new Map(), parP = new Map();
+  for (const r of lignesL || []) {
+    const d = r && r.data; if (!d) continue;
+    const k = /^harvest_(\d+)_listings$/.exec(String((r && r.id) || ''));
+    const uid = k ? k[1] : (d.uid != null ? String(d.uid) : '');
+    if (uid) parL.set(uid, r);
+  }
+  for (const r of lignesP || []) {
+    const k = /^harvest_(\d+)_enligne$/.exec(String((r && r.id) || ''));
+    if (k) parP.set(k[1], r);
+  }
+  const lignes = [], aConfirmer = new Map(), parCompte = new Map();
+  for (const uid of new Set([...parL.keys(), ...parP.keys()])) {
+    const r = parL.get(uid) || null, d = r ? r.data : null, p = d ? d.payload : null;
+    const liste = (p && Array.isArray(p.items)) ? { items: p.items, cap: dateLectureDressing(r) } : null;
+    const q = parP.get(uid) || null;
+    const pub = lignesP === null ? { passu: true } : (q ? { complet: q.complet, ids: q.ids, items: q.items, cap: Date.parse(q.cap || '') } : null);
+    const res = enLigneDuCompte(liste, pub, supp ? (supp.get(uid) || null) : null, maintenant);
+    parCompte.set(uid, res);
+    if (res.aConfirmer.length) aConfirmer.set(uid, res.aConfirmer);
+    const items = res.fermees.concat(res.absentes.map((it) => Object.assign({}, it, { is_closed: true, _vrmAbsente: true })), res.enLigne);
+    if (!liste && !items.length) continue;
+    const data = Object.assign({ type: 'listings' }, d || {}, { uid: (d && d.uid != null) ? d.uid : uid,
+      _vrmLu: isFinite(res.lu) ? res.lu : null, _vrmSource: res.source,
+      payload: Object.assign({}, p || {}, { items }) });
+    lignes.push(Object.assign({}, r || {}, { id: (r && r.id) || `harvest_${uid}_listings`, data }));
+  }
+  return { lignes, aConfirmer, parCompte };
+}
+// </enligne-regle>
+// (5.167, 11 octobre : `retirerSupprimeesLignes` est RETIRÉE — les suppressions
+//  s'appliquent désormais dans `enLigneDesLignes`, avec la lecture la plus
+//  récente de chaque compte : la même règle que l'app, §11.)
 // Toutes les suppressions rangées, par compte. `null` = la base n'a pas répondu
 // (« pas su » : l'appelant n'écarte rien). Une ligne par compte : famille bornée.
 async function lireSupprimeesTous() {
@@ -2099,6 +2203,30 @@ async function lireSupprimeesTous() {
     if (k && r.ids && typeof r.ids === 'object') m.set(k[1], r.ids);
   }
   return m;
+}
+// Les dressings de TOUS les comptes, avec la règle « en ligne » appliquée
+// (`enLigneDesLignes`, la même que l'app — §11). Les lectures publiques des
+// autres comptes (`harvest_{uid}_enligne`, une ligne par compte : famille
+// bornée) n'ajoutent ni n'ôtent rien quand elles sont illisibles : le dressing
+// seul décide alors, et un compte qu'on ne peut pas dater reste « à confirmer ».
+const SELECT_ENLIGNE = 'id,cap:data->>capturedAt,complet:data->complet,ids:data->ids,items:data->items';
+// ⚠️ Revue de la 5.167 — deux lectures ratées passaient pour « rien » :
+//    · les DRESSINGS illisibles (`|| []`) : aucune annonce en ligne, donc toutes
+//      ses paires publiées sur Leboncoin dites « plus en ligne, à retirer »
+//      (prouvé : celles du compte connecté, jamais relu en public). ⇒ `echec` :
+//      les files ne calculent rien et le disent ;
+//    · les lectures PUBLIQUES illisibles (`|| []`) : le vieux dressing redécidait,
+//      et les annonces qu'une lecture plus récente savait parties revenaient dans
+//      la file. ⇒ la dernière valeur connue (ce service worker), sinon « pas su »
+//      (`null`) : la règle rend « à confirmer » ce qu'elle ne peut plus dater.
+let _dernieresLecturesPubliques = null;
+async function lireDressingsEnLigne() {
+  const lignesL = await sbGet('app_data?id=like.harvest_*_listings&select=id,data');
+  if (!Array.isArray(lignesL)) { noterDiag('enligne_dressings_pas_lus'); return { echec: true, lignes: [], aConfirmer: new Map(), parCompte: new Map() }; }
+  let lignesP = await sbGet(`app_data?id=like.harvest_*_enligne&select=${SELECT_ENLIGNE}`);
+  if (Array.isArray(lignesP)) _dernieresLecturesPubliques = lignesP;
+  else { noterDiag('enligne_lignes_pas_lues'); lignesP = _dernieresLecturesPubliques; }
+  return enLigneDesLignes(lignesL, lignesP, await lireSupprimeesTous(), Date.now());
 }
 
 // ⚠️ LE TÉLÉCHARGEMENT MANUEL NE POUVAIT PAS ÊTRE RELIÉ QUAND IL Y EN A DEUX.
@@ -3072,6 +3200,308 @@ async function tickPhotos() {
     // Plus rien à faire (ou garde qui refuse) → on met en pause ce compte.
     if (!n) { cd[uid] = Date.now(); await chrome.storage.local.set({ vrmPhotosCooldown: cd }); }
   } catch (_) { /* une capture ratée n'a pas à réveiller d'erreur */ }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CE QUI EST EN LIGNE SUR SES AUTRES COMPTES — RELU À CHAQUE VISITE (5.167)
+// ══════════════════════════════════════════════════════════════════════════════
+// Julien, 11 octobre : « j'avais supprimé mes annonces sur Vinted, il y avait
+// encore toutes mes annonces sur VRM — je me retrouve avec trois fois la même
+// paire alors qu'il n'y a qu'une seule annonce ». MESURÉ le même jour : l'écran
+// Annonces montrait 27 annonces « en ligne », dont 16 d'une lecture du
+// 8 octobre (arthuror2, tomj683) — l'extension ne relit le dressing QUE du
+// compte connecté dans Chrome, et ces deux-là n'y étaient pas passés (la copie
+// qui les lisait n'avait pas de session : ses écritures étaient refusées).
+// ⇒ À chaque visite, après la moisson du compte connecté, on relit le dressing
+//   PUBLIC de ses AUTRES comptes : `GET /api/v2/wardrobe/{profil}/items`, la
+//   requête que la page de profil fait d'elle-même quand on ouvre un dressing.
+//   C'est une LECTURE de données publiques, faite avec la session du compte
+//   connecté — jamais une action, jamais au nom d'un autre compte, jamais avec
+//   les jetons d'un autre compte (`activeFetchAll` est retiré, §3).
+// Bornes (§3) : uniquement les comptes LIÉS (`vinted_accounts`), jamais un compte
+// masqué dans l'app (`vinted_accounts_hidden`) ni supprimé (`vrm_blocked_accounts`)
+// — et « pas su » sur ces listes ⇒ personne n'est lu ; dans la file Vinted (une
+// requête à la fois), pause et frein respectés ; sur le budget de LECTURE du
+// compte connecté, après l'argent et les colis, avant les photos (`gardeLecture`,
+// classe `enligne`) ; au plus 3 comptes par visite, aucun relu depuis moins de
+// 30 min ; toutes les pages, jusqu'à la dernière annoncée par Vinted — sinon la
+// lecture n'est PAS complète et ne décide rien.
+// ⚠️ Revue de la 5.167 : ce paragraphe promettait aussi « jamais un compte refusé
+//    par Vinted ». C'était faux : cette liste-là (`vinted_accounts_blocked`) est
+//    PROPRE À L'APPAREIL qui l'a vue (elle n'est pas synchronisée — mesuré, absente
+//    de `main` chez lui) ; l'extension ne la voit donc pas. Ce n'est pas un risque :
+//    la lecture publique se fait avec la session du compte CONNECTÉ, elle ne touche
+//    à aucun jeton du compte refusé. On ne promet plus ce qu'on ne lit pas.
+// ⚠️⚠️ Revue de la 5.167 — UN 403 SUR UN SEUL COMPTE FAISAIT MONTER LA PAUSE À 4 H.
+//    Après un échec, ce compte réessayait dans 5 min (moins que la pause de 15 min)
+//    et restait le plus ancien : la première requête partie après CHAQUE pause
+//    était celle que Vinted venait de refuser — 15, 30, 60, 120, 240 min, et 705
+//    minutes de pause sur 738 en douze heures (prouvé au banc) ; bordereaux,
+//    réponses et commandes de l'app bloqués presque tout le temps. C'est la forme
+//    exacte du §3. ⇒ Un frein (403/429) sur une lecture publique écarte CE compte
+//    24 h (comme les autres lecteurs : codes 6 h, versements et photos 24 h) ; un
+//    429 (« ralentis ») ou un second compte freiné dans les 24 h coupe TOUTE la
+//    relecture publique pour la journée (c'est le lecteur qui est en cause, pas un
+//    compte). Et un compte en échec récent passe APRÈS les autres.
+// Rangé dans une ligne DÉDIÉE `harvest_{uid}_enligne` — jamais par-dessus
+// `harvest_{uid}_listings` : la vue publique est plus pauvre (vues, boost) et ne
+// doit rien effacer. Une lecture ratée ou incomplète n'écrit RIEN.
+const ENLIGNE_MAX_PAR_VISITE = 3;
+const ENLIGNE_DELAI_MS = 30 * 60 * 1000;
+const ENLIGNE_REESSAI_MS = 5 * 60 * 1000;
+const ENLIGNE_PAR_PAGE = 96;                 // Vinted plafonne à 96 (mesuré : 101 articles = 2 pages)
+const ENLIGNE_MAX_PAGES = 10;
+const ENLIGNE_ESSAIS = 'vrmEnLigneEssais';   // { [uid]: ms de la dernière tentative } (§4.9)
+const ENLIGNE_FREINS = 'vrmEnLigneFreins';   // { [uid]: ms du dernier 403/429 ; _tous : ms de la coupure } (§4.9)
+const ENLIGNE_ECHECS = 'vrmEnLigneEchecs';   // { [uid]: ms du dernier échec (lecture incomplète) }
+const ENLIGNE_FREIN_MS = 24 * 3600 * 1000;
+const ENLIGNE_ECHEC_RECENT_MS = 48 * 3600 * 1000;
+// Le moyen de lire : dans un onglet Vinted ouvert (la requête part de la page,
+// avec ses cookies, comme quand on ouvre un dressing), sinon par le service
+// worker avec les cookies du compte connecté. Une requête = une place de la file.
+// ⚠️⚠️ REVUE DE LA 5.167 — L'ONGLET PEUT QUITTER VINTED PENDANT LA RELECTURE.
+//    Il était choisi UNE fois, au début : s'il naviguait vers Leboncoin entre deux
+//    pages, `executeScript({target:{tabId}})` injectait dans le document COURANT
+//    (aucune épingle d'origine) — la requête partait CHEZ LEBONCOIN, avec le jeton
+//    CSRF de Vinted, les identifiants de profil Vinted et les cookies Leboncoin ;
+//    et un 403 de Leboncoin posait la pause Vinted (prouvé dans Chromium et au
+//    banc : un bordereau commandé juste après était refusé « Vinted demande de
+//    ralentir »). ⇒ Avant CHAQUE requête on revérifie l'adresse de l'onglet
+//    (sinon on en reprend un autre, ou le repli par cookie) ; la fonction
+//    injectée vérifie elle-même `location.hostname` AVANT tout `fetch` et rend
+//    son origine ; une réponse qui ne vient pas de Vinted vaut « rien lu »
+//    (statut 0) — jamais une pause Vinted.
+const VINTED_HOTE = /(^|\.)vinted\.(fr|com|it|de|es|be|nl|lu|at|pt|pl|cz|lt|co\.uk)$/i;
+const ongletEstVinted = (t) => { try { return !!(t && t.id != null && !t.discarded && VINTED_HOTE.test(new URL(String(t.url || '')).hostname)); } catch (_) { return false; } };
+async function ongletVinted(prefere) {
+  if (prefere != null) {
+    try { const t = await chrome.tabs.get(prefere); if (ongletEstVinted(t) && t.status === 'complete') return t; } catch (_) {}
+  }
+  try {
+    const tabs = await chrome.tabs.query({ url: ['https://*.vinted.fr/*', 'https://*.vinted.com/*'] });
+    return (tabs || []).find((t) => ongletEstVinted(t) && t.status === 'complete') || null;
+  } catch (_) { return null; }
+}
+async function lecteurPublic(domain) {
+  let tabId = ((await ongletVinted(null)) || {}).id;
+  const csrf = lastCsrfByDomain[domain] || '';
+  if (tabId == null) return (chemin) => vintedGetCookie(domain, chemin);
+  return async (chemin) => {
+    // L'onglet a pu naviguer depuis la page précédente : on le revérifie, à chaque fois.
+    const tab = await ongletVinted(tabId);
+    if (!tab) { noterDiag('enligne_onglet_parti'); tabId = null; return vintedGetCookie(domain, chemin); }
+    tabId = tab.id;
+    return requeteVinted('public', async () => {
+      try {
+        const res = await chrome.scripting.executeScript({
+          target: { tabId }, world: 'MAIN', args: [chemin, csrf],
+          func: async (p, csrfTok) => {
+            // Hors de Vinted, AUCUNE requête : un fetch relatif partirait chez l'autre site.
+            const hote = String((typeof location !== 'undefined' && location.hostname) || '');
+            const origine = String((typeof location !== 'undefined' && location.origin) || '');
+            if (!/(^|\.)vinted\.(fr|com|it|de|es|be|nl|lu|at|pt|pl|cz|lt|co\.uk)$/i.test(hote)) return { status: 0, ok: false, json: null, horsVinted: true, origine };
+            try {
+              const h = { accept: 'application/json' };
+              if (csrfTok) h['x-csrf-token'] = csrfTok;
+              const r = await fetch(p, { credentials: 'include', headers: h });
+              let json = null; try { json = await r.json(); } catch (_) {}
+              return { status: r.status, ok: r.ok, json, origine };
+            } catch (_) { return { status: 0, ok: false, json: null, origine }; }
+          },
+        });
+        const o = res && res[0] && res[0].result;
+        if (!o || typeof o !== 'object') return { status: 0, ok: false, json: null };
+        // La réponse ne vient pas de Vinted : « rien lu » — jamais une pause Vinted.
+        let hote = ''; try { hote = new URL(String(o.origine || '')).hostname; } catch (_) {}
+        if (o.horsVinted || !VINTED_HOTE.test(hote)) { noterDiag('enligne_hors_vinted'); return { status: 0, ok: false, json: null, horsVinted: true }; }
+        return o;
+      } catch (_) { return { status: 0, ok: false, json: null }; }
+    });
+  };
+}
+// Le dressing public d'UN profil, page par page. `avantPage()` rend un refus
+// (budget, pause) ou `null`. Complet SEULEMENT si la boucle s'arrête d'elle-même
+// (page vide, ou dernière page annoncée) ET que le total annoncé est atteint.
+// ⚠️⚠️ REVUE DE LA 5.167 — UNE LECTURE « DÉCHIRÉE » PASSAIT POUR COMPLÈTE. Une
+//    suppression faite entre la page 1 et la page 2 (il supprime et republie
+//    tout en ce moment) décale la liste : une annonce TOUJOURS en ligne passe en
+//    page 1 déjà lue et n'est jamais vue, le total baisse d'autant, et « lus =
+//    total » passait — l'annonce en ligne sortait de VRM, la supprimée y restait
+//    (prouvé au banc, et la republiée manquait aussi avec une suppression + une
+//    republication). ⇒ Chaque page doit annoncer le MÊME total et le même nombre
+//    de pages que la page 1, et quand il y a plusieurs pages on RELIT la page 1 à
+//    la fin : mêmes identifiants, même total. Sinon la lecture est « mouvante »,
+//    rien n'est rangé, et ce compte réessaie dans 5 min.
+// ⚠️ Un 403/429 de Vinted (« non » / « ralentis ») rend `frein` : l'appelant ne
+//    réessaie pas ce compte avant le lendemain (§3).
+async function lireDressingPublic(lire, pid, avantPage) {
+  const vus = new Set(), items = [];
+  let total = null, complet = false, raison = 'lecture', statut = 0, pages = 0, signature = null, idsPage1 = null;
+  const url = (page) => `/api/v2/wardrobe/${encodeURIComponent(pid)}/items?page=${page}&per_page=${ENLIGNE_PAR_PAGE}`;
+  const echec = (r) => {
+    statut = Number(r && r.status) || 0;
+    if (r && r.pause) return { complet: false, raison: 'vinted-pause' };
+    if (freinVinted(statut)) return { complet: false, raison: 'frein', statut };
+    return { complet: false, raison: (r && r.horsVinted) ? 'hors-vinted' : 'lecture', statut };
+  };
+  const sig = (pg) => `${pg.total_entries == null ? '' : String(pg.total_entries)}|${pg.total_pages == null ? '' : String(pg.total_pages)}`;
+  for (let page = 1; page <= ENLIGNE_MAX_PAGES; page++) {
+    const refus = avantPage ? await avantPage() : null;
+    if (refus) return { complet: false, raison: refus.code || 'refus' };
+    const r = await lire(url(page));
+    if (!r || r.pause || !r.ok || !r.json || !Array.isArray(r.json.items)) return echec(r);
+    pages++;
+    const lot = r.json.items;
+    const pg = r.json.pagination || {};
+    if (signature == null) signature = sig(pg);
+    else if (sig(pg) !== signature) return { complet: false, raison: 'mouvant' };   // la liste a bougé entre deux pages
+    if (page === 1) idsPage1 = lot.map((it) => String(it && it.id)).join(',');
+    for (const it of lot) {
+      if (!it || it.id == null) continue;
+      // L'IDENTITÉ (§5) : un article d'un AUTRE membre n'est jamais rangé sous ce compte.
+      const proprio = it.user_id != null ? it.user_id : (it.user && it.user.id);
+      if (proprio != null && String(proprio) !== String(pid)) return { complet: false, raison: 'autre-membre' };
+      const k = String(it.id);
+      if (vus.has(k)) continue;
+      vus.add(k); items.push(it);
+    }
+    if (pg.total_entries != null && pg.total_entries !== '' && isFinite(Number(pg.total_entries))) total = Number(pg.total_entries);
+    const tp = Number(pg.total_pages);
+    if (!lot.length || (isFinite(tp) && tp > 0 && page >= tp)) { complet = true; break; }
+    await wait(1200);
+  }
+  if (complet && total != null && items.length < total) return { complet: false, raison: 'total', total, n: items.length };
+  // Sans total annoncé (forme inattendue, page vide sans pagination), on ne peut
+  // pas prouver qu'on a TOUT lu : une réponse vide déciderait sinon que toutes
+  // ses annonces sont parties. « Rien lu » ne vaut pas « rien » (§4.1).
+  if (complet && total == null) return { complet: false, raison: 'sans-total', n: items.length };
+  if (!complet) return { complet: false, raison, statut };
+  // Plusieurs pages : la page 1 relue doit être la même (une suppression suivie
+  // d'une republication garde le total, mais décale la page 1).
+  if (pages > 1) {
+    const refus = avantPage ? await avantPage() : null;
+    if (refus) return { complet: false, raison: refus.code || 'refus' };
+    const r = await lire(url(1));
+    if (!r || r.pause || !r.ok || !r.json || !Array.isArray(r.json.items)) return echec(r);
+    const pg = r.json.pagination || {};
+    if (sig(pg) !== signature || r.json.items.map((it) => String(it && it.id)).join(',') !== idsPage1) return { complet: false, raison: 'mouvant' };
+  }
+  return { complet: true, items, total };
+}
+// La dernière lecture de chaque compte (son dressing ou sa lecture publique),
+// en scalaires (§4.4). `null` = la base n'a pas répondu (« pas su »).
+async function lecturesParCompte() {
+  const a = await sbGet('app_data?id=like.harvest_*_listings&select=id,cap:meta->>capturedAt');
+  const b = await sbGet('app_data?id=like.harvest_*_enligne&select=id,cap:meta->>capturedAt');
+  if (a === null || b === null) return null;
+  const m = new Map();
+  for (const r of [...a, ...b]) {
+    const k = /^harvest_(\d+)_(?:listings|enligne)$/.exec(String((r && r.id) || ''));
+    if (!k) continue;
+    const t = Date.parse((r && r.cap) || '');
+    if (isFinite(t) && t > (m.get(k[1]) || 0)) m.set(k[1], t);
+  }
+  return m;
+}
+async function relireAnnoncesAutresComptes(uidConnecte) {
+  try {
+    if (!uidConnecte) return 0;
+    if (await pauseVinted()) return 0;
+    if (await sansSessionPourEcrire()) { noterDiag('enligne_sans_session'); return 0; }
+    const st0 = await chrome.storage.local.get([ENLIGNE_ESSAIS, ENLIGNE_FREINS, ENLIGNE_ECHECS]);
+    const freins = st0[ENLIGNE_FREINS] || {}, echecs = st0[ENLIGNE_ECHECS] || {};
+    if (Date.now() - Number(freins._tous || 0) < ENLIGNE_FREIN_MS) { noterDiag('enligne_coupee_frein'); await noterLecturesDues(uidConnecte, 'enligne', 0); return 0; }
+    const accts = await getStoredAccounts({ ouNull: true });
+    if (!Array.isArray(accts)) { noterDiag('enligne_comptes_pas_lus'); return 0; }
+    const acc = accts.find((a) => String(a.vinted_user_id) === String(uidConnecte));
+    if (!acc) return 0;                       // la session de lecture doit être celle d'un de SES comptes
+    const noirs = await blockedAccounts();
+    if (!noirs) { noterDiag('enligne_supprimes_pas_lus'); return 0; }      // pas su : on ne lit personne
+    const main = await lireMain(['vinted_accounts_hidden', 'vinted_accounts_blocked']);
+    if (main === null) { noterDiag('enligne_exclus_pas_lus'); return 0; }
+    const off = new Set([...(main.vinted_accounts_hidden || []), ...(main.vinted_accounts_blocked || [])].map(String));
+    const lus = await lecturesParCompte();
+    if (lus === null) { noterDiag('enligne_dates_pas_lues'); return 0; }
+    const essais = st0[ENLIGNE_ESSAIS] || {};
+    const t = Date.now();
+    const recent = (u) => (t - Number(echecs[u] || 0) < ENLIGNE_ECHEC_RECENT_MS) || (t - Number(freins[u] || 0) < ENLIGNE_ECHEC_RECENT_MS);
+    const candidats = [...new Set(accts.map((a) => String((a && a.vinted_user_id) || '')))]
+      .filter((u) => u && u !== String(uidConnecte) && !noirs.has(u) && !off.has(u))
+      .filter((u) => !(t - Number(freins[u] || 0) < ENLIGNE_FREIN_MS))             // freiné : pas avant demain
+      .filter((u) => !(t - Number(essais[u] || 0) < ENLIGNE_DELAI_MS))
+      .filter((u) => !(t - Number(lus.get(u) || 0) < ENLIGNE_DELAI_MS))
+      // Le plus ancien d'abord — mais un compte en échec récent APRÈS les autres :
+      // sinon il repasse en tête à chaque visite et prend la place des autres.
+      .sort((a, b) => (Number(recent(a)) - Number(recent(b))) || (Number(lus.get(a) || 0) - Number(lus.get(b) || 0)));
+    // Ce qui reste à lire se NOTE : les photos s'arrêtent avant (`reserveLectures`).
+    await noterLecturesDues(uidConnecte, 'enligne', candidats.length);
+    if (!candidats.length) return 0;
+    const domain = acc.domain || 'www.vinted.fr';
+    const lire = await lecteurPublic(domain);
+    let n = 0, tentes = 0;
+    const ranges = new Set();
+    const ranger = async () => { try { await chrome.storage.local.set({ [ENLIGNE_ESSAIS]: essais, [ENLIGNE_FREINS]: freins, [ENLIGNE_ECHECS]: echecs }); } catch (_) {} };
+    for (const uid of candidats) {
+      if (tentes >= ENLIGNE_MAX_PAR_VISITE) break;
+      if (await pauseVinted()) break;
+      const pid = await profilIdRange(uid);
+      if (!pid) { noterDiag(pid === null ? 'enligne_profil_pas_lu' : 'enligne_sans_profil'); continue; }
+      tentes++;
+      const debut = Date.now();
+      essais[uid] = debut;
+      await ranger();
+      const lu = await lireDressingPublic(lire, pid, () => gardeLecture(uidConnecte, acc, 'enligne'));
+      if (!lu.complet) {
+        noterDiag(`enligne_incomplet_${lu.raison}`);
+        if (lu.raison === 'frein') {
+          // Vinted a dit non (403) ou ralentis (429) : ce compte attend demain. Un
+          // 429, ou un SECOND compte freiné dans les 24 h, coupe toute la relecture
+          // publique pour la journée — c'est le lecteur qui est en cause.
+          const autre = Object.keys(freins).some((u) => u !== '_tous' && u !== uid && t - Number(freins[u] || 0) < ENLIGNE_FREIN_MS);
+          freins[uid] = Date.now();
+          if (Number(lu.statut) === 429 || autre) { freins._tous = Date.now(); noterDiag('enligne_coupee_frein'); }
+          echecs[uid] = Date.now();
+          await ranger();
+          break;
+        }
+        // Rien de rangé : ce compte réessaie dans 5 min (jamais en rafale) —
+        // pas dans 30, sa lecture n'a pas eu lieu. Un échec qui vient de CE
+        // dressing (lecture, total, liste qui bouge, autre membre) le fait passer
+        // après les autres ; une pause, un budget vide ou un compte changé ne
+        // sont pas de son fait.
+        essais[uid] = Date.now() - ENLIGNE_DELAI_MS + ENLIGNE_REESSAI_MS;
+        if (['lecture', 'total', 'sans-total', 'mouvant', 'autre-membre'].includes(lu.raison)) echecs[uid] = Date.now();
+        await ranger();
+        // Vinted freine, le budget est vide ou le compte a changé : on s'arrête là.
+        if (lu.raison === 'vinted-pause' || lu.raison === 'lectures-reservees' || lu.raison === 'trop-de-lectures' || lu.raison === 'autre-compte') break;
+        continue;
+      }
+      const ouvertes = lu.items.filter((it) => ouverteSurVinted(it) && !venduePourSonVendeur(it)).map(articleMaigre);
+      const data = { type: 'enligne', uid: String(uid), pid: String(pid), source: 'public', complet: true,
+        capturedAt: new Date(debut).toISOString(), n: ouvertes.length, ids: ouvertes.map((x) => String(x.id)),
+        items: ouvertes, lus: lu.items.length, total: lu.total, ver: EXT_VERSION };
+      const ok = await supabaseUpsert('app_data', [{ id: `harvest_${uid}_enligne`, data, updated_at: data.capturedAt }], 'id');
+      if (ok === false) {
+        noterDiag('enligne_ecriture_ratee');
+        essais[uid] = Date.now() - ENLIGNE_DELAI_MS + ENLIGNE_REESSAI_MS;
+        await ranger();
+        continue;
+      }
+      delete echecs[uid];
+      await ranger();
+      ranges.add(uid);
+      n++;
+      noterDiag('enligne_range');
+      notifierApp({ type: 'maj', quoi: 'annonces', uid: String(uid) });
+    }
+    // Ce qu'il reste à lire, pour la réserve : rien quand la relecture est coupée
+    // pour la journée (les photos n'ont pas à attendre ce qui ne viendra pas).
+    const coupee = Date.now() - Number(freins._tous || 0) < ENLIGNE_FREIN_MS;
+    const restent = coupee ? 0 : candidats.filter((u) => !ranges.has(u) && !(Date.now() - Number(freins[u] || 0) < ENLIGNE_FREIN_MS)).length;
+    await noterLecturesDues(uidConnecte, 'enligne', restent);
+    if (n) logActivity(`🟢 Annonces en ligne relues sur ${n} autre${n > 1 ? 's' : ''} compte${n > 1 ? 's' : ''}`);
+    return n;
+  } catch (_) { return 0; }
 }
 
 // MÊME EXPRESSION que `isAwaitingShipStatus` (src/App.jsx) et `awaitingShip`
@@ -4131,6 +4561,13 @@ async function visiteVinted() {
     // `/payouts` (aucune requête ajoutée) ; ici on ne va chercher que les mois
     // PASSÉS encore absents, deux par visite au plus.
     await capterReleves(uid);
+    // ⚠️ 5.167 (11 octobre) — CE QUI EST EN LIGNE SUR SES AUTRES COMPTES : leur
+    // dressing PUBLIC, relu avec la session du compte connecté (au plus 3 comptes
+    // par visite, aucun relu depuis moins de 30 min, budget de lecture ordinaire).
+    // Sans ça, un compte où il ne repasse pas restait figé sur sa dernière
+    // lecture — ses annonces supprimées s'affichaient « en ligne » à côté des
+    // republiées (« trois fois la même paire »). Voir `relireAnnoncesAutresComptes`.
+    await relireAnnoncesAutresComptes(uid);
     // ⚠️ APRÈS la moisson : la liste du dressing (id + nPhotos) vient d'être
     // captée. On complète EN PASSIF les photos manquantes de ses annonces en
     // ligne — une par une, compte connecté (§3). Sans ouvrir l'annonce : c'est
@@ -4338,6 +4775,16 @@ const LECTURES_DUES_VALIDITE_MS = 60 * 60 * 1000;
 // Les lecteurs prioritaires et ce qu'une visite peut lire pour chacun. Lu à
 // l'appel (les constantes vivent plus bas dans le fichier).
 const lecteursPrioritaires = () => ({ versement: VERSEMENT_MAX_PAR_VISITE, releve: RELEVE_MAX_PAR_VISITE, retrait: RETRAIT_MAX_PAR_VISITE });
+// ⚠️⚠️ REVUE DE LA 5.167 — LA RELECTURE PUBLIQUE ÉTAIT DANS LA CLASSE DES PHOTOS.
+//    Après une republication (30 annonces neuves dont il manque les photos),
+//    `tickPhotos` vidait le budget à la minute 0, et les autres comptes attendaient
+//    une HEURE — pendant que l'écran promettait « à ta prochaine visite » (prouvé
+//    au banc, horloge simulée). ⇒ Trois étages, le total ne bouge pas (20/h) :
+//    l'argent et les colis d'abord (tout le budget), puis la relecture des autres
+//    comptes (tout sauf la réserve de l'argent), puis les photos (tout sauf les
+//    deux réserves). La relecture note elle aussi ce qui lui reste
+//    (`noterLecturesDues(uid, 'enligne', …)`) ; « pas su » garde sa réserve.
+const lecteursAvantPhotos = () => ({ enligne: ENLIGNE_MAX_PAR_VISITE });
 async function noterLecturesDues(uid, quoi, reste) {
   try {
     const cur = (await chrome.storage.local.get(LECTURES_DUES))[LECTURES_DUES] || {};
@@ -4347,8 +4794,8 @@ async function noterLecturesDues(uid, quoi, reste) {
     await chrome.storage.local.set({ [LECTURES_DUES]: cur });
   } catch (_) {}
 }
-async function reserveLectures(uid) {
-  const max = lecteursPrioritaires();
+async function reserveLectures(uid, classe = 'photos') {
+  const max = Object.assign({}, lecteursPrioritaires(), classe === 'photos' ? lecteursAvantPhotos() : {});
   let dues = {};
   try { dues = ((await chrome.storage.local.get(LECTURES_DUES))[LECTURES_DUES] || {})[String(uid)] || {}; } catch (_) {}
   let r = 0;
@@ -4364,7 +4811,9 @@ async function reserveLectures(uid) {
 // de lecture, pas celui des actions.
 // `classe` : 'argent' (versements, relevés) et 'colis' (codes de retrait) ont
 // tout le budget ; 'clic' (une lecture déclenchée par SON clic) aussi ;
-// 'photos' (le défaut) s'arrête avant la réserve.
+// 'enligne' (la relecture des autres comptes) s'arrête avant la réserve de
+// l'argent et des colis ; 'photos' (le défaut) avant celle-ci ET celle de la
+// relecture.
 async function gardeLecture(uid, acc, classe = 'photos') {
   const p = await pauseVinted();
   if (p) return { ok: false, code: 'vinted-pause', error: raisonPauseVinted(p) };
@@ -4374,7 +4823,7 @@ async function gardeLecture(uid, acc, classe = 'photos') {
              error: "ton navigateur est connecté à un autre compte — bascule sur celui-ci sur Vinted" };
   }
   const prioritaire = classe === 'argent' || classe === 'colis' || classe === 'clic';
-  const plafond = prioritaire ? LECTURES_MAX_HEURE : LECTURES_MAX_HEURE - (await reserveLectures(uid));
+  const plafond = prioritaire ? LECTURES_MAX_HEURE : LECTURES_MAX_HEURE - (await reserveLectures(uid, classe === 'enligne' ? 'enligne' : 'photos'));
   const c = await compterLecture(String(uid), plafond);
   if (!c.ok) return prioritaire
     ? { ok: false, code: 'trop-de-lectures',
@@ -4821,6 +5270,8 @@ async function publierDepuisAppSuite(msg, cmd, id, lbc) {
   const r = lbc ? await buildLbcData() : await buildEbayData();
   const preuveKO = lbc ? !!(r && r.stats && r.stats.preuveKO) : !!(r && r.preuveKO);
   if (preuveKO) return { accepte: false, code: 'preuve', raison: "je n'ai pas pu vérifier qu'elle n'est pas déjà vendue — réessaie dans un moment" };
+  const lecturesKO = lbc ? !!(r && r.stats && r.stats.lecturesKO) : !!(r && r.lecturesKO);
+  if (lecturesKO) return { accepte: false, code: 'lecture', raison: "je n'ai pas pu relire tes annonces Vinted — réessaie dans un moment" };
   const ad = ((r && r.queue) || []).find((a) => String(a.id) === id);
   if (!ad) return { accepte: false, code: 'absente', raison: "elle n'est plus dans la file (vendue, déjà publiée, ou décochée)" };
   const jobId = (lbc ? 'lbc:' : 'ebay:') + id;
@@ -6777,7 +7228,14 @@ async function buildEbayData() {
   const lost = main.vinted_pairs_lost || {};
   const pos = await readEbayPosted();
   const posted = new Set(pos.ids);
-  const listRows = retirerSupprimeesLignes((await sbGet('app_data?id=like.harvest_*_listings&select=id,data')) || [], await lireSupprimeesTous());
+  // 5.167 (11 octobre) : seulement ce qui est EN LIGNE d'après la lecture la plus
+  // récente de chaque compte — sans les supprimées, sans celles qu'une lecture
+  // publique plus récente ne montre plus, et sans celles « à confirmer ».
+  const enl = await lireDressingsEnLigne();
+  if (enl.echec) return { queue: [], retirees: 0, vendues: 0, aConfirmer: 0, preuveKO: false, lecturesKO: true, postedCount: posted.size, echec: pos.echec };
+  const listRows = enl.lignes;
+  let aConfirmer = 0;
+  for (const [u, l] of enl.aConfirmer) if (!off.has(String(u))) aConfirmer += l.length;
   const itemRows = (await sbGetTout('app_data?id=like.harvest_*_item_*&select=id,data')) || []; // §4.5 : une ligne par annonce, tous comptes → dépasse 1000 chez un vendeur actif, sbGet tronquait
   const details = {};
   for (const r of itemRows) { const p = (r.data || {}).payload || {}; const it = (p && p.item) || p; if (it && it.id) details[String(it.id)] = it; }
@@ -6824,7 +7282,7 @@ async function buildEbayData() {
     }
   }
   queue.sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0));
-  return { queue, retirees, vendues, preuveKO: preuve.echec, postedCount: posted.size, echec: pos.echec };
+  return { queue, retirees, vendues, aConfirmer, preuveKO: preuve.echec, postedCount: posted.size, echec: pos.echec };
 }
 
 async function buildLbcData() {
@@ -6862,8 +7320,18 @@ async function buildLbcData() {
   const posted = new Set(postedData.ids);
   const lbcLimit = postedData.limit;
   const lbcPlan = postedData.plan;
-  // Annonces EN LIGNE (harvest listings) — sans celles qu'il vient de supprimer (5.165).
-  const listRows = retirerSupprimeesLignes((await sbGet('app_data?id=like.harvest_*_listings&select=id,data')) || [], await lireSupprimeesTous());
+  // Annonces EN LIGNE d'après la lecture la plus récente de chaque compte
+  // (5.167, `lireDressingsEnLigne`) — sans les supprimées, sans celles qu'une
+  // lecture publique plus récente ne montre plus. Celles « à confirmer » (compte
+  // pas relu depuis 24 h) ne sont ni dans la file, ni « à retirer de Leboncoin » :
+  // on ne sait pas, on ne dit rien.
+  const enl = await lireDressingsEnLigne();
+  // Ses annonces Vinted n'ont pas pu être lues : ni file, ni « à retirer » — on le dit.
+  if (enl.echec) return { queue: [], removals: [], unlinked: [], postedList: [],
+    stats: { postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lecturesKO: true, preuveKO: false, aConfirmer: 0, onlineCount: 0, queueCount: 0, limit: lbcLimit, plan: lbcPlan } };
+  const listRows = enl.lignes;
+  const aConfirmerIds = new Set();
+  for (const [u, l] of enl.aConfirmer) if (!off.has(String(u))) for (const it of l) if (it && it.id != null) aConfirmerIds.add(String(it.id));
   const online = []; const onlineIds = new Set(); const seen = new Set();
   let exclues = 0;
   for (const r of listRows) {
@@ -7009,6 +7477,7 @@ async function buildLbcData() {
   for (const pid of posted) {
     if (!/^\d+$/.test(pid)) continue;                 // on ne suit que les ids d'annonce
     if (onlineIds.has(pid)) continue;                  // encore en ligne sur Vinted → RAS
+    if (aConfirmerIds.has(pid)) continue;              // à confirmer : on ne sait pas, on n'alerte pas
     const e = numeros[pid] || {};
     removalSeen.add(pid);
     removals.push({ id: pid, numero: String(e.numero || '?'), ref: 'VRM-' + (e.numero || '?'), title: e.title || '', etat: etatDe(pid) });
@@ -7023,6 +7492,11 @@ async function buildLbcData() {
     for (const o of online) {
       const e = numeros[o.id]; const num = e && e.numero;
       for (const k of vintedKeys(o, num)) keysOnline.add(k);
+    }
+    // Une paire « à confirmer » n'est pas « plus en ligne » : on ne sait pas.
+    for (const [u, l] of enl.aConfirmer) {
+      if (off.has(String(u))) continue;
+      for (const it of l) { const e = numeros[String(it.id)]; for (const k of vintedKeys({ raw: it }, e && e.numero)) keysOnline.add(k); }
     }
     // Numéros connus de VRM (toutes annonces numérotées, en ligne ou non).
     const keysKnown = new Set();
@@ -7096,7 +7570,7 @@ async function buildLbcData() {
   try { const rec = await sbGet('app_data?id=eq.lbc_recon&select=quota:data->quota'); const q = rec && rec[0] && rec[0].quota; if (q && q.value) detected = q.value; } catch (_) {}
   // Compteurs de diagnostic (pour comprendre si la file est vide et pourquoi).
   const numberedOnline = online.filter((o) => { const e = numeros[o.id]; return e && String(e.numero || '').trim() !== ''; }).length;
-  const stats = { postedCount, lbcCount, lbcJamaisLu, preuveKO: preuveLbc.echec, limit: lbcLimit, plan: lbcPlan, detected, exclues, onlineCount: online.length, numberedCount: numberedOnline, queueCount: queue.length,
+  const stats = { postedCount, lbcCount, lbcJamaisLu, preuveKO: preuveLbc.echec, limit: lbcLimit, plan: lbcPlan, detected, exclues, aConfirmer: aConfirmerIds.size, onlineCount: online.length, numberedCount: numberedOnline, queueCount: queue.length,
     autoMatched: autoMatched.size, lbcSeen: lbcItems.length, unlinkedCount: unlinked.length };
   // Liste des paires marquées « publiées » (pour pouvoir annuler une erreur).
   const postedList = [...posted].filter((x) => /^\d+$/.test(x)).map((pid) => { const e = numeros[pid] || {}; return { id: pid, numero: String(e.numero || '?'), title: e.title || '' }; }).sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0));

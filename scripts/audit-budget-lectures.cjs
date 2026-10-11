@@ -19,7 +19,12 @@
 //      lire (l'autre sens : sinon les photos seraient bridées pour toujours) ;
 //   4. « pas su » (une lecture ratée) garde la réserve de ce lecteur ;
 //   5. un CLIC (publier) n'est pas bridé par la réserve ; le total ne dépasse
-//      jamais 20 lectures/heure.
+//      jamais 20 lectures/heure ;
+//   6. (5.167, revue) la relecture PUBLIQUE de ses autres comptes passe entre
+//      l'argent et les photos : les photos s'arrêtent aussi avant SA réserve, et
+//      la relecture garde la place de l'argent. Un seul compte lié : rien à
+//      relire, la relecture le note (reste 0) et les photos n'attendent rien —
+//      d'où l'appel `relireAnnoncesAutresComptes` en tête des cas 2 à 4.
 //  Données inventées. Usage : node scripts/audit-budget-lectures.cjs [--src f]
 // ════════════════════════════════════════════════════════════════════════════
 const { faireFond, cheminSource } = require('./_fond-vm.cjs');
@@ -84,6 +89,7 @@ const prioritaires = async (ctx) => { await ctx.capterRetraits(UID); await ctx.c
   console.log('── 2. les photos s’arrêtent avant la réserve de l’argent et des colis');
   await essaie('réserve', async () => {
     const f = faireFond({ src: SRC, lignes: lignes(), vinted, store: {} });
+    await f.ctx.relireAnnoncesAutresComptes(UID);      // un seul compte : rien à relire (noté)
     await f.ctx.capterPhotosAnnonces(UID);
     await f.ctx.capterPhotosAnnonces(UID);           // le fond qui tourne chaque minute
     await f.ctx.capterPhotosAnnonces(UID);
@@ -100,6 +106,7 @@ const prioritaires = async (ctx) => { await ctx.capterRetraits(UID); await ctx.c
   await essaie('libération', async () => {
     const f = faireFond({ src: SRC, lignes: lignes({ relais: 0, mois: 0, datees: true }), vinted, store: {} });
     await prioritaires(f.ctx);                          // rien à lire : chacun note « reste 0 »
+    await f.ctx.relireAnnoncesAutresComptes(UID);
     dit(f.j.vinted.length === 0, 'rien à lire : aucune requête', `${f.j.vinted.length}`);
     await f.ctx.capterPhotosAnnonces(UID);
     await f.ctx.capterPhotosAnnonces(UID);
@@ -113,6 +120,7 @@ const prioritaires = async (ctx) => { await ctx.capterRetraits(UID); await ctx.c
     const f = faireFond({ src: SRC, lignes: lignes({ relais: 0, mois: 0 }), vinted, store: {},
       lectureKO: (u) => /orders_sold/.test(u) });
     await prioritaires(f.ctx);
+    await f.ctx.relireAnnoncesAutresComptes(UID);
     await f.ctx.capterPhotosAnnonces(UID);
     await f.ctx.capterPhotosAnnonces(UID);
     const ph = compte(f.j, /^\/items\/\d+$/);
@@ -127,6 +135,20 @@ const prioritaires = async (ctx) => { await ctx.capterRetraits(UID); await ctx.c
     dit(eu === true && compte(f.j, /^\/items\/801$/) === 1, 'publier une paire va chercher SES photos même quand les photos de fond sont à la réserve', `rendu=${eu}`);
     await f.ctx.capterPhotosAnnonces(UID);
     dit(compte(f.j, /^\/items\/\d+$/) === 1, 'mais le fond, lui, ne lit plus rien au-delà de la réserve', `${compte(f.j, /^\/items\/\d+$/)} page(s)`);
+  });
+
+  console.log('── 6. la relecture des autres comptes passe entre l’argent et les photos (5.167)');
+  await essaie('relecture', async () => {
+    // Plusieurs comptes liés, relecture jamais notée (« pas su ») : sa réserve (3) s'ajoute à celle de l'argent (10).
+    const f = faireFond({ src: SRC, lignes: lignes(), vinted, store: {} });
+    for (let i = 0; i < 4; i++) await f.ctx.capterPhotosAnnonces(UID);
+    const ph = compte(f.j, /^\/items\/\d+$/);
+    dit(ph === 7, 'les photos s’arrêtent avant la réserve de l’argent ET celle de la relecture : 7 pages, pas 10', `${ph} page(s) lue(s)`);
+    const acc = { vinted_user_id: UID, domain: 'www.vinted.fr' };
+    const g = []; for (let i = 0; i < 4; i++) g.push(await f.ctx.gardeLecture(UID, acc, 'enligne'));
+    dit(g.slice(0, 3).every((x) => x === null) && g[3] && g[3].code === 'lectures-reservees', 'la relecture lit ses 3 places, pas une de plus (la réserve de l’argent tient)', JSON.stringify(g.map((x) => x && x.code)));
+    const a = []; for (let i = 0; i < 10; i++) a.push(await f.ctx.gardeLecture(UID, acc, 'argent'));
+    dit(a.every((x) => x === null) && lect(f.store) === 20, 'l’argent et les colis ont toujours leurs 10 places — et le total reste 20', `${a.filter((x) => x === null).length} lectures · total ${lect(f.store)}`);
   });
 
   console.log(`\n${ko ? '❌' : '✅'} budget des lectures : ${ok} vert(s), ${ko} rouge(s)`);

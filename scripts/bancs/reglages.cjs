@@ -26,6 +26,7 @@
 //    dans le dépôt, §6) : ce qui est mesuré est la RÈGLE, pas leur contenu.
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
 const { metaVersData } = require('./_meta.cjs');
+const { dressingsDuJour } = require('./_instantane.cjs'); // fx/ est une photo datée : la lecture du dressing la plus récente = « il y a 1 min » (règle « en ligne » ≤ 24 h)
 const fs = require('fs'), http = require('http'), path = require('path');
 // ⚠️⚠️ JAMAIS UN CHEMIN ABSOLU : la méthode de preuve (§6.1) lance le banc
 // depuis /tmp/avN, et un chemin en dur y servirait le build COURANT — le banc
@@ -33,7 +34,7 @@ const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist'), SC = __dirname;
 const FX = (f) => JSON.parse(fs.readFileSync(path.join(SC, 'fx', f + '.json'), 'utf8'));
 const main = FX('main'), accounts = FX('accounts');
-const rows = [...FX('sold'), ...FX('purch'), ...FX('listings'), ...FX('inbox'),
+const rows = [...FX('sold'), ...FX('purch'), ...dressingsDuJour(FX('listings')), ...FX('inbox'),
   ...FX('track'), ...FX('bord'), ...FX('label'), ...FX('billing')];
 
 // Les quatre lignes de réglages, telles qu'elles existent chez lui (formes
