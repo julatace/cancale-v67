@@ -9033,7 +9033,13 @@ function BoutonToutGenerer({ items }) {
 // Leboncoin publie sans booster (décision du 20 septembre).
 // GRISÉ et jamais caché quand l'extension ne peut pas (§ BoutonBordereau) ; la
 // raison commune est dite UNE fois au-dessus de la liste (`RaisonPublication`).
-function BoutonPublier({ place, id }) {
+// `croitVendue` (revue du 11 octobre, défaut 12) : VRM sait la paire REVENUE
+// (vente remboursée ensuite), mais une extension antérieure à la règle de
+// l'instantané (`EXT_CAPACITES.preuves`) la croit encore vendue et refuserait
+// de la publier (elle relit SA file). Le bouton est grisé avec la raison — dite
+// UNE fois au-dessus de la liste (`LbcCroitVendue`), §7.
+const texteCroitVendue = () => `Ton extension la croit encore vendue (elle ne sait pas qu'une vente remboursée fait revenir la paire) et refuserait de la publier : mets-la à jour (${EXT_ATTENDUE}).`;
+function BoutonPublier({ place, id, croitVendue }) {
   const { jobs } = useExtVivante();
   const sansSouris = useSansSouris();
   const [refus, setRefus] = React.useState(null);
@@ -9041,7 +9047,8 @@ function BoutonPublier({ place, id }) {
   const lbc = place === 'lbc';
   const jobId = (lbc ? 'lbc:' : 'ebay:') + id;
   const job = jobs[jobId] || null;
-  const glob = raisonExtGlobale(sansSouris, { cap: 'publication', role: 'publie tes annonces' });
+  const glob = raisonExtGlobale(sansSouris, { cap: 'publication', role: 'publie tes annonces' })
+    || (croitVendue && extSait('preuves') === 'retard' ? { code: 'croit-vendue', texte: texteCroitVendue() } : null);
   const fait = job && job.etape === 'fait';
   const enCours = job && job.etape === 'depot' && (Date.now() - Number(job.at || 0) < 15 * 60000);
   const lancer = async () => {
@@ -9074,6 +9081,15 @@ function BoutonPublier({ place, id }) {
       </button>
       {refus && <span style={{ fontSize: 11, color: C.warn, lineHeight: 1.35, whiteSpace: 'normal' }}>{refus}</span>}
     </span>
+  );
+}
+function LbcCroitVendue({ n }) {
+  useExtVivante();
+  if (!n || extSait('preuves') !== 'retard') return null;
+  return (
+    <div data-lbc-croit-vendue={n} style={{ fontSize: 12.5, color: C.text, background: C.card, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.warn}`, borderRadius: 10, padding: '9px 12px', marginBottom: 10, lineHeight: 1.45 }}>
+      <b>{n} paire{n > 1 ? 's' : ''} revenue{n > 1 ? 's' : ''}</b> (vente remboursée ou annulée) : de nouveau à publier pour VRM, mais ton extension {n > 1 ? 'les croit encore vendues' : 'la croit encore vendue'} et refuserait de {n > 1 ? 'les' : 'la'} publier — mets-la à jour ({EXT_ATTENDUE}).
+    </div>
   );
 }
 function RaisonPublication({ n, place }) {
@@ -12173,6 +12189,15 @@ function EbayAnnonces({ baseKO, comptes = [] }) {
   // (11 octobre) Les ventes Vinted EN COURS qu'aucune preuve ne relie encore à
   // leur annonce : `undefined` en cours · `null` pas su · [{ uid, tx }].
   const [sansPreuve, setSansPreuve] = React.useState(undefined);
+  // (revue du 11 octobre) Les comptes dont les ventes n'ont pas pu être lues
+  // pour cette ligne : on le DIT, sinon « pas encore reliées » disparaît en
+  // silence — l'écran d'une panne serait celui où tout est relié (§4.1).
+  const [sansPreuveKO, setSansPreuveKO] = React.useState([]);
+  // Le geste de la ligne « pas reliées » suit l'extension de CE navigateur (sa
+  // version, sa session VRM) et l'appareil (téléphone : rien à générer ici).
+  const sansSouris = useSansSouris();
+  const [, majExt] = React.useReducer((x) => x + 1, 0);
+  React.useEffect(() => onVmrExt(majExt), []);
   // L'extension prévient quand elle a rangé une preuve (une transaction lue,
   // un bordereau, des ventes) : on relit, regroupé (une rafale = une lecture).
   const [preuveRelue, setPreuveRelue] = React.useState(0);
@@ -12317,7 +12342,7 @@ function EbayAnnonces({ baseKO, comptes = [] }) {
   React.useEffect(() => {
     if (!aVerifier) return;
     let stop = false;
-    lirePreuvesVenteVinted({ comptes: avecSku ? comptesPreuve : null }).then((p) => { if (!stop) { setVendusVinted(p ? p.vendus : null); setSansPreuve(p ? p.sansPreuve : null); } });
+    lirePreuvesVenteVinted({ comptes: avecSku ? comptesPreuve : null }).then((p) => { if (!stop) { setVendusVinted(p ? p.vendus : null); setSansPreuve(p ? p.sansPreuve : null); setSansPreuveKO(p && Array.isArray(p.sansPreuveKO) ? p.sansPreuveKO : []); } });
     (async () => {
       try {
         const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=ventes:data->ventes`, { headers: sbAuth() });
@@ -12566,14 +12591,23 @@ function EbayAnnonces({ baseKO, comptes = [] }) {
   // et programmée ici ne lève l'alerte que si ses ventes ont été lues.
   const progReliees = listeProgrammees.some((p) => p && numDeSkuEbay(p.sku));
   const lbcPasSu = progReliees && (ventesLbc === null || ventesConnues.pasSu.includes('tes annonces Leboncoin'));
+  // (revue du 11 octobre) Les ventes d'AUTRES comptes illisibles : la preuve
+  // tient (elle ne dépend pas d'eux), mais la ligne « pas encore reliées » ne
+  // peut pas être écrite — on nomme les comptes et ce que ça empêche, sinon
+  // l'écran d'une panne est celui où tout est relié (§4.1).
+  const nomCompte = (u) => { const a = (Array.isArray(comptes) ? comptes : []).find((x) => String(x && x.vinted_user_id) === String(u)); return (a && a.login) || `#${u}`; };
+  const ventesKO = (relieesEbay || progReliees) && vendusVinted instanceof Set && sansPreuve === null && Array.isArray(sansPreuveKO) && sansPreuveKO.length
+    ? sansPreuveKO.map(nomCompte) : [];
   const pasSu = [
     (relieesEbay || progReliees) && vendusVinted === null && 'tes ventes Vinted',
+    ventesKO.length > 0 && `les ventes Vinted de ${ventesKO.join(', ')}`,
     commandes === null && 'tes ventes eBay',
     lbcPasSu && 'tes ventes Leboncoin',
     skuCommandes && enLigne === null && 'tes annonces Vinted',
   ].filter(Boolean);
   const effets = [
     (relieesEbay || progReliees) && vendusVinted === null && 'je ne peux pas te dire si une paire en vente ou programmée ici est déjà partie sur Vinted',
+    ventesKO.length > 0 && `je ne peux pas te dire quelles ventes en cours ${ventesKO.length > 1 ? 'de ces comptes' : 'de ce compte'} ne sont pas encore reliées à leur annonce`,
     lbcPasSu && 'je ne peux pas te dire si une paire programmée ici est déjà vendue sur Leboncoin',
     (commandes === null || (skuCommandes && enLigne === null)) && 'je ne peux pas te dire si une paire vendue ici est encore en vente sur Vinted',
   ].filter(Boolean);
@@ -12593,21 +12627,42 @@ function EbayAnnonces({ baseKO, comptes = [] }) {
   const ligneSansPreuve = nSansPreuve > 0 && (() => {
     const parCompte = new Map();
     for (const v of sansPreuve) parCompte.set(v.uid, (parCompte.get(v.uid) || 0) + 1);
-    const nom = (u) => { const a = (Array.isArray(comptes) ? comptes : []).find((x) => String(x && x.vinted_user_id) === String(u)); return (a && a.login) || `#${u}`; };
+    const nom = nomCompte;
     const noms = [...parCompte.entries()].map(([u, n]) => parCompte.size > 1 ? `${nom(u)} (${n})` : nom(u));
     const un = nSansPreuve === 1, ce = parCompte.size === 1 ? 'ce compte' : 'chacun de ces comptes';
     const cap = extSait('preuves');
+    // ⚠️⚠️ (revue du 11 octobre) « ELLE LIT TOUTE SEULE » N'EST VRAI QUE SI ELLE
+    //    PEUT ÉCRIRE : sans session VRM, la visite s'arrête avant de lire quoi que
+    //    ce soit (`visite_sans_session`, prouvé dans le vm). La promesse ne se fait
+    //    qu'à une extension connectée à CE compte VRM, ici, sur un ordinateur — la
+    //    même règle que les annonces à confirmer (`connexionExtensionVrm`, §11) ;
+    //    sinon on dit ce qui bloque, avec la phrase de l'indicateur
+    //    (`raisonExtGlobale`) : une voix, pas deux.
+    const ailleurs = cap === 'absente' || sansSouris;
+    const blocage = cap === 'ok' && !ailleurs ? raisonExtGlobale(false, { cap: 'preuves', role: 'lit la transaction de tes ventes' }) : null;
+    const promet = cap === 'ok' && !ailleurs && !blocage && connexionExtensionVrm() === 'ok';
+    // Une ligne a son bouton « Générer le bordereau » seulement si elle est à
+    // poster, SANS bordereau déjà rangé (un bordereau capté au téléchargement ne
+    // porte pas l'annonce : « Générer » répondrait « déjà fait » et ne relierait
+    // rien — l'écran Ventes, lui, dit « prêt à imprimer », §11), et sur un
+    // ordinateur (au doigt, un bouton grisé n'explique rien).
+    const aBouton = (v) => !sansSouris && !v.bordCapte && aExpedier({ status: v.statut, transaction_user_status: v.tus });
+    const generer = sansPreuve.some(aBouton);
     // (revue du 11 octobre) LE CHIFFRE, PAS LA PROMESSE : l'extension n'en lit
     // que `PREUVE_PAR_VISITE` par visite et par compte (`PREUVE_MAX_PAR_VISITE`
     // dans background.js, comparé par audit-preuve-vente) — « à ta prochaine
     // visite » n'est vrai que si aucun compte n'en a plus.
     const plusParCompte = Math.max(...parCompte.values());
     const quand = plusParCompte > PREUVE_PAR_VISITE ? 'au fil de tes visites' : 'à ta prochaine visite';
-    const geste = cap === 'ok'
+    const ouvre = `ouvre ${un ? 'la vente' : 'chaque vente'} sur vinted.fr (lien${un ? '' : 's'} ci-dessous), connecté sur ${ce}`;
+    const ouGenere = generer ? ` — ou génère ${un ? 'son' : 'leur'} bordereau depuis VRM (bouton ci-dessous) : un bordereau généré par VRM relie la vente` : '';
+    const geste = promet
       ? `L'extension de ce navigateur lit ${un ? 'sa transaction' : 'leur transaction'} toute seule sur vinted.fr, connecté sur ${ce} — ${PREUVE_PAR_VISITE} par visite, donc ${quand}.`
-      : cap === 'retard'
-        ? `L'extension installée ici ne va pas ${un ? 'la' : 'les'} chercher toute seule : mets-la à jour (${EXT_ATTENDUE}). En attendant, ouvre ${un ? 'la vente' : 'chaque vente'} sur vinted.fr (lien${un ? '' : 's'} ci-dessous), connecté sur ${ce} — ou génère ${un ? 'son' : 'leur'} bordereau : un bordereau capté relie déjà la vente.`
-        : `Sur l'ordinateur où l'extension VRM est installée : passe sur vinted.fr connecté sur ${ce}, ou ouvre ${un ? 'la vente' : 'chaque vente'} (lien${un ? '' : 's'} ci-dessous) si l'extension n'est pas à jour.`;
+      : ailleurs
+        ? `Sur l'ordinateur où l'extension VRM est installée : passe sur vinted.fr connecté sur ${ce}, ou ouvre ${un ? 'la vente' : 'chaque vente'} (lien${un ? '' : 's'} ci-dessous) si l'extension n'est pas à jour.`
+        : cap === 'retard'
+          ? `L'extension installée ici ne va pas ${un ? 'la' : 'les'} chercher toute seule : mets-la à jour (${EXT_ATTENDUE}). En attendant, ${ouvre}${ouGenere}.`
+          : `${blocage ? blocage.texte : 'Je vérifie que l\'extension de ce navigateur est connectée à ton compte VRM.'} Tant que ce n'est pas réglé, elle ne lit rien : ${ouvre}${ouGenere}.`;
     // (revue du 11 octobre) « Ouvre la conversation de chaque vente » sans dire
     // LAQUELLE : il a neuf comptes et des dizaines de ventes. Chaque vente est
     // nommée (son titre, sinon son n° de transaction), avec le lien vers SA
@@ -12615,16 +12670,17 @@ function EbayAnnonces({ baseKO, comptes = [] }) {
     // « Générer le bordereau » : un bordereau capté porte l'annonce (§5).
     const lienVente = (v) => v.conv ? `https://www.vinted.fr/inbox/${encodeURIComponent(v.conv)}` : `https://www.vinted.fr/member/transactions/${encodeURIComponent(v.tx)}`;
     return (
-      <div data-ebay-ventes-sans-preuve={nSansPreuve} data-ebay-sans-preuve-geste={cap} style={{ ...bloc(), fontSize: 12.5, color: E.text, lineHeight: 1.5 }}>
+      <div data-ebay-ventes-sans-preuve={nSansPreuve} data-ebay-sans-preuve-geste={cap} data-ebay-sans-preuve-promesse={promet ? '1' : '0'} data-ebay-sans-preuve-blocage={blocage ? blocage.code : ''} style={{ ...bloc(), fontSize: 12.5, color: E.text, lineHeight: 1.5 }}>
         <b>{nSansPreuve} vente{un ? '' : 's'} Vinted en cours pas encore reliée{un ? '' : 's'} à {un ? 'son' : 'leur'} annonce</b> (sur {noms.join(', ')}) : l'anti double vente ne {un ? 'la' : 'les'} voit pas encore — si la paire est aussi en vente ici, VRM ne peut pas te dire de la retirer. {geste}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
           {sansPreuve.map((v) => (
             <div key={v.uid + ':' + v.tx} data-ebay-sans-preuve-vente={v.tx} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, minWidth: 0 }}>
               <span style={{ fontWeight: 600, minWidth: 0, overflowWrap: 'anywhere' }}>{v.titre || `vente n° ${v.tx}`}{parCompte.size > 1 ? <span style={{ color: E.muted, fontWeight: 500 }}> · {nom(v.uid)}</span> : null}</span>
               <a href={lienVente(v)} target="_blank" rel="noreferrer" style={{ ...lienE, textDecoration: 'none' }}>ouvrir sur Vinted ↗</a>
-              {aExpedier({ status: v.statut, transaction_user_status: v.tus }) && (
+              {aBouton(v) && (
                 <BoutonBordereau uid={v.uid} tx={String(v.tx)} conv={v.conv} login={nom(v.uid)} aGenerer pdf={false} sansRepli onFait={() => setPreuveRelue((n) => n + 1)} />
               )}
+              {v.bordCapte && <span data-ebay-sans-preuve-bord-capte={v.tx} style={{ color: E.muted, fontSize: 11.5 }}>bordereau déjà là (Ventes)</span>}
             </div>
           ))}
         </div>
@@ -19505,7 +19561,16 @@ function ventesParCompteDe(lignes, uids) {
 // `comptes` (uids, facultatif) : l'appelant veut aussi les ventes EN COURS
 // (à poster, en route) qu'AUCUNE preuve ne relie à leur annonce — l'anti double
 // vente ne les voit pas ; l'écran eBay les compte, une fois.
-// Rend `null` · `{ vendus: Set(annonce), sansPreuve: [{ uid, tx, titre, conv, statut, tus }] | null }`.
+// Rend `null` · `{ vendus: Set(annonce), sansPreuve: [{ uid, tx, titre, conv, statut, tus, bordCapte }] | null,
+//   sansPreuveKO: [uid] (comptes demandés dont les ventes n'ont pas pu être lues),
+//   ancienne: Set(annonce) }`.
+// (revue du 11 octobre) `bordCapte` : un bordereau est DÉJÀ rangé pour cette
+// vente, sans l'annonce (capté au téléchargement) — « Générer » ne ferait rien.
+// `ancienne` : ce que la règle des extensions PUBLIÉES (transactions seules,
+// jusqu'à la 5.170) dit vendu — l'écran Leboncoin ne propose pas « Publier » sur
+// une paire que l'extension installée refusera (elle relit SA file).
+// `sansPreuveKO` : on DIT quels comptes n'ont pas été lus — sinon « pas
+// reliée » disparaît en silence, comme si tout était relié (§4.1).
 // Combien de transactions l'extension lit par visite et par compte : le MIROIR
 // de `PREUVE_MAX_PAR_VISITE` (background.js) — `audit-preuve-vente` exige
 // l'égalité, sinon l'écran promettrait un rythme que l'extension ne tient pas.
@@ -19537,13 +19602,16 @@ const lirePreuvesVenteVinted = async (opts = {}) => {
     // `null`, elle n'efface JAMAIS la preuve — une vente prouvée par sa
     // transaction reste « à retirer » même quand cette lecture (la plus lourde)
     // ne répond pas.
-    let sansPreuve = null;
+    let sansPreuve = null, sansPreuveKO = [];
     if (comptes) {
       const autres = comptes.filter((u) => !juger.includes(u));
       const l2 = autres.length ? await ordres(autres) : [];
+      if (l2 === null) sansPreuveKO = autres;
       if (l2 !== null) {
         Object.assign(parCompte, ventesParCompteDe(l2, autres));
         const bordTx = preuvesParBordereau(bords, parCompte).tx;
+        // Les bordereaux rangés, quels qu'ils soient (avec ou sans l'annonce).
+        const ranges = new Set((bords || []).map((b) => { const m = /^harvest_(\d+)_label_(\d+)$/.exec(String((b && b.id) || '')); return m ? m[1] + ':' + m[2] : ''; }).filter(Boolean));
         sansPreuve = [];
         const vus = new Set(), maintenant = Date.now();
         for (const u of comptes) for (const o of (parCompte[u] || [])) {
@@ -19551,11 +19619,11 @@ const lirePreuvesVenteVinted = async (opts = {}) => {
           const tx = String(o.transaction_id);
           if (vus.has(tx) || parTx.tx.has(tx) || bordTx.has(tx)) continue;
           vus.add(tx);
-          sansPreuve.push({ uid: u, tx, titre: String(o.title || '').trim(), conv: o.conversation_id != null ? String(o.conversation_id) : '', statut: String(o.status || ''), tus: String(o.transaction_user_status || '') });
+          sansPreuve.push({ uid: u, tx, titre: String(o.title || '').trim(), conv: o.conversation_id != null ? String(o.conversation_id) : '', statut: String(o.status || ''), tus: String(o.transaction_user_status || ''), bordCapte: ranges.has(u + ':' + tx) });
         }
       }
     }
-    return { vendus, sansPreuve };
+    return { vendus, sansPreuve, sansPreuveKO, ancienne: preuvesParTransaction(rows).items };
   } catch (_) { return null; }
 };
 const lireVentesVintedProuvees = async () => { const p = await lirePreuvesVenteVinted(); return p ? p.vendus : null; };
@@ -32886,7 +32954,13 @@ function LeboncoinScreen() {
     //    « Publier » était alors refusé par l'extension, qui relit SA file. Et
     //    une transaction figée sur « payée » d'une vente remboursée restait
     //    « vendue ». Une règle (`lirePreuvesVenteVinted`), `null` = pas su.
-    const preuveLue = await lireVentesVintedProuvees();
+    // ⚠️ (revue du 11 octobre, défaut 12) + `ancienne` : ce que les extensions
+    //    PUBLIÉES (jusqu'à la 5.170) disent vendu sur la seule transaction. Une
+    //    paire REVENUE (vente remboursée ensuite) est « à publier » ici et
+    //    « vendue » pour elles : leur « Publier » serait refusé.
+    const preuveP = await lirePreuvesVenteVinted();
+    const preuveLue = preuveP ? preuveP.vendus : null;
+    const ancienne = (preuveP && preuveP.ancienne) || new Set();
     const preuveKO = preuveLue === null;
     const vendus = preuveLue || new Set();
     const online = []; const onlineIds = new Set(); const seen = new Set(); const etatVinted = {};
@@ -33009,6 +33083,7 @@ function LeboncoinScreen() {
         photos, photosAll, nReelles, vignette: photosAll[0] || '',
         desc: !!lbcDescription(d.description),
         url: 'https://www.vinted.fr/items/' + o.id,
+        croitVendue: ancienne.has(String(o.id)),
       });
     }
     queue.sort((a, b) => triNum(a.numero, b.numero));
@@ -33315,6 +33390,7 @@ function LeboncoinScreen() {
                 aucune — 0 sur 57 lignes, vérifié). Mettre ces 54 en haut, c'est
                 mettre devant ce qui fera une annonce bâclée. */}
             <RaisonPublication n={data.queue.length} place="lbc"/>
+            <LbcCroitVendue n={data.queue.filter(q => q.croitVendue).length}/>
             {(() => {
               const pretes = data.queue.filter(q => q.photos >= 2);
               const maigres = data.queue.filter(q => q.photos === 1);
@@ -33353,7 +33429,7 @@ function LeboncoinScreen() {
                     )}
                   </div>
                   <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginTop: 7 }}>
-                    {q.photos > 0 && <BoutonPublier place="lbc" id={q.id}/>}
+                    {q.photos > 0 && <BoutonPublier place="lbc" id={q.id} croitVendue={!!q.croitVendue}/>}
                     <button type="button" onClick={() => marquer(q.id)} title="Tu l'as déjà publiée toi-même : elle sort de la file"
                       style={{ border: 'none', background: 'transparent', padding: 0, minHeight: 0, color: C.muted, fontSize: 11.5, fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}>Déjà publiée</button>
                   </div>
@@ -37316,6 +37392,22 @@ function AppCoeur() {
     window.addEventListener('vrm:colis', on);
     return () => window.removeEventListener('vrm:colis', on);
   }, []);
+  // ⚠️⚠️ (revue du 11 octobre) UNE PREUVE RANGÉE PENDANT QUE VRM EST OUVERT.
+  //    Le retrait automatique d'eBay (`retirerEbayAuto`, allumé par lui) ne
+  //    tournait qu'à l'ouverture : l'extension range le bordereau d'une vente
+  //    (ou sa transaction) et prévient l'app (`maj · label | preuves | ventes`),
+  //    personne ne recalculait — l'annonce eBay restait en vente jusqu'au
+  //    rechargement, le flux même de la N°553 (#78). La cloche écoute donc les
+  //    mêmes signaux qu'eBay → Annonces, REGROUPÉS (une rafale = un recalcul,
+  //    au plus un toutes les 5 s) ; `__retraitEbayAutoTentes` garde qu'une
+  //    annonce ne parte qu'une fois.
+  const [preuveTick, setPreuveTick] = useState(0);
+  useEffect(() => {
+    const signal = regrouperSignaux(() => setPreuveTick(t => t + 1), SIGNAL_MIN_MS, 1500);
+    const f = (e) => { const d = e && e.detail; if (d && d.type === 'maj' && ['preuves', 'label', 'ventes'].includes(d.quoi)) signal(); };
+    window.addEventListener('vrm:ext', f);
+    return () => { signal.arreter(); window.removeEventListener('vrm:ext', f); };
+  }, []);
   useEffect(()=>{
     if(!vintedAccounts || vintedAccounts.length===0) return;
     // ⚠️ DEUX CHOSES DIFFÉRENTES VIVAIENT DANS LE MÊME « UNE SEULE FOIS » :
@@ -37612,7 +37704,7 @@ function AppCoeur() {
   // 2 colis réels, et ne se recalculait jamais (§5.49). On recompte à
   // l'arrivée du nuage.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[vintedAccounts, colisTick, nuagePret]);
+  },[vintedAccounts, colisTick, nuagePret, preuveTick]);
 
   // Multi-vendeurs : tant qu'on ne sait pas qui est là, on n'affiche rien (un
   // écran de connexion qui clignote avant de disparaître fait « bug »), et sans

@@ -85,7 +85,7 @@ const MUTATIONS = {
   'preuve-pas-su-lue': { ext: (s) => remplace(s, '    if (det === null) return 0;                                           // pas su\n    const bords', '    const bords', 'preuve-pas-su-lue') },
   'regle-divergente': { ext: (s) => remplace(s, 'const PREUVE_RECENTE_MS = 30 * 86400000;', 'const PREUVE_RECENTE_MS = 31 * 86400000;', 'regle-divergente') },
   // (revue du 11 octobre, défaut 3) L'écran Leboncoin reprend SA boucle sur les transactions (la forme de 6729407).
-  'lecteur-lbc-hors-bloc': { app: (s) => remplace(s, "    const preuveLue = await lireVentesVintedProuvees();\n", "    const txnRows = await sbGet('app_data?id=like.harvest_*_txn_*&select=it:meta->>item_id,ti:meta->>status_title');\n    const preuveLue = txnRows === null ? null : new Set(txnRows.filter((r) => r && r.it && String(r.ti || '').trim() && !PAS_UNE_VENTE.test(String(r.ti))).map((r) => String(r.it)));\n", 'lecteur-lbc-hors-bloc') },
+  'lecteur-lbc-hors-bloc': { app: (s) => remplace(s, "    const preuveLue = preuveP ? preuveP.vendus : null;\n", "    const txnRows = await sbGet('app_data?id=like.harvest_*_txn_*&select=it:meta->>item_id,ti:meta->>status_title');\n    const preuveLue = txnRows === null ? null : new Set(txnRows.filter((r) => r && r.it && String(r.ti || '').trim() && !PAS_UNE_VENTE.test(String(r.ti))).map((r) => String(r.it)));\n", 'lecteur-lbc-hors-bloc') },
   // (revue du 11 octobre) La capacité promise à une version PUBLIÉE qui ne l'a pas.
   'capacite-publiee': { app: (s) => remplace(s, "preuves: '5.172.0' };", "preuves: '5.170.0' };", 'capacite-publiee') },
   // L'écran annonce un autre rythme que celui de l'extension.
