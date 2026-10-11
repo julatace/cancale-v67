@@ -7167,6 +7167,63 @@ Leboncoin ». Causes MESURÉES (journaux d'auth, vrai GoTrue, vrai Chromium) :
   le catalogue Leboncoin attend en mémoire du service worker (renvoyé à chaque
   visite, rien de perdu). Extension **5.169.0** (écrite comme « 5.167 en cours », mais les 5.167 et 5.168 sont parties en production SANS ce code : deux contenus ne portent jamais le même numéro), zip régénéré.
 
+### ⚠️⚠️ REVUE DE LA SESSION ADRESSÉE : « JE LA (RE)CONNECTE » SANS RIEN ENVOYER (11 octobre, 5.169)
+Revue contradictoire du chantier ci-dessus, chaque constat REPRODUIT (rendu sur
+données inventées, vrai `background.js` dans un `vm`, vrai Chromium + vraie
+extension), corrigé, rouge sur 24bec0d et sous mutation.
+- ⚠️⚠️ **La version** : ce code était écrit « 5.167 en cours », mais la 5.167 et
+  la 5.168 sont parties en production SANS lui. Il passe en **5.169.0** — et les
+  seuils qui datent ses nouveautés aussi (`EXT_CAPACITES.liaison`,
+  `CODE_DANS_ETAT`, le jugement du code par `bridge.js` et `vrm-badge.js`) :
+  à 5.167, une 5.168 publiée aurait été déclarée « périmée » à tort.
+- ⚠️⚠️ **« Je la (re)connecte — rien à taper » à une extension qui ne reçoit plus
+  rien.** La garde (« elle ne sait pas recevoir la session adressée ») n'était
+  posée que sur « pas connectée » : « autre compte VRM » et les premiers pas le
+  promettaient encore à une 5.164 (mesuré : 0 envoi en 25 s), et « Se connecter
+  avec VRM » nommait un bouton que sa fenêtre n'a pas. ⇒ **`voieConnexionExt()`**,
+  une règle pour l'en-tête, la liste des ventes, le panneau et les premiers pas :
+  `app` (5.169, le serveur n'a rien refusé) · `retard` (la mettre à jour, ou le
+  mot de passe VRM) · `serveur` (refus 429/503 : le mot de passe ; l'app
+  réessaie après `__sessExtPasAvant`). Le panneau lisait « Se connecter avec
+  VRM » pendant que la liste disait le mot de passe : c'est fini (§11).
+- **Autre compte + extension d'avant la 5.169** : son icône, connectée, ouvre
+  VRM (pas sa fenêtre) — « clique l'icône, Se déconnecter » était impossible.
+  Le seul geste d'ici : **« Déconnecter l'extension de ce Chrome »**, l'ANCIEN
+  message (`session: null`), sur ce clic seulement ; puis le mot de passe VRM
+  dans sa fenêtre. Même message sur le geste « Se déconnecter » de VRM (une
+  5.164 continuait d'écrire sous ce compte) — jamais quand on SAIT qu'elle écrit
+  sous un autre compte ; une 5.169 l'ignore (elle passe par l'adressé).
+- **« Se connecter avec VRM » bloqué** : avec une copie ancienne à côté, la
+  session part quand même, ADRESSÉE à celle qui a demandé (les commandes restent
+  coupées) ; sur un code périmé, le bandeau le dit (⟳) et repart après la
+  réparation ; la croix apparaît toujours au bout de 6 s. Le bandeau laisse la
+  place de l'île (`vrm-tete-row`) : sa croix ne se cliquait pas à 1512/1280 px.
+- **Périmé réparé, page ouverte** : le pont remis à neuf annonce `ready` ; l'app
+  relit l'état tout de suite (avant : « périmé — clique ⟳ » ~20 s, commandes
+  coupées).
+- **La fenêtre de l'icône sur un code périmé** (5 de ses 6 Chrome) : l'ancien
+  service worker ne connaît pas `lierAvecVRM`, le clic ne faisait RIEN. Sans
+  réponse, `popup.js` (lu depuis le disque) ouvre VRM avec l'identifiant de
+  l'extension, répare le code (⟳), sinon déplie le mot de passe VRM et dit ⟳.
+- **Dépôt Leboncoin** : un onglet ouvert n'est pas un dépôt vivant (navigué sur
+  vinted.fr, il bloquait la paire pour toujours) — vivant = adresse de dépôt ET
+  réponse de `lbc.js` pour CETTE paire (grâce de 30 s / page qui charge : un
+  double clic n'abandonne rien). Un arrêt à 90 s ou un onglet fermé, c'est « pas
+  su » : il a pu FINIR À LA MAIN (champ obligatoire non devinable) — l'app ne dit
+  plus « n'a pas abouti », nomme « Déjà publiée », et **relancer exige sa
+  confirmation** (l'extension refuse `confirmer` sans elle). La paire en dépôt
+  n'est rendue (`getPending`) qu'à l'onglet ouvert pour elle.
+- Laissé tel quel, décision assumée : une extension d'avant la 5.169 ne reçoit
+  plus de session de l'app (le mot de passe VRM dans sa fenêtre marche toujours).
+- Preuves : `pont.cjs` **18 rouges** sur 24bec0d · `premierjour.cjs` 10 ·
+  `deux-extensions.cjs` 2 · `publier.cjs` 6 · `popup.cjs` 3 · `leboncoin.cjs` 1 ·
+  `audit-pont-session.cjs` 7 · `session.cjs` (vrai Chromium, cas G/P/S) 5 ;
+  7 mutations de l'app, 4 de l'extension, 2 de la fenêtre ⇒ toutes rouges.
+- ⚠️ **Non mesuré** : la vraie page de dépôt Leboncoin (réponse de `lbc.js` sur
+  leboncoin.fr) ; le délai réel entre ⟳ et le `ready` du pont réinjecté chez lui.
+- **Geste de Julien** : installer la **5.169** dans UN seul dossier, puis ⟳ dans
+  CHAQUE Chrome (ou ouvrir VRM : le pont répare un code périmé tout seul).
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
