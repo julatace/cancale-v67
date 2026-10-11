@@ -1,6 +1,7 @@
 // Banc : aucun écran vide, aucun débordement horizontal, aucune erreur.
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
 const { metaVersData } = require('./_meta.cjs');
+const { dressingsDuJour } = require('./_instantane.cjs'); // fx/ est une photo datée : la lecture du dressing la plus récente = « il y a 1 min » (règle « en ligne » ≤ 24 h)
 const fs=require('fs'), http=require('http'), path=require('path');
 // ⚠️⚠️ JAMAIS UN CHEMIN ABSOLU ICI. La méthode de preuve du dossier (§6.1)
 // extrait le code d'AVANT dans /tmp/avN, y copie le banc et le lance DEPUIS
@@ -21,7 +22,7 @@ const main=FX('main'), accounts=FX('accounts');
 // est pire qu'absent, §6). Une annonce par compte suffit à peupler liveStats ;
 // le solde, lui, vient des fixtures `billing`.
 function LISTV(){ return accounts.map((a,i)=>({ id:`harvest_${a.vinted_user_id}_listings`, data:{ payload:{ items:[{ id:`syn_${a.vinted_user_id}_${i}`, title:'Paire test '+(i+1), brand_title:'Nike', size_title:'42', price:{amount:'40',currency_code:'EUR'}, is_closed:false, is_hidden:false, is_draft:false, photo:{url:''} }], pagination:null } } })); }
-const rows=[...FX('sold'),...FX('purch'),...FX('listings'),...LISTV(),...FX('inbox'),...FX('track'),...FX('bord'),...FX('label'),...FX('billing'),...LBCV(),...EBAYO()]; const txn=FX('txn');
+const rows=[...FX('sold'),...FX('purch'),...dressingsDuJour(FX('listings')),...LISTV(),...FX('inbox'),...FX('track'),...FX('bord'),...FX('label'),...FX('billing'),...LBCV(),...EBAYO()]; const txn=FX('txn');
 // ⚠️ VENTES LEBONCOIN — donnée SYNTHÉTIQUE (aucun acheteur, aucune adresse : elle
 // peut donc vivre DANS le banc, dépôt public). Sans elle, l'écran Ventes rend le
 // bloc « Ventes Leboncoin » VIDE, et un piège §4.6 (TDZ) ou un mensonge §5 (un
