@@ -173,7 +173,11 @@ async function rendre(nav, etat) {
   const bd = vus.demandes.bloc;
   dit(bd.includes(e.texte.slice(0, 40)) && bd.includes(e.login), 'l\'envoi réel reste affiché, avec la personne', bd.slice(0, 200));
   dit(!bd.includes(PAS_PARTIE.slice(0, 30)), 'une réponse préparée mais PAS envoyée n\'apparaît pas dans « ce qui est parti en ton nom »', bd.slice(0, 300));
-  dit(!/«\s*(undefined|\[object)/i.test(bd) && !/\bet \d+ autres?\./.test(bd), 'les questions mémorisées ne sont pas listées comme des envois', bd.slice(0, 300));
+  // On COMPTE les envois listés (un « … » par envoi, après le titre de la liste) :
+  // la même ligne, avec ou sans `demandes`, doit lister exactement autant d'envois.
+  const nEnvois = (b) => { const i = b.indexOf('Ce qui est parti en ton nom'); return i < 0 ? -1 : (b.slice(i).match(/«/g) || []).length; };
+  dit(nEnvois(bd) === nEnvois(vus.reel.bloc) && nEnvois(bd) > 0 && !/«\s*(undefined|\[object)/i.test(bd),
+    'les questions mémorisées ne sont pas listées comme des envois', `${nEnvois(bd)} envoi(s) listé(s) avec « demandes », ${nEnvois(vus.reel.bloc)} sans`);
 
   await nav.close(); srv.close();
   console.log(`\n${ko ? '❌ ' + ko + ' contrôle(s) au rouge.' : '✅ Ce qui part en son nom est relisible, et les nombres sont les vrais.'}`);
