@@ -405,7 +405,7 @@ let TLS = null;
     // Le jeton entre dans la marge de renouvellement (moins d'une minute).
     await appelSW(ctx, ID, async () => { const x = await loadSession(); await saveSession(Object.assign({}, x, { expires_at: Date.now() + 30000 })); });
     const avantD = ((await sessionExt(ctx, ID)).session || {}).jeton;
-    F.st.pannes.push('lent:9000');        // GoTrue fait tourner le jeton, la réponse n'arrive pas à temps
+    F.st.pannes.push('lent:15000');       // GoTrue fait tourner le jeton, la réponse n'arrive pas à temps (au-delà des 4 s d'aujourd'hui ET des 10 s d'avant)
     const t0 = Date.now();
     await appelSW(ctx, ID, async () => { await authToken(); });
     const dt = Date.now() - t0;
