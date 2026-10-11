@@ -6013,7 +6013,14 @@ au-dessus ça accepte ». Fait SUR eBAY seulement, avec le réglage natif d'eBay
   `ebay-regle-offre.cjs` (port 4761, données inventées, deux tailles, **202
   contrôles**) prouvé par `prouve-banc-regle-offre.cjs` (**11 mutations** de
   l'écran, chacune rouge ; **47 rouges sur 53** sur le build d'avant) ; `ebay-form`,
-  `ebay-programmer`, `annonces-carte` étendus.
+  `ebay-programmer`, `annonces-carte` étendus — sur le build d'avant, **2**, **3**
+  et **3 rouges** (le formulaire, les brouillons programmés, la baisse d'une
+  paire qui dort sous une règle). `audit-ebay-route.cjs` entier : 354 contrôles.
+  ⚠️ **Trois bancs eBay mesuraient une forme d'avant** (§6.3) : `ebay-write`
+  jugeait le DERNIER appel Trading — or un changement de prix relit maintenant
+  l'annonce après la révision (rouge sur une route intacte) ; `ebay-programmer`
+  jugeait les brouillons illisibles pendant « charge » (rouge sous charge) ;
+  `ebay-form` mourait sur un build sans le champ au lieu de rapporter.
   ⚠️ **Deux contrôles du banc étaient des courses d'horloge** (« Arrêter »
   pendant le 1er envoi, quitter l'écran pendant le 2ᵉ) : rouges une fois sur
   quelques-unes à 1512 px sur une machine chargée, sur un code intact. Le faux
