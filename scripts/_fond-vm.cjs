@@ -123,9 +123,10 @@ function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }
       if (/app_data\?select=owner&limit=1/.test(u)) return rep(400, { message: 'column app_data.owner does not exist' });
       if (lectureKO(u)) return rep(522, '<html>522</html>', 'text/html');
       const sel = (/[?&]select=([^&]+)/.exec(u) || [])[1] || '';
-      const eq = /[?&]id=eq\.([^&]+)/.exec(u), like = /[?&]id=like\.([^&]+)/.exec(u);
+      const eq = /[?&]id=eq\.([^&]+)/.exec(u), like = /[?&]id=like\.([^&]+)/.exec(u), dans = /[?&]id=in\.\(([^)]*)\)/.exec(u);
       const sortie = [];
       if (eq) { if (lignes[eq[1]] !== undefined) sortie.push({ id: eq[1], data: lignes[eq[1]] }); }
+      else if (dans) { for (const k of dans[1].split(',')) if (lignes[k] !== undefined) sortie.push({ id: k, data: lignes[k] }); }
       else if (like) {
         const re = new RegExp('^' + like[1].replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/%/g, '.*') + '$');
         for (const k of Object.keys(lignes)) if (re.test(k)) sortie.push({ id: k, data: lignes[k] });
