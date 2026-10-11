@@ -22,6 +22,13 @@
 //   5. en direct : l'extension prévient (`maj · annonces`), la carte part sans
 //      recharger la page ;
 //   6. aucun débordement à 390 px, aucune erreur d'app.
+// Revue de la 5.165 (11 octobre), reproduit au rendu :
+//   8. pas de « ✓ à jour » (ventes) au-dessus de la section Annonces ;
+//   9. tous les comptes à repasser NOMMÉS (pas « a, b, c et 3 autres ») ;
+//  10. le seuil : 12 h, ou vu actif après la lecture — pas 30 min pour tous ;
+//  11. sur iPhone sans extension, le geste dit OÙ il se fait ;
+//  12. le compteur = les cartes retirées (pas les pauses ni les brouillons) ;
+//  13. « sort d'ici tout de suite » : une extension à jour ET seule, avec le geste.
 // Ce qui est jugé : la présence des cartes (`data-carte-annonce`), des attributs
 // `data-*` et des nombres rendus — pas une formulation.
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
@@ -74,32 +81,38 @@ const projette = (row, sel) => {
   }
   return out;
 };
-// Un pont d'extension À JOUR (les états « ok » de la phrase), dans la vraie forme.
-const PONT = () => {
-  const version = '5.165.0';
+// Les ponts d'extension, dans la vraie forme (`ping` → `ready {version[, id]}`).
+// Par défaut UN pont à jour (les états « ok » de la phrase) ; `[]` : aucune
+// extension (téléphone) ; deux ponts d'identifiants différents : deux extensions.
+const PONTS = (ponts) => {
   const post = (m) => window.postMessage(m, '*');
-  window.addEventListener('message', (e) => {
-    const d = e.data; if (e.source !== window || !d || typeof d !== 'object') return;
-    if (d.__vmr === 'ping') post({ __vmr: 'ready', version });
-    if (d.__vmr === 'etat') post({ __vmr: 'etat:result', reqId: d.reqId, resp: { ok: true, version, vrm: { ok: true, connecte: true, email: 'vendeur@exemple.test', user_id: 'u1' }, vinted: null, cmds: {} } });
+  ponts.forEach((p) => {
+    const ready = () => post(Object.assign({ __vmr: 'ready', version: p.version }, p.id ? { id: p.id } : {}));
+    window.addEventListener('message', (e) => {
+      const d = e.data; if (e.source !== window || !d || typeof d !== 'object') return;
+      if (d.__vmr === 'ping') ready();
+      if (d.__vmr === 'etat') post({ __vmr: 'etat:result', reqId: d.reqId, resp: { ok: true, version: p.version, vrm: { ok: true, connecte: true, email: 'vendeur@exemple.test', user_id: 'u1' }, vinted: null, cmds: {} } });
+    });
+    ready();
   });
-  post({ __vmr: 'ready', version });
 };
+const UN_PONT = [{ version: '5.166.0', id: 'ext1' }];
 
-async function rendre(b, { lignes, suppKO = false, tel = false, onglet = 'cat_annonces', etat = {} }) {
+async function rendre(b, { lignes, suppKO = false, tel = false, mobile, onglet = 'cat_annonces', etat = {}, ponts = UN_PONT, accs, section }) {
   const vp = tel ? { width: 390, height: 844 } : { width: 1512, height: 950 };
-  const ctx = await b.newContext({ viewport: vp, ...(tel ? { isMobile: true, hasTouch: true } : {}) });
+  const mob = mobile === undefined ? tel : mobile;
+  const ctx = await b.newContext({ viewport: vp, ...(mob ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
-  await pg.addInitScript(PONT);
+  await pg.addInitScript(PONTS, ponts);
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
     if (route.request().method() !== 'GET') return j([]);
     if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
-    if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCS);
+    if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(accs || ACCS);
     // La ligne des suppressions ILLISIBLE (522 Cloudflare, en HTML), la base debout par ailleurs.
     if ((suppKO || etat.suppKO) && /_supprimees/.test(u)) return route.fulfill({ status: 522, contentType: 'text/html', body: '<html>522</html>' });
     const L = etat.lignes || lignes;
@@ -117,6 +130,7 @@ async function rendre(b, { lignes, suppKO = false, tel = false, onglet = 'cat_an
     : r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' })));
   await pg.goto(`http://localhost:${PORT}/?tab=${onglet}`, { waitUntil: 'domcontentloaded' });
   await pg.waitForTimeout(4500);
+  if (section) { await pg.click(`[data-section="${section}"]`); await pg.waitForTimeout(2500); }
   return { ctx, pg, errs };
 }
 const lireAnnonces = (pg) => pg.evaluate(() => {
@@ -127,6 +141,12 @@ const lireAnnonces = (pg) => pg.evaluate(() => {
     nFraicheur: f.length,
     vieux: el ? el.getAttribute('data-vieux') : null,
     supprimees: el ? el.getAttribute('data-supprimees') : null,
+    promesse: el ? el.getAttribute('data-promesse') : null,
+    ailleurs: el ? el.getAttribute('data-ailleurs') : null,
+    // La coche « à jour » se reconnaît à ce qu'elle DIT (elle n'avait pas
+    // d'attribut avant : un contrôle posé sur un attribut neuf serait vert par
+    // accident sur le code d'avant).
+    aJour: (document.body.innerText.match(/✓ (Données|Ventes) Vinted à jour/g) || []).length,
     texte: el ? el.innerText : '',
     couleurs: el ? [...el.querySelectorAll('*')].concat([el]).map((x) => getComputedStyle(x).color) : [],
     sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth,
@@ -230,6 +250,102 @@ const lireDash = (pg) => pg.evaluate(() => {
       dit(!a1.cartes.includes('7002') && a1.cartes.includes('7001'), 'après « maj · annonces » : 7002 est partie, sans rechargement', JSON.stringify(a1.cartes));
       dit(r.errs.length === 0, 'aucune erreur d’app', r.errs.join(' | ').slice(0, 160));
       await r.ctx.close();
+    });
+    // ════════════════════════════════════════════════════════════════════
+    // Revue de la 5.165 (11 octobre) — défauts reproduits au rendu
+    // ════════════════════════════════════════════════════════════════════
+    const ventes = (u, capMin) => ({ id: `harvest_${u}_orders_sold`, data: { uid: u, capturedAt: new Date(now - capMin * 60e3).toISOString(), nItems: 1,
+      payload: { my_orders: [{ transaction_id: Number(u) * 10 + 1, title: 'Vente ' + u, status: 'Commande finalisée', price: { amount: '30.0', currency_code: 'EUR' }, date: iso(30) }], pagination: { total_pages: 1 } } } });
+
+    for (const tel of [false, true]) {
+      const t = tel ? '390 px' : '1512 px';
+      console.log(`── 8. ${t} — Vinted → Annonces : pas de « ✓ à jour » des ventes au-dessus d’un dressing d’hier`);
+      await essaie('8 ' + t, async () => {
+        const lignes = [...BASE(), ventes('111', 3), ventes('222', 3)];
+        const r = await rendre(b, { lignes, tel, mobile: false, onglet: 'plat_vinted', section: 'annonces' });
+        const a = await lireAnnonces(r.pg);
+        dit(a.nFraicheur === 1 && a.aJour === 0, `${t} : la date du dressing est dite, et AUCUNE coche « à jour » ne la contredit sur le même écran (§11, §5)`, JSON.stringify({ fraicheur: a.nFraicheur, aJour: a.aJour }));
+        await r.pg.click('[data-section="ventes"]'); await r.pg.waitForTimeout(2500);
+        const v = await lireAnnonces(r.pg);
+        dit(v.aJour === 1, `${t} : l’autre sens — sur la section Ventes, la coche des ventes captées à l’instant reste`, JSON.stringify({ aJour: v.aJour }));
+        dit(r.errs.length === 0, `${t} : aucune erreur d’app`, r.errs.join(' | ').slice(0, 160));
+        await r.ctx.close();
+      });
+    }
+
+    console.log('── 9. Six comptes lus hier : TOUS nommés (sur Annonces et sur le tableau de bord)');
+    await essaie('9', async () => {
+      const uids = ['301', '302', '303', '304', '305', '306'];
+      const accs = uids.map((u, i) => ({ id: 10 + i, vinted_user_id: u, login: 'compte_' + u, domain: 'www.vinted.fr', updated_at: iso(0) }));
+      const lignes = [{ id: 'main', data: { vinted_annonce_numeros: {} } },
+        ...uids.map((u, i) => ({ id: `harvest_${u}_listings`, data: { uid: u, capturedAt: iso(20 + 3 * i), nItems: 1, payload: { items: [ann(9100 + i, 'Zeta Six ' + u)], pagination: { total_entries: 1, total_pages: 1 } } } }))];
+      for (const onglet of ['cat_annonces', 'dashboard']) {
+        const r = await rendre(b, { lignes, accs, onglet });
+        if (onglet === 'dashboard') await r.pg.waitForTimeout(1500);
+        const txt = await r.pg.evaluate((sel) => { const el = document.querySelector(sel); return el ? el.innerText : ''; }, onglet === 'dashboard' ? '[data-dash-fraicheur]' : '[data-ann-fraicheur]');
+        const manquent = uids.filter((u) => !txt.includes('compte_' + u));
+        dit(txt && !manquent.length, `${onglet} : les six comptes à repasser sont NOMMÉS (le geste est par compte)`, manquent.length ? `absents : ${manquent.join(', ')} · « ${txt.slice(0, 160)} »` : '');
+        await r.ctx.close();
+      }
+    });
+
+    console.log('── 10. Le seuil : actionnable, pas permanent');
+    await essaie('10', async () => {
+      // Dressing lu il y a 2 h, rien vu depuis : pas nommé (avant : nommé au bout de 30 min, tous les comptes, tout le temps).
+      const L2h = [BASE()[0], dressing111(2, ITEMS_111), BASE()[2]];
+      const r = await rendre(b, { lignes: L2h });
+      const a = await lireAnnonces(r.pg);
+      dit(a.nFraicheur === 0, 'un dressing lu il y a 2 h, sans activité vue depuis, n’est pas nommé (30 min faisait du bruit permanent sur 7 comptes)', JSON.stringify({ n: a.nFraicheur, vieux: a.vieux }));
+      await r.ctx.close();
+      // Le même, mais ses ventes rangées il y a 3 min : il est passé dessus et le dressing n'a pas été relu.
+      const r2 = await rendre(b, { lignes: [...L2h, ventes('111', 3)] });
+      const a2 = await lireAnnonces(r2.pg);
+      dit(a2.vieux === '111', 'l’autre sens : vu actif APRÈS la lecture (ventes rangées il y a 3 min), il est nommé', JSON.stringify({ vieux: a2.vieux }));
+      await r2.ctx.close();
+    });
+
+    console.log('── 11. iPhone (390 px, tactile, sans extension) : le geste dit OÙ il se fait');
+    await essaie('11', async () => {
+      const r = await rendre(b, { lignes: [...BASE(), SUPP], tel: true, mobile: true, ponts: [] });
+      const a = await lireAnnonces(r.pg);
+      dit(a.ailleurs === '1' && /ordinateur/.test(a.texte), 'sans extension ici : « sur l’ordinateur où l’extension VRM est installée »', a.texte.slice(0, 220));
+      dit(a.promesse === '0' && !/tout de suite/.test(a.texte), 'et aucune promesse « sort d’ici tout de suite »', a.texte.slice(0, 220));
+      await r.ctx.close();
+      const r2 = await rendre(b, { lignes: [...BASE(), SUPP] });
+      const a2 = await lireAnnonces(r2.pg);
+      dit(a2.ailleurs === '0' && !/ordinateur où/.test(a2.texte), 'l’autre sens : sur l’ordinateur où elle tourne, le geste reste « ouvre vinted.fr dans Chrome »', a2.texte.slice(0, 220));
+      await r2.ctx.close();
+    });
+
+    console.log('── 12. Le compteur dit les CARTES retirées, pas les pauses et brouillons supprimés');
+    await essaie('12', async () => {
+      const items = [ann(7001, 'Zeta Garde Alpha 42'), ann(7002, 'Zeta Supprimee Beta 41'), ann(7003, 'Zeta Garde Gamma 43'),
+        ann(7004, 'Zeta Pause 40', { is_hidden: true }), ann(7005, 'Zeta Brouillon 39', { is_draft: true })];
+      const supp = { id: 'harvest_111_supprimees', data: { uid: '111', ids: { '7002': iso(2), '7004': iso(2), '7005': iso(2) } } };
+      const lignes = [BASE()[0], dressing111(20, items), BASE()[2], supp];
+      const r = await rendre(b, { lignes });
+      const a = await lireAnnonces(r.pg);
+      dit(a.cartes.length === 3 && a.supprimees === '1', 'Annonces : une carte retirée ⇒ « 1 annonce supprimée » (pas 3)', JSON.stringify({ cartes: a.cartes, dit: a.supprimees }));
+      await r.ctx.close();
+      const r2 = await rendre(b, { lignes, onglet: 'dashboard' });
+      await r2.pg.waitForTimeout(1500);
+      const d = await lireDash(r2.pg);
+      dit(d.online === '3' && d.supprimees === '1', 'tableau de bord : le même nombre', JSON.stringify(d));
+      await r2.ctx.close();
+    });
+
+    console.log('── 13. « Sort d’ici tout de suite » : seulement quand c’est vrai, avec le geste qui le rend vrai');
+    await essaie('13', async () => {
+      const lignes = [...BASE(), SUPP];
+      const r = await rendre(b, { lignes });
+      const a = await lireAnnonces(r.pg);
+      dit(a.promesse === '1' && /recharge/i.test(a.texte), 'une extension à jour, seule : la promesse, avec « recharge les onglets Vinted ouverts avant la mise à jour »', a.texte.slice(0, 260));
+      await r.ctx.close();
+      const r2 = await rendre(b, { lignes, ponts: [{ version: '5.164.0', id: 'ancienne' }, { version: '5.166.0', id: 'neuve' }] });
+      await r2.pg.waitForTimeout(1500);
+      const a2 = await lireAnnonces(r2.pg);
+      dit(a2.promesse === '0' && !/tout de suite/.test(a2.texte), 'deux extensions VRM répondent : AUCUNE promesse (l’ancienne patche la page à la place de la neuve)', a2.texte.slice(0, 260));
+      await r2.ctx.close();
     });
   } catch (e) { dit(false, 'le banc a tourné jusqu’au bout', String(e && e.message).slice(0, 200)); }
   finally { if (b) await b.close(); srv.close(); }
