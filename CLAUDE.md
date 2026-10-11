@@ -6949,7 +6949,7 @@ qui arrivent pour de vrai (`orders_sold` 18, `inbox` 17, `profile` 12).
 - **Geste de Julien** : installer la **5.166** dans UN seul dossier, recharger
   ses onglets Vinted, puis passer une fois sur **tomj683** et **arthuror2**.
 
-### ⚠️⚠️ « ANNONCES = LES PAIRES EN LIGNE MAINTENANT » — LA RELECTURE PUBLIQUE DE SES AUTRES COMPTES (11 octobre, 5.166)
+### ⚠️⚠️ « ANNONCES = LES PAIRES EN LIGNE MAINTENANT » — LA RELECTURE PUBLIQUE DE SES AUTRES COMPTES (11 octobre, 5.167)
 Julien : « j'avais supprimé mes annonces sur Vinted… il y avait encore toutes mes
 annonces sur VRM… trois fois la même paire alors qu'il n'y a qu'une seule
 annonce. Il faut que ce soit les paires qui sont en ligne actuellement. »
@@ -6967,49 +6967,74 @@ est CONNECTÉ dessus (un seul jeton vivant à la fois). `arthuror2` (10 annonces
   moins de 30 min ; une requête à la fois dans `requeteVinted`, pause/frein
   respectés ; budget de LECTURE (`gardeLecture`, classe ordinaire : les
   priorités argent/colis/clic gardent leur réserve) ; toutes les pages jusqu'à
-  `total_entries`, et un article d'un AUTRE membre ⇒ lecture rejetée.
+  `total_entries`, un article d'un AUTRE membre ⇒ lecture rejetée, et une
+  réponse **sans total annoncé** (forme inattendue, page vide sans pagination)
+  ne décide RIEN — rangée, elle aurait fait « partir » toutes ses annonces.
   Incomplète ⇒ **rien n'est écrit**, nouvel essai dans 5 min. Complète ⇒
   `harvest_{uid}_enligne` `{ids, n, items, complet:true, capturedAt, source:'public'}`
   — une ligne À PART, jamais par-dessus `harvest_{uid}_listings` — puis
   `maj · annonces` à l'app.
 - **UNE règle, la même texte pour texte dans l'app et l'extension**
   (`<enligne-regle>` : `enLigneDuCompte`, `enLigneDesLignes`) : la lecture
-  COMPLÈTE la plus récente fait foi (son dressing ou la vue publique) ; une
-  annonce absente de la vue publique plus récente **sort toute seule** (ce
-  n'est pas une preuve de VENTE : elle ne devient pas « vendue ») ; une annonce
-  republiée (seulement dans la vue publique) apparaît ; une suppression vue
-  après la lecture la retire (`supprimeeApres`). Lecteurs : écran Annonces
-  (`annBase`), tableau de bord, file et alertes Leboncoin, recherche, prix du
-  marché, et côté extension `buildLbcData` / `buildEbayData`.
-- **Une lecture de plus de 24 h ne compte plus « en ligne »** : ses annonces
-  sont « à confirmer » — hors de la grille et des totaux, **rien n'est
-  supprimé**, son numéro reste. UNE ligne repliée au-dessus de la grille
-  (`FraicheurAnnonces`, la même que les supprimées, §7) : « ▸ N annonces de X à
-  confirmer — dernière lecture il y a 3 j », qui s'ouvre au clic, et UN geste
-  selon `extSait('enligne')` (à jour · en retard · absente, téléphone compris).
-  Pendant ce temps la file Leboncoin ne propose pas de les retirer (pas su) et
-  l'anti double vente les compte encore. Lecture des lignes `enligne` ratée ⇒
-  on retombe sur le dressing seul : rien ne disparaît en silence.
-- **Preuves** : `audit-enligne.cjs` (le VRAI `background.js` dans un `vm`, la
-  vraie règle des deux fichiers, mêmes sorties) **59 contrôles, 15 rouges sur
-  4a29202**, et **15 mutations sur 15** rouges (lecture la plus récente,
-  « à confirmer » retiré, divergence app/extension, vendue, exclus, pas su, 3
-  par visite, 30 min, total, page ratée, budget, file, écrasement de
+  COMPLÈTE la plus récente fait foi (son dressing ou la vue publique), datée par
+  `dateLectureDressing` (`capturedAt`, jamais `updated_at` — la revue de la
+  5.165, §11) ; une annonce absente de la vue publique plus récente **sort toute
+  seule** (ce n'est pas une preuve de VENTE : elle ne devient pas « vendue ») ;
+  une annonce republiée (seulement dans la vue publique) apparaît, avec ce que
+  la vue publique en sait (titre, prix, photo) ; une suppression vue après la
+  lecture la retire (`supprimeeApres`). Lecteurs : écran Annonces (`annBase`,
+  via `dressingEnLigne`), tableau de bord, file et alertes Leboncoin de l'app,
+  recherche, prix du marché, numérotation automatique (elle ne voit que
+  `listings.items`), et côté extension `buildLbcData` / `buildEbayData`.
+  `retirerSupprimees(Lignes)` n'existe plus : la règle les remplace partout.
+- **Une lecture de plus de 24 h (ou sans date) ne compte plus « en ligne »** :
+  ses annonces sont « à confirmer » — hors de la grille et des totaux, **rien
+  n'est supprimé**, son numéro reste (pool append-only, §5). UNE ligne repliée
+  au-dessus de la grille, dans `FraicheurAnnonces` (la même voix que les
+  supprimées et les lectures anciennes, §7) : « ▸ N annonces de X à confirmer —
+  dernière lecture il y a 3 j », qui s'ouvre au clic ; plusieurs comptes : TOUS
+  nommés, chacun avec son nombre et son âge (revue de la 5.165). UN geste selon
+  `extSait('enligne')` : à jour ⇒ « vérifiées à ta prochaine visite sur Vinted,
+  sur n'importe lequel de tes comptes » ; en retard ⇒ mettre à jour, d'ici là
+  ouvrir le compte ; téléphone ou sans extension ici ⇒ « avec l'extension VRM à
+  jour, sur l'ordinateur où elle est installée ». La promesse « une suppression
+  sort d'ici tout de suite » et l'avertissement « deux extensions » de la revue
+  de la 5.165 restent, dans la même phrase. Pendant ce temps la file Leboncoin
+  ne propose pas de les retirer (pas su) et l'anti double vente les compte
+  encore. Lecture des lignes `enligne` ratée ⇒ on retombe sur le dressing seul :
+  rien ne disparaît en silence.
+- **Les bancs à fixtures** (`fx/`, une photo datée) recalent en mémoire la date
+  de leurs dressings (`_instantane.cjs`, écarts entre comptes gardés) : sans ça
+  une copie de la semaine passerait toute « à confirmer » et le banc mesurerait
+  l'horloge.
+- **Preuves** (méthode §6.1, sur la tête d'`integ-11oct`, ef03dc8) :
+  `audit-enligne.cjs` (le VRAI `background.js` dans un `vm`, la vraie règle des
+  deux fichiers, mêmes sorties) **62 contrôles, 16 rouges sur ef03dc8**, et
+  **16 mutations sur 16** rouges (lecture la plus récente, « à confirmer »
+  retiré, divergence app/extension, vendue, exclus, pas su, 3 par visite,
+  30 min, total, sans total, page ratée, budget, file, écrasement de
   `listings`, autre membre, retrait sur une lecture partielle). Banc
   `enligne.cjs` (données inventées, 390 et 1512 px : 3 annonces d'une paire
-  dont 2 supprimées ⇒ 1 seule ; compte figé ⇒ « à confirmer » ; republiée ⇒
-  affichée ; lecture ratée ⇒ rien ne disparaît ; téléphone) **25 rouges** sur le
-  build de 4a29202 et rouge sous 3 mutations. `audit-places` et
-  `audit-supprimees` servent des dressings DATÉS (sans date ⇒ « à confirmer »,
-  §6.3) ; le banc `supprimees` lit le nouveau geste.
-- `EXT_CAPACITES.enligne = '5.166.0'` (`relireAnnoncesAutresComptes`).
+  dont 2 supprimées ⇒ 1 seule, la republiée ; compte figé ⇒ « à confirmer »,
+  hors grille et hors compteur ; republiée ⇒ affichée ; lecture ratée ⇒ rien
+  ne disparaît ; téléphone) **25 rouges** sur le build d'ef03dc8 et rouge sous
+  3 mutations (lecture publique ignorée 16, « à confirmer » retiré 14, ligne
+  muette 14). `audit-supprimees` §7 compare les QUATRE lecteurs sur une ligne
+  sans date (rien en ligne, la même liste « à confirmer ») ; banc `supprimees`
+  2 rouges sur ef03dc8 (le geste).
+- `EXT_CAPACITES.enligne = '5.167.0'` (`relireAnnoncesAutresComptes`). La 5.167
+  porte aussi la numérotation (013), les suppressions et la revue de la 5.165.
 - ⚠️ **Non mesuré** (aucun appel à Vinted d'ici) : la forme réelle de la vue
   publique (une annonce vendue y figure-t-elle, `total_entries` y est-il
-  cohérent ?) ; la réaction de Vinted à 3 lectures publiques par visite ; le
-  premier tour réel chez lui.
-- **Geste de Julien** : installer la 5.166 (un seul dossier), puis ouvrir
-  vinted.fr sur n'importe lequel de ses comptes — trois autres comptes sont
-  relus à chaque visite.
+  cohérent avec `items` ?) — si le total y compte des annonces que la liste ne
+  rend pas, aucune lecture ne sera jamais « complète » et ses autres comptes
+  resteront « à confirmer » (le sens sûr) ; la réaction de Vinted à 3 lectures
+  publiques par visite ; le premier tour réel chez lui ; la copie de
+  l'extension sans session (§ mesure du 11 oct.) qui lit arthuror2 et tomj683.
+- **Geste de Julien** : installer la **5.167** (UN seul dossier — retirer toute
+  autre copie de VRM dans `chrome://extensions`, dans chaque profil Chrome),
+  puis ouvrir vinted.fr sur n'importe lequel de ses comptes — trois autres
+  comptes sont relus à chaque visite.
 
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
@@ -7037,7 +7062,7 @@ arrivée** — vérifiée commit par commit sur `manifest.json`, pas devinée.
 | `vestiaire` | `storeVcRecon` | **5.154.0** (4 oct.) | Vestiaire : « ouvre Vestiaire dans ce Chrome, l'extension apprend à le lire » |
 | `detourage` | `detourerPhotos` | **5.156.0** (4 oct.) | « tes photos sont détourées (fond blanc) avant d'être attachées à Leboncoin » |
 | `supprimees` | `noterSuppression` | **5.165.0** (11 oct.) | « une suppression faite sur vinted.fr dans ce Chrome sort d'ici tout de suite » |
-| `enligne` | `relireAnnoncesAutresComptes` | **5.166.0** (11 oct.) | « tes autres comptes sont relus à ta prochaine visite sur Vinted, sur n'importe lequel de tes comptes » |
+| `enligne` | `relireAnnoncesAutresComptes` | **5.167.0** (11 oct.) | « tes autres comptes sont relus à ta prochaine visite sur Vinted, sur n'importe lequel de tes comptes » |
 
 ⚠️ **DEUX SEUILS POUR UNE MÊME NOTION, EXPRÈS.** Les photos s'attachent côté
 Leboncoin depuis la 5.58 et côté eBay depuis la 5.59 : un seul seuil aurait
