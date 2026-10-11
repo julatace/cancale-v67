@@ -155,7 +155,10 @@ const lireDash = (pg) => pg.evaluate(() => {
         dit(a.cartes.includes('7001') && a.cartes.includes('7003') && a.cartes.includes('8001'), `${t} : les autres restent (une identité, pas un compte entier)`, JSON.stringify(a.cartes));
         dit(a.nFraicheur === 1, `${t} : la date de la lecture est dite UNE fois au-dessus de la grille (§7)`, `${a.nFraicheur} bloc(s)`);
         dit(a.vieux === '111' && /compte_hier/.test(a.texte) && !/compte_frais/.test(a.texte), `${t} : elle NOMME le compte lu il y a 20 h, pas celui lu il y a 5 min`, JSON.stringify({ vieux: a.vieux, texte: a.texte }));
-        dit(/vinted\.fr/.test(a.texte), `${t} : avec le geste vrai (ouvrir vinted.fr connecté sur ce compte)`, a.texte);
+        // 5.165 (11 octobre) : une extension à jour relit le dressing PUBLIC des
+        // autres comptes à chaque visite — le geste vrai n'est plus « ouvre ce
+        // compte-là », c'est une visite sur Vinted, sur n'importe lequel.
+        dit(/prochaine visite sur Vinted, sur n.importe lequel de tes comptes/.test(a.texte), `${t} : avec le geste vrai (une visite sur Vinted, sur n'importe lequel de ses comptes)`, a.texte);
         dit(a.supprimees === '1', `${t} : et elle dit combien ont été retirées parce que supprimées`, JSON.stringify(a.supprimees));
         dit(a.sw <= a.cw + 1, `${t} : aucun débordement`, `${a.sw} > ${a.cw}`);
         dit(r.errs.length === 0, `${t} : aucune erreur d’app`, r.errs.join(' | ').slice(0, 160));
