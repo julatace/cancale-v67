@@ -149,6 +149,32 @@ if(appNeedsBord&&bgShipConst){
         `capacité « ${c.nom} » : son seuil ${c.v} est atteignable`,
         `manifeste ${man.version} — un seuil plus haut ne s'affiche jamais`);
     }
+    // ⚠️⚠️ (revue du 11 octobre) LE SEUIL DOIT ÊTRE AU-DESSUS DE TOUTE VERSION
+    //    PUBLIÉE QUI N'A PAS LA FONCTION. `preuves` valait 5.169.0 pendant que la
+    //    5.170.0 servie en production (PR #473) n'avait pas `capterPreuvesVente` :
+    //    l'app lui promettait « l'extension lit sa transaction toute seule » — le
+    //    défaut le plus coûteux du projet, refait par un numéro pris ailleurs.
+    //    « Atteignable » (ci-dessus) ne le voit pas. Les versions publiées se
+    //    LISENT dans l'historique de `main` (`_versions-publiees.cjs`), jamais une
+    //    liste recopiée : celle d'audit-preuve-vente oubliait justement la 5.170.
+    //    « Pas su » (pas d'historique lisible ici) n'est pas « aucune » : rouge,
+    //    avec le geste (`VRM_GIT=<dépôt>` depuis une copie, §6.1).
+    {
+      const { versionsPubliees, versionsSans } = require('./_versions-publiees.cjs');
+      const pub = versionsPubliees({ racine: RACINE });
+      dit(!!pub, 'les versions PUBLIÉES de l\'extension se lisent dans l\'historique de main',
+        pub ? '' : 'historique illisible ici — relance avec VRM_GIT=<chemin du dépôt> (depuis une copie) ; rien n\'est conclu');
+      if (pub) {
+        const fautes = [];
+        for (const c of caps) {
+          const fn = FONCTIONS[c.nom];
+          if (!fn) continue;
+          const sans = versionsSans(pub, fn).filter((v) => cmpVer(c.v, v) <= 0);
+          if (sans.length) fautes.push(`${c.nom} ${c.v} ≤ ${sans.sort(cmpVer).join(', ')} (publiée${sans.length > 1 ? 's' : ''} sans \`${fn}\`)`);
+        }
+        dit(!fautes.length, `aucune capacité n'est promise à une version PUBLIÉE qui ne l'a pas (${pub.commits.length} commits de ${pub.ref} lus)`, fautes.join(' · '));
+      }
+    }
     // ⚠️⚠️ CE QUE L'APP DIT DES PHOTOS DÉPEND DE LA VERSION INSTALLÉE.
     // Elles étaient téléchargées sur son disque jusqu'à la 5.58 (Leboncoin) et
     // la 5.59 (eBay) ; depuis, elles s'attachent au formulaire. Le 13 septembre

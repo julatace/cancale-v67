@@ -228,9 +228,18 @@ function chargeExt({ lignes, vinted, ko, connecte = A, store = {} } = {}) {
   return { ...f, lus };
 }
 
-// Les versions PUBLIÉES sans `capterPreuvesVente` (vérifié sur origin/main le
-// 11 octobre : 61ef35a = 5.167.0, 93e9e0e = 5.168.0, `grep -c` = 0 chacune).
-const PUBLIEES_SANS_PREUVE = ['5.164.0', '5.167.0', '5.168.0'];
+// Les versions PUBLIÉES sans `capterPreuvesVente`. ⚠️ (revue du 11 octobre)
+// Cette liste était RECOPIÉE à la main (['5.164.0', '5.167.0', '5.168.0']) : la
+// 5.170.0 partie en production (PR #473) n'y était pas — sans la fonction, elle
+// rendait « ok » et l'app lui promettait « elle lit toute seule ». Elle se LIT
+// maintenant dans l'historique de main (`_versions-publiees.cjs`, la même
+// lecture qu'audit-coherence) ; « pas su » est rouge, jamais une liste vide.
+// Les numéros RÉSERVÉS par d'autres chantiers pas encore publiés ne se lisent
+// nulle part : ils sont nommés ici (deux contenus ne portent jamais un numéro).
+const { versionsPubliees, versionsSans } = require('./_versions-publiees.cjs');
+const PUB = versionsPubliees({ racine: RACINE });
+const PUBLIEES_SANS_PREUVE = PUB ? versionsSans(PUB, 'capterPreuvesVente') : null;
+const RESERVEES = ['5.169.0', '5.171.0'];   // chantier extension (wf_4d08d5c8-e7b-1)
 (async () => {
   console.log('0. LA CAPACITÉ N\'EST PROMISE QU\'À UNE EXTENSION QUI L\'A (revue du 11 octobre)');
   await essaie('capacité', () => {
@@ -239,11 +248,16 @@ const PUBLIEES_SANS_PREUVE = ['5.164.0', '5.167.0', '5.168.0'];
     const sait = (v) => { const ctx = { vmrExtPresent: () => true, vmrExtVersion: () => v }; vm.createContext(ctx); vm.runInContext(src + '\n;this.r = extSait("preuves");', ctx); return ctx.r; };
     const att = (/const EXT_ATTENDUE = '([^']+)'/.exec(APP) || [])[1];
     const vManif = JSON.parse(fs.readFileSync(path.join(RACINE, 'vinted-sync-extension/manifest.json'), 'utf8')).version;
-    const r = PUBLIEES_SANS_PREUVE.map((v) => `${v}→${sait(v)}`);
-    dit(PUBLIEES_SANS_PREUVE.every((v) => sait(v) === 'retard'), 'les versions PUBLIÉES sans `capterPreuvesVente` (5.164, 5.167.0, 5.168.0) rendent « retard » — l\'app ne leur promet pas « elle va lire la transaction toute seule »', r.join(' · '));
+    dit(!!PUBLIEES_SANS_PREUVE, 'les versions PUBLIÉES se lisent dans l\'historique de main', PUB ? '' : 'historique illisible ici — relance avec VRM_GIT=<chemin du dépôt> (§6.1)');
+    const lst = PUBLIEES_SANS_PREUVE || [];
+    const recentes = lst.filter((v) => /^5\.1[6-9]\d\./.test(v)).sort().join(', ');
+    const r = lst.filter((v) => sait(v) !== 'retard').map((v) => `${v}→${sait(v)}`);
+    dit(!!PUBLIEES_SANS_PREUVE && lst.includes('5.170.0') && !r.length, `les ${lst.length} versions PUBLIÉES sans \`capterPreuvesVente\` (dont ${recentes}) rendent « retard » — l'app ne leur promet pas « elle va lire la transaction toute seule »`, r.join(' · ') || (lst.includes('5.170.0') ? '' : 'la 5.170.0 de production manque à la liste'));
     dit(sait(att) === 'ok' && sait(vManif) === 'ok', `et l'extension livrée (${vManif}, EXT_ATTENDUE ${att}) rend « ok »`, `${att}→${sait(att)} · ${vManif}→${sait(vManif)}`);
     dit(/async function capterPreuvesVente\(/.test(EXT), 'et elle a bien `capterPreuvesVente`');
-    dit(!PUBLIEES_SANS_PREUVE.includes(vManif), 'et elle ne porte pas le numéro d\'une version déjà publiée avec un autre contenu', vManif);
+    const BG = fs.readFileSync(path.join(RACINE, 'vinted-sync-extension/background.js'), 'utf8');
+    const autreContenu = PUB ? PUB.commits.filter((c) => c.version === vManif && c.bg !== BG).map((c) => c.sha.slice(0, 7)) : ['pas su'];
+    dit(!autreContenu.length && !RESERVEES.includes(vManif), 'et elle ne porte ni le numéro d\'une version déjà publiée avec un autre contenu, ni un numéro réservé par un autre chantier', `${vManif}${autreContenu.length ? ' publiée par ' + autreContenu.join(', ') : ''}${RESERVEES.includes(vManif) ? ' (réservée)' : ''}`);
     const pApp = (/const PREUVE_PAR_VISITE = (\d+);/.exec(APP) || [])[1], pExt = (/const PREUVE_MAX_PAR_VISITE = (\d+);/.exec(EXT) || [])[1];
     dit(!!pApp && pApp === pExt, 'le rythme dit par l\'écran eBay (« N par visite ») est celui de l\'extension', `app ${pApp} · extension ${pExt}`);
   });
