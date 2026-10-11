@@ -1201,6 +1201,9 @@ async function storeHarvest(domain, type, id, body) {
   // suivante. Seulement si l'écriture a ABOUTI : prévenir sur un échec ferait
   // relire une ligne qui n'a pas bougé.
   if (ecrit !== false && type === 'orders_purchased') notifierApp({ type: 'maj', quoi: 'achats', uid: String(uid) });
+  // 5.165 : un dressing RANGÉ fait foi sur les suppressions d'avant (règle
+  // `supprimeeApres`) et rajeunit « annonces lues il y a… » : l'app relit.
+  if (ecrit !== false && type === 'listings') notifierApp({ type: 'maj', quoi: 'annonces', uid: String(uid) });
 
   // Apprentissage passif des codes de statut d'offre (voir noterStatutsOffres).
   if (type === 'conversation') { try { await noterStatutsOffres(parsed); } catch (_) {} }
@@ -3085,6 +3088,7 @@ async function storeHarvestRow(uid, type, payload, domain, opts) {
   const ecritRow = await supabaseUpsert('app_data', [{ id: `harvest_${uid}_${type}`, data, updated_at: maintenant }], 'id');
   if (ecritRow !== false && type === 'orders_sold') notifierApp({ type: 'maj', quoi: 'ventes', uid: String(uid) });
   if (ecritRow !== false && type === 'orders_purchased') notifierApp({ type: 'maj', quoi: 'achats', uid: String(uid) });
+  if (ecritRow !== false && type === 'listings') notifierApp({ type: 'maj', quoi: 'annonces', uid: String(uid) });   // 5.165 (voir storeHarvest)
   noterFlux('vinted', ecritRow !== false);
   if (type === 'listings') {
     try { const tous = (brut && brut.items) || []; await archiverLot(uid, tous.filter(it => it && !it.is_closed && !it.is_hidden && !it.is_draft), tous); } catch (_) {}
