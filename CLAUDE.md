@@ -4174,11 +4174,17 @@ numéros ». **Ce sont SES décisions, pas des options à reproposer.**
   IDENTIFIANT après le rechargement — jamais les numéros.
 - **Un « 230 » écrit AVANT la coupure désigne l'ANCIENNE paire** : le SKU d'une
   annonce eBay ou la référence d'une annonce Leboncoin qui le portaient à la
-  coupure (leurs identifiants sont dans le marqueur), une commande eBay passée
-  avant T. Sans ça, la vente Vinted de la NOUVELLE 230 faisait retirer d'eBay
-  l'annonce de l'ancienne (`numeroExterne`, la même règle dans l'app,
-  `api/_lib/numerotation.js` et l'extension 5.165 pour Leboncoin). Le retrait
-  eBay automatique relit le marqueur chez le serveur ; illisible ⇒ rien.
+  coupure, une commande eBay passée avant T. Sans ça, la vente Vinted de la
+  NOUVELLE 230 faisait retirer d'eBay l'annonce de l'ancienne (`numeroExterne`,
+  la même règle dans l'app, `api/_lib/numerotation.js` et l'extension pour
+  Leboncoin, `numeroLbcLu`). Le retrait eBay automatique relit le marqueur chez
+  le serveur ; illisible ⇒ rien.
+  ⚠️ Le marqueur garde, PAR ANNONCE, chaque numéro qu'elle portait à la coupure
+  ET ce qu'il devient : `ebayAnnonces = { "<itemId>": { "553": "1", "12": "B12" } }`
+  (même forme pour `lbcAnnonces`). Un numéro donné APRÈS T (provisoire, dans
+  `renum`) suit SA paire ; un numéro donné à plusieurs paires nouvelles rend
+  `''` (personne). Et on ne traduit que si l'annonce porte ENCORE ce numéro :
+  un SKU réécrit après T (« Relier à une paire ») se lit tel quel.
 - **Les emails** : après la conversion, le « nXXX » d'un TITRE n'est retenu que
   s'il désigne une fiche actuelle de la nouvelle série AU MÊME TITRE ; sinon il
   part dans `numeroTitre` (jamais tamponné). Le repli par titre ne rend jamais
@@ -4187,11 +4193,73 @@ numéros ». **Ce sont SES décisions, pas des options à reproposer.**
   ~5 min, et l'essai annulé qui ne laisse rien) ; `audit-numerotation-lecteurs.cjs`
   (les règles de l'app, du serveur et de l'extension exécutées, 18 mutations) ;
   `audit-ebay-route.cjs` (le retrait automatique : 3 rouges sur le code d'avant).
+- **Relecture du 11 octobre — seize défauts reproduits, corrigés** (chacun rouge
+  sur d8c688b, vert après, rouge sous mutation) :
+  - ⚠️⚠️ **le RETOUR ARRIÈRE était refusé sur SA forme réelle** : il n'a pas de
+    ligne `ebay_brouillons` ; une ligne absente (NULL SQL) comparée au `null`
+    JSON rangé par la conversion valait « des numéros ont bougé ».
+    `vrm_proj_aucun` ramène absent / `null` / `[]` à une seule forme. Rejoué sur
+    la PROJECTION de sa base (lecture seule du 11 octobre, Postgres 16 jetable) :
+    avant « REFUSÉ (ebay_brouillons) », après il passe et `main`, emails et
+    garage reviennent exactement.
+  - ⚠️⚠️ **ses DEUX annonces eBay étaient lues « B553 » et « B559 »** (numéros
+    provisoires du 10 octobre, devenus 1 et 7) : plus aucune paire, l'anti
+    double vente coupé. Le marqueur par annonce (ci-dessus) les rend à 1 et 7,
+    sur sa projection. « Relier » une annonce d'avant au MÊME chiffre est
+    refusé (409 `numero-ambigu` : rien ne distinguerait plus la B22 de la 22) ;
+    `publish`/`programmer` lisent le marqueur et refusent un écran d'une autre
+    version de numérotation (409 `numerotation-perimee`, l'app envoie la sienne).
+  - **3 ventes d'après T (564/565/568) n'avaient que leur BORDEREAU capté** :
+    `harvest_{uid}_label_{tx}` (`meta.tx` → `meta.item`, la copie `label_latest`
+    écartée, un `meta.tx` qui contredit sa ligne aussi) relie maintenant comme la
+    transaction : sur sa projection 564/565/568 → **1/12/13**, comme leurs
+    voisines. ⚠️ **À faire confirmer par Julien** : ces trois numéros étaient
+    `autoShip` (tamponnés sur le bordereau expédié). Toutes les ventes d'après T
+    suivent désormais leur paire — pas un mélange selon ce qui a été capté.
+  - **Une ANCIENNE annonce encore en ligne vendue après T** recevait un numéro
+    NEUF (la photo ET l'identité étaient jetées) : seule la photo l'est, Vinted
+    (transaction → annonce) dit la paire, la vente garde « B7 ».
+  - La mesure nomme les **comptes dont le dressing date d'avant T** (`dressings`,
+    et `attention` dans l'essai) : le plan n'y voit aucune annonce republiée.
+    Mesuré le 11 octobre à 12:15 : les 7 comptes recaptés, tomj683 et arthuror2
+    compris.
+  - Le rattrapage épargne un chiffre porté par une fiche ACTUELLE au même titre
+    (la règle `numeroDuTitreApresCoupure`) ; le plan n'est calculé qu'UNE fois
+    (`main` verrouillée ~6 s sur sa projection : **l'essai et l'application se
+    lancent VRM fermé partout**).
+  - App : « Retape son numéro » / « garde le N°B… » / ⧉ ne s'affichent plus à
+    côté d'un numéro d'archive (« numéro neuf »), et la paire revenue sort de la
+    liste quand elle est republiée (identité ou photo) ; Réglages n'enregistre
+    plus de lettre au clic sur « Avec une lettre » et ne propose plus « B125 » ;
+    le bloc relit la version au refus (« remise à zéro », jamais « un autre
+    appareil » au hasard) ; une sauvegarde d'avant la remise à zéro est refusée
+    AVANT d'écrire, avec la vraie cause ; effacer un N° garde la fiche ; les
+    gestes d'un écran périmé se rejouent en DIFFÉRENCE (un colis décoché ailleurs
+    ne redevient pas « posté »).
+  - Preuves : `audit-renum-b.cjs` (126) et ses mutations ; `audit-numerotation-
+    lecteurs.cjs` (38/38 mutations) ; `audit-ebay-route.cjs` (10 rouges sur
+    d8c688b) ; banc `numeros-remise-a-zero.cjs` sections E-F-G (9 rouges sur le
+    build de d8c688b) ; et un banc de rendu sur la projection de sa base convertie
+    par la vraie migration (hors dépôt : vraies données), 18 rouges avant, 0 après.
 - ⚠️ **Non mesuré** : la migration n'a JAMAIS tourné sur sa vraie base (données
   inventées à la forme des siennes). Une annonce republiée SANS date lisible ne
   se numérote pas toute seule (elle reste « sans N° »). Le « nXXX » d'un titre
   Vinted republié reste lu tel quel par la file Leboncoin de l'extension
   (`vintedKeys`) : ancien ou nouveau numéro, VRM ne peut pas le savoir.
+
+- **Fusion du 11 octobre (après-midi)** : la numérotation corrigée (99fd0a7 : retour
+  arrière sans `ebay_brouillons`, annonces eBay/LBC publiées après T sous un N°
+  provisoire traduites par annonce, ventes d'après T reliées par leur bordereau
+  capté, dressings figés signalés, rattrapage, fiche vidée gardée, plan calculé une
+  fois, ancienne annonce vendue après T qui garde son B, `api/ebay` qui lit le
+  marqueur) arrive sur une production où la **5.167.0** est déjà publiée : son code
+  d'extension change (`numeroLbcLu`), donc **5.168.0**, zip régénéré,
+  `EXT_ATTENDUE` suivie. Une version publiée ne change jamais de contenu.
+  **Tranché à la place de Julien (il ne veut plus de questions)** : les ventes
+  d'après T suivent leur paire (564/565/568 → 1/12/13, B564/B565/B568 restent au
+  pool) ; relier une ancienne annonce eBay au nouveau numéro du même chiffre reste
+  refusé (409 `numero-ambigu` : terminer et republier) ; une sauvegarde faite avant
+  la remise à zéro ne se restaure plus.
 
 ### Leboncoin et eBay rangés comme Vinted : résumé, puis Ventes / Achats / Annonces (3 octobre)
 Demande du 2 octobre : « plus d'écran Aperçu intermédiaire ». Les deux onglets

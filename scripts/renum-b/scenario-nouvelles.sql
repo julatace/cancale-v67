@@ -10,6 +10,7 @@ update public.app_data set data = jsonb_set(jsonb_set(data,
       "8000000002": {"numero": "554", "auto": true, "title": "Nouvelle inventée B", "numberedAt": "2026-10-10T08:31:00.000Z"},
       "8000000003": {"numero": "555", "auto": true, "title": "Nouvelle inventée C", "numberedAt": "2026-10-10T08:31:00.000Z"}}'::jsonb)
  where owner = :'J' and id = 'main';
+insert into public.vinted_accounts (vinted_user_id, login, owner) values (1002, 'compte_deux', :'J');
 -- Le dressing recapté ce matin : les trois nouvelles annonces, avec l'heure de
 -- dépôt de leur photo (secondes) — B à 08:10, C à 08:20, A à 08:30.
 insert into public.app_data (owner, id, data, updated_at) values (:'J', 'harvest_1002_listings', '{"capturedAt":"2026-10-10T08:35:00.000Z","payload":{"code":0,"pagination":{},"items":[
