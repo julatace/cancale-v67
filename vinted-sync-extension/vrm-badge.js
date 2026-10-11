@@ -94,12 +94,45 @@
 
   let etat = null;      // null = pas encore su
   let pasSu = false;    // le service worker n'a pas répondu
+  let perime = false;   // le code qui répond n'est pas celui du manifeste
+
+  // ══ LE CODE PÉRIMÉ (11 octobre) ══════════════════════════════════════════
+  // ⚠️⚠️ MESURÉ : sous un manifeste neuf, le service worker exécutait encore
+  //    l'ancien code (⟳ jamais cliqué dans ce Chrome). Le logo disait alors
+  //    « L'extension ne répond pas — recharge la page » : recharger ne change
+  //    RIEN. Ce script, lui, est lu depuis le disque : il sait quelle version le
+  //    manifeste annonce, et il compare avec le `code` que l'état renvoie
+  //    (depuis la 5.167). Périmé ⇒ on pose UNE fois la page de réparation
+  //    (`popup.html?mode=reparer`, qui vérifie elle-même avant de recharger), et
+  //    on dit le geste exact s'il faut le faire à la main.
+  const versionManif = (() => { try { return String(chrome.runtime.getManifest().version || ''); } catch (_) { return ''; } })();
+  const vNum = (v) => String(v || '').split('.').map((x) => parseInt(x, 10) || 0);
+  const auMoins = (v, ref) => { const a = vNum(v), b = vNum(ref); for (let i = 0; i < 3; i++) { if ((a[i] || 0) !== (b[i] || 0)) return (a[i] || 0) > (b[i] || 0); } return true; };
+  const jugeable = /^\d+\.\d+\.\d+$/.test(versionManif) && auMoins(versionManif, '5.167.0');
+  let reparationPosee = false;
+  function reparer() {
+    if (reparationPosee) return;
+    reparationPosee = true;
+    try {
+      const f = document.createElement('iframe');
+      f.src = chrome.runtime.getURL('popup.html') + '?mode=reparer';
+      f.setAttribute('aria-hidden', 'true');
+      f.tabIndex = -1;
+      f.style.cssText = 'position:fixed;width:1px;height:1px;left:-10px;top:-10px;border:0;opacity:0;pointer-events:none;';
+      (document.body || document.documentElement).appendChild(f);
+      setTimeout(() => { try { f.remove(); } catch (_) {} }, 15000);
+    } catch (_) {}
+  }
 
   const demander = () => new Promise((res) => {
     if (!vivant()) { res(undefined); return; }
     try {
       chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'etat' }, (r) => {
-        void (chrome.runtime && chrome.runtime.lastError);
+        let err = null; try { err = chrome.runtime && chrome.runtime.lastError; } catch (_) {}
+        // ≤ 5.129 : ce service worker ne connaît pas la carte — le port se ferme.
+        if (err && jugeable && /port closed/i.test(String(err.message || err))) { perime = true; reparer(); res(null); return; }
+        if (r && r.ok && jugeable && String(r.code || '') !== versionManif) { perime = true; reparer(); }
+        else if (r && r.ok) perime = false;
         res(r && r.ok ? r : null);
       });
     } catch (_) { res(null); }
@@ -118,10 +151,16 @@
 
   function rendre() {
     const e = etat;
-    pt.classList.toggle('on', aFaire(e));
+    pt.classList.toggle('on', aFaire(e) || perime);
+    // Le code qui tourne n'est pas celui du manifeste : recharger la PAGE ne
+    // change rien, c'est l'extension qu'il faut recharger (⟳) — et on le fait
+    // nous-mêmes (page de réparation) ; le geste manuel n'est dit qu'en secours.
+    const lignePerime = perime
+      ? `<div class="ligne"><div class="lib">Extension</div><div class="val alerte">Elle tourne encore sur son ancienne version${e && e.code ? ' (' + esc(e.code) + ')' : ''} : je la redémarre sur la ${esc(versionManif)}. Si ce message reste, ouvre chrome://extensions et clique ⟳ sur VRM — dans ce Chrome.</div></div>`
+      : '';
     if (!e) {
       carte.innerHTML = `<div class="tete"><b>VRM</b></div>
-        <div class="ligne"><div class="val gris">${pasSu ? "L'extension ne répond pas pour l'instant — recharge la page." : 'Vérification…'}</div></div>`;
+        ${lignePerime || `<div class="ligne"><div class="val gris">${pasSu ? "L'extension ne répond pas pour l'instant. Si ça dure, ouvre chrome://extensions et clique ⟳ sur VRM (dans ce Chrome)." : 'Vérification…'}</div></div>`}`;
       return;
     }
     const v = e.vrm;
@@ -159,6 +198,7 @@
 
     const pied = v && v.connecte ? 'Clique sur le logo pour <b>ouvrir VRM</b>.' : 'Clique sur le logo pour <b>te connecter</b>.';
     carte.innerHTML = `<div class="tete"><b>VRM</b><span class="ver">${e.version ? 'extension ' + esc(e.version) : ''}</span></div>
+      ${lignePerime}
       <div class="ligne"><div class="lib">Compte VRM utilisé</div>${compteVrm}</div>
       <div class="ligne"><div class="lib">Compte ${esc(nomSite)}</div>${compteSite}</div>
       ${e.capte ? `<div class="ligne"><div class="lib">Tes données</div>${flux}</div>` : ''}

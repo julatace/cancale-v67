@@ -778,7 +778,11 @@
       //    90 secondes. Passé ce délai, le remplissage s'arrêtait EN SILENCE :
       //    il attendait que les champs suivants se remplissent seuls, et rien ne
       //    venait. Le bandeau dit maintenant que c'est à lui de cliquer.
-      if (pendingTries > 90) { clearInterval(pendingTimer); pendingArrete = true; banner(); }
+      // ⚠️ 11 octobre : et l'APP doit le savoir. Le bouton « Publier » de VRM
+      //    restait « Publication en cours… » 15 minutes, sans un mot, après un
+      //    dépôt qui n'aboutissait pas (reproduit 2 sur 2). On le dit au
+      //    service worker : l'app propose « Réessayer ».
+      if (pendingTries > 90) { clearInterval(pendingTimer); pendingArrete = true; send({ action: 'depotArrete', id: pending.id, raison: 'arret' }); banner(); }
     }, 1000);
   }
   // ── LES MENUS D'ATTRIBUTS DE LEBONCOIN sont des COMPOSANTS React (mesuré sur
@@ -1116,27 +1120,38 @@
       '</div>' +
       '<div style="color:#6B7485;font-size:10px;margin-top:7px">VRM remplit tout et publie <b>sans booster</b> (aucune option payante). Tu peux relire avant que ça parte.</div>';
     const refill = el.querySelector('#vrm-refill');
-    if (refill) refill.onclick = () => {
-      pendingDone = fillNowForce(pending);
-      pendingArrete = false; pendingTries = 0; publieFait = false;
-      // « Reprendre » rend ses essais à l'enchaînement des étapes (sinon une étape
-      // tentée 4 fois pendant le détourage resterait bloquée pour toujours).
-      for (const k of Object.keys(_avanceEssais)) delete _avanceEssais[k];
-      clearInterval(pendingTimer);
-      pendingTimer = setInterval(() => {
-        pendingTries++;
-        const n2 = fillNow(pending);
-        if (n2 > pendingDone) { pendingDone = n2; banner(); }
-        if (!photosFaites && champsFichier().length) lancerPhotos();
-        if (!publieFait && pending.publier !== false && estEtapePublication() && photosEtat && (photosEtat.envoyees || photosEtat.n || 0) > 0) {
-          publieFait = true;
-          publierSansBooster().then((r) => { publieEtat = r; banner(); if (r && r.ok) { clearInterval(pendingTimer); send({ action: 'markPosted', id: pending.id }); send({ action: 'setPending', ad: null }); } });
-        }
-        if (pendingTries > 90) { clearInterval(pendingTimer); pendingArrete = true; banner(); }
-      }, 1000);
-      banner();
+    if (refill) refill.onclick = reprendre;
+    // Fermer le bandeau, c'est laisser tomber CE dépôt : l'app doit le savoir
+    // (sinon son bouton reste « Publication en cours… » pendant 15 min).
+    el.querySelector('#vrm-close').onclick = () => {
+      clearInterval(pendingTimer); el.remove();
+      if (pending) send({ action: 'depotArrete', id: pending.id, raison: 'bandeau-ferme' });
+      send({ action: 'setPending', ad: null });
     };
-    el.querySelector('#vrm-close').onclick = () => { clearInterval(pendingTimer); el.remove(); send({ action: 'setPending', ad: null }); };
+  }
+  // « ↻ Reprendre » — ici, ou depuis l'app (« Réessayer » sur un dépôt arrêté :
+  // le service worker remet cet onglet devant et nous le demande).
+  function reprendre() {
+    if (!pending) return;
+    pendingDone = fillNowForce(pending);
+    pendingArrete = false; pendingTries = 0; publieFait = false;
+    send({ action: 'depotRepris', id: pending.id });
+    // « Reprendre » rend ses essais à l'enchaînement des étapes (sinon une étape
+    // tentée 4 fois pendant le détourage resterait bloquée pour toujours).
+    for (const k of Object.keys(_avanceEssais)) delete _avanceEssais[k];
+    clearInterval(pendingTimer);
+    pendingTimer = setInterval(() => {
+      pendingTries++;
+      const n2 = fillNow(pending);
+      if (n2 > pendingDone) { pendingDone = n2; banner(); }
+      if (!photosFaites && champsFichier().length) lancerPhotos();
+      if (!publieFait && pending.publier !== false && estEtapePublication() && photosEtat && (photosEtat.envoyees || photosEtat.n || 0) > 0) {
+        publieFait = true;
+        publierSansBooster().then((r) => { publieEtat = r; banner(); if (r && r.ok) { clearInterval(pendingTimer); send({ action: 'markPosted', id: pending.id }); send({ action: 'setPending', ad: null }); } });
+      }
+      if (pendingTries > 90) { clearInterval(pendingTimer); pendingArrete = true; send({ action: 'depotArrete', id: pending.id, raison: 'arret' }); banner(); }
+    }, 1000);
+    banner();
   }
   function fillNowForce(ad) {
     let n = 0;
@@ -1161,6 +1176,16 @@
     captureDepositForm();
   }
   if (!DANS_UN_CADRE) {
+    // « Réessayer » dans l'app, sur un dépôt arrêté dont l'onglet est encore
+    // ouvert : le service worker remet CET onglet devant et nous demande de
+    // reprendre (jamais un second dépôt pour la même paire).
+    try {
+      chrome.runtime.onMessage.addListener((m) => {
+        if (!m || m.__vrmLbc !== 'reprendre') return;
+        if (pending && String(pending.id) === String(m.id)) reprendre();
+        else autoPrefill();
+      });
+    } catch (_) {}
     demarrer();
     // Leboncoin est une SPA : on relit après une navigation interne, et au
     // retour sur l'onglet.

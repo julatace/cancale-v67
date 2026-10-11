@@ -1,19 +1,81 @@
 // popup.js — la connexion à VRM, et rien d'autre.
 //
-// Deux endroits l'affichent, avec LE MÊME code (§11) :
+// Trois endroits l'affichent, avec LE MÊME code (§11) :
 // - l'icône de l'extension dans la barre de Chrome (fenêtre classique) ;
 // - la petite carte en bas à droite de Vinted, Leboncoin, eBay… (`?mode=carte`,
-//   dans un iframe de l'EXTENSION : le mot de passe ne passe jamais par le DOM
-//   du site, que ses scripts peuvent lire).
+//   dans un iframe de l'EXTENSION : rien ne passe par le DOM du site, que ses
+//   scripts peuvent lire) ;
+// - un cadre invisible posé par le pont quand le code qui tourne est périmé
+//   (`?mode=reparer`, voir plus bas).
 //
 // 2 octobre (Julien) : « tout doit être centralisé dans VRM ». Les sections
 // « Comptes captés », « Fraîcheur » et « Synchroniser » sont parties : leur
 // place est dans l'app.
+// 11 octobre (Julien) : « quand j'appuie sur se connecter ça doit envoyer
+// directement dans l'application VRM ». Le bouton principal OUVRE VRM, qui
+// connecte l'extension tout seul (session adressée à CETTE extension) ; le
+// mot de passe VRM ne se tape plus ici que si on le demande exprès.
 const CARTE = /[?&]mode=carte\b/.test(location.search);
+const REPARER = /[?&]mode=reparer\b/.test(location.search);
 if (CARTE) document.body.classList.add('carte');
 
 // Un email est du texte saisi : il n'entre jamais dans du HTML sans être échappé.
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+// ── LA RÉPARATION D'UN CODE PÉRIMÉ (11 octobre) ───────────────────────────
+// ⚠️⚠️ MESURÉ : après le remplacement du dossier, Chrome garde l'ANCIEN service
+//    worker tant qu'on n'a pas cliqué ⟳ dans chrome://extensions — et seulement
+//    dans le Chrome où on le clique. Une page de l'extension, elle, est lue
+//    depuis le disque : elle peut faire ce ⟳ (`chrome.runtime.reload()`).
+//    Le pont la pose quand il juge le code périmé ; elle ne le CROIT pas sur
+//    parole : elle redemande la version du code au service worker, et ne
+//    recharge que si elle n'est pas celle du manifeste — UNE fois par version
+//    (garde dans `chrome.storage.local`, une boucle de rechargements est
+//    impossible). Un service worker simplement lent n'est pas rechargé : il
+//    répond la bonne version.
+const REPARATION_STORE = 'vrmReparation';
+async function reparerSiPerime() {
+  let manif = ''; try { manif = String(chrome.runtime.getManifest().version || ''); } catch (_) { return 'manifeste'; }
+  if (!/^\d+\.\d+\.\d+$/.test(manif)) return 'manifeste';
+  const code = await new Promise((res) => {
+    const t = setTimeout(() => res(undefined), 6000);
+    try {
+      chrome.runtime.sendMessage({ from: 'cancale-popup', action: 'codeVersion' }, (r) => {
+        clearTimeout(t);
+        const e = chrome.runtime.lastError;
+        res(e ? null : ((r && r.code) || null));
+      });
+    } catch (_) { clearTimeout(t); res(null); }
+  });
+  if (code === manif) return 'a-jour';
+  let deja = null;
+  try { deja = (await chrome.storage.local.get(REPARATION_STORE))[REPARATION_STORE] || null; } catch (_) { return 'stockage'; }
+  if (deja && deja.cle === manif && Date.now() - Number(deja.at || 0) < 24 * 3600e3) return 'deja';
+  try { await chrome.storage.local.set({ [REPARATION_STORE]: { cle: manif, at: Date.now(), vu: code == null ? '' : String(code) } }); } catch (_) { return 'stockage'; }
+  try { chrome.runtime.reload(); } catch (_) { return 'echec'; }
+  return 'recharge';
+}
+
+// L'onglet actif (fenêtre de l'icône) : c'est lui qui décide l'onglet de VRM.
+function ongletActif() {
+  return new Promise((res) => {
+    try { chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => res((tabs && tabs[0] && tabs[0].url) || '')); }
+    catch (_) { res(''); }
+  });
+}
+// « Se connecter avec VRM » : le service worker ouvre VRM TOUT DE SUITE (aucune
+// attente avant), et l'app connectée lui adresse sa session.
+async function lierAvecVRM() {
+  const st = document.getElementById('lierEtat');
+  if (st) { st.textContent = 'J’ouvre VRM…'; st.hidden = false; }
+  const urlActive = CARTE ? '' : await ongletActif();
+  try {
+    chrome.runtime.sendMessage({ from: 'cancale-popup', action: 'lierAvecVRM', urlActive }, () => {
+      void chrome.runtime.lastError;
+      if (!CARTE) window.close();
+    });
+  } catch (_) {}
+}
 
 function rendreAuth(e) {
   const box = document.getElementById('auth');
@@ -39,20 +101,43 @@ function rendreAuth(e) {
   }
   const expiree = e && e.expiree;
   box.innerHTML = `<div class="who"><span class="dot warn"></span><span class="nom">${expiree ? 'Session expirée' : 'Non connecté'}</span></div>
-    <div class="muted" style="margin-top:2px">${expiree ? 'Ta session a expiré — retape le mot de passe de ton compte VRM.' : quelCompte}</div>
-    <input id="mail" type="email" placeholder="Email de ton compte VRM" autocomplete="username" value="${esc(expiree && e.email ? e.email : '')}">
-    <input id="pw" type="password" placeholder="Mot de passe VRM" autocomplete="current-password">
-    <button id="inBtn">Se connecter</button>
-    <div class="err" id="authErr" hidden></div>
-    <div class="muted">Pas encore de compte ? <a href="https://vrm.center" target="_blank" rel="noreferrer">Ouvre vrm.center</a> et crée-le en une minute.</div>`;
+    <div class="muted" style="margin-top:2px">${expiree
+      ? 'Reconnecte l’extension à ton compte VRM : un clic, VRM s’ouvre et la reconnecte tout seul.'
+      : 'Connecte l’extension à ton compte VRM : un clic, VRM s’ouvre et la connecte tout seul. Rien à taper ici.'}</div>
+    <button id="lierBtn">Se connecter avec VRM</button>
+    <div class="muted" id="lierEtat" hidden></div>
+    <div class="muted" style="margin-top:12px"><a href="#" id="mdpLien">avec mon mot de passe VRM</a></div>
+    <div id="mdpForm" hidden>
+      <div class="muted" style="margin-top:6px">${quelCompte}</div>
+      <input id="mail" type="email" placeholder="Email de ton compte VRM" autocomplete="username" value="${esc(expiree && e.email ? e.email : '')}">
+      <input id="pw" type="password" placeholder="Mot de passe VRM" autocomplete="current-password">
+      <button class="sec" id="inBtn">Me connecter</button>
+      <div class="err" id="authErr" hidden></div>
+    </div>
+    <div class="muted">Pas encore de compte ? <a href="https://vrm.center/?inscription" target="_blank" rel="noreferrer">Ouvre vrm.center</a> et crée-le en une minute.</div>`;
+  document.getElementById('lierBtn').addEventListener('click', lierAvecVRM);
+  document.getElementById('mdpLien').addEventListener('click', (ev) => {
+    ev.preventDefault();
+    const f = document.getElementById('mdpForm');
+    f.hidden = !f.hidden;
+    if (!f.hidden) { const m = document.getElementById('mail'); if (m && !m.value) m.focus(); else { const p = document.getElementById('pw'); if (p) p.focus(); } }
+  });
   const err = document.getElementById('authErr');
+  // ⚠️ Une connexion à la fois : Entrée répétée (ou clic + Entrée) ouvrait
+  //    plusieurs sessions pour une seule connexion (mesuré : 4 × Entrée ⇒ 2 à 3
+  //    sessions, dont les autres restent orphelines).
+  let enVol = false;
   const go = () => {
+    if (enVol) return;
     const email = document.getElementById('mail').value, password = document.getElementById('pw').value;
     const btn = document.getElementById('inBtn');
-    btn.textContent = 'Connexion…'; btn.disabled = true; err.hidden = true;
-    chrome.runtime.sendMessage({ from: 'cancale-popup', action: 'authLogin', email, password }, (r) => {
-      btn.textContent = 'Se connecter'; btn.disabled = false;
-      if (r && r.ok) ouvrirVRM();
+    enVol = true; btn.textContent = 'Connexion…'; btn.disabled = true; err.hidden = true;
+    // Dans la carte, c'est le SERVICE WORKER qui ouvre VRM après la connexion
+    // (`ouvrir`) : la carte se referme dès que la session change, avant d'avoir
+    // reçu la réponse — elle n'ouvrait VRM que 45 fois sur 50.
+    chrome.runtime.sendMessage({ from: 'cancale-popup', action: 'authLogin', email, password, ouvrir: CARTE }, (r) => {
+      enVol = false; btn.textContent = 'Me connecter'; btn.disabled = false;
+      if (r && r.ok) { if (!CARTE) ouvrirVRM(); }
       else { err.textContent = (r && r.error) || 'Connexion refusée.'; err.hidden = false; }
     });
   };
@@ -101,4 +186,5 @@ function chargerAuth(rester) {
     rendreAuth(e);
   });
 }
-chargerAuth();
+if (REPARER) reparerSiPerime().then((r) => { try { document.body.setAttribute('data-reparation', r); } catch (_) {} });
+else chargerAuth();

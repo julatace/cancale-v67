@@ -163,6 +163,8 @@
         "popup.html"
       ],
       "matches": [
+        "https://vrm.center/*",
+        "https://cancale-v67-ten.vercel.app/*",
         "https://*.vinted.fr/*",
         "https://*.vinted.com/*",
         "https://*.vinted.it/*",
@@ -174,6 +176,12 @@
       ]
     }
   ],
+  "externally_connectable": {
+    "matches": [
+      "https://vrm.center/*",
+      "https://cancale-v67-ten.vercel.app/*"
+    ]
+  },
   "action": {
     "default_popup": "popup.html",
     "default_title": "VRM",
