@@ -18,7 +18,7 @@
 //   1. un zip est livré, et l'app le propose ;
 //   2. il porte la version du manifeste — donc `EXT_ATTENDUE` aussi ;
 //   3. il se dézippe en UN SEUL dossier (règle de Julien) ;
-//   4. il contient tous les fichiers de l'extension ;
+//   4. il contient tous les fichiers de l'extension, et ce sont CEUX de la source ;
 //   5. aucun zip périmé ne traîne à côté.
 //
 // Lecture seule.
@@ -68,6 +68,21 @@ const manquants = attendus.filter(f => !noms.includes(`${racines[0]}/${f}`));
 dit(manquants.length === 0, 'il contient tous les fichiers de l\'extension',
   manquants.length ? 'manque : ' + manquants.join(', ') : attendus.length + ' fichiers');
 
+// 4b) LE CONTENU — revue de la 5.165 (11 octobre). Le zip pouvait porter la
+//     BONNE version et un `background.js` d'avant : une correction faite après
+//     le bump (ici `dateLectureDressing`) partait sans être livrée, et le
+//     contrôle de version restait vert. Chaque fichier du zip doit être,
+//     octet pour octet, celui de la source.
+{
+  const differents = attendus.filter((f) => {
+    const e = entrees[`${racines[0]}/${f}`];
+    if (!e || !e.contenu) return false;              // déjà dit plus haut
+    return !Buffer.from(e.contenu).equals(fs.readFileSync(path.join(SRC, f)));
+  });
+  dit(differents.length === 0, 'chaque fichier du zip est celui de la source (octet pour octet)',
+    differents.length ? 'périmé dans le zip : ' + differents.join(', ') + ' — régénère le zip' : '');
+}
+
 // 2) LA VERSION — le contrôle qui aurait évité des semaines de blocage.
 const vSrc = JSON.parse(fs.readFileSync(path.join(SRC, 'manifest.json'), 'utf8')).version;
 const mZip = entrees[`${racines[0]}/manifest.json`];
@@ -75,6 +90,20 @@ let vZip = null;
 try { vZip = JSON.parse(mZip.contenu.toString('utf8')).version; } catch (_) {}
 dit(vZip === vSrc, 'le zip livré porte la version du manifeste',
   `zip ${vZip || '?'} · source ${vSrc}`);
+// 2b) LA VERSION ÉCRITE DANS LE CODE (5.165). Mesuré le 9 octobre : des
+//     sessions qui disaient `ver = 5.164.0` envoyaient des requêtes que seul un
+//     `background.js` d'avant la 5.134 sait former — on n'a pas pu savoir si
+//     c'était une copie partielle. `CODE_VERSION` voyage avec `ver` dans
+//     `panel_diag_capture` : il doit être égal au manifeste, dans la source ET
+//     dans le zip, sinon la mesure mentirait elle-même.
+{
+  const cv = (t) => { const m = /const CODE_VERSION\s*=\s*'([^']+)'/.exec(t || ''); return m ? m[1] : null; };
+  const cSrc = cv(fs.readFileSync(path.join(SRC, 'background.js'), 'utf8'));
+  const bZip = entrees[`${racines[0]}/background.js`];
+  const cZip = cv(bZip && bZip.contenu ? bZip.contenu.toString('utf8') : '');
+  dit(cSrc === vSrc && cZip === vSrc, '`CODE_VERSION` (background.js) suit le manifeste, dans la source et dans le zip',
+    `source ${cSrc || '?'} · zip ${cZip || '?'} · manifeste ${vSrc}`);
+}
 const mAtt = /EXT_ATTENDUE\s*=\s*'([^']+)'/.exec(APP);
 dit(mAtt && mAtt[1] === vSrc, '`EXT_ATTENDUE` suit la même version',
   `app ${mAtt ? mAtt[1] : '?'} · source ${vSrc}`);

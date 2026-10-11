@@ -41,7 +41,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.164.0';
+const EXT_ATTENDUE = '5.166.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -175,7 +175,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // exactement. Le seuil est 5.160 : en deçà, l'app dit « mets à jour », elle ne
 // laisse pas le bouton se casser. (Mesuré le 7 octobre : son extension installée
 // est en 5.143 — c'est pour ça que « publier depuis VRM ne marche pas ».)
-const EXT_CAPACITES = { codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', repond: '5.77.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', detourage: '5.156.0' };
+const EXT_CAPACITES = { supprimees: '5.165.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', repond: '5.77.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', detourage: '5.156.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -833,7 +833,16 @@ if (MULTI_USER && typeof window !== 'undefined') {
 //      quand elle en a BESOIN (pas de session, session morte, autre compte),
 //      jamais à chaque rafraîchissement. Voir `assurerSessionExtension`.
 // À la déconnexion on envoie toujours null : elle oublie tout.
+// ⚠️⚠️ DEUX EXTENSIONS VRM DANS LE MÊME CHROME (mesuré le 9 octobre, 5.165) :
+//    `null` = une seule répond (ou pas su) · `['5.77.0','5.165.0']` = PLUSIEURS.
+//    Décidé par `sonderPonts` (plus bas), lu par `raisonExtGlobale`, `vmrExec`,
+//    `vmrDemande` et ici. Une session postée ici est relayée par CHAQUE pont
+//    vivant de la page : deux extensions adopteraient la MÊME famille de jetons
+//    et se la tueraient en la renouvelant (`refresh_token_already_used`,
+//    « Possible abuse attempt », relevé à 18:37:02 le 9 octobre).
+let __vmrPlusieurs = null;
 const posterSessionExtension = (session) => {
+  if (session && __vmrPlusieurs) return;   // « oublie tout » (null) part toujours
   try { window.postMessage({ __vmr: 'session', session: session || null }, window.location.origin); } catch (_) {}
 };
 // Le repli d'AVANT (notre propre session) ne sert plus qu'à amorcer une
@@ -1488,6 +1497,229 @@ const harvestTs = (row) => {
 // données dans l'UI (« données du 7 juil. ») au lieu de laisser croire au direct.
 const _harvestSeen = {};
 const harvestAgeMs = (uid, type) => { const t = _harvestSeen[`${uid}_${type}`]; return t ? (Date.now() - t) : null; };
+// ══════════════════════════════════════════════════════════════════════════════
+// UNE ANNONCE SUPPRIMÉE SUR VINTED SORT DE VRM TOUT DE SUITE (10 octobre, 5.165)
+// ══════════════════════════════════════════════════════════════════════════════
+// Julien, 9 octobre 18:40 : « je viens de supprimer beaucoup de paires et elles
+// sont encore marquées dans les annonces ». Le dressing de cinq comptes datait
+// du 8 au soir : ~41 annonces affichées « en ligne » qu'il venait de supprimer.
+// L'extension (≥ 5.165) voit maintenant, dans son navigateur, la RÉPONSE de
+// `POST /api/v2/items/{id}/delete` et ne retient qu'un 2xx, par l'IDENTIFIANT de
+// l'annonce (§5) : `harvest_{uid}_supprimees = { ids: { [id]: atISO } }`.
+// ⇒ UNE règle (`supprimeeApres`), appliquée au dressing LÀ OÙ IL EST LU
+//   (`fetchHarvestBrut`, et `retirerSupprimeesLignes` pour les lecteurs qui
+//   balaient tous les comptes) : tous les écrans qui en dérivent — Annonces, ses
+//   chiffres, la file Leboncoin, le tableau de bord, la recherche — la suivent
+//   sans la recalculer (§11). La MÊME règle vit dans l'extension
+//   (`buildLbcData`, `buildEbayData`) : `audit-supprimees.cjs` compare les sorties.
+// ⚠️ Le dressing RELU après la suppression fait foi (une annonce supprimée en
+//    disparaît : mesuré, 10010415608 d'angeled92). ⚠️ « Pas su » ne cache rien :
+//    ligne illisible ⇒ aucune annonce écartée. ⚠️ Supprimée n'est PAS vendue :
+//    rien ici n'entre dans une preuve de vente, un CA, ni « à retirer ailleurs ».
+// <supprimees-regle> — LA MÊME RÈGLE QUE L'EXTENSION (background.js), §11.
+// `capturedAt` est l'heure du RANGEMENT, pas de la lecture : une moisson partie
+// avant la suppression et rangée après la ressusciterait — d'où la marge. Une
+// annonce supprimée ne revient jamais légitimement (republiée, elle a un NOUVEL
+// identifiant) : la marge ne fait que retarder une résurrection qui n'a pas lieu.
+const SUPPR_MARGE_MS = 5 * 60 * 1000;
+function supprimeeApres(ids, id, capTs) {
+  if (!ids || typeof ids !== 'object') return false;          // pas su : on n'écarte rien
+  const at = Date.parse(ids[String(id)] || '');
+  if (isNaN(at)) return false;
+  return !(Number(capTs) >= at + SUPPR_MARGE_MS);             // lecture d'avant, ou sans date : écartée
+}
+// La date de LECTURE d'un dressing — UNE fonction pour les quatre lecteurs
+// (écran Annonces, file Leboncoin de l'app, files LBC/eBay et photos de
+// l'extension, §11) : `capturedAt` écrit par l'extension (la colonne `cap`
+// d'une projection, ou `data.capturedAt` d'une ligne entière). JAMAIS
+// `updated_at`, qui ment (§4.3) — l'écran Annonces y retombait, les autres non :
+// la même ligne rendait deux listes (revue de la 5.165). Sans date : `NaN`.
+function dateLectureDressing(ligne) {
+  const c = ligne && (ligne.cap != null ? ligne.cap : (ligne.data && ligne.data.capturedAt));
+  return Date.parse(c || '');
+}
+// </supprimees-regle>
+// Ce que la dernière lecture a écarté, par compte (pour le DIRE, une fois, §7).
+const _supprRetirees = {};
+// La ligne d'un compte : `ids` · `{}` (aucune) · `null` (la base n'a pas répondu).
+const lireSupprimees = (uid) => cachedRow(`s:${uid}`, async () => {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.harvest_${uid}_supprimees&select=ids:data->ids`, { headers: sbAuth() });
+    if (!res.ok) return null;
+    const rows = await res.json();
+    if (!Array.isArray(rows)) return null;
+    const ids = rows[0] && rows[0].ids;
+    return (ids && typeof ids === 'object' && !Array.isArray(ids)) ? ids : {};
+  } catch (_) { return null; }
+});
+// Toutes les lignes (une par compte : famille bornée) → Map uid → ids, ou `null`.
+const lireSupprimeesTous = () => cachedRow('s:*', async () => {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_supprimees&select=id,ids:data->ids`, { headers: sbAuth() });
+    if (!res.ok) return null;
+    const rows = await res.json();
+    if (!Array.isArray(rows)) return null;
+    const m = new Map();
+    for (const r of rows) {
+      const k = /^harvest_(\d+)_supprimees$/.exec(String((r && r.id) || ''));
+      if (k && r.ids && typeof r.ids === 'object') m.set(k[1], r.ids);
+    }
+    return m;
+  } catch (_) { return null; }
+});
+// Un dressing (payload) sans les annonces supprimées APRÈS sa lecture.
+// `_vrmRetirees` garde les annonces retirées elles-mêmes : l'écran ne COMPTE que
+// celles qui étaient affichées en ligne (revue 5.165 — « 3 supprimées » quand une
+// seule carte était partie, les deux autres étaient en pause ou en brouillon).
+const retirerSupprimees = (payload, ids, capTs) => {
+  if (!ids || !payload || !Array.isArray(payload.items)) return payload;
+  const items = [], retirees = [], retireesItems = [];
+  for (const it of payload.items) { if (it && supprimeeApres(ids, it.id, capTs)) { retirees.push(String(it.id)); retireesItems.push(it); } else items.push(it); }
+  return retirees.length ? { ...payload, items, _vrmSupprimees: retirees, _vrmRetirees: retireesItems } : payload;
+};
+// Des lignes `harvest_{uid}_listings` lues en entier (`id,data` ou `data`).
+const retirerSupprimeesLignes = (lignes, supp) => {
+  if (!supp || !Array.isArray(lignes)) return lignes;
+  return lignes.map((r) => {
+    const d = r && r.data; if (!d) return r;
+    const k = /^harvest_(\d+)_listings$/.exec(String((r && r.id) || ''));
+    const uid = k ? k[1] : (d.uid != null ? String(d.uid) : '');
+    const ids = uid && supp.get(uid);
+    if (!ids || !d.payload) return r;
+    const p2 = retirerSupprimees(d.payload, ids, dateLectureDressing(r));
+    return p2 === d.payload ? r : { ...r, data: { ...d, payload: p2 } };
+  });
+};
+// ── DE QUAND DATE LA LECTURE DU DRESSING, COMPTE PAR COMPTE (5.165) ─────────
+// L'écran Annonces n'en disait RIEN : la lecture du 8 au soir de cinq comptes
+// s'affichait comme l'état du 9 (§4.3, §5 : un chiffre qu'on ne peut pas
+// vérifier est invendable). Il ne prévenait qu'au-delà de 7 JOURS, et seulement
+// avec au moins deux comptes. ⇒ Au-delà de 30 min, on le DIT — une fois, au-
+// dessus de la grille (§7), en nommant les comptes et l'heure, avec le geste
+// vrai. Sans couleur : rien n'est cassé, c'est une date. Heure inconnue ⇒ on ne
+// dit rien de ce compte (« pas su » ne vaut ni « à jour » ni « vieux »).
+// ⚠️ REVUE DE LA 5.165 — 30 MIN ÉTAIT DU BRUIT PERMANENT. L'extension ne relit
+//    que le compte ouvert dans Chrome : avec sept comptes, au bout d'une demi-
+//    heure TOUS étaient « anciens », à chaque ouverture — une consigne qu'on ne
+//    peut ni suivre ni faire disparaître (§7). Un compte est nommé quand :
+//      · sa lecture a plus de 12 h (une suppression faite ailleurs — téléphone,
+//        autre navigateur — n'y est peut-être pas ; mesuré : celle du 8 au soir
+//        affichée le 9 à 18 h 40) ;
+//      · OU l'extension l'a vu actif APRÈS cette lecture (ses ventes rangées plus
+//        de 10 min après son dressing) : il est passé dessus, et le dressing n'a
+//        pas été relu — c'est l'échec qu'il faut voir.
+const DRESSING_FRAIS_MS = 12 * 3600 * 1000;
+const DRESSING_ACTIVITE_MARGE_MS = 10 * 60 * 1000;
+const MOIS_COURT_FR = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+const quandFr = (ts, maintenant = Date.now()) => {
+  const d = new Date(Number(ts)); if (isNaN(d)) return '';
+  const min = Math.round((maintenant - d.getTime()) / 60000);
+  if (min < 60) return `il y a ${Math.max(1, min)} min`;
+  const hm = `${d.getHours()} h ${String(d.getMinutes()).padStart(2, '0')}`;
+  const j0 = new Date(maintenant); j0.setHours(0, 0, 0, 0);
+  const t0 = new Date(d.getTime()); t0.setHours(0, 0, 0, 0);
+  const dj = Math.round((j0 - t0) / 86400000);
+  if (dj === 0) return `aujourd'hui à ${hm}`;
+  if (dj === 1) return `hier à ${hm}`;
+  return `le ${d.getDate()} ${MOIS_COURT_FR[d.getMonth()]} à ${hm}`;
+};
+// Les comptes AFFICHÉS (au moins une annonce en ligne à l'écran) dont le dressing
+// est ANCIEN (règle ci-dessus) — du plus ancien au plus récent. `activite` :
+// uid → heure de la dernière capture de ses ventes (absente ⇒ la règle des 12 h).
+const dressingsAnciens = (lues, enLigne, maintenant = Date.now(), activite = null) =>
+  Object.keys(enLigne || {})
+    .filter((u) => {
+      if (!((enLigne[u] || 0) > 0 && lues && Number(lues[u]) > 0)) return false;
+      const lu = Number(lues[u]);
+      if (maintenant - lu > DRESSING_FRAIS_MS) return true;
+      const act = activite && Number(activite[u]);
+      return !!(act > 0 && act - lu > DRESSING_ACTIVITE_MARGE_MS);
+    })
+    .sort((a, b) => Number(lues[a]) - Number(lues[b]));
+// UNE phrase pour l'écran Annonces ET le tableau de bord (§11).
+// ⚠️ Revue de la 5.165 :
+//    · TOUS les comptes sont nommés, chacun avec son heure (« a, b, c et 3
+//      autres » cachait sur quel compte repasser — il en a neuf, §5) ;
+//    · sans extension ICI (téléphone, autre navigateur), le geste dit OÙ il se
+//      fait : ouvrir vinted.fr sur ce téléphone ne relit rien ;
+//    · « sort d'ici tout de suite » ne se promet que si l'extension de CE Chrome
+//      le sait (≥ 5.165) ET qu'elle est seule (deux extensions : l'ancienne patche
+//      la page à sa place), avec le geste qui rend la promesse vraie : un onglet
+//      Vinted ouvert AVANT la mise à jour garde l'ancien code jusqu'au rechargement
+//      (mesuré dans Chromium : 0 suppression vue avant, toutes après).
+function FraicheurAnnonces({ lues, enLigne, noms, supprimees, activite, attr = 'data-ann-fraicheur', style }) {
+  const sansSouris = useSansSouris();
+  const [, majExt] = React.useReducer((x) => x + 1, 0);
+  React.useEffect(() => onVmrExt(majExt), []);
+  const vieux = dressingsAnciens(lues, enLigne, Date.now(), activite);
+  const nSuppr = Object.keys(supprimees || {}).filter((u) => enLigne && u in enLigne).reduce((t, u) => t + (Number(supprimees[u]) || 0), 0);
+  if (!vieux.length && !nSuppr) return null;
+  const nom = (u) => (noms && noms[u]) || `#${u}`;
+  const cap = extSait('supprimees');
+  const plusieurs = !!__vmrPlusieurs;
+  const ailleurs = cap === 'absente' || sansSouris;          // le geste ne se fait pas sur CET appareil
+  const promet = cap === 'ok' && !plusieurs && !sansSouris;
+  const s = nSuppr > 1 ? 's' : '';
+  const ceux = vieux.length > 1 ? 'chacun de ces comptes' : 'ce compte';
+  return (
+    <div {...{ [attr]: '' }} data-vieux={vieux.join(',')} data-supprimees={nSuppr} data-cap={cap} data-promesse={promet ? '1' : '0'} data-ailleurs={ailleurs ? '1' : '0'}
+      style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, marginBottom: 12, ...(style || {}) }}>
+      {nSuppr > 0 && <span data-suppr-dit>{nSuppr} annonce{s} supprimée{s} sur Vinted depuis la dernière lecture : déjà retirée{s} d'ici. </span>}
+      {vieux.length > 0 && <span data-vieux-dit>
+        {vieux.length === 1
+          ? <><b style={{ color: C.text }}>{nom(vieux[0])}</b> : annonces lues {quandFr(Number(lues[vieux[0]]))}</>
+          : <>Annonces lues : {vieux.map((u, i) => <React.Fragment key={u}>{i ? ', ' : ''}<b style={{ color: C.text }}>{nom(u)}</b> {quandFr(Number(lues[u]))}</React.Fragment>)}</>}
+        {' '}— ce que tu as supprimé ou mis en ligne depuis n'y est pas{nSuppr > 0 ? ' (hors les suppressions ci-dessus)' : ''}.
+        {' '}{ailleurs
+          ? <>Sur l'ordinateur où l'extension VRM est installée, ouvre <b style={{ color: C.text }}>vinted.fr</b> connecté sur {ceux} : elle relit son dressing.</>
+          : <>Ouvre <b style={{ color: C.text }}>vinted.fr</b> connecté sur {ceux} dans Chrome : l'extension relit son dressing.</>}
+        {promet && ' Une suppression faite sur vinted.fr dans ce Chrome sort d’ici tout de suite — recharge d’abord les onglets Vinted ouverts avant la dernière mise à jour de l’extension.'}
+        {cap === 'retard' && !plusieurs && ` Mets l'extension à jour (${EXT_CAPACITES.supprimees}) : une suppression faite sur vinted.fr en sortira tout de suite.`}
+        {plusieurs && ' Deux extensions VRM répondent dans ce Chrome : tant qu’il en reste deux, une suppression peut ne pas être vue.'}
+      </span>}
+    </div>
+  );
+}
+// ⚠️⚠️ REVUE DE LA 5.165 — UN SIGNAL DE L'EXTENSION NE FAIT JAMAIS PARTIR LE
+//    RELAIS SERVEUR. Chaque « maj · annonces » (une par suppression rangée, une
+//    par dressing rangé) relançait les lectures de l'app — et pour un compte lié
+//    SANS ligne moissonnée, ces lectures retombaient sur `/api/vinted-proxy` :
+//    le serveur lisait Vinted (dressing, ventes, boîte) depuis l'IP de Vercel,
+//    au nom d'un AUTRE compte, ~4 fois par suppression. Prouvé au rendu : 0
+//    appel avant la 5.165, 24 après 6 suppressions. C'est le motif « multi-
+//    comptes piloté par un robot depuis l'IP du serveur » (§3).
+//    ⇒ Une relecture sur signal ne lit QUE la moisson (`moissonSeule`) ; un
+//      compte sans ligne garde ce qu'on montrait ; et les signaux rapprochés se
+//      REGROUPENT : la première relecture part vite (une rafale de suppressions
+//      en une seule), les suivantes au plus une par `SIGNAL_MIN_MS`, et la
+//      dernière n'est jamais perdue (sinon la dernière suppression resterait à
+//      l'écran).
+const SIGNAL_MIN_MS = 5000;
+function regrouperSignaux(relire, minMs = SIGNAL_MIN_MS, rafaleMs = 300) {
+  let uids = null, tous = false, minuterie = null, derniere = 0, enCours = false;
+  const lancer = async () => {
+    minuterie = null;
+    if (enCours) { planifier(); return; }
+    const cible = tous ? null : uids;
+    uids = null; tous = false; enCours = true; derniere = Date.now();
+    try { await relire(cible); } catch (_) {} finally { enCours = false; }
+  };
+  const planifier = () => {
+    if (minuterie) return;
+    minuterie = setTimeout(lancer, Math.max(rafaleMs, derniere + minMs - Date.now()));
+  };
+  const signal = (uid) => {
+    if (uid) (uids = uids || new Set()).add(String(uid)); else tous = true;
+    planifier();
+  };
+  signal.arreter = () => { if (minuterie) clearTimeout(minuterie); minuterie = null; };
+  return signal;
+}
+// L'extension vient de ranger une suppression : on oublie ce qu'on avait lu.
+const oublierDressing = (uid) => {
+  if (uid) { _rowCache.delete(`h:${uid}:listings`); _rowCache.delete(`s:${uid}`); }
+  _rowCache.delete('s:*');
+};
 // ── ACTIVITÉ RÉSEAU (barre de chargement en haut) ───────────────────────────
 // Tous les chargements de données passent par fetchHarvest (moisson) ou
 // vintedApiCall (Vinted). On compte les requêtes en cours à cet endroit unique,
@@ -1645,7 +1877,10 @@ const fetchHarvestBrut = async (uid, type, opts = {}) => {
     const rows = await res.json();
     const row = rows[0];
     if (!row) return null;
-    const ts = harvestTs(row);
+    // Un dressing se date par `dateLectureDressing` (capturedAt seul), comme chez
+    // tous ses autres lecteurs (§11) : la date dite à l'écran et celle qui écarte
+    // les annonces supprimées sont la MÊME.
+    const ts = type === 'listings' ? dateLectureDressing(row) : harvestTs(row);
     if (!isNaN(ts)) _harvestSeen[`${uid}_${type}`] = ts;
     // ⚠️ ON NE JETTE PLUS une moisson « trop vieille » par défaut. Ça faisait
     // afficher « Impossible de charger » (Messages, Annonces…) dès que Julien
@@ -1657,7 +1892,15 @@ const fetchHarvestBrut = async (uid, type, opts = {}) => {
     // Un appelant qui exige de la fraîcheur peut encore passer opts.maxAgeMs.
     const maxAge = opts.maxAgeMs != null ? opts.maxAgeMs : 0;
     if (maxAge > 0 && !isNaN(ts) && (Date.now() - ts) > maxAge) return null;
-    return row.data?.payload || null;
+    const payload = row.data?.payload || null;
+    // 5.165 : le dressing, LÀ OÙ IL EST LU, sans les annonces supprimées depuis
+    // (tous les écrans qui en dérivent suivent la même règle, §11).
+    if (type === 'listings' && payload) {
+      const p2 = retirerSupprimees(payload, await lireSupprimees(uid), ts);
+      _supprRetirees[uid] = (p2 && p2._vrmSupprimees) || [];
+      return p2;
+    }
+    return payload;
   } catch (_) { return null; }
   finally { busyEnd(); }  // finally : le compteur redescend quel que soit le chemin de sortie
 };
@@ -3597,6 +3840,10 @@ const fetchVintedOrders = async (account, type, page = 1, statusFilter = 'comple
   // Mode "moisson seulement" : on n'interroge PAS Vinted, on renvoie du vide si
   // la page n'a pas encore été ouverte dans le navigateur.
   if (opts.harvestOnly) return { ok: true, items: [], pagination: null, source: 'harvest' };
+  // `moissonSeule` (revue 5.165) : une relecture déclenchée par un SIGNAL de
+  // l'extension. Pas de ligne ⇒ « rien de neuf à dire » (l'appelant garde ce
+  // qu'il montrait) — jamais le relais serveur, jamais un faux « 0 ».
+  if (opts.moissonSeule) return { ok: false, error: 'moisson-absente', items: [], pagination: null, source: 'moisson-absente' };
   // 2) Repli : proxy — on récupère TOUTES les pages. ⚠️ Avant, on ne prenait
   //    que la 1re page de 20 commandes/compte → CA, « en attente » et coûts
   //    d'achat étaient largement sous-comptés (ex. 71 ventes lues comme 20).
@@ -3645,6 +3892,7 @@ const fetchVintedConversations = async (account, page = 1, opts = {}) => {
   }
   // Mode "moisson seulement" : aucun appel Vinted.
   if (opts.harvestOnly) return { ok: true, items: [], pagination: null, raw: null, source: 'harvest' };
+  if (opts.moissonSeule) return { ok: false, error: 'moisson-absente', items: [], pagination: null, raw: null, source: 'moisson-absente' };
   // 2) Repli : proxy (si l'inbox n'a pas encore été ouverte dans le navigateur).
   const res = await vintedApiCall(account, `/api/v2/inbox?page=${page}&per_page=20`);
   if (!res.ok) return { ok: false, error: res.status || res.error, items: [], pagination: null, raw: res };
@@ -3788,13 +4036,77 @@ let __vmrExtReady = false, __vmrExtVersion = '';
 // la détection est asynchrone, un composant déjà affiché doit se redessiner.
 const __vmrExtSubs = new Set();
 const onVmrExt = (fn) => { __vmrExtSubs.add(fn); return () => __vmrExtSubs.delete(fn); };
+// ══ COMBIEN D'EXTENSIONS VRM RÉPONDENT DANS CETTE PAGE ? (5.165) ═══════════
+// Mesuré le 9 octobre (Chromium réel, vraies extensions) : avec une 5.143 ou une
+// 5.77 restée installée À CÔTÉ de la 5.164, CHAQUE commande et CHAQUE envoi de
+// l'app étaient exécutés par LES DEUX (« cmd:bordereau ×2 », « exec …/replies
+// ×2 ») — deux files « une requête à la fois », deux budgets de 20 actions/h,
+// une réponse à un acheteur envoyée deux fois (§3). Et l'app affichait la
+// version du DERNIER « ready » reçu : « mets l'extension à jour » à quelqu'un
+// qui venait de le faire. Rien ne le disait.
+// ⇒ On le MESURE, sans deviner : on pose la question (« ping ») et on compte les
+//   ponts VIVANTS qui répondent à CETTE question. Un pont orphelin depuis la
+//   5.129 se tait ; un pont plus ancien encore orphelin répond aussi — d'où le
+//   geste « recharge cette page » dans la phrase. Deux réponses de la même
+//   extension (même identifiant, ou même version sans identifiant) ne comptent
+//   qu'une fois : jamais deux pour une. Depuis la 5.165 le pont joint
+//   l'IDENTIFIANT de son extension (deux copies de la même version se
+//   distinguent alors aussi).
+// La version retenue est la plus HAUTE vue au dernier tour — jamais « la
+// dernière arrivée », qui changeait d'un rechargement à l'autre.
+const cleDuPont = (d) => (d && d.id ? 'id:' + String(d.id) : 'v:' + String((d && d.version) || ''));
+let __vmrTour = null, __vmrToursFaits = 0;
+const __vmrAttenteTour = [];
+// Avant le PREMIER compte, on ne sait pas s'il y en a une ou deux : une commande,
+// un envoi ou une session attendent ce premier compte (au plus 2,5 s) — sinon
+// la relecture des ventes partait vers les deux avant même qu'on ait compté
+// (vu au banc). Ensuite on décide sur le dernier compte, sans attendre.
+function sondageConnu(maxMs = 2500) {
+  if (typeof window === 'undefined' || !__vmrExtReady || __vmrToursFaits > 0) return Promise.resolve();
+  return new Promise((res) => {
+    const t = setTimeout(res, maxMs);
+    __vmrAttenteTour.push(() => { clearTimeout(t); res(); });
+    sonderPonts();
+  });
+}
+// La phrase (une seule, §11) : ce qui se passe, ce que l'app fait, le geste.
+// Les versions sont celles qui ONT RÉPONDU — jamais devinées.
+function textePlusieurs() {
+  const v = (__vmrPlusieurs || []).filter((x) => x && x !== '?');
+  const geste = v.length >= 2
+    ? `supprime l'ancienne et garde la ${v[v.length - 1]}`
+    : "n'en garde qu'une (la plus récente)";
+  return `Deux extensions VRM répondent dans ce Chrome${v.length >= 2 ? ` (${v.slice(0, -1).join(', ')} et ${v[v.length - 1]})` : ''} : chaque commande partirait deux fois, alors je n'en envoie aucune. Dans chrome://extensions, ${geste}, puis recharge cette page (si tu viens de la retirer, recharger suffit).`;
+}
+function sonderPonts(dureeMs = 1500) {
+  if (typeof window === 'undefined' || !__vmrExtReady || __vmrTour) return;
+  const tour = { t0: Date.now(), ponts: new Map() };
+  __vmrTour = tour;
+  try { window.postMessage({ __vmr: 'ping' }, '*'); } catch (_) {}
+  setTimeout(() => {
+    if (__vmrTour === tour) __vmrTour = null;
+    __vmrToursFaits++;
+    __vmrAttenteTour.splice(0).forEach((f) => { try { f(); } catch (_) {} });
+    if (!tour.ponts.size) return;                       // personne n'a répondu : pas de conclusion
+    const versions = [...new Set([...tour.ponts.values()].filter(Boolean))].sort(cmpVersion);
+    if (versions.length) __vmrExtVersion = versions[versions.length - 1];
+    const avant = JSON.stringify(__vmrPlusieurs);
+    __vmrPlusieurs = tour.ponts.size >= 2 ? (versions.length ? versions : ['?']) : null;
+    if (JSON.stringify(__vmrPlusieurs) !== avant) __vmrExtSubs.forEach(fn => { try { fn(); } catch (_) {} });
+  }, dureeMs);
+}
 if (typeof window !== 'undefined') {
   try {
     window.addEventListener('message', (e) => {
       if (e.source !== window || !e.data || e.data.__vmr !== 'ready') return;
+      const premier = !__vmrExtReady;
       __vmrExtReady = true;
-      if (e.data.version) __vmrExtVersion = String(e.data.version);
+      if (__vmrTour) __vmrTour.ponts.set(cleDuPont(e.data), e.data.version ? String(e.data.version) : '');
+      else if (e.data.version && (!__vmrExtVersion || cmpVersion(String(e.data.version), __vmrExtVersion) > 0 || !__vmrPlusieurs)) __vmrExtVersion = String(e.data.version);
       __vmrExtSubs.forEach(fn => { try { fn(); } catch (_) {} });
+      // Le premier « ready » : on compte tout de suite (un second pont répond
+      // à la même question dans la seconde).
+      if (premier) setTimeout(() => sonderPonts(), 50);
     });
     window.postMessage({ __vmr: 'ping' }, '*');
     // ⚠️ L'extension injecte bridge.js à `document_idle` : un seul ping au
@@ -3878,9 +4190,13 @@ function vmrPdfLbc(url, timeoutMs = 15000) {
   });
 }
 
-function vmrExec({ uid, method, endpoint, body }, timeoutMs = 15000) {
+function vmrExec(q, timeoutMs = 15000) { return sondageConnu().then(() => vmrExecUn(q, timeoutMs)); }
+function vmrExecUn({ uid, method, endpoint, body }, timeoutMs = 15000) {
   return new Promise((resolve) => {
     if (typeof window === 'undefined') { resolve({ ok: false, error: 'no window' }); return; }
+    // 5.165 : deux extensions répondent ⇒ une réponse à un acheteur partirait
+    //    DEUX fois (mesuré : « exec …/replies ×2 »). Rien ne part.
+    if (__vmrPlusieurs) { resolve({ ok: false, error: textePlusieurs(), code: 'plusieurs' }); return; }
     const reqId = 'r' + Date.now() + '_' + Math.random().toString(36).slice(2);
     let dernier = null;
     const cleanup = () => { clearTimeout(to); window.removeEventListener('message', onMsg); };
@@ -3932,11 +4248,17 @@ const VMR_GRACE_VIDE_MS = 1500;
 //    vivant la lance ferait réessayer — un bordereau demandé deux fois. Pour
 //    elle, une réponse vide attend l'échéance (revue du 5 octobre).
 function vmrDemande(type, payload, timeoutMs) {
+  return (type === 'cmd' ? sondageConnu() : Promise.resolve()).then(() => vmrDemandeUn(type, payload, timeoutMs));
+}
+function vmrDemandeUn(type, payload, timeoutMs) {
   return new Promise((resolve) => {
     if (typeof window === 'undefined' || !__vmrExtReady) { resolve(null); return; }
     const reqId = 'q' + Date.now() + '_' + Math.random().toString(36).slice(2);
     let done = false, grace = null, to = null;
     const agit = type === 'cmd';
+    // 5.165 : deux extensions répondent ⇒ une commande serait exécutée DEUX fois
+    //    (mesuré : « cmd:bordereau ×2 »). On n'en envoie aucune, et on le dit.
+    if (agit && __vmrPlusieurs) { resolve({ accepte: false, code: 'plusieurs', raison: textePlusieurs() }); return; }
     const fin = (v) => { if (done) return; done = true; clearTimeout(grace); clearTimeout(to); window.removeEventListener('message', onMsg); resolve(v); };
     const onMsg = (e) => {
       if (e.source !== window || !e.data || e.data.__vmr !== type + ':result' || e.data.reqId !== reqId) return;
@@ -3964,7 +4286,9 @@ let __vmrBattementEnVol = false, __vmrRelance = null;
 const pontSaitRepondreEtat = () => { const v = vmrExtVersion(); return !!v && cmpVersion(v, EXT_CAPACITES.commande) >= 0; };
 async function battementExt() {
   if (typeof document !== 'undefined' && document.hidden) return;
-  if (!__vmrExtReady || __vmrBattementEnVol) return;
+  if (!__vmrExtReady) return;
+  sonderPonts();                         // 5.165 : combien d'extensions répondent (voir plus haut)
+  if (__vmrBattementEnVol) return;
   if (!pontSaitRepondreEtat()) { legacySessionExtension(); return; }
   __vmrBattementEnVol = true;
   let r = null;
@@ -3997,6 +4321,9 @@ const enVolSession = (v) => { __sessExtEnVol = v; __vmrNotifier(); };   // l'ind
 const cleSeparee = (uid) => 'vrm_ext_separee_' + uid;
 async function assurerSessionExtension() {
   if (!MULTI_USER || typeof window === 'undefined') return;
+  // 5.165 : deux extensions adopteraient la MÊME session et se la tueraient.
+  await sondageConnu();
+  if (__vmrPlusieurs) return;
   const s = AUTH.session, u = AUTH.user;
   if (!s || !s.access_token || !u || !u.id) return;
   const e = __vmrEtat;
@@ -4053,6 +4380,7 @@ async function assurerSessionExtension() {
 let __legacyPoste = 0;
 function legacySessionExtension() {
   if (!MULTI_USER || !AUTH.session || !AUTH.user) return;
+  if (!__vmrToursFaits || __vmrPlusieurs) return;   // 5.165 : pas avant d'avoir compté, jamais à deux
   if (Date.now() - __legacyPoste < 30 * 60000) return;
   __legacyPoste = Date.now();
   posterSessionExtension(sessionAppPourExtension());
@@ -4064,7 +4392,11 @@ if (typeof window !== 'undefined') {
       // Un pont qui (ré)apparaît — premier chargement, ou remis à neuf après une
       // mise à jour de l'extension : on lui redemande son état tout de suite,
       // y compris si on l'avait cru muette.
-      if (e.data.__vmr === 'ready') { if (__vmrEtat === undefined || __vmrEtat === null) { __vmrRates = 0; setTimeout(battementExt, 30); } return; }
+      // ⚠️ 5.165 : un « ready » qui RÉPOND à notre propre compte des ponts
+      //    (`sonderPonts`, à chaque battement) n'est pas un pont qui apparaît —
+      //    sinon chaque battement remettait les ratés à zéro, et une extension
+      //    muette n'était plus jamais dite muette (vu au banc `pont.cjs`).
+      if (e.data.__vmr === 'ready') { if (!__vmrTour && (__vmrEtat === undefined || __vmrEtat === null)) { __vmrRates = 0; setTimeout(battementExt, 30); } return; }
       if (e.data.__vmr !== 'evt' || !e.data.evt) return;
       const ev = e.data.evt;
       if (ev.type === 'cmd' && ev.jobId) { __vmrJobs[ev.jobId] = ev; __vmrNotifier(); }
@@ -4113,6 +4445,9 @@ function raisonExtGlobale(sansSouris, opt) {
   const role = (opt && opt.role) || 'génère les bordereaux';
   if (sansSouris) return { code: 'telephone', texte: `Depuis ton ordinateur : c'est là que tourne l'extension qui ${role}.` };
   if (!vmrExtPresent()) return { code: 'absente', texte: `Extension VRM pas détectée dans ce navigateur — c'est elle qui ${role}.` };
+  // ⚠️⚠️ PLUSIEURS AVANT TOUT LE RESTE (5.165) : « mets à jour » ou « recharge »
+  //    seraient faux — il vient de mettre à jour, et l'ancienne répond encore.
+  if (__vmrPlusieurs) return { code: 'plusieurs', geste: 'extensions', texte: textePlusieurs() };
   // ⚠️ « En retard » AVANT « muette » : un pont trop ancien ne sait pas
   //    répondre, et lui dire « recharge la page » ne change rien (revue).
   if (extSait(cap) === 'retard') return { code: 'retard', texte: `Mets l'extension à jour (${EXT_ATTENDUE}) : celle installée ne sait pas encore recevoir cette commande de l'app.` };
@@ -4277,18 +4612,30 @@ const fetchVintedListings = async (account, page = 1, opts = {}) => {
     // dire « rien capté », pas « plus rien en ligne » — et l'app le prenait pour
     // argent comptant : d'où les bandeaux « compte muet » et « annonces
     // disparues » alors que les annonces étaient bien en ligne.
-    if (h && Array.isArray(h.items) && h.items.length > 0) {
+    // ⚠️ 5.165 — SAUF un dressing VIDÉ pour de vrai : supprimées depuis (la règle
+    //    ci-dessus les a retirées), ou lu en entier par l'extension et vide
+    //    (`total_entries: 0`). Ce vide-là EST une réponse ; sans ça, l'app
+    //    repartait demander le dressing au relais du serveur.
+    const videDit = !!(h && Array.isArray(h.items) && ((h._vrmSupprimees || []).length
+      || (h.pagination && h.pagination.total_entries !== '' && h.pagination.total_entries != null && Number(h.pagination.total_entries) === 0)));
+    if (h && Array.isArray(h.items) && (h.items.length > 0 || videDit)) {
       // ⚠️ On remonte AUSSI les annonces que Vinted a fermées en disant « vendue ».
       //    Elles sortent des « en ligne » (c'est leur place), mais leur IDENTIFIANT
       //    est la seule preuve sans ressemblance qu'une paire numérotée est bien
       //    partie. Calculé sur des données déjà en mémoire : 0 requête, 0 octet.
       return { ok: true, items: h.items.filter(isOnlineListing).map(mapWardrobeItem),
                soldIds: h.items.filter(venduChezVinted).map(x => String(x.id)),
+               // Les cartes RETIRÉES de l'écran — pas les annonces en pause ou en
+               // brouillon qu'il a supprimées aussi (elles n'étaient pas affichées).
+               supprimees: (h._vrmRetirees || []).filter(isOnlineListing).length,
                pagination: h.pagination || null, source: 'harvest' };
     }
   }
   // Mode "moisson seulement" : aucun appel Vinted.
   if (opts.harvestOnly) return { ok: true, items: [], pagination: null, source: 'harvest' };
+  // `moissonSeule` (revue 5.165) : relecture sur SIGNAL de l'extension — voir
+  // `fetchVintedOrders`. Ligne absente ou illisible ⇒ on garde ce qu'on montrait.
+  if (opts.moissonSeule) return { ok: false, error: 'moisson-absente', items: [], pagination: null, source: 'moisson-absente' };
   // 2) Repli : proxy. La penderie utilise l'ID DE PROFIL (celui du /member/…),
   //    différent du vinted_user_id (account_id du token) — sinon 0 annonce.
   let profileId = account._vintedProfileId;
@@ -7638,7 +7985,7 @@ function RaisonBordereauxGrises({ ventes }) {
       <Icon name="doc" size={15} style={{ color: C.warn, flexShrink: 0, marginTop: 2 }}/>
       <span style={{ minWidth: 0 }}>
         <b>{n} bordereau{n > 1 ? 'x' : ''} à générer</b> — {r.texte}
-        {r.geste === 'recharger' && (
+        {(r.geste === 'recharger' || r.geste === 'extensions') && (
           <> <button type="button" data-recharger="1" onClick={() => { try { window.location.reload(); } catch (_) {} }}
             style={{ marginLeft: 4, border: `1px solid ${C.accent}`, background: 'transparent', color: C.accent, borderRadius: 8, padding: '3px 9px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Recharger la page</button></>
         )}
@@ -8022,12 +8369,13 @@ function EtatActions({ onNav, ordi, sombre }) {
   const ink = sombre ? '#fff' : C.text, bd = sombre ? '#3A3A3C' : C.border;
 
   // ── Les trois lignes : extension · compte VRM · compte Vinted ──────────────
-  const extKo = ['telephone', 'absente', 'muette', 'retard'].includes(code);
+  const extKo = ['telephone', 'absente', 'muette', 'retard', 'plusieurs'].includes(code);
   const ligneVrmVerif = code === 'vrm-encours';
   const majDispo = !extKo && extSait('_maj') === 'retard';
   const ligneExt = code === 'telephone' ? { s: '—', t: "s'utilise sur l'ordinateur où elle est installée" }
     : code === 'absente' ? { s: 'non', t: 'pas détectée dans ce navigateur' }
     : code === 'muette' ? { s: 'non', t: 'ne répond pas' }
+    : code === 'plusieurs' ? { s: 'non', t: `deux extensions VRM répondent${(__vmrPlusieurs || []).filter((x) => x && x !== '?').length >= 2 ? ' (' + __vmrPlusieurs.join(' et ') + ')' : ''}` }
     // La version à installer est dite UNE fois, sur le bouton juste dessous
     // (revue du 9 octobre : « 5.163.0 » écrit trois fois dans le panneau).
     : code === 'retard' ? { s: 'non', t: `version ${version || '?'} — trop ancienne pour recevoir des commandes de VRM` }
@@ -8051,6 +8399,9 @@ function EtatActions({ onNav, ordi, sombre }) {
   if (code === 'telephone') geste = <span>Ouvre VRM sur l'ordinateur où l'extension est installée pour générer un bordereau, répondre ou publier.</span>;
   else if (code === 'absente' || code === 'retard') geste = <button type="button" data-etat-geste="maj" style={btn} onClick={() => { setOuvert(false); onNav && onNav('settings'); }}>{code === 'absente' ? "Installer l'extension (Réglages)" : `Mettre à jour en ${EXT_ATTENDUE} (Réglages)`}</button>;
   else if (code === 'muette') geste = <button type="button" data-etat-geste="recharger" style={btn} onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button>;
+  // Deux extensions : le geste se fait dans Chrome (une page web ne peut pas
+  // ouvrir chrome://extensions) — on le DIT, puis on recharge.
+  else if (code === 'plusieurs') geste = <span data-etat-geste="extensions">Tape <b>chrome://extensions</b> dans la barre d'adresse, supprime l'ancienne VRM, puis <button type="button" data-etat-geste-recharger="1" style={{ ...btn, padding: '4px 9px', fontSize: 12 }} onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button></span>;
   // Non connectée : son icône ouvre SA fenêtre de connexion (une extension
   // connectée, elle, ouvre VRM) — c'est le repli si la reconnexion automatique
   // n'aboutit pas.
@@ -8097,7 +8448,7 @@ function EtatActions({ onNav, ordi, sombre }) {
           ) : (
             <div style={{ color: C.muted, marginBottom: 8 }}>
               Tout ce qui est déjà dans VRM marche : tes ventes, achats, annonces et messages, les colis à retirer et leurs codes, l'impression des bordereaux déjà reçus.
-              {' '}{code === 'pause' ? st.glob.texte
+              {' '}{code === 'pause' || code === 'plusieurs' ? st.glob.texte
                 : <>Générer un bordereau ou répondre demande l'extension allumée, connectée à ton compte VRM, avec un compte Vinted ouvert dans Chrome ; publier sur Leboncoin demande {extSait('publication') === 'retard' ? 'une extension à jour' : "l'extension allumée"}.</>}
             </div>
           )}
@@ -8466,12 +8817,17 @@ function PrixMarche({ data, baseKO }) {
 // les chiffres sont figés (un colis déjà expédié peut encore apparaître) : on le
 // DIT plutôt que de laisser croire à un défaut. Le geste, jamais la promesse
 // (§7). `jours == null` (âge inconnu / lecture ratée) ⇒ rien : jamais un faux.
+// ⚠️ Revue de la 5.165 (§5 : la phrase qui explique vient de la MÊME source) :
+//    l'âge vient des VENTES captées (`harvest_*_orders_sold`) — la coche le dit
+//    (« Ventes Vinted à jour »), et elle ne s'affiche pas au-dessus de la section
+//    Annonces, où le dressing a sa propre date (`FraicheurAnnonces`) : on y lisait
+//    « ✓ à jour » et, trois lignes plus bas, « annonces lues hier ».
 function FraicheurDonnees({ jours, compte, siAJour = true }) {
   if (jours == null) return null;
   // L'accueil ne dit rien quand tout va bien (« trop de texte », 30 sept.) :
   // seule l'alerte d'une capture ancienne y a sa place.
   if (jours <= 1 && !siAJour) return null;
-  if (jours <= 1) return <div style={{fontSize:11.5,color:C.muted}}>✓ Données Vinted à jour (capturées {jours<1?"aujourd'hui":'hier'}).</div>;
+  if (jours <= 1) return <div data-fraicheur-ventes="" style={{fontSize:11.5,color:C.muted}}>✓ Ventes Vinted à jour (captées {jours<1?"aujourd'hui":'hier'}).</div>;
   return (
     <div style={{fontSize:12,color:C.warn,background:`${C.warn}12`,border:`1px solid ${C.warn}55`,borderRadius:10,padding:'9px 12px',lineHeight:1.5}}>
       {compte
@@ -8506,7 +8862,7 @@ function PlatSubNav({ sub, setSub, sections, dark }) {
 // « il n'y a pas direct les ventes et les achats »). Plus d'écran « Aperçu » à
 // traverser : les chiffres qui comptent (CA, argent) restent sous les yeux, et
 // la liste (ventes par défaut) est juste en dessous. Consomme liveStats (§11).
-function VintedResume({ liveStats, baseKO }) {
+function VintedResume({ liveStats, baseKO, siAJour = true }) {
   // ⚠️ §7 : pendant une panne, le résumé NE répète PAS la ligne « Je n'ai pas pu
   //    lire » — le bloc de la coque la dit déjà, et la liste en dessous
   //    (Comptabilite) porte la sienne. Deux lignes ici = « la panne dite trois
@@ -8526,7 +8882,7 @@ function VintedResume({ liveStats, baseKO }) {
         <div style={box}><div style={eti}>Disponible</div><div className="vrm-display" style={{fontSize:20,fontWeight:700,color:C.text}}>{dispo==null?'—':fmt(dispo)}</div></div>
         <div style={box}><div style={eti}>En attente</div><div className="vrm-display" style={{fontSize:20,fontWeight:700,color:C.muted}}>{att==null?'—':fmt(att)}</div></div>
       </div>
-      <FraicheurDonnees jours={dAge} compte={liveStats && liveStats.dataAgeCompte}/>
+      <FraicheurDonnees jours={dAge} compte={liveStats && liveStats.dataAgeCompte} siAJour={siAJour}/>
     </div>
   );
 }
@@ -12309,6 +12665,9 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
               </button>
             ))}
           </div>
+          {/* 5.165 : « Annonces en ligne » dit de quand date sa lecture — la même
+              phrase que l'écran Annonces (`FraicheurAnnonces`, §11). */}
+          <FraicheurAnnonces attr="data-dash-fraicheur" lues={liveStats.annLues} enLigne={liveStats.annEnLigne} noms={liveStats.annNoms} supprimees={liveStats.annSuppr} activite={liveStats.annActivite} style={{marginTop:8,marginBottom:0}}/>
         </div>
       )}
 
@@ -20691,6 +21050,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return tout;
   };
   const [listings, setListings] = useState({ loading:false, items:null });
+  // La liste AFFICHÉE, lue par une relecture sur signal (`loadListings`) : la
+  // fermeture de l'écouteur ne voit que l'état de son montage.
+  const listingsRef = useRef(listings); listingsRef.current = listings;
+  const signalPendantLecture = useRef(false);
   const [convs, setConvs] = useState({ loading:false, items:null });
   const [openConv, setOpenConv] = useState(null);
   const [replyText, setReplyText] = useState('');
@@ -22239,7 +22602,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // d'aujourd'hui (`comptes`) : un compte ajouté depuis serait « lu · 0 », un
   // compte retiré resterait compté.
   const entreeCache = (key) => { const c=_acctCache[key]; return (c && c.v===_CACHE_V && Array.isArray(c.items) && Date.now()-c.ts<_CACHE_TTL && c.comptes===cleComptes) ? c : null; };
-  const putCache = (key, items, echecs, comptes) => { _acctCache[key] = { ts:Date.now(), v:_CACHE_V, comptes, items, failed:(echecs&&echecs.failed)||[], failedUids:(echecs&&echecs.failedUids)||[] }; _persistAcctCache(); };
+  const putCache = (key, items, echecs, comptes, extra) => { _acctCache[key] = { ...(extra||{}), ts:Date.now(), v:_CACHE_V, comptes, items, failed:(echecs&&echecs.failed)||[], failedUids:(echecs&&echecs.failedUids)||[] }; _persistAcctCache(); };
 
   // ── RELIRE SANS FAIRE CLIGNOTER (4 octobre) ──────────────────────────────
   // Chaque signal de l'extension (« ventes rangées », toutes les 90 s quand il
@@ -22492,24 +22855,61 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   //    Un numéro ne change JAMAIS tout seul (§5). Ne pas les remettre.
 
 
-  const loadListings = async (force) => {
+  // `surSignal` (revue 5.165) : relecture déclenchée par l'EXTENSION (« maj ·
+  // annonces ») — `Set` des comptes signalés, ou `null` pour tous. On ne lit QUE
+  // la moisson (`moissonSeule`, jamais le relais serveur), seulement les comptes
+  // signalés, et un compte sans ligne garde ce qu'on montrait. Rien d'affiché
+  // encore : rien à relire (l'ouverture de l'écran lira la moisson fraîche).
+  const loadListings = async (force, silencieux, surSignal) => {
     // Le cache garde aussi les comptes qui n'ont pas répondu : relue du cache,
     // une liste partielle reste `incomplet` (jamais présentée comme complète).
     // Complète, elle ne dit pas `false` : la publication des paires qui dorment
     // n'accepte qu'une lecture FRAÎCHE (voir plus haut).
     const demandes = cleComptesVinted(accounts);
-    const cached = !force && entreeCache('listings');
-    if (cached) { setListings({ loading:false, items:cached.items, comptes:cached.comptes, ...(cached.failedUids.length ? { incomplet: true } : {}) }); return; }
-    setListings({ loading:true, items:null, error:false });
+    const parSignal = surSignal !== undefined;
+    const avant = listingsRef.current;
+    if (parSignal && !(avant && Array.isArray(avant.items) && avant.comptes === demandes)) {
+      // Une lecture d'ouverture est EN COURS : elle a pu lire le dressing avant
+      // la suppression — on relira juste après elle.
+      if (avant && avant.loading) signalPendantLecture.current = true;
+      return;
+    }
+    const cached = !force && !parSignal && entreeCache('listings');
+    if (cached) { setListings({ loading:false, items:cached.items, comptes:cached.comptes, lues:cached.lues||{}, supprimees:cached.supprimees||{}, ko:cached.failedUids, ...(cached.failedUids.length ? { incomplet: true } : {}) }); return; }
+    // `silencieux` (5.165, relecture sur signal de l'extension) : on garde ce qui
+    // est affiché pendant la lecture, et un échec ne remplace rien.
+    if (!silencieux && !parSignal) setListings({ loading:true, items:null, error:false });
     const out = []; let anyOk=false, anyErr=false; const failedUids=[];
     // PARALLÈLE (voir loadOrders) : tous les comptes en même temps.
-    const results = await Promise.all(accounts.map(async acc => { const r = await fetchVintedListings(acc, 1, { force }); noteAcctLive(acc.vinted_user_id, r, force); return { acc, r }; }));
+    const results = await Promise.all(accounts.map(async acc => {
+      const uid = String(acc.vinted_user_id);
+      if (parSignal && surSignal && !surSignal.has(uid)) return { acc, r: null };      // pas signalé : on garde
+      const r = await fetchVintedListings(acc, 1, parSignal ? { moissonSeule: true } : { force });
+      if (parSignal && !r.ok) return { acc, r: null };                                   // pas de ligne : on garde
+      noteAcctLive(acc.vinted_user_id, r, force); return { acc, r };
+    }));
     const vendues = new Set();
+    // 5.165 : DE QUAND date la lecture du dressing de chaque compte, et combien
+    // d'annonces supprimées depuis en ont été retirées — pour le DIRE (une fois,
+    // au-dessus de la grille). Gardés dans le cache : un rechargement ne doit pas
+    // faire passer une lecture d'hier pour celle d'aujourd'hui.
+    const lues = {}, supprimees = {};
     for (const { acc, r } of results) {
-      if (r.ok) { anyOk=true; r.items.forEach(it => out.push({ ...it, _acc:acc })); (r.soldIds || []).forEach(id => vendues.add(String(id))); }
-      else { anyErr=true; failedUids.push(String(acc.vinted_user_id)); }
+      const uid = String(acc.vinted_user_id);
+      if (r === null) {                                    // relecture sur signal : ce compte garde ce qu'on montrait
+        (avant.items || []).forEach(it => { if (String(it._acc && it._acc.vinted_user_id) === uid) { out.push(it); anyOk = true; } });
+        if (avant.lues && avant.lues[uid]) lues[uid] = avant.lues[uid];
+        if (avant.supprimees && avant.supprimees[uid]) supprimees[uid] = avant.supprimees[uid];
+        if ((avant.ko || []).includes(uid)) { anyErr = true; failedUids.push(uid); }
+        continue;
+      }
+      if (r.ok) { anyOk=true; r.items.forEach(it => out.push({ ...it, _acc:acc })); (r.soldIds || []).forEach(id => vendues.add(String(id)));
+        if (r.source === 'harvest' && _harvestSeen[`${uid}_listings`]) lues[uid] = _harvestSeen[`${uid}_listings`];
+        if (r.supprimees) supprimees[uid] = r.supprimees; }
+      else { anyErr=true; failedUids.push(uid); }
     }
     const error = out.length===0 && anyErr && !anyOk;
+    if (silencieux && !parSignal && (error || anyErr)) return;          // relecture ratée : on garde l'affichage
     // Complète la longueur de description pour les annonces captées AVANT que
     // l'extension ne la pose (elle ne coûte qu'une lecture, mise en cache).
     try {
@@ -22522,12 +22922,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if (info.ph) it.captPhotos = info.ph;
       }
     } catch (_) { /* sans ce complément, le critère reste simplement inconnu */ }
-    if (!error) putCache('listings', out, { failedUids }, demandes);
-    // Annonces que VINTED a marquées vendues (identité, jamais un titre).
-    if (vendues.size) setVenduesVinted(vendues);
+    if (!error) putCache('listings', out, { failedUids }, demandes, { lues, supprimees });
+    // Annonces que VINTED a marquées vendues (identité, jamais un titre). Sur
+    // signal, seuls quelques comptes sont relus : on AJOUTE, on n'efface rien.
+    if (vendues.size) setVenduesVinted(parSignal ? (p) => new Set([...p, ...vendues]) : vendues);
     // `incomplet` : au moins un compte n'a pas répondu. Les chiffres tirés de
     // cette liste sont alors des minorants (le bilan de la semaine le dit).
-    setListings({ loading:false, items: out, error, incomplet: anyErr, comptes: demandes });
+    setListings({ loading:false, items: out, error, incomplet: anyErr, comptes: demandes, lues, supprimees, ko: failedUids });
+    if (!parSignal && signalPendantLecture.current) { signalPendantLecture.current = false; setTimeout(() => loadListings(false, true, null), 200); }
   };
   const loadConvs = async (force) => {
     const demandes = cleComptesVinted(accounts);
@@ -22804,7 +23206,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       }
       // Un code de retrait lu dans une conversation (5.155) : on relit la ligne.
       else if (ev.quoi === 'retrait') relireColisRelais();
+      // 5.165 : une annonce SUPPRIMÉE sur Vinted (ou le dressing relu) — on
+      // oublie la lecture d'avant et l'écran qui les montre se relit, sans squelette.
+      // ⚠️ Revue 5.165 : la MOISSON seulement, regroupée (`signalAnnonces`) —
+      //    jamais le relais serveur sur un signal.
+      else if (ev.quoi === 'annonces') {
+        oublierDressing(ev.uid);
+        try { delete _acctCache.listings; _persistAcctCache(); } catch (_) {}
+        if (['annonces', 'journee', 'bordereaux'].includes(curSub)) signalAnnonces(ev.uid);
+      }
     };
+    const signalAnnonces = regrouperSignaux((uids) => loadListings(false, true, uids));
     window.addEventListener('vrm:ext', ecoute);
     if (ecrans.includes(curSub) && ventesPerimees.current) relire();
     const vus = vusSonde.current;
@@ -22831,7 +23243,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     demander();
     sonde();
     const t = setInterval(sonde, 60000);
-    return () => { window.removeEventListener('vrm:ext', ecoute); document.removeEventListener('visibilitychange', onVis); clearInterval(t); };
+    return () => { window.removeEventListener('vrm:ext', ecoute); document.removeEventListener('visibilitychange', onVis); clearInterval(t); signalAnnonces.arreter(); };
   /* eslint-disable-next-line */ }, [curSub, cleComptes]);
   // ── COLIS ↔ ACHAT : rapprochement UNIQUE ou RIEN ──────────────────────────
   // Un email de suivi ne porte que le titre de l'article : il n'y a pas d'autre
@@ -27336,8 +27748,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           if (uids.length < 2 && !uids.some(u=>hiddenAccts.has(u))) return null; // un seul compte : rien à dire
           const nOff = uids.filter(u => acctOff(u)).length;
           const refuses = uids.filter(u => blockedAccts.has(u) && !acctOff(u));
-          const vieux = uids.filter(u => { const ms = harvestAgeMs(u, 'listings'); return ms != null && ms >= 7*86400000 && !hiddenAccts.has(u) && !blockedAccts.has(u); });
-          const nVieux = vieux.reduce((t,u)=>t+(visibles[u]||0), 0);
           const accByUid = {}; accounts.forEach(a=>{ accByUid[String(a.vinted_user_id)] = a; });
           const nom = (u) => { const a = accByUid[u]; return a ? accNameOf(a) : `#${u}`; };
           return (
@@ -27346,7 +27756,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 Annonces de <b style={{color:C.text}}>{uids.length - nOff} compte{uids.length - nOff>1?'s':''}</b>
                 {nOff>0 && <> · {nOff} masqué{nOff>1?'s':''}</>}
                 {refuses.length>0 && <> · <b style={{color:C.warn}}>connexion refusée : {refuses.map(nom).join(', ')}</b></>}
-                {nVieux>0 && <> · <b style={{color:C.warn}}>{nVieux} annonce{nVieux>1?'s':''}</b> de {vieux.length>1?`${vieux.length} comptes`:nom(vieux[0])} pas rafraîchie{nVieux>1?'s':''} depuis une semaine — connecte-toi dessus sur vinted.fr et ouvre ton dressing</>}
               </span>
               <button type="button" onClick={()=>onNav && onNav('vintedaccounts')}
                 style={{border:'none',background:'transparent',padding:0,color:C.accent,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
@@ -27354,6 +27763,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </button>
             </div>
           );
+        })()}
+        {/* 5.165 — DE QUAND DATE CE QU'ON VOIT, et les annonces SUPPRIMÉES depuis.
+            Une fois, au-dessus de la grille (§7) ; la règle et la phrase sont
+            celles du tableau de bord (`FraicheurAnnonces`, §11). Remplace le
+            « pas rafraîchie depuis une semaine » de la ligne des comptes. */}
+        {listings.items && (()=>{
+          const enLigne = {};
+          for (const it of annBase) { const u = String(it._acc?.vinted_user_id || ''); if (u) enLigne[u] = (enLigne[u]||0)+1; }
+          for (const u of Object.keys(listings.supprimees || {})) if (!acctOff(u) && !(u in enLigne)) enLigne[u] = 0;
+          const noms = {}; accounts.forEach(a => { noms[String(a.vinted_user_id)] = accNameOf(a); });
+          return <FraicheurAnnonces lues={listings.lues} enLigne={enLigne} noms={noms} supprimees={listings.supprimees} activite={liveStats && liveStats.annActivite}/>;
         })()}
         {listings.loading && <Skeleton variant="card" count={6}/>}
         {listings.error && <LoadError onRetry={()=>loadListings(true)}/>}
@@ -29838,10 +30258,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   const tx = openConv.conversation && openConv.conversation.transaction && openConv.conversation.transaction.id;
                   if (!off && !tx) return null;
                   const etat = extSait('messagerie');
-                  if (etat !== 'ok') return (
+                  if (etat !== 'ok' || __vmrPlusieurs) return (
                     <div data-offre="indisponible" style={{fontSize:11.5,color:C.muted,marginBottom:8,lineHeight:1.4}}>
                       {off ? <><b style={{color:C.text}}>Offre de {fmtE(off.prix)}</b> en attente — </> : null}
-                      {etat==='retard' ? `mets l'extension à jour (${EXT_CAPACITES.messagerie}) pour trancher ou faire une offre d'ici.` : "les offres se font depuis le Chrome où l'extension est installée."}
+                      {__vmrPlusieurs ? textePlusieurs() : etat==='retard' ? `mets l'extension à jour (${EXT_CAPACITES.messagerie}) pour trancher ou faire une offre d'ici.` : "les offres se font depuis le Chrome où l'extension est installée."}
                       {' '}<a href={`https://www.vinted.fr/inbox/${openConv.convId}`} target="_blank" rel="noreferrer" style={{color:C.accent,fontWeight:600}}>Ouvrir sur Vinted</a>
                     </div>
                   );
@@ -31139,7 +31559,9 @@ function LeboncoinScreen() {
     ((blkRows && blkRows[0] && blkRows[0].data && blkRows[0].data.uids) || []).forEach((u) => offAcc.add(String(u)));
     const lost = main.vinted_pairs_lost || {};
     const listRowsBrut = await sbGet('app_data?id=like.harvest_*_listings&select=id,data');
-    const listRows = listRowsBrut || [];
+    // 5.165 : sans les annonces qu'il vient de SUPPRIMER sur Vinted — la même
+    // règle que l'écran Annonces et que la file de l'extension (§11).
+    const listRows = retirerSupprimeesLignes(listRowsBrut || [], await lireSupprimeesTous());
     // Les photos HD et la description ne viennent QUE de la page de l'annonce :
     // mesuré le 12 septembre, l'API Vinted ne renvoie aucune photo (0 sur 57
     // lignes `harvest_*_item_*`, captures jusqu'au 9 septembre). Sans cette
@@ -34558,7 +34980,7 @@ function AppCoeur() {
   useEffect(()=>{ if(!gsOpen || gsData) return; (async()=>{
     const sb=async(q)=>{ try{ const r=await fetch(`${SUPABASE_URL}/rest/v1/${q}`,{headers:sbAuth()}); return r.ok?await r.json():null; }catch(_){ return null; } };
     const online=new Set(); const sold=[]; const bought=[]; const lbc=new Set();
-    const lst=await sb('app_data?id=like.harvest_*_listings&select=data')||[];
+    const lst=retirerSupprimeesLignes(await sb('app_data?id=like.harvest_*_listings&select=data')||[], await lireSupprimeesTous());   // 5.165 : sans les supprimées
     for(const r of lst){ const p=(r.data&&r.data.payload)||{}; for(const it of (p.items||[])){ if(!it.is_closed&&!it.is_hidden&&!it.is_draft) online.add(String(it.id)); } }
     const so=await sb('app_data?id=like.harvest_*_orders_sold&select=data')||[];
     const seenS=new Set(); for(const r of so){ const p=(r.data&&r.data.payload)||{}; for(const o of (p.my_orders||[])){ const t=String(o.transaction_id||o.id||''); if(t&&!seenS.has(t)){ seenS.add(t); sold.push(o); } } }
@@ -34771,7 +35193,7 @@ function AppCoeur() {
     for(const r of so){ const p=(r.data&&r.data.payload)||{}; for(const o of (p.my_orders||[])){
       const t=String(o.transaction_id||o.id||''); if(t&&seen.has(t)) continue; if(t) seen.add(t);
       if(/finalis/i.test(o.status||'')) sold.push(o); } }
-    const lst=await sb('app_data?id=like.harvest_*_listings&select=data')||[];
+    const lst=retirerSupprimeesLignes(await sb('app_data?id=like.harvest_*_listings&select=data')||[], await lireSupprimeesTous());   // 5.165 : sans les supprimées
     const online=[]; for(const r of lst){ const p=(r.data&&r.data.payload)||{};
       for(const it of (p.items||[])){ if(!it.is_closed&&!it.is_hidden&&!it.is_draft) online.push(it); } }
     const g = grouperPrixMarche(sold, online);
@@ -35070,6 +35492,31 @@ function AppCoeur() {
   // réglages SYNCHRONISÉS, pas des réglages d'appareil (§5.49).
   const [nuagePret, setNuagePret] = useState(() => isCloudReady());
   useEffect(() => onCloudReady(() => setNuagePret(true)), []);
+  // 5.165 : une annonce SUPPRIMÉE sur Vinted (ou un dressing relu) — le tableau
+  // de bord recompte, comme l'écran Annonces (la même règle, §11).
+  // ⚠️⚠️ Revue de la 5.165 : ce signal relançait TOUT le calcul — ventes, annonces
+  //    et boîte de TOUS les comptes — et, pour un compte lié sans ligne moissonnée,
+  //    chaque lecture partait au relais serveur (Vinted lu depuis l'IP de Vercel,
+  //    ~4 fois par suppression). Maintenant : les signaux se regroupent
+  //    (`regrouperSignaux`), on ne relit que les ANNONCES des comptes signalés,
+  //    dans la moisson seulement ; les ventes et la boîte de la dernière lecture
+  //    complète sont reprises telles quelles. Un compte sans ligne garde ce qu'on
+  //    montrait. Aucune requête Vinted sur un signal.
+  const [annoncesTick, setAnnoncesTick] = useState(0);
+  const perAccRef = useRef(null);            // { cle, perAcc } : la dernière lecture complète
+  const comptesSignales = useRef(null);      // Set des comptes signalés, 'tous', ou null
+  useEffect(() => {
+    const relire = (uids) => {
+      const cur = comptesSignales.current;
+      comptesSignales.current = (!uids || cur === 'tous') ? 'tous' : new Set([...(cur || []), ...uids]);
+      // Le premier calcul n'est pas fini : il relancera lui-même à sa fin.
+      if (perAccRef.current) setAnnoncesTick((t) => t + 1);
+    };
+    const signal = regrouperSignaux(relire);
+    const f = (e) => { const d = e && e.detail; if (d && d.type === 'maj' && d.quoi === 'annonces') { oublierDressing(d.uid); signal(d.uid); } };
+    window.addEventListener('vrm:ext', f);
+    return () => { window.removeEventListener('vrm:ext', f); signal.arreter(); };
+  }, []);
   useEffect(()=>{
     if(!accountsLoaded || !vintedAccounts || vintedAccounts.length===0) return;
     if(!nuagePret) return;              // sinon on compte des comptes qu'il a exclus
@@ -35138,7 +35585,19 @@ function AppCoeur() {
       //    dans « vendu » (`ventesFaites`, la règle de Ma journée) : un compte que
       //    Vinted a refusé a quand même vendu. Seuls les comptes que Julien a
       //    écartés (`compteEcarte`) en sortent — comme sur l'écran Ventes.
-      const perAcc=await Promise.all(vintedAccounts.map(async a=>{
+      // Revue 5.165 : sur un SIGNAL de l'extension (voir `comptesSignales`), on ne
+      // relit que les annonces des comptes signalés, dans la moisson.
+      const cleCalc=cleComptesVinted(vintedAccounts)+'|'+[...blockedS].sort().join(',')+'|'+[...hiddenS].sort().join(',');
+      const sig=comptesSignales.current; comptesSignales.current=null;
+      const prec=perAccRef.current;
+      const perAcc=(sig && prec && prec.cle===cleCalc)
+        ? await Promise.all(prec.perAcc.map(async p=>{
+            if(!p.actif) return p;
+            if(sig!=='tous' && !sig.has(String(p.a.vinted_user_id))) return p;
+            const list=await fetchVintedListings(p.a,1,{ moissonSeule:true });
+            return list.ok ? { ...p, list } : p;
+          }))
+        : await Promise.all(vintedAccounts.map(async a=>{
         const actif=!skipAcc(a.vinted_user_id);
         const [sold,list,conv]=await Promise.all([
           fetchVintedOrders(a,'sold',1,'all'),
@@ -35147,6 +35606,11 @@ function AppCoeur() {
         ]);
         return { a, sold, list, conv, actif };
       }));
+      if(stop) { if(sig) comptesSignales.current = sig === 'tous' || comptesSignales.current === 'tous' ? 'tous' : new Set([...sig, ...(comptesSignales.current || [])]); return; }
+      perAccRef.current={ cle:cleCalc, perAcc };
+      // Un signal arrivé PENDANT ce calcul : il a pu lire avant la suppression.
+      if(comptesSignales.current) setAnnoncesTick(t=>t+1);
+      const annLues={}, annEnLigne={}, annSuppr={}, annNoms={}, annActivite={};
       const ventesToutes=[]; let ventesLues=false; const vusTx=new Set();
       for(const { a, sold } of perAcc){
         if(!sold.ok) continue; ventesLues=true;
@@ -35184,12 +35648,23 @@ function AppCoeur() {
         // arrivaient APRÈS le premier rendu, et les deux écrans annonçaient
         // deux nombres (64 et 63, mesuré).
         if(list.ok){ ok=true;
+          const uidL=String(a.vinted_user_id); let nL=0;
           for(const it of list.items){
             const id=String(it.id);
             if(soldIds.has(id)) continue;
-            online++;
+            online++; nL++;
             const bp=numeros[it.id]?.buyPrice; if(bp!=null&&bp!=='') stockValue+=Number(bp)||0;
-          } }
+          }
+          // 5.165 : de quand date ce qu'on compte, et ce qui a été retiré parce
+          // que supprimé depuis — la MÊME phrase que l'écran Annonces (§11).
+          annEnLigne[uidL]=nL;
+          if(list.source==='harvest' && _harvestSeen[`${uidL}_listings`]) annLues[uidL]=_harvestSeen[`${uidL}_listings`];
+          // Revue 5.165 : l'heure de ses VENTES captées — vu actif après la lecture
+          // du dressing, le compte est nommé (`dressingsAnciens`).
+          if(_harvestSeen[`${uidL}_orders_sold`]) annActivite[uidL]=_harvestSeen[`${uidL}_orders_sold`];
+          if(list.supprimees) annSuppr[uidL]=list.supprimees;
+          annNoms[uidL]=(load('vinted_account_labels',{})||{})[uidL]||a.login||`#${uidL}`;
+        }
         if(conv.ok){ ok=true; unread+=conv.items.filter(c=>c.unread).length; }
       }
       // Paires en stock = nb de numéros réellement étiquetés dans le garage (3D).
@@ -35253,6 +35728,7 @@ function AppCoeur() {
       }catch(_){/* pas su ⇒ null ⇒ rien d'affiché */}
       if(!stop && ok){
       setLiveStats({caMois,caEncaisse,enCours,online,unread,stockValue,pairesStock,ventesJour,caJour,ventesMois,soldTotal,joursVente:joursVenteSet.size,caParCompte,caParMois,ventesParMois,dataAgeJours,dataAgeCompte,
+        annLues,annEnLigne,annSuppr,annNoms,annActivite,
         walletDispo:(walletEsc&&walletEsc.accounts>0)?walletEsc.dispo:null,
         walletAttente:(walletEsc&&walletEsc.accounts>0)?walletEsc.total:null,
         walletComptes:(walletEsc&&walletEsc.accounts)||0,
@@ -35266,7 +35742,7 @@ function AppCoeur() {
     })();
     return ()=>{stop=true;};
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[accountsLoaded, vintedAccounts, nuagePret]);
+  },[accountsLoaded, vintedAccounts, nuagePret, annoncesTick]);
 
   // ── « VENDU » : UNE RÈGLE, CELLE DE MA JOURNÉE (§11, 4 octobre) ────────────
   // L'accueil (« Aujourd'hui »), Statistiques (« Vendu ce mois », la courbe) et
@@ -36271,7 +36747,7 @@ function AppCoeur() {
           {/* Résumé CA/argent TOUJOURS visible en haut, puis la liste (ventes par
               défaut) directement — plus d'écran « Aperçu » intermédiaire. Les
               sections restent les mêmes écrans (§11), juste à un tap. */}
-          <VintedResume liveStats={liveStatsVus} baseKO={baseKO}/>
+          <VintedResume liveStats={liveStatsVus} baseKO={baseKO} siAJour={platSub!=='annonces'}/>
           {/* ⚠️ 4 octobre — Julien : « dans Vinted […] il y ait les messages ».
               L'écran complet existait (liste tous comptes, fil, réponse, offres)
               mais n'avait plus AUCUNE porte dans Vinted : seulement la cloche. */}

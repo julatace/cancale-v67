@@ -13,6 +13,9 @@
 //
 // Rien n'est envoye a Vinted par l'extension : elle ne parle qu'a Supabase.
 
+// La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
+// dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
+const CODE_VERSION = '5.166.0';
 const SUPABASE_URL = 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ';
 
@@ -539,7 +542,13 @@ async function supabaseUpsert(table, rows, onConflict) {
       const s2 = await renouvelerUneFois();
       if (s2 && s2.access_token) res = await envoyer();
     }
-    if (res.ok) return true;
+    if (res.ok) {
+      // La base a pris une ligne de CAPTURE : elle répond — le recul tombe
+      // (`effacerReculBase`). Jamais sur une ligne de diagnostic ou de réglage,
+      // qui peut passer quand les captures, elles, sont refusées.
+      if (table === 'app_data' && list.some((r) => r && RE_LIGNE_CAPTURE.test(String(r.id || '')))) await effacerReculBase();
+      return true;
+    }
     statut = String(res.status || 'inconnu');
   } catch (_) { statut = 'reseau'; }
   // ⚠️ JAMAIS `await` ici : `viderTampon` écrit lui-même par `supabaseUpsert`
@@ -782,9 +791,16 @@ async function viderTampon(buf) {
   // iPhone ce qu'un Chrome sait faire, c'est-à-dire le défaut le plus coûteux
   // du projet. `audit-coherence.cjs` l'interdit.
   const ver = (() => { try { return String(chrome.runtime.getManifest().version || ''); } catch (_) { return ''; } })();
+  // ⚠️ 5.165 : la version ÉCRITE DANS LE CODE, à côté de celle du manifeste.
+  //    Mesuré le 9 octobre : des sessions qui écrivaient `ver = 5.164.0`
+  //    envoyaient des requêtes que seul un `background.js` d'avant la 5.134
+  //    sait former. Copie partielle (manifeste neuf, code ancien) ou deux
+  //    extensions sous la même session ? On n'a pas pu trancher. Les deux
+  //    nombres côte à côte le diront la prochaine fois (`audit-extension-zip`
+  //    exige qu'ils soient égaux dans le zip livré).
   const okDiag = await supabaseUpsert('app_data', [{ id: 'panel_diag_capture', data: {
     ...tout, n, rates: { ...(tout.rates || {}), ...(buf.rates || {}) }, majAt: new Date().toISOString(),
-    ...(ver ? { ver, verAt: new Date().toISOString() } : {}),
+    ...(ver ? { ver, verAt: new Date().toISOString() } : {}), verCode: CODE_VERSION,
   } }], 'id');
   // ⚠️ LE TITRE DE CETTE FONCTION LE DISAIT, LE CODE NE LE FAISAIT PAS : le
   //    tampon était vidé même quand l'écriture avait échoué — les compteurs d'un
@@ -854,18 +870,58 @@ const CHAMPS_CRITIQUES = {
   orders_purchased: ['transaction_id', 'title'],
   inbox:            ['id'],
 };
+// ⚠️⚠️ 5.165 — « LISTE COMPLÈTE DEVENUE PLUS COURTE » N'EST PAS « PAGE PARTIELLE ».
+//    Julien, 9 octobre : « je viens de supprimer beaucoup de paires et elles
+//    sont encore marquées dans les annonces ». Une annonce SUPPRIMÉE disparaît
+//    du dressing (mesuré : 10010415608 d'angeled92, absente de la lecture
+//    suivante) — et un compte dont il supprime TOUT rend `items: []`,
+//    `total_entries: 0`. `listePlusRiche` (total > 0 exigé) et `plein()`
+//    refusaient ce vide POUR TOUJOURS : le compte restait figé sur ses
+//    anciennes annonces, toutes affichées « en ligne » (prouvé au banc).
+//    Ce qui sépare une liste complète d'une page partielle, c'est ce que la
+//    moisson ACTIVE sait et qu'une page captée en passant ignore : elle a lu
+//    TOUTES les pages, sans un échec, jusqu'à la dernière que Vinted annonce
+//    (`opts.complet`). Elle fait alors foi — y compris vide —
+//      · si Vinted donne un total, il doit être ATTEINT (sinon sa pagination se
+//        contredit : 96 articles lus pour 150 annoncés, c'est une page qui
+//        manque, et §4.2 reste vrai) ;
+//      · sans total, une liste VIDE n'est jamais une preuve (§4.1).
+//    ⚠️ La capture PASSIVE (`storeHarvest`) n'a jamais `complet` : une page 1
+//    de 20 annonces n'écrase toujours pas un dressing de 61.
+function dressingCompletFaitFoi(parsed, opts) {
+  if (!(opts && opts.complet === true)) return false;
+  const items = parsed && Array.isArray(parsed.items) ? parsed.items : null;
+  if (!items) return false;
+  const pg = parsed.pagination || {};
+  const total = Number(pg.total_entries);
+  if (pg.total_entries != null && pg.total_entries !== '' && isFinite(total)) return items.length >= total;
+  return items.length > 0;
+}
+// ⚠️⚠️ REVUE DE LA 5.165 — « PAS SU » NE VAUT PAS « ON ÉCRIT » (§4.1, §4.2).
+//    La lecture du compteur ratée (522, réseau, une réponse qui n'est pas un
+//    tableau) rendait `true` : « on ne sait pas → on écrit ». Prouvé au banc
+//    (lecture KO, écriture OK — le cas qui détruit) : la page 1 du dressing,
+//    20 annonces sur 61, ÉCRASAIT la liste complète, et depuis la 5.165 avec un
+//    `capturedAt` rajeuni — la liste tronquée se présentait comme fraîche et
+//    complète. Trois états désormais : `true` on écrit · `false` plus pauvre ·
+//    `null` PAS SU (on n'écrit pas ; l'appelant le compte à part). On n'écrit
+//    sans comparer que sur une capture complète, ou quand la base dit qu'il n'y
+//    a pas encore de ligne (ou une ligne sans compteur).
 async function listePlusRiche(rowId, parsed, cle) {
   const n = ((parsed && parsed[cle]) || []).length;
   const total = Number(parsed && parsed.pagination && parsed.pagination.total_entries);
   if (isFinite(total) && total > 0 && n >= total) return true;   // capture complète : fait foi
+  const passu = () => { noterDiag('ignore_partiel_lecture_ratee'); return null; };
   try {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${rowId}&select=n:data->>nItems`, { headers: await sbHeaders() });
-    if (!r.ok) return true;                       // on ne sait pas → on écrit
+    if (!r.ok) return passu();                    // pas su : on n'écrase rien
     const j = await r.json();
+    if (!Array.isArray(j)) return passu();        // un 522 Cloudflare rend du HTML
+    if (!j.length) return true;                   // aucune ligne encore : on écrit
     const avant = Number(j[0] && j[0].n);
-    if (!isFinite(avant)) return true;            // ancienne ligne sans compteur → on écrit
+    if (j[0].n == null || !isFinite(avant)) return true;   // ancienne ligne sans compteur → on écrit
     return n >= avant;                            // jamais plus pauvre qu'avant
-  } catch (_) { return true; }
+  } catch (_) { return passu(); }
 }
 
 // ══ LA BOÎTE DE RÉCEPTION SE FUSIONNE, ELLE NE SE COMPTE PAS (5.162) ═══════
@@ -1075,6 +1131,20 @@ async function storeHarvest(domain, type, id, body) {
   verifFormeListe(type, parsed, id);
   verifFormeObjet(type, parsed, id);   // transaction/conversation : un champ lu renommé
 
+  // ⚠️⚠️ 5.165 — LE DRESSING D'UN AUTRE MEMBRE N'EST JAMAIS LE SIEN (§5).
+  //    `/wardrobe/{id}/items` passe par ici quel que soit `{id}` : ouvrir le
+  //    dressing d'un vendeur concurrent (ou d'un acheteur) rangeait SES annonces
+  //    sous le compte du cookie — prouvé au banc (`audit-moisson-dressing`,
+  //    15 annonces d'un inconnu dans `harvest_A_listings`). On ne range que le
+  //    dressing dont l'id est le PROFIL du compte connecté. Profil pas lu ou
+  //    pas encore rangé : on ne range pas (un dressing manqué se rattrape à la
+  //    visite suivante ; le dressing d'un autre affiché comme le sien, non).
+  if (type === 'listings') {
+    const pid = await profilIdRange(uid);
+    if (pid === null) { noterDiag('ignore_dressing_profil_pas_lu'); return; }
+    if (!pid || id == null || String(id) !== pid) { noterDiag('ignore_dressing_autre_membre'); return; }
+  }
+
   // Cle de ligne app_data selon le type de donnee.
   let rowId;
   if (type === 'conversation' && id) rowId = `harvest_${uid}_conv_${id}`;
@@ -1119,9 +1189,10 @@ async function storeHarvest(domain, type, id, body) {
     const f = await inboxFusionnee(rowId, parsed);
     if (f === null) { noterDiag('inbox_lecture_ratee'); return; }   // pas su : on n'écrase rien
     parsed = f;
-  } else if (CLE_LISTE[type] && !(await listePlusRiche(rowId, parsed, CLE_LISTE[type]))) {
-    noterDiag(`ignore_partiel_${type}`);
-    return;
+  } else if (CLE_LISTE[type]) {
+    const riche = await listePlusRiche(rowId, parsed, CLE_LISTE[type]);
+    if (riche === null) return;                   // compteur illisible : pas su, on n'écrase rien (déjà noté)
+    if (!riche) { noterDiag(`ignore_partiel_${type}`); return; }
   }
   // ⚠️ MÊME PIÈGE QUE LE DRESSING, SUR LE PORTE-MONNAIE. Le motif « billing » de
   // `inject.js` attrape aussi des réponses de tarification : l'une d'elles
@@ -1160,6 +1231,9 @@ async function storeHarvest(domain, type, id, body) {
   // suivante. Seulement si l'écriture a ABOUTI : prévenir sur un échec ferait
   // relire une ligne qui n'a pas bougé.
   if (ecrit !== false && type === 'orders_purchased') notifierApp({ type: 'maj', quoi: 'achats', uid: String(uid) });
+  // 5.165 : un dressing RANGÉ fait foi sur les suppressions d'avant (règle
+  // `supprimeeApres`) et rajeunit « annonces lues il y a… » : l'app relit.
+  if (ecrit !== false && type === 'listings') notifierApp({ type: 'maj', quoi: 'annonces', uid: String(uid) });
 
   // Apprentissage passif des codes de statut d'offre (voir noterStatutsOffres).
   if (type === 'conversation') { try { await noterStatutsOffres(parsed); } catch (_) {} }
@@ -1257,10 +1331,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       sendResponse({ ok: true });
       return true;
     }
-    if (msg && msg.from === 'cancale-popup' && msg.action === 'syncNow') {
-      captureAllAccounts().then((r) => { activeFetchAll(); sendResponse({ ok: true, accounts: r }); });
-      return true; // reponse asynchrone
-    }
+    // (5.165 : `syncNow` — sans appelant depuis la 5.130 — est retiré avec
+    //  `activeFetchAll`, le balayage de tous les comptes, voir plus bas.)
     // SESSION DU VENDEUR : relayee par bridge.js depuis l'app connectee.
     // On ne l'accepte QUE d'un onglet de l'app elle-meme (verification de
     // l'origine de l'expediteur) — sinon n'importe quel site pourrait nous
@@ -1565,6 +1637,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     storeWriteReq(domain, msg.method, msg.url, msg.body);
   } else if (msg.kind === 'seen_urls' && Array.isArray(msg.paths)) {
     storeSeenUrls(domain, msg.paths, msg.reponses);
+  } else if (msg.kind === 'suppression' && msg.itemId) {
+    noterSuppression(domain, msg.itemId, msg.status, msg.at);
   } else if (msg.kind === 'vintedFrein' && freinVinted(Number(msg.statut))) {
     // 5.162 : la moisson faite DANS la page (`inject.js`) a reçu un 429/403 sur
     // SA propre requête. Même pause que pour les requêtes du fond. (Un message
@@ -1664,6 +1738,147 @@ async function storeWriteReq(domain, method, url, body) {
   const key = (path.replace(/\/\d+/g, '/_id').replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '').slice(0, 60)) || 'root';
   const data = { uid, method, url: WREQ_SENSIBLE.test(path) ? path : url, path, body: body || '', capturedAt: new Date().toISOString() };
   await supabaseUpsert('app_data', [{ id: `harvest_${uid}_wreq_${key}`, data }], 'id');
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// UNE ANNONCE SUPPRIMÉE SUR VINTED SORT DE VRM TOUT DE SUITE (5.165)
+// ══════════════════════════════════════════════════════════════════════════════
+// Julien, 9 octobre 18:40 : « je viens de supprimer beaucoup de paires et elles
+// sont encore marquées dans les annonces ». Il supprime tout pour reposter ; le
+// dressing de cinq comptes datait du 8 au soir (~41 annonces affichées « en
+// ligne »). La seule trace d'une suppression était `writereq` — posée AVANT la
+// requête (donc aussi pour une suppression refusée), sans statut, une ligne par
+// compte écrasée à chaque fois.
+// ⇒ `inject.js` voit la RÉPONSE de `POST /api/v2/items/{id}/delete` et ne poste
+//   qu'un 2xx, avec l'IDENTIFIANT de l'annonce (§5). On le range ici dans UNE
+//   ligne par compte, `harvest_{uid}_supprimees = { uid, ids: { [id]: atISO } }`,
+//   bornée aux 500 plus récentes.
+// ⚠️ Il en supprime des dizaines à la suite : deux lire-fusionner-réécrire en
+//    même temps sur la MÊME ligne se perdraient l'un l'autre. Une seule chaîne,
+//    et la file d'attente vit dans `chrome.storage.local` (§4.9 : le service
+//    worker meurt, la suppression vue ne doit pas mourir avec lui).
+// ⚠️ « Rien lu ne vaut pas rien » : lecture de la ligne ratée ⇒ on n'écrit PAS
+//    (on écraserait les suppressions déjà rangées) ; l'entrée reste en file et
+//    repart au tour suivant (alarme, visite). `audit-fusion` porte le cas.
+// ⚠️ Supprimée n'est PAS vendue : rien de tout ça n'entre dans une preuve de
+//    vente, un CA, ni « à retirer de Leboncoin ». Le numéro n'est pas touché.
+const SUPPR_FILE = 'vrmSupprAttente';
+const SUPPR_MAX = 500;
+let _chaineSuppr = Promise.resolve();
+async function noterSuppression(domain, itemId, status, at) {
+  const id = String(itemId || '');
+  const st = Number(status);
+  if (!/^\d{4,15}$/.test(id) || !(st >= 200 && st < 300)) { noterDiag('suppression_refusee_forme'); return; }
+  const uid = await activeAccountId(domain);
+  if (!uid) { noterDiag('suppression_sans_compte'); return; }   // on ne devine pas le compte
+  let t = Date.parse(String(at || ''));
+  if (isNaN(t) || t > Date.now() + 5 * 60000) t = Date.now();   // l'heure de la page ne dicte rien de futur
+  // ⚠️ L'ENFILAGE PASSE AUSSI PAR LA CHAÎNE. Dix suppressions reçues en même
+  //    temps faisaient dix lire-ajouter-réécrire de la file dans
+  //    `chrome.storage` : la dernière écriture gagnait, neuf se perdaient
+  //    (prouvé au banc, `audit-supprimees` : 1/10).
+  const entree = { uid: String(uid), id, at: new Date(t).toISOString() };
+  const enfiler = async () => {
+    try {
+      const enAttente = (await chrome.storage.local.get(SUPPR_FILE))[SUPPR_FILE] || [];
+      enAttente.push(entree);
+      await chrome.storage.local.set({ [SUPPR_FILE]: enAttente.slice(-SUPPR_MAX) });
+      noterDiag('suppression_vue');
+    } catch (_) {}
+  };
+  _chaineSuppr = _chaineSuppr.then(enfiler, enfiler);
+  await viderSuppressions();
+}
+function viderSuppressions() {
+  _chaineSuppr = _chaineSuppr.then(rangerSuppressions, rangerSuppressions);
+  return _chaineSuppr;
+}
+async function rangerSuppressions() {
+  let file = [];
+  try { file = (await chrome.storage.local.get(SUPPR_FILE))[SUPPR_FILE] || []; } catch (_) { return; }
+  if (!file.length) return;
+  const parCompte = {};
+  for (const e of file) if (e && e.uid && e.id) (parCompte[e.uid] = parCompte[e.uid] || []).push(e);
+  const ranges = new Set();
+  for (const uid of Object.keys(parCompte)) {
+    const rows = await sbGet(`app_data?id=eq.harvest_${uid}_supprimees&select=data`);
+    if (rows === null) { noterDiag('suppression_lecture_ratee'); continue; }   // pas su : on n'écrase rien
+    const cur = (rows[0] && rows[0].data) || {};
+    const ids = Object.assign({}, (cur.ids && typeof cur.ids === 'object') ? cur.ids : {});
+    for (const e of parCompte[uid]) {
+      const av = Date.parse(ids[e.id] || '');
+      if (isNaN(av) || Date.parse(e.at) < av) ids[e.id] = e.at;      // la PREMIÈRE suppression vue fait foi
+    }
+    const garde = Object.entries(ids).sort((a, b) => Date.parse(b[1]) - Date.parse(a[1])).slice(0, SUPPR_MAX);
+    const data = { uid: String(uid), ids: Object.fromEntries(garde), capturedAt: new Date().toISOString(), ver: EXT_VERSION };
+    const ok = await supabaseUpsert('app_data', [{ id: `harvest_${uid}_supprimees`, data }], 'id');
+    if (ok === false) { noterDiag('suppression_ecriture_ratee'); continue; }
+    for (const e of parCompte[uid]) ranges.add(e);
+    noterDiag('suppression_rangee');
+    notifierApp({ type: 'maj', quoi: 'annonces', uid: String(uid) });
+  }
+  if (!ranges.size) return;
+  // On ne retire de la file que ce qui est RANGÉ — relu au dernier moment : une
+  // suppression vue pendant l'écriture ne doit pas disparaître avec les autres.
+  try {
+    const now = (await chrome.storage.local.get(SUPPR_FILE))[SUPPR_FILE] || [];
+    const cle = (e) => `${e.uid}|${e.id}|${e.at}`;
+    const faits = new Set([...ranges].map(cle));
+    await chrome.storage.local.set({ [SUPPR_FILE]: now.filter((e) => !faits.has(cle(e))) });
+  } catch (_) {}
+}
+// <supprimees-regle> — LA MÊME RÈGLE QUE L'APP (src/App.jsx), §11 ; comparées par
+// `audit-supprimees.cjs`. Une annonce `id` lue dans un dressing capturé à `capTs`
+// est cachée si elle a été supprimée APRÈS cette lecture. `capturedAt` est l'heure
+// du RANGEMENT, pas de la lecture : une moisson partie avant la suppression et
+// rangée après la ressusciterait — d'où la marge. Une annonce supprimée ne revient
+// jamais légitimement (republiée, elle a un NOUVEL identifiant) : la marge ne fait
+// que retarder une résurrection qui ne doit pas avoir lieu.
+const SUPPR_MARGE_MS = 5 * 60 * 1000;
+function supprimeeApres(ids, id, capTs) {
+  if (!ids || typeof ids !== 'object') return false;          // pas su : on n'écarte rien
+  const at = Date.parse(ids[String(id)] || '');
+  if (isNaN(at)) return false;
+  return !(Number(capTs) >= at + SUPPR_MARGE_MS);             // lecture d'avant, ou sans date : écartée
+}
+// La date de LECTURE d'un dressing — UNE fonction pour les quatre lecteurs
+// (écran Annonces, file Leboncoin de l'app, files LBC/eBay et photos de
+// l'extension, §11) : `capturedAt` écrit par l'extension (la colonne `cap`
+// d'une projection, ou `data.capturedAt` d'une ligne entière). JAMAIS
+// `updated_at`, qui ment (§4.3) — l'écran Annonces y retombait, les autres non :
+// la même ligne rendait deux listes (revue de la 5.165). Sans date : `NaN`.
+function dateLectureDressing(ligne) {
+  const c = ligne && (ligne.cap != null ? ligne.cap : (ligne.data && ligne.data.capturedAt));
+  return Date.parse(c || '');
+}
+// </supprimees-regle>
+// Applique la règle à des lignes `harvest_{uid}_listings` lues en entier
+// (`select=id,data`) : rend des lignes dont les annonces supprimées APRÈS la
+// lecture sont retirées. `supp === null` (pas su) ⇒ les lignes telles quelles.
+function retirerSupprimeesLignes(lignes, supp) {
+  if (!supp || !Array.isArray(lignes)) return lignes;
+  return lignes.map((r) => {
+    const k = /^harvest_(\d+)_listings$/.exec(String(r && r.id || ''));
+    const d = r && r.data; const p = d && d.payload;
+    const ids = k && supp.get(k[1]);
+    if (!ids || !p || !Array.isArray(p.items)) return r;
+    const cap = dateLectureDressing(r);
+    const items = p.items.filter((it) => !(it && supprimeeApres(ids, it.id, cap)));
+    if (items.length === p.items.length) return r;
+    return Object.assign({}, r, { data: Object.assign({}, d, { payload: Object.assign({}, p, { items }) }) });
+  });
+}
+// Toutes les suppressions rangées, par compte. `null` = la base n'a pas répondu
+// (« pas su » : l'appelant n'écarte rien). Une ligne par compte : famille bornée.
+async function lireSupprimeesTous() {
+  const rows = await sbGet('app_data?id=like.harvest_*_supprimees&select=id,ids:data->ids');
+  if (rows === null || !Array.isArray(rows)) return null;
+  const m = new Map();
+  for (const r of rows) {
+    const k = /^harvest_(\d+)_supprimees$/.exec(String(r && r.id || ''));
+    if (k && r.ids && typeof r.ids === 'object') m.set(k[1], r.ids);
+  }
+  return m;
 }
 
 // ⚠️ LE TÉLÉCHARGEMENT MANUEL NE POUVAIT PAS ÊTRE RELIÉ QUAND IL Y EN A DEUX.
@@ -2500,11 +2715,18 @@ async function capterPhotosAnnonces(uid) {
     if (!acc) return 0;
     // La liste du dressing : id + nPhotos + état. C'est SA donnée (ligne du compte).
     let items = [];
+    let capListe = NaN;
     try {
-      const rows = await sbGet(`app_data?id=eq.harvest_${uid}_listings&select=items:data->payload->items`);
+      const rows = await sbGet(`app_data?id=eq.harvest_${uid}_listings&select=items:data->payload->items,cap:data->>capturedAt`);
       items = (rows && rows[0] && Array.isArray(rows[0].items)) ? rows[0].items : [];
+      capListe = dateLectureDressing(rows && rows[0]);
     } catch (_) {}
     if (!items.length) return 0;
+    // 5.165 : une annonce qu'il vient de SUPPRIMER n'est plus en ligne — la lire
+    // coûtait une requête Vinted pour un 404 (mesuré : `photos_annonce_refuse_404`
+    // = 96). Même règle que l'app ; suppressions illisibles ⇒ on n'écarte rien.
+    { const supp = await lireSupprimeesTous(); const ids = supp && supp.get(String(uid));
+      if (ids) items = items.filter((it) => !(it && supprimeeApres(ids, it.id, capListe))); }
     // Ce qu'on a DÉJÀ capté (photos par id) — une lecture, la carte complète.
     let dej = {};
     try {
@@ -2842,7 +3064,11 @@ function resumeCommandes(type, payload) {
   return { n: cmds.length, txns, at: Date.now() };
 }
 
-async function storeHarvestRow(uid, type, payload, domain) {
+// ⚠️ 5.165 — `opts.complet` : la moisson ACTIVE a lu TOUTES les pages du
+//    dressing, sans un échec, jusqu'à la dernière que Vinted annonce (ou une
+//    page vide). Elle le SAIT ; une page captée en passant, jamais.
+//    Voir `dressingCompletFaitFoi`.
+async function storeHarvestRow(uid, type, payload, domain, opts) {
   // ⚠️ LA MOISSON ACTIVE N'ALIMENTAIT PAS LE COFFRE. « 🔄 Tout recapter » va
   // chercher le dressing COMPLET (toutes les pages) — et jetait tout au coffre
   // près : seule la voie passive archivait. C'est pour ça que le coffre plafonne
@@ -2887,7 +3113,13 @@ async function storeHarvestRow(uid, type, payload, domain) {
     //    indiscernable de « rien lu ». Même famille de nom, suffixe `actif` :
     //    sur cette voie le refus veut dire « une page a manqué », pas « la page
     //    affichait un aperçu ».
-    if (!(await listePlusRiche(`harvest_${uid}_${type}`, payload, CLE_LISTE[type]))) {
+    const completFaitFoi = type === 'listings' && dressingCompletFaitFoi(payload, opts);
+    if (completFaitFoi) noterDiag('dressing_complet_range');
+    const riche = completFaitFoi || await listePlusRiche(`harvest_${uid}_${type}`, payload, CLE_LISTE[type]);
+    // Compteur illisible : ce n'est pas « lu, plus pauvre » (qui vaut « rangé »
+    // pour la moisson), c'est la base qui n'a pas répondu — compté comme un échec.
+    if (riche === null) return 'lecture-ratee';
+    if (!riche) {
       noterDiag(`ignore_partiel_actif_${type}`);
       return 'plus-pauvre';
     }
@@ -2900,6 +3132,7 @@ async function storeHarvestRow(uid, type, payload, domain) {
   const ecritRow = await supabaseUpsert('app_data', [{ id: `harvest_${uid}_${type}`, data, updated_at: maintenant }], 'id');
   if (ecritRow !== false && type === 'orders_sold') notifierApp({ type: 'maj', quoi: 'ventes', uid: String(uid) });
   if (ecritRow !== false && type === 'orders_purchased') notifierApp({ type: 'maj', quoi: 'achats', uid: String(uid) });
+  if (ecritRow !== false && type === 'listings') notifierApp({ type: 'maj', quoi: 'annonces', uid: String(uid) });   // 5.165 (voir storeHarvest)
   noterFlux('vinted', ecritRow !== false);
   if (type === 'listings') {
     try { const tous = (brut && brut.items) || []; await archiverLot(uid, tous.filter(it => it && !it.is_closed && !it.is_hidden && !it.is_draft), tous); } catch (_) {}
@@ -2914,15 +3147,19 @@ async function storeHarvestRow(uid, type, payload, domain) {
 // invisible pour l'app (annonces « disparues », numerotation faussee).
 // `getter(path)` renvoie { ok, json } — on branche indifferemment la version a
 // jetons ou la version a cookies.
-async function fetchAllWardrobe(getter, profileId, maxPages = 10) {
+// `suivi` (facultatif) reçoit `complet` : VRAI seulement si la boucle s'est
+// arrêtée d'elle-même (page vide, ou dernière page annoncée par Vinted) — jamais
+// sur un échec ni au plafond de pages (5.165, voir `dressingCompletFaitFoi`).
+async function fetchAllWardrobe(getter, profileId, maxPages = 10, suivi) {
   let out = null;
+  if (suivi) suivi.complet = false;
   for (let page = 1; page <= maxPages; page++) {
     const r = await getter(`/api/v2/wardrobe/${profileId}/items?page=${page}&per_page=100`);
     const lot = r && r.ok && r.json && Array.isArray(r.json.items) ? r.json.items : null;
     if (!lot) break;
     if (!out) out = r.json; else out.items = out.items.concat(lot);
     const tp = r.json.pagination && r.json.pagination.total_pages;
-    if (!lot.length || (tp && page >= tp)) break;
+    if (!lot.length || (tp && page >= tp)) { if (suivi) suivi.complet = true; break; }
     await wait(1200); // rythme d'une navigation humaine
   }
   return out;
@@ -2948,65 +3185,16 @@ async function fetchAllOrders(acc, type, maxPages = 8, suivi) {
   return { my_orders: all, pagination };
 }
 
-// Rafraichit toutes les donnees d'UN compte.
-async function activeFetchAccount(acc) {
-  const uid = acc.vinted_user_id;
-  if (!uid || !acc.access_token) return;
-  const domain = acc.domain || 'www.vinted.fr';
-
-  // 1) Profil (donne l'id de PROFIL, different de l'account_id, requis pour le
-  //    dressing) + le pseudo.
-  let prof = await vintedGet(acc, '/api/v2/users/current');
-  // Token expire ? Si ce compte est celui actif dans le navigateur, on le
-  // renouvelle (comme la page Vinted) puis on rejoue. acc.access_token est
-  // mis a jour en place -> tous les appels suivants (annonces/ventes/achats/
-  // messages) profitent du token frais. Sinon on laisse tomber sans risque.
-  if (prof.status === 401) {
-    const refreshed = await refreshIfActive(acc);
-    if (refreshed) { await wait(500); prof = await vintedGet(acc, '/api/v2/users/current'); }
-  }
-  if (prof.ok && prof.json) {
-    await storeHarvestRow(uid, 'profile', prof.json, domain);
-    const login = prof.json.user && prof.json.user.login;
-    if (login) {
-      try {
-        await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${uid}`, {
-          method: 'PATCH',
-          headers: await sbHeaders({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
-          body: JSON.stringify({ login }),
-        });
-      } catch (_) {}
-    }
-  }
-  // 5.162 : Vinted vient de freiner (ou une pause court) ⇒ on n'enchaîne pas.
-  if (prof.pause || freinVinted(prof.status)) return;
-  await wait(1500);
-
-  // 2) Annonces en ligne (dressing) via l'ID DE PROFIL.
-  const profileId = prof.json && prof.json.user && prof.json.user.id;
-  if (profileId) {
-    const w = await fetchAllWardrobe((path) => vintedGet(acc, path), profileId);
-    if (w && Array.isArray(w.items) && w.items.length) await storeHarvestRow(uid, 'listings', w, domain);
-    await wait(1500);
-  }
-
-  // 3) Ventes (TOUTES les pages, pour une compta complete).
-  if (await pauseVinted()) return;
-  const sold = await fetchAllOrders(acc, 'sold');
-  if (sold && sold.my_orders.length) await storeHarvestRow(uid, 'orders_sold', sold, domain);
-  await wait(1500);
-
-  // 4) Achats (toutes les pages).
-  if (await pauseVinted()) return;
-  const bought = await fetchAllOrders(acc, 'purchased');
-  if (bought && bought.my_orders.length) await storeHarvestRow(uid, 'orders_purchased', bought, domain);
-  await wait(1500);
-
-  // 5) Messages (inbox).
-  if (await pauseVinted()) return;
-  const inbox = await vintedGet(acc, '/api/v2/inbox?page=1&per_page=30');
-  if (inbox.ok && inbox.json) await storeHarvestRow(uid, 'inbox', inbox.json, domain);
-}
+// ⚠️⚠️ 5.165 — `activeFetchAccount` (moisson d'UN compte avec SES jetons, sans
+//    cookie) et `activeFetchAll` (la même chose pour TOUS les comptes à la suite)
+//    sont RETIRÉES. `runActive` y retombait quand aucun onglet Vinted ni cookie
+//    n'était là (déconnecté, bascule de compte) : profil, dressing, ventes,
+//    achats et boîte de CHAQUE compte, en vingt secondes, depuis le même
+//    navigateur — la signature multi-comptes que §3 interdit. Prouvé au banc
+//    (`audit-moisson-dressing`, requêtes pour A, B et C) et OBSERVÉ le 8 octobre
+//    à 22:27 (une session écrit les profils de trois comptes en 20 s). Un compte
+//    se relit désormais quand il est connecté dans Chrome, et seulement là ;
+//    l'app dit, compte par compte, de quand date sa dernière lecture.
 
 // Recupere la liste des comptes lies depuis Supabase.
 // `{ ouNull: true }` : `null` quand la base n'a pas répondu, au lieu de `[]`
@@ -3021,22 +3209,6 @@ async function getStoredAccounts(opts) {
     const j = await res.json();
     return opts && opts.ouNull && !Array.isArray(j) ? null : j;
   } catch (_) { return ko; }
-}
-
-// Rafraichit TOUS les comptes, un par un, en douceur (pauses entre comptes).
-let activeFetchRunning = false;
-async function activeFetchAll() {
-  if (activeFetchRunning) return;
-  activeFetchRunning = true;
-  try {
-    const accts = await getStoredAccounts();
-    for (const acc of accts) {
-      if (await pauseVinted()) break;             // Vinted a demandé de ralentir : on s'arrête là
-      await activeFetchAccount(acc);
-      await wait(4000); // pause entre comptes (rythme humain, discret)
-    }
-    try { chrome.storage.local.set({ lastActiveFetch: Date.now(), activeCount: accts.length }); } catch (_) {}
-  } finally { activeFetchRunning = false; }
 }
 
 // ── FETCH ACTIF PAR COOKIE (v3.8.1) ────────────────────────────────────────
@@ -3055,16 +3227,18 @@ async function activeUidForDomain(domain) {
 }
 // ID de PROFIL (≠ account_id) deja connu pour ce compte, lu dans la derniere
 // ligne harvest_{uid}_profile. Stable dans le temps → sert de repli fiable.
+// ⚠️ 5.165 : lue en SCALAIRE (§4.4), et en TROIS états — l'id (texte) · `''`
+//    (aucun profil rangé) · `null` (la base n'a pas répondu, « pas su »).
+//    `lastProfileId` garde son contrat d'avant (l'id ou `null`).
+async function profilIdRange(uid) {
+  let rows = null;
+  try { rows = await sbGet(`app_data?id=eq.harvest_${uid}_profile&select=pid:data->payload->user->>id`); } catch (_) { rows = null; }
+  if (rows === null || !Array.isArray(rows)) return null;
+  const v = rows[0] && rows[0].pid;
+  return v != null && String(v) !== '' ? String(v) : '';
+}
 async function lastProfileId(uid) {
-  try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.harvest_${uid}_profile&select=data`, {
-      headers: await sbHeaders(),
-    });
-    if (!r.ok) return null;
-    const rows = await r.json();
-    const u = rows[0] && rows[0].data && rows[0].data.payload && rows[0].data.payload.user;
-    return u && u.id ? u.id : null;
-  } catch (_) { return null; }
+  try { const v = await profilIdRange(uid); return v || null; } catch (_) { return null; }
 }
 async function vintedGetCookie(domain, endpoint) {
   return requeteVinted('cookie', async () => {
@@ -3112,8 +3286,10 @@ async function pageActiveFetch() {
   // ID de profil connu (stable) du compte actif, lu dans la derniere moisson :
   // sert de repli si /users/current echoue (c'est ce qui bloquait le dressing).
   const activeUid0 = await activeUidForDomain(domain);
+  // 5.165 : aucun compte connecté dans ce Chrome ⇒ rien à ranger, rien ne part.
+  if (!activeUid0) return false;
   let knownPid = null;
-  if (activeUid0) { try { knownPid = await lastProfileId(activeUid0); } catch (_) {} }
+  try { knownPid = await lastProfileId(activeUid0); } catch (_) {}
   // ⚠️ 5.162 : toute la série faite dans la page occupe UNE place de la file
   // Vinted (aucune autre requête de l'extension ne part pendant ce temps), et
   // un 429/403 reçu dans la page ARRÊTE la série sur place (`frein`) — avant,
@@ -3145,6 +3321,9 @@ async function pageActiveFetch() {
         // — les autres etaient invisibles (annonces « disparues », numerotation
         // faussee). Vinted plafonne per_page a ~96, donc il FAUT paginer.
         let listings = null;
+        // 5.165 : VRAI seulement si la boucle s'arrête d'elle-même (page vide ou
+        // dernière page annoncée) — jamais sur un échec ni au plafond.
+        let listingsComplet = false;
         if (pid) {
           const MAX_PAGES = 10;               // garde-fou
           for (let pg = 1; pg <= MAX_PAGES; pg++) {
@@ -3153,7 +3332,7 @@ async function pageActiveFetch() {
             if (!lot) break;
             if (!listings) listings = r; else listings.items = listings.items.concat(lot);
             const tp = r.pagination && r.pagination.total_pages;
-            if (!lot.length || (tp && pg >= tp)) break;
+            if (!lot.length || (tp && pg >= tp)) { listingsComplet = true; break; }
             // Petite pause : on reste sur le rythme d'une navigation humaine.
             await new Promise(res => setTimeout(res, 700));
           }
@@ -3188,7 +3367,7 @@ async function pageActiveFetch() {
         // solde. Un appel de plus, depuis SON navigateur, sur une page ou il
         // est deja connecte — c'est le meme profil de trafic qu'une visite.
         const wallet = pid ? await get('/api/v2/users/' + pid + '/payouts') : null;
-        return { who: who || null, listings: listings || null, sold: sold || null, bought: bought || null, inbox: inbox || null, wallet: wallet || null, frein };
+        return { who: who || null, listings: listings || null, listingsComplet, pid: pid || null, sold: sold || null, bought: bought || null, inbox: inbox || null, wallet: wallet || null, frein };
       },
     });
     const o = res && res[0] && res[0].result;
@@ -3201,23 +3380,50 @@ async function pageActiveFetch() {
   // On range sous l'uid du COMPTE ACTIF (decode du cookie de session).
   const uid = await activeUidForDomain(domain);
   if (!uid) return false;
-  let stored = false;
+  // ⚠️⚠️ 5.165 — IL A CHANGÉ DE COMPTE PENDANT LA MOISSON ⇒ ON JETTE (§5).
+  //    `uid` est relu APRÈS la série : il bascule de compte en supprimant ses
+  //    annonces, et les annonces de A partaient sous B (prouvé au banc :
+  //    48 annonces de A dans `harvest_B_listings`). Mieux vaut un blanc qu'un faux.
+  if (String(uid) !== String(activeUid0)) { noterDiag('moisson_compte_change'); return 'abandon'; }
+  // Revue 5.165 : le profil que la page a rendu doit être celui qu'on a rangé
+  // pour CE compte (quand on le connaît) — sinon la page parlait pour un autre.
+  if (knownPid && out.who && out.who.user && out.who.user.id != null && String(out.who.user.id) !== String(knownPid)) { noterDiag('moisson_compte_change'); return 'abandon'; }
+  // ⚠️⚠️ 5.165 — ON NE COMPTE QUE CE QUI EST RANGÉ. `stored = true` se posait
+  //    AVANT de savoir ce que la base avait répondu : une moisson dont TOUTES les
+  //    écritures étaient refusées (400, sans session, 9 octobre) se disait
+  //    « Données rafraîchies », et la garde de 5 min restait posée.
+  //    Lu-mais-refusé-plus-pauvre et porte-monnaie hors sujet valent « lu ».
+  let stored = false, ratees = 0;
+  const range = async (type, data, opts) => {
+    const r = await storeHarvestRow(uid, type, data, domain, opts);
+    if (r === 'ecrit' || r === 'plus-pauvre' || r === 'hors-sujet') stored = true; else ratees++;
+  };
   // ⚠️ NE JAMAIS ECRASER UNE MOISSON PAR DU VIDE. Une session expiree, une
   // page pas encore chargee ou un appel refuse renvoient une LISTE VIDE, pas
   // une erreur : en rangeant ce vide, on effacait des donnees valides et
   // l'onglet Ventes se retrouvait desesperement vide alors que les ventes
   // existaient. C'est exactement ce qui etait arrive aux 10 comptes.
   const plein = (o, cle) => o && Array.isArray(o[cle]) && o[cle].length > 0;
-  if (out.who) { await storeHarvestRow(uid, 'profile', out.who, domain); stored = true; }
-  if (plein(out.listings, 'items')) { await storeHarvestRow(uid, 'listings', out.listings, domain); stored = true; }
-  if (plein(out.sold, 'my_orders')) { await storeHarvestRow(uid, 'orders_sold', out.sold, domain); stored = true; }
-  if (plein(out.bought, 'my_orders')) { await storeHarvestRow(uid, 'orders_purchased', out.bought, domain); stored = true; }
-  if (plein(out.inbox, 'conversations')) { await storeHarvestRow(uid, 'inbox', out.inbox, domain); stored = true; }
+  // ⚠️ 5.165 — SAUF LE DRESSING LU EN ENTIER PAR SON PROPRIÉTAIRE : Vinted
+  //    l'a dit lui-même (`/users/current` a répondu, toutes les pages lues,
+  //    jusqu'à la dernière). Vide ou plus court, c'est l'état réel après des
+  //    suppressions — `dressingCompletFaitFoi` tranche (total atteint, §4.2).
+  const dressingComplet = !!(out.listingsComplet && out.who && out.who.user && out.who.user.id
+    && out.listings && Array.isArray(out.listings.items));
+  if (out.who) await range('profile', out.who);
+  if (plein(out.listings, 'items') || dressingComplet) await range('listings', out.listings, dressingComplet ? { complet: true } : undefined);
+  if (plein(out.sold, 'my_orders')) await range('orders_sold', out.sold);
+  if (plein(out.bought, 'my_orders')) await range('orders_purchased', out.bought);
+  if (plein(out.inbox, 'conversations')) await range('inbox', out.inbox);
   // Le solde n'est pas une liste : on le range des qu'il porte un montant.
   // `payouts` renvoie `{balance}` là où le porte-monnaie renvoie `{main,escrow}` :
   // sans ce troisième cas, la lecture ajoutée en 4.26 était jetée à l'arrivée.
-  if (estPorteMonnaie(out.wallet)) { await storeHarvestRow(uid, 'billing', out.wallet, domain); stored = true; }
+  if (estPorteMonnaie(out.wallet)) await range('billing', out.wallet);
   if (stored) { try { chrome.storage.local.set({ lastActiveFetch: Date.now(), activeUid: uid, via: 'page' }); } catch (_) {} }
+  noterDiag(stored ? 'moisson_page_rangee' : (ratees ? 'moisson_page_ecriture_ratee' : 'moisson_page_vide'));
+  // Lu chez Vinted, refusé par la BASE : ni « rafraîchi », ni repli (§3) — et
+  // `runActive` pose le recul (revue 5.165 : relire Vinted ne rangerait rien).
+  if (!stored && ratees) return 'base';
   return stored;
 }
 
@@ -3229,29 +3435,67 @@ async function activeFetchActiveAccount() {
     const domain = 'www.vinted.fr';
     const uid = await activeUidForDomain(domain);
     if (!uid) return false; // aucun compte connecte dans le navigateur
+    // ⚠️⚠️ REVUE DE LA 5.165 — CE REPLI N'AVAIT PAS LA GARDE DE LA PAGE. `uid`
+    //    était lu UNE fois au départ, puis tout partait avec le cookie du moment.
+    //    Or c'est justement le chemin qui tourne quand la page navigue — à chaque
+    //    suppression, à chaque bascule de compte. Prouvé au banc : il passe de A
+    //    à B en route ⇒ le profil, le dressing et les ventes de B rangés sous A ;
+    //    et, B venant d'être VIDÉ, son dressing complet et vide effaçait les
+    //    61 annonces de A (`dressingCompletFaitFoi`). Puis la garde passive,
+    //    trompée par le profil de B rangé sous A, refusait le dressing de A.
+    //    ⇒ Le compte du cookie est RELU avant chaque rangement ; au moindre
+    //      écart, rien de plus n'est rangé (`moisson_compte_change`). Et le profil
+    //      rendu doit être celui qu'on a rangé pour ce compte : connu et
+    //      différent ⇒ rien ; pas su (la base n'a pas répondu) ⇒ rien non plus.
+    const pidRange = await profilIdRange(uid);    // id · '' (jamais rangé) · null (pas su)
+    if (pidRange === null) { noterDiag('moisson_profil_pas_lu'); return 'base'; }
     const prof = await vintedGetCookie(domain, '/api/v2/users/current');
     if (!prof.ok || !prof.json) return false; // pas connecte / endpoint change (ou pause Vinted)
-    await storeHarvestRow(uid, 'profile', prof.json, domain);
     const profileId = prof.json.user && prof.json.user.id;
+    let change = false;
+    const memeCompte = async () => {
+      if (change) return false;
+      if (String((await activeUidForDomain(domain)) || '') === String(uid)) return true;
+      change = true; noterDiag('moisson_compte_change'); return false;
+    };
+    if (pidRange && profileId != null && String(profileId) !== pidRange) { noterDiag('moisson_compte_change'); return 'abandon'; }
+    if (!(await memeCompte())) return 'abandon';
+    // 5.165 : comme `pageActiveFetch` — on ne compte que ce qui est RANGÉ.
+    let stored = false, ratees = 0;
+    const range = async (type, data, opts) => {
+      if (!(await memeCompte())) return 'abandon';
+      const r = await storeHarvestRow(uid, type, data, domain, opts);
+      if (r === 'ecrit' || r === 'plus-pauvre' || r === 'hors-sujet') stored = true; else ratees++;
+      return r;
+    };
+    const fin = () => {
+      if (stored) { try { chrome.storage.local.set({ lastActiveFetch: Date.now(), activeUid: uid }); } catch (_) {} }
+      if (change) return 'abandon';
+      // Lu chez Vinted, TOUT refusé par la base : `runActive` pose le recul.
+      if (!stored && ratees) return 'base';
+      return stored;
+    };
+    await range('profile', prof.json);
     await wait(1200);
-    if (profileId) {
-      const w = await fetchAllWardrobe((path) => vintedGetCookie(domain, path), profileId);
-      if (w && Array.isArray(w.items) && w.items.length) await storeHarvestRow(uid, 'listings', w, domain);
+    if (profileId && !change) {
+      const suivi = {};
+      const w = await fetchAllWardrobe((path) => vintedGetCookie(domain, path), profileId, undefined, suivi);
+      // Lu en entier par son propriétaire (5.165) : vide ou plus court fait foi.
+      if (w && Array.isArray(w.items) && (w.items.length || suivi.complet)) await range('listings', w, suivi.complet ? { complet: true } : undefined);
       await wait(1200);
     }
-    if (await pauseVinted()) return true;   // 5.162 : Vinted a freiné en route — on s'arrête là
+    if (change || await pauseVinted()) return fin();   // 5.162 : Vinted a freiné en route — on s'arrête là
     const sold = await fetchAllOrdersCookie(domain, 'sold');
-    if (sold && sold.my_orders.length) await storeHarvestRow(uid, 'orders_sold', sold, domain);
+    if (sold && sold.my_orders.length) await range('orders_sold', sold);
     await wait(1200);
-    if (await pauseVinted()) return true;
+    if (change || await pauseVinted()) return fin();
     const bought = await fetchAllOrdersCookie(domain, 'purchased');
-    if (bought && bought.my_orders.length) await storeHarvestRow(uid, 'orders_purchased', bought, domain);
+    if (bought && bought.my_orders.length) await range('orders_purchased', bought);
     await wait(1200);
-    if (await pauseVinted()) return true;
+    if (change || await pauseVinted()) return fin();
     const inbox = await vintedGetCookie(domain, '/api/v2/inbox?page=1&per_page=30');
-    if (inbox.ok && inbox.json) await storeHarvestRow(uid, 'inbox', inbox.json, domain);
-    try { chrome.storage.local.set({ lastActiveFetch: Date.now(), activeUid: uid }); } catch (_) {}
-    return true;
+    if (inbox.ok && inbox.json) await range('inbox', inbox.json);
+    return fin();
   } finally { cookieFetchRunning = false; }
 }
 
@@ -3264,15 +3508,101 @@ async function activeFetchActiveAccount() {
 // le journal au lieu d'annoncer un rafraîchissement qui n'a rien capté.
 async function runActive() {
   // ⚠️ 5.162 : pendant une pause demandée par Vinted, on ne tente RIEN — et un
-  // frein reçu en route n'est pas suivi des deux chemins de secours (qui
-  // auraient refait toute la moisson, et `activeFetchAll` sur TOUS les comptes).
+  // frein reçu en route n'est pas suivi du chemin de secours.
   if (await pauseVinted()) return false;
-  if (await pageActiveFetch()) return true;
+  // ⚠️⚠️ 5.165 — SANS SESSION VRM, RIEN NE PART CHEZ VINTED. Mesuré le 9 octobre
+  //    dans les journaux de la base : la moisson de llloollllaa (18:38:21 et
+  //    18:38:29) et celle de julatace35260 (18:44:34) ont été LUES chez Vinted
+  //    puis refusées en bloc (`POST app_data → 400` : une ligne sans
+  //    propriétaire ne passe pas RLS). Vingt requêtes Vinted pour rien (§3 :
+  //    aucune requête sans raison), et une garde de 5 min consommée.
+  if (await sansSessionPourEcrire()) { noterDiag('moisson_sans_session'); return false; }
+  // Revue 5.165 : NOTRE base refuse tout depuis peu (panne, RLS) — rien ne part
+  // chez Vinted pour une lecture qu'on ne pourrait pas ranger. Ici, et pas
+  // seulement dans la visite : l'alarme des 20 min et le changement de cookie
+  // appellent `runActive` sans la garde de la visite.
+  if (await reculBase()) { noterDiag('moisson_base_en_recul'); return 'recul'; }
+  const p = await pageActiveFetch();
+  if (p === true) return true;
+  // La BASE a tout refusé : refaire la même moisson par le service worker ne
+  // rangerait rien de plus — pas de repli, et le recul est posé.
+  if (p === 'base') { await poserReculBase(); return 'base'; }
+  // Le compte a changé en route : rien rangé, pas de repli.
+  if (p === 'abandon') return false;
   if (await pauseVinted()) return false;
-  if (await activeFetchActiveAccount()) return true;
-  if (await pauseVinted()) return false;
-  await activeFetchAll();
-  return false;
+  // (5.165 : plus de `activeFetchAll` — jamais tous les comptes d'un coup, §3.)
+  const c = await activeFetchActiveAccount();
+  if (c === 'base') { await poserReculBase(); return 'base'; }
+  return c === true;
+}
+// ⚠️ 5.165 — base cloisonnée et AUCUNE session VRM utilisable : toute écriture
+//    serait refusée. Même règle que `withOwner` (un `owner` n'est posé que si la
+//    session porte un `user_id`) : « pas de propriétaire » ⇔ « refusé ».
+async function sansSessionPourEcrire() {
+  try {
+    if (!(await isCloisonne())) return false;
+    const s = await authToken();
+    return !(s && s.access_token && s.user_id);
+  } catch (_) { return true; }
+}
+// ══ NOTRE BASE REFUSE TOUT : ON NE RELIT PAS VINTED POUR RIEN (revue 5.165) ═══
+// Mesuré au banc (le vrai background.js, horloge pilotée) : la garde des 5 min
+// était RENDUE à 60 s sur CHAQUE échec — y compris quand c'est NOTRE base qui
+// refuse toutes les écritures (RLS 403/42501, abonnement coupé) ou qui ne
+// répond plus (522, du 9 au 12 septembre). La moisson complète (profil,
+// dressing, ventes, achats, boîte, porte-monnaie) repartait chez Vinted à
+// chaque minute de navigation : 30 moissons en 30 min (6 avant la 5.165),
+// toutes jetées. Le code le disait pourtant : « lu chez Vinted, refusé par la
+// BASE : ni rafraîchi, ni repli (§3) ».
+// ⇒ Une moisson (ou les ventes) dont TOUTES les écritures sont refusées pose un
+//   RECUL rangé dans `chrome.storage.local` (§4.9) : 1 min, puis 5, 10, 20, 40,
+//   60. Pendant le recul, rien ne part chez Vinted pour une lecture qu'on ne
+//   pourrait pas ranger. Il tombe dès qu'une ligne de CAPTURE est écrite (la
+//   capture passive continue d'essayer : c'est elle qui dit que la base est
+//   revenue) — jamais sur une ligne de diagnostic, qui peut passer quand les
+//   captures sont refusées.
+// ⚠️ Le premier palier (1 min) garde le simple hoquet : la page suivante, une
+//    minute plus tard, range (`audit-moisson-dressing` §2).
+const RECUL_BASE = 'vrmReculBase';                 // { jusqua, niveau, depuis }
+const RECUL_BASE_PALIERS_MIN = [1, 5, 10, 20, 40, 60];
+const RECUL_BASE_OUBLI_MS = 6 * 3600000;            // au-delà, on repart du premier palier
+const RE_LIGNE_CAPTURE = /^harvest_[^_]+_(profile|listings|orders_sold|orders_purchased|inbox|billing)$/;
+async function reculBase() {
+  try {
+    const r = (await chrome.storage.local.get(RECUL_BASE))[RECUL_BASE];
+    const reste = Number((r && r.jusqua) || 0) - Date.now();
+    return reste > 0 ? Object.assign({}, r, { resteMs: reste }) : null;
+  } catch (_) { return null; }
+}
+// Économie d'écritures seulement : la vérité vit dans le stockage (§4.9).
+let _reculPeutExister;
+let _reculChaine = Promise.resolve();
+function poserReculBase() {
+  _reculChaine = _reculChaine.then(async () => {
+    const t = Date.now();
+    let cur = {};
+    try { cur = (await chrome.storage.local.get(RECUL_BASE))[RECUL_BASE] || {}; } catch (_) {}
+    if (Number(cur.jusqua || 0) > t) return;          // déjà en recul : rien ne monte
+    const recent = cur.jusqua && (t - Number(cur.jusqua)) < RECUL_BASE_OUBLI_MS;
+    const niveau = recent ? Math.min(Number(cur.niveau || 0) + 1, RECUL_BASE_PALIERS_MIN.length) : 1;
+    const minutes = RECUL_BASE_PALIERS_MIN[niveau - 1];
+    _reculPeutExister = true;
+    try { await chrome.storage.local.set({ [RECUL_BASE]: { jusqua: t + minutes * 60000, niveau, depuis: Number(cur.depuis) && recent ? Number(cur.depuis) : t } }); } catch (_) {}
+    noterDiag(`moisson_base_recul_${niveau}`);
+    logActivity(`⏸ Ta base VRM n'a rien pris — Vinted n'est pas relu avant ${minutes} min`);
+  }).catch(() => {});
+  return _reculChaine;
+}
+function effacerReculBase() {
+  if (_reculPeutExister === false) return Promise.resolve();
+  _reculChaine = _reculChaine.then(async () => {
+    try {
+      const cur = (await chrome.storage.local.get(RECUL_BASE))[RECUL_BASE];
+      if (cur) { await chrome.storage.local.remove(RECUL_BASE); noterDiag('moisson_base_revenue'); }
+      _reculPeutExister = false;
+    } catch (_) {}
+  }).catch(() => {});
+  return _reculChaine;
 }
 function fullSync() { captureAllAccounts().then(() => runActive()); }
 
@@ -3325,6 +3655,9 @@ try {
     // faut-il qu'il PARTE un jour. Sans ce réveil, un tampon posé juste avant
     // une longue période calme attendrait la prochaine capture pour être écrit.
     majTampon(() => {});
+    // 5.165 : une suppression vue mais pas encore rangée (base muette, pas de
+    // session) repart ici — la file vit dans `chrome.storage.local`.
+    viderSuppressions();
   });
 } catch (_) {}
 
@@ -3390,7 +3723,7 @@ async function rafraichirVentes(uid) {
   if (!sold.my_orders.length) return { ok: true, ecrit: false, raison: 'aucune' };
   const issue = await storeHarvestRow(uid, 'orders_sold', sold, acc.domain || 'www.vinted.fr');
   if (issue === 'plus-pauvre') return { ok: true, ecrit: false, raison: 'plus-pauvre' };
-  if (issue !== 'ecrit') return { ok: false, ecrit: false, raison: 'ecriture' };
+  if (issue !== 'ecrit') { await poserReculBase(); return { ok: false, ecrit: false, raison: 'ecriture' }; }
   // ⚠️ On vient d'écrire des ventes FRAÎCHES : tout ce que le mémo de visite
   // garde sur ce compte est périmé à la milliseconde près. On le vide.
   viderMemoVisite(uid);
@@ -3438,6 +3771,50 @@ async function rafraichirVentesGarde(uid, marque) {
   return r;
 }
 
+// ── LA GARDE DES 5 MIN, RENDUE SUR UN ÉCHEC (5.165) ─────────────────────────
+// Même règle que `rendreGardeVentes` : posée AVANT la moisson (deux visites ne
+// moissonnent pas deux fois), RELÂCHÉE si rien n'a été rangé — mesuré le
+// 9 octobre : une moisson refusée par la base à 18:38 bloquait toute nouvelle
+// lecture du dressing jusqu'à 18:43, session revenue entre-temps.
+// ⚠️ « Relâcher » n'est pas « effacer » (§3) : la page suivante réessaie dans
+//    `VISITE_REESSAI_MS` (60 s), jamais en rafale ; on ne relâche que SA marque ;
+//    et pendant une pause demandée par Vinted, la garde reste ENTIÈRE.
+const VISITE_REESSAI_MS = 60 * 1000;
+async function rendreGardeVisite(uid, marque, reessaiMs = VISITE_REESSAI_MS) {
+  try {
+    if (await pauseVinted()) return;
+    const st = (await chrome.storage.local.get('vrmDerniereVisite')).vrmDerniereVisite || {};
+    if (Number(st[uid]) !== Number(marque)) return;
+    st[uid] = Date.now() - VISITE_DELAI_MS + reessaiMs;
+    await chrome.storage.local.set({ vrmDerniereVisite: st });
+    noterDiag('visite_garde_rendue');
+  } catch (_) {}
+}
+// ⚠️⚠️ REVUE DE LA 5.165 — RENDUE UNE FOIS, PAS À CHAQUE ÉCHEC. La garde
+//    repartait à 60 s sur n'importe quel échec, sans les compter : un échec qui
+//    DURE (session Vinted cassée, base qui refuse) faisait une moisson complète
+//    par minute de navigation — 5× plus qu'avant la 5.165, et pour rien.
+//    · `true`            : rangé — le compteur repart de zéro ;
+//    · `base` / `recul`  : c'est NOTRE base — le recul (`reculBase`) décide
+//      quand réessayer, la garde de la visite ne l'allonge pas ;
+//    · autre échec       : le PREMIER rend la garde (nouvel essai à 60 s : une
+//      page qui naviguait), les suivants gardent les 5 min entières.
+//    Les échecs consécutifs vivent dans `chrome.storage.local` (§4.9).
+const ECHECS_VISITE = 'vrmVisiteEchecs';            // { [uid]: n }
+async function issueVisite(uid, marque, r) {
+  let ech = {};
+  try { ech = (await chrome.storage.local.get(ECHECS_VISITE))[ECHECS_VISITE] || {}; } catch (_) {}
+  const avant = Number(ech[uid] || 0);
+  if (r === true) {
+    if (avant) { delete ech[uid]; try { await chrome.storage.local.set({ [ECHECS_VISITE]: ech }); } catch (_) {} }
+    return;
+  }
+  if (r === 'base' || r === 'recul') { await rendreGardeVisite(uid, marque, 0); return; }
+  ech[uid] = avant + 1;
+  try { await chrome.storage.local.set({ [ECHECS_VISITE]: ech }); } catch (_) {}
+  if (avant === 0) await rendreGardeVisite(uid, marque);
+  else noterDiag('visite_echec_repete');
+}
 async function visiteVinted() {
   try {
     const uid = await activeUidForDomain('www.vinted.fr');
@@ -3447,6 +3824,13 @@ async function visiteVinted() {
     // reçu en route arrête la suite). Le ménage des PDF ne touche que NOTRE
     // base : il passe quand même.
     if (await pauseVinted()) { noterDiag('visite_en_pause'); await purgeBordereaux(); return; }
+    // ⚠️⚠️ 5.165 — SANS SESSION VRM, LA VISITE N'ENVOIE RIEN À VINTED. Le
+    //    9 octobre, la visite lisait profil, dressing, ventes, achats, boîte
+    //    (vingt requêtes) que la base refusait ensuite en bloc (400, RLS), et
+    //    posait la garde de 5 min : une fois la session revenue, plus rien
+    //    jusqu'à ce qu'il quitte le compte. Ici on rend la main SANS garde :
+    //    la page suivante réessaie dès que la session est là.
+    if (await sansSessionPourEcrire()) { noterDiag('visite_sans_session'); return; }
 
     // ═══ 1. CE QU'IL ATTEND, TOUT DE SUITE ═══════════════════════════════
     // ⚠️ ORDRE INVERSÉ (Julien, 3 septembre : « quand je me connecte, que ça me
@@ -3457,7 +3841,9 @@ async function visiteVinted() {
     // alors que la vente ne demande QU'UNE requête (`my_orders?type=sold`).
     // Ce bloc ne coûte rien de plus : ce sont les mêmes appels, simplement
     // placés avant le lourd. Rien à voir avec un « rythme humain » (§32).
-    const marqueVentes = await prendreGardeVentes(uid);
+    // (Revue 5.165 : pendant un recul de NOTRE base, les ventes non plus ne sont
+    //  pas relues — elles ne pourraient pas être rangées.)
+    const marqueVentes = (await reculBase()) ? null : await prendreGardeVentes(uid);
     if (marqueVentes !== null) await rafraichirVentesGarde(uid, marqueVentes);
     // ⚠️ LA VISITE GÉNÈRE, TOUTE SEULE (Julien, 27 août puis 3 septembre :
     // « que ça envoie direct dans l'app sans me demander »). Cohérent avec
@@ -3479,12 +3865,22 @@ async function visiteVinted() {
     // Le garde de 5 min ne protège plus que la moisson COMPLÈTE — c'est elle
     // qui est lourde, et refaire dix fois la même en naviguant de page en page
     // n'apporte rien (§5.19).
+    // Revue 5.165 : NOTRE base refuse tout depuis peu — ni moisson, ni lecteurs
+    // (ils liraient Vinted pour rien) ; la garde n'est pas consommée.
+    if (await reculBase()) { noterDiag('visite_base_en_recul'); return; }
     const st = (await chrome.storage.local.get('vrmDerniereVisite')).vrmDerniereVisite || {};
     if (Date.now() - Number(st[uid] || 0) < VISITE_DELAI_MS) return;
-    st[uid] = Date.now();
+    const marqueVisite = Date.now();
+    st[uid] = marqueVisite;
     await chrome.storage.local.set({ vrmDerniereVisite: st });
-    const ok = await runActive();
-    logActivity(ok ? '🔄 Données rafraîchies en arrivant sur Vinted' : '🔄 Rien de neuf à capter');
+    const r = await runActive();
+    const ok = r === true;
+    // ⚠️ 5.165 : une moisson qui n'a RIEN rangé rend sa garde — UNE fois pour un
+    //    échec passager, jamais pour un refus de notre base (`issueVisite`).
+    await issueVisite(uid, marqueVisite, r);
+    logActivity(ok ? '🔄 Données rafraîchies en arrivant sur Vinted'
+      : (r === 'base' || r === 'recul') ? '🔄 Ta base VRM n\'a rien pris — Vinted ne sera relu qu\'après une pause'
+      : '🔄 Rien n\'a pu être rangé — nouvel essai plus tard');
     // ⚠️ APRÈS la moisson elle aussi : la liste des colis « déposés en point
     // relais » vient des achats qu'on vient de capter. Sans ça, on lirait la
     // photo d'hier et on redemanderait des conversations pour rien.
@@ -6008,7 +6404,7 @@ async function buildEbayData() {
   const lost = main.vinted_pairs_lost || {};
   const pos = await readEbayPosted();
   const posted = new Set(pos.ids);
-  const listRows = (await sbGet('app_data?id=like.harvest_*_listings&select=id,data')) || [];
+  const listRows = retirerSupprimeesLignes((await sbGet('app_data?id=like.harvest_*_listings&select=id,data')) || [], await lireSupprimeesTous());
   const itemRows = (await sbGetTout('app_data?id=like.harvest_*_item_*&select=id,data')) || []; // §4.5 : une ligne par annonce, tous comptes → dépasse 1000 chez un vendeur actif, sbGet tronquait
   const details = {};
   for (const r of itemRows) { const p = (r.data || {}).payload || {}; const it = (p && p.item) || p; if (it && it.id) details[String(it.id)] = it; }
@@ -6093,8 +6489,8 @@ async function buildLbcData() {
   const posted = new Set(postedData.ids);
   const lbcLimit = postedData.limit;
   const lbcPlan = postedData.plan;
-  // Annonces EN LIGNE (harvest listings).
-  const listRows = (await sbGet('app_data?id=like.harvest_*_listings&select=id,data')) || [];
+  // Annonces EN LIGNE (harvest listings) — sans celles qu'il vient de supprimer (5.165).
+  const listRows = retirerSupprimeesLignes((await sbGet('app_data?id=like.harvest_*_listings&select=id,data')) || [], await lireSupprimeesTous());
   const online = []; const onlineIds = new Set(); const seen = new Set();
   let exclues = 0;
   for (const r of listRows) {

@@ -61,7 +61,13 @@
     try { if (globalThis.__vrmPontVivant === moi) delete globalThis.__vrmPontVivant; } catch (_) {}
   };
   const poster = (m) => { try { window.postMessage(m, '*'); } catch (_) {} };
-  function announce() { if (!vivant()) { retirer(); return; } poster({ __vmr: 'ready', version }); }
+  // 5.165 : l'IDENTIFIANT de l'extension voyage avec la version. Deux extensions
+  //    VRM installées dans le même Chrome exécutaient CHAQUE commande de l'app
+  //    deux fois (mesuré le 9 octobre) ; l'app compte les ponts qui répondent à
+  //    un même « ping » (`sonderPonts`) — avec l'identifiant, deux copies de la
+  //    MÊME version se distinguent aussi. Rien d'autre ne part.
+  const idExt = (() => { try { return String(rt.id || ''); } catch (_) { return ''; } })();
+  function announce() { if (!vivant()) { retirer(); return; } poster({ __vmr: 'ready', version, id: idExt }); }
 
   // Relaie au service worker et rend la réponse — ou RIEN si ce pont est devenu
   // orphelin entre-temps (envoi qui lève, ou réponse arrivée après la mort).

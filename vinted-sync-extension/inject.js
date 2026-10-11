@@ -243,6 +243,32 @@
     } catch (_) {}
   };
 
+  // ── UNE ANNONCE QUE TU SUPPRIMES SORT DE VRM TOUT DE SUITE (5.165) ──────────
+  // Julien, 9 octobre : « je viens de supprimer beaucoup de paires et elles sont
+  // encore marquées dans les annonces ». La seule trace était `writereq`, posée
+  // AVANT la requête (donc aussi pour une suppression REFUSÉE) et sans statut —
+  // et une ligne par compte, écrasée à chaque fois. Le statut, lui, ne partait
+  // qu'au vidage du mouchard (5 s, 20 s) : une page qui navigue juste après le
+  // 200 le perdait, et il ne portait pas l'identifiant (`{id}`).
+  // ⇒ On regarde la RÉPONSE, dans son rappel (avant le code de Vinted qui
+  //   navigue), et on ne retient qu'une suppression RÉUSSIE (2xx), sur Vinted,
+  //   par son IDENTIFIANT d'annonce (§5) — jamais le corps, jamais un titre.
+  //   C'est une LECTURE de ce que la page vient de faire sur SON clic : zéro
+  //   requête de plus vers Vinted (§3).
+  const RE_SUPPR = /^\/api\/v\d+\/items\/(\d{4,15})\/delete\/?$/;
+  const noteSuppression = (method, url, status) => {
+    try {
+      if (String(method || '').toUpperCase() !== 'POST') return;
+      const st = Number(status);
+      if (!(st >= 200 && st < 300)) return;               // refusée, échouée : rien
+      let U = null; try { U = new URL(url, location.origin); } catch (_) { return; }
+      if (!/(^|\.)vinted\.[a-z.]+$/i.test(U.hostname)) return;
+      const m = RE_SUPPR.exec(U.pathname);
+      if (!m) return;
+      post({ kind: 'suppression', itemId: m[1], status: st, at: new Date().toISOString() });
+    } catch (_) {}
+  };
+
   // Convertit un ArrayBuffer en base64 (par morceaux pour eviter le débordement
   // de pile sur les gros PDF).
   const abToB64 = (buf) => {
@@ -289,6 +315,7 @@
         noteSeen(url); // diagnostic : TOUT appel API, pas seulement ceux qui matchent
         p.then((res) => {
           try {
+            noteSuppression(method, url, res.status);   // 5.165 : AVANT tout le reste (la page va naviguer)
             noteSeen(url, method, res.status);          // le STATUT, pas seulement le chemin
             const ct = (res.headers && res.headers.get) ? (res.headers.get('content-type') || '') : '';
             if (/application\/pdf/i.test(ct)) {
@@ -329,6 +356,7 @@
         noteSeen(url); // diagnostic : TOUT appel API (XHR aussi)
         this.addEventListener('load', function () {
           try {
+            noteSuppression(this.__cancaleMethod, url, this.status);   // 5.165
             noteSeen(url, this.__cancaleMethod, this.status);   // le STATUT aussi
             const ct = this.getResponseHeader ? (this.getResponseHeader('content-type') || '') : '';
             // Bordereau PDF via XHR (si Vinted le charge en binaire).
