@@ -243,6 +243,42 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
     await p2.close();
   }
 
+  // ── 11 OCTOBRE : UN DÉPÔT QUI N'ABOUTIT PAS LE DIT À L'APP ─────────────────
+  // « Quand je vais poster des paires sur le bon coin, je ne peux pas » : fermer
+  // le bandeau laissait le bouton de l'app « Publication en cours… » 15 minutes.
+  // Fermer, c'est laisser tomber CE dépôt : le service worker l'apprend
+  // (`depotArrete`), et « Réessayer » depuis l'app fait REPRENDRE cet onglet.
+  {
+    const p2b = await b.newPage({ viewport: { width: 1280, height: 900 } });
+    await p2b.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => {
+      const t = r.request().resourceType();
+      return (t === 'image' || t === 'font' || t === 'media') ? r.abort() : r.continue();
+    });
+    await p2b.addInitScript((d) => {
+      window.__envoyes = []; window.__ecouteurs = [];
+      window.chrome = { runtime: { id: 'banc', lastError: null, sendMessage: (m, cb) => { const rep = (o) => { try { cb && cb(o); } catch (_) {} };
+        window.__envoyes.push(JSON.parse(JSON.stringify(m || {})));
+        if (m && m.action === 'getQueue') return rep({ ok: true, queue: d.queue, removals: [], unlinked: [], postedList: [], stats: { onlineCount: 3, numberedCount: 3 } });
+        if (m && m.action === 'getPending') return rep({ ok: true, ad: d.queue[0] });
+        return rep({ ok: true }); }, onMessage: { addListener(fn) { window.__ecouteurs.push(fn); } } } };
+    }, { queue: QUEUE });
+    await p2b.goto('http://localhost:4491/depot', { waitUntil: 'domcontentloaded' });
+    await p2b.addScriptTag({ content: SRC });
+    await p2b.waitForTimeout(2500);
+    const id = String(QUEUE[0].id);
+    // « Réessayer » depuis l'app, sur cet onglet encore ouvert : il REPREND ici.
+    await p2b.evaluate((id) => { for (const f of window.__ecouteurs) { try { f({ __vrmLbc: 'reprendre', id }); } catch (_) {} } }, id);
+    await p2b.waitForTimeout(300);
+    const repris = await p2b.evaluate((id) => window.__envoyes.some((m) => m.action === 'depotRepris' && String(m.id) === id), id);
+    dit(repris, '« Réessayer » depuis l’app sur un dépôt ouvert : la page REPREND ici (pas un second dépôt)', '');
+    const ferme = await p2b.$('#vrm-close');
+    if (ferme) await ferme.click().catch(() => {});
+    await p2b.waitForTimeout(300);
+    const arret = await p2b.evaluate(() => window.__envoyes.filter((m) => m.action === 'depotArrete'));
+    dit(!!ferme && arret.length === 1 && String(arret[0].id) === id && arret[0].raison === 'bandeau-ferme', 'fermer le bandeau du dépôt : l’app l’apprend (« Le dépôt n’a pas abouti — Réessayer »), au lieu de 15 minutes « en cours »', JSON.stringify(arret));
+    await p2b.close();
+  }
+
   // ── LE PANNEAU N'AUTO-REMPLIT QUE LES PAGES DE DÉPÔT ──────────────────────
   // ⚠️ Avant, « Pré-remplir » pouvait remplir n'importe quelle page (une
   //    recherche avec « Prix min/max »). Maintenant l'extension fait tout TOUTE
