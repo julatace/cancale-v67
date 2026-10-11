@@ -4261,6 +4261,26 @@ numéros ». **Ce sont SES décisions, pas des options à reproposer.**
   refusé (409 `numero-ambigu` : terminer et republier) ; une sauvegarde faite avant
   la remise à zéro ne se restaure plus.
 
+- ✅ **APPLIQUÉE EN PRODUCTION LE 11 OCTOBRE À 14:58:07 UTC** (T = 2026-10-09T00:00:00Z,
+  marqueur version 2). Ordre suivi : déploiement du serveur et de l'app qui
+  lisent le marqueur (PR #472) → mesure (7 dressings relus le jour même, aucun
+  avant T ; 24 nouvelles, toutes datées par la photo ; 0 contradiction ; les 6
+  « pas en ligne » = 6 ventes) → essai ANNULÉ sur sa vraie base (7,2 s, rien
+  restant, vérifié) → application en UNE transaction : mesure refaite, refus si
+  l'empreinte md5 du plan diffère de celle de l'essai, conversion, garde-fous
+  posés dans la même transaction → rattrapage (0 email). Résultat : pool
+  558 B + 1…24 ; fiches 401 B + 24 ; ventes 503 B + 6 (1, 7, 9, 14, 16, 17 :
+  nouvelles déjà vendues) ; eBay 128127336988 {553→1}, 128086452103 {559→10} ;
+  ventes 571/572/573 sans identité → B571/B572/B573 (vendues, historique).
+  ⚠️ **Comment c'est passé** : l'outil SQL ne prend pas de fichier, et 92 Ko d'un
+  bloc ne passent pas. Les fonctions (sections 1 à 6, sans effet tant qu'on ne les
+  appelle pas) ont été installées en 6 morceaux d'instructions entières
+  (commentaires hors corps retirés), puis **chaque corps comparé par md5(prosrc)**
+  à celui du fichier : 28/28 identiques. Les deux `drop trigger if exists` ont été
+  retirés (déclencheurs absents, et un DROP attend une confirmation humaine dans
+  l'outil). Retour arrière : `sauvegarde.vrm_numerotation_annuler(owner)` (125
+  copies prises), refusé dès qu'un numéro a bougé.
+
 ### Leboncoin et eBay rangés comme Vinted : résumé, puis Ventes / Achats / Annonces (3 octobre)
 Demande du 2 octobre : « plus d'écran Aperçu intermédiaire ». Les deux onglets
 ouvrent sur **Ventes**, avec un résumé compact au-dessus (`PlatResume`, même forme

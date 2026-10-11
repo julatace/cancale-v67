@@ -1,6 +1,7 @@
 -- ════════════════════════════════════════════════════════════════════════════
 -- 013 — LES ANCIENS NUMÉROS DEVIENNENT « B… », LES NOUVELLES PAIRES REPARTENT DE 1
---        Décisions de Julien, 9 et 10 octobre 2026. PAS ENCORE APPLIQUÉE.
+--        Décisions de Julien, 9 et 10 octobre 2026. APPLIQUÉE le 11 octobre 2026
+--        à 14:58:07 UTC (T = 2026-10-09T00:00:00Z, version 2) — voir CLAUDE.md.
 -- ════════════════════════════════════════════════════════════════════════════
 -- 9 octobre, en ses mots : « On va reprendre la numérotation à zéro. Je veux que
 -- tous les anciens numéros, tu les fasses commencer par B1, B2… On commence à
