@@ -8913,7 +8913,14 @@ function EtatActions({ onNav, ordi, sombre }) {
   // Non connectée : son icône ouvre SA fenêtre de connexion (une extension
   // connectée, elle, ouvre VRM) — c'est le repli si la reconnexion automatique
   // n'aboutit pas.
-  else if (code === 'vrm') geste = <span>{__sessExtEnVol ? 'Un instant…' : <>Je réessaie de la connecter. Sinon : clique l'icône VRM en haut de Chrome et connecte-toi avec <b>{monMail || 'ton email VRM'}</b>.</>}</span>;
+  // 11 octobre : « je réessaie » n'est vrai que si l'extension sait RECEVOIR la
+  // connexion de VRM (5.167, session adressée). Une plus ancienne ne reçoit
+  // plus rien de l'app — promettre « je réessaie » serait le défaut le plus
+  // coûteux du projet ; on dit les deux vrais gestes.
+  else if (code === 'vrm') geste = <span data-etat-geste={extSait('liaison') === 'retard' ? 'maj-ou-mdp' : 'liaison'}>{__sessExtEnVol ? 'Un instant…'
+    : extSait('liaison') === 'retard'
+      ? <>Cette extension ({vmrExtVersion() || 'version ?'}) ne sait pas recevoir la connexion de VRM : mets-la à jour en {EXT_ATTENDUE} (Réglages) — ou clique l'icône VRM en haut de Chrome et connecte-toi avec ton mot de passe VRM (<b>{monMail || 'ton email VRM'}</b>).</>
+      : <>Je la connecte à <b>{monMail || 'ton compte VRM'}</b>. Si ça ne vient pas : clique l'icône VRM en haut de Chrome, puis « Se connecter avec VRM ».</>}</span>;
   else if (code === 'autre-vrm' || code === 'vrm-passu') geste = __sessExtEnVol ? <span>Un instant…</span>
     : <button type="button" data-etat-geste="recharger" style={btn} onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button>;
   else if (code === 'vinted') geste = <a data-etat-geste="vinted" href="https://www.vinted.fr" target="_blank" rel="noreferrer" style={btn}>Ouvrir vinted.fr et me connecter</a>;
