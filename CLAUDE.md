@@ -66,6 +66,11 @@ Ce ne sont pas des positions de principe : chacune a une raison technique.
 PDF (ça n'engage aucun argent, la vente est faite, le colis doit partir), et
 toute **lecture** sur ses propres données.
 
+**Refusé par Julien le 11 octobre (son choix, pas une limite technique) — ne pas
+reproposer** : « imprimer la journée » avec une liste de préparation triée par
+emplacement ; les étiquettes de carton avec QR code ; le prix conseillé à la mise
+en ligne (calculé sur ses ventes passées).
+
 **Garde-fous de l'extension, à ne jamais retirer** : agir uniquement au nom du
 **compte connecté dans l'onglet** (`garde`), plafond de **20 actions/heure par
 compte**, plafond par visite, requêtes **une par une** en attendant la réponse.
