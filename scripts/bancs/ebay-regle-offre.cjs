@@ -74,6 +74,10 @@ const OFFRES_K2 = () => ({
 });
 
 let rows = [], cfg = {}, ebay = {}, envois = [], bruts = [], scen = {}, enVol = 0, maxEnVol = 0, ecrituresMain = 0, apiEbay = 0;
+// `cfg.retenir = n` : la n-ième requête `regleoffre` est RETENUE jusqu'à `lacher()`
+// — un geste « pendant l'envoi » se joue alors à coup sûr, pas sur une course
+// d'horloge (une machine chargée faisait tomber « Arrêter » APRÈS le 1er envoi).
+let lacher = () => {};
 // L'état d'eBay (le faux) : ce qu'eBay TIENT, par annonce — prix et règle.
 const preparer = (c) => {
   cfg = c || {};
@@ -213,7 +217,9 @@ async function ouvrir(b, vp, c) {
     if (body.action === 'regleoffre') {
       enVol++; maxEnVol = Math.max(maxEnVol, enVol);
       try {
-        await attendre(cfg.regleDelai || 250);
+        const rang = bruts.filter((x) => /"action":"regleoffre"/.test(x)).length;
+        if (cfg.retenir === rang) await new Promise((ok) => { lacher = ok; setTimeout(ok, 20000); });
+        else await attendre(cfg.regleDelai || 250);
         const id = String(body.itemId); const s = ebay[id];
         const sc = scen[id] && scen[id].shift();
         if (sc) return j(sc.body, sc.status || 200);
@@ -592,16 +598,18 @@ async function finPage(pg, errs, quoi) {
         await ctx.close();
       });
       if (bloc(9)) await essaie(`[9] ${T} arrêter`, async () => {
-        // le 1er envoi dure 2 s : « Arrêter » tombe PENDANT lui, à coup sûr.
-        const { ctx, pg } = await ouvrir(b, vp, { regleDelai: 2000 });
+        // le 1er envoi est RETENU par le faux eBay : « Arrêter » tombe PENDANT lui.
+        const { ctx, pg } = await ouvrir(b, vp, { retenir: 1 });
         await allerAnnonces(pg); await ouvrirToutes(pg, 90);
         await pg.click(`[data-regles-ligne="${A.A6}"] [data-regles-choix]`); await pg.click(`[data-regles-ligne="${A.A7}"] [data-regles-choix]`); await pg.waitForTimeout(200);
         await pg.click('[data-regles-appliquer]'); await feuille(pg).waitFor({ timeout: 5000 });
         await feuille(pg).getByRole('button', { name: 'Oui, régler les 4' }).click();
-        await pg.waitForSelector('[data-regles-arreter]', { timeout: 3000 }); await pg.click('[data-regles-arreter]');
+        await pg.waitForSelector('[data-regles-arreter]', { timeout: 3000 });
+        const prog = await pg.$eval('[data-regles-progres]', (e) => e.getAttribute('data-regles-progres')).catch(() => '');
+        await pg.click('[data-regles-arreter]'); lacher();
         await pg.waitForSelector('[data-regles-bilan]', { timeout: 8000 });
         const ne = await pg.$eval('[data-regles-bilan]', (e) => e.getAttribute('data-regles-non-envoyees'));
-        dit(ne === '3' && regleoffres().length === 1, `[9] ${T} « Arrêter » pendant le 1er envoi : 3 non envoyées, dites`, `${ne} · ${regleoffres().length} envoi(s)`);
+        dit(prog === '1/4' && ne === '3' && regleoffres().length === 1, `[9] ${T} « Arrêter » pendant le 1er envoi : 3 non envoyées, dites`, `progrès ${prog} · ${ne} · ${regleoffres().length} envoi(s)`);
         await ctx.close();
       });
       if (bloc(9)) await essaie(`[9] ${T} vue d'un compte`, async () => {
@@ -613,15 +621,15 @@ async function finPage(pg, errs, quoi) {
         await ctx.close();
       });
       if (bloc(9)) await essaie(`[9] ${T} démontage`, async () => {
-        // chaque envoi dure 1,5 s : on quitte l'écran PENDANT le 2ᵉ, à coup sûr.
-        const { ctx, pg } = await ouvrir(b, vp, { regleDelai: 1500 });
+        // le 2ᵉ envoi est RETENU par le faux eBay : on quitte l'écran PENDANT lui.
+        const { ctx, pg } = await ouvrir(b, vp, { retenir: 2 });
         await allerAnnonces(pg); await ouvrirToutes(pg, 90);
         await pg.click(`[data-regles-ligne="${A.A6}"] [data-regles-choix]`); await pg.click(`[data-regles-ligne="${A.A7}"] [data-regles-choix]`); await pg.waitForTimeout(200);
         await pg.click('[data-regles-appliquer]'); await feuille(pg).waitFor({ timeout: 5000 });
         await feuille(pg).getByRole('button', { name: 'Oui, régler les 4' }).click();
         for (let i = 0; i < 100 && regleoffres().length < 2; i++) await pg.waitForTimeout(50);
         await sousOnglet(pg, 'Ventes');
-        const n = regleoffres().length; await pg.waitForTimeout(1500);
+        const n = regleoffres().length; lacher(); await pg.waitForTimeout(1500);
         dit(n === 2 && regleoffres().length === 2, `[9] ${T} changer de sous-onglet pendant le 2ᵉ envoi : plus AUCUN envoi après`, `${n} → ${regleoffres().length}`);
         await sousOnglet(pg, 'Annonces'); await pg.waitForSelector('[data-ebay-annonce]', { timeout: 8000 }); await pg.waitForTimeout(600);
         const li = await pg.$eval('[data-regles-lot-interrompu]', (e) => e.getAttribute('data-regles-lot-interrompu')).catch(() => null);
