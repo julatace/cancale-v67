@@ -7572,6 +7572,57 @@ extension), corrigé, rouge sur 24bec0d et sous mutation.
 - **Geste de Julien** : installer la **5.169** dans UN seul dossier, puis ⟳ dans
   CHAQUE Chrome (ou ouvrir VRM : le pont répare un code périmé tout seul).
 
+### ⚠️⚠️ LA 5.170 DE PRODUCTION DITE « PÉRIMÉE », ET « RIEN D'AUTRE À FAIRE » SOUS « LECTURE SEULE » (11 octobre, 5.171)
+Deux défauts de la revue du chantier ci-dessus, reproduits après la fusion
+d'`integ-11oct` (annonces en ligne, photos) dans ce chantier.
+- **Extension 5.171.0** : `main` a publié une **5.170** (PR #473) SANS ce
+  chantier. Deux contenus ne portent jamais le même numéro.
+- ⚠️⚠️ **Collision de numéros.** `CODE_DANS_ETAT`, `EXT_CAPACITES.liaison` et
+  `jugeable` (pont, logo) étaient à 5.169 — en dessous de la 5.170 publiée, dont
+  l'état n'a PAS `code` : sa 5.170 était dite « périmée » (« Lecture seule »,
+  aucune commande ni session, « clique ⟳ » — faux : ⟳ recharge la même 5.170) et
+  l'app lui promettait « je la connecte » sur un canal qu'elle n'ouvre pas.
+  Les quatre frontières passent à **5.171.0**. **Invariant** : chaque frontière
+  reste STRICTEMENT au-dessus de toute version publiée sans le champ.
+  `scripts/audit-planchers-code.cjs` exécute `codePerime` et `extSait('liaison')`
+  sur 5.168, 5.170 et ce que dit `origin/main` (sa version, `code:` dans son état,
+  `demanderLiaison`) ⇒ **après un `git fetch`, il passe au rouge tout seul** si
+  `main` publie encore une version sans ce code au niveau de la frontière : monter
+  alors les quatre ensemble.
+- **Le bandeau de liaison** disait « connectée ✓ — elle capte maintenant pour
+  toi. Rien d'autre à faire. » AU-DESSUS de « Lecture seule » (une copie ancienne
+  vivante : la session part adressée, les commandes restent coupées). Il lit
+  l'état de l'extension (`raisonExtGlobale`, §11) et dit ce qui reste, avec le
+  geste (`data-liaison-reste` : plusieurs · périmé · muette · absente · trop
+  ancienne). La session VRM, elle, vient d'être posée : pas jugée ; une pause de
+  Vinted n'appelle aucun geste.
+- ⚠️⚠️ **TROUVÉ EN FUSIONNANT les deux chantiers** : l'écran Annonces
+  (`FraicheurAnnonces`, chantier « en ligne ») promettait « elles seront
+  vérifiées à ta prochaine visite » et « une suppression sort d'ici tout de
+  suite » à une extension dont le CODE est périmé, pendant que la pastille disait
+  « Lecture seule — clique ⟳ ». Un code d'avant ne fait pas ce que la version
+  annoncée sait faire : périmé ⇒ aucune promesse, le même geste ⟳
+  (`data-perime`). Et les bancs `enligne` et `supprimees` servaient un état
+  « à jour » SANS `code` — une fiction depuis la frontière (§6.3) : ils servent
+  la vraie forme (`code` à partir de `CODE_DANS_ETAT`, lu dans la source).
+  `enligne.cjs` 13b : **2 rouges** sur le build de b4a7bc8, mutation rouge.
+- Preuves : `audit-planchers-code.cjs` **6 rouges** sur 7187f88 et sur la fusion
+  (7899211), 5 mutations rouges · `pont.cjs` (5.170 de production) **3 rouges**
+  et `premierjour.cjs` **2** sur le build de 7899211 · `deux-extensions.cjs`
+  (rendu COMBINÉ bandeau + pastille, Ma journée, 390 et 1512 px ; l'autre sens)
+  **6 rouges** sur le build de 7899211, 3 mutations rouges.
+- Vérifié après : 90 audits verts ; bancs rejoués un par un sur le build final —
+  pont, premierjour, deux-extensions, badge, popup, publier, signal-annonces,
+  tout-generer, filtre-compte, session, capacites, enligne, supprimees : verts.
+  ⚠️ `publier` (3) et `signal-annonces` (1) sont sortis rouges UNE fois, sous une
+  charge de 16 à 20 (d'autres sessions sur la machine) ; verts relancés seuls, et
+  verts sur le build de la fusion : instables sous charge, pas un défaut.
+- ⚠️ **Non mesuré** : la 5.170 réellement installée chez lui (les bancs simulent
+  sa FORME : version sans `code`, pas de canal adressé — lue dans le code de
+  `main`, jamais vue répondre).
+- **Geste de Julien** : installer la **5.171** (pas la 5.169, jamais livrée) dans
+  UN seul dossier, puis ⟳ dans CHAQUE Chrome.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
@@ -7599,7 +7650,7 @@ arrivée** — vérifiée commit par commit sur `manifest.json`, pas devinée.
 | `detourage` | `detourerPhotos` | **5.156.0** (4 oct.) | « tes photos sont détourées (fond blanc) avant d'être attachées à Leboncoin » |
 | `supprimees` | `noterSuppression` | **5.165.0** (11 oct.) | « une suppression faite sur vinted.fr dans ce Chrome sort d'ici tout de suite » |
 | `enligne` | `relireAnnoncesAutresComptes` | **5.170.0** (11 oct. — les 5.167/5.168 de production ne la portent pas) | « tes autres comptes sont relus à ta prochaine visite sur Vinted, sur n'importe lequel de tes comptes » — et seulement si l'extension est connectée à CE compte VRM (revue, 5.170) |
-| `liaison` | `demanderLiaison` | **5.169.0** (11 oct.) | « je connecte l'extension à ton compte VRM — rien à taper » (session adressée) |
+| `liaison` | `demanderLiaison` | **5.171.0** (11 oct. — la 5.170 de production ne la porte pas) | « je connecte l'extension à ton compte VRM — rien à taper » (session adressée) |
 
 ⚠️ **DEUX SEUILS POUR UNE MÊME NOTION, EXPRÈS.** Les photos s'attachent côté
 Leboncoin depuis la 5.58 et côté eBay depuis la 5.59 : un seul seuil aurait
@@ -7743,7 +7794,7 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | outil | quoi |
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
-| `node scripts/audit-*.cjs` | **89 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `node scripts/audit-*.cjs` | **90 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
 | `scripts/bancs/*.cjs` | les **80 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
@@ -8036,7 +8087,7 @@ script-là me fait croire à une catastrophe.
 src/App.jsx                     l'app (grep avant de lire — le fichier est énorme)
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
-scripts/audit-*.cjs             les 89 audits
+scripts/audit-*.cjs             les 90 audits
 scripts/bancs/                  les 80 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
