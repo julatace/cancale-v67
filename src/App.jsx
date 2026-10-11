@@ -163,6 +163,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 //   (offres  `autoAccepterOffres` — RETIRÉE le 5 octobre à sa demande : l'app ne
 //    promet plus aucune acceptation automatique, voir CLAUDE.md §3)
 //   releve  `capterReleves`       5.52.0  (5 sept.)   le relevé daté du porte-monnaie
+//   preuves `capterPreuvesVente`  5.167.0 (11 oct.)   la transaction des ventes en cours (anti double vente)
 // `audit-coherence.cjs` vérifie que ces trois fonctions existent toujours dans
 // l'extension : une capacité annoncée mais retirée serait le même mensonge.
 // ⚠️⚠️ LE SEUIL EST LA VERSION OÙ LA CHOSE MARCHE DE BOUT EN BOUT, PAS OÙ LE
@@ -175,7 +176,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // exactement. Le seuil est 5.160 : en deçà, l'app dit « mets à jour », elle ne
 // laisse pas le bouton se casser. (Mesuré le 7 octobre : son extension installée
 // est en 5.143 — c'est pour ça que « publier depuis VRM ne marche pas ».)
-const EXT_CAPACITES = { supprimees: '5.165.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', repond: '5.77.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', detourage: '5.156.0' };
+const EXT_CAPACITES = { supprimees: '5.165.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', repond: '5.77.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', detourage: '5.156.0', preuves: '5.167.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -199,6 +200,7 @@ const CAPACITES_DITES = [
   ['versement', 'relever la date de versement de tes ventes'],
   ['lbcmsg', 'relever tes messages Leboncoin'],
   ['detourage', 'détourer tes photos'],
+  ['preuves', 'relier tes ventes à leur annonce pour l\'anti double vente'],
 ];
 const capacitesManquantes = (v) => (v ? CAPACITES_DITES.filter(([k]) => cmpVersion(v, EXT_CAPACITES[k]) < 0).map(([, t]) => t) : []);
 const listeFr = (l) => (l.length <= 1 ? (l[0] || '') : `${l.slice(0, -1).join(', ')} ni ${l[l.length - 1]}`);
@@ -11637,6 +11639,18 @@ function EbayAnnonces({ baseKO, comptes = [] }) {
   const { paires, enLigne } = useEbayPaires(comptes);  // source partagée avec l'onglet Compte (§11)
   const [commandes, setCommandes] = React.useState(undefined);       // ebay_orders : undefined · null · []
   const [vendusVinted, setVendusVinted] = React.useState(undefined); // prouvées vendues : undefined · null · Set
+  // (11 octobre) Les ventes Vinted EN COURS qu'aucune preuve ne relie encore à
+  // leur annonce : `undefined` en cours · `null` pas su · [{ uid, tx }].
+  const [sansPreuve, setSansPreuve] = React.useState(undefined);
+  // L'extension prévient quand elle a rangé une preuve (une transaction lue,
+  // un bordereau, des ventes) : on relit, regroupé (une rafale = une lecture).
+  const [preuveRelue, setPreuveRelue] = React.useState(0);
+  React.useEffect(() => {
+    let t = null;
+    const f = (e) => { const d = e && e.detail; if (!d || d.type !== 'maj' || !['preuves', 'label', 'ventes'].includes(d.quoi)) return; clearTimeout(t); t = setTimeout(() => setPreuveRelue((n) => n + 1), 1500); };
+    window.addEventListener('vrm:ext', f);
+    return () => { clearTimeout(t); window.removeEventListener('vrm:ext', f); };
+  }, []);
   const [eligibles, setEligibles] = React.useState(undefined);       // offre : undefined · null · { ids:Set, complet }
   const [retraits, setRetraits] = React.useState({});                // itemId → '…' (en cours) | message
   // Retrait automatique (proposition 8) : l'interrupteur, et ce qui a été retiré
@@ -11645,6 +11659,10 @@ function EbayAnnonces({ baseKO, comptes = [] }) {
   const [retraitAuto, setRetraitAuto] = React.useState(() => load('vrm_ebay_retrait_auto', false) === true);
   React.useEffect(() => onCloudReady(() => setRetraitAuto((v) => v || load('vrm_ebay_retrait_auto', false) === true)), []);
   const [journalAuto, setJournalAuto] = React.useState(undefined);
+  // Le réglage est SYNCHRONISÉ : tant que le nuage n'est pas arrivé, on ne sait
+  // pas s'il est allumé (trois états, jamais deux).
+  const [reglageAutoLu, setReglageAutoLu] = React.useState(() => isCloudReady());
+  React.useEffect(() => onCloudReady(() => setReglageAutoLu(true)), []);
   React.useEffect(() => { let stop = false; (async () => {
     try {
       const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.ebay_retraits_auto&select=items:data->items`, { headers: sbAuth() });
@@ -11749,10 +11767,17 @@ function EbayAnnonces({ baseKO, comptes = [] }) {
   // (la base n'a pas répondu) · objet lu (`{}` = aucune vente captée).
   const [ventesLbc, setVentesLbc] = React.useState(undefined);
   const [lbcItems, setLbcItems] = React.useState(undefined);   // annonces Leboncoin : lues SEULEMENT si une vente ne se relie pas sans elles
+  // Les comptes dont on compte les ventes pas encore reliées : ceux qui sont
+  // liés et pas mis de côté par lui (un compte exclu ne se réclame pas, §7).
+  const comptesPreuve = React.useMemo(() => {
+    const masques = new Set((load('vinted_accounts_hidden', []) || []).map(String));
+    return (Array.isArray(comptes) ? comptes : []).map((a) => String((a && a.vinted_user_id) || '')).filter((u) => /^\d+$/.test(u) && !masques.has(u));
+  }, [comptes, nuage]);
+  const clePreuve = comptesPreuve.join(',');
   React.useEffect(() => {
     if (!aVerifier) return;
     let stop = false;
-    lireVentesVintedProuvees().then((v) => { if (!stop) setVendusVinted(v); });
+    lirePreuvesVenteVinted({ comptes: comptesPreuve }).then((p) => { if (!stop) { setVendusVinted(p ? p.vendus : null); setSansPreuve(p ? p.sansPreuve : null); } });
     (async () => {
       try {
         const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=ventes:data->ventes`, { headers: sbAuth() });
@@ -11764,7 +11789,7 @@ function EbayAnnonces({ baseKO, comptes = [] }) {
       } catch (_) { if (!stop) setVentesLbc(null); }
     })();
     return () => { stop = true; };
-  }, [aVerifier, items]);
+  }, [aVerifier, items, clePreuve, preuveRelue]);
   // Après une publication / modif : on resynchronise depuis eBay puis on relit.
   const resync = React.useCallback(async () => {
     try { await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'sync' }) }); } catch (_) {}
@@ -11967,14 +11992,22 @@ function EbayAnnonces({ baseKO, comptes = [] }) {
         ))}
       </div>
     )}
-    {/* Retrait automatique (proposition 8) — éteint par défaut, son choix. */}
-    <div data-ebay-retrait-auto={retraitAuto ? 'allume' : 'eteint'} style={{ ...bloc(), display: 'flex', flexDirection: 'column', gap: 6 }}>
+    {/* Retrait automatique (proposition 8) — éteint par défaut, son choix.
+        (11 octobre) Julien le croyait éteint : il était ALLUMÉ dans sa base.
+        L'état se dit d'abord, en un mot, et ce qu'il fait EN SON NOM ; tant que
+        le réglage n'est pas relu du nuage, on ne dit ni l'un ni l'autre (sur un
+        appareil neuf, « éteint » serait un faux). On ne touche pas à SON choix. */}
+    <div data-ebay-retrait-auto={!reglageAutoLu ? 'pas-lu' : retraitAuto ? 'allume' : 'eteint'} style={{ ...bloc(), display: 'flex', flexDirection: 'column', gap: 6 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <div style={{ flex: '1 1 200px', minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: E.text }}>Retrait automatique d'eBay</div>
-          <div style={{ fontSize: 11.5, color: E.muted, lineHeight: 1.45 }}>{retraitAuto ? 'Allumé : une paire prouvée vendue sur Vinted est retirée d\'eBay quand VRM est ouvert, si son annonce porte son N°.' : 'Éteint : VRM te montre les paires à retirer, c\'est toi qui cliques.'}</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: E.text }}>Retrait automatique d'eBay : <span data-ebay-retrait-etat={!reglageAutoLu ? 'pas-lu' : retraitAuto ? 'allume' : 'eteint'} style={{ fontWeight: 800 }}>{!reglageAutoLu ? '…' : retraitAuto ? 'ALLUMÉ' : 'ÉTEINT'}</span></div>
+          <div style={{ fontSize: 11.5, color: E.muted, lineHeight: 1.45 }}>{!reglageAutoLu
+            ? 'Je relis ton réglage…'
+            : retraitAuto
+              ? 'VRM retire TOUT SEUL d\'eBay, sans te demander, une paire prouvée vendue sur Vinted dont l\'annonce porte le N° — dès que VRM est ouvert, sur n\'importe lequel de tes appareils. Une annonce eBay terminée ne revient pas : si la vente Vinted est annulée ensuite, il faudra la republier. Tu ne l\'as pas voulu ? « Éteindre ».'
+              : 'VRM te montre les paires à retirer, c\'est toi qui cliques.'}</div>
         </div>
-        <button type="button" data-ebay-retrait-auto-bouton onClick={basculerRetraitAuto} style={lienE}>{retraitAuto ? 'Éteindre' : 'Allumer'}</button>
+        <button type="button" data-ebay-retrait-auto-bouton disabled={!reglageAutoLu} onClick={basculerRetraitAuto} style={{ ...lienE, opacity: reglageAutoLu ? 1 : 0.5 }}>{retraitAuto ? 'Éteindre' : 'Allumer'}</button>
       </div>
       {Array.isArray(journalAuto) && journalAuto.length > 0 && (
         <div data-ebay-retraits-faits={journalAuto.length} style={{ fontSize: 11.5, color: E.muted, lineHeight: 1.5, borderTop: `1px solid ${E.border}`, paddingTop: 6 }}>
@@ -12009,13 +12042,39 @@ function EbayAnnonces({ baseKO, comptes = [] }) {
       ⚠️ Je n'ai pas pu lire {pasSu.length === 1 ? pasSu[0] : pasSu.slice(0, -1).join(', ') + ' ni ' + pasSu[pasSu.length - 1]} — rien n'est perdu, rouvre l'écran dans un moment. En attendant, {effets.join(', et ')}.
     </div>
   );
+  // ── 2 bis. LES VENTES VINTED QUE L'ANTI DOUBLE VENTE NE VOIT PAS (11 octobre)
+  // Une vente EN COURS (à poster, en route) qu'aucune preuve ne relie à son
+  // annonce — ni transaction rangée, ni bordereau. Si sa paire est aussi en
+  // vente ici, VRM ne peut pas le dire : c'était la N°553 du 10 octobre. Dit UNE
+  // fois (§7), chaque compte NOMMÉ (le geste se fait compte par compte), et le
+  // geste suit l'extension de CE navigateur (`extSait`, trois états) — jamais
+  // la promesse qu'elle le fera si elle ne sait pas le faire.
+  const nSansPreuve = (relieesEbay || progReliees) && Array.isArray(sansPreuve) ? sansPreuve.length : 0;
+  const ligneSansPreuve = nSansPreuve > 0 && (() => {
+    const parCompte = new Map();
+    for (const v of sansPreuve) parCompte.set(v.uid, (parCompte.get(v.uid) || 0) + 1);
+    const nom = (u) => { const a = (Array.isArray(comptes) ? comptes : []).find((x) => String(x && x.vinted_user_id) === String(u)); return (a && a.login) || `#${u}`; };
+    const noms = [...parCompte.entries()].map(([u, n]) => parCompte.size > 1 ? `${nom(u)} (${n})` : nom(u));
+    const un = nSansPreuve === 1, ce = parCompte.size === 1 ? 'ce compte' : 'chacun de ces comptes';
+    const cap = extSait('preuves');
+    const geste = cap === 'ok'
+      ? `L'extension de ce navigateur va lire ${un ? 'sa transaction' : 'leur transaction'} toute seule à ta prochaine visite sur vinted.fr, connecté sur ${ce}.`
+      : cap === 'retard'
+        ? `L'extension installée ici ne va pas ${un ? 'la' : 'les'} chercher toute seule : mets-la à jour (${EXT_ATTENDUE}). En attendant, ouvre la conversation de ${un ? 'la vente' : 'chaque vente'} sur vinted.fr, connecté sur ${ce}.`
+        : `Sur l'ordinateur où l'extension VRM est installée : passe sur vinted.fr connecté sur ${ce}, et ouvre la conversation de ${un ? 'la vente' : 'chaque vente'} si l'extension n'est pas à jour.`;
+    return (
+      <div data-ebay-ventes-sans-preuve={nSansPreuve} data-ebay-sans-preuve-geste={cap} style={{ ...bloc(), fontSize: 12.5, color: E.text, lineHeight: 1.5 }}>
+        <b>{nSansPreuve} vente{un ? '' : 's'} Vinted en cours pas encore reliée{un ? '' : 's'} à {un ? 'son' : 'leur'} annonce</b> (sur {noms.join(', ')}) : l'anti double vente ne {un ? 'la' : 'les'} voit pas encore — si la paire est aussi en vente ici, VRM ne peut pas te dire de la retirer. {geste}
+      </div>
+    );
+  })();
   if (baseKO) return wrap(<>{head()}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué. Réessaie dans un instant.</div></>);
-  if (items === undefined) return wrap(<>{head()}{alertes}{lignePasSu}{outils}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Chargement…</div></>);
-  if (items === null) return wrap(<>{head()}{alertes}{lignePasSu}{outils}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Je n'ai pas pu lire tes annonces eBay. Réessaie dans un instant.</div></>);
+  if (items === undefined) return wrap(<>{head()}{alertes}{lignePasSu}{ligneSansPreuve}{outils}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Chargement…</div></>);
+  if (items === null) return wrap(<>{head()}{alertes}{lignePasSu}{ligneSansPreuve}{outils}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Je n'ai pas pu lire tes annonces eBay. Réessaie dans un instant.</div></>);
   // ⚠️ Une paire VENDUE sur eBay sort de cette liste (l'annonce est terminée) :
   //    c'est justement quand il n'en reste aucune que « retire-la de Vinted »
   //    compte le plus. Les alertes passent donc AVANT ce cas.
-  if (!items.length) return wrap(<>{head(0)}{alertes}{lignePasSu}{outils}<div style={{ color: E.muted, fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>Pas encore d'annonce eBay en ligne. {connected === true ? 'Mets une paire en vente ci-dessus — elle apparaîtra ici.' : 'Connecte ton compte eBay (onglet « Compte eBay ») et synchronise.'}</div></>);
+  if (!items.length) return wrap(<>{head(0)}{alertes}{lignePasSu}{ligneSansPreuve}{outils}<div style={{ color: E.muted, fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>Pas encore d'annonce eBay en ligne. {connected === true ? 'Mets une paire en vente ci-dessus — elle apparaîtra ici.' : 'Connecte ton compte eBay (onglet « Compte eBay ») et synchronise.'}</div></>);
   // ── 4. L'OFFRE AUX OBSERVATEURS et les annonces pas reliées : une phrase
   //    chacune, au-dessus de la liste ; sur la carte, seulement le bouton ou la
   //    pastille, qui distinguent (§7). ─────────────────────────────────────────
@@ -12027,6 +12086,7 @@ function EbayAnnonces({ baseKO, comptes = [] }) {
     <div style={{ color: E.muted, fontSize: 12, marginBottom: 12 }}>Tes annonces en ligne sur eBay — touche une annonce pour la modifier</div>
     {alertes}
     {lignePasSu}
+    {ligneSansPreuve}
     {outils}
     <div style={{ height: 12 }} />
     {nSans > 0 && (
@@ -18744,25 +18804,147 @@ const normTitle = (t) => (t || '').toLowerCase().replace(/\s+/g, ' ').trim();
 // ⚠️ Même expression que côté extension (`background.js`) — une notion, une
 //    règle (§11). Deux copies qui divergeraient donneraient deux files.
 const PAS_UNE_VENTE = /annul|cancel|refus|rembours|retour|suspend|[ée]chou/i;
+// ⚠️⚠️ 11 OCTOBRE — LA PREUVE QUI MANQUAIT À L'ANTI DOUBLE VENTE eBAY. Plainte
+// de Julien : « J'ai fait une vente hier, j'avais relié les deux paires, ça n'a
+// pas retiré la paire sur eBay, ça ne m'a même pas proposé ». Mesuré en lecture
+// seule : la N°553 (tx 23052006117, angeled92) n'avait AUCUNE ligne
+// `harvest_*_txn_*` — elle n'arrive que quand la CONVERSATION de la vente est
+// ouverte sur vinted.fr, geste que « Générer le bordereau » depuis l'app rend
+// inutile. Sur 18 ventes en cours, 6 seulement étaient prouvées : la règle a
+// tourné 36 fois sur ses deux appareils sans rien voir. Son BORDEREAU, lui,
+// était là depuis 21:55 et portait l'annonce (`item`, lu dans la transaction).
+// ⇒ la preuve par le bordereau, la même règle que l'extension (§11), bloc
+//   ci-dessous ; et l'extension 5.167 range désormais la transaction qu'elle lit.
+// ⚠️ Jamais `item_closing_action: 'sold'` seul : mesuré, 10 annonces « sold »
+//    n'ont que des transactions revenues (annulées, retours).
+// <preuve-vente-regle> — LA MÊME RÈGLE QUE L'EXTENSION (background.js), §11 ; comparées par
+// `audit-preuve-vente.cjs` (texte ET sorties). Fonctions PURES.
+const PREUVE_RECENTE_MS = 30 * 86400000;
+// Une vente qui n'est pas REVENUE : son état ne l'annule pas, et Vinted ne la
+// classe pas « en échec » (`failed` : remboursée, annulée).
+function venteVivante(o) {
+  if (!o || o.transaction_id == null) return false;
+  if (PAS_UNE_VENTE.test(String(o.status || ''))) return false;
+  return String(o.transaction_user_status || '') !== 'failed';
+}
+// Une vente EN COURS (à poster ou en route) : vivante, pas finalisée, de moins
+// de 30 jours. C'est la fenêtre où une double vente peut encore arriver.
+function venteEnCoursPreuve(o, maintenant) {
+  if (!venteVivante(o)) return false;
+  if (/finalis/i.test(String(o.status || '')) || String(o.transaction_user_status || '') === 'completed') return false;
+  const d = Date.parse(o.date || '');
+  return !(Number.isFinite(d) && maintenant - d > PREUVE_RECENTE_MS);
+}
+// La preuve par la TRANSACTION (ce qui existait) : l'annonce (`item_id`) et un
+// état de commande qui ne la fait pas revenir. Une conversation (état vide)
+// n'est pas une vente. Rend { items, tx } (annonces, transactions prouvées).
+function preuvesParTransaction(lignes) {
+  const items = new Set(), tx = new Set();
+  for (const r of (Array.isArray(lignes) ? lignes : [])) {
+    if (!r || !r.it) continue;
+    const etat = String(r.ti || '').trim();
+    if (!etat || PAS_UNE_VENTE.test(etat)) continue;
+    items.add(String(r.it));
+    const m = /_txn_(\d+)$/.exec(String(r.id || ''));
+    if (m) tx.add(m[1]);
+  }
+  return { items, tx };
+}
+// La preuve par le BORDEREAU : `harvest_{uid}_label_{tx}` porte l'annonce que
+// l'extension a lue dans la transaction (une identité, §5). Elle ne vaut que si
+// la vente `tx` est LUE dans les ventes du MÊME compte et qu'elle est vivante
+// (mesuré : 4 bordereaux sur 71 finissent « Remboursement effectué »).
+// `label_latest` (une copie) n'est jamais lu ; un `tx` de méta qui contredit
+// l'identifiant de la ligne = doute ⇒ rien. `ventesParCompte` : { uid: [ventes] }
+// — un compte absent n'a pas été lu ⇒ aucun de ses bordereaux ne prouve rien.
+function preuvesParBordereau(bordereaux, ventesParCompte) {
+  const items = new Set(), tx = new Set();
+  for (const b of (Array.isArray(bordereaux) ? bordereaux : [])) {
+    const m = /^harvest_(\d+)_label_(\d+)$/.exec(String((b && b.id) || ''));
+    if (!m) continue;
+    const t = m[2];
+    if (b.tx != null && String(b.tx).trim() !== '' && String(b.tx).trim() !== t) continue;
+    const it = String(b.it == null ? '' : b.it).trim();
+    if (!/^\d+$/.test(it)) continue;
+    const ventes = ventesParCompte ? ventesParCompte[m[1]] : null;
+    if (!Array.isArray(ventes)) continue;
+    const o = ventes.find((v) => v && String(v.transaction_id) === t);
+    if (!o || !venteVivante(o)) continue;
+    items.add(it); tx.add(t);
+  }
+  return { items, tx };
+}
+// Les comptes dont il faut LIRE les ventes : ceux qui portent un bordereau dont
+// l'annonce n'est pas déjà prouvée par une transaction (le reste ne coûte rien).
+function comptesAJuger(bordereaux, dejaProuves) {
+  const out = [];
+  for (const b of (Array.isArray(bordereaux) ? bordereaux : [])) {
+    const m = /^harvest_(\d+)_label_(\d+)$/.exec(String((b && b.id) || ''));
+    const it = String((b && b.it) == null ? '' : b.it).trim();
+    if (m && /^\d+$/.test(it) && !(dejaProuves && dejaProuves.has(it)) && !out.includes(m[1])) out.push(m[1]);
+  }
+  return out;
+}
+// Les ventes lues, par compte (`select=id,v:data->payload->my_orders`). Un
+// compte demandé sans ligne n'a aucune vente captée : `[]`, rien n'est prouvé.
+function ventesParCompteDe(lignes, uids) {
+  const out = {};
+  for (const u of (Array.isArray(uids) ? uids : [])) out[String(u)] = [];
+  for (const r of (Array.isArray(lignes) ? lignes : [])) {
+    const m = /^harvest_(\d+)_orders_sold$/.exec(String((r && r.id) || ''));
+    if (m && Array.isArray(out[m[1]]) && Array.isArray(r.v)) out[m[1]] = out[m[1]].concat(r.v);
+  }
+  return out;
+}
+// </preuve-vente-regle>
 // Les annonces Vinted PROUVÉES vendues (§5) : la transaction porte l'annonce
 // (`item_id`) et Vinted lui donne un ÉTAT DE COMMANDE qui ne la fait pas
-// revenir — la MÊME règle que l'écran Leboncoin et que l'extension
-// (`lireVentesProuvees`) : une conversation (état vide) n'est pas une vente.
-// Paginée et STRICTE (§4.5) : `null` = pas su, jamais une demi-liste.
-const lireVentesVintedProuvees = async () => {
+// revenir — ou son BORDEREAU porte l'annonce et la vente est lue, vivante, dans
+// les ventes du même compte. La MÊME règle que l'extension (`lireVentesProuvees`).
+// Paginée et STRICTE (§4.5) : `null` = pas su (une des lectures n'a pas
+// répondu), jamais une demi-liste.
+// `comptes` (uids, facultatif) : l'appelant veut aussi les ventes EN COURS
+// (à poster, en route) qu'AUCUNE preuve ne relie à leur annonce — l'anti double
+// vente ne les voit pas ; l'écran eBay les compte, une fois.
+// Rend `null` · `{ vendus: Set(annonce), sansPreuve: [{ uid, tx }] | null }`.
+const lirePreuvesVenteVinted = async (opts = {}) => {
   try {
-    const rows = await lireTout('id=like.harvest_%25_txn_%25&select=it:meta->>item_id,ti:meta->>status_title', { strict: true });
+    const rows = await lireTout('id=like.harvest_%25_txn_%25&select=id,it:meta->>item_id,ti:meta->>status_title', { strict: true });
     if (rows === null) return null;
-    const vendus = new Set();
-    for (const r of rows) {
-      if (!r || !r.it) continue;
-      const etat = String(r.ti || '').trim();
-      if (!etat || PAS_UNE_VENTE.test(etat)) continue;
-      vendus.add(String(r.it));
+    const parTx = preuvesParTransaction(rows);
+    const vendus = new Set(parTx.items);
+    // Les bordereaux (une ligne par vente, tous comptes, `_latest` écarté par
+    // la règle) : deux scalaires de `meta`, jamais le PDF (§4.4).
+    const bords = await lireTout('id=like.harvest_%25_label_%25&select=id,tx:meta->>tx,it:meta->>item', { strict: true });
+    if (bords === null) return null;
+    const comptes = Array.isArray(opts.comptes) ? [...new Set(opts.comptes.map(String).filter((u) => /^\d+$/.test(u)))] : null;
+    // Les ventes ne sont lues que pour les comptes qui en ont besoin (bordereau
+    // pas encore prouvé, ou comptes demandés) — la liste des commandes, rien d'autre.
+    const uids = [...new Set([...comptesAJuger(bords, vendus), ...(comptes || [])])];
+    let parCompte = {};
+    if (uids.length) {
+      const lignes = await lireTout(`id=in.(${uids.map((u) => `harvest_${u}_orders_sold`).join(',')})&select=id,v:data->payload->my_orders`, { strict: true });
+      if (lignes === null) return null;
+      parCompte = ventesParCompteDe(lignes, uids);
     }
-    return vendus;
+    const parBord = preuvesParBordereau(bords, parCompte);
+    for (const it of parBord.items) vendus.add(it);
+    let sansPreuve = null;
+    if (comptes) {
+      sansPreuve = [];
+      const vus = new Set(), maintenant = Date.now();
+      for (const u of comptes) for (const o of (parCompte[u] || [])) {
+        if (!venteEnCoursPreuve(o, maintenant)) continue;
+        const tx = String(o.transaction_id);
+        if (vus.has(tx) || parTx.tx.has(tx) || parBord.tx.has(tx)) continue;
+        vus.add(tx);
+        sansPreuve.push({ uid: u, tx });
+      }
+    }
+    return { vendus, sansPreuve };
   } catch (_) { return null; }
 };
+const lireVentesVintedProuvees = async () => { const p = await lirePreuvesVenteVinted(); return p ? p.vendus : null; };
 
 // ══════════════════════════════════════════════════════════════════════════════
 // UNE OFFRE NE SE RANGE PAS PAR RESSEMBLANCE DE TITRE (§5)
