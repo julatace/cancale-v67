@@ -5554,7 +5554,7 @@ const qMain = (cles) => `app_data?id=eq.main&select=${cles.map((k) => `${k}:data
 //    mais c'est le motif exact de « l'app annonçait 39, le panneau 40 » (§11),
 //    et `audit-places.cjs` existe pour ça. Les trois lecteurs, une seule règle.
 const MAIN_FILE = ['vinted_account_labels', 'vinted_accounts', 'vinted_accounts_blocked',
-  'vinted_accounts_hidden', 'vinted_annonce_numeros', 'vinted_pairs_lost', 'vrm_lbc_liens'];
+  'vinted_accounts_hidden', 'vinted_annonce_numeros', 'vinted_pairs_lost', 'vrm_lbc_liens', 'vrm_numerotation'];
 // Rend la ligne projetée (les clés absentes valent `null`), ou `null` si la base
 // n'a pas répondu — « rien lu » ne vaut pas « rien ».
 async function lireMain(cles) {
@@ -5877,16 +5877,29 @@ async function readLbcItems() {
 // ⚠️ `liens` = `vrm_lbc_liens` (annonce LBC → N°), posé À LA MAIN dans l'app
 // (« Relier », C4). Une identité qu'il pose lui-même ; l'app applique la même
 // règle (`adKeys`), sinon l'app relie et le panneau ne relie pas (§11).
-function adRefKeys(ad, liens) {
+// ⚠️ LA REMISE À ZÉRO DES NUMÉROS (migration 013, 10 octobre) : une annonce
+// Leboncoin qui portait un ancien numéro à la coupure (son IDENTIFIANT est dans
+// `vrm_numerotation.lbcAnnonces`, posé par le serveur) parle de l'ANCIENNE
+// paire — sa référence « 230 » est la B230, jamais la nouvelle 230. La MÊME
+// règle que `clesAnnonceLbc` / `numeroExterne` dans l'app (§11) ; le lien posé
+// À LA MAIN reste ce qu'il dit. Marqueur absent ou annulé : comme avant.
+function numeroLbcLu(k, ad, mk) {
+  const arch = mk && typeof mk === 'object' && !mk.annule && /^[A-Z]{1,3}$/.test(String(mk.archive || '')) ? String(mk.archive) : '';
+  if (!k || !arch || !/^\d+$/.test(k)) return k;
+  const ids = Array.isArray(mk.lbcAnnonces) ? mk.lbcAnnonces : [];
+  return ad && ad.id != null && ids.some((x) => String(x) === String(ad.id)) ? cleNum(arch + k) : k;
+}
+function adRefKeys(ad, liens, mk) {
   const keys = [];
   // Toutes les clés passent par `cleNum` — des deux côtés (`vintedKeys`).
   const push = (v) => { const t = cleNum(v); if (t && !keys.includes(t)) keys.push(t); };
+  const ext = (v) => { const t = cleNum(v); if (t) push(numeroLbcLu(t, ad, mk)); };
   if (liens && ad && ad.id != null && liens[String(ad.id)] != null) push(liens[String(ad.id)]);
-  if (ad.customRef) push(refVRMDe(ad.customRef));
-  if (ad.ref) push(ad.ref);
+  if (ad.customRef) ext(refVRMDe(ad.customRef));
+  if (ad.ref) ext(ad.ref);
   const t = String(ad.subject || '');
-  let m = RE_VRM.exec(t); if (m) push(m[1]);
-  m = /\bn\s*°?\s*(\d{1,5})\b/i.exec(t); if (m) push(m[1]);
+  let m = RE_VRM.exec(t); if (m) ext(m[1]);
+  m = /\bn\s*°?\s*(\d{1,5})\b/i.exec(t); if (m) ext(m[1]);
   return keys;
 }
 
@@ -6180,7 +6193,7 @@ async function buildLbcData() {
   for (const ad of lbcItems) {
     const dead = /(supprim|delete|expir|refus|sold|vendu)/i.test(String(ad.status || ''));
     if (dead) continue;
-    for (const k of adRefKeys(ad, liens)) if (!lbcByRef.has(k)) lbcByRef.set(k, ad);
+    for (const k of adRefKeys(ad, liens, main.vrm_numerotation)) if (!lbcByRef.has(k)) lbcByRef.set(k, ad);
   }
   // Clés de rapprochement d'une annonce Vinted : son numéro VRM + le « nXXXX »
   // présent dans son titre (les deux numérotations coexistent chez toi).
@@ -6265,7 +6278,7 @@ async function buildLbcData() {
     }
     for (const ad of lbcItems) {
       if (/(supprim|delete|expir|refus|sold|vendu)/i.test(String(ad.status || ''))) continue;
-      const keys = adRefKeys(ad, liens);
+      const keys = adRefKeys(ad, liens, main.vrm_numerotation);
       if (!keys.length) { unlinked.push(lbcRow(ad, keys)); continue; }
       if (keys.some((k) => keysOnline.has(k))) continue;   // encore en ligne sur Vinted
       // Paire inconnue de VRM : on ne crie PAS « à retirer » (on risquerait de

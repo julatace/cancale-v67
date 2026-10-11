@@ -68,6 +68,10 @@ const MUTATIONS = {
   'auto-photo-archive': { app: (s) => remplace(s, "      if (!numeroReprenable(e.numero)) continue;\n      const pk = entryPhotoKey(e);", "      const pk = entryPhotoKey(e);", 'auto-photo-archive') },
   // La pose à la main accepte « B230 ».
   'main-archive': { app: (s) => remplace(s, "    if (!numeroReprenable(cle)) {\n      updatePair(item, { numero: avant });", "    if (false) {\n      updatePair(item, { numero: avant });", 'main-archive') },
+  // L'extension lit la référence d'une vieille annonce Leboncoin comme la nouvelle série.
+  'extension-lbc': { ext: (s) => remplace(s, "return ad && ad.id != null && ids.some((x) => String(x) === String(ad.id)) ? cleNum(arch + k) : k;", "return k;", 'extension-lbc') },
+  // L'extension ne projette plus le marqueur (la clé vaudrait `undefined`, en silence).
+  'extension-projection': { ext: (s) => remplace(s, "'vinted_pairs_lost', 'vrm_lbc_liens', 'vrm_numerotation'];", "'vinted_pairs_lost', 'vrm_lbc_liens'];", 'extension-projection') },
   // L'écran ne relit plus la version avant de numéroter.
   'sans-version': { app: (s) => remplace(s, "    if (!numerotationPermise()) return;\n    // ⚠️ TOUTE ANNONCE EN LIGNE DOIT AVOIR UN NUMÉRO", "    // ⚠️ TOUTE ANNONCE EN LIGNE DOIT AVOIR UN NUMÉRO", 'sans-version') },
   // Un refus de la base n'arrête plus les envois.
@@ -95,7 +99,8 @@ if (MUTATION && !M) { console.log('❌ mutation inconnue : ' + MUTATION); proces
 let APP = fs.readFileSync(path.join(RACINE, 'src/App.jsx'), 'utf8');
 let LIB = fs.readFileSync(path.join(RACINE, 'api/_lib/numerotation.js'), 'utf8');
 let ROUTE = fs.readFileSync(path.join(RACINE, 'api/email-inbound.js'), 'utf8');
-try { if (M && M.app) APP = M.app(APP); if (M && M.lib) LIB = M.lib(LIB); if (M && M.route) ROUTE = M.route(ROUTE); }
+let EXT = fs.readFileSync(path.join(RACINE, 'vinted-sync-extension/background.js'), 'utf8');
+try { if (M && M.app) APP = M.app(APP); if (M && M.lib) LIB = M.lib(LIB); if (M && M.route) ROUTE = M.route(ROUTE); if (M && M.ext) EXT = M.ext(EXT); }
 catch (e) { console.log('❌ ' + e.message); process.exit(1); }
 
 function extraire(src, nom) {
@@ -186,6 +191,13 @@ const MK = { version: 2, coupure: T, appliqueLe: '2026-10-10T08:00:00.000Z', arc
     dit(JSON.stringify(R.clesAnnonceLbc(ad, {})) === '["B230"]', 'Leboncoin : la réf. et le « n230 » d\'une annonce d\'avant ⇒ B230', JSON.stringify(R.clesAnnonceLbc(ad, {})));
     dit(JSON.stringify(R.clesAnnonceLbc(ad, { 2900000001: '7' })) === '["7","B230"]', 'un lien posé À LA MAIN (après la coupure) reste ce qu\'il dit', JSON.stringify(R.clesAnnonceLbc(ad, { 2900000001: '7' })));
     dit(JSON.stringify(R.clesAnnonceLbc({ id: '2900000099', ref: '230', subject: 'Nike n230' }, {})) === '["230"]', 'une annonce Leboncoin d\'après ⇒ la nouvelle 230');
+    // L'EXTENSION (la file Leboncoin) lit la même chose (§11).
+    const ctxE = {}; vm.createContext(ctxE);
+    vm.runInContext(['cleNum', 'RE_VRM', 'refVRMDe', 'numeroLbcLu', 'adRefKeys'].map((n) => extraire(EXT, n)).join('\n') + '\n;this.E = { adRefKeys };', ctxE);
+    const cas = [[ad, {}], [ad, { 2900000001: '7' }], [{ id: '2900000099', ref: '230', subject: 'Nike n230' }, {}], [{ id: '2900000001', customRef: 'VRM-B12', subject: 'x' }, {}]];
+    const ecarts = cas.filter(([a, l]) => JSON.stringify(ctxE.E.adRefKeys(a, l, MK)) !== JSON.stringify(R.clesAnnonceLbc(a, l)));
+    dit(!ecarts.length, 'l\'extension (file Leboncoin) lit les mêmes clés que l\'app, marqueur compris (§11)', ecarts.map(([a, l]) => JSON.stringify(ctxE.E.adRefKeys(a, l, MK)) + ' ≠ ' + JSON.stringify(R.clesAnnonceLbc(a, l))).join(' · '));
+    dit(/'vrm_lbc_liens', 'vrm_numerotation'\];/.test(EXT) && /adRefKeys\(ad, liens, main\.vrm_numerotation\)/.test(EXT), 'et la file Leboncoin de l\'extension projette le marqueur et le passe à ses deux lecteurs');
   });
 
   console.log('\n5. LA VENTE DE LA NOUVELLE 22 NE FAIT PAS RETIRER L\'ANCIENNE D\'eBAY');
