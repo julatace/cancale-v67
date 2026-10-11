@@ -110,6 +110,8 @@ const MUTATIONS = {
   'retours-archive-retape': { app: (s) => remplace(s, "const arch = !numeroReprenable(num);", "const arch = false;", 'retours-archive-retape') },
   // Les paires qui reviennent ne sortent jamais de la liste (B… jamais porté par une annonce en ligne).
   'retours-jamais-republiees': { app: (s) => remplace(s, "      if (num && !numeroReprenable(num) && republiee(o)) continue;", "", 'retours-jamais-republiees') },
+  // L'app ne dit plus au serveur quelle version de numérotation elle a lue (publier / programmer sur eBay).
+  'ebay-sans-version': { app: (s) => remplace(s, "const avecVersion = corps && (corps.action === 'publish' || corps.action === 'programmer');", "const avecVersion = false;", 'ebay-sans-version') },
   // Restaurer une sauvegarde d'avant la remise à zéro : pas de contrôle de version.
   'restaure-sans-version': { app: (s) => remplace(s, "if(vF!==vIci){ toast(SAUVEGARDE_AVANT_REMISE); return; }", "", 'restaure-sans-version') },
   // L'écran ne relit plus la version avant de numéroter.
@@ -393,7 +395,10 @@ const MK = { version: 2, coupure: T, appliqueLe: '2026-10-10T08:00:00.000Z', arc
     dit(/const arch = !numeroReprenable\(num\);/.test(A) && /↩️ revient → numéro neuf/.test(A) && /🔁 renvoi → numéro neuf/.test(A), 'une vente revenue qui portait un ancien N° (B…) dit « numéro neuf », jamais « garde le N°B… »');
     dit(/\{r\.num && numeroReprenable\(r\.num\) && <button/.test(A) && /retoursAttendus\.some\(r=>r\.num&&numeroReprenable\(r\.num\)\) && <> <b>Retape son numéro<\/b>/.test(A), '« Retape son numéro » et le bouton ⧉ seulement pour un numéro qui se redonne');
     dit(/if \(num && !numeroReprenable\(num\) && republiee\(o\)\) continue;/.test(A), 'une paire revenue à l\'ancien N° sort de la liste quand elle est republiée (identité ou photo), pas par le numéro');
-    dit(/if\(vF!==vIci\)\{ toast\(SAUVEGARDE_AVANT_REMISE\); return; \}/.test(A) && /refus=codeRefusNumeros\(t\)\|\|'refus'/.test(A), 'restaurer une sauvegarde d\'avant la remise à zéro : refusé AVANT d\'écrire, et la vraie cause dite (jamais « la base n\'a pas répondu »)');
+    { const ae = corps('async function appelEbay(corps) {', '\n}\n');
+      dit(/const avecVersion = corps && \(corps\.action === 'publish' \|\| corps\.action === 'programmer'\);/.test(ae) && /avecVersion \? \{ \.\.\.corps, numerotation: versionNumerotation\(\) \}/.test(ae),
+        'publier / programmer sur eBay disent au serveur la version de numérotation lue par CET écran (il refuse un écran d\'avant la remise à zéro)'); }
+    dit(/if\(vF!==vIci\)\{ toast\(SAUVEGARDE_AVANT_REMISE\); return; \}/.test(A) && /refus=codeRefusNumeros\(t\)\|\|\(r\.status>=400&&r\.status<500\?'refus':null\)/.test(A), 'restaurer une sauvegarde d\'avant la remise à zéro : refusé AVANT d\'écrire, et la vraie cause dite (jamais « la base n\'a pas répondu »)');
   });
 
   console.log('\n9. L\'ÉCRAN PÉRIMÉ, EXÉCUTÉ (version relue, impression, refus, saisies rejouées, retrait automatique)');

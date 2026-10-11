@@ -1512,6 +1512,15 @@ commit;
 -- T = la coupure (date de mise en ligne) : 2026-10-09T00:00:00Z sauf décision
 -- contraire, à revérifier au moment de passer la migration.
 --
+-- ⚠️ VRM FERMÉ PARTOUT pendant l'essai et l'application (aucun appareil qui
+-- synchronise) : mesuré sur la projection de sa base (11 octobre, Postgres 16),
+-- la conversion verrouille `main` ~6 s ; une écriture de l'app qui attend plus
+-- de 8 s (statement_timeout / lock_timeout de ses rôles) tombe.
+-- ⚠️ Lire `dressings.avantCoupure` de la mesure (`attention` dans l'essai) : un
+-- compte dont le dressing a été capté AVANT T ne montre aucune annonce
+-- republiée — le faire recapter (passer sur Vinted connecté sur ce compte),
+-- puis refaire la mesure.
+--
 --   select sauvegarde.vrm_numerotation_mesurer(
 --     (select valeur::uuid from public.vrm_reglages where cle = 'proprietaire'), 'B', '2026-10-09T00:00:00Z');
 --

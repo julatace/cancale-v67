@@ -30,7 +30,8 @@ grant select on public.app_data to anon;
 create table public.vrm_reglages (cle text primary key, valeur text);
 -- Les comptes Vinted liés (colonnes lues par la migration : identifiant, login,
 -- propriétaire — jamais les jetons, qui n'existent pas ici).
-create table public.vinted_accounts (vinted_user_id bigint, login text, owner uuid not null default auth.uid());
+-- (`vinted_user_id` est un TEXTE en production — mesuré le 11 octobre.)
+create table public.vinted_accounts (vinted_user_id text, login text, owner uuid not null default auth.uid());
 alter table public.vinted_accounts enable row level security;
 alter table public.vrm_reglages enable row level security;
 

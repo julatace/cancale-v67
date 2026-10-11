@@ -9598,7 +9598,10 @@ async function appelEbay(corps) {
   try {
     // La version de numérotation qu'a lue CET écran (migration 013) : le serveur
     // refuse de publier ou programmer sous un numéro d'avant la remise à zéro.
-    const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ ...corps, numerotation: versionNumerotation() }) });
+    // (Seulement pour ces deux gestes : les autres corps restent exactement ce
+    // qu'ils étaient — ils ne posent aucun numéro.)
+    const avecVersion = corps && (corps.action === 'publish' || corps.action === 'programmer');
+    const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify(avecVersion ? { ...corps, numerotation: versionNumerotation() } : corps) });
     let j = null; try { j = await r.json(); } catch (_) {}
     return { code: r.status, j };
   } catch (_) { return { code: 0, j: null }; }
@@ -36760,7 +36763,7 @@ function AppCoeur() {
                 if(Object.keys(payload).length){
                   const r=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${SUPABASE_ROW}`, { method:'PATCH', headers:sbAuth({ 'Content-Type':'application/json', Prefer:'return=minimal' }), body: JSON.stringify({ data:payload, updated_at:new Date().toISOString() }) });
                   enregistre=r.ok;
-                  if(!r.ok){ let t=''; try{ t=await r.text(); }catch(_){} refus=codeRefusNumeros(t)||'refus'; }
+                  if(!r.ok){ let t=''; try{ t=await r.text(); }catch(_){} refus=codeRefusNumeros(t)||(r.status>=400&&r.status<500?'refus':null); } // un 5xx (522 de Cloudflare…) : la base n'a PAS répondu, ce n'est pas un refus
                 }
               }catch(_){ enregistre=false; }
               if(!enregistre){

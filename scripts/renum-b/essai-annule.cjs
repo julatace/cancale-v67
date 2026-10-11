@@ -21,6 +21,13 @@
 //     créés qu'à la fin, juste avant le ROLLBACK. `lock_timeout` (5 s) et
 //     `statement_timeout` (120 s) bornent l'essai. Le lancer d'un bloc, jamais
 //     pas à pas dans une session laissée ouverte.
+//  ⚠️ À lancer VRM FERMÉ PARTOUT : mesuré sur la projection de sa base (11
+//     octobre), l'essai dure ~8 s et `main` reste verrouillée ~6 s ; une
+//     écriture de l'app qui attend plus de 8 s tombe.
+//  ⚠️ Lire `attention` AVANT d'appliquer : `dressingsAvantCoupure` nomme les
+//     comptes dont le dressing a été capté avant T (le plan n'y voit aucune
+//     annonce republiée) ; `nouvellesPasEnLigne` compte les nouvelles qu'aucune
+//     capture ne montre en ligne (vendues, ou supprimées).
 //  ⚠️ `audit-renum-b.cjs` exécute ce script sur un Postgres jetable et vérifie
 //     qu'il ne laisse RIEN derrière lui.
 // ════════════════════════════════════════════════════════════════════════════
