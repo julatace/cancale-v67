@@ -1822,22 +1822,108 @@ function supprimeeApres(ids, id, capTs) {
   return !(Number(capTs) >= at + SUPPR_MARGE_MS);             // lecture d'avant, ou sans date : écartée
 }
 // </supprimees-regle>
-// Applique la règle à des lignes `harvest_{uid}_listings` lues en entier
-// (`select=id,data`) : rend des lignes dont les annonces supprimées APRÈS la
-// lecture sont retirées. `supp === null` (pas su) ⇒ les lignes telles quelles.
-function retirerSupprimeesLignes(lignes, supp) {
-  if (!supp || !Array.isArray(lignes)) return lignes;
-  return lignes.map((r) => {
-    const k = /^harvest_(\d+)_listings$/.exec(String(r && r.id || ''));
-    const d = r && r.data; const p = d && d.payload;
-    const ids = k && supp.get(k[1]);
-    if (!ids || !p || !Array.isArray(p.items)) return r;
-    const cap = Date.parse(d.capturedAt || '');
-    const items = p.items.filter((it) => !(it && supprimeeApres(ids, it.id, cap)));
-    if (items.length === p.items.length) return r;
-    return Object.assign({}, r, { data: Object.assign({}, d, { payload: Object.assign({}, p, { items }) }) });
-  });
+// <enligne-regle> — LA MÊME RÈGLE DANS L'APP (src/App.jsx) ET DANS L'EXTENSION
+// (background.js), §11. `audit-enligne.cjs` exige que les deux blocs soient
+// IDENTIQUES et compare leurs sorties sur les mêmes entrées. Il dépend de
+// `supprimeeApres` (bloc <supprimees-regle>, juste au-dessus dans les deux).
+// Julien, 11 octobre : « quand les annonces ne sont plus en ligne, elles doivent
+// être enlevées, automatiquement — je me retrouve avec trois fois la même paire
+// alors qu'il n'y a qu'une seule annonce ». Une annonce est EN LIGNE si :
+//   · la lecture COMPLÈTE la plus récente de son compte la contient ouverte —
+//     son propre dressing (`harvest_{uid}_listings`, quand il est connecté) ou
+//     son dressing PUBLIC relu depuis un autre de ses comptes
+//     (`harvest_{uid}_enligne`, 5.165) : la plus récente des deux fait foi ;
+//   · aucune suppression vue APRÈS cette lecture ne la retire ;
+//   · et cette lecture a moins de 24 h. Au-delà (ou jamais lue) on ne SAIT pas :
+//     ses annonces ne sont ni « en ligne » ni « disparues » — « à confirmer »,
+//     dites à part, jamais comptées (« rien lu ne vaut pas rien », §4.1).
+// Une annonce présente dans la lecture publique mais pas dans le dressing (elle
+// vient d'être republiée) est en ligne, avec ce que la lecture publique en sait.
+// Une annonce ouverte dans un dressing plus ancien et ABSENTE de la lecture
+// publique plus récente n'est plus en ligne (supprimée, vendue ou masquée) : elle
+// est rendue FERMÉE (`_vrmAbsente`), jamais « vendue » (rien ne le prouve).
+// ⚠️ Une annonce que son vendeur voit VENDUE ne se rouvre pas d'un coup d'œil
+//    public (la vue publique n'est pas mesurée sur les ventes) : la vente fait foi.
+const ENLIGNE_FRAIS_MS = 24 * 60 * 60 * 1000;
+function ouverteSurVinted(it) { return !!(it && !it.is_closed && !it.is_hidden && !it.is_draft); }
+function venduePourSonVendeur(it) { return !!(it && it.is_closed && /sold/i.test(String(it.item_closing_action || ''))); }
+function enLigneDuCompte(liste, pub, suppIds, maintenant) {
+  const itemsL = (liste && Array.isArray(liste.items)) ? liste.items : null;
+  const capL = itemsL && liste.cap != null && liste.cap !== '' ? Number(liste.cap) : NaN;
+  const pubLisible = !!(pub && (pub.complet === true || pub.complet === 'true') && Array.isArray(pub.ids));
+  const capP = pubLisible && pub.cap != null && pub.cap !== '' ? Number(pub.cap) : NaN;
+  const r = { enLigne: [], aConfirmer: [], fermees: [], absentes: [], supprimees: [], lu: NaN, source: '' };
+  const cand = [];
+  if (isFinite(capP) && !(isFinite(capL) && capL >= capP)) {
+    r.source = 'public'; r.lu = capP;
+    const parL = new Map(), parP = new Map(), vus = new Set();
+    for (const it of itemsL || []) if (it && it.id != null) parL.set(String(it.id), it);
+    for (const it of (Array.isArray(pub.items) ? pub.items : [])) if (it && it.id != null) parP.set(String(it.id), it);
+    for (const x of pub.ids) {
+      const id = String(x == null ? '' : x);
+      if (!id || vus.has(id)) continue;
+      vus.add(id);
+      const l = parL.get(id) || null, p = parP.get(id) || null;
+      if (!l && !p) continue;
+      if (l && venduePourSonVendeur(l)) continue;
+      cand.push(Object.assign({}, l || {}, p || {}, { id: (l || p).id, is_closed: false, is_hidden: false, is_draft: false }));
+    }
+    for (const it of itemsL || []) {
+      if (!it || it.id == null || vus.has(String(it.id))) continue;
+      if (ouverteSurVinted(it)) r.absentes.push(it); else r.fermees.push(it);
+    }
+  } else if (isFinite(capL)) {
+    r.source = 'dressing'; r.lu = capL;
+    for (const it of itemsL) { if (!it) continue; if (ouverteSurVinted(it)) cand.push(it); else r.fermees.push(it); }
+  } else if (itemsL) {
+    for (const it of itemsL) { if (!it) continue; if (ouverteSurVinted(it)) cand.push(it); else r.fermees.push(it); }
+  }
+  const garde = [];
+  for (const it of cand) { if (supprimeeApres(suppIds, it.id, r.lu)) r.supprimees.push(it); else garde.push(it); }
+  const age = Number(maintenant) - r.lu;
+  if (isFinite(r.lu) && age <= ENLIGNE_FRAIS_MS) r.enLigne = garde; else r.aConfirmer = garde;
+  return r;
 }
+// Les lignes de tous les comptes, telles que les balayages les lisent :
+// `lignesL` = `harvest_{uid}_listings` (`select=id,data` ou `data`), `lignesP` =
+// `harvest_{uid}_enligne` projetées (`id, cap, complet, ids, items`), `supp` =
+// Map uid → suppressions (`null` = pas su). Chaque compte rend UNE ligne au
+// format d'un dressing : ses annonces fermées, les absentes rendues fermées, et
+// celles qui sont en ligne — jamais celles « à confirmer », rendues à part.
+function enLigneDesLignes(lignesL, lignesP, supp, maintenant) {
+  const parL = new Map(), parP = new Map();
+  for (const r of lignesL || []) {
+    const d = r && r.data; if (!d) continue;
+    const k = /^harvest_(\d+)_listings$/.exec(String((r && r.id) || ''));
+    const uid = k ? k[1] : (d.uid != null ? String(d.uid) : '');
+    if (uid) parL.set(uid, r);
+  }
+  for (const r of lignesP || []) {
+    const k = /^harvest_(\d+)_enligne$/.exec(String((r && r.id) || ''));
+    if (k) parP.set(k[1], r);
+  }
+  const lignes = [], aConfirmer = new Map(), parCompte = new Map();
+  for (const uid of new Set([...parL.keys(), ...parP.keys()])) {
+    const r = parL.get(uid) || null, d = r ? r.data : null, p = d ? d.payload : null;
+    const liste = (p && Array.isArray(p.items)) ? { items: p.items, cap: Date.parse((d && d.capturedAt) || '') } : null;
+    const q = parP.get(uid) || null;
+    const pub = q ? { complet: q.complet, ids: q.ids, items: q.items, cap: Date.parse(q.cap || '') } : null;
+    const res = enLigneDuCompte(liste, pub, supp ? (supp.get(uid) || null) : null, maintenant);
+    parCompte.set(uid, res);
+    if (res.aConfirmer.length) aConfirmer.set(uid, res.aConfirmer);
+    const items = res.fermees.concat(res.absentes.map((it) => Object.assign({}, it, { is_closed: true, _vrmAbsente: true })), res.enLigne);
+    if (!liste && !items.length) continue;
+    const data = Object.assign({ type: 'listings' }, d || {}, { uid: (d && d.uid != null) ? d.uid : uid,
+      _vrmLu: isFinite(res.lu) ? res.lu : null, _vrmSource: res.source,
+      payload: Object.assign({}, p || {}, { items }) });
+    lignes.push(Object.assign({}, r || {}, { id: (r && r.id) || `harvest_${uid}_listings`, data }));
+  }
+  return { lignes, aConfirmer, parCompte };
+}
+// </enligne-regle>
+// (5.165, 11 octobre : `retirerSupprimeesLignes` est RETIRÉE — les suppressions
+//  s'appliquent désormais dans `enLigneDesLignes`, avec la lecture la plus
+//  récente de chaque compte : la même règle que l'app, §11.)
 // Toutes les suppressions rangées, par compte. `null` = la base n'a pas répondu
 // (« pas su » : l'appelant n'écarte rien). Une ligne par compte : famille bornée.
 async function lireSupprimeesTous() {
@@ -1849,6 +1935,18 @@ async function lireSupprimeesTous() {
     if (k && r.ids && typeof r.ids === 'object') m.set(k[1], r.ids);
   }
   return m;
+}
+// Les dressings de TOUS les comptes, avec la règle « en ligne » appliquée
+// (`enLigneDesLignes`, la même que l'app — §11). Les lectures publiques des
+// autres comptes (`harvest_{uid}_enligne`, une ligne par compte : famille
+// bornée) n'ajoutent ni n'ôtent rien quand elles sont illisibles : le dressing
+// seul décide alors, et un compte qu'on ne peut pas dater reste « à confirmer ».
+const SELECT_ENLIGNE = 'id,cap:data->>capturedAt,complet:data->complet,ids:data->ids,items:data->items';
+async function lireDressingsEnLigne() {
+  const lignesL = (await sbGet('app_data?id=like.harvest_*_listings&select=id,data')) || [];
+  const lignesP = await sbGet(`app_data?id=like.harvest_*_enligne&select=${SELECT_ENLIGNE}`);
+  if (lignesP === null) noterDiag('enligne_lignes_pas_lues');
+  return enLigneDesLignes(lignesL, lignesP || [], await lireSupprimeesTous(), Date.now());
 }
 
 // ⚠️ LE TÉLÉCHARGEMENT MANUEL NE POUVAIT PAS ÊTRE RELIÉ QUAND IL Y EN A DEUX.
@@ -2824,6 +2922,180 @@ async function tickPhotos() {
   } catch (_) { /* une capture ratée n'a pas à réveiller d'erreur */ }
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// CE QUI EST EN LIGNE SUR SES AUTRES COMPTES — RELU À CHAQUE VISITE (5.165)
+// ══════════════════════════════════════════════════════════════════════════════
+// Julien, 11 octobre : « j'avais supprimé mes annonces sur Vinted, il y avait
+// encore toutes mes annonces sur VRM — je me retrouve avec trois fois la même
+// paire alors qu'il n'y a qu'une seule annonce ». MESURÉ le même jour : l'écran
+// Annonces montrait 27 annonces « en ligne », dont 16 d'une lecture du
+// 8 octobre (arthuror2, tomj683) — l'extension ne relit le dressing QUE du
+// compte connecté dans Chrome, et ces deux-là n'y étaient pas passés (la copie
+// qui les lisait n'avait pas de session : ses écritures étaient refusées).
+// ⇒ À chaque visite, après la moisson du compte connecté, on relit le dressing
+//   PUBLIC de ses AUTRES comptes : `GET /api/v2/wardrobe/{profil}/items`, la
+//   requête que la page de profil fait d'elle-même quand on ouvre un dressing.
+//   C'est une LECTURE de données publiques, faite avec la session du compte
+//   connecté — jamais une action, jamais au nom d'un autre compte, jamais avec
+//   les jetons d'un autre compte (`activeFetchAll` est retiré, §3).
+// Bornes (§3) : uniquement les comptes LIÉS (`vinted_accounts`), jamais un compte
+// exclu (masqué, refusé par Vinted) ni supprimé (`vrm_blocked_accounts`) — et
+// « pas su » sur ces listes ⇒ personne n'est lu ; dans la file Vinted (une requête
+// à la fois), pause et frein respectés ; sur le budget de LECTURE du compte
+// connecté, après l'argent et les colis (`gardeLecture`, classe ordinaire) ; au
+// plus 3 comptes par visite, aucun relu depuis moins de 30 min ; toutes les pages,
+// jusqu'à la dernière annoncée par Vinted — sinon la lecture n'est PAS complète
+// et ne décide rien.
+// Rangé dans une ligne DÉDIÉE `harvest_{uid}_enligne` — jamais par-dessus
+// `harvest_{uid}_listings` : la vue publique est plus pauvre (vues, boost) et ne
+// doit rien effacer. Une lecture ratée ou incomplète n'écrit RIEN.
+const ENLIGNE_MAX_PAR_VISITE = 3;
+const ENLIGNE_DELAI_MS = 30 * 60 * 1000;
+const ENLIGNE_REESSAI_MS = 5 * 60 * 1000;
+const ENLIGNE_PAR_PAGE = 96;                 // Vinted plafonne à 96 (mesuré : 101 articles = 2 pages)
+const ENLIGNE_MAX_PAGES = 10;
+const ENLIGNE_ESSAIS = 'vrmEnLigneEssais';   // { [uid]: ms de la dernière tentative } (§4.9)
+// Le moyen de lire : dans un onglet Vinted ouvert (la requête part de la page,
+// avec ses cookies, comme quand on ouvre un dressing), sinon par le service
+// worker avec les cookies du compte connecté. Une requête = une place de la file.
+async function lecteurPublic(domain) {
+  let tab = null;
+  try {
+    const tabs = await chrome.tabs.query({ url: ['https://*.vinted.fr/*', 'https://*.vinted.com/*'] });
+    tab = (tabs || []).find((t) => t && t.id != null && !t.discarded && t.status === 'complete') || null;
+  } catch (_) { tab = null; }
+  const csrf = lastCsrfByDomain[domain] || '';
+  if (!tab) return (chemin) => vintedGetCookie(domain, chemin);
+  return (chemin) => requeteVinted('public', async () => {
+    try {
+      const res = await chrome.scripting.executeScript({
+        target: { tabId: tab.id }, world: 'MAIN', args: [chemin, csrf],
+        func: async (p, csrfTok) => {
+          try {
+            const h = { accept: 'application/json' };
+            if (csrfTok) h['x-csrf-token'] = csrfTok;
+            const r = await fetch(p, { credentials: 'include', headers: h });
+            let json = null; try { json = await r.json(); } catch (_) {}
+            return { status: r.status, ok: r.ok, json };
+          } catch (_) { return { status: 0, ok: false, json: null }; }
+        },
+      });
+      const o = res && res[0] && res[0].result;
+      return (o && typeof o === 'object') ? o : { status: 0, ok: false, json: null };
+    } catch (_) { return { status: 0, ok: false, json: null }; }
+  });
+}
+// Le dressing public d'UN profil, page par page. `avantPage()` rend un refus
+// (budget, pause) ou `null`. Complet SEULEMENT si la boucle s'arrête d'elle-même
+// (page vide, ou dernière page annoncée) ET que le total annoncé est atteint.
+async function lireDressingPublic(lire, pid, avantPage) {
+  const vus = new Set(), items = [];
+  let total = null, complet = false, raison = 'lecture', statut = 0;
+  for (let page = 1; page <= ENLIGNE_MAX_PAGES; page++) {
+    const refus = avantPage ? await avantPage() : null;
+    if (refus) return { complet: false, raison: refus.code || 'refus' };
+    const r = await lire(`/api/v2/wardrobe/${encodeURIComponent(pid)}/items?page=${page}&per_page=${ENLIGNE_PAR_PAGE}`);
+    if (!r || r.pause) return { complet: false, raison: 'vinted-pause' };
+    if (!r.ok || !r.json || !Array.isArray(r.json.items)) { statut = Number(r.status) || 0; raison = 'lecture'; break; }
+    const lot = r.json.items;
+    for (const it of lot) {
+      if (!it || it.id == null) continue;
+      // L'IDENTITÉ (§5) : un article d'un AUTRE membre n'est jamais rangé sous ce compte.
+      const proprio = it.user_id != null ? it.user_id : (it.user && it.user.id);
+      if (proprio != null && String(proprio) !== String(pid)) return { complet: false, raison: 'autre-membre' };
+      const k = String(it.id);
+      if (vus.has(k)) continue;
+      vus.add(k); items.push(it);
+    }
+    const pg = r.json.pagination || {};
+    if (pg.total_entries != null && pg.total_entries !== '' && isFinite(Number(pg.total_entries))) total = Number(pg.total_entries);
+    const tp = Number(pg.total_pages);
+    if (!lot.length || (isFinite(tp) && tp > 0 && page >= tp)) { complet = true; break; }
+    await wait(1200);
+  }
+  if (complet && total != null && items.length < total) return { complet: false, raison: 'total', total, n: items.length };
+  return complet ? { complet: true, items, total } : { complet: false, raison, statut };
+}
+// La dernière lecture de chaque compte (son dressing ou sa lecture publique),
+// en scalaires (§4.4). `null` = la base n'a pas répondu (« pas su »).
+async function lecturesParCompte() {
+  const a = await sbGet('app_data?id=like.harvest_*_listings&select=id,cap:meta->>capturedAt');
+  const b = await sbGet('app_data?id=like.harvest_*_enligne&select=id,cap:meta->>capturedAt');
+  if (a === null || b === null) return null;
+  const m = new Map();
+  for (const r of [...a, ...b]) {
+    const k = /^harvest_(\d+)_(?:listings|enligne)$/.exec(String((r && r.id) || ''));
+    if (!k) continue;
+    const t = Date.parse((r && r.cap) || '');
+    if (isFinite(t) && t > (m.get(k[1]) || 0)) m.set(k[1], t);
+  }
+  return m;
+}
+async function relireAnnoncesAutresComptes(uidConnecte) {
+  try {
+    if (!uidConnecte) return 0;
+    if (await pauseVinted()) return 0;
+    if (await sansSessionPourEcrire()) { noterDiag('enligne_sans_session'); return 0; }
+    const accts = await getStoredAccounts({ ouNull: true });
+    if (!Array.isArray(accts)) { noterDiag('enligne_comptes_pas_lus'); return 0; }
+    const acc = accts.find((a) => String(a.vinted_user_id) === String(uidConnecte));
+    if (!acc) return 0;                       // la session de lecture doit être celle d'un de SES comptes
+    const noirs = await blockedAccounts();
+    if (!noirs) { noterDiag('enligne_supprimes_pas_lus'); return 0; }      // pas su : on ne lit personne
+    const main = await lireMain(['vinted_accounts_hidden', 'vinted_accounts_blocked']);
+    if (main === null) { noterDiag('enligne_exclus_pas_lus'); return 0; }
+    const off = new Set([...(main.vinted_accounts_hidden || []), ...(main.vinted_accounts_blocked || [])].map(String));
+    const lus = await lecturesParCompte();
+    if (lus === null) { noterDiag('enligne_dates_pas_lues'); return 0; }
+    const essais = (await chrome.storage.local.get(ENLIGNE_ESSAIS))[ENLIGNE_ESSAIS] || {};
+    const t = Date.now();
+    const candidats = [...new Set(accts.map((a) => String((a && a.vinted_user_id) || '')))]
+      .filter((u) => u && u !== String(uidConnecte) && !noirs.has(u) && !off.has(u))
+      .filter((u) => !(t - Number(essais[u] || 0) < ENLIGNE_DELAI_MS))
+      .filter((u) => !(t - Number(lus.get(u) || 0) < ENLIGNE_DELAI_MS))
+      .sort((a, b) => Number(lus.get(a) || 0) - Number(lus.get(b) || 0));   // le plus ancien d'abord
+    if (!candidats.length) return 0;
+    const domain = acc.domain || 'www.vinted.fr';
+    const lire = await lecteurPublic(domain);
+    let n = 0, tentes = 0;
+    for (const uid of candidats) {
+      if (tentes >= ENLIGNE_MAX_PAR_VISITE) break;
+      if (await pauseVinted()) break;
+      const pid = await profilIdRange(uid);
+      if (!pid) { noterDiag(pid === null ? 'enligne_profil_pas_lu' : 'enligne_sans_profil'); continue; }
+      tentes++;
+      const debut = Date.now();
+      essais[uid] = debut;
+      try { await chrome.storage.local.set({ [ENLIGNE_ESSAIS]: essais }); } catch (_) {}
+      const lu = await lireDressingPublic(lire, pid, () => gardeLecture(uidConnecte, acc, 'enligne'));
+      if (!lu.complet) {
+        noterDiag(`enligne_incomplet_${lu.raison}`);
+        // Vinted freine, ou le budget est vide : on s'arrête là (rien de rangé).
+        if (lu.raison === 'vinted-pause' || lu.raison === 'lectures-reservees' || lu.raison === 'trop-de-lectures' || lu.raison === 'autre-compte') break;
+        essais[uid] = Date.now() - ENLIGNE_DELAI_MS + ENLIGNE_REESSAI_MS;      // nouvel essai dans 5 min, jamais en rafale
+        try { await chrome.storage.local.set({ [ENLIGNE_ESSAIS]: essais }); } catch (_) {}
+        continue;
+      }
+      const ouvertes = lu.items.filter((it) => ouverteSurVinted(it) && !venduePourSonVendeur(it)).map(articleMaigre);
+      const data = { type: 'enligne', uid: String(uid), pid: String(pid), source: 'public', complet: true,
+        capturedAt: new Date(debut).toISOString(), n: ouvertes.length, ids: ouvertes.map((x) => String(x.id)),
+        items: ouvertes, lus: lu.items.length, total: lu.total, ver: EXT_VERSION };
+      const ok = await supabaseUpsert('app_data', [{ id: `harvest_${uid}_enligne`, data, updated_at: data.capturedAt }], 'id');
+      if (ok === false) {
+        noterDiag('enligne_ecriture_ratee');
+        essais[uid] = Date.now() - ENLIGNE_DELAI_MS + ENLIGNE_REESSAI_MS;
+        try { await chrome.storage.local.set({ [ENLIGNE_ESSAIS]: essais }); } catch (_) {}
+        continue;
+      }
+      n++;
+      noterDiag('enligne_range');
+      notifierApp({ type: 'maj', quoi: 'annonces', uid: String(uid) });
+    }
+    if (n) logActivity(`🟢 Annonces en ligne relues sur ${n} autre${n > 1 ? 's' : ''} compte${n > 1 ? 's' : ''}`);
+    return n;
+  } catch (_) { return 0; }
+}
+
 // MÊME EXPRESSION que `isAwaitingShipStatus` (src/App.jsx) et `awaitingShip`
 // (api/widget.js) — « Bordereau d'envoi commandé » (4 oct.) et « Commande du
 // bordereau d'envoi validée » (1er sept.) sont la même étape que « bordereau
@@ -3730,6 +4002,13 @@ async function visiteVinted() {
     // `/payouts` (aucune requête ajoutée) ; ici on ne va chercher que les mois
     // PASSÉS encore absents, deux par visite au plus.
     await capterReleves(uid);
+    // ⚠️ 5.165 (11 octobre) — CE QUI EST EN LIGNE SUR SES AUTRES COMPTES : leur
+    // dressing PUBLIC, relu avec la session du compte connecté (au plus 3 comptes
+    // par visite, aucun relu depuis moins de 30 min, budget de lecture ordinaire).
+    // Sans ça, un compte où il ne repasse pas restait figé sur sa dernière
+    // lecture — ses annonces supprimées s'affichaient « en ligne » à côté des
+    // republiées (« trois fois la même paire »). Voir `relireAnnoncesAutresComptes`.
+    await relireAnnoncesAutresComptes(uid);
     // ⚠️ APRÈS la moisson : la liste du dressing (id + nPhotos) vient d'être
     // captée. On complète EN PASSIF les photos manquantes de ses annonces en
     // ligne — une par une, compte connecté (§3). Sans ouvrir l'annonce : c'est
@@ -6239,7 +6518,13 @@ async function buildEbayData() {
   const lost = main.vinted_pairs_lost || {};
   const pos = await readEbayPosted();
   const posted = new Set(pos.ids);
-  const listRows = retirerSupprimeesLignes((await sbGet('app_data?id=like.harvest_*_listings&select=id,data')) || [], await lireSupprimeesTous());
+  // 5.165 (11 octobre) : seulement ce qui est EN LIGNE d'après la lecture la plus
+  // récente de chaque compte — sans les supprimées, sans celles qu'une lecture
+  // publique plus récente ne montre plus, et sans celles « à confirmer ».
+  const enl = await lireDressingsEnLigne();
+  const listRows = enl.lignes;
+  let aConfirmer = 0;
+  for (const [u, l] of enl.aConfirmer) if (!off.has(String(u))) aConfirmer += l.length;
   const itemRows = (await sbGetTout('app_data?id=like.harvest_*_item_*&select=id,data')) || []; // §4.5 : une ligne par annonce, tous comptes → dépasse 1000 chez un vendeur actif, sbGet tronquait
   const details = {};
   for (const r of itemRows) { const p = (r.data || {}).payload || {}; const it = (p && p.item) || p; if (it && it.id) details[String(it.id)] = it; }
@@ -6286,7 +6571,7 @@ async function buildEbayData() {
     }
   }
   queue.sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0));
-  return { queue, retirees, vendues, preuveKO: preuve.echec, postedCount: posted.size, echec: pos.echec };
+  return { queue, retirees, vendues, aConfirmer, preuveKO: preuve.echec, postedCount: posted.size, echec: pos.echec };
 }
 
 async function buildLbcData() {
@@ -6324,8 +6609,15 @@ async function buildLbcData() {
   const posted = new Set(postedData.ids);
   const lbcLimit = postedData.limit;
   const lbcPlan = postedData.plan;
-  // Annonces EN LIGNE (harvest listings) — sans celles qu'il vient de supprimer (5.165).
-  const listRows = retirerSupprimeesLignes((await sbGet('app_data?id=like.harvest_*_listings&select=id,data')) || [], await lireSupprimeesTous());
+  // Annonces EN LIGNE d'après la lecture la plus récente de chaque compte
+  // (5.165, `lireDressingsEnLigne`) — sans les supprimées, sans celles qu'une
+  // lecture publique plus récente ne montre plus. Celles « à confirmer » (compte
+  // pas relu depuis 24 h) ne sont ni dans la file, ni « à retirer de Leboncoin » :
+  // on ne sait pas, on ne dit rien.
+  const enl = await lireDressingsEnLigne();
+  const listRows = enl.lignes;
+  const aConfirmerIds = new Set();
+  for (const [u, l] of enl.aConfirmer) if (!off.has(String(u))) for (const it of l) if (it && it.id != null) aConfirmerIds.add(String(it.id));
   const online = []; const onlineIds = new Set(); const seen = new Set();
   let exclues = 0;
   for (const r of listRows) {
@@ -6471,6 +6763,7 @@ async function buildLbcData() {
   for (const pid of posted) {
     if (!/^\d+$/.test(pid)) continue;                 // on ne suit que les ids d'annonce
     if (onlineIds.has(pid)) continue;                  // encore en ligne sur Vinted → RAS
+    if (aConfirmerIds.has(pid)) continue;              // à confirmer : on ne sait pas, on n'alerte pas
     const e = numeros[pid] || {};
     removalSeen.add(pid);
     removals.push({ id: pid, numero: String(e.numero || '?'), ref: 'VRM-' + (e.numero || '?'), title: e.title || '', etat: etatDe(pid) });
@@ -6485,6 +6778,11 @@ async function buildLbcData() {
     for (const o of online) {
       const e = numeros[o.id]; const num = e && e.numero;
       for (const k of vintedKeys(o, num)) keysOnline.add(k);
+    }
+    // Une paire « à confirmer » n'est pas « plus en ligne » : on ne sait pas.
+    for (const [u, l] of enl.aConfirmer) {
+      if (off.has(String(u))) continue;
+      for (const it of l) { const e = numeros[String(it.id)]; for (const k of vintedKeys({ raw: it }, e && e.numero)) keysOnline.add(k); }
     }
     // Numéros connus de VRM (toutes annonces numérotées, en ligne ou non).
     const keysKnown = new Set();
@@ -6558,7 +6856,7 @@ async function buildLbcData() {
   try { const rec = await sbGet('app_data?id=eq.lbc_recon&select=quota:data->quota'); const q = rec && rec[0] && rec[0].quota; if (q && q.value) detected = q.value; } catch (_) {}
   // Compteurs de diagnostic (pour comprendre si la file est vide et pourquoi).
   const numberedOnline = online.filter((o) => { const e = numeros[o.id]; return e && String(e.numero || '').trim() !== ''; }).length;
-  const stats = { postedCount, lbcCount, lbcJamaisLu, preuveKO: preuveLbc.echec, limit: lbcLimit, plan: lbcPlan, detected, exclues, onlineCount: online.length, numberedCount: numberedOnline, queueCount: queue.length,
+  const stats = { postedCount, lbcCount, lbcJamaisLu, preuveKO: preuveLbc.echec, limit: lbcLimit, plan: lbcPlan, detected, exclues, aConfirmer: aConfirmerIds.size, onlineCount: online.length, numberedCount: numberedOnline, queueCount: queue.length,
     autoMatched: autoMatched.size, lbcSeen: lbcItems.length, unlinkedCount: unlinked.length };
   // Liste des paires marquées « publiées » (pour pouvoir annuler une erreur).
   const postedList = [...posted].filter((x) => /^\d+$/.test(x)).map((pid) => { const e = numeros[pid] || {}; return { id: pid, numero: String(e.numero || '?'), title: e.title || '' }; }).sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0));
