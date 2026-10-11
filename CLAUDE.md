@@ -7119,7 +7119,7 @@ visite », le défaut le plus coûteux du projet, refait par une collision de nu
   le sont. **La promesse** « vérifiées à ta prochaine visite » (et « une
   suppression sort d'ici tout de suite ») n'est faite qu'à une extension
   CONNECTÉE à CE compte VRM (`connexionExtensionVrm`) ; sinon le geste.
-- **Preuves** (§6.1 sur 18880b6) : `audit-enligne.cjs` **101 contrôles, 30 rouges**
+- **Preuves** (§6.1 sur 18880b6) : `audit-enligne.cjs` **101 contrôles, 31 rouges**
   sur 18880b6, et **30 mutations sur 30** rouges (dont `frein`, `coupure`, `tri`,
   `ongletfige`, `hotepage`, `sansgarde`, `relit`, `pagetotal`, `budget2`,
   `dressingsko`, `pubko`, `vendue2`, `supprpublic`, `passupub`) — `_fond-vm.cjs`
