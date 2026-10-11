@@ -273,6 +273,10 @@ console.log('── A. La règle « en ligne » : la même dans l\'app et dans l
     dit(JSON.stringify(f.lignes.harvest_222_listings) === avant, 'et le dressing du compte est intact');
     dit(!!f.lignes.harvest_333_enligne, 'les autres comptes, lus en entier, sont rangés');
     dit(Number(((f.store.vrmEnLigneEssais || {})['222'] || 0)) < Date.now() - 30 * 60e3 + 6 * 60e3, 'le compte raté réessaie dans 5 min, pas dans 30', String((f.store.vrmEnLigneEssais || {})['222']));
+    // La cause est la PAGE ratée, pas seulement le total : chaque garde tient seule
+    // (sans ce contrôle, retirer l'arrêt sur page ratée resterait invisible derrière
+    // la garde du total — deux gardes, deux preuves).
+    dit(f.j.diags.includes('enligne_incomplet_lecture'), 'et la cause notée est la page ratée (`enligne_incomplet_lecture`), pas le total', JSON.stringify(f.j.diags.filter((d) => /enligne_incomplet/.test(d))));
   });
 
   await essaie('B6 total', async () => {
