@@ -40,13 +40,33 @@ const MUTATIONS = {
             if (!listings) listings = r; else listings.items = listings.items.concat(lot);`]],
   // le total annoncé par Vinted ne compterait plus
   totalignore: [[`  if (pg.total_entries != null && pg.total_entries !== '' && isFinite(total)) return items.length >= total;`, `  if (false) return items.length >= total;`]],
-  // la garde des 5 min ne serait plus rendue
-  garde: [[`    if (!ok) await rendreGardeVisite(uid, marqueVisite);`, `    if (false) await rendreGardeVisite(uid, marqueVisite);`]],
+  // la garde des 5 min ne serait plus rendue sur un refus de la base (le recul seul ne suffit pas)
+  garde: [[`  if (r === 'base' || r === 'recul') { await rendreGardeVisite(uid, marque, 0); return; }`, `  if (r === 'base' || r === 'recul') return;`]],
+  // revue 5.165 : la garde rendue à CHAQUE échec, sans les compter
+  durable: [[`  if (avant === 0) await rendreGardeVisite(uid, marque);
+  else noterDiag('visite_echec_repete');`, `  await rendreGardeVisite(uid, marque);`]],
+  // revue 5.165 : plus de recul quand NOTRE base refuse tout
+  recul: [[`    return reste > 0 ? Object.assign({}, r, { resteMs: reste }) : null;
+  } catch (_) { return null; }
+}
+// Économie`, `    return null;
+  } catch (_) { return null; }
+}
+// Économie`]],
+  // revue 5.165 : le repli par cookie ne relirait plus le compte en route
+  cookie: [[`      if (!(await memeCompte())) return 'abandon';
+      const r = await storeHarvestRow`, `      const r = await storeHarvestRow`],
+    [`    if (pidRange && profileId != null && String(profileId) !== pidRange) { noterDiag('moisson_compte_change'); return 'abandon'; }
+    if (!(await memeCompte())) return 'abandon';`, ``]],
+  // revue 5.165 : compteur illisible ⇒ « on écrit » (§4.2 violé)
+  lecturepassu: [[`    if (!r.ok) return passu();                    // pas su : on n'écrase rien`, `    if (!r.ok) return true;`]],
   // plus de contrôle de session avant de lire chez Vinted
   session: [[`    if (await sansSessionPourEcrire()) { noterDiag('visite_sans_session'); return; }`, ``],
     [`  if (await sansSessionPourEcrire()) { noterDiag('moisson_sans_session'); return false; }`, ``]],
   // on compterait comme rangé ce que la base a refusé
-  range: [[`    if (r === 'ecrit' || r === 'plus-pauvre' || r === 'hors-sujet') stored = true; else ratees++;`, `    stored = true;`]],
+  range: [[`    if (r === 'ecrit' || r === 'plus-pauvre' || r === 'hors-sujet') stored = true; else ratees++;
+  };`, `    stored = true;
+  };`]],
   // le compte qui change en route ne serait plus vu
   compte: [[`  if (String(uid) !== String(activeUid0)) { noterDiag('moisson_compte_change'); return 'abandon'; }`, ``]],
   // le dressing d'un autre membre passerait
@@ -91,14 +111,22 @@ const ligneProfil = (k) => ({ type: 'profile', capturedAt: HIER, payload: { user
 // Une base + un Vinted À ÉTAT. `etat.dressing[k]` = ce que Vinted rend MAINTENANT.
 //  · `etat.parPage` découpe le dressing en pages ; `etat.pageKO` fait échouer une page (500) ;
 //  · `etat.totalForce[k]` force `total_entries` (une pagination qui se contredit).
+//  · `etat.basePanne` : NOTRE base ne répond plus (522 partout, lectures comprises —
+//    du 9 au 12 septembre) ; `etat.baseRLS` : elle lit `[]` et REFUSE toute écriture
+//    (403 42501 — abonnement coupé, règle refusée) ; `etat.nItemsKO` : seule la
+//    lecture du compteur `nItems` échoue (lecture KO, écriture OK — §4.2).
+//  · L'horloge du service worker est PILOTÉE (`m.avance(ms)`) : la garde, le recul
+//    et les marques vivent dans le même temps, comme dans Chrome.
 function monter({ lignes, etat, onglets }) {
   const f = faireFond({ src: SRC, lignes, comptes: COMPTES, onglets: onglets || [{ id: 7, url: 'https://www.vinted.fr/member/1', status: 'complete' }],
-    vinted: (r) => repondre(r) });
+    vinted: (r) => repondre(r), lectureKO: (u) => !!(etat.nItemsKO && /select=n:data->>nItems/.test(u)) });
+  require('vm').runInContext('(function(){ var r = Date.now; Date.now = function(){ return r() + (globalThis.__decalage || 0); }; })();', f.ctx);
+  f.ctx.__decalage = 0;
   const req = [], refus = [];
   let courant = null;
   function repondre(r) {
     const c = courant, ch = r.chemin;
-    if (!c) return { status: 401, body: { message: 'unauthorized' } };
+    if (!c || etat.vinted401) return { status: 401, body: { message: 'unauthorized' } };
     if (/\/api\/v2\/users\/current/.test(ch)) return { status: 200, body: { user: { id: PID[c], login: 'compte_' + c } } };
     const w = /\/api\/v2\/wardrobe\/(\d+)\/items/.exec(ch);
     if (w) {
@@ -126,6 +154,13 @@ function monter({ lignes, etat, onglets }) {
       const a = String((opts.headers && (opts.headers.Authorization || opts.headers.authorization)) || '');
       courant = /^Bearer /.test(a) ? Object.keys(TOK).find((k) => TOK[k] === a.slice(7)) || null : etat.cookie;
       req.push({ origine: /^Bearer /.test(a) ? 'jeton' : 'cookie', compte: courant, chemin: u.replace(/^https:\/\/[^/]+/, '') });
+    } else if (/\/rest\/v1\//.test(u) && etat.basePanne) {
+      return { ok: false, status: 522, headers: { get: () => 'text/html' }, json: async () => { throw new Error('html'); }, text: async () => '<html>522</html>', clone() { return this; } };
+    } else if (/\/rest\/v1\//.test(u) && etat.baseRLS && String(opts.method || 'GET').toUpperCase() === 'POST') {
+      refus.push('rls');
+      return { ok: false, status: 403, headers: { get: () => 'application/json' }, json: async () => ({ code: '42501' }), text: async () => '{"code":"42501","message":"new row violates row-level security policy"}', clone() { return this; } };
+    } else if (/\/rest\/v1\/app_data\?/.test(u) && etat.baseRLS) {
+      return { ok: true, status: 200, headers: { get: () => 'application/json' }, json: async () => [], text: async () => '[]', clone() { return this; } };
     } else if (/\/rest\/v1\//.test(u) && String(opts.method || 'GET').toUpperCase() === 'POST') {
       let rows = []; try { rows = JSON.parse(opts.body || '[]'); } catch (_) {}
       // LA BASE DE JULIEN : clé (owner, id) + RLS. Une ligne sans propriétaire
@@ -138,13 +173,16 @@ function monter({ lignes, etat, onglets }) {
     return fetch0(url, opts);
   };
   // Le compte du cookie Vinted, et la session VRM, tels qu'ils sont À CET INSTANT.
-  f.ctx.activeUidForDomain = async () => etat.cookie || null;
+  // `etat.bascule = { apres: n, vers }` : il change de compte JUSTE APRÈS la n-ième lecture du cookie.
+  f.ctx.activeUidForDomain = async () => { etat.lectures = (etat.lectures || 0) + 1; const v = etat.cookie; if (etat.bascule && etat.lectures === etat.bascule.apres) etat.cookie = etat.bascule.vers; return v || null; };
   f.ctx.activeAccountId = async () => etat.cookie || null;
   f.ctx.isCloisonne = async () => true;
   f.ctx.authToken = async () => (etat.session ? { access_token: 'session_vrm', user_id: 'PROPRIO', expires_at: Date.now() + 3600e3 } : null);
   const dressingDe = (k) => (f.lignes[`harvest_${k}_listings`] || {});
   const lectDressing = (k) => req.filter((x) => x.compte === k && /\/wardrobe\//.test(x.chemin)).length;
-  return { f, req, refus, dressingDe, lectDressing };
+  const avance = (ms) => { f.ctx.__decalage += ms; };
+  const moissons = () => req.filter((x) => /\/api\/v2\/users\/current/.test(x.chemin)).length;
+  return { f, req, refus, dressingDe, lectDressing, avance, moissons };
 }
 const nDe = (m, k) => { const d = m.dressingDe(k); return ((d.payload || {}).items || []).length; };
 
@@ -169,6 +207,8 @@ const nDe = (m, k) => { const d = m.dressingDe(k); return ((d.payload || {}).ite
   await essaie('base refuse', async () => {
     const etat = { cookie: 'A', session: true, baseRefuse: true, dressing: { A: dressing(0, 48, 1000) } };
     const m = monter({ etat, lignes: { harvest_A_profile: ligneProfil('A'), harvest_A_listings: ligneDressing(dressing(13, 48, 1000)) } });
+    // Les ventes rapides (90 s) ont déjà été relues : on juge la MOISSON seule.
+    m.f.store.vrmDerniereVente = { A: Date.now() };
     await m.f.ctx.visiteVinted();
     dit(!m.f.j.journal.some((t) => /Données rafraîchies/.test(t)), 'une moisson dont TOUTES les écritures sont refusées ne se dit pas « rafraîchie »', JSON.stringify(m.f.j.journal.slice(0, 2)));
     // (le repli relirait le PROFIL et le DRESSING hors de la page ; la vente rapide
@@ -176,9 +216,7 @@ const nDe = (m, k) => { const d = m.dressingDe(k); return ((d.payload || {}).ite
     const repli = m.req.filter((x) => x.origine !== 'page' && /wardrobe|users\/current/.test(x.chemin));
     dit(repli.length === 0, 'pas de seconde moisson de repli quand c’est la BASE qui refuse', `${repli.length} requête(s) : ${repli.map((x) => x.origine + ' ' + x.chemin).join(' · ')}`);
     etat.baseRefuse = false;
-    const st = m.f.store.vrmDerniereVisite || {};
-    st.A = Number(st.A || 0) - 61000;                      // 61 s plus tard
-    m.f.store.vrmDerniereVisite = st;
+    m.avance(61000);                                       // 61 s plus tard
     await m.f.ctx.visiteVinted();
     dit(nDe(m, 'A') === 48, 'la garde est RENDUE (nouvel essai à 60 s, pas 5 min) : le dressing est rangé au passage suivant', `en base : ${nDe(m, 'A')}`);
     // ⚠️ l'autre sens : relâcher n'est pas effacer — pendant une pause, la garde reste entière.
@@ -273,6 +311,105 @@ const nDe = (m, k) => { const d = m.dressingDe(k); return ((d.payload || {}).ite
     m.f.ctx.chrome.scripting.executeScript = async () => [{ result: null }];
     const r = await m.f.ctx.runActive();
     dit(r === true && nDe(m, 'A') === 0, 'le repli par cookie du service worker range quand même le dressing — vide compris, lu en entier', `runActive=${r}, en base ${nDe(m, 'A')}`);
+  });
+
+  // ════════════════════════════════════════════════════════════════════════
+  // Revue de la 5.165 (11 octobre) — trois défauts reproduits par les relecteurs
+  // ════════════════════════════════════════════════════════════════════════
+  // Il navigue sur Vinted : une page toutes les `pas` ms pendant `duree` ms.
+  // On compte les moissons COMPLÈTES lancées (une visite qui a demandé
+  // `/users/current`, par la page ou par le cookie).
+  const naviguer = async (m, pas, duree) => {
+    let n = 0;
+    for (let t = 0; t < duree; t += pas) {
+      if (t) m.avance(pas);
+      const a = m.moissons();
+      await m.f.ctx.visiteVinted();
+      if (m.moissons() > a) n++;
+    }
+    return n;
+  };
+  console.log('\n── 9. Échec DURABLE de notre base : la garde n’est pas rendue à chaque échec');
+  await essaie('base refuse toujours', async () => {
+    // RLS : lectures `[]`, écritures 403 42501 (abonnement coupé) — à chaque passage.
+    const etat = { cookie: 'A', session: true, baseRLS: true, dressing: { A: dressing(13, 48, 1000) } };
+    const m = monter({ etat, lignes: { harvest_A_profile: ligneProfil('A'), harvest_A_listings: ligneDressing(dressing(13, 48, 1000)) } });
+    const n5 = await naviguer(m, 61000, 5 * 61000);
+    dit(n5 <= 2, 'écritures refusées à CHAQUE passage (RLS 403) : au plus 2 moissons en 5 min de navigation (pas une par minute)', `${n5} moisson(s)`);
+    const m2 = monter({ etat: { ...etat, dressing: { A: dressing(13, 48, 1000) } }, lignes: { harvest_A_profile: ligneProfil('A'), harvest_A_listings: ligneDressing(dressing(13, 48, 1000)) } });
+    const n30 = await naviguer(m2, 15000, 30 * 60000);
+    dit(n30 <= 5 && m2.req.length <= 40, 'RLS sur 30 min de navigation (une page toutes les 15 s) : au plus 5 moissons, 40 requêtes chez Vinted', `${n30} moisson(s), ${m2.req.length} requête(s) Vinted`);
+    const etatP = { cookie: 'A', session: true, basePanne: true, dressing: { A: dressing(13, 48, 1000) } };
+    const m3 = monter({ etat: etatP, lignes: {} });
+    const nP = await naviguer(m3, 15000, 30 * 60000);
+    dit(nP <= 5 && m3.req.length <= 40, 'base en PANNE (522 partout, comme du 9 au 12 septembre) sur 30 min : au plus 5 moissons, 40 requêtes chez Vinted', `${nP} moisson(s), ${m3.req.length} requête(s) Vinted`);
+    // L'alarme des 20 min et le changement de cookie appellent `runActive` SANS la
+    // garde de la visite : la règle doit vivre là aussi.
+    const m4 = monter({ etat: { ...etatP }, lignes: {} });
+    await m4.f.ctx.runActive(); m4.avance(30000);
+    const a4 = m4.moissons();
+    await m4.f.ctx.runActive();
+    dit(m4.moissons() === a4, 'et `runActive` appelé hors visite (alarme, cookie) 30 s après un refus de la base ne relit pas Vinted', `${m4.moissons() - a4} moisson(s) de plus`);
+    // L'autre sens : la base revient, la capture passive range une ligne ⇒ la visite suivante moissonne.
+    etatP.basePanne = false;
+    await m3.f.ctx.storeHarvest('www.vinted.fr', 'orders_sold', '', JSON.stringify({ my_orders: [vente('Z1'), vente('Z2'), vente('Z3')], pagination: { total_entries: 3, total_pages: 1 } }));
+    m3.avance(6 * 60000);
+    const a3 = m3.moissons();
+    await m3.f.ctx.visiteVinted();
+    dit(m3.moissons() > a3 && nDe(m3, 'A') === 61, 'l’autre sens : la base revenue (une capture rangée), la visite suivante relit et RANGE le dressing', `${m3.moissons() - a3} moisson(s), dressing en base ${nDe(m3, 'A')}`);
+  });
+  await essaie('échec passager répété', async () => {
+    // La session Vinted est cassée (401 partout, cookie présent) : rien n'est lu.
+    const etat = { cookie: 'A', session: true, vinted401: true, dressing: { A: dressing(13, 48, 1000) } };
+    const m = monter({ etat, lignes: { harvest_A_profile: ligneProfil('A'), harvest_A_listings: ligneDressing(dressing(13, 48, 1000)) } });
+    const n = await naviguer(m, 61000, 5 * 61000);
+    dit(n <= 2, 'un échec répété côté Vinted (401) : la garde n’est rendue qu’UNE fois — au plus 2 moissons en 5 min', `${n} moisson(s)`);
+  });
+
+  console.log('\n── 10. Repli par cookie : il change de compte pendant la moisson');
+  const dressingA61 = () => ligneDressing(dressing(13, 48, 1000));
+  const basculer = async (apres, bVide, quand) => {
+    const etat = { cookie: 'A', session: true, dressing: { A: dressing(13, 48, 1000), B: bVide ? [] : dressing(4, 0, 2000) } };
+    const m = monter({ etat, onglets: [], lignes: { harvest_A_profile: ligneProfil('A'), harvest_B_profile: ligneProfil('B'), harvest_A_listings: dressingA61(),
+      harvest_A_orders_sold: { type: 'orders_sold', capturedAt: HIER, nItems: 1, payload: { my_orders: [vente('A0')], pagination: { total_entries: 1 } } } } });
+    if (quand === 'dressing') {
+      const f0 = m.f.ctx.fetch;
+      m.f.ctx.fetch = async (u, o) => { const r = await f0(u, o); if (/wardrobe/.test(String(u))) etat.cookie = 'B'; return r; };
+    } else etat.bascule = { apres, vers: 'B' };
+    const r = await m.f.ctx.activeFetchActiveAccount();
+    const items = ((m.dressingDe('A').payload || {}).items || []);
+    const pidA = ((((m.f.lignes.harvest_A_profile || {}).payload || {}).user) || {}).id;
+    const ventesA = (((m.f.lignes.harvest_A_orders_sold || {}).payload || {}).my_orders || []).map((o) => o.transaction_id);
+    return { r, n: items.length, deB: items.filter((x) => x.id >= 2000 && x.id < 3000).length, pidA, ventesA };
+  };
+  await essaie('bascule cookie', async () => {
+    const a = await basculer(1, false, 'profil');
+    dit(a.deB === 0 && a.n === 61 && a.pidA === PID.A && !a.ventesA.some((t) => /^B/.test(t)), 'bascule AVANT le profil : ni le profil, ni le dressing, ni les ventes de B rangés sous A (§5)', JSON.stringify(a));
+    const b = await basculer(0, false, 'dressing');
+    dit(b.deB === 0 && b.n === 61 && !b.ventesA.some((t) => /^B/.test(t)), 'bascule APRÈS le dressing : les ventes de B ne sont pas rangées sous A', JSON.stringify(b));
+    const c = await basculer(1, true, 'profil');
+    dit(c.n === 61, 'B vient d’être VIDÉ : son dressing vide n’efface PAS les 61 annonces de A', JSON.stringify(c));
+    // L'autre sens : sans bascule, le repli range toujours.
+    const etat = { cookie: 'A', session: true, dressing: { A: dressing(0, 48, 1000) } };
+    const m = monter({ etat, onglets: [], lignes: { harvest_A_profile: ligneProfil('A'), harvest_A_listings: dressingA61() } });
+    const r = await m.f.ctx.activeFetchActiveAccount();
+    dit(r === true && nDe(m, 'A') === 48, 'l’autre sens : même compte du début à la fin, le repli range (61 → 48)', `r=${r}, en base ${nDe(m, 'A')}`);
+  });
+
+  console.log('\n── 11. §4.2 : la lecture du compteur échoue (lecture KO, écriture OK)');
+  await essaie('compteur illisible', async () => {
+    const etat = { cookie: 'A', session: true, nItemsKO: true, dressing: {} };
+    const m = monter({ etat, lignes: { harvest_A_profile: ligneProfil('A'), harvest_A_listings: dressingA61() } });
+    await m.f.ctx.storeHarvest('www.vinted.fr', 'listings', String(PID.A), JSON.stringify({ items: dressing(13, 7, 1000), pagination: { total_entries: 61, total_pages: 4 } }));
+    dit(nDe(m, 'A') === 61, 'capture PASSIVE : la page 1 (20 sur 61) n’écrase pas le dressing quand le compteur n’a pas pu être lu', `en base : ${nDe(m, 'A')}`);
+    const etat2 = { cookie: 'A', session: true, nItemsKO: true, parPage: 20, pageKO: 2, dressing: { A: dressing(13, 48, 1000) } };
+    const m2 = monter({ etat: etat2, lignes: { harvest_A_profile: ligneProfil('A'), harvest_A_listings: dressingA61() } });
+    await m2.f.ctx.visiteVinted();
+    dit(nDe(m2, 'A') === 61, 'moisson ACTIVE incomplète (page 2 en échec) : n’écrase pas non plus', `en base : ${nDe(m2, 'A')}`);
+    const etat3 = { cookie: 'A', session: true, nItemsKO: true, parPage: 20, dressing: { A: dressing(0, 48, 1000) } };
+    const m3 = monter({ etat: etat3, lignes: { harvest_A_profile: ligneProfil('A'), harvest_A_listings: dressingA61() } });
+    await m3.f.ctx.visiteVinted();
+    dit(nDe(m3, 'A') === 48, 'l’autre sens : lu EN ENTIER (total atteint), il est rangé sans avoir besoin du compteur', `en base : ${nDe(m3, 'A')}`);
   });
 
   console.log(`\n${ok} ✅ · ${ko} ❌`);
