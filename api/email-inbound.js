@@ -25,6 +25,7 @@ import { withOwnerAll, conflictTarget, contexteVendeur, proprietaireCourant, duV
 import { adressesDeLivraison, resoudreProprietaire, fusionnerRegistres, PROPRIETAIRE_NEUTRE } from './_lib/proprietaire-email.js';
 import { normaliserEntrant, formeRecue, demasquerRelais } from './_lib/lire-email.js';
 import { sbCle } from './_lib/cle.js';
+import { numeroDuTitreApresCoupure, lireMarqueur, archiveDe, estArchive } from './_lib/numerotation.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 // ⚠️ CLÉ DE SERVICE QUAND ELLE EXISTE. Ces routes tournent sur le serveur, sans
@@ -500,6 +501,43 @@ async function findNumeroByTitle(title, size) {
     }
     return '';
   } catch (_) { return ''; }
+}
+
+// ── LE N° D'UN EMAIL, APRÈS LA REMISE À ZÉRO (migration 013) ───────────────
+// Le « nXXX » du titre n'est qu'une ressemblance, et après la coupure il peut
+// porter l'ANCIEN numéro : une paire republiée sous son vieux titre « … n230 »
+// serait tamponnée « N°230 » — le numéro d'une AUTRE paire de la nouvelle
+// série, ou un numéro d'archive. Règle (`api/_lib/numerotation.js`, la même
+// que `numeroEmailAdmis` dans l'app) : retenu seulement s'il désigne une fiche
+// actuelle de la nouvelle série AU MÊME TITRE ; sinon gardé dans `numeroTitre`.
+// Le repli par titre (`findNumeroByTitle`) ne rend jamais un numéro d'archive.
+// Marqueur illisible ⇒ aucun numéro (pas su ne vaut pas « pas de coupure »).
+// Aucune remise à zéro ⇒ exactement comme avant.
+async function marqueurVendeur() {
+  return lireMarqueur(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=mk:data->vrm_numerotation`), { ...sbCle(SUPABASE_KEY) });
+}
+async function fichesVendeur() {
+  try {
+    const r = await fetch(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=f:data->vinted_annonce_numeros`), { headers: { ...sbCle(SUPABASE_KEY) } });
+    if (!r.ok) return undefined;
+    const rows = await r.json();
+    if (!Array.isArray(rows)) return undefined;
+    const f = rows[0] ? rows[0].f : null;
+    return f && typeof f === 'object' ? f : {};
+  } catch (_) { return undefined; }
+}
+export async function numeroDEmail(numeroLu, titre, viaTitre) {
+  const mk = await marqueurVendeur();
+  const arch = mk && typeof mk === 'object' ? archiveDe(mk) : '';
+  const lu = String(numeroLu == null ? '' : numeroLu).trim();
+  let out;
+  if (mk === null || (mk !== undefined && !arch)) out = { numero: lu, numeroTitre: '' };
+  else out = numeroDuTitreApresCoupure(lu, titre, mk, lu ? await fichesVendeur() : {});
+  if (!out.numero && viaTitre && mk !== undefined) {
+    const n = await findNumeroByTitle(viaTitre.title, viaTitre.size);
+    if (n && !(arch && estArchive(n, arch))) out.numero = n;
+  }
+  return out;
 }
 
 // Prix d'achat d'une paire d'après le titre de l'annonce (pour le Copilote
@@ -1342,7 +1380,8 @@ export async function traiterEmail(req, res) {
       const pdf = (mail.attachments || []).find(a => /application\/pdf/i.test(a.contentType || '') || /\.pdf$/i.test(a.filename || ''));
       // N° absent du titre de l'annonce ? On le retrouve dans les annonces
       // numérotées de l'app (correspondance de titre, jamais si ambigu).
-      if (!data.numero) data.numero = await findNumeroByTitle(data.modele || data.article, data.taille);
+      { const jn = await numeroDEmail(data.numero, data.article, { title: data.modele || data.article, size: data.taille });
+        data.numero = jn.numero; if (jn.numeroTitre) data.numeroTitre = jn.numeroTitre; }
       // Tamponnage AUTOMATIQUE : N° + titre imprimés sur le PDF à l'emplacement
       // mémorisé pour ce format d'étiquette (réglé une fois dans l'app).
       let pdfTamponneB64 = null, posKnown = false;
@@ -1386,9 +1425,10 @@ export async function traiterEmail(req, res) {
       if (!montant) montant = (finText.match(/(\d+[,.]\d{2})\s*€\s*(?:ont|a)?\s*(?:[ée]t[ée]\s+)?(?:vir[ée]s?|ajout[ée]s?|cr[ée]dit[ée]s?|re[çc]us?)/i) || [])[1] || '';
       if (!montant) montant = (finText.match(/(?:re[çc]u|ajout[ée]s?|cr[ée]dit[ée]s?|porte-monnaie|solde|gagn[ée])[^€\d]{0,40}(\d+[,.]\d{2})\s*€/i) || [])[1] || '';
       if (!montant) { const all = [...finText.matchAll(/(\d+[,.]\d{2})\s*€/g)].map(x => parseFloat(x[1].replace(',', '.'))).filter(v => v > 0); if (all.length) montant = String(Math.max(...all).toFixed(2)).replace('.', ','); }
-      const numero = (article.match(/\bn[°º]?\s*(\d{2,6})\b/i) || [])[1] || '';
+      const jn = await numeroDEmail((article.match(/\bn[°º]?\s*(\d{2,6})\b/i) || [])[1] || '', article);
+      const numero = jn.numero;
       await supabaseUpsert([{ id: `email_final_${key}`, data: {
-        type: 'finalisation', subject, article, montant, numero,
+        type: 'finalisation', subject, article, montant, numero, ...(jn.numeroTitre ? { numeroTitre: jn.numeroTitre } : {}),
         account: acc.login || '', uid: acc.uid || '', receivedAt: now,
       } }]);
       // Notif push : l'argent arrive dans le porte-monnaie.
@@ -1466,6 +1506,8 @@ export async function traiterEmail(req, res) {
       if (!data) { await garderInconnu(corpsBrut, mail, 'reconnu vente, analyse impossible', 'vente');
         repondre(res, 200, { ok: false, type: 'vente', error: 'parse échec', garde: true }); return; }
       const key = shortHash(`${data.pseudo}|${data.prix}|${(data.designation || '').slice(0, 40)}`);
+      { const jn = await numeroDEmail(data.numero, data.designation);
+        data.numero = jn.numero; if (jn.numeroTitre) data.numeroTitre = jn.numeroTitre; }
       await supabaseUpsert([{ id: `email_sale_${key}`, data: { type: 'vente', ...data, account: acc.login || '', uid: acc.uid || '', receivedAt: now } }]);
       // Notif push : vente en temps réel, même app fermée et ordi éteint.
       try { await pushOnce({ title: '💸 Vendu !', body: `${data.designation || 'Article'}${data.prix ? ` — ${data.prix} €` : ''}${acc.login ? ` (${acc.login})` : ''}`, tag: `sale-${key}`, url: '/?tab=cat_ventes' }, 'vente'); } catch (_) {}

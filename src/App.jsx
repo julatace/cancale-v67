@@ -41,7 +41,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.166.0';
+const EXT_ATTENDUE = '5.167.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -898,7 +898,11 @@ const SYNC_KEYS = [
   'vinted_invoice_settings','vinted_custom_logo','vinted_dark','vinted_stock_vinted',
   'vinted_accounts','vinted_account_labels','vinted_account_emails','vinted_account_phones',
   'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros','vinted_annonces_vendues','vinted_bords_shipped',
-  'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats','vinted_bords_printed','vrm_imprimante','vrm_prenom','vrm_num_prefixe', 'vinted_repond_auto','vinted_offres_auto','vrm_detourage','vrm_points_relais','vrm_ville','vrm_colis_collected','vrm_colis_collected_at',
+  'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats','vinted_bords_printed','vrm_imprimante','vrm_prenom','vrm_num_prefixe',
+  // Le marqueur de la remise à zéro (migration 013) : ÉCRIT PAR LE SERVEUR SEUL
+  // (le garde-fou de la base le recopie depuis la ligne d'avant, quoi que le
+  // navigateur envoie). Synchronisé pour être LU : série d'archive, version.
+  'vrm_numerotation', 'vinted_repond_auto','vinted_offres_auto','vrm_detourage','vrm_points_relais','vrm_ville','vrm_colis_collected','vrm_colis_collected_at',
   'vinted_txn_link','vinted_sales_hidden','vinted_purchases_hidden','vinted_accounts_hidden','vinted_autonum','vinted_urssaf_freq','vinted_urssaf_taux',
   // « J'ai déclaré ce mois » : quelles ventes il a déclarées, et dans quel mois
   // (`ventesDeclarables`). Écrit sur SON clic uniquement.
@@ -1216,8 +1220,19 @@ const ALLEGER_AVANT_CLOUD = {
     : v,
 };
 
+// ⚠️ LA BASE PEUT REFUSER UNE ÉCRITURE (migration 013, garde-fou des numéros) :
+// l'écran a été chargé avant une remise à zéro, ou un autre appareil a donné des
+// numéros depuis. Avant, un refus ne donnait qu'un point « erreur de synchro »,
+// avec l'infobulle « Hors ligne (sauvegarde locale) » — faux deux fois : la base
+// répondait, et rien n'était gardé (le chargement suivant réécrit le navigateur
+// depuis le nuage). On dit la vraie cause (`signalerNumerosPerimes` → le bloc de
+// la coque) et on N'ENVOIE PLUS RIEN : chaque envoi serait refusé de même. Les
+// saisies restent dans le navigateur, et le bloc les rejoue après rechargement.
+let _pushBloque = false;
+let _prefixeRetente = false;
 const cloudPush = () => {
   if (!isCloudReady()) { _pushPending = true; return; } // verrou 1 : cloud pas encore chargé
+  if (_pushBloque) { _emitSync('refus'); return; }
   if (_cloudTimer) clearTimeout(_cloudTimer);
   _emitSync('saving');
   _cloudTimer = setTimeout(async () => {
@@ -1234,6 +1249,22 @@ const cloudPush = () => {
         headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }),
         body: JSON.stringify([withOwner({ id: SUPABASE_ROW, data: payload, updated_at: new Date().toISOString() })]),
       });
+      if (!res.ok) {
+        let txt = ''; try { txt = await res.text(); } catch (_) {}
+        const code = codeRefusNumeros(txt);
+        if (code === 'vrm_prefixe_archive') {
+          // La lettre des nouveaux numéros ne peut pas être celle des anciens.
+          try { localStorage.setItem('vrm_num_prefixe', JSON.stringify('')); } catch (_) {}
+          try { window.dispatchEvent(new Event('vrm-prefixe')); } catch (_) {}
+          toast(`La lettre « ${archiveNumeros() || 'B'} » est celle de tes anciens numéros : tes nouvelles paires restent en chiffres.`);
+          _emitSync('error'); _cloudTimer = null;
+          // Le reste de cet envoi a été refusé avec lui : on le renvoie UNE fois,
+          // sans la lettre (jamais en boucle).
+          if (!_prefixeRetente) { _prefixeRetente = true; setTimeout(() => cloudPush(), 50); }
+          return;
+        }
+        if (code) { _pushBloque = true; _emitSync('refus'); signalerNumerosPerimes(code); _cloudTimer = null; return; }
+      }
       _emitSync(res.ok ? 'synced' : 'error');
     } catch (_) { _emitSync('error'); }
     _cloudTimer = null;
@@ -4737,6 +4768,226 @@ const numsPresents = () => {
   const l = Array.isArray(p) ? p : (p && Array.isArray(p.nums) ? p.nums : null);
   return l && l.length ? new Set(l.map(cleNum)) : null;
 };
+
+// ── LA REMISE À ZÉRO DU 9 OCTOBRE : LES ANCIENS NUMÉROS SONT EN « B » ─────────
+// Julien : « tous les anciens numéros, tu les fais commencer par B1, B2… ; on
+// commence à partir de zéro à partir du moment où je recommence à reposter ».
+// La conversion est faite UNE fois par le serveur (migration 013), qui pose dans
+// `main` un MARQUEUR `vrm_numerotation` = { version, coupure, archive: 'B', … }.
+// Le marqueur appartient au SERVEUR : un navigateur ne peut ni le poser ni le
+// changer (le garde-fou de la base le recopie). L'app le LIT, c'est tout (§11 :
+// la série d'archive vient de là, jamais d'un « B » écrit en dur).
+//   • `archive` : la lettre des anciens numéros, '' tant qu'aucune coupure (ou
+//     après un retour arrière, `annule`) ;
+//   • `version` : monte à chaque coupure ou retour arrière. Un écran qui a lu une
+//     autre version que celle de la base affiche des numéros FAUX : il se recharge.
+const marqueurNumerotation = () => { const m = load('vrm_numerotation', null); return m && typeof m === 'object' && !Array.isArray(m) ? m : null; };
+const archiveNumeros = () => { const m = marqueurNumerotation(); const a = m && !m.annule ? String(m.archive || '') : ''; return /^[A-Z]{1,3}$/.test(a) ? a : ''; };
+const coupureNumerotation = () => { const m = marqueurNumerotation(); const t = m && !m.annule ? Date.parse(m.coupure || '') : NaN; return isNaN(t) ? null : t; };
+const versionNumerotation = () => { const m = marqueurNumerotation(); const v = m ? Number(m.version) : NaN; return isFinite(v) ? v : null; };
+// Un ancien numéro (« B230 », ou un lot « B12+B13 ») : de la série d'archive.
+const estArchive = (num, arch = archiveNumeros()) => !!arch && new RegExp('^' + arch + '\\d+(\\+' + arch + '\\d+)*$').test(cleNum(num));
+// Une vente faite APRÈS la coupure (date illisible ⇒ « après » : c'est le sens
+// sûr, une nouvelle paire ne reçoit jamais un ancien numéro par une photo).
+const venteApresCoupure = (o) => { const c = coupureNumerotation(); if (c == null) return false; const t = Date.parse((o && o.date) || ''); return !(t > 0) || t >= c; };
+// Julien, 10 octobre : « les anciens, c'est que les paires vendues : je vais
+// tout republier, c'est pour ça que je veux de nouveaux numéros ». Donc :
+//   • une annonce reçoit un numéro AUTOMATIQUEMENT seulement si Vinted la date
+//     d'après la coupure (`createdTs` : la date que l'app affiche déjà, lue par
+//     IDENTITÉ de l'annonce). Plus ancienne, ou sans date : pas de numéro tout
+//     seul — c'est une annonce d'avant qu'il n'a pas republiée ;
+//   • un numéro d'ARCHIVE (B230) ne se redonne JAMAIS automatiquement : ni par
+//     une vente, ni par une photo, ni par un dossier de photo, ni par la
+//     bannière ♻️. Une paire republiée prend un numéro NEUF, même si c'est
+//     physiquement la paire qui avait le 230 : il réétiquette le carton.
+// La date de mise en ligne, par les MÊMES sources que la migration 013, dans le
+// même ordre (§11) : la date Vinted de l'annonce (`createdTs` : `created_at_ts`,
+// sinon l'heure de dépôt de sa photo), puis la date « Ajouté il y a… » lue sur
+// la page (`vinted_listing_dates`). Sinon `null` : on ne sait pas.
+const dateMiseEnLigneMs = (it, dates) => {
+  const ms = (v) => { const n = Number(v); return v != null && isFinite(n) && n > 0 ? (n < 1e12 ? n * 1000 : n) : null; };
+  const t = ms(it && it.createdTs); if (t != null) return t;
+  const d = dates && it ? dates[String(it.id)] : null;
+  return d ? ms(d.ts) : null;
+};
+// Avant toute remise à zéro (aucune coupure) : tout se numérote, comme avant.
+// Après : seulement une annonce DATÉE d'après la coupure. Sans date lisible, pas
+// de numéro tout seul — elle reste comptée « sans N° » sur l'écran Annonces.
+const annonceNumerotable = (it, dates, coupure = coupureNumerotation()) => { if (coupure == null) return true; const t = dateMiseEnLigneMs(it, dates); return t != null && t >= coupure; };
+const numeroReprenable = (num, arch = archiveNumeros()) => { const n = String(num == null ? '' : num).trim(); return n && !estArchive(n, arch) ? n : null; };
+// Le N° lu dans un EMAIL de bordereau (le serveur le tire du « nXXX » du titre,
+// ou d'une fiche au même titre) : après la remise à zéro, ce n'est qu'une
+// ressemblance qui peut porter l'ANCIEN numéro (une paire republiée sous le
+// même titre « … n230 »). Pour un email arrivé APRÈS la conversion, on ne
+// l'admet que s'il désigne une fiche ACTUELLE de la nouvelle série portant le
+// MÊME titre ; un numéro d'archive, jamais. La même règle que le serveur
+// (`numeroDuTitreApresCoupure`, api/email-inbound.js). Avant toute remise à
+// zéro, ou pour un email d'avant la conversion (l'histoire) : admis, comme avant.
+const numeroEmailAdmis = (b, fiches) => {
+  const m = marqueurNumerotation(); const arch = archiveNumeros();
+  if (!m || !arch) return true;
+  const depuis = Date.parse(m.appliqueLe || m.coupure || '');
+  const t = Date.parse((b && b.receivedAt) || '');
+  if (isFinite(depuis) && isFinite(t) && t < depuis) return true;
+  const k = cleNum(b && b.numero);
+  if (!k || !numeroReprenable(k, arch)) return false;
+  const titre = normTitle((b && (b.article || b.modele)) || '');
+  if (!titre) return false;
+  return Object.values(fiches || {}).some((e) => e && cleNum(e.numero) === k && normTitle(e.title) === titre);
+};
+
+// La VERSION de la base est relue (une lecture scalaire, §4.4) toutes les 60 s,
+// au retour au premier plan, et avant de numéroter ou d'imprimer. Trois états,
+// jamais deux : 'ok' (relue, identique) · 'perime' (la base a changé de version
+// depuis le chargement de cet écran) · 'passu' (la base n'a pas répondu).
+let _verNum = { etat: 'attente', at: 0, nuage: null };
+let _verNumListeners = [];
+const onVersionNumerotation = (fn) => { _verNumListeners.push(fn); return () => { _verNumListeners = _verNumListeners.filter(f => f !== fn); }; };
+const _emitVerNum = (patch) => { _verNum = { ..._verNum, ...patch }; _verNumListeners.forEach(fn => { try { fn(_verNum); } catch (_) {} }); };
+const etatVersionNumerotation = () => _verNum;
+// Lue en même temps que la ligne entière au chargement : c'est une vraie lecture.
+const noterVersionChargee = () => _emitVerNum({ etat: 'ok', at: Date.now(), nuage: versionNumerotation() });
+let _verNumEnVol = null;
+const verifierVersionNumerotation = () => {
+  if (_verNumEnVol) return _verNumEnVol;
+  _verNumEnVol = (async () => {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${SUPABASE_ROW}&select=v:data->vrm_numerotation->>version`, { headers: sbAuth() });
+      if (!r.ok) throw new Error('http ' + r.status);
+      const rows = await r.json();
+      if (!Array.isArray(rows)) throw new Error('forme');
+      const v = rows[0] && rows[0].v != null && String(rows[0].v) !== '' ? Number(rows[0].v) : null;
+      // « Périmé » est définitif pour cet écran : seul un rechargement le lève.
+      if (_verNum.etat === 'perime') _emitVerNum({ at: Date.now(), nuage: v });
+      else _emitVerNum({ etat: v === versionNumerotation() ? 'ok' : 'perime', at: Date.now(), nuage: v });
+    } catch (_) {
+      if (_verNum.etat !== 'perime') _emitVerNum({ etat: 'passu' });
+    }
+    _verNumEnVol = null;
+    return _verNum;
+  })();
+  return _verNumEnVol;
+};
+// Peut-on NUMÉROTER maintenant ? Seulement sur une version relue il y a moins
+// de 3 minutes et identique. Sinon on relit (l'effet repassera tout seul).
+const VERSION_FRAICHE_MS = 3 * 60 * 1000;
+const numerotationPermise = () => {
+  if (!isCloudReady()) return false;
+  const e = _verNum;
+  if (e.etat === 'ok' && Date.now() - e.at < VERSION_FRAICHE_MS) return true;
+  if (e.etat !== 'perime') verifierVersionNumerotation();
+  return false;
+};
+// Avant d'IMPRIMER (le N° est tamponné sur le bordereau) : on relit si la
+// dernière lecture date de plus d'une minute. Rend true si on peut imprimer.
+// ⚠️ Un écran chargé AVANT la remise à zéro n'a pas de marqueur du tout : la
+// vérification ne dépend donc pas du marqueur local, c'est la VERSION de la base
+// qui tranche. Périmée ⇒ on ne tamponne pas (le bloc « Recharger » s'ouvre).
+// Pas su (la base n'a pas répondu) ⇒ on tamponne : les octets du PDF viennent de
+// la même base, et le bloc s'ouvrira dès qu'elle répondra.
+const assurerVersionNumerotation = async () => {
+  if (_verNum.etat !== 'ok' || Date.now() - _verNum.at > 60 * 1000) await verifierVersionNumerotation();
+  if (_verNum.etat === 'perime') { signalerNumerosPerimes('version'); return false; }
+  return true;
+};
+const NUMEROS_PERIMES_IMPRESSION = "Cet écran a été ouvert avant la remise à zéro de tes numéros : recharge-le avant d'imprimer (aucun N° n'a été tamponné).";
+onVersionNumerotation((e) => { if (e.etat === 'ok') _verNum.okAt = e.at; });
+
+// Un REFUS de la base (garde-fou de la migration 013) : l'écran a été chargé
+// avant une remise à zéro, ou un autre appareil a donné des numéros depuis.
+// Le code du refus voyage jusqu'au bloc de la coque (`BlocNumerosPerimes`).
+let _numPerimes = null;
+let _numPerimesListeners = [];
+const onNumerosPerimes = (fn) => { _numPerimesListeners.push(fn); return () => { _numPerimesListeners = _numPerimesListeners.filter(f => f !== fn); }; };
+const etatNumerosPerimes = () => _numPerimes;
+const signalerNumerosPerimes = (code) => {
+  if (_numPerimes) return;
+  _numPerimes = { code: String(code || 'version'), at: Date.now() };
+  if (_verNum.etat !== 'perime' && code !== 'vrm_prefixe_archive') _emitVerNum({ etat: 'perime' });
+  _numPerimesListeners.forEach(fn => { try { fn(_numPerimes); } catch (_) {} });
+};
+const codeRefusNumeros = (txt) => { const m = /vrm_(pool_retreci|numeros_perimes|fiche_perdue|garage_perime|prefixe_archive)/.exec(String(txt || '')); return m ? m[0] : null; };
+
+// LES SAISIES D'UN ÉCRAN PÉRIMÉ NE SE PERDENT PAS. Quand la base refuse un écran
+// chargé avant (ou qu'un autre appareil a numéroté depuis), on recharge — mais
+// ce qu'il a tapé ici (un prix d'achat, un colis coché…) est d'abord mis de
+// côté, par IDENTIFIANT d'annonce ou de vente (jamais par numéro), puis rejoué
+// sur la ligne fraîche. Les NUMÉROS, eux, ne sont jamais rejoués : ceux de cet
+// écran étaient faux.
+let _instantaneCharge = null;
+const noterInstantaneCharge = (cloud) => { try { _instantaneCharge = JSON.parse(JSON.stringify(cloud || {})); } catch (_) { _instantaneCharge = null; } };
+const CHAMPS_NUMERO_FICHE = ['numero', 'auto', 'numberedAt', 'manuelAt', 'repriseAt', 'repriseDe', 'title', 'photo', 'photoK', 'price', 'accountId', 'etiquetteAt'];
+const CHAMPS_NUMERO_VENTE = ['numero', 'autoAssigned', 'autoShip', 'manuelAt'];
+// Les clés « gestes » rejouées telles quelles (objets fusionnés, listes unies).
+const CLES_GESTES = ['vinted_ship_done', 'vinted_bords_printed', 'vinted_bords_hidden', 'vinted_bords_shipped', 'vinted_pickup_done',
+  'vinted_offers_done', 'vinted_sales_hidden', 'vinted_purchases_hidden', 'vinted_annonces_vendues', 'vinted_retours_recus',
+  'vinted_retours_dismissed', 'vrm_colis_collected', 'vrm_colis_collected_at', 'vinted_achat_notes', 'vrm_urssaf_declare', 'vrm_lbc_colis_done'];
+const SAISIES_A_REJOUER = 'vrm_saisies_a_rejouer';
+const memoriserSaisies = () => {
+  const avant = _instantaneCharge; if (!avant) return 0;
+  const egal = (a, b) => JSON.stringify(a == null ? null : a) === JSON.stringify(b == null ? null : b);
+  const out = { fiches: {}, ventes: {}, gestes: {}, at: Date.now() };
+  let n = 0;
+  const diffCarte = (cle, exclus, dest) => {
+    const loc = load(cle, {}) || {}, av = (avant[cle] && typeof avant[cle] === 'object') ? avant[cle] : {};
+    for (const id in loc) {
+      const e = loc[id]; if (!e || typeof e !== 'object') continue;
+      const p = {};
+      for (const k in e) { if (exclus.includes(k)) continue; if (!egal(e[k], (av[id] || {})[k])) p[k] = e[k]; }
+      if (Object.keys(p).length) { dest[id] = p; n++; }
+    }
+  };
+  diffCarte('vinted_annonce_numeros', CHAMPS_NUMERO_FICHE, out.fiches);
+  diffCarte('vinted_sale_overrides', CHAMPS_NUMERO_VENTE, out.ventes);
+  for (const k of CLES_GESTES) {
+    const loc = load(k, null); if (loc == null || egal(loc, avant[k])) continue;
+    out.gestes[k] = loc; n++;
+  }
+  if (n) { try { localStorage.setItem(SAISIES_A_REJOUER, JSON.stringify(out)); } catch (_) {} }
+  return n;
+};
+// Au chargement suivant (après que le nuage a rempli le navigateur, AVANT que
+// les écrans le relisent) : on rejoue. Rend { n, prix } ou null.
+const rejouerSaisies = () => {
+  let s = null; try { s = JSON.parse(localStorage.getItem(SAISIES_A_REJOUER) || 'null'); } catch (_) { s = null; }
+  try { localStorage.removeItem(SAISIES_A_REJOUER); } catch (_) {}
+  if (!s || typeof s !== 'object' || !(Date.now() - (s.at || 0) < 24 * 3600 * 1000)) return null;
+  let n = 0, prix = 0, nonRejoue = 0;
+  const appliquer = (cle, src) => {
+    const cur = load(cle, {}) || {};
+    for (const id in (src || {})) {
+      if (!cur[id]) {
+        // Une fiche que la base ne connaît pas : on ne la recrée que SANS numéro.
+        const p = { ...src[id] }; delete p.numero;
+        if (cle === 'vinted_annonce_numeros' && Object.keys(p).length) { cur[id] = p; n++; if (p.buyPrice != null) prix++; } else nonRejoue++;
+        continue;
+      }
+      cur[id] = { ...cur[id], ...src[id] }; n++;
+      if (src[id].buyPrice != null) prix++;
+    }
+    try { localStorage.setItem(cle, JSON.stringify(cur)); } catch (_) {}
+  };
+  appliquer('vinted_annonce_numeros', s.fiches);
+  appliquer('vinted_sale_overrides', s.ventes);
+  for (const k in (s.gestes || {})) {
+    if (!CLES_GESTES.includes(k)) continue;
+    const loc = s.gestes[k], cur = load(k, null);
+    let v = loc;
+    if (Array.isArray(loc) && Array.isArray(cur)) v = [...cur, ...loc.filter(x => !cur.some(y => JSON.stringify(y) === JSON.stringify(x)))];
+    else if (loc && cur && typeof loc === 'object' && typeof cur === 'object' && !Array.isArray(loc) && !Array.isArray(cur)) v = { ...cur, ...loc };
+    try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {}
+    n++;
+  }
+  return { n, prix, nonRejoue };
+};
+const rechargerEnGardantLesSaisies = () => {
+  memoriserSaisies();
+  try { const v = _verNum.nuage; if (v != null) sessionStorage.setItem('vrm_recharge_numerotation', String(v)); } catch (_) {}
+  try { window.location.reload(); } catch (_) {}
+};
+// Les copies d'APPAREIL qui portent des numéros (jamais synchronisées) : à
+// jeter quand la version change, sinon elles parlent de l'ancienne série.
+const purgerCopiesNumeros = () => { ['vinted_nums_physiques', 'vrm_room_plan', 'vrm_local_plan'].forEach(k => { try { localStorage.removeItem(k); } catch (_) {} }); };
 // Annote un bordereau (PDF) en imprimant le NUMERO de la paire (en gros) et le
 // TITRE en bas de la premiere page, sur un bandeau blanc, puis declenche le
 // telechargement. But : ne pas se tromper de paire quand on prepare un envoi.
@@ -5110,6 +5361,7 @@ const ouvrirPdfOnglet = (url) => {
   } catch (_) { return false; }
 };
 const annotateAndDownloadBordereau = async (numero, title, pdfArrayBuffer, pos) => {
+  if (numero && !(await assurerVersionNumerotation())) throw new Error(NUMEROS_PERIMES_IMPRESSION);
   const PL = await import('pdf-lib');
   const { PDFDocument, rgb, StandardFonts } = PL;
   const pdf = await PDFDocument.load(pdfArrayBuffer);
@@ -5131,6 +5383,7 @@ const annotateAndDownloadBordereau = async (numero, title, pdfArrayBuffer, pos) 
 // [{ numero, title, pdfBuf }]. `resolvePos(w,h)` donne la position mémorisée du
 // tampon pour chaque format → le N° tombe au MÊME endroit sur tous.
 const mergeAndDownloadBordereaux = async (items, resolvePos, opts = {}) => {
+  if ((items || []).some((it) => it && it.numero) && !(await assurerVersionNumerotation())) throw new Error(NUMEROS_PERIMES_IMPRESSION);
   const PL = await import('pdf-lib');
   const { PDFDocument, rgb, StandardFonts } = PL;
   const out = await PDFDocument.create();
@@ -7779,6 +8032,43 @@ const dureePanne = () => {
     return h < 0 ? null : h;
   } catch (_) { return null; }
 };
+
+// ── UN ÉCRAN PÉRIMÉ NE MONTRE PLUS DE NUMÉROS (migration 013) ────────────────
+// Un écran chargé AVANT la remise à zéro (ou avant qu'un autre appareil donne
+// des numéros) affiche des numéros FAUX — « N°553 » pour une paire devenue 1 —
+// et il pourrait les tamponner sur un bordereau sans rien écrire en base. Dès
+// que la base refuse une de ses écritures, ou que sa version relue diffère de
+// celle chargée, un bloc couvre TOUT l'écran : rien ne se lit ni ne s'imprime
+// d'ici, et le seul geste est de recharger. Ce qu'il a tapé ici (prix d'achat,
+// colis cochés…) est mis de côté et rejoué après le rechargement.
+function BlocNumerosPerimes() {
+  const [refus, setRefus] = useState(() => etatNumerosPerimes());
+  const [ver, setVer] = useState(() => etatVersionNumerotation());
+  useEffect(() => onNumerosPerimes(setRefus), []);
+  useEffect(() => onVersionNumerotation((e) => setVer({ ...e })), []);
+  const perime = !!refus || ver.etat === 'perime';
+  if (!perime) return null;
+  const remise = ver.nuage != null && ver.nuage !== versionNumerotation();
+  return (
+    <div data-numeros-perimes={refus ? refus.code : 'version'} role="alertdialog" aria-modal="true"
+      style={{ position: 'fixed', inset: 0, zIndex: 100000, background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div style={{ maxWidth: 460, borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, padding: '22px 20px' }}>
+        <div style={{ fontSize: 17, fontWeight: 700, color: C.text, marginBottom: 8 }}>
+          {remise ? 'Cet écran a été ouvert avant la remise à zéro de tes numéros' : 'Un autre appareil vient de donner des numéros'}
+        </div>
+        <div style={{ fontSize: 13.5, color: C.text, lineHeight: 1.55 }}>
+          Les numéros affichés ici peuvent être <b>faux</b> : n'en écris aucun sur un carton et n'imprime rien depuis cet écran.
+          <br/><br/>
+          Recharge-le. Ce que tu as tapé ici (prix d'achat, colis cochés…) est <b>gardé</b> et remis après le rechargement.
+        </div>
+        <button type="button" onClick={rechargerEnGardantLesSaisies}
+          style={{ marginTop: 16, width: '100%', border: 'none', background: C.accent, color: '#fff', borderRadius: 10, padding: '12px', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+          Recharger
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function BaseInjoignable() {
   // ⚠️⚠️ « ÇA REVIENT TOUT SEUL » ÉTAIT FAUX LE TROISIÈME JOUR.
@@ -11280,7 +11570,7 @@ function EbayProgrammees({ programmees, brouillons, onRelire, onAnnule }) {
             const s = statut(l);
             const t = Date.parse(l.debut || '');
             const derniereHeure = Number.isFinite(t) && t - maintenant < 60 * 60000;
-            const n = numDeSkuEbay(l.sku);
+            const n = numEbayLu(l.sku, l.itemId);
             const info = infos[l.itemId];
             return (
               <div key={l.itemId} data-prog={l.itemId} data-prog-statut={s} style={{ padding: '8px 0', borderTop: `1px solid ${E.border}` }}>
@@ -11510,7 +11800,7 @@ function EbayAnnonces({ baseKO, comptes = [] }) {
   }), [items, commandes, fiches, enLigne, vendusVinted, listeProgrammees, ventesConnues]);
   const numsConnus = React.useMemo(() => new Set(Object.values(fiches).map((f) => cleNum(f && f.numero)).filter(Boolean)), [fiches]);
   const titreDeNum = React.useMemo(() => { const m = new Map(); for (const f of Object.values(fiches)) { const k = cleNum(f && f.numero); if (k && !m.has(k)) m.set(k, (f && f.title) || ''); } return m; }, [fiches]);
-  const pris = React.useMemo(() => { const m = new Map(); for (const a of (Array.isArray(items) ? items : [])) { const k = numDeSkuEbay(a && a.sku); if (k && !m.has(k)) m.set(k, String(a.itemId)); } return m; }, [items]);
+  const pris = React.useMemo(() => { const m = new Map(); for (const a of (Array.isArray(items) ? items : [])) { const k = numEbayLu(a && a.sku, a && a.itemId); if (k && !m.has(k)) m.set(k, String(a.itemId)); } return m; }, [items]);
   // (6 octobre) Ce que le formulaire de mise en vente doit savoir : la paire est
   // déjà EN VENTE sur eBay, ou déjà PROGRAMMÉE (elle n'était pas vue — une
   // publication immédiate créait une seconde annonce, et la programmée
@@ -11518,8 +11808,8 @@ function EbayAnnonces({ baseKO, comptes = [] }) {
   const dejaSurEbay = React.useMemo(() => {
     const m = new Map();
     for (const k of pris.keys()) m.set(k, { etat: 'en-vente' });
-    for (const x of ((programmees && typeof programmees === 'object' && Array.isArray(programmees.enLigne)) ? programmees.enLigne : [])) { const k = numDeSkuEbay(x && x.sku); if (k && !m.has(k)) m.set(k, { etat: 'en-vente' }); }
-    for (const p of listeProgrammees) { const k = numDeSkuEbay(p && p.sku); if (k && !m.has(k)) m.set(k, { etat: 'programmee', debut: p.debut || null }); }
+    for (const x of ((programmees && typeof programmees === 'object' && Array.isArray(programmees.enLigne)) ? programmees.enLigne : [])) { const k = numEbayLu(x && x.sku, x && x.itemId); if (k && !m.has(k)) m.set(k, { etat: 'en-vente' }); }
+    for (const p of listeProgrammees) { const k = numEbayLu(p && p.sku, p && p.itemId); if (k && !m.has(k)) m.set(k, { etat: 'programmee', debut: p.debut || null }); }
     return m;
   }, [pris, programmees, listeProgrammees]);
   const surSku = React.useCallback((itemId, sku) => {
@@ -11753,7 +12043,7 @@ function EbayAnnonces({ baseKO, comptes = [] }) {
       {items.map((it, i) => (
         <div key={it.itemId || i} data-ebay-annonce={it.itemId || ''}>
           <EbayAnnonceCard it={it} first={i === 0} onSaved={resync}
-            numero={numDeSkuEbay(it.sku)}
+            numero={numEbayLu(it.sku, it.itemId)}
             eligible={elig ? (elig.has(String(it.itemId)) ? true : (eligibles.complet ? false : undefined)) : undefined}
             paires={paires} numsConnus={numsConnus} titreDeNum={titreDeNum} pris={pris}
             onSku={(id, sku) => { surSku(id, sku); resync(); }}
@@ -14921,8 +15211,17 @@ function LocalPhoto({ locate, onLocateConsumed }) {
 const loadRoomPlan = async () => {
   try { const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_room&select=data`, { headers: sbAuth() }); if (!res.ok) return null; const rows = await res.json(); return rows[0]?.data || null; } catch (_) { return null; }
 };
+// ⚠️ Le garage porte la VERSION de la numérotation (migration 013) : la base
+//    refuse un garage qui ne la porte pas (un écran d'avant la remise à zéro
+//    remettrait les cartons en chiffres). On l'estampille à chaque envoi, et un
+//    refus ne passe plus en silence : c'est l'écran qui est périmé.
 const saveRoomPlan = async (data) => {
-  try { await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, { method: 'POST', headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }), body: JSON.stringify(withOwner({ id: 'vrm_room', data })) }); } catch (_) {}
+  try {
+    const v = versionNumerotation();
+    const corps = v != null ? { ...data, numerotation: v } : data;
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, { method: 'POST', headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }), body: JSON.stringify(withOwner({ id: 'vrm_room', data: corps })) });
+    if (!r.ok) { let t = ''; try { t = await r.text(); } catch (_) {} const code = codeRefusNumeros(t); if (code) signalerNumerosPerimes(code); }
+  } catch (_) {}
 };
 // Catalogue de rangements — volontairement large pour convenir à TOUTE méthode.
 // `build` = quel constructeur 3D utiliser (plusieurs types partagent une forme).
@@ -16252,7 +16551,9 @@ function normalizePlan(p) {
   if (p && Array.isArray(p.rooms) && p.rooms.length) {
     const rooms = p.rooms.map(mk);
     const active = p.active && rooms.some(r => r.id === p.active) ? p.active : rooms[0].id;
-    return { rooms, active };
+    // `numerotation` (la version, migration 013) est GARDÉE : la jeter faisait
+    // refuser chaque sauvegarde du garage par la base.
+    return p.numerotation != null ? { rooms, active, numerotation: p.numerotation } : { rooms, active };
   }
   // ancien format (une seule pièce) → on l'enveloppe
   const only = mk({ id: 'r1', name: 'Ma pièce', room: (p && p.room) || ROOM_DEFAULT, items: (p && p.items) || [] });
@@ -19726,6 +20027,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // écrase les numéros du cloud). Dès qu'il l'est, on RECHARGE les numéros depuis
   // le localStorage (que le cloud vient de remplir) → les numéros restent stables.
   const [cloudReady, setCloudReady] = useState(() => isCloudReady());
+  // La numérotation attend une version RELUE (migration 013) : chaque relecture
+  // relance les deux effets qui numérotent.
+  const [verNumTick, setVerNumTick] = useState(0);
+  useEffect(() => onVersionNumerotation(() => setVerNumTick(t => t + 1)), []);
   // ⚠️⚠️ CET EFFET RELIT CE QUE LE CLOUD VIENT D'ÉCRIRE DANS LE LOCALSTORAGE.
   // Tout état initialisé par `load(...)` et RÉÉCRIT ENSUITE PAR UN EFFET
   // AUTOMATIQUE doit être ici — sinon, sur un appareil neuf (localStorage vide
@@ -19921,7 +20226,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // et 177 des 178 bordereaux portent leur transaction. Sans identité : rien.
   const bordForItem = (itemId, numero) => {
     const list = emailBords || [];
-    if (numero) { const hit = list.find(bb => bb.numero && String(bb.numero) === String(numero)); if (hit) return hit; }
+    if (numero) { const hit = list.find(bb => bb.numero && String(bb.numero) === String(numero) && numeroEmailAdmis(bb, numeros)); if (hit) return hit; }
     if (!itemId) return null;
     return list.find(bb => bb.transaction && String(txnItem[String(bb.transaction)] || '') === String(itemId)) || null;
   };
@@ -19940,7 +20245,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const so = (sales.items || []).find(o => String(o.transaction_id) === String(b.transaction));
       if (so && orderPhoto(so)) return orderPhoto(so);
     }
-    if (b.numero) {
+    if (b.numero && numeroEmailAdmis(b, numeros)) {
       for (const k in numeros) {
         const e = numeros[k];
         if (e && String(e.numero) === String(b.numero) && e.photo) return e.photo;
@@ -21158,9 +21463,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const entryKeyByPhoto = (o) => {
     const url = o ? orderPhoto(o) : null;
     const pk = photoKey(url);
-    if (pk && numerosByPhoto[pk]) return numerosByPhoto[pk];   // même fichier = certain
-    const d = photoDir(url);                                    // même image re-téléversée
-    return (d && numerosByPhotoDir[d]) || null;
+    let k = (pk && numerosByPhoto[pk]) || null;                  // même fichier = certain
+    if (!k) { const d = photoDir(url); k = (d && numerosByPhotoDir[d]) || null; }   // même image re-téléversée
+    // Julien, 10 octobre : une paire republiée prend un NOUVEAU numéro. Une vente
+    // faite après la remise à zéro n'est jamais reliée par sa photo à une fiche
+    // d'archive (elle lui donnerait « B230 »). Une vente d'avant, oui : c'est
+    // l'histoire.
+    if (k && venteApresCoupure(o) && !numeroReprenable((numeros[k] || {}).numero)) return null;
+    return k;
   };
   // Ids des annonces ENCORE EN LIGNE (wardrobe actif). Une paire en ligne ne peut
   // pas être vendue → on ne lui attribue jamais une vente (sinon un exemplaire
@@ -21552,8 +21862,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       toast('Un numéro, ce sont des chiffres (125) ou 1 à 3 lettres suivies de chiffres (B125).');
       return;
     }
+    // Un numéro d'ARCHIVE (« B230 ») ne se redonne pas à une annonce : la paire
+    // republiée a un numéro neuf (Julien, 10 octobre).
+    if (!numeroReprenable(cle)) {
+      updatePair(item, { numero: avant });
+      toast(`« ${cle} » est un ancien numéro : il ne se redonne pas. Ta paire republiée garde un numéro neuf — écris celui-là sur le carton.`);
+      return;
+    }
     // Ce qu'on écrit : tel quel pour des chiffres, la clé (majuscules) sinon.
     const n = /^\d+$/.test(brut) ? brut : cle;
+    // Un numéro posé À LA MAIN porte sa date : la base sait que c'est un geste.
+    const manuelAt = new Date().toISOString();
     const autres = Object.keys(numeros).filter(k => k !== moi && cleNum((numeros[k] || {}).numero) === cle);
     // ⚠️ Un numéro BRÛLÉ sans fiche (une vente passée, un numéro posé sur une
     //    vente) a déjà été écrit sur un carton : avant, on le reprenait sans un
@@ -21565,11 +21884,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         ok: 'Oui, la même paire', cancel: `Non — N°${nextNumero}`,
       });
       const v = meme ? n : String(nextNumero);
-      updatePair(item, { numero: v }); recordUsed(v); return;
+      updatePair(item, { numero: v, manuelAt }); recordUsed(v); return;
     }
     // ⚠️ C'EST ICI qu'on écrit le numéro (le champ ne valide qu'à la sortie,
     //    cf. `ChampSaisie` — il n'écrit plus à chaque frappe).
-    if (!autres.length) { updatePair(item, { numero: n }); recordUsed(n); return; }
+    if (!autres.length) { updatePair(item, { numero: n, manuelAt }); recordUsed(n); return; }
     const presents = (porteursNum[cle] || []).filter(p => String(p.id) !== moi);
     if (presents.length) {
       const qui = presents.map(p => p.type === 'annonce' ? `📦 en ligne « ${p.titre} »`
@@ -21581,7 +21900,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         desc: `Une paire le porte encore :\n${qui}\n\nDeux paires avec le même numéro, c'est la mauvaise chaussure au moment d'expédier.`,
         ok: `Prendre le N°${nextNumero}`, cancel: 'Annuler',
       });
-      updatePair(item, { numero: prendre ? String(nextNumero) : avant });
+      updatePair(item, prendre ? { numero: String(nextNumero), manuelAt } : { numero: avant });
       if (prendre) recordUsed(nextNumero);
       return;
     }
@@ -21591,7 +21910,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       desc: `Il était sur « ${anc.title || 'une autre paire'} », qui n'est plus en ligne.\n\nEst-ce bien la MÊME paire qui te revient (litige, retour, annulation) ?\n\nSi oui, elle reprend son prix d'achat et ses infos. Si c'est une autre paire, prends le N°${nextNumero} : un numéro ne se réattribue jamais.`,
       ok: 'Oui, la même paire revient', cancel: `Non — N°${nextNumero}`,
     });
-    if (!meme) { updatePair(item, { numero: String(nextNumero) }); recordUsed(nextNumero); return; }
+    if (!meme) { updatePair(item, { numero: String(nextNumero), manuelAt }); recordUsed(nextNumero); return; }
     setNumeros(prev => {
       const u = { ...prev }; const a = u[autres[0]] || {};
       u[moi] = { ...(u[moi] || {}),
@@ -21599,8 +21918,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         fees: a.fees, size: (u[moi] || {}).size ?? a.size ?? null,
         numero: n, title: item.title, photo: item.photo || null, photoK: photoKey(item.photo) || null,
         price: item.price ?? null, accountId: item._acc?.vinted_user_id,
-        auto: false, repriseAt: new Date().toISOString() };
-      delete u[autres[0]];                       // l'ancienne fiche devient celle-ci
+        auto: false, repriseAt: new Date().toISOString(), manuelAt, repriseDe: String(autres[0]) };
+      delete u[autres[0]];                       // l'ancienne fiche devient celle-ci (`repriseDe` le dit à la base)
       save('vinted_annonce_numeros', u); return u;
     });
     recordUsed(n);
@@ -22197,6 +22516,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     for (const k in numeros) {
       const e = numeros[k];
       if (!e || !String(e.numero || '').trim()) continue;
+      // Un numéro d'ARCHIVE ne se reprend jamais : la paire republiée garde son
+      // nouveau numéro (Julien, 10 octobre — sa décision, pas une option).
+      if (!numeroReprenable(e.numero)) continue;
       if (onlineAnnonceIds.has(String(k))) continue;
       if (pairsLost[String(e.numero)]) continue;
       orphans.push({ key: k, e, vendue: pairesVendues.has(String(k)) });
@@ -22246,11 +22568,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const oldNum = String(r.orphan.e.numero), autoNum2 = String(r.current.numero);
     const q = r.vendue
       ? `Cette paire t'est REVENUE (litige, retour, annulation) ?\n\n« ${r.item.title} »\n\nElle a été vendue sous le N°${oldNum}. Si tu l'as remise dans SA boîte, elle peut le reprendre — sinon garde le N°${autoNum2}, qui est neuf.`
-      : `Cette annonce est bien ta paire N°${oldNum} ?\n\n« ${r.item.title} »\n\nElle reprendra le N°${oldNum} (celui écrit sur sa boîte).\nLe N°${autoNum2}, créé automatiquement, sera rendu.`;
+      : `Cette annonce est bien ta paire N°${oldNum} ?\n\n« ${r.item.title} »\n\nElle reprendra le N°${oldNum} (celui écrit sur sa boîte).\nLe N°${autoNum2}, créé automatiquement, reste brûlé : il ne sera donné à aucune autre paire.`;
     if (!await askConfirm(q)) return;
     setNumeros(prev => {
       const u = { ...prev };
-      u[r.item.id] = { ...(u[r.item.id] || {}), ...r.orphan.e, numero: oldNum, title: r.item.title, photo: r.item.photo || null, photoK: photoKey(r.item.photo) || null, price: r.item.price ?? null, accountId: r.item._acc?.vinted_user_id, auto: false, repriseAt: new Date().toISOString() };
+      u[r.item.id] = { ...(u[r.item.id] || {}), ...r.orphan.e, numero: oldNum, title: r.item.title, photo: r.item.photo || null, photoK: photoKey(r.item.photo) || null, price: r.item.price ?? null, accountId: r.item._acc?.vinted_user_id, auto: false, repriseAt: new Date().toISOString(), manuelAt: new Date().toISOString(), repriseDe: String(r.orphan.key) };
       delete u[r.orphan.key]; // l'ancienne fiche devient l'annonce actuelle
       save('vinted_annonce_numeros', u);
       return u;
@@ -22507,7 +22829,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if (!Array.isArray(rows)) { if (!stop) setEbayVivantes(null); return; }
         const m = new Map();
         for (const x of ((rows[0] && Array.isArray(rows[0].items)) ? rows[0].items : [])) {
-          const c = numDeSkuEbay(x && x.sku); const prix = parseFloat(String((x && x.price) || '').replace(',', '.'));
+          const c = numEbayLu(x && x.sku, x && x.itemId); const prix = parseFloat(String((x && x.price) || '').replace(',', '.'));
           if (!c || !x.itemId || !(prix > 0)) continue;
           if (m.has(c)) { m.set(c, { ambigu: true }); continue; }
           m.set(c, { itemId: String(x.itemId), prix, url: x.url || `https://www.ebay.fr/itm/${x.itemId}` });
@@ -22770,6 +23092,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // ÉCRASE les numéros saisis à la main (et leur prix d'achat). C'est ce qui
     // a brûlé les numéros 43→74 et remplacé le N°56 par le N°87.
     if (!cloudReady) return;
+    if (!numerotationPermise()) return;   // version de la numérotation relue (migration 013)
     if (!sales.items || !sales.items.length) return;
     // Deuxième filet : si l'app ne connaît AUCUNE paire numérotée, c'est que les
     // données ne sont pas (encore) là — on ne mint rien plutôt que de tout renuméroter.
@@ -22801,7 +23124,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // Numéro SAISI À LA MAIN (pas autoAssigned) : on n'y touche jamais.
       if (cur && cur.numero != null && String(cur.numero).trim() !== '' && !cur.autoAssigned) continue;
       const broadKey = identiteAnnonce(o);
-      const reuse = (broadKey && numeros[broadKey] && numeros[broadKey].numero) ? String(numeros[broadKey].numero) : null;
+      let reuse = (broadKey && numeros[broadKey] && numeros[broadKey].numero) ? String(numeros[broadKey].numero) : null;
+      // Une vente faite APRÈS la remise à zéro ne reprend jamais un numéro d'archive.
+      if (reuse && venteApresCoupure(o) && !numeroReprenable(reuse)) reuse = null;
       if (reuse) {
         if (!cur || String(cur.numero||'') !== reuse) { ovNext[tid] = { ...(cur||{}), numero: reuse, autoAssigned: false }; changed = true; }
       } else if ((needsBordereau(o.status) || venteRecente(o)) && !isHidden(o) && classifyOrderStatus(o.status) !== 'cancelled') {
@@ -22843,7 +23168,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       setSaleOv(ovNext); save('vinted_sale_overrides', ovNext);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, numeros, autoNum, cloudReady]);
+  }, [sales.items, numeros, autoNum, cloudReady, verNumTick]);
 
   // ⚠️⚠️ ICI VIVAIENT TROIS MIGRATIONS « UNE SEULE FOIS » SUR LES NUMÉROS
   //    (nettoyage du pool, compactage des numéros auto > 42, purge des numéros
@@ -23453,6 +23778,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Modifiable à la main ensuite (le champ N° reste éditable), et désactivable.
   useEffect(() => {
     if (!cloudReady) return; // ⛔ pas de numérotation avant que le cloud soit chargé
+    // ⛔ Ni sur une version de la numérotation qu'on n'a pas relue récemment :
+    //    un écran chargé avant la remise à zéro donnerait « 553 » (migration 013).
+    if (!numerotationPermise()) return;
     // ⚠️ TOUTE ANNONCE EN LIGNE DOIT AVOIR UN NUMÉRO — Julien : « je veux
     //    forcément qu'elle ait un numéro, peu importe : dès qu'elle est postée,
     //    elle doit avoir un numéro ». Donc `listings.items` (toutes les annonces
@@ -23488,6 +23816,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const byPhoto = {};
     for (const k in numeros) {
       const e = numeros[k]; if (!e || !String(e.numero || '').trim()) continue;
+      // Un numéro d'archive ne se redonne jamais par une photo (Julien, 10 octobre).
+      if (!numeroReprenable(e.numero)) continue;
       const pk = entryPhotoKey(e); if (pk && !byPhoto[pk]) byPhoto[pk] = String(e.numero);
     }
     const nextNum = { ...numeros };
@@ -23496,7 +23826,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const nextUsed = new Set(usedNumeros.map(entreePool).filter(x => x != null));
     const takenK = new Set(takenCles);
     let changed = false;
-    const sorted = [...items].sort((a, b) => (a.createdTs || 0) - (b.createdTs || 0));
+    // Dans l'ORDRE DE MISE EN LIGNE (1, 2, 3… comme il les reposte), par la même
+    // date que celle qui décide si l'annonce se numérote.
+    const sorted = [...items].sort((a, b) => (dateMiseEnLigneMs(a, listingDates) || 0) - (dateMiseEnLigneMs(b, listingDates) || 0));
     for (const it of sorted) {
       const cur = nextNum[it.id];
       const pk = photoKey(it.photo);
@@ -23508,10 +23840,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // paire (voir `numVentesParIdentite` juste au-dessus) : sans ça, une
       // annonce postée depuis le téléphone puis vendue avant d'être captée
       // repartirait sur un numéro neuf alors que sa boîte en porte déjà un.
-      let num = numVentesParIdentite.parItem[String(it.id)]
-             || (pk && numVentesParIdentite.parPhoto[pk])
+      // Après la remise à zéro : une annonce d'AVANT la coupure (ou sans date)
+      // n'est pas numérotée toute seule — seules les annonces republiées le sont.
+      if (!annonceNumerotable(it, listingDates)) continue;
+      let num = numeroReprenable(numVentesParIdentite.parItem[String(it.id)])
+             || numeroReprenable(pk && numVentesParIdentite.parPhoto[pk])
              || null;
-      if (!num) num = (pk && byPhoto[pk]) || null; // réutilisation par PHOTO (retour/republication du MÊME article)
+      if (!num) num = numeroReprenable(pk && byPhoto[pk]); // réutilisation par PHOTO (jamais un numéro d'archive)
       // Prochain numéro = le premier JAMAIS UTILISÉ. `taken` contient tous les
       // numéros déjà donnés (à vie, §5.40) : la séquence monte et ne redescend
       // pas. C'est voulu — elle compte les paires passées, pas le stock.
@@ -23536,7 +23871,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // arrivent souvent APRÈS les annonces. Sans elle, une annonce déjà rendue
   // garderait le numéro neuf qu'on vient justement d'éviter.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listings.items, cloudReady, numVentesParIdentite, sales.items, txnPret]);
+  }, [listings.items, cloudReady, numVentesParIdentite, sales.items, txnPret, verNumTick, listingDates]);
 
   const openConversation = async (conv) => {
     setReplyText(''); setReplyErr(null); setReplyBusy(false);
@@ -25000,6 +25335,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const buf = lu && lu.octets ? lu.octets : null;
       if (!buf) { libererOngletPdf(); toast(messagePdfManquant(lu)); return; }
       const numero = numForBord(b), title = b.modele || b.article || '';
+      if (numero && !(await assurerVersionNumerotation())) { libererOngletPdf(); toast(NUMEROS_PERIMES_IMPRESSION); return; }
       const { width, height } = await readPdfFirstPageSize(buf);
       const pos = posForFormat(width, height);
       const inv = invForBord(b);
@@ -25091,7 +25427,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const man = manualEntry(b); if (man && man.numero) return String(man.numero);
     const parItem = numFromLabelItem(b); if (parItem) return parItem;   // identité Vinted, zéro déduction
     const parTxn = numFromTxn(b); if (parTxn) return parTxn;
-    if (b.numero) return String(b.numero);
+    if (b.numero && numeroEmailAdmis(b, numeros)) return String(b.numero);
     return '';
   };
   // Le numéro de l'email contredit-il celui de la transaction ? On le signale au
@@ -25100,7 +25436,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // On compare au plus sûr des deux chemins certains : l'identité d'annonce si
     // l'extension l'a jointe au bordereau, sinon la transaction.
     const parTxn = numFromLabelItem(b) || numFromTxn(b);
-    const parMail = String((b && b.numero) || '').trim();
+    const parMail = numeroEmailAdmis(b, numeros) ? String((b && b.numero) || '').trim() : '';
     return parTxn && parMail && parTxn !== parMail ? { txn: parTxn, mail: parMail } : null;
   };
   // Date limite d'expédition d'un bordereau (Vinted pénalise les retards) : on la
@@ -26145,7 +26481,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <Notice tone="warn" icon="box"
               value={pending.length}
               title={`vente${pending.length>1?'s':''} repérée${pending.length>1?'s':''} via bordereau, pas encore synchronisée${pending.length>1?'s':''}`}
-              desc={pending.map(b=>(b.numero?`N°${b.numero} · `:'')+(b.modele||b.article||'?')).join(' — ')}
+              desc={pending.map(b=>(b.numero&&numeroEmailAdmis(b,numeros)?`N°${b.numero} · `:'')+(b.modele||b.article||'?')).join(' — ')}
               detail="Elles apparaîtront dans la liste (et dans la comptabilité) après ta prochaine navigation sur Vinted : c'est l'extension qui recapte les ventes."/>
           );
         })()}
@@ -27706,7 +28042,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <button type="button" onClick={async ()=>{
                       const libre = String(nextNumero);
                       if (!await askConfirm({ title:`Donner le N°${libre} à cette paire ?`, desc:`« ${it.title} »\n\nElle quitte le N°${g.numero}, qui reste à l'autre paire. Pense à changer l'étiquette de la boîte.`, ok:`Passer au N°${libre}` })) return;
-                      setNumeros(prev => { const u={...prev}; u[it.id]={...(u[it.id]||{}), numero:libre}; save('vinted_annonce_numeros',u); return u; });
+                      setNumeros(prev => { const u={...prev}; u[it.id]={...(u[it.id]||{}), numero:libre, manuelAt:new Date().toISOString()}; save('vinted_annonce_numeros',u); return u; });
                       recordUsed(libre);   // le numéro est pris à vie (§5.40)
                       toast(`✓ Cette paire est maintenant le N°${libre}.`);
                     }} style={{flexShrink:0,border:`1px solid ${C.accent}`,background:'transparent',color:C.accent,borderRadius:8,padding:'5px 10px',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
@@ -31067,11 +31403,16 @@ function clesAnnonceLbc(ad, liens) {
   const ks = [];
   if (!ad) return ks;
   const push = (v) => { const k = cleNum(v); if (k && !ks.includes(k)) ks.push(k); };
+  // Le lien posé À LA MAIN est pris tel quel (déjà converti par la migration,
+  // ou posé après elle) ; la référence et le « nXXX » d'une annonce qui portait
+  // un ancien numéro à la remise à zéro (`lbcAnnonces`) désignent l'ANCIENNE
+  // paire (B…), jamais la nouvelle du même chiffre.
+  const ext = (v) => { const k = cleNum(v); if (k) push(numeroExterne(k, ad.id, 'lbcAnnonces')); };
   const lien = ad.id != null && liens ? liens[String(ad.id)] : null;
   if (lien != null && String(lien).trim()) push(lien);
-  push(refVRMDe(ad.customRef));
-  if (ad.ref) push(ad.ref);
-  const mt = numDeTitreLbc(ad.subject || ad.title); if (mt) push(mt);
+  ext(refVRMDe(ad.customRef));
+  if (ad.ref) ext(ad.ref);
+  const mt = numDeTitreLbc(ad.subject || ad.title); if (mt) ext(mt);
   return ks;
 }
 
@@ -31181,6 +31522,27 @@ const numDeSkuEbay = (sku) => {
   return c && NUM_OK.test(c) ? c : '';
 };
 const skuEbayDe = (numero) => { const c = cleNum(numero); return c && NUM_OK.test(c) ? 'VRM-' + c : ''; };
+// ⚠️ APRÈS LA REMISE À ZÉRO (migration 013), un numéro écrit chez eBay ou sur
+// Leboncoin AVANT elle désigne l'ANCIENNE paire : le SKU « VRM-230 » d'une
+// vieille annonce eBay est la B230, pas la nouvelle 230 (une autre paire). Le
+// serveur ne peut pas réécrire ce qui est chez eBay ; le marqueur garde donc
+// les IDENTIFIANTS des annonces qui portaient un ancien numéro à la coupure
+// (`ebayAnnonces`, `lbcAnnonces`), et une commande eBay passée AVANT la
+// coupure parle aussi de l'ancienne série. Sans ça, la vente Vinted de la
+// nouvelle 230 faisait retirer d'eBay l'annonce de l'ancienne 230.
+// Par l'identifiant ou la date, jamais par le titre (§5).
+const numeroExterne = (k, id, liste, dateMs) => {
+  const arch = archiveNumeros();
+  if (!k || !arch || !/^\d+$/.test(k)) return k;
+  const m = marqueurNumerotation();
+  const ids = m && !m.annule && Array.isArray(m[liste]) ? m[liste] : [];
+  const coupure = coupureNumerotation();
+  const avant = dateMs != null && isFinite(dateMs) && coupure != null && dateMs < coupure;
+  return (id != null && ids.some((x) => String(x) === String(id))) || avant ? cleNum(arch + k) : k;
+};
+// Le N° d'une annonce / ligne de commande eBay, lu avec son identifiant.
+const numEbayLu = (sku, itemId, dateMs) => numeroExterne(numDeSkuEbay(sku), itemId, 'ebayAnnonces', dateMs);
+const numLigneEbay = (o, li) => numEbayLu(li && li.sku, li && (li.legacyItemId || li.itemId), Date.parse((o && o.creationDate) || ''));
 // Une commande eBay qui ENGAGE la paire : ni annulée, ni remboursée, ni en
 // paiement échoué. Un paiement en attente engage déjà : l'acheteur s'est engagé.
 const commandeEbayEngagee = (o) => !!o
@@ -31214,7 +31576,10 @@ const retirerEbayAuto = async (liste) => {
       __retraitEbayAutoTentes.add(id); n += 1;
       try {
         const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() },
-          body: JSON.stringify({ action: 'retirer', itemId: id, confirme: true, auto: true, sku: a.sku, titre: a.title || '' }) });
+          // Le SKU de la paire que la règle a JUGÉE vendue (« VRM-B230 » pour une
+          // ancienne annonce), pas la chaîne lue chez eBay : le serveur relit
+          // l'annonce et la traduit par le même marqueur avant de la terminer.
+          body: JSON.stringify({ action: 'retirer', itemId: id, confirme: true, auto: true, sku: skuEbayDe(d.numero) || a.sku, titre: a.title || '' }) });
         const j = await r.json().catch(() => null);
         if (j && j.ok) toast(`N°${d.numero} retirée d'eBay automatiquement : elle est vendue sur Vinted.`, 'ok');
       } catch (_) { /* il la verra dans « à retirer », avec le bouton */ }
@@ -31270,7 +31635,7 @@ function numerosDejaVendus({ numeros, autres, enLigne, vendusVinted, commandes, 
   else if (!Array.isArray(commandes)) pasSu.push('tes ventes eBay');
   else for (const o of commandes) {
     if (!commandeEbayEngagee(o)) continue;
-    for (const li of (Array.isArray(o.lineItems) ? o.lineItems : [])) pose(numDeSkuEbay(li && li.sku), 'eBay');
+    for (const li of (Array.isArray(o.lineItems) ? o.lineItems : [])) pose(numLigneEbay(o, li), 'eBay');
   }
   if (ventesLbc === undefined) enCours = true;
   else if (!ventesLbc || typeof ventesLbc !== 'object') pasSu.push('tes ventes Leboncoin');
@@ -31308,7 +31673,7 @@ function doublesVenteEbay({ annonces, commandes, numeros, enLigne, vendusVinted,
   const verdict = ventes && ventes.vendus && typeof ventes.vendus.get === 'function' ? ventes.vendus : null;
   if (verdict || vendusVinted) for (const p of (Array.isArray(programmees) ? programmees : [])) {
     if (!p || !p.itemId) continue;
-    const n = numDeSkuEbay(p.sku);
+    const n = numEbayLu(p.sku, p.itemId);
     if (!n) continue;                                             // pas de SKU : rien n'est rapproché (§5)
     const ids = parNum.get(n) || [];
     if (verdict) {
@@ -31323,7 +31688,7 @@ function doublesVenteEbay({ annonces, commandes, numeros, enLigne, vendusVinted,
   }
   for (const a of (Array.isArray(annonces) ? annonces : [])) {
     if (!a || !a.itemId) continue;
-    const n = numDeSkuEbay(a.sku);
+    const n = numEbayLu(a.sku, a.itemId);
     if (!n) { nonReliees.push(a); continue; }
     if (!vendusVinted) continue;                                  // pas su : on n'affirme rien
     const ids = parNum.get(n) || [];
@@ -31337,7 +31702,7 @@ function doublesVenteEbay({ annonces, commandes, numeros, enLigne, vendusVinted,
   if (enLigne) for (const o of (Array.isArray(commandes) ? commandes : [])) {
     if (!commandeEbayEngagee(o)) continue;
     for (const li of (Array.isArray(o.lineItems) ? o.lineItems : [])) {
-      const n = numDeSkuEbay(li && li.sku);
+      const n = numLigneEbay(o, li);
       if (!n) continue;
       const ids = parNum.get(n) || [];
       const vendueVinted = vendusVinted ? ids.filter((id) => vendusVinted.has(id)) : [];
@@ -33165,19 +33530,25 @@ function NumerosSetting() {
     if (touche.current) return;                            // §5.49 : ne remplacer que le vide
     const v = prefixeNumeros(); if (v) { setP(v); setMode('lettre'); }
   }), []);
+  // La lettre des ANCIENS numéros (remise à zéro, migration 013) ne peut pas
+  // être celle des nouveaux : « B12 » désignerait deux paires. La base le
+  // refuse ; l'écran le dit avant, et n'enregistre rien.
+  const arch = archiveNumeros();
   const poser = (v) => {
     touche.current = true;
     const n = String(v || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3);
     setP(n);
+    if (n && arch && n === arch) return;
     // La copie locale tout de suite (`save` écrit 500 ms plus tard) : les champs
     // N° et la numérotation automatique la lisent dès le prochain rendu.
     try { localStorage.setItem('vrm_num_prefixe', JSON.stringify(n)); } catch (_) {}
     save('vrm_num_prefixe', n);
     try { window.dispatchEvent(new Event('vrm-prefixe')); } catch (_) {}
   };
-  const choix = (m) => { setMode(m); poser(m === 'chiffres' ? '' : (p || 'B')); };
+  const defaut = arch === 'B' ? 'C' : 'B';
+  const choix = (m) => { setMode(m); poser(m === 'chiffres' ? '' : (p && p !== arch ? p : defaut)); };
   const pill = (on) => ({ border: `1px solid ${on ? C.accent : C.border}`, background: on ? C.accent : C.card, color: on ? (C.onAccent || '#fff') : C.text, borderRadius: 999, padding: '7px 14px', fontSize: 13, fontWeight: on ? 700 : 600, cursor: 'pointer', fontFamily: 'inherit' });
-  const ex = p || 'B';
+  const ex = p && p !== arch ? p : defaut;
   return (
     <div data-numeros-reglage={mode} style={{padding:'13px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
       <div style={{fontSize:13,fontWeight:600,color:C.text}}>Tes numéros de rangement</div>
@@ -33194,6 +33565,11 @@ function NumerosSetting() {
           <input value={p} onChange={(e) => poser(e.target.value)} placeholder="B" autoCapitalize="characters" aria-label="Lettres de la série"
             style={{width:70,padding:'8px 10px',borderRadius:8,border:`1px solid ${C.border}`,background:C.bg,color:C.text,fontSize:14,fontFamily:'inherit',textTransform:'uppercase'}}/>
         </label>
+      )}
+      {mode === 'lettre' && arch && p === arch && (
+        <div data-numeros-lettre-archive style={{fontSize:12,color:C.text,marginTop:8,lineHeight:1.5}}>
+          « {arch} » est la lettre de tes <b>anciens</b> numéros ({arch}1, {arch}2…) : rien n'est enregistré. Choisis une autre lettre.
+        </div>
       )}
       <div style={{fontSize:11.5,color:C.muted,marginTop:8,lineHeight:1.5}}>
         Tu peux toujours taper un numéro à la main, dans n'importe quelle forme : 125, B125, C40. « b125 » et « B125 » sont le même carton.
@@ -35315,7 +35691,21 @@ function AppCoeur() {
         // ⚠️ `vinted_accounts` est EXCLU : la copie du nuage est volontairement
         // sans jetons (cf. ALLEGER_AVANT_CLOUD), l'écrire ici retirerait les
         // jetons de cet appareil jusqu'à ce que la table réponde.
+        // ⚠️ LA REMISE À ZÉRO DES NUMÉROS (migration 013). La version du marqueur
+        //    que CET appareil connaissait, avant de restaurer : si celle du nuage
+        //    diffère, les copies d'APPAREIL qui portent des numéros (le garage
+        //    3D, « Mon local », les numéros présents) parlent de l'ancienne série
+        //    — on les jette, l'écran concerné les relira.
+        const verLocale = versionNumerotation();
+        const verNuage = cloud.vrm_numerotation && isFinite(Number(cloud.vrm_numerotation.version)) ? Number(cloud.vrm_numerotation.version) : null;
         SYNC_KEYS.forEach(k => { if (k === 'vinted_accounts') return; if (cloud[k] !== undefined && cloud[k] !== null) { try { localStorage.setItem(k, JSON.stringify(cloud[k])); } catch (_) {} } });
+        if (verNuage !== verLocale) purgerCopiesNumeros();
+        noterInstantaneCharge(cloud);
+        noterVersionChargee();
+        // Les saisies d'un écran rechargé parce qu'il était périmé (un prix
+        // d'achat, un colis coché…) : rejouées sur la ligne fraîche, par
+        // IDENTIFIANT, jamais les numéros. Puis envoyées.
+        { const rj = rejouerSaisies(); if (rj && rj.n) { cloudPush(); setTimeout(() => toast(`${rj.n} saisie${rj.n > 1 ? 's' : ''} faite${rj.n > 1 ? 's' : ''} sur l'écran rechargé ${rj.n > 1 ? 'ont été gardées' : 'a été gardée'}${rj.prix ? ` (dont ${rj.prix} prix d'achat)` : ''}.`), 800); } }
         // 2) Puis on met à jour les états React des données gérées à la racine.
         const apply = (key, setter) => {
           if (cloud[key] !== undefined && cloud[key] !== null) { setter(cloud[key]); }
@@ -35341,6 +35731,17 @@ function AppCoeur() {
     })();
     return () => { stop = true; off(); };
   }, []);
+
+  // La VERSION de la numérotation est relue (une lecture scalaire) toutes les
+  // 60 s et au retour au premier plan : un onglet resté VISIBLE sur un second
+  // écran ne reçoit jamais `visibilitychange`, d'où l'horloge aussi.
+  useEffect(() => {
+    if (!synced) return;
+    const t = setInterval(() => { verifierVersionNumerotation(); }, 60 * 1000);
+    const vis = () => { if (document.visibilityState === 'visible') verifierVersionNumerotation(); };
+    document.addEventListener('visibilitychange', vis);
+    return () => { clearInterval(t); document.removeEventListener('visibilitychange', vis); };
+  }, [synced]);
 
   // ── Automatismes Stock Vinted ──────────────────────────
   // On n'active ces effets qu'APRÈS le chargement initial (synced),
@@ -36336,13 +36737,14 @@ function AppCoeur() {
               syncStatus==='synced'?'Synchronisé avec le cloud':
               syncStatus==='saving'?'Sauvegarde en cours...':
               syncStatus==='loading'?'Chargement...':
-              syncStatus==='error'?'Hors ligne (sauvegarde locale)':'En attente'
+              syncStatus==='refus'?'Refusé par la base : cet écran est périmé, recharge-le':
+              syncStatus==='error'?'La base n\u2019a pas répondu — la sauvegarde sera retentée':'En attente'
             } style={{fontSize:13,opacity:0.9,display:'flex',alignItems:'center',gap:4}}>
               {/* Icône au trait plutôt qu'emoji : elle prend la couleur de l'état
                   (vert synchronisé, orange en cours, rouge hors ligne), ce qu'un
                   emoji ne sait pas faire. */}
-              <span style={{display:'flex',color:syncStatus==='error'?C.danger:syncStatus==='synced'?C.accent:C.warn}}>
-                <Icon name={syncStatus==='error'?'cloudOff':syncStatus==='synced'?'cloud':'sync'} size={16}/>
+              <span style={{display:'flex',color:(syncStatus==='error'||syncStatus==='refus')?C.danger:syncStatus==='synced'?C.accent:C.warn}}>
+                <Icon name={(syncStatus==='error'||syncStatus==='refus')?'cloudOff':syncStatus==='synced'?'cloud':'sync'} size={16}/>
               </span>
               {/* ⚠️ L'HEURE DE SYNCHRO EST RETIRÉE. Sur un iPhone, l'en-tête
                   portait : retour, icône VRM, mot « VRM », nuage, heure, loupe,
@@ -36563,6 +36965,7 @@ function AppCoeur() {
             LIGNE de panne (`LignePanne`) là où leur propre liste vide
             mentirait — le bloc, lui, ne s'affiche qu'une fois. */}
         {baseKO && <BaseInjoignable/>}
+        <BlocNumerosPerimes/>
         {tab==='settings'&&<SettingsScreen setTab={setTab} comptes={vintedAccounts}
           customLogo={customLogo} onPickLogo={()=>logoInputRef.current&&logoInputRef.current.click()} onResetLogo={resetLogo}
           notifEnabled={notifEnabled}

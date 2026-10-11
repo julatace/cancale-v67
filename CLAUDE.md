@@ -4122,6 +4122,77 @@ montait, et la migration **repartait** sur ses vraies données.
   porte 543…552, remettre ce numéro dans le champ N° (l'app demande une
   confirmation, le numéro étant déjà au pool). **Ne pas corriger sa base à sa
   place** : seul le carton dit quel numéro est le vrai.
+### ⚠️⚠️⚠️ Anciens numéros en B — la remise à zéro (migration 013, 9-11 octobre)
+Julien, 9 octobre : « tous les anciens numéros, tu les fais commencer par B1,
+B2… on commence à partir de zéro à partir du moment où je recommence à
+reposter ». 10 octobre : « j'ai tout supprimé et je reposte, regarde par
+rapport à la DATE DE MISE EN LIGNE », puis : « les anciens c'est que les paires
+vendues, car je vais tout republier — c'est pour ça que je veux de nouveaux
+numéros ». **Ce sont SES décisions, pas des options à reproposer.**
+- **La règle** : une annonce mise en ligne APRÈS la coupure T est NOUVELLE et
+  reçoit 1, 2, 3… dans l'ordre de mise en ligne — même si c'est physiquement une
+  paire qui avait un numéro (il réétiquette le carton). Tout le reste passe en
+  « B + l'ancien » et ne sert plus qu'à l'HISTOIRE (ventes, compta, bordereaux,
+  fiches des paires supprimées). **Un ancien numéro ne se redonne JAMAIS** — ni
+  « B230 », ni « 230 » : ni par une vente, ni par une photo ou un dossier de
+  photo, ni par la bannière ♻️, ni à la main.
+- **La date de mise en ligne**, dans l'ordre (la migration ET l'app,
+  `dateMiseEnLigneMs`, §11) : `created_at_ts` du dressing, l'heure de dépôt de
+  la photo (`photo.high_resolution.timestamp`), `vinted_listing_dates`, puis
+  (migration seulement) `numberedAt`. Une fiche numérotée avant T ne devient
+  jamais nouvelle sur une date contraire (`contradictions`, compté).
+- **La migration** (`supabase/migrations/013-anciens-numeros-en-b.sql`) ne
+  convertit RIEN à l'installation. L'appel est à part : MESURE
+  (`vrm_numerotation_mesurer`) → ESSAI ANNULÉ (`node
+  scripts/renum-b/essai-annule.cjs --coupure=… > essai.sql`, qui rend le plan :
+  chaque annonce jugée nouvelle avec sa date, sa source et si une capture la
+  montre en ligne) → APPLICATION (`vrm_numerotation_archiver`, avec la mesure)
+  → `vrm_numerotation_rattraper`. Retour arrière ciblé :
+  `vrm_numerotation_annuler`, refusé dès qu'un numéro a bougé depuis.
+  ⚠️ **Le choix de T** : une annonce mise en ligne après T puis supprimée
+  prendrait quand même un numéro neuf — le plan le signale
+  (`nouvellesPasEnLigne`). À regarder avant d'appliquer.
+- **Le marqueur** `main.vrm_numerotation` = `{version, coupure, appliqueLe,
+  archive, renum, lbcAnnonces, ebayAnnonces, annule?}` n'est écrit QUE par le
+  serveur : le garde-fou de la base le recopie depuis la ligne d'avant, quoi
+  qu'envoie un navigateur. `renum` = {numéro provisoire → nouveau} (les 553+
+  donnés avant la migration) : un appareil qui réécrirait « 553 » sur une fiche
+  devenue « 1 » est refusé (`vrm_numeros_perimes`).
+- **Les garde-fous de la base** (écritures `authenticated`/`anon` seulement) :
+  `vrm_pool_retreci` (le pool ne rétrécit jamais, même avant la coupure),
+  `vrm_numeros_perimes` (B230 qui redevient 230, une clé B385 qui redevient
+  385, le numéro provisoire qui revient), `vrm_fiche_perdue` (une fiche
+  numérotée qui disparaît sans `repriseDe`), `vrm_garage_perime` (garage sans la
+  version), `vrm_prefixe_archive` (« B » comme lettre des nouveaux numéros).
+  Une saisie à la main datée d'après la conversion (`manuelAt`) passe.
+- **L'app** lit le marqueur (`archiveNumeros`, `coupureNumerotation`,
+  `versionNumerotation`) : la version est relue toutes les 60 s et au retour au
+  premier plan ; la numérotation automatique n'agit que sur une version relue
+  depuis moins de 3 min (`numerotationPermise`). Un refus nommé de la base, ou
+  une version qui a changé, couvre l'écran (`BlocNumerosPerimes`) : « Recharger »
+  met de côté ce qui a été tapé (prix d'achat, colis cochés…) et le rejoue par
+  IDENTIFIANT après le rechargement — jamais les numéros.
+- **Un « 230 » écrit AVANT la coupure désigne l'ANCIENNE paire** : le SKU d'une
+  annonce eBay ou la référence d'une annonce Leboncoin qui le portaient à la
+  coupure (leurs identifiants sont dans le marqueur), une commande eBay passée
+  avant T. Sans ça, la vente Vinted de la NOUVELLE 230 faisait retirer d'eBay
+  l'annonce de l'ancienne (`numeroExterne`, la même règle dans l'app,
+  `api/_lib/numerotation.js` et l'extension 5.165 pour Leboncoin). Le retrait
+  eBay automatique relit le marqueur chez le serveur ; illisible ⇒ rien.
+- **Les emails** : après la conversion, le « nXXX » d'un TITRE n'est retenu que
+  s'il désigne une fiche actuelle de la nouvelle série AU MÊME TITRE ; sinon il
+  part dans `numeroTitre` (jamais tamponné). Le repli par titre ne rend jamais
+  un numéro d'archive (`numeroDEmail`, serveur ; `numeroEmailAdmis`, app).
+- Preuves : `audit-renum-b.cjs` (la migration EXÉCUTÉE sur un Postgres jetable,
+  ~5 min, et l'essai annulé qui ne laisse rien) ; `audit-numerotation-lecteurs.cjs`
+  (les règles de l'app, du serveur et de l'extension exécutées, 18 mutations) ;
+  `audit-ebay-route.cjs` (le retrait automatique : 3 rouges sur le code d'avant).
+- ⚠️ **Non mesuré** : la migration n'a JAMAIS tourné sur sa vraie base (données
+  inventées à la forme des siennes). Une annonce republiée SANS date lisible ne
+  se numérote pas toute seule (elle reste « sans N° »). Le « nXXX » d'un titre
+  Vinted republié reste lu tel quel par la file Leboncoin de l'extension
+  (`vintedKeys`) : ancien ou nouveau numéro, VRM ne peut pas le savoir.
+
 ### Leboncoin et eBay rangés comme Vinted : résumé, puis Ventes / Achats / Annonces (3 octobre)
 Demande du 2 octobre : « plus d'écran Aperçu intermédiaire ». Les deux onglets
 ouvrent sur **Ventes**, avec un résumé compact au-dessus (`PlatResume`, même forme
