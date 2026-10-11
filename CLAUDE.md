@@ -49,7 +49,7 @@ Ce ne sont pas des positions de principe : chacune a une raison technique.
 | demande | pourquoi non |
 |---|---|
 | republication automatique en file, avec délais aléatoires | un délai « faussement humain » n'a qu'un usage : tromper la détection bot. C'est ce qui a fait bloquer `vanessa5723`. |
-| **accepter une offre automatiquement** — ⛔ **RETIRÉ, sa décision** | coupée le 4 octobre (« je ne veux pas que ça accepte tout seul les offres »), **retirée** le 5 octobre (« enlève l'acceptation de l'offre ») : le moteur de l'extension, ses planchers, le champ « Min. accepté », l'interrupteur de Réglages. Accepter engage une vente ferme, et un programme qui accepte ressemble à un robot (le compte bloqué). **Ne jamais le reproposer** — je l'ai fait par erreur le 5 octobre en lisant l'ancienne version de cette ligne. Reste permis : accepter UNE offre depuis la messagerie, sur son clic, avec confirmation (`executerPourApp`). `audit-offres-auto.cjs` refuse tout autre chemin vers `/accept`. ⚠️ **Tout ce qui précède vaut pour VINTED. Sur eBay, Julien l'a demandé le 9 octobre**, en ses mots : « Je veux juste définir une règle sur chaque annonce et à chaque offre au-dessus ça accepte », puis, à la question « aussi sur Vinted ? » : « **eBay seulement** », et « J'accepte » sur le plan. Sur eBay c'est donc permis, sous UNE seule forme : le **seuil natif d'eBay** (`BestOfferAutoAcceptPrice`), posé annonce par annonce **sur son clic**, avec une confirmation qui dit qu'une offre acceptée vend la paire. C'est eBay qui accepte : VRM n'appelle aucune route d'acceptation et ne décide rien. Sur Vinted, rien ne change. |
+| **accepter une offre automatiquement** — ⛔ **RETIRÉ, sa décision** | coupée le 4 octobre (« je ne veux pas que ça accepte tout seul les offres »), **retirée** le 5 octobre (« enlève l'acceptation de l'offre ») : le moteur de l'extension, ses planchers, le champ « Min. accepté », l'interrupteur de Réglages. Accepter engage une vente ferme, et un programme qui accepte ressemble à un robot (le compte bloqué). **Ne jamais le reproposer** — je l'ai fait par erreur le 5 octobre en lisant l'ancienne version de cette ligne. Reste permis : accepter UNE offre depuis la messagerie, sur son clic, avec confirmation (`executerPourApp`). `audit-offres-auto.cjs` refuse tout autre chemin vers `/accept`. ⚠️ **Tout ce qui précède vaut pour VINTED. Sur eBay, Julien l'a demandé le 9 octobre**, en ses mots : « Je veux juste définir une règle sur chaque annonce et à chaque offre au-dessus ça accepte », puis, à la question « aussi sur Vinted ? » : « **eBay seulement** », et « J'accepte » sur le plan. Sur eBay c'est donc permis, sous UNE seule forme : le **seuil natif d'eBay** (`BestOfferAutoAcceptPrice`), posé annonce par annonce **sur son clic**, avec une confirmation qui dit qu'une offre acceptée vend la paire. C'est eBay qui accepte : VRM n'appelle aucune route d'acceptation et ne décide rien (`audit-offres-auto.cjs` le vérifie aussi pour `api/`, section 5). Sur Vinted, rien ne change : ce n'est **pas** un retour de l'acceptation automatique sur Vinted, ne pas l'y reproposer. Détail : « eBay : au-dessus, ça accepte » plus bas. |
 | piloter la souris / le clavier | Vinted reçoit la **même requête** ; en plus un événement synthétique porte `isTrusted:false`, donc ça **ajoute** une preuve d'automatisation. Et un clic aveugle agit à côté quand la page bouge. |
 | modifier les photos pour republier / passer sur un autre compte | Vinted relie les comptes par **appareil, navigateur, adresse, moyen de paiement** — pas par les images. Tourner une photo ne protège de rien. |
 | supprimer une annonce automatiquement | irréversible et sans confirmation côté Vinted. |
@@ -5969,6 +5969,79 @@ séparées ». Il a un compte particulier ET un compte pro.
   ouvrir eBay → Compte eBay (son pseudo doit apparaître), puis « Connecter un
   autre compte eBay » et se connecter avec l'autre compte.
 
+### eBay : « au-dessus, ça accepte » — c'est eBay qui accepte, au seuil qu'il fixe (9 octobre)
+Julien : « je veux juste définir une règle sur chaque annonce et à chaque offre
+au-dessus ça accepte ». Fait SUR eBAY seulement, avec le réglage natif d'eBay
+(Offre directe : `BestOfferAutoAcceptPrice`, et en option le refus
+`MinimumBestOfferPrice`) ; Vinted et l'extension ne changent pas (§3).
+- **Fait** : actions `regleoffre` (pose, change, retire ; `ReviseFixedPriceItem`,
+  `DeletedField` pour retirer) et `regleoffrelire` dans `api/ebay.js` (toujours
+  12 fonctions) ; ligne `ebay_offres{_clé}` par compte eBay
+  (lire-fusionner-réécrire gardé : lecture ratée ⇒ rien n'est écrit, et une
+  lecture n'écrase pas une plus récente, `lueA`) ; la synchro lit la règle dans
+  les GetItem qu'elle faisait déjà (zéro appel de plus, rien dans
+  `ebay_listings`) ; carte « Offres reçues : eBay accepte dès X € » ou « Définir
+  une règle d'offre », modification en place ; « Une règle pour toutes » (%,
+  aperçu arrondi au centime SUPÉRIEUR, une par une, Arrêter, bilan dont la somme
+  vaut le total) ; champs à la création, dans les brouillons et le
+  planificateur (sans règle, le XML envoyé est celui d'avant, au caractère
+  près) ; un changement de prix (carte ET baisse des paires qui dorment) relit
+  la règle et dit ce qu'il en reste ; déconnexion d'un compte eBay et « Fermer
+  mon compte » disent combien d'annonces gardent une règle chez eBay.
+- **Décisions** : trois états (connue · aucune · pas su ; une lecture de plus de
+  30 jours, un prix changé depuis, des offres dont on ne sait pas si elles sont
+  actives valent « pas su », qui n'affiche AUCUN montant) ; le prix et la règle
+  que Julien a VUS sont des gardes serveur (`prixVu`, `attendu` : 409 s'ils ont
+  changé chez eBay — une règle existante jamais lue n'est pas écrasée sans le
+  lui redemander) ; un seuil sous la moitié du prix (« 7 » au lieu de « 72 »)
+  exige `sousMoitie` ; la base est marquée « en cours » AVANT l'écriture chez
+  eBay ; sans `<Ack>` ou panne d'eBay (`SystemError`, classe absente) ⇒
+  relecture, jamais « refusé » ; le refus existant est RENVOYÉ quand on ne le
+  touche pas (sinon eBay peut le faire sauter) ; le compte de L'ANNONCE, jamais
+  celui de la vue ; pas de règle sur une paire vendue ailleurs ou en vente sur
+  deux comptes (retirer reste possible, un clic, sans feuille) ; l'écran dit les
+  deux fenêtres où eBay vend sans que VRM le voie (ventes eBay relues à
+  l'ouverture au-delà de 6 h quand une règle est posée ; retrait automatique
+  seulement VRM ouvert). Couleurs : texte pour un ✓ sans réserve, ambre pour
+  tout le reste — jamais de vert.
+- **Preuves** : `audit-ebay-route.cjs` section 12 (**126 contrôles**, la
+  route exécutée ; **105 rouges** sur la base d'avant, `worktree-wf_d62e1db4-b5c-1`) ;
+  `prouve-regle-offre.cjs` (**16 mutations** de la route, chacune rouge sur les
+  contrôles nommés ; XML de publication sans règle identique à celui d'avant,
+  12 048 caractères, et avec `offre: null` ; une route qui appellerait
+  `RespondToBestOffer` fait rougir `audit-offres-auto.cjs`, section 5) ; banc
+  `ebay-regle-offre.cjs` (port 4761, données inventées, deux tailles, **202
+  contrôles**) prouvé par `prouve-banc-regle-offre.cjs` (**11 mutations** de
+  l'écran, chacune rouge ; **47 rouges sur 53** sur le build d'avant) ; `ebay-form`,
+  `ebay-programmer`, `annonces-carte` étendus.
+  ⚠️ **Deux contrôles du banc étaient des courses d'horloge** (« Arrêter »
+  pendant le 1er envoi, quitter l'écran pendant le 2ᵉ) : rouges une fois sur
+  quelques-unes à 1512 px sur une machine chargée, sur un code intact. Le faux
+  eBay RETIENT maintenant la requête visée jusqu'au geste (`retenir`). *Un
+  geste « pendant » se joue sur une requête tenue, jamais sur un délai.*
+  ⚠️ Vu au rendu : l'anneau de focus de TOUTE l'app était encore le vert de
+  l'ancienne palette menthe (`#0f6b4f`, posé après la règle aux couleurs de la
+  marque, il l'écrasait) — remis au bleu de la marque, le sombre suit
+  `data-theme`.
+- **Non mesuré (eBay et la production sont bloqués d'ici, rien n'a été appelé
+  pour de vrai)** : les noms et places des éléments dans `ReviseFixedPriceItem`
+  et `AddFixedPriceItem` (doc d'eBay) ; `DeletedField` sur ces chemins ; que
+  `GetItem` rende les seuils au jeton du vendeur et qu'« absent » veuille dire
+  « pas de seuil » ; que la catégorie 15709 sur eBay.fr accepte le seuil (sinon
+  eBay active les offres sans le montant : l'écran le dit) ; « strictement sous
+  le prix » (23004) et « refus sous l'acceptation » (sources tierces) ; ce que
+  `ReviseInventoryStatus` fait d'une annonce à seuils (effacer, garder, refuser :
+  les trois issues sont tenues, l'écran ne dit que ce qu'il a relu) ; une offre
+  égale au seuil acceptée ; le délai de propagation d'une révision (VRM relit
+  une 2ᵉ fois après 2 s) ; une offre déjà faite et en attente acceptée dès la
+  pose (la feuille le dit comme une possibilité) ; la révision d'une annonce
+  PROGRAMMÉE (refusée par VRM, 409). **Premiers gestes de Julien** : eBay →
+  Compte eBay → « ↻ Rafraîchir depuis eBay » (ses 2 annonces passent de « — » à
+  leur vrai état) ; relier ses 2 annonces à leur paire ; poser une règle sur UNE
+  annonce et lire le message (« ✓ … » ou « activé les offres mais pas gardé le
+  montant ») ; la retirer ; changer le prix d'une annonce à règle et lire ce que
+  VRM a relu.
+
 ### Mise en production du 5 octobre
 PR #442 mergée à 10:24 UTC (80 déploiements sur 24 h : sous la limite), déploiement
 de production READY sur le commit de merge, `/api/sante` répond, le zip servi
@@ -7065,8 +7138,8 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | outil | quoi |
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
-| `node scripts/audit-*.cjs` | **82 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
-| `scripts/bancs/*.cjs` | les **72 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
+| `node scripts/audit-*.cjs` | **84 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `scripts/bancs/*.cjs` | les **76 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
 **Trois règles de preuve :**
@@ -7358,8 +7431,8 @@ script-là me fait croire à une catastrophe.
 src/App.jsx                     l'app (grep avant de lire — le fichier est énorme)
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
-scripts/audit-*.cjs             les 82 audits
-scripts/bancs/                  les 72 bancs (leur README dit comment les lancer)
+scripts/audit-*.cjs             les 84 audits
+scripts/bancs/                  les 76 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 ```
