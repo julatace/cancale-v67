@@ -193,8 +193,9 @@ async function page(nav, { largeur = 1512, hauteur = 900, mobile = false, sessio
       const t = await pg.evaluate(() => document.querySelector('[data-accueil]').innerText);
       const cgv = fs.readFileSync(path.join(RACINE, 'public', 'legal', 'cgv.html'), 'utf8');
       // ⚠️ Le prix vient des CGV, une seule source (§11). Depuis le 4 octobre
-      //    elles annoncent l'abonnement (« 9,99 € par mois ») : la page d'accueil
-      //    doit dire CE montant — et aucun autre montant mensuel, ni « 0 € ».
+      //    elles annoncent l'abonnement (« 9,99 € par mois », puis « 12,99 € par
+      //    mois » depuis le 11 octobre) : la page d'accueil doit dire CE montant
+      //    — et aucun autre montant mensuel, ni « 0 € ».
       const gratuitCgv = /VRM est gratuit/i.test(cgv);
       const prixCgv = (/abonnement à (\d+,\d{2}) € par mois/i.exec(cgv) || [])[1] || null;
       if (gratuitCgv) dit(/gratuit/i.test(t) && /0 €/.test(t), 'le prix affiché est celui des CGV (« gratuit »)');

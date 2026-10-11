@@ -13,8 +13,8 @@
 //     c'est zéro conflit.
 //
 // ⚠️ AUCUNE DONNÉE INVENTÉE (§2.3) : pas de faux avis, pas de faux « 10 000
-//    vendeurs », pas de prix imaginaire. Le prix est celui des CGV (« 9,99 €
-//    par mois », depuis le 4 octobre — le banc le vérifie), la confidentialité cite la politique publiée, et
+//    vendeurs », pas de prix imaginaire. Le prix est celui des CGV (« 12,99 €
+//    par mois », depuis le 11 octobre — 9,99 € avant ; le banc le vérifie), la confidentialité cite la politique publiée, et
 //    chaque fonction décrite existe dans l'app. Les chiffres de l'animation
 //    sont une DÉMONSTRATION (une paire, un numéro de carton) — aucun vrai
 //    compte, aucun vrai acheteur.
@@ -107,7 +107,7 @@ const Photo = ({ s = 34, i = 0, r = 8 }) => {
 function SceneComptes({ u, c }) {
   const carte = sortie(seg(u, 0.05, 0.24));
   // ⚠️ On compte DEPUIS un socle non nul : un « 0 € » transitoire serait pris pour
-  //    un prix affiché « 0 € » par le banc d'honnêteté (le prix, c'est 9,99 €/mois).
+  //    un prix affiché « 0 € » par le banc d'honnêteté (le prix, c'est 12,99 €/mois).
   const vendu = Math.round(mix(118, 142, douce(seg(u, 0.12, 0.46))));
   const recu = Math.round(mix(74, 96, douce(seg(u, 0.22, 0.54))));
   const jours = [2, 4, 3, 5, 2, 6, 4, 3, 7, 5, 4, 6, 5, 8];
@@ -638,7 +638,7 @@ const FAQ = [
   { q: 'J’ai plusieurs comptes Vinted.', r: 'C’est fait pour. Passe sur Vinted connecté à chacun de tes comptes : ils apparaissent tous dans VRM, et tu peux en exclure un quand tu veux.' },
   { q: 'Vinted peut-il bloquer mon compte à cause de VRM ?', r: 'Personne ne peut garantir une décision de Vinted, mais VRM est conçu pour ne rien faire qu’une personne ne ferait pas : une action à la fois, jamais en rafale, seulement sur le compte connecté, avec un plafond par heure. Les comportements qui trahissent un robot, VRM les refuse par principe (question suivante).' },
   { q: 'Est-ce que VRM fait des choses à ma place qui pourraient me faire bloquer ?', r: 'Non, et c’est un choix. Les automatisations qui font repérer un robot — relancer en série les personnes qui ont mis un article en favori, republier des annonces en boucle, accepter des offres automatiquement — VRM ne les fait pas. Il range tes données et prépare ton travail ; c’est toujours toi qui cliques sur publier, accepter ou envoyer.' },
-  { q: 'Combien ça coûte ?', r: '9,99 € par mois, sans engagement, résiliable à tout moment depuis l’app. Tant que l’abonnement n’est pas activé, l’accès est offert — et rien n’est jamais prélevé sans que tu t’abonnes toi-même.' },
+  { q: 'Combien ça coûte ?', r: '12,99 € par mois, sans engagement, résiliable à tout moment depuis l’app. Tant que l’abonnement n’est pas activé, l’accès est offert — et rien n’est jamais prélevé sans que tu t’abonnes toi-même.' },
   { q: 'Que deviennent mes données ?', r: 'Elles servent à faire marcher ta boutique, rien d’autre : VRM ne vend aucune donnée et ne fait pas de publicité.' },
 ];
 const LEGAL = [
@@ -845,11 +845,11 @@ export default function Accueil({ onEntrer }) {
             <div>
               <div className="acc-eyebrow">Prix</div>
               <h2 className="acc-h2 vrm-display">Un prix. Sans piège.</h2>
-              <p className="acc-sub">9,99 € par mois, sans engagement : tu résilies quand tu veux, en deux clics, depuis l’app. Tant que l’abonnement n’est pas activé, l’accès est offert — et rien n’est jamais prélevé sans que tu t’abonnes toi-même.</p>
+              <p className="acc-sub">12,99 € par mois, sans engagement : tu résilies quand tu veux, en deux clics, depuis l’app. Tant que l’abonnement n’est pas activé, l’accès est offert — et rien n’est jamais prélevé sans que tu t’abonnes toi-même.</p>
             </div>
             <div className="acc-prix">
               <div style={{ fontSize: 14, color: K.muted, fontWeight: 600, marginBottom: 10 }}>VRM</div>
-              <div className="gros vrm-display">9,99 €</div>
+              <div className="gros vrm-display">12,99 €</div>
               <div style={{ fontSize: 14, color: K.muted, margin: '8px 0 20px' }}>par mois · toutes les fonctions, tous tes comptes.</div>
               <ul className="acc-liste" style={{ marginBottom: 22 }}>
                 {['Vinted, Leboncoin et eBay réunis', 'Bordereaux tamponnés, prêts à imprimer', 'Numéros de rangement', 'Messages et offres', 'Rapports pour l’URSSAF et ton comptable'].map((x) => <li key={x} style={{ padding: '10px 0', fontSize: 15 }}><Coche s={15} />{x}</li>)}

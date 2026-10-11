@@ -33095,7 +33095,8 @@ const applyZoom = (z) => {
 // défaut, et alors l'accueil dit « Bonjour » tout court. On ne le déduit PAS de
 // l'email : un prénom inventé est un faux, et un blanc vaut mieux (§5).
 // ══════════════════════════════════════════════════════════════════════════
-// L'ABONNEMENT (4 octobre) — 9,99 €/mois, pour tout le monde sauf le propriétaire
+// L'ABONNEMENT (4 octobre) — 12,99 €/mois depuis le 11 octobre (9,99 € avant),
+// pour tout le monde sauf le propriétaire
 // ══════════════════════════════════════════════════════════════════════════
 // Le serveur décide (api/compte.js) : qui est propriétaire (VRM_OWNER_UID), si
 // Stripe est branché, si l'abonnement est obligatoire, et le statut — lu dans
@@ -33125,7 +33126,13 @@ async function ouvrirStripe(mode, extra) {
     return (j && j.message) || "Stripe n'a pas répondu. Réessaie dans un instant.";
   } catch (_) { return "Pas de connexion. Réessaie dans un instant."; }
 }
-const prixLisible = (p) => p ? `${Number(p.montant).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € / ${p.intervalle === 'year' ? 'an' : 'mois'}` : '9,99 € / mois';
+// Le prix des CGV (public/legal/cgv.html), écrit UNE fois côté app : c'est ce
+// qu'on dit quand Stripe ne donne pas de prix — ou en donne un AUTRE que celui
+// des CGV (le serveur ne le relaie alors pas, api/compte.js `prixConforme`).
+// audit-lancement.cjs exige que ce soit la même valeur que les CGV et que le
+// serveur (`PRIX_CGV`) : 12,99 € depuis le 11 octobre (décision de Julien).
+const PRIX_CGV_LISIBLE = '12,99 € / mois';
+const prixLisible = (p) => p ? `${Number(p.montant).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € / ${p.intervalle === 'year' ? 'an' : 'mois'}` : PRIX_CGV_LISIBLE;
 const dateLisible = (iso) => { try { return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }); } catch (_) { return ''; } };
 
 // MES FACTURES ET MA CARTE — trois états : `undefined` en cours · `null` pas su
@@ -33324,7 +33331,28 @@ function MonAbonnement() {
   const titre = <div style={{ fontSize: 15, fontWeight: 600, color: C.text }}>Ton abonnement</div>;
   if (e === undefined) return <div style={carte} data-abonnement="chargement">{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3 }}>Je regarde…</div></div>;
   if (e === null) return <div style={carte} data-abonnement="pas-su">{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3, lineHeight: 1.5 }}>Je n'ai pas pu lire ton abonnement. Rouvre cet écran dans un instant — rien n'a changé de ton côté.</div></div>;
-  if (e.proprietaire) return <div style={carte} data-abonnement="proprietaire">{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3, lineHeight: 1.5 }}>Compte propriétaire de VRM : gratuit, aucun abonnement.</div></div>;
+  // ⚠️ LE PRIX CHEZ STRIPE ≠ CELUI DES CGV (11 octobre : 12,99 €, et le prix
+  //    rangé chez Stripe sous `vrm_mensuel` est un réglage de SON tableau de
+  //    bord). Le serveur refuse alors d'ouvrir le paiement ; c'est au
+  //    propriétaire — le seul qui peut le corriger — qu'on le dit, avec le geste.
+  //    « Pas su » (Stripe muet : `prixConforme` null) ne dit rien.
+  //    ⚠️ Le prix de Stripe s'écrit avec le TEXTE DU SERVEUR (`prixStripe.texte`,
+  //    montant + devise + rythme), jamais reformaté ici : `prixLisible` ignore la
+  //    devise et le rythme, et faisait dire « 12,99 € / mois n'est pas
+  //    12,99 € / mois » pour un prix en dollars ou tous les 3 mois — ou
+  //    « 0,00 € » pour un prix sans montant fixe — juste quand il doit voir son
+  //    erreur dans Stripe (revue du 11 octobre).
+  const prixAcorriger = e.proprietaire && e.prixConforme === false && e.prixStripe;
+  const texteStripe = prixAcorriger && typeof e.prixStripe.texte === 'string' && e.prixStripe.texte.trim() ? e.prixStripe.texte : 'un prix différent';
+  if (e.proprietaire) return (
+    <div style={carte} data-abonnement="proprietaire">{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3, lineHeight: 1.5 }}>Compte propriétaire de VRM : gratuit, aucun abonnement.</div>
+      {prixAcorriger && (
+        <div data-prix-stripe="different" style={{ fontSize: 12.5, color: C.text, marginTop: 8, lineHeight: 1.5 }}>
+          Le prix réglé chez Stripe (<b data-prix-stripe-texte="">{texteStripe}</b>) n'est pas celui des conditions de vente (<b>{PRIX_CGV_LISIBLE}</b>). Le paiement reste <b>fermé</b> : personne ne peut s'abonner tant que ce n'est pas corrigé. Dans Stripe → Produits, ajoute au produit VRM un prix de {PRIX_CGV_LISIBLE.replace(' / ', ' par ')} avec la clé de recherche « vrm_mensuel » (coche « transférer la clé »).
+        </div>
+      )}
+    </div>
+  );
   if (!e.configure) return <div style={carte} data-abonnement="non-branche">{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3, lineHeight: 1.5 }}>Le paiement n'est pas encore ouvert : VRM reste gratuit pour l'instant.</div></div>;
   const test = e.modeTest ? <div data-mode-test="" style={{ fontSize: 11.5, color: C.muted, marginTop: 6, lineHeight: 1.5 }}>Paiement en <b style={{ color: C.text }}>mode test</b> : aucune vraie carte n'est débitée (carte d'essai 4242 4242 4242 4242).</div> : null;
   const cb = fx && fx.carte;
@@ -33340,7 +33368,11 @@ function MonAbonnement() {
     return (<>
       <div style={carte} data-abonnement="actif" data-resilie={annule ? '' : undefined}>
         {titre}
-        <div style={{ fontSize: 12.5, color: C.text, marginTop: 4, lineHeight: 1.5 }}>Abonné · {prixLisible(e.prix)}</div>
+        {/* ⚠️ Le prix de SON abonnement (`prixAbonnement`, lu sur l'article de
+            l'abonnement chez Stripe), jamais celui de l'offre (`prix`) ni celui
+            des CGV : un abonnement garde le prix auquel il a été souscrit
+            (9,99 € avant le 11 octobre). Pas su ⇒ « Abonné » sans montant. */}
+        <div data-prix-abonnement={e.prixAbonnement && e.prixAbonnement.texte ? '' : undefined} style={{ fontSize: 12.5, color: C.text, marginTop: 4, lineHeight: 1.5 }}>Abonné{e.prixAbonnement && typeof e.prixAbonnement.texte === 'string' && e.prixAbonnement.texte.trim() ? ` · ${e.prixAbonnement.texte}` : ''}</div>
         {e.finPeriode && (
           <div style={{ fontSize: 12.5, color: C.muted, marginTop: 2, lineHeight: 1.5 }}>
             {annule ? `Résilié : VRM reste ouvert jusqu'au ${dateLisible(e.finPeriode)}, aucun autre prélèvement.` : `Prochain prélèvement le ${dateLisible(e.finPeriode)}.`}
@@ -33374,6 +33406,14 @@ function MonAbonnement() {
       {listeFactures}
     </>);
   }
+  // Le prix de Stripe n'est pas celui des CGV : le serveur n'ouvrira pas le
+  // paiement (api/compte.js) — aucun bouton qui mènerait à un refus.
+  // ⚠️ Un ANCIEN abonné garde ses factures (sa compta) : cette branche les rend
+  //    comme celle du dessous — elle les perdait (revue du 11 octobre).
+  if (e.prixConforme === false) return (<>
+    <div style={carte} data-abonnement="non-branche" data-raison="prix">{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3, lineHeight: 1.5 }}>Le paiement n'est pas encore ouvert : VRM reste gratuit pour l'instant.</div></div>
+    {listeFactures}
+  </>);
   return (<>
     <div style={carte} data-abonnement="sans">
       {titre}
@@ -33460,8 +33500,19 @@ function AbonnementRequis({ info }) {
   // encore chez Stripe, on ne lui en vend pas un second — on l'envoie mettre
   // sa carte à jour (sinon « S'abonner » répondrait « tu es déjà abonné »).
   const impaye = !!(info && info.peutGerer && (info.statut === 'past_due' || info.statut === 'unpaid'));
+  // ⚠️ LE PAIEMENT EST FERMÉ (revue du 11 octobre) : le prix réglé chez Stripe
+  //    n'est pas celui des CGV (`prixConforme: false`), ou Stripe n'est pas
+  //    branché. Le serveur refuserait le paiement (api/compte.js, 503
+  //    `prix-cgv`) : la porte — second écran qui vend l'abonnement, comme la
+  //    carte « Mon compte » (§11) — ne propose donc NI la case des CGV NI
+  //    « S'abonner », et ne dit aucun prix. Elle disait « 12,99 € / mois » et
+  //    menait au refus. Un impayé, lui, garde « Mettre à jour ma carte » (son
+  //    abonnement existe : rien à voir avec le prix de l'offre).
+  //    « Pas su » (`info` pas encore lu, `prixConforme: null`) ne ferme rien.
+  const paiementFerme = !impaye && !!info && (info.prixConforme === false || info.configure === false);
   const [cgv, setCgv] = React.useState(false);
   const agir = async () => {
+    if (paiementFerme) return;
     if (!impaye && !cgv) { setMsg("Coche « J'accepte les conditions générales de vente » avant de payer."); return; }
     setOccupe(true); setMsg('');
     const m = await ouvrirStripe(impaye ? 'portail' : 'checkout', impaye ? null : { cgv: true });
@@ -33472,17 +33523,21 @@ function AbonnementRequis({ info }) {
       <div style={{ width: '100%', maxWidth: 420, background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: '26px 22px', boxShadow: C.shadowLg || 'none' }}>
         <img src="/logo-vrm-96.png" alt="VRM" width="44" height="44" style={{ borderRadius: 10, display: 'block' }}/>
         <div style={{ fontSize: 22, fontWeight: 700, color: C.text, marginTop: 16, letterSpacing: -0.4 }}>Ton abonnement VRM</div>
-        <div style={{ fontSize: 14, color: C.muted, marginTop: 8, lineHeight: 1.55 }} data-impaye={impaye ? '' : undefined}>
+        <div style={{ fontSize: 14, color: C.muted, marginTop: 8, lineHeight: 1.55 }} data-impaye={impaye ? '' : undefined} data-paiement-ferme={paiementFerme ? '' : undefined}>
           {impaye
             ? "Ton prélèvement n'est pas passé depuis plus de 14 jours : VRM est en pause. Mets ta carte à jour et tout revient tel quel — tes données sont intactes."
-            : `${prixLisible(info && info.prix)}, sans engagement, résiliable à tout moment. Tes données sont intactes : elles t'attendent dès que l'abonnement est actif.`}
+            : paiementFerme
+              ? "Le paiement de l'abonnement n'est pas encore ouvert : rien n'a été prélevé. Tes données sont intactes : elles t'attendent. Réessaie un peu plus tard."
+              : `${prixLisible(info && info.prix)}, sans engagement, résiliable à tout moment. Tes données sont intactes : elles t'attendent dès que l'abonnement est actif.`}
         </div>
-        {info && info.modeTest && <div style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>Mode test : aucune vraie carte n'est débitée.</div>}
-        {!impaye && <CaseCgv coche={cgv} onChange={setCgv}/>}
-        <button type="button" disabled={occupe || (!impaye && !cgv)} data-sabonner="" onClick={agir} style={{ marginTop: 18, width: '100%', border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '13px 16px', fontSize: 15, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', opacity: (!impaye && !cgv) ? 0.5 : 1 }}>
-          {occupe ? 'Ouverture du paiement…' : (impaye ? 'Mettre à jour ma carte' : "S'abonner")}
-        </button>
-        {msg && <div style={{ fontSize: 12.5, color: C.warn, marginTop: 8 }}>{msg}</div>}
+        {!paiementFerme && info && info.modeTest && <div style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>Mode test : aucune vraie carte n'est débitée.</div>}
+        {!impaye && !paiementFerme && <CaseCgv coche={cgv} onChange={setCgv}/>}
+        {!paiementFerme && (
+          <button type="button" disabled={occupe || (!impaye && !cgv)} data-sabonner="" onClick={agir} style={{ marginTop: 18, width: '100%', border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '13px 16px', fontSize: 15, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', opacity: (!impaye && !cgv) ? 0.5 : 1 }}>
+            {occupe ? 'Ouverture du paiement…' : (impaye ? 'Mettre à jour ma carte' : "S'abonner")}
+          </button>
+        )}
+        {msg && !paiementFerme && <div style={{ fontSize: 12.5, color: C.warn, marginTop: 8 }}>{msg}</div>}
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 14, fontSize: 12.5 }}>
           <a href="/legal/cgv.html" target="_blank" rel="noopener noreferrer" style={{ color: C.muted }}>Conditions de vente</a>
           <button type="button" onClick={() => { authSignOut(); }} style={{ border: 'none', background: 'transparent', color: C.muted, cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5, padding: 0, minHeight: 0 }}>Se déconnecter</button>
