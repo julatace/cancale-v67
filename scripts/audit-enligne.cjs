@@ -27,6 +27,15 @@
 //   C. LES FILES Leboncoin et eBay de l'extension suivent la règle : la
 //      republiée y entre, l'ancienne en sort, celles « à confirmer » ne sont ni
 //      dans la file, ni « à retirer de Leboncoin ».
+//   D. REVUE DE LA 5.167 (11 octobre) — les défauts reproduits par la relecture :
+//      un 403 sur UN compte ne fait plus monter la pause (24 h pour ce compte,
+//      coupure du jour sur un 429 ou un second compte) ; un onglet qui quitte
+//      Vinted ne fait partir AUCUNE requête chez l'autre site ni de pause ; une
+//      lecture « déchirée » (suppression, republication entre deux pages) ne
+//      décide rien ; la relecture passe avant les photos dans le budget ; des
+//      dressings illisibles ne font rien dire « à retirer » ; des lectures
+//      publiques illisibles ne ressuscitent rien (dernière connue, sinon « à
+//      confirmer »).
 //  Usage : node scripts/audit-enligne.cjs [--mutation nom] (voir MUTATIONS)
 // ════════════════════════════════════════════════════════════════════════════
 const fs = require('fs'), vm = require('vm'), path = require('path'), os = require('os');
@@ -42,12 +51,12 @@ const MUTATIONS = {
   plusrecente: [['bg', `  if (isFinite(capP) && !(isFinite(capL) && capL >= capP)) {`, `  if (false) {`],
                 ['app', `  if (isFinite(capP) && !(isFinite(capL) && capL >= capP)) {`, `  if (false) {`]],
   // plus de « à confirmer » : une lecture de trois jours compterait en ligne
-  ajourdhui: [['bg', `  if (isFinite(r.lu) && age <= ENLIGNE_FRAIS_MS) r.enLigne = garde; else r.aConfirmer = garde;`, `  r.enLigne = garde;`],
-              ['app', `  if (isFinite(r.lu) && age <= ENLIGNE_FRAIS_MS) r.enLigne = garde; else r.aConfirmer = garde;`, `  r.enLigne = garde;`]],
+  ajourdhui: [['bg', `  if (isFinite(r.lu) && age <= ENLIGNE_FRAIS_MS && sur) r.enLigne = garde; else r.aConfirmer = garde;`, `  r.enLigne = garde;`],
+              ['app', `  if (isFinite(r.lu) && age <= ENLIGNE_FRAIS_MS && sur) r.enLigne = garde; else r.aConfirmer = garde;`, `  r.enLigne = garde;`]],
   // l'app seule change le seuil : les deux côtés divergent
   divergence: [['app', `const ENLIGNE_FRAIS_MS = 24 * 60 * 60 * 1000;`, `const ENLIGNE_FRAIS_MS = 72 * 60 * 60 * 1000;`]],
   // une vente vue par son vendeur se rouvrirait d'un coup d'œil public
-  vendue: [['bg', `      if (l && venduePourSonVendeur(l)) continue;\n`, ``], ['app', `      if (l && venduePourSonVendeur(l)) continue;\n`, ``]],
+  vendue: [['bg', `      if (l && venduePourSonVendeur(l)) { r.fermees.push(l); continue; }\n`, ``], ['app', `      if (l && venduePourSonVendeur(l)) { r.fermees.push(l); continue; }\n`, ``]],
   // l'extension lirait aussi les comptes EXCLUS
   exclus: [['bg', `.filter((u) => u && u !== String(uidConnecte) && !noirs.has(u) && !off.has(u))`, `.filter((u) => u && u !== String(uidConnecte) && !noirs.has(u))`]],
   // « pas su » sur la liste des supprimés laisserait lire tout le monde
@@ -59,12 +68,12 @@ const MUTATIONS = {
   // une lecture qui n'atteint pas le total annoncé serait rangée
   total: [['bg', `  if (complet && total != null && items.length < total) return { complet: false, raison: 'total', total, n: items.length };\n`, ``]],
   // une page qui échoue en route vaudrait la fin de la liste
-  pageko: [['bg', `    if (!r.ok || !r.json || !Array.isArray(r.json.items)) { statut = Number(r.status) || 0; raison = 'lecture'; break; }`, `    if (!r.ok || !r.json || !Array.isArray(r.json.items)) { complet = true; break; }`]],
+  pageko: [['bg', `    if (!r || r.pause || !r.ok || !r.json || !Array.isArray(r.json.items)) return echec(r);\n    pages++;`, `    if (!r || r.pause || !r.ok || !r.json || !Array.isArray(r.json.items)) { if (r && r.pause) return echec(r); complet = true; break; }\n    pages++;`]],
   // plus de budget de lecture
   budget: [['bg', `      const lu = await lireDressingPublic(lire, pid, () => gardeLecture(uidConnecte, acc, 'enligne'));`, `      const lu = await lireDressingPublic(lire, pid, null);`]],
   // la lecture publique passerait hors de la file Vinted
-  file: [['bg', `  return (chemin) => requeteVinted('public', async () => {\n    try {\n      const res = await chrome.scripting.executeScript({`, `  return (chemin) => (async () => {\n    try {\n      const res = await chrome.scripting.executeScript({`],
-         ['bg', `      return (o && typeof o === 'object') ? o : { status: 0, ok: false, json: null };\n    } catch (_) { return { status: 0, ok: false, json: null }; }\n  });\n}`, `      return (o && typeof o === 'object') ? o : { status: 0, ok: false, json: null };\n    } catch (_) { return { status: 0, ok: false, json: null }; }\n  })();\n}`]],
+  file: [['bg', `    return requeteVinted('public', async () => {\n      try {\n        const res = await chrome.scripting.executeScript({`, `    return (async () => {\n      try {\n        const res = await chrome.scripting.executeScript({`],
+         ['bg', `        return o;\n      } catch (_) { return { status: 0, ok: false, json: null }; }\n    });\n  };\n}`, `        return o;\n      } catch (_) { return { status: 0, ok: false, json: null }; }\n    })();\n  };\n}`]],
   // la lecture publique écraserait le dressing du compte
   ecrase: [['bg', "const ok = await supabaseUpsert('app_data', [{ id: `harvest_${uid}_enligne`, data, updated_at: data.capturedAt }], 'id');", "const ok = await supabaseUpsert('app_data', [{ id: `harvest_${uid}_listings`, data, updated_at: data.capturedAt }], 'id');"]],
   // un article d'un autre membre serait rangé
@@ -73,6 +82,41 @@ const MUTATIONS = {
   autremembre: [['bg', `      if (proprio != null && String(proprio) !== String(pid)) return { complet: false, raison: 'autre-membre' };\n`, ``]],
   // la file Leboncoin alerterait « à retirer » sur une paire à confirmer
   retirer: [['bg', `    if (aConfirmerIds.has(pid)) continue;              // à confirmer : on ne sait pas, on n'alerte pas\n`, ``]],
+  // ── revue de la 5.167 ──
+  // une vendue listée ouverte en public disparaîtrait de TOUTES les sorties
+  vendue2: [['bg', `      if (l && venduePourSonVendeur(l)) { r.fermees.push(l); continue; }`, `      if (l && venduePourSonVendeur(l)) continue;`],
+            ['app', `      if (l && venduePourSonVendeur(l)) { r.fermees.push(l); continue; }`, `      if (l && venduePourSonVendeur(l)) continue;`]],
+  // une lecture PUBLIQUE postérieure annulerait une suppression vue en 2xx
+  supprpublic: [['bg', `supprimeeApres(suppIds, it.id, r.source === 'public' ? -Infinity : r.lu)`, `supprimeeApres(suppIds, it.id, r.lu)`],
+                ['app', `supprimeeApres(suppIds, it.id, r.source === 'public' ? -Infinity : r.lu)`, `supprimeeApres(suppIds, it.id, r.lu)`]],
+  // « pas su » les lectures publiques : le vieux dressing redéciderait
+  passupub: [['bg', `  const sur = !pubPasSu || age < ENLIGNE_SUR_MS;`, `  const sur = true;`],
+             ['app', `  const sur = !pubPasSu || age < ENLIGNE_SUR_MS;`, `  const sur = true;`]],
+  // un 403 public réessaierait dans 5 min (la pause monte à 4 h)
+  frein: [['bg', `      .filter((u) => !(t - Number(freins[u] || 0) < ENLIGNE_FREIN_MS))             // freiné : pas avant demain\n`, ``],
+          ['bg', `        if (lu.raison === 'frein') {`, `        if (false) {`]],
+  // un 429 ne couperait pas la relecture du jour
+  coupure: [['bg', `          if (Number(lu.statut) === 429 || autre) { freins._tous = Date.now(); noterDiag('enligne_coupee_frein'); }`, ``]],
+  // un compte en échec récent resterait en tête
+  tri: [['bg', `      .sort((a, b) => (Number(recent(a)) - Number(recent(b))) || (Number(lus.get(a) || 0) - Number(lus.get(b) || 0)));`, `      .sort((a, b) => Number(lus.get(a) || 0) - Number(lus.get(b) || 0));`]],
+  // l'onglet choisi une fois pour toutes
+  ongletfige: [['bg', `    const tab = await ongletVinted(tabId);`, `    const tab = { id: tabId };`]],
+  // la page injectée ne vérifie plus où elle est
+  hotepage: [['bg', `            if (!/(^|\\.)vinted\\.(fr|com|it|de|es|be|nl|lu|at|pt|pl|cz|lt|co\\.uk)$/i.test(hote)) return { status: 0, ok: false, json: null, horsVinted: true, origine };\n`, ``]],
+  // … ni l'origine de la réponse (les deux défenses retirées)
+  sansgarde: [['bg', `            if (!/(^|\\.)vinted\\.(fr|com|it|de|es|be|nl|lu|at|pt|pl|cz|lt|co\\.uk)$/i.test(hote)) return { status: 0, ok: false, json: null, horsVinted: true, origine };\n`, ``],
+              ['bg', `        if (o.horsVinted || !VINTED_HOTE.test(hote)) { noterDiag('enligne_hors_vinted'); return { status: 0, ok: false, json: null, horsVinted: true }; }\n`, ``]],
+  // la page 1 n'est plus relue à la fin
+  relit: [['bg', `  if (pages > 1) {\n    const refus = avantPage ? await avantPage() : null;`, `  if (false) {\n    const refus = avantPage ? await avantPage() : null;`]],
+  // le total de chaque page n'est plus comparé à celui de la page 1
+  pagetotal: [['bg', `    else if (sig(pg) !== signature) return { complet: false, raison: 'mouvant' };   // la liste a bougé entre deux pages\n`, ``]],
+  // la relecture retombe dans la classe des photos
+  budget2: [['bg', `LECTURES_MAX_HEURE - (await reserveLectures(uid, classe === 'enligne' ? 'enligne' : 'photos'))`, `LECTURES_MAX_HEURE - (await reserveLectures(uid))`],
+            ['bg', `    await noterLecturesDues(uidConnecte, 'enligne', candidats.length);\n`, ``]],
+  // des dressings illisibles valent « aucun dressing »
+  dressingsko: [['bg', `  if (!Array.isArray(lignesL)) { noterDiag('enligne_dressings_pas_lus'); return { echec: true, lignes: [], aConfirmer: new Map(), parCompte: new Map() }; }`, `  if (!Array.isArray(lignesL)) return enLigneDesLignes([], [], null, Date.now());`]],
+  // des lectures publiques illisibles valent « aucune lecture publique »
+  pubko: [['bg', `  else { noterDiag('enligne_lignes_pas_lues'); lignesP = _dernieresLecturesPubliques; }`, `  else { noterDiag('enligne_lignes_pas_lues'); lignesP = []; }`]],
 };
 const iM = process.argv.indexOf('--mutation');
 const MUT = iM > 0 ? process.argv[iM + 1] : '';
@@ -129,7 +173,10 @@ console.log('── A. La règle « en ligne » : la même dans l\'app et dans l
       ['lecture publique INCOMPLÈTE ⇒ ignorée', L([art(1), art(2)], 2), P([art(1)], 0.5, { complet: false }), null, { en: '1,2', ac: '', abs: '', src: 'dressing' }],
       ['vendue pour son vendeur, « ouverte » vue de l\'extérieur ⇒ ne se rouvre pas', L([art(1, { is_closed: true, item_closing_action: 'sold' })], 30), P([art(1)], 1), null, { en: '', ac: '', abs: '', src: 'public' }],
       ['supprimée APRÈS la lecture publique ⇒ sort', L([], 30), P([art(1), art(2)], 3), { '1': new Date(NOW - 1 * H).toISOString() }, { en: '2', ac: '', abs: '', src: 'public' }],
-      ['supprimée AVANT la lecture publique qui la montre encore ⇒ la lecture fait foi', L([], 30), P([art(1)], 1), { '1': new Date(NOW - 3 * H).toISOString() }, { en: '1', ac: '', abs: '', src: 'public' }],
+      // Revue de la 5.167 : une suppression vue en 2xx est DÉFINITIVE face à une lecture PUBLIQUE (Vinted ne
+      // réutilise jamais un identifiant ; la vue publique n'est pas mesurée) — le DRESSING, lui, fait toujours foi (5.165).
+      ['supprimée AVANT une lecture publique qui la montre encore ⇒ elle reste supprimée (la vue publique ne la rouvre pas)', L([], 30), P([art(1)], 1), { '1': new Date(NOW - 3 * H).toISOString() }, { en: '', ac: '', abs: '', src: 'public' }],
+      ['supprimée AVANT un DRESSING relu qui la montre encore ⇒ le dressing fait foi (5.165)', L([art(1)], 1), null, { '1': new Date(NOW - 3 * H).toISOString() }, { en: '1', ac: '', abs: '', src: 'dressing' }],
       ['suppressions pas lues (null) ⇒ rien n\'est écarté', L([art(1)], 2), null, null, { en: '1', ac: '', abs: '', src: 'dressing' }],
       ['lecture publique de 30 h ⇒ à confirmer aussi', L([art(1)], 72), P([art(1)], 30), null, { en: '', ac: '1', abs: '', src: 'public' }],
     ];
@@ -141,6 +188,11 @@ console.log('── A. La règle « en ligne » : la même dans l\'app et dans l
       dit(ids(a.enLigne) === att.en && ids(a.aConfirmer) === att.ac && ids(a.absentes) === att.abs && a.source === att.src, nom, `app ${sig(a)} · extension ${sig(e)}`);
     }
     dit(!diverge.length, 'l\'app et l\'extension rendent la MÊME sortie sur tous les cas (§11)', diverge.join(' · '));
+    // Revue de la 5.167 : une VENDUE (pour son vendeur) que la lecture publique montre encore ouverte reste parmi
+    // les fermées — c'est la seule preuve sans ressemblance qu'une paire numérotée est partie.
+    { const rv = A.compte(L([art(1, { is_closed: true, item_closing_action: 'sold' }), art(2)], 30), P([art(1), art(2)], 1), null, NOW);
+      const ev = E.compte(L([art(1, { is_closed: true, item_closing_action: 'sold' }), art(2)], 30), P([art(1), art(2)], 1), null, NOW);
+      dit(ids(rv.fermees) === '1' && ids(rv.enLigne) === '2' && ids(ev.fermees) === '1', 'une vendue listée ouverte par une lecture publique plus récente RESTE parmi les fermées (app = extension)', `app fermées[${ids(rv.fermees)}] · ext fermées[${ids(ev.fermees)}]`); }
     // La republiée porte ce que la lecture publique en sait (titre, prix, photo).
     const r9 = A.compte(L([art(1)], 72), P([art(9, { title: 'Nike neuve', price: { amount: '61.0' }, photo: { url: 'https://images1.vinted.net/x.jpg' } })], 0.2), null, NOW);
     const n9 = r9.enLigne[0] || {};
@@ -169,6 +221,22 @@ console.log('── A. La règle « en ligne » : la même dans l\'app et dans l
     dit(parId.harvest_444_listings === '40', 'un compte connu seulement par sa lecture publique a sa ligne', parId.harvest_444_listings);
     dit(!('harvest_333_listings' in parId) || parId.harvest_333_listings === '', 'compte figé depuis 3 jours : aucune annonce en ligne', parId.harvest_333_listings);
     dit(ra.aConfirmer.has('333') && ids(ra.aConfirmer.get('333')) === '30', 'et ses annonces sont rendues à part, « à confirmer »', JSON.stringify([...ra.aConfirmer.keys()]));
+
+    // Revue de la 5.167 : les lectures publiques ILLISIBLES (`null`) ne laissent plus un vieux dressing redécider.
+    console.log('── A3. Lectures publiques illisibles (« pas su ») : rien ne ressuscite');
+    const lignesL3 = [
+      { id: 'harvest_111_listings', data: { uid: '111', capturedAt: new Date(NOW - 10 * 60e3).toISOString(), payload: { items: [art(10)] } } },   // lu il y a 10 min
+      { id: 'harvest_222_listings', data: { uid: '222', capturedAt: new Date(NOW - 10 * H).toISOString(), payload: { items: [art(20), art(21)] } } },  // lu il y a 10 h
+    ];
+    const lignesP3 = [{ id: 'harvest_222_enligne', cap: new Date(NOW - 1 * H).toISOString(), complet: true, ids: ['21'], items: [art(21)] }];
+    const vu3 = (r) => JSON.stringify({ l: r.lignes.map((x) => [x.id, x.data.payload.items.filter((it) => !it.is_closed).map((it) => String(it.id)).sort()]).sort(), ac: [...r.aConfirmer.entries()].map(([u, l]) => [u, ids(l)]).sort() });
+    const lu3 = A.lignes(lignesL3, lignesP3, null, NOW), ko3 = A.lignes(lignesL3, null, null, NOW), ko3e = E.lignes(lignesL3, null, null, NOW);
+    dit(/"harvest_222_listings",\["21"\]/.test(vu3(lu3)), 'lecture publique lisible : 20 est partie, 21 en ligne', vu3(lu3));
+    const en222 = (ko3.lignes.find((x) => x.id === 'harvest_222_listings') || { data: { payload: { items: [] } } }).data.payload.items.filter((it) => !it.is_closed).map((it) => String(it.id));
+    dit(!en222.includes('20'), 'illisible : l’annonce qu’une lecture plus récente savait partie ne redevient PAS « en ligne »', vu3(ko3));
+    dit(ko3.aConfirmer.has('222') && ids(ko3.aConfirmer.get('222')) === '20,21', 'ses annonces sont « à confirmer » (le dressing de 10 h ne décide plus seul)', vu3(ko3));
+    dit(/"harvest_111_listings",\["10"\]/.test(vu3(ko3)), 'l’autre sens : un dressing de 10 min décide encore (aucune lecture plus récente ne peut exister)', vu3(ko3));
+    dit(vu3(ko3) === vu3(ko3e), 'app = extension sur « pas su »', `app ${vu3(ko3)} · ext ${vu3(ko3e)}`);
   });
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -229,7 +297,7 @@ console.log('── A. La règle « en ligne » : la même dans l\'app et dans l
     dit(f.j.vinted.every((x) => x.origine === 'page' && x.methode === 'GET'), 'des LECTURES (GET), faites depuis la page Vinted ouverte', JSON.stringify([...new Set(f.j.vinted.map((x) => x.methode + ' ' + x.origine))]));
     const l222 = f.lignes.harvest_222_enligne;
     dit(!!l222 && l222.complet === true && l222.source === 'public' && l222.n === 149 && l222.ids.length === 149, 'toutes les pages lues (150 articles sur 2 pages de 96) : ligne dédiée, complète, les 149 ouvertes', l222 ? JSON.stringify({ n: l222.n, c: l222.complet, s: l222.source, lus: l222.lus }) : 'absente');
-    dit(lus(f).filter((p) => p === String(PID['222'])).length === 2, 'et deux pages exactement pour ce compte', String(lus(f).filter((p) => p === String(PID['222'])).length));
+    dit(lus(f).filter((p) => p === String(PID['222'])).length === 3, 'deux pages, puis la page 1 RELUE (rien n’a bougé entre-temps) : trois requêtes pour ce compte', String(lus(f).filter((p) => p === String(PID['222'])).length));
     dit(JSON.stringify(f.lignes.harvest_222_listings) === avant, 'harvest_{uid}_listings n\'est PAS touché (la vue publique est plus pauvre)');
     dit(['222', '333', '444'].every((u) => f.j.evts.some((e) => e && e.type === 'maj' && e.quoi === 'annonces' && e.uid === u)), 'l\'app est prévenue (maj · annonces) pour chaque compte relu', JSON.stringify(f.j.evts));
     const lec = (f.store.vrmLectures || {})['111'] || [];
@@ -365,6 +433,185 @@ console.log('── A. La règle « en ligne » : la même dans l\'app et dans l
     const eb = await faireFond({ src: BG, lignes: JSON.parse(JSON.stringify(lignes)), connecte: '111' }).ctx.buildEbayData();
     const qe = (eb.queue || []).map((a) => String(a.numero)).sort().join(',');
     dit(qe === '109' && eb.aConfirmer === 1, 'eBay : pareil', `${qe} · à confirmer ${eb.aConfirmer}`);
+  });
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // D. Revue de la 5.167 — les défauts reproduits par la relecture
+  // ══════════════════════════════════════════════════════════════════════════
+  console.log('── D. Revue de la 5.167');
+  // Une horloge pilotée DANS le vm (le service worker ne lit que `Date.now()`).
+  const horloge = (f, t0) => { const h = { t: t0 }; f.ctx.__horloge = h; vm.runInContext('Date.now = function () { return globalThis.__horloge.t; };', f.ctx); return h; };
+  const MIN = 60e3;
+
+  await essaie('D1 frein sur UN compte', async () => {
+    // 222 (le plus ancien) répond 403 à chaque lecture publique ; 333 et 444 répondent.
+    const AGE4 = { '111': 0.1, '222': 90, '333': 40, '444': 30 };
+    const l = { main: { vinted_accounts_hidden: [], vinted_accounts_blocked: [] }, vrm_blocked_accounts: { uids: [] } };
+    for (const u of Object.keys(AGE4)) {
+      l[`harvest_${u}_profile`] = { type: 'profile', capturedAt: iso(AGE4[u]), payload: { user: { id: PID[u] } } };
+      l[`harvest_${u}_listings`] = { type: 'listings', uid: u, capturedAt: iso(AGE4[u]), payload: { items: [art(Number(u) * 10)] } };
+    }
+    const f = monter({ lignes: l, repondre: (pid) => (pid === String(PID['222']) ? { status: 403, body: {} } : null) });
+    f.ctx.getStoredAccounts = async () => COMPTES.filter((c) => c.vinted_user_id in AGE4);
+    const h = horloge(f, Date.now());
+    const T0 = h.t; let paliers = [], enPause = 0;
+    // Douze heures de visites : chaque fois à la fin de la pause (+6 min), sinon toutes les 31 min.
+    while (h.t - T0 < 12 * H) {
+      await f.ctx.relireAnnoncesAutresComptes('111');
+      const p = f.store.vrmPauseVinted || {};
+      const reste = Math.max(0, Number(p.jusqua || 0) - h.t);
+      if (reste) paliers.push(p.niveau);
+      enPause += reste;
+      h.t += reste ? reste + 6 * MIN : 31 * MIN;
+    }
+    const n222 = lus(f).filter((p) => p === String(PID['222'])).length;
+    dit(n222 === 1, 'un 403 sur le dressing public d’UN compte : ce compte n’est plus relu de la journée (une seule requête en 12 h)', `${n222} requête(s) vers 222`);
+    dit(Math.max(0, ...paliers) <= 1, 'et la pause Vinted ne MONTE pas (palier 1, jamais 2 à 5)', JSON.stringify(paliers));
+    dit(enPause <= 15 * MIN, 'au plus 15 min de pause sur 12 h — bordereaux et réponses ne sont pas bloqués', `${Math.round(enPause / MIN)} min de pause`);
+    dit(comptesLus(f).includes('333') && comptesLus(f).includes('444'), 'les AUTRES comptes finissent par être relus', comptesLus(f).join(','));
+    // Le lendemain, il est réessayé — une fois — et après les autres (échec récent).
+    h.t = T0 + 25 * H;
+    f.j.vinted.length = 0;
+    await f.ctx.relireAnnoncesAutresComptes('111');
+    const ordre = comptesLus(f);
+    dit(ordre[0] !== '222' && ordre.includes('333') && ordre.includes('444'), 'le lendemain, le compte freiné passe APRÈS les autres (il ne prend plus leur place)', ordre.join(','));
+  });
+
+  await essaie('D1b 429 et second compte freiné', async () => {
+    const f = monter({ repondre: () => ({ status: 429, body: {} }) });
+    const h = horloge(f, Date.now());
+    await f.ctx.relireAnnoncesAutresComptes('111');
+    h.t += 20 * MIN; f.j.vinted.length = 0;
+    await f.ctx.relireAnnoncesAutresComptes('111');
+    dit(lus(f).length === 0, 'un 429 (« ralentis ») coupe TOUTE la relecture publique pour la journée', `${lus(f).length} requête(s) après la pause`);
+    dit(f.j.diags.includes('enligne_coupee_frein'), 'et c’est noté (`enligne_coupee_frein`)', JSON.stringify(f.j.diags.filter((d) => /enligne_/.test(d))));
+    // Deux comptes différents qui répondent 403 : c'est le lecteur, pas un compte.
+    const g = monter({ repondre: (pid) => (pid === String(PID['333']) || pid === String(PID['444']) ? { status: 403, body: {} } : null) });
+    const hg = horloge(g, Date.now());
+    for (let i = 0; i < 4; i++) { await g.ctx.relireAnnoncesAutresComptes('111'); const p = g.store.vrmPauseVinted || {}; hg.t = Math.max(hg.t + 31 * MIN, Number(p.jusqua || 0) + 6 * MIN); }
+    const freines = new Set(g.j.vinted.filter((x) => /wardrobe\/(9333|9444)\//.test(x.chemin)).map((x) => x.chemin.replace(/\?.*/, '')));
+    dit(freines.size === 2 && !!((g.store.vrmEnLigneFreins || {})._tous), 'un second compte freiné dans les 24 h coupe la relecture du jour (au plus deux 403)', `${freines.size} compte(s) freiné(s) · coupure ${!!((g.store.vrmEnLigneFreins || {})._tous)}`);
+  });
+
+  // L'onglet quitte Vinted pendant la relecture (il clique vers Leboncoin dans cet onglet).
+  const ongletQuiPart = (o = {}) => {
+    const onglets = [{ id: 7, url: 'https://www.vinted.fr/', status: 'complete' }];
+    const f = faireFond({ src: BG, lignes: baseLignes(), connecte: '111', comptes: COMPTES, store: {}, onglets,
+      vinted: (r) => {
+        const w = /\/api\/v2\/wardrobe\/(\d+)\/items\?page=(\d+)&per_page=(\d+)/.exec(r.chemin);
+        if (!w) return { status: 404, body: {} };
+        const tous = dressingPublic(w[1]); const per = Number(w[3]); const page = Number(w[2]);
+        return { status: 200, body: { items: tous.slice((page - 1) * per, page * per).map((it) => Object.assign({ user_id: Number(w[1]) }, it)), pagination: { current_page: page, per_page: per, total_entries: tous.length, total_pages: Math.max(1, Math.ceil(tous.length / per)) } } };
+      } });
+    vm.runInContext(`lastCsrfByDomain['www.vinted.fr'] = 'CSRF-VINTED';`, f.ctx);
+    const exec = f.ctx.chrome.scripting.executeScript;
+    f.ctx.chrome.scripting.executeScript = async (x) => { const r = await exec(x); if (f.j.injections === 1) onglets[0].url = 'https://www.leboncoin.fr/'; return r; };
+    if (o.menteur) f.ctx.chrome.tabs.get = async () => ({ id: 7, url: 'https://www.vinted.fr/', status: 'complete' });   // la navigation arrive APRÈS la vérification
+    return f;
+  };
+  await essaie('D2 onglet qui quitte Vinted', async () => {
+    const f = ongletQuiPart();
+    await f.ctx.relireAnnoncesAutresComptes('111');
+    dit(f.j.horsVinted.length === 0, 'l’onglet est passé sur leboncoin.fr : AUCUNE requête n’y part (ni jeton CSRF, ni identifiant Vinted)', JSON.stringify(f.j.horsVinted.map((x) => x.url)));
+    dit(!(f.store.vrmPauseVinted && f.store.vrmPauseVinted.jusqua > Date.now()), 'aucune pause Vinted posée', JSON.stringify(f.store.vrmPauseVinted || null));
+    dit(!!f.lignes.harvest_222_enligne && f.lignes.harvest_222_enligne.n === 149, 'la lecture se termine par le service worker (repli) : rangée, complète', JSON.stringify(f.lignes.harvest_222_enligne ? { n: f.lignes.harvest_222_enligne.n } : null));
+    const g = ongletQuiPart({ menteur: true });
+    await g.ctx.relireAnnoncesAutresComptes('111');
+    dit(g.j.horsVinted.length === 0, 'la navigation arrive juste APRÈS la vérification : la page injectée refuse elle-même (aucune requête hors de Vinted)', JSON.stringify(g.j.horsVinted.map((x) => x.url)));
+    const g2 = ongletQuiPart({ menteur: true });
+    const st = g2.store;
+    await g2.ctx.relireAnnoncesAutresComptes('111');
+    dit(!(st.vrmPauseVinted && st.vrmPauseVinted.jusqua > Date.now()), 'et aucune pause Vinted : une réponse qui ne vient pas de Vinted ne freine pas Vinted', JSON.stringify(st.vrmPauseVinted || null));
+    dit(!g2.lignes.harvest_222_enligne, 'rien n’est rangé sur une lecture coupée en route', JSON.stringify(Object.keys(g2.lignes).filter((k) => /_enligne$/.test(k))));
+  });
+
+  // Une lecture « déchirée » : la liste bouge entre deux pages.
+  const dechire = (taille, quand, change) => {
+    let L = Array.from({ length: taille }, (_, i) => art(1000 + i));
+    let vues = 0;
+    return monter({ repondre: (pid, page) => {
+      if (pid !== String(PID['222'])) return null;
+      vues++;
+      if (vues === quand + 1) L = change(L);          // entre la page `quand` et la suivante
+      const items = L.slice((page - 1) * 96, page * 96).map((it) => Object.assign({ user_id: PID['222'] }, it));
+      return { status: 200, body: { items, pagination: { current_page: page, per_page: 96, total_entries: L.length, total_pages: Math.max(1, Math.ceil(L.length / 96)) } } };
+    } });
+  };
+  await essaie('D3 lecture déchirée', async () => {
+    const a = dechire(150, 1, (L) => L.filter((x) => x.id !== 1004));                       // suppression (page 1) entre p1 et p2
+    await a.ctx.relireAnnoncesAutresComptes('111');
+    dit(!a.lignes.harvest_222_enligne, 'une suppression entre la page 1 et la page 2 : la lecture n’est PAS complète, rien n’est rangé (l’annonce 1096, toujours en ligne, aurait manqué)', a.lignes.harvest_222_enligne ? `rangé n=${a.lignes.harvest_222_enligne.n}` : '');
+    dit(a.j.diags.includes('enligne_incomplet_mouvant'), 'la cause est notée (`enligne_incomplet_mouvant`)', JSON.stringify(a.j.diags.filter((d) => /enligne_incomplet/.test(d))));
+    const n222 = lus(a).filter((p) => p === String(PID['222'])).length;
+    dit(n222 === 2, 'et elle s’arrête dès la page dont le total a changé (aucune requête Vinted de plus)', `${n222} requête(s) vers 222`);
+    dit(Number(((a.store.vrmEnLigneEssais || {})['222'] || 0)) < Date.now() - 30 * 60e3 + 6 * 60e3, 'et ce compte réessaie dans 5 min', String((a.store.vrmEnLigneEssais || {})['222']));
+    const b = dechire(150, 1, (L) => [art(5555)].concat(L.filter((x) => x.id !== 1004)));    // suppression + republication : même total
+    await b.ctx.relireAnnoncesAutresComptes('111');
+    dit(!b.lignes.harvest_222_enligne, 'une suppression ET une republication entre deux pages (même total) : la page 1 relue a changé, rien n’est rangé', b.lignes.harvest_222_enligne ? `rangé n=${b.lignes.harvest_222_enligne.n}, 5555 ${b.lignes.harvest_222_enligne.ids.includes('5555') ? 'présente' : 'ABSENTE'}` : '');
+    const c = dechire(250, 2, (L) => L.filter((x) => x.id !== 1100));                       // 3 pages : suppression (page 2) entre p2 et p3
+    await c.ctx.relireAnnoncesAutresComptes('111');
+    dit(!c.lignes.harvest_222_enligne, 'trois pages, une suppression entre la page 2 et la page 3 (la page 1 ne bouge pas) : le total a changé, rien n’est rangé', c.lignes.harvest_222_enligne ? `rangé n=${c.lignes.harvest_222_enligne.n}` : '');
+  });
+
+  await essaie('D4 budget', async () => {
+    // Il vient de republier : 30 annonces du compte connecté sans leurs photos.
+    const l = baseLignes();
+    l.vinted_item_details = {};
+    l.harvest_111_listings = { type: 'listings', uid: '111', capturedAt: iso(0), nItems: 30, payload: { items: Array.from({ length: 30 }, (_, i) => art(110000 + i, { nPhotos: 6 })) } };
+    const f = monter({ lignes: l, autre: (r) => (/^\/items\/\d+/.test(r.chemin) ? { status: 200, body: '<html><body>annonce</body></html>' } : { status: 404, body: {} }) });
+    const h = horloge(f, Date.now());
+    const T0 = h.t; let premiere = null; let photos0 = 0;
+    for (let m = 0; m <= 20 && premiere == null; m++) {
+      h.t = T0 + m * MIN;
+      await f.ctx.tickPhotos();
+      if (m === 0) photos0 = f.j.vinted.filter((x) => /^\/items\/\d+/.test(x.chemin)).length;
+      if (m % 5 === 0) { const av = lus(f).length; await f.ctx.relireAnnoncesAutresComptes('111'); if (lus(f).length > av) premiere = m; }
+    }
+    dit(premiere != null && premiere <= 5, 'les photos à rattraper ne bloquent pas la relecture des autres comptes : elle part dans les 5 min', `première relecture à la minute ${premiere}`);
+    dit(photos0 > 0, 'l’autre sens : les photos avancent quand même', `${photos0} page(s) photo à la minute 0`);
+    const g = await f.ctx.gardeLecture('111', COMPTES[0], 'argent');
+    dit(g === null, 'et l’argent et les colis gardent leur place', JSON.stringify(g));
+  });
+
+  await essaie('D5 lignes illisibles (files de l’extension)', async () => {
+    const T = Date.now();
+    const NUM = { '1001': { numero: '101', mp: { lbc: true, ebay: true } }, '1002': { numero: '102', mp: { lbc: true, ebay: true } },
+      '2001': { numero: '201', mp: { lbc: true, ebay: true } }, '2002': { numero: '202', mp: { lbc: true, ebay: true } }, '2003': { numero: '203', mp: { lbc: true, ebay: true } } };
+    // 111 (connecté, lu il y a 12 min) : 1001 (publiée sur Leboncoin), 1002.
+    // 222 (dressing de 10 h) : 2001, 2002 (publiée), 2003 ; sa lecture publique d'il y a 30 min ne montre plus 2002.
+    const lignes = () => ({
+      main: { vinted_annonce_numeros: NUM, vinted_accounts_hidden: [], vinted_accounts: [{ vinted_user_id: '111' }, { vinted_user_id: '222' }] },
+      vrm_blocked_accounts: { uids: [] },
+      harvest_111_listings: { uid: '111', capturedAt: new Date(T - 0.2 * H).toISOString(), payload: { items: [art(1001), art(1002)] } },
+      harvest_222_listings: { uid: '222', capturedAt: new Date(T - 10 * H).toISOString(), payload: { items: [art(2001), art(2002), art(2003)] } },
+      harvest_222_enligne: { uid: '222', complet: true, source: 'public', capturedAt: new Date(T - 0.5 * H).toISOString(), ids: ['2001', '2003'], items: [art(2001), art(2003)] },
+      vinted_lbc_posted: { ids: ['1001', '2002'] },
+    });
+    const q = (x) => (x.queue || []).map((a) => String(a.numero)).sort().join(',');
+    const rm = (x) => (x.removals || []).map((r) => String(r.numero)).sort().join(',');
+    // Témoin : tout est lisible.
+    const t0 = await faireFond({ src: BG, lignes: lignes(), connecte: '111' }).ctx.buildLbcData();
+    dit(q(t0) === '102,201,203' && rm(t0) === '202', 'témoin, tout lisible : file 102, 201, 203 · 202 (partie) « à retirer de Leboncoin »', `${q(t0)} · ${rm(t0)}`);
+    // Dressings ILLISIBLES : ni file, ni « à retirer ».
+    const f = faireFond({ src: BG, lignes: lignes(), connecte: '111', lectureKO: (u) => /harvest_\*_listings/.test(u) });
+    const lbc = await f.ctx.buildLbcData();
+    dit(rm(lbc) === '', 'dressings illisibles : aucune paire dite « à retirer de Leboncoin »', rm(lbc));
+    dit(!!(lbc.stats && lbc.stats.lecturesKO) && q(lbc) === '', 'et la file le DIT (`lecturesKO`), sans rien proposer', JSON.stringify(lbc.stats));
+    const eb = await f.ctx.buildEbayData();
+    dit(!!eb.lecturesKO && q(eb) === '', 'eBay pareil', JSON.stringify({ k: eb.lecturesKO, q: q(eb) }));
+    // Lectures publiques ILLISIBLES (service worker neuf, aucune connue) : le dressing de 10 h ne redécide pas.
+    const g = faireFond({ src: BG, lignes: lignes(), connecte: '111', lectureKO: (u) => /harvest_\*_enligne/.test(u) });
+    const lbc2 = await g.ctx.buildLbcData();
+    dit(!/20/.test(q(lbc2)), 'lectures publiques illisibles : les annonces de 222 (dressing de 10 h) ne sont plus proposées — « à confirmer »', q(lbc2));
+    dit(q(lbc2) === '102', 'l’autre sens : le compte lu il y a 12 min reste dans la file', q(lbc2));
+    dit(rm(lbc2) === '', 'et rien de « à confirmer » n’est dit « à retirer »', rm(lbc2));
+    dit(lbc2.stats && lbc2.stats.aConfirmer === 3, 'le nombre « à confirmer » est rendu', JSON.stringify(lbc2.stats && lbc2.stats.aConfirmer));
+    // Une lecture réussie puis une ratée : la dernière connue sert.
+    let ko = false;
+    const k = faireFond({ src: BG, lignes: lignes(), connecte: '111', lectureKO: (u) => ko && /harvest_\*_enligne/.test(u) });
+    await k.ctx.buildLbcData(); ko = true;
+    const lbc3 = await k.ctx.buildLbcData();
+    dit(q(lbc3) === '102,201,203' && rm(lbc3) === '202', 'une lecture ratée après une lecture réussie : la dernière connue sert (2002 reste partie)', `${q(lbc3)} · ${rm(lbc3)}`);
   });
 
   try { fs.unlinkSync(BG); } catch (_) {}

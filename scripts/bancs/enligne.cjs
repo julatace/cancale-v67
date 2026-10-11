@@ -17,7 +17,16 @@
 //   4. panne de lecture (lectures publiques illisibles) ⇒ rien ne disparaît en
 //      silence : ce qui n'est plus sûr est « à confirmer », jamais retiré sans un mot ;
 //   5. l'autre sens : tout est frais ⇒ aucune ligne « à confirmer » ;
-//   6. aucun débordement à 390 px, aucune erreur d'app.
+//   6. aucun débordement à 390 px, aucune erreur d'app ;
+//   8 à 14. REVUE DE LA 5.167 (11 octobre), chaque défaut reproduit au rendu :
+//      une paire « à confirmer » garde son numéro (le champ N° ne dit jamais
+//      « n'est plus en ligne », aucun ♻️ sur un titre) ; « Annonces en ligne » et
+//      le widget n'affirment pas un total quand des annonces sont à confirmer ;
+//      la liste dépliée du tableau de bord porte les mêmes N° qu'Annonces ; une
+//      lecture PUBLIQUE ne rend pas « À jour » un compte figé, ni ne lève
+//      « Refusé par Vinted » ; l'écran Leboncoin dit la cause « à confirmer » ;
+//      la promesse « vérifiées à ta prochaine visite » n'est faite qu'à une
+//      extension connectée à VRM ; et les lectures publiques illisibles se disent.
 // Ce qui est jugé : les cartes (`data-carte-annonce`), les attributs `data-*` et
 // les nombres rendus — pas une formulation.
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
@@ -79,6 +88,7 @@ const projette = (row, sel) => {
     const src = m[2], alias = m[1] || src.split(/->>|->/).pop();
     if (src === 'id') { out[alias] = row.id; continue; }
     if (src === 'data') { out[alias] = row.data; continue; }
+    if (src === 'updated_at') { out[alias] = (row.data && row.data.capturedAt) || iso(0); continue; }
     let v = row.data; for (const seg of src.replace(/^data(->>|->)/, '').split(/->>|->/)) v = v == null ? null : v[seg];
     out[alias] = v == null ? null : (src.includes('->>') && typeof v === 'object' ? JSON.stringify(v) : v);
   }
@@ -90,34 +100,40 @@ const projette = (row, sel) => {
 // banc mesurerait le bump, pas la règle (même leçon que le banc `publier`).
 const VERSION_A_JOUR = (fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'App.jsx'), 'utf8').match(/const EXT_ATTENDUE = '([\d.]+)'/) || [])[1];
 if (!VERSION_A_JOUR) { console.log('KO EXT_ATTENDUE introuvable dans src/App.jsx'); process.exit(1); }
-const PONT = (version) => {
+const PONT = (o) => {
+  const version = o.version, connecte = o.connecte !== false;
   const post = (m) => window.postMessage(m, '*');
   window.addEventListener('message', (e) => {
     const d = e.data; if (e.source !== window || !d || typeof d !== 'object') return;
     if (d.__vmr === 'ping') post({ __vmr: 'ready', version });
-    if (d.__vmr === 'etat') post({ __vmr: 'etat:result', reqId: d.reqId, resp: { ok: true, version, vrm: { ok: true, connecte: true, email: 'vendeur@exemple.test', user_id: 'u1' }, vinted: null, cmds: {} } });
+    if (d.__vmr === 'etat') post({ __vmr: 'etat:result', reqId: d.reqId, resp: { ok: true, version, vrm: connecte ? { ok: true, connecte: true, email: 'vendeur@exemple.test', user_id: 'u1' } : { ok: true, connecte: false }, vinted: null, cmds: {} } });
   });
   post({ __vmr: 'ready', version });
 };
 
-async function rendre(b, { lignes, tel = false, onglet = 'cat_annonces', enligneKO = false, sansPont = false }) {
+async function rendre(b, { lignes, tel = false, onglet = 'cat_annonces', enligneKO = false, sansPont = false, accs = ACCS, posts = null, ls = null, pontConnecte = true }) {
   const vp = tel ? { width: 390, height: 844 } : { width: 1512, height: 950 };
   const ctx = await b.newContext({ viewport: vp, ...(tel ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
-  if (!sansPont) await pg.addInitScript(PONT, VERSION_A_JOUR);
+  if (!sansPont) await pg.addInitScript(PONT, { version: VERSION_A_JOUR, connecte: pontConnecte });
+  // Un réglage PROPRE À L'APPAREIL (ex. « refusé par Vinted »), posé une seule fois.
+  if (ls) await pg.addInitScript((o) => { try { for (const k in o) if (!localStorage.getItem('__fait_' + k)) { localStorage.setItem(k, JSON.stringify(o[k])); localStorage.setItem('__fait_' + k, '1'); } } catch (_) {} }, ls);
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
-    if (route.request().method() !== 'GET') return j([]);
+    if (route.request().method() !== 'GET') { if (posts) { try { posts.push(JSON.parse(route.request().postData() || 'null')); } catch (_) {} } return j([]); }
     if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
-    if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCS);
+    if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(accs);
     // Les lectures publiques ILLISIBLES (522 Cloudflare, en HTML), la base debout par ailleurs.
     if (enligneKO && /_enligne/.test(u)) return route.fulfill({ status: 522, contentType: 'text/html', body: '<html>522</html>' });
     const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
     const forme = (r) => (sel && !/^id,data|^data$|^data,/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: (r.data && r.data.capturedAt) || iso(0), cap: r.data && r.data.capturedAt });
+    // Pagination par `Range` (lireTout) : tout tient dans la première page.
+    const rng = route.request().headers()['range'];
+    if (rng && !/^0-/.test(rng)) return j([]);
     const eq = /id=eq\.([^&]*)/.exec(u);
     if (eq) return j(lignes.filter((r) => r.id === eq[1]).map(forme));
     const lk = /id=like\.([^&]*)/.exec(u);
@@ -160,6 +176,8 @@ const lireAnnonces = (pg) => pg.evaluate((PAIRE) => {
 
 (async () => {
   let b;
+  // `SECTIONS=8,9` : seulement ces sections (preuve par mutation, plus rapide).
+  const veut = (k) => !process.env.SECTIONS || process.env.SECTIONS.split(',').includes(String(k));
   const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom + ' : le scénario a tourné jusqu’au bout', String(e && e.message).slice(0, 200)); } };
   try {
     b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
@@ -167,7 +185,7 @@ const lireAnnonces = (pg) => pg.evaluate((PAIRE) => {
     for (const tel of [false, true]) {
       const t = tel ? '390 px' : '1512 px';
       console.log(`── 1-2. ${t} — trois annonces de la même paire, un compte figé`);
-      await essaie('1 ' + t, async () => {
+      if (veut('1')) await essaie('1 ' + t, async () => {
         const r = await rendre(b, { lignes: BASE(), tel });
         const a = await lireAnnonces(r.pg);
         dit(a.paire.length === 1, `${t} : la paire supprimée deux fois et republiée apparaît UNE fois`, JSON.stringify(a.paire));
@@ -194,7 +212,7 @@ const lireAnnonces = (pg) => pg.evaluate((PAIRE) => {
     }
 
     console.log('── 3. Tableau de bord : le même chiffre, la même ligne');
-    await essaie('3', async () => {
+    if (veut('3')) await essaie('3', async () => {
       const r = await rendre(b, { lignes: BASE(), onglet: 'dashboard' });
       await r.pg.waitForTimeout(1500);
       const d = await r.pg.evaluate(() => {
@@ -209,7 +227,7 @@ const lireAnnonces = (pg) => pg.evaluate((PAIRE) => {
     });
 
     console.log('── 4. File Leboncoin de l’app');
-    await essaie('4', async () => {
+    if (veut('4')) await essaie('4', async () => {
       const r = await rendre(b, { lignes: BASE(), onglet: 'leboncoin' });
       await r.pg.waitForTimeout(1500);
       const txt = await r.pg.evaluate(() => document.body.innerText);
@@ -223,7 +241,7 @@ const lireAnnonces = (pg) => pg.evaluate((PAIRE) => {
     for (const tel of [false, true]) {
       const t = tel ? '390 px' : '1512 px';
       console.log(`── 5. ${t} — panne : les lectures publiques sont illisibles`);
-      await essaie('5 ' + t, async () => {
+      if (veut('5')) await essaie('5 ' + t, async () => {
         const r = await rendre(b, { lignes: BASE(), tel, enligneKO: true });
         const a = await lireAnnonces(r.pg);
         await r.pg.click('[data-a-confirmer-ouvrir]').catch(() => {});
@@ -232,15 +250,21 @@ const lireAnnonces = (pg) => pg.evaluate((PAIRE) => {
         const vues = new Set([...a2.cartes, ...a2.liste]);
         const manquent = ['7001', '7002', '7011', '7031', '7041', '7042'].filter((id) => !vues.has(id));
         dit(!manquent.length, `${t} : rien ne disparaît en silence — chaque annonce connue est soit en ligne, soit « à confirmer »`, `manquent : ${manquent.join(',')}`);
-        dit(a.cartes.includes('7031') && !a.cartes.includes('7001'), `${t} : le compte frais reste en ligne, les lectures de 3 jours deviennent « à confirmer »`, JSON.stringify(a.cartes));
+        // Revue de la 5.167 : sans les lectures publiques, un dressing ne décide QUE
+        // s'il a moins de 30 min (aucune lecture plus récente ne peut exister). Le
+        // dressing de 3 h de compte_333 a justement été dépassé par une lecture
+        // publique (la republiée 7003) : le croire ferait cacher la republiée.
+        dit(!a.cartes.includes('7001') && !a.cartes.includes('7002') && !a.cartes.includes('7031'), `${t} : aucune lecture de plus de 30 min ne décide seule — tout est « à confirmer », rien n'est ressuscité`, JSON.stringify(a.cartes));
         dit(a.supprimees === '0', `${t} : et rien n'est dit « plus en ligne » sur une lecture qui n'a pas eu lieu`, JSON.stringify(a.supprimees));
+        const pk = await r.pg.evaluate(() => { const f = document.querySelector('[data-ann-fraicheur]'); const s = f && f.querySelector('[data-pub-ko-dit]'); return { attr: f && f.getAttribute('data-pub-ko'), n: document.querySelectorAll('[data-pub-ko-dit]').length, t: s ? s.innerText : '' }; });
+        dit(pk.attr === '1' && pk.n === 1 && /n.ont pas pu être lues/.test(pk.t), `${t} : et la panne est DITE, une fois`, JSON.stringify(pk));
         dit(r.errs.length === 0, `${t} : aucune erreur d’app`, r.errs.join(' | ').slice(0, 160));
         await r.ctx.close();
       });
     }
 
     console.log('── 6. Sur un téléphone (sans extension) : la même règle, sur les lignes en base');
-    await essaie('6', async () => {
+    if (veut('6')) await essaie('6', async () => {
       const r = await rendre(b, { lignes: BASE(), tel: true, sansPont: true });
       const a = await lireAnnonces(r.pg);
       dit(JSON.stringify(a.paire) === '["7003"]' && a.aConfirmer === '2', 'la même grille et la même ligne « à confirmer »', JSON.stringify({ p: a.paire, ac: a.aConfirmer }));
@@ -248,12 +272,151 @@ const lireAnnonces = (pg) => pg.evaluate((PAIRE) => {
       await r.ctx.close();
     });
 
+    console.log('── 7b. Panne des lectures publiques, dressings de moins de 30 min : ils décident encore');
+    if (veut('7b')) await essaie('7b', async () => {
+      const r = await rendre(b, { lignes: FRAIS(), enligneKO: true });
+      const a = await lireAnnonces(r.pg);
+      dit(a.cartes.includes('7011') && a.cartes.includes('7031') && a.cartes.includes('7003'), 'un dressing lu il y a 6 min reste en ligne (aucune lecture plus récente ne peut exister)', JSON.stringify(a.cartes));
+      await r.ctx.close();
+    });
+
     console.log('── 7. L’autre sens : tout est frais');
-    await essaie('7', async () => {
+    if (veut('7')) await essaie('7', async () => {
       const r = await rendre(b, { lignes: FRAIS() });
       const a = await lireAnnonces(r.pg);
       dit(a.nFraicheur === 0 && a.paire.length === 1, 'aucune ligne quand tout a été lu il y a moins de 30 min, et la paire une fois', JSON.stringify(a));
       await r.ctx.close();
+    });
+
+    // ══════════════════════════════════════════════════════════════════════
+    // REVUE DE LA 5.167 — chaque défaut reproduit au rendu (données inventées)
+    // ══════════════════════════════════════════════════════════════════════
+    const autre = (uid, type, capH, payload) => ({ id: `harvest_${uid}_${type}`, data: { type, uid, capturedAt: iso(capH), payload } });
+    const ventesVides = (uid, capH = 0.05) => autre(uid, 'orders_sold', capH, { my_orders: [], pagination: { total_entries: 0, total_pages: 0 } });
+
+    console.log('── 8. Une paire « à confirmer » garde son numéro');
+    if (veut('8')) await essaie('8 numéro', async () => {
+      // 8001 (compte_111, lu il y a 2 h, N°3) ; 8002 (compte_222, lu il y a 30 h : « à confirmer ») porte le N°7.
+      const lignes = [{ id: 'main', data: { vinted_annonce_numeros: { '8001': { numero: '3', title: 'Beta Alpha 40', accountId: '111' }, '8002': { numero: '7', title: 'Beta Beta 41', accountId: '222', buyPrice: '35' } }, vinted_used_numeros: ['3', '7'] } },
+        ventesVides('111'), ventesVides('222'), ventesVides('333'), ventesVides('444'), dressing('333', 0.05, []), dressing('444', 0.05, []),
+        dressing('111', 2, [ann(8001, 'Beta Alpha 40')]), dressing('222', 30, [ann(8002, 'Beta Beta 41')])];
+      const posts = [];
+      const r = await rendre(b, { lignes, posts });
+      await r.pg.waitForTimeout(1500);
+      await r.pg.click('[data-carte-annonce="8001"] [data-edition="numero"]', { timeout: 8000 });
+      await r.pg.keyboard.press('Control+A'); await r.pg.keyboard.type('7'); await r.pg.keyboard.press('Enter');
+      await r.pg.waitForTimeout(1200);
+      const t = await r.pg.evaluate(() => document.body.innerText);
+      const i = t.indexOf('N°7');
+      const dialogue = i >= 0 ? t.slice(Math.max(0, i - 20), i + 260) : '';
+      dit(!/n.est plus en ligne/.test(dialogue) && !/Oui, la même paire revient/.test(t), 'taper le N° d’une paire « à confirmer » : jamais « elle n’est plus en ligne », jamais « la même paire revient »', dialogue.replace(/\n+/g, ' | '));
+      dit(/peut-être encore/.test(dialogue) && /Annuler/.test(t), 'le dialogue dit qu’une paire le porte PEUT-ÊTRE encore, avec Annuler / un numéro neuf', dialogue.replace(/\n+/g, ' | '));
+      // Annuler : rien n'est écrit sur 8002 (ni fiche supprimée, ni prix d'achat déplacé).
+      await r.pg.click('text=Annuler', { timeout: 4000 }).catch(() => {});
+      await r.pg.waitForTimeout(1500);
+      const ecritMain = posts.flat().filter((x) => x && x.id === 'main').map((x) => x.data && x.data.vinted_annonce_numeros).filter(Boolean);
+      const dernier = ecritMain[ecritMain.length - 1] || null;
+      dit(!dernier || (dernier['8002'] && dernier['8002'].numero === '7' && dernier['8002'].buyPrice === '35' && !(dernier['8001'] && dernier['8001'].repriseDe)), 'la fiche « à confirmer » garde son N°7 et son prix d’achat', JSON.stringify(dernier && { a: dernier['8001'], b: dernier['8002'] }));
+      dit(r.errs.length === 0, 'aucune erreur d’app', r.errs.join(' | ').slice(0, 160));
+      await r.ctx.close();
+      // Le bandeau ♻️ ne propose pas de lui prendre son numéro sur un simple titre.
+      const lignes2 = [{ id: 'main', data: { vinted_annonce_numeros: { '8001': { numero: '9', auto: true, title: 'Beta Beta 41', accountId: '111' }, '8002': { numero: '5', auto: true, title: 'Beta Beta 41', accountId: '222' } }, vinted_used_numeros: ['5', '9'] } },
+        ventesVides('111'), ventesVides('222'), ventesVides('333'), ventesVides('444'), dressing('333', 0.05, []), dressing('444', 0.05, []),
+        dressing('111', 2, [ann(8001, 'Beta Beta 41')]), dressing('222', 30, [ann(8002, 'Beta Beta 41')])];
+      const r2 = await rendre(b, { lignes: lignes2 });
+      await r2.pg.waitForTimeout(1500);
+      const t2 = await r2.pg.evaluate(() => document.body.innerText);
+      dit(!/♻️/.test(t2), 'aucun bandeau ♻️ « paire déjà connue » sur une paire « à confirmer » au même libellé', (t2.slice(t2.indexOf('♻️'), t2.indexOf('♻️') + 120) || '').replace(/\n+/g, ' | '));
+      await r2.ctx.close();
+    });
+
+    console.log('── 9. « Annonces en ligne » et le widget n’affirment pas un total partiel');
+    if (veut('9')) await essaie('9 widget', async () => {
+      const MAIN9 = { id: 'main', data: { vinted_annonce_numeros: { '8001': { numero: '1' }, '8002': { numero: '2' }, '8003': { numero: '3' } } } };
+      for (const [nom, lignes, tuileOk] of [
+        ['tout lu il y a 30 h', [MAIN9, ventesVides('111'), ventesVides('222'), ventesVides('333'), ventesVides('444'), dressing('444', 0.05, []), dressing('111', 30, [ann(8001, 'Alpha A 40')]), dressing('222', 30, [ann(8002, 'Beta B 41')]), dressing('333', 30, [ann(8003, 'Gamma C 42')])], (v) => /—/.test(v) && !/\b0\b/.test(v)],
+        ['un compte relu il y a 2 h, deux à 30 h', [MAIN9, ventesVides('111'), ventesVides('222'), ventesVides('333'), ventesVides('444'), dressing('444', 0.05, []), dressing('111', 2, [ann(8001, 'Alpha A 40')]), dressing('222', 30, [ann(8002, 'Beta B 41')]), dressing('333', 30, [ann(8003, 'Gamma C 42')])], (v) => /≥\s*1/.test(v)],
+      ]) {
+        const posts = [];
+        const r = await rendre(b, { lignes, onglet: 'dashboard', posts });
+        await r.pg.waitForTimeout(5000);
+        const tuile = await r.pg.evaluate(() => { const s = document.querySelector('[data-dash-stat="online"]'); return s ? s.innerText.replace(/\s+/g, ' ') : ''; });
+        const w = posts.flat().filter((x) => x && x.id === 'widget_stats').map((x) => x.data && x.data.online);
+        dit(tuileOk(tuile), `${nom} : la tuile ne présente pas un minorant comme un total (« — » ou « ≥ N »)`, tuile);
+        dit(w.length > 0 && w.every((v) => v === null), `${nom} : le widget de l’iPhone ne reçoit AUCUN nombre (un tiret, jamais un zéro inventé)`, JSON.stringify(w));
+        await r.ctx.close();
+      }
+    });
+
+    console.log('── 10. La liste dépliée du tableau de bord porte les mêmes N° que l’écran Annonces');
+    if (veut('10')) await essaie('10 numéros dépliés', async () => {
+      const lu = {};
+      for (const onglet of ['dashboard', 'cat_annonces']) {
+        const r = await rendre(b, { lignes: BASE(), onglet });
+        await r.pg.click(onglet === 'dashboard' ? '[data-dash-fraicheur] [data-a-confirmer-ouvrir]' : '[data-ann-fraicheur] [data-a-confirmer-ouvrir]', { timeout: 8000 });
+        await r.pg.waitForTimeout(400);
+        lu[onglet] = await r.pg.evaluate(() => [...document.querySelectorAll('[data-a-confirmer-annonce]')].map((x) => x.getAttribute('data-a-confirmer-annonce') + ' ' + ((x.innerText.match(/N°\S+|sans N°/) || [''])[0])));
+        await r.ctx.close();
+      }
+      dit(JSON.stringify(lu.dashboard) === JSON.stringify(lu.cat_annonces) && /N°41/.test(lu.dashboard.join()), 'tableau de bord = Annonces (N°41, N°42), jamais « sans N° » pour une paire numérotée', JSON.stringify(lu));
+    });
+
+    console.log('── 11. Une lecture PUBLIQUE ne rend pas « À jour » un compte figé (Comptes liés)');
+    if (veut('11')) await essaie('11 comptes liés', async () => {
+      const vieux = 72;
+      const sans = [BASE()[0], dressing('111', 0.2, [ann(7011, 'A')]), autre('111', 'orders_sold', 0.2, { my_orders: [] }), autre('111', 'profile', 0.2, { user: { id: 111 } }),
+        dressing('444', vieux, [ann(7041, 'Zeta Figee Delta 40')]), autre('444', 'orders_sold', vieux, { my_orders: [] }), autre('444', 'profile', vieux, { user: { id: 444 } }), autre('444', 'inbox', vieux, { conversations: [] })];
+      const avec = sans.concat([publique('444', 10 / 60, [ann(7041, 'Zeta Figee Delta 40')])]);
+      // Des comptes AVEC leur jeton de renouvellement (sinon « À reconnecter » masquerait l'état).
+      const accs = [ACCS[0], ACCS[3]].map((a) => ({ ...a, refresh_token: 'r' }));
+      const etat = {};
+      for (const [nom, lignes] of [['sans', sans], ['avec', avec]]) {
+        const r = await rendre(b, { lignes, onglet: 'vintedaccounts', accs });
+        await r.pg.waitForTimeout(1500);
+        etat[nom] = await r.pg.evaluate(() => { const t = document.body.innerText; const i = t.indexOf('compte_444'); return t.slice(i, i + 120).replace(/\s+/g, ' '); });
+        await r.ctx.close();
+      }
+      dit(/Pas capté/.test(etat.avec) && !/À jour/.test(etat.avec), 'compte figé depuis 3 jours, relu en public il y a 10 min : toujours « Pas capté », jamais « À jour »', JSON.stringify(etat));
+      // Un compte « refusé par Vinted » (liste propre à l'appareil), sans aucune
+      // capture de SA session depuis 10 jours, le reste — même relu en public.
+      const dix = 240;
+      const refuse = [BASE()[0], dressing('111', 0.2, [ann(7011, 'A')]), autre('111', 'orders_sold', 0.2, { my_orders: [] }), autre('111', 'profile', 0.2, { user: { id: 111 } }),
+        dressing('444', dix, [ann(7041, 'Zeta Figee Delta 40')]), autre('444', 'orders_sold', dix, { my_orders: [] }), autre('444', 'profile', dix, { user: { id: 444 } }),
+        publique('444', 10 / 60, [ann(7041, 'Zeta Figee Delta 40')])];
+      const r = await rendre(b, { lignes: refuse, onglet: 'cat_annonces', accs, ls: { vinted_accounts_blocked: ['444'] } });
+      await r.pg.waitForTimeout(2500);
+      const ls = await r.pg.evaluate(() => localStorage.getItem('vinted_accounts_blocked'));
+      dit(ls === '["444"]', 'un compte « refusé par Vinted » ne sort pas de la liste sur une simple lecture publique', ls);
+      await r.ctx.close();
+    });
+
+    console.log('── 12. L’écran Leboncoin dit la cause « à confirmer »');
+    if (veut('12')) await essaie('12 leboncoin', async () => {
+      const tous = [BASE()[0], dressing('111', 30, [ann(7011, 'Zeta Garde Alpha 42')]), dressing('333', 30, [ann(7031, 'Zeta Garde Gamma 41')]), dressing('444', 30, [ann(7041, 'Zeta Figee Delta 40'), ann(7042, 'Zeta Figee Epsilon 39')])];
+      const r = await rendre(b, { lignes: tous, onglet: 'leboncoin' });
+      await r.pg.waitForTimeout(1500);
+      const d = await r.pg.evaluate(() => ({ t: document.body.innerText, ac: (document.querySelector('[data-lbc-a-confirmer]') || {}).getAttribute ? document.querySelector('[data-lbc-a-confirmer]').getAttribute('data-lbc-a-confirmer') : null, vide: (document.querySelector('[data-lbc-vide]') || { getAttribute: () => null }).getAttribute('data-lbc-vide') }));
+      dit(!/pas encore d.annonce en ligne/i.test(d.t), 'tout est « à confirmer » : il n’affirme PAS « tu n’as pas encore d’annonce en ligne »', '');
+      dit(d.ac === '4' && d.vide === 'a-confirmer', 'il dit combien sont à confirmer, et que la file attend leur relecture', JSON.stringify({ ac: d.ac, vide: d.vide }));
+      await r.ctx.close();
+      const r2 = await rendre(b, { lignes: BASE(), onglet: 'leboncoin' });
+      await r2.pg.waitForTimeout(1500);
+      const ac2 = await r2.pg.evaluate(() => { const e = document.querySelector('[data-lbc-a-confirmer]'); return e ? e.getAttribute('data-lbc-a-confirmer') : null; });
+      dit(ac2 === '2', 'un seul compte à confirmer : la file ne rétrécit pas sans un mot (2 annonces dites)', String(ac2));
+      await r2.ctx.close();
+    });
+
+    console.log('── 13. La promesse « vérifiées à ta prochaine visite » suppose une extension CONNECTÉE à VRM');
+    if (veut('13')) await essaie('13 sans session', async () => {
+      const etats = {};
+      for (const pc of [true, false]) {
+        const r = await rendre(b, { lignes: BASE(), pontConnecte: pc });
+        await r.pg.waitForTimeout(1500);
+        etats[pc] = await r.pg.evaluate(() => { const f = document.querySelector('[data-ann-fraicheur]'); const g = f && f.querySelector('[data-geste-dit]'); return { relit: f && f.getAttribute('data-relit'), promesse: f && f.getAttribute('data-promesse'), geste: g ? g.innerText : '' }; });
+        await r.ctx.close();
+      }
+      dit(etats.true.relit === '1' && /vérifiées à ta prochaine visite/.test(etats.true.geste), 'extension connectée : la promesse est faite', JSON.stringify(etats.true));
+      dit(etats.false.relit === '0' && etats.false.promesse === '0' && !/vérifiées à ta prochaine visite|sort d.ici tout de suite/.test(etats.false.geste) && /pas connectée à ton compte VRM/.test(etats.false.geste), 'extension PAS connectée à VRM : aucune promesse, le geste à la place', JSON.stringify(etats.false));
     });
   } catch (e) { dit(false, 'le banc a tourné jusqu’au bout', String(e && e.message).slice(0, 200)); }
   finally { if (b) await b.close(); srv.close(); }

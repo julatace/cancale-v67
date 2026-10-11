@@ -158,7 +158,8 @@ function lecteurAnnoncesApp(ligne, ids) {
   const dressingEnLigne = morceau(/const dressingEnLigne = async[\s\S]*?\n\};/, 'dressingEnLigne');
   const brut = morceau(/const fetchHarvestBrut = async[\s\S]*?\n\};/, 'fetchHarvestBrut');
   const ctx = { console, Date, JSON, Number, isNaN, isFinite, Array, Object, String, Map, Set, SUPABASE_URL: 'https://base.test', sbAuth: () => ({}),
-    busyStart() {}, busyEnd() {}, _harvestSeen: {}, _supprRetirees: {}, lireSupprimees: async () => ids, lireEnLigneTous: async () => [],
+    busyStart() {}, busyEnd() {}, _harvestSeen: {}, _supprRetirees: {}, lireSupprimees: async () => ids, lireEnLigneTous: async () => [], lecturesPubliquesKO: () => false,   // (5.167 revue : `dressingEnLigne` dit si les lectures publiques ont pu être lues)
+   
     fetch: async (url) => {
       const u = decodeURIComponent(String(url));
       const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || '';
