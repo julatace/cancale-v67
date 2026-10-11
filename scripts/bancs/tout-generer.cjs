@@ -235,7 +235,13 @@ const compte = (t, s) => String(t || '').split(s).length - 1;
       dit(p && /mettre à jour/i.test(p) && /publier une annonce sur Leboncoin/.test(p), 'téléphone + capture en 5.143 : la mise à jour est dite, avec ce qui manque vraiment', JSON.stringify(p).slice(0, 400));
       await r.ctx.close(); }
     { const r = await rendre(b, { tab: 'cat_ventes', tel: true, diagVer: '5.161.0' }); const p = await r.panneau();
-      dit(p && /mettre à jour/i.test(p) && !/ne sait pas encore|Vinted\s*Go|rafraîchit|publie une annonce/.test(p), 'téléphone + capture en 5.161 : la version est dite, AUCUNE capacité promise qu\'elle aurait déjà', JSON.stringify(p).slice(0, 400));
+      // (11 octobre) Ce qui est interdit, c'est de nommer ce que la 5.161 SAIT
+      // déjà faire — pas la tournure « ne sait pas encore » : depuis la 5.167
+      // (`preuves`), il lui manque VRAIMENT quelque chose, et le dire est juste
+      // (la liste est tirée d'EXT_CAPACITES, §11). Le contrôle suit la règle.
+      const DEJA_5161 = /générer un bordereau depuis VRM|répondre et faire une offre|publier une annonce sur Leboncoin|relever la date de versement|relever tes messages Leboncoin|détourer tes photos|Vinted\s*Go|rafraîchit|publie une annonce/;
+      dit(p && /mettre à jour/i.test(p) && !DEJA_5161.test(p), 'téléphone + capture en 5.161 : la version est dite, AUCUNE capacité promise qu\'elle aurait déjà', JSON.stringify(p).slice(0, 400));
+      dit(p && /relier tes ventes à leur annonce/.test(p), 'et ce qui lui manque VRAIMENT (arrivé après elle) est nommé', JSON.stringify(p).slice(0, 400));
       await r.ctx.close(); }
     { const r = await rendre(b, { tab: 'cat_ventes', pont: { version: '5.128.0', connecte: '111' }, diagVer: '5.143.0', attente: 6000 }); const p = await r.panneau();
       dit(p && compte(p, EXT_ATTENDUE) === 1, `extension 5.128 : « ${EXT_ATTENDUE} » écrite une fois dans le panneau (le bouton)`, `${compte(p, EXT_ATTENDUE)} fois`);
