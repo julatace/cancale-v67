@@ -72,6 +72,7 @@ insert into public.app_data (owner, id, data, updated_at) values
   (:'J', 'email_journal', '{"entries":[{"numero":"241"},{"numero":""},{"numero":"274"},{"numero":"220"}]}', '2026-09-01 10:00:00+00'),
   (:'J', 'lbc_listings', '{"items":{"2900000001":{"id":"2900000001","ref":"266","subject":"x"},"2900000099":{"id":"2900000099","subject":"chalet"}}}', now()),
   (:'J', 'ebay_listings', '{"items":[{"itemId":"1","sku":""},{"itemId":"2"},{"itemId":"3","sku":"VRM-12"}]}', now()),
+  (:'J', 'ebay_programmees', '{"items":[{"itemId":"7","sku":"VRM-40","debut":"2026-10-12T18:00:00.000Z"},{"itemId":"8","sku":"12345-ABC"}],"enLigne":[{"itemId":"9","sku":"vrm 041"}]}', now()),
   (:'J', 'coffre_1000_9000000001', '{"title":"x","photos":[]}', now()),
   (:'T', 'main', '{"vrm_prenom":"essai","vinted_dark":true,"vinted_used_numeros":[1,2,3]}', now()),
   (:'T', 'vrm_room', '{"rooms":[{"id":"r1","items":[{"id":"x","type":"pile","nums":["1","2"]}]}],"active":"r1"}', now());

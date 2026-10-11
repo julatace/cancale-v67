@@ -277,53 +277,57 @@ $$;
 --   'pins'        : les repères de « Mon local en photo » (`vrm_local`).
 create or replace function sauvegarde.vrm_valeurs(d jsonb, quoi text)
 returns setof jsonb
-language sql
+language plpgsql
 immutable
 set search_path = ''
 as $$
-  select e from jsonb_array_elements(case when jsonb_typeof(d) = 'array' then d else '[]' end) e where quoi = 'liste'
-  union all
-  select v -> 'numero' from jsonb_each(case when jsonb_typeof(d) = 'object' then d else '{}' end) x(k, v)
-   where quoi = 'champ' and jsonb_typeof(v) = 'object'
-  union all
-  select to_jsonb(k) from jsonb_object_keys(case when jsonb_typeof(d) = 'object' then d else '{}' end) k where quoi = 'cles'
-  union all
-  select v from jsonb_each(case when jsonb_typeof(d) = 'object' then d else '{}' end) x(k, v) where quoi = 'valeurs'
-  union all
-  select v -> 'numero' from jsonb_array_elements(case when jsonb_typeof(d) = 'array' then d else '[]' end) v
-   where quoi = 'liste_champ' and jsonb_typeof(v) = 'object'
-  union all
-  select e from jsonb_each(case when jsonb_typeof(d) = 'object' then d else '{}' end) x(k, a),
-                jsonb_array_elements(case when jsonb_typeof(a) = 'array' then a else '[]' end) e where quoi = 'grille'
-  union all
-  select to_jsonb(k) from jsonb_object_keys(case when jsonb_typeof(d -> 'pointes') = 'object' then d -> 'pointes' else '{}' end) k
-   where quoi = 'pointage'
-  union all
-  select z.v
-    from jsonb_array_elements(case when jsonb_typeof(d -> 'rooms') = 'array' then d -> 'rooms' else '[]' end) r,
-         jsonb_array_elements(case when jsonb_typeof(r -> 'items') = 'array' then r -> 'items' else '[]' end) it,
-         lateral (
-           select it -> 'num' v where jsonb_typeof(it) = 'object' and it ? 'num'
-           union all
-           select e from jsonb_array_elements(case when jsonb_typeof(it -> 'nums') = 'array' then it -> 'nums' else '[]' end) e
-           union all
-           select e from jsonb_each(case when jsonb_typeof(it -> 'slots') = 'object' then it -> 'slots' else '{}' end) s(c, a),
-                         jsonb_array_elements(case when jsonb_typeof(a) = 'array' then a else '[]' end) e
-           union all
-           -- Une pile SANS liste se numérote depuis `start` (start, start+1…) :
-           -- ce sont aussi des cartons étiquetés.
-           select to_jsonb(((it ->> 'start')::bigint + g)::text)
-             from generate_series(0, greatest(1, coalesce(nullif(it ->> 'cols', '')::int, 1)) * greatest(1, coalesce(nullif(it ->> 'rows', '')::int, 5)) - 1) g
-            where jsonb_typeof(it) = 'object' and it ->> 'type' = 'pile'
-              and coalesce(jsonb_array_length(case when jsonb_typeof(it -> 'nums') = 'array' then it -> 'nums' else '[]' end), 0) = 0
-              and coalesce(it ->> 'start', '') ~ '^[0-9]{1,6}$' and coalesce(it ->> 'cols', '1') ~ '^[0-9]{1,3}$' and coalesce(it ->> 'rows', '5') ~ '^[0-9]{1,3}$'
-         ) z
-   where quoi = 'garage'
-  union all
-  select pin -> 'numero'
-    from jsonb_array_elements(case when jsonb_typeof(d -> 'photos') = 'array' then d -> 'photos' else '[]' end) ph,
-         jsonb_array_elements(case when jsonb_typeof(ph -> 'pins') = 'array' then ph -> 'pins' else '[]' end) pin
-   where quoi = 'pins' and jsonb_typeof(pin) = 'object'
+-- Une branche par endroit : seule celle demandée s'exécute (la version en UNE
+-- requête à neuf branches mettait 1,9 s pour 405 fiches — mesuré).
+begin
+  if quoi = 'liste' then
+    return query select e from jsonb_array_elements(case when jsonb_typeof(d) = 'array' then d else '[]' end) e;
+  elsif quoi = 'champ' then
+    return query select v -> 'numero' from jsonb_each(case when jsonb_typeof(d) = 'object' then d else '{}' end) x(k, v)
+      where jsonb_typeof(v) = 'object';
+  elsif quoi = 'cles' then
+    return query select to_jsonb(k) from jsonb_object_keys(case when jsonb_typeof(d) = 'object' then d else '{}' end) k;
+  elsif quoi = 'valeurs' then
+    return query select v from jsonb_each(case when jsonb_typeof(d) = 'object' then d else '{}' end) x(k, v);
+  elsif quoi = 'liste_champ' then
+    return query select v -> 'numero' from jsonb_array_elements(case when jsonb_typeof(d) = 'array' then d else '[]' end) v
+      where jsonb_typeof(v) = 'object';
+  elsif quoi = 'grille' then
+    return query select e from jsonb_each(case when jsonb_typeof(d) = 'object' then d else '{}' end) x(k, a),
+                  jsonb_array_elements(case when jsonb_typeof(a) = 'array' then a else '[]' end) e;
+  elsif quoi = 'pointage' then
+    return query select to_jsonb(k) from jsonb_object_keys(case when jsonb_typeof(d -> 'pointes') = 'object' then d -> 'pointes' else '{}' end) k;
+  elsif quoi = 'garage' then
+    return query select z.v
+      from jsonb_array_elements(case when jsonb_typeof(d -> 'rooms') = 'array' then d -> 'rooms' else '[]' end) r,
+           jsonb_array_elements(case when jsonb_typeof(r -> 'items') = 'array' then r -> 'items' else '[]' end) it,
+           lateral (
+             select it -> 'num' v where jsonb_typeof(it) = 'object' and it ? 'num'
+             union all
+             select e from jsonb_array_elements(case when jsonb_typeof(it -> 'nums') = 'array' then it -> 'nums' else '[]' end) e
+             union all
+             select e from jsonb_each(case when jsonb_typeof(it -> 'slots') = 'object' then it -> 'slots' else '{}' end) s(c, a),
+                           jsonb_array_elements(case when jsonb_typeof(a) = 'array' then a else '[]' end) e
+             union all
+             -- Une pile SANS liste se numérote depuis `start` (start, start+1…) :
+             -- ce sont aussi des cartons étiquetés.
+             select to_jsonb(((it ->> 'start')::bigint + g)::text)
+               from generate_series(0, greatest(1, coalesce(nullif(it ->> 'cols', '')::int, 1)) * greatest(1, coalesce(nullif(it ->> 'rows', '')::int, 5)) - 1) g
+              where jsonb_typeof(it) = 'object' and it ->> 'type' = 'pile'
+                and coalesce(jsonb_array_length(case when jsonb_typeof(it -> 'nums') = 'array' then it -> 'nums' else '[]' end), 0) = 0
+                and coalesce(it ->> 'start', '') ~ '^[0-9]{1,6}$' and coalesce(it ->> 'cols', '1') ~ '^[0-9]{1,3}$' and coalesce(it ->> 'rows', '5') ~ '^[0-9]{1,3}$'
+           ) z;
+  elsif quoi = 'pins' then
+    return query select pin -> 'numero'
+      from jsonb_array_elements(case when jsonb_typeof(d -> 'photos') = 'array' then d -> 'photos' else '[]' end) ph,
+           jsonb_array_elements(case when jsonb_typeof(ph -> 'pins') = 'array' then ph -> 'pins' else '[]' end) pin
+     where jsonb_typeof(pin) = 'object';
+  end if;
+end
 $$;
 
 -- Le BILAN d'un endroit : combien de valeurs de chaque genre. `neufs` = combien
@@ -542,7 +546,10 @@ begin
   dres as (
     select it ->> 'id' iid,
            min(sauvegarde.vrm_ms(it -> 'created_at_ts')) c_ms,
-           min(sauvegarde.vrm_ms(it -> 'photo' -> 'high_resolution' -> 'timestamp')) p_ms
+           min(sauvegarde.vrm_ms(it -> 'photo' -> 'high_resolution' -> 'timestamp')) p_ms,
+           -- Vue OUVERTE dans au moins une capture (pour le rapport seulement :
+           -- une annonce mise en ligne après T puis supprimée se voit).
+           bool_or(coalesce(it ->> 'is_closed', 'false') <> 'true') ouverte
       from public.app_data a,
            jsonb_array_elements(case when jsonb_typeof(a.data -> 'payload' -> 'items') = 'array' then a.data -> 'payload' -> 'items' else '[]' end) it
      where a.owner = p_owner and a.id ~ '^harvest_[0-9]+_listings$' and jsonb_typeof(it) = 'object' and coalesce(it ->> 'id', '') <> ''
@@ -558,7 +565,7 @@ begin
       from jsonb_each(case when jsonb_typeof(d -> 'vinted_annonce_numeros') = 'object' then d -> 'vinted_annonce_numeros' else '{}' end) e(k, v)
      where jsonb_typeof(v) = 'object' and sauvegarde.vrm_num_genre(v -> 'numero') <> 'vide'),
   fd as (
-    select f.*, coalesce(dres.c_ms, dres.p_ms, ld.ms, f.na) date_ms,
+    select f.*, coalesce(dres.c_ms, dres.p_ms, ld.ms, f.na) date_ms, dres.ouverte,
            case when dres.c_ms is not null then 'dressing'
                 when dres.p_ms is not null then 'dressingPhoto'
                 when ld.ms is not null then 'listingDates'
@@ -602,7 +609,12 @@ begin
     'sourcesNouvelles', (select coalesce(jsonb_object_agg(source, n), '{}') from (select source, count(*) n from nv group by source) z),
     'contradictions', (select count(*) from cl2 where contradiction),
     'nouvelles', (select coalesce(jsonb_agg(jsonb_build_object('id', id, 'avant', v -> 'numero', 'apres', rang::text,
-                                                               'date', sauvegarde.vrm_iso(date_ms), 'source', source) order by rang), '[]') from nv),
+                                                               'date', sauvegarde.vrm_iso(date_ms), 'source', source,
+                                                               'enLigne', coalesce(ouverte, false)) order by rang), '[]') from nv),
+    -- Une « nouvelle » qu'aucune capture ne montre ouverte (supprimée, ou jamais
+    -- vue) : elle prendra quand même un numéro neuf — à regarder AVANT d'appliquer
+    -- (une coupure trop tôt numéroterait des annonces supprimées depuis).
+    'nouvellesPasEnLigne', (select count(*) from nv where not coalesce(ouverte, false)),
     'carte', (select coalesce(jsonb_object_agg(cle, val), '{}') from carte),
     'parTx', (select coalesce(jsonb_object_agg(tx, rang::text), '{}') from partx))
     into res;
@@ -767,9 +779,15 @@ begin
       union
       select k2 from jsonb_each(case when jsonb_typeof(d -> 'vrm_lbc_liens') = 'object' then d -> 'vrm_lbc_liens' else '{}' end) e2(k2, v)
        where sauvegarde.vrm_num_genre(v) = 'nu') z;
+  -- eBay : les annonces EN LIGNE (`ebay_listings`) et les PROGRAMMÉES
+  -- (`ebay_programmees` : à venir, et déjà parties) qui portaient « VRM-n ».
   select coalesce(jsonb_agg(distinct to_jsonb(v ->> 'itemId')), '[]'::jsonb) into ebay_ids
-    from public.app_data a, jsonb_array_elements(case when jsonb_typeof(a.data -> 'items') = 'array' then a.data -> 'items' else '[]' end) v
-   where a.owner = p_owner and a.id = 'ebay_listings' and coalesce(v ->> 'sku', '') ~* '^\s*VRM[-\s]?0*[0-9]{1,6}\s*$';
+    from public.app_data a,
+         jsonb_array_elements(case when jsonb_typeof(a.data -> 'items') = 'array' then a.data -> 'items' else '[]' end
+                              || case when jsonb_typeof(a.data -> 'enLigne') = 'array' then a.data -> 'enLigne' else '[]' end) v
+   where a.owner = p_owner and a.id in ('ebay_listings', 'ebay_programmees')
+     and coalesce(v ->> 'itemId', '') <> ''
+     and coalesce(v ->> 'sku', '') ~* '^\s*VRM[-\s]?0*[0-9]{1,6}\s*$';
 
   -- SAUVEGARDE : `main`, le garage, « Mon local », les brouillons eBay en entier ;
   -- pour les emails, le numéro seul (les PDF ne bougent pas).

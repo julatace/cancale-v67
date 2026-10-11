@@ -85,6 +85,8 @@ const MUTATIONS = {
   'annuler-sans-garde': { sql: (s) => remplace(s, "  if bouge <> '' then\n    raise exception 'vrm_numerotation : retour arrière REFUSÉ", "  if false then\n    raise exception 'vrm_numerotation : retour arrière REFUSÉ", 'annuler-sans-garde') },
   // Le pool peut rétrécir.
   'pool-retrecit': { sql: (s) => remplace(s, "    if perdus > 0 then\n      raise exception using errcode = 'P0001', message = 'vrm_pool_retreci',", "    if false then\n      raise exception using errcode = 'P0001', message = 'vrm_pool_retreci',", 'pool-retrecit') },
+  // Les annonces eBay PROGRAMMÉES oubliées : leur « VRM-40 » serait lu comme la nouvelle 40.
+  'programmees-oubliees': { sql: (s) => remplace(s, "a.id in ('ebay_listings', 'ebay_programmees')", "a.id = 'ebay_listings'", 'programmees-oubliees') },
   // Un numéro donné à PLUSIEURS paires nouvelles serait attribué « à la première ».
   'ambigu-devine': { sql: (s) => remplace(s, "case when count(*) = 1 then to_jsonb(min(rang)::text) else 'null'::jsonb end val", "to_jsonb(min(rang)::text) val", 'ambigu-devine') },
 };
@@ -222,7 +224,7 @@ essaie('mémoriser l\'avant', () => {
   AVANT.main = md5(DB, 'main'); AVANT.T = md5(DB, 'main', T); AVANT.room = md5(DB, 'vrm_room');
   AVANT.stock = Q(DB, `select md5((data -> 'vinted_stock_vinted')::text) from public.app_data where owner = '${J}' and id = 'main'`);
   AVANT.pdf = Q(DB, `select md5(string_agg(data ->> 'pdfB64', '' order by id)) from public.app_data where owner = '${J}' and id like 'email_bord_%'`);
-  AVANT.lbc = md5(DB, 'lbc_listings'); AVANT.journal = md5(DB, 'email_journal'); AVANT.ebayl = md5(DB, 'ebay_listings');
+  AVANT.lbc = md5(DB, 'lbc_listings'); AVANT.journal = md5(DB, 'email_journal'); AVANT.ebayl = md5(DB, 'ebay_listings'); AVANT.ebayp = md5(DB, 'ebay_programmees');
   AVANT.emailsMaj = Q(DB, `select md5(string_agg(updated_at::text, ',' order by id)) from public.app_data where owner = '${J}' and id like 'email\\_%'`);
   snap(DB, 'avant'); snap(DB, 'room_avant', 'vrm_room');
 });
@@ -236,7 +238,7 @@ essaie('installer', () => {
       === (m && m.apres && /garage/.test(m.apres) ? 'vrm_garde_numeros,vrm_meta_maj,vrm_noter_ecriture' : 'vrm_garde_garage,vrm_garde_numeros,vrm_meta_maj,vrm_noter_ecriture'),
     'les garde-fous sont posés, avant `vrm_meta_maj` (ordre alphabétique : `meta` est calculé sur la ligne finale)');
   dit(Q(DB, "select has_schema_privilege('authenticated', 'sauvegarde', 'usage')") === 'f', 'le navigateur n\'a aucun accès au schéma `sauvegarde`');
-  dit(psql(DB, null, { fichier: FMIG }).ok, 'réinstaller le fichier une seconde fois ne lève rien');
+  dit(installer(DB).ok, 'réinstaller le fichier une seconde fois ne lève rien');
 });
 essaie('avant la coupure', () => {
   const r = navigateur(DB, 'main', `data || '{"vrm_numerotation":{"version":9,"archive":"Z"}}'::jsonb`);
@@ -277,7 +279,9 @@ essaie('mesure périmée', () => {
 essaie('forme inconnue', () => {
   const r = psql(DB, `begin; update public.app_data set data = jsonb_set(data, '{vinted_annonce_numeros,9000000001,numero}', '"12a"') where owner = '${J}' and id = 'main';
     select sauvegarde.vrm_numerotation_archiver('${J}', 'B', '${COUPURE}', sauvegarde.vrm_numerotation_mesurer('${J}', 'B', '${COUPURE}')); commit;`);
-  dit(!r.ok && /forme inconnue/.test(r.err), 'un numéro de forme inconnue (« 12a ») ARRÊTE tout : on ne devine pas', r.err.slice(0, 160));
+  // Le PREMIER garde-fou (avant toute écriture) — le second, après conversion,
+  // rattraperait aussi, mais on prouve celui-ci : « rien n'est fait ».
+  dit(!r.ok && /forme inconnue \(ni un numéro/.test(r.err), 'un numéro de forme inconnue (« 12a ») ARRÊTE tout AVANT d\'écrire : on ne devine pas', r.err.slice(0, 160));
   const r2 = archiver(DB, null);
   dit(!r2.ok && /mesure « attendu » est obligatoire/.test(r2.err), 'sans la mesure, rien ne se fait', r2.err.slice(0, 120));
   const r3 = psql(DB, `select sauvegarde.vrm_numerotation_archiver('${J}', 'B', now() + interval '1 day', '{}'::jsonb)`);
@@ -315,8 +319,8 @@ essaie('main convertie', () => {
   const mk = d.vrm_numerotation || {};
   dit(mk.version === 2 && mk.archive === 'B' && mk.coupure === '2026-10-09T00:00:00.000Z' && mk.renum && Object.keys(mk.renum).length === 0 && mk.nouvelles === 0 && !!mk.appliqueLe,
     'marqueur : { version 2, coupure T, appliqueLe, archive B, renum {} }', JSON.stringify(mk).slice(0, 200));
-  dit(JSON.stringify(mk.lbcAnnonces) === '["2900000001","2900000002","2900000003"]' && JSON.stringify(mk.ebayAnnonces) === '["3"]',
-    'marqueur : les annonces Leboncoin et eBay qui portaient un ancien N°, par leur IDENTIFIANT');
+  dit(JSON.stringify(mk.lbcAnnonces) === '["2900000001","2900000002","2900000003"]' && JSON.stringify(mk.ebayAnnonces) === '["3","7","9"]',
+    'marqueur : les annonces Leboncoin et eBay (en ligne ET programmées) qui portaient un ancien N°, par leur IDENTIFIANT', JSON.stringify(mk.ebayAnnonces));
   dit(Q(DB, `select md5((data -> 'vinted_stock_vinted')::text) from public.app_data where owner = '${J}' and id = 'main'`) === AVANT.stock, 'l\'ancien catalogue (stock_vinted) n\'est pas touché');
   dit(prochain(d) === '1', 'le VRAI `prochainLibre` d\'App.jsx sur la ligne convertie rend « 1 »', prochain(d));
 });
@@ -341,7 +345,7 @@ essaie('emails', () => {
   dit(Q(DB, `select md5(string_agg(data ->> 'pdfB64', '' order by id)) from public.app_data where owner = '${J}' and id like 'email_bord_%'`) === AVANT.pdf
       && Q(DB, `select md5(string_agg(updated_at::text, ',' order by id)) from public.app_data where owner = '${J}' and id like 'email\\_%'`) === AVANT.emailsMaj,
     'les PDF et `updated_at` des emails ne bougent pas');
-  dit(md5(DB, 'lbc_listings') === AVANT.lbc && md5(DB, 'email_journal') === AVANT.journal && md5(DB, 'ebay_listings') === AVANT.ebayl && md5(DB, 'main', T) === AVANT.T,
+  dit(md5(DB, 'lbc_listings') === AVANT.lbc && md5(DB, 'email_journal') === AVANT.journal && md5(DB, 'ebay_listings') === AVANT.ebayl && md5(DB, 'ebay_programmees') === AVANT.ebayp && md5(DB, 'main', T) === AVANT.T,
     'captures Leboncoin/eBay, journal du serveur et l\'autre vendeur : intacts');
   dit(Q(DB, `select count(*) || '/' || count(*) filter (where data ? 'pdfB64') from sauvegarde.numerotation_013`) === '125/0', 'copie : main, garage, local, brouillons + 121 emails (sans PDF)');
   dit(Q(DB, `select md5(data::text) from sauvegarde.numerotation_013 where id = 'main'`) === AVANT.main, 'la copie de main est l\'avant exact');
@@ -450,6 +454,7 @@ essaie('plan', () => {
   const n = a.plan.nouvelles.map(x => `${x.id}:${x.avant}→${x.apres}`).join(',');
   dit(n === '8000000002:554→1,8000000003:555→2,8000000001:553→3', 'dans l\'ORDRE DE MISE EN LIGNE (08:10, 08:20, 08:30), pas dans l\'ordre des 553-555', n);
   dit(JSON.stringify(a.plan.sourcesNouvelles) === '{"dressingPhoto":3}', 'datées par le dressing capté (heure de dépôt de la photo)', JSON.stringify(a.plan.sourcesNouvelles));
+  dit(a.plan.nouvellesPasEnLigne === 0 && a.plan.nouvelles.every((x) => x.enLigne === true), 'le plan dit que les trois sont EN LIGNE (vues ouvertes dans une capture)', `${a.plan.nouvellesPasEnLigne}`);
   snap(DBB, 'avant');
   const r = archiver(DBB, JSON.stringify(a));
   dit(r.ok, 'conversion', r.ok ? '' : r.err.slice(0, 300));
@@ -477,6 +482,8 @@ essaie('plan et conversion', () => {
   const n = a.plan.nouvelles.map(x => `${x.id}→${x.apres}(${x.source})`).join(',');
   dit(n === '8000000002→1(dressingPhoto),8000000003→2(dressingPhoto),8000000001→3(dressingPhoto),8000000005→4(dressingPhoto),8000000004→5(numberedAt)',
     'une annonce sans date lisible est jugée par `numberedAt`, ET LE PLAN LE DIT', n);
+  dit(a.plan.nouvellesPasEnLigne === 1 && (a.plan.nouvelles.find((x) => x.id === '8000000004') || {}).enLigne === false,
+    'le plan SIGNALE la nouvelle qu\'aucune capture ne montre en ligne (à regarder avant d\'appliquer : une coupure trop tôt numéroterait des annonces supprimées)', `${a.plan.nouvellesPasEnLigne}`);
   dit(a.plan.contradictions === 1 && !a.plan.nouvelles.some(x => x.id === '9000000300'),
     'une fiche numérotée en juillet dont la photo a été redéposée après la coupure reste ANCIENNE (on ne numérote pas une annonce qui n\'existe pas encore) — comptée', `contradictions ${a.plan.contradictions}`);
   const r = archiver(DBC, JSON.stringify(a));
@@ -513,6 +520,34 @@ essaie('ambigu', () => {
   const d = mainJ(DBD);
   dit(r2.ok && fiche(d, '8200000001') === '1' && fiche(d, '8200000002') === '2' && !pool(d).some(x => /557/.test(x)),
     'sans cette vente : chacune son numéro (1, 2), et 557 sort du pool', r2.ok ? '' : r2.err.slice(0, 160));
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+console.log('\nE. L\'ESSAI DANS UNE TRANSACTION ANNULÉE (le script remis à celui qui applique)');
+const DBE = 'renum_e';
+essaie('essai annulé', () => {
+  nouvelleBase(DBE, 2);
+  const tout = () => Q(DBE, `select md5(string_agg(md5(owner::text || id || data::text), ',' order by owner, id)) from public.app_data`);
+  const avant = tout();
+  const fab = spawnSync(process.execPath, [path.join(__dirname, 'renum-b/essai-annule.cjs'), '--coupure=' + COUPURE, '--migration=' + FMIG], { encoding: 'utf8', maxBuffer: 64 << 20 });
+  dit(fab.status === 0 && /^begin;$/m.test(fab.stdout) && /^rollback;\s*$/m.test(fab.stdout) && !/^commit;$/m.test(fab.stdout),
+    'le script d\'essai se fabrique depuis la migration : BEGIN … ROLLBACK, aucun COMMIT', (fab.stderr || '').slice(0, 200));
+  const F = path.join(DIR, 'essai.sql'); fs.writeFileSync(F, fab.stdout);
+  const r = psql(DBE, null, { fichier: F });
+  dit(r.ok, 'l\'essai passe sans erreur', r.ok ? '' : r.err.slice(0, 300));
+  const ligne = (r.out || '').split('\n').filter((l) => l.startsWith('{')).pop() || 'null';
+  const e = JSON.parse(ligne) || {};
+  dit(e.proprietaireTrouve === true && e.rapport && e.rapport.version === 2 && e.marqueur && e.marqueur.archive === 'B',
+    'il rend UN rapport : le vendeur trouvé, la conversion (version 2), le marqueur', JSON.stringify(e.rapport || {}).slice(0, 160));
+  dit(e.plan && e.plan.nouvellesPasEnLigne === 1 && Array.isArray(e.plan.nouvelles) && e.plan.nouvelles.length === 5,
+    'et le plan à relire AVANT d\'appliquer : les 5 nouvelles, dont 1 qu\'aucune capture ne montre en ligne');
+  dit(e.poolApres && e.poolApres.enChiffres === 5 && JSON.stringify(e.poolApres.chiffres) === '[1,2,3,4,5]' && e.fichesApres.enChiffres === 5,
+    'le pool après : seuls 1 à 5 restent en chiffres', JSON.stringify(e.poolApres));
+  dit(tout() === avant, 'après le ROLLBACK, AUCUNE ligne n\'a bougé');
+  dit(Q(DBE, "select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace where p.proname like 'vrm_numerotation%' or (n.nspname = 'public' and p.proname in ('vrm_garde_numeros', 'vrm_garde_garage'))") === '0'
+      && Q(DBE, "select count(*) from pg_trigger where tgname like 'vrm_garde%'") === '0'
+      && Q(DBE, "select count(*) from pg_tables where schemaname = 'sauvegarde' and tablename like 'numerotation%'") === '0',
+    'ni fonction, ni déclencheur, ni table de sauvegarde ne restent installés');
 });
 
 console.log(`\n${ok} vert(s), ${ko} rouge(s).`);
