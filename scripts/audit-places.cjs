@@ -35,12 +35,18 @@ const NUMEROS = {
   '202': { numero: '202', title: 'Paire B', mp: { lbc: false } },  // retirée
   '303': { numero: '303', title: 'Paire C' },                      // jamais touchée
 };
+// ⚠️ 5.165 (11 octobre) : un dressing porte TOUJOURS l'heure de sa lecture
+//    (`capturedAt`, posée par l'extension). La règle « en ligne » la lit : un
+//    dressing sans date, ou de plus de 24 h, est « à confirmer » et n'alimente
+//    aucune file. Servir des lignes sans date mesurerait une forme qui n'existe
+//    pas en base (§6.3).
+const LU_RECENT = new Date(Date.now() - 3600e3).toISOString();
 const LISTINGS = [
-  { id: 'harvest_9001_listings', data: { uid: '9001', payload: { items: [
+  { id: 'harvest_9001_listings', data: { uid: '9001', capturedAt: LU_RECENT, payload: { items: [
     { id: 101, title: 'Paire A', price: { amount: '40' } },
     { id: 202, title: 'Paire B', price: { amount: '50' } },
   ] } } },
-  { id: 'harvest_9002_listings', data: { uid: '9002', payload: { items: [
+  { id: 'harvest_9002_listings', data: { uid: '9002', capturedAt: LU_RECENT, payload: { items: [
     { id: 303, title: 'Paire C', price: { amount: '60' } },
   ] } } },
 ];
