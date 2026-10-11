@@ -39,6 +39,13 @@ comptabilité. Il n'est **pas développeur** et pilote tout par des sessions Cla
 6. **L'extension se livre en zip qui se dézippe en UN dossier.**
 7. **Il n'est pas développeur** : une alerte qui ne dit pas quoi faire ne sert à
    rien ; un chiffre qu'on ne peut pas vérifier est invendable.
+8. **Sur eBay, c'est l'acheteur qui paie le bordereau** (11 octobre, mot pour
+   mot : « pour ebay on est d'accord c'est l'acheteur qui paye le bordereau »).
+   Son compte est en livraison gérée par eBay : l'acheteur paie le port à eBay,
+   eBay fournit l'étiquette prépayée. VRM n'achète **jamais** une étiquette avec
+   son argent, ne pose **jamais** « livraison gratuite », et le port n'est ni une
+   recette ni une charge dans sa compta. L'achat d'étiquettes chez un agrégateur
+   (chantier K14 de l'agent eBay) est **gelé** pour lui.
 
 ---
 
