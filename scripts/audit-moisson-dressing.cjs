@@ -25,6 +25,15 @@
 //   6. le dressing d'un AUTRE membre, capté en passant, n'est jamais le sien ;
 //   7. sans onglet ni cookie : AUCUN compte n'est moissonné avec ses jetons (§3) ;
 //   8. la page navigue pendant la moisson : le repli par cookie range quand même.
+//  Revue de la 5.165 (11 octobre), horloge du service worker PILOTÉE :
+//   9. notre base refuse TOUT (RLS 403) ou ne répond plus (522) : le recul tient
+//      la moisson (au plus 2 en 5 min, 5 en 30 min), y compris pour `runActive`
+//      appelé hors visite ; un échec passager répété ne rend la garde qu'UNE
+//      fois ; et l'autre sens : la base revenue, la visite suivante range ;
+//  10. le repli par COOKIE : il change de compte en route ⇒ rien de B sous A,
+//      et le dressing vide de B n'efface pas celui de A ;
+//  11. §4.2 : le compteur `nItems` illisible (lecture KO, écriture OK) ⇒ une
+//      page partielle n'écrase rien, ni en passant ni par la moisson active.
 //  Données inventées (le dépôt est public). Aucune requête réseau.
 //  Usage : node scripts/audit-moisson-dressing.cjs [--src f] [--mutation nom]
 //  `--mutation` réaffaiblit UNE règle dans une copie du fichier : le contrôle
