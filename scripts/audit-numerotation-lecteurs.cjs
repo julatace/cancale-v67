@@ -49,7 +49,12 @@ const MUTATIONS = {
   // Le repli `vinted_listing_dates` oublié.
   'sans-dates-captees': { app: (s) => remplace(s, "  const d = dates && it ? dates[String(it.id)] : null;\n  return d ? ms(d.ts) : null;", "  return null;", 'sans-dates-captees') },
   // Le SKU d'une vieille annonce eBay lu comme la nouvelle série.
-  'sku-sans-marqueur': { app: (s) => remplace(s, "return (id != null && ids.some((x) => String(x) === String(id))) || avant ? cleNum(arch + k) : k;", "return k;", 'sku-sans-marqueur') },
+  'sku-sans-marqueur': { app: (s) => remplace(s, "return (id != null && ids.some((x) => String(x) === String(id))) || avant ? (renum || cleNum(arch + k)) : k;", "return k;", 'sku-sans-marqueur') },
+  // (11 octobre) Un numéro PROVISOIRE (renuméroté par la conversion) lu comme
+  // un ancien numéro : « VRM-553 » deviendrait « B553 », qui ne désigne rien.
+  'renum-oublie': { app: (s) => remplace(s, "? (renum || cleNum(arch + k)) : k;", "? cleNum(arch + k) : k;", 'renum-oublie') },
+  'serveur-renum-oublie': { lib: (s) => remplace(s, "? (renum || cleNum(arch + c)) : c;", "? cleNum(arch + c) : c;", 'serveur-renum-oublie') },
+  'extension-renum-oublie': { ext: (s) => remplace(s, "? (renum || cleNum(arch + k)) : k;\n}\nfunction adRefKeys", "? cleNum(arch + k) : k;\n}\nfunction adRefKeys", 'extension-renum-oublie') },
   // Une commande eBay d'avant la coupure lue comme la nouvelle série.
   'commande-sans-date': { app: (s) => remplace(s, "Date.parse((o && o.creationDate) || ''));", "null);", 'commande-sans-date') },
   // Le N° d'un email admis sans vérifier la fiche.
@@ -69,7 +74,7 @@ const MUTATIONS = {
   // La pose à la main accepte « B230 ».
   'main-archive': { app: (s) => remplace(s, "    if (!numeroReprenable(cle)) {\n      updatePair(item, { numero: avant });", "    if (false) {\n      updatePair(item, { numero: avant });", 'main-archive') },
   // L'extension lit la référence d'une vieille annonce Leboncoin comme la nouvelle série.
-  'extension-lbc': { ext: (s) => remplace(s, "return ad && ad.id != null && ids.some((x) => String(x) === String(ad.id)) ? cleNum(arch + k) : k;", "return k;", 'extension-lbc') },
+  'extension-lbc': { ext: (s) => remplace(s, "return ad && ad.id != null && ids.some((x) => String(x) === String(ad.id)) ? (renum || cleNum(arch + k)) : k;", "return k;", 'extension-lbc') },
   // L'extension ne projette plus le marqueur (la clé vaudrait `undefined`, en silence).
   'extension-projection': { ext: (s) => remplace(s, "'vinted_pairs_lost', 'vrm_lbc_liens', 'vrm_numerotation'];", "'vinted_pairs_lost', 'vrm_lbc_liens'];", 'extension-projection') },
   // Réglages laisse choisir « B » (la lettre des anciens) pour les nouveaux numéros.
@@ -219,6 +224,33 @@ const MK = { version: 2, coupure: T, appliqueLe: '2026-10-10T08:00:00.000Z', arc
     dit(r4.aRetirerVinted.length === 0, 'une vieille commande eBay « VRM-22 » ne dit pas de retirer la NOUVELLE 22 de Vinted', JSON.stringify(r4.aRetirerVinted.map((d) => d.numero)));
   });
 
+  console.log('\n5 bis. UN NUMÉRO PROVISOIRE (« les 553+ ») DÉSIGNE SA PAIRE RENUMÉROTÉE (11 octobre)');
+  await essaie('renum', () => {
+    // La N°553 du 10 octobre : numérotée APRÈS la coupure (provisoire), publiée
+    // sur eBay « VRM-553 » le soir même, renumérotée « 1 » par la conversion.
+    const MK2 = { ...MK, ebayAnnonces: [...MK.ebayAnnonces, '110000000553'], lbcAnnonces: [...MK.lbcAnnonces, '2900000553'] };
+    MARQUEUR = MK2;
+    dit(R.numEbayLu('VRM-553', '110000000553') === '1', 'SKU « VRM-553 » (provisoire, renuméroté 553 → 1) ⇒ la paire 1, pas « B553 »', R.numEbayLu('VRM-553', '110000000553'));
+    dit(R.numEbayLu('VRM-22', '110000000001') === 'B22', 'un ANCIEN numéro (absent de la carte) reste B22');
+    dit(R.numEbayLu('VRM-553', '110000000999') === '553', 'une annonce publiée APRÈS la conversion suit la nouvelle série');
+    const numeros = { 8100000001: { numero: '1' }, 8100000553: { numero: '553' } };
+    const annonces = [{ itemId: '110000000553', sku: 'VRM-553', title: 'Autry reelwind beige 36' }];
+    const r1 = R.doublesVenteEbay({ annonces, commandes: [], numeros, enLigne: new Set(), vendusVinted: new Set(['8100000001']), programmees: [] });
+    dit(r1.aRetirerEbay.length === 1 && r1.aRetirerEbay[0].numero === '1', 'la paire renumérotée 1, prouvée vendue ⇒ son annonce eBay « VRM-553 » est à retirer', JSON.stringify(r1.aRetirerEbay.map((d) => d.numero)));
+    dit(R.skuEbayDe(r1.aRetirerEbay[0] && r1.aRetirerEbay[0].numero) === 'VRM-1', 'et le retrait automatique envoie « VRM-1 » (le serveur relit « VRM-553 » et le traduit pareil)');
+    const r2 = R.doublesVenteEbay({ annonces, commandes: [], numeros, enLigne: new Set(), vendusVinted: new Set(['8100000553']), programmees: [] });
+    dit(r2.aRetirerEbay.length === 0, 'l\'autre sens : la FUTURE 553 de la nouvelle série vendue ne fait PAS retirer l\'annonce de la paire 1', JSON.stringify(r2.aRetirerEbay.map((d) => d.numero)));
+    const ad = { id: '2900000553', ref: '553', subject: 'Autry n553' };
+    dit(JSON.stringify(R.clesAnnonceLbc(ad, {})) === '["1"]', 'Leboncoin : la réf. « 553 » d\'une annonce d\'avant la conversion ⇒ 1', JSON.stringify(R.clesAnnonceLbc(ad, {})));
+    const ctxE = {}; vm.createContext(ctxE);
+    vm.runInContext(['cleNum', 'RE_VRM', 'refVRMDe', 'numeroLbcLu', 'adRefKeys'].map((n) => extraire(EXT, n)).join('\n') + '\n;this.E = { adRefKeys };', ctxE);
+    const e = JSON.stringify(ctxE.E.adRefKeys(ad, {}, MK2)), a = JSON.stringify(R.clesAnnonceLbc(ad, {}));
+    dit(e === a, 'l\'extension (file Leboncoin) lit la même chose que l\'app (§11)', e === a ? '' : `${e} ≠ ${a}`);
+    MARQUEUR = { ...MK2, renum: { 553: '<script>' } };
+    dit(R.numEbayLu('VRM-553', '110000000553') === 'B553', 'une valeur de carte de forme inconnue ne se lit pas (la nouvelle série est en chiffres)', R.numEbayLu('VRM-553', '110000000553'));
+    MARQUEUR = MK;
+  });
+
   console.log('\n6. LE N° LU DANS UN EMAIL (app)');
   await essaie('email app', () => {
     MARQUEUR = MK;
@@ -249,6 +281,14 @@ const MK = { version: 2, coupure: T, appliqueLe: '2026-10-10T08:00:00.000Z', arc
       if (L.numeroExterne(k, id, 'ebayAnnonces', d, MK) !== R.numeroExterne(k, id, 'ebayAnnonces', d)) { dit(false, 'numeroExterne : serveur et app divergent', `${k}/${id}`); return; }
     }
     dit(true, 'numeroExterne : serveur et app rendent la même lecture (§11)');
+    // (11 octobre) Le numéro PROVISOIRE : le serveur relit « VRM-553 » chez eBay
+    // avant un retrait automatique — il doit le lire comme l'app (« 1 »), sinon
+    // 409 sku-change et le retrait n'a jamais lieu.
+    const MK2 = { ...MK, ebayAnnonces: [...MK.ebayAnnonces, '110000000553'] };
+    MARQUEUR = MK2;
+    const s553 = L.numeroExterne('553', '110000000553', 'ebayAnnonces', null, MK2), a553 = R.numeroExterne('553', '110000000553', 'ebayAnnonces', null);
+    dit(s553 === '1' && s553 === a553, 'numeroExterne : un numéro provisoire se lit « 1 » au serveur ET dans l\'app', `serveur=${s553} · app=${a553}`);
+    MARQUEUR = MK;
   });
 
   await essaie('route email', async () => {

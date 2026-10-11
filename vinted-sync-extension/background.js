@@ -6381,7 +6381,12 @@ function numeroLbcLu(k, ad, mk) {
   const arch = mk && typeof mk === 'object' && !mk.annule && /^[A-Z]{1,3}$/.test(String(mk.archive || '')) ? String(mk.archive) : '';
   if (!k || !arch || !/^\d+$/.test(k)) return k;
   const ids = Array.isArray(mk.lbcAnnonces) ? mk.lbcAnnonces : [];
-  return ad && ad.id != null && ids.some((x) => String(x) === String(ad.id)) ? cleNum(arch + k) : k;
+  // 5.167 : un numéro PROVISOIRE (donné après la coupure, avant la conversion)
+  // désigne la paire sous son NOUVEAU numéro (`renum`), jamais une B… (§11,
+  // la même règle que `numeroExterne` dans l'app et le serveur).
+  const r = mk.renum && typeof mk.renum === 'object' && !Array.isArray(mk.renum) && typeof mk.renum[k] === 'string' ? cleNum(mk.renum[k]) : '';
+  const renum = /^\d{1,6}$/.test(r) ? r : '';   // la nouvelle série est en chiffres
+  return ad && ad.id != null && ids.some((x) => String(x) === String(ad.id)) ? (renum || cleNum(arch + k)) : k;
 }
 function adRefKeys(ad, liens, mk) {
   const keys = [];

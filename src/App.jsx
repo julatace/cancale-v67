@@ -31713,6 +31713,14 @@ const skuEbayDe = (numero) => { const c = cleNum(numero); return c && NUM_OK.tes
 // coupure parle aussi de l'ancienne série. Sans ça, la vente Vinted de la
 // nouvelle 230 faisait retirer d'eBay l'annonce de l'ancienne 230.
 // Par l'identifiant ou la date, jamais par le titre (§5).
+// ⚠️⚠️ (11 octobre) ET UN NUMÉRO PROVISOIRE N'EST PAS UN ANCIEN NUMÉRO. Les
+// numéros donnés APRÈS la coupure mais AVANT la conversion (« les 553+ ») sont
+// renumérotés par elle (`renum` : 553 → 1…). Une annonce eBay qui portait
+// « VRM-553 » (la N°553 vendue le 10 octobre, publiée le soir même) désigne donc
+// la paire sous son NOUVEAU numéro — pas « B553 », qui ne désigne rien (553
+// n'a jamais été un ancien numéro), ni la future 553 de la nouvelle série (une
+// autre paire, retirée d'eBay À TORT le jour où elle se vend). Même règle côté
+// serveur (`api/_lib/numerotation.js`) et extension (`numeroLbcLu`), §11.
 const numeroExterne = (k, id, liste, dateMs) => {
   const arch = archiveNumeros();
   if (!k || !arch || !/^\d+$/.test(k)) return k;
@@ -31720,7 +31728,9 @@ const numeroExterne = (k, id, liste, dateMs) => {
   const ids = m && !m.annule && Array.isArray(m[liste]) ? m[liste] : [];
   const coupure = coupureNumerotation();
   const avant = dateMs != null && isFinite(dateMs) && coupure != null && dateMs < coupure;
-  return (id != null && ids.some((x) => String(x) === String(id))) || avant ? cleNum(arch + k) : k;
+  const r = m && m.renum && typeof m.renum === 'object' && !Array.isArray(m.renum) && typeof m.renum[k] === 'string' ? cleNum(m.renum[k]) : '';
+  const renum = /^\d{1,6}$/.test(r) ? r : '';   // la nouvelle série est en chiffres : autre chose ne se lit pas
+  return (id != null && ids.some((x) => String(x) === String(id))) || avant ? (renum || cleNum(arch + k)) : k;
 };
 // Le N° d'une annonce / ligne de commande eBay, lu avec son identifiant.
 const numEbayLu = (sku, itemId, dateMs) => numeroExterne(numDeSkuEbay(sku), itemId, 'ebayAnnonces', dateMs);

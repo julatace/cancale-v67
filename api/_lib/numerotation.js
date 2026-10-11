@@ -51,7 +51,12 @@ export function numeroExterne(k, id, liste, dateMs, mk) {
   const ids = Array.isArray(mk[liste]) ? mk[liste] : [];
   const coupure = Date.parse(mk.coupure || '');
   const avant = dateMs != null && isFinite(dateMs) && isFinite(coupure) && dateMs < coupure;
-  return (id != null && ids.some((x) => String(x) === String(id))) || avant ? cleNum(arch + c) : c;
+  // (11 octobre) Un numéro PROVISOIRE (donné après la coupure, avant la
+  // conversion) désigne la paire sous son NOUVEAU numéro (`renum`), jamais une
+  // B… — la même règle que `numeroExterne` dans l'app (§11).
+  const r = mk.renum && typeof mk.renum === 'object' && !Array.isArray(mk.renum) && typeof mk.renum[c] === 'string' ? cleNum(mk.renum[c]) : '';
+  const renum = /^\d{1,6}$/.test(r) ? r : '';   // la nouvelle série est en chiffres
+  return (id != null && ids.some((x) => String(x) === String(id))) || avant ? (renum || cleNum(arch + c)) : c;
 }
 
 // Le N° tiré du TITRE d'un email (bordereau, vente, finalisation), jugé.
