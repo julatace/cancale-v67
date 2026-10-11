@@ -23,13 +23,16 @@
 //   4. l'AUTRE SENS : une seule extension dont le pont répond deux fois (même
 //      identifiant) ⇒ PAS « plusieurs », le bouton est actif et la commande part
 //      UNE fois ; un ancien pont qui s'est tu (orphelin) ⇒ pas « plusieurs » ;
-//   5. la version retenue est la plus HAUTE, pas la dernière arrivée.
+//   5. la version retenue est la plus HAUTE, pas la dernière arrivée ;
+//   6. (11 octobre) la session ne passe plus par la page : adressée à UNE
+//      extension (son identifiant, son nonce) — une copie ancienne qui écoute
+//      la page n'entend rien, et l'app ne lui prête jamais la sienne.
 // Ce qui est jugé : des `data-*` et ce que les ponts ont REÇU — pas une formulation.
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
 const DIST = path.join(__dirname, '..', '..', 'dist');
-const PORT = 5732;
+const PORT = 4793;
 
 const auj = Date.now();
 const iso = (h) => new Date(auj - h * 3600e3).toISOString();
@@ -79,6 +82,21 @@ const projette = (row, sel) => {
 const PONTS = ({ ponts, connecte, vrm }) => {
   window.__recus = [];
   window.__sessions = [];
+  window.__externes = [];
+  // `externally_connectable` (5.167) : la page peut ADRESSER un message à une
+  // extension par son identifiant ; seule celle-là le reçoit.
+  const adressables = ponts.filter((p) => p.adresse && p.id);
+  if (adressables.length) {
+    window.chrome = { runtime: { lastError: null, sendMessage(id, msg, cb) {
+      const p = adressables.find((x) => x.id === id);
+      window.__externes.push({ id, type: msg && msg.type, nonce: msg && msg.nonce || null, recu: !!p });
+      let r;
+      if (!p) r = undefined;
+      else if (msg.type === 'liaison') r = { ok: true, besoin: true, nonce: 'n'.repeat(32), raison: 'aucune' };
+      else if (msg.type === 'session') r = msg.nonce === 'n'.repeat(32) ? { ok: true, email: 'vendeur@exemple.test' } : { ok: false, code: 'nonce' };
+      setTimeout(() => cb && cb(r), 5);
+    } } };
+  }
   window.addEventListener('message', (e) => { const d = e.data; if (e.source === window && d && d.__vmr === 'session' && d.session) window.__sessions.push(1); });
   const post = (m) => window.postMessage(m, '*');
   ponts.forEach((p, i) => {
@@ -93,7 +111,7 @@ const PONTS = ({ ponts, connecte, vrm }) => {
       for (let k = 0; k < n; k++) {
         if (d.__vmr === 'ping') ready();
         if (k) continue;                     // le second pont d'une même extension relaie au MÊME service worker
-        if (d.__vmr === 'etat') post({ __vmr: 'etat:result', reqId: d.reqId, resp: { ok: true, version: p.version, vrm: vrm || { ok: true, connecte: true, email: '' }, vinted: { uid: connecte, login: 'compte_a' }, cmds: {} } });
+        if (d.__vmr === 'etat') post({ __vmr: 'etat:result', reqId: d.reqId, resp: Object.assign({ ok: true, version: p.version, vrm: vrm || { ok: true, connecte: true, email: '' }, vinted: { uid: connecte, login: 'compte_a' }, cmds: {} }, p.adresse ? { code: p.version, ext: p.id } : {}) });
         if (d.__vmr === 'cmd') { window.__recus.push(nom + ' cmd:' + d.cmd); post({ __vmr: 'cmd:result', reqId: d.reqId, resp: d.cmd === 'bordereau' ? { accepte: true, jobId: `bord:${d.uid}:${d.tx}`, etape: 'file' } : { accepte: true, etape: 'recent' } }); }
         if (d.__vmr === 'exec') { window.__recus.push(nom + ' exec:' + d.method + ' ' + d.endpoint); post({ __vmr: 'result', reqId: d.reqId, ok: true, status: 200, data: { conversation: { id: 402, messages: [] } } }); }
         if (d.__vmr === 'session' && d.session) window.__recus.push(nom + ' session');
@@ -140,7 +158,7 @@ async function rendre(b, { ponts, onglet = 'cat_ventes', tel = false, vrm = null
     raisons: [...document.querySelectorAll('[data-raison-bord]')].map((x) => ({ code: x.getAttribute('data-raison-bord'), txt: x.innerText })),
     recharger: document.querySelectorAll('[data-raison-bord] [data-recharger]').length,
     etat: (() => { const x = document.querySelector('[data-etat-actions]'); return x ? { niveau: x.getAttribute('data-etat-actions'), code: x.getAttribute('data-etat-code') } : null; })(),
-    recus: window.__recus || [], sessions: (window.__sessions || []).length,
+    recus: window.__recus || [], sessions: (window.__sessions || []).length, externes: window.__externes || [],
     sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth,
   }));
   const panneau = async () => {
@@ -234,6 +252,19 @@ async function rendre(b, { ponts, onglet = 'cat_ventes', tel = false, vrm = null
       const r = await rendre(b, { ponts: [{ version: '5.143.0', tu: true }, { version: '5.165.0', id: 'idA' }] });
       const v = await r.lire();
       dit(v.etat && v.etat.code !== 'plusieurs' && v.raisons.length === 0 && v.boutons[0] && v.boutons[0].etat === 'pret', 'un pont muet ne compte pas : une extension, actions possibles', JSON.stringify({ e: v.etat, r: v.raisons, b: v.boutons }));
+      await r.ctx.close();
+    });
+    console.log('── 7. (11 octobre) Une 5.167 + une copie ancienne muette : la session va à LA BONNE, adressée');
+    await essaie('7', async () => {
+      const A = 'abcdefghijklmnopabcdefghijklmnop';
+      const r = await rendre(b, { session: true, vrm: { ok: true, connecte: false, email: '' }, ponts: [{ version: '5.143.0', tu: true }, { version: '5.167.0', id: A, adresse: true }] });
+      await r.pg.waitForTimeout(1500);
+      const v = await r.lire();
+      const env = v.externes.filter((x) => x.type === 'session');
+      dit(v.etat && v.etat.code !== 'plusieurs', 'une copie muette ne compte pas : une seule extension', JSON.stringify(v.etat));
+      dit(env.length === 1 && env[0].id === A && env[0].recu && env[0].nonce === 'n'.repeat(32), 'la session part À CETTE extension (son identifiant, le nonce qu’elle a émis)', JSON.stringify(v.externes));
+      dit(v.externes.every((x) => x.id === A), 'et à aucune autre', JSON.stringify(v.externes));
+      dit(v.sessions === 0 && !v.recus.some((x) => / session/.test(x)), 'RIEN dans la page : la copie ancienne qui écoute la page n’entend rien (avant : elle adoptait la même famille de jetons)', JSON.stringify({ sessions: v.sessions, recus: v.recus }));
       await r.ctx.close();
     });
   } catch (e) { dit(false, 'le banc a tourné jusqu’au bout', String(e && e.message).slice(0, 200)); }

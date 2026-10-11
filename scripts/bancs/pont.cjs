@@ -31,11 +31,23 @@
 //     reçoit RIEN ;
 //   · L'INDICATEUR « Actions possibles / Lecture seule » de l'en-tête, dans
 //     chaque situation, avec le geste qui débloque.
+// Ajouté le 11 octobre (« l'extension est censée être allumée, elle n'est pas
+// allumée », « elle ne garde pas les connexions ») :
+//   · CODE PÉRIMÉ : le manifeste dit 5.167, le service worker exécute un code
+//     d'avant (⟳ jamais cliqué) — l'état sans `code`, une clé qui n'existe plus
+//     depuis la 5.159, ou le verdict du pont → « périmé », commandes coupées, le
+//     geste ⟳ ; et l'AUTRE SENS : le bon code n'est jamais dit périmé ;
+//   · « ACTIONS POSSIBLES · SAUF PUBLIER » quand publier est bloqué alors que le
+//     reste marche (deux voix contraires sur le même écran avant) ;
+//   · LA SESSION ADRESSÉE : plus rien n'est posté dans la page ; la session va
+//     à UNE extension (son identifiant, son nonce) ; une extension trop ancienne
+//     ne reçoit rien, et l'app ne promet pas « je réessaie ».
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
-const PORT = 4336;
+const PORT = 4791;
+const EXT_ID = 'abcdefghijklmnopabcdefghijklmnop';
 
 const auj = new Date();
 const vente = (id, titre, statut) => ({ transaction_id: id, title: titre, price: { amount: '60', currency_code: 'EUR' }, status: statut, date: new Date(auj.getTime() - 3600e3).toISOString() });
@@ -81,23 +93,50 @@ const projette = (row, sel) => {
 // dont l'extension a été rechargée) · orphelin+ok (l'orphelin ET un pont
 // vivant) · lent (répond au bout de 4 s) · ok ; `connecte` : uid du cookie
 // Vinted ; `vrm` : ce que l'extension dit de sa session VRM.
-const PONT = ({ mode, connecte, vrm, version = '5.143.0', cmdLente = 0 }) => {
-  window.__sessions = [];                               // ce que l'app envoie à l'extension
+const PONT = ({ mode, connecte, vrm, version = '5.143.0', cmdLente = 0, code = undefined, offresAutoLocal = false, verdict = null, extId, besoin = null }) => {
+  window.__sessions = [];                               // ce que l'app poste dans la page (TOUTE extension l'entend)
+  window.__externes = [];                               // ce que l'app ADRESSE à une extension (externally_connectable)
+  window.__cmds = [];
   window.addEventListener('message', (e) => { const d = e.data; if (e.source === window && d && d.__vmr === 'session') window.__sessions.push(d.session || null); });
   if (mode === 'absente') return;
+  const vn = (v) => String(v || '').split('.').map((x) => parseInt(x, 10) || 0);
+  const auMoins = (v, r) => { const a = vn(v), b = vn(r); for (let i = 0; i < 3; i++) if (a[i] !== b[i]) return a[i] > b[i]; return true; };
+  const neuf = auMoins(version, '5.167.0');
+  // `externally_connectable` : seule une extension ≥ 5.167 l'ouvre à la page.
+  if (neuf) {
+    window.chrome = { runtime: { lastError: null, sendMessage(id, msg, cb) {
+      window.__externes.push({ id, type: msg && msg.type, nonce: msg && msg.nonce, refresh: msg && msg.session ? msg.session.refresh_token : null, raison: msg && msg.raison, force: !!(msg && msg.force) });
+      let r = { ok: false };
+      if (id !== extId) r = undefined;                  // une autre extension : personne ne répond
+      else if (msg.type === 'liaison') {
+        const b = besoin != null ? besoin : !(vrm && vrm.connecte === true) || msg.raison === 'separer' || msg.force;
+        r = b ? { ok: true, besoin: true, nonce: 'n'.repeat(32), raison: 'test' } : { ok: true, besoin: false };
+      } else if (msg.type === 'session') r = msg.nonce === 'n'.repeat(32) ? { ok: true, email: 'vendeur@exemple.test' } : { ok: false, code: 'nonce' };
+      else if (msg.type === 'deconnexion') r = { ok: true };
+      setTimeout(() => cb && cb(r), 5);
+    } } };
+  }
   const post = (m) => window.postMessage(m, '*');
   const orphelin = mode === 'orphelin' || mode === 'orphelin+ok';
   window.addEventListener('message', (e) => {
     const d = e.data; if (e.source !== window || !d || typeof d !== 'object') return;
-    if (d.__vmr === 'ping') post({ __vmr: 'ready', version });
+    if (d.__vmr === 'ping') post({ __vmr: 'ready', version, id: neuf ? extId : undefined });
     // L'ancien bridge.js (5.159 et avant) quand il est orphelin : `repondre(null)`.
     if (orphelin && (d.__vmr === 'etat' || d.__vmr === 'cmd') && d.reqId) post({ __vmr: d.__vmr + ':result', reqId: d.reqId, resp: null });
+    // Un pont ≥ 5.167 (lu depuis le disque) devant un service worker qui ne
+    // connaît même pas « état » : il le dit (`perime`), réponse vide.
+    if (verdict && d.__vmr === 'etat' && d.reqId) { post({ __vmr: 'etat:result', reqId: d.reqId, resp: null, perime: verdict }); return; }
     if (mode === 'muette' || mode === 'orphelin') return;  // plus rien derrière
     // Un pont 5.128 ne connaît pas « état » (arrivé en 5.129) : il ne répond rien.
     if (d.__vmr === 'etat' && version < '5.129.0' && version.split('.')[1].length === 3) return;
     const delai = mode === 'lent' ? 4000 : mode === 'orphelin+ok' ? 300 : 0;
-    if (d.__vmr === 'etat') setTimeout(() => post({ __vmr: 'etat:result', reqId: d.reqId, resp: { ok: true, version, vrm: vrm || { ok: true, connecte: true, email: '' },
-      vinted: connecte ? { uid: connecte, login: connecte === '111' ? 'compte_a' : 'compte_b' } : null, cmds: {} } }), delai);
+    if (d.__vmr === 'etat') setTimeout(() => post({ __vmr: 'etat:result', reqId: d.reqId, resp: Object.assign({ ok: true, version, vrm: vrm || { ok: true, connecte: true, email: '' },
+      vinted: connecte ? { uid: connecte, login: connecte === '111' ? 'compte_a' : 'compte_b' } : null, cmds: {} },
+      // Depuis la 5.167, l'état porte la version du CODE et l'identifiant de
+      // l'extension. `code: null` simule un code d'avant sous un manifeste neuf.
+      neuf && code !== null ? { code: code || version, ext: extId } : {},
+      offresAutoLocal ? { offresAutoLocal: false } : {}) }), delai);
+    if (d.__vmr === 'cmd') window.__cmds.push(d.cmd);
     if (d.__vmr === 'cmd' && d.cmd === 'ventes') post({ __vmr: 'cmd:result', reqId: d.reqId, resp: { accepte: true, etape: 'recent' } });
     if (d.__vmr === 'cmd' && d.cmd === 'bordereau') {
       const jobId = `bord:${d.uid}:${d.tx}`;
@@ -118,7 +157,7 @@ const SESSION = { access_token: 'jeton-de-l-app', refresh_token: 'jeton-de-renou
 const FOURCHE = { access_token: 'jeton-de-l-extension', refresh_token: 'renouvellement-propre-a-l-extension', expires_at: Date.now() + 3600e3,
   user_id: SESSION.user.id, email: SESSION.user.email };
 
-async function rendre(b, { mode, connecte, tel = false, vrm = null, session = false, routeFourche = 200, attente = null, diagKO = false, version = '5.143.0', cmdLente = 0, separee = false, largeur = null }) {
+async function rendre(b, { mode, connecte, tel = false, vrm = null, session = false, routeFourche = 200, attente = null, diagKO = false, version = '5.143.0', cmdLente = 0, separee = false, largeur = null, code = undefined, offresAutoLocal = false, verdict = null, besoin = null }) {
   const vp = tel ? { width: largeur || 390, height: 844 } : { width: 1512, height: 950 };
   const ctx = await b.newContext({ viewport: vp, ...(tel ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
@@ -126,7 +165,7 @@ async function rendre(b, { mode, connecte, tel = false, vrm = null, session = fa
   let labelPret = false; const cmds = [];
   await pg.exposeFunction('__cmdRecu', (tx) => { cmds.push(tx); setTimeout(() => { labelPret = true; }, 600); });
   await pg.addInitScript((sess) => { try { if (sess) localStorage.setItem('vrm_session', JSON.stringify(sess)); else localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} }, session ? SESSION : null);
-  await pg.addInitScript(PONT, { mode, connecte, vrm, version, cmdLente });
+  await pg.addInitScript(PONT, { mode, connecte, vrm, version, cmdLente, code, offresAutoLocal, verdict, extId: EXT_ID, besoin });
   // L'appareil a-t-il déjà séparé la session de l'extension (une fois par compte) ?
   if (separee) await pg.addInitScript((uid) => { try { localStorage.setItem('vrm_ext_separee_' + uid, '1'); } catch (_) {} }, SESSION.user.id);
   const fourches = [];
@@ -168,6 +207,9 @@ async function rendre(b, { mode, connecte, tel = false, vrm = null, session = fa
     surVinted: [...document.querySelectorAll('[data-bord-vinted]')].map((a) => a.getAttribute('href')),
     etat: (() => { const x = document.querySelector('[data-etat-actions]'); return x ? { niveau: x.getAttribute('data-etat-actions'), code: x.getAttribute('data-etat-code'), txt: x.innerText } : null; })(),
     sessions: window.__sessions || [],
+    externes: window.__externes || [],
+    cmdsEnvoyees: window.__cmds || [],
+    exception: (() => { const x = document.querySelector('[data-etat-actions]'); return x ? x.getAttribute('data-etat-exception') : null; })(),
     sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth,
   }));
   // Ouvre le panneau de l'indicateur et renvoie ce qu'il dit.
@@ -263,24 +305,60 @@ async function rendre(b, { mode, connecte, tel = false, vrm = null, session = fa
       dit(p && p.geste === 'vinted', 'le geste : ouvrir vinted.fr et s’y connecter', JSON.stringify(p));
       await r.ctx.close(); }
 
-    console.log('── SESSION : l’extension n’en a pas → elle reçoit LA SIENNE, jamais celle de l’app');
-    { const r = await rendre(b, { mode: 'ok', connecte: '111', session: true, vrm: { ok: true, connecte: false, email: '' }, attente: 5000 }); const v = await r.lire();
-      const propres = v.sessions.filter((x) => x && x.refresh_token === FOURCHE.refresh_token);
-      const siennes = v.sessions.filter((x) => x && x.refresh_token === SESSION.refresh_token);
-      dit(r.fourches.length >= 1 && r.fourches.every((f) => f.methode === 'POST' && /jeton-de-l-app/.test(f.auth)), 'l’app demande au serveur une session pour l’extension (POST, avec SA connexion)', JSON.stringify(r.fourches));
-      dit(propres.length === 1, 'l’extension reçoit UNE session, la sienne', JSON.stringify(v.sessions.map((x) => x && x.refresh_token)));
-      dit(siennes.length === 0, 'et JAMAIS le jeton de renouvellement de l’app (même famille → jetons qui s’annulent)', JSON.stringify(v.sessions.map((x) => x && x.refresh_token)));
+    console.log('── SESSION (11 octobre) : ADRESSÉE à UNE extension, plus rien dans la page');
+    { const r = await rendre(b, { mode: 'ok', connecte: '111', session: true, version: '5.167.0', vrm: { ok: true, connecte: false, email: '' }, attente: 5000 }); const v = await r.lire();
+      const liaisons = v.externes.filter((x) => x.type === 'liaison'), envois = v.externes.filter((x) => x.type === 'session');
+      dit(liaisons.length >= 1 && liaisons.every((x) => x.id === EXT_ID), 'l’app DEMANDE d’abord à CETTE extension (son identifiant) si elle a besoin d’une session', JSON.stringify(v.externes));
+      dit(r.fourches.length === 1 && r.fourches.every((f) => f.methode === 'POST' && /jeton-de-l-app/.test(f.auth)), 'puis fait fabriquer SA session par le serveur (POST, avec la connexion de l’app)', JSON.stringify(r.fourches));
+      dit(envois.length === 1 && envois[0].id === EXT_ID && envois[0].nonce === 'n'.repeat(32) && envois[0].refresh === FOURCHE.refresh_token, 'la session part à CETTE extension, avec le nonce qu’elle a émis — la sienne, jamais celle de l’app', JSON.stringify(envois));
+      dit(v.sessions.length === 0, 'et RIEN n’est posté dans la page (une copie ancienne à côté l’adoptait : même famille de jetons, révoquée)', JSON.stringify(v.sessions.map((x) => x && x.refresh_token)));
       await r.ctx.close(); }
-    { const r = await rendre(b, { mode: 'ok', connecte: '111', session: true, separee: true, vrm: { ok: true, connecte: true, email: SESSION.user.email, user_id: SESSION.user.id }, attente: 5000 }); const v = await r.lire();
-      dit(r.fourches.length === 0 && v.sessions.length === 0, 'autre sens : une extension déjà connectée au bon compte (et déjà séparée) ne reçoit RIEN', `demandes : ${r.fourches.length} · sessions envoyées : ${v.sessions.length}`);
+    { const r = await rendre(b, { mode: 'ok', connecte: '111', session: true, separee: true, version: '5.167.0', vrm: { ok: true, connecte: true, email: SESSION.user.email, user_id: SESSION.user.id }, attente: 5000 }); const v = await r.lire();
+      dit(r.fourches.length === 0 && v.externes.filter((x) => x.type === 'session').length === 0 && v.sessions.length === 0, 'autre sens : une extension déjà connectée au bon compte (et déjà séparée) ne reçoit RIEN', `demandes : ${r.fourches.length} · envois : ${JSON.stringify(v.externes)} · page : ${v.sessions.length}`);
       await r.ctx.close(); }
-    // Une extension qui a encore la session donnée par l'app avant le 5 octobre
+    // Une extension qui a encore la session donnée par l'app avant le 6 octobre
     // partage sa famille de jetons : on la sépare UNE fois, d'avance.
-    { const r = await rendre(b, { mode: 'ok', connecte: '111', session: true, vrm: { ok: true, connecte: true, email: SESSION.user.email, user_id: SESSION.user.id }, attente: 5000 }); const v = await r.lire();
-      dit(v.sessions.length === 1 && v.sessions[0] && v.sessions[0].refresh_token === FOURCHE.refresh_token, 'jamais séparée : elle reçoit UNE session à elle (séparation d’avance), pas la nôtre', JSON.stringify(v.sessions.map((x) => x && x.refresh_token)));
+    { const r = await rendre(b, { mode: 'ok', connecte: '111', session: true, version: '5.167.0', vrm: { ok: true, connecte: true, email: SESSION.user.email, user_id: SESSION.user.id }, attente: 5000 }); const v = await r.lire();
+      const envois = v.externes.filter((x) => x.type === 'session');
+      dit(v.externes.some((x) => x.type === 'liaison' && x.raison === 'separer') && envois.length === 1 && envois[0].refresh === FOURCHE.refresh_token && v.sessions.length === 0, 'jamais séparée : elle reçoit UNE session à elle (séparation d’avance), adressée', JSON.stringify(v.externes));
       await r.ctx.close(); }
-    { const r = await rendre(b, { mode: 'ok', connecte: '111', session: true, routeFourche: 404, vrm: { ok: true, connecte: false, expiree: true, email: SESSION.user.email }, attente: 5000 }); const v = await r.lire();
-      dit(v.sessions.filter((x) => x && x.refresh_token === SESSION.refresh_token).length === 0, 'serveur muet + session MORTE : on ne lui redonne pas la nôtre (c’est le cas qui s’entre-tue)', JSON.stringify(v.sessions.map((x) => x && x.refresh_token)));
+    { const r = await rendre(b, { mode: 'ok', connecte: '111', session: true, routeFourche: 404, version: '5.167.0', vrm: { ok: true, connecte: false, expiree: true, email: SESSION.user.email }, attente: 5000 }); const v = await r.lire();
+      dit(v.sessions.length === 0 && v.externes.filter((x) => x.type === 'session').length === 0, 'serveur muet + session MORTE : on ne lui redonne JAMAIS la nôtre, ni par la page, ni adressée', JSON.stringify({ page: v.sessions.map((x) => x && x.refresh_token), adressees: v.externes }));
+      const p = await r.panneau();
+      dit(p && /mot de passe VRM|Se connecter avec VRM/.test(p.txt) && !/réessaie/.test(p.txt), 'et le panneau dit le vrai geste (pas « je réessaie » sans fin)', JSON.stringify(p && p.txt).slice(0, 260));
+      await r.ctx.close(); }
+    { const r = await rendre(b, { mode: 'ok', connecte: '111', session: true, version: '5.164.0', vrm: { ok: true, connecte: false, email: '' }, attente: 5000 }); const v = await r.lire();
+      dit(v.sessions.length === 0 && r.fourches.length === 0, 'une extension 5.164 (pas de canal adressé) : rien dans la page, aucune session fabriquée pour rien', `page : ${v.sessions.length} · demandes : ${r.fourches.length}`);
+      const p = await r.panneau();
+      dit(p && /mets-la à jour|Mettre à jour/.test(p.txt) && /mot de passe VRM/.test(p.txt) && !/Je réessaie/.test(p.txt), 'et l’app le DIT : la mettre à jour, ou s’y connecter au mot de passe VRM — jamais « je réessaie »', JSON.stringify(p && p.txt).slice(0, 300));
+      await r.ctx.close(); }
+    { const r = await rendre(b, { mode: 'ok', connecte: '111', session: true, version: '5.128.0', attente: 6000 }); const v = await r.lire();
+      dit(v.sessions.length === 0, 'une extension < 5.129 : l’app ne lui prête plus SA session (même famille → l’app perdait la sienne 12 s plus tard)', JSON.stringify(v.sessions.map((x) => x && x.refresh_token)));
+      await r.ctx.close(); }
+
+    console.log('── CODE PÉRIMÉ (manifeste 5.167, service worker d’avant)');
+    for (const [nom, opts] of [['état SANS code', { version: '5.167.0', code: null }], ['clé disparue depuis la 5.159 (offresAutoLocal)', { version: '5.164.0', offresAutoLocal: true }], ['verdict du pont', { version: '5.167.0', verdict: { code: null, attendu: '5.167.0', raison: 'sans-etat' } }]]) {
+      const r = await rendre(b, Object.assign({ mode: 'ok', connecte: '111', attente: 4500 }, opts)); const v = await r.lire();
+      dit(v.etat && v.etat.code === 'perime' && v.etat.niveau === 'lecture', `${nom} : l’en-tête dit « périmé » (lecture seule), jamais « Actions possibles »`, JSON.stringify(v.etat));
+      dit(v.boutons.length && v.boutons.every((x) => x.etat === 'grise') && v.raisons.length === 1 && /^perime/.test(v.raisons[0]) && /⟳/.test(v.raisons[0]), `${nom} : les boutons sont grisés, la raison dite UNE fois, avec ⟳`, JSON.stringify(v.raisons));
+      const p = await r.panneau();
+      dit(p && p.geste === 'recharger-extension' && /chrome:\/\/extensions/.test(p.txt), `${nom} : le geste est ⟳ dans chrome://extensions (recharger la page ne change rien)`, JSON.stringify(p && { geste: p.geste }));
+      await r.pg.keyboard.press('Escape').catch(() => {});
+      await r.pg.click('[data-bouton-bord] button').catch(() => {}); await r.pg.waitForTimeout(400);
+      const apres = await r.lire();
+      dit(!apres.cmdsEnvoyees.includes('bordereau'), `${nom} : un clic n’envoie AUCUNE commande au code périmé (il n’a pas les garde-fous d’aujourd’hui)`, JSON.stringify(apres.cmdsEnvoyees));
+      await r.ctx.close();
+    }
+    { const r = await rendre(b, { mode: 'ok', connecte: '111', version: '5.167.0', code: '5.167.0', attente: 4500 }); const v = await r.lire();
+      dit(v.etat && v.etat.code !== 'perime' && v.etat.niveau === 'ok', 'autre sens : le code du manifeste n’est jamais dit périmé', JSON.stringify(v.etat));
+      dit(!v.exception, 'et une extension à jour n’a pas d’exception « sauf publier »', JSON.stringify(v.exception));
+      await r.ctx.close(); }
+
+    console.log('── « ACTIONS POSSIBLES » AU-DESSUS D’UN « PUBLIER » GRISÉ');
+    { const r = await rendre(b, { mode: 'ok', connecte: '111', version: '5.143.0', attente: 4000 }); const v = await r.lire();
+      dit(v.etat && v.etat.niveau === 'ok' && v.exception === 'publication' && /sauf publier/.test(v.etat.txt), 'bordereaux possibles, publier non : l’en-tête dit « Actions possibles · sauf publier »', JSON.stringify({ etat: v.etat, exception: v.exception }));
+      const p = await r.panneau();
+      dit(p && /Sauf publier sur Leboncoin/.test(p.txt) && /mets l'extension à jour|Mets l'extension à jour/i.test(p.txt), 'et le panneau dit pourquoi (la même raison que le bouton)', JSON.stringify(p && p.txt).slice(0, 260));
       await r.ctx.close(); }
 
     console.log('── EXTENSION 5.128 (ne connaît pas « état ») : « à mettre à jour », jamais « recharge la page »');

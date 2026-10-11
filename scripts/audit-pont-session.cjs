@@ -121,7 +121,12 @@ function faireBg({ store = {}, jeton = () => rep(200, JETON_NEUF), sonde = () =>
   });
   const espion = (evt) => { j.notifs.push(JSON.parse(JSON.stringify(evt))); };
   try { ctx.notifierApp = async (evt) => espion(evt); } catch (_) {}
-  return { ctx, j, store, pont, ext };
+  // Un message d'un script de contenu (lbc.js…), avec SON onglet.
+  const brut = (msg, sender) => new Promise((res) => {
+    const r = ecouteur(msg, sender || {}, res);
+    if (r !== true) setTimeout(() => res(undefined), 5);
+  });
+  return { ctx, j, store, pont, ext, brut };
 }
 
 // ── Le pont dans de vrais mondes isolés ────────────────────────────────────
@@ -468,6 +473,39 @@ const quiRepond = (r, t) => (t.vivante(r) ? String(t.vivante(r)) : 'vide/erreur'
     dit(b2.j.alarmesCreees.includes('vrm-session'), 'm · autre sens : absentes, elles sont créées', JSON.stringify(b2.j.alarmesCreees));
   });
 
+  // ══ h2. « JE NE PEUX PAS POSTER SUR LEBONCOIN » : LE DÉPÔT QUI N'ABOUTIT PAS ══
+  //    Reproduit 2 sur 2 le 11 octobre : un dépôt fermé (ou arrêté) bloquait la
+  //    paire 15 minutes, et le clic suivant était refusé sans rien montrer.
+  await essaie('h2 · dépôt abandonné', async () => {
+    const b = faireBg({ store: { vrmSession: session(3600e3), vrmCloisonne: true } });
+    b.ctx.completerPhotosSiManque = async () => {};
+    b.ctx.buildLbcData = async () => ({ stats: {}, queue: [{ id: '7700112233', numero: '12' }] });
+    const ouverts = new Set(); let nTab = 10; const crees = [], devant = [], reprises = [];
+    b.ctx.chrome.tabs.create = async (o) => { const id = ++nTab; ouverts.add(id); crees.push(o && o.url); return { id, windowId: 1 }; };
+    b.ctx.chrome.tabs.get = async (id) => { if (!ouverts.has(id)) throw new Error('No tab with id: ' + id); return { id, windowId: 1 }; };
+    b.ctx.chrome.tabs.update = async (id, o) => { if (o && o.active) devant.push(id); return { id }; };
+    b.ctx.chrome.tabs.sendMessage = (id, m, cb) => { if (m && m.__vrmLbc === 'reprendre') reprises.push(id); if (typeof cb === 'function') cb(); };
+    const cmds = async () => (await b.ctx.lireCmds())['lbc:7700112233'] || {};
+    const r1 = await b.ctx.publierDepuisApp({ cmd: 'lbcPublier', id: '7700112233' });
+    const tab1 = (await cmds()).tabId;
+    dit(r1 && r1.accepte && tab1 === 11 && crees.length === 1, 'h2 · publier : un onglet de dépôt, RETENU (son identifiant est noté)', JSON.stringify({ r1, tab1 }));
+    const r2 = await b.ctx.publierDepuisApp({ cmd: 'lbcPublier', id: '7700112233' });
+    dit(r2 && r2.accepte === false && r2.ouvert === true && /devant/.test(r2.raison || '') && devant.includes(11) && crees.length === 1, "h2 · re-cliquer pendant le dépôt : l'onglet est REMIS DEVANT, aucun second dépôt, et la raison est dite", JSON.stringify({ r2, devant, crees: crees.length }));
+    ouverts.delete(11); await b.ctx.depotOngletFerme(11);
+    const c = await cmds();
+    dit(c.etape === 'abandonne' && c.raison === 'onglet-ferme' && !b.store.vrmPendingAd, "h2 · l'onglet du dépôt fermé : « abandonné », et la paire n'attend plus dans une page de dépôt", JSON.stringify({ etape: c.etape, raison: c.raison, pending: !!b.store.vrmPendingAd }));
+    dit(b.j.notifs.some((n) => n.type === 'cmd' && n.jobId === 'lbc:7700112233' && n.etape === 'abandonne'), "h2 · et l'app le sait tout de suite (« Le dépôt n'a pas abouti — Réessayer »)", JSON.stringify(b.j.notifs.map((n) => n.etape)));
+    const r3 = await b.ctx.publierDepuisApp({ cmd: 'lbcPublier', id: '7700112233' });
+    dit(r3 && r3.accepte && crees.length === 2, '« Réessayer » : un nouveau dépôt part tout de suite (avant : refusé 15 minutes, sans un mot)', JSON.stringify({ r3, crees: crees.length }));
+    // lbc.js arrête son remplissage (90 s) : l'onglet reste ouvert.
+    const tab2 = (await cmds()).tabId;
+    await b.brut({ from: 'cancale-lbc', action: 'depotArrete', id: '7700112233', raison: 'arret' }, { tab: { id: tab2 } });
+    const c2 = await cmds();
+    dit(c2.etape === 'abandonne' && c2.raison === 'arret', '« arrêté » par la page de dépôt : abandonné aussi, avec sa raison', JSON.stringify(c2));
+    const r4 = await b.ctx.publierDepuisApp({ cmd: 'lbcPublier', id: '7700112233' });
+    dit(r4 && r4.accepte && r4.repris && reprises.includes(tab2) && crees.length === 2, "h2 · « Réessayer » sur un onglet encore ouvert : il REPREND dans cet onglet (pas un second dépôt — Leboncoin publierait deux fois)", JSON.stringify({ r4, reprises, crees: crees.length }));
+  });
+
   // ══ f. LE PONT : UN ORPHELIN SE TAIT, UN DOUBLON NE RELAIE PAS DEUX FOIS ══
   const pw = chargerPlaywright();
   if (!pw) { dit(false, 'f · Playwright introuvable — le contrôle du pont ne peut pas tourner'); }
@@ -541,6 +579,11 @@ const quiRepond = (r, t) => (t.vivante(r) ? String(t.vivante(r)) : 'vide/erreur'
         const ret = await P.demander(TYPES[6].msg);
         const appels = (await P.dans(w, 'globalThis.__appels')).filter((a) => a === 'exec');
         dit(appels.length === 1 && ret.length === 1, 'f · pont vivant injecté DEUX fois : un « exec » est relayé UNE fois (pas deux réponses à un acheteur)', `${appels.length} relais · ${ret.length} réponse(s)`);
+        // ⚠️ Le pont s'annonce aussi tout seul à 0,8 s et 2,5 s : sans attendre la
+        //    fin de ces annonces, une d'elles tombait dans la fenêtre du « ping »
+        //    et le contrôle comptait 2 « ready » (rouge une fois sur trois, sur un
+        //    code intact). On compte la réponse au PING, une fois le calme revenu.
+        await attendre(2700);
         const r = await P.readies();
         dit(r.length === 1, 'f · et il ne s’annonce qu’une fois', `${r.length} « ready »`);
         await P.ctx.close();
