@@ -39,6 +39,13 @@ comptabilité. Il n'est **pas développeur** et pilote tout par des sessions Cla
 6. **L'extension se livre en zip qui se dézippe en UN dossier.**
 7. **Il n'est pas développeur** : une alerte qui ne dit pas quoi faire ne sert à
    rien ; un chiffre qu'on ne peut pas vérifier est invendable.
+8. **Sur eBay, c'est l'acheteur qui paie le bordereau** (11 octobre, mot pour
+   mot : « pour ebay on est d'accord c'est l'acheteur qui paye le bordereau »).
+   Son compte est en livraison gérée par eBay : l'acheteur paie le port à eBay,
+   eBay fournit l'étiquette prépayée. VRM n'achète **jamais** une étiquette avec
+   son argent, ne pose **jamais** « livraison gratuite », et le port n'est ni une
+   recette ni une charge dans sa compta. L'achat d'étiquettes chez un agrégateur
+   (chantier K14 de l'agent eBay) est **gelé** pour lui.
 
 ---
 
@@ -7308,6 +7315,170 @@ visite », le défaut le plus coûteux du projet, refait par une collision de nu
   la relecture de la page 1 suppose ça) ; le script iOS du widget (absent du dépôt :
   `online: null` doit y afficher un tiret).
 
+### ⚠️⚠️ « JE N'AI PLUS LES PHOTOS DE MES PAIRES » — L'AFFICHAGE HORS DE VINTED.FR (11 octobre)
+Julien : plus aucune photo dans VRM (Annonces, Ventes, Colis/bordereaux…).
+**Mesuré avant de coder** : les données sont intactes (`photo.url` =
+`https://images1.vinted.net/t/…/f800/….jpeg?s=…`, captures du jour) et le code
+d'affichage n'avait pas changé dans le déploiement. La cause est donc
+**extérieure et pas prouvée** : le CDN de Vinted qui refuse l'affichage hors de
+son site (CORP, ou anti-hotlink sur le référent), ou un logiciel de protection.
+- **Une règle, un composant** (`src/photosVinted.js` + `PhotoVinted`, §11) :
+  les **49** `<img>` qui PEUVENT montrer une photo Vinted passent par lui ; toute
+  autre adresse reste un `<img>` ordinaire (logos, QR de retrait, carte, photo
+  de la pièce). `audit-photos-vinted.cjs` le garde dans le temps : tout `<img>`
+  de `src/` est dans `PhotoVinted` ou dans une **liste FERMÉE** de sources qui
+  ne peuvent pas être une photo Vinted, chacune avec sa raison — une source
+  inconnue est rouge (un `<img src={orderPhoto(o)}>` remis sur Achats le serait).
+  Dans l'ordre :
+  1. `referrerPolicy="no-referrer"` — une protection par référent s'arrête là
+     (banc, scénario D, Chromium en émulation iPhone — pas Safari) ;
+  2. si le navigateur refuse quand même, **l'extension** va chercher les octets
+     par le pont « photo » (présent depuis très longtemps : **rien à changer
+     dans l'extension**). **Mesuré par la relecture avec la vraie extension** :
+     la requête de son service worker part sans référent, sans `Origin`, sans
+     cookie, et CORP ne s'y applique pas — les octets reviennent → URL objet,
+     **uniquement jpeg/png/webp/gif/avif** (un SVG en URL objet ouvert dans un
+     onglet s'exécute dans l'origine de l'app : refusé) ;
+  3. cache par URL, 300 entrées hors écran (URL objet révoquées à l'éviction),
+     **au plus 3 demandes en vol**, la place prise **jusqu'à la vraie réponse**
+     (plafond dur 30 s), **aucune demande pour une photo hors écran** ;
+  4. sans secours : le pictogramme à la place, **jamais une image cassée**.
+     `onError()` n'est appelé que sur l'état **définitif** — l'extension a
+     RÉPONDU, et pas avec une image (`estDefinitive`). « Pas d'extension ici,
+     pour l'instant » se dessine (pictogramme) mais ne retire rien d'une liste.
+- **Un échec n'est pas figé** : un **témoin** (UNE photo perdue à l'écran,
+  rechargée sans référent à 20 s puis ×2 jusqu'à 5 min, onglet visible),
+  l'événement `online` (tout réessaie, refus de l'extension compris) et une
+  photo **remontée plus d'une minute** après son échec. Dès qu'une photo qui
+  avait échoué passe, **toutes** réessaient et la cause est remesurée.
+- **Délai ≠ refus** (`vmrPhotoIssue`) : `refus` = l'extension a répondu sans
+  octets ; `delai` = pas de réponse (« pas su ») → la photo retourne en attente,
+  un nouvel essai, jamais « perdue » ; après deux délais on n'insiste plus sans
+  signal neuf (remontage, témoin, `online`, retour de l'extension).
+- **« Pas su » ≠ « non »** : l'extension se manifeste quelques secondes après
+  le chargement — pendant 7 s rien n'est déclaré perdu ; quand elle (re)devient
+  disponible, ses photos retrouvent leurs essais.
+- **UNE phrase, sur la coque** (`PhotosBloquees`), sans couleur d'alerte. QUAND
+  parler vit dans `photosVinted.decision()`, jugé sur ce qui est **MONTÉ** (pas
+  sur la session) : au moins **3** photos perdues à l'écran · aucune affichée
+  **par l'extension** à l'écran (sinon les autres sont des liens morts) · et si
+  une photo s'affiche par le navigateur, seulement quand la sonde a mesuré un
+  blocage (une photo du cache ne prouve rien) · jamais pendant la mesure.
+  `data-photos-bloquees` = la **cause affichée**, qui dit ce qui est mesuré et
+  rien de plus : `navigateur` (deux échecs réseau ET l'extension les a
+  récupérées : c'est la page qui est refusée, « dans VRM ») · `injoignable`
+  (deux échecs réseau, sans plus : « ce navigateur n'arrive pas à les charger
+  ici » — une coupure, un filtre ou CORP donnent la même erreur) · `reponse` ·
+  `passu`. `data-photos-geste` : `refus` (l'extension a répondu sans image —
+  **rien à régler**, jamais « recharge ») · `muette` (« recharge cette page ») ·
+  `muette-ailleurs` (un bandeau de l'écran dit déjà que l'extension ne répond
+  pas : `useVoixExt`, la phrase ne le redit pas, §7) · `telephone` · `chrome`.
+  Sur ordinateur, sa boîte réserve la place de l'île d'actions
+  (`.vrm-sous-ile`, comme `.vrm-tete-row`) : le geste passait dessous.
+- **La mesure, dans SON navigateur** : au premier échec (et après chaque
+  reprise), une sonde `fetch(no-cors, no-referrer, sans cookie)`. Réponse
+  opaque ⇒ `reponse`. `TypeError` ⇒ **une seconde sonde 8 s plus tard sur une
+  AUTRE photo** ; deux `TypeError` ⇒ `bloquee` (= deux échecs réseau espacés).
+  Remesurer (en changeant d'écran) **ne fait pas disparaître la phrase** : la
+  conclusion d'avant reste pendant le premier essai, une erreur de plus après
+  `bloquee` (aucune photo revenue depuis, sinon `reprise` l'aurait effacée) la
+  confirme sans attendre ; « en cours » (rien affiché) seulement s'il n'y avait
+  pas de conclusion, ou si le premier essai la contredit.
+  Le bilan attend la conclusion, puis part dans **`app_data.diag_photos`**
+  (sa ligne, RLS), au plus toutes les 10 min, en lire-fusionner-réécrire
+  **gardé** (lecture ratée ⇒ rien n'est écrit) :
+  `{ at, dernier, parNavigateur: { 'Mac Chrome': {…}, 'iOS Safari': {…} } }`,
+  chaque bilan = `{at, ko, ok, secoursOk, secoursKo, retours, delais, temoins,
+  sonde, hote, ext (presente|absente|muette), ecran, nav, version}` — des
+  nombres et des mots, **jamais une URL, une signature ou un titre**.
+  **Comment le lire** (`select data from app_data where id = 'diag_photos'`) :
+  `ok:0, ko>0, sonde:'bloquee', secoursOk>0` ⇒ le navigateur refuse la page (CORP
+  de Vinted ou un logiciel de protection) et l'extension contourne ;
+  `sonde:'bloquee', secoursOk:0` ⇒ bloqué OU injoignable, indiscernable d'ici ;
+  `sonde:'reponse'` ⇒ le serveur répond une erreur (lien périmé, refus) ;
+  `retours>0` ⇒ des photos sont revenues après un échec (c'était passager) ;
+  `delais>0` ⇒ l'extension a tardé ; `ext:'absente'` sur `iOS …` ⇒ rien ne peut
+  aller les chercher sur ce téléphone ; `ok>0` ⇒ elles s'affichent.
+- ⚠️⚠️ **UN FAUX CDN SERVI PAR `page.route()` NE PROUVE RIEN** : mesuré, une
+  image servie ainsi avec `Cross-Origin-Resource-Policy: same-site` **s'affiche**
+  dans le Chromium du banc (l'interception de Playwright passe à côté du contrôle
+  CORP). Le banc `photos-vinted.cjs` (ports 5741/5742) sert donc un **vrai
+  serveur HTTPS local**, résolu sous `images1.vinted.net`
+  (`--host-resolver-rules`), certificat jetable fabriqué à chaque lancement — et
+  il VÉRIFIE en tête que CORP bloque.
+- `verif_visuel.cjs` et `verif_dark.cjs` coupent désormais `*.vinted.net` en
+  entier : leurs fixtures portent de vraies adresses, et la sonde est un `fetch`
+  (pas une image) que leur route laissait passer.
+- **Non mesuré** : la vraie cause chez lui (c'est `diag_photos` qui la dira) ;
+  que SON extension installée réponde au pont « photo » sur sa machine ; le
+  poids mémoire réel (300 photos f800 en URL objet : quelques dizaines de Mo au
+  pire) ; Safari sur iPhone (aucun secours possible : seul `no-referrer` peut y
+  aider, et seulement si la cause est le référent) ; le délai réel d'un service
+  worker qui se réveille sur sa machine (le plafond de 30 s est un choix).
+
+#### ⚠️⚠️ Revue du 11 octobre — onze défauts de c02ffcf, reproduits, corrigés
+Deux relecteurs adverses, chaque défaut reproduit (vrai CDN HTTPS local, vraie
+extension pour la mesure du service worker), puis corrigé :
+- ⚠️⚠️ **Un échec PASSAGER devenait définitif pour la session** (réseau qui
+  hoquette, PWA qui se réveille) : 36 pictogrammes jusqu'au rechargement, le CDN
+  revenu — **219150e réessayait à chaque affichage**. Et la phrase affirmait
+  « Ce navigateur **bloque** les photos de Vinted dès qu'elles s'affichent en
+  dehors de vinted.fr » sur une connexion coupée, une seule `TypeError` suffisant
+  à le dire, gardé dans `diag_photos` pour toute la session. ⇒ témoin, `online`,
+  remontage, deux sondes, cause dite telle que mesurée (voir plus haut).
+- **Une photo affichée sur Ventes faisait taire la phrase sur Annonces**
+  (`okNatif === 0` jugé sur la session). Mesuré dans Chromium : une photo mise
+  en cache AVANT que le CDN pose CORP s'affiche encore après — plausible chez lui
+  (photos anciennes en cache, annonces republiées les 10-11 octobre non).
+- **« Recharge cette page » quand Vinted refuse aussi l'extension** (403 partout) :
+  un geste qui ne peut pas marcher, redit après chaque ouverture.
+- **Un délai de 8 s valait refus définitif**, et libérait la place côté app
+  pendant que le service worker travaillait encore : **6 demandes** chez lui
+  (« au plus 3 » ne tenait pas), photos jetées, et « l'extension n'a pas pu les
+  récupérer » alors qu'elle les avait rendues.
+- **`onError` sur un état réversible** : Ma journée retirait ses photos (6 icônes
+  de repli) quand l'extension n'était pas ENCORE là, et ne les rendait pas quand
+  elle arrivait (0 demande au pont), alors que Ventes, sur la même page, les
+  récupérait.
+- **§7 : extension muette, la même cause dite deux fois** sur Ventes (« ne
+  répond pas » ×2, « recharge » ×3).
+- **Aucun garde-fou contre le retour d'un `<img>` brut** (aucun des 87 audits ne
+  regardait les `<img>`, le banc ne rendait que trois écrans).
+- **Un seul lien mort, et la phrase disait « l'extension n'a pas pu les
+  récupérer non plus : recharge »** à côté de 8 photos qu'elle venait de rendre.
+- **La phrase et son geste passaient SOUS l'île d'actions** (1512 px, mesuré mot
+  par mot : « VRM est installée : c'est elle qui va les », « recharge cette
+  page »).
+- **Durcissement** : `evilvinted.net` passait la règle ; un SVG gardait son type
+  en URL objet (mesuré : ouvert en onglet, il lit le `localStorage` de l'app).
+  Aucune source réelle n'en injecte aujourd'hui. Côté app seulement (l'extension
+  n'a pas été touchée : un autre chantier la modifie).
+- ⚠️ **Et le premier jet de CETTE correction faisait scintiller la phrase** :
+  en changeant d'écran, la cause se remesure sur les photos qui échouent
+  maintenant, et la sonde posait « en cours » d'office — la phrase de la coque
+  DISPARAISSAIT pendant les 8 s de la seconde sonde, puis revenait identique, à
+  chaque écran (vu au banc, scénario U : 0 phrase sur Annonces 5,5 s après le
+  changement). Corrigé comme dit plus haut ; mutations `scintille` (audit et
+  banc U) et `cause-perimee` (audit : une cause contredite ne reste pas
+  affichée pendant qu'on remesure) rouges.
+- **Preuves** (méthode §6.1 : le banc et l'audit FINAUX copiés dans l'arbre de
+  c02ffcf et lancés depuis lui) : banc `photos-vinted.cjs` — **130 contrôles**
+  (A étendu à Ma journée et Achats ; G lien mort isolé ; H CDN injoignable puis
+  revenu, aux deux tailles ; M ventes passent/annonces bloquées, aux deux
+  tailles ; R tout refusé ; L extension à 9 s ; J extension arrivée après
+  l'ouverture ; U extension muette ; S cause remesurée ; K île mesurée EN HAUT de
+  page — dans le premier jet le contrôle tombait après le défilement, donc vert
+  par vacuité). **24 rouges sur le build de c02ffcf**, et dix mutations du code
+  final, chacune rouge sur son scénario (voir le README des bancs).
+  `audit-photos-vinted.cjs` (nouveau) : **33 contrôles**, **14 rouges** sur
+  c02ffcf, quinze mutations chacune rouge (`--mutation`). ⚠️ Son contrôle « au
+  plus 3 demandes » est VERT sur c02ffcf, et c'est normal : le délai de 8 s qui
+  libérait la place vivait dans `vmrPhoto` (App.jsx), pas dans la règle — c'est
+  le banc L qui le prouve (« max 6 » sur c02ffcf).
+  ⚠️ Un premier jet du scénario L ralentissait les photos des annonces 1 à 3 —
+  qui ne sont PAS à l'écran (tri par date) : vert sur c02ffcf, par vacuité. Il
+  ralentit maintenant les trois PREMIÈRES demandées, et vérifie qu'elles l'ont été.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
@@ -7478,8 +7649,8 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | outil | quoi |
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
-| `node scripts/audit-*.cjs` | **88 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
-| `scripts/bancs/*.cjs` | les **79 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
+| `node scripts/audit-*.cjs` | **89 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `scripts/bancs/*.cjs` | les **80 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
 **Trois règles de preuve :**
@@ -7771,8 +7942,8 @@ script-là me fait croire à une catastrophe.
 src/App.jsx                     l'app (grep avant de lire — le fichier est énorme)
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
-scripts/audit-*.cjs             les 88 audits
-scripts/bancs/                  les 79 bancs (leur README dit comment les lancer)
+scripts/audit-*.cjs             les 89 audits
+scripts/bancs/                  les 80 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 ```
