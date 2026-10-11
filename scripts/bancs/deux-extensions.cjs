@@ -267,6 +267,24 @@ async function rendre(b, { ponts, onglet = 'cat_ventes', tel = false, vrm = null
       dit(v.sessions === 0 && !v.recus.some((x) => / session/.test(x)), 'RIEN dans la page : la copie ancienne qui écoute la page n’entend rien (avant : elle adoptait la même famille de jetons)', JSON.stringify({ sessions: v.sessions, recus: v.recus }));
       await r.ctx.close();
     });
+    // ⚠️ Revue du 11 octobre : « Se connecter avec VRM » cliqué dans la NEUVE
+    //    pendant qu'une copie ancienne répond encore au ping. Le bandeau restait
+    //    « Je connecte… Rien à taper » pour toujours, sans croix, sous une
+    //    pastille « supprime l'ancienne » — et rien ne partait.
+    console.log('── 8. (11 octobre) « Se connecter avec VRM » avec une copie ancienne VIVANTE à côté');
+    await essaie('8', async () => {
+      const A = 'abcdefghijklmnopabcdefghijklmnop';
+      const r = await rendre(b, { session: true, onglet: 'cat_ventes&lier-extension=' + A, vrm: { ok: true, connecte: false, email: '' }, ponts: [{ version: '5.77.0' }, { version: '5.169.0', id: A, adresse: true }] });
+      await r.pg.waitForTimeout(3000);
+      const v = await r.lire();
+      const band = await r.pg.evaluate(() => { const x = document.querySelector('[data-liaison]'); return x ? { etat: x.getAttribute('data-liaison'), fermer: !!x.querySelector('button[aria-label="Fermer"]') } : null; });
+      const env = v.externes.filter((x) => x.type === 'session');
+      dit(v.etat && v.etat.code === 'plusieurs', 'deux extensions répondent : dit dans la pastille', JSON.stringify(v.etat));
+      dit(env.length === 1 && env[0].id === A && env[0].recu, 'la session part quand même, ADRESSÉE à celle qui a demandé', JSON.stringify(v.externes));
+      dit(v.sessions === 0 && !v.recus.some((x) => / session/.test(x)) && !v.recus.some((x) => /cmd:|exec:/.test(x)), 'rien dans la page, et aucune commande n’est relayée (les commandes restent coupées)', JSON.stringify(v.recus));
+      dit(band && band.etat === 'ok' && band.fermer, 'le bandeau dit le résultat, et se ferme — plus de « Je connecte… » éternel', JSON.stringify(band));
+      await r.ctx.close();
+    });
   } catch (e) { dit(false, 'le banc a tourné jusqu’au bout', String(e && e.message).slice(0, 200)); }
   finally { if (b) await b.close(); srv.close(); }
   console.log(ko ? `\n❌ deux-extensions : ${ko} rouge(s)` : '\n✅ deux-extensions : tout est vert');

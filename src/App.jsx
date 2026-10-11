@@ -753,6 +753,23 @@ const authSetPassword = async (password) => {
 const authSignOut = () => {
   const uid = AUTH.user && AUTH.user.id;
   try { if (uid) deconnecterExtension(String(uid)); } catch (_) {}
+  // ⚠️ Revue du 11 octobre : une extension d'avant la 5.169 n'entend pas le
+  //    canal adressé — après « Se déconnecter », elle continuait d'écrire sous
+  //    ce compte (mesuré : aucun message envoyé ; la modale promet pourtant
+  //    qu'« une autre personne qui se connecte derrière toi n'hérite pas de tes
+  //    numéros »). Sur ce GESTE seulement, l'ancien message (`session: null`).
+  //    Pas quand on SAIT qu'elle écrit sous un AUTRE compte : ce n'est pas la
+  //    nôtre à déconnecter. Deux copies (une neuve, une ancienne) : l'ancienne
+  //    aussi doit oublier — la neuve ignore ce message.
+  try {
+    if (uid && (extSait('liaison') !== 'ok' || __vmrPlusieurs)) {
+      const v = __vmrEtat && __vmrEtat.ok ? __vmrEtat.vrm : null;
+      const sonId = String((v && v.user_id) || ''), sonMail = String((v && v.email) || '').trim().toLowerCase();
+      const monMail = String((AUTH.user && AUTH.user.email) || '').trim().toLowerCase();
+      const autre = !!v && v.connecte === true && ((sonId && sonId !== String(uid)) || (!sonId && sonMail && monMail && sonMail !== monMail));
+      if (!autre) deconnecterExtensionAncienne();
+    }
+  } catch (_) {}
   writeSession(null); wipeLocalData();
 };
 
@@ -4409,6 +4426,40 @@ async function battementExt() {
 let __sessExtEnVol = false, __sessExtPasAvant = 0, __sessExtIncertain = 0;
 let __sessExtErreur = null;     // ce que le serveur a répondu quand il n'a pas pu
 const enVolSession = (v) => { __sessExtEnVol = v; __vmrNotifier(); };   // l'indicateur le dit pendant que ça se fait
+// ⚠️⚠️ QUI PEUT CONNECTER L'EXTENSION DE CE CHROME, ET COMMENT (revue du
+//    11 octobre). « Je la (re)connecte » n'est vrai que si l'APP peut le faire :
+//    une extension qui ne sait pas recevoir la session adressée (avant la 5.169
+//    — dont la 5.164 installée chez lui) ne reçoit plus RIEN de l'app, et un
+//    serveur qui a refusé de fabriquer sa session ne la fabriquera pas avant
+//    `__sessExtPasAvant`. La garde avait été posée sur « pas connectée »
+//    seulement : « autre compte » et les premiers pas promettaient encore
+//    « je la reconnecte — rien à taper », sans rien envoyer (mesuré : 0 envoi
+//    en 25 s). UNE règle pour l'en-tête, la liste des ventes, le panneau et les
+//    premiers pas (§11) :
+//      'app'     — l'app la connecte elle-même ;
+//      'retard'  — elle ne sait pas la recevoir : la mettre à jour, ou le mot
+//                  de passe VRM dans SA fenêtre ;
+//      'serveur' — le serveur a refusé : le mot de passe VRM (l'app réessaie
+//                  quand même après `__sessExtPasAvant`).
+function voieConnexionExt() {
+  if (extSait('liaison') !== 'ok') return 'retard';
+  if (__sessExtErreur) return 'serveur';
+  return 'app';
+}
+const minutesAvantReessai = () => Math.max(1, Math.ceil((__sessExtPasAvant - Date.now()) / 60000));
+// « Déconnecter l'extension de ce Chrome » pour une extension qui ne connaît
+// pas le canal adressé (avant la 5.169) : l'ancien message de la page, qu'elle
+// comprend (`session: null` = elle oublie sa session). UNIQUEMENT sur un GESTE
+// (ce bouton, ou « Se déconnecter » de VRM) — jamais tout seul : c'est ce qui
+// faisait oublier sa session à l'extension au démarrage d'une app morte (B9).
+// Un pont 5.169 l'ignore (il répond `canal`) : la sienne passe par l'adressé.
+function deconnecterExtensionAncienne() {
+  if (typeof window === 'undefined' || !vmrExtPresent()) return false;
+  try { window.postMessage({ __vmr: 'session', session: null }, '*'); } catch (_) { return false; }
+  // Elle vient d'oublier sa session : on relit son état tout de suite.
+  setTimeout(() => { try { battementExt(); } catch (_) {} }, 700);
+  return true;
+}
 // ⚠️ UNE EXTENSION QUI A ENCORE LA SESSION DE L'APP (donnée avant le 6 octobre)
 //    partage sa famille de jetons avec l'app jusqu'à ce que l'une des deux soit
 //    révoquée. On la sépare UNE fois, d'avance, par appareil et par compte. Ce
@@ -4461,14 +4512,21 @@ async function assurerSessionExtension() {
   // 5.165 : deux extensions répondent ⇒ on ne donne rien (on ne saurait pas
   // laquelle garder, et l'ancienne exécuterait encore les commandes).
   await sondageConnu();
-  if (__vmrPlusieurs) return;
+  const lier = __lier && (__lier.etat === 'attente' || __lier.etat === 'encours') ? __lier : null;
+  // ⚠️ Revue du 11 octobre : « Se connecter avec VRM » cliqué dans UNE extension
+  //    nomme SON identifiant. Avec une copie ancienne à côté, on sortait ici :
+  //    le bandeau disait « Je connecte… Rien à taper » pour toujours, sans
+  //    croix, sous une pastille « supprime l'ancienne » — deux voix contraires.
+  //    La session lui est ADRESSÉE (l'ancienne ne l'entend pas) : elle part.
+  //    Les commandes, elles, restent coupées tant qu'il y en a deux.
+  if (__vmrPlusieurs && !lier) return;
   const s = AUTH.session, u = AUTH.user;
   if (!s || !s.access_token || !u || !u.id) return;
   const e = __vmrEtat;
   // Un code périmé n'écoute pas le canal adressé : rien à lui donner (le geste
-  // est le ⟳, dit ailleurs).
-  if (codePerime()) return;
-  const lier = __lier && (__lier.etat === 'attente' || __lier.etat === 'encours') ? __lier : null;
+  // est le ⟳, dit ailleurs). Une liaison demandée le DIT (le bandeau ne reste
+  // pas sur « Je connecte… ») et repart dès que le code est réparé.
+  if (codePerime()) { if (lier && lier.bloque !== 'perime') poserLier(Object.assign({}, lier, { bloque: 'perime' })); return; }
   // La cible : l'extension qui a demandé (« Se connecter »), sinon celle qui
   // répond à l'état dans cette page. Jamais « toutes ».
   const ext = String((lier && lier.id) || (e && e.ok && e.ext) || '');
@@ -4491,7 +4549,7 @@ async function assurerSessionExtension() {
   if (!(lierIci || (v && v.connecte === false) || __sessExtIncertain >= 2 || aSeparer || (autre && auPremierPlan))) return;
   if (__sessExtEnVol || (!lierIci && Date.now() < __sessExtPasAvant)) return;
   enVolSession(true);
-  if (lierIci) poserLier(Object.assign({}, lier, { etat: 'encours' }));
+  if (lierIci) poserLier(Object.assign({}, lier, { etat: 'encours', bloque: null }));
   try {
     // 1. Est-ce qu'ELLE en a besoin ? Elle seule le sait, et elle émet le nonce.
     const q = await versExtension(ext, { type: 'liaison', pour: monId, force: lierIci || (autre && auPremierPlan), raison: aSeparer ? 'separer' : '' });
@@ -4557,7 +4615,17 @@ if (typeof window !== 'undefined') {
       //    (`sonderPonts`, à chaque battement) n'est pas un pont qui apparaît —
       //    sinon chaque battement remettait les ratés à zéro, et une extension
       //    muette n'était plus jamais dite muette (vu au banc `pont.cjs`).
-      if (e.data.__vmr === 'ready') { if (!__vmrTour && (__vmrEtat === undefined || __vmrEtat === null)) { __vmrRates = 0; setTimeout(battementExt, 30); } return; }
+      // ⚠️ Revue du 11 octobre : après la RÉPARATION d'un code périmé (le ⟳
+      //    fait par la page de réparation), le pont remis à neuf annonce
+      //    « ready » — mais l'état étant un objet, rien n'était relu : l'app
+      //    disait « périmé — clique ⟳ » et coupait les commandes encore ~20 s
+      //    (jusqu'au battement suivant), code déjà réparé. Un pont qui
+      //    apparaît pendant un verdict « périmé » est relu tout de suite.
+      if (e.data.__vmr === 'ready') {
+        if (!__vmrTour && (__vmrEtat === undefined || __vmrEtat === null)) { __vmrRates = 0; setTimeout(battementExt, 30); }
+        else if (!__vmrTour && codePerime()) { __vmrRates = 0; setTimeout(battementExt, 30); setTimeout(() => { if (codePerime()) battementExt(); }, 2500); }
+        return;
+      }
       if (e.data.__vmr !== 'evt' || !e.data.evt) return;
       const ev = e.data.evt;
       if (ev.type === 'cmd' && ev.jobId) { __vmrJobs[ev.jobId] = ev; __vmrNotifier(); }
@@ -4650,9 +4718,20 @@ function raisonExtGlobale(sansSouris, opt) {
   // ⚠️ L'icône d'une extension connectée ouvre VRM, pas sa fenêtre : lui dire
   //    « clique l'icône et déconnecte-la » était impossible à suivre. L'app la
   //    reconnecte d'elle-même à ton compte (au premier plan).
-  if (autre) return { code: 'autre-vrm', texte: __sessExtEnVol
-    ? `L'extension écrivait dans le compte VRM ${sonMail || 'd’un autre'} — je la reconnecte au tien…`
-    : `L'extension est connectée au compte VRM ${sonMail || 'd’un autre'}, pas au tien (${monMail}) — je la reconnecte au tien ; si ça persiste, recharge cette page.` };
+  // ⚠️⚠️ Revue du 11 octobre : « je la reconnecte » n'est vrai que si l'APP le
+  //    peut (`voieConnexionExt`). Une 5.164 n'entend pas le canal adressé (0
+  //    envoi mesuré en 25 s) ; un serveur qui a refusé ne refait rien avant
+  //    `__sessExtPasAvant`. Le vrai geste, alors.
+  if (autre) {
+    const voie = voieConnexionExt();
+    return { code: 'autre-vrm', voie, texte: __sessExtEnVol
+      ? `L'extension écrivait dans le compte VRM ${sonMail || 'd’un autre'} — je la reconnecte au tien…`
+      : voie === 'retard'
+        ? `L'extension est connectée au compte VRM ${sonMail || 'd’un autre'}, pas au tien (${monMail}), et celle-ci (${vmrExtVersion() || 'version ?'}) ne sait pas recevoir la connexion de VRM : mets-la à jour (${EXT_ATTENDUE}), ou déconnecte-la (bouton « Lecture seule », en haut) puis connecte-toi avec ton mot de passe VRM.`
+        : voie === 'serveur'
+          ? `L'extension est connectée au compte VRM ${sonMail || 'd’un autre'}, pas au tien (${monMail}), et le serveur n'a pas pu préparer sa connexion${__sessExtErreur.message ? ' (' + __sessExtErreur.message + ')' : ''} — je réessaie dans ${minutesAvantReessai()} min, cette page ouverte.`
+          : `L'extension est connectée au compte VRM ${sonMail || 'd’un autre'}, pas au tien (${monMail}) — je la reconnecte au tien ; si ça persiste, recharge cette page.` };
+  }
   // ⚠️⚠️ VINTED A DEMANDÉ DE RALENTIR (revue du 9 octobre). Pendant la pause de
   //    l'extension (5.162), l'en-tête disait « Actions possibles » et « Tout
   //    générer » restait actif : seul le clic révélait le refus. L'extension
@@ -8283,19 +8362,36 @@ function BandeauLiaison() {
   const [, force] = React.useReducer((n) => n + 1, 0);
   React.useEffect(() => { __lierSubs.add(force); return () => { __lierSubs.delete(force); }; }, []);
   const l = __lier;
+  // ⚠️ Revue du 11 octobre : pendant l'attente, AUCUNE croix — un bandeau
+  //    bloqué (copie ancienne à côté, code périmé) restait là pour toujours.
+  //    La croix vient au bout de quelques secondes, quoi qu'il arrive.
+  const cle = l ? `${l.id}|${l.etat}` : '';
+  const [vieux, setVieux] = React.useState('');
+  React.useEffect(() => { if (!cle) return undefined; const t = setTimeout(() => setVieux(cle), 6000); return () => clearTimeout(t); }, [cle]);
   if (!l) return null;
   const encours = l.etat === 'attente' || l.etat === 'encours';
   const bon = l.etat === 'ok' || l.etat === 'deja';
-  const texte = encours ? "Je connecte l'extension de ce Chrome à ton compte VRM… Rien à taper."
+  const fermable = !encours || l.bloque || vieux === cle;
+  // Une liaison qui ne PEUT pas partir le dit, avec le geste — jamais
+  // « Je connecte… » sans rien envoyer.
+  const texte = encours && l.bloque === 'perime' ? <>L'extension de ce Chrome tourne encore sur son ancien code : je la connecte dès qu'elle est rechargée. Si rien ne bouge : ouvre chrome://extensions, clique ⟳ sur VRM, puis recharge cette page.</>
+    : encours ? "Je connecte l'extension de ce Chrome à ton compte VRM… Rien à taper."
     : l.etat === 'ok' ? <>Extension connectée à <b>{l.email || 'ton compte VRM'}</b> ✓ — elle capte maintenant pour toi dans ce Chrome. Rien d'autre à faire.</>
     : l.etat === 'deja' ? <>L'extension de ce Chrome était déjà connectée à ton compte VRM ✓ — rien à faire.</>
     : l.etat === 'absente' ? <>L'extension n'a pas répondu dans ce Chrome. Ouvre VRM dans le Chrome où tu as cliqué « Se connecter » ; si c'est celui-ci, ouvre chrome://extensions, clique ⟳ sur VRM, puis recharge cette page.</>
     : <>Je n'ai pas pu connecter l'extension{l.message ? ` (${l.message})` : ''}. Clique son icône en haut de Chrome, puis « avec mon mot de passe VRM ».</>;
+  // ⚠️ Revue du 11 octobre (§7, l'île) : sur ordinateur, l'île d'actions flotte
+  //    en haut à droite, et ce bandeau — premier bloc de la colonne — passait
+  //    DESSOUS : sa croix ne se cliquait pas, et « …chrome://extensions… »
+  //    disparaissait sous la pastille. Il lui laisse sa place, comme la ligne
+  //    de titre des écrans (`vrm-tete-row` lit `--vrm-ile`).
   return (
-    <div data-liaison={l.etat} role="status" style={{ display: 'flex', gap: 10, alignItems: 'flex-start', margin: '0 0 12px', padding: '10px 12px', borderRadius: 10,
-      background: C.card, border: `1px solid ${C.border}`, borderLeft: `3px solid ${bon ? C.accent : encours ? C.border : C.warn}`, fontSize: 12.5, lineHeight: 1.45, color: C.text }}>
+    <div className="vrm-tete-row">
+    <div data-liaison={l.etat} data-liaison-bloque={encours && l.bloque ? l.bloque : undefined} role="status" style={{ display: 'flex', gap: 10, alignItems: 'flex-start', margin: '0 0 12px', padding: '10px 12px', borderRadius: 10,
+      background: C.card, border: `1px solid ${C.border}`, borderLeft: `3px solid ${bon ? C.accent : (encours && !l.bloque) ? C.border : C.warn}`, fontSize: 12.5, lineHeight: 1.45, color: C.text }}>
       <span style={{ flex: 1, minWidth: 0 }}>{texte}</span>
-      {!encours && <button type="button" aria-label="Fermer" onClick={() => poserLier(null)} style={{ border: 'none', background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: '0 2px', minHeight: 0 }}>×</button>}
+      {fermable && <button type="button" aria-label="Fermer" onClick={() => poserLier(null)} style={{ border: 'none', background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: '0 2px', minHeight: 0 }}>×</button>}
+    </div>
     </div>
   );
 }
@@ -8440,6 +8536,8 @@ function useEtapePont() {
   React.useEffect(() => onVmrExt(() => setPont({ on: vmrExtPresent(), v: vmrExtVersion() })), []);
   // `undefined` = on demande · `null` = l'extension n'a pas répondu · objet = mesuré.
   const [extAuth, setExtAuth] = React.useState(undefined);
+  // `tour` : relire après un geste (« Déconnecter l'extension de ce Chrome »).
+  const [tour, setTour] = React.useState(0);
   React.useEffect(() => {
     let stop = false;
     (async () => {
@@ -8448,7 +8546,8 @@ function useEtapePont() {
       if (!stop) setExtAuth(e);
     })();
     return () => { stop = true; };
-  }, [pont.on]);
+  }, [pont.on, tour]);
+  const relire = React.useCallback(() => setTour((n) => n + 1), []);
   // Le compte sous lequel l'extension écrit est-il CELUI-CI ? C'est une
   // identité (la même adresse), pas une ressemblance. Si elle écrit sous une
   // autre, ses captures partent chez l'autre vendeur et cette boutique reste
@@ -8461,7 +8560,7 @@ function useEtapePont() {
     : !extAuth.connecte ? 'pasconnectee'
     : (monMail && sonMail && monMail !== sonMail) ? 'autrecompte'
     : 'connectee';
-  return { pont, extAuth, etape };
+  return { pont, extAuth, etape, relire };
 }
 
 // ── LE BOUTON BORDEREAU D'UNE VENTE (Ventes ET Colis — un seul composant, §11) ─
@@ -8748,7 +8847,15 @@ function BoutonToutGenerer({ items }) {
 //        Réessayer » (l'extension le dit, `depotArrete` / onglet fermé) ;
 //      · le bouton annonce les photos CAPTÉES sur le total de l'annonce — le
 //        dépôt part avec ce qui est capté, jamais plus.
-const RAISON_ABANDON = { 'onglet-ferme': "l'onglet Leboncoin a été fermé avant la fin", arret: "le remplissage s'est arrêté avant la fin (Leboncoin a peut-être demandé autre chose)", 'bandeau-ferme': 'tu as fermé le bandeau VRM sur Leboncoin' };
+// ⚠️⚠️ Revue du 11 octobre : « LE DÉPÔT N'A PAS ABOUTI » ÉTAIT UNE AFFIRMATION
+//    SUR UNE MESURE QUI N'A PAS EU LIEU. L'arrêt à 90 s arrive justement quand
+//    un champ obligatoire ne se devine pas (Univers*), c'est-à-dire quand il
+//    FINIT À LA MAIN — et VRM ne voit pas la page de fin. « Réessayer » ouvrait
+//    alors un second dépôt qui PUBLIE TOUT SEUL (prouvé : 2 onglets de dépôt,
+//    `publier: true`) : la paire en ligne deux fois. L'arrêt veut dire « pas
+//    su », pas « échec » : on le dit, on nomme « Déjà publiée », et relancer
+//    demande une confirmation (l'extension l'exige aussi, `confirme`).
+const RAISON_ABANDON = { 'onglet-ferme': "l'onglet Leboncoin a été fermé avant que VRM voie la fin", 'onglet-quitte': "l'onglet du dépôt est parti sur une autre page avant que VRM voie la fin", arret: "le remplissage s'est arrêté avant la fin (Leboncoin a peut-être demandé autre chose)", 'bandeau-ferme': 'tu as fermé le bandeau VRM sur Leboncoin avant la fin' };
 function BoutonPublier({ place, id, photos = null, total = null }) {
   const { jobs } = useExtVivante();
   const sansSouris = useSansSouris();
@@ -8767,8 +8874,24 @@ function BoutonPublier({ place, id, photos = null, total = null }) {
     //    cas faisaient `return` en silence — « je ne peux pas poster ».
     if (glob) { setRefus(glob.texte); return; }
     if (fait) { setRefus(lbc ? 'Déjà publiée sur Leboncoin depuis VRM — rien à refaire.' : 'Déjà préparée sur eBay.'); return; }
+    // Un dépôt abandonné a pu être FINI À LA MAIN : relancer publierait la
+    // paire une seconde fois. On demande d'abord — ici si l'app le sait déjà,
+    // sinon quand l'extension le découvre (onglet parti ailleurs : `confirmer`).
+    const demander = () => askConfirm({ title: 'Relancer le dépôt sur Leboncoin ?',
+      desc: "VRM n'a pas vu la fin du dépôt précédent. Si tu l'as publiée toi-même sur Leboncoin, annule et clique « Déjà publiée » : un nouveau dépôt la publierait une seconde fois. Sinon, relance.",
+      ok: 'Relancer le dépôt', cancel: 'Annuler' });
+    let confirme = false;
+    if (lbc && abandonne) { if (!(await demander())) return; confirme = true; }
     setRefus(null); setEnvoi(true);
-    const r = await vmrCmd({ cmd: lbc ? 'lbcPublier' : 'ebayPreparer', id: String(id) }, 30000);
+    const envoyer = (c) => vmrCmd(Object.assign({ cmd: lbc ? 'lbcPublier' : 'ebayPreparer', id: String(id) }, c ? { confirme: true } : {}), 30000);
+    let r = await envoyer(confirme);
+    if (r && !r.accepte && r.code === 'confirmer' && !confirme) {
+      __vmrJobs[jobId] = Object.assign({}, __vmrJobs[jobId] || {}, { etape: 'abandonne', raison: 'onglet-quitte', at: Date.now() }); __vmrNotifier();
+      setEnvoi(false);
+      if (!(await demander())) return;
+      setEnvoi(true);
+      r = await envoyer(true);
+    }
     setEnvoi(false);
     if (!r) { setRefus("L'extension n'a pas répondu — recharge cette page et réessaie."); return; }
     if (!r.accepte) { setRefus(r.raison || "Refusé par l'extension."); return; }
@@ -8787,7 +8910,7 @@ function BoutonPublier({ place, id, photos = null, total = null }) {
   return (
     <span data-bouton-publier={etat} data-id={id} data-photos={nPh == null ? undefined : nPh} data-photos-total={nTot == null ? undefined : nTot}
       style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3, maxWidth: '100%' }}>
-      {abandonne && <span data-depot-abandonne={job.raison || ''} style={{ fontSize: 11, color: C.warn, lineHeight: 1.35, whiteSpace: 'normal', fontWeight: 600 }}>Le dépôt n'a pas abouti{RAISON_ABANDON[job.raison] ? ` : ${RAISON_ABANDON[job.raison]}` : ''}.</span>}
+      {abandonne && <span data-depot-abandonne={job.raison || ''} style={{ fontSize: 11, color: C.warn, lineHeight: 1.35, whiteSpace: 'normal', fontWeight: 600 }}>{RAISON_ABANDON[job.raison] ? RAISON_ABANDON[job.raison].charAt(0).toUpperCase() + RAISON_ABANDON[job.raison].slice(1) : "VRM n'a pas vu la fin du dépôt"}. {lbc ? 'Si tu l’as publiée toi-même, clique « Déjà publiée » ; sinon Réessayer.' : 'Si tu l’as mise en vente toi-même, rien à refaire ; sinon Réessayer.'}</span>}
       <button type="button" onClick={lancer} aria-disabled={grise ? 'true' : undefined}
         title={glob ? glob.texte : enCours ? (lbc ? 'Le dépôt est ouvert dans un onglet Leboncoin — clique pour y retourner' : 'Le formulaire eBay est ouvert — clique pour y retourner') : lbc ? "L'extension ouvre Leboncoin, remplit tout (photos, titre, description, prix, catégorie) et publie sans option payante" : "L'extension ouvre la mise en vente eBay et remplit ce qu'elle reconnaît — tu relis et tu mets en vente"}
         style={{ display: 'inline-flex', alignItems: 'center', gap: 6, borderRadius: 8, fontFamily: 'inherit', fontWeight: 600, fontSize: 12.5,
@@ -8962,11 +9085,28 @@ function EtatActions({ onNav, ordi, sombre }) {
   // connexion de VRM (5.169, session adressée). Une plus ancienne ne reçoit
   // plus rien de l'app — promettre « je réessaie » serait le défaut le plus
   // coûteux du projet ; on dit les deux vrais gestes.
-  else if (code === 'vrm') geste = <span data-etat-geste={extSait('liaison') === 'retard' ? 'maj-ou-mdp' : 'liaison'}>{__sessExtEnVol ? 'Un instant…'
-    : extSait('liaison') === 'retard'
+  // ⚠️ Revue du 11 octobre : après un REFUS du serveur (429, 503), « Se
+  //    connecter avec VRM » repasse par la même route, bloquée 15 min — le
+  //    panneau disait ce geste pendant que la liste des ventes disait le mot de
+  //    passe. Une règle (`voieConnexionExt`), les mêmes gestes partout (§11).
+  else if (code === 'vrm') { const voie = voieConnexionExt(); geste = <span data-etat-geste={voie === 'retard' ? 'maj-ou-mdp' : voie === 'serveur' ? 'mdp' : 'liaison'}>{__sessExtEnVol ? 'Un instant…'
+    : voie === 'retard'
       ? <>Cette extension ({vmrExtVersion() || 'version ?'}) ne sait pas recevoir la connexion de VRM : mets-la à jour en {EXT_ATTENDUE} (Réglages) — ou clique l'icône VRM en haut de Chrome et connecte-toi avec ton mot de passe VRM (<b>{monMail || 'ton email VRM'}</b>).</>
-      : <>Je la connecte à <b>{monMail || 'ton compte VRM'}</b>. Si ça ne vient pas : clique l'icône VRM en haut de Chrome, puis « Se connecter avec VRM ».</>}</span>;
-  else if (code === 'autre-vrm' || code === 'vrm-passu') geste = __sessExtEnVol ? <span>Un instant…</span>
+      : voie === 'serveur'
+        ? <>Le serveur n'a pas pu préparer sa connexion{__sessExtErreur.message ? ` (${__sessExtErreur.message})` : ''} : clique l'icône VRM en haut de Chrome, puis « avec mon mot de passe VRM » (<b>{monMail || 'ton email VRM'}</b>).</>
+        : <>Je la connecte à <b>{monMail || 'ton compte VRM'}</b>. Si ça ne vient pas : clique l'icône VRM en haut de Chrome, puis « Se connecter avec VRM ».</>}</span>; }
+  // Autre compte : une extension CONNECTÉE ouvre VRM quand on clique son icône
+  // (sa fenêtre n'apparaît plus) — « clique l'icône, Se déconnecter » serait
+  // impossible à suivre. Avant la 5.169 elle n'entend pas le canal adressé : le
+  // seul geste d'ici est de la déconnecter (l'ancien message), puis le mot de
+  // passe VRM dans sa fenêtre — ou la mettre à jour.
+  else if (code === 'autre-vrm') { const voie = voieConnexionExt(); geste = __sessExtEnVol ? <span>Un instant…</span>
+    : voie === 'retard'
+      ? <span data-etat-geste="deconnecter">Cette extension ({vmrExtVersion() || 'version ?'}) ne sait pas recevoir la connexion de VRM. <button type="button" data-etat-geste-deconnecter="1" style={{ ...btn, padding: '4px 9px', fontSize: 12 }} onClick={() => { deconnecterExtensionAncienne(); }}>Déconnecter l'extension de ce Chrome</button>, puis clique l'icône VRM en haut de Chrome et connecte-toi avec ton mot de passe VRM (<b>{monMail || 'ton email VRM'}</b>) — ou mets-la à jour en {EXT_ATTENDUE} (Réglages).</span>
+      : voie === 'serveur'
+        ? <span data-etat-geste="attendre-serveur">Le serveur n'a pas pu préparer sa connexion{__sessExtErreur.message ? ` (${__sessExtErreur.message})` : ''} : je réessaie dans {minutesAvantReessai()} min, cette page ouverte.</span>
+        : <button type="button" data-etat-geste="recharger" style={btn} onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button>; }
+  else if (code === 'vrm-passu') geste = __sessExtEnVol ? <span>Un instant…</span>
     : <button type="button" data-etat-geste="recharger" style={btn} onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button>;
   else if (code === 'vinted') geste = <a data-etat-geste="vinted" href="https://www.vinted.fr" target="_blank" rel="noreferrer" style={btn}>Ouvrir vinted.fr et me connecter</a>;
   // 'pause' : aucun geste — la phrase du panneau dit que ça repart seul.
@@ -9053,8 +9193,15 @@ function EtatActions({ onNav, ordi, sombre }) {
 // bord, « ta journée est vide » sur l'accueil) — mais les ÉTAPES, elles, sont
 // les mêmes, et c'est tout ce qui compte.
 function PremiersPas({ onNav, titreNeuf, introNeuf }) {
-  const { extAuth, etape } = useEtapePont();
+  const { extAuth, etape, relire } = useEtapePont();
   const sansSouris = useSansSouris();
+  // ⚠️⚠️ Revue du 11 octobre : « je la connecte d'ici, sans rien à taper » était
+  //    écrit à une 5.164, qui ne reçoit plus rien de l'app (0 envoi en 25 s), et
+  //    « clique son icône, puis « Se connecter avec VRM » » nommait un bouton que
+  //    sa fenêtre n'a pas. Les mêmes voies que l'en-tête (`voieConnexionExt`).
+  const voie = voieConnexionExt();
+  const [deconnectee, setDeconnectee] = React.useState(false);
+  const deconnecter = () => { if (deconnecterExtensionAncienne()) { setDeconnectee(true); setTimeout(relire, 900); } };
   // ⚠️⚠️ « CE N'EST PAS NATUREL » — Julien, 16 septembre, en regardant le
   //    premier écran. Il avait raison : c'était une notice de montage. Quatre
   //    étapes numérotées d'un coup, « Mode développeur », « extension non
@@ -9086,14 +9233,24 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
         Dans Chrome, l’extension est connectée sous <b style={{color:C.text}}>{extAuth.email}</b>. Toi, tu es sur <b style={{color:C.text}}>{(AUTH.user&&AUTH.user.email)||'ce compte'}</b>.
       </p>
       <p style={{margin:0}}>
-        Du coup, tout ce qu’elle lit sur Vinted part dans l’autre boutique, et celle-ci reste vide.
-        Je la reconnecte à <b style={{color:C.text}}>{(AUTH.user&&AUTH.user.email)||'ton compte'}</b> dès que cette page est devant toi — rien à taper. Si ça persiste : clique son icône en haut de Chrome, « Se déconnecter », puis « Se connecter avec VRM ».
+        Du coup, tout ce qu’elle lit sur Vinted part dans l’autre boutique, et celle-ci reste vide.{' '}
+        {voie === 'retard'
+          ? <>Et celle-ci ({vmrExtVersion() || 'version ?'}) ne sait pas recevoir la connexion de VRM : mets-la à jour (bouton ci-dessous) et je la reconnecterai à <b style={{color:C.text}}>{(AUTH.user&&AUTH.user.email)||'ton compte'}</b> — ou déconnecte-la d’ici, puis clique son icône en haut de Chrome et connecte-toi avec l’email et le mot de passe de ton compte VRM.</>
+          : voie === 'serveur'
+            ? <>Le serveur n’a pas pu préparer sa connexion : je réessaie dans {minutesAvantReessai()} min, cette page ouverte.</>
+            : <>Je la reconnecte à <b style={{color:C.text}}>{(AUTH.user&&AUTH.user.email)||'ton compte'}</b> dès que cette page est devant toi — rien à taper. Si ça persiste, recharge cette page.</>}
       </p>
     </>
   ) : etape === 'pasconnectee' ? (
     <>
       <p style={{margin:'0 0 10px'}}>Je vois bien ton extension dans ce navigateur 👍 — mais elle ne sait pas encore à qui elle a affaire, alors elle n’a nulle part où ranger ce qu’elle lit.</p>
-      <p style={{margin:0}}>Je la connecte à ton compte VRM d’ici, <b style={{color:C.text}}>sans rien à taper</b> — c’est ce qui envoie tes données chez toi, et nulle part ailleurs. Si ça ne vient pas : clique son icône en haut de Chrome, puis <b style={{color:C.text}}>« Se connecter avec VRM »</b>.</p>
+      {voie === 'retard' ? (
+        <p style={{margin:0}}>Celle-ci ({vmrExtVersion() || 'version ?'}) ne sait pas recevoir la connexion de VRM. Mets-la à jour avec le bouton ci-dessous — ou clique son icône en haut de Chrome et connecte-toi avec <b style={{color:C.text}}>l’email et le mot de passe de ton compte VRM</b> (pas ceux de Vinted) : c’est ce qui envoie tes données chez toi, et nulle part ailleurs.</p>
+      ) : voie === 'serveur' ? (
+        <p style={{margin:0}}>Le serveur n’a pas pu préparer sa connexion. Clique son icône en haut de Chrome, puis <b style={{color:C.text}}>« avec mon mot de passe VRM »</b> : c’est ce qui envoie tes données chez toi, et nulle part ailleurs.</p>
+      ) : (
+        <p style={{margin:0}}>Je la connecte à ton compte VRM d’ici, <b style={{color:C.text}}>sans rien à taper</b> — c’est ce qui envoie tes données chez toi, et nulle part ailleurs. Si ça ne vient pas : clique son icône en haut de Chrome, puis <b style={{color:C.text}}>« Se connecter avec VRM »</b>.</p>
+      )}
     </>
   ) : etape === 'connectee' ? (
     <>
@@ -9136,10 +9293,19 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
   //    d'un autre. Quand le geste se passe dans Chrome (cliquer l'icône de
   //    l'extension), une page web ne peut pas l'ouvrir : on ne met alors AUCUN
   //    bouton principal.
+  // Une extension qui ne sait pas recevoir la connexion de VRM : le geste qui
+  // débloque est de la METTRE À JOUR (le zip), et — si elle range chez un autre —
+  // de la déconnecter d'ici (son icône, connectée, ouvre VRM : pas sa fenêtre).
+  const majLiaison = fait.ext && !fait.lien && voie === 'retard' && (etape === 'pasconnectee' || etape === 'autrecompte');
   const bouton = (!fait.ext && sansSouris)
     ? null   // un zip sur un téléphone est du poids mort, pas un geste
     : !fait.ext
     ? <a href="/VRM-extension.zip" download style={{textDecoration:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'12px 18px',fontSize:14,fontWeight:600}}>Télécharger l’extension</a>
+    : majLiaison
+      ? <>
+          <a href="/VRM-extension.zip" download data-premiers-geste="maj" style={{textDecoration:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'12px 18px',fontSize:14,fontWeight:600}}>Télécharger la mise à jour ({EXT_ATTENDUE})</a>
+          {etape === 'autrecompte' && <button type="button" data-premiers-geste="deconnecter" disabled={deconnectee} onClick={deconnecter} style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'12px 18px',fontSize:14,fontWeight:600,cursor:deconnectee?'default':'pointer',fontFamily:'inherit'}}>{deconnectee ? 'Déconnectée — connecte-la avec ton mot de passe VRM' : 'Déconnecter l’extension de ce Chrome'}</button>}
+        </>
     : etape === 'connectee'
       ? <a href="https://www.vinted.fr" target="_blank" rel="noreferrer" style={{textDecoration:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'12px 18px',fontSize:14,fontWeight:600}}>Ouvrir vinted.fr</a>
       : null;
@@ -9150,7 +9316,7 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
        vingt-trois fois dans ce projet. Le banc juge l'état rendu et ses
        conséquences (quel bouton, quelles adresses nommées) ; le texte reste
        libre. */
-    <div data-etape={etape} style={{padding:'22px 20px',border:`1px solid ${etape==='autrecompte'?C.warn+'66':C.border}`,borderRadius:12,background:C.card}}>
+    <div data-etape={etape} data-voie={fait.ext && !fait.lien ? voie : undefined} style={{padding:'22px 20px',border:`1px solid ${etape==='autrecompte'?C.warn+'66':C.border}`,borderRadius:12,background:C.card}}>
       {/* Où on en est — trois pastilles, lisibles d'un coup d'œil. */}
       <div style={{display:'flex',gap:6,marginBottom:14}}>
         {ETAPES.map((e,k)=>(
@@ -33079,7 +33245,8 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
     const close = () => setAcct(null);
     const valider = async () => {
       setAcct(a => ({ ...a, busy:true, err:'' }));
-      if (M === 'out') { authSignOut(); location.reload(); return; }
+      // Un temps pour que le message à l'extension parte avant le rechargement.
+      if (M === 'out') { authSignOut(); setTimeout(() => location.reload(), 300); return; }
       if (M === 'pw') {
         if (acct.val.length < 8) { setAcct(a=>({...a,busy:false,err:'8 caractères minimum.'})); return; }
         if (/^(\d+|[a-zA-Z]+)$/.test(acct.val)) { setAcct(a=>({...a,busy:false,err:'Mélange lettres et chiffres — ce mot de passe protège ta compta.'})); return; }

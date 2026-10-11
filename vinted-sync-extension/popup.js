@@ -65,16 +65,53 @@ function ongletActif() {
 }
 // « Se connecter avec VRM » : le service worker ouvre VRM TOUT DE SUITE (aucune
 // attente avant), et l'app connectée lui adresse sa session.
+// ⚠️⚠️ Revue du 11 octobre : sur un code PÉRIMÉ (dossier remplacé, ⟳ jamais
+//    cliqué — 5 de ses 6 Chrome), l'ancien service worker ne connaît pas
+//    `lierAvecVRM` : le port se fermait, la fenêtre se fermait aussi, et RIEN ne
+//    se passait (mesuré : aucun onglet VRM, code toujours ancien). Cette page,
+//    elle, est lue depuis le disque : sans réponse, elle ouvre VRM elle-même
+//    (avec l'identifiant de CETTE extension), répare le code (le ⟳), et si elle
+//    ne peut pas, déplie le mot de passe VRM et dit le geste.
+function ouvrirVRMPourLier(urlActive) {
+  let id = ''; try { id = String(chrome.runtime.id || ''); } catch (_) {}
+  const cible = ongletVRM(urlActive) + (id ? '&lier-extension=' + encodeURIComponent(id) : '');
+  return new Promise((res) => {
+    const t = setTimeout(() => res(false), 3000);
+    const fin = (ok) => { clearTimeout(t); res(ok); };
+    try {
+      chrome.tabs.query({ url: APP + '/*' }, (ouverts) => {
+        const o = (ouverts || [])[0];
+        if (o) chrome.tabs.update(o.id, { url: cible, active: true }, () => { try { chrome.windows.update(o.windowId, { focused: true }); } catch (_) {} fin(true); });
+        else chrome.tabs.create({ url: cible }, () => fin(true));
+      });
+    } catch (_) { try { chrome.tabs.create({ url: cible }, () => fin(true)); } catch (_) { fin(false); } }
+  });
+}
 async function lierAvecVRM() {
   const st = document.getElementById('lierEtat');
   if (st) { st.textContent = 'J’ouvre VRM…'; st.hidden = false; }
   const urlActive = CARTE ? '' : await ongletActif();
-  try {
-    chrome.runtime.sendMessage({ from: 'cancale-popup', action: 'lierAvecVRM', urlActive }, () => {
-      void chrome.runtime.lastError;
-      if (!CARTE) window.close();
-    });
-  } catch (_) {}
+  const r = await new Promise((res) => {
+    const t = setTimeout(() => res(null), 4000);
+    try {
+      chrome.runtime.sendMessage({ from: 'cancale-popup', action: 'lierAvecVRM', urlActive }, (x) => {
+        clearTimeout(t);
+        let e = null; try { e = chrome.runtime.lastError; } catch (_) { e = null; }
+        res(e ? null : (x || null));
+      });
+    } catch (_) { clearTimeout(t); res(null); }
+  });
+  if (r && r.ok) { if (!CARTE) window.close(); return; }
+  // Pas de réponse : le code qui tourne n'est pas celui de cette page.
+  await ouvrirVRMPourLier(urlActive);
+  const rep = await reparerSiPerime();          // 'recharge' : l'extension redémarre (et cette fenêtre avec)
+  try { document.body.setAttribute('data-lier-secours', rep); } catch (_) {}
+  if (rep === 'recharge') return;
+  if (st) st.textContent = rep === 'a-jour'
+    ? 'L’extension n’a pas répondu à temps. VRM est ouvert : si rien ne se passe, connecte-toi ici avec ton mot de passe VRM.'
+    : 'L’extension de ce Chrome tourne encore sur son ancien code : ouvre chrome://extensions et clique ⟳ sur VRM — ou connecte-toi ici avec ton mot de passe VRM.';
+  const f = document.getElementById('mdpForm');
+  if (f) { f.hidden = false; const m = document.getElementById('mail'); if (m) m.focus(); }
 }
 
 function rendreAuth(e) {

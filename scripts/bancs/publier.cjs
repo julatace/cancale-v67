@@ -82,6 +82,10 @@ const PONT = ({ mode, version, suite = 'fait' }) => {
       // (l'onglet du dépôt fermé avant la fin), `rien` (le dépôt reste ouvert),
       // `refus` (l'extension refuse, avec sa raison).
       if (suite === 'refus') { post({ __vmr: 'cmd:result', reqId: d.reqId, resp: { accepte: false, code: 'inconnue', raison: 'Cette paire n’est plus dans la file (vendue ou décochée).' } }); return; }
+      // `confirmer` (revue du 11 octobre) : l'extension découvre au clic que le
+      // dépôt précédent est abandonné (onglet parti ailleurs) et exige SA
+      // confirmation — il a pu le finir à la main.
+      if (suite === 'confirmer' && !d.confirme) { post({ __vmr: 'cmd:result', reqId: d.reqId, resp: { accepte: false, code: 'confirmer', jobId, etape: 'abandonne', raison: 'VRM n’a pas vu la fin du dépôt précédent' } }); return; }
       post({ __vmr: 'cmd:result', reqId: d.reqId, resp: { accepte: true, jobId, etape: 'depot' } });
       if (suite === 'fait') setTimeout(() => post({ __vmr: 'evt', evt: { type: 'cmd', jobId, etape: 'fait', at: Date.now() } }), 400);
       if (suite === 'abandon' && window.__cmds.length === 1) setTimeout(() => post({ __vmr: 'evt', evt: { type: 'cmd', jobId, etape: 'abandonne', raison: 'onglet-ferme', at: Date.now() } }), 400);
@@ -99,7 +103,7 @@ const PONT = ({ mode, version, suite = 'fait' }) => {
     //    pas l'identifiant avant), et ce banc servait encore 5.130 — rouge sur
     //    une app intacte depuis (§6.3 : servir la forme que le code attend).
     for (const cas of [{ mode: 'ok', version: SEUIL_PUBLIER }, { mode: 'ok', version: '5.129.0' }, { mode: 'absente' },
-      { mode: 'ok', version: SEUIL_PUBLIER, suite: 'abandon' }, { mode: 'ok', version: SEUIL_PUBLIER, suite: 'rien' }, { mode: 'ok', version: SEUIL_PUBLIER, suite: 'refus' }]) {
+      { mode: 'ok', version: SEUIL_PUBLIER, suite: 'abandon' }, { mode: 'ok', version: SEUIL_PUBLIER, suite: 'rien' }, { mode: 'ok', version: SEUIL_PUBLIER, suite: 'refus' }, { mode: 'ok', version: SEUIL_PUBLIER, suite: 'confirmer' }]) {
       const nom = (cas.mode === 'absente' ? 'extension absente' : 'extension ' + cas.version) + (cas.suite ? ' · dépôt ' + cas.suite : '');
       console.log('── ' + nom);
       const ctx = await b.newContext({ viewport: { width: 1512, height: 950 } });
@@ -139,12 +143,33 @@ const PONT = ({ mode, version, suite = 'fait' }) => {
         await pg.click('[data-bouton-publier="pret"] button');
         await pg.waitForTimeout(1000);
         const a = (await lire()).boutons[0] || {};
-        dit(a.etat === 'abandonne' && /n'a pas abouti/.test(a.abandon) && /onglet Leboncoin a été fermé/.test(a.abandon) && /Réessayer/.test(a.txt), 'onglet du dépôt fermé : « Le dépôt n’a pas abouti » + la raison, et le bouton dit « Réessayer »', JSON.stringify(a));
+        // ⚠️ Revue du 11 octobre : VRM ne voit pas la fin d'un dépôt fini À LA
+        //    MAIN — « n'a pas abouti » était une affirmation sans mesure. On dit
+        //    « pas su », la raison, et « Déjà publiée » en face de « Réessayer ».
+        dit(a.etat === 'abandonne' && !/n'a pas abouti/.test(a.abandon) && /onglet Leboncoin a été fermé/.test(a.abandon) && /Déjà publiée/.test(a.abandon) && /Réessayer/.test(a.txt), 'onglet du dépôt fermé : la raison, « si tu l’as publiée toi-même, Déjà publiée », et le bouton dit « Réessayer » — jamais « n’a pas abouti »', JSON.stringify(a));
         await pg.click('[data-bouton-publier] button');
         await pg.waitForTimeout(600);
+        const avantOk = await pg.evaluate(() => window.__cmds.length);
+        dit(avantOk === 1, '« Réessayer » ne relance RIEN avant sa confirmation (un second dépôt publierait une seconde fois)', String(avantOk));
+        const annuler = await pg.$('button:has-text("Annuler")');
+        if (annuler) { await annuler.click(); await pg.waitForTimeout(400); }
+        dit(!!annuler && (await pg.evaluate(() => window.__cmds.length)) === 1, 'Annuler : rien ne part', String(await pg.evaluate(() => window.__cmds.length)));
+        await pg.click('[data-bouton-publier] button');
+        await pg.waitForTimeout(500);
+        const relancer = await pg.$('button:has-text("Relancer le dépôt")');
+        if (relancer) { await relancer.click(); await pg.waitForTimeout(700); }
         const cmds = await pg.evaluate(() => window.__cmds);
-        dit(cmds.length === 2, '« Réessayer » renvoie la commande', JSON.stringify(cmds));
+        dit(cmds.length === 2 && /confirme/.test(cmds[1]), 'confirmé : « Réessayer » renvoie la commande, AVEC sa confirmation (l’extension l’exige)', JSON.stringify(cmds));
         await pg.screenshot({ path: path.join(require('os').tmpdir(), 'publier-abandon.png') });
+      } else if (cas.suite === 'confirmer') {
+        await pg.click('[data-bouton-publier="pret"] button');
+        await pg.waitForTimeout(900);
+        const relancer = await pg.$('button:has-text("Relancer le dépôt")');
+        const a = (await lire()).boutons[0] || {};
+        dit(!!relancer && a.etat === 'abandonne' && (await pg.evaluate(() => window.__cmds.length)) === 1, 'l’extension découvre un dépôt abandonné : l’app le dit, et DEMANDE avant de relancer', JSON.stringify({ relancer: !!relancer, etat: a.etat }));
+        if (relancer) { await relancer.click(); await pg.waitForTimeout(800); }
+        const cmds = await pg.evaluate(() => window.__cmds);
+        dit(cmds.length === 2 && /confirme/.test(cmds[1]), 'confirmé : la commande repart avec sa confirmation', JSON.stringify(cmds));
       } else if (cas.suite === 'rien') {
         await pg.click('[data-bouton-publier="pret"] button');
         await pg.waitForTimeout(800);

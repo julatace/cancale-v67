@@ -267,10 +267,22 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
     await p2b.waitForTimeout(2500);
     const id = String(QUEUE[0].id);
     // « Réessayer » depuis l'app, sur cet onglet encore ouvert : il REPREND ici.
-    await p2b.evaluate((id) => { for (const f of window.__ecouteurs) { try { f({ __vrmLbc: 'reprendre', id }); } catch (_) {} } }, id);
+    // ⚠️ Revue du 11 octobre : le service worker juge l'onglet VIVANT par la
+    //    RÉPONSE de la page (un onglet parti ailleurs bloquait la paire pour
+    //    toujours) — elle répond donc, pour CETTE paire.
+    const reponses = await p2b.evaluate((id) => new Promise((res) => {
+      const out = {}; let n = 0; const fin = () => { if (++n === 2) res(out); };
+      for (const f of window.__ecouteurs) {
+        try { f({ __vrmLbc: 'vivant', id }, {}, (r) => { out.vivant = r; fin(); }); } catch (_) {}
+        try { f({ __vrmLbc: 'reprendre', id }, {}, (r) => { out.reprendre = r; fin(); }); } catch (_) {}
+      }
+      setTimeout(() => res(out), 1500);
+    }), id);
     await p2b.waitForTimeout(300);
     const repris = await p2b.evaluate((id) => window.__envoyes.some((m) => m.action === 'depotRepris' && String(m.id) === id), id);
     dit(repris, '« Réessayer » depuis l’app sur un dépôt ouvert : la page REPREND ici (pas un second dépôt)', '');
+    dit(reponses.vivant && reponses.vivant.ok && reponses.vivant.depot === true && reponses.vivant.sienne === true && reponses.reprendre && reponses.reprendre.repris === true,
+      'et la page RÉPOND : sur le dépôt, pour cette paire, reprise faite (c’est ce que le service worker attend pour la dire vivante)', JSON.stringify(reponses));
     const ferme = await p2b.$('#vrm-close');
     if (ferme) await ferme.click().catch(() => {});
     await p2b.waitForTimeout(300);

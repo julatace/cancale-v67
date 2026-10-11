@@ -1823,7 +1823,17 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             const g = await chrome.storage.local.get('vrmPendingAd');
             const p = g && g.vrmPendingAd;
             const frais = p && p.at && (Date.now() - p.at) < 30 * 60 * 1000;
-            sendResponse({ ok: true, ad: frais ? p.ad : null }); return;
+            // ⚠️ Revue du 11 octobre : la paire en dépôt ne se remplit que dans
+            //    l'onglet ouvert POUR elle. Une autre page de dépôt restée
+            //    ouverte (un dépôt abandonné, puis relancé ailleurs) la reprenait
+            //    au premier retour sur l'onglet — et publiait une seconde fois.
+            //    Sans onglet connu (dépôt lancé autrement) : comme avant.
+            let ad = frais ? p.ad : null;
+            if (ad && sender && sender.tab && sender.tab.id != null) {
+              const job = (await lireCmds())['lbc:' + String(ad.id)];
+              if (job && job.tabId != null && job.tabId !== sender.tab.id) ad = null;
+            }
+            sendResponse({ ok: true, ad }); return;
           }
           sendResponse({ ok: false, error: 'action inconnue' });
         } catch (e) { sendResponse({ ok: false, error: String(e) }); }
@@ -4696,23 +4706,72 @@ async function publierDepuisApp(msg) {
     //        arrêté ⇒ on lui demande de reprendre, dans CET onglet ;
     //      · fermé ⇒ le dépôt est abandonné : on relance.
     //    Sans onglet connu (dépôt d'avant la 5.169), l'ancienne règle des 15 min.
+    let etapeDeja = jobDeja ? jobDeja.etape : '';
     if (jobDeja && (jobDeja.etape === 'depot' || jobDeja.etape === 'abandonne')) {
-      const onglet = jobDeja.tabId != null ? await ongletOuvert(jobDeja.tabId) : undefined;
+      let onglet = jobDeja.tabId != null ? await ongletOuvert(jobDeja.tabId) : undefined;
+      // ⚠️⚠️ Revue du 11 octobre : un onglet OUVERT n'est pas un dépôt VIVANT.
+      //    Navigué ailleurs (vinted.fr, la liste de Leboncoin…), il restait
+      //    ouvert, et « son dépôt est encore ouvert — je te le remets devant »
+      //    revenait à chaque clic, pour toujours (reproduit : un job de 20 h,
+      //    l'onglet sur vinted.fr, trois clics, trois refus). Vivant = l'adresse
+      //    est encore une page de dépôt ET le script de la page RÉPOND pour CETTE
+      //    paire. Sinon, le dépôt est abandonné — on ne sait pas comment il a
+      //    fini (voir plus bas).
       if (onglet) {
-        try { await chrome.tabs.update(onglet.id, { active: true }); if (onglet.windowId != null) chrome.windows.update(onglet.windowId, { focused: true }); } catch (_) {}
-        if (jobDeja.etape === 'abandonne') {
-          try { chrome.tabs.sendMessage(onglet.id, { __vrmLbc: 'reprendre', id }, () => { void chrome.runtime.lastError; }); } catch (_) {}
-          await majCmd(cleJob, { etape: 'depot', raison: null });
-          return { accepte: true, jobId: cleJob, etape: 'depot', repris: true };
+        const vivant = await ongletDepotVivant(onglet, id, lbc, jobDeja.etape === 'abandonne');
+        if (vivant) {
+          try { await chrome.tabs.update(onglet.id, { active: true }); if (onglet.windowId != null) chrome.windows.update(onglet.windowId, { focused: true }); } catch (_) {}
+          if (jobDeja.etape === 'abandonne') {
+            await majCmd(cleJob, { etape: 'depot', raison: null });
+            return { accepte: true, jobId: cleJob, etape: 'depot', repris: true };
+          }
+          return { accepte: false, code: 'en-cours', ouvert: true, raison: lbc ? 'son dépôt est encore ouvert dans un onglet Leboncoin — je te le remets devant' : 'sa préparation eBay est encore ouverte — je te la remets devant' };
         }
-        return { accepte: false, code: 'en-cours', ouvert: true, raison: lbc ? 'son dépôt est encore ouvert dans un onglet Leboncoin — je te le remets devant' : 'sa préparation eBay est encore ouverte — je te la remets devant' };
+        if (jobDeja.etape === 'depot' || jobDeja.raison !== 'onglet-quitte') await majCmd(cleJob, { etape: 'abandonne', raison: 'onglet-quitte', tabId: null });
+        etapeDeja = 'abandonne';
+        onglet = null;
       }
       if (onglet === undefined && jobDeja.etape === 'depot' && Date.now() - Number(jobDeja.at || 0) < 15 * 60000) {
         return { accepte: false, code: 'en-cours', raison: lbc ? 'sa publication est déjà en cours dans un autre onglet' : 'sa préparation eBay est déjà ouverte dans un autre onglet' };
       }
     }
+    // ⚠️⚠️ Revue du 11 octobre : UN DÉPÔT ABANDONNÉ A PU ÊTRE FINI À LA MAIN.
+    //    L'arrêt à 90 s arrive justement quand un champ obligatoire ne se devine
+    //    pas — il le termine lui-même, VRM ne voit pas la page de fin, puis il
+    //    ferme l'onglet. « Réessayer » ouvrait alors un SECOND dépôt qui publie
+    //    tout seul : la paire deux fois sur Leboncoin. On ne relance une
+    //    publication automatique qu'avec sa confirmation (l'app la demande, avec
+    //    « Déjà publiée » en face). eBay ne publie rien tout seul : pas besoin.
+    if (lbc && etapeDeja === 'abandonne' && msg.confirme !== true) {
+      return { accepte: false, code: 'confirmer', jobId: cleJob, etape: 'abandonne', raison: "VRM n'a pas vu la fin du dépôt précédent — si tu l'as publiée toi-même, clique « Déjà publiée » ; sinon confirme pour relancer" };
+    }
     return await publierDepuisAppSuite(msg, cmd, id, lbc);
   } finally { PUBLICATIONS_EN_VOL.delete(cleJob); }
+}
+// Le dépôt de CETTE paire vit-il encore dans cet onglet ? (revue du 11 octobre)
+//    Leboncoin : l'adresse est une page de dépôt (pas la page de fin) ET lbc.js
+//    y répond pour cette paire — un acquittement, pas seulement l'existence de
+//    l'onglet. `reprendre` : on lui demande en même temps de reprendre le
+//    remplissage (dépôt arrêté) ; vivant = il a repris. Pas de réponse (lbc.js
+//    absent, page partie ailleurs, ancienne version) ⇒ pas vivant.
+//    eBay : ebay.js ne répond pas à ce message — l'adresse seule juge.
+async function ongletDepotVivant(onglet, id, lbc, reprendre) {
+  const url = String((onglet && (onglet.url || onglet.pendingUrl)) || '');
+  if (!lbc) return !url || /^https:\/\/([a-z0-9-]+\.)*ebay\.(fr|com)\//i.test(url);
+  if (url && (!/^https:\/\/([a-z0-9-]+\.)*leboncoin\.fr\/deposer-une-annonce/i.test(url) || /\/confirmation/i.test(url))) return false;
+  const rep = await new Promise((res) => {
+    let fini = false;
+    const t = setTimeout(() => { if (!fini) { fini = true; res(null); } }, 2500);
+    try {
+      chrome.tabs.sendMessage(onglet.id, { __vrmLbc: reprendre ? 'reprendre' : 'vivant', id: String(id) }, { frameId: 0 }, (r) => {
+        if (fini) return; fini = true; clearTimeout(t);
+        let e = null; try { e = chrome.runtime.lastError; } catch (_) { e = null; }
+        res(e ? null : (r || null));
+      });
+    } catch (_) { if (!fini) { fini = true; clearTimeout(t); res(null); } }
+  });
+  if (!rep || !rep.ok) return false;
+  return reprendre ? rep.repris === true : (rep.depot === true && rep.sienne === true);
 }
 // L'onglet d'un dépôt : l'objet s'il est encore ouvert, `null` s'il est fermé,
 // `undefined` si on ne sait pas (pas d'identifiant, API absente).

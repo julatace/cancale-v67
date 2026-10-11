@@ -497,11 +497,82 @@ let TLS = null;
       await pg.goto('https://vrm.center/?tab=cat_ventes', { waitUntil: 'domcontentloaded' }).catch(() => {});
       const rep = await attendreQue(async () => { const x = await appelSW(ctx, r.id, () => ({ neuf: typeof demanderLiaison === 'function' })); return x && x.neuf ? x : null; }, 30000, 500);
       dit(!!rep.v, 'G : le code est RÉPARÉ tout seul (le pont l’a repéré, la page de réparation a fait ⟳)', rep.v ? `${rep.ms} ms` : `toujours l’ancien code après ${rep.ms} ms`);
+      // ⚠️ Revue du 11 octobre : SANS recharger la page, l'app disait encore
+      //    « périmé — clique ⟳ » ~20 s après la réparation (commandes coupées),
+      //    jusqu'au battement suivant. Le pont remis à neuf annonce « ready » :
+      //    elle doit relire tout de suite.
+      if (rep.v) {
+        const sans = await attendreQue(async () => { const c = await pg.evaluate(() => { const b = document.querySelector('[data-etat-actions]'); return b ? b.getAttribute('data-etat-code') : null; }).catch(() => null); return c && c !== 'perime' ? c : null; }, 15000, 250);
+        dit(!!sans.v && sans.ms < 6000, 'G : sans recharger la page, l’app ne le dit plus périmé en quelques secondes (avant : ~20 s)', sans.v ? `${sans.v} après ${sans.ms} ms` : `toujours « périmé » après ${sans.ms} ms`);
+      }
       await pg.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
       await attendre(4000);
       const code = await pg.evaluate(() => { const b = document.querySelector('[data-etat-actions]'); return b ? b.getAttribute('data-etat-code') : null; }).catch(() => null);
       dit(!!rep.v && code !== 'perime' && code !== 'muette', 'G : et l’app ne le dit plus périmé', String(code));
     } finally { await ctx.close().catch(() => {}); }
+  });
+
+  // ══ P. CODE PÉRIMÉ : « SE CONNECTER AVEC VRM » DANS LA FENÊTRE DE L'ICÔNE ═══
+  //    Revue du 11 octobre, mesuré : l'ancien service worker ne connaît pas
+  //    `lierAvecVRM` — le port se fermait, la fenêtre se fermait, RIEN ne se
+  //    passait (aucun onglet VRM, code toujours ancien). C'est l'état de 5 de
+  //    ses 6 Chrome.
+  await cas('P · code périmé : « Se connecter avec VRM » dans la fenêtre de l’icône', async (F) => {
+    if (!V164) { dit(false, 'P : la 5.164 ne peut pas être reconstituée'); return; }
+    const app = sessionApp(F);
+    const dir = copier(V164, 'perime-P-' + Date.now());
+    const udd = path.join(TMP, 'profil-P-' + Date.now());
+    let ctx = await lancer(udd, []);
+    const br = ctx.browser();
+    const bcdp = br ? await br.newBrowserCDPSession() : await ctx.newCDPSession(await ctx.newPage());
+    const r = await bcdp.send('Extensions.loadUnpacked', { path: dir }).catch((e) => ({ err: e.message }));
+    if (!r || !r.id) { dit(false, 'P : installation non empaquetée (CDP)', JSON.stringify(r)); await ctx.close(); return; }
+    await attendre(2500);
+    await ctx.close();
+    remplacer(dir, EXT_SRC);
+    ctx = await lancer(udd, []);
+    try {
+      await poserSessionApp(ctx, app.s);
+      await attendre(2000);
+      const avant = await appelSW(ctx, r.id, () => ({ manif: chrome.runtime.getManifest().version, neuf: typeof demanderLiaison === 'function' }));
+      dit(avant && avant.neuf === false, 'P : reproduit — manifeste ' + MANIF + ', ancien service worker', JSON.stringify(avant));
+      const pop = await ctx.newPage();
+      await pop.goto(`chrome-extension://${r.id}/popup.html`); await attendre(1200);
+      const bouton = await pop.$('#lierBtn');
+      dit(!!bouton, 'P : la fenêtre (lue depuis le disque) propose « Se connecter avec VRM »');
+      if (bouton) await bouton.click().catch(() => {});
+      const vrm = await pageVRM(ctx);
+      dit(!!vrm, 'P : le clic OUVRE VRM quand même (l’ancien code ne connaît pas ce message)', vrm ? vrm.url() : JSON.stringify(ctx.pages().map((x) => x.url())));
+      const rep = await attendreQue(async () => { const x = await appelSW(ctx, r.id, () => ({ neuf: typeof demanderLiaison === 'function' })); return x && x.neuf ? x : null; }, 20000, 500);
+      dit(!!rep.v, 'P : et le code est réparé (⟳ fait par la fenêtre)', rep.v ? `${rep.ms} ms` : `ancien code après ${rep.ms} ms`);
+      const co = await attendreQue(async () => { const e = await sessionExt(ctx, r.id); return e && e.session && !e.session.mort ? e : null; }, 30000, 500);
+      dit(!!co.v && co.v.session.sid !== app.sid, 'P : au bout du compte, l’extension est CONNECTÉE (sa propre session), sans rien taper', co.v ? `${co.v.session.sid} en ${co.ms} ms` : `pas connectée après ${co.ms} ms`);
+    } finally { await ctx.close().catch(() => {}); }
+  });
+
+  // ══ S. « SE DÉCONNECTER » DE VRM, UNE EXTENSION 5.164 CONNECTÉE ICI ═══════
+  //    Revue du 11 octobre : elle n'entend pas le canal adressé, et l'app ne
+  //    lui postait plus rien — elle continuait d'écrire sous ce compte après
+  //    « Se déconnecter » (la modale promet le contraire).
+  await cas('S · « Se déconnecter » de VRM, extension 5.164 connectée sous ce compte', async (F, ouvrir) => {
+    if (!V164) { dit(false, 'S : la 5.164 ne peut pas être reconstituée'); return; }
+    const app = sessionApp(F);
+    const ID164 = extId(V164);
+    const ctx = await ouvrir([V164], 'S');
+    await poserSessionApp(ctx, app.s);
+    if (!(await sw(ctx, ID164))) { dit(false, 'S : le service worker de la 5.164 démarre'); return; }
+    const co = await appelSW(ctx, ID164, async (a) => { const r = await authLogin(a.e, a.p); return r && r.ok; }, { e: U.email, p: MDP });
+    const avant = await sessionExt(ctx, ID164);
+    dit(co === true && avant.session, 'S : la 5.164 est connectée sous ce compte', JSON.stringify(avant.session && avant.session.sid));
+    const pg = await ctx.newPage();
+    await pg.goto('https://vrm.center/?tab=settings&vue=compte', { waitUntil: 'domcontentloaded' }).catch(() => {});
+    await attendre(5000);
+    await pg.getByText('Se déconnecter', { exact: true }).first().click().catch(() => {});
+    await attendre(500);
+    let valide = false;
+    for (const x of await pg.$$('button')) { const t = ((await x.innerText().catch(() => '')) || '').trim(); const st = (await x.getAttribute('style').catch(() => '')) || ''; if (t === 'Se déconnecter' && /flex: 2/.test(st)) { await x.click().catch(() => {}); valide = true; break; } }
+    const r = await attendreQue(async () => { const e = await sessionExt(ctx, ID164); return e && !e.session ? e : null; }, 8000, 300);
+    dit(valide && !!r.v, 'S : « Se déconnecter » de VRM lui fait OUBLIER sa session (l’ancien message, sur ce geste seulement)', JSON.stringify({ valide, apres: (await sessionExt(ctx, ID164)).session }));
   });
 
   // ══ H. CHACUN SA FAMILLE : PERSONNE NE TUE PERSONNE ══════════════════════

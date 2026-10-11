@@ -58,6 +58,12 @@ async function rendre(nav, etat, { carte = false, mode = '', geste = null, faux 
       runtime: {
         sendMessage: (msg, cb) => {
           window.__envoyes.push(msg);
+          // Un service worker d'AVANT (code périmé) ne connaît pas ce message :
+          // Chrome ferme le port, le rappel reçoit `undefined` avec `lastError`.
+          if ((faux.lierFerme && msg.action === 'lierAvecVRM') || (faux.codeFerme && msg.action === 'codeVersion')) {
+            setTimeout(() => { window.chrome.runtime.lastError = { message: 'The message port closed before a response was received.' }; try { cb && cb(undefined); } finally { window.chrome.runtime.lastError = null; } }, 5);
+            return;
+          }
           const r = msg.action === 'authEtat' ? e
             : msg.action === 'freshness' ? { ok: true, fresh: [] }
             : msg.action === 'codeVersion' ? (faux.codeMuet ? undefined : { ok: true, code: faux.code || null })
@@ -68,6 +74,7 @@ async function rendre(nav, etat, { carte = false, mode = '', geste = null, faux 
           setTimeout(() => cb && cb(r), (r && r.__lent) || 0);
         },
         lastError: null,
+        id: 'abcdefghijklmnopabcdefghijklmnop',
         getManifest: () => ({ version: faux.manifeste || '5.169.0' }),
         reload: () => { window.__recharges++; },
       },
@@ -100,6 +107,7 @@ async function rendre(nav, etat, { carte = false, mode = '', geste = null, faux 
   const boutons = await pg.evaluate(() => Array.from(document.querySelectorAll('button')).filter((b) => b.offsetParent).map((b) => b.id));
   const recharges = await pg.evaluate(() => window.__recharges);
   const reparation = await pg.evaluate(() => document.body.getAttribute('data-reparation'));
+  const secours = await pg.evaluate(() => document.body.getAttribute('data-lier-secours'));
   const mem = await pg.evaluate(() => window.__mem);
   // Tout doit tenir dans la carte, sans défilement horizontal ni coupe.
   const deborde = await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth || document.documentElement.scrollHeight > window.innerHeight + 1);
@@ -107,7 +115,7 @@ async function rendre(nav, etat, { carte = false, mode = '', geste = null, faux 
   const anciens = await pg.evaluate(() => /#4aa87d|#E0B972|#F7E3B6/i.test(document.documentElement.outerHTML));
   if (carte && process.env.BANC_CAPTURES) await pg.screenshot({ path: path.join(process.env.BANC_CAPTURES, `popup-carte-${etat.connecte ? 'co' : 'deco'}.png`) });
   await ctx.close();
-  return { txt, champs, liens, erreurs, ouvert, ferme, envoyes, messages, boutons, deborde, anciens, recharges, reparation, mem };
+  return { txt, champs, liens, erreurs, ouvert, ferme, envoyes, messages, boutons, deborde, anciens, recharges, reparation, mem, secours };
 }
 const ouvrirMdp = async (pg) => { const a = await pg.$('#mdpLien'); if (a) { await a.click(); await pg.waitForTimeout(120); } };
 
@@ -134,6 +142,18 @@ const ouvrirMdp = async (pg) => { const a = await pg.$('#mdpLien'); if (a) { awa
     dit(!!m && /vinted\.fr/.test(m.urlActive || ''), 'un clic : le service worker OUVRE VRM (avec l’identifiant de cette extension) — rien à taper', JSON.stringify(r.messages));
     dit(!r.envoyes.includes('authLogin'), 'et aucun mot de passe n’est envoyé', JSON.stringify(r.envoyes));
     dit(r.ferme, 'la petite fenêtre se referme (VRM est devant)');
+  });
+  // ⚠️⚠️ Revue du 11 octobre — CODE PÉRIMÉ : l'ancien service worker ne connaît
+  //    pas `lierAvecVRM`. Le clic fermait la fenêtre et RIEN ne se passait
+  //    (mesuré dans un vrai Chromium, sur 5 de ses 6 Chrome).
+  await essaie('« Se connecter avec VRM » sur un code périmé', async () => {
+    const r = await rendre(nav, { ok: true, connecte: false }, { geste: async (pg) => { await pg.click('#lierBtn'); await pg.waitForTimeout(400); }, faux: { lierFerme: true, codeFerme: true, manifeste: '5.169.0' } });
+    dit(/lier-extension=abcdefghijklmnopabcdefghijklmnop/.test(r.ouvert || ''), 'le service worker ne répond pas : la fenêtre OUVRE VRM elle-même, avec l’identifiant de cette extension', String(r.ouvert));
+    dit(r.recharges === 1 && r.secours === 'recharge', 'et répare le code (⟳ = `chrome.runtime.reload`, une fois)', JSON.stringify({ recharges: r.recharges, secours: r.secours }));
+    const d = await rendre(nav, { ok: true, connecte: false }, { geste: async (pg) => { await pg.click('#lierBtn'); await pg.waitForTimeout(400); }, faux: { lierFerme: true, codeFerme: true, manifeste: '5.169.0', stock: { vrmReparation: { cle: '5.169.0', at: Date.now() } } } });
+    dit(d.recharges === 0 && d.champs.some((c) => c.id === 'pw' && c.visible) && /⟳/.test(d.txt) && /mot de passe VRM/.test(d.txt) && !d.ferme, 'réparation déjà tentée : le mot de passe VRM se déplie, et la fenêtre dit le geste (⟳) — elle ne se ferme pas sur rien', JSON.stringify({ recharges: d.recharges, champs: d.champs.filter((c) => c.visible).map((c) => c.id), ferme: d.ferme }));
+    const ok = await rendre(nav, { ok: true, connecte: false }, { geste: (pg) => pg.click('#lierBtn') });
+    dit(ok.recharges === 0 && !/lier-extension/.test(ok.ouvert || '') && ok.ferme, 'autre sens : un service worker à jour répond — rien d’autre (ni rechargement, ni second onglet)', JSON.stringify({ recharges: ok.recharges, ouvert: ok.ouvert, ferme: ok.ferme }));
   });
   // Le mot de passe VRM reste possible — sur demande, avec la mise en garde.
   await essaie('mot de passe sur demande', async () => {

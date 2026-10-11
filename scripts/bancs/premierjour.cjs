@@ -73,7 +73,7 @@ const ecouter = () => new Promise((res, rej) => {
 //   comptes : [] (neuf) ou [COMPTE_BANC]
 //   baseKO  : la base ne répond pas (522 + HTML, la VRAIE forme de la panne)
 //   prenom  : ce que le réglage synchronisé contient
-async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lecturePublique = false, sansSession = false, pont = null, tab = 'journee', telephone = false } = {}) {
+async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lecturePublique = false, sansSession = false, pont = null, tab = 'journee', telephone = false, version = '5.63.0', clic = null } = {}) {
   // ⚠️ Un téléphone n'est pas « un écran étroit » : ce qui compte est l'ENTRÉE.
   //    `isMobile + hasTouch` fait déclarer à Chromium `pointer: coarse` et
   //    `hover: none` — exactement ce que l'app mesure (vérifié : coarse true /
@@ -96,20 +96,26 @@ async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lectureP
   //   pont = null              → aucune extension ici (téléphone, autre navigateur)
   //   pont = 'muette'          → elle est là mais ne répond pas (« pas su »)
   //   pont = {connecte, email} → elle répond
+  // `version` : celle que le pont annonce. Avant la 5.169 l'extension n'entend
+  // pas le canal adressé : l'app ne peut PAS la connecter elle-même (revue du
+  // 11 octobre). `__posts` note ce que l'app poste dans la page ; une ancienne
+  // extension comprend `session: null` (elle oublie sa session).
   if (pont) {
-    await pg.addInitScript((p) => {
+    await pg.addInitScript(([p, version]) => {
+      window.__posts = [];
       window.addEventListener('message', (ev) => {
         if (ev.source !== window || !ev.data || typeof ev.data !== 'object') return;
         const d = ev.data;
-        if (d.__vmr === 'ping') { window.postMessage({ __vmr: 'ready', version: '5.63.0' }, '*'); return; }
+        if (d.__vmr === 'session') { window.__posts.push(d.session === null ? 'null' : 'session'); if (d.session === null && p && typeof p === 'object') p.connecte = false; return; }
+        if (d.__vmr === 'ping') { window.postMessage({ __vmr: 'ready', version }, '*'); return; }
         if (d.__vmr === 'authEtat' && d.reqId && p !== 'muette') {
           window.postMessage({ __vmr: 'authEtat:result', reqId: d.reqId,
-            etat: { ok: true, connecte: !!p.connecte, email: p.email || '', cloisonne: true } }, '*');
+            etat: { ok: true, connecte: !!p.connecte, email: p.connecte ? (p.email || '') : '', cloisonne: true } }, '*');
         }
       });
-      window.postMessage({ __vmr: 'ready', version: '5.63.0' }, '*');
-      setTimeout(() => window.postMessage({ __vmr: 'ready', version: '5.63.0' }, '*'), 400);
-    }, pont);
+      window.postMessage({ __vmr: 'ready', version }, '*');
+      setTimeout(() => window.postMessage({ __vmr: 'ready', version }, '*'), 400);
+    }, [pont, version]);
   }
 
   await pg.route('**/auth/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json',
@@ -141,6 +147,12 @@ async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lectureP
   //    5 octobre : une extension qui se réveille met parfois 3 s à répondre,
   //    et l'app la déclarait muette à tort) : on laisse ce délai s'écouler.
   await pg.waitForTimeout(pont === 'muette' ? 8000 : 5000);
+  let clique = null;
+  if (clic) { const el = await pg.$(clic); clique = !!el; if (el) { await el.click().catch(() => {}); await pg.waitForTimeout(2500); } }
+  const posts = await pg.evaluate(() => window.__posts || []);
+  const voie = await pg.evaluate(() => { const el = document.querySelector('[data-etape]'); return el ? el.getAttribute('data-voie') : null; });
+  const gestes = await pg.evaluate(() => Array.from(document.querySelectorAll('[data-premiers-geste]')).map((x) => x.getAttribute('data-premiers-geste')));
+  const carte = await pg.evaluate(() => { const el = document.querySelector('[data-etape]'); return el ? el.innerText : ''; });
 
   const txt = await pg.evaluate(() => document.body.innerText);
   // ⚠️ On lit aussi les href : un geste qui se CLIQUE ne se voit pas dans
@@ -157,7 +169,7 @@ async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lectureP
   // sur toute la page attraperait n'importe quel prénom écrit ailleurs.
   const bonjour = (/^(?:Bonjour|Bon après-midi|Bonsoir).*$/m.exec(txt) || [''])[0].trim();
   await ctx.close();
-  return { txt, liens, bonjour, erreurs, etat };
+  return { txt, liens, bonjour, erreurs, etat, voie, gestes, carte, posts, clique };
 }
 
 (async () => {
@@ -266,6 +278,32 @@ async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lectureP
   // on propose de réessayer. C'est le geste qui est exigé, pas sa formulation.
   dit(/recharge/i.test(muette.txt), 'mais on dit quoi faire (recharger) plutôt que de se taire',
     muette.txt.split('\n').slice(-2).join(' · '));
+
+  // ── 4 bis (b). UNE EXTENSION QUI NE SAIT PAS RECEVOIR LA CONNEXION DE VRM ──
+  // ⚠️⚠️ Revue du 11 octobre : à une 5.164 (celle qu'il a installée), la carte
+  //    promettait « je la connecte d'ici, sans rien à taper » et « je la
+  //    reconnecte… rien à taper » — l'app ne lui envoie plus RIEN (canal
+  //    adressé : 5.169), et « Se connecter avec VRM » nommait un bouton que sa
+  //    fenêtre n'a pas. On juge l'état décidé (`data-voie`) et ses gestes.
+  console.log('\n── Extension 5.164 (pas de canal adressé) : aucune promesse, le vrai geste');
+  const vieillePas = await rendre(nav, { comptes: [], pont: { connecte: false }, version: '5.164.0' });
+  dit(vieillePas.etat === 'pasconnectee' && vieillePas.voie === 'retard', 'pas connectée, 5.164 : l’app sait qu’elle ne peut PAS la connecter', `${vieillePas.etat} · voie ${vieillePas.voie}`);
+  dit(!/rien à taper|Je la connecte|je la reconnecte/i.test(vieillePas.carte), 'aucune promesse « je la connecte… rien à taper »', vieillePas.carte.slice(0, 300).replace(/\n/g, ' · '));
+  dit(!/Se connecter avec VRM/.test(vieillePas.carte), 'aucun bouton que sa fenêtre n’a pas (« Se connecter avec VRM »)');
+  dit(vieillePas.gestes.includes('maj') && /mot de passe/i.test(vieillePas.carte), 'les deux vrais gestes : la mise à jour (le zip) ou le mot de passe VRM', JSON.stringify(vieillePas.gestes));
+  {
+    const vieilleAutre = await rendre(nav, { comptes: [], pont: { connecte: true, email: 'quelqu-un-dautre@exemple.fr' }, version: '5.164.0' });
+    dit(vieilleAutre.etat === 'autrecompte' && vieilleAutre.voie === 'retard', 'autre compte, 5.164 : l’app sait qu’elle ne peut pas la reconnecter', `${vieilleAutre.etat} · voie ${vieilleAutre.voie}`);
+    dit(!/rien à taper|je la reconnecte à/i.test(vieilleAutre.carte), 'aucune promesse « je la reconnecte… rien à taper »', vieilleAutre.carte.slice(0, 400).replace(/\n/g, ' · '));
+    dit(vieilleAutre.gestes.includes('maj') && vieilleAutre.gestes.includes('deconnecter'), 'gestes : la mise à jour, ou la déconnecter d’ici', JSON.stringify(vieilleAutre.gestes));
+    dit(vieilleAutre.posts.length === 0, 'et RIEN n’est posté dans la page tant qu’il n’a pas cliqué', JSON.stringify(vieilleAutre.posts));
+  }
+  const deco = await rendre(nav, { comptes: [], pont: { connecte: true, email: 'quelqu-un-dautre@exemple.fr' }, version: '5.164.0', clic: '[data-premiers-geste="deconnecter"]' });
+  dit(deco.clique && deco.posts.length === 1 && deco.posts[0] === 'null', 'son clic « Déconnecter l’extension de ce Chrome » lui fait oublier sa session (l’ancien message, session: null) — une fois', JSON.stringify({ clique: deco.clique, posts: deco.posts }));
+  dit(deco.etat === 'pasconnectee', 'et la carte passe à l’étape suivante (la connecter au mot de passe VRM)', `état rendu = ${deco.etat}`);
+  // L'autre sens : une 5.169 (canal adressé) garde la promesse — l'app LA tient.
+  const neuve = await rendre(nav, { comptes: [], pont: { connecte: false }, version: '5.169.0' });
+  dit(neuve.etat === 'pasconnectee' && neuve.voie === 'app' && /sans rien à taper/i.test(neuve.carte), 'autre sens : une 5.169 garde « je la connecte d’ici, sans rien à taper »', `${neuve.etat} · voie ${neuve.voie}`);
 
   // ── 4 ter. LES DEUX ÉCRANS D'ACCUEIL DISENT LA MÊME CHOSE (§11) ───────────
   // Il y avait DEUX onboardings : le tableau de bord récitait « 3 étapes »

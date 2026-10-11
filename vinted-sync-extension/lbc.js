@@ -1179,11 +1179,24 @@
     // « Réessayer » dans l'app, sur un dépôt arrêté dont l'onglet est encore
     // ouvert : le service worker remet CET onglet devant et nous demande de
     // reprendre (jamais un second dépôt pour la même paire).
+    // ⚠️ Revue du 11 octobre : le service worker juge l'onglet VIVANT par notre
+    //    RÉPONSE (avant : par sa seule existence — un onglet parti sur vinted.fr
+    //    bloquait la paire pour toujours). On répond donc toujours : `vivant` =
+    //    sommes-nous encore sur une page de dépôt, pour CETTE paire ;
+    //    `reprendre` = avons-nous vraiment repris.
     try {
-      chrome.runtime.onMessage.addListener((m) => {
-        if (!m || m.__vrmLbc !== 'reprendre') return;
-        if (pending && String(pending.id) === String(m.id)) reprendre();
-        else autoPrefill();
+      chrome.runtime.onMessage.addListener((m, _expediteur, repondre) => {
+        if (!m || (m.__vrmLbc !== 'reprendre' && m.__vrmLbc !== 'vivant')) return;
+        const surDepot = /deposer|depot|d[ée]p[oô]t/i.test(location.href) && !/\/confirmation/i.test(location.href);   // la même page que `autoPrefill`
+        const sienne = () => !!pending && String(pending.id) === String(m.id);
+        const dire = (r) => { try { repondre(Object.assign({ ok: true }, r)); } catch (_) {} };
+        if (m.__vrmLbc === 'vivant') { dire({ depot: surDepot, sienne: sienne() }); return; }
+        if (!surDepot) { dire({ repris: false }); return; }
+        if (sienne()) { reprendre(); dire({ repris: true }); return; }
+        // La page a été rechargée : on relit la paire en dépôt (le service
+        // worker ne la rend qu'à l'onglet ouvert pour elle), puis on dit.
+        autoPrefill().then(() => dire({ repris: sienne() }), () => dire({ repris: false }));
+        return true;
       });
     } catch (_) {}
     demarrer();

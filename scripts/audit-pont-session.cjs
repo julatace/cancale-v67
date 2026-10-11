@@ -480,30 +480,68 @@ const quiRepond = (r, t) => (t.vivante(r) ? String(t.vivante(r)) : 'vide/erreur'
     const b = faireBg({ store: { vrmSession: session(3600e3), vrmCloisonne: true } });
     b.ctx.completerPhotosSiManque = async () => {};
     b.ctx.buildLbcData = async () => ({ stats: {}, queue: [{ id: '7700112233', numero: '12' }] });
-    const ouverts = new Set(); let nTab = 10; const crees = [], devant = [], reprises = [];
-    b.ctx.chrome.tabs.create = async (o) => { const id = ++nTab; ouverts.add(id); crees.push(o && o.url); return { id, windowId: 1 }; };
-    b.ctx.chrome.tabs.get = async (id) => { if (!ouverts.has(id)) throw new Error('No tab with id: ' + id); return { id, windowId: 1 }; };
+    // Les onglets, et ce que lbc.js y répond (revue du 11 octobre : l'onglet
+    // VIVANT se juge par une réponse de la page, pas par son existence).
+    //   pages[id] = { url, pending (id de la paire en dépôt), muet (pas de lbc.js) }
+    const pages = new Map(); let nTab = 10; const crees = [], devant = [], reprises = [];
+    b.ctx.chrome.tabs.create = async (o) => { const id = ++nTab; pages.set(id, { url: o && o.url, pending: '7700112233', muet: false }); crees.push(o && o.url); return { id, windowId: 1, url: o && o.url }; };
+    b.ctx.chrome.tabs.get = async (id) => { const pg = pages.get(id); if (!pg) throw new Error('No tab with id: ' + id); return { id, windowId: 1, url: pg.url }; };
     b.ctx.chrome.tabs.update = async (id, o) => { if (o && o.active) devant.push(id); return { id }; };
-    b.ctx.chrome.tabs.sendMessage = (id, m, cb) => { if (m && m.__vrmLbc === 'reprendre') reprises.push(id); if (typeof cb === 'function') cb(); };
+    b.ctx.chrome.tabs.sendMessage = (id, m, a, c) => {
+      const cb = typeof a === 'function' ? a : c;
+      const pg = pages.get(id);
+      const repondre = (r) => { if (typeof cb === 'function') setTimeout(() => cb(r), 5); };
+      if (!pg || pg.muet || !m || !m.__vrmLbc) { repondre(undefined); return; }
+      const surDepot = /deposer-une-annonce/.test(pg.url || '') && !/confirmation/.test(pg.url || '');
+      const sienne = String(pg.pending || '') === String(m.id);
+      if (m.__vrmLbc === 'vivant') repondre({ ok: true, depot: surDepot, sienne });
+      else if (m.__vrmLbc === 'reprendre') { if (surDepot && sienne) reprises.push(id); repondre({ ok: true, repris: surDepot && sienne }); }
+    };
     const cmds = async () => (await b.ctx.lireCmds())['lbc:7700112233'] || {};
     const r1 = await b.ctx.publierDepuisApp({ cmd: 'lbcPublier', id: '7700112233' });
     const tab1 = (await cmds()).tabId;
     dit(r1 && r1.accepte && tab1 === 11 && crees.length === 1, 'h2 · publier : un onglet de dépôt, RETENU (son identifiant est noté)', JSON.stringify({ r1, tab1 }));
     const r2 = await b.ctx.publierDepuisApp({ cmd: 'lbcPublier', id: '7700112233' });
     dit(r2 && r2.accepte === false && r2.ouvert === true && /devant/.test(r2.raison || '') && devant.includes(11) && crees.length === 1, "h2 · re-cliquer pendant le dépôt : l'onglet est REMIS DEVANT, aucun second dépôt, et la raison est dite", JSON.stringify({ r2, devant, crees: crees.length }));
-    ouverts.delete(11); await b.ctx.depotOngletFerme(11);
+    // La paire en dépôt ne se remplit que dans SON onglet : une autre page de
+    // dépôt restée ouverte ne la reprend pas (elle publierait une seconde fois).
+    const gAutre = await b.brut({ from: 'cancale-lbc', action: 'getPending' }, { tab: { id: 99 } });
+    const gSien = await b.brut({ from: 'cancale-lbc', action: 'getPending' }, { tab: { id: 11 } });
+    dit(gAutre && gAutre.ok && !gAutre.ad && gSien && gSien.ad && String(gSien.ad.id) === '7700112233', 'h2 · la paire en dépôt n’est rendue qu’à l’onglet ouvert pour elle (une autre page de dépôt ne la reprend pas)', JSON.stringify({ autre: gAutre && !!gAutre.ad, sien: !!(gSien && gSien.ad) }));
+    pages.delete(11); await b.ctx.depotOngletFerme(11);
     const c = await cmds();
     dit(c.etape === 'abandonne' && c.raison === 'onglet-ferme' && !b.store.vrmPendingAd, "h2 · l'onglet du dépôt fermé : « abandonné », et la paire n'attend plus dans une page de dépôt", JSON.stringify({ etape: c.etape, raison: c.raison, pending: !!b.store.vrmPendingAd }));
-    dit(b.j.notifs.some((n) => n.type === 'cmd' && n.jobId === 'lbc:7700112233' && n.etape === 'abandonne'), "h2 · et l'app le sait tout de suite (« Le dépôt n'a pas abouti — Réessayer »)", JSON.stringify(b.j.notifs.map((n) => n.etape)));
+    dit(b.j.notifs.some((n) => n.type === 'cmd' && n.jobId === 'lbc:7700112233' && n.etape === 'abandonne'), "h2 · et l'app le sait tout de suite (Réessayer)", JSON.stringify(b.j.notifs.map((n) => n.etape)));
+    // ⚠️⚠️ Revue du 11 octobre : il a pu le FINIR À LA MAIN avant de fermer.
+    //    Relancer sans lui demander ouvrait un second dépôt qui publie tout seul.
     const r3 = await b.ctx.publierDepuisApp({ cmd: 'lbcPublier', id: '7700112233' });
-    dit(r3 && r3.accepte && crees.length === 2, '« Réessayer » : un nouveau dépôt part tout de suite (avant : refusé 15 minutes, sans un mot)', JSON.stringify({ r3, crees: crees.length }));
-    // lbc.js arrête son remplissage (90 s) : l'onglet reste ouvert.
+    dit(r3 && r3.accepte === false && r3.code === 'confirmer' && crees.length === 1 && !b.store.vrmPendingAd, "h2 · « Réessayer » après un dépôt abandonné : rien ne repart sans sa confirmation (il a pu le publier à la main — un second dépôt la publierait deux fois)", JSON.stringify({ r3, crees: crees.length, pending: !!b.store.vrmPendingAd }));
+    const r3b = await b.ctx.publierDepuisApp({ cmd: 'lbcPublier', id: '7700112233', confirme: true });
+    dit(r3b && r3b.accepte && crees.length === 2, "h2 · confirmé : un nouveau dépôt part tout de suite (avant : refusé 15 minutes, sans un mot)", JSON.stringify({ r3b, crees: crees.length }));
+    // lbc.js arrête son remplissage (90 s) : l'onglet reste ouvert, sur le dépôt.
     const tab2 = (await cmds()).tabId;
     await b.brut({ from: 'cancale-lbc', action: 'depotArrete', id: '7700112233', raison: 'arret' }, { tab: { id: tab2 } });
     const c2 = await cmds();
     dit(c2.etape === 'abandonne' && c2.raison === 'arret', '« arrêté » par la page de dépôt : abandonné aussi, avec sa raison', JSON.stringify(c2));
     const r4 = await b.ctx.publierDepuisApp({ cmd: 'lbcPublier', id: '7700112233' });
-    dit(r4 && r4.accepte && r4.repris && reprises.includes(tab2) && crees.length === 2, "h2 · « Réessayer » sur un onglet encore ouvert : il REPREND dans cet onglet (pas un second dépôt — Leboncoin publierait deux fois)", JSON.stringify({ r4, reprises, crees: crees.length }));
+    dit(r4 && r4.accepte && r4.repris && reprises.includes(tab2) && crees.length === 2, "h2 · « Réessayer » sur un onglet encore sur le dépôt : il REPREND dans cet onglet (pas un second dépôt — Leboncoin publierait deux fois)", JSON.stringify({ r4, reprises, crees: crees.length }));
+    // ⚠️⚠️ Revue du 11 octobre : L'ONGLET EST RESTÉ OUVERT MAIS PARTI AILLEURS.
+    //    Reproduit : job de 20 h, onglet sur vinted.fr — « je te le remets
+    //    devant » trois fois de suite, la paire bloquée pour toujours.
+    pages.get(tab2).url = 'https://www.vinted.fr/member/1';
+    await b.ctx.majCmd('lbc:7700112233', { etape: 'depot', at: Date.now() - 20 * 3600e3 });
+    const r5 = [];
+    for (let k = 0; k < 3; k++) r5.push(await b.ctx.publierDepuisApp({ cmd: 'lbcPublier', id: '7700112233' }));
+    dit(r5.every((r) => !(r && r.ouvert)) && r5.every((r) => r && r.code === 'confirmer'), "h2 · onglet parti sur une autre page : plus jamais « je te le remets devant » — le dépôt est abandonné, et il décide (confirmer)", JSON.stringify(r5.map((r) => r && (r.code || (r.accepte ? 'accepte' : '?')))));
+    const r6 = await b.ctx.publierDepuisApp({ cmd: 'lbcPublier', id: '7700112233', confirme: true });
+    dit(r6 && r6.accepte && crees.length === 3, 'h2 · et une fois confirmé, la paire repart (elle n’est plus immobilisée)', JSON.stringify({ r6, crees: crees.length }));
+    // Une page de dépôt où lbc.js ne répond pas (ancienne version, script mort) :
+    // l'existence de l'onglet ne suffit pas.
+    const tab3 = (await cmds()).tabId;
+    pages.get(tab3).muet = true;
+    await b.ctx.majCmd('lbc:7700112233', { etape: 'depot', at: Date.now() - 20 * 3600e3 });
+    const r7 = await b.ctx.publierDepuisApp({ cmd: 'lbcPublier', id: '7700112233' });
+    dit(r7 && !r7.ouvert && r7.code === 'confirmer', "h2 · onglet sur le dépôt mais lbc.js muet : pas « remis devant » non plus", JSON.stringify(r7));
   });
 
   // ══ f. LE PONT : UN ORPHELIN SE TAIT, UN DOUBLON NE RELAIE PAS DEUX FOIS ══
