@@ -35,7 +35,7 @@ const BUCKET = 'detourage';
 // sinon une photo détourée avec l'ancien réglage reviendrait.
 const VPARAMS = 'blanc-jpg-v1';
 export const MAX_B64 = 3000000;               // ~2,2 Mo d'octets : sous les 4,5 Mo d'une fonction Vercel
-export const PLAFOND_DEFAUT = 150;            // photos par vendeur et par mois (~3 $)
+export const PLAFOND_DEFAUT = 100;            // photos par vendeur et par mois (~2 $) — 150 → 100 le 11 octobre (coût par vendeur)
 const DELAI_MS = 20000;
 const SHA = /^[0-9a-f]{64}$/;
 
