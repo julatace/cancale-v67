@@ -3886,6 +3886,11 @@ async function visiteVinted() {
     // photo d'hier et on redemanderait des conversations pour rien.
     // (Chaque lecteur passe par `gardeLecture`, qui refuse pendant une pause :
     //  un frein reçu par l'un arrête les suivants sans requête.)
+    // ⚠️ 5.167 — EN PREMIER : la preuve des ventes en cours qui n'en ont pas.
+    //    Les ventes viennent d'être captées ; sans leur transaction, l'anti
+    //    double vente ne les voit pas (la N°553 du 10 octobre, restée en vente
+    //    sur eBay). La moisson de 20:34 l'aurait prouvée dans la minute.
+    await capterPreuvesVente(uid);
     await capterRetraits(uid);
     // ⚠️ APRÈS la moisson : les ventes « finalisées » viennent d'être captées.
     // On relit le détail de celles dont on n'a pas encore la date de versement
@@ -4097,11 +4102,11 @@ async function compterLecture(uid, plafond = LECTURES_MAX_HEURE) {
 // qu'elles ont quelque chose à lire. Chaque lecteur prioritaire note ce qu'il
 // lui RESTE (`vrmLecturesDues`) ; « pas su » (jamais noté, ou noté il y a plus
 // d'une heure) garde la réserve entière. Le plafond total ne bouge pas (20/h).
-const LECTURES_DUES = 'vrmLecturesDues';          // { [uid]: { versement:{reste,at}, releve:{…}, retrait:{…} } }
+const LECTURES_DUES = 'vrmLecturesDues';          // { [uid]: { versement:{reste,at}, releve:{…}, retrait:{…}, preuve:{…} } }
 const LECTURES_DUES_VALIDITE_MS = 60 * 60 * 1000;
 // Les lecteurs prioritaires et ce qu'une visite peut lire pour chacun. Lu à
 // l'appel (les constantes vivent plus bas dans le fichier).
-const lecteursPrioritaires = () => ({ versement: VERSEMENT_MAX_PAR_VISITE, releve: RELEVE_MAX_PAR_VISITE, retrait: RETRAIT_MAX_PAR_VISITE });
+const lecteursPrioritaires = () => ({ versement: VERSEMENT_MAX_PAR_VISITE, releve: RELEVE_MAX_PAR_VISITE, retrait: RETRAIT_MAX_PAR_VISITE, preuve: PREUVE_MAX_PAR_VISITE });
 async function noterLecturesDues(uid, quoi, reste) {
   try {
     const cur = (await chrome.storage.local.get(LECTURES_DUES))[LECTURES_DUES] || {};
@@ -5430,6 +5435,88 @@ async function capterDatesVersement(uid) {
   } catch (_) { return 0; }
 }
 
+// ═══ LA PREUVE DE VENTE, RANGÉE (5.167, 11 octobre) ════════════════════════
+// Une transaction LUE (par le bordereau ou par `capterPreuvesVente`) est rangée
+// sous `harvest_{uid}_txn_{tx}`, la forme EXACTE de `capterDatesVersement` : la
+// base en tire `meta->>item_id` et `meta->>status_title`, ce que lit la preuve
+// de vente de l'app et de l'extension — rien à changer chez elles.
+// ⚠️ Une réponse qui porte une AUTRE transaction n'est pas rangée sous ce
+//    numéro (on ne fabrique pas une preuve pour la mauvaise vente).
+// Rend `true` si la base l'a RANGÉE.
+async function rangerTransaction(uid, acc, tx, json, quoi) {
+  try {
+    const t = json && json.transaction;
+    if (!t || typeof t !== 'object' || !/^\d+$/.test(String(tx))) return false;
+    if (t.id != null && String(t.id) !== String(tx)) { await noterDiag(`${quoi}_txn_autre`); return false; }
+    const data = { type: 'transaction', uid: String(uid), domain: (acc && acc.domain) || 'www.vinted.fr',
+      capturedAt: new Date().toISOString(), payload: alleger('transaction', json) };
+    const ok = await supabaseUpsert('app_data', [{ id: `harvest_${uid}_txn_${tx}`, data }], 'id');
+    if (ok === false) { await noterDiag(`${quoi}_txn_ecriture_ratee`); return false; }
+    await noterDiag(`${quoi}_txn_rangee`);
+    return true;
+  } catch (_) { return false; }
+}
+
+// ═══ LA PREUVE DES VENTES EN COURS (5.167, 11 octobre) ═════════════════════
+// Une vente à poster ou en route dont aucune preuve n'existe (ni transaction
+// rangée, ni bordereau qui porte son annonce) est INVISIBLE pour l'anti double
+// vente : sa paire peut rester en vente sur eBay. Mesuré le 11 octobre : 4 des
+// 18 ventes en cours n'avaient ni l'une ni l'autre. On lit leur transaction.
+// ⚠️ Une LECTURE sur ses propres ventes (§3 l'autorise), la forme exacte de
+// `capterDatesVersement` : compte connecté (`gardeLecture`, priorité colis),
+// dans la file Vinted (une requête à la fois), 3 par visite, jamais deux fois
+// la même vente en 6 h. « Pas su » (ventes, transactions ou bordereaux
+// illisibles) ⇒ on ne lit RIEN chez Vinted.
+const PREUVE_MAX_PAR_VISITE = 3;
+const PREUVE_RETRY_MS = 6 * 60 * 60 * 1000;
+async function capterPreuvesVente(uid) {
+  try {
+    if (!uid) return 0;
+    const accts = await getStoredAccounts();
+    const acc = accts.find(a => String(a.vinted_user_id) === String(uid));
+    if (!acc) return 0;
+    const rows = await sbGet(`app_data?id=eq.harvest_${uid}_orders_sold&select=v:data->payload->my_orders`);
+    if (!Array.isArray(rows)) return 0;                                   // pas su
+    const ventes = (rows[0] && Array.isArray(rows[0].v)) ? rows[0].v : [];
+    const maintenant = Date.now();
+    const enCours = ventes.filter(o => venteEnCoursPreuve(o, maintenant) && /^\d+$/.test(String(o.transaction_id)));
+    if (!enCours.length) { await noterLecturesDues(uid, 'preuve', 0); return 0; }
+    const det = await sbGetTout(`app_data?id=like.harvest_${uid}_txn_*&select=id,it:meta->>item_id,ti:meta->>status_title`);
+    if (det === null) return 0;                                           // pas su
+    const bords = await sbGetTout(`app_data?id=like.harvest_${uid}_label_*&select=id,tx:meta->>tx,it:meta->>item`);
+    if (bords === null) return 0;                                         // pas su
+    const prouvees = preuvesParTransaction(det).tx;
+    const parBord = preuvesParBordereau(bords, { [String(uid)]: ventes }).tx;
+    const memo = (await chrome.storage.local.get('vrmPreuveFaits')).vrmPreuveFaits || {};
+    for (const k of Object.keys(memo)) if (maintenant - Number(memo[k]) > 2 * 86400000) delete memo[k];
+    const aLire = (o) => {
+      const tx = String(o.transaction_id);
+      if (prouvees.has(tx) || parBord.has(tx)) return false;
+      return !(memo[tx] && Date.now() - Number(memo[tx]) < PREUVE_RETRY_MS);
+    };
+    let n = 0, ecrites = 0;
+    for (const o of enCours) {
+      if (n >= PREUVE_MAX_PAR_VISITE) break;
+      if (!aLire(o)) continue;
+      const tx = String(o.transaction_id);
+      const refus = await gardeLecture(uid, acc, 'colis');
+      if (refus) { if (refus.code !== 'vinted-pause') logActivity(`⚠️ Preuve de vente non lue : ${refus.error}`); break; }
+      memo[tx] = Date.now();
+      n++;
+      const rep = await vintedGet(acc, `/api/v2/transactions/${encodeURIComponent(tx)}`);
+      if (!rep || !rep.ok || !rep.json) { await noterDiag(`preuve_refuse_${(rep && rep.status) || 0}`); continue; }
+      if (await rangerTransaction(uid, acc, tx, rep.json, 'preuve')) ecrites++;
+    }
+    await chrome.storage.local.set({ vrmPreuveFaits: memo });
+    await noterLecturesDues(uid, 'preuve', enCours.filter(aLire).length);
+    if (ecrites) {
+      logActivity(`🧾 ${ecrites} vente${ecrites > 1 ? 's' : ''} reliée${ecrites > 1 ? 's' : ''} à leur annonce (anti double vente)`);
+      notifierApp({ type: 'maj', quoi: 'preuves', uid: String(uid) });
+    }
+    return n;
+  } catch (_) { return 0; }
+}
+
 // ═══ PURGE DES VIEUX BORDEREAUX (4 octobre) ════════════════════════════════
 // Julien : « 117 colis partis… après avoir expédié / au-delà de 2 semaines tu
 // peux supprimer les bordereaux, ça ferait énormément d'économie ». Il a tranché :
@@ -5608,6 +5695,17 @@ async function recupererLabel(acc, uid, tx, connu) {
   try {
     const t = (connu && connu.t) || await vintedGet(acc, `/api/v2/transactions/${tx}`);
     if (t && (t.pause || freinVinted(t.status))) return { ok: false, pause: true, raison: t.raison || 'Vinted demande de ralentir' };   // 5.162
+    // ⚠️⚠️ 5.167 — LA TRANSACTION LUE ICI ÉTAIT JETÉE. C'est pourtant la PREUVE
+    //    de vente que lit l'anti double vente (`harvest_{uid}_txn_{tx}` →
+    //    `item_id` + état de commande) : la N°553 vendue le 10 octobre a eu son
+    //    bordereau à 21:55, et aucune ligne de transaction — l'annonce eBay est
+    //    restée en vente. On la range, sous la forme exacte de
+    //    `capterDatesVersement` : AUCUNE requête Vinted de plus, et une seule
+    //    écriture réussie par appel, même quand `recupererLabelInsiste` réessaie.
+    if (t && t.ok && t.json && t.json.transaction && !(connu && connu.txnRangee)) {
+      const range = await rangerTransaction(uid, acc, tx, t.json, 'label');
+      if (connu && range) connu.txnRangee = true;
+    }
     const shipId = t && t.json && (t.json.transaction?.shipment?.id ?? t.json.shipment?.id);
     // ⚠️⚠️ ON NE GARDE LA TRANSACTION QUE SI ELLE A RÉPONDU CE QU'ON LUI
     //    DEMANDAIT. « Vinted n'expose pas encore l'expédition » est justement le
@@ -6344,16 +6442,114 @@ function mpChoisi(e, place) {
 //   comme une vente, pas disparaître — c'est le même sens que
 //   `classifyOrderStatus` côté app.
 const PAS_UNE_VENTE = /annul|cancel|refus|rembours|retour|suspend|[ée]chou/i;
-async function lireVentesProuvees() {
-  const rows = await sbGetTout('app_data?id=like.harvest_*_txn_*&select=it:meta->>item_id,ti:meta->>status_title');
-  if (rows === null) return { echec: true, vendus: new Set() };
-  const vendus = new Set();
-  for (const r of rows) {
+// ⚠️⚠️ 5.167 (11 octobre) — LA PREUVE QUI MANQUAIT À L'ANTI DOUBLE VENTE.
+// Plainte de Julien : « J'ai fait une vente hier, j'avais relié les deux paires,
+// ça n'a pas retiré la paire sur eBay, ça ne m'a même pas proposé ». Mesuré en
+// lecture seule : la N°553 (tx 23052006117, angeled92) n'avait AUCUNE ligne
+// `harvest_*_txn_*` — elle n'arrive que quand la CONVERSATION de la vente est
+// ouverte sur vinted.fr, geste que « Générer le bordereau » depuis l'app rend
+// inutile. Sur 18 ventes en cours, 6 seulement étaient prouvées. Or
+// l'extension avait LU la transaction pour le bordereau (21:55) et l'avait
+// jetée. Trois voies, une règle (§11, la même dans `src/App.jsx`) :
+//   · `recupererLabel` range la transaction qu'il lit (aucune requête de plus) ;
+//   · `capterPreuvesVente` lit celle des ventes en cours qui n'ont rien ;
+//   · le BORDEREAU (`harvest_{uid}_label_{tx}`, il porte l'annonce) prouve la
+//     vente quand la transaction est LUE dans les ventes du même compte, ni
+//     annulée ni revenue. ⚠️ Jamais `item_closing_action: 'sold'` seul : mesuré,
+//     10 annonces « sold » n'ont que des transactions revenues.
+// <preuve-vente-regle> — LA MÊME RÈGLE QUE L'APP (src/App.jsx), §11 ; comparées par
+// `audit-preuve-vente.cjs` (texte ET sorties). Fonctions PURES.
+const PREUVE_RECENTE_MS = 30 * 86400000;
+// Une vente qui n'est pas REVENUE : son état ne l'annule pas, et Vinted ne la
+// classe pas « en échec » (`failed` : remboursée, annulée).
+function venteVivante(o) {
+  if (!o || o.transaction_id == null) return false;
+  if (PAS_UNE_VENTE.test(String(o.status || ''))) return false;
+  return String(o.transaction_user_status || '') !== 'failed';
+}
+// Une vente EN COURS (à poster ou en route) : vivante, pas finalisée, de moins
+// de 30 jours. C'est la fenêtre où une double vente peut encore arriver.
+function venteEnCoursPreuve(o, maintenant) {
+  if (!venteVivante(o)) return false;
+  if (/finalis/i.test(String(o.status || '')) || String(o.transaction_user_status || '') === 'completed') return false;
+  const d = Date.parse(o.date || '');
+  return !(Number.isFinite(d) && maintenant - d > PREUVE_RECENTE_MS);
+}
+// La preuve par la TRANSACTION (ce qui existait) : l'annonce (`item_id`) et un
+// état de commande qui ne la fait pas revenir. Une conversation (état vide)
+// n'est pas une vente. Rend { items, tx } (annonces, transactions prouvées).
+function preuvesParTransaction(lignes) {
+  const items = new Set(), tx = new Set();
+  for (const r of (Array.isArray(lignes) ? lignes : [])) {
     if (!r || !r.it) continue;
     const etat = String(r.ti || '').trim();
-    if (!etat) continue;                       // conversation : aucune commande
-    if (PAS_UNE_VENTE.test(etat)) continue;    // la paire revient
-    vendus.add(String(r.it));
+    if (!etat || PAS_UNE_VENTE.test(etat)) continue;
+    items.add(String(r.it));
+    const m = /_txn_(\d+)$/.exec(String(r.id || ''));
+    if (m) tx.add(m[1]);
+  }
+  return { items, tx };
+}
+// La preuve par le BORDEREAU : `harvest_{uid}_label_{tx}` porte l'annonce que
+// l'extension a lue dans la transaction (une identité, §5). Elle ne vaut que si
+// la vente `tx` est LUE dans les ventes du MÊME compte et qu'elle est vivante
+// (mesuré : 4 bordereaux sur 71 finissent « Remboursement effectué »).
+// `label_latest` (une copie) n'est jamais lu ; un `tx` de méta qui contredit
+// l'identifiant de la ligne = doute ⇒ rien. `ventesParCompte` : { uid: [ventes] }
+// — un compte absent n'a pas été lu ⇒ aucun de ses bordereaux ne prouve rien.
+function preuvesParBordereau(bordereaux, ventesParCompte) {
+  const items = new Set(), tx = new Set();
+  for (const b of (Array.isArray(bordereaux) ? bordereaux : [])) {
+    const m = /^harvest_(\d+)_label_(\d+)$/.exec(String((b && b.id) || ''));
+    if (!m) continue;
+    const t = m[2];
+    if (b.tx != null && String(b.tx).trim() !== '' && String(b.tx).trim() !== t) continue;
+    const it = String(b.it == null ? '' : b.it).trim();
+    if (!/^\d+$/.test(it)) continue;
+    const ventes = ventesParCompte ? ventesParCompte[m[1]] : null;
+    if (!Array.isArray(ventes)) continue;
+    const o = ventes.find((v) => v && String(v.transaction_id) === t);
+    if (!o || !venteVivante(o)) continue;
+    items.add(it); tx.add(t);
+  }
+  return { items, tx };
+}
+// Les comptes dont il faut LIRE les ventes : ceux qui portent un bordereau dont
+// l'annonce n'est pas déjà prouvée par une transaction (le reste ne coûte rien).
+function comptesAJuger(bordereaux, dejaProuves) {
+  const out = [];
+  for (const b of (Array.isArray(bordereaux) ? bordereaux : [])) {
+    const m = /^harvest_(\d+)_label_(\d+)$/.exec(String((b && b.id) || ''));
+    const it = String((b && b.it) == null ? '' : b.it).trim();
+    if (m && /^\d+$/.test(it) && !(dejaProuves && dejaProuves.has(it)) && !out.includes(m[1])) out.push(m[1]);
+  }
+  return out;
+}
+// Les ventes lues, par compte (`select=id,v:data->payload->my_orders`). Un
+// compte demandé sans ligne n'a aucune vente captée : `[]`, rien n'est prouvé.
+function ventesParCompteDe(lignes, uids) {
+  const out = {};
+  for (const u of (Array.isArray(uids) ? uids : [])) out[String(u)] = [];
+  for (const r of (Array.isArray(lignes) ? lignes : [])) {
+    const m = /^harvest_(\d+)_orders_sold$/.exec(String((r && r.id) || ''));
+    if (m && Array.isArray(out[m[1]]) && Array.isArray(r.v)) out[m[1]] = out[m[1]].concat(r.v);
+  }
+  return out;
+}
+// </preuve-vente-regle>
+async function lireVentesProuvees() {
+  const rows = await sbGetTout('app_data?id=like.harvest_*_txn_*&select=id,it:meta->>item_id,ti:meta->>status_title');
+  if (rows === null) return { echec: true, vendus: new Set() };
+  const vendus = new Set(preuvesParTransaction(rows).items);
+  // 5.167 : + le bordereau. Paginé (une ligne par vente, tous comptes) et
+  // strict : une lecture ratée vaut « pas su », jamais une demi-preuve.
+  const bords = await sbGetTout('app_data?id=like.harvest_*_label_*&select=id,tx:meta->>tx,it:meta->>item');
+  if (bords === null) return { echec: true, vendus: new Set() };
+  const uids = comptesAJuger(bords, vendus);
+  if (uids.length) {
+    const lignes = await sbGet(`app_data?id=in.(${uids.map((u) => `harvest_${u}_orders_sold`).join(',')})&select=id,v:data->payload->my_orders`);
+    if (!Array.isArray(lignes)) return { echec: true, vendus: new Set() };
+    for (const it of preuvesParBordereau(bords, ventesParCompteDe(lignes, uids)).items) vendus.add(it);
   }
   return { echec: false, vendus };
 }

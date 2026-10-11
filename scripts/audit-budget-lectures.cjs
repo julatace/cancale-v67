@@ -13,7 +13,8 @@
 //  chez Vinted et ce que chaque budget a consommé :
 //   1. budget d'ACTIONS plein ⇒ codes, versements et relevés se lisent quand
 //      même, et le budget d'actions ne bouge pas ;
-//   2. les photos s'arrêtent avant la RÉSERVE de l'argent et des colis (10) —
+//   2. les photos s'arrêtent avant la RÉSERVE de l'argent et des colis (13 depuis
+//      la 5.167 : les 3 preuves de vente des ventes en cours y entrent) —
 //      même en tournant tout l'heure — et les lectures prioritaires y tiennent ;
 //   3. la réserve se LIBÈRE quand les lecteurs prioritaires n'ont plus rien à
 //      lire (l'autre sens : sinon les photos seraient bridées pour toujours) ;
@@ -35,9 +36,14 @@ const RELAIS = "La livraison n'a pas encore eu lieu - colis déposé en bureau d
 const html = (id) => '<!doctype html><script id="__NEXT_DATA__" type="application/json">' + JSON.stringify({ props: { pageProps: { item: {
   id: Number(id), description: 'desc', catalog_id: 1, photos: [0, 1, 2, 3, 4].map((i) => ({ id: i, full_size_url: `https://images1.vinted.net/t/x/f800/${id}${i}` })) } } } }) + '</script>';
 
-function lignes({ ventes = 6, relais = 3, mois = 3, annonces = 30, datees = false } = {}) {
+// 5.167 : `enCours` — des ventes à poster SANS preuve (ni transaction rangée, ni
+// bordereau) : la preuve de vente (`capterPreuvesVente`) lit leur transaction.
+function lignes({ ventes = 6, relais = 3, mois = 3, annonces = 30, datees = false, enCours = 3 } = {}) {
   const l = {
-    [`harvest_${UID}_orders_sold`]: { capturedAt: new Date().toISOString(), payload: { my_orders: Array.from({ length: ventes }, (_, i) => ({ transaction_id: 5001 + i, title: 'Vente ' + i, status: FINALISEE })) } },
+    [`harvest_${UID}_orders_sold`]: { capturedAt: new Date().toISOString(), payload: { my_orders: [
+      ...Array.from({ length: ventes }, (_, i) => ({ transaction_id: 5001 + i, title: 'Vente ' + i, status: FINALISEE })),
+      ...Array.from({ length: enCours }, (_, i) => ({ transaction_id: 5101 + i, title: 'Vente en cours ' + i, status: 'Bordereau envoyé au vendeur', transaction_user_status: 'needs_action', date: new Date().toISOString() })),
+    ] } },
     [`harvest_${UID}_orders_purchased`]: { capturedAt: new Date().toISOString(), payload: { my_orders: Array.from({ length: relais }, (_, i) => ({ transaction_id: 6001 + i, conversation_id: 7001 + i, title: 'Achat ' + i, status: RELAIS })) } },
     panel_colis_relais: {},
     [`harvest_${UID}_billing`]: { payload: { history: Array.from({ length: mois }, (_, i) => ({ year: 2026, month: 9 - i })) } },
@@ -61,7 +67,7 @@ const compte = (j, re) => j.vinted.filter((x) => re.test(x.chemin)).length;
 const lect = (store) => ((store.vrmLectures || {})[UID] || []).length;
 const actions = (store) => ((store.vrmActions || {})[UID] || []).length;
 const maintenant = () => Date.now();
-const prioritaires = async (ctx) => { await ctx.capterRetraits(UID); await ctx.capterDatesVersement(UID); await ctx.capterReleves(UID); };
+const prioritaires = async (ctx) => { await ctx.capterPreuvesVente(UID); await ctx.capterRetraits(UID); await ctx.capterDatesVersement(UID); await ctx.capterReleves(UID); };
 
 (async () => {
   console.log('── 1. budget d’ACTIONS plein (20 bordereaux/réponses dans l’heure)');
@@ -72,6 +78,7 @@ const prioritaires = async (ctx) => { await ctx.capterRetraits(UID); await ctx.c
     dit(compte(f.j, /\/conversations\/\d+$/) > 0, 'les codes de retrait se lisent quand même', `${compte(f.j, /\/conversations\/\d+$/)} conversation(s) lue(s)`);
     dit(compte(f.j, /\/transactions\/\d+$/) > 0, 'les dates de versement se lisent quand même', `${compte(f.j, /\/transactions\/\d+$/)} transaction(s) lue(s)`);
     dit(compte(f.j, /\/payouts\?year=/) > 0, 'les relevés se lisent quand même', `${compte(f.j, /\/payouts\?year=/)} relevé(s) lu(s)`);
+    dit(compte(f.j, /\/transactions\/51\d\d$/) === 3, 'et les preuves de vente aussi (5.167 : 3 ventes en cours sans preuve)', `${compte(f.j, /\/transactions\/51\d\d$/)} preuve(s) lue(s)`);
   });
   await essaie('budget actions intact', async () => {
     const f = faireFond({ src: SRC, lignes: lignes(), vinted, store: {} });
@@ -88,17 +95,17 @@ const prioritaires = async (ctx) => { await ctx.capterRetraits(UID); await ctx.c
     await f.ctx.capterPhotosAnnonces(UID);           // le fond qui tourne chaque minute
     await f.ctx.capterPhotosAnnonces(UID);
     const ph = compte(f.j, /^\/items\/\d+$/);
-    dit(ph === 10, 'trente annonces à compléter, tout l’heure : 10 pages lues, pas 20 (la réserve de 10 tient)', `${ph} page(s) lue(s)`);
+    dit(ph === 7, 'trente annonces à compléter, tout l’heure : 7 pages lues, pas 20 (la réserve de 13 tient : 5 versements, 3 codes, 2 relevés, 3 preuves de vente)', `${ph} page(s) lue(s)`);
     const avant = f.j.vinted.length;
     await prioritaires(f.ctx);
     const pr = f.j.vinted.length - avant;
-    dit(pr === 10, 'et l’argent + les colis y tiennent : 5 versements, 3 codes, 2 relevés', `${pr} lecture(s) prioritaire(s)`);
+    dit(pr === 13, 'et l’argent + les colis y tiennent : 5 versements, 3 codes, 2 relevés, 3 preuves de vente', `${pr} lecture(s) prioritaire(s)`);
     dit(lect(f.store) <= 20, 'le plafond total de 20 lectures/heure n’est jamais dépassé', `lectures=${lect(f.store)}`);
   });
 
   console.log('── 3. la réserve se LIBÈRE quand il n’y a plus rien à lire');
   await essaie('libération', async () => {
-    const f = faireFond({ src: SRC, lignes: lignes({ relais: 0, mois: 0, datees: true }), vinted, store: {} });
+    const f = faireFond({ src: SRC, lignes: lignes({ relais: 0, mois: 0, datees: true, enCours: 0 }), vinted, store: {} });
     await prioritaires(f.ctx);                          // rien à lire : chacun note « reste 0 »
     dit(f.j.vinted.length === 0, 'rien à lire : aucune requête', `${f.j.vinted.length}`);
     await f.ctx.capterPhotosAnnonces(UID);
@@ -116,7 +123,7 @@ const prioritaires = async (ctx) => { await ctx.capterRetraits(UID); await ctx.c
     await f.ctx.capterPhotosAnnonces(UID);
     await f.ctx.capterPhotosAnnonces(UID);
     const ph = compte(f.j, /^\/items\/\d+$/);
-    dit(ph === 15, 'ventes illisibles : la place des 5 versements reste gardée (15 photos, pas 20)', `${ph} page(s) lue(s)`);
+    dit(ph === 12, 'ventes illisibles : la place des 5 versements et des 3 preuves de vente reste gardée (12 photos, pas 20)', `${ph} page(s) lue(s)`);
   });
 
   console.log('── 5. un clic n’est pas bridé, et le total tient');
