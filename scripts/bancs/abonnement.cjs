@@ -56,7 +56,23 @@ const ETATS = {
   // prix (`prix: null`, `prixConforme: false`) ; seul le propriétaire reçoit le
   // montant de Stripe, pour le corriger.
   prixDifferent: { ...base, prix: null, prixConforme: false },
-  proprietairePrixDifferent: { ...base, proprietaire: true, actif: true, prix: null, prixConforme: false, prixStripe: { montant: 9.99, devise: 'eur', intervalle: 'month' } },
+  proprietairePrixDifferent: { ...base, proprietaire: true, actif: true, prix: null, prixConforme: false, prixStripe: { montant: 9.99, devise: 'eur', intervalle: 'month', texte: '9,99 € / mois' } },
+  // Revue du 11 octobre — ce que le VRAI serveur rend dans les états de la
+  // transition (audit-abonnement.cjs exécute api/compte.js) :
+  //  · un ANCIEN abonné (résilié, client Stripe) quand le prix diffère : ses
+  //    factures restent (sa compta), aucun bouton pour payer ;
+  ancienPrixDifferent: { ...base, prix: null, prixConforme: false, statut: 'canceled', peutGerer: true },
+  //  · un abonné ACTIF pendant la transition : le serveur ne relaie plus le prix
+  //    de l'offre, et le prix de SON abonnement n'a pas pu être lu ⇒ la carte ne
+  //    retombe JAMAIS sur le prix des CGV (il paie peut-être 9,99 €) ;
+  actifPrixDifferent: { ...base, prix: null, prixConforme: false, statut: 'active', finPeriode: '2026-11-04T10:00:00.000Z', peutGerer: true, actif: true, prixAbonnement: null },
+  //  · un abonné souscrit à 9,99 € quand l'offre est passée à 12,99 € : la carte
+  //    dit le prix de SON abonnement, pas celui de l'offre ;
+  actifAncienPrix: { ...base, statut: 'active', finPeriode: '2026-11-04T10:00:00.000Z', peutGerer: true, actif: true, prixAbonnement: { montant: 9.99, devise: 'eur', intervalle: 'month', texte: '9,99 € / mois' } },
+  //  · le propriétaire quand Stripe a un prix en DOLLARS, ou sans montant fixe :
+  //    l'alerte écrit le texte du serveur, jamais deux prix identiques ni 0,00 €.
+  proprietaireUsd: { ...base, proprietaire: true, actif: true, prix: null, prixConforme: false, prixStripe: { montant: 12.99, devise: 'usd', intervalle: 'month', texte: '12,99 USD / mois' } },
+  proprietairePaliers: { ...base, proprietaire: true, actif: true, prix: null, prixConforme: false, prixStripe: { montant: null, devise: 'eur', intervalle: 'month', texte: 'sans montant fixe, par mois' } },
 };
 
 let ko = 0, ok = 0;
@@ -74,8 +90,9 @@ const srv = http.createServer((q, r) => {
 // `fx` : la réponse de ?mode=factures — un objet, ou 'panne' (502).
 // `compte` : cliquer l'onglet « Mon compte » après le chargement.
 // `fermer` : la réponse de ?mode=fermer — `{ status, body }`.
-async function ouvrir(nav, { abo, tab = 'settings', checkoutUrl = 'https://checkout.stripe.com/c/pay/cs_banc', fx = FACTURES, compte = true, extra = '', fermer = null }) {
-  const ctx = await nav.newContext({ viewport: { width: 1512, height: 950 } });
+async function ouvrir(nav, { abo, tab = 'settings', checkoutUrl = 'https://checkout.stripe.com/c/pay/cs_banc', fx = FACTURES, compte = true, extra = '', fermer = null, largeur = 1512 }) {
+  const mobile = largeur < 600;
+  const ctx = await nav.newContext({ viewport: { width: largeur, height: mobile ? 844 : 950 }, isMobile: mobile, hasTouch: mobile });
   const pg = await ctx.newPage();
   const erreurs = []; pg.on('pageerror', (e) => erreurs.push(e.message));
   await pg.addInitScript((s) => { try { localStorage.setItem('vrm_session', JSON.stringify(s)); } catch (_) {} }, SESSION);
@@ -137,7 +154,8 @@ const boutons = (pg) => pg.evaluate(() => { const e = document.querySelector('[d
   const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   try {
     console.log('\n── La carte suit ce que le serveur sait');
-    const attendus = { sans: 'sans', actif: 'actif', resilie: 'actif', impaye: 'impaye', proprietaire: 'proprietaire', nonBranche: 'non-branche', prixDifferent: 'non-branche', proprietairePrixDifferent: 'proprietaire' };
+    const attendus = { sans: 'sans', actif: 'actif', resilie: 'actif', impaye: 'impaye', proprietaire: 'proprietaire', nonBranche: 'non-branche', prixDifferent: 'non-branche', proprietairePrixDifferent: 'proprietaire',
+      ancienPrixDifferent: 'non-branche', actifPrixDifferent: 'actif', actifAncienPrix: 'actif', proprietaireUsd: 'proprietaire', proprietairePaliers: 'proprietaire' };
     for (const [nom, rendu] of Object.entries(attendus)) {
       await essaie(nom, async () => {
         const { ctx, pg, erreurs } = await ouvrir(nav, { abo: ETATS[nom] });
@@ -153,6 +171,20 @@ const boutons = (pg) => pg.evaluate(() => { const e = document.querySelector('[d
           dit(b.length === 0 && /9,99/.test(w) && /12,99/.test(w) && /vrm_mensuel/.test(w), '  propriétaire : le prix réglé chez Stripe et celui des CGV, et le geste (clé « vrm_mensuel »)', w.replace(/\n/g, ' ').slice(0, 200));
         }
         if (nom === 'proprietaire') dit(!(await pg.evaluate(() => !!document.querySelector('[data-prix-stripe]'))), '  propriétaire, prix conforme : aucune alerte de prix');
+        // ── Revue du 11 octobre ──────────────────────────────────────────────
+        if (nom === 'ancienPrixDifferent') {
+          const f = await pg.evaluate(() => { const e = document.querySelector('[data-factures]'); return e ? e.getAttribute('data-factures') : null; });
+          const sab = await pg.evaluate(() => !!document.querySelector('[data-sabonner]'));
+          dit(f === '2' && !sab && b.length === 0, '  ancien abonné, prix Stripe ≠ CGV : ses factures restent (sa compta), aucun bouton pour payer', `factures=${f} · s’abonner=${sab} · ${b.join(' · ')}`);
+        }
+        if (nom === 'actifPrixDifferent') dit(/abonné/i.test(t) && !/12,99/.test(t) && !/9,99/.test(t), '  abonné actif, prix de son abonnement pas su : « Abonné » sans montant — jamais le prix des CGV', t.replace(/\n/g, ' ').slice(0, 140));
+        if (nom === 'actifAncienPrix') dit(/Abonné · 9,99 € \/ mois/.test(t) && !/12,99/.test(t), '  abonné à 9,99 € quand l’offre est à 12,99 € : la carte dit le prix de SON abonnement', t.replace(/\n/g, ' ').slice(0, 140));
+        if (nom === 'proprietaireUsd' || nom === 'proprietairePaliers') {
+          const w = await pg.evaluate(() => { const e = document.querySelector('[data-prix-stripe="different"]'); const x = document.querySelector('[data-prix-stripe-texte]'); return { t: e ? e.innerText : '', x: x ? x.innerText : null }; });
+          const attendu = ETATS[nom].prixStripe.texte;
+          const n1299 = (w.t.match(/12,99 € \/ mois/g) || []).length;
+          dit(w.x === attendu && n1299 <= 1 && !/0,00/.test(w.t), `  propriétaire, prix Stripe « ${attendu} » : l’alerte écrit le texte du serveur — jamais deux prix identiques ni 0,00 €`, `texte=${w.x} · « 12,99 € / mois » ×${n1299} · ${w.t.replace(/\n/g, ' ').slice(0, 160)}`);
+        }
         if (nom === 'actif') dit(b.some((x) => /^résilier$/i.test(x)) && b.some((x) => /carte/i.test(x)) && !b.some((x) => /abonner/i.test(x)) && /prochain prélèvement le 4 novembre 2026/i.test(t), '  abonné : la date du prochain prélèvement, « changer de carte » et « résilier », jamais un second « s’abonner »', b.join(' · ') + ' / ' + t.replace(/\n/g, ' ').slice(0, 120));
         if (nom === 'actif') dit(/Visa •••• 4242/.test(t) && /12\/27/.test(t), '  abonné : la carte est dite (marque, 4 derniers chiffres, expiration)', t.replace(/\n/g, ' ').slice(0, 160));
         if (nom === 'resilie') dit(/jusqu'au 4 novembre 2026/.test(t) && b.some((x) => /reprendre/i.test(x)) && !b.some((x) => /^résilier$/i.test(x)), '  résilié : jusqu’à quand l’accès reste, et « reprendre »', b.join(' · ') + ' / ' + t.replace(/\n/g, ' ').slice(0, 120));
@@ -280,6 +312,32 @@ const boutons = (pg) => pg.evaluate(() => { const e = document.querySelector('[d
       dit(/12,99/.test(t) && /déconnecter/i.test(t), '  il dit le prix et laisse se déconnecter', t.replace(/\n/g, ' ').slice(0, 120));
       await ctx.close();
     });
+    // ⚠️ REVUE DU 11 OCTOBRE : la porte — second écran qui vend l'abonnement —
+    //    proposait « S'abonner » (case des CGV, 12,99 € / mois) quand le paiement
+    //    est FERMÉ (prix Stripe ≠ CGV) : le clic menait au refus 503 du serveur,
+    //    qui nommait par-dessus le montant de Stripe (9,99 €) à un vendeur. Elle
+    //    ne propose plus rien, ne dit aucun prix, et laisse se déconnecter.
+    for (const largeur of [1512, 390]) {
+      for (const [nom, abo] of [
+        ['prix Stripe ≠ CGV', { ...ETATS.prixDifferent, obligatoire: true, acces: false }],
+        ['Stripe pas branché', { ...ETATS.nonBranche, obligatoire: true, acces: false }],
+      ]) {
+        await essaie(`porte paiement fermé ${nom} ${largeur}`, async () => {
+          const { ctx, pg, appels, erreurs } = await ouvrir(nav, { abo, tab: 'journee', largeur });
+          const r = await pg.evaluate(() => {
+            const p = document.querySelector('[data-abonnement-requis]');
+            return p ? { t: p.innerText, sab: !!p.querySelector('[data-sabonner]'), cgv: !!p.querySelector('[data-case-cgv]'), boutons: [...p.querySelectorAll('button')].map((b) => b.innerText.trim()),
+              debord: document.documentElement.scrollWidth > document.documentElement.clientWidth } : null;
+          });
+          dit(!!r && !r.sab && !r.cgv && !r.boutons.some((x) => /abonner|payer/i.test(x)) && erreurs.length === 0,
+            `porte, ${nom} (${largeur} px) : ni case des CGV ni « S’abonner » — le serveur refuserait`, r ? r.boutons.join(' · ') : 'pas de porte');
+          dit(!!r && !/9,99/.test(r.t) && !/12,99/.test(r.t) && /pas encore ouvert/i.test(r.t) && /rien n'a été prélevé/i.test(r.t) && /intactes/.test(r.t) && /déconnecter/i.test(r.t) && !r.debord,
+            '  elle dit que le paiement n’est pas ouvert et que rien n’a été prélevé, sans aucun prix, et laisse se déconnecter', r ? r.t.replace(/\n/g, ' ').slice(0, 180) : '');
+          dit(!appels.some((a) => a.mode === 'checkout'), '  et aucune demande de paiement ne part', JSON.stringify(appels));
+          await ctx.close();
+        });
+      }
+    }
     await essaie('impayé 14 jours', async () => {
       const { ctx, pg, appels } = await ouvrir(nav, { abo: { ...ETATS.impaye, obligatoire: true, acces: false }, tab: 'journee' });
       const porte = await pg.evaluate(() => !!document.querySelector('[data-abonnement-requis]'));

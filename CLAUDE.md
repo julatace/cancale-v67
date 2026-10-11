@@ -5881,9 +5881,9 @@ etc. lorsqu'elle ne paye plus ».
   fait**, et ça ne se simule pas. À refaire en mode réel le jour du passage.
   ⇒ **L'app le détecte, côté serveur** : `checkout` compare le prix lu chez
   Stripe à `PRIX_CGV` (`prixConforme` : mêmes centimes, en euros, une fois par
-  mois) et, s'il diffère, **n'ouvre PAS le paiement** — 503 `prix-cgv`, « le
-  prix réglé chez Stripe (9,99 € / mois) n'est pas celui des conditions de vente
-  (12,99 € / mois). Rien n'a été prélevé. » Jamais 9,99 € prélevés sur des CGV
+  mois) et, s'il diffère, **n'ouvre PAS le paiement** — 503 `prix-cgv`, « Le
+  paiement n'est pas encore ouvert : rien n'a été prélevé » (au vendeur, SANS
+  le montant de Stripe — revue ci-dessous). Jamais 9,99 € prélevés sur des CGV
   acceptées à 12,99 €. La carte « Mon compte » ne relaie pas un prix non
   conforme (`prix: null`, `prixConforme: false` ⇒ « le paiement n'est pas
   encore ouvert », aucun bouton) ; seul le PROPRIÉTAIRE reçoit le montant de
@@ -5900,6 +5900,55 @@ etc. lorsqu'elle ne paye plus ».
     côté de la constante ⇒ rouge. Banc `abonnement.cjs` **60** — 3 rouges sur le
     build d'avant (il affichait « 9,99 € / mois » et « S'abonner » quand Stripe
     différait des CGV).
+  ⚠️⚠️ **REVUE DU 11 OCTOBRE — QUATRE DÉFAUTS DE CE CHANGEMENT DE PRIX, REPRODUITS
+  AU RENDU (1512 et 390 px) ET EN EXÉCUTANT `api/compte.js`, TOUS CORRIGÉS.**
+  Latents aujourd'hui (abonnement facultatif, 0 abonné), réels le jour où il
+  passe `abonnement_obligatoire` à '1' sans avoir recréé le prix — et en mode
+  réel, il devra le refaire.
+  1. ⚠️⚠️ **La PORTE (second écran qui vend l'abonnement, §11) proposait
+     « S'abonner » quand le paiement est fermé** : « 12,99 € / mois », la case
+     des CGV, un bouton actif — et le clic menait au refus 503, dont le message
+     nommait par-dessus **le prix réglé chez Stripe (9,99 €) à un vendeur**. La
+     carte « Mon compte » évitait ce bouton, la porte non. ⇒ `paiementFerme`
+     (`prixConforme === false`, ou Stripe pas branché, et pas un impayé) : ni
+     case, ni bouton, aucun prix — « le paiement n'est pas encore ouvert, rien
+     n'a été prélevé, tes données t'attendent » — et « Se déconnecter » reste.
+     Un impayé garde « Mettre à jour ma carte ». Le refus 503 ne part jamais au
+     propriétaire (409 avant) : il est **générique** pour tout le monde, le
+     détail (les deux prix, le geste) reste dans `console.warn` et sur la carte
+     du propriétaire.
+  2. **Un ANCIEN abonné perdait la liste de ses factures** (sa compta) : la
+     branche `prixConforme === false` de la carte rendait la carte seule — les
+     factures étaient demandées puis jamais affichées. Elle rend `listeFactures`
+     comme la branche d'en dessous.
+  3. ⚠️ **L'alerte du propriétaire pouvait écrire deux prix IDENTIQUES** —
+     « le prix réglé chez Stripe (12,99 € / mois) n'est pas celui des CGV
+     (12,99 € / mois) » pour un prix en dollars, tous les 3 mois ou par semaine
+     — **ou « 0,00 € »** pour un prix sans montant fixe : `prixLisible` ignorait
+     la devise et le rythme, et `lirePrix` changeait `unit_amount: null` en 0.
+     C'est justement quand il se trompe de devise ou de récurrence dans Stripe
+     qu'elle doit le lui montrer. ⇒ Le serveur écrit le texte (`prixTexte` :
+     montant, **devise** — « 12,99 USD » —, **rythme** — « / semaine »,
+     « tous les 3 mois », « en une fois » —, « sans montant fixe » jamais 0) et
+     le rend dans `prixStripe.texte` ; la carte l'affiche **tel quel**.
+     `prixTexte(PRIX_CGV)` vaut exactement `PRIX_CGV_LISIBLE` (vérifié).
+  4. **Un abonné actif lisait « Abonné · 12,99 € / mois » en payant 9,99 €** :
+     la carte retombait sur le prix de l'offre (ou des CGV quand le serveur ne
+     le relayait pas), juste au-dessus de factures à 9,99 €. Or un abonnement
+     Stripe garde le prix auquel il a été souscrit (les CGV le disent). ⇒ le
+     serveur lit le prix de **SON** abonnement (`prixAbonnement` : l'article de
+     l'abonnement chez Stripe, vérifié sur son client, un seul article) ; pas
+     su ⇒ la carte écrit « Abonné » **sans montant**, jamais un prix deviné.
+     ⚠️ Ça coûte une lecture Stripe de plus à l'ouverture de « Mon compte »,
+     pour un abonné seulement.
+  - Preuves : `audit-abonnement.cjs` **91 contrôles**, **17 rouges** sur
+    2851ef4 ; quatre mutations, chacune rouge : l'ancien formateur (6), le
+    refus qui renomme le prix Stripe au vendeur (1), le prix de l'abonnement lu
+    sans vérifier le client (1), `prixAbonnement` = prix de l'offre (5). Banc
+    `abonnement.cjs` **82** (la porte aux deux tailles, Stripe ≠ CGV et Stripe
+    pas branché) — **13 rouges** sur le build de 2851ef4, et **13 rouges** sur
+    un build réaffaibli des quatre correctifs à la fois (chaque groupe de
+    contrôles tombe sur SA mutation).
 - **Stripe en MODE TEST seulement**, sans bibliothèque (`api/_lib/stripe.js`) :
   Checkout (abonnement), portail de gestion, webhook signé (HMAC sur le corps
   BRUT, comparaison en temps constant, 5 min de tolérance), version d'API
