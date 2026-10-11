@@ -84,6 +84,8 @@ const MUTATIONS = {
   'preuve-relit-prouvees': { ext: (s) => remplace(s, '      if (prouvees.has(tx) || parBord.has(tx)) return false;\n', '', 'preuve-relit-prouvees') },
   'preuve-pas-su-lue': { ext: (s) => remplace(s, '    if (det === null) return 0;                                           // pas su\n    const bords', '    const bords', 'preuve-pas-su-lue') },
   'regle-divergente': { ext: (s) => remplace(s, 'const PREUVE_RECENTE_MS = 30 * 86400000;', 'const PREUVE_RECENTE_MS = 31 * 86400000;', 'regle-divergente') },
+  // (revue du 11 octobre, défaut 3) L'écran Leboncoin reprend SA boucle sur les transactions (la forme de 6729407).
+  'lecteur-lbc-hors-bloc': { app: (s) => remplace(s, "    const preuveLue = await lireVentesVintedProuvees();\n", "    const txnRows = await sbGet('app_data?id=like.harvest_*_txn_*&select=it:meta->>item_id,ti:meta->>status_title');\n    const preuveLue = txnRows === null ? null : new Set(txnRows.filter((r) => r && r.it && String(r.ti || '').trim() && !PAS_UNE_VENTE.test(String(r.ti))).map((r) => String(r.it)));\n", 'lecteur-lbc-hors-bloc') },
   // (revue du 11 octobre) La capacité promise à une version PUBLIÉE qui ne l'a pas.
   'capacite-publiee': { app: (s) => remplace(s, "preuves: '5.172.0' };", "preuves: '5.170.0' };", 'capacite-publiee') },
   // L'écran annonce un autre rythme que celui de l'extension.
@@ -267,6 +269,32 @@ const RESERVEES = ['5.169.0', '5.171.0'];   // chantier extension (wf_4d08d5c8-e
     const a = BLOC_RE.exec(APP), e = BLOC_RE.exec(EXT);
     dit(!!a && !!e, 'le bloc <preuve-vente-regle> existe dans l\'app ET dans l\'extension');
     dit(!!a && !!e && a[1] === e[1], 'et il est IDENTIQUE au caractère près (une notion, une règle)', a && e && a[1] !== e[1] ? 'les deux textes divergent' : '');
+  });
+
+  // ⚠️⚠️ (revue du 11 octobre, défaut 3) UN TROISIÈME LECTEUR. L'écran Leboncoin
+  //    de l'app gardait SA boucle sur `harvest_*_txn_*` (transactions seules,
+  //    sans bordereau, sans les ventes relues) : « 2 à publier » dans l'app, « 1 »
+  //    dans l'extension, et « Publier » refusé. Le bloc partagé ne protège que
+  //    ceux qui le lisent. ⇒ Toute lecture de la famille qui demande l'ÉTAT DE
+  //    COMMANDE (`status_title` : c'est lui qui fait dire « vendue ») vit dans
+  //    un des lecteurs autorisés — jamais ailleurs. On juge le CODE (commentaires
+  //    neutralisés) et on nomme la fonction fautive.
+  console.log('\n1 bis. PERSONNE D\'AUTRE NE JUGE « VENDUE » SUR LES TRANSACTIONS (§11)');
+  await essaie('lecteurs', () => {
+    const sansCom = (src) => src.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' ')).replace(/(^|[^:])\/\/[^\n]*/g, (m, p1) => p1 + ' '.repeat(Math.max(0, m.length - p1.length)));
+    const fautes = (src, permis) => {
+      const code = sansCom(src), lignes = code.split('\n'), out = [];
+      lignes.forEach((l, i) => {
+        if (!/_txn_/.test(l) || !/status_title/.test(l)) return;
+        let fn = '?';
+        for (let k = i; k >= 0; k--) { const m = /^(?:async\s+)?function\s+(\w+)\s*\(|^const\s+(\w+)\s*=/.exec(lignes[k]); if (m) { fn = m[1] || m[2]; break; } }
+        if (!permis.includes(fn)) out.push(`${fn} (ligne ${i + 1})`);
+      });
+      return out;
+    };
+    const fa = fautes(APP, ['lirePreuvesVenteVinted']), fe = fautes(EXT, ['lireVentesProuvees', 'capterPreuvesVente']);
+    dit(!fa.length, 'dans l\'app, seul `lirePreuvesVenteVinted` lit l\'état des transactions pour dire « vendue »', fa.join(' · '));
+    dit(!fe.length, 'dans l\'extension, seuls `lireVentesProuvees` et `capterPreuvesVente` le lisent', fe.join(' · '));
   });
 
   console.log('\n2. LA PREUVE PAR LE BORDEREAU — ET LES AUTRES SENS (app)');
