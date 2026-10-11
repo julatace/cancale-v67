@@ -70,7 +70,10 @@ class DernierFilet extends React.Component {
 const aUneSession = () => { try { return !!localStorage.getItem('vrm_session') || localStorage.getItem('vrm_acces_direct') === '1'; } catch (_) { return false; } };
 const veutLApp = () => {
   const q = window.location.search || '', h = window.location.hash || '';
-  return /[?&](connexion|inscription|tab|code|error|error_description|type)(=|&|$)/.test(q) || /(access_token|error|type)=/.test(h);
+  // `?lier-extension=` : « Se connecter avec VRM » cliqué dans l'extension
+  // (11 octobre) — droit dans l'app, qui connecte l'extension (ou demande
+  // d'abord la connexion), jamais la page d'accueil.
+  return /[?&](connexion|inscription|tab|code|error|error_description|type|lier-extension)(=|&|$)/.test(q) || /(access_token|error|type)=/.test(h);
 };
 const versApp = () => aUneSession() || veutLApp();
 const filmDemande = /[?&]film(=|&|$)/.test(window.location.search || '');

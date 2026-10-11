@@ -196,7 +196,7 @@
       bascule = `<div class="ligne"><div class="lib">Attention</div><div class="val alerte">Le ${esc(quand)}, ce Chrome est passé du compte VRM ${esc(b.de || '?')} à ${esc(b.vers || '?')}. Les captures suivent le compte connecté : si ce n'est pas le tien, reconnecte-toi avec le bon.</div></div>`;
     }
 
-    const pied = v && v.connecte ? 'Clique sur le logo pour <b>ouvrir VRM</b>.' : 'Clique sur le logo pour <b>te connecter</b>.';
+    const pied = v && v.connecte ? 'Clique sur le logo pour <b>ouvrir VRM</b>.' : 'Clique sur le logo : <b>VRM s’ouvre et connecte l’extension</b> — rien à taper ici.';
     carte.innerHTML = `<div class="tete"><b>VRM</b><span class="ver">${e.version ? 'extension ' + esc(e.version) : ''}</span></div>
       ${lignePerime}
       <div class="ligne"><div class="lib">Compte VRM utilisé</div>${compteVrm}</div>
@@ -243,9 +243,22 @@
       try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'ouvrirVRM' }, () => { void chrome.runtime.lastError; }); } catch (_) {}
       return;
     }
-    // Pas connecté, session expirée — ou pas su : on propose la connexion
-    // sans insister (pas d'ambre tant qu'on ne sait pas).
-    ouvrirConnexion();
+    // ⚠️ 11 octobre (Julien : « quand j'appuie sur se connecter ça doit envoyer
+    //    directement dans l'application VRM ») : le logo OUVRE VRM à chaque
+    //    fois. Pas connecté, session expirée ou pas su : VRM s'ouvre avec
+    //    l'identifiant de CETTE extension, et l'app (connectée, ou après sa
+    //    connexion) lui adresse sa session. La carte de mot de passe ne revient
+    //    qu'en secours, si le service worker ne sait pas faire la liaison
+    //    (code périmé : il ne connaît pas ce message).
+    let repondu = false;
+    const secours = setTimeout(() => { if (!repondu) ouvrirConnexion(); }, 2500);
+    try {
+      chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'lierAvecVRM' }, (r) => {
+        let err = null; try { err = chrome.runtime.lastError; } catch (_) {}
+        repondu = true; clearTimeout(secours);
+        if (err || !r || !r.ok) ouvrirConnexion();
+      });
+    } catch (_) { repondu = true; clearTimeout(secours); ouvrirConnexion(); }
   });
 
   // La carte d'état au survol ; elle se ferme quand on s'en va.

@@ -1528,7 +1528,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       return true;
     }
     // « Se connecter avec VRM » : ouvre l'app, qui connecte l'extension.
-    if (msg && msg.from === 'cancale-popup' && msg.action === 'lierAvecVRM') {
+    // Le logo des sites (vrm-badge) aussi : il ouvre VRM à chaque fois (11 octobre).
+    if (msg && (msg.from === 'cancale-popup' || msg.from === 'vrm-badge') && msg.action === 'lierAvecVRM') {
       lierAvecVRM((sender && sender.tab && sender.tab.url) || msg.urlActive || '').then(sendResponse, () => sendResponse({ ok: false }));
       return true;
     }

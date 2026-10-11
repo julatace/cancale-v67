@@ -175,7 +175,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // exactement. Le seuil est 5.160 : en deçà, l'app dit « mets à jour », elle ne
 // laisse pas le bouton se casser. (Mesuré le 7 octobre : son extension installée
 // est en 5.143 — c'est pour ça que « publier depuis VRM ne marche pas ».)
-const EXT_CAPACITES = { supprimees: '5.165.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', repond: '5.77.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', detourage: '5.156.0' };
+const EXT_CAPACITES = { liaison: '5.167.0', supprimees: '5.165.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', repond: '5.77.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', detourage: '5.156.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -747,7 +747,14 @@ const authSetPassword = async (password) => {
     return { ok: true };
   } catch (_) { return { ok: false, error: 'Pas de connexion internet.' }; }
 };
-const authSignOut = () => { writeSession(null); wipeLocalData(); };
+// « Se déconnecter » (un GESTE) déconnecte aussi l'extension de ce Chrome —
+// adressé, et seulement si elle écrit sous CE compte. Une session qui meurt
+// toute seule, elle, ne fait plus rien oublier à l'extension (11 octobre).
+const authSignOut = () => {
+  const uid = AUTH.user && AUTH.user.id;
+  try { if (uid) deconnecterExtension(String(uid)); } catch (_) {}
+  writeSession(null); wipeLocalData();
+};
 
 // CHANGEMENT DE VENDEUR SUR LE MÊME NAVIGATEUR : le localStorage est commun à
 // tout le site. Sans ménage, le vendeur qui se connecte après un autre
@@ -832,39 +839,37 @@ if (MULTI_USER && typeof window !== 'undefined') {
 //      indépendantes, qui ne se marchent plus dessus. On ne la lui donne que
 //      quand elle en a BESOIN (pas de session, session morte, autre compte),
 //      jamais à chaque rafraîchissement. Voir `assurerSessionExtension`.
-// À la déconnexion on envoie toujours null : elle oublie tout.
+// ⚠️⚠️ 11 OCTOBRE — PLUS AUCUNE SESSION PAR LA PAGE, ET JAMAIS LA NÔTRE.
+//    Mesuré dans les journaux d'authentification de production, et rejoué sur
+//    un vrai GoTrue (relectures du 11 octobre) :
+//    · `window.postMessage({__vmr:'session'})` est entendu par TOUTE extension
+//      de la page — une copie ancienne restée à côté adoptait la même famille
+//      de jetons, qui finit révoquée (« Possible abuse attempt ») ;
+//    · un `session: null` posté au démarrage d'une app dont la session venait de
+//      mourir faisait OUBLIER à l'extension la sienne, saine (9 oct. 18:37,
+//      10 oct. 09:08 : une écriture, puis plus rien — « à chaque fois je dois
+//      me reconnecter ») ;
+//    · `legacySessionExtension` prêtait à une extension < 5.129 NOTRE propre
+//      jeton de renouvellement (rejoué : famille révoquée, l'app perd sa
+//      session 12 s plus tard).
+//    ⇒ La session de l'extension est ADRESSÉE à UNE extension, par son
+//      identifiant (`chrome.runtime.sendMessage(<id>, …)`, permis par
+//      `externally_connectable`), avec un NONCE qu'elle a elle-même émis, et
+//      fabriquée par le serveur pour le même compte (une famille de jetons à
+//      elle). Voir `assurerSessionExtension`. Une extension plus ancienne ne
+//      reçoit RIEN — l'app lui dit de se mettre à jour.
+//    ⇒ Une session de l'app qui MEURT ne touche plus à celle de l'extension.
+//      Seul « Se déconnecter » (un geste) la déconnecte, et seulement si elle
+//      écrit sous CE compte (`deconnecterExtension`).
 // ⚠️⚠️ DEUX EXTENSIONS VRM DANS LE MÊME CHROME (mesuré le 9 octobre, 5.165) :
 //    `null` = une seule répond (ou pas su) · `['5.77.0','5.165.0']` = PLUSIEURS.
 //    Décidé par `sonderPonts` (plus bas), lu par `raisonExtGlobale`, `vmrExec`,
-//    `vmrDemande` et ici. Une session postée ici est relayée par CHAQUE pont
-//    vivant de la page : deux extensions adopteraient la MÊME famille de jetons
-//    et se la tueraient en la renouvelant (`refresh_token_already_used`,
-//    « Possible abuse attempt », relevé à 18:37:02 le 9 octobre).
+//    `vmrDemande` et `assurerSessionExtension`.
 let __vmrPlusieurs = null;
-const posterSessionExtension = (session) => {
-  if (session && __vmrPlusieurs) return;   // « oublie tout » (null) part toujours
-  try { window.postMessage({ __vmr: 'session', session: session || null }, window.location.origin); } catch (_) {}
-};
-// Le repli d'AVANT (notre propre session) ne sert plus qu'à amorcer une
-// extension qui n'a AUCUNE session quand le serveur ne sait pas en fabriquer
-// une (route pas encore déployée, clé de service absente) — jamais pour
-// remplacer une session morte : c'est exactement le cas qui faisait s'entre-
-// tuer les deux familles.
-const sessionAppPourExtension = () => {
-  const s = AUTH.session;
-  return s ? {
-    access_token: s.access_token, refresh_token: s.refresh_token,
-    expires_at: s.expires_at, user_id: AUTH.user && AUTH.user.id,
-    // L'email voyage avec la session : c'est lui que l'extension affiche
-    // (« compte VRM utilisé »). Sans lui elle ne pouvait pas le nommer.
-    email: (AUTH.user && AUTH.user.email) || '',
-  } : null;
-};
 let __sessionAvait = false;
 if (MULTI_USER && typeof window !== 'undefined') {
   onAuthChange(() => {
     const a = !!(AUTH.session && AUTH.user);
-    if (__sessionAvait && !a) posterSessionExtension(null);   // déconnexion : elle oublie
     __sessionAvait = a;
     // Connexion (ou nouveau compte) : on vérifie si l'extension a ce qu'il faut.
     if (a) setTimeout(() => { try { assurerSessionExtension(); } catch (_) {} }, 50);
@@ -4228,6 +4233,7 @@ function vmrExecUn({ uid, method, endpoint, body }, timeoutMs = 15000) {
     // 5.165 : deux extensions répondent ⇒ une réponse à un acheteur partirait
     //    DEUX fois (mesuré : « exec …/replies ×2 »). Rien ne part.
     if (__vmrPlusieurs) { resolve({ ok: false, error: textePlusieurs(), code: 'plusieurs' }); return; }
+    if (codePerime()) { resolve({ ok: false, error: textePerime(), code: 'perime' }); return; }
     const reqId = 'r' + Date.now() + '_' + Math.random().toString(36).slice(2);
     let dernier = null;
     const cleanup = () => { clearTimeout(to); window.removeEventListener('message', onMsg); };
@@ -4260,6 +4266,44 @@ function vmrExecUn({ uid, method, endpoint, body }, timeoutMs = 15000) {
 //    deux — `undefined` on vérifie · `null` elle ne répond pas · objet mesuré.
 //    L'état ne coûte AUCUNE requête Vinted (cookie + stockage de l'extension).
 let __vmrEtat = undefined, __vmrRates = 0;
+// ══ LE CODE QUI TOURNE N'EST PAS CELUI DU MANIFESTE (11 octobre) ═══════════
+// ⚠️⚠️ MESURÉ dans ses journaux, reproduit dans un vrai Chromium : sur 5 des 6
+//    Chrome qui travaillent pour lui, le dossier avait été remplacé par la
+//    5.164, mais le service worker exécutait encore une 5.95–5.129 — et
+//    ANNONÇAIT « 5.164.0 » (la version vient du fichier manifeste, pas du code).
+//    L'app jugeait sur cette version : « Actions possibles », « ton ordinateur
+//    est à jour ». Seul ⟳ (chrome://extensions) recharge le code, et seulement
+//    dans le Chrome où on le clique.
+// ⇒ Trois signes, tous MESURÉS, jamais devinés :
+//    · le pont (≥ 5.167, toujours lu depuis le disque) juge le code et joint son
+//      verdict (`perime`) — y compris quand le code est si vieux qu'il ne répond
+//      rien à « état » ;
+//    · l'état porte `code` depuis la 5.167 : absent alors que la version annoncée
+//      est ≥ 5.167, ou différent d'elle ⇒ périmé ;
+//    · la clé `offresAutoLocal` n'a existé dans l'état que de la 5.130 à la 5.158
+//      (retirée avec l'acceptation automatique) : une version ≥ 5.159 qui la
+//      porte encore exécute un code d'avant.
+//    Trois états, jamais deux : `null` = rien ne dit périmé.
+let __vmrPerimePont = null;
+function codePerime() {
+  const p = __vmrPerimePont;
+  if (p && Date.now() - Number(p.at || 0) < 120000) return { code: p.code || null, raison: p.raison || 'pont' };
+  const e = __vmrEtat;
+  if (!e || !e.ok) return null;
+  const v = String(e.version || vmrExtVersion() || '');
+  if (!/^\d+\.\d+\.\d+$/.test(v)) return null;
+  if (Object.prototype.hasOwnProperty.call(e, 'offresAutoLocal') && cmpVersion(v, '5.159.0') >= 0) return { code: null, raison: 'ancien-etat' };
+  if (cmpVersion(v, CODE_DANS_ETAT) >= 0 && !e.code) return { code: null, raison: 'sans-code' };
+  if (e.code && String(e.code) !== v) return { code: String(e.code), raison: 'autre-code' };
+  return null;
+}
+// La version où l'état porte `code` (la constante `CODE_VERSION` de background.js).
+const CODE_DANS_ETAT = '5.167.0';
+function textePerime() {
+  const p = codePerime() || {};
+  const v = String((__vmrEtat && __vmrEtat.version) || vmrExtVersion() || '');
+  return `L'extension de ce Chrome tourne encore sur son ancien code${p.code ? ` (${p.code})` : ''}, pas sur la ${v || 'version'} que tu as installée — Chrome ne la recharge pas tout seul. Dans ce Chrome : ouvre chrome://extensions et clique ⟳ (la flèche ronde) sur VRM. À faire dans CHAQUE Chrome où elle est installée.`;
+}
 const __vmrJobs = {};                       // jobId → dernière étape connue
 const __vmrNotifier = () => __vmrExtSubs.forEach(fn => { try { fn(); } catch (_) {} });
 // ⚠️⚠️ UN PONT ORPHELIN RÉPONDAIT « RIEN » PLUS VITE QUE LE PONT VIVANT
@@ -4290,9 +4334,17 @@ function vmrDemandeUn(type, payload, timeoutMs) {
     // 5.165 : deux extensions répondent ⇒ une commande serait exécutée DEUX fois
     //    (mesuré : « cmd:bordereau ×2 »). On n'en envoie aucune, et on le dit.
     if (agit && __vmrPlusieurs) { resolve({ accepte: false, code: 'plusieurs', raison: textePlusieurs() }); return; }
+    // 11 octobre : un code PÉRIMÉ (manifeste neuf, service worker ancien) n'a
+    // pas les garde-fous d'aujourd'hui (une seule requête à la fois, pause
+    // quand Vinted freine…) : aucune commande ne part tant qu'il tourne.
+    if (agit && codePerime()) { resolve({ accepte: false, code: 'perime', raison: textePerime() }); return; }
     const fin = (v) => { if (done) return; done = true; clearTimeout(grace); clearTimeout(to); window.removeEventListener('message', onMsg); resolve(v); };
     const onMsg = (e) => {
       if (e.source !== window || !e.data || e.data.__vmr !== type + ':result' || e.data.reqId !== reqId) return;
+      // 11 octobre : le pont (≥ 5.167, toujours lu depuis le disque) juge le
+      // CODE qui répond et joint son verdict — y compris quand ce code est si
+      // ancien qu'il ne répond rien à « état » (`resp: null`).
+      if (type === 'etat') __vmrPerimePont = e.data.perime && typeof e.data.perime === 'object' ? Object.assign({}, e.data.perime, { at: Date.now() }) : (e.data.resp ? null : __vmrPerimePont);
       if (e.data.resp) { fin(e.data.resp); return; }
       if (!agit && !grace) grace = setTimeout(() => fin(null), VMR_GRACE_VIDE_MS);
     };
@@ -4320,7 +4372,10 @@ async function battementExt() {
   if (!__vmrExtReady) return;
   sonderPonts();                         // 5.165 : combien d'extensions répondent (voir plus haut)
   if (__vmrBattementEnVol) return;
-  if (!pontSaitRepondreEtat()) { legacySessionExtension(); return; }
+  // ⚠️ Un pont plus ancien que la 5.129 ne reçoit RIEN (11 octobre) : avant, on
+  //    lui prêtait NOTRE session (`legacySessionExtension`) — même famille de
+  //    jetons, révoquée au premier renouvellement croisé. Il doit être mis à jour.
+  if (!pontSaitRepondreEtat()) return;
   __vmrBattementEnVol = true;
   let r = null;
   try { r = await vmrEtat(); } finally { __vmrBattementEnVol = false; }
@@ -4335,46 +4390,122 @@ async function battementExt() {
     else { clearTimeout(__vmrRelance); __vmrRelance = setTimeout(battementExt, 3000); }
   }
   __vmrNotifier();
-  if (r && r.ok) { try { assurerSessionExtension(); } catch (_) {} }
+  // Une liaison demandée (« Se connecter » dans l'extension) part même si l'état
+  // ne vient pas de CETTE extension : c'est à elle qu'on s'adresse.
+  if ((r && r.ok) || (__lier && (__lier.etat === 'attente' || __lier.etat === 'encours'))) { try { assurerSessionExtension(); } catch (_) {} }
 }
-// L'EXTENSION REÇOIT SA PROPRE SESSION QUAND ELLE EN A BESOIN (voir
-// `posterSessionExtension`). Besoin = elle n'en a pas, la sienne est morte, ou
-// elle écrit sous un AUTRE compte VRM que celui de cette page (c'est la
-// personne au clavier qui décide : l'extension note la bascule et la dit).
+// ══ LA SESSION DE L'EXTENSION, ADRESSÉE (11 octobre) ══════════════════════
+// L'extension reçoit SA PROPRE session (fabriquée par le serveur pour le même
+// compte, `/api/compte?mode=session-extension` : une famille de jetons à elle)
+// quand elle en a BESOIN — pas de session, session morte, autre compte, ou
+// « Se connecter » cliqué dans CETTE extension. Le chemin, entièrement adressé :
+//   1. l'app demande À L'EXTENSION (par son identifiant) si elle a besoin d'une
+//      session pour CE compte : c'est elle qui décide, et seulement si oui elle
+//      rend un nonce (128 bits, 2 min, une seule fois) ;
+//   2. l'app fait fabriquer la session par le serveur (sa propre connexion fait foi) ;
+//   3. l'app la remet À CETTE extension, avec le nonce. Aucune autre extension
+//      de la page ne l'entend : `window.postMessage` n'est plus utilisé.
 // Pas su (`connecte: null`, renouvellement en cours) ⇒ on ne touche à rien.
 let __sessExtEnVol = false, __sessExtPasAvant = 0, __sessExtIncertain = 0;
+let __sessExtErreur = null;     // ce que le serveur a répondu quand il n'a pas pu
 const enVolSession = (v) => { __sessExtEnVol = v; __vmrNotifier(); };   // l'indicateur le dit pendant que ça se fait
-// ⚠️ UNE EXTENSION QUI A ENCORE LA SESSION DE L'APP (donnée avant le 5 octobre)
+// ⚠️ UNE EXTENSION QUI A ENCORE LA SESSION DE L'APP (donnée avant le 6 octobre)
 //    partage sa famille de jetons avec l'app jusqu'à ce que l'une des deux soit
-//    révoquée — et Supabase peut alors révoquer les DEUX. On la sépare UNE fois,
-//    d'avance, par appareil et par compte (revue du 5 octobre). Ce n'est pas une
-//    migration de données : au pire on refait une séparation de plus, sans perte.
+//    révoquée. On la sépare UNE fois, d'avance, par appareil et par compte. Ce
+//    n'est pas une migration de données : au pire une séparation de plus.
 const cleSeparee = (uid) => 'vrm_ext_separee_' + uid;
+// Le canal ADRESSÉ vers une extension : `chrome.runtime` n'existe dans la page
+// que si une extension installée déclare `externally_connectable` pour elle
+// (la 5.167 et suivantes). `null` = pas de réponse (absente, trop ancienne,
+// code périmé) — jamais une réponse devinée.
+const canalExt = () => { try { return (typeof chrome !== 'undefined' && chrome && chrome.runtime && typeof chrome.runtime.sendMessage === 'function') ? chrome.runtime : null; } catch (_) { return null; } };
+function versExtension(id, msg, timeoutMs = 5000) {
+  return new Promise((res) => {
+    const rt = canalExt();
+    if (!rt || !/^[a-p]{32}$/.test(String(id || ''))) { res(null); return; }
+    let fini = false;
+    const t = setTimeout(() => { if (!fini) { fini = true; res(null); } }, timeoutMs);
+    try {
+      rt.sendMessage(String(id), msg, (r) => {
+        if (fini) return; fini = true; clearTimeout(t);
+        let e = null; try { e = rt.lastError; } catch (_) { e = null; }
+        res(e ? null : (r || null));
+      });
+    } catch (_) { if (!fini) { fini = true; clearTimeout(t); res(null); } }
+  });
+}
+// « SE CONNECTER AVEC VRM » : l'extension ouvre VRM avec `?lier-extension=<son
+// identifiant>`. On le garde (15 min) le temps d'une connexion éventuelle — le
+// rechargement qui suit la connexion ne doit pas le perdre.
+const LIER_CLE = 'vrm_lier_extension';
+let __lier = null;   // { id, at, etat: 'attente'|'encours'|'ok'|'deja'|'erreur'|'absente', email, message }
+const __lierSubs = new Set();
+const lierNotifier = () => __lierSubs.forEach((fn) => { try { fn(); } catch (_) {} });
+const poserLier = (v) => { __lier = v; try { if (v && (v.etat === 'attente' || v.etat === 'encours')) sessionStorage.setItem(LIER_CLE, JSON.stringify({ id: v.id, at: v.at })); else sessionStorage.removeItem(LIER_CLE); } catch (_) {} lierNotifier(); __vmrNotifier(); };
+if (typeof window !== 'undefined') {
+  try {
+    const q = new URLSearchParams(window.location.search || '');
+    const id = q.get('lier-extension');
+    if (id && /^[a-p]{32}$/.test(id)) {
+      __lier = { id, at: Date.now(), etat: 'attente' };
+      try { sessionStorage.setItem(LIER_CLE, JSON.stringify({ id, at: Date.now() })); } catch (_) {}
+      try { q.delete('lier-extension'); const rest = q.toString(); window.history.replaceState(window.history.state, '', window.location.pathname + (rest ? '?' + rest : '') + window.location.hash); } catch (_) {}
+    } else {
+      const g = JSON.parse(sessionStorage.getItem(LIER_CLE) || 'null');
+      if (g && /^[a-p]{32}$/.test(String(g.id || '')) && Date.now() - Number(g.at || 0) < 15 * 60000) __lier = { id: String(g.id), at: Number(g.at), etat: 'attente' };
+    }
+  } catch (_) {}
+}
 async function assurerSessionExtension() {
   if (!MULTI_USER || typeof window === 'undefined') return;
-  // 5.165 : deux extensions adopteraient la MÊME session et se la tueraient.
+  // 5.165 : deux extensions répondent ⇒ on ne donne rien (on ne saurait pas
+  // laquelle garder, et l'ancienne exécuterait encore les commandes).
   await sondageConnu();
   if (__vmrPlusieurs) return;
   const s = AUTH.session, u = AUTH.user;
   if (!s || !s.access_token || !u || !u.id) return;
   const e = __vmrEtat;
-  const v = e && e.ok ? e.vrm : null;
-  if (!v || typeof v !== 'object') return;
+  // Un code périmé n'écoute pas le canal adressé : rien à lui donner (le geste
+  // est le ⟳, dit ailleurs).
+  if (codePerime()) return;
+  const lier = __lier && (__lier.etat === 'attente' || __lier.etat === 'encours') ? __lier : null;
+  // La cible : l'extension qui a demandé (« Se connecter »), sinon celle qui
+  // répond à l'état dans cette page. Jamais « toutes ».
+  const ext = String((lier && lier.id) || (e && e.ok && e.ext) || '');
+  if (!ext) return;
+  if (extSait('liaison') !== 'ok' && !lier) return;
+  // Ce que l'état dit de la session ne vaut que s'il vient de CETTE extension.
+  const v = e && e.ok && (!e.ext || String(e.ext) === ext) ? e.vrm : null;
   const monId = String(u.id), monMail = String(u.email || '').trim().toLowerCase();
-  const sonId = String(v.user_id || ''), sonMail = String(v.email || '').trim().toLowerCase();
-  const autre = (sonId && sonId !== monId) || (!sonId && sonMail && monMail && sonMail !== monMail);
+  const sonId = String((v && v.user_id) || ''), sonMail = String((v && v.email) || '').trim().toLowerCase();
+  const autre = !!v && ((sonId && sonId !== monId) || (!sonId && sonMail && monMail && sonMail !== monMail));
   // « Pas su » (renouvellement en cours) n'est pas « pas connectée » — mais s'il
-  // dure deux battements, sa session est en pause : on lui en donne une neuve.
-  __sessExtIncertain = v.connecte === null ? __sessExtIncertain + 1 : 0;
+  // dure deux battements, sa session est en pause : on lui en propose une neuve.
+  __sessExtIncertain = v && v.connecte === null ? __sessExtIncertain + 1 : 0;
   let separee = false; try { separee = !!localStorage.getItem(cleSeparee(monId)); } catch (_) { separee = true; }
-  const aSeparer = v.connecte === true && !autre && !separee;
+  const aSeparer = !!v && v.connecte === true && !autre && !separee;
   // « Autre compte » : seul l'onglet AU PREMIER PLAN tranche — deux onglets sur
   // deux comptes se renverraient l'extension toutes les minutes.
   const auPremierPlan = typeof document === 'undefined' || (!document.hidden && (typeof document.hasFocus !== 'function' || document.hasFocus()));
-  if (!(v.connecte === false || __sessExtIncertain >= 2 || aSeparer || (autre && auPremierPlan))) return;
-  if (__sessExtEnVol || Date.now() < __sessExtPasAvant) return;
+  const lierIci = !!lier;
+  if (!(lierIci || (v && v.connecte === false) || __sessExtIncertain >= 2 || aSeparer || (autre && auPremierPlan))) return;
+  if (__sessExtEnVol || (!lierIci && Date.now() < __sessExtPasAvant)) return;
   enVolSession(true);
+  if (lierIci) poserLier(Object.assign({}, lier, { etat: 'encours' }));
   try {
+    // 1. Est-ce qu'ELLE en a besoin ? Elle seule le sait, et elle émet le nonce.
+    const q = await versExtension(ext, { type: 'liaison', pour: monId, force: lierIci || (autre && auPremierPlan), raison: aSeparer ? 'separer' : '' });
+    if (!q || !q.ok) {
+      __sessExtPasAvant = Date.now() + 60000;
+      if (lierIci) poserLier(Object.assign({}, lier, { etat: 'absente' }));
+      return;
+    }
+    if (!q.besoin) {
+      if (aSeparer) { try { localStorage.setItem(cleSeparee(monId), String(Date.now())); } catch (_) {} }
+      if (lierIci) poserLier(Object.assign({}, lier, { etat: 'deja', email: (v && v.email) || u.email || '' }));
+      return;
+    }
+    // 2. Une session à ELLE, fabriquée par le serveur (notre connexion fait foi).
     let r = null;
     try { r = await fetch('/api/compte?mode=session-extension', { method: 'POST', cache: 'no-store', headers: { Authorization: `Bearer ${s.access_token}` } }); } catch (_) { r = null; }
     const j = r ? await r.json().catch(() => null) : null;
@@ -4382,39 +4513,38 @@ async function assurerSessionExtension() {
     //    la session d'un compte qui n'est plus celui de cette page.
     if (!AUTH.session || !AUTH.user || String(AUTH.user.id) !== monId) return;
     const neuve = r && r.ok && j && j.ok && j.session && j.session.access_token && j.session.refresh_token ? j.session : null;
-    if (neuve && String(neuve.user_id || '') === monId) {
-      posterSessionExtension(neuve);
+    if (!neuve || String(neuve.user_id || '') !== monId) {
+      // ⚠️ PLUS DE REPLI SUR NOTRE PROPRE SESSION (11 octobre) : c'était
+      //    exactement le cas qui faisait s'entre-tuer les deux familles. On DIT
+      //    ce que le serveur a répondu, et le geste de secours.
+      __sessExtErreur = { status: r ? r.status : 0, message: (j && j.message) || '' };
+      __sessExtPasAvant = Date.now() + (r && r.status === 429 ? 15 * 60000 : 5 * 60000);
+      if (lierIci) poserLier(Object.assign({}, lier, { etat: 'erreur', message: __sessExtErreur.message }));
+      return;
+    }
+    // 3. Remise À CETTE extension, avec son nonce. Aucune autre ne l'entend.
+    const a = await versExtension(ext, { type: 'session', nonce: q.nonce, session: neuve });
+    if (a && a.ok) {
+      __sessExtErreur = null;
       try { localStorage.setItem(cleSeparee(monId), String(Date.now())); } catch (_) {}
       __sessExtPasAvant = Date.now() + 60000;
       __sessExtIncertain = 0;
+      if (lierIci) poserLier(Object.assign({}, lier, { etat: 'ok', email: a.email || u.email || '' }));
       // Elle vient de changer de session : on relit son état tout de suite.
       setTimeout(battementExt, 800);
       return;
     }
-    // Le serveur ne sait pas (encore) en fabriquer une — route absente ou pas
-    // configurée, et SEULEMENT ça (une panne passagère n'est pas une raison) :
-    // repli d'avant, pour amorcer une extension qui n'a AUCUNE session du tout.
-    const pasDeServeur = r && (r.status === 404 || r.status === 405 || (r.status === 503 && j && j.erreur === 'non-configure'));
-    if (pasDeServeur && v.connecte === false && !v.expiree && !v.email) {
-      posterSessionExtension(sessionAppPourExtension());
-      __sessExtPasAvant = Date.now() + 10 * 60000;
-      setTimeout(battementExt, 800);
-      return;
-    }
-    __sessExtPasAvant = Date.now() + (r && r.status === 429 ? 15 * 60000 : 5 * 60000);
+    __sessExtPasAvant = Date.now() + 60000;
+    if (lierIci) poserLier(Object.assign({}, lier, { etat: 'erreur', message: '' }));
   } finally { enVolSession(false); }
 }
-// Un pont plus ancien que la 5.129 ne dit pas sous quel compte il écrit (pas
-// d'« état ») : on garde avec lui le comportement d'AVANT — notre session à
-// chaque « ready » — plutôt que de le laisser sans aucune session. Il partage
-// alors notre famille de jetons comme avant ; c'est lui qui doit être mis à jour.
-let __legacyPoste = 0;
-function legacySessionExtension() {
-  if (!MULTI_USER || !AUTH.session || !AUTH.user) return;
-  if (!__vmrToursFaits || __vmrPlusieurs) return;   // 5.165 : pas avant d'avoir compté, jamais à deux
-  if (Date.now() - __legacyPoste < 30 * 60000) return;
-  __legacyPoste = Date.now();
-  posterSessionExtension(sessionAppPourExtension());
+// « Se déconnecter » dans VRM : l'extension de ce Chrome oublie sa session —
+// seulement si elle écrit sous CE compte (elle le vérifie elle-même). Adressé.
+function deconnecterExtension(uid) {
+  const e = __vmrEtat;
+  const ext = String((e && e.ok && e.ext) || '');
+  if (!ext || !uid) return Promise.resolve(null);
+  return versExtension(ext, { type: 'deconnexion', pour: String(uid) }, 3000);
 }
 if (typeof window !== 'undefined') {
   try {
@@ -4431,6 +4561,10 @@ if (typeof window !== 'undefined') {
       if (e.data.__vmr !== 'evt' || !e.data.evt) return;
       const ev = e.data.evt;
       if (ev.type === 'cmd' && ev.jobId) { __vmrJobs[ev.jobId] = ev; __vmrNotifier(); }
+      // 11 octobre : sa session vient de mourir (refus définitif) — on ne
+      // l'apprend plus au battement suivant, on lui en redonne une tout de suite.
+      if (ev.type === 'session' && ev.etat === 'morte') { __sessExtPasAvant = 0; setTimeout(battementExt, 200); }
+      if (ev.type === 'session' && ev.etat === 'liee') setTimeout(battementExt, 300);
       // Les écrans qui ont des données à relire (un bordereau rangé, des
       // ventes rafraîchies) l'écoutent : `vrm:ext`.
       try { window.dispatchEvent(new CustomEvent('vrm:ext', { detail: ev })); } catch (_) {}
@@ -4479,10 +4613,16 @@ function raisonExtGlobale(sansSouris, opt) {
   // ⚠️⚠️ PLUSIEURS AVANT TOUT LE RESTE (5.165) : « mets à jour » ou « recharge »
   //    seraient faux — il vient de mettre à jour, et l'ancienne répond encore.
   if (__vmrPlusieurs) return { code: 'plusieurs', geste: 'extensions', texte: textePlusieurs() };
+  // ⚠️⚠️ PÉRIMÉ AVANT TOUT LE RESTE (11 octobre) : la version annoncée est la
+  //    bonne, c'est le CODE qui ne l'est pas — « mets à jour » serait faux (il
+  //    vient de le faire), « recharge la page » ne change rien. Le geste est ⟳.
+  if (codePerime()) return { code: 'perime', geste: 'recharger-extension', texte: textePerime() };
   // ⚠️ « En retard » AVANT « muette » : un pont trop ancien ne sait pas
   //    répondre, et lui dire « recharge la page » ne change rien (revue).
   if (extSait(cap) === 'retard') return { code: 'retard', texte: `Mets l'extension à jour (${EXT_ATTENDUE}) : celle installée ne sait pas encore recevoir cette commande de l'app.` };
-  if (__vmrEtat === null) return { code: 'muette', geste: 'recharger', texte: "L'extension ne répond pas — recharge cette page (après une mise à jour), ou réactive-la dans chrome://extensions." };
+  // Muette : recharger la page suffit après une mise à jour (l'ancien pont est
+  // resté dans la page) ; si non, c'est le service worker — ⟳ dans ce Chrome.
+  if (__vmrEtat === null) return { code: 'muette', geste: 'recharger', texte: "L'extension ne répond pas — recharge cette page ; si ça ne suffit pas, ouvre chrome://extensions et clique ⟳ sur VRM (dans ce Chrome)." };
   if (__vmrEtat === undefined) return { code: 'verif', texte: "Vérification de l'extension…" };
   const v = __vmrEtat.vrm;
   // ⚠️ « Pas su » ne vaut pas « oui » (revue du 5 octobre) : sans réponse sur
@@ -4490,9 +4630,16 @@ function raisonExtGlobale(sansSouris, opt) {
   if (!v || typeof v !== 'object') return { code: 'vrm-passu', texte: "Je n'ai pas pu savoir sous quel compte VRM l'extension écrit — recharge cette page." };
   // L'app lui transmet d'elle-même sa connexion quand elle n'en a pas
   // (`assurerSessionExtension`) : on le dit pendant que ça se fait.
+  // ⚠️ 11 octobre : une extension plus ancienne que la 5.167 n'écoute pas le
+  //    canal adressé — l'app ne lui prête plus JAMAIS sa propre session. On le
+  //    dit, avec les deux vrais gestes, au lieu de promettre un « je réessaie ».
   if (v.connecte === false) return { code: 'vrm', texte: __sessExtEnVol
     ? "Je connecte l'extension à ton compte VRM…"
-    : "L'extension n'est pas connectée à ton compte VRM — je réessaie de la connecter ; sinon, recharge cette page." };
+    : extSait('liaison') === 'retard'
+      ? `L'extension n'est pas connectée à ton compte VRM, et celle-ci (${vmrExtVersion() || 'version ?'}) ne sait pas encore recevoir la connexion de VRM : mets-la à jour (${EXT_ATTENDUE}), ou clique son icône et connecte-toi avec ton mot de passe VRM.`
+      : __sessExtErreur
+        ? `L'extension n'est pas connectée à ton compte VRM et le serveur n'a pas pu préparer sa connexion${__sessExtErreur.message ? ' (' + __sessExtErreur.message + ')' : ''} — clique son icône et connecte-toi avec ton mot de passe VRM.`
+        : "L'extension n'est pas connectée à ton compte VRM — je la connecte ; si ça ne vient pas, recharge cette page." };
   if (v.connecte === null) return { code: 'vrm-encours', texte: "L'extension renouvelle sa connexion à VRM — un instant." };
   // Même compte ? Par IDENTITÉ (l'identifiant du compte), l'email en repli —
   // la même règle que la session qu'on lui donne (§11).
@@ -6074,12 +6221,16 @@ function ExtEnRetard({ onNav }) {
       title="Ton extension VRM est en retard"
       value={muette ? `? → ${EXT_ATTENDUE}` : `${ext.v} → ${EXT_ATTENDUE}`}
       desc="Elle capte toujours, mais moins que ce que l'app attend — et elle ne le dit pas d'elle-même. C'est elle qui va chercher les codes de retrait dans tes conversations Vinted."
-      /* ⚠️ « CLIQUE SUR ⟳ » NE SUFFIT PAS, ET C'EST CE QUI L'A BLOQUÉ DES
-         SEMAINES : la flèche ronde recharge le DOSSIER du disque — donc la
-         MÊME vieille version. Il faut d'abord remplacer le dossier. Et le zip
-         de la 5.52 n'existait nulle part : le dépôt n'en portait qu'un, du
-         30 août, en 4.13. On le livre maintenant depuis l'app. */
-      detail={"1. Télécharge le zip ci-contre. 2. Dézippe-le : tu obtiens un dossier « VRM-extension » — mets-le à la place de l'ancien, au même endroit et avec le même nom. 3. Ouvre chrome://extensions et clique sur ⟳ (la flèche ronde) sur VRM. 4. Recharge une page Vinted : la capture repart avec la nouvelle version."}
+      /* ⚠️ LES DEUX GESTES, ET DANS CET ORDRE — MESURÉ (11 octobre).
+         · ⟳ SEUL ne suffit pas : la flèche ronde recharge le DOSSIER du disque,
+           donc la même vieille version tant qu'on ne l'a pas remplacé (c'est
+           ce qui l'a bloqué des semaines en août-septembre).
+         · Remplacer le dossier SEUL ne suffit pas non plus : Chrome garde
+           l'ANCIEN code en mémoire — mesuré chez lui, 5 Chrome sur 6
+           exécutaient une 5.95–5.129 sous un manifeste « 5.164 » — tant qu'on
+           n'a pas cliqué ⟳, et SEULEMENT dans le Chrome où on le clique. Il a
+           un Chrome (un profil) par compte Vinted : ⟳ dans CHACUN. */
+      detail={"1. Télécharge le zip ci-contre. 2. Dézippe-le : tu obtiens un dossier « VRM-extension » — mets-le à la place de l'ancien, au même endroit et avec le même nom. 3. PUIS, dans CHAQUE Chrome où l'extension est installée (chaque profil) : ouvre chrome://extensions, garde une seule carte VRM, et clique ⟳ (la flèche ronde) dessus — sans ⟳, Chrome garde l'ancien code. 4. Recharge une page Vinted : la capture repart avec la nouvelle version."}
       action={<a href={`/VRM-extension.zip?v=${EXT_ATTENDUE}`} download
         style={{display:'inline-block',border:'none',background:C.warn,color:'#fff',borderRadius:8,padding:'9px 15px',fontSize:12.5,fontWeight:700,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap',textDecoration:'none'}}>
         Télécharger la {EXT_ATTENDUE}
@@ -7788,6 +7939,13 @@ function AuthScreen() {
              : mode==='newpw' ? 'Choisis-en un nouveau, tu resteras connecté.'
              : 'Retrouve ta boutique, tes numéros et ta compta.'}
           </div>
+          {/* 11 octobre : on arrive ici depuis « Se connecter » dans l'extension.
+              UNE connexion pour les deux : l'app connecte l'extension juste après. */}
+          {__lier && (mode==='in' || mode==='up') && (
+            <div data-lier-connexion="" style={{fontSize:12.5,color:C.text,background:`${C.accent}12`,border:`1px solid ${C.accent}55`,borderRadius:8,padding:'8px 10px',marginBottom:14,lineHeight:1.45}}>
+              Connecte-toi ici : l'extension de ce Chrome sera connectée en même temps — rien à taper dans l'extension.
+            </div>
+          )}
 
           {/* Connexion par Google / Discord, EN PREMIER : c'est le chemin le plus
               court et le plus sûr (aucun mot de passe à créer, donc aucun mot de
@@ -8066,6 +8224,33 @@ function BlocNumerosPerimes() {
           Recharger
         </button>
       </div>
+    </div>
+  );
+}
+
+// ── « SE CONNECTER AVEC VRM » : CE QUI SE PASSE (11 octobre) ────────────────
+// Julien : « quand j'appuie sur se connecter, ça doit envoyer directement dans
+// l'application VRM ». L'extension ouvre VRM avec son identifiant ; l'app,
+// connectée, lui adresse SA session (`assurerSessionExtension`). Ce bandeau dit
+// où on en est, UNE fois, sur la coque — et le geste quand ça n'aboutit pas.
+// L'état décidé est porté par `data-liaison` (le banc juge l'état, pas la phrase).
+function BandeauLiaison() {
+  const [, force] = React.useReducer((n) => n + 1, 0);
+  React.useEffect(() => { __lierSubs.add(force); return () => { __lierSubs.delete(force); }; }, []);
+  const l = __lier;
+  if (!l) return null;
+  const encours = l.etat === 'attente' || l.etat === 'encours';
+  const bon = l.etat === 'ok' || l.etat === 'deja';
+  const texte = encours ? "Je connecte l'extension de ce Chrome à ton compte VRM… Rien à taper."
+    : l.etat === 'ok' ? <>Extension connectée à <b>{l.email || 'ton compte VRM'}</b> ✓ — elle capte maintenant pour toi dans ce Chrome. Rien d'autre à faire.</>
+    : l.etat === 'deja' ? <>L'extension de ce Chrome était déjà connectée à ton compte VRM ✓ — rien à faire.</>
+    : l.etat === 'absente' ? <>L'extension n'a pas répondu dans ce Chrome. Ouvre VRM dans le Chrome où tu as cliqué « Se connecter » ; si c'est celui-ci, ouvre chrome://extensions, clique ⟳ sur VRM, puis recharge cette page.</>
+    : <>Je n'ai pas pu connecter l'extension{l.message ? ` (${l.message})` : ''}. Clique son icône en haut de Chrome, puis « avec mon mot de passe VRM ».</>;
+  return (
+    <div data-liaison={l.etat} role="status" style={{ display: 'flex', gap: 10, alignItems: 'flex-start', margin: '0 0 12px', padding: '10px 12px', borderRadius: 10,
+      background: C.card, border: `1px solid ${C.border}`, borderLeft: `3px solid ${bon ? C.accent : encours ? C.border : C.warn}`, fontSize: 12.5, lineHeight: 1.45, color: C.text }}>
+      <span style={{ flex: 1, minWidth: 0 }}>{texte}</span>
+      {!encours && <button type="button" aria-label="Fermer" onClick={() => poserLier(null)} style={{ border: 'none', background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: '0 2px', minHeight: 0 }}>×</button>}
     </div>
   );
 }
@@ -8506,7 +8691,20 @@ function BoutonToutGenerer({ items }) {
 // Leboncoin publie sans booster (décision du 20 septembre).
 // GRISÉ et jamais caché quand l'extension ne peut pas (§ BoutonBordereau) ; la
 // raison commune est dite UNE fois au-dessus de la liste (`RaisonPublication`).
-function BoutonPublier({ place, id }) {
+// ⚠️⚠️ 11 octobre — « QUAND JE VAIS POSTER DES PAIRES SUR LE BON COIN, JE NE
+//    PEUX PAS ». Reproduit 2 sur 2 : après un dépôt qui n'aboutissait pas
+//    (onglet fermé, Leboncoin qui demande de se connecter), le bouton restait
+//    « Publication en cours… » 15 minutes, et un clic ne faisait RIEN, sans un
+//    mot (`if (… enCours) return;`). Désormais :
+//      · un clic refusé DIT pourquoi, toujours (grisé, déjà publiée, en cours) ;
+//      · « en cours » renvoie la commande : l'extension remet l'onglet du dépôt
+//        devant s'il est ouvert, ou relance s'il a été fermé ;
+//      · un dépôt arrêté ou fermé passe à « Le dépôt n'a pas abouti —
+//        Réessayer » (l'extension le dit, `depotArrete` / onglet fermé) ;
+//      · le bouton annonce les photos CAPTÉES sur le total de l'annonce — le
+//        dépôt part avec ce qui est capté, jamais plus.
+const RAISON_ABANDON = { 'onglet-ferme': "l'onglet Leboncoin a été fermé avant la fin", arret: "le remplissage s'est arrêté avant la fin (Leboncoin a peut-être demandé autre chose)", 'bandeau-ferme': 'tu as fermé le bandeau VRM sur Leboncoin' };
+function BoutonPublier({ place, id, photos = null, total = null }) {
   const { jobs } = useExtVivante();
   const sansSouris = useSansSouris();
   const [refus, setRefus] = React.useState(null);
@@ -8517,11 +8715,13 @@ function BoutonPublier({ place, id }) {
   const glob = raisonExtGlobale(sansSouris, { cap: 'publication', role: 'publie tes annonces' });
   const fait = job && job.etape === 'fait';
   const enCours = job && job.etape === 'depot' && (Date.now() - Number(job.at || 0) < 15 * 60000);
+  const abandonne = job && job.etape === 'abandonne';
   const lancer = async () => {
-    // ⚠️ « En cours » et « faite » bloquent aussi (revue du 5 octobre) : un
-    //    second clic ouvrait un second dépôt, et Leboncoin publie sans booster
-    //    tout seul — deux annonces pour la même paire.
-    if (glob || envoi || enCours || fait) return;
+    if (envoi) return;                       // la demande précédente est en vol : son résultat arrive
+    // ⚠️ Un clic refusé dit TOUJOURS pourquoi (11 octobre) : avant, ces trois
+    //    cas faisaient `return` en silence — « je ne peux pas poster ».
+    if (glob) { setRefus(glob.texte); return; }
+    if (fait) { setRefus(lbc ? 'Déjà publiée sur Leboncoin depuis VRM — rien à refaire.' : 'Déjà préparée sur eBay.'); return; }
     setRefus(null); setEnvoi(true);
     const r = await vmrCmd({ cmd: lbc ? 'lbcPublier' : 'ebayPreparer', id: String(id) }, 30000);
     setEnvoi(false);
@@ -8532,20 +8732,27 @@ function BoutonPublier({ place, id }) {
   };
   const libelle = envoi ? 'Envoi…' : fait ? (lbc ? 'Publiée ✓' : 'Préparée ✓')
     : enCours ? (lbc ? 'Publication en cours…' : 'Formulaire eBay ouvert')
+    : abandonne ? 'Réessayer'
     : (lbc ? 'Publier sur Leboncoin' : 'Préparer sur eBay');
   const grise = !!glob || fait;
+  const nPh = Number.isFinite(Number(photos)) && photos != null ? Number(photos) : null;
+  const nTot = Number.isFinite(Number(total)) && total != null && Number(total) >= (nPh || 0) ? Number(total) : null;
+  const textePhotos = nPh == null ? '' : nTot != null && nTot > nPh ? `${nPh} photo${nPh > 1 ? 's' : ''} sur ${nTot}` : `${nPh} photo${nPh > 1 ? 's' : ''}`;
+  const etat = glob ? 'grise' : fait ? 'fait' : enCours ? 'encours' : abandonne ? 'abandonne' : 'pret';
   return (
-    <span data-bouton-publier={glob ? 'grise' : fait ? 'fait' : enCours ? 'encours' : 'pret'} data-id={id}
+    <span data-bouton-publier={etat} data-id={id} data-photos={nPh == null ? undefined : nPh} data-photos-total={nTot == null ? undefined : nTot}
       style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3, maxWidth: '100%' }}>
+      {abandonne && <span data-depot-abandonne={job.raison || ''} style={{ fontSize: 11, color: C.warn, lineHeight: 1.35, whiteSpace: 'normal', fontWeight: 600 }}>Le dépôt n'a pas abouti{RAISON_ABANDON[job.raison] ? ` : ${RAISON_ABANDON[job.raison]}` : ''}.</span>}
       <button type="button" onClick={lancer} aria-disabled={grise ? 'true' : undefined}
-        title={glob ? glob.texte : lbc ? "L'extension ouvre Leboncoin, remplit tout (photos, titre, description, prix, catégorie) et publie sans option payante" : "L'extension ouvre la mise en vente eBay et remplit ce qu'elle reconnaît — tu relis et tu mets en vente"}
+        title={glob ? glob.texte : enCours ? (lbc ? 'Le dépôt est ouvert dans un onglet Leboncoin — clique pour y retourner' : 'Le formulaire eBay est ouvert — clique pour y retourner') : lbc ? "L'extension ouvre Leboncoin, remplit tout (photos, titre, description, prix, catégorie) et publie sans option payante" : "L'extension ouvre la mise en vente eBay et remplit ce qu'elle reconnaît — tu relis et tu mets en vente"}
         style={{ display: 'inline-flex', alignItems: 'center', gap: 6, borderRadius: 8, fontFamily: 'inherit', fontWeight: 600, fontSize: 12.5,
           padding: '7px 11px', whiteSpace: 'nowrap', cursor: grise ? 'not-allowed' : 'pointer',
           border: `1px solid ${glob ? C.border : C.accent}`, background: glob ? 'transparent' : (fait ? 'transparent' : `${C.accent}14`),
           color: glob ? C.muted : C.accent, opacity: glob ? 0.55 : 1, filter: glob ? 'grayscale(1)' : 'none' }}>
         {libelle}
+        {textePhotos && !fait ? <span data-photos-bouton="" style={{ fontWeight: 500, fontSize: 11.5, color: glob ? C.muted : C.text, opacity: 0.8 }}>· {textePhotos}</span> : null}
       </button>
-      {refus && <span style={{ fontSize: 11, color: C.warn, lineHeight: 1.35, whiteSpace: 'normal' }}>{refus}</span>}
+      {refus && <span data-refus-publier="" style={{ fontSize: 11, color: C.warn, lineHeight: 1.35, whiteSpace: 'normal' }}>{refus}</span>}
     </span>
   );
 }
@@ -8597,7 +8804,13 @@ function etatActionsExt(sansSouris) {
   //    la pastille l'affirmait à côté d'un bouton Publier grisé « mets
   //    l'extension à jour » — deux voix sur la même action (§11).
   if (!vinted) return { niveau: 'lecture', glob: { code: 'vinted', texte: `Aucun compte Vinted n'est ouvert dans ce Chrome — les actions SUR VINTED (bordereau, répondre) attendent ; ${extSait('publication') === 'ok' ? 'publier sur Leboncoin reste possible.' : `publier sur Leboncoin demande une extension à jour (${EXT_ATTENDUE}).`}` }, vinted: null };
-  return { niveau: 'ok', glob: null, vinted };
+  // ⚠️ 11 octobre : « Actions possibles » s'affichait AU-DESSUS de boutons
+  //    « Publier sur Leboncoin » grisés (reproduit avec une 5.143) — deux voix
+  //    contraires sur le même écran. Quand publier est bloqué alors que le
+  //    reste marche, la pastille DIT l'exception, avec la même raison que le
+  //    bouton (une seule règle, `raisonExtGlobale`, §11).
+  const pub = raisonExtGlobale(sansSouris, { cap: 'publication', role: 'publie tes annonces' });
+  return { niveau: 'ok', glob: null, vinted, exception: pub && pub.code !== 'verif' ? pub : null };
 }
 // La DERNIÈRE capture reçue d'une extension (où qu'elle tourne) : l'extension
 // inscrit sa version et l'heure dans sa ligne de diagnostic à chaque passage
@@ -8654,12 +8867,12 @@ function EtatActions({ onNav, ordi, sombre }) {
   // Vinted qui demande de ralentir : rien à faire non plus, ça repart seul.
   const aRattraper = st.niveau === 'lecture' && code !== 'telephone' && code !== 'pause';
   const point = st.niveau === 'ok' ? C.accent : aRattraper ? C.warn : C.muted;
-  const libelle = st.niveau === 'ok' ? 'Actions possibles' : st.niveau === 'verif' ? 'Vérification…' : 'Lecture seule';
+  const libelle = st.niveau === 'ok' ? (st.exception ? 'Actions possibles · sauf publier' : 'Actions possibles') : st.niveau === 'verif' ? 'Vérification…' : 'Lecture seule';
   const court = !ordi;                       // en-tête de téléphone : peu de place
   const ink = sombre ? '#fff' : C.text, bd = sombre ? '#3A3A3C' : C.border;
 
   // ── Les trois lignes : extension · compte VRM · compte Vinted ──────────────
-  const extKo = ['telephone', 'absente', 'muette', 'retard', 'plusieurs'].includes(code);
+  const extKo = ['telephone', 'absente', 'muette', 'retard', 'plusieurs', 'perime'].includes(code);
   const ligneVrmVerif = code === 'vrm-encours';
   const majDispo = !extKo && extSait('_maj') === 'retard';
   const ligneExt = code === 'telephone' ? { s: '—', t: "s'utilise sur l'ordinateur où elle est installée" }
@@ -8669,6 +8882,8 @@ function EtatActions({ onNav, ordi, sombre }) {
     // La version à installer est dite UNE fois, sur le bouton juste dessous
     // (revue du 9 octobre : « 5.163.0 » écrit trois fois dans le panneau).
     : code === 'retard' ? { s: 'non', t: `version ${version || '?'} — trop ancienne pour recevoir des commandes de VRM` }
+    // 11 octobre : la version annoncée est la bonne, le CODE ne l'est pas.
+    : code === 'perime' ? { s: 'non', t: `elle annonce la ${version || '?'} mais tourne encore sur son ancien code${(codePerime() || {}).code ? ' (' + codePerime().code + ')' : ''}` }
     : st.niveau === 'verif' ? { s: '…', t: 'je lui demande…' }
     : { s: 'oui', t: `allumée${version ? ' · ' + version : ''}${majDispo ? ` (la ${EXT_ATTENDUE} existe)` : ''}` };
   const ligneVrm = ligneVrmVerif ? { s: '…', t: 'renouvellement de sa connexion…' }
@@ -8689,6 +8904,9 @@ function EtatActions({ onNav, ordi, sombre }) {
   if (code === 'telephone') geste = <span>Ouvre VRM sur l'ordinateur où l'extension est installée pour générer un bordereau, répondre ou publier.</span>;
   else if (code === 'absente' || code === 'retard') geste = <button type="button" data-etat-geste="maj" style={btn} onClick={() => { setOuvert(false); onNav && onNav('settings'); }}>{code === 'absente' ? "Installer l'extension (Réglages)" : `Mettre à jour en ${EXT_ATTENDUE} (Réglages)`}</button>;
   else if (code === 'muette') geste = <button type="button" data-etat-geste="recharger" style={btn} onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button>;
+  // Code périmé : le geste se fait DANS CHROME (une page web ne peut pas ouvrir
+  // chrome://extensions) — on le dit tel quel, puis on recharge la page.
+  else if (code === 'perime') geste = <span data-etat-geste="recharger-extension">Dans ce Chrome : tape <b>chrome://extensions</b> dans la barre d'adresse, clique ⟳ (la flèche ronde) sur VRM, puis <button type="button" data-etat-geste-recharger="1" style={{ ...btn, padding: '4px 9px', fontSize: 12 }} onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button></span>;
   // Deux extensions : le geste se fait dans Chrome (une page web ne peut pas
   // ouvrir chrome://extensions) — on le DIT, puis on recharge.
   else if (code === 'plusieurs') geste = <span data-etat-geste="extensions">Tape <b>chrome://extensions</b> dans la barre d'adresse, supprime l'ancienne VRM, puis <button type="button" data-etat-geste-recharger="1" style={{ ...btn, padding: '4px 9px', fontSize: 12 }} onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button></span>;
@@ -8710,9 +8928,9 @@ function EtatActions({ onNav, ordi, sombre }) {
 
   return (
     <div ref={boite} style={{ position: 'relative', flexShrink: 0 }}>
-      <button type="button" data-etat-actions={st.niveau} data-etat-code={code} onClick={() => setOuvert((o) => !o)}
+      <button type="button" data-etat-actions={st.niveau} data-etat-code={code} data-etat-exception={st.exception ? 'publication' : undefined} onClick={() => setOuvert((o) => !o)}
         aria-expanded={ouvert ? 'true' : 'false'}
-        title={st.niveau === 'ok' ? `Actions Vinted possibles, au nom de ${loginVinted}` : st.glob ? st.glob.texte : ''}
+        title={st.niveau === 'ok' ? `Actions Vinted possibles, au nom de ${loginVinted}${st.exception ? ` — sauf publier sur Leboncoin : ${st.exception.texte}` : ''}` : st.glob ? st.glob.texte : ''}
         style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'transparent', border: `1px solid ${bd}`, borderRadius: 8,
           padding: court ? '6px 8px' : '6px 11px', color: ink, cursor: 'pointer', fontSize: 12.5, fontWeight: 600, fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
         <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: 5, background: point, flexShrink: 0 }}/>
@@ -8732,8 +8950,9 @@ function EtatActions({ onNav, ordi, sombre }) {
             <div style={{ color: C.muted, marginBottom: 8 }}>
               {/* On ne promet que ce que l'extension INSTALLÉE sait faire (revue
                   du 5 octobre) : chaque geste suit sa capacité. */}
-              {['Générer un bordereau', extSait('messagerie') === 'ok' ? 'répondre, faire une offre' : null].filter(Boolean).join(', ')} : ça part au nom de <b style={{ color: C.text }}>{loginVinted}</b>, le compte Vinted ouvert dans ce Chrome. Pour un autre de tes comptes, connecte-toi avec lui sur vinted.fr.
-              {extSait('publication') === 'ok' ? ' Publier sur Leboncoin passe aussi par l’extension.' : ''}
+              {['Générer un bordereau', extSait('messagerie') === 'ok' ? 'répondre, faire une offre' : null].filter(Boolean).join(', ')} : ça part au nom de <b style={{ color: C.text }}>{loginVinted}</b>, le compte Vinted ouvert dans ce Chrome. Pour un autre de tes comptes : connecte-toi avec lui sur vinted.fr dans ce Chrome, ou ouvre VRM dans le Chrome (le profil) où il est connecté.
+              {!st.exception && extSait('publication') === 'ok' ? ' Publier sur Leboncoin passe aussi par l’extension.' : ''}
+              {st.exception ? <span data-etat-exception-texte="publication"><br/><b style={{ color: C.text }}>Sauf publier sur Leboncoin</b> : {st.exception.texte}</span> : null}
             </div>
           ) : (
             <div style={{ color: C.muted, marginBottom: 8 }}>
@@ -8799,7 +9018,7 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
   const n = !fait.ext ? 1 : !fait.lien ? 2 : 3;
   const ETAPES = [
     { t: 'Installer l’extension dans Chrome', c: 'extension' },
-    { t: 'La connecter avec le même email que VRM', c: 'lien' },
+    { t: 'La connecter à ton compte VRM — le même email qu’ici, en un clic', c: 'lien' },
     { t: 'Passer une fois sur vinted.fr', c: 'vinted' },
   ];
 
@@ -8816,13 +9035,13 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
       </p>
       <p style={{margin:0}}>
         Du coup, tout ce qu’elle lit sur Vinted part dans l’autre boutique, et celle-ci reste vide.
-        Clique son icône en haut de Chrome, déconnecte-la, et reconnecte-la avec <b style={{color:C.text}}>{(AUTH.user&&AUTH.user.email)||'ton email'}</b>.
+        Je la reconnecte à <b style={{color:C.text}}>{(AUTH.user&&AUTH.user.email)||'ton compte'}</b> dès que cette page est devant toi — rien à taper. Si ça persiste : clique son icône en haut de Chrome, « Se déconnecter », puis « Se connecter avec VRM ».
       </p>
     </>
   ) : etape === 'pasconnectee' ? (
     <>
       <p style={{margin:'0 0 10px'}}>Je vois bien ton extension dans ce navigateur 👍 — mais elle ne sait pas encore à qui elle a affaire, alors elle n’a nulle part où ranger ce qu’elle lit.</p>
-      <p style={{margin:0}}>Clique son icône en haut de Chrome, puis entre <b style={{color:C.text}}>le même email et le même mot de passe</b> qu’ici. C’est ce qui envoie tes données chez toi, et nulle part ailleurs.</p>
+      <p style={{margin:0}}>Je la connecte à ton compte VRM d’ici, <b style={{color:C.text}}>sans rien à taper</b> — c’est ce qui envoie tes données chez toi, et nulle part ailleurs. Si ça ne vient pas : clique son icône en haut de Chrome, puis <b style={{color:C.text}}>« Se connecter avec VRM »</b>.</p>
     </>
   ) : etape === 'connectee' ? (
     <>
@@ -32400,7 +32619,7 @@ function LeboncoinScreen() {
                     <span style={{ flex: 1, minWidth: 0 }}>
                       <span style={{ display: 'block', fontSize: 12.5, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{q.title || '—'}</span>
                       <span style={{ display: 'block', fontSize: 10.5, color: C.muted, marginTop: 1 }}>
-                        N°{q.numero} · {q.prix != null ? q.prix.toFixed(2).replace('.', ',') + ' €' : '—'} · {q.photos} photo{q.photos > 1 ? 's' : ''}{manque ? ` captée${q.photos > 1 ? 's' : ''} sur ${q.nReelles}` : ''}{q.desc ? '' : ' · pas de description'}
+                        N°{q.numero} · {q.prix != null ? q.prix.toFixed(2).replace('.', ',') + ' €' : '—'}{q.photos > 0 ? '' : ' · 0 photo'}{q.desc ? '' : ' · pas de description'}
                         {' · '}<a href={q.url} target="_blank" rel="noreferrer" style={{ color: C.accent, fontWeight: 700 }}>l'annonce Vinted</a>
                       </span>
                     </span>
@@ -32417,7 +32636,9 @@ function LeboncoinScreen() {
                     )}
                   </div>
                   <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginTop: 7 }}>
-                    {q.photos > 0 && <BoutonPublier place="lbc" id={q.id}/>}
+                    {/* Le bouton dit les photos captées sur le total (11 octobre) —
+                        une fois, là où on décide de publier (§7). */}
+                    {q.photos > 0 && <BoutonPublier place="lbc" id={q.id} photos={q.photos} total={q.nReelles}/>}
                     <button type="button" onClick={() => marquer(q.id)} title="Tu l'as déjà publiée toi-même : elle sort de la file"
                       style={{ border: 'none', background: 'transparent', padding: 0, minHeight: 0, color: C.muted, fontSize: 11.5, fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}>Déjà publiée</button>
                   </div>
@@ -34910,7 +35131,8 @@ function ConnexionsSetting() {
       <Ligne t="Extension Chrome" coul={!ext.on ? C.warn : extEnRetard(ext.v) ? C.warn : INV_STATUS.online.color}
         etat={!ext.on ? 'pas détectée ici' : !ext.v ? 'détectée' : extEnRetard(ext.v) ? `version ${ext.v} — en retard` : `version ${ext.v} · à jour`}
         d={!ext.on ? <>Sur téléphone c'est normal (il n'y a pas d'extension). Sur l'ordinateur : ouvre l'app dans le Chrome où elle est installée, et recharge-la dans chrome://extensions.{derniereExt && derniereExt !== 'aucune' ? <><br/><b style={{color: extEnRetard(derniereExt.v) ? C.warn : INV_STATUS.online.color}}>La dernière capture est partie d'une {derniereExt.v}{derniereExt.at ? ` (${depuis(Date.parse(derniereExt.at) || 0)})` : ''}.</b> {extEnRetard(derniereExt.v) ? `C'est donc l'ancienne qui tourne encore sur ton ordinateur — c'est là qu'il faut la remplacer par la ${EXT_ATTENDUE}.` : `Ton ordinateur est donc bien à jour — rien à faire ici.`}</> : null}</>
-           : extEnRetard(ext.v) ? `La ${EXT_ATTENDUE} est prête à télécharger (bouton ci-dessous). Dézippe, remplace l'ancien dossier « VRM-extension », puis ⟳ dans chrome://extensions. Tant que c'est l'ancienne qui tourne, elle capte moins de choses que l'app en attend — sans jamais afficher d'erreur.`
+           : extEnRetard(ext.v) ? `La ${EXT_ATTENDUE} est prête à télécharger (bouton ci-dessous). Dézippe, remplace l'ancien dossier « VRM-extension », puis ⟳ dans chrome://extensions — dans CHAQUE Chrome où elle est installée. Tant que c'est l'ancienne qui tourne, elle capte moins de choses que l'app en attend — sans jamais afficher d'erreur.`
+           : codePerime() ? textePerime()
            : "Elle est branchée sur cette page : répondre à un message part de ton navigateur, jamais d'un serveur."}/>
       {/* ⚠️ LE ZIP DOIT ÊTRE À UN CLIC. Pendant des semaines l'app a dit
           « mets à jour l'extension » sans que le zip existe nulle part : le
@@ -34923,7 +35145,7 @@ function ConnexionsSetting() {
           Télécharger l'extension {EXT_ATTENDUE}
         </a>
         <span style={{fontSize:11,color:C.muted,flex:'1 1 180px',minWidth:0,lineHeight:1.4}}>
-          Le zip se dézippe en un seul dossier « VRM-extension » : remplace l'ancien au même endroit, puis ⟳ dans chrome://extensions.
+          Le zip se dézippe en un seul dossier « VRM-extension » : remplace l'ancien au même endroit, PUIS clique ⟳ sur VRM dans chrome://extensions — dans chaque Chrome où elle est installée (sans ⟳, Chrome garde l'ancien code).
         </span>
       </div>
       <Ligne t="Capture Vinted" coul={teinte(capt && capt.ts)}
@@ -36965,6 +37187,7 @@ function AppCoeur() {
             LIGNE de panne (`LignePanne`) là où leur propre liste vide
             mentirait — le bloc, lui, ne s'affiche qu'une fois. */}
         {baseKO && <BaseInjoignable/>}
+        <BandeauLiaison/>
         <BlocNumerosPerimes/>
         {tab==='settings'&&<SettingsScreen setTab={setTab} comptes={vintedAccounts}
           customLogo={customLogo} onPickLogo={()=>logoInputRef.current&&logoInputRef.current.click()} onResetLogo={resetLogo}
