@@ -96,7 +96,12 @@ const PONTS = (ponts) => {
     ready();
   });
 };
-const UN_PONT = [{ version: '5.166.0', id: 'ext1' }];
+// « À jour » = la version que l'app ATTEND (EXT_ATTENDUE, lue dans la source) :
+// une version écrite ici vieillirait au prochain numéro et ferait passer l'état
+// « ok » pour « en retard » (la relecture des autres comptes arrive en 5.167).
+const VERSION_A_JOUR = (fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'App.jsx'), 'utf8').match(/const EXT_ATTENDUE = '([\d.]+)'/) || [])[1];
+if (!VERSION_A_JOUR) { console.log('KO EXT_ATTENDUE introuvable dans src/App.jsx'); process.exit(1); }
+const UN_PONT = [{ version: VERSION_A_JOUR, id: 'ext1' }];
 
 async function rendre(b, { lignes, suppKO = false, tel = false, mobile, onglet = 'cat_annonces', etat = {}, ponts = UN_PONT, accs, section }) {
   const vp = tel ? { width: 390, height: 844 } : { width: 1512, height: 950 };
@@ -129,7 +134,14 @@ async function rendre(b, { lignes, suppKO = false, tel = false, mobile, onglet =
     ? r.fulfill({ status: 503, contentType: 'application/json', body: '{"erreur":"pas-su"}' })
     : r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' })));
   await pg.goto(`http://localhost:${PORT}/?tab=${onglet}`, { waitUntil: 'domcontentloaded' });
-  await pg.waitForTimeout(4500);
+  // Sous charge (plusieurs bancs à la fois), le premier rendu peut dépasser
+  // 4,5 s : on attend que l'écran ait DIT quelque chose (une carte, le chiffre du
+  // tableau de bord, la file) — au plus 25 s. Un écran qui ne rend jamais reste
+  // rouge : l'attente ne cache rien, elle évite de mesurer la charge du banc.
+  await pg.waitForFunction(() => document.querySelector('[data-carte-annonce]')
+    || (document.querySelector('[data-dash-stat="online"]') && /\d/.test(document.querySelector('[data-dash-stat="online"]').innerText))
+    || /Zeta/.test(document.body.innerText), null, { timeout: 25000 }).catch(() => {});
+  await pg.waitForTimeout(2000);
   if (section) { await pg.click(`[data-section="${section}"]`); await pg.waitForTimeout(2500); }
   return { ctx, pg, errs };
 }
@@ -175,7 +187,10 @@ const lireDash = (pg) => pg.evaluate(() => {
         dit(a.cartes.includes('7001') && a.cartes.includes('7003') && a.cartes.includes('8001'), `${t} : les autres restent (une identité, pas un compte entier)`, JSON.stringify(a.cartes));
         dit(a.nFraicheur === 1, `${t} : la date de la lecture est dite UNE fois au-dessus de la grille (§7)`, `${a.nFraicheur} bloc(s)`);
         dit(a.vieux === '111' && /compte_hier/.test(a.texte) && !/compte_frais/.test(a.texte), `${t} : elle NOMME le compte lu il y a 20 h, pas celui lu il y a 5 min`, JSON.stringify({ vieux: a.vieux, texte: a.texte }));
-        dit(/vinted\.fr/.test(a.texte), `${t} : avec le geste vrai (ouvrir vinted.fr connecté sur ce compte)`, a.texte);
+        // 5.165 (11 octobre) : une extension à jour relit le dressing PUBLIC des
+        // autres comptes à chaque visite — le geste vrai n'est plus « ouvre ce
+        // compte-là », c'est une visite sur Vinted, sur n'importe lequel.
+        dit(/prochaine visite sur Vinted, sur n.importe lequel de tes comptes/.test(a.texte), `${t} : avec le geste vrai (une visite sur Vinted, sur n'importe lequel de ses comptes)`, a.texte);
         dit(a.supprimees === '1', `${t} : et elle dit combien ont été retirées parce que supprimées`, JSON.stringify(a.supprimees));
         dit(a.sw <= a.cw + 1, `${t} : aucun débordement`, `${a.sw} > ${a.cw}`);
         dit(r.errs.length === 0, `${t} : aucune erreur d’app`, r.errs.join(' | ').slice(0, 160));

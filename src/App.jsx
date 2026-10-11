@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { VAPID_PUBLIC_KEY } from "./vapid.js";
 import { noterPlantage, viderPlantages } from "./plantages.js";
+import * as photosVinted from "./photosVinted.js";
 import { contactEmail, CONTACT_A_VENIR } from "./contact.js";
 // §11 : l'adresse de réception se compare avec LA forme du serveur (celle qui
 // décide à qui appartient un email) — jamais une seconde normalisation ici.
@@ -41,7 +42,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.169.0';
+const EXT_ATTENDUE = '5.172.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -163,10 +164,12 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 //   (offres  `autoAccepterOffres` — RETIRÉE le 5 octobre à sa demande : l'app ne
 //    promet plus aucune acceptation automatique, voir CLAUDE.md §3)
 //   releve  `capterReleves`       5.52.0  (5 sept.)   le relevé daté du porte-monnaie
-//   preuves `capterPreuvesVente`  5.169.0 (11 oct.)   la transaction des ventes en cours (anti double vente)
-//   ⚠️ PAS 5.167 : la 5.167.0 et la 5.168.0 PUBLIÉES (PR #471, #472) n'ont pas
-//   `capterPreuvesVente` — le chantier portait un autre contenu sous le même
-//   numéro (revue du 11 octobre). Deux contenus ne portent jamais un numéro.
+//   preuves `capterPreuvesVente`  5.172.0 (11 oct.)   la transaction des ventes en cours (anti double vente)
+//   ⚠️ PAS 5.167, NI 5.169, NI 5.170 : la 5.167.0, la 5.168.0 et la 5.170.0
+//   PUBLIÉES (PR #471, #472, #473) n'ont pas `capterPreuvesVente`, et la 5.169.0
+//   et la 5.171.0 sont prises par le chantier extension (un autre contenu). Deux
+//   contenus ne portent jamais un numéro (revue du 11 octobre) ;
+//   `audit-coherence.cjs` le vérifie sur l'historique de origin/main.
 // `audit-coherence.cjs` vérifie que ces trois fonctions existent toujours dans
 // l'extension : une capacité annoncée mais retirée serait le même mensonge.
 // ⚠️⚠️ LE SEUIL EST LA VERSION OÙ LA CHOSE MARCHE DE BOUT EN BOUT, PAS OÙ LE
@@ -179,7 +182,12 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // exactement. Le seuil est 5.160 : en deçà, l'app dit « mets à jour », elle ne
 // laisse pas le bouton se casser. (Mesuré le 7 octobre : son extension installée
 // est en 5.143 — c'est pour ça que « publier depuis VRM ne marche pas ».)
-const EXT_CAPACITES = { supprimees: '5.165.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', repond: '5.77.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', detourage: '5.156.0', preuves: '5.169.0' };
+// ⚠️ `enligne` (relecture publique des autres comptes) : 5.170, PAS 5.167 — les
+//    5.167 et 5.168 parties en production (`main`) ne portent pas
+//    `relireAnnoncesAutresComptes` (ce chantier-ci s'appelait « 5.167 » sur sa
+//    branche). Un seuil plus bas promettrait la relecture à SON extension de
+//    production — le défaut le plus coûteux du projet (revue de la 5.167).
+const EXT_CAPACITES = { supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', repond: '5.77.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', detourage: '5.156.0', preuves: '5.172.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -1060,7 +1068,7 @@ function RangerSheet({ paires, cellNom, onPick, onLibre, onClose }) {
           <button key={p.numero} onClick={()=>onPick(p)}
             style={{display:'flex',alignItems:'center',gap:11,textAlign:'left',border:`1px solid ${C.border}`,borderRadius:10,background:C.card,padding:'9px 11px',cursor:'pointer',fontFamily:'inherit',boxShadow:C.shadow}}>
             {p.photo
-              ? <img src={p.photo} alt="" style={{width:44,height:44,borderRadius:8,objectFit:'cover',flexShrink:0,background:C.card2}}/>
+              ? <PhotoVinted src={p.photo} alt="" style={{width:44,height:44,borderRadius:8,objectFit:'cover',flexShrink:0,background:C.card2}}/>
               : <span style={{width:44,height:44,borderRadius:8,background:C.card2,display:'flex',alignItems:'center',justifyContent:'center',fontSize:19,flexShrink:0}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
             <span style={{flex:'1 1 120px',minWidth:0}}>
               <span className="vrm-display" style={{display:'block',fontSize:15,fontWeight:700,color:C.accent}}>N°{p.numero}</span>
@@ -1529,6 +1537,11 @@ const harvestTs = (row) => {
   const u = Date.parse((row && row.updated_at) || '');
   return isNaN(u) ? NaN : u;
 };
+// Une ligne `harvest_{uid}_*` capturée AVEC LA SESSION de ce compte ? Rend le
+// match (`m[1]` = uid) ou `null`. `harvest_{uid}_enligne` (5.167) est la lecture
+// PUBLIQUE de son dressing faite depuis un AUTRE compte : elle ne dit rien de la
+// santé de CE compte (ventes, messages, jetons) — revue de la 5.167.
+const ligneDeSaSession = (id) => /^harvest_(\d+)_(?!enligne$)/.exec(String(id || ''));
 // (HARVEST_MAX_AGE_MS retiré : on n'expire plus une moisson par défaut — voir
 // fetchHarvest. Une donnée datée s'affiche, « Synchroniser » rafraîchit.)
 // Âge de la dernière moisson lue, par uid+type → sert à AFFICHER la date des
@@ -1545,7 +1558,7 @@ const harvestAgeMs = (uid, type) => { const t = _harvestSeen[`${uid}_${type}`]; 
 // `POST /api/v2/items/{id}/delete` et ne retient qu'un 2xx, par l'IDENTIFIANT de
 // l'annonce (§5) : `harvest_{uid}_supprimees = { ids: { [id]: atISO } }`.
 // ⇒ UNE règle (`supprimeeApres`), appliquée au dressing LÀ OÙ IL EST LU
-//   (`fetchHarvestBrut`, et `retirerSupprimeesLignes` pour les lecteurs qui
+//   (`fetchHarvestBrut` → `dressingEnLigne`, et `lireLignesEnLigne` pour les lecteurs qui
 //   balaient tous les comptes) : tous les écrans qui en dérivent — Annonces, ses
 //   chiffres, la file Leboncoin, le tableau de bord, la recherche — la suivent
 //   sans la recalculer (§11). La MÊME règle vit dans l'extension
@@ -1577,6 +1590,123 @@ function dateLectureDressing(ligne) {
   return Date.parse(c || '');
 }
 // </supprimees-regle>
+// <enligne-regle> — LA MÊME RÈGLE DANS L'APP (src/App.jsx) ET DANS L'EXTENSION
+// (background.js), §11. `audit-enligne.cjs` exige que les deux blocs soient
+// IDENTIQUES et compare leurs sorties sur les mêmes entrées. Il dépend de
+// `supprimeeApres` (bloc <supprimees-regle>, juste au-dessus dans les deux).
+// Julien, 11 octobre : « quand les annonces ne sont plus en ligne, elles doivent
+// être enlevées, automatiquement — je me retrouve avec trois fois la même paire
+// alors qu'il n'y a qu'une seule annonce ». Une annonce est EN LIGNE si :
+//   · la lecture COMPLÈTE la plus récente de son compte la contient ouverte —
+//     son propre dressing (`harvest_{uid}_listings`, quand il est connecté) ou
+//     son dressing PUBLIC relu depuis un autre de ses comptes
+//     (`harvest_{uid}_enligne`, 5.167) : la plus récente des deux fait foi ;
+//   · aucune suppression vue APRÈS cette lecture ne la retire ;
+//   · et cette lecture a moins de 24 h. Au-delà (ou jamais lue) on ne SAIT pas :
+//     ses annonces ne sont ni « en ligne » ni « disparues » — « à confirmer »,
+//     dites à part, jamais comptées (« rien lu ne vaut pas rien », §4.1).
+// Une annonce présente dans la lecture publique mais pas dans le dressing (elle
+// vient d'être republiée) est en ligne, avec ce que la lecture publique en sait.
+// Une annonce ouverte dans un dressing plus ancien et ABSENTE de la lecture
+// publique plus récente n'est plus en ligne (supprimée, vendue ou masquée) : elle
+// est rendue FERMÉE (`_vrmAbsente`), jamais « vendue » (rien ne le prouve).
+// ⚠️ Une annonce que son vendeur voit VENDUE ne se rouvre pas d'un coup d'œil
+//    public (la vue publique n'est pas mesurée sur les ventes) : la vente fait foi
+//    — et elle RESTE parmi les fermées (revue de la 5.167 : elle disparaissait de
+//    toutes les sorties, et avec elle la seule preuve sans ressemblance qu'une
+//    paire numérotée est partie).
+// ⚠️ Une suppression vue en 2xx ne se « rattrape » pas par une lecture PUBLIQUE
+//    qui la montre encore (revue de la 5.167) : Vinted ne réutilise jamais un
+//    identifiant, et la vue publique n'est pas mesurée (index, cache en retard ?).
+//    Le dressing de son vendeur, lui, reste la mesure qui fait foi (5.165).
+// ⚠️⚠️ « PAS SU » LES LECTURES PUBLIQUES (`pub = { passu: true }`, revue de la
+//    5.167) : sur un hoquet, les annonces qu'une lecture plus récente savait
+//    PARTIES revenaient « en ligne » — la triple paire de sa plainte, sans un mot.
+//    Sans les lectures publiques, un dressing ne décide QUE s'il a moins de
+//    `ENLIGNE_SUR_MS` : l'extension ne relit jamais en public un compte lu depuis
+//    moins de 30 min (`ENLIGNE_DELAI_MS`), donc aucune lecture plus récente ne
+//    peut exister. Au-delà, ses annonces sont « à confirmer ».
+const ENLIGNE_FRAIS_MS = 24 * 60 * 60 * 1000;
+const ENLIGNE_SUR_MS = 30 * 60 * 1000;
+function ouverteSurVinted(it) { return !!(it && !it.is_closed && !it.is_hidden && !it.is_draft); }
+function venduePourSonVendeur(it) { return !!(it && it.is_closed && /sold/i.test(String(it.item_closing_action || ''))); }
+function enLigneDuCompte(liste, pub, suppIds, maintenant) {
+  const itemsL = (liste && Array.isArray(liste.items)) ? liste.items : null;
+  const capL = itemsL && liste.cap != null && liste.cap !== '' ? Number(liste.cap) : NaN;
+  const pubPasSu = !!(pub && pub.passu === true);
+  const pubLisible = !pubPasSu && !!(pub && (pub.complet === true || pub.complet === 'true') && Array.isArray(pub.ids));
+  const capP = pubLisible && pub.cap != null && pub.cap !== '' ? Number(pub.cap) : NaN;
+  const r = { enLigne: [], aConfirmer: [], fermees: [], absentes: [], supprimees: [], lu: NaN, source: '', pubPasSu };
+  const cand = [];
+  if (isFinite(capP) && !(isFinite(capL) && capL >= capP)) {
+    r.source = 'public'; r.lu = capP;
+    const parL = new Map(), parP = new Map(), vus = new Set();
+    for (const it of itemsL || []) if (it && it.id != null) parL.set(String(it.id), it);
+    for (const it of (Array.isArray(pub.items) ? pub.items : [])) if (it && it.id != null) parP.set(String(it.id), it);
+    for (const x of pub.ids) {
+      const id = String(x == null ? '' : x);
+      if (!id || vus.has(id)) continue;
+      vus.add(id);
+      const l = parL.get(id) || null, p = parP.get(id) || null;
+      if (!l && !p) continue;
+      if (l && venduePourSonVendeur(l)) { r.fermees.push(l); continue; }
+      cand.push(Object.assign({}, l || {}, p || {}, { id: (l || p).id, is_closed: false, is_hidden: false, is_draft: false }));
+    }
+    for (const it of itemsL || []) {
+      if (!it || it.id == null || vus.has(String(it.id))) continue;
+      if (ouverteSurVinted(it)) r.absentes.push(it); else r.fermees.push(it);
+    }
+  } else if (isFinite(capL)) {
+    r.source = 'dressing'; r.lu = capL;
+    for (const it of itemsL) { if (!it) continue; if (ouverteSurVinted(it)) cand.push(it); else r.fermees.push(it); }
+  } else if (itemsL) {
+    for (const it of itemsL) { if (!it) continue; if (ouverteSurVinted(it)) cand.push(it); else r.fermees.push(it); }
+  }
+  const garde = [];
+  for (const it of cand) { if (supprimeeApres(suppIds, it.id, r.source === 'public' ? -Infinity : r.lu)) r.supprimees.push(it); else garde.push(it); }
+  const age = Number(maintenant) - r.lu;
+  const sur = !pubPasSu || age < ENLIGNE_SUR_MS;
+  if (isFinite(r.lu) && age <= ENLIGNE_FRAIS_MS && sur) r.enLigne = garde; else r.aConfirmer = garde;
+  return r;
+}
+// Les lignes de tous les comptes, telles que les balayages les lisent :
+// `lignesL` = `harvest_{uid}_listings` (`select=id,data` ou `data`), `lignesP` =
+// `harvest_{uid}_enligne` projetées (`id, cap, complet, ids, items`) — `null` =
+// la base n'a pas répondu (« pas su » : chaque compte reçoit `{ passu: true }`) —,
+// `supp` = Map uid → suppressions (`null` = pas su). Chaque compte rend UNE ligne au
+// format d'un dressing : ses annonces fermées, les absentes rendues fermées, et
+// celles qui sont en ligne — jamais celles « à confirmer », rendues à part.
+function enLigneDesLignes(lignesL, lignesP, supp, maintenant) {
+  const parL = new Map(), parP = new Map();
+  for (const r of lignesL || []) {
+    const d = r && r.data; if (!d) continue;
+    const k = /^harvest_(\d+)_listings$/.exec(String((r && r.id) || ''));
+    const uid = k ? k[1] : (d.uid != null ? String(d.uid) : '');
+    if (uid) parL.set(uid, r);
+  }
+  for (const r of lignesP || []) {
+    const k = /^harvest_(\d+)_enligne$/.exec(String((r && r.id) || ''));
+    if (k) parP.set(k[1], r);
+  }
+  const lignes = [], aConfirmer = new Map(), parCompte = new Map();
+  for (const uid of new Set([...parL.keys(), ...parP.keys()])) {
+    const r = parL.get(uid) || null, d = r ? r.data : null, p = d ? d.payload : null;
+    const liste = (p && Array.isArray(p.items)) ? { items: p.items, cap: dateLectureDressing(r) } : null;
+    const q = parP.get(uid) || null;
+    const pub = lignesP === null ? { passu: true } : (q ? { complet: q.complet, ids: q.ids, items: q.items, cap: Date.parse(q.cap || '') } : null);
+    const res = enLigneDuCompte(liste, pub, supp ? (supp.get(uid) || null) : null, maintenant);
+    parCompte.set(uid, res);
+    if (res.aConfirmer.length) aConfirmer.set(uid, res.aConfirmer);
+    const items = res.fermees.concat(res.absentes.map((it) => Object.assign({}, it, { is_closed: true, _vrmAbsente: true })), res.enLigne);
+    if (!liste && !items.length) continue;
+    const data = Object.assign({ type: 'listings' }, d || {}, { uid: (d && d.uid != null) ? d.uid : uid,
+      _vrmLu: isFinite(res.lu) ? res.lu : null, _vrmSource: res.source,
+      payload: Object.assign({}, p || {}, { items }) });
+    lignes.push(Object.assign({}, r || {}, { id: (r && r.id) || `harvest_${uid}_listings`, data }));
+  }
+  return { lignes, aConfirmer, parCompte };
+}
+// </enligne-regle>
 // Ce que la dernière lecture a écarté, par compte (pour le DIRE, une fois, §7).
 const _supprRetirees = {};
 // La ligne d'un compte : `ids` · `{}` (aucune) · `null` (la base n'a pas répondu).
@@ -1605,29 +1735,43 @@ const lireSupprimeesTous = () => cachedRow('s:*', async () => {
     return m;
   } catch (_) { return null; }
 });
-// Un dressing (payload) sans les annonces supprimées APRÈS sa lecture.
-// `_vrmRetirees` garde les annonces retirées elles-mêmes : l'écran ne COMPTE que
-// celles qui étaient affichées en ligne (revue 5.165 — « 3 supprimées » quand une
-// seule carte était partie, les deux autres étaient en pause ou en brouillon).
-const retirerSupprimees = (payload, ids, capTs) => {
-  if (!ids || !payload || !Array.isArray(payload.items)) return payload;
-  const items = [], retirees = [], retireesItems = [];
-  for (const it of payload.items) { if (it && supprimeeApres(ids, it.id, capTs)) { retirees.push(String(it.id)); retireesItems.push(it); } else items.push(it); }
-  return retirees.length ? { ...payload, items, _vrmSupprimees: retirees, _vrmRetirees: retireesItems } : payload;
+// ── LA LECTURE PUBLIQUE DES AUTRES COMPTES (5.167, 11 octobre) ──────────────
+// L'extension relit, à chaque visite sur Vinted, le dressing PUBLIC de ses autres
+// comptes et le range dans `harvest_{uid}_enligne` (une ligne par compte). La
+// règle `enLigneDuCompte` (bloc <enligne-regle>, la même que l'extension) dit
+// alors quelle lecture fait foi. Projetée (§4.4) : rien d'autre n'est lu.
+// Trois états : les lignes · `[]` (aucune lecture publique) · `null` (pas su).
+// ⚠️⚠️ Revue de la 5.167 — « PAS SU » RESSUSCITAIT LES ANNONCES PARTIES. La règle
+//    retombait alors sur le seul dressing : une annonce qu'une lecture publique
+//    plus récente savait supprimée revenait « en ligne » sur un simple hoquet, sans
+//    un mot (la triple paire de sa plainte). ⇒ On garde la DERNIÈRE valeur lue
+//    pendant la session ; sans aucune, la règle reçoit « pas su » et rend « à
+//    confirmer » ce qu'elle ne peut plus dater (`ENLIGNE_SUR_MS`). Et l'écran le
+//    DIT, une fois (`lecturesPubliquesKO`).
+const SELECT_ENLIGNE = 'id,cap:data->>capturedAt,complet:data->complet,ids:data->ids,items:data->items';
+let _dernieresLecturesPubliques = null;
+let _lecturesPubliquesKO = false;
+// `false` · `'cache'` (la dernière connue sert) · `'passu'` (aucune connue).
+const lecturesPubliquesKO = () => (_lecturesPubliquesKO ? (_dernieresLecturesPubliques ? 'cache' : 'passu') : false);
+const lireEnLigneBrut = () => cachedRow('e:*', async () => {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_enligne&select=${SELECT_ENLIGNE}`, { headers: sbAuth() });
+    if (!res.ok) return null;
+    const rows = await res.json();
+    return Array.isArray(rows) ? rows : null;
+  } catch (_) { return null; }
+});
+const lireEnLigneTous = async () => {
+  const rows = await lireEnLigneBrut();
+  if (Array.isArray(rows)) { _dernieresLecturesPubliques = rows; _lecturesPubliquesKO = false; return rows; }
+  _lecturesPubliquesKO = true;
+  return _dernieresLecturesPubliques;          // la dernière connue, sinon `null` (« pas su »)
 };
-// Des lignes `harvest_{uid}_listings` lues en entier (`id,data` ou `data`).
-const retirerSupprimeesLignes = (lignes, supp) => {
-  if (!supp || !Array.isArray(lignes)) return lignes;
-  return lignes.map((r) => {
-    const d = r && r.data; if (!d) return r;
-    const k = /^harvest_(\d+)_listings$/.exec(String((r && r.id) || ''));
-    const uid = k ? k[1] : (d.uid != null ? String(d.uid) : '');
-    const ids = uid && supp.get(uid);
-    if (!ids || !d.payload) return r;
-    const p2 = retirerSupprimees(d.payload, ids, dateLectureDressing(r));
-    return p2 === d.payload ? r : { ...r, data: { ...d, payload: p2 } };
-  });
-};
+// Des lignes `harvest_{uid}_listings` lues en entier (`id,data` ou `data`), avec
+// la règle « en ligne » appliquée (la même que l'écran Annonces et l'extension) :
+// sans les supprimées, sans celles qu'une lecture plus récente ne montre plus, et
+// sans celles « à confirmer » (rendues à part, dans `aConfirmer`).
+const lireLignesEnLigne = async (lignesL) => enLigneDesLignes(lignesL || [], await lireEnLigneTous(), await lireSupprimeesTous(), Date.now());
 // ── DE QUAND DATE LA LECTURE DU DRESSING, COMPTE PAR COMPTE (5.165) ─────────
 // L'écran Annonces n'en disait RIEN : la lecture du 8 au soir de cinq comptes
 // s'affichait comme l'état du 9 (§4.3, §5 : un chiffre qu'on ne peut pas
@@ -1674,8 +1818,27 @@ const dressingsAnciens = (lues, enLigne, maintenant = Date.now(), activite = nul
       return !!(act > 0 && act - lu > DRESSING_ACTIVITE_MARGE_MS);
     })
     .sort((a, b) => Number(lues[a]) - Number(lues[b]));
-// UNE phrase pour l'écran Annonces ET le tableau de bord (§11).
-// ⚠️ Revue de la 5.165 :
+// « il y a 5 h », « il y a 3 j » : l'âge d'une lecture, quand il dépasse un jour.
+const depuisFr = (ts, maintenant = Date.now()) => {
+  const h = (maintenant - Number(ts)) / 3600000;
+  if (!isFinite(h) || !(Number(ts) > 0)) return '';
+  return h < 48 ? `il y a ${Math.max(1, Math.round(h))} h` : `il y a ${Math.round(h / 24)} j`;
+};
+// UNE phrase pour l'écran Annonces ET le tableau de bord (§11). Elle dit, une
+// fois au-dessus de la grille (§7), sans couleur (rien n'est cassé, c'est une
+// date) :
+//   · combien d'annonces sont sorties parce qu'elles ne sont plus en ligne
+//     (supprimées, ou absentes d'une lecture plus récente) ;
+//   · 5.167 (11 octobre) — les annonces « À CONFIRMER » : celles d'un compte dont
+//     la dernière lecture complète a plus de 24 h (ou n'est pas datée). Ni
+//     comptées en ligne, ni dans la grille, et rien n'est supprimé : une ligne
+//     repliée qui s'ouvre au clic (« rien lu ne vaut pas rien » : ni « en ligne »,
+//     ni « disparue ») ;
+//   · de quand date une lecture ANCIENNE (plus de 12 h, ou vu actif depuis) ;
+//   · et LE geste, une fois : avec une extension qui relit les autres comptes
+//     (`extSait('enligne')`), une visite sur Vinted, sur n'importe lequel de ses
+//     comptes ; plus ancienne, ouvrir vinted.fr connecté sur le compte.
+// ⚠️ Revue de la 5.165 (gardée telle quelle) :
 //    · TOUS les comptes sont nommés, chacun avec son heure (« a, b, c et 3
 //      autres » cachait sur quel compte repasser — il en a neuf, §5) ;
 //    · sans extension ICI (téléphone, autre navigateur), le geste dit OÙ il se
@@ -1685,36 +1848,109 @@ const dressingsAnciens = (lues, enLigne, maintenant = Date.now(), activite = nul
 //      la page à sa place), avec le geste qui rend la promesse vraie : un onglet
 //      Vinted ouvert AVANT la mise à jour garde l'ancien code jusqu'au rechargement
 //      (mesuré dans Chromium : 0 suppression vue avant, toutes après).
-function FraicheurAnnonces({ lues, enLigne, noms, supprimees, activite, attr = 'data-ann-fraicheur', style }) {
+// ⚠️ Revue de la 5.167 (11 octobre) :
+//    · « Elles seront vérifiées à ta prochaine visite » se disait aussi quand l'app
+//      SAIT que l'extension n'est pas connectée à son compte VRM — et sans session
+//      elle ne relit RIEN (prouvé au banc). La promesse n'est tenue que si
+//      l'extension de ce Chrome est connectée à CE compte VRM ; sinon on dit le
+//      geste, jamais la promesse (`connexionExtensionVrm`) ;
+//    · les lectures publiques illisibles se DISENT (une fois) : ce qui n'est plus
+//      sûr est « à confirmer », rien n'est retiré ;
+//    · sans `numeros` (tableau de bord), le N° n'est pas inventé : un blanc, jamais
+//      un faux « sans N° » — et le tableau de bord les passe.
+function connexionExtensionVrm() {
+  const e = __vmrEtat;
+  if (e === undefined) return 'verif';
+  if (!e || !e.vrm || typeof e.vrm !== 'object') return 'passu';
+  if (e.vrm.connecte !== true) return 'non';
+  const monId = String((AUTH.user && AUTH.user.id) || ''), sonId = String(e.vrm.user_id || '');
+  const monMail = String((AUTH.user && AUTH.user.email) || '').trim().toLowerCase(), sonMail = String(e.vrm.email || '').trim().toLowerCase();
+  const autre = (monId && sonId) ? monId !== sonId : !!(monMail && sonMail && monMail !== sonMail);
+  return autre ? 'autre' : 'ok';
+}
+function FraicheurAnnonces({ lues, enLigne, noms, supprimees, aConfirmer, numeros, activite, attr = 'data-ann-fraicheur', style }) {
   const sansSouris = useSansSouris();
   const [, majExt] = React.useReducer((x) => x + 1, 0);
   React.useEffect(() => onVmrExt(majExt), []);
+  const [ouvert, setOuvert] = useState(false);
   const vieux = dressingsAnciens(lues, enLigne, Date.now(), activite);
   const nSuppr = Object.keys(supprimees || {}).filter((u) => enLigne && u in enLigne).reduce((t, u) => t + (Number(supprimees[u]) || 0), 0);
-  if (!vieux.length && !nSuppr) return null;
+  const ac = Array.isArray(aConfirmer) ? aConfirmer.filter(Boolean) : [];
+  const parC = {};
+  for (const it of ac) { const u = String((it._acc && it._acc.vinted_user_id) || ''); if (u) (parC[u] = parC[u] || []).push(it); }
+  const uidsAC = Object.keys(parC).sort((a, b) => (Number(lues && lues[a]) || 0) - (Number(lues && lues[b]) || 0));
+  // Les lectures publiques de ses autres comptes n'ont pas pu être lues (la base a
+  // hoqueté) — dit seulement quand l'écran montre déjà quelque chose (une panne
+  // totale a son propre bloc, sur la coque : une voix, pas deux, §7).
+  const pubKO = !!lecturesPubliquesKO() && (Object.keys(enLigne || {}).length > 0 || ac.length > 0);
+  if (!vieux.length && !nSuppr && !ac.length && !pubKO) return null;
   const nom = (u) => (noms && noms[u]) || `#${u}`;
-  const cap = extSait('supprimees');
+  const cap = extSait('enligne');                 // relit le dressing public des autres comptes (5.170)
+  const capS = extSait('supprimees');             // voit une suppression faite dans ce Chrome (5.165)
   const plusieurs = !!__vmrPlusieurs;
   const ailleurs = cap === 'absente' || sansSouris;          // le geste ne se fait pas sur CET appareil
-  const promet = cap === 'ok' && !plusieurs && !sansSouris;
+  const connexion = ailleurs ? 'ailleurs' : connexionExtensionVrm();
+  const relit = connexion === 'ok';                            // la relecture aura vraiment lieu
+  const promet = capS === 'ok' && !plusieurs && !sansSouris && relit;
   const s = nSuppr > 1 ? 's' : '';
-  const ceux = vieux.length > 1 ? 'chacun de ces comptes' : 'ce compte';
+  const nAC = ac.length, sAC = nAC > 1 ? 's' : '';
+  const ageAC = (u) => { const t = Number(lues && lues[u]); return t > 0 ? `dernière lecture ${depuisFr(t)}` : 'jamais datée'; };
+  // Le geste, UNE fois, pour ce qui est à confirmer ET ce qui date de quelques heures.
+  const aRelire = [...uidsAC, ...vieux];
+  const ceux = aRelire.length > 1 ? 'chacun de ces comptes' : 'ce compte';
+  const elles = nAC > 0 ? (nAC > 1 ? 'elles seront vérifiées' : 'elle sera vérifiée') : 'elles seront relues';
+  const visite = `à ta prochaine visite sur Vinted, sur n'importe lequel de tes comptes${aRelire.length > 3 ? ' (trois comptes par visite)' : ''}`;
+  const geste = !aRelire.length ? null
+    : ailleurs ? `Avec l'extension VRM à jour (${EXT_CAPACITES.enligne}), sur l'ordinateur où elle est installée, ${elles} ${visite} ; plus ancienne, ouvre vinted.fr connecté sur ${ceux}.`
+    : cap === 'ok' && relit ? `${elles.charAt(0).toUpperCase() + elles.slice(1)} ${visite}.`
+    : cap === 'ok' && (connexion === 'non' || connexion === 'autre') ? `L'extension de ce Chrome n'est pas connectée à ton compte VRM${connexion === 'autre' ? ' (elle écrit dans un autre)' : ''} : tant qu'elle ne l'est pas, rien ne sera relu. VRM la reconnecte de lui-même ; sinon, recharge cette page.`
+    : cap === 'ok' ? `Dès que l'extension de ce Chrome aura répondu, ${elles} ${visite}.`
+    : `Mets l'extension à jour (${EXT_CAPACITES.enligne}) : elle les vérifiera ${visite}. D'ici là, ouvre vinted.fr connecté sur ${ceux} dans Chrome : elle relit son dressing.`;
+  const num = (it) => { if (!numeros) return ''; const n = numeros[it.id] && numeros[it.id].numero; return n != null && String(n).trim() !== '' ? `N°${n}` : 'sans N°'; };
   return (
-    <div {...{ [attr]: '' }} data-vieux={vieux.join(',')} data-supprimees={nSuppr} data-cap={cap} data-promesse={promet ? '1' : '0'} data-ailleurs={ailleurs ? '1' : '0'}
+    <div {...{ [attr]: '' }} data-vieux={vieux.join(',')} data-supprimees={nSuppr} data-cap={cap} data-cap-suppr={capS}
+      data-promesse={promet ? '1' : '0'} data-ailleurs={ailleurs ? '1' : '0'} data-relit={relit ? '1' : '0'} data-pub-ko={pubKO ? '1' : '0'}
+      data-a-confirmer={nAC} data-a-confirmer-comptes={uidsAC.join(',')}
       style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, marginBottom: 12, ...(style || {}) }}>
-      {nSuppr > 0 && <span data-suppr-dit>{nSuppr} annonce{s} supprimée{s} sur Vinted depuis la dernière lecture : déjà retirée{s} d'ici. </span>}
+      {pubKO && <span data-pub-ko-dit>{lecturesPubliquesKO() === 'cache'
+        ? "La dernière relecture de tes autres comptes n'a pas pu être relue (la base n'a pas répondu) : on garde celle d'avant. "
+        : "Les relectures de tes autres comptes n'ont pas pu être lues (la base n'a pas répondu) : ce qui n'est plus sûr est « à confirmer », rien n'est retiré. "}</span>}
+      {nSuppr > 0 && <span data-suppr-dit>{nSuppr} annonce{s} plus en ligne sur Vinted (supprimée{s} ou retirée{s}) : enlevée{s} d'ici automatiquement. </span>}
+      {nAC > 0 && <span data-a-confirmer-dit>
+        <button type="button" data-a-confirmer-ouvrir aria-expanded={ouvert} onClick={() => setOuvert((o) => !o)}
+          style={{ border: 'none', background: 'transparent', padding: 0, margin: 0, font: 'inherit', color: C.text, fontWeight: 600, cursor: 'pointer', textAlign: 'left', minHeight: 0 }}>
+          {ouvert ? '▾' : '▸'} {nAC} annonce{sAC}{uidsAC.length === 1 ? ` de ${nom(uidsAC[0])}` : ''} à confirmer
+        </button>
+        {' '}— {uidsAC.length === 1
+          ? ageAC(uidsAC[0])
+          : uidsAC.map((u, i) => <React.Fragment key={u}>{i ? ', ' : ''}<b style={{ color: C.text }}>{nom(u)}</b> ({parC[u].length}, {ageAC(u)})</React.Fragment>)}
+        {' '}: elle{sAC} ne {nAC > 1 ? 'sont' : 'est'} pas comptée{sAC} en ligne, et rien n'est supprimé.{' '}
+      </span>}
       {vieux.length > 0 && <span data-vieux-dit>
         {vieux.length === 1
           ? <><b style={{ color: C.text }}>{nom(vieux[0])}</b> : annonces lues {quandFr(Number(lues[vieux[0]]))}</>
           : <>Annonces lues : {vieux.map((u, i) => <React.Fragment key={u}>{i ? ', ' : ''}<b style={{ color: C.text }}>{nom(u)}</b> {quandFr(Number(lues[u]))}</React.Fragment>)}</>}
-        {' '}— ce que tu as supprimé ou mis en ligne depuis n'y est pas{nSuppr > 0 ? ' (hors les suppressions ci-dessus)' : ''}.
-        {' '}{ailleurs
-          ? <>Sur l'ordinateur où l'extension VRM est installée, ouvre <b style={{ color: C.text }}>vinted.fr</b> connecté sur {ceux} : elle relit son dressing.</>
-          : <>Ouvre <b style={{ color: C.text }}>vinted.fr</b> connecté sur {ceux} dans Chrome : l'extension relit son dressing.</>}
+        {' '}— ce que tu as supprimé ou mis en ligne depuis n'y est pas{nSuppr > 0 ? ' (hors celles enlevées ci-dessus)' : ''}.{' '}
+      </span>}
+      {geste && <span data-geste-dit>
+        {geste}
         {promet && ' Une suppression faite sur vinted.fr dans ce Chrome sort d’ici tout de suite — recharge d’abord les onglets Vinted ouverts avant la dernière mise à jour de l’extension.'}
-        {cap === 'retard' && !plusieurs && ` Mets l'extension à jour (${EXT_CAPACITES.supprimees}) : une suppression faite sur vinted.fr en sortira tout de suite.`}
         {plusieurs && ' Deux extensions VRM répondent dans ce Chrome : tant qu’il en reste deux, une suppression peut ne pas être vue.'}
       </span>}
+      {ouvert && nAC > 0 && (
+        <div data-a-confirmer-liste style={{ marginTop: 8, borderTop: `1px solid ${C.border}`, paddingTop: 6 }}>
+          {ac.slice(0, 40).map((it) => (
+            <div key={`${(it._acc && it._acc.vinted_user_id) || ''}_${it.id}`} data-a-confirmer-annonce={String(it.id)}
+              style={{ display: 'flex', gap: 8, alignItems: 'baseline', padding: '3px 0', minWidth: 0 }}>
+              {numeros && <span style={{ color: C.text, fontWeight: 600, flex: '0 0 auto' }}>{num(it)}</span>}
+              <span style={{ color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flex: '1 1 auto' }}>{it.title || '—'}</span>
+              <span style={{ flex: '0 0 auto' }}>{it.price != null ? fmt(it.price) : '—'}</span>
+              <span style={{ flex: '0 0 auto' }}>{nom(String((it._acc && it._acc.vinted_user_id) || ''))}</span>
+            </div>
+          ))}
+          {ac.length > 40 && <div style={{ paddingTop: 4 }}>… et {ac.length - 40} autre{ac.length - 40 > 1 ? 's' : ''}.</div>}
+        </div>
+      )}
     </div>
   );
 }
@@ -1756,7 +1992,7 @@ function regrouperSignaux(relire, minMs = SIGNAL_MIN_MS, rafaleMs = 300) {
 // L'extension vient de ranger une suppression : on oublie ce qu'on avait lu.
 const oublierDressing = (uid) => {
   if (uid) { _rowCache.delete(`h:${uid}:listings`); _rowCache.delete(`s:${uid}`); }
-  _rowCache.delete('s:*');
+  _rowCache.delete('s:*'); _rowCache.delete('e:*');
 };
 // ── ACTIVITÉ RÉSEAU (barre de chargement en haut) ───────────────────────────
 // Tous les chargements de données passent par fetchHarvest (moisson) ou
@@ -1914,11 +2150,15 @@ const fetchHarvestBrut = async (uid, type, opts = {}) => {
     if (!res.ok) return null;
     const rows = await res.json();
     const row = rows[0];
+    // 5.167 (11 octobre) : le dressing d'un compte, LÀ OÙ IL EST LU, passe par la
+    // règle « en ligne » — la lecture complète la plus récente (son dressing ou
+    // sa lecture publique), sans les supprimées, et « à confirmer » au-delà de
+    // 24 h. Tous les écrans qui en dérivent la suivent sans la recalculer (§11).
+    if (type === 'listings') return await dressingEnLigne(uid, row || null, opts);
     if (!row) return null;
-    // Un dressing se date par `dateLectureDressing` (capturedAt seul), comme chez
-    // tous ses autres lecteurs (§11) : la date dite à l'écran et celle qui écarte
-    // les annonces supprimées sont la MÊME.
-    const ts = type === 'listings' ? dateLectureDressing(row) : harvestTs(row);
+    // (Un dressing ne passe pas ici : il se date par `dateLectureDressing` dans
+    // `dressingEnLigne`, comme chez tous ses autres lecteurs — §11.)
+    const ts = harvestTs(row);
     if (!isNaN(ts)) _harvestSeen[`${uid}_${type}`] = ts;
     // ⚠️ ON NE JETTE PLUS une moisson « trop vieille » par défaut. Ça faisait
     // afficher « Impossible de charger » (Messages, Annonces…) dès que Julien
@@ -1931,16 +2171,39 @@ const fetchHarvestBrut = async (uid, type, opts = {}) => {
     const maxAge = opts.maxAgeMs != null ? opts.maxAgeMs : 0;
     if (maxAge > 0 && !isNaN(ts) && (Date.now() - ts) > maxAge) return null;
     const payload = row.data?.payload || null;
-    // 5.165 : le dressing, LÀ OÙ IL EST LU, sans les annonces supprimées depuis
-    // (tous les écrans qui en dérivent suivent la même règle, §11).
-    if (type === 'listings' && payload) {
-      const p2 = retirerSupprimees(payload, await lireSupprimees(uid), ts);
-      _supprRetirees[uid] = (p2 && p2._vrmSupprimees) || [];
-      return p2;
-    }
     return payload;
   } catch (_) { return null; }
   finally { busyEnd(); }  // finally : le compteur redescend quel que soit le chemin de sortie
+};
+// Le dressing d'UN compte tel que l'app le montre : la ligne `harvest_{uid}_listings`
+// (ou `null`), la lecture publique, les suppressions — passées par la règle.
+// Rend un payload au format d'un dressing : `items` = ses annonces fermées, les
+// absentes d'une lecture plus récente rendues fermées, et celles EN LIGNE ;
+// `_vrmAConfirmer` = celles qu'on ne peut pas dater (jamais comptées) ;
+// `_vrmLu` = l'heure de la lecture qui fait foi. `null` = rien à lire du tout.
+const dressingEnLigne = async (uid, row, opts = {}) => {
+  const payload = (row && row.data && row.data.payload) || null;
+  // Toutes les lectures publiques en UNE requête partagée (une ligne par compte :
+  // famille bornée) — l'écran lit tous ses comptes en même temps.
+  const tous = await lireEnLigneTous();
+  const q = Array.isArray(tous) ? tous.find((r) => r && r.id === `harvest_${uid}_enligne`) : null;
+  // `null` = les lectures publiques n'ont pas pu être lues (ni maintenant, ni avant) :
+  // la règle ne laisse décider qu'un dressing de moins de 30 min (« pas su »).
+  const pub = tous === null ? { passu: true } : (q && q.id ? { complet: q.complet, ids: q.ids, items: q.items, cap: Date.parse(q.cap || '') } : null);
+  if (!payload && !(pub && !pub.passu)) return null;
+  // La date de LECTURE du dressing (`capturedAt`, jamais `updated_at` qui ment,
+  // §4.3) — la même fonction que ses autres lecteurs (`dateLectureDressing`, §11).
+  const ts = row ? dateLectureDressing(row) : NaN;
+  const res = enLigneDuCompte(payload && Array.isArray(payload.items) ? { items: payload.items, cap: ts } : null,
+    pub, await lireSupprimees(uid), Date.now());
+  if (isFinite(res.lu)) _harvestSeen[`${uid}_listings`] = res.lu; else if (!isNaN(ts)) _harvestSeen[`${uid}_listings`] = ts;
+  const maxAge = opts.maxAgeMs != null ? opts.maxAgeMs : 0;
+  if (maxAge > 0 && isFinite(res.lu) && (Date.now() - res.lu) > maxAge) return null;
+  _supprRetirees[uid] = res.supprimees.map((it) => String(it.id));
+  const items = res.fermees.concat(res.absentes.map((it) => ({ ...it, is_closed: true, _vrmAbsente: true })), res.enLigne);
+  return { ...(payload || {}), items,
+    _vrmSupprimees: res.supprimees.map((it) => String(it.id)), _vrmAbsentes: res.absentes.map((it) => String(it.id)),
+    _vrmAConfirmer: res.aConfirmer, _vrmLu: isFinite(res.lu) ? res.lu : null, _vrmSource: res.source };
 };
 // Bordereaux reçus par EMAIL (pipeline usevrm) : lignes app_data email_bord_*
 // = { numero, modele, taille, transaction, pdfB64, ... }. Le PDF est en base64.
@@ -4187,23 +4450,32 @@ function vmrAuthEtat(timeoutMs = 4000) {
 // en-tête CORS : la page peut afficher l'image, pas en lire les octets (et un
 // canvas nourri d'une image cross-origin devient inexportable, §4.93). Sans
 // extension → null, et le document se génère simplement sans photo.
-function vmrPhoto(url, timeoutMs = 8000) {
+// ⚠️ REFUS ≠ DÉLAI (revue du 11 octobre). `vmrPhotoIssue` dit lequel des deux :
+//    `refus` = l'extension a RÉPONDU sans octets (le CDN la refuse aussi, lien
+//    mort) ; `delai` = aucune réponse avant l'échéance (service worker qui se
+//    réveille, réseau lent) — « pas su », pas « non ». Les photos à l'écran
+//    (src/photosVinted.js) en ont besoin : un délai se réessaie, un refus ne
+//    se réclame pas en boucle, et « recharge cette page » ne se dit pas sur un
+//    refus (le geste ne pourrait pas marcher). `vmrPhoto` garde son contrat
+//    (les octets ou `null`) pour le reçu d'achat.
+function vmrPhotoIssue(url, timeoutMs = 8000) {
   return new Promise((resolve) => {
-    if (typeof window === 'undefined' || !__vmrExtReady || !url) { resolve(null); return; }
+    if (typeof window === 'undefined' || !__vmrExtReady || !url) { resolve({ dataUrl: null, issue: 'absente' }); return; }
     const reqId = 'p' + Date.now() + '_' + Math.random().toString(36).slice(2);
     let done = false, grace = null;
     const fin = (v) => { if (done) return; done = true; clearTimeout(grace); window.removeEventListener('message', onMsg); resolve(v); };
     // Réponse vide : peut-être un pont orphelin (voir `vmrDemande`) — on attend encore un peu.
     const onMsg = (e) => {
       if (!(e.source === window && e.data && e.data.__vmr === 'photo:result' && e.data.reqId === reqId)) return;
-      if (e.data.dataUrl) { fin(e.data.dataUrl); return; }
-      if (!grace) grace = setTimeout(() => fin(null), VMR_GRACE_VIDE_MS);
+      if (e.data.dataUrl) { fin({ dataUrl: e.data.dataUrl, issue: 'ok' }); return; }
+      if (!grace) grace = setTimeout(() => fin({ dataUrl: null, issue: 'refus' }), VMR_GRACE_VIDE_MS);
     };
     window.addEventListener('message', onMsg);
-    setTimeout(() => fin(null), timeoutMs);
-    try { window.postMessage({ __vmr: 'photo', reqId, url }, '*'); } catch (_) { fin(null); }
+    setTimeout(() => fin({ dataUrl: null, issue: 'delai' }), timeoutMs);
+    try { window.postMessage({ __vmr: 'photo', reqId, url }, '*'); } catch (_) { fin({ dataUrl: null, issue: 'delai' }); }
   });
 }
+function vmrPhoto(url, timeoutMs = 8000) { return vmrPhotoIssue(url, timeoutMs).then((r) => (r && r.dataUrl) || null); }
 
 // Le PDF d'un bordereau Leboncoin, lu par l'extension (5.136) : il est derrière
 // SA session Leboncoin, la page ne peut pas le lire. `{dataUrl}` ou `{error}`.
@@ -4446,6 +4718,194 @@ if (typeof window !== 'undefined') {
     document.addEventListener('visibilitychange', () => { if (!document.hidden) battementExt(); });
   } catch (_) {}
 }
+// ══ LES PHOTOS DU CDN DE VINTED (11 octobre) — la règle vit dans src/photosVinted.js ══
+// « Je n'ai plus les photos de mes annonces, ni dans les bordereaux, ni dans les
+// ventes » (Julien, 11 octobre). Les données sont intactes ; c'est l'AFFICHAGE
+// hors de vinted.fr qui échoue. Toute photo du CDN Vinted passe par
+// `PhotoVinted` (une règle, §11) : sans référent d'abord, puis, si le navigateur
+// refuse quand même, les octets demandés à l'EXTENSION (le pont « photo »,
+// présent depuis très longtemps — rien à changer côté extension).
+// Peut-on demander le secours ICI ? Trois états, jamais deux : l'extension se
+// manifeste quelques secondes après le chargement (pings à 0,6 · 1,5 · 3 · 6 s) —
+// avant, c'est « pas encore su », pas « non ».
+const __photosDebut = Date.now();
+const PHOTOS_GRACE_EXT_MS = 7000;
+const secoursPhotos = () => {
+  if (typeof window === 'undefined') return 'non';
+  if (__vmrExtReady) return __vmrEtat === null ? 'non' : 'oui';
+  return Date.now() - __photosDebut < PHOTOS_GRACE_EXT_MS ? 'attente' : 'non';
+};
+photosVinted.configurer({
+  // Le plafond DUR (30 s) : la place reste prise jusqu'à la vraie réponse, et
+  // un délai se dit « délai », jamais « refus » (revue du 11 octobre).
+  demander: (u) => vmrPhotoIssue(u, photosVinted.DELAI_SECOURS_MS),
+  secours: secoursPhotos,
+  ext: () => (__vmrExtReady ? (__vmrEtat === null ? 'muette' : 'presente') : 'absente'),
+});
+if (typeof window !== 'undefined') {
+  try {
+    onVmrExt(() => photosVinted.secoursChange());
+    setTimeout(() => photosVinted.secoursChange(), PHOTOS_GRACE_EXT_MS + 200);
+  } catch (_) {}
+}
+// Le cadre du pictogramme reprend la PLACE de l'image (jamais un trou, jamais
+// l'icône « image cassée » du navigateur) : mêmes dimensions, mêmes arrondis.
+const CLES_CADRE_PHOTO = ['width', 'height', 'minWidth', 'minHeight', 'maxWidth', 'maxHeight', 'borderRadius', 'flexShrink', 'flex', 'margin', 'marginLeft', 'marginRight', 'marginTop', 'marginBottom', 'border', 'boxShadow', 'position', 'top', 'left', 'right', 'bottom', 'aspectRatio', 'background'];
+function cadrePhoto(style) {
+  const s = {};
+  if (style) for (const k of CLES_CADRE_PHOTO) if (style[k] !== undefined) s[k] = style[k];
+  if (s.width === undefined) s.width = '100%';
+  if (s.height === undefined || s.height === 'auto') s.height = typeof s.width === 'number' ? s.width : '100%';
+  return { ...s, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', boxSizing: 'border-box', color: C.muted };
+}
+const taillePicto = (style) => {
+  const w = style && style.width, h = style && style.height;
+  const m = Math.min(typeof w === 'number' ? w : 44, typeof h === 'number' ? h : 44);
+  return Math.max(12, Math.min(22, Math.round(m * 0.45)));
+};
+// Remplace un `<img>` qui PEUT afficher une photo du CDN Vinted. Pour toute autre
+// adresse, c'est un `<img>` ordinaire, comme avant.
+//   · `repli` : ce qui prend la place de la photo quand elle ne s'affiche pas
+//     (en attente du secours, ou définitivement) — `null` = rien du tout ;
+//     absent = le pictogramme « image ».
+//   · `onError()` : appelé UNE fois, sans argument, quand la photo est
+//     DÉFINITIVEMENT perdue (l'extension a répondu, et pas avec une image) —
+//     c'est ce que lisent les écrans qui la retirent de leur liste
+//     (`noterImgMorte`). ⚠️ JAMAIS sur « pas d'extension ici, pour l'instant » :
+//     c'est réversible (elle arrive, elle revient), et une photo retirée d'une
+//     liste n'y revient pas — mesuré : Ma journée gardait 6 icônes de repli
+//     après l'arrivée de l'extension, sans lui avoir rien demandé. Pour cet
+//     état-là, ce composant dessine déjà son pictogramme.
+function PhotoVinted({ src, repli, onError, onLoad, style, loading, ...reste }) {
+  const vinted = photosVinted.estPhotoVinted(src);
+  const [, maj] = React.useReducer((x) => x + 1, 0);
+  const qui = React.useRef(null); if (!qui.current) qui.current = {};
+  const el = React.useRef(null);
+  const etat = vinted ? photosVinted.etat(src) : 'natif';
+  const mort = vinted && photosVinted.estMorte(src);
+  const vuAuRendu = React.useRef('');
+  vuAuRendu.current = etat + (mort ? '!' : '');
+  React.useEffect(() => {
+    if (!vinted) return undefined;
+    const off = photosVinted.monter(src, maj);
+    // Ce qui a changé entre le rendu et l'abonnement (une autre vignette de la
+    // même photo a échoué entre-temps) : on se met à jour une fois.
+    if (photosVinted.etat(src) + (photosVinted.estMorte(src) ? '!' : '') !== vuAuRendu.current) maj();
+    return off;
+  }, [src, vinted]);
+  const attend = vinted && !mort && (etat === 'attente' || etat === 'vol');
+  React.useEffect(() => {
+    if (!attend || !el.current) return undefined;
+    return photosVinted.observer(el.current, (v) => photosVinted.voir(src, qui.current, v));
+  }, [attend, src]);
+  const definitive = vinted && photosVinted.estDefinitive(src);
+  const signale = React.useRef(null);
+  React.useEffect(() => {
+    if (!definitive || signale.current === src) return;
+    signale.current = src;
+    if (onError) { try { onError(); } catch (_) {} }
+  }, [definitive, src]);
+  if (!vinted) {
+    return <img src={src} loading={loading} style={style} {...reste} onLoad={onLoad}
+      onError={onError ? () => { try { onError(); } catch (_) {} } : undefined}/>;
+  }
+  if (etat === 'ok') {
+    return <img src={photosVinted.blobDe(src)} style={style} {...reste} data-photo-vinted="secours" onLoad={onLoad}
+      onError={() => photosVinted.echecBlob(src)}/>;
+  }
+  if (etat === 'natif') {
+    return <img src={src} referrerPolicy="no-referrer" loading={loading || 'lazy'} style={style} {...reste} data-photo-vinted="natif"
+      onLoad={(e) => { photosVinted.chargeNatif(src); if (onLoad) onLoad(e); }}
+      onError={() => photosVinted.echecNatif(src)}/>;
+  }
+  if (mort && repli === null) return null;
+  return (
+    <span ref={el} aria-hidden="true" data-photo-vinted={mort ? 'perdue' : 'attente'} style={cadrePhoto(style)}>
+      {repli !== undefined ? repli : <Icon name="image" size={taillePicto(style)} style={{ color: C.muted, opacity: .55 }}/>}
+    </span>
+  );
+}
+// ── QUI DIT DÉJÀ, SUR CET ÉCRAN, CE QUI BLOQUE L'EXTENSION ? (§7) ────────────
+// Les raisons « au niveau de l'extension » (`raisonExtGlobale`) se disent sous
+// les boutons qu'elles grisent (bordereaux, publication). Quand l'extension est
+// muette, la phrase des photos le redisait — « ne répond pas » ×2 et
+// « recharge » ×3 sur l'écran Ventes (revue du 11 octobre). Chaque bandeau qui
+// la DIT s'inscrit ici tant qu'il est affiché ; la phrase des photos laisse
+// alors le geste à ce bandeau-là.
+const __voixExt = new Map();
+const __voixExtSubs = new Set();
+const __voixExtNotifier = () => __voixExtSubs.forEach((f) => { try { f(); } catch (_) {} });
+function useVoixExt(code) {
+  React.useEffect(() => {
+    if (!code) return undefined;
+    const k = {};
+    __voixExt.set(k, code); __voixExtNotifier();
+    return () => { __voixExt.delete(k); __voixExtNotifier(); };
+  }, [code]);
+}
+const voixExtDit = (code) => { for (const c of __voixExt.values()) if (c === code) return true; return false; };
+const ecouterVoixExt = (fn) => { __voixExtSubs.add(fn); return () => __voixExtSubs.delete(fn); };
+// UNE phrase, UNE fois, sur la coque (§7) — la règle de QUAND parler vit dans
+// `photosVinted.decision()` (src/photosVinted.js), jugée sur ce qui est MONTÉ
+// maintenant : au moins trois photos perdues à l'écran, aucune récupérée par
+// l'extension, et rien qui montre que le CDN sert ce navigateur. Rien pendant
+// qu'on mesure encore la cause, rien pour des liens morts isolés. Pas de
+// couleur d'alerte : il n'y a rien d'irréversible, la donnée est intacte.
+// La CAUSE dit ce qui est MESURÉ, rien de plus :
+//   · deux échecs réseau espacés, et l'extension les a récupérées ⇒ c'est la
+//     PAGE qui est refusée (« dans VRM ») ;
+//   · deux échecs réseau, sans plus ⇒ « n'arrive pas à les charger ici » (une
+//     coupure, un filtre ou CORP donnent la même erreur : on ne tranche pas) ;
+//   · le serveur répond ⇒ il répond, mais l'image ne s'affiche pas ;
+//   · sinon ⇒ on n'a pas pu mesurer.
+// Le GESTE suit ce qui est possible ici : rien à régler quand l'extension a
+// répondu sans image (« recharge » ne pourrait pas marcher), recharger quand
+// elle est muette — sauf si un bandeau de l'écran le dit déjà —, l'ordinateur
+// sur un téléphone, le bon Chrome ailleurs.
+function PhotosBloquees() {
+  const sansSouris = useSansSouris();
+  const [, maj] = React.useReducer((x) => x + 1, 0);
+  React.useEffect(() => photosVinted.ecouter(maj), []);
+  React.useEffect(() => onVmrExt(maj), []);
+  React.useEffect(() => ecouterVoixExt(maj), []);
+  const d = photosVinted.decision();
+  if (!d || !d.parle) return null;
+  const extPresente = d.ext === 'presente';
+  const cause = d.cause === 'navigateur' && !extPresente
+    ? "Ce navigateur refuse d'afficher les photos de Vinted dans VRM — l'extension VRM, elle, sait les récupérer."
+    : d.cause === 'navigateur' || d.cause === 'injoignable'
+      ? "Ce navigateur n'arrive pas à charger les photos de Vinted ici."
+      : d.cause === 'reponse'
+        ? "Le serveur de photos de Vinted répond, mais ses images ne s'affichent pas dans VRM."
+        : "Les photos de Vinted ne s'affichent pas ici, et je n'ai pas pu mesurer pourquoi.";
+  const intactes = " Tes annonces et tes ventes ne sont pas touchées.";
+  const codeGeste = extPresente ? 'refus'
+    : d.ext === 'muette' ? (voixExtDit('muette') ? 'muette-ailleurs' : 'muette')
+      : sansSouris ? 'telephone' : 'chrome';
+  const geste = codeGeste === 'refus'
+    ? <>L'extension VRM n'a pas pu les récupérer non plus : rien à régler ici, je réessaie de temps en temps.{intactes}</>
+    : codeGeste === 'muette-ailleurs'
+      ? <>C'est l'extension VRM qui va les chercher : le message sur l'extension, plus bas, dit quoi faire.</>
+      : codeGeste === 'muette'
+        ? <>L'extension VRM, qui sait aller les chercher, ne répond pas : <b>recharge cette page</b>.</>
+        : codeGeste === 'telephone'
+          ? <>Ici, rien ne peut aller les chercher : sur l'<b>ordinateur où l'extension VRM est installée</b>, c'est elle qui les récupère.{intactes}</>
+          : <><b>Ouvre VRM dans le Chrome où l'extension VRM est installée</b> : c'est elle qui va les chercher.{intactes}</>;
+  // ⚠️ `vrm-sous-ile` (index.html) : sur ordinateur, l'île d'actions flotte en
+  //    haut à droite et le GESTE de cette phrase passait dessous (mesuré mot par
+  //    mot, revue du 11 octobre). Le côté droit lui laisse sa place — c'est
+  //    pourquoi le style en ligne ne pose AUCUN padding à droite (il gagnerait
+  //    sur la classe).
+  return (
+    <div className="vrm-sous-ile" style={{ paddingTop: 12, paddingLeft: 16, paddingBottom: 4 }}>
+      <div data-photos-bloquees={d.cause} data-photos-geste={codeGeste} data-photos-perdues={d.morts}
+        style={{ display: 'flex', gap: 10, alignItems: 'flex-start', border: `1px solid ${C.border}`, background: C.card, borderRadius: 10, padding: '11px 13px', fontSize: 13, lineHeight: 1.5, color: C.text }}>
+        <span style={{ flexShrink: 0, marginTop: 1, color: C.muted }}><Icon name="image" size={18}/></span>
+        <span>{cause} {geste}</span>
+      </div>
+    </div>
+  );
+}
 // LE COMPTE VINTED OUVERT DANS CE CHROME, tel que l'extension le lit dans son
 // cookie — réponse `etat` du pont, relue toutes les 20 s et au retour sur
 // l'onglet. ⚠️ C'est la SEULE réponse du pont qui le porte : `authEtat` ne parle
@@ -4654,18 +5114,27 @@ const fetchVintedListings = async (account, page = 1, opts = {}) => {
     //    ci-dessus les a retirées), ou lu en entier par l'extension et vide
     //    (`total_entries: 0`). Ce vide-là EST une réponse ; sans ça, l'app
     //    repartait demander le dressing au relais du serveur.
+    // ⚠️ 5.167 (11 octobre) — ET un vide que la RÈGLE « en ligne » a produit :
+    //    une lecture publique plus récente qui ne montre plus rien, des annonces
+    //    « à confirmer » (compte pas relu depuis 24 h). Ce vide-là se DIT au-dessus
+    //    de la grille ; aller le redemander au relais serait le contredire.
     const videDit = !!(h && Array.isArray(h.items) && ((h._vrmSupprimees || []).length
+      || h._vrmSource === 'public' || (h._vrmAConfirmer || []).length
       || (h.pagination && h.pagination.total_entries !== '' && h.pagination.total_entries != null && Number(h.pagination.total_entries) === 0)));
     if (h && Array.isArray(h.items) && (h.items.length > 0 || videDit)) {
       // ⚠️ On remonte AUSSI les annonces que Vinted a fermées en disant « vendue ».
       //    Elles sortent des « en ligne » (c'est leur place), mais leur IDENTIFIANT
       //    est la seule preuve sans ressemblance qu'une paire numérotée est bien
       //    partie. Calculé sur des données déjà en mémoire : 0 requête, 0 octet.
+      // 5.167 : `lu` = l'heure de la lecture qui FAIT FOI (son dressing ou sa
+      // lecture publique) ; `aConfirmer` = ses annonces qu'on ne peut pas dater
+      // (jamais comptées en ligne) ; `supprimees` = celles retirées parce que
+      // supprimées ou absentes d'une lecture plus récente.
       return { ok: true, items: h.items.filter(isOnlineListing).map(mapWardrobeItem),
                soldIds: h.items.filter(venduChezVinted).map(x => String(x.id)),
-               // Les cartes RETIRÉES de l'écran — pas les annonces en pause ou en
-               // brouillon qu'il a supprimées aussi (elles n'étaient pas affichées).
-               supprimees: (h._vrmRetirees || []).filter(isOnlineListing).length,
+               supprimees: (h._vrmSupprimees || []).length + (h._vrmAbsentes || []).length,
+               aConfirmer: (h._vrmAConfirmer || []).map(mapWardrobeItem),
+               lu: Number.isFinite(h._vrmLu) ? h._vrmLu : null,
                pagination: h.pagination || null, source: 'harvest' };
     }
   }
@@ -4700,7 +5169,8 @@ const fetchVintedListings = async (account, page = 1, opts = {}) => {
     if (!lot.length || (tp && pg >= tp)) break;
   }
   const items = brut.filter(isOnlineListing).map(mapWardrobeItem);
-  return { ok: okUn, items, pagination };
+  // Lue à l'instant, page après page : c'est une lecture complète et fraîche.
+  return { ok: okUn, items, pagination, lu: okUn ? Date.now() : null };
 };
 
 // Detecte un numero de paire ecrit dans un titre Vinted, au format "nXX",
@@ -6602,7 +7072,7 @@ function PhotoEditor({ refPhoto, refTitle, onClose, toast }) {
               {refPhoto && (
                 <div style={{marginBottom:14}}>
                   <div style={{fontSize:11,color:C.muted,fontWeight:600,marginBottom:6}}>ANNONCE ACTUELLE (repère)</div>
-                  <img src={refPhoto} alt="" style={{width:110,height:'auto',borderRadius:10,border:`1px solid ${C.border}`}}/>
+                  <PhotoVinted src={refPhoto} alt="" style={{width:110,height:'auto',borderRadius:10,border:`1px solid ${C.border}`}}/>
                 </div>
               )}
               <label style={{display:'inline-flex',alignItems:'center',gap:8,border:`1px solid ${C.accent}`,background:C.accent+'12',color:C.accent,borderRadius:10,fontSize:14,fontWeight:700,padding:'13px 18px',cursor:'pointer'}}>
@@ -8318,9 +8788,12 @@ function RaisonBordereauxGrises({ ventes }) {
   useExtVivante();
   const sansSouris = useSansSouris();
   const n = (ventes || []).length;
-  if (!n) return null;
-  const r = raisonExtGlobale(sansSouris);
-  if (!r || r.code === 'verif') return null;
+  const r = n ? raisonExtGlobale(sansSouris) : null;
+  const montre = !!(r && r.code !== 'verif');
+  // Ce bandeau DIT la raison de l'extension sur cet écran : la phrase des photos
+  // ne la répète pas (§7, `useVoixExt`).
+  useVoixExt(montre ? r.code : null);
+  if (!montre) return null;
   return (
     <div data-raison-bord={r.code} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12.5, color: C.text, background: C.card,
       border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.warn}`, borderRadius: 10, padding: '9px 12px', marginBottom: 10, lineHeight: 1.45 }}>
@@ -8607,6 +9080,7 @@ function RaisonPublication({ n, place }) {
   const sansSouris = useSansSouris();
   useExtVivante();
   const r = raisonExtGlobale(sansSouris, { cap: 'publication', role: 'publie tes annonces' });
+  useVoixExt(r && n ? r.code : null);
   if (!r || !n) return null;
   return (
     <div data-raison-publier={r.code} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12.5, color: C.text, background: C.card,
@@ -9241,7 +9715,7 @@ function PhotoVente({ src, size = 56 }) {
   const [ko, setKo] = React.useState(false);
   const ok = src && /^https?:\/\//.test(String(src)) && !ko;
   const box = { width: size, height: size, flexShrink: 0, borderRadius: 10, overflow: 'hidden', background: C.bg, border: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' };
-  if (ok) return <img src={src} alt="" loading="lazy" onError={() => setKo(true)} style={{ ...box, objectFit: 'cover' }} />;
+  if (ok) return <PhotoVinted src={src} alt="" loading="lazy" onError={() => setKo(true)} style={{ ...box, objectFit: 'cover' }} />;
   return <div style={box} aria-hidden="true"><Icon name="tag" size={Math.round(size * 0.42)} color={C.muted} /></div>;
 }
 // Le QR d'un colis Leboncoin : l'image si elle charge, sinon un lien (api.leboncoin
@@ -10287,7 +10761,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
           {(urls.length > 0 || titre.trim()) && (
             <div style={{ display: 'flex', gap: 12, alignItems: 'center', border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: 10, boxShadow: C.shadow }}>
               <div style={{ flexShrink: 0, width: 66, height: 66, borderRadius: 10, overflow: 'hidden', background: C.bg, border: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {urls[0] ? <img src={urls[0]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.currentTarget.style.display = 'none'; }} /> : <Icon name="tag" size={20} />}
+                {urls[0] ? <PhotoVinted src={urls[0]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name="tag" size={20} />}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13.5, fontWeight: 600, color: titre.trim() ? C.text : C.muted, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{titre.trim() || 'Titre de ton annonce…'}</div>
@@ -10311,7 +10785,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
                   {listePaires.length === 0 && <div style={{ fontSize: 12.5, color: C.muted, padding: '6px 2px' }}>Aucune paire ne correspond.</div>}
                   {listePaires.slice(0, 120).map(p => (
                     <button key={p.id} type="button" onClick={() => choisirPaire(p)} style={{ display: 'flex', alignItems: 'center', gap: 11, textAlign: 'left', border: `1px solid ${C.border}`, borderRadius: 10, background: C.card, padding: '8px 10px', cursor: 'pointer', fontFamily: 'inherit' }}>
-                      {p.cover ? <img src={p.cover} alt="" loading="lazy" style={{ width: 46, height: 46, borderRadius: 8, objectFit: 'cover', flexShrink: 0, background: C.bg }} onError={e => { e.currentTarget.style.opacity = 0.15; }} /> : <span style={{ width: 46, height: 46, borderRadius: 8, background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
+                      {p.cover ? <PhotoVinted src={p.cover} alt="" loading="lazy" style={{ width: 46, height: 46, borderRadius: 8, objectFit: 'cover', flexShrink: 0, background: C.bg }} /> : <span style={{ width: 46, height: 46, borderRadius: 8, background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
                       <span style={{ flex: 1, minWidth: 0 }}>
                         <span className="vrm-display" style={{ display: 'block', fontSize: 14, fontWeight: 700, color: C.accent }}>N°{p.num}</span>
                         <span style={{ display: 'block', fontSize: 12.5, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.title || '—'}</span>
@@ -10332,7 +10806,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
                 <div className="vrm-rangee" style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 2 }}>
                   {urls.map((u, i) => (
                     <div key={u + i} style={{ position: 'relative', width: 74, height: 74, borderRadius: 10, overflow: 'hidden', border: `1px solid ${C.border}`, flexShrink: 0, background: C.bg }}>
-                      <img src={u} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.currentTarget.style.opacity = 0.15; }} />
+                      <PhotoVinted src={u} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       <button type="button" onClick={() => setUrls(urls.filter((_, j) => j !== i))} aria-label="Retirer" style={{ position: 'absolute', top: 3, right: 3, width: 20, height: 20, borderRadius: 10, border: 'none', background: 'rgba(0,0,0,.62)', color: '#fff', fontSize: 13, cursor: 'pointer', lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
                       {i === 0 && <span style={{ position: 'absolute', bottom: 0, left: 0, right: 0, fontSize: 9, textAlign: 'center', background: 'rgba(0,0,0,.6)', color: '#fff', padding: '2px 0', fontWeight: 600 }}>couverture</span>}
                     </div>
@@ -12568,6 +13042,9 @@ function Collectif({ liveStats, lbcVentes = {ventes:[],inconnues:0}, ebayCa = nu
 }
 
 function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,baseKO,premierJour,lbcVentes={ventes:[],inconnues:0},ebayCa=null}) {
+  // Les N° des annonces « à confirmer » (la liste dépliée sous « Annonces en ligne ») :
+  // relus avec les chiffres, jamais un « sans N° » inventé (revue de la 5.167).
+  const numerosDash=React.useMemo(()=>load('vinted_annonce_numeros',{}),[liveStats]);
   // Mois sélectionné au clic sur un graphique (affiche le détail des ventes)
   const [selMonthEnc,setSelMonthEnc]=useState(null);   // graphique encaissé
   const [selMonthVente,setSelMonthVente]=useState(null); // graphique date de vente
@@ -13096,7 +13573,10 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
                  de Ma journée (4 octobre). */
               {k:'caMois', icon:'💸', label:'Vendu ce mois', val:liveStats.caMois!=null?`${liveStats.caMois.toFixed(0)} €`:'—', go:'cat_ventes', color:C.text},
               {k:'enCours', icon:'⏳', label:'Ventes en cours', val:liveStats.enCours!=null?liveStats.enCours:'—', go:'cat_ventes', color:C.text},
-              {k:'online', icon:'🟢', label:'Annonces en ligne', val:liveStats.online, go:'cat_annonces', color:C.text},
+              /* Revue de la 5.167 : des annonces « à confirmer » ne sont pas comptées —
+                 le nombre est alors un MINORANT (« ≥ N »), et un zéro qui veut dire
+                 « je ne sais pas » s'écrit « — » (§7). La ligne dessous dit combien. */
+              {k:'online', icon:'🟢', label:'Annonces en ligne', val:(liveStats.annAConfirmer||[]).length ? (liveStats.online>0 ? `≥ ${liveStats.online}` : '—') : liveStats.online, go:'cat_annonces', color:C.text},
             ].map(s=>(
               <button key={s.k} onClick={()=>onGo&&onGo(s.go)} title={`Voir ${s.label.toLowerCase()}`}
                 style={{textAlign:'left',border:'none',background:'transparent',borderRadius:0,padding:0,cursor:'pointer',fontFamily:'inherit',display:'block',width:'100%'}}>
@@ -13106,7 +13586,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
           </div>
           {/* 5.165 : « Annonces en ligne » dit de quand date sa lecture — la même
               phrase que l'écran Annonces (`FraicheurAnnonces`, §11). */}
-          <FraicheurAnnonces attr="data-dash-fraicheur" lues={liveStats.annLues} enLigne={liveStats.annEnLigne} noms={liveStats.annNoms} supprimees={liveStats.annSuppr} activite={liveStats.annActivite} style={{marginTop:8,marginBottom:0}}/>
+          <FraicheurAnnonces attr="data-dash-fraicheur" lues={liveStats.annLues} enLigne={liveStats.annEnLigne} noms={liveStats.annNoms} supprimees={liveStats.annSuppr} aConfirmer={liveStats.annAConfirmer} numeros={numerosDash} activite={liveStats.annActivite} style={{marginTop:8,marginBottom:0}}/>
         </div>
       )}
 
@@ -17443,7 +17923,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
                   {dedans.map(p => (
                     <div key={p.cell + '_' + p.numero} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '7px 9px', borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, minWidth: 0 }}>
                       {p.photo
-                        ? <img src={p.photo} alt="" style={{ width: 36, height: 36, borderRadius: 9, objectFit: 'cover', flexShrink: 0, background: C.card2 }}/>
+                        ? <PhotoVinted src={p.photo} alt="" style={{ width: 36, height: 36, borderRadius: 9, objectFit: 'cover', flexShrink: 0, background: C.card2 }}/>
                         : <span style={{ width: 36, height: 36, borderRadius: 9, background: C.card2, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
                       <span style={{ flex: '1 1 90px', minWidth: 0 }}>
                         <span className="vrm-display" style={{ display: 'block', fontSize: 14, fontWeight: 700, color: C.accent }}>N°{p.numero}</span>
@@ -18435,7 +18915,12 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
       // plus rien sur la fraîcheur d'un compte vivant.
       const rows = await lireTout('id=like.harvest_*&select=id,updated_at,cap:meta->>capturedAt&meta->>supprime=is.null');
       if (!rows) return; const by = {};
-      rows.forEach(r => { const m = String(r.id || '').match(/^harvest_(\d+)_/); if (!m) return; const t = harvestTs(r) || 0; if (t && (!by[m[1]] || t > by[m[1]])) by[m[1]] = t; });
+      // ⚠️ Revue de la 5.167 : `harvest_{uid}_enligne` est la lecture PUBLIQUE de
+      //    son dressing, faite avec la session d'un AUTRE compte (5.167) — ni ses
+      //    ventes, ni sa messagerie, ni son porte-monnaie n'ont été lus. Comptée, elle
+      //    faisait dire « À jour » à un compte figé depuis trois jours, en permanence
+      //    (c'est l'écran qui dit sur quel compte repasser). `ligneDeSaSession`.
+      rows.forEach(r => { const m = ligneDeSaSession(r && r.id); if (!m) return; const t = harvestTs(r) || 0; if (t && (!by[m[1]] || t > by[m[1]])) by[m[1]] = t; });
       setLastCap(by);
     } catch (_) {}
   })(); }, []);
@@ -19619,7 +20104,7 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
                       return (
                         <div key={listing.id} style={{border:`1px solid ${C.border}`,borderRadius:8,overflow:'hidden',background:C.bg,opacity:linked?0.6:1}}>
                           <div style={{width:'100%',aspectRatio:'1/1',background:C.border,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                            {listing.photo ? <img src={listing.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/> : <span style={{fontSize:26}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
+                            {listing.photo ? <PhotoVinted src={listing.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/> : <span style={{fontSize:26}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
                           </div>
                           <div style={{padding:8}}>
                             <div title={listing.title} style={{fontSize:11,fontWeight:600,color:C.text,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden',minHeight:28}}>{listing.title}</div>
@@ -19657,7 +20142,7 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
           return (
             <div key={p.id} style={{display:'flex',gap:12,alignItems:'center',padding:11,borderRadius:10,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none'}}>
               <div style={{width:52,height:52,borderRadius:8,background:C.border,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
-                {p.photo ? <img src={p.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/> : <span style={{fontSize:22}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
+                {p.photo ? <PhotoVinted src={p.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/> : <span style={{fontSize:22}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
               </div>
               <div style={{flexShrink:0,minWidth:54,textAlign:'center'}}>
                 <div style={{fontSize:9,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>N°</div>
@@ -20884,7 +21369,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const rows = await lireTout('id=like.harvest_*&select=id,updated_at,cap:meta->>capturedAt&meta->>supprime=is.null');
       if (!rows) return; const parUid = {};
       rows.forEach(r => {
-        const m = String(r.id || '').match(/^harvest_(\d+)_/); if (!m) return;
+        // La lecture PUBLIQUE (`_enligne`) n'est pas une capture faite avec SA
+        // session : elle ne prouve pas que ce compte refusé par Vinted revit
+        // (revue de la 5.167 — la pastille « Refusé par Vinted » tombait).
+        const m = ligneDeSaSession(r && r.id); if (!m) return;
         const t = harvestTs(r) || 0; if (t && (!parUid[m[1]] || t > parUid[m[1]])) parUid[m[1]] = t;
       });
       const vivants = [...blockedAccts].filter(uid => parUid[uid] && (Date.now() - parUid[uid]) < 7 * 86400000);
@@ -21151,7 +21639,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return (
       <div style={{display:'flex',alignItems:'center',gap:7,margin:'0 0 8px',padding:'5px 7px',borderRadius:8,border:`1px solid ${INV_STATUS.online.color}44`,background:`${INV_STATUS.online.color}0e`}}>
         <div style={{width:30,height:30,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-          {ph ? <img src={ph} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/> : <span style={{fontSize:14}}>🧾</span>}
+          {ph ? <PhotoVinted src={ph} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/> : <span style={{fontSize:14}}>🧾</span>}
         </div>
         <div style={{flex:'1 1 90px',minWidth:0}}>
           <div style={{fontSize:11,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={a.title}>{a.title||'Achat relié'}</div>
@@ -21794,6 +22282,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // pas être vendue → on ne lui attribue jamais une vente (sinon un exemplaire
   // identique vendu ferait apparaître « vendue » une paire encore en vente).
   const onlineAnnonceIds = useMemo(() => new Set((listings.items || []).map(it => String(it.id))), [listings.items]);
+  // ⚠️⚠️ REVUE DE LA 5.167 — « À CONFIRMER » N'EST PAS « PLUS EN LIGNE ». Les
+  //    annonces d'un compte pas relu depuis 24 h ont quitté `listings.items`
+  //    (5.167) ; la protection des numéros les croyait donc PARTIES : le champ N°
+  //    disait « il était sur …, qui n'est plus en ligne » et proposait de LUI
+  //    PRENDRE son numéro (sa fiche supprimée, son prix d'achat déménagé), et le
+  //    bandeau ♻️ proposait la même reprise sur un simple titre. Rien ne prouve
+  //    qu'elle a quitté l'étagère : deux paires sous un même numéro est le seul
+  //    risque irréversible de l'app (§5). ⇒ Les PAIRES PRÉSENTES (numéros) =
+  //    en ligne + à confirmer, partout où un numéro se protège (`porteursNum`,
+  //    `numeroReprises`, `vinted_nums_physiques`) — comme `numDoublons` (§11).
+  //    (`onlineAnnonceIds` reste « en ligne » : relier une vente PROUVÉE à une
+  //    annonce à confirmer est juste — c'est même souvent pour ça qu'elle l'est.)
+  const presentesAnnonceIds = useMemo(() => new Set([...(listings.items || []), ...(listings.aConfirmer || [])].map(it => String(it.id))), [listings.items, listings.aConfirmer]);
   // Clé (id d'annonce) d'une entrée numéro, par référence — pour le verrouillage.
   // ⚠️ UNE SEULE RÈGLE D'IDENTITÉ (§11) : « quelle annonce est cette vente ? ».
   // Deux voies, toutes deux certaines, et RIEN d'autre :
@@ -21908,10 +22409,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (§11 : une seule règle par notion). Clé LOCALE (pas dans SYNC_KEYS) : c'est
   // une photo recalculable, elle n'a rien à faire dans le nuage.
   useEffect(() => {
-    if (!listings.items || !listings.items.length) return;   // rien de sûr à publier
+    // Revue de la 5.167 : les annonces « à confirmer » sont peut-être encore sur
+    // l'étagère — leur numéro reste PHYSIQUE (une seule source des paires
+    // présentes, `porteursNum`/`numDoublons`, §11).
+    const presentes = [...(listings.items || []), ...(listings.aConfirmer || [])];
+    if (!presentes.length) return;   // rien de sûr à publier
     if (!sales.items) return;
     const vivants = new Set();
-    for (const it of listings.items) { const n = String((numeros[it.id] || {}).numero || '').trim(); if (n) vivants.add(n); }
+    for (const it of presentes) { const n = String((numeros[it.id] || {}).numero || '').trim(); if (n) vivants.add(n); }
     for (const o of (sales.items || [])) {
       if (!needsBordereau(o.status)) continue;
       const n = String((saleOv[String(o.transaction_id)] || {}).numero || '').trim(); if (n) vivants.add(n);
@@ -21922,7 +22427,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const memeChose = avant && Array.isArray(avant.nums) && avant.nums.length === liste.length && avant.nums.every((x,i)=>x===liste[i]);
       if (!memeChose) save('vinted_nums_physiques', { nums: liste, at: Date.now() });
     } catch (_) {}
-  }, [listings.items, sales.items, numeros, saleOv]);
+  }, [listings.items, listings.aConfirmer, sales.items, numeros, saleOv]);
 
   // ⚠️⚠️ LE RÉCAP URSSAF DU TABLEAU DE BORD AFFICHAIT 0 € PARTOUT.
   // Il lit `vinted_sales` — l'archive des anciennes ventes, VIDÉE en juillet
@@ -22102,6 +22607,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     for (const it of (listings.items || [])) {
       const e = numeros[it.id]; if (e && e.numero != null) add(e.numero, { type: 'annonce', titre: it.title, id: it.id });
     }
+    // Revue de la 5.167 : une annonce « à confirmer » est peut-être encore sur
+    // l'étagère — elle PORTE son numéro (marquée, pour le dire autrement).
+    for (const it of (listings.aConfirmer || [])) {
+      const e = numeros[it.id]; const uid = String((it._acc && it._acc.vinted_user_id) || '');
+      if (e && e.numero != null) add(e.numero, { type: 'annonce', titre: it.title, id: it.id, aConfirmer: true, lu: Number((listings.lues || {})[uid]) || null });
+    }
     for (const o of (sales.items || [])) {
       // ⚠️ UNE VENTE ANNULÉE AVANT L'ENVOI GARDE SA PLACE. La paire n'a jamais
       // quitté la maison : son carton est toujours sur l'étagère, avec son
@@ -22123,7 +22634,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     }
     return m;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listings.items, sales.items, numeros, saleOv, garageGrid, hiddenSales, hiddenAccts, labelsCaptes, emailBords]);
+  }, [listings.items, listings.aConfirmer, listings.lues, sales.items, numeros, saleOv, garageGrid, hiddenSales, hiddenAccts, labelsCaptes, emailBords]);
 
   // Numéros OCCUPÉS par une paire réellement présente — jamais réattribuables.
   const numsOccupes = useMemo(() => {
@@ -22209,13 +22720,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (!autres.length) { updatePair(item, { numero: n, manuelAt }); recordUsed(n); return; }
     const presents = (porteursNum[cle] || []).filter(p => String(p.id) !== moi);
     if (presents.length) {
-      const qui = presents.map(p => p.type === 'annonce' ? `📦 en ligne « ${p.titre} »`
+      // Revue de la 5.167 : une annonce « à confirmer » n'est ni « en ligne » ni
+      // « partie » — on ne sait pas. On le dit tel quel, et on ne propose JAMAIS
+      // de lui prendre son numéro.
+      const qui = presents.map(p => p.type === 'annonce' ? (p.aConfirmer
+          ? `📦 peut-être encore en ligne « ${p.titre} » (son compte n'a pas été relu depuis ${p.lu ? depuisFr(p.lu).replace(/^il y a /, '') : 'longtemps'})`
+          : `📦 en ligne « ${p.titre} »`)
         : p.type === 'vente' ? `📮 à expédier « ${p.titre} »`
         : p.type === 'annulee' ? `↩️ vente annulée, la paire est restée « ${p.titre} »`
         : `${p.titre}`).join('\n');
+      const peutEtre = presents.every(p => p.aConfirmer);
       const prendre = await askConfirm({
-        title: `Le N°${n} est déjà pris`,
-        desc: `Une paire le porte encore :\n${qui}\n\nDeux paires avec le même numéro, c'est la mauvaise chaussure au moment d'expédier.`,
+        title: peutEtre ? `Le N°${n} est peut-être encore pris` : `Le N°${n} est déjà pris`,
+        desc: `${peutEtre ? 'Une paire le porte peut-être encore' : 'Une paire le porte encore'} :\n${qui}\n\nDeux paires avec le même numéro, c'est la mauvaise chaussure au moment d'expédier.`,
         ok: `Prendre le N°${nextNumero}`, cancel: 'Annuler',
       });
       updatePair(item, prendre ? { numero: String(nextNumero), manuelAt } : { numero: avant });
@@ -22516,13 +23033,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     for (const u in attendus) {
       if (parAcc[u]) continue;                       // il répond → rien à signaler
       if (acctOff(u)) continue;                      // déjà masqué à la main / bloqué
+      // 5.167 : on ne juge « muet » que sur une lecture de MOINS de 24 h — une
+      // lecture plus vieille ne dit rien (ses annonces sont « à confirmer »).
+      const lu = Number(listings.lues && listings.lues[u]);
+      if (!(lu > 0 && Date.now() - lu <= ENLIGNE_FRAIS_MS)) continue;
       const acc = accounts.find(a => String(a.vinted_user_id) === u);
       if (!acc) continue;                            // compte déconnecté, pas notre sujet
       out.push({ uid: u, acc, nb: attendus[u] });
     }
     return out;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listings.items, numeros, accounts, hiddenAccts, blockedAccts]);
+  }, [listings.items, listings.lues, numeros, accounts, hiddenAccts, blockedAccts]);
 
   // ⚠️⚠️ UNE PAIRE VENDUE QUI TRAÎNE ENCORE « EN LIGNE » — ET LE TITRE DÉSIGNAIT
   // LA MAUVAISE. Vinted laisse parfois l'annonce avec `is_closed:false` après la
@@ -22560,9 +23081,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return ids;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, txnItem, numeros]);
-  const annBase = useMemo(() => {
-    const items = (listings.items || []);
-    return items.filter(it => {
+  // Le tri des comptes et des ventes, le MÊME pour la grille et pour les annonces
+  // « à confirmer » (5.167) : une annonce d'un compte exclu, ou prouvée vendue,
+  // n'est ni dans l'une ni dans l'autre.
+  const garderAnnonce = (it) => {
       // ⚠️ UNE ANNONCE DOIT VENIR D'UN COMPTE QUI EXISTE ENCORE. `acctOffOf`
       // teste `_acc.vinted_user_id` : quand ce compte a été supprimé, l'annonce
       // portait un compte introuvable, `acctOff('')` répondait « non masqué »
@@ -22586,10 +23108,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // Vendue d'après VINTED LUI-MÊME (identité, jamais le titre).
       if (!showEmailSold && annoncesVendues.has(String(it.id))) return false;
       return true;
-    });
-  },
+  };
+  const annBase = useMemo(() => (listings.items || []).filter(garderAnnonce),
   // eslint-disable-next-line react-hooks/exhaustive-deps
   [listings.items, soldManual, emailSoldIds, showEmailSold, blockedAccts, hiddenAccts, annoncesVendues, accountUids]);
+  // Les annonces d'un compte pas relu depuis 24 h : ni en ligne, ni disparues —
+  // dites UNE fois au-dessus de la grille, repliées (`FraicheurAnnonces`).
+  const annAConfirmer = useMemo(() => (listings.aConfirmer || []).filter(garderAnnonce),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [listings.aConfirmer, soldManual, emailSoldIds, showEmailSold, blockedAccts, hiddenAccts, annoncesVendues, accountUids]);
 
   // ⚠️ « pas au garage » SUR CHAQUE LIGNE NE DIT RIEN TANT QUE LE GARAGE EST
   // VIDE. Mesuré : 0 case posée, donc la mention s'affichait sur les 184 ventes,
@@ -22615,7 +23142,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   //    Deux paires au même numéro = la mauvaise chose part dans le carton.
   const numDoublons = useMemo(() => {
     const par = new Map();
-    for (const it of (listings.items || [])) {
+    // 5.167 : une paire « à confirmer » est peut-être encore sur l'étagère — un
+    // numéro en double avec elle reste un risque (le seul irréversible, §5).
+    for (const it of [...(listings.items || []), ...(listings.aConfirmer || [])]) {
       const n = cleNum((numeros[it.id] || {}).numero);
       if (!n) continue;
       if (!par.has(n)) par.set(n, []);
@@ -22626,7 +23155,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       .map(([numero, list]) => ({ numero, items: list }))
       .sort((a, b) => triNum(a.numero, b.numero));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listings.items, numeros]);
+  }, [listings.items, listings.aConfirmer, numeros]);
 
   // Un numéro en double est trop grave pour rester derrière une barre repliée :
   // on déplie tout seul. Les autres signalements restent discrets.
@@ -22853,7 +23382,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // Un numéro d'ARCHIVE ne se reprend jamais : la paire republiée garde son
       // nouveau numéro (Julien, 10 octobre — sa décision, pas une option).
       if (!numeroReprenable(e.numero)) continue;
-      if (onlineAnnonceIds.has(String(k))) continue;
+      if (presentesAnnonceIds.has(String(k))) continue;          // en ligne OU à confirmer : pas orpheline
       if (pairsLost[String(e.numero)]) continue;
       orphans.push({ key: k, e, vendue: pairesVendues.has(String(k)) });
     }
@@ -22894,7 +23423,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     }
     return out;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [annBase, numeros, onlineAnnonceIds, pairesVendues, pairsLost, porteursNum]);
+  }, [annBase, numeros, presentesAnnonceIds, pairesVendues, pairsLost, porteursNum]);
 
   // Applique la reprise : l'annonce en ligne récupère l'ancien numéro, et le
   // numéro auto tout juste créé est rendu (il n'a jamais été écrit sur une boîte).
@@ -23541,7 +24070,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       return;
     }
     const cached = !force && !parSignal && entreeCache('listings');
-    if (cached) { setListings({ loading:false, items:cached.items, comptes:cached.comptes, lues:cached.lues||{}, supprimees:cached.supprimees||{}, ko:cached.failedUids, ...(cached.failedUids.length ? { incomplet: true } : {}) }); return; }
+    if (cached) { setListings({ loading:false, items:cached.items, comptes:cached.comptes, lues:cached.lues||{}, supprimees:cached.supprimees||{}, aConfirmer:cached.aConfirmer||[], ko:cached.failedUids, ...(cached.failedUids.length ? { incomplet: true } : {}) }); return; }
     // `silencieux` (5.165, relecture sur signal de l'extension) : on garde ce qui
     // est affiché pendant la lecture, et un échec ne remplace rien.
     if (!silencieux && !parSignal) setListings({ loading:true, items:null, error:false });
@@ -23559,19 +24088,26 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // d'annonces supprimées depuis en ont été retirées — pour le DIRE (une fois,
     // au-dessus de la grille). Gardés dans le cache : un rechargement ne doit pas
     // faire passer une lecture d'hier pour celle d'aujourd'hui.
-    const lues = {}, supprimees = {};
+    // 5.167 (11 octobre) : `lu` est l'heure de la lecture qui FAIT FOI (son
+    // dressing, ou sa lecture publique relue depuis un autre compte) ; les
+    // annonces « à confirmer » (compte pas relu depuis 24 h) vivent à part —
+    // jamais dans `items`, donc jamais comptées en ligne.
+    const lues = {}, supprimees = {}, aConfirmer = [];
     for (const { acc, r } of results) {
       const uid = String(acc.vinted_user_id);
       if (r === null) {                                    // relecture sur signal : ce compte garde ce qu'on montrait
         (avant.items || []).forEach(it => { if (String(it._acc && it._acc.vinted_user_id) === uid) { out.push(it); anyOk = true; } });
         if (avant.lues && avant.lues[uid]) lues[uid] = avant.lues[uid];
         if (avant.supprimees && avant.supprimees[uid]) supprimees[uid] = avant.supprimees[uid];
+        (avant.aConfirmer || []).forEach(it => { if (String(it._acc && it._acc.vinted_user_id) === uid) aConfirmer.push(it); });
         if ((avant.ko || []).includes(uid)) { anyErr = true; failedUids.push(uid); }
         continue;
       }
       if (r.ok) { anyOk=true; r.items.forEach(it => out.push({ ...it, _acc:acc })); (r.soldIds || []).forEach(id => vendues.add(String(id)));
-        if (r.source === 'harvest' && _harvestSeen[`${uid}_listings`]) lues[uid] = _harvestSeen[`${uid}_listings`];
-        if (r.supprimees) supprimees[uid] = r.supprimees; }
+        if (Number.isFinite(r.lu)) lues[uid] = r.lu;
+        else if (r.source === 'harvest' && _harvestSeen[`${uid}_listings`]) lues[uid] = _harvestSeen[`${uid}_listings`];
+        if (r.supprimees) supprimees[uid] = r.supprimees;
+        (r.aConfirmer || []).forEach(it => aConfirmer.push({ ...it, _acc:acc })); }
       else { anyErr=true; failedUids.push(uid); }
     }
     const error = out.length===0 && anyErr && !anyOk;
@@ -23588,13 +24124,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if (info.ph) it.captPhotos = info.ph;
       }
     } catch (_) { /* sans ce complément, le critère reste simplement inconnu */ }
-    if (!error) putCache('listings', out, { failedUids }, demandes, { lues, supprimees });
+    if (!error) putCache('listings', out, { failedUids }, demandes, { lues, supprimees, aConfirmer });
     // Annonces que VINTED a marquées vendues (identité, jamais un titre). Sur
     // signal, seuls quelques comptes sont relus : on AJOUTE, on n'efface rien.
     if (vendues.size) setVenduesVinted(parSignal ? (p) => new Set([...p, ...vendues]) : vendues);
     // `incomplet` : au moins un compte n'a pas répondu. Les chiffres tirés de
     // cette liste sont alors des minorants (le bilan de la semaine le dit).
-    setListings({ loading:false, items: out, error, incomplet: anyErr, comptes: demandes, lues, supprimees, ko: failedUids });
+    setListings({ loading:false, items: out, error, incomplet: anyErr, comptes: demandes, lues, supprimees, aConfirmer, ko: failedUids });
     if (!parSignal && signalPendantLecture.current) { signalPendantLecture.current = false; setTimeout(() => loadListings(false, true, null), 200); }
   };
   const loadConvs = async (force) => {
@@ -26321,7 +26857,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {j.photos && j.photos.length
                       ? <div style={{display:'flex',flexShrink:0,paddingRight:2}}>
                           {j.photos.map((ph,k)=>(
-                            <img key={ph} src={ph} alt="" loading="lazy" onError={()=>noterImgMorte(ph)}
+                            <PhotoVinted key={ph} src={ph} alt="" loading="lazy" onError={()=>noterImgMorte(ph)}
                               style={{width:46,height:46,borderRadius:8,objectFit:'cover',border:`2px solid ${C.card}`,marginLeft:k?-18:0,background:C.bg,boxShadow:'0 1px 3px rgba(0,0,0,.25)'}}/>
                           ))}
                         </div>
@@ -26428,7 +26964,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           {/* Le CDN Vinted expire : sans ce repli, la vignette
                               devient l'icône « image cassée » du navigateur (§5.76). */}
                           {ph && !imgMortes.has(ph)
-                            ? <img src={ph} alt="" loading="lazy" onError={()=>noterImgMorte(ph)} style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                            ? <PhotoVinted src={ph} alt="" loading="lazy" onError={()=>noterImgMorte(ph)} style={{width:'100%',height:'100%',objectFit:'cover'}}/>
                             : <Icon name="image" size={30} style={{color:C.muted,opacity:.5}}/>}
                           {num && <span style={{position:'absolute',top:9,right:9,fontSize:10.5,fontWeight:700,color:'#fff',background:'rgba(11,15,21,.62)',borderRadius:8,padding:'2px 8px'}}>N°{num}</span>}
                         </div>
@@ -27183,7 +27719,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                {/* ── Haut : photo · titre + méta · prix ─────────────────────── */}
                <div style={{display:'flex',gap:12,alignItems:'flex-start'}}>
                 <div style={{width:72,height:72,borderRadius:10,background:C.card2||C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                  {orderPhoto(o)?<img src={orderPhoto(o)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
+                  {orderPhoto(o)?<PhotoVinted src={orderPhoto(o)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
                 </div>
                 <div style={{flex:'1 1 auto',minWidth:0}}>
                   <div style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.2,
@@ -27378,7 +27914,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.45}}>Ouvre la commande sur Vinted pour générer l'étiquette de retour, la réimprimer ou suivre le colis. VRM ne la génère pas tout seul (un retour engage l'envoi, et c'est un compte en litige).</div>
               {l.map(o=>{ const ph=orderPhoto(o); return (
                 <div key={o.transaction_id} style={{display:'flex',alignItems:'center',gap:10,marginTop:9,flexWrap:'wrap'}}>
-                  {ph && !imgMortes.has(ph) ? <img src={ph} alt="" loading="lazy" onError={()=>noterImgMorte(ph)} style={{width:38,height:38,borderRadius:8,objectFit:'cover',flexShrink:0,border:`1px solid ${C.border}`}}/> : null}
+                  {ph && !imgMortes.has(ph) ? <PhotoVinted src={ph} alt="" loading="lazy" onError={()=>noterImgMorte(ph)} style={{width:38,height:38,borderRadius:8,objectFit:'cover',flexShrink:0,border:`1px solid ${C.border}`}}/> : null}
                   <div style={{flex:'1 1 160px',minWidth:0}}>
                     <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={o.title}>{o.title}</div>
                     {!unSeul && o._acc && <div style={{fontSize:11.5,color:C.muted}}>compte {accNameOf(o._acc)}</div>}
@@ -27472,7 +28008,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // « image brisée » du navigateur au milieu d'une carte de colis, c'est
           // ce qui fait « pas fini » (vu en capture sur « Salomon sneakers »).
           const thumb = (src) => src && !imgMortes.has(src)
-            ? <img src={src} alt="" loading="lazy" onError={()=>noterImgMorte(src)}
+            ? <PhotoVinted src={src} alt="" loading="lazy" onError={()=>noterImgMorte(src)}
                 style={{width:38,height:38,borderRadius:8,objectFit:'cover',flexShrink:0,border:`1px solid ${C.border}`}}/>
             : <span style={{flexShrink:0,color:C.muted,display:'flex'}}><Icon name="bag" size={22}/></span>;
           // ⚠️ ON NE DEVINE PLUS LE LIEU (Julien, 23 sept. : « ne prends plus en
@@ -28252,7 +28788,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             return (
             <div key={o.transaction_id} style={{padding:'12px 14px',borderTop:i>0?`1px solid ${C.border}`:'none',opacity:cancelled?0.55:1,display:'flex',alignItems:'center',gap:12,...(estFloute(o)?STYLE_FLOU:null)}}>
               <div style={{width:46,height:46,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                {orderPhoto(o)?<img src={orderPhoto(o)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={18} style={{color:C.muted,opacity:.55}}/>}
+                {orderPhoto(o)?<PhotoVinted src={orderPhoto(o)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={18} style={{color:C.muted,opacity:.55}}/>}
               </div>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:15,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',letterSpacing:-0.2}} title={o.title}>{o.title}</div>
@@ -28383,7 +28919,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:6}}>N°{g.numero}</div>
                 {g.items.map(it => (
                   <div key={it.id} style={{display:'flex',alignItems:'center',gap:9,marginBottom:6}}>
-                    {it.photo && <img src={it.photo} alt="" style={{width:34,height:34,borderRadius:8,objectFit:'cover',flexShrink:0}}/>}
+                    {it.photo && <PhotoVinted src={it.photo} alt="" style={{width:34,height:34,borderRadius:8,objectFit:'cover',flexShrink:0}}/>}
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:12,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{it.title}</div>
                       <div style={{fontSize:10,color:C.muted}}><AcctTag acc={it._acc} name={accNameOf(it._acc)}/></div>
@@ -28458,11 +28994,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           for (const it of annBase) { const u = String(it._acc?.vinted_user_id || ''); if (u) enLigne[u] = (enLigne[u]||0)+1; }
           for (const u of Object.keys(listings.supprimees || {})) if (!acctOff(u) && !(u in enLigne)) enLigne[u] = 0;
           const noms = {}; accounts.forEach(a => { noms[String(a.vinted_user_id)] = accNameOf(a); });
-          return <FraicheurAnnonces lues={listings.lues} enLigne={enLigne} noms={noms} supprimees={listings.supprimees} activite={liveStats && liveStats.annActivite}/>;
+          return <FraicheurAnnonces lues={listings.lues} enLigne={enLigne} noms={noms} supprimees={listings.supprimees} aConfirmer={annAConfirmer} numeros={numeros} activite={liveStats && liveStats.annActivite}/>;
         })()}
         {listings.loading && <Skeleton variant="card" count={6}/>}
         {listings.error && <LoadError onRetry={()=>loadListings(true)}/>}
-        {listings.items && !listings.error && listings.items.length===0 && (
+        {/* Aucune annonce en ligne MAIS des annonces à confirmer : la ligne du
+            dessus le dit déjà, avec le geste (§7 — une cause, une phrase). */}
+        {listings.items && !listings.error && listings.items.length===0 && !annAConfirmer.length && (
           <EmptyState icon="🟢" title="Aucune annonce en ligne"
             desc="Ouvre ta boutique sur vinted.fr une fois, avec l'extension active : tes annonces remonteront ici automatiquement."
             action={<a href="https://www.vinted.fr/member/general/settings" target="_blank" rel="noreferrer" style={{display:'inline-block',background:C.accent,color:'#fff',textDecoration:'none',fontWeight:600,fontSize:13,padding:'10px 16px',borderRadius:10}}>Ouvrir Vinted ↗</a>}/>
@@ -28492,7 +29030,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {numeroReprises.slice(0,8).map((r,i)=>(
                   <div key={i} style={{display:'flex',alignItems:'center',gap:9,background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:'7px 9px'}}>
                     <div style={{width:34,height:34,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                      {r.item.photo?<img src={r.item.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
+                      {r.item.photo?<PhotoVinted src={r.item.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
                     </div>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:12,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.item.title}</div>
@@ -28581,7 +29119,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <div key={i} style={{display:'flex',alignItems:'center',gap:9,flexWrap:'wrap',background:C.card,border:`1px solid ${recu?INV_STATUS.online.color:C.border}`,borderRadius:8,padding:'7px 9px'}}>
                       <div style={{flexShrink:0,minWidth:44,height:34,borderRadius:8,background:r.num?C.accent:C.border,color:r.num?C.onAccent:C.muted,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:700,padding:'0 6px'}}>{r.num?`N°${r.num}`:'—'}</div>
                       <div style={{width:34,height:34,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                        {orderPhoto(r.o)?<img src={orderPhoto(r.o)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
+                        {orderPhoto(r.o)?<PhotoVinted src={orderPhoto(r.o)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
                       </div>
                       <div style={{flex:'1 1 120px',minWidth:0}}>
                         <div style={{fontSize:12,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={r.title}>{r.title}</div>
@@ -28634,7 +29172,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {disparues.slice(0,40).map(d=>(
                   <div key={d.id} style={{display:'flex',alignItems:'center',gap:10,padding:'7px 0',borderTop:`1px solid ${C.border}`}}>
                     <div style={{width:34,height:34,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden'}}>
-                      {d.e.photo && <img src={d.e.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>}
+                      {d.e.photo && <PhotoVinted src={d.e.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>}
                     </div>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:12,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>N°{d.numero} · {d.e.title||'—'}</div>
@@ -28721,7 +29259,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <div key={it.id} style={{borderTop:`1px solid ${C.warn}22`}}>
                       <div style={{display:'flex',gap:10,alignItems:'center',padding:'8px 12px'}}>
                         <div style={{width:40,height:40,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                          {it.photo?<img src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
+                          {it.photo?<PhotoVinted src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
                         </div>
                         <div style={{flex:1,minWidth:0}}>
                           <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{num?`N°${num} · `:''}{it.title||'Annonce'}</div>
@@ -28954,7 +29492,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div key={it._acc.vinted_user_id+'_'+it.id} data-carte-annonce={it.id} style={{borderRadius:10,background:C.card,border:`1px solid ${soldBord?C.warn:C.border}`,boxShadow:C.shadow||'none',display:'flex',flexDirection:'column',overflow:'hidden',...(estFloute(it)?STYLE_FLOU:null)}}>
                 <div style={{display:'flex',gap:10,padding:10}}>
                   <a href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted" style={{flexShrink:0,width:88,height:118,borderRadius:8,overflow:'hidden',background:C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',position:'relative'}}>
-                    {it.photo?<img src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/>}
+                    {it.photo?<PhotoVinted src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/>}
                     {it.promoted===true && <span data-boostee title="Vinted dit que cette annonce est boostée en ce moment" style={{position:'absolute',left:4,right:4,bottom:4,textAlign:'center',fontSize:10,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:5,padding:'1px 0'}}>Boostée</span>}
                   </a>
                   <div style={{flex:1,minWidth:0,display:'flex',flexDirection:'column',gap:2}}>
@@ -29245,7 +29783,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   return (
                     <button key={(c._acc?c._acc.vinted_user_id:'')+'_'+c.id} type="button" data-conv={c.id} onClick={()=>openConversation(c)}
                       style={{display:'flex',gap:10,alignItems:'center',width:'100%',textAlign:'left',padding:'10px 12px',border:'none',borderTop:i?`1px solid ${C.border}`:'none',background:'transparent',color:C.text,cursor:'pointer',fontFamily:'inherit',...(selEff&&uidC(c)!==selEff?STYLE_FLOU:null)}}>
-                      {photo ? <img src={photo} alt="" loading="lazy" style={{width:40,height:40,borderRadius:8,objectFit:'cover',flexShrink:0}}/> : <span style={{width:40,height:40,borderRadius:8,background:C.card2||C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',color:C.muted,flexShrink:0}}><Icon name="chat" size={17}/></span>}
+                      {photo ? <PhotoVinted src={photo} alt="" loading="lazy" style={{width:40,height:40,borderRadius:8,objectFit:'cover',flexShrink:0}}/> : <span style={{width:40,height:40,borderRadius:8,background:C.card2||C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',color:C.muted,flexShrink:0}}><Icon name="chat" size={17}/></span>}
                       <span style={{flex:1,minWidth:0}}>
                         <span style={{display:'flex',alignItems:'baseline',gap:6}}>
                           <span style={{fontSize:13.5,fontWeight:c.unread?700:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{(c.opposite_user&&c.opposite_user.login)||'Conversation'}</span>
@@ -29423,7 +29961,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   const b = bordsParTxn[tx] || null;
                   return (
                     <div key={tx} data-tx={tx} data-limite={limiteDepassee?'depassee':'ok'} style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap',padding:'7px 9px',border:`1px solid ${C.border}`,borderRadius:8,background:C.card,minWidth:0}}>
-                      <div style={{width:34,height:34,borderRadius:5,background:C.border,flexShrink:0,overflow:'hidden'}}>{ph && !imgMortes.has(ph) && <img src={ph} alt="" loading="lazy" onError={()=>noterImgMorte(ph)} style={{width:'100%',height:'100%',objectFit:'cover'}}/>}</div>
+                      <div style={{width:34,height:34,borderRadius:5,background:C.border,flexShrink:0,overflow:'hidden'}}>{ph && !imgMortes.has(ph) && <PhotoVinted src={ph} alt="" loading="lazy" onError={()=>noterImgMorte(ph)} style={{width:'100%',height:'100%',objectFit:'cover'}}/>}</div>
                       <div style={{flex:'1 1 180px',minWidth:0}}>
                         <div style={{fontSize:12.5,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{o.title || 'Vente'}</div>
                         <div style={{fontSize:11,color:C.muted,marginTop:2,display:'flex',gap:8,flexWrap:'wrap'}}>
@@ -29647,7 +30185,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div data-bord-card style={{padding:'11px 12px',border:`1px solid ${dl!=null&&dl<0?C.danger+'66':pdf?INV_STATUS.online.color+'44':C.border}`,background:C.card,borderRadius:10,opacity:posted?0.55:1}}>
                     <div style={{display:'flex',gap:12,alignItems:'center'}}>
                       <div style={{width:58,height:58,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                        {ph?<img src={ph} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:22}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
+                        {ph?<PhotoVinted src={ph} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:22}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
                       </div>
                       <div style={{flex:'1 1 150px',minWidth:0}}>
                         <div style={{display:'flex',alignItems:'center',gap:6}}>
@@ -29827,7 +30365,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   const ph = orderPhoto(o);
                   return (
                     <div key={String(o.transaction_id)} data-parti={st.label} style={{display:'flex',gap:10,alignItems:'center',padding:'7px 9px',border:`1px solid ${C.border}`,borderRadius:8,minWidth:0}}>
-                      <div style={{width:34,height:34,borderRadius:5,background:C.border,flexShrink:0,overflow:'hidden'}}>{ph && !imgMortes.has(ph) && <img src={ph} alt="" loading="lazy" onError={()=>noterImgMorte(ph)} style={{width:'100%',height:'100%',objectFit:'cover'}}/>}</div>
+                      <div style={{width:34,height:34,borderRadius:5,background:C.border,flexShrink:0,overflow:'hidden'}}>{ph && !imgMortes.has(ph) && <PhotoVinted src={ph} alt="" loading="lazy" onError={()=>noterImgMorte(ph)} style={{width:'100%',height:'100%',objectFit:'cover'}}/>}</div>
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{fontSize:12.5,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{o.title || 'Vente'}</div>
                         <div style={{fontSize:11,color:C.muted,marginTop:2,display:'flex',gap:8,flexWrap:'wrap'}}>
@@ -29863,7 +30401,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               .map((b,i)=>(
                 <div key={i} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 10px',border:`1px solid ${C.border}`,background:C.card,borderRadius:10,opacity:0.7}}>
                   <div style={{width:38,height:38,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                    {bordPhoto(b)?<img src={bordPhoto(b)} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:16}}>📄</span>}
+                    {bordPhoto(b)?<PhotoVinted src={bordPhoto(b)} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:16}}>📄</span>}
                   </div>
                   <div style={{flex:'1 1 120px',minWidth:0}}>
                     <div style={{fontSize:12,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{numForBord(b)?`N°${numForBord(b)} · `:''}{b.modele||b.article||'Bordereau'}</div>
@@ -29889,7 +30427,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{padding:'12px 16px',borderBottom:`1px solid ${C.border}`,display:'flex',alignItems:'center',gap:11}}>
               <div style={{width:46,height:46,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
                 {pickerFor.photo && !imgMortes.has(pickerFor.photo)
-                  ? <img src={pickerFor.photo} alt="" onError={()=>noterImgMorte(pickerFor.photo)} style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                  ? <PhotoVinted src={pickerFor.photo} alt="" onError={()=>noterImgMorte(pickerFor.photo)} style={{width:'100%',height:'100%',objectFit:'cover'}}/>
                   : <span style={{fontSize:20}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
               </div>
               <div style={{flex:1,minWidth:0}}>
@@ -29924,7 +30462,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 // commencer, et le prix d'achat finit par ne jamais être saisi.
                 return avail.map((p, iP) => (
                   <button key={p.transaction_id} type="button" onClick={()=>choosePick(p)} style={{display:'flex',gap:10,alignItems:'center',padding:8,borderRadius:8,border:`1px solid ${C.border}`,background:C.surface,cursor:'pointer',textAlign:'left'}}>
-                    <div style={{width:44,height:44,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{orderPhoto(p)?<img src={orderPhoto(p)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}</div>
+                    <div style={{width:44,height:44,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{orderPhoto(p)?<PhotoVinted src={orderPhoto(p)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}</div>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:12,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
                         {/* ⚠️ SEUIL 12, PAS 8. À 8 (marque + taille) le badge s'allumait sur des
@@ -30283,7 +30821,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   return (
                     <div key={i} style={{display:'flex',alignItems:'center',gap:10,background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:'9px 11px'}}>
                       {it.photo
-                        ? <img src={it.photo} alt="" style={{flexShrink:0,width:34,height:34,borderRadius:8,objectFit:'cover',background:C.border}}/>
+                        ? <PhotoVinted src={it.photo} alt="" style={{flexShrink:0,width:34,height:34,borderRadius:8,objectFit:'cover',background:C.border}}/>
                         : <span style={{flexShrink:0,width:34,height:34,borderRadius:8,background:C.border,display:'flex',alignItems:'center',justifyContent:'center',fontSize:15}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
                       <span style={{flexShrink:0,minWidth:30,height:30,borderRadius:8,background:num?C.accent:C.border,color:num?C.onAccent:C.muted,display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:700,padding:'0 5px'}}>{num?`#${num}`:'—'}</span>
                       <span style={{flex:'1 1 120px',minWidth:0,fontSize:13,fontWeight:500,color:C.text,overflow:'hidden',textOverflow:'ellipsis'}}>{it.title}{it.size?<span style={{color:C.muted,fontWeight:400}}> · {it.size}</span>:''}</span>
@@ -30518,7 +31056,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div key={r.key} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:'8px 10px',marginBottom:6}}>
                  <div style={{display:'flex',gap:10,alignItems:'center'}}>
                   <div style={{width:40,height:40,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                    {r.e.photo?<img src={r.e.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:16}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
+                    {r.e.photo?<PhotoVinted src={r.e.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:16}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
                   </div>
                   <div style={{flex:'1 1 130px',minWidth:0}}>
                     <div style={{fontSize:12.5,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
@@ -30549,7 +31087,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                            <button key={ci} type="button" onClick={()=>linkBuyForKey(r.key,p)}
                              style={{width:'100%',display:'flex',alignItems:'center',gap:8,border:`1px solid ${sur?C.accent+'55':C.border}`,background:sur?`${C.accent}10`:C.card,borderRadius:8,padding:'6px 8px',cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
                              {orderPhoto(p)
-                               ? <img src={orderPhoto(p)} alt="" loading="lazy" decoding="async" style={{width:26,height:26,borderRadius:5,objectFit:'cover',flexShrink:0}}/>
+                               ? <PhotoVinted src={orderPhoto(p)} alt="" loading="lazy" decoding="async" style={{width:26,height:26,borderRadius:5,objectFit:'cover',flexShrink:0}}/>
                                : <span style={{width:26,height:26,borderRadius:5,background:C.border,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
                              <span style={{flex:1,minWidth:0}}>
                                <span style={{display:'block',fontSize:11.5,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.title||'(sans titre)'}</span>
@@ -30588,7 +31126,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div key={id} style={{background:C.card,border:`1px solid ${actif?C.accent+'55':C.border}`,borderRadius:10,padding:'8px 10px',marginBottom:6}}>
                     <div style={{display:'flex',gap:10,alignItems:'center'}}>
                       <div style={{width:40,height:40,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                        {e.photo?<img src={e.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:16}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
+                        {e.photo?<PhotoVinted src={e.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:16}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
                       </div>
                       <div style={{flex:'1 1 130px',minWidth:0}}>
                         <div style={{fontSize:12.5,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
@@ -30904,7 +31442,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         <div onClick={()=>setOpenConv(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'85vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             <div style={{display:'flex',gap:10,alignItems:'center',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
-              {openConv.header?.photo?<img src={openConv.header.photo} alt="" style={{width:38,height:38,borderRadius:8,objectFit:'cover'}}/>:<div style={{width:38,height:38,borderRadius:8,background:C.border,display:'flex',alignItems:'center',justifyContent:'center',fontSize:17}}>💬</div>}
+              {openConv.header?.photo?<PhotoVinted src={openConv.header.photo} alt="" style={{width:38,height:38,borderRadius:8,objectFit:'cover'}}/>:<div style={{width:38,height:38,borderRadius:8,background:C.border,display:'flex',alignItems:'center',justifyContent:'center',fontSize:17}}>💬</div>}
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:15,fontWeight:600,color:C.text}}>{openConv.header?.login||'Conversation'}</div>
                 <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{openConv.header?.title||''}</div>
@@ -31028,7 +31566,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <button key={e.num} type="button" onClick={()=>{ setBordLink(linkPickFor, e.num); setLinkPickFor(null); }}
                   style={{display:'flex',gap:10,alignItems:'center',border:`1px solid ${already&&String(already.numero)===String(e.num)?C.accent:C.border}`,background:C.card,borderRadius:8,padding:'8px 10px',cursor:'pointer',textAlign:'left',fontFamily:'inherit'}}>
                   <div style={{width:42,height:42,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                    {e.photo?<img src={e.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:17}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
+                    {e.photo?<PhotoVinted src={e.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:17}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
                   </div>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontSize:13,fontWeight:700,color:C.text}}>N°{e.num}{e.size!=null&&String(e.size).trim()!==''?` · T${e.size}`:''}</div>
@@ -31131,7 +31669,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if(w.bestPair) cards.push({ bg:'linear-gradient(160deg,#b8860b 0%,#ffbf3d 100%)', body:(
           <div style={{textAlign:'center'}}>
             <div style={{fontSize:14,color:'rgba(0,0,0,0.55)',fontWeight:700,letterSpacing:1,textTransform:'uppercase'}}>👑 Paire de l'année</div>
-            <div style={{width:130,height:130,borderRadius:12,overflow:'hidden',margin:'14px auto',background:'rgba(0,0,0,0.15)',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 10px 30px rgba(0,0,0,0.3)'}}>{w.bestPair.photo?<img src={w.bestPair.photo} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:44}}>👑</span>}</div>
+            <div style={{width:130,height:130,borderRadius:12,overflow:'hidden',margin:'14px auto',background:'rgba(0,0,0,0.15)',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 10px 30px rgba(0,0,0,0.3)'}}>{w.bestPair.photo?<PhotoVinted src={w.bestPair.photo} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:44}}>👑</span>}</div>
             <div style={{fontSize:17,fontWeight:700,color:'#fff',padding:'0 20px',lineHeight:1.2}}>{w.bestPair.num?`N°${w.bestPair.num} · `:''}{w.bestPair.title}</div>
             <div style={{fontSize:22,fontWeight:800,color:'#fff',marginTop:8}}>+{eur0(w.bestPair.m)} de bénéfice</div>
           </div>
@@ -31248,7 +31786,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div style={{display:'flex',flexDirection:'column'}}>
                     {p.colis.map((t,j)=>{ const buy=buyForTrack(t); return (
                       <div key={j} style={{display:'flex',gap:9,alignItems:'center',padding:'7px 12px',borderTop:j>0?`1px solid ${C.border}`:'none'}}>
-                        <div style={{width:32,height:32,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{buy&&orderPhoto(buy)?<img src={orderPhoto(buy)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}>📦</span>}</div>
+                        <div style={{width:32,height:32,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{buy&&orderPhoto(buy)?<PhotoVinted src={orderPhoto(buy)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}>📦</span>}</div>
                         <div style={{flex:1,minWidth:0}}><div style={{fontSize:12,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{(buy&&buy.title)||t.artTitle||`Colis${t.suivi?' n°'+t.suivi:''}`}</div>{codeRetrait(t.code)&&<div style={{fontSize:11,color:C.muted}}>code {codeRetrait(t.code)}</div>}</div>
                         <button type="button" onClick={()=>markCollected(t)} title="J'ai retiré ce colis" style={{flexShrink:0,border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}14`,color:INV_STATUS.online.color,borderRadius:8,padding:'5px 8px',fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>✓</button>
                       </div>
@@ -31342,7 +31880,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               ) : moves.map(m=>(
                 <div key={m.id} style={{display:'flex',alignItems:'center',gap:11,padding:'8px 0',borderTop:`1px solid ${C.border}`}}>
                   <div style={{width:38,height:38,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden'}}>
-                    {m.photo && <img src={m.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>}
+                    {m.photo && <PhotoVinted src={m.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>}
                   </div>
                   <div style={{flex:1,minWidth:0,fontSize:12,color:C.text,fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{m.title}</div>
                   <div style={{flexShrink:0,display:'flex',alignItems:'center',gap:7,fontSize:13,fontWeight:600}}>
@@ -31418,7 +31956,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <div key={l.num} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 11px',borderTop:i?`1px solid ${C.border}66`:'none',background:dbl?`${C.danger}0e`:'transparent'}}>
                       <span style={{flexShrink:0,fontSize:14,fontWeight:700,color:'#fff',background:dbl?C.danger:INV_STATUS.online.color,borderRadius:8,padding:'3px 8px',minWidth:44,textAlign:'center'}}>N°{l.num}</span>
                       <span style={{width:38,height:38,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden'}}>
-                        {ph && <img src={ph} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/>}
+                        {ph && <PhotoVinted src={ph} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/>}
                       </span>
                       <span style={{flex:1,minWidth:0}}>
                         <span style={{display:'block',fontSize:12.5,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{l.p.map(x=>x.titre).filter(Boolean)[0] || '—'}</span>
@@ -31461,7 +31999,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         );
         const Row = ({num,e}) => (
           <div key={num} style={{display:'flex',gap:8,alignItems:'center',border:`1px solid ${C.border}`,background:C.card,borderRadius:8,padding:'5px 8px'}}>
-            <div style={{width:30,height:30,borderRadius:5,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{e&&e.photo?<img src={e.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:13}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}</div>
+            <div style={{width:30,height:30,borderRadius:5,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{e&&e.photo?<PhotoVinted src={e.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:13}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}</div>
             <div style={{flex:1,minWidth:0}}><div style={{fontSize:13,fontWeight:600,color:C.text}}>N°{num}{e&&e.size?` · T${e.size}`:''}</div><div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{(e&&e.title)||''}</div></div>
           </div>
         );
@@ -31525,7 +32063,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <button key={it.id} type="button" onClick={()=>setLotSel(prev=>{ const n=new Set(prev); if(n.has(it.id))n.delete(it.id); else n.add(it.id); return n; })}
                   style={{display:'flex',gap:10,alignItems:'center',border:`1.5px solid ${sel?C.accent:C.border}`,background:sel?`${C.accent}0e`:C.card,borderRadius:8,padding:'7px 9px',cursor:'pointer',textAlign:'left',fontFamily:'inherit'}}>
                   <div style={{width:20,height:20,borderRadius:5,flexShrink:0,border:`1.5px solid ${sel?C.accent:C.border}`,background:sel?C.accent:'transparent',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:700}}>{sel?'✓':''}</div>
-                  <div style={{width:38,height:38,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{it.photo?<img src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}</div>
+                  <div style={{width:38,height:38,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{it.photo?<PhotoVinted src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}</div>
                   <div style={{flex:1,minWidth:0}}><div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{num?`N°${num} · `:''}{it.title}</div><div style={{fontSize:11,color:C.muted}}>{[it.size,prix(it.price,it.currency)||null].filter(Boolean).join(' · ')}</div></div>
                   {sel && sh!=null && <div style={{flexShrink:0,fontSize:13,fontWeight:700,color:INV_STATUS.online.color}}>{sh.toFixed(2).replace('.',',')} €</div>}
                 </button>
@@ -31573,7 +32111,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <div onClick={ev=>ev.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'85vh',borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             <div style={{display:'flex',gap:12,alignItems:'center',padding:'14px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{width:52,height:52,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                {photo?<img src={photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:22}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
+                {photo?<PhotoVinted src={photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:22}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
               </div>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:15,fontWeight:700,color:C.text}}>📖 Passeport {num?`· N°${num}`:''}</div>
@@ -31606,7 +32144,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {qrView && (
         <div onClick={()=>setQrView(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.82)',zIndex:1400,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
           <div onClick={e=>e.stopPropagation()} style={{background:'#fff',width:'100%',maxWidth:420,borderRadius:12,padding:'22px 20px 18px',display:'flex',flexDirection:'column',alignItems:'center',gap:14,boxShadow:'0 12px 40px rgba(0,0,0,0.4)'}}>
-            {qrView.photo && <img src={qrView.photo} alt="" loading="lazy" style={{width:64,height:64,borderRadius:10,objectFit:'cover',border:'1px solid #e3e3e3'}}/>}
+            {qrView.photo && <PhotoVinted src={qrView.photo} alt="" loading="lazy" style={{width:64,height:64,borderRadius:10,objectFit:'cover',border:'1px solid #e3e3e3'}}/>}
             <div style={{fontSize:15,fontWeight:700,color:'#111',textAlign:'center',lineHeight:1.3}}>{qrView.title}</div>
             {/* Vrai QR uniquement (Chronopost). Si l'image hébergée ne charge
                 pas, on bascule sur le code — surtout pas sur un QR fabriqué. */}
@@ -32113,7 +32651,7 @@ function LbcRelier({ ad, numsConnus, onRelie, suggestions, detail }) {
     <div data-lbc-relier={id} style={{ padding: '8px 0', borderTop: `1px solid ${C.border}` }}>
     <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
       <div style={{ width: 52, height: 52, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: C.card2 || C.border, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        {photo ? <img src={photo} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : <Icon name="image" size={18} style={{ color: C.muted, opacity: .55 }}/>}
+        {photo ? <PhotoVinted src={photo} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : <Icon name="image" size={18} style={{ color: C.muted, opacity: .55 }}/>}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 12.5, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ad.subject || ad.title || '—'}</div>
@@ -32138,7 +32676,7 @@ function LbcRelier({ ad, numsConnus, onRelie, suggestions, detail }) {
           {sugg.map((s) => (
             <button key={s.numero} type="button" data-suggestion={s.numero} onClick={() => poser(s.numero)} title={s.titre || ''}
               style={{ display: 'inline-flex', alignItems: 'center', gap: 6, maxWidth: 260, border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, padding: '4px 8px 4px 4px', fontSize: 11.5, cursor: 'pointer', fontFamily: 'inherit', minHeight: 0 }}>
-              {s.photo ? <img src={s.photo} alt="" loading="lazy" style={{ width: 24, height: 24, borderRadius: 5, objectFit: 'cover', flexShrink: 0 }}/> : null}
+              {s.photo ? <PhotoVinted src={s.photo} alt="" loading="lazy" style={{ width: 24, height: 24, borderRadius: 5, objectFit: 'cover', flexShrink: 0 }}/> : null}
               <b style={{ flexShrink: 0 }}>N°{s.numero}</b>
               <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: C.muted }}>{s.titre || ''}</span>
             </button>
@@ -32297,9 +32835,15 @@ function LeboncoinScreen() {
     ((blkRows && blkRows[0] && blkRows[0].data && blkRows[0].data.uids) || []).forEach((u) => offAcc.add(String(u)));
     const lost = main.vinted_pairs_lost || {};
     const listRowsBrut = await sbGet('app_data?id=like.harvest_*_listings&select=id,data');
-    // 5.165 : sans les annonces qu'il vient de SUPPRIMER sur Vinted — la même
-    // règle que l'écran Annonces et que la file de l'extension (§11).
-    const listRows = retirerSupprimeesLignes(listRowsBrut || [], await lireSupprimeesTous());
+    // 5.167 (11 octobre) : seulement ce qui est EN LIGNE d'après la lecture la
+    // plus récente de chaque compte — la même règle que l'écran Annonces et que
+    // la file de l'extension (`enLigneDesLignes`, §11). Celles « à confirmer »
+    // (compte pas relu depuis 24 h) ne sont ni dans la file, ni « à retirer de
+    // Leboncoin » : on ne sait pas, on ne dit rien.
+    const enl = await lireLignesEnLigne(listRowsBrut || []);
+    const listRows = enl.lignes;
+    const aConfirmerIds = new Set();
+    for (const [u, l] of enl.aConfirmer) if (!offAcc.has(String(u))) for (const it of l) if (it && it.id != null) aConfirmerIds.add(String(it.id));
     // Les photos HD et la description ne viennent QUE de la page de l'annonce :
     // mesuré le 12 septembre, l'API Vinted ne renvoie aucune photo (0 sur 57
     // lignes `harvest_*_item_*`, captures jusqu'au 9 septembre). Sans cette
@@ -32471,10 +33015,12 @@ function LeboncoinScreen() {
 
     const removals = [];
     const etatDe = (oid) => etatVinted[String(oid)] || (vendus.has(String(oid)) ? 'vendue' : 'inconnue');
-    for (const pid of posted) { if (!/^\d+$/.test(pid)) continue; if (onlineIds.has(pid)) continue; const e = numeros[pid] || {}; removals.push({ numero: String(e.numero || '?'), title: e.title || '', etat: etatDe(pid) }); }
+    for (const pid of posted) { if (!/^\d+$/.test(pid)) continue; if (onlineIds.has(pid) || aConfirmerIds.has(pid)) continue; const e = numeros[pid] || {}; removals.push({ numero: String(e.numero || '?'), title: e.title || '', etat: etatDe(pid) }); }
     // Détection auto : annonce LBC active dont la paire n'est plus en ligne sur
     // Vinted = vendue → à retirer. Uniquement si la paire est connue de VRM.
+    // ⚠️ Une paire « à confirmer » n'est pas « plus en ligne » : on ne sait pas.
     const keysOnline = new Set(); online.forEach(o => vKeys(o.id, o.title).forEach(k => keysOnline.add(k)));
+    for (const [u, l] of enl.aConfirmer) if (!offAcc.has(String(u))) for (const it of l) vKeys(String(it.id), it.title).forEach(k => keysOnline.add(k));
     const keysKnown = new Set();
     for (const id in numeros) { const e = numeros[id] || {}; if (e.numero) keysKnown.add(cleNum(e.numero)); const m = numFrom(e.title); if (m) keysKnown.add(cleNum(m)); }
     const unlinked = [];
@@ -32494,7 +33040,10 @@ function LeboncoinScreen() {
     // Vinted a déjà vendues (`vendus`) : vendue ici ET là, c'est une vente qu'il
     // ne pourra pas honorer.
     const dv = ventesLbcKO ? { doublons: [], aRelier: [] }
-      : doublesVenteLbc({ ventes: ventesLbc, items: lbcItems, liens, numeros, enLigne: onlineIds, vendusVinted: vendus });
+      // ⚠️ Une paire « à confirmer » PEUT être encore en vente sur Vinted : vendue
+      //    sur Leboncoin, on le dit quand même (manquer une double vente coûte une
+      //    paire ; regarder sur Vinted, un clic).
+      : doublesVenteLbc({ ventes: ventesLbc, items: lbcItems, liens, numeros, enLigne: new Set([...onlineIds, ...aConfirmerIds]), vendusVinted: vendus });
     // Les paires qu'il a encore en ligne sur Vinted, avec leur N° : ce sont elles
     // qu'une annonce Leboncoin peut désigner. Proposées, jamais reliées seules.
     const candidats = online.filter((o) => numeros[o.id] && numeros[o.id].numero)
@@ -32506,7 +33055,7 @@ function LeboncoinScreen() {
     // Répartition des annonces LBC par compte (plusieurs comptes possibles).
     const parCompte = {};
     for (const ad of liveAds) { const k = String(ad.lbcUser || '?'); (parCompte[k] = parCompte[k] || []).push(ad); }
-    setData({ preuveKO, echecLecture: echecLecture || listRowsBrut === null, lbcJamaisLu: lbcJamaisLu || (lbcRows !== null && liveAds.length === 0), lbcKO: lbcRows === null, vendues, nEnLigne: online.length, nNumerotees, queue, removals, unlinked, doublons, aRelierVentes, ventesLbcKO, numsConnus: [...keysKnown], liveAds, autoMatched, retirees, lbcAccounts, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: liveAds.length, limit: pd.limit, plan: pd.plan, prep });
+    setData({ preuveKO, aConfirmer: aConfirmerIds.size, echecLecture: echecLecture || listRowsBrut === null, lbcJamaisLu: lbcJamaisLu || (lbcRows !== null && liveAds.length === 0), lbcKO: lbcRows === null, vendues, nEnLigne: online.length, nNumerotees, queue, removals, unlinked, doublons, aRelierVentes, ventesLbcKO, numsConnus: [...keysKnown], liveAds, autoMatched, retirees, lbcAccounts, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: liveAds.length, limit: pd.limit, plan: pd.plan, prep });
     setLoading(false);
   };
   useEffect(() => { reload(); /* eslint-disable-next-line */ }, []);
@@ -32547,7 +33096,7 @@ function LeboncoinScreen() {
             return (
               <div key={String(d.vente.txId || d.ad.id)} data-doublon={d.numero} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 0', borderTop: `1px solid ${C.border}` }}>
                 <div style={{ width: 44, height: 44, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: C.card2 || C.border }}>
-                  {ph ? <img src={ph} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : null}
+                  {ph ? <PhotoVinted src={ph} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : null}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 12.5, fontWeight: 700, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>N°{d.numero} · {d.vente.title || d.ad.subject || ''}</div>
@@ -32707,6 +33256,15 @@ function LeboncoinScreen() {
               {data.vendues} paire{data.vendues > 1 ? 's' : ''} {data.vendues > 1 ? 'sont' : 'est'} <b>déjà vendue{data.vendues > 1 ? 's' : ''} sur Vinted</b> — {data.vendues > 1 ? 'elles ne sont' : "elle n'est"} pas dans cette file. (Vinted laisse parfois l'annonce ouverte après la vente ; c'est la transaction qui fait foi.)
             </div>
           )}
+          {/* ⚠️ Revue de la 5.167 : les annonces « à confirmer » (compte pas relu
+              depuis 24 h) sortaient de la file SANS UN MOT — et quand c'étaient
+              toutes, l'écran affirmait « tu n'as pas encore d'annonce en ligne ».
+              La cause est connue : on la dit, une fois, au-dessus de la file. */}
+          {data.aConfirmer > 0 && !data.echecLecture && (
+            <div data-lbc-a-confirmer={data.aConfirmer} style={{ fontSize: 11, color: C.muted, marginBottom: 8, lineHeight: 1.5 }}>
+              {data.aConfirmer} annonce{data.aConfirmer > 1 ? 's' : ''} {data.aConfirmer > 1 ? 'ne sont' : "n'est"} pas dans cette file : {data.aConfirmer > 1 ? 'leurs comptes n’ont' : 'son compte n’a'} pas été relu{data.aConfirmer > 1 ? 's' : ''} depuis plus de 24 h — <b>à confirmer</b> (le détail est sur l'écran <b>Annonces</b>). Rien n'est supprimé.
+            </div>
+          )}
           {data.retirees > 0 && (
             <div style={{ fontSize: 11, color: C.muted, marginBottom: 8, lineHeight: 1.5 }}>
               {data.retirees} annonce{data.retirees > 1 ? 's' : ''} en ligne {data.retirees > 1 ? 'ne sont' : "n'est"} pas dans cette file : tu {data.retirees > 1 ? 'les' : "l'"}as retirée{data.retirees > 1 ? 's' : ''} de Leboncoin. Ça se règle annonce par annonce sur l'écran <b>Annonces</b> (la puce « Aussi sur »).
@@ -32724,6 +33282,10 @@ function LeboncoinScreen() {
                affirme une chose qui ne veut rien dire sur zéro paire. Une file
                vide a ici encore une cause connue — et une cause connue se dit.
                Troisième forme, après « lecture ratée » et « tout décoché ». */
+            /* Quatrième cause (revue de la 5.167) : tout est « à confirmer » — la
+               ligne au-dessus le dit ; affirmer « pas encore d'annonce » serait faux. */
+            : data.nEnLigne === 0 && data.aConfirmer > 0
+              ? <div data-lbc-vide="a-confirmer" style={{ fontSize: 12, color: C.muted }}>Rien à proposer tant que ces comptes ne sont pas relus — l'écran <b>Annonces</b> dit lesquels et comment.</div>
             : data.nEnLigne === 0
               ? <div style={{ fontSize: 12, color: C.muted }}>Tu n'as pas encore d'annonce en ligne sur Vinted — c'est de là que vient cette file. Dès qu'il y en aura, elles apparaîtront ici.</div>
             : data.nNumerotees === 0
@@ -32785,7 +33347,7 @@ function LeboncoinScreen() {
                   <div className="vrm-rangee" style={{ display: 'flex', gap: 6, marginTop: 7, overflowX: 'auto', paddingBottom: 2 }}>
                     {toutes.length === 0
                       ? <span style={{ width: 54, height: 54, borderRadius: 8, flexShrink: 0, background: C.bg, border: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="image" size={20} style={{ color: C.muted, opacity: .5 }} /></span>
-                      : toutes.map((src, i) => <img key={i} src={src} alt="" loading="lazy" decoding="async" style={{ width: 54, height: 54, borderRadius: 8, objectFit: 'cover', flexShrink: 0, background: C.bg, border: `1px solid ${C.border}` }} />)}
+                      : toutes.map((src, i) => <PhotoVinted key={i} src={src} alt="" loading="lazy" decoding="async" style={{ width: 54, height: 54, borderRadius: 8, objectFit: 'cover', flexShrink: 0, background: C.bg, border: `1px solid ${C.border}` }} />)}
                     {manque > 0 && (
                       <span style={{ width: 54, height: 54, borderRadius: 8, flexShrink: 0, background: C.bg, border: `1px dashed ${C.border}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: C.muted, textAlign: 'center', lineHeight: 1.2 }}>+{manque}<span style={{ fontSize: 8, fontWeight: 500 }}>rouvrir</span></span>
                     )}
@@ -35477,7 +36039,7 @@ function EcranMasques({ comptes, ordi }) {
               return (
                 <div key={tx} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 10, border: `1px solid ${C.border}`, background: C.card, borderRadius: 12 }}>
                   <div style={{ width: 64, height: 64, flexShrink: 0, borderRadius: 8, overflow: 'hidden', background: C.card2 || C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted }}>
-                    {ph ? <img src={ph} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { e.currentTarget.style.display = 'none'; }}/>
+                    {ph ? <PhotoVinted src={ph} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/>
                       : <Icon name={det === undefined ? 'sync' : 'box'} size={20}/>}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -35615,6 +36177,32 @@ function AppCoeur() {
     window.addEventListener('vrm:plantage', plus_tard);
     return () => { vivant=false; if (t) clearTimeout(t); window.removeEventListener('vrm:plantage', plus_tard); };
   },[]);
+  // ── LE BILAN DES PHOTOS VINTED PART DANS SA BASE (`diag_photos`) ────────────
+  // Pourquoi ses photos ne s'affichent pas, MESURÉ dans son navigateur
+  // (src/photosVinted.js) : des nombres et des mots, jamais une URL, une
+  // signature ou un titre. Une ligne à lui (RLS), un bilan par navigateur
+  // (iPhone et ordinateur ne s'écrasent pas), lire-fusionner-réécrire GARDÉ :
+  // une lecture ratée n'écrit rien (« rien lu » ne vaut pas « rien »).
+  React.useEffect(()=>{
+    const nav = (() => { try { const u = navigator.userAgent || ''; return (/iPhone|iPad/.test(u) ? 'iOS ' : /Android/.test(u) ? 'Android ' : /Mac/.test(u) ? 'Mac ' : /Windows/.test(u) ? 'Windows ' : '') + (/Edg\//.test(u) ? 'Edge' : /Chrome\//.test(u) ? 'Chrome' : /Firefox\//.test(u) ? 'Firefox' : /Safari\//.test(u) ? 'Safari' : 'autre'); } catch (_) { return 'autre'; } })();
+    photosVinted.configurer({ ecrire: async (b) => {
+      const bilan = { ...b, nav, version: BUILD_ID };
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.diag_photos&select=data`, { headers: sbAuth() });
+      if (!r.ok) return false;
+      const rows = await r.json();
+      if (!Array.isArray(rows)) return false;
+      const cur = (rows[0] && rows[0].data && typeof rows[0].data === 'object') ? rows[0].data : {};
+      const par = (cur.parNavigateur && typeof cur.parNavigateur === 'object') ? { ...cur.parNavigateur } : {};
+      par[nav] = bilan;
+      const garde = Object.keys(par).sort((a, b2) => String((par[b2] && par[b2].at) || '').localeCompare(String((par[a] && par[a].at) || ''))).slice(0, 6);
+      const data = { at: bilan.at, dernier: bilan, parNavigateur: Object.fromEntries(garde.map((k) => [k, par[k]])) };
+      const w = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
+        method:'POST', headers:{ ...sbAuth(), 'Content-Type':'application/json', Prefer:'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify([withOwner({ id: 'diag_photos', data })]) });
+      return w.ok;
+    } });
+    return () => photosVinted.configurer({ ecrire: null });
+  },[]);
   // Clé du widget iPhone : créée une seule fois, après le chargement du cloud
   // (sinon chaque appareil en générerait une différente et se voleraient la
   // place à tour de rôle).
@@ -35631,6 +36219,8 @@ function AppCoeur() {
   //    pilotage quotidien (les actions du jour) ; Collectif reste une vue
   //    d'ensemble optionnelle dans le menu, plus l'écran forcé à l'ouverture.
   const [tab,setTab]=useState('journee');
+  // L'écran où une photo Vinted a échoué en premier (le bilan `diag_photos`).
+  React.useEffect(()=>{ photosVinted.ecranActuel(tab); },[tab]);
   // ⚠️ UN SEUL ONGLET PAR PLATEFORME QUI CONTIENT TOUT (Julien, 25 sept. : « tu
   //    peux directement tout mettre dans l'onglet Vinted… sans avoir besoin
   //    d'avoir vente, achat »). Le hub Vinted/Leboncoin porte une sous-navigation
@@ -35803,7 +36393,7 @@ function AppCoeur() {
   useEffect(()=>{ if(!gsOpen || gsData) return; (async()=>{
     const sb=async(q)=>{ try{ const r=await fetch(`${SUPABASE_URL}/rest/v1/${q}`,{headers:sbAuth()}); return r.ok?await r.json():null; }catch(_){ return null; } };
     const online=new Set(); const sold=[]; const bought=[]; const lbc=new Set();
-    const lst=retirerSupprimeesLignes(await sb('app_data?id=like.harvest_*_listings&select=data')||[], await lireSupprimeesTous());   // 5.165 : sans les supprimées
+    const lst=(await lireLignesEnLigne(await sb('app_data?id=like.harvest_*_listings&select=data')||[])).lignes;   // 5.167 : la règle « en ligne » (§11)
     for(const r of lst){ const p=(r.data&&r.data.payload)||{}; for(const it of (p.items||[])){ if(!it.is_closed&&!it.is_hidden&&!it.is_draft) online.add(String(it.id)); } }
     const so=await sb('app_data?id=like.harvest_*_orders_sold&select=data')||[];
     const seenS=new Set(); for(const r of so){ const p=(r.data&&r.data.payload)||{}; for(const o of (p.my_orders||[])){ const t=String(o.transaction_id||o.id||''); if(t&&!seenS.has(t)){ seenS.add(t); sold.push(o); } } }
@@ -36016,7 +36606,7 @@ function AppCoeur() {
     for(const r of so){ const p=(r.data&&r.data.payload)||{}; for(const o of (p.my_orders||[])){
       const t=String(o.transaction_id||o.id||''); if(t&&seen.has(t)) continue; if(t) seen.add(t);
       if(/finalis/i.test(o.status||'')) sold.push(o); } }
-    const lst=retirerSupprimeesLignes(await sb('app_data?id=like.harvest_*_listings&select=data')||[], await lireSupprimeesTous());   // 5.165 : sans les supprimées
+    const lst=(await lireLignesEnLigne(await sb('app_data?id=like.harvest_*_listings&select=data')||[])).lignes;   // 5.167 : la règle « en ligne » (§11)
     const online=[]; for(const r of lst){ const p=(r.data&&r.data.payload)||{};
       for(const it of (p.items||[])){ if(!it.is_closed&&!it.is_hidden&&!it.is_draft) online.push(it); } }
     const g = grouperPrixMarche(sold, online);
@@ -36458,7 +37048,7 @@ function AppCoeur() {
       perAccRef.current={ cle:cleCalc, perAcc };
       // Un signal arrivé PENDANT ce calcul : il a pu lire avant la suppression.
       if(comptesSignales.current) setAnnoncesTick(t=>t+1);
-      const annLues={}, annEnLigne={}, annSuppr={}, annNoms={}, annActivite={};
+      const annLues={}, annEnLigne={}, annSuppr={}, annNoms={}, annActivite={}, annAConfirmer=[];
       const ventesToutes=[]; let ventesLues=false; const vusTx=new Set();
       for(const { a, sold } of perAcc){
         if(!sold.ok) continue; ventesLues=true;
@@ -36506,11 +37096,15 @@ function AppCoeur() {
           // 5.165 : de quand date ce qu'on compte, et ce qui a été retiré parce
           // que supprimé depuis — la MÊME phrase que l'écran Annonces (§11).
           annEnLigne[uidL]=nL;
-          if(list.source==='harvest' && _harvestSeen[`${uidL}_listings`]) annLues[uidL]=_harvestSeen[`${uidL}_listings`];
+          if(Number.isFinite(list.lu)) annLues[uidL]=list.lu;
+          else if(list.source==='harvest' && _harvestSeen[`${uidL}_listings`]) annLues[uidL]=_harvestSeen[`${uidL}_listings`];
           // Revue 5.165 : l'heure de ses VENTES captées — vu actif après la lecture
           // du dressing, le compte est nommé (`dressingsAnciens`).
           if(_harvestSeen[`${uidL}_orders_sold`]) annActivite[uidL]=_harvestSeen[`${uidL}_orders_sold`];
           if(list.supprimees) annSuppr[uidL]=list.supprimees;
+          // 5.167 : « à confirmer » (compte pas relu depuis 24 h) — jamais compté en
+          // ligne, dit à part, comme sur l'écran Annonces (§11).
+          for(const it of (list.aConfirmer||[])){ if(!soldIds.has(String(it.id))) annAConfirmer.push({ ...it, _acc:a }); }
           annNoms[uidL]=(load('vinted_account_labels',{})||{})[uidL]||a.login||`#${uidL}`;
         }
         if(conv.ok){ ok=true; unread+=conv.items.filter(c=>c.unread).length; }
@@ -36576,7 +37170,7 @@ function AppCoeur() {
       }catch(_){/* pas su ⇒ null ⇒ rien d'affiché */}
       if(!stop && ok){
       setLiveStats({caMois,caEncaisse,enCours,online,unread,stockValue,pairesStock,ventesJour,caJour,ventesMois,soldTotal,joursVente:joursVenteSet.size,caParCompte,caParMois,ventesParMois,dataAgeJours,dataAgeCompte,
-        annLues,annEnLigne,annSuppr,annNoms,annActivite,
+        annLues,annEnLigne,annSuppr,annNoms,annActivite,annAConfirmer,
         walletDispo:(walletEsc&&walletEsc.accounts>0)?walletEsc.dispo:null,
         walletAttente:(walletEsc&&walletEsc.accounts>0)?walletEsc.total:null,
         walletComptes:(walletEsc&&walletEsc.accounts)||0,
@@ -36585,7 +37179,12 @@ function AppCoeur() {
         // qu'elle affiche → le widget montre EXACTEMENT la même chose. « Vendu ce
         // mois » est complété plus bas avec `ventesFaites` (toutes plateformes),
         // quand Leboncoin et eBay sont lus — c'est l'effet du widget qui écrit.
-        setWidgetBase({enAttente:Math.round(enAttenteReel),caEncaisse:Math.round(caEncaisse),online,unread,pairesStock});
+        // ⚠️ Revue de la 5.167 : des annonces « à confirmer » (compte pas relu
+        //    depuis 24 h) ne sont pas comptées — `online` n'est alors qu'un MINORANT.
+        //    Publié tel quel, l'iPhone affichait « 0 annonce en ligne » comme un
+        //    fait (§4.1, §5 : un total partiel présenté comme complet). On n'écrit
+        //    pas de nombre (`null` : le widget affiche un tiret, jamais un zéro).
+        setWidgetBase({enAttente:Math.round(enAttenteReel),caEncaisse:Math.round(caEncaisse),online:annAConfirmer.length?null:online,unread,pairesStock});
       }
     })();
     return ()=>{stop=true;};
@@ -37270,7 +37869,7 @@ function AppCoeur() {
         const total = pairs.length+ventes.length+achats.length;
         const go=(tab)=>{ setGsOpen(false); setTab(tab); };
         const numBadge=(n)=> <span style={{flexShrink:0,minWidth:26,height:26,borderRadius:8,background:C.accent,color:C.onAccent,fontSize:12,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',padding:'0 5px'}}>{n?`#${n}`:'—'}</span>;
-        const thumb=(src,fb)=> <div style={{width:44,height:44,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{src?<img src={src} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}>{fb||<Icon name="image" size={18} style={{color:C.muted,opacity:.55}}/>}</span>}</div>;
+        const thumb=(src,fb)=> <div style={{width:44,height:44,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{src?<PhotoVinted src={src} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}>{fb||<Icon name="image" size={18} style={{color:C.muted,opacity:.55}}/>}</span>}</div>;
         return (
         <div style={{position:'fixed',inset:0,zIndex:70,background:C.bg,display:'flex',flexDirection:'column'}}>
           <div style={{display:'flex',alignItems:'center',gap:10,padding:'12px 14px',borderBottom:`1px solid ${C.border}`,background:C.surface}}>
@@ -37412,6 +38011,9 @@ function AppCoeur() {
             LIGNE de panne (`LignePanne`) là où leur propre liste vide
             mentirait — le bloc, lui, ne s'affiche qu'une fois. */}
         {baseKO && <BaseInjoignable/>}
+        {/* Les photos de Vinted qui ne s'affichent pas ICI : dit UNE fois,
+            sur la coque, pour tous les écrans (src/photosVinted.js). */}
+        {!baseKO && <PhotosBloquees/>}
         <BlocNumerosPerimes/>
         {tab==='settings'&&<SettingsScreen setTab={setTab} comptes={vintedAccounts}
           customLogo={customLogo} onPickLogo={()=>logoInputRef.current&&logoInputRef.current.click()} onResetLogo={resetLogo}

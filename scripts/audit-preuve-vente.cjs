@@ -85,7 +85,7 @@ const MUTATIONS = {
   'preuve-pas-su-lue': { ext: (s) => remplace(s, '    if (det === null) return 0;                                           // pas su\n    const bords', '    const bords', 'preuve-pas-su-lue') },
   'regle-divergente': { ext: (s) => remplace(s, 'const PREUVE_RECENTE_MS = 30 * 86400000;', 'const PREUVE_RECENTE_MS = 31 * 86400000;', 'regle-divergente') },
   // (revue du 11 octobre) La capacité promise à une version PUBLIÉE qui ne l'a pas.
-  'capacite-publiee': { app: (s) => remplace(s, "preuves: '5.169.0' };", "preuves: '5.167.0' };", 'capacite-publiee') },
+  'capacite-publiee': { app: (s) => remplace(s, "preuves: '5.172.0' };", "preuves: '5.170.0' };", 'capacite-publiee') },
   // L'écran annonce un autre rythme que celui de l'extension.
   'rythme-different': { app: (s) => remplace(s, 'const PREUVE_PAR_VISITE = 3;', 'const PREUVE_PAR_VISITE = 5;', 'rythme-different') },
 };
