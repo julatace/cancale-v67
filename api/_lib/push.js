@@ -118,19 +118,22 @@ export const PUSH_DEFAUT = {
 //    Julien a activé les messages ; un simple hoquet de lecture de `push_prefs`
 //    (522, la base debout par ailleurs) les rendait muets. Trois états, jamais
 //    deux : la préférence est LUE (elle décide), ABSENTE (le défaut décide), ou
-//    PAS SUE — et alors :
-//      1. la dernière préférence lue pour CE vendeur par cette instance décide
-//         (une préférence « non » lue il y a une minute tient pendant le hoquet) ;
-//      2. à défaut, on SONNE pour ce qui appelle un geste ou de l'argent
-//         (`SONNE_SI_PAS_SU` : les défauts « oui », plus les messages — un
-//         acheteur attend une réponse) : une notification de trop se répare, un
-//         message manqué non. Le reste (suivi, achat, favori, facture : rien à
-//         faire) garde son défaut — on ne réveille pas pour rien.
-//    La mémoire est par vendeur et ne sert QUE de repli : ce n'est pas un état
-//    à garder (une instance froide n'a rien, et c'est le cas 2).
-const SONNE_SI_PAS_SU = new Set([...Object.keys(PUSH_DEFAUT).filter((k) => PUSH_DEFAUT[k]), 'message']);
+//    PAS SUE — et alors, dans l'ordre :
+//      1. on RELIT une fois (un hoquet) ;
+//      2. la dernière préférence lue pour CE vendeur par cette instance ;
+//      3. la dernière préférence lue, GARDÉE AVEC SES APPAREILS (`push_subs.prefs`,
+//         une copie écrite par le serveur quand il la lit — cette ligne-là est lue
+//         de toute façon avant d'envoyer) : elle survit à une instance froide ;
+//      4. à défaut, le DÉFAUT de la catégorie.
+// ⚠️⚠️ REVUE DU 11 OCTOBRE : la première version sonnait pour les messages sur
+//    TOUTE instance froide qui ne lisait pas les préférences (`SONNE_SI_PAS_SU`),
+//    y compris chez un vendeur qui ne les a jamais activés ou qui les a COUPÉS à
+//    la main — Vercel démarre des instances froides sans cesse. « Pas su » ne
+//    vaut pas « oui » pour une catégorie coupée par défaut : seule une trace de
+//    SA préférence (2 ou 3) peut la faire sonner.
 const _prefsVues = new Map();                       // vendeur → dernières préférences LUES
-export const oublierPrefsVues = () => _prefsVues.clear();   // bancs : repartir d'une instance froide
+const _copieVue = new Map();                        // vendeur → la copie déjà rangée avec ses appareils (JSON)
+export const oublierPrefsVues = () => { _prefsVues.clear(); _copieVue.clear(); };   // bancs : instance froide
 const decider = (prefs, cat) => {
   const v = prefs[cat];
   return typeof v === 'boolean' ? v : (PUSH_DEFAUT[cat] !== false);
@@ -151,14 +154,37 @@ async function lirePrefs() {
     return (d && typeof d === 'object') ? d : {};
   } catch (_) { return null; }
 }
+// La copie des préférences gardée avec les appareils. On ne l'écrit que si elle
+// a CHANGÉ (une fois par instance, ou quand il bascule un réglage), par la même
+// écriture conditionnelle que la liste — qui n'est jamais touchée ici. Pas de
+// ligne d'appareils ⇒ rien à protéger, on ne la crée pas.
+async function copierPrefs(qui, prefs) {
+  const json = JSON.stringify(prefs || {});
+  if (_copieVue.get(qui) === json) return;
+  for (let i = 0; i < 3; i++) {
+    const lu = await lireSubsVersion();
+    if (!lu || !lu.existe) return;
+    if (JSON.stringify(lu.prefs || null) === json) { _copieVue.set(qui, json); return; }
+    const e = await ecrireSubsSi(lu, lu.subs, prefs || {});
+    if (e === 'ok') { _copieVue.set(qui, json); return; }
+    if (e === 'ko') return;
+  }
+}
 export async function pushCategorieActive(cat) {
   if (!cat) return true;
   const qui = vendeurDuPush() || '';
-  const lues = await lirePrefs();
-  if (lues) { _prefsVues.set(qui, lues); return decider(lues, cat); }
+  let lues = await lirePrefs();
+  if (!lues) lues = await lirePrefs();              // un hoquet : on relit une fois
+  if (lues) {
+    _prefsVues.set(qui, lues);
+    try { await copierPrefs(qui, lues); } catch (_) {}
+    return decider(lues, cat);
+  }
   const vues = _prefsVues.get(qui);
   if (vues) return decider(vues, cat);
-  return SONNE_SI_PAS_SU.has(cat) ? true : (PUSH_DEFAUT[cat] !== false);
+  const lu = await lireSubsVersion();
+  if (lu && lu.prefs) return decider(lu.prefs, cat);
+  return PUSH_DEFAUT[cat] !== false;
 }
 
 export async function loadSubs() {
@@ -218,13 +244,17 @@ async function lireSubsVersion() {
     const rows = await res.json();
     if (!Array.isArray(rows)) return null;
     const d = rows[0] && rows[0].data;
-    if (!rows[0]) return { existe: false, subs: [], rev: null };
-    return { existe: true, subs: (d && Array.isArray(d.subs)) ? d.subs : [], rev: (d && d.rev != null) ? String(d.rev) : null };
+    if (!rows[0]) return { existe: false, subs: [], rev: null, prefs: null };
+    return { existe: true, subs: (d && Array.isArray(d.subs)) ? d.subs : [], rev: (d && d.rev != null) ? String(d.rev) : null,
+      prefs: (d && d.prefs && typeof d.prefs === 'object' && !Array.isArray(d.prefs)) ? d.prefs : null };
   } catch (_) { return null; }
 }
-async function ecrireSubsSi(lu, subs) {
+// `prefs` (facultatif) remplace la copie des préférences ; sinon celle qu'on a
+// LUE est gardée telle quelle — une modification de la liste ne la perd jamais.
+async function ecrireSubsSi(lu, subs, prefs) {
   try {
-    const data = { subs, updatedAt: new Date().toISOString(), rev: nouvelleRev() };
+    const copie = prefs !== undefined ? prefs : lu.prefs;
+    const data = { subs, updatedAt: new Date().toISOString(), rev: nouvelleRev(), ...(copie ? { prefs: copie } : {}) };
     const enTetes = { ...HEADERS, Prefer: 'return=representation' };
     if (lu.existe) {
       const filtre = lu.rev == null ? 'data->>rev=is.null' : `data->>rev=eq.${encodeURIComponent(lu.rev)}`;

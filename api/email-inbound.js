@@ -184,9 +184,13 @@ async function detectAccount(raw) {
 // La paire d'un email de message, lue dans son SUJET (forme mesurée sur 59 emails :
 // « Nouveau message à propos de salomon XT-6 gris taille 40 »). Rien d'autre :
 // un sujet sans « à propos de » ne donne pas de paire (mieux vaut un blanc).
+// ⚠️ Revue du 11 octobre : la règle acceptait aussi « concernant » et « au sujet
+//    de » — jamais mesurés sur un email de message, et portés par des sujets
+//    SYSTÈME (« Action requise concernant ta commande ») : la notification
+//    disait « 💬 ta commande ». Seule la forme mesurée désigne une paire.
 export function paireDuSujetMessage(sujet) {
   const s = String(sujet || '').replace(/^\s*(?:(?:re|tr|fwd?|fw)\s*:\s*)+/i, '');
-  const m = s.match(/(?:[àa]\s+propos\s+(?:de\s+|d['’]\s*)|concernant\s+|au\s+sujet\s+(?:de\s+|d['’]\s*))(.+)$/i);
+  const m = s.match(/[àa]\s+propos\s+(?:de\s+|d['’]\s*)(.+)$/i);
   const p = m ? m[1].replace(/^[«"“'\s]+|[»"”'\s.]+$/g, '').trim() : '';
   return p.length >= 2 ? p : '';
 }
@@ -1696,14 +1700,29 @@ export async function traiterEmail(req, res) {
       //    et elle sépare deux messages qui ne diffèrent qu'à la fin. L'ancienne
       //    clé reste reconnue (jamais réécrite) : sans elle, le jour du
       //    déploiement, chaque fil renvoyé re-sonnerait en entier.
+      // ⚠️⚠️ REVUE DU 11 OCTOBRE — DEUX DÉFAUTS DE CE CORRECTIF, REPRODUITS :
+      //    1. l'ancienne clé (« sujet + 200 caractères ») reconnue comme ALIAS
+      //       avalait tout NOUVEAU message d'une paire déjà notifiée par l'ancien
+      //       code — y compris celui d'un AUTRE acheteur — tant qu'elle restait au
+      //       mémo. Elle ne désigne le MÊME email que si elle couvrait tout le texte
+      //       (corps ≤ 200 caractères) : seulement là, elle est un alias. Au-delà,
+      //       un fil renvoyé le jour du déploiement re-sonne UNE fois — une
+      //       notification de trop se répare, un message avalé non.
+      //    2. deux messages d'une même conversation dont le corps ne porte pas le
+      //       texte (la forme mesurée : l'analyse n'en tire ni l'acheteur ni le
+      //       texte, 59 emails sur 59) ont la MÊME empreinte. Seule une identité
+      //       PAR EMAIL les sépare : le Message-ID (envoyé par le script Gmail et
+      //       le Worker, `normaliserEntrant`). Avec lui, c'est LUI la clé ; sans
+      //       lui (un script d'avant), l'empreinte du texte entier reste le repli.
       const cleEntiere = crypto.createHash('sha256').update(`${subject}\n${corpsTexte}`).digest('hex').slice(0, 20);
-      const cleAncienne = `msg-${shortHash(subject + corpsTexte.slice(0, 200))}`;
+      const cleEmail = mail.messageId ? `msg-id-${crypto.createHash('sha256').update(String(mail.messageId)).digest('hex').slice(0, 20)}` : '';
+      const aliasAncien = corpsTexte.length <= 200 ? [`msg-${shortHash(subject + corpsTexte.slice(0, 200))}`] : [];
       try { await pushOnce({
         title: `💬 ${paire ? court(paire, 70) : (qui || 'Message Vinted')}`,
         body: `${qui && paire ? `${qui} · ` : ''}Nouveau message${acc.login ? ` sur ${acc.login}` : ''}${extrait ? ` : « ${extrait} »` : ' — ouvre Vinted pour répondre.'}`,
-        tag: `msg-${cleEntiere}`, url: '/?tab=cat_msg',
+        tag: cleEmail || `msg-${cleEntiere}`, url: '/?tab=cat_msg',
         _cat: 'message',
-      }, null, [cleAncienne]); } catch (_) {}
+      }, null, aliasAncien); } catch (_) {}
       await logEmail({ type: 'message', subject, from: mail.from, de: qui, extrait, paire, account: acc.login || '' });
       repondre(res, 200, { ok: true, type: 'message', de: qui, extrait, paire });
       return;

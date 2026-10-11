@@ -22,6 +22,21 @@
 //      avait répondu « activé ») ; G. pareil pour la purge d'un appareil mort
 //      pendant qu'un autre s'abonne.
 //
+// REVUE DU 11 OCTOBRE (six défauts du correctif lui-même, reproduits ici) :
+//   E2. l'ANCIENNE clé (« sujet + 200 caractères »), reconnue comme alias le jour
+//       du déploiement, AVALAIT tout nouveau message d'une paire déjà notifiée
+//       par l'ancien code — y compris celui d'un autre acheteur. Le banc E
+//       partait toujours d'un mémo vierge et ne pouvait pas le voir ;
+//   I.  deux messages d'une même conversation dont le corps ne porte pas le
+//       texte (la forme mesurée, 59 sur 59) ont la MÊME empreinte : seule une
+//       identité PAR EMAIL (Message-ID, envoyé par le script Gmail et le Worker)
+//       les sépare ;
+//   C2. préférences illisibles ⇒ les messages sonnaient pour TOUT vendeur sur une
+//       instance froide, y compris celui qui les a coupés (« pas su » valait
+//       « oui » pour une catégorie coupée par défaut) ;
+//   A2. « concernant » / « au sujet de » donnaient une fausse « paire »
+//       (« 💬 ta commande »).
+//
 // §4.10 : on EXÉCUTE la VRAIE route (api/email-inbound.js, api/push.js,
 // api/_lib/push.js) contre une fausse base À ÉTAT — ce qui est écrit est relu,
 // les écritures conditionnelles (PATCH filtré, insertion sans écrasement) sont
@@ -135,6 +150,14 @@ const emailMessage = (n, entete = '', article = ARTICLE) => ({
   text: `${entete}Bonjour compte_banc,\nTu as reçu un nouveau message.\nRépondre\nhttps://www.vinted.fr/inbox/${1000 + n}\nVinted, UAB`,
   html: '', attachments: [],
 });
+// La clé de l'ANCIEN code (avant le 11 octobre) : `msg-` + shortHash(sujet +
+// 200 premiers caractères du corps) — recopiée ici pour remplir un mémo comme
+// l'aurait laissé la production le jour du déploiement.
+const cleAncienne = (m) => {
+  let h = 0; const t = String(m.subject) + String(m.text).slice(0, 200);
+  for (let i = 0; i < t.length; i++) h = ((h << 5) - h + t.charCodeAt(i)) | 0;
+  return `msg-${Math.abs(h).toString(36)}`;
+};
 const emailFavori = { from: 'no-reply@vinted.fr', to: 'boite-de-reception@banc.test', subject: 'Ton article a été ajouté aux favoris', text: 'quelquun a ajouté ton article « Paire banc » dans ses favoris', html: '', attachments: [] };
 const deuxAppareils = () => ({ subs: [{ endpoint: 'https://web.push.apple.com/iphone' }, { endpoint: 'https://fcm.googleapis.com/chrome' }] });
 
@@ -179,6 +202,15 @@ const deuxAppareils = () => ({ subs: [{ endpoint: 'https://web.push.apple.com/ip
     await recoit(sansPaire);
     const p3 = pushes[0] || {};
     dit(pushes.length === 2 && /message vinted/i.test(String(p3.title || '')), 'sujet sans paire : « Message Vinted », jamais une paire inventée', JSON.stringify(p3.title));
+    // A2. Un sujet SYSTÈME qui dit « concernant » / « au sujet de » ne désigne
+    //     pas une paire : la seule forme mesurée est « à propos de » (59 sur 59).
+    for (const sujet of ['Information concernant ta commande', 'Rappel au sujet de ton compte']) {
+      pushes.length = 0;
+      await recoit(Object.assign(emailMessage(4), { subject: sujet }));
+      const p4 = pushes[0] || {};
+      dit(pushes.length === 2 && /message vinted/i.test(String(p4.title || '')) && !/ta commande|ton compte/i.test(String(p4.title || '')),
+        `sujet « ${sujet} » : « Message Vinted », jamais « 💬 ${sujet.split(/concernant |au sujet de /)[1]} »`, JSON.stringify(p4.title));
+    }
   });
 
   // ══ B. Le fil renvoyé en entier : seul le message nouveau sonne ═══════════
@@ -194,11 +226,15 @@ const deuxAppareils = () => ({ subs: [{ endpoint: 'https://web.push.apple.com/ip
   // ══ C. Préférences illisibles ══════════════════════════════════════════════
   console.log('\n── C. Préférences illisibles (522, la base debout par ailleurs)');
   await essaie('C', async () => {
+    // C1. Préférence « message: oui » LUE une fois (l'instance ou la trace
+    //     durable s'en souvient), puis un hoquet : le message activé sonne.
     reset({ message: true });
+    await recoit(emailMessage(1, 'Message 1\n'));
+    froid();                                           // une AUTRE instance, froide
     pannes.add('push_prefs');
-    await recoit(emailMessage(1));
-    dit(sonnes() === 1, 'préférences illisibles : le message activé sonne quand même (« pas su » ne coupe pas)',
-      `${sonnes()} notification(s) — le défaut de « message » est non`);
+    await recoit(emailMessage(2, 'Message 2\n'));
+    dit(sonnes() === 2, 'messages activés, lus une fois, puis préférences illisibles sur une instance FROIDE : le message sonne quand même (la dernière préférence connue est gardée avec les appareils)',
+      `${sonnes()} notification(s) sur 2 messages`);
     // L'AUTRE SENS 1 : une préférence LUE à « non » est respectée.
     reset({ message: false });
     await recoit(emailMessage(1));
@@ -208,12 +244,34 @@ const deuxAppareils = () => ({ subs: [{ endpoint: 'https://web.push.apple.com/ip
     pannes.add('push_prefs');
     await recoit(emailMessage(2, 'Message 2\n'));
     dit(sonnes() === 0, 'préférence « non » lue avant le hoquet : elle tient pendant le hoquet', `${sonnes()} notification(s)`);
+    // C2. ⚠️ REVUE DU 11 OCTOBRE : et sur une instance FROIDE (Vercel en démarre
+    //     sans cesse) ? « pas su » ne vaut pas « oui » pour une catégorie coupée.
+    froid();
+    await recoit(emailMessage(3, 'Message 3\n'));
+    dit(sonnes() === 0, 'messages COUPÉS à la main, préférences illisibles, instance FROIDE : rien ne sonne', `${sonnes()} notification(s)`);
+    reset({ achat: true });                            // jamais activé : le défaut de « message » est non
+    await recoit(emailMessage(1));                     // lu une fois (rien de coupé, rien d'activé)
+    froid(); pannes.add('push_prefs');
+    await recoit(emailMessage(2, 'Message 2\n'));
+    dit(sonnes() === 0, 'messages JAMAIS activés (défaut « non »), préférences illisibles, instance froide : rien ne sonne', `${sonnes()} notification(s)`);
+    reset({ message: false });
+    pannes.add('push_prefs');                          // jamais lues nulle part, et illisibles
+    await recoit(emailMessage(1));
+    dit(sonnes() === 0, 'préférences JAMAIS lues et illisibles : on ne sonne pas pour une catégorie coupée par défaut (« pas su » ne vaut pas « oui »)', `${sonnes()} notification(s)`);
     // Une catégorie sans action (favori : défaut non), préférences illisibles,
     // jamais lues : on ne réveille pas pour ce qui n'appelle aucun geste.
     reset({ favori: true });
     pannes.add('push_prefs');
     await recoit(emailFavori);
     dit(sonnes() === 0, 'favori, préférences jamais lues et illisibles : reste au défaut (rien à faire, pas de réveil)', `${sonnes()} notification(s)`);
+    // La copie durable ne réécrit PAS la liste des appareils à chaque email.
+    reset({ message: true });
+    await recoit(emailMessage(1, 'Message 1\n'));
+    ecritures = [];
+    await recoit(emailMessage(2, 'Message 2\n'));
+    dit(!ecritures.includes('push_subs'), 'préférences inchangées : la liste des appareils n’est pas réécrite à chaque email', `écritures ${JSON.stringify(ecritures)}`);
+    const subsApres = ((lire('push_subs') || {}).subs || []).length;
+    dit(subsApres === 2, 'et les appareils sont tous là', `${subsApres} appareil(s)`);
   });
 
   // ══ D. Mémo anti-doublon illisible ═════════════════════════════════════════
@@ -257,6 +315,52 @@ const deuxAppareils = () => ({ subs: [{ endpoint: 'https://web.push.apple.com/ip
     base.set(`${OWNER}|push_dedup`, { keys: [`msg-${Math.abs(h).toString(36)}`] });
     await recoit(m);
     dit(sonnes() === 0, 'une clé à l’ancien format (avant le déploiement) est encore reconnue : pas de rafale au déploiement', `${sonnes()} notification(s)`);
+  });
+
+  await essaie('E2-ancien-memo', async () => {
+    // ⚠️⚠️ REVUE DU 11 OCTOBRE : le jour du déploiement, le mémo a été rempli par
+    //    l'ANCIEN code. La clé ancienne ne couvre que « sujet + 200 caractères » :
+    //    reconnue telle quelle, elle avalait tout NOUVEAU message de la même paire
+    //    dont le début est identique — y compris celui d'un AUTRE acheteur.
+    reset({ message: true });
+    const long = 'Bonjour compte_banc,\n' + 'Tu as reçu un nouveau message sur Vinted à propos de ton article. '.repeat(4) + '\n';
+    const m1 = emailMessage(1, long); m1.text += '\nTexte : premier message';
+    const m2 = emailMessage(1, long); m2.text += '\nTexte : second message, différent';
+    base.set(`${OWNER}|push_dedup`, { keys: [cleAncienne(m1)] });          // m1 a sonné avec l'ancien code
+    await recoit(m2);
+    dit(sonnes() === 1, 'mémo rempli par l’ANCIEN code, puis un NOUVEAU message (même début) : il sonne', `${sonnes()} notification(s)`);
+    reset({ message: true });
+    const a = emailMessage(1, long), b = emailMessage(2, long);            // deux conversations, même paire
+    base.set(`${OWNER}|push_dedup`, { keys: [cleAncienne(a)] });
+    await recoit(b);
+    dit(sonnes() === 1, 'un AUTRE acheteur, autre conversation, même paire : il sonne', `${sonnes()} notification(s)`);
+    // L'AUTRE SENS : un email COURT (≤ 200 caractères) renvoyé tel quel reste
+    // reconnu par l'ancienne clé — pas de rafale au déploiement.
+    reset({ message: true });
+    const court = emailMessage(1, 'Message 1\n');
+    base.set(`${OWNER}|push_dedup`, { keys: [cleAncienne(court)] });
+    await recoit(court);
+    dit(sonnes() === 0, 'un email court déjà notifié par l’ancien code, renvoyé : ne re-sonne pas', `${sonnes()} notification(s)`);
+  });
+
+  // ══ I. Une identité PAR EMAIL (Message-ID) ════════════════════════════════════
+  console.log('\n── I. Deux messages d’une même conversation, corps identique : l’identité de l’email les sépare');
+  await essaie('I', async () => {
+    reset({ message: true });
+    // La forme mesurée : le corps ne porte pas le texte du message (59 sur 59).
+    const mid = (n) => Object.assign(emailMessage(1), { messageId: `<msg-${n}.banc@vinted.fr>` });
+    await recoit(mid(1)); await recoit(mid(2));
+    dit(sonnes() === 2, 'deux emails, même conversation, MÊME corps, deux Message-ID : les deux sonnent', `${sonnes()} notification(s)`);
+    await recoit(mid(1)); await recoit(mid(2));
+    dit(sonnes() === 2, 'le renvoi de l’un ou de l’autre (même Message-ID) ne re-sonne pas', `${sonnes()} notification(s)`);
+    // La forme du Worker / d'un service qui passe les en-têtes.
+    const viaEntetes = Object.assign(emailMessage(1), { headers: { 'Message-ID': '<msg-3.banc@vinted.fr>' } });
+    await recoit(viaEntetes);
+    dit(sonnes() === 3, 'Message-ID lu aussi dans les en-têtes : un troisième message sonne', `${sonnes()} notification(s)`);
+    // L'AUTRE SENS : sans identité, un renvoi identique reste reconnu.
+    reset({ message: true });
+    await recoit(emailMessage(1)); await recoit(emailMessage(1));
+    dit(sonnes() === 1, 'sans Message-ID, le même email renvoyé ne sonne qu’une fois', `${sonnes()} notification(s)`);
   });
 
   // ══ F. Deux appareils s'abonnent en même temps ═════════════════════════════
