@@ -833,7 +833,16 @@ if (MULTI_USER && typeof window !== 'undefined') {
 //      quand elle en a BESOIN (pas de session, session morte, autre compte),
 //      jamais à chaque rafraîchissement. Voir `assurerSessionExtension`.
 // À la déconnexion on envoie toujours null : elle oublie tout.
+// ⚠️⚠️ DEUX EXTENSIONS VRM DANS LE MÊME CHROME (mesuré le 9 octobre, 5.165) :
+//    `null` = une seule répond (ou pas su) · `['5.77.0','5.165.0']` = PLUSIEURS.
+//    Décidé par `sonderPonts` (plus bas), lu par `raisonExtGlobale`, `vmrExec`,
+//    `vmrDemande` et ici. Une session postée ici est relayée par CHAQUE pont
+//    vivant de la page : deux extensions adopteraient la MÊME famille de jetons
+//    et se la tueraient en la renouvelant (`refresh_token_already_used`,
+//    « Possible abuse attempt », relevé à 18:37:02 le 9 octobre).
+let __vmrPlusieurs = null;
 const posterSessionExtension = (session) => {
+  if (session && __vmrPlusieurs) return;   // « oublie tout » (null) part toujours
   try { window.postMessage({ __vmr: 'session', session: session || null }, window.location.origin); } catch (_) {}
 };
 // Le repli d'AVANT (notre propre session) ne sert plus qu'à amorcer une
@@ -3934,13 +3943,77 @@ let __vmrExtReady = false, __vmrExtVersion = '';
 // la détection est asynchrone, un composant déjà affiché doit se redessiner.
 const __vmrExtSubs = new Set();
 const onVmrExt = (fn) => { __vmrExtSubs.add(fn); return () => __vmrExtSubs.delete(fn); };
+// ══ COMBIEN D'EXTENSIONS VRM RÉPONDENT DANS CETTE PAGE ? (5.165) ═══════════
+// Mesuré le 9 octobre (Chromium réel, vraies extensions) : avec une 5.143 ou une
+// 5.77 restée installée À CÔTÉ de la 5.164, CHAQUE commande et CHAQUE envoi de
+// l'app étaient exécutés par LES DEUX (« cmd:bordereau ×2 », « exec …/replies
+// ×2 ») — deux files « une requête à la fois », deux budgets de 20 actions/h,
+// une réponse à un acheteur envoyée deux fois (§3). Et l'app affichait la
+// version du DERNIER « ready » reçu : « mets l'extension à jour » à quelqu'un
+// qui venait de le faire. Rien ne le disait.
+// ⇒ On le MESURE, sans deviner : on pose la question (« ping ») et on compte les
+//   ponts VIVANTS qui répondent à CETTE question. Un pont orphelin depuis la
+//   5.129 se tait ; un pont plus ancien encore orphelin répond aussi — d'où le
+//   geste « recharge cette page » dans la phrase. Deux réponses de la même
+//   extension (même identifiant, ou même version sans identifiant) ne comptent
+//   qu'une fois : jamais deux pour une. Depuis la 5.165 le pont joint
+//   l'IDENTIFIANT de son extension (deux copies de la même version se
+//   distinguent alors aussi).
+// La version retenue est la plus HAUTE vue au dernier tour — jamais « la
+// dernière arrivée », qui changeait d'un rechargement à l'autre.
+const cleDuPont = (d) => (d && d.id ? 'id:' + String(d.id) : 'v:' + String((d && d.version) || ''));
+let __vmrTour = null, __vmrToursFaits = 0;
+const __vmrAttenteTour = [];
+// Avant le PREMIER compte, on ne sait pas s'il y en a une ou deux : une commande,
+// un envoi ou une session attendent ce premier compte (au plus 2,5 s) — sinon
+// la relecture des ventes partait vers les deux avant même qu'on ait compté
+// (vu au banc). Ensuite on décide sur le dernier compte, sans attendre.
+function sondageConnu(maxMs = 2500) {
+  if (typeof window === 'undefined' || !__vmrExtReady || __vmrToursFaits > 0) return Promise.resolve();
+  return new Promise((res) => {
+    const t = setTimeout(res, maxMs);
+    __vmrAttenteTour.push(() => { clearTimeout(t); res(); });
+    sonderPonts();
+  });
+}
+// La phrase (une seule, §11) : ce qui se passe, ce que l'app fait, le geste.
+// Les versions sont celles qui ONT RÉPONDU — jamais devinées.
+function textePlusieurs() {
+  const v = (__vmrPlusieurs || []).filter((x) => x && x !== '?');
+  const geste = v.length >= 2
+    ? `supprime l'ancienne et garde la ${v[v.length - 1]}`
+    : "n'en garde qu'une (la plus récente)";
+  return `Deux extensions VRM répondent dans ce Chrome${v.length >= 2 ? ` (${v.slice(0, -1).join(', ')} et ${v[v.length - 1]})` : ''} : chaque commande partirait deux fois, alors je n'en envoie aucune. Dans chrome://extensions, ${geste}, puis recharge cette page (si tu viens de la retirer, recharger suffit).`;
+}
+function sonderPonts(dureeMs = 1500) {
+  if (typeof window === 'undefined' || !__vmrExtReady || __vmrTour) return;
+  const tour = { t0: Date.now(), ponts: new Map() };
+  __vmrTour = tour;
+  try { window.postMessage({ __vmr: 'ping' }, '*'); } catch (_) {}
+  setTimeout(() => {
+    if (__vmrTour === tour) __vmrTour = null;
+    __vmrToursFaits++;
+    __vmrAttenteTour.splice(0).forEach((f) => { try { f(); } catch (_) {} });
+    if (!tour.ponts.size) return;                       // personne n'a répondu : pas de conclusion
+    const versions = [...new Set([...tour.ponts.values()].filter(Boolean))].sort(cmpVersion);
+    if (versions.length) __vmrExtVersion = versions[versions.length - 1];
+    const avant = JSON.stringify(__vmrPlusieurs);
+    __vmrPlusieurs = tour.ponts.size >= 2 ? (versions.length ? versions : ['?']) : null;
+    if (JSON.stringify(__vmrPlusieurs) !== avant) __vmrExtSubs.forEach(fn => { try { fn(); } catch (_) {} });
+  }, dureeMs);
+}
 if (typeof window !== 'undefined') {
   try {
     window.addEventListener('message', (e) => {
       if (e.source !== window || !e.data || e.data.__vmr !== 'ready') return;
+      const premier = !__vmrExtReady;
       __vmrExtReady = true;
-      if (e.data.version) __vmrExtVersion = String(e.data.version);
+      if (__vmrTour) __vmrTour.ponts.set(cleDuPont(e.data), e.data.version ? String(e.data.version) : '');
+      else if (e.data.version && (!__vmrExtVersion || cmpVersion(String(e.data.version), __vmrExtVersion) > 0 || !__vmrPlusieurs)) __vmrExtVersion = String(e.data.version);
       __vmrExtSubs.forEach(fn => { try { fn(); } catch (_) {} });
+      // Le premier « ready » : on compte tout de suite (un second pont répond
+      // à la même question dans la seconde).
+      if (premier) setTimeout(() => sonderPonts(), 50);
     });
     window.postMessage({ __vmr: 'ping' }, '*');
     // ⚠️ L'extension injecte bridge.js à `document_idle` : un seul ping au
@@ -4024,9 +4097,13 @@ function vmrPdfLbc(url, timeoutMs = 15000) {
   });
 }
 
-function vmrExec({ uid, method, endpoint, body }, timeoutMs = 15000) {
+function vmrExec(q, timeoutMs = 15000) { return sondageConnu().then(() => vmrExecUn(q, timeoutMs)); }
+function vmrExecUn({ uid, method, endpoint, body }, timeoutMs = 15000) {
   return new Promise((resolve) => {
     if (typeof window === 'undefined') { resolve({ ok: false, error: 'no window' }); return; }
+    // 5.165 : deux extensions répondent ⇒ une réponse à un acheteur partirait
+    //    DEUX fois (mesuré : « exec …/replies ×2 »). Rien ne part.
+    if (__vmrPlusieurs) { resolve({ ok: false, error: textePlusieurs(), code: 'plusieurs' }); return; }
     const reqId = 'r' + Date.now() + '_' + Math.random().toString(36).slice(2);
     let dernier = null;
     const cleanup = () => { clearTimeout(to); window.removeEventListener('message', onMsg); };
@@ -4078,11 +4155,17 @@ const VMR_GRACE_VIDE_MS = 1500;
 //    vivant la lance ferait réessayer — un bordereau demandé deux fois. Pour
 //    elle, une réponse vide attend l'échéance (revue du 5 octobre).
 function vmrDemande(type, payload, timeoutMs) {
+  return (type === 'cmd' ? sondageConnu() : Promise.resolve()).then(() => vmrDemandeUn(type, payload, timeoutMs));
+}
+function vmrDemandeUn(type, payload, timeoutMs) {
   return new Promise((resolve) => {
     if (typeof window === 'undefined' || !__vmrExtReady) { resolve(null); return; }
     const reqId = 'q' + Date.now() + '_' + Math.random().toString(36).slice(2);
     let done = false, grace = null, to = null;
     const agit = type === 'cmd';
+    // 5.165 : deux extensions répondent ⇒ une commande serait exécutée DEUX fois
+    //    (mesuré : « cmd:bordereau ×2 »). On n'en envoie aucune, et on le dit.
+    if (agit && __vmrPlusieurs) { resolve({ accepte: false, code: 'plusieurs', raison: textePlusieurs() }); return; }
     const fin = (v) => { if (done) return; done = true; clearTimeout(grace); clearTimeout(to); window.removeEventListener('message', onMsg); resolve(v); };
     const onMsg = (e) => {
       if (e.source !== window || !e.data || e.data.__vmr !== type + ':result' || e.data.reqId !== reqId) return;
@@ -4110,7 +4193,9 @@ let __vmrBattementEnVol = false, __vmrRelance = null;
 const pontSaitRepondreEtat = () => { const v = vmrExtVersion(); return !!v && cmpVersion(v, EXT_CAPACITES.commande) >= 0; };
 async function battementExt() {
   if (typeof document !== 'undefined' && document.hidden) return;
-  if (!__vmrExtReady || __vmrBattementEnVol) return;
+  if (!__vmrExtReady) return;
+  sonderPonts();                         // 5.165 : combien d'extensions répondent (voir plus haut)
+  if (__vmrBattementEnVol) return;
   if (!pontSaitRepondreEtat()) { legacySessionExtension(); return; }
   __vmrBattementEnVol = true;
   let r = null;
@@ -4143,6 +4228,9 @@ const enVolSession = (v) => { __sessExtEnVol = v; __vmrNotifier(); };   // l'ind
 const cleSeparee = (uid) => 'vrm_ext_separee_' + uid;
 async function assurerSessionExtension() {
   if (!MULTI_USER || typeof window === 'undefined') return;
+  // 5.165 : deux extensions adopteraient la MÊME session et se la tueraient.
+  await sondageConnu();
+  if (__vmrPlusieurs) return;
   const s = AUTH.session, u = AUTH.user;
   if (!s || !s.access_token || !u || !u.id) return;
   const e = __vmrEtat;
@@ -4199,6 +4287,7 @@ async function assurerSessionExtension() {
 let __legacyPoste = 0;
 function legacySessionExtension() {
   if (!MULTI_USER || !AUTH.session || !AUTH.user) return;
+  if (!__vmrToursFaits || __vmrPlusieurs) return;   // 5.165 : pas avant d'avoir compté, jamais à deux
   if (Date.now() - __legacyPoste < 30 * 60000) return;
   __legacyPoste = Date.now();
   posterSessionExtension(sessionAppPourExtension());
@@ -4259,6 +4348,9 @@ function raisonExtGlobale(sansSouris, opt) {
   const role = (opt && opt.role) || 'génère les bordereaux';
   if (sansSouris) return { code: 'telephone', texte: `Depuis ton ordinateur : c'est là que tourne l'extension qui ${role}.` };
   if (!vmrExtPresent()) return { code: 'absente', texte: `Extension VRM pas détectée dans ce navigateur — c'est elle qui ${role}.` };
+  // ⚠️⚠️ PLUSIEURS AVANT TOUT LE RESTE (5.165) : « mets à jour » ou « recharge »
+  //    seraient faux — il vient de mettre à jour, et l'ancienne répond encore.
+  if (__vmrPlusieurs) return { code: 'plusieurs', geste: 'extensions', texte: textePlusieurs() };
   // ⚠️ « En retard » AVANT « muette » : un pont trop ancien ne sait pas
   //    répondre, et lui dire « recharge la page » ne change rien (revue).
   if (extSait(cap) === 'retard') return { code: 'retard', texte: `Mets l'extension à jour (${EXT_ATTENDUE}) : celle installée ne sait pas encore recevoir cette commande de l'app.` };
@@ -7791,7 +7883,7 @@ function RaisonBordereauxGrises({ ventes }) {
       <Icon name="doc" size={15} style={{ color: C.warn, flexShrink: 0, marginTop: 2 }}/>
       <span style={{ minWidth: 0 }}>
         <b>{n} bordereau{n > 1 ? 'x' : ''} à générer</b> — {r.texte}
-        {r.geste === 'recharger' && (
+        {(r.geste === 'recharger' || r.geste === 'extensions') && (
           <> <button type="button" data-recharger="1" onClick={() => { try { window.location.reload(); } catch (_) {} }}
             style={{ marginLeft: 4, border: `1px solid ${C.accent}`, background: 'transparent', color: C.accent, borderRadius: 8, padding: '3px 9px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Recharger la page</button></>
         )}
@@ -8175,12 +8267,13 @@ function EtatActions({ onNav, ordi, sombre }) {
   const ink = sombre ? '#fff' : C.text, bd = sombre ? '#3A3A3C' : C.border;
 
   // ── Les trois lignes : extension · compte VRM · compte Vinted ──────────────
-  const extKo = ['telephone', 'absente', 'muette', 'retard'].includes(code);
+  const extKo = ['telephone', 'absente', 'muette', 'retard', 'plusieurs'].includes(code);
   const ligneVrmVerif = code === 'vrm-encours';
   const majDispo = !extKo && extSait('_maj') === 'retard';
   const ligneExt = code === 'telephone' ? { s: '—', t: "s'utilise sur l'ordinateur où elle est installée" }
     : code === 'absente' ? { s: 'non', t: 'pas détectée dans ce navigateur' }
     : code === 'muette' ? { s: 'non', t: 'ne répond pas' }
+    : code === 'plusieurs' ? { s: 'non', t: `deux extensions VRM répondent${(__vmrPlusieurs || []).filter((x) => x && x !== '?').length >= 2 ? ' (' + __vmrPlusieurs.join(' et ') + ')' : ''}` }
     // La version à installer est dite UNE fois, sur le bouton juste dessous
     // (revue du 9 octobre : « 5.163.0 » écrit trois fois dans le panneau).
     : code === 'retard' ? { s: 'non', t: `version ${version || '?'} — trop ancienne pour recevoir des commandes de VRM` }
@@ -8204,6 +8297,9 @@ function EtatActions({ onNav, ordi, sombre }) {
   if (code === 'telephone') geste = <span>Ouvre VRM sur l'ordinateur où l'extension est installée pour générer un bordereau, répondre ou publier.</span>;
   else if (code === 'absente' || code === 'retard') geste = <button type="button" data-etat-geste="maj" style={btn} onClick={() => { setOuvert(false); onNav && onNav('settings'); }}>{code === 'absente' ? "Installer l'extension (Réglages)" : `Mettre à jour en ${EXT_ATTENDUE} (Réglages)`}</button>;
   else if (code === 'muette') geste = <button type="button" data-etat-geste="recharger" style={btn} onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button>;
+  // Deux extensions : le geste se fait dans Chrome (une page web ne peut pas
+  // ouvrir chrome://extensions) — on le DIT, puis on recharge.
+  else if (code === 'plusieurs') geste = <span data-etat-geste="extensions">Tape <b>chrome://extensions</b> dans la barre d'adresse, supprime l'ancienne VRM, puis <button type="button" data-etat-geste-recharger="1" style={{ ...btn, padding: '4px 9px', fontSize: 12 }} onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button></span>;
   // Non connectée : son icône ouvre SA fenêtre de connexion (une extension
   // connectée, elle, ouvre VRM) — c'est le repli si la reconnexion automatique
   // n'aboutit pas.
@@ -8250,7 +8346,7 @@ function EtatActions({ onNav, ordi, sombre }) {
           ) : (
             <div style={{ color: C.muted, marginBottom: 8 }}>
               Tout ce qui est déjà dans VRM marche : tes ventes, achats, annonces et messages, les colis à retirer et leurs codes, l'impression des bordereaux déjà reçus.
-              {' '}{code === 'pause' ? st.glob.texte
+              {' '}{code === 'pause' || code === 'plusieurs' ? st.glob.texte
                 : <>Générer un bordereau ou répondre demande l'extension allumée, connectée à ton compte VRM, avec un compte Vinted ouvert dans Chrome ; publier sur Leboncoin demande {extSait('publication') === 'retard' ? 'une extension à jour' : "l'extension allumée"}.</>}
             </div>
           )}
@@ -30020,10 +30116,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   const tx = openConv.conversation && openConv.conversation.transaction && openConv.conversation.transaction.id;
                   if (!off && !tx) return null;
                   const etat = extSait('messagerie');
-                  if (etat !== 'ok') return (
+                  if (etat !== 'ok' || __vmrPlusieurs) return (
                     <div data-offre="indisponible" style={{fontSize:11.5,color:C.muted,marginBottom:8,lineHeight:1.4}}>
                       {off ? <><b style={{color:C.text}}>Offre de {fmtE(off.prix)}</b> en attente — </> : null}
-                      {etat==='retard' ? `mets l'extension à jour (${EXT_CAPACITES.messagerie}) pour trancher ou faire une offre d'ici.` : "les offres se font depuis le Chrome où l'extension est installée."}
+                      {__vmrPlusieurs ? textePlusieurs() : etat==='retard' ? `mets l'extension à jour (${EXT_CAPACITES.messagerie}) pour trancher ou faire une offre d'ici.` : "les offres se font depuis le Chrome où l'extension est installée."}
                       {' '}<a href={`https://www.vinted.fr/inbox/${openConv.convId}`} target="_blank" rel="noreferrer" style={{color:C.accent,fontWeight:600}}>Ouvrir sur Vinted</a>
                     </div>
                   );
