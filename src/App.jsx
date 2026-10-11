@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { VAPID_PUBLIC_KEY } from "./vapid.js";
 import { noterPlantage, viderPlantages } from "./plantages.js";
+import * as photosVinted from "./photosVinted.js";
 import { contactEmail, CONTACT_A_VENIR } from "./contact.js";
 // §11 : l'adresse de réception se compare avec LA forme du serveur (celle qui
 // décide à qui appartient un email) — jamais une seconde normalisation ici.
@@ -1053,7 +1054,7 @@ function RangerSheet({ paires, cellNom, onPick, onLibre, onClose }) {
           <button key={p.numero} onClick={()=>onPick(p)}
             style={{display:'flex',alignItems:'center',gap:11,textAlign:'left',border:`1px solid ${C.border}`,borderRadius:10,background:C.card,padding:'9px 11px',cursor:'pointer',fontFamily:'inherit',boxShadow:C.shadow}}>
             {p.photo
-              ? <img src={p.photo} alt="" style={{width:44,height:44,borderRadius:8,objectFit:'cover',flexShrink:0,background:C.card2}}/>
+              ? <PhotoVinted src={p.photo} alt="" style={{width:44,height:44,borderRadius:8,objectFit:'cover',flexShrink:0,background:C.card2}}/>
               : <span style={{width:44,height:44,borderRadius:8,background:C.card2,display:'flex',alignItems:'center',justifyContent:'center',fontSize:19,flexShrink:0}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
             <span style={{flex:'1 1 120px',minWidth:0}}>
               <span className="vrm-display" style={{display:'block',fontSize:15,fontWeight:700,color:C.accent}}>N°{p.numero}</span>
@@ -4439,6 +4440,145 @@ if (typeof window !== 'undefined') {
     document.addEventListener('visibilitychange', () => { if (!document.hidden) battementExt(); });
   } catch (_) {}
 }
+// ══ LES PHOTOS DU CDN DE VINTED (11 octobre) — la règle vit dans src/photosVinted.js ══
+// « Je n'ai plus les photos de mes annonces, ni dans les bordereaux, ni dans les
+// ventes » (Julien, 11 octobre). Les données sont intactes ; c'est l'AFFICHAGE
+// hors de vinted.fr qui échoue. Toute photo du CDN Vinted passe par
+// `PhotoVinted` (une règle, §11) : sans référent d'abord, puis, si le navigateur
+// refuse quand même, les octets demandés à l'EXTENSION (le pont « photo »,
+// présent depuis très longtemps — rien à changer côté extension).
+// Peut-on demander le secours ICI ? Trois états, jamais deux : l'extension se
+// manifeste quelques secondes après le chargement (pings à 0,6 · 1,5 · 3 · 6 s) —
+// avant, c'est « pas encore su », pas « non ».
+const __photosDebut = Date.now();
+const PHOTOS_GRACE_EXT_MS = 7000;
+const secoursPhotos = () => {
+  if (typeof window === 'undefined') return 'non';
+  if (__vmrExtReady) return __vmrEtat === null ? 'non' : 'oui';
+  return Date.now() - __photosDebut < PHOTOS_GRACE_EXT_MS ? 'attente' : 'non';
+};
+photosVinted.configurer({
+  demander: (u) => vmrPhoto(u),
+  secours: secoursPhotos,
+  ext: () => (__vmrExtReady ? (__vmrEtat === null ? 'muette' : 'presente') : 'absente'),
+});
+if (typeof window !== 'undefined') {
+  try {
+    onVmrExt(() => photosVinted.secoursChange());
+    setTimeout(() => photosVinted.secoursChange(), PHOTOS_GRACE_EXT_MS + 200);
+  } catch (_) {}
+}
+// Le cadre du pictogramme reprend la PLACE de l'image (jamais un trou, jamais
+// l'icône « image cassée » du navigateur) : mêmes dimensions, mêmes arrondis.
+const CLES_CADRE_PHOTO = ['width', 'height', 'minWidth', 'minHeight', 'maxWidth', 'maxHeight', 'borderRadius', 'flexShrink', 'flex', 'margin', 'marginLeft', 'marginRight', 'marginTop', 'marginBottom', 'border', 'boxShadow', 'position', 'top', 'left', 'right', 'bottom', 'aspectRatio', 'background'];
+function cadrePhoto(style) {
+  const s = {};
+  if (style) for (const k of CLES_CADRE_PHOTO) if (style[k] !== undefined) s[k] = style[k];
+  if (s.width === undefined) s.width = '100%';
+  if (s.height === undefined || s.height === 'auto') s.height = typeof s.width === 'number' ? s.width : '100%';
+  return { ...s, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', boxSizing: 'border-box', color: C.muted };
+}
+const taillePicto = (style) => {
+  const w = style && style.width, h = style && style.height;
+  const m = Math.min(typeof w === 'number' ? w : 44, typeof h === 'number' ? h : 44);
+  return Math.max(12, Math.min(22, Math.round(m * 0.45)));
+};
+// Remplace un `<img>` qui PEUT afficher une photo du CDN Vinted. Pour toute autre
+// adresse, c'est un `<img>` ordinaire, comme avant.
+//   · `repli` : ce qui prend la place de la photo quand elle ne s'affiche pas
+//     (en attente du secours, ou définitivement) — `null` = rien du tout ;
+//     absent = le pictogramme « image ».
+//   · `onError()` : appelé UNE fois, sans argument, quand la photo est
+//     DÉFINITIVEMENT perdue ici (le secours a échoué ou n'existe pas) — c'est ce
+//     que lisent les écrans qui la retirent de leur liste (`noterImgMorte`).
+function PhotoVinted({ src, repli, onError, onLoad, style, loading, ...reste }) {
+  const vinted = photosVinted.estPhotoVinted(src);
+  const [, maj] = React.useReducer((x) => x + 1, 0);
+  const qui = React.useRef(null); if (!qui.current) qui.current = {};
+  const el = React.useRef(null);
+  const etat = vinted ? photosVinted.etat(src) : 'natif';
+  const mort = vinted && photosVinted.estMorte(src);
+  const vuAuRendu = React.useRef('');
+  vuAuRendu.current = etat + (mort ? '!' : '');
+  React.useEffect(() => {
+    if (!vinted) return undefined;
+    const off = photosVinted.monter(src, maj);
+    // Ce qui a changé entre le rendu et l'abonnement (une autre vignette de la
+    // même photo a échoué entre-temps) : on se met à jour une fois.
+    if (photosVinted.etat(src) + (photosVinted.estMorte(src) ? '!' : '') !== vuAuRendu.current) maj();
+    return off;
+  }, [src, vinted]);
+  const attend = vinted && !mort && (etat === 'attente' || etat === 'vol');
+  React.useEffect(() => {
+    if (!attend || !el.current) return undefined;
+    return photosVinted.observer(el.current, (v) => photosVinted.voir(src, qui.current, v));
+  }, [attend, src]);
+  const signale = React.useRef(null);
+  React.useEffect(() => {
+    if (!mort || signale.current === src) return;
+    signale.current = src;
+    if (onError) { try { onError(); } catch (_) {} }
+  }, [mort, src]);
+  if (!vinted) {
+    return <img src={src} loading={loading} style={style} {...reste} onLoad={onLoad}
+      onError={onError ? () => { try { onError(); } catch (_) {} } : undefined}/>;
+  }
+  if (etat === 'ok') {
+    return <img src={photosVinted.blobDe(src)} style={style} {...reste} data-photo-vinted="secours" onLoad={onLoad}
+      onError={() => photosVinted.echecBlob(src)}/>;
+  }
+  if (etat === 'natif') {
+    return <img src={src} referrerPolicy="no-referrer" loading={loading || 'lazy'} style={style} {...reste} data-photo-vinted="natif"
+      onLoad={(e) => { photosVinted.chargeNatif(src); if (onLoad) onLoad(e); }}
+      onError={() => photosVinted.echecNatif(src)}/>;
+  }
+  if (mort && repli === null) return null;
+  return (
+    <span ref={el} aria-hidden="true" data-photo-vinted={mort ? 'perdue' : 'attente'} style={cadrePhoto(style)}>
+      {repli !== undefined ? repli : <Icon name="image" size={taillePicto(style)} style={{ color: C.muted, opacity: .55 }}/>}
+    </span>
+  );
+}
+// UNE phrase, UNE fois, sur la coque (§7) — seulement quand des photos Vinted
+// ne s'affichent PAS ICI et que rien ne peut aller les chercher (ou que le
+// secours a échoué). Rien quand tout s'affiche, rien pendant qu'on attend
+// encore l'extension, rien pour un lien mort isolé (d'autres photos s'affichent
+// — c'est une photo expirée, pas un blocage). Pas de couleur d'alerte : il n'y
+// a rien d'irréversible, la donnée est intacte.
+// La CAUSE suit la sonde (trois états, trois phrases — on n'affirme pas que
+// c'est Vinted quand on ne l'a pas mesuré) ; le GESTE suit ce qui est possible
+// ici (pas d'extension sur ce téléphone / dans ce navigateur, extension muette,
+// secours refusé).
+function PhotosBloquees() {
+  const sansSouris = useSansSouris();
+  const [, maj] = React.useReducer((x) => x + 1, 0);
+  React.useEffect(() => photosVinted.ecouter(maj), []);
+  React.useEffect(() => onVmrExt(maj), []);
+  const g = photosVinted.etatGlobal();
+  if (!(g.koNatif > 0 && g.okNatif === 0 && g.morts > 0)) return null;
+  const cause = g.sonde === 'bloquee'
+    ? "Ce navigateur bloque les photos de Vinted dès qu'elles s'affichent en dehors de vinted.fr."
+    : g.sonde === 'reponse'
+      ? "Le serveur de photos de Vinted répond, mais ses images ne s'affichent pas dans VRM."
+      : "Les photos de Vinted ne s'affichent pas dans VRM, et je n'ai pas pu mesurer pourquoi.";
+  const ext = __vmrExtReady ? (__vmrEtat === null ? 'muette' : 'presente') : 'absente';
+  const geste = ext === 'presente'
+    ? <>L'extension VRM n'a pas pu les récupérer non plus : <b>recharge cette page</b>. Tes annonces et tes ventes ne sont pas touchées.</>
+    : ext === 'muette'
+      ? <>L'extension VRM, qui sait aller les chercher, ne répond pas : <b>recharge cette page</b>.</>
+      : sansSouris
+        ? <>Ici, rien ne peut aller les chercher : sur l'<b>ordinateur où l'extension VRM est installée</b>, c'est elle qui les récupère. Tes annonces et tes ventes ne sont pas touchées.</>
+        : <><b>Ouvre VRM dans le Chrome où l'extension VRM est installée</b> : c'est elle qui va les chercher. Tes annonces et tes ventes ne sont pas touchées.</>;
+  return (
+    <div style={{ padding: '12px 16px 4px' }}>
+      <div data-photos-bloquees={g.sonde || 'passu'} data-photos-geste={ext === 'absente' ? (sansSouris ? 'telephone' : 'chrome') : ext}
+        style={{ display: 'flex', gap: 10, alignItems: 'flex-start', border: `1px solid ${C.border}`, background: C.card, borderRadius: 10, padding: '11px 13px', fontSize: 13, lineHeight: 1.5, color: C.text }}>
+        <span style={{ flexShrink: 0, marginTop: 1, color: C.muted }}><Icon name="image" size={18}/></span>
+        <span>{cause} {geste}</span>
+      </div>
+    </div>
+  );
+}
 // LE COMPTE VINTED OUVERT DANS CE CHROME, tel que l'extension le lit dans son
 // cookie — réponse `etat` du pont, relue toutes les 20 s et au retour sur
 // l'onglet. ⚠️ C'est la SEULE réponse du pont qui le porte : `authEtat` ne parle
@@ -6553,7 +6693,7 @@ function PhotoEditor({ refPhoto, refTitle, onClose, toast }) {
               {refPhoto && (
                 <div style={{marginBottom:14}}>
                   <div style={{fontSize:11,color:C.muted,fontWeight:600,marginBottom:6}}>ANNONCE ACTUELLE (repère)</div>
-                  <img src={refPhoto} alt="" style={{width:110,height:'auto',borderRadius:10,border:`1px solid ${C.border}`}}/>
+                  <PhotoVinted src={refPhoto} alt="" style={{width:110,height:'auto',borderRadius:10,border:`1px solid ${C.border}`}}/>
                 </div>
               )}
               <label style={{display:'inline-flex',alignItems:'center',gap:8,border:`1px solid ${C.accent}`,background:C.accent+'12',color:C.accent,borderRadius:10,fontSize:14,fontWeight:700,padding:'13px 18px',cursor:'pointer'}}>
@@ -9187,7 +9327,7 @@ function PhotoVente({ src, size = 56 }) {
   const [ko, setKo] = React.useState(false);
   const ok = src && /^https?:\/\//.test(String(src)) && !ko;
   const box = { width: size, height: size, flexShrink: 0, borderRadius: 10, overflow: 'hidden', background: C.bg, border: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' };
-  if (ok) return <img src={src} alt="" loading="lazy" onError={() => setKo(true)} style={{ ...box, objectFit: 'cover' }} />;
+  if (ok) return <PhotoVinted src={src} alt="" loading="lazy" onError={() => setKo(true)} style={{ ...box, objectFit: 'cover' }} />;
   return <div style={box} aria-hidden="true"><Icon name="tag" size={Math.round(size * 0.42)} color={C.muted} /></div>;
 }
 // Le QR d'un colis Leboncoin : l'image si elle charge, sinon un lien (api.leboncoin
@@ -10228,7 +10368,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
           {(urls.length > 0 || titre.trim()) && (
             <div style={{ display: 'flex', gap: 12, alignItems: 'center', border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: 10, boxShadow: C.shadow }}>
               <div style={{ flexShrink: 0, width: 66, height: 66, borderRadius: 10, overflow: 'hidden', background: C.bg, border: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {urls[0] ? <img src={urls[0]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.currentTarget.style.display = 'none'; }} /> : <Icon name="tag" size={20} />}
+                {urls[0] ? <PhotoVinted src={urls[0]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name="tag" size={20} />}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13.5, fontWeight: 600, color: titre.trim() ? C.text : C.muted, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{titre.trim() || 'Titre de ton annonce…'}</div>
@@ -10252,7 +10392,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
                   {listePaires.length === 0 && <div style={{ fontSize: 12.5, color: C.muted, padding: '6px 2px' }}>Aucune paire ne correspond.</div>}
                   {listePaires.slice(0, 120).map(p => (
                     <button key={p.id} type="button" onClick={() => choisirPaire(p)} style={{ display: 'flex', alignItems: 'center', gap: 11, textAlign: 'left', border: `1px solid ${C.border}`, borderRadius: 10, background: C.card, padding: '8px 10px', cursor: 'pointer', fontFamily: 'inherit' }}>
-                      {p.cover ? <img src={p.cover} alt="" loading="lazy" style={{ width: 46, height: 46, borderRadius: 8, objectFit: 'cover', flexShrink: 0, background: C.bg }} onError={e => { e.currentTarget.style.opacity = 0.15; }} /> : <span style={{ width: 46, height: 46, borderRadius: 8, background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
+                      {p.cover ? <PhotoVinted src={p.cover} alt="" loading="lazy" style={{ width: 46, height: 46, borderRadius: 8, objectFit: 'cover', flexShrink: 0, background: C.bg }} /> : <span style={{ width: 46, height: 46, borderRadius: 8, background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
                       <span style={{ flex: 1, minWidth: 0 }}>
                         <span className="vrm-display" style={{ display: 'block', fontSize: 14, fontWeight: 700, color: C.accent }}>N°{p.num}</span>
                         <span style={{ display: 'block', fontSize: 12.5, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.title || '—'}</span>
@@ -10273,7 +10413,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
                 <div className="vrm-rangee" style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 2 }}>
                   {urls.map((u, i) => (
                     <div key={u + i} style={{ position: 'relative', width: 74, height: 74, borderRadius: 10, overflow: 'hidden', border: `1px solid ${C.border}`, flexShrink: 0, background: C.bg }}>
-                      <img src={u} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.currentTarget.style.opacity = 0.15; }} />
+                      <PhotoVinted src={u} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       <button type="button" onClick={() => setUrls(urls.filter((_, j) => j !== i))} aria-label="Retirer" style={{ position: 'absolute', top: 3, right: 3, width: 20, height: 20, borderRadius: 10, border: 'none', background: 'rgba(0,0,0,.62)', color: '#fff', fontSize: 13, cursor: 'pointer', lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
                       {i === 0 && <span style={{ position: 'absolute', bottom: 0, left: 0, right: 0, fontSize: 9, textAlign: 'center', background: 'rgba(0,0,0,.6)', color: '#fff', padding: '2px 0', fontWeight: 600 }}>couverture</span>}
                     </div>
@@ -17294,7 +17434,7 @@ function RoomPlan({ locate, onLocateConsumed }) {
                   {dedans.map(p => (
                     <div key={p.cell + '_' + p.numero} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '7px 9px', borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, minWidth: 0 }}>
                       {p.photo
-                        ? <img src={p.photo} alt="" style={{ width: 36, height: 36, borderRadius: 9, objectFit: 'cover', flexShrink: 0, background: C.card2 }}/>
+                        ? <PhotoVinted src={p.photo} alt="" style={{ width: 36, height: 36, borderRadius: 9, objectFit: 'cover', flexShrink: 0, background: C.card2 }}/>
                         : <span style={{ width: 36, height: 36, borderRadius: 9, background: C.card2, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
                       <span style={{ flex: '1 1 90px', minWidth: 0 }}>
                         <span className="vrm-display" style={{ display: 'block', fontSize: 14, fontWeight: 700, color: C.accent }}>N°{p.numero}</span>
@@ -19308,7 +19448,7 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
                       return (
                         <div key={listing.id} style={{border:`1px solid ${C.border}`,borderRadius:8,overflow:'hidden',background:C.bg,opacity:linked?0.6:1}}>
                           <div style={{width:'100%',aspectRatio:'1/1',background:C.border,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                            {listing.photo ? <img src={listing.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/> : <span style={{fontSize:26}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
+                            {listing.photo ? <PhotoVinted src={listing.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/> : <span style={{fontSize:26}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
                           </div>
                           <div style={{padding:8}}>
                             <div title={listing.title} style={{fontSize:11,fontWeight:600,color:C.text,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden',minHeight:28}}>{listing.title}</div>
@@ -19346,7 +19486,7 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
           return (
             <div key={p.id} style={{display:'flex',gap:12,alignItems:'center',padding:11,borderRadius:10,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none'}}>
               <div style={{width:52,height:52,borderRadius:8,background:C.border,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
-                {p.photo ? <img src={p.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/> : <span style={{fontSize:22}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
+                {p.photo ? <PhotoVinted src={p.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/> : <span style={{fontSize:22}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
               </div>
               <div style={{flexShrink:0,minWidth:54,textAlign:'center'}}>
                 <div style={{fontSize:9,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>N°</div>
@@ -20833,7 +20973,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return (
       <div style={{display:'flex',alignItems:'center',gap:7,margin:'0 0 8px',padding:'5px 7px',borderRadius:8,border:`1px solid ${INV_STATUS.online.color}44`,background:`${INV_STATUS.online.color}0e`}}>
         <div style={{width:30,height:30,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-          {ph ? <img src={ph} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/> : <span style={{fontSize:14}}>🧾</span>}
+          {ph ? <PhotoVinted src={ph} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/> : <span style={{fontSize:14}}>🧾</span>}
         </div>
         <div style={{flex:'1 1 90px',minWidth:0}}>
           <div style={{fontSize:11,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={a.title}>{a.title||'Achat relié'}</div>
@@ -25980,7 +26120,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {j.photos && j.photos.length
                       ? <div style={{display:'flex',flexShrink:0,paddingRight:2}}>
                           {j.photos.map((ph,k)=>(
-                            <img key={ph} src={ph} alt="" loading="lazy" onError={()=>noterImgMorte(ph)}
+                            <PhotoVinted key={ph} src={ph} alt="" loading="lazy" onError={()=>noterImgMorte(ph)}
                               style={{width:46,height:46,borderRadius:8,objectFit:'cover',border:`2px solid ${C.card}`,marginLeft:k?-18:0,background:C.bg,boxShadow:'0 1px 3px rgba(0,0,0,.25)'}}/>
                           ))}
                         </div>
@@ -26087,7 +26227,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           {/* Le CDN Vinted expire : sans ce repli, la vignette
                               devient l'icône « image cassée » du navigateur (§5.76). */}
                           {ph && !imgMortes.has(ph)
-                            ? <img src={ph} alt="" loading="lazy" onError={()=>noterImgMorte(ph)} style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                            ? <PhotoVinted src={ph} alt="" loading="lazy" onError={()=>noterImgMorte(ph)} style={{width:'100%',height:'100%',objectFit:'cover'}}/>
                             : <Icon name="image" size={30} style={{color:C.muted,opacity:.5}}/>}
                           {num && <span style={{position:'absolute',top:9,right:9,fontSize:10.5,fontWeight:700,color:'#fff',background:'rgba(11,15,21,.62)',borderRadius:8,padding:'2px 8px'}}>N°{num}</span>}
                         </div>
@@ -26842,7 +26982,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                {/* ── Haut : photo · titre + méta · prix ─────────────────────── */}
                <div style={{display:'flex',gap:12,alignItems:'flex-start'}}>
                 <div style={{width:72,height:72,borderRadius:10,background:C.card2||C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                  {orderPhoto(o)?<img src={orderPhoto(o)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
+                  {orderPhoto(o)?<PhotoVinted src={orderPhoto(o)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
                 </div>
                 <div style={{flex:'1 1 auto',minWidth:0}}>
                   <div style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.2,
@@ -27029,7 +27169,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.45}}>Ouvre la commande sur Vinted pour générer l'étiquette de retour, la réimprimer ou suivre le colis. VRM ne la génère pas tout seul (un retour engage l'envoi, et c'est un compte en litige).</div>
               {l.map(o=>{ const ph=orderPhoto(o); return (
                 <div key={o.transaction_id} style={{display:'flex',alignItems:'center',gap:10,marginTop:9,flexWrap:'wrap'}}>
-                  {ph && !imgMortes.has(ph) ? <img src={ph} alt="" loading="lazy" onError={()=>noterImgMorte(ph)} style={{width:38,height:38,borderRadius:8,objectFit:'cover',flexShrink:0,border:`1px solid ${C.border}`}}/> : null}
+                  {ph && !imgMortes.has(ph) ? <PhotoVinted src={ph} alt="" loading="lazy" onError={()=>noterImgMorte(ph)} style={{width:38,height:38,borderRadius:8,objectFit:'cover',flexShrink:0,border:`1px solid ${C.border}`}}/> : null}
                   <div style={{flex:'1 1 160px',minWidth:0}}>
                     <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={o.title}>{o.title}</div>
                     {!unSeul && o._acc && <div style={{fontSize:11.5,color:C.muted}}>compte {accNameOf(o._acc)}</div>}
@@ -27123,7 +27263,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // « image brisée » du navigateur au milieu d'une carte de colis, c'est
           // ce qui fait « pas fini » (vu en capture sur « Salomon sneakers »).
           const thumb = (src) => src && !imgMortes.has(src)
-            ? <img src={src} alt="" loading="lazy" onError={()=>noterImgMorte(src)}
+            ? <PhotoVinted src={src} alt="" loading="lazy" onError={()=>noterImgMorte(src)}
                 style={{width:38,height:38,borderRadius:8,objectFit:'cover',flexShrink:0,border:`1px solid ${C.border}`}}/>
             : <span style={{flexShrink:0,color:C.muted,display:'flex'}}><Icon name="bag" size={22}/></span>;
           // ⚠️ ON NE DEVINE PLUS LE LIEU (Julien, 23 sept. : « ne prends plus en
@@ -27903,7 +28043,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             return (
             <div key={o.transaction_id} style={{padding:'12px 14px',borderTop:i>0?`1px solid ${C.border}`:'none',opacity:cancelled?0.55:1,display:'flex',alignItems:'center',gap:12,...(estFloute(o)?STYLE_FLOU:null)}}>
               <div style={{width:46,height:46,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                {orderPhoto(o)?<img src={orderPhoto(o)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={18} style={{color:C.muted,opacity:.55}}/>}
+                {orderPhoto(o)?<PhotoVinted src={orderPhoto(o)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={18} style={{color:C.muted,opacity:.55}}/>}
               </div>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:15,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',letterSpacing:-0.2}} title={o.title}>{o.title}</div>
@@ -28034,7 +28174,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:6}}>N°{g.numero}</div>
                 {g.items.map(it => (
                   <div key={it.id} style={{display:'flex',alignItems:'center',gap:9,marginBottom:6}}>
-                    {it.photo && <img src={it.photo} alt="" style={{width:34,height:34,borderRadius:8,objectFit:'cover',flexShrink:0}}/>}
+                    {it.photo && <PhotoVinted src={it.photo} alt="" style={{width:34,height:34,borderRadius:8,objectFit:'cover',flexShrink:0}}/>}
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:12,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{it.title}</div>
                       <div style={{fontSize:10,color:C.muted}}><AcctTag acc={it._acc} name={accNameOf(it._acc)}/></div>
@@ -28143,7 +28283,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {numeroReprises.slice(0,8).map((r,i)=>(
                   <div key={i} style={{display:'flex',alignItems:'center',gap:9,background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:'7px 9px'}}>
                     <div style={{width:34,height:34,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                      {r.item.photo?<img src={r.item.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
+                      {r.item.photo?<PhotoVinted src={r.item.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
                     </div>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:12,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.item.title}</div>
@@ -28226,7 +28366,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <div key={i} style={{display:'flex',alignItems:'center',gap:9,flexWrap:'wrap',background:C.card,border:`1px solid ${recu?INV_STATUS.online.color:C.border}`,borderRadius:8,padding:'7px 9px'}}>
                       <div style={{flexShrink:0,minWidth:44,height:34,borderRadius:8,background:r.num?C.accent:C.border,color:r.num?C.onAccent:C.muted,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:700,padding:'0 6px'}}>{r.num?`N°${r.num}`:'—'}</div>
                       <div style={{width:34,height:34,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                        {orderPhoto(r.o)?<img src={orderPhoto(r.o)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
+                        {orderPhoto(r.o)?<PhotoVinted src={orderPhoto(r.o)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
                       </div>
                       <div style={{flex:'1 1 120px',minWidth:0}}>
                         <div style={{fontSize:12,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={r.title}>{r.title}</div>
@@ -28279,7 +28419,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {disparues.slice(0,40).map(d=>(
                   <div key={d.id} style={{display:'flex',alignItems:'center',gap:10,padding:'7px 0',borderTop:`1px solid ${C.border}`}}>
                     <div style={{width:34,height:34,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden'}}>
-                      {d.e.photo && <img src={d.e.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>}
+                      {d.e.photo && <PhotoVinted src={d.e.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>}
                     </div>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:12,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>N°{d.numero} · {d.e.title||'—'}</div>
@@ -28366,7 +28506,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <div key={it.id} style={{borderTop:`1px solid ${C.warn}22`}}>
                       <div style={{display:'flex',gap:10,alignItems:'center',padding:'8px 12px'}}>
                         <div style={{width:40,height:40,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                          {it.photo?<img src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
+                          {it.photo?<PhotoVinted src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
                         </div>
                         <div style={{flex:1,minWidth:0}}>
                           <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{num?`N°${num} · `:''}{it.title||'Annonce'}</div>
@@ -28599,7 +28739,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div key={it._acc.vinted_user_id+'_'+it.id} data-carte-annonce={it.id} style={{borderRadius:10,background:C.card,border:`1px solid ${soldBord?C.warn:C.border}`,boxShadow:C.shadow||'none',display:'flex',flexDirection:'column',overflow:'hidden',...(estFloute(it)?STYLE_FLOU:null)}}>
                 <div style={{display:'flex',gap:10,padding:10}}>
                   <a href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted" style={{flexShrink:0,width:88,height:118,borderRadius:8,overflow:'hidden',background:C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',position:'relative'}}>
-                    {it.photo?<img src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/>}
+                    {it.photo?<PhotoVinted src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/>}
                     {it.promoted===true && <span data-boostee title="Vinted dit que cette annonce est boostée en ce moment" style={{position:'absolute',left:4,right:4,bottom:4,textAlign:'center',fontSize:10,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:5,padding:'1px 0'}}>Boostée</span>}
                   </a>
                   <div style={{flex:1,minWidth:0,display:'flex',flexDirection:'column',gap:2}}>
@@ -28890,7 +29030,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   return (
                     <button key={(c._acc?c._acc.vinted_user_id:'')+'_'+c.id} type="button" data-conv={c.id} onClick={()=>openConversation(c)}
                       style={{display:'flex',gap:10,alignItems:'center',width:'100%',textAlign:'left',padding:'10px 12px',border:'none',borderTop:i?`1px solid ${C.border}`:'none',background:'transparent',color:C.text,cursor:'pointer',fontFamily:'inherit',...(selEff&&uidC(c)!==selEff?STYLE_FLOU:null)}}>
-                      {photo ? <img src={photo} alt="" loading="lazy" style={{width:40,height:40,borderRadius:8,objectFit:'cover',flexShrink:0}}/> : <span style={{width:40,height:40,borderRadius:8,background:C.card2||C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',color:C.muted,flexShrink:0}}><Icon name="chat" size={17}/></span>}
+                      {photo ? <PhotoVinted src={photo} alt="" loading="lazy" style={{width:40,height:40,borderRadius:8,objectFit:'cover',flexShrink:0}}/> : <span style={{width:40,height:40,borderRadius:8,background:C.card2||C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',color:C.muted,flexShrink:0}}><Icon name="chat" size={17}/></span>}
                       <span style={{flex:1,minWidth:0}}>
                         <span style={{display:'flex',alignItems:'baseline',gap:6}}>
                           <span style={{fontSize:13.5,fontWeight:c.unread?700:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{(c.opposite_user&&c.opposite_user.login)||'Conversation'}</span>
@@ -29068,7 +29208,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   const b = bordsParTxn[tx] || null;
                   return (
                     <div key={tx} data-tx={tx} data-limite={limiteDepassee?'depassee':'ok'} style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap',padding:'7px 9px',border:`1px solid ${C.border}`,borderRadius:8,background:C.card,minWidth:0}}>
-                      <div style={{width:34,height:34,borderRadius:5,background:C.border,flexShrink:0,overflow:'hidden'}}>{ph && !imgMortes.has(ph) && <img src={ph} alt="" loading="lazy" onError={()=>noterImgMorte(ph)} style={{width:'100%',height:'100%',objectFit:'cover'}}/>}</div>
+                      <div style={{width:34,height:34,borderRadius:5,background:C.border,flexShrink:0,overflow:'hidden'}}>{ph && !imgMortes.has(ph) && <PhotoVinted src={ph} alt="" loading="lazy" onError={()=>noterImgMorte(ph)} style={{width:'100%',height:'100%',objectFit:'cover'}}/>}</div>
                       <div style={{flex:'1 1 180px',minWidth:0}}>
                         <div style={{fontSize:12.5,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{o.title || 'Vente'}</div>
                         <div style={{fontSize:11,color:C.muted,marginTop:2,display:'flex',gap:8,flexWrap:'wrap'}}>
@@ -29292,7 +29432,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div data-bord-card style={{padding:'11px 12px',border:`1px solid ${dl!=null&&dl<0?C.danger+'66':pdf?INV_STATUS.online.color+'44':C.border}`,background:C.card,borderRadius:10,opacity:posted?0.55:1}}>
                     <div style={{display:'flex',gap:12,alignItems:'center'}}>
                       <div style={{width:58,height:58,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                        {ph?<img src={ph} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:22}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
+                        {ph?<PhotoVinted src={ph} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:22}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
                       </div>
                       <div style={{flex:'1 1 150px',minWidth:0}}>
                         <div style={{display:'flex',alignItems:'center',gap:6}}>
@@ -29472,7 +29612,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   const ph = orderPhoto(o);
                   return (
                     <div key={String(o.transaction_id)} data-parti={st.label} style={{display:'flex',gap:10,alignItems:'center',padding:'7px 9px',border:`1px solid ${C.border}`,borderRadius:8,minWidth:0}}>
-                      <div style={{width:34,height:34,borderRadius:5,background:C.border,flexShrink:0,overflow:'hidden'}}>{ph && !imgMortes.has(ph) && <img src={ph} alt="" loading="lazy" onError={()=>noterImgMorte(ph)} style={{width:'100%',height:'100%',objectFit:'cover'}}/>}</div>
+                      <div style={{width:34,height:34,borderRadius:5,background:C.border,flexShrink:0,overflow:'hidden'}}>{ph && !imgMortes.has(ph) && <PhotoVinted src={ph} alt="" loading="lazy" onError={()=>noterImgMorte(ph)} style={{width:'100%',height:'100%',objectFit:'cover'}}/>}</div>
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{fontSize:12.5,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{o.title || 'Vente'}</div>
                         <div style={{fontSize:11,color:C.muted,marginTop:2,display:'flex',gap:8,flexWrap:'wrap'}}>
@@ -29508,7 +29648,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               .map((b,i)=>(
                 <div key={i} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 10px',border:`1px solid ${C.border}`,background:C.card,borderRadius:10,opacity:0.7}}>
                   <div style={{width:38,height:38,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                    {bordPhoto(b)?<img src={bordPhoto(b)} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:16}}>📄</span>}
+                    {bordPhoto(b)?<PhotoVinted src={bordPhoto(b)} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:16}}>📄</span>}
                   </div>
                   <div style={{flex:'1 1 120px',minWidth:0}}>
                     <div style={{fontSize:12,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{numForBord(b)?`N°${numForBord(b)} · `:''}{b.modele||b.article||'Bordereau'}</div>
@@ -29534,7 +29674,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{padding:'12px 16px',borderBottom:`1px solid ${C.border}`,display:'flex',alignItems:'center',gap:11}}>
               <div style={{width:46,height:46,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
                 {pickerFor.photo && !imgMortes.has(pickerFor.photo)
-                  ? <img src={pickerFor.photo} alt="" onError={()=>noterImgMorte(pickerFor.photo)} style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                  ? <PhotoVinted src={pickerFor.photo} alt="" onError={()=>noterImgMorte(pickerFor.photo)} style={{width:'100%',height:'100%',objectFit:'cover'}}/>
                   : <span style={{fontSize:20}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
               </div>
               <div style={{flex:1,minWidth:0}}>
@@ -29569,7 +29709,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 // commencer, et le prix d'achat finit par ne jamais être saisi.
                 return avail.map((p, iP) => (
                   <button key={p.transaction_id} type="button" onClick={()=>choosePick(p)} style={{display:'flex',gap:10,alignItems:'center',padding:8,borderRadius:8,border:`1px solid ${C.border}`,background:C.surface,cursor:'pointer',textAlign:'left'}}>
-                    <div style={{width:44,height:44,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{orderPhoto(p)?<img src={orderPhoto(p)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}</div>
+                    <div style={{width:44,height:44,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{orderPhoto(p)?<PhotoVinted src={orderPhoto(p)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}</div>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:12,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
                         {/* ⚠️ SEUIL 12, PAS 8. À 8 (marque + taille) le badge s'allumait sur des
@@ -29928,7 +30068,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   return (
                     <div key={i} style={{display:'flex',alignItems:'center',gap:10,background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:'9px 11px'}}>
                       {it.photo
-                        ? <img src={it.photo} alt="" style={{flexShrink:0,width:34,height:34,borderRadius:8,objectFit:'cover',background:C.border}}/>
+                        ? <PhotoVinted src={it.photo} alt="" style={{flexShrink:0,width:34,height:34,borderRadius:8,objectFit:'cover',background:C.border}}/>
                         : <span style={{flexShrink:0,width:34,height:34,borderRadius:8,background:C.border,display:'flex',alignItems:'center',justifyContent:'center',fontSize:15}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
                       <span style={{flexShrink:0,minWidth:30,height:30,borderRadius:8,background:num?C.accent:C.border,color:num?C.onAccent:C.muted,display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:700,padding:'0 5px'}}>{num?`#${num}`:'—'}</span>
                       <span style={{flex:'1 1 120px',minWidth:0,fontSize:13,fontWeight:500,color:C.text,overflow:'hidden',textOverflow:'ellipsis'}}>{it.title}{it.size?<span style={{color:C.muted,fontWeight:400}}> · {it.size}</span>:''}</span>
@@ -30163,7 +30303,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div key={r.key} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:'8px 10px',marginBottom:6}}>
                  <div style={{display:'flex',gap:10,alignItems:'center'}}>
                   <div style={{width:40,height:40,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                    {r.e.photo?<img src={r.e.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:16}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
+                    {r.e.photo?<PhotoVinted src={r.e.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:16}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
                   </div>
                   <div style={{flex:'1 1 130px',minWidth:0}}>
                     <div style={{fontSize:12.5,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
@@ -30194,7 +30334,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                            <button key={ci} type="button" onClick={()=>linkBuyForKey(r.key,p)}
                              style={{width:'100%',display:'flex',alignItems:'center',gap:8,border:`1px solid ${sur?C.accent+'55':C.border}`,background:sur?`${C.accent}10`:C.card,borderRadius:8,padding:'6px 8px',cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
                              {orderPhoto(p)
-                               ? <img src={orderPhoto(p)} alt="" loading="lazy" decoding="async" style={{width:26,height:26,borderRadius:5,objectFit:'cover',flexShrink:0}}/>
+                               ? <PhotoVinted src={orderPhoto(p)} alt="" loading="lazy" decoding="async" style={{width:26,height:26,borderRadius:5,objectFit:'cover',flexShrink:0}}/>
                                : <span style={{width:26,height:26,borderRadius:5,background:C.border,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
                              <span style={{flex:1,minWidth:0}}>
                                <span style={{display:'block',fontSize:11.5,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.title||'(sans titre)'}</span>
@@ -30233,7 +30373,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div key={id} style={{background:C.card,border:`1px solid ${actif?C.accent+'55':C.border}`,borderRadius:10,padding:'8px 10px',marginBottom:6}}>
                     <div style={{display:'flex',gap:10,alignItems:'center'}}>
                       <div style={{width:40,height:40,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                        {e.photo?<img src={e.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:16}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
+                        {e.photo?<PhotoVinted src={e.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:16}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
                       </div>
                       <div style={{flex:'1 1 130px',minWidth:0}}>
                         <div style={{fontSize:12.5,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
@@ -30549,7 +30689,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         <div onClick={()=>setOpenConv(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'85vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             <div style={{display:'flex',gap:10,alignItems:'center',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
-              {openConv.header?.photo?<img src={openConv.header.photo} alt="" style={{width:38,height:38,borderRadius:8,objectFit:'cover'}}/>:<div style={{width:38,height:38,borderRadius:8,background:C.border,display:'flex',alignItems:'center',justifyContent:'center',fontSize:17}}>💬</div>}
+              {openConv.header?.photo?<PhotoVinted src={openConv.header.photo} alt="" style={{width:38,height:38,borderRadius:8,objectFit:'cover'}}/>:<div style={{width:38,height:38,borderRadius:8,background:C.border,display:'flex',alignItems:'center',justifyContent:'center',fontSize:17}}>💬</div>}
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:15,fontWeight:600,color:C.text}}>{openConv.header?.login||'Conversation'}</div>
                 <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{openConv.header?.title||''}</div>
@@ -30673,7 +30813,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <button key={e.num} type="button" onClick={()=>{ setBordLink(linkPickFor, e.num); setLinkPickFor(null); }}
                   style={{display:'flex',gap:10,alignItems:'center',border:`1px solid ${already&&String(already.numero)===String(e.num)?C.accent:C.border}`,background:C.card,borderRadius:8,padding:'8px 10px',cursor:'pointer',textAlign:'left',fontFamily:'inherit'}}>
                   <div style={{width:42,height:42,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                    {e.photo?<img src={e.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:17}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
+                    {e.photo?<PhotoVinted src={e.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:17}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
                   </div>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontSize:13,fontWeight:700,color:C.text}}>N°{e.num}{e.size!=null&&String(e.size).trim()!==''?` · T${e.size}`:''}</div>
@@ -30776,7 +30916,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if(w.bestPair) cards.push({ bg:'linear-gradient(160deg,#b8860b 0%,#ffbf3d 100%)', body:(
           <div style={{textAlign:'center'}}>
             <div style={{fontSize:14,color:'rgba(0,0,0,0.55)',fontWeight:700,letterSpacing:1,textTransform:'uppercase'}}>👑 Paire de l'année</div>
-            <div style={{width:130,height:130,borderRadius:12,overflow:'hidden',margin:'14px auto',background:'rgba(0,0,0,0.15)',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 10px 30px rgba(0,0,0,0.3)'}}>{w.bestPair.photo?<img src={w.bestPair.photo} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:44}}>👑</span>}</div>
+            <div style={{width:130,height:130,borderRadius:12,overflow:'hidden',margin:'14px auto',background:'rgba(0,0,0,0.15)',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 10px 30px rgba(0,0,0,0.3)'}}>{w.bestPair.photo?<PhotoVinted src={w.bestPair.photo} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:44}}>👑</span>}</div>
             <div style={{fontSize:17,fontWeight:700,color:'#fff',padding:'0 20px',lineHeight:1.2}}>{w.bestPair.num?`N°${w.bestPair.num} · `:''}{w.bestPair.title}</div>
             <div style={{fontSize:22,fontWeight:800,color:'#fff',marginTop:8}}>+{eur0(w.bestPair.m)} de bénéfice</div>
           </div>
@@ -30893,7 +31033,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div style={{display:'flex',flexDirection:'column'}}>
                     {p.colis.map((t,j)=>{ const buy=buyForTrack(t); return (
                       <div key={j} style={{display:'flex',gap:9,alignItems:'center',padding:'7px 12px',borderTop:j>0?`1px solid ${C.border}`:'none'}}>
-                        <div style={{width:32,height:32,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{buy&&orderPhoto(buy)?<img src={orderPhoto(buy)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}>📦</span>}</div>
+                        <div style={{width:32,height:32,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{buy&&orderPhoto(buy)?<PhotoVinted src={orderPhoto(buy)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}>📦</span>}</div>
                         <div style={{flex:1,minWidth:0}}><div style={{fontSize:12,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{(buy&&buy.title)||t.artTitle||`Colis${t.suivi?' n°'+t.suivi:''}`}</div>{codeRetrait(t.code)&&<div style={{fontSize:11,color:C.muted}}>code {codeRetrait(t.code)}</div>}</div>
                         <button type="button" onClick={()=>markCollected(t)} title="J'ai retiré ce colis" style={{flexShrink:0,border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}14`,color:INV_STATUS.online.color,borderRadius:8,padding:'5px 8px',fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>✓</button>
                       </div>
@@ -30987,7 +31127,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               ) : moves.map(m=>(
                 <div key={m.id} style={{display:'flex',alignItems:'center',gap:11,padding:'8px 0',borderTop:`1px solid ${C.border}`}}>
                   <div style={{width:38,height:38,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden'}}>
-                    {m.photo && <img src={m.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>}
+                    {m.photo && <PhotoVinted src={m.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>}
                   </div>
                   <div style={{flex:1,minWidth:0,fontSize:12,color:C.text,fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{m.title}</div>
                   <div style={{flexShrink:0,display:'flex',alignItems:'center',gap:7,fontSize:13,fontWeight:600}}>
@@ -31063,7 +31203,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <div key={l.num} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 11px',borderTop:i?`1px solid ${C.border}66`:'none',background:dbl?`${C.danger}0e`:'transparent'}}>
                       <span style={{flexShrink:0,fontSize:14,fontWeight:700,color:'#fff',background:dbl?C.danger:INV_STATUS.online.color,borderRadius:8,padding:'3px 8px',minWidth:44,textAlign:'center'}}>N°{l.num}</span>
                       <span style={{width:38,height:38,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden'}}>
-                        {ph && <img src={ph} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/>}
+                        {ph && <PhotoVinted src={ph} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/>}
                       </span>
                       <span style={{flex:1,minWidth:0}}>
                         <span style={{display:'block',fontSize:12.5,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{l.p.map(x=>x.titre).filter(Boolean)[0] || '—'}</span>
@@ -31106,7 +31246,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         );
         const Row = ({num,e}) => (
           <div key={num} style={{display:'flex',gap:8,alignItems:'center',border:`1px solid ${C.border}`,background:C.card,borderRadius:8,padding:'5px 8px'}}>
-            <div style={{width:30,height:30,borderRadius:5,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{e&&e.photo?<img src={e.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:13}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}</div>
+            <div style={{width:30,height:30,borderRadius:5,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{e&&e.photo?<PhotoVinted src={e.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:13}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}</div>
             <div style={{flex:1,minWidth:0}}><div style={{fontSize:13,fontWeight:600,color:C.text}}>N°{num}{e&&e.size?` · T${e.size}`:''}</div><div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{(e&&e.title)||''}</div></div>
           </div>
         );
@@ -31170,7 +31310,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <button key={it.id} type="button" onClick={()=>setLotSel(prev=>{ const n=new Set(prev); if(n.has(it.id))n.delete(it.id); else n.add(it.id); return n; })}
                   style={{display:'flex',gap:10,alignItems:'center',border:`1.5px solid ${sel?C.accent:C.border}`,background:sel?`${C.accent}0e`:C.card,borderRadius:8,padding:'7px 9px',cursor:'pointer',textAlign:'left',fontFamily:'inherit'}}>
                   <div style={{width:20,height:20,borderRadius:5,flexShrink:0,border:`1.5px solid ${sel?C.accent:C.border}`,background:sel?C.accent:'transparent',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:700}}>{sel?'✓':''}</div>
-                  <div style={{width:38,height:38,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{it.photo?<img src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}</div>
+                  <div style={{width:38,height:38,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{it.photo?<PhotoVinted src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}</div>
                   <div style={{flex:1,minWidth:0}}><div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{num?`N°${num} · `:''}{it.title}</div><div style={{fontSize:11,color:C.muted}}>{[it.size,prix(it.price,it.currency)||null].filter(Boolean).join(' · ')}</div></div>
                   {sel && sh!=null && <div style={{flexShrink:0,fontSize:13,fontWeight:700,color:INV_STATUS.online.color}}>{sh.toFixed(2).replace('.',',')} €</div>}
                 </button>
@@ -31218,7 +31358,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <div onClick={ev=>ev.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'85vh',borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             <div style={{display:'flex',gap:12,alignItems:'center',padding:'14px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{width:52,height:52,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                {photo?<img src={photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:22}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
+                {photo?<PhotoVinted src={photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:22}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
               </div>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:15,fontWeight:700,color:C.text}}>📖 Passeport {num?`· N°${num}`:''}</div>
@@ -31251,7 +31391,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {qrView && (
         <div onClick={()=>setQrView(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.82)',zIndex:1400,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
           <div onClick={e=>e.stopPropagation()} style={{background:'#fff',width:'100%',maxWidth:420,borderRadius:12,padding:'22px 20px 18px',display:'flex',flexDirection:'column',alignItems:'center',gap:14,boxShadow:'0 12px 40px rgba(0,0,0,0.4)'}}>
-            {qrView.photo && <img src={qrView.photo} alt="" loading="lazy" style={{width:64,height:64,borderRadius:10,objectFit:'cover',border:'1px solid #e3e3e3'}}/>}
+            {qrView.photo && <PhotoVinted src={qrView.photo} alt="" loading="lazy" style={{width:64,height:64,borderRadius:10,objectFit:'cover',border:'1px solid #e3e3e3'}}/>}
             <div style={{fontSize:15,fontWeight:700,color:'#111',textAlign:'center',lineHeight:1.3}}>{qrView.title}</div>
             {/* Vrai QR uniquement (Chronopost). Si l'image hébergée ne charge
                 pas, on bascule sur le code — surtout pas sur un QR fabriqué. */}
@@ -31740,7 +31880,7 @@ function LbcRelier({ ad, numsConnus, onRelie, suggestions, detail }) {
     <div data-lbc-relier={id} style={{ padding: '8px 0', borderTop: `1px solid ${C.border}` }}>
     <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
       <div style={{ width: 52, height: 52, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: C.card2 || C.border, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        {photo ? <img src={photo} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : <Icon name="image" size={18} style={{ color: C.muted, opacity: .55 }}/>}
+        {photo ? <PhotoVinted src={photo} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : <Icon name="image" size={18} style={{ color: C.muted, opacity: .55 }}/>}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 12.5, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ad.subject || ad.title || '—'}</div>
@@ -31765,7 +31905,7 @@ function LbcRelier({ ad, numsConnus, onRelie, suggestions, detail }) {
           {sugg.map((s) => (
             <button key={s.numero} type="button" data-suggestion={s.numero} onClick={() => poser(s.numero)} title={s.titre || ''}
               style={{ display: 'inline-flex', alignItems: 'center', gap: 6, maxWidth: 260, border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.text, padding: '4px 8px 4px 4px', fontSize: 11.5, cursor: 'pointer', fontFamily: 'inherit', minHeight: 0 }}>
-              {s.photo ? <img src={s.photo} alt="" loading="lazy" style={{ width: 24, height: 24, borderRadius: 5, objectFit: 'cover', flexShrink: 0 }}/> : null}
+              {s.photo ? <PhotoVinted src={s.photo} alt="" loading="lazy" style={{ width: 24, height: 24, borderRadius: 5, objectFit: 'cover', flexShrink: 0 }}/> : null}
               <b style={{ flexShrink: 0 }}>N°{s.numero}</b>
               <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: C.muted }}>{s.titre || ''}</span>
             </button>
@@ -32173,7 +32313,7 @@ function LeboncoinScreen() {
             return (
               <div key={String(d.vente.txId || d.ad.id)} data-doublon={d.numero} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 0', borderTop: `1px solid ${C.border}` }}>
                 <div style={{ width: 44, height: 44, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: C.card2 || C.border }}>
-                  {ph ? <img src={ph} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : null}
+                  {ph ? <PhotoVinted src={ph} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : null}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 12.5, fontWeight: 700, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>N°{d.numero} · {d.vente.title || d.ad.subject || ''}</div>
@@ -32411,7 +32551,7 @@ function LeboncoinScreen() {
                   <div className="vrm-rangee" style={{ display: 'flex', gap: 6, marginTop: 7, overflowX: 'auto', paddingBottom: 2 }}>
                     {toutes.length === 0
                       ? <span style={{ width: 54, height: 54, borderRadius: 8, flexShrink: 0, background: C.bg, border: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="image" size={20} style={{ color: C.muted, opacity: .5 }} /></span>
-                      : toutes.map((src, i) => <img key={i} src={src} alt="" loading="lazy" decoding="async" style={{ width: 54, height: 54, borderRadius: 8, objectFit: 'cover', flexShrink: 0, background: C.bg, border: `1px solid ${C.border}` }} />)}
+                      : toutes.map((src, i) => <PhotoVinted key={i} src={src} alt="" loading="lazy" decoding="async" style={{ width: 54, height: 54, borderRadius: 8, objectFit: 'cover', flexShrink: 0, background: C.bg, border: `1px solid ${C.border}` }} />)}
                     {manque > 0 && (
                       <span style={{ width: 54, height: 54, borderRadius: 8, flexShrink: 0, background: C.bg, border: `1px dashed ${C.border}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: C.muted, textAlign: 'center', lineHeight: 1.2 }}>+{manque}<span style={{ fontSize: 8, fontWeight: 500 }}>rouvrir</span></span>
                     )}
@@ -35085,7 +35225,7 @@ function EcranMasques({ comptes, ordi }) {
               return (
                 <div key={tx} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 10, border: `1px solid ${C.border}`, background: C.card, borderRadius: 12 }}>
                   <div style={{ width: 64, height: 64, flexShrink: 0, borderRadius: 8, overflow: 'hidden', background: C.card2 || C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted }}>
-                    {ph ? <img src={ph} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { e.currentTarget.style.display = 'none'; }}/>
+                    {ph ? <PhotoVinted src={ph} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/>
                       : <Icon name={det === undefined ? 'sync' : 'box'} size={20}/>}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -35223,6 +35363,32 @@ function AppCoeur() {
     window.addEventListener('vrm:plantage', plus_tard);
     return () => { vivant=false; if (t) clearTimeout(t); window.removeEventListener('vrm:plantage', plus_tard); };
   },[]);
+  // ── LE BILAN DES PHOTOS VINTED PART DANS SA BASE (`diag_photos`) ────────────
+  // Pourquoi ses photos ne s'affichent pas, MESURÉ dans son navigateur
+  // (src/photosVinted.js) : des nombres et des mots, jamais une URL, une
+  // signature ou un titre. Une ligne à lui (RLS), un bilan par navigateur
+  // (iPhone et ordinateur ne s'écrasent pas), lire-fusionner-réécrire GARDÉ :
+  // une lecture ratée n'écrit rien (« rien lu » ne vaut pas « rien »).
+  React.useEffect(()=>{
+    const nav = (() => { try { const u = navigator.userAgent || ''; return (/iPhone|iPad/.test(u) ? 'iOS ' : /Android/.test(u) ? 'Android ' : /Mac/.test(u) ? 'Mac ' : /Windows/.test(u) ? 'Windows ' : '') + (/Edg\//.test(u) ? 'Edge' : /Chrome\//.test(u) ? 'Chrome' : /Firefox\//.test(u) ? 'Firefox' : /Safari\//.test(u) ? 'Safari' : 'autre'); } catch (_) { return 'autre'; } })();
+    photosVinted.configurer({ ecrire: async (b) => {
+      const bilan = { ...b, nav, version: BUILD_ID };
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.diag_photos&select=data`, { headers: sbAuth() });
+      if (!r.ok) return false;
+      const rows = await r.json();
+      if (!Array.isArray(rows)) return false;
+      const cur = (rows[0] && rows[0].data && typeof rows[0].data === 'object') ? rows[0].data : {};
+      const par = (cur.parNavigateur && typeof cur.parNavigateur === 'object') ? { ...cur.parNavigateur } : {};
+      par[nav] = bilan;
+      const garde = Object.keys(par).sort((a, b2) => String((par[b2] && par[b2].at) || '').localeCompare(String((par[a] && par[a].at) || ''))).slice(0, 6);
+      const data = { at: bilan.at, dernier: bilan, parNavigateur: Object.fromEntries(garde.map((k) => [k, par[k]])) };
+      const w = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
+        method:'POST', headers:{ ...sbAuth(), 'Content-Type':'application/json', Prefer:'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify([withOwner({ id: 'diag_photos', data })]) });
+      return w.ok;
+    } });
+    return () => photosVinted.configurer({ ecrire: null });
+  },[]);
   // Clé du widget iPhone : créée une seule fois, après le chargement du cloud
   // (sinon chaque appareil en générerait une différente et se voleraient la
   // place à tour de rôle).
@@ -35239,6 +35405,8 @@ function AppCoeur() {
   //    pilotage quotidien (les actions du jour) ; Collectif reste une vue
   //    d'ensemble optionnelle dans le menu, plus l'écran forcé à l'ouverture.
   const [tab,setTab]=useState('journee');
+  // L'écran où une photo Vinted a échoué en premier (le bilan `diag_photos`).
+  React.useEffect(()=>{ photosVinted.ecranActuel(tab); },[tab]);
   // ⚠️ UN SEUL ONGLET PAR PLATEFORME QUI CONTIENT TOUT (Julien, 25 sept. : « tu
   //    peux directement tout mettre dans l'onglet Vinted… sans avoir besoin
   //    d'avoir vente, achat »). Le hub Vinted/Leboncoin porte une sous-navigation
@@ -36878,7 +37046,7 @@ function AppCoeur() {
         const total = pairs.length+ventes.length+achats.length;
         const go=(tab)=>{ setGsOpen(false); setTab(tab); };
         const numBadge=(n)=> <span style={{flexShrink:0,minWidth:26,height:26,borderRadius:8,background:C.accent,color:C.onAccent,fontSize:12,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',padding:'0 5px'}}>{n?`#${n}`:'—'}</span>;
-        const thumb=(src,fb)=> <div style={{width:44,height:44,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{src?<img src={src} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}>{fb||<Icon name="image" size={18} style={{color:C.muted,opacity:.55}}/>}</span>}</div>;
+        const thumb=(src,fb)=> <div style={{width:44,height:44,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{src?<PhotoVinted src={src} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}>{fb||<Icon name="image" size={18} style={{color:C.muted,opacity:.55}}/>}</span>}</div>;
         return (
         <div style={{position:'fixed',inset:0,zIndex:70,background:C.bg,display:'flex',flexDirection:'column'}}>
           <div style={{display:'flex',alignItems:'center',gap:10,padding:'12px 14px',borderBottom:`1px solid ${C.border}`,background:C.surface}}>
@@ -37020,6 +37188,9 @@ function AppCoeur() {
             LIGNE de panne (`LignePanne`) là où leur propre liste vide
             mentirait — le bloc, lui, ne s'affiche qu'une fois. */}
         {baseKO && <BaseInjoignable/>}
+        {/* Les photos de Vinted qui ne s'affichent pas ICI : dit UNE fois,
+            sur la coque, pour tous les écrans (src/photosVinted.js). */}
+        {!baseKO && <PhotosBloquees/>}
         <BlocNumerosPerimes/>
         {tab==='settings'&&<SettingsScreen setTab={setTab} comptes={vintedAccounts}
           customLogo={customLogo} onPickLogo={()=>logoInputRef.current&&logoInputRef.current.click()} onResetLogo={resetLogo}

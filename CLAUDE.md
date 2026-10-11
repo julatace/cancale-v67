@@ -7036,6 +7036,73 @@ qui arrivent pour de vrai (`orders_sold` 18, `inbox` 17, `profile` 12).
 - **Geste de Julien** : installer la **5.166** dans UN seul dossier, recharger
   ses onglets Vinted, puis passer une fois sur **tomj683** et **arthuror2**.
 
+### ⚠️⚠️ « JE N'AI PLUS LES PHOTOS DE MES PAIRES » — L'AFFICHAGE HORS DE VINTED.FR (11 octobre)
+Julien : plus aucune photo dans VRM (Annonces, Ventes, Colis/bordereaux…).
+**Mesuré avant de coder** : les données sont intactes (`photo.url` =
+`https://images1.vinted.net/t/…/f800/….jpeg?s=…`, captures du jour) et le code
+d'affichage n'avait pas changé dans le déploiement. La cause est donc
+**extérieure et pas prouvée** : le CDN de Vinted qui refuse l'affichage hors de
+son site (CORP, ou anti-hotlink sur le référent), ou un logiciel de protection.
+- **Une règle, un composant** (`src/photosVinted.js` + `PhotoVinted`, §11) :
+  les **49** `<img>` qui PEUVENT montrer une photo Vinted passent par lui ; toute
+  autre adresse reste un `<img>` ordinaire (logos, QR de retrait, carte, photo
+  de la pièce : 15 sites laissés tels quels). Dans l'ordre :
+  1. `referrerPolicy="no-referrer"` — une protection par référent s'arrête là,
+     **y compris sur iPhone** (banc, scénario D) ;
+  2. si le navigateur refuse quand même, **l'extension** va chercher les octets
+     par le pont « photo » (présent depuis très longtemps : **rien à changer
+     dans l'extension** — la requête de son service worker n'est soumise ni à
+     CORP ni au référent de la page) → URL objet ;
+  3. cache par URL (succès ET échec : jamais redemandé en boucle), 300 entrées
+     hors écran (URL objet révoquées à l'éviction), **au plus 3 demandes en
+     vol**, **aucune pour une photo hors écran** (`IntersectionObserver`) ;
+  4. sans secours : le pictogramme à la place, **jamais une image cassée**.
+     `onError()` n'est appelé qu'à la mort DÉFINITIVE (sans argument) : les
+     écrans qui retirent une photo morte (`noterImgMorte`) gardent leur règle.
+- **« Pas su » ≠ « non »** : l'extension se manifeste quelques secondes après
+  le chargement — pendant 7 s rien n'est déclaré perdu.
+- **UNE phrase, sur la coque** (`PhotosBloquees`, `data-photos-bloquees`), sans
+  couleur d'alerte, seulement si des photos Vinted ont échoué, qu'**aucune** ne
+  s'est affichée directement, et qu'il en reste à l'écran sans secours (un lien
+  mort isolé n'est pas un blocage). La CAUSE suit la sonde — `bloquee` · le
+  serveur `reponse` · `passu` : on n'affirme « bloqué » que mesuré ; le GESTE
+  suit ce qui est possible ICI (ordinateur sans extension · téléphone ·
+  extension muette · secours refusé).
+- **La mesure, dans SON navigateur** : au premier échec de l'ouverture, une sonde
+  `fetch(no-cors, no-referrer, sans cookie)` — `TypeError` ⇒ `bloquee`, réponse
+  opaque ⇒ `reponse`, sinon `passu`. Le bilan part dans **`app_data.diag_photos`**
+  (sa ligne, RLS), au plus toutes les 10 min, en lire-fusionner-réécrire
+  **gardé** (lecture ratée ⇒ rien n'est écrit) :
+  `{ at, dernier, parNavigateur: { 'Mac Chrome': {…}, 'iOS Safari': {…} } }`,
+  chaque bilan = `{at, ko, ok, secoursOk, secoursKo, sonde, hote, ext
+  (presente|absente|muette), ecran, nav, version}` — des nombres et des mots,
+  **jamais une URL, une signature ou un titre**.
+  **Comment le lire** (`select data from app_data where id = 'diag_photos'`) :
+  `ok:0, ko>0, sonde:'bloquee'` ⇒ le navigateur refuse (CORP de Vinted ou un
+  logiciel de protection) ; `sonde:'reponse'` ⇒ le serveur répond une erreur
+  (lien périmé, refus) ; `secoursOk>0` ⇒ l'extension les récupère ;
+  `ext:'absente'` sur `iOS …` ⇒ rien ne peut aller les chercher sur ce téléphone ;
+  `ok>0` ⇒ elles s'affichent (le référent coupé a suffi, ou c'était passager).
+- ⚠️⚠️ **UN FAUX CDN SERVI PAR `page.route()` NE PROUVE RIEN** : mesuré, une
+  image servie ainsi avec `Cross-Origin-Resource-Policy: same-site` **s'affiche**
+  dans le Chromium du banc (l'interception de Playwright passe à côté du contrôle
+  CORP). Le banc `photos-vinted.cjs` (ports 5741/5742) sert donc un **vrai
+  serveur HTTPS local**, résolu sous `images1.vinted.net`
+  (`--host-resolver-rules`), certificat jetable fabriqué à chaque lancement — et
+  il VÉRIFIE en tête que CORP bloque. **74 contrôles, 35 rouges** sur 219150e
+  (40 images cassées sur Annonces, aucune phrase, aucun bilan, le CDN à référent
+  refusé) ; cinq mutations rouges : secours retiré (14) · concurrence illimitée
+  (2 — jusqu'à 15 en vol) · cache retiré (2) · référent remis (4) · photos hors
+  écran demandées (3).
+- `verif_visuel.cjs` et `verif_dark.cjs` coupent désormais `*.vinted.net` en
+  entier : leurs fixtures portent de vraies adresses, et la sonde est un `fetch`
+  (pas une image) que leur route laissait passer.
+- **Non mesuré** : la vraie cause chez lui (c'est `diag_photos` qui la dira) ;
+  que SON extension installée réponde au pont « photo » sur sa machine ; le
+  poids mémoire réel (300 photos f800 en URL objet : quelques dizaines de Mo au
+  pire) ; Safari sur iPhone (aucun secours possible : seul `no-referrer` peut y
+  aider, et seulement si la cause est le référent).
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par

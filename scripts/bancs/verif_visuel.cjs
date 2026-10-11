@@ -119,6 +119,10 @@ const TABS=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','pl
       if (t3 === 'image' || t3 === 'media' || t3 === 'font') return r3.abort();
       return r3.continue();
     });
+    // 11 oct. : quand une photo Vinted ne s'affiche pas, l'app SONDE le CDN
+    // (une requête `fetch`, pas une image — src/photosVinted.js). Les fixtures
+    // portent de vraies adresses : le CDN de Vinted est coupé en entier.
+    await pg.route('**://*.vinted.net/**', (r4) => r4.abort());
     await pg.route('**/rest/v1/**',route=>{const u=metaVersData(route.request().url());
       const j=d=>route.fulfill({status:200,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:JSON.stringify(d)});
       if(/select=owner/.test(u)) return route.fulfill({status:400,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:'{"m":1}'});
