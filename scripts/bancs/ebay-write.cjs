@@ -9,6 +9,10 @@ const RACINE = path.join(__dirname, '..', '..');
 let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
 let tradingMode = 'ok', lastCall = '', lastBody = '';
+// Tous les appels Trading, dans l'ordre : depuis la règle d'offre (9 octobre),
+// un changement de PRIX relit l'annonce (GetItem) APRÈS la révision — le
+// dernier appel n'est plus la révision, on la cherche par son nom.
+const appels = [];
 const PROPRIO = '11111111-1111-1111-1111-111111111111';
 process.env.VRM_OWNER_UID = PROPRIO;
 global.fetch = async (url, opts = {}) => {
@@ -22,7 +26,7 @@ global.fetch = async (url, opts = {}) => {
     return new Response(JSON.stringify([{ refresh_token: 'RT' }]), { status: 200 });   // accessToken lit ça
   }
   if (u.includes('/ws/api.dll')) {
-    lastCall = h['X-EBAY-API-CALL-NAME'] || ''; lastBody = String(opts.body || '');
+    lastCall = h['X-EBAY-API-CALL-NAME'] || ''; lastBody = String(opts.body || ''); appels.push({ nom: lastCall, corps: lastBody });
     if (tradingMode === 'deuxErreurs') return new Response('<?xml version="1.0"?><r xmlns="urn:ebay:apis:eBLBaseComponents"><Ack>Failure</Ack>'
       + '<Errors><ShortMessage>Titre</ShortMessage><LongMessage>Le titre est long, il sera peut-être coupé.</LongMessage><ErrorCode>21917091</ErrorCode><SeverityCode>Warning</SeverityCode></Errors>'
       + '<Errors><ShortMessage>Photo</ShortMessage><LongMessage>La photo est trop petite (500 px minimum).</LongMessage><ErrorCode>21916672</ErrorCode><SeverityCode>Error</SeverityCode></Errors></r>', { status: 200 });
@@ -73,9 +77,10 @@ const item = { title: 'Nike Air Max 1 Aquatone Bleu T44', categoryId: '15709', p
     dit(res.code === 400 && res.corps && res.corps.ok === false, 'publish sans catégorie/prix → 400'); }
 
   // 4. Modifier prix/stock OK
-  { const res = faireRes(); await handler({ method: 'POST', query: {}, body: { action: 'revise', itemId: '110555000111', price: '72', quantity: '1' } }, res);
+  { const n0 = appels.length; const res = faireRes(); await handler({ method: 'POST', query: {}, body: { action: 'revise', itemId: '110555000111', price: '72', quantity: '1' } }, res);
     dit(res.code === 200 && res.corps && res.corps.ok === true, 'revise → ReviseInventoryStatus OK');
-    dit(/ReviseInventoryStatus/.test(lastCall) && /<StartPrice>72\.00<\/StartPrice>/.test(lastBody), 'le nouveau prix est envoyé (72.00)'); }
+    const rev = appels.slice(n0).filter((a) => a.nom === 'ReviseInventoryStatus');
+    dit(rev.length === 1 && /<StartPrice>72\.00<\/StartPrice>/.test(rev[0].corps), 'le nouveau prix est envoyé (72.00), en UNE révision', appels.slice(n0).map((a) => a.nom).join(',')); }
 
   // 5. Refus de modification → remonte
   tradingMode = 'fail';
