@@ -193,12 +193,16 @@ const envoisEbay = []; let avertir = false;
   // On juge le CORPS EXACT de ce qui part (`item.offre`), jamais un libellé.
   // Les caractéristiques obligatoires laissées vides (Couleur, Département) :
   // on les remplit, sinon rien ne peut partir.
+  // ⚠️ Un banc ne meurt pas, il rapporte : sur un build sans le champ, la suite
+  //    lèverait (un `fill` sans cible) et tuerait le processus AVANT le bilan.
+  try {
   await pg.evaluate(()=>{ const labs=[...document.querySelectorAll('label')];
     const set=(re,v)=>{ const l=labs.find(x=>re.test(x.textContent)); const box=l&&l.parentElement; const el=box&&(box.querySelector('select')||box.querySelector('input')); if(!el)return; const proto=el.tagName==='SELECT'?HTMLSelectElement.prototype:HTMLInputElement.prototype; Object.getOwnPropertyDescriptor(proto,'value').set.call(el,v); el.dispatchEvent(new Event(el.tagName==='SELECT'?'change':'input',{bubbles:true})); el.dispatchEvent(new Event('change',{bubbles:true})); };
     set(/^couleur/i,'Bleu'); set(/^département/i,'Homme'); });
   await pg.waitForTimeout(300);
   const champOffre = await pg.$('[data-publier-offre-accepte]');
   dit(!!champOffre, 'le champ « Accepter les offres dès » est dans « Prix & livraison »');
+  if (!champOffre) throw new Error('pas de champ « Accepter les offres dès » : les contrôles de la règle à la création ne peuvent pas se dérouler');
   const verifs = () => envoisEbay.filter((x) => x.action === 'pubverify');
   const verifier = async () => { const n = verifs().length; await (await pg.$('text=Vérifier sans publier')).click(); await pg.waitForTimeout(700); return verifs().length > n ? verifs()[verifs().length - 1] : null; };
   let v = await verifier();
@@ -233,6 +237,7 @@ const envoisEbay = []; let avertir = false;
   if (feuilleV) { await pg.locator('div[style*="z-index: 2000"]').getByRole('button', { name: 'Annuler' }).click(); await pg.waitForTimeout(600); }
   dit(pubActif && feuilleV && /66,00\s*€/.test(feuilleT), '« Publier » avec une règle : une feuille, même avec un seul compte, qui dit le montant (66,00 €)', `bouton ${pubActif ? 'actif' : 'grisé'} · feuille ${feuilleV}`);
   dit(envoisEbay.filter((x) => x.action === 'publish').length === nPub, '« Annuler » : AUCUN `publish` envoyé');
+  } catch (e) { dit(false, 'la règle d\'offre à la création se déroule', String((e && e.message) || e).split('\n')[0].slice(0, 200)); }
   dit(errs.length === 0, 'aucune erreur d\'app', errs.slice(0,1).join(''));
 
   console.log(ko ? ('\n'+ko+' contrôle(s) non conforme(s).') : '\nOn publie en CHOISISSANT une paire (photos auto, aucun lien) ; eBay gère la livraison (il propose le prix), comme dans l\'appli eBay.');
