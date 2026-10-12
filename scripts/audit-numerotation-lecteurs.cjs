@@ -52,6 +52,13 @@ const MUTATIONS = {
   'sku-sans-marqueur': { app: (s) => remplace(s, "  const t = traductionAnnonce(m && !m.annule ? m[liste] : null, id, k);\n", "  const t = undefined;\n", 'sku-sans-marqueur') },
   // (relecture du 11 octobre) Une annonce RELIÉE après la coupure (SKU réécrit) serait encore traduite en B.
   'traduction-ignore-reecriture': { app: (s) => remplace(s, "  if (!e || typeof e !== 'object' || Array.isArray(e) || !Object.prototype.hasOwnProperty.call(e, k)) return undefined;\n  return typeof e[k] === 'string' ? cleNum(e[k]) : '';\n};", "  if (!e || typeof e !== 'object' || Array.isArray(e)) return undefined;\n  if (!Object.prototype.hasOwnProperty.call(e, k)) return cleNum(archiveNumeros() + k);\n  return typeof e[k] === 'string' ? cleNum(e[k]) : '';\n};", 'traduction-ignore-reecriture') },
+  // (revue du 11 octobre, défaut 5) La carte par annonce lue comme une LISTE (la
+  // lecture `Array.isArray(mk.ebayAnnonces)` de d92613f) : sur la forme que la 013
+  // a VRAIMENT écrite (un objet), « VRM-553 » ne se traduit plus en « 1 » — la
+  // N°553 vendue (#78) ne lève aucune alerte eBay. App, serveur, extension.
+  'app-marqueur-liste': { app: (s) => remplace(s, "  if (id == null || !carte || typeof carte !== 'object' || Array.isArray(carte)) return undefined;\n  const e = carte[String(id)];", "  if (id == null || !Array.isArray(carte)) return undefined;\n  const e = carte[String(id)];", 'app-marqueur-liste') },
+  'serveur-marqueur-liste': { lib: (s) => remplace(s, "  if (id == null || !carte || typeof carte !== 'object' || Array.isArray(carte)) return undefined;", "  if (id == null || !Array.isArray(carte)) return undefined;", 'serveur-marqueur-liste') },
+  'extension-marqueur-liste': { ext: (s) => remplace(s, "  if (!ad || ad.id == null || !carte || typeof carte !== 'object' || Array.isArray(carte)) return k;", "  if (!ad || ad.id == null || !Array.isArray(carte)) return k;", 'extension-marqueur-liste') },
   // Un numéro PROVISOIRE (553, devenu 1) lu en B, comme un ancien.
   'provisoire-en-b': { app: (s) => remplace(s, "  return typeof e[k] === 'string' ? cleNum(e[k]) : '';\n};\nconst numeroExterne", "  return cleNum(archiveNumeros() + k);\n};\nconst numeroExterne", 'provisoire-en-b') },
   // Une commande eBay d'avant la coupure lue comme la nouvelle série.
@@ -67,7 +74,7 @@ const MUTATIONS = {
   // La photo relie une vente d'après la coupure à une fiche d'archive.
   'photo-archive': { app: (s) => remplace(s, "    if (k && venteApresCoupure(o) && !numeroReprenable((numeros[k] || {}).numero)) return null;\n", "", 'photo-archive') },
   // La bannière ♻️ propose un numéro d'archive.
-  'banniere-archive': { app: (s) => remplace(s, "      if (!numeroReprenable(e.numero)) continue;\n      if (onlineAnnonceIds.has(String(k))) continue;", "      if (onlineAnnonceIds.has(String(k))) continue;", 'banniere-archive') },
+  'banniere-archive': { app: (s) => remplace(s, "      if (!numeroReprenable(e.numero)) continue;\n      if (presentesAnnonceIds.has(String(k))) continue;", "      if (presentesAnnonceIds.has(String(k))) continue;", 'banniere-archive') },
   // La réutilisation par photo de la numérotation automatique reprend l'archive.
   'auto-photo-archive': { app: (s) => remplace(s, "      if (!numeroReprenable(e.numero)) continue;\n      const pk = entryPhotoKey(e);", "      const pk = entryPhotoKey(e);", 'auto-photo-archive') },
   // La pose à la main accepte « B230 ».
@@ -319,6 +326,14 @@ const MK = { version: 2, coupure: T, appliqueLe: '2026-10-10T08:00:00.000Z', arc
       if (L.numeroExterne(k, id, 'ebayAnnonces', d, MK) !== R.numeroExterne(k, id, 'ebayAnnonces', d)) { dit(false, 'numeroExterne : serveur et app divergent', `${k}/${id}`); return; }
     }
     dit(true, 'numeroExterne : serveur et app rendent la même lecture (§11)');
+    // (11 octobre) Le numéro PROVISOIRE : le serveur relit « VRM-553 » chez eBay
+    // avant un retrait automatique — il doit le lire comme l'app (« 1 »), sinon
+    // 409 sku-change et le retrait n'a jamais lieu.
+    // Sur la FORME écrite par la 013 appliquée (carte par annonce, objet) : 128127336988 → { 553: '1' }.
+    MARQUEUR = MK;
+    const s553 = L.numeroExterne('553', '128127336988', 'ebayAnnonces', null, MK), a553 = R.numeroExterne('553', '128127336988', 'ebayAnnonces', null);
+    dit(s553 === '1' && s553 === a553, 'numeroExterne : un numéro provisoire se lit « 1 » au serveur ET dans l\'app', `serveur=${s553} · app=${a553}`);
+    MARQUEUR = MK;
   });
 
   await essaie('route email', async () => {

@@ -84,14 +84,18 @@ const projette = (row, sel) => {
 // Les ponts d'extension, dans la vraie forme (`ping` → `ready {version[, id]}`).
 // Par défaut UN pont à jour (les états « ok » de la phrase) ; `[]` : aucune
 // extension (téléphone) ; deux ponts d'identifiants différents : deux extensions.
-const PONTS = (ponts) => {
+// La VRAIE forme de l'état (§6.3) : à partir de `CODE_DANS_ETAT` (lu dans la
+// source), une extension joint `code` — sans lui, l'app la dit « périmée ».
+const PONTS = ({ ponts, codeDansEtat }) => {
   const post = (m) => window.postMessage(m, '*');
+  const vn = (v) => String(v || '').split('.').map((x) => parseInt(x, 10) || 0);
+  const auMoins = (v, r) => { const a = vn(v), b = vn(r); for (let i = 0; i < 3; i++) if (a[i] !== b[i]) return a[i] > b[i]; return true; };
   ponts.forEach((p) => {
     const ready = () => post(Object.assign({ __vmr: 'ready', version: p.version }, p.id ? { id: p.id } : {}));
     window.addEventListener('message', (e) => {
       const d = e.data; if (e.source !== window || !d || typeof d !== 'object') return;
       if (d.__vmr === 'ping') ready();
-      if (d.__vmr === 'etat') post({ __vmr: 'etat:result', reqId: d.reqId, resp: { ok: true, version: p.version, vrm: { ok: true, connecte: true, email: 'vendeur@exemple.test', user_id: 'u1' }, vinted: null, cmds: {} } });
+      if (d.__vmr === 'etat') post({ __vmr: 'etat:result', reqId: d.reqId, resp: Object.assign({ ok: true, version: p.version, vrm: { ok: true, connecte: true, email: 'vendeur@exemple.test', user_id: 'u1' }, vinted: null, cmds: {} }, codeDansEtat && auMoins(p.version, codeDansEtat) ? { code: p.version } : {}) });
     });
     ready();
   });
@@ -100,6 +104,7 @@ const PONTS = (ponts) => {
 // une version écrite ici vieillirait au prochain numéro et ferait passer l'état
 // « ok » pour « en retard » (la relecture des autres comptes arrive en 5.167).
 const VERSION_A_JOUR = (fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'App.jsx'), 'utf8').match(/const EXT_ATTENDUE = '([\d.]+)'/) || [])[1];
+const CODE_DANS_ETAT = (fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'App.jsx'), 'utf8').match(/const CODE_DANS_ETAT = '([\d.]+)'/) || [])[1] || '';
 if (!VERSION_A_JOUR) { console.log('KO EXT_ATTENDUE introuvable dans src/App.jsx'); process.exit(1); }
 const UN_PONT = [{ version: VERSION_A_JOUR, id: 'ext1' }];
 
@@ -110,7 +115,7 @@ async function rendre(b, { lignes, suppKO = false, tel = false, mobile, onglet =
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
-  await pg.addInitScript(PONTS, ponts);
+  await pg.addInitScript(PONTS, { ponts, codeDansEtat: CODE_DANS_ETAT });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));

@@ -100,24 +100,32 @@ const projette = (row, sel) => {
 // banc mesurerait le bump, pas la règle (même leçon que le banc `publier`).
 const VERSION_A_JOUR = (fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'App.jsx'), 'utf8').match(/const EXT_ATTENDUE = '([\d.]+)'/) || [])[1];
 if (!VERSION_A_JOUR) { console.log('KO EXT_ATTENDUE introuvable dans src/App.jsx'); process.exit(1); }
+// La VRAIE forme de l'état (§6.3) : depuis `CODE_DANS_ETAT` (lu dans la source),
+// une extension à jour joint `code` (la version du code qui répond). Sans lui,
+// l'app la dit « périmée » — un état « à jour » sans `code` est une fiction.
+// `perime` : le manifeste est à jour, le service worker exécute un code d'avant.
+const CODE_DANS_ETAT = (fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'App.jsx'), 'utf8').match(/const CODE_DANS_ETAT = '([\d.]+)'/) || [])[1] || '';
 const PONT = (o) => {
   const version = o.version, connecte = o.connecte !== false;
+  const vn = (v) => String(v || '').split('.').map((x) => parseInt(x, 10) || 0);
+  const auMoins = (v, r) => { const a = vn(v), b = vn(r); for (let i = 0; i < 3; i++) if (a[i] !== b[i]) return a[i] > b[i]; return true; };
+  const code = !o.perime && o.codeDansEtat && auMoins(version, o.codeDansEtat) ? { code: version } : {};
   const post = (m) => window.postMessage(m, '*');
   window.addEventListener('message', (e) => {
     const d = e.data; if (e.source !== window || !d || typeof d !== 'object') return;
     if (d.__vmr === 'ping') post({ __vmr: 'ready', version });
-    if (d.__vmr === 'etat') post({ __vmr: 'etat:result', reqId: d.reqId, resp: { ok: true, version, vrm: connecte ? { ok: true, connecte: true, email: 'vendeur@exemple.test', user_id: 'u1' } : { ok: true, connecte: false }, vinted: null, cmds: {} } });
+    if (d.__vmr === 'etat') post({ __vmr: 'etat:result', reqId: d.reqId, resp: Object.assign({ ok: true, version, vrm: connecte ? { ok: true, connecte: true, email: 'vendeur@exemple.test', user_id: 'u1' } : { ok: true, connecte: false }, vinted: null, cmds: {} }, code) });
   });
   post({ __vmr: 'ready', version });
 };
 
-async function rendre(b, { lignes, tel = false, onglet = 'cat_annonces', enligneKO = false, sansPont = false, accs = ACCS, posts = null, ls = null, pontConnecte = true }) {
+async function rendre(b, { lignes, tel = false, onglet = 'cat_annonces', enligneKO = false, sansPont = false, accs = ACCS, posts = null, ls = null, pontConnecte = true, pontPerime = false }) {
   const vp = tel ? { width: 390, height: 844 } : { width: 1512, height: 950 };
   const ctx = await b.newContext({ viewport: vp, ...(tel ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
-  if (!sansPont) await pg.addInitScript(PONT, { version: VERSION_A_JOUR, connecte: pontConnecte });
+  if (!sansPont) await pg.addInitScript(PONT, { version: VERSION_A_JOUR, connecte: pontConnecte, perime: pontPerime, codeDansEtat: CODE_DANS_ETAT });
   // Un réglage PROPRE À L'APPAREIL (ex. « refusé par Vinted »), posé une seule fois.
   if (ls) await pg.addInitScript((o) => { try { for (const k in o) if (!localStorage.getItem('__fait_' + k)) { localStorage.setItem(k, JSON.stringify(o[k])); localStorage.setItem('__fait_' + k, '1'); } } catch (_) {} }, ls);
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
@@ -417,6 +425,22 @@ const lireAnnonces = (pg) => pg.evaluate((PAIRE) => {
       }
       dit(etats.true.relit === '1' && /vérifiées à ta prochaine visite/.test(etats.true.geste), 'extension connectée : la promesse est faite', JSON.stringify(etats.true));
       dit(etats.false.relit === '0' && etats.false.promesse === '0' && !/vérifiées à ta prochaine visite|sort d.ici tout de suite/.test(etats.false.geste) && /pas connectée à ton compte VRM/.test(etats.false.geste), 'extension PAS connectée à VRM : aucune promesse, le geste à la place', JSON.stringify(etats.false));
+    });
+    // ⚠️⚠️ Fusion du 11 octobre (deux chantiers) : le manifeste est à jour mais
+    //    le service worker exécute un code d'AVANT (⟳ jamais cliqué). La pastille
+    //    dit « Lecture seule — clique ⟳ » ; l'écran Annonces promettait quand
+    //    même « elles seront vérifiées à ta prochaine visite » — deux voix
+    //    contraires, et une promesse que l'ancien code ne tient pas.
+    console.log('── 13b. Code PÉRIMÉ (manifeste à jour, service worker d’avant) : aucune promesse de relecture');
+    if (veut('13')) await essaie('13b périmé', async () => {
+      const r = await rendre(b, { lignes: BASE(), pontPerime: true });
+      await r.pg.waitForTimeout(1500);
+      const e = await r.pg.evaluate(() => { const f = document.querySelector('[data-ann-fraicheur]'); const g = f && f.querySelector('[data-geste-dit]'); const x = document.querySelector('[data-etat-actions]');
+        return { relit: f && f.getAttribute('data-relit'), promesse: f && f.getAttribute('data-promesse'), perime: f && f.getAttribute('data-perime'), geste: g ? g.innerText : '', pastille: x ? x.getAttribute('data-etat-code') : null }; });
+      dit(e.pastille === 'perime', 'la pastille dit « périmé »', JSON.stringify(e.pastille));
+      dit(e.relit === '0' && e.promesse === '0' && !/vérifiées à ta prochaine visite|sort d.ici tout de suite/.test(e.geste), 'et l’écran Annonces ne promet AUCUNE relecture (une voix, la même que la pastille)', JSON.stringify(e));
+      dit(e.perime === '1' && /chrome:\/\/extensions/.test(e.geste) && /⟳/.test(e.geste), 'il dit le geste : ⟳ dans chrome://extensions', e.geste);
+      await r.ctx.close();
     });
   } catch (e) { dit(false, 'le banc a tourné jusqu’au bout', String(e && e.message).slice(0, 200)); }
   finally { if (b) await b.close(); srv.close(); }

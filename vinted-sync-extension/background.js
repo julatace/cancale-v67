@@ -15,7 +15,43 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.170.0';
+const CODE_VERSION = '5.175.0';
+
+// ══════════════════════════════════════════════════════════════════════════
+// LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
+// ══════════════════════════════════════════════════════════════════════════
+// ⚠️⚠️ MESURÉ dans ses journaux, et reproduit au banc dans un vrai Chromium :
+//    sur 5 des 6 Chrome qui travaillent pour lui, le dossier a été remplacé par
+//    la 5.164 mais le SERVICE WORKER exécutait encore une 5.95–5.129 — en
+//    annonçant « 5.164.0 », parce que `getManifest()` lit le FICHIER, pas le
+//    code. Ni l'attente, ni l'arrêt du service worker, ni un redémarrage de
+//    Chrome ne réparent : seul ⟳ (chrome://extensions) le fait, et seulement
+//    dans le Chrome où on le clique. Aucune correction depuis le 3 octobre ne
+//    tournait chez lui.
+// ⇒ À chaque démarrage du service worker : si le code n'est pas celui du
+//   manifeste, on se recharge UNE fois (`chrome.runtime.reload()` = le ⟳).
+//   La garde vit dans `chrome.storage.local` (§4.9) et porte la PAIRE
+//   code → manifeste : un rechargement qui ne réparerait rien ne tourne pas en
+//   boucle. Stockage illisible ⇒ on ne recharge pas (« pas su » ne vaut pas
+//   « vas-y » : sans garde, une boucle de rechargements est possible).
+// ⚠️ Ça répare les mises à jour SUIVANTES. Le vieux code qui tourne aujourd'hui
+//    n'a pas ce contrôle : c'est le pont (bridge.js, toujours lu depuis le
+//    disque) qui le repère et demande la réparation (popup.html?mode=reparer).
+const RECHARGE_CODE_STORE = 'vrmRechargeCode';
+async function rechargerSiCodePerime() {
+  let manif = '';
+  try { manif = String(chrome.runtime.getManifest().version || ''); } catch (_) { return false; }
+  if (!/^\d+\.\d+\.\d+$/.test(manif) || manif === CODE_VERSION) return false;
+  if (!chrome.runtime || typeof chrome.runtime.reload !== 'function') return false;
+  const cle = CODE_VERSION + '>' + manif;
+  let deja;
+  try { deja = (await chrome.storage.local.get(RECHARGE_CODE_STORE))[RECHARGE_CODE_STORE]; } catch (_) { return false; }
+  if (deja && deja.cle === cle) return false;
+  try { await chrome.storage.local.set({ [RECHARGE_CODE_STORE]: { cle, at: Date.now() } }); } catch (_) { return false; }
+  try { chrome.runtime.reload(); } catch (_) { return false; }
+  return true;
+}
+rechargerSiCodePerime().catch(() => {});
 const SUPABASE_URL = 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ';
 
@@ -98,14 +134,21 @@ function plateformeDe(url) {
   if (/vinted\.(fr|com|it|de)/i.test(u)) return 'vinted';
   return '';
 }
-function ouvrirVRMDepuis(urlActive) {
+// `lier` (11 octobre) : « Se connecter » dans l'extension ouvre VRM avec
+// `lier-extension=<identifiant de CETTE extension>` — l'app, connectée, lui
+// adresse sa propre session (voir `demanderLiaison`). Plus de mot de passe VRM
+// tapé dans l'extension quand l'app peut la connecter.
+function ouvrirVRMDepuis(urlActive, opts) {
   const p = plateformeDe(urlActive);
-  const cible = APP_URL_VRM + '/?tab=' + (p ? 'plat_' + p : 'plat_vinted');
+  let idExt = ''; try { idExt = String(chrome.runtime.id || ''); } catch (_) {}
+  const lier = !!(opts && opts.lier && idExt);
+  const cible = APP_URL_VRM + '/?tab=' + (p ? 'plat_' + p : 'plat_vinted') + (lier ? '&lier-extension=' + encodeURIComponent(idExt) : '');
   try {
     chrome.tabs.query({ url: APP_URL_VRM + '/*' }, (ouverts) => {
       const t = (ouverts || [])[0];
-      // Déjà sur VRM : on ne recharge pas la page (on garde l'écran où l'on est).
-      if (t && /vrm\.center/i.test(urlActive || '')) { chrome.tabs.update(t.id, { active: true }); return; }
+      // Déjà sur VRM : on ne recharge pas la page (on garde l'écran où l'on est)
+      // — sauf pour une liaison, que l'app lit dans l'adresse.
+      if (t && !lier && /vrm\.center/i.test(urlActive || '')) { chrome.tabs.update(t.id, { active: true }); return; }
       if (t) { chrome.tabs.update(t.id, { url: cible, active: true }); try { chrome.windows.update(t.windowId, { focused: true }); } catch (_) {} }
       else chrome.tabs.create({ url: cible });
     });
@@ -156,7 +199,11 @@ function avecDelai(p, ms, repli) {
 //    retiendrait rien). Pendant la pause, un jeton d'accès encore valide sert.
 const RENOUV_STORE = 'vrmRenouv';          // { echecs, prochainAt, code, at, okAt }
 const RENOUV_PAUSE_MIN_MS = 30000, RENOUV_PAUSE_MAX_MS = 600000;
-const RENOUV_DELAI_MS = 10000;             // un renouvellement qui ne répond pas = échec passager
+const RENOUV_DELAI_MS = 4000;              // un renouvellement qui ne répond pas = échec passager
+// Les rejeux du MÊME jeton après une réponse perdue (11 octobre) : +1,5 s puis
+// +4 s, avant la pause croissante. Mesuré : `/auth/v1/token` répond chez lui en
+// 247 ms au plus — au-delà de 4 s, c'est une réponse perdue, pas une base lente.
+const RENOUV_REJEUX_MS = [1500, 4000];
 async function lireRenouv() {
   try { return (await chrome.storage.local.get(RENOUV_STORE))[RENOUV_STORE] || {}; } catch (_) { return {}; }
 }
@@ -199,23 +246,49 @@ async function renouvelerSession({ force = false } = {}) {
   // ne changera rien au refus — c'est une autre cause (et une rafale évitée).
   if (force && rv.okAt && maintenant - Number(rv.okAt) < 60000 && s.access_token && s.expires_at > maintenant) return s;
   const jeton = s.refresh_token;
-  let res = null, corps = null;
-  try {
-    const ctrl = typeof AbortController === 'function' ? new AbortController() : null;
-    const envoi = fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, Object.assign({
-      method: 'POST',
-      headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refresh_token: jeton }),
-    }, ctrl ? { signal: ctrl.signal } : {}));
-    res = await avecDelai(envoi, RENOUV_DELAI_MS, null);
-    if (!res && ctrl) { try { ctrl.abort(); } catch (_) {} }
-    if (res && typeof res.text === 'function') {
-      const t = await avecDelai(res.text().catch(() => ''), RENOUV_DELAI_MS, '');
-      try { corps = t ? JSON.parse(t) : null; } catch (_) { corps = null; }
-    } else if (res && typeof res.json === 'function') {
-      corps = await avecDelai(res.json().catch(() => null), RENOUV_DELAI_MS, null);
-    }
-  } catch (_) { res = null; }
+  // ⚠️⚠️ UNE RÉPONSE PERDUE NE TUE PLUS LA SESSION (11 octobre). Le serveur a pu
+  //    faire tourner le jeton et la réponse se perdre (veille, réseau qui
+  //    change, délai dépassé) : le nouveau jeton n'est jamais arrivé. On rejoue
+  //    alors le MÊME jeton, vite, deux fois (+1,5 s puis +4 s) — dans la fenêtre
+  //    où Supabase rend le jeton courant au parent qui n'a pas pu ranger sa
+  //    réponse (mesuré sur le vrai GoTrue : le PARENT du jeton actif est même
+  //    accepté sans limite). Avant, on attendait 30 s de pause, et pendant ce
+  //    temps rien ne s'écrivait. Un 429 n'est PAS rejoué (c'est « ralentis »).
+  const UN_ESSAI = async () => {
+    let r = null, c = null;
+    try {
+      const ctrl = typeof AbortController === 'function' ? new AbortController() : null;
+      const envoi = fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, Object.assign({
+        method: 'POST',
+        headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: jeton }),
+      }, ctrl ? { signal: ctrl.signal } : {}));
+      r = await avecDelai(envoi, RENOUV_DELAI_MS, null);
+      if (!r && ctrl) { try { ctrl.abort(); } catch (_) {} }
+      if (r && typeof r.text === 'function') {
+        const t = await avecDelai(r.text().catch(() => ''), RENOUV_DELAI_MS, '');
+        try { c = t ? JSON.parse(t) : null; } catch (_) { c = null; }
+      } else if (r && typeof r.json === 'function') {
+        c = await avecDelai(r.json().catch(() => null), RENOUV_DELAI_MS, null);
+      }
+    } catch (_) { r = null; }
+    return { r, c };
+  };
+  // Rejouable : rien reçu (réseau, délai), 5xx, ou un 2xx illisible. Jamais un
+  // 429 (Supabase demande de ralentir) ni un refus d'authentification.
+  const rejouable = (x) => !x.r || Number(x.r.status) >= 500 || (x.r.ok && !(x.c && x.c.access_token));
+  let res = null, corps = null, rejoue = 0;
+  for (let i = 0; ; i++) {
+    const x = await UN_ESSAI();
+    res = x.r; corps = x.c;
+    if (!rejouable(x) || i >= RENOUV_REJEUX_MS.length) break;
+    // La session a changé entre-temps (l'app vient d'en donner une) : on s'arrête.
+    const cur = await loadSession();
+    if (!cur || cur.refresh_token !== jeton) break;
+    await new Promise((ok) => setTimeout(ok, RENOUV_REJEUX_MS[i]));
+    rejoue++;
+  }
+  if (rejoue) Promise.resolve().then(() => noterDiag('session_renouv_rejoue_' + rejoue + (res && res.ok ? '_ok' : ''))).catch(() => {});
   // ⚠️ LA SESSION A PU CHANGER PENDANT LE VOL (l'app vient d'envoyer la sienne,
   //    ou une déconnexion) : on n'écrase rien, et un refus de l'ANCIEN jeton ne
   //    tue pas la NOUVELLE session.
@@ -243,6 +316,12 @@ async function renouvelerSession({ force = false } = {}) {
     const raison = String((corps && (corps.error_code || corps.error || corps.code)) || res.status).slice(0, 60);
     await saveSession(Object.assign({}, s, { mort: true, mortAt: Date.now(), mortRaison: raison }));
     Promise.resolve().then(() => noterDiag('session_morte_' + raison.replace(/[^a-z_]/gi, '').slice(0, 40))).catch(() => {});
+    // ⚠️ 11 octobre : une session morte ne se répare plus en silence au bout de
+    //    20 s (le battement de l'app) — ni jamais si personne ne regarde. On
+    //    prévient TOUT DE SUITE l'app ouverte dans ce Chrome : connectée, elle
+    //    redonne une session À CETTE extension (adressée, `onMessageExternal`).
+    //    Sans app ouverte : rien ne part, la carte du logo dit « reconnecte ».
+    Promise.resolve().then(() => notifierApp({ type: 'session', etat: 'morte' })).catch(() => {});
     return null;
   }
   // Passager (429, 5xx, réseau, délai, réponse illisible) : pause croissante.
@@ -364,6 +443,131 @@ function emailDuJwt(token) {
 }
 
 async function authLogout() { await saveSession(null); return { ok: true }; }
+
+// ══════════════════════════════════════════════════════════════════════════
+// « SE CONNECTER AVEC VRM » — LA SESSION ADRESSÉE À UNE EXTENSION (11 octobre)
+// ══════════════════════════════════════════════════════════════════════════
+// Julien : « quand j'appuie sur se connecter ça doit envoyer directement dans
+// l'application VRM », « elle ne garde pas les connexions ». MESURÉ (journaux
+// d'authentification de production, et rejoué sur un vrai GoTrue) :
+//   · l'app POSTAIT une session par `window.postMessage` : TOUTE extension de la
+//     page l'adoptait — une copie ancienne restée à côté (même famille de jetons,
+//     qui finit révoquée) ; et un `session: null` posté au démarrage d'une app
+//     dont la session était morte faisait OUBLIER à l'extension la sienne, saine
+//     (9 oct. 18:37, 10 oct. 09:08 : une écriture, puis plus rien) ;
+//   · se connecter DANS l'extension ne connectait pas l'app : il retapait son
+//     mot de passe une seconde fois dans VRM.
+// ⇒ Un seul canal, ADRESSÉ : `chrome.runtime.onMessageExternal` (le manifeste
+//   déclare `externally_connectable` pour l'app). Chrome pose lui-même l'origine
+//   de l'expéditeur, et seule l'extension dont l'app a donné l'IDENTIFIANT reçoit
+//   le message — une copie ancienne, qui n'écoute pas ce canal, n'entend rien.
+//   Trois messages, tous refusés hors de l'origine de l'app :
+//     · `liaison` {pour, force, raison} : « as-tu besoin d'une session pour le
+//       compte VRM `pour` ? » — l'extension décide, et seulement si oui rend un
+//       NONCE (128 bits, 2 min, une seule fois) ;
+//     · `session` {nonce, session} : acceptée seulement avec CE nonce, et pour
+//       le compte annoncé — jamais une session venue d'ailleurs ;
+//     · `deconnexion` {pour} : « Se déconnecter » dans VRM — seulement si
+//       l'extension écrit sous CE compte (une session morte de l'app, elle, ne
+//       fait plus rien oublier).
+const LIAISON_STORE = 'vrmLiaison';          // { demandeAt, nonce: { n, at, pour } }
+const LIAISON_DEMANDE_MS = 15 * 60000;       // « Se connecter » cliqué : valable 15 min
+const LIAISON_NONCE_MS = 2 * 60000;
+async function lireLiaison() {
+  try { return (await chrome.storage.local.get(LIAISON_STORE))[LIAISON_STORE] || {}; } catch (_) { return null; }
+}
+async function ecrireLiaison(v) { try { await chrome.storage.local.set({ [LIAISON_STORE]: v }); return true; } catch (_) { return false; } }
+function nonceAleatoire() {
+  const a = new Uint8Array(16);
+  crypto.getRandomValues(a);
+  return Array.from(a, (b) => b.toString(16).padStart(2, '0')).join('');
+}
+// « Se connecter » (fenêtre de l'icône, carte du logo) : on note la demande, et
+// on ouvre VRM TOUT DE SUITE — aucune attente avant l'ouverture (la carte de
+// connexion pouvait disparaître avant d'avoir ouvert VRM : 5 fois sur 50).
+async function lierAvecVRM(urlActive) {
+  const l = (await lireLiaison()) || {};
+  await ecrireLiaison(Object.assign({}, l, { demandeAt: Date.now() }));
+  ouvrirVRMDepuis(urlActive, { lier: true });
+  return { ok: true };
+}
+const UUID_VRM = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+async function demanderLiaison(msg) {
+  const pour = String((msg && msg.pour) || '');
+  if (!UUID_VRM.test(pour)) return { ok: false, code: 'invalide' };
+  const l = await lireLiaison();
+  if (l === null) return { ok: false, code: 'stockage' };       // pas su ⇒ on ne s'engage à rien
+  const s = await loadSession();
+  const sonId = s ? String(s.user_id || subDuJwt(s.access_token) || '') : '';
+  const demande = !!(l.demandeAt && Date.now() - Number(l.demandeAt) < LIAISON_DEMANDE_MS);
+  let raison = '';
+  if (!s || !s.refresh_token) raison = 'aucune';
+  else if (s.mort) raison = 'morte';
+  else if (sonId && sonId !== pour) raison = (demande || msg.force === true) ? 'autre' : '';
+  else if (demande) raison = 'demande';
+  // Une session donnée par l'app AVANT le 6 octobre partage encore sa famille
+  // de jetons : l'app demande UNE fois, par appareil, de la remplacer.
+  else if (msg.raison === 'separer') raison = 'separer';
+  if (!raison) return { ok: true, besoin: false };
+  const n = nonceAleatoire();
+  if (!(await ecrireLiaison(Object.assign({}, l, { nonce: { n, at: Date.now(), pour } })))) return { ok: false, code: 'stockage' };
+  return { ok: true, besoin: true, nonce: n, raison };
+}
+async function recevoirSessionAdressee(msg) {
+  const l = await lireLiaison();
+  const att = l && l.nonce;
+  if (!att || !msg || typeof msg.nonce !== 'string' || att.n !== msg.nonce) return { ok: false, code: 'nonce' };
+  if (Date.now() - Number(att.at || 0) > LIAISON_NONCE_MS) return { ok: false, code: 'nonce-perime' };
+  const sess = msg.session;
+  if (!sess || typeof sess.access_token !== 'string' || typeof sess.refresh_token !== 'string' || !sess.access_token || !sess.refresh_token) return { ok: false, code: 'session' };
+  const uid = String(sess.user_id || subDuJwt(sess.access_token) || '');
+  if (!uid || uid !== String(att.pour || '')) return { ok: false, code: 'compte' };
+  // Le nonce ne sert qu'UNE fois — consommé avant tout le reste.
+  if (!(await ecrireLiaison({}))) return { ok: false, code: 'stockage' };
+  // ⚠️⚠️ L'APP TRANSMET UNE SESSION, ET L'EXTENSION L'ADOPTE. Mesuré le
+  //    2 octobre : quelqu'un s'est connecté à VRM avec une AUTRE adresse dans ce
+  //    Chrome, et les captures sont parties dans cette autre boutique. On garde
+  //    la trace de la bascule pour que la carte du logo la DISE.
+  try {
+    const avant = await loadSession();
+    const sonAvant = avant ? String(avant.user_id || subDuJwt(avant.access_token) || '') : '';
+    if (avant && sonAvant && sonAvant !== uid) {
+      await chrome.storage.local.set({ vrmBascule: { de: avant.email || emailDuJwt(avant.access_token) || '', vers: sess.email || emailDuJwt(sess.access_token) || '', at: Date.now() } });
+    }
+  } catch (_) {}
+  const email = String(sess.email || emailDuJwt(sess.access_token) || '');
+  await saveSession({ access_token: sess.access_token, refresh_token: sess.refresh_token, expires_at: sess.expires_at, user_id: uid, email });
+  Promise.resolve().then(() => noterDiag('session_liee')).catch(() => {});
+  notifierApp({ type: 'session', etat: 'liee', email });
+  return { ok: true, email };
+}
+async function deconnexionAdressee(msg) {
+  const s = await loadSession();
+  if (!s) return { ok: true, deja: true };
+  const sonId = String(s.user_id || subDuJwt(s.access_token) || '');
+  if (!sonId || sonId !== String((msg && msg.pour) || '')) return { ok: false, code: 'compte' };
+  await saveSession(null);
+  return { ok: true };
+}
+try {
+  chrome.runtime.onMessageExternal.addListener((msg, sender, sendResponse) => {
+    const src = (sender && (sender.origin || sender.url)) || '';
+    // `ORIGINE_APP` est posée plus bas dans ce fichier : un message n'arrive
+    // jamais avant la fin de son évaluation.
+    if (!ORIGINE_APP.test(src)) { sendResponse({ ok: false, code: 'origine' }); return false; }
+    if (!msg || typeof msg !== 'object') { sendResponse({ ok: false, code: 'invalide' }); return false; }
+    (async () => {
+      try {
+        if (msg.type === 'liaison') { sendResponse(await demanderLiaison(msg)); return; }
+        if (msg.type === 'session') { sendResponse(await recevoirSessionAdressee(msg)); return; }
+        if (msg.type === 'deconnexion') { sendResponse(await deconnexionAdressee(msg)); return; }
+        if (msg.type === 'code') { let ext = ''; try { ext = String(chrome.runtime.id || ''); } catch (_) {} sendResponse({ ok: true, code: CODE_VERSION, ext }); return; }
+        sendResponse({ ok: false, code: 'inconnu' });
+      } catch (e) { sendResponse({ ok: false, code: 'erreur' }); }
+    })();
+    return true;
+  });
+} catch (_) {}
 // EST-CE QUE LA BASE SAIT SEPARER LES VENDEURS ?
 // Tant que la colonne `owner` n'existe pas, ecrire un `owner` ferait echouer
 // TOUTES les captures (400 : colonne inconnue). On teste donc l'etat reel de la
@@ -1313,7 +1517,27 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       authEtat().then(sendResponse); return true;
     }
     if (msg && msg.from === 'cancale-popup' && msg.action === 'authLogin') {
-      authLogin(msg.email, msg.password).then(sendResponse); return true;
+      // Depuis la CARTE (un iframe dans l'onglet du site) : c'est le service
+      // worker qui ouvre VRM après la connexion. La carte se referme dès que la
+      // session change, AVANT d'avoir reçu cette réponse : elle n'ouvrait VRM
+      // que 45 fois sur 50 (mesuré, 11 octobre).
+      authLogin(msg.email, msg.password).then((r) => {
+        if (r && r.ok && msg.ouvrir && sender && sender.tab) ouvrirVRMDepuis(sender.tab.url || '');
+        sendResponse(r);
+      });
+      return true;
+    }
+    // « Se connecter avec VRM » : ouvre l'app, qui connecte l'extension.
+    // Le logo des sites (vrm-badge) aussi : il ouvre VRM à chaque fois (11 octobre).
+    if (msg && (msg.from === 'cancale-popup' || msg.from === 'vrm-badge') && msg.action === 'lierAvecVRM') {
+      lierAvecVRM((sender && sender.tab && sender.tab.url) || msg.urlActive || '').then(sendResponse, () => sendResponse({ ok: false }));
+      return true;
+    }
+    // La version du CODE qui tourne (la page de réparation la compare au
+    // manifeste — un code plus ancien que le manifeste ne connaît pas ce
+    // message, et c'est justement ce qui le trahit).
+    if (msg && msg.from === 'cancale-popup' && msg.action === 'codeVersion') {
+      sendResponse({ ok: true, code: CODE_VERSION }); return true;
     }
     if (msg && msg.from === 'cancale-popup' && msg.action === 'authLogout') {
       authLogout().then(sendResponse); return true;
@@ -1348,27 +1572,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       authEtat().then(sendResponse);
       return true;
     }
+    // ⚠️⚠️ PLUS AUCUNE SESSION PAR LA PAGE (11 octobre). `window.postMessage`
+    //    est entendu par TOUTE extension de la page : une copie ancienne restée
+    //    à côté adoptait la même session (une famille de jetons pour deux, qui
+    //    finit révoquée), et un `session: null` posté par une app dont la session
+    //    venait de mourir faisait oublier à l'extension la sienne, saine. La
+    //    session arrive maintenant ADRESSÉE, avec un nonce (`onMessageExternal`,
+    //    plus haut). Ce relais-ci est refusé, et le dit.
     if (msg && msg.from === 'vmr-bridge' && msg.action === 'session') {
-      const from = (sender && sender.origin) || (sender && sender.url) || '';
-      const trusted = ORIGINE_APP.test(from);
-      if (!trusted) { sendResponse({ ok: false, error: 'origine non autorisee' }); return true; }
-      (async () => {
-        // ⚠️⚠️ L'APP TRANSMET SA SESSION, ET L'EXTENSION L'ADOPTE. Mesuré le
-        //    2 octobre : quelqu'un s'est connecté à VRM avec une AUTRE adresse
-        //    dans ce Chrome, et pendant quatre minutes les captures de
-        //    `angeled92` (bordereaux compris) sont parties dans cette autre
-        //    boutique — sans un mot nulle part. On garde la trace de la bascule
-        //    pour que le petit écran de l'extension la DISE.
-        try {
-          const avant = await loadSession();
-          const apres = msg.session || null;
-          if (avant && apres && avant.user_id && apres.user_id && String(avant.user_id) !== String(apres.user_id)) {
-            await chrome.storage.local.set({ vrmBascule: { de: avant.email || emailDuJwt(avant.access_token) || '', vers: apres.email || emailDuJwt(apres.access_token) || '', at: Date.now() } });
-          }
-        } catch (_) {}
-        await saveSession(msg.session || null);
-        sendResponse({ ok: true });
-      })();
+      sendResponse({ ok: false, code: 'canal', error: 'la session passe par le canal adressé (5.171)' });
       return true;
     }
 
@@ -1517,32 +1729,38 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             //    j'avais — et je ne saurai jamais où vivent la catégorie, l'état
             //    ou le champ photo. Noms de champs et libellés d'options
             //    uniquement : aucun contenu saisi.
-            const prev = await sbGet('app_data?id=eq.lbc_recon&select=data');
-            if (prev !== null) {
-              const cur = (prev && prev[0] && prev[0].data) || {};
-              const etapes = Object.assign({}, cur.etapes || {});
-              // ⚠️⚠️ « C'EST DIFFÉRENT POUR CHAQUE ANNONCE » (Julien, 17 sept.) :
-              //    les étapes du dépôt dépendent de la CATÉGORIE. Une clé qui ne
-              //    porte que la structure ferait passer le formulaire d'un livre
-              //    pour celui d'une paire de chaussures. La catégorie entre donc
-              //    dans la clé, et l'étape garde son DÉPÔT et son RANG — sans
-              //    quoi on ne sait ni quelle étape suit laquelle, ni laquelle
-              //    appartient à quelle annonce.
-              const cle = [String(msg.categorie || 'sans-categorie').slice(0, 40),
-                String(msg.etape || msg.url || Object.keys(etapes).length)].join(' :: ');
-              etapes[cle] = { url: msg.url, fields: msg.fields, selects: msg.selects || [],
+            // ⚠️⚠️ « C'EST DIFFÉRENT POUR CHAQUE ANNONCE » (Julien, 17 sept.) :
+            //    les étapes du dépôt dépendent de la CATÉGORIE. Une clé qui ne
+            //    porte que la structure ferait passer le formulaire d'un livre
+            //    pour celui d'une paire de chaussures. La catégorie entre donc
+            //    dans la clé, et l'étape garde son DÉPÔT et son RANG.
+            // 11 octobre : l'étape part comme un MORCEAU (`etapeOne`) ; c'est le
+            //    vidage regroupé de `lbc_recon` qui la fusionne à la ligne (et
+            //    borne à 40 étapes) — plus de relecture entière à chaque étape.
+            const cle = [String(msg.categorie || 'sans-categorie').slice(0, 40),
+              String(msg.etape || msg.url || ('etape-' + Date.now()))].join(' :: ');
+            await storeLbcRecon({
+              form: { url: msg.url, fields: msg.fields, at: new Date().toISOString() },
+              etapeOne: { cle, val: { url: msg.url, fields: msg.fields, selects: msg.selects || [],
                 livraison: msg.livraison || [], fichiers: msg.fichiers || 0,
                 fichiersMultiple: !!msg.fichiersMultiple, categorie: String(msg.categorie || ''),
                 depot: String(msg.depot || ''), ordre: Number(msg.ordre) || 0,
                 ver: String(msg.ver || ''),
-                at: new Date().toISOString() };
-              // Borné : on garde les plus récentes, jamais une ligne qui enfle.
-              const cles = Object.keys(etapes);
-              if (cles.length > 40) {
-                const gardees = cles.sort((x, y) => Date.parse((etapes[y] || {}).at || 0) - Date.parse((etapes[x] || {}).at || 0)).slice(0, 40);
-                for (const k of cles) if (!gardees.includes(k)) delete etapes[k];
-              }
-              await storeLbcRecon({ form: { url: msg.url, fields: msg.fields, at: new Date().toISOString() }, etapes });
+                at: new Date().toISOString() } },
+            });
+            sendResponse({ ok: true }); return;
+          }
+          // ⚠️ 11 octobre : un dépôt qui n'aboutit pas le DIT à l'app (arrêt à
+          //    90 s, bandeau fermé). Son bouton restait « Publication en
+          //    cours… » 15 minutes, sans un mot. L'onglet est retenu : un
+          //    « Réessayer » le remet devant au lieu d'en ouvrir un second.
+          if ((msg.action === 'depotArrete' || msg.action === 'depotRepris') && msg.id) {
+            const jid = 'lbc:' + String(msg.id);
+            const cur = (await lireCmds())[jid];
+            if (cur && (cur.etape === 'depot' || cur.etape === 'abandonne')) {
+              const tabId = sender && sender.tab ? sender.tab.id : cur.tabId;
+              if (msg.action === 'depotArrete') await majCmd(jid, { etape: 'abandonne', raison: String(msg.raison || 'arret').slice(0, 30), tabId });
+              else await majCmd(jid, { etape: 'depot', raison: null, tabId });
             }
             sendResponse({ ok: true }); return;
           }
@@ -1575,16 +1793,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           //    quittent pas sa page). C'est ce qui dit quels champs le dépôt
           //    attend vraiment, catégorie par catégorie.
           if (msg.action === 'lbcEnvoi' && Array.isArray(msg.cles)) {
-            const prev = await sbGet('app_data?id=eq.lbc_recon&select=data');
-            if (prev !== null) {
-              const cur = (prev && prev[0] && prev[0].data) || {};
-              const envois = Object.assign({}, cur.envois || {});
-              const cle = (String(msg.methode || '') + ' ' + String(msg.url || '').replace(/^https?:\/\//, '').split('?')[0]).trim().slice(0, 110);
-              envois[cle] = { at: new Date().toISOString(), ver: EXT_VERSION, methode: String(msg.methode || ''), cles: msg.cles.slice(0, 400) };
-              const noms = Object.keys(envois);
-              if (noms.length > 60) { const g = noms.sort((x, y) => Date.parse((envois[y] || {}).at || 0) - Date.parse((envois[x] || {}).at || 0)).slice(0, 60); for (const n of noms) if (!g.includes(n)) delete envois[n]; }
-              await storeLbcRecon({ envois });
-            }
+            const cle = (String(msg.methode || '') + ' ' + String(msg.url || '').replace(/^https?:\/\//, '').split('?')[0]).trim().slice(0, 110);
+            await storeLbcRecon({ envoiOne: { cle, val: { at: new Date().toISOString(), ver: EXT_VERSION, methode: String(msg.methode || ''), cles: msg.cles.slice(0, 400) } } });
             sendResponse({ ok: true }); return;
           }
           if (msg.action === 'lbcPaths' && Array.isArray(msg.paths)) { await storeLbcRecon({ paths: msg.paths, url: msg.url }); sendResponse({ ok: true }); return; }
@@ -1613,7 +1823,17 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             const g = await chrome.storage.local.get('vrmPendingAd');
             const p = g && g.vrmPendingAd;
             const frais = p && p.at && (Date.now() - p.at) < 30 * 60 * 1000;
-            sendResponse({ ok: true, ad: frais ? p.ad : null }); return;
+            // ⚠️ Revue du 11 octobre : la paire en dépôt ne se remplit que dans
+            //    l'onglet ouvert POUR elle. Une autre page de dépôt restée
+            //    ouverte (un dépôt abandonné, puis relancé ailleurs) la reprenait
+            //    au premier retour sur l'onglet — et publiait une seconde fois.
+            //    Sans onglet connu (dépôt lancé autrement) : comme avant.
+            let ad = frais ? p.ad : null;
+            if (ad && sender && sender.tab && sender.tab.id != null) {
+              const job = (await lireCmds())['lbc:' + String(ad.id)];
+              if (job && job.tabId != null && job.tabId !== sender.tab.id) ad = null;
+            }
+            sendResponse({ ok: true, ad }); return;
           }
           sendResponse({ ok: false, error: 'action inconnue' });
         } catch (e) { sendResponse({ ok: false, error: String(e) }); }
@@ -3448,6 +3668,10 @@ const RETRAIT_MAX_J = 45;
 //    annonçait « code récupéré » sur un code qui n'était nulle part). C'est
 //    aussi ce qui prévient l'app (`maj · retrait`) : un seul endroit, quel que
 //    soit le chemin (conversation passive ou `capterRetraits`).
+// Rend `true` (un code neuf, rangé) · `false` (rien de neuf, ou rien à ranger) ·
+// `null` (la base n'a pas répondu ou a refusé : le code lu n'est PAS rangé —
+// relecture croisée de la 5.174 : `capterRetraits` le relit alors à la visite
+// suivante au lieu d'attendre 6 h).
 async function noterRetrait(r, uid) {
   if (!r || !r.tx) return false;
   try {
@@ -3456,7 +3680,7 @@ async function noterRetrait(r, uid) {
     //    répondu ; repartir de `{}` et réécrire la ligne ENTIÈRE efface tout le
     //    reste. On n'écrit pas.
     //    Ici on perdrait les CODES DE RETRAIT déjà lus dans les conversations.
-    if (rows === null) return false;
+    if (rows === null) return null;
     const cur = (rows[0] && rows[0].data) || {};
     const avant = cur[r.tx];
     // Rien de neuf → aucune écriture (égress, §34).
@@ -3466,11 +3690,11 @@ async function noterRetrait(r, uid) {
     for (const k in cur) { const v = cur[k]; if (v && Date.parse(v.at || '') > limite) out[k] = v; }
     out[r.tx] = r;
     const ok = await supabaseUpsert('app_data', [{ id: 'panel_colis_relais', data: out }], 'id');
-    if (ok === false) { noterDiag('retrait_conv_ecriture_ratee'); return false; }
+    if (ok === false) { noterDiag('retrait_conv_ecriture_ratee'); return null; }
     noterDiag('retrait_conv_ecrit');
     if (uid) notifierApp({ type: 'maj', quoi: 'retrait', uid: String(uid), tx: String(r.tx) });
     return true;
-  } catch (_) { return false; }
+  } catch (_) { return null; }
 }
 
 function resumeCommandes(type, payload) {
@@ -4061,21 +4285,34 @@ async function reinjecterPont() {
 chrome.runtime.onInstalled.addListener((details) => { fullSync(); if (raisonReinjecte(details)) reinjecterPont(); });
 chrome.runtime.onStartup.addListener(() => { fullSync(); });
 
+// ⚠️ 11 octobre (mesuré au banc, dans un vrai Chromium) : `chrome.alarms.create`
+//    REMET À ZÉRO une alarme qui existe déjà. Refait à CHAQUE réveil du service
+//    worker — et `vrm-photos` le réveille chaque minute —, `vrm-session` (40 min),
+//    `cancale-active` (20) et `cancale-sync` (10) ne partaient JAMAIS : 2 398 s,
+//    puis 2 378 s, puis 2 398 s après un réveil. Plus aucun entretien de la
+//    session : une session morte ne se voyait qu'à la première écriture.
+//    ⇒ On ne crée une alarme que si elle n'existe pas encore.
+function alarmeSiAbsente(nom, opts) {
+  try {
+    if (typeof chrome.alarms.get !== 'function') { chrome.alarms.create(nom, opts); return; }
+    chrome.alarms.get(nom, (a) => { void (chrome.runtime && chrome.runtime.lastError); if (!a) { try { chrome.alarms.create(nom, opts); } catch (_) {} } });
+  } catch (_) { try { chrome.alarms.create(nom, opts); } catch (_) {} }
+}
 try {
   // Capture des comptes toutes les 10 min ; fetch actif toutes les 20 min
   // (assez pour etre a jour, assez espace pour rester discret).
-  chrome.alarms.create('cancale-sync', { periodInMinutes: 10 });
-  chrome.alarms.create('cancale-active', { periodInMinutes: 20 });
+  alarmeSiAbsente('cancale-sync', { periodInMinutes: 10 });
+  alarmeSiAbsente('cancale-active', { periodInMinutes: 20 });
   // ⚠️ ENTRETIEN DE LA SESSION VENDEUR. Le jeton d'accès dure ~1 h ; il n'était
   // renouvelé qu'au moment d'écrire, et SEULEMENT si la base est cloisonnée.
   // Une fois la migration passée, une extension restée ouverte sans écrire
   // aurait laissé mourir son jeton, puis serait retombée sur la clé publique —
   // c'est-à-dire, sous RLS, plus aucune capture enregistrée, en silence.
   // 40 min : bien avant l'heure, et rien ne part si aucune session n'existe.
-  chrome.alarms.create('vrm-session', { periodInMinutes: 40 });
+  alarmeSiAbsente('vrm-session', { periodInMinutes: 40 });
   // Photos des annonces : tant qu'un onglet Vinted est ouvert, on complète tout
   // seul, sans attendre une navigation (Julien, 29 sept.). Voir `tickPhotos`.
-  chrome.alarms.create('vrm-photos', { periodInMinutes: 1 });
+  alarmeSiAbsente('vrm-photos', { periodInMinutes: 1 });
   chrome.alarms.onAlarm.addListener((a) => {
     if (a.name === 'cancale-sync') captureAllAccounts();
     else if (a.name === 'cancale-active') runActive();
@@ -4088,6 +4325,9 @@ try {
     // 5.165 : une suppression vue mais pas encore rangée (base muette, pas de
     // session) repart ici — la file vit dans `chrome.storage.local`.
     viderSuppressions();
+    // 11 octobre : les morceaux Leboncoin en attente (au plus une écriture par
+    // 30 s) partent ici si le service worker s'est endormi entre-temps.
+    try { viderLbcRecon(); viderLbcCatalogue(); } catch (_) {}
   });
 } catch (_) {}
 
@@ -4316,6 +4556,11 @@ async function visiteVinted() {
     // photo d'hier et on redemanderait des conversations pour rien.
     // (Chaque lecteur passe par `gardeLecture`, qui refuse pendant une pause :
     //  un frein reçu par l'un arrête les suivants sans requête.)
+    // ⚠️ 5.169 — EN PREMIER : la preuve des ventes en cours qui n'en ont pas.
+    //    Les ventes viennent d'être captées ; sans leur transaction, l'anti
+    //    double vente ne les voit pas (la N°553 du 10 octobre, restée en vente
+    //    sur eBay). La moisson de 20:34 l'aurait prouvée dans la minute.
+    await capterPreuvesVente(uid);
     await capterRetraits(uid);
     // ⚠️ APRÈS la moisson : les ventes « finalisées » viennent d'être captées.
     // On relit le détail de celles dont on n'a pas encore la date de versement
@@ -4534,11 +4779,11 @@ async function compterLecture(uid, plafond = LECTURES_MAX_HEURE) {
 // qu'elles ont quelque chose à lire. Chaque lecteur prioritaire note ce qu'il
 // lui RESTE (`vrmLecturesDues`) ; « pas su » (jamais noté, ou noté il y a plus
 // d'une heure) garde la réserve entière. Le plafond total ne bouge pas (20/h).
-const LECTURES_DUES = 'vrmLecturesDues';          // { [uid]: { versement:{reste,at}, releve:{…}, retrait:{…} } }
+const LECTURES_DUES = 'vrmLecturesDues';          // { [uid]: { versement:{reste,at}, releve:{…}, retrait:{…}, preuve:{…} } }
 const LECTURES_DUES_VALIDITE_MS = 60 * 60 * 1000;
 // Les lecteurs prioritaires et ce qu'une visite peut lire pour chacun. Lu à
 // l'appel (les constantes vivent plus bas dans le fichier).
-const lecteursPrioritaires = () => ({ versement: VERSEMENT_MAX_PAR_VISITE, releve: RELEVE_MAX_PAR_VISITE, retrait: RETRAIT_MAX_PAR_VISITE });
+const lecteursPrioritaires = () => ({ versement: VERSEMENT_MAX_PAR_VISITE, releve: RELEVE_MAX_PAR_VISITE, retrait: RETRAIT_MAX_PAR_VISITE, preuve: PREUVE_MAX_PAR_VISITE });
 // ⚠️⚠️ REVUE DE LA 5.167 — LA RELECTURE PUBLIQUE ÉTAIT DANS LA CLASSE DES PHOTOS.
 //    Après une republication (30 annonces neuves dont il manque les photos),
 //    `tickPhotos` vidait le budget à la minute 0, et les autres comptes attendaient
@@ -4815,7 +5060,7 @@ async function etatSite(url) {
   const flux = (capte || mesure) ? ((local.vrmFlux || {})[plateforme] || {}) : null;
   const b = local.vrmBascule;
   const bascule = b && Date.now() - Number(b.at || 0) < BASCULE_VISIBLE_MS ? b : null;
-  return { ok: true, plateforme, capte, mesure, version, vrm, site, flux, bascule };
+  return { ok: true, plateforme, capte, mesure, version, code: CODE_VERSION, vrm, site, flux, bascule };
 }
 
 // L'état que l'app interroge toutes les 20 s : ZÉRO requête Vinted (cookie,
@@ -4854,7 +5099,11 @@ async function etatPourApp() {
   //    et le bouton d'ensemble le jetait. `pause.jusqua` laisse l'app griser
   //    et DIRE « Vinted demande de ralentir — X min ». « Pas su » (stockage
   //    lent) ⇒ rien n'est affirmé, ni pause ni absence de pause.
-  return Object.assign({ ok: true, version, vrm, vinted: uid && !vintedPasSu ? { uid: String(uid), login: login || '' } : null, cmds: cmdsVus },
+  // 5.171 : `code` = la version du CODE qui répond (le manifeste peut être plus
+  //    récent que lui, voir `rechargerSiCodePerime`) ; `ext` = l'identifiant de
+  //    CETTE extension, à qui l'app adresse sa session (jamais à toutes).
+  let ext = ''; try { ext = String(chrome.runtime.id || ''); } catch (_) {}
+  return Object.assign({ ok: true, version, code: CODE_VERSION, ext, vrm, vinted: uid && !vintedPasSu ? { uid: String(uid), login: login || '' } : null, cmds: cmdsVus },
     vintedPasSu ? { vintedPasSu: true } : {},
     pause && pause !== PAUSE_PAS_SUE ? { pause: { jusqua: Number(pause.jusqua) || 0 } } : {});
 }
@@ -4906,12 +5155,121 @@ async function publierDepuisApp(msg) {
   PUBLICATIONS_EN_VOL.add(cleJob);
   try {
     const jobDeja = (await lireCmds())[cleJob];
-    if (jobDeja && jobDeja.etape === 'depot' && Date.now() - Number(jobDeja.at || 0) < 15 * 60000) {
-      return { accepte: false, code: 'en-cours', raison: lbc ? 'sa publication est déjà en cours dans un autre onglet' : 'sa préparation eBay est déjà ouverte dans un autre onglet' };
+    // ⚠️⚠️ 11 octobre : « JE NE PEUX PAS POSTER SUR LEBONCOIN ». Un dépôt qui
+    //    n'aboutissait pas (onglet fermé, connexion demandée par Leboncoin)
+    //    bloquait la paire 15 minutes, et le clic suivant était refusé sans
+    //    rien montrer. On regarde maintenant l'ONGLET du dépôt :
+    //      · encore ouvert ⇒ on le remet devant (un dépôt en cours n'est pas
+    //        relancé : Leboncoin publierait deux fois), et on DIT pourquoi ;
+    //        arrêté ⇒ on lui demande de reprendre, dans CET onglet ;
+    //      · fermé ⇒ le dépôt est abandonné : on relance.
+    //    Sans onglet connu (dépôt d'avant la 5.171), l'ancienne règle des 15 min.
+    let etapeDeja = jobDeja ? jobDeja.etape : '';
+    if (jobDeja && (jobDeja.etape === 'depot' || jobDeja.etape === 'abandonne')) {
+      let onglet = jobDeja.tabId != null ? await ongletOuvert(jobDeja.tabId) : undefined;
+      // ⚠️⚠️ Revue du 11 octobre : un onglet OUVERT n'est pas un dépôt VIVANT.
+      //    Navigué ailleurs (vinted.fr, la liste de Leboncoin…), il restait
+      //    ouvert, et « son dépôt est encore ouvert — je te le remets devant »
+      //    revenait à chaque clic, pour toujours (reproduit : un job de 20 h,
+      //    l'onglet sur vinted.fr, trois clics, trois refus). Vivant = l'adresse
+      //    est encore une page de dépôt ET le script de la page RÉPOND pour CETTE
+      //    paire. Sinon, le dépôt est abandonné — on ne sait pas comment il a
+      //    fini (voir plus bas).
+      if (onglet) {
+        // Un dépôt ouvert il y a moins de 30 s : sa page charge encore, lbc.js
+        // ne peut pas encore répondre — un double clic ne doit pas le déclarer
+        // abandonné (ni en ouvrir un second).
+        const recent = jobDeja.etape === 'depot' && Date.now() - Number(jobDeja.at || 0) < 30000;
+        const vivant = await ongletDepotVivant(onglet, id, lbc, jobDeja.etape === 'abandonne', recent);
+        if (vivant) {
+          try { await chrome.tabs.update(onglet.id, { active: true }); if (onglet.windowId != null) chrome.windows.update(onglet.windowId, { focused: true }); } catch (_) {}
+          if (jobDeja.etape === 'abandonne') {
+            await majCmd(cleJob, { etape: 'depot', raison: null });
+            return { accepte: true, jobId: cleJob, etape: 'depot', repris: true };
+          }
+          return { accepte: false, code: 'en-cours', ouvert: true, raison: lbc ? 'son dépôt est encore ouvert dans un onglet Leboncoin — je te le remets devant' : 'sa préparation eBay est encore ouverte — je te la remets devant' };
+        }
+        await majCmd(cleJob, { etape: 'abandonne', raison: 'onglet-quitte', tabId: null });
+        // Comme un onglet fermé : la paire n'attend plus dans une page de dépôt
+        // (une page restée sur le dépôt la reprendrait toute seule).
+        try {
+          const cle = lbc ? 'vrmPendingAd' : 'vrmPendingEbay';
+          const pend = (await chrome.storage.local.get(cle))[cle];
+          if (pend && pend.ad && String(pend.ad.id) === String(id)) await chrome.storage.local.set({ [cle]: null });
+        } catch (_) {}
+        etapeDeja = 'abandonne';
+        onglet = null;
+      }
+      if (onglet === undefined && jobDeja.etape === 'depot' && Date.now() - Number(jobDeja.at || 0) < 15 * 60000) {
+        return { accepte: false, code: 'en-cours', raison: lbc ? 'sa publication est déjà en cours dans un autre onglet' : 'sa préparation eBay est déjà ouverte dans un autre onglet' };
+      }
+    }
+    // ⚠️⚠️ Revue du 11 octobre : UN DÉPÔT ABANDONNÉ A PU ÊTRE FINI À LA MAIN.
+    //    L'arrêt à 90 s arrive justement quand un champ obligatoire ne se devine
+    //    pas — il le termine lui-même, VRM ne voit pas la page de fin, puis il
+    //    ferme l'onglet. « Réessayer » ouvrait alors un SECOND dépôt qui publie
+    //    tout seul : la paire deux fois sur Leboncoin. On ne relance une
+    //    publication automatique qu'avec sa confirmation (l'app la demande, avec
+    //    « Déjà publiée » en face). eBay ne publie rien tout seul : pas besoin.
+    if (lbc && etapeDeja === 'abandonne' && msg.confirme !== true) {
+      return { accepte: false, code: 'confirmer', jobId: cleJob, etape: 'abandonne', raison: "VRM n'a pas vu la fin du dépôt précédent — si tu l'as publiée toi-même, clique « Déjà publiée » ; sinon confirme pour relancer" };
     }
     return await publierDepuisAppSuite(msg, cmd, id, lbc);
   } finally { PUBLICATIONS_EN_VOL.delete(cleJob); }
 }
+// Le dépôt de CETTE paire vit-il encore dans cet onglet ? (revue du 11 octobre)
+//    Leboncoin : l'adresse est une page de dépôt (pas la page de fin) ET lbc.js
+//    y répond pour cette paire — un acquittement, pas seulement l'existence de
+//    l'onglet. `reprendre` : on lui demande en même temps de reprendre le
+//    remplissage (dépôt arrêté) ; vivant = il a repris. Pas de réponse (lbc.js
+//    absent, page partie ailleurs, ancienne version) ⇒ pas vivant.
+//    eBay : ebay.js ne répond pas à ce message — l'adresse seule juge.
+async function ongletDepotVivant(onglet, id, lbc, reprendre, recent) {
+  const url = String((onglet && (onglet.url || onglet.pendingUrl)) || '');
+  if (!lbc) return !url || /^https:\/\/([a-z0-9-]+\.)*ebay\.(fr|com)\//i.test(url);
+  if (url && (!/^https:\/\/([a-z0-9-]+\.)*leboncoin\.fr\/deposer-une-annonce/i.test(url) || /\/confirmation/i.test(url))) return false;
+  // Page qui charge (ou dépôt ouvert à l'instant) : lbc.js ne répond pas
+  // ENCORE — elle reprendra d'elle-même la paire en chargeant (`getPending`).
+  if ((onglet && onglet.status === 'loading') || recent) return true;
+  const rep = await new Promise((res) => {
+    let fini = false;
+    const t = setTimeout(() => { if (!fini) { fini = true; res(null); } }, 2500);
+    try {
+      chrome.tabs.sendMessage(onglet.id, { __vrmLbc: reprendre ? 'reprendre' : 'vivant', id: String(id) }, { frameId: 0 }, (r) => {
+        if (fini) return; fini = true; clearTimeout(t);
+        let e = null; try { e = chrome.runtime.lastError; } catch (_) { e = null; }
+        res(e ? null : (r || null));
+      });
+    } catch (_) { if (!fini) { fini = true; clearTimeout(t); res(null); } }
+  });
+  if (!rep || !rep.ok) return false;
+  return reprendre ? rep.repris === true : (rep.depot === true && rep.sienne === true);
+}
+// L'onglet d'un dépôt : l'objet s'il est encore ouvert, `null` s'il est fermé,
+// `undefined` si on ne sait pas (pas d'identifiant, API absente).
+async function ongletOuvert(tabId) {
+  if (tabId == null || !chrome.tabs || typeof chrome.tabs.get !== 'function') return undefined;
+  try { const t = await chrome.tabs.get(Number(tabId)); return t && t.id != null ? t : null; } catch (_) { return null; }
+}
+// Un onglet de dépôt fermé ⇒ le dépôt est abandonné, l'app le sait aussitôt.
+async function depotOngletFerme(tabId) {
+  const cmds = await lireCmds();
+  for (const jid of Object.keys(cmds)) {
+    const c = cmds[jid];
+    if (!/^(lbc|ebay):/.test(jid) || !c || c.tabId !== tabId) continue;
+    if (c.etape === 'depot') await majCmd(jid, { etape: 'abandonne', raison: 'onglet-ferme', tabId: null });
+    else if (c.etape === 'abandonne') await majCmd(jid, { tabId: null });
+    else continue;
+    // La paire n'est plus « en dépôt » : une page de dépôt ouverte plus tard ne
+    // doit pas se remplir toute seule avec elle.
+    try {
+      const cle = /^lbc:/.test(jid) ? 'vrmPendingAd' : 'vrmPendingEbay';
+      const p = (await chrome.storage.local.get(cle))[cle];
+      if (p && p.ad && String(p.ad.id) === String(c.id)) await chrome.storage.local.set({ [cle]: null });
+    } catch (_) {}
+  }
+}
+try { chrome.tabs.onRemoved.addListener((tabId) => { depotOngletFerme(tabId).catch(() => {}); }); } catch (_) {}
 const PUBLICATIONS_EN_VOL = new Set();
 async function publierDepuisAppSuite(msg, cmd, id, lbc) {
   // Capture au clic : si les photos de CETTE paire manquent, on les cherche
@@ -4928,8 +5286,12 @@ async function publierDepuisAppSuite(msg, cmd, id, lbc) {
   const jobId = (lbc ? 'lbc:' : 'ebay:') + id;
   if (lbc) await chrome.storage.local.set({ vrmPendingAd: { ad: Object.assign({}, ad, { publier: true }), at: Date.now() } });
   else await chrome.storage.local.set({ vrmPendingEbay: { ad, at: Date.now() } });
-  await majCmd(jobId, { etape: 'depot', id, numero: ad.numero || '' });
-  try { await chrome.tabs.create({ url: lbc ? 'https://www.leboncoin.fr/deposer-une-annonce' : 'https://www.ebay.fr/sl/sell', active: true }); } catch (_) {}
+  // L'onglet du dépôt est RETENU (11 octobre) : fermé, le dépôt passe à
+  // « abandonné » et l'app propose de réessayer ; encore ouvert, un second clic
+  // le remet devant au lieu d'en ouvrir un autre.
+  let tab = null;
+  try { tab = await chrome.tabs.create({ url: lbc ? 'https://www.leboncoin.fr/deposer-une-annonce' : 'https://www.ebay.fr/sl/sell', active: true }); } catch (_) { tab = null; }
+  await majCmd(jobId, { etape: 'depot', id, numero: ad.numero || '', tabId: tab && tab.id != null ? tab.id : null, raison: null });
   return { accepte: true, jobId, etape: 'depot' };
 }
 async function executerCommande(msg) {
@@ -5588,6 +5950,7 @@ const BORD_RATTRAPAGE_J = 21;
 //    est un colis perdu » appliqué à ce qu'on dit à ses acheteurs.
 const MSG_MAX_PAR_VISITE = 8;
 const MSG_MIN_CONFIANCE = 55;    // en dessous, l'IA hésite : on ne parle pas à sa place
+const MSG_DEMANDES_MAX = 300;    // questions à l'IA mémorisées (une par message, voir `demandes`)
 
 // ══════════════════════════════════════════════════════════════════════════════
 // ⚠️⚠️ QUI VEND ? C'EST UNE IDENTITÉ, ET ELLE M'A ÉVITÉ D'ÉCRIRE N'IMPORTE QUOI
@@ -5648,6 +6011,24 @@ async function repondreAuxMessages(uid) {
     const rows = await sbGet('app_data?id=eq.panel_msg_repondus&select=data');
     if (rows === null) return 0;                   // on ne risque pas de répondre deux fois
     const deja = (rows[0] && rows[0].data) || {};
+    // ⚠️⚠️ LA FUITE DE L'IA (11 octobre). Cette fonction tourne à CHAQUE page
+    //    Vinted chargée — mesuré : ~255 passages par jour chez Julien. Un message
+    //    où l'IA HÉSITE (confiance sous le seuil) ou rend une réponse vide n'était
+    //    mémorisé nulle part : il repartait chez l'IA au passage suivant, tant
+    //    qu'il restait non lu. Un seul message hésitant ≈ 255 appels payés par
+    //    jour (≈ 15 à 18 $ par mois, plus que l'abonnement). Même chose pour une
+    //    réponse sûre que `garde` a empêchée de partir (plafond horaire atteint) :
+    //    redemandée à chaque page.
+    // ⇒ UNE question à l'IA par message, jamais deux. L'identité est la même que
+    //    pour les envois (`conversation:message`, jamais le texte ni la date) et
+    //    elle vit dans la MÊME ligne, sous une clé réservée (`demandes`) — lue et
+    //    réécrite avec la même garde (lecture ratée ⇒ rien ne part, plus haut).
+    //    · réponse sûre pas encore partie ⇒ on garde son texte et on le RÉUTILISE ;
+    //    · hésitation ou réponse vide ⇒ on ne la redemande plus (un NOUVEAU
+    //      message de l'acheteur a un autre id : lui, il est redemandé) ;
+    //    · IA injoignable (rien de facturé) ⇒ rien n'est mémorisé, on retentera.
+    const demandes = (deja.demandes && typeof deja.demandes === 'object' && !Array.isArray(deja.demandes)) ? deja.demandes : {};
+    const demandesNeuves = {};
 
     let envoyes = 0;
     const neufs = {};
@@ -5656,8 +6037,13 @@ async function repondreAuxMessages(uid) {
     //    message de l'acheteur dedans, 1 est refusée à la réponse par Vinted,
     //    1 est un échange où il achète — il en reste **3**. L'app écrit ces
     //    nombres ; un total partiel présenté comme complet est pire qu'absent.
+    // ⚠️ `iaKO` (revue du 11 octobre) : quand c'est l'IA qui n'a rien rendu
+    //    d'utilisable (pas branchée, injoignable, sortie illisible), ce n'est PAS
+    //    une hésitation — l'app l'écrivait « elle n'était pas sûre ». Compté à
+    //    part, avec sa cause (`iaKOcauses` : pasBranchee · injoignable · illisible).
     const bilan = { nonLues: nonLues.length, pasCaptee: 0, sansMessage: 0, pasVendeur: 0,
-      replyRefuse: 0, dejaRepondu: 0, pasSure: 0, envoyes: 0, refusees: 0, at: new Date().toISOString() };
+      replyRefuse: 0, dejaRepondu: 0, pasSure: 0, iaKO: 0, iaKOcauses: {}, envoyes: 0, refusees: 0, at: new Date().toISOString() };
+    const iaKO = (cause) => { bilan.iaKO++; bilan.iaKOcauses[cause] = (bilan.iaKOcauses[cause] || 0) + 1; };
     for (const c of nonLues) {
       const cid = String(c.id);
       const det = await convDernierMessageId(uid, cid);
@@ -5668,15 +6054,52 @@ async function repondreAuxMessages(uid) {
       if (!(det.itemId && miennes.has(String(det.itemId)))) { bilan.pasVendeur++; continue; }
       const cle = cid + ':' + det.id;
       if (deja[cle] || neufs[cle]) { bilan.dejaRepondu++; continue; }    // déjà répondu à CE message
-      if (envoyes >= MSG_MAX_PAR_VISITE) continue;                       // le reste attend la prochaine visite
-      const sugg = await aiReply(det.body, det.article || c.description || '', det.price);
-      const texte = (sugg && sugg.ok && Array.isArray(sugg.suggestions) && sugg.suggestions[0]
-        && String(sugg.suggestions[0].text || '').trim()) || '';
-      // Mieux vaut un blanc qu'un faux : rien à dire ⇒ on se tait et on le note.
-      if (!texte || Number(sugg.confidence || 0) < MSG_MIN_CONFIANCE) {
-        bilan.pasSure++;
-        noterDiag(!texte ? 'repond_sans_reponse' : 'repond_peu_sur');
+      // Déjà demandé à l'IA pour CE message, et elle a hésité : on ne la repaie pas.
+      const dejaDemande = demandesNeuves[cle] || demandes[cle] || null;
+      if (dejaDemande && !dejaDemande.texte) {
+        if (dejaDemande.raison === 'illisible') { iaKO('illisible'); noterDiag('repond_illisible_memorisee'); }
+        else { bilan.pasSure++; noterDiag('repond_hesitation_memorisee'); }
         continue;
+      }
+      if (envoyes >= MSG_MAX_PAR_VISITE) continue;                       // le reste attend la prochaine visite
+      let texte = '', sugg = null;
+      if (dejaDemande && dejaDemande.texte) {
+        // Une réponse SÛRE déjà obtenue pour ce message, qui n'a pas pu partir :
+        // on la renvoie telle quelle, sans redemander (ni repayer) l'IA.
+        texte = String(dejaDemande.texte);
+        sugg = { intent: dejaDemande.intention || '', confidence: Number(dejaDemande.confiance || 0) };
+        noterDiag('repond_reponse_reutilisee');
+      } else {
+        sugg = await aiReply(det.body, det.article || c.description || '', det.price);
+        if (!(sugg && sugg.ok)) {
+          // ⚠️⚠️ REVUE DU 11 OCTOBRE : une réponse PAYÉE mais illisible (JSON
+          //    tronqué, texte libre, réponse vide — le serveur dit `facture: true`,
+          //    et `reason: 'parse'` pour un serveur d'avant) se range comme une
+          //    hésitation : on ne la repaie pas à chaque page Vinted. Seuls les
+          //    refus d'AVANT l'appel payé (clé absente, session, abonnement,
+          //    réseau, Anthropic en panne) ne sont pas mémorisés : on retentera.
+          if (sugg && (sugg.facture === true || sugg.reason === 'parse')) {
+            demandesNeuves[cle] = { at: new Date().toISOString(), confiance: 0, raison: 'illisible' };
+            iaKO('illisible'); noterDiag('repond_illisible');
+            continue;
+          }
+          iaKO(sugg && sugg.reason === 'no-key' ? 'pasBranchee' : 'injoignable');
+          noterDiag(sugg && sugg.reason === 'no-key' ? 'repond_ia_pas_branchee' : 'repond_ia_injoignable');
+          continue;
+        }
+        texte = (Array.isArray(sugg.suggestions) && sugg.suggestions[0]
+          && String(sugg.suggestions[0].text || '').trim()) || '';
+        const conf = Number(sugg.confidence || 0);
+        const sure = !!texte && conf >= MSG_MIN_CONFIANCE;
+        demandesNeuves[cle] = sure
+          ? { at: new Date().toISOString(), confiance: conf, intention: String(sugg.intent || ''), texte: texte.slice(0, 1000) }
+          : { at: new Date().toISOString(), confiance: conf, raison: texte ? 'peu-sur' : 'vide' };
+        // Mieux vaut un blanc qu'un faux : rien à dire ⇒ on se tait et on le note.
+        if (!sure) {
+          bilan.pasSure++;
+          noterDiag(!texte ? 'repond_sans_reponse' : 'repond_peu_sur');
+          continue;
+        }
       }
       // ⚠️ LE PLAFOND HORAIRE SE CONSOMME AU MOMENT DE L'ENVOI, JAMAIS AVANT.
       //    `garde` → `compterAction` POUSSE un créneau du budget 20/h à chaque
@@ -5710,8 +6133,18 @@ async function repondreAuxMessages(uid) {
     // Lire-fusionner-réécrire, avec la garde du dossier : on ne fusionne que si
     // on a lu (la lecture plus haut a déjà refusé le cas `null`). Le bilan vit
     // sous une clé réservée, jamais confondue avec un envoi (`conv:message`).
+    // Les questions à l'IA : les anciennes + celles de ce passage, sans celles
+    // dont la réponse est partie (l'envoi les remplace), bornées aux 300 plus
+    // récentes (une ligne lue à chaque visite ne grossit pas sans fin, §4.4).
+    const toutesDemandes = Object.assign({}, demandes, demandesNeuves);
+    const gardees = Object.keys(toutesDemandes)
+      .filter((k) => !deja[k] && !neufs[k] && toutesDemandes[k] && typeof toutesDemandes[k] === 'object')
+      .sort((a, b) => String(toutesDemandes[b].at || '').localeCompare(String(toutesDemandes[a].at || '')))
+      .slice(0, MSG_DEMANDES_MAX);
+    const demandesEcrites = {};
+    for (const k of gardees) demandesEcrites[k] = toutesDemandes[k];
     await supabaseUpsert('app_data', [{ id: 'panel_msg_repondus',
-      data: Object.assign({}, deja, neufs, { bilan: Object.assign({}, bilan, { uid: String(uid), ver: EXT_VERSION }) }) }], 'id');
+      data: Object.assign({}, deja, neufs, { demandes: demandesEcrites, bilan: Object.assign({}, bilan, { uid: String(uid), ver: EXT_VERSION }) }) }], 'id');
     return envoyes;
   } catch (_) { return 0; }
 }
@@ -5750,6 +6183,41 @@ async function convDernierMessageId(uid, convId) {
     }
     return null;
   } catch (_) { return null; }
+}
+
+// ══ UN ÉCHEC PASSAGER NE BLOQUE PAS 6 H (relecture croisée de la 5.174) ══════
+// Les lecteurs bornés (`capterRetraits` 6 h, `capterDatesVersement` 24 h,
+// `capterPreuvesVente` 6 h) posaient leur mémo AVANT la requête et ne l'ôtaient
+// jamais : un 429 de Vinted (pause de 15 min), un 401, une coupure réseau, ou une
+// écriture refusée par NOTRE base cachaient la vente 6 ou 24 h. Mesuré (vrai
+// background.js dans un vm, 12 octobre) : 2 ventes lues, 0 rangée, relues
+// seulement à +6 h 06 — pendant que l'écran eBay promettait « à ta prochaine
+// visite », et que le retrait automatique d'eBay ne voyait pas la vente.
+// Ce qu'un échec dit de la suite :
+//   'garder'  — Vinted a JUGÉ cette demande (4xx autre que 401/403/429) : le
+//               délai normal ;
+//   'bref'    — Vinted en panne (5xx) : 30 min, pas 6 h (une transaction cassée
+//               ne mange pas le budget de lecture à chaque visite) ;
+//   'oublier' — rien n'a été jugé (pause, frein 429/403, 401, réseau) : la visite
+//               suivante la relit — la pause, elle, l'empêche avant.
+// (Une réponse 200 sans l'objet attendu est un jugement : le délai normal, posé
+// par l'appelant. Une ÉCRITURE refusée par notre base : l'appelant ôte le mémo
+// et s'arrête — la base refuse, la suivante échouerait aussi.)
+const RELECTURE_BREVE_MS = 30 * 60000;
+function suiteLectureRatee(rep) {
+  if (!rep || rep.pause) return 'oublier';
+  const s = Number(rep.status) || 0;
+  if (!s || s === 401 || freinVinted(s)) return 'oublier';
+  if (s >= 500) return 'bref';
+  return 'garder';
+}
+// Applique la suite au mémo (`cle` → date de l'essai, relu avec `delaiMs`) ;
+// rend `true` quand la boucle doit s'arrêter (Vinted a demandé de ralentir).
+function memoApresEchec(memo, cle, rep, delaiMs) {
+  const suite = suiteLectureRatee(rep);
+  if (suite === 'oublier') delete memo[cle];
+  else if (suite === 'bref') memo[cle] = Date.now() - delaiMs + RELECTURE_BREVE_MS;
+  return !!(rep && (rep.pause || freinVinted(Number(rep.status) || 0)));
 }
 
 const RETRAIT_MAX_PAR_VISITE = 3;
@@ -5793,11 +6261,13 @@ async function capterRetraits(uid) {
       memo[cid] = Date.now();
       n++;
       const rep = await vintedGet(acc, `/api/v2/conversations/${encodeURIComponent(cid)}`);
-      if (!rep.ok || !rep.json) { noterDiag(`retrait_conv_refuse_${rep.status}`); continue; }
+      if (!rep.ok || !rep.json) { noterDiag(`retrait_conv_refuse_${rep.status}`); if (memoApresEchec(memo, cid, rep, BORD_RETRY_MS)) break; continue; }
       const r = retraitDeConversation(rep.json);
       if (!r) { noterDiag('retrait_conv_sans_message'); continue; }
       if (!r.tx && tx) r.tx = tx;                                 // identité de l'achat
       const ecrit = await noterRetrait(r, uid);
+      // Code lu mais PAS rangé (notre base) : relu à la visite suivante.
+      if (ecrit === null) { delete memo[cid]; break; }
       if (ecrit) logActivity(`📦 Code de retrait récupéré — ${(r.code || r.lieu || '').slice(0, 40)}`);
     }
     await chrome.storage.local.set({ vrmRetraitFaits: memo });
@@ -5861,13 +6331,15 @@ async function capterDatesVersement(uid) {
       memo[tx] = Date.now();
       n++;
       const rep = await vintedGet(acc, `/api/v2/transactions/${encodeURIComponent(tx)}`);
-      if (!rep.ok || !rep.json) { noterDiag(`versement_refuse_${rep.status}`); continue; }
+      if (!rep.ok || !rep.json) { noterDiag(`versement_refuse_${rep.status}`); if (memoApresEchec(memo, tx, rep, VERSEMENT_RETRY_MS)) break; continue; }
       const t = rep.json.transaction;
       if (!t || typeof t !== 'object') { noterDiag('versement_sans_transaction'); continue; }
       const data = { type: 'transaction', uid: String(uid), domain: acc.domain || 'www.vinted.fr',
         capturedAt: new Date().toISOString(), payload: alleger('transaction', rep.json) };
       const ok = await supabaseUpsert('app_data', [{ id: `harvest_${uid}_txn_${tx}`, data }], 'id');
-      if (ok === false) { noterDiag('versement_ecriture_ratee'); continue; }
+      // Notre base refuse : la date n'est PAS rangée — relue à la visite suivante
+      // (pas dans 24 h), et on s'arrête (la suivante échouerait aussi).
+      if (ok === false) { noterDiag('versement_ecriture_ratee'); delete memo[tx]; break; }
       if (String(t.status) === '450' && t.status_updated_at) { ecrites++; noterDiag('versement_date_ecrit'); }
       else noterDiag(`versement_statut_${String(t.status).slice(0, 8)}`);
     }
@@ -5876,6 +6348,94 @@ async function capterDatesVersement(uid) {
     if (ecrites) {
       logActivity(`💶 ${ecrites} date${ecrites > 1 ? 's' : ''} de versement récupérée${ecrites > 1 ? 's' : ''}`);
       notifierApp({ type: 'maj', quoi: 'versements', uid: String(uid) });
+    }
+    return n;
+  } catch (_) { return 0; }
+}
+
+// ═══ LA PREUVE DE VENTE, RANGÉE (5.169, 11 octobre) ════════════════════════
+// Une transaction LUE (par le bordereau ou par `capterPreuvesVente`) est rangée
+// sous `harvest_{uid}_txn_{tx}`, la forme EXACTE de `capterDatesVersement` : la
+// base en tire `meta->>item_id` et `meta->>status_title`, ce que lit la preuve
+// de vente de l'app et de l'extension — rien à changer chez elles.
+// ⚠️ Une réponse qui porte une AUTRE transaction n'est pas rangée sous ce
+//    numéro (on ne fabrique pas une preuve pour la mauvaise vente).
+// Rend `true` si la base l'a RANGÉE · `false` si ce n'est pas une transaction
+// rangeable (absente, ou une AUTRE) · `null` si NOTRE base a refusé l'écriture
+// (relecture croisée de la 5.174 : la preuve se relit alors à la visite suivante).
+async function rangerTransaction(uid, acc, tx, json, quoi) {
+  try {
+    const t = json && json.transaction;
+    if (!t || typeof t !== 'object' || !/^\d+$/.test(String(tx))) return false;
+    if (t.id != null && String(t.id) !== String(tx)) { await noterDiag(`${quoi}_txn_autre`); return false; }
+    const data = { type: 'transaction', uid: String(uid), domain: (acc && acc.domain) || 'www.vinted.fr',
+      capturedAt: new Date().toISOString(), payload: alleger('transaction', json) };
+    const ok = await supabaseUpsert('app_data', [{ id: `harvest_${uid}_txn_${tx}`, data }], 'id');
+    if (ok === false) { await noterDiag(`${quoi}_txn_ecriture_ratee`); return null; }
+    await noterDiag(`${quoi}_txn_rangee`);
+    return true;
+  } catch (_) { return null; }
+}
+
+// ═══ LA PREUVE DES VENTES EN COURS (5.169, 11 octobre) ═════════════════════
+// Une vente à poster ou en route dont aucune preuve n'existe (ni transaction
+// rangée, ni bordereau qui porte son annonce) est INVISIBLE pour l'anti double
+// vente : sa paire peut rester en vente sur eBay. Mesuré le 11 octobre : 4 des
+// 18 ventes en cours n'avaient ni l'une ni l'autre. On lit leur transaction.
+// ⚠️ Une LECTURE sur ses propres ventes (§3 l'autorise), la forme exacte de
+// `capterDatesVersement` : compte connecté (`gardeLecture`, priorité colis),
+// dans la file Vinted (une requête à la fois), 3 par visite, jamais deux fois
+// la même vente en 6 h. « Pas su » (ventes, transactions ou bordereaux
+// illisibles) ⇒ on ne lit RIEN chez Vinted.
+const PREUVE_MAX_PAR_VISITE = 3;
+const PREUVE_RETRY_MS = 6 * 60 * 60 * 1000;
+async function capterPreuvesVente(uid) {
+  try {
+    if (!uid) return 0;
+    const accts = await getStoredAccounts();
+    const acc = accts.find(a => String(a.vinted_user_id) === String(uid));
+    if (!acc) return 0;
+    const rows = await sbGet(`app_data?id=eq.harvest_${uid}_orders_sold&select=v:data->payload->my_orders`);
+    if (!Array.isArray(rows)) return 0;                                   // pas su
+    const ventes = (rows[0] && Array.isArray(rows[0].v)) ? rows[0].v : [];
+    const maintenant = Date.now();
+    const enCours = ventes.filter(o => venteEnCoursPreuve(o, maintenant) && /^\d+$/.test(String(o.transaction_id)));
+    if (!enCours.length) { await noterLecturesDues(uid, 'preuve', 0); return 0; }
+    const det = await sbGetTout(`app_data?id=like.harvest_${uid}_txn_*&select=id,it:meta->>item_id,ti:meta->>status_title`);
+    if (det === null) return 0;                                           // pas su
+    const bords = await sbGetTout(`app_data?id=like.harvest_${uid}_label_*&select=id,tx:meta->>tx,it:meta->>item`);
+    if (bords === null) return 0;                                         // pas su
+    const prouvees = preuvesParTransaction(det, { [String(uid)]: ventes }).tx;
+    const parBord = preuvesParBordereau(bords, { [String(uid)]: ventes }).tx;
+    const memo = (await chrome.storage.local.get('vrmPreuveFaits')).vrmPreuveFaits || {};
+    for (const k of Object.keys(memo)) if (maintenant - Number(memo[k]) > 2 * 86400000) delete memo[k];
+    const aLire = (o) => {
+      const tx = String(o.transaction_id);
+      if (prouvees.has(tx) || parBord.has(tx)) return false;
+      return !(memo[tx] && Date.now() - Number(memo[tx]) < PREUVE_RETRY_MS);
+    };
+    let n = 0, ecrites = 0;
+    for (const o of enCours) {
+      if (n >= PREUVE_MAX_PAR_VISITE) break;
+      if (!aLire(o)) continue;
+      const tx = String(o.transaction_id);
+      const refus = await gardeLecture(uid, acc, 'colis');
+      if (refus) { if (refus.code !== 'vinted-pause') logActivity(`⚠️ Preuve de vente non lue : ${refus.error}`); break; }
+      memo[tx] = Date.now();
+      n++;
+      const rep = await vintedGet(acc, `/api/v2/transactions/${encodeURIComponent(tx)}`);
+      if (!rep || !rep.ok || !rep.json) { await noterDiag(`preuve_refuse_${(rep && rep.status) || 0}`); if (memoApresEchec(memo, tx, rep, PREUVE_RETRY_MS)) break; continue; }
+      const range = await rangerTransaction(uid, acc, tx, rep.json, 'preuve');
+      // Notre base refuse : la preuve n'est PAS rangée — relue à la visite
+      // suivante (et comptée dans la réserve), et on s'arrête.
+      if (range === null) { delete memo[tx]; break; }
+      if (range) ecrites++;
+    }
+    await chrome.storage.local.set({ vrmPreuveFaits: memo });
+    await noterLecturesDues(uid, 'preuve', enCours.filter(aLire).length);
+    if (ecrites) {
+      logActivity(`🧾 ${ecrites} vente${ecrites > 1 ? 's' : ''} reliée${ecrites > 1 ? 's' : ''} à leur annonce (anti double vente)`);
+      notifierApp({ type: 'maj', quoi: 'preuves', uid: String(uid) });
     }
     return n;
   } catch (_) { return 0; }
@@ -6059,6 +6619,17 @@ async function recupererLabel(acc, uid, tx, connu) {
   try {
     const t = (connu && connu.t) || await vintedGet(acc, `/api/v2/transactions/${tx}`);
     if (t && (t.pause || freinVinted(t.status))) return { ok: false, pause: true, raison: t.raison || 'Vinted demande de ralentir' };   // 5.162
+    // ⚠️⚠️ 5.169 — LA TRANSACTION LUE ICI ÉTAIT JETÉE. C'est pourtant la PREUVE
+    //    de vente que lit l'anti double vente (`harvest_{uid}_txn_{tx}` →
+    //    `item_id` + état de commande) : la N°553 vendue le 10 octobre a eu son
+    //    bordereau à 21:55, et aucune ligne de transaction — l'annonce eBay est
+    //    restée en vente. On la range, sous la forme exacte de
+    //    `capterDatesVersement` : AUCUNE requête Vinted de plus, et une seule
+    //    écriture réussie par appel, même quand `recupererLabelInsiste` réessaie.
+    if (t && t.ok && t.json && t.json.transaction && !(connu && connu.txnRangee)) {
+      const range = await rangerTransaction(uid, acc, tx, t.json, 'label');
+      if (connu && range) connu.txnRangee = true;
+    }
     const shipId = t && t.json && (t.json.transaction?.shipment?.id ?? t.json.shipment?.id);
     // ⚠️⚠️ ON NE GARDE LA TRANSACTION QUE SI ELLE A RÉPONDU CE QU'ON LUI
     //    DEMANDAIT. « Vinted n'expose pas encore l'expédition » est justement le
@@ -6802,17 +7373,145 @@ function mpChoisi(e, place) {
 //   comme une vente, pas disparaître — c'est le même sens que
 //   `classifyOrderStatus` côté app.
 const PAS_UNE_VENTE = /annul|cancel|refus|rembours|retour|suspend|[ée]chou/i;
-async function lireVentesProuvees() {
-  const rows = await sbGetTout('app_data?id=like.harvest_*_txn_*&select=it:meta->>item_id,ti:meta->>status_title');
-  if (rows === null) return { echec: true, vendus: new Set() };
-  const vendus = new Set();
-  for (const r of rows) {
+// ⚠️⚠️ 5.169 (11 octobre) — LA PREUVE QUI MANQUAIT À L'ANTI DOUBLE VENTE.
+// Plainte de Julien : « J'ai fait une vente hier, j'avais relié les deux paires,
+// ça n'a pas retiré la paire sur eBay, ça ne m'a même pas proposé ». Mesuré en
+// lecture seule : la N°553 (tx 23052006117, angeled92) n'avait AUCUNE ligne
+// `harvest_*_txn_*` — elle n'arrive que quand la CONVERSATION de la vente est
+// ouverte sur vinted.fr, geste que « Générer le bordereau » depuis l'app rend
+// inutile. Sur 18 ventes en cours, 6 seulement étaient prouvées. Or
+// l'extension avait LU la transaction pour le bordereau (21:55) et l'avait
+// jetée. Trois voies, une règle (§11, la même dans `src/App.jsx`) :
+//   · `recupererLabel` range la transaction qu'il lit (aucune requête de plus) ;
+//   · `capterPreuvesVente` lit celle des ventes en cours qui n'ont rien ;
+//   · le BORDEREAU (`harvest_{uid}_label_{tx}`, il porte l'annonce) prouve la
+//     vente quand la transaction est LUE dans les ventes du même compte, ni
+//     annulée ni revenue. ⚠️ Jamais `item_closing_action: 'sold'` seul : mesuré,
+//     10 annonces « sold » n'ont que des transactions revenues.
+// <preuve-vente-regle> — LA MÊME RÈGLE QUE L'APP (src/App.jsx), §11 ; comparées par
+// `audit-preuve-vente.cjs` (texte ET sorties). Fonctions PURES.
+const PREUVE_RECENTE_MS = 30 * 86400000;
+// Une vente qui n'est pas REVENUE : son état ne l'annule pas, et Vinted ne la
+// classe pas « en échec » (`failed` : remboursée, annulée).
+function venteVivante(o) {
+  if (!o || o.transaction_id == null) return false;
+  if (PAS_UNE_VENTE.test(String(o.status || ''))) return false;
+  return String(o.transaction_user_status || '') !== 'failed';
+}
+// Une vente EN COURS (à poster ou en route) : vivante, pas finalisée, de moins
+// de 30 jours. C'est la fenêtre où une double vente peut encore arriver.
+function venteEnCoursPreuve(o, maintenant) {
+  if (!venteVivante(o)) return false;
+  if (/finalis/i.test(String(o.status || '')) || String(o.transaction_user_status || '') === 'completed') return false;
+  const d = Date.parse(o.date || '');
+  return !(Number.isFinite(d) && maintenant - d > PREUVE_RECENTE_MS);
+}
+// La preuve par la TRANSACTION (ce qui existait) : l'annonce (`item_id`) et un
+// état de commande qui ne la fait pas revenir. Une conversation (état vide)
+// n'est pas une vente. Rend { items, tx } (annonces, transactions prouvées).
+// ⚠️⚠️ (revue du 11 octobre) LA LIGNE `harvest_{uid}_txn_{tx}` EST UN
+// INSTANTANÉ, JAMAIS RELU : celle que range le bordereau (5.169) dit « Bordereau
+// envoyé au vendeur » pour toujours, même quand la vente finit remboursée — la
+// paire, revenue chez lui, restait « vendue » (retrait d'eBay, file Leboncoin).
+// Mesuré en production : 46 preuves à un état NON terminal, 5 contredites par
+// leur vente (« Le paiement a été validé » / « Remboursement effectué », failed).
+// ⇒ Un état non terminal ne prouve que si la vente `tx`, lue dans les ventes du
+//   MÊME compte (relues à chaque visite), n'est pas revenue. Vente pas trouvée
+//   dans les ventes lues : l'instantané est la seule information, il tient.
+//   « Commande finalisée » est terminal : rien ne la fait revenir.
+const ETAT_TXN_TERMINAL = /finalis/i;
+function preuvesParTransaction(lignes, ventesParCompte) {
+  const items = new Set(), tx = new Set();
+  for (const r of (Array.isArray(lignes) ? lignes : [])) {
     if (!r || !r.it) continue;
     const etat = String(r.ti || '').trim();
-    if (!etat) continue;                       // conversation : aucune commande
-    if (PAS_UNE_VENTE.test(etat)) continue;    // la paire revient
-    vendus.add(String(r.it));
+    if (!etat || PAS_UNE_VENTE.test(etat)) continue;
+    const id = String(r.id || '');
+    const t = (/_txn_(\d+)$/.exec(id) || [])[1];
+    const u = (/^harvest_(\d+)_txn_\d+$/.exec(id) || [])[1];
+    if (u && t && ventesParCompte && !ETAT_TXN_TERMINAL.test(etat)) {
+      const ventes = ventesParCompte[u];
+      const o = Array.isArray(ventes) ? ventes.find((v) => v && String(v.transaction_id) === t) : null;
+      if (o && !venteVivante(o)) continue;
+    }
+    items.add(String(r.it));
+    if (t) tx.add(t);
   }
+  return { items, tx };
+}
+// La preuve par le BORDEREAU : `harvest_{uid}_label_{tx}` porte l'annonce que
+// l'extension a lue dans la transaction (une identité, §5). Elle ne vaut que si
+// la vente `tx` est LUE dans les ventes du MÊME compte et qu'elle est vivante
+// (mesuré : 4 bordereaux sur 71 finissent « Remboursement effectué »).
+// `label_latest` (une copie) n'est jamais lu ; un `tx` de méta qui contredit
+// l'identifiant de la ligne = doute ⇒ rien. `ventesParCompte` : { uid: [ventes] }
+// — un compte absent n'a pas été lu ⇒ aucun de ses bordereaux ne prouve rien.
+function preuvesParBordereau(bordereaux, ventesParCompte) {
+  const items = new Set(), tx = new Set();
+  for (const b of (Array.isArray(bordereaux) ? bordereaux : [])) {
+    const m = /^harvest_(\d+)_label_(\d+)$/.exec(String((b && b.id) || ''));
+    if (!m) continue;
+    const t = m[2];
+    if (b.tx != null && String(b.tx).trim() !== '' && String(b.tx).trim() !== t) continue;
+    const it = String(b.it == null ? '' : b.it).trim();
+    if (!/^\d+$/.test(it)) continue;
+    const ventes = ventesParCompte ? ventesParCompte[m[1]] : null;
+    if (!Array.isArray(ventes)) continue;
+    const o = ventes.find((v) => v && String(v.transaction_id) === t);
+    if (!o || !venteVivante(o)) continue;
+    items.add(it); tx.add(t);
+  }
+  return { items, tx };
+}
+// Les comptes dont il faut LIRE les ventes : ceux qui portent un bordereau dont
+// l'annonce n'est pas déjà prouvée par une transaction, et ceux dont une
+// transaction ne prouve qu'un instantané (état non terminal, ci-dessus) — sa
+// vente peut l'avoir dépassé. Le reste ne coûte rien.
+function comptesAJuger(bordereaux, dejaProuves, transactions) {
+  const out = [];
+  for (const r of (Array.isArray(transactions) ? transactions : [])) {
+    const m = /^harvest_(\d+)_txn_\d+$/.exec(String((r && r.id) || ''));
+    const etat = String((r && r.ti) || '').trim();
+    if (m && r.it && etat && !PAS_UNE_VENTE.test(etat) && !ETAT_TXN_TERMINAL.test(etat) && !out.includes(m[1])) out.push(m[1]);
+  }
+  for (const b of (Array.isArray(bordereaux) ? bordereaux : [])) {
+    const m = /^harvest_(\d+)_label_(\d+)$/.exec(String((b && b.id) || ''));
+    const it = String((b && b.it) == null ? '' : b.it).trim();
+    if (m && /^\d+$/.test(it) && !(dejaProuves && dejaProuves.has(it)) && !out.includes(m[1])) out.push(m[1]);
+  }
+  return out;
+}
+// Les ventes lues, par compte (`select=id,v:data->payload->my_orders`). Un
+// compte demandé sans ligne n'a aucune vente captée : `[]`, rien n'est prouvé.
+function ventesParCompteDe(lignes, uids) {
+  const out = {};
+  for (const u of (Array.isArray(uids) ? uids : [])) out[String(u)] = [];
+  for (const r of (Array.isArray(lignes) ? lignes : [])) {
+    const m = /^harvest_(\d+)_orders_sold$/.exec(String((r && r.id) || ''));
+    if (m && Array.isArray(out[m[1]]) && Array.isArray(r.v)) out[m[1]] = out[m[1]].concat(r.v);
+  }
+  return out;
+}
+// </preuve-vente-regle>
+async function lireVentesProuvees() {
+  const rows = await sbGetTout('app_data?id=like.harvest_*_txn_*&select=id,it:meta->>item_id,ti:meta->>status_title');
+  if (rows === null) return { echec: true, vendus: new Set() };
+  // 5.169 : + le bordereau. Paginé (une ligne par vente, tous comptes) et
+  // strict : une lecture ratée vaut « pas su », jamais une demi-preuve.
+  const bords = await sbGetTout('app_data?id=like.harvest_*_label_*&select=id,tx:meta->>tx,it:meta->>item');
+  if (bords === null) return { echec: true, vendus: new Set() };
+  // (revue du 11 octobre) + les ventes des comptes dont une transaction ne
+  // prouve qu'un instantané (état non terminal) : la vente, relue à chaque
+  // visite, prime — une vente remboursée ne garde pas sa paire « vendue ».
+  const uids = comptesAJuger(bords, preuvesParTransaction(rows).items, rows);
+  let parCompte = {};
+  if (uids.length) {
+    const lignes = await sbGet(`app_data?id=in.(${uids.map((u) => `harvest_${u}_orders_sold`).join(',')})&select=id,v:data->payload->my_orders`);
+    if (!Array.isArray(lignes)) return { echec: true, vendus: new Set() };
+    parCompte = ventesParCompteDe(lignes, uids);
+  }
+  const vendus = new Set(preuvesParTransaction(rows, parCompte).items);
+  for (const it of preuvesParBordereau(bords, parCompte).items) vendus.add(it);
   return { echec: false, vendus };
 }
 
@@ -7358,54 +8057,122 @@ async function storeLbcAccount(acc) {
 }
 // RECON : on garde un échantillon des réponses Leboncoin (chemins d'API + un bout
 // de corps) pour brancher l'extraction au millimètre. Ligne dédiée lbc_recon.
-async function storeLbcRecon(patch) {
-  try {
+// ══════════════════════════════════════════════════════════════════════════
+// ⚠️⚠️ 40 Mo PAR VISITE SUR LEBONCOIN (mesuré dans les journaux de la base,
+//    10 octobre, 12:37) : 89 écritures en une minute, la plus grosse de 2,6 Mo ;
+//    `lbc_recon` (462 Ko) relue EN ENTIER 77 fois dans la même minute, puis
+//    réécrite en entier à CHAQUE réponse relayée (chemins, schéma, échantillon…)
+//    — et `lbc_catalogue` (2,6 Mo) relu entier pour savoir s'il avait changé.
+//    C'est de l'égress (le quota que §4.4 a déjà vu crever), et c'est la voie
+//    montante de son Mac saturée pendant qu'il revient sur VRM.
+// ⇒ Les MORCEAUX s'accumulent dans `chrome.storage.local` (§4.9 : un service
+//   worker meurt au bout de 30 s, une variable de module ne retiendrait rien) ;
+//   la ligne n'est relue et réécrite qu'AU PLUS une fois toutes les 30 s, et
+//   SEULEMENT si la fusion change quelque chose (un chemin déjà connu, un schéma
+//   identique ⇒ aucune écriture). Lecture ratée ⇒ rien n'est écrit, les morceaux
+//   restent pour le passage suivant (« pas su » ≠ « vide » — la carte du
+//   formulaire de dépôt vit dans cette ligne).
+// ⚠️ Les morceaux SE FUSIONNENT en attendant : `etapeOne`/`envoiOne`/`venteOne`
+//    par clé, `paths` en ensemble, `sample` en tête, `schemaOne` par endpoint ;
+//    toute autre clé remplace la précédente (comme avant). Rien n'est perdu entre
+//    deux vidages, et une clé inconnue est gardée telle quelle (la leçon du
+//    17 septembre : on ne range plus clé par clé).
+const LBC_RECON_TAMPON = 'vrmLbcReconTampon';     // { patch, dernier }
+const LBC_ECRITURE_MIN_MS = 30000;
+let _lbcReconChaine = Promise.resolve();
+let _lbcReconMinuteur = null;
+const LBC_DICTS = { etapeOne: ['etapes', 40], envoiOne: ['envois', 60], venteOne: ['ventes', 12] };
+// Accumule un morceau dans le tampon (sans réseau).
+function fusionnerMorceauLbc(t0, patch) {
+  const t = Object.assign({}, t0 || {});
+  for (const k of Object.keys(patch || {})) {
+    const v = patch[k];
+    if (v === undefined) continue;
+    if (k === 'paths') { t.paths = [...new Set([...(t.paths || []), ...(Array.isArray(v) ? v : [])])].slice(0, 600); continue; }
+    if (k === 'sample') { t.samples = [v, ...(t.samples || [])].slice(0, 6); continue; }
+    if (k === 'schemaOne') {
+      if (v && v.endpoint) { t.schemas = Object.assign({}, t.schemas || {}); t.schemas[String(v.endpoint).slice(0, 120)] = { cles: (v.cles || []).slice(0, 200), at: new Date().toISOString() }; }
+      continue;
+    }
+    if (LBC_DICTS[k]) {
+      if (v && v.cle) { const d = LBC_DICTS[k][0]; t[d] = Object.assign({}, t[d] || {}); t[d][String(v.cle)] = v.val; }
+      continue;
+    }
+    t.autres = Object.assign({}, t.autres || {}, { [k]: v });
+  }
+  return t;
+}
+// Applique les morceaux accumulés à la ligne lue (même règles qu'avant).
+const garderRecents = (d, max) => {
+  const ks = Object.keys(d);
+  if (ks.length <= max) return d;
+  const keep = ks.sort((x, y) => Date.parse((d[y] || {}).at || 0) - Date.parse((d[x] || {}).at || 0)).slice(0, max);
+  for (const k of ks) if (!keep.includes(k)) delete d[k];
+  return d;
+};
+function appliquerMorceauxLbc(prev, t) {
+  const next = Object.assign({ paths: [], samples: [] }, prev);
+  if (t.paths) next.paths = [...new Set([...(next.paths || []), ...t.paths])].slice(0, 300);
+  if (t.samples) next.samples = [...t.samples, ...(next.samples || [])].slice(0, 6);
+  if (t.schemas) next.schemas = garderRecents(Object.assign({}, next.schemas || {}, t.schemas), 80);
+  for (const k of Object.keys(LBC_DICTS)) {
+    const [d, max] = LBC_DICTS[k];
+    if (t[d]) next[d] = garderRecents(Object.assign({}, next[d] || {}, t[d]), max);
+  }
+  if (t.autres && t.autres.url) next.lastUrl = t.autres.url;
+  for (const k of Object.keys(t.autres || {})) {
+    if (k === 'url') continue;
+    next[k] = t.autres[k];
+  }
+  return next;
+}
+const sansDateLbc = (d) => { try { const c = Object.assign({}, d || {}); delete c.updatedAt; return JSON.stringify(c); } catch (_) { return ''; } };
+function programmerLbcRecon(ms) {
+  try { clearTimeout(_lbcReconMinuteur); } catch (_) {}
+  _lbcReconMinuteur = setTimeout(() => { _lbcReconMinuteur = null; viderLbcRecon().catch(() => {}); }, Math.max(1000, ms));
+}
+async function lireTamponLbc() {
+  try { return (await chrome.storage.local.get(LBC_RECON_TAMPON))[LBC_RECON_TAMPON] || {}; } catch (_) { return null; }
+}
+async function ecrireTamponLbc(v) { try { await chrome.storage.local.set({ [LBC_RECON_TAMPON]: v }); return true; } catch (_) { return false; } }
+function viderLbcRecon() {
+  const p = _lbcReconChaine.then(async () => {
+    const st = await lireTamponLbc();
+    if (!st || !st.patch || !Object.keys(st.patch).length) return;
+    const reste = LBC_ECRITURE_MIN_MS - (Date.now() - Number(st.dernier || 0));
+    if (reste > 0) { programmerLbcRecon(reste); return; }
     const prevRows = await sbGet('app_data?id=eq.lbc_recon&select=data');
     // ⚠️⚠️ C'EST LA LIGNE QUI PORTE LA CARTE DU FORMULAIRE DE DÉPÔT (`form`,
-    //    `etapes`) — celle qu'on attend depuis des semaines, et qu'un seul dépôt
-    //    fait à la main remplira. Une lecture ratée réécrivait la ligne avec le
-    //    seul échantillon du moment : la carte partait, et il faudrait refaire
-    //    le dépôt. Prouvé : `form:PERDU · etapes:PERDUES`.
-    if (prevRows === null) return;
+    //    `etapes`) — celle qu'un seul dépôt fait à la main remplit. Une lecture
+    //    ratée réécrivait la ligne avec le seul échantillon du moment : la carte
+    //    partait. Prouvé : `form:PERDU · etapes:PERDUES`. Ici : on garde les
+    //    morceaux, et on réessaie au prochain passage.
+    if (prevRows === null) { await ecrireTamponLbc({ patch: st.patch, dernier: Date.now() }); programmerLbcRecon(LBC_ECRITURE_MIN_MS); return; }
     const prev = (prevRows[0] && prevRows[0].data) || {};
-    const next = Object.assign({ paths: [], samples: [] }, prev);
-    if (patch.paths) { const set = new Set([...(next.paths || []), ...patch.paths]); next.paths = [...set].slice(0, 300); }
-    if (patch.sample) { next.samples = [patch.sample, ...(next.samples || [])].slice(0, 6); }
-    // La carte complète : un schéma par endpoint, fusionné (jamais remplacé),
-    // borné aux 80 endpoints les plus récents. Structure seule, pas de valeur.
-    if (patch.schemaOne && patch.schemaOne.endpoint) {
-      const sc = Object.assign({}, next.schemas || {});
-      sc[String(patch.schemaOne.endpoint).slice(0, 120)] = { cles: (patch.schemaOne.cles || []).slice(0, 200), at: new Date().toISOString() };
-      const ks = Object.keys(sc);
-      if (ks.length > 80) { const keep = ks.sort((a, b) => Date.parse(sc[b].at || 0) - Date.parse(sc[a].at || 0)).slice(0, 80); for (const k of ks) if (!keep.includes(k)) delete sc[k]; }
-      next.schemas = sc;
-    }
-    if (patch.url) next.lastUrl = patch.url;
-    // ⚠️⚠️⚠️ CETTE FONCTION JETAIT `etapes` ET `capture` — EN SILENCE.
-    //    Mesuré le 17 septembre, juste après que Julien a fait son dépôt à la
-    //    main : `lbc_recon.form` écrit à 12:18:55 avec 3 champs (donc
-    //    `captureDepositForm` a bel et bien tourné, et le handler a bel et bien
-    //    construit `etapes`)… et `etapes` **toujours absente de la base**.
-    //    Cause : il y avait `if (patch.form)` et `if (patch.quota)`, et RIEN
-    //    pour `patch.etapes` ni `patch.capture`. Les deux moitiés existaient,
-    //    le raccord manquait — le motif du tiroir `Nav` (§4.11), sur la donnée
-    //    que j'attends depuis trois passes. **Il a fait ce dépôt pour rien, et
-    //    c'est de mon fait.**
-    //    ⚠️ Et ça réécrit l'histoire de `lbcDiag` : le dossier disait « il n'a
-    //      jamais tourné » ; en réalité c'est son rangement qui le jetait.
-    // ⇒ ON NE RANGE PLUS CLÉ PAR CLÉ. Tout ce qu'un appelant envoie est gardé ;
-    //   seules `paths` et `sample` ont besoin d'une fusion particulière (au-dessus).
-    //   Une clé oubliée ne peut plus disparaître sans un mot.
-    for (const k of Object.keys(patch)) {
-      if (k === 'paths' || k === 'sample' || k === 'url' || k === 'schemaOne') continue;   // déjà traitées
-      if (patch[k] === undefined) continue;
-      next[k] = patch[k];
-    }
-    next.updatedAt = new Date().toISOString();
-    const _okFlux = await supabaseUpsert('app_data', [{ id: 'lbc_recon', data: next }], 'id');
-    noterFlux('leboncoin', _okFlux !== false);
-    if (patch.etapes || patch.envois) await publierPrepLbc();   // idem
-  } catch (_) {}
+    const next = appliquerMorceauxLbc(prev, st.patch);
+    const change = sansDateLbc(next) !== sansDateLbc(prev);
+    if (change) {
+      next.updatedAt = new Date().toISOString();
+      const ok = await supabaseUpsert('app_data', [{ id: 'lbc_recon', data: next }], 'id');
+      noterFlux('leboncoin', ok !== false);
+      if (ok === false) { await ecrireTamponLbc({ patch: st.patch, dernier: Date.now() }); programmerLbcRecon(LBC_ECRITURE_MIN_MS); return; }
+    } else noterDiag('lbc_recon_inchange');
+    await ecrireTamponLbc({ patch: {}, dernier: Date.now() });
+    if (change && (st.patch.etapes || st.patch.envois)) await publierPrepLbc({ recon: next });
+  });
+  _lbcReconChaine = p.catch(() => {});
+  return _lbcReconChaine;
+}
+// Un appelant donne un MORCEAU ; il est rangé tout de suite dans le tampon
+// (sans réseau), et la ligne est écrite si le dernier vidage date de 30 s ou plus.
+function storeLbcRecon(patch) {
+  const p = _lbcReconChaine.then(async () => {
+    const st = await lireTamponLbc();
+    if (st === null) return;                      // stockage illisible : rien à accumuler
+    await ecrireTamponLbc({ patch: fusionnerMorceauLbc(st.patch, patch || {}), dernier: st.dernier || 0 });
+  });
+  _lbcReconChaine = p.catch(() => {});
+  return _lbcReconChaine.then(() => viderLbcRecon());
 }
 // LA VENTE LEBONCOIN — la surface qu'on attendait pour « vendue → à retirer » et
 // « capter le bordereau comme sur Vinted ». On range un échantillon capé par
@@ -7420,15 +8187,9 @@ async function storeLbcVente(url, body, coupe) {
     catch (_) { fam = String(url).split('?')[0].slice(0, 120); }
     fam = fam.slice(0, 120);
     if (!fam) return;
-    const prevRows = await sbGet('app_data?id=eq.lbc_recon&select=data');
-    if (prevRows === null) return;                 // pas su ≠ vide (§ storeLbcListings)
-    const cur = (prevRows[0] && prevRows[0].data) || {};
-    const ventes = Object.assign({}, cur.ventes || {});
-    ventes[fam] = { url: String(url).split('?')[0].slice(0, 160), body, coupe: !!coupe, ver: EXT_VERSION, at: new Date().toISOString() };
-    // Borné : au plus 12 familles, les plus récentes.
-    const noms = Object.keys(ventes);
-    if (noms.length > 12) { const g = noms.sort((x, y) => Date.parse((ventes[y] || {}).at || 0) - Date.parse((ventes[x] || {}).at || 0)).slice(0, 12); for (const n of noms) if (!g.includes(n)) delete ventes[n]; }
-    await storeLbcRecon({ ventes });
+    // 11 octobre : un MORCEAU, fusionné (et borné à 12 familles) par le vidage
+    //    regroupé de `lbc_recon` — plus de relecture entière à chaque vente.
+    await storeLbcRecon({ venteOne: { cle: fam, val: { url: String(url).split('?')[0].slice(0, 160), body, coupe: !!coupe, ver: EXT_VERSION, at: new Date().toISOString() } } });
   } catch (_) {}
 }
 
@@ -7630,22 +8391,86 @@ async function rangerLbcVentes(list) {
 //    fois. Et le drapeau `coupe` reste : on saura si ça ne suffit toujours pas.
 const EXT_VERSION = (() => { try { return (chrome.runtime.getManifest() || {}).version || ''; } catch (_) { return ''; } })();
 const LBC_CATALOGUE_MAX = 3000000;
+// ⚠️⚠️ 11 octobre (mesuré : 2,6 Mo par écriture, plusieurs fois par minute). Le
+//    catalogue était RELU EN ENTIER (2,6 Mo) à chaque réponse, juste pour savoir
+//    s'il avait changé, puis réécrit en entier — tous les endpoints à la fois —
+//    dès qu'UN changeait de taille. Désormais :
+//      · son EMPREINTE (SHA-256) est comparée à ce qu'on a déjà écrit, rangée
+//        dans `chrome.storage.local` : rien de neuf ⇒ pas un octet ne part ;
+//      · ce qui change attend en mémoire, et la ligne est écrite AU PLUS une
+//        fois toutes les 30 s, avec tous les morceaux du moment. Perdre ce
+//        tampon (service worker endormi) ne coûte rien : l'empreinte n'a pas
+//        été notée, la visite suivante le reprend ;
+//      · la ligne porte un `index` (taille, coupé, date par endpoint) : le
+//        résumé publié pour l'app ne relit plus 2,6 Mo pour trois nombres.
+const LBC_CAT_VU = 'vrmLbcCatalogueVu';    // { [cle]: { h, at }, __dernier }
+let _lbcCatTampon = {};
+let _lbcCatChaine = Promise.resolve();
+let _lbcCatMinuteur = null;
+async function empreinteTexte(t) {
+  try {
+    const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(t)));
+    return Array.from(new Uint8Array(d), (b) => b.toString(16).padStart(2, '0')).join('').slice(0, 40);
+  } catch (_) { return 'taille:' + String(t).length; }
+}
+async function lireCatVu() { try { return (await chrome.storage.local.get(LBC_CAT_VU))[LBC_CAT_VU] || {}; } catch (_) { return null; } }
 async function storeLbcCatalogue(url, body, coupe) {
   try {
     const cle = String(url || '').replace(/^https?:\/\//, '').split('?')[0].replace(/[^a-zA-Z0-9]+/g, '_').slice(0, 80);
-    if (!cle) return;
+    if (!cle || cle === 'index' || cle === 'updatedAt') return;
+    const h = await empreinteTexte(String(body) + '|' + (coupe ? 1 : 0));
+    const vu = await lireCatVu();
+    if (vu && vu[cle] && vu[cle].h === h) return;          // déjà écrit tel quel : rien ne part
+    _lbcCatTampon[cle] = { url, body: String(body), coupe: !!coupe, h };
+    await viderLbcCatalogue();
+  } catch (_) {}
+}
+function viderLbcCatalogue() {
+  const p = _lbcCatChaine.then(async () => {
+    const cles = Object.keys(_lbcCatTampon);
+    if (!cles.length) return;
+    const vu = await lireCatVu();
+    if (vu === null) return;
+    const reste = LBC_ECRITURE_MIN_MS - (Date.now() - Number(vu.__dernier || 0));
+    if (reste > 0) {
+      try { clearTimeout(_lbcCatMinuteur); } catch (_) {}
+      _lbcCatMinuteur = setTimeout(() => { _lbcCatMinuteur = null; viderLbcCatalogue().catch(() => {}); }, Math.max(1000, reste));
+      return;
+    }
+    const lot = _lbcCatTampon; _lbcCatTampon = {};
     const prevRows = await sbGet('app_data?id=eq.lbc_catalogue&select=data');
-    if (prevRows === null) return;                 // pas su ≠ vide (voir storeLbcListings)
+    if (prevRows === null) { _lbcCatTampon = Object.assign({}, lot, _lbcCatTampon); return; }   // pas su ≠ vide
     const prev = (prevRows[0] && prevRows[0].data) || {};
     const next = Object.assign({}, prev);
-    const dejala = next[cle];
-    // Rien de neuf → on n'écrit pas : inutile de renvoyer 400 Ko à chaque visite.
-    if (dejala && dejala.taille === body.length && dejala.coupe === !!coupe) return;
-    next[cle] = { url, at: new Date().toISOString(), taille: body.length, coupe: !!coupe, corps: body };
-    next.updatedAt = new Date().toISOString();
-    await supabaseUpsert('app_data', [{ id: 'lbc_catalogue', data: next }], 'id');
-    await publierPrepLbc();      // l'app doit VOIR ce qui a été capté (§11)
-  } catch (_) {}
+    const memo = Object.assign({}, vu);
+    let change = false;
+    for (const cle of Object.keys(lot)) {
+      const x = lot[cle];
+      const deja = prev[cle];
+      memo[cle] = { h: x.h, at: Date.now() };
+      // Un autre Chrome l'a peut-être déjà écrit, identique : on ne réécrit pas.
+      if (deja && deja.corps === x.body && !!deja.coupe === x.coupe) continue;
+      next[cle] = { url: x.url, at: new Date().toISOString(), taille: x.body.length, coupe: x.coupe, corps: x.body };
+      change = true;
+    }
+    if (change) {
+      const index = {};
+      for (const k of Object.keys(next)) {
+        if (k === 'index' || k === 'updatedAt') continue;
+        const v = next[k] || {};
+        index[k] = { taille: v.taille || 0, coupe: !!v.coupe, at: v.at || null };
+      }
+      next.index = index;
+      next.updatedAt = new Date().toISOString();
+      const ok = await supabaseUpsert('app_data', [{ id: 'lbc_catalogue', data: next }], 'id');
+      if (ok === false) { _lbcCatTampon = Object.assign({}, lot, _lbcCatTampon); return; }
+    }
+    memo.__dernier = Date.now();
+    try { await chrome.storage.local.set({ [LBC_CAT_VU]: memo }); } catch (_) {}
+    if (change) await publierPrepLbc({ index: next.index });      // l'app doit VOIR ce qui a été capté (§11)
+  });
+  _lbcCatChaine = p.catch(() => {});
+  return _lbcCatChaine;
 }
 // ══════════════════════════════════════════════════════════════════════════════
 // CE QUI EST PRÊT POUR PUBLIER SUR LEBONCOIN — PUBLIÉ, PAS DEVINÉ
@@ -7661,19 +8486,39 @@ async function storeLbcCatalogue(url, body, coupe) {
 //    de `vrm_colis_prets`). Un seul propriétaire, aucune divergence possible.
 // ⚠️ Et on n'y met que des FAITS : des tailles, des noms d'endpoint, des dates.
 //    Aucune promesse — c'est l'app qui dira le geste.
-async function publierPrepLbc() {
+async function publierPrepLbc(enMain) {
   try {
-    const cat = await sbGet('app_data?id=eq.lbc_catalogue&select=data');
-    const rec = await sbGet('app_data?id=eq.lbc_recon&select=data');
-    // « Pas su » ne vaut pas « rien » : sans lecture, on ne publie pas — sinon
-    // un simple timeout annoncerait « rien n'est capté » et le ferait
-    // recommencer un dépôt pour rien.
-    if (cat === null || rec === null) return;
-    const cd = (cat[0] && cat[0].data) || {};
-    const rd = (rec[0] && rec[0].data) || {};
+    const em = enMain || {};
+    // 11 octobre : on ne relit plus 2,6 Mo + 462 Ko pour trois nombres. Le
+    // catalogue porte son `index` ; de `lbc_recon` on ne lit que `envois` et
+    // `etapes`. Ce que l'appelant a déjà en main n'est pas relu du tout.
+    let idx = em.index || null;
+    if (!idx) {
+      const r = await sbGet('app_data?id=eq.lbc_catalogue&select=index:data->index');
+      if (r === null) return;
+      idx = (r[0] && r[0].index) || null;
+      if (!idx) {
+        // Une ligne d'avant l'index : une fois, en entier (la prochaine écriture le pose).
+        const full = await sbGet('app_data?id=eq.lbc_catalogue&select=data');
+        if (full === null) return;
+        const d = (full[0] && full[0].data) || {};
+        idx = {};
+        for (const k of Object.keys(d)) { if (k === 'updatedAt' || k === 'index') continue; const v = d[k] || {}; idx[k] = { taille: v.taille || 0, coupe: !!v.coupe, at: v.at || null }; }
+      }
+    }
+    let rd = em.recon || null;
+    if (!rd) {
+      const r = await sbGet('app_data?id=eq.lbc_recon&select=envois:data->envois,etapes:data->etapes');
+      // « Pas su » ne vaut pas « rien » : sans lecture, on ne publie pas — sinon
+      // un simple timeout annoncerait « rien n'est capté » et le ferait
+      // recommencer un dépôt pour rien.
+      if (r === null) return;
+      rd = (r[0]) || {};
+    }
+    const cd = idx;
     const morceaux = {};
     for (const k of Object.keys(cd)) {
-      if (k === 'updatedAt') continue;
+      if (k === 'updatedAt' || k === 'index') continue;
       const v = cd[k] || {};
       const nom = /fdata/.test(k) ? 'codes' : /fforms/.test(k) ? 'formulaires'
         : /dynamic-deposit|config/.test(k) ? 'config' : /adparams|prediction/.test(k) ? 'prerempli'

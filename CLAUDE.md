@@ -1,5 +1,14 @@
 # VRM — dossier de passation
 
+> ⚠️⚠️ **PASSATION DU 12 OCTOBRE — DEUX AGENTS — LIS D'ABORD `docs/passation/README.md`,
+> section « 🔴 LIRE D'ABORD » puis « RÉPARTITION ».** Agent 1 : mettre en ligne
+> la 5.175 (avec le second correctif photos), migration 014, règle d'offre eBay,
+> puis l'agent eBay. Agent 2 : page d'accueil, tri des 21 anciennes branches,
+> fonctions retenues le 11 octobre, revue complète. Le travail non poussé est
+> dans `docs/passation/branches-2026-10-12.bundle` et
+> `branches-locales-2026-10-11.bundle` ; les listes de défauts restants dans
+> `docs/passation/notes/`.
+
 **Lis ce fichier en entier avant de coder. Il est court exprès.**
 L'historique détaillé (chaque session, chaque mesure, chaque erreur et sa cause)
 vit dans **`docs/journal-2026.md`** — 7 700 lignes, à ouvrir seulement si tu
@@ -46,6 +55,13 @@ comptabilité. Il n'est **pas développeur** et pilote tout par des sessions Cla
    son argent, ne pose **jamais** « livraison gratuite », et le port n'est ni une
    recette ni une charge dans sa compta. L'achat d'étiquettes chez un agrégateur
    (chantier K14 de l'agent eBay) est **gelé** pour lui.
+9. **Aucune fonction payante à l'usage ne tourne sur SA clé pour les autres**
+   (11 octobre : « trouve une solution sans IA ou avec leur clé API mais pas la
+   mienne »). Traduction, détourage, IA, lecture d'image : d'abord **sans IA**
+   (ce que le navigateur fait seul : reconnaissance vocale, traducteur intégré à
+   Chrome, modèle local dans la page) ; sinon **la clé du vendeur**, collée par
+   lui, rangée côté serveur, jamais relue par le navigateur. Une fonction qui
+   n'a ni l'un ni l'autre se tait et dit pourquoi — jamais un repli sur sa clé.
 
 ---
 
@@ -65,6 +81,28 @@ Ce ne sont pas des positions de principe : chacune a une raison technique.
 **Ce qui EST autorisé et automatique** : générer un bordereau et récupérer son
 PDF (ça n'engage aucun argent, la vente est faite, le colis doit partir), et
 toute **lecture** sur ses propres données.
+
+**Refusé par Julien le 11 octobre (son choix, pas une limite technique) — ne pas
+reproposer** : « imprimer la journée » avec une liste de préparation triée par
+emplacement ; les étiquettes de carton avec QR code ; le prix conseillé à la mise
+en ligne (calculé sur ses ventes passées) ; l'alerte « achat jamais arrivé » ;
+l'alerte « argent bloqué » ; le rappel des messages sans réponse depuis 24 h ; le
+rappel des évaluations à laisser ; la sauvegarde hebdomadaire envoyée chez lui ;
+le widget iPhone enrichi.
+Et, le même jour, parmi les nouveautés proposées : le badge « bonne affaire »
+sur Vinted, la saisonnalité, la photo d'étiquette → fiche, les acheteurs fidèles.
+
+**Retenu par Julien le 11 octobre (à construire, en plus du reste)** : prix
+d'achat au numérotage · double vente app fermée · rappel URSSAF · fiche
+« republier » · app plus rapide · page « tout va bien ? » · codes de retrait hors
+ligne · rappel la veille au soir · fiche prête à l'arrivée d'un achat · plan des
+paires qui dorment · bénéfice réel · récap comptable · réponses rapides · double
+vérification de connexion · achats à vérifier avant la date limite · retour →
+stock · favoris sans vente (remise native) · boost rentable ? · compte qui vend
+le mieux · ce qui part vite · studio photo + détourage · saisie vocale ·
+traduction des messages · mode équipe — les fonctions payantes selon la règle
+§2.9.
+
 
 **Garde-fous de l'extension, à ne jamais retirer** : agir uniquement au nom du
 **compte connecté dans l'onglet** (`garde`), plafond de **20 actions/heure par
@@ -4288,6 +4326,161 @@ numéros ». **Ce sont SES décisions, pas des options à reproposer.**
   l'outil). Retour arrière : `sauvegarde.vrm_numerotation_annuler(owner)` (125
   copies prises), refusé dès qu'un numéro a bougé.
 
+### La mémoire de l'agent eBay : migration 014 (chantier K3, 11 octobre) — PAS ENCORE APPLIQUÉE
+Premier morceau de l'agent eBay « VRM fermé » (spécification `spec-finale.md`
+§5.1-5.2, K3). Julien ne voit rien. **Aucune horloge** (ni `pg_cron` ni `pg_net` :
+c'est la 015, sur son oui), **aucun DROP**, rien qui tourne : des tables vides et
+`vrm_reglages.agent_ebay = '0'`. Fichier : `supabase/migrations/014-agent.sql`.
+- **Les garanties vivent dans la base, face à tout appelant de l'API** (navigateur,
+  clé de service, route boguée) : 16 tables, 21 fonctions (`SECURITY DEFINER`,
+  `search_path` vide, exécutables par `service_role` SEULEMENT) et 3 aides
+  internes exécutables par PERSONNE (`vrm_agent_heure`, `vrm_agent_efface`,
+  `vrm_agent_sans_acheteur`). Même la clé de service n'écrit la file, les
+  commandes, le journal, les compteurs, les mémos, les titulaires, l'index, les
+  preuves, l'horloge, les pierres tombales et les marques **que par leurs
+  fonctions** (ni INSERT, ni UPDATE, ni DELETE, ni TRUNCATE direct). Elle écrit
+  directement : `vrm_agent_vendeurs` (réglages versionnés, pouls), `vrm_agent_vus`
+  (insertion), `vrm_agent_routes`, `vrm_ebay_cles_publiques`, `vrm_coffre`.
+  ⚠️ **Le propriétaire des tables** (`postgres`, celui de l'outil SQL) garde, par
+  construction, le moyen de défaire n'importe quelle garde (désactiver un
+  déclencheur, accorder un droit) : aucune garde en base ne tient face à lui.
+  C'est `--verifier` qui voit qu'une garde a été touchée.
+- **Le navigateur** lit SES lignes de `vrm_agent_vendeurs`, `_commandes`,
+  `_journal` (avec la restrictive `abonnement_requis` : qui ne paie plus ne voit
+  plus rien), n'écrit RIEN (TRUNCATE compris), ne lit rien d'autre ; `anon` ne lit
+  rien du tout. ⚠️ Mesuré le 11 octobre : les droits par défaut du schéma public
+  ouvrent toute table neuve en entier à anon et authenticated — la migration les
+  retire tous.
+- **L'heure** : le temps est un paramètre (`p_maintenant`) pour le banc de vie sur
+  horloge simulée (K5) — et pour lui SEUL. Sans la variable de session
+  `vrm.horloge_simulee = '1'` (que l'API ne sait pas poser ; un banc la pose par
+  `set`, ou `PGOPTIONS='-c vrm.horloge_simulee=1'`), c'est `now()` du serveur
+  qui compte, quoi que dise l'appelant. ⚠️ **Le banc de vie de K5 DOIT poser cette
+  variable**, sinon ses heures simulées sont ignorées.
+- **La file** : `vrm_agent_prendre` choisit ses candidats EN SQL (une tâche par
+  compte libre, quatre par vendeur, la plus en retard d'abord) puis en prend ≤ 2
+  par vendeur et ≤ 1 par compte eBay : un arriéré de 250 tâches sur un compte
+  n'affame plus personne. **Un compte eBay n'a jamais deux tâches en vol,
+  battements ET clics confondus** : `vrm_agent_prendre_cle` (le clic, ⇒ 409)
+  refuse une tâche tenue ET un compte dont une autre tâche est en vol, sous le
+  même verrou consultatif que `prendre`. `vrm_agent_rendre` ne rend qu'avec SON
+  jeton, ne RETIRE la tâche que sur un « fini » explicite (`p_fini`) sans échec ;
+  « pas de prochaine fois » sans « fini », ou un échec, la garde 15 min (« pas
+  su » ne détruit jamais une tâche) ; la raison est un CODE (sinon
+  `raison-illisible`). Une sonnette arrivée pendant le bail — même EXPIRÉ mais pas
+  encore repris (un appel lent) — n'est jamais perdue (`reveil`).
+- **Une commande** : `vrm_agent_ecrire_commande(owner, jeton, compte, commande,
+  version_lue, colonnes, plateforme, maintenant)` — la tâche qui la tient est
+  DÉRIVÉE (`{plateforme}:{compte}:cmd:{commande}`), jamais reçue. Modifier exige
+  le bail de CETTE tâche (la veille d'un compte ne réécrit plus une commande
+  qu'un clic achète) ; créer, le bail d'une tâche de ce vendeur et de CE compte
+  eBay. Version ET bail (FOR SHARE), sinon 0 ligne ; le rang ne descend jamais
+  (`vrm_rang_descend`, dit).
+- **R18 en base, sur ce qui a une FORME** : des codes (`etape`, `voie`,
+  `transporteur`, `suivi`, `numero`, `raison`, `ref`, `source`…), des NOMS de clés
+  `shipTo` d'eBay seulement dans `cles_shipto` (liste blanche : « Dupont »,
+  « Cancale » sont refusés), aucune clé d'acheteur ni d'adresse à aucune
+  profondeur, et aucune adresse email, dans `data`, `en_cours` et `defaire`
+  (`vrm_agent_sans_acheteur`) ; la ville d'un devis reste permise (effacée avec
+  lui). ⚠️ Le TEXTE d'un message (journal, `texte`) est libre : son contrôle (R13)
+  reste au code (K13).
+- `vrm_agent_premiere_fois` : les clés `achat:`, `msg:`, `eval:`, `offre:` sont
+  GLOBALES (propriétaire neutre, quel que soit l'appelant) [S5], mémos ≥ 100 jours
+  [S25]. `vrm_agent_reserver` : `ceil(TTC × 1,15)`, jour de Paris, plafond NULL ⇒
+  refusé ; `vrm_agent_rendre_reservation` une seule fois ; la purge ne touche
+  JAMAIS un compteur du mois en cours ni du mois précédent (ce sont des plafonds
+  d'argent). `vrm_agent_quota` : confort 60 %, détection 80 %, obligations 100 %,
+  1 % par compte — et un vendeur inconnu (NULL) est refusé hors obligation.
+- **Titulaires et index** : un compte eBay, un vendeur ; un libellé de compte est
+  unique chez un vendeur (il nomme ses tâches) ; quand il change, l'index des
+  annonces le SUIT ; libérer retire TOUT l'index de ce compte ; seul le titulaire
+  indexe, et une ligne laissée par un vendeur qui ne l'est plus est reprise.
+  Preuve vue (heure jamais déplacée), horloge à `-infinity` [D14].
+- **Le journal** : une seule réécriture, `vrm_agent_anonymiser_journal` (R19), qui
+  retire le texte, la référence ET le « défaire » d'une entrée. Toute autre
+  modification, suppression ou vidage est refusé (même au propriétaire de la
+  table, par une écriture ordinaire) ; la purge et l'effacement d'un vendeur
+  passent par une MARQUE de transaction (`vrm_agent_marques`, clé
+  `txid_current()`) — une variable de session ne l'ouvre plus.
+- **« Fermer mon compte »** : `vrm_agent_effacer_vendeur(owner)` efface les 12
+  tables qui portent son nom (coffre, commandes, preuves, index compris) et les
+  quotas par compte qui le nomment sous le neutre, et pose d'ABORD une **pierre
+  tombale** (`vrm_agent_effaces`) : plus aucune ligne ne s'écrit à son nom, ni par
+  une fonction (un battement en vol), ni par une écriture directe du serveur
+  (déclencheur `vrm_agent_pierre_tombale`, `vrm_vendeur_efface`). ⚠️ **À brancher
+  dans `api/compte.js`** par le premier chantier qui écrit dans ces tables
+  (aucune suppression directe ne passe). La purge (`vrm_agent_purger`, par la
+  015) : vus 14 j, mémos à échéance, compteurs 400 j hors mois courant et
+  précédent, journal 13 mois, commandes closes compactées à 90 j, et
+  `cron.job_run_details` > 7 j **sans jamais faire échouer le reste**.
+- **La forme** : `create table if not exists` sautait en silence une table d'une
+  version plus ancienne ; une EMPREINTE (colonnes, types, NOT NULL, noms des
+  contraintes) dans le fichier fait tout refuser (`vrm_agent_forme`), rien n'est
+  installé.
+- **La garde `ebay_tokens*`** sur `app_data` : un navigateur (`auth.role()` ou rôle
+  courant) ne peut ni créer, ni réécrire, ni effacer, ni renommer une ligne de
+  jeton eBay (`vrm_ebay_tokens_serveur`). Mesuré : seule la route serveur l'écrit (aucun
+  écrivain dans l'app ni l'extension ; en base, une ligne, celle du propriétaire).
+  ⚠️ Sur la base d'aujourd'hui, un vendeur connecté PEUT réécrire sa ligne
+  `ebay_tokens` (prouvé au banc sur l'avant).
+- **Preuves** : `scripts/audit-agent-sql.cjs` — la migration EXÉCUTÉE sur un
+  Postgres jetable qui imite la production (`postgres` NON superutilisateur,
+  droits par défaut, 005-007 ET 013 appliquées telles quelles,
+  `scripts/agent-sql/supabase-min.sql`) : **193 contrôles**. Sur l'arbre de
+  59edcdd (l'audit copié dedans, lancé depuis lui, §6.1) : **48 rouges sur
+  172**. `--prouve` : **66/66 mutations** au rouge — les 27 d'avant et 39 pour la
+  revue du 11 octobre au soir (24 constats, deux relecteurs) : bail de commande
+  quelconque, création sous un autre compte, rang qui descend, sans FOR SHARE,
+  heure reçue, « at » reçu au journal, sans pierre tombale, quotas, coffre,
+  commandes, preuves ou index oubliés à l'effacement, vérification aveugle aux
+  déclencheurs, aux droits ou aux fonctions, forme ignorée, R18 (noms de clés,
+  data, codes, référence du journal), anonymisation du seul texte, raison
+  brute, « pas su » qui efface, réveil sous bail expiré, clic qui ignore le
+  compte en vol, fenêtre brute, quota sans vendeur, index sous l'ancien libellé
+  ou gardé à la libération, indexation sans être titulaire, ligne périmée
+  jamais reprise, journal ouvert par une variable, compteurs à 1 jour, mois en
+  cours purgé, purge de pg_cron sans filet, TRUNCATE au navigateur, INSERT et
+  TRUNCATE au serveur, garde des jetons aveugle au rôle courant.
+  ⚠️ Les relectures avaient trouvé **dix mutations VERTES** sur l'audit de
+  59edcdd (TRUNCATE et INSERT jamais essayés, 5 tables sur 12 vérifiées à
+  l'effacement, purge des compteurs et FOR SHARE jamais exercés…) et un contrôle
+  R18 vert sur une forme qui arrangeait (deux valeurs à espace) : un contrôle de
+  refus exige désormais le refus PAR LA CONTRAINTE — une erreur d'appel n'en est
+  pas un (vacant sinon sur le code d'avant, §6.3).
+- **Application (session principale)** : `node scripts/agent-sql/essai-annule.cjs >
+  essai.sql` (~63 Ko, indentation et commentaires retirés, ROLLBACK, ne laisse
+  rien — vérifié), puis la migration, puis `--verifier` : lecture seule, `ok`
+  et `ecarts` ; elle regarde la forme de chaque table, RLS activé ET forcé, les
+  droits EXACTS d'anon, authenticated et service_role (dont TRUNCATE, et MAINTAIN
+  en Postgres 17), la séquence, les règles et leur texte, chaque fonction (une
+  seule version, SECURITY DEFINER et search_path du fichier, corps md5, qui
+  l'exécute), chaque déclencheur présent ET actif, l'horloge, le réglage, aucune
+  marque qui traîne, aucune horloge simulée posée sur la base ou un rôle. ⚠️ Celle
+  de 59edcdd rendait `ok = true` avec les gardes suspendues, une restrictive
+  retirée, une fonction en SECURITY INVOKER, FORCE RLS retiré, le coffre lisible
+  par le navigateur (reproduit) : l'audit en sert maintenant **19 dénaturations**
+  et exige `ok = false` et la bonne partie nommée. Si l'outil SQL refuse le bloc :
+  `--morceaux --dossier=…` (17,6 · 34 · 7,2 Ko, trois transactions dans l'ordre,
+  chaque objet né fermé — vérifié), puis `--verifier`.
+- **Mesuré en production le 11 octobre au soir** (lecture seule du catalogue) :
+  Postgres 17.6, 0 table et 0 fonction de l'agent, aucun réglage `vrm.*` posé sur
+  la base ou un rôle, ni `pg_cron` ni `pg_net`, déclencheurs d'`app_data` =
+  ceux du socle du banc (`vrm_garde_garage`, `vrm_garde_numeros`, `vrm_meta_maj`,
+  `vrm_noter_ecriture`).
+- **Non mesuré** : jamais appliquée sur sa vraie base ; que l'outil SQL accepte
+  ~63 Ko d'un bloc (la 013 à 92 Ko ne passait pas) ; la durée du verrou posé sur
+  `app_data` par les déclencheurs en production (`lock_timeout` 3 s). **Le banc
+  n'est pas la production** : Postgres 16 au banc contre 17.6 en production (le
+  droit MAINTAIN des droits par défaut mesurés n'existe pas en 16 ; `--verifier`
+  le contrôle en 17, sans l'avoir jamais vu tourner sur 17) ; la forme
+  normalisée du texte des règles (`pg_policies`) n'a été vue qu'en 16 — un écart
+  de mise en forme en 17 rendrait `ok = false` (le sens sûr : une alerte, jamais
+  un feu vert) ; la purge de `cron.job_run_details` n'a tourné que sur une table
+  À LA FORME de Supabase (droits de `postgres` supposés : pg_cron n'est pas
+  installé en production) ; les contraintes ne sont comparées que par leur NOM
+  (une définition changée sous le même nom ne se voit pas).
+- **Julien** : rien.
+
 ### Leboncoin et eBay rangés comme Vinted : résumé, puis Ventes / Achats / Annonces (3 octobre)
 Demande du 2 octobre : « plus d'écran Aperçu intermédiaire ». Les deux onglets
 ouvrent sur **Ventes**, avec un résumé compact au-dessus (`PlatResume`, même forme
@@ -7131,6 +7324,167 @@ qui arrivent pour de vrai (`orders_sold` 18, `inbox` 17, `profile` 12).
 - **Geste de Julien** : installer la **5.166** dans UN seul dossier, recharger
   ses onglets Vinted, puis passer une fois sur **tomj683** et **arthuror2**.
 
+### ⚠️⚠️ « VENDUE HIER, RELIÉE, NI RETIRÉE D'eBAY NI PROPOSÉE » — LA PREUVE DE VENTE MANQUAIT (11 octobre, 5.169)
+**Mesuré (lecture seule)** : la N°553 (tx 23052006117, angeled92) n'avait
+**aucune** ligne `harvest_*_txn_*` — elle n'arrive que quand la conversation
+est ouverte sur vinted.fr, geste que « Générer le bordereau » depuis l'app rend
+inutile. Son bordereau (21:55) portait pourtant l'annonce, lue dans la
+transaction puis **jetée**. Sur 18 ventes en cours, 6 seulement étaient
+prouvées ; la règle a tourné 36 fois sans rien voir. Le retrait automatique est
+**ALLUMÉ** dans sa base (il le croyait éteint).
+- **Une règle, deux côtés** (`<preuve-vente-regle>`, identique dans l'app et
+  l'extension, §11) : vente prouvée = transaction avec un état de commande qui ne
+  la fait pas revenir, **ou** bordereau `harvest_{uid}_label_{tx}` (méta `tx`,
+  `item` ; jamais `_latest`, méta contredite = doute) dont la vente est LUE dans
+  les ventes du **même** compte, ni annulée, ni retour, ni `failed`. ⚠️ Jamais
+  `item_closing_action: 'sold'` seul (mesuré : 10 « sold » n'ont que des
+  transactions revenues). Les ventes ne sont lues que s'il reste un bordereau à
+  juger ; toute lecture ratée ⇒ `null` / `echec` (« pas su »).
+- **Extension 5.169** (⚠️ pas 5.167 : la 5.167.0 et la 5.168.0 PUBLIÉES par
+  #471 et #472 n'ont pas ce code — voir la revue juste en dessous) :
+  `recupererLabel` range la transaction qu'il lit
+  (`rangerTransaction`, forme de `capterDatesVersement`, **zéro** requête de plus,
+  une écriture par appel, jamais sous un autre numéro) ; `capterPreuvesVente`,
+  après la moisson, lit la transaction des ventes en cours sans preuve
+  (`gardeLecture` colis, file Vinted, 3 par visite, 6 h, compte du cookie,
+  pause) et entre dans la réserve des lectures prioritaires (13 au lieu de 10 :
+  `audit-budget-lectures` suit). `EXT_CAPACITES.preuves = '5.169.0'`.
+- **Écran eBay → Annonces** : « N ventes Vinted en cours pas encore reliées à
+  leur annonce » dit **une** fois, comptes nommés, le geste selon `extSait`
+  (absente · retard · ok), seulement s'il y a une annonce reliée ; il se relit
+  sur `maj preuves|label|ventes`. L'interrupteur dit **ALLUMÉ / ÉTEINT** en un
+  mot, ce qu'il fait en son nom, et « … » tant que le réglage n'est pas relu du
+  nuage (il affichait « éteint » sur un appareil neuf). Son choix n'est pas
+  touché.
+- ⚠️⚠️ **Le SKU passe par la numérotation — et un numéro PROVISOIRE n'est pas un
+  ancien** : la 553 fait partie des « 553+ » renumérotés par la 013. ⚠️ Le premier
+  correctif de ce chantier lisait `renum` sur un marqueur à l'ANCIENNE forme
+  (liste d'identifiants) : sur la production convertie à 14:58 (carte PAR
+  ANNONCE, `ebayAnnonces = { "128127336988": { "553": "1" } }`), « VRM-553 »
+  restait « 553 » et la N°1 vendue ne déclenchait rien. **Abandonné à la fusion**
+  au profit de `traductionAnnonce` d'integ-11oct (app, serveur, extension) —
+  mesuré : « VRM-553 » → **1**, la paire 1 vendue ⇒ « à retirer ».
+- **Preuves** : `audit-preuve-vente.cjs` (app + vrai `background.js`, même base
+  inventée) **54 contrôles, 23 rouges** sur ef03dc8, **20/20 mutations**
+  attrapées (74 contrôles et 26 mutations après la revue ci-dessous) ; banc
+  `ebay-annonces.cjs` sert la vente par son **seul bordereau** (il servait une
+  ligne txn : vert sur le défaut, §6.3), plus vente annulée et paire revenue :
+  **23 rouges** sur le build d'ef03dc8, **16 rouges** sur un build réaffaibli
+  (preuve par bordereau retirée + interrupteur sans « pas lu »), 0 après. Ses
+  feuilles de confirmation attendent 20 s (en rendu logiciel à 1512 px, le voile
+  flouté rend Playwright lent à juger un bouton « stable » — déjà rouge à 1512 px
+  sur ef03dc8, ce n'était pas l'app). `BANC_PORT` choisit le port.
+- ⚠️ **Non mesuré** : le délai réel entre la vente et la moisson (la preuve
+  n'arrive qu'avec la visite suivante sur le bon compte) ; un LOT ne prouve que
+  son `item` (les `items` d'un lot ne sont pas dans `meta`) ; rien n'a été
+  envoyé à Vinted ni à eBay. Aucune notification « vendue ailleurs » n'existe (le
+  contrôle ne tourne qu'app ouverte).
+- **Geste de Julien** : terminer l'annonce eBay de l'Autry dans le Seller Hub si
+  elle est encore en ligne ; décider s'il garde le retrait automatique ALLUMÉ ;
+  installer la **5.169**.
+
+### ⚠️⚠️ REVUE DU CHANTIER eBAY : L'INSTANTANÉ DE LA TRANSACTION, DEUX CONTENUS POUR UN NUMÉRO (11 octobre, 5.169)
+Onze défauts reproduits par la revue (vm + Chromium, données inventées), corrigés
+après une **vraie** fusion d'integ-11oct (aee8e5c : la 013 appliquée à 14:58).
+- ⚠️⚠️ **LA TRANSACTION RANGÉE EST UN INSTANTANÉ, JAMAIS RELU.** Celle que le
+  bordereau range dit « Bordereau envoyé au vendeur » pour toujours : une vente
+  annulée ou **remboursée** ensuite restait « prouvée vendue » — la paire,
+  revenue, sortait des files Leboncoin/eBay et partait au **retrait automatique**
+  d'eBay (ALLUMÉ chez lui). Mesuré en production (lecture seule) : **46 preuves à
+  un état non terminal sur 7 comptes, 5 contredites** par leur vente
+  (« Le paiement a été validé » / « Remboursement effectué », failed).
+  ⇒ Bloc partagé (§11) : un état **non terminal** ne prouve que si la vente du
+  même `tx`, lue dans les ventes **du même compte** (relues à chaque visite),
+  n'est pas revenue ; vente introuvable dans la liste lue ⇒ l'instantané tient ;
+  « Commande finalisée » est terminal. Les comptes qui portent un tel instantané
+  sont lus (`comptesAJuger(…, transactions)`), leur panne vaut « pas su ».
+  ⚠️ Coût : les ventes de ces ~7 comptes (~190 Ko) sont lues à chaque
+  construction de file — la correction avant l'égress.
+- ⚠️⚠️ **DEUX CONTENUS SOUS LE MÊME NUMÉRO.** La 5.167.0 et la 5.168.0 sont
+  **publiées** (#471, #472) **sans** `capterPreuvesVente` ; le chantier promettait
+  à ces versions « l'extension va lire la transaction toute seule ». Extension
+  **5.169.0**, `EXT_CAPACITES.preuves = '5.169.0'` ; l'audit exige « retard »
+  pour 5.164/5.167.0/5.168.0. ⚠️ **À l'intégration : si un autre chantier a déjà
+  pris 5.169, monter encore** — jamais deux contenus sous un numéro.
+- **§11 : l'écran Leboncoin de l'app** gardait sa boucle sur les seules
+  transactions ; il lit maintenant `lireVentesVintedProuvees` (même preuve que
+  `buildLbcData` et l'écran eBay). Banc `lbc-preuve.cjs` (port 4913).
+- **La ligne « pas reliées » d'eBay** ne fait plus tomber la preuve quand les
+  ventes des AUTRES comptes ne se lisent pas (elle vaut `null`, la preuve reste) ;
+  elle **nomme** chaque vente (titre), avec le lien vers **sa** conversation et,
+  à poster, son bouton « Générer le bordereau » (un bordereau capté relie déjà
+  la vente, même en 5.164) ; elle dit le **chiffre** (« 3 par visite », « au fil
+  de tes visites » au-delà — `PREUVE_PAR_VISITE` = `PREUVE_MAX_PAR_VISITE`,
+  comparé par l'audit). Le panneau d'état d'une 5.164 dit ce qui lui manque
+  vraiment (« la preuve des ventes qui n'ont pas encore de bordereau »).
+- **L'interrupteur du retrait automatique** suit le nuage à son arrivée
+  (`v || …` ne pouvait jamais repasser à faux : éteint ailleurs, il affichait
+  ALLUMÉ pendant que le retrait, lui, ne faisait rien).
+- **Preuves** (rouge sur 6729407, vert après, rouge sous mutation) :
+  `audit-preuve-vente.cjs` **74 contrôles, 9 rouges** sur l'avant, **26/26
+  mutations** ; banc `ebay-annonces.cjs` (port `BANC_PORT`) **16 rouges** sur
+  l'avant, 4 builds réaffaiblis rouges (interrupteur, capacité 5.167, rythme,
+  nom de la vente) ; `lbc-preuve.cjs` **4 rouges**, 3 sur un build réaffaibli ;
+  `tout-generer.cjs` **3 rouges**, 1 sur un build réaffaibli ;
+  `audit-numerotation-lecteurs` (integ) + le serveur lit « 553 » → « 1 » sur la
+  forme de la 013 appliquée (`repro` : « 553 » sur l'avant).
+- ⚠️ **Non mesuré** : rien n'est parti chez Vinted ni eBay ; le DOM réel d'une
+  conversation Vinted (`inbox/{conversation_id}`) n'est pas vérifié ici ; une
+  vente remboursée APRÈS sa finalisation (état terminal) resterait prouvée — pas
+  vu dans sa base.
+
+### ⚠️⚠️ REVUE DU CHANTIER eBAY (11 octobre, 5.172) — LE NUMÉRO 5.169 ÉTAIT DÉJÀ PRIS, ET LA 5.170 DE PRODUCTION N'A PAS LA PREUVE
+Treize constats d'une revue adverse, chacun **reproduit** (vm, Chromium, données
+inventées) avant d'être corrigé. Fusion de `integ-11oct` (c7efee0, 5.170 servie
+en production) dans le chantier.
+- ⚠️⚠️ **Extension 5.172.0, `EXT_CAPACITES.preuves = '5.172.0'`.** La 5.170.0
+  servie par main (PR #473) n'a **pas** `capterPreuvesVente` : avec le seuil à
+  5.169, l'app lui promettait « l'extension lit sa transaction toute seule ».
+  Et « 5.169 » désignait déjà le chantier extension (e7b-1, qui prend aussi la
+  5.171). ⇒ `scripts/_versions-publiees.cjs` **lit l'historique** de main (sa
+  première lignée, + la 5.164 installée hors main) ; `audit-coherence` refuse
+  tout seuil ≤ une version servie sans la fonction (rouge sur 5e74f92 :
+  « preuves 5.169.0 ≤ 5.170.0 ») ; `audit-preuve-vente` dérive de là ses
+  versions publiées (la liste recopiée oubliait la 5.170) et refuse un numéro
+  réservé (`RESERVEES`) ou déjà servi avec un autre contenu. Depuis une copie
+  (§6.1) : `VRM_GIT=<dépôt>`, sinon « pas su » est **rouge**.
+  ⚠️ **À la fusion avec e7b-1 : monter encore** (aucun des deux ne porte le code
+  de l'autre).
+- **La promesse « elle lit toute seule »** n'est faite qu'à une extension à jour
+  **et connectée à CE compte VRM** (`connexionExtensionVrm`) : sans session, la
+  visite s'arrête avant de lire (`visite_sans_session`). Sinon la ligne dit ce
+  qui bloque avec **la phrase de l'indicateur** (`raisonExtGlobale`, §11 — les
+  deux adresses quand c'est un autre compte) et le geste qui marche (ouvrir la
+  vente).
+- **La cloche relance l'anti double vente** sur `maj · label | preuves | ventes`
+  (regroupé, au plus un recalcul / 5 s) : retrait automatique allumé, une preuve
+  rangée pendant que VRM est ouvert retirait **rien** avant un rechargement — le
+  flux même de la N°553.
+- **Les ventes d'un AUTRE compte illisibles** sont nommées dans la ligne « pas
+  pu lire » (avant : la ligne « pas reliées » disparaissait, l'écran d'une panne
+  était celui où tout est relié) ; la preuve, elle, tient.
+- **Pas de « Générer le bordereau »** sur une vente dont le bordereau est déjà
+  capté sans l'annonce (le clic répondait « déjà fait » sans rien relier, et
+  Ventes disait « prêt à imprimer ») ; ni **au doigt** (un bouton grisé muet).
+- **Leboncoin** : une paire REVENUE (vente remboursée après une transaction
+  figée) est « à publier » pour VRM mais « vendue » pour une extension
+  antérieure à la règle de l'instantané — son « Publier » est **grisé** avec la
+  raison, dite une fois (`LbcCroitVendue`), au lieu d'un refus au clic.
+- Déjà corrigé avant la revue et **gardé** (preuves ajoutées) : transaction
+  figée + vente remboursée ⇒ pas vendue (8239c6f) ; l'écran Leboncoin lit la
+  même preuve (`audit-preuve-vente` §1 bis refuse désormais tout troisième
+  lecteur de `status_title`) ; l'interrupteur suit le nuage ; la carte par
+  annonce de la 013 (objet) — trois mutations « lue comme une liste ».
+- **Preuves** : `audit-preuve-vente` 77 contrôles, **27/27 mutations** (12 rouges
+  sur 6729407) ; `audit-coherence` (rouge sur 5e74f92 et sous mutation) ;
+  `audit-numerotation-lecteurs` **42/42** (l'ancre `banniere-archive` suivait
+  encore `onlineAnnonceIds`) ; banc `ebay-annonces` **153 contrôles**, 23 rouges
+  sur le build de 5e74f92, 38 sur 6729407, rouge sous six mutations ; banc
+  `lbc-preuve` cas D, 3 rouges sur 5e74f92, rouge sous mutation ;
+  `audit-budget-lectures` recompté (réserve 13 = argent + colis + preuves).
+- ⚠️ **Non mesuré** : la réponse réelle de Vinted et d'eBay (aucun appel) ; si
+  Julien a d'autres extensions installées hors main que la 5.164.
+
 ### ⚠️⚠️ « ANNONCES = LES PAIRES EN LIGNE MAINTENANT » — LA RELECTURE PUBLIQUE DE SES AUTRES COMPTES (11 octobre, 5.167)
 Julien : « j'avais supprimé mes annonces sur Vinted… il y avait encore toutes mes
 annonces sur VRM… trois fois la même paire alors qu'il n'y a qu'une seule
@@ -7343,9 +7697,10 @@ son site (CORP, ou anti-hotlink sur le référent), ou un logiciel de protection
      **au plus 3 demandes en vol**, la place prise **jusqu'à la vraie réponse**
      (plafond dur 30 s), **aucune demande pour une photo hors écran** ;
   4. sans secours : le pictogramme à la place, **jamais une image cassée**.
-     `onError()` n'est appelé que sur l'état **définitif** — l'extension a
-     RÉPONDU, et pas avec une image (`estDefinitive`). « Pas d'extension ici,
-     pour l'instant » se dessine (pictogramme) mais ne retire rien d'une liste.
+     ⚠️ **Plus aucun état n'est « définitif »** (seconde revue, plus bas) :
+     `onError()` ne part plus pour une photo Vinted, aucune liste ne la retire
+     (`noterImgMorte`) — elle garde sa place avec le pictogramme et revient
+     d'elle-même. `onError` ne vaut que pour un `<img>` ordinaire.
 - **Un échec n'est pas figé** : un **témoin** (UNE photo perdue à l'écran,
   rechargée sans référent à 20 s puis ×2 jusqu'à 5 min, onglet visible),
   l'événement `online` (tout réessaie, refus de l'extension compris) et une
@@ -7355,6 +7710,12 @@ son site (CORP, ou anti-hotlink sur le référent), ou un logiciel de protection
   octets ; `delai` = pas de réponse (« pas su ») → la photo retourne en attente,
   un nouvel essai, jamais « perdue » ; après deux délais on n'insiste plus sans
   signal neuf (remontage, témoin, `online`, retour de l'extension).
+  ⚠️ **Un refus n'est pas un verdict non plus** : le pont ne relaie que
+  `dataUrl` (un 404, un 503, une coupure arrivent identiques). La photo est
+  « perdue » pour l'instant et **redemandée** : par le témoin (à l'extension, une
+  photo à l'écran), au remontage après son recul (1, 2, 4 puis 5 min), à
+  `online`, au retour de l'extension — et dès qu'une photo refusée revient par
+  l'extension, toutes les autres lui sont redemandées.
 - **« Pas su » ≠ « non »** : l'extension se manifeste quelques secondes après
   le chargement — pendant 7 s rien n'est déclaré perdu ; quand elle (re)devient
   disponible, ses photos retrouvent leurs essais.
@@ -7368,35 +7729,54 @@ son site (CORP, ou anti-hotlink sur le référent), ou un logiciel de protection
   rien de plus : `navigateur` (deux échecs réseau ET l'extension les a
   récupérées : c'est la page qui est refusée, « dans VRM ») · `injoignable`
   (deux échecs réseau, sans plus : « ce navigateur n'arrive pas à les charger
-  ici » — une coupure, un filtre ou CORP donnent la même erreur) · `reponse` ·
-  `passu`. `data-photos-geste` : `refus` (l'extension a répondu sans image —
-  **rien à régler**, jamais « recharge ») · `muette` (« recharge cette page ») ·
-  `muette-ailleurs` (un bandeau de l'écran dit déjà que l'extension ne répond
-  pas : `useVoixExt`, la phrase ne le redit pas, §7) · `telephone` · `chrome`.
+  ici » — une coupure, un filtre ou CORP donnent la même erreur) · `reponse`
+  (« peut-être des liens expirés ») · `horsligne` (`navigator.onLine === false`,
+  mesuré) · `passu`. `data-photos-geste` : `reseau` (hors ligne : « je réessaie
+  dès que le réseau revient », rien d'autre) · `refus` (l'extension a répondu
+  sans image : « je lui redemande de temps en temps », jamais « recharge ») ·
+  `reponse` (le serveur répond : **aucune promesse que l'extension les
+  récupère** — elle rend `{ok:false}` sur un statut d'erreur) · `muette`
+  (« recharge cette page ») · `muette-ailleurs` (un bandeau de l'écran dit déjà
+  que l'extension ne répond pas : `useVoixExt`, la phrase ne le redit pas, §7) ·
+  `telephone` · `chrome`.
   Sur ordinateur, sa boîte réserve la place de l'île d'actions
   (`.vrm-sous-ile`, comme `.vrm-tete-row`) : le geste passait dessous.
 - **La mesure, dans SON navigateur** : au premier échec (et après chaque
   reprise), une sonde `fetch(no-cors, no-referrer, sans cookie)`. Réponse
   opaque ⇒ `reponse`. `TypeError` ⇒ **une seconde sonde 8 s plus tard sur une
   AUTRE photo** ; deux `TypeError` ⇒ `bloquee` (= deux échecs réseau espacés).
+  Une `TypeError` puis une réponse ⇒ la PREMIÈRE photo est re-sondée : si elle
+  répond aussi, **le réseau est revenu** — tout réessaie tout de suite, rien
+  n'est conclu (au plus une fois par minute) ; si elle échoue encore, c'est un
+  mélange ⇒ `reponse`. Hors ligne ⇒ `horsligne`.
   Remesurer (en changeant d'écran) **ne fait pas disparaître la phrase** : la
   conclusion d'avant reste pendant le premier essai, une erreur de plus après
   `bloquee` (aucune photo revenue depuis, sinon `reprise` l'aurait effacée) la
   confirme sans attendre ; « en cours » (rien affiché) seulement s'il n'y avait
   pas de conclusion, ou si le premier essai la contredit.
   Le bilan attend la conclusion, puis part dans **`app_data.diag_photos`**
-  (sa ligne, RLS), au plus toutes les 10 min, en lire-fusionner-réécrire
-  **gardé** (lecture ratée ⇒ rien n'est écrit) :
+  (sa ligne, RLS), au plus toutes les 10 min — **un retour** (une photo qui
+  avait échoué s'affiche) le fait réécrire sans attendre, jamais deux fois en
+  15 s — en lire-fusionner-réécrire **gardé** (lecture ratée ⇒ rien n'est écrit) :
   `{ at, dernier, parNavigateur: { 'Mac Chrome': {…}, 'iOS Safari': {…} } }`,
   chaque bilan = `{at, ko, ok, secoursOk, secoursKo, retours, delais, temoins,
-  sonde, hote, ext (presente|absente|muette), ecran, nav, version}` — des
-  nombres et des mots, **jamais une URL, une signature ou un titre**.
+  redemandes, sonde, sondeVue, enEchec, sansEchec, hote, ext
+  (presente|absente|muette), ecran, nav, version}` — des nombres et des mots,
+  **jamais une URL, une signature ou un titre**. Une session **sans aucun
+  échec** propose un bilan `sansEchec:true`, que l'écriture ne range **que s'il
+  remplace un échec rangé par ce navigateur** (sinon aucune écriture : pas une
+  ligne de plus à chaque ouverture).
   **Comment le lire** (`select data from app_data where id = 'diag_photos'`) :
   `ok:0, ko>0, sonde:'bloquee', secoursOk>0` ⇒ le navigateur refuse la page (CORP
   de Vinted ou un logiciel de protection) et l'extension contourne ;
   `sonde:'bloquee', secoursOk:0` ⇒ bloqué OU injoignable, indiscernable d'ici ;
   `sonde:'reponse'` ⇒ le serveur répond une erreur (lien périmé, refus) ;
   `retours>0` ⇒ des photos sont revenues après un échec (c'était passager) ;
+  `enEchec:0` ⇒ plus rien n'échoue à l'écran au moment du bilan ; `sondeVue` ⇒
+  la cause mesurée plus tôt dans la session (une reprise remet `sonde` à zéro) ;
+  `sansEchec:true` ⇒ une session où tout s'est affiché a remplacé un échec ;
+  `redemandes>0` ⇒ l'extension a été redemandée après un refus ou deux délais ;
+  `sonde:'horsligne'` ⇒ l'appareil était hors ligne ;
   `delais>0` ⇒ l'extension a tardé ; `ext:'absente'` sur `iOS …` ⇒ rien ne peut
   aller les chercher sur ce téléphone ; `ok>0` ⇒ elles s'affichent.
 - ⚠️⚠️ **UN FAUX CDN SERVI PAR `page.route()` NE PROUVE RIEN** : mesuré, une
@@ -7479,6 +7859,455 @@ extension pour la mesure du service worker), puis corrigé :
   qui ne sont PAS à l'écran (tri par date) : vert sur c02ffcf, par vacuité. Il
   ralentit maintenant les trois PREMIÈRES demandées, et vérifie qu'elles l'ont été.
 
+#### ⚠️⚠️ Seconde revue du 11 octobre — sept constats confirmés, cinq défauts distincts
+Trois lentilles (écrans, phrase, charge), chaque constat REPRODUIT (vrai CDN HTTPS
+local, extension simulée par un aller-retour HORS page comme son service worker)
+puis contre-vérifié par deux sceptiques. Les constats que les sceptiques n'ont
+pas retenus ne sont PAS corrigés — dont « la phrase redit *ordinateur* sous le
+bandeau des bordereaux » (un premier jet de ce correctif l'avait traité ; retiré,
+il n'était pas dans la liste confirmée).
+- ⚠️⚠️ **UN REFUS PASSAGER DE L'EXTENSION FIGEAIT LA PHOTO POUR LA SESSION**
+  (trois constats, une cause ; gravité haute). Le pont (`bridge.js`) ne relaie
+  que `dataUrl` : un 503 ou un 429 du CDN, un réseau qui hoquette dans son
+  service worker arrivent EXACTEMENT comme un lien mort. c7efee0 posait
+  `refus=true` pour de bon : le remontage, le témoin et le retour de
+  l'extension ne la lui redemandaient jamais (seul `online` l'effaçait, et un
+  hoquet ne passe pas toujours hors ligne) ; Ma journée RETIRAIT les photos de
+  sa liste (`estDefinitive` → `onError` → `noterImgMorte`) ; et la phrase
+  disait « rien à régler ici, je réessaie » alors qu'un rechargement les
+  rendait toutes (mesuré : 15/15). ⇒ **Un refus n'est plus un verdict** :
+  - le **témoin** (20 s, puis ×2 jusqu'à 5 min) redemande à l'extension **au
+    plus 3 photos à l'écran par passage, les moins redemandées d'abord** — une
+    seule par passage, prise dans l'ordre de la page, faisait passer cinq liens
+    morts avant le premier refus passager (10 min de pictogrammes) ;
+  - dès qu'une photo refusée **revient**, toutes les autres sont redemandées —
+    sauf un lien déjà redemandé dans la même vague, qui attend son **recul**
+    (1, 2, 4 puis 5 min) : sans cette borne, quinze retours redemandaient quinze
+    fois le même lien mort ;
+  - le **remontage** après son recul, `online` et le **retour de l'extension**
+    la redemandent aussi ;
+  - **plus aucun état n'est définitif** : aucune liste ne retire plus une photo
+    Vinted (elle garde sa place avec le pictogramme et revient d'elle-même) ;
+  - la phrase dit ce que fait la règle : « je lui redemande de temps en temps,
+    elles s'afficheront ici dès qu'elle y arrive » — jamais « rien à régler ».
+- **« Le serveur répond » promettait que l'extension « va les chercher »**
+  (ordinateur) ou « c'est elle qui les récupère » (téléphone). Or `photoBytes`
+  rend `{ok:false}` sur tout statut d'erreur : sur un lien mort elle ne fait pas
+  mieux. Geste `reponse` : « je réessaie de temps en temps ; si ce sont des
+  liens expirés, ils se renouvellent quand l'extension VRM repasse sur tes
+  comptes Vinted » — la cause dit « peut-être des liens de photo expirés ».
+- **`diag_photos` gardait « bloquée, 0 affichée, 0 revenue » pour un hoquet de
+  20 s** : un retour ne déclenchait aucun bilan, et une session où tout
+  s'affiche n'écrivait rien. ⇒ un retour réécrit le bilan sans attendre les
+  10 min (jamais deux fois en 15 s) ; une session sans échec propose UN bilan
+  `sansEchec`, que l'écriture ne range que pour **remplacer** un échec rangé par
+  ce navigateur (sinon aucune écriture). Champs ajoutés : `redemandes`,
+  `sondeVue`, `enEchec`, `sansEchec` — des nombres et des mots, jamais d'URL.
+- **PWA qui se réveille** : une erreur puis une réponse (le réseau revenu entre
+  les deux sondes) faisait dire « le serveur répond, mais ses images ne
+  s'affichent pas » pendant ~12 s. ⇒ la PREMIÈRE photo est re-sondée : si elle
+  répond aussi, le réseau est revenu — tout réessaie, rien n'est conclu (au
+  plus une reprise par minute) ; si elle échoue encore, `reponse`.
+- **Hors ligne mesuré disait « je n'ai pas pu mesurer pourquoi » et envoyait sur
+  l'ordinateur**. ⇒ cause `horsligne` (`navigator.onLine === false`, maintenant
+  ou à la sonde), geste `reseau` : « Pas de connexion internet ici pour
+  l'instant… Je réessaie dès que le réseau revient. »
+- **PREUVES** (méthode §6.1 : l'audit et le banc FINAUX copiés dans l'arbre de
+  c7efee0 et lancés depuis lui) :
+  - `audit-photos-vinted.cjs` : **50 contrôles**, **15 rouges sur c7efee0** ;
+    onze mutations nouvelles, chacune rouge — `refus-definitif` (2),
+    `temoin-navigateur` (4), `retour-seul` (3), `retour-sans-borne` (1 : quinze
+    retours redemandent quinze fois le lien mort), `refus-colle` (1),
+    `temoin-tout` (2 : tout redemander à chaque passage), `temoin-une` (1 : une
+    seule photo, dans l'ordre de la page), `bilan-retour` (2),
+    `bilan-sans-echec` (2), `reveil` (2), `horsligne-passu` (1) ; les quinze
+    d'avant restent rouges.
+  - banc `photos-vinted.cjs` : **166 contrôles, tout vert** ; scénarios
+    nouveaux T, T390, X, O, E390, W, N, Y (et E, C étendus) : **15 rouges sur le
+    build de c7efee0**, chaque scénario « réel » vert (il reproduit bien le
+    défaut) — T ×2, T390 ×3 (dont « rien à régler ici »), X ×2 (Ma journée :
+    `retirees:5`), O ×2, E et E390 (promesse), W (« reponse/telephone » à 8 s),
+    N (« passu/telephone »), Y ×2 (bilan resté « bloquée, 0 revenue »). Dix
+    mutations du code final, chacune rouge sur son scénario : `estDefinitive`
+    rétabli (X, O : 4) · témoin sans l'extension (T : 4) · cadre non observé
+    (T : 4) · texte « rien à régler » (T390) · réveil (W) · hors ligne « pas
+    su » (N) · promesse sur `reponse` (E, E390) · bilan sans retour (Y) ·
+    session sans échec muette (Y) · bilan « sans échec » écrit d'office (C).
+  - tous les `scripts/audit-*.cjs` à 0 (hors `audit-renum-b`) ; bancs voisins
+    verts un par un : annonces-carte, ventes-bordereau, messagerie, premierjour
+    (48), statuts-colis, enligne (relancé seul : son premier passage est mort
+    sur « browser has been closed », disque de la machine plein).
+  ⚠️ **Le disque partagé de la machine s'est rempli pendant les preuves** (656 Mo
+  libres) : Chromium mourait au milieu d'un banc (« Target page, context or
+  browser has been closed ») et les copies des mutations échouaient. Ces rouges
+  ne sont PAS des défauts : chaque scénario touché a été relancé seul.
+- ⚠️ **Côté extension, à faire dans un chantier extension (pas ici)** : le pont
+  ne dit pas POURQUOI il n'a pas d'octets. `bridge.js` (relais `photo`) devrait
+  relayer `error` comme le fait déjà `pdfLbc`, et `photoBytes` le **statut**
+  numérique : alors un 404/410 (lien mort) pourrait attendre plus longtemps, et
+  un 429/5xx/réseau être redemandé plus tôt. Tant que ce n'est pas fait, l'app
+  traite tout refus comme « passager, avec recul » — le sens sûr : une photo
+  revient, au prix de quelques redemandes bornées sur des liens vraiment morts.
+- **Non mesuré** : le rythme réel des refus passagers chez lui ; ce que le CDN
+  répond vraiment à son service worker quand la page est refusée (403, 429 ?).
+
+### ⚠️⚠️ « SE CONNECTER » OUVRE VRM, LA SESSION TIENT, LE CODE PÉRIMÉ SE RÉPARE (11 octobre, 5.169)
+Plaintes de Julien : « se connecter doit envoyer dans VRM », « elle ne garde pas
+les connexions », « l'extension n'est pas allumée », « je ne peux pas poster sur
+Leboncoin ». Causes MESURÉES (journaux d'auth, vrai GoTrue, vrai Chromium) :
+- ⚠️⚠️ **5 Chrome sur 6 exécutaient une 5.95–5.129 sous un manifeste « 5.164 »** :
+  remplacer le dossier ne recharge PAS le service worker ; seul ⟳ le fait, et
+  seulement dans le Chrome où on le clique. ⇒ au démarrage, un code ≠ manifeste se
+  recharge UNE fois (garde `vrmRechargeCode`) ; le pont (toujours lu depuis le
+  disque) juge le code qui répond (`perime`) et pose `popup.html?mode=reparer`, qui
+  vérifie AVANT ⟳ ; l'état porte `code` et `ext` ; l'app dit « périmé » (pastille
+  ambre, commandes coupées, geste ⟳). La consigne de mise à jour dit les DEUX
+  gestes : remplacer le dossier, PUIS ⟳ dans CHAQUE Chrome (`audit-extension-zip`).
+- ⚠️⚠️ **La session ne passe plus par la page** (⚠️ sauf, depuis le 12 octobre,
+  pour une extension d'AVANT la 5.171 — voir « Relecture croisée de la 5.174 ») : `window.postMessage` était
+  entendu par toute extension (une copie ancienne adoptait la même famille de
+  jetons → révoquée), un `session: null` au démarrage d'une app morte faisait
+  oublier la sienne à l'extension (B9), et l'app prêtait SA famille aux < 5.129.
+  ⇒ `externally_connectable` : l'app demande à UNE extension (son identifiant)
+  si elle a besoin d'une session (`liaison` → nonce 128 bits, 2 min, une fois),
+  fait fabriquer la sienne par le serveur, la lui remet avec le nonce. Seul
+  « Se déconnecter » (un geste) la déconnecte, et sous CE compte seulement.
+- **Renouvellement** : une réponse perdue est rejouée (+1,5 s, +4 s) — le vrai
+  GoTrue rend le jeton actif au parent ; une session morte prévient l'app tout de
+  suite (`evt session morte`) ; les alarmes ne sont plus remises à zéro à chaque
+  réveil (`vrm-session` ne partait jamais).
+- **« Se connecter avec VRM »** (fenêtre, et le logo des sites à chaque clic) ouvre
+  `vrm.center/?lier-extension=<id>` ; connectée, l'app connecte l'extension ;
+  sinon une connexion dans VRM suffit. Le mot de passe VRM reste derrière un lien.
+- **Leboncoin** : un dépôt fermé ou arrêté passe à « abandonné » (onglet retenu,
+  `depotArrete`) — « Le dépôt n'a pas abouti — Réessayer » ; un clic refusé dit
+  pourquoi ; « Actions possibles · sauf publier » ; le bouton dit « 2 photos sur
+  5 ». Écritures `lbc_recon`/`lbc_catalogue` : morceaux dans
+  `chrome.storage.local`, au plus une écriture par 30 s et seulement si ça change
+  (40 Mo par visite mesurés le 10 octobre).
+- Preuves (rouges sur ef03dc8, verts après) : banc `session.cjs` (vrai Chromium,
+  vraie extension, faux GoTrue à la rotation RÉELLE, port 4794) **18 rouges** ;
+  `pont.cjs` 20 ; `publier.cjs` 5 ; `deux-extensions.cjs` 2 ;
+  `audit-pont-session.cjs` 19 ; `audit-lbc-catalogue` 4 ; mutations (rejeu
+  retiré, mort non annoncée, pont qui ne juge plus) ⇒ rouges.
+- ⚠️ **Non mesuré** : la vraie page de dépôt Leboncoin fermée/arrêtée ; la
+  réparation sur SES Chrome (prouvée sur un profil reproduit, pas chez lui) ;
+  le catalogue Leboncoin attend en mémoire du service worker (renvoyé à chaque
+  visite, rien de perdu). Extension **5.169.0** (écrite comme « 5.167 en cours », mais les 5.167 et 5.168 sont parties en production SANS ce code : deux contenus ne portent jamais le même numéro), zip régénéré.
+
+### ⚠️⚠️ REVUE DE LA SESSION ADRESSÉE : « JE LA (RE)CONNECTE » SANS RIEN ENVOYER (11 octobre, 5.169)
+Revue contradictoire du chantier ci-dessus, chaque constat REPRODUIT (rendu sur
+données inventées, vrai `background.js` dans un `vm`, vrai Chromium + vraie
+extension), corrigé, rouge sur 24bec0d et sous mutation.
+- ⚠️⚠️ **La version** : ce code était écrit « 5.167 en cours », mais la 5.167 et
+  la 5.168 sont parties en production SANS lui. Il passe en **5.169.0** — et les
+  seuils qui datent ses nouveautés aussi (`EXT_CAPACITES.liaison`,
+  `CODE_DANS_ETAT`, le jugement du code par `bridge.js` et `vrm-badge.js`) :
+  à 5.167, une 5.168 publiée aurait été déclarée « périmée » à tort.
+- ⚠️⚠️ **« Je la (re)connecte — rien à taper » à une extension qui ne reçoit plus
+  rien.** La garde (« elle ne sait pas recevoir la session adressée ») n'était
+  posée que sur « pas connectée » : « autre compte VRM » et les premiers pas le
+  promettaient encore à une 5.164 (mesuré : 0 envoi en 25 s), et « Se connecter
+  avec VRM » nommait un bouton que sa fenêtre n'a pas. ⇒ **`voieConnexionExt()`**,
+  une règle pour l'en-tête, la liste des ventes, le panneau et les premiers pas :
+  `app` (5.169, le serveur n'a rien refusé) · `retard` (la mettre à jour, ou le
+  mot de passe VRM) · `serveur` (refus 429/503 : le mot de passe ; l'app
+  réessaie après `__sessExtPasAvant`). Le panneau lisait « Se connecter avec
+  VRM » pendant que la liste disait le mot de passe : c'est fini (§11).
+- **Autre compte + extension d'avant la 5.169** : son icône, connectée, ouvre
+  VRM (pas sa fenêtre) — « clique l'icône, Se déconnecter » était impossible.
+  Le seul geste d'ici : **« Déconnecter l'extension de ce Chrome »**, l'ANCIEN
+  message (`session: null`), sur ce clic seulement ; puis le mot de passe VRM
+  dans sa fenêtre. Même message sur le geste « Se déconnecter » de VRM (une
+  5.164 continuait d'écrire sous ce compte) — jamais quand on SAIT qu'elle écrit
+  sous un autre compte ; une 5.169 l'ignore (elle passe par l'adressé).
+- **« Se connecter avec VRM » bloqué** : avec une copie ancienne à côté, la
+  session part quand même, ADRESSÉE à celle qui a demandé (les commandes restent
+  coupées) ; sur un code périmé, le bandeau le dit (⟳) et repart après la
+  réparation ; la croix apparaît toujours au bout de 6 s. Le bandeau laisse la
+  place de l'île (`vrm-tete-row`) : sa croix ne se cliquait pas à 1512/1280 px.
+- **Périmé réparé, page ouverte** : le pont remis à neuf annonce `ready` ; l'app
+  relit l'état tout de suite (avant : « périmé — clique ⟳ » ~20 s, commandes
+  coupées).
+- **La fenêtre de l'icône sur un code périmé** (5 de ses 6 Chrome) : l'ancien
+  service worker ne connaît pas `lierAvecVRM`, le clic ne faisait RIEN. Sans
+  réponse, `popup.js` (lu depuis le disque) ouvre VRM avec l'identifiant de
+  l'extension, répare le code (⟳), sinon déplie le mot de passe VRM et dit ⟳.
+- **Dépôt Leboncoin** : un onglet ouvert n'est pas un dépôt vivant (navigué sur
+  vinted.fr, il bloquait la paire pour toujours) — vivant = adresse de dépôt ET
+  réponse de `lbc.js` pour CETTE paire (grâce de 30 s / page qui charge : un
+  double clic n'abandonne rien). Un arrêt à 90 s ou un onglet fermé, c'est « pas
+  su » : il a pu FINIR À LA MAIN (champ obligatoire non devinable) — l'app ne dit
+  plus « n'a pas abouti », nomme « Déjà publiée », et **relancer exige sa
+  confirmation** (l'extension refuse `confirmer` sans elle). La paire en dépôt
+  n'est rendue (`getPending`) qu'à l'onglet ouvert pour elle.
+- ~~Laissé tel quel, décision assumée : une extension d'avant la 5.169 ne reçoit
+  plus de session de l'app~~ — ⚠️⚠️ **RENVERSÉ le 12 octobre** (« Relecture
+  croisée de la 5.174 », plus bas) : il ne peut pas mettre à jour, et la
+  production les reconnectait.
+- Preuves : `pont.cjs` **18 rouges** sur 24bec0d · `premierjour.cjs` 10 ·
+  `deux-extensions.cjs` 2 · `publier.cjs` 6 · `popup.cjs` 3 · `leboncoin.cjs` 1 ·
+  `audit-pont-session.cjs` 7 · `session.cjs` (vrai Chromium, cas G/P/S) 5 ;
+  7 mutations de l'app, 4 de l'extension, 2 de la fenêtre ⇒ toutes rouges.
+- ⚠️ **Non mesuré** : la vraie page de dépôt Leboncoin (réponse de `lbc.js` sur
+  leboncoin.fr) ; le délai réel entre ⟳ et le `ready` du pont réinjecté chez lui.
+- **Geste de Julien** : installer la **5.169** dans UN seul dossier, puis ⟳ dans
+  CHAQUE Chrome (ou ouvrir VRM : le pont répare un code périmé tout seul).
+
+### ⚠️⚠️ LA 5.170 DE PRODUCTION DITE « PÉRIMÉE », ET « RIEN D'AUTRE À FAIRE » SOUS « LECTURE SEULE » (11 octobre, 5.171)
+Deux défauts de la revue du chantier ci-dessus, reproduits après la fusion
+d'`integ-11oct` (annonces en ligne, photos) dans ce chantier.
+- **Extension 5.171.0** : `main` a publié une **5.170** (PR #473) SANS ce
+  chantier. Deux contenus ne portent jamais le même numéro.
+- ⚠️⚠️ **Collision de numéros.** `CODE_DANS_ETAT`, `EXT_CAPACITES.liaison` et
+  `jugeable` (pont, logo) étaient à 5.169 — en dessous de la 5.170 publiée, dont
+  l'état n'a PAS `code` : sa 5.170 était dite « périmée » (« Lecture seule »,
+  aucune commande ni session, « clique ⟳ » — faux : ⟳ recharge la même 5.170) et
+  l'app lui promettait « je la connecte » sur un canal qu'elle n'ouvre pas.
+  Les quatre frontières passent à **5.171.0**. **Invariant** : chaque frontière
+  reste STRICTEMENT au-dessus de toute version publiée sans le champ.
+  `scripts/audit-planchers-code.cjs` exécute `codePerime` et `extSait('liaison')`
+  sur 5.168, 5.170 et ce que dit `origin/main` (sa version, `code:` dans son état,
+  `demanderLiaison`) ⇒ **après un `git fetch`, il passe au rouge tout seul** si
+  `main` publie encore une version sans ce code au niveau de la frontière : monter
+  alors les quatre ensemble.
+- **Le bandeau de liaison** disait « connectée ✓ — elle capte maintenant pour
+  toi. Rien d'autre à faire. » AU-DESSUS de « Lecture seule » (une copie ancienne
+  vivante : la session part adressée, les commandes restent coupées). Il lit
+  l'état de l'extension (`raisonExtGlobale`, §11) et dit ce qui reste, avec le
+  geste (`data-liaison-reste` : plusieurs · périmé · muette · absente · trop
+  ancienne). La session VRM, elle, vient d'être posée : pas jugée ; une pause de
+  Vinted n'appelle aucun geste.
+- ⚠️⚠️ **TROUVÉ EN FUSIONNANT les deux chantiers** : l'écran Annonces
+  (`FraicheurAnnonces`, chantier « en ligne ») promettait « elles seront
+  vérifiées à ta prochaine visite » et « une suppression sort d'ici tout de
+  suite » à une extension dont le CODE est périmé, pendant que la pastille disait
+  « Lecture seule — clique ⟳ ». Un code d'avant ne fait pas ce que la version
+  annoncée sait faire : périmé ⇒ aucune promesse, le même geste ⟳
+  (`data-perime`). Et les bancs `enligne` et `supprimees` servaient un état
+  « à jour » SANS `code` — une fiction depuis la frontière (§6.3) : ils servent
+  la vraie forme (`code` à partir de `CODE_DANS_ETAT`, lu dans la source).
+  `enligne.cjs` 13b : **2 rouges** sur le build de b4a7bc8, mutation rouge.
+- Preuves : `audit-planchers-code.cjs` **6 rouges** sur 7187f88 et sur la fusion
+  (7899211), 5 mutations rouges · `pont.cjs` (5.170 de production) **3 rouges**
+  et `premierjour.cjs` **2** sur le build de 7899211 · `deux-extensions.cjs`
+  (rendu COMBINÉ bandeau + pastille, Ma journée, 390 et 1512 px ; l'autre sens)
+  **6 rouges** sur le build de 7899211, 3 mutations rouges.
+- Vérifié après : 90 audits verts ; bancs rejoués un par un sur le build final —
+  pont, premierjour, deux-extensions, badge, popup, publier, signal-annonces,
+  tout-generer, filtre-compte, session, capacites, enligne, supprimees : verts.
+  ⚠️ `publier` (3) et `signal-annonces` (1) sont sortis rouges UNE fois, sous une
+  charge de 16 à 20 (d'autres sessions sur la machine) ; verts relancés seuls, et
+  verts sur le build de la fusion : instables sous charge, pas un défaut.
+- ⚠️ **Non mesuré** : la 5.170 réellement installée chez lui (les bancs simulent
+  sa FORME : version sans `code`, pas de canal adressé — lue dans le code de
+  `main`, jamais vue répondre).
+- **Geste de Julien** : installer la **5.171** (pas la 5.169, jamais livrée) dans
+  UN seul dossier, puis ⟳ dans CHAQUE Chrome.
+
+### « Les notifications des messages ne sont pas toujours envoyées » — le serveur, l'app, la fuite de l'IA (11 octobre)
+**Mesuré d'abord** (base en lecture seule, journaux de la base ; rapport et deux
+relectures dans le scratchpad `plaintes-11oct/notifications*.md`) : **le serveur
+n'a perdu aucune notification les 9 et 10 octobre** (22 emails de message, 22
+envois, 0 purge). Ce qui manque est en amont : **3 comptes n'envoient aucun
+email à VRM** (`angeled92` et `tomj606` jamais, `arthuror2` plus rien depuis le
+23 septembre — prouvé par transaction : leurs ventes n'ont aucun
+`email_bord_{tx}`), Vinted envoie l'email **~15 min 30 s** après le message, et
+pas quand il a déjà répondu dans l'app Vinted (3 sur 3). ⚠️ **« Masquer mon
+adresse » d'Apple n'est PAS la cause prouvée** : deux comptes retirés à adresse
+Apple recevaient très bien leurs emails, et le relais d'`arthuror2` transfère.
+Les « 4 messages sans email » du premier rapport étaient des réponses de Julien.
+- **La notification nomme la paire** (`paireDuSujetMessage`, lue dans le sujet
+  « Nouveau message à propos de … », rien d'autre) : « 💬 {paire} » /
+  « Nouveau message sur {compte} — ouvre Vinted pour répondre. »
+- **Quatre faiblesses de la route, reproduites puis fermées** (banc
+  `notif-messages.cjs`, la vraie route, base à état) :
+  · préférences illisibles ⇒ la dernière lue par l'instance, sinon on SONNE pour
+    ce qui appelle un geste ou de l'argent **et les messages** (`SONNE_SI_PAS_SU`)
+    — suivi, achat, favori, facture gardent leur défaut ;
+  · mémo anti-doublon lu en **trois états** (`supabaseLireRow`) : une lecture
+    ratée ne le réécrit plus à vide ; on envoie, et la clé est retenue par
+    l'instance (`_memoEnAttente`, un REPLI) puis versée au mémo à la lecture
+    suivante. Même garde sur le journal des emails (il se vidait aussi) ;
+  · clé = **empreinte du texte entier** (sha256) — l'ancienne clé « sujet + 200
+    caractères » reste reconnue comme ALIAS, jamais réécrite : sans elle, le jour
+    du déploiement, chaque fil renvoyé re-sonnerait en entier ;
+  · `push_subs` se modifie par **écriture conditionnelle** (`modifierSubs` :
+    `PATCH …&data->>rev=eq.<lue>`, insertion `ignore-duplicates`, relire et
+    recommencer sur conflit) — abonnements simultanés, désinscription, purge
+    d'un appareil mort : plus aucun appareil perdu ; un appareil déjà inscrit ne
+    réécrit plus la liste. Aucune migration : la première écriture pose `rev`.
+  ⚠️ `PATCH` filtré sur `data->>rev` est la grammaire PostgREST documentée,
+  **jamais appelée sur la vraie base** (lecture seule).
+- **L'app dit quels comptes n'envoient aucun email, depuis quand, avec le
+  geste** — UNE règle (`etatEmailsComptes`, bloc `<comptes-sans-email>`) pour
+  Réglages → Notifications ET Achats → En attente (§11). « Muet » seulement sur
+  **preuve** : ≥ 2 ventes captées (de plus de 3 jours, la plus ancienne de plus
+  de 7) sans email de bordereau depuis le dernier signe de vie du compte. Le
+  journal compte (`jujuf38` n'est plus « aucun email »), un compte qui n'a rien
+  vendu est « calme » (gris), plus aucun rouge (§7), lecture ratée ⇒ personne
+  n'est accusé et c'est dit. Le geste : 1) Vinted → Paramètres → Notifications
+  (e-mails), 2) la boîte fait suivre — pour une adresse Apple : Réglages → ton
+  nom → Connexion et sécurité → Se connecter avec Apple → Vinted → Transférer à.
+  Les ventes viennent de la coque (`publierVentesCoque`/`useVentesCoque`).
+- **La fuite de l'IA** (`repondreAuxMessages`, à chaque page Vinted, ~255/jour) :
+  une hésitation ou une réponse vide n'était mémorisée nulle part et repartait
+  chez l'IA à chaque page. **Une question par message** (`panel_msg_repondus.demandes`,
+  clé `conversation:message`, 300 au plus) ; une réponse sûre retenue par le
+  plafond horaire est **réutilisée** sans repayer ; IA injoignable (rien de
+  facturé) ⇒ rien n'est mémorisé. L'app ne liste pas `demandes` comme un envoi.
+- **Détourage** : plafond par défaut **100** photos par vendeur et par mois (150 avant).
+- Preuves : `notif-messages.cjs` **23 contrôles, 14 rouges** sur 1465387, 5
+  mutations rouges ; `audit-repondre.cjs` **49, 7 rouges** sur 1465387, 3
+  mutations rouges ; `audit-comptes-sans-email.cjs` **16** (`--prouve` : 11
+  rouges) ; banc `comptes-sans-email.cjs` **24 rouges** sur le build de
+  1465387, 8 sur un build réaffaibli ; `repondre.cjs` 1 rouge sur l'avant.
+  `audit-abonnement.cjs` sert maintenant la forme `return=representation`.
+- **Pas fait, à savoir** : les emails d'ACTION de Vinted (« L'acheteur souhaite
+  annuler », « Action requise », « Demande de remboursement ») ne sonnent
+  toujours pas (relecture n° 1, N2) ; le journal par appareil (qui a reçu) ; la
+  notification `new Notification` de l'app (refusée sur iPhone, N4).
+- **Le geste de Julien** : sur `angeled92`, `tomj606`, `arthuror2`, vérifier les
+  notifications e-mail dans Vinted puis le « Transférer à » d'Apple ; remplacer
+  le script Gmail par celui du dépôt (il en tourne un d'avant le 4 octobre).
+- ~~Extension : `background.js` touché, version inchangée~~ — **FAUX, corrigé
+  par la revue ci-dessous** : ce contenu portait le numéro 5.168.0, déjà publié
+  par `main` (PR #472) avec un AUTRE `background.js`. Extension **5.173.0**.
+
+#### Revue du chantier notifications (11 octobre, 5.173) — 17 constats, tous reproduits puis corrigés
+Chacun ROUGE sur le code d'avant (9af5943 / 0ae270e / 6f305b3), vert après,
+ROUGE sous mutation.
+- ⚠️⚠️ **Version** : ce chantier modifiait `background.js` SOUS le numéro 5.168.0
+  déjà servi par la production, puis la production est passée en 5.170 sans le
+  correctif de l'IA — une extension installée depuis l'une ou l'autre se serait
+  dite « à jour ». Fusion d'integ-11oct (vrai merge) et **5.173.0** (5.169/5.171 :
+  chantier extension, 5.172 : chantier eBay). `audit-extension-zip` refuse
+  désormais qu'une version DÉJÀ servie par `main` change de contenu (il lit
+  l'historique de main : rouge sur f3cbac2 et sur ce contenu sous 5.170).
+- ⚠️⚠️ **L'ancienne clé anti-doublon AVALAIT les nouveaux messages** d'une paire
+  déjà notifiée par l'ancien code (même d'un autre acheteur) : elle n'est un alias
+  que si elle couvrait tout le corps (≤ 200 caractères). Au-delà, un fil renvoyé
+  le jour du déploiement re-sonne UNE fois — une notification de trop se répare.
+- **Une identité PAR EMAIL** : le Message-ID (script Gmail : `getHeader('Message-ID')`,
+  repli `getId()` ; Worker : `message.headers.get('Message-ID')`), lu par
+  `normaliserEntrant` (`messageId`). Deux messages d'une même conversation au
+  corps identique (la forme mesurée) sonnent tous les deux. ⚠️ **Le script Gmail
+  et le Worker doivent être recollés** : sans eux, l'empreinte du texte reste le
+  repli (et deux corps identiques n'en font qu'un).
+- **Préférences illisibles** : relues une fois, puis la dernière lue (instance),
+  puis la copie gardée AVEC LES APPAREILS (`push_subs.prefs`, écrite par le
+  serveur seulement quand elle change, jamais au détriment de la liste), sinon le
+  DÉFAUT. Plus de `SONNE_SI_PAS_SU` : des messages coupés ne sonnent plus sur une
+  instance froide. ⚠️ Un vendeur dont les préférences n'ont jamais été lues ET
+  sont illisibles ne reçoit pas ses messages (défaut « non ») — « pas su » ne
+  vaut pas « oui ».
+- `paireDuSujetMessage` : « à propos de » seulement (« concernant » donnait
+  « 💬 ta commande »).
+- ⚠️⚠️ **La fuite de l'IA n'était pas fermée** : une réponse PAYÉE mais illisible
+  (`reason:'parse'` — JSON tronqué, texte libre, vraie réponse vide) était prise
+  pour « IA injoignable » et redemandée à chaque page (10 sur 10). `api/ai.js` dit
+  `facture: true` après tout 2xx d'Anthropic ; l'extension la range (« illisible »,
+  jamais redemandée). L'audit servait une forme que le serveur ne rend pas
+  (`{ok:true, suggestions:[{text:'  '}]}`) : il exécute maintenant le VRAI
+  `api/ai.js` (§6.3). IA pas branchée / injoignable / illisible : comptée à part
+  (`bilan.iaKO` + causes), l'app écrit « l'IA n'a pas répondu (cause) — rien n'est
+  parti », plus « elle n'était pas sûre ».
+- **Comptes sans email** : on ne juge que les ventes POSTÉRIEURES au début de la
+  réception (le plus ancien email lu, tous comptes ; inconnu ⇒ personne n'est
+  muet) — un compte dormant ou une nouvelle vendeuse n'est plus accusé.
+  « Calme » = aucune vente depuis ce début ; une vente sans email sous le seuil =
+  « à surveiller » avec sa phrase ; exclu = « exclu — non vérifié ». Le bloc dit
+  l'effet PROUVÉ (« pas de rappel du matin pour leurs colis à poster » :
+  `ship-reminders` ne compte que les `email_bord_*`), plus « leurs codes de
+  retrait » ; singulier pour un compte ; Réglages déplié ne redit pas le
+  résumé ; la table ne redit pas un compte nommé au-dessus ; Achats : une ligne
+  repliée (44 px à 390), APRÈS les colis jamais retirés.
+- Preuves : `notif-messages.cjs` 37 (10 rouges, 5 mutations) · `audit-repondre`
+  65 (14 rouges, 3 mutations) · `repondre.cjs` (2 rouges) ·
+  `audit-comptes-sans-email` 26 (10 rouges ; `--prouve=ancienne|debut|calme`
+  20/3/6) · `comptes-sans-email.cjs` (29 rouges, 2 mutations d'écran) ·
+  `audit-extension-zip` (rouge sur 5.168 et sous mutation 5.170).
+- **Non mesurable ici** : le vrai corps d'un email de message (deux messages
+  d'une même conversation) — l'identité par Message-ID le contourne, mais ne
+  marche qu'une fois le script Gmail / le Worker recollés ; ce que `ship-reminders`
+  devrait compter pour les comptes muets (les colis attendus d'après la moisson)
+  — dit, pas codé ; la forme réelle d'un 4xx d'Anthropic facturé (aucun appel réel).
+- **Gestes de Julien** : installer la **5.173**, recoller `scripts/gmail-forwarder.gs`
+  et le Worker de `docs/email-pipeline.md`.
+
+### ⚠️⚠️ RELECTURE CROISÉE DE LA 5.174 : QUATRE DÉFAUTS ENTRE LES TROIS CHANTIERS (12 octobre, 5.175)
+Les trois chantiers de l'intégration (connexion, preuve de vente, notifications)
+avaient été relus SÉPARÉMENT. Relus ENSEMBLE, face aux extensions qu'il a
+AUJOURD'HUI — **il ne peut pas mettre à jour** (5 de ses 6 Chrome exécutent un
+code 5.95–5.129 sous un manifeste 5.164 ; la 5.170 n'est pas installée) — la
+nouvelle app devait faire AU MOINS ce que faisait la production (2fed734).
+Chaque défaut REPRODUIT d'abord (le VRAI `bridge.js` de la 5.164 et de la 5.170
+lu dans git, le vrai `background.js` dans un `vm`, la vraie 5.164 chargée dans
+Chromium), corrigé, rouge sur 0caff0d et sous mutation.
+- ⚠️⚠️ **Une 5.164 / 5.170 sans session, à la session MORTE, ou sur un AUTRE
+  compte VRM n'était plus jamais reconnectée** (la production le faisait en un
+  battement). `assurerSessionExtension` sortait sur `!ext` (l'état d'avant la
+  5.171 n'a pas `ext`) puis sur `liaison !== 'ok'`. Sans session, la 5.164 écrit
+  avec la clé publique — refusée par RLS : plus rien de ce Chrome n'arrivait tant
+  qu'il ne retapait pas son mot de passe, **dans chacun de ses Chrome**. Et l'app
+  y menait elle-même : elle conseille ⟳ au code 5.95–5.128, après quoi c'est la
+  5.164 qui tourne… sans session.
+  ⇒ **Voie `page`** (`connexionParLaPage`, `sessionParLaPage`) : le chemin de la
+  production, resserré — extension d'avant la 5.171 qui répond à « état »
+  (≥ 5.129), code non périmé, UN seul pont (`!__vmrPlusieurs`, après
+  `sondageConnu`), et seulement si `connecte === false`, « pas su » deux
+  battements de suite, ou un autre compte avec l'onglet au premier plan (jamais
+  pour « séparer » une extension saine) ; session fabriquée par le serveur
+  (`mode=session-extension`, une famille à ELLE — `sessionAppPourExtension`
+  reste retirée ; serveur qui refuse ⇒ rien, et `__sessExtErreur` le dit) ;
+  postée `{__vmr:'session'}` vers `location.origin`, bornée par
+  `__sessExtPasAvant`. `session: null` n'est toujours posté que sur un GESTE.
+  `voieConnexionExt()` rend `'page'` : la promesse « je la connecte » suit
+  l'envoi, et le secours nomme ce que SA fenêtre a (email + mot de passe VRM —
+  pas « Se connecter avec VRM », qu'elle n'a pas). Une 5.171+ ignore ce message
+  (son pont répond `canal`).
+- ⚠️ **« Se déconnecter » puis reconnexion laissait une 5.164 / 5.170 déconnectée
+  pour de bon** (D9 lui fait oublier sa session au geste — juste ; mais rien ne la
+  lui rendait). Corrigé par la voie `page`.
+- ⚠️⚠️ **Preuve de vente : un échec passager cachait la vente 6 h** à l'anti
+  double vente (et au retrait automatique d'eBay), pendant que l'écran promettait
+  « à ta prochaine visite ». Le mémo était posé AVANT la requête et jamais ôté :
+  une écriture refusée par NOTRE base (recul d'une minute) ou un 429 (pause de
+  15 min) ⇒ relue à +6 h 06. Même motif dans `capterRetraits` (6 h) et
+  `capterDatesVersement` (24 h). ⇒ `suiteLectureRatee` / `memoApresEchec` (une
+  règle pour les trois) : 4xx autre que 401/403/429 = jugé, délai normal ; 5xx =
+  30 min ; pause, 429/403, 401, réseau = mémo ôté (la pause empêche avant) ;
+  écriture refusée par notre base = mémo ôté et on s'arrête (`rangerTransaction`
+  et `noterRetrait` rendent `null` pour « pas rangé », `false` pour « rien à
+  ranger »). La vente reste comptée dans `noterLecturesDues` : la réserve de
+  lecture tient. Extension **5.175.0** (CODE_VERSION, EXT_ATTENDUE, zip).
+  ⚠️ `audit-evt-extension.cjs` exigeait l'orthographe `noterRetrait(...) === false`
+  sur une écriture refusée : il juge maintenant la règle (jamais « écrit », l'app
+  pas prévenue) et la nouvelle distinction (`null` ≠ `false`).
+- **eBay → Annonces, « vente pas encore reliée »** : « ou génère son bordereau
+  (bouton ci-dessous) » s'écrivait au-dessus d'un bouton GRISÉ — et avec deux
+  extensions, le même paragraphe disait « je n'en envoie aucune ». Le bouton et
+  la phrase ne sont là que si `raisonExtGlobale(sansSouris, {cap:'commande'})`
+  vaut `null` ; sinon « ouvre la vente sur vinted.fr » (le bouton de l'écran
+  Ventes reste, grisé avec sa raison).
+- Preuves (rouges sur 0caff0d, verts après) : `session.cjs` (vraie 5.164 dans
+  Chromium, cas F, F2 morte, F3 autre compte, F4 5.164+5.170, F5 5.164+neuve, S
+  déconnexion → reconnexion) **17 rouges** ; mutation (deux copies + jeton de
+  l'app) ⇒ 5 rouges, dont F4 « les deux adoptent la même famille » ;
+  `pont.cjs` (simulé + VRAI `bridge.js` 5.164 : morte, deux copies, cycle)
+  **10 rouges** ; `premierjour.cjs` **4** ; `audit-preuve-vente.cjs` §10
+  **12 rouges**, 5 mutations rouges (`memo-echec-garde`, `memo-ecriture-*`,
+  `cinq-cents-six-heures`) ; `ebay-annonces.cjs` **8 rouges** (deux extensions,
+  périmé, 5.164 périmée et muette, pas connectée, autre compte, absente ; l'autre
+  sens : une 5.170 connectée garde bouton et phrase). Banc d'origine :
+  `scratchpad/croisee/compat/banc-compat.cjs` (prod 2fed734 contre l'intégration).
+- ⚠️ **Limite connue, comme en production** : deux copies de la MÊME version
+  ancienne (sans identifiant dans leur `ready`, d'avant la 5.165) comptent pour
+  une — la page les atteindrait toutes les deux. Non vu chez lui ; le geste
+  (une seule copie par profil) est déjà dans la consigne.
+- **Geste de Julien** : rien de neuf — installer la **5.175** quand il pourra
+  (pas la 5.174, jamais livrée). D'ici là, ses 5.164 sont reconnectées par l'app.
+
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
 ne sait pas faire) s'est reproduit **trois fois**. Il ne se traite pas au cas par
@@ -7506,6 +8335,8 @@ arrivée** — vérifiée commit par commit sur `manifest.json`, pas devinée.
 | `detourage` | `detourerPhotos` | **5.156.0** (4 oct.) | « tes photos sont détourées (fond blanc) avant d'être attachées à Leboncoin » |
 | `supprimees` | `noterSuppression` | **5.165.0** (11 oct.) | « une suppression faite sur vinted.fr dans ce Chrome sort d'ici tout de suite » |
 | `enligne` | `relireAnnoncesAutresComptes` | **5.170.0** (11 oct. — les 5.167/5.168 de production ne la portent pas) | « tes autres comptes sont relus à ta prochaine visite sur Vinted, sur n'importe lequel de tes comptes » — et seulement si l'extension est connectée à CE compte VRM (revue, 5.170) |
+| `preuves` | `capterPreuvesVente` | **5.172.0** (11 oct. — ni la 5.167, ni la 5.168, ni la 5.170 publiées ne l'ont ; la 5.169 et la 5.171 sont prises par d'autres chantiers) | « l'extension lit toute seule la transaction des ventes en cours pas encore reliées (anti double vente) » |
+| `liaison` | `demanderLiaison` | **5.171.0** (11 oct. — la 5.170 de production ne la porte pas) | « je connecte l'extension à ton compte VRM — rien à taper » (session adressée) |
 
 ⚠️ **DEUX SEUILS POUR UNE MÊME NOTION, EXPRÈS.** Les photos s'attachent côté
 Leboncoin depuis la 5.58 et côté eBay depuis la 5.59 : un seul seuil aurait
@@ -7649,8 +8480,8 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | outil | quoi |
 |---|---|
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
-| `node scripts/audit-*.cjs` | **89 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
-| `scripts/bancs/*.cjs` | les **80 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
+| `node scripts/audit-*.cjs` | **93 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `scripts/bancs/*.cjs` | les **84 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
 **Trois règles de preuve :**
@@ -7942,8 +8773,8 @@ script-là me fait croire à une catastrophe.
 src/App.jsx                     l'app (grep avant de lire — le fichier est énorme)
 vinted-sync-extension/          background.js · inject.js · vinted-panel.js · content.js
 api/                            email-inbound · push · widget · ship-reminders · ai
-scripts/audit-*.cjs             les 89 audits
-scripts/bancs/                  les 80 bancs (leur README dit comment les lancer)
+scripts/audit-*.cjs             les 93 audits
+scripts/bancs/                  les 84 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 ```

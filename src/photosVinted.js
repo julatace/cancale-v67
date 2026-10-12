@@ -44,6 +44,33 @@
 //   · la phrase se juge sur ce qui est MONTÉ maintenant, plus sur la session :
 //     une photo affichée sur Ventes faisait taire la phrase sur Annonces.
 //
+// ⚠️⚠️ SECONDE REVUE DU 11 OCTOBRE (sept constats confirmés, cinq défauts distincts) — ce qui a changé :
+//   · une réponse SANS octets de l'extension n'est plus un refus DÉFINITIF. Le
+//     pont (bridge.js) ne transmet que `dataUrl` : un lien mort (404), un 503 ou
+//     un 429 du CDN, une coupure du service worker arrivent IDENTIQUES ici. Un
+//     refus est donc « pas su, avec recul » : le TÉMOIN redemande à l'extension
+//     (au plus 3 photos à l'écran par passage, les moins redemandées d'abord ;
+//     20 s puis ×2 jusqu'à 5 min), une photo remontée la redemande après son
+//     recul (1, 2, 4, puis 5 min), `online` et le retour de l'extension la
+//     redemandent ; et dès qu'UNE photo refusée revient par l'extension, toutes
+//     les autres sont redemandées (elle sait de nouveau faire) — sauf un lien
+//     déjà redemandé dans la même vague, qui attend son recul. Sans ça, un hoquet de quelques secondes laissait 15 pictogrammes
+//     jusqu'au rechargement, sous « rien à régler ici » ;
+//   · plus RIEN n'est « définitif » (`estDefinitive`) : tout ce qui empêche une
+//     photo de s'afficher se défait (réseau, extension, témoin). Ma journée,
+//     Achats et Colis ne la retirent donc plus de leur liste — elle garde sa
+//     place avec le pictogramme, et revient d'elle-même ;
+//   · le bilan `diag_photos` dit aussi le RETOUR : une photo revenue après un
+//     échec le fait réécrire (au plus une fois toutes les 15 s), et une session
+//     où tout s'affiche propose un bilan « sans échec », que l'écriture ne range
+//     QUE pour remplacer un échec rangé par ce navigateur ;
+//   · une seconde sonde qui reçoit une réponse après une erreur réseau, sur la
+//     MÊME photo, prouve que le réseau est revenu : tout réessaie tout de suite,
+//     sans phrase (un téléphone qui se réveille affichait « le serveur répond,
+//     mais ses images ne s'affichent pas » pendant 12 s) ;
+//   · hors ligne MESURÉ (`navigator.onLine === false`) est une cause : « pas de
+//     connexion », jamais « je n'ai pas pu mesurer » ni « va sur l'ordinateur ».
+//
 // ⚠️ « Pas su » ne vaut pas « oui » : tant que l'extension n'a pas pu se
 //    manifester (les premières secondes), on n'affirme pas qu'il n'y a pas de
 //    secours. Les dépendances (le pont, l'état de l'extension, l'écriture du
@@ -79,6 +106,14 @@ export const SEUIL_PHRASE = 3;
 // les premiers secours répondent), les suivants au plus une fois toutes les 10 min.
 export const BILAN_PREMIER_MS = 6000;
 export const BILAN_INTERVALLE_MS = 10 * 60e3;
+// Un RETOUR (une photo qui avait échoué s'affiche) change ce que dit le bilan :
+// il part sans attendre les 10 min, mais jamais deux fois en 15 s.
+export const BILAN_URGENT_ECART_MS = 15000;
+// Le recul d'une photo que l'extension a rendue SANS octets, avant qu'un
+// remontage (ou une reprise) la lui redemande : 1, 2, 4, puis 5 min.
+export const reculRefus = (n) => Math.min(TEMOIN_MAX_MS, RELANCE_MONTAGE_MS * Math.pow(2, Math.max(0, (n | 0) - 1)));
+// « Le réseau est revenu » (seconde sonde) relance tout — au plus une fois par minute.
+export const REPRISE_RESEAU_MIN_MS = 60000;
 
 // ── Les dépendances (injectées par App.jsx) ─────────────────────────────────
 // demander(url) → Promise<{ dataUrl, issue }> : le pont « photo » de l'extension
@@ -107,16 +142,15 @@ const secoursIci = () => { try { return deps.secours(); } catch (_) { return 'no
 // Le battement de l'extension prévient toutes les 20 s : on ne redessine les
 // photos que si la réponse à « peut-on demander ici ? » a CHANGÉ.
 // ⚠️ Quand l'extension (RE)DEVIENT disponible, les photos qu'elle avait laissées
-//    en délai retrouvent leurs essais : son retour est un signal neuf.
+//    en délai OU rendues sans octets retrouvent leurs essais : son retour est un
+//    signal neuf (son service worker a pu échouer pour une raison passagère).
 let dernierSecours = null;
 export function secoursChange() {
   const s = secoursIci();
   if (s !== dernierSecours) {
     const avant = dernierSecours;
     dernierSecours = s;
-    if (s === 'oui' && avant !== null && avant !== 'oui') {
-      for (const e of entrees.values()) if (e.etat === 'attente') e.delais = 0;
-    }
+    if (s === 'oui' && avant !== null && avant !== 'oui') rouvrirTout();
     toutNotifier();
   }
   pomper();
@@ -127,17 +161,22 @@ export function secoursChange() {
 // etat : 'natif' (on laisse le navigateur l'afficher) · 'attente' (le navigateur
 // a échoué, on attend le secours) · 'vol' (demandée à l'extension) · 'ok' (URL
 // objet prête) · 'ko' (l'extension a répondu sans image, ou ses octets ne sont
-// pas une image — définitif tant qu'aucun signal neuf ne revient).
+// pas une image — JAMAIS définitif : redemandé au témoin, après son recul, au
+// retour du réseau ou de l'extension).
 // echecAt : la dernière fois que cette photo a échoué (navigateur, refus, délai).
-// refus : l'extension a répondu SANS octets — on ne lui redemande pas.
+// refus : l'extension a répondu SANS octets — on ne lui redemande pas avant
+//         `reculRefus(refusN)` (ou un signal neuf). refusAt : quand.
 // delais : demandes restées sans réponse (« pas su », jamais un refus).
+// rouvert : redemandée après un refus ou deux délais (si elle revient, toutes
+//           les autres sont redemandées : l'extension sait de nouveau faire).
+// rouvertAt : quand elle a été redemandée ainsi pour la dernière fois.
 // natifOk : affichée par le navigateur lui-même, maintenant.
 const entrees = new Map();
 function entree(url, creer) {
   let e = entrees.get(url);
   if (!e && creer) {
     e = { etat: 'natif', blob: null, refs: 0, visibles: new Set(), abonnes: new Set(), essaisBlob: 0,
-      echecAt: 0, refus: false, delais: 0, natifOk: false };
+      echecAt: 0, refus: false, refusN: 0, refusAt: 0, delais: 0, rouvert: false, rouvertAt: 0, natifOk: false };
     entrees.set(url, e);
   }
   return e || null;
@@ -160,7 +199,9 @@ function ranger() {
 // Des empreintes, pas des adresses : le bilan ne compte que des NOMBRES.
 const empreinte = (s) => { let h = 0x811c9dc5; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return h; };
 const vus = { okNatif: new Set(), koNatif: new Set(), secoursOk: new Set(), secoursKo: new Set(), retours: new Set() };
-let nDelais = 0, nTemoins = 0;
+let nDelais = 0, nTemoins = 0, nRedemandes = 0;
+let sondeVue = '';          // la dernière cause CONCLUE dans la session (le bilan la garde après un retour)
+let derniereRepriseReseau = 0;
 let sonde = null;           // null jamais lancée · 'encours' · 'bloquee' · 'reponse' · 'passu'
 let sondeGen = 0;           // une sonde rendue caduque par une reprise ne conclut plus rien
 let sondeEnCours = false;   // une mesure tourne (la cause d'avant reste affichée tant qu'elle n'est pas contredite)
@@ -204,13 +245,17 @@ export function estMorte(url) {
   if (e.etat === 'ko') return true;
   return e.etat === 'attente' && secoursIci() === 'non';
 }
-// Définitive = l'extension a répondu, et pas avec une image. C'est le SEUL état
-// qui déclenche `onError` (les écrans qui retirent la photo de leur liste,
-// `noterImgMorte`) : « pas d'extension ICI, pour l'instant » se répare quand
-// elle arrive, et une photo retirée d'une liste ne revient pas (revue du
-// 11 octobre : Ma journée gardait ses 6 icônes de repli après l'arrivée de
-// l'extension, sans lui avoir rien demandé).
-export function estDefinitive(url) { const e = entrees.get(url); return !!(e && e.etat === 'ko'); }
+// Définitive = plus RIEN dans ce module ne pourrait la faire revenir. C'est ce
+// qui déclencherait `onError` (les écrans qui retirent la photo de leur liste,
+// `noterImgMorte`) — et une photo retirée d'une liste n'y revient pas.
+// ⚠️⚠️ AUCUN ÉTAT N'EST DÉFINITIF (seconde revue du 11 octobre). « L'extension a
+//    répondu sans image » ne l'est pas non plus : le pont ne dit pas POURQUOI
+//    (un 404, un 503, une coupure de son service worker arrivent identiques), et
+//    le témoin, le recul, `online` et le retour de l'extension la redemandent.
+//    Avec `etat === 'ko'` ici, Ma journée RETIRAIT ses 5 photos sur une coupure
+//    de quelques secondes, et ne les remontrait pas une fois le réseau revenu.
+//    La photo garde sa place (pictogramme « perdue ») et revient d'elle-même.
+export function estDefinitive(url) { void url; return false; }
 // Lente = l'extension n'a pas répondu à temps, deux fois : « pas su ».
 export function estLente(url) {
   const e = entrees.get(url);
@@ -223,6 +268,8 @@ export function monter(url, fn) {
   toucher(url);
   // Une photo perdue qu'on RE-montre plus d'une minute après son échec : un
   // nouvel essai (219150e réessayait à CHAQUE affichage ; ici, une fois par minute).
+  // Une photo que l'extension avait rendue sans octets lui est REDEMANDÉE si
+  // son recul est passé (`relancer` lève le refus) — sinon le navigateur seul.
   if ((e.etat === 'ko' || e.etat === 'attente') && e.echecAt && maintenant() - e.echecAt >= RELANCE_MONTAGE_MS
       && !(e.etat === 'attente' && secoursIci() !== 'non' && secourable(e))) {
     relancer(e, 'montage');
@@ -253,6 +300,13 @@ export function chargeNatif(url) {
     e.echecAt = 0;
     vus.retours.add(k);
     reprise('retour');
+    // Le bilan rangé disait l'échec : il dit maintenant le retour (sans
+    // attendre les 10 min — « bloquée » sur un hoquet de 20 s était faux).
+    planifierBilan(true);
+  } else if (!vus.koNatif.size) {
+    // Rien n'a échoué : un bilan « sans échec », une fois par session — que
+    // l'écriture ne range QUE pour remplacer un échec rangé par ce navigateur.
+    planifierBilan(false);
   }
   notifierGlobal();
 }
@@ -289,7 +343,7 @@ export function echecBlob(url) {
   e.blob = null;
   e.essaisBlob++;
   e.etat = e.essaisBlob > 1 ? 'ko' : 'attente';
-  if (e.etat === 'ko') { e.refus = true; e.echecAt = maintenant(); vus.secoursKo.add(empreinte(url)); }
+  if (e.etat === 'ko') { e.refus = true; e.refusN++; e.refusAt = e.echecAt = maintenant(); e.rouvert = false; vus.secoursKo.add(empreinte(url)); }
   planifierBilan();
   notifier(url);
   pomper();
@@ -297,16 +351,50 @@ export function echecBlob(url) {
 
 // ── Un nouvel essai par le navigateur lui-même ──────────────────────────────
 // `relancer` : l'entrée redevient « natif » (le composant redessine un <img>
-// neuf, donc une vraie nouvelle requête). Une photo refusée par l'extension le
-// reste (si le navigateur échoue encore, elle repasse « perdue » sans redemander) ;
-// seul un retour du RÉSEAU (`online`) efface ce refus — l'extension a pu
-// échouer pour la même raison que la page.
+// neuf, donc une vraie nouvelle requête). Le refus de l'extension tombe :
+//   · tout de suite quand le RÉSEAU revient (`online`, ou la seconde sonde qui
+//     le prouve : `reseau`) — l'extension a pu échouer pour la même raison ;
+//   · sinon une fois son RECUL passé (`reculRefus`) : 1, 2, 4, puis 5 min.
+// Le refus levé, si le navigateur échoue encore, la photo repart en attente et
+// l'extension est redemandée (à l'écran seulement, 3 à la fois).
+function leverRefusSiMur(e, raison) {
+  if (!e.refus) return;
+  if (raison === 'online' || raison === 'reseau' || maintenant() - e.refusAt >= reculRefus(e.refusN)) e.refus = false;
+}
 function relancer(e, raison) {
   if (e.etat !== 'attente' && e.etat !== 'ko') return false;
   e.etat = 'natif';
   e.delais = 0;
-  if (raison === 'online') e.refus = false;
+  leverRefusSiMur(e, raison);
   return true;
+}
+// L'extension est REDEMANDÉE pour cette photo (sans repasser par le navigateur) :
+// le témoin, le retour de l'extension, une photo refusée qui revient par elle.
+function rouvrir(e) {
+  if (!(e.etat === 'ko' || (e.etat === 'attente' && !secourable(e)))) return false;
+  e.refus = false; e.delais = 0; e.rouvert = true; e.rouvertAt = maintenant(); e.etat = 'attente';
+  nRedemandes++;
+  return true;
+}
+// Toutes les photos refusées ou restées sans réponse sont redemandées : une
+// photo refusée vient de revenir par l'extension (`parRetour`), ou l'extension
+// (re)vient. Seules celles À L'ÉCRAN partent (`pomper`) ; les autres attendent
+// d'y être.
+// ⚠️ CHARGE : des liens vraiment morts mêlés à des refus passagers. Chaque photo
+//    qui revient déclenche ce balayage ; sans borne, un lien mort déjà
+//    redemandé dans la même vague l'était de nouveau à CHAQUE retour (quinze
+//    retours, quinze demandes). Sur un retour, une photo déjà redemandée
+//    attend donc son recul (`reculRefus`) ; seul le retour de l'EXTENSION (un
+//    signal neuf) redemande tout.
+function rouvrirTout(parRetour) {
+  let n = 0;
+  const t = maintenant();
+  for (const e of entrees.values()) {
+    if (parRetour && e.etat === 'ko' && e.rouvertAt && t - e.rouvertAt < reculRefus(e.refusN)) continue;
+    if (rouvrir(e)) n++;
+  }
+  if (n) { toutNotifier(); pomper(); }
+  return n;
 }
 function reprise(raison) {
   let n = 0;
@@ -326,6 +414,13 @@ function reprise(raison) {
 // bout de 20 s, puis 40, 80… jusqu'à 5 min — seulement onglet visible, et
 // seulement tant qu'une photo à l'écran ne peut pas s'afficher autrement. Si
 // elle passe : tout réessaie (`chargeNatif` → `reprise`).
+// ⚠️ Et si le navigateur échoue encore ALORS QUE L'EXTENSION EST LÀ, c'est à
+//    elle que le témoin redemande des photos (au plus 3, À L'ÉCRAN) : un
+//    refus de l'extension n'est pas un verdict (seconde revue du 11 octobre —
+//    le témoin ne passait que par le navigateur, que CORP refuse toujours :
+//    53 requêtes au CDN, toutes refusées, et 0 nouvelle demande à l'extension,
+//    qui les aurait rendues). Si elle la rend, toutes les autres lui sont
+//    redemandées (`lancer` → `rouvrirTout`).
 let temoinTimer = null, temoinDelai = TEMOIN_PREMIER_MS, temoinDernier = '', temoinEnCours = false, temoinAt = 0;
 const visible = () => { try { return typeof document === 'undefined' || !document.hidden; } catch (_) { return true; } };
 function candidatsTemoin() {
@@ -364,13 +459,30 @@ async function lancerTemoin() {
   if (!visible()) return;                 // repris au retour au premier plan
   const l = candidatsTemoin();
   if (!l.length) { temoinDelai = TEMOIN_PREMIER_MS; return; }
-  const i = (l.indexOf(temoinDernier) + 1) % l.length;
-  const u = l[i]; temoinDernier = u;
+  // Avec l'extension, de préférence une photo À L'ÉCRAN : c'est la seule qu'on
+  // puisse lui redemander (aucune demande pour une image hors écran).
+  const lv = secoursIci() === 'oui' ? l.filter((x) => { const e = entrees.get(x); return e && e.visibles.size > 0; }) : [];
+  const pool = lv.length ? lv : l;
+  const i = (pool.indexOf(temoinDernier) + 1) % pool.length;
+  const u = pool[i]; temoinDernier = u;
   temoinEnCours = true; temoinAt = maintenant(); nTemoins++;
   let ok = false;
   try { ok = await (deps.chargerImage || chargerImageParDefaut)(u); } catch (_) { ok = false; }
   temoinEnCours = false;
   if (ok) { temoinDelai = TEMOIN_PREMIER_MS; chargeNatif(u); return; }
+  // Le navigateur échoue encore : l'extension, si elle est là, pour des photos
+  // À L'ÉCRAN seulement — au plus MAX_EN_VOL par passage, les MOINS redemandées
+  // d'abord. Une seule par passage, prise dans l'ordre de la page, faisait
+  // passer cinq liens morts avant le premier refus passager : 10 minutes de
+  // pictogrammes (20 + 40 + 80 + 160 + 300 s) pour des photos que l'extension
+  // rendait. Si l'une revient, toutes les autres suivent (`rouvrirTout`).
+  if (deps.demander && secoursIci() === 'oui') {
+    const l2 = [...entrees.values()].filter((x) => x.refs > 0 && x.visibles.size > 0 && (x.etat === 'ko' || (x.etat === 'attente' && !secourable(x))));
+    l2.sort((a, b2) => (a.refusN - b2.refusN) || (a.rouvertAt - b2.rouvertAt));
+    let n = 0;
+    for (const x of l2) { if (n >= MAX_EN_VOL) break; if (rouvrir(x)) n++; }
+    if (n) { toutNotifier(); pomper(); }
+  }
   temoinDelai = Math.min(TEMOIN_MAX_MS, temoinDelai * 2);
   planifierTemoin();
 }
@@ -379,6 +491,8 @@ if (typeof window !== 'undefined' && typeof window.addEventListener === 'functio
   try {
     // Le réseau revient : tout réessaie (refus de l'extension compris).
     window.addEventListener('online', () => { reprise('online'); pomper(); });
+    // Il part : la phrase le dit (« pas de connexion »), jamais « pas su ».
+    window.addEventListener('offline', () => { notifierGlobal(); });
     // Retour au premier plan : le témoin passe tout de suite (une seule photo),
     // pas plus d'une fois toutes les 10 s.
     if (typeof document !== 'undefined' && document.addEventListener) {
@@ -437,8 +551,18 @@ function lancer(url) {
       if (blob) {
         try { cur.blob = URL.createObjectURL(blob); } catch (_) { cur.blob = null; }
       }
-      if (cur.blob) { cur.etat = 'ok'; vus.secoursOk.add(k); vus.secoursKo.delete(k); }
-      else { cur.etat = 'ko'; cur.refus = true; cur.echecAt = maintenant(); if (!vus.secoursOk.has(k)) vus.secoursKo.add(k); }
+      if (cur.blob) {
+        // Une photo REDEMANDÉE (refusée, ou restée sans réponse) revient : l'extension
+        // sait de nouveau faire — toutes les autres lui sont redemandées.
+        const revenue = cur.refusN > 0 || cur.rouvert;
+        cur.etat = 'ok'; cur.refusN = 0; cur.rouvert = false; vus.secoursOk.add(k); vus.secoursKo.delete(k);
+        if (revenue) { vus.retours.add(k); rouvrirTout(true); planifierBilan(true); }
+      } else {
+        // Réponse SANS octets : le pont ne dit pas pourquoi (lien mort, 503, coupure).
+        // « Perdue » pour l'instant, JAMAIS définitive — redemandée plus tard.
+        cur.etat = 'ko'; cur.refus = true; cur.refusN++; cur.refusAt = cur.echecAt = maintenant(); cur.rouvert = false;
+        if (!vus.secoursOk.has(k)) vus.secoursKo.add(k);
+      }
     }
     planifierBilan();
     notifier(url);
@@ -486,11 +610,15 @@ export function blobDeDataUrl(d) {
 //     donne la même) : on en refait une SECONDE, SONDE_ECART_MS plus tard, sur
 //     une AUTRE photo en échec. Deux ⇒ « bloquee » (= deux échecs réseau
 //     espacés : la cause reste « bloquée OU injoignable », la phrase le dit) ;
-//   · hors ligne, délai, autre erreur ⇒ « pas su ».
+//   · hors ligne MESURÉ (`navigator.onLine === false`) ⇒ « horsligne » : une
+//     cause, pas un « pas su » (la phrase disait « je n'ai pas pu mesurer
+//     pourquoi » et envoyait sur l'ordinateur — seconde revue du 11 octobre) ;
+//   · délai, autre erreur ⇒ « pas su ».
 const attendre = (ms) => new Promise((ok) => setTimeout(ok, ms));
+const horsLigne = () => { try { return typeof navigator !== 'undefined' && navigator.onLine === false; } catch (_) { return false; } };
 async function essaiSonde(url) {
   try {
-    if (typeof navigator !== 'undefined' && navigator.onLine === false) return 'passu';
+    if (horsLigne()) return 'horsligne';
     if (typeof fetch !== 'function') return 'passu';
     const ac = typeof AbortController === 'function' ? new AbortController() : null;
     const t = setTimeout(() => { try { ac && ac.abort(); } catch (_) {} }, SONDE_DELAI_MS);
@@ -519,6 +647,17 @@ function autreEchec(url) {
 //    cours » (rien affiché) seulement quand il faut VRAIMENT attendre la seconde
 //    sonde : pas de conclusion d'avant, ou une conclusion que le premier essai
 //    contredit (« le serveur répondait », il ne répond plus : on ne sait pas).
+// ⚠️⚠️ UNE ERREUR PUIS UNE RÉPONSE, C'EST LE RÉSEAU QUI REVIENT (seconde revue du
+//    11 octobre, scénario « PWA qui se réveille »). La seconde sonde recevait une
+//    réponse (le réseau était revenu entre-temps) et la phrase affirmait « le
+//    serveur répond, mais ses images ne s'affichent pas » pendant 12 s, sur des
+//    photos qui n'avaient simplement pas été réessayées. On redemande donc la
+//    PREMIÈRE photo : si elle répond aussi, le réseau est revenu — tout
+//    réessaie tout de suite (`reprise('reseau')`), sans conclure ; « répond,
+//    mais ne s'affiche pas » ne se dira que sur un échec constaté APRÈS. Si elle
+//    échoue encore pendant qu'une autre répond, c'est un mélange : « reponse »,
+//    comme avant. Au plus une reprise par minute (un réseau qui bat ne fait pas
+//    tourner la sonde en boucle) — au-delà, « pas su ».
 async function sonder(url) {
   const gen = ++sondeGen;
   const avant = sonde === 'reponse' || sonde === 'bloquee' ? sonde : null;
@@ -540,14 +679,26 @@ async function sonder(url) {
       sondeUrls = [url, autre];
       const r2 = await essaiSonde(autre);
       if (gen !== sondeGen) return;
-      r = r2 === 'erreur'
-        ? ((typeof navigator !== 'undefined' && navigator.onLine === false) ? 'passu' : 'bloquee')
-        : r2;
+      if (r2 === 'erreur') r = horsLigne() ? 'horsligne' : 'bloquee';
+      else if (r2 === 'reponse') {
+        const r3 = autre === url ? r2 : await essaiSonde(url);
+        if (gen !== sondeGen) return;
+        if (r3 === 'reponse') {
+          if (maintenant() - derniereRepriseReseau >= REPRISE_RESEAU_MIN_MS) {
+            derniereRepriseReseau = maintenant();
+            reprise('reseau');
+            pomper();
+            return;
+          }
+          r = 'passu';
+        } else r = r3 === 'erreur' ? 'reponse' : r3;
+      } else r = r2;
     }
   } catch (_) { r = 'passu'; }
   if (gen !== sondeGen) return;
   sondeEnCours = false;
-  sonde = r === 'reponse' || r === 'bloquee' ? r : 'passu';
+  sonde = r === 'reponse' || r === 'bloquee' || r === 'horsligne' ? r : 'passu';
+  if (sonde !== 'passu') sondeVue = sonde;
   planifierBilan();
   notifierGlobal();
 }
@@ -567,7 +718,9 @@ async function sonder(url) {
 //     ne prouve rien — la phrase reste.
 // cause : 'navigateur' (deux échecs réseau, mais l'extension les a récupérées :
 //         c'est la page qui est refusée) · 'injoignable' (deux échecs réseau,
-//         rien ne dit que l'extension ferait mieux) · 'reponse' · 'passu'.
+//         rien ne dit que l'extension ferait mieux) · 'reponse' · 'horsligne'
+//         (`navigator.onLine === false`, MESURÉ maintenant ou par la sonde) ·
+//         'passu'.
 export function decision() {
   let morts = 0, lentes = 0, okNatif = 0, okSecours = 0, refusees = 0;
   for (const [u, e] of entrees) {
@@ -581,9 +734,12 @@ export function decision() {
   if (sonde === 'encours') return { parle: false, pourquoi: 'mesure', ...compte };
   if (morts < SEUIL_PHRASE) return { parle: false, pourquoi: 'isolees', ...compte };
   if (okSecours > 0) return { parle: false, pourquoi: 'extension', ...compte };
-  if (okNatif > 0 && sonde !== 'bloquee') return { parle: false, pourquoi: 'liens', ...compte };
-  const cause = sonde === 'bloquee' ? (vus.secoursOk.size > 0 ? 'navigateur' : 'injoignable')
-    : sonde === 'reponse' ? 'reponse' : 'passu';
+  // Hors ligne : la cause est connue, quelles que soient les photos du cache.
+  const hl = horsLigne() || sonde === 'horsligne';
+  if (!hl && okNatif > 0 && sonde !== 'bloquee') return { parle: false, pourquoi: 'liens', ...compte };
+  const cause = hl ? 'horsligne'
+    : sonde === 'bloquee' ? (vus.secoursOk.size > 0 ? 'navigateur' : 'injoignable')
+      : sonde === 'reponse' ? 'reponse' : 'passu';
   let ext = 'absente'; try { const v = deps.ext(); ext = v === 'presente' || v === 'muette' ? v : 'absente'; } catch (_) {}
   return { parle: true, cause, ext, ...compte };
 }
@@ -605,20 +761,49 @@ export function bilan(extra) {
     secoursOk: vus.secoursOk.size, secoursKo: vus.secoursKo.size,
     // Photos revenues après un échec, demandes restées sans réponse, témoins
     // tentés : ce qui distingue un hoquet d'un refus durable.
-    retours: vus.retours.size, delais: nDelais, temoins: nTemoins,
-    sonde: sonde === 'bloquee' || sonde === 'reponse' ? sonde : 'passu',
+    retours: vus.retours.size, delais: nDelais, temoins: nTemoins, redemandes: nRedemandes,
+    sonde: sonde === 'bloquee' || sonde === 'reponse' || sonde === 'horsligne' ? sonde : 'passu',
+    // La cause conclue plus tôt dans la session (une reprise remet `sonde` à zéro :
+    // sans elle, le bilan d'un retour ne dirait plus ce qu'on avait mesuré).
+    sondeVue: sondeVue || '',
+    // Photos à l'écran qui ne s'affichent pas EN CE MOMENT (0 = tout est revenu).
+    enEchec: (() => { let n = 0; for (const e of entrees.values()) if (e.refs > 0 && (e.etat === 'attente' || e.etat === 'ko' || e.etat === 'vol')) n++; return n; })(),
+    // Rien n'a échoué dans la session : ce bilan ne sert qu'à REMPLACER un échec rangé.
+    sansEchec: !vus.koNatif.size,
     hote: hote || '',
     ext: (() => { try { const v = deps.ext(); return v === 'presente' || v === 'muette' ? v : 'absente'; } catch (_) { return 'absente'; } })(),
     ecran: ecranPremier || ecranCourant || '',
   }, extra || {});
 }
-let bilanTimer = null, bilanDernier = 0, bilanEnVol = false, bilanSale = false;
-function planifierBilan() {
-  if (!vus.koNatif.size) return;      // tout s'affiche : rien à écrire
+// ⚠️⚠️ LE BILAN DIT AUSSI LE RETOUR (seconde revue du 11 octobre). Il n'était
+//    écrit QUE sur un échec : une photo revenue ne le faisait jamais réécrire, et
+//    une session où tout s'affiche n'écrivait rien. La base gardait donc
+//    « bloquée, 0 affichée, 0 revenue » pour un hoquet de 20 s — la mesure qui
+//    doit trancher la cause chez lui mentait. Maintenant :
+//      · un échec : premier bilan après BILAN_PREMIER_MS, puis au plus toutes
+//        les 10 min (inchangé) ;
+//      · un RETOUR (`urgent`) : réécrit sans attendre les 10 min, jamais deux
+//        fois en BILAN_URGENT_ECART_MS ;
+//      · aucun échec : UN bilan « sans échec » par session — l'écriture (App.jsx)
+//        ne le range que s'il REMPLACE un échec rangé par ce navigateur (sinon
+//        aucune écriture : pas une ligne de plus à chaque ouverture).
+let bilanTimer = null, bilanDernier = 0, bilanEnVol = false, bilanSale = false, bilanTimerAt = 0, bilanSansEchecFait = false;
+function planifierBilan(urgent) {
+  if (!vus.koNatif.size) {
+    if (bilanSansEchecFait || !vus.okNatif.size) return;
+    bilanSansEchecFait = true;
+  }
   bilanSale = true;
-  if (bilanTimer || bilanEnVol) return;
+  if (bilanEnVol) return;
   const t = maintenant();
-  const delai = bilanDernier ? Math.max(0, bilanDernier + BILAN_INTERVALLE_MS - t) : BILAN_PREMIER_MS;
+  const delai = (!bilanDernier) ? BILAN_PREMIER_MS
+    : urgent ? Math.max(BILAN_PREMIER_MS, bilanDernier + BILAN_URGENT_ECART_MS - t)
+      : Math.max(0, bilanDernier + BILAN_INTERVALLE_MS - t);
+  if (bilanTimer) {
+    if (!urgent || bilanTimerAt <= t + delai) return;
+    clearTimeout(bilanTimer); bilanTimer = null;
+  }
+  bilanTimerAt = t + delai;
   bilanTimer = setTimeout(envoyerBilan, delai);
 }
 async function envoyerBilan() {
@@ -628,12 +813,15 @@ async function envoyerBilan() {
   if (!deps.ecrire || !bilanSale) return;
   // On mesure encore la cause (deux sondes espacées) : le bilan attend sa
   // conclusion — écrit trop tôt, il dirait « pas su » pour dix minutes.
-  if (sondeEnCours || sonde === 'encours') { bilanTimer = setTimeout(envoyerBilan, 2000); return; }
+  if (sondeEnCours || sonde === 'encours') { bilanTimerAt = maintenant() + 2000; bilanTimer = setTimeout(envoyerBilan, 2000); return; }
   bilanEnVol = true; bilanSale = false;
+  const b = bilan();
   let ok = false;
-  try { ok = await deps.ecrire(bilan()); } catch (_) { ok = false; }
+  try { ok = await deps.ecrire(b); } catch (_) { ok = false; }
   bilanEnVol = false;
-  bilanDernier = maintenant();
+  // Un bilan « sans échec » (le plus souvent PAS écrit : rien à remplacer) ne
+  // retarde pas le premier bilan d'un échec qui arriverait ensuite.
+  if (!b.sansEchec) bilanDernier = maintenant();
   // Pas écrit ⇒ on retentera au prochain créneau ; écrit ⇒ seulement si du neuf est arrivé.
   if (!ok) bilanSale = true;
   if (bilanSale) planifierBilan();

@@ -42,7 +42,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.170.0';
+const EXT_ATTENDUE = '5.175.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -164,6 +164,12 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 //   (offres  `autoAccepterOffres` — RETIRÉE le 5 octobre à sa demande : l'app ne
 //    promet plus aucune acceptation automatique, voir CLAUDE.md §3)
 //   releve  `capterReleves`       5.52.0  (5 sept.)   le relevé daté du porte-monnaie
+//   preuves `capterPreuvesVente`  5.172.0 (11 oct.)   la transaction des ventes en cours (anti double vente)
+//   ⚠️ PAS 5.167, NI 5.169, NI 5.170 : la 5.167.0, la 5.168.0 et la 5.170.0
+//   PUBLIÉES (PR #471, #472, #473) n'ont pas `capterPreuvesVente`, et la 5.169.0
+//   et la 5.171.0 sont prises par le chantier extension (un autre contenu). Deux
+//   contenus ne portent jamais un numéro (revue du 11 octobre) ;
+//   `audit-coherence.cjs` le vérifie sur l'historique de origin/main.
 // `audit-coherence.cjs` vérifie que ces trois fonctions existent toujours dans
 // l'extension : une capacité annoncée mais retirée serait le même mensonge.
 // ⚠️⚠️ LE SEUIL EST LA VERSION OÙ LA CHOSE MARCHE DE BOUT EN BOUT, PAS OÙ LE
@@ -181,7 +187,10 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 //    `relireAnnoncesAutresComptes` (ce chantier-ci s'appelait « 5.167 » sur sa
 //    branche). Un seuil plus bas promettrait la relecture à SON extension de
 //    production — le défaut le plus coûteux du projet (revue de la 5.167).
-const EXT_CAPACITES = { supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', repond: '5.77.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', detourage: '5.156.0' };
+// ⚠️ `liaison` (session adressée) : 5.171, PAS 5.169 — la 5.170 publiée par
+//    `main` ne l'a pas (pas de `demanderLiaison`, pas de canal adressé). La même
+//    frontière que `CODE_DANS_ETAT` : les deux arrivent ensemble.
+const EXT_CAPACITES = { liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', repond: '5.77.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', detourage: '5.156.0', preuves: '5.172.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -205,6 +214,9 @@ const CAPACITES_DITES = [
   ['versement', 'relever la date de versement de tes ventes'],
   ['lbcmsg', 'relever tes messages Leboncoin'],
   ['detourage', 'détourer tes photos'],
+  // (revue du 11 octobre) Ce qui manque VRAIMENT : relier une vente qui a son
+  // BORDEREAU, une 5.164 le fait déjà (le bordereau porte l'annonce).
+  ['preuves', 'aller chercher toute seule la preuve des ventes qui n\'ont pas encore de bordereau (anti double vente)'],
 ];
 const capacitesManquantes = (v) => (v ? CAPACITES_DITES.filter(([k]) => cmpVersion(v, EXT_CAPACITES[k]) < 0).map(([, t]) => t) : []);
 const listeFr = (l) => (l.length <= 1 ? (l[0] || '') : `${l.slice(0, -1).join(', ')} ni ${l[l.length - 1]}`);
@@ -753,7 +765,31 @@ const authSetPassword = async (password) => {
     return { ok: true };
   } catch (_) { return { ok: false, error: 'Pas de connexion internet.' }; }
 };
-const authSignOut = () => { writeSession(null); wipeLocalData(); };
+// « Se déconnecter » (un GESTE) déconnecte aussi l'extension de ce Chrome —
+// adressé, et seulement si elle écrit sous CE compte. Une session qui meurt
+// toute seule, elle, ne fait plus rien oublier à l'extension (11 octobre).
+const authSignOut = () => {
+  const uid = AUTH.user && AUTH.user.id;
+  try { if (uid) deconnecterExtension(String(uid)); } catch (_) {}
+  // ⚠️ Revue du 11 octobre : une extension d'avant la 5.171 n'entend pas le
+  //    canal adressé — après « Se déconnecter », elle continuait d'écrire sous
+  //    ce compte (mesuré : aucun message envoyé ; la modale promet pourtant
+  //    qu'« une autre personne qui se connecte derrière toi n'hérite pas de tes
+  //    numéros »). Sur ce GESTE seulement, l'ancien message (`session: null`).
+  //    Pas quand on SAIT qu'elle écrit sous un AUTRE compte : ce n'est pas la
+  //    nôtre à déconnecter. Deux copies (une neuve, une ancienne) : l'ancienne
+  //    aussi doit oublier — la neuve ignore ce message.
+  try {
+    if (uid && (extSait('liaison') !== 'ok' || __vmrPlusieurs)) {
+      const v = __vmrEtat && __vmrEtat.ok ? __vmrEtat.vrm : null;
+      const sonId = String((v && v.user_id) || ''), sonMail = String((v && v.email) || '').trim().toLowerCase();
+      const monMail = String((AUTH.user && AUTH.user.email) || '').trim().toLowerCase();
+      const autre = !!v && v.connecte === true && ((sonId && sonId !== String(uid)) || (!sonId && sonMail && monMail && sonMail !== monMail));
+      if (!autre) deconnecterExtensionAncienne();
+    }
+  } catch (_) {}
+  writeSession(null); wipeLocalData();
+};
 
 // CHANGEMENT DE VENDEUR SUR LE MÊME NAVIGATEUR : le localStorage est commun à
 // tout le site. Sans ménage, le vendeur qui se connecte après un autre
@@ -838,39 +874,40 @@ if (MULTI_USER && typeof window !== 'undefined') {
 //      indépendantes, qui ne se marchent plus dessus. On ne la lui donne que
 //      quand elle en a BESOIN (pas de session, session morte, autre compte),
 //      jamais à chaque rafraîchissement. Voir `assurerSessionExtension`.
-// À la déconnexion on envoie toujours null : elle oublie tout.
+// ⚠️⚠️ 11 OCTOBRE — PLUS AUCUNE SESSION PAR LA PAGE, ET JAMAIS LA NÔTRE.
+//    Mesuré dans les journaux d'authentification de production, et rejoué sur
+//    un vrai GoTrue (relectures du 11 octobre) :
+//    · `window.postMessage({__vmr:'session'})` est entendu par TOUTE extension
+//      de la page — une copie ancienne restée à côté adoptait la même famille
+//      de jetons, qui finit révoquée (« Possible abuse attempt ») ;
+//    · un `session: null` posté au démarrage d'une app dont la session venait de
+//      mourir faisait OUBLIER à l'extension la sienne, saine (9 oct. 18:37,
+//      10 oct. 09:08 : une écriture, puis plus rien — « à chaque fois je dois
+//      me reconnecter ») ;
+//    · `legacySessionExtension` prêtait à une extension < 5.129 NOTRE propre
+//      jeton de renouvellement (rejoué : famille révoquée, l'app perd sa
+//      session 12 s plus tard).
+//    ⇒ La session de l'extension est ADRESSÉE à UNE extension, par son
+//      identifiant (`chrome.runtime.sendMessage(<id>, …)`, permis par
+//      `externally_connectable`), avec un NONCE qu'elle a elle-même émis, et
+//      fabriquée par le serveur pour le même compte (une famille de jetons à
+//      elle). Voir `assurerSessionExtension`. Une extension d'avant la 5.171
+//      (sa 5.164, la 5.170 de production) n'entend pas ce canal : elle reçoit,
+//      seule et quand elle en a besoin, une session fabriquée par le serveur par
+//      l'ancien message de la page (`sessionParLaPage` — relecture croisée de
+//      la 5.174 : sans ça, elle n'était plus jamais reconnectée).
+//    ⇒ Une session de l'app qui MEURT ne touche plus à celle de l'extension.
+//      Seul « Se déconnecter » (un geste) la déconnecte, et seulement si elle
+//      écrit sous CE compte (`deconnecterExtension`).
 // ⚠️⚠️ DEUX EXTENSIONS VRM DANS LE MÊME CHROME (mesuré le 9 octobre, 5.165) :
 //    `null` = une seule répond (ou pas su) · `['5.77.0','5.165.0']` = PLUSIEURS.
 //    Décidé par `sonderPonts` (plus bas), lu par `raisonExtGlobale`, `vmrExec`,
-//    `vmrDemande` et ici. Une session postée ici est relayée par CHAQUE pont
-//    vivant de la page : deux extensions adopteraient la MÊME famille de jetons
-//    et se la tueraient en la renouvelant (`refresh_token_already_used`,
-//    « Possible abuse attempt », relevé à 18:37:02 le 9 octobre).
+//    `vmrDemande` et `assurerSessionExtension`.
 let __vmrPlusieurs = null;
-const posterSessionExtension = (session) => {
-  if (session && __vmrPlusieurs) return;   // « oublie tout » (null) part toujours
-  try { window.postMessage({ __vmr: 'session', session: session || null }, window.location.origin); } catch (_) {}
-};
-// Le repli d'AVANT (notre propre session) ne sert plus qu'à amorcer une
-// extension qui n'a AUCUNE session quand le serveur ne sait pas en fabriquer
-// une (route pas encore déployée, clé de service absente) — jamais pour
-// remplacer une session morte : c'est exactement le cas qui faisait s'entre-
-// tuer les deux familles.
-const sessionAppPourExtension = () => {
-  const s = AUTH.session;
-  return s ? {
-    access_token: s.access_token, refresh_token: s.refresh_token,
-    expires_at: s.expires_at, user_id: AUTH.user && AUTH.user.id,
-    // L'email voyage avec la session : c'est lui que l'extension affiche
-    // (« compte VRM utilisé »). Sans lui elle ne pouvait pas le nommer.
-    email: (AUTH.user && AUTH.user.email) || '',
-  } : null;
-};
 let __sessionAvait = false;
 if (MULTI_USER && typeof window !== 'undefined') {
   onAuthChange(() => {
     const a = !!(AUTH.session && AUTH.user);
-    if (__sessionAvait && !a) posterSessionExtension(null);   // déconnexion : elle oublie
     __sessionAvait = a;
     // Connexion (ou nouveau compte) : on vérifie si l'extension a ce qu'il faut.
     if (a) setTimeout(() => { try { assurerSessionExtension(); } catch (_) {} }, 50);
@@ -1881,7 +1918,12 @@ function FraicheurAnnonces({ lues, enLigne, noms, supprimees, aConfirmer, numero
   const plusieurs = !!__vmrPlusieurs;
   const ailleurs = cap === 'absente' || sansSouris;          // le geste ne se fait pas sur CET appareil
   const connexion = ailleurs ? 'ailleurs' : connexionExtensionVrm();
-  const relit = connexion === 'ok';                            // la relecture aura vraiment lieu
+  // ⚠️⚠️ Fusion du 11 octobre (deux chantiers) : un code PÉRIMÉ (manifeste neuf,
+  //    service worker d'avant, ⟳ jamais cliqué) ne fait pas ce que la version
+  //    annoncée sait faire. La pastille dit « Lecture seule — clique ⟳ » ; on ne
+  //    promet donc ici aucune relecture (§11, une voix) : on dit le même geste.
+  const perime = !ailleurs && !!codePerime();
+  const relit = connexion === 'ok' && !perime;                 // la relecture aura vraiment lieu
   const promet = capS === 'ok' && !plusieurs && !sansSouris && relit;
   const s = nSuppr > 1 ? 's' : '';
   const nAC = ac.length, sAC = nAC > 1 ? 's' : '';
@@ -1893,6 +1935,7 @@ function FraicheurAnnonces({ lues, enLigne, noms, supprimees, aConfirmer, numero
   const visite = `à ta prochaine visite sur Vinted, sur n'importe lequel de tes comptes${aRelire.length > 3 ? ' (trois comptes par visite)' : ''}`;
   const geste = !aRelire.length ? null
     : ailleurs ? `Avec l'extension VRM à jour (${EXT_CAPACITES.enligne}), sur l'ordinateur où elle est installée, ${elles} ${visite} ; plus ancienne, ouvre vinted.fr connecté sur ${ceux}.`
+    : perime ? `L'extension de ce Chrome tourne encore sur son ancien code : rien ne sera relu tant qu'elle n'est pas rechargée — ouvre chrome://extensions et clique ⟳ sur VRM.`
     : cap === 'ok' && relit ? `${elles.charAt(0).toUpperCase() + elles.slice(1)} ${visite}.`
     : cap === 'ok' && (connexion === 'non' || connexion === 'autre') ? `L'extension de ce Chrome n'est pas connectée à ton compte VRM${connexion === 'autre' ? ' (elle écrit dans un autre)' : ''} : tant qu'elle ne l'est pas, rien ne sera relu. VRM la reconnecte de lui-même ; sinon, recharge cette page.`
     : cap === 'ok' ? `Dès que l'extension de ce Chrome aura répondu, ${elles} ${visite}.`
@@ -1900,7 +1943,7 @@ function FraicheurAnnonces({ lues, enLigne, noms, supprimees, aConfirmer, numero
   const num = (it) => { if (!numeros) return ''; const n = numeros[it.id] && numeros[it.id].numero; return n != null && String(n).trim() !== '' ? `N°${n}` : 'sans N°'; };
   return (
     <div {...{ [attr]: '' }} data-vieux={vieux.join(',')} data-supprimees={nSuppr} data-cap={cap} data-cap-suppr={capS}
-      data-promesse={promet ? '1' : '0'} data-ailleurs={ailleurs ? '1' : '0'} data-relit={relit ? '1' : '0'} data-pub-ko={pubKO ? '1' : '0'}
+      data-promesse={promet ? '1' : '0'} data-ailleurs={ailleurs ? '1' : '0'} data-relit={relit ? '1' : '0'} data-perime={perime ? '1' : '0'} data-pub-ko={pubKO ? '1' : '0'}
       data-a-confirmer={nAC} data-a-confirmer-comptes={uidsAC.join(',')}
       style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, marginBottom: 12, ...(style || {}) }}>
       {pubKO && <span data-pub-ko-dit>{lecturesPubliquesKO() === 'cache'
@@ -2318,39 +2361,159 @@ const reclassifyTrack = (d) => {
 // introuvables : la boîte de ce compte ne transfère pas.
 // Lecture SCALAIRE uniquement (compte + date), jamais le corps (§34).
 // ⚠️ UNE NOTIFICATION DE VENTE NAÎT D'UN EMAIL DE VENTE, PAS DE LA MOISSON.
-// Mesuré le 31 août : 6 ventes dans la journée, **3 emails de vente seulement**.
-// Les comptes `tomj606`, `angeled92`, `arthuror2`, `liliand653` et
-// `julatace3535` n'ont JAMAIS envoyé un seul email de vente à l'app — leurs
-// ventes ne peuvent donc déclencher aucune notification, quoi qu'on fasse dans
-// le code. Ce n'est pas réparable côté app : il faut que ces boîtes fassent
-// suivre vers l'adresse de réception. Autant le DIRE, à l'endroit où il règle
-// ses notifications, plutôt que de le laisser découvrir un lundi matin.
-// Lecture SCALAIRE (une colonne, §34) et une seule requête.
-const fetchComptesSansEmailVente = async (comptes) => {
+// Mesuré le 31 août : 6 ventes dans la journée, **3 emails de vente seulement** —
+// et le 11 octobre, sur les MESSAGES : `angeled92` et `tomj606` n'ont JAMAIS
+// envoyé un email à VRM (ni vente, ni bordereau, ni message), `arthuror2` plus
+// aucun depuis le 23 septembre. Leurs ventes et leurs messages ne peuvent donc
+// déclencher aucune notification, quoi qu'on fasse dans le code : c'est en
+// amont (réglages de notification de Vinted pour ce compte, ou une boîte qui
+// ne fait pas suivre). Autant le DIRE, avec le geste, à l'endroit où il règle
+// ses notifications et là où il regarde ses comptes.
+//
+// ⚠️⚠️ ET L'ANCIEN COMPTE SE TROMPAIT DANS LES DEUX SENS (11 octobre) :
+//   · il ne lisait que 6 familles de lignes, pas le JOURNAL : `jujuf38`, dont
+//     9 messages sont bien arrivés, était annoncé « aucun email », en ROUGE ;
+//   · « aucun email » ne prouve rien pour un compte qui n'a rien vendu : rien
+//     n'avait à arriver. On ne parle de compte muet que sur une PREUVE — des
+//     ventes captées (identité : le compte qui les a moissonnées) qui auraient
+//     dû produire un email de bordereau (identité : `email_bord_{transaction}`),
+//     et n'en ont produit aucun depuis le dernier signe de vie du compte ;
+//   · `limit=1000` coupait en silence (§4.5), et une famille illisible rendait
+//     une demi-liste — donc des comptes « sans email » sur une simple panne.
+// Trois états, jamais deux : `undefined` en cours · `null` pas su · un objet lu.
+// Lecture SCALAIRE (compte + date), jamais le corps (§34).
+// <comptes-sans-email> — une règle pour Réglages → Notifications ET Achats (§11)
+const CSE_DELAI_MS = 3 * 86400000;     // une vente de moins de 3 jours n'a peut-être pas encore eu son email
+const CSE_MIN_VENTES = 2;              // il faut au moins 2 ventes sans email après le dernier signe de vie…
+const CSE_MIN_JOURS = 7;               // … dont la plus ancienne a au moins 7 jours (un motif, pas un retard)
+const estRelaisApple = (adr) => /@privaterelay\.appleid\.com\s*$/i.test(String(adr || ''));
+// `reception` : `{ parCompte: { login: { n, last } }, bordTx: Set, debut }` · `null` pas su · `undefined` en cours.
+//               `debut` = le plus ancien email que VRM ait reçu (toutes familles, journal, tous comptes) :
+//               le DÉBUT DE LA RÉCEPTION. Absent ⇒ inconnu ⇒ aucun compte n'est jugé muet.
+// `ventes`    : les ventes de tous les comptes liés (`_acc` posé, celles de la coque) · `null` · `undefined`.
+// `ventesKO`  : comptes dont la lecture des ventes a échoué (uid) — rien ne s'y juge.
+// ⚠️⚠️ REVUE DU 11 OCTOBRE — DEUX DÉFAUTS DE LA PREMIÈRE RÈGLE, REPRODUITS :
+//   · une vente ANTÉRIEURE à toute réception d'email suffisait à accuser un
+//     compte : un compte dormant (ventes d'il y a 4 mois, avant le premier email
+//     que VRM ait reçu) ou une nouvelle vendeuse dès son premier jour (son
+//     historique) étaient « muets, jamais ». VRM ne recevait AUCUN email à ces
+//     dates : ce n'est pas une preuve. On ne juge que les ventes postérieures au
+//     début de la réception ; sans début connu, on ne juge personne ;
+//   · « calme » (« ces comptes n'ont pas encore vendu ») s'affichait sous des
+//     comptes qui AVAIENT vendu — une vente sans email il y a 20 jours, trois
+//     ventes d'hier : la phrase rassurait là où la boîte est peut-être muette.
+//     « calme » = AUCUNE vente depuis le début de la réception ; des ventes sans
+//     email sous le seuil = « surveiller », avec leur propre phrase.
+function etatEmailsComptes({ comptes, reception, ventes, ventesKO, adresses, exclus, maintenant, annulee }) {
+  if (reception === undefined) return { etat: 'encours', lignes: [], muets: [], debut: null };
+  if (reception === null) return { etat: 'pasSu', lignes: [], muets: [], debut: null };
+  const now = Number.isFinite(maintenant) ? maintenant : Date.now();
+  const debut = reception.debut ? Date.parse(reception.debut) : NaN;
+  const debutConnu = Number.isFinite(debut);
+  const estAnnulee = typeof annulee === 'function' ? annulee
+    : (o) => (typeof classifyOrderStatus === 'function' ? classifyOrderStatus(o && o.status) === 'cancelled' : false);
+  const ko = new Set((ventesKO || []).map(String));
+  const horsJeu = new Set((exclus || []).map(String));
+  const bordTx = reception.bordTx instanceof Set ? reception.bordTx : new Set(reception.bordTx || []);
+  const txDe = (o) => String(o && (o.transaction_id != null ? o.transaction_id : (o.id != null ? o.id : '')));
+  const lignes = [];
+  for (const a of (comptes || [])) {
+    const uid = String((a && a.vinted_user_id) || '');
+    const login = String((a && a.login) || '').trim();
+    const e = (login && reception.parCompte && reception.parCompte[login]) || null;
+    const n = e ? (e.n || 0) : 0;
+    const dernierEmail = e && e.last ? Date.parse(e.last) : NaN;
+    const ventesLues = Array.isArray(ventes) && !ko.has(uid);
+    const ventesEnCours = ventes === undefined;
+    const sesVentes = ventesLues
+      ? ventes.filter((o) => o && o._acc && String(o._acc.vinted_user_id) === uid && !estAnnulee(o) && Number.isFinite(Date.parse(o.date)))
+      : [];
+    let derniereAvecEmail = -Infinity;
+    for (const o of sesVentes) { const t = Date.parse(o.date); if (bordTx.has(txDe(o)) && t > derniereAvecEmail) derniereAvecEmail = t; }
+    const signe = Math.max(Number.isFinite(dernierEmail) ? dernierEmail : -Infinity, derniereAvecEmail);
+    // Les ventes qui AURAIENT DÛ produire un email : après le début de la réception
+    // ET après le dernier signe de vie du compte, sans email de bordereau.
+    const aJuger = sesVentes.filter((o) => { const t = Date.parse(o.date); return debutConnu && t >= debut && t > signe && !bordTx.has(txDe(o)); });
+    const sansEmail = aJuger
+      .filter((o) => Date.parse(o.date) < now - CSE_DELAI_MS)
+      .sort((x, y) => Date.parse(x.date) - Date.parse(y.date));
+    const recentes = aJuger.length - sansEmail.length;           // trop récentes : leur email peut encore arriver
+    const depuisDebut = debutConnu ? sesVentes.filter((o) => Date.parse(o.date) >= debut).length : sesVentes.length;
+    const plusAncienne = sansEmail.length ? Date.parse(sansEmail[0].date) : NaN;
+    const muet = debutConnu && ventesLues && !horsJeu.has(uid) && sansEmail.length >= CSE_MIN_VENTES
+      && Number.isFinite(plusAncienne) && now - plusAncienne >= CSE_MIN_JOURS * 86400000;
+    const statut = muet ? 'muet'
+      : (n > 0 || Number.isFinite(derniereAvecEmail)) ? 'recoit'
+      : !ventesLues ? (ventesEnCours ? 'encours' : 'pasSu')
+      : horsJeu.has(uid) ? 'exclu'
+      : depuisDebut > 0 ? 'surveiller'
+      : 'calme';
+    lignes.push({
+      uid, login: login || uid, n, last: Number.isFinite(dernierEmail) ? new Date(dernierEmail).toISOString() : '',
+      statut, jamais: muet && !Number.isFinite(signe),
+      depuis: muet && Number.isFinite(signe) ? new Date(signe).toISOString() : null,
+      nSansEmail: (muet || statut === 'surveiller') ? sansEmail.length : 0,
+      premiereSansEmail: (muet || statut === 'surveiller') && Number.isFinite(plusAncienne) ? new Date(plusAncienne).toISOString() : null,
+      // « surveiller » : pourquoi on ne conclut pas — rien reçu du tout (début
+      // inconnu), ventes trop récentes, ou trop peu de ventes sans email.
+      nRecentes: statut === 'surveiller' ? recentes : 0,
+      raisonSurveiller: statut !== 'surveiller' ? null : !debutConnu ? 'aucunDebut' : sansEmail.length ? 'peu' : 'recentes',
+      relaisApple: estRelaisApple(adresses && adresses[uid]),
+    });
+  }
+  return { etat: 'lu', lignes, muets: lignes.filter((l) => l.statut === 'muet'), debut: debutConnu ? new Date(debut).toISOString() : null };
+}
+// </comptes-sans-email>
+const FAMILLES_EMAILS_COMPTE = ['email_track_', 'email_sale_', 'email_bord_', 'email_achat_', 'email_final_', 'email_offer_'];
+const fetchEmailsParCompte = async () => {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_sale_*&select=acc:meta->>account&limit=1000`, { headers: sbAuth() });
+    const parCompte = {};
+    // Le DÉBUT de la réception : le plus ancien email lu, quel que soit son compte
+    // (une ligne sans compte reconnu prouve quand même que VRM recevait).
+    let debut = '';
+    const ajoute = (acc, at) => {
+      const d = String(at || '');
+      if (d && Number.isFinite(Date.parse(d)) && (!debut || d < debut)) debut = d;
+      const a = String(acc || '').trim(); if (!a) return;
+      const e = (parCompte[a] = parCompte[a] || { n: 0, last: '' });
+      e.n += 1; if (d > e.last) e.last = d;
+    };
+    for (const f of FAMILLES_EMAILS_COMPTE) {
+      const rows = await lireTout(`id=like.${f}*&select=acc:meta->>account,at:meta->>receivedAt`, { strict: true });
+      if (rows === null) return null;                 // une famille illisible : on n'accuse personne
+      for (const row of rows) ajoute(row.acc, row.at);
+    }
+    // Le JOURNAL porte les messages et les favoris (aucune ligne à eux) : sans
+    // lui, un compte dont les messages arrivent était dit « aucun email ».
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.email_journal&select=entries:data->entries`, { headers: sbAuth() });
     if (!r.ok) return null;
-    const vus = new Set();
-    for (const row of await r.json()) { const a = String(row.acc || '').trim(); if (a) vus.add(a); }
-    if (!vus.size) return null;                       // rien lu : on n'accuse personne
-    return (comptes || []).filter(a => { const l = String(a.login || '').trim(); return l && !vus.has(l); });
+    const j = await r.json();
+    if (!Array.isArray(j)) return null;
+    for (const e of ((j[0] && j[0].entries) || [])) if (e) ajoute(e.account, e.at);
+    // Les bordereaux reçus par email, par TRANSACTION (identité, jamais le compte deviné).
+    const bords = await lireTout('id=like.email_bord_*&select=id', { strict: true });
+    if (bords === null) return null;
+    const bordTx = new Set(bords.map((b) => String(b.id || '').replace(/^email_bord_/, '')).filter(Boolean));
+    return { parCompte, bordTx, debut: debut || null };
   } catch (_) { return null; }
 };
-const fetchEmailsParCompte = async () => {
-  const out = {};
-  try {
-    for (const f of ['email_track_', 'email_sale_', 'email_bord_', 'email_achat_', 'email_final_', 'email_offer_']) {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.${f}*&select=acc:meta->>account,at:meta->>receivedAt&limit=1000`, { headers: sbAuth() });
-      if (!r.ok) continue;
-      for (const row of await r.json()) {
-        const a = String(row.acc || '').trim(); if (!a) continue;
-        const e = (out[a] = out[a] || { n: 0, last: '' });
-        e.n += 1; if (String(row.at || '') > e.last) e.last = String(row.at || '');
-      }
-    }
-  } catch (_) { /* réseau : on rend ce qu'on a */ }
-  return out;
+// Les ventes de la COQUE (tous les comptes liés), publiées pour les écrans qui
+// en ont besoin sans les relire (§11 : la coque les lit, les autres consomment).
+// `ventes` : `undefined` pas encore lu · `null` aucune lecture n'a abouti · un tableau.
+const _ventesCoquePub = { ventes: undefined, ko: [] };
+const publierVentesCoque = (ventes, ko) => {
+  _ventesCoquePub.ventes = ventes; _ventesCoquePub.ko = Array.isArray(ko) ? ko : [];
+  try { window.dispatchEvent(new Event('vrm:ventes-coque')); } catch (_) {}
 };
+function useVentesCoque() {
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const f = () => setTick((t) => t + 1);
+    window.addEventListener('vrm:ventes-coque', f);
+    return () => window.removeEventListener('vrm:ventes-coque', f);
+  }, []);
+  return { ventes: _ventesCoquePub.ventes, ko: _ventesCoquePub.ko };
+}
 // ⚠️ LA MÊME RÈGLE À LA LECTURE (leçon §5.37).
 // Les emails déjà en base n'ont pas de champ `famille` — ils ne seront jamais
 // réécrits. Sans cette copie côté app, le compteur continuerait d'annoncer
@@ -4442,13 +4605,18 @@ function vmrAuthEtat(timeoutMs = 4000) {
 // canvas nourri d'une image cross-origin devient inexportable, §4.93). Sans
 // extension → null, et le document se génère simplement sans photo.
 // ⚠️ REFUS ≠ DÉLAI (revue du 11 octobre). `vmrPhotoIssue` dit lequel des deux :
-//    `refus` = l'extension a RÉPONDU sans octets (le CDN la refuse aussi, lien
-//    mort) ; `delai` = aucune réponse avant l'échéance (service worker qui se
-//    réveille, réseau lent) — « pas su », pas « non ». Les photos à l'écran
-//    (src/photosVinted.js) en ont besoin : un délai se réessaie, un refus ne
-//    se réclame pas en boucle, et « recharge cette page » ne se dit pas sur un
-//    refus (le geste ne pourrait pas marcher). `vmrPhoto` garde son contrat
-//    (les octets ou `null`) pour le reçu d'achat.
+//    `refus` = l'extension a RÉPONDU sans octets ; `delai` = aucune réponse
+//    avant l'échéance (service worker qui se réveille, réseau lent) — « pas
+//    su », pas « non ». Les photos à l'écran (src/photosVinted.js) en ont
+//    besoin : un délai se réessaie tout de suite, un refus après un RECUL, et
+//    « recharge cette page » ne se dit pas sur un refus.
+//    ⚠️⚠️ Un « refus » n'est PAS un verdict (seconde revue du 11 octobre) : le
+//    pont (bridge.js) ne relaie que `dataUrl`, jamais l'erreur — un lien mort
+//    (404), un 503 ou un 429 du CDN, une coupure du service worker arrivent ici
+//    IDENTIQUES. La règle le redemande donc plus tard (témoin, recul, réseau).
+//    Distinguer « lien mort » de « passager » demanderait que l'extension
+//    relaie `resp.error` — à faire côté extension, pas ici. `vmrPhoto` garde
+//    son contrat (les octets ou `null`) pour le reçu d'achat.
 function vmrPhotoIssue(url, timeoutMs = 8000) {
   return new Promise((resolve) => {
     if (typeof window === 'undefined' || !__vmrExtReady || !url) { resolve({ dataUrl: null, issue: 'absente' }); return; }
@@ -4498,6 +4666,7 @@ function vmrExecUn({ uid, method, endpoint, body }, timeoutMs = 15000) {
     // 5.165 : deux extensions répondent ⇒ une réponse à un acheteur partirait
     //    DEUX fois (mesuré : « exec …/replies ×2 »). Rien ne part.
     if (__vmrPlusieurs) { resolve({ ok: false, error: textePlusieurs(), code: 'plusieurs' }); return; }
+    if (codePerime()) { resolve({ ok: false, error: textePerime(), code: 'perime' }); return; }
     const reqId = 'r' + Date.now() + '_' + Math.random().toString(36).slice(2);
     let dernier = null;
     const cleanup = () => { clearTimeout(to); window.removeEventListener('message', onMsg); };
@@ -4530,6 +4699,52 @@ function vmrExecUn({ uid, method, endpoint, body }, timeoutMs = 15000) {
 //    deux — `undefined` on vérifie · `null` elle ne répond pas · objet mesuré.
 //    L'état ne coûte AUCUNE requête Vinted (cookie + stockage de l'extension).
 let __vmrEtat = undefined, __vmrRates = 0;
+// ══ LE CODE QUI TOURNE N'EST PAS CELUI DU MANIFESTE (11 octobre) ═══════════
+// ⚠️⚠️ MESURÉ dans ses journaux, reproduit dans un vrai Chromium : sur 5 des 6
+//    Chrome qui travaillent pour lui, le dossier avait été remplacé par la
+//    5.164, mais le service worker exécutait encore une 5.95–5.129 — et
+//    ANNONÇAIT « 5.164.0 » (la version vient du fichier manifeste, pas du code).
+//    L'app jugeait sur cette version : « Actions possibles », « ton ordinateur
+//    est à jour ». Seul ⟳ (chrome://extensions) recharge le code, et seulement
+//    dans le Chrome où on le clique.
+// ⇒ Trois signes, tous MESURÉS, jamais devinés :
+//    · le pont (≥ 5.171, toujours lu depuis le disque) juge le code et joint son
+//      verdict (`perime`) — y compris quand le code est si vieux qu'il ne répond
+//      rien à « état » ;
+//    · l'état porte `code` depuis la 5.171 : absent alors que la version annoncée
+//      est ≥ 5.171, ou différent d'elle ⇒ périmé ;
+//    · la clé `offresAutoLocal` n'a existé dans l'état que de la 5.130 à la 5.158
+//      (retirée avec l'acceptation automatique) : une version ≥ 5.159 qui la
+//      porte encore exécute un code d'avant.
+//    Trois états, jamais deux : `null` = rien ne dit périmé.
+let __vmrPerimePont = null;
+function codePerime() {
+  const p = __vmrPerimePont;
+  if (p && Date.now() - Number(p.at || 0) < 120000) return { code: p.code || null, raison: p.raison || 'pont' };
+  const e = __vmrEtat;
+  if (!e || !e.ok) return null;
+  const v = String(e.version || vmrExtVersion() || '');
+  if (!/^\d+\.\d+\.\d+$/.test(v)) return null;
+  if (Object.prototype.hasOwnProperty.call(e, 'offresAutoLocal') && cmpVersion(v, '5.159.0') >= 0) return { code: null, raison: 'ancien-etat' };
+  if (cmpVersion(v, CODE_DANS_ETAT) >= 0 && !e.code) return { code: null, raison: 'sans-code' };
+  if (e.code && String(e.code) !== v) return { code: String(e.code), raison: 'autre-code' };
+  return null;
+}
+// La version où l'état porte `code` (la constante `CODE_VERSION` de background.js).
+// ⚠️⚠️ COLLISION DE NUMÉROS (11 octobre) : ce chantier s'appelait « 5.169 » sur
+//    sa branche, et `main` a publié une 5.170 SANS lui — son état n'a pas
+//    `code`. Une frontière à 5.169 disait cette 5.170 « périmée » : « Lecture
+//    seule », plus aucune commande ni session, et « clique ⟳ » — qui recharge la
+//    même 5.170, toujours sans `code`. La frontière (ici, `EXT_CAPACITES.liaison`,
+//    `jugeable` du pont et du logo) reste STRICTEMENT au-dessus de toute version
+//    publiée sans le champ : `scripts/audit-planchers-code.cjs` le vérifie, sur
+//    ce que `codePerime` REND.
+const CODE_DANS_ETAT = '5.171.0';
+function textePerime() {
+  const p = codePerime() || {};
+  const v = String((__vmrEtat && __vmrEtat.version) || vmrExtVersion() || '');
+  return `L'extension de ce Chrome tourne encore sur son ancien code${p.code ? ` (${p.code})` : ''}, pas sur la ${v || 'version'} que tu as installée — Chrome ne la recharge pas tout seul. Dans ce Chrome : ouvre chrome://extensions et clique ⟳ (la flèche ronde) sur VRM. À faire dans CHAQUE Chrome où elle est installée.`;
+}
 const __vmrJobs = {};                       // jobId → dernière étape connue
 const __vmrNotifier = () => __vmrExtSubs.forEach(fn => { try { fn(); } catch (_) {} });
 // ⚠️⚠️ UN PONT ORPHELIN RÉPONDAIT « RIEN » PLUS VITE QUE LE PONT VIVANT
@@ -4560,9 +4775,17 @@ function vmrDemandeUn(type, payload, timeoutMs) {
     // 5.165 : deux extensions répondent ⇒ une commande serait exécutée DEUX fois
     //    (mesuré : « cmd:bordereau ×2 »). On n'en envoie aucune, et on le dit.
     if (agit && __vmrPlusieurs) { resolve({ accepte: false, code: 'plusieurs', raison: textePlusieurs() }); return; }
+    // 11 octobre : un code PÉRIMÉ (manifeste neuf, service worker ancien) n'a
+    // pas les garde-fous d'aujourd'hui (une seule requête à la fois, pause
+    // quand Vinted freine…) : aucune commande ne part tant qu'il tourne.
+    if (agit && codePerime()) { resolve({ accepte: false, code: 'perime', raison: textePerime() }); return; }
     const fin = (v) => { if (done) return; done = true; clearTimeout(grace); clearTimeout(to); window.removeEventListener('message', onMsg); resolve(v); };
     const onMsg = (e) => {
       if (e.source !== window || !e.data || e.data.__vmr !== type + ':result' || e.data.reqId !== reqId) return;
+      // 11 octobre : le pont (≥ 5.171, toujours lu depuis le disque) juge le
+      // CODE qui répond et joint son verdict — y compris quand ce code est si
+      // ancien qu'il ne répond rien à « état » (`resp: null`).
+      if (type === 'etat') __vmrPerimePont = e.data.perime && typeof e.data.perime === 'object' ? Object.assign({}, e.data.perime, { at: Date.now() }) : (e.data.resp ? null : __vmrPerimePont);
       if (e.data.resp) { fin(e.data.resp); return; }
       if (!agit && !grace) grace = setTimeout(() => fin(null), VMR_GRACE_VIDE_MS);
     };
@@ -4590,7 +4813,10 @@ async function battementExt() {
   if (!__vmrExtReady) return;
   sonderPonts();                         // 5.165 : combien d'extensions répondent (voir plus haut)
   if (__vmrBattementEnVol) return;
-  if (!pontSaitRepondreEtat()) { legacySessionExtension(); return; }
+  // ⚠️ Un pont plus ancien que la 5.129 ne reçoit RIEN (11 octobre) : avant, on
+  //    lui prêtait NOTRE session (`legacySessionExtension`) — même famille de
+  //    jetons, révoquée au premier renouvellement croisé. Il doit être mis à jour.
+  if (!pontSaitRepondreEtat()) return;
   __vmrBattementEnVol = true;
   let r = null;
   try { r = await vmrEtat(); } finally { __vmrBattementEnVol = false; }
@@ -4605,46 +4831,194 @@ async function battementExt() {
     else { clearTimeout(__vmrRelance); __vmrRelance = setTimeout(battementExt, 3000); }
   }
   __vmrNotifier();
-  if (r && r.ok) { try { assurerSessionExtension(); } catch (_) {} }
+  // Une liaison demandée (« Se connecter » dans l'extension) part même si l'état
+  // ne vient pas de CETTE extension : c'est à elle qu'on s'adresse.
+  if ((r && r.ok) || (__lier && (__lier.etat === 'attente' || __lier.etat === 'encours'))) { try { assurerSessionExtension(); } catch (_) {} }
 }
-// L'EXTENSION REÇOIT SA PROPRE SESSION QUAND ELLE EN A BESOIN (voir
-// `posterSessionExtension`). Besoin = elle n'en a pas, la sienne est morte, ou
-// elle écrit sous un AUTRE compte VRM que celui de cette page (c'est la
-// personne au clavier qui décide : l'extension note la bascule et la dit).
+// ══ LA SESSION DE L'EXTENSION, ADRESSÉE (11 octobre) ══════════════════════
+// L'extension reçoit SA PROPRE session (fabriquée par le serveur pour le même
+// compte, `/api/compte?mode=session-extension` : une famille de jetons à elle)
+// quand elle en a BESOIN — pas de session, session morte, autre compte, ou
+// « Se connecter » cliqué dans CETTE extension. Le chemin, entièrement adressé :
+//   1. l'app demande À L'EXTENSION (par son identifiant) si elle a besoin d'une
+//      session pour CE compte : c'est elle qui décide, et seulement si oui elle
+//      rend un nonce (128 bits, 2 min, une seule fois) ;
+//   2. l'app fait fabriquer la session par le serveur (sa propre connexion fait foi) ;
+//   3. l'app la remet À CETTE extension, avec le nonce. Aucune autre extension
+//      de la page ne l'entend : `window.postMessage` n'est plus utilisé.
 // Pas su (`connecte: null`, renouvellement en cours) ⇒ on ne touche à rien.
 let __sessExtEnVol = false, __sessExtPasAvant = 0, __sessExtIncertain = 0;
+let __sessExtErreur = null;     // ce que le serveur a répondu quand il n'a pas pu
 const enVolSession = (v) => { __sessExtEnVol = v; __vmrNotifier(); };   // l'indicateur le dit pendant que ça se fait
-// ⚠️ UNE EXTENSION QUI A ENCORE LA SESSION DE L'APP (donnée avant le 5 octobre)
+// ⚠️⚠️ QUI PEUT CONNECTER L'EXTENSION DE CE CHROME, ET COMMENT (revue du
+//    11 octobre). « Je la (re)connecte » n'est vrai que si l'APP peut le faire :
+//    une extension qui ne sait pas recevoir la session adressée (avant la 5.171
+//    — dont la 5.164 installée chez lui) ne reçoit plus RIEN de l'app, et un
+//    serveur qui a refusé de fabriquer sa session ne la fabriquera pas avant
+//    `__sessExtPasAvant`. La garde avait été posée sur « pas connectée »
+//    seulement : « autre compte » et les premiers pas promettaient encore
+//    « je la reconnecte — rien à taper », sans rien envoyer (mesuré : 0 envoi
+//    en 25 s). UNE règle pour l'en-tête, la liste des ventes, le panneau et les
+//    premiers pas (§11) :
+//      'app'     — l'app la connecte elle-même ;
+//      'retard'  — elle ne sait pas la recevoir : la mettre à jour, ou le mot
+//                  de passe VRM dans SA fenêtre ;
+//      'serveur' — le serveur a refusé : le mot de passe VRM (l'app réessaie
+//                  quand même après `__sessExtPasAvant`).
+//      'page'    — elle est d'avant la 5.171 mais répond à « état » : l'app la
+//                  connecte par l'ancien message de la page (`sessionParLaPage`,
+//                  le chemin de la production 2fed734), avec une session
+//                  fabriquée par le serveur — jamais la sienne.
+// ⚠️⚠️ RELECTURE CROISÉE DE LA 5.174 (12 octobre) — la voie 'page'. Le chantier
+//    « connexion » avait retiré TOUT envoi par la page : une 5.164 ou une 5.170
+//    dont la session était morte, absente, ou sur un autre compte VRM n'était
+//    plus jamais reconnectée par l'app (mesuré au banc, vrai bridge.js 5.164 et
+//    5.170 : production 1 session reçue, « Actions possibles » ; intégration 0,
+//    « Lecture seule »). Or Julien NE PEUT PAS mettre à jour ses extensions
+//    maintenant (5 de ses 6 Chrome exécutent un code d'avant) : la nouvelle app
+//    doit faire AU MOINS ce que faisait la production. Les risques qui avaient
+//    motivé le retrait restent fermés — deux copies (`__vmrPlusieurs` : rien ne
+//    part), `null` au démarrage (seul un GESTE le poste), la famille de jetons
+//    de l'app (la session vient du serveur, `sessionAppPourExtension` reste
+//    retirée).
+function connexionParLaPage() {
+  if (extSait('liaison') === 'ok' || __vmrPlusieurs || !pontSaitRepondreEtat() || codePerime()) return false;
+  // « Pas su » ne vaut pas « oui » : la promesse suit l'envoi, et l'app n'envoie
+  // que si l'extension a dit sous quel compte elle écrit (son « état »).
+  const e = __vmrEtat;
+  return !!(e && e.ok && e.vrm && typeof e.vrm === 'object');
+}
+function voieConnexionExt() {
+  const ancienne = extSait('liaison') !== 'ok';
+  if (ancienne && !connexionParLaPage()) return 'retard';
+  if (__sessExtErreur) return 'serveur';
+  return ancienne ? 'page' : 'app';
+}
+// Le geste de secours quand l'app n'y arrive pas : la fenêtre de l'extension.
+// Celle d'avant la 5.171 n'a pas « Se connecter avec VRM » ni « avec mon mot de
+// passe VRM » — seulement email et mot de passe (son icône l'ouvre).
+const fenetreAncienne = () => extSait('liaison') !== 'ok';
+const minutesAvantReessai = () => Math.max(1, Math.ceil((__sessExtPasAvant - Date.now()) / 60000));
+// « Déconnecter l'extension de ce Chrome » pour une extension qui ne connaît
+// pas le canal adressé (avant la 5.171) : l'ancien message de la page, qu'elle
+// comprend (`session: null` = elle oublie sa session). UNIQUEMENT sur un GESTE
+// (ce bouton, ou « Se déconnecter » de VRM) — jamais tout seul : c'est ce qui
+// faisait oublier sa session à l'extension au démarrage d'une app morte (B9).
+// Un pont 5.171 l'ignore (il répond `canal`) : la sienne passe par l'adressé.
+function deconnecterExtensionAncienne() {
+  if (typeof window === 'undefined' || !vmrExtPresent()) return false;
+  try { window.postMessage({ __vmr: 'session', session: null }, '*'); } catch (_) { return false; }
+  // Elle vient d'oublier sa session : on relit son état tout de suite.
+  setTimeout(() => { try { battementExt(); } catch (_) {} }, 700);
+  return true;
+}
+// ⚠️ UNE EXTENSION QUI A ENCORE LA SESSION DE L'APP (donnée avant le 6 octobre)
 //    partage sa famille de jetons avec l'app jusqu'à ce que l'une des deux soit
-//    révoquée — et Supabase peut alors révoquer les DEUX. On la sépare UNE fois,
-//    d'avance, par appareil et par compte (revue du 5 octobre). Ce n'est pas une
-//    migration de données : au pire on refait une séparation de plus, sans perte.
+//    révoquée. On la sépare UNE fois, d'avance, par appareil et par compte. Ce
+//    n'est pas une migration de données : au pire une séparation de plus.
 const cleSeparee = (uid) => 'vrm_ext_separee_' + uid;
+// Le canal ADRESSÉ vers une extension : `chrome.runtime` n'existe dans la page
+// que si une extension installée déclare `externally_connectable` pour elle
+// (la 5.171 et suivantes). `null` = pas de réponse (absente, trop ancienne,
+// code périmé) — jamais une réponse devinée.
+const canalExt = () => { try { const c = typeof window !== 'undefined' ? window.chrome : null; return (c && c.runtime && typeof c.runtime.sendMessage === 'function') ? c.runtime : null; } catch (_) { return null; } };
+function versExtension(id, msg, timeoutMs = 5000) {
+  return new Promise((res) => {
+    const rt = canalExt();
+    if (!rt || !/^[a-p]{32}$/.test(String(id || ''))) { res(null); return; }
+    let fini = false;
+    const t = setTimeout(() => { if (!fini) { fini = true; res(null); } }, timeoutMs);
+    try {
+      rt.sendMessage(String(id), msg, (r) => {
+        if (fini) return; fini = true; clearTimeout(t);
+        let e = null; try { e = rt.lastError; } catch (_) { e = null; }
+        res(e ? null : (r || null));
+      });
+    } catch (_) { if (!fini) { fini = true; clearTimeout(t); res(null); } }
+  });
+}
+// « SE CONNECTER AVEC VRM » : l'extension ouvre VRM avec `?lier-extension=<son
+// identifiant>`. On le garde (15 min) le temps d'une connexion éventuelle — le
+// rechargement qui suit la connexion ne doit pas le perdre.
+const LIER_CLE = 'vrm_lier_extension';
+let __lier = null;   // { id, at, etat: 'attente'|'encours'|'ok'|'deja'|'erreur'|'absente', email, message }
+const __lierSubs = new Set();
+const lierNotifier = () => __lierSubs.forEach((fn) => { try { fn(); } catch (_) {} });
+const poserLier = (v) => { __lier = v; try { if (v && (v.etat === 'attente' || v.etat === 'encours')) sessionStorage.setItem(LIER_CLE, JSON.stringify({ id: v.id, at: v.at })); else sessionStorage.removeItem(LIER_CLE); } catch (_) {} lierNotifier(); __vmrNotifier(); };
+if (typeof window !== 'undefined') {
+  try {
+    const q = new URLSearchParams(window.location.search || '');
+    const id = q.get('lier-extension');
+    if (id && /^[a-p]{32}$/.test(id)) {
+      __lier = { id, at: Date.now(), etat: 'attente' };
+      try { sessionStorage.setItem(LIER_CLE, JSON.stringify({ id, at: Date.now() })); } catch (_) {}
+      try { q.delete('lier-extension'); const rest = q.toString(); window.history.replaceState(window.history.state, '', window.location.pathname + (rest ? '?' + rest : '') + window.location.hash); } catch (_) {}
+    } else {
+      const g = JSON.parse(sessionStorage.getItem(LIER_CLE) || 'null');
+      if (g && /^[a-p]{32}$/.test(String(g.id || '')) && Date.now() - Number(g.at || 0) < 15 * 60000) __lier = { id: String(g.id), at: Number(g.at), etat: 'attente' };
+    }
+  } catch (_) {}
+}
 async function assurerSessionExtension() {
   if (!MULTI_USER || typeof window === 'undefined') return;
-  // 5.165 : deux extensions adopteraient la MÊME session et se la tueraient.
+  // 5.165 : deux extensions répondent ⇒ on ne donne rien (on ne saurait pas
+  // laquelle garder, et l'ancienne exécuterait encore les commandes).
   await sondageConnu();
-  if (__vmrPlusieurs) return;
+  const lier = __lier && (__lier.etat === 'attente' || __lier.etat === 'encours') ? __lier : null;
+  // ⚠️ Revue du 11 octobre : « Se connecter avec VRM » cliqué dans UNE extension
+  //    nomme SON identifiant. Avec une copie ancienne à côté, on sortait ici :
+  //    le bandeau disait « Je connecte… Rien à taper » pour toujours, sans
+  //    croix, sous une pastille « supprime l'ancienne » — deux voix contraires.
+  //    La session lui est ADRESSÉE (l'ancienne ne l'entend pas) : elle part.
+  //    Les commandes, elles, restent coupées tant qu'il y en a deux.
+  if (__vmrPlusieurs && !lier) return;
   const s = AUTH.session, u = AUTH.user;
   if (!s || !s.access_token || !u || !u.id) return;
   const e = __vmrEtat;
-  const v = e && e.ok ? e.vrm : null;
-  if (!v || typeof v !== 'object') return;
+  // Un code périmé n'écoute pas le canal adressé : rien à lui donner (le geste
+  // est le ⟳, dit ailleurs). Une liaison demandée le DIT (le bandeau ne reste
+  // pas sur « Je connecte… ») et repart dès que le code est réparé.
+  if (codePerime()) { if (lier && lier.bloque !== 'perime') poserLier(Object.assign({}, lier, { bloque: 'perime' })); return; }
+  // ⚠️⚠️ Relecture croisée de la 5.174 : une extension d'avant la 5.171 (canal
+  //    adressé inconnu) qui répond à « état » est connectée par l'ancien message
+  //    de la page, comme le faisait la production (voir `voieConnexionExt`).
+  if (!lier && extSait('liaison') !== 'ok') { if (connexionParLaPage()) await sessionParLaPage(s, u, e); return; }
+  // La cible : l'extension qui a demandé (« Se connecter »), sinon celle qui
+  // répond à l'état dans cette page. Jamais « toutes ».
+  const ext = String((lier && lier.id) || (e && e.ok && e.ext) || '');
+  if (!ext) return;
+  // Ce que l'état dit de la session ne vaut que s'il vient de CETTE extension.
+  const v = e && e.ok && (!e.ext || String(e.ext) === ext) ? e.vrm : null;
   const monId = String(u.id), monMail = String(u.email || '').trim().toLowerCase();
-  const sonId = String(v.user_id || ''), sonMail = String(v.email || '').trim().toLowerCase();
-  const autre = (sonId && sonId !== monId) || (!sonId && sonMail && monMail && sonMail !== monMail);
+  const sonId = String((v && v.user_id) || ''), sonMail = String((v && v.email) || '').trim().toLowerCase();
+  const autre = !!v && ((sonId && sonId !== monId) || (!sonId && sonMail && monMail && sonMail !== monMail));
   // « Pas su » (renouvellement en cours) n'est pas « pas connectée » — mais s'il
-  // dure deux battements, sa session est en pause : on lui en donne une neuve.
-  __sessExtIncertain = v.connecte === null ? __sessExtIncertain + 1 : 0;
+  // dure deux battements, sa session est en pause : on lui en propose une neuve.
+  __sessExtIncertain = v && v.connecte === null ? __sessExtIncertain + 1 : 0;
   let separee = false; try { separee = !!localStorage.getItem(cleSeparee(monId)); } catch (_) { separee = true; }
-  const aSeparer = v.connecte === true && !autre && !separee;
+  const aSeparer = !!v && v.connecte === true && !autre && !separee;
   // « Autre compte » : seul l'onglet AU PREMIER PLAN tranche — deux onglets sur
   // deux comptes se renverraient l'extension toutes les minutes.
   const auPremierPlan = typeof document === 'undefined' || (!document.hidden && (typeof document.hasFocus !== 'function' || document.hasFocus()));
-  if (!(v.connecte === false || __sessExtIncertain >= 2 || aSeparer || (autre && auPremierPlan))) return;
-  if (__sessExtEnVol || Date.now() < __sessExtPasAvant) return;
+  const lierIci = !!lier;
+  if (!(lierIci || (v && v.connecte === false) || __sessExtIncertain >= 2 || aSeparer || (autre && auPremierPlan))) return;
+  if (__sessExtEnVol || (!lierIci && Date.now() < __sessExtPasAvant)) return;
   enVolSession(true);
+  if (lierIci) poserLier(Object.assign({}, lier, { etat: 'encours', bloque: null }));
   try {
+    // 1. Est-ce qu'ELLE en a besoin ? Elle seule le sait, et elle émet le nonce.
+    const q = await versExtension(ext, { type: 'liaison', pour: monId, force: lierIci || (autre && auPremierPlan), raison: aSeparer ? 'separer' : '' });
+    if (!q || !q.ok) {
+      __sessExtPasAvant = Date.now() + 60000;
+      if (lierIci) poserLier(Object.assign({}, lier, { etat: 'absente' }));
+      return;
+    }
+    if (!q.besoin) {
+      if (aSeparer) { try { localStorage.setItem(cleSeparee(monId), String(Date.now())); } catch (_) {} }
+      if (lierIci) poserLier(Object.assign({}, lier, { etat: 'deja', email: (v && v.email) || u.email || '' }));
+      return;
+    }
+    // 2. Une session à ELLE, fabriquée par le serveur (notre connexion fait foi).
     let r = null;
     try { r = await fetch('/api/compte?mode=session-extension', { method: 'POST', cache: 'no-store', headers: { Authorization: `Bearer ${s.access_token}` } }); } catch (_) { r = null; }
     const j = r ? await r.json().catch(() => null) : null;
@@ -4652,39 +5026,88 @@ async function assurerSessionExtension() {
     //    la session d'un compte qui n'est plus celui de cette page.
     if (!AUTH.session || !AUTH.user || String(AUTH.user.id) !== monId) return;
     const neuve = r && r.ok && j && j.ok && j.session && j.session.access_token && j.session.refresh_token ? j.session : null;
-    if (neuve && String(neuve.user_id || '') === monId) {
-      posterSessionExtension(neuve);
+    if (!neuve || String(neuve.user_id || '') !== monId) {
+      // ⚠️ PLUS DE REPLI SUR NOTRE PROPRE SESSION (11 octobre) : c'était
+      //    exactement le cas qui faisait s'entre-tuer les deux familles. On DIT
+      //    ce que le serveur a répondu, et le geste de secours.
+      __sessExtErreur = { status: r ? r.status : 0, message: (j && j.message) || '' };
+      __sessExtPasAvant = Date.now() + (r && r.status === 429 ? 15 * 60000 : 5 * 60000);
+      if (lierIci) poserLier(Object.assign({}, lier, { etat: 'erreur', message: __sessExtErreur.message }));
+      return;
+    }
+    // 3. Remise À CETTE extension, avec son nonce. Aucune autre ne l'entend.
+    const a = await versExtension(ext, { type: 'session', nonce: q.nonce, session: neuve });
+    if (a && a.ok) {
+      __sessExtErreur = null;
       try { localStorage.setItem(cleSeparee(monId), String(Date.now())); } catch (_) {}
       __sessExtPasAvant = Date.now() + 60000;
       __sessExtIncertain = 0;
+      if (lierIci) poserLier(Object.assign({}, lier, { etat: 'ok', email: a.email || u.email || '' }));
       // Elle vient de changer de session : on relit son état tout de suite.
       setTimeout(battementExt, 800);
       return;
     }
-    // Le serveur ne sait pas (encore) en fabriquer une — route absente ou pas
-    // configurée, et SEULEMENT ça (une panne passagère n'est pas une raison) :
-    // repli d'avant, pour amorcer une extension qui n'a AUCUNE session du tout.
-    const pasDeServeur = r && (r.status === 404 || r.status === 405 || (r.status === 503 && j && j.erreur === 'non-configure'));
-    if (pasDeServeur && v.connecte === false && !v.expiree && !v.email) {
-      posterSessionExtension(sessionAppPourExtension());
-      __sessExtPasAvant = Date.now() + 10 * 60000;
-      setTimeout(battementExt, 800);
-      return;
-    }
-    __sessExtPasAvant = Date.now() + (r && r.status === 429 ? 15 * 60000 : 5 * 60000);
+    __sessExtPasAvant = Date.now() + 60000;
+    if (lierIci) poserLier(Object.assign({}, lier, { etat: 'erreur', message: '' }));
   } finally { enVolSession(false); }
 }
-// Un pont plus ancien que la 5.129 ne dit pas sous quel compte il écrit (pas
-// d'« état ») : on garde avec lui le comportement d'AVANT — notre session à
-// chaque « ready » — plutôt que de le laisser sans aucune session. Il partage
-// alors notre famille de jetons comme avant ; c'est lui qui doit être mis à jour.
-let __legacyPoste = 0;
-function legacySessionExtension() {
-  if (!MULTI_USER || !AUTH.session || !AUTH.user) return;
-  if (!__vmrToursFaits || __vmrPlusieurs) return;   // 5.165 : pas avant d'avoir compté, jamais à deux
-  if (Date.now() - __legacyPoste < 30 * 60000) return;
-  __legacyPoste = Date.now();
-  posterSessionExtension(sessionAppPourExtension());
+// ══ UNE EXTENSION D'AVANT LA 5.171 : L'ANCIEN MESSAGE DE LA PAGE ═══════════
+// Le chemin de la production 2fed734, gardé pour les extensions qu'il a
+// AUJOURD'HUI (5.164, 5.170 — il ne peut pas les mettre à jour) et resserré :
+//   · seule, connue (`connexionParLaPage` : un seul pont répond, son code n'est
+//     pas périmé, elle a dit sous quel compte elle écrit) ;
+//   · seulement quand elle en a BESOIN : pas connectée, « pas su » deux
+//     battements de suite, ou un AUTRE compte VRM avec cet onglet au premier
+//     plan (deux onglets sur deux comptes se la renverraient) — jamais pour
+//     « séparer » une extension saine ;
+//   · une session fabriquée par le serveur (`/api/compte?mode=session-extension`,
+//     une famille de jetons à ELLE) — jamais celle de l'app, et rien du tout si
+//     le serveur refuse (on le dit, `__sessExtErreur`) ;
+//   · `session: null` n'est jamais posté ici : seul un geste le poste
+//     (`deconnecterExtensionAncienne`).
+async function sessionParLaPage(s, u, e) {
+  const v = e && e.ok ? e.vrm : null;
+  if (!v || typeof v !== 'object') return;
+  const monId = String(u.id), monMail = String(u.email || '').trim().toLowerCase();
+  const sonId = String(v.user_id || ''), sonMail = String(v.email || '').trim().toLowerCase();
+  const autre = (sonId && sonId !== monId) || (!sonId && sonMail && monMail && sonMail !== monMail);
+  __sessExtIncertain = v.connecte === null ? __sessExtIncertain + 1 : 0;
+  const auPremierPlan = typeof document === 'undefined' || (!document.hidden && (typeof document.hasFocus !== 'function' || document.hasFocus()));
+  if (!(v.connecte === false || __sessExtIncertain >= 2 || (autre && auPremierPlan))) return;
+  if (__sessExtEnVol || Date.now() < __sessExtPasAvant) return;
+  enVolSession(true);
+  try {
+    let r = null;
+    try { r = await fetch('/api/compte?mode=session-extension', { method: 'POST', cache: 'no-store', headers: { Authorization: `Bearer ${s.access_token}` } }); } catch (_) { r = null; }
+    const j = r ? await r.json().catch(() => null) : null;
+    // Déconnexion ou changement de compte PENDANT l'attente : on n'envoie pas la
+    // session d'un compte qui n'est plus celui de cette page. Et si une seconde
+    // copie a répondu entre-temps (ou si son code s'est révélé périmé), la page
+    // la ferait adopter par les deux : rien ne part.
+    if (!AUTH.session || !AUTH.user || String(AUTH.user.id) !== monId) return;
+    if (!connexionParLaPage()) return;
+    const neuve = r && r.ok && j && j.ok && j.session && j.session.access_token && j.session.refresh_token ? j.session : null;
+    if (!neuve || String(neuve.user_id || '') !== monId) {
+      __sessExtErreur = { status: r ? r.status : 0, message: (j && j.message) || '' };
+      __sessExtPasAvant = Date.now() + (r && r.status === 429 ? 15 * 60000 : 5 * 60000);
+      return;
+    }
+    try { window.postMessage({ __vmr: 'session', session: neuve }, window.location.origin); } catch (_) { __sessExtPasAvant = Date.now() + 60000; return; }
+    __sessExtErreur = null;
+    try { localStorage.setItem(cleSeparee(monId), String(Date.now())); } catch (_) {}
+    __sessExtPasAvant = Date.now() + 60000;
+    __sessExtIncertain = 0;
+    // Elle vient de changer de session : on relit son état tout de suite.
+    setTimeout(battementExt, 800);
+  } finally { enVolSession(false); }
+}
+// « Se déconnecter » dans VRM : l'extension de ce Chrome oublie sa session —
+// seulement si elle écrit sous CE compte (elle le vérifie elle-même). Adressé.
+function deconnecterExtension(uid) {
+  const e = __vmrEtat;
+  const ext = String((e && e.ok && e.ext) || '');
+  if (!ext || !uid) return Promise.resolve(null);
+  return versExtension(ext, { type: 'deconnexion', pour: String(uid) }, 3000);
 }
 if (typeof window !== 'undefined') {
   try {
@@ -4697,10 +5120,24 @@ if (typeof window !== 'undefined') {
       //    (`sonderPonts`, à chaque battement) n'est pas un pont qui apparaît —
       //    sinon chaque battement remettait les ratés à zéro, et une extension
       //    muette n'était plus jamais dite muette (vu au banc `pont.cjs`).
-      if (e.data.__vmr === 'ready') { if (!__vmrTour && (__vmrEtat === undefined || __vmrEtat === null)) { __vmrRates = 0; setTimeout(battementExt, 30); } return; }
+      // ⚠️ Revue du 11 octobre : après la RÉPARATION d'un code périmé (le ⟳
+      //    fait par la page de réparation), le pont remis à neuf annonce
+      //    « ready » — mais l'état étant un objet, rien n'était relu : l'app
+      //    disait « périmé — clique ⟳ » et coupait les commandes encore ~20 s
+      //    (jusqu'au battement suivant), code déjà réparé. Un pont qui
+      //    apparaît pendant un verdict « périmé » est relu tout de suite.
+      if (e.data.__vmr === 'ready') {
+        if (!__vmrTour && (__vmrEtat === undefined || __vmrEtat === null)) { __vmrRates = 0; setTimeout(battementExt, 30); }
+        else if (!__vmrTour && codePerime()) { __vmrRates = 0; setTimeout(battementExt, 30); setTimeout(() => { if (codePerime()) battementExt(); }, 2500); }
+        return;
+      }
       if (e.data.__vmr !== 'evt' || !e.data.evt) return;
       const ev = e.data.evt;
       if (ev.type === 'cmd' && ev.jobId) { __vmrJobs[ev.jobId] = ev; __vmrNotifier(); }
+      // 11 octobre : sa session vient de mourir (refus définitif) — on ne
+      // l'apprend plus au battement suivant, on lui en redonne une tout de suite.
+      if (ev.type === 'session' && ev.etat === 'morte') { __sessExtPasAvant = 0; setTimeout(battementExt, 200); }
+      if (ev.type === 'session' && ev.etat === 'liee') setTimeout(battementExt, 300);
       // Les écrans qui ont des données à relire (un bordereau rangé, des
       // ventes rafraîchies) l'écoutent : `vrm:ext`.
       try { window.dispatchEvent(new CustomEvent('vrm:ext', { detail: ev })); } catch (_) {}
@@ -4760,13 +5197,15 @@ const taillePicto = (style) => {
 //     (en attente du secours, ou définitivement) — `null` = rien du tout ;
 //     absent = le pictogramme « image ».
 //   · `onError()` : appelé UNE fois, sans argument, quand la photo est
-//     DÉFINITIVEMENT perdue (l'extension a répondu, et pas avec une image) —
-//     c'est ce que lisent les écrans qui la retirent de leur liste
-//     (`noterImgMorte`). ⚠️ JAMAIS sur « pas d'extension ici, pour l'instant » :
-//     c'est réversible (elle arrive, elle revient), et une photo retirée d'une
-//     liste n'y revient pas — mesuré : Ma journée gardait 6 icônes de repli
-//     après l'arrivée de l'extension, sans lui avoir rien demandé. Pour cet
-//     état-là, ce composant dessine déjà son pictogramme.
+//     DÉFINITIVEMENT perdue (`photosVinted.estDefinitive`) — c'est ce que lisent
+//     les écrans qui la retirent de leur liste (`noterImgMorte`), et une photo
+//     retirée d'une liste n'y revient pas. ⚠️⚠️ Pour une photo Vinted, AUCUN état
+//     n'est définitif (seconde revue du 11 octobre) : un refus de l'extension se
+//     redemande, le réseau revient, l'extension arrive. Avec « l'extension a
+//     répondu sans image » ici, Ma journée retirait ses 5 photos sur une coupure
+//     de quelques secondes et ne les remontrait jamais. Ce composant dessine
+//     lui-même le pictogramme à leur place. Pour une autre adresse (un <img>
+//     ordinaire), `onError` part sur l'erreur du navigateur, comme avant.
 function PhotoVinted({ src, repli, onError, onLoad, style, loading, ...reste }) {
   const vinted = photosVinted.estPhotoVinted(src);
   const [, maj] = React.useReducer((x) => x + 1, 0);
@@ -4784,11 +5223,14 @@ function PhotoVinted({ src, repli, onError, onLoad, style, loading, ...reste }) 
     if (photosVinted.etat(src) + (photosVinted.estMorte(src) ? '!' : '') !== vuAuRendu.current) maj();
     return off;
   }, [src, vinted]);
-  const attend = vinted && !mort && (etat === 'attente' || etat === 'vol');
+  // On observe le CADRE (attente, en vol, ou perdue) : une photo perdue À
+  // L'ÉCRAN est celle que le témoin peut redemander à l'extension — sans savoir
+  // si elle est visible, il la redemanderait hors écran, ou jamais.
+  const cadre = vinted && (etat === 'attente' || etat === 'vol' || etat === 'ko' || mort) && !(mort && repli === null);
   React.useEffect(() => {
-    if (!attend || !el.current) return undefined;
+    if (!cadre || !el.current) return undefined;
     return photosVinted.observer(el.current, (v) => photosVinted.voir(src, qui.current, v));
-  }, [attend, src]);
+  }, [cadre, src]);
   const definitive = vinted && photosVinted.estDefinitive(src);
   const signale = React.useRef(null);
   React.useEffect(() => {
@@ -4847,12 +5289,24 @@ const ecouterVoixExt = (fn) => { __voixExtSubs.add(fn); return () => __voixExtSu
 //     PAGE qui est refusée (« dans VRM ») ;
 //   · deux échecs réseau, sans plus ⇒ « n'arrive pas à les charger ici » (une
 //     coupure, un filtre ou CORP donnent la même erreur : on ne tranche pas) ;
-//   · le serveur répond ⇒ il répond, mais l'image ne s'affiche pas ;
+//   · le serveur répond ⇒ il répond, mais l'image ne s'affiche pas (peut-être
+//     des liens expirés) ;
+//   · hors ligne (mesuré) ⇒ pas de connexion ;
 //   · sinon ⇒ on n'a pas pu mesurer.
-// Le GESTE suit ce qui est possible ici : rien à régler quand l'extension a
-// répondu sans image (« recharge » ne pourrait pas marcher), recharger quand
-// elle est muette — sauf si un bandeau de l'écran le dit déjà —, l'ordinateur
-// sur un téléphone, le bon Chrome ailleurs.
+// Le GESTE suit ce qui est possible ici : je redemande à l'extension quand elle
+// a répondu sans image (« recharge » ne servirait à rien : la règle la lui
+// redemande elle-même), recharger quand elle est muette, l'ordinateur sur un
+// téléphone, le bon Chrome ailleurs — sauf si un bandeau de l'écran dit DÉJÀ
+// que l'extension ne répond pas (§7 : une cause, une phrase).
+// ⚠️⚠️ SECONDE REVUE DU 11 OCTOBRE :
+//   · « le serveur répond » ne promet PLUS que l'extension va les chercher :
+//     elle rend `{ok:false}` sur un statut d'erreur (photoBytes, background.js),
+//     donc sur un lien mort elle ne ferait pas mieux (« pas su ne vaut pas oui ») ;
+//   · hors ligne : « pas de connexion », jamais « je n'ai pas pu mesurer », ni
+//     « va sur l'ordinateur » (rien n'y changerait) ;
+//   · « rien à régler ici » sur un refus de l'extension était faux : un
+//     rechargement les faisait revenir. La règle les lui redemande maintenant
+//     elle-même (témoin, recul) — la phrase dit ce qu'elle fait.
 function PhotosBloquees() {
   const sansSouris = useSansSouris();
   const [, maj] = React.useReducer((x) => x + 1, 0);
@@ -4862,26 +5316,34 @@ function PhotosBloquees() {
   const d = photosVinted.decision();
   if (!d || !d.parle) return null;
   const extPresente = d.ext === 'presente';
-  const cause = d.cause === 'navigateur' && !extPresente
-    ? "Ce navigateur refuse d'afficher les photos de Vinted dans VRM — l'extension VRM, elle, sait les récupérer."
-    : d.cause === 'navigateur' || d.cause === 'injoignable'
-      ? "Ce navigateur n'arrive pas à charger les photos de Vinted ici."
-      : d.cause === 'reponse'
-        ? "Le serveur de photos de Vinted répond, mais ses images ne s'affichent pas dans VRM."
-        : "Les photos de Vinted ne s'affichent pas ici, et je n'ai pas pu mesurer pourquoi.";
+  const cause = d.cause === 'horsligne'
+    ? "Pas de connexion internet ici pour l'instant : les photos de Vinted ne peuvent pas se charger."
+    : d.cause === 'navigateur' && !extPresente
+      ? "Ce navigateur refuse d'afficher les photos de Vinted dans VRM — l'extension VRM, elle, sait les récupérer."
+      : d.cause === 'navigateur' || d.cause === 'injoignable'
+        ? "Ce navigateur n'arrive pas à charger les photos de Vinted ici."
+        : d.cause === 'reponse'
+          ? "Le serveur de photos de Vinted répond, mais ses images ne s'affichent pas dans VRM — ce sont peut-être des liens de photo expirés."
+          : "Les photos de Vinted ne s'affichent pas ici, et je n'ai pas pu mesurer pourquoi.";
   const intactes = " Tes annonces et tes ventes ne sont pas touchées.";
-  const codeGeste = extPresente ? 'refus'
-    : d.ext === 'muette' ? (voixExtDit('muette') ? 'muette-ailleurs' : 'muette')
-      : sansSouris ? 'telephone' : 'chrome';
-  const geste = codeGeste === 'refus'
-    ? <>L'extension VRM n'a pas pu les récupérer non plus : rien à régler ici, je réessaie de temps en temps.{intactes}</>
-    : codeGeste === 'muette-ailleurs'
-      ? <>C'est l'extension VRM qui va les chercher : le message sur l'extension, plus bas, dit quoi faire.</>
-      : codeGeste === 'muette'
-        ? <>L'extension VRM, qui sait aller les chercher, ne répond pas : <b>recharge cette page</b>.</>
-        : codeGeste === 'telephone'
-          ? <>Ici, rien ne peut aller les chercher : sur l'<b>ordinateur où l'extension VRM est installée</b>, c'est elle qui les récupère.{intactes}</>
-          : <><b>Ouvre VRM dans le Chrome où l'extension VRM est installée</b> : c'est elle qui va les chercher.{intactes}</>;
+  const codeGeste = d.cause === 'horsligne' ? 'reseau'
+    : extPresente ? 'refus'
+      : d.cause === 'reponse' ? 'reponse'
+        : d.ext === 'muette' ? (voixExtDit('muette') ? 'muette-ailleurs' : 'muette')
+          : sansSouris ? 'telephone' : 'chrome';
+  const geste = codeGeste === 'reseau'
+    ? <>Je réessaie dès que le réseau revient.{intactes}</>
+    : codeGeste === 'refus'
+      ? <>L'extension VRM n'a pas pu les récupérer non plus pour l'instant : je lui redemande de temps en temps, elles s'afficheront ici dès qu'elle y arrive.{intactes}</>
+      : codeGeste === 'reponse'
+        ? <>Je réessaie de temps en temps ; si ce sont des liens expirés, ils se renouvellent quand l'extension VRM repasse sur tes comptes Vinted.{intactes}</>
+        : codeGeste === 'muette-ailleurs'
+          ? <>C'est l'extension VRM qui va les chercher : le message sur l'extension, plus bas, dit quoi faire.</>
+          : codeGeste === 'muette'
+            ? <>L'extension VRM, qui sait aller les chercher, ne répond pas : <b>recharge cette page</b>.</>
+            : codeGeste === 'telephone'
+              ? <>Ici, rien ne peut aller les chercher : sur l'<b>ordinateur où l'extension VRM est installée</b>, c'est elle qui les récupère.{intactes}</>
+              : <><b>Ouvre VRM dans le Chrome où l'extension VRM est installée</b> : c'est elle qui va les chercher.{intactes}</>;
   // ⚠️ `vrm-sous-ile` (index.html) : sur ordinateur, l'île d'actions flotte en
   //    haut à droite et le GESTE de cette phrase passait dessous (mesuré mot par
   //    mot, revue du 11 octobre). Le côté droit lui laisse sa place — c'est
@@ -4937,10 +5399,16 @@ function raisonExtGlobale(sansSouris, opt) {
   // ⚠️⚠️ PLUSIEURS AVANT TOUT LE RESTE (5.165) : « mets à jour » ou « recharge »
   //    seraient faux — il vient de mettre à jour, et l'ancienne répond encore.
   if (__vmrPlusieurs) return { code: 'plusieurs', geste: 'extensions', texte: textePlusieurs() };
+  // ⚠️⚠️ PÉRIMÉ AVANT TOUT LE RESTE (11 octobre) : la version annoncée est la
+  //    bonne, c'est le CODE qui ne l'est pas — « mets à jour » serait faux (il
+  //    vient de le faire), « recharge la page » ne change rien. Le geste est ⟳.
+  if (codePerime()) return { code: 'perime', geste: 'recharger-extension', texte: textePerime() };
   // ⚠️ « En retard » AVANT « muette » : un pont trop ancien ne sait pas
   //    répondre, et lui dire « recharge la page » ne change rien (revue).
   if (extSait(cap) === 'retard') return { code: 'retard', texte: `Mets l'extension à jour (${EXT_ATTENDUE}) : celle installée ne sait pas encore recevoir cette commande de l'app.` };
-  if (__vmrEtat === null) return { code: 'muette', geste: 'recharger', texte: "L'extension ne répond pas — recharge cette page (après une mise à jour), ou réactive-la dans chrome://extensions." };
+  // Muette : recharger la page suffit après une mise à jour (l'ancien pont est
+  // resté dans la page) ; si non, c'est le service worker — ⟳ dans ce Chrome.
+  if (__vmrEtat === null) return { code: 'muette', geste: 'recharger', texte: "L'extension ne répond pas — recharge cette page ; si ça ne suffit pas, ouvre chrome://extensions et clique ⟳ sur VRM (dans ce Chrome)." };
   if (__vmrEtat === undefined) return { code: 'verif', texte: "Vérification de l'extension…" };
   const v = __vmrEtat.vrm;
   // ⚠️ « Pas su » ne vaut pas « oui » (revue du 5 octobre) : sans réponse sur
@@ -4948,9 +5416,20 @@ function raisonExtGlobale(sansSouris, opt) {
   if (!v || typeof v !== 'object') return { code: 'vrm-passu', texte: "Je n'ai pas pu savoir sous quel compte VRM l'extension écrit — recharge cette page." };
   // L'app lui transmet d'elle-même sa connexion quand elle n'en a pas
   // (`assurerSessionExtension`) : on le dit pendant que ça se fait.
-  if (v.connecte === false) return { code: 'vrm', texte: __sessExtEnVol
+  // ⚠️ 11 octobre : une extension plus ancienne que la 5.171 n'écoute pas le
+  //    canal adressé — l'app ne lui prête plus JAMAIS sa propre session. On le
+  //    dit, avec les deux vrais gestes, au lieu de promettre un « je réessaie ».
+  // ⚠️ Relecture croisée de la 5.174 : une 5.164/5.170 qui répond à « état »
+  //    est connectée par la page (voie 'page') — la promesse suit l'envoi.
+  if (v.connecte === false) { const voie = voieConnexionExt(); return { code: 'vrm', voie, texte: __sessExtEnVol
     ? "Je connecte l'extension à ton compte VRM…"
-    : "L'extension n'est pas connectée à ton compte VRM — je réessaie de la connecter ; sinon, recharge cette page." };
+    : voie === 'retard'
+      ? `L'extension n'est pas connectée à ton compte VRM, et celle-ci (${vmrExtVersion() || 'version ?'}) ne sait pas encore recevoir la connexion de VRM : mets-la à jour (${EXT_ATTENDUE}), ou clique son icône et connecte-toi avec ton mot de passe VRM.`
+      : voie === 'serveur'
+        ? `L'extension n'est pas connectée à ton compte VRM et le serveur n'a pas pu préparer sa connexion${__sessExtErreur.message ? ' (' + __sessExtErreur.message + ')' : ''} — clique son icône et connecte-toi avec ton mot de passe VRM.`
+        : voie === 'page'
+          ? "L'extension n'est pas connectée à ton compte VRM — je la connecte ; si ça ne vient pas, recharge cette page, ou clique son icône et connecte-toi avec ton mot de passe VRM."
+          : "L'extension n'est pas connectée à ton compte VRM — je la connecte ; si ça ne vient pas, recharge cette page." }; }
   if (v.connecte === null) return { code: 'vrm-encours', texte: "L'extension renouvelle sa connexion à VRM — un instant." };
   // Même compte ? Par IDENTITÉ (l'identifiant du compte), l'email en repli —
   // la même règle que la session qu'on lui donne (§11).
@@ -4961,9 +5440,20 @@ function raisonExtGlobale(sansSouris, opt) {
   // ⚠️ L'icône d'une extension connectée ouvre VRM, pas sa fenêtre : lui dire
   //    « clique l'icône et déconnecte-la » était impossible à suivre. L'app la
   //    reconnecte d'elle-même à ton compte (au premier plan).
-  if (autre) return { code: 'autre-vrm', texte: __sessExtEnVol
-    ? `L'extension écrivait dans le compte VRM ${sonMail || 'd’un autre'} — je la reconnecte au tien…`
-    : `L'extension est connectée au compte VRM ${sonMail || 'd’un autre'}, pas au tien (${monMail}) — je la reconnecte au tien ; si ça persiste, recharge cette page.` };
+  // ⚠️⚠️ Revue du 11 octobre : « je la reconnecte » n'est vrai que si l'APP le
+  //    peut (`voieConnexionExt`). Une 5.164 n'entend pas le canal adressé (0
+  //    envoi mesuré en 25 s) ; un serveur qui a refusé ne refait rien avant
+  //    `__sessExtPasAvant`. Le vrai geste, alors.
+  if (autre) {
+    const voie = voieConnexionExt();
+    return { code: 'autre-vrm', voie, texte: __sessExtEnVol
+      ? `L'extension écrivait dans le compte VRM ${sonMail || 'd’un autre'} — je la reconnecte au tien…`
+      : voie === 'retard'
+        ? `L'extension est connectée au compte VRM ${sonMail || 'd’un autre'}, pas au tien (${monMail}), et celle-ci (${vmrExtVersion() || 'version ?'}) ne sait pas recevoir la connexion de VRM : mets-la à jour (${EXT_ATTENDUE}), ou déconnecte-la (bouton « Lecture seule », en haut) puis connecte-toi avec ton mot de passe VRM.`
+        : voie === 'serveur'
+          ? `L'extension est connectée au compte VRM ${sonMail || 'd’un autre'}, pas au tien (${monMail}), et le serveur n'a pas pu préparer sa connexion${__sessExtErreur.message ? ' (' + __sessExtErreur.message + ')' : ''} — je réessaie dans ${minutesAvantReessai()} min, cette page ouverte.`
+          : `L'extension est connectée au compte VRM ${sonMail || 'd’un autre'}, pas au tien (${monMail}) — je la reconnecte au tien ; si ça persiste, recharge cette page.` };
+  }
   // ⚠️⚠️ VINTED A DEMANDÉ DE RALENTIR (revue du 9 octobre). Pendant la pause de
   //    l'extension (5.162), l'en-tête disait « Actions possibles » et « Tout
   //    générer » restait actif : seul le clic révélait le refus. L'extension
@@ -6584,12 +7074,16 @@ function ExtEnRetard({ onNav }) {
       title="Ton extension VRM est en retard"
       value={muette ? `? → ${EXT_ATTENDUE}` : `${ext.v} → ${EXT_ATTENDUE}`}
       desc="Elle capte toujours, mais moins que ce que l'app attend — et elle ne le dit pas d'elle-même. C'est elle qui va chercher les codes de retrait dans tes conversations Vinted."
-      /* ⚠️ « CLIQUE SUR ⟳ » NE SUFFIT PAS, ET C'EST CE QUI L'A BLOQUÉ DES
-         SEMAINES : la flèche ronde recharge le DOSSIER du disque — donc la
-         MÊME vieille version. Il faut d'abord remplacer le dossier. Et le zip
-         de la 5.52 n'existait nulle part : le dépôt n'en portait qu'un, du
-         30 août, en 4.13. On le livre maintenant depuis l'app. */
-      detail={"1. Télécharge le zip ci-contre. 2. Dézippe-le : tu obtiens un dossier « VRM-extension » — mets-le à la place de l'ancien, au même endroit et avec le même nom. 3. Ouvre chrome://extensions et clique sur ⟳ (la flèche ronde) sur VRM. 4. Recharge une page Vinted : la capture repart avec la nouvelle version."}
+      /* ⚠️ LES DEUX GESTES, ET DANS CET ORDRE — MESURÉ (11 octobre).
+         · ⟳ SEUL ne suffit pas : la flèche ronde recharge le DOSSIER du disque,
+           donc la même vieille version tant qu'on ne l'a pas remplacé (c'est
+           ce qui l'a bloqué des semaines en août-septembre).
+         · Remplacer le dossier SEUL ne suffit pas non plus : Chrome garde
+           l'ANCIEN code en mémoire — mesuré chez lui, 5 Chrome sur 6
+           exécutaient une 5.95–5.129 sous un manifeste « 5.164 » — tant qu'on
+           n'a pas cliqué ⟳, et SEULEMENT dans le Chrome où on le clique. Il a
+           un Chrome (un profil) par compte Vinted : ⟳ dans CHACUN. */
+      detail={"1. Télécharge le zip ci-contre. 2. Dézippe-le : tu obtiens un dossier « VRM-extension » — mets-le à la place de l'ancien, au même endroit et avec le même nom. 3. PUIS, dans CHAQUE Chrome où l'extension est installée (chaque profil) : ouvre chrome://extensions, garde une seule carte VRM, et clique ⟳ (la flèche ronde) dessus — sans ⟳, Chrome garde l'ancien code. 4. Recharge une page Vinted : la capture repart avec la nouvelle version."}
       action={<a href={`/VRM-extension.zip?v=${EXT_ATTENDUE}`} download
         style={{display:'inline-block',border:'none',background:C.warn,color:'#fff',borderRadius:8,padding:'9px 15px',fontSize:12.5,fontWeight:700,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap',textDecoration:'none'}}>
         Télécharger la {EXT_ATTENDUE}
@@ -7425,13 +7919,101 @@ const libellePeriode = (p) => {
    affichés même à zéro : « aucun email reçu » est l'information utile.
    Aucune requête pour les dates des colis (elles viennent des suivis déjà
    chargés) ; deux lectures scalaires pour le reste (§34). */
+// ── « QUELS COMPTES N'ENVOIENT AUCUN EMAIL À VRM, ET DEPUIS QUAND » (11 oct.) ──
+// Une règle (`etatEmailsComptes`), un bloc, deux endroits : Réglages →
+// Notifications et Achats → En attente (§11 — deux écrans, une phrase).
+function useEtatEmailsComptes(comptes) {
+  const [reception, setReception] = useState(undefined);   // undefined en cours · null pas su · objet lu
+  const { ventes, ko } = useVentesCoque();
+  useEffect(() => {
+    let mort = false;
+    fetchEmailsParCompte().then((r) => { if (!mort) setReception(r); });
+    return () => { mort = true; };
+  }, []);
+  return useMemo(() => etatEmailsComptes({
+    comptes: comptes || [], reception, ventes, ventesKO: ko,
+    adresses: load('vinted_account_emails', {}) || {},
+    exclus: load('vinted_accounts_hidden', []) || [],
+  }), [comptes, reception, ventes, ko]);
+}
+const dateCourteFr = (iso) => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }); };
+// Ce que dit un compte muet, sur sa ligne : la PREUVE (ses ventes sans email),
+// jamais une supposition sur la cause.
+const phraseCompteMuet = (l) => l.jamais
+  ? `aucun email de Vinted n’est jamais arrivé — ${l.nSansEmail} vente${l.nSansEmail > 1 ? 's' : ''} depuis le ${dateCourteFr(l.premiereSansEmail)}, aucune n’a eu son email`
+  : `plus aucun email depuis le ${dateCourteFr(l.depuis)} — ${l.nSansEmail} vente${l.nSansEmail > 1 ? 's' : ''} depuis, sans leur email`;
+// Un compte qui a vendu SANS email, mais pas assez pour conclure : sa phrase à
+// lui, tirée de la donnée (jamais « n'a pas encore vendu » — revue du 11 oct.).
+const phraseCompteSurveille = (l) => {
+  const s = (k) => (k > 1 ? 's' : '');
+  if (l.raisonSurveiller === 'aucunDebut') return 'VRM n’a encore reçu aucun email — rien à conclure';
+  if (l.raisonSurveiller === 'peu') return `${l.nSansEmail} vente${s(l.nSansEmail)} sans email depuis le ${dateCourteFr(l.premiereSansEmail)}${l.nRecentes ? ` (+ ${l.nRecentes} récente${s(l.nRecentes)})` : ''} — pas encore de quoi conclure`;
+  return `${l.nRecentes} vente${s(l.nRecentes)} de moins de 3 jours — ${l.nRecentes > 1 ? 'leur' : 'son'} email peut encore arriver`;
+};
+// Le bloc : qui, depuis quand, ce que ça coûte (une fois), et LE geste (une fois).
+// ⚠️ « Masquer mon adresse » n'est PAS la cause prouvée (deux comptes à adresse
+//    Apple recevaient très bien leurs emails, relecture du 11 octobre) : c'est
+//    UNE vérification de plus, dite seulement pour les comptes concernés. La
+//    première vérification est celle des notifications email de Vinted.
+function BlocComptesMuets({ muets }) {
+  if (!muets || !muets.length) return null;
+  const n = muets.length;
+  const apple = muets.filter((l) => l.relaisApple);
+  const tousApple = apple.length === n;
+  return (
+    <div data-comptes-muets={n} style={{border:`1px solid ${C.warn}`,borderLeft:`3px solid ${C.warn}`,background:`${C.warn}10`,borderRadius:8,padding:'9px 11px'}}>
+      <div style={{fontSize:12.5,fontWeight:700,color:C.text}}>
+        {n} compte{n>1?'s':''} Vinted n’envoie{n>1?'nt':''} aucun email à VRM
+      </div>
+      <div style={{display:'flex',flexDirection:'column',gap:3,marginTop:5}}>
+        {muets.map((l) => (
+          <div key={l.uid} data-compte-muet={l.login} style={{fontSize:11.5,color:C.muted,lineHeight:1.45}}>
+            <b style={{color:C.text}}>{l.login}</b> — {phraseCompteMuet(l)}{l.relaisApple && !tousApple ? ' (adresse « Masquer mon adresse » d’Apple)' : ''}.
+          </div>
+        ))}
+      </div>
+      {/* ⚠️ REVUE DU 11 OCTOBRE : ce qui est PROUVÉ, pas plus. La règle mesure
+          des ventes sans email de BORDEREAU : le rappel du matin (« 📮 Colis à
+          poster », api/ship-reminders.js) ne compte que ces emails-là — leurs
+          colis n'y sont donc jamais. « Leurs codes de retrait n'arrivent pas »
+          n'était pas prouvé (ils viennent des transporteurs, côté achats), et la
+          phrase parlait au pluriel pour un seul compte. */}
+      <div style={{fontSize:11.5,color:C.muted,marginTop:6,lineHeight:1.45}} data-effet-muets>
+        {n>1?'Leurs':'Ses'} ventes s’affichent bien (l’extension les capte), mais {n>1?'leurs':'ses'} bordereaux n’arrivent pas par email&nbsp;: <b style={{color:C.text}}>pas de rappel du matin pour {n>1?'leurs':'ses'} colis à poster</b>, et ton téléphone ne sonne ni pour {n>1?'leurs':'ses'} ventes ni pour {n>1?'leurs':'ses'} messages.
+      </div>
+      <div style={{fontSize:11.5,color:C.text,marginTop:6,lineHeight:1.5}} data-geste-muets>
+        <b>Pour {n>1?'chacun':'ce compte'}&nbsp;:</b> 1. sur Vinted, connecté sur {n>1?'ce compte':muets[0].login}&nbsp;: <b>Paramètres → Notifications</b>, active les e-mails (messages, offres, ventes).
+        {' '}2. {tousApple
+          ? <>{n>1?'Leur':'Son'} adresse est une adresse « Masquer mon adresse » d’Apple&nbsp;: sur l’iPhone, <b>Réglages → ton nom → Connexion et sécurité → Se connecter avec Apple → Vinted → Transférer à</b>, choisis la boîte reliée à VRM.</>
+          : <>Vérifie que sa boîte fait suivre les emails de Vinted vers celle reliée à VRM{apple.length ? <> — pour {apple.map((l) => l.login).join(', ')} (adresse « Masquer mon adresse » d’Apple)&nbsp;: sur l’iPhone, <b>Réglages → ton nom → Connexion et sécurité → Se connecter avec Apple → Vinted → Transférer à</b></> : null}.</>}
+      </div>
+    </div>
+  );
+}
+function MuetsCompact({ muets, detail }) {
+  const [ouvert, setOuvert] = useState(false);
+  const n = muets.length;
+  return (
+    <details data-muets-compact={n} style={{marginBottom:10}} onToggle={(e) => setOuvert(e.currentTarget.open)}>
+      <summary style={{cursor:'pointer',listStyle:'none',display:'flex',alignItems:'center',gap:7,fontSize:12,fontWeight:600,color:C.text,padding:'6px 10px',border:`1px solid ${C.warn}`,borderLeft:`3px solid ${C.warn}`,background:`${C.warn}10`,borderRadius:8}}>
+        <span aria-hidden="true" style={{color:C.warn,display:'flex'}}><Icon name="alert" size={14}/></span>
+        <span style={{flex:1,minWidth:0}}>{ouvert ? 'Masquer' : <>{n} compte{n>1?'s':''} n’envoie{n>1?'nt':''} aucun email à VRM — voir {n>1?'lesquels':'lequel'} et le geste</>}</span>
+        <span aria-hidden="true" style={{color:C.muted}}>{ouvert ? '▴' : '▾'}</span>
+      </summary>
+      <div style={{marginTop:6}}><BlocComptesMuets muets={muets}/></div>
+      <details style={{marginTop:6}}>
+        <summary style={{cursor:'pointer',fontSize:11.5,color:C.muted}}>Le détail : transporteurs et comptes</summary>
+        <div style={{marginTop:8,border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'10px 12px'}}>{detail}</div>
+      </details>
+    </details>
+  );
+}
 function ReceptionEmails({ tracking, comptes, colisParTransporteur }) {
   const [incompris, setIncompris] = useState(null);
-  const [parCompte, setParCompte] = useState(null);
+  const etatComptes = useEtatEmailsComptes(comptes);
   useEffect(() => {
     let mort = false;
     fetchEmailsIncompris().then(r => { if (!mort) setIncompris(r); });
-    fetchEmailsParCompte().then(r => { if (!mort) setParCompte(r); });
     return () => { mort = true; };
   }, []);
   const lignes = useMemo(() => {
@@ -7458,11 +8040,10 @@ function ReceptionEmails({ tracking, comptes, colisParTransporteur }) {
   const vraimentInconnus = useMemo(() => (incompris || []).filter(e => !String(e.famille || '').trim() && !familleEmail(e.subject, e.from)), [incompris]);
   const nInc = vraimentInconnus.length;
   const nConnus = (incompris ? incompris.length : 0) - nInc;
-  // Un compte sans le moindre email : sa boîte ne transfère pas vers l'app.
-  const muets = useMemo(() => {
-    if (!parCompte || !comptes || !comptes.length) return [];
-    return comptes.filter(a => { const l = String(a.login || '').trim(); return l && !parCompte[l]; });
-  }, [parCompte, comptes]);
+  // Un compte MUET, sur preuve : des ventes captées qui n'ont eu aucun email
+  // depuis son dernier signe de vie (`etatEmailsComptes`). « Aucun email » seul
+  // ne prouve rien — un compte qui n'a rien vendu n'avait rien à recevoir.
+  const muets = etatComptes.muets;
   // ⚠️⚠️ « ON LES ATTEND » N'EST PAS VRAI LE PREMIER JOUR. Vu au rendu le
   //    16 septembre sur une installation neuve : « Réception des emails ·
   //    3 transporteurs silencieux », en ambre, avec trois « aucun email reçu »
@@ -7501,22 +8082,40 @@ function ReceptionEmails({ tracking, comptes, colisParTransporteur }) {
       {comptes && comptes.length > 0 && (
         <div style={{marginTop:9,paddingTop:8,borderTop:`1px solid ${C.border}`}}>
           <div style={{fontSize:11.5,fontWeight:600,color:C.text,marginBottom:5}}>Tes comptes Vinted et leurs emails</div>
-          {parCompte === null && <div style={{fontSize:11,color:C.muted}}>lecture en cours…</div>}
-          {parCompte !== null && (
+          {etatComptes.etat === 'encours' && <div style={{fontSize:11,color:C.muted}}>lecture en cours…</div>}
+          {etatComptes.etat === 'pasSu' && <div style={{fontSize:11,color:C.muted}}>Je n’ai pas pu lire les emails reçus : je ne dis rien des comptes plutôt que d’en accuser un à tort. Rouvre cet écran dans un moment.</div>}
+          {etatComptes.etat === 'lu' && (
             <div style={{display:'flex',flexDirection:'column',gap:4}}>
-              {comptes.map(a => {
-                const l = String(a.login || '').trim() || String(a.vinted_user_id || '');
-                const e = parCompte[String(a.login || '').trim()] || null;
-                const ts = e && e.last ? Date.parse(e.last) : NaN;
+              {/* ⚠️ §7 (revue du 11 oct.) : un compte déjà nommé dans le bloc
+                  au-dessus n'est pas redit ici. */}
+              {etatComptes.lignes.filter(l => !(muets.length && l.statut === 'muet')).map(l => {
+                const ts = l.last ? Date.parse(l.last) : NaN;
+                // ⚠️ Plus de rouge (§7 : le rouge est pour deux paires sous un
+                //    même numéro). Ambre seulement pour un compte PROUVÉ muet.
+                const coul = l.statut === 'muet' ? C.warn
+                  : l.statut === 'recoit' ? (!isNaN(ts) && Date.now()-ts<7*86400000 ? (C.ok||C.accent) : C.muted)
+                  : C.muted;
+                const txt = l.statut === 'muet' ? (l.jamais ? 'aucun email, jamais' : `plus rien depuis le ${dateCourteFr(l.depuis)}`)
+                  : l.statut === 'recoit' ? `${l.n} email${l.n>1?'s':''}${isNaN(ts)?'':' · '+age(ts)}`
+                  : l.statut === 'surveiller' ? phraseCompteSurveille(l)
+                  : l.statut === 'exclu' ? 'exclu de l’app — non vérifié'
+                  : l.statut === 'calme' ? 'aucun email pour l’instant'
+                  : l.statut === 'encours' ? '…' : '—';
                 return (
-                  <div key={String(a.vinted_user_id)} style={{...ligne,fontSize:11.5}}>
-                    <div style={{flex:1,minWidth:0,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{l}</div>
-                    <div style={{flexShrink:0,fontWeight:600,color:e?(isNaN(ts)?C.muted:(Date.now()-ts<7*86400000?(C.ok||C.accent):C.warn)):C.danger}}>
-                      {e ? `${e.n} email${e.n>1?'s':''}${isNaN(ts)?'':' · '+age(ts)}` : 'aucun email'}
-                    </div>
+                  <div key={l.uid} data-compte-email={l.login} data-statut={l.statut} style={{...ligne,fontSize:11.5,flexWrap:'wrap'}}>
+                    <div style={{flex:'1 1 110px',minWidth:0,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{l.login}</div>
+                    <div style={{flex:'0 1 auto',minWidth:0,fontWeight:600,color:coul,textAlign:'right'}}>{txt}</div>
                   </div>
                 );
               })}
+              {muets.length > 0 && (
+                <div style={{fontSize:10.5,color:C.muted}}>+ {muets.length} compte{muets.length>1?'s':''} nommé{muets.length>1?'s':''} au-dessus.</div>
+              )}
+              {/* La phrase vient de la MÊME source que le statut (§5) : « calme »
+                  = aucune vente depuis le début de la réception. */}
+              {etatComptes.lignes.some(l => l.statut === 'calme') && (
+                <div style={{fontSize:10.5,color:C.muted,marginTop:2}} data-note-calme>« Aucun email pour l’instant » n’est pas une panne : {etatComptes.lignes.filter(l => l.statut === 'calme').length > 1 ? 'ces comptes n’ont rien vendu' : 'ce compte n’a rien vendu'}{etatComptes.debut ? ` depuis le ${dateCourteFr(etatComptes.debut)}, premier email reçu par VRM` : ''} — rien n’avait à arriver.</div>
+              )}
             </div>
           )}
         </div>
@@ -7544,16 +8143,21 @@ function ReceptionEmails({ tracking, comptes, colisParTransporteur }) {
   // ── QUAND QUELQUE CHOSE CLOCHE : on le NOMME, avec le geste à faire.
   //    Un compte muet est le cas grave : ses codes de retrait n'arrivent jamais.
   if (probleme) {
-    const quoi = muets.length > 0
-      ? `compte${muets.length>1?'s':''} Vinted ne reçoi${muets.length>1?'vent':'t'} aucun email`
-      : `email${nInc>1?'s':''} reçu${nInc>1?'s':''} que l'app n'a pas su classer`;
+    if (muets.length > 0) {
+      // ⚠️ REVUE DU 11 OCTOBRE : déplié d'office, ce bloc faisait 312 px à
+      //    390 px (125 avant) et repoussait les colis que personne n'est venu
+      //    chercher — de l'argent perdu — sous une information de configuration
+      //    qu'on règle une fois. Dans Achats : UNE ligne, qui s'ouvre sur le bloc
+      //    complet (Réglages → Notifications le garde en entier).
+      // (Ne pas écrire ici le titre exact de ce bloc-là : `audit-retrait` le
+      //  trouve par sa première occurrence dans le fichier.)
+      return <MuetsCompact muets={muets} detail={detail}/>;
+    }
     return (
       <Notice tone="warn" icon="alert"
-        value={muets.length > 0 ? muets.length : nInc}
-        title={quoi}
-        desc={muets.length > 0
-          ? `${muets.map(a=>a.login||a.vinted_user_id).join(', ')} — leurs codes de retrait n'arrivent donc jamais ici. Il faut faire suivre ces boîtes vers l'adresse de l'app.`
-          : "Ils sont conservés entiers, rien n'est perdu — mais aucune action n'en a été tirée."}
+        value={nInc}
+        title={`email${nInc>1?'s':''} reçu${nInc>1?'s':''} que l'app n'a pas su classer`}
+        desc="Ils sont conservés entiers, rien n'est perdu — mais aucune action n'en a été tirée."
         detail={detail}/>
     );
   }
@@ -8298,6 +8902,13 @@ function AuthScreen() {
              : mode==='newpw' ? 'Choisis-en un nouveau, tu resteras connecté.'
              : 'Retrouve ta boutique, tes numéros et ta compta.'}
           </div>
+          {/* 11 octobre : on arrive ici depuis « Se connecter » dans l'extension.
+              UNE connexion pour les deux : l'app connecte l'extension juste après. */}
+          {__lier && (mode==='in' || mode==='up') && (
+            <div data-lier-connexion="" style={{fontSize:12.5,color:C.text,background:`${C.accent}12`,border:`1px solid ${C.accent}55`,borderRadius:8,padding:'8px 10px',marginBottom:14,lineHeight:1.45}}>
+              Connecte-toi ici : l'extension de ce Chrome sera connectée en même temps — rien à taper dans l'extension.
+            </div>
+          )}
 
           {/* Connexion par Google / Discord, EN PREMIER : c'est le chemin le plus
               court et le plus sûr (aucun mot de passe à créer, donc aucun mot de
@@ -8583,6 +9194,71 @@ function BlocNumerosPerimes() {
   );
 }
 
+// ── « SE CONNECTER AVEC VRM » : CE QUI SE PASSE (11 octobre) ────────────────
+// Julien : « quand j'appuie sur se connecter, ça doit envoyer directement dans
+// l'application VRM ». L'extension ouvre VRM avec son identifiant ; l'app,
+// connectée, lui adresse SA session (`assurerSessionExtension`). Ce bandeau dit
+// où on en est, UNE fois, sur la coque — et le geste quand ça n'aboutit pas.
+// L'état décidé est porté par `data-liaison` (le banc juge l'état, pas la phrase).
+function BandeauLiaison() {
+  const [, force] = React.useReducer((n) => n + 1, 0);
+  React.useEffect(() => { __lierSubs.add(force); return () => { __lierSubs.delete(force); }; }, []);
+  // ⚠️⚠️ Seconde revue du 11 octobre : « connectée ✓ — elle capte maintenant
+  //    pour toi. Rien d'autre à faire. » s'affichait AU-DESSUS de la pastille
+  //    « Lecture seule » quand une copie ancienne répondait encore (la session
+  //    part adressée, les commandes restent coupées). Deux voix contraires, et
+  //    « rien d'autre à faire » était faux. Le bandeau écoute donc l'état de
+  //    l'extension (la même règle que la pastille, `raisonExtGlobale`, §11).
+  useExtVivante();
+  const sansSouris = useSansSouris();
+  const l = __lier;
+  // ⚠️ Revue du 11 octobre : pendant l'attente, AUCUNE croix — un bandeau
+  //    bloqué (copie ancienne à côté, code périmé) restait là pour toujours.
+  //    La croix vient au bout de quelques secondes, quoi qu'il arrive.
+  const cle = l ? `${l.id}|${l.etat}` : '';
+  const [vieux, setVieux] = React.useState('');
+  React.useEffect(() => { if (!cle) return undefined; const t = setTimeout(() => setVieux(cle), 6000); return () => clearTimeout(t); }, [cle]);
+  if (!l) return null;
+  const encours = l.etat === 'attente' || l.etat === 'encours';
+  const bon = l.etat === 'ok' || l.etat === 'deja';
+  const fermable = !encours || l.bloque || vieux === cle;
+  // Connectée, mais l'EXTENSION ne peut encore rien faire (une copie ancienne
+  // répond aussi, code périmé, muette, absente, trop ancienne) : on dit ce qui
+  // reste, jamais « rien d'autre à faire ». Seuls les blocages de l'extension
+  // elle-même comptent — la session VRM, elle vient d'être posée (le battement
+  // suivant la relit), et une pause de Vinted n'appelle aucun geste.
+  const glob = bon ? raisonExtGlobale(sansSouris) : null;
+  const reste = glob && ['plusieurs', 'perime', 'muette', 'absente', 'retard'].includes(glob.code) ? glob : null;
+  const connectee = l.etat === 'ok' ? <>Extension connectée à <b>{l.email || 'ton compte VRM'}</b> ✓</> : <>L'extension de ce Chrome était déjà connectée à ton compte VRM ✓</>;
+  const resteTexte = !reste ? null
+    : reste.code === 'plusieurs' ? <> — mais une autre extension VRM répond encore dans ce Chrome : tant qu'elles sont deux, rien ne part (en haut : lecture seule). Dans chrome://extensions, supprime l'ancienne, puis recharge cette page.</>
+    : reste.code === 'perime' ? <> — mais ce Chrome exécute encore son ancien code : rien ne part tant qu'elle n'est pas rechargée (en haut : lecture seule). Ouvre chrome://extensions et clique ⟳ sur VRM.</>
+    : <> — mais elle ne peut pas encore agir (en haut : lecture seule) : {reste.texte}</>;
+  // Une liaison qui ne PEUT pas partir le dit, avec le geste — jamais
+  // « Je connecte… » sans rien envoyer.
+  const texte = encours && l.bloque === 'perime' ? <>L'extension de ce Chrome tourne encore sur son ancien code : je la connecte dès qu'elle est rechargée. Si rien ne bouge : ouvre chrome://extensions, clique ⟳ sur VRM, puis recharge cette page.</>
+    : encours ? "Je connecte l'extension de ce Chrome à ton compte VRM… Rien à taper."
+    : bon && reste ? <>{connectee}{resteTexte}</>
+    : l.etat === 'ok' ? <>Extension connectée à <b>{l.email || 'ton compte VRM'}</b> ✓ — elle capte maintenant pour toi dans ce Chrome. Rien d'autre à faire.</>
+    : l.etat === 'deja' ? <>L'extension de ce Chrome était déjà connectée à ton compte VRM ✓ — rien à faire.</>
+    : l.etat === 'absente' ? <>L'extension n'a pas répondu dans ce Chrome. Ouvre VRM dans le Chrome où tu as cliqué « Se connecter » ; si c'est celui-ci, ouvre chrome://extensions, clique ⟳ sur VRM, puis recharge cette page.</>
+    : <>Je n'ai pas pu connecter l'extension{l.message ? ` (${l.message})` : ''}. Clique son icône en haut de Chrome, puis « avec mon mot de passe VRM ».</>;
+  // ⚠️ Revue du 11 octobre (§7, l'île) : sur ordinateur, l'île d'actions flotte
+  //    en haut à droite, et ce bandeau — premier bloc de la colonne — passait
+  //    DESSOUS : sa croix ne se cliquait pas, et « …chrome://extensions… »
+  //    disparaissait sous la pastille. Il lui laisse sa place, comme la ligne
+  //    de titre des écrans (`vrm-tete-row` lit `--vrm-ile`).
+  return (
+    <div className="vrm-tete-row">
+    <div data-liaison={l.etat} data-liaison-bloque={encours && l.bloque ? l.bloque : undefined} data-liaison-reste={reste ? reste.code : undefined} role="status" style={{ display: 'flex', gap: 10, alignItems: 'flex-start', margin: '0 0 12px', padding: '10px 12px', borderRadius: 10,
+      background: C.card, border: `1px solid ${C.border}`, borderLeft: `3px solid ${bon && !reste ? C.accent : (encours && !l.bloque) ? C.border : C.warn}`, fontSize: 12.5, lineHeight: 1.45, color: C.text }}>
+      <span style={{ flex: 1, minWidth: 0 }}>{texte}</span>
+      {fermable && <button type="button" aria-label="Fermer" onClick={() => poserLier(null)} style={{ border: 'none', background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: '0 2px', minHeight: 0 }}>×</button>}
+    </div>
+    </div>
+  );
+}
+
 function BaseInjoignable() {
   // ⚠️⚠️ « ÇA REVIENT TOUT SEUL » ÉTAIT FAUX LE TROISIÈME JOUR.
   // La phrase promettait une panne passagère. Le 9 septembre la base est
@@ -8723,6 +9399,8 @@ function useEtapePont() {
   React.useEffect(() => onVmrExt(() => setPont({ on: vmrExtPresent(), v: vmrExtVersion() })), []);
   // `undefined` = on demande · `null` = l'extension n'a pas répondu · objet = mesuré.
   const [extAuth, setExtAuth] = React.useState(undefined);
+  // `tour` : relire après un geste (« Déconnecter l'extension de ce Chrome »).
+  const [tour, setTour] = React.useState(0);
   React.useEffect(() => {
     let stop = false;
     (async () => {
@@ -8731,7 +9409,8 @@ function useEtapePont() {
       if (!stop) setExtAuth(e);
     })();
     return () => { stop = true; };
-  }, [pont.on]);
+  }, [pont.on, tour]);
+  const relire = React.useCallback(() => setTour((n) => n + 1), []);
   // Le compte sous lequel l'extension écrit est-il CELUI-CI ? C'est une
   // identité (la même adresse), pas une ressemblance. Si elle écrit sous une
   // autre, ses captures partent chez l'autre vendeur et cette boutique reste
@@ -8744,7 +9423,7 @@ function useEtapePont() {
     : !extAuth.connecte ? 'pasconnectee'
     : (monMail && sonMail && monMail !== sonMail) ? 'autrecompte'
     : 'connectee';
-  return { pont, extAuth, etape };
+  return { pont, extAuth, etape, relire };
 }
 
 // ── LE BOUTON BORDEREAU D'UNE VENTE (Ventes ET Colis — un seul composant, §11) ─
@@ -8806,7 +9485,9 @@ function RaisonBordereauxGrises({ ventes }) {
     </div>
   );
 }
-function BoutonBordereau({ uid, tx, conv, login, aGenerer, pdf, onImprimer, onFait, grand }) {
+// `sansRepli` : la ligne qui l'accueille porte DÉJÀ le lien vers la vente sur
+// Vinted — le bouton ne le répète pas (§7, une chose une fois).
+function BoutonBordereau({ uid, tx, conv, login, aGenerer, pdf, onImprimer, onFait, grand, sansRepli }) {
   const { etat, jobs } = useExtVivante();
   const sansSouris = useSansSouris();
   const [refus, setRefus] = React.useState(null);
@@ -8867,7 +9548,7 @@ function BoutonBordereau({ uid, tx, conv, login, aGenerer, pdf, onImprimer, onFa
   // Le repli sur Vinted, propre à CETTE vente (son adresse distingue la ligne,
   // §7) : la conversation de la vente porte le bouton « Imprimer le bordereau ».
   const surVinted = conv ? `https://www.vinted.fr/inbox/${encodeURIComponent(conv)}` : `https://www.vinted.fr/member/transactions/${encodeURIComponent(tx)}`;
-  const repliVinted = (grise && glob && glob.code !== 'verif') || !!refusVu;
+  const repliVinted = !sansRepli && ((grise && glob && glob.code !== 'verif') || !!refusVu);
   return (
     <span data-bouton-bord={grise ? 'grise' : enCours ? 'encours' : ko ? 'echec' : 'pret'} data-tx={tx} style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3, maxWidth: '100%' }}>
       <button type="button" onClick={lancer} aria-disabled={grise || enCours ? 'true' : undefined}
@@ -9022,7 +9703,34 @@ function BoutonToutGenerer({ items }) {
 // Leboncoin publie sans booster (décision du 20 septembre).
 // GRISÉ et jamais caché quand l'extension ne peut pas (§ BoutonBordereau) ; la
 // raison commune est dite UNE fois au-dessus de la liste (`RaisonPublication`).
-function BoutonPublier({ place, id }) {
+// `croitVendue` (revue du 11 octobre, défaut 12) : VRM sait la paire REVENUE
+// (vente remboursée ensuite), mais une extension antérieure à la règle de
+// l'instantané (`EXT_CAPACITES.preuves`) la croit encore vendue et refuserait
+// de la publier (elle relit SA file). Le bouton est grisé avec la raison — dite
+// UNE fois au-dessus de la liste (`LbcCroitVendue`), §7.
+const texteCroitVendue = () => `Ton extension la croit encore vendue (elle ne sait pas qu'une vente remboursée fait revenir la paire) et refuserait de la publier : mets-la à jour (${EXT_ATTENDUE}).`;
+// ⚠️⚠️ 11 octobre — « QUAND JE VAIS POSTER DES PAIRES SUR LE BON COIN, JE NE
+//    PEUX PAS ». Reproduit 2 sur 2 : après un dépôt qui n'aboutissait pas
+//    (onglet fermé, Leboncoin qui demande de se connecter), le bouton restait
+//    « Publication en cours… » 15 minutes, et un clic ne faisait RIEN, sans un
+//    mot (`if (… enCours) return;`). Désormais :
+//      · un clic refusé DIT pourquoi, toujours (grisé, déjà publiée, en cours) ;
+//      · « en cours » renvoie la commande : l'extension remet l'onglet du dépôt
+//        devant s'il est ouvert, ou relance s'il a été fermé ;
+//      · un dépôt arrêté ou fermé passe à « Le dépôt n'a pas abouti —
+//        Réessayer » (l'extension le dit, `depotArrete` / onglet fermé) ;
+//      · le bouton annonce les photos CAPTÉES sur le total de l'annonce — le
+//        dépôt part avec ce qui est capté, jamais plus.
+// ⚠️⚠️ Revue du 11 octobre : « LE DÉPÔT N'A PAS ABOUTI » ÉTAIT UNE AFFIRMATION
+//    SUR UNE MESURE QUI N'A PAS EU LIEU. L'arrêt à 90 s arrive justement quand
+//    un champ obligatoire ne se devine pas (Univers*), c'est-à-dire quand il
+//    FINIT À LA MAIN — et VRM ne voit pas la page de fin. « Réessayer » ouvrait
+//    alors un second dépôt qui PUBLIE TOUT SEUL (prouvé : 2 onglets de dépôt,
+//    `publier: true`) : la paire en ligne deux fois. L'arrêt veut dire « pas
+//    su », pas « échec » : on le dit, on nomme « Déjà publiée », et relancer
+//    demande une confirmation (l'extension l'exige aussi, `confirme`).
+const RAISON_ABANDON = { 'onglet-ferme': "l'onglet Leboncoin a été fermé avant que VRM voie la fin", 'onglet-quitte': "l'onglet du dépôt est parti sur une autre page avant que VRM voie la fin", arret: "le remplissage s'est arrêté avant la fin (Leboncoin a peut-être demandé autre chose)", 'bandeau-ferme': 'tu as fermé le bandeau VRM sur Leboncoin avant la fin' };
+function BoutonPublier({ place, id, croitVendue, photos = null, total = null }) {
   const { jobs } = useExtVivante();
   const sansSouris = useSansSouris();
   const [refus, setRefus] = React.useState(null);
@@ -9030,16 +9738,35 @@ function BoutonPublier({ place, id }) {
   const lbc = place === 'lbc';
   const jobId = (lbc ? 'lbc:' : 'ebay:') + id;
   const job = jobs[jobId] || null;
-  const glob = raisonExtGlobale(sansSouris, { cap: 'publication', role: 'publie tes annonces' });
+  const glob = raisonExtGlobale(sansSouris, { cap: 'publication', role: 'publie tes annonces' })
+    || (croitVendue && extSait('preuves') === 'retard' ? { code: 'croit-vendue', texte: texteCroitVendue() } : null);
   const fait = job && job.etape === 'fait';
   const enCours = job && job.etape === 'depot' && (Date.now() - Number(job.at || 0) < 15 * 60000);
+  const abandonne = job && job.etape === 'abandonne';
   const lancer = async () => {
-    // ⚠️ « En cours » et « faite » bloquent aussi (revue du 5 octobre) : un
-    //    second clic ouvrait un second dépôt, et Leboncoin publie sans booster
-    //    tout seul — deux annonces pour la même paire.
-    if (glob || envoi || enCours || fait) return;
+    if (envoi) return;                       // la demande précédente est en vol : son résultat arrive
+    // ⚠️ Un clic refusé dit TOUJOURS pourquoi (11 octobre) : avant, ces trois
+    //    cas faisaient `return` en silence — « je ne peux pas poster ».
+    if (glob) { setRefus(glob.texte); return; }
+    if (fait) { setRefus(lbc ? 'Déjà publiée sur Leboncoin depuis VRM — rien à refaire.' : 'Déjà préparée sur eBay.'); return; }
+    // Un dépôt abandonné a pu être FINI À LA MAIN : relancer publierait la
+    // paire une seconde fois. On demande d'abord — ici si l'app le sait déjà,
+    // sinon quand l'extension le découvre (onglet parti ailleurs : `confirmer`).
+    const demander = () => askConfirm({ title: 'Relancer le dépôt sur Leboncoin ?',
+      desc: "VRM n'a pas vu la fin du dépôt précédent. Si tu l'as publiée toi-même sur Leboncoin, annule et clique « Déjà publiée » : un nouveau dépôt la publierait une seconde fois. Sinon, relance.",
+      ok: 'Relancer le dépôt', cancel: 'Annuler' });
+    let confirme = false;
+    if (lbc && abandonne) { if (!(await demander())) return; confirme = true; }
     setRefus(null); setEnvoi(true);
-    const r = await vmrCmd({ cmd: lbc ? 'lbcPublier' : 'ebayPreparer', id: String(id) }, 30000);
+    const envoyer = (c) => vmrCmd(Object.assign({ cmd: lbc ? 'lbcPublier' : 'ebayPreparer', id: String(id) }, c ? { confirme: true } : {}), 30000);
+    let r = await envoyer(confirme);
+    if (r && !r.accepte && r.code === 'confirmer' && !confirme) {
+      __vmrJobs[jobId] = Object.assign({}, __vmrJobs[jobId] || {}, { etape: 'abandonne', raison: 'onglet-quitte', at: Date.now() }); __vmrNotifier();
+      setEnvoi(false);
+      if (!(await demander())) return;
+      setEnvoi(true);
+      r = await envoyer(true);
+    }
     setEnvoi(false);
     if (!r) { setRefus("L'extension n'a pas répondu — recharge cette page et réessaie."); return; }
     if (!r.accepte) { setRefus(r.raison || "Refusé par l'extension."); return; }
@@ -9048,21 +9775,37 @@ function BoutonPublier({ place, id }) {
   };
   const libelle = envoi ? 'Envoi…' : fait ? (lbc ? 'Publiée ✓' : 'Préparée ✓')
     : enCours ? (lbc ? 'Publication en cours…' : 'Formulaire eBay ouvert')
+    : abandonne ? 'Réessayer'
     : (lbc ? 'Publier sur Leboncoin' : 'Préparer sur eBay');
   const grise = !!glob || fait;
+  const nPh = Number.isFinite(Number(photos)) && photos != null ? Number(photos) : null;
+  const nTot = Number.isFinite(Number(total)) && total != null && Number(total) >= (nPh || 0) ? Number(total) : null;
+  const textePhotos = nPh == null ? '' : nTot != null && nTot > nPh ? `${nPh} photo${nPh > 1 ? 's' : ''} sur ${nTot}` : `${nPh} photo${nPh > 1 ? 's' : ''}`;
+  const etat = glob ? 'grise' : fait ? 'fait' : enCours ? 'encours' : abandonne ? 'abandonne' : 'pret';
   return (
-    <span data-bouton-publier={glob ? 'grise' : fait ? 'fait' : enCours ? 'encours' : 'pret'} data-id={id}
+    <span data-bouton-publier={etat} data-id={id} data-photos={nPh == null ? undefined : nPh} data-photos-total={nTot == null ? undefined : nTot}
       style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3, maxWidth: '100%' }}>
+      {abandonne && <span data-depot-abandonne={job.raison || ''} style={{ fontSize: 11, color: C.warn, lineHeight: 1.35, whiteSpace: 'normal', fontWeight: 600 }}>{RAISON_ABANDON[job.raison] ? RAISON_ABANDON[job.raison].charAt(0).toUpperCase() + RAISON_ABANDON[job.raison].slice(1) : "VRM n'a pas vu la fin du dépôt"}. {lbc ? 'Si tu l’as publiée toi-même, clique « Déjà publiée » ; sinon Réessayer.' : 'Si tu l’as mise en vente toi-même, rien à refaire ; sinon Réessayer.'}</span>}
       <button type="button" onClick={lancer} aria-disabled={grise ? 'true' : undefined}
-        title={glob ? glob.texte : lbc ? "L'extension ouvre Leboncoin, remplit tout (photos, titre, description, prix, catégorie) et publie sans option payante" : "L'extension ouvre la mise en vente eBay et remplit ce qu'elle reconnaît — tu relis et tu mets en vente"}
+        title={glob ? glob.texte : enCours ? (lbc ? 'Le dépôt est ouvert dans un onglet Leboncoin — clique pour y retourner' : 'Le formulaire eBay est ouvert — clique pour y retourner') : lbc ? "L'extension ouvre Leboncoin, remplit tout (photos, titre, description, prix, catégorie) et publie sans option payante" : "L'extension ouvre la mise en vente eBay et remplit ce qu'elle reconnaît — tu relis et tu mets en vente"}
         style={{ display: 'inline-flex', alignItems: 'center', gap: 6, borderRadius: 8, fontFamily: 'inherit', fontWeight: 600, fontSize: 12.5,
           padding: '7px 11px', whiteSpace: 'nowrap', cursor: grise ? 'not-allowed' : 'pointer',
           border: `1px solid ${glob ? C.border : C.accent}`, background: glob ? 'transparent' : (fait ? 'transparent' : `${C.accent}14`),
           color: glob ? C.muted : C.accent, opacity: glob ? 0.55 : 1, filter: glob ? 'grayscale(1)' : 'none' }}>
         {libelle}
+        {textePhotos && !fait ? <span data-photos-bouton="" style={{ fontWeight: 500, fontSize: 11.5, color: glob ? C.muted : C.text, opacity: 0.8 }}>· {textePhotos}</span> : null}
       </button>
-      {refus && <span style={{ fontSize: 11, color: C.warn, lineHeight: 1.35, whiteSpace: 'normal' }}>{refus}</span>}
+      {refus && <span data-refus-publier="" style={{ fontSize: 11, color: C.warn, lineHeight: 1.35, whiteSpace: 'normal' }}>{refus}</span>}
     </span>
+  );
+}
+function LbcCroitVendue({ n }) {
+  useExtVivante();
+  if (!n || extSait('preuves') !== 'retard') return null;
+  return (
+    <div data-lbc-croit-vendue={n} style={{ fontSize: 12.5, color: C.text, background: C.card, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.warn}`, borderRadius: 10, padding: '9px 12px', marginBottom: 10, lineHeight: 1.45 }}>
+      <b>{n} paire{n > 1 ? 's' : ''} revenue{n > 1 ? 's' : ''}</b> (vente remboursée ou annulée) : de nouveau à publier pour VRM, mais ton extension {n > 1 ? 'les croit encore vendues' : 'la croit encore vendue'} et refuserait de {n > 1 ? 'les' : 'la'} publier — mets-la à jour ({EXT_ATTENDUE}).
+    </div>
   );
 }
 function RaisonPublication({ n, place }) {
@@ -9114,7 +9857,13 @@ function etatActionsExt(sansSouris) {
   //    la pastille l'affirmait à côté d'un bouton Publier grisé « mets
   //    l'extension à jour » — deux voix sur la même action (§11).
   if (!vinted) return { niveau: 'lecture', glob: { code: 'vinted', texte: `Aucun compte Vinted n'est ouvert dans ce Chrome — les actions SUR VINTED (bordereau, répondre) attendent ; ${extSait('publication') === 'ok' ? 'publier sur Leboncoin reste possible.' : `publier sur Leboncoin demande une extension à jour (${EXT_ATTENDUE}).`}` }, vinted: null };
-  return { niveau: 'ok', glob: null, vinted };
+  // ⚠️ 11 octobre : « Actions possibles » s'affichait AU-DESSUS de boutons
+  //    « Publier sur Leboncoin » grisés (reproduit avec une 5.143) — deux voix
+  //    contraires sur le même écran. Quand publier est bloqué alors que le
+  //    reste marche, la pastille DIT l'exception, avec la même raison que le
+  //    bouton (une seule règle, `raisonExtGlobale`, §11).
+  const pub = raisonExtGlobale(sansSouris, { cap: 'publication', role: 'publie tes annonces' });
+  return { niveau: 'ok', glob: null, vinted, exception: pub && pub.code !== 'verif' ? pub : null };
 }
 // La DERNIÈRE capture reçue d'une extension (où qu'elle tourne) : l'extension
 // inscrit sa version et l'heure dans sa ligne de diagnostic à chaque passage
@@ -9171,12 +9920,12 @@ function EtatActions({ onNav, ordi, sombre }) {
   // Vinted qui demande de ralentir : rien à faire non plus, ça repart seul.
   const aRattraper = st.niveau === 'lecture' && code !== 'telephone' && code !== 'pause';
   const point = st.niveau === 'ok' ? C.accent : aRattraper ? C.warn : C.muted;
-  const libelle = st.niveau === 'ok' ? 'Actions possibles' : st.niveau === 'verif' ? 'Vérification…' : 'Lecture seule';
+  const libelle = st.niveau === 'ok' ? (st.exception ? 'Actions possibles · sauf publier' : 'Actions possibles') : st.niveau === 'verif' ? 'Vérification…' : 'Lecture seule';
   const court = !ordi;                       // en-tête de téléphone : peu de place
   const ink = sombre ? '#fff' : C.text, bd = sombre ? '#3A3A3C' : C.border;
 
   // ── Les trois lignes : extension · compte VRM · compte Vinted ──────────────
-  const extKo = ['telephone', 'absente', 'muette', 'retard', 'plusieurs'].includes(code);
+  const extKo = ['telephone', 'absente', 'muette', 'retard', 'plusieurs', 'perime'].includes(code);
   const ligneVrmVerif = code === 'vrm-encours';
   const majDispo = !extKo && extSait('_maj') === 'retard';
   const ligneExt = code === 'telephone' ? { s: '—', t: "s'utilise sur l'ordinateur où elle est installée" }
@@ -9186,6 +9935,8 @@ function EtatActions({ onNav, ordi, sombre }) {
     // La version à installer est dite UNE fois, sur le bouton juste dessous
     // (revue du 9 octobre : « 5.163.0 » écrit trois fois dans le panneau).
     : code === 'retard' ? { s: 'non', t: `version ${version || '?'} — trop ancienne pour recevoir des commandes de VRM` }
+    // 11 octobre : la version annoncée est la bonne, le CODE ne l'est pas.
+    : code === 'perime' ? { s: 'non', t: `elle annonce la ${version || '?'} mais tourne encore sur son ancien code${(codePerime() || {}).code ? ' (' + codePerime().code + ')' : ''}` }
     : st.niveau === 'verif' ? { s: '…', t: 'je lui demande…' }
     : { s: 'oui', t: `allumée${version ? ' · ' + version : ''}${majDispo ? ` (la ${EXT_ATTENDUE} existe)` : ''}` };
   const ligneVrm = ligneVrmVerif ? { s: '…', t: 'renouvellement de sa connexion…' }
@@ -9206,14 +9957,47 @@ function EtatActions({ onNav, ordi, sombre }) {
   if (code === 'telephone') geste = <span>Ouvre VRM sur l'ordinateur où l'extension est installée pour générer un bordereau, répondre ou publier.</span>;
   else if (code === 'absente' || code === 'retard') geste = <button type="button" data-etat-geste="maj" style={btn} onClick={() => { setOuvert(false); onNav && onNav('settings'); }}>{code === 'absente' ? "Installer l'extension (Réglages)" : `Mettre à jour en ${EXT_ATTENDUE} (Réglages)`}</button>;
   else if (code === 'muette') geste = <button type="button" data-etat-geste="recharger" style={btn} onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button>;
+  // Code périmé : le geste se fait DANS CHROME (une page web ne peut pas ouvrir
+  // chrome://extensions) — on le dit tel quel, puis on recharge la page.
+  else if (code === 'perime') geste = <span data-etat-geste="recharger-extension">Dans ce Chrome : tape <b>chrome://extensions</b> dans la barre d'adresse, clique ⟳ (la flèche ronde) sur VRM, puis <button type="button" data-etat-geste-recharger="1" style={{ ...btn, padding: '4px 9px', fontSize: 12 }} onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button></span>;
   // Deux extensions : le geste se fait dans Chrome (une page web ne peut pas
   // ouvrir chrome://extensions) — on le DIT, puis on recharge.
   else if (code === 'plusieurs') geste = <span data-etat-geste="extensions">Tape <b>chrome://extensions</b> dans la barre d'adresse, supprime l'ancienne VRM, puis <button type="button" data-etat-geste-recharger="1" style={{ ...btn, padding: '4px 9px', fontSize: 12 }} onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button></span>;
   // Non connectée : son icône ouvre SA fenêtre de connexion (une extension
   // connectée, elle, ouvre VRM) — c'est le repli si la reconnexion automatique
   // n'aboutit pas.
-  else if (code === 'vrm') geste = <span>{__sessExtEnVol ? 'Un instant…' : <>Je réessaie de la connecter. Sinon : clique l'icône VRM en haut de Chrome et connecte-toi avec <b>{monMail || 'ton email VRM'}</b>.</>}</span>;
-  else if (code === 'autre-vrm' || code === 'vrm-passu') geste = __sessExtEnVol ? <span>Un instant…</span>
+  // 11 octobre : « je réessaie » n'est vrai que si l'extension sait RECEVOIR la
+  // connexion de VRM (5.171, session adressée). Une plus ancienne ne reçoit
+  // plus rien de l'app — promettre « je réessaie » serait le défaut le plus
+  // coûteux du projet ; on dit les deux vrais gestes.
+  // ⚠️ Revue du 11 octobre : après un REFUS du serveur (429, 503), « Se
+  //    connecter avec VRM » repasse par la même route, bloquée 15 min — le
+  //    panneau disait ce geste pendant que la liste des ventes disait le mot de
+  //    passe. Une règle (`voieConnexionExt`), les mêmes gestes partout (§11).
+  // ⚠️ Relecture croisée de la 5.174 : la voie 'page' (une 5.164/5.170 que l'app
+  //    connecte par l'ancien message) — sa fenêtre n'a que email et mot de passe.
+  else if (code === 'vrm') { const voie = voieConnexionExt(); geste = <span data-etat-geste={voie === 'retard' ? 'maj-ou-mdp' : voie === 'serveur' ? 'mdp' : voie === 'page' ? 'page' : 'liaison'}>{__sessExtEnVol ? 'Un instant…'
+    : voie === 'retard'
+      ? <>Cette extension ({vmrExtVersion() || 'version ?'}) ne sait pas recevoir la connexion de VRM : mets-la à jour en {EXT_ATTENDUE} (Réglages) — ou clique l'icône VRM en haut de Chrome et connecte-toi avec ton mot de passe VRM (<b>{monMail || 'ton email VRM'}</b>).</>
+      : voie === 'serveur'
+        ? (fenetreAncienne()
+          ? <>Le serveur n'a pas pu préparer sa connexion{__sessExtErreur.message ? ` (${__sessExtErreur.message})` : ''} : clique l'icône VRM en haut de Chrome et connecte-toi avec ton mot de passe VRM (<b>{monMail || 'ton email VRM'}</b>).</>
+          : <>Le serveur n'a pas pu préparer sa connexion{__sessExtErreur.message ? ` (${__sessExtErreur.message})` : ''} : clique l'icône VRM en haut de Chrome, puis « avec mon mot de passe VRM » (<b>{monMail || 'ton email VRM'}</b>).</>)
+        : voie === 'page'
+          ? <>Je la connecte à <b>{monMail || 'ton compte VRM'}</b>. Si ça ne vient pas : recharge cette page, ou clique l'icône VRM en haut de Chrome et connecte-toi avec ton mot de passe VRM.</>
+          : <>Je la connecte à <b>{monMail || 'ton compte VRM'}</b>. Si ça ne vient pas : clique l'icône VRM en haut de Chrome, puis « Se connecter avec VRM ».</>}</span>; }
+  // Autre compte : une extension CONNECTÉE ouvre VRM quand on clique son icône
+  // (sa fenêtre n'apparaît plus) — « clique l'icône, Se déconnecter » serait
+  // impossible à suivre. Avant la 5.171 elle n'entend pas le canal adressé : le
+  // seul geste d'ici est de la déconnecter (l'ancien message), puis le mot de
+  // passe VRM dans sa fenêtre — ou la mettre à jour.
+  else if (code === 'autre-vrm') { const voie = voieConnexionExt(); geste = __sessExtEnVol ? <span>Un instant…</span>
+    : voie === 'retard'
+      ? <span data-etat-geste="deconnecter">Cette extension ({vmrExtVersion() || 'version ?'}) ne sait pas recevoir la connexion de VRM. <button type="button" data-etat-geste-deconnecter="1" style={{ ...btn, padding: '4px 9px', fontSize: 12 }} onClick={() => { deconnecterExtensionAncienne(); }}>Déconnecter l'extension de ce Chrome</button>, puis clique l'icône VRM en haut de Chrome et connecte-toi avec ton mot de passe VRM (<b>{monMail || 'ton email VRM'}</b>) — ou mets-la à jour en {EXT_ATTENDUE} (Réglages).</span>
+      : voie === 'serveur'
+        ? <span data-etat-geste="attendre-serveur">Le serveur n'a pas pu préparer sa connexion{__sessExtErreur.message ? ` (${__sessExtErreur.message})` : ''} : je réessaie dans {minutesAvantReessai()} min, cette page ouverte.</span>
+        : <button type="button" data-etat-geste="recharger" style={btn} onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button>; }
+  else if (code === 'vrm-passu') geste = __sessExtEnVol ? <span>Un instant…</span>
     : <button type="button" data-etat-geste="recharger" style={btn} onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button>;
   else if (code === 'vinted') geste = <a data-etat-geste="vinted" href="https://www.vinted.fr" target="_blank" rel="noreferrer" style={btn}>Ouvrir vinted.fr et me connecter</a>;
   // 'pause' : aucun geste — la phrase du panneau dit que ça repart seul.
@@ -9227,9 +10011,9 @@ function EtatActions({ onNav, ordi, sombre }) {
 
   return (
     <div ref={boite} style={{ position: 'relative', flexShrink: 0 }}>
-      <button type="button" data-etat-actions={st.niveau} data-etat-code={code} onClick={() => setOuvert((o) => !o)}
+      <button type="button" data-etat-actions={st.niveau} data-etat-code={code} data-etat-exception={st.exception ? 'publication' : undefined} onClick={() => setOuvert((o) => !o)}
         aria-expanded={ouvert ? 'true' : 'false'}
-        title={st.niveau === 'ok' ? `Actions Vinted possibles, au nom de ${loginVinted}` : st.glob ? st.glob.texte : ''}
+        title={st.niveau === 'ok' ? `Actions Vinted possibles, au nom de ${loginVinted}${st.exception ? ` — sauf publier sur Leboncoin : ${st.exception.texte}` : ''}` : st.glob ? st.glob.texte : ''}
         style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'transparent', border: `1px solid ${bd}`, borderRadius: 8,
           padding: court ? '6px 8px' : '6px 11px', color: ink, cursor: 'pointer', fontSize: 12.5, fontWeight: 600, fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
         <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: 5, background: point, flexShrink: 0 }}/>
@@ -9249,8 +10033,9 @@ function EtatActions({ onNav, ordi, sombre }) {
             <div style={{ color: C.muted, marginBottom: 8 }}>
               {/* On ne promet que ce que l'extension INSTALLÉE sait faire (revue
                   du 5 octobre) : chaque geste suit sa capacité. */}
-              {['Générer un bordereau', extSait('messagerie') === 'ok' ? 'répondre, faire une offre' : null].filter(Boolean).join(', ')} : ça part au nom de <b style={{ color: C.text }}>{loginVinted}</b>, le compte Vinted ouvert dans ce Chrome. Pour un autre de tes comptes, connecte-toi avec lui sur vinted.fr.
-              {extSait('publication') === 'ok' ? ' Publier sur Leboncoin passe aussi par l’extension.' : ''}
+              {['Générer un bordereau', extSait('messagerie') === 'ok' ? 'répondre, faire une offre' : null].filter(Boolean).join(', ')} : ça part au nom de <b style={{ color: C.text }}>{loginVinted}</b>, le compte Vinted ouvert dans ce Chrome. Pour un autre de tes comptes : connecte-toi avec lui sur vinted.fr dans ce Chrome, ou ouvre VRM dans le Chrome (le profil) où il est connecté.
+              {!st.exception && extSait('publication') === 'ok' ? ' Publier sur Leboncoin passe aussi par l’extension.' : ''}
+              {st.exception ? <span data-etat-exception-texte="publication"><br/><b style={{ color: C.text }}>Sauf publier sur Leboncoin</b> : {st.exception.texte}</span> : null}
             </div>
           ) : (
             <div style={{ color: C.muted, marginBottom: 8 }}>
@@ -9299,8 +10084,15 @@ function EtatActions({ onNav, ordi, sombre }) {
 // bord, « ta journée est vide » sur l'accueil) — mais les ÉTAPES, elles, sont
 // les mêmes, et c'est tout ce qui compte.
 function PremiersPas({ onNav, titreNeuf, introNeuf }) {
-  const { extAuth, etape } = useEtapePont();
+  const { extAuth, etape, relire } = useEtapePont();
   const sansSouris = useSansSouris();
+  // ⚠️⚠️ Revue du 11 octobre : « je la connecte d'ici, sans rien à taper » était
+  //    écrit à une 5.164, qui ne reçoit plus rien de l'app (0 envoi en 25 s), et
+  //    « clique son icône, puis « Se connecter avec VRM » » nommait un bouton que
+  //    sa fenêtre n'a pas. Les mêmes voies que l'en-tête (`voieConnexionExt`).
+  const voie = voieConnexionExt();
+  const [deconnectee, setDeconnectee] = React.useState(false);
+  const deconnecter = () => { if (deconnecterExtensionAncienne()) { setDeconnectee(true); setTimeout(relire, 900); } };
   // ⚠️⚠️ « CE N'EST PAS NATUREL » — Julien, 16 septembre, en regardant le
   //    premier écran. Il avait raison : c'était une notice de montage. Quatre
   //    étapes numérotées d'un coup, « Mode développeur », « extension non
@@ -9316,7 +10108,7 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
   const n = !fait.ext ? 1 : !fait.lien ? 2 : 3;
   const ETAPES = [
     { t: 'Installer l’extension dans Chrome', c: 'extension' },
-    { t: 'La connecter avec le même email que VRM', c: 'lien' },
+    { t: 'La connecter à ton compte VRM — le même email qu’ici, en un clic', c: 'lien' },
     { t: 'Passer une fois sur vinted.fr', c: 'vinted' },
   ];
 
@@ -9332,14 +10124,30 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
         Dans Chrome, l’extension est connectée sous <b style={{color:C.text}}>{extAuth.email}</b>. Toi, tu es sur <b style={{color:C.text}}>{(AUTH.user&&AUTH.user.email)||'ce compte'}</b>.
       </p>
       <p style={{margin:0}}>
-        Du coup, tout ce qu’elle lit sur Vinted part dans l’autre boutique, et celle-ci reste vide.
-        Clique son icône en haut de Chrome, déconnecte-la, et reconnecte-la avec <b style={{color:C.text}}>{(AUTH.user&&AUTH.user.email)||'ton email'}</b>.
+        Du coup, tout ce qu’elle lit sur Vinted part dans l’autre boutique, et celle-ci reste vide.{' '}
+        {voie === 'retard'
+          ? <>Et celle-ci ({vmrExtVersion() || 'version ?'}) ne sait pas recevoir la connexion de VRM : mets-la à jour (bouton ci-dessous) et je la reconnecterai à <b style={{color:C.text}}>{(AUTH.user&&AUTH.user.email)||'ton compte'}</b> — ou déconnecte-la d’ici, puis clique son icône en haut de Chrome et connecte-toi avec l’email et le mot de passe de ton compte VRM.</>
+          : voie === 'serveur'
+            ? <>Le serveur n’a pas pu préparer sa connexion : je réessaie dans {minutesAvantReessai()} min, cette page ouverte.</>
+            : <>Je la reconnecte à <b style={{color:C.text}}>{(AUTH.user&&AUTH.user.email)||'ton compte'}</b> dès que cette page est devant toi — rien à taper. Si ça persiste, recharge cette page.</>}
       </p>
     </>
   ) : etape === 'pasconnectee' ? (
     <>
       <p style={{margin:'0 0 10px'}}>Je vois bien ton extension dans ce navigateur 👍 — mais elle ne sait pas encore à qui elle a affaire, alors elle n’a nulle part où ranger ce qu’elle lit.</p>
-      <p style={{margin:0}}>Clique son icône en haut de Chrome, puis entre <b style={{color:C.text}}>le même email et le même mot de passe</b> qu’ici. C’est ce qui envoie tes données chez toi, et nulle part ailleurs.</p>
+      {voie === 'retard' ? (
+        <p style={{margin:0}}>Celle-ci ({vmrExtVersion() || 'version ?'}) ne sait pas recevoir la connexion de VRM. Mets-la à jour avec le bouton ci-dessous — ou clique son icône en haut de Chrome et connecte-toi avec <b style={{color:C.text}}>l’email et le mot de passe de ton compte VRM</b> (pas ceux de Vinted) : c’est ce qui envoie tes données chez toi, et nulle part ailleurs.</p>
+      ) : voie === 'serveur' ? (
+        fenetreAncienne()
+          ? <p style={{margin:0}}>Le serveur n’a pas pu préparer sa connexion. Clique son icône en haut de Chrome et connecte-toi avec <b style={{color:C.text}}>l’email et le mot de passe de ton compte VRM</b> (pas ceux de Vinted) : c’est ce qui envoie tes données chez toi, et nulle part ailleurs.</p>
+          : <p style={{margin:0}}>Le serveur n’a pas pu préparer sa connexion. Clique son icône en haut de Chrome, puis <b style={{color:C.text}}>« avec mon mot de passe VRM »</b> : c’est ce qui envoie tes données chez toi, et nulle part ailleurs.</p>
+      ) : voie === 'page' ? (
+        /* Relecture croisée de la 5.174 : une 5.164/5.170, connectée par l'ancien
+           message de la page — sa fenêtre n'a pas « Se connecter avec VRM ». */
+        <p style={{margin:0}}>Je la connecte à ton compte VRM d’ici, <b style={{color:C.text}}>sans rien à taper</b> — c’est ce qui envoie tes données chez toi, et nulle part ailleurs. Si ça ne vient pas : recharge cette page, ou clique son icône en haut de Chrome et connecte-toi avec <b style={{color:C.text}}>l’email et le mot de passe de ton compte VRM</b> (pas ceux de Vinted).</p>
+      ) : (
+        <p style={{margin:0}}>Je la connecte à ton compte VRM d’ici, <b style={{color:C.text}}>sans rien à taper</b> — c’est ce qui envoie tes données chez toi, et nulle part ailleurs. Si ça ne vient pas : clique son icône en haut de Chrome, puis <b style={{color:C.text}}>« Se connecter avec VRM »</b>.</p>
+      )}
     </>
   ) : etape === 'connectee' ? (
     <>
@@ -9382,10 +10190,19 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
   //    d'un autre. Quand le geste se passe dans Chrome (cliquer l'icône de
   //    l'extension), une page web ne peut pas l'ouvrir : on ne met alors AUCUN
   //    bouton principal.
+  // Une extension qui ne sait pas recevoir la connexion de VRM : le geste qui
+  // débloque est de la METTRE À JOUR (le zip), et — si elle range chez un autre —
+  // de la déconnecter d'ici (son icône, connectée, ouvre VRM : pas sa fenêtre).
+  const majLiaison = fait.ext && !fait.lien && voie === 'retard' && (etape === 'pasconnectee' || etape === 'autrecompte');
   const bouton = (!fait.ext && sansSouris)
     ? null   // un zip sur un téléphone est du poids mort, pas un geste
     : !fait.ext
     ? <a href="/VRM-extension.zip" download style={{textDecoration:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'12px 18px',fontSize:14,fontWeight:600}}>Télécharger l’extension</a>
+    : majLiaison
+      ? <>
+          <a href="/VRM-extension.zip" download data-premiers-geste="maj" style={{textDecoration:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'12px 18px',fontSize:14,fontWeight:600}}>Télécharger la mise à jour ({EXT_ATTENDUE})</a>
+          {etape === 'autrecompte' && <button type="button" data-premiers-geste="deconnecter" disabled={deconnectee} onClick={deconnecter} style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'12px 18px',fontSize:14,fontWeight:600,cursor:deconnectee?'default':'pointer',fontFamily:'inherit'}}>{deconnectee ? 'Déconnectée — connecte-la avec ton mot de passe VRM' : 'Déconnecter l’extension de ce Chrome'}</button>}
+        </>
     : etape === 'connectee'
       ? <a href="https://www.vinted.fr" target="_blank" rel="noreferrer" style={{textDecoration:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'12px 18px',fontSize:14,fontWeight:600}}>Ouvrir vinted.fr</a>
       : null;
@@ -9396,7 +10213,7 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
        vingt-trois fois dans ce projet. Le banc juge l'état rendu et ses
        conséquences (quel bouton, quelles adresses nommées) ; le texte reste
        libre. */
-    <div data-etape={etape} style={{padding:'22px 20px',border:`1px solid ${etape==='autrecompte'?C.warn+'66':C.border}`,borderRadius:12,background:C.card}}>
+    <div data-etape={etape} data-voie={fait.ext && !fait.lien ? voie : undefined} style={{padding:'22px 20px',border:`1px solid ${etape==='autrecompte'?C.warn+'66':C.border}`,borderRadius:12,background:C.card}}>
       {/* Où on en est — trois pastilles, lisibles d'un coup d'œil. */}
       <div style={{display:'flex',gap:6,marginBottom:14}}>
         {ETAPES.map((e,k)=>(
@@ -12159,14 +12976,44 @@ function EbayAnnonces({ baseKO, comptes = [] }) {
   const { paires, enLigne } = useEbayPaires(comptes);  // source partagée avec l'onglet Compte (§11)
   const [commandes, setCommandes] = React.useState(undefined);       // ebay_orders : undefined · null · []
   const [vendusVinted, setVendusVinted] = React.useState(undefined); // prouvées vendues : undefined · null · Set
+  // (11 octobre) Les ventes Vinted EN COURS qu'aucune preuve ne relie encore à
+  // leur annonce : `undefined` en cours · `null` pas su · [{ uid, tx }].
+  const [sansPreuve, setSansPreuve] = React.useState(undefined);
+  // (revue du 11 octobre) Les comptes dont les ventes n'ont pas pu être lues
+  // pour cette ligne : on le DIT, sinon « pas encore reliées » disparaît en
+  // silence — l'écran d'une panne serait celui où tout est relié (§4.1).
+  const [sansPreuveKO, setSansPreuveKO] = React.useState([]);
+  // Le geste de la ligne « pas reliées » suit l'extension de CE navigateur (sa
+  // version, sa session VRM) et l'appareil (téléphone : rien à générer ici).
+  const sansSouris = useSansSouris();
+  const [, majExt] = React.useReducer((x) => x + 1, 0);
+  React.useEffect(() => onVmrExt(majExt), []);
+  // L'extension prévient quand elle a rangé une preuve (une transaction lue,
+  // un bordereau, des ventes) : on relit, regroupé (une rafale = une lecture).
+  const [preuveRelue, setPreuveRelue] = React.useState(0);
+  React.useEffect(() => {
+    let t = null;
+    const f = (e) => { const d = e && e.detail; if (!d || d.type !== 'maj' || !['preuves', 'label', 'ventes'].includes(d.quoi)) return; clearTimeout(t); t = setTimeout(() => setPreuveRelue((n) => n + 1), 1500); };
+    window.addEventListener('vrm:ext', f);
+    return () => { clearTimeout(t); window.removeEventListener('vrm:ext', f); };
+  }, []);
   const [eligibles, setEligibles] = React.useState(undefined);       // offre : undefined · null · { ids:Set, complet }
   const [retraits, setRetraits] = React.useState({});                // itemId → '…' (en cours) | message
   // Retrait automatique (proposition 8) : l'interrupteur, et ce qui a été retiré
   // en son nom (`ebay_retraits_auto`, écrit par la route). Trois états pour le
   // journal : `undefined` en cours · `null` pas su · tableau.
   const [retraitAuto, setRetraitAuto] = React.useState(() => load('vrm_ebay_retrait_auto', false) === true);
-  React.useEffect(() => onCloudReady(() => setRetraitAuto((v) => v || load('vrm_ebay_retrait_auto', false) === true)), []);
+  // (revue du 11 octobre) À l'arrivée du nuage, le réglage EST celui du nuage :
+  // `v || …` ne pouvait jamais repasser à faux — éteint sur un autre appareil,
+  // l'écran disait ALLUMÉ (« VRM retire tout seul ») pendant que le retrait
+  // automatique, qui lit `load(…)`, ne faisait rien. Aucune saisie n'est à
+  // protéger ici : le bouton est désactivé tant que le nuage n'est pas lu.
+  React.useEffect(() => onCloudReady(() => setRetraitAuto(load('vrm_ebay_retrait_auto', false) === true)), []);
   const [journalAuto, setJournalAuto] = React.useState(undefined);
+  // Le réglage est SYNCHRONISÉ : tant que le nuage n'est pas arrivé, on ne sait
+  // pas s'il est allumé (trois états, jamais deux).
+  const [reglageAutoLu, setReglageAutoLu] = React.useState(() => isCloudReady());
+  React.useEffect(() => onCloudReady(() => setReglageAutoLu(true)), []);
   React.useEffect(() => { let stop = false; (async () => {
     try {
       const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.ebay_retraits_auto&select=items:data->items`, { headers: sbAuth() });
@@ -12271,10 +13118,21 @@ function EbayAnnonces({ baseKO, comptes = [] }) {
   // (la base n'a pas répondu) · objet lu (`{}` = aucune vente captée).
   const [ventesLbc, setVentesLbc] = React.useState(undefined);
   const [lbcItems, setLbcItems] = React.useState(undefined);   // annonces Leboncoin : lues SEULEMENT si une vente ne se relie pas sans elles
+  // Les comptes dont on compte les ventes pas encore reliées : ceux qui sont
+  // liés et pas mis de côté par lui (un compte exclu ne se réclame pas, §7).
+  const comptesPreuve = React.useMemo(() => {
+    const masques = new Set((load('vinted_accounts_hidden', []) || []).map(String));
+    return (Array.isArray(comptes) ? comptes : []).map((a) => String((a && a.vinted_user_id) || '')).filter((u) => /^\d+$/.test(u) && !masques.has(u));
+  }, [comptes, nuage]);
+  // Les ventes de tous ses comptes (~190 Ko mesurés, la liste des commandes) ne
+  // sont lues pour « pas encore reliées » que s'il y a ici une annonce reliée
+  // (en ligne ou programmée) qu'une double vente pourrait toucher (§4.4).
+  const avecSku = (Array.isArray(items) && items.some((a) => a && numDeSkuEbay(a.sku))) || listeProgrammees.some((p) => p && numDeSkuEbay(p.sku));
+  const clePreuve = avecSku ? comptesPreuve.join(',') : '';
   React.useEffect(() => {
     if (!aVerifier) return;
     let stop = false;
-    lireVentesVintedProuvees().then((v) => { if (!stop) setVendusVinted(v); });
+    lirePreuvesVenteVinted({ comptes: avecSku ? comptesPreuve : null }).then((p) => { if (!stop) { setVendusVinted(p ? p.vendus : null); setSansPreuve(p ? p.sansPreuve : null); setSansPreuveKO(p && Array.isArray(p.sansPreuveKO) ? p.sansPreuveKO : []); } });
     (async () => {
       try {
         const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=ventes:data->ventes`, { headers: sbAuth() });
@@ -12286,7 +13144,7 @@ function EbayAnnonces({ baseKO, comptes = [] }) {
       } catch (_) { if (!stop) setVentesLbc(null); }
     })();
     return () => { stop = true; };
-  }, [aVerifier, items]);
+  }, [aVerifier, items, clePreuve, preuveRelue]);
   // Après une publication / modif : on resynchronise depuis eBay puis on relit.
   const resync = React.useCallback(async () => {
     try { await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'sync' }) }); } catch (_) {}
@@ -12489,14 +13347,22 @@ function EbayAnnonces({ baseKO, comptes = [] }) {
         ))}
       </div>
     )}
-    {/* Retrait automatique (proposition 8) — éteint par défaut, son choix. */}
-    <div data-ebay-retrait-auto={retraitAuto ? 'allume' : 'eteint'} style={{ ...bloc(), display: 'flex', flexDirection: 'column', gap: 6 }}>
+    {/* Retrait automatique (proposition 8) — éteint par défaut, son choix.
+        (11 octobre) Julien le croyait éteint : il était ALLUMÉ dans sa base.
+        L'état se dit d'abord, en un mot, et ce qu'il fait EN SON NOM ; tant que
+        le réglage n'est pas relu du nuage, on ne dit ni l'un ni l'autre (sur un
+        appareil neuf, « éteint » serait un faux). On ne touche pas à SON choix. */}
+    <div data-ebay-retrait-auto={!reglageAutoLu ? 'pas-lu' : retraitAuto ? 'allume' : 'eteint'} style={{ ...bloc(), display: 'flex', flexDirection: 'column', gap: 6 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <div style={{ flex: '1 1 200px', minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: E.text }}>Retrait automatique d'eBay</div>
-          <div style={{ fontSize: 11.5, color: E.muted, lineHeight: 1.45 }}>{retraitAuto ? 'Allumé : une paire prouvée vendue sur Vinted est retirée d\'eBay quand VRM est ouvert, si son annonce porte son N°.' : 'Éteint : VRM te montre les paires à retirer, c\'est toi qui cliques.'}</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: E.text }}>Retrait automatique d'eBay : <span data-ebay-retrait-etat={!reglageAutoLu ? 'pas-lu' : retraitAuto ? 'allume' : 'eteint'} style={{ fontWeight: 800 }}>{!reglageAutoLu ? '…' : retraitAuto ? 'ALLUMÉ' : 'ÉTEINT'}</span></div>
+          <div style={{ fontSize: 11.5, color: E.muted, lineHeight: 1.45 }}>{!reglageAutoLu
+            ? 'Je relis ton réglage…'
+            : retraitAuto
+              ? 'VRM retire TOUT SEUL d\'eBay, sans te demander, une paire prouvée vendue sur Vinted dont l\'annonce porte le N° — dès que VRM est ouvert, sur n\'importe lequel de tes appareils. Une annonce eBay terminée ne revient pas : si la vente Vinted est annulée ensuite, il faudra la republier. Tu ne l\'as pas voulu ? « Éteindre ».'
+              : 'VRM te montre les paires à retirer, c\'est toi qui cliques.'}</div>
         </div>
-        <button type="button" data-ebay-retrait-auto-bouton onClick={basculerRetraitAuto} style={lienE}>{retraitAuto ? 'Éteindre' : 'Allumer'}</button>
+        <button type="button" data-ebay-retrait-auto-bouton disabled={!reglageAutoLu} onClick={basculerRetraitAuto} style={{ ...lienE, opacity: reglageAutoLu ? 1 : 0.5 }}>{retraitAuto ? 'Éteindre' : 'Allumer'}</button>
       </div>
       {Array.isArray(journalAuto) && journalAuto.length > 0 && (
         <div data-ebay-retraits-faits={journalAuto.length} style={{ fontSize: 11.5, color: E.muted, lineHeight: 1.5, borderTop: `1px solid ${E.border}`, paddingTop: 6 }}>
@@ -12515,14 +13381,23 @@ function EbayAnnonces({ baseKO, comptes = [] }) {
   // et programmée ici ne lève l'alerte que si ses ventes ont été lues.
   const progReliees = listeProgrammees.some((p) => p && numDeSkuEbay(p.sku));
   const lbcPasSu = progReliees && (ventesLbc === null || ventesConnues.pasSu.includes('tes annonces Leboncoin'));
+  // (revue du 11 octobre) Les ventes d'AUTRES comptes illisibles : la preuve
+  // tient (elle ne dépend pas d'eux), mais la ligne « pas encore reliées » ne
+  // peut pas être écrite — on nomme les comptes et ce que ça empêche, sinon
+  // l'écran d'une panne est celui où tout est relié (§4.1).
+  const nomCompte = (u) => { const a = (Array.isArray(comptes) ? comptes : []).find((x) => String(x && x.vinted_user_id) === String(u)); return (a && a.login) || `#${u}`; };
+  const ventesKO = (relieesEbay || progReliees) && vendusVinted instanceof Set && sansPreuve === null && Array.isArray(sansPreuveKO) && sansPreuveKO.length
+    ? sansPreuveKO.map(nomCompte) : [];
   const pasSu = [
     (relieesEbay || progReliees) && vendusVinted === null && 'tes ventes Vinted',
+    ventesKO.length > 0 && `les ventes Vinted de ${ventesKO.join(', ')}`,
     commandes === null && 'tes ventes eBay',
     lbcPasSu && 'tes ventes Leboncoin',
     skuCommandes && enLigne === null && 'tes annonces Vinted',
   ].filter(Boolean);
   const effets = [
     (relieesEbay || progReliees) && vendusVinted === null && 'je ne peux pas te dire si une paire en vente ou programmée ici est déjà partie sur Vinted',
+    ventesKO.length > 0 && `je ne peux pas te dire quelles ventes en cours ${ventesKO.length > 1 ? 'de ces comptes' : 'de ce compte'} ne sont pas encore reliées à leur annonce`,
     lbcPasSu && 'je ne peux pas te dire si une paire programmée ici est déjà vendue sur Leboncoin',
     (commandes === null || (skuCommandes && enLigne === null)) && 'je ne peux pas te dire si une paire vendue ici est encore en vente sur Vinted',
   ].filter(Boolean);
@@ -12531,13 +13406,93 @@ function EbayAnnonces({ baseKO, comptes = [] }) {
       ⚠️ Je n'ai pas pu lire {pasSu.length === 1 ? pasSu[0] : pasSu.slice(0, -1).join(', ') + ' ni ' + pasSu[pasSu.length - 1]} — rien n'est perdu, rouvre l'écran dans un moment. En attendant, {effets.join(', et ')}.
     </div>
   );
+  // ── 2 bis. LES VENTES VINTED QUE L'ANTI DOUBLE VENTE NE VOIT PAS (11 octobre)
+  // Une vente EN COURS (à poster, en route) qu'aucune preuve ne relie à son
+  // annonce — ni transaction rangée, ni bordereau. Si sa paire est aussi en
+  // vente ici, VRM ne peut pas le dire : c'était la N°553 du 10 octobre. Dit UNE
+  // fois (§7), chaque compte NOMMÉ (le geste se fait compte par compte), et le
+  // geste suit l'extension de CE navigateur (`extSait`, trois états) — jamais
+  // la promesse qu'elle le fera si elle ne sait pas le faire.
+  const nSansPreuve = (relieesEbay || progReliees) && Array.isArray(sansPreuve) ? sansPreuve.length : 0;
+  const ligneSansPreuve = nSansPreuve > 0 && (() => {
+    const parCompte = new Map();
+    for (const v of sansPreuve) parCompte.set(v.uid, (parCompte.get(v.uid) || 0) + 1);
+    const nom = nomCompte;
+    const noms = [...parCompte.entries()].map(([u, n]) => parCompte.size > 1 ? `${nom(u)} (${n})` : nom(u));
+    const un = nSansPreuve === 1, ce = parCompte.size === 1 ? 'ce compte' : 'chacun de ces comptes';
+    const cap = extSait('preuves');
+    // ⚠️⚠️ (revue du 11 octobre) « ELLE LIT TOUTE SEULE » N'EST VRAI QUE SI ELLE
+    //    PEUT ÉCRIRE : sans session VRM, la visite s'arrête avant de lire quoi que
+    //    ce soit (`visite_sans_session`, prouvé dans le vm). La promesse ne se fait
+    //    qu'à une extension connectée à CE compte VRM, ici, sur un ordinateur — la
+    //    même règle que les annonces à confirmer (`connexionExtensionVrm`, §11) ;
+    //    sinon on dit ce qui bloque, avec la phrase de l'indicateur
+    //    (`raisonExtGlobale`) : une voix, pas deux.
+    const ailleurs = cap === 'absente' || sansSouris;
+    const blocage = cap === 'ok' && !ailleurs ? raisonExtGlobale(false, { cap: 'preuves', role: 'lit la transaction de tes ventes' }) : null;
+    const promet = cap === 'ok' && !ailleurs && !blocage && connexionExtensionVrm() === 'ok';
+    // Une ligne a son bouton « Générer le bordereau » seulement si elle est à
+    // poster, SANS bordereau déjà rangé (un bordereau capté au téléchargement ne
+    // porte pas l'annonce : « Générer » répondrait « déjà fait » et ne relierait
+    // rien — l'écran Ventes, lui, dit « prêt à imprimer », §11), et sur un
+    // ordinateur (au doigt, un bouton grisé n'explique rien).
+    // ⚠️ Relecture croisée de la 5.174 : « ou génère son bordereau (bouton
+    //    ci-dessous) » s'écrivait au-dessus d'un bouton GRISÉ — deux extensions
+    //    (« je n'en envoie aucune » dans le même paragraphe), code périmé, autre
+    //    compte VRM, pas connectée, et sa 5.164 d'aujourd'hui. Le bouton ne sert
+    //    ici qu'à RELIER la vente : il n'est monté — et proposé — que si
+    //    l'extension de ce navigateur peut recevoir la commande (la règle de
+    //    l'indicateur, `raisonExtGlobale`, §11). Sinon : ouvrir la vente sur
+    //    vinted.fr, et le bouton reste sur l'écran Ventes (grisé, avec sa raison).
+    const commandePossible = raisonExtGlobale(sansSouris, { cap: 'commande' }) === null;
+    const aBouton = (v) => commandePossible && !v.bordCapte && aExpedier({ status: v.statut, transaction_user_status: v.tus });
+    const generer = sansPreuve.some(aBouton);
+    // (revue du 11 octobre) LE CHIFFRE, PAS LA PROMESSE : l'extension n'en lit
+    // que `PREUVE_PAR_VISITE` par visite et par compte (`PREUVE_MAX_PAR_VISITE`
+    // dans background.js, comparé par audit-preuve-vente) — « à ta prochaine
+    // visite » n'est vrai que si aucun compte n'en a plus.
+    const plusParCompte = Math.max(...parCompte.values());
+    const quand = plusParCompte > PREUVE_PAR_VISITE ? 'au fil de tes visites' : 'à ta prochaine visite';
+    const ouvre = `ouvre ${un ? 'la vente' : 'chaque vente'} sur vinted.fr (lien${un ? '' : 's'} ci-dessous), connecté sur ${ce}`;
+    const ouGenere = generer ? ` — ou génère ${un ? 'son' : 'leur'} bordereau depuis VRM (bouton ci-dessous) : un bordereau généré par VRM relie la vente` : '';
+    const geste = promet
+      ? `L'extension de ce navigateur lit ${un ? 'sa transaction' : 'leur transaction'} toute seule sur vinted.fr, connecté sur ${ce} — ${PREUVE_PAR_VISITE} par visite, donc ${quand}.`
+      : ailleurs
+        ? `Sur l'ordinateur où l'extension VRM est installée : passe sur vinted.fr connecté sur ${ce}, ou ouvre ${un ? 'la vente' : 'chaque vente'} (lien${un ? '' : 's'} ci-dessous) si l'extension n'est pas à jour.`
+        : cap === 'retard'
+          ? `L'extension installée ici ne va pas ${un ? 'la' : 'les'} chercher toute seule : mets-la à jour (${EXT_ATTENDUE}). En attendant, ${ouvre}${ouGenere}.`
+          : `${blocage ? blocage.texte : 'Je vérifie que l\'extension de ce navigateur est connectée à ton compte VRM.'} Tant que ce n'est pas réglé, elle ne lit rien : ${ouvre}${ouGenere}.`;
+    // (revue du 11 octobre) « Ouvre la conversation de chaque vente » sans dire
+    // LAQUELLE : il a neuf comptes et des dizaines de ventes. Chaque vente est
+    // nommée (son titre, sinon son n° de transaction), avec le lien vers SA
+    // conversation (ou sa transaction) — et, si elle est à poster, son bouton
+    // « Générer le bordereau » : un bordereau capté porte l'annonce (§5).
+    const lienVente = (v) => v.conv ? `https://www.vinted.fr/inbox/${encodeURIComponent(v.conv)}` : `https://www.vinted.fr/member/transactions/${encodeURIComponent(v.tx)}`;
+    return (
+      <div data-ebay-ventes-sans-preuve={nSansPreuve} data-ebay-sans-preuve-geste={cap} data-ebay-sans-preuve-promesse={promet ? '1' : '0'} data-ebay-sans-preuve-blocage={blocage ? blocage.code : ''} style={{ ...bloc(), fontSize: 12.5, color: E.text, lineHeight: 1.5 }}>
+        <b>{nSansPreuve} vente{un ? '' : 's'} Vinted en cours pas encore reliée{un ? '' : 's'} à {un ? 'son' : 'leur'} annonce</b> (sur {noms.join(', ')}) : l'anti double vente ne {un ? 'la' : 'les'} voit pas encore — si la paire est aussi en vente ici, VRM ne peut pas te dire de la retirer. {geste}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
+          {sansPreuve.map((v) => (
+            <div key={v.uid + ':' + v.tx} data-ebay-sans-preuve-vente={v.tx} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, minWidth: 0 }}>
+              <span style={{ fontWeight: 600, minWidth: 0, overflowWrap: 'anywhere' }}>{v.titre || `vente n° ${v.tx}`}{parCompte.size > 1 ? <span style={{ color: E.muted, fontWeight: 500 }}> · {nom(v.uid)}</span> : null}</span>
+              <a href={lienVente(v)} target="_blank" rel="noreferrer" style={{ ...lienE, textDecoration: 'none' }}>ouvrir sur Vinted ↗</a>
+              {aBouton(v) && (
+                <BoutonBordereau uid={v.uid} tx={String(v.tx)} conv={v.conv} login={nom(v.uid)} aGenerer pdf={false} sansRepli onFait={() => setPreuveRelue((n) => n + 1)} />
+              )}
+              {v.bordCapte && <span data-ebay-sans-preuve-bord-capte={v.tx} style={{ color: E.muted, fontSize: 11.5 }}>bordereau déjà là (Ventes)</span>}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  })();
   if (baseKO) return wrap(<>{head()}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué. Réessaie dans un instant.</div></>);
-  if (items === undefined) return wrap(<>{head()}{alertes}{lignePasSu}{outils}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Chargement…</div></>);
-  if (items === null) return wrap(<>{head()}{alertes}{lignePasSu}{outils}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Je n'ai pas pu lire tes annonces eBay. Réessaie dans un instant.</div></>);
+  if (items === undefined) return wrap(<>{head()}{alertes}{lignePasSu}{ligneSansPreuve}{outils}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Chargement…</div></>);
+  if (items === null) return wrap(<>{head()}{alertes}{lignePasSu}{ligneSansPreuve}{outils}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Je n'ai pas pu lire tes annonces eBay. Réessaie dans un instant.</div></>);
   // ⚠️ Une paire VENDUE sur eBay sort de cette liste (l'annonce est terminée) :
   //    c'est justement quand il n'en reste aucune que « retire-la de Vinted »
   //    compte le plus. Les alertes passent donc AVANT ce cas.
-  if (!items.length) return wrap(<>{head(0)}{alertes}{lignePasSu}{outils}<div style={{ color: E.muted, fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>Pas encore d'annonce eBay en ligne. {connected === true ? 'Mets une paire en vente ci-dessus — elle apparaîtra ici.' : 'Connecte ton compte eBay (onglet « Compte eBay ») et synchronise.'}</div></>);
+  if (!items.length) return wrap(<>{head(0)}{alertes}{lignePasSu}{ligneSansPreuve}{outils}<div style={{ color: E.muted, fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>Pas encore d'annonce eBay en ligne. {connected === true ? 'Mets une paire en vente ci-dessus — elle apparaîtra ici.' : 'Connecte ton compte eBay (onglet « Compte eBay ») et synchronise.'}</div></>);
   // ── 4. L'OFFRE AUX OBSERVATEURS et les annonces pas reliées : une phrase
   //    chacune, au-dessus de la liste ; sur la carte, seulement le bouton ou la
   //    pastille, qui distinguent (§7). ─────────────────────────────────────────
@@ -12549,6 +13504,7 @@ function EbayAnnonces({ baseKO, comptes = [] }) {
     <div style={{ color: E.muted, fontSize: 12, marginBottom: 12 }}>Tes annonces en ligne sur eBay — touche une annonce pour la modifier</div>
     {alertes}
     {lignePasSu}
+    {ligneSansPreuve}
     {outils}
     <div style={{ height: 12 }} />
     {nSans > 0 && (
@@ -19277,25 +20233,199 @@ const normTitle = (t) => (t || '').toLowerCase().replace(/\s+/g, ' ').trim();
 // ⚠️ Même expression que côté extension (`background.js`) — une notion, une
 //    règle (§11). Deux copies qui divergeraient donneraient deux files.
 const PAS_UNE_VENTE = /annul|cancel|refus|rembours|retour|suspend|[ée]chou/i;
+// ⚠️⚠️ 11 OCTOBRE — LA PREUVE QUI MANQUAIT À L'ANTI DOUBLE VENTE eBAY. Plainte
+// de Julien : « J'ai fait une vente hier, j'avais relié les deux paires, ça n'a
+// pas retiré la paire sur eBay, ça ne m'a même pas proposé ». Mesuré en lecture
+// seule : la N°553 (tx 23052006117, angeled92) n'avait AUCUNE ligne
+// `harvest_*_txn_*` — elle n'arrive que quand la CONVERSATION de la vente est
+// ouverte sur vinted.fr, geste que « Générer le bordereau » depuis l'app rend
+// inutile. Sur 18 ventes en cours, 6 seulement étaient prouvées : la règle a
+// tourné 36 fois sur ses deux appareils sans rien voir. Son BORDEREAU, lui,
+// était là depuis 21:55 et portait l'annonce (`item`, lu dans la transaction).
+// ⇒ la preuve par le bordereau, la même règle que l'extension (§11), bloc
+//   ci-dessous ; et l'extension 5.169 range désormais la transaction qu'elle lit.
+// ⚠️ Jamais `item_closing_action: 'sold'` seul : mesuré, 10 annonces « sold »
+//    n'ont que des transactions revenues (annulées, retours).
+// <preuve-vente-regle> — LA MÊME RÈGLE QUE L'EXTENSION (background.js), §11 ; comparées par
+// `audit-preuve-vente.cjs` (texte ET sorties). Fonctions PURES.
+const PREUVE_RECENTE_MS = 30 * 86400000;
+// Une vente qui n'est pas REVENUE : son état ne l'annule pas, et Vinted ne la
+// classe pas « en échec » (`failed` : remboursée, annulée).
+function venteVivante(o) {
+  if (!o || o.transaction_id == null) return false;
+  if (PAS_UNE_VENTE.test(String(o.status || ''))) return false;
+  return String(o.transaction_user_status || '') !== 'failed';
+}
+// Une vente EN COURS (à poster ou en route) : vivante, pas finalisée, de moins
+// de 30 jours. C'est la fenêtre où une double vente peut encore arriver.
+function venteEnCoursPreuve(o, maintenant) {
+  if (!venteVivante(o)) return false;
+  if (/finalis/i.test(String(o.status || '')) || String(o.transaction_user_status || '') === 'completed') return false;
+  const d = Date.parse(o.date || '');
+  return !(Number.isFinite(d) && maintenant - d > PREUVE_RECENTE_MS);
+}
+// La preuve par la TRANSACTION (ce qui existait) : l'annonce (`item_id`) et un
+// état de commande qui ne la fait pas revenir. Une conversation (état vide)
+// n'est pas une vente. Rend { items, tx } (annonces, transactions prouvées).
+// ⚠️⚠️ (revue du 11 octobre) LA LIGNE `harvest_{uid}_txn_{tx}` EST UN
+// INSTANTANÉ, JAMAIS RELU : celle que range le bordereau (5.169) dit « Bordereau
+// envoyé au vendeur » pour toujours, même quand la vente finit remboursée — la
+// paire, revenue chez lui, restait « vendue » (retrait d'eBay, file Leboncoin).
+// Mesuré en production : 46 preuves à un état NON terminal, 5 contredites par
+// leur vente (« Le paiement a été validé » / « Remboursement effectué », failed).
+// ⇒ Un état non terminal ne prouve que si la vente `tx`, lue dans les ventes du
+//   MÊME compte (relues à chaque visite), n'est pas revenue. Vente pas trouvée
+//   dans les ventes lues : l'instantané est la seule information, il tient.
+//   « Commande finalisée » est terminal : rien ne la fait revenir.
+const ETAT_TXN_TERMINAL = /finalis/i;
+function preuvesParTransaction(lignes, ventesParCompte) {
+  const items = new Set(), tx = new Set();
+  for (const r of (Array.isArray(lignes) ? lignes : [])) {
+    if (!r || !r.it) continue;
+    const etat = String(r.ti || '').trim();
+    if (!etat || PAS_UNE_VENTE.test(etat)) continue;
+    const id = String(r.id || '');
+    const t = (/_txn_(\d+)$/.exec(id) || [])[1];
+    const u = (/^harvest_(\d+)_txn_\d+$/.exec(id) || [])[1];
+    if (u && t && ventesParCompte && !ETAT_TXN_TERMINAL.test(etat)) {
+      const ventes = ventesParCompte[u];
+      const o = Array.isArray(ventes) ? ventes.find((v) => v && String(v.transaction_id) === t) : null;
+      if (o && !venteVivante(o)) continue;
+    }
+    items.add(String(r.it));
+    if (t) tx.add(t);
+  }
+  return { items, tx };
+}
+// La preuve par le BORDEREAU : `harvest_{uid}_label_{tx}` porte l'annonce que
+// l'extension a lue dans la transaction (une identité, §5). Elle ne vaut que si
+// la vente `tx` est LUE dans les ventes du MÊME compte et qu'elle est vivante
+// (mesuré : 4 bordereaux sur 71 finissent « Remboursement effectué »).
+// `label_latest` (une copie) n'est jamais lu ; un `tx` de méta qui contredit
+// l'identifiant de la ligne = doute ⇒ rien. `ventesParCompte` : { uid: [ventes] }
+// — un compte absent n'a pas été lu ⇒ aucun de ses bordereaux ne prouve rien.
+function preuvesParBordereau(bordereaux, ventesParCompte) {
+  const items = new Set(), tx = new Set();
+  for (const b of (Array.isArray(bordereaux) ? bordereaux : [])) {
+    const m = /^harvest_(\d+)_label_(\d+)$/.exec(String((b && b.id) || ''));
+    if (!m) continue;
+    const t = m[2];
+    if (b.tx != null && String(b.tx).trim() !== '' && String(b.tx).trim() !== t) continue;
+    const it = String(b.it == null ? '' : b.it).trim();
+    if (!/^\d+$/.test(it)) continue;
+    const ventes = ventesParCompte ? ventesParCompte[m[1]] : null;
+    if (!Array.isArray(ventes)) continue;
+    const o = ventes.find((v) => v && String(v.transaction_id) === t);
+    if (!o || !venteVivante(o)) continue;
+    items.add(it); tx.add(t);
+  }
+  return { items, tx };
+}
+// Les comptes dont il faut LIRE les ventes : ceux qui portent un bordereau dont
+// l'annonce n'est pas déjà prouvée par une transaction, et ceux dont une
+// transaction ne prouve qu'un instantané (état non terminal, ci-dessus) — sa
+// vente peut l'avoir dépassé. Le reste ne coûte rien.
+function comptesAJuger(bordereaux, dejaProuves, transactions) {
+  const out = [];
+  for (const r of (Array.isArray(transactions) ? transactions : [])) {
+    const m = /^harvest_(\d+)_txn_\d+$/.exec(String((r && r.id) || ''));
+    const etat = String((r && r.ti) || '').trim();
+    if (m && r.it && etat && !PAS_UNE_VENTE.test(etat) && !ETAT_TXN_TERMINAL.test(etat) && !out.includes(m[1])) out.push(m[1]);
+  }
+  for (const b of (Array.isArray(bordereaux) ? bordereaux : [])) {
+    const m = /^harvest_(\d+)_label_(\d+)$/.exec(String((b && b.id) || ''));
+    const it = String((b && b.it) == null ? '' : b.it).trim();
+    if (m && /^\d+$/.test(it) && !(dejaProuves && dejaProuves.has(it)) && !out.includes(m[1])) out.push(m[1]);
+  }
+  return out;
+}
+// Les ventes lues, par compte (`select=id,v:data->payload->my_orders`). Un
+// compte demandé sans ligne n'a aucune vente captée : `[]`, rien n'est prouvé.
+function ventesParCompteDe(lignes, uids) {
+  const out = {};
+  for (const u of (Array.isArray(uids) ? uids : [])) out[String(u)] = [];
+  for (const r of (Array.isArray(lignes) ? lignes : [])) {
+    const m = /^harvest_(\d+)_orders_sold$/.exec(String((r && r.id) || ''));
+    if (m && Array.isArray(out[m[1]]) && Array.isArray(r.v)) out[m[1]] = out[m[1]].concat(r.v);
+  }
+  return out;
+}
+// </preuve-vente-regle>
 // Les annonces Vinted PROUVÉES vendues (§5) : la transaction porte l'annonce
 // (`item_id`) et Vinted lui donne un ÉTAT DE COMMANDE qui ne la fait pas
-// revenir — la MÊME règle que l'écran Leboncoin et que l'extension
-// (`lireVentesProuvees`) : une conversation (état vide) n'est pas une vente.
-// Paginée et STRICTE (§4.5) : `null` = pas su, jamais une demi-liste.
-const lireVentesVintedProuvees = async () => {
+// revenir — ou son BORDEREAU porte l'annonce et la vente est lue, vivante, dans
+// les ventes du même compte. La MÊME règle que l'extension (`lireVentesProuvees`).
+// Paginée et STRICTE (§4.5) : `null` = pas su (une des lectures n'a pas
+// répondu), jamais une demi-liste.
+// `comptes` (uids, facultatif) : l'appelant veut aussi les ventes EN COURS
+// (à poster, en route) qu'AUCUNE preuve ne relie à leur annonce — l'anti double
+// vente ne les voit pas ; l'écran eBay les compte, une fois.
+// Rend `null` · `{ vendus: Set(annonce), sansPreuve: [{ uid, tx, titre, conv, statut, tus, bordCapte }] | null,
+//   sansPreuveKO: [uid] (comptes demandés dont les ventes n'ont pas pu être lues),
+//   ancienne: Set(annonce) }`.
+// (revue du 11 octobre) `bordCapte` : un bordereau est DÉJÀ rangé pour cette
+// vente, sans l'annonce (capté au téléchargement) — « Générer » ne ferait rien.
+// `ancienne` : ce que la règle des extensions PUBLIÉES (transactions seules,
+// jusqu'à la 5.170) dit vendu — l'écran Leboncoin ne propose pas « Publier » sur
+// une paire que l'extension installée refusera (elle relit SA file).
+// `sansPreuveKO` : on DIT quels comptes n'ont pas été lus — sinon « pas
+// reliée » disparaît en silence, comme si tout était relié (§4.1).
+// Combien de transactions l'extension lit par visite et par compte : le MIROIR
+// de `PREUVE_MAX_PAR_VISITE` (background.js) — `audit-preuve-vente` exige
+// l'égalité, sinon l'écran promettrait un rythme que l'extension ne tient pas.
+const PREUVE_PAR_VISITE = 3;
+const lirePreuvesVenteVinted = async (opts = {}) => {
   try {
-    const rows = await lireTout('id=like.harvest_%25_txn_%25&select=it:meta->>item_id,ti:meta->>status_title', { strict: true });
+    const rows = await lireTout('id=like.harvest_%25_txn_%25&select=id,it:meta->>item_id,ti:meta->>status_title', { strict: true });
     if (rows === null) return null;
-    const vendus = new Set();
-    for (const r of rows) {
-      if (!r || !r.it) continue;
-      const etat = String(r.ti || '').trim();
-      if (!etat || PAS_UNE_VENTE.test(etat)) continue;
-      vendus.add(String(r.it));
+    // Les bordereaux (une ligne par vente, tous comptes, `_latest` écarté par
+    // la règle) : deux scalaires de `meta`, jamais le PDF (§4.4).
+    const bords = await lireTout('id=like.harvest_%25_label_%25&select=id,tx:meta->>tx,it:meta->>item', { strict: true });
+    if (bords === null) return null;
+    const comptes = Array.isArray(opts.comptes) ? [...new Set(opts.comptes.map(String).filter((u) => /^\d+$/.test(u)))] : null;
+    const ordres = (uids) => lireTout(`id=in.(${uids.map((u) => `harvest_${u}_orders_sold`).join(',')})&select=id,v:data->payload->my_orders`, { strict: true });
+    // Les ventes dont une PREUVE dépend (bordereau à juger, transaction à un état
+    // non terminal) : leur panne vaut « pas su » — jamais une demi-preuve.
+    const juger = comptesAJuger(bords, preuvesParTransaction(rows).items, rows);
+    const parCompte = {};
+    if (juger.length) {
+      const lignes = await ordres(juger);
+      if (lignes === null) return null;
+      Object.assign(parCompte, ventesParCompteDe(lignes, juger));
     }
-    return vendus;
+    const parTx = preuvesParTransaction(rows, parCompte);
+    const vendus = new Set(parTx.items);
+    for (const it of preuvesParBordereau(bords, parCompte).items) vendus.add(it);
+    // (revue du 11 octobre) Les ventes des AUTRES comptes demandés ne servent
+    // qu'à la ligne « pas reliées » (une information) : leur panne la rend
+    // `null`, elle n'efface JAMAIS la preuve — une vente prouvée par sa
+    // transaction reste « à retirer » même quand cette lecture (la plus lourde)
+    // ne répond pas.
+    let sansPreuve = null, sansPreuveKO = [];
+    if (comptes) {
+      const autres = comptes.filter((u) => !juger.includes(u));
+      const l2 = autres.length ? await ordres(autres) : [];
+      if (l2 === null) sansPreuveKO = autres;
+      if (l2 !== null) {
+        Object.assign(parCompte, ventesParCompteDe(l2, autres));
+        const bordTx = preuvesParBordereau(bords, parCompte).tx;
+        // Les bordereaux rangés, quels qu'ils soient (avec ou sans l'annonce).
+        const ranges = new Set((bords || []).map((b) => { const m = /^harvest_(\d+)_label_(\d+)$/.exec(String((b && b.id) || '')); return m ? m[1] + ':' + m[2] : ''; }).filter(Boolean));
+        sansPreuve = [];
+        const vus = new Set(), maintenant = Date.now();
+        for (const u of comptes) for (const o of (parCompte[u] || [])) {
+          if (!venteEnCoursPreuve(o, maintenant)) continue;
+          const tx = String(o.transaction_id);
+          if (vus.has(tx) || parTx.tx.has(tx) || bordTx.has(tx)) continue;
+          vus.add(tx);
+          sansPreuve.push({ uid: u, tx, titre: String(o.title || '').trim(), conv: o.conversation_id != null ? String(o.conversation_id) : '', statut: String(o.status || ''), tus: String(o.transaction_user_status || ''), bordCapte: ranges.has(u + ':' + tx) });
+        }
+      }
+    }
+    return { vendus, sansPreuve, sansPreuveKO, ancienne: preuvesParTransaction(rows).items };
   } catch (_) { return null; }
 };
+const lireVentesVintedProuvees = async () => { const p = await lirePreuvesVenteVinted(); return p ? p.vendus : null; };
 
 // ══════════════════════════════════════════════════════════════════════════════
 // UNE OFFRE NE SE RANGE PAS PAR RESSEMBLANCE DE TITRE (§5)
@@ -28274,15 +29404,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
           );
         })()}
-        {/* ⚠️ SOUS LES COLIS, PAS AU-DESSUS. Ce panneau dit quelles boîtes mail
-            ne transfèrent pas — une information de configuration, vraie pendant
-            des semaines, qu'on règle une fois. Placé en tête, il repoussait
-            chaque jour les colis, leurs codes et leurs QR d'une centaine de
-            pixels : ce qu'on vient chercher passait après ce qu'on ne peut pas
-            régler d'ici. Il reste sur cet onglet (c'est bien là que les codes
-            manquent), simplement après. */}
-        {aFilter==='attente' && <ReceptionEmails tracking={tracking} comptes={accounts}
-          colisParTransporteur={(()=>{ const m={}; for(const t of (pickupUnion.emailList||[])){ const k=carrierKey(t&&t.carrier)||'autre'; m[k]=(m[k]||0)+1; } return m; })()}/>}
         {/* ── ⚠️ LES COLIS JAMAIS RETIRÉS ────────────────────────────────────────
             « Je dois passer à côté de rien. » Ces colis-là sortaient de l'écran
             SANS RIEN DIRE dès qu'ils dépassaient 14 jours (mesuré : 4 colis de
@@ -28343,6 +29464,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
           </div>
         )}
+        {/* ⚠️ SOUS LES COLIS, PAS AU-DESSUS. Ce panneau dit quelles boîtes mail
+            ne transfèrent pas — une information de configuration, vraie pendant
+            des semaines, qu'on règle une fois. Placé en tête, il repoussait
+            chaque jour les colis, leurs codes et leurs QR d'une centaine de
+            pixels : ce qu'on vient chercher passait après ce qu'on ne peut pas
+            régler d'ici. Il reste sur cet onglet (c'est bien là que les codes
+            manquent), simplement après — ET APRÈS LES COLIS JAMAIS RETIRÉS
+            (revue du 11 octobre : déplié, il faisait 312 px et repoussait de
+            l'argent perdu). Avec des comptes muets : une ligne (`MuetsCompact`). */}
+        {aFilter==='attente' && <ReceptionEmails tracking={tracking} comptes={accounts}
+          colisParTransporteur={(()=>{ const m={}; for(const t of (pickupUnion.emailList||[])){ const k=carrierKey(t&&t.carrier)||'autre'; m[k]=(m[k]||0)+1; } return m; })()}/>}
         {/* ── LES COLIS QUI SONT REPARTIS CHEZ LE VENDEUR ────────────────────
             ⚠️ MESURÉ SUR LA VRAIE BASE (6 septembre) : trois achats portent
             « Commande non réclamée - Retournée à l'expéditeur.rice », pour
@@ -32610,21 +33742,28 @@ function LeboncoinScreen() {
     //    ⇒ Une vente est prouvée quand Vinted donne un ÉTAT DE COMMANDE à la
     //      transaction, et que cet état ne la fait pas REVENIR. On ne liste pas
     //      des codes : un code inconnu demain doit compter comme une vente.
-    const txnRows = await sbGet('app_data?id=like.harvest_*_txn_*&select=it:meta->>item_id,ti:meta->>status_title');
     // ⚠️⚠️ ET « JE N'AI PAS PU LIRE » N'EST PAS « AUCUNE VENTE ». Mesuré en
     //    direct le 15 septembre : cette lecture a échoué une fois (base sous
     //    charge), le `|| []` l'a transformée en « aucune vente prouvée », et la
     //    file est passée de **40 à 55 paires** — quinze paires DÉJÀ VENDUES
     //    reproposées à la publication, sans un mot. C'est la plainte du
     //    13 septembre ressuscitée par un simple timeout.
-    const preuveKO = txnRows === null;
-    const vendus = new Set();
-    for (const r of (txnRows || [])) {
-      if (!r || !r.it) continue;
-      const etat = String(r.ti || '').trim();
-      if (!etat || PAS_UNE_VENTE.test(etat)) continue;   // conversation, ou la paire revient
-      vendus.add(String(r.it));
-    }
+    // ⚠️⚠️ (revue du 11 octobre) LA MÊME PREUVE QUE L'EXTENSION ET L'ÉCRAN eBAY
+    //    (§11) : cet écran gardait sa propre boucle sur les seules transactions.
+    //    Une vente prouvée par son BORDEREAU (le cas de la N°553) sortait de la
+    //    file de l'extension et restait ici « à publier » — et le clic
+    //    « Publier » était alors refusé par l'extension, qui relit SA file. Et
+    //    une transaction figée sur « payée » d'une vente remboursée restait
+    //    « vendue ». Une règle (`lirePreuvesVenteVinted`), `null` = pas su.
+    // ⚠️ (revue du 11 octobre, défaut 12) + `ancienne` : ce que les extensions
+    //    PUBLIÉES (jusqu'à la 5.170) disent vendu sur la seule transaction. Une
+    //    paire REVENUE (vente remboursée ensuite) est « à publier » ici et
+    //    « vendue » pour elles : leur « Publier » serait refusé.
+    const preuveP = await lirePreuvesVenteVinted();
+    const preuveLue = preuveP ? preuveP.vendus : null;
+    const ancienne = (preuveP && preuveP.ancienne) || new Set();
+    const preuveKO = preuveLue === null;
+    const vendus = preuveLue || new Set();
     const online = []; const onlineIds = new Set(); const seen = new Set(); const etatVinted = {};
     for (const r of listRows) {
       const uid = String(r.id).split('_')[1];
@@ -32745,6 +33884,7 @@ function LeboncoinScreen() {
         photos, photosAll, nReelles, vignette: photosAll[0] || '',
         desc: !!lbcDescription(d.description),
         url: 'https://www.vinted.fr/items/' + o.id,
+        croitVendue: ancienne.has(String(o.id)),
       });
     }
     queue.sort((a, b) => triNum(a.numero, b.numero));
@@ -33051,6 +34191,7 @@ function LeboncoinScreen() {
                 aucune — 0 sur 57 lignes, vérifié). Mettre ces 54 en haut, c'est
                 mettre devant ce qui fera une annonce bâclée. */}
             <RaisonPublication n={data.queue.length} place="lbc"/>
+            <LbcCroitVendue n={data.queue.filter(q => q.croitVendue).length}/>
             {(() => {
               const pretes = data.queue.filter(q => q.photos >= 2);
               const maigres = data.queue.filter(q => q.photos === 1);
@@ -33072,7 +34213,7 @@ function LeboncoinScreen() {
                     <span style={{ flex: 1, minWidth: 0 }}>
                       <span style={{ display: 'block', fontSize: 12.5, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{q.title || '—'}</span>
                       <span style={{ display: 'block', fontSize: 10.5, color: C.muted, marginTop: 1 }}>
-                        N°{q.numero} · {q.prix != null ? q.prix.toFixed(2).replace('.', ',') + ' €' : '—'} · {q.photos} photo{q.photos > 1 ? 's' : ''}{manque ? ` captée${q.photos > 1 ? 's' : ''} sur ${q.nReelles}` : ''}{q.desc ? '' : ' · pas de description'}
+                        N°{q.numero} · {q.prix != null ? q.prix.toFixed(2).replace('.', ',') + ' €' : '—'}{q.photos > 0 ? '' : ' · 0 photo'}{q.desc ? '' : ' · pas de description'}
                         {' · '}<a href={q.url} target="_blank" rel="noreferrer" style={{ color: C.accent, fontWeight: 700 }}>l'annonce Vinted</a>
                       </span>
                     </span>
@@ -33089,7 +34230,9 @@ function LeboncoinScreen() {
                     )}
                   </div>
                   <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginTop: 7 }}>
-                    {q.photos > 0 && <BoutonPublier place="lbc" id={q.id}/>}
+                    {/* Le bouton dit les photos captées sur le total (11 octobre) —
+                        une fois, là où on décide de publier (§7). */}
+                    {q.photos > 0 && <BoutonPublier place="lbc" id={q.id} croitVendue={!!q.croitVendue} photos={q.photos} total={q.nReelles}/>}
                     <button type="button" onClick={() => marquer(q.id)} title="Tu l'as déjà publiée toi-même : elle sort de la file"
                       style={{ border: 'none', background: 'transparent', padding: 0, minHeight: 0, color: C.muted, fontSize: 11.5, fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}>Déjà publiée</button>
                   </div>
@@ -33287,7 +34430,7 @@ const PUSH_CATS = [
   { id:'bilan',    def:true,  titre:'📊 Bilan de la semaine', desc:"Le lundi matin : vendu, reçu, colis à poster, paires qui dorment." },
   { id:'suivi',   def:false, titre:'🚚 Suivi du colis',    desc:'« En transit », « livré ». Rien à faire.' },
   { id:'achat',    def:false, titre:'🛍 Achat confirmé',    desc:"Tu viens de l'acheter, tu le sais déjà." },
-  { id:'message',  def:false, titre:'💬 Message',           desc:"Le badge de l'app suffit." },
+  { id:'message',  def:false, titre:'💬 Message',           desc:"Nouveau message d’un acheteur, avec la paire. Arrive ~15 min après le message (c’est le délai de l’email de Vinted)." },
   { id:'favori',   def:false, titre:'❤️ Nouveau favori',    desc:'Vinted en envoie beaucoup.' },
   { id:'facture',  def:false, titre:'🧾 Facture',           desc:'Facture préparée ou envoyée.' },
 ];
@@ -33297,14 +34440,12 @@ function PushPrefsSetting({ comptes }) {
   //    « Chargement… » pour toujours à un panneau qui a ÉCHOUÉ.
   const [prefs, setPrefs] = useState(undefined);
   const [busy, setBusy] = useState(false);
-  // Comptes dont aucune vente ne peut déclencher de notification (voir
-  // `fetchComptesSansEmailVente`). `null` tant qu'on ne sait pas : on
-  // n'affiche jamais une accusation sur une lecture ratée.
-  const [muets, setMuets] = useState(null);
-  useEffect(() => { let mort = false;
-    if (comptes && comptes.length) fetchComptesSansEmailVente(comptes).then(r => { if (!mort) setMuets(r); });
-    return () => { mort = true; };
-  }, [comptes]);
+  const [ouvert, setOuvert] = useState(false);
+  // Comptes dont ni les ventes ni les messages ne peuvent déclencher de
+  // notification : la MÊME règle que l'écran Achats (`etatEmailsComptes`, §11).
+  // Rien tant qu'on ne sait pas : jamais une accusation sur une lecture ratée.
+  const etatComptes = useEtatEmailsComptes(comptes);
+  const muets = etatComptes.etat === 'lu' ? etatComptes.muets : null;
   useEffect(() => { let mort = false;
     (async () => {
       try {
@@ -33334,7 +34475,7 @@ function PushPrefsSetting({ comptes }) {
   };
   const n = prefs ? PUSH_CATS.filter(actif).length : 0;
   return (
-    <details style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'10px 14px'}}>
+    <details style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'10px 14px'}} onToggle={(e) => setOuvert(e.currentTarget.open)}>
       <summary style={{cursor:'pointer',listStyle:'none',display:'flex',alignItems:'center',gap:8}}>
         <div style={{flex:1,minWidth:0}}>
           <div style={{fontSize:13,fontWeight:600,color:C.text}}>🔔 Ce que tu reçois sur ton téléphone</div>
@@ -33342,9 +34483,10 @@ function PushPrefsSetting({ comptes }) {
             {enCours ? 'Chargement…'
               : pasLu ? <span style={{display:'inline-block',fontSize:11,fontWeight:600,color:C.muted,background:C.bg,border:`1px solid ${C.border}`,borderRadius:999,padding:'2px 9px'}}>{REGLAGE_PAS_LU}</span>
               : `${n} type${n>1?'s':''} de notification sur ${PUSH_CATS.length}. Par défaut, on ne sonne que pour l'argent et ce qu'il y a à faire.`}
-            {muets && muets.length > 0 && (
-              <div style={{color:C.warn,fontWeight:600,marginTop:3}}>
-                ⚠ {muets.length} compte{muets.length>1?'s':''} ne te préviendra{muets.length>1?'ient':''} d'aucune vente — déplie pour savoir lesquels.
+            {/* §7 (revue du 11 oct.) : déplié, le bloc dessous dit tout — le résumé se tait. */}
+            {muets && muets.length > 0 && !ouvert && (
+              <div style={{color:C.warn,fontWeight:600,marginTop:3}} data-resume-muets={muets.length}>
+                ⚠ {muets.length} compte{muets.length>1?'s':''} n’envoie{muets.length>1?'nt':''} aucun email à VRM&nbsp;: ni {muets.length>1?'leurs':'ses'} ventes ni {muets.length>1?'leurs':'ses'} messages ne te préviendront — déplie pour savoir lesquels.
               </div>
             )}
           </div>
@@ -33352,17 +34494,7 @@ function PushPrefsSetting({ comptes }) {
         <span style={{color:C.muted,fontSize:13,flexShrink:0}}>▾</span>
       </summary>
       {muets && muets.length > 0 && (
-        <div style={{marginTop:10,border:`1px solid ${C.warn}`,borderLeft:`3px solid ${C.warn}`,background:`${C.warn}10`,borderRadius:8,padding:'9px 11px'}}>
-          <div style={{fontSize:12.5,fontWeight:700,color:C.text}}>
-            {muets.length} compte{muets.length>1?'s':''} ne te préviendra{muets.length>1?'ient':''} d'aucune vente
-          </div>
-          <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.45}}>
-            <b style={{color:C.text}}>{muets.map(a=>a.login).join(', ')}</b> — une notification de vente part d'un
-            email Vinted, et ces boîtes n'en font suivre aucun vers l'app. Leurs ventes s'afficheront bien
-            dans l'onglet Ventes (elles viennent de l'extension), mais ton téléphone ne sonnera pas.
-            Fais suivre ces boîtes vers l'adresse de réception de l'app pour les activer.
-          </div>
-        </div>
+        <div style={{marginTop:10}}><BlocComptesMuets muets={muets}/></div>
       )}
       <div style={{marginTop:10,display:'flex',flexDirection:'column',gap:2}}>
         {PUSH_CATS.map(c => {
@@ -33411,7 +34543,8 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
     const close = () => setAcct(null);
     const valider = async () => {
       setAcct(a => ({ ...a, busy:true, err:'' }));
-      if (M === 'out') { authSignOut(); location.reload(); return; }
+      // Un temps pour que le message à l'extension parte avant le rechargement.
+      if (M === 'out') { authSignOut(); setTimeout(() => location.reload(), 300); return; }
       if (M === 'pw') {
         if (acct.val.length < 8) { setAcct(a=>({...a,busy:false,err:'8 caractères minimum.'})); return; }
         if (/^(\d+|[a-zA-Z]+)$/.test(acct.val)) { setAcct(a=>({...a,busy:false,err:'Mélange lettres et chiffres — ce mot de passe protège ta compta.'})); return; }
@@ -34335,6 +35468,18 @@ function NumerosSetting() {
 //    l'EXTENSION qui répond, avec SA version. Sans `extSait('repond')`, l'app
 //    promettrait « elle répond à tes messages » à une extension qui ne sait pas
 //    le faire — pour la septième fois. Trois états, jamais deux.
+const CLES_RESERVEES_REPONDUS = ['bilan', 'demandes'];
+// Les causes d'une IA qui n'a rien rendu, tirées du bilan de l'extension (une
+// cause à zéro n'est pas écrite).
+const causesIaKO = (c) => {
+  const m = (c && typeof c === 'object') ? c : {};
+  const l = [
+    m.pasBranchee ? 'pas branchée sur le serveur' : '',
+    m.injoignable ? 'injoignable' : '',
+    m.illisible ? 'réponse inutilisable, elle ne sera pas redemandée' : '',
+  ].filter(Boolean);
+  return l.length ? ` (${l.join(' · ')})` : '';
+};
 function RepondreSetting() {
   const [on, setOn] = React.useState(() => !!load('vinted_repond_auto', false));
   const [envois, setEnvois] = React.useState(undefined);   // undefined = en cours · null = pas su
@@ -34354,9 +35499,11 @@ function RepondreSetting() {
         if (!r.ok) { setEnvois(null); setBilan(null); return; }
         const j = await r.json();
         const d = (j && j[0] && j[0].data) || {};
-        // `bilan` est une clé réservée : ce n'est pas un envoi, on ne le liste pas.
+        // `bilan` et `demandes` sont des clés réservées : ce ne sont pas des
+        // envois, on ne les liste pas. (`demandes` = ce que l'extension a déjà
+        // demandé à l'IA, une fois par message — 5.168, la « fuite » du 11 oct.)
         setBilan(d.bilan || null);
-        setEnvois(Object.keys(d).filter((k) => k !== 'bilan').map((k) => d[k]).filter(Boolean)
+        setEnvois(Object.keys(d).filter((k) => !CLES_RESERVEES_REPONDUS.includes(k)).map((k) => d[k]).filter(Boolean)
           .sort((a, b) => String(b.at || '').localeCompare(String(a.at || ''))));
       } catch (_) { if (vivant) { setEnvois(null); setBilan(null); } }
     })();
@@ -34377,6 +35524,10 @@ function RepondreSetting() {
     bilan.sansMessage ? `${bilan.sansMessage} sans message de l’acheteur à cette heure` : '',
     bilan.replyRefuse ? `${bilan.replyRefuse} où Vinted n’autorise pas de réponse` : '',
     bilan.pasSure ? `${bilan.pasSure} où elle n’était pas sûre — elle n’a rien envoyé` : '',
+    // ⚠️ Revue du 11 octobre : quand c'est l'IA qui n'a rien rendu d'utilisable
+    //    (pas branchée, injoignable, sortie illisible), ce n'est PAS « elle
+    //    n'était pas sûre ». L'extension ≥ 5.173 le compte à part, avec la cause.
+    bilan.iaKO ? `${bilan.iaKO} où l’IA n’a pas répondu${causesIaKO(bilan.iaKOcauses)} — rien n’est parti` : '',
   ].filter(Boolean) : [];
   return (
     <div style={{padding:'13px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
@@ -35655,7 +36806,8 @@ function ConnexionsSetting() {
       <Ligne t="Extension Chrome" coul={!ext.on ? C.warn : extEnRetard(ext.v) ? C.warn : INV_STATUS.online.color}
         etat={!ext.on ? 'pas détectée ici' : !ext.v ? 'détectée' : extEnRetard(ext.v) ? `version ${ext.v} — en retard` : `version ${ext.v} · à jour`}
         d={!ext.on ? <>Sur téléphone c'est normal (il n'y a pas d'extension). Sur l'ordinateur : ouvre l'app dans le Chrome où elle est installée, et recharge-la dans chrome://extensions.{derniereExt && derniereExt !== 'aucune' ? <><br/><b style={{color: extEnRetard(derniereExt.v) ? C.warn : INV_STATUS.online.color}}>La dernière capture est partie d'une {derniereExt.v}{derniereExt.at ? ` (${depuis(Date.parse(derniereExt.at) || 0)})` : ''}.</b> {extEnRetard(derniereExt.v) ? `C'est donc l'ancienne qui tourne encore sur ton ordinateur — c'est là qu'il faut la remplacer par la ${EXT_ATTENDUE}.` : `Ton ordinateur est donc bien à jour — rien à faire ici.`}</> : null}</>
-           : extEnRetard(ext.v) ? `La ${EXT_ATTENDUE} est prête à télécharger (bouton ci-dessous). Dézippe, remplace l'ancien dossier « VRM-extension », puis ⟳ dans chrome://extensions. Tant que c'est l'ancienne qui tourne, elle capte moins de choses que l'app en attend — sans jamais afficher d'erreur.`
+           : extEnRetard(ext.v) ? `La ${EXT_ATTENDUE} est prête à télécharger (bouton ci-dessous). Dézippe, remplace l'ancien dossier « VRM-extension », puis ⟳ dans chrome://extensions — dans CHAQUE Chrome où elle est installée. Tant que c'est l'ancienne qui tourne, elle capte moins de choses que l'app en attend — sans jamais afficher d'erreur.`
+           : codePerime() ? textePerime()
            : "Elle est branchée sur cette page : répondre à un message part de ton navigateur, jamais d'un serveur."}/>
       {/* ⚠️ LE ZIP DOIT ÊTRE À UN CLIC. Pendant des semaines l'app a dit
           « mets à jour l'extension » sans que le zip existe nulle part : le
@@ -35668,7 +36820,7 @@ function ConnexionsSetting() {
           Télécharger l'extension {EXT_ATTENDUE}
         </a>
         <span style={{fontSize:11,color:C.muted,flex:'1 1 180px',minWidth:0,lineHeight:1.4}}>
-          Le zip se dézippe en un seul dossier « VRM-extension » : remplace l'ancien au même endroit, puis ⟳ dans chrome://extensions.
+          Le zip se dézippe en un seul dossier « VRM-extension » : remplace l'ancien au même endroit, PUIS clique ⟳ sur VRM dans chrome://extensions — dans chaque Chrome où elle est installée (sans ⟳, Chrome garde l'ancien code).
         </span>
       </div>
       <Ligne t="Capture Vinted" coul={teinte(capt && capt.ts)}
@@ -35929,6 +37081,13 @@ function AppCoeur() {
       if (!Array.isArray(rows)) return false;
       const cur = (rows[0] && rows[0].data && typeof rows[0].data === 'object') ? rows[0].data : {};
       const par = (cur.parNavigateur && typeof cur.parNavigateur === 'object') ? { ...cur.parNavigateur } : {};
+      // Une session SANS échec ne s'écrit que pour REMPLACER un échec rangé par
+      // ce navigateur (sinon la base garderait « bloquée » pour un hoquet passé) ;
+      // rien d'échoué ici, rien de rangé : aucune écriture (seconde revue du 11 octobre).
+      if (b.sansEchec) {
+        const avant = par[nav];
+        if (!avant || !(Number(avant.ko) > 0)) return true;
+      }
       par[nav] = bilan;
       const garde = Object.keys(par).sort((a, b2) => String((par[b2] && par[b2].at) || '').localeCompare(String((par[a] && par[a].at) || ''))).slice(0, 6);
       const data = { at: bilan.at, dernier: bilan, parNavigateur: Object.fromEntries(garde.map((k) => [k, par[k]])) };
@@ -36326,6 +37485,10 @@ function AppCoeur() {
   // Les comptes dont la lecture des ventes a ÉCHOUÉ (uid) : sans eux, « vendu »
   // est un total PARTIEL — dit comme tel, jamais publié au widget (§5).
   const [ventesKO,setVentesKO]=useState([]);
+  // Publiées pour Réglages → Notifications et Achats (« quels comptes n'envoient
+  // aucun email ») : une lecture, ici ; les autres consomment (§11).
+  useEffect(()=>{ publierVentesCoque(ventesCoque, ventesKO); },[ventesCoque, ventesKO]);
+  useEffect(()=>()=>publierVentesCoque(undefined, []),[]);
   // Ce que le widget publie hors « vendu » (attente, encaissé, stock, messages).
   const [widgetBase,setWidgetBase]=useState(null);
   // ── « Le prix qui marche » : chargé À LA DEMANDE (onglet ouvert), une fois ──
@@ -37052,6 +38215,22 @@ function AppCoeur() {
     window.addEventListener('vrm:colis', on);
     return () => window.removeEventListener('vrm:colis', on);
   }, []);
+  // ⚠️⚠️ (revue du 11 octobre) UNE PREUVE RANGÉE PENDANT QUE VRM EST OUVERT.
+  //    Le retrait automatique d'eBay (`retirerEbayAuto`, allumé par lui) ne
+  //    tournait qu'à l'ouverture : l'extension range le bordereau d'une vente
+  //    (ou sa transaction) et prévient l'app (`maj · label | preuves | ventes`),
+  //    personne ne recalculait — l'annonce eBay restait en vente jusqu'au
+  //    rechargement, le flux même de la N°553 (#78). La cloche écoute donc les
+  //    mêmes signaux qu'eBay → Annonces, REGROUPÉS (une rafale = un recalcul,
+  //    au plus un toutes les 5 s) ; `__retraitEbayAutoTentes` garde qu'une
+  //    annonce ne parte qu'une fois.
+  const [preuveTick, setPreuveTick] = useState(0);
+  useEffect(() => {
+    const signal = regrouperSignaux(() => setPreuveTick(t => t + 1), SIGNAL_MIN_MS, 1500);
+    const f = (e) => { const d = e && e.detail; if (d && d.type === 'maj' && ['preuves', 'label', 'ventes'].includes(d.quoi)) signal(); };
+    window.addEventListener('vrm:ext', f);
+    return () => { signal.arreter(); window.removeEventListener('vrm:ext', f); };
+  }, []);
   useEffect(()=>{
     if(!vintedAccounts || vintedAccounts.length===0) return;
     // ⚠️ DEUX CHOSES DIFFÉRENTES VIVAIENT DANS LE MÊME « UNE SEULE FOIS » :
@@ -37348,7 +38527,7 @@ function AppCoeur() {
   // 2 colis réels, et ne se recalculait jamais (§5.49). On recompte à
   // l'arrivée du nuage.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[vintedAccounts, colisTick, nuagePret]);
+  },[vintedAccounts, colisTick, nuagePret, preuveTick]);
 
   // Multi-vendeurs : tant qu'on ne sait pas qui est là, on n'affiche rien (un
   // écran de connexion qui clignote avant de disparaître fait « bug »), et sans
@@ -37747,6 +38926,7 @@ function AppCoeur() {
             LIGNE de panne (`LignePanne`) là où leur propre liste vide
             mentirait — le bloc, lui, ne s'affiche qu'une fois. */}
         {baseKO && <BaseInjoignable/>}
+        <BandeauLiaison/>
         {/* Les photos de Vinted qui ne s'affichent pas ICI : dit UNE fois,
             sur la coque, pour tous les écrans (src/photosVinted.js). */}
         {!baseKO && <PhotosBloquees/>}

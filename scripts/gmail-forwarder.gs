@@ -99,7 +99,15 @@ function forwardVintedEmails() {
           content: Utilities.base64Encode(a.getBytes()),
         }));
 
+        // L'IDENTITÉ DE L'EMAIL (11 octobre) : deux messages d'une même
+        // conversation Vinted ont souvent le MÊME corps — sans elle, le second
+        // ne sonnait pas (anti-doublon des notifications). Le Message-ID est
+        // aussi celui que le Worker Cloudflare envoie : un même email arrivé
+        // par les deux chemins garde une seule identité.
+        let messageId = '';
+        try { messageId = msg.getHeader('Message-ID') || ''; } catch (_) {}
         const payload = {
+          messageId: messageId || msg.getId(),
           from: msg.getFrom(),
           to: msg.getTo(),
           subject: msg.getSubject(),

@@ -87,7 +87,9 @@ Contraintes : le titre fait au plus 70 caractères ; la description fait 2 à 4 
     const text = (j.content || []).map(c => c.text || '').join('').trim();
     let parsed = null;
     try { parsed = JSON.parse(text); } catch { const m = text.match(/\{[\s\S]*\}/); if (m) { try { parsed = JSON.parse(m[0]); } catch {} } }
-    if (!parsed || !parsed.title) { res.status(200).json({ ok: false, reason: 'parse' }); return; }
+    // `facture: true` : Anthropic a répondu 2xx, l'appel est PAYÉ même si sa sortie
+    // est inexploitable — l'appelant ne doit pas le redemander comme une panne.
+    if (!parsed || !parsed.title) { res.status(200).json({ ok: false, reason: 'parse', facture: true }); return; }
     res.status(200).json({
       ok: true,
       title: String(parsed.title).slice(0, 120),
@@ -127,10 +129,17 @@ Donne 3 à 5 suggestions, chacune dans un ton DIFFÉRENT, prêtes à copier. Ada
     const text = (j.content || []).map(c => c.text || '').join('').trim();
     let parsed = null;
     try { parsed = JSON.parse(text); } catch { const m = text.match(/\{[\s\S]*\}/); if (m) { try { parsed = JSON.parse(m[0]); } catch {} } }
-    if (!parsed || !Array.isArray(parsed.suggestions)) { res.status(200).json({ ok: false, reason: 'parse' }); return; }
+    // ⚠️⚠️ REVUE DU 11 OCTOBRE : à partir d'ici Anthropic a répondu 2xx — l'appel
+    //    est FACTURÉ. Une sortie illisible (JSON tronqué, texte libre, réponse
+    //    vide) répondait `{ok:false, reason:'parse'}` comme une panne, et
+    //    l'extension (`repondreAuxMessages`) la redemandait à chaque page Vinted :
+    //    la fuite qu'on venait de fermer restait ouverte. `facture: true` le DIT ;
+    //    les refus d'avant l'appel (no-key, session, abonnement, réseau,
+    //    api-error) ne le portent jamais.
+    if (!parsed || !Array.isArray(parsed.suggestions)) { res.status(200).json({ ok: false, reason: 'parse', facture: true }); return; }
     const suggestions = parsed.suggestions.filter(s => s && s.text).slice(0, 5)
       .map(s => ({ tone: String(s.tone || '').slice(0, 20), text: String(s.text).slice(0, 400) }));
-    if (!suggestions.length) { res.status(200).json({ ok: false, reason: 'parse' }); return; }
+    if (!suggestions.length) { res.status(200).json({ ok: false, reason: 'parse', facture: true }); return; }
     res.status(200).json({
       ok: true,
       intent: String(parsed.intent || 'autre').slice(0, 20),

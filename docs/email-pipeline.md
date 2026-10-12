@@ -74,6 +74,9 @@ export default {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        // L'identité de l'email : deux messages d'une même conversation Vinted
+        // ont souvent le même corps — sans elle, le second ne sonnait pas.
+        messageId: message.headers.get('Message-ID') || email.messageId || '',
         from: (message.from) || '',
         to: (message.to) || '',
         subject: email.subject || '',

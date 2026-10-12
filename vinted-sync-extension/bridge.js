@@ -69,6 +69,55 @@
   const idExt = (() => { try { return String(rt.id || ''); } catch (_) { return ''; } })();
   function announce() { if (!vivant()) { retirer(); return; } poster({ __vmr: 'ready', version, id: idExt }); }
 
+  // ══ LE CODE QUI RÉPOND EST-IL CELUI DU MANIFESTE ? (11 octobre) ══════════
+  // ⚠️⚠️ MESURÉ chez lui : 5 Chrome sur 6 exécutaient une 5.95–5.129 sous un
+  //    manifeste « 5.164 » (dossier remplacé, ⟳ jamais cliqué dans ce Chrome).
+  //    Ce pont, lui, est TOUJOURS lu depuis le disque : il est donc de la
+  //    version du manifeste, et il peut juger le service worker. Depuis la 5.171
+  //    l'état porte `code` (la version du code qui répond). Un état sans `code`,
+  //    un `code` différent, ou un service worker qui ne connaît même pas
+  //    « état » (≤ 5.128 : le port se ferme sans réponse) ⇒ code PÉRIMÉ.
+  //    On ne juge que si NOTRE version est une vraie version ≥ 5.171 (sinon ce
+  //    pont ne saurait pas que `code` existe).
+  const vNum = (v) => String(v || '').split('.').map((x) => parseInt(x, 10) || 0);
+  const auMoins = (v, ref) => { const a = vNum(v), b = vNum(ref); for (let i = 0; i < 3; i++) { if ((a[i] || 0) !== (b[i] || 0)) return (a[i] || 0) > (b[i] || 0); } return true; };
+  const jugeable = /^\d+\.\d+\.\d+$/.test(version) && auMoins(version, '5.171.0');
+  function jugerCode(resp, err) {
+    if (!jugeable) return null;
+    if (err) {
+      const t = String((err && err.message) || err);
+      // « The message port closed before a response was received » : le service
+      // worker a écouté, mais ne connaît pas ce message (antérieur à 5.129).
+      return /port closed/i.test(t) ? { code: null, attendu: version, raison: 'sans-etat' } : null;
+    }
+    if (!resp || typeof resp !== 'object' || !resp.ok) return null;
+    if (!resp.code) return { code: null, attendu: version, raison: 'sans-code' };
+    if (String(resp.code) !== version) return { code: String(resp.code), attendu: version, raison: 'autre-code' };
+    return null;
+  }
+  // La RÉPARATION : seule une page de l'extension peut appeler
+  // `chrome.runtime.reload()` (le ⟳ de chrome://extensions) — un script de
+  // contenu n'en a pas le droit. On pose donc, UNE fois par page, un cadre
+  // invisible `popup.html?mode=reparer` : il vérifie lui-même que le code est
+  // périmé, et ne recharge qu'UNE fois par version (garde dans
+  // `chrome.storage.local`). Prouvé dans un vrai Chromium (relecture du
+  // 11 octobre) : le service worker repart sur le bon code, et le reste après un
+  // redémarrage de Chrome. S'il ne répare pas, l'app dit le geste (⟳).
+  let reparationPosee = false;
+  function reparer() {
+    if (reparationPosee) return;
+    reparationPosee = true;
+    try {
+      const f = document.createElement('iframe');
+      f.src = rt.getURL('popup.html') + '?mode=reparer';
+      f.setAttribute('aria-hidden', 'true');
+      f.tabIndex = -1;
+      f.style.cssText = 'position:fixed;width:1px;height:1px;left:-10px;top:-10px;border:0;opacity:0;pointer-events:none;';
+      (document.body || document.documentElement).appendChild(f);
+      setTimeout(() => { try { f.remove(); } catch (_) {} }, 15000);
+    } catch (_) {}
+  }
+
   // Relaie au service worker et rend la réponse — ou RIEN si ce pont est devenu
   // orphelin entre-temps (envoi qui lève, ou réponse arrivée après la mort).
   // `rendre(resp, err)` : err = la raison d'un échec d'un pont VIVANT (service
@@ -111,8 +160,17 @@
     if ((d.__vmr === 'etat' || d.__vmr === 'cmd' || d.__vmr === 'cmd:statut') && d.reqId) {
       const charge = {};
       for (const k of Object.keys(d)) if (k !== '__vmr' && k !== 'reqId' && k !== 'from' && k !== 'action') charge[k] = d[k];
-      relayer(Object.assign(charge, { from: 'vmr-bridge', action: d.__vmr }),
-        (resp) => poster({ __vmr: d.__vmr + ':result', reqId: d.reqId, resp: resp || null }));
+      // Un service worker trop ancien peut aussi ne RIEN répondre à « état » :
+      // au bout de 8 s on demande la réparation (la page de réparation vérifie
+      // elle-même le code — un service worker juste lent n'est pas rechargé).
+      const muet = (d.__vmr === 'etat' && jugeable) ? setTimeout(() => reparer(), 8000) : null;
+      relayer(Object.assign(charge, { from: 'vmr-bridge', action: d.__vmr }), (resp, err) => {
+        if (muet) clearTimeout(muet);
+        // 11 octobre : sur « état », on juge le CODE qui répond (voir `jugerCode`).
+        const per = d.__vmr === 'etat' ? jugerCode(resp, err) : null;
+        if (per) reparer(per);
+        poster(Object.assign({ __vmr: d.__vmr + ':result', reqId: d.reqId, resp: resp || null }, per ? { perime: per } : {}));
+      });
       return;
     }
 
@@ -124,15 +182,16 @@
       return;
     }
 
-    // SESSION DU VENDEUR (multi-vendeurs). L'app, une fois connectee, nous
-    // transmet son jeton : c'est ce qui permet a l'extension d'ecrire dans la
-    // base SOUS SON COMPTE une fois l'isolation activee. On ne la stocke pas
-    // ici (une page web n'a pas a garder ca) : on la relaie au service worker.
-    // A la deconnexion, l'app envoie session:null et l'extension oublie tout.
-    if (d.__vmr === 'session') {
-      relayer({ from: 'vmr-bridge', action: 'session', session: d.session || null }, () => {});
-      return;
-    }
+    // ⚠️⚠️ PLUS AUCUNE SESSION PAR LA PAGE (11 octobre). Ce pont relayait toute
+    //    `{__vmr:'session'}` postée dans la page — et CHAQUE extension de la page
+    //    faisait de même : une copie ancienne restée à côté adoptait la même
+    //    famille de jetons, et un `session: null` posté par une app dont la
+    //    session venait de mourir faisait oublier à l'extension la sienne. La
+    //    session arrive maintenant ADRESSÉE à CETTE extension, avec un nonce, par
+    //    `chrome.runtime.sendMessage(<identifiant>, …)` depuis l'app
+    //    (`externally_connectable`, voir background.js). Ce message-ci n'est
+    //    plus relayé du tout.
+    if (d.__vmr === 'session') return;
 
     // Le PDF d'un bordereau Leboncoin (derrière la session Leboncoin : l'app ne
     // peut pas le lire, l'extension si). Simple relais.
