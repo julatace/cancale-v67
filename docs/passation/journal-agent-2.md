@@ -178,3 +178,45 @@ il a la paire en main — **au numérotage**.
 - Passe d'audits : seul `audit-planchers-code.cjs` rouge (pré-existant, domaine
   Agent 1, EXT_CAPACITES.liaison/5.175 — pas touché). `audit-photos-vinted` est
   repassé vert entre-temps.
+
+#### Triage du reste du groupe « Argent et stock » (mesuré §6)
+- **14 bénéfice réel (avec couverture)** : **déjà en production**. Le bénéfice ne
+  somme que les ventes au COÛT CONNU et affiche la couverture (`benefConnu`,
+  `nbCout/nb`, « sur X/Y ventes au coût connu », « inconnu — aucun prix d'achat
+  saisi »). Rien à bâtir.
+- **21 retour reçu → la paire revient en stock** : **déjà en production**
+  (`retoursRecus`, `isRetourRecu`, `toggleRetourRecu`, `retoursAttendus`, et la
+  règle « (re)numérotée APRÈS la vente ⇒ republiée, de retour en stock »). La
+  règle §5/013 (un ancien numéro ne se redonne jamais) est respectée via
+  `numeroReprenable`. Rien à bâtir.
+- ⛔ **18 achats à vérifier avant la date limite** : **mesurée impossible
+  honnêtement**. Lecture seule sur sa vraie base (1 581 achats) :
+  `a_une_echeance = false` partout (aucun `protection_until`/`complete_by`/…),
+  les champs d'un achat sont `conversation_id, date, photo, price, status,
+  title, transaction_id, transaction_user_status` — **aucune date limite
+  d'acheteur**. Et **aucun état « livré, en attente de ta validation »** : les
+  achats sont à 99 % « Transaction finalisée - l'acheteur a validé la
+  commande ». Bâtir une alerte « date limite » reviendrait à **inventer le délai
+  de Vinted** — explicitement interdit par le README (G/18). Non bâtie, comme le
+  dossier le fait pour la photo du code de retrait : mieux vaut un blanc qu'un
+  faux. Les seuls « à vérifier » réels (à retirer, en transit, retour à
+  renvoyer) sont déjà surfacés par `achatStage`.
+
+#### 11 · Fiche à l'arrivée d'un achat (TERMINÉE ✅)
+Mesuré : un achat porte `title`(100 %), `price`(100 %, le prix payé),
+`photo`(18 %), `date` — **pas de taille**. La carte d'achat EST déjà la fiche
+(photo, titre, prix payé, N° lié, reçu, étiquette SKU, note). Le seul manque à
+l'arrivée pour la **revente** : reporter le prix payé vers le numérotage (G1).
+- Menu ⋯ d'un achat **ARRIVÉ** (`st.step>=3 && !cancelled && !st.retour`) :
+  **« Copier le prix payé (pour le numérotage) »** (`data-copier-prix`), copie
+  robuste (`await` → une promesse rejetée tombe bien dans `catch`, jamais
+  « copié » à tort ; `toast('Copie impossible','error')` sinon). On ne relie
+  RIEN automatiquement (§5) : il la renumérote/rephotographie. Gated sur
+  l'arrivée : un achat annulé/remboursé ne le porte pas.
+- `data-achat-tx` posé sur la carte d'achat (affordance de test, comme `data-tx`
+  des ventes) pour cibler une carte au banc.
+- **Preuves** : `npm run build` vert ; banc `scripts/bancs/achats-fiche.cjs`
+  (données inventées, deux tailles) **tout vert**, et **rouge sous mutation** :
+  M1 (entrée retirée) → les contrôles « arrivé » rouges ; M2a (copie naïve
+  `try{writeText}catch`) → « refusé » rouge (ment « copié ») ; M2b (garde
+  `arrive` retirée) → « annulé » rouge (présent à tort). `audit-bancs` vert.
