@@ -891,8 +891,11 @@ if (MULTI_USER && typeof window !== 'undefined') {
 //      identifiant (`chrome.runtime.sendMessage(<id>, …)`, permis par
 //      `externally_connectable`), avec un NONCE qu'elle a elle-même émis, et
 //      fabriquée par le serveur pour le même compte (une famille de jetons à
-//      elle). Voir `assurerSessionExtension`. Une extension plus ancienne ne
-//      reçoit RIEN — l'app lui dit de se mettre à jour.
+//      elle). Voir `assurerSessionExtension`. Une extension d'avant la 5.171
+//      (sa 5.164, la 5.170 de production) n'entend pas ce canal : elle reçoit,
+//      seule et quand elle en a besoin, une session fabriquée par le serveur par
+//      l'ancien message de la page (`sessionParLaPage` — relecture croisée de
+//      la 5.174 : sans ça, elle n'était plus jamais reconnectée).
 //    ⇒ Une session de l'app qui MEURT ne touche plus à celle de l'extension.
 //      Seul « Se déconnecter » (un geste) la déconnecte, et seulement si elle
 //      écrit sous CE compte (`deconnecterExtension`).
