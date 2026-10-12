@@ -12354,6 +12354,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   const [relectureRegles, setRelectureRegles] = React.useState('');   // ce que « Relire chez eBay » a à dire
   const [relitRegles, setRelitRegles] = React.useState(false);
   const [relitVentes, setRelitVentes] = React.useState(false);
+  const [relectureVentes, setRelectureVentes] = React.useState('');    // ce que « Relire mes ventes eBay » a à dire (échec de synchro, compte non relié) — §11, comme relectureRegles
   const [toutesOuvert, setToutesOuvert] = React.useState(false);       // le panneau « Une règle pour toutes »
   const [illisiblesAnnonces, setIllisiblesAnnonces] = React.useState([]);   // comptes dont les annonces n'ont pas pu être lues
   const [comptesStatut, setComptesStatut] = React.useState(undefined);      // {cle,pseudo,principal,relie}[] — la route
@@ -12529,8 +12530,19 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   // celui qu'on vient de toucher (`ref`).
   const resync = React.useCallback(async (ref) => {
     const liste = typeof ref === 'string' && ref ? [{ ref }] : (comptesRelies.length ? comptesRelies : [{ ref: 'principal' }]);
-    for (const c of liste) { try { await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'sync', ...corpsCompteEbay(c.ref) }) }); } catch (_) {} }
+    // ⚠️ (tour 4, défaut #3) La synchro ne se fait plus EN SILENCE : on lit
+    //    `r.ok` (et `j.ok` si le corps le porte) pour chaque compte et on rend
+    //    la liste de ceux qui N'ONT PAS répondu — l'appelant le DIT (comme
+    //    « Relire chez eBay »). Un `try/catch` muet masquait une vente au seuil
+    //    jamais relue.
+    const echecs = [];
+    for (const c of liste) {
+      let ok = false;
+      try { const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'sync', ...corpsCompteEbay(c.ref) }) }); const j = await r.json().catch(() => null); ok = !!(r && r.ok) && !(j && j.ok === false); } catch (_) {}
+      if (!ok) echecs.push(c.ref);
+    }
     await charger();
+    return echecs;
   }, [charger, comptesRelies]);
   // ── (9 octobre) eBAY VEND SANS ATTENDRE VRM ──────────────────────────────
   // Une règle d'offre active, c'est eBay qui vend : VRM ne voit cette vente
@@ -13059,9 +13071,26 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   const ventesVieilles = ventesAge.etat === 'jamais' || ventesAge.etat === 'illisible' || (ventesAge.etat === 'lu' && ventesAge.h > 6);
   const relireVentesEbay = async () => {
     if (relitVentes) return;
-    setRelitVentes(true);
+    setRelitVentes(true); setRelectureVentes('');
     const relies = Array.isArray(comptesStatut) ? new Set(comptesRelies.map((c) => c.ref)) : null;
-    try { for (const ref of refsRegle) if (!relies || relies.has(ref)) await resync(ref); } finally { setRelitVentes(false); }
+    // ⚠️ (tour 4, défaut #3) Ne plus échouer en silence : un compte dont la
+    //    synchro refuse, et un compte NON RELIÉ sauté, se DISENT (comme
+    //    « Relire chez eBay », §11) — sinon « eBay vend sans attendre » reste
+    //    identique et rien ne dit que la vente au seuil n'a pas pu être vue.
+    const echoues = [], nonRelies = [];
+    try {
+      for (const ref of refsRegle) {
+        if (relies && !relies.has(ref)) { nonRelies.push(ref); continue; }
+        const e = await resync(ref);
+        if (Array.isArray(e) && e.includes(ref)) echoues.push(ref);
+      }
+    } finally {
+      const notes = [];
+      for (const ref of echoues) notes.push(`eBay n'a pas répondu pour le compte ${nomRef(ref)} — réessaie dans un moment.`);
+      for (const ref of nonRelies) notes.push(`Le compte eBay ${nomRef(ref)} n'est plus connecté à VRM : ses ventes n'ont pas été relues.`);
+      setRelectureVentes(notes.join(' '));
+      setRelitVentes(false);
+    }
   };
   // « Voir le retrait automatique » : il est PLUS HAUT (dans les alertes). On y
   // va, et on met le focus sur son bouton — rien n'est allumé ici (allumer
@@ -13154,6 +13183,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
       <div data-regles-fenetre-ventes {...(ventesAge.etat === 'lu' ? { 'data-regles-ventes-age-h': String(ventesAge.h) } : {})} style={{ marginTop: 6, color: ventesVieilles ? E.warn : E.muted, fontSize: 12 }}>
         eBay vend sans attendre VRM : VRM ne voit cette vente qu'en relisant tes ventes eBay — {ventesAge.etat === 'lu' ? `dernière lecture il y a ${ventesAge.h < 1 ? 'moins d\'une heure' : (ventesAge.h < 48 ? `${ventesAge.h} h` : `${Math.floor(ventesAge.h / 24)} jours`)}` : (ventesAge.etat === 'jamais' ? 'pas encore lues' : (ventesAge.etat === 'illisible' ? 'je n\'ai pas pu savoir quand' : 'lecture en cours'))}.
         {' '}<button type="button" data-regles-relire-ventes disabled={relitVentes} onClick={relireVentesEbay} style={{ ...lienE, padding: '5px 9px', fontSize: 12, opacity: relitVentes ? 0.6 : 1 }}>{relitVentes ? 'Lecture…' : 'Relire mes ventes eBay'}</button>
+        {relectureVentes && <div data-regles-ventes-echec style={{ marginTop: 4, color: E.warn, fontSize: 11.5 }}>{relectureVentes}</div>}
       </div>
       <div data-regles-fenetre style={{ marginTop: 6, color: E.muted, fontSize: 12 }}>
         Si une de ces paires se vend sur Vinted, VRM ne la retire d'eBay que quand tu ouvres VRM et que la vente Vinted a été captée{retraitAuto ? '' : ' — et seulement si le retrait automatique est allumé : sinon c\'est toi qui cliques'}. Entre les deux, eBay peut encore accepter une offre ici.

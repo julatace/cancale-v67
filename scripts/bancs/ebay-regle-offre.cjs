@@ -424,6 +424,10 @@ async function finPage(pg, errs, quoi) {
         await pg.click('[data-regles-relire-ventes]'); await pg.waitForTimeout(1200);
         const s = bruts.filter((x) => /"action":"sync"/.test(x)).slice(n0);
         dit(s.length === 1 && s[0] === '{"action":"sync"}', `[3] ${T} le bouton relit les ventes du compte qui a des règles`, JSON.stringify(s));
+        // (tour 4, défaut #3) la synchro refusée ne doit PLUS échouer en silence :
+        // un message apparaît (comme « Relire chez eBay »).
+        const txtEchec = await pg.locator('[data-regles-ventes-echec]').textContent().catch(() => '') || '';
+        dit(await pg.locator('[data-regles-ventes-echec]').count() === 1 && /n'a pas répondu/.test(txtEchec), `[3] ${T} la synchro refusée le DIT (plus de silence)`, txtEchec.slice(0, 80));
         await ctx.close();
       });
       if (bloc(3)) await essaie(`[3] ${T} sans règle`, async () => {
