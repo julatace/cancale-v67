@@ -2048,6 +2048,24 @@ const RA = {};
     dit(q.code === 200 && q.corps.enLigneMaintenant === true && !!e3 && e3.lu === true && e3.accepte === 66,
       '[R-prog-regle] eBay a ignoré l\'heure (en ligne MAINTENANT) ⇒ la règle est relue et rangée tout de suite', `HTTP ${q.code} · ${JSON.stringify(e3)}`);
   });
+  // [R-retrouvee] (tour 4, #2) Après un premier envoi resté SANS RÉPONSE,
+  // l'annonce existe chez eBay avec sa règle. Au second essai, `dejaChezEbay`
+  // la reconnaît (409 « deja-* ») AVANT la branche « programmée rangée » du
+  // tour 3 : la règle n'était alors rangée NULLE PART (ni « ce que ça engage »,
+  // ni la relecture des ventes, ni la déconnexion). `rangerRetrouvee` la range
+  // depuis la demande.
+  await essaie('[R-retrouvee]', async () => {
+    const corpsR = { action: 'programmer', confirme: true, uuid: 'D1FFEE0123456789ABCDEF0123456789', fraisVus: 0.2, scheduleTime: iso(Date.now() + 2 * JOUR), item: { ...item, numero: '63', offre: { accepte: 66, refuse: null } } };
+    avecR(); uuidsVus.clear(); mode.add = 'reseau-apres';
+    const o = await app(JWT_J, corpsR);
+    dit(o.code === 504 && o.corps.reason === 'incertain', '[R-retrouvee] le réseau tombe après l\'ajout ⇒ « incertain » (l\'annonce a pu être créée chez eBay avec sa règle)', `HTTP ${o.code}`);
+    mode.add = 'ok';
+    const o2 = await app(JWT_J, corpsR);
+    const id = o2.corps && String(o2.corps.itemId || '');
+    const e = (offresDe(J) || {})[id];
+    dit(o2.code === 409 && o2.corps.reason === 'deja-programmee' && !!e && e.lu === false && e.raison === 'programmee' && e.accepte === 66 && !!o2.corps.offre && o2.corps.offre.retrouvee === true && o2.corps.offre.range === true,
+      '[R-retrouvee] le second envoi retrouve la paire déjà programmée (409) ⇒ sa règle (66 €) est RANGÉE depuis la demande, pas perdue', `HTTP ${o2.code} · ${JSON.stringify(e)}`);
+  });
   // [R-retire-regle] Une annonce terminée (retirée, programmation annulée) sort
   // aussi des règles rangées — la déconnexion la comptait encore.
   await essaie('[R-retire-regle]', async () => {

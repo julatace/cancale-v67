@@ -866,7 +866,7 @@ async function handlePublish(b, ctx) {
   // chez eBay, en ligne ET programmées ; sans SKU, rien à comparer.
   if (it.sku) {
     const deja = await dejaChezEbay(ctx, at.token, it.sku, 'publié');
-    if (deja) return deja;
+    if (deja) { await rangerRetrouvee(ctx, at.token, deja, it); return deja; }
   }
   const r = await tradingAddFixedPriceItem(at.token, it);
   if (sansAck(r)) return { status: 504, body: { ok: false, reason: 'incertain', error: 'eBay n\'a pas répondu clairement — je ne sais pas si l\'annonce a été créée. Rafraîchis depuis eBay avant de recommencer.' } };
@@ -980,7 +980,7 @@ async function handleProgrammer(b, ctx) {
   // ── UNE PAIRE, UNE ANNONCE : relue chez eBay, maintenant, sur TOUS ses
   // comptes (une liste INCOMPLÈTE ne prouve pas l'absence : on ne programme pas).
   const deja = await dejaChezEbay(ctx, at.token, it.sku, 'envoyé');
-  if (deja) return deja;
+  if (deja) { await rangerRetrouvee(ctx, at.token, deja, it); return deja; }
   // ── LES FRAIS, revérifiés juste avant (sans UUID). ──
   const v = await tradingVerifyAddFixedPriceItem(at.token, it);
   if (v.status === 0) return { status: 503, body: { ok: false, error: 'eBay injoignable — rien n\'a été envoyé.' } };
@@ -1030,6 +1030,29 @@ async function rangerRegleProgrammee(ctx, token, corps, it, quand) {
   }
   const range = await rangerReglesOffre(ctx, { [id]: { lu: false, raison: 'programmee', accepte: envoyee.accepte, refuse: envoyee.refuse == null ? null : envoyee.refuse, debut: corps.debut || quand, lueA: Date.now(), par: 'programmation' } });
   return { envoyee, programmee: true, range: range === true };
+}
+// ⚠️ (tour 4, #2) L'ANNONCE EST RETROUVÉE PAR SON SKU, SA RÈGLE DOIT ÊTRE RANGÉE.
+// Après un premier envoi resté sans réponse, l'annonce existe chez eBay avec sa
+// règle. Au second essai, `dejaChezEbay` la reconnaît (« deja-programmee » /
+// « deja-en-ligne ») et REND 409 AVANT la branche 488 qui rangeait : la règle
+// n'était alors rangée nulle part (ni « ce que ça engage », ni la relecture des
+// ventes, ni la déconnexion, ni « Fermer mon compte »). On la range ici, comme
+// `rangerRegleProgrammee` : en ligne ⇒ relue chez eBay (`par:'programmation'`) ;
+// programmée ⇒ « programmee » avec ce qui a été envoyé (la synchro qui suit la
+// relit). `deja.body.offre` porte le résultat pour l'app. Jamais sur « pas su ».
+async function rangerRetrouvee(ctx, token, deja, it) {
+  const body = (deja && deja.body) || {};
+  const id = String(body.itemId || '');
+  if (!it.regleOffre || !/^deja-/.test(String(body.reason || '')) || !ID_EBAY.test(id)) return;
+  const envoyee = { accepte: it.regleOffre.accepte, refuse: it.regleOffre.refuse };
+  if (body.reason === 'deja-en-ligne') {
+    const post = await lireRegleOffre(token, id);
+    const range = await rangerReglesOffre(ctx, { [id]: post.ok ? { ...post.lecture, par: 'programmation' } : { lu: false, raison: 'apres-ecriture', lueA: Date.now(), par: 'programmation' } });
+    body.offre = { envoyee, verifie: post.ok ? memeRegle(post.lecture, envoyee, null) : null, lecture: post.ok ? post.lecture : null, range: range === true, retrouvee: true };
+  } else {
+    const range = await rangerReglesOffre(ctx, { [id]: { lu: false, raison: 'programmee', accepte: envoyee.accepte, refuse: envoyee.refuse == null ? null : envoyee.refuse, debut: body.debut || null, lueA: Date.now(), par: 'programmation' } });
+    body.offre = { envoyee, programmee: true, range: range === true, retrouvee: true };
+  }
 }
 // Une annonce TERMINÉE (retirée, programmation annulée) sort aussi des règles
 // rangées : sinon, jusqu'à la prochaine synchro, la déconnexion et « Fermer mon

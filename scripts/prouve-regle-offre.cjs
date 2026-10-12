@@ -83,6 +83,9 @@ const MUTATIONS = [
   // ── (11 octobre, revue — tour 3) ──
   // une annonce programmée avec sa règle n'est de nouveau ni rangée ni relue.
   ['prog-non-rangee', API, '  if (it.regleOffre) corps.offre = await rangerRegleProgrammee(ctx, at.token, corps, it, quand);', '  if (it.regleOffre) corps.offre = { envoyee: { accepte: it.regleOffre.accepte, refuse: it.regleOffre.refuse } };', ['R-prog-regle']],
+  // (tour 4 #2) l'annonce retrouvée par SKU au second essai (409 « deja-* ») ne
+  //   range plus sa règle : `rangerRetrouvee` redevient un no-op.
+  ['retrouvee-non-rangee', API, "  if (!it.regleOffre || !/^deja-/.test(String(body.reason || '')) || !ID_EBAY.test(id)) return;", "  return;", ['R-retrouvee']],
   // retirer une annonce laisse sa règle rangée (la déconnexion la compte encore).
   ['retirer-garde-regle', API, "  // n'a plus de règle qu'eBay applique.\n  const regles = await sortirDesRegles(itemId, ctx);", "  // n'a plus de règle qu'eBay applique.\n  const regles = true;", ['R-retire-regle']],
   // « Relire chez eBay » ne sort plus la règle d'une annonce qu'eBay ne montre plus.

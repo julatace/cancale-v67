@@ -11676,8 +11676,13 @@ function EbayPlanificateur({ brouillons = [], annoncesEbay, programmees, ventes,
         // nouvel essai, avec le MÊME identifiant d'envoi.
         const p = await appelEbay({ action: 'programmees', ...corpsCompteEbay(compteLot) });
         const trouve = p.j && p.j.ok ? [...(p.j.items || []), ...(p.j.enLigne || [])].find((x) => x && skuCanon(x.sku) === l.sku) : null;
-        if (trouve) r = { code: 200, j: { ok: true, itemId: trouve.itemId, debut: trouve.debut || null, retrouvee: true } };
-        else if (p.j && p.j.ok) r = await appelEbay(corps);
+        // (tour 4, #2) Même quand la liste la retrouve, on REFAIT l'envoi (même
+        // UUID) : la route reconnaît « deja-* » et RANGE sa règle d'offre — sinon
+        // une paire programmée avec un seuil n'était comptée nulle part. Si ce
+        // second essai ne confirme pas (liste illisible côté route), la preuve de
+        // la liste (`trouve`) l'emporte quand même.
+        if (p.j && p.j.ok) r = await appelEbay(corps);
+        if (trouve && !(r.j && (r.j.ok || (r.code === 409 && /^deja-/.test(String(r.j.reason || '')))))) r = { code: 200, j: { ok: true, itemId: trouve.itemId, debut: trouve.debut || null, retrouvee: true } };
       }
       let j = r.j || {};
       // Au second essai, la route peut retrouver la paire elle-même (« déjà
