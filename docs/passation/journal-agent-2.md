@@ -265,3 +265,40 @@ classement, `data-ventes-par-compte`).
   seuil `>=2`→`>=1` → « un seul compte » rouge. Le contrôle « gamma (exclu)
   nulle part » garde le placement APRÈS `isHidden`. `audit-tdz`/`audit-bancs`
   verts.
+
+### Déploiements de la session (12 octobre, après-midi)
+- **PR #479** (G1 prix d'achat au numérotage) → mergée, déployée, `/api/sante`
+  200. En production.
+- **PR #480** (G11 fiche à l'arrivée) → mergée, déployée, `/api/sante` 200.
+- **PR #482** (G24 compte qui vend le mieux) → mergée.
+  ⚠️⚠️ **Le déploiement Vercel du merge a échoué DEUX fois sur `git_info_fail`**
+  (Vercel n'arrivait pas à récupérer le commit depuis GitHub — échec en ~7 s,
+  AVANT tout build, `list_deployment_events` vide). **Ce n'était PAS un défaut de
+  code** : `npm run build` passait, le commit existait bien sur GitHub. C'est un
+  hoquet d'intégration Vercel↔GitHub, transitoire. **Production jamais tombée** :
+  l'alias vrm.center est resté sur le dernier déploiement READY (#480). Résolu au
+  **3ᵉ redéploiement** (`create_deployment` par `deploymentId`, `forceNew:1`,
+  `target:production`) après ~90 s d'attente → READY, aliasé, `/api/sante` 200.
+  **Leçon** : sur `git_info_fail`, ne pas pousser de commit « correctif » (le code
+  est bon) — attendre 1-2 min et **redéployer le même commit**. Le prochain
+  déploiement réussi (le mien ou celui de l'Agent 1) emporte de toute façon le
+  HEAD de `main`, features comprises.
+
+#### 22 · Favoris sans vente → remise native (TERMINÉE ✅)
+Julien (retenu le 11 oct) : relancer les favoris. §3 l'a tranché : on ne connaît
+PAS qui a mis en favori (Vinted ne le dit pas — aucun endpoint, aucun champ),
+donc pas de message individuel ; **la remise NATIVE de Vinted, elle, touche tous
+les favoris en un clic**. Mesuré sur sa vraie base (lecture seule) : sur **644
+annonces captées, 224 ont ≥3 favoris** (max 165, moy 17,5) — de vrais candidats.
+- Nouveau bloc « 👀 Suivies, pas encore vendues » dans « Conseils & signalements »
+  de l'écran Annonces : les annonces EN LIGNE (`annBase`, une vendue en est déjà
+  sortie) à **≥3 favoris**, triées par favoris, **PAS déjà dans le repricing**
+  (un seul conseil par paire, §7). Chaque ligne : photo, N°·titre, « X ❤️ », et
+  **« Proposer une remise »** = un LIEN vers l'annonce Vinted. **VRM ne change
+  jamais le prix (§3)** — c'est lui, sur Vinted ; l'explication de la remise
+  native est écrite UNE fois en tête du bloc.
+- `favourites` est un NOMBRE, jamais une identité (§5/§3). Aucune lecture neuve.
+- **Preuves** : `npm run build` vert ; banc `annonces-carte.cjs` étendu
+  (9106 = 10 ❤️ récente hors repricing → ressort ; 9105 = 2 ❤️ → absente, seuil
+  3), **vert aux deux tailles**, **4 rouges sous mutation** (bloc neutralisé →
+  « 9106 ressort » et « remise native » rouges). `audit-tdz`/`audit-bancs` verts.
