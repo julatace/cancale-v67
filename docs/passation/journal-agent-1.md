@@ -42,3 +42,31 @@ soit mergée dans `main` avant sa première mise en ligne.
   n'est jamais définitif (`estDefinitive` rend toujours faux).
 
 (suite ci-dessous au fil des étapes)
+
+### Étape B — TERMINÉE ✅ (12 octobre)
+
+- Fusion `photos-r2` (`bf63bca`) : conflits CLAUDE.md + `scripts/bancs/README.md`
+  résolus (les deux sections photos gardées + relecture croisée 5.174 ;
+  `photos-vinted` = version 166 contrôles ; `enligne`/`deux-extensions` = versions
+  riches 5.171). `src/App.jsx`/`photosVinted.js` auto-mergés, `estDefinitive`
+  rend toujours `false`.
+- `npm run build` vert.
+- **91 audits verts, 0 rouge.** Sautés faute de Postgres dans ce conteneur :
+  `audit-agent-sql`, `audit-renum-b` (hors périmètre photos ; à couvrir en C).
+- **Bancs : 26 verts.** `photos-vinted` a montré 7 « reds » = flakes de fin de
+  session Chromium (`Target page… has been closed` après ~160 contextes dans un
+  seul process) ; **chaque scénario (T, T390, X, O, W, N, Y) rejoué seul = vert**
+  (SEUL=…, ports 5751/5752). `capacites` **non lancé** : il lit `fx/` (fixtures
+  réelles absentes du dépôt public, pas de clé Supabase ici).
+- `git merge origin/main` : no-op de contenu (vérifié par merge-tree).
+- **PR #476 → `main` mergée** (merge commit `e432f8c`).
+- **Vercel** : déploiement `dpl_EQnr41h4...` READY, alias `vrm.center` ;
+  `/api/sante` = 200 `{ok, serviceKey:true, owner:true, ia:false, stripe:false,
+  stripeWebhook:true}` ; `/VRM-extension.zip` servi = **439 265 B** (identique à
+  `public/VRM-extension.zip`, `application/zip`) → c'est bien la 5.175.
+- Consigne d'installation envoyée à Julien (une fois).
+
+➡️ **L'Agent 2 peut maintenant partir** (sa 1ʳᵉ mise en ligne était bloquée
+tant que la 5.175 n'était pas dans `main` — c'est fait).
+
+### Étape C — migration 014 (K3) : EN COURS
