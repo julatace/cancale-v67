@@ -342,3 +342,23 @@ mesurer), puis **Vitesse (5), en dernier, seule**.
 ⇒ Les fonctions restantes demandent soit une migration (essai annulé sur branche
 Supabase), soit une API navigateur non prouvable en banc, soit une coordination
 avec la lane eBay de l'Agent 1 — à ouvrir chacune proprement, pas en fin de passe.
+
+#### 34 · Saisie vocale (TERMINÉE ✅)
+Retenu le 11 oct. §2.9 : d'abord ce que le navigateur fait SEUL — la Web Speech
+API (`SpeechRecognition`/`webkitSpeechRecognition`), **en français, sans clé ni
+serveur**. Composant réutilisable `MicDictee` (après `Icon`) : bouton micro au
+trait (icône `mic` ajoutée à `ICON_PATHS`), posé sur la **recherche Annonces**
+et le **champ modèle du « mise en vente »** (`setAnnSearch`/`setListQ`).
+- **Muet si l'API manque** (`DICTEE_OK`) : sur Safari iPhone, RIEN — jamais un
+  bouton mort (§2.7, une fonction qui ne peut pas tenir se tait). Aucune clé,
+  aucun serveur (§2.9). On ne DEVINE pas le texte : on pose ce que le navigateur
+  a reconnu, à lui de corriger.
+- **Preuves** : `npm run build` + `audit-tdz` + `audit-icones` verts ; banc
+  `scripts/bancs/dictee.cjs` (deux tailles) — micro présent quand l'API est là
+  (mockée, comme le pont/presse-papier : `SpeechRecognition` n'existe pas en
+  Chromium headless), la dictée pose « salomon » dans la recherche, écoute en
+  `fr-FR` ; **absent** sans API. **4 rouges sous mutation** (garde retirée →
+  « absent » rouge ; report `onText` cassé → « dicter » rouge).
+- Le composant est **réutilisable** (drop-in) sur les autres champs texte
+  (recherches Ventes/Achats) — placé ici sur les deux plus utiles, à étendre si
+  Julien le demande.

@@ -7700,6 +7700,8 @@ const ICON_PATHS = {
   // Mélanger les deux, c'est précisément ce qui fait « assemblé à la va-vite ».
   // Toutes celles-ci partagent la grille 24, le trait et les coins arrondis des
   // icônes de la barre du bas.
+  // Micro : saisie vocale (G34). Capsule + arceau + pied — au trait, jamais 🎤.
+  mic:     <><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/><path d="M8.5 21h7"/></>,
   truck:   <><path d="M3 7.5h11v9H3z"/><path d="M14 11h3.6l2.4 2.6v2.9H14z"/><circle cx="7" cy="18" r="1.8"/><circle cx="17.4" cy="18" r="1.8"/></>,
   clock:   <><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 1.8"/></>,
   alert:   <><path d="M12 4.2 21 19.2H3L12 4.2Z"/><path d="M12 10v4"/><path d="M12 16.6h.01"/></>,
@@ -7777,6 +7779,38 @@ const Icon = ({ name, size = 24, style }) => {
       style={{verticalAlign:'middle',...(style||{})}}>{d}</svg>
   );
 };
+// ── SAISIE VOCALE (G34) ───────────────────────────────────────────────────────
+// Dictée par le micro du navigateur (Web Speech API), en français, SANS clé ni
+// serveur — c'est ce que le navigateur fait SEUL (§2.9). Le bouton n'apparaît
+// QUE si l'API existe (Safari iPhone ne la fournit pas) : sinon RIEN, jamais un
+// bouton mort (§2.7, une fonction qui ne peut pas tenir se tait). On ne DEVINE
+// pas le texte — on pose ce que le navigateur a reconnu, à lui de corriger.
+const DICTEE_OK = typeof window !== 'undefined' && ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window);
+function MicDictee({ onText, titre = 'Dicter' }) {
+  const [ecoute, setEcoute] = React.useState(false);
+  const recRef = React.useRef(null);
+  if (!DICTEE_OK) return null;
+  const lancer = () => {
+    if (ecoute) { try { recRef.current && recRef.current.stop(); } catch (_) {} return; }
+    try {
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const rec = new SR();
+      rec.lang = 'fr-FR'; rec.interimResults = false; rec.maxAlternatives = 1;
+      rec.onresult = (e) => { const t = e && e.results && e.results[0] && e.results[0][0] && e.results[0][0].transcript; if (t) onText(String(t).trim()); };
+      rec.onerror = () => setEcoute(false);
+      rec.onend = () => { setEcoute(false); recRef.current = null; };
+      recRef.current = rec; setEcoute(true); rec.start();
+    } catch (_) { setEcoute(false); recRef.current = null; }
+  };
+  return (
+    <button type="button" data-mic-dictee onClick={lancer} aria-label={titre} aria-pressed={ecoute}
+      title={ecoute ? 'À l’écoute… parle, puis touche pour arrêter' : titre}
+      style={{flexShrink:0,display:'inline-flex',alignItems:'center',justifyContent:'center',width:38,height:38,borderRadius:8,cursor:'pointer',fontFamily:'inherit',
+        border:`1px solid ${ecoute?C.accent:C.border}`,background:ecoute?`${C.accent}18`:C.card,color:ecoute?C.accent:C.muted,transition:'background .15s,color .15s,border-color .15s'}}>
+      <Icon name="mic" size={17}/>
+    </button>
+  );
+}
 // ── LA BARRE DU BAS NE DÉFILE PLUS ───────────────────────────────────────────
 // ⚠️ Plainte de Julien : « je dois glisser de gauche à droite en bas pour voir
 // toutes les interfaces ». C'était exact : la barre portait NEUF onglets dans un
@@ -30285,6 +30319,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <div style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap'}}>
             <input value={annSearch} onChange={e=>setAnnSearch(e.target.value)} placeholder="Rechercher (titre, marque, N°)…"
               style={{flex:'1 1 180px',minWidth:0,border:`1px solid ${C.border}`,borderRadius:8,padding:'8px 12px',fontSize:13,background:C.card,color:C.text,outline:'none'}}/>
+            <MicDictee onText={(t)=>setAnnSearch(t)} titre="Dicter la recherche"/>
             <select value={annSort} onChange={e=>setAnnSort(e.target.value)}
               style={{border:`1px solid ${C.border}`,borderRadius:8,padding:'8px 10px',fontSize:13,background:C.card,color:C.text,cursor:'pointer',fontWeight:500}}>
               <option value="oldest">Date d'ajout (ancienne → récente)</option>
@@ -31723,6 +31758,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:14}}>
                 <input value={listQ} onChange={e=>setListQ(e.target.value)} placeholder="Modèle (ex : Nike Air Max 90, gel-lyte…)" autoFocus
                   style={{flex:'2 1 200px',border:`1px solid ${C.border}`,borderRadius:8,padding:'9px 12px',fontSize:15,fontFamily:'inherit',background:C.card,color:C.text,outline:'none'}}/>
+                <MicDictee onText={(t)=>setListQ(t)} titre="Dicter le modèle"/>
                 <input value={listSize} onChange={e=>setListSize(e.target.value)} placeholder="Pointure" inputMode="decimal"
                   style={{flex:'1 1 80px',border:`1px solid ${C.border}`,borderRadius:8,padding:'9px 12px',fontSize:15,fontFamily:'inherit',background:C.card,color:C.text,outline:'none'}}/>
                 <input value={listBuy} onChange={e=>setListBuy(e.target.value)} placeholder="Prix d'achat €" inputMode="decimal"
