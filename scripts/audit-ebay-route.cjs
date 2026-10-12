@@ -2103,10 +2103,14 @@ const RA = {};
       ['aucune', lu({ offresActives: true, accepte: null }), null],
       ['offres coupées', lu({ offresActives: false, accepte: 72 }), null],
       ['lecture ratée', { lu: false, raison: 'lecture-ratee', lueA: now }, null],
-      ['autre devise', lu({ offresActives: true, accepte: 72, devise: 'USD' }), null],
+      // (tour 4, défauts #4 et #6) Une règle qu'eBay TIENT en devise étrangère
+      // engage comme en euros — VRM ne la POSE pas, mais eBay vend seul.
+      ['autre devise, règle active', lu({ offresActives: true, accepte: 72, devise: 'USD' }), 'oui'],
+      ['autre devise, seuil relu sans l\'état des offres', lu({ offresActives: null, accepte: 72, devise: 'USD' }), 'peut-etre'],
+      ['autre devise, aucune règle', lu({ offresActives: false, accepte: null, devise: 'USD' }), null],
     ];
     const faux = cas.filter(([, e, k]) => A.regleEngage(A.etatRegleOffre({ itemId: '1', price: '80' }, new Map([['principal:1', e]]), null, now)) !== k);
-    dit(!faux.length, '[R-engage] connue ⇒ « oui » ; seuil relu sans l\'état des offres, incertaine, en cours, posée pas relue, programmée, prix changé ⇒ « peut-être » ; aucune, offres coupées, lecture ratée, autre devise ⇒ rien', faux.map((c) => c[0]).join(' · '));
+    dit(!faux.length, '[R-engage] connue ⇒ « oui » ; seuil relu sans l\'état des offres, incertaine, en cours, posée pas relue, programmée, prix changé, règle active en devise étrangère ⇒ « oui »/« peut-être » selon l\'état ; aucune, offres coupées, lecture ratée ⇒ rien', faux.map((c) => c[0]).join(' · '));
     const E = (o) => lu({ offresActives: true, accepte: 60, ...o });
     const base = (o) => ({ ref: 'principal', entrees: { '1': E({}), '2': E({ lueA: now - 2 * JOUR }), '3': E({ lueA: now }), '4': { lu: false, raison: 'apres-ecriture', lueA: now - 2 * JOUR } }, annonces: [{ itemId: '1', price: '80' }], programmees: [], cap: now - H / 2, complet: true, ...o });
     const r1 = A.reglesEngagees([base({})], now);

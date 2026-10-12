@@ -9520,7 +9520,20 @@ function etatRegleOffre(it, regles, illisibles, maintenant) {
   // dès la mise en ligne : un risque, comme une écriture pas relue.
   if (e.lu !== true) { const r = e.raison || 'lecture-ratee'; return { etat: 'pas-su', raison: r, risque: r === 'incertain' || r === 'apres-ecriture' || r === 'en-cours' || r === 'programmee' }; }
   const avaitRegle = e.accepte != null;
-  if (e.devise && e.devise !== 'EUR') return { etat: 'pas-su', raison: 'devise', risque: false };
+  if (e.devise && e.devise !== 'EUR') {
+    // ⚠️ (tour 4, défauts #4 et #6) VRM ne POSE pas de règle en devise étrangère
+    //    (la route refuse une feuille en euros), MAIS eBay peut en TENIR une.
+    //    Une règle active (offres activées + seuil) ENGAGE (eBay vend seul) ; un
+    //    seuil relu sans l'état des offres engage « peut-être ». Avant, tout
+    //    foreign comptait « rien » — ni « ce que ça engage », ni relecture des
+    //    ventes, ni déconnexion, ni « Fermer mon compte » —, et la carte
+    //    proposait quand même « Définir » (feuille en euros, refusée par la
+    //    route). `raison:'devise'` RESTE (l'affichage « VRM n'y pose pas de
+    //    règle » et l'exclusion de la POSE ne bougent pas) ; `active`/`risque`
+    //    portent l'engagement.
+    const active = avaitRegle && e.offresActives === true;
+    return { etat: 'pas-su', raison: 'devise', devise: e.devise, active, risque: avaitRegle && e.offresActives == null, accepte: avaitRegle ? Number(e.accepte) : null, refuse: e.refuse == null ? null : Number(e.refuse), offresActives: e.offresActives, lu: { accepte: avaitRegle ? Number(e.accepte) : null, refuse: e.refuse == null ? null : Number(e.refuse) } };
+  }
   const lueA = Number(e.lueA) || 0;
   if (!lueA || now - lueA > REGLE_ANCIENNE_MS) return { etat: 'pas-su', raison: 'ancienne', risque: avaitRegle };
   const p = Number(String(it.price == null ? '' : it.price).replace(',', '.'));
@@ -9565,7 +9578,7 @@ const seRelitChezEbay = (e) => !!e && e.etat === 'pas-su' && !PAS_SU_SANS_RELECT
 //   'oui'       : connue (relue, offres activées) ;
 //   'peut-etre' : « pas su » AVEC risque (`etatRegleOffre`) ;
 //   null        : rien n'engage (aucune ; pas su sans risque).
-const regleEngage = (e) => (!e ? null : (e.etat === 'connue' ? 'oui' : (e.etat === 'pas-su' && e.risque === true ? 'peut-etre' : null)));
+const regleEngage = (e) => (!e ? null : (e.etat === 'connue' || (e.etat === 'pas-su' && e.active === true) ? 'oui' : (e.etat === 'pas-su' && e.risque === true ? 'peut-etre' : null)));
 // Les règles qu'eBay tient — ou tient peut-être — sur des comptes, avec la
 // MÊME règle par annonce que l'écran eBay → Annonces (`etatRegleOffre` +
 // `regleEngage`). `parCompte` : [{ ref, entrees: { itemId: entrée rangée },
@@ -11217,9 +11230,12 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
           <div {...attrs} style={{ padding: '0 14px 10px 14px', fontSize: 12.5, color: E.muted, lineHeight: 1.45 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               {montant != null && <span style={{ minWidth: 0 }}>Offres reçues : {montant}</span>}
-              {et.etat === 'connue'
-                ? <button type="button" data-regle-modifier={it.itemId} disabled={gesteBloque || !!envoiRegle} onClick={ouvrirRegle} style={btnR}>Modifier</button>
-                : <button type="button" data-regle-ouvrir={it.itemId} disabled={gesteBloque || !!envoiRegle} onClick={ouvrirRegle} style={btnR}>Définir une règle d'offre</button>}
+              {et.raison === 'devise'
+                /* (tour 4, défaut #6) Devise étrangère : VRM ne pose pas de règle en euros ici (la route la refuserait). On ne propose donc PAS « Définir », et si eBay y applique une règle on le dit. */
+                ? <span data-regle-devise={et.devise || ''} style={{ fontSize: 11.5, color: E.muted }}>VRM ne pose pas de règle d'offre en {et.devise || 'cette devise'}{et.active ? ' — mais eBay y en applique une : il peut vendre seul' : ''}</span>
+                : (et.etat === 'connue'
+                  ? <button type="button" data-regle-modifier={it.itemId} disabled={gesteBloque || !!envoiRegle} onClick={ouvrirRegle} style={btnR}>Modifier</button>
+                  : <button type="button" data-regle-ouvrir={it.itemId} disabled={gesteBloque || !!envoiRegle} onClick={ouvrirRegle} style={btnR}>Définir une règle d'offre</button>)}
               {bloquee && regleEngage(et) && <button type="button" data-regle-retirer-direct={it.itemId} disabled={!!envoiRegle || enLot} onClick={retirerRegle} style={{ ...btnE, padding: '6px 10px', fontSize: 12, opacity: (envoiRegle || enLot) ? 0.45 : 1 }}>{envoiRegle === 'retrait' ? 'Envoi…' : 'Retirer la règle'}</button>}
             </div>
             {bloquee && bloquee.t && <div data-regle-bloquee-texte={bloquee.k} style={{ fontSize: 11.5, color: E.warn, marginTop: 4 }}>{bloquee.t}</div>}
