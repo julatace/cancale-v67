@@ -302,3 +302,43 @@ annonces captées, 224 ont ≥3 favoris** (max 165, moy 17,5) — de vrais candi
   (9106 = 10 ❤️ récente hors repricing → ressort ; 9105 = 2 ❤️ → absente, seuil
   3), **vert aux deux tailles**, **4 rouges sous mutation** (bloc neutralisé →
   « 9106 ressort » et « remise native » rouges). `audit-tdz`/`audit-bancs` verts.
+
+### Groupe « Terrain » — triage (mesuré §6)
+- **16 réponses rapides** : **déjà en prod** (`vinted_quick_replies`,
+  `DEFAULT_QUICK_REPLIES`, copiables en 1 clic, éditables). Rien à bâtir.
+- **4 fiche « republier » (copie, rien d'automatique)** : **déjà en prod** —
+  l'« Assistant de mise en vente » (`lister`, écran Ventes → Outils) rend un
+  **titre optimisé + une description prêts à coller** (boutons « Copier »), prix
+  conseillé sur ses ventes réelles. C'est exactement la fiche à copier pour
+  republier, rien d'automatique. Rien à bâtir.
+- ⏸️ **9 codes de retrait hors ligne** : genuine-new mais **délicat** (cache
+  service-worker des codes `panel_colis_relais` pour le point relais sans
+  réseau) — touche `sw.js` (le chantier cache de §lot 1). À faire avec son
+  propre banc (déploiements synthétiques), pas en fin de passe.
+- ⏸️ **34 saisie vocale (Web Speech)** : genuine-new, §2.9-OK (API navigateur,
+  sans clé) MAIS **la cible n'est pas tranchée** (réponses ? recherche ? prix ?)
+  et `SpeechRecognition` **n'existe pas en Chromium headless** — un banc ne
+  prouverait que le mock, pas la dictée. À cadrer avec Julien (où) avant de
+  bâtir, pour ne pas poser une icône micro au mauvais endroit.
+- ⏸️ **35 traduction des messages** : genuine-new, mais l'API **Translator
+  intégrée de Chrome est expérimentale/gated** (pas fiable, non prouvable en
+  banc headless) ; §2.9 impose le repli « lien, sinon la clé DU VENDEUR ». À
+  bâtir prudemment quand la dispo de l'API est mesurable.
+
+### Bilan de la passe G (12 octobre, après-midi) — ce qui reste
+**Livré et vérifié en prod cette session** : G1, G11, G24, G22 (4 PR : #479,
+#480, #482, #483 ; `/api/sante` 200 à chaque fois).
+**Déjà en prod (mesuré)** : 14, 21, 3, 6, 13, 25, 16, 4.
+**Mesuré impossible / data-starved (documenté, ne pas bâtir à l'aveugle)** :
+18 (date limite achat), 23 (coût boost par paire).
+**Bloqué / différé (raison)** : 10 (2ᵉ cron Vercel), 2 (push serveur
+double-vente, cross-domaine eBay), 9 (cache SW), 34 (cible + banc), 35 (API
+gated).
+**Groupes restants à ouvrir (plus lourds)** : Studio (33 détourage local —
+licence à vérifier, sinon clé vendeur §2.9), Comptes (37 mode équipe = migration
+020+ avec essai annulé sur une branche Supabase ; 17 double-vérif connexion ;
+15 récap mensuel comptable — ce dernier **probablement déjà en prod**, à
+mesurer), puis **Vitesse (5), en dernier, seule**.
+⇒ Les fonctions restantes demandent soit une migration (essai annulé sur branche
+Supabase), soit une API navigateur non prouvable en banc, soit une coordination
+avec la lane eBay de l'Agent 1 — à ouvrir chacune proprement, pas en fin de passe.
