@@ -796,6 +796,37 @@ async function finPage(pg, errs, quoi) {
         await ctx.close();
       });
 
+      if (bloc(11)) await essaie(`[11] ${T} règle tombée, eBay garde le refus (défaut #5)`, async () => {
+        // (tour 4, défaut #5) L'annonce n'avait QU'un refus (pas de montant
+        // d'acceptation). Après le changement de prix, eBay le garde. La phrase
+        // ne doit JAMAIS dire « dès 0,00 € », et doit dire que le refus reste.
+        const { ctx, pg } = await ouvrir(b, vp, { scen: {
+          ['revise:' + A.A1]: [
+            { body: { ok: true, ack: 'Success', regle: { lecture: { lu: true, offresActives: true, accepte: null, refuse: 50, devise: 'EUR', prix: 95, offresFaites: 0, lueA: Date.now() }, tombee: true, avant: { accepte: null, refuse: 50 } } } },
+          ] } });
+        await allerAnnonces(pg);
+        await pg.click(`[data-ebay-carte-ouvrir="${A.A1}"]`); await pg.waitForSelector(`[data-ebay-revise-ouvrir="${A.A1}"]`, { timeout: 5000 }); await pg.click(`[data-ebay-revise-ouvrir="${A.A1}"]`); await pg.waitForSelector(`[data-ebay-revise-prix="${A.A1}"]`, { timeout: 5000 });
+        await pg.fill(`[data-ebay-revise-prix="${A.A1}"]`, '95'); await pg.click(`[data-ebay-revise-enregistrer="${A.A1}"]`); await pg.waitForTimeout(800);
+        const msg = await pg.$eval(`[data-ebay-revise-msg="${A.A1}"]`, (e) => e.innerText).catch(() => '');
+        dit(!/dès 0,00/.test(msg) && /refus/i.test(msg) && /50,00/.test(msg), `[11] ${T} jamais « dès 0,00 € », et le refus gardé par eBay (50 €) est dit`, msg);
+        await ctx.close();
+      });
+      if (bloc(11)) await essaie(`[11] ${T} seuil gardé mais refus sauté (défaut #5)`, async () => {
+        // (tour 4, défaut #5) eBay garde le seuil d'acceptation mais fait sauter
+        // le refus : pas un « ✓ … reste à 70 € » en couleur de texte — on le DIT,
+        // en ambre.
+        const { ctx, pg } = await ouvrir(b, vp, { scen: {
+          ['revise:' + A.A1]: [
+            { body: { ok: true, ack: 'Success', regle: { lecture: { lu: true, offresActives: true, accepte: 70, refuse: null, devise: 'EUR', prix: 95, offresFaites: 0, lueA: Date.now() }, tombee: false, avant: { accepte: 70, refuse: 50 } } } },
+          ] } });
+        await allerAnnonces(pg);
+        await pg.click(`[data-ebay-carte-ouvrir="${A.A1}"]`); await pg.waitForSelector(`[data-ebay-revise-ouvrir="${A.A1}"]`, { timeout: 5000 }); await pg.click(`[data-ebay-revise-ouvrir="${A.A1}"]`); await pg.waitForSelector(`[data-ebay-revise-prix="${A.A1}"]`, { timeout: 5000 });
+        await pg.fill(`[data-ebay-revise-prix="${A.A1}"]`, '95'); await pg.click(`[data-ebay-revise-enregistrer="${A.A1}"]`); await pg.waitForTimeout(800);
+        const msg = await pg.$eval(`[data-ebay-revise-msg="${A.A1}"]`, (e) => e.innerText).catch(() => '');
+        const c = await couleur(pg, `[data-ebay-revise-msg="${A.A1}"]`);
+        dit(!/^✓/.test(msg) && /refus/i.test(msg) && /50,00/.test(msg) && c === C_WARN, `[11] ${T} seuil gardé, refus sauté : message ambre, sans ✓, le refus perdu est dit`, `${msg} · ${c}`);
+        await ctx.close();
+      });
       if (bloc(11)) await essaie(`[11] ${T} prix illisible`, async () => {
         // (11 octobre) Une saisie non vide qu'on ne sait pas lire n'est PAS « prix
         // inchangé » : rien ne part, et c'est dit — jamais « ✓ Modifié sur eBay ».

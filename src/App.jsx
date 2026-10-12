@@ -9622,7 +9622,22 @@ function regleApresPrix(regle, erreurs) {
   const plus = vingt ? ' eBay signale que le refus automatique a sauté.' : '';
   if (!regle || typeof regle !== 'object') return { msg: plus.trim(), ton: plus ? 'warn' : 'ok', lecture: undefined };
   const lecture = regle.lecture && typeof regle.lecture === 'object' ? { ...regle.lecture } : { lu: false, raison: 'apres-ecriture', lueA: Date.now() };
-  if (regle.tombee === true) return { msg: `Prix changé — ta règle d'offre (dès ${eurEbay((regle.avant && regle.avant.accepte) || 0)}) n'est plus sur l'annonce eBay : repose-la si tu la veux (« Définir une règle d'offre »).` + plus, ton: 'warn', lecture };
+  if (regle.tombee === true) {
+    // ⚠️ (tour 4, défaut #5) La phrase tient compte du REFUS
+    //    (`MinimumBestOfferPrice`), pas seulement de l'acceptation :
+    //    · une annonce qui n'avait QU'un refus ne doit pas dire « dès 0,00 € »
+    //      (`avant.accepte` était null) ;
+    //    · si eBay GARDE le refus (la relecture le montre), on le dit — il n'est
+    //      pas « plus sur l'annonce ».
+    const av = regle.avant || {};
+    const lec = regle.lecture && typeof regle.lecture === 'object' ? regle.lecture : null;
+    const refusReste = lec && lec.refuse != null;
+    const tete = av.accepte != null
+      ? `Prix changé — ta règle d'offre (dès ${eurEbay(av.accepte)}) n'est plus sur l'annonce eBay`
+      : `Prix changé — eBay n'accepte plus automatiquement les offres sur cette annonce`;
+    const refusTxt = refusReste ? ` (eBay garde le refus des offres sous ${eurEbay(lec.refuse)})` : '';
+    return { msg: `${tete}${refusTxt} : repose-la si tu la veux (« Définir une règle d'offre »).` + plus, ton: 'warn', lecture };
+  }
   const l = regle.lecture;
   if (l && l.accepte != null) {
     // ⚠️ (11 octobre, revue — tour 3) La phrase vient de la MÊME règle que la
@@ -9635,6 +9650,11 @@ function regleApresPrix(regle, erreurs) {
     if (etL.etat !== 'connue') return { msg: `Prix changé — l'annonce eBay montre : ${etatEnClair(l)}.` + plus, ton: 'warn', lecture };
     const pct = Number(l.prix) > 0 ? Math.round(Number(l.accepte) / Number(l.prix) * 100) : null;
     const bas = seuilTropBas(Number(l.accepte), Number(l.prix));
+    // ⚠️ (tour 4, défaut #5) eBay a GARDÉ le seuil d'acceptation mais fait sauter
+    //    le refus (`avant.refuse` posé, relecture sans refus) : ce n'est pas un
+    //    simple « ✓ … reste à X » en couleur de texte — on le DIT, en ambre.
+    const refusTombe = regle.avant && regle.avant.refuse != null && l.refuse == null;
+    if (refusTombe) return { msg: `Prix changé — ta règle d'offre reste à ${eurEbay(l.accepte)}${pct != null ? ` (${pct} % du nouveau prix)` : ''}, mais le refus des offres basses (sous ${eurEbay(regle.avant.refuse)}) n'est plus sur l'annonce eBay.` + (bas ? ' Et le seuil est moins de la moitié du prix : change-le si besoin.' : '') + plus, ton: 'warn', lecture };
     return { msg: `✓ Prix changé — ta règle d'offre reste à ${eurEbay(l.accepte)}${pct != null ? ` (${pct} % du nouveau prix)` : ''}.` + (bas ? ' C\'est moins de la moitié du prix : change-la si besoin.' : '') + plus, ton: (bas || vingt) ? 'warn' : 'ok', lecture };
   }
   if (!l && regle.avant) return { msg: 'Prix changé — je n\'ai pas pu relire ta règle d\'offre : « Relire chez eBay ».' + plus, ton: 'warn', lecture };
