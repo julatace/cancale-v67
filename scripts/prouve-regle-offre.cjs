@@ -56,6 +56,10 @@ const MUTATIONS = [
   ], null, ['R-partiel', 'R-idem', 'R-offres-inconnues']],
   ['refus-non-renvoye', API, '    const yRefus = refuse != null ? refuse : (refuse === undefined && P.refuse != null ? P.refuse : null);', '    const yRefus = refuse != null ? refuse : null;', ['R-garde-refus']],
   ['ordre-luea', API, '    if (!_force && avant && (Number(avant.lueA) || 0) > (Number(v.lueA) || 0)) continue;\n', '', ['R-ordre']],
+  // (api, tour 4 #0) « eBay montre encore l'état d'avant » n'est plus détecté :
+  //   la relecture qui CONTREDIT l'écriture est rangée comme un fait « aucune »
+  //   et rendue à la carte. Les trois issues post-écriture rougissent.
+  ['contredit-range-fait', API, 'const eqLecRegle = (a, c) => !!a && !!c && cents(a.accepte) === cents(c.accepte) && cents(a.refuse) === cents(c.refuse) && (a.offresActives === c.offresActives);', 'const eqLecRegle = (a, c) => false;', ['R-ack', 'R-systeme', 'R-ecart']],
   ['compte', API, '  if (!L.actives.some((x) => x.itemId === itemId)) {\n    if (L.complet) return { status: 409, body: { ok: false, reason: \'pas-sur-ce-compte\'', '  if (false) {\n    if (L.complet) return { status: 409, body: { ok: false, reason: \'pas-sur-ce-compte\'', ['R-compte']],
   // La lecture de la ligne ratée ⇒ on n'écrit RIEN (repartir de vide effacerait
   // les autres annonces). Depuis le 11 octobre, cette lecture vit dans

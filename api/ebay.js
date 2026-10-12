@@ -335,6 +335,11 @@ async function lireRegleOffre(token, itemId) {
 // demandé, on attend puis on relit UNE fois. Délai lu dans
 // process.env.EBAY_RELECTURE_MS (défaut 2000 ; l'audit le met à 20).
 const cents = (v) => (v == null ? null : Math.round(Number(v) * 100));
+// (tour 4, #0) Deux lectures de règle identiques (seuil, refus, offres) : sert à
+// savoir si, APRÈS une écriture, eBay montre ENCORE l'état d'avant (propagation
+// non faite) — auquel cas la relecture ne confirme rien et ne doit pas être
+// rangée comme un fait.
+const eqLecRegle = (a, c) => !!a && !!c && cents(a.accepte) === cents(c.accepte) && cents(a.refuse) === cents(c.refuse) && (a.offresActives === c.offresActives);
 // Trois issues : true (eBay montre la demande) · false (eBay montre autre chose)
 // · null (montants conformes mais on ne sait pas si les offres sont actives).
 function memeRegle(lu, demande, pre) {
@@ -514,19 +519,44 @@ async function handleRegleOffre(b, ctx) {
       + (P.refuse != null ? '<DeletedField>Item.ListingDetails.MinimumBestOfferPrice</DeletedField>' : '');
   }
   const r = await tradingCall(at.token, 'ReviseFixedPriceItem', inner);
-  const rangerPost = (post, raisonKo) => rangerReglesOffre(ctx, { [itemId]: post.ok ? { ...post.lecture, par: 'regle', _force: true } : { lu: false, raison: raisonKo, lueA: Date.now(), par: 'regle', _force: true } });
+  // (tour 4, #0) Une relecture qui montre ENCORE l'état d'avant l'écriture
+  // (`eqLecRegle(post.lecture, P)` sans confirmer la demande) est une
+  // PROPAGATION non faite, pas un fait : on range un RISQUE (la raison du KO —
+  // « apres-ecriture » ou « incertain »), jamais le fait « aucune ». eBay a
+  // dit « Success » (ou n'a pas répondu) : il applique peut-être la règle qu'on
+  // vient d'écrire. Rangé en risque ⇒ `etatRegleOffre` le compte « peut-être ».
+  const rangerPost = (post, raisonKo) => {
+    const conf = post.ok && memeRegle(post.lecture, demande, P) === true;
+    const nonBouge = post.ok && !conf && eqLecRegle(post.lecture, P);
+    const v = (!post.ok || nonBouge)
+      ? { lu: false, raison: raisonKo, lueA: Date.now(), par: 'regle', _force: true }
+      : { ...post.lecture, par: 'regle', _force: true };
+    return rangerReglesOffre(ctx, { [itemId]: v });
+  };
   if (r.ok) {
     const post = await relireApres(at.token, itemId, demande, P);
     const range = await rangerPost(post, 'apres-ecriture');
     if (!post.ok) return { status: 200, body: { ok: true, verifie: null, lecture: null, avertissements: r.avertissements, erreurs: r.erreurs, range } };
-    return { status: 200, body: { ok: true, verifie: memeRegle(post.lecture, demande, P), lecture: post.lecture, avertissements: r.avertissements, erreurs: r.erreurs, range, compte: ctx.compte.pseudo || '' } };
+    const vf = memeRegle(post.lecture, demande, P);
+    // eBay a accepté (« Success ») mais montre ENCORE l'état d'avant : la règle
+    // n'est pas confirmée. On ne rend PAS cette lecture (ce serait « aucune »
+    // dans la carte) : « pas encore relue », un risque — comme le marqueur rangé.
+    if (vf !== true && eqLecRegle(post.lecture, P)) return { status: 200, body: { ok: true, verifie: null, lecture: null, nonConfirme: true, avertissements: r.avertissements, erreurs: r.erreurs, range, compte: ctx.compte.pseudo || '' } };
+    return { status: 200, body: { ok: true, verifie: vf, lecture: post.lecture, avertissements: r.avertissements, erreurs: r.erreurs, range, compte: ctx.compte.pseudo || '' } };
   }
   if (sansAck(r) || classeEchec(r) === 'incertain') {
     // Pas de réponse claire, ou panne d'eBay : il a peut-être écrit. On relit.
     const post = await relireApres(at.token, itemId, demande, P);
     const range = await rangerPost(post, 'incertain');
     if (post.ok && memeRegle(post.lecture, demande, P) === true) return { status: 200, body: { ok: true, verifie: true, apresIncertain: true, lecture: post.lecture, avertissements: r.avertissements || [], range } };
-    if (post.ok) return { status: 504, body: { ok: false, reason: 'incertain', lecture: post.lecture, erreurs: r.erreurs, range, error: `eBay n'a pas répondu clairement. L'annonce montre aujourd'hui : ${etatEnClair(post.lecture)}. Relis-la dans un moment avant de recommencer.` } };
+    if (post.ok) {
+      // eBay montre encore l'état d'avant ⇒ on ne rend pas cette lecture (sinon
+      // la carte la rangerait comme un fait « aucune ») : le geste reste « relis-la ».
+      const nb = eqLecRegle(post.lecture, P);
+      return { status: 504, body: { ok: false, reason: 'incertain', lecture: nb ? null : post.lecture, erreurs: r.erreurs, range, error: nb
+        ? 'eBay n\'a pas répondu clairement, et l\'annonce montre encore son état d\'avant — je ne sais pas si la règle est posée. « Relire chez eBay » dans un moment avant de recommencer.'
+        : `eBay n'a pas répondu clairement. L'annonce montre aujourd'hui : ${etatEnClair(post.lecture)}. Relis-la dans un moment avant de recommencer.` } };
+    }
     return { status: 504, body: { ok: false, reason: 'incertain', erreurs: r.erreurs, range, error: 'eBay n\'a pas répondu clairement — je ne sais pas si la règle est posée. « Relire chez eBay » avant de recommencer.' } };
   }
   // RequestError : la requête est refusée, rien n'est appliqué. Une relecture

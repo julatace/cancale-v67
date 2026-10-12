@@ -1583,7 +1583,7 @@ const RA = {};
     avecR(); mode.regle = '503-avant';
     const o2 = await app(JWT_J, POSE('110000000301', 72, 80, NUL));
     const it2 = (offresDe(J) || {})['110000000301'];
-    dit(o2.code === 504 && o2.corps.reason === 'incertain' && o2.corps.lecture && o2.corps.lecture.accepte === null && it2 && it2.lu === true, '[R-ack] 503 AVANT d\'écrire ⇒ 504 « incertain » avec ce qu\'eBay montre (aucune), rangé — jamais « refusé »', `HTTP ${o2.code}`);
+    dit(o2.code === 504 && o2.corps.reason === 'incertain' && o2.corps.lecture == null && it2 && it2.lu === false && it2.raison === 'incertain', '[R-ack] 503 AVANT d\'écrire, eBay montre ENCORE l\'état d\'avant ⇒ 504 « incertain », rangé en RISQUE (jamais le fait « aucune » — #0)', `HTTP ${o2.code} · ${JSON.stringify(it2)}`);
     for (const r of ['503-apres', 'reseau-apres']) {
       avecR(); mode.regle = r; mode.getitemApres = 'ko';
       const o3 = await app(JWT_J, POSE('110000000301', 72, 80, NUL));
@@ -1597,7 +1597,8 @@ const RA = {};
     dit(o.code === 200 && o.corps.verifie === true, '[R-systeme] eBay écrit PUIS répond « panne interne » (SystemError) ⇒ relu posé : 200 vérifiée — jamais « rien n\'a changé »', `HTTP ${o.code} · ${o.corps && o.corps.reason}`);
     avecR(); mode.regle = 'failure-systeme';
     const o2 = await app(JWT_J, POSE('110000000301', 72, 80, NUL));
-    dit(o2.code === 504 && o2.corps.reason === 'incertain' && o2.corps.lecture && (o2.corps.erreurs || [])[0] && o2.corps.erreurs[0].classe === 'SystemError', '[R-systeme] panne d\'eBay sans écriture ⇒ 504 « incertain » avec la lecture, et la classe de l\'erreur rendue', `HTTP ${o2.code}`);
+    const it2 = (offresDe(J) || {})['110000000301'];
+    dit(o2.code === 504 && o2.corps.reason === 'incertain' && o2.corps.lecture == null && it2 && it2.lu === false && (o2.corps.erreurs || [])[0] && o2.corps.erreurs[0].classe === 'SystemError', '[R-systeme] panne d\'eBay sans écriture, eBay montre encore l\'état d\'avant ⇒ 504 « incertain », rangé en RISQUE (jamais « aucune » — #0), la classe de l\'erreur rendue', `HTTP ${o2.code} · ${JSON.stringify(it2)}`);
     avecR(); mode.regle = 'failure-sans-classe';
     const o3 = await app(JWT_J, POSE('110000000301', 72, 80, NUL));
     dit(o3.code === 504 && o3.corps.reason === 'incertain', '[R-systeme] un échec sans classe ⇒ « incertain », jamais « refusé »', `HTTP ${o3.code}`);
@@ -1637,8 +1638,8 @@ const RA = {};
     avecR(); mode.regle = 'ignore';
     const o = await app(JWT_J, POSE('110000000301', 72, 80, NUL));
     const it = (offresDe(J) || {})['110000000301'];
-    dit(o.code === 200 && o.corps.verifie === false && o.corps.lecture && o.corps.lecture.accepte === null && it && it.accepte === null && getsApres(o.journal) === 2,
-      '[R-ecart] eBay dit « fait » mais n\'a rien appliqué ⇒ « pas vérifiée », après une relecture DIFFÉRÉE (2 GetItem)', `verifie=${o.corps && o.corps.verifie} · ${getsApres(o.journal)} GetItem après`);
+    dit(o.code === 200 && o.corps.verifie === null && o.corps.lecture == null && it && it.lu === false && it.raison === 'apres-ecriture' && getsApres(o.journal) === 2,
+      '[R-ecart] eBay dit « fait » mais montre ENCORE l\'état d\'avant ⇒ « pas confirmée » (verifie null, rangé en RISQUE apres-ecriture, jamais le fait « aucune » — #0), après une relecture DIFFÉRÉE (2 GetItem)', `verifie=${o.corps && o.corps.verifie} · ${getsApres(o.journal)} GetItem après · ${JSON.stringify(it)}`);
   });
   await essaie('[R-delai]', async () => {
     avecR(); mode.getitemApres = 'ancien-puis-nouveau';
