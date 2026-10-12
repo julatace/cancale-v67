@@ -7811,6 +7811,49 @@ function MicDictee({ onText, titre = 'Dicter' }) {
     </button>
   );
 }
+// ── TRADUCTION DES MESSAGES (G35) ─────────────────────────────────────────────
+// Un acheteur écrit en anglais, en espagnol… (mesuré : « Trainers are in post »,
+// cf. la section IA). On traduit en français AVEC LE TRADUCTEUR INTÉGRÉ du
+// navigateur (API `Translator`/`LanguageDetector` de Chrome), SANS clé ni
+// serveur — ce que le navigateur fait SEUL (§2.9). Jamais sur SA clé, jamais
+// l'IA de réponse. Le bouton n'apparaît QUE si l'API existe (Safari, vieux
+// Chrome : rien — §2.7) et UNIQUEMENT sur le clic (pas de téléchargement de
+// modèle ni d'appel en rafale). On n'écrase pas le message : la traduction
+// s'ajoute dessous, et on DIT de quelle langue — jamais « traduit » sans dire
+// d'où, et un message déjà en français n'est pas « traduit » pour rien.
+const TRAD_OK = typeof window !== 'undefined' && 'Translator' in window;
+const NOM_LANGUE = { en:'anglais', es:'espagnol', it:'italien', de:'allemand', nl:'néerlandais', pt:'portugais', pl:'polonais', ro:'roumain', lt:'lituanien', cs:'tchèque', sk:'slovaque', hu:'hongrois', sv:'suédois', da:'danois', fi:'finnois', el:'grec', uk:'ukrainien', ru:'russe', ja:'japonais', zh:'chinois', ar:'arabe', tr:'turc' };
+function BoutonTraduire({ texte }) {
+  const [etat, setEtat] = React.useState('idle'); // idle | charge | fait | deja | ko
+  const [trad, setTrad] = React.useState('');
+  const [langue, setLangue] = React.useState('');
+  if (!TRAD_OK || !texte || !String(texte).trim()) return null;
+  const lancer = async () => {
+    if (etat === 'charge') return;
+    setEtat('charge');
+    try {
+      let src = 'en';
+      try {
+        if ('LanguageDetector' in window) {
+          const d = await window.LanguageDetector.create();
+          const r = await d.detect(String(texte));
+          if (r && r[0] && r[0].detectedLanguage) src = r[0].detectedLanguage;
+        }
+      } catch (_) {}
+      if (src === 'fr') { setEtat('deja'); return; }
+      const dispo = await window.Translator.availability({ sourceLanguage: src, targetLanguage: 'fr' });
+      if (dispo === 'unavailable') { setEtat('ko'); return; }
+      const tr = await window.Translator.create({ sourceLanguage: src, targetLanguage: 'fr' });
+      const out = await tr.translate(String(texte));
+      if (out && String(out).trim()) { setTrad(String(out)); setLangue(src); setEtat('fait'); }
+      else setEtat('ko');
+    } catch (_) { setEtat('ko'); }
+  };
+  if (etat === 'fait') return <div data-traduit={langue} style={{marginTop:4,fontSize:12.5,color:C.muted,fontStyle:'italic',whiteSpace:'pre-wrap',wordBreak:'break-word'}}>🌐 {trad}<span style={{display:'block',fontSize:10,fontStyle:'normal',marginTop:2}}>traduit de {NOM_LANGUE[langue] || langue}</span></div>;
+  if (etat === 'deja') return <div data-traduit="fr" style={{marginTop:3,fontSize:11,color:C.muted}}>déjà en français</div>;
+  if (etat === 'ko') return <div style={{marginTop:3,fontSize:11,color:C.muted}}>traduction indisponible sur cet appareil</div>;
+  return <button type="button" data-traduire onClick={lancer} style={{marginTop:3,fontSize:11,fontWeight:600,color:C.accent,background:'transparent',border:'none',padding:0,cursor:etat==='charge'?'default':'pointer',fontFamily:'inherit'}}>{etat === 'charge' ? 'traduction…' : '🌐 Traduire'}</button>;
+}
 // ── LA BARRE DU BAS NE DÉFILE PLUS ───────────────────────────────────────────
 // ⚠️ Plainte de Julien : « je dois glisser de gauche à droite en bas pour voir
 // toutes les interfaces ». C'était exact : la barre portait NEUF onglets dans un
@@ -32540,6 +32583,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   : <div key={i} style={{alignSelf:m.mine?'flex-end':'flex-start',maxWidth:'80%'}}>
                       <div style={{background:m.mine?C.accent:C.surface,color:m.mine?'#fff':C.text,border:m.mine?'none':`1px solid ${C.border}`,borderRadius:10,padding:'8px 12px',fontSize:13,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{m.body||(m.photos?.length?'📷 photo':'')}</div>
                       {(m.links||[]).map((l,j)=><a key={j} href={l.url} target="_blank" rel="noreferrer" style={{display:'block',marginTop:3,fontSize:12,fontWeight:500,color:C.blue||C.accent,alignSelf:m.mine?'flex-end':'flex-start'}}>{l.bordereau?'📄 Bordereau':'🔗 lien'}</a>)}
+                      {!m.mine && m.body ? <BoutonTraduire texte={m.body}/> : null}
                     </div>
               ))}
               {!openConv.loading && !openConv.error && openConv.messages.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Aucun message.</div>}

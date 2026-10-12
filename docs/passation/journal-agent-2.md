@@ -405,3 +405,37 @@ serait dite « périmée » ou recevrait une session qu'elle ne sait pas lire. L
 remède documenté (« monter les quatre frontières ensemble » : `EXT_CAPACITES.liaison`,
 `CODE_DANS_ETAT`, bridge.js, vrm-badge.js) appartient à ta ligne, pas à la mienne
 — je n'y ai pas touché. À regarder.
+
+---
+
+## G35 — Traduction des messages (Terrain) — 12 octobre
+
+**Besoin de Julien (retenu le 11 oct, groupe Terrain) :** « traduction des
+messages ». Mesuré : des acheteurs écrivent en anglais (cf. la section IA de
+CLAUDE.md, « Trainers are in post »).
+
+**Règle §2.9 appliquée :** d'abord SANS IA, avec le traducteur INTÉGRÉ du
+navigateur (API `Translator` + `LanguageDetector` de Chrome) — aucune clé,
+aucun serveur, jamais SA clé ni l'IA de réponse. Même patron que G34 (micro) :
+feature-détection, et si l'API n'existe pas (Safari, vieux Chrome) ⇒ RIEN
+(§2.7), jamais un bouton mort.
+
+**Livré :** `BoutonTraduire` (près de `MicDictee`), posé sous chaque message
+ENTRANT du fil (`!m.mine && m.body` — jamais les miens, jamais un évènement).
+Au clic : détecte la langue, traduit en français, affiche la traduction SOUS
+l'original (on n'écrase pas) et DIT de quelle langue (`NOM_LANGUE`). Un message
+déjà en français dit « déjà en français » (pas de fausse traduction) ; une API
+indisponible dit « traduction indisponible sur cet appareil ». Tout au clic
+seulement (pas de téléchargement de modèle ni d'appel en rafale).
+
+**Preuves :** banc `scripts/bancs/traduire-messages.cjs` (données inventées,
+390 + 1512 px, `Translator`/`LanguageDetector` mockés comme le micro) :
+bouton présent sur l'entrant anglais et UN SEUL (pas sur le mien) ; clic →
+traduction + « traduit de l'anglais » ; message FR → « déjà en français » ;
+API absente → aucun bouton. **Rouge sous trois mutations** : bouton sur tous
+les messages (→ 2 boutons), API ignorée (→ bouton sans traducteur), FR traduit
+quand même. `messagerie.cjs` reste vert (sans mock, `TRAD_OK` faux → rien).
+`audit-tdz/icones/coherence/variables/chiffres/boutons` verts.
+
+Aucune entrée d'`EXT_CAPACITES` : c'est le navigateur qui traduit, l'app ne
+promet rien de l'extension.
