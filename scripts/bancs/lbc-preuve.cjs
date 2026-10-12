@@ -25,6 +25,12 @@
 //      La file de l'extension publiée est EXÉCUTÉE (son background.js, lu dans
 //      l'historique de main — `VRM_GIT` depuis une copie).
 const path = require('path'), fs = require('fs'), http = require('http');
+// Une extension ≥ CODE_DANS_ETAT (5.171) porte dans son état la version du CODE
+// qui tourne (\`code\`) : sans lui, l'app la dit « périmée » (chantier connexion du
+// 11 octobre). Le seuil est LU dans l'app, jamais recopié (§11).
+const CODE_DANS_ETAT_BANC = (require('fs').readFileSync(require('path').join(__dirname, '..', '..', 'src', 'App.jsx'), 'utf8').match(/const CODE_DANS_ETAT = '([0-9.]+)'/) || [])[1] || '5.171.0';
+const auMoinsBanc = (v, s) => { const a = String(v || '').split('.').map(Number), b = String(s).split('.').map(Number); for (let i = 0; i < 3; i++) { if ((a[i] || 0) !== (b[i] || 0)) return (a[i] || 0) > (b[i] || 0); } return true; };
+const codeEtat = (v) => auMoinsBanc(v, CODE_DANS_ETAT_BANC) ? { code: v, ext: 'banc-ext' } : {};
 const RACINE = path.join(__dirname, '..', '..');
 const { faireFond, projette } = require(path.join(RACINE, 'scripts/_fond-vm.cjs'));
 const { metaVersData } = require('./_meta.cjs');
@@ -93,7 +99,7 @@ const PONT = (o) => {
   window.addEventListener('message', (e) => {
     const d = e.data; if (e.source !== window || !d || typeof d !== 'object') return;
     if (d.__vmr === 'ping') post({ __vmr: 'ready', version: o.version });
-    if (d.__vmr === 'etat') post({ __vmr: 'etat:result', reqId: d.reqId, resp: { ok: true, version: o.version, vrm: { ok: true, connecte: true, email: '' }, vinted: { uid: '111', login: 'compte_test' }, cmds: {} } });
+    if (d.__vmr === 'etat') post({ __vmr: 'etat:result', reqId: d.reqId, resp: { ok: true, version: o.version, ...(o.etatCode || {}), vrm: { ok: true, connecte: true, email: '' }, vinted: { uid: '111', login: 'compte_test' }, cmds: {} } });
   });
   post({ __vmr: 'ready', version: o.version });
 };
@@ -103,7 +109,7 @@ async function fileApp(b, lignes, vp, pont) {
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
-  if (pont) await pg.addInitScript(PONT, pont);
+  if (pont) await pg.addInitScript(PONT, Object.assign({}, pont, { etatCode: codeEtat(pont.version) }));
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (rt) => (['image', 'media', 'font'].includes(rt.request().resourceType()) ? rt.abort() : rt.continue()));
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));

@@ -49,6 +49,12 @@
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
+// Une extension ≥ CODE_DANS_ETAT (5.171) porte dans son état la version du CODE
+// qui tourne (\`code\`) : sans lui, l'app la dit « périmée » (chantier connexion du
+// 11 octobre). Le seuil est LU dans l'app, jamais recopié (§11).
+const CODE_DANS_ETAT_BANC = (require('fs').readFileSync(require('path').join(__dirname, '..', '..', 'src', 'App.jsx'), 'utf8').match(/const CODE_DANS_ETAT = '([0-9.]+)'/) || [])[1] || '5.171.0';
+const auMoinsBanc = (v, s) => { const a = String(v || '').split('.').map(Number), b = String(s).split('.').map(Number); for (let i = 0; i < 3; i++) { if ((a[i] || 0) !== (b[i] || 0)) return (a[i] || 0) > (b[i] || 0); } return true; };
+const codeEtat = (v) => auMoinsBanc(v, CODE_DANS_ETAT_BANC) ? { code: v, ext: 'banc-ext' } : {};
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || 4711;
 const EXT_ATTENDUE = (/const EXT_ATTENDUE = '([^']+)'/.exec(fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'App.jsx'), 'utf8')) || [])[1] || '?';
@@ -58,7 +64,7 @@ const PONT = (o) => {
   window.addEventListener('message', (e) => {
     const d = e.data; if (e.source !== window || !d || typeof d !== 'object') return;
     if (d.__vmr === 'ping') post({ __vmr: 'ready', version: o.version });
-    if (d.__vmr === 'etat') post({ __vmr: 'etat:result', reqId: d.reqId, resp: { ok: true, version: o.version, vrm: o.vrm || { ok: true, connecte: true, email: '' }, vinted: { uid: '111', login: 'compte_test' }, cmds: {} } });
+    if (d.__vmr === 'etat') post({ __vmr: 'etat:result', reqId: d.reqId, resp: { ok: true, version: o.version, ...(o.etatCode || {}), vrm: o.vrm || { ok: true, connecte: true, email: '' }, vinted: { uid: '111', login: 'compte_test' }, cmds: {} } });
     if (d.__vmr === 'cmd' && d.cmd === 'ventes') post({ __vmr: 'cmd:result', reqId: d.reqId, resp: { accepte: true, etape: 'recent' } });
     // Comme le VRAI background.js quand le PDF est déjà rangé (mesuré dans le vm) :
     // « fait », sans rien demander à Vinted — et sans relier la vente.
@@ -202,7 +208,7 @@ async function ouvrir(b, vp, panne, opts = {}) {
   if (opts.session) await pg.addInitScript((sess) => { try { localStorage.setItem('vrm_session', JSON.stringify(sess)); } catch (_) {} }, SESSION);
   else await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
   if (opts.session) await pg.route('**/auth/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ...SESSION, expires_in: 3600 }) }));
-  if (opts.pont) await pg.addInitScript(PONT, opts.pont);
+  if (opts.pont) await pg.addInitScript(PONT, Object.assign({}, opts.pont, { etatCode: codeEtat(opts.pont.version) }));
   if (opts.local) await pg.addInitScript((l) => { try { for (const [k, v] of Object.entries(l)) localStorage.setItem(k, v); } catch (_) {} }, opts.local);
   await pg.addInitScript(() => {
     window.__etatsAuto = [];
