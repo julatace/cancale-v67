@@ -1,11 +1,13 @@
 # VRM — dossier de passation
 
-> ⚠️⚠️ **PASSATION DU 11 OCTOBRE (SOIR) — LIS D'ABORD `docs/passation/README.md`.**
-> Ce qui est en production, ce qui attend sur la branche d'intégration (extension
-> 5.175 depuis la relecture croisée du 12 octobre), le travail sauvé dans un paquet git (`docs/passation/*.bundle`, 21
-> branches qui n'existaient que sur une machine), et la répartition entre les
-> deux sessions (Session 1 : mise en ligne, eBay, agent ; Session 2 :
-> fonctionnalités, accueil, revue).
+> ⚠️⚠️ **PASSATION DU 12 OCTOBRE — DEUX AGENTS — LIS D'ABORD `docs/passation/README.md`,
+> section « 🔴 LIRE D'ABORD » puis « RÉPARTITION ».** Agent 1 : mettre en ligne
+> la 5.175 (avec le second correctif photos), migration 014, règle d'offre eBay,
+> puis l'agent eBay. Agent 2 : page d'accueil, tri des 21 anciennes branches,
+> fonctions retenues le 11 octobre, revue complète. Le travail non poussé est
+> dans `docs/passation/branches-2026-10-12.bundle` et
+> `branches-locales-2026-10-11.bundle` ; les listes de défauts restants dans
+> `docs/passation/notes/`.
 
 **Lis ce fichier en entier avant de coder. Il est court exprès.**
 L'historique détaillé (chaque session, chaque mesure, chaque erreur et sa cause)

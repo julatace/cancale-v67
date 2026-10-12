@@ -9,6 +9,259 @@ avez tranché.
 
 ---
 
+## 🔴 LIRE D'ABORD — CONSIGNES DE REPRISE (12 octobre, 08:20 UTC)
+
+La session d'origine atteint sa **limite de la semaine**. Julien a demandé des
+consignes précises pour celle qui reprend. Ce qui suit **remplace** les
+sections §0 à §5 quand elles se contredisent ; §6 et §7 restent valables.
+
+### RÉPARTITION — Julien a DEUX agents (consigne du 12 octobre)
+
+**Lis la colonne de ton rôle.** Julien te dit lequel tu es (« tu es l'agent 1 » /
+« tu es l'agent 2 »). S'il ne l'a pas dit : `git fetch origin`, puis cherche un
+journal déjà poussé (`git grep -l "AGENT 1" $(git branch -r | grep claude/) --
+docs/passation/journal-agent-1.md`). **Un `journal-agent-1.md` existe déjà sur
+une autre branche ⇒ tu es l'Agent 2 ; sinon tu es l'Agent 1** — et pousse ton
+journal tout de suite, première chose, pour que l'autre le voie.
+
+| | **AGENT 1 — « mise en ligne, eBay, agent »** | **AGENT 2 — « fonctionnalités, accueil, revue »** |
+|---|---|---|
+| fait, dans l'ordre | B (mettre la 5.175 en ligne, avec les photos) → C (migration 014) → D (règle d'offre eBay) → l'agent eBay (`notes/agent-ebay/spec-finale.md`, vagues §10, K14 GELÉ) | E (page d'accueil) → F (trier les 21 anciennes branches) → G (fonctions retenues, groupe par groupe, « Vitesse » en dernier) → H (revue complète, quand l'Agent 1 a fini D) |
+| possède (lui seul modifie) | `api/ebay.js`, `api/_lib/ebay*`, tout ce qui commence par `Ebay` dans `src/App.jsx`, `supabase/migrations/014*` et `015*`, `scripts/agent-sql/`, `scripts/audit-ebay-*`, `scripts/prouve-*regle*`, `scripts/bancs/ebay-*` | `src/Accueil.jsx`, `public/legal/`, `scripts/film-accueil.cjs`, tout le reste de `src/App.jsx`, `vinted-sync-extension/`, `public/VRM-extension.zip`, les migrations **020 et au-delà** |
+| versions d'extension | **5.190 → 5.199** (seulement s'il doit toucher l'extension — normalement jamais) | **5.176 → 5.189** |
+| première PR vers `main` | la sienne (étape B) — **c'est elle qui part en premier** | **pas avant** que la PR de la 5.175 de l'Agent 1 soit mergée (`git log origin/main` le dit) ; ensuite `git merge origin/main` avant chaque PR |
+| journal à tenir | `docs/passation/journal-agent-1.md` sur SA branche, poussé | `docs/passation/journal-agent-2.md` sur SA branche, poussé |
+
+**Coordination (les deux agents ne se parlent que par git)** :
+- Chacun part de `origin/claude/project-review-nsk5su` (tête `e2d377c` ou plus
+  récente) sur **sa propre branche** (celle que son environnement lui donne),
+  et pousse à chaque modification.
+- Chacun tient son **journal** (ce qu'il fait maintenant, ce qui est fini, la
+  version d'extension qu'il a prise, les fichiers hors de son domaine qu'il a
+  dû toucher et pourquoi). **Avant de commencer une étape, et avant chaque PR**,
+  `git fetch origin` puis lire le journal de l'autre :
+  `git branch -r | grep claude/` puis
+  `git show origin/<branche-de-l-autre>:docs/passation/journal-agent-N.md`.
+- Un fichier qui appartient à l'autre : n'y touche que si c'est indispensable,
+  dis-le dans ton journal **avant** de pousser, et garde le changement minimal.
+  `CLAUDE.md` est commun : chacun ajoute SES sections ; au merge, on garde les
+  deux.
+- Tout passe en production par PR vers `main`, l'une après l'autre ; jamais
+  deux PR mergées dans la même heure sans `git merge origin/main` +
+  build + audits entre les deux. Plafond Vercel commun : **100 déploiements /
+  24 h**.
+- Si l'Agent 1 n'a pas mergé la 5.175 quand l'Agent 2 est prêt à mettre en
+  ligne, l'Agent 2 attend : il n'emporte PAS l'intégration à sa place (elle
+  serait livrée sans les photos ni la vérification de l'étape B).
+- Chacun parle à Julien dans sa propre session : pas de questions, une phrase
+  quand quelque chose est en ligne ou quand un geste lui revient (§7).
+
+### A. Où est chaque morceau de travail, exactement
+
+| morceau | où le prendre | tête | état |
+|---|---|---|---|
+| **Intégration à mettre en ligne** (extension **5.175.0**) | `origin/claude/project-review-nsk5su` | `e2d377c`, ou un commit plus récent de la session d'origine | Relecture croisée **faite** : 4 défauts corrigés (`c658216`, `19df09a`, `e2d377c`) — liste : `notes/croisee-5174/defauts-corriges-en-c658216.json`. **Les bancs de la vérification finale tournaient encore** à l'arrêt : à refaire (Agent 1, B). |
+| **Photos, second tour** (correctif de la plainte « plus de photos ») | paquet `branches-2026-10-12.bundle`, branche `passation2/photos-r2` | `bf63bca` (au-dessus de `c7efee0`, déjà dans l'intégration) | 13 défauts signalés, 7 confirmés (5 défauts distincts), **tous corrigés et prouvés** (audit-photos-vinted 50 contrôles, 26 mutations ; banc photos-vinted 166 contrôles). **À fusionner AVANT la mise en ligne.** Le correctif ne touche que l'app : aucune nouvelle version d'extension. |
+| **K3 : migration 014** (mémoire de l'agent eBay) | même paquet, `passation2/k3-014` | `9df8061` (au-dessus de `9dcd405`, déjà dans l'intégration) | Revue 2 : 5 défauts confirmés, **corrigés** (liste : `notes/k3/defauts-revue2-corriges-en-9df8061.json`). Une **3ᵉ relecture tournait**, sans résultat rendu. **PAS appliquée en production.** |
+| **Règle d'offre eBay** (seuil natif, décision du 9 oct.) | même paquet, `passation2/regle-offre` | `00a9d92` | Tours 1 à 3 corrigés. **Tour 4 sur `00a9d92` : 6 défauts CONFIRMÉS + 5 pas encore jugés** — liste complète, avec la sonde, la commande et la sortie de chacun : `notes/regle-offre/defauts-tour4-sur-00a9d92.json`. |
+| **Page d'accueil refaite + film** | même paquet, `passation2/accueil` | `a78fbc9` | Construite. La vérification au rendu et la revue adverse n'ont **pas** été faites. |
+| **21 anciennes branches** (propositions du 8 oct., pointage, coffre, compte de résultat, boutique Chrome, PDF dans le stockage…) | `branches-locales-2026-10-11.bundle` | voir §3 | à trier (Agent 2, F) |
+| **Fonctions retenues par Julien le 11 oct.** | rien de commité | — | à construire (Agent 2, G) |
+
+Récupérer les deux paquets (depuis une copie de la branche à jour) :
+```
+git fetch origin claude/project-review-nsk5su main
+git checkout -B <ta-branche> origin/claude/project-review-nsk5su
+git fetch docs/passation/branches-2026-10-12.bundle 'refs/heads/passation2/*:refs/remotes/passation2/*'
+git fetch docs/passation/branches-locales-2026-10-11.bundle 'refs/heads/*:refs/remotes/passation/*'
+git branch -r | grep passation
+```
+Les scripts de workflow de `docs/passation/workflows/` portent des chemins de
+la machine d'origine (`/home/user/cancale-v67/.claude/worktrees/…`,
+`/tmp/claude-0/…/scratchpad/…`) : **adapte-les** à ta copie avant de les
+relancer, et passe les listes de défauts en `args`.
+
+### B. AGENT 1 · Étape 1 — mettre la 5.175 en ligne (c'est ce que Julien attend)
+
+1. Sur ta branche (copie de `origin/claude/project-review-nsk5su`) :
+   `git merge passation2/photos-r2`. Conflits attendus : **CLAUDE.md** (garde
+   les DEUX sections photos — « revue du 11 octobre » et « seconde revue du
+   11 octobre » — et la section « Relecture croisée de la 5.174 ») et peut-être
+   `src/App.jsx` autour de `PhotoVinted` / la phrase des photos : garde le
+   comportement de `bf63bca` (un refus de l'extension n'est **jamais**
+   définitif ; `estDefinitive` rend toujours faux) **et** les corrections de la
+   relecture croisée. Jamais `-s ours`.
+2. `npm ci` si besoin, puis `npm run build`.
+3. Tous les audits : `for f in scripts/audit-*.cjs; do node "$f" >/tmp/a.log 2>&1 || echo "ROUGE $f"; done`.
+   `audit-renum-b.cjs` (~5 min, Postgres local) et `audit-agent-sql.cjs`
+   (Postgres jetable) peuvent être sautés s'il n'y a pas de Postgres — **dis-le**.
+   Tout autre rouge se corrige avant d'aller plus loin.
+4. Les bancs, **un par un** (ils se gênent en parallèle) :
+   `bash docs/passation/workflows/verif-integ.sh photos-vinted pont popup session deux-extensions supprimees enligne lbc-preuve ebay-annonces ebay-programmer ebay-form tout-generer notif-messages comptes-sans-email detourage detourage-reglage badge capacites premierjour publier repondre double-vente vendu-recu messagerie statuts-colis ventes-bordereau annonces-carte`
+   (lis le script d'abord : il crée un lien temporaire vers `fx/`). Les bancs
+   qui lisent les fixtures réelles (`verif_visuel`, `verif_dark`, `colis`,
+   `comptes`, `retrait`, `urssaf`…) ont besoin de `scripts/bancs/fx/`, qui
+   n'est **pas** dans le dépôt (public). Pour l'obtenir :
+   `node scripts/bancs/copie-fixtures.mjs <SUPABASE_URL> <ANON_KEY>` — en
+   lecture seule ; **ne jamais commiter `fx/`** (`audit-bancs.cjs` le refuse).
+   Pas de clé ? Dis lesquels n'ont pas tourné, ne prétends rien.
+   Un banc chronométré qui rate une fois se relance **seul** avant de conclure.
+5. `git merge origin/main` (vrai merge ; `main` = `2fed734` doit déjà être
+   un ancêtre, donc rien ne doit changer) puis
+   `git diff origin/main --stat` : seuls les fichiers des chantiers.
+6. PR vers `main` (outil GitHub `create_pull_request`), puis
+   `merge_pull_request` avec le **SHA complet de 40 caractères** de la tête.
+7. Vérifier la mise en ligne avec l'outil **Vercel** (vrm.center est bloqué
+   par le proxy du conteneur) : `list_deployments` du projet → le déploiement
+   du commit de merge est **READY** ; `web_fetch_vercel_url` sur
+   `https://vrm.center/api/sante` répond ; le zip servi
+   (`/VRM-extension.zip`) est bien celui de la 5.175 (taille identique à
+   `public/VRM-extension.zip`). Plafond : 100 déploiements / 24 h ; **ne
+   jamais promouvoir une prévisualisation**.
+8. Envoyer à Julien, en clair, une fois :
+   « La 5.175 est en ligne. Quand tu pourras : télécharge-la depuis Réglages
+   (ou vrm.center/VRM-extension.zip), dézippe-la en UN dossier, puis dans
+   chrome://extensions **de chaque profil Chrome** supprime toute autre copie
+   de VRM, charge ce dossier, clique ⟳, recharge tes onglets Vinted. Ensuite
+   passe une fois sur arthuror2 et tomj683. » Il a dit le 11 qu'il ne pouvait
+   pas l'installer tout de suite : **ne pas insister**.
+
+### C. AGENT 1 · Étape 2 — migration 014 (K3)
+
+1. Partir de `passation2/k3-014` (`9df8061`). Faire la **3ᵉ relecture
+   adverse** (modèle : `workflows/k3-revue-2-wf_25506800-353.js`) : deux
+   relecteurs qui REPRODUISENT sur un Postgres jetable
+   (`node scripts/audit-agent-sql.cjs` lance le sien ; il dit s'il ne trouve
+   pas Postgres), deux sceptiques par défaut, correction prouvée (rouge sur la
+   tête d'avant, vert après, rouge sous mutation — `--prouve`), jusqu'à **deux
+   tours sans défaut neuf**. Ne pas re-signaler ce qui est dans
+   `notes/k3/defauts-revue2-corriges-en-9df8061.json`.
+2. Fusionner dans l'intégration (elle n'ajoute que la migration, ses scripts,
+   son audit et sa section de CLAUDE.md — aucun effet tant qu'elle n'est pas
+   appliquée), PR, merge.
+3. **Essai annulé sur la vraie base**, avec l'outil SQL Supabase (projet
+   `lgonxzrzjcqthjtbdpzo`) : `node scripts/agent-sql/essai-annule.cjs >
+   essai.sql`, coller son contenu dans `execute_sql` (une transaction, un
+   rapport JSON d'une ligne, puis ROLLBACK). Vérifier ensuite qu'**il ne reste
+   rien** (`select count(*) from pg_tables where tablename like 'vrm_agent%'`
+   = 0, et aucun déclencheur `vrm_agent%` sur `app_data`). Si l'outil refuse le
+   bloc : `--morceaux --dossier=…`, trois transactions dans l'ordre.
+4. Appliquer la migration (le fichier, tel quel), puis
+   `node scripts/agent-sql/essai-annule.cjs --verifier > verifier.sql` →
+   `execute_sql` → `ok` doit valoir **true** ; sinon `ecarts` dit quoi.
+5. Consigner dans CLAUDE.md (« APPLIQUÉE le … à … UTC », comme la 013).
+   `vrm_reglages.agent_ebay` reste `'0'` : rien ne tourne. **Aucun DROP**
+   (l'outil exige alors une confirmation humaine).
+
+### D. AGENT 1 · Étape 3 — règle d'offre eBay
+
+1. Partir de `passation2/regle-offre` (`00a9d92`). Lire
+   `notes/regle-offre/defauts-tour4-sur-00a9d92.json` **en entier** (chaque
+   entrée porte `reproduction` : sonde, commande, sortie, cause ; et les deux
+   votes des sceptiques).
+2. **Corriger les 6 confirmés** (numéros 0, 2, 3, 4, 5, 6) :
+   - **0 (haute)** — une relecture qui CONTREDIT l'écriture (après un
+     « Success » d'eBay, ou un 503 sans `<Ack>`) est rangée comme « aucune
+     règle » : VRM oublie une règle qu'eBay applique peut-être. ⇒ une relecture
+     qui contredit une écriture récente vaut « pas su », pas « aucune ».
+   - **2** — planificateur / publication après un premier envoi sans réponse :
+     l'annonce existe chez eBay avec sa règle, VRM ne range jamais la règle.
+   - **3** — « Relire mes ventes eBay » échoue en silence.
+   - **4 et 6** — une règle active sur une annonce dans une **autre devise**
+     que l'euro n'est comptée nulle part (« ce que ça engage », relecture des
+     ventes, déconnexion, « Fermer mon compte ») et la carte propose quand même
+     « Définir » (feuille en euros, refusée ensuite par la route).
+   - **5** — ✏️ / « Baisser sur eBay » : la phrase sur la règle ignore le
+     **refus** (`MinimumBestOfferPrice`) : « dès 0,00 € n'est plus sur
+     l'annonce » alors qu'eBay garde le refus.
+3. **Juger toi-même les 5 non jugés** (7 à 11) : reproduis chacun sur une
+   copie ; s'il ne se reproduit pas, ou si c'est du style, ou s'il existe tel
+   quel avant le chantier, écarte-le en le disant. Sinon corrige-le.
+4. Puis relecture adverse jusqu'à **deux tours sans défaut neuf**
+   (`workflows/regle-offre-tour-3.js`, adapté).
+5. Fusionner dans l'intégration : **gros conflit attendu** (`src/App.jsx`,
+   `api/ebay.js`, CLAUDE.md — la branche part de `cdc9c1d`, avant la 013, la
+   preuve de vente et la relecture croisée). Vrai merge dans une copie, puis
+   build, tous les audits (surtout `audit-ebay-route.cjs`,
+   `audit-offres-auto.cjs`, `prouve-regle-offre.cjs`), les bancs eBay
+   (`ebay-regle-offre`, `ebay-annonces`, `ebay-programmer`, `ebay-form`,
+   `ebay-comptes`, `annonces-carte`) et relire le diff contre l'intégration.
+   Aucune version d'extension (elle ne la touche pas). PR, merge.
+6. Ensuite seulement : l'agent eBay (§4.4 et `notes/agent-ebay/spec-finale.md`
+   — **§0bis : l'acheteur paie le bordereau, K14 GELÉ**). K0 = règle d'offre +
+   multi-comptes (fini en D), K3 = la 014 (fini en C) ; ensuite vague 2 :
+   K1 ‖ K2, puis K4 ‖ K12, etc. Le battement pg_cron/pg_net est la migration
+   **015** (essai annulé d'abord). Modèle : `workflows/chantier-agent-ebay.js`.
+
+### E. AGENT 2 · Étape 1 — page d'accueil
+
+Partir de `passation2/accueil` (`a78fbc9`), finir selon `notes/accueil/spec.md`,
+puis : rendu aux deux tailles (390 et 1512 px) ; relecture adverse
+(honnêteté : prix lu dans les CGV — **12,99 €** —, aucun chiffre de clientèle
+ni étoile, aucune adresse en dur, `src/contact.js` seul) ; bancs
+`accueil.cjs` et `demarrage.cjs` ; poids avant l'app (mesuré 248,5 Ko, à ne pas
+dépasser sans raison) ; film régénéré par `scripts/film-accueil.cjs` (les MP4
+ne montent pas dans le dépôt). PR, merge.
+
+### F. AGENT 2 · Étape 2 — trier les 21 anciennes branches (§3)
+
+Une par une : `git merge-tree --write-tree <intégration> passation/<branche>`,
+lire ses commits, puis si elle apporte encore quelque chose : vrai merge dans
+une copie, build, tous les audits, bancs touchés, relecture du diff (une
+vieille branche peut **défaire** une correction récente). Les trois
+« probablement déjà fusionnées » (§3) : vérifier puis les laisser.
+
+### G. AGENT 2 · Étape 3 — les fonctions retenues par Julien (11 octobre)
+
+Liste exacte et refus : CLAUDE.md §3. **Ne jamais reproposer un refus**
+(7, 8, 12, 19, 20, 26-32, 36). Par groupe, chacun : mesurer la vraie base en
+lecture seule, construire, deux relecteurs qui reproduisent, deux sceptiques,
+corriger, prouver (rouge avant / vert après / rouge sous mutation), PR :
+- **Argent et stock** : 1 prix d'achat au numérotage, 11 fiche à l'arrivée
+  d'un achat, 14 bénéfice réel (avec sa couverture), 18 achats à vérifier
+  avant la date limite (ne pas inventer le délai de Vinted), 21 retour reçu →
+  la paire revient en stock (attention : un ancien numéro ne se redonne
+  jamais, 013).
+- **Alertes** : 2 double vente app fermée (notification serveur dès qu'une
+  vente Vinted est apprise par email, identité par N°), 3 rappel URSSAF à
+  l'échéance, 10 rappel la veille au soir (aucun nouveau cron Vercel sans
+  preuve qu'il passe), 6 page « tout va bien ? ».
+- **Ventes** : 13 plan des paires qui dorment, 22 favoris sans vente (remise
+  NATIVE de Vinted), 23 boost rentable ?, 24 compte qui vend le mieux, 25 ce
+  qui part vite.
+- **Terrain** : 9 codes de retrait hors ligne, 34 saisie vocale (Web Speech,
+  sans clé), 16 réponses rapides, 35 traduction (traducteur intégré de Chrome,
+  sinon lien, sinon la clé DU VENDEUR — §2.9), 4 fiche « republier » (copie,
+  rien d'automatique).
+- **Studio photo** : 33 cadre guide + détourage local (licence commerciale
+  vérifiée, pas d'AGPL), sinon la clé Photoroom DU VENDEUR (§2.9).
+- **Comptes** : 37 mode équipe (RLS, migration avec essai annulé),
+  17 double vérification de connexion, 15 récap mensuel pour le comptable.
+- **Vitesse** (5) : **en dernier, seule**.
+Versions d'extension de l'Agent 2 : **5.176 → 5.189**, dans l'ordre (l'Agent 1
+a 5.190 → 5.199). Le groupe « Alertes » touche `api/` (push, rappels) : pas
+`api/ebay.js`, qui est à l'Agent 1. Avant de poser une capacité
+dans `EXT_CAPACITES`, vérifier quelle version la PUBLIE
+(`scripts/_versions-publiees.cjs`).
+
+### H. AGENT 2 · Étape 4 — revue complète de l'app (quand l'Agent 1 a fini D)
+
+Un workflow par zone (écrans, `api/`, extension, données) : trouver →
+reproduire → réfuter → corriger, jusqu'à deux tours sans rien de neuf, puis
+un déploiement.
+
+### I. LES DEUX — ce qu'il ne faut JAMAIS faire (rappel court)
+
+Poser une question à Julien (il a tout autorisé : trancher et dire ce qui a
+été tranché) · écrire dans la base de production hors d'une migration passée
+par son essai annulé · appeler Vinted, eBay ou Leboncoin depuis un agent ·
+commiter une fixture réelle · accepter une offre Vinted automatiquement ·
+acheter une étiquette avec son argent (§2.8) · faire payer sur SA clé une
+fonction utilisée par un autre vendeur (§2.9) · `git merge -s ours` · un
+identifiant de modèle dans un commit · retirer un garde-fou de l'extension.
+
+---
+
 ## 0. MISE À JOUR — 12 octobre, 05:30 UTC : la session d'origine CONTINUE
 
 La limite atteinte le 11 au soir était celle de la session (5 h), pas celle de
