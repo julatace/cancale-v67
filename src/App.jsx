@@ -25852,10 +25852,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     let daysSum=0, daysNb=0, caMois=0;
     const now = new Date(); const ym = now.getFullYear()*100 + now.getMonth();
     const brands = {}; // marque -> {benef, nb}
+    const parCompte = {}; // uid -> {nom, n, ca} — « compte qui vend le mieux » (G24)
     for (const o of items) {
       if (isHidden(o)) continue;
       if (classifyOrderStatus(o.status) !== 'completed') continue;
       const sell = o.price?.amount!=null ? Number(o.price.amount) : 0;
+      // COMPTE QUI VEND LE MIEUX (G24) : on compte ses ventes finalisées par
+      // compte Vinted. Un compte EXCLU et une vente masquée (✕) n'y entrent pas
+      // déjà, via le `if (isHidden(o)) continue;` du haut de boucle (§11, une
+      // seule règle — `isHidden` = `hiddenSales` ∪ `acctOffOf`). C'est une
+      // agrégation de ventes connues, pas une estimation. Nom = libellé partagé.
+      if (o._acc && o._acc.vinted_user_id!=null) {
+        const uid = String(o._acc.vinted_user_id);
+        const pc = parCompte[uid] || (parCompte[uid] = { nom: accNameOf(o._acc), n:0, ca:0 });
+        pc.n += 1; pc.ca += (isFinite(sell) ? sell : 0);
+      }
       const e = effEntry(o);
       if (o.date) { const d=new Date(o.date); if (!isNaN(d) && d.getFullYear()*100+d.getMonth()===ym) caMois += sell; }
       // Temps de vente : de la numérotation (mise en suivi) à la date de vente.
@@ -25877,9 +25888,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const online = annBase.length;
     const vendues = items.filter(o=>!isHidden(o) && classifyOrderStatus(o.status)==='completed').length;
     const ecoul = (online+vendues)>0 ? (vendues/(online+vendues))*100 : null;
-    return { joursMoy: daysNb?daysSum/daysNb:null, joursNb:daysNb, bestBrand, caMois, ecoul, online, vendues };
+    const comptesVendeurs = Object.values(parCompte).sort((a,b)=> b.n - a.n || b.ca - a.ca);
+    // « qui vend LE MIEUX » suppose une comparaison : rien à moins de 2 comptes vendeurs.
+    const bestAccount = comptesVendeurs.length>=2 ? comptesVendeurs[0] : null;
+    return { joursMoy: daysNb?daysSum/daysNb:null, joursNb:daysNb, bestBrand, caMois, ecoul, online, vendues, bestAccount, comptesVendeurs };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, annBase, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts]);
+  }, [sales.items, annBase, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, panelAcctOff]);
 
   // ── REPÈRE D'ACHAT PAR MODÈLE (proposition 10, 6 octobre) ────────────────
   // « Combien je gagne en moyenne sur une Samba ? » : le prix moyen de REVENTE
@@ -28303,12 +28317,29 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </details>
           );
         })()}
-        {/* Analyse de perf : temps de vente, écoulement, meilleure marque */}
-        {totals.nb>0 && (perf.joursMoy!=null || perf.ecoul!=null || perf.bestBrand) && (
+        {/* Analyse de perf : temps de vente, écoulement, meilleure marque, top compte */}
+        {totals.nb>0 && (perf.joursMoy!=null || perf.ecoul!=null || perf.bestBrand || perf.bestAccount) && (
           <div style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:8}}>
             {perf.joursMoy!=null && <StatBox label="Temps de vente" value={`${perf.joursMoy.toFixed(0)} j`} sub={`moyenne sur ${perf.joursNb}`}/>}
             {perf.ecoul!=null && <StatBox label="Écoulement" value={`${perf.ecoul.toFixed(0)} %`} sub={`${perf.vendues} vendu / ${perf.online} en ligne`}/>}
             {perf.bestBrand && <StatBox label="Top marque" value={perf.bestBrand.brand} color={INV_STATUS.online.color} sub={`+${perf.bestBrand.moy.toFixed(0)} €/paire`}/>}
+            {perf.bestAccount && <StatBox label="Compte qui vend le mieux" value={perf.bestAccount.nom} color={INV_STATUS.online.color} sub={`${perf.bestAccount.n} vente${perf.bestAccount.n>1?'s':''} · ${fmtE(perf.bestAccount.ca)}`}/>}
+          </div>
+        )}
+        {/* VENTES PAR COMPTE (G24) : le classement complet, pour un revendeur à
+            plusieurs comptes. Agrégation de ventes finalisées connues (comptes
+            exclus écartés) — jamais une estimation (§5). */}
+        {totals.nb>0 && perf.comptesVendeurs && perf.comptesVendeurs.length>=2 && (
+          <div data-ventes-par-compte="" style={{border:`1px solid ${C.border}`,borderRadius:10,background:C.card,padding:'10px 12px',marginBottom:8}}>
+            <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:6}}>Ventes finalisées par compte</div>
+            {perf.comptesVendeurs.map((c,i)=>(
+              <div key={i} data-compte-vend={c.nom} style={{display:'flex',alignItems:'center',gap:8,fontSize:12.5,color:C.text,padding:'3px 0'}}>
+                <span style={{color:C.muted,width:16,flexShrink:0}}>{i+1}.</span>
+                <span style={{flex:1,minWidth:0,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{c.nom}</span>
+                <span style={{fontWeight:700,flexShrink:0}}>{c.n} vente{c.n>1?'s':''}</span>
+                <span style={{color:C.muted,flexShrink:0}}>· {fmtE(c.ca)}</span>
+              </div>
+            ))}
           </div>
         )}
         {/* Repère d'achat par modèle (proposition 10) : deux moyennes, jamais de la compta. */}
