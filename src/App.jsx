@@ -23544,6 +23544,31 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   //    passe par « 1 », qui déclencherait une fausse alerte.
   // `avant` = la valeur du champ AU MOMENT OÙ ON L'A OUVERT (mémorisée par
   // `ChampSaisie` au focus), pour pouvoir la remettre si on refuse le nouveau.
+  // Prix d'achat AU NUMÉROTAGE (Julien, 11 octobre). Quand on pose un N° neuf
+  // sur une paire dont on ne connaît AUCUN prix d'achat (ni saisi, ni relié à
+  // un achat), on le demande tout de suite : c'est le geste naturel, et c'est
+  // le seul moment où la paire est sous la main. Mesuré : 8 paires sur 401
+  // seulement en portaient un. « Plus tard » laisse vide — mieux vaut un blanc
+  // qu'un faux (§5), rien n'est jamais deviné.
+  const demanderPrixAchat = async (item, numeroPose) => {
+    if (buyOf(item) != null) return;                       // déjà un prix saisi
+    const e = effEntry(item);
+    if (e && e.buyFromId) return;                          // déjà relié à un achat
+    const rep = await askText({
+      title: `Prix d'achat de la N°${numeroPose} ?`,
+      desc: `Tu viens de numéroter « ${item.title || item.brand || 'cette paire'} ». Si tu l'as sous la main, note ce que tu l'as payée — sinon « Plus tard », tu le mettras quand tu veux.`,
+      value: '', placeholder: 'ex : 25 ou 12,50', ok: 'Enregistrer', cancel: 'Plus tard',
+    });
+    if (rep == null) return;                               // « Plus tard » / fermé
+    const v = String(rep).trim();
+    if (v === '') return;
+    const n = parseFloat(v.replace(',', '.'));
+    if (!isFinite(n) || n < 0) { toast('Un prix, ce sont des chiffres (ex : 25 ou 12,50).'); return; }
+    // Même écriture que le champ « achat » de la carte : un prix posé à la main
+    // n'est pas « relié à un achat » (on efface buyFromId/buyFrom).
+    updatePair(item, { buyPrice: v, buyFromId: null, buyFrom: null });
+    toast(`Prix d'achat enregistré : ${fmtE(n)}`);
+  };
   const poserNumero = async (item, valeur, avant) => {
     const brut = String(valeur || '').trim();
     // Champ vidé : on ne retire JAMAIS un numéro (§5.40, il est écrit sur une
@@ -23580,11 +23605,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         ok: 'Oui, la même paire', cancel: `Non — N°${nextNumero}`,
       });
       const v = meme ? n : String(nextNumero);
-      updatePair(item, { numero: v, manuelAt }); recordUsed(v); return;
+      updatePair(item, { numero: v, manuelAt }); recordUsed(v); await demanderPrixAchat(item, v); return;
     }
     // ⚠️ C'EST ICI qu'on écrit le numéro (le champ ne valide qu'à la sortie,
     //    cf. `ChampSaisie` — il n'écrit plus à chaque frappe).
-    if (!autres.length) { updatePair(item, { numero: n, manuelAt }); recordUsed(n); return; }
+    if (!autres.length) { updatePair(item, { numero: n, manuelAt }); recordUsed(n); await demanderPrixAchat(item, n); return; }
     const presents = (porteursNum[cle] || []).filter(p => String(p.id) !== moi);
     if (presents.length) {
       // Revue de la 5.167 : une annonce « à confirmer » n'est ni « en ligne » ni
@@ -23603,7 +23628,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         ok: `Prendre le N°${nextNumero}`, cancel: 'Annuler',
       });
       updatePair(item, prendre ? { numero: String(nextNumero), manuelAt } : { numero: avant });
-      if (prendre) recordUsed(nextNumero);
+      if (prendre) { recordUsed(nextNumero); await demanderPrixAchat(item, String(nextNumero)); }
       return;
     }
     const anc = numeros[autres[0]] || {};
@@ -23612,7 +23637,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       desc: `Il était sur « ${anc.title || 'une autre paire'} », qui n'est plus en ligne.\n\nEst-ce bien la MÊME paire qui te revient (litige, retour, annulation) ?\n\nSi oui, elle reprend son prix d'achat et ses infos. Si c'est une autre paire, prends le N°${nextNumero} : un numéro ne se réattribue jamais.`,
       ok: 'Oui, la même paire revient', cancel: `Non — N°${nextNumero}`,
     });
-    if (!meme) { updatePair(item, { numero: String(nextNumero), manuelAt }); recordUsed(nextNumero); return; }
+    if (!meme) { updatePair(item, { numero: String(nextNumero), manuelAt }); recordUsed(nextNumero); await demanderPrixAchat(item, String(nextNumero)); return; }
     setNumeros(prev => {
       const u = { ...prev }; const a = u[autres[0]] || {};
       u[moi] = { ...(u[moi] || {}),

@@ -238,7 +238,7 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
   // Et c'est `poserNumero` — donc après les contrôles — qui écrit le numéro.
   // (10 octobre) la pose porte aussi sa date (`manuelAt`, migration 013) : la
   // RÈGLE est que l'écriture vient après les contrôles, pas son orthographe.
-  /if \(!autres\.length\) \{ updatePair\(item, \{ numero: n(, manuelAt)? \}\); recordUsed\(n\); return; \}/.test(SRC)
+  /if \(!autres\.length\) \{ updatePair\(item, \{ numero: n(, manuelAt)? \}\); recordUsed\(n\);( await demanderPrixAchat\(item, n\);)? return; \}/.test(SRC)
     ? ok('le numéro n\'est écrit qu\'après les contrôles de collision')
     : nok('le numéro n\'est écrit qu\'après les contrôles de collision');
 }

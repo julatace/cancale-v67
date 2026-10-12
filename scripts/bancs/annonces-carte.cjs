@@ -32,6 +32,7 @@ const ITEMS = [
   ann(9102, { title: 'Salomon XT-6 blanc taille 40', brand_title: 'Salomon', nPhotos: 6, created_at_ts: ilYa(3) }),
   ann(9103, { title: 'Adidas Spezial noir taille 38', brand_title: 'Adidas', nPhotos: 6, created_at_ts: ilYa(5) }),
   ann(9104, { title: 'Adidas Spezial noir taille 38', brand_title: 'Adidas', nPhotos: 6, created_at_ts: ilYa(6) }),   // même titre que 9103
+  ann(9105, { title: 'Nike Blazer mid 77 taille 42', brand_title: 'Nike', nPhotos: 5, created_at_ts: ilYa(2) }),      // SANS N° ni prix : « + N° » pour le prix d'achat au numérotage
 ];
 const MAIN = { vinted_annonce_numeros: {
   '9101': { numero: '41', buyPrice: '25', fees: '1.95' },
@@ -162,6 +163,25 @@ const projette = (row, sel) => {
       } catch (e) { dit(false, 'l’achat se modifie en place (texte cliquable)', String(e.message).slice(0, 80)); }
       const apres = await pg.evaluate(() => (document.querySelector('[data-carte-annonce="9102"]') || {}).innerText || '');
       dit(/achat\s*30,00/.test(apres), 'cliquer sur « achat — », taper 30, Entrée : la carte dit « achat 30,00 € »', (apres.match(/achat[^\n]*/) || [''])[0]);
+      // ── Feature 1 (Julien, 11 oct.) : PRIX D'ACHAT AU NUMÉROTAGE.
+      // La 9105 n'a ni N° ni prix. On pose un N° neuf : la feuille de prix doit
+      // s'ouvrir tout de suite ; on saisit, et la carte porte le prix. Mutation :
+      // retirer l'appel `demanderPrixAchat` ⇒ la feuille ne s'ouvre jamais, rouge.
+      let feuillePrix = false, prix9105 = '';
+      try {
+        await pg.click('[data-carte-annonce="9105"] [data-edition="numero"]', { timeout: 4000 });
+        await pg.keyboard.type('60');
+        await pg.keyboard.press('Enter');
+        feuillePrix = await pg.getByPlaceholder('ex : 25 ou 12,50').isVisible({ timeout: 4000 }).catch(() => false);
+        if (feuillePrix) {
+          await pg.getByPlaceholder('ex : 25 ou 12,50').fill('18');
+          await pg.getByRole('button', { name: 'Enregistrer', exact: true }).click({ timeout: 4000 });
+          await pg.waitForTimeout(500);
+          prix9105 = await pg.evaluate(() => (document.querySelector('[data-carte-annonce="9105"]') || {}).innerText || '');
+        }
+      } catch (e) { prix9105 = 'ERREUR ' + String(e.message).slice(0, 80); }
+      dit(feuillePrix, 'poser un N° sur une paire SANS prix d’achat ouvre la feuille « Prix d’achat de la N°… » tout de suite', feuillePrix ? '' : 'la feuille ne s’est pas ouverte');
+      dit(/achat\s*18,00/.test(prix9105), '… et la saisie enregistre le prix (la carte dit « achat 18,00 € »)', (String(prix9105).match(/achat[^\n]*/) || [''])[0] || prix9105);
       // ── Proposition 9 : la paire qui dort, AUSSI sur eBay — baisse en un clic.
       try {
         // Le repricing vit sous « Conseils & signalements » (replié par défaut).
