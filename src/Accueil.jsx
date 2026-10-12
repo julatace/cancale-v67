@@ -214,6 +214,18 @@ const CSS = `
 .acc-q .acc-icone{color:${K.muted};flex-shrink:0;margin-top:1px}
 .acc-q h3{display:flex;align-items:flex-start;gap:10px;font-family:'Inter',system-ui,sans-serif;font-size:15px;font-weight:600;line-height:1.35;letter-spacing:-.005em}
 .acc-q p{font-size:14px;line-height:1.45;color:${K.muted};margin-top:6px}
+/* Les cartes répondent sous le curseur (sur SOURIS seulement — sur mobile un
+   survol reste collé après un tap, et la carte-question y est de toute façon
+   sans cadre). §7 : on réutilise les ombres existantes, aucune couleur neuve. */
+@media (hover:hover) and (pointer:fine){
+  .acc-q{transition:transform 180ms ${COURBE_SORTIE},box-shadow 180ms ${COURBE_SORTIE}}
+  .acc-q:hover{transform:translateY(-2px);box-shadow:${REFLET},${OMBRE_CARTE}}
+  .acc-prix{transition:transform 200ms ${COURBE_SORTIE}}
+  .acc-prix:hover{transform:translateY(-2px)}
+  .acc-marque img{transition:transform 220ms ${COURBE_SORTIE}}
+  .acc-marque:hover img{transform:scale(1.05)}
+}
+@media (prefers-reduced-motion:reduce){.acc-q:hover,.acc-prix:hover,.acc-marque:hover img{transform:none!important}}
 
 /* L'installation, puis la confiance. */
 .acc-bande{background:${K.surface};border-top:1px solid ${K.line};border-bottom:1px solid ${K.line}}

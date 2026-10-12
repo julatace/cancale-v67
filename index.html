@@ -302,6 +302,34 @@
        les enfants position:fixed). */
     main > *{animation:cancaleEnter var(--vrm-dur-ecran) var(--vrm-ease-out) backwards;}
 
+    /* ── CARTES VIVANTES SOUS LE DOIGT ──────────────────────────────────────
+       Le même soin que les boutons (jolis au repos, morts sous le doigt),
+       étendu aux cartes. Classe OPT-IN `.vrm-card` : une légère élévation au
+       survol, SUR SOURIS seulement (sur mobile un survol reste « collé » après
+       un tap). §7 : ombre d'ENCRE à deux couches, AUCUNE couleur d'accent — on
+       ne peint rien, on soulève. Le repos n'est pas touché (aucun décalage de
+       mise en page), donc sans risque sur les écrans déjà composés. */
+    .vrm-card{transition:transform var(--vrm-dur-etat) var(--vrm-ease-out),box-shadow var(--vrm-dur-etat) var(--vrm-ease-out);will-change:transform;}
+    @media (hover:hover) and (pointer:fine){
+      .vrm-card:hover{transform:translateY(-2px);box-shadow:0 1px 2px rgba(3,5,10,.3),0 14px 30px -12px rgba(3,5,10,.5);}
+    }
+    :root[data-theme="light"] .vrm-card:hover{box-shadow:0 1px 2px rgba(16,21,27,.08),0 16px 32px -14px rgba(16,21,27,.18);}
+    .vrm-card:active{transform:translateY(-1px);}
+
+    /* ── CASCADE D'ENTRÉE ────────────────────────────────────────────────────
+       Les enfants directs d'un conteneur `.vrm-stagger` arrivent l'un après
+       l'autre (fondu + petite montée), UNE fois au montage. À réserver à un
+       conteneur monté une fois — pas une liste qui se réordonne en direct
+       (sinon ça rejouerait à chaque changement de donnée, §Emil). `backwards`,
+       JAMAIS `both` : pas de contexte d'empilement laissé derrière (§comment). */
+    @keyframes vrmMonte{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+    .vrm-stagger > *{animation:vrmMonte var(--vrm-dur-ecran) var(--vrm-ease-out) backwards;}
+    .vrm-stagger > *:nth-child(1){animation-delay:40ms}
+    .vrm-stagger > *:nth-child(2){animation-delay:90ms}
+    .vrm-stagger > *:nth-child(3){animation-delay:140ms}
+    .vrm-stagger > *:nth-child(4){animation-delay:190ms}
+    .vrm-stagger > *:nth-child(n+5){animation-delay:230ms}
+
     /* 7bis) DÉBORDEMENTS — ⚠️ NE PAS mettre `min-width:0` en règle GLOBALE.
        Essayé, mesuré, ANNULÉ : ça enlève bien le plancher qui fait déborder un
        enfant de flex, mais du coup certains conteneurs s'effondrent à ~0 px et
@@ -328,7 +356,7 @@
     :focus-visible{outline:2.5px solid #0f6b4f;outline-offset:2px;border-radius:8px;}
     button:focus:not(:focus-visible),a:focus:not(:focus-visible),input:focus:not(:focus-visible),select:focus:not(:focus-visible){outline:none;}
     /* Respect du réglage système « réduire les animations ». */
-    @media (prefers-reduced-motion: reduce){*{animation-duration:.001ms!important;transition-duration:.001ms!important;}button:active:not(:disabled){transform:none!important;}}
+    @media (prefers-reduced-motion: reduce){*{animation-duration:.001ms!important;transition-duration:.001ms!important;animation-delay:0ms!important;}button:active:not(:disabled){transform:none!important;}.vrm-card:hover{transform:none!important;}.vrm-stagger > *{animation:none!important;}}
   </style>
 </head>
 <body><div id="root"></div>
