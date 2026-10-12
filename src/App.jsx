@@ -9293,6 +9293,9 @@ function BandeauLiaison() {
   );
 }
 
+// Les codes de retrait gardés en local (G9) : lisibles même quand la base ne
+// répond pas (au point relais, réseau faible). Une liste non vide, ou null.
+const codesHorsLigne = () => { try { const c = load('vrm_codes_hors_ligne', null); return (c && Array.isArray(c.codes) && c.codes.length) ? c : null; } catch (_) { return null; } };
 function BaseInjoignable() {
   // ⚠️⚠️ « ÇA REVIENT TOUT SEUL » ÉTAIT FAUX LE TROISIÈME JOUR.
   // La phrase promettait une panne passagère. Le 9 septembre la base est
@@ -9368,6 +9371,32 @@ function BaseInjoignable() {
           Recharger
         </button>
       </div>
+      {/* CODES DE RETRAIT HORS LIGNE (G9) : s'affichent MÊME quand la base ne
+          répond pas — c'est au point relais, réseau faible, qu'il en a besoin.
+          Copie locale de la dernière lecture ; le code est l'info utile (un QR
+          a besoin du réseau, on le dit). */}
+      {(() => {
+        const c = codesHorsLigne(); if (!c) return null;
+        const h = Math.max(0, Math.round((Date.now() - (c.at || 0)) / 3600000));
+        const quand = h < 1 ? 'à l’instant' : h < 24 ? `il y a ${h} h` : `il y a ${Math.round(h / 24)} j`;
+        return (
+          <div data-codes-hors-ligne style={{marginTop:12,borderRadius:12,border:`1px solid ${C.border}`,background:C.card,padding:'16px 16px 10px'}}>
+            <div style={{fontSize:14,fontWeight:700,color:C.text,marginBottom:3}}>📴 Tes codes de retrait (hors ligne)</div>
+            <div style={{fontSize:11.5,color:C.muted,marginBottom:10}}>Gardés sur cet appareil — dernière mise à jour {quand}. Donne le code au comptoir.</div>
+            {c.codes.map((x, i) => (
+              <div key={i} data-code-hl style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderTop:i>0?`1px solid ${C.border}`:'none'}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{x.titre || x.lieu || (x.carrier ? carrierName(x.carrier) : 'Colis')}</div>
+                  <div style={{fontSize:11,color:C.muted}}>{[x.lieu, x.suivi && `n°${x.suivi}`].filter(Boolean).join(' · ')}</div>
+                </div>
+                {x.code
+                  ? <div style={{flexShrink:0,fontSize:17,fontWeight:800,letterSpacing:1,color:C.text,background:C.card2||`${C.accent}12`,border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 11px'}}>{x.code}</div>
+                  : <div style={{flexShrink:0,fontSize:11,color:C.muted,fontStyle:'italic'}}>QR — besoin d’internet</div>}
+              </div>
+            ))}
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -22850,6 +22879,27 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // lus au montage (`onCloudReady`) : ce qui arrive après doit se faire
         // entendre, sinon l'écran garde sa première réponse.
         try { window.dispatchEvent(new CustomEvent('vrm:colis')); } catch (_) {}
+      }
+      // CODES DE RETRAIT HORS LIGNE (G9) : au point relais, le réseau passe
+      // mal — si la base ne répond pas, l'app bascule sur BaseInjoignable et il
+      // ne voit plus SES codes. On en garde une copie LOCALE (le code est la
+      // seule chose utile hors ligne ; un QR a besoin du réseau pour s'afficher,
+      // on le signale). On n'écrit QUE si la liste n'est pas vide (§4.2 : une
+      // liste momentanément vide n'efface pas la dernière connue).
+      const codes = [];
+      for (const t of pickupUnion.emailList) {
+        const code = codeRetrait(t.code); const lieu = (cleanLieu(t.lieu).nom || '').trim();
+        const qr = !!(t && (t.qr || t.qrUrl || t.qrB64));
+        if (code || qr) codes.push({ code: code || '', lieu, carrier: t.carrier || '', suivi: t.suivi || '', titre: String(t.artTitle || '').slice(0, 60), qr });
+      }
+      for (const o of pickupUnion.extra) {
+        const r = colisRelais[String((o && o.transaction_id) || '')] || null;
+        const code = r ? codeRetrait(r.code) : ''; const qr = !!(r && (r.qr || r.qrUrl || r.qrB64));
+        if (code || qr) codes.push({ code: code || '', lieu: (r && r.lieu) || '', carrier: '', suivi: '', titre: String((o && o.title) || '').slice(0, 60), qr });
+      }
+      if (codes.length) {
+        const avantC = load('vrm_codes_hors_ligne', null);
+        if (!avantC || JSON.stringify(avantC.codes) !== JSON.stringify(codes)) save('vrm_codes_hors_ligne', { at: Date.now(), codes });
       }
     } catch (_) {}
   }, [pickupUnion, tracking, buys.items]);

@@ -144,6 +144,8 @@ if (MUTATION && !MUTER_MODULE[MUTATION] && !MUTER_APP[MUTATION]) { console.log('
       'Fenetre :: "/logo-vrm-96.png"': 'logo de l’app (page d’accueil)',
       'Film :: "/logo-vrm-192.png"': 'logo de l’app (film de la page d’accueil)',
       'Accueil :: "/logo-vrm-96.png"': 'logo de l’app (page d’accueil)',
+      'Plateau :: "/logo-vrm-192.png"': 'logo de l’app (scène du film d’accueil, src/AccueilFilm.jsx)',
+      'CarteJourEcran :: "/logo-vrm-96.png"': 'logo de l’app (carte « Ma journée » de l’accueil, src/accueil-carte.jsx)',
     };
     const fichiers = fs.readdirSync(path.join(R, 'src')).filter((f) => /\.jsx?$/.test(f));
     const trouves = [], inconnus = [];
