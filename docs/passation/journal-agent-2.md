@@ -220,3 +220,48 @@ l'arrivée pour la **revente** : reporter le prix payé vers le numérotage (G1)
   M1 (entrée retirée) → les contrôles « arrivé » rouges ; M2a (copie naïve
   `try{writeText}catch`) → « refusé » rouge (ment « copié ») ; M2b (garde
   `arrive` retirée) → « annulé » rouge (présent à tort). `audit-bancs` vert.
+
+### Groupe « Alertes » — triage (mesuré §6)
+- **3 rappel URSSAF à l'échéance** : **déjà en prod** (`api/ship-reminders.js`,
+  le 1er du mois ; `push.js` `urssaf:true` ; app). Rien à bâtir.
+- **6 page « tout va bien ? »** : **déjà en prod** (Ma journée « Rien d'urgent —
+  ta boutique tourne », « quand tout va bien, une ligne »). Rien à bâtir.
+- ⛔ **10 rappel la veille au soir** : **bloqué par la contrainte cron**. Le seul
+  cron du projet (`ship-reminders`, 08:00 UTC = matin de Paris) tourne une fois
+  par jour et mentionne DÉJÀ « demain ». Un rappel *le soir* exigerait un SECOND
+  cron Vercel — le README l'interdit sans preuve qu'il passe, et un cron refusé
+  bloquerait TOUS les déploiements (plan Hobby, incident #250). Non bâti ; à
+  trancher par Julien (second cron) ou à la montée en plan.
+- ⏸️ **2 double vente « app fermée » (push serveur)** : **différé**, lourd et
+  **cross-domaine**. L'anti double vente existe déjà côté app (cloche + écrans,
+  eBay/Leboncoin). Le pousser côté SERVEUR dès qu'`email-inbound` apprend une
+  vente, par identité N°, exige de résoudre N°→annonce eBay/LBC côté serveur
+  (numeros `main`, `ebay_listings`/`lbc_listings`, marqueur 013 `numeroExterne`)
+  — ce qui chevauche la lane eBay de l'Agent 1. Un push générique « vendue,
+  pense à retirer ailleurs » sans vérifier qu'elle est cross-listée serait une
+  fausse alerte (interdit). À coordonner avec l'Agent 1 ; non bâti seul.
+
+### Groupe « Ventes »
+Triage : **13 (paires qui dorment)** et **25 (ce qui part vite = temps de vente)**
+**déjà en prod** ; **23 (boost rentable ?)** data-starved (le coût de boost par
+paire est mesuré impossible, §5.132 : 0 trace en base) — laissé ; **22 (favoris
+sans vente → remise native)** candidat (favourite_count, un nombre, pas une
+identité — §3 : la remise native touche tout le monde) ; **24** bâti.
+
+#### 24 · Compte qui vend le mieux (TERMINÉE ✅)
+Absent (0 occurrence). Il a 7+ comptes Vinted ; il veut savoir lequel vend le
+plus. Agrégation des ventes **finalisées** par compte (count + CA) dans le memo
+`perf` de l'écran Ventes, **à côté de « Top marque »** : StatBox « Compte qui
+vend le mieux » (le leader) + liste « Ventes finalisées par compte » (le
+classement, `data-ventes-par-compte`).
+- **Honnête** : agrégation de ventes connues, jamais une estimation (§5). Un
+  compte exclu et une vente masquée (✕) n'y entrent pas — via le
+  `if (isHidden(o)) continue;` déjà en tête de boucle (§11, une seule règle ;
+  pas de second garde d'exclusion). « Qui vend LE MIEUX » suppose une
+  comparaison : rien à moins de **2** comptes vendeurs.
+- **Preuves** : `npm run build` vert ; banc `scripts/bancs/ventes-par-compte.cjs`
+  (3 comptes dont un exclu, données inventées, deux tailles) **vert**, **rouge
+  sous mutation** : agrégation neutralisée → leader/classement rouges (6) ;
+  seuil `>=2`→`>=1` → « un seul compte » rouge. Le contrôle « gamma (exclu)
+  nulle part » garde le placement APRÈS `isHidden`. `audit-tdz`/`audit-bancs`
+  verts.
