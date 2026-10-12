@@ -29,6 +29,20 @@
 //      session ne la fait pas taire ; une photo récupérée par l'extension à
 //      l'écran, si (les autres sont des liens morts) ; « refusées dans VRM »
 //      seulement si l'extension a récupéré des photos.
+//    ── SECONDE REVUE DU 11 OCTOBRE (sept constats confirmés, cinq défauts distincts) ──
+//    · une réponse SANS octets de l'extension n'est PAS définitive (le pont ne
+//      dit pas pourquoi : lien mort, 503, coupure) : le témoin la redemande à
+//      l'extension (une photo à l'écran), le remontage après son recul aussi,
+//      et dès qu'une photo refusée revient, toutes les autres sont redemandées ;
+//      la charge reste bornée (des liens vraiment morts ne sont pas redemandés
+//      en boucle) ;
+//    · plus aucun état n'est « définitif » (une photo n'est plus retirée d'une
+//      liste sur un état que `online` ou le témoin défont) ;
+//    · le bilan dit le RETOUR (réécrit peu après), et une session sans échec
+//      propose UN bilan « sans échec » ;
+//    · une erreur réseau puis une réponse sur la MÊME photo = le réseau est
+//      revenu : tout réessaie, aucune cause « le serveur répond » ;
+//    · hors ligne mesuré ⇒ cause « horsligne », jamais « pas su ».
 // Un audit ne meurt pas, il rapporte (`essaie`) : sur le code d'avant
 // (c02ffcf), les fonctions absentes sont des contrôles ROUGES, pas une pile.
 const fs = require('fs'), path = require('path'), vm = require('vm');
@@ -52,7 +66,7 @@ const MUTER_MODULE = {
   // un délai traité comme un refus
   'delai-refus': (s) => s.replace("if (r.issue === 'delai' || r.issue === 'absente') return { dataUrl: null, issue: 'delai' };", ''),
   // la phrase jugée sur la SESSION (une photo vue ailleurs la fait taire)
-  'session': (s) => s.replace("if (okNatif > 0 && sonde !== 'bloquee')", "if (vus.okNatif.size > 0)"),
+  'session': (s) => s.replace("if (!hl && okNatif > 0 && sonde !== 'bloquee')", "if (vus.okNatif.size > 0)"),
   // une photo récupérée par l'extension ne fait plus taire la phrase
   'secours-ignore': (s) => s.replace("if (okSecours > 0) return { parle: false, pourquoi: 'extension', ...compte };", ''),
   // « refusées dans VRM » sans que l'extension n'ait rien récupéré
@@ -73,7 +87,30 @@ const MUTER_MODULE = {
   // pendant la remesure, la cause d'avant reste même quand le premier essai la contredit
   'cause-perimee': (s) => s.replace("    else if (r === 'erreur') {\n      sonde = 'encours';", "    else if (r === 'erreur') {"),
   // le bilan part pendant la mesure
-  'bilan-tot': (s) => s.replace("if (sondeEnCours || sonde === 'encours') { bilanTimer = setTimeout(envoyerBilan, 2000); return; }", ''),
+  'bilan-tot': (s) => s.replace("if (sondeEnCours || sonde === 'encours') { bilanTimerAt = maintenant() + 2000; bilanTimer = setTimeout(envoyerBilan, 2000); return; }", ''),
+  // ── seconde revue du 11 octobre ──
+  // un refus de l'extension redevient DÉFINITIF (les listes retirent la photo)
+  'refus-definitif': (s) => s.replace('export function estDefinitive(url) { void url; return false; }', "export function estDefinitive(url) { const e = entrees.get(url); return !!(e && e.etat === 'ko'); }"),
+  // le témoin ne repasse que par le navigateur (que CORP refuse toujours)
+  'temoin-navigateur': (s) => s.replace("for (const x of l2) { if (n >= MAX_EN_VOL) break; if (rouvrir(x)) n++; }", ''),
+  // une photo refusée qui revient ne fait pas redemander les autres
+  'retour-seul': (s) => s.replace('if (revenue) { vus.retours.add(k); rouvrirTout(true); planifierBilan(true); }', 'if (revenue) { vus.retours.add(k); planifierBilan(true); }'),
+  // chaque retour redemande TOUS les refus, même ceux déjà redemandés dans la vague (charge)
+  'retour-sans-borne': (s) => s.replace("    if (parRetour && e.etat === 'ko' && e.rouvertAt && t - e.rouvertAt < reculRefus(e.refusN)) continue;\n", ''),
+  // le refus ne tombe qu'au retour du réseau (le remontage ne redemande jamais)
+  'refus-colle': (s) => s.replace("if (raison === 'online' || raison === 'reseau' || maintenant() - e.refusAt >= reculRefus(e.refusN)) e.refus = false;", "if (raison === 'online') e.refus = false;"),
+  // le témoin redemande TOUTES les photos refusées à chaque passage (charge)
+  'temoin-tout': (s) => s.replace("for (const x of l2) { if (n >= MAX_EN_VOL) break; if (rouvrir(x)) n++; }", 'for (const x of entrees.values()) if (x.refs > 0 && rouvrir(x)) n++;'),
+  // le témoin ne redemande qu'UNE photo, dans l'ordre de la page (des liens morts en tête retardent tout)
+  'temoin-une': (s) => s.replace("for (const x of l2) { if (n >= MAX_EN_VOL) break; if (rouvrir(x)) n++; }", "for (const x of [...entrees.values()].filter((y) => l2.includes(y))) { if (n >= 1) break; if (rouvrir(x)) n++; }"),
+  // un retour ne fait pas réécrire le bilan
+  'bilan-retour': (s) => s.replace("    reprise('retour');\n    // Le bilan rangé disait l'échec", "    reprise('retour'); if (false)\n    // Le bilan rangé disait l'échec"),
+  // une session sans échec n'écrit jamais rien
+  'bilan-sans-echec': (s) => s.replace("    if (bilanSansEchecFait || !vus.okNatif.size) return;", "    return;"),
+  // une erreur puis une réponse : « le serveur répond » (le réseau revenu n'est pas reconnu)
+  'reveil': (s) => s.replace("        if (r3 === 'reponse') {", "        if (false) {"),
+  // hors ligne mesuré redevient « pas su »
+  'horsligne-passu': (s) => s.replace("if (horsLigne()) return 'horsligne';", "if (horsLigne()) return 'passu';").replace("const hl = horsLigne() || sonde === 'horsligne';", 'const hl = false;'),
 };
 const MUTER_APP = {
   // un <img> brut remis sur une photo de vente
@@ -292,12 +329,51 @@ if (MUTATION && !MUTER_MODULE[MUTATION] && !MUTER_APP[MUTATION]) { console.log('
     dit(dR.parle && dR.cause === 'reponse' && !dPendant.parle && dPendant.pourquoi === 'mesure',
       'la cause d’avant CONTREDITE par la nouvelle mesure (« le serveur répond » → erreur réseau) ne reste pas affichée pendant qu’on remesure',
       `avant ${dR.parle ? dR.cause : dR.pourquoi} · pendant ${dPendant.parle ? dPendant.cause : dPendant.pourquoi}`);
-    // La seconde reçoit une réponse ⇒ « reponse ».
+    // ⚠️ Seconde revue : une erreur, puis une réponse SUR LA MÊME PHOTO ⇒ le
+    // réseau est revenu (PWA qui se réveille). On ne conclut PAS « le serveur
+    // répond » (la phrase l'affirmait 12 s) : tout réessaie tout de suite.
     w = monde({ sonde: (u, n) => (n === 1 ? 'erreur' : 'reponse') });
     w.m.configurer({ secours: () => 'non' });
     monterEchouer(w.m, [U(1), U(2), U(3)]);
+    await w.avancer(10);
+    const dPendantReveil = w.m.decision();
     await w.avancer(w.m.SONDE_ECART_MS + 50);
-    dit(w.m._etatInterne().sonde === 'reponse', 'la seconde sonde reçoit une réponse ⇒ « le serveur répond », pas « bloquée »', String(w.m._etatInterne().sonde));
+    const etatsReveil = [U(1), U(2), U(3)].map((u) => w.m.etat(u));
+    const dReveil = w.m.decision();
+    dit(w.m._etatInterne().sonde !== 'reponse' && etatsReveil.every((e) => e === 'natif') && !dReveil.parle && !dPendantReveil.parle,
+      'une erreur réseau, puis une réponse sur la même photo : le réseau est revenu ⇒ tout réessaie tout de suite, et aucune phrase « le serveur répond »',
+      `sonde ${w.m._etatInterne().sonde} · états ${etatsReveil.join(',')} · phrase ${dReveil.parle ? dReveil.cause : dReveil.pourquoi} · ${w.sondes.length} sonde(s)`);
+    // … et si elles échouent ENCORE, le serveur répondant : c'est mesuré APRÈS ⇒ « reponse ».
+    [U(1), U(2), U(3)].forEach((u) => w.m.echecNatif(u));
+    await w.avancer(w.m.SONDE_ECART_MS + 50);
+    const dApresReveil = w.m.decision();
+    dit(w.m._etatInterne().sonde === 'reponse' && dApresReveil.parle && dApresReveil.cause === 'reponse',
+      '… et un échec constaté APRÈS que le serveur répond ⇒ « le serveur répond » (mesuré, cette fois)', `sonde ${w.m._etatInterne().sonde} · ${dApresReveil.parle ? dApresReveil.cause : dApresReveil.pourquoi}`);
+    // Un MÉLANGE (cette photo échoue deux fois, une autre répond) ⇒ « reponse », comme avant.
+    w = monde({ sonde: (u) => (/0000001abc/.test(u) ? 'erreur' : 'reponse') });
+    w.m.configurer({ secours: () => 'non' });
+    monterEchouer(w.m, [U(1), U(2), U(3)]);
+    await w.avancer(w.m.SONDE_ECART_MS + 50);
+    dit(w.m._etatInterne().sonde === 'reponse' && [U(1), U(2), U(3)].every((u) => w.m.etat(u) === 'attente'),
+      'un mélange (cette photo échoue deux fois, une autre répond) ⇒ « le serveur répond », sans reprise', `${w.m._etatInterne().sonde} · ${[U(1), U(2), U(3)].map((u) => w.m.etat(u)).join(',')}`);
+    // Un réseau qui BAT ne fait pas tourner la sonde en boucle : une reprise par minute au plus.
+    w = monde({ sonde: (u, n) => (n % 3 === 1 ? 'erreur' : 'reponse') });
+    w.m.configurer({ secours: () => 'non' });
+    monterEchouer(w.m, [U(1), U(2), U(3)]);
+    let reprises = 0;
+    for (let k = 0; k < 6; k++) {
+      await w.avancer(w.m.SONDE_ECART_MS + 50);
+      if ([U(1), U(2), U(3)].every((u) => w.m.etat(u) === 'natif')) { reprises++; [U(1), U(2), U(3)].forEach((u) => w.m.echecNatif(u)); }
+    }
+    dit(reprises === 1 && w.sondes.length <= 18, 'un réseau qui bat : au plus UNE reprise par minute (la sonde ne tourne pas en boucle)', `${reprises} reprise(s) en ~1 min · ${w.sondes.length} sonde(s)`);
+    // Hors ligne MESURÉ : une cause, pas « pas su ».
+    w = monde({ horsLigne: true });
+    w.m.configurer({ secours: () => 'non' });
+    monterEchouer(w.m, [U(1), U(2), U(3), U(4)]);
+    await w.avancer(w.m.SONDE_ECART_MS + 50);
+    const dHl = w.m.decision();
+    dit(w.m._etatInterne().sonde === 'horsligne' && dHl.parle && dHl.cause === 'horsligne',
+      'hors ligne (navigator.onLine === false) ⇒ la cause « horsligne », jamais « je n’ai pas pu mesurer »', `sonde ${w.m._etatInterne().sonde} · ${JSON.stringify(dHl)}`);
   });
 
   await essaie('bilan', async () => {
@@ -375,12 +451,157 @@ if (MUTATION && !MUTER_MODULE[MUTATION] && !MUTER_APP[MUTATION]) { console.log('
     await w.avancer(10);
     const lente = w.m.estLente(U(1));
     dit(lente && !w.m.estDefinitive(U(1)), 'deux délais : « pas su » (lente), on n’insiste plus sans signal — et toujours pas définitive', `lente ${lente} · définitive ${w.m.estDefinitive(U(1))}`);
-    // Un REFUS, lui, est définitif.
+  });
+
+  // ══ Seconde revue : un REFUS de l'extension n'est pas un verdict ══════════
+  // Le pont (bridge.js) ne relaie que `dataUrl` : un 503, un 429, une coupure de
+  // son service worker arrivent comme un lien mort. Scénario des relecteurs :
+  // la 1re demande de chaque photo est refusée, les suivantes rendues ; le
+  // navigateur, lui, est toujours refusé (CORP).
+  const PNG = 'data:image/png;base64,iVBORw0KGgo=';
+  const transitoire = () => {
+    const parUrl = {};
+    return { parUrl, demander: async (u) => { parUrl[u] = (parUrl[u] || 0) + 1; return parUrl[u] === 1 ? { dataUrl: null, issue: 'refus' } : { dataUrl: PNG, issue: 'ok' }; } };
+  };
+  await essaie('refus passager', async () => {
+    let w = monde({ sonde: () => 'erreur' });
+    let x = transitoire();
+    let secours = 'oui';
+    w.m.configurer({ secours: () => secours, ext: () => 'presente', demander: x.demander, chargerImage: async () => false });
+    const urls = [1, 2, 3, 4].map(U);
+    monterEchouer(w.m, urls);
+    await w.avancer(10);
+    const apres = urls.map((u) => w.m.etat(u));
+    dit(apres.every((e) => e === 'ko') && urls.every((u) => !w.m.estDefinitive(u)),
+      'un refus de l’extension : « perdue » pour l’instant, JAMAIS définitive (rien ne la retire d’une liste)', `${apres.join(',')} · définitives ${urls.filter((u) => w.m.estDefinitive(u)).length}`);
+    await w.avancer(w.m.TEMOIN_PREMIER_MS + 200);
+    const fin = urls.map((u) => w.m.etat(u));
+    dit(fin.every((e) => e === 'ok'), 'sans rien toucher : le témoin (20 s) redemande UNE photo à l’extension ; elle revient ⇒ toutes les autres lui sont redemandées, et s’affichent', `${fin.join(',')} · demandes ${JSON.stringify(Object.values(x.parUrl))}`);
+    dit(Object.values(x.parUrl).every((n) => n === 2), '… chacune demandée deux fois exactement (aucune redemande de trop)', JSON.stringify(Object.values(x.parUrl)));
+    const dFin = w.m.decision();
+    dit(!dFin.parle, '… et plus de phrase', JSON.stringify(dFin));
+    // Le remontage après son recul (une minute) : redemandée.
+    w = monde({ sonde: () => 'erreur' });
+    x = transitoire();
+    w.m.configurer({ secours: () => 'oui', ext: () => 'presente', demander: x.demander, chargerImage: async () => false });
+    const offs = [U(5)].map((u) => { const off = w.m.monter(u, () => {}); w.m.voir(u, {}, true); w.m.echecNatif(u); return off; });
+    await w.avancer(10);
+    offs.forEach((f) => f());               // on quitte l'écran avant le témoin (il ne la voit plus)
+    await w.avancer(30_000);
+    const off30 = w.m.monter(U(5), () => {});  // remontée 30 s après : avant son recul
+    if (w.m.etat(U(5)) === 'natif') w.m.echecNatif(U(5));
+    await w.avancer(10);
+    const a30 = w.m.etat(U(5)), n30 = x.parUrl[U(5)];
+    off30();
+    await w.avancer(40_000);
+    w.m.monter(U(5), () => {});            // remontée 70 s après : son recul (1 min) est passé
+    if (w.m.etat(U(5)) === 'natif') w.m.echecNatif(U(5));
+    w.m.voir(U(5), {}, true);
+    await w.avancer(10);
+    dit(a30 === 'ko' && n30 === 1 && w.m.etat(U(5)) === 'ok' && x.parUrl[U(5)] === 2,
+      'une photo refusée, remontée : rien avant son recul (1 min), puis l’extension la lui redemande', `à 30 s : ${a30} (${n30} demande) · à 70 s : ${w.m.etat(U(5))} (${x.parUrl[U(5)]} demandes)`);
+    // L'extension qui revient (battement) : un signal neuf.
+    w = monde({ sonde: () => 'erreur' });
+    x = transitoire();
+    secours = 'oui';
+    w.m.configurer({ secours: () => secours, ext: () => 'presente', demander: x.demander, chargerImage: async () => false });
+    monterEchouer(w.m, [U(6), U(7)]);
+    await w.avancer(10);
+    secours = 'non'; w.m.secoursChange(); secours = 'oui'; w.m.secoursChange();
+    await w.avancer(10);
+    dit([U(6), U(7)].every((u) => w.m.etat(u) === 'ok'), 'l’extension revient (battement) : les photos qu’elle avait refusées lui sont redemandées', [U(6), U(7)].map((u) => w.m.etat(u)).join(','));
+    // `online` : tout réessaie, et le refus tombe.
+    w = monde({ sonde: () => 'erreur' });
+    x = transitoire();
+    w.m.configurer({ secours: () => 'oui', ext: () => 'presente', demander: x.demander, chargerImage: async () => false });
+    monterEchouer(w.m, [U(8), U(9)]);
+    await w.avancer(10);
+    w.emettre('online');
+    await w.avancer(10);
+    [U(8), U(9)].forEach((u) => { if (w.m.etat(u) === 'natif') w.m.echecNatif(u); });
+    await w.avancer(10);
+    dit([U(8), U(9)].every((u) => w.m.etat(u) === 'ok'), '`online` : le refus tombe, le navigateur échoue encore ⇒ l’extension est redemandée, et les rend', [U(8), U(9)].map((u) => w.m.etat(u)).join(','));
+  });
+
+  await essaie('refus : charge bornée', async () => {
+    // Des liens VRAIMENT morts (l'extension refuse toujours), 12 à l'écran, 30 min.
+    const w = monde({ sonde: () => 'reponse' });
+    let n = 0;
+    w.m.configurer({ secours: () => 'oui', ext: () => 'presente', demander: async () => { n++; return { dataUrl: null, issue: 'refus' }; }, chargerImage: async () => false });
+    const urls = Array.from({ length: 12 }, (_, i) => U(30 + i));
+    monterEchouer(w.m, urls);
+    await w.avancer(10);
+    const n0 = n;
+    await w.avancer(30 * 60e3);
+    const t = w.m.bilan().temoins;
+    dit(n0 === 12 && n - n0 <= 3 * t && t <= 10, 'des liens vraiment morts (12 à l’écran, 30 min) : au plus TROIS redemandes par passage du témoin (20 s, puis ×2 jusqu’à 5 min) — jamais toutes à chaque fois', `${n0} au départ, puis ${n - n0} en 30 min · ${t} témoin(s)`);
+    const d = w.m.decision();
+    dit(d.parle && urls.every((u) => !w.m.estDefinitive(u)), '… elles restent « perdues » (la phrase parle), jamais définitives', JSON.stringify(d).slice(0, 160));
+    // Des liens morts MÊLÉS à des refus passagers : chaque photo qui revient
+    // relance la vague — un lien mort déjà redemandé dans la vague attend son
+    // recul (sinon quinze retours = quinze demandes du même lien mort).
     const w2 = monde({ sonde: () => 'erreur' });
-    w2.m.configurer({ secours: () => 'oui', demander: async () => ({ dataUrl: null, issue: 'refus' }) });
-    monterEchouer(w2.m, [U(7)]);
+    const parUrl = {};
+    const morts = Array.from({ length: 5 }, (_, i) => U(100 + i));
+    const passagers = Array.from({ length: 15 }, (_, i) => U(110 + i));
+    w2.m.configurer({ secours: () => 'oui', ext: () => 'presente', chargerImage: async () => false,
+      demander: async (u) => { parUrl[u] = (parUrl[u] || 0) + 1; return (morts.includes(u) || parUrl[u] === 1) ? { dataUrl: null, issue: 'refus' } : { dataUrl: PNG, issue: 'ok' }; } });
+    monterEchouer(w2.m, [...morts, ...passagers]);
     await w2.avancer(10);
-    dit(w2.m.estDefinitive(U(7)), 'un REFUS de l’extension (réponse sans octets) : définitif (c’est le seul état qui retire une photo d’une liste)', w2.m.etat(U(7)));
+    // Deux passages du témoin (20 s, puis 40 s) : au plus six redemandes.
+    await w2.avancer(3 * w2.m.TEMOIN_PREMIER_MS + 2000);
+    const revenues = passagers.filter((u) => w2.m.etat(u) === 'ok').length;
+    const parMort = morts.map((u) => parUrl[u] || 0);
+    dit(revenues === 15 && parMort.every((n) => n <= 2),
+      'des liens morts mêlés à des refus passagers : les 15 passagers reviennent, et chaque lien mort n’est redemandé qu’UNE fois dans la vague (pas une fois par retour)',
+      `${revenues}/15 revenues · demandes par lien mort ${JSON.stringify(parMort)}`);
+  });
+
+  await essaie('bilan : le retour', async () => {
+    // Réseau coupé à l'ouverture, sans extension ; puis il revient.
+    let cdnOk = false;
+    const w = monde({ sonde: () => (cdnOk ? 'reponse' : 'erreur') });
+    const ecrits = [];
+    w.m.configurer({ secours: () => 'non', ext: () => 'absente', ecrire: async (b) => { ecrits.push(JSON.parse(JSON.stringify(b))); return true; }, chargerImage: async () => cdnOk });
+    const urls = Array.from({ length: 12 }, (_, i) => U(50 + i));
+    urls.forEach((u) => { w.m.monter(u, () => {}); w.m.voir(u, {}, true); w.m.echecNatif(u); });
+    await w.avancer(15000);
+    const n1 = ecrits.length;
+    cdnOk = true;
+    await w.avancer(10000);
+    urls.forEach((u) => { if (w.m.etat(u) === 'natif') w.m.chargeNatif(u); });
+    await w.avancer(30000);
+    const d = ecrits[ecrits.length - 1] || {};
+    dit(n1 === 1 && ecrits.length === 2 && d.retours > 0 && d.ok > 0 && d.enEchec === 0 && d.sondeVue === 'bloquee',
+      'le bilan dit le RETOUR : réécrit peu après (sans attendre 10 min), avec les photos revenues, 0 en échec, et la cause mesurée plus tôt', `${n1} écrit(s) pendant la coupure, ${ecrits.length} au total · dernier ${JSON.stringify(d).slice(0, 220)}`);
+    await w.avancer(60 * 60e3);
+    dit(ecrits.length === 2, '… et rien de plus en une heure (rien de neuf)', `${ecrits.length} écrit(s)`);
+  });
+
+  await essaie('bilan : session sans échec', async () => {
+    const w = monde({ sonde: () => 'reponse' });
+    const ecrits = [];
+    w.m.configurer({ secours: () => 'non', ext: () => 'absente', ecrire: async (b) => { ecrits.push(JSON.parse(JSON.stringify(b))); return true; } });
+    const urls = Array.from({ length: 8 }, (_, i) => U(70 + i));
+    urls.forEach((u) => { w.m.monter(u, () => {}); w.m.chargeNatif(u); });
+    await w.avancer(60 * 60e3);
+    const b = ecrits[0] || {};
+    dit(ecrits.length === 1 && b.sansEchec === true && b.ko === 0 && b.ok > 0, 'une session où tout s’affiche propose UN bilan « sans échec » (l’écriture ne le range que pour remplacer un échec rangé)', `${ecrits.length} · ${JSON.stringify(b).slice(0, 160)}`);
+    const w2 = monde({ sonde: () => 'reponse' });
+    const e2 = [];
+    w2.m.configurer({ secours: () => 'non', ecrire: async (b2) => { e2.push(b2); return true; } });
+    await w2.avancer(60 * 60e3);
+    dit(e2.length === 0, '… et une session sans aucune photo n’écrit rien', String(e2.length));
+    // Le bilan « sans échec » ne retarde pas celui d'un échec qui arrive ensuite.
+    const w3 = monde({ sonde: () => 'erreur' });
+    const e3 = [];
+    w3.m.configurer({ secours: () => 'non', ecrire: async (b3) => { e3.push(JSON.parse(JSON.stringify(b3))); return true; } });
+    [U(80), U(81)].forEach((u) => { w3.m.monter(u, () => {}); w3.m.chargeNatif(u); });
+    await w3.avancer(60_000);
+    monterEchouer(w3.m, [U(82), U(83), U(84)]);
+    await w3.avancer(w3.m.SONDE_ECART_MS + w3.m.BILAN_PREMIER_MS + 3000);
+    dit(e3.length === 2 && e3[0].sansEchec === true && e3[1].sansEchec === false && e3[1].ko === 3,
+      '… et il ne retarde pas le bilan d’un échec qui arrive ensuite (écrit en secondes, pas 10 min plus tard)', JSON.stringify(e3.map((x) => ({ sansEchec: x.sansEchec, ko: x.ko }))));
   });
 
   await essaie('quand parler', async () => {

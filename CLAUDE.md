@@ -7697,9 +7697,10 @@ son site (CORP, ou anti-hotlink sur le référent), ou un logiciel de protection
      **au plus 3 demandes en vol**, la place prise **jusqu'à la vraie réponse**
      (plafond dur 30 s), **aucune demande pour une photo hors écran** ;
   4. sans secours : le pictogramme à la place, **jamais une image cassée**.
-     `onError()` n'est appelé que sur l'état **définitif** — l'extension a
-     RÉPONDU, et pas avec une image (`estDefinitive`). « Pas d'extension ici,
-     pour l'instant » se dessine (pictogramme) mais ne retire rien d'une liste.
+     ⚠️ **Plus aucun état n'est « définitif »** (seconde revue, plus bas) :
+     `onError()` ne part plus pour une photo Vinted, aucune liste ne la retire
+     (`noterImgMorte`) — elle garde sa place avec le pictogramme et revient
+     d'elle-même. `onError` ne vaut que pour un `<img>` ordinaire.
 - **Un échec n'est pas figé** : un **témoin** (UNE photo perdue à l'écran,
   rechargée sans référent à 20 s puis ×2 jusqu'à 5 min, onglet visible),
   l'événement `online` (tout réessaie, refus de l'extension compris) et une
@@ -7709,6 +7710,12 @@ son site (CORP, ou anti-hotlink sur le référent), ou un logiciel de protection
   octets ; `delai` = pas de réponse (« pas su ») → la photo retourne en attente,
   un nouvel essai, jamais « perdue » ; après deux délais on n'insiste plus sans
   signal neuf (remontage, témoin, `online`, retour de l'extension).
+  ⚠️ **Un refus n'est pas un verdict non plus** : le pont ne relaie que
+  `dataUrl` (un 404, un 503, une coupure arrivent identiques). La photo est
+  « perdue » pour l'instant et **redemandée** : par le témoin (à l'extension, une
+  photo à l'écran), au remontage après son recul (1, 2, 4 puis 5 min), à
+  `online`, au retour de l'extension — et dès qu'une photo refusée revient par
+  l'extension, toutes les autres lui sont redemandées.
 - **« Pas su » ≠ « non »** : l'extension se manifeste quelques secondes après
   le chargement — pendant 7 s rien n'est déclaré perdu ; quand elle (re)devient
   disponible, ses photos retrouvent leurs essais.
@@ -7722,35 +7729,54 @@ son site (CORP, ou anti-hotlink sur le référent), ou un logiciel de protection
   rien de plus : `navigateur` (deux échecs réseau ET l'extension les a
   récupérées : c'est la page qui est refusée, « dans VRM ») · `injoignable`
   (deux échecs réseau, sans plus : « ce navigateur n'arrive pas à les charger
-  ici » — une coupure, un filtre ou CORP donnent la même erreur) · `reponse` ·
-  `passu`. `data-photos-geste` : `refus` (l'extension a répondu sans image —
-  **rien à régler**, jamais « recharge ») · `muette` (« recharge cette page ») ·
-  `muette-ailleurs` (un bandeau de l'écran dit déjà que l'extension ne répond
-  pas : `useVoixExt`, la phrase ne le redit pas, §7) · `telephone` · `chrome`.
+  ici » — une coupure, un filtre ou CORP donnent la même erreur) · `reponse`
+  (« peut-être des liens expirés ») · `horsligne` (`navigator.onLine === false`,
+  mesuré) · `passu`. `data-photos-geste` : `reseau` (hors ligne : « je réessaie
+  dès que le réseau revient », rien d'autre) · `refus` (l'extension a répondu
+  sans image : « je lui redemande de temps en temps », jamais « recharge ») ·
+  `reponse` (le serveur répond : **aucune promesse que l'extension les
+  récupère** — elle rend `{ok:false}` sur un statut d'erreur) · `muette`
+  (« recharge cette page ») · `muette-ailleurs` (un bandeau de l'écran dit déjà
+  que l'extension ne répond pas : `useVoixExt`, la phrase ne le redit pas, §7) ·
+  `telephone` · `chrome`.
   Sur ordinateur, sa boîte réserve la place de l'île d'actions
   (`.vrm-sous-ile`, comme `.vrm-tete-row`) : le geste passait dessous.
 - **La mesure, dans SON navigateur** : au premier échec (et après chaque
   reprise), une sonde `fetch(no-cors, no-referrer, sans cookie)`. Réponse
   opaque ⇒ `reponse`. `TypeError` ⇒ **une seconde sonde 8 s plus tard sur une
   AUTRE photo** ; deux `TypeError` ⇒ `bloquee` (= deux échecs réseau espacés).
+  Une `TypeError` puis une réponse ⇒ la PREMIÈRE photo est re-sondée : si elle
+  répond aussi, **le réseau est revenu** — tout réessaie tout de suite, rien
+  n'est conclu (au plus une fois par minute) ; si elle échoue encore, c'est un
+  mélange ⇒ `reponse`. Hors ligne ⇒ `horsligne`.
   Remesurer (en changeant d'écran) **ne fait pas disparaître la phrase** : la
   conclusion d'avant reste pendant le premier essai, une erreur de plus après
   `bloquee` (aucune photo revenue depuis, sinon `reprise` l'aurait effacée) la
   confirme sans attendre ; « en cours » (rien affiché) seulement s'il n'y avait
   pas de conclusion, ou si le premier essai la contredit.
   Le bilan attend la conclusion, puis part dans **`app_data.diag_photos`**
-  (sa ligne, RLS), au plus toutes les 10 min, en lire-fusionner-réécrire
-  **gardé** (lecture ratée ⇒ rien n'est écrit) :
+  (sa ligne, RLS), au plus toutes les 10 min — **un retour** (une photo qui
+  avait échoué s'affiche) le fait réécrire sans attendre, jamais deux fois en
+  15 s — en lire-fusionner-réécrire **gardé** (lecture ratée ⇒ rien n'est écrit) :
   `{ at, dernier, parNavigateur: { 'Mac Chrome': {…}, 'iOS Safari': {…} } }`,
   chaque bilan = `{at, ko, ok, secoursOk, secoursKo, retours, delais, temoins,
-  sonde, hote, ext (presente|absente|muette), ecran, nav, version}` — des
-  nombres et des mots, **jamais une URL, une signature ou un titre**.
+  redemandes, sonde, sondeVue, enEchec, sansEchec, hote, ext
+  (presente|absente|muette), ecran, nav, version}` — des nombres et des mots,
+  **jamais une URL, une signature ou un titre**. Une session **sans aucun
+  échec** propose un bilan `sansEchec:true`, que l'écriture ne range **que s'il
+  remplace un échec rangé par ce navigateur** (sinon aucune écriture : pas une
+  ligne de plus à chaque ouverture).
   **Comment le lire** (`select data from app_data where id = 'diag_photos'`) :
   `ok:0, ko>0, sonde:'bloquee', secoursOk>0` ⇒ le navigateur refuse la page (CORP
   de Vinted ou un logiciel de protection) et l'extension contourne ;
   `sonde:'bloquee', secoursOk:0` ⇒ bloqué OU injoignable, indiscernable d'ici ;
   `sonde:'reponse'` ⇒ le serveur répond une erreur (lien périmé, refus) ;
   `retours>0` ⇒ des photos sont revenues après un échec (c'était passager) ;
+  `enEchec:0` ⇒ plus rien n'échoue à l'écran au moment du bilan ; `sondeVue` ⇒
+  la cause mesurée plus tôt dans la session (une reprise remet `sonde` à zéro) ;
+  `sansEchec:true` ⇒ une session où tout s'est affiché a remplacé un échec ;
+  `redemandes>0` ⇒ l'extension a été redemandée après un refus ou deux délais ;
+  `sonde:'horsligne'` ⇒ l'appareil était hors ligne ;
   `delais>0` ⇒ l'extension a tardé ; `ext:'absente'` sur `iOS …` ⇒ rien ne peut
   aller les chercher sur ce téléphone ; `ok>0` ⇒ elles s'affichent.
 - ⚠️⚠️ **UN FAUX CDN SERVI PAR `page.route()` NE PROUVE RIEN** : mesuré, une
@@ -7832,6 +7858,98 @@ extension pour la mesure du service worker), puis corrigé :
   ⚠️ Un premier jet du scénario L ralentissait les photos des annonces 1 à 3 —
   qui ne sont PAS à l'écran (tri par date) : vert sur c02ffcf, par vacuité. Il
   ralentit maintenant les trois PREMIÈRES demandées, et vérifie qu'elles l'ont été.
+
+#### ⚠️⚠️ Seconde revue du 11 octobre — sept constats confirmés, cinq défauts distincts
+Trois lentilles (écrans, phrase, charge), chaque constat REPRODUIT (vrai CDN HTTPS
+local, extension simulée par un aller-retour HORS page comme son service worker)
+puis contre-vérifié par deux sceptiques. Les constats que les sceptiques n'ont
+pas retenus ne sont PAS corrigés — dont « la phrase redit *ordinateur* sous le
+bandeau des bordereaux » (un premier jet de ce correctif l'avait traité ; retiré,
+il n'était pas dans la liste confirmée).
+- ⚠️⚠️ **UN REFUS PASSAGER DE L'EXTENSION FIGEAIT LA PHOTO POUR LA SESSION**
+  (trois constats, une cause ; gravité haute). Le pont (`bridge.js`) ne relaie
+  que `dataUrl` : un 503 ou un 429 du CDN, un réseau qui hoquette dans son
+  service worker arrivent EXACTEMENT comme un lien mort. c7efee0 posait
+  `refus=true` pour de bon : le remontage, le témoin et le retour de
+  l'extension ne la lui redemandaient jamais (seul `online` l'effaçait, et un
+  hoquet ne passe pas toujours hors ligne) ; Ma journée RETIRAIT les photos de
+  sa liste (`estDefinitive` → `onError` → `noterImgMorte`) ; et la phrase
+  disait « rien à régler ici, je réessaie » alors qu'un rechargement les
+  rendait toutes (mesuré : 15/15). ⇒ **Un refus n'est plus un verdict** :
+  - le **témoin** (20 s, puis ×2 jusqu'à 5 min) redemande à l'extension **au
+    plus 3 photos à l'écran par passage, les moins redemandées d'abord** — une
+    seule par passage, prise dans l'ordre de la page, faisait passer cinq liens
+    morts avant le premier refus passager (10 min de pictogrammes) ;
+  - dès qu'une photo refusée **revient**, toutes les autres sont redemandées —
+    sauf un lien déjà redemandé dans la même vague, qui attend son **recul**
+    (1, 2, 4 puis 5 min) : sans cette borne, quinze retours redemandaient quinze
+    fois le même lien mort ;
+  - le **remontage** après son recul, `online` et le **retour de l'extension**
+    la redemandent aussi ;
+  - **plus aucun état n'est définitif** : aucune liste ne retire plus une photo
+    Vinted (elle garde sa place avec le pictogramme et revient d'elle-même) ;
+  - la phrase dit ce que fait la règle : « je lui redemande de temps en temps,
+    elles s'afficheront ici dès qu'elle y arrive » — jamais « rien à régler ».
+- **« Le serveur répond » promettait que l'extension « va les chercher »**
+  (ordinateur) ou « c'est elle qui les récupère » (téléphone). Or `photoBytes`
+  rend `{ok:false}` sur tout statut d'erreur : sur un lien mort elle ne fait pas
+  mieux. Geste `reponse` : « je réessaie de temps en temps ; si ce sont des
+  liens expirés, ils se renouvellent quand l'extension VRM repasse sur tes
+  comptes Vinted » — la cause dit « peut-être des liens de photo expirés ».
+- **`diag_photos` gardait « bloquée, 0 affichée, 0 revenue » pour un hoquet de
+  20 s** : un retour ne déclenchait aucun bilan, et une session où tout
+  s'affiche n'écrivait rien. ⇒ un retour réécrit le bilan sans attendre les
+  10 min (jamais deux fois en 15 s) ; une session sans échec propose UN bilan
+  `sansEchec`, que l'écriture ne range que pour **remplacer** un échec rangé par
+  ce navigateur (sinon aucune écriture). Champs ajoutés : `redemandes`,
+  `sondeVue`, `enEchec`, `sansEchec` — des nombres et des mots, jamais d'URL.
+- **PWA qui se réveille** : une erreur puis une réponse (le réseau revenu entre
+  les deux sondes) faisait dire « le serveur répond, mais ses images ne
+  s'affichent pas » pendant ~12 s. ⇒ la PREMIÈRE photo est re-sondée : si elle
+  répond aussi, le réseau est revenu — tout réessaie, rien n'est conclu (au
+  plus une reprise par minute) ; si elle échoue encore, `reponse`.
+- **Hors ligne mesuré disait « je n'ai pas pu mesurer pourquoi » et envoyait sur
+  l'ordinateur**. ⇒ cause `horsligne` (`navigator.onLine === false`, maintenant
+  ou à la sonde), geste `reseau` : « Pas de connexion internet ici pour
+  l'instant… Je réessaie dès que le réseau revient. »
+- **PREUVES** (méthode §6.1 : l'audit et le banc FINAUX copiés dans l'arbre de
+  c7efee0 et lancés depuis lui) :
+  - `audit-photos-vinted.cjs` : **50 contrôles**, **15 rouges sur c7efee0** ;
+    onze mutations nouvelles, chacune rouge — `refus-definitif` (2),
+    `temoin-navigateur` (4), `retour-seul` (3), `retour-sans-borne` (1 : quinze
+    retours redemandent quinze fois le lien mort), `refus-colle` (1),
+    `temoin-tout` (2 : tout redemander à chaque passage), `temoin-une` (1 : une
+    seule photo, dans l'ordre de la page), `bilan-retour` (2),
+    `bilan-sans-echec` (2), `reveil` (2), `horsligne-passu` (1) ; les quinze
+    d'avant restent rouges.
+  - banc `photos-vinted.cjs` : **166 contrôles, tout vert** ; scénarios
+    nouveaux T, T390, X, O, E390, W, N, Y (et E, C étendus) : **15 rouges sur le
+    build de c7efee0**, chaque scénario « réel » vert (il reproduit bien le
+    défaut) — T ×2, T390 ×3 (dont « rien à régler ici »), X ×2 (Ma journée :
+    `retirees:5`), O ×2, E et E390 (promesse), W (« reponse/telephone » à 8 s),
+    N (« passu/telephone »), Y ×2 (bilan resté « bloquée, 0 revenue »). Dix
+    mutations du code final, chacune rouge sur son scénario : `estDefinitive`
+    rétabli (X, O : 4) · témoin sans l'extension (T : 4) · cadre non observé
+    (T : 4) · texte « rien à régler » (T390) · réveil (W) · hors ligne « pas
+    su » (N) · promesse sur `reponse` (E, E390) · bilan sans retour (Y) ·
+    session sans échec muette (Y) · bilan « sans échec » écrit d'office (C).
+  - tous les `scripts/audit-*.cjs` à 0 (hors `audit-renum-b`) ; bancs voisins
+    verts un par un : annonces-carte, ventes-bordereau, messagerie, premierjour
+    (48), statuts-colis, enligne (relancé seul : son premier passage est mort
+    sur « browser has been closed », disque de la machine plein).
+  ⚠️ **Le disque partagé de la machine s'est rempli pendant les preuves** (656 Mo
+  libres) : Chromium mourait au milieu d'un banc (« Target page, context or
+  browser has been closed ») et les copies des mutations échouaient. Ces rouges
+  ne sont PAS des défauts : chaque scénario touché a été relancé seul.
+- ⚠️ **Côté extension, à faire dans un chantier extension (pas ici)** : le pont
+  ne dit pas POURQUOI il n'a pas d'octets. `bridge.js` (relais `photo`) devrait
+  relayer `error` comme le fait déjà `pdfLbc`, et `photoBytes` le **statut**
+  numérique : alors un 404/410 (lien mort) pourrait attendre plus longtemps, et
+  un 429/5xx/réseau être redemandé plus tôt. Tant que ce n'est pas fait, l'app
+  traite tout refus comme « passager, avec recul » — le sens sûr : une photo
+  revient, au prix de quelques redemandes bornées sur des liens vraiment morts.
+- **Non mesuré** : le rythme réel des refus passagers chez lui ; ce que le CDN
+  répond vraiment à son service worker quand la page est refusée (403, 429 ?).
 
 ### ⚠️⚠️ « SE CONNECTER » OUVRE VRM, LA SESSION TIENT, LE CODE PÉRIMÉ SE RÉPARE (11 octobre, 5.169)
 Plaintes de Julien : « se connecter doit envoyer dans VRM », « elle ne garde pas
