@@ -362,3 +362,46 @@ et le **champ modèle du « mise en vente »** (`setAnnSearch`/`setListQ`).
 - Le composant est **réutilisable** (drop-in) sur les autres champs texte
   (recherches Ventes/Achats) — placé ici sur les deux plus utiles, à étendre si
   Julien le demande.
+
+---
+
+## G9 — Codes de retrait visibles hors ligne (Terrain) — 12 octobre
+
+**Besoin de Julien (retenu le 11 oct, groupe Terrain) :** « codes de retrait hors
+ligne ». Au comptoir du point relais, le réseau passe mal ; quand la base ne
+répond pas, l'app bascule sur `BaseInjoignable` et il ne voyait plus SES codes —
+pile au moment où il en a besoin.
+
+**Mesuré d'abord (§6) :** les codes lisibles vivent déjà dans `panel_colis_relais`
+(extension) + les emails transporteur (`email_track_*`, `isColisRetirable`). La
+file « à retirer » est publiée dans `vrm_colis_retirer`. Il manquait juste une
+copie LOCALE pour survivre à la panne.
+
+**Livré (app seule, aucune requête de plus) :**
+- L'effet qui publie `vrm_colis_retirer` garde une copie des codes lisibles
+  (`vrm_codes_hors_ligne` = `{at, codes:[{code,lieu,carrier,suivi,titre,qr}]}`),
+  réécrite seulement quand elle change (§4.4).
+- `codesHorsLigne()` : trois états (pas de cache ⇒ rien — jamais un faux).
+- `BaseInjoignable` affiche « 📴 Tes codes de retrait (hors ligne) » : par colis,
+  le code en grand, ou « QR — besoin d'internet » quand il n'y a qu'un QR (on ne
+  promet pas ce qu'on ne peut pas montrer, §2.7).
+
+**Preuves :** banc `scripts/bancs/codes-hors-ligne.cjs` (données inventées, 390 +
+1512 px) — phase 1 base up : le code est gardé en local ; phase 2 base KO : il
+reste affiché dans `BaseInjoignable`. Rouge sous mutation (écriture du cache
+retirée → phase 1 rouge ; bloc hors ligne retiré → phase 2 rouge). `audit-tdz`
+vert.
+
+**Au passage — `audit-photos-vinted` était rouge sur `main`** (collision entre mon
+étape E et le chantier photos) : `src/AccueilFilm.jsx` et `src/accueil-carte.jsx`
+portent le logo VRM `/logo-vrm-*.png` (même-origine, jamais une photo Vinted).
+Inscrits dans `PERMIS` avec leur raison — l'extension sanctionnée de cet audit.
+Ce sont MES fichiers (domaine Accueil), donc à moi de les régulariser.
+
+**⚠️ Pour Agent 1 (ligne connexion/extension) — `audit-planchers-code` est ROUGE
+sur `main`** : `main` publie la **5.175.0** qui ne porte pas le code `liaison` à la
+frontière, alors que `EXT_CAPACITES.liaison = 5.171.0` est en dessous — une 5.175
+serait dite « périmée » ou recevrait une session qu'elle ne sait pas lire. Le
+remède documenté (« monter les quatre frontières ensemble » : `EXT_CAPACITES.liaison`,
+`CODE_DANS_ETAT`, bridge.js, vrm-badge.js) appartient à ta ligne, pas à la mienne
+— je n'y ai pas touché. À regarder.
