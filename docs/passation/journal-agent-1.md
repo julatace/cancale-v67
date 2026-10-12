@@ -96,3 +96,20 @@ tant que la 5.175 n'était pas dans `main` — c'est fait).
   6 confirmés (0,2,3,4,5,6) à corriger, 5 à juger (7-11), #1 rejeté (laissé).
 - Fusion dans l'intégration = gros conflit attendu (branche partie de `cdc9c1d`,
   avant 013 / preuve-vente / relecture croisée).
+
+## Passe visuelle (demande de Julien — skills design d'Emil Kowalski installés)
+Branche `claude/new-session-gzdgur` (branche de dev sanctionnée), commit 10a1e93.
+Constat d'abord : la base visuelle est DÉJÀ très soignée (appui iOS, fondu
+d'onglet, feuilles/toasts, anneaux de focus bleu marque, reduced-motion,
+opposition police d'affichage/texte, grain, chiffres tabulaires). On ÉLÈVE,
+on ne refait pas — §7 intacte, aucune couleur nouvelle.
+Fait, couche GLOBALE (`index.html` seul — faible collision, aucun churn App.jsx) :
+- `touch-action:manipulation` → supprime la latence ~300 ms du tap sur iPhone
+  (pincer-pour-zoomer gardé) ; appui long ne sélectionne plus le texte d'un bouton.
+- Courbes/durées nommées (`--vrm-ease-ios/-out`, `--vrm-dur-*`), réutilisées.
+- Entrée d'écran en ease-out-quint, opacité seule (contrainte position:fixed).
+Preuves : build + audits boutons/cohérence/icônes/chiffres/variables verts.
+Plafond atteint côté couche globale : pas de classe `.vrm-card` générique, les
+cartes sont stylées EN LIGNE dans App.jsx. Aller plus loin (élévation au survol,
+stagger d'entrée) = toucher le gros fichier partagé — à faire en passe DÉDIÉE,
+vérifiée au rendu (fixtures ou déploiement), jamais en aveugle (§7, §6.2).
