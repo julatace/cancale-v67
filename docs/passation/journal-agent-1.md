@@ -113,3 +113,18 @@ Plafond atteint côté couche globale : pas de classe `.vrm-card` générique, l
 cartes sont stylées EN LIGNE dans App.jsx. Aller plus loin (élévation au survol,
 stagger d'entrée) = toucher le gros fichier partagé — à faire en passe DÉDIÉE,
 vérifiée au rendu (fixtures ou déploiement), jamais en aveugle (§7, §6.2).
+
+## Cartes vivantes (options 1 & 2 de Julien, prouvées au banc) — commit ee4b73a
+- Option 1 (accueil) : survol d'élévation sur `.acc-q` et `.acc-prix` + logo
+  qui respire. Réutilise REFLET/OMBRE_CARTE (aucune couleur neuve), loin du hero
+  → « accent rare » intact. Accueil banc 171/0 inchangé.
+- Option 2 : primitives `.vrm-card` (élévation au survol + appui) et
+  `.vrm-stagger` (cascade d'entrée, montage unique) dans index.html ; appliquées
+  à la carte d'accueil de l'app (PremiersPas) + sa liste d'étapes. Premier jour
+  banc 67/0 inchangé.
+- Preuve : `scripts/bancs/cartes-vivantes.cjs` survole pour de vrai et lit
+  ombre/transform calculés. Red-before sur HEAD = 6 rouges (les 6 contrôles de
+  survol/cascade), 12/12 après ; reduced-motion neutralise.
+- `.vrm-card`/`.vrm-stagger` sont prêtes à être adoptées écran par écran (une à
+  la fois, prouvée à chaque fois) — ne jamais mettre `.vrm-stagger` sur une
+  liste qui se réordonne en direct (ça rejouerait, §Emil).
