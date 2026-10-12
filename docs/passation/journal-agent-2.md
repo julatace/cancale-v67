@@ -34,6 +34,50 @@ Je ne touche PAS au domaine de l'Agent 1 (`api/ebay.js`, `api/_lib/ebay*`,
   rien casser de la coordination) : je pars sur `claude/agent2-nsk5su` depuis
   `origin/main`, l'état le plus à jour.
 
-### Étape E — page d'accueil + film (EN COURS)
-- À reprendre : `passation2/accueil` (`a78fbc9`) dans
-  `branches-2026-10-12.bundle`, finir selon `notes/accueil/spec.md`.
+### Étape E — page d'accueil + film (TERMINÉE ✅)
+- `passation2/accueil` (`a78fbc9`) est sur une **base ancienne** (`e6bda5c`,
+  #470) : son diff vs `main` SUPPRIME les migrations 013/014, `photosVinted.js`,
+  et réécrit `App.jsx`/`background.js`. **Je ne l'ai PAS mergée** (elle défairait
+  tout le travail récent, §3). J'ai extrait **uniquement** les 12 fichiers du
+  delta accueil (vs sa base) et les ai posés sur `main` actuel :
+  - neufs : `AccueilFilm.jsx`, `accueil-carte.jsx`, `accueil-demo.js`,
+    `accueil-jetons.js`, `accueil-mouvement.js`, `accueil-reglages.js`,
+    `accueil-scenes.jsx`, `scripts/audit-accueil-demo.cjs` ;
+  - réécrits : `src/Accueil.jsx` (modulaire), `scripts/film-accueil.cjs`,
+    `scripts/bancs/accueil.cjs` ;
+  - `src/main.jsx` : version branche (Film en `React.lazy`) **+** j'ai ré-appliqué
+    l'ajout `lier-extension` que `main` avait (sinon régression du chantier
+    connexion de l'Agent 1).
+- **Prix 12,99 €** : la branche était à 9,99 € (base ancienne) ; `main`/CGV sont
+  à 12,99 € depuis le 11 oct. Corrigé `PRIX_MOIS='12,99'` (`accueil-reglages.js`,
+  source unique rendue par `{PRIX_MOIS}`) et les 2 littéraux du banc (fallback +
+  liste d'interdits du film).
+- `audit-lancement.cjs` : il cherchait le prix en **littéral** dans `Accueil.jsx`
+  (ancienne orthographe) — la page le rend maintenant via la constante. Corrigé
+  pour suivre la RÈGLE (`PRIX_MOIS`=CGV + aucun littéral mensuel contradictoire),
+  **sans affaiblir** : prouvé rouge sous mutation (`PRIX_MOIS` faux → rouge).
+  28ᵉ « cri au loup » de la famille documentée.
+- **Preuves** : `npm run build` vert ; banc `accueil.cjs` **171 verts / 0 rouge**
+  (poids avant l'app : entrée 21,7 Ko gzip, scènes 8,4, film 7,3 — sous les
+  plafonds ; `?film` 35 s, fonction pure, aucun prix) ; banc `demarrage.cjs` tout
+  vert ; honnêteté statique OK (0 adresse en dur, 0 preuve sociale, 0 promesse
+  interdite). `verif_visuel`/`verif_dark` NON lancés (fx/ réelles absentes, pas
+  de clé Supabase ici) — ils rendent des écrans de l'app, non touchés par E, et
+  restent à la version de `main`.
+- **MP4 du film** : non régénéré ici (les MP4 ne montent pas dans le dépôt, et
+  la page ne charge aucune vidéo — le film est rendu en direct par canvas ;
+  l'export marketing se refait à la demande via `scripts/film-accueil.cjs`).
+
+### ⚠️ À L'AGENT 1 — deux audits ROUGES sur `main` (hors mon domaine, pré-existants)
+Mesuré sur `origin/main` (vrai worktree git) à mon démarrage, AVANT mon étape E
+(donc pas une régression de ma part) :
+- **`audit-photos-vinted.cjs`** : rouge sur `main`. Domaine photos
+  (`photosVinted.js`). À regarder.
+- **`audit-planchers-code.cjs`** : rouge sur `main`. Il dit
+  « `EXT_CAPACITES.liaison = 5.171.0` est au-dessus de toute version publiée
+  sans le champ — 5.175.0 serait dite périmée (ou recevrait une session qu'elle
+  ne sait pas lire) », et « une 5.175.0 publiée ne reçoit pas de session
+  adressée (extSait('liaison')) : ok [attendu retard] ». C'est ton chantier
+  **connexion de l'extension / 5.175** (EXT_CAPACITES.liaison dans App.jsx +
+  `scripts/_versions-publiees.cjs`). Je n'y touche pas (risque de conflit avec
+  ta lane). À corriger côté 5.175, car ça touche Julien à l'installation.
