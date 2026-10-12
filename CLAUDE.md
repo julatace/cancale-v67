@@ -4312,6 +4312,15 @@ c'est la 015, sur son oui), **aucun DROP**, rien qui tourne : des tables vides e
   `set`, ou `PGOPTIONS='-c vrm.horloge_simulee=1'`), c'est `now()` du serveur
   qui compte, quoi que dise l'appelant. ⚠️ **Le banc de vie de K5 DOIT poser cette
   variable**, sinon ses heures simulées sont ignorées.
+  **Les durées et échéances reçues sont BORNÉES en base** (revue 2) : un bail de
+  plus de 600 s est REFUSÉ (`prendre` ne prend rien, `prendre_cle` rend false) —
+  120 000 « secondes » qui étaient des millisecondes gelaient un compte eBay
+  33 h 20, et `prendre_cle(…, 2147483647)` posait un bail jusqu'en 2094 ; une
+  prochaine fois (`rendre`) ou une sonnette (`planifier`) à plus d'un an est
+  refusée (false / NULL) — « dans 15 min » en millisecondes rangeait la veille
+  en l'an 58 748, et le secours ne la recréait pas (elle n'était pas
+  « manquante »). Refusé, jamais réduit en silence : la tâche reste tenue et
+  revient à la fin de son bail (≤ 10 min).
 - **La file** : `vrm_agent_prendre` choisit ses candidats EN SQL (une tâche par
   compte libre, quatre par vendeur, la plus en retard d'abord) puis en prend ≤ 2
   par vendeur et ≤ 1 par compte eBay : un arriéré de 250 tâches sur un compte
@@ -4357,6 +4366,32 @@ c'est la 015, sur son oui), **aucun DROP**, rien qui tourne : des tables vides e
   table, par une écriture ordinaire) ; la purge et l'effacement d'un vendeur
   passent par une MARQUE de transaction (`vrm_agent_marques`, clé
   `txid_current()`) — une variable de session ne l'ouvre plus.
+- **« Fermer mon compte » est SÉRIALISÉ avec chaque écrivain du vendeur** (revue 2,
+  le 12 octobre). La pierre tombale n'était visible qu'au COMMIT de l'effacement :
+  une sonnette (`planifier`), une ligne de journal (le texte de l'acheteur
+  compris), un compteur de quota ou une écriture directe faits PENDANT ces
+  quelques secondes survivaient, « Fermer mon compte » rendait « fait », et une
+  tâche orpheline faisait LEVER `vrm_agent_prendre` pour TOUS les vendeurs, à
+  chaque battement (reproduit en Postgres 16.14 et 17.6). ⇒ Un verrou consultatif
+  par vendeur (`hashtext('vrm_agent_vendeur')`, `hashtext(owner)`) : EXCLUSIF en
+  tête de `vrm_agent_effacer_vendeur`, PARTAGÉ dans `vrm_agent_efface` (passée en
+  plpgsql **VOLATILE** : la relecture qui suit le verrou voit ce qui a été validé
+  pendant l'attente — `--verifier` contrôle la volatilité), que TOUTES les
+  fonctions qui écrivent appellent EN TÊTE (avant tout verrou de ligne : aucun
+  interblocage ; `rendre`, `rendre_reservation` et `anonymiser_journal` l'ont
+  désormais aussi), et que le déclencheur de la pierre tombale prend pour une
+  NOUVELLE ligne (INSERT, ou UPDATE qui change le propriétaire — un UPDATE d'une
+  ligne existante ne crée rien qu'un effacement ne voie, il ne relit que la
+  pierre tombale validée, sans verrou). Un écrivain en vol finit avant
+  l'effacement et ses lignes partent avec le reste ; un écrivain qui arrive
+  pendant attend, puis voit la pierre tombale. `vrm_agent_prendre` ÉCARTE les
+  vendeurs effacés de ses candidats et saute sans attendre un vendeur en cours
+  d'effacement : une ligne restée à leur nom ne lève plus jamais pour les
+  autres. ⚠️ **READ COMMITTED exigé** (le défaut de PostgREST et de Supabase) :
+  sous REPEATABLE READ la pierre tombale serait relue sur un instantané d'avant
+  le verrou — l'écriture et l'effacement y sont refusés (`vrm_agent_isolation`).
+  ⚠️ Un écrivain tenu ouvert retarde « Fermer mon compte » d'autant (un appel
+  PostgREST = une transaction courte).
 - **« Fermer mon compte »** : `vrm_agent_effacer_vendeur(owner)` efface les 12
   tables qui portent son nom (coffre, commandes, preuves, index compris) et les
   quotas par compte qui le nomment sous le neutre, et pose d'ABORD une **pierre
@@ -4369,9 +4404,17 @@ c'est la 015, sur son oui), **aucun DROP**, rien qui tourne : des tables vides e
   précédent, journal 13 mois, commandes closes compactées à 90 j, et
   `cron.job_run_details` > 7 j **sans jamais faire échouer le reste**.
 - **La forme** : `create table if not exists` sautait en silence une table d'une
-  version plus ancienne ; une EMPREINTE (colonnes, types, NOT NULL, noms des
-  contraintes) dans le fichier fait tout refuser (`vrm_agent_forme`), rien n'est
-  installé.
+  version plus ancienne ; une EMPREINTE (colonnes, types, NOT NULL, et chaque
+  contrainte : son NOM **et** les 12 premiers hexadécimaux du md5 de son TEXTE,
+  `pg_get_constraintdef` sans « public. ») dans le fichier fait tout refuser
+  (`vrm_agent_forme`, le `detail` donne la valeur trouvée et le texte des
+  contraintes en place), rien n'est installé. ⚠️ Revue 2 : le NOM seul ne
+  suffisait pas — une table d'avant dont la contrainte R18 du même nom valait
+  `check (true)` était réutilisée en silence (et la 014 corrigée, réappliquée,
+  l'aurait gardée), puis une commande rangeait le nom et l'email de l'acheteur.
+  L'empreinte est mesurée identique en Postgres 16.14 et 17.6 ; changer une
+  contrainte change son empreinte (l'installation neuve de l'audit refuse et
+  donne la nouvelle valeur, à recopier).
 - **La garde `ebay_tokens*`** sur `app_data` : un navigateur (`auth.role()` ou rôle
   courant) ne peut ni créer, ni réécrire, ni effacer, ni renommer une ligne de
   jeton eBay (`vrm_ebay_tokens_serveur`). Mesuré : seule la route serveur l'écrit (aucun
@@ -4381,7 +4424,30 @@ c'est la 015, sur son oui), **aucun DROP**, rien qui tourne : des tables vides e
 - **Preuves** : `scripts/audit-agent-sql.cjs` — la migration EXÉCUTÉE sur un
   Postgres jetable qui imite la production (`postgres` NON superutilisateur,
   droits par défaut, 005-007 ET 013 appliquées telles quelles,
-  `scripts/agent-sql/supabase-min.sql`) : **193 contrôles**. Sur l'arbre de
+  `scripts/agent-sql/supabase-min.sql`) : **221 contrôles** (193 avant la revue
+  2). **Revue 2 (12 octobre)** : sur l'arbre de 9dcd405 (l'audit copié dedans,
+  lancé depuis lui, §6.1) **21 rouges sur 221** ; `--prouve` **79/79** — les 66
+  d'avant et 13 de plus : effacement sans verrou exclusif, écrivains sans verrou
+  partagé, pierre tombale STABLE, déclencheur sans verrou, quota qui revérifie
+  après ses verrous, `prendre` qui n'écarte plus les effacés, isolation ignorée,
+  bail non borné, prochaine fois non bornée, forme aux seuls noms, vérification
+  aveugle à la définition des déclencheurs, aux droits de colonne, à la
+  volatilité. ⚠️ **Les courses sont jouées sur un ÉTAT observé**, jamais sur un
+  délai : l'effacement (ou l'écrivain) tient sa transaction ouverte APRÈS son
+  travail (`pg_sleep`), et l'autre partie n'est lancée qu'une fois cette fenêtre
+  vue dans `pg_stat_activity` (ou l'appel vu en attente d'un verrou) — sous la
+  charge de `--prouve` (quatre audits à la fois), un délai fixe laissait le
+  contrôle vacant. ⚠️ Premier jet du contrôle « ligne orpheline » : posée sur un
+  compte dont une autre tâche était en vol, elle n'était jamais candidate —
+  vert sur le défaut ; elle est posée sur un compte LIBRE. ⚠️ Et la nouvelle
+  empreinte a d'abord AFFAIBLI quatre preuves : les mutations R18 (noms de clés,
+  data, codes, référence du journal) changent le TEXTE d'une contrainte, donc
+  son empreinte — la forme refusait l'installation de la migration mutée, et
+  elles passaient au rouge pour une MAUVAISE raison (« vrm_agent_forme », 70
+  contrôles), sans prouver que le contrôle R18 mord. L'audit recalcule
+  l'empreinte de la migration mutée (`contraintes: true`) : c'est le contrôle
+  R18 qui tombe (1 à 2 rouges chacune). *Une mutation se juge sur la RAISON
+  de son rouge, pas sur son nombre.* Sur l'arbre de
   59edcdd (l'audit copié dedans, lancé depuis lui, §6.1) : **48 rouges sur
   172**. `--prouve` : **66/66 mutations** au rouge — les 27 d'avant et 39 pour la
   revue du 11 octobre au soir (24 constats, deux relecteurs) : bail de commande
@@ -4403,37 +4469,49 @@ c'est la 015, sur son oui), **aucun DROP**, rien qui tourne : des tables vides e
   refus exige désormais le refus PAR LA CONTRAINTE — une erreur d'appel n'en est
   pas un (vacant sinon sur le code d'avant, §6.3).
 - **Application (session principale)** : `node scripts/agent-sql/essai-annule.cjs >
-  essai.sql` (~63 Ko, indentation et commentaires retirés, ROLLBACK, ne laisse
+  essai.sql` (~67 Ko, indentation et commentaires retirés, ROLLBACK, ne laisse
   rien — vérifié), puis la migration, puis `--verifier` : lecture seule, `ok`
-  et `ecarts` ; elle regarde la forme de chaque table, RLS activé ET forcé, les
-  droits EXACTS d'anon, authenticated et service_role (dont TRUNCATE, et MAINTAIN
-  en Postgres 17), la séquence, les règles et leur texte, chaque fonction (une
-  seule version, SECURITY DEFINER et search_path du fichier, corps md5, qui
-  l'exécute), chaque déclencheur présent ET actif, l'horloge, le réglage, aucune
-  marque qui traîne, aucune horloge simulée posée sur la base ou un rôle. ⚠️ Celle
-  de 59edcdd rendait `ok = true` avec les gardes suspendues, une restrictive
+  et `ecarts` ; elle regarde la forme de chaque table (et le TEXTE de chaque
+  contrainte, par la MÊME expression que le bloc 1c, relue dans le fichier), RLS
+  activé ET forcé, les droits EXACTS d'anon, authenticated et service_role (dont
+  TRUNCATE, et MAINTAIN en Postgres 17) et AUCUN droit de COLONNE
+  (`droits_colonnes`), la séquence, les règles et leur texte, chaque fonction
+  (une seule version, SECURITY DEFINER, search_path et VOLATILITÉ du fichier,
+  corps md5, qui l'exécute), chaque déclencheur présent ET actif AVEC sa
+  définition (moment, évènements, ligne/instruction, condition WHEN normalisée,
+  aucun `UPDATE OF`, aucun argument), l'horloge, le réglage, aucune marque qui
+  traîne, aucune horloge simulée posée sur la base ou un rôle. ⚠️ Celle de
+  59edcdd rendait `ok = true` avec les gardes suspendues, une restrictive
   retirée, une fonction en SECURITY INVOKER, FORCE RLS retiré, le coffre lisible
-  par le navigateur (reproduit) : l'audit en sert maintenant **19 dénaturations**
-  et exige `ok = false` et la bonne partie nommée. Si l'outil SQL refuse le bloc :
-  `--morceaux --dossier=…` (17,6 · 34 · 7,2 Ko, trois transactions dans l'ordre,
-  chaque objet né fermé — vérifié), puis `--verifier`.
+  par le navigateur ; celle de 9dcd405 avec une garde affaiblie sous le MÊME nom
+  (la garde des jetons recréée `when (false)` — un navigateur réécrivait le jeton
+  eBay —, la garde du journal pour UPDATE seulement, la pierre tombale de la file
+  pour INSERT seulement, `vrm_agent_commandes_data` et les 100 jours des mémos en
+  `check (true)`, `grant insert (…)` ou `grant update (bail_jeton, bail_jusqua)`
+  au serveur — reproduits) : l'audit en sert maintenant **28 dénaturations** et
+  exige `ok = false` et la bonne partie nommée. Si l'outil SQL refuse le bloc :
+  `--morceaux --dossier=…` (18,6 · 36,3 · 7,5 Ko, trois transactions dans
+  l'ordre, chaque objet né fermé — vérifié), puis `--verifier`.
 - **Mesuré en production le 11 octobre au soir** (lecture seule du catalogue) :
   Postgres 17.6, 0 table et 0 fonction de l'agent, aucun réglage `vrm.*` posé sur
   la base ou un rôle, ni `pg_cron` ni `pg_net`, déclencheurs d'`app_data` =
   ceux du socle du banc (`vrm_garde_garage`, `vrm_garde_numeros`, `vrm_meta_maj`,
   `vrm_noter_ecriture`).
 - **Non mesuré** : jamais appliquée sur sa vraie base ; que l'outil SQL accepte
-  ~63 Ko d'un bloc (la 013 à 92 Ko ne passait pas) ; la durée du verrou posé sur
+  ~67 Ko d'un bloc (la 013 à 92 Ko ne passait pas) ; la durée du verrou posé sur
   `app_data` par les déclencheurs en production (`lock_timeout` 3 s). **Le banc
-  n'est pas la production** : Postgres 16 au banc contre 17.6 en production (le
-  droit MAINTAIN des droits par défaut mesurés n'existe pas en 16 ; `--verifier`
-  le contrôle en 17, sans l'avoir jamais vu tourner sur 17) ; la forme
-  normalisée du texte des règles (`pg_policies`) n'a été vue qu'en 16 — un écart
-  de mise en forme en 17 rendrait `ok = false` (le sens sûr : une alerte, jamais
-  un feu vert) ; la purge de `cron.job_run_details` n'a tourné que sur une table
+  n'est pas la production** : Postgres 16 au banc contre 17.6 en production. ⚠️
+  Revue 2 : l'audit ENTIER a aussi tourné sur un 17.6 « vanilla » (binaires
+  `@embedded-postgres/linux-x64@17.6.0-beta.15`, `PG_BIN=…`) — **221 contrôles,
+  0 au rouge** (MAINTAIN, texte des règles, empreinte des contraintes, WHEN des
+  déclencheurs compris) ; pas sur le 17.6 de Supabase lui-même ; la purge de `cron.job_run_details` n'a tourné que sur une table
   À LA FORME de Supabase (droits de `postgres` supposés : pg_cron n'est pas
-  installé en production) ; les contraintes ne sont comparées que par leur NOM
-  (une définition changée sous le même nom ne se voit pas).
+  installé en production) ; l'empreinte du texte des contraintes et la
+  normalisation des conditions WHEN sont mesurées identiques en 16.14 et en 17.6
+  « vanilla » (binaires embarqués), pas sur le 17.6 de Supabase — un écart de mise
+  en forme ferait REFUSER l'installation (`vrm_agent_forme`) ou rendrait
+  `ok = false` : le sens sûr, jamais un feu vert. Une montée de version majeure
+  de Postgres pourra exiger de recopier l'empreinte.
 - **Julien** : rien.
 
 ### Leboncoin et eBay rangés comme Vinted : résumé, puis Ventes / Achats / Annonces (3 octobre)

@@ -16,17 +16,26 @@
 //     ligne, `verification`, en JSON, dont `ok` doit valoir true, et `ecarts`
 //     nomme ce qui diffère. Elle regarde TOUT ce qui fait une garantie, pas
 //     seulement que les objets existent :
-//       • la FORME de chaque table (colonnes, types, NOT NULL, contraintes),
-//         contre l'empreinte écrite dans le fichier ;
+//       • la FORME de chaque table (colonnes, types, NOT NULL, et chaque
+//         contrainte : son NOM et l'empreinte de son TEXTE), contre l'empreinte
+//         écrite dans le fichier, calculée par la MÊME expression que le bloc 1c
+//         (relue dans le fichier, jamais recopiée) ;
 //       • RLS activé ET forcé sur chaque table ;
 //       • les DROITS EXACTS de anon, authenticated et service_role sur chaque
 //         table (dont TRUNCATE, et MAINTAIN en Postgres 17), et sur la séquence ;
+//         et AUCUN droit de COLONNE (un `grant insert (owner, cle, …)` ne se
+//         voit pas au niveau de la table : il ouvrait l'écriture directe des
+//         mémos au serveur, la vérification rendait ok) ;
 //       • les RÈGLES (RLS) et leur texte ;
-//       • chaque FONCTION : une seule version, SECURITY DEFINER et search_path
-//         tels que le fichier les écrit, corps identique (md5), et qui peut
-//         l'exécuter ;
+//       • chaque FONCTION : une seule version, SECURITY DEFINER, search_path et
+//         VOLATILITÉ tels que le fichier les écrit (la pierre tombale, STABLE,
+//         relirait un instantané d'avant le verrou), corps identique (md5), et
+//         qui peut l'exécuter ;
 //       • chaque DÉCLENCHEUR du fichier présent ET actif (une garde suspendue
-//         n'est pas une garde) ;
+//         n'est pas une garde), avec SON moment, SES évènements, sa portée
+//         (ligne / instruction), aucune restriction de colonnes (`UPDATE OF`),
+//         et SA condition WHEN : le même nom recréé `when (false)`, ou pour
+//         UPDATE seulement, n'est plus la même garde ;
 //       • la ligne d'horloge, le réglage, aucune marque de transaction qui
 //         traîne, aucune horloge simulée posée sur la base ou sur un rôle.
 //
@@ -69,15 +78,32 @@ const md5 = (x) => crypto.createHash('md5').update(x).digest('hex');
 const FONCTIONS = {};
 for (const m of sql.matchAll(/create or replace function ([a-z_]+)\.([a-z_]+)\(([\s\S]*?)\bas \$\$([\s\S]*?)\$\$/g)) {
   const entete = m[3];
-  FONCTIONS[m[1] + '.' + m[2]] = { md5: md5(m[4]), def: /\bsecurity definer\b/i.test(entete), sp: /\bset search_path (?:=|to) ''/i.test(entete) };
+  FONCTIONS[m[1] + '.' + m[2]] = { md5: md5(m[4]), def: /\bsecurity definer\b/i.test(entete), sp: /\bset search_path (?:=|to) ''/i.test(entete),
+    vol: /\bimmutable\b/i.test(entete) ? 'i' : /\bstable\b/i.test(entete) ? 's' : 'v' };
 }
 // Celles que le serveur (service_role) exécute : la liste du §4 du fichier.
 const sec4 = sql.slice(sql.indexOf('-- ── 4. '), sql.indexOf('-- ── 5. '));
 const api = /p\.proname in \(([^)]*)\)/.exec(sec4);
 const API = new Set(api ? [...api[1].matchAll(/'([a-z_]+)'/g)].map((x) => 'public.' + x[1]) : []);
-// Les déclencheurs : `create or replace trigger <nom> before|after … on <table> … execute function <fonction>(`.
-const DECLENCHEURS = [...sql.matchAll(/create or replace trigger (\w+)\s+(?:before|after)\s[\s\S]*?\bon\s+(\w+\.\w+)\s[\s\S]*?execute function (\w+\.\w+)\(/g)]
-  .map((m) => m[2] + ':' + m[1] + ':' + m[3]);
+// Les déclencheurs : `create or replace trigger <nom> before|after <évènements> on <table> for each row|statement
+// [when (<condition>)] execute function <fonction>(`. Chacun est attendu TEL QUE le fichier l'écrit : table,
+// nom, fonction, `tgtype` (ligne 1 · avant 2 · insert 4 · delete 8 · update 16 · truncate 32), et sa condition
+// WHEN normalisée (minuscules, sans conversion `::type`, sans espaces ni parenthèses — la même normalisation que
+// celle appliquée au texte que Postgres en redonne, `pg_get_triggerdef`).
+const normWhen = (x) => String(x || '').toLowerCase().replace(/::[a-z_]+/g, '').replace(/[\s()]/g, '');
+const DECLENCHEURS = [...sql.matchAll(/create or replace trigger (\w+)\s+(before|after)\s+([a-z ]+?)\s+on\s+(\w+\.\w+)\s+for each (row|statement)\s+(?:when \(([\s\S]*?)\)\s+)?execute function (\w+\.\w+)\(/g)]
+  .map((m) => {
+    const ev = m[3].split(/\s+or\s+/);
+    const type = (m[5] === 'row' ? 1 : 0) | (m[2] === 'before' ? 2 : 0) | (ev.includes('insert') ? 4 : 0) | (ev.includes('delete') ? 8 : 0)
+      | (ev.includes('update') ? 16 : 0) | (ev.includes('truncate') ? 32 : 0);
+    return m[4] + ':' + m[1] + ':' + m[7] + ':' + type + ':' + normWhen(m[6]);
+  });
+// Chaque `create or replace trigger` du fichier doit avoir été LU : un déclencheur écrit sous une forme que
+// l'expression ne reconnaît pas ne serait jamais vérifié (jamais « ok » par vide).
+const NB_DECLENCHEURS = (sql.match(/create or replace trigger /g) || []).length;
+// L'expression de la FORME : celle du bloc 1c du fichier, relue ici (jamais recopiée : une seule règle).
+const fx = /\n {4}select (coalesce\(\(select string_agg\(x\.attname[\s\S]*?)\n {6}into v\n/.exec(sql);
+const FORME = fx ? fx[1] : null;
 // L'empreinte de chaque table (le bloc 1c du fichier, la MÊME que celle qui refuse une forme ancienne).
 const em = /\$empreinte\$(\{[\s\S]*?\})\$empreinte\$/.exec(sql);
 const EMPREINTE = em ? JSON.parse(em[1]) : {};
@@ -96,7 +122,7 @@ const REGLES = LISIBLES.flatMap((t) => [
   `${t}:abonnement_requis:RESTRICTIVE:ALL:authenticated:(selectvrm_acces_ok()):(selectvrm_acces_ok())`,
   `${t}:agent_lecture_soi:PERMISSIVE:SELECT:authenticated:(owner=(selectauth.uid())):`]).sort();
 const FONCTIONS_ATTENDUES = Object.fromEntries(Object.entries(FONCTIONS).map(([k, f]) => [k,
-  { n: 1, def: f.def, cfg: f.sp ? ['search_path=""'] : null, md5: f.md5, sr: API.has(k), nav: false }]));
+  { n: 1, def: f.def, cfg: f.sp ? ['search_path=""'] : null, vol: f.vol, md5: f.md5, sr: API.has(k), nav: false }]));
 
 // Compter les lignes d'une table qui peut ne pas exister (une version d'avant,
 // une base pas encore installée) : -1 si elle manque, jamais une erreur.
@@ -106,22 +132,21 @@ const norm = (x) => `regexp_replace(regexp_replace(regexp_replace(lower(coalesce
 const etat = `json_build_object(
   'tables', (select count(*) from pg_class where relnamespace = 'public'::regnamespace and relname = any(${tabs}) and relrowsecurity),
   'rls_force', (select count(*) from pg_class where relnamespace = 'public'::regnamespace and relname = any(${tabs}) and relrowsecurity and relforcerowsecurity),
-  'formes', (select json_object_agg(t, (select coalesce((select string_agg(x.attname || ' ' || pg_catalog.format_type(x.atttypid, x.atttypmod) || case when x.attnotnull then ' !' else '' end, ', ' order by x.attnum)
-                       from pg_catalog.pg_attribute x where x.attrelid = c.oid and x.attnum > 0 and not x.attisdropped), '')
-           || ' | ' || coalesce((select string_agg(k.conname, ', ' order by k.conname)
-                                   from pg_catalog.pg_constraint k where k.conrelid = c.oid and k.contype in ('c', 'f', 'p', 'u', 'x')), '')
-      from pg_catalog.pg_class c where c.oid = pg_catalog.to_regclass('public.' || t))) from unnest(${tabs}) t),
+  'formes', ${FORME ? `(select json_object_agg(t, (select ${FORME}
+      from pg_catalog.pg_class c where c.oid = pg_catalog.to_regclass('public.' || t))) from unnest(${tabs}) t)` : 'null'},
   'droits', (select coalesce(json_agg(r || ':' || c.relname || ':' || p order by (r || ':' || c.relname || ':' || p) collate "C"), '[]') from pg_class c,
              unnest(array['anon', 'authenticated', 'service_role']) r,
              unnest(case when current_setting('server_version_num')::int >= 170000
                          then array['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER', 'MAINTAIN']
                          else array['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER'] end) p
              where c.relnamespace = 'public'::regnamespace and c.relname = any(${tabs}) and has_table_privilege(r, c.oid, p)),
+  'droits_colonnes', (select json_agg(c.relname || '.' || a.attname || ':' || a.attacl::text order by c.relname, a.attnum) from pg_attribute a join pg_class c on c.oid = a.attrelid
+                      where c.relnamespace = 'public'::regnamespace and c.relname = any(${tabs}) and a.attnum > 0 and a.attacl is not null),
   'sequence', (select json_agg(r || ':' || p) from pg_class c, unnest(array['anon', 'authenticated', 'service_role']) r, unnest(array['USAGE', 'SELECT', 'UPDATE']) p
                where c.oid = to_regclass('public.vrm_agent_journal_id_seq') and has_sequence_privilege(r, c.oid, p)),
   'regles', (select coalesce(json_agg(s order by s collate "C"), '[]') from (select tablename || ':' || policyname || ':' || permissive || ':' || cmd || ':' || array_to_string(roles, ',') || ':' || ${norm('qual')} || ':' || ${norm('with_check')} s
              from pg_policies where schemaname = 'public' and tablename = any(${tabs})) z),
-  'fonctions', (select json_object_agg(q, (select json_build_object('n', count(*), 'def', bool_and(p.prosecdef), 'cfg', (array_agg(to_jsonb(p.proconfig)))[1], 'md5', (array_agg(md5(p.prosrc)))[1],
+  'fonctions', (select json_object_agg(q, (select json_build_object('n', count(*), 'def', bool_and(p.prosecdef), 'cfg', (array_agg(to_jsonb(p.proconfig)))[1], 'vol', (array_agg(p.provolatile::text))[1], 'md5', (array_agg(md5(p.prosrc)))[1],
                                             'sr', bool_and(has_function_privilege('service_role', p.oid, 'execute')),
                                             'nav', bool_or(has_function_privilege('anon', p.oid, 'execute') or has_function_privilege('authenticated', p.oid, 'execute')))
                                          from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname || '.' || p.proname = q))
@@ -130,7 +155,9 @@ const etat = `json_build_object(
                    where not exists (select 1 from pg_trigger tg join pg_class c on c.oid = tg.tgrelid join pg_namespace cn on cn.oid = c.relnamespace
                                        join pg_proc p on p.oid = tg.tgfoid join pg_namespace pn on pn.oid = p.pronamespace
                                       where not tg.tgisinternal and tg.tgenabled = 'O'
-                                        and cn.nspname || '.' || c.relname || ':' || tg.tgname || ':' || pn.nspname || '.' || p.proname = e)),
+                                        and cn.nspname || '.' || c.relname || ':' || tg.tgname || ':' || pn.nspname || '.' || p.proname
+                                            || ':' || tg.tgtype::int || ':' || regexp_replace(regexp_replace(lower(coalesce(substring(pg_get_triggerdef(tg.oid) from ' WHEN \\((.*)\\) EXECUTE '), '')), '::[a-z_]+', '', 'g'), '[\\s()]', '', 'g') = e
+                                        and tg.tgattr::text = '' and tg.tgnargs = 0)),
   'horloge', ${compte('public.vrm_agent_horloge', 'id = 1')},
   'agent_ebay', (select valeur from public.vrm_reglages where cle = 'agent_ebay'),
   'marques', ${compte('public.vrm_agent_marques', 'true')},
@@ -144,10 +171,11 @@ const etat = `json_build_object(
 if (process.argv.includes('--verifier')) {
   const parties = {
     // Un fichier sans empreinte (une version d'avant) ne peut rien vérifier : jamais « ok » par vide.
-    empreinte: TABLES.length > 0 && Object.keys(FONCTIONS).length > 0 && DECLENCHEURS.length > 0 ? 'true' : 'false',
+    empreinte: TABLES.length > 0 && Object.keys(FONCTIONS).length > 0 && DECLENCHEURS.length > 0 && DECLENCHEURS.length === NB_DECLENCHEURS && FORME ? 'true' : 'false',
     rls: `(e.j ->> 'tables')::int = ${TABLES.length} and (e.j ->> 'rls_force')::int = ${TABLES.length}`,
     formes: `(e.j -> 'formes')::jsonb = ${lit(JSON.stringify(EMPREINTE))}::jsonb`,
     droits: `(e.j -> 'droits')::jsonb = ${lit(JSON.stringify([...DROITS].sort()))}::jsonb`,
+    droits_colonnes: `(e.j ->> 'droits_colonnes') is null`,
     sequence: `(e.j ->> 'sequence') is null`,
     regles: `(e.j -> 'regles')::jsonb = ${lit(JSON.stringify(REGLES))}::jsonb`,
     fonctions: `(e.j -> 'fonctions')::jsonb = ${lit(JSON.stringify(FONCTIONS_ATTENDUES))}::jsonb`,

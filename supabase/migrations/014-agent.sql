@@ -27,7 +27,13 @@
 --   • l'HORLOGE à « -infinity » : jamais un NULL qui ferait ignorer chaque
 --     battement pour toujours [D14] ;
 --   • une PIERRE TOMBALE : « Fermer mon compte » ferme aussi la porte — plus rien
---     ne s'écrit au nom d'un vendeur effacé, même par un battement en vol ;
+--     ne s'écrit au nom d'un vendeur effacé, même par un battement en vol.
+--     L'effacement et les écrivains d'un même vendeur sont SÉRIALISÉS par un
+--     verrou consultatif (exclusif pour effacer, partagé pour écrire, pris AVANT
+--     toute lecture de la pierre tombale) : une écriture en vol finit avant
+--     l'effacement et part avec le reste ; une écriture qui arrive pendant
+--     attend, puis voit la pierre tombale. Et une ligne qui resterait malgré
+--     tout ne fait jamais échouer le battement des AUTRES vendeurs ;
 --   • la GARDE d'écriture sur `ebay_tokens*` : plus aucun navigateur ne peut
 --     écrire, réécrire ni effacer un jeton eBay (§5.1) ;
 --   • R18 en base, sur ce qui a une FORME : codes, noms de clés eBay, aucune clé
@@ -39,7 +45,12 @@
 -- `vrm.horloge_simulee = '1'` (que l'API ne sait pas poser), c'est l'heure du
 -- SERVEUR qui compte, quoi que dise l'appelant. Une heure fausse (millisecondes
 -- lues en secondes, fuseau mal lu) ne peut donc ni arrêter l'horloge, ni purger
--- le journal et les mémos, ni voler un bail.
+-- le journal et les mémos, ni voler un bail. Et les DURÉES et ÉCHÉANCES reçues
+-- sont bornées en base : un bail de plus de 10 minutes (120 000 « secondes »
+-- qui étaient des millisecondes) est REFUSÉ, jamais posé — il gèlerait un
+-- compte eBay 33 h — ; une prochaine fois ou une sonnette à plus d'un an est
+-- refusée — elle ferait disparaître une veille sans qu'elle soit « manquante ».
+-- Refusé, jamais réduit en silence : l'appelant le voit (false, NULL, rien).
 --
 -- QUI LIT, QUI ÉCRIT :
 --   • lisibles par LEUR vendeur (RLS `owner = auth.uid()` + la restrictive
@@ -63,7 +74,12 @@
 -- ⚠️ AUCUN `DROP` dans ce fichier (l'outil SQL attend une confirmation humaine
 --    pour un DROP). Réinstaller le fichier une seconde fois ne lève rien et ne
 --    touche aucune donnée ; une table déjà là sous une AUTRE forme (une version
---    plus ancienne de ce fichier) fait tout refuser (`vrm_agent_forme`).
+--    plus ancienne de ce fichier, y compris une contrainte du même NOM mais d'un
+--    autre texte) fait tout refuser (`vrm_agent_forme`).
+-- ⚠️ Les fonctions qui écrivent exigent READ COMMITTED (le défaut de PostgREST
+--    et de Supabase) : la sérialisation avec l'effacement repose sur une
+--    relecture APRÈS le verrou, qu'une transaction REPEATABLE READ ne fait pas.
+--    Sous un autre niveau, elles refusent (`vrm_agent_isolation`).
 -- ⚠️ « Fermer mon compte » (api/compte.js) devra appeler
 --    `vrm_agent_effacer_vendeur(owner)` dès que l'agent écrit quelque chose :
 --    le journal refuse toute autre suppression (voir §5).
@@ -313,43 +329,54 @@ create table if not exists public.vrm_agent_marques (        -- les marques de T
 -- 1c. LA FORME. `create table if not exists` SAUTE en silence une table déjà là
 --     sous une autre forme (une version plus ancienne de ce fichier) : l'erreur
 --     n'apparaîtrait qu'à l'exécution (« column f.reveil does not exist »). On
---     compare donc chaque table à son empreinte (colonnes, types, NOT NULL, noms
---     des contraintes) : un écart fait tout refuser, rien n'est installé.
---     `essai-annule.cjs --verifier` relit la MÊME empreinte dans ce fichier.
+--     compare donc chaque table à son empreinte (colonnes, types, NOT NULL, et
+--     chaque contrainte : son NOM et une empreinte de son TEXTE, md5 de
+--     `pg_get_constraintdef` sans « public. ») : un écart fait tout refuser,
+--     rien n'est installé. Le NOM seul ne suffisait pas : une table d'avant dont
+--     la contrainte R18 du même nom vaut `check (true)` était réutilisée en
+--     silence, et la 014 corrigée, réappliquée, la gardait.
+--     `essai-annule.cjs --verifier` relit la MÊME empreinte ET la MÊME expression
+--     (celle qui suit `select`, jusqu'à `into v`) dans ce fichier.
+--     ⚠️ Changer une contrainte change son empreinte : l'installation neuve de
+--     l'audit refuse alors en donnant la nouvelle valeur (`detail`), à recopier
+--     ici. Mesurée identique en Postgres 16.14 et 17.6.
 do $$
 declare
   attendu constant jsonb := $empreinte${
-    "vrm_agent_vendeurs": "owner uuid !, actif boolean !, reglages jsonb !, reglages_version integer !, repetition jsonb !, pouls jsonb !, reverif_jusqua timestamp with time zone, maj timestamp with time zone ! | vrm_agent_vendeurs_formes, vrm_agent_vendeurs_pkey",
-    "vrm_agent_commandes": "owner uuid !, plateforme text !, compte text !, commande text !, etape text !, rang integer !, branche text, numero text, voie text, limite timestamp with time zone, transporteur text, suivi text, etape_colis text, colis_le timestamp with time zone, en_cours jsonb, politique_etiquette text, pays text, pickup boolean, reference_programme boolean, cles_shipto text[], version integer !, maj timestamp with time zone !, data jsonb ! | vrm_agent_commandes_codes, vrm_agent_commandes_data, vrm_agent_commandes_en_cours, vrm_agent_commandes_pays, vrm_agent_commandes_pkey, vrm_agent_commandes_politique, vrm_agent_commandes_rang, vrm_agent_commandes_shipto",
-    "vrm_agent_journal": "id bigint !, owner uuid !, compte text, at timestamp with time zone !, geste text !, cible text, numero text, resultat text !, centimes integer, texte text, ref text, source text, defaire jsonb, texte_retire_le timestamp with time zone | vrm_agent_journal_codes, vrm_agent_journal_defaire, vrm_agent_journal_pkey, vrm_agent_journal_resultat, vrm_agent_journal_texte",
-    "vrm_agent_file": "owner uuid !, cle text !, groupe text !, prochain timestamp with time zone !, bail_jeton uuid, bail_jusqua timestamp with time zone, essais integer !, raison text, reveil timestamp with time zone | vrm_agent_file_bail, vrm_agent_file_codes, vrm_agent_file_essais, vrm_agent_file_pkey",
-    "vrm_agent_compteurs": "owner uuid !, cle text !, n integer !, centimes bigint !, maj timestamp with time zone ! | vrm_agent_compteurs_pkey, vrm_agent_compteurs_positifs",
-    "vrm_agent_vus": "owner uuid !, cle text !, at timestamp with time zone ! | vrm_agent_vus_pkey",
-    "vrm_agent_memos": "owner uuid !, cle text !, at timestamp with time zone !, expire timestamp with time zone ! | vrm_agent_memos_cent_jours, vrm_agent_memos_pkey",
-    "vrm_agent_routes": "k text !, owner uuid !, compte text, fournisseur text !, cree timestamp with time zone !, revoque timestamp with time zone | vrm_agent_routes_opaque, vrm_agent_routes_pkey",
-    "vrm_agent_horloge": "id integer !, dernier_tic timestamp with time zone !, dernier_battement timestamp with time zone !, dernier_succes timestamp with time zone ! | vrm_agent_horloge_id_check, vrm_agent_horloge_pkey",
-    "vrm_ebay_cles_publiques": "kid text !, pem text !, lu timestamp with time zone ! | vrm_ebay_cles_publiques_pkey",
-    "vrm_coffre": "owner uuid !, compte text !, fournisseur text !, v integer !, nonce bytea !, chiffre bytea !, tag bytea !, etat text, teste_le timestamp with time zone, maj timestamp with time zone ! | vrm_coffre_gcm, vrm_coffre_pkey",
-    "vrm_ebay_titulaires": "cle_ebay text !, owner uuid !, compte text !, depuis timestamp with time zone ! | vrm_ebay_titulaires_cle, vrm_ebay_titulaires_libelle, vrm_ebay_titulaires_pkey",
-    "vrm_ebay_annonces_index": "listing_id text !, owner uuid !, compte text !, maj timestamp with time zone ! | vrm_ebay_annonces_index_id, vrm_ebay_annonces_index_pkey",
-    "vrm_agent_preuves": "owner uuid !, numero_cle text !, source text !, ref text !, vue_le timestamp with time zone ! | vrm_agent_preuves_non_vides, vrm_agent_preuves_pkey",
-    "vrm_agent_effaces": "owner uuid !, le timestamp with time zone ! | vrm_agent_effaces_pkey",
-    "vrm_agent_marques": "xid bigint !, quoi text !, owner uuid, avant timestamp with time zone | vrm_agent_marques_pkey, vrm_agent_marques_quoi"
+    "vrm_agent_vendeurs": "owner uuid !, actif boolean !, reglages jsonb !, reglages_version integer !, repetition jsonb !, pouls jsonb !, reverif_jusqua timestamp with time zone, maj timestamp with time zone ! | vrm_agent_vendeurs_formes=116a432ad517, vrm_agent_vendeurs_pkey=27e717ec98bb",
+    "vrm_agent_commandes": "owner uuid !, plateforme text !, compte text !, commande text !, etape text !, rang integer !, branche text, numero text, voie text, limite timestamp with time zone, transporteur text, suivi text, etape_colis text, colis_le timestamp with time zone, en_cours jsonb, politique_etiquette text, pays text, pickup boolean, reference_programme boolean, cles_shipto text[], version integer !, maj timestamp with time zone !, data jsonb ! | vrm_agent_commandes_codes=72cca1e8327d, vrm_agent_commandes_data=4afe548af558, vrm_agent_commandes_en_cours=2f87c2de3319, vrm_agent_commandes_pays=9319441f18df, vrm_agent_commandes_pkey=170543a69c79, vrm_agent_commandes_politique=7894c5f9f28a, vrm_agent_commandes_rang=7e059deb9fcf, vrm_agent_commandes_shipto=dd7b4d471160",
+    "vrm_agent_journal": "id bigint !, owner uuid !, compte text, at timestamp with time zone !, geste text !, cible text, numero text, resultat text !, centimes integer, texte text, ref text, source text, defaire jsonb, texte_retire_le timestamp with time zone | vrm_agent_journal_codes=b9fc37f3acbf, vrm_agent_journal_defaire=39dbf5eb5a8f, vrm_agent_journal_pkey=4c6419b37043, vrm_agent_journal_resultat=c566ce4cf418, vrm_agent_journal_texte=ce061b28c3d1",
+    "vrm_agent_file": "owner uuid !, cle text !, groupe text !, prochain timestamp with time zone !, bail_jeton uuid, bail_jusqua timestamp with time zone, essais integer !, raison text, reveil timestamp with time zone | vrm_agent_file_bail=3817e0d52e2e, vrm_agent_file_codes=700ff24e9934, vrm_agent_file_essais=825e629b238d, vrm_agent_file_pkey=8b2a24b5e6f0",
+    "vrm_agent_compteurs": "owner uuid !, cle text !, n integer !, centimes bigint !, maj timestamp with time zone ! | vrm_agent_compteurs_pkey=8b2a24b5e6f0, vrm_agent_compteurs_positifs=ed89b41ebeb1",
+    "vrm_agent_vus": "owner uuid !, cle text !, at timestamp with time zone ! | vrm_agent_vus_pkey=8b2a24b5e6f0",
+    "vrm_agent_memos": "owner uuid !, cle text !, at timestamp with time zone !, expire timestamp with time zone ! | vrm_agent_memos_cent_jours=f635393ea0c2, vrm_agent_memos_pkey=8b2a24b5e6f0",
+    "vrm_agent_routes": "k text !, owner uuid !, compte text, fournisseur text !, cree timestamp with time zone !, revoque timestamp with time zone | vrm_agent_routes_opaque=3206f2ef3bc9, vrm_agent_routes_pkey=606573f57e77",
+    "vrm_agent_horloge": "id integer !, dernier_tic timestamp with time zone !, dernier_battement timestamp with time zone !, dernier_succes timestamp with time zone ! | vrm_agent_horloge_id_check=d1e072e92488, vrm_agent_horloge_pkey=4c6419b37043",
+    "vrm_ebay_cles_publiques": "kid text !, pem text !, lu timestamp with time zone ! | vrm_ebay_cles_publiques_pkey=025f593b821c",
+    "vrm_coffre": "owner uuid !, compte text !, fournisseur text !, v integer !, nonce bytea !, chiffre bytea !, tag bytea !, etat text, teste_le timestamp with time zone, maj timestamp with time zone ! | vrm_coffre_gcm=f9deb2479952, vrm_coffre_pkey=10dd5d77e957",
+    "vrm_ebay_titulaires": "cle_ebay text !, owner uuid !, compte text !, depuis timestamp with time zone ! | vrm_ebay_titulaires_cle=d7f6901371c6, vrm_ebay_titulaires_libelle=a15d21d09601, vrm_ebay_titulaires_pkey=191afbc59980",
+    "vrm_ebay_annonces_index": "listing_id text !, owner uuid !, compte text !, maj timestamp with time zone ! | vrm_ebay_annonces_index_id=6fa9b0ceaf82, vrm_ebay_annonces_index_pkey=389f0ae8d81d",
+    "vrm_agent_preuves": "owner uuid !, numero_cle text !, source text !, ref text !, vue_le timestamp with time zone ! | vrm_agent_preuves_non_vides=89d175d462fd, vrm_agent_preuves_pkey=1394297198fe",
+    "vrm_agent_effaces": "owner uuid !, le timestamp with time zone ! | vrm_agent_effaces_pkey=27e717ec98bb",
+    "vrm_agent_marques": "xid bigint !, quoi text !, owner uuid, avant timestamp with time zone | vrm_agent_marques_pkey=256d2282284a, vrm_agent_marques_quoi=161592d72c4f"
   }$empreinte$;
   t text;
   a text;
   v text;
+  d text;
 begin
   for t, a in select e.key, e.value from jsonb_each_text(attendu) e loop
     select coalesce((select string_agg(x.attname || ' ' || pg_catalog.format_type(x.atttypid, x.atttypmod) || case when x.attnotnull then ' !' else '' end, ', ' order by x.attnum)
                        from pg_catalog.pg_attribute x where x.attrelid = c.oid and x.attnum > 0 and not x.attisdropped), '')
-           || ' | ' || coalesce((select string_agg(k.conname, ', ' order by k.conname)
+           || ' | ' || coalesce((select string_agg(k.conname || '=' || pg_catalog.substr(pg_catalog.md5(pg_catalog.replace(pg_catalog.pg_get_constraintdef(k.oid), 'public.', '')), 1, 12), ', ' order by k.conname)
                                    from pg_catalog.pg_constraint k where k.conrelid = c.oid and k.contype in ('c', 'f', 'p', 'u', 'x')), '')
       into v
       from pg_catalog.pg_class c where c.oid = pg_catalog.to_regclass('public.' || t);
     if v is distinct from a then
+      select pg_catalog.string_agg(k.conname || ' ' || pg_catalog.pg_get_constraintdef(k.oid), ' · ' order by k.conname) into d
+        from pg_catalog.pg_constraint k where k.conrelid = pg_catalog.to_regclass('public.' || t) and k.contype in ('c', 'f', 'p', 'u', 'x');
       raise exception using errcode = 'P0001', message = 'vrm_agent_forme',
-        detail = 'public.' || t || ' existe déjà sous une autre forme : ' || coalesce(v, '(absente)'),
+        detail = 'public.' || t || ' existe déjà sous une autre forme : ' || coalesce(v, '(absente)') || ' — contraintes en place : ' || coalesce(d, '(aucune)'),
         hint = 'attendu : ' || a || ' — rien n''est installé ; à trancher à la main (jamais par un DROP en tâche de fond).';
     end if;
   end loop;
@@ -417,14 +444,37 @@ as $$
 $$;
 
 -- 3·1. La PIERRE TOMBALE : ce vendeur a fermé son compte. Une aide interne.
+--      Elle prend D'ABORD le verrou PARTAGÉ du vendeur — « Fermer mon compte »
+--      prend le même en EXCLUSIF (§3r) — PUIS relit la pierre tombale :
+--        • un écrivain déjà en vol tient le verrou : l'effacement l'attend, et
+--          ses lignes partent avec le reste ;
+--        • un écrivain qui arrive pendant l'effacement attend, puis VOIT la
+--          pierre tombale (validée) et refuse.
+--      Lue sans ce verrou, la pierre tombale n'était visible qu'au COMMIT de
+--      l'effacement : une sonnette ou une ligne de journal écrite pendant ces
+--      quelques secondes survivait (le texte de l'acheteur compris), et une
+--      tâche orpheline faisait échouer `prendre` pour TOUS les vendeurs.
+--      ⚠️ VOLATILE et plpgsql, exprès : chaque instruction y prend un instantané
+--      NEUF (READ COMMITTED), donc la lecture qui suit le verrou voit ce qui a
+--      été validé pendant l'attente. STABLE, elle relirait l'instantané d'AVANT
+--      l'attente (`--verifier` contrôle la volatilité). Pour la même raison, une
+--      transaction REPEATABLE READ ou SERIALIZABLE est refusée.
 create or replace function public.vrm_agent_efface(p_owner uuid)
 returns boolean
-language sql
-stable
+language plpgsql
+volatile
 security definer
 set search_path = ''
 as $$
-  select exists (select 1 from public.vrm_agent_effaces e where e.owner = p_owner)
+begin
+  if p_owner is null then return false; end if;
+  if pg_catalog.current_setting('transaction_isolation') <> 'read committed' then
+    raise exception using errcode = 'P0001', message = 'vrm_agent_isolation',
+      detail = 'L''agent écrit en READ COMMITTED (le défaut de PostgREST) : sous un autre niveau, la pierre tombale serait relue sur un instantané d''avant le verrou.';
+  end if;
+  perform pg_catalog.pg_advisory_xact_lock_shared(pg_catalog.hashtext('vrm_agent_vendeur'), pg_catalog.hashtext(p_owner::text));
+  return exists (select 1 from public.vrm_agent_effaces e where e.owner = p_owner);
+end
 $$;
 
 -- 3a. PRENDRE des tâches dues. ≤ 2 par vendeur, ≤ 1 par groupe (compte eBay),
@@ -437,6 +487,12 @@ $$;
 --     les autres comptes passent dans le même battement.
 --     Seule la ligne PRISE est verrouillée, et `skip locked` : un battement ne
 --     bloque JAMAIS derrière un autre (ni derrière un clic qui tient sa tâche).
+--     Un vendeur EFFACÉ (pierre tombale) n'est jamais candidat, et un vendeur en
+--     cours d'effacement (verrou exclusif tenu ou demandé) est sauté sans
+--     attendre : une ligne restée à son nom ne fait JAMAIS échouer le battement
+--     des autres vendeurs (elle levait `vrm_vendeur_efface` pour tout le monde).
+--     Le bail est BORNÉ : 1 à 600 s. Au-delà, rien n'est pris (120 000
+--     « secondes » qui étaient des millisecondes geleraient un compte 33 h).
 create or replace function public.vrm_agent_prendre(p_lim integer, p_jeton uuid, p_bail_s integer, p_maintenant timestamptz default now())
 returns table (owner uuid, cle text, groupe text, essais integer, raison text)
 language plpgsql
@@ -453,7 +509,7 @@ declare
   groupes text[] := '{}';
   k text;
 begin
-  if p_jeton is null or p_lim is null or p_lim < 1 or p_bail_s is null or p_bail_s < 1 then
+  if p_jeton is null or p_lim is null or p_lim < 1 or p_bail_s is null or p_bail_s < 1 or p_bail_s > 600 then
     return;
   end if;
   for c in
@@ -464,6 +520,7 @@ begin
          and coalesce(f.bail_jusqua, '-infinity'::timestamptz) < maintenant
          and not exists (select 1 from public.vrm_agent_file g
                           where g.owner = f.owner and g.groupe = f.groupe and g.bail_jusqua >= maintenant)
+         and not exists (select 1 from public.vrm_agent_effaces e where e.owner = f.owner)
     ), une_par_groupe as (
       select distinct on (d.owner, d.groupe) d.owner, d.cle, d.groupe, d.prochain
         from dues d
@@ -483,6 +540,11 @@ begin
     k := c.owner::text || '|' || c.groupe;
     continue when k = any (groupes);
     continue when coalesce((par_vendeur ->> c.owner::text)::integer, 0) >= 2;
+    -- Le vendeur d'abord : verrou PARTAGÉ sans attendre (un effacement en cours
+    -- ⇒ on passe, sans avoir pris le verrou de son compte), puis la pierre
+    -- tombale relue APRÈS ce verrou.
+    continue when not pg_catalog.pg_try_advisory_xact_lock_shared(pg_catalog.hashtext('vrm_agent_vendeur'), pg_catalog.hashtext(c.owner::text));
+    continue when exists (select 1 from public.vrm_agent_effaces e where e.owner = c.owner);
     continue when not pg_catalog.pg_try_advisory_xact_lock(pg_catalog.hashtext('vrm_agent_groupe'), pg_catalog.hashtext(k));
     continue when exists (select 1 from public.vrm_agent_file g
                            where g.owner = c.owner and g.groupe = c.groupe and g.cle <> c.cle
@@ -513,7 +575,8 @@ $$;
 --     R8], sous la MÊME règle de compte : tâche tenue, ou AUTRE tâche du même
 --     compte eBay en vol (un battement, un autre clic) ⇒ false : la route
 --     répond 409 « l'agent travaille sur ce compte eBay ». Tâche absente : elle
---     est créée tenue si l'appelant donne son groupe.
+--     est créée tenue si l'appelant donne son groupe. Bail borné (1 à 600 s) :
+--     au-delà, false.
 create or replace function public.vrm_agent_prendre_cle(p_owner uuid, p_cle text, p_jeton uuid, p_bail_s integer,
                                                         p_maintenant timestamptz default now(), p_groupe text default null)
 returns boolean
@@ -526,7 +589,7 @@ declare
   maintenant timestamptz := public.vrm_agent_heure(p_maintenant);
   grp text;
 begin
-  if p_owner is null or p_cle is null or p_jeton is null or p_bail_s is null or p_bail_s < 1
+  if p_owner is null or p_cle is null or p_jeton is null or p_bail_s is null or p_bail_s < 1 or p_bail_s > 600
      or public.vrm_agent_efface(p_owner) then
     return false;
   end if;
@@ -562,6 +625,10 @@ $$;
 --     sonnette en attente (`reveil`). « Pas de prochaine fois » sans « fini », ou
 --     un échec, la GARDE (dans 15 min) : « pas su » ne détruit jamais une tâche.
 --     La raison est un CODE : une réponse brute devient « raison-illisible ».
+--     Une prochaine fois à plus d'un an (« dans 15 min » écrit en millisecondes :
+--     l'an 58 748) est REFUSÉE (false) : la tâche reste tenue, et revient à la
+--     fin de son bail (≤ 10 min) — jamais une veille rangée hors du temps, que
+--     le secours ne recréerait pas puisqu'elle n'est pas « manquante ».
 create or replace function public.vrm_agent_rendre(p_owner uuid, p_cle text, p_jeton uuid, p_prochain timestamptz,
                                                    p_echec boolean default false, p_raison text default null,
                                                    p_fini boolean default false, p_maintenant timestamptz default now())
@@ -576,7 +643,10 @@ declare
   r public.vrm_agent_file%rowtype;
   fini boolean := coalesce(p_fini, false) and p_prochain is null and not coalesce(p_echec, false);
 begin
-  if p_owner is null or p_cle is null or p_jeton is null then return false; end if;
+  if p_owner is null or p_cle is null or p_jeton is null or p_prochain > maintenant + interval '1 year'
+     or public.vrm_agent_efface(p_owner) then
+    return false;
+  end if;
   select * into r from public.vrm_agent_file f
    where f.owner = p_owner and f.cle = p_cle and f.bail_jeton = p_jeton
      for update;
@@ -603,7 +673,9 @@ $$;
 -- 3d. PLANIFIER « au plus tard à `p_quand` » : ne recule jamais une échéance,
 --     ne vole jamais un bail. Si la tâche est TENUE (bail vivant, ou expiré mais
 --     pas encore repris : un appel lent peut encore rendre « dans 6 h »), la
---     sonnette est gardée dans `reveil` et `rendre` la respecte.
+--     sonnette est gardée dans `reveil` et `rendre` la respecte. Une échéance à
+--     plus d'un an est refusée (NULL) : une tâche neuve rangée en l'an 58 748
+--     ne serait jamais « manquante », donc jamais recréée par le secours.
 create or replace function public.vrm_agent_planifier(p_owner uuid, p_cle text, p_groupe text, p_quand timestamptz,
                                                       p_maintenant timestamptz default now())
 returns timestamptz
@@ -612,9 +684,12 @@ volatile
 security definer
 set search_path = ''
 as $$
-declare p timestamptz;
+declare
+  maintenant timestamptz := public.vrm_agent_heure(p_maintenant);
+  p timestamptz;
 begin
-  if p_owner is null or p_cle is null or p_groupe is null or p_quand is null or public.vrm_agent_efface(p_owner) then
+  if p_owner is null or p_cle is null or p_groupe is null or p_quand is null or p_quand > maintenant + interval '1 year'
+     or public.vrm_agent_efface(p_owner) then
     return null;
   end if;
   insert into public.vrm_agent_file as f (owner, cle, groupe, prochain)
@@ -837,7 +912,7 @@ declare
   k text;
   c bigint;
 begin
-  if p_owner is null or p_reservation is null then return false; end if;
+  if p_owner is null or p_reservation is null or public.vrm_agent_efface(p_owner) then return false; end if;
   delete from public.vrm_agent_compteurs x
    where x.owner = p_owner and x.cle like 'resa:' || p_reservation::text || '|%'
   returning x.cle, x.centimes into k, c;
@@ -879,6 +954,10 @@ begin
     return false;
   end if;
   if p_priorite <> 'obligation' and p_owner is null then return false; end if;
+  -- Le verrou du vendeur AVANT le compteur `cc` (qui le NOMME, sous le neutre,
+  -- où le déclencheur de la pierre tombale ne le voit pas) : un effacement
+  -- attend la fin de cet appel, et efface son compteur avec le reste ; un appel
+  -- qui arrive pendant l'effacement attend, puis est refusé sans rien écrire.
   if p_owner is not null and public.vrm_agent_efface(p_owner) then return false; end if;
   lim := floor(p_plafond * seuil)::integer;
   if p_priorite <> 'obligation' then
@@ -964,7 +1043,9 @@ declare
   maintenant timestamptz := public.vrm_agent_heure(p_maintenant);
   n integer;
 begin
-  if p_owner is null or p_cible is null or p_cible = '' then return 0; end if;
+  -- Le verrou du vendeur d'abord (comme tout écrivain) : un vendeur effacé n'a
+  -- plus aucune ligne, il n'y a rien à retirer.
+  if p_owner is null or p_cible is null or p_cible = '' or public.vrm_agent_efface(p_owner) then return 0; end if;
   update public.vrm_agent_journal j set texte = null, ref = null, defaire = null, texte_retire_le = maintenant
    where j.owner = p_owner and j.cible = p_cible
      and (j.texte is not null or j.ref is not null or j.defaire is not null);
@@ -1150,8 +1231,16 @@ end
 $$;
 
 -- 3r. EFFACER tout ce que l'agent garde d'un vendeur (« Fermer mon compte »).
---     D'ABORD la pierre tombale : un battement en vol ne peut plus rien écrire à
---     son nom (journal, tâches, mémos, coffre…). Puis ses tâches, commandes,
+--     D'ABORD le verrou EXCLUSIF du vendeur : il attend la fin de chaque
+--     écrivain en vol (tous prennent le même verrou PARTAGÉ avant d'écrire,
+--     §3·1 et §8) — leurs lignes, validées, partent avec le reste — et chaque
+--     écrivain qui arrive ensuite attend la fin de l'effacement, puis voit la
+--     pierre tombale. Chaque suppression relit APRÈS ce verrou (plpgsql
+--     VOLATILE, READ COMMITTED exigé). Puis la pierre tombale : un battement en
+--     vol ne peut plus rien écrire à son nom (journal, tâches, mémos, coffre…).
+--     ⚠️ Sans ce verrou, la pierre tombale n'était visible qu'au COMMIT : une
+--     sonnette ou une ligne de journal écrite pendant l'effacement restait, et
+--     « Fermer mon compte » rendait « fait ». Puis ses tâches, commandes,
 --     journal, compteurs (et les quotas par compte qui le nomment, sous le
 --     neutre), mémos à son nom, vus, routes, coffre, titulaires (son compte eBay
 --     redevient libre), index, preuves, réglages. Les mémos GLOBAUX restent : ils
@@ -1170,6 +1259,11 @@ declare
   tx bigint := pg_catalog.txid_current();
 begin
   if p_owner is null or p_owner = '00000000-0000-0000-0000-000000000000' then return null; end if;
+  if pg_catalog.current_setting('transaction_isolation') <> 'read committed' then
+    raise exception using errcode = 'P0001', message = 'vrm_agent_isolation',
+      detail = 'Effacer un vendeur exige READ COMMITTED : chaque suppression relit ce que les écrivains ont validé pendant l''attente du verrou.';
+  end if;
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext('vrm_agent_vendeur'), pg_catalog.hashtext(p_owner::text));
   insert into public.vrm_agent_effaces (owner, le) values (p_owner, pg_catalog.now()) on conflict (owner) do nothing;
   insert into public.vrm_agent_marques (xid, quoi, owner) values (tx, 'effacer', p_owner)
   on conflict (xid, quoi) do update set owner = excluded.owner;
@@ -1232,7 +1326,8 @@ begin
      set data = jsonb_strip_nulls(jsonb_build_object('bordereau', c.data -> 'bordereau', 'preuve', c.data -> 'preuve',
                                                      'compactee', to_jsonb(maintenant))),
          version = c.version + 1
-   where c.etape = 'close' and c.maj < maintenant - interval '90 days' and not (c.data ? 'compactee');
+   where c.etape = 'close' and c.maj < maintenant - interval '90 days' and not (c.data ? 'compactee')
+     and not exists (select 1 from public.vrm_agent_effaces e where e.owner = c.owner);
   get diagnostics n = row_count; r := r || jsonb_build_object('compactees', n);
   if to_regclass('cron.job_run_details') is not null then
     begin
@@ -1384,14 +1479,33 @@ create or replace trigger vrm_noter_ecriture after insert or update on public.vr
 -- nom d'un vendeur effacé, que ce soit par une fonction (un battement qui était
 -- en vol) ou par une écriture directe du serveur (pouls, coffre, vus, routes).
 -- Les fonctions refusent déjà proprement ; ce déclencheur tient le reste.
+--   • Une NOUVELLE ligne à son nom (INSERT, ou UPDATE qui change le
+--     propriétaire) prend le verrou PARTAGÉ du vendeur (`vrm_agent_efface`) :
+--     une écriture directe en vol fait attendre l'effacement, qui la voit et
+--     l'efface ; une écriture qui arrive pendant attend, puis est refusée. Le
+--     déclencheur passe AVANT l'attente sur un conflit de clé : sans ce verrou,
+--     une insertion attendait la fin de l'effacement… puis réinsérait la ligne.
+--   • Un UPDATE d'une ligne existante sans changer son propriétaire ne crée rien
+--     qu'un effacement ne voie (il attend la ligne, puis l'efface) : on ne relit
+--     que la pierre tombale validée, SANS verrou — un verrou pris après celui de
+--     la ligne pourrait se croiser avec l'effacement (interblocage).
 create or replace function public.vrm_agent_refuser_efface()
 returns trigger
 language plpgsql
 security definer
 set search_path = ''
 as $$
+declare
+  efface boolean;
 begin
-  if public.vrm_agent_efface(new.owner) then
+  if tg_op = 'INSERT' then
+    efface := public.vrm_agent_efface(new.owner);
+  elsif new.owner is distinct from old.owner then
+    efface := public.vrm_agent_efface(new.owner);
+  else
+    efface := exists (select 1 from public.vrm_agent_effaces e where e.owner = new.owner);
+  end if;
+  if efface then
     raise exception using errcode = 'P0001', message = 'vrm_vendeur_efface',
       detail = 'Ce vendeur a fermé son compte : l''agent n''écrit plus rien à son nom.';
   end if;

@@ -32,6 +32,16 @@
 //  R18 tient sur ce qui a une forme ; un navigateur ne lit QUE ses lignes,
 //  n'écrit RIEN (TRUNCATE compris), ne touche jamais `ebay_tokens*` ; qui ne
 //  paie plus ne voit plus rien ; et `--verifier` voit chaque garde touchée.
+//  Et la revue du 12 octobre (second tour) : « Fermer mon compte » est
+//  SÉRIALISÉ avec chaque écrivain du vendeur (une sonnette, une note, un clic,
+//  un quota, une écriture directe — en vol ou arrivés pendant : rien ne survit,
+//  rien n'est accepté après) ; une ligne restée au nom d'un vendeur effacé ne
+//  fait jamais lever le battement des autres ; le bail (≤ 600 s), la prochaine
+//  fois et la sonnette (≤ 1 an) sont bornés ; READ COMMITTED est exigé ; la
+//  forme compare le TEXTE des contraintes, et `--verifier` voit une garde
+//  affaiblie sous le MÊME nom (déclencheur, contrainte, droit de colonne,
+//  volatilité). Les courses sont jouées sur un ÉTAT observé (une transaction
+//  tenue dans sa fenêtre, un appel qui attend un verrou), jamais sur un délai.
 //
 //  ⚠️ S'il ne trouve pas Postgres, il le DIT et sort en 1 : un audit qui ne
 //     peut pas tourner n'est jamais vert par défaut.
@@ -163,14 +173,14 @@ on conflict (id) do nothing;`, '', 'horloge-absente') },
   'verifier-droits': { outil: (s) => remplace(s, "    droits: `(e.j -> 'droits')::jsonb = ${lit(JSON.stringify([...DROITS].sort()))}::jsonb`,\n", '', 'verifier-droits') },
   'verifier-fonctions': { outil: (s) => remplace(s, "    fonctions: `(e.j -> 'fonctions')::jsonb = ${lit(JSON.stringify(FONCTIONS_ATTENDUES))}::jsonb`,\n", '', 'verifier-fonctions') },
   // [4] Une table d'une forme ancienne réutilisée en silence.
-  'forme-ignoree': { sql: (s) => remplace(s, "    if v is distinct from a then\n      raise exception using errcode = 'P0001', message = 'vrm_agent_forme',", "    if false then\n      raise exception using errcode = 'P0001', message = 'vrm_agent_forme',", 'forme-ignoree') },
+  'forme-ignoree': { sql: (s) => remplace(s, "    if v is distinct from a then\n      select pg_catalog.string_agg(k.conname", "    if false then\n      select pg_catalog.string_agg(k.conname", 'forme-ignoree') },
   // [5] R18 : la forme ancienne des noms de clés, data sans garde, codes libres, anonymisation du seul texte, raison brute.
-  'r18-shipto': { sql: (s) => remplace(s, "    and array_to_string(cles_shipto, '|', '?') ~ '^((contactAddress[.]|primaryPhone[.])?(fullName|companyName|email|contactAddress|primaryPhone|addressLine1|addressLine2|city|stateOrProvince|postalCode|countryCode|county|phoneNumber)([|]|$))*$')));",
+  'r18-shipto': { contraintes: true, sql: (s) => remplace(s, "    and array_to_string(cles_shipto, '|', '?') ~ '^((contactAddress[.]|primaryPhone[.])?(fullName|companyName|email|contactAddress|primaryPhone|addressLine1|addressLine2|city|stateOrProvince|postalCode|countryCode|county|phoneNumber)([|]|$))*$')));",
     "    and array_to_string(cles_shipto, '|') ~ '^[A-Za-z][A-Za-z0-9_.]{0,63}(\\|[A-Za-z][A-Za-z0-9_.]{0,63})*$')));", 'r18-shipto') },
-  'r18-data': { sql: (s) => remplace(s, "  constraint vrm_agent_commandes_data check (jsonb_typeof(data) = 'object' and octet_length(data::text) <= 4096\n    and public.vrm_agent_sans_acheteur(data)),",
+  'r18-data': { contraintes: true, sql: (s) => remplace(s, "  constraint vrm_agent_commandes_data check (jsonb_typeof(data) = 'object' and octet_length(data::text) <= 4096\n    and public.vrm_agent_sans_acheteur(data)),",
     "  constraint vrm_agent_commandes_data check (jsonb_typeof(data) = 'object' and octet_length(data::text) <= 4096),", 'r18-data') },
-  'r18-codes': { sql: (s) => remplace(s, "    and (voie is null or voie ~ '^[a-z0-9_.:-]{1,64}$') and (transporteur is null or transporteur ~ '^[a-z0-9_.:-]{1,64}$')\n", '', 'r18-codes') },
-  'r18-journal': { sql: (s) => remplace(s, " and (ref is null or ref ~ '^[A-Za-z0-9_.:/#-]{1,120}$')),", '),', 'r18-journal') },
+  'r18-codes': { contraintes: true, sql: (s) => remplace(s, "    and (voie is null or voie ~ '^[a-z0-9_.:-]{1,64}$') and (transporteur is null or transporteur ~ '^[a-z0-9_.:-]{1,64}$')\n", '', 'r18-codes') },
+  'r18-journal': { contraintes: true, sql: (s) => remplace(s, " and (ref is null or ref ~ '^[A-Za-z0-9_.:/#-]{1,120}$')),", '),', 'r18-journal') },
   'anonymiser-texte-seul': { sql: (s) => remplace(s, '  update public.vrm_agent_journal j set texte = null, ref = null, defaire = null, texte_retire_le = maintenant', '  update public.vrm_agent_journal j set texte = null, texte_retire_le = maintenant', 'anonymiser-texte-seul') },
   'raison-brute': { sql: (s) => remplace(s, "                       else 'raison-illisible' end", "                       else left(p_raison, 64) end", 'raison-brute') },
   // [6] « Pas de prochaine fois » retire la tâche, même en échec.
@@ -191,6 +201,7 @@ on conflict (id) do nothing;`, '', 'horloge-absente') },
          and coalesce(f.bail_jusqua, '-infinity'::timestamptz) < maintenant
          and not exists (select 1 from public.vrm_agent_file g
                           where g.owner = f.owner and g.groupe = f.groupe and g.bail_jusqua >= maintenant)
+         and not exists (select 1 from public.vrm_agent_effaces e where e.owner = f.owner)
     ), une_par_groupe as (
       select distinct on (d.owner, d.groupe) d.owner, d.cle, d.groupe, d.prochain
         from dues d
@@ -208,6 +219,7 @@ on conflict (id) do nothing;`, '', 'horloge-absente') },
       from public.vrm_agent_file f
      where f.prochain <= maintenant
        and coalesce(f.bail_jusqua, '-infinity'::timestamptz) < maintenant
+       and not exists (select 1 from public.vrm_agent_effaces e where e.owner = f.owner)
      order by f.prochain, f.owner, f.cle
      limit least(p_lim, 100) * 25`, 'fenetre-brute') },
   // [10] Quota : un vendeur inconnu passe hors obligation.
@@ -245,6 +257,47 @@ on conflict (id) do nothing;`, '', 'horloge-absente') },
   'truncate-serveur': { apres: 'grant truncate on public.vrm_agent_commandes, public.vrm_agent_file, public.vrm_agent_memos to service_role;' },
   // [R1-23] La garde des jetons qui ne regarde que le jeton (pas le rôle courant).
   'garde-tokens-sans-role-courant': { sql: (s) => remplace(s, "  if coalesce(auth.role(), '') in ('authenticated', 'anon') or current_user in ('authenticated', 'anon') then", "  if coalesce(auth.role(), '') in ('authenticated', 'anon') then", 'garde-tokens-sans-role-courant') },
+  // ── la revue du 12 octobre (second tour) ──
+  // [R2-1, R2-4] L'effacement sans son verrou EXCLUSIF : la pierre tombale n'est visible qu'au COMMIT.
+  'effacer-sans-verrou': { sql: (s) => remplace(s, "  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext('vrm_agent_vendeur'), pg_catalog.hashtext(p_owner::text));\n", '', 'effacer-sans-verrou') },
+  // [R2-1, R2-3, R2-4] Les écrivains sans le verrou PARTAGÉ : ils lisent la pierre tombale sans attendre l'effacement.
+  'efface-sans-verrou': { sql: (s) => remplace(s, "  perform pg_catalog.pg_advisory_xact_lock_shared(pg_catalog.hashtext('vrm_agent_vendeur'), pg_catalog.hashtext(p_owner::text));\n", '', 'efface-sans-verrou') },
+  // [R2-4] La pierre tombale STABLE : relue sur l'instantané d'AVANT l'attente du verrou.
+  'efface-stable': { sql: (s) => remplace(s, "returns boolean\nlanguage plpgsql\nvolatile\nsecurity definer\nset search_path = ''\nas $$\nbegin\n  if p_owner is null then return false; end if;\n",
+    "returns boolean\nlanguage plpgsql\nstable\nsecurity definer\nset search_path = ''\nas $$\nbegin\n  if p_owner is null then return false; end if;\n", 'efface-stable') },
+  // [R2-3] Le déclencheur relit la pierre tombale validée SANS verrou : une écriture DIRECTE en vol survit.
+  'refuser-sans-verrou': { sql: (s) => remplace(s, "  if tg_op = 'INSERT' then\n    efface := public.vrm_agent_efface(new.owner);\n",
+    "  if tg_op = 'INSERT' then\n    efface := exists (select 1 from public.vrm_agent_effaces e where e.owner = new.owner);\n", 'refuser-sans-verrou') },
+  // [R2-3] Le quota revérifie la pierre tombale APRÈS les verrous du compteur (et a déjà écrit `cc`).
+  'quota-sans-verrou': { sql: (s) => remplace(remplace(s, "  if p_owner is not null and public.vrm_agent_efface(p_owner) then return false; end if;\n  lim := floor", '  lim := floor', 'quota-sans-verrou'),
+    '  perform 1 from public.vrm_agent_compteurs k where k.owner = neutre and k.cle in (p_cle, cc) order by k.cle for update;\n',
+    '  perform 1 from public.vrm_agent_compteurs k where k.owner = neutre and k.cle in (p_cle, cc) order by k.cle for update;\n  if p_owner is not null and public.vrm_agent_efface(p_owner) then return false; end if;\n', 'quota-sans-verrou') },
+  // [R2-1, R2-4] `prendre` n'écarte plus les vendeurs effacés : une ligne restée à leur nom fait LEVER le battement de tous.
+  'prendre-zombie': { sql: (s) => remplace(remplace(s, '         and not exists (select 1 from public.vrm_agent_effaces e where e.owner = f.owner)\n', '', 'prendre-zombie'),
+    '    continue when exists (select 1 from public.vrm_agent_effaces e where e.owner = c.owner);\n', '', 'prendre-zombie') },
+  // [R2-4] Une transaction REPEATABLE READ relit la pierre tombale sur un instantané d'avant le verrou.
+  'isolation-ignoree': { sql: (s) => { const a = "if pg_catalog.current_setting('transaction_isolation') <> 'read committed' then"; if (s.split(a).length !== 3) throw new Error('mutation isolation-ignoree : ancre introuvable (' + (s.split(a).length - 1) + ' occurrence(s))'); return s.split(a).join('if false then'); } },
+  // [R2-2] Le bail non borné (120 000 « s » = 33 h de gel) ; la prochaine fois et la sonnette non bornées (l'an 58 748).
+  'bail-non-borne': { sql: (s) => { const a = ' or p_bail_s > 600'; if (s.split(a).length !== 3) throw new Error('mutation bail-non-borne : ancre introuvable (' + (s.split(a).length - 1) + ' occurrence(s))'); return s.split(a).join(''); } },
+  'prochain-non-borne': { sql: (s) => remplace(remplace(s, " or p_prochain > maintenant + interval '1 year'", '', 'prochain-non-borne'), " or p_quand > maintenant + interval '1 year'", '', 'prochain-non-borne') },
+  // [R2-5] La forme ne compare que les NOMS des contraintes (l'expression ET l'empreinte : la vérification les relit).
+  'forme-noms-seuls': { sql: (s) => {
+    const avant = "string_agg(k.conname || '=' || pg_catalog.substr(pg_catalog.md5(pg_catalog.replace(pg_catalog.pg_get_constraintdef(k.oid), 'public.', '')), 1, 12), ', ' order by k.conname)";
+    const x = remplace(s, avant, "string_agg(k.conname, ', ' order by k.conname)", 'forme-noms-seuls');
+    const m = /\$empreinte\$(\{[\s\S]*?\})\$empreinte\$/.exec(x);
+    if (!m || !/=[0-9a-f]{12}/.test(m[1])) throw new Error('mutation forme-noms-seuls : ancre introuvable (empreinte)');
+    return x.slice(0, m.index) + m[0].replace(/=[0-9a-f]{12}/g, '') + x.slice(m.index + m[0].length);
+  } },
+  // [R2-5] La vérification aveugle à la définition des déclencheurs (moment, évènements, WHEN, UPDATE OF).
+  'verifier-declencheurs-def': { outil: (s) => {
+    const x = remplace(s, "    return m[4] + ':' + m[1] + ':' + m[7] + ':' + type + ':' + normWhen(m[6]);", "    return m[4] + ':' + m[1] + ':' + m[7];", 'verifier-declencheurs-def');
+    const a = x.indexOf("\n                                            || ':' || tg.tgtype::int"), b = x.indexOf("and tg.tgattr::text = '' and tg.tgnargs = 0)),");
+    if (a < 0 || b < a) throw new Error('mutation verifier-declencheurs-def : ancre introuvable');
+    return x.slice(0, a) + ' = e)),' + x.slice(b + "and tg.tgattr::text = '' and tg.tgnargs = 0)),".length);
+  } },
+  // [R2-5] La vérification aveugle aux droits de COLONNE, et à la volatilité des fonctions.
+  'verifier-droits-colonnes': { outil: (s) => remplace(s, "    droits_colonnes: `(e.j ->> 'droits_colonnes') is null`,\n", '', 'verifier-droits-colonnes') },
+  'verifier-volatilite': { outil: (s) => remplace(remplace(s, ', vol: f.vol', '', 'verifier-volatilite'), "'vol', (array_agg(p.provolatile::text))[1], ", '', 'verifier-volatilite') },
 };
 
 if (PROUVE) {
@@ -330,6 +383,11 @@ const runAsync = (sql, o = {}) => new Promise((ok) => {
   p.stdin.end(sql);
 });
 const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
+// Attendre qu'une condition lue par le banc (superutilisateur) devienne vraie : les courses se jouent sur un
+// ÉTAT observé (une transaction est dans sa fenêtre, un appel attend un verrou), jamais sur un délai deviné —
+// sous la charge de `--prouve` (quatre audits à la fois), un délai fixe rendrait le contrôle vacant.
+const attendreQue = async (sql, ms = 10000) => { const fin = Date.now() + ms; while (Date.now() < fin) { if (Q(sql, { role: 'supabase_admin' }) === 't') return true; await attendre(40); } return false; };
+const enSommeil = (s) => `select exists (select 1 from pg_stat_activity where query like 'select pg_sleep(${s})%' and state = 'active')`;
 // Les rôles, joués comme PostgREST les joue. Le serveur tourne sur HORLOGE
 // SIMULÉE (le banc de vie de K5 fera de même) ; `serveurReel` sans elle.
 const COMME = {
@@ -389,6 +447,25 @@ const verifier = (FMIG, db) => {
   const m = MUTATION ? MUTATIONS[MUTATION] : null;
   if (MUTATION && !m) { console.log('❌ mutation inconnue : ' + MUTATION); process.exit(1); }
   if (SQL && m && m.sql) SQL = m.sql(SQL);   // une ancre introuvable lève ici : « ancre introuvable », jamais vert
+  // Une mutation qui change le TEXTE d'une contrainte change son empreinte : sans recalage, le bloc 1c refuserait
+  // l'installation de la migration mutée elle-même, et la mutation passerait au rouge pour une MAUVAISE raison
+  // (« vrm_agent_forme ») — sans prouver que le contrôle R18 mord. On recalcule donc l'empreinte de la migration
+  // mutée (installée une fois, forme neutralisée, sur une base jetable) : c'est le contrôle R18 qui doit tomber.
+  if (SQL && m && m.contraintes) await essaie('recaler l\'empreinte de la migration mutée (le texte de ses contraintes change)', () => {
+    Q('drop database if exists empreinte', { db: 'postgres', role: 'supabase_admin' });
+    Q('create database empreinte template socle owner postgres', { db: 'postgres', role: 'supabase_admin' });
+    const r = run(remplace(SQL, '    if v is distinct from a then\n', '    if false then\n', 'recaler'), { db: 'empreinte' });
+    if (!r.ok) throw new Error('migration mutée : ' + r.err.slice(0, 200));
+    const forme = /\n {4}select (coalesce\(\(select string_agg\(x\.attname[\s\S]*?)\n {6}into v\n/.exec(SQL);
+    const bloc = /\$empreinte\$(\{[\s\S]*?\})\$empreinte\$/.exec(SQL);
+    if (!forme || !bloc) throw new Error('forme ou empreinte introuvable dans la migration mutée');
+    const tabs = Object.keys(JSON.parse(bloc[1]));
+    const v = run(`select json_object_agg(t, (select ${forme[1]} from pg_catalog.pg_class c where c.oid = pg_catalog.to_regclass('public.' || t))) from unnest(array[${tabs.map((x) => `'${x}'`).join(',')}]::text[]) t;`, { db: 'empreinte' });
+    if (!v.ok) throw new Error('empreinte : ' + v.err.slice(0, 200));
+    const e = JSON.parse(v.out);
+    const neuf = '{\n' + tabs.map((x) => '    ' + JSON.stringify(x) + ': ' + JSON.stringify(e[x])).join(',\n') + '\n  }';
+    SQL = SQL.slice(0, bloc.index) + '$empreinte$' + neuf + '$empreinte$' + SQL.slice(bloc.index + bloc[0].length);
+  });
   if (m && m.outil) { OUTIL = path.join(DIR, 'essai-annule.cjs'); fs.writeFileSync(OUTIL, m.outil(fs.readFileSync(OUTIL_SRC, 'utf8'))); }
   const FMIG = path.join(DIR, 'migration.sql');
   await essaie('appliquer la migration', () => {
@@ -422,6 +499,20 @@ const verifier = (FMIG, db) => {
     const r = run(SQL, { db: 'ancienne' });
     dit(refuse(r, /vrm_agent_forme/) && /vrm_agent_file/.test(r.err), 'la migration REFUSE de s\'installer sur une table d\'une autre forme, et la nomme (« vrm_agent_forme »)', r.ok ? 'installée' : r.err.slice(0, 160));
     dit(Q("select count(*) from pg_class where relname in ('vrm_agent_journal', 'vrm_agent_commandes')") === '0' && Q("select count(*) from pg_proc where proname like 'vrm\\_agent\\_%'") === '0',
+      'et elle n\'a RIEN installé (une transaction)');
+    // [revue 2] Les MÊMES colonnes et les MÊMES noms de contraintes, mais des contraintes R18 vides de sens
+    // (une version d'avant) : la forme ne comparait que les NOMS — la table était réutilisée en silence, et la
+    // vérification rendait ok pendant qu'une commande rangeait l'adresse de l'acheteur.
+    fraiche('ancienne2', 'socle');
+    const ddl = SQL.slice(SQL.indexOf('create table if not exists public.vrm_agent_commandes'), SQL.indexOf('create table if not exists public.vrm_agent_journal'))
+      .replace(/constraint vrm_agent_commandes_data check \([\s\S]*?\),\n  constraint vrm_agent_commandes_en_cours/, "constraint vrm_agent_commandes_data check (jsonb_typeof(data) = 'object'),\n  constraint vrm_agent_commandes_en_cours")
+      .replace(/constraint vrm_agent_commandes_shipto check \([\s\S]*?\)\)\);\s*$/, 'constraint vrm_agent_commandes_shipto check (true));\n');
+    Q('create function public.vrm_agent_sans_acheteur(j jsonb) returns boolean language sql immutable as $$ select true $$;\n' + ddl);
+    const posees = Q(`select string_agg(pg_get_constraintdef(oid), ' | ' order by conname) from pg_constraint where conrelid = 'public.vrm_agent_commandes'::regclass and conname in ('vrm_agent_commandes_data', 'vrm_agent_commandes_shipto')`);
+    if (!/jsonb_typeof\(data\) = 'object'::text\)\) \| CHECK \(true\)$/.test(posees)) throw new Error('la table d\'avant n\'a pas la forme voulue (contrôle vacant) : ' + posees);
+    const r2 = run(SQL, { db: 'ancienne2' });
+    dit(refuse(r2, /vrm_agent_forme/) && /vrm_agent_commandes/.test(r2.err), 'une table d\'avant aux MÊMES noms de contraintes mais d\'un autre TEXTE (`check (true)` sous le nom R18) : la migration REFUSE de s\'installer, et nomme la table [revue 2]', r2.ok ? 'installée' : r2.err.slice(0, 200));
+    dit(Q("select count(*) from pg_class where relname = 'vrm_agent_journal'") === '0' && Q("select count(*) from pg_proc where proname like 'vrm\\_agent\\_%' and proname <> 'vrm_agent_sans_acheteur'") === '0',
       'et elle n\'a RIEN installé (une transaction)');
     DB = 'gabarit';
   });
@@ -482,6 +573,17 @@ const verifier = (FMIG, db) => {
       ['les codes R18 retirés des commandes', 'alter table public.vrm_agent_commandes drop constraint vrm_agent_commandes_codes;', 'formes'],
       ['une marque de transaction laissée', "insert into public.vrm_agent_marques (xid, quoi, avant) values (1, 'purger', 'infinity');", 'marques'],
       ['l\'horloge simulée posée sur la base', 'alter database {db} set vrm.horloge_simulee = \'1\';', 'simulee'],
+      // [revue 2] Une garde affaiblie sous le MÊME nom : condition ou évènements d'un déclencheur, texte d'une
+      // contrainte, droit de COLONNE, volatilité de la pierre tombale.
+      ['la garde des jetons recréée sous le même nom, WHEN (false)', 'create or replace trigger vrm_garde_ebay_tokens_maj before update on public.app_data for each row when (false) execute function public.vrm_garde_ebay_tokens();', 'declencheurs'],
+      ['la garde du journal recréée pour UPDATE seulement (plus DELETE)', 'create or replace trigger vrm_agent_journal_garde before update on public.vrm_agent_journal for each row execute function public.vrm_agent_journal_garde();', 'declencheurs'],
+      ['la garde du journal recréée « UPDATE OF texte » (contournée en ne touchant pas texte)', 'create or replace trigger vrm_agent_journal_garde before update of texte or delete on public.vrm_agent_journal for each row execute function public.vrm_agent_journal_garde();', 'declencheurs'],
+      ['la pierre tombale de la file recréée pour INSERT seulement', 'create or replace trigger vrm_agent_pierre_tombale before insert on public.vrm_agent_file for each row execute function public.vrm_agent_refuser_efface();', 'declencheurs'],
+      ['R18 : la contrainte des données de commande recréée sous le même nom, check (true)', 'alter table public.vrm_agent_commandes drop constraint vrm_agent_commandes_data; alter table public.vrm_agent_commandes add constraint vrm_agent_commandes_data check (true);', 'formes'],
+      ['les 100 jours des mémos recréés sous le même nom, check (true)', 'alter table public.vrm_agent_memos drop constraint vrm_agent_memos_cent_jours; alter table public.vrm_agent_memos add constraint vrm_agent_memos_cent_jours check (true);', 'formes'],
+      ['les mémos écrits DIRECTEMENT par le serveur (droit de COLONNE)', 'grant insert (owner, cle, at, expire) on public.vrm_agent_memos to service_role;', 'droits_colonnes'],
+      ['un bail volé DIRECTEMENT par le serveur (droit de COLONNE)', 'grant update (bail_jeton, bail_jusqua) on public.vrm_agent_file to service_role;', 'droits_colonnes'],
+      ['la pierre tombale relue sur un instantané figé (STABLE)', 'alter function public.vrm_agent_efface(uuid) stable;', 'fonctions'],
     ];
     const vus = [];
     cas.forEach(([nom, sql, partie], i) => {
@@ -490,7 +592,7 @@ const verifier = (FMIG, db) => {
       const v = verifier(FMIG, DB);
       if (v.ok !== false || !(v.ecarts || []).includes(partie)) vus.push(`${nom} → ok=${v.ok} ${JSON.stringify(v.ecarts)}`);
     });
-    dit(vus.length === 0, `la vérification rend ok = false, en nommant ce qui diffère, pour chacune des ${cas.length} dénaturations (déclencheurs suspendus, règles, fonctions, RLS, droits, séquence, forme, marque, horloge simulée)`, vus.join(' · ').slice(0, 500));
+    dit(vus.length === 0, `la vérification rend ok = false, en nommant ce qui diffère, pour chacune des ${cas.length} dénaturations (déclencheurs suspendus OU recréés sous le même nom, règles, fonctions et leur volatilité, RLS, droits de table ET de colonne, séquence, forme et texte des contraintes, marque, horloge simulée)`, vus.join(' · ').slice(0, 500));
     DB = 'gabarit';
   });
   const TABLES = ['vrm_agent_vendeurs', 'vrm_agent_commandes', 'vrm_agent_journal', 'vrm_agent_file', 'vrm_agent_compteurs', 'vrm_agent_vus',
@@ -796,6 +898,33 @@ const verifier = (FMIG, db) => {
     S(`select public.vrm_agent_planifier('${J}', 'ebay:s1:cmd:O3', 's1', ${t(150)}, ${t(150)});`);   // 08:02:30 : l'annulation sonne
     S(`select public.vrm_agent_rendre('${J}', 'ebay:s1:cmd:O3', '${uuid(43)}', ${t(160 + 6 * 3600)}, false, null, p_maintenant => ${t(160)});`);   // 08:02:40 : « dans 6 h »
     dit(A(`select prochain = ${t(150)} from public.vrm_agent_file where cle = 'ebay:s1:cmd:O3'`) === 't', 'le travailleur lent qui rend « dans 6 h » ne perd pas la sonnette de 08:02:30', A(`select prochain from public.vrm_agent_file where cle = 'ebay:s1:cmd:O3'`));
+  });
+
+  await essaie('le bail et l\'échéance sont BORNÉS [revue 2 : des millisecondes lues comme des secondes gelaient un compte 33 h]', () => {
+    fraiche('bornes');
+    tache(J, 'ebay:s1:veille', 's1', -60); tache(J, 'ebay:s1:cmd:O1', 's1', 3600);
+    const l = prendre(8, uuid(110), 0, 120000);
+    const libre = A(`select coalesce(bail_jusqua::text, 'libre') from public.vrm_agent_file where cle = 'ebay:s1:veille'`);
+    dit(l.length === 0 && libre === 'libre', 'un bail de 120 000 « secondes » (des millisecondes : 33 h 20) est REFUSÉ : rien n\'est pris, le compte eBay n\'est pas gelé', `${l.length} prise(s) · ${libre}`);
+    const l601 = prendre(8, uuid(111), 0, 601), l600 = prendre(8, uuid(112), 0, 600);
+    dit(l601.length === 0 && l600.length === 1, 'la borne est 10 minutes : 601 s refusé, 600 s pris', JSON.stringify([l601.length, l600.map((x) => x.cle)]));
+    const pc = (cle, bail, groupe) => S(`select public.vrm_agent_prendre_cle('${J}', '${cle}', '${uuid(113)}', ${bail}, ${t(1)}, '${groupe}');`);
+    dit(pc('ebay:s2:veille', 2147483647, 's2') === 'f' && A(`select count(*) from public.vrm_agent_file where cle = 'ebay:s2:veille'`) === '0',
+      'le clic aussi : un bail de 2 147 483 647 s (jusqu\'en 2094) est refusé, et aucune tâche n\'est créée tenue');
+    dit(pc('ebay:s2:veille', 120, 's2') === 't', 'l\'autre sens : un bail de 120 s est pris');
+    // « dans 15 min » écrit en millisecondes : l'an 58 748.
+    tache(J, 'ebay:s3:veille', 's3', -60, { jeton: uuid(114), jusqua: 120 });
+    const r = S(`select public.vrm_agent_rendre('${J}', 'ebay:s3:veille', '${uuid(114)}', to_timestamp((extract(epoch from ${t(10)}) + 900) * 1000), p_maintenant => ${t(10)});`);
+    const e = A(`select (bail_jeton = '${uuid(114)}') || '|' || (prochain = ${t(-60)}) from public.vrm_agent_file where cle = 'ebay:s3:veille'`);
+    dit(r === 'f' && e === 'true|true', 'rendre « dans 15 min » écrit en millisecondes (l\'an 58 748) est REFUSÉ : la veille reste tenue, son échéance intacte', `${r} · ${e}`);
+    const l2 = prendre(8, uuid(115), 121);
+    dit(l2.some((x) => x.cle === 'ebay:s3:veille'), 'et elle revient à la fin de son bail : aucune veille ne disparaît', JSON.stringify(l2.map((x) => x.cle)));
+    dit(S(`select public.vrm_agent_rendre('${J}', 'ebay:s3:veille', '${uuid(115)}', ${t(121 + 20 * JOUR)}, p_maintenant => ${t(122)});`) === 't', 'l\'autre sens : rendre « dans 20 jours » passe');
+    const p1 = S(`select coalesce(public.vrm_agent_planifier('${J}', 'ebay:s4:veille', 's4', ${t(2 * 365 * JOUR)}, ${t(0)})::text, 'null');`);
+    dit(p1 === 'null' && A(`select count(*) from public.vrm_agent_file where cle = 'ebay:s4:veille'`) === '0', 'planifier dans 2 ans est refusé (NULL) : aucune tâche rangée hors du temps — le secours la voit « manquante » et la recrée', p1);
+    const p2 = S(`select public.vrm_agent_planifier('${J}', 'ebay:s1:cmd:O1', 's1', ${t(2 * 365 * JOUR)}, ${t(0)}) is null;`);
+    dit(p2 === 't' && A(`select prochain = ${t(3600)} from public.vrm_agent_file where cle = 'ebay:s1:cmd:O1'`) === 't', 'une sonnette à 2 ans sur une tâche existante : refusée, son échéance ne bouge pas');
+    dit(S(`select public.vrm_agent_planifier('${J}', 'ebay:s5:veille', 's5', ${t(20 * JOUR)}, ${t(0)}) = ${t(20 * JOUR)};`) === 't', 'l\'autre sens : planifier dans 20 jours passe');
   });
 
   // ── 5. LES COMMANDES : VERSION ET BAIL ────────────────────────────────────
@@ -1152,6 +1281,100 @@ const verifier = (FMIG, db) => {
     const reste = ['vrm_agent_journal', 'vrm_agent_file', 'vrm_agent_memos', 'vrm_agent_vendeurs', 'vrm_coffre', 'vrm_agent_commandes'].map((x) => A(`select count(*) from public.${x} where owner = '${J}'`)).join('');
     dit(reste === '000000' && A(`select count(*) from public.vrm_agent_compteurs where cle like '%${J}%' or owner = '${J}'`) === '0', 'et rien ne renaît : ni journal (texte de l\'acheteur compris), ni tâche, ni mémo, ni compteur', reste);
     dit(S(`select public.vrm_agent_noter('${V}', '{"geste":"retrait","resultat":"fait"}', ${t(51)}) is not null;`) === 't', 'l\'autre sens : l\'autre vendeur écrit toujours');
+  });
+  // ── La revue du 12 octobre (second tour) : la pierre tombale n'était visible qu'au COMMIT de l'effacement.
+  //    Chaque course est jouée sur un ÉTAT observé : la transaction d'effacement (ou de l'écrivain) est tenue
+  //    ouverte après son travail, et l'autre partie n'est lancée qu'une fois cette fenêtre atteinte.
+  await essaie('« Fermer mon compte » PENDANT une sonnette, une note et un clic : rien ne survit, et le battement des autres ne lève jamais [revue 2]', async () => {
+    fraiche('course');
+    tache(J, 'ebay:s1:veille', 's1', -60); tache(V, 'ebay:s9:veille', 's9', -30);
+    S(`select public.vrm_agent_noter('${J}', '{"geste":"retrait","resultat":"fait","texte":"merci"}', ${t(0)});`);
+    // L'effacement a fini de supprimer, mais n'est pas encore validé : la fenêtre où la pierre tombale ne se voyait pas.
+    const E = runAsync(COMME.serveur + `begin;\nselect 'E:' || public.vrm_agent_effacer_vendeur('${J}')::text;\nselect pg_sleep(1.51);\ncommit;\n`, { db: DB });
+    const fenetre = await attendreQue(enSommeil('1.51'));
+    const B = runAsync(COMME.serveur + `select 'B:' || coalesce(public.vrm_agent_planifier('${J}', 'ebay:s1:cmd:O9', 's1', ${t(0)}, ${t(0)})::text, 'null');`, { db: DB });
+    const C = runAsync(COMME.serveur + `select 'C:' || coalesce(public.vrm_agent_noter('${J}', '{"geste":"message","resultat":"fait","cible":"O7","texte":"Bonjour Paul Martin, 12 rue des Lilas, ton colis part demain"}', ${t(0)})::text, 'null');`, { db: DB });
+    const D = runAsync(COMME.serveur + `select 'D:' || public.vrm_agent_prendre_cle('${J}', 'ebay:s1:cmd:O8', '${uuid(120)}', 120, ${t(0)}, 's1');`, { db: DB });
+    const [e, b, c, d] = await Promise.all([E, B, C, D]);
+    if (!fenetre) throw new Error('l\'effacement n\'a jamais atteint sa fenêtre (contrôle vacant) : ' + (e.out + ' ' + e.err).slice(0, 200));
+    dit(e.ok && b.ok && c.ok && d.ok, 'l\'effacement, la sonnette, la note et le clic répondent tous, sans erreur', [e.err, b.err, c.err, d.err].join(' ').slice(0, 300));
+    dit(/B:null/.test(b.out) && /C:null/.test(c.out) && /D:f/.test(d.out), 'arrivés PENDANT l\'effacement, la sonnette, la note et le clic attendent sa fin, puis sont REFUSÉS (la pierre tombale est relue APRÈS le verrou)', [b.out, c.out, d.out].join(' '));
+    const reste = ['vrm_agent_file', 'vrm_agent_journal'].map((x) => A(`select count(*) from public.${x} where owner = '${J}'`)).join('|');
+    dit(reste === '0|0', 'et rien ne survit à son nom : ni tâche, ni ligne de journal (le texte de l\'acheteur compris) — « Fermer mon compte » ne rend plus « fait » sur une porte restée ouverte', reste + ' ' + A(`select coalesce(string_agg(texte, ' · '), '') from public.vrm_agent_journal where owner = '${J}'`));
+    const p = run(COMME.serveur + `select coalesce(json_agg(x.owner || ' ' || x.cle), '[]') from public.vrm_agent_prendre(8, '${uuid(121)}', 120, ${t(5)}) x;`, { db: DB });
+    dit(p.ok && p.out.includes(V) && !p.out.includes(J), 'le battement suivant ne lève pas, et prend la veille de l\'autre vendeur', p.ok ? p.out : p.err.slice(0, 200));
+  });
+  await essaie('une ligne restée au nom d\'un vendeur effacé ne fait JAMAIS échouer le battement des autres [revue 2]', () => {
+    // Suite de la base « course » : J est effacé. Une ligne orpheline posée par le banc (déclencheur suspendu le
+    // temps de la poser : ce que la sérialisation empêche désormais), sur un compte LIBRE et PLUS en retard que la
+    // tâche de l'autre vendeur : elle est la première candidate.
+    A(`alter table public.vrm_agent_file disable trigger vrm_agent_pierre_tombale;
+       insert into public.vrm_agent_file (owner, cle, groupe, prochain) values ('${J}', 'ebay:s7:veille', 's7', ${t(-7200)});
+       alter table public.vrm_agent_file enable trigger vrm_agent_pierre_tombale;`);
+    tache(V, 'ebay:s8:veille', 's8', -60);
+    const p = run(COMME.serveur + `select coalesce(json_agg(x.owner || ' ' || x.cle), '[]') from public.vrm_agent_prendre(8, '${uuid(122)}', 120, ${t(10)}) x;`, { db: DB });
+    dit(p.ok && p.out.includes('ebay:s8:veille') && !p.out.includes(J), 'prendre ÉCARTE le vendeur effacé (il levait `vrm_vendeur_efface` pour tout le monde, à chaque battement) et sert l\'autre vendeur', p.ok ? p.out : p.err.slice(0, 200));
+    dit(A(`select bail_jeton is null from public.vrm_agent_file where owner = '${J}' and cle = 'ebay:s7:veille'`) === 't', 'la ligne orpheline n\'est pas prise');
+  });
+  await essaie('« Fermer mon compte » PENDANT une écriture DIRECTE du serveur (coffre, pouls, vus) : elle part avec le reste [revue 2]', async () => {
+    fraiche('course2');
+    const W = runAsync(COMME.serveur + `begin;
+insert into public.vrm_coffre (owner, compte, fournisseur, v, nonce, chiffre, tag) values ('${J}', 's1', 'boxtal', 1, '\\x000102030405060708090a0b', '\\x00', '\\x000102030405060708090a0b0c0d0e0f');
+insert into public.vrm_agent_vendeurs (owner, actif) values ('${J}', true);
+insert into public.vrm_agent_vus (owner, cle) values ('${J}', 'notif:N7');
+select pg_sleep(1.52);
+commit;
+`, { db: DB });
+    const enVol = await attendreQue(enSommeil('1.52'));
+    const e = await runAsync(COMME.serveur + `select 'E:' || public.vrm_agent_effacer_vendeur('${J}')::text;`, { db: DB });
+    const w = await W;
+    if (!enVol) throw new Error('l\'écriture n\'a jamais atteint sa fenêtre (contrôle vacant) : ' + w.err.slice(0, 200));
+    dit(w.ok && e.ok, 'l\'écriture en vol et l\'effacement répondent', (w.err + ' ' + e.err).slice(0, 200));
+    const reste = ['vrm_coffre', 'vrm_agent_vendeurs', 'vrm_agent_vus'].map((x) => A(`select count(*) from public.${x} where owner = '${J}'`)).join('|');
+    dit(reste === '0|0|0', 'l\'effacement ATTEND l\'écriture directe en vol (le déclencheur prend le verrou du vendeur), puis l\'efface : rien ne reste à son nom', reste + ' ' + e.out.slice(0, 200));
+  });
+  await essaie('« Fermer mon compte » PENDANT un battement qui écrit par les fonctions (journal, mémos, preuve, vu, réservation) [revue 2]', async () => {
+    fraiche('course3');
+    const W = runAsync(COMME.serveur + `begin;
+select public.vrm_agent_noter('${J}', '{"geste":"message","resultat":"fait","cible":"O7","texte":"Bonjour Paul Martin, ton colis part demain"}', ${t(0)});
+select public.vrm_agent_premiere_fois('${J}', 'push:vente:O7', null, ${t(0)});
+select public.vrm_agent_preuve_vue('${J}', '7', 'vinted', 'tx-7', ${t(0)});
+select public.vrm_agent_vu('${J}', 'notif:N7', ${t(0)});
+select public.vrm_agent_reserver('${J}', 's1', 840, 2500, 10, 8000, 30000, ${t(0)});
+select pg_sleep(1.53);
+commit;
+`, { db: DB });
+    const enVol = await attendreQue(enSommeil('1.53'));
+    const e = await runAsync(COMME.serveur + `select 'E:' || public.vrm_agent_effacer_vendeur('${J}')::text;`, { db: DB });
+    const w = await W;
+    if (!enVol) throw new Error('le battement n\'a jamais atteint sa fenêtre (contrôle vacant) : ' + w.err.slice(0, 200));
+    dit(w.ok && e.ok, 'le battement en vol et l\'effacement répondent', (w.err + ' ' + e.err).slice(0, 200));
+    const reste = ['vrm_agent_journal', 'vrm_agent_memos', 'vrm_agent_preuves', 'vrm_agent_vus', 'vrm_agent_compteurs'].map((x) => A(`select count(*) from public.${x} where owner = '${J}'`)).join('|');
+    dit(reste === '0|0|0|0|0', 'l\'effacement attend la fin du battement, et ses lignes partent avec le reste : journal, mémos, preuve, vu, réservation', reste + ' ' + e.out.slice(0, 200));
+  });
+  await essaie('« Fermer mon compte » PENDANT un quota qui attend le compteur du jour : aucun compteur ne survit, et le quota ne répond jamais vrai APRÈS l\'effacement [revue 2]', async () => {
+    fraiche('course4');
+    // V tient la ligne globale du jour (la contention normale : tous les appels de l'installation la verrouillent).
+    const Vq = runAsync(COMME.serveur + `begin;\nselect 'V:' || public.vrm_agent_quota('trading:2026-10-12', 'confort', 1, 5000, '${V}', 's9', ${t(0)});\nselect pg_sleep(1.54);\ncommit;\n`, { db: DB });
+    const tenu = await attendreQue(enSommeil('1.54'));
+    const Jq = runAsync(COMME.serveur + `select 'J:' || public.vrm_agent_quota('trading:2026-10-12', 'confort', 1, 5000, '${J}', 's1', ${t(0)});`, { db: DB });
+    const attend = await attendreQue(`select exists (select 1 from pg_stat_activity where query like '%vrm_agent_quota%${J}%' and wait_event_type = 'Lock')`);
+    const e = await runAsync(COMME.serveur + `select 'E:' || public.vrm_agent_effacer_vendeur('${J}')::text;`, { db: DB });
+    const [v, j] = await Promise.all([Vq, Jq]);
+    if (!tenu || !attend) throw new Error('la course n\'a pas eu lieu (contrôle vacant) : ' + JSON.stringify({ tenu, attend, v: v.out, j: j.out }));
+    dit(v.ok && j.ok && e.ok, 'les deux quotas et l\'effacement répondent', (v.err + ' ' + j.err + ' ' + e.err).slice(0, 200));
+    const cc = A(`select count(*) from public.vrm_agent_compteurs where cle like '%${J}%'`);
+    const quotas = (/"quotas": (\d+)/.exec(e.out) || [])[1];
+    dit(cc === '0', 'aucun compteur qui NOMME le vendeur ne survit (il est rangé sous le neutre, où le déclencheur ne le voit pas)', `${cc} · ${j.out} · quotas=${quotas}`);
+    dit(!/J:t/.test(j.out) || Number(quotas) >= 1, 'un quota qui a répondu vrai l\'a fait AVANT l\'effacement, qui l\'a vu et effacé (jamais un « vrai » validé après)', `${j.out} · quotas=${quotas}`);
+    dit(S(`select public.vrm_agent_quota('trading:2026-10-12', 'confort', 1, 5000, '${J}', 's2', ${t(1)});`) === 'f', 'et l\'appel suivant est refusé');
+  });
+  await essaie('READ COMMITTED exigé : la relecture après le verrou n\'a lieu que là [revue 2]', () => {
+    const rr = run(COMME.serveur + `begin isolation level repeatable read;\nselect public.vrm_agent_noter('${V}', '{"geste":"retrait","resultat":"fait"}', ${t(0)});\ncommit;\n`, { db: DB });
+    const rr2 = run(COMME.serveur + `begin isolation level repeatable read;\nselect public.vrm_agent_effacer_vendeur('${V}');\ncommit;\n`, { db: DB });
+    dit(refuse(rr, /vrm_agent_isolation/) && refuse(rr2, /vrm_agent_isolation/) && A(`select count(*) from public.vrm_agent_effaces where owner = '${V}'`) === '0',
+      'une écriture ou un effacement en REPEATABLE READ (la pierre tombale y serait relue sur un instantané d\'avant le verrou) est refusé (« vrm_agent_isolation »)', (rr.err + ' ' + rr2.err).slice(0, 200));
+    dit(S(`select public.vrm_agent_noter('${V}', '{"geste":"retrait","resultat":"fait"}', ${t(0)}) is not null;`) === 't', 'l\'autre sens : en READ COMMITTED (le défaut de PostgREST), elle passe');
   });
   await essaie('compacter les commandes closes depuis 90 jours', () => {
     fraiche('compacter');
