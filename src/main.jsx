@@ -1,7 +1,7 @@
 import { cleVapid, abonnementAJour } from './vapid.js';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import Accueil, { Film } from './Accueil.jsx';
+import Accueil from './Accueil.jsx';
 import { ecouterPlantages, noterPlantage } from './plantages.js';
 // Le journal des plantages écoute dès le démarrage : une erreur AVANT que l'app
 // soit montée est justement celle qu'aucun écran ne montre (src/plantages.js).
@@ -10,6 +10,9 @@ ecouterPlantages(() => ({ ecran: (() => { try { return new URLSearchParams(locat
 // L'app n'est téléchargée que par ceux qui y entrent : un visiteur qui lit la
 // page d'accueil ne charge pas 340 Ko compressés pour rien (§ montée en charge).
 const App = React.lazy(() => import('./App.jsx'));
+// Le film de la page d'accueil (`?film`, export MP4) est un morceau à part : un
+// visiteur de la page ne le télécharge jamais, et `?film` ne charge pas l'app.
+const Film = React.lazy(() => import('./AccueilFilm.jsx'));
 // Polices HÉBERGÉES SUR LE SITE (30 sept.) : charger Google Fonts envoyait
 // l'adresse IP de chaque visiteur à Google (recommandation CNIL, jugement
 // LG München 3 O 17493/20). Mêmes familles, même rendu, plus aucun tiers.
@@ -89,7 +92,7 @@ function Racine() {
     window.addEventListener('popstate', f);
     return () => window.removeEventListener('popstate', f);
   }, []);
-  if (filmDemande) return <Film />;
+  if (filmDemande) return <React.Suspense fallback={<FondApp />}><Film /></React.Suspense>;
   if (vue === 'accueil') {
     return <Accueil onEntrer={(mode) => {
       try { window.history.pushState({}, '', mode === 'up' ? '/?inscription' : '/?connexion'); } catch (_) {}
