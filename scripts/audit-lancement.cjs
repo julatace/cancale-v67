@@ -148,12 +148,18 @@ const ast = parser.parse(app, { sourceType: 'module', plugins: ['jsx'], errorRec
       'le serveur compare Stripe au prix des CGV (PRIX_CGV : mêmes centimes, en euros, par mois)', serveur ? `serveur ${serveur[1]} c · CGV ${cgvCentimes} c` : 'PRIX_CGV introuvable');
     const appPrix = (/const PRIX_CGV_LISIBLE\s*=\s*'(\d+,\d{2}) € \/ mois'/.exec(app) || [])[1];
     dit(appPrix && uniques.length === 1 && appPrix === uniques[0], 'l’app dit le prix des CGV quand Stripe n’en donne pas (PRIX_CGV_LISIBLE)', `app ${appPrix || '?'} · CGV ${uniques.join('/')}`);
+    // La page d'accueil (réécrite le 12 octobre) rend le prix via la constante
+    // PRIX_MOIS (src/accueil-reglages.js), UNE seule source — plus de littéral
+    // répété. On suit la RÈGLE, pas l'orthographe : (a) PRIX_MOIS vaut le prix
+    // des CGV, (b) aucun prix MENSUEL écrit en clair dans Accueil.jsx ne le
+    // contredit (les montants de la démo, « 52,00 € », ne sont pas mensuels).
+    const reg = (lire('src/accueil-reglages.js') || '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+    const prixMois = (/PRIX_MOIS\s*=\s*'(\d+,\d{2})'/.exec(reg) || [])[1];
     const acc = (lire('src/Accueil.jsx') || '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
-    // Un PRIX D'ABONNEMENT : « X € par mois », « X € / mois », ou le gros chiffre
-    // de la section Prix. Les montants de la démonstration (« 52,00 € » d'une
-    // vente inventée) ne sont pas des prix d'abonnement.
-    const montantsAcc = [...acc.matchAll(/(\d+,\d{2}) €(?=\s*(?:par mois|\/\s*mois))|className="gros[^"]*">(\d+,\d{2}) €/g)].map((m) => m[1] || m[2]);
-    dit(montantsAcc.length >= 3 && montantsAcc.every((m) => uniques.length === 1 && m === uniques[0]), 'la page d’accueil n’écrit que ce prix-là (FAQ, section Prix, gros chiffre)', montantsAcc.join(' · '));
+    const litterauxAcc = [...acc.matchAll(/(\d+,\d{2}) €(?=\s*(?:par mois|\/\s*mois))|className="gros[^"]*">(\d+,\d{2}) €/g)].map((m) => m[1] || m[2]);
+    dit(prixMois && uniques.length === 1 && prixMois === uniques[0] && litterauxAcc.every((m) => m === uniques[0]),
+      'la page d’accueil dit le prix des CGV et aucun autre (PRIX_MOIS, aucun prix mensuel en clair qui le contredise)',
+      `PRIX_MOIS ${prixMois || '?'} · CGV ${uniques.join('/')}${litterauxAcc.length ? ' · en clair ' + litterauxAcc.join(', ') : ''}`);
     const fb = /const prixLisible = \(p\) => [^\n]*: (PRIX_CGV_LISIBLE|'[^']*');/.exec(app);
     dit(fb && fb[1] === 'PRIX_CGV_LISIBLE', '… et `prixLisible` retombe sur cette constante, jamais une seconde valeur écrite à côté', fb ? fb[1] : 'prixLisible introuvable');
   });
