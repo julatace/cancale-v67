@@ -29680,7 +29680,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const rc = receiptFor(o);
             const numA = buyNumByTxn[String(o.transaction_id)];
             return (
-            <div key={o.transaction_id} style={{padding:'12px 14px',borderTop:i>0?`1px solid ${C.border}`:'none',opacity:cancelled?0.55:1,display:'flex',alignItems:'center',gap:12,...(estFloute(o)?STYLE_FLOU:null)}}>
+            <div key={o.transaction_id} data-achat-tx={String(o.transaction_id)} style={{padding:'12px 14px',borderTop:i>0?`1px solid ${C.border}`:'none',opacity:cancelled?0.55:1,display:'flex',alignItems:'center',gap:12,...(estFloute(o)?STYLE_FLOU:null)}}>
               <div style={{width:46,height:46,borderRadius:10,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
                 {orderPhoto(o)?<PhotoVinted src={orderPhoto(o)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={18} style={{color:C.muted,opacity:.55}}/>}
               </div>
@@ -29725,6 +29725,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 const tid = String(o.transaction_id || '');
                 const note = achatNotes[tid] || '';
                 const rembourse = /annul|rembours|refus|retour|cancel|refund/i.test(String(o.status || '') + ' ' + String((o.status_title||'')));
+                // FICHE À L'ARRIVÉE (G11) : quand la paire achetée ARRIVE (à
+                // retirer / reçue), elle est prête à remettre en vente. Le seul
+                // pont honnête vers la revente est de reporter le PRIX PAYÉ vers
+                // le numérotage (G1 le redemande à ce moment-là). On ne relie
+                // RIEN automatiquement (§5) : il la renumérote/rephotographie.
+                const arrive = st.step>=3 && !cancelled && !st.retour;
+                const prixPaye = montantCommande(o).toFixed(2).replace('.',',');
                 const item = { display:'flex',alignItems:'center',gap:10,width:'100%',textAlign:'left',border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,padding:'9px 12px',cursor:'pointer',fontFamily:'inherit' };
                 const close = () => setAchatMenu(null);
                 return (
@@ -29740,6 +29747,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {achatMenu===tid && (<>
                   <div onClick={close} style={{position:'fixed',inset:0,zIndex:40}}/>
                   <div role="menu" style={{position:'absolute',top:34,right:0,zIndex:41,minWidth:226,background:C.card,border:`1px solid ${C.border}`,borderRadius:10,boxShadow:C.shadow||'0 8px 24px rgba(0,0,0,.18)',overflow:'hidden',padding:'4px 0'}}>
+                    {arrive && <button type="button" role="menuitem" data-copier-prix={prixPaye} style={item} onClick={async ()=>{ close(); try { await navigator.clipboard.writeText(prixPaye); toast(`Prix payé copié : ${prixPaye} € — colle-le au numérotage`); } catch(_) { toast('Copie impossible','error'); } }}><Icon name="cash" size={15} style={{color:C.muted}}/>Copier le prix payé (pour le numérotage)</button>}
                     <button type="button" role="menuitem" style={item} onClick={()=>{ close(); setNoteEdit({tid,title:o.title,val:note}); }}><Icon name="doc" size={15} style={{color:C.muted}}/>{note?'Modifier la note interne':'Ajouter une note interne'}</button>
                     <button type="button" role="menuitem" style={item} onClick={()=>{ close(); if(rc){ if(rc.pdfB64) openReceipt(rc); else setReceiptView(rc); } else generateAchatJustificatif(o,{ account:accNameOf(o._acc), regime:load('vinted_regime','micro'), numero:numA||'' }); }}><Icon name="receipt" size={15} style={{color:C.muted}}/>{rc?'Reçu d\'achat (Vinted)':'Attestation d\'achat'}</button>
                     {rembourse && <button type="button" role="menuitem" style={item} onClick={()=>{ close(); generateRemboursementAttestation(o,{ account:accNameOf(o._acc) }); }}><Icon name="receipt" size={15} style={{color:C.muted}}/>Attestation de remboursement</button>}
