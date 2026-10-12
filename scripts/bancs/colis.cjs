@@ -4,7 +4,7 @@
 // donc `r.filename` sur un objet qui ne l'a pas → TOUS les bordereaux tombaient,
 // et l'ecran affichait « 0 bordereau pret a imprimer ». C'etait un artefact du
 // banc, pas un defaut de l'app (§6.3 : servir TOUTES les formes de requete).
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require('playwright');
 const { metaVersData } = require('./_meta.cjs');
 const { dressingsDuJour } = require('./_instantane.cjs'); // fx/ est une photo datée : la lecture du dressing la plus récente = « il y a 1 min » (règle « en ligne » ≤ 24 h)
 const fs=require('fs'), http=require('http'), path=require('path');
@@ -124,10 +124,10 @@ const aEnvoyer=ventes.filter(o=>/Bordereau envoyé au vendeur|Le paiement a ét�
 const attendus=aEnvoyer.filter(o=>parTx[String(o.transaction_id)]).length;
 (async()=>{
   console.log('base servie : '+aEnvoyer.length+' ventes a expedier · '+attendus+' ont deja leur PDF en base');
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
+  const b=await chromium.launch({executablePath:require('../_chromium.cjs').executablePath(),args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
   // Un SECOND navigateur pour la comparaison accueil ↔ Colis : il lui faut un
   // `localStorage` VIERGE (l'appareil neuf), et celui du premier a déjà servi.
-  const b2=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
+  const b2=await chromium.launch({executablePath:require('../_chromium.cjs').executablePath(),args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
   const pg=await b.newPage({viewport:{width:1512,height:950}});
   const errs=[]; pg.on('pageerror',e=>errs.push(e.message));
   await pg.addInitScript(()=>{try{localStorage.setItem('vrm_acces_direct','1');}catch(_){}});

@@ -13,7 +13,7 @@
 //    « Copie impossible », jamais « copié » (réaffaiblir à try{writeText}catch
 //    le ferait mentir — c'est la preuve qui compte, pas « la fonction est neuve ») ;
 //  • un achat ANNULÉ/remboursé → PAS d'entrée « Copier le prix payé » (gated).
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require('playwright');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -111,7 +111,7 @@ const prixDe = (pg, tx) => pg.evaluate((t) => {
 async function main() {
   let b;
   try {
-    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+    b = await chromium.launch({ executablePath: require('../_chromium.cjs').executablePath(), args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
     for (const vp of [{ width: 390, height: 780 }, { width: 1512, height: 950 }]) {
       const T = vp.width < 600 ? '📱' : '🖥️';
 

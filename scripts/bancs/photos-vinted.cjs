@@ -79,7 +79,7 @@
 // On juge les ÉLÉMENTS rendus (naturalWidth, `data-photo-vinted`,
 // `data-photos-bloquees` = la cause affichée, `data-photos-geste`), les
 // demandes reçues par le pont et le corps envoyé à la base — pas une formulation.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require('playwright');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), https = require('https'), path = require('path'), os = require('os'), cp = require('child_process');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -412,7 +412,7 @@ const pageTexte = (pg) => pg.evaluate(() => document.body.innerText);
   await new Promise((ok) => srv.listen(PORT, ok));
   await new Promise((ok) => cdn.listen(PORT_CDN, '127.0.0.1', ok));
   try {
-    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+    b = await chromium.launch({ executablePath: require('../_chromium.cjs').executablePath(),
       args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server', `--host-resolver-rules=MAP images1.vinted.net 127.0.0.1:${PORT_CDN}`] });
 
     // ── 0. Le banc mesure-t-il ce qu'il croit mesurer ? ───────────────────────

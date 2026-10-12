@@ -16,7 +16,7 @@ const RACINE = path.join(__dirname, '..', '..');
 const SW = fs.readFileSync(path.join(RACINE, 'public', 'sw.js'), 'utf8');
 let chromium;
 try { ({ chromium } = require(path.join(RACINE, 'node_modules', 'playwright'))); }
-catch (_) { ({ chromium } = require('/home/user/cancale-v67/node_modules/playwright')); }
+catch (_) { ({ chromium } = require('playwright')); }
 
 let ko = 0;
 const ok = (m) => console.log('OK  ' + m);
@@ -43,7 +43,7 @@ const srv = http.createServer(servir);
 srv.on('error', (e) => { console.log('KO  le banc n\'a pas pu démarrer — ' + e.message); process.exit(1); });
 srv.listen(0, '127.0.0.1', async () => {
   const base = 'http://127.0.0.1:' + srv.address().port + '/';
-  const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox'] });
+  const b = await chromium.launch({ executablePath: require('../_chromium.cjs').executablePath(), args: ['--use-angle=swiftshader', '--no-sandbox'] });
   try {
     const ctx = await b.newContext();
     const pg = await ctx.newPage();

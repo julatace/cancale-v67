@@ -83,7 +83,7 @@ const VENTE_BODY = JSON.stringify({ pageProps: {
 
 (async () => {
   console.log('── CE QUI PART DE LA PAGE (le vrai `lbc-inject.js`, dans un vrai navigateur)');
-  const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox'] });
+  const b = await chromium.launch({ executablePath: require('./_chromium.cjs').executablePath(), args: ['--use-angle=swiftshader', '--no-sandbox'] });
   const pg = await b.newPage();
   // On sert la page SOUS LE VRAI NOM D'HÔTE : `location.origin` décide du sort
   // des adresses relatives, et Leboncoin en utilise (`/_next/data/…`).

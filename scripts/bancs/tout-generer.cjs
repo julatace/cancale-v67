@@ -21,7 +21,7 @@
 //     son lien n'est pas écrit deux fois.
 // On juge les ÉTATS (`data-*`) et les NOMBRES (requêtes reçues par le pont,
 // occurrences d'une phrase) — jamais une formulation seule (§6.5).
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require('playwright');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -153,7 +153,7 @@ const compte = (t, s) => String(t || '').split(s).length - 1;
 (async () => {
   let b;
   try {
-    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+    b = await chromium.launch({ executablePath: require('../_chromium.cjs').executablePath(), args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
 
     console.log('── COLIS · la raison commune d\'un bouton grisé est écrite UNE fois (§7)');
     for (const tel of [false, true]) {

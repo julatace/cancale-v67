@@ -21,7 +21,7 @@
 //   • le compte exclu ne compte PAS parmi les pannes ;
 //   • mais il reste NOMMÉ (un compte caché en silence serait pire) ;
 //   • et le compte réellement en panne, lui, est toujours signalé.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require('playwright');
 const { metaVersData } = require('./_meta.cjs');
 const { dressingsDuJour } = require('./_instantane.cjs'); // fx/ est une photo datée : la lecture du dressing la plus récente = « il y a 1 min » (règle « en ligne » ≤ 24 h)
 const fs=require('fs'), http=require('http'), path=require('path');
@@ -59,7 +59,7 @@ srv.listen(4477);
 let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' — '+d:''));};
 
 (async()=>{
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
+  const b=await chromium.launch({executablePath:require('../_chromium.cjs').executablePath(),args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
   // On masque le compte le PLUS EN RETARD : c'est celui qui, sans la garde,
   // ressort en rouge « en panne ». Masquer un compte frais ne prouverait rien.
   const parUid={}; accounts.forEach(a=>{ parUid[String(a.vinted_user_id)]=String(a.login||''); });

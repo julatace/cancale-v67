@@ -17,7 +17,7 @@
 // `vinted`, comme background.js de la 5.116 à la 5.163), `etat` = le cookie.
 // Ce qui est jugé : des attributs `data-*`, la valeur du `<select>`, le style
 // calculé des lignes — jamais une formulation.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require('playwright');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -159,7 +159,7 @@ const messagerie = (pg) => pg.evaluate(() => {
   let b;
   const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom + ' : le scénario a tourné jusqu’au bout', String(e && e.message).slice(0, 200)); } };
   try {
-    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+    b = await chromium.launch({ executablePath: require('../_chromium.cjs').executablePath(), args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
 
     console.log('── 1. Chrome ouvert sur compte_a (111), rien choisi — Ventes');
     await essaie('1', async () => {

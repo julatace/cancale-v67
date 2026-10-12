@@ -22,7 +22,7 @@
 //     devant, ou relance) — jamais un clic muet ;
 //   · un clic refusé DIT pourquoi (grisé, refus de l'extension) ;
 //   · le bouton annonce les photos captées sur le total de l'annonce.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require('playwright');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -97,7 +97,7 @@ const PONT = ({ mode, version, suite = 'fait' }) => {
 (async () => {
   let b;
   try {
-    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+    b = await chromium.launch({ executablePath: require('../_chromium.cjs').executablePath(), args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
     // ⚠️ « À jour » = le seuil de `EXT_CAPACITES.publication`, lu dans l'app :
     //    il est passé de 5.130 à 5.160 (le relais des commandes ne transportait
     //    pas l'identifiant avant), et ce banc servait encore 5.130 — rouge sur

@@ -53,9 +53,23 @@ const manifMain = git(['show', 'origin/main:vinted-sync-extension/manifest.json'
 const fondMain = git(['show', 'origin/main:vinted-sync-extension/background.js']);
 if (refMain && manifMain && fondMain) {
   const vMain = (JSON.parse(manifMain).version || '').trim();
-  const portePas = (re) => !re.test(fondMain.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, ''));
-  if (portePas(/\bcode:\s*CODE_VERSION\b/)) SANS_CODE.add(vMain);
-  if (portePas(/function\s+demanderLiaison\b/)) SANS_LIAISON.add(vMain);
+  // Un retrait de commentaires par regex traverse les chaînes et les motifs
+  // de background.js : il effaçait demanderLiaison, pourtant bien publiée.
+  // Babel distingue le code des commentaires sans modifier le texte analysé.
+  const astMain = require('@babel/parser').parse(fondMain, { sourceType: 'script' });
+  let avecCode = false, avecLiaison = false;
+  const visiter = (n) => {
+    if (!n || typeof n !== 'object') return;
+    if (Array.isArray(n)) { n.forEach(visiter); return; }
+    if (n.type === 'FunctionDeclaration' && n.id?.name === 'demanderLiaison') avecLiaison = true;
+    if (n.type === 'ObjectProperty' && !n.computed && n.key?.name === 'code' && n.value?.name === 'CODE_VERSION') avecCode = true;
+    for (const [k, v] of Object.entries(n)) {
+      if (!['loc', 'leadingComments', 'trailingComments', 'innerComments', 'comments', 'tokens'].includes(k) && v && typeof v === 'object') visiter(v);
+    }
+  };
+  visiter(astMain.program);
+  if (!avecCode) SANS_CODE.add(vMain);
+  if (!avecLiaison) SANS_LIAISON.add(vMain);
   console.log(`· origin/main (${refMain.trim()}) : ${vMain} — état avec \`code\` : ${SANS_CODE.has(vMain) ? 'non' : 'oui'} · liaison : ${SANS_LIAISON.has(vMain) ? 'non' : 'oui'}`);
 } else {
   console.log('· origin/main illisible ici (copie sans .git ?) : seules les versions mesurées le 11 octobre comptent');

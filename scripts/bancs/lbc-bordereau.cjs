@@ -24,7 +24,7 @@
 //   2. un onglet s'ouvre sur un PDF qui PORTE le titre (tampon), jamais un
 //      téléchargement ;
 //   3. extension trop ancienne : le lien d'avant (PDF tel quel), aucun appel.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require('playwright');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -106,7 +106,7 @@ async function rendre(b, version) {
 (async () => {
   let b;
   try {
-    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+    b = await chromium.launch({ executablePath: require('../_chromium.cjs').executablePath(), args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
     console.log('── extension à jour (5.136)');
     {
       const r = await rendre(b, '5.136.0');

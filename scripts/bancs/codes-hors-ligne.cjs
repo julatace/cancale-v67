@@ -3,7 +3,7 @@
 // sur BaseInjoignable — et sans ce chantier, il ne voit plus SES codes. On en
 // garde une copie LOCALE : phase 1 (base up) les lit → cache écrit ; phase 2
 // (base KO) les affiche depuis le cache. Données INVENTÉES (vit dans le dépôt).
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require('playwright');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -52,7 +52,7 @@ const projette = (row, sel) => {
 async function main() {
   let b;
   try {
-    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+    b = await chromium.launch({ executablePath: require('../_chromium.cjs').executablePath(), args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
     for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }]) {
       const T = vp.width < 600 ? '📱' : '🖥️';
       await essaie(`${T} hors ligne`, async () => {

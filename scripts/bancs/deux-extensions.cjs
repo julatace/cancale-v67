@@ -32,7 +32,7 @@
 //      au-dessus de « Lecture seule » — il porte le même blocage que la pastille
 //      (`data-liaison-reste`) et le geste ; seule, il ne l'invente pas.
 // Ce qui est jugé : des `data-*` et ce que les ponts ont REÇU — pas une formulation.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require('playwright');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -181,7 +181,7 @@ async function rendre(b, { ponts, onglet = 'cat_ventes', tel = false, vrm = null
   let b;
   const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom + ' : le scénario a tourné jusqu’au bout', String(e && e.message).slice(0, 200)); } };
   try {
-    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+    b = await chromium.launch({ executablePath: require('../_chromium.cjs').executablePath(), args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
 
     for (const tel of [false, true]) {
       const t = tel ? '390 px' : '1512 px';

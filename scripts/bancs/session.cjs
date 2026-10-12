@@ -52,7 +52,7 @@ const fs = require('fs'), path = require('path'), os = require('os'), https = re
 const { execFileSync } = require('child_process');
 const chargerPw = () => { for (const p of [__dirname, process.cwd(), '/home/user/cancale-v67']) { try { return require(require.resolve('playwright', { paths: [p] })); } catch (_) {} } return null; };
 const pw = chargerPw();
-const CHROME = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const CHROME = require('../_chromium.cjs').executablePath();
 const PORT = Number(process.env.BANC_PORT) || 4794;
 const iA = process.argv.indexOf('--arbre');
 const ARBRE = iA > 0 ? path.resolve(process.argv[iA + 1]) : path.join(__dirname, '..', '..');

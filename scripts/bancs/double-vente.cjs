@@ -14,7 +14,7 @@
 //     enfin listée ; celle d'un inconnu (étiquetée de son propre compte) non ;
 //   · le tableau de bord dit la même chose (même règle, §11) ;
 //   · aucun débordement, aucune erreur.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require('playwright');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -84,7 +84,7 @@ const projette = (row, sel) => {
 (async () => {
   let b;
   try {
-    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+    b = await chromium.launch({ executablePath: require('../_chromium.cjs').executablePath(), args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
     for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }]) {
       console.log(`── ${vp.width} px`);
       rows[0].data = JSON.parse(JSON.stringify(MAIN));   // chaque passe repart de la même base

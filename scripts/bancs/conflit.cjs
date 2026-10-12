@@ -3,7 +3,7 @@
 // La numérotation automatique a redonné N°1 à N°16 en août alors qu'ils étaient
 // déjà dans le pool. Deux paires sous le même numéro = la mauvaise chaussure
 // part. Ce banc vérifie que l'app le lui DIT, en rouge, là où se fait le geste.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require('playwright');
 const { metaVersData } = require('./_meta.cjs');
 const { dressingsDuJour } = require('./_instantane.cjs'); // fx/ est une photo datée : la lecture du dressing la plus récente = « il y a 1 min » (règle « en ligne » ≤ 24 h)
 const fs=require('fs'), http=require('http'), path=require('path');
@@ -59,7 +59,7 @@ const vivants=Object.entries(par).filter(([,ks])=>ks.filter(k=>enLigne.has(Strin
 let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' — '+d:''));};
 (async()=>{
   console.log('base servie : '+vivants.length+' numeros portes par 2+ paires EN LIGNE ('+vivants.map(([n])=>'N°'+n).join(' ')+')');
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
+  const b=await chromium.launch({executablePath:require('../_chromium.cjs').executablePath(),args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
   const pg=await b.newPage({viewport:{width:1512,height:950}});
   const errs=[]; pg.on('pageerror',e=>errs.push(e.message));
   await pg.addInitScript(()=>{try{localStorage.setItem('vrm_acces_direct','1');}catch(_){}});

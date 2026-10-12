@@ -35,7 +35,7 @@
 //      et le DIT à côté du chiffre.
 // Et toujours : un compte exclu n'apparaît pas, aucun rouge ni ambre (§7),
 // aucun débordement, aucune erreur d'app. Port 4802.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require('playwright');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -235,7 +235,7 @@ const communs = (r, errs, quoi) => {
 (async () => {
   let b;
   try {
-    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+    b = await chromium.launch({ executablePath: require('../_chromium.cjs').executablePath(), args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
     const mainNormal = { vinted_accounts_hidden: ['9104'], vrm_urssaf_declare: DECLARATIONS };
 
     // ── A. Le cas courant, aux deux tailles : compte_panne ne répond pas.

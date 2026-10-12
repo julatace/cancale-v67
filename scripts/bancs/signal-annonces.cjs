@@ -22,7 +22,7 @@
 //   4. aucune erreur d'app.
 // Ce qui est jugé : les requêtes réseau (le relais, la ligne relue) et les
 // cartes rendues (`data-carte-annonce`) — pas une formulation.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require('playwright');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -131,7 +131,7 @@ const SUPP = (ids) => ({ id: 'harvest_111_supprimees', data: { uid: '111', ids: 
   let b;
   const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom + ' : le scénario a tourné jusqu’au bout', String(e && e.message).slice(0, 200)); } };
   try {
-    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+    b = await chromium.launch({ executablePath: require('../_chromium.cjs').executablePath(), args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
 
     for (const [onglet, sansVentes] of [['cat_annonces', false], ['dashboard', false], ['cat_annonces', true]]) {
       const nom = `${onglet}${sansVentes ? ' (ventes et boîte absentes aussi)' : ''}`;

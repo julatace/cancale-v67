@@ -11,11 +11,19 @@ Les bancs lisent leurs données dans un dossier `fx/` **à côté d'eux**, qui n
 vraies adresses — et **ce dépôt est public**.
 
 ```bash
-mkdir -p /tmp/bancs && cp scripts/bancs/*.cjs /tmp/bancs/
+npm ci
+npx playwright install chromium
 node scripts/bancs/copie-fixtures.mjs <SUPABASE_URL> <ANON_KEY>   # écrit fx/
 npm run build            # ⚠️ jamais pendant qu'un banc sert dist/
-node /tmp/bancs/verif_visuel.cjs
+node scripts/bancs/verif_visuel.cjs
 ```
+
+Les bancs utilisent le Playwright du dépôt et le navigateur installé par
+Playwright. Ils tournent aussi sur macOS et Windows. L'ancien Chromium Linux
+du conteneur reste utilisé s'il existe ; `BANC_CHROMIUM=/chemin/vers/chrome`
+permet de choisir un autre exécutable. Une valeur inexistante fait échouer le
+contrôle. Pour vérifier une autre version du code, utiliser une copie complète
+du dépôt avec ses dépendances, pas seulement une copie des scripts.
 
 `copie-fixtures.mjs` ne copie **jamais** les PDF (§4.4 : 6 Mo dont 99 % de PDF).
 
