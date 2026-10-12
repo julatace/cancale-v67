@@ -439,3 +439,65 @@ quand même. `messagerie.cjs` reste vert (sans mock, `TRAD_OK` faux → rien).
 
 Aucune entrée d'`EXT_CAPACITES` : c'est le navigateur qui traduit, l'app ne
 promet rien de l'extension.
+
+---
+
+## Bilan de l'étape G — ce qui est livré, ce qui reste et pourquoi (12 octobre)
+
+**Livré et en ligne cette passe (chaîne de preuve complète, PR mergée, déploiement
+READY sur vrm.center, `/api/sante` ok) :**
+- **G1** prix d'achat au numérotage (#479) · **G11** copier le prix payé (#480) ·
+  **G24** compte qui vend le mieux (#482) · **G22** favoris sans vente → remise
+  native (#483) · **G34** saisie vocale (#484) · **G9** codes de retrait hors
+  ligne (#485) · **G35** traduction des messages (#486).
+
+**Déjà en production (mesuré, rien à refaire) :** 14, 21 (Argent) · 3, 6
+(Alertes) · 13, 25 (Ventes) · 16, 4 (Terrain) · 15 récap comptable (Comptes).
+
+**Mesuré impossible / data-starved (documenté, pas inventé) :**
+- **18** (alerte « achat à vérifier avant date limite ») : 0 délai de protection
+  acheteur dans ses 1581 achats, pas d'état « livré en attente de validation » —
+  on ne peut pas inventer le délai de Vinted.
+- **23** (coût de boost par paire) : aucune trace de boost rattachable à une paire
+  en base (§5.132) — un coût de compte, jamais réparti.
+
+**Différés — chacun exige une DÉCISION de Julien ou une ressource qu'une session
+autonome ne peut pas se donner (le projet interdit d'inventer une règle qu'il n'a
+pas tranchée, et d'expédier de l'irréversible sur son outil de gagne-pain) :**
+- **2** (double vente notifiée app fermée) : push SERVEUR, et le versant eBay est
+  la ligne de l'Agent 1. Cross-lane.
+- **10** (rappel la veille au soir) : demande un SECOND cron Vercel. Un cron refusé
+  au déploiement bloque TOUS les déploiements (leçon #250) — à ne pas tenter sans
+  que Julien l'ait validé (il est noté « à trancher » dans CLAUDE.md, section
+  Bilan de la semaine).
+- **33 Studio** : le **détourage est déjà en prod** (Photoroom, clé vendeur, §2.9).
+  Le « cadre guide + modèle LOCAL dans la page » est sous **licence commerciale**
+  (noté dans la passation) — pas de modèle sans clé ni licence libre mesuré, donc
+  pas construit (§2.9 : ni SA clé, ni un coût caché).
+- **17 double vérification de connexion (2FA)** : aucun MFA aujourd'hui (mesuré :
+  0 `factors`/`totp`/`enroll`). Buildable avec le MFA natif de Supabase, MAIS :
+  (a) Julien est seul utilisateur et **un mauvais enrôlement le VERROUILLE hors de
+  son propre outil** — irréversible sans plan de récupération ; (b) ça touche le
+  flux d'auth que la ligne « session adressée » de l'extension fait mûrir. Il faut
+  SON feu vert + un chemin de récupération décidé avec lui. Différé, pas abandonné.
+- **37 mode équipe** : aucun code équipe aujourd'hui (mesuré). C'est de l'auth +
+  RLS (migration 020+), **testable seulement sur une branche Supabase** (§2.3,
+  jamais la prod), et il reste des choix PRODUIT non tranchés : quel périmètre
+  exact (« colis et codes » = quels écrans ?), comment un membre s'authentifie
+  (login séparé ? invitation par email — or les adresses ne sont pas encore
+  PROUVÉES, pas de SMTP), comment on révoque. Ça se superpose à l'isolation
+  multi-vendeur encore en cours. À cadrer avec lui avant d'écrire une ligne.
+- **5 Vitesse (écrans à la demande)** : **les gros découpages sont déjà faits** —
+  `App.jsx` est en `React.lazy` derrière l'accueil (`main.jsx`), `three` (720 Ko)
+  et `pdf-lib` sont en `import()` dynamique. Le reste, c'est découper le fichier
+  **unique de ~37 000 lignes** par écran : un refactor « en dernier, seul » (dit
+  tel quel dans la passation) qui est un champ de mines TDZ (§4.6, le défaut le
+  plus fréquent du projet) et dont chaque interaction d'écran devrait être
+  revalidée. Le livrer en autonome sans Julien pour valider risquerait exactement
+  la casse silencieuse que le projet craint le plus. À faire incrémentalement,
+  écran par écran, avec un banc par écran — pas en une passe aveugle.
+
+**⇒ Tout ce qui est sûrement constructible en autonomie est livré.** Les 5 items
+restants (2, 10, 17, 33, 37) attendent une décision de Julien ou une ressource
+(cron validé, licence, branche + SMTP), et Vitesse 5 est le gros refactor final à
+mener écran par écran. Rien n'a été inventé ni expédié à l'aveugle.
