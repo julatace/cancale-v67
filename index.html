@@ -73,6 +73,26 @@
     html[data-theme="light"] { color-scheme: light; }
     @media (prefers-color-scheme: dark){ body{background:#07090D;background-image:none;} }
     *{-webkit-tap-highlight-color:transparent;}
+    /* ── COURBES & DURÉES, nommées UNE fois (cohésion : une app « composée »
+       réutilise les mêmes ressorts partout au lieu d'en réinventer à chaque
+       règle). --vrm-ease-ios était déjà la courbe de l'appui et des feuilles ;
+       --vrm-ease-out est la courbe d'ENTRÉE (sortie douce, sans rebond). */
+    :root{
+      --vrm-ease-ios:cubic-bezier(.32,.72,0,1);
+      --vrm-ease-out:cubic-bezier(.22,1,.36,1);
+      --vrm-dur-appui:.12s; --vrm-dur-etat:.2s; --vrm-dur-ecran:.28s;
+    }
+    /* ⚠️ LATENCE DU TOUCHER : sans `touch-action:manipulation`, iOS attend
+       ~300 ms après chaque tap (au cas où ce serait un double-tap pour zoomer).
+       `manipulation` garde le pan ET le pincer-pour-zoomer (le zoom du viewport,
+       gardé pour l'accessibilité, reste intact) et ne supprime QUE ce délai :
+       chaque bouton répond au doigt sans retard. C'est le détail qui sépare
+       « site web » de « app installée » sur son iPhone. */
+    button,a[role="button"],a.vrm-btn,input,select,textarea,[role="tab"],[role="switch"]{touch-action:manipulation;}
+    /* Un appui long sur un bouton ne doit PAS sélectionner son texte ni ouvrir
+       le menu « copier » d'iOS (un bouton n'est pas du texte). Réservé aux
+       boutons : les montants, eux, restent copiables. */
+    button,a[role="button"]{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;}
     /* ⚠️ COQUE APP-SHELL : la hauteur est bornée à l'écran et c'est le CONTENU
        (`<main>`) qui défile, jamais le document. La barre du bas vit HORS du
        défilement — elle ne peut donc plus « flotter au milieu de l'écran »
@@ -91,7 +111,7 @@
     body{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1,"cv05" 1,"ss01" 1;}
 
     /* 2) RÉPONSE AU TOUCHER : léger enfoncement au clic, comme une app native. */
-    button,a[role="button"]{transition:transform .12s cubic-bezier(.32,.72,0,1),box-shadow .2s ease,background-color .2s ease,border-color .2s ease,opacity .2s ease;}
+    button,a[role="button"]{transition:transform var(--vrm-dur-appui) var(--vrm-ease-ios),box-shadow var(--vrm-dur-etat) ease,background-color var(--vrm-dur-etat) ease,border-color var(--vrm-dur-etat) ease,opacity var(--vrm-dur-etat) ease;}
     button:active:not(:disabled),a[role="button"]:active{transform:scale(.975);}
 
     /* 3) TITRES ET MONTANTS : police d'AFFICHAGE, resserrée.
@@ -276,7 +296,11 @@
        piégées dessous, et sur téléphone la barre du bas (z 60) passait PAR-DESSUS
        leurs boutons : « CSV » et « PDF » étaient introuvables. `backwards` fait
        le même fondu à l'entrée et ne laisse rien une fois fini. */
-    main > *{animation:cancaleEnter .24s ease backwards;}
+    /* Courbe d'entrée d'écran : sortie douce (ease-out-quint) plutôt qu'un `ease`
+       symétrique — le changement d'onglet « se pose » au lieu de simplement
+       apparaître. Opacité SEULE (jamais transform : §commentaire plus haut sur
+       les enfants position:fixed). */
+    main > *{animation:cancaleEnter var(--vrm-dur-ecran) var(--vrm-ease-out) backwards;}
 
     /* 7bis) DÉBORDEMENTS — ⚠️ NE PAS mettre `min-width:0` en règle GLOBALE.
        Essayé, mesuré, ANNULÉ : ça enlève bien le plancher qui fait déborder un
