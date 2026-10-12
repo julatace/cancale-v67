@@ -59,6 +59,23 @@
 //   S. des liens morts sur Ventes, puis Annonces bloquée : la cause est
 //      remesurée sur l'écran qui échoue (elle restait « le serveur répond ») ;
 //   K. à 1512 px, aucun mot de la phrase sous l'île d'actions.
+// ── SECONDE REVUE DU 11 OCTOBRE (sept constats confirmés, cinq défauts distincts) ──
+//   T. l'extension refuse UNE fois chaque photo (un 503, une coupure de son
+//      service worker — le pont ne dit pas pourquoi), puis les rendrait : sans
+//      rien toucher, elles reviennent (le témoin la redemande, puis toutes) —
+//      elles restaient des pictogrammes, sous « rien à régler ici » ;
+//   X. Ma journée, le CDN injoignable à l'ouverture (l'extension, un vrai
+//      aller-retour HORS page, échoue aussi), puis en CORP : aucune photo
+//      RETIRÉE de la liste pendant la coupure, et elles reviennent ;
+//   O. hors ligne sur Ma journée, puis en ligne : rien de retiré, tout revient ;
+//   E (suite). le serveur répond (404) : aucune promesse que l'extension les
+//      récupérera (elle rend `{ok:false}` sur un statut d'erreur) ;
+//   W. PWA qui se réveille (3 s sans réseau) : aucune phrase « le serveur
+//      répond » ni « injoignable » — tout réessaie quand le réseau revient ;
+//   N. hors ligne mesuré : « pas de connexion », jamais « va sur l'ordinateur » ;
+//   Y. le bilan `diag_photos` dit le RETOUR une fois le CDN revenu, et une
+//      session sans échec REMPLACE un échec rangé par ce navigateur — sans rien
+//      écrire quand rien n'est rangé (C).
 // On juge les ÉLÉMENTS rendus (naturalWidth, `data-photo-vinted`,
 // `data-photos-bloquees` = la cause affichée, `data-photos-geste`), les
 // demandes reçues par le pont et le corps envoyé à la base — pas une formulation.
@@ -66,7 +83,8 @@ const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), https = require('https'), path = require('path'), os = require('os'), cp = require('child_process');
 const DIST = path.join(__dirname, '..', '..', 'dist');
-const PORT = 5741, PORT_CDN = 5742;
+// PORT_BANC / PORT_CDN : pour tourner à côté d'un autre banc (5741/5742 par défaut).
+const PORT = +process.env.PORT_BANC || 5741, PORT_CDN = +process.env.PORT_CDN || 5742;
 
 const MAINTENANT = Date.now();
 const ilYa = (j) => new Date(MAINTENANT - j * 86400000).toISOString();
@@ -115,9 +133,28 @@ const essaie = async (nom, f) => { if (SEUL && !nom.startsWith(SEUL)) return; tr
 
 // ── L'application ──
 const types = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/json', '.woff2': 'font/woff2' };
+// Le SERVICE WORKER de l'extension (`photoBytes`) : une requête faite HORS de la
+// page — ni CORP, ni référent — vers le faux CDN, comme le vrai. `{dataUrl:null}`
+// sur une erreur réseau ou un statut d'erreur (le pont ne relaie que ça).
+const SW = { n: 0, ok: 0, ko: 0 };
 const srv = http.createServer((q, r) => {
   // Une page VIDE de la même origine que l'app (contrôle 0 : le faux CDN bloque-t-il ?).
   if (q.url === '/__banc-vide') { r.writeHead(200, { 'content-type': 'text/html' }); return r.end('<!doctype html><title>banc</title>'); }
+  if (q.url.startsWith('/__sw?')) {
+    const u = new URL('http://x' + q.url).searchParams.get('u'); const cible = new URL(u);
+    SW.n++;
+    const repondre = (j) => { try { r.writeHead(200, { 'content-type': 'application/json' }); r.end(JSON.stringify(j)); } catch (_) {} };
+    const rq = https.request({ host: '127.0.0.1', port: PORT_CDN, servername: 'images1.vinted.net', path: cible.pathname + cible.search, method: 'GET', rejectUnauthorized: false, headers: { host: 'images1.vinted.net' } }, (rs) => {
+      const ch = []; rs.on('data', (c) => ch.push(c)); rs.on('end', () => {
+        const ok = rs.statusCode >= 200 && rs.statusCode < 300; const buf = Buffer.concat(ch);
+        if (ok && buf.length) { SW.ok++; repondre({ dataUrl: `data:${rs.headers['content-type'] || 'image/jpeg'};base64,${buf.toString('base64')}` }); }
+        else { SW.ko++; repondre({ dataUrl: null }); }
+      });
+    });
+    rq.on('error', () => { SW.ko++; repondre({ dataUrl: null }); });
+    rq.setTimeout(20000, () => rq.destroy(new Error('timeout')));
+    rq.end(); return;
+  }
   let f = q.url.split('?')[0]; if (f === '/' || !path.extname(f)) f = '/index.html';
   const p = path.join(DIST, f);
   if (!fs.existsSync(p)) { r.writeHead(404); return r.end(); }
@@ -172,7 +209,11 @@ const projette = (row, sel) => {
 // `retard` (le pont n'existe pas avant ce délai : extension installée ou
 // réactivée pendant que VRM est ouvert), `muet` (il annonce sa présence, puis
 // ne répond plus à rien : service worker mort).
-const PONT = ({ dataUrl, delai, refuse, refusePremieres, lentPremieres, lentMs, retard, muet }) => {
+// `refusUneFois` : {cles, n} — la PREMIÈRE demande de n photos de ces familles
+// est refusée (un 503, une coupure du service worker), les suivantes rendues ;
+// `sw` : chaque demande fait un vrai aller-retour HORS page (`/__sw`) ;
+// `refuseHorsLigne` : hors ligne, l'extension n'obtient rien (son fetch échoue).
+const PONT = ({ dataUrl, delai, refuse, refusePremieres, lentPremieres, lentMs, retard, muet, refusUneFois, sw, refuseHorsLigne }) => {
   window.__pont = { enVol: 0, max: 0, total: 0, rendues: 0, refusees: 0, parUrl: {} };
   const version = '5.164.0';
   const t0 = Date.now();
@@ -201,6 +242,18 @@ const PONT = ({ dataUrl, delai, refuse, refusePremieres, lentPremieres, lentMs, 
         p.lentesPrises = p.lentesPrises || [];
         if (!p.lentesPrises.includes(d.url) && p.lentesPrises.length < lentPremieres.n) { p.lentesPrises.push(d.url); lente = true; }
       }
+      if (refusUneFois && refusUneFois.cles.some((x) => String(d.url).includes(x))) {
+        p.uneFois = p.uneFois || {};
+        if (p.uneFois[d.url] === undefined && Object.keys(p.uneFois).length < refusUneFois.n) { p.uneFois[d.url] = 1; nul = true; }
+      }
+      if (refuseHorsLigne && !navigator.onLine) { nul = true; p.horsLigne = (p.horsLigne || 0) + 1; }
+      if (sw && !nul) {
+        fetch('/__sw?u=' + encodeURIComponent(d.url)).then((r) => r.json()).catch(() => ({ dataUrl: null })).then((j) => {
+          p.enVol--; if (j.dataUrl) p.rendues++; else p.refusees++;
+          post({ __vmr: 'photo:result', reqId: d.reqId, dataUrl: j.dataUrl || null });
+        });
+        return;
+      }
       const ms = lente ? lentMs : delai;
       setTimeout(() => { p.enVol--; if (nul || !dataUrl) p.refusees++; else p.rendues++; post({ __vmr: 'photo:result', reqId: d.reqId, dataUrl: nul ? null : dataUrl }); }, ms);
     }
@@ -209,7 +262,10 @@ const PONT = ({ dataUrl, delai, refuse, refusePremieres, lentPremieres, lentMs, 
   else post({ __vmr: 'ready', version, id: 'banc' });
 };
 
-async function preparer(b, vp, { pont = false, diagKO = false, pontOpts = {} } = {}) {
+// `diagStock` : { data } — la ligne `diag_photos` de la base, lue ET réécrite
+// (sinon une écriture n'est jamais relue, et « remplacer un échec rangé » ne se
+// mesure pas).
+async function preparer(b, vp, { pont = false, diagKO = false, pontOpts = {}, diagStock = null } = {}) {
   const ctx = await b.newContext({ viewport: vp, ignoreHTTPSErrors: true, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
@@ -223,10 +279,14 @@ async function preparer(b, vp, { pont = false, diagKO = false, pontOpts = {} } =
     const req = route.request();
     const u = decodeURIComponent(metaVersData(req.url()));
     const j = (d, s = 200) => route.fulfill({ status: s, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
-    if (req.method() !== 'GET') { ecrits.push({ url: u, body: req.postData() || '' }); return j([]); }
+    if (req.method() !== 'GET') {
+      ecrits.push({ url: u, body: req.postData() || '' });
+      if (diagStock && /diag_photos/.test(req.postData() || '')) { try { diagStock.data = JSON.parse(req.postData())[0].data; } catch (_) {} }
+      return j([]);
+    }
     if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCOUNTS);
-    if (/id=eq\.diag_photos/.test(u)) return diagKO ? route.fulfill({ status: 522, contentType: 'text/html', body: '<html>522</html>' }) : j([]);
+    if (/id=eq\.diag_photos/.test(u)) return diagKO ? route.fulfill({ status: 522, contentType: 'text/html', body: '<html>522</html>' }) : j(diagStock && diagStock.data ? [{ data: diagStock.data }] : []);
     const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
     const forme = (r) => (sel && sel !== 'data,updated_at,cap:data->>capturedAt' && !/^id,data|^data$|^data,/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: new Date(MAINTENANT).toISOString(), cap: r.data.capturedAt });
     const eq = /id=eq\.([^&]*)/.exec(u);
@@ -486,7 +546,7 @@ const pageTexte = (pg) => pg.evaluate(() => document.body.innerText);
       console.log('── C. le CDN marche');
       cdnEtat.mode = 'ok';
       await essaie(`C ${L}`, async () => {
-        const { ctx, pg, errs } = await preparer(b, vp, { pont: true });
+        const { ctx, pg, errs, ecrits } = await preparer(b, vp, { pont: true });
         await ouvrir(pg, 'plat_vinted', 3000);
         await section(pg, 'annonces', 5000);
         await versPhotos(pg, 2500);
@@ -494,6 +554,11 @@ const pageTexte = (pg) => pg.evaluate(() => document.body.innerText);
         dit(m.ecran >= 2 && m.affichees === m.ecran, `C ${L} : les photos s'affichent directement`, JSON.stringify({ ecran: m.ecran, affichees: m.affichees }));
         dit(!!p && p.total === 0, `C ${L} : aucune demande à l'extension`, p ? `${p.total} demande(s)` : 'pont muet');
         dit(m.phrases === 0, `C ${L} : aucune phrase`, `${m.phrases}`);
+        // Y (l'autre sens) : tout s'affiche et aucun échec n'est rangé ⇒ AUCUNE
+        // écriture de diag_photos (pas une ligne de plus à chaque ouverture).
+        await pg.waitForTimeout(4000);
+        const diagC = ecrits.filter((e) => /diag_photos/.test(e.body));
+        dit(diagC.length === 0, `Y ${L} : tout s'affiche, rien d'échoué n'est rangé ⇒ aucune écriture de diag_photos`, `${diagC.length} écriture(s)`);
         dit(errs.length === 0, `C ${L} : aucune erreur d'app`, errs.join(' | ').slice(0, 160));
         await ctx.close();
       });
@@ -699,8 +764,25 @@ const pageTexte = (pg) => pg.evaluate(() => document.body.innerText);
       const m = await mesurer(pg);
       dit(m.phrases === 1 && m.sonde === 'reponse', 'E : la sonde a mesuré « le serveur a répondu », et la phrase est dite une fois', `${m.phrases} phrase(s), sonde ${m.sonde}`);
       dit(m.phrases === 1 && !/bloque/i.test(m.texte), 'E : la phrase n’affirme pas un blocage du navigateur qu’on n’a pas mesuré', m.texte.slice(0, 160));
+      // ⚠️ Seconde revue : sur une réponse d'erreur, l'extension rend `{ok:false}`
+      // (photoBytes) — la phrase ne promet pas qu'elle « va les chercher ».
+      dit(m.phrases === 1 && m.geste === 'reponse', 'E : le serveur répond ⇒ aucune promesse que l’extension les récupérera (le geste ne dépend pas d’elle)', `${m.geste} · ${m.texte.slice(0, 200)}`);
       dit(m.cassees === 0, 'E : aucune image cassée', `${m.cassees}`);
       dit(errs.length === 0, 'E : aucune erreur d’app', errs.join(' | ').slice(0, 160));
+      await ctx.close();
+    });
+    // Le même cas sur téléphone : c7efee0 y disait « sur l'ordinateur où
+    // l'extension VRM est installée, c'est elle qui les récupère » — la même
+    // promesse non mesurée, sous le geste `telephone`.
+    cdnEtat.mode = 'erreur';
+    await essaie('E390', async () => {
+      const { ctx, pg, errs } = await preparer(b, { width: 390, height: 844 }, { pont: false });
+      await ouvrir(pg, 'plat_vinted', 3000);
+      await section(pg, 'annonces', 12000);
+      const m = await mesurer(pg);
+      dit(m.phrases === 1 && m.sonde === 'reponse', 'E390 : le scénario est réel (sonde « le serveur a répondu », la phrase est là)', `${m.phrases} phrase(s), sonde ${m.sonde}`);
+      dit(m.phrases === 1 && m.geste === 'reponse' && !/les r[ée]cup[èe]re|va les chercher/i.test(m.texte), 'E390 : sur téléphone non plus, aucune promesse que l’extension les récupérera', `${m.geste} · ${m.texte.slice(0, 220)}`);
+      dit(errs.length === 0, 'E390 : aucune erreur d’app', errs.join(' | ').slice(0, 160));
       await ctx.close();
     });
 
@@ -714,6 +796,188 @@ const pageTexte = (pg) => pg.evaluate(() => document.body.innerText);
       const diag = ecrits.filter((e) => /diag_photos/.test(e.body));
       dit(diag.length === 0, 'F : lecture ratée de diag_photos ⇒ aucune écriture (« rien lu » ne vaut pas « rien »)', `${diag.length} écriture(s)`);
       await ctx.close();
+    });
+    // ══ SECONDE REVUE DU 11 OCTOBRE ══════════════════════════════════════════
+    const V390 = { width: 390, height: 844 };
+    const urlsRefusees = (p) => (p && p.uneFois ? Object.keys(p.uneFois) : []);
+
+    // ── T. L'extension refuse UNE fois chaque photo, puis les rendrait ─────────
+    // Un 503 ou un 429 du CDN, une coupure de son service worker : le pont ne
+    // relaie que `dataUrl`, la réponse arrive comme un lien mort. Sur c7efee0 :
+    // 3 pictogrammes pour toute la session, une seule demande par photo.
+    console.log('\n── T. l’extension refuse une fois trois photos d’Annonces, puis les rendrait — 1512 px');
+    cdnEtat.mode = 'corp';
+    await essaie('T', async () => {
+      const { ctx, pg, errs } = await preparer(b, V1512, { pont: true, pontOpts: { refusUneFois: { cles: JETONS_ANNONCES, n: 3 } } });
+      await ouvrir(pg, 'plat_vinted', 3000);
+      await section(pg, 'annonces', 6000);
+      await versPhotos(pg, 2000);
+      let m = await mesurer(pg); let p = await pont(pg);
+      const refusees = urlsRefusees(p);
+      await capture(pg, 'T-annonces-t0');
+      dit(refusees.length === 3 && m.perdues >= 3, 'T : le scénario est réel (trois photos refusées une fois, « perdues » à l’écran)', `${refusees.length} refusée(s), ${m.perdues} perdue(s)`);
+      // Sans rien toucher : le témoin passe à 20 s.
+      await pg.waitForTimeout(24000);
+      m = await mesurer(pg); p = await pont(pg);
+      await capture(pg, 'T-annonces-t30');
+      const redemandes = refusees.map((u) => p.parUrl[u] || 0);
+      dit(m.ecran >= 2 && m.affichees === m.ecran && m.pictoEcran === 0 && m.perdues === 0, 'T : sans rien toucher, les photos refusées une fois reviennent (l’extension leur est redemandée)', detail(m) + ` · perdues ${m.perdues}`);
+      dit(redemandes.length === 3 && redemandes.every((n) => n === 2), 'T : chacune redemandée UNE fois de plus, pas davantage', JSON.stringify(redemandes));
+      dit(m.phrases === 0, 'T : aucune phrase', `${m.phrases} : ${m.texte.slice(0, 120)}`);
+      dit(errs.length === 0, 'T : aucune erreur d’app', errs.join(' | ').slice(0, 160));
+      await ctx.close();
+    });
+    console.log('\n── T390. Ventes : l’extension refuse une fois toutes les photos — 390 px');
+    cdnEtat.mode = 'corp';
+    await essaie('T390', async () => {
+      const { ctx, pg, errs } = await preparer(b, V390, { pont: true, pontOpts: { refusUneFois: { cles: JETONS_VENTES, n: 99 } } });
+      // La cause se mesure en deux sondes espacées de 8 s : la phrase arrive vers 11 s.
+      await ouvrir(pg, 'plat_vinted', 9000);
+      await versPhotos(pg, 3500);
+      let m = await mesurer(pg);
+      await capture(pg, 'T390-ventes-t0');
+      dit(m.phrases === 1 && m.geste === 'refus', 'T390 : le scénario est réel (la phrase « l’extension n’a pas pu » est là)', `${m.phrases} · ${m.geste}`);
+      dit(!/rien à régler/i.test(m.texte), 'T390 : la phrase ne dit plus « rien à régler ici » (un rechargement les faisait revenir)', m.texte.slice(0, 200));
+      await pg.waitForTimeout(24000);
+      m = await mesurer(pg);
+      await capture(pg, 'T390-ventes-t30');
+      dit(m.ecran >= 2 && m.affichees === m.ecran && m.pictoEcran === 0, 'T390 : sans rien toucher, les photos de Ventes reviennent', detail(m));
+      dit(m.phrases === 0, 'T390 : et la phrase s’en va', `${m.phrases} : ${m.texte.slice(0, 120)}`);
+      dit(errs.length === 0, 'T390 : aucune erreur d’app', errs.join(' | ').slice(0, 160));
+      await ctx.close();
+    });
+
+    // ── X. Ma journée : le CDN injoignable à l'ouverture, puis en CORP ─────────
+    // L'extension fait un VRAI aller-retour hors page : pendant la coupure elle
+    // échoue aussi. Sur c7efee0 : les 5 photos RETIRÉES de la liste (onError sur
+    // un refus « définitif »), et jamais remontrées une fois le réseau revenu.
+    console.log('\n── X. Ma journée : le CDN coupé à l’ouverture (l’extension échoue aussi), puis en CORP — 1512 px');
+    cdnEtat.mode = 'coupe';
+    SW.n = SW.ok = SW.ko = 0;
+    await essaie('X', async () => {
+      const { ctx, pg, errs } = await preparer(b, V1512, { pont: true, pontOpts: { sw: true } });
+      await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
+      await pg.waitForTimeout(6000);
+      await pg.evaluate(() => { const c = document.querySelector('.vrm-carrousel'); const mn = document.querySelector('main[data-defile]'); if (c && mn) { mn.scrollTop += c.getBoundingClientRect().top - mn.getBoundingClientRect().top - 60; } });
+      await pg.waitForTimeout(6000);
+      const c1 = await carrousel(pg); const p1 = await pont(pg);
+      await capture(pg, 'X-journee-coupe');
+      dit(!!p1 && p1.refusees >= 2 && SW.ko >= 2, 'X : le scénario est réel (l’extension, hors page, a échoué pendant la coupure)', `pont ${p1 && p1.refusees} refusée(s) · service worker ${JSON.stringify(SW)}`);
+      dit(!!c1 && c1.cartes >= 3 && c1.retirees === 0, 'X pendant la coupure : aucune photo RETIRÉE de la liste (elles gardent leur place)', JSON.stringify(c1));
+      cdnEtat.mode = 'corp';                        // le réseau revient ; la PAGE reste refusée (CORP)
+      await pg.waitForTimeout(30000);
+      const c2 = await carrousel(pg); const p2 = await pont(pg);
+      await capture(pg, 'X-journee-retour');
+      dit(!!c2 && c2.secours >= 2 && c2.retirees === 0, 'X le réseau revenu : les photos des dernières ventes reviennent par l’extension, sans recharger', JSON.stringify(c2) + ` · pont ${p2 && p2.total} demande(s) · service worker ${JSON.stringify(SW)}`);
+      dit(errs.length === 0, 'X : aucune erreur d’app', errs.join(' | ').slice(0, 160));
+      await ctx.close();
+    });
+
+    // ── O. Hors ligne sur Ma journée, puis en ligne ────────────────────────────
+    console.log('\n── O. hors ligne sur Ma journée (l’extension n’obtient rien), puis en ligne — 1512 px');
+    cdnEtat.mode = 'corp';
+    await essaie('O', async () => {
+      const { ctx, pg, errs } = await preparer(b, V1512, { pont: true, pontOpts: { refuseHorsLigne: true } });
+      await ouvrir(pg, 'plat_vinted', 3000);
+      await section(pg, 'annonces', 4000);
+      await ctx.setOffline(true);
+      await pg.getByRole('button', { name: /Ma journée/ }).first().click();
+      await pg.waitForTimeout(5000);
+      await pg.evaluate(() => { const c = document.querySelector('.vrm-carrousel'); const mn = document.querySelector('main[data-defile]'); if (c && mn) { mn.scrollTop += c.getBoundingClientRect().top - mn.getBoundingClientRect().top - 60; } });
+      await pg.waitForTimeout(5000);
+      const c1 = await carrousel(pg); const p1 = await pont(pg);
+      await capture(pg, 'O-horsligne');
+      dit(!!p1 && (p1.horsLigne || 0) >= 1, 'O : le scénario est réel (hors ligne, l’extension a répondu sans image)', `${p1 && p1.horsLigne} refus hors ligne`);
+      dit(!!c1 && c1.cartes >= 3 && c1.retirees === 0, 'O hors ligne : aucune photo RETIRÉE de la liste', JSON.stringify(c1));
+      await ctx.setOffline(false);
+      await pg.waitForTimeout(12000);
+      const c2 = await carrousel(pg);
+      await capture(pg, 'O-enligne');
+      dit(!!c2 && c2.secours >= 2 && c2.retirees === 0, 'O de nouveau en ligne : les photos reviennent, sans recharger ni changer d’écran', JSON.stringify(c2));
+      dit(errs.length === 0, 'O : aucune erreur d’app', errs.join(' | ').slice(0, 160));
+      await ctx.close();
+    });
+
+    // ── W. PWA qui se réveille : 3 s sans réseau, puis il revient ──────────────
+    console.log('\n── W. le réseau manque 3 s à l’ouverture d’Annonces, puis revient (téléphone, aucune extension)');
+    cdnEtat.mode = 'ok';
+    await essaie('W', async () => {
+      const { ctx, pg, errs } = await preparer(b, V390, { pont: false });
+      await ouvrir(pg, 'plat_vinted', 9000);
+      cdnEtat.mode = 'coupe';
+      await section(pg, 'annonces', 300);
+      await versPhotos(pg, 0);                    // plusieurs photos À L'ÉCRAN échouent pendant la coupure
+      const t0 = Date.now();
+      const journal = [];
+      let bascule = false, faux = '', maxPicto = 0;
+      while (Date.now() - t0 < 30000) {
+        if (!bascule && Date.now() - t0 > 3000) { cdnEtat.mode = 'ok'; bascule = true; journal.push(`${((Date.now() - t0) / 1000).toFixed(1)} s : réseau revenu`); }
+        const m = await mesurer(pg);
+        if (!bascule) maxPicto = Math.max(maxPicto, m.pictoEcran);
+        const etat = `${m.phrases ? m.sonde + '/' + m.geste : '—'} · ${m.affichees} affichée(s) / ${m.pictoEcran} picto(s)`;
+        if (!journal.length || !journal[journal.length - 1].endsWith(etat)) journal.push(`${((Date.now() - t0) / 1000).toFixed(1)} s : ${etat}`);
+        if (m.phrases && /reponse|injoignable/.test(m.sonde || '') && !faux) faux = m.texte.slice(0, 160);
+        await pg.waitForTimeout(700);
+      }
+      await versPhotos(pg, 1500);
+      const m = await mesurer(pg);
+      dit(maxPicto >= 3, 'W : le scénario est réel (au moins trois photos à l’écran échouent pendant la coupure)', `${maxPicto} pictogramme(s) au plus`);
+      dit(!faux, 'W : réseau revenu en 3 s — aucune phrase « le serveur répond » ni « injoignable »', journal.join(' | ').slice(0, 400) + (faux ? ' · « ' + faux + ' »' : ''));
+      dit(m.ecran >= 2 && m.affichees === m.ecran && m.phrases === 0, 'W : les photos sont là, sans phrase', detail(m));
+      dit(errs.length === 0, 'W : aucune erreur d’app', errs.join(' | ').slice(0, 160));
+      await ctx.close();
+    });
+
+    // ── N. Hors ligne mesuré (téléphone, aucune extension) ─────────────────────
+    console.log('\n── N. le téléphone perd le réseau (navigator.onLine = false), aucune extension');
+    cdnEtat.mode = 'ok';
+    await essaie('N', async () => {
+      const { ctx, pg, errs } = await preparer(b, V390, { pont: false });
+      await ouvrir(pg, 'plat_vinted', 6000);
+      await ctx.setOffline(true);
+      await section(pg, 'annonces', 6000);
+      await versPhotos(pg, 5000);
+      const m = await mesurer(pg);
+      const horsLigne = await pg.evaluate(() => navigator.onLine === false);
+      await capture(pg, 'N-horsligne');
+      dit(horsLigne && m.pictoEcran >= 2, 'N : le scénario est réel (hors ligne, des photos ne se chargent pas)', `onLine=${!horsLigne} · ${detail(m)}`);
+      dit(m.phrases === 0 || (m.sonde === 'horsligne' && m.geste === 'reseau'), 'N : hors ligne ⇒ « pas de connexion », jamais « pas pu mesurer » ni « va sur l’ordinateur »', `${m.phrases} · ${m.sonde}/${m.geste} · ${m.texte.slice(0, 180)}`);
+      await ctx.setOffline(false);
+      await pg.waitForTimeout(6000);
+      const m2 = await mesurer(pg);
+      dit(m2.ecran >= 2 && m2.affichees === m2.ecran && m2.phrases === 0, 'N de nouveau en ligne : les photos reviennent, plus de phrase', detail(m2));
+      dit(errs.length === 0, 'N : aucune erreur d’app', errs.join(' | ').slice(0, 160));
+      await ctx.close();
+    });
+
+    // ── Y. Le bilan diag_photos dit le RETOUR (téléphone, aucune extension) ────
+    console.log('\n── Y. le bilan diag_photos après le retour du CDN, et une session sans échec qui remplace un échec rangé');
+    cdnEtat.mode = 'coupe';
+    await essaie('Y', async () => {
+      const stock = { data: null };
+      const { ctx, pg, ecrits } = await preparer(b, V390, { pont: false, diagStock: stock });
+      await ouvrir(pg, 'plat_vinted', 3000);
+      await section(pg, 'annonces', 16000);
+      const nav = await pg.evaluate(() => { const u = navigator.userAgent || ''; return (/iPhone|iPad/.test(u) ? 'iOS ' : /Android/.test(u) ? 'Android ' : /Mac/.test(u) ? 'Mac ' : /Windows/.test(u) ? 'Windows ' : '') + (/Edg\//.test(u) ? 'Edge' : /Chrome\//.test(u) ? 'Chrome' : /Firefox\//.test(u) ? 'Firefox' : /Safari\//.test(u) ? 'Safari' : 'autre'); });
+      const d1 = stock.data && stock.data.parNavigateur && stock.data.parNavigateur[nav];
+      dit(!!d1 && d1.ko > 0 && d1.ok === 0, 'Y : le scénario est réel (pendant la coupure, le bilan rangé dit l’échec)', JSON.stringify(d1).slice(0, 200));
+      cdnEtat.mode = 'ok';
+      await pg.waitForTimeout(38000);
+      await versPhotos(pg, 2000);
+      const m = await mesurer(pg);
+      const d2 = stock.data && stock.data.parNavigateur && stock.data.parNavigateur[nav];
+      dit(m.ecran >= 2 && m.affichees === m.ecran && m.phrases === 0, 'Y : les photos sont revenues (le témoin), plus de phrase', detail(m));
+      dit(!!d2 && d2.retours > 0 && d2.ok > 0 && d2.enEchec === 0, 'Y : le bilan rangé dit le RETOUR (revenues, 0 en échec) — plus « bloquée, 0 affichée, 0 revenue »', JSON.stringify(d2).slice(0, 240));
+      await ctx.close();
+      // Une session suivante où tout s'affiche REMPLACE l'échec rangé par ce navigateur.
+      cdnEtat.mode = 'ok';
+      const stock2 = { data: { at: new Date(MAINTENANT - 3600e3).toISOString(), parNavigateur: { [nav]: { at: new Date(MAINTENANT - 3600e3).toISOString(), ko: 9, ok: 0, retours: 0, sonde: 'bloquee', ext: 'absente' } } } };
+      const s2 = await preparer(b, V1512, { pont: false, diagStock: stock2 });
+      await ouvrir(s2.pg, 'plat_vinted', 3000);
+      await section(s2.pg, 'annonces', 12000);
+      const d3 = stock2.data && stock2.data.parNavigateur && stock2.data.parNavigateur[nav];
+      dit(!!d3 && d3.ko === 0 && d3.ok > 0 && d3.sansEchec === true, 'Y : une session où tout s’affiche remplace l’échec rangé par ce navigateur', JSON.stringify(d3).slice(0, 200));
+      await s2.ctx.close();
     });
   } catch (e) { dit(false, 'le banc a tourné jusqu’au bout', String(e && e.message).slice(0, 200)); }
   finally {
