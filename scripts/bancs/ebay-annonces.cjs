@@ -62,7 +62,7 @@ const CODE_DANS_ETAT_BANC = (require('fs').readFileSync(require('path').join(__d
 const auMoinsBanc = (v, s) => { const a = String(v || '').split('.').map(Number), b = String(s).split('.').map(Number); for (let i = 0; i < 3; i++) { if ((a[i] || 0) !== (b[i] || 0)) return (a[i] || 0) > (b[i] || 0); } return true; };
 const codeEtat = (v) => auMoinsBanc(v, CODE_DANS_ETAT_BANC) ? { code: v, ext: 'banc-ext' } : {};
 const DIST = path.join(__dirname, '..', '..', 'dist');
-const PORT = Number(process.env.BANC_PORT) || 4711;
+const PORT = Number(process.env.BANC_PORT || process.env.PORT) || 4711;
 const EXT_ATTENDUE = (/const EXT_ATTENDUE = '([^']+)'/.exec(fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'App.jsx'), 'utf8')) || [])[1] || '?';
 // Le pont simulé (le VRAI dialogue `ready` / `etat`), injecté AVANT l'app.
 // `o.vieux` : une seconde copie (elle répond au ping) · `o.muette` : le code qui
@@ -125,8 +125,12 @@ const VENTES = { capturedAt: auj.toISOString(), payload: { my_orders: [
 ] } };
 const bordereau = (tx, item) => ({ id: `harvest_111_label_${tx}`, data: { uid: '111', url: 'https://s3.test/l.pdf', tx: String(tx), item: String(item), items: [String(item)], capturedAt: auj.toISOString(), pdfB64: 'JVBERi0x' } });
 const BORDEREAUX = [bordereau(9001, 7002), bordereau(9003, 7003), bordereau(9006, 7006)];
+// (revue du 6 octobre) Le retrait AUTOMATIQUE exige que l'annonce eBay ait été
+// mise en ligne AVANT la vente Vinted (`depuis`, le StartTime d'eBay) et que la
+// liste des ventes (`orders_sold`) confirme la vente.
+const ilYaJ = (j) => new Date(Date.now() - j * 86400000).toISOString();
 const EBAY_ANNONCES = () => [
-  { itemId: '110000000001', title: 'Adidas Gazelle bleu taille 40', price: '80.0', sku: 'VRM-22', observateurs: 1, photo: 'https://img.test/e1.jpg', url: 'https://www.ebay.fr/itm/110000000001' },
+  { itemId: '110000000001', title: 'Adidas Gazelle bleu taille 40', price: '80.0', sku: 'VRM-22', observateurs: 1, photo: 'https://img.test/e1.jpg', url: 'https://www.ebay.fr/itm/110000000001', depuis: ilYaJ(10) },
   // Pas de SKU, et SA photo est exactement celle de la paire N°21 (une identité).
   { itemId: '110000000002', title: 'Nike Dunk Low panda taille 42', price: '100.0', sku: '', observateurs: 3, photo: 'https://img.test/v7001.jpg', url: 'https://www.ebay.fr/itm/110000000002' },
   { itemId: '110000000003', title: 'Salomon XT-6 noir taille 41', price: '120.0', sku: 'VRM-23', observateurs: null, photo: 'https://img.test/e3.jpg' },
@@ -139,15 +143,34 @@ const EBAY_COMMANDES = [
   // Sans SKU, au titre IDENTIQUE à la paire N°23 encore en ligne : ne désigne rien.
   { orderId: '01-003', orderPaymentStatus: 'PAID', lineItems: [{ sku: '', title: 'Salomon XT-6 noir taille 41' }], pricingSummary: { total: { value: '120.00', currency: 'EUR' } } },
 ];
+// La liste des ventes du compte (la forme de `orders_sold`) : la vente N°22
+// (transaction 9001) y est FINALISÉE — l'état le plus frais.
+const vente = (tx, titre, statut, j) => ({ transaction_id: tx, title: titre, price: { amount: '80.0', currency_code: 'EUR' }, status: statut, date: ilYaJ(j) });
+
+// (revue du 6 octobre) Le retrait automatique, trois paires qu'il ne doit PAS
+// toucher (et qui, sauf la remboursée, restent dans l'alerte avec le bouton) :
+//   · N°26 : la transaction dit encore « Le paiement a été validé », la liste
+//     de ses ventes dit « Remboursement effectué » — la paire est revenue ;
+//   · N°27 : l'annonce eBay a été mise en ligne APRÈS la vente (remise en vente) ;
+//   · N°28 : le N° est porté par DEUX fiches (héritage d'août).
+const AUTO_FICHES = { '7006': fiche('26', 'Puma Suede gris taille 42', 7006), '7007': fiche('27', 'Vans Old Skool noir taille 41', 7007), '7008': fiche('28', 'Asics Gel Lyte III taille 42', 7008), '8028': fiche('28', 'New Balance 990 gris taille 43', 8028) };
+const AUTO_TXN = [txn(9006, 7006, 400, 'Le paiement a été validé'), txn(9007, 7007, 450, 'Commande finalisée'), txn(9008, 7008, 450, 'Commande finalisée')];
+const AUTO_VENTES = [vente(9006, 'Puma Suede gris taille 42', 'Remboursement effectué', 4), vente(9007, 'Vans Old Skool noir taille 41', 'Commande finalisée', 5), vente(9008, 'Asics Gel Lyte III taille 42', 'Commande finalisée', 3)];
+const AUTO_ANNONCES = [
+  { itemId: '110000000006', title: 'Puma Suede gris 42', price: '60.0', sku: 'VRM-26', observateurs: 0, depuis: ilYaJ(10) },
+  { itemId: '110000000007', title: 'Vans Old Skool noir 41', price: '50.0', sku: 'VRM-27', observateurs: 0, depuis: ilYaJ(1) },
+  { itemId: '110000000008', title: 'Asics Gel Lyte III 42', price: '70.0', sku: 'VRM-28', observateurs: 0, depuis: ilYaJ(10) },
+];
 let rows = [];
-const remettre = () => {
+const remettre = (auto) => {
   rows = [
-    { id: 'main', data: JSON.parse(JSON.stringify(MAIN)) },
+    ...(auto ? AUTO_TXN : []),
+    { id: 'main', data: auto ? { ...JSON.parse(JSON.stringify(MAIN)), vinted_annonce_numeros: { ...MAIN.vinted_annonce_numeros, ...AUTO_FICHES } } : JSON.parse(JSON.stringify(MAIN)) },
     { id: 'harvest_111_listings', data: LISTINGS },
-    { id: 'harvest_111_orders_sold', data: { ...VENTES, payload: { my_orders: [...VENTES.payload.my_orders, ...Array.from({ length: ventesEnPlus }, (_, i) => ({ transaction_id: 9100 + i, title: 'Paire en plus ' + (i + 1), status: 'Le paiement a été validé', transaction_user_status: 'needs_action', date: recent(3) }))] } } },
+    { id: 'harvest_111_orders_sold', data: { ...VENTES, payload: { my_orders: [...VENTES.payload.my_orders.filter(v => !auto || !AUTO_VENTES.some(a => a.transaction_id === v.transaction_id)), ...(auto ? AUTO_VENTES : []), ...Array.from({ length: ventesEnPlus }, (_, i) => ({ transaction_id: 9100 + i, title: 'Paire en plus ' + (i + 1), status: 'Le paiement a été validé', transaction_user_status: 'needs_action', date: recent(3) }))] } } },
     ...TXN,
     ...BORDEREAUX,
-    { id: 'ebay_listings', data: { items: EBAY_ANNONCES(), capturedAt: Date.now() } },
+    { id: 'ebay_listings', data: { items: auto ? [...EBAY_ANNONCES(), ...AUTO_ANNONCES] : EBAY_ANNONCES(), capturedAt: Date.now() } },
     { id: 'ebay_orders', data: { orders: EBAY_COMMANDES, capturedAt: Date.now() } },
     // (5 octobre) Deux annonces PROGRAMMÉES : la N°22, prouvée vendue sur
     // Vinted ⇒ « programmée sur eBay — à annuler » ; la N°25 (une simple
@@ -507,7 +530,7 @@ const deborde = (pg) => pg.evaluate(() => ({ sw: document.documentElement.scroll
     //    sur la preuve ⇒ rien.
     console.log('── retrait automatique (1512 px)');
     {
-      remettre();
+      remettre(true);
       const o = await ouvrir(b, { width: 1512, height: 950 }, false);
       await essaie('retrait automatique', async () => {
         const auto = () => o.envois.filter((x) => x.action === 'retirer' && x.auto === true);
@@ -519,6 +542,7 @@ const deborde = (pg) => pg.evaluate(() => ({ sw: document.documentElement.scroll
         await o.pg.click('[data-ebay-retrait-auto-bouton]');
         await o.pg.waitForTimeout(300);
         dit((await o.pg.getAttribute('[data-ebay-retrait-auto]', 'data-ebay-retrait-auto')) === 'eteint', 'allumer DEMANDE d’abord (une annonce terminée ne revient pas)');
+        const confTxt = await feuille(o.pg).innerText().catch(() => '');
         await feuille(o.pg).locator('button', { hasText: 'Allumer' }).click();
         await o.pg.waitForTimeout(900);
         const memo = await o.pg.evaluate(() => localStorage.getItem('vrm_ebay_retrait_auto'));
@@ -533,9 +557,37 @@ const deborde = (pg) => pg.evaluate(() => ({ sw: document.documentElement.scroll
         dit(a.length === 1 && a[0].itemId === '110000000001' && a[0].sku === 'VRM-22' && a[0].confirme === true,
           'allumé : la paire N°22, PROUVÉE vendue sur Vinted, est retirée d’eBay — elle seule, avec son SKU', JSON.stringify(a));
         dit(!o.envois.some((x) => x.action === 'retirer' && /11000000000[35]/.test(x.itemId)), 'ni la N°23 (vente annulée), ni la N°25 (une conversation)');
+        dit(!o.envois.some((x) => x.action === 'retirer' && x.itemId === '110000000006'), 'ni la N°26 : sa vente a été REMBOURSÉE (la liste de ses ventes le dit, la transaction était périmée)');
+        dit(!o.envois.some((x) => x.action === 'retirer' && x.itemId === '110000000007'), 'ni la N°27 : son annonce eBay a été mise en ligne APRÈS la vente (une remise en vente voulue)');
+        dit(!o.envois.some((x) => x.action === 'retirer' && x.itemId === '110000000008'), 'ni la N°28 : son N° est porté par DEUX fiches (il désignerait peut-être l’autre paire)');
         await o.pg.reload({ waitUntil: 'domcontentloaded' });
         await o.pg.waitForTimeout(5000);
         dit(auto().length === 1, 'une annonce retirée ne repart pas (la synchro l’a sortie de la liste)', `${auto().length} envoi(s)`);
+        // Ce que le retrait automatique n'a pas fait reste À LUI, avec le bouton —
+        // sauf la paire remboursée, qui n'est plus vendue du tout.
+        await versAnnoncesEbay(o.pg);
+        const reste = await lire(o.pg);
+        dit(JSON.stringify([...reste.retirer].sort()) === '["110000000007","110000000008"]',
+          'l’alerte « à retirer d’eBay » garde la N°27 et la N°28 (son clic), et plus la N°26 remboursée', JSON.stringify(reste.retirer));
+        // (revue du 8 octobre) Allumé, l'écran dit POURQUOI chacune n'est pas
+        // partie toute seule — la même règle que le passage (sinon il lit
+        // « allumé » au-dessus de deux paires qui restent, et croit la
+        // fonction cassée). L'état est porté par la ligne ; le texte, libre.
+        const rz = await o.pg.evaluate(() => {
+          const commune = (document.querySelector('[data-ebay-auto-raison-commune]') || {}).innerText || '';
+          return Object.fromEntries([...document.querySelectorAll('[data-ebay-doublon]')].map((e) => [e.getAttribute('data-ebay-doublon'),
+            { r: e.getAttribute('data-ebay-auto-raison'), txt: ((e.querySelector('[data-ebay-auto-raison-texte]') || {}).innerText || '') || commune }]));
+        });
+        dit(rz['27'] && rz['27'].r === 'ebay-apres-vente' && rz['27'].txt.length > 20, 'N°27 : sa ligne dit pourquoi elle n’est pas partie toute seule (annonce eBay mise en ligne après la vente)', JSON.stringify(rz['27']));
+        dit(rz['28'] && rz['28'].r === 'numero-partage' && rz['28'].txt.length > 20, 'N°28 : sa ligne dit pourquoi (N° porté par deux paires)', JSON.stringify(rz['28']));
+        dit(rz['27'] && rz['28'] && rz['27'].txt !== rz['28'].txt, 'deux raisons différentes, deux phrases différentes (une raison commune se dirait une fois)');
+        // La ligne d'état de l'interrupteur décrit LA règle — la même source que
+        // la confirmation (plus long morceau commun ≥ 120 caractères), pas une
+        // ancienne description restée en arrière.
+        const regle = await o.pg.evaluate(() => (document.querySelector('[data-ebay-retrait-auto]') || {}).innerText || '');
+        const commun = (a, b) => { let best = 0; for (let i = 0; i < a.length; i++) for (let j = 0; j < b.length; j++) { let k = 0; while (a[i + k] && a[i + k] === b[j + k]) k++; if (k > best) best = k; } return best; };
+        const lc = commun(regle.replace(/\s+/g, ' '), confTxt.replace(/\s+/g, ' '));
+        dit(lc >= 120, 'la ligne d’état « allumé » dit les MÊMES conditions que la confirmation (une source) — pas l’ancienne règle', `${lc} caractères communs · « ${regle.replace(/\s+/g, ' ').slice(0, 160)} »`);
       });
       await o.ctx.close();
       remettre();

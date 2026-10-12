@@ -10,7 +10,8 @@ const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const MIME = { '.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json','.png':'image/png','.svg':'image/svg+xml','.webmanifest':'application/manifest+json' };
 const srv = http.createServer((q,r)=>{ let f=q.url.split('?')[0]; if(f==='/'||!path.extname(f))f='/index.html'; const p=path.join(DIST,f); if(!fs.existsSync(p)){r.writeHead(404);return r.end();} r.writeHead(200,{'content-type':MIME[path.extname(p)]||'application/octet-stream'}); r.end(fs.readFileSync(p)); });
-srv.listen(4331);
+const PORT = Number(process.env.PORT) || 4331;
+srv.listen(PORT);
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEklEQVR4nGNk+M+ADzCOKgAAV7wDA8mm/lgAAAAASUVORK5CYII=','base64');
 // La paire à vendre : sa fiche numéro (localStorage) + ses photos captées (base).
 // Deux paires numérotées : la 401 est EN LIGNE, la 402 est VENDUE (annonce
@@ -27,6 +28,8 @@ const ACCOUNTS = [{ vinted_user_id:'u1', login:'moi' }];
 // et la paire passe « à confirmer » (§6.3 : servir la forme réelle).
 const LISTINGS = { data:{ capturedAt: new Date().toISOString(), payload:{ items:[ { id:'111', is_closed:false, nPhotos:9 }, { id:'222', is_closed:true } ] } } };
 let ko = 0; const dit = (c,m,d)=>{ if(!c)ko++; console.log((c?'✅ ':'❌ ')+m+(d?' — '+d:'')); };
+// Ce qui part vers /api/ebay (le corps exact), et l'avertissement servi à la demande.
+const envoisEbay = []; let avertir = false;
 (async()=>{
   const b = await chromium.launch({ executablePath:require('../_chromium.cjs').executablePath(), args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server'] });
   const pg = await b.newPage({ viewport:{ width:390, height:1500 } });
@@ -48,7 +51,16 @@ let ko = 0; const dit = (c,m,d)=>{ if(!c)ko++; console.log((c?'✅ ':'❌ ')+m+(
   await pg.route('**/api/ebay**', route=>{ const req=route.request(); const j=d=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(d)});
     if(req.method()!=='POST') return j({ ready:true, canConsent:true });
     let body={}; try{ body=JSON.parse(req.postData()||'{}'); }catch(_){}
+    envoisEbay.push(body);
     if(body.action==='status') return j({ ok:true, connected:true });
+    // (9 octobre) La vérification à blanc rend les frais par nom, et — quand le
+    // banc le demande — un avertissement d'eBay (une catégorie sans offres).
+    if(body.action==='pubverify') return j({ ok:true, fees:'0.35', frais:{ total:0.35, parNom:{ ListingFee:0.35 } }, avertissements: avertir ? ['Les offres ne sont pas disponibles dans cette catégorie (message inventé).'] : [] });
+    // (11 octobre, revue — tour 3) Publiée AVEC une règle : la route relit le
+    // seuil (66 €) mais eBay ne montre pas si les offres sont activées
+    // (`verifie:null` AVEC une lecture — la forme réelle de la route).
+    if(body.action==='publish') return j({ ok:true, itemId:'110000000001', url:'https://www.ebay.fr/itm/110000000001', sku:'VRM-401', compte:'', avertissements:[],
+      ...((body.item && body.item.offre) ? { offre: { envoyee:{ accepte: body.item.offre.accepte, refuse: null }, verifie: null, lecture: { lu:true, offresActives:null, accepte: body.item.offre.accepte, refuse:null, devise:'EUR', prix:74, offresFaites:null, lueA: Date.now() }, range: true } } : {}) });
     if(body.action==='pubinfo'){ const cid = body.categoryId || '15709';
       return j({ ok:true, categorie:{ categoryId:cid, suggeree:{ categoryId:'15709', categoryName:'Baskets' } },
       categories:[{categoryId:'15709',categoryName:'Baskets'},{categoryId:'93427',categoryName:'Chaussures de sport'},{categoryId:'3034',categoryName:'Chaussures ville'}],
@@ -66,7 +78,7 @@ let ko = 0; const dit = (c,m,d)=>{ if(!c)ko++; console.log((c?'✅ ':'❌ ')+m+(
       attributsObligatoires:['Marque','Pointure EU','Couleur','Département'] }); }
     if(body.action==='finances') return j({ ok:false, reason:'scope', error:'x' });
     return j({ ok:true }); });
-  await pg.goto('http://localhost:4331/?tab=plat_ebay',{waitUntil:'domcontentloaded'});
+  await pg.goto(`http://localhost:${PORT}/?tab=plat_ebay`,{waitUntil:'domcontentloaded'});
   await pg.waitForTimeout(2500);
   // ⚠️ 4 octobre — Julien : « il y a deux fois le bouton pour poster les
   //    paires ». Le publieur était monté dans « Annonces » ET dans « Compte
@@ -184,6 +196,67 @@ let ko = 0; const dit = (c,m,d)=>{ if(!c)ko++; console.log((c?'✅ ':'❌ ')+m+(
   txt = await T();
   dit(/74,00 €/.test(txt), 'l\'aperçu montre le prix formaté (74,00 €)');
   dit(/Vérifier sans publier/.test(txt) && /Publier sur eBay/.test(txt), 'les deux gestes sont là (vérifier à blanc + publier)');
+  // ── (9 octobre) LA RÈGLE D'OFFRE À LA CRÉATION ────────────────────────────
+  // « Accepter les offres dès » : c'est eBay qui acceptera, au montant fixé.
+  // On juge le CORPS EXACT de ce qui part (`item.offre`), jamais un libellé.
+  // Les caractéristiques obligatoires laissées vides (Couleur, Département) :
+  // on les remplit, sinon rien ne peut partir.
+  // ⚠️ Un banc ne meurt pas, il rapporte : sur un build sans le champ, la suite
+  //    lèverait (un `fill` sans cible) et tuerait le processus AVANT le bilan.
+  try {
+  await pg.evaluate(()=>{ const labs=[...document.querySelectorAll('label')];
+    const set=(re,v)=>{ const l=labs.find(x=>re.test(x.textContent)); const box=l&&l.parentElement; const el=box&&(box.querySelector('select')||box.querySelector('input')); if(!el)return; const proto=el.tagName==='SELECT'?HTMLSelectElement.prototype:HTMLInputElement.prototype; Object.getOwnPropertyDescriptor(proto,'value').set.call(el,v); el.dispatchEvent(new Event(el.tagName==='SELECT'?'change':'input',{bubbles:true})); el.dispatchEvent(new Event('change',{bubbles:true})); };
+    set(/^couleur/i,'Bleu'); set(/^département/i,'Homme'); });
+  await pg.waitForTimeout(300);
+  const champOffre = await pg.$('[data-publier-offre-accepte]');
+  dit(!!champOffre, 'le champ « Accepter les offres dès » est dans « Prix & livraison »');
+  if (!champOffre) throw new Error('pas de champ « Accepter les offres dès » : les contrôles de la règle à la création ne peuvent pas se dérouler');
+  const verifs = () => envoisEbay.filter((x) => x.action === 'pubverify');
+  const verifier = async () => { const n = verifs().length; await (await pg.$('text=Vérifier sans publier')).click(); await pg.waitForTimeout(700); return verifs().length > n ? verifs()[verifs().length - 1] : null; };
+  let v = await verifier();
+  dit(!!v && v.item && !('offre' in v.item), 'sans règle : le corps « pubverify » n\'a AUCUNE clé `offre` (l\'annonce part comme avant)', v ? Object.keys(v.item || {}).join(',') : 'aucun envoi');
+  await pg.fill('[data-publier-offre-accepte]', '66'); await pg.waitForTimeout(250);
+  v = await verifier();
+  dit(!!v && JSON.stringify(v.item.offre) === '{"accepte":66,"refuse":null}', '66 € sur 74 € : `item.offre` = {"accepte":66,"refuse":null}', v ? JSON.stringify(v.item.offre) : 'aucun envoi');
+  await pg.fill('[data-publier-offre-accepte]', '80'); await pg.waitForTimeout(250);
+  const errOffre = await pg.locator('[data-publier-offre-erreur]').count();
+  v = await verifier();
+  dit(errOffre === 1 && !v, '80 € (au-dessus du prix) : l\'erreur est dite, et RIEN n\'est envoyé', `erreur ×${errOffre} · ${v ? 'envoyé' : 'rien'}`);
+  await pg.fill('[data-publier-offre-accepte]', '30'); await pg.waitForTimeout(250);
+  const caseBas = await pg.locator('[data-publier-offre-sous-moitie]').count();
+  v = await verifier();
+  dit(caseBas === 1 && !v, '30 € (moins de la moitié) : la case « je fixe volontairement » apparaît, rien ne part tant qu\'elle n\'est pas cochée', `case ×${caseBas} · ${v ? 'envoyé' : 'rien'}`);
+  await pg.click('[data-publier-offre-sous-moitie] input'); await pg.waitForTimeout(250);
+  v = await verifier();
+  dit(!!v && JSON.stringify(v.item.offre) === '{"accepte":30,"refuse":null,"sousMoitie":true}', 'case cochée : `"sousMoitie":true` part avec la règle', v ? JSON.stringify(v.item.offre) : 'aucun envoi');
+  avertir = true;
+  await pg.fill('[data-publier-offre-accepte]', '66'); await pg.waitForTimeout(250);
+  v = await verifier();
+  dit(await pg.locator('[data-publier-avertissements]').count() === 1, 'un avertissement d\'eBay à la vérification se VOIT (`data-publier-avertissements`)');
+  avertir = false;
+  // « Publier » avec une règle : une feuille de confirmation, même avec UN seul
+  // compte eBay — et « Annuler » n'envoie RIEN.
+  const nPub = envoisEbay.filter((x) => x.action === 'publish').length;
+  const pubBtn = pg.getByRole('button', { name: /^Publier sur eBay/ }).last();
+  const pubActif = await pubBtn.isEnabled().catch(() => false);
+  if (pubActif) await pubBtn.click();
+  const feuilleV = await pg.locator('div[style*="z-index: 2000"]').waitFor({ timeout: 4000 }).then(() => true).catch(() => false);
+  const feuilleT = feuilleV ? await pg.locator('div[style*="z-index: 2000"]').innerText() : '';
+  if (feuilleV) { await pg.locator('div[style*="z-index: 2000"]').getByRole('button', { name: 'Annuler' }).click(); await pg.waitForTimeout(600); }
+  dit(pubActif && feuilleV && /66,00\s*€/.test(feuilleT), '« Publier » avec une règle : une feuille, même avec un seul compte, qui dit le montant (66,00 €)', `bouton ${pubActif ? 'actif' : 'grisé'} · feuille ${feuilleV}`);
+  dit(envoisEbay.filter((x) => x.action === 'publish').length === nPub, '« Annuler » : AUCUN `publish` envoyé');
+  // (11 octobre, revue — tour 3) On publie pour de vrai : la route a RELU le
+  // seuil (66 €), eBay ne montre pas si les offres sont activées. La ligne de
+  // la règle doit le dire comme la carte (`resultatRegleOffre`, §11) — jamais
+  // « pas encore relue » sur un seuil relu.
+  if (pubActif) {
+    await pubBtn.click(); await pg.locator('div[style*="z-index: 2000"]').waitFor({ timeout: 4000 });
+    await pg.locator('div[style*="z-index: 2000"]').getByRole('button', { name: 'Oui, publier' }).click();
+  }
+  const po = await pg.waitForSelector('[data-publie-offre]', { timeout: 8000 }).then(() => pg.$eval('[data-publie-offre]', (e) => [e.getAttribute('data-publie-offre'), e.getAttribute('data-publie-offre-issue'), e.innerText])).catch(() => [null, null, '']);
+  dit(po[0] === 'warn' && po[1] === 'offres-inconnues' && /66,00\s*€/.test(po[2]) && !/pas encore relue/.test(po[2]),
+    'publiée avec une règle, seuil relu sans l\'état des offres : la ligne dit le seuil RELU (66,00 €) et « regarde sur eBay », en ambre — jamais « pas encore relue »', JSON.stringify(po));
+  } catch (e) { dit(false, 'la règle d\'offre à la création se déroule', String((e && e.message) || e).split('\n')[0].slice(0, 200)); }
   dit(errs.length === 0, 'aucune erreur d\'app', errs.slice(0,1).join(''));
 
   console.log(ko ? ('\n'+ko+' contrôle(s) non conforme(s).') : '\nOn publie en CHOISISSANT une paire (photos auto, aucun lien) ; eBay gère la livraison (il propose le prix), comme dans l\'appli eBay.');

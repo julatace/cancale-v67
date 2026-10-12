@@ -63,3 +63,31 @@ Après reconnexion par Julien le 12 octobre : le connecteur confirme l'accès
 `push` au dépôt. La branche distante `claude/codex-preparation-publication`
 est créée. Le lot est envoyé par le connecteur (Git HTTPS reste sans session).
 Une PR de revue est préparée ; aucune mise en production de ce lot.
+
+## 12 octobre — reprise eBay et mémoire SQL
+
+La migration 014 a été essayée en transaction annulée puis appliquée au projet
+Supabase existant. Le contrôle après application ne trouve aucun écart : 16
+ tables de l'agent, RLS forcée, fonctions et déclencheurs attendus. L'installation
+`agent_ebay` reste à `0` : aucun agent ni horloge activés. Sur PostgreSQL jetable,
+`audit-agent-sql` passe 221 contrôles et `audit-renum-b` 126.
+
+Fusion véritable de `claude/wip-d-regle-offre` (0255714) avec le lot Codex et
+main : comptes multiples et règles natives eBay conservés, ainsi que les
+preuves par bordereau et la numérotation après migration 013. Le retrait relit
+le marqueur du vendeur dans le contexte du compte choisi. Les comparaisons de
+SKU traduisent aussi les anciennes annonces avant de comparer les numéros.
+
+Les bancs fusionnés utilisent les preuves projetées actuelles, sans doublon de
+ligne orders_sold. Le contrôle du corps de retrait simule désormais le contexte
+multi-compte et un statut HTTP, comme la route. Le texte du retrait automatique
+réutilise les conditions de sa confirmation.
+
+Vérifications : 93 audits hors SQL passent (le dernier lecteur de numérotation
+100/0) ; ses 42 mutations sont détectées ; règle d'offre rendue 376/0 ; comptes
+multiples, API, écritures, callback, suppression et formulaire passent. La passe
+complète des annonces et de la programmation se termine avant validation K0.
+Aucun appel réel eBay/Vinted, aucune annonce créée ou retirée par ces essais.
+
+Julien reporte les informations légales à la fin. Ne pas inventer d'identité
+ni considérer le site prêt à ouvrir : K1/K2 et la suite restent à construire.
