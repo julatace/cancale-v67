@@ -68,6 +68,69 @@ Je ne touche PAS au domaine de l'Agent 1 (`api/ebay.js`, `api/_lib/ebay*`,
   la page ne charge aucune vidéo — le film est rendu en direct par canvas ;
   l'export marketing se refait à la demande via `scripts/film-accueil.cjs`).
 
+### Étape F — tri des 21 anciennes branches (TERMINÉE ✅)
+Méthode (§F) : pour chaque branche, `merge-base` avec `main`, `merge-tree`,
+lecture des commits, et vérification du CŒUR de sa feature (fonction/banc, pas
+seulement le nom) sur `main` actuel. ⚠️ `e6bda5c` ET `cdc9c1d` sont **ancêtres
+de `main`** : un merge n'apporte que le(s) commit(s) de feature (3-way) — le
+risque §3 (« défaire une correction récente ») n'existe que si on accepte le
+côté branche dans un conflit.
+
+**Hors de mon périmètre (Agent 1 / déjà fait)** : `worktree-wf_30feaf2f-334-8`
+(règle d'offre eBay, étape D), `worktree-wf_d62e1db4-b5c-1` (eBay multi-comptes),
+`worktree-agent-a14d457d…` (eBay planificateur), `worktree-wf_e364d40c-3ea-9`
+(accueil — fait en E).
+
+**Déjà en production → laissées** (feature cœur présente sur `main`, vérifié) :
+- `…-1d6-1` litiges → `ACHAT_A_RENVOYER` (×5) en prod (5.164).
+- `…-1d6-2` messages → `data-messagerie` en prod (messagerie 5.135) ; la revue
+  du 9 oct est antérieure à la refonte messagerie en prod.
+- `…-1d6-3` synchro ligne main → `onCloudReady` (×39) en prod (4 oct, 11 cartes).
+- `…-1d6-4` copies « Remettre » → `repriseDe`/`Remettre` (×12) + 013 en prod.
+- `…-1d6-6` achats pas postés → `poste-sans-depart`/`cochesNonPartis` (×16) en
+  prod (5.162).
+- `…-1d6-7` URSSAF par rythme → `vinted_urssaf_freq` (×5) en prod.
+- `…-1d6-8` logo/prénom/consignes → icônes PWA (3 oct) + `vrm_prenom` en prod.
+- `cb6f835a-c5a-1` pointage (banc seul) / `cb6f835a-c5a-2` coffre →
+  `archiverAnnonce` (×3) en prod (5.150). Ce sont surtout des BANCS de
+  couverture écrits sur une base ancienne ; les réimporter risquerait des rouges
+  (code évolué), peu de valeur.
+- `c713efbe-040-2` compte de résultat → `comptabilite` en prod (tâche terminée).
+- `wf-banc-statuts` → `audit-statuts`/`statuts-colis`/`widget-colis` sur `main`.
+- `wf-ext-notifs` → `audit-evt-extension` sur `main` (5.155).
+
+**WIP interrompus, rien à récupérer → laissés** : `133587f0-45f-5`,
+`6f1cc0ad-b1e-1`.
+
+**Vraiment absentes de prod, mais PAS intégrées, avec la raison** :
+- `…-1d6-5` **« Tes connexions »** (0 occurrence en prod — genuinely new, voulue
+  par Julien, proposition 7). J'ai tenté le merge (2 conflits App.jsx + README).
+  **ANNULÉ** : la branche part d'une base pré-5.171 et s'entremêle au chantier
+  **session/extension d'Agent 1** (5.171-5.175) — conflit #3 remplacerait
+  `authSignOut` (reworké le 11 oct : canal adressé, `deconnecterExtensionAncienne`,
+  garde « autre compte », `__vmrPlusieurs`) par un `seDeconnecter` plus ancien
+  ⇒ régression du travail tout juste livré ; et `marquerSessionExtension` +
+  le changement `background.js` (`etat.session_id`) sont DANS son domaine.
+  Sa migration est numérotée **011** (hors de mon périmètre 020+) et son audit
+  exige un **Postgres local absent ici** (je ne peux pas la prouver). ⇒ À
+  rebâtir proprement sur `main` : UI de liste de sessions + migration **020**
+  (revue + essai annulé sur une **branche Supabase**, audit-connexions là où
+  Postgres existe), et l'étiquetage de la session d'extension **coordonné avec
+  l'Agent 1**. Je n'ai rien poussé pour elle.
+- `pdf/app-lecture` **PDF dans le stockage, étape 2** (l'app lit `pdfPath`,
+  0 en prod). Prématurée : l'étape 1 (le serveur ÉCRIT les PDF dans le stockage)
+  n'est pas faite ; CLAUDE.md « PDF — étape 0 » stage les étapes 1-4 en PR
+  séparées avec mesures sur une branche Supabase. Laissée.
+- `133587f0-45f-4` **Boutique Chrome** (`audit-store` absent). Gated par
+  `EXTENSION_SUR_LE_STORE=false` ; publier la fiche sur le Chrome Web Store est
+  un geste de Julien (§7). Laissée jusqu'à sa décision.
+
+**Bilan F** : aucune branche n'apporte, ici et maintenant, une feature
+intégrable sans régresser le travail d'un autre agent, appliquer une migration
+non prouvable (pas de Postgres), ou livrer un demi-chantier. Tout est laissé,
+chaque cas documenté. « Tes connexions » reste le meilleur candidat à construire
+proprement (coordination Agent 1 pour l'extension).
+
 ### ⚠️ À L'AGENT 1 — deux audits ROUGES sur `main` (hors mon domaine, pré-existants)
 Mesuré sur `origin/main` (vrai worktree git) à mon démarrage, AVANT mon étape E
 (donc pas une régression de ma part) :
