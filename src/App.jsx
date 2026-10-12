@@ -24562,6 +24562,29 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return out;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [annBase, numeros]);
+  // ── SUIVIES, PAS ENCORE VENDUES → REMISE NATIVE (G22) ─────────────────────
+  // Une paire dans les favoris de plusieurs personnes mais non vendue est la
+  // candidate idéale à la REMISE NATIVE de Vinted : une baisse de prix prévient
+  // d'un coup TOUS ceux qui l'ont mise en favori (§3 : « la remise aux favoris
+  // touche tout le monde en un clic »). On ne connaît PAS qui a mis en favori
+  // (Vinted ne le dit pas, §3) — seulement le NOMBRE (`favourites`), jamais une
+  // identité (§5). L'action reste un LIEN vers l'annonce : VRM ne change jamais
+  // le prix (§3). `annBase` = annonces en ligne (une vendue en est déjà sortie,
+  // donc « pas encore vendue »). On n'en remet pas celles déjà dans le repricing
+  // (un seul conseil par paire, §7).
+  const SEUIL_SUIVI = 3;
+  const suiviesList = useMemo(() => {
+    const dejaConseil = new Set(repriceList.map((r) => String(r.it.id)));
+    const out = [];
+    for (const it of annBase) {
+      const favs = it.favourites;
+      if (favs == null || favs < SEUIL_SUIVI) continue;
+      if (dejaConseil.has(String(it.id))) continue;
+      out.push({ it, favs });
+    }
+    out.sort((a, b) => b.favs - a.favs);
+    return out;
+  }, [annBase, repriceList]);
   // ── PAIRES QUI DORMENT, TOUTES PLATEFORMES (proposition 9, 6 octobre) ──────
   // La paire à baisser est peut-être AUSSI en vente sur eBay : son annonce
   // porte le SKU `VRM-{n°}` (une identité, §5 — jamais un titre). Sur Vinted la
@@ -30228,6 +30251,31 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   })}
                   {ebayVivantes === null && <div style={{padding:'6px 12px',fontSize:11,color:C.muted}}>Tes annonces eBay n'ont pas pu être lues : je ne propose pas de baisse sur eBay pour l'instant.</div>}
                   {repriceList.length>30 && <div style={{padding:'8px 12px',fontSize:11,color:C.muted}}>+ {repriceList.length-30} autres paires à baisser…</div>}
+                </div>
+              )}
+              {/* G22 — suivies, pas encore vendues → remise NATIVE (prévient tous les favoris) */}
+              {suiviesList.length>0 && (
+                <div data-suivies style={{border:`1px solid ${C.border}`,borderRadius:10,background:C.card,overflow:'hidden',marginTop:10}}>
+                  <div style={{padding:'10px 12px',borderBottom:`1px solid ${C.border}`}}>
+                    <span style={{display:'block',fontSize:13,fontWeight:700,color:C.text}}>👀 Suivies, pas encore vendues — {suiviesList.length}</span>
+                    <span style={{display:'block',fontSize:11,color:C.muted,marginTop:3,lineHeight:1.45}}>Ces paires sont dans les favoris de plusieurs personnes mais ne se sont pas vendues. Une petite remise sur Vinted prévient d'un coup <b>toutes</b> les personnes qui l'ont mise en favori (la remise aux favoris de Vinted). VRM ne change jamais ton prix — c'est toi, sur Vinted.</span>
+                  </div>
+                  {suiviesList.slice(0,30).map(({it,favs})=>{
+                    const num = numeros[it.id]?.numero;
+                    return (
+                      <div key={it.id} data-suivie={String(it.id)} data-favs={favs} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 12px',borderTop:`1px solid ${C.border}`}}>
+                        <div style={{width:40,height:40,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                          {it.photo?<PhotoVinted src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/>}
+                        </div>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{num?`N°${num} · `:''}{it.title||'Annonce'}</div>
+                          <div style={{fontSize:11,color:C.muted}}>{favs} ❤️ en favori{(it.views!=null)?` · ${it.views} vues`:''}</div>
+                        </div>
+                        <a href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted pour proposer une remise (elle prévient tous les favoris)" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.border}`,background:'transparent',color:C.text,fontSize:11,fontWeight:600,padding:'5px 10px',borderRadius:8,display:'inline-flex',alignItems:'center',gap:4}}><Icon name="tag" size={12}/>Proposer une remise</a>
+                      </div>
+                    );
+                  })}
+                  {suiviesList.length>30 && <div style={{padding:'8px 12px',fontSize:11,color:C.muted}}>+ {suiviesList.length-30} autres paires suivies…</div>}
                 </div>
               )}
             </div>

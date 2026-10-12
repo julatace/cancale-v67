@@ -33,12 +33,16 @@ const ITEMS = [
   ann(9103, { title: 'Adidas Spezial noir taille 38', brand_title: 'Adidas', nPhotos: 6, created_at_ts: ilYa(5) }),
   ann(9104, { title: 'Adidas Spezial noir taille 38', brand_title: 'Adidas', nPhotos: 6, created_at_ts: ilYa(6) }),   // même titre que 9103
   ann(9105, { title: 'Nike Blazer mid 77 taille 42', brand_title: 'Nike', nPhotos: 5, created_at_ts: ilYa(2) }),      // SANS N° ni prix : « + N° » pour le prix d'achat au numérotage
+  // G22 — très suivie (10 ❤️), récente (hors repricing) : doit ressortir en
+  // « Suivies, pas encore vendues → remise native ». 9105 (2 ❤️) reste le témoin.
+  ann(9106, { title: 'Nike Dunk low panda taille 41', brand_title: 'Nike', nPhotos: 6, created_at_ts: ilYa(4), favourite_count: 10, view_count: 25 }),
 ];
 const MAIN = { vinted_annonce_numeros: {
   '9101': { numero: '41', buyPrice: '25', fees: '1.95' },
   '9102': { numero: '42' },
   '9103': { numero: '43' },
   '9104': { numero: '44' },
+  '9106': { numero: '45' },
 } };
 const DETAILS = { '9101': { photos: ['a', 'b', 'c', 'd', 'e', 'f'], description: 'Très bon état.' }, '9102': { photos: ['a', 'b'] } };
 const rows = [
@@ -205,6 +209,19 @@ const projette = (row, sel) => {
         const fait = await pg.evaluate(() => (document.querySelector('[data-reprice-ebay="fait"]') || {}).innerText || '');
         dit(/baissé à 53 €/.test(fait), 'et l’écran le dit (« baissé à 53 € »)', fait);
       } catch (e) { dit(false, 'la baisse eBay se déroule jusqu’au bout', String(e.message).slice(0, 120)); }
+      // ── G22 : suivies, pas encore vendues → remise native ──────────────────
+      try {
+        const s = await pg.evaluate(() => {
+          const bloc = document.querySelector('[data-suivies]');
+          const l9106 = document.querySelector('[data-suivie="9106"]');
+          const l9105 = document.querySelector('[data-suivie="9105"]');
+          return { aBloc: !!bloc, remiseFavoris: !!bloc && /favori/i.test(bloc.innerText) && /remise/i.test(bloc.innerText),
+            favs9106: l9106 ? l9106.getAttribute('data-favs') : null, a9105: !!l9105 };
+        });
+        dit(s.aBloc && s.favs9106 === '10', 'G22 : une paire très suivie non vendue (9106, 10 ❤️) ressort en « Suivies, pas encore vendues »', s.favs9106 == null ? 'absente' : s.favs9106);
+        dit(s.remiseFavoris, 'G22 : le bloc explique la remise NATIVE (prévient tous les favoris)', s.aBloc ? '' : 'bloc absent');
+        dit(!s.a9105, 'G22 : une paire peu suivie (9105, 2 ❤️) n’y est PAS (seuil 3)', s.a9105 ? 'présente à tort' : '');
+      } catch (e) { dit(false, 'G22 : le bloc « suivies » se lit', String(e.message).slice(0, 120)); }
       await pg.screenshot({ path: path.join(require('os').tmpdir(), 'annonces-' + vp.width + '.png') });
       await ctx.close();
     }
