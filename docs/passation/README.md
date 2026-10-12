@@ -9,6 +9,26 @@ avez tranché.
 
 ---
 
+## 0. MISE À JOUR — 12 octobre, 05:30 UTC : la session d'origine CONTINUE
+
+La limite atteinte le 11 au soir était celle de la session (5 h), pas celle de
+la semaine : la session d'origine a repris le 12 à 05:20 UTC. **Avant de
+commencer quoi que ce soit, regardez `git log origin/claude/project-review-nsk5su`
+et cette section** : ce qui y est marqué « en cours » est déjà pris.
+
+- Vérification de la 5.174 : **faite** — build vert, 92 audits verts, 30 bancs
+  verts (les deux rouges `ebay-annonces` et `lbc-preuve` venaient des bancs :
+  leur extension simulée n'avait pas le champ `code` des 5.171+, corrigé en
+  0caff0d).
+- **En cours (session d'origine)** : relecture croisée de la 5.174 avant mise en
+  ligne (compatibilité avec ses extensions actuelles — il ne peut pas mettre à
+  jour —, fusions de `background.js`, écrans) ; correction du second tour de
+  revue des photos ; correction du second tour de revue de la migration 014
+  (5 défauts confirmés, dont « Fermer mon compte » pendant un battement) ;
+  tour 2 de la règle d'offre eBay (corrigée en `c4fa405`, relecture en cours).
+- Si cette session s'arrête de nouveau, ces chantiers reprennent depuis les
+  branches du paquet (§3) et les listes de défauts dans `docs/passation/notes/`.
+
 ## 1. Ce qui est EN PRODUCTION (main, vrm.center)
 
 | PR | contenu | extension |
